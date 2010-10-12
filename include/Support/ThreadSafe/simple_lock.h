@@ -1,0 +1,37 @@
+// simple spin lock -*- C++ -*-
+
+namespace threadsafe {
+
+  // The most stupid spinlock you can imagine
+  class simpleLock {
+    int _lock;
+  public:
+
+    simpleLock() : _lock(0) {}
+
+    void read_lock() {
+      assert(!_lock);
+      while (!try_read_lock()) {}
+    }
+    void read_unlock() {
+      assert(_lock);
+      _lock = 0;
+    }
+    bool try_read_lock() {
+      return __sync_bool_compare_and_swap(&_lock, 0, 1);
+    }
+
+    void promote() {}
+
+    void write_lock() {
+      read_lock();
+    }
+    void write_unlock() {
+      read_unlock();
+    }
+    bool try_write_lock() {
+      return try_read_lock();
+    }
+  };
+
+}
