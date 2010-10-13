@@ -2,6 +2,7 @@
 
 #include <list>
 #include <map>
+#include <vector>
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/iterator/filter_iterator.hpp>
 
@@ -27,31 +28,47 @@ class FirstGraph {
   typedef typename VoidWrapper<_NodeTy>::Type NodeTy;
   typedef typename VoidWrapper<_EdgeTy>::Type EdgeTy;
   
+
   struct gNode {
     NodeTy data;
     bool active;
+    std::vector<std::pair<gNode*, EdgeTy*> > edges;
+
     gNode(const NodeTy& d, bool a)
       :data(d), active(a)
     {}
+
+    //does not release data, but returns it
+    EdgeTy* eraseEdge(gNode* N) {
+      for (typename std::vector<std::pair<gNode*, EdgeTy*> >::iterator ii = edges.begin(), ee = edges.end(); ii != ee; ++ii) {
+	if (ii->first == N) {
+	  EdgeTy* D = ii->second;
+	  edges.erase(ii);
+	  return D;
+	}
+      }
+      return 0;
+    }
+
+    EdgeTy*& getOrCreateEdge(gNode* N) {
+      for (typename std::vector<std::pair<gNode*, EdgeTy*> >::iterator ii = edges.begin(), ee = edges.end(); ii != ee; ++ii) 
+	if (ii->first == N) 
+	  return ii->second;
+      edges.push_back(std::make_pair(N, (EdgeTy*)NULL));
+      return edges.back().second;
+    }
+    EdgeTy* getEdge(gNode* N) {
+      for (typename std::vector<std::pair<gNode*, EdgeTy*> >::iterator ii = edges.begin(), ee = edges.end(); ii != ee; ++ii) 
+	if (ii->first == N)
+	  return ii->second;
+      return 0;
+    }
   };
-  
-  struct gEdge {
-    EdgeTy data;
-    gNode* src;
-    gNode* dst;
-    gEdge(const EdgeTy& da, gNode* s, gNode* d)
-      :data(da), src(s), dst(d)
-    {}
-  };
-  
   
   //The graph manages the lifetimes of the data in the nodes and edges
   std::list<gNode> nodes;
-  std::list<gEdge> edges;
   
   int numActive;
-  
-  std::map<gNode*, std::map<gNode*, gEdge*> >edgeMap;
   
   //deal with the Node redirction
   NodeTy& getData(gNode* ID) {
@@ -104,11 +121,11 @@ public:
 
 private:
   // Helpers for the iterator classes
-  class makeGraphNode : public std::unary_function<std::pair<gNode*, gEdge*>, GraphNode >{
+  class makeGraphNode : public std::unary_function<std::pair<gNode*, EdgeTy*>, GraphNode >{
     FirstGraph* G;
   public:
     makeGraphNode(FirstGraph* g) : G(g) {}
-    GraphNode operator()(std::pair<gNode* const, gEdge*>& data) const {
+    GraphNode operator()(std::pair<gNode*, EdgeTy*>& data) const {
       return GraphNode(G, data.first);
     }
   };
@@ -163,12 +180,12 @@ public:
       --numActive;
       N->active = false;
       //erase the in-edges first
-      for (typename std::map<gNode*, gEdge*>::iterator ii = edgeMap[N].begin(), ee = edgeMap[N].end(); ii != ee; ++ii)
-	if (ii->first != N) // don't handle loops yet
-	  edgeMap[ii->first].erase(N);
-      
-      //erase the out-edges second (and loops)
-      edgeMap.erase(N);
+      for (int i = 0; i < N->edges.size(); ++i) {
+	if (N->edges[i].first != N) // don't handle loops yet
+	  N->edges[i].first->eraseEdge(N);
+	delete N->edges[i].second;
+      }
+      N->edges.clear();
     }
     return wasActive;
   }
@@ -176,32 +193,30 @@ public:
   // Edge Handling
 
   // Adds an edge to the graph containing the specified data.
-  // returns true if there was no previous edge between the two nodes
-  bool addEdge(GraphNode src, GraphNode dst, const EdgeTy& data) {
+  void addEdge(GraphNode src, GraphNode dst, const EdgeTy& data) {
     assert(src.ID);
     assert(dst.ID);
-    gEdge N(data, src.ID, dst.ID);
-    typename std::list<gEdge>::iterator I = edges.insert(edges.begin(), N);
-    gEdge*& rval = edgeMap[src.ID][dst.ID];
-    bool retval = (rval == 0);
-    rval = &*I;
-    edgeMap[dst.ID][src.ID] = &*I;
-    return retval;
+    EdgeTy*& E1 = src.ID->getOrCreateEdge(dst.ID);
+    EdgeTy*& E2 = dst.ID->getOrCreateEdge(src.ID);
+    assert (E1 == E2);
+    if (E1)
+      delete E1;
+    E1 = E2 = new EdgeTy(data);
   }
 
   
-  bool removeEdge(GraphNode src, GraphNode dst) {
+  void removeEdge(GraphNode src, GraphNode dst) {
     assert(src.ID);
     assert(dst.ID);
-    bool retval = edgeMap[src.ID][dst.ID];
-    edgeMap[src.ID].erase(dst.ID);
-    edgeMap[dst.ID].erase(src.ID);
-    return retval;
+    EdgeTy* E1 = src.ID->eraseEdge(dst.ID);
+    EdgeTy* E2 = dst.ID->eraseEdge(src.ID);
+    assert(E1 == E2);
+    delete E1;
   }
 
   EdgeTy& getEdgeData(GraphNode src, GraphNode dst) {
     //yes, fault on null (no edge)
-    return edgeMap[src.ID][dst.ID]->data;
+    return *(src.ID->getEdge(dst.ID));
   }
 
   // General Things
@@ -213,18 +228,18 @@ public:
 
   int neighborsSize(GraphNode N) {
     assert(N.ID);
-    return edgeMap[N.ID].size();
+    return N.ID->edges.size();
   }
 
-  typedef boost::transform_iterator<makeGraphNode, typename std::map<gNode*, gEdge*>::iterator > neighbor_iterator;
+  typedef boost::transform_iterator<makeGraphNode, typename std::vector<std::pair<gNode*, EdgeTy*> >::iterator > neighbor_iterator;
 
   neighbor_iterator neighbor_begin(GraphNode N) {
     assert(N.ID);
-    return boost::make_transform_iterator(edgeMap[N.ID].begin(), makeGraphNode(this));
+    return boost::make_transform_iterator(N.ID->edges.begin(), makeGraphNode(this));
   }
   neighbor_iterator neighbor_end(GraphNode N) {
     assert(N.ID);
-    return boost::make_transform_iterator(edgeMap[N.ID].end(), makeGraphNode(this));
+    return boost::make_transform_iterator(N.ID->edges.end(), makeGraphNode(this));
   }
 
   typedef boost::transform_iterator<makeGraphNode2, boost::filter_iterator<is_active_node, typename std::list<gNode>::iterator> >active_iterator;
