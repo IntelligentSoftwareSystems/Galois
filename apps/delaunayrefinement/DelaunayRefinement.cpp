@@ -36,6 +36,7 @@
 
 #include "Element.h"
 
+#include "Galois/Launcher.h"
 #include "Galois/Graphs/Graph.h"
 
 typedef FirstGraph<Element,Edge>            Graph;
@@ -90,7 +91,6 @@ void process(GNode item, threadsafe::ts_stack<GNode>& lwl) {
 }
 
 void refine(Mesh& m) {
-  m.getBad(mesh, wl);
   if (threads == 1) {
     while (wl.size()) {
       bool suc;
@@ -126,13 +126,29 @@ int main(int argc, char** argv) {
   mesh = new Graph();
   Mesh m;
   m.read(mesh, argv[1]);
-  
-  cerr << "configuration: " << mesh->size() << " total triangles, ?? bad triangles\n"
+  int numbad = m.getBad(mesh, wl);
+
+  cerr << "configuration: " << mesh->size() << " total triangles, " << numbad << " bad triangles\n"
        << "number of threads: " << threads << "\n"
        << "\n";
   
+  Galois::Launcher::startTiming();
   refine(m);
-  m.verify(mesh);
+  Galois::Launcher::stopTiming();
+  
+  cerr << "Time: " << Galois::Launcher::elapsedTime() << " msec\n";
 
-  cerr << "Done\n";
+  if (!m.verify(mesh)) {
+    cerr << "Refinement failed.\n";
+    assert(0 && "Refinement failed");
+    abort();
+  }
+  
+  int size = m.getBad(mesh, wl);
+  if (size != 0) {
+    cerr << "Refinement failed with " << size << " remaining triangles.\n";
+    assert(0 && "Refinement failed");
+    abort();
+  }
+  cerr << "Refinement OK\n";
 }

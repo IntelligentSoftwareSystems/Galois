@@ -117,7 +117,7 @@ public:
     return (180/M_PI) * acos(c);
   }
 
-  void print(std::ostream& os) {
+  void print(std::ostream& os) const {
     char *buf = new char[256];
     sprintf(buf, "(%.4f, %.4f, %.4f)", _t[0], _t[1], _t[2]);
     os << buf;
@@ -129,7 +129,7 @@ public:
   
 };
 
-static inline std::ostream& operator<<(std::ostream& os, Tuple& rhs) {
+static inline std::ostream& operator<<(std::ostream& os, const Tuple& rhs) {
   rhs.print(os);
   return os;
 }

@@ -32,36 +32,34 @@ class FirstGraph {
   struct gNode {
     NodeTy data;
     bool active;
-    std::vector<std::pair<gNode*, EdgeTy*> > edges;
+    std::vector<std::pair<gNode*, EdgeTy> > edges;
 
     gNode(const NodeTy& d, bool a)
       :data(d), active(a)
     {}
 
-    //does not release data, but returns it
-    EdgeTy* eraseEdge(gNode* N) {
-      for (typename std::vector<std::pair<gNode*, EdgeTy*> >::iterator ii = edges.begin(), ee = edges.end(); ii != ee; ++ii) {
+    void eraseEdge(gNode* N) {
+      for (typename std::vector<std::pair<gNode*, EdgeTy> >::iterator ii = edges.begin(), ee = edges.end(); ii != ee; ++ii) {
 	if (ii->first == N) {
-	  EdgeTy* D = ii->second;
 	  edges.erase(ii);
-	  return D;
+	  return;
 	}
       }
-      return 0;
     }
 
-    EdgeTy*& getOrCreateEdge(gNode* N) {
-      for (typename std::vector<std::pair<gNode*, EdgeTy*> >::iterator ii = edges.begin(), ee = edges.end(); ii != ee; ++ii) 
+    EdgeTy& getOrCreateEdge(gNode* N) {
+      for (typename std::vector<std::pair<gNode*, EdgeTy> >::iterator ii = edges.begin(), ee = edges.end(); ii != ee; ++ii) 
 	if (ii->first == N) 
 	  return ii->second;
-      edges.push_back(std::make_pair(N, (EdgeTy*)NULL));
+      edges.push_back(std::make_pair(N, EdgeTy()));
       return edges.back().second;
     }
-    EdgeTy* getEdge(gNode* N) {
-      for (typename std::vector<std::pair<gNode*, EdgeTy*> >::iterator ii = edges.begin(), ee = edges.end(); ii != ee; ++ii) 
+    EdgeTy& getEdge(gNode* N) {
+      for (typename std::vector<std::pair<gNode*, EdgeTy> >::iterator ii = edges.begin(), ee = edges.end(); ii != ee; ++ii) 
 	if (ii->first == N)
 	  return ii->second;
-      return 0;
+      assert(0 && "Edge doesn't exist");
+      abort();
     }
   };
   
@@ -121,11 +119,11 @@ public:
 
 private:
   // Helpers for the iterator classes
-  class makeGraphNode : public std::unary_function<std::pair<gNode*, EdgeTy*>, GraphNode >{
+  class makeGraphNode : public std::unary_function<std::pair<gNode*, EdgeTy>, GraphNode >{
     FirstGraph* G;
   public:
     makeGraphNode(FirstGraph* g) : G(g) {}
-    GraphNode operator()(std::pair<gNode*, EdgeTy*>& data) const {
+    GraphNode operator()(std::pair<gNode*, EdgeTy>& data) const {
       return GraphNode(G, data.first);
     }
   };
@@ -183,7 +181,6 @@ public:
       for (int i = 0; i < N->edges.size(); ++i) {
 	if (N->edges[i].first != N) // don't handle loops yet
 	  N->edges[i].first->eraseEdge(N);
-	delete N->edges[i].second;
       }
       N->edges.clear();
     }
@@ -196,27 +193,28 @@ public:
   void addEdge(GraphNode src, GraphNode dst, const EdgeTy& data) {
     assert(src.ID);
     assert(dst.ID);
-    EdgeTy*& E1 = src.ID->getOrCreateEdge(dst.ID);
-    EdgeTy*& E2 = dst.ID->getOrCreateEdge(src.ID);
-    assert (E1 == E2);
-    if (E1)
-      delete E1;
-    E1 = E2 = new EdgeTy(data);
+    EdgeTy& E1 = src.ID->getOrCreateEdge(dst.ID);
+    EdgeTy& E2 = dst.ID->getOrCreateEdge(src.ID);
+    if (src < dst)
+      E1 = data;
+    else
+      E2 = data;
   }
 
   
   void removeEdge(GraphNode src, GraphNode dst) {
     assert(src.ID);
     assert(dst.ID);
-    EdgeTy* E1 = src.ID->eraseEdge(dst.ID);
-    EdgeTy* E2 = dst.ID->eraseEdge(src.ID);
-    assert(E1 == E2);
-    delete E1;
+    src.ID->eraseEdge(dst.ID);
+    dst.ID->eraseEdge(src.ID);
   }
 
   EdgeTy& getEdgeData(GraphNode src, GraphNode dst) {
     //yes, fault on null (no edge)
-    return *(src.ID->getEdge(dst.ID));
+    if (src < dst)
+      return src.ID->getEdge(dst.ID);
+    else
+      return dst.ID->getEdge(src.ID);
   }
 
   // General Things
@@ -231,7 +229,7 @@ public:
     return N.ID->edges.size();
   }
 
-  typedef boost::transform_iterator<makeGraphNode, typename std::vector<std::pair<gNode*, EdgeTy*> >::iterator > neighbor_iterator;
+  typedef boost::transform_iterator<makeGraphNode, typename std::vector<std::pair<gNode*, EdgeTy> >::iterator > neighbor_iterator;
 
   neighbor_iterator neighbor_begin(GraphNode N) {
     assert(N.ID);

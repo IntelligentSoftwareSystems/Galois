@@ -30,6 +30,7 @@
 #define _ELEMENT_H
 
 #include <cassert>
+#include <stdlib.h>
 
 #include "Edge.h"
 
@@ -202,11 +203,25 @@ class Element {
         if (edges[i] == e.edges[j])
           return edges[i];
     assert(0);
+    abort();
   }
 
   double getRadiusSquared() const {
     return radius_squared;
   }
 
+  std::ostream& print(std::ostream& s) const {
+    s << '[';
+    for (int i = 0; i < dim; ++i)
+      s << coords[i] << (i < (dim - 1) ? ", " : "");
+    s << ']';
+    return s;
+  }
+
 };
+
+static std::ostream& operator<<(std::ostream& s, const Element& E) {
+  return E.print(s);
+}
+
 #endif
