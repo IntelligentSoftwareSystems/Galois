@@ -99,7 +99,7 @@ void refine(Mesh& m) {
   //      process(N, wl);
   //    }
   //  } else {
-    Galois::setMaxThreads(1); //threads);
+    Galois::setMaxThreads(threads);
     Galois::for_each(wl, process);
     //  }
 }
@@ -109,10 +109,15 @@ using namespace std;
 
 int main(int argc, char** argv) {
   if (argc < 2) {
-    cerr << "Arguments: <input file>\n";
+    cerr << "Arguments: [-t threads] <input file>\n";
     return 1;
   }
 
+  int inputFileAt = 1;
+  if (std::string("-t") == argv[1]) {
+    inputFileAt = 3;
+    threads = atoi(argv[2]);
+  }
 
   cerr << "\nLonestar Benchmark Suite v3.0\n"
        << "Copyright (C) 2007, 2008, 2009, 2010 The University of Texas at Austin\n"
@@ -126,7 +131,7 @@ int main(int argc, char** argv) {
 
   mesh = new Graph();
   Mesh m;
-  m.read(mesh, argv[1]);
+  m.read(mesh, argv[inputFileAt]);
   int numbad = m.getBad(mesh, wl);
 
   cerr << "configuration: " << mesh->size() << " total triangles, " << numbad << " bad triangles\n"

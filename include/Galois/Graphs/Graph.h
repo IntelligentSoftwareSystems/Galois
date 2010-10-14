@@ -6,6 +6,9 @@
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/iterator/filter_iterator.hpp>
 
+
+#include "Galois/Runtime/Context.h"
+
 ////////////////////////////////////////////////////////////////////////////////
 // Wrap void so that we can have a valid type on void nodes
 
@@ -28,7 +31,7 @@ class FirstGraph {
   typedef typename VoidWrapper<_EdgeTy>::Type EdgeTy;
   
 
-  struct gNode {
+  struct gNode : public GaloisRuntime::Lockable {
     NodeTy data;
     bool active;
     std::vector<std::pair<gNode*, EdgeTy> > edges;
@@ -66,10 +69,13 @@ class FirstGraph {
   std::list<gNode> nodes;
   
   int numActive;
-  
+
+  threadsafe::simpleLock GraphLock;
+
   //deal with the Node redirction
   NodeTy& getData(gNode* ID) {
     assert(ID);
+    GaloisRuntime::acquire(ID);
     return ID->data;
   }
   
@@ -147,18 +153,22 @@ public:
   // Creates a new node holding the indicated data.
   // Node is not added to the graph
   GraphNode createNode(const NodeTy& n) {
+    GraphLock.write_lock();
     gNode N(n,false);
     typename std::list<gNode>::iterator I = nodes.insert(nodes.begin(), N);
-    return GraphNode(this, &*I);
+    GraphNode NewNode(this, &*I);
+    GraphLock.write_unlock();
+    return NewNode;
   }
 
   // Adds a node to the graph.
   bool addNode(const GraphNode& n) {
     assert(n.ID);
+    GaloisRuntime::acquire(n.ID);
     bool oldActive = n.ID->active;
     if (!oldActive) {
       n.ID->active = true;
-      ++numActive;
+      __sync_add_and_fetch(&numActive, 1);
     }
     return !oldActive;
   }
@@ -171,10 +181,11 @@ public:
   // Removes a node from the graph along with all its outgoing/incoming edges.
   bool removeNode(GraphNode n) {
     assert(n.ID);
+    GaloisRuntime::acquire(n.ID);
     gNode* N = n.ID;
     bool wasActive = N->active;
     if (wasActive) {
-      --numActive;
+      __sync_sub_and_fetch(&numActive, 1);
       N->active = false;
       //erase the in-edges first
       for (int i = 0; i < N->edges.size(); ++i) {
@@ -192,6 +203,8 @@ public:
   void addEdge(GraphNode src, GraphNode dst, const EdgeTy& data) {
     assert(src.ID);
     assert(dst.ID);
+    GaloisRuntime::acquire(src.ID);
+    GaloisRuntime::acquire(dst.ID);
     EdgeTy& E1 = src.ID->getOrCreateEdge(dst.ID);
     EdgeTy& E2 = dst.ID->getOrCreateEdge(src.ID);
     if (src < dst)
@@ -204,12 +217,20 @@ public:
   void removeEdge(GraphNode src, GraphNode dst) {
     assert(src.ID);
     assert(dst.ID);
+    GaloisRuntime::acquire(src.ID);
+    GaloisRuntime::acquire(dst.ID);
     src.ID->eraseEdge(dst.ID);
     dst.ID->eraseEdge(src.ID);
   }
 
   EdgeTy& getEdgeData(GraphNode src, GraphNode dst) {
+    assert(src.ID);
+    assert(dst.ID);
+
     //yes, fault on null (no edge)
+    GaloisRuntime::acquire(src.ID);
+    GaloisRuntime::acquire(dst.ID);
+
     if (src < dst)
       return src.ID->getEdge(dst.ID);
     else
@@ -225,6 +246,7 @@ public:
 
   int neighborsSize(GraphNode N) {
     assert(N.ID);
+    GaloisRuntime::acquire(N.ID);
     return N.ID->edges.size();
   }
 
@@ -232,12 +254,17 @@ public:
 
   neighbor_iterator neighbor_begin(GraphNode N) {
     assert(N.ID);
+    GaloisRuntime::acquire(N.ID);
     return boost::make_transform_iterator(N.ID->edges.begin(), makeGraphNode(this));
   }
   neighbor_iterator neighbor_end(GraphNode N) {
     assert(N.ID);
+    GaloisRuntime::acquire(N.ID);
     return boost::make_transform_iterator(N.ID->edges.end(), makeGraphNode(this));
   }
+
+
+  //These are not thread safe!!
 
   typedef boost::transform_iterator<makeGraphNode2, boost::filter_iterator<is_active_node, typename std::list<gNode>::iterator> >active_iterator;
 

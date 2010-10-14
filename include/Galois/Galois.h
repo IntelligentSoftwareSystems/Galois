@@ -2,54 +2,12 @@
 
 #include <set>
 #include <pthread.h>
-#include "Support/ThreadSafe/simple_lock.h"
+#include "Galois/Runtime/Context.h"
 
-class Lockable {
-  threadsafe::simpleLock L;
-public:
-  bool try_lock() {
-    return L.try_write_lock();
-  }
-  void unlock() {
-    L.write_unlock();
-  }
-};
 
 namespace GaloisRuntime {
   
   extern int numThreads;
-
-  class GaloisWorkContextCausious {
-    std::set<Lockable*> locks;
-    
-    void rollback() {
-      throw -1;
-    }
-
-  public:
-
-    ~GaloisWorkContextCausious() {
-      for (std::set<Lockable*>::iterator ii = locks.begin(), ee = locks.end(); ii != ee; ++ii)
-	(*ii)->unlock();
-    }
-    void acquire(Lockable* C) {
-      if (!locks.count(C)) {
-	bool suc = C->try_lock();
-	if (suc) {
-	  locks.insert(C);
-	} else {
-	  rollback();
-	}
-      }
-    }
-
-    void release(Lockable* C) {
-      C->unlock();
-      locks.erase(C);
-    }
-  };
-
-  extern __thread GaloisWorkContextCausious* thread_cnx;
 
   template<class WorkListTy, class Function> 
   class GaloisWork {
@@ -66,20 +24,25 @@ namespace GaloisRuntime {
       return 0;
     }
     void perThreadLaunch() {
+      WorkListTy wlLocal;
       while (!wl.empty()) {
-	GaloisWorkContextCausious cnx;
-	thread_cnx = &cnx;
 	bool gotOne = false;
 	typename WorkListTy::value_type val = wl.pop(gotOne);
 	if (gotOne) {
-	  try {
-	    //cnx.acquire(val);
-	    f(val, wl);
-	  } catch (int a) {
-	    wl.push(val);
+	  wlLocal.push(val);
+	  while (!wlLocal.empty()) {
+	    SimpleRuntimeContext cnx;
+	    setThreadContext(&cnx);
+	    val = wlLocal.pop(gotOne);
+	    try {
+	      val.getData(); //acquire lock
+	      f(val, wlLocal);
+	    } catch (int a) {
+	      wl.push(val); // put conflicting work on the global wl
+	    }
+	    setThreadContext(0);
 	  }
 	}
-	thread_cnx = 0;
       }
     }
   };
