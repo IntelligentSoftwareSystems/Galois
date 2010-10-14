@@ -1,1 +1,3 @@
-add_library(galois Launcher.cpp)
+file(GLOB Sources *.cpp)
+
+add_library(galois ${Sources})

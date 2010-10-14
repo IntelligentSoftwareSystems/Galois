@@ -91,22 +91,5 @@ namespace threadsafe {
       }
       return retval;
     }
-
-    value_type pop_or_value(value_type error_Value) {
-      lock.read_lock();
-      value_type retval;
-      if (!c.empty()) {
-	lock.promote();
-	retval = c.back();
-	c.pop_back();
-	lock.write_unlock();
-      } else {
-	retval = error_Value;
-	lock.read_unlock();
-      }
-      return retval;
-
-    }
-
   };
 }

@@ -1,5 +1,10 @@
 // simple spin lock -*- C++ -*-
 
+#ifndef _SIMPLE_LOCK_H
+#define _SIMPLE_LOCK_H
+
+#include <cassert>
+
 namespace threadsafe {
 
   // The most stupid spinlock you can imagine
@@ -35,3 +40,5 @@ namespace threadsafe {
   };
 
 }
+
+#endif

@@ -1,9 +1,8 @@
 // simple galois scheduler and runtime -*- C++ -*-
 
 #include <set>
-#include <list>
-#include <map>
 #include <pthread.h>
+#include "Support/ThreadSafe/simple_lock.h"
 
 class Lockable {
   threadsafe::simpleLock L;
@@ -70,10 +69,11 @@ namespace GaloisRuntime {
       while (!wl.empty()) {
 	GaloisWorkContextCausious cnx;
 	thread_cnx = &cnx;
-	typename WorkListTy::value_type val = wl.pop_or_value(0);
-	if (val) {
+	bool gotOne = false;
+	typename WorkListTy::value_type val = wl.pop(gotOne);
+	if (gotOne) {
 	  try {
-	    cnx.acquire(val);
+	    //cnx.acquire(val);
 	    f(val, wl);
 	  } catch (int a) {
 	    wl.push(val);
@@ -94,12 +94,14 @@ namespace GaloisRuntime {
 
     template<class _GaloisWork>
     void launch(_GaloisWork* GW) {
-      for (int i = 0; i < num; ++i)
+      for (int i = 0; i < (num - 1); ++i)
 	pthread_create(&threadpool[i], 0, _GaloisWork::threadLaunch, (void*)GW);
+      //We use this thread for the last thread to avoid serial overhead for now
+      _GaloisWork::threadLaunch(GW);
     }
  
     void wait() {
-      for (int i = 0; i < num; ++i)
+      for (int i = 0; i < (num - 1); ++i)
 	pthread_join(threadpool[i], 0);
     }
   };

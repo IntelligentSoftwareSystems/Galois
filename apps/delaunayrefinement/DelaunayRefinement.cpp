@@ -38,6 +38,7 @@
 
 #include "Galois/Launcher.h"
 #include "Galois/Graphs/Graph.h"
+#include "Galois/Galois.h"
 
 typedef FirstGraph<Element,Edge>            Graph;
 typedef FirstGraph<Element,Edge>::GraphNode GNode;
@@ -91,16 +92,16 @@ void process(GNode item, threadsafe::ts_stack<GNode>& lwl) {
 }
 
 void refine(Mesh& m) {
-  if (threads == 1) {
-    while (wl.size()) {
-      bool suc;
-      GNode N = wl.pop(suc);
-      process(N, wl);
-    }
-  } else {
-    //Galois::setMaxThreads(1); //threads);
-    //Galois::for_each(wl, process);
-  }
+  //  if (threads == 1) {
+  //    while (wl.size()) {
+  //      bool suc;
+  //      GNode N = wl.pop(suc);
+  //      process(N, wl);
+  //    }
+  //  } else {
+    Galois::setMaxThreads(1); //threads);
+    Galois::for_each(wl, process);
+    //  }
 }
 
 

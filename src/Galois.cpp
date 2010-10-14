@@ -1,4 +1,5 @@
-#include "Galois.h"
+#include <cassert>
+#include "Galois/Galois.h"
 
 int GaloisRuntime::numThreads;
 
