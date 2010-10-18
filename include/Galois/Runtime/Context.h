@@ -4,23 +4,15 @@
 #define _GALOIS_RUNTIME_CONTEXT_H
 
 #include "Support/ThreadSafe/simple_lock.h"
-#include <set>
+#include <vector>
 
 namespace GaloisRuntime {
-  class Lockable {
-    threadsafe::simpleLock L;
-  public:
-    bool try_lock() {
-      return L.try_write_lock();
-    }
-    void unlock() {
-      L.write_unlock();
-    }
-  };
+
+  typedef threadsafe::ptrLock Lockable;
 
   class SimpleRuntimeContext {
 
-    std::set<Lockable*> locks;
+    std::vector<Lockable*> locks;
 
     void rollback() {
       throw -1;
@@ -30,10 +22,10 @@ namespace GaloisRuntime {
       acquire(&L);
     }
     void acquire(Lockable* C) {
-      if (!locks.count(C)) {
-	bool suc = C->try_lock();
+      if (C->getValue() != this) {
+	bool suc = C->try_lock(this);
 	if (suc) {
-	  locks.insert(C);
+	  locks.push_back(C);
 	} else {
 	  rollback();
 	}
@@ -42,15 +34,30 @@ namespace GaloisRuntime {
 
     SimpleRuntimeContext() {}
     ~SimpleRuntimeContext() {
-      for (std::set<Lockable*>::iterator ii = locks.begin(), ee = locks.end(); ii != ee; ++ii)
+      for (std::vector<Lockable*>::iterator ii = locks.begin(), ee = locks.end(); ii != ee; ++ii)
 	(*ii)->unlock();
     }
   };
 
-  SimpleRuntimeContext* getThreadContext();
-  void setThreadContext(SimpleRuntimeContext* n);
-  void acquire(Lockable&);
-  void acquire(Lockable*);
+  extern __thread SimpleRuntimeContext* thread_cnx;
+
+  static SimpleRuntimeContext* getThreadContext() {
+    return thread_cnx;
+  }
+
+  static void setThreadContext(SimpleRuntimeContext* n) {
+    thread_cnx = n;
+  }
+
+  static void acquire(Lockable* C) {
+    SimpleRuntimeContext* cnx = getThreadContext();
+    if (cnx)
+      cnx->acquire(C);
+  }
+
+  static void acquire(Lockable& L) {
+    acquire(&L);
+  }
 
 }
 

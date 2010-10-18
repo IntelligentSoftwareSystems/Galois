@@ -1,12 +1,12 @@
-// Stack implementation -*- C++ -*-
+// Queue implementation -*- C++ -*-
 
-#include <deque>
+#include <queue>
 
 namespace threadsafe {
   
   template< class _Tp, class _Lock = simpleLock >
-  class ts_stack {
-    typedef std::deque<_Tp> _Sequence;
+  class ts_queue {
+    typedef std::queue<_Tp> _Sequence;
   public:
     typedef typename _Sequence::value_type                value_type;
     typedef typename _Sequence::const_reference           const_reference;
@@ -22,10 +22,10 @@ namespace threadsafe {
   public:
 
     explicit
-    ts_stack(const _Sequence& __c)
+    ts_queue(const _Sequence& __c)
       : c(__c) { }
     
-    ts_stack()
+    ts_queue()
       : c() { }
     
     /**
@@ -63,7 +63,7 @@ namespace threadsafe {
     push(const value_type& __x)
     {
       lock.write_lock();
-      c.push_back(__x);
+      c.push(__x);
       lock.write_unlock();
     }
 
@@ -82,8 +82,8 @@ namespace threadsafe {
       value_type retval;
       if (!c.empty()) {
 	lock.promote();
-	retval = c.back();
-	c.pop_back();
+	retval = c.front();
+	c.pop();
 	lock.write_unlock();
 	suc = true;
       } else {

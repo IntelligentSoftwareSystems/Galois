@@ -49,13 +49,13 @@ typedef FirstGraph<Element,Edge>::GraphNode GNode;
 #include "Cavity.h"
 
 #include "Support/ThreadSafe/simple_lock.h"
-#include "Support/ThreadSafe/TSStack.h"
+#include "Support/ThreadSafe/TSQueue.h"
 
 Graph* mesh;
-threadsafe::ts_stack<GNode> wl;
+threadsafe::ts_queue<GNode> wl;
 int threads = 1;
 
-void process(GNode item, threadsafe::ts_stack<GNode>& lwl) {
+void process(GNode item, std::stack<GNode>& lwl) {
   if (!mesh->containsNode(item))
     return;
 
@@ -64,13 +64,13 @@ void process(GNode item, threadsafe::ts_stack<GNode>& lwl) {
   cav.build();
   cav.update();
 
-  for (std::set<GNode>::iterator ii = cav.getPre().getNodes().begin(),
-	 ee = cav.getPre().getNodes().end(); ii != ee; ++ii) 
+  for (Subgraph::iterator ii = cav.getPre().begin(),
+	 ee = cav.getPre().end(); ii != ee; ++ii) 
     mesh->removeNode(*ii);
 
   //add new data
-  for (std::set<GNode>::iterator ii = cav.getPost().getNodes().begin(),
-	 ee = cav.getPost().getNodes().end(); ii != ee; ++ii) {
+  for (Subgraph::iterator ii = cav.getPost().begin(),
+	 ee = cav.getPost().end(); ii != ee; ++ii) {
     GNode node = *ii;
     mesh->addNode(node);
     Element& element = node.getData();
@@ -79,8 +79,8 @@ void process(GNode item, threadsafe::ts_stack<GNode>& lwl) {
     }
   }
 
-  for (std::set<Subgraph::tmpEdge>::iterator ii = cav.getPost().getEdges().begin(),
-	 ee = cav.getPost().getEdges().end(); ii != ee; ++ii) {
+  for (Subgraph::edge_iterator ii = cav.getPost().edge_begin(),
+	 ee = cav.getPost().edge_end(); ii != ee; ++ii) {
     Subgraph::tmpEdge edge = *ii;
     //bool ret = 
     mesh->addEdge(edge.src, edge.dst, edge.data);

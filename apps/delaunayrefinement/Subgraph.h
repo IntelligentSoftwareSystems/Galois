@@ -1,3 +1,5 @@
+// Subgraph -*- C++ -*-
+
 /* 
  
  Lonestar DelaunayRefinement: Refinement of an initial, unrefined Delaunay
@@ -26,7 +28,8 @@
  
  */ 
 
-#include <set>
+#include <list>
+#include <algorithm>
 
 /**
  *  A sub-graph of the mesh. Used to store information about the original 
@@ -42,49 +45,57 @@ class Subgraph {
     :src(s), dst(d), data(_d)
     {}
 
-    bool operator<(const tmpEdge& rhs) const {
-      if (src < rhs.src) return true;
-      if (src > rhs.src) return false;
-      if (dst < rhs.dst) return true;
-      if (dst > rhs.dst) return false;
-      return false;
+    bool operator==(const tmpEdge& rhs) const {
+      return src == rhs.src && dst == rhs.dst && data == data;
     }
   };
 
  private:
   // the nodes in the graph before updating
-  std::set<GNode> nodes;
+  std::list<GNode> nodes;
   // the edges that connect the subgraph to the rest of the graph
-  std::set<tmpEdge> edges;
+  std::list<tmpEdge> edges;
 
  public:
   Subgraph() {}
 
-  bool containsNode(GNode n) {
-    return nodes.count(n);
+  bool containsNode(GNode N) {
+    return std::find(nodes.begin(), nodes.end(), N) != nodes.end();
   }
 
-  bool addNode(GNode n) {
-    return nodes.insert(n).second;
+  void addNode(GNode n) {
+    return nodes.push_front(n);
   }
  
-  bool addEdge(tmpEdge e) {
-    return edges.insert(e).second;
+  void addEdge(tmpEdge e) {
+    return edges.push_front(e);
   }
-  bool addEdge(GNode src, GNode dst, const Edge& e) {
-    return edges.insert(tmpEdge(src,dst,e)).second;
-  }
-
-  std::set<GNode>& getNodes() {
-    return nodes;
-  }
-
-  std::set<tmpEdge>& getEdges() {
-    return edges;
+  void addEdge(GNode src, GNode dst, const Edge& e) {
+    return edges.push_front(tmpEdge(src,dst,e));
   }
 
   void reset() {
     nodes.clear();
     edges.clear();
+  }
+
+  typedef std::list<GNode>::iterator iterator;
+
+  iterator begin() {
+    return nodes.begin();
+  }
+
+  iterator end() {
+    return nodes.end();
+  }
+
+  typedef std::list<tmpEdge>::iterator edge_iterator;
+
+  edge_iterator edge_begin() {
+    return edges.begin();
+  }
+
+  edge_iterator edge_end() {
+    return edges.end();
   }
 };

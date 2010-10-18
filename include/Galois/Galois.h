@@ -1,9 +1,11 @@
 // simple galois scheduler and runtime -*- C++ -*-
 
 #include <set>
+#include <stack>
+#include <iostream>
 #include <pthread.h>
 #include "Galois/Runtime/Context.h"
-
+#include "Galois/Runtime/WorkList.h"
 
 namespace GaloisRuntime {
   
@@ -13,18 +15,23 @@ namespace GaloisRuntime {
   class GaloisWork {
     WorkListTy& wl;
     Function f;
+    int conflicts;
   public:
     GaloisWork(WorkListTy& _wl, Function _f)
-      :wl(_wl), f(_f)
+      :wl(_wl), f(_f), conflicts(0)
     {}
     
+    ~GaloisWork() {
+      std::cerr << "Conflicts: " << conflicts << "\n";
+    }
+
     static void* threadLaunch(void* _GW) {
       GaloisWork* GW = (GaloisWork*)_GW;
       GW->perThreadLaunch();
       return 0;
     }
     void perThreadLaunch() {
-      WorkListTy wlLocal;
+      std::stack<typename WorkListTy::value_type> wlLocal;
       while (!wl.empty()) {
 	bool gotOne = false;
 	typename WorkListTy::value_type val = wl.pop(gotOne);
@@ -33,12 +40,14 @@ namespace GaloisRuntime {
 	  while (!wlLocal.empty()) {
 	    SimpleRuntimeContext cnx;
 	    setThreadContext(&cnx);
-	    val = wlLocal.pop(gotOne);
+	    val = wlLocal.top();
+	    wlLocal.pop();
 	    try {
 	      val.getData(); //acquire lock
 	      f(val, wlLocal);
 	    } catch (int a) {
 	      wl.push(val); // put conflicting work on the global wl
+	      __sync_fetch_and_add(&conflicts, 1);
 	    }
 	    setThreadContext(0);
 	  }
@@ -69,7 +78,7 @@ namespace GaloisRuntime {
     }
   };
 
-  template<class WorkListTy, class Function> 
+  template<class WorkListTy, class Function>
   void for_each_simple (WorkListTy& wl, Function f)
   {
     GaloisWork<WorkListTy, Function> GW(wl, f);
@@ -87,10 +96,10 @@ namespace Galois {
 
   extern void setMaxThreads(int T);
 
-  template<class WorkListTy, class Function> 
+  template<typename WorkListTy, typename Function>
   void for_each (WorkListTy& wl, Function f)
   {
     GaloisRuntime::for_each_simple(wl, f);
   }
-  
+
 }

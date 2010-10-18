@@ -125,7 +125,7 @@ public:
   
   static int cmp(Tuple a, Tuple b) {return a.cmp(b);};
   static double distance(Tuple a, Tuple b) {return a.distance(b);};
-  static double angle(Tuple a, Tuple b, Tuple c) {return b.angle(a, c);};
+  static double angle(const Tuple& a, const Tuple& b, const Tuple& c) {return b.angle(a, c);};
   
 };
 

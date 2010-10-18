@@ -1,3 +1,5 @@
+// Element data in the graph -*- C++ -*-
+
 /* 
  
    Lonestar DelaunayRefinement: Refinement of an initial, unrefined Delaunay
@@ -37,58 +39,48 @@
 #define MINANGLE 30.0
 
 class Element {
-  bool bObtuse; // if the triangle has an obtuse angle
+  // if the triangle has an obtuse angle
+  // obtuse - 1 is which one
+  signed char obtuse;
   bool bBad;
+  bool bDim; // true == 3, false == 2
 
-  Tuple obtuse;
   Tuple coords[3]; // The three endpoints of the triangle
-  Edge edges[3]; // The edges connecting it to neighboring triangles
-  int dim; // (=3 is a triangle, =2 is a segment)
+  //Edge edges[3]; // The edges connecting it to neighboring triangles
 
   Tuple center; // The coordinates of the center of the circumcircle the triangle
   double radius_squared;
-  double minAngle;
 
  public:
-	
-  Element(Tuple a, Tuple b, Tuple c) { //constructor for Triangles
-    dim = 3;
+  
+ Element(const Tuple& a, const Tuple& b, const Tuple& c)
+   :obtuse(0), bBad(0), bDim(true)
+  { //constructor for Triangles
     coords[0] = a;
     coords[1] = b;
     coords[2] = c;
     if (b < a || c < a) {
       if (b < c) {
-        coords[0] = b;
-        coords[1] = c;
-        coords[2] = a;
+	coords[0] = b;
+	coords[1] = c;
+	coords[2] = a;
       } else {
-        coords[0] = c;
-        coords[1] = a;
-        coords[2] = b;
+	coords[0] = c;
+	coords[1] = a;
+	coords[2] = b;
       }
     }
-    edges[0] = Edge(coords[0], coords[1]);
-    edges[1] = Edge(coords[1], coords[2]);
-    edges[2] = Edge(coords[2], coords[0]);
-    bool l_bObtuse = false;
-    bool l_bBad = false;
-    Tuple l_obtuse;
-    minAngle = 180.0;
+    //    edges[0] = Edge(coords[0], coords[1]);
+    //    edges[1] = Edge(coords[1], coords[2]);
+    //    edges[2] = Edge(coords[2], coords[0]);
     for (int i = 0; i < 3; i++) {
       double angle = getAngle(i);
       if (angle > 90.1) {
-        l_bObtuse = true;
-        l_obtuse = coords[i];
+	obtuse = i + 1;
       } else if (angle < MINANGLE) {
-        l_bBad = true;
-      }
-      if (angle < minAngle) {
-        minAngle = angle;
+	bBad = true;
       }
     }
-    bBad = l_bBad;
-    bObtuse = l_bObtuse;
-    obtuse = l_obtuse;
     Tuple x = b - a;
     Tuple y = c - a;
     double xlen = a.distance(b);
@@ -105,49 +97,45 @@ class Element {
     center = tmpval + (c * wp);
     radius_squared = center.distance_squared(a);
   }
-
-  Element(Tuple a, Tuple b) { //constructor for segments
-    dim = 2;
+  
+  Element(Tuple a, Tuple b)
+    :obtuse(0), bBad(0), bDim(false)
+  { //constructor for segments
     coords[0] = a;
     coords[1] = b;
     if (b < a) {
       coords[0] = b;
       coords[1] = a;
     }
-    edges[0] = Edge(coords[0], coords[1]);
-    edges[1] = Edge(coords[1], coords[0]);
-    bBad = false;
-    bObtuse = false;
+    //    edges[0] = Edge(coords[0], coords[1]);
+    //    edges[1] = Edge(coords[1], coords[0]);
     center = (a + b) * 0.5;
     radius_squared = center.distance_squared(a);
   }
-
+  
   bool operator< (const Element& rhs) const {
     //apparently a triangle is less than a line
-    if (dim < rhs.getDim()) return false;
-    if (dim > rhs.getDim()) return true;
-    for (int i = 0; i < dim; i++) {
+    if (getDim() < rhs.getDim()) return false;
+    if (getDim() > rhs.getDim()) return true;
+    for (int i = 0; i < getDim(); i++) {
       if (coords[i] < rhs.coords[i]) return true;
       else if (coords[i] > rhs.coords[i]) return false;
     }
     return false;
   }
 
-  /// @return if the current triangle has a common edge with e 
+  /// @return if the current triangle has a common edge with e
   bool isRelated(const Element& rhs) const {
-    for(int i = 0; i < dim; ++i)
-      for(int j = 0; j < rhs.dim; ++j)
-	if (edges[i] == rhs.edges[j]) 
-	  return true;
-    return false;  
+    int num_eq = 0;
+    for(int i = 0; i < getDim(); ++i)
+      for(int j = 0; j < rhs.getDim(); ++j)
+	if (coords[i] == rhs.coords[j])
+	  ++num_eq;
+    return num_eq == 2;
   }
 
   const Tuple& getCenter() const {
     return center;
-  }
-
-  double getMinAngle() const {
-    return minAngle;
   }
 
   bool inCircle(Tuple p) const {
@@ -156,16 +144,32 @@ class Element {
   }
 
   double getAngle(int i) const {
-    int j = (i + 1) % dim;
-    int k = (i + 2) % dim; 
-    Tuple a = coords[i];
-    Tuple b = coords[j];
-    Tuple c = coords[k];
+    int j = (i + 1) % getDim();
+    int k = (i + 2) % getDim(); 
+    const Tuple& a = coords[i];
+    const Tuple& b = coords[j];
+    const Tuple& c = coords[k];
     return Tuple::angle(b, a, c);
   }
 
-  const Edge& getEdge(int i) const {
-    return edges[i];
+  //Virtualize the Edges array
+  //Used only by Mesh now
+  Edge getEdge(int i) const {
+    if (!bDim) {
+      if (i == 0)
+	return Edge(coords[0], coords[1]);
+      else if (i == 1)
+	return Edge(coords[1], coords[0]);
+    } else {
+      if (i == 0)
+	return Edge(coords[0], coords[1]);
+      else if (i == 1)
+	return Edge(coords[1], coords[2]);
+      else if (i == 2)
+	return Edge(coords[2], coords[0]);
+    }
+    assert(0 && "unknown edge");
+    abort();
   }
 
   const Tuple& getPoint(int i) const {
@@ -173,7 +177,22 @@ class Element {
   }
 
   const Tuple& getObtuse() const {
-    return obtuse;
+    return coords[obtuse-1];
+  }
+
+  Edge getOppositeObtuse() const {
+    //The edge opposite the obtuse angle is the edge formed by
+    //the other indexes
+    switch (obtuse) {
+    case 1:
+      return getEdge(1);
+    case 2:
+      return getEdge(2);
+    case 3:
+      return getEdge(0);
+    };
+    assert(0 && "no obtuse edge");
+    abort();
   }
 
   // should the node be processed?
@@ -182,43 +201,48 @@ class Element {
   }
 
   int getDim() const {
-    return dim;
+    return bDim ? 3 : 2;
   }
 
   int numEdges() const {
-    return dim + dim - 3;
+    return getDim() + getDim() - 3;
   }
 
   bool isObtuse() const {
-    return bObtuse;
+    return obtuse != 0;
   }
 
   /**
    * Scans all the edges of the two elements and if it finds one that is
    * equal, then sets this as the Edge of the EdgeRelation
    */
-  const Edge& getRelatedEdge(const Element& e) const {
-    for(int i = 0; i < dim; ++i)
-      for(int j = 0; j < e.dim; ++j)
-        if (edges[i] == e.edges[j])
-          return edges[i];
-    assert(0);
-    abort();
-  }
-
-  double getRadiusSquared() const {
-    return radius_squared;
+  Edge getRelatedEdge(const Element& e) const {
+    int at = 0;
+    Tuple d[2];
+    for(int i = 0; i < getDim(); ++i)
+      for(int j = 0; j < e.getDim(); ++j)
+	if (coords[i] == e.coords[j])
+	  d[at++] = coords[i];
+    assert(at == 2);
+    return Edge(d[0], d[1]);
   }
 
   std::ostream& print(std::ostream& s) const {
     s << '[';
-    for (int i = 0; i < dim; ++i)
-      s << coords[i] << (i < (dim - 1) ? ", " : "");
+    for (int i = 0; i < getDim(); ++i)
+      s << coords[i] << (i < (getDim() - 1) ? ", " : "");
     s << ']';
     return s;
   }
 
 };
+
+struct printsize {
+  printsize() {
+    std::cerr << sizeof(Element) << "\n";
+  }
+};
+printsize P;
 
 static std::ostream& operator<<(std::ostream& s, const Element& E) {
   return E.print(s);

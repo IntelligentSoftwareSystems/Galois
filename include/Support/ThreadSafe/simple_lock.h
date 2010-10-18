@@ -39,6 +39,28 @@ namespace threadsafe {
     }
   };
 
+  class ptrLock {
+    volatile void* _lock;
+  public:
+
+    ptrLock() : _lock(0) {}
+
+    void lock(void* val) {
+      assert(!_lock);
+      while (!try_lock(val)) {}
+    }
+    void unlock() {
+      assert(_lock);
+      _lock = 0;
+    }
+    bool try_lock(void* val) {
+      return __sync_bool_compare_and_swap(&_lock, 0, val);
+    }
+    volatile void* getValue() {
+      return _lock;
+    }
+  };
+
 }
 
 #endif

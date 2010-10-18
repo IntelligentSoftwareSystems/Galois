@@ -27,7 +27,8 @@
 */ 
 
 #include <queue>
-#include <set>
+#include <list>
+#include <algorithm>
 
 class Cavity {
 
@@ -41,7 +42,7 @@ class Cavity {
   // what the new elements should look like
   Subgraph post;
   // the edge-relations that connect the boundary to the cavity
-  std::set<Subgraph::tmpEdge> connections;
+  std::list<Subgraph::tmpEdge> connections;
 
   Graph* graph;
 	
@@ -55,11 +56,12 @@ class Cavity {
       assert(0);
     }
     Element& element = node.getData();
+    Tuple elementTuple = element.getObtuse();
+    Edge ObtuseEdge = element.getOppositeObtuse();
     GNode dst;
     for (Graph::neighbor_iterator ii = graph->neighbor_begin(node), ee = graph->neighbor_end(node); ii != ee; ++ii) {
       GNode neighbor = *ii;
       Edge& edgeData = graph->getEdgeData(node, neighbor);
-      Tuple elementTuple = element.getObtuse();
       if (elementTuple != edgeData.getPoint(0) && elementTuple != edgeData.getPoint(1)) {
 	assert(dst.isNull());
 	dst = neighbor;
@@ -88,8 +90,8 @@ class Cavity {
       // not a member
       Edge& edgeData = graph->getEdgeData(node, next);
       Subgraph::tmpEdge edge(node, next, edgeData);
-      if (!connections.count(edge)) {
-	connections.insert(edge);
+      if (std::find(connections.begin(), connections.end(), edge) == connections.end()) {
+	connections.push_front(edge);
       }
     }
   }
@@ -141,7 +143,7 @@ class Cavity {
       GNode node2 = graph->createNode(ele2);
       post.addNode(node2);
     }
-    for (std::set<Subgraph::tmpEdge>::iterator ii = connections.begin(), ee = connections.end(); ii != ee; ++ii) {
+    for (std::list<Subgraph::tmpEdge>::iterator ii = connections.begin(), ee = connections.end(); ii != ee; ++ii) {
       Subgraph::tmpEdge conn = *ii;
       Edge& edge = conn.data;
       Element new_element(center, edge.getPoint(0), edge.getPoint(1));
@@ -157,8 +159,7 @@ class Cavity {
       //boolean mod = 
       post.addEdge(Subgraph::tmpEdge(ne_node, ne_connection, new_edge));
       //assert mod;
-      std::set<GNode>& postnodes = post.getNodes();
-      for (std::set<GNode>::iterator ii = postnodes.begin(), ee = postnodes.end(); ii != ee; ++ii) {
+      for (Subgraph::iterator ii = post.begin(), ee = post.end(); ii != ee; ++ii) {
         GNode node = *ii;
         Element& element = node.getData();
         if (element.isRelated(new_element)) {
