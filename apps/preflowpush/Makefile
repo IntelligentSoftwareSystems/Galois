@@ -36,10 +36,10 @@ CMAKE_COMMAND = /usr/bin/cmake
 RM = /usr/bin/cmake -E remove -f
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = "/home/anand/compilers project/GaloisCpp/trunk"
+CMAKE_SOURCE_DIR = /home/sarat/trunk
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = "/home/anand/compilers project/GaloisCpp/trunk"
+CMAKE_BINARY_DIR = /home/sarat/trunk
 
 #=============================================================================
 # Targets provided globally by CMake.
@@ -66,14 +66,14 @@ rebuild_cache/fast: rebuild_cache
 
 # The main all target
 all: cmake_check_build_system
-	cd "/home/anand/compilers project/GaloisCpp/trunk" && $(CMAKE_COMMAND) -E cmake_progress_start "/home/anand/compilers project/GaloisCpp/trunk/CMakeFiles" "/home/anand/compilers project/GaloisCpp/trunk/apps/preflowpush/CMakeFiles/progress.marks"
-	cd "/home/anand/compilers project/GaloisCpp/trunk" && $(MAKE) -f CMakeFiles/Makefile2 apps/preflowpush/all
-	$(CMAKE_COMMAND) -E cmake_progress_start "/home/anand/compilers project/GaloisCpp/trunk/CMakeFiles" 0
+	cd /home/sarat/trunk && $(CMAKE_COMMAND) -E cmake_progress_start /home/sarat/trunk/CMakeFiles /home/sarat/trunk/apps/preflowpush/CMakeFiles/progress.marks
+	cd /home/sarat/trunk && $(MAKE) -f CMakeFiles/Makefile2 apps/preflowpush/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/sarat/trunk/CMakeFiles 0
 .PHONY : all
 
 # The main clean target
 clean:
-	cd "/home/anand/compilers project/GaloisCpp/trunk" && $(MAKE) -f CMakeFiles/Makefile2 apps/preflowpush/clean
+	cd /home/sarat/trunk && $(MAKE) -f CMakeFiles/Makefile2 apps/preflowpush/clean
 .PHONY : clean
 
 # The main clean target
@@ -82,22 +82,22 @@ clean/fast: clean
 
 # Prepare targets for installation.
 preinstall: all
-	cd "/home/anand/compilers project/GaloisCpp/trunk" && $(MAKE) -f CMakeFiles/Makefile2 apps/preflowpush/preinstall
+	cd /home/sarat/trunk && $(MAKE) -f CMakeFiles/Makefile2 apps/preflowpush/preinstall
 .PHONY : preinstall
 
 # Prepare targets for installation.
 preinstall/fast:
-	cd "/home/anand/compilers project/GaloisCpp/trunk" && $(MAKE) -f CMakeFiles/Makefile2 apps/preflowpush/preinstall
+	cd /home/sarat/trunk && $(MAKE) -f CMakeFiles/Makefile2 apps/preflowpush/preinstall
 .PHONY : preinstall/fast
 
 # clear depends
 depend:
-	cd "/home/anand/compilers project/GaloisCpp/trunk" && $(CMAKE_COMMAND) -H$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
+	cd /home/sarat/trunk && $(CMAKE_COMMAND) -H$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
 .PHONY : depend
 
 # Convenience name for target.
 apps/preflowpush/CMakeFiles/preflowpush.dir/rule:
-	cd "/home/anand/compilers project/GaloisCpp/trunk" && $(MAKE) -f CMakeFiles/Makefile2 apps/preflowpush/CMakeFiles/preflowpush.dir/rule
+	cd /home/sarat/trunk && $(MAKE) -f CMakeFiles/Makefile2 apps/preflowpush/CMakeFiles/preflowpush.dir/rule
 .PHONY : apps/preflowpush/CMakeFiles/preflowpush.dir/rule
 
 # Convenience name for target.
@@ -106,7 +106,7 @@ preflowpush: apps/preflowpush/CMakeFiles/preflowpush.dir/rule
 
 # fast build rule for target.
 preflowpush/fast:
-	cd "/home/anand/compilers project/GaloisCpp/trunk" && $(MAKE) -f apps/preflowpush/CMakeFiles/preflowpush.dir/build.make apps/preflowpush/CMakeFiles/preflowpush.dir/build
+	cd /home/sarat/trunk && $(MAKE) -f apps/preflowpush/CMakeFiles/preflowpush.dir/build.make apps/preflowpush/CMakeFiles/preflowpush.dir/build
 .PHONY : preflowpush/fast
 
 PreflowPush.o: PreflowPush.cpp.o
@@ -114,7 +114,7 @@ PreflowPush.o: PreflowPush.cpp.o
 
 # target to build an object file
 PreflowPush.cpp.o:
-	cd "/home/anand/compilers project/GaloisCpp/trunk" && $(MAKE) -f apps/preflowpush/CMakeFiles/preflowpush.dir/build.make apps/preflowpush/CMakeFiles/preflowpush.dir/PreflowPush.cpp.o
+	cd /home/sarat/trunk && $(MAKE) -f apps/preflowpush/CMakeFiles/preflowpush.dir/build.make apps/preflowpush/CMakeFiles/preflowpush.dir/PreflowPush.cpp.o
 .PHONY : PreflowPush.cpp.o
 
 PreflowPush.i: PreflowPush.cpp.i
@@ -122,7 +122,7 @@ PreflowPush.i: PreflowPush.cpp.i
 
 # target to preprocess a source file
 PreflowPush.cpp.i:
-	cd "/home/anand/compilers project/GaloisCpp/trunk" && $(MAKE) -f apps/preflowpush/CMakeFiles/preflowpush.dir/build.make apps/preflowpush/CMakeFiles/preflowpush.dir/PreflowPush.cpp.i
+	cd /home/sarat/trunk && $(MAKE) -f apps/preflowpush/CMakeFiles/preflowpush.dir/build.make apps/preflowpush/CMakeFiles/preflowpush.dir/PreflowPush.cpp.i
 .PHONY : PreflowPush.cpp.i
 
 PreflowPush.s: PreflowPush.cpp.s
@@ -130,7 +130,7 @@ PreflowPush.s: PreflowPush.cpp.s
 
 # target to generate assembly for a file
 PreflowPush.cpp.s:
-	cd "/home/anand/compilers project/GaloisCpp/trunk" && $(MAKE) -f apps/preflowpush/CMakeFiles/preflowpush.dir/build.make apps/preflowpush/CMakeFiles/preflowpush.dir/PreflowPush.cpp.s
+	cd /home/sarat/trunk && $(MAKE) -f apps/preflowpush/CMakeFiles/preflowpush.dir/build.make apps/preflowpush/CMakeFiles/preflowpush.dir/PreflowPush.cpp.s
 .PHONY : PreflowPush.cpp.s
 
 # Help Target
@@ -156,6 +156,6 @@ help:
 # No rule that depends on this can have commands that come from listfiles
 # because they might be regenerated.
 cmake_check_build_system:
-	cd "/home/anand/compilers project/GaloisCpp/trunk" && $(CMAKE_COMMAND) -H$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
+	cd /home/sarat/trunk && $(CMAKE_COMMAND) -H$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
 .PHONY : cmake_check_build_system
 

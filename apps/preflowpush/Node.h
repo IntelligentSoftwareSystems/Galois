@@ -3,13 +3,13 @@ class Node
 	private:
 	int current;
 	double excess;
-	int height;
 	
 
 	public:
 	int id;
 	bool isSink;
 	bool isSource;
+	int height;
 	Node(int n)
 	{
 	  this->id = n;
