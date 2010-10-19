@@ -8,6 +8,7 @@
 
 
 #include "Galois/Runtime/Context.h"
+#include "Support/ThreadSafe/TSIBag.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 // Wrap void so that we can have a valid type on void nodes
@@ -66,12 +67,9 @@ class FirstGraph {
   };
   
   //The graph manages the lifetimes of the data in the nodes and edges
-  std::list<gNode> nodes;
+  typedef threadsafe::ts_insert_bag<gNode> nodeListTy;
+  nodeListTy nodes;
   
-  int numActive;
-
-  threadsafe::simpleLock GraphLock;
-
   //deal with the Node redirction
   NodeTy& getData(gNode* ID) {
     assert(ID);
@@ -153,12 +151,8 @@ public:
   // Creates a new node holding the indicated data.
   // Node is not added to the graph
   GraphNode createNode(const NodeTy& n) {
-    GraphLock.write_lock();
     gNode N(n,false);
-    typename std::list<gNode>::iterator I = nodes.insert(nodes.begin(), N);
-    GraphNode NewNode(this, &*I);
-    GraphLock.write_unlock();
-    return NewNode;
+    return GraphNode(this, &(nodes.push(N)));
   }
 
   // Adds a node to the graph.
@@ -168,7 +162,7 @@ public:
     bool oldActive = n.ID->active;
     if (!oldActive) {
       n.ID->active = true;
-      __sync_add_and_fetch(&numActive, 1);
+      //__sync_add_and_fetch(&numActive, 1);
     }
     return !oldActive;
   }
@@ -185,7 +179,7 @@ public:
     gNode* N = n.ID;
     bool wasActive = N->active;
     if (wasActive) {
-      __sync_sub_and_fetch(&numActive, 1);
+      //__sync_sub_and_fetch(&numActive, 1);
       N->active = false;
       //erase the in-edges first
       for (int i = 0; i < N->edges.size(); ++i) {
@@ -239,11 +233,6 @@ public:
 
   // General Things
 
-  // The number of nodes in the graph
-  int size() {
-    return numActive;
-  }
-
   int neighborsSize(GraphNode N) {
     assert(N.ID);
     GaloisRuntime::acquire(N.ID);
@@ -266,7 +255,7 @@ public:
 
   //These are not thread safe!!
 
-  typedef boost::transform_iterator<makeGraphNode2, boost::filter_iterator<is_active_node, typename std::list<gNode>::iterator> >active_iterator;
+  typedef boost::transform_iterator<makeGraphNode2, boost::filter_iterator<is_active_node, typename nodeListTy::iterator> >active_iterator;
 
   active_iterator active_begin() {
     return boost::make_transform_iterator(boost::make_filter_iterator<is_active_node>(nodes.begin(), nodes.end()), makeGraphNode2(this));
@@ -274,6 +263,10 @@ public:
 
   active_iterator active_end() {
     return boost::make_transform_iterator(boost::make_filter_iterator<is_active_node>(nodes.end(), nodes.end()), makeGraphNode2(this));
+  }
+  // The number of nodes in the graph
+  int size() {
+    return std::distance(active_begin(), active_end());
   }
 
 };

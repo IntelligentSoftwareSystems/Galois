@@ -9,4 +9,3 @@ void Galois::setMaxThreads(int T)
 }
 
 __thread GaloisRuntime::SimpleRuntimeContext* GaloisRuntime::thread_cnx;
-

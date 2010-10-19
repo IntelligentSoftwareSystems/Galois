@@ -33,24 +33,22 @@ namespace GaloisRuntime {
     void perThreadLaunch() {
       std::stack<typename WorkListTy::value_type> wlLocal;
       while (!wl.empty()) {
-	bool gotOne = false;
-	typename WorkListTy::value_type val = wl.pop(gotOne);
-	if (gotOne) {
-	  wlLocal.push(val);
-	  while (!wlLocal.empty()) {
-	    SimpleRuntimeContext cnx;
-	    setThreadContext(&cnx);
-	    val = wlLocal.top();
-	    wlLocal.pop();
-	    try {
-	      val.getData(); //acquire lock
-	      f(val, wlLocal);
-	    } catch (int a) {
-	      wl.push(val); // put conflicting work on the global wl
-	      __sync_fetch_and_add(&conflicts, 1);
-	    }
-	    setThreadContext(0);
+	//move some items out of the global list
+	wl.moveTo(wlLocal, 256);
+
+	while (!wlLocal.empty()) {
+	  SimpleRuntimeContext cnx;
+	  setThreadContext(&cnx);
+	  typename WorkListTy::value_type val = wlLocal.top();
+	  wlLocal.pop();
+	  try {
+	    val.getData(); //acquire lock
+	    f(val, wlLocal);
+	  } catch (int a) {
+	    wl.push(val); // put conflicting work onto the global wl
+	    __sync_fetch_and_add(&conflicts, 1);
 	  }
+	  setThreadContext(0);
 	}
       }
     }

@@ -40,6 +40,22 @@ namespace threadsafe {
       return retval;
     }
 
+    template<typename S>
+    bool moveTo(S& other, int count = 0) {
+      bool retval = false;
+      lock.write_lock();
+      bool do_all = count == 0;
+      while (!c.empty() && (do_all || count)) {
+	value_type v = c.top();
+	c.pop();
+	other.push(v);
+	retval = true;
+	--count;
+      }
+      lock.write_unlock();
+      return retval;
+    }
+
     /**  Returns the number of elements in the %stack.  */
     size_type
     size() const
