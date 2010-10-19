@@ -13,16 +13,21 @@
 
 using namespace std;
 
-class Node {
+const int INFINITY = 2147483647;
+
+class SNode {
 private:
-	const int id;
+	int id;
 	int dist;
+	SNode* pred;
 public:
-	Node(int _id, int _dist) : id(_id), dist(_dist) {};
-	virtual ~Node();
+	SNode(int _id) : id(_id) { dist = INFINITY; pred = NULL; };
+	virtual ~SNode();
+	const int get_id() { return id; };
+	int get_dist() { return dist; };
+	void set_dist(const int d) { dist = d; };
+	void set_pred(SNode* p) { pred = p; };
 	string toString() {string *s = new string(""); return *s;}; //TODO: complete toString
-	Node& clone();
-	void restoreFrom(Node copy);
 };
 
 #endif /* NODE_H_ */

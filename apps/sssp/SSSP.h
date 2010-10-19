@@ -2,22 +2,25 @@
  * SSSP.h
  *
  *  Created on: Oct 18, 2010
- *      Author: amshali
+ *      Author: reza
  */
 
 #ifndef SSSP_H_
 #define SSSP_H_
-#include "Node.h"
-#include "Galois/Graphs/Graph.h"
-typedef FirstGraph<Node,int>            Graph;
+#include <list>
 
+#include "SNode.h"
+#include "SEdge.h"
+#include "Galois/Graphs/Graph.h"
+typedef FirstGraph<SNode, SEdge> Graph;
 
 class SSSP {
 public:
-	void updateSourceAndSink(Graph &g, const int sourceId, const int sinkId);
-	void initializeGraph(Graph &g, char* filename);
 	SSSP();
 	virtual ~SSSP();
+
+	void bellman_ford(const std::list<SNode> & nodes,
+			const std::list<SEdge> & edges, SNode & source);
 };
 
 #endif /* SSSP_H_ */
