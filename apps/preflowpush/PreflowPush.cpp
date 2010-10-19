@@ -87,7 +87,7 @@ int main(int argc, char** argv) {
     << "http://iss.ices.utexas.edu/lonestar/preflowpush.html\n"
     << "\n";
 
-  config = new Graph();
+  theGraph = new Graph();
   Builder b;
   b.read(config, argv[1]);
 

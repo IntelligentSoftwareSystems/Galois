@@ -1,13 +1,12 @@
 #include "iostream"
 #include "fstream"
 #include "string"
-#include"map"
-#include<string.h>
+#include "map"
+#include <string.h>
 
 using namespace std;
 
 class Builder{
-
 
   class Pair{
      public:
@@ -19,10 +18,7 @@ class Builder{
       }
   };
 
-
-
   map<Pair*,int> edge_map;
-
 
   public:
   void read(Graph* b, string filename) {
@@ -138,6 +134,4 @@ class Builder{
       //edge_map[y]=1;
     }
   }
-
-
 };
