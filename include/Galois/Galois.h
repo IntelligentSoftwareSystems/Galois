@@ -5,7 +5,6 @@
 #include <iostream>
 #include <pthread.h>
 #include "Galois/Runtime/Context.h"
-#include "Galois/Runtime/WorkList.h"
 
 namespace GaloisRuntime {
   
