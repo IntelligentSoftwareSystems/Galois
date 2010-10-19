@@ -1,4 +1,4 @@
-# Install script for directory: /home/sarat/trunk/apps/preflowpush
+# Install script for directory: /home/sarat/GaloisCpp/code/trunk/apps/preflowpush
 
 # Set the install prefix
 IF(NOT DEFINED CMAKE_INSTALL_PREFIX)

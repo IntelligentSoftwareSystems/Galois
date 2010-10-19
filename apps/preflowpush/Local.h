@@ -5,7 +5,7 @@
 class Local
   {
 public:
-        GNode *src;
+        GNode src;
         int cur;
         bool finished;
         int minHeight;
@@ -14,7 +14,7 @@ public:
 
         void resetForRelabel()
         {
-          minHeight = MAX_INT;
+          minHeight = INT_MAX;
           minEdge = 0;
           relabelCur = 0;
         }

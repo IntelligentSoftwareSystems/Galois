@@ -5,198 +5,142 @@
 #include <math.h>
 #include <string.h>
 #include <cassert>
-
-#include "Galois/Launcher.h"
-#include "Galois/Graphs/Graph.h"
-#include "Node.h"
-#include "Edge.h"
-
-
-
-typedef FirstGraph<Node,Edge>            Graph;
-typedef FirstGraph<Node,Edge>::GraphNode GNode;
-
-
-int numNodes;
-int numEdges;
-Graph* config;
-GNode sink;
-GNode source;
-
-#include "Builder.h"
-#include "Support/ThreadSafe/simple_lock.h"
-#include "Support/ThreadSafe/TSStack.h"
-
-threadsafe::ts_stack<GNode> wl;
-int threads = 1;
+#include "include.h"   //containds Global variables and initialization
 
 using namespace std;
 
-const int ALPHA=6;
-const int BETA=12;
-
-// gatAtSerial in cpp
 void gapAtSerial(vector<int>& gapYet,  int h) {
- for(Graph::active_iterator ii = config->active_begin(), ee = config->active_end(); ii != ee; ++ii) {
-     Node& node = ii->getData();
-             if (node.isSink || node.isSource)
-               continue;
-           if (h < node.height && node.height < numNodes)
-               node.height = numNodes;
-     }
+	for(Graph::active_iterator ii = config->active_begin(), ee = config->active_end(); ii != ee; ++ii) {
+		Node& node = ii->getData();
+		if (node.isSink || node.isSource)
+			continue;
+		if (h < node.height && node.height < numNodes)
+			node.height = numNodes;
+	}
 
-     if (&gapYet != NULL) {
-       for (int i = h + 1; i < numNodes; i++) {
-         gapYet[h]=0;
-       }
-     }
-   }
-
-
+	if (&gapYet != NULL) {
+		for (int i = h + 1; i < numNodes; i++) {
+			gapYet[h]=0;
+		}
+	}
+}
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+void reduceCapacity(GNode& src, GNode& dst, int amount) {
+        Edge& e1 = config->getEdgeData(src, dst);
+        Edge& e2 = config->getEdgeData(dst, src);
+        e1.cap -= amount;
+        e2.cap += amount;
+}
 
 
 
 int main(int argc, char** argv) {
-  if (argc < 2) {
-    cerr << "Arguments: <input file>\n";
-    return 1;
-  }
-
-  cerr << "\nLonestar Benchmark Suite v3.0\n"
-    << "Copyright (C) 2007, 2008, 2009, 2010 The University of Texas at Austin\n"
-    << "http://iss.ices.utexas.edu/lonestar/\n"
-    << "\n"
-    << "application: Preflow Push Algorithm (c++ version)\n"
-    << "Finds the maximum flow in a given network\n"
-    << "using the preflow push technique\n"
-    << "http://iss.ices.utexas.edu/lonestar/preflowpush.html\n"
-    << "\n";
-
-  theGraph = new Graph();
-  Builder b;
-  b.read(config, argv[1]);
-
-
-  for(Graph::active_iterator ii = config->active_begin(), ee = config->active_end(); ii != ee; ++ii) 
-   {
-	Node& n = ii->getData();
-	if(n.isSink)
-	{
-		sink = *ii;   
+	if (argc < 2) {
+		cerr << "Arguments: <input file>\n";
+		return 1;
 	}
-	else if(n.isSource)
+
+	cerr << "\nLonestar Benchmark Suite v3.0\n"
+		<< "Copyright (C) 2007, 2008, 2009, 2010 The University of Texas at Austin\n"
+		<< "http://iss.ices.utexas.edu/lonestar/\n"
+		<< "\n"
+		<< "application: Preflow Push Algorithm (c++ version)\n"
+		<< "Finds the maximum flow in a given network\n"
+		<< "Using the preflow push technique\n"
+		<< "http://iss.ices.utexas.edu/lonestar/preflowpush.html\n"
+		<< "\n";
+
+	config = new Graph();   //config is a variable of type Graph*
+	Builder b;	//Builder class has method to read from file and construct graph
+	b.read(config, argv[1]);
+
+
+	for(Graph::active_iterator ii = config->active_begin(), ee = config->active_end(); ii != ee; ++ii) 
 	{
-		source= *ii;
-	}
-   }
-
-int globalRelabelInterval = numNodes * ALPHA + numEdges;
-
-// something like this has to be done final Counter<GNode<Node>>[] gapYet = new Counter[numNodes];
-
-	vector<int> gapYet(numNodes,0);
-     for (int i = 0; i < numNodes; i++) {
-       int height = i;
-       gapYet[height] =0;
-	gapAtSerial(gapYet, height);
-     }
-int relabelYet = globalRelabelInterval;   //the trigger function has to be implemented....
-
-
-
-
-
-
-}
-
-
-
-
-
-//  Func1 implemented in cpp
-
-initializePreflow(final Counter<GNode>[] gapYet) {  //the parameters will change....
-
-
-	for(Graph::active_iterator ii = config->active_begin(), ee = config->active_end(); ii != ee; ++ii) {
-		Node& element = ii->getData();
-		if (!node.isSink && !node.isSource) {
-			incrementGap(gapYet, node.height);  //have to implement incrementGap func...
+		Node& n = ii->getData();
+		if(n.isSink)
+		{
+			sink = *ii;   
+		}
+		else if(n.isSource)
+		{
+			source= *ii;
 		}
 	}
 
+	cout<<"Step 1 done sucessfully...numNodes is "<< numNodes <<endl;   //debug code
 
-	for (Graph::neighbor_iterator ii = graph->neighbor_begin(source), ee = graph->neighbor_end(source); ii != ee; ++ii) {
-		GNode neighbor = *ii;
-		Edge& edgeData = config->getEdgeData(source, neighbor);
-
-		int cap = edgedata.cap;
-		reduceCapacity(source, neighbour, cap);    
-		Node& node = neighbour->getData();
-		node.excess += cap;
-		if (cap > 0)
-			wl.push(neighbour);
+	gapYet.resize(numNodes,0);	
+	for (int i = 0; i < numNodes; i++) {
+		int height = i;
+		gapYet[height] =0;
+		gapAtSerial(gapYet, height);
 	}
+	relabelYet = globalRelabelInterval;   //the trigger function has to be implemented....
+
+	cout<<"Step 2 done sucessfully"<<endl;    //debug code
+	initializePreflow(gapYet);
+
+	cout<<"Step 3 done sucessfully"<<endl;    //debug code
+	int debug_var=0;
+	while (wl.size()) {
+		cout<<++debug_var;
+		bool suc;
+		GNode N = wl.pop(suc);
+		process(N, wl);
+	}
+}
+
+
+void process(GNode item, threadsafe::ts_stack<GNode>& lwl) {
+	int increment = 1;
+	if (discharge(lwl, gapYet, item)) {
+		increment += BETA;
+	}
+
+	relabelYet+=increment;
+	if(relabelYet >= globalRelabelInterval) 
+		globalRelabelSerial(gapYet,lwl);
+}
+
+
+
+void  initializePreflow(vector<int>& gapYet) {  
+
+
+        for(Graph::active_iterator ii = config->active_begin(), ee = config->active_end(); ii != ee; ++ii) {
+                Node& node = ii->getData();
+                if (!node.isSink && !node.isSource) {
+                        gapYet[node.height]--;  
+                }
+        }
+
+
+        for (Graph::neighbor_iterator ii = config->neighbor_begin(source), ee = config->neighbor_end(source); ii != ee; ++ii) {
+                GNode neighbor = *ii;
+                Edge& edgeData = config->getEdgeData(source, neighbor);
+
+                int cap = edgeData.cap;
+                reduceCapacity(source, neighbor, cap);
+                Node& node = neighbor.getData();
+                node.excess += cap;
+                if (cap > 0)
+                        wl.push(neighbor);
+        }
 
 }
 
-/*
-//Func2 implemented in cpp
-  private static void decrementGap(final Counter<GNode>[] gapYet, ForeachContext<GNode<Node>> ctx, int height) {
-    if (gapYet != null) {
-      gapYet[height].increment(ctx, MethodFlag.NONE);   //need to implement this increment function provided by Counter interface
-    }
-  }
-
-
-//Func3 implemented in cpp
-  private static void incrementGap(final Counter<GNode<Node>>[] gapYet, ForeachContext<GNode<Node>> ctx, int height) {
-    if (gapYet != null) {
-      gapYet[height].increment(ctx, -1, MethodFlg.ALL);  //need to implement this increment function provided by Counter class 
-    }
-  }
-
-
-//Func4 implemented in cpp
-  private static void incrementGap(final Counter<GNode>[] gapYet, int height) {
-    if (gapYet != null) {
-      gapYet[height].increment(-1);   //need to implement increment function of Counter interface
-    }
-  }
-
-
-//Func5 implemented in cpp
-  private void reduceCapacity(GNode src, GNode dst, int amount) {
-    Edge e1 = config->getEdgeData(src, dst);
-    Edge e2 = config->getEdgeData(dst, src);
-    e1.cap -= amount;
-    e2.cap += amount;
-  }
 
 
 
-bool discharge( threadsafe::ts_stack<GNode>& lwl , Counter<GNode>[] gapYet, GNode src) {
+bool discharge(threadsafe::ts_stack<GNode>& lwl , vector<int>& gapYet, GNode& src) {
 	Node& node = src.getData();
 	int prevHeight = node.height;
 	bool retval = false;
 
 	if (node.excess == 0 || node.height >= numNodes)
-		return ;
+		return retval;
 
 	Local l;
 	l.src = src;
@@ -204,9 +148,7 @@ bool discharge( threadsafe::ts_stack<GNode>& lwl , Counter<GNode>[] gapYet, GNod
 	while (true) {
 		l.finished = false;
 
-		//src.map(dbody, l, ctx, !retval ? MethodFlag.CHECK_CONFLICT : MethodFlag.NONE);  // this map function has to be edited...
-
-		for (Graph::neighbor_iterator ii = graph->neighbor_begin(src), ee = graph->neighbor_end(src); ii != ee; ++ii) {
+		for (Graph::neighbor_iterator ii = config->neighbor_begin(src), ee = config->neighbor_end(src); ii != ee; ++ii) {
 			GNode dst=*ii;
 			if (l.finished)
 				break;
@@ -219,7 +161,7 @@ bool discharge( threadsafe::ts_stack<GNode>& lwl , Counter<GNode>[] gapYet, GNod
 				Node& dnode = dst.getData();
 				if (node.height - 1 == dnode.height) {
 					// Push flow
-					amount = (int) Math.min(node.excess, cap);
+					node.excess < cap ? amount = node.excess : amount = cap;
 					reduceCapacity(l.src, dst, amount);
 					// Only add once
 				}
@@ -237,12 +179,12 @@ bool discharge( threadsafe::ts_stack<GNode>& lwl , Counter<GNode>[] gapYet, GNod
 		relabel(src, l);
 
 		retval = true;
-		decrementGap(gapYet, ctx, prevHeight); //check new implementation...
+		gapYet[prevHeight]++; //check new implementation...
 
 		if (node.height == numNodes)
 			break;
 
-		incrementGap(gapYet, ctx, node.height); //check new implemention ....
+		gapYet[node.height]--; //check new implemention ....
 		prevHeight = node.height;
 		l.cur = 0;
 	}
@@ -252,23 +194,95 @@ bool discharge( threadsafe::ts_stack<GNode>& lwl , Counter<GNode>[] gapYet, GNod
 
 
 
-//Func relabel implemented in cpp
 
-  private void relabel(GNode src, Local& l) {
-    l.resetForRelabel();
-    
-src.map(rbody, src, l, MethodFlag.NONE);   // this map function has to be edited....
+void relabel(GNode& src, Local& l) {
+	l.resetForRelabel();
 
-    l.minHeight++;
+	for (Graph::neighbor_iterator ii = config->neighbor_begin(src), ee = config->neighbor_end(src); ii != ee; ++ii){
+		GNode dst = *ii;
+		int cap = config->getEdgeData(src, dst).cap; //refined? check Graph.h file if that is the exact function
+		if (cap > 0) {
+			Node& dnode = dst.getData();
+			if (dnode.height < l.minHeight) {
+				l.minHeight = dnode.height;
+				l.minEdge = l.relabelCur;
+			}
+		}
+		l.relabelCur++;
+	}
 
-    Node& node = src.getData();
-    if (l.minHeight < numNodes) {
-      node.height = l.minHeight;
-      node.current = l.minEdge;
-    } else {
-      node.height = numNodes;
-    }
-  }
+	l.minHeight++;
+
+	Node& node = src.getData();
+	if (l.minHeight < numNodes) {
+		node.height = l.minHeight;
+		node.current = l.minEdge;
+	} else {
+		node.height = numNodes;
+	}
+}
 
 
-*/
+
+
+void globalRelabelSerial(vector<int>& gapYet, threadsafe::ts_stack<GNode>& lw) {
+	set<GNode> visited;
+	deque<GNode> queue;
+
+	for(Graph::active_iterator ii = config->active_begin(), ee = config->active_end(); ii != ee; ++ii) {
+		Node& node = ii->getData();
+		// Max distance
+		node.height = numNodes;
+		node.current = 0;
+
+		if (node.isSink) {
+			node.height = 0;
+			queue.push_front(*ii); 
+			visited.insert(*ii);
+		}
+	}
+
+	if ( &gapYet != NULL) {
+		for (int i = 0; i < numNodes; i++) {
+			gapYet[i]=0;
+		}
+	}
+
+	// Do walk on reverse *residual* graph!
+	while (!queue.empty()) {
+		GNode& src = queue.front();
+		queue.pop_front(); //pollFirst();
+		for (Graph::neighbor_iterator ii = config->neighbor_begin(src), ee = config->neighbor_end(src); ii != ee; ++ii){
+			GNode dst=*ii;        	
+			if (visited.find(dst) != visited.end())
+				continue;
+			Edge& edge = config->getEdgeData(dst,src);
+			if (edge.cap > 0) {
+				visited.insert(dst);
+				Node& node = dst.getData();
+				Node& node2 = src.getData();	          
+				node.height = node2.height + 1;
+				queue.push_back(dst); 
+			}
+		}
+	}
+
+	for(Graph::active_iterator ii = config->active_begin(), ee = config->active_end(); ii != ee; ++ii) {
+		Node& node = ii->getData();
+
+		if (node.isSink || node.isSource || node.height >= numNodes) {
+			continue;
+		}
+
+		if (node.excess > 0) {
+			lw.push(*ii);
+		}
+
+		gapYet[node.height]--;
+	}
+
+}
+
+
+
+

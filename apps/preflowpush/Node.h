@@ -1,11 +1,10 @@
 class Node
   {
-	private:
+	public:
 	int current;
 	double excess;
 	
 
-	public:
 	int id;
 	bool isSink;
 	bool isSource;

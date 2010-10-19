@@ -1,11 +1,10 @@
 class Edge
   {
-	private:
+	public:
 	int src,dst;	
   int cap;
 	int ocap;
 
-	public:
 	Edge(int source, int dest, int ocap)
 	{
 	    this->src=source;
