@@ -9,7 +9,8 @@ endif()
 
 find_package(Threads)
 
-set(CMAKE_CXX_FLAGS_RELEASE        "-O3 -DNDEBUG")
+#set(CMAKE_CXX_FLAGS_RELEASE        "-O3 -DNDEBUG")
+set(CMAKE_CXX_FLAGS_RELEASE        "-O3")
 set(CMAKE_CXX_FLAGS_DEBUG          "-g")
 
 set(CMAKE_BUILD_TYPE Release)

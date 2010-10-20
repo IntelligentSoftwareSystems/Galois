@@ -12,7 +12,9 @@ namespace GaloisRuntime {
 
   class SimpleRuntimeContext {
 
-    std::vector<Lockable*> locks;
+    typedef std::vector<Lockable*> locksTy;
+    //, __gnu_cxx::malloc_allocator<Lockable*> > locksTy;
+    locksTy locks;
 
     void rollback() {
       throw -1;
@@ -34,7 +36,7 @@ namespace GaloisRuntime {
 
     SimpleRuntimeContext() {}
     ~SimpleRuntimeContext() {
-      for (std::vector<Lockable*>::iterator ii = locks.begin(), ee = locks.end(); ii != ee; ++ii)
+      for (locksTy::iterator ii = locks.begin(), ee = locks.end(); ii != ee; ++ii)
 	(*ii)->unlock();
     }
   };

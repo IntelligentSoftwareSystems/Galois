@@ -46,7 +46,7 @@ class Builder{
 		int sourceId=numNodes++;
 		int sinkId=numNodes++;
 
-		GNode nodes[numNodes];
+		std::vector<GNode> nodes(numNodes);
 		for (int i = 0; i < numNodes; i++)
 		{
 			Node n(i);

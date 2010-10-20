@@ -53,7 +53,7 @@ class Element {
 
  public:
   
- Element(const Tuple& a, const Tuple& b, const Tuple& c)
+ explicit Element(const Tuple& a, const Tuple& b, const Tuple& c)
    :obtuse(0), bBad(0), bDim(true)
   { //constructor for Triangles
     coords[0] = a;
@@ -98,7 +98,7 @@ class Element {
     radius_squared = center.distance_squared(a);
   }
   
-  Element(Tuple a, Tuple b)
+  explicit Element(const Tuple& a, const Tuple& b)
     :obtuse(0), bBad(0), bDim(false)
   { //constructor for segments
     coords[0] = a;

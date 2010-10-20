@@ -15,7 +15,7 @@ namespace threadsafe {
     simpleLock() : _lock(0) {}
 
     void read_lock() {
-      assert(!_lock);
+      //      assert(!_lock);
       while (!try_read_lock()) {}
     }
     void read_unlock() {
@@ -46,7 +46,7 @@ namespace threadsafe {
     ptrLock() : _lock(0) {}
 
     void lock(void* val) {
-      assert(!_lock);
+      //      assert(!_lock);
       while (!try_lock(val)) {}
     }
     void unlock() {

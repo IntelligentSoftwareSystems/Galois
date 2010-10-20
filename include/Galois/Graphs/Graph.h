@@ -8,6 +8,7 @@
 
 
 #include "Galois/Runtime/Context.h"
+#include "Galois/Runtime/InsBag.h"
 #include "Support/ThreadSafe/TSIBag.h"
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -35,14 +36,16 @@ class FirstGraph {
   struct gNode : public GaloisRuntime::Lockable {
     NodeTy data;
     bool active;
-    std::vector<std::pair<gNode*, EdgeTy> > edges;
+    typedef std::vector<std::pair<gNode*, EdgeTy> > edgesTy;
+    //, __gnu_cxx::malloc_allocator<std::pair<gNode*, EdgeTy> > > edgesTy;
+    edgesTy edges;
 
     gNode(const NodeTy& d, bool a)
       :data(d), active(a)
     {}
 
     void eraseEdge(gNode* N) {
-      for (typename std::vector<std::pair<gNode*, EdgeTy> >::iterator ii = edges.begin(), ee = edges.end(); ii != ee; ++ii) {
+      for (typename edgesTy::iterator ii = edges.begin(), ee = edges.end(); ii != ee; ++ii) {
 	if (ii->first == N) {
 	  edges.erase(ii);
 	  return;
@@ -51,14 +54,14 @@ class FirstGraph {
     }
 
     EdgeTy& getOrCreateEdge(gNode* N) {
-      for (typename std::vector<std::pair<gNode*, EdgeTy> >::iterator ii = edges.begin(), ee = edges.end(); ii != ee; ++ii) 
+      for (typename edgesTy::iterator ii = edges.begin(), ee = edges.end(); ii != ee; ++ii) 
 	if (ii->first == N) 
 	  return ii->second;
       edges.push_back(std::make_pair(N, EdgeTy()));
       return edges.back().second;
     }
     EdgeTy& getEdge(gNode* N) {
-      for (typename std::vector<std::pair<gNode*, EdgeTy> >::iterator ii = edges.begin(), ee = edges.end(); ii != ee; ++ii) 
+      for (typename edgesTy::iterator ii = edges.begin(), ee = edges.end(); ii != ee; ++ii) 
 	if (ii->first == N)
 	  return ii->second;
       assert(0 && "Edge doesn't exist");
@@ -67,6 +70,7 @@ class FirstGraph {
   };
   
   //The graph manages the lifetimes of the data in the nodes and edges
+  //typedef GaloisRuntime::galois_insert_bag<gNode> nodeListTy;
   typedef threadsafe::ts_insert_bag<gNode> nodeListTy;
   nodeListTy nodes;
   
@@ -239,7 +243,7 @@ public:
     return N.ID->edges.size();
   }
 
-  typedef boost::transform_iterator<makeGraphNode, typename std::vector<std::pair<gNode*, EdgeTy> >::iterator > neighbor_iterator;
+  typedef boost::transform_iterator<makeGraphNode, typename gNode::edgesTy::iterator > neighbor_iterator;
 
   neighbor_iterator neighbor_begin(GraphNode N) {
     assert(N.ID);

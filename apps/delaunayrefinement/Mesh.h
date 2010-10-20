@@ -186,6 +186,8 @@ class Mesh {
 
     if (found.size() != mesh->size()) {
       std::cerr << "Not all elements are reachable \n";
+      std::cerr << "Found: " << found.size() << "\nMesh: " << mesh->size() << "\n";
+      assert(0 && "Not all elements are reachable");
       return false;
     }
     return true;
