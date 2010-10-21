@@ -28,7 +28,7 @@ struct VoidWrapper<void> {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-template<typename _NodeTy, typename _EdgeTy>
+template<typename _NodeTy, typename _EdgeTy, bool Directional>
 class FirstGraph {
   typedef typename VoidWrapper<_NodeTy>::Type NodeTy;
   typedef typename VoidWrapper<_EdgeTy>::Type EdgeTy;
@@ -179,6 +179,7 @@ public:
   }
 
   // Removes a node from the graph along with all its outgoing/incoming edges.
+  // FIXME: incoming edges aren't handled here for directed graphs
   bool removeNode(GraphNode n) {
     assert(n.ID);
     GaloisRuntime::acquire(n.ID);
@@ -200,17 +201,21 @@ public:
   // Edge Handling
 
   // Adds an edge to the graph containing the specified data.
-  void addEdge(GraphNode src, GraphNode dst, const EdgeTy& data) {
+  void addEdge(GraphNode src, GraphNode dst, const EdgeTy& data = EdgeTy()) {
     assert(src.ID);
     assert(dst.ID);
     GaloisRuntime::acquire(src.ID);
     GaloisRuntime::acquire(dst.ID);
-    EdgeTy& E1 = src.ID->getOrCreateEdge(dst.ID);
-    EdgeTy& E2 = dst.ID->getOrCreateEdge(src.ID);
-    if (src < dst)
-      E1 = data;
-    else
-      E2 = data;
+    if (Directional) {
+      src.ID->getOrCreateEdge(dst.ID) = data;
+    } else {
+      EdgeTy& E1 = src.ID->getOrCreateEdge(dst.ID);
+      EdgeTy& E2 = dst.ID->getOrCreateEdge(src.ID);
+      if (src < dst)
+	E1 = data;
+      else
+	E2 = data;
+    }
   }
 
   
@@ -219,8 +224,12 @@ public:
     assert(dst.ID);
     GaloisRuntime::acquire(src.ID);
     GaloisRuntime::acquire(dst.ID);
-    src.ID->eraseEdge(dst.ID);
-    dst.ID->eraseEdge(src.ID);
+    if (Directional) {
+      src.ID->eraseEdge(dst.ID);
+    } else {
+      src.ID->eraseEdge(dst.ID);
+      dst.ID->eraseEdge(src.ID);
+    }
   }
 
   EdgeTy& getEdgeData(GraphNode src, GraphNode dst) {
@@ -231,10 +240,14 @@ public:
     GaloisRuntime::acquire(src.ID);
     GaloisRuntime::acquire(dst.ID);
 
-    if (src < dst)
+    if (Directional) {
       return src.ID->getEdge(dst.ID);
-    else
-      return dst.ID->getEdge(src.ID);
+    } else {
+      if (src < dst)
+	return src.ID->getEdge(dst.ID);
+      else
+	return dst.ID->getEdge(src.ID);
+    }
   }
 
   // General Things

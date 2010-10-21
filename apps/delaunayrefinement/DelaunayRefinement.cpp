@@ -40,8 +40,8 @@
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
 
-typedef FirstGraph<Element,Edge>            Graph;
-typedef FirstGraph<Element,Edge>::GraphNode GNode;
+typedef FirstGraph<Element,Edge,false>            Graph;
+typedef FirstGraph<Element,Edge,false>::GraphNode GNode;
 
 
 #include "Subgraph.h"

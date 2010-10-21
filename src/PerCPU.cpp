@@ -38,51 +38,44 @@ union LocalDataItem {
   void* ptrData;
 };
 
-//index 0 always stores the local length of the array
 static __thread LocalDataItem* ThreadLocalData = 0;
+static __thread int ThreadLocalNum = 0;
+
 //This is the total number allocated so far
-//a full array is this + 1 (local length field)
 static int nextLocalItem = 0;
 
-static std::vector<LocalDataItem*> AllThreadData;
+static std::vector<std::pair<LocalDataItem*, int> > AllThreadData;
 static threadsafe::simpleLock AllThreadDataLock;
 
-//returned indexes start at zero and index into i + 1 of the array
-
-static __attribute__((noinline)) LocalDataItem* getIndexedRemote(int index, LocalDataItem* L) {
-  if (L[0].longData <= index) {
-    return 0;
-  }
-  return &L[index + 1];
+static LocalDataItem* createAll() {
+  //We only create inside a thread, so no concurrency worry
+  int num = nextLocalItem;
+  LocalDataItem* L = new LocalDataItem[num];
+  bzero(L, sizeof(LocalDataItem[num]));
+  ThreadLocalData = L;
+  ThreadLocalNum = num;
+  AllThreadDataLock.write_lock();
+  int myID = GaloisRuntime::getThreadID();
+  AllThreadData.resize(std::max(1 + myID, (int)AllThreadData.size()));
+  AllThreadData[myID].first = L;
+  AllThreadData[myID].second = num;
+  AllThreadDataLock.write_unlock();
 }
 
 static LocalDataItem* getIndexedChecked(int index) {
   LocalDataItem* L = ThreadLocalData;
   assert(index < nextLocalItem); //Check global safety
   if (!L) {
-    AllThreadDataLock.write_lock();
-    //We only create inside a thread, so no concurrency worry
-    int num = nextLocalItem;
-    ThreadLocalData = L = new LocalDataItem[num + 1];
-    L[0].longData = num;
-    AllThreadData.resize(std::max(1 + GaloisRuntime::getThreadID(), (int)AllThreadData.size()));
-    AllThreadData[GaloisRuntime::getThreadID()] = L;
-    AllThreadDataLock.write_unlock();
-  } else if (L[0].longData <= index) {
-    AllThreadDataLock.write_lock();
+    L = createAll();
+  } else if (ThreadLocalNum <= index) {
     LocalDataItem* Old = L;
-    long oldsize = L[0].longData;
-    int num = nextLocalItem;
-    ThreadLocalData = L = new LocalDataItem[num + 1];
-    bzero(L, sizeof(LocalDataItem[num + 1]));
-    memcpy(L, Old, sizeof(LocalDataItem[num + 1]));
-    L[0].longData = num;
+    long oldsize = ThreadLocalNum;
+    L = createAll();
+    std::copy(&Old[0], &Old[oldsize], &L[0]);
+    //memcpy(L, Old, sizeof(LocalDataItem[oldsize]));
     delete Old;
-    AllThreadData.resize(std::max(1 + GaloisRuntime::getThreadID(), (int)AllThreadData.size()));
-    AllThreadData[GaloisRuntime::getThreadID()] = L;
-    AllThreadDataLock.write_unlock();    
   }
-  return &L[index + 1];
+  return &L[index];
 }
 
 static int createNewID() {
@@ -132,11 +125,10 @@ namespace GaloisRuntime {
     T retval = (T)0;
     AllThreadDataLock.write_lock();
     AllThreadData.resize(std::max(1 + rThreadID, (int)AllThreadData.size()));
-    if (LocalDataItem* L = AllThreadData[rThreadID]) {
-      L = getIndexedRemote(index, L);
-      if (L)
-	retval = *(getByType<T>(L));
-    }
+    LocalDataItem* L = AllThreadData[rThreadID].first;
+    int num = AllThreadData[rThreadID].second;
+    if (L && (index < num))
+      retval = *(getByType<T>(&L[index]));
     AllThreadDataLock.write_unlock();
     return retval;
   }

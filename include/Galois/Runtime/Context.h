@@ -44,13 +44,12 @@ namespace GaloisRuntime {
       acquire(&L);
     }
     void acquire(Lockable* C) {
-      if (C->get_lock_value() != this) {
-	bool suc = C->try_lock(this);
-	if (suc) {
-	  locks.push_front(*C);
-	} else {
+      bool suc = C->try_lock(this);
+      if (suc) {
+	locks.push_front(*C);
+      } else {
+	if (C->get_lock_value() != this)
 	  rollback();
-	}
       }
     }
 
@@ -59,9 +58,10 @@ namespace GaloisRuntime {
       //Although the destructor for the list would do the unlink,
       //we do it here since we already are iterating
       while (!locks.empty()) {
+	//ORDER MATTERS!
 	Lockable& L = locks.front();
-	L.unlock();
 	locks.pop_front();
+	L.unlock();
       }
     }
   };

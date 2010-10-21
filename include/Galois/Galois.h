@@ -54,7 +54,7 @@ namespace GaloisRuntime {
   };
 
   class pThreadPool {
-    pthread_t threadpool[32]; // FIXME: be dynamic
+    pthread_t threadpool[64]; // FIXME: be dynamic
     int num;
   public:
     pThreadPool(int i) {
