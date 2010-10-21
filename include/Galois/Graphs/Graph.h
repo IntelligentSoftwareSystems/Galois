@@ -10,6 +10,7 @@
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/InsBag.h"
 #include "Support/ThreadSafe/TSIBag.h"
+#include "LLVM/SmallVector.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 // Wrap void so that we can have a valid type on void nodes
@@ -36,7 +37,8 @@ class FirstGraph {
   struct gNode : public GaloisRuntime::Lockable {
     NodeTy data;
     bool active;
-    typedef std::vector<std::pair<gNode*, EdgeTy> > edgesTy;
+    typedef llvm::SmallVector<std::pair<gNode*, EdgeTy>, 4> edgesTy;
+    //typedef std::vector<std::pair<gNode*, EdgeTy> > edgesTy;
     //, __gnu_cxx::malloc_allocator<std::pair<gNode*, EdgeTy> > > edgesTy;
     edgesTy edges;
 
@@ -70,8 +72,8 @@ class FirstGraph {
   };
   
   //The graph manages the lifetimes of the data in the nodes and edges
-  //typedef GaloisRuntime::galois_insert_bag<gNode> nodeListTy;
-  typedef threadsafe::ts_insert_bag<gNode> nodeListTy;
+  typedef GaloisRuntime::galois_insert_bag<gNode> nodeListTy;
+  //typedef threadsafe::ts_insert_bag<gNode> nodeListTy;
   nodeListTy nodes;
   
   //deal with the Node redirction
