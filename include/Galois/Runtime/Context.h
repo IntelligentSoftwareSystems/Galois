@@ -4,16 +4,36 @@
 #define _GALOIS_RUNTIME_CONTEXT_H
 
 #include "Support/ThreadSafe/simple_lock.h"
-#include <vector>
+#include <boost/intrusive/slist.hpp>
 
 namespace GaloisRuntime {
 
-  typedef threadsafe::ptrLock Lockable;
+  //All objects that may be locked (nodes primarily) must inherit from Lockable
+  //Use an intrusive list to track objects in a context without allocation overhead
+  class LockableListTag;
+  typedef boost::intrusive::slist_base_hook<boost::intrusive::tag<LockableListTag>,boost::intrusive::link_mode<boost::intrusive::normal_link> > LockableBaseHook;
+  class Lockable : public LockableBaseHook {
+    volatile void* _lock;
+  public:
+    Lockable() : _lock(0) {}
+    void lock(void* val) {
+      while (!try_lock(val)) {}
+    }
+    void unlock() {
+      assert(_lock);
+      _lock = 0;
+    }
+    bool try_lock(void* val) {
+      return __sync_bool_compare_and_swap(&_lock, 0, val);
+    }
+    void* get_lock_value() {
+      return const_cast<void*>(_lock);
+    }
+  };
 
   class SimpleRuntimeContext {
 
-    typedef std::vector<Lockable*> locksTy;
-    //, __gnu_cxx::malloc_allocator<Lockable*> > locksTy;
+    typedef boost::intrusive::slist<Lockable, boost::intrusive::base_hook<LockableBaseHook>, boost::intrusive::constant_time_size<false>, boost::intrusive::linear<true> > locksTy;
     locksTy locks;
 
     void rollback() {
@@ -24,10 +44,10 @@ namespace GaloisRuntime {
       acquire(&L);
     }
     void acquire(Lockable* C) {
-      if (C->getValue() != this) {
+      if (C->get_lock_value() != this) {
 	bool suc = C->try_lock(this);
 	if (suc) {
-	  locks.push_back(C);
+	  locks.push_front(*C);
 	} else {
 	  rollback();
 	}
@@ -36,8 +56,13 @@ namespace GaloisRuntime {
 
     SimpleRuntimeContext() {}
     ~SimpleRuntimeContext() {
-      for (locksTy::iterator ii = locks.begin(), ee = locks.end(); ii != ee; ++ii)
-	(*ii)->unlock();
+      //Although the destructor for the list would do the unlink,
+      //we do it here since we already are iterating
+      while (!locks.empty()) {
+	Lockable& L = locks.front();
+	L.unlock();
+	locks.pop_front();
+      }
     }
   };
 

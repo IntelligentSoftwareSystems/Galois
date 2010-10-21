@@ -178,6 +178,7 @@ class Mesh {
       GNode node = remaining.top();
       remaining.pop();
       if (!found.count(node)) {
+	assert(mesh->containsNode(node) && "Reachable node was removed from graph");
 	found.insert(node);
 	for (Graph::neighbor_iterator ii = mesh->neighbor_begin(node), ee = mesh->neighbor_end(node); ii != ee; ++ii)
 	  remaining.push(*ii);

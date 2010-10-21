@@ -1,24 +1,26 @@
-#include <vector>
 #include <string.h>
+
+#include <vector>
 #include <algorithm>
 
 #include "Galois/Runtime/PerCPU.h"
 #include "Support/ThreadSafe/simple_lock.h"
 
 //This, once initialized by a thread, stores an dense index/label for that thread
-static __thread int ThreadID = 0;
+static __thread int LocalThreadID = 0;
 
 //This stores the next thread id
 static int nextThreadID = 0;
 
 
 int GaloisRuntime::getThreadID() {
-  int ID = ThreadID;
+  int ID = LocalThreadID;
   if (!ID) {
     //Not previously accessed
     ID = __sync_add_and_fetch(&nextThreadID, 1);
-    ThreadID = ID;
+    LocalThreadID = ID;
   }
+  assert(ID > 0 && ID < 64);
   return ID;
 }
 
