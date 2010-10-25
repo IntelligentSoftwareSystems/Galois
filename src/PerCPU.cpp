@@ -1,7 +1,6 @@
-#include <string.h>
-
 #include <vector>
 #include <algorithm>
+#include <iostream>
 
 #include "Galois/Runtime/PerCPU.h"
 #include "Support/ThreadSafe/simple_lock.h"
@@ -47,11 +46,22 @@ static int nextLocalItem = 0;
 static std::vector<std::pair<LocalDataItem*, int> > AllThreadData;
 static threadsafe::simpleLock AllThreadDataLock;
 
+static LocalDataItem setToZero() {
+  LocalDataItem LDI;
+  LDI.longData = 0;
+  LDI.intData = 0;
+  LDI.shortData = 0;
+  LDI.charData = 0;
+  LDI.boolData = 0;
+  LDI.ptrData = 0;
+  return LDI;
+}
+
 static LocalDataItem* createAll() {
   //We only create inside a thread, so no concurrency worry
   int num = nextLocalItem;
   LocalDataItem* L = new LocalDataItem[num];
-  bzero(L, sizeof(LocalDataItem[num]));
+  std::generate(&L[0], &L[num], setToZero);
   ThreadLocalData = L;
   ThreadLocalNum = num;
   AllThreadDataLock.write_lock();
@@ -60,6 +70,7 @@ static LocalDataItem* createAll() {
   AllThreadData[myID].first = L;
   AllThreadData[myID].second = num;
   AllThreadDataLock.write_unlock();
+  return L;
 }
 
 static LocalDataItem* getIndexedChecked(int index) {
@@ -72,7 +83,7 @@ static LocalDataItem* getIndexedChecked(int index) {
     long oldsize = ThreadLocalNum;
     L = createAll();
     std::copy(&Old[0], &Old[oldsize], &L[0]);
-    //memcpy(L, Old, sizeof(LocalDataItem[oldsize]));
+    std::cerr << "Copy Happened\n";
     delete Old;
   }
   return &L[index];
