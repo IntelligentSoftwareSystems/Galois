@@ -56,6 +56,14 @@ namespace threadsafe {
       return retval;
     }
 
+    template<typename Siter>
+    void insert(Siter b, Siter e) {
+      lock.write_lock();
+      for (; b != e; ++b)
+	c.push(*b);
+      lock.write_unlock();
+    }
+
     /**  Returns the number of elements in the %stack.  */
     size_type
     size() const

@@ -59,6 +59,8 @@ void process(GNode item, std::stack<GNode>& lwl) {
   if (!mesh->containsNode(item))
     return;
 
+  item.getData(); //lock
+
   Cavity cav(mesh);
   cav.initialize(item);
   cav.build();
@@ -144,11 +146,11 @@ int main(int argc, char** argv) {
   
   cerr << "Time: " << Galois::Launcher::elapsedTime() << " msec\n";
 
-  if (!m.verify(mesh)) {
-    cerr << "Refinement failed.\n";
-    assert(0 && "Refinement failed");
-    abort();
-  }
+  //  if (!m.verify(mesh)) {
+  //    cerr << "Refinement failed.\n";
+  //    assert(0 && "Refinement failed");
+  //    abort();
+  //  }
   
   int size = m.getBad(mesh, wl);
   if (size != 0) {
