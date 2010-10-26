@@ -34,5 +34,7 @@ void SSSP::bellman_ford(const std::list<SNode> & nodes,
 
 }
 
-
+int main(int argc, char** argv) {
+  return 0;
+}
 
