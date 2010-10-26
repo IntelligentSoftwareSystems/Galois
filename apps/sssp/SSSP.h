@@ -12,7 +12,8 @@
 #include "SNode.h"
 #include "SEdge.h"
 #include "Galois/Graphs/Graph.h"
-typedef FirstGraph<SNode, SEdge> Graph;
+typedef FirstGraph<SNode, SEdge, true> Graph;
+typedef FirstGraph<SNode, SEdge, true>::GraphNode GNode;
 
 class SSSP {
 public:
