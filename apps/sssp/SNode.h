@@ -17,10 +17,11 @@ const int INFINITY = 2147483647;
 
 class SNode {
 private:
+public:
 	int id;
 	int dist;
 	SNode* pred;
-public:
+
 	SNode(int _id) : id(_id) { dist = INFINITY; pred = NULL; };
 	virtual ~SNode();
 	const int get_id() { return id; };
