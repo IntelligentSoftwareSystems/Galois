@@ -7,9 +7,9 @@ include_directories(${Boost_INCLUDE_DIRS})
 
 find_package(Threads REQUIRED)
 
-set(CMAKE_CXX_FLAGS_RELEASE        "-O3 -DNDEBUG")
+set(CMAKE_CXX_FLAGS_RELEASE        "-Wall -O3 -DNDEBUG")
 #set(CMAKE_CXX_FLAGS_RELEASE        "-O3 -g")
-set(CMAKE_CXX_FLAGS_DEBUG          "-g")
+set(CMAKE_CXX_FLAGS_DEBUG          "-Wall -g")
 
 set(CMAKE_BUILD_TYPE Release)
 #set(CMAKE_BUILD_TYPE Debug)

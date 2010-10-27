@@ -7,13 +7,12 @@
 #include <pthread.h>
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Timer.h"
+#include "Galois/Runtime/ThreadPool.h"
 
 namespace GaloisRuntime {
   
-  extern int numThreads;
-
   template<class WorkListTy, class Function> 
-  class GaloisWork {
+  class GaloisWork : public Executable {
     WorkListTy& wl;
     Function f;
     int conflicts;
@@ -50,7 +49,7 @@ namespace GaloisRuntime {
       return true;
     }
     
-    void perThreadLaunch() {
+    virtual void operator() (void) {
       std::stack<typename WorkListTy::value_type> wlLocal;
       //std::vector<typename WorkListTy::value_type> wlDelay;
       int lconflicts = 0;
@@ -87,35 +86,12 @@ namespace GaloisRuntime {
     }
   };
 
-  class pThreadPool {
-    pthread_t threadpool[64]; // FIXME: be dynamic
-    int num;
-  public:
-    pThreadPool(int i) {
-      num = i;
-    }
-
-    template<class _GaloisWork>
-    void launch(_GaloisWork* GW) {
-      for (int i = 0; i < (num - 1); ++i)
-	pthread_create(&threadpool[i], 0, _GaloisWork::threadLaunch, (void*)GW);
-      //We use this thread for the last thread to avoid serial overhead for now
-      _GaloisWork::threadLaunch(GW);
-    }
- 
-    void wait() {
-      for (int i = 0; i < (num - 1); ++i)
-	pthread_join(threadpool[i], 0);
-    }
-  };
-
   template<class WorkListTy, class Function>
   void for_each_simple (WorkListTy& wl, Function f)
   {
     GaloisWork<WorkListTy, Function> GW(wl, f);
-    pThreadPool PTP(numThreads);
-    PTP.launch(&GW);
-    PTP.wait();
+    ThreadPool& PTP = getSystemThreadPool();
+    PTP.run(&GW);
   }
   
 
@@ -125,7 +101,9 @@ namespace GaloisRuntime {
 
 namespace Galois {
 
-  extern void setMaxThreads(int T);
+  static void setMaxThreads(int T) {
+    GaloisRuntime::getSystemThreadPool().resize(T);
+  }
 
   template<typename WorkListTy, typename Function>
   void for_each (WorkListTy& wl, Function f)
