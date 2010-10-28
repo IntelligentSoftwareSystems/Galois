@@ -39,17 +39,13 @@
 #define MINANGLE 30.0
 
 class Element {
+  Tuple coords[3]; // The three endpoints of the triangle
+
   // if the triangle has an obtuse angle
   // obtuse - 1 is which one
   signed char obtuse;
   bool bBad;
   bool bDim; // true == 3, false == 2
-
-  Tuple coords[3]; // The three endpoints of the triangle
-  //Edge edges[3]; // The edges connecting it to neighboring triangles
-
-  Tuple center; // The coordinates of the center of the circumcircle the triangle
-  double radius_squared;
 
  public:
   
@@ -81,21 +77,6 @@ class Element {
 	bBad = true;
       }
     }
-    Tuple x = b - a;
-    Tuple y = c - a;
-    double xlen = a.distance(b);
-    double ylen = a.distance(c);
-    double cosine = (x * y) / (xlen * ylen);
-    double sine_sq = 1.0 - cosine * cosine;
-    double plen = ylen / xlen;
-    double s = plen * cosine;
-    double t = plen * sine_sq;
-    double wp = (plen - cosine) / (2 * t);
-    double wb = 0.5 - (wp * s);
-    Tuple tmpval = a * (1 - wb - wp);
-    tmpval = tmpval + (b * wb);
-    center = tmpval + (c * wp);
-    radius_squared = center.distance_squared(a);
   }
   
   explicit Element(const Tuple& a, const Tuple& b)
@@ -107,12 +88,40 @@ class Element {
       coords[0] = b;
       coords[1] = a;
     }
-    //    edges[0] = Edge(coords[0], coords[1]);
-    //    edges[1] = Edge(coords[1], coords[0]);
-    center = (a + b) * 0.5;
-    radius_squared = center.distance_squared(a);
+  }
+
+  Tuple getCenter() const {
+    if (getDim() == 2) {
+      return (coords[0] + coords[1]) * 0.5;
+    } else {
+      const Tuple& a = coords[0];
+      const Tuple& b = coords[1];
+      const Tuple& c = coords[2];
+      Tuple x = b - a;
+      Tuple y = c - a;
+      double xlen = a.distance(b);
+      double ylen = a.distance(c);
+      double cosine = (x * y) / (xlen * ylen);
+      double sine_sq = 1.0 - cosine * cosine;
+      double plen = ylen / xlen;
+      double s = plen * cosine;
+      double t = plen * sine_sq;
+      double wp = (plen - cosine) / (2 * t);
+      double wb = 0.5 - (wp * s);
+      Tuple tmpval = a * (1 - wb - wp);
+      tmpval = tmpval + (b * wb);
+      return tmpval + (c * wp);
+    }
   }
   
+  double get_radius_squared() const {
+    return get_radius_squared(getCenter());
+  }
+
+  double get_radius_squared(const Tuple& center) const {
+    return center.distance_squared(coords[0]);
+  }
+
   bool operator< (const Element& rhs) const {
     //apparently a triangle is less than a line
     if (getDim() < rhs.getDim()) return false;
@@ -134,13 +143,10 @@ class Element {
     return num_eq == 2;
   }
 
-  const Tuple& getCenter() const {
-    return center;
-  }
-
   bool inCircle(Tuple p) const {
+    Tuple center = getCenter();
     double ds = center.distance_squared(p);
-    return ds <= radius_squared;
+    return ds <= get_radius_squared(center);
   }
 
   double getAngle(int i) const {
@@ -236,13 +242,6 @@ class Element {
   }
 
 };
-
-struct printsize {
-  printsize() {
-    std::cerr << sizeof(Element) << "\n";
-  }
-};
-printsize P;
 
 static std::ostream& operator<<(std::ostream& s, const Element& E) {
   return E.print(s);

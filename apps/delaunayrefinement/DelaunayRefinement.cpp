@@ -55,7 +55,7 @@ Graph* mesh;
 threadsafe::ts_queue<GNode> wl;
 int threads = 1;
 
-void process(GNode item, std::stack<GNode>& lwl) {
+void process(GNode item, GaloisRuntime::LocalWorkListTy<GNode>::type& lwl) {
   if (!mesh->containsNode(item))
     return;
 
@@ -101,7 +101,7 @@ void refine(Mesh& m) {
   //      process(N, wl);
   //    }
   //  } else {
-    Galois::setMaxThreads(threads);
+  //Galois::setMaxThreads(threads);
     Galois::for_each(wl, process);
     //  }
 }
@@ -139,7 +139,8 @@ int main(int argc, char** argv) {
   cerr << "configuration: " << mesh->size() << " total triangles, " << numbad << " bad triangles\n"
        << "number of threads: " << threads << "\n"
        << "\n";
-  
+
+  Galois::setMaxThreads(threads);
   Galois::Launcher::startTiming();
   refine(m);
   Galois::Launcher::stopTiming();

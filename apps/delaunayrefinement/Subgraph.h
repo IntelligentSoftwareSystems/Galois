@@ -28,8 +28,9 @@
  
  */ 
 
-#include <list>
+#include <vector>
 #include <algorithm>
+#include <ext/malloc_allocator.h>
 
 /**
  *  A sub-graph of the mesh. Used to store information about the original 
@@ -52,9 +53,12 @@ class Subgraph {
 
  private:
   // the nodes in the graph before updating
-  std::list<GNode> nodes;
+  typedef std::vector<GNode,__gnu_cxx::malloc_allocator<GNode> > nodesTy;
+  nodesTy nodes;
+
   // the edges that connect the subgraph to the rest of the graph
-  std::list<tmpEdge> edges;
+  typedef std::vector<tmpEdge,__gnu_cxx::malloc_allocator<tmpEdge> > edgesTy;
+  edgesTy edges;
 
  public:
   Subgraph() {}
@@ -64,14 +68,14 @@ class Subgraph {
   }
 
   void addNode(GNode n) {
-    return nodes.push_front(n);
+    return nodes.push_back(n);
   }
  
   void addEdge(tmpEdge e) {
-    return edges.push_front(e);
+    return edges.push_back(e);
   }
   void addEdge(GNode src, GNode dst, const Edge& e) {
-    return edges.push_front(tmpEdge(src,dst,e));
+    return edges.push_back(tmpEdge(src,dst,e));
   }
 
   void reset() {
@@ -79,7 +83,7 @@ class Subgraph {
     edges.clear();
   }
 
-  typedef std::list<GNode>::iterator iterator;
+  typedef nodesTy::iterator iterator;
 
   iterator begin() {
     return nodes.begin();
@@ -89,7 +93,7 @@ class Subgraph {
     return nodes.end();
   }
 
-  typedef std::list<tmpEdge>::iterator edge_iterator;
+  typedef edgesTy::iterator edge_iterator;
 
   edge_iterator edge_begin() {
     return edges.begin();

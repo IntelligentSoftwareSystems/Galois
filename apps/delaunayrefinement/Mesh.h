@@ -30,6 +30,7 @@
 #define _MESH_H_
 
 #include <vector>
+#include <set>
 #include <fstream>
 #include <istream>
 #include <boost/iostreams/filter/gzip.hpp>

@@ -26,9 +26,9 @@
  
 */ 
 
-#include <queue>
-#include <list>
+#include <vector>
 #include <algorithm>
+#include <ext/malloc_allocator.h>
 
 class Cavity {
 
@@ -36,13 +36,14 @@ class Cavity {
   GNode centerNode;
   Element* centerElement;
   int dim;
-  std::queue<GNode> frontier;
+  std::vector<GNode,__gnu_cxx::malloc_allocator<GNode> > frontier;
   // the cavity itself
   Subgraph pre;
   // what the new elements should look like
   Subgraph post;
   // the edge-relations that connect the boundary to the cavity
-  std::list<Subgraph::tmpEdge> connections;
+  typedef std::vector<Subgraph::tmpEdge,__gnu_cxx::malloc_allocator<Subgraph::tmpEdge> > connTy;
+  connTy connections;
 
   Graph* graph;
 	
@@ -83,7 +84,7 @@ class Cavity {
       } else {
 	if (!pre.containsNode(next)) {
 	  pre.addNode(next);
-	  frontier.push(next);
+	  frontier.push_back(next);
 	}
       }
     } else {
@@ -91,7 +92,7 @@ class Cavity {
       Edge& edgeData = graph->getEdgeData(node, next);
       Subgraph::tmpEdge edge(node, next, edgeData);
       if (std::find(connections.begin(), connections.end(), edge) == connections.end()) {
-	connections.push_front(edge);
+	connections.push_back(edge);
       }
     }
   }
@@ -107,7 +108,7 @@ class Cavity {
     pre.reset();
     post.reset();
     connections.clear();
-    frontier = std::queue<GNode>();
+    frontier.clear();// = std::<GNode>();
     centerNode = node;
     centerElement = &centerNode.getData();
     while (graph->containsNode(centerNode) && centerElement->isObtuse()) {
@@ -117,13 +118,13 @@ class Cavity {
     center = centerElement->getCenter();
     dim = centerElement->getDim();
     pre.addNode(centerNode);
-    frontier.push(centerNode);
+    frontier.push_back(centerNode);
   }
 
   void build() {
     while (!frontier.empty()) {
-      GNode curr = frontier.front();
-      frontier.pop();
+      GNode curr = frontier.back();
+      frontier.pop_back();
       for (Graph::neighbor_iterator ii = graph->neighbor_begin(curr), ee = graph->neighbor_end(curr); ii != ee; ++ii) {
 	GNode neighbor = *ii;
 	expand(curr, neighbor);
@@ -143,7 +144,7 @@ class Cavity {
       GNode node2 = graph->createNode(ele2);
       post.addNode(node2);
     }
-    for (std::list<Subgraph::tmpEdge>::iterator ii = connections.begin(), ee = connections.end(); ii != ee; ++ii) {
+    for (connTy::iterator ii = connections.begin(), ee = connections.end(); ii != ee; ++ii) {
       Subgraph::tmpEdge conn = *ii;
       Edge& edge = conn.data;
       Element new_element(center, edge.getPoint(0), edge.getPoint(1));
