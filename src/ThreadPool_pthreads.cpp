@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <iostream>
 #include <list>
+#include <cassert>
 
 #include "Galois/Runtime/ThreadPool.h"
 
@@ -60,16 +61,22 @@ namespace {
     Executable* work;
     volatile bool shutdown;
     std::list<pthread_t> threads;
+    int tmax;
 
     int numThreads() {
-      return (int)threads.size();
+      return threads.size();
+    }
+
+    int mkID() {
+      return __sync_fetch_and_add(&tmax, 1);
     }
 
     void launch(void) {
+      int myID = mkID();
       while (!shutdown) {
 	start.acquire();
 	if (!shutdown)
-	  (*work)();
+	  (*work)(myID, numThreads());
 	finish.release();
       }
     }
@@ -81,7 +88,7 @@ namespace {
 
   public:
     ThreadPool_pthread() 
-      :start(0), finish(0), work(0), shutdown(false)
+      :start(0), finish(0), work(0), shutdown(false),tmax(0)
     {
       resize(1);
     }
@@ -107,6 +114,7 @@ namespace {
 	int rc = pthread_join(t, NULL);
 	checkResults(rc);
       }
+      tmax = 0;
       shutdown = false;
       while (num) {
 	--num;

@@ -1,16 +1,24 @@
 // simple galois scheduler and runtime -*- C++ -*-
 
-#include <set>
+#include <cmath>
+
 #include <stack>
 #include <vector>
+#include <ext/malloc_allocator.h>
+
 #include <iostream>
-#include <pthread.h>
+
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Timer.h"
 #include "Galois/Runtime/ThreadPool.h"
 
 namespace GaloisRuntime {
   
+  template<typename T>
+  struct LocalWorkListTy {
+    typedef std::stack<T, std::deque<T, __gnu_cxx::malloc_allocator<T> > > type;
+  };
+
   template<class WorkListTy, class Function> 
   class GaloisWork : public Executable {
     WorkListTy& wl;
@@ -37,7 +45,7 @@ namespace GaloisRuntime {
       return 0;
     }
 
-    bool doProcess(typename WorkListTy::value_type val, std::stack<typename WorkListTy::value_type>& wlLocal) {
+    bool doProcess(typename WorkListTy::value_type val, typename LocalWorkListTy<typename WorkListTy::value_type>::type& wlLocal) {
       SimpleRuntimeContext cnx;
       setThreadContext(&cnx);
       try {
@@ -49,8 +57,9 @@ namespace GaloisRuntime {
       return true;
     }
     
-    virtual void operator() (void) {
-      std::stack<typename WorkListTy::value_type> wlLocal;
+    virtual void operator() (int ID, int tmax) {
+      typename LocalWorkListTy<typename WorkListTy::value_type>::type wlLocal;
+
       //std::vector<typename WorkListTy::value_type> wlDelay;
       int lconflicts = 0;
       GaloisRuntime::Timer TotalTime;

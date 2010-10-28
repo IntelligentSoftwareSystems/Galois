@@ -7,7 +7,8 @@ namespace GaloisRuntime {
   
   class Executable {
   public:
-    virtual void operator()(void) = 0;
+    //! run work.  id is the thread id, max is the total num
+    virtual void operator()(int id, int tmax) = 0;
   };
 
   class ThreadPool {
