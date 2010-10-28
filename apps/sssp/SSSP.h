@@ -10,6 +10,7 @@
 
 #include <list>
 #include <vector>
+#include <queue>
 
 #include "SNode.h"
 #include "SEdge.h"
@@ -38,8 +39,6 @@ public:
 
 	void updateSourceAndSink(const int sourceId, const int sinkId);
 	int getEdgeData(GNode src, GNode dst);
-	void bellman_ford(const std::list<SNode> & nodes,
-			const std::list<SEdge> & edges, SNode & source);
 	void verify();
 	void runBody(const GNode src);
 };

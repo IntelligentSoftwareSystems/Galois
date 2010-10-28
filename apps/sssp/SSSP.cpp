@@ -14,26 +14,6 @@ SSSP::SSSP() {
 SSSP::~SSSP() {
 }
 
-void SSSP::bellman_ford(const std::list<SNode> & nodes,
-		const std::list<SEdge> & edges, SNode & source) {
-
-	source.set_dist(0);
-	source.set_pred(NULL);
-
-	for (unsigned int i = 0; i < nodes.size() - 1; i++) {
-		std::list<SEdge>::const_iterator it;
-		for (it = edges.begin(); it != edges.end(); it++) {
-			SNode & u = (*it).get_source();
-			SNode & v = (*it).get_destination();
-			if (u.get_dist() + (*it).get_weight() < v.get_dist()) {
-				v.set_dist(u.get_dist() + (*it).get_weight());
-				v.set_pred(&u);
-			}
-		}
-	}
-
-}
-
 void SSSP::updateSourceAndSink(const int sourceId, const int sinkId) {
 	for (Graph::active_iterator src = graph->active_begin(), ee =
 			graph->active_end(); src != ee; ++src) {
@@ -88,27 +68,35 @@ void SSSP::verify() {
 }
 
 void SSSP::runBody(const GNode src) {
-	vector<UpdateRequest> initial;
+	queue<UpdateRequest> initial;
 	for (Graph::neighbor_iterator ii = graph->neighbor_begin(src), ee =
 			graph->neighbor_end(src); ii != ee; ++ii) {
 		GNode dst = *ii;
 		int w = getEdgeData(src, dst);
-		UpdateRequest up = UpdateRequest(dst, w, w <= delta);
-		initial.push_back(up);
+		UpdateRequest *up = new UpdateRequest(dst, w, w <= delta);
+		initial.push(*up);
 	}
 
-	vector<UpdateRequest>::iterator it;
-	for (it = initial.begin(); it < initial.end(); it++) {
-		UpdateRequest req = *it;
-    SNode data = req.n.getData();
-    int v;
-    while (req.w < (v = data.get_dist())) {
-      if (data.get_dist() == v ) {
-      	data.set_dist(req.w);
-//        req.n.map(body, req, ctx, MethodFlag.NONE); //TODO:
-        break;
-      }
-    }
+	while (!initial.empty()) {
+		UpdateRequest* req = &initial.front();
+		initial.pop();
+		SNode data = req->n.getData();
+		int v;
+		while (req->w < (v = data.get_dist())) {
+			if (data.get_dist() == v) {
+				data.set_dist(req->w);
+
+				for (Graph::neighbor_iterator ii = graph->neighbor_begin(src), ee =
+						graph->neighbor_end(src); ii != ee; ++ii) {
+					GNode dst = *ii;
+					int d = getEdgeData(req->n, dst);
+					int newDist = req->w + d;
+					initial.push(*(new UpdateRequest(dst, newDist, d <= delta)));
+				}
+				break;
+			}
+		}
+		delete req;
 	}
 
 }

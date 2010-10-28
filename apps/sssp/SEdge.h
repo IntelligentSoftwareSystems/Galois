@@ -12,50 +12,33 @@
 
 class SEdge {
 private:
-	SNode * source;
-	SNode * destination;
 	int weight;
 public:
-	SEdge(SNode &s, SNode &d, const int w) :
-			source(&s), destination(&d), weight(w) {};
-	SEdge(const SEdge & copy) : source(copy.source),
-			destination(copy.destination), weight(copy.weight) {};
+	SEdge() {
+		weight = 0;
+	}
+	;
+	SEdge(const int w) {
+		weight = w;
+	}
+	;
+	SEdge(const SEdge & copy) :
+		weight(copy.weight) {
+	}
+	;
 	SEdge& operator=(const SEdge & copy) {
-		source = copy.source;
-		destination = copy.destination;
 		weight = copy.weight;
 		return *this;
 	}
 	virtual ~SEdge();
-    SNode & get_destination() const
-    {
-        return *destination;
-    }
 
-    SNode & get_source() const
-    {
-        return *source;
-    }
+	int get_weight() const {
+		return weight;
+	}
 
-    int get_weight() const
-    {
-        return weight;
-    }
-
-    void set_destination(SNode & destination)
-    {
-        this->destination = &destination;
-    }
-
-    void set_source(SNode & source)
-    {
-        this->source = &source;
-    }
-
-    void set_weight(int weight)
-    {
-        this->weight = weight;
-    }
+	void set_weight(int weight) {
+		this->weight = weight;
+	}
 
 };
 

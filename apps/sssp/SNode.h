@@ -20,14 +20,12 @@ private:
 public:
 	int id;
 	int dist;
-	SNode* pred;
 
-	SNode(int _id) : id(_id) { dist = INFINITY; pred = NULL; };
+	SNode(int _id) : id(_id) { dist = INFINITY; };
 	virtual ~SNode();
 	const int get_id() { return id; };
 	int get_dist() { return dist; };
 	void set_dist(const int d) { dist = d; };
-	void set_pred(SNode* p) { pred = p; };
 	string toString() {string *s = new string(""); return *s;}; //TODO: complete toString
 };
 
