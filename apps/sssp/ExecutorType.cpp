@@ -5,7 +5,7 @@
  *      Author: amshali
  */
 
-#include "/home/amshali/src/java-workspace/GaloisCPP/apps/sssp/ExecutorType.h"
+#include "ExecutorType.h"
 
 ExecutorType::ExecutorType() {
 	// TODO Auto-generated constructor stub

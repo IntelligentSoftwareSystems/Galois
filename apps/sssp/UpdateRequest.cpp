@@ -5,7 +5,7 @@
  *      Author: amshali
  */
 
-#include "/home/amshali/src/java-workspace/GaloisCPP/apps/sssp/UpdateRequest.h"
+#include "UpdateRequest.h"
 
 UpdateRequest::UpdateRequest() {
 	// TODO Auto-generated constructor stub

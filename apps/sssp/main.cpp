@@ -15,7 +15,7 @@ int main(int argc, char *argv[]) {
 	char* inputfile = NULL;
 	bool bfs;
 	if (argc != 3) {
-		cout << "Usage: <bfs> <input-file>" << endl;
+		cout << "Usage: sssp <bfs> <input-file>" << endl;
 		exit(-1);
 	} else {
 		bfs = strcmp(argv[1], "f") == 0 ? false : true;
