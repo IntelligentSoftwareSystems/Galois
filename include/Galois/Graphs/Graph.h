@@ -3,6 +3,7 @@
 #include <list>
 #include <map>
 #include <vector>
+#include <iostream>
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/iterator/filter_iterator.hpp>
 
@@ -35,15 +36,15 @@ class FirstGraph {
   
 
   struct gNode : public GaloisRuntime::Lockable {
-    NodeTy data;
     bool active;
-    typedef llvm::SmallVector<std::pair<gNode*, EdgeTy>, 4> edgesTy;
+    NodeTy data;
+    typedef llvm::SmallVector<std::pair<gNode*, EdgeTy>, 3> edgesTy;
     //typedef std::vector<std::pair<gNode*, EdgeTy> > edgesTy;
     //, __gnu_cxx::malloc_allocator<std::pair<gNode*, EdgeTy> > > edgesTy;
     edgesTy edges;
 
     gNode(const NodeTy& d, bool a)
-      :data(d), active(a)
+      :active(a), data(d)
     {}
 
     void eraseEdge(gNode* N) {
@@ -102,6 +103,10 @@ public:
 
     NodeTy& getData() {
       return Parent->getData(ID);
+    }
+
+    NodeTy& getDataUnsafe() {
+      return ID->data;
     }
 
     bool isNull() const {
@@ -189,7 +194,7 @@ public:
       //__sync_sub_and_fetch(&numActive, 1);
       N->active = false;
       //erase the in-edges first
-      for (int i = 0; i < N->edges.size(); ++i) {
+      for (unsigned int i = 0; i < N->edges.size(); ++i) {
 	if (N->edges[i].first != N) // don't handle loops yet
 	  N->edges[i].first->eraseEdge(N);
       }
@@ -284,8 +289,15 @@ public:
     return boost::make_transform_iterator(boost::make_filter_iterator<is_active_node>(nodes.end(), nodes.end()), makeGraphNode2(this));
   }
   // The number of nodes in the graph
-  int size() {
+  unsigned int size() {
     return std::distance(active_begin(), active_end());
   }
 
+
+  FirstGraph() {
+    std::cerr << "NodeSize: " << (int)sizeof(gNode) << "\n";
+  }
+
 };
+
+

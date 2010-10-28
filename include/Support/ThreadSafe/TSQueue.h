@@ -1,12 +1,13 @@
 // Queue implementation -*- C++ -*-
 
-#include <queue>
+#include <deque>
+#include <ext/malloc_allocator.h>
 
 namespace threadsafe {
   
   template< class _Tp, class _Lock = simpleLock >
   class ts_queue {
-    typedef std::queue<_Tp> _Sequence;
+    typedef std::deque<_Tp, __gnu_cxx::malloc_allocator<_Tp> > _Sequence;
   public:
     typedef typename _Sequence::value_type                value_type;
     typedef typename _Sequence::const_reference           const_reference;
@@ -47,7 +48,7 @@ namespace threadsafe {
       bool do_all = count == 0;
       while (!c.empty() && (do_all || count)) {
 	value_type v = c.front();
-	c.pop();
+	c.pop_front();
 	other.push(v);
 	retval = true;
 	--count;
@@ -87,7 +88,7 @@ namespace threadsafe {
     push(const value_type& __x)
     {
       lock.write_lock();
-      c.push(__x);
+      c.push_back(__x);
       lock.write_unlock();
     }
 
