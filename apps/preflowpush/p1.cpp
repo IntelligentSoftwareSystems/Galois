@@ -6,7 +6,7 @@
 
 using namespace std;
 
-int main() {
+int multiple_mains() {
 	string filename = "randGraph400x400.txt";
 	char str[100];
 	string tt;
