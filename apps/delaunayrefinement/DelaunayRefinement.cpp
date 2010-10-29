@@ -52,14 +52,13 @@ typedef FirstGraph<Element,Edge,false>::GraphNode GNode;
 #include "Support/ThreadSafe/TSQueue.h"
 
 Graph* mesh;
-threadsafe::ts_queue<GNode> wl;
 int threads = 1;
 
-void process(GNode item, GaloisRuntime::LocalWorkListTy<GNode>::type& lwl) {
+void process(GNode item, Galois::WorkList<GNode>& lwl) {
+  item.getData(); //lock
+ 
   if (!mesh->containsNode(item))
     return;
-
-  item.getData(); //lock
 
   Cavity cav(mesh);
   cav.initialize(item);
@@ -93,7 +92,8 @@ void process(GNode item, GaloisRuntime::LocalWorkListTy<GNode>::type& lwl) {
   }
 }
 
-void refine(Mesh& m) {
+template<typename WLTY>
+void refine(Mesh& m, WLTY& wl) {
   //  if (threads == 1) {
   //    while (wl.size()) {
   //      bool suc;
@@ -102,7 +102,7 @@ void refine(Mesh& m) {
   //    }
   //  } else {
   //Galois::setMaxThreads(threads);
-    Galois::for_each(wl, process);
+  Galois::for_each(wl, process);
     //  }
 }
 
@@ -111,7 +111,7 @@ using namespace std;
 
 int main(int argc, char** argv) {
   if (argc < 2) {
-    cerr << "Arguments: [-t threads] <input file>\n";
+    cout << "Arguments: [-t threads] <input file>\n";
     return 1;
   }
 
@@ -121,7 +121,7 @@ int main(int argc, char** argv) {
     threads = atoi(argv[2]);
   }
 
-  cerr << "\nLonestar Benchmark Suite v3.0\n"
+  cout << "\nLonestar Benchmark Suite v3.0\n"
        << "Copyright (C) 2007, 2008, 2009, 2010 The University of Texas at Austin\n"
        << "http://iss.ices.utexas.edu/lonestar/\n"
        << "\n"
@@ -134,18 +134,19 @@ int main(int argc, char** argv) {
   mesh = new Graph();
   Mesh m;
   m.read(mesh, argv[inputFileAt]);
+  threadsafe::ts_queue<GNode> wl;
   int numbad = m.getBad(mesh, wl);
 
-  cerr << "configuration: " << mesh->size() << " total triangles, " << numbad << " bad triangles\n"
+  cout << "configuration: " << mesh->size() << " total triangles, " << numbad << " bad triangles\n"
        << "number of threads: " << threads << "\n"
        << "\n";
 
   Galois::setMaxThreads(threads);
   Galois::Launcher::startTiming();
-  refine(m);
+  refine(m, wl);
   Galois::Launcher::stopTiming();
   
-  cerr << "Time: " << Galois::Launcher::elapsedTime() << " msec\n";
+  cout << "STAT: Time " << Galois::Launcher::elapsedTime() << "\n";
 
   if (!m.verify(mesh)) {
     cerr << "Refinement failed.\n";
@@ -159,5 +160,5 @@ int main(int argc, char** argv) {
     assert(0 && "Refinement failed");
     abort();
   }
-  cerr << "Refinement OK\n";
+  cout << "Refinement OK\n";
 }

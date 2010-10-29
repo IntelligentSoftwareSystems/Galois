@@ -72,17 +72,17 @@ namespace GaloisRuntime {
     return thread_cnx;
   }
 
-  static void setThreadContext(SimpleRuntimeContext* n) {
+  static __attribute__((unused)) void setThreadContext(SimpleRuntimeContext* n) {
     thread_cnx = n;
   }
 
-  static void acquire(Lockable* C) {
+  static __attribute__((unused)) void acquire(Lockable* C) {
     SimpleRuntimeContext* cnx = getThreadContext();
     if (cnx)
       cnx->acquire(C);
   }
 
-  static void acquire(Lockable& L) {
+  static __attribute__((unused)) void acquire(Lockable& L) {
     acquire(&L);
   }
 

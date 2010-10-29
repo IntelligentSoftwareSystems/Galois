@@ -99,8 +99,10 @@ namespace {
 
     virtual void run(Executable* E) {
       work = E;
+      work->preRun(numThreads());
       start.release(numThreads());
       finish.acquire(numThreads());
+      work->postRun();
     }
 
     virtual void resize(int num) {

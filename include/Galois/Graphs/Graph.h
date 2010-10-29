@@ -295,7 +295,7 @@ public:
 
 
   FirstGraph() {
-    std::cerr << "NodeSize: " << (int)sizeof(gNode) << "\n";
+    //std::cerr << "NodeSize: " << (int)sizeof(gNode) << "\n";
   }
 
 };

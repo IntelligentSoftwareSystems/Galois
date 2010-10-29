@@ -11,8 +11,8 @@ set(CMAKE_CXX_FLAGS_RELEASE        "-Wall -O3 -DNDEBUG")
 #set(CMAKE_CXX_FLAGS_RELEASE        "-O3 -g")
 set(CMAKE_CXX_FLAGS_DEBUG          "-Wall -g")
 
-#set(CMAKE_BUILD_TYPE Release)
-set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE Release)
+#set(CMAKE_BUILD_TYPE Debug)
 
 #set(CMAKE_CXX_COMPILER clang++)
 
