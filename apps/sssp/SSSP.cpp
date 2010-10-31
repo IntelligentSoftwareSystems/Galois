@@ -35,6 +35,60 @@ int SSSP::getEdgeData(GNode src, GNode dst) {
 		return graph->getEdgeData(src, dst).get_weight();
 }
 
+void SSSP::initializeGraph(char *filename) {
+	ifstream infile;
+	infile.open(filename, ifstream::in); // opens the vector file
+	if (!infile) { // file couldn't be opened
+		cerr << "Error: vector file could not be opened" << endl;
+		exit(-1);
+	}
+
+	string name;
+	int numNodes, numEdges;
+	SNode **nodes = NULL;
+	GNode *gnodes = NULL;
+	while (!infile.eof()) {
+		string line;
+		string firstchar;
+		infile >> firstchar;
+		if (!strcmp(firstchar.c_str(), "c")) {
+		} else if (!strcmp(firstchar.c_str(), "p")) {
+			infile >> name;
+			infile >> numNodes;
+			infile >> numEdges;
+			graph = new Graph();
+			nodes = new SNode*[numNodes];
+			gnodes = new GNode[numNodes];
+			for (int i = 0; i < numNodes; i++) {
+				nodes[i] = new SNode(i+1);
+				gnodes[i] = graph->createNode(*nodes[i]);
+				graph->addNode(gnodes[i]);
+			}
+			cout << "graph name is " << name << " and it has " << numNodes
+					<< " nodes and some edges" << endl;
+		} else if (!strcmp(firstchar.c_str(), "a")) {
+			int src, dest, weight;
+			infile >> src >> dest >> weight;
+			graph->addEdge(gnodes[src-1], gnodes[dest-1], SEdge(weight));
+			cout << "node: " << src << " " << dest << " " << weight << endl;
+		}
+		getline(infile, line);
+	}
+	this->numNodes = numNodes;
+	this->numEdges= numEdges;
+	this->delta = 700;
+
+	infile.close();
+}
+
+void SSSP::run(bool bfs, char *filename) {
+	initializeGraph(filename);
+	updateSourceAndSink(1, numNodes); //FIXME:!!?
+	runBody(source);
+	cout<<this->sink.getData().dist << endl;
+	verify();
+}
+
 void SSSP::verify() {
 	if (source.getData().get_dist() != 0) {
 		cerr << "source has non-zero dist value" << endl;

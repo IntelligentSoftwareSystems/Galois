@@ -11,6 +11,10 @@
 #include <list>
 #include <vector>
 #include <queue>
+#include <iostream>
+#include <fstream>
+using namespace std;
+
 
 #include "SNode.h"
 #include "SEdge.h"
@@ -36,11 +40,12 @@ private:
 public:
 	SSSP();
 	virtual ~SSSP();
-
+	void initializeGraph(char *filename);
 	void updateSourceAndSink(const int sourceId, const int sinkId);
 	int getEdgeData(GNode src, GNode dst);
 	void verify();
 	void runBody(const GNode src);
+	void run(bool bfs, char *filename);
 };
 
 #endif /* SSSP_H_ */
