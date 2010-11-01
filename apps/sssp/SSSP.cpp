@@ -64,13 +64,13 @@ void SSSP::initializeGraph(char *filename) {
 				gnodes[i] = graph->createNode(*nodes[i]);
 				graph->addNode(gnodes[i]);
 			}
-			cout << "graph name is " << name << " and it has " << numNodes
-					<< " nodes and some edges" << endl;
+//			cout << "graph name is " << name << " and it has " << numNodes
+//					<< " nodes and some edges" << endl;
 		} else if (!strcmp(firstchar.c_str(), "a")) {
 			int src, dest, weight;
 			infile >> src >> dest >> weight;
 			graph->addEdge(gnodes[src-1], gnodes[dest-1], SEdge(weight));
-			cout << "node: " << src << " " << dest << " " << weight << endl;
+//			cout << "node: " << src << " " << dest << " " << weight << endl;
 		}
 		getline(infile, line);
 	}
@@ -122,30 +122,29 @@ void SSSP::verify() {
 }
 
 void SSSP::runBody(const GNode src) {
-	queue<UpdateRequest> initial;
+	queue<UpdateRequest *> initial;
 	for (Graph::neighbor_iterator ii = graph->neighbor_begin(src), ee =
 			graph->neighbor_end(src); ii != ee; ++ii) {
 		GNode dst = *ii;
 		int w = getEdgeData(src, dst);
 		UpdateRequest *up = new UpdateRequest(dst, w, w <= delta);
-		initial.push(*up);
+		initial.push(up);
 	}
 
 	while (!initial.empty()) {
-		UpdateRequest* req = &initial.front();
+		UpdateRequest* req = initial.front();
 		initial.pop();
-		SNode data = req->n.getData();
+		SNode& data = req->n.getData();
 		int v;
 		while (req->w < (v = data.get_dist())) {
 			if (data.get_dist() == v) {
 				data.set_dist(req->w);
-
-				for (Graph::neighbor_iterator ii = graph->neighbor_begin(src), ee =
-						graph->neighbor_end(src); ii != ee; ++ii) {
+				for (Graph::neighbor_iterator ii = graph->neighbor_begin(req->n), ee =
+						graph->neighbor_end(req->n); ii != ee; ++ii) {
 					GNode dst = *ii;
 					int d = getEdgeData(req->n, dst);
 					int newDist = req->w + d;
-					initial.push(*(new UpdateRequest(dst, newDist, d <= delta)));
+					initial.push(new UpdateRequest(dst, newDist, d <= delta));
 				}
 				break;
 			}
