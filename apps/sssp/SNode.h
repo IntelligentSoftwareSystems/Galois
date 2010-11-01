@@ -22,7 +22,7 @@ public:
 	int dist;
 
 	SNode(int _id) : id(_id) { dist = DIST_INFINITY; };
-	virtual ~SNode();
+	virtual ~SNode() {};
 	const int get_id() { return id; };
 	int get_dist() { return dist; };
 	void set_dist(const int d) { dist = d; };

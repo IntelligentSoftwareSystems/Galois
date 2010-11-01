@@ -14,9 +14,9 @@ class ExecutorType {
 private:
 public:
 	bool bfs;
-	ExecutorType();
+	ExecutorType(){};
 	ExecutorType(bool _bfs) : bfs(_bfs) {};
-	virtual ~ExecutorType();
+	virtual ~ExecutorType(){};
 };
 
 #endif /* EXECUTORTYPE_H_ */

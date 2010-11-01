@@ -30,7 +30,7 @@ public:
 		weight = copy.weight;
 		return *this;
 	}
-	virtual ~SEdge();
+	virtual ~SEdge(){};
 
 	int get_weight() const {
 		return weight;
