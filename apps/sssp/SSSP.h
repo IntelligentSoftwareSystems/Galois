@@ -2,7 +2,7 @@
  * SSSP.h
  *
  *  Created on: Oct 18, 2010
- *      Author: reza
+ *      Author: amin, reza
  */
 
 #ifndef SSSP_H_

@@ -2,7 +2,7 @@
  * SSSP.cpp
  *
  *  Created on: Oct 18, 2010
- *      Author: reza
+ *      Author: amin, reza
  */
 
 #include <list>
