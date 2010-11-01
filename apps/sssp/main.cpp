@@ -13,15 +13,18 @@ using namespace std;
 int main(int argc, char *argv[]) {
 	char* inputfile = NULL;
 	bool bfs;
-	if (argc != 3) {
-		cout << "Usage: sssp <bfs> <input-file>" << endl;
+	int threads = 0;
+	if (argc != 4) {
+		cout << "Usage: sssp <num-threads> <bfs> <input-file>" << endl;
+		cout<< "A zero for <num-threads> indicates sequential execution." << endl;
 		exit(-1);
 	} else {
-		bfs = strcmp(argv[1], "f") == 0 ? false : true;
-		inputfile = argv[2];
+		threads = atoi(argv[1]);
+		bfs = strcmp(argv[2], "f") == 0 ? false : true;
+		inputfile = argv[3];
 	}
 
 	SSSP sssp = SSSP();
-	sssp.run(bfs, inputfile, 2);
+	sssp.run(bfs, inputfile, threads);
 	exit(0);
 }
