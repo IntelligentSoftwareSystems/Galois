@@ -18,7 +18,7 @@ void SSSP::updateSourceAndSink(const int sourceId, const int sinkId) {
 	for (Graph::active_iterator src = graph->active_begin(), ee =
 			graph->active_end(); src != ee; ++src) {
 		SNode& node = src->getData();
-		node.set_dist(INFINITY);
+		node.set_dist(DIST_INFINITY);
 		if (node.id == sourceId) {
 			source = *src;
 			node.set_dist(0);
@@ -81,28 +81,77 @@ void SSSP::initializeGraph(char *filename) {
 	infile.close();
 }
 
-void SSSP::run(bool bfs, char *filename) {
+void SSSP::run(bool bfs, char *filename, int threadnum) {
 	executorType = ExecutorType(bfs);
 	initializeGraph(filename);
 	updateSourceAndSink(1, numNodes); //FIXME:!!?
-	runBody(source);
+
+	if (threadnum == 0) {
+		Galois::Launcher::startTiming();
+		runBody(source);
+		Galois::Launcher::stopTiming();
+	}
+	else {
+	  Galois::setMaxThreads(threadnum);
+		Galois::Launcher::startTiming();
+		runBodyParallel(source);
+		Galois::Launcher::stopTiming();
+	}
+  cout << "STAT: Time " << Galois::Launcher::elapsedTime() << "\n";
 	cout<<this->sink.getData().dist << endl;
-	verify();
+	if (!verify()) {
+    cerr << "Verification failed.\n";
+    assert(0 && "Verification failed");
+    abort();
+	}
 }
 
-void SSSP::verify() {
+SSSP *sssp;
+void process(UpdateRequest* req, Galois::WorkList<UpdateRequest *>& lwl) {
+	SNode& data = req->n.getData();
+	int v;
+	while (req->w < (v = data.get_dist())) {
+		if (data.get_dist() == v) {
+			data.set_dist(req->w);
+			for (Graph::neighbor_iterator ii = sssp->graph->neighbor_begin(req->n), ee =
+					sssp->graph->neighbor_end(req->n); ii != ee; ++ii) {
+				GNode dst = *ii;
+				int d = sssp->getEdgeData(req->n, dst);
+				int newDist = req->w + d;
+				lwl.push(new UpdateRequest(dst, newDist, d <= sssp->delta));
+			}
+			break;
+		}
+	}
+	delete req;
+}
+
+void SSSP::runBodyParallel(const GNode src) {
+	threadsafe::ts_queue<UpdateRequest *> wl;
+	for (Graph::neighbor_iterator ii = graph->neighbor_begin(src), ee =
+			graph->neighbor_end(src); ii != ee; ++ii) {
+		GNode dst = *ii;
+		int w = getEdgeData(src, dst);
+		UpdateRequest *up = new UpdateRequest(dst, w, w <= delta);
+		wl.push(up);
+	}
+	sssp = this;
+	Galois::for_each(wl, process);
+}
+
+bool SSSP::verify() {
 	if (source.getData().get_dist() != 0) {
 		cerr << "source has non-zero dist value" << endl;
-		exit(-1);
+		return false;
 	}
 
 	for (Graph::active_iterator src = graph->active_begin(), ee =
 			graph->active_end(); src != ee; ++src) {
 		const int dist = src->getData().get_dist();
-		if (dist >= INFINITY) {
+		if (dist >= DIST_INFINITY) {
 			cerr << "found node = " << src->getData().get_dist()
 					<< " with label >= INFINITY = " << dist << endl;
-			exit(-1);
+			return false;
 		}
 
 		for (Graph::neighbor_iterator ii = graph->neighbor_begin(*src), ee =
@@ -113,13 +162,12 @@ void SSSP::verify() {
 			if (ddist > dist + getEdgeData(*src, neighbor)) {
 				cerr << "bad level value at " << src->getData().id
 						<< " which is a neighbor of " << neighbor.getData().id << endl;
-				exit(-1);
+				return false;
 			}
 
 		}
 	}
-
-	cerr << "result verified" << endl;
+	return true;
 }
 
 void SSSP::runBody(const GNode src) {

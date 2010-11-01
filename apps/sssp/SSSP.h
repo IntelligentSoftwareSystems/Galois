@@ -13,12 +13,19 @@
 #include <queue>
 #include <iostream>
 #include <fstream>
+
+#include "Support/ThreadSafe/simple_lock.h"
+#include "Support/ThreadSafe/TSQueue.h"
+
 using namespace std;
 
 
 #include "SNode.h"
 #include "SEdge.h"
+
+#include "Galois/Launcher.h"
 #include "Galois/Graphs/Graph.h"
+#include "Galois/Galois.h"
 typedef FirstGraph<SNode, SEdge, true> Graph;
 typedef FirstGraph<SNode, SEdge, true>::GraphNode GNode;
 
@@ -28,24 +35,26 @@ typedef FirstGraph<SNode, SEdge, true>::GraphNode GNode;
 
 class SSSP {
 private:
-	Graph* graph;
 	GNode source;
 	GNode sink;
 	ExecutorType executorType;
 	int numNodes;
 	int numEdges;
 	int maxWeight;
-	int delta;
 
 public:
+	Graph* graph;
+	int delta;
 	SSSP();
 	virtual ~SSSP();
 	void initializeGraph(char *filename);
 	void updateSourceAndSink(const int sourceId, const int sinkId);
 	int getEdgeData(GNode src, GNode dst);
-	void verify();
+	bool verify();
 	void runBody(const GNode src);
-	void run(bool bfs, char *filename);
+	void run(bool bfs, char *filename, int threadnum);
+	void runBodyParallel(const GNode src);
+//	void process(UpdateRequest* item, Galois::WorkList<UpdateRequest *>& lwl);
 };
 
 #endif /* SSSP_H_ */

@@ -13,7 +13,7 @@
 
 using namespace std;
 
-const int INFINITY = 2147483647;
+const int DIST_INFINITY = 2147483647;
 
 class SNode {
 private:
@@ -21,7 +21,7 @@ public:
 	int id;
 	int dist;
 
-	SNode(int _id) : id(_id) { dist = INFINITY; };
+	SNode(int _id) : id(_id) { dist = DIST_INFINITY; };
 	virtual ~SNode();
 	const int get_id() { return id; };
 	int get_dist() { return dist; };
