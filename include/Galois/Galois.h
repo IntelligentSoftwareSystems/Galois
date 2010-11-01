@@ -123,7 +123,7 @@ namespace GaloisRuntime {
   template<class WorkListTy, class Function>
   void for_each_simple (WorkListTy& wl, Function f)
   {
-    wl.sort();
+    //wl.sort();
     GaloisWork<WorkListTy, Function> GW(wl, f);
     ThreadPool& PTP = getSystemThreadPool();
     PTP.run(&GW);

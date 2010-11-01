@@ -73,7 +73,7 @@ class FirstGraph {
   };
   
   //The graph manages the lifetimes of the data in the nodes and edges
-  typedef GaloisRuntime::galois_insert_bag<gNode*> nodeListTy;
+  typedef GaloisRuntime::galois_insert_bag<gNode> nodeListTy;
   //typedef threadsafe::ts_insert_bag<gNode> nodeListTy;
   nodeListTy nodes;
 

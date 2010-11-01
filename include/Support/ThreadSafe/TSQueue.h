@@ -1,6 +1,7 @@
 // Queue implementation -*- C++ -*-
 
 #include <deque>
+#include <algorithm>
 #include <ext/malloc_allocator.h>
 
 namespace threadsafe {
@@ -117,10 +118,11 @@ namespace threadsafe {
       }
       return retval;
     }
-  };
-
   void sort() {
+    lock.write_lock();
     std::sort(c.begin(), c.end());
+    lock.write_unlock();
   }
 
+  };
 }
