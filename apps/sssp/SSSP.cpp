@@ -82,6 +82,7 @@ void SSSP::initializeGraph(char *filename) {
 }
 
 void SSSP::run(bool bfs, char *filename) {
+	executorType = ExecutorType(bfs);
 	initializeGraph(filename);
 	updateSourceAndSink(1, numNodes); //FIXME:!!?
 	runBody(source);
@@ -109,7 +110,7 @@ void SSSP::verify() {
 			GNode neighbor = *ii;
 			int ddist = src->getData().get_dist();
 
-			if (ddist > dist + getEdgeData(neighbor, *src)) { // FIXME:might be wrong
+			if (ddist > dist + getEdgeData(*src, neighbor)) {
 				cerr << "bad level value at " << src->getData().id
 						<< " which is a neighbor of " << neighbor.getData().id << endl;
 				exit(-1);
