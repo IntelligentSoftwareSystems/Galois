@@ -118,4 +118,9 @@ namespace threadsafe {
       return retval;
     }
   };
+
+  void sort() {
+    std::sort(c.begin(), c.end());
+  }
+
 }
