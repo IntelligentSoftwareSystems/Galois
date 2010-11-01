@@ -8,12 +8,6 @@
 #include <list>
 #include "SSSP.h"
 
-SSSP::SSSP() {
-}
-
-SSSP::~SSSP() {
-}
-
 void SSSP::updateSourceAndSink(const int sourceId, const int sinkId) {
 	for (Graph::active_iterator src = graph->active_begin(), ee =
 			graph->active_end(); src != ee; ++src) {

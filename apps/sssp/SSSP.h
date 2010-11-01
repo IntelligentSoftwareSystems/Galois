@@ -45,8 +45,8 @@ private:
 public:
 	Graph* graph;
 	int delta;
-	SSSP();
-	virtual ~SSSP();
+	SSSP(){};
+	virtual ~SSSP(){};
 	void initializeGraph(char *filename);
 	void updateSourceAndSink(const int sourceId, const int sinkId);
 	int getEdgeData(GNode src, GNode dst);
@@ -54,7 +54,6 @@ public:
 	void runBody(const GNode src);
 	void run(bool bfs, char *filename, int threadnum);
 	void runBodyParallel(const GNode src);
-//	void process(UpdateRequest* item, Galois::WorkList<UpdateRequest *>& lwl);
 };
 
 #endif /* SSSP_H_ */
