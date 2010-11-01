@@ -79,7 +79,10 @@ namespace GaloisRuntime {
     }
 
     void resize(int n) {
-      datum.resize(n);
+      datum.reserve(std::max((int)n, (int)datum.size()));
+      //Do this one at a time because of the copying symantics of resize
+      while ((int)datum.size() < n)
+	datum.resize(datum.size() + 1);
     }
   };
 

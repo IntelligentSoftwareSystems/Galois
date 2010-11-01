@@ -19,7 +19,9 @@ namespace GaloisRuntime {
   template<class WorkListTy, class Function> 
   class GaloisWork : public Executable {
     typedef typename WorkListTy::value_type value_type;
-    typedef GWL_LIFO<value_type> localWLTy;
+    typedef GWL_LIFO_SB<value_type> localWLTy;
+    //typedef GWL_ChaseLev_Dyn<value_type> localWLTy;
+    //typedef GWL_Idempotent_FIFO_SB<value_type> localWLTy;
 
     WorkListTy& global_wl;
     Function f;
@@ -37,18 +39,24 @@ namespace GaloisRuntime {
       std::cout << "STAT: Conflicts " << conflicts << "\n";
       std::cout << "STAT: TotalTime " << tTime << "\n";
       std::cout << "STAT: ProcessTime " << pTime << "\n";
+      assert(global_wl.empty());
     }
 
-    bool doProcess(value_type val, localWLTy& wlLocal) {
+    void doProcess(value_type val, localWLTy& wlLocal, GaloisRuntime::TimeAccumulator& ProcessTime, int& lconflicts) {
+      ProcessTime.start();
       SimpleRuntimeContext cnx;
       setThreadContext(&cnx);
       try {
 	f(val, wlLocal);
       } catch (int a) {
-	return false;
+	ProcessTime.stop();
+	++lconflicts;
+	global_wl.push(val);
+	return;
       }	
       setThreadContext(0);
-      return true;
+      ProcessTime.stop();
+      return;
     }
 
     virtual void preRun(int tmax) {
@@ -56,6 +64,9 @@ namespace GaloisRuntime {
     }
 
     virtual void postRun() {
+      for (int i = 0; i < local_wl.size(); ++i)
+	assert(local_wl[i].empty());
+      assert(global_wl.empty());
     }
     
     virtual void operator() (int ID, int tmax) {
@@ -66,51 +77,42 @@ namespace GaloisRuntime {
       GaloisRuntime::TimeAccumulator ProcessTime;
 
       TotalTime.start();
-
-      int failed = 0;
-
+      /*
       do {
-	do {
-	  //move some items out of the global list
-	  global_wl.moveTo(wlLocal, 256);
-
-	  while (!wlLocal.empty()) {
-	    bool suc;
-	    value_type val = wlLocal.pop(suc);
-	    if (suc) {
-	      ProcessTime.start();
-	      bool result = doProcess(val, wlLocal);
-	      ProcessTime.stop();
-	      if (!result) {
-		++lconflicts;
-		//wlDelay.push_back(val);
-		global_wl.push(val);
-	      }
-	    }     
-	  }
-	} while (!global_wl.empty());
-
-	//Try to steal work
-	for (int i = 0; i < tmax; ++i) {
+	global_wl.moveTo(wlLocal, 256);
+	while (!wlLocal.empty()) {
 	  bool suc;
-	  value_type val = local_wl[(i + ID) % tmax].steal(suc);
-	  //Don't push it on the queue before we can execute it
-	  if (suc) {
-	    failed = 0;
-	    ProcessTime.start();
-	    bool result = doProcess(val, wlLocal);
-	    ProcessTime.stop();
-	    if (!result) {
-	      ++lconflicts;
-	      //wlDelay.push_back(val);
-	      global_wl.push(val);
-	    }
-	    //One item is enough
-	    break;
-	  }
+	  value_type val = wlLocal.pop(suc);
+	  if (suc)
+	    doProcess(val, wlLocal, ProcessTime, lconflicts);
 	}
-      } while (!wlLocal.empty());
-    
+      } while (!global_wl.empty());
+      */
+      do {
+      	do {
+      	  //move some items out of the global list
+      	  global_wl.moveTo(wlLocal, 256);
+	  
+      	  bool suc;
+      	  do {
+      	    value_type val = wlLocal.pop(suc);
+      	    if (suc)
+      	      doProcess(val, wlLocal, ProcessTime, lconflicts);
+      	  } while (suc);
+      	} while (!global_wl.empty());
+	
+      	//Try to steal work
+      	for (int i = 0; i < tmax; ++i) {
+      	  bool suc = false;
+      	  value_type val = local_wl[(i + ID) % tmax].steal(suc);
+      	  //Don't push it on the queue before we can execute it
+      	  if (suc) {
+      	    doProcess(val, wlLocal,ProcessTime, lconflicts);
+      	    //One item is enough
+      	    break;
+      	  }
+      	}
+      } while (!wlLocal.empty() || !global_wl.empty());
       TotalTime.stop();
       __sync_fetch_and_add(&tTime, TotalTime.get());
       __sync_fetch_and_add(&pTime, ProcessTime.get());

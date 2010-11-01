@@ -55,10 +55,10 @@ Graph* mesh;
 int threads = 1;
 
 void process(GNode item, Galois::WorkList<GNode>& lwl) {
-  item.getData(); //lock
- 
   if (!mesh->containsNode(item))
     return;
+
+  item.getData(); //lock
 
   Cavity cav(mesh);
   cav.initialize(item);
@@ -110,6 +110,7 @@ void refine(Mesh& m, WLTY& wl) {
 using namespace std;
 
 int main(int argc, char** argv) {
+
   if (argc < 2) {
     cout << "Arguments: [-t threads] <input file>\n";
     return 1;
@@ -162,3 +163,4 @@ int main(int argc, char** argv) {
   }
   cout << "Refinement OK\n";
 }
+
