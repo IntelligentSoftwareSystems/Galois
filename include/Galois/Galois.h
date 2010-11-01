@@ -214,6 +214,7 @@ public:
 				}
 			} while (!wlLocal.empty() || !global_wl.empty());
 			__sync_fetch_and_add(&threadsWorking, -1);
+			usleep(10);
 		} while (__sync_fetch_and_add(&threadsWorking, 0) > 0);
 		TotalTime.stop();
 		__sync_fetch_and_add(&tTime, TotalTime.get());
