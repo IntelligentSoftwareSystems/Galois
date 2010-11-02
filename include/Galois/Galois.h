@@ -89,6 +89,7 @@ public:
 		 }
 		 } while (!global_wl.empty());
 		 */
+
 		do {
 			do {
 				//move some items out of the global list
@@ -195,7 +196,7 @@ public:
             //    cnt2++;
 				while(!global_wl.empty()) {
 					//move some items out of the global list
-					global_wl.moveTo(wlLocal, 20);
+					global_wl.moveTo(wlLocal, 4);
               //      cnt3++;
 
 					bool suc;
