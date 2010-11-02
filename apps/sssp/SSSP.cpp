@@ -54,22 +54,22 @@ void SSSP::initializeGraph(char *filename) {
 			nodes = new SNode*[numNodes];
 			gnodes = new GNode[numNodes];
 			for (int i = 0; i < numNodes; i++) {
-				nodes[i] = new SNode(i+1);
+				nodes[i] = new SNode(i + 1);
 				gnodes[i] = graph->createNode(*nodes[i]);
 				graph->addNode(gnodes[i]);
 			}
-//			cout << "graph name is " << name << " and it has " << numNodes
-//					<< " nodes and some edges" << endl;
+			//			cout << "graph name is " << name << " and it has " << numNodes
+			//					<< " nodes and some edges" << endl;
 		} else if (!strcmp(firstchar.c_str(), "a")) {
 			int src, dest, weight;
 			infile >> src >> dest >> weight;
-			graph->addEdge(gnodes[src-1], gnodes[dest-1], SEdge(weight));
-//			cout << "node: " << src << " " << dest << " " << weight << endl;
+			graph->addEdge(gnodes[src - 1], gnodes[dest - 1], SEdge(weight));
+			//			cout << "node: " << src << " " << dest << " " << weight << endl;
 		}
 		getline(infile, line);
 	}
 	this->numNodes = numNodes;
-	this->numEdges= numEdges;
+	this->numEdges = numEdges;
 	this->delta = 700;
 
 	infile.close();
@@ -84,35 +84,34 @@ void SSSP::run(bool bfs, char *filename, int threadnum) {
 		Galois::Launcher::startTiming();
 		runBody(source);
 		Galois::Launcher::stopTiming();
-	}
-	else {
-	  Galois::setMaxThreads(threadnum);
+	} else {
+		Galois::setMaxThreads(threadnum);
 		Galois::Launcher::startTiming();
 		runBodyParallel(source);
 		Galois::Launcher::stopTiming();
 	}
-  cout << "STAT: Time " << Galois::Launcher::elapsedTime() << "\n";
-	cout<<this->sink.getData().dist << endl;
+	cout << "STAT: Time " << Galois::Launcher::elapsedTime() << "\n";
+	cout << this->sink.getData().dist << endl;
 	if (!verify()) {
-    cerr << "Verification failed.\n";
-    assert(0 && "Verification failed");
-    abort();
+		cerr << "Verification failed.\n";
+		assert(0 && "Verification failed");
+		abort();
 	}
 }
 
 SSSP *sssp;
 void process(UpdateRequest* req, Galois::WorkList<UpdateRequest *>& lwl) {
 	SNode& data = req->n.getData();
-	int v;
+	int v = data.dist;
 	while (req->w < (v = data.dist)) {
-		if (__sync_val_compare_and_swap(&data.dist, v, req->w)) {
-			for (Graph::neighbor_iterator ii = sssp->graph->neighbor_begin(req->n), ee =
-					sssp->graph->neighbor_end(req->n); ii != ee; ++ii) {
-				GNode dst = *ii;
-				int d = sssp->getEdgeData(req->n, dst);
-				int newDist = req->w + d;
-				lwl.push(new UpdateRequest(dst, newDist, d <= sssp->delta));
-			}
+		for (Graph::neighbor_iterator ii = sssp->graph->neighbor_begin(req->n), ee =
+				sssp->graph->neighbor_end(req->n); ii != ee; ++ii) {
+			GNode dst = *ii;
+			int d = sssp->getEdgeData(req->n, dst);
+			int newDist = req->w + d;
+			lwl.push(new UpdateRequest(dst, newDist, d <= sssp->delta));
+		}
+		if (__sync_bool_compare_and_swap(&data.dist, v, req->w) == true) {
 			break;
 		}
 	}
@@ -179,7 +178,7 @@ void SSSP::runBody(const GNode src) {
 		SNode& data = req->n.getData();
 		int v;
 		while (req->w < (v = data.dist)) {
-//			if (__sync_val_compare_and_swap(&data.dist, v, req->w)) {
+			//			if (__sync_val_compare_and_swap(&data.dist, v, req->w)) {
 			if (data.dist == v) {
 				data.dist = req->w;
 				for (Graph::neighbor_iterator ii = graph->neighbor_begin(req->n), ee =
