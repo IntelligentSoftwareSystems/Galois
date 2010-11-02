@@ -128,7 +128,7 @@ void SSSP::runBodyParallel(const GNode src) {
 		wl.push(up);
 	}
 	sssp = this;
-	Galois::for_each2(wl, process);
+	Galois::for_each(wl, process);
 }
 
 bool SSSP::verify() {
