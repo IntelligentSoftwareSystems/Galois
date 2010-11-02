@@ -191,7 +191,7 @@ public:
 			do {
 				do {
 					//move some items out of the global list
-					global_wl.moveTo(wlLocal, 4);
+					global_wl.moveTo(wlLocal, 256);
 
 					bool suc;
 					do {
