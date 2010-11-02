@@ -12,10 +12,10 @@ void SSSP::updateSourceAndSink(const int sourceId, const int sinkId) {
 	for (Graph::active_iterator src = graph->active_begin(), ee =
 			graph->active_end(); src != ee; ++src) {
 		SNode& node = src->getData();
-		node.set_dist(DIST_INFINITY);
+		node.dist = DIST_INFINITY;
 		if (node.id == sourceId) {
 			source = *src;
-			node.set_dist(0);
+			node.dist = 0;
 		} else if (node.id == sinkId) {
 			sink = *src;
 		}
@@ -104,9 +104,8 @@ SSSP *sssp;
 void process(UpdateRequest* req, Galois::WorkList<UpdateRequest *>& lwl) {
 	SNode& data = req->n.getData();
 	int v;
-	while (req->w < (v = data.get_dist())) {
-		if (data.get_dist() == v) {
-			data.set_dist(req->w);
+	while (req->w < (v = data.dist)) {
+		if (__sync_val_compare_and_swap(&data.dist, v, req->w)) {
 			for (Graph::neighbor_iterator ii = sssp->graph->neighbor_begin(req->n), ee =
 					sssp->graph->neighbor_end(req->n); ii != ee; ++ii) {
 				GNode dst = *ii;
@@ -134,16 +133,16 @@ void SSSP::runBodyParallel(const GNode src) {
 }
 
 bool SSSP::verify() {
-	if (source.getData().get_dist() != 0) {
+	if (source.getData().dist != 0) {
 		cerr << "source has non-zero dist value" << endl;
 		return false;
 	}
 
 	for (Graph::active_iterator src = graph->active_begin(), ee =
 			graph->active_end(); src != ee; ++src) {
-		const int dist = src->getData().get_dist();
+		const int dist = src->getData().dist;
 		if (dist >= DIST_INFINITY) {
-			cerr << "found node = " << src->getData().get_dist()
+			cerr << "found node = " << src->getData().dist
 					<< " with label >= INFINITY = " << dist << endl;
 			return false;
 		}
@@ -151,7 +150,7 @@ bool SSSP::verify() {
 		for (Graph::neighbor_iterator ii = graph->neighbor_begin(*src), ee =
 				graph->neighbor_end(*src); ii != ee; ++ii) {
 			GNode neighbor = *ii;
-			int ddist = src->getData().get_dist();
+			int ddist = src->getData().dist;
 
 			if (ddist > dist + getEdgeData(*src, neighbor)) {
 				cerr << "bad level value at " << src->getData().id
@@ -180,9 +179,9 @@ void SSSP::runBody(const GNode src) {
 		SNode& data = req->n.getData();
 		int v;
 		while (req->w < (v = data.dist)) {
-			if (__sync_val_compare_and_swap(&data.dist, v, req->w)) {
-//			if (data.get_dist() == v) {
-//				data.set_dist(req->w);
+//			if (__sync_val_compare_and_swap(&data.dist, v, req->w)) {
+			if (data.dist == v) {
+				data.dist = req->w;
 				for (Graph::neighbor_iterator ii = graph->neighbor_begin(req->n), ee =
 						graph->neighbor_end(req->n); ii != ee; ++ii) {
 					GNode dst = *ii;
