@@ -186,49 +186,49 @@ public:
 
 		TotalTime.start();
 
-		int wdone = 0;
-        int cnt1 = 0, cnt2 = 0, cnt3 = 0;
+		//int wdone = 0;
+        //int cnt1 = 0, cnt2 = 0, cnt3 = 0;
         do {
 			__sync_fetch_and_add(&threadsWorking, +1);
-            cnt1++;
+          //  cnt1++;
 			do {
-                cnt2++;
+            //    cnt2++;
 				while(!global_wl.empty()) {
 					//move some items out of the global list
-					global_wl.moveTo(wlLocal, 4);
-                    cnt3++;
+					global_wl.moveTo(wlLocal, 20);
+              //      cnt3++;
 
 					bool suc;
 					do {
 						value_type val = wlLocal.pop(suc);
 						if (suc) {
 							doProcess(val, wlLocal, ProcessTime, lconflicts);
-                            wdone++;
+                            //wdone++;
                         }
 					} while (suc);
 				}
 
-				//Try to steal work
+				//Try to steal work 
 					for (int i = 0; i < tmax; ++i) {
 						bool suc = false;
 						value_type val = local_wl[(i + ID) % tmax].steal(suc);
 						//Don't push it on the queue before we can execute it
 						if (suc) {
 							doProcess(val, wlLocal, ProcessTime, lconflicts);
-                            wdone++;
+                            //wdone++;
 							//One item is enough
                             break;
 						}
-				}
+				} 
 			} while (!wlLocal.empty() || !global_wl.empty());
 			__sync_fetch_and_add(&threadsWorking, -1);
 			usleep(50);
 		} while (__sync_fetch_and_add(&threadsWorking, 0) > 0);
 		TotalTime.stop();
-        usleep((rand() % 2000000)+1000000);
-        std::cout<<ID<<":"<<wdone<<std::endl;
-        std::cout << ID << ":" << cnt1 << "," << cnt2 << "," << cnt3 << std::endl;
-        std::cout.flush();
+       // usleep((rand() % 2000000)+1000000);
+       // std::cout<<ID<<":"<<wdone<<std::endl;
+       // std::cout << ID << ":" << cnt1 << "," << cnt2 << "," << cnt3 << std::endl;
+       // std::cout.flush();
 		__sync_fetch_and_add(&tTime, TotalTime.get());
 		__sync_fetch_and_add(&pTime, ProcessTime.get());
 		__sync_fetch_and_add(&conflicts, lconflicts);
