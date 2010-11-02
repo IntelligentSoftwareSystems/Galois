@@ -179,9 +179,10 @@ void SSSP::runBody(const GNode src) {
 		initial.pop();
 		SNode& data = req->n.getData();
 		int v;
-		while (req->w < (v = data.get_dist())) {
-			if (data.get_dist() == v) {
-				data.set_dist(req->w);
+		while (req->w < (v = data.dist)) {
+			if (__sync_val_compare_and_swap(&data.dist, v, req->w)) {
+//			if (data.get_dist() == v) {
+//				data.set_dist(req->w);
 				for (Graph::neighbor_iterator ii = graph->neighbor_begin(req->n), ee =
 						graph->neighbor_end(req->n); ii != ee; ++ii) {
 					GNode dst = *ii;
