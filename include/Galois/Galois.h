@@ -226,6 +226,14 @@ public:
 template<class WorkListTy, class Function>
 void for_each_simple(WorkListTy& wl, Function f) {
 	//wl.sort();
+	GaloisWork<WorkListTy, Function> GW(wl, f);
+	ThreadPool& PTP = getSystemThreadPool();
+	PTP.run(&GW);
+}
+
+template<class WorkListTy, class Function>
+void for_each_simple2(WorkListTy& wl, Function f) {
+	//wl.sort();
 	GaloisWork2<WorkListTy, Function> GW(wl, f);
 	ThreadPool& PTP = getSystemThreadPool();
 	PTP.run(&GW);
@@ -249,6 +257,11 @@ static __attribute__((unused)) void setMaxThreads(int T) {
 template<typename WorkListTy, typename Function>
 void for_each(WorkListTy& wl, Function f) {
 	GaloisRuntime::for_each_simple(wl, f);
+}
+
+template<typename WorkListTy, typename Function>
+void for_each2(WorkListTy& wl, Function f) {
+	GaloisRuntime::for_each_simple2(wl, f);
 }
 
 }
