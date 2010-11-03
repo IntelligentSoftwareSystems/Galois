@@ -62,27 +62,44 @@ namespace GaloisRuntime {
       T data;
       char* padding[64 - (sizeof(T) % 64)];
     };
-    std::vector<item> datum;
-
-  public:
-    explicit CPUSpaced(int i) {
-      datum.resize(i);
+    item* datum;
+    int num;
+    void create(int i) {
+      assert(!datum && !num);
+      num = i;
+      datum = new item[num];
+      for (int i = 0; i < num; ++i)
+	new (&(datum[i].data)) T(); //in place new
     }
-    CPUSpaced() {}
+  public:
+    explicit CPUSpaced(int i)
+      :datum(0), num(0)
+    {
+      create(i);
+    }
+
+    CPUSpaced()
+      :datum(0), num(0)
+      {}
+
+    ~CPUSpaced() {
+      if (datum) {
+	for (int i = 0; i < num; ++i)
+	  datum[i].data.~T(); // in place delete
+	delete[] datum;
+      }
+    }
 
     T& operator[] (int i) {
       return datum[i].data;
     }
 
     int size() const {
-      return datum.size();
+      return num;
     }
 
-    void resize(int n) {
-      datum.reserve(std::max((int)n, (int)datum.size()));
-      //Do this one at a time because of the copying symantics of resize
-      while ((int)datum.size() < n)
-	datum.resize(datum.size() + 1);
+    void late_initialize(int i) {
+      create(i);
     }
   };
 
