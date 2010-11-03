@@ -135,7 +135,7 @@ class Mesh {
       if (edge_map.find(edge) == edge_map.end()) {
         edge_map[edge] = node;
       } else {
-        mesh->addEdge(node, edge_map[edge], edge);
+        mesh->addEdge(node, edge_map[edge]);//, edge);
         edge_map.erase(edge);
       }
     }

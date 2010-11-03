@@ -62,7 +62,8 @@ class Cavity {
     GNode dst;
     for (Graph::neighbor_iterator ii = graph->neighbor_begin(node), ee = graph->neighbor_end(node); ii != ee; ++ii) {
       GNode neighbor = *ii;
-      Edge& edgeData = graph->getEdgeData(node, neighbor);
+      //Edge& edgeData = graph->getEdgeData(node, neighbor);
+      Edge edgeData = element.getRelatedEdge(neighbor.getData());
       if (elementTuple != edgeData.getPoint(0) && elementTuple != edgeData.getPoint(1)) {
 	assert(dst.isNull());
 	dst = neighbor;
@@ -89,7 +90,8 @@ class Cavity {
       }
     } else {
       // not a member
-      Edge& edgeData = graph->getEdgeData(node, next);
+      //Edge& edgeData = graph->getEdgeData(node, next);
+      Edge edgeData = nextElement.getRelatedEdge(node.getData());
       Subgraph::tmpEdge edge(node, next, edgeData);
       if (std::find(connections.begin(), connections.end(), edge) == connections.end()) {
 	connections.push_back(edge);

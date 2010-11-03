@@ -40,8 +40,8 @@
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
 
-typedef FirstGraph<Element,Edge,false>            Graph;
-typedef FirstGraph<Element,Edge,false>::GraphNode GNode;
+typedef FirstGraph<Element,void,false>            Graph;
+typedef FirstGraph<Element,void,false>::GraphNode GNode;
 
 
 #include "Subgraph.h"
@@ -84,7 +84,7 @@ void process(GNode item, Galois::WorkList<GNode>& lwl) {
 	 ee = cav.getPost().edge_end(); ii != ee; ++ii) {
     Subgraph::tmpEdge edge = *ii;
     //bool ret = 
-    mesh->addEdge(edge.src, edge.dst, edge.data);
+    mesh->addEdge(edge.src, edge.dst); //, edge.data);
     //assert ret;
   }
   if (mesh->containsNode(item)) {
