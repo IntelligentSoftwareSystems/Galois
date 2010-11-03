@@ -26,6 +26,7 @@ class GaloisWork: public Executable {
   WorkListTy& global_wl;
   Function f;
   int threadmax;
+  int threadsWorking;
 
   struct ThreadLD {
     localWLTy wl;
@@ -41,7 +42,7 @@ class GaloisWork: public Executable {
 
 public:
   GaloisWork(WorkListTy& _wl, Function _f):
-    global_wl(_wl), f(_f), threadmax(0) {
+    global_wl(_wl), f(_f), threadmax(0), threadsWorking(0) {
   }
 
   ~GaloisWork() {
@@ -116,10 +117,17 @@ public:
 
     tld.TotalTime.start();
     do {
+      __sync_fetch_and_add(&threadsWorking, +1); 
       do {
-	runLocalQueue(tld);
-      } while (global_wl.moveTo(tld.wl, 256));
-    } while (trySteal(tld));
+	do {
+	  do {
+	    runLocalQueue(tld);
+	  } while (global_wl.moveTo(tld.wl, 256));
+	} while (trySteal(tld));
+      } while (!tld.wl.empty() || !global_wl.empty());
+      __sync_fetch_and_sub(&threadsWorking, 1); 
+      usleep(50);
+    } while (threadsWorking > 0); 
     tld.TotalTime.stop();
   }
 };
