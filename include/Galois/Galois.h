@@ -18,124 +18,119 @@ namespace GaloisRuntime {
 
 template<class WorkListTy, class Function>
 class GaloisWork: public Executable {
-	typedef typename WorkListTy::value_type value_type;
-	typedef GWL_LIFO_SB<value_type> localWLTy;
-	//typedef GWL_ChaseLev_Dyn<value_type> localWLTy;
-	//typedef GWL_Idempotent_FIFO_SB<value_type> localWLTy;
+  typedef typename WorkListTy::value_type value_type;
+  typedef GWL_LIFO_SB<value_type> localWLTy;
+  //typedef GWL_ChaseLev_Dyn<value_type> localWLTy;
+  //typedef GWL_Idempotent_FIFO_SB<value_type> localWLTy;
 
-	WorkListTy& global_wl;
-	Function f;
-	int conflicts;
-	unsigned long tTime;
-	unsigned long pTime;
-	CPUSpaced<localWLTy> local_wl;
-	int threadsWorking;
+  WorkListTy& global_wl;
+  Function f;
+  int threadmax;
+
+  struct ThreadLD {
+    localWLTy wl;
+    int conflicts;
+    GaloisRuntime::TimeAccumulator ProcessTime;
+    GaloisRuntime::Timer TotalTime;
+    int ID;
+    bool pausing;
+    ThreadLD() :conflicts(0), ID(-1), pausing(false) {}
+  };
+
+  CPUSpaced<ThreadLD> tdata;
 
 public:
-	GaloisWork(WorkListTy& _wl, Function _f) :
-		global_wl(_wl), f(_f), conflicts(0), tTime(0), pTime(0) {
-		threadsWorking = 0;
-	}
+  GaloisWork(WorkListTy& _wl, Function _f):
+    global_wl(_wl), f(_f), threadmax(0) {
+  }
 
-	~GaloisWork() {
-		std::cout << "STAT: Conflicts " << conflicts << "\n";
-		std::cout << "STAT: TotalTime " << tTime << "\n";
-		std::cout << "STAT: ProcessTime " << pTime << "\n";
-		assert(global_wl.empty());
-	}
+  ~GaloisWork() {
+    int conflicts = 0;
+    unsigned long tTime = 0;
+    unsigned long pTime = 0;
 
-	void doProcess(value_type val, localWLTy& wlLocal,
-			GaloisRuntime::TimeAccumulator& ProcessTime, int& lconflicts) {
-		ProcessTime.start();
-		SimpleRuntimeContext cnx;
-		setThreadContext(&cnx);
-		try {
-			f(val, wlLocal);
-		} catch (int a) {
-			ProcessTime.stop();
-			++lconflicts;
-			global_wl.push(val);
-			return;
-		}
-		setThreadContext(0);
-		ProcessTime.stop();
-		return;
-	}
+    for (int i = 0; i < tdata.size(); ++i) {
+      conflicts += tdata[i].conflicts;
+      tTime += tdata[i].TotalTime.get();
+      pTime += tdata[i].ProcessTime.get();
+      assert(tdata[i].wl.empty());
+    }
 
-	virtual void preRun(int tmax) {
-		local_wl.resize(tmax);
-	}
+    std::cout << "STAT: Conflicts " << conflicts << "\n";
+    std::cout << "STAT: TotalTime " << tTime << "\n";
+    std::cout << "STAT: ProcessTime " << pTime << "\n";
+    assert(global_wl.empty());
+  }
 
-	virtual void postRun() {
-		for (int i = 0; i < local_wl.size(); ++i)
-			assert(local_wl[i].empty());
-		assert(global_wl.empty());
-	}
+  void doProcess(value_type val, ThreadLD& tld) {
+    tld.ProcessTime.start();
+    SimpleRuntimeContext cnx;
+    setThreadContext(&cnx);
+    try {
+      f(val, tld.wl);
+    } catch (int a) {
+      tld.ProcessTime.stop();
+      ++tld.conflicts;
+      global_wl.push(val);
+      return;
+    }
+    setThreadContext(0);
+    tld.ProcessTime.stop();
+    return;
+  }
 
-	virtual void operator()(int ID, int tmax) {
-		localWLTy& wlLocal = local_wl[ID];
+  virtual void preRun(int tmax) {
+    threadmax = tmax;
+    tdata.late_initialize(tmax);
+  }
 
-		int lconflicts = 0;
-		GaloisRuntime::Timer TotalTime;
-		GaloisRuntime::TimeAccumulator ProcessTime;
+  virtual void postRun() {}
 
-		TotalTime.start();
-		/*
-		 do {
-		 global_wl.moveTo(wlLocal, 256);
-		 while (!wlLocal.empty()) {
-		 bool suc;
-		 value_type val = wlLocal.pop(suc);
-		 if (suc)
-		 doProcess(val, wlLocal, ProcessTime, lconflicts);
-		 }
-		 } while (!global_wl.empty());
-		 */
+  bool trySteal(ThreadLD& tld) {
+    //Try to steal work
+    int num = (1 + tld.ID) % threadmax;
+    bool foundone = false;
+    value_type val = tdata[num].wl.steal(foundone);
+    //Don't push it on the queue before we can execute it
+    if (foundone) {
+      doProcess(val, tld);
+      //One item is enough
+      return true;
+    }
+    return false;
+  }
+    
 
-		do {
-			__sync_fetch_and_add(&threadsWorking, +1);
-			do {
-				while (!global_wl.empty()) {
-					//move some items out of the global list
-					global_wl.moveTo(wlLocal, 4);
+  void runLocalQueue(ThreadLD& tld) {
+    while (!tld.wl.empty()) {
+      bool suc = false;
+      value_type val = tld.wl.pop(suc);
+      if (suc)
+	doProcess(val, tld);
+    }
+  }
 
-					bool suc;
-					do {
-						value_type val = wlLocal.pop(suc);
-						if (suc)
-							doProcess(val, wlLocal, ProcessTime, lconflicts);
-					} while (suc);
-				}
+  virtual void operator()(int ID, int tmax) {
+    ThreadLD& tld = tdata[ID];
+    tld.ID = ID;
 
-				//Try to steal work
-				for (int i = 0; i < tmax; ++i) {
-					bool suc = false;
-					value_type val = local_wl[(i + ID) % tmax].steal(suc);
-					//Don't push it on the queue before we can execute it
-					if (suc) {
-						doProcess(val, wlLocal, ProcessTime, lconflicts);
-						//One item is enough
-						break;
-					}
-				}
-			} while (!wlLocal.empty() || !global_wl.empty());
-			__sync_fetch_and_add(&threadsWorking, -1);
-			usleep(50);
-		} while (__sync_fetch_and_add(&threadsWorking, 0) > 0);
-		TotalTime.stop();
-		__sync_fetch_and_add(&tTime, TotalTime.get());
-		__sync_fetch_and_add(&pTime, ProcessTime.get());
-		__sync_fetch_and_add(&conflicts, lconflicts);
-	}
+    tld.TotalTime.start();
+    do {
+      do {
+	runLocalQueue(tld);
+      } while (global_wl.moveTo(tld.wl, 256));
+    } while (trySteal(tld));
+    tld.TotalTime.stop();
+  }
 };
 
 
 template<class WorkListTy, class Function>
 void for_each_simple(WorkListTy& wl, Function f) {
-	//wl.sort();
-	GaloisWork<WorkListTy, Function> GW(wl, f);
-	ThreadPool& PTP = getSystemThreadPool();
-	PTP.run(&GW);
+  //wl.sort();
+  GaloisWork<WorkListTy, Function> GW(wl, f);
+  ThreadPool& PTP = getSystemThreadPool();
+  PTP.run(&GW);
 }
 
 }
@@ -146,15 +141,15 @@ namespace Galois {
 template<typename T>
 class WorkList {
 public:
-	virtual void push(T) = 0;
+  virtual void push(T) = 0;
 };
 
 static __attribute__((unused)) void setMaxThreads(int T) {
-	GaloisRuntime::getSystemThreadPool().resize(T);
+  GaloisRuntime::getSystemThreadPool().resize(T);
 }
 
 template<typename WorkListTy, typename Function>
 void for_each(WorkListTy& wl, Function f) {
-	GaloisRuntime::for_each_simple(wl, f);
+  GaloisRuntime::for_each_simple(wl, f);
 }
 }

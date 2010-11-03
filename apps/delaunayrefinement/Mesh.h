@@ -181,8 +181,15 @@ class Mesh {
       if (!found.count(node)) {
 	assert(mesh->containsNode(node) && "Reachable node was removed from graph");
 	found.insert(node);
-	for (Graph::neighbor_iterator ii = mesh->neighbor_begin(node), ee = mesh->neighbor_end(node); ii != ee; ++ii)
-	  remaining.push(*ii);
+	int i = 0;
+	for (Graph::neighbor_iterator ii = mesh->neighbor_begin(node), ee = mesh->neighbor_end(node); ii != ee; ++ii) {
+	  assert(i < 3);
+	  assert(mesh->containsNode(*ii));
+	  assert(node != *ii);
+	  ++i;
+	  //	  if (!found.count(*ii))
+	    remaining.push(*ii);
+	}
       }
     }
 

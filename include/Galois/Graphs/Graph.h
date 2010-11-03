@@ -210,10 +210,10 @@ public:
     assert(src.ID);
     assert(dst.ID);
     GaloisRuntime::acquire(src.ID);
-    GaloisRuntime::acquire(dst.ID);
     if (Directional) {
       src.ID->getOrCreateEdge(dst.ID) = data;
     } else {
+      GaloisRuntime::acquire(dst.ID);
       EdgeTy& E1 = src.ID->getOrCreateEdge(dst.ID);
       EdgeTy& E2 = dst.ID->getOrCreateEdge(src.ID);
       if (src < dst)
@@ -228,10 +228,10 @@ public:
     assert(src.ID);
     assert(dst.ID);
     GaloisRuntime::acquire(src.ID);
-    GaloisRuntime::acquire(dst.ID);
     if (Directional) {
       src.ID->eraseEdge(dst.ID);
     } else {
+      GaloisRuntime::acquire(dst.ID);
       src.ID->eraseEdge(dst.ID);
       dst.ID->eraseEdge(src.ID);
     }
@@ -243,11 +243,11 @@ public:
 
     //yes, fault on null (no edge)
     GaloisRuntime::acquire(src.ID);
-    GaloisRuntime::acquire(dst.ID);
 
     if (Directional) {
       return src.ID->getEdge(dst.ID);
     } else {
+      GaloisRuntime::acquire(dst.ID);
       if (src < dst)
 	return src.ID->getEdge(dst.ID);
       else
@@ -268,6 +268,11 @@ public:
   neighbor_iterator neighbor_begin(GraphNode N) {
     assert(N.ID);
     GaloisRuntime::acquire(N.ID);
+    for (typename gNode::edgesTy::iterator ii = N.ID->edges.begin(), ee = N.ID->edges.end(); ii != ee; ++ii) {
+      __builtin_prefetch(ii->first);
+      if(!Directional)
+	GaloisRuntime::acquire(ii->first);
+    }
     return boost::make_transform_iterator(N.ID->edges.begin(), makeGraphNode(this));
   }
   neighbor_iterator neighbor_end(GraphNode N) {
@@ -295,7 +300,7 @@ public:
 
 
   FirstGraph() {
-    //std::cerr << "NodeSize: " << (int)sizeof(gNode) << "\n";
+    std::cerr << "NodeSize: " << (int)sizeof(gNode) << "\n";
   }
 
 };

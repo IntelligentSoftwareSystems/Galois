@@ -68,8 +68,6 @@ namespace GaloisRuntime {
       assert(!datum && !num);
       num = i;
       datum = new item[num];
-      for (int i = 0; i < num; ++i)
-	new (&(datum[i].data)) T(); //in place new
     }
   public:
     explicit CPUSpaced(int i)
@@ -84,8 +82,6 @@ namespace GaloisRuntime {
 
     ~CPUSpaced() {
       if (datum) {
-	for (int i = 0; i < num; ++i)
-	  datum[i].data.~T(); // in place delete
 	delete[] datum;
       }
     }
