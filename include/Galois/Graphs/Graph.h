@@ -6,71 +6,126 @@
 #include <iostream>
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/iterator/filter_iterator.hpp>
-
+#include <boost/functional.hpp>
 
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/InsBag.h"
 #include "Support/ThreadSafe/TSIBag.h"
 #include "LLVM/SmallVector.h"
 
+namespace Galois {
+namespace Graph {
+
 ////////////////////////////////////////////////////////////////////////////////
 // Wrap void so that we can have a valid type on void nodes
 
 template<typename T>
 struct VoidWrapper {
-  typedef T Type;
+  typedef T type;
+  typedef T& ref_type;
 };
-
+ 
 template<>
 struct VoidWrapper<void> {
   struct unit {};
-  typedef unit Type;
+  typedef unit type;
+  typedef unit ref_type;
+};
+
+
+template<typename NTy, typename ETy>
+struct EdgeItem {
+  NTy N;
+  ETy E;
+  NTy getNeighbor() { return N; }
+  ETy& getData() { return E; }
+  EdgeItem(NTy& n)
+    :N(n)
+  {}
+
+};
+
+template<typename NTy>
+struct EdgeItem<NTy, void> {
+  NTy N;
+  NTy getNeighbor() { return N; }
+  typename VoidWrapper<void>::ref_type getData() { 
+    return VoidWrapper<void>::ref_type(); 
+  }
+  EdgeItem(NTy& n)
+    :N(n)
+  {}
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 
-template<typename _NodeTy, typename _EdgeTy, bool Directional>
+template<typename NodeTy, typename EdgeTy, bool Directional>
 class FirstGraph {
-  typedef typename VoidWrapper<_NodeTy>::Type NodeTy;
-  typedef typename VoidWrapper<_EdgeTy>::Type EdgeTy;
-  
 
   struct gNode : public GaloisRuntime::Lockable {
-    bool active;
-    NodeTy data;
-    typedef llvm::SmallVector<std::pair<gNode*, EdgeTy>, 3> edgesTy;
-    //typedef std::vector<std::pair<gNode*, EdgeTy> > edgesTy;
-    //, __gnu_cxx::malloc_allocator<std::pair<gNode*, EdgeTy> > > edgesTy;
+    //The storage type for edges
+    typedef EdgeItem<gNode*, EdgeTy> EITy;
+    //The return type for edge data
+    typedef typename VoidWrapper<EdgeTy>::ref_type REdgeTy;
+    typedef llvm::SmallVector<EITy, 3> edgesTy;
     edgesTy edges;
+    NodeTy data;
+    bool active;
+
+    typedef typename edgesTy::iterator iterator;
+
+    iterator begin() { return edges.begin(); }
+    iterator end()   { return edges.end();   }
+
+    typedef typename boost::transform_iterator<boost::mem_fun_ref_t<gNode*, EITy>, iterator> neighbor_iterator;
+
+    neighbor_iterator neighbor_begin() { 
+      return boost::make_transform_iterator(begin(), boost::mem_fun_ref(&EITy::getNeighbor));
+    }
+    neighbor_iterator neighbor_end() { 
+      return boost::make_transform_iterator(end(), boost::mem_fun_ref(&EITy::getNeighbor));
+    }
 
     gNode(const NodeTy& d, bool a)
-      :active(a), data(d)
+      :data(d), active(a)
     {}
 
+    void prefetch_neighbors() {
+      for (iterator ii = begin(), ee = end(); ii != ee; ++ii)
+	if (ii->getNeighbor())
+	  __builtin_prefetch(ii->getNeighbor());
+    }
+
     void eraseEdge(gNode* N) {
-      for (typename edgesTy::iterator ii = edges.begin(), ee = edges.end(); ii != ee; ++ii) {
-	if (ii->first == N) {
+      for (iterator ii = begin(), ee = end(); ii != ee; ++ii) {
+	if (ii->getNeighbor() == N) {
 	  edges.erase(ii);
 	  return;
 	}
       }
     }
 
-    EdgeTy& getOrCreateEdge(gNode* N) {
-      for (typename edgesTy::iterator ii = edges.begin(), ee = edges.end(); ii != ee; ++ii) 
-	if (ii->first == N) 
-	  return ii->second;
-      edges.push_back(std::make_pair(N, EdgeTy()));
-      return edges.back().second;
-    }
-    EdgeTy& getEdge(gNode* N) {
-      for (typename edgesTy::iterator ii = edges.begin(), ee = edges.end(); ii != ee; ++ii) 
-	if (ii->first == N)
-	  return ii->second;
+    REdgeTy getEdgeData(gNode* N) {
+      for (iterator ii = begin(), ee = end(); ii != ee; ++ii) 
+	if (ii->getNeighbor() == N)
+	  return ii->getData();
       assert(0 && "Edge doesn't exist");
       abort();
     }
+
+    REdgeTy getOrCreateEdge(gNode* N) {
+      for (iterator ii = begin(), ee = end(); ii != ee; ++ii) 
+	if (ii->getNeighbor() == N)
+	  return ii->getData();
+      edges.push_back(EITy(N));
+      return edges.back().getData();
+    }
+
+    bool isActive() {
+      return active;
+    }
   };
+
   
   //The graph manages the lifetimes of the data in the nodes and edges
   typedef GaloisRuntime::galois_insert_bag<gNode> nodeListTy;
@@ -83,75 +138,67 @@ class FirstGraph {
     GaloisRuntime::acquire(ID);
     return ID->data;
   }
-  
+
 public:
-  
   class GraphNode {
     friend class FirstGraph;
-    friend class makeGraphNode;
-    friend class makeGraphNode2;
     FirstGraph* Parent;
     gNode* ID;
-    GraphNode(FirstGraph* p, gNode* id)
-      :Parent(p), ID(id)
+    
+    explicit GraphNode(FirstGraph* p, gNode* id)
+    :Parent(p), ID(id)
     {}
+    
   public:
-    //public constructor is the Null pointer
+    
     GraphNode()
       :Parent(0), ID(0)
     {}
+    
+    void prefetch_all() {
+      if (ID) ID->prefetch_neighbors();
+    }
 
     NodeTy& getData() {
       return Parent->getData(ID);
     }
 
-    NodeTy& getDataUnsafe() {
-      return ID->data;
-    }
-
-    bool isNull() const {
-      return !Parent;
-    }
-
     bool operator!= (const GraphNode& rhs) const {
       return Parent != rhs.Parent || ID != rhs.ID;
     }
-
+  
     bool operator== (const GraphNode& rhs) const {
       return Parent == rhs.Parent && ID == rhs.ID;
     }
-
+    
     bool operator< (const GraphNode& rhs) const {
-      return Parent < rhs.Parent || (Parent == rhs.Parent && ID < rhs.ID);
+      return Parent < rhs.Parent || 
+	(Parent == rhs.Parent && ID < rhs.ID);
     }
-
+    
     bool operator> (const GraphNode& rhs) const {
-      return Parent > rhs.Parent || (Parent == rhs.Parent && ID >rhs.ID);
+      return Parent > rhs.Parent 
+	|| (Parent == rhs.Parent && ID >rhs.ID);
     }
-
+    
   };
 
 private:
   // Helpers for the iterator classes
-  class makeGraphNode : public std::unary_function<std::pair<gNode*, EdgeTy>, GraphNode >{
+  class makeGraphNode : public std::unary_function<gNode, GraphNode > {
     FirstGraph* G;
   public:
     makeGraphNode(FirstGraph* g) : G(g) {}
-    GraphNode operator()(std::pair<gNode*, EdgeTy>& data) const {
-      return GraphNode(G, data.first);
-    }
-  };
-  class makeGraphNode2 : public std::unary_function<gNode, GraphNode >{
-    FirstGraph* G;
-  public:
-    makeGraphNode2(FirstGraph* g) : G(g) {}
     GraphNode operator()(gNode& data) const {
       return GraphNode(G, &data);
     }
   };
-  struct is_active_node : public std::unary_function<gNode, bool>{
-    bool operator()(const gNode& g) const {
-      return g.active;
+  class makeGraphNodePtr : public std::unary_function<gNode*, GraphNode > {
+    FirstGraph* G;
+  public:
+    makeGraphNodePtr(FirstGraph* g) : G(g) {}
+    GraphNode operator()(gNode* data) const {
+      return GraphNode(G, data);
     }
   };
 
@@ -195,8 +242,8 @@ public:
       N->active = false;
       //erase the in-edges first
       for (unsigned int i = 0; i < N->edges.size(); ++i) {
-	if (N->edges[i].first != N) // don't handle loops yet
-	  N->edges[i].first->eraseEdge(N);
+	if (N->edges[i].getNeighbor() != N) // don't handle loops yet
+	  N->edges[i].getNeighbor()->eraseEdge(N);
       }
       N->edges.clear();
     }
@@ -206,7 +253,7 @@ public:
   // Edge Handling
 
   // Adds an edge to the graph containing the specified data.
-  void addEdge(GraphNode src, GraphNode dst, const EdgeTy& data = EdgeTy()) {
+  void addEdge(GraphNode src, GraphNode dst, const typename VoidWrapper<EdgeTy>::type& data) {
     assert(src.ID);
     assert(dst.ID);
     GaloisRuntime::acquire(src.ID);
@@ -220,6 +267,20 @@ public:
 	E1 = data;
       else
 	E2 = data;
+    }
+  }
+
+  // Adds an edge to the graph
+  void addEdge(GraphNode src, GraphNode dst) {
+    assert(src.ID);
+    assert(dst.ID);
+    GaloisRuntime::acquire(src.ID);
+    if (Directional) {
+      src.ID->getOrCreateEdge(dst.ID);
+    } else {
+      GaloisRuntime::acquire(dst.ID);
+      src.ID->getOrCreateEdge(dst.ID);
+      dst.ID->getOrCreateEdge(src.ID);
     }
   }
 
@@ -237,7 +298,7 @@ public:
     }
   }
 
-  EdgeTy& getEdgeData(GraphNode src, GraphNode dst) {
+  typename VoidWrapper<EdgeTy>::type& getEdgeData(GraphNode src, GraphNode dst) {
     assert(src.ID);
     assert(dst.ID);
 
@@ -245,13 +306,13 @@ public:
     GaloisRuntime::acquire(src.ID);
 
     if (Directional) {
-      return src.ID->getEdge(dst.ID);
+      return src.ID->getEdgeData(dst.ID);
     } else {
       GaloisRuntime::acquire(dst.ID);
       if (src < dst)
-	return src.ID->getEdge(dst.ID);
+	return src.ID->getEdgeData(dst.ID);
       else
-	return dst.ID->getEdge(src.ID);
+	return dst.ID->getEdgeData(src.ID);
     }
   }
 
@@ -263,35 +324,34 @@ public:
     return N.ID->edges.size();
   }
 
-  typedef boost::transform_iterator<makeGraphNode, typename gNode::edgesTy::iterator > neighbor_iterator;
+  typedef typename boost::transform_iterator<makeGraphNodePtr, typename gNode::neighbor_iterator > neighbor_iterator;
 
   neighbor_iterator neighbor_begin(GraphNode N) {
     assert(N.ID);
     GaloisRuntime::acquire(N.ID);
-    for (typename gNode::edgesTy::iterator ii = N.ID->edges.begin(), ee = N.ID->edges.end(); ii != ee; ++ii) {
-      __builtin_prefetch(ii->first);
+    for (typename gNode::neighbor_iterator ii = N.ID->neighbor_begin(), ee = N.ID->neighbor_end(); ii != ee; ++ii) {
+      __builtin_prefetch(*ii);
       if(!Directional)
-	GaloisRuntime::acquire(ii->first);
+	GaloisRuntime::acquire(*ii);
     }
-    return boost::make_transform_iterator(N.ID->edges.begin(), makeGraphNode(this));
+    return boost::make_transform_iterator(N.ID->neighbor_begin(), makeGraphNodePtr(this));
   }
   neighbor_iterator neighbor_end(GraphNode N) {
     assert(N.ID);
     GaloisRuntime::acquire(N.ID);
-    return boost::make_transform_iterator(N.ID->edges.end(), makeGraphNode(this));
+    return boost::make_transform_iterator(N.ID->neighbor_end(), makeGraphNodePtr(this));
   }
 
 
   //These are not thread safe!!
-
-  typedef boost::transform_iterator<makeGraphNode2, boost::filter_iterator<is_active_node, typename nodeListTy::iterator> >active_iterator;
+  typedef boost::transform_iterator<makeGraphNode, boost::filter_iterator<std::mem_fun_ref_t<bool,gNode>, typename nodeListTy::iterator> > active_iterator;
 
   active_iterator active_begin() {
-    return boost::make_transform_iterator(boost::make_filter_iterator<is_active_node>(nodes.begin(), nodes.end()), makeGraphNode2(this));
+    return boost::make_transform_iterator(boost::make_filter_iterator(std::mem_fun_ref(&gNode::isActive), nodes.begin(), nodes.end()), makeGraphNode(this));
   }
 
   active_iterator active_end() {
-    return boost::make_transform_iterator(boost::make_filter_iterator<is_active_node>(nodes.end(), nodes.end()), makeGraphNode2(this));
+    return boost::make_transform_iterator(boost::make_filter_iterator(std::mem_fun_ref(&gNode::isActive), nodes.end(), nodes.end()), makeGraphNode(this));
   }
   // The number of nodes in the graph
   unsigned int size() {
@@ -300,8 +360,10 @@ public:
 
 
   FirstGraph() {
-    std::cerr << "NodeSize: " << (int)sizeof(gNode) << "\n";
+    std::cout << "STAT: NodeSize " << (int)sizeof(gNode) << "\n";
   }
 
 };
 
+}
+}

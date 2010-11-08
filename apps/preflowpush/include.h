@@ -5,8 +5,8 @@
 #include "Edge.h"
 
 
-typedef FirstGraph<Node,Edge,false>            Graph;
-typedef FirstGraph<Node,Edge,false>::GraphNode GNode;
+typedef Galois::Graph::FirstGraph<Node,Edge,false>            Graph;
+typedef Galois::Graph::FirstGraph<Node,Edge,false>::GraphNode GNode;
 
 
 #include "Local.h"

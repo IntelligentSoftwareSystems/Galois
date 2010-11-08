@@ -4,6 +4,7 @@
 #define __GALOIS_PERCPU_H
 
 #include <vector>
+#include <cassert>
 
 namespace GaloisRuntime {
   //Return an int (dense from 1) labeling this thread
@@ -97,6 +98,28 @@ namespace GaloisRuntime {
     void late_initialize(int i) {
       create(i);
     }
+
+    template<typename F>
+    void reduce_and_reset(F& Func) {
+      item* NI = new item[1]; //must use array style
+      for (int i = 0; i < num; ++i)
+	NI->data = Func(NI->data, datum[i].data);
+      delete[] datum;
+      datum = NI;
+      num = 1;
+    }
+    
+    //You must have reduced the object already
+    void grow(int i) {
+      assert(i == 1 || i == 0);
+      item* OI = datum;
+      num = 0;
+      datum = 0;
+      create(i);
+      datum[i].data = OI->data;
+      delete[] OI;
+    }
+
   };
 
 }

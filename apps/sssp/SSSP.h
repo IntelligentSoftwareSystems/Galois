@@ -26,8 +26,8 @@ using namespace std;
 #include "Galois/Launcher.h"
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
-typedef FirstGraph<SNode, SEdge, true> Graph;
-typedef FirstGraph<SNode, SEdge, true>::GraphNode GNode;
+typedef Galois::Graph::FirstGraph<SNode, SEdge, true> Graph;
+typedef Galois::Graph::FirstGraph<SNode, SEdge, true>::GraphNode GNode;
 
 #include "ExecutorType.h"
 

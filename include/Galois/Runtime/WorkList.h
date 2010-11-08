@@ -1,18 +1,16 @@
 // Scalable Chunked worklist -*- C++ -*-
 
-#include "Support/ThreadSafe/simple_lock.h"
-#include "Support/PackedInt.h"
 #include <queue>
 #include <stack>
 
+#include "Support/ThreadSafe/simple_lock.h"
+#include "Support/PackedInt.h"
+
+//Forward Declaration
 namespace Galois {
   template<typename T>
   class WorkList;
 }
-
-#define NOCOPY(_name)				\
-  _name(const _name& rhs);			\
-  _name& operator=(const _name&)
 
 namespace GaloisRuntime {
 
@@ -21,9 +19,6 @@ namespace GaloisRuntime {
     std::stack<T> wl;
     threadsafe::simpleLock lock;
 
-    //Don't allow copying
-    NOCOPY(GWL_LIFO);
-    
   public:
 
     GWL_LIFO() {}
@@ -69,8 +64,6 @@ namespace GaloisRuntime {
     std::deque<T> wl;
     threadsafe::simpleLock lock;
 
-    NOCOPY(GWL_LIFO_SB);
-
   public:
 
     GWL_LIFO_SB() {}
@@ -97,6 +90,21 @@ namespace GaloisRuntime {
 	return retval;
       }
     }
+
+    T peek(bool& succeeded) {
+      lock.write_lock();
+      if (wl.empty()) {
+	succeeded = false;
+	lock.write_unlock();
+	return T();
+      } else {
+	succeeded = true;
+	T retval = wl.back();
+	lock.write_unlock();
+	return retval;
+      }
+    }
+      
     
     //This can be called by any thread
     T steal(bool& succeeded) {
@@ -127,8 +135,6 @@ namespace GaloisRuntime {
   class GWL_FIFO : public Galois::WorkList<T> {
     std::queue<T> wl;
     threadsafe::simpleLock lock;
-
-    NOCOPY(GWL_FIFO);
 
   public:
 
@@ -173,8 +179,6 @@ namespace GaloisRuntime {
   //This is buggy
   template<typename T>  
   class GWL_ChaseLev_Dyn : public Galois::WorkList<T> {
-
-    NOCOPY(GWL_ChaseLev_Dyn);
 
     struct DequeNode {
       enum { ArraySize = 256 };
@@ -476,8 +480,6 @@ namespace GaloisRuntime {
   template<typename T>
   class GWL_Idempotent_LIFO : public Galois::WorkList<T> {
 
-    NOCOPY(GWL_Idempotent_LIFO);
-
     packedInt2<32,32> anchor; //tail,tag
     unsigned int capacity;
     T* volatile tasks;
@@ -587,8 +589,6 @@ namespace GaloisRuntime {
 
   template<typename T>
   class GWL_Idempotent_FIFO : public Galois::WorkList<T> {
-
-    NOCOPY(GWL_Idempotent_FIFO);
 
     struct TaskArrayWithSize {
       int size;
@@ -710,8 +710,6 @@ namespace GaloisRuntime {
 
   template<typename T>
   class GWL_Idempotent_FIFO_SB : public Galois::WorkList<T> {
-
-    NOCOPY(GWL_Idempotent_FIFO_SB);
 
     struct TaskArrayWithSize {
       int size;

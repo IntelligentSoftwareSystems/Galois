@@ -118,6 +118,23 @@ namespace threadsafe {
       }
       return retval;
     }
+
+    value_type
+    peek(bool& suc) {
+      lock.read_lock();
+      value_type retval;
+      if (!c.empty()) {
+	lock.promote();
+	retval = c.front();
+	lock.write_unlock();
+	suc = true;
+      } else {
+	lock.read_unlock();
+	suc = false;
+      }
+      return retval;
+    }      
+
   void sort() {
     lock.write_lock();
     std::sort(c.begin(), c.end());

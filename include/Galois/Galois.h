@@ -14,6 +14,8 @@
 #include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/WorkList.h"
 
+#include <boost/utility.hpp>
+
 namespace GaloisRuntime {
 
 template<class WorkListTy, class Function>
@@ -101,11 +103,14 @@ public:
     return false;
   }
     
-
   void runLocalQueue(ThreadLD& tld) {
     while (!tld.wl.empty()) {
       bool suc = false;
       value_type val = tld.wl.pop(suc);
+      //      bool psuc = false;
+      //      value_type pval = tld.wl.peek(psuc);
+      //      if (psuc)
+      //	pval.prefetch_all();
       if (suc)
 	doProcess(val, tld);
     }
@@ -116,8 +121,8 @@ public:
     tld.ID = ID;
 
     tld.TotalTime.start();
-    do {
-      __sync_fetch_and_add(&threadsWorking, +1); 
+    //    do {
+      //      __sync_fetch_and_add(&threadsWorking, +1); 
       do {
 	do {
 	  do {
@@ -125,9 +130,9 @@ public:
 	  } while (global_wl.moveTo(tld.wl, 256));
 	} while (trySteal(tld));
       } while (!tld.wl.empty() || !global_wl.empty());
-      __sync_fetch_and_sub(&threadsWorking, 1); 
-      usleep(50);
-    } while (threadsWorking > 0); 
+      //      __sync_fetch_and_sub(&threadsWorking, 1); 
+      //      usleep(50);
+      //    } while (threadsWorking > 0); 
     tld.TotalTime.stop();
   }
 };
@@ -147,7 +152,7 @@ void for_each_simple(WorkListTy& wl, Function f) {
 namespace Galois {
 
 template<typename T>
-class WorkList {
+class WorkList : boost::noncopyable {
 public:
   virtual void push(T) = 0;
 };
