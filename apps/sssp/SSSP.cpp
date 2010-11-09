@@ -189,14 +189,14 @@ void SSSP::runBody(const GNode src) {
 		SNode& data = req.n.getData(Galois::Graph::NONE);
 		int v;
 		while (req.w < (v = data.dist)) {
-			for (Graph::neighbor_iterator ii = graph->neighbor_begin(req.n, Galois::Graph::NONE), ee =
-					graph->neighbor_end(req.n, Galois::Graph::NONE); ii != ee; ++ii) {
-				GNode dst = *ii;
-				int d = getEdgeData(req.n, dst);
-				int newDist = req.w + d;
-				initial.push(UpdateRequest(dst, newDist, d <= delta));
-			}
 			if (__sync_bool_compare_and_swap(&data.dist, v, req.w) == true) {
+				for (Graph::neighbor_iterator ii = graph->neighbor_begin(req.n, Galois::Graph::NONE), ee =
+						graph->neighbor_end(req.n, Galois::Graph::NONE); ii != ee; ++ii) {
+					GNode dst = *ii;
+					int d = getEdgeData(req.n, dst);
+					int newDist = req.w + d;
+					initial.push(UpdateRequest(dst, newDist, d <= delta));
+				}
 				break;
 			}
 		}
