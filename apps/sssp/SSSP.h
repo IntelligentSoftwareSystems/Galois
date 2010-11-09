@@ -58,6 +58,8 @@ public:
 	bool verify();
 	void runBody(const GNode src);
 	void run(bool bfs, char *filename, int threadnum);
+	template<typename T>
+        void runBodyParallel(const GNode src, T& wl);
 	void runBodyParallel(const GNode src);
 
 	class UpdateRequestCompare {

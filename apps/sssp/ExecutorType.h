@@ -16,7 +16,6 @@ public:
 	bool bfs;
 	ExecutorType(){};
 	ExecutorType(bool _bfs) : bfs(_bfs) {};
-	virtual ~ExecutorType(){};
 };
 
 #endif /* EXECUTORTYPE_H_ */

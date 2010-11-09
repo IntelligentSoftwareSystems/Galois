@@ -8,22 +8,16 @@
 #ifndef UPDATEREQUEST_H_
 #define UPDATEREQUEST_H_
 
-#include "SSSP.h"
-
 class UpdateRequest {
 private:
 public:
-	bool light;
-	GNode n;
-	int w;
-	UpdateRequest() {};
-	UpdateRequest(GNode _n, int _w, bool _light) {
-		w = _w;
-		n = _n;
-		light = _light;
-	}
-	;
-	virtual ~UpdateRequest() {};
+  bool light;
+  GNode n;
+  int w;
+  UpdateRequest() {};
+  UpdateRequest(GNode _n, int _w, bool _light)
+    :light(_light), n(_n), w(_w)
+  {}
 };
 
 #endif /* UPDATEREQUEST_H_ */
