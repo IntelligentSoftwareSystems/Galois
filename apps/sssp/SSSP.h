@@ -61,26 +61,6 @@ public:
 	template<typename T>
         void runBodyParallel(const GNode src, T& wl);
 	void runBodyParallel(const GNode src);
-
-	class UpdateRequestCompare {
-	private:
-		int computeIndx(UpdateRequest * u1) const {
-			const int range = 30*1024;
-      int bucket1 = std::min<int>(u1->w / 700, range - 1);
-      int retval1;
-      if (u1->light)
-        retval1 = bucket1 * 2;
-      else
-        retval1 = bucket1 * 2 + 1;
-      return retval1;
-		}
-	public:
-		bool operator()(UpdateRequest * u1, UpdateRequest * u2) const {
-			if (computeIndx(u1) > computeIndx(u2)) return true;
-			return false;
-		}
-	};
-
 };
 
 #endif /* SSSP_H_ */
