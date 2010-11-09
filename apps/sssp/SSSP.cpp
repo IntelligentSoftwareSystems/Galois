@@ -101,20 +101,20 @@ void SSSP::run(bool bfs, char *filename, int threadnum) {
 
 SSSP *sssp;
 void process(UpdateRequest& req, Galois::WorkList<UpdateRequest>& lwl) {
-	SNode& data = req.n.getData(Galois::Graph::NONE);
-	int v = data.dist;
-	while (req.w < (v = data.dist)) {
-		for (Graph::neighbor_iterator ii = sssp->graph->neighbor_begin(req.n, Galois::Graph::NONE), ee =
-				sssp->graph->neighbor_end(req.n, Galois::Graph::NONE); ii != ee; ++ii) {
-			GNode dst = *ii;
-			int d = sssp->getEdgeData(req.n, dst);
-			int newDist = req.w + d;
-			lwl.push(UpdateRequest(dst, newDist, d <= sssp->delta));
-		}
-		if (__sync_bool_compare_and_swap(&data.dist, v, req.w) == true) {
-			break;
-		}
-	}
+  SNode& data = req.n.getData(Galois::Graph::NONE);
+  int v;
+  while (req.w < (v = data.dist)) {
+    if (__sync_bool_compare_and_swap(&data.dist, v, req.w)) {
+      for (Graph::neighbor_iterator ii = sssp->graph->neighbor_begin(req.n, Galois::Graph::NONE), ee =
+	     sssp->graph->neighbor_end(req.n, Galois::Graph::NONE); ii != ee; ++ii) {
+	GNode dst = *ii;
+	int d = sssp->getEdgeData(req.n, dst);
+	int newDist = req.w + d;
+	lwl.push(UpdateRequest(dst, newDist, d <= sssp->delta));
+      }
+      break;
+    }
+  }
 }
 
 
