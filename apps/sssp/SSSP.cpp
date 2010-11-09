@@ -11,7 +11,7 @@
 void SSSP::updateSourceAndSink(const int sourceId, const int sinkId) {
 	for (Graph::active_iterator src = graph->active_begin(), ee =
 			graph->active_end(); src != ee; ++src) {
-		SNode& node = src->getData();
+		SNode& node = src->getData(Galois::Graph::NONE);
 		node.dist = DIST_INFINITY;
 		if (node.id == sourceId) {
 			source = *src;
@@ -26,7 +26,7 @@ int SSSP::getEdgeData(GNode src, GNode dst) {
 	if (executorType.bfs)
 		return 1;
 	else
-		return graph->getEdgeData(src, dst);
+		return graph->getEdgeData(src, dst, Galois::Graph::NONE).get_weight();
 }
 
 void SSSP::initializeGraph(char *filename) {
@@ -56,14 +56,14 @@ void SSSP::initializeGraph(char *filename) {
 			for (int i = 0; i < numNodes; i++) {
 				nodes[i] = new SNode(i + 1);
 				gnodes[i] = graph->createNode(*nodes[i]);
-				graph->addNode(gnodes[i]);
+				graph->addNode(gnodes[i], Galois::Graph::NONE);
 			}
 			//			cout << "graph name is " << name << " and it has " << numNodes
 			//					<< " nodes and some edges" << endl;
 		} else if (!strcmp(firstchar.c_str(), "a")) {
 			int src, dest, weight;
 			infile >> src >> dest >> weight;
-			graph->addEdge(gnodes[src - 1], gnodes[dest - 1], weight);
+			graph->addEdge(gnodes[src - 1], gnodes[dest - 1], SEdge(weight), Galois::Graph::NONE);
 			//			cout << "node: " << src << " " << dest << " " << weight << endl;
 		}
 		getline(infile, line);
@@ -91,7 +91,7 @@ void SSSP::run(bool bfs, char *filename, int threadnum) {
 		Galois::Launcher::stopTiming();
 	}
 	cout << "STAT: Time " << Galois::Launcher::elapsedTime() << "\n";
-	cout << this->sink.getData().dist << endl;
+	cout << this->sink.getData(Galois::Graph::NONE).dist << endl;
 	if (!verify()) {
 		cerr << "Verification failed.\n";
 		assert(0 && "Verification failed");
@@ -100,69 +100,74 @@ void SSSP::run(bool bfs, char *filename, int threadnum) {
 }
 
 SSSP *sssp;
-void process(UpdateRequest& req, Galois::WorkList<UpdateRequest>& lwl) {
-	SNode& data = req.n.getData();
+void process(UpdateRequest* req, Galois::WorkList<UpdateRequest *>& lwl) {
+	SNode& data = req->n.getData(Galois::Graph::NONE);
 	int v = data.dist;
-	while (req.w < (v = data.dist)) {
-		for (Graph::neighbor_iterator ii = sssp->graph->neighbor_begin(req.n), ee =
-				sssp->graph->neighbor_end(req.n); ii != ee; ++ii) {
+	while (req->w < (v = data.dist)) {
+		for (Graph::neighbor_iterator ii = sssp->graph->neighbor_begin(req->n, Galois::Graph::NONE), ee =
+				sssp->graph->neighbor_end(req->n, Galois::Graph::NONE); ii != ee; ++ii) {
 			GNode dst = *ii;
-			int d = sssp->getEdgeData(req.n, dst);
-			int newDist = req.w + d;
-			lwl.push(UpdateRequest(dst, newDist, d <= sssp->delta));
+			int d = sssp->getEdgeData(req->n, dst);
+			int newDist = req->w + d;
+			lwl.push(new UpdateRequest(dst, newDist, d <= sssp->delta));
 		}
-		if (__sync_bool_compare_and_swap(&data.dist, v, req.w) == true) {
+		if (__sync_bool_compare_and_swap(&data.dist, v, req->w) == true) {
 			break;
 		}
 	}
-}
-
-template<typename T>
-void SSSP::runBodyParallel(const GNode src, T& wl) {
-  for (Graph::neighbor_iterator ii = graph->neighbor_begin(src), ee =
-	 graph->neighbor_end(src); ii != ee; ++ii) {
-    GNode dst = *ii;
-    int w = getEdgeData(src, dst);
-    UpdateRequest up(dst, w, w <= delta);
-    wl.push(up);
-  }
-  sssp = this;
-  Galois::for_each(wl, process);
+	delete req;
 }
 
 void SSSP::runBodyParallel(const GNode src) {
-  if (executorType.bfs) {
-    threadsafe::ts_queue<UpdateRequest> wl;
-    runBodyParallel(src,wl);
-  } else {
-    threadsafe::ts_pqueue<UpdateRequest, std::greater<UpdateRequest> > wl;
-    runBodyParallel(src,wl);
-  }
+	if (executorType.bfs) {
+		threadsafe::ts_queue<UpdateRequest *> wl;
+		for (Graph::neighbor_iterator ii = graph->neighbor_begin(src, Galois::Graph::NONE), ee =
+				graph->neighbor_end(src, Galois::Graph::NONE); ii != ee; ++ii) {
+			GNode dst = *ii;
+			int w = getEdgeData(src, dst);
+			UpdateRequest *up = new UpdateRequest(dst, w, w <= delta);
+			wl.push(up);
+		}
+		sssp = this;
+		Galois::for_each(wl, process);
+	} else {
+		threadsafe::ts_pqueue<UpdateRequest *, UpdateRequestCompare> wl;
+		//		threadsafe::ts_queue<UpdateRequest *> wl;
+		for (Graph::neighbor_iterator ii = graph->neighbor_begin(src, Galois::Graph::NONE), ee =
+				graph->neighbor_end(src, Galois::Graph::NONE); ii != ee; ++ii) {
+			GNode dst = *ii;
+			int w = getEdgeData(src, dst);
+			UpdateRequest *up = new UpdateRequest(dst, w, w <= delta);
+			wl.push(up);
+		}
+		sssp = this;
+		Galois::for_each(wl, process);
+	}
 }
 
 bool SSSP::verify() {
-	if (source.getData().dist != 0) {
+	if (source.getData(Galois::Graph::NONE).dist != 0) {
 		cerr << "source has non-zero dist value" << endl;
 		return false;
 	}
 
 	for (Graph::active_iterator src = graph->active_begin(), ee =
 			graph->active_end(); src != ee; ++src) {
-		const int dist = src->getData().dist;
+		const int dist = src->getData(Galois::Graph::NONE).dist;
 		if (dist >= DIST_INFINITY) {
-			cerr << "found node = " << src->getData().dist
+			cerr << "found node = " << src->getData(Galois::Graph::NONE).dist
 					<< " with label >= INFINITY = " << dist << endl;
 			return false;
 		}
 
-		for (Graph::neighbor_iterator ii = graph->neighbor_begin(*src), ee =
-				graph->neighbor_end(*src); ii != ee; ++ii) {
+		for (Graph::neighbor_iterator ii = graph->neighbor_begin(*src, Galois::Graph::NONE), ee =
+				graph->neighbor_end(*src, Galois::Graph::NONE); ii != ee; ++ii) {
 			GNode neighbor = *ii;
-			int ddist = src->getData().dist;
+			int ddist = src->getData(Galois::Graph::NONE).dist;
 
 			if (ddist > dist + getEdgeData(*src, neighbor)) {
-				cerr << "bad level value at " << src->getData().id
-						<< " which is a neighbor of " << neighbor.getData().id << endl;
+				cerr << "bad level value at " << src->getData(Galois::Graph::NONE).id
+						<< " which is a neighbor of " << neighbor.getData(Galois::Graph::NONE).id << endl;
 				return false;
 			}
 
@@ -172,34 +177,35 @@ bool SSSP::verify() {
 }
 
 void SSSP::runBody(const GNode src) {
-  priority_queue<UpdateRequest, vector<UpdateRequest> ,	
-    std::greater<UpdateRequest> > initial;
+	priority_queue<UpdateRequest *, vector<UpdateRequest *> ,
+			UpdateRequestCompare> initial;
 	//	queue<UpdateRequest *> initial;
-	for (Graph::neighbor_iterator ii = graph->neighbor_begin(src), ee =
-			graph->neighbor_end(src); ii != ee; ++ii) {
+	for (Graph::neighbor_iterator ii = graph->neighbor_begin(src, Galois::Graph::NONE), ee =
+			graph->neighbor_end(src, Galois::Graph::NONE); ii != ee; ++ii) {
 		GNode dst = *ii;
 		int w = getEdgeData(src, dst);
-		UpdateRequest up(dst, w, w <= delta);
+		UpdateRequest *up = new UpdateRequest(dst, w, w <= delta);
 		initial.push(up);
 	}
 
 	while (!initial.empty()) {
-		UpdateRequest req = initial.top();
+		UpdateRequest* req = initial.top();
 		initial.pop();
-		SNode& data = req.n.getData();
+		SNode& data = req->n.getData(Galois::Graph::NONE);
 		int v;
-		while (req.w < (v = data.dist)) {
-			for (Graph::neighbor_iterator ii = graph->neighbor_begin(req.n), ee =
-					graph->neighbor_end(req.n); ii != ee; ++ii) {
+		while (req->w < (v = data.dist)) {
+			for (Graph::neighbor_iterator ii = graph->neighbor_begin(req->n, Galois::Graph::NONE), ee =
+					graph->neighbor_end(req->n, Galois::Graph::NONE); ii != ee; ++ii) {
 				GNode dst = *ii;
-				int d = getEdgeData(req.n, dst);
-				int newDist = req.w + d;
-				initial.push(UpdateRequest(dst, newDist, d <= delta));
+				int d = getEdgeData(req->n, dst);
+				int newDist = req->w + d;
+				initial.push(new UpdateRequest(dst, newDist, d <= delta));
 			}
-			if (__sync_bool_compare_and_swap(&data.dist, v, req.w) == true) {
+			if (__sync_bool_compare_and_swap(&data.dist, v, req->w) == true) {
 				break;
 			}
 		}
+		delete req;
 	}
 
 }
