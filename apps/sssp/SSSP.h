@@ -63,23 +63,19 @@ public:
 	void runBodyParallel(const GNode src);
 
 	class UpdateRequestCompare {
-	public:
-		bool operator()(UpdateRequest * u1, UpdateRequest * u2) const {
+	private:
+		int computeIndx(UpdateRequest * u1) const {
       int bucket1 = std::min<int>(u1->w / 700, range - 1);
       int retval1;
       if (u1->light)
         retval1 = bucket1 * 2;
       else
         retval1 = bucket1 * 2 + 1;
-
-      int bucket2 = std::min<int>(u2->w / 700, range - 1);
-      int retval2;
-      if (u1->light)
-        retval2 = bucket2 * 2;
-      else
-        retval2 = bucket2 * 2 + 1;
-
-			if (retval1 < retval2) return true;
+      return retval1;
+		}
+	public:
+		bool operator()(UpdateRequest * u1, UpdateRequest * u2) const {
+			if (computeIndx(u1) < computeIndx(u2)) return true;
 			return false;
 		}
 	};
