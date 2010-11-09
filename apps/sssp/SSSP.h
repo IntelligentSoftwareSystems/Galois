@@ -34,6 +34,8 @@ typedef Galois::Graph::FirstGraph<SNode, SEdge, true>::GraphNode GNode;
 
 #include "UpdateRequest.h"
 
+const int range = 30*1024;
+
 class SSSP {
 private:
 	GNode source;
@@ -63,7 +65,21 @@ public:
 	class UpdateRequestCompare {
 	public:
 		bool operator()(UpdateRequest * u1, UpdateRequest * u2) const {
-			if (u1->w < u2->w) return true;
+      int bucket1 = std::min<int>(u1->w / 700, range - 1);
+      int retval1;
+      if (u1->light)
+        retval1 = bucket1 * 2;
+      else
+        retval1 = bucket1 * 2 + 1;
+
+      int bucket2 = std::min<int>(u2->w / 700, range - 1);
+      int retval2;
+      if (u1->light)
+        retval2 = bucket2 * 2;
+      else
+        retval2 = bucket2 * 2 + 1;
+
+			if (retval1 < retval2) return true;
 			return false;
 		}
 	};
