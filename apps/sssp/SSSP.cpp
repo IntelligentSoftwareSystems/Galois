@@ -131,8 +131,8 @@ void SSSP::runBodyParallel(const GNode src) {
 		sssp = this;
 		Galois::for_each(wl, process);
 	} else {
-//		threadsafe::ts_pqueue<UpdateRequest *, UpdateRequestCompare> wl;
-		threadsafe::ts_queue<UpdateRequest *> wl;
+		threadsafe::ts_pqueue<UpdateRequest *, UpdateRequestCompare> wl;
+//		threadsafe::ts_queue<UpdateRequest *> wl;
 		for (Graph::neighbor_iterator ii = graph->neighbor_begin(src), ee =
 				graph->neighbor_end(src); ii != ee; ++ii) {
 			GNode dst = *ii;
@@ -177,8 +177,8 @@ bool SSSP::verify() {
 }
 
 void SSSP::runBody(const GNode src) {
-//	priority_queue<UpdateRequest *, vector<UpdateRequest *>, UpdateRequestCompare> initial;
-	queue<UpdateRequest *> initial;
+	priority_queue<UpdateRequest *, vector<UpdateRequest *>, UpdateRequestCompare> initial;
+//	queue<UpdateRequest *> initial;
 	for (Graph::neighbor_iterator ii = graph->neighbor_begin(src), ee =
 			graph->neighbor_end(src); ii != ee; ++ii) {
 		GNode dst = *ii;
@@ -188,7 +188,7 @@ void SSSP::runBody(const GNode src) {
 	}
 
 	while (!initial.empty()) {
-		UpdateRequest* req = initial.front();
+		UpdateRequest* req = initial.top();
 		initial.pop();
 		SNode& data = req->n.getData();
 		int v;

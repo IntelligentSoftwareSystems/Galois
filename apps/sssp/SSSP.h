@@ -75,7 +75,7 @@ public:
 		}
 	public:
 		bool operator()(UpdateRequest * u1, UpdateRequest * u2) const {
-			if (computeIndx(u1) < computeIndx(u2)) return true;
+			if (computeIndx(u1) > computeIndx(u2)) return true;
 			return false;
 		}
 	};
