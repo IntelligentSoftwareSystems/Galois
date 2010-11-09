@@ -132,7 +132,7 @@ void SSSP::runBodyParallel(const GNode src) {
 		Galois::for_each(wl, process);
 	} else {
 		threadsafe::ts_pqueue<UpdateRequest *, UpdateRequestCompare> wl;
-//		threadsafe::ts_queue<UpdateRequest *> wl;
+		//		threadsafe::ts_queue<UpdateRequest *> wl;
 		for (Graph::neighbor_iterator ii = graph->neighbor_begin(src), ee =
 				graph->neighbor_end(src); ii != ee; ++ii) {
 			GNode dst = *ii;
@@ -177,8 +177,9 @@ bool SSSP::verify() {
 }
 
 void SSSP::runBody(const GNode src) {
-	priority_queue<UpdateRequest *, vector<UpdateRequest *>, UpdateRequestCompare> initial;
-//	queue<UpdateRequest *> initial;
+	priority_queue<UpdateRequest *, vector<UpdateRequest *> ,
+			UpdateRequestCompare> initial;
+	//	queue<UpdateRequest *> initial;
 	for (Graph::neighbor_iterator ii = graph->neighbor_begin(src), ee =
 			graph->neighbor_end(src); ii != ee; ++ii) {
 		GNode dst = *ii;
@@ -193,16 +194,14 @@ void SSSP::runBody(const GNode src) {
 		SNode& data = req->n.getData();
 		int v;
 		while (req->w < (v = data.dist)) {
-			//			if (__sync_val_compare_and_swap(&data.dist, v, req->w)) {
-			if (data.dist == v) {
-				data.dist = req->w;
-				for (Graph::neighbor_iterator ii = graph->neighbor_begin(req->n), ee =
-						graph->neighbor_end(req->n); ii != ee; ++ii) {
-					GNode dst = *ii;
-					int d = getEdgeData(req->n, dst);
-					int newDist = req->w + d;
-					initial.push(new UpdateRequest(dst, newDist, d <= delta));
-				}
+			for (Graph::neighbor_iterator ii = graph->neighbor_begin(req->n), ee =
+					graph->neighbor_end(req->n); ii != ee; ++ii) {
+				GNode dst = *ii;
+				int d = getEdgeData(req->n, dst);
+				int newDist = req->w + d;
+				initial.push(new UpdateRequest(dst, newDist, d <= delta));
+			}
+			if (__sync_bool_compare_and_swap(&data.dist, v, req->w) == true) {
 				break;
 			}
 		}
