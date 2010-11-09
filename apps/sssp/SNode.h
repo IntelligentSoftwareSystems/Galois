@@ -7,23 +7,26 @@
 
 #ifndef NODE_H_
 #define NODE_H_
-#include <stdlib.h>
-#include <string.h>
-#include <iostream>
 
-using namespace std;
+#include <string>
+#include <sstream>
+#include <limits>
 
-const int DIST_INFINITY = 2147483647;
+static const int DIST_INFINITY = std::numeric_limits<int>::max() / 2 - 1;
 
 class SNode {
 private:
 public:
-	int id;
-	int dist;
-
-	SNode(int _id) : id(_id) { dist = DIST_INFINITY; };
-	virtual ~SNode() {};
-	string toString() {string *s = new string(""); return *s;}; //TODO: complete toString
+  int id;
+  int dist;
+  
+ SNode(int _id) : id(_id), dist(DIST_INFINITY) {}
+  std::string toString() {
+    std::string ret;
+    std::stringstream s(ret, std::ios_base::out);
+    s << '[' << id << "] dist: " << dist;
+    return ret;
+  }
 };
 
 #endif /* NODE_H_ */
