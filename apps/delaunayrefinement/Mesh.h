@@ -53,9 +53,9 @@ class Mesh {
   template<typename Collection>
     int getBad(Graph* mesh, Collection& ret) {
     int retval = 0;
+
     for(Graph::active_iterator ii = mesh->active_begin(), ee = mesh->active_end(); ii != ee; ++ii) {
-      Element& element = ii->getData();
-      if (element.isBad()) {
+      if (ii->getData().isBad()) {
 	ret.push(*ii);
 	++retval;
       }

@@ -109,7 +109,7 @@ namespace threadsafe {
       if (!c.empty()) {
 	lock.promote();
 	retval = c.front();
-	c.pop();
+	c.pop_front();
 	lock.write_unlock();
 	suc = true;
       } else {
