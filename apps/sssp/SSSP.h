@@ -34,7 +34,6 @@ typedef Galois::Graph::FirstGraph<SNode, SEdge, true>::GraphNode GNode;
 
 #include "UpdateRequest.h"
 
-const int range = 30*1024;
 
 class SSSP {
 private:
@@ -65,6 +64,7 @@ public:
 	class UpdateRequestCompare {
 	private:
 		int computeIndx(UpdateRequest * u1) const {
+			const int range = 30*1024;
       int bucket1 = std::min<int>(u1->w / 700, range - 1);
       int retval1;
       if (u1->light)
