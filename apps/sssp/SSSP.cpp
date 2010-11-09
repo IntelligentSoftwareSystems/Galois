@@ -26,7 +26,7 @@ int SSSP::getEdgeData(GNode src, GNode dst) {
 	if (executorType.bfs)
 		return 1;
 	else
-		return graph->getEdgeData(src, dst).get_weight();
+		return graph->getEdgeData(src, dst);
 }
 
 void SSSP::initializeGraph(char *filename) {
@@ -63,7 +63,7 @@ void SSSP::initializeGraph(char *filename) {
 		} else if (!strcmp(firstchar.c_str(), "a")) {
 			int src, dest, weight;
 			infile >> src >> dest >> weight;
-			graph->addEdge(gnodes[src - 1], gnodes[dest - 1], SEdge(weight));
+			graph->addEdge(gnodes[src - 1], gnodes[dest - 1], weight);
 			//			cout << "node: " << src << " " << dest << " " << weight << endl;
 		}
 		getline(infile, line);

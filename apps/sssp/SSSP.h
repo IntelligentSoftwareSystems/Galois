@@ -22,13 +22,12 @@
 using namespace std;
 
 #include "SNode.h"
-#include "SEdge.h"
 
 #include "Galois/Launcher.h"
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
-typedef Galois::Graph::FirstGraph<SNode, SEdge, true> Graph;
-typedef Galois::Graph::FirstGraph<SNode, SEdge, true>::GraphNode GNode;
+typedef Galois::Graph::FirstGraph<SNode, int, true> Graph;
+typedef Galois::Graph::FirstGraph<SNode, int, true>::GraphNode GNode;
 
 #include "ExecutorType.h"
 
