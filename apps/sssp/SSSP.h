@@ -14,11 +14,12 @@
 #include <iostream>
 #include <fstream>
 
+#include "Support/ThreadSafe/TSPQueue.h"
+
 #include "Support/ThreadSafe/simple_lock.h"
 #include "Support/ThreadSafe/TSQueue.h"
 
 using namespace std;
-
 
 #include "SNode.h"
 #include "SEdge.h"
@@ -45,8 +46,12 @@ private:
 public:
 	Graph* graph;
 	int delta;
-	SSSP(){};
-	virtual ~SSSP(){};
+	SSSP() {
+	}
+	;
+	virtual ~SSSP() {
+	}
+	;
 	void initializeGraph(char *filename);
 	void updateSourceAndSink(const int sourceId, const int sinkId);
 	int getEdgeData(GNode src, GNode dst);
@@ -54,6 +59,15 @@ public:
 	void runBody(const GNode src);
 	void run(bool bfs, char *filename, int threadnum);
 	void runBodyParallel(const GNode src);
+
+	class UpdateRequestCompare {
+	public:
+		bool operator()(UpdateRequest * u1, UpdateRequest * u2) const {
+			if (u1->w < u2->w) return true;
+			return false;
+		}
+	};
+
 };
 
 #endif /* SSSP_H_ */

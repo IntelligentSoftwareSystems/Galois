@@ -119,16 +119,29 @@ void process(UpdateRequest* req, Galois::WorkList<UpdateRequest *>& lwl) {
 }
 
 void SSSP::runBodyParallel(const GNode src) {
-	threadsafe::ts_queue<UpdateRequest *> wl;
-	for (Graph::neighbor_iterator ii = graph->neighbor_begin(src), ee =
-			graph->neighbor_end(src); ii != ee; ++ii) {
-		GNode dst = *ii;
-		int w = getEdgeData(src, dst);
-		UpdateRequest *up = new UpdateRequest(dst, w, w <= delta);
-		wl.push(up);
+	if (executorType.bfs) {
+		threadsafe::ts_queue<UpdateRequest *> wl;
+		for (Graph::neighbor_iterator ii = graph->neighbor_begin(src), ee =
+				graph->neighbor_end(src); ii != ee; ++ii) {
+			GNode dst = *ii;
+			int w = getEdgeData(src, dst);
+			UpdateRequest *up = new UpdateRequest(dst, w, w <= delta);
+			wl.push(up);
+		}
+		sssp = this;
+		Galois::for_each(wl, process);
+	} else {
+		threadsafe::ts_pqueue<UpdateRequest *, UpdateRequestCompare> wl;
+		for (Graph::neighbor_iterator ii = graph->neighbor_begin(src), ee =
+				graph->neighbor_end(src); ii != ee; ++ii) {
+			GNode dst = *ii;
+			int w = getEdgeData(src, dst);
+			UpdateRequest *up = new UpdateRequest(dst, w, w <= delta);
+			wl.push(up);
+		}
+		sssp = this;
+		Galois::for_each(wl, process);
 	}
-	sssp = this;
-	Galois::for_each(wl, process);
 }
 
 bool SSSP::verify() {
