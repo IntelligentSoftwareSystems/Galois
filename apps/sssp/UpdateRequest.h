@@ -14,10 +14,11 @@ public:
   bool light;
   GNode n;
   int w;
+  int idx;
   UpdateRequest() {};
   UpdateRequest(GNode _n, int _w, bool _light)
     :light(_light), n(_n), w(_w)
-  {}
+  { idx = computeIndx(); }
 
   int computeIndx() const {
     const int range = 30*1024;
@@ -31,11 +32,11 @@ public:
   }
   
   bool operator> (const UpdateRequest& RHS) const {
-    return computeIndx() > RHS.computeIndx();
+    return idx > RHS.idx; //computeIndx() > RHS.computeIndx();
   }
 
   bool operator<(const UpdateRequest& RHS) const {
-    return computeIndx() < RHS.computeIndx();
+    return idx < RHS.idx; //computeIndx() < RHS.computeIndx();
   }
 };
 

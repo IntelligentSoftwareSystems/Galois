@@ -127,7 +127,7 @@ public:
 	do {
 	  do {
 	    runLocalQueue(tld);
-	  } while (global_wl.moveTo(tld.wl, 256));
+	  } while (global_wl.moveTo(tld.wl, 4));
 	} while (trySteal(tld));
       } while (!tld.wl.empty() || !global_wl.empty());
       //      __sync_fetch_and_sub(&threadsWorking, 1);

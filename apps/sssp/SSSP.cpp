@@ -39,7 +39,6 @@ void SSSP::initializeGraph(char *filename) {
 
 	string name;
 	int numNodes, numEdges;
-	SNode **nodes = NULL;
 	GNode *gnodes = NULL;
 	while (!infile.eof()) {
 		string line;
@@ -51,11 +50,9 @@ void SSSP::initializeGraph(char *filename) {
 			infile >> numNodes;
 			infile >> numEdges;
 			graph = new Graph();
-			nodes = new SNode*[numNodes];
 			gnodes = new GNode[numNodes];
 			for (int i = 0; i < numNodes; i++) {
-				nodes[i] = new SNode(i + 1);
-				gnodes[i] = graph->createNode(*nodes[i]);
+				gnodes[i] = graph->createNode(SNode(i+1));
 				graph->addNode(gnodes[i], Galois::Graph::NONE);
 			}
 			//			cout << "graph name is " << name << " and it has " << numNodes
@@ -91,7 +88,7 @@ void SSSP::run(bool bfs, char *filename, int threadnum) {
 		Galois::Launcher::stopTiming();
 	}
 	cout << "STAT: Time " << Galois::Launcher::elapsedTime() << "\n";
-	cout << this->sink.getData(Galois::Graph::NONE).dist << endl;
+	cout << this->sink.getData(Galois::Graph::NONE).toString() << endl;
 	if (!verify()) {
 		cerr << "Verification failed.\n";
 		assert(0 && "Verification failed");
@@ -133,7 +130,7 @@ void SSSP::runBodyParallel(const GNode src, T& wl) {
 
 void SSSP::runBodyParallel(const GNode src) {
 	if (executorType.bfs) {
-		threadsafe::ts_queue<UpdateRequest> wl;
+	  threadsafe::ts_queue<UpdateRequest> wl;
 		runBodyParallel(src,wl);
 	} else {
 	  threadsafe::ts_pqueue<UpdateRequest, std::greater<UpdateRequest> > wl;

@@ -26,5 +26,5 @@ int main(int argc, char *argv[]) {
 
 	SSSP sssp = SSSP();
 	sssp.run(bfs, inputfile, threads);
-	exit(0);
+	return 0;
 }

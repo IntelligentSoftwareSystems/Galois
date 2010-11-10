@@ -22,10 +22,9 @@ public:
   
  SNode(int _id) : id(_id), dist(DIST_INFINITY) {}
   std::string toString() {
-    std::string ret;
-    std::stringstream s(ret, std::ios_base::out);
+    std::ostringstream s;
     s << '[' << id << "] dist: " << dist;
-    return ret;
+    return s.str();
   }
 };
 
