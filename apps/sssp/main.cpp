@@ -11,20 +11,18 @@
 using namespace std;
 
 int main(int argc, char *argv[]) {
-	char* inputfile = NULL;
-	bool bfs;
-	int threads = 0;
-	if (argc != 4) {
-		cout << "Usage: sssp <num-threads> <bfs> <input-file>" << endl;
-		cout<< "A zero for <num-threads> indicates sequential execution." << endl;
-		exit(-1);
-	} else {
-		threads = atoi(argv[1]);
-		bfs = strcmp(argv[2], "f") == 0 ? false : true;
-		inputfile = argv[3];
-	}
+  if (argc != 5) {
+    cout << "Usage: sssp <num-threads> <bfs> <maxNode> <input-file>" << endl;
+    cout<< "A zero for <num-threads> indicates sequential execution." << endl;
+    return -1;
+  }
 
-	SSSP sssp = SSSP();
-	sssp.run(bfs, inputfile, threads);
-	return 0;
+  int threads = atoi(argv[1]);
+  bool bfs = strcmp(argv[2], "f") == 0 ? false : true;
+  int maxNodes = atoi(argv[3]);
+  char* inputfile = argv[4];
+  
+  SSSP sssp;
+  sssp.run(bfs, inputfile, threads, maxNodes);
+  return 0;
 }

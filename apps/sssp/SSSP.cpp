@@ -72,10 +72,10 @@ void SSSP::initializeGraph(char *filename) {
 	infile.close();
 }
 
-void SSSP::run(bool bfs, char *filename, int threadnum) {
+void SSSP::run(bool bfs, char *filename, int threadnum, int maxNodes) {
 	executorType = ExecutorType(bfs);
 	initializeGraph(filename);
-	updateSourceAndSink(1, numNodes); //FIXME:!!?
+	updateSourceAndSink(maxNodes, numNodes - 1 - maxNodes); //FIXME:!!?
 
 	if (threadnum == 0) {
 		Galois::Launcher::startTiming();

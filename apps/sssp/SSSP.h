@@ -57,7 +57,7 @@ public:
 	int getEdgeData(GNode src, GNode dst);
 	bool verify();
 	void runBody(const GNode src);
-	void run(bool bfs, char *filename, int threadnum);
+	void run(bool bfs, char *filename, int threadnum, int maxNodes);
 	template<typename T>
         void runBodyParallel(const GNode src, T& wl);
 	void runBodyParallel(const GNode src);
