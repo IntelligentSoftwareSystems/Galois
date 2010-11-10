@@ -193,6 +193,10 @@ public:
       return Parent->getData(ID, mflag);
     }
 
+    bool isNull() const {
+      return !Parent;
+    }
+
     bool operator!=(const GraphNode& rhs) const {
       return Parent != rhs.Parent || ID != rhs.ID;
     }
