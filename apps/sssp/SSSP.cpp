@@ -9,6 +9,10 @@
 #include "SSSP.h"
 
 void SSSP::updateSourceAndSink(const int sourceId, const int sinkId) {
+	if (sourceId > numNodes || sourceId <= 0 || sinkId > numNodes || sinkId <= 0) {
+		cerr<<"Invalid maxNode!" <<endl;
+		exit(-1);
+	}
 	for (Graph::active_iterator src = graph->active_begin(), ee =
 			graph->active_end(); src != ee; ++src) {
 		SNode& node = src->getData(Galois::Graph::NONE);
@@ -149,7 +153,7 @@ bool SSSP::verify() {
 			graph->active_end(); src != ee; ++src) {
 		const int dist = src->getData(Galois::Graph::NONE).dist;
 		if (dist >= DIST_INFINITY) {
-			cerr << "found node = " << src->getData(Galois::Graph::NONE).dist
+			cerr << "found node = " << src->getData(Galois::Graph::NONE).id
 					<< " with label >= INFINITY = " << dist << endl;
 			return false;
 		}
