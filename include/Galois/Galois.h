@@ -34,11 +34,11 @@ class GaloisWork : public Executable {
   struct ThreadLD {
     localWLTy wl;
     int conflicts;
+    int iterations;
     GaloisRuntime::TimeAccumulator ProcessTime;
     GaloisRuntime::Timer TotalTime;
     int ID;
-    bool pausing;
-    ThreadLD() :conflicts(0), ID(-1), pausing(false) {}
+    ThreadLD() :conflicts(0), iterations(0), ID(-1) {}
   };
 
   CPUSpaced<ThreadLD> tdata;
@@ -49,26 +49,30 @@ public:
 
   ~GaloisWork() {
     int conflicts = 0;
+    int iterations = 0;
     unsigned long tTime = 0;
     unsigned long pTime = 0;
 
     for (int i = 0; i < tdata.size(); ++i) {
       conflicts += tdata[i].conflicts;
+      iterations += tdata[i].iterations;
       tTime += tdata[i].TotalTime.get();
       pTime += tdata[i].ProcessTime.get();
       assert(tdata[i].wl.empty());
     }
 
     std::cout << "STAT: Conflicts " << conflicts << "\n";
+    std::cout << "STAT: Iterations " << iterations << "\n";
     std::cout << "STAT: TotalTime " << tTime << "\n";
     std::cout << "STAT: ProcessTime " << pTime << "\n";
     assert(global_wl.empty());
   }
 
   void doProcess(value_type val, ThreadLD& tld) {
-    tld.ProcessTime.start();
+    ++tld.iterations;
     SimpleRuntimeContext cnx;
     setThreadContext(&cnx);
+    tld.ProcessTime.start();
     try {
       f(val, tld.wl);
     } catch (int a) {
@@ -77,8 +81,8 @@ public:
       global_wl.push(val);
       return;
     }
-    setThreadContext(0);
     tld.ProcessTime.stop();
+    setThreadContext(0);
     return;
   }
 
