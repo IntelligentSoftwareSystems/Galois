@@ -24,6 +24,7 @@ class GaloisWork : public Executable {
   //typedef GWL_LIFO_SB<value_type> localWLTy;
   typedef GWL_ChaseLev_Dyn<value_type> localWLTy;
   //  typedef GWL_Idempotent_FIFO_SB<value_type> localWLTy;
+  //typedef GWL_PQueue<value_type, std::greater<value_type> > localWLTy;
 
   WorkListTy& global_wl;
   Function f;

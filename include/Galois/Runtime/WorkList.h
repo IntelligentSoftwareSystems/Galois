@@ -14,6 +14,51 @@ namespace Galois {
 
 namespace GaloisRuntime {
 
+template<typename T, class Compare = std::less<T> >
+class GWL_PQueue : public Galois::WorkList<T> {
+  std::priority_queue<T, std::vector<T>, Compare> wl;
+  threadsafe::simpleLock lock;
+  
+public:
+  
+  GWL_PQueue() {}
+  ~GWL_PQueue() {}
+
+  //These should only be called by one thread
+  virtual void push(T val) {
+    lock.write_lock();
+    wl.push(val);
+    lock.write_unlock();
+  }
+
+  T pop(bool& succeeded) {
+    lock.write_lock();
+    if (wl.empty()) {
+      succeeded = false;
+      lock.write_unlock();
+      return T();
+    } else {
+      succeeded = true;
+      T retval = wl.top();
+      wl.pop();
+      lock.write_unlock();
+      return retval;
+    }
+  }
+    
+  //This can be called by any thread
+  T steal(bool& succeeded) {
+    return pop(succeeded);
+  }
+  
+  bool empty() {
+    lock.write_lock();
+    bool retval = wl.empty();
+    lock.write_unlock();
+    return retval;
+  }
+};
+
   template<typename T>
   class GWL_LIFO : public Galois::WorkList<T> {
     std::stack<T> wl;
