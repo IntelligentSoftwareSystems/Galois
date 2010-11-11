@@ -2,6 +2,9 @@
  *  \brief pthread thread pool implementation
  */
 
+#include "galois_config.h"
+#ifdef WITH_PTHREAD_POOL
+
 #include <semaphore.h>
 #include <pthread.h>
 #include <stdlib.h>
@@ -139,3 +142,5 @@ static ThreadPool_pthread pool;
 ThreadPool& GaloisRuntime::getSystemThreadPool() {
   return pool;
 }
+
+#endif
