@@ -24,7 +24,7 @@ public:
     writeef(&_lock, 0); // clears the lock and clears the lock lock
   }
 
-  bool read_try_lock() {
+  bool try_read_lock() {
     int V = readfe(&_lock); // sets to empty, acquiring the lock lock
     if (V) {
       //failed
