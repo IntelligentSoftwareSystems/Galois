@@ -79,7 +79,7 @@ public:
     }
   }
   void* getValue() {
-    return readxx(_lock); //does not touch the lock lock
+    return readxx(&_lock); //does not touch the lock lock
   }
 };
 
