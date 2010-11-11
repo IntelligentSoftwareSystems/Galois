@@ -3,10 +3,7 @@
 #ifndef _SIMPLE_LOCK_H
 #define _SIMPLE_LOCK_H
 
-#include <cassert>
-
 namespace threadsafe {
-namespace cray {
 
 // The most stupid spinlock you can imagine
 class simpleLock {
@@ -83,7 +80,6 @@ public:
   }
 };
 
-}
 }
 
 #endif

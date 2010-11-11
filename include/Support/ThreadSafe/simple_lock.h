@@ -3,6 +3,12 @@
 #ifndef _SIMPLE_LOCK_H
 #define _SIMPLE_LOCK_H
 
+#include "galois_config.h"
+
+#ifdef WITH_CRAY_POOL
+#include "simple_lock_cray.h"
+#else
+
 #include <cassert>
 
 namespace threadsafe {
@@ -63,4 +69,5 @@ namespace threadsafe {
 
 }
 
+#endif
 #endif
