@@ -33,15 +33,11 @@ namespace {
 
     virtual void run(Executable* E) {
       work = E;
-      work->preRun(numThreads());
-      ThreadPool_cray* p = this;
-      future int children[num];
-      future children$(p) {
-	p->launch();
-	return 0;
+      work->preRun(num);
+#pragma mta assert parallel
+      for (int i = 0; i < num; ++i) {
+	launch();
       }
-      for (int i = 0; i < num; ++i)
-	touch(&children$[i])
       work->postRun();
     }
 

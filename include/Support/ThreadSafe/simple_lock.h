@@ -6,7 +6,7 @@
 #include "galois_config.h"
 
 #ifdef WITH_CRAY_POOL
-#include "simple_lock_cray.h"
+#include "Support/ThreadSafe/cray_simple_lock.h"
 #else
 
 #include <cassert>
