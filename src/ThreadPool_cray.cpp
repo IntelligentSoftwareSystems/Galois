@@ -5,40 +5,11 @@
 #include "galois_config.h"
 #ifdef WITH_CRAY_POOL
 
-#include <list>
-#include <cassert>
-
 #include "Galois/Runtime/ThreadPool.h"
 
 using namespace GaloisRuntime;
 
 namespace {
-
-  class Semaphore {
-    sem_t sem;
-  public:
-    explicit Semaphore(int val) {
-      sem_init(&sem, 0, val);
-    }
-    ~Semaphore() {
-      sem_destroy(&sem);
-    }
-
-    void release(int n = 1) {
-      while (n) {
-	--n;
-	sem_post(&sem);
-      }
-    }
-
-    void acquire(int n = 1) {
-      while (n) {
-	--n;
-	sem_wait(&sem);
-      }
-    }
-    
-  };
 
   class ThreadPool_cray : public ThreadPool {
     
