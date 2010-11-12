@@ -5,6 +5,8 @@
  *      Author: amshali
  */
 
+#include "Barneshut.h"
+
 int main(int argc, char* argv[]) {
 	return 0;
 }
