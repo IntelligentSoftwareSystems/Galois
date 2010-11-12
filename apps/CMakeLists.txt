@@ -1,3 +1,4 @@
 add_subdirectory(delaunayrefinement)
 add_subdirectory(preflowpush)
 add_subdirectory(sssp)
+add_subdirectory(barneshut)
