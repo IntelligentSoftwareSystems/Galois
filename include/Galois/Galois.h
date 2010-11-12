@@ -7,6 +7,8 @@
 
 #include <iostream>
 
+#include "Galois/Scheduling.h"
+
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Timer.h"
 #include "Galois/Runtime/ThreadPool.h"
@@ -21,9 +23,9 @@ template<class WorkListTy, class Function>
 class GaloisWork : public Executable {
   typedef typename WorkListTy::value_type value_type;
   //typedef GWL_LIFO_SB<value_type> localWLTy;
-  typedef GWL_ChaseLev_Dyn<value_type> localWLTy;
+  //typedef GWL_ChaseLev_Dyn<value_type> localWLTy;
   //  typedef GWL_Idempotent_FIFO_SB<value_type> localWLTy;
-  //typedef GWL_PQueue<value_type, std::greater<value_type> > localWLTy;
+  typedef GWL_PQueue<value_type, std::greater<value_type> > localWLTy;
 
   WorkListTy& global_wl;
   Function f;
@@ -164,8 +166,14 @@ static __attribute__((unused)) void setMaxThreads(int T) {
   GaloisRuntime::getSystemThreadPool().resize(T);
 }
 
-template<typename WorkListTy, typename Function>
-void for_each(WorkListTy& wl, Function f) {
+template<typename WorkListTy, typename Function, typename Pri>
+void for_each(WorkListTy& wl, Function f, Pri P) {
   GaloisRuntime::for_each_simple(wl, f);
 }
+
+template<typename WorkListTy, typename Function>
+void for_each(WorkListTy& wl, Function f) {
+  for_each(wl, f, Galois::Scheduling::Priority.defaultOrder());
+}
+
 }

@@ -102,7 +102,9 @@ void refine(Mesh& m, WLTY& wl) {
   //    }
   //  } else {
   //Galois::setMaxThreads(threads);
-  Galois::for_each(wl, process);
+  using namespace Galois::Scheduling;
+  Galois::for_each(wl, process, 
+		   Priority.first<ChunkedFIFO>().thenLocally<LIFO>());
     //  }
 }
 
