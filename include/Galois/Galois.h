@@ -8,6 +8,7 @@
 #include <iostream>
 
 #include "Galois/Scheduling.h"
+#include "Galois/Context.h"
 
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Timer.h"
@@ -15,31 +16,48 @@
 #include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/WorkList.h"
 
-#include <boost/utility.hpp>
-
 namespace GaloisRuntime {
 
 template<class WorkListTy, class Function>
-class GaloisWork : public Executable {
+class GaloisWork : public Galois::Executable {
   typedef typename WorkListTy::value_type value_type;
-  //typedef GWL_LIFO_SB<value_type> localWLTy;
+  typedef GWL_LIFO_SB<value_type> localWLTy;
   //typedef GWL_ChaseLev_Dyn<value_type> localWLTy;
-  //  typedef GWL_Idempotent_FIFO_SB<value_type> localWLTy;
-  typedef GWL_PQueue<value_type, std::greater<value_type> > localWLTy;
+  //typedef GWL_Idempotent_FIFO_SB<value_type> localWLTy;
+  //typedef GWL_PQueue<value_type, std::greater<value_type> > localWLTy;
 
   WorkListTy& global_wl;
   Function f;
   int threadmax;
   int threadsWorking;
 
-  struct ThreadLD {
+  class ThreadLD : public Galois::Context<value_type> {
+  public:
     localWLTy wl;
     int conflicts;
     int iterations;
     GaloisRuntime::TimeAccumulator ProcessTime;
     GaloisRuntime::Timer TotalTime;
-    int ID;
-    ThreadLD() :conflicts(0), iterations(0), ID(-1) {}
+    GaloisRuntime::SimpleRuntimeContext cnx;
+  public:
+    ThreadLD()
+      :conflicts(0), iterations(0)
+    {}
+
+    void setThreadID(int ID) {
+      Galois::Context<value_type>::threadID = ID;
+    }
+
+    virtual void push(value_type T) {
+      wl.push(T);
+    }
+
+    virtual void finish() {
+    }
+
+    virtual void suspendWith(Executable* E) {
+      abort();
+    }
   };
 
   CPUSpaced<ThreadLD> tdata;
@@ -71,19 +89,20 @@ public:
 
   void doProcess(value_type val, ThreadLD& tld) {
     ++tld.iterations;
-    SimpleRuntimeContext cnx;
-    setThreadContext(&cnx);
+    setThreadContext(&tld.cnx);
+    tld.cnx.start();
     tld.ProcessTime.start();
     try {
-      f(val, tld.wl);
+      f(val, tld);
     } catch (int a) {
       tld.ProcessTime.stop();
+      tld.cnx.cancel();
       ++tld.conflicts;
       global_wl.push(val);
       return;
     }
     tld.ProcessTime.stop();
-    setThreadContext(0);
+    tld.cnx.commit();
     return;
   }
 
@@ -97,7 +116,7 @@ public:
 
   bool trySteal(ThreadLD& tld) {
     //Try to steal work
-    int num = (1 + tld.ID) % threadmax;
+    int num = (1 + tld.getThreadID()) % threadmax;
     bool foundone = false;
     value_type val = tdata[num].wl.steal(foundone);
     //Don't push it on the queue before we can execute it
@@ -124,7 +143,8 @@ public:
 
   virtual void operator()(int ID, int tmax) {
     ThreadLD& tld = tdata[ID];
-    tld.ID = ID;
+    tld.setThreadID(ID);
+    setThreadContext(&tld.cnx);
 
     tld.TotalTime.start();
     //    do {
@@ -133,7 +153,7 @@ public:
 	do {
 	  do {
 	    runLocalQueue(tld);
-	  } while (global_wl.moveTo(tld.wl, 4));
+	  } while (global_wl.moveTo(tld.wl, 512));
 	} while (trySteal(tld));
       } while (!tld.wl.empty() || !global_wl.empty());
       //      __sync_fetch_and_sub(&threadsWorking, 1);
@@ -155,12 +175,6 @@ void for_each_simple(WorkListTy& wl, Function f) {
 
 //The user interface
 namespace Galois {
-
-template<typename T>
-class WorkList : boost::noncopyable {
-public:
-  virtual void push(T) = 0;
-};
 
 static __attribute__((unused)) void setMaxThreads(int T) {
   GaloisRuntime::getSystemThreadPool().resize(T);

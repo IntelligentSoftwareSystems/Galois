@@ -54,7 +54,7 @@ typedef Galois::Graph::FirstGraph<Element,void,false>::GraphNode GNode;
 Graph* mesh;
 int threads = 1;
 
-void process(GNode item, Galois::WorkList<GNode>& lwl) {
+void process(GNode item, Galois::Context<GNode>& lwl) {
   if (!mesh->containsNode(item))
     return;
 

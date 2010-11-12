@@ -102,7 +102,7 @@ void SSSP::run(bool bfs, char *filename, int threadnum, int maxNodes) {
 }
 
 SSSP *sssp;
-void process(UpdateRequest& req, Galois::WorkList<UpdateRequest>& lwl) {
+void process(UpdateRequest& req, Galois::Context<UpdateRequest>& lwl) {
   SNode& data = req.n.getData(Galois::Graph::NONE);
   int v;
   while (req.w < (v = data.dist)) {

@@ -2,13 +2,12 @@
 
 #include <deque>
 #include <algorithm>
-#include <ext/malloc_allocator.h>
 
 namespace threadsafe {
   
 template< class _Tp, class _Lock = simpleLock<int,true> >
   class ts_queue {
-    typedef std::deque<_Tp, __gnu_cxx::malloc_allocator<_Tp> > _Sequence;
+    typedef std::deque<_Tp> _Sequence;
   public:
     typedef typename _Sequence::value_type                value_type;
     typedef typename _Sequence::const_reference           const_reference;

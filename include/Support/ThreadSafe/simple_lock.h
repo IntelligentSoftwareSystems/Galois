@@ -22,7 +22,7 @@ class simpleLock<T, true> {
 public:
   simpleLock() : _lock(0) {}
 
-  void lock(T val = (T)1) { 
+  void lock(T val = 1) { 
     while (!try_lock(val)) {} 
   }
 
@@ -31,7 +31,7 @@ public:
     _lock = 0;
   }
 
-  bool try_lock(T val = (T)1) {
+  bool try_lock(T val) {
     return __sync_bool_compare_and_swap(&_lock, 0, val);
   }
 

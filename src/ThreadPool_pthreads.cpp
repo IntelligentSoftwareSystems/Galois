@@ -5,14 +5,15 @@
 #include "galois_config.h"
 #ifdef WITH_PTHREAD_POOL
 
+#include "Galois/Executable.h"
+#include "Galois/Runtime/ThreadPool.h"
+
 #include <semaphore.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <iostream>
 #include <list>
 #include <cassert>
-
-#include "Galois/Runtime/ThreadPool.h"
 
 using namespace GaloisRuntime;
 
@@ -61,7 +62,7 @@ namespace {
     
     Semaphore start;
     Semaphore finish;
-    Executable* work;
+    Galois::Executable* work;
     volatile bool shutdown;
     std::list<pthread_t> threads;
     int tmax;
@@ -100,7 +101,7 @@ namespace {
       resize(0);
     }
 
-    virtual void run(Executable* E) {
+    virtual void run(Galois::Executable* E) {
       work = E;
       work->preRun(numThreads());
       start.release(numThreads());

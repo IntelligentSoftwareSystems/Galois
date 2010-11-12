@@ -20,9 +20,6 @@ class Lockable : public LockableBaseHook, public threadsafe::simpleLock<void*, t
     typedef boost::intrusive::slist<Lockable, boost::intrusive::base_hook<LockableBaseHook>, boost::intrusive::constant_time_size<false>, boost::intrusive::linear<true> > locksTy;
     locksTy locks;
 
-    void rollback() {
-      throw -1;
-    }
   public:
     void acquire(Lockable& L) {
       acquire(&L);
@@ -33,12 +30,19 @@ class Lockable : public LockableBaseHook, public threadsafe::simpleLock<void*, t
 	locks.push_front(*C);
       } else {
 	if (C->getValue() != this)
-	  rollback();
+	  throw -1; //CONFLICT
       }
     }
 
-    SimpleRuntimeContext() {}
-    ~SimpleRuntimeContext() {
+    void start() {
+      assert(locks.empty());
+    }
+
+    void cancel() {
+      commit();
+    }
+
+    void commit() {
       //Although the destructor for the list would do the unlink,
       //we do it here since we already are iterating
       while (!locks.empty()) {

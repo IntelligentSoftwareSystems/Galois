@@ -14,16 +14,12 @@
 #include "Support/ThreadSafe/simple_lock.h"
 #include "Support/PackedInt.h"
 
-//Forward Declaration
-namespace Galois {
-  template<typename T>
-  class WorkList;
-}
+#include <boost/utility.hpp>
 
 namespace GaloisRuntime {
 
 template<typename T, class Compare = std::less<T> >
-class GWL_PQueue : public Galois::WorkList<T>, threadsafe::simpleLock<int, true> {
+class GWL_PQueue : boost::noncopyable, threadsafe::simpleLock<int, true> {
   std::priority_queue<T, std::vector<T>, Compare> wl;
   
 public:
@@ -67,7 +63,7 @@ public:
 };
 
   template<typename T>
-  class GWL_LIFO : public Galois::WorkList<T>, threadsafe::simpleLock<int, true> {
+  class GWL_LIFO : boost::noncopyable, threadsafe::simpleLock<int, true> {
     std::stack<T> wl;
 
   public:
@@ -111,7 +107,7 @@ public:
   };
 
   template<typename T>
-  class GWL_LIFO_SB : public Galois::WorkList<T>, threadsafe::simpleLock<int, true> {
+  class GWL_LIFO_SB : boost::noncopyable, threadsafe::simpleLock<int, true> {
     std::deque<T> wl;
 
   public:
@@ -182,7 +178,7 @@ public:
   };
 
   template<typename T>
-  class GWL_FIFO : public Galois::WorkList<T>, threadsafe::simpleLock<int, true> {
+  class GWL_FIFO : boost::noncopyable, threadsafe::simpleLock<int, true> {
     std::queue<T> wl;
 
   public:
@@ -226,7 +222,7 @@ public:
   };
 
   template<typename T>  
-  class GWL_ChaseLev_Dyn : public Galois::WorkList<T> {
+  class GWL_ChaseLev_Dyn : boost::noncopyable {
 
     struct DequeNode {
       enum { ArraySize = 256 };
@@ -526,7 +522,7 @@ public:
   };
 
   template<typename T>
-  class GWL_Idempotent_LIFO : public Galois::WorkList<T> {
+  class GWL_Idempotent_LIFO : boost::noncopyable {
 
     packedInt2<32,32> anchor; //tail,tag
     unsigned int capacity;
@@ -636,7 +632,7 @@ public:
 
 
   template<typename T>
-  class GWL_Idempotent_FIFO : public Galois::WorkList<T> {
+  class GWL_Idempotent_FIFO : boost::noncopyable {
 
     struct TaskArrayWithSize {
       int size;
@@ -757,7 +753,7 @@ public:
 
 
   template<typename T>
-  class GWL_Idempotent_FIFO_SB : public Galois::WorkList<T> {
+  class GWL_Idempotent_FIFO_SB : boost::noncopyable {
 
     struct TaskArrayWithSize {
       int size;
