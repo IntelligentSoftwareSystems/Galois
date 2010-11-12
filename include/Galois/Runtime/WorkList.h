@@ -221,7 +221,6 @@ public:
     }
   };
 
-  //This is buggy
   template<typename T>  
   class GWL_ChaseLev_Dyn : public Galois::WorkList<T> {
 
