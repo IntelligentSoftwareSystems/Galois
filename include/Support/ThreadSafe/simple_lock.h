@@ -13,59 +13,43 @@
 
 namespace threadsafe {
 
-  // The most stupid spinlock you can imagine
-  class simpleLock {
-    int _lock;
-  public:
+template<typename T, bool isALock>
+class simpleLock;
 
-    simpleLock() : _lock(0) {}
+template<typename T>
+class simpleLock<T, true> {
+  T _lock;
+public:
+  simpleLock() : _lock(0) {}
 
-    void read_lock() {
-      //      assert(!_lock);
-      while (!try_read_lock()) {}
-    }
-    void read_unlock() {
-      assert(_lock);
-      _lock = 0;
-    }
-    bool try_read_lock() {
-      return __sync_bool_compare_and_swap(&_lock, 0, 1);
-    }
+  void lock(T val = (T)1) { 
+    while (!try_lock(val)) {} 
+  }
 
-    void promote() {}
+  void unlock() {
+    assert(_lock);
+    _lock = 0;
+  }
 
-    void write_lock() {
-      read_lock();
-    }
-    void write_unlock() {
-      read_unlock();
-    }
-    bool try_write_lock() {
-      return try_read_lock();
-    }
-  };
+  bool try_lock(T val = (T)1) {
+    return __sync_bool_compare_and_swap(&_lock, 0, val);
+  }
 
-  class ptrLock {
-    volatile void* _lock;
-  public:
+  T getValue() {
+    return _lock;
+  }
+};
 
-    ptrLock() : _lock(0) {}
+template<typename T>
+class simpleLock<T, false> {
+public:
+  simpleLock() {}
+  void lock(T val = 0) {}
+  void unlock() {}
+  bool try_lock(T val = 0) { return true; }
+  T getValue() { return 0; }
+};
 
-    void lock(void* val) {
-      //      assert(!_lock);
-      while (!try_lock(val)) {}
-    }
-    void unlock() {
-      assert(_lock);
-      _lock = 0;
-    }
-    bool try_lock(void* val) {
-      return __sync_bool_compare_and_swap(&_lock, 0, val);
-    }
-    volatile void* getValue() {
-      return _lock;
-    }
-  };
 
 }
 

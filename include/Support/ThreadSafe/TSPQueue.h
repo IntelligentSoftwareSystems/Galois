@@ -5,7 +5,7 @@
 
 namespace threadsafe {
 
-template<class _Tp, class _Compare = std::less<_Tp>, class _Lock = simpleLock>
+template<class _Tp, class _Compare = std::less<_Tp>, class _Lock = simpleLock<int, true> >
 class ts_pqueue {
 	typedef std::priority_queue<_Tp, std::vector<_Tp>, _Compare> _Sequence;
 public:
@@ -33,16 +33,16 @@ public:
 	 *  Returns true if the %stack is empty.
 	 */
 	bool empty() const {
-		lock.read_lock();
+		lock.lock();
 		bool retval = c.empty();
-		lock.read_unlock();
+		lock.unlock();
 		return retval;
 	}
 
 	template<typename S>
 	bool moveTo(S& other, int count = 0) {
 		bool retval = false;
-		lock.write_lock();
+		lock.lock();
 		bool do_all = count == 0;
 		while (!c.empty() && (do_all || count)) {
 			value_type v = c.top();
@@ -51,23 +51,23 @@ public:
 			retval = true;
 			--count;
 		}
-		lock.write_unlock();
+		lock.unlock();
 		return retval;
 	}
 
 	template<typename Siter>
 	void insert(Siter b, Siter e) {
-		lock.write_lock();
+		lock.lock();
 		for (; b != e; ++b)
 			c.push(*b);
-		lock.write_unlock();
+		lock.unlock();
 	}
 
 	/**  Returns the number of elements in the %stack.  */
 	size_type size() const {
-		lock.read_lock();
+		lock.lock();
 		size_type retval = c.size();
-		lock.read_unlock();
+		lock.unlock();
 		return retval;
 	}
 
@@ -81,9 +81,9 @@ public:
 	 *  underlying sequence.
 	 */
 	void push(const value_type& __x) {
-		lock.write_lock();
+		lock.lock();
 		c.push(__x);
-		lock.write_unlock();
+		lock.unlock();
 	}
 
 	/**
@@ -95,31 +95,29 @@ public:
 	 *
 	 */
 	value_type pop(bool& suc) {
-		lock.read_lock();
+		lock.lock();
 		value_type retval;
 		if (!c.empty()) {
-			lock.promote();
 			retval = c.front();
 			c.pop();
-			lock.write_unlock();
+			lock.unlock();
 			suc = true;
 		} else {
-			lock.read_unlock();
+			lock.unlock();
 			suc = false;
 		}
 		return retval;
 	}
 
 	value_type peek(bool& suc) {
-		lock.read_lock();
+		lock.lock();
 		value_type retval;
 		if (!c.empty()) {
-			lock.promote();
 			retval = c.front();
-			lock.write_unlock();
+			lock.unlock();
 			suc = true;
 		} else {
-			lock.read_unlock();
+			lock.unlock();
 			suc = false;
 		}
 		return retval;

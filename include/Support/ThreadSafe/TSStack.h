@@ -4,7 +4,7 @@
 
 namespace threadsafe {
   
-  template< class _Tp, class _Lock = simpleLock >
+template< class _Tp, class _Lock = simpleLock<int,true> >
   class ts_stack {
     typedef std::deque<_Tp> _Sequence;
   public:
@@ -34,9 +34,9 @@ namespace threadsafe {
     bool
     empty() const
     { 
-      lock.read_lock();
+      lock.lock();
       bool retval = c.empty();
-      lock.read_unlock();
+      lock.unlock();
       return retval;
     }
 
@@ -52,7 +52,7 @@ namespace threadsafe {
 	retval = true;
 	--count;
       }
-      lock.write_unlock();
+      lock.unlock();
       return retval;
     }
 
@@ -60,9 +60,9 @@ namespace threadsafe {
     size_type
     size() const
     { 
-      lock.read_lock();
+      lock.lock();
       size_type retval = c.size();
-      lock.read_unlock();
+      lock.unlock();
       return retval;
     }
 
@@ -78,9 +78,9 @@ namespace threadsafe {
     void
     push(const value_type& __x)
     {
-      lock.write_lock();
+      lock.lock();
       c.push_back(__x);
-      lock.write_unlock();
+      lock.unlock();
     }
 
     /**
@@ -94,16 +94,15 @@ namespace threadsafe {
     value_type
     pop(bool& suc)
     {
-      lock.read_lock();
+      lock.lock();
       value_type retval;
       if (!c.empty()) {
-	lock.promote();
 	retval = c.back();
 	c.pop_back();
-	lock.write_unlock();
+	lock.unlock();
 	suc = true;
       } else {
-	lock.read_unlock();
+	lock.unlock();
 	suc = false;
       }
       return retval;

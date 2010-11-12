@@ -12,24 +12,8 @@ namespace GaloisRuntime {
   //Use an intrusive list to track objects in a context without allocation overhead
   class LockableListTag;
   typedef boost::intrusive::slist_base_hook<boost::intrusive::tag<LockableListTag>,boost::intrusive::link_mode<boost::intrusive::normal_link> > LockableBaseHook;
-  class Lockable : public LockableBaseHook {
-    volatile void* _lock;
-  public:
-    Lockable() : _lock(0) {}
-    void lock(void* val) {
-      while (!try_lock(val)) {}
-    }
-    void unlock() {
-      assert(_lock);
-      _lock = 0;
-    }
-    bool try_lock(void* val) {
-      return __sync_bool_compare_and_swap(&_lock, 0, val);
-    }
-    void* get_lock_value() {
-      return const_cast<void*>(_lock);
-    }
-  };
+class Lockable : public LockableBaseHook, public threadsafe::simpleLock<void*, true> {
+};
 
   class SimpleRuntimeContext {
 
@@ -48,7 +32,7 @@ namespace GaloisRuntime {
       if (suc) {
 	locks.push_front(*C);
       } else {
-	if (C->get_lock_value() != this)
+	if (C->getValue() != this)
 	  rollback();
       }
     }

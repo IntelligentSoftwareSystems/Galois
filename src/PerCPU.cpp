@@ -44,7 +44,7 @@ static __thread int ThreadLocalNum = 0;
 static int nextLocalItem = 0;
 
 static std::vector<std::pair<LocalDataItem*, int> > AllThreadData;
-static threadsafe::simpleLock AllThreadDataLock;
+static threadsafe::simpleLock<int,true> AllThreadDataLock;
 
 static LocalDataItem setToZero() {
   LocalDataItem LDI;
@@ -64,12 +64,12 @@ static LocalDataItem* createAll() {
   std::generate(&L[0], &L[num], setToZero);
   ThreadLocalData = L;
   ThreadLocalNum = num;
-  AllThreadDataLock.write_lock();
+  AllThreadDataLock.lock();
   int myID = GaloisRuntime::getThreadID();
   AllThreadData.resize(std::max(1 + myID, (int)AllThreadData.size()));
   AllThreadData[myID].first = L;
   AllThreadData[myID].second = num;
-  AllThreadDataLock.write_unlock();
+  AllThreadDataLock.unlock();
   return L;
 }
 
@@ -134,13 +134,13 @@ namespace GaloisRuntime {
   template<typename T>
   T PerCPUData<T>::getRemote(int rThreadID) const {
     T retval = (T)0;
-    AllThreadDataLock.write_lock();
+    AllThreadDataLock.lock();
     AllThreadData.resize(std::max(1 + rThreadID, (int)AllThreadData.size()));
     LocalDataItem* L = AllThreadData[rThreadID].first;
     int num = AllThreadData[rThreadID].second;
     if (L && (index < num))
       retval = *(getByType<T>(&L[index]));
-    AllThreadDataLock.write_unlock();
+    AllThreadDataLock.unlock();
     return retval;
   }
 

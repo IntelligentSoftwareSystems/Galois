@@ -1,4 +1,12 @@
-// Scalable Chunked worklist -*- C++ -*-
+// Scalable Local worklists -*- C++ -*-
+// This contains final (leaf) worklists.  Some support stealing, some don't
+// All classes conform to:
+// Galois::WorkList (for virtual push)
+// T pop(bool&)
+// bool empty()
+// If they support stealing:
+// T steal(bool&)
+// bool canSteal
 
 #include <queue>
 #include <stack>
@@ -15,9 +23,8 @@ namespace Galois {
 namespace GaloisRuntime {
 
 template<typename T, class Compare = std::less<T> >
-class GWL_PQueue : public Galois::WorkList<T> {
+class GWL_PQueue : public Galois::WorkList<T>, threadsafe::simpleLock<int, true> {
   std::priority_queue<T, std::vector<T>, Compare> wl;
-  threadsafe::simpleLock lock;
   
 public:
   
@@ -26,22 +33,22 @@ public:
 
   //These should only be called by one thread
   virtual void push(T val) {
-    lock.write_lock();
+    lock();
     wl.push(val);
-    lock.write_unlock();
+    unlock();
   }
 
   T pop(bool& succeeded) {
-    lock.write_lock();
+    lock();
     if (wl.empty()) {
       succeeded = false;
-      lock.write_unlock();
+      unlock();
       return T();
     } else {
       succeeded = true;
       T retval = wl.top();
       wl.pop();
-      lock.write_unlock();
+      unlock();
       return retval;
     }
   }
@@ -52,17 +59,16 @@ public:
   }
   
   bool empty() {
-    lock.write_lock();
+    lock();
     bool retval = wl.empty();
-    lock.write_unlock();
+    unlock();
     return retval;
   }
 };
 
   template<typename T>
-  class GWL_LIFO : public Galois::WorkList<T> {
+  class GWL_LIFO : public Galois::WorkList<T>, threadsafe::simpleLock<int, true> {
     std::stack<T> wl;
-    threadsafe::simpleLock lock;
 
   public:
 
@@ -71,22 +77,22 @@ public:
 
     //These should only be called by one thread
     virtual void push(T val) {
-      lock.write_lock();
+      lock();
       wl.push(val);
-      lock.write_unlock();
+      unlock();
     }
 
     T pop(bool& succeeded) {
-      lock.write_lock();
+      lock();
       if (wl.empty()) {
 	succeeded = false;
-	lock.write_unlock();
+	unlock();
 	return T();
       } else {
 	succeeded = true;
 	T retval = wl.top();
 	wl.pop();
-	lock.write_unlock();
+	unlock();
 	return retval;
       }
     }
@@ -97,17 +103,16 @@ public:
     }
 
     bool empty() {
-      lock.write_lock();
+      lock();
       bool retval = wl.empty();
-      lock.write_unlock();
+      unlock();
       return retval;
     }
   };
 
   template<typename T>
-  class GWL_LIFO_SB : public Galois::WorkList<T> {
+  class GWL_LIFO_SB : public Galois::WorkList<T>, threadsafe::simpleLock<int, true> {
     std::deque<T> wl;
-    threadsafe::simpleLock lock;
 
   public:
 
@@ -116,36 +121,36 @@ public:
 
     //These should only be called by one thread
     virtual void push(T val) {
-      lock.write_lock();
+      lock();
       wl.push_back(val);
-      lock.write_unlock();
+      unlock();
     }
 
     T pop(bool& succeeded) {
-      lock.write_lock();
+      lock();
       if (wl.empty()) {
 	succeeded = false;
-	lock.write_unlock();
+	unlock();
 	return T();
       } else {
 	succeeded = true;
 	T retval = wl.back();
 	wl.pop_back();
-	lock.write_unlock();
+	unlock();
 	return retval;
       }
     }
 
     T peek(bool& succeeded) {
-      lock.write_lock();
+      lock();
       if (wl.empty()) {
 	succeeded = false;
-	lock.write_unlock();
+	unlock();
 	return T();
       } else {
 	succeeded = true;
 	T retval = wl.back();
-	lock.write_unlock();
+	unlock();
 	return retval;
       }
     }
@@ -153,33 +158,32 @@ public:
     
     //This can be called by any thread
     T steal(bool& succeeded) {
-      lock.write_lock();
+      lock();
       if (wl.empty()) {
 	succeeded = false;
-	lock.write_unlock();
+	unlock();
 	return T();
       } else {
 	succeeded = true;
 	T retval = wl.front();
 	wl.pop_front();
-	lock.write_unlock();
+	unlock();
 	return retval;
       }
 
     }
 
     bool empty() {
-      lock.write_lock();
+      lock();
       bool retval = wl.empty();
-      lock.write_unlock();
+      unlock();
       return retval;
     }
   };
 
   template<typename T>
-  class GWL_FIFO : public Galois::WorkList<T> {
+  class GWL_FIFO : public Galois::WorkList<T>, threadsafe::simpleLock<int, true> {
     std::queue<T> wl;
-    threadsafe::simpleLock lock;
 
   public:
 
@@ -188,22 +192,22 @@ public:
 
     //These should only be called by one thread
     virtual void push(T val) {
-      lock.write_lock();
+      lock();
       wl.push(val);
-      lock.write_unlock();
+      unlock();
     }
 
     T pop(bool& succeeded) {
-      lock.write_lock();
+      lock();
       if (wl.empty()) {
 	succeeded = false;
-	lock.write_unlock();
+	unlock();
 	return T();
       } else {
 	succeeded = true;
 	T retval = wl.top();
 	wl.pop();
-	lock.write_unlock();
+	unlock();
 	return retval;
       }
     }
@@ -214,9 +218,9 @@ public:
     }
 
     bool empty() {
-      lock.write_lock();
+      lock();
       bool retval = wl.empty();
-      lock.write_unlock();
+      unlock();
       return retval;
     }
   };
