@@ -27,6 +27,9 @@ struct LocalRule {
   typedef NextTy nextRule;
   typedef ThisTy thisRule;
   enum { STEALING = Stealing };
+  LocalRule<ThisTy, NextTy, true> withStealing() {
+    return LocalRule<ThisTy, NextTy, true>();
+  }
 };
 
 template<typename ThisTy, typename NextTy>

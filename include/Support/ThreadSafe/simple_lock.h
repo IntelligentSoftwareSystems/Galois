@@ -43,7 +43,6 @@ public:
 template<typename T>
 class simpleLock<T, false> {
 public:
-  simpleLock() {}
   void lock(T val = 0) {}
   void unlock() {}
   bool try_lock(T val = 0) { return true; }

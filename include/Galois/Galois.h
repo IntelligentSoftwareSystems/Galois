@@ -21,10 +21,10 @@ namespace GaloisRuntime {
 template<class WorkListTy, class Function>
 class GaloisWork : public Galois::Executable {
   typedef typename WorkListTy::value_type value_type;
-  typedef GWL_LIFO_SB<value_type> localWLTy;
-  //typedef GWL_ChaseLev_Dyn<value_type> localWLTy;
-  //typedef GWL_Idempotent_FIFO_SB<value_type> localWLTy;
-  //typedef GWL_PQueue<value_type, std::greater<value_type> > localWLTy;
+  typedef GaloisRuntime::WorkList::Local::GWL_LIFO_SB<value_type> localWLTy;
+  //typedef GaloisRuntime::WorkList::Local::GWL_ChaseLev_Dyn<value_type> localWLTy;
+  //typedef GaloisRuntime::WorkList::Local::GWL_Idempotent_FIFO_SB<value_type> localWLTy;
+  //typedef GaloisRuntime::WorkList::Local::GWL_PQueue<value_type, std::greater<value_type> > localWLTy;
 
   WorkListTy& global_wl;
   Function f;
@@ -115,15 +115,17 @@ public:
   }
 
   bool trySteal(ThreadLD& tld) {
-    //Try to steal work
-    int num = (1 + tld.getThreadID()) % threadmax;
-    bool foundone = false;
-    value_type val = tdata[num].wl.steal(foundone);
-    //Don't push it on the queue before we can execute it
-    if (foundone) {
-      doProcess(val, tld);
-      //One item is enough
-      return true;
+    if (localWLTy::MAYSTEAL) {
+      //Try to steal work
+      int num = (1 + tld.getThreadID()) % threadmax;
+      bool foundone = false;
+      value_type val = tdata[num].wl.steal(foundone);
+      //Don't push it on the queue before we can execute it
+      if (foundone) {
+	doProcess(val, tld);
+	//One item is enough
+	return true;
+      }
     }
     return false;
   }
