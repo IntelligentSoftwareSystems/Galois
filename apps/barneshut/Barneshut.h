@@ -12,6 +12,7 @@
 #include <sstream>
 #include <iostream>
 #include <limits>
+#include <math.h>
 
 #include "OctTreeNodeData.h"
 #include "OctTreeLeafNodeData.h"
@@ -20,7 +21,8 @@
 #include "Galois/Graphs/IndexedGraph.h"
 #include "Galois/Galois.h"
 typedef Galois::Graph::IndexedGraph<OctTreeNodeData, int, true, 8> Graph;
-typedef Galois::Graph::IndexedGraph<OctTreeNodeData, int, true, 8>::GraphNode GNode;
+typedef Galois::Graph::IndexedGraph<OctTreeNodeData, int, true, 8>::GraphNode
+		GNode;
 
 class Barneshut {
 public:
@@ -137,7 +139,7 @@ public:
 			i += 4;
 			z = r;
 		}
-		GNode child = octree->getNeighbor(root, i,Galois::Graph::NONE);
+		GNode child = octree->getNeighbor(root, i, Galois::Graph::NONE);
 		if (child.isIDNull()) {
 			GNode newnode = octree->createNode(b);
 			octree->addNode(newnode, Galois::Graph::NONE);
@@ -148,13 +150,157 @@ public:
 			if (!(ch.isLeaf())) {
 				insert(octree, child, b, rh);
 			} else {
-				GNode newnode = octree->createNode(OctTreeNodeData(
-						n.posx - rh + x, n.posy - rh + y, n.posz - rh + z));
+				GNode newnode = octree->createNode(OctTreeNodeData(n.posx - rh + x,
+						n.posy - rh + y, n.posz - rh + z));
 				octree->addNode(newnode, Galois::Graph::NONE);
 				insert(octree, newnode, b, rh);
 				insert(octree, newnode, ch, rh);
 				octree->setNeighbor(root, newnode, i, Galois::Graph::NONE);
 			}
+		}
+	}
+
+	void computeCenterOfMass(Graph *octree, GNode &root) {
+		double m, px = 0.0, py = 0.0, pz = 0.0;
+		OctTreeNodeData n = root.getData();
+		int j = 0;
+		n.mass = 0.0;
+		for (int i = 0; i < 8; i++) {
+			GNode child = octree->getNeighbor(root, i, Galois::Graph::NONE);
+			if (child.isIDNull()) {
+				if (i != j) {
+					octree->setNeighbor(root, Graph::GraphNode::buildNullGraphNode(), i,
+							Galois::Graph::NONE);
+					octree->setNeighbor(root, child, j); // move non-null children to the
+					// front (needed later to make other code faster)
+				}
+				j++;
+				OctTreeNodeData ch = child.getData();
+				if (ch.isLeaf()) {
+					leaf[curr++] = child; // sort bodies in tree order (approximation of
+					// putting nearby nodes together for locality)
+				} else {
+					computeCenterOfMass(octree, child);
+				}
+				m = ch.mass;
+				n.mass += m;
+				px += ch.posx * m;
+				py += ch.posy * m;
+				pz += ch.posz * m;
+			}
+		}
+		m = 1.0 / n.mass;
+		n.posx = px * m;
+		n.posy = py * m;
+		n.posz = pz * m;
+	}
+	void computeForce(GNode &leaf, Graph *octree, GNode &root, double size,
+			double itolsq, int step, double dthf, double epssq) {
+		double ax, ay, az;
+		OctTreeLeafNodeData* nd =
+				dynamic_cast<OctTreeLeafNodeData*> (&leaf.getData(Galois::Graph::NONE));
+
+		ax = nd->accx;
+		ay = nd->accy;
+		az = nd->accz;
+		nd->accx = 0.0;
+		nd->accy = 0.0;
+		nd->accz = 0.0;
+		recurseForce(leaf, octree, root, size * size * itolsq, epssq);
+		if (step > 0) {
+			nd->velx += (nd->accx - ax) * dthf;
+			nd->vely += (nd->accy - ay) * dthf;
+			nd->velz += (nd->accz - az) * dthf;
+		}
+	}
+
+	void recurseForce(GNode &leaf, Graph *octree, GNode &nn, double dsq,
+			double epssq) {
+		double drx, dry, drz, drsq, nphi, scale, idr;
+		OctTreeLeafNodeData* nd =
+				dynamic_cast<OctTreeLeafNodeData*> (&leaf.getData(Galois::Graph::NONE));
+		OctTreeNodeData n = nn.getData(Galois::Graph::NONE);
+		drx = n.posx - nd->posx;
+		dry = n.posy - nd->posy;
+		drz = n.posz - nd->posz;
+		drsq = drx * drx + dry * dry + drz * drz;
+		if (drsq < dsq) {
+			if (!(n.isLeaf())) { // n is a cell
+				dsq *= 0.25;
+				GNode child = octree->getNeighbor(nn, 0, Galois::Graph::NONE);
+				if (child.isIDNull()) {
+					recurseForce(leaf, octree, child, dsq, epssq);
+					child = octree->getNeighbor(nn, 1, Galois::Graph::NONE);
+					if (child.isIDNull()) {
+						recurseForce(leaf, octree, child, dsq, epssq);
+						child = octree->getNeighbor(nn, 2, Galois::Graph::NONE);
+						if (child.isIDNull()) {
+							recurseForce(leaf, octree, child, dsq, epssq);
+							child = octree->getNeighbor(nn, 3, Galois::Graph::NONE);
+							if (child.isIDNull()) {
+								recurseForce(leaf, octree, child, dsq, epssq);
+								child = octree->getNeighbor(nn, 4, Galois::Graph::NONE);
+								if (child.isIDNull()) {
+									recurseForce(leaf, octree, child, dsq, epssq);
+									child = octree->getNeighbor(nn, 5, Galois::Graph::NONE);
+									if (child.isIDNull()) {
+										recurseForce(leaf, octree, child, dsq, epssq);
+										child = octree->getNeighbor(nn, 6, Galois::Graph::NONE);
+										if (child.isIDNull()) {
+											recurseForce(leaf, octree, child, dsq, epssq);
+											child = octree->getNeighbor(nn, 7, Galois::Graph::NONE);
+											if (child.isIDNull()) {
+												recurseForce(leaf, octree, child, dsq, epssq);
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			} else { // n is a body
+				if (&n != nd) {
+					drsq += epssq;
+					idr = 1 / sqrt(drsq);
+					nphi = n.mass * idr;
+					scale = nphi * idr * idr;
+					nd->accx += drx * scale;
+					nd->accy += dry * scale;
+					nd->accz += drz * scale;
+				}
+			}
+		} else { // node is far enough away, don't recurse any deeper
+			drsq += epssq;
+			idr = 1 / sqrt(drsq);
+			nphi = n.mass * idr;
+			scale = nphi * idr * idr;
+			nd->accx += drx * scale;
+			nd->accy += dry * scale;
+			nd->accz += drz * scale;
+		}
+	}
+
+	void advance(Graph *octree, double dthf, double dtime) {
+		double dvelx, dvely, dvelz;
+		double velhx, velhy, velhz;
+
+		for (int i = 0; i < nbodies; i++) {
+			OctTreeLeafNodeData* nd =
+							dynamic_cast<OctTreeLeafNodeData*> (&leaf[i].getData());
+			body[i] = *nd;
+			dvelx = nd->accx * dthf;
+			dvely = nd->accy * dthf;
+			dvelz = nd->accz * dthf;
+			velhx = nd->velx + dvelx;
+			velhy = nd->vely + dvely;
+			velhz = nd->velz + dvelz;
+			nd->posx += velhx * dtime;
+			nd->posy += velhy * dtime;
+			nd->posz += velhz * dtime;
+			nd->velx = velhx + dvelx;
+			nd->vely = velhy + dvely;
+			nd->velz = velhz + dvelz;
 		}
 	}
 };

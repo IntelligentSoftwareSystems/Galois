@@ -152,6 +152,14 @@ public:
 			return !Parent;
 		}
 
+		void setIDNull() {
+			ID = NULL;
+		}
+
+		static GraphNode buildNullGraphNode() {
+			return GraphNode(NULL, NULL);
+		}
+
 		bool operator!=(const GraphNode& rhs) const {
 			return Parent != rhs.Parent || ID != rhs.ID;
 		}

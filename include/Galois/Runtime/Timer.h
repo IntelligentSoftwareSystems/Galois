@@ -1,3 +1,7 @@
+#ifndef TIMER_H_
+#define TIMER_H_
+
+
 namespace GaloisRuntime {
 
   //A simple timer
@@ -29,3 +33,5 @@ namespace GaloisRuntime {
   };
 
 }
+#endif
+
