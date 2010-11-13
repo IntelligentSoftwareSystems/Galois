@@ -17,6 +17,7 @@
 #include "OctTreeLeafNodeData.h"
 #include "Galois/Launcher.h"
 #include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/IndexedGraph.h"
 #include "Galois/Galois.h"
 typedef Galois::Graph::FirstGraph<OctTreeNodeData, int, true> Graph;
 typedef Galois::Graph::FirstGraph<OctTreeNodeData, int, true>::GraphNode GNode;

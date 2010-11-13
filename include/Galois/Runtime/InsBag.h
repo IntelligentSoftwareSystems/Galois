@@ -1,5 +1,7 @@
 // Insert Bag implementation -*- C++ -*-
 // This one is suppose to be scalable and uses Galois PerCPU classes
+#ifndef GALOIS_INSERT_BAG_H_
+#define GALOIS_INSERT_BAG_H_
 
 #include "Galois/Runtime/PerCPU.h"
 
@@ -107,3 +109,4 @@ namespace GaloisRuntime {
     
   };
 }
+#endif

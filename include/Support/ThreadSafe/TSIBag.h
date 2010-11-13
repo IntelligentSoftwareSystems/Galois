@@ -1,5 +1,8 @@
 // Insert Bag implementation -*- C++ -*-
 
+#ifndef TS_INSERT_BAG_H_
+#define TS_INSERT_BAG_H_
+
 namespace threadsafe {
   
   template< class T>
@@ -79,3 +82,6 @@ namespace threadsafe {
 
   };
 }
+
+#endif
+
