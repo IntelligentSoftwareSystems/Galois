@@ -24,7 +24,7 @@
 namespace Galois {
 namespace Graph {
 
-template<typename NodeTy, typename EdgeTy, bool Directional>
+template<typename NodeTy, typename EdgeTy, bool Directional, int BranchingFactor = 2>
 class IndexedGraph {
 
 	struct gNode: public GaloisRuntime::Lockable {
@@ -32,7 +32,7 @@ class IndexedGraph {
 		typedef EdgeItem<gNode*, EdgeTy> EITy;
 		//The return type for edge data
 		typedef typename VoidWrapper<EdgeTy>::ref_type REdgeTy;
-		typedef llvm::SmallVector<EITy, 3> edgesTy;
+		typedef std::vector<EITy> edgesTy;
 		edgesTy edges;
 		NodeTy data;
 		bool active;
@@ -60,6 +60,7 @@ class IndexedGraph {
 
 		gNode(const NodeTy& d, bool a) :
 			data(d), active(a) {
+//			edges.resize(BranchingFactor, EITy(NULL));
 		}
 
 		void prefetch_neighbors() {
@@ -91,6 +92,14 @@ class IndexedGraph {
 					return ii->getData();
 			edges.push_back(EITy(N));
 			return edges.back().getData();
+		}
+
+		void createEdge(gNode* N, int indx) {
+			edges[indx] = EITy(N);
+		}
+
+		EITy getEdge(int indx) {
+			return edges[indx];
 		}
 
 		bool isActive() {
@@ -136,6 +145,9 @@ public:
 			return Parent->getData(ID, mflag);
 		}
 
+		bool isIDNull() const {
+			return !ID;
+		}
 		bool isNull() const {
 			return !Parent;
 		}
@@ -359,7 +371,23 @@ public:
 	unsigned int size() {
 		return std::distance(active_begin(), active_end());
 	}
+	void setNeighbor(GraphNode src, GraphNode dst, int index, MethodFlag mflag =
+			ALL) {
+		assert(src.ID);
+		assert(dst.ID);
 
+		//yes, fault on null (no edge)
+		if (shouldLock(mflag))
+			GaloisRuntime::acquire(src.ID);
+
+		src.ID->createEdge(dst.ID, index);
+	}
+	GraphNode getNeighbor(GraphNode src, int index, MethodFlag mflag = ALL) {
+		assert(src.ID);
+		if (shouldLock(mflag))
+			GaloisRuntime::acquire(src.ID);
+		return makeGraphNodePtr(this)(src.ID->getEdge(index).getNeighbor()); // FIXME: creating the makeGraphNodePtr every time is not efficient
+	}
 	IndexedGraph() {
 		std::cout << "STAT: NodeSize " << (int) sizeof(gNode) << "\n";
 	}

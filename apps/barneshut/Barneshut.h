@@ -19,8 +19,8 @@
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Graphs/IndexedGraph.h"
 #include "Galois/Galois.h"
-typedef Galois::Graph::FirstGraph<OctTreeNodeData, int, true> Graph;
-typedef Galois::Graph::FirstGraph<OctTreeNodeData, int, true>::GraphNode GNode;
+typedef Galois::Graph::IndexedGraph<OctTreeNodeData, int, true, 8> Graph;
+typedef Galois::Graph::IndexedGraph<OctTreeNodeData, int, true, 8>::GraphNode GNode;
 
 class Barneshut {
 public:
@@ -121,7 +121,7 @@ public:
 		centery = (maxy + miny) * 0.5;
 		centerz = (maxz + minz) * 0.5;
 	}
-	void insert(Graph *octree, GNode &root, OctTreeLeafNodeData &b, double r) {
+	void insert(Graph *octree, GNode &root, OctTreeNodeData &b, double r) {
 		double x = 0.0, y = 0.0, z = 0.0;
 		OctTreeNodeData n = root.getData();
 		int i = 0;
@@ -137,25 +137,25 @@ public:
 			i += 4;
 			z = r;
 		}
-//		GNode child = octree.getNeighbor(root, i);
-//		if (child == null) {
-//			GNode<OctTreeNodeData> newnode = octree.createNode(b);
-//			octree.add(newnode);
-//			octree.setNeighbor(root, newnode, i);
-//		} else {
-//			double rh = 0.5 * r;
-//			OctTreeNodeData ch = child.getData();
-//			if (!(ch.isLeaf())) {
-//				Insert(octree, child, b, rh);
-//			} else {
-//				GNode<OctTreeNodeData> newnode = octree.createNode(new OctTreeNodeData(
-//						n.posx - rh + x, n.posy - rh + y, n.posz - rh + z));
-//				octree.add(newnode);
-//				Insert(octree, newnode, b, rh);
-//				Insert(octree, newnode, (OctTreeLeafNodeData) ch, rh);
-//				octree.setNeighbor(root, newnode, i);
-//			}
-//		}
+		GNode child = octree->getNeighbor(root, i,Galois::Graph::NONE);
+		if (child.isIDNull()) {
+			GNode newnode = octree->createNode(b);
+			octree->addNode(newnode, Galois::Graph::NONE);
+			octree->setNeighbor(root, newnode, i, Galois::Graph::NONE);
+		} else {
+			double rh = 0.5 * r;
+			OctTreeNodeData ch = child.getData();
+			if (!(ch.isLeaf())) {
+				insert(octree, child, b, rh);
+			} else {
+				GNode newnode = octree->createNode(OctTreeNodeData(
+						n.posx - rh + x, n.posy - rh + y, n.posz - rh + z));
+				octree->addNode(newnode, Galois::Graph::NONE);
+				insert(octree, newnode, b, rh);
+				insert(octree, newnode, ch, rh);
+				octree->setNeighbor(root, newnode, i, Galois::Graph::NONE);
+			}
+		}
 	}
 };
 
