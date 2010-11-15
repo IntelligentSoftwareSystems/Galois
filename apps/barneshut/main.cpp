@@ -115,14 +115,14 @@ int main(int argc, char* argv[]) {
 //			delete octree2;
 		}
 
-		if ((abs(res.posx - s_res.posx) / abs(std::min(res.posx, s_res.posx))
-				> 0.001) || (abs(res.posy - s_res.posy) / abs(std::min(res.posy,
-				s_res.posy)) > 0.001) || (abs(res.posz - s_res.posz) / abs(std::min(
+		if ((fabs(res.posx - s_res.posx) / fabs(std::min(res.posx, s_res.posx))
+				> 0.001) || (fabs(res.posy - s_res.posy) / fabs(std::min(res.posy,
+				s_res.posy)) > 0.001) || (fabs(res.posz - s_res.posz) / fabs(std::min(
 				res.posz, s_res.posz)) > 0.001)) {
 			std::cerr << "verification failed" << std::endl;
 		} else {
 			std::cerr << "verification succeeded" << std::endl;
 		}
-		barneshut2.clear();
+//		barneshut2.clear();
 	}
 }

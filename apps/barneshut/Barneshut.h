@@ -46,20 +46,24 @@ public:
 	double diameter, centerx, centery, centerz;
 	int curr;
 
-///*
+	///*
 	void clear() {
-		delete leaf;
-		leaf = NULL;
+		if (leaf != NULL) {
+			delete[] leaf;
+			leaf = NULL;
+		}
 		for (int i = 0; i < nbodies; i++) {
 			if (body[i] != NULL) {
 				delete body[i];
 				body[i] = NULL;
 			}
 		}
-		delete body;
-		body = NULL;
+		if (body != NULL) {
+			delete[] body;
+			body = NULL;
+		}
 	}
-//*/
+	//*/
 	void readInput(char *filename, bool print) {
 		double vx, vy, vz;
 		std::ifstream infile;
