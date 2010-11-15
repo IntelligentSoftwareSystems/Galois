@@ -24,6 +24,8 @@ void process(GNode& item, Galois::Context<GNode>& lwl) {
 }
 
 int main(int argc, char* argv[]) {
+  std::cout.setf(std::ios::right|std::ios::scientific|std::ios::showpoint);
+
 	if (Galois::Launcher::isFirstRun()) {
 		std::cerr << "Lonestar Benchmark Suite v3.0" << std::endl;
 		std::cerr
@@ -49,7 +51,7 @@ int main(int argc, char* argv[]) {
 	for (step = 0; step < barneshut.ntimesteps; step++) { // time-step the system
 		barneshut.computeCenterAndDiameter();
 		octree = new Graph;
-		root = octree->createNode(OctTreeNodeData(barneshut.centerx,
+		root = createNode(octree, OctTreeNodeData(barneshut.centerx,
 				barneshut.centery, barneshut.centerz)); // create the
 		// tree's
 		// root
@@ -63,7 +65,9 @@ int main(int argc, char* argv[]) {
 		barneshut.computeCenterOfMass(octree, root); // summarize subtree info in each internal node (plus restructure tree and sort bodies for performance reasons)
 
 		threadsafe::ts_queue<GNode> wl;
-
+		for (int ii = 0; ii < barneshut.curr; ii++) {
+			wl.push(barneshut.leaf[ii]);
+		}
 		Galois::for_each(wl, process);
 
 		barneshut.advance(octree, barneshut.dthf, barneshut.dtime); // advance the position and velocity of each
@@ -84,7 +88,7 @@ int main(int argc, char* argv[]) {
 		for (step = 0; step < barneshut.ntimesteps; step++) {
 			barneshut.computeCenterAndDiameter();
 			octree = new Graph;
-			root = octree->createNode(OctTreeNodeData(barneshut.centerx,
+			root = createNode(octree, OctTreeNodeData(barneshut.centerx,
 					barneshut.centery, barneshut.centerz)); // create the
 			octree->addNode(root);
 			double radius = barneshut.diameter * 0.5;

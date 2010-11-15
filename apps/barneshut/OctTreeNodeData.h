@@ -17,25 +17,61 @@ public:
 	double posx;
 	double posy;
 	double posz;
+	double velx;
+	double vely;
+	double velz;
+	double accx;
+	double accy;
+	double accz;
+	bool leaf;
+	OctTreeNodeData() {
+		leaf = true;
+		mass = 0.0;
+		posx = 0.0;
+		posy = 0.0;
+		posz = 0.0;
+		velx = 0.0;
+		vely = 0.0;
+		velz = 0.0;
+		accx = 0.0;
+		accy = 0.0;
+		accz = 0.0;
+	}
 	OctTreeNodeData(double px, double py, double pz) {
 		mass = 0.0;
 		posx = px;
 		posy = py;
 		posz = pz;
+		velx = 0.0;
+		vely = 0.0;
+		velz = 0.0;
+		accx = 0.0;
+		accy = 0.0;
+		accz = 0.0;
+		leaf = false;
 	}
 	OctTreeNodeData(const OctTreeNodeData& copy) {
-		mass = copy.mass;
-		posx = copy.posx;
-		posy = copy.posy;
-		posz = copy.posz;
+		restoreFrom(copy);
 	}
-	virtual bool isLeaf() {
-		return false;
+	bool isLeaf() {
+		return leaf;
+	}
+	void setVelocity(double x, double y, double z) {
+		velx = x;
+		vely = y;
+		velz = z;
 	}
 	std::string toString() {
 		std::ostringstream s;
-		s << "mass = " << mass << " pos = (" << posx << "," << posy << "," << posz
-				<< ")";
+		if (isLeaf()) {
+			s << OctTreeNodeData::toString();
+			s << "vel = (" << velx << "," << vely << "," << velz << ")";
+			s << "acc = (" << accx << "," << accy << "," << accz << ")";
+			return s.str();
+		} else {
+			s << "mass = " << mass << " pos = (" << posx << "," << posy << ","
+					<< posz << ")";
+		}
 		return s.str();
 	}
 	double _posx() {
@@ -52,6 +88,17 @@ public:
 		posy = data.posy;
 		posz = data.posz;
 		mass = data.mass;
+		posx = data.posx;
+		posy = data.posy;
+		posz = data.posz;
+		mass = data.mass;
+		velx = data.velx;
+		vely = data.vely;
+		velz = data.velz;
+		accx = data.accx;
+		accy = data.accy;
+		accz = data.accz;
+		leaf = data.leaf;
 	}
 };
 

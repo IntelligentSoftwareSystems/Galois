@@ -2,8 +2,8 @@ cmake_minimum_required (VERSION 2.6)
 project (Galois)
 
 #Boost
-SET(Boost_ADDITIONAL_VERSIONS "1.44" "1.44.0")
-find_package( Boost 1.44.0 REQUIRED )
+SET(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0")
+find_package( Boost 1.40.0 REQUIRED )
 include_directories(${Boost_INCLUDE_DIRS})
 
 #PThreads
@@ -11,8 +11,8 @@ find_package(Threads REQUIRED)
 
 #Flags
 add_definitions("-Wall")
-set(CMAKE_CXX_FLAGS_RELEASE        "-O3 -DNDEBUG")
-#set(CMAKE_CXX_FLAGS_RELEASE        "-O3 -g")
+#set(CMAKE_CXX_FLAGS_RELEASE        "-O3 -DNDEBUG")
+set(CMAKE_CXX_FLAGS_RELEASE        "-g")
 #set(CMAKE_CXX_FLAGS_RELEASE        "-DNDEBUG -pg")
 
 set(CMAKE_CXX_FLAGS_DEBUG          "-g")

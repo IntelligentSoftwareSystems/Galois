@@ -24,7 +24,8 @@
 namespace Galois {
 namespace Graph {
 
-template<typename NodeTy, typename EdgeTy, bool Directional, int BranchingFactor = 2>
+template<typename NodeTy, typename EdgeTy, bool Directional,
+		int BranchingFactor = 2>
 class IndexedGraph {
 
 	struct gNode: public GaloisRuntime::Lockable {
@@ -32,73 +33,30 @@ class IndexedGraph {
 		typedef EdgeItem<gNode*, EdgeTy> EITy;
 		//The return type for edge data
 		typedef typename VoidWrapper<EdgeTy>::ref_type REdgeTy;
-		typedef std::vector<EITy> edgesTy;
-		edgesTy edges;
+		EITy* edges[BranchingFactor];
 		NodeTy data;
 		bool active;
 
-		typedef typename edgesTy::iterator iterator;
-
-		iterator begin() {
-			return edges.begin();
-		}
-		iterator end() {
-			return edges.end();
-		}
-
-		typedef typename boost::transform_iterator<boost::mem_fun_ref_t<gNode*,
-				EITy>, iterator> neighbor_iterator;
-
-		neighbor_iterator neighbor_begin() {
-			return boost::make_transform_iterator(begin(), boost::mem_fun_ref(
-					&EITy::getNeighbor));
-		}
-		neighbor_iterator neighbor_end() {
-			return boost::make_transform_iterator(end(), boost::mem_fun_ref(
-					&EITy::getNeighbor));
-		}
-
 		gNode(const NodeTy& d, bool a) :
 			data(d), active(a) {
-//			edges.resize(BranchingFactor, EITy(NULL));
-		}
-
-		void prefetch_neighbors() {
-			for (iterator ii = begin(), ee = end(); ii != ee; ++ii)
-				if (ii->getNeighbor())
-					__builtin_prefetch(ii->getNeighbor());
-		}
-
-		void eraseEdge(gNode* N) {
-			for (iterator ii = begin(), ee = end(); ii != ee; ++ii) {
-				if (ii->getNeighbor() == N) {
-					edges.erase(ii);
-					return;
-				}
+			for (int ii = 0; ii < BranchingFactor; ++ii) {
+				edges[ii] = NULL;
 			}
 		}
 
 		REdgeTy getEdgeData(gNode* N) {
-			for (iterator ii = begin(), ee = end(); ii != ee; ++ii)
-				if (ii->getNeighbor() == N)
-					return ii->getData();
+			for (int ii = 0; ii < BranchingFactor; ++ii)
+				if (edges[ii]->getNeighbor() == N)
+					return edges[ii]->getData();
 			assert(0 && "Edge doesn't exist");
 			abort();
 		}
 
-		REdgeTy getOrCreateEdge(gNode* N) {
-			for (iterator ii = begin(), ee = end(); ii != ee; ++ii)
-				if (ii->getNeighbor() == N)
-					return ii->getData();
-			edges.push_back(EITy(N));
-			return edges.back().getData();
-		}
-
 		void createEdge(gNode* N, int indx) {
-			edges[indx] = EITy(N);
+			edges[indx] = new EITy(N);
 		}
 
-		EITy getEdge(int indx) {
+		EITy* getEdge(int indx) {
 			return edges[indx];
 		}
 
@@ -335,30 +293,6 @@ public:
 		return N.ID->edges.size();
 	}
 
-	typedef typename boost::transform_iterator<makeGraphNodePtr,
-			typename gNode::neighbor_iterator> neighbor_iterator;
-
-	neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = ALL) {
-		assert(N.ID);
-		if (shouldLock(mflag))
-			GaloisRuntime::acquire(N.ID);
-		for (typename gNode::neighbor_iterator ii = N.ID->neighbor_begin(), ee =
-				N.ID->neighbor_end(); ii != ee; ++ii) {
-			__builtin_prefetch(*ii);
-			if (!Directional && shouldLock(mflag))
-				GaloisRuntime::acquire(*ii);
-		}
-		return boost::make_transform_iterator(N.ID->neighbor_begin(),
-				makeGraphNodePtr(this));
-	}
-	neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = ALL) {
-		assert(N.ID);
-		if (shouldLock(mflag)) // Probably not necessary (no valid use for an end pointer should ever require it)
-			GaloisRuntime::acquire(N.ID);
-		return boost::make_transform_iterator(N.ID->neighbor_end(),
-				makeGraphNodePtr(this));
-	}
-
 	//These are not thread safe!!
 	typedef boost::transform_iterator<makeGraphNode, boost::filter_iterator<
 			std::mem_fun_ref_t<bool, gNode>, typename nodeListTy::iterator> >
@@ -382,7 +316,6 @@ public:
 	void setNeighbor(GraphNode src, GraphNode dst, int index, MethodFlag mflag =
 			ALL) {
 		assert(src.ID);
-		assert(dst.ID);
 
 		//yes, fault on null (no edge)
 		if (shouldLock(mflag))
@@ -394,7 +327,10 @@ public:
 		assert(src.ID);
 		if (shouldLock(mflag))
 			GaloisRuntime::acquire(src.ID);
-		return makeGraphNodePtr(this)(src.ID->getEdge(index).getNeighbor()); // FIXME: creating the makeGraphNodePtr every time is not efficient
+		EdgeItem<gNode*, EdgeTy>* eity = src.ID->getEdge(index);
+		if (eity != NULL)
+			return makeGraphNodePtr(this)(eity->getNeighbor()); // FIXME: creating the makeGraphNodePtr every time is not efficient
+		else return makeGraphNodePtr(this)(NULL);
 	}
 	IndexedGraph() {
 		std::cout << "STAT: NodeSize " << (int) sizeof(gNode) << "\n";
