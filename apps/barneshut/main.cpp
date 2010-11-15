@@ -77,7 +77,7 @@ int main(int argc, char* argv[]) {
 
 		if (Galois::Launcher::isFirstRun()) {
 			// print center of mass for this timestep
-			res = root.getData();
+			res = root.getData(Galois::Graph::NONE);
 			std::cout << "Timestep " << step << " Center of Mass = " << res.posx
 					<< " " << res.posy << " " << res.posz << std::endl;
 		}

@@ -112,19 +112,8 @@ public:
 			return Parent->getData(ID, mflag);
 		}
 
-		bool isIDNull() const {
-			return !ID;
-		}
 		bool isNull() const {
 			return !Parent;
-		}
-
-		void setIDNull() {
-			ID = NULL;
-		}
-
-		static GraphNode buildNullGraphNode() {
-			return GraphNode(NULL, NULL);
 		}
 
 		bool operator!=(const GraphNode& rhs) const {
@@ -337,9 +326,9 @@ public:
 		if (shouldLock(mflag))
 			GaloisRuntime::acquire(src.ID);
 		EdgeItem<gNode*, EdgeTy>* eity = src.ID->getEdge(index);
-		if (eity != NULL)
+		if (eity != NULL && eity->getNeighbor() != NULL)
 			return makeGraphNodePtr(this)(eity->getNeighbor()); // FIXME: creating the makeGraphNodePtr every time is not efficient
-		else return makeGraphNodePtr(this)(NULL);
+		else return makeGraphNodePtr(NULL)(NULL);
 	}
 	IndexedGraph() {
 		std::cout << "STAT: NodeSize " << (int) sizeof(gNode) << "\n";
