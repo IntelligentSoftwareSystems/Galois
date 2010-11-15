@@ -53,6 +53,7 @@ class IndexedGraph {
 		}
 
 		void createEdge(gNode* N, int indx) {
+			if (edges[indx] != NULL) delete edges[indx];
 			edges[indx] = new EITy(N);
 		}
 
@@ -62,6 +63,14 @@ class IndexedGraph {
 
 		bool isActive() {
 			return active;
+		}
+		~gNode() {
+			for (int ii = 0; ii < BranchingFactor; ++ii) {
+				if (edges[ii]!=NULL) {
+					delete edges[ii];
+					edges[ii] = NULL;
+				}
+			}
 		}
 	};
 

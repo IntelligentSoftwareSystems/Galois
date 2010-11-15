@@ -44,8 +44,11 @@ int main(int argc, char* argv[]) {
 		std::cerr << "arguments: <num_threads> <input_file_name>" << std::endl;
 		exit(-1);
 	}
+
+	int threadnum = atoi(argv[1]);
 	barneshut.readInput(argv[2], true);
-	OctTreeNodeData *res = NULL;
+	OctTreeNodeData res;
+	Galois::setMaxThreads(threadnum);
 
 	Galois::Launcher::startTiming();
 	for (step = 0; step < barneshut.ntimesteps; step++) { // time-step the system
@@ -58,7 +61,7 @@ int main(int argc, char* argv[]) {
 		octree->addNode(root);
 		double radius = barneshut.diameter * 0.5;
 		for (int i = 0; i < barneshut.nbodies; i++) {
-			barneshut.insert(octree, root, barneshut.body[i], radius); // grow the tree by inserting
+			barneshut.insert(octree, root, *barneshut.body[i], radius); // grow the tree by inserting
 			// each body
 		}
 		barneshut.curr = 0;
@@ -74,47 +77,52 @@ int main(int argc, char* argv[]) {
 
 		if (Galois::Launcher::isFirstRun()) {
 			// print center of mass for this timestep
-			res = &root.getData();
-			std::cout << "Timestep " << step << " Center of Mass = " << res->posx
-					<< " " << res->posy << " " << res->posz << std::endl;
+			res = root.getData();
+			std::cout << "Timestep " << step << " Center of Mass = " << res.posx
+					<< " " << res.posy << " " << res.posz << std::endl;
 		}
+//		delete octree;
 	} // end of time step
 	Galois::Launcher::stopTiming();
+	std::cout << "STAT: Time " << Galois::Launcher::elapsedTime() << "\n";
+//	barneshut.clear();
 
 	if (Galois::Launcher::isFirstRun()) { // verify result
-		barneshut.readInput(argv[2], false);
-		OctTreeNodeData *s_res = NULL;
+		Barneshut barneshut2;
+		barneshut2.readInput(argv[2], false);
+		OctTreeNodeData s_res;
 
-		for (step = 0; step < barneshut.ntimesteps; step++) {
-			barneshut.computeCenterAndDiameter();
-			octree = new Graph;
-			root = createNode(octree, OctTreeNodeData(barneshut.centerx,
-					barneshut.centery, barneshut.centerz)); // create the
-			octree->addNode(root);
-			double radius = barneshut.diameter * 0.5;
-			for (int i = 0; i < barneshut.nbodies; i++) {
-				barneshut.insert(octree, root, barneshut.body[i], radius);
+		for (step = 0; step < barneshut2.ntimesteps; step++) {
+			barneshut2.computeCenterAndDiameter();
+			Graph *octree2 = new Graph;
+			root = createNode(octree2, OctTreeNodeData(barneshut2.centerx,
+					barneshut2.centery, barneshut2.centerz)); // create the
+			octree2->addNode(root);
+			double radius = barneshut2.diameter * 0.5;
+			for (int i = 0; i < barneshut2.nbodies; i++) {
+				barneshut2.insert(octree2, root, *barneshut2.body[i], radius);
 			}
-			barneshut.curr = 0;
-			barneshut.computeCenterOfMass(octree, root);
+			barneshut2.curr = 0;
+			barneshut2.computeCenterOfMass(octree2, root);
 
-			for (int kk = 0; kk < barneshut.curr; kk++) {
-				barneshut.computeForce(barneshut.leaf[kk], octree, root,
-						barneshut.diameter, barneshut.itolsq, step, barneshut.dthf,
-						barneshut.epssq);
+			for (int kk = 0; kk < barneshut2.curr; kk++) {
+				barneshut2.computeForce(barneshut2.leaf[kk], octree2, root,
+						barneshut2.diameter, barneshut2.itolsq, step, barneshut2.dthf,
+						barneshut2.epssq);
 			}
-			barneshut.advance(octree, barneshut.dthf, barneshut.dtime);
-			s_res = &root.getData(Galois::Graph::NONE);
+			barneshut2.advance(octree2, barneshut2.dthf, barneshut2.dtime);
+			s_res = root.getData(Galois::Graph::NONE);
+//			delete octree2;
 		}
 
-		if ((abs(res->posx - s_res->posx) / abs(std::min(res->posx, s_res->posx))
-				> 0.001) || (abs(res->posy - s_res->posy) / abs(std::min(res->posy,
-				s_res->posy)) > 0.001) || (abs(res->posz - s_res->posz) / abs(std::min(
-				res->posz, s_res->posz)) > 0.001)) {
+		if ((abs(res.posx - s_res.posx) / abs(std::min(res.posx, s_res.posx))
+				> 0.001) || (abs(res.posy - s_res.posy) / abs(std::min(res.posy,
+				s_res.posy)) > 0.001) || (abs(res.posz - s_res.posz) / abs(std::min(
+				res.posz, s_res.posz)) > 0.001)) {
 			std::cerr << "verification failed" << std::endl;
 		} else {
 			std::cerr << "verification succeeded" << std::endl;
-
 		}
+		barneshut2.clear();
 	}
 }

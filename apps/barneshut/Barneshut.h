@@ -41,11 +41,25 @@ public:
 	double tol; // tolerance for stopping recursion, should be less than 0.57 for 3D case to bound error
 
 	double dthf, epssq, itolsq;
-	OctTreeNodeData *body; // the n bodies
+	OctTreeNodeData **body; // the n bodies
 	GNode *leaf;
 	double diameter, centerx, centery, centerz;
 	int curr;
 
+///*
+	void clear() {
+		delete leaf;
+		leaf = NULL;
+		for (int i = 0; i < nbodies; i++) {
+			if (body[i] != NULL) {
+				delete body[i];
+				body[i] = NULL;
+			}
+		}
+		delete body;
+		body = NULL;
+	}
+//*/
 	void readInput(char *filename, bool print) {
 		double vx, vy, vz;
 		std::ifstream infile;
@@ -73,20 +87,20 @@ public:
 			std::cerr << "configuration: " << nbodies << " bodies, " << ntimesteps
 					<< " time steps" << std::endl << std::endl;
 		}
-		body = new OctTreeNodeData[nbodies];
+		body = new OctTreeNodeData*[nbodies];
 		leaf = new GNode[nbodies];
-//		for (int i = 0; i < nbodies; i++) {
-//			body[i] = OctTreeNodeData();
-//		}
 		for (int i = 0; i < nbodies; i++) {
-			infile >> body[i].mass;
-			infile >> body[i].posx;
-			infile >> body[i].posy;
-			infile >> body[i].posz;
+			body[i] = new OctTreeNodeData();
+		}
+		for (int i = 0; i < nbodies; i++) {
+			infile >> body[i]->mass;
+			infile >> body[i]->posx;
+			infile >> body[i]->posy;
+			infile >> body[i]->posz;
 			infile >> vx;
 			infile >> vy;
 			infile >> vz;
-			body[i].setVelocity(vx, vy, vz);
+			body[i]->setVelocity(vx, vy, vz);
 			getline(infile, line);
 		}
 	}
@@ -98,9 +112,9 @@ public:
 		minx = miny = minz = std::numeric_limits<double>::max();
 		maxx = maxy = maxz = std::numeric_limits<double>::min();
 		for (int i = 0; i < nbodies; i++) {
-			posx = body[i].posx;
-			posy = body[i].posy;
-			posz = body[i].posz;
+			posx = body[i]->posx;
+			posy = body[i]->posy;
+			posz = body[i]->posz;
 			if (minx > posx) {
 				minx = posx;
 			}
@@ -133,7 +147,7 @@ public:
 	}
 	void insert(Graph *octree, GNode &root, OctTreeNodeData &b, double r) {
 		double x = 0.0, y = 0.0, z = 0.0;
-		OctTreeNodeData n = root.getData();
+		OctTreeNodeData &n = root.getData();
 		int i = 0;
 		if (n.posx < b.posx) {
 			i = 1;
@@ -154,7 +168,7 @@ public:
 			octree->setNeighbor(root, newnode, i, Galois::Graph::NONE);
 		} else {
 			double rh = 0.5 * r;
-			OctTreeNodeData ch = child.getData();
+			OctTreeNodeData &ch = child.getData();
 			if (!(ch.isLeaf())) {
 				insert(octree, child, b, rh);
 			} else {
@@ -169,7 +183,7 @@ public:
 	}
 	void computeCenterOfMass(Graph *octree, GNode &root) {
 		double m, px = 0.0, py = 0.0, pz = 0.0;
-		OctTreeNodeData n = root.getData();
+		OctTreeNodeData &n = root.getData();
 		int j = 0;
 		n.mass = 0.0;
 		for (int i = 0; i < 8; i++) {
@@ -182,7 +196,7 @@ public:
 					// front (needed later to make other code faster)
 				}
 				j++;
-				OctTreeNodeData ch = child.getData();
+				OctTreeNodeData &ch = child.getData();
 				if (ch.isLeaf()) {
 					leaf[curr++] = child; // sort bodies in tree order (approximation of
 					// putting nearby nodes together for locality)
@@ -204,7 +218,7 @@ public:
 	void computeForce(GNode &leaf, Graph *octree, GNode &root, double size,
 			double itolsq, int step, double dthf, double epssq) {
 		double ax, ay, az;
-		OctTreeNodeData nd = leaf.getData(Galois::Graph::NONE);
+		OctTreeNodeData &nd = leaf.getData(Galois::Graph::NONE);
 
 		ax = nd.accx;
 		ay = nd.accy;
@@ -223,8 +237,8 @@ public:
 	void recurseForce(GNode &leaf, Graph *octree, GNode &nn, double dsq,
 			double epssq) {
 		double drx, dry, drz, drsq, nphi, scale, idr;
-		OctTreeNodeData nd = leaf.getData(Galois::Graph::NONE);
-		OctTreeNodeData n = nn.getData(Galois::Graph::NONE);
+		OctTreeNodeData &nd = leaf.getData(Galois::Graph::NONE);
+		OctTreeNodeData &n = nn.getData(Galois::Graph::NONE);
 		drx = n.posx - nd.posx;
 		dry = n.posy - nd.posy;
 		drz = n.posz - nd.posz;
@@ -291,8 +305,8 @@ public:
 		double velhx, velhy, velhz;
 
 		for (int i = 0; i < nbodies; i++) {
-			OctTreeNodeData nd = leaf[i].getData();
-			body[i] = nd;
+			OctTreeNodeData &nd = leaf[i].getData();
+			body[i] = &nd;
 			dvelx = nd.accx * dthf;
 			dvely = nd.accy * dthf;
 			dvelz = nd.accz * dthf;
