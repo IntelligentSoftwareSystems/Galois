@@ -11,8 +11,7 @@ find_package(Threads REQUIRED)
 
 #Flags
 add_definitions("-Wall")
-#set(CMAKE_CXX_FLAGS_RELEASE        "-O3 -DNDEBUG")
-set(CMAKE_CXX_FLAGS_RELEASE        "-g")
+set(CMAKE_CXX_FLAGS_RELEASE        "-O3 -g -DNDEBUG")
 #set(CMAKE_CXX_FLAGS_RELEASE        "-DNDEBUG -pg")
 
 set(CMAKE_CXX_FLAGS_DEBUG          "-g")
@@ -22,6 +21,8 @@ set(CMAKE_BUILD_TYPE Release)
 
 #set(CMAKE_CXX_COMPILER clang++)
 #set(CMAKE_CXX_COMPILER /opt/intel/Compiler/11.1/073/bin/intel64/icpc)
+#These help the intel compiler
+#add_definitions("-wd981")
 
 #Options
 # OPTION( VARIABLE "Description" Initial state)

@@ -99,10 +99,12 @@ public:
   }
 
   double distance_squared(const Tuple& p) const { //squared distance between current tuple and x
-    double x = _t[0] - p._t[0];
-    double y = _t[1] - p._t[1];
-    double z = _t[2] - p._t[2];
-    return x*x + y*y + z*z;
+    double sum = 0.0;
+    for (int i = 0; i < 3; ++i) {
+      double d = _t[i] - p._t[i];
+      sum += d * d;
+    }
+    return sum;
   }
   
   double distance(const Tuple& p) const { //distance between current tuple and x

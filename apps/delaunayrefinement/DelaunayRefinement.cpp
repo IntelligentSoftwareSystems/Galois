@@ -51,6 +51,8 @@ typedef Galois::Graph::FirstGraph<Element,void,false>::GraphNode GNode;
 #include "Support/ThreadSafe/simple_lock.h"
 #include "Support/ThreadSafe/TSQueue.h"
 
+#include "/opt/intel/vtune_amplifier_xe_2011/include/libittnotify.h"
+
 Graph* mesh;
 int threads = 1;
 
@@ -103,9 +105,11 @@ void refine(Mesh& m, WLTY& wl) {
   //  } else {
   //Galois::setMaxThreads(threads);
   using namespace Galois::Scheduling;
+  __itt_resume();
   Galois::for_each(wl, process, 
 		   Priority.first<ChunkedFIFO>().thenLocally<LIFO>());
     //  }
+  __itt_pause();
 }
 
 
@@ -137,7 +141,8 @@ int main(int argc, char** argv) {
   mesh = new Graph();
   Mesh m;
   m.read(mesh, argv[inputFileAt]);
-  threadsafe::ts_queue<GNode> wl;
+  //  threadsafe::ts_queue<GNode> wl;
+  std::vector<GNode> wl;
   int numbad = m.getBad(mesh, wl);
 
   cout << "configuration: " << mesh->size() << " total triangles, " << numbad << " bad triangles\n"

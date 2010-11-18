@@ -67,9 +67,9 @@ int main(int argc, char* argv[]) {
 		barneshut.curr = 0;
 		barneshut.computeCenterOfMass(octree, root); // summarize subtree info in each internal node (plus restructure tree and sort bodies for performance reasons)
 
-		threadsafe::ts_queue<GNode> wl;
+		std::vector<GNode> wl;
 		for (int ii = 0; ii < barneshut.curr; ii++) {
-			wl.push(barneshut.leaf[ii]);
+			wl.push_back(barneshut.leaf[ii]);
 		}
 		Galois::for_each(wl, process);
 

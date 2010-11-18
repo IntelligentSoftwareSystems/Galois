@@ -152,10 +152,7 @@ class Element {
   double getAngle(int i) const {
     int j = (i + 1) % getDim();
     int k = (i + 2) % getDim(); 
-    const Tuple& a = coords[i];
-    const Tuple& b = coords[j];
-    const Tuple& c = coords[k];
-    return Tuple::angle(b, a, c);
+    return Tuple::angle(coords[j], coords[i], coords[k]);
   }
 
   //Virtualize the Edges array

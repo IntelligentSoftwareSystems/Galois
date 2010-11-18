@@ -21,7 +21,8 @@ namespace GaloisRuntime {
 template<class WorkListTy, class Function>
 class GaloisWork : public Galois::Executable {
   typedef typename WorkListTy::value_type value_type;
-  typedef GaloisRuntime::WorkList::Local::GWL_LIFO_SB<value_type> localWLTy;
+  typedef typename WorkListTy::LocalTy localWLTy;
+  //typedef GaloisRuntime::WorkList::Local::GWL_LIFO_SB<value_type> localWLTy;
   //typedef GaloisRuntime::WorkList::Local::GWL_ChaseLev_Dyn<value_type> localWLTy;
   //typedef GaloisRuntime::WorkList::Local::GWL_Idempotent_FIFO_SB<value_type> localWLTy;
   //typedef GaloisRuntime::WorkList::Local::GWL_PQueue<value_type, std::greater<value_type> > localWLTy;
@@ -33,7 +34,7 @@ class GaloisWork : public Galois::Executable {
 
   class ThreadLD : public Galois::Context<value_type> {
   public:
-    localWLTy wl;
+    localWLTy* wl;
     int conflicts;
     int iterations;
     GaloisRuntime::TimeAccumulator ProcessTime;
@@ -41,7 +42,7 @@ class GaloisWork : public Galois::Executable {
     GaloisRuntime::SimpleRuntimeContext cnx;
   public:
     ThreadLD()
-      :conflicts(0), iterations(0)
+      :wl(0), conflicts(0), iterations(0)
     {}
 
     void setThreadID(int ID) {
@@ -49,7 +50,7 @@ class GaloisWork : public Galois::Executable {
     }
 
     virtual void push(value_type T) {
-      wl.push(T);
+      wl->push(T);
     }
 
     virtual void finish() {
@@ -77,7 +78,7 @@ public:
       iterations += tdata[i].iterations;
       tTime += tdata[i].TotalTime.get();
       pTime += tdata[i].ProcessTime.get();
-      assert(tdata[i].wl.empty());
+      assert(!tdata[i].wl);
     }
 
     std::cout << "STAT: Conflicts " << conflicts << "\n";
@@ -98,7 +99,7 @@ public:
       tld.ProcessTime.stop();
       tld.cnx.cancel();
       ++tld.conflicts;
-      global_wl.push(val);
+      global_wl.push_aborted(val, tld.wl);
       return;
     }
     tld.ProcessTime.stop();
@@ -119,7 +120,9 @@ public:
       //Try to steal work
       int num = (1 + tld.getThreadID()) % threadmax;
       bool foundone = false;
-      value_type val = tdata[num].wl.steal(foundone);
+      value_type val;
+      if (tdata[num].wl) //Unresolvable Data race
+	tdata[num].wl->steal(foundone);
       //Don't push it on the queue before we can execute it
       if (foundone) {
 	doProcess(val, tld);
@@ -131,15 +134,19 @@ public:
   }
 
   void runLocalQueue(ThreadLD& tld) {
-    while (!tld.wl.empty()) {
-      bool suc = false;
-      value_type val = tld.wl.pop(suc);
-      //      bool psuc = false;
-      //      value_type pval = tld.wl.peek(psuc);
-      //      if (psuc)
-      //	pval.prefetch_all();
-      if (suc)
-	doProcess(val, tld);
+    if (tld.wl) {
+      while (!tld.wl->empty()) {
+	bool suc = false;
+	value_type val = tld.wl->pop(suc);
+	//      bool psuc = false;
+	//      value_type pval = tld.wl->peek(psuc);
+	//      if (psuc)
+	//	pval.prefetch_all();
+	if (suc)
+	  doProcess(val, tld);
+      }
+      delete tld.wl;
+      tld.wl = 0;
     }
   }
 
@@ -155,9 +162,9 @@ public:
 	do {
 	  do {
 	    runLocalQueue(tld);
-	  } while (global_wl.moveTo(tld.wl, 512));
+	  } while ((tld.wl = global_wl.getNext()));
 	} while (trySteal(tld));
-      } while (!tld.wl.empty() || !global_wl.empty());
+      } while ((tld.wl && !tld.wl->empty()) || !global_wl.empty());
       //      __sync_fetch_and_sub(&threadsWorking, 1);
       //      usleep(50);
       //    } while (threadsWorking > 0);
@@ -168,7 +175,10 @@ public:
 template<class WorkListTy, class Function>
 void for_each_simple(WorkListTy& wl, Function f) {
   //wl.sort();
-  GaloisWork<WorkListTy, Function> GW(wl, f);
+  typedef GaloisRuntime::WorkList::Global::ChunkedFIFO<typename WorkListTy::value_type, 256> GWLTy;
+  GWLTy GWL;
+  GWL.fill_initial(wl.begin(), wl.end());
+  GaloisWork<GWLTy, Function> GW(GWL, f);
   ThreadPool& PTP = getSystemThreadPool();
   PTP.run(&GW);
 }

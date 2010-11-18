@@ -56,7 +56,7 @@ class Mesh {
 
     for(Graph::active_iterator ii = mesh->active_begin(), ee = mesh->active_end(); ii != ee; ++ii) {
       if (ii->getData().isBad()) {
-	ret.push(*ii);
+	ret.push_back(*ii);
 	++retval;
       }
     }

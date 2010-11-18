@@ -29,6 +29,8 @@ static bool shouldLock(MethodFlag g) {
   case CHECK_CONFLICT:
     return true;
   }
+  assert(0 && "Shouldn't get here");
+  abort();
 }
 
 

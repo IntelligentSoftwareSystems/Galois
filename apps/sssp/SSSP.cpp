@@ -127,20 +127,22 @@ void SSSP::runBodyParallel(const GNode src, T& wl) {
     GNode dst = *ii;
     int w = getEdgeData(src, dst);
     UpdateRequest up = UpdateRequest(dst, w, w <= delta);
-    wl.push(up);
+    wl.push_back(up);
   }
   sssp = this;
+  //Sorry, but you'll have to edit Galois.h to get the correct local
+  //and global queues.
   Galois::for_each(wl, process);
 }
 
 void SSSP::runBodyParallel(const GNode src) {
-	if (executorType.bfs) {
-	  threadsafe::ts_queue<UpdateRequest> wl;
-		runBodyParallel(src,wl);
-	} else {
-	  threadsafe::ts_pqueue<UpdateRequest, std::greater<UpdateRequest> > wl;
-		runBodyParallel(src,wl);
-	}
+  if (executorType.bfs) {
+    std::vector<UpdateRequest> wl;
+    runBodyParallel(src,wl);
+  } else {
+    std::vector<UpdateRequest> wl;
+    runBodyParallel(src,wl);
+  }
 }
 
 bool SSSP::verify() {

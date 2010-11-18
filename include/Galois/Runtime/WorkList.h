@@ -22,7 +22,7 @@ namespace WorkList {
 namespace Local {
 
 template<typename T, class Compare = std::less<T>, bool concurrent = true>
-class GWL_PQueue : boost::noncopyable, threadsafe::simpleLock<int, concurrent> {
+class GWL_PQueue : private boost::noncopyable, private threadsafe::simpleLock<int, concurrent> {
   std::priority_queue<T, std::vector<T>, Compare> wl;
   
 public:
@@ -70,7 +70,7 @@ public:
 };
 
 template<typename T, bool concurrent = true>
-class GWL_LIFO : boost::noncopyable, threadsafe::simpleLock<int, concurrent> {
+class GWL_LIFO : private boost::noncopyable, private threadsafe::simpleLock<int, concurrent> {
   std::stack<T> wl;
 
 public:
@@ -117,7 +117,7 @@ public:
 };
 
 template<typename T, bool concurrent = true>
-class GWL_LIFO_SB : boost::noncopyable, threadsafe::simpleLock<int, concurrent> {
+class GWL_LIFO_SB : private boost::noncopyable, private threadsafe::simpleLock<int, concurrent> {
   std::deque<T> wl;
 
 public:
@@ -191,7 +191,7 @@ public:
 };
 
 template<typename T, bool concurrent = true>
-class GWL_FIFO : boost::noncopyable, threadsafe::simpleLock<int, concurrent> {
+class GWL_FIFO : private boost::noncopyable, private threadsafe::simpleLock<int, concurrent> {
   std::queue<T> wl;
 
 public:
@@ -217,7 +217,7 @@ public:
       return T();
     } else {
       succeeded = true;
-      T retval = wl.top();
+      T retval = wl.front();
       wl.pop();
       threadsafe::simpleLock<int, concurrent>::unlock();
       return retval;
@@ -238,7 +238,7 @@ public:
 };
 
 template<typename T>  
-class GWL_ChaseLev_Dyn : boost::noncopyable {
+class GWL_ChaseLev_Dyn : private boost::noncopyable {
 
   struct DequeNode {
     enum { ArraySize = 256 };
@@ -543,7 +543,7 @@ public:
 };
 
 template<typename T>
-class GWL_Idempotent_LIFO : boost::noncopyable {
+class GWL_Idempotent_LIFO : private boost::noncopyable {
 
   packedInt2<32,32> anchor; //tail,tag
   unsigned int capacity;
@@ -657,7 +657,7 @@ public:
 
 
 template<typename T>
-class GWL_Idempotent_FIFO : boost::noncopyable {
+class GWL_Idempotent_FIFO : private boost::noncopyable {
 
   struct TaskArrayWithSize {
     int size;
@@ -782,7 +782,7 @@ public:
 
 
 template<typename T>
-class GWL_Idempotent_FIFO_SB : boost::noncopyable {
+class GWL_Idempotent_FIFO_SB : private boost::noncopyable {
 
   struct TaskArrayWithSize {
     int size;
@@ -912,7 +912,105 @@ public:
 
 namespace Global {
 
-}
+template<typename T, int ChunkSize = 64, typename BackingTy = GaloisRuntime::WorkList::Local::GWL_LIFO_SB<T, false> >
+class ChunkedFIFO {
+ public:
+  
+  class Chunk {
+    friend class ChunkedFIFO;
+    BackingTy data;
+    int size;
 
+    //These are only used by ChunkedFIFO and should not be exposed to
+    //users of the local queue
+    bool full() { return ChunkSize == size; }
+    void push_initial(T val) {
+      ++size;
+      data.push(val);
+    }
+
+    Chunk() : size(0) {}
+    
+  public:
+
+    enum {MAYSTEAL = BackingTy::MAYSTEAL};
+
+    void push(T val) {
+      data.push(val);
+    }
+
+    T pop(bool& succeeded) {
+      return data.pop(succeeded);
+    }
+
+    T steal(bool& succeeded) {
+      return data.steal(succeeded);
+    }
+
+    bool empty() {
+      return data.empty();
+    }
+  };
+
+ private:
+  GaloisRuntime::WorkList::Local::GWL_FIFO<Chunk*, true> Items;
+  Chunk* next;
+  threadsafe::simpleLock<int, true> nextLock;
+
+  void push_one_next(T& val) {
+    if (!next)
+      next = new Chunk;
+    if (next->full()) {
+      Items.push(next);
+      next = new Chunk;
+    }
+    next->push_initial(val);
+  }
+
+ public:
+  
+  typedef Chunk LocalTy;
+  typedef T value_type;
+
+  ChunkedFIFO() :next(0) {}
+
+  Chunk* getNext() {
+    bool suc = false;
+    Chunk* C = Items.pop(suc);
+    if (suc)
+      return C;
+    //Nothing on the queue, check next
+    C = 0;
+    nextLock.lock();
+    if (next) {
+      C = next;
+      next = 0;
+    }
+    nextLock.unlock();
+    return C;
+  }
+
+  bool empty() {
+    return Items.empty() && !next;
+  }
+
+  void push_aborted(T& val, Chunk* C) {
+    nextLock.lock();
+    push_one_next(val);
+    nextLock.unlock();
+  }
+
+  template<typename Iter>
+  void fill_initial(Iter ii, Iter ee) {
+    while (ii != ee) {
+      push_one_next(*ii++);
+    }
+  }
+
+
+
+};
+
+}
 }
 }
