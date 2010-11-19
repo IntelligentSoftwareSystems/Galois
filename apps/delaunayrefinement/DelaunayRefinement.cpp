@@ -51,7 +51,9 @@ typedef Galois::Graph::FirstGraph<Element,void,false>::GraphNode GNode;
 #include "Support/ThreadSafe/simple_lock.h"
 #include "Support/ThreadSafe/TSQueue.h"
 
+#ifdef WITH_VTUNE
 #include "/opt/intel/vtune_amplifier_xe_2011/include/libittnotify.h"
+#endif
 
 Graph* mesh;
 int threads = 1;
@@ -105,11 +107,15 @@ void refine(Mesh& m, WLTY& wl) {
   //  } else {
   //Galois::setMaxThreads(threads);
   using namespace Galois::Scheduling;
+#ifdef WITH_VTUNE
   __itt_resume();
+#endif
   Galois::for_each(wl, process, 
 		   Priority.first<ChunkedFIFO>().thenLocally<LIFO>());
     //  }
+#ifdef WITH_VTUNE
   __itt_pause();
+#endif
 }
 
 

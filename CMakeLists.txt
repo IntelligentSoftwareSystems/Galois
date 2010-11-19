@@ -28,6 +28,8 @@ set(CMAKE_BUILD_TYPE Release)
 # OPTION( VARIABLE "Description" Initial state)
 OPTION( WITH_PTHREAD_POOL "Enable PThreads support" ON )
 OPTION( WITH_CRAY_POOL    "Enable Cray support" OFF )
+#SET( WITH_VTUNE ON )
+
 CONFIGURE_FILE( ${CMAKE_SOURCE_DIR}/include/galois_config.h.cmake ${CMAKE_SOURCE_DIR}/include/galois_config.h )
 
 #Source finding
