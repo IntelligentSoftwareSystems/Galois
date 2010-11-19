@@ -1,0 +1,77 @@
+Q1: What kind of applications will Hoard speed up?
+
+A1: Hoard will always improve the performance of multithreaded programs
+running on multiprocessors that make frequent use of the heap (calls
+to malloc/free or new/delete, as well as many STL functions). Because
+Hoard avoids false sharing, Hoard also speeds up programs that only
+occasionally call heap functions but access these objects frequently.
+
+-----
+
+Q2: I'm using the STL but not seeing any performance improvement. Why not?
+
+A2: In order to benefit from Hoard, you have to tell STL to use malloc
+instead of its internal custom memory allocator:
+
+typedef list<int, malloc_alloc> mylist;
+
+typedef list<int, std::allocator<int> > mylist;
+
+The first form works for most platforms using g++, while the second
+form is for Visual Studio (Windows).
+
+-----
+
+Q3: What systems does Hoard work on?
+A3: Hoard is fully supported for the following platforms.
+
+- Windows NT/2000/XP/Server (32 and 64-bit)
+- Linux x86 (32 and 64-bit)
+- Solaris (Sparc, x86, and x86-64)
+- Mac OS X (Intel)
+
+Hoard also runs on PowerPC systems (including IBM Power and Macs
+running Apple OS X).
+
+-----
+
+Q4: Have you compared Hoard with SmartHeap SMP?
+A4: We tried a version of SmartHeap SMP years ago but it did run
+correctly due to an apparent race condition in the code.
+
+-----
+
+Q5: Have you compared Hoard against mtmalloc or libumem?
+A5: Yes. Hoard is much faster than either. For example, here's an
+execution of threadtest on Solaris:
+
+Default:	4.60 seconds
+Libmtmalloc:	6.23 seconds
+Libumem:	5.47 seconds
+Hoard 3.2:	1.99 seconds
+
+-----
+
+Q6: Can I use Hoard with a commercial application?
+
+A6: Yes. Hoard is available under two licenses. The first license is
+the GNU General Public License. That license is free, but it requires
+you to open-source your application.
+
+Because of the restrictions imposed by this license, commercial users
+of Hoard can purchase licenses through the University of Texas at
+Austin. For detailed information on licenses, please contact Jitendra
+Jain <jjain@otc.utexas.edu> or myself, Emery Berger <emery@cs.umass.edu>.
+
+Jitendra Jain's full contact information follows:
+
+Jitendra Jain
+The University of Texas at Austin 
+Office of Technology Commercialization 
+MCC Building, Suite 1.9A 
+3925 West Braker Lane 
+Austin, Texas 78759 
+
+(512) 471-9055
+(512) 475-6894 (FAX)
+jjain@otc.utexas.edu

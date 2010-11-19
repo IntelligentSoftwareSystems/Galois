@@ -1,0 +1,63 @@
+BODY {
+	FONT-SIZE: 12px; FONT-FAMILY: geneva, arial, helvetica
+}
+DIV {
+	FONT-SIZE: 12px; FONT-FAMILY: geneva, arial, helvetica
+}
+SPAN {
+	FONT-SIZE: 12px; FONT-FAMILY: geneva, arial, helvetica
+}
+P {
+	FONT-SIZE: 12px; FONT-FAMILY: geneva, arial, helvetica
+}
+FORM {
+	FONT-SIZE: 12px; FONT-FAMILY: geneva, arial, helvetica
+}
+TD {
+	FONT-SIZE: 12px; FONT-FAMILY: geneva, arial, helvetica
+}
+INPUT {
+	FONT-SIZE: 12px; FONT-FAMILY: geneva, arial, helvetica
+}
+SELECT {
+	FONT-SIZE: 12px; FONT-FAMILY: geneva, arial, helvetica
+}
+INPUT.font {
+	FONT-SIZE: 12px; FONT-FAMILY: geneva, arial, helvetica
+}
+.topNav {
+	FONT-SIZE: 12px; FONT-FAMILY: geneva, arial, helvetica
+}
+.copy {
+	FONT-SIZE: 12px; FONT-FAMILY: geneva, arial, helvetica
+}
+TABLE.elfixo {
+	TABLE-LAYOUT: fixed
+}
+.TWcastpromoBOX {
+	MARGIN-TOP: 5px; MARGIN-BOTTOM: 5px; MARGIN-LEFT: 5px
+}
+.minipromoBOX {
+	MARGIN-TOP: 3px; MARGIN-BOTTOM: 4px; MARGIN-LEFT: 3px
+}
+.PurpPromo {
+	FONT-WEIGHT: bold; FONT-SIZE: 11px; COLOR: #663399
+}
+.GreenPromo {
+	FONT-WEIGHT: bold; FONT-SIZE: 11px; COLOR: #003300
+}
+.OrangePromo {
+	FONT-WEIGHT: bold; FONT-SIZE: 11px; COLOR: #cc6600
+}
+.BluePromo {
+	FONT-WEIGHT: bold; FONT-SIZE: 11px; COLOR: #333366
+}
+.Font10 {
+	FONT-SIZE: 10px; LINE-HEIGHT: 12px
+}
+.HEADBAR {
+	MARGIN-TOP: 2px; MARGIN-BOTTOM: 2px; MARGIN-LEFT: 6px
+}
+.micro12RED {
+	FONT-WEIGHT: bold; FONT-SIZE: 12px; COLOR: #cc0000
+}

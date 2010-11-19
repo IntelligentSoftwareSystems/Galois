@@ -1,0 +1,42 @@
+10/03/2006 -- libhugetlbfs-1.0 Released
+
+After roughly one year in development, version 1.0 of libhugetlbfs is here.
+It can be downloaded from SourceForge or the OzLabs mirror:
+
+	http://sourceforge.net/project/showfiles.php?group_id=156936
+	http://libhugetlbfs.ozlabs.org/snapshots/
+
+After a series of preview releases, we have tested a huge array of the
+supported usage scenarios using benchmarks and real HPC applications.
+Usability and reliability have greatly improved.  But... due to the
+incredible diversity of applications that exist, there is bound to be a few
+that will not work correctly.
+
+If using libhugetlbfs makes your application slower:
+
+ * Play around with the different combinations of hugetlb malloc and the
+   two different supported link types to see which combination works best.
+
+ * Keep in mind that huge pages are a niche performance tweak and are not
+   suitable for every type of application.  They are specifically known to
+   hurt performance in certain situations.
+
+If you experience problems:
+
+ * You've already read the HOWTO document, but read through it again.  It
+   is full of hints, notes, warnings, and caveats that we have found over
+   time.  This is the best starting point for a quick resolution to your
+   issue.
+
+ * Make sure you have enough huge pages allocated.  Even if you think you
+   have enough, try increasing it to a number you know you will not use.
+
+ * Set HUGETLB_VERBOSE=99 and HUGETLB_DEBUG=yes.  These options increase
+   the verbosity of the library and enable extra checking to help diagnose
+   the problem.
+
+If the above steps do not help, send as much information about the problem
+(including all libhugetlbfs debug output) to
+libhugetlbfs-devel@lists.sourceforge.net and we'll help out as much as we
+can.  We will probably ask you to collect things like: straces,
+/proc/pid/maps and gdb back traces.

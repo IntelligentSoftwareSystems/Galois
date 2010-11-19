@@ -1,0 +1,219 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<META http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta content="Apache Forrest" name="Generator">
+<meta name="Forrest-version" content="0.6">
+<meta name="Forrest-skin-name" content="pelt">
+<title>Building Hoard</title>
+<link type="text/css" href="skin/basic.css" rel="stylesheet">
+<link media="screen" type="text/css" href="skin/screen.css" rel="stylesheet">
+<link media="print" type="text/css" href="skin/print.css" rel="stylesheet">
+<link type="text/css" href="skin/profile.css" rel="stylesheet">
+<script src="skin/getBlank.js" language="javascript" type="text/javascript"></script><script src="skin/getMenu.js" language="javascript" type="text/javascript"></script><script src="skin/fontsize.js" language="javascript" type="text/javascript"></script>
+<link rel="shortcut icon" href="">
+</head>
+<body onload="init()">
+<script type="text/javascript">ndeSetTextSize();</script>
+<div id="top">
+<!--+
+    |header
+    +-->
+<div class="header">
+<!--+
+    |start group logo
+    +-->
+<div class="grouplogo">
+<a href="http://www.hoard.org"><img class="logoImage" alt="Hoard" src="images/hoard-logo.jpg" title="The Hoard Multiprocessor Memory Allocator"></a>
+</div>
+<!--+
+    |end group logo
+    +-->
+<!--+
+    |start Project Logo
+    +-->
+<div class="projectlogoA1">
+<a href=""></a>
+</div>
+<!--+
+    |end Project Logo
+    +-->
+<!--+
+    |start Tabs
+    +-->
+<ul id="tabs"></ul>
+<!--+
+    |end Tabs
+    +-->
+</div>
+</div>
+<div id="main">
+<div id="publishedStrip">
+<!--+
+    |start Subtabs
+    +-->
+<div id="level2tabs"></div>
+<!--+
+    |end Endtabs
+    +-->
+<script type="text/javascript" language="JavaScript"><!--
+              document.write("Published: " + document.lastModified);
+              //  --></script>
+</div>
+<!--+
+    |breadtrail
+    +-->
+<div class="breadtrail">
+             
+             &nbsp;
+           </div>
+<!--+
+    |start Menu, mainarea
+    +-->
+<!--+
+    |start Menu
+    +-->
+<div id="menu">
+<div onclick="SwitchMenu('menu_selected_1.1', 'skin/')" id="menu_selected_1.1Title" class="menutitle" style="background-image: url('skin/images/chapter_open.gif');">Table of Contents</div>
+<div id="menu_selected_1.1" class="selectedmenuitemgroup" style="display: block;">
+<div class="menuitem">
+<a title="Welcome to Hoard" href="index.html">Home</a>
+</div>
+<div class="menuitem">
+<a title="Download Hoard" href="download.html">Download</a>
+</div>
+<div class="menuitem">
+<a title="Screenshots" href="screenshot.html">Screenshots</a>
+</div>
+<div class="menuitem">
+<a title="How to Use Hoard" href="using.html">Using Hoard</a>
+</div>
+<div class="menupage">
+<div class="menupagetitle">Building Hoard</div>
+</div>
+<div class="menuitem">
+<a title="FAQs" href="faqs.html">FAQs</a>
+</div>
+<div class="menuitem">
+<a title="License Info" href="licensing.html">Licensing Info</a>
+</div>
+</div>
+<div id="credit"></div>
+<div id="roundbottom">
+<img style="display: none" class="corner" height="15" width="15" alt="" src="skin/images/rc-b-l-15-1body-2menu-3menu.png"></div>
+<!--+
+  |alternative credits
+  +-->
+</div>
+<!--+
+    |end Menu
+    +-->
+<!--+
+    |start content
+    +-->
+<div id="content">
+<div id="skinconf-txtlink"></div>
+<h1>Building Hoard</h1>
+<div id="minitoc-area">
+<ul class="minitoc">
+<li>
+<a href="#Linux+and+Solaris+Builds">Linux and Solaris Builds</a>
+</li>
+<li>
+<a href="#Windows+Builds">Windows Builds</a>
+</li>
+</ul>
+</div>
+
+
+<p>
+You can use the available pre-built binaries or build Hoard
+yourself. Hoard is written to work on Windows and any variant of UNIX
+that supports threads, and should compile out of the box. Rather than
+using Makefiles or configure scripts, Hoard includes custom scripts
+that all start with the prefix compile.
+</p>
+
+  
+<a name="N1000F"></a><a name="Linux+and+Solaris+Builds"></a>
+<h2 class="boxed">Linux and Solaris Builds</h2>
+<div class="section">
+<p>
+You can compile Hoard out of the box for Linux and Solaris using the
+GNU compilers (g++) just by running the compile
+script:
+</p>
+<pre class="code">
+./compile
+</pre>
+</div>
+
+  
+<a name="N1001D"></a><a name="Windows+Builds"></a>
+<h2 class="boxed">Windows Builds</h2>
+<div class="section">
+<p>
+There are two alternative ways of using Hoard with Windows.
+</p>
+<ol>
+
+<li>
+
+<p>
+The first approach builds a DLL, libhoard.dll and
+its associated library libhoard.lib.
+</p>
+
+
+<pre class="code">
+.\compile-dll
+</pre>
+
+</li>
+
+
+<li>
+
+<p>
+The second and preferred approach generates winhoard, which replaces
+malloc/new calls in your program and any DLLs it might use.
+  </p>
+
+
+<pre class="code">
+.\compile-winhoard
+</pre>
+  
+</li>
+  
+</ol>
+</div>
+
+
+</div>
+<!--+
+    |end content
+    +-->
+<div class="clearboth">&nbsp;</div>
+</div>
+<div id="footer">
+<!--+
+    |start bottomstrip
+    +-->
+<div class="lastmodified">
+<script type="text/javascript"><!--
+document.write("Last Published: " + document.lastModified);
+//  --></script>
+</div>
+<div class="copyright">
+ Copyright &copy; 2005 Emery Berger.</div>
+<div id="feedback">
+    Send feedback about the website to:
+  <a id="feedbackto" href="mailto:emery@cs.umass.edu?subject=Feedback,building.html">emery@cs.umass.edu</a>
+</div>
+<!--+
+    |end bottomstrip
+    +-->
+</div>
+</body>
+</html>

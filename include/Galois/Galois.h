@@ -12,7 +12,7 @@
 
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Timer.h"
-#include "Galois/Runtime/ThreadPool.h"
+#include "Galois/Runtime/Threads.h"
 #include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/WorkList.h"
 
@@ -37,20 +37,16 @@ class GaloisWork : public Galois::Executable {
     localWLTy* wl;
     int conflicts;
     int iterations;
+    unsigned long TotalTime;
     GaloisRuntime::TimeAccumulator ProcessTime;
-    GaloisRuntime::Timer TotalTime;
     GaloisRuntime::SimpleRuntimeContext cnx;
   public:
     ThreadLD()
       :wl(0), conflicts(0), iterations(0)
     {}
 
-    void setThreadID(int ID) {
-      Galois::Context<value_type>::threadID = ID;
-    }
-
-    virtual void push(value_type T) {
-      wl->push(T);
+    virtual void push(value_type val) {
+      wl->push(val);
     }
 
     virtual void finish() {
@@ -59,32 +55,28 @@ class GaloisWork : public Galois::Executable {
     virtual void suspendWith(Executable* E) {
       abort();
     }
+    
+    static void merge(ThreadLD& lhs, ThreadLD& rhs) {
+      lhs.conflicts += rhs.conflicts;
+      lhs.iterations += rhs.iterations;
+      lhs.ProcessTime += rhs.ProcessTime;
+      lhs.TotalTime += rhs.TotalTime;
+    }
+
   };
 
   CPUSpaced<ThreadLD> tdata;
 
 public:
   GaloisWork(WorkListTy& _wl, Function _f)
-    :global_wl(_wl), f(_f), threadmax(0), threadsWorking(0) {}
+    :global_wl(_wl), f(_f), threadmax(0), threadsWorking(0), tdata(ThreadLD::merge) {}
 
   ~GaloisWork() {
-    int conflicts = 0;
-    int iterations = 0;
-    unsigned long tTime = 0;
-    unsigned long pTime = 0;
 
-    for (int i = 0; i < tdata.size(); ++i) {
-      conflicts += tdata[i].conflicts;
-      iterations += tdata[i].iterations;
-      tTime += tdata[i].TotalTime.get();
-      pTime += tdata[i].ProcessTime.get();
-      assert(!tdata[i].wl);
-    }
-
-    std::cout << "STAT: Conflicts " << conflicts << "\n";
-    std::cout << "STAT: Iterations " << iterations << "\n";
-    std::cout << "STAT: TotalTime " << tTime << "\n";
-    std::cout << "STAT: ProcessTime " << pTime << "\n";
+    std::cout << "STAT: Conflicts " << tdata.get().conflicts << "\n";
+    std::cout << "STAT: Iterations " << tdata.get().iterations << "\n";
+    std::cout << "STAT: TotalTime " << tdata.get().TotalTime << "\n";
+    std::cout << "STAT: ProcessTime " << tdata.get().ProcessTime.get() << "\n";
     assert(global_wl.empty());
   }
 
@@ -109,16 +101,16 @@ public:
 
   virtual void preRun(int tmax) {
     threadmax = tmax;
-    tdata.late_initialize(tmax);
   }
 
   virtual void postRun() {
   }
 
   bool trySteal(ThreadLD& tld) {
+#if 0
     if (localWLTy::MAYSTEAL) {
       //Try to steal work
-      int num = (1 + tld.getThreadID()) % threadmax;
+      int num = (ThreadPool::getMyID()) % (threadmax + 1);
       bool foundone = false;
       value_type val;
       if (tdata[num].wl) //Unresolvable Data race
@@ -130,6 +122,7 @@ public:
 	return true;
       }
     }
+#endif
     return false;
   }
 
@@ -150,12 +143,12 @@ public:
     }
   }
 
-  virtual void operator()(int ID, int tmax) {
-    ThreadLD& tld = tdata[ID];
-    tld.setThreadID(ID);
+  virtual void operator()() {
+    ThreadLD& tld = tdata.get();
     setThreadContext(&tld.cnx);
 
-    tld.TotalTime.start();
+    Timer T;
+    T.start();
     //    do {
     //      __sync_fetch_and_add(&threadsWorking, +1);
       do {
@@ -168,7 +161,8 @@ public:
       //      __sync_fetch_and_sub(&threadsWorking, 1);
       //      usleep(50);
       //    } while (threadsWorking > 0);
-    tld.TotalTime.stop();
+    T.stop();
+    tld.TotalTime = T.get();
   }
 };
 

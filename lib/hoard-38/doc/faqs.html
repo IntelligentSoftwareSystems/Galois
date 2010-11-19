@@ -1,0 +1,295 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<META http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta content="Apache Forrest" name="Generator">
+<meta name="Forrest-version" content="0.6">
+<meta name="Forrest-skin-name" content="pelt">
+<title>Hoard Frequently Asked Questions</title>
+<link type="text/css" href="skin/basic.css" rel="stylesheet">
+<link media="screen" type="text/css" href="skin/screen.css" rel="stylesheet">
+<link media="print" type="text/css" href="skin/print.css" rel="stylesheet">
+<link type="text/css" href="skin/profile.css" rel="stylesheet">
+<script src="skin/getBlank.js" language="javascript" type="text/javascript"></script><script src="skin/getMenu.js" language="javascript" type="text/javascript"></script><script src="skin/fontsize.js" language="javascript" type="text/javascript"></script>
+<link rel="shortcut icon" href="">
+</head>
+<body onload="init()">
+<script type="text/javascript">ndeSetTextSize();</script>
+<div id="top">
+<!--+
+    |header
+    +-->
+<div class="header">
+<!--+
+    |start group logo
+    +-->
+<div class="grouplogo">
+<a href="http://www.hoard.org"><img class="logoImage" alt="Hoard" src="images/hoard-logo.jpg" title="The Hoard Multiprocessor Memory Allocator"></a>
+</div>
+<!--+
+    |end group logo
+    +-->
+<!--+
+    |start Project Logo
+    +-->
+<div class="projectlogoA1">
+<a href=""></a>
+</div>
+<!--+
+    |end Project Logo
+    +-->
+<!--+
+    |start Tabs
+    +-->
+<ul id="tabs"></ul>
+<!--+
+    |end Tabs
+    +-->
+</div>
+</div>
+<div id="main">
+<div id="publishedStrip">
+<!--+
+    |start Subtabs
+    +-->
+<div id="level2tabs"></div>
+<!--+
+    |end Endtabs
+    +-->
+<script type="text/javascript" language="JavaScript"><!--
+              document.write("Published: " + document.lastModified);
+              //  --></script>
+</div>
+<!--+
+    |breadtrail
+    +-->
+<div class="breadtrail">
+             
+             &nbsp;
+           </div>
+<!--+
+    |start Menu, mainarea
+    +-->
+<!--+
+    |start Menu
+    +-->
+<div id="menu">
+<div onclick="SwitchMenu('menu_selected_1.1', 'skin/')" id="menu_selected_1.1Title" class="menutitle" style="background-image: url('skin/images/chapter_open.gif');">Table of Contents</div>
+<div id="menu_selected_1.1" class="selectedmenuitemgroup" style="display: block;">
+<div class="menuitem">
+<a title="Welcome to Hoard" href="index.html">Home</a>
+</div>
+<div class="menuitem">
+<a title="Download Hoard" href="download.html">Download</a>
+</div>
+<div class="menuitem">
+<a title="Screenshots" href="screenshot.html">Screenshots</a>
+</div>
+<div class="menuitem">
+<a title="How to Use Hoard" href="using.html">Using Hoard</a>
+</div>
+<div class="menuitem">
+<a title="How to Build Hoard" href="building.html">Building Hoard</a>
+</div>
+<div class="menupage">
+<div class="menupagetitle">FAQs</div>
+</div>
+<div class="menuitem">
+<a title="License Info" href="licensing.html">Licensing Info</a>
+</div>
+</div>
+<div id="credit"></div>
+<div id="roundbottom">
+<img style="display: none" class="corner" height="15" width="15" alt="" src="skin/images/rc-b-l-15-1body-2menu-3menu.png"></div>
+<!--+
+  |alternative credits
+  +-->
+</div>
+<!--+
+    |end Menu
+    +-->
+<!--+
+    |start content
+    +-->
+<div id="content">
+<div id="skinconf-txtlink"></div>
+<h1>Hoard Frequently Asked Questions</h1>
+<div id="minitoc-area">
+<ul class="minitoc">
+<li>
+<a href="#%0AWhat+kind+of+applications+will+Hoard+speed+up%3F%0A">
+What kind of applications will Hoard speed up?
+</a>
+</li>
+<li>
+<a href="#%0A++I%27m+using+the+STL+but+not+seeing+any+performance+improvement.+Why+not%3F%0A++">
+  I'm using the STL but not seeing any performance improvement. Why not?
+  </a>
+</li>
+<li>
+<a href="#%0AWhat+systems+does+Hoard+work+on%3F%0A">
+What systems does Hoard work on?
+</a>
+</li>
+<li>
+<a href="#%0AHave+you+compared+Hoard+with+SmartHeap+SMP%3F%0A">
+Have you compared Hoard with SmartHeap SMP?
+</a>
+</li>
+<li>
+<a href="#%0A++++++Have+you+compared+Hoard+against+mtmalloc+or+libumem%3F%0A">
+      Have you compared Hoard against mtmalloc or libumem?
+</a>
+</li>
+<li>
+<a href="#%0ACan+I+use+Hoard+with+a+commercial+application%3F%0A">
+Can I use Hoard with a commercial application?
+</a>
+</li>
+</ul>
+</div>
+  
+<a name="N1000C"></a><a name="%0AWhat+kind+of+applications+will+Hoard+speed+up%3F%0A"></a>
+<h2 class="boxed">
+What kind of applications will Hoard speed up?
+</h2>
+<div class="section">
+<p>
+Hoard will always improve the performance of multithreaded programs
+running on multiprocessors that make frequent use of the heap (calls
+to malloc/free or new/delete, as well as many STL functions). Because
+Hoard avoids false sharing, Hoard also speeds up programs that only
+occasionally call heap functions but access these objects frequently.
+  </p>
+</div>
+
+
+  
+<a name="N10016"></a><a name="%0A++I%27m+using+the+STL+but+not+seeing+any+performance+improvement.+Why+not%3F%0A++"></a>
+<h2 class="boxed">
+  I'm using the STL but not seeing any performance improvement. Why not?
+  </h2>
+<div class="section">
+<p>
+In order to benefit from Hoard, you have to tell STL to use malloc instead of its internal custom memory allocator:
+      </p>
+<pre class="code">
+typedef list&lt;unsigned int, malloc_alloc&gt; mylist;
+</pre>
+</div>
+
+
+
+<a name="N10024"></a><a name="%0AWhat+systems+does+Hoard+work+on%3F%0A"></a>
+<h2 class="boxed">
+What systems does Hoard work on?
+</h2>
+<div class="section">
+<p>
+Hoard has been successfully tested on numerous Windows, Linux and
+Solaris systems, including a 4-processor x86 box running Windows
+NT/2000, a 4-processor x86 box running RedHat Linux 6.0 and 6.1, and a
+16-processor Sun Enterprise server running Solaris.
+  </p>
+</div>
+
+
+
+<a name="N1002D"></a><a name="%0AHave+you+compared+Hoard+with+SmartHeap+SMP%3F%0A"></a>
+<h2 class="boxed">
+Have you compared Hoard with SmartHeap SMP?
+</h2>
+<div class="section">
+<p>
+We tried SmartHeap SMP but it did not work on our Suns (due to an
+apparent race condition in the code).
+  </p>
+</div>
+
+
+  
+<a name="N10036"></a><a name="%0A++++++Have+you+compared+Hoard+against+mtmalloc+or+libumem%3F%0A"></a>
+<h2 class="boxed">
+      Have you compared Hoard against mtmalloc or libumem?
+</h2>
+<div class="section">
+<p>
+Yes. Hoard is much faster than either. For example, here's an
+execution of threadtest on Solaris:
+</p>
+<table class="ForrestTable" cellspacing="1" cellpadding="4">
+           
+<tr>
+             
+<td colspan="1" rowspan="1">Default:</td>
+ 	     <td colspan="1" rowspan="1">4.60 seconds</td>
+           
+</tr>
+           
+<tr>
+             
+<td colspan="1" rowspan="1">Libmtmalloc:</td>
+ 	     <td colspan="1" rowspan="1">6.23 seconds</td>
+           
+</tr>
+           
+<tr>
+             
+<td colspan="1" rowspan="1">Libumem:</td>
+             <td colspan="1" rowspan="1">5.47 seconds</td>
+           
+</tr>
+           
+<tr>
+             
+<td colspan="1" rowspan="1">Hoard 3.2:</td>
+ 	     <td colspan="1" rowspan="1">1.99 seconds</td>
+           
+</tr>
+     
+</table>
+</div>
+
+
+<a name="N10077"></a><a name="%0ACan+I+use+Hoard+with+a+commercial+application%3F%0A"></a>
+<h2 class="boxed">
+Can I use Hoard with a commercial application?
+</h2>
+<div class="section">
+<p>
+Yes. Hoard is available under two licenses. The first license is the
+GNU General Public License. That license is free, but it requires you
+to open-source your application. The second option is to purchase a
+license from the University of Texas at Austin. Click the "Licensing Info"
+link on the left for more information.
+</p>
+</div>
+
+
+</div>
+<!--+
+    |end content
+    +-->
+<div class="clearboth">&nbsp;</div>
+</div>
+<div id="footer">
+<!--+
+    |start bottomstrip
+    +-->
+<div class="lastmodified">
+<script type="text/javascript"><!--
+document.write("Last Published: " + document.lastModified);
+//  --></script>
+</div>
+<div class="copyright">
+ Copyright &copy; 2005 Emery Berger.</div>
+<div id="feedback">
+    Send feedback about the website to:
+  <a id="feedbackto" href="mailto:emery@cs.umass.edu?subject=Feedback,faqs.html">emery@cs.umass.edu</a>
+</div>
+<!--+
+    |end bottomstrip
+    +-->
+</div>
+</body>
+</html>

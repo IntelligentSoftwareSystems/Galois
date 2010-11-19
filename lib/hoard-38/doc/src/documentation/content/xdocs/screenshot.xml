@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE document PUBLIC "-//APACHE//DTD Documentation V2.0//EN" "http://forrest.apache.org/dtd/document-v20.dtd">
+<document> 
+
+  <header> 
+    <title>Screenshots</title> 
+  </header> 
+
+<body>
+
+  <p>
+  Because Hoard is a transparent plug-in replacement, ordinary
+  screenshots don't make much sense, since the applications look and
+  work the same! However, it's easy to visualize Hoard's impact on
+  application performance. Here are a few example speedup
+  graphs. Ideally, the speedup as the number of processors increases
+  is a straight diagonal line going from the lower left of each graph
+  to the upper right. These benchmarks compare Hoard to Ptmalloc (the
+  Linux allocator), mtmalloc version 8, and the Solaris default
+  allocator, and are run on a 14-processor Sun.
+</p>
+
+  <table>
+  <tr>
+    <td>
+    <!-- <center> -->
+    <img alt="Threadtest graph" src="images/plot-threadtest-speedup.gif"/>
+    <!-- </center> -->
+    </td>
+  </tr>
+  <tr>
+    <td>
+    <!-- <center> -->
+<p>
+    This benchmark has multiple threads, each allocating and freeing
+    objects. It stresses raw scalability of allocation in individual
+    threads. In this case, Hoard achieves a linear speedup. Ptmalloc
+    scales to four processors but then runs out of steam.
+</p>
+    <!-- </center> -->
+    </td>
+  </tr>
+  <tr>
+    <td>
+    <!-- <center> -->
+    <img alt="Larson graph" src="images/plot-larson-speedup.gif"/>
+    <!-- </center> -->
+    </td>
+  </tr>
+  <tr>
+    <td>
+    <!-- <center> -->
+<p>
+    In this benchmark, multiple threads allocate objects and pass some
+    objects to other threads that free them. This stresses the ability
+    of the memory manager to handle object sharing. Only Hoard scales
+    for this case.
+</p>
+    <!-- </center> -->
+    </td>
+  </tr>
+  <tr>
+    <td>
+    <!-- <center> -->
+    <img alt="Cache-scratch graph" src="images/plot-cache-scratch-speedup.gif"/>
+    <!-- </center> -->
+    </td>
+  </tr>
+  <tr>
+    <td>
+    <!-- <center> -->
+<p>
+    A test of whether a memory manager avoids causing false sharing of
+    cache lines (an insidious effect that destroys scalability). The
+    linear speedup shows that Hoard avoids false sharing completely.
+</p>
+    <!-- </center> -->
+    </td>
+  </tr>
+  </table>
+
+</body>
+</document>

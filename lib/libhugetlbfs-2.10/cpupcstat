@@ -1,0 +1,321 @@
+#!/usr/bin/perl -w
+# This script starts a requested application after setting up oprofile to
+# collect TLB miss data.  It will use this data to calculate the TLB
+# apporximate TLB miss rate.
+# Licensed under LGPL 2.1 as packaged with libhugetlbfs
+# (c) Eric Munson 2009
+
+use Getopt::Long;
+use FindBin qw($Bin);
+use lib "$Bin";
+use POSIX ":sys_wait_h";
+use TLBC::OpCollect;
+use TLBC::PerfCollect;
+use strict;
+
+my ($arch, $cputype);
+my $vmlinux;
+my $target;
+my $real_target;
+my $target_pid;
+my $misses;
+my $instructions = 0;
+my $cycles = 0;
+my $kern_misses;
+my $time_elapsed;
+my $wait_time = 10;
+my $time_limit;
+my $persist = 0;
+my $instruct_ratio;
+my $cycle_ratio;
+my $service;
+my $config;
+my $cost_in_cycles = 0;
+my $kernel;
+my $force_oprofile;
+my $collector;
+my $miss_scale = 0;
+my $ins_scale = 0;
+my $cyc_scale = 0;
+my $tlbcost_cache = "$Bin/tlbmisscost";
+
+sub start_target()
+{
+	my $pid = fork();
+	if (not defined $pid) {
+		die "Failed to fork\n";
+	} elsif ($pid == 0) {
+		exec $target or die "Failed to exec '$target'\n";
+	} else {
+		return($pid);
+	}
+}
+
+sub run_profile()
+{
+	my $start_time;
+	my $end_time;
+	my @results;
+	my $binName;
+	my $pid;
+	my $ret;
+	my $prev = 0;
+	my $kern_prev = 0;
+	my $ins_new = 0;
+	my $ins_prev = 0;
+	my $cyc_new = 0;
+	my $cyc_prev = 0;
+	my $new;
+	my @events;
+
+	if ($force_oprofile) {
+		$collector = TLBC::OpCollect->new();
+	} else {
+		$collector = TLBC::PerfCollect->new();
+	}
+
+	push(@events, "dtlb_miss");
+	if ($instruct_ratio) {
+		push(@events, "instructions");
+	}
+	if ($cycle_ratio || $service) {
+		push(@events, "timer");
+	}
+
+	$start_time = time();
+
+	if ($collector->setup($vmlinux, \@events) == 0) {
+		$collector = TLBC::OpCollect->new();
+		if ($force_oprofile ||
+			$collector->setup($vmlinux, \@events) == 0) {
+			die("Unable to setup data collector");
+		}
+	}
+
+	if (defined $target_pid) {
+		$target = readlink("/proc/$target_pid/exe");
+		chomp($target);
+		$binName = $target;
+		$pid = $target_pid;
+	} elsif (defined $target) {
+		if (defined $real_target) {
+			$binName = $real_target;
+		} else {
+			@results = split(/ /, $target);
+			$binName = $results[0];
+		}
+		$pid = start_target();
+	}
+
+	$binName = `basename $binName`;
+	chomp($binName);
+
+	printf("%15s%18s%19s", "Target Name", "DTLB Miss Samples",
+		"Samples/second");
+
+	$miss_scale = $collector->samples("dtlb_miss");
+	if ($instruct_ratio) {
+		printf("%24s\n", "Instructions/TLB Miss\n");
+		$ins_scale = $collector->samples("instructions");
+	} elsif ($cycle_ratio || $service) {
+		printf("%24s\n", "Cycles/TLB Miss\n");
+		$cyc_scale = $collector->samples("timer");
+	} else {
+		print("\n");
+	}
+
+	printf("%15s%18s%19s\n", "", "Sample every " . $collector->samples("dtlb_miss"), "");
+	sleep($wait_time);
+
+	# While our target is still running and we have not exceeded our
+	# runtime, collect oprofile data every $wait_time seconds to display
+	# the dtlb miss rate.
+	while (waitpid($pid, WNOHANG) <= 0 || $persist) {
+		$collector->read_eventcount();
+		$ret = $collector->get_current_eventcount($binName, "dtlb_miss");
+		$new = $ret - $prev;
+		printf("%15s%18d%19f", $binName, $new, $new / $wait_time);
+		$prev = $ret;
+
+		if ($instruct_ratio) {
+			$ret = $collector->get_current_eventcount($binName,
+				"instructions");
+			$ins_new = $ret - $ins_prev;
+			if ($new == 0) {
+				printf("%24f\n", $new);
+			} else {
+				printf("%24f\n",
+				($ins_new * $ins_scale) / ($new * $miss_scale));
+			}
+			$ins_prev = $ret;
+		} elsif ($cycle_ratio) {
+			$ret = $collector->get_current_eventcount($binName,
+				"timer");
+			$cyc_new = $ret - $cyc_prev;
+			if ($new == 0) {
+				printf("%24f\n", $new);
+			} else {
+				printf("%24f\n",
+				($cyc_new * $cyc_scale) / ($new * $miss_scale));
+			}
+			$cyc_prev = $ret;
+		} else {
+			print("\n");
+		}
+		if ($kernel) {
+			$ret = $collector->get_current_eventcount("vmlinux", "dtlb_miss");
+			$new = $ret - $kern_prev;
+			printf("%15s%18d%19f\n", "vmlinux", $new,
+				$new / $wait_time);
+			$kern_prev = $ret;
+		}
+		$end_time = time();
+		$time_elapsed = $end_time - $start_time;
+		if (defined $time_limit && $time_elapsed > $time_limit) {
+			last;
+		}
+		sleep($wait_time);
+	}
+	$end_time = time();
+	$time_elapsed = $end_time - $start_time;
+	$collector->read_eventcount();
+	$misses = $collector->get_current_eventcount($binName, "dtlb_miss");
+	if ($instruct_ratio) {
+		$instructions = $collector->get_current_eventcount($binName, "instructions");
+	}
+	if ($cycle_ratio || $service) {
+		$cycles = $collector->get_current_eventcount($binName, "timer");
+	}
+
+	if ($kernel) {
+		$kern_misses = $collector->get_current_eventcount("vmlinux", "dtlb_miss");
+	}
+
+	$collector->shutdown();
+}
+
+sub get_target()
+{
+	$target .= $_[0] . " ";
+}
+
+sub print_usage()
+{
+	print "Usage: cpupcstat [options] target
+	Options:
+	--vmlinux /path/to/vmlinux Sets the vmlinux file to use
+	--delay N                  Waits N seconds before rereading the
+                                   miss rate
+	--target-pid P             Watch the miss rate of P instead of a target
+	--real-target T            Watch T instead of target in case target is
+                                   a launcher script
+	--time-limit L             Sets a time limit for watching the target
+	--kernel                   Output DTLB miss data for the kernel as well
+                                   as the specified target
+	--misses-per-instruction   Prints the ratio of TLB misses per
+                                   instruction retired
+	--misses-per-cycle         Prints the ratio of TLB misses per CPU cycle
+	--force-oprofile	   The perf tool is prefered for data
+				   collection with oprofile as the fall back,
+				   force oprofile usage instead
+	--help                     prints this message
+
+	Note: If --target-pid is specified, target will be ignored.\n";
+	exit(0);
+}
+
+sub exit_cleanup()
+{
+	my $collector = TLBC::OpCollect->new();
+	$collector->shutdown();
+	exit(0);
+}
+use sigtrap 'handler' => \&exit_cleanup, 'INT';
+
+Getopt::Long::Configure ('bundling');
+GetOptions ('v|vmlinux=s' => \$vmlinux,
+	    'h|help' => \&print_usage,
+	    'd|delay=i' => \$wait_time,
+	    'p|target-pid=i' => \$target_pid,
+	    'r|real-target=s' => \$real_target,
+	    'l|time-limit=i' => \$time_limit,
+	    'k|kernel' => \$kernel,
+	    'i|misses-per-instruction' => \$instruct_ratio,
+	    'c|misses-per-cycle' => \$cycle_ratio,
+	    't|time-servicing' => \$service,
+	    'C|cost-config=s' => \$config,
+	    'o|force-oprofile' => \$force_oprofile,
+	    's|persist' => \$persist,
+	    '<>' => \&get_target);
+
+if (!$target && not defined $target_pid) {
+	print_usage();
+}
+
+if (!$vmlinux) {
+	$vmlinux = "/boot/vmlinux-" . `uname -r`;
+}
+
+chomp($vmlinux);
+if ($target) {
+	chomp($target);
+}
+
+$misses = 0;
+$kern_misses = 0;
+run_profile();
+
+if ($misses > 0) {
+	print("\n$target saw $misses total DTLB miss samples over ",
+		"$time_elapsed seconds\n");
+	print("at rate of ", $misses / $time_elapsed, " samples/second\n");
+	$misses *= $miss_scale;
+	$cycles *= $cyc_scale;
+	$instructions *= $ins_scale;
+
+	if ($instruct_ratio && $instructions > 0) {
+		print("The ratio of instructions retired per TLB miss was ",
+			$instructions / $misses, "\n");
+	}
+	if ($cycle_ratio && $cycles > 0) {
+		print("The ratio of cycles per TLB miss was ",
+			$cycles / $misses, "\n");
+	}
+
+	if ($service && $cycles > 0) {
+		if ( !$config && -e $tlbcost_cache ) {
+			$config = $tlbcost_cache;
+		}
+		if ($config) {
+			open(DAT, $config) || die "Failed to open $config\n";
+			my $data = <DAT>;
+			close(DAT);
+			($data,$cost_in_cycles) = split(/\=/, $data);
+			chomp($cost_in_cycles);
+		}
+
+		if ($cost_in_cycles <= 0) {
+			my $cost_script = `which tlbmiss_cost.sh`;
+			if ($cost_script eq "") {
+				$cost_script = "$Bin/contrib/tlbmiss_cost.sh";
+			}
+			my $data = `$cost_script --vmlinux $vmlinux`;
+			($data,$cost_in_cycles) = split(/\=/, $data);
+			chomp($cost_in_cycles);
+			open (DAT, ">$tlbcost_cache");
+			print DAT "TLB_MISS_COST=$cost_in_cycles";
+			close (DAT);
+		}
+		my $total_cost = $cost_in_cycles * $misses;
+		print("$target spent ",
+			$total_cost / $cycles * 100,
+			"% of its CPU cycles servicing\nTLB misses\n");
+	}
+}
+
+if ($kern_misses > 0) {
+	print("The kernel saw $kern_misses total DTLB miss samples over ",
+		"$time_elapsed seconds\n");
+	print("at rate of ", $kern_misses / $time_elapsed, " samples/second\n");
+}
+

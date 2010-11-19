@@ -4,8 +4,10 @@
 // This is linux/bsd specific
 #include <sys/time.h>
 
+using namespace GaloisRuntime;
+
 static bool firstRun = true;
-static GaloisRuntime::Timer LaunchTimer;
+static Timer LaunchTimer;
 
 bool Galois::Launcher::isFirstRun() {
   return firstRun;
@@ -27,25 +29,25 @@ unsigned long Galois::Launcher::elapsedTime() {
   return LaunchTimer.get();
 }
 
-GaloisRuntime::Timer::Timer()
+Timer::Timer()
   :_start_hi(0), _start_low(0), _stop_hi(0), _stop_low(0)
 {}
 
-void GaloisRuntime::Timer::start() {
+void Timer::start() {
   timeval start;
   gettimeofday(&start, 0);
   _start_hi = start.tv_sec;
   _start_low = start.tv_usec;
 }
 
-void GaloisRuntime::Timer::stop() {
+void Timer::stop() {
   timeval stop;
   gettimeofday(&stop, 0);
   _stop_hi = stop.tv_sec;
   _stop_low = stop.tv_usec;
 }
 
-unsigned long GaloisRuntime::Timer::get() const {
+unsigned long Timer::get() const {
   unsigned long msec = _stop_hi - _start_hi;
   msec *= 1000;
   if (_stop_low > _start_low)
@@ -57,7 +59,7 @@ unsigned long GaloisRuntime::Timer::get() const {
   return msec;
 }
 
-unsigned long GaloisRuntime::Timer::get_usec() const {
+unsigned long Timer::get_usec() const {
   unsigned long usec = _stop_hi - _start_hi;
   usec *= 1000000;
   if (_stop_low > _start_low)
@@ -69,20 +71,24 @@ unsigned long GaloisRuntime::Timer::get_usec() const {
   return usec;
 }
 
-
-GaloisRuntime::TimeAccumulator::TimeAccumulator()
+TimeAccumulator::TimeAccumulator()
   :ltimer(), acc(0)
 {}
 
-void GaloisRuntime::TimeAccumulator::start() {
+void TimeAccumulator::start() {
   ltimer.start();
 }
 
-void GaloisRuntime::TimeAccumulator::stop() {
+void TimeAccumulator::stop() {
   ltimer.stop();
   acc += ltimer.get_usec();
 }
 
-unsigned long GaloisRuntime::TimeAccumulator::get() const {
+unsigned long TimeAccumulator::get() const {
   return acc / 1000;
+}
+
+TimeAccumulator& TimeAccumulator::operator+=(const TimeAccumulator& rhs) {
+  acc += rhs.acc;
+  return *this;
 }

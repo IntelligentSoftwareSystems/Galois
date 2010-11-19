@@ -1,8 +1,5 @@
 // simple graph -*- C++ -*-
 
-#include <list>
-#include <map>
-#include <vector>
 #include <iostream>
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/iterator/filter_iterator.hpp>
@@ -10,6 +7,7 @@
 
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/InsBag.h"
+//#include "Galois/Runtime/MemRegionPool.h"
 #include "Support/ThreadSafe/TSIBag.h"
 #include "LLVM/SmallVector.h"
 
@@ -161,6 +159,8 @@ class FirstGraph {
   typedef GaloisRuntime::galois_insert_bag<gNode> nodeListTy;
   //typedef threadsafe::ts_insert_bag<gNode> nodeListTy;
   nodeListTy nodes;
+
+  //GaloisRuntime::MemRegionPool<gNode> NodePool;
 
   //deal with the Node redirction
   NodeTy& getData(gNode* ID, MethodFlag mflag = ALL) {

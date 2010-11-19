@@ -10,8 +10,8 @@ namespace Galois {
   
 class Executable {
 public:
-  //! run work.  id is the thread id, max is the total num
-  virtual void operator()(int id, int tmax) = 0;
+  //! run work.
+  virtual void operator()() = 0;
   
   //! execute before work is run to let any local, number of threads
   //! dependent variables get initialized

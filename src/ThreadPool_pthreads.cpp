@@ -6,7 +6,7 @@
 #ifdef WITH_PTHREAD_POOL
 
 #include "Galois/Executable.h"
-#include "Galois/Runtime/ThreadPool.h"
+#include "Galois/Runtime/Threads.h"
 
 #include <semaphore.h>
 #include <pthread.h>
@@ -65,22 +65,16 @@ namespace {
     Galois::Executable* work;
     volatile bool shutdown;
     std::list<pthread_t> threads;
-    int tmax;
 
     int numThreads() {
       return threads.size();
     }
 
-    int mkID() {
-      return __sync_fetch_and_add(&tmax, 1);
-    }
-
     void launch(void) {
-      int myID = mkID();
       while (!shutdown) {
 	start.acquire();
 	if (!shutdown)
-	  (*work)(myID, numThreads());
+	  (*work)();
 	finish.release();
       }
     }
@@ -92,7 +86,7 @@ namespace {
 
   public:
     ThreadPool_pthread() 
-      :start(0), finish(0), work(0), shutdown(false),tmax(0)
+      :start(0), finish(0), work(0), shutdown(false)
     {
       resize(1);
     }
@@ -103,10 +97,12 @@ namespace {
 
     virtual void run(Galois::Executable* E) {
       work = E;
+      ThreadPool::NotifyAware(numThreads());
       work->preRun(numThreads());
       start.release(numThreads());
       finish.acquire(numThreads());
       work->postRun();
+      ThreadPool::NotifyAware(0);
     }
 
     virtual void resize(int num) {
@@ -120,7 +116,7 @@ namespace {
 	int rc = pthread_join(t, NULL);
 	checkResults(rc);
       }
-      tmax = 0;
+      ResetThreadNumbers();
       shutdown = false;
       while (num) {
 	--num;

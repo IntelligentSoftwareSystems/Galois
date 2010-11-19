@@ -971,6 +971,7 @@ class ChunkedFIFO {
   
   typedef Chunk LocalTy;
   typedef T value_type;
+  enum { SHOULD_DELETE_LOCAL = true };
 
   ChunkedFIFO() :next(0) {}
 

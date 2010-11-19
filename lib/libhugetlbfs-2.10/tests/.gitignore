@@ -1,0 +1,4 @@
+gethugepagesize
+test_root_hugetlbfs
+find_path
+tempfile

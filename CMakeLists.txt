@@ -33,6 +33,7 @@ CONFIGURE_FILE( ${CMAKE_SOURCE_DIR}/include/galois_config.h.cmake ${CMAKE_SOURCE
 #Source finding
 include_directories("include")
 
+add_subdirectory(lib)
 add_subdirectory(src)
 add_subdirectory(apps)
 

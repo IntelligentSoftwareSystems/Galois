@@ -31,6 +31,7 @@
 
 #include <vector>
 #include <set>
+#include <map>
 #include <fstream>
 #include <istream>
 #include <boost/iostreams/filter/gzip.hpp>

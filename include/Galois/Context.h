@@ -11,14 +11,10 @@ namespace Galois {
 
 template<typename T>
 class Context : boost::noncopyable {
-protected:
-  int threadID;
-  Context() :threadID(-1) {}
 public:
   virtual void push(T) = 0;
   virtual void finish() = 0;
   virtual void suspendWith(Executable*) = 0;
-  int getThreadID() { return threadID; }
 };
 
 

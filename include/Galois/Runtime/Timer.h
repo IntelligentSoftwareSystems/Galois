@@ -30,6 +30,7 @@ namespace GaloisRuntime {
     void start();
     void stop(); //This adds the next timed interval to the total
     unsigned long get() const;
+    TimeAccumulator& operator+=(const TimeAccumulator& rhs);
   };
 
 }
