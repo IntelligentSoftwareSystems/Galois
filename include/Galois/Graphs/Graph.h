@@ -11,6 +11,8 @@
 #include "Support/ThreadSafe/TSIBag.h"
 #include "LLVM/SmallVector.h"
 
+using namespace GaloisRuntime;
+
 namespace Galois {
 namespace Graph {
 
@@ -163,10 +165,11 @@ class FirstGraph {
   //GaloisRuntime::MemRegionPool<gNode> NodePool;
 
   //deal with the Node redirction
-  NodeTy& getData(gNode* ID, MethodFlag mflag = ALL) {
+  template<typename Context>
+  NodeTy& getData(gNode* ID, MethodFlag mflag = ALL, Context* C = getThreadContext()) {
     assert(ID);
     if (shouldLock(mflag))
-      GaloisRuntime::acquire(ID);
+      SimpleRuntimeContext::acquire(C, ID);
     return ID->data;
   }
 
@@ -191,8 +194,8 @@ public:
 	ID->prefetch_neighbors();
     }
 
-    NodeTy& getData(MethodFlag mflag = ALL) {
-      return Parent->getData(ID, mflag);
+    NodeTy& getData(MethodFlag mflag = ALL, SimpleRuntimeContext* C = getThreadContext()) {
+      return Parent->getData(ID, mflag, C);
     }
 
     bool isNull() const {
@@ -252,10 +255,10 @@ public:
   }
 
   // Adds a node to the graph.
-  bool addNode(const GraphNode& n, MethodFlag mflag = ALL) {
+  bool addNode(const GraphNode& n, MethodFlag mflag = ALL, SimpleRuntimeContext* C = getThreadContext()) {
     assert(n.ID);
     if (shouldLock(mflag))
-      GaloisRuntime::acquire(n.ID);
+      SimpleRuntimeContext::acquire(C, n.ID);
     bool oldActive = n.ID->active;
     if (!oldActive) {
       n.ID->active = true;
@@ -271,10 +274,10 @@ public:
 
   // Removes a node from the graph along with all its outgoing/incoming edges.
   // FIXME: incoming edges aren't handled here for directed graphs
-  bool removeNode(GraphNode n, MethodFlag mflag = ALL) {
+  bool removeNode(GraphNode n, MethodFlag mflag = ALL, SimpleRuntimeContext* C = getThreadContext()) {
     assert(n.ID);
     if (shouldLock(mflag))
-      GaloisRuntime::acquire(n.ID);
+      SimpleRuntimeContext::acquire(C, n.ID);
     gNode* N = n.ID;
     bool wasActive = N->active;
     if (wasActive) {
@@ -294,16 +297,17 @@ public:
 
   // Adds an edge to the graph containing the specified data.
   void addEdge(GraphNode src, GraphNode dst,
-	       const typename VoidWrapper<EdgeTy>::type& data, MethodFlag mflag = ALL) {
+	       const typename VoidWrapper<EdgeTy>::type& data, 
+	       MethodFlag mflag = ALL, SimpleRuntimeContext* C = getThreadContext()) {
     assert(src.ID);
     assert(dst.ID);
     if (shouldLock(mflag)) 
-      GaloisRuntime::acquire(src.ID);
+      SimpleRuntimeContext::acquire(C, src.ID);
     if (Directional) {
       src.ID->getOrCreateEdge(dst.ID) = data;
     } else {
       if (shouldLock(mflag))
-	GaloisRuntime::acquire(dst.ID);
+	SimpleRuntimeContext::acquire(C, dst.ID);
       EdgeTy& E1 = src.ID->getOrCreateEdge(dst.ID);
       EdgeTy& E2 = dst.ID->getOrCreateEdge(src.ID);
       if (src < dst)
@@ -314,50 +318,51 @@ public:
   }
 
   // Adds an edge to the graph
-  void addEdge(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
+  void addEdge(GraphNode src, GraphNode dst, MethodFlag mflag = ALL, SimpleRuntimeContext* C = getThreadContext()) {
     assert(src.ID);
     assert(dst.ID);
     if (shouldLock(mflag))
-      GaloisRuntime::acquire(src.ID);
+      SimpleRuntimeContext::acquire(C, src.ID);
     if (Directional) {
       src.ID->getOrCreateEdge(dst.ID);
     } else {
       if (shouldLock(mflag))
-	GaloisRuntime::acquire(dst.ID);
+	SimpleRuntimeContext::acquire(C, dst.ID);
       src.ID->getOrCreateEdge(dst.ID);
       dst.ID->getOrCreateEdge(src.ID);
     }
   }
 
-  void removeEdge(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
+  void removeEdge(GraphNode src, GraphNode dst, MethodFlag mflag = ALL, SimpleRuntimeContext* C = getThreadContext()) {
     assert(src.ID);
     assert(dst.ID);
     if (shouldLock(mflag))
-      GaloisRuntime::acquire(src.ID);
+      SimpleRuntimeContext::acquire(C, src.ID);
     if (Directional) {
       src.ID->eraseEdge(dst.ID);
     } else {
       if (shouldLock(mflag))
-	GaloisRuntime::acquire(dst.ID);
+	SimpleRuntimeContext::acquire(C, dst.ID);
       src.ID->eraseEdge(dst.ID);
       dst.ID->eraseEdge(src.ID);
     }
   }
 
   typename VoidWrapper<EdgeTy>::type& getEdgeData(GraphNode src, GraphNode dst,
-						  MethodFlag mflag = ALL) {
+						  MethodFlag mflag = ALL,
+						  SimpleRuntimeContext* C = getThreadContext()) {
     assert(src.ID);
     assert(dst.ID);
 
     //yes, fault on null (no edge)
     if (shouldLock(mflag))
-      GaloisRuntime::acquire(src.ID);
+      SimpleRuntimeContext::acquire(C, src.ID);
 
     if (Directional) {
       return src.ID->getEdgeData(dst.ID);
     } else {
       if (shouldLock(mflag))
-	GaloisRuntime::acquire(dst.ID);
+	SimpleRuntimeContext::acquire(C, dst.ID);
       if (src < dst)
 	return src.ID->getEdgeData(dst.ID);
       else
@@ -367,33 +372,33 @@ public:
 
   // General Things
 
-  int neighborsSize(GraphNode N, MethodFlag mflag = ALL) {
+  int neighborsSize(GraphNode N, MethodFlag mflag = ALL, SimpleRuntimeContext* C = getThreadContext()) {
     assert(N.ID);
     if (shouldLock(mflag))
-      GaloisRuntime::acquire(N.ID);
+      SimpleRuntimeContext::acquire(C, N.ID);
     return N.ID->edges.size();
   }
 
   typedef typename boost::transform_iterator<makeGraphNodePtr,
 					     typename gNode::neighbor_iterator> neighbor_iterator;
 
-  neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = ALL) {
+  neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = ALL, SimpleRuntimeContext* C = getThreadContext()) {
     assert(N.ID);
     if (shouldLock(mflag))
-      GaloisRuntime::acquire(N.ID);
+      SimpleRuntimeContext::acquire(C, N.ID);
     for (typename gNode::neighbor_iterator ii = N.ID->neighbor_begin(), ee =
 	   N.ID->neighbor_end(); ii != ee; ++ii) {
       __builtin_prefetch(*ii);
       if (!Directional && shouldLock(mflag))
-	GaloisRuntime::acquire(*ii);
+	SimpleRuntimeContext::acquire(C, *ii);
     }
     return boost::make_transform_iterator(N.ID->neighbor_begin(),
 					  makeGraphNodePtr(this));
   }
-  neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = ALL) {
+  neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = ALL, SimpleRuntimeContext* C = getThreadContext()) {
     assert(N.ID);
     if (shouldLock(mflag)) // Probably not necessary (no valid use for an end pointer should ever require it)
-      GaloisRuntime::acquire(N.ID);
+      SimpleRuntimeContext::acquire(C, N.ID);
     return boost::make_transform_iterator(N.ID->neighbor_end(),
 					  makeGraphNodePtr(this));
   }

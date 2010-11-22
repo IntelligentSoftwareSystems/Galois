@@ -62,23 +62,23 @@ void process(GNode item, Galois::Context<GNode>& lwl) {
   if (!mesh->containsNode(item))
     return;
 
-  item.getData(); //lock
+  item.getData(Galois::Graph::ALL, lwl.getRuntimeContext()); //lock
 
   Cavity cav(mesh);
-  cav.initialize(item);
-  cav.build();
-  cav.update();
+  cav.initialize(item, &lwl);
+  cav.build(&lwl);
+  cav.update(&lwl);
 
   for (Subgraph::iterator ii = cav.getPre().begin(),
 	 ee = cav.getPre().end(); ii != ee; ++ii) 
-    mesh->removeNode(*ii);
+    mesh->removeNode(*ii, Galois::Graph::NONE, lwl.getRuntimeContext());
 
   //add new data
   for (Subgraph::iterator ii = cav.getPost().begin(),
 	 ee = cav.getPost().end(); ii != ee; ++ii) {
     GNode node = *ii;
-    mesh->addNode(node);
-    Element& element = node.getData();
+    mesh->addNode(node, Galois::Graph::ALL, lwl.getRuntimeContext());
+    Element& element = node.getData(Galois::Graph::ALL, lwl.getRuntimeContext());
     if (element.isBad()) {
       lwl.push(node);
     }
@@ -88,7 +88,7 @@ void process(GNode item, Galois::Context<GNode>& lwl) {
 	 ee = cav.getPost().edge_end(); ii != ee; ++ii) {
     Subgraph::tmpEdge edge = *ii;
     //bool ret = 
-    mesh->addEdge(edge.src, edge.dst); //, edge.data);
+    mesh->addEdge(edge.src, edge.dst, Galois::Graph::ALL, lwl.getRuntimeContext()); //, edge.data);
     //assert ret;
   }
   if (mesh->containsNode(item)) {

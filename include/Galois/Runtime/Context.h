@@ -10,21 +10,18 @@ namespace GaloisRuntime {
 
   //All objects that may be locked (nodes primarily) must inherit from Lockable
   //Use an intrusive list to track objects in a context without allocation overhead
-  class LockableListTag;
-  typedef boost::intrusive::slist_base_hook<boost::intrusive::tag<LockableListTag>,boost::intrusive::link_mode<boost::intrusive::normal_link> > LockableBaseHook;
+class LockableListTag;
+typedef boost::intrusive::slist_base_hook<boost::intrusive::tag<LockableListTag>,boost::intrusive::link_mode<boost::intrusive::normal_link> > LockableBaseHook;
+
 class Lockable : public LockableBaseHook, public threadsafe::simpleLock<void*, true> {
 };
 
-  class SimpleRuntimeContext {
+class SimpleRuntimeContext {
 
     typedef boost::intrusive::slist<Lockable, boost::intrusive::base_hook<LockableBaseHook>, boost::intrusive::constant_time_size<false>, boost::intrusive::linear<true> > locksTy;
     locksTy locks;
 
-  public:
-    void acquire(Lockable& L) {
-      acquire(&L);
-    }
-    void acquire(Lockable* C) {
+    void acquire_i(Lockable* C) {
       bool suc = C->try_lock(this);
       if (suc) {
 	locks.push_front(*C);
@@ -34,6 +31,7 @@ class Lockable : public LockableBaseHook, public threadsafe::simpleLock<void*, t
       }
     }
 
+  public:
     void start() {
       assert(locks.empty());
     }
@@ -52,11 +50,17 @@ class Lockable : public LockableBaseHook, public threadsafe::simpleLock<void*, t
 	L.unlock();
       }
     }
-  };
+
+  static void acquire(SimpleRuntimeContext* C, Lockable* L) {
+    if (C)
+      C->acquire_i(L);
+  }
+};
 
   extern __thread SimpleRuntimeContext* thread_cnx;
 
   static SimpleRuntimeContext* getThreadContext() {
+    assert(0);
     return thread_cnx;
   }
 
@@ -64,14 +68,11 @@ class Lockable : public LockableBaseHook, public threadsafe::simpleLock<void*, t
     thread_cnx = n;
   }
 
+
   static __attribute__((unused)) void acquire(Lockable* C) {
     SimpleRuntimeContext* cnx = getThreadContext();
     if (cnx)
-      cnx->acquire(C);
-  }
-
-  static __attribute__((unused)) void acquire(Lockable& L) {
-    acquire(&L);
+      SimpleRuntimeContext::acquire(cnx, C);
   }
 
 }

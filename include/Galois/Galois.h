@@ -56,6 +56,10 @@ class GaloisWork : public Galois::Executable {
       abort();
     }
     
+    virtual SimpleRuntimeContext* getRuntimeContext() {
+      return &cnx;
+    }
+
     static void merge(ThreadLD& lhs, ThreadLD& rhs) {
       lhs.conflicts += rhs.conflicts;
       lhs.iterations += rhs.iterations;

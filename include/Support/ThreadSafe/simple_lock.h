@@ -26,7 +26,6 @@ public:
 
   void unlock() {
     assert(_lock);
-    _lock = 0;
 #ifdef GALOIS_CRAY
     readfe(&_lock); // sets to empty, acquiring the lock lock
     writeef(&_lock, 0); // clears the lock and clears the lock lock

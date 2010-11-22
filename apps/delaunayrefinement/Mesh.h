@@ -56,7 +56,7 @@ class Mesh {
     int retval = 0;
 
     for(Graph::active_iterator ii = mesh->active_begin(), ee = mesh->active_end(); ii != ee; ++ii) {
-      if (ii->getData().isBad()) {
+      if (ii->getData(Galois::Graph::NONE, 0).isBad()) {
 	ret.push_back(*ii);
 	++retval;
       }
@@ -130,13 +130,13 @@ class Mesh {
  protected:
   GNode addElement(Graph* mesh, Element& element) {
     GNode node = mesh->createNode(element);
-    mesh->addNode(node);
+    mesh->addNode(node, Galois::Graph::NONE, 0);
     for (int i = 0; i < element.numEdges(); i++) {
       Edge edge = element.getEdge(i);
       if (edge_map.find(edge) == edge_map.end()) {
         edge_map[edge] = node;
       } else {
-        mesh->addEdge(node, edge_map[edge]);//, edge);
+        mesh->addEdge(node, edge_map[edge], Galois::Graph::NONE, 0);//, edge);
         edge_map.erase(edge);
       }
     }
@@ -151,15 +151,15 @@ class Mesh {
     for (Graph::active_iterator ii = mesh->active_begin(), ee = mesh->active_end(); ii != ee; ++ii) {
  
       GNode node = *ii;
-      Element& element = node.getData();
+      Element& element = node.getData(Galois::Graph::NONE, 0);
       if (element.getDim() == 2) {
-	if (mesh->neighborsSize(node) != 1) {
-	  std::cerr << "-> Segment " << element << " has " << mesh->neighborsSize(node) << " relation(s)\n";
+	if (mesh->neighborsSize(node, Galois::Graph::NONE, 0) != 1) {
+	  std::cerr << "-> Segment " << element << " has " << mesh->neighborsSize(node, Galois::Graph::NONE, 0) << " relation(s)\n";
 	  error = true;
 	}
       } else if (element.getDim() == 3) {
-	if (mesh->neighborsSize(node) != 3) {
-	  std::cerr << "-> Triangle " << element << " has " << mesh->neighborsSize(node) << " relation(s)";
+	if (mesh->neighborsSize(node, Galois::Graph::NONE, 0) != 3) {
+	  std::cerr << "-> Triangle " << element << " has " << mesh->neighborsSize(node, Galois::Graph::NONE, 0) << " relation(s)";
 	  error = true;
 	}
       } else {
@@ -183,7 +183,7 @@ class Mesh {
 	assert(mesh->containsNode(node) && "Reachable node was removed from graph");
 	found.insert(node);
 	int i = 0;
-	for (Graph::neighbor_iterator ii = mesh->neighbor_begin(node), ee = mesh->neighbor_end(node); ii != ee; ++ii) {
+	for (Graph::neighbor_iterator ii = mesh->neighbor_begin(node, Galois::Graph::NONE, 0), ee = mesh->neighbor_end(node, Galois::Graph::NONE, 0); ii != ee; ++ii) {
 	  assert(i < 3);
 	  assert(mesh->containsNode(*ii));
 	  assert(node != *ii);

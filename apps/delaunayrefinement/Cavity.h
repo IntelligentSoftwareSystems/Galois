@@ -1,3 +1,4 @@
+// -*- C++ -*-
 /* 
  
    Lonestar DelaunayRefinement: Refinement of an initial, unrefined Delaunay
@@ -51,19 +52,20 @@ class Cavity {
   /**
    * find the node that is opposite the obtuse angle of the element
    */
-  GNode getOpposite(GNode node) {
-    int numOutNeighbors = graph->neighborsSize(node);
+  template<typename Context>
+  GNode getOpposite(GNode node, Context* cnx) {
+    int numOutNeighbors = graph->neighborsSize(node, Galois::Graph::ALL, cnx->getRuntimeContext());
     if (numOutNeighbors != 3) {
       assert(0);
     }
-    Element& element = node.getData();
+    Element& element = node.getData(Galois::Graph::ALL, cnx->getRuntimeContext());
     Tuple elementTuple = element.getObtuse();
     Edge ObtuseEdge = element.getOppositeObtuse();
     GNode dst;
-    for (Graph::neighbor_iterator ii = graph->neighbor_begin(node), ee = graph->neighbor_end(node); ii != ee; ++ii) {
+    for (Graph::neighbor_iterator ii = graph->neighbor_begin(node,Galois::Graph::ALL, cnx->getRuntimeContext()), ee = graph->neighbor_end(node,Galois::Graph::ALL, cnx->getRuntimeContext()); ii != ee; ++ii) {
       GNode neighbor = *ii;
       //Edge& edgeData = graph->getEdgeData(node, neighbor);
-      Edge edgeData = element.getRelatedEdge(neighbor.getData());
+      Edge edgeData = element.getRelatedEdge(neighbor.getData(Galois::Graph::ALL, cnx->getRuntimeContext()));
       if (elementTuple != edgeData.getPoint(0) && elementTuple != edgeData.getPoint(1)) {
 	assert(dst.isNull());
 	dst = neighbor;
@@ -73,15 +75,16 @@ class Cavity {
     return dst;
   }
 
-  void expand(GNode node, GNode next) {
-    Element& nextElement = next.getData();
+  template<typename Context>
+  void expand(GNode node, GNode next, Context* cnx) {
+    Element& nextElement = next.getData(Galois::Graph::ALL, cnx->getRuntimeContext());
     if ((!(dim == 2 && nextElement.getDim() == 2 && next != centerNode)) && nextElement.inCircle(center)) {
       // isMember says next is part of the cavity, and we're not the second
       // segment encroaching on this cavity
       if ((nextElement.getDim() == 2) && (dim != 2)) {
 	// is segment, and we are encroaching
-	initialize(next);
-	build();
+	initialize(next, cnx);
+	build(cnx);
       } else {
 	if (!pre.containsNode(next)) {
 	  pre.addNode(next);
@@ -91,7 +94,7 @@ class Cavity {
     } else {
       // not a member
       //Edge& edgeData = graph->getEdgeData(node, next);
-      Edge edgeData = nextElement.getRelatedEdge(node.getData());
+      Edge edgeData = nextElement.getRelatedEdge(node.getData(Galois::Graph::ALL, cnx->getRuntimeContext()));
       Subgraph::tmpEdge edge(node, next, edgeData);
       if (std::find(connections.begin(), connections.end(), edge) == connections.end()) {
 	connections.push_back(edge);
@@ -105,17 +108,18 @@ class Cavity {
  Cavity(Graph* g)
    :graph(g)
   {}
-	
-  void initialize(GNode node) {
+  
+  template<typename Context>
+  void initialize(GNode node, Context* cnx) {
     pre.reset();
     post.reset();
     connections.clear();
     frontier.clear();// = std::<GNode>();
     centerNode = node;
-    centerElement = &centerNode.getData();
+    centerElement = &centerNode.getData(Galois::Graph::ALL, cnx->getRuntimeContext());
     while (graph->containsNode(centerNode) && centerElement->isObtuse()) {
-      centerNode = getOpposite(centerNode);
-      centerElement = &centerNode.getData();
+      centerNode = getOpposite(centerNode, cnx);
+      centerElement = &centerNode.getData(Galois::Graph::ALL, cnx->getRuntimeContext());
     }
     center = centerElement->getCenter();
     dim = centerElement->getDim();
@@ -123,13 +127,14 @@ class Cavity {
     frontier.push_back(centerNode);
   }
 
-  void build() {
+  template<typename Context>
+  void build(Context* cnx) {
     while (!frontier.empty()) {
       GNode curr = frontier.back();
       frontier.pop_back();
-      for (Graph::neighbor_iterator ii = graph->neighbor_begin(curr), ee = graph->neighbor_end(curr); ii != ee; ++ii) {
+      for (Graph::neighbor_iterator ii = graph->neighbor_begin(curr,Galois::Graph::ALL, cnx->getRuntimeContext()), ee = graph->neighbor_end(curr,Galois::Graph::ALL, cnx->getRuntimeContext()); ii != ee; ++ii) {
 	GNode neighbor = *ii;
-	expand(curr, neighbor);
+	expand(curr, neighbor, cnx);
       }
     }
   }
@@ -137,7 +142,8 @@ class Cavity {
   /**
    * Create the new cavity based on the data of the old one
    */
-  void update() {
+  template<typename Context>
+  void update(Context* cnx) {
     if (centerElement->getDim() == 2) { // we built around a segment
       Element ele1(center, centerElement->getPoint(0));
       GNode node1 = graph->createNode(ele1);
@@ -157,14 +163,14 @@ class Cavity {
       } else {
         ne_connection = conn.dst;
       }
-      Element& ne_nodeData = ne_connection.getData();
+      Element& ne_nodeData = ne_connection.getData(Galois::Graph::ALL, cnx->getRuntimeContext());
       const Edge& new_edge = new_element.getRelatedEdge(ne_nodeData);
       //boolean mod = 
       post.addEdge(Subgraph::tmpEdge(ne_node, ne_connection, new_edge));
       //assert mod;
       for (Subgraph::iterator ii = post.begin(), ee = post.end(); ii != ee; ++ii) {
         GNode node = *ii;
-        Element& element = node.getData();
+        Element& element = node.getData(Galois::Graph::ALL, cnx->getRuntimeContext());
         if (element.isRelated(new_element)) {
           const Edge& ele_edge = new_element.getRelatedEdge(element);
           //mod = 
