@@ -30,11 +30,8 @@ class CPUSpaced : public ThreadAware {
     for (int i = 0; i < num; ++i)
       reduce(zero_datum.data, datum[i].data);
     delete[] datum;
+    datum = 0;
     num = 0;
-  }
-
-  int getMyID() {
-    return ThreadPool::getMyID();
   }
 
 public:
@@ -51,11 +48,11 @@ public:
   }
   
   T& get() {
-    int i = getMyID();
+    int i = ThreadAware::getMyID();
     if (!i)
       return zero_datum.data;
     assert(i <= num);
-    assert(darum);
+    assert(datum);
     return datum[i - 1].data;
   }
 

@@ -12,7 +12,15 @@
 
 namespace GaloisRuntime {
 
+struct initMainThread {
+  initMainThread();
+};
+
 class ThreadPool {
+  friend class initMainThread;
+  static __thread int LocalThreadID;
+  static int nextThreadID;
+
 protected:
   static void NotifyAware(int n);
   static void ResetThreadNumbers();
@@ -29,6 +37,7 @@ public:
   virtual int size() = 0;
 
   static int getMyID();
+
 };
 
 //Returns or creates the appropriate thread pool for the system
@@ -50,6 +59,7 @@ class ThreadAware : public HIDDEN::ThreadAwareHook {
 
 protected:
   void init();
+  int getMyID() { return ThreadPool::getMyID(); }
 
 public:
   ThreadAware();

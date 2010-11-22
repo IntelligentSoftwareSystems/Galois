@@ -165,7 +165,10 @@ namespace HL {
 
   private:
 
-    class MyHeap : public LockedHeap<SpinLockType, FreelistHeap<ZoneHeap<PrivateMmapHeap, 16384 - 16> > > {}; // FIX ME: 16 = size of ZoneHeap header.
+    enum {NSIZE = 4 * 4 * 1024};
+    //enum {NSIZE = 1024 * 1024 * 2};
+
+    class MyHeap : public LockedHeap<SpinLockType, FreelistHeap<ZoneHeap<PrivateMmapHeap, NSIZE - 16> > > {}; // FIX ME: 16 = size of ZoneHeap header.
 
     typedef MyHashMap<void *, size_t, MyHeap> mapType;
 

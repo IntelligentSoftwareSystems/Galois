@@ -12,13 +12,10 @@ static threadsafe::simpleLock<int, true> allObjectsLock;
 static int numThreads = 0;
 
 //This, once initialized by a thread, stores an dense index/label for that thread
-static __thread int LocalThreadID = -1;
+__thread int ThreadPool::LocalThreadID = -1;
 
 //This stores the next thread id
-static int nextThreadID = 0;
-
-//This stores the minimum below which we don't consider an ID valid anymore
-static int minThreadID = 0;
+int ThreadPool::nextThreadID = 0;
 
 ThreadAware::ThreadAware() {
   allObjectsLock.lock();
@@ -53,7 +50,7 @@ void ThreadPool::NotifyAware(int n) {
 }
 
 void ThreadPool::ResetThreadNumbers() {
-  minThreadID = nextThreadID;
+  nextThreadID = 0;
 }
 
 int ThreadPool::getMyID() {
@@ -67,14 +64,10 @@ int ThreadPool::getMyID() {
   return retval;
 }
 
-namespace {
-struct initMainThread {
-  initMainThread() {
-    LocalThreadID = 0;
-  }
-};
+initMainThread::initMainThread() {
+  ThreadPool::LocalThreadID = 0;
 }
 
-initMainThread mainThreadIDSetter;
+static initMainThread mainThreadIDSetter;
 
   

@@ -5,14 +5,14 @@
 
 #include "Galois/Runtime/PerCPU.h"
 #include <list>
-//#include <ext/malloc_allocator.h>
+#include <ext/malloc_allocator.h>
 
 namespace GaloisRuntime {
   
 template< class T>
 class galois_insert_bag {
-  //typedef std::list<T, __gnu_cxx::malloc_allocator<T> > ListTy;
-  typedef std::list<T> ListTy;
+  typedef std::list<T, __gnu_cxx::malloc_allocator<T> > ListTy;
+  //typedef std::list<T> ListTy;
   CPUSpaced<ListTy> heads;
   
   static void merge(ListTy& lhs, ListTy& rhs) {
