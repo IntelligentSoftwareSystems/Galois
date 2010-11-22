@@ -86,7 +86,6 @@ public:
 
   void doProcess(value_type val, ThreadLD& tld) {
     ++tld.iterations;
-    setThreadContext(&tld.cnx);
     tld.cnx.start();
     tld.ProcessTime.start();
     try {
@@ -167,6 +166,7 @@ public:
       //    } while (threadsWorking > 0);
     T.stop();
     tld.TotalTime = T.get();
+    setThreadContext(0);
   }
 };
 
