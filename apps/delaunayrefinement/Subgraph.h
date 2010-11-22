@@ -30,7 +30,7 @@
 
 #include <vector>
 #include <algorithm>
-#include <ext/malloc_allocator.h>
+//#include <ext/malloc_allocator.h>
 
 /**
  *  A sub-graph of the mesh. Used to store information about the original 
@@ -53,11 +53,13 @@ class Subgraph {
 
  private:
   // the nodes in the graph before updating
-  typedef std::vector<GNode,__gnu_cxx::malloc_allocator<GNode> > nodesTy;
+  //  typedef std::vector<GNode,__gnu_cxx::malloc_allocator<GNode> > nodesTy;
+  typedef std::vector<GNode> nodesTy;
   nodesTy nodes;
 
   // the edges that connect the subgraph to the rest of the graph
-  typedef std::vector<tmpEdge,__gnu_cxx::malloc_allocator<tmpEdge> > edgesTy;
+  //  typedef std::vector<tmpEdge,__gnu_cxx::malloc_allocator<tmpEdge> > edgesTy;
+  typedef std::vector<tmpEdge> edgesTy;
   edgesTy edges;
 
  public:

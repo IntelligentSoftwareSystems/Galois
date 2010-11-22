@@ -5,7 +5,7 @@
    variation of Chew's algorithm.
  
    Authors: Milind Kulkarni 
- 
+
    Copyright (C) 2007, 2008 The University of Texas at Austin
  
    Licensed under the Eclipse Public License, Version 1.0 (the "License");
@@ -129,7 +129,7 @@ int main(int argc, char** argv) {
   }
 
   int inputFileAt = 1;
-  if (std::string("-t") == argv[1]) {
+  if (std::string("-t").compare(argv[1]) == 0) {
     inputFileAt = 3;
     threads = atoi(argv[2]);
   }

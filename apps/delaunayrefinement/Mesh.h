@@ -34,8 +34,8 @@
 #include <map>
 #include <fstream>
 #include <istream>
-#include <boost/iostreams/filter/gzip.hpp>
-#include <boost/iostreams/filtering_stream.hpp>
+//#include <boost/iostreams/filter/gzip.hpp>
+//#include <boost/iostreams/filtering_stream.hpp>
 
 /**
  * Helper class used providing methods to read in information and create the graph 
@@ -67,7 +67,7 @@ class Mesh {
  private:
 
   void readNodes(std::string filename, std::vector<Tuple>& tuples) {
-    std::ifstream scanner((filename + ".node").c_str());
+    std::ifstream scanner(filename.append(".node").c_str());
     int ntups;
     scanner >> ntups;
     int dummy;
@@ -85,7 +85,7 @@ class Mesh {
   }
 
   void readElements(Graph* mesh, std::string filename, std::vector<Tuple>& tuples) {
-    std::ifstream scanner((filename + ".ele").c_str());
+    std::ifstream scanner(filename.append(".ele").c_str());
     
     int nels;
     int dummy;
@@ -102,7 +102,7 @@ class Mesh {
   }
 
   void readPoly(Graph* mesh, std::string filename, std::vector<Tuple>& tuples) {
-    std::ifstream scanner((filename + ".poly").c_str());
+    std::ifstream scanner(filename.append(".poly").c_str());
     int dummy;
     scanner >> dummy >> dummy >> dummy >> dummy;
     int nsegs;

@@ -29,7 +29,7 @@
 
 #include <vector>
 #include <algorithm>
-#include <ext/malloc_allocator.h>
+//#include <ext/malloc_allocator.h>
 
 class Cavity {
 
@@ -37,13 +37,15 @@ class Cavity {
   GNode centerNode;
   Element* centerElement;
   int dim;
-  std::vector<GNode,__gnu_cxx::malloc_allocator<GNode> > frontier;
+  //  std::vector<GNode,__gnu_cxx::malloc_allocator<GNode> > frontier;
+  std::vector<GNode> frontier;
   // the cavity itself
   Subgraph pre;
   // what the new elements should look like
   Subgraph post;
   // the edge-relations that connect the boundary to the cavity
-  typedef std::vector<Subgraph::tmpEdge,__gnu_cxx::malloc_allocator<Subgraph::tmpEdge> > connTy;
+  //  typedef std::vector<Subgraph::tmpEdge,__gnu_cxx::malloc_allocator<Subgraph::tmpEdge> > connTy;
+  typedef std::vector<Subgraph::tmpEdge> connTy;
   connTy connections;
 
   Graph* graph;
