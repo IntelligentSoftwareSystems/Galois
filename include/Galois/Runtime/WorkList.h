@@ -560,16 +560,16 @@ class GWL_Idempotent_LIFO : private boost::noncopyable {
     return t == 0;
   }
 
-  void put(T task) {
+  void put(T t_ask) {
     //Order write in 3 before write in 4
     unsigned int t,g;
     anchor.packedRead(t,g);
     if (t == capacity) {
       expand();
-      put(task);
+      put(t_ask);
       return;
     }
-    tasks[t] = task;
+    tasks[t] = t_ask;
     order();
     anchor.packedWrite(t+1,g+1);
   }
@@ -582,9 +582,9 @@ class GWL_Idempotent_LIFO : private boost::noncopyable {
       EMPTY = true;
       return T();
     }
-    T task = tasks[t-1];
+    T t_ask = tasks[t-1];
     anchor.packedWrite(t-1,g);
-    return task;
+    return t_ask;
   }
     
   T i_steal(bool& EMPTY) {
@@ -599,12 +599,12 @@ class GWL_Idempotent_LIFO : private boost::noncopyable {
     }
     order();
     T* a = tasks;
-    T task = a[t-1];
+    T t_ask = a[t-1];
     order();
     if (!anchor.CAS(t,g, t-1,g )) {
       return i_steal(EMPTY);
     }
-    return task;
+    return t_ask;
   }
     
   void expand() {
@@ -683,16 +683,16 @@ class GWL_Idempotent_FIFO : private boost::noncopyable {
     return head == tail;
   }
 
-  void put(T task) {
+  void put(T t_ask) {
     //Order write at 4 before write at 5
     int h = head;
     int t = tail;
     if (t == h+tasks->size) {
       expand();
-      put(task);
+      put(t_ask);
       return;
     }
-    tasks->array[t%tasks->size] = task;
+    tasks->array[t%tasks->size] = t_ask;
     order();
     tail = t+1;
   }
@@ -705,9 +705,9 @@ class GWL_Idempotent_FIFO : private boost::noncopyable {
       EMPTY = true;
       return T();
     }
-    T task = tasks->array[h%tasks->size];
+    T t_ask = tasks->array[h%tasks->size];
     head = h+1;
-    return task;
+    return t_ask;
   }
     
   T i_steal(bool& EMPTY) {
@@ -724,12 +724,12 @@ class GWL_Idempotent_FIFO : private boost::noncopyable {
       return T();
     }
     TaskArrayWithSize* a = tasks;
-    T task = a->array[h%a->size];
+    T t_ask = a->array[h%a->size];
     order();
     if (!__sync_bool_compare_and_swap(&head,h,h+1)) {
       return i_steal(EMPTY);
     }
-    return task;
+    return t_ask;
   }
     
   void expand() {
@@ -810,16 +810,16 @@ class GWL_Idempotent_FIFO_SB : private boost::noncopyable {
     return s == 0;
   }
 
-  void put(T task) {
+  void put(T t_ask) {
     //Order write in 3 before write in 4
     unsigned int h,s,g;
     anchor.packedRead(h,s,g);
     if ((int)s == tasks->size) {
       expand();
-      put(task);
+      put(t_ask);
       return;
     }
-    tasks->array[(h+s)%tasks->size] = task;
+    tasks->array[(h+s)%tasks->size] = t_ask;
     order();
     anchor.packedWrite(h,s+1,g+1);
   }
@@ -832,9 +832,9 @@ class GWL_Idempotent_FIFO_SB : private boost::noncopyable {
       EMPTY = true;
       return T();
     }
-    T task = tasks->array[(h+s-1)%tasks->size];
+    T t_ask = tasks->array[(h+s-1)%tasks->size];
     anchor.packedWrite(h,s-1,g);
-    return task;
+    return t_ask;
   }
     
   T i_steal(bool& EMPTY) {
@@ -849,13 +849,13 @@ class GWL_Idempotent_FIFO_SB : private boost::noncopyable {
     }
     order();
     TaskArrayWithSize* a = tasks;
-    T task = a->array[h%a->size];
+    T t_ask = a->array[h%a->size];
     unsigned int h2 = (h+1) % a->size;
     order();
     if (!anchor.CAS(h,s,g , h2,s-1,g )) {
       return i_steal(EMPTY);
     }
-    return task;
+    return t_ask;
   }
     
   void expand() {
