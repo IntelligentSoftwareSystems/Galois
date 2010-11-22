@@ -2,8 +2,7 @@
  *  \brief cray thread pool implementation
  */
 
-#include "galois_config.h"
-#ifdef WITH_CRAY_POOL
+#ifdef GALOIS_CRAY
 
 #include "Galois/Runtime/ThreadPool.h"
 

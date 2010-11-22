@@ -2,8 +2,7 @@
  *  \brief pthread thread pool implementation
  */
 
-#include "galois_config.h"
-#ifdef WITH_PTHREAD_POOL
+#ifdef GALOIS_PTHREAD
 
 #include "Galois/Executable.h"
 #include "Galois/Runtime/Threads.h"
@@ -16,7 +15,6 @@
 #include <cassert>
 
 using namespace GaloisRuntime;
-
 
 //! Generic check for pthread functions
 static void checkResults(int val, char* errmsg = 0, bool fail = true) {
