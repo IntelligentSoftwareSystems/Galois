@@ -58,7 +58,7 @@ namespace HL {
 
   private:
 
-    inline static size_t align (int sz) {
+    inline static size_t align (size_t sz) {
       return (sz + (sizeof(double) - 1)) & ~(sizeof(double) - 1);
     }
 

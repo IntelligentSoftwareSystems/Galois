@@ -97,12 +97,12 @@ public:
 
 #if defined(MAP_ALIGN) && defined(MAP_ANON)
     // Request memory aligned to the Alignment value above.
-    ptr = mmap ((char *) Alignment, sz, HL_MMAP_PROTECTION_MASK, MAP_PRIVATE | MAP_ALIGN | MAP_ANON, -1, 0);
+    ptr = mmap ((char *) Alignment, sz, HL_MMAP_PROTECTION_MASK, MAP_PRIVATE | MAP_ALIGN | MAP_ANON | MAP_POPULATE, -1, 0);
 #elif !defined(MAP_ANONYMOUS)
     static int fd = ::open ("/dev/zero", O_RDWR);
-    ptr = mmap (NULL, sz, HL_MMAP_PROTECTION_MASK, MAP_PRIVATE, fd, 0);
+    ptr = mmap (NULL, sz, HL_MMAP_PROTECTION_MASK, MAP_PRIVATE | MAP_POPULATE, fd, 0);
 #else
-    ptr = mmap (0, sz, HL_MMAP_PROTECTION_MASK, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    ptr = mmap (0, sz, HL_MMAP_PROTECTION_MASK, MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
 #endif
 
     if (ptr == MAP_FAILED) {

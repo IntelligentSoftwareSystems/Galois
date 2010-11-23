@@ -120,12 +120,12 @@ namespace HL {
     inline void * malloc (size_t sz) {
 #if defined(MAP_ALIGN) && defined(MAP_ANON)
       // Request memory aligned to the Alignment value above.
-      void * ptr = mmap ((char *) Alignment, sz, HL_MMAP_PROTECTION_MASK, MAP_PRIVATE | MAP_ALIGN | MAP_ANON, -1, 0);
+      void * ptr = mmap ((char *) Alignment, sz, HL_MMAP_PROTECTION_MASK, MAP_PRIVATE | MAP_ALIGN | MAP_ANON | MAP_POPULATE, -1, 0);
 #elif !defined(MAP_ANONYMOUS)
       static int fd = ::open ("/dev/zero", O_RDWR);
-      void * ptr = mmap (NULL, sz, HL_MMAP_PROTECTION_MASK, MAP_PRIVATE, fd, 0);
+      void * ptr = mmap (NULL, sz, HL_MMAP_PROTECTION_MASK, MAP_PRIVATE | MAP_POPULATE, fd, 0);
 #else
-      void * ptr = mmap (NULL, sz, HL_MMAP_PROTECTION_MASK, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+      void * ptr = mmap (NULL, sz, HL_MMAP_PROTECTION_MASK, MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
 #endif
       if (ptr == MAP_FAILED) {
 	ptr = NULL;

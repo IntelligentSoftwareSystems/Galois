@@ -40,7 +40,7 @@ namespace Hoard {
     }
     
     inline PerThreadHeap& getHeap (void) {
-      int tid;
+      long tid;
       if (anyThreadCreated) {
 	tid = HL::CPUInfo::getThreadId();
       } else {

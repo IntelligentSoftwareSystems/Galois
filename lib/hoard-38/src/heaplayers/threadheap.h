@@ -67,7 +67,7 @@ private:
   }
 
   // Get a suitable thread id number.
-  inline static volatile int getThreadId (void);
+  inline static int getThreadId (void);
 
   PerThreadHeap ptHeaps[NumHeaps];
 
@@ -88,7 +88,7 @@ private:
 #endif
 
 template <int NumHeaps, class PerThreadHeap>
-inline volatile int
+inline int
 HL::ThreadHeap<NumHeaps, PerThreadHeap>::getThreadId (void) {
 #if defined(WIN32)
   // It looks like thread id's are always multiples of 4, so...

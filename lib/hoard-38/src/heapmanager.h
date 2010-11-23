@@ -39,8 +39,8 @@ namespace Hoard {
 
       HL::Guard<LockType> g (heapLock);
       
-      unsigned int tid_original = HL::CPUInfo::getThreadId();
-      unsigned int tid = tid_original % HeapType::MaxThreads;
+      unsigned long tid_original = HL::CPUInfo::getThreadId();
+      unsigned long tid = tid_original % HeapType::MaxThreads;
       
       int i = 0;
       while ((i < HeapType::MaxHeaps) && (HeapType::getInusemap(i)))
