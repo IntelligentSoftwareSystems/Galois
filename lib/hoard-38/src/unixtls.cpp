@@ -11,7 +11,6 @@
                      + __GNUC_PATCHLEVEL__)
 
 #if ((GCC_VERSION >= 30300) && \
-     !defined(__x86_64) && \
      !defined(__SVR4) && \
      !defined(__APPLE__)) \
    || defined(__SUNPRO_CC)
@@ -24,7 +23,7 @@
 #include "realtls.cpp"
 
 #else // !defined(USE_THREAD_KEYWORD)
-
+#error "Fake TLS"
 #include "simtls.cpp"
 
 #endif

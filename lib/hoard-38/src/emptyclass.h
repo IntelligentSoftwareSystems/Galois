@@ -27,7 +27,7 @@ public:
   EmptyClass (void)
   {
     for (int i = 0; i <= EmptinessClasses + 1; i++) {
-      _available(i) = 0;
+      _available(i) = NULL;
     }
   }
 
