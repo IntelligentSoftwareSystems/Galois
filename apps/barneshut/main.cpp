@@ -50,22 +50,10 @@ int main(int argc, char* argv[]) {
 	barneshut.readInput(argv[2], true);
 	OctTreeNodeData res;
 	Galois::setMaxThreads(threadnum);
-	double t1, t2;
-  timeval *tim;
 	Galois::Launcher::startTiming();
 	for (step = 0; step < barneshut.ntimesteps; step++) { // time-step the system
-		tim = new timeval;
-    gettimeofday(tim, NULL);
-    t1=tim->tv_sec*1000.0+(tim->tv_usec/1000.0);
 		barneshut.computeCenterAndDiameter();
-    gettimeofday(tim, NULL);
-    t2=tim->tv_sec*1000.0+(tim->tv_usec/1000.0);
-    printf("%.2lf ms elapsed in computeCenterAndDiameter\n", t2-t1);
 
-
-		tim = new timeval;
-    gettimeofday(tim, NULL);
-    t1=tim->tv_sec*1000.0+(tim->tv_usec/1000.0);
     octree = new Graph;
 		root = createNode(octree, OctTreeNodeData(barneshut.centerx,
 				barneshut.centery, barneshut.centerz)); // create the
@@ -77,38 +65,16 @@ int main(int argc, char* argv[]) {
 			barneshut.insert(octree, root, *barneshut.body[i], radius); // grow the tree by inserting
 			// each body
 		}
-    gettimeofday(tim, NULL);
-    t2=tim->tv_sec*1000.0+(tim->tv_usec/1000.0);
-    printf("%.2lf ms elapsed in insert\n", t2-t1);
-
-		tim = new timeval;
-    gettimeofday(tim, NULL);
-    t1=tim->tv_sec*1000.0+(tim->tv_usec/1000.0);
     barneshut.curr = 0;
 		barneshut.computeCenterOfMass(octree, root); // summarize subtree info in each internal node (plus restructure tree and sort bodies for performance reasons)
-    gettimeofday(tim, NULL);
-    t2=tim->tv_sec*1000.0+(tim->tv_usec/1000.0);
-    printf("%.2lf ms elapsed in computeCenterOfMass\n", t2-t1);
 
-		tim = new timeval;
-    gettimeofday(tim, NULL);
-    t1=tim->tv_sec*1000.0+(tim->tv_usec/1000.0);
 		std::vector<GNode> wl;
 		for (int ii = 0; ii < barneshut.curr; ii++) {
 			wl.push_back(barneshut.leaf[ii]);
 		}
 		Galois::for_each(wl, process);
-    gettimeofday(tim, NULL);
-    t2=tim->tv_sec*1000.0+(tim->tv_usec/1000.0);
-    printf("%.2lf ms elapsed in for_each\n", t2-t1);
 
-		tim = new timeval;
-    gettimeofday(tim, NULL);
-    t1=tim->tv_sec*1000.0+(tim->tv_usec/1000.0);
 		barneshut.advance(octree, barneshut.dthf, barneshut.dtime); // advance the position and velocity of each
-    gettimeofday(tim, NULL);
-    t2=tim->tv_sec*1000.0+(tim->tv_usec/1000.0);
-    printf("%.2lf ms elapsed in advance\n", t2-t1);
 
 		if (Galois::Launcher::isFirstRun()) {
 			// print center of mass for this timestep

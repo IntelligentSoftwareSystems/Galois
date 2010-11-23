@@ -39,7 +39,6 @@ public:
 	double dtime; // length of one time step
 	double eps; // potential softening parameter
 	double tol; // tolerance for stopping recursion, should be less than 0.57 for 3D case to bound error
-
 	double dthf, epssq, itolsq;
 	OctTreeNodeData **body; // the n bodies
 	GNode *leaf;
@@ -251,28 +250,28 @@ public:
 			if (!(n.isLeaf())) { // n is a cell
 				dsq *= 0.25;
 				GNode child = octree->getNeighbor(nn, 0, Galois::Graph::NONE);
-				if (child.isNull()) {
+				if (!child.isNull()) {
 					recurseForce(leaf, octree, child, dsq, epssq);
 					child = octree->getNeighbor(nn, 1, Galois::Graph::NONE);
-					if (child.isNull()) {
+					if (!child.isNull()) {
 						recurseForce(leaf, octree, child, dsq, epssq);
 						child = octree->getNeighbor(nn, 2, Galois::Graph::NONE);
-						if (child.isNull()) {
+						if (!child.isNull()) {
 							recurseForce(leaf, octree, child, dsq, epssq);
 							child = octree->getNeighbor(nn, 3, Galois::Graph::NONE);
-							if (child.isNull()) {
+							if (!child.isNull()) {
 								recurseForce(leaf, octree, child, dsq, epssq);
 								child = octree->getNeighbor(nn, 4, Galois::Graph::NONE);
-								if (child.isNull()) {
+								if (!child.isNull()) {
 									recurseForce(leaf, octree, child, dsq, epssq);
 									child = octree->getNeighbor(nn, 5, Galois::Graph::NONE);
-									if (child.isNull()) {
+									if (!child.isNull()) {
 										recurseForce(leaf, octree, child, dsq, epssq);
 										child = octree->getNeighbor(nn, 6, Galois::Graph::NONE);
-										if (child.isNull()) {
+										if (!child.isNull()) {
 											recurseForce(leaf, octree, child, dsq, epssq);
 											child = octree->getNeighbor(nn, 7, Galois::Graph::NONE);
-											if (child.isNull()) {
+											if (!child.isNull()) {
 												recurseForce(leaf, octree, child, dsq, epssq);
 											}
 										}
@@ -309,7 +308,7 @@ public:
 		double velhx, velhy, velhz;
 
 		for (int i = 0; i < nbodies; i++) {
-			OctTreeNodeData &nd = leaf[i].getData();
+			OctTreeNodeData &nd = leaf[i].getData(Galois::Graph::NONE);
 			body[i] = &nd;
 			dvelx = nd.accx * dthf;
 			dvely = nd.accy * dthf;
