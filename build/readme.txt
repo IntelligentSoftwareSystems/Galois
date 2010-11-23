@@ -3,6 +3,7 @@ The eclipse project has been configured to use this directory as the build direc
 Pressing Ctrl+B will run make inside this directory.
 
 To initialize this directory you need to run cmake:
+make -C ${ProjDirPath}/build VERBOSE=1
 
 cd to the "build" directory and run "cmake .."
 
