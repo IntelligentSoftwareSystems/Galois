@@ -62,7 +62,8 @@ int main(int argc, char* argv[]) {
 		octree->addNode(root);
 		double radius = barneshut.diameter * 0.5;
 		for (int i = 0; i < barneshut.nbodies; i++) {
-			barneshut.insert(octree, root, *barneshut.body[i], radius); // grow the tree by inserting
+			OctTreeNodeData &b = barneshut.body[i];
+			barneshut.insert(octree, root, b, radius); // grow the tree by inserting
 			// each body
 		}
     barneshut.curr = 0;
@@ -82,17 +83,15 @@ int main(int argc, char* argv[]) {
 			std::cout << "Timestep " << step << " Center of Mass = " << res.posx
 					<< " " << res.posy << " " << res.posz << std::endl;
 		}
-//		delete octree;
+		delete octree;
 	} // end of time step
 	Galois::Launcher::stopTiming();
 	std::cout << "STAT: Time " << Galois::Launcher::elapsedTime() << "\n";
-//	barneshut.clear();
 
 	if (Galois::Launcher::isFirstRun()) { // verify result
 		Barneshut barneshut2;
 		barneshut2.readInput(argv[2], false);
 		OctTreeNodeData s_res;
-
 		for (step = 0; step < barneshut2.ntimesteps; step++) {
 			barneshut2.computeCenterAndDiameter();
 			Graph *octree2 = new Graph;
@@ -101,7 +100,8 @@ int main(int argc, char* argv[]) {
 			octree2->addNode(root);
 			double radius = barneshut2.diameter * 0.5;
 			for (int i = 0; i < barneshut2.nbodies; i++) {
-				barneshut2.insert(octree2, root, *barneshut2.body[i], radius);
+				OctTreeNodeData &b = barneshut.body[i];
+				barneshut2.insert(octree2, root, b, radius);
 			}
 			barneshut2.curr = 0;
 			barneshut2.computeCenterOfMass(octree2, root);
@@ -113,7 +113,7 @@ int main(int argc, char* argv[]) {
 			}
 			barneshut2.advance(octree2, barneshut2.dthf, barneshut2.dtime);
 			s_res = root.getData(Galois::Graph::NONE);
-//			delete octree2;
+			delete octree2;
 		}
 
 		if ((fabs(res.posx - s_res.posx) / fabs(std::min(res.posx, s_res.posx))
@@ -124,6 +124,5 @@ int main(int argc, char* argv[]) {
 		} else {
 			std::cerr << "verification succeeded" << std::endl;
 		}
-//		barneshut2.clear();
 	}
 }

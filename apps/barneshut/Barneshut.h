@@ -40,22 +40,16 @@ public:
 	double eps; // potential softening parameter
 	double tol; // tolerance for stopping recursion, should be less than 0.57 for 3D case to bound error
 	double dthf, epssq, itolsq;
-	OctTreeNodeData **body; // the n bodies
+	OctTreeNodeData *body; // the n bodies
 	GNode *leaf;
 	double diameter, centerx, centery, centerz;
 	int curr;
 
 	///*
-	void clear() {
+	~Barneshut() {
 		if (leaf != NULL) {
 			delete[] leaf;
 			leaf = NULL;
-		}
-		for (int i = 0; i < nbodies; i++) {
-			if (body[i] != NULL) {
-				delete body[i];
-				body[i] = NULL;
-			}
 		}
 		if (body != NULL) {
 			delete[] body;
@@ -90,20 +84,18 @@ public:
 			std::cerr << "configuration: " << nbodies << " bodies, " << ntimesteps
 					<< " time steps" << std::endl << std::endl;
 		}
-		body = new OctTreeNodeData*[nbodies];
+		body = new OctTreeNodeData[nbodies];
 		leaf = new GNode[nbodies];
 		for (int i = 0; i < nbodies; i++) {
-			body[i] = new OctTreeNodeData();
-		}
-		for (int i = 0; i < nbodies; i++) {
-			infile >> body[i]->mass;
-			infile >> body[i]->posx;
-			infile >> body[i]->posy;
-			infile >> body[i]->posz;
+			OctTreeNodeData &b = body[i];
+			infile >> b.mass;
+			infile >> b.posx;
+			infile >> b.posy;
+			infile >> b.posz;
 			infile >> vx;
 			infile >> vy;
 			infile >> vz;
-			body[i]->setVelocity(vx, vy, vz);
+			b.setVelocity(vx, vy, vz);
 			getline(infile, line);
 		}
 	}
@@ -115,9 +107,10 @@ public:
 		minx = miny = minz = std::numeric_limits<double>::max();
 		maxx = maxy = maxz = std::numeric_limits<double>::min();
 		for (int i = 0; i < nbodies; i++) {
-			posx = body[i]->posx;
-			posy = body[i]->posy;
-			posz = body[i]->posz;
+			OctTreeNodeData &b = body[i];
+			posx = b.posx;
+			posy = b.posy;
+			posz = b.posz;
 			if (minx > posx) {
 				minx = posx;
 			}
@@ -309,7 +302,6 @@ public:
 
 		for (int i = 0; i < nbodies; i++) {
 			OctTreeNodeData &nd = leaf[i].getData(Galois::Graph::NONE);
-			body[i] = &nd;
 			dvelx = nd.accx * dthf;
 			dvely = nd.accy * dthf;
 			dvelz = nd.accz * dthf;
@@ -322,6 +314,7 @@ public:
 			nd.velx = velhx + dvelx;
 			nd.vely = velhy + dvely;
 			nd.velz = velhz + dvelz;
+			body[i].restoreFrom(nd);
 		}
 	}
 };

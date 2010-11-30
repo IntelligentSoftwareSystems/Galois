@@ -65,6 +65,9 @@ struct EdgeItem {
     N(n) {
   }
 
+  EdgeItem(){
+  }
+
 };
 
 template<typename NTy>

@@ -33,14 +33,15 @@ class IndexedGraph {
 		typedef EdgeItem<gNode*, EdgeTy> EITy;
 		//The return type for edge data
 		typedef typename VoidWrapper<EdgeTy>::ref_type REdgeTy;
-		EITy* edges[BranchingFactor];
+		EITy edges[BranchingFactor];
+		bool isNullEdges[BranchingFactor];
 		NodeTy data;
 		bool active;
 
 		gNode(const NodeTy& d, bool a) :
 			data(d), active(a) {
 			for (int ii = 0; ii < BranchingFactor; ++ii) {
-				edges[ii] = NULL;
+				isNullEdges[ii] = true;
 			}
 		}
 
@@ -53,24 +54,22 @@ class IndexedGraph {
 		}
 
 		void createEdge(gNode* N, int indx) {
-			if (edges[indx] != NULL) delete edges[indx];
-			edges[indx] = new EITy(N);
+			edges[indx] = EITy(N);
+			isNullEdges[indx] = false;
 		}
 
-		EITy* getEdge(int indx) {
+		EITy getEdge(int indx) {
 			return edges[indx];
+		}
+
+		bool isNullEdge(int indx) {
+			return isNullEdges[indx];
 		}
 
 		bool isActive() {
 			return active;
 		}
 		~gNode() {
-			for (int ii = 0; ii < BranchingFactor; ++ii) {
-				if (edges[ii]!=NULL) {
-					delete edges[ii];
-					edges[ii] = NULL;
-				}
-			}
 		}
 	};
 
@@ -325,9 +324,9 @@ public:
 		assert(src.ID);
 		if (shouldLock(mflag))
 			GaloisRuntime::acquire(src.ID);
-		EdgeItem<gNode*, EdgeTy>* eity = src.ID->getEdge(index);
-		if (eity != NULL && eity->getNeighbor() != NULL)
-			return makeGraphNodePtr(this)(eity->getNeighbor()); // FIXME: creating the makeGraphNodePtr every time is not efficient
+		EdgeItem<gNode*, EdgeTy> eity = src.ID->getEdge(index);
+		if (!src.ID->isNullEdge(index) && eity.getNeighbor() != NULL)
+			return makeGraphNodePtr(this)(eity.getNeighbor()); // FIXME: creating the makeGraphNodePtr every time is not efficient
 		else return makeGraphNodePtr(NULL)(NULL);
 	}
 	IndexedGraph() {
