@@ -10,6 +10,7 @@
 #include <semaphore.h>
 #include <pthread.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <iostream>
 #include <list>
 #include <cassert>
@@ -69,6 +70,20 @@ namespace {
     }
 
     void launch(void) {
+#ifdef __linux__
+      int id = ThreadPool::getMyID();
+      cpu_set_t mask;
+      /* CPU_ZERO initializes all the bits in the mask to zero. */
+      CPU_ZERO( &mask );
+      
+      /* CPU_SET sets only the bit corresponding to cpu. */
+      CPU_SET( id - 1, &mask );
+      
+      /* sched_setaffinity returns 0 in success */
+      if( sched_setaffinity( 0, sizeof(mask), &mask ) == -1 ) {
+	std::cerr << "WARNING: Could not set CPU Affinity for thread " << id << ", continuing...\n";
+      }
+#endif      
       while (!shutdown) {
 	start.acquire();
 	if (!shutdown)
@@ -104,6 +119,14 @@ namespace {
     }
 
     virtual void resize(int num) {
+#ifdef __linux__
+      int NUM_PROCS = sysconf(_SC_NPROCESSORS_CONF);
+      if (num > NUM_PROCS) {
+	num = NUM_PROCS;
+	std::cerr << "Capping threads to number of processors (" << num << ")\n";
+      }
+#endif
+
       //To make this easy, we just kill everything and try again
       shutdown = true;
       start.release(numThreads());
