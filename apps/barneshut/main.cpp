@@ -100,7 +100,7 @@ int main(int argc, char* argv[]) {
 			octree2->addNode(root);
 			double radius = barneshut2.diameter * 0.5;
 			for (int i = 0; i < barneshut2.nbodies; i++) {
-				OctTreeNodeData &b = barneshut.body[i];
+				OctTreeNodeData &b = barneshut2.body[i];
 				barneshut2.insert(octree2, root, b, radius);
 			}
 			barneshut2.curr = 0;
