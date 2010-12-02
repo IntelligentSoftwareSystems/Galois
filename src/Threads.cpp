@@ -58,7 +58,7 @@ int ThreadPool::getMyID() {
   if (retval == 0)
     return 0;
   if (retval == -1) {
-    retval = __sync_fetch_and_add(&nextThreadID, 1);
+    retval = __sync_add_and_fetch(&nextThreadID, 1);
     LocalThreadID = retval;
   }
   return retval;
@@ -69,5 +69,3 @@ initMainThread::initMainThread() {
 }
 
 static initMainThread mainThreadIDSetter;
-
-  
