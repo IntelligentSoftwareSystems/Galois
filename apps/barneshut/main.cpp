@@ -49,6 +49,7 @@ int main(int argc, char* argv[]) {
 	int threadnum = atoi(argv[1]);
 	barneshut.readInput(argv[2], true);
 	OctTreeNodeData res;
+	std::cout<<"Num. of threads: "<<threadnum<<std::endl;
 	Galois::setMaxThreads(threadnum);
 	Galois::Launcher::startTiming();
 	for (step = 0; step < barneshut.ntimesteps; step++) { // time-step the system
