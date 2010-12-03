@@ -49,7 +49,10 @@ public:
   ~Tuple() {};
   
   bool operator==(const Tuple& rhs) const {
-    return (_t[0] == rhs._t[0]) && (_t[1] == rhs._t[1]) && (_t[2] == rhs._t[2]);
+    for (int x = 0; x < 3; ++x)
+      if (_t[x] != rhs._t[x])
+	return false;
+    return true;
   }
 
   bool operator!=(const Tuple& rhs) const {
@@ -119,16 +122,36 @@ public:
     return (180/M_PI) * acos(c);
   }
 
+  void angleCheck(const Tuple& a, const Tuple& b, bool& ob, bool& sm, double M) const { //angle formed by a, current tuple, b
+    Tuple vb = a - *this;
+    Tuple vc = b - *this;
+    double dp = vb*vc;
+
+    if (dp < 0) {
+      ob = true;
+      return;
+    }
+
+    double c = dp / sqrt(distance_squared(a) * distance_squared(b));
+    if (c > cos(M*M_PI/180)) {
+      sm = true;
+      return;
+    }
+    return;
+  }
+ 
+
   void print(std::ostream& os) const {
     char *buf = new char[256];
     sprintf(buf, "(%.4f, %.4f, %.4f)", _t[0], _t[1], _t[2]);
     os << buf;
   }
   
-  static int cmp(Tuple a, Tuple b) {return a.cmp(b);};
-  static double distance(Tuple a, Tuple b) {return a.distance(b);};
-  static double angle(const Tuple& a, const Tuple& b, const Tuple& c) {return b.angle(a, c);};
-  
+  static int cmp(Tuple a, Tuple b) {return a.cmp(b);}
+  static double distance(Tuple a, Tuple b) {return a.distance(b);}
+  static double angle(const Tuple& a, const Tuple& b, const Tuple& c) {return b.angle(a, c);}
+  static void angleCheck(const Tuple& a, const Tuple& b, const Tuple& c, bool& ob, bool& sm, double M) { b.angleCheck(a, c, ob, sm, M);}
+ 
 };
 
 static inline std::ostream& operator<<(std::ostream& os, const Tuple& rhs) {

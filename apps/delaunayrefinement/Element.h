@@ -40,6 +40,7 @@
 
 class Element {
   Tuple coords[3]; // The three endpoints of the triangle
+  //the last index is the center
 
   // if the triangle has an obtuse angle
   // obtuse - 1 is which one
@@ -70,13 +71,15 @@ class Element {
     //    edges[1] = Edge(coords[1], coords[2]);
     //    edges[2] = Edge(coords[2], coords[0]);
     for (int i = 0; i < 3; i++) {
-      double angle = getAngle(i);
-      if (angle > 90.1) {
+      bool ob = false, sm = false;
+      angleCheck(i, ob, sm, MINANGLE);
+      if (ob) {
 	obtuse = i + 1;
-      } else if (angle < MINANGLE) {
+      } else if (sm) {
 	bBad = true;
       }
     }
+    //computeCenter();
   }
   
   explicit Element(const Tuple& a, const Tuple& b)
@@ -88,7 +91,12 @@ class Element {
       coords[0] = b;
       coords[1] = a;
     }
+    //computeCenter();
   }
+
+  // Tuple getCenter() const {
+  //   return coords[3];
+  // }
 
   Tuple getCenter() const {
     if (getDim() == 2) {
@@ -149,10 +157,10 @@ class Element {
     return ds <= get_radius_squared(center);
   }
 
-  double getAngle(int i) const {
+  void angleCheck(int i, bool& ob, bool& sm, double M) const {
     int j = (i + 1) % getDim();
     int k = (i + 2) % getDim(); 
-    return Tuple::angle(coords[j], coords[i], coords[k]);
+    Tuple::angleCheck(coords[j], coords[i], coords[k], ob, sm, M);
   }
 
   //Virtualize the Edges array
