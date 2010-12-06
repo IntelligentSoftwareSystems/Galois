@@ -5,9 +5,22 @@
 #include "Edge.h"
 
 
-typedef Galois::Graph::FirstGraph<Node,Edge,false>            Graph;
-typedef Galois::Graph::FirstGraph<Node,Edge,false>::GraphNode GNode;
+typedef Galois::Graph::FirstGraph<Node,Edge,true>            Graph;
+typedef Galois::Graph::FirstGraph<Node,Edge,true>::GraphNode GNode;
 
+#ifdef WITH_VTUNE
+#include "/opt/intel/vtune_amplifier_xe_2011/include/libittnotify.h"
+#endif
+
+
+class Index
+{
+	public:
+		int index_func(GNode n )
+		{
+			return n.getData(Galois::Graph::NONE,0).height;
+		}
+};
 
 #include "Local.h"
 int numNodes;
@@ -16,20 +29,49 @@ Graph* config;
 GNode sink;
 GNode source;
 
-#include "Builder.h"
-#include "Support/ThreadSafe/simple_lock.h"
-#include "Support/ThreadSafe/TSStack.h"
+#include "Builder2.h"
+//#include "Support/ThreadSafe/TSPQueue.h"
+#include "Support/ThreadSafe/TSQueue.h"
+//#include "PQ.h"
 
-void  initializePreflow(vector<int>& gapYet);
-void process(GNode item, threadsafe::ts_stack<GNode>& lwl);
-bool discharge(threadsafe::ts_stack<GNode>& lwl , vector<int>& gapYet, GNode& src) ;
-void relabel(GNode& src, Local& l);
-void globalRelabelSerial(vector<int>& gapYet, threadsafe::ts_stack<GNode>& lw);
-threadsafe::ts_stack<GNode> wl;
-int threads = 1;
+void  initializePreflow();
+void process(GNode& item , Galois::Context<GNode>& lwl);
+
+template<typename Context>
+void relabel(GNode& src, Local& l, Context* cnx);
+
+template<typename Context>
+bool discharge( GNode& src,Context* cnx);
+
+template<typename Context>
+void bfs(GNode& src, Context* cnx);
+
+template<typename Context>
+void globalRelabelSerial(Context* cnx);
+
+void checkMaxFlow();
+void checkFlowsForCut();
+void checkHeights();
+void checkAugmentingPathExistence();
+
+int threads = 1 ;
 vector<int> gapYet;
+double expected;
 
+//vector_wl<GNode> wl;
+//threadsafe::ts_pqueue< GNode, compare > wl;
+//ordered_wl<GNode, Index > wl;
+threadsafe::ts_queue<GNode> que;
+std::vector<GNode> wl;
+//threadsafe::ts_queue<GNode> wl;
+
+volatile int counter=0;
+volatile bool lock=false;
+volatile long int token=0;
 const int ALPHA=6;
 const int BETA=12;
-const int globalRelabelInterval = numNodes * ALPHA + numEdges;
-int relabelYet;
+int globalRelabelInterval;
+volatile int relabelYet;
+struct timeval tvBegin, tvEnd, tvDiff;
+long int global_sec=0,global_usec=0;
+

@@ -1,5 +1,4 @@
 #include <iostream>
-#include <set>
 #include <stack>
 #include <sys/time.h>
 #include <limits.h>
@@ -7,40 +6,73 @@
 #include <string.h>
 #include <cassert>
 #include "include.h"   //containds Global variables and initialization
-
+int counting=0;
 using namespace std;
 
-void gapAtSerial(vector<int>& gapYet,  int h) {
-	for(Graph::active_iterator ii = config->active_begin(), ee = config->active_end(); ii != ee; ++ii) {
-		Node& node = ii->getData();
-		if (node.isSink || node.isSource)
-			continue;
-		if (h < node.height && node.height < numNodes)
-			node.height = numNodes;
-	}
-
-	if (&gapYet != NULL) {
-		for (int i = h + 1; i < numNodes; i++) {
-			gapYet[h]=0;
-		}
-	}
-}
-
-
 void reduceCapacity(GNode& src, GNode& dst, int amount) {
-        Edge& e1 = config->getEdgeData(src, dst);
-        Edge& e2 = config->getEdgeData(dst, src);
+        Edge& e1 = config->getEdgeData(src, dst,Galois::Graph::ALL,0);
+        Edge& e2 = config->getEdgeData(dst, src,Galois::Graph::ALL,0);
         e1.cap -= amount;
         e2.cap += amount;
 }
 
 
+bool check(int h)
+{
+        int i;
+        if(gapYet[h]==0)
+        {
+                for(i=h+1;i<gapYet.size();i++)
+                        if(gapYet[i]>0)
+                                return true;
+        }
+        return false;
+}
+
+
+void checkHeight(int h){
+    for(Graph::active_iterator ii = config->active_begin(), ee = config->active_end(); ii != ee; ++ii) {
+	    Node& node = (*ii).getData(Galois::Graph::ALL,0);
+	    if (node.isSink || node.isSource)
+		    continue;
+	    if (h < node.height && node.height < numNodes)
+		    node.height = numNodes;
+    }
+}
+
+
+void printHeights()
+{
+	for(Graph::active_iterator ii = config->active_begin(), ee = config->active_end(); ii != ee; ++ii) {
+		Node& node = (*ii).getData(Galois::Graph::ALL,0);
+		cout<<" Inside printHeight func.. node.height = "<<node.height<<endl;
+	}
+}
+
 
 int main(int argc, char** argv) {
+
 	if (argc < 2) {
-		cerr << "Arguments: <input file>\n";
+		cerr << "Arguments: [-t threads] <input file> <expected flow>\n";
 		return 1;
 	}
+
+	int inputFileAt = 1;
+	if (std::string("-t") == argv[1]) {
+		inputFileAt = 3;
+		threads = atoi(argv[2]);
+	}
+
+        if(argc==5)   //if expected flow value is provided 
+                expected=atoi(argv[4]);
+        else   //if expected flow value is not provided 
+        {
+                cout<<endl<<endl<<"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"<<endl;
+                cout<<"!! Expected flow value not provided as arguement !!"<<endl;
+                cout << "Arguments: [-t threads] <input file> <expected flow value>\n";
+                expected=0;
+        }
+
 
 	cerr << "\nLonestar Benchmark Suite v3.0\n"
 		<< "Copyright (C) 2007, 2008, 2009, 2010 The University of Texas at Austin\n"
@@ -53,157 +85,198 @@ int main(int argc, char** argv) {
 		<< "\n";
 
 	config = new Graph();   //config is a variable of type Graph*
-	Builder b;	//Builder class has method to read from file and construct graph
-	b.read(config, argv[1]);
+	Builder b;	//Builder class has method to read from file and construct graphb.read_wash(config, argv[inputFileAt]);
+	b.read_rand(config, argv[inputFileAt]);
+	cout<<"numNodes is "<< numNodes <<endl;   //debug code
+
+	gapYet.resize(numNodes+1,0);	
+	//wl.resize(numNodes);
+	//initialize gapYet
+	for(Graph::active_iterator ii = config->active_begin(), ee = config->active_end(); ii != ee; ++ii) {
+		Node& node = (*ii).getData();
+		gapYet[node.height]++;
+	}
 
 
-	for(Graph::active_iterator ii = config->active_begin(), ee = config->active_end(); ii != ee; ++ii) 
+	globalRelabelInterval = numNodes * ALPHA + numEdges;
+
+	cout<<"Global Relabel = "<<globalRelabelInterval<<endl;
+	relabelYet = 0;   //the trigger function has to be implemented....
+
+	initializePreflow();
+	cout<<"Size of worklist is : "<<wl.size()<<endl;
+	cout<<"Source and sink are "<<source.getData().id<<"   "<<sink.getData().id<<endl;
+	int increment=1;	
+	Galois::Launcher::startTiming();
+	/*while (wl.size()) {
+	  bool suc;
+	  GNode N = wl.pop(suc);
+	//process(N);		
+	if(discharge(N))
+		increment+=BETA;
+	if(increment > globalRelabelInterval)
 	{
-		Node& n = ii->getData();
-		if(n.isSink)
-		{
-			sink = *ii;   
+		cout<<"Doing Global Relabel"<<endl;
+		globalRelabelSerial();		
+		increment=0;
+	}
+	}*/
+	Galois::setMaxThreads(threads);
+	cout<<"Threads :"<<threads<<endl;
+	Galois::for_each(wl, process);
+	Galois::Launcher::stopTiming();
+
+	cerr << "Time: " << Galois::Launcher::elapsedTime() << " msec\n";
+	cout<<"Number of global relabels is :"<<counting<<endl;	
+	cout<<"Flow is "<<sink.getData().excess<<endl;
+	//checkMaxFlow();
+	cout<<"Flow is OK"<<endl;
+}
+
+
+void process(GNode& item, Galois::Context<GNode>& lwl) {
+/*	bool inRelabel = false;
+	try
+	{
+		while(lock==true);
+		__sync_fetch_and_add(&counter,1);
+		int increment = 1;*/
+		if(discharge(item, &lwl));
+		/*	increment += BETA;
+		__sync_fetch_and_add(&relabelYet, increment);
+		if(relabelYet > globalRelabelInterval)
+		{	
+			if( __sync_val_compare_and_swap(&lock, false, true) == false)
+			{
+				flag = 0;
+				//cout<<"Trying Global Relabel..."<<endl;
+				while(counter!=1);
+				inRelabel = true;
+				//cout<<"Doing Global Relabel...Counter is "<<counter<<endl;
+				globalRelabelSerial(&lwl);
+				counting++;
+				__sync_val_compare_and_swap(&relabelYet, relabelYet, 0);
+				//cout<<"Global relabel complete... "<<counter<<endl;
+				flag = 1;
+				lock = false;
+			}
 		}
-		else if(n.isSource)
+		__sync_fetch_and_add(&counter, -1);
+		//cout<<"Counter at end :"<<counter<<endl;
+	}catch(...)
+	{
+		if (inRelabel)
 		{
-			source= *ii;
+			//cout<<"Exception in global relabel"<<endl;
+			__sync_val_compare_and_swap(&lock, true, false);
+			flag = 1;
+		}
+		__sync_fetch_and_add(&counter, -1);
+		throw;	
+	}*/
+}
+
+
+
+void  initializePreflow() {  
+	int count=0;
+	for (Graph::neighbor_iterator ii = config->neighbor_begin(source), ee = config->neighbor_end(source); ii != ee; ++ii) {
+		GNode neighbor = *ii;
+		Edge& edgeData = config->getEdgeData(source, neighbor,Galois::Graph::NONE,0);
+
+		int cap = edgeData.cap;
+		reduceCapacity(source, neighbor, cap);
+		Node& node = neighbor.getData();
+		node.excess += cap;
+		if (cap > 0)
+		{	
+			node.insert_time = ++token;
+			wl.push_back(*ii);
 		}
 	}
 
-	cout<<"Step 1 done sucessfully...numNodes is "<< numNodes <<endl;   //debug code
-
-	gapYet.resize(numNodes,0);	
-	for (int i = 0; i < numNodes; i++) {
-		int height = i;
-		gapYet[height] =0;
-		gapAtSerial(gapYet, height);
-	}
-	relabelYet = globalRelabelInterval;   //the trigger function has to be implemented....
-
-	cout<<"Step 2 done sucessfully"<<endl;    //debug code
-	initializePreflow(gapYet);
-
-	cout<<"Step 3 done sucessfully"<<endl;    //debug code
-	int debug_var=0;
-	while (wl.size()) {
-		cout<<++debug_var;
-		bool suc;
-		GNode N = wl.pop(suc);
-		process(N, wl);
-	}
-}
-
-
-void process(GNode item, threadsafe::ts_stack<GNode>& lwl) {
-	int increment = 1;
-	if (discharge(lwl, gapYet, item)) {
-		increment += BETA;
-	}
-
-	relabelYet+=increment;
-	if(relabelYet >= globalRelabelInterval) 
-		globalRelabelSerial(gapYet,lwl);
 }
 
 
 
-void  initializePreflow(vector<int>& gapYet) {  
-
-
-        for(Graph::active_iterator ii = config->active_begin(), ee = config->active_end(); ii != ee; ++ii) {
-                Node& node = ii->getData();
-                if (!node.isSink && !node.isSource) {
-                        gapYet[node.height]--;  
-                }
-        }
-
-
-        for (Graph::neighbor_iterator ii = config->neighbor_begin(source), ee = config->neighbor_end(source); ii != ee; ++ii) {
-                GNode neighbor = *ii;
-                Edge& edgeData = config->getEdgeData(source, neighbor);
-
-                int cap = edgeData.cap;
-                reduceCapacity(source, neighbor, cap);
-                Node& node = neighbor.getData();
-                node.excess += cap;
-                if (cap > 0)
-                        wl.push(neighbor);
-        }
-
-}
-
-
-
-
-bool discharge(threadsafe::ts_stack<GNode>& lwl , vector<int>& gapYet, GNode& src) {
-	Node& node = src.getData();
+template<typename Context>
+bool discharge(GNode& src, Context* cnx) {
+	Node& node = src.getData(Galois::Graph::ALL,cnx->getRuntimeContext());
 	int prevHeight = node.height;
+	//cout<<"Height of node is "<<prevHeight<<"  Insert Time is : "<<node.insert_time<<endl;
 	bool retval = false;
 
 	if (node.excess == 0 || node.height >= numNodes)
 		return retval;
-
+	static int i=0;
+	int j=0;	
 	Local l;
 	l.src = src;
-
 	while (true) {
 		l.finished = false;
 
 		for (Graph::neighbor_iterator ii = config->neighbor_begin(src), ee = config->neighbor_end(src); ii != ee; ++ii) {
 			GNode dst=*ii;
+			Node& node2 = l.src.getData(Galois::Graph::ALL,cnx->getRuntimeContext());
+			Node& dnode = dst.getData(Galois::Graph::ALL,cnx->getRuntimeContext());
 			if (l.finished)
 				break;
-			Node& node = l.src.getData();
-
-			int cap = config->getEdgeData(l.src, dst).cap;  //this needs to be refined
-
-			if (cap > 0 && l.cur >= node.current) {
+			int cap = config->getEdgeData((l.src), dst,Galois::Graph::ALL,cnx->getRuntimeContext()).cap;  //this needs to be refined
+			if (cap > 0 && l.cur >= node2.current) {
 				int amount = 0;
-				Node& dnode = dst.getData();
-				if (node.height - 1 == dnode.height) {
+				if (node2.height - 1 == dnode.height) {
 					// Push flow
-					node.excess < cap ? amount = node.excess : amount = cap;
-					reduceCapacity(l.src, dst, amount);
+					node2.excess < cap ? amount = node2.excess : amount = cap;
+					reduceCapacity((l.src), dst, amount);
 					// Only add once
-				}
-				node.excess -= amount;
-				dnode.excess += amount;
-			}
-		}
+					if (!dnode.isSink && !dnode.isSource && dnode.excess == 0) {
+						//cout<<"Adding to list..."<<endl;
+						__sync_fetch_and_add(&token, 1);
+						dnode.insert_time=token;
+						cnx->push(dst);
+					}
 
+					node2.excess -= amount;
+					dnode.excess += amount;
+					if (node2.excess == 0) {
+						l.finished = true;
+						node2.current = l.cur;						
+						break;
+					}
+				}
+			}
+			l.cur++;
+		}
 
 		if (l.finished)
 			break;
-
-		// Went through all our edges and still
-		// have flow: Relabel
-		relabel(src, l);
-
+		// Went through all our edges and still have flow: Relabel
+		relabel(src, l, cnx);
 		retval = true;
-		gapYet[prevHeight]++; //check new implementation...
+		gapYet[prevHeight]--;
+		gapYet[node.height]++;
+		if(check(prevHeight))
+			checkHeight(prevHeight);
 
 		if (node.height == numNodes)
 			break;
 
-		gapYet[node.height]--; //check new implemention ....
 		prevHeight = node.height;
 		l.cur = 0;
 	}
-
 	return retval;
 }
 
 
-
-
-void relabel(GNode& src, Local& l) {
+template<typename Context>
+void relabel(GNode& src, Local& l, Context* cnx) {
 	l.resetForRelabel();
 
 	for (Graph::neighbor_iterator ii = config->neighbor_begin(src), ee = config->neighbor_end(src); ii != ee; ++ii){
 		GNode dst = *ii;
-		int cap = config->getEdgeData(src, dst).cap; //refined? check Graph.h file if that is the exact function
+		int cap = config->getEdgeData(src, dst,Galois::Graph::ALL,cnx->getRuntimeContext()).cap; //refined? check Graph.h file if that is the exact function
 		if (cap > 0) {
-			Node& dnode = dst.getData();
+			Node& dnode = dst.getData(Galois::Graph::ALL,cnx->getRuntimeContext());
 			if (dnode.height < l.minHeight) {
 				l.minHeight = dnode.height;
 				l.minEdge = l.relabelCur;
@@ -225,65 +298,188 @@ void relabel(GNode& src, Local& l) {
 
 
 
-
-void globalRelabelSerial(vector<int>& gapYet, threadsafe::ts_stack<GNode>& lw) {
-	set<GNode> visited;
-	deque<GNode> queue;
-
+template<typename Context>
+void globalRelabelSerial  (Context* cnx )  
+{
+	//vector<GNode> visited;
+	//deque<GNode> queue;
+	//usleep(50000);
 	for(Graph::active_iterator ii = config->active_begin(), ee = config->active_end(); ii != ee; ++ii) {
-		Node& node = ii->getData();
+		Node& node = ii->getData(Galois::Graph::ALL,cnx->getRuntimeContext());
 		// Max distance
 		node.height = numNodes;
 		node.current = 0;
-
-		if (node.isSink) {
-			node.height = 0;
-			queue.push_front(*ii); 
-			visited.insert(*ii);
-		}
 	}
+	Node& temp=sink.getData(Galois::Graph::ALL,cnx->getRuntimeContext());
+	temp.height = 0;	
+	que.push(sink);
+//cout<<"End of Phase 1"<<endl; 
 
-	if ( &gapYet != NULL) {
-		for (int i = 0; i < numNodes; i++) {
-			gapYet[i]=0;
-		}
-	}
-
-	// Do walk on reverse *residual* graph!
-	while (!queue.empty()) {
-		GNode& src = queue.front();
-		queue.pop_front(); //pollFirst();
+	gapYet.assign(numNodes+1,0);
+	//Galois::setMaxThreads(threads);
+	//Galois::for_each(que,bfs);
+	while (!que.empty()) {
+		bool suc;
+		GNode src = que.pop(suc); //pollFirst();
 		for (Graph::neighbor_iterator ii = config->neighbor_begin(src), ee = config->neighbor_end(src); ii != ee; ++ii){
 			GNode dst=*ii;        	
-			if (visited.find(dst) != visited.end())
-				continue;
-			Edge& edge = config->getEdgeData(dst,src);
+			Edge& edge = config->getEdgeData(dst,src,Galois::Graph::ALL,cnx->getRuntimeContext());
 			if (edge.cap > 0) {
-				visited.insert(dst);
-				Node& node = dst.getData();
-				Node& node2 = src.getData();	          
-				node.height = node2.height + 1;
-				queue.push_back(dst); 
+				Node& node = dst.getData(Galois::Graph::ALL,cnx->getRuntimeContext());
+				int newHeight=src.getData(Galois::Graph::ALL,cnx->getRuntimeContext()).height+1;
+				if(newHeight<node.height){
+					node.height = newHeight;
+					que.push(dst);
+				}
 			}
 		}
 	}
 
+//cout<<"End of Phase 2"<<endl; 
 	for(Graph::active_iterator ii = config->active_begin(), ee = config->active_end(); ii != ee; ++ii) {
-		Node& node = ii->getData();
+		GNode temp=*ii;
+		Node& node = ii->getData(Galois::Graph::ALL,cnx->getRuntimeContext());
 
 		if (node.isSink || node.isSource || node.height >= numNodes) {
 			continue;
 		}
 
-		if (node.excess > 0) {
-			lw.push(*ii);
-		}
+		gapYet[node.height]++;
 
-		gapYet[node.height]--;
+		if (node.excess > 0) {
+			cnx->push(temp);
+		}		
 	}
 
+
+	cout<<"Global Relabel ends..Flow is "<<sink.getData(Galois::Graph::ALL,cnx->getRuntimeContext()).excess<<endl;
+
+}
+
+
+template<typename Context>
+void bfs(GNode& src ,Context* cnx)
+{
+	for (Graph::neighbor_iterator ii = config->neighbor_begin(src), ee = config->neighbor_end(src); ii != ee; ++ii){
+		//	cout<<"Inside BFS..."<<endl;
+		GNode dst=*ii;
+		//if (  visited.search(dst) )
+		//        continue;
+		Edge& edge = config->getEdgeData(dst,src,Galois::Graph::ALL,cnx->getRuntimeContext());
+		if (edge.cap > 0) {
+			//visited.push(dst);
+			Node& node = dst.getData(Galois::Graph::ALL,cnx->getRuntimeContext());
+			//Node& node2 = src.getData();
+			int newHeight=src.getData(Galois::Graph::ALL,cnx->getRuntimeContext()).height+1;
+			if(newHeight<node.height){
+				node.height = newHeight;
+				que.push(dst);
+			}
+		}
+	}
+
+}
+
+/*
+void checkMaxFlow() {
+	double result=sink.getData().excess;
+	if ( expected == result ) {
+		checkFlowsForCut();
+		checkHeights();
+		checkAugmentingPathExistence();
+	} else {
+		if (result != expected) {
+			cerr<<"Inconsistent flows: "<<expected<<" != "<<result<<endl;
+			exit(-1);
+		}
+	}
+}
+
+
+void checkFlowsForCut() 
+{
+	// Check conservation
+	for(Graph::active_iterator ii = config->active_begin(), ee = config->active_end(); ii != ee; ++ii) 
+	{
+		GNode src=*ii;
+		Node& node = src.getData();
+		if (node.isSource || node.isSink) 
+			continue;
+
+		if (node.excess < 0)
+		{cout<<"Excess at "<<node.id;exit(-1);}
+
+		double sum;
+		for (Graph::neighbor_iterator jj = config->neighbor_begin(src), ff = config->neighbor_end(src); jj != ff; ++jj) 
+		{
+			GNode dst = *jj;
+
+
+			int ocap = config->getEdgeData(src, dst,Galois::Graph::ALL,0).ocap;
+			int delta = 0;
+			if (ocap > 0) 
+			{
+				delta -= ocap - config->getEdgeData(src, dst,Galois::Graph::ALL,0).cap;
+
+			} else 
+			{
+				delta += config->getEdgeData(src, dst,Galois::Graph::ALL,0).cap;
+			}
+			sum+=delta;
+		}
+
+		if (node.excess != sum)
+		{	cerr<<"Not pseudoflow "<<node.excess<<" != "<<sum<<" at node "<<node.id<<endl;exit(-1);}
+	}
+}
+
+
+void checkHeights() {
+	for(Graph::active_iterator ii = config->active_begin(), ee = config->active_end(); ii != ee; ++ii)
+	{
+		GNode src=*ii;
+		for (Graph::neighbor_iterator jj = config->neighbor_begin(src), ff = config->neighbor_end(src); jj != ff; ++jj)
+		{
+			GNode dst = *jj;
+			int sh = src.getData().height;
+			int dh = dst.getData().height;
+			int cap = config->getEdgeData_directed(src, dst).cap;
+			if (cap > 0 && sh > dh + 1) 
+			{	cout<<"height violated "<<endl;exit(-1);}
+		}
+	}
 }
 
 
 
 
+void checkAugmentingPathExistence() {
+	vector<GNode> visited;
+	deque<GNode> queue;
+
+	visited.push_back(source);
+	queue.push_back(source);
+
+	while (!queue.empty()) {
+		GNode& src = queue.front();
+		queue.pop_front(); //pollFirst();
+		for (Graph::neighbor_iterator ii = config->neighbor_begin(src), ee = config->neighbor_end(src); ii != ee; ++ii)
+		{
+			GNode dst=*ii;
+			if (  (find( visited.begin(), visited.end(), (dst) ) == visited.end()) && config->getEdgeData(src, dst,Galois::Graph::ALL,0).cap > 0  )
+			{
+				visited.push_back(dst);
+				queue.push_back(dst);
+			}
+
+
+			if (find( visited.begin(), visited.end(), (dst) ) != visited.end()) 
+			{ 
+				cout<<"Augmenting path exists"<<endl;
+				exit(-1); 
+			}
+
+		}
+	}
+}
+*/

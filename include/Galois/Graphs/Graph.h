@@ -158,6 +158,13 @@ class FirstGraph {
     bool isActive() {
       return active;
     }
+
+    bool hasNeighbor(gNode* N) {
+      for (iterator ii = begin(), ee = end(); ii != ee; ++ii)
+        if (ii->getNeighbor() == N)
+          return true;
+      return false;
+    }
   };
 
   //The graph manages the lifetimes of the data in the nodes and edges
@@ -221,6 +228,9 @@ public:
       return Parent > rhs.Parent || (Parent == rhs.Parent && ID > rhs.ID);
     }
 
+    bool hasNeighbor(GraphNode& N) {
+      return ID->hasNeighbor(N.ID);
+    }
   };
 
 private:
