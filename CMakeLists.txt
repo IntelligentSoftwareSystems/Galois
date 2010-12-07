@@ -4,7 +4,7 @@ project (Galois)
 #Options
 SET( PTHREAD ON)
 #SET( CRAY ON )
-SET( WITH_VTUNE ON )
+#SET( WITH_VTUNE ON )
 
 #Boost
 SET(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0")
