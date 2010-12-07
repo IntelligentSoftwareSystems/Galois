@@ -64,7 +64,7 @@ void process(GNode item, Galois::Context<GNode>& lwl) {
 
   item.getData(Galois::Graph::ALL, lwl.getRuntimeContext()); //lock
 
-  Cavity cav(mesh);
+  Cavity cav(mesh, &lwl);
   cav.initialize(item, &lwl);
   cav.build(&lwl);
   cav.update(&lwl);

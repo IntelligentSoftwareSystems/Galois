@@ -14,6 +14,7 @@ class CPUSpaced : public ThreadAware {
   struct item {
     T data;
     char* padding[64 - (sizeof(T) % 64)];
+    item() :data() {}
   };
   item zero_datum;
   item* datum;
@@ -45,6 +46,10 @@ public:
     if (datum) {
       delete[] datum;
     }
+  }
+
+  T& getMaster() {
+    return zero_datum.data;
   }
   
   T& get() {

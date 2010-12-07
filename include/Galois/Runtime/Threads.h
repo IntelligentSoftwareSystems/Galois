@@ -17,7 +17,7 @@ struct initMainThread {
 };
 
 class ThreadPool {
-  friend class initMainThread;
+  friend struct initMainThread;
   static __thread int LocalThreadID;
   static int nextThreadID;
 

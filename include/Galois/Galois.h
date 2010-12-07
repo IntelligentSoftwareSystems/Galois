@@ -1,12 +1,5 @@
 // simple galois scheduler and runtime -*- C++ -*-
 
-#include <cmath>
-
-#include <stack>
-#include <vector>
-
-#include <iostream>
-
 #include "Galois/Scheduling.h"
 #include "Galois/Context.h"
 
@@ -40,10 +33,12 @@ class GaloisWork : public Galois::Executable {
     unsigned long TotalTime;
     GaloisRuntime::TimeAccumulator ProcessTime;
     GaloisRuntime::SimpleRuntimeContext cnx;
+    
   public:
     ThreadLD()
       :wl(0), conflicts(0), iterations(0)
     {}
+    virtual ~ThreadLD() {}
 
     virtual void push(value_type val) {
       wl->push(val);
@@ -67,6 +62,10 @@ class GaloisWork : public Galois::Executable {
       lhs.TotalTime += rhs.TotalTime;
     }
 
+    void resetAlloc_() {
+      Galois::Context<value_type>::resetAlloc();
+    }
+
   };
 
   CPUSpaced<ThreadLD> tdata;
@@ -84,7 +83,7 @@ public:
     assert(global_wl.empty());
   }
 
-  void doProcess(value_type val, ThreadLD& tld) {
+  void doProcess(value_type val, ThreadLD& tld) __attribute__((noinline)) {
     ++tld.iterations;
     tld.cnx.start();
     tld.ProcessTime.start();
@@ -99,6 +98,7 @@ public:
     }
     tld.ProcessTime.stop();
     tld.cnx.commit();
+    tld.resetAlloc_();
     return;
   }
 
@@ -129,7 +129,7 @@ public:
     return false;
   }
 
-  void runLocalQueue(ThreadLD& tld) {
+  void runLocalQueue(ThreadLD& tld) __attribute__((noinline)) {
     if (tld.wl) {
       while (!tld.wl->empty()) {
 	bool suc = false;

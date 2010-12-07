@@ -29,7 +29,6 @@
 
 #include <vector>
 #include <algorithm>
-//#include <ext/malloc_allocator.h>
 
 class Cavity {
 
@@ -37,15 +36,13 @@ class Cavity {
   GNode centerNode;
   Element* centerElement;
   int dim;
-  //  std::vector<GNode,__gnu_cxx::malloc_allocator<GNode> > frontier;
-  std::vector<GNode> frontier;
+  std::vector<GNode,Galois::Context<GNode>::ItAllocTy::rebind<GNode>::other> frontier;
   // the cavity itself
   Subgraph pre;
   // what the new elements should look like
   Subgraph post;
   // the edge-relations that connect the boundary to the cavity
-  //  typedef std::vector<Subgraph::tmpEdge,__gnu_cxx::malloc_allocator<Subgraph::tmpEdge> > connTy;
-  typedef std::vector<Subgraph::tmpEdge> connTy;
+  typedef std::vector<Subgraph::tmpEdge,Galois::Context<GNode>::ItAllocTy::rebind<Subgraph::tmpEdge>::other> connTy;
   connTy connections;
 
   Graph* graph;
@@ -105,10 +102,14 @@ class Cavity {
   }
 
 
- public:
+public:
   
- Cavity(Graph* g)
-   :graph(g)
+  Cavity(Graph* g, Galois::Context<GNode>* cnx)
+    :frontier(cnx->PerIterationAllocator),
+     pre(cnx),
+     post(cnx),
+     connections(cnx->PerIterationAllocator),
+     graph(g)
   {}
   
   template<typename Context>
@@ -134,7 +135,9 @@ class Cavity {
     while (!frontier.empty()) {
       GNode curr = frontier.back();
       frontier.pop_back();
-      for (Graph::neighbor_iterator ii = graph->neighbor_begin(curr,Galois::Graph::ALL, cnx->getRuntimeContext()), ee = graph->neighbor_end(curr,Galois::Graph::ALL, cnx->getRuntimeContext()); ii != ee; ++ii) {
+      for (Graph::neighbor_iterator ii = graph->neighbor_begin(curr,Galois::Graph::ALL, cnx->getRuntimeContext()), 
+	     ee = graph->neighbor_end(curr,Galois::Graph::ALL, cnx->getRuntimeContext()); 
+	   ii != ee; ++ii) {
 	GNode neighbor = *ii;
 	expand(curr, neighbor, cnx);
       }

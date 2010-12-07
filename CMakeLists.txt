@@ -4,7 +4,7 @@ project (Galois)
 #Options
 SET( PTHREAD ON)
 #SET( CRAY ON )
-#SET( WITH_VTUNE ON )
+SET( WITH_VTUNE ON )
 
 #Boost
 SET(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0")
@@ -22,7 +22,7 @@ if (CRAY)
 endif(CRAY)
 
 #Flags
-#add_definitions("-Wall")
+add_definitions("-Wall")
 set(CMAKE_CXX_FLAGS_RELEASE        "-O3 -g -DNDEBUG")
 #set(CMAKE_CXX_FLAGS_RELEASE        "-DNDEBUG -pg")
 

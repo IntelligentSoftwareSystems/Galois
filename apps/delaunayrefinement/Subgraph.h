@@ -30,7 +30,6 @@
 
 #include <vector>
 #include <algorithm>
-//#include <ext/malloc_allocator.h>
 
 /**
  *  A sub-graph of the mesh. Used to store information about the original 
@@ -53,17 +52,21 @@ class Subgraph {
 
  private:
   // the nodes in the graph before updating
-  //  typedef std::vector<GNode,__gnu_cxx::malloc_allocator<GNode> > nodesTy;
-  typedef std::vector<GNode> nodesTy;
+  typedef std::vector<GNode,Galois::Context<GNode>::ItAllocTy::rebind<GNode>::other> nodesTy;
+
   nodesTy nodes;
 
   // the edges that connect the subgraph to the rest of the graph
-  //  typedef std::vector<tmpEdge,__gnu_cxx::malloc_allocator<tmpEdge> > edgesTy;
-  typedef std::vector<tmpEdge> edgesTy;
+
+  typedef std::vector<tmpEdge,Galois::Context<GNode>::ItAllocTy::rebind<tmpEdge>::other> edgesTy;
+
   edgesTy edges;
 
  public:
-  Subgraph() {}
+  explicit Subgraph(Galois::Context<GNode>* cnx) 
+  : nodes(cnx->PerIterationAllocator), 
+    edges(cnx->PerIterationAllocator)
+  {}
 
   bool containsNode(GNode N) {
     return std::find(nodes.begin(), nodes.end(), N) != nodes.end();

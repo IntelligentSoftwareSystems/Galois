@@ -954,17 +954,29 @@ class ChunkedFIFO {
 
  private:
   GaloisRuntime::WorkList::Local::GWL_FIFO<Chunk*, true> Items;
-  Chunk* next;
-  threadsafe::simpleLock<int, true> nextLock;
+  CPUSpaced<Chunk*> next;
 
   void push_one_next(T& val) {
-    if (!next)
-      next = new Chunk;
-    if (next->full()) {
-      Items.push(next);
-      next = new Chunk;
+    Chunk*& N = next.get();
+    if (!N)
+      N = new Chunk;
+    if (N->full()) {
+      Items.push(N);
+      N = new Chunk;
     }
-    next->push_initial(val);
+    N->push_initial(val);
+  }
+
+  static void merge(Chunk*& lhs, Chunk*& rhs) {
+    assert(!lhs);
+    assert(!rhs);
+  }
+
+  void prepare() {
+    Chunk*& N = next.get();
+    if (N)
+      Items.push(N);
+    N = 0;
   }
 
  public:
@@ -973,7 +985,7 @@ class ChunkedFIFO {
   typedef T value_type;
   enum { SHOULD_DELETE_LOCAL = true };
 
-  ChunkedFIFO() :next(0) {}
+  ChunkedFIFO() :next(merge) { next.get() = 0; }
 
   Chunk* getNext() {
     bool suc = false;
@@ -982,23 +994,18 @@ class ChunkedFIFO {
       return C;
     //Nothing on the queue, check next
     C = 0;
-    nextLock.lock();
-    if (next) {
-      C = next;
-      next = 0;
-    }
-    nextLock.unlock();
+    Chunk*& N = next.get();
+    C = N;
+    N = 0;
     return C;
   }
 
   bool empty() {
-    return Items.empty() && !next;
+    return Items.empty() && !next.get();
   }
 
   void push_aborted(T& val, Chunk* C) {
-    nextLock.lock();
     push_one_next(val);
-    nextLock.unlock();
   }
 
   template<typename Iter>
@@ -1006,6 +1013,7 @@ class ChunkedFIFO {
     while (ii != ee) {
       push_one_next(*ii++);
     }
+    prepare();
   }
 
 
