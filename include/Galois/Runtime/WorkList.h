@@ -309,35 +309,6 @@ class GWL_ChaseLev_Dyn : private boost::noncopyable {
 
   bool CAS(volatile uint64_t* ptr, uint64_t old, uint64_t val) {
     return __sync_bool_compare_and_swap(ptr,old,val);
-    /*
-      unsigned char cas_result = 0;
-      uint64_t old_low = (uint64_t)old;
-      uint64_t old_high = (uint64_t)(old >> 64);
-      uint64_t val_low = (uint64_t)val;
-      uint64_t val_high = (uint64_t)(val >> 64);
- 
-      __asm__ __volatile__ 
-      ( 
-      // load *compare into into edx:eax 
-      // "mov eax, %;" 
-      // "mov edx, %;" 
-      // load *exchange into ecx:ebx 
-      // "mov ebx, %;" 
-      // "mov ecx, %;" 
-      "lock;"          // make cmpxchg16b atomic 
-      "cmpxchg16b %0;"  // cmpxchg16b sets ZF on success 
-      "setz      %1;"  // if ZF set, set cas_result to 1 
-      // output 
-      : "=m" (*ptr), "=q" (cas_result) 
-      // input 
-      : "m" (*ptr), "a" (old_low), "d" (old_high),
-      "b" (val_low), "c" (val_high) 
-      // clobbered 
-      : "cc", "memory" 
-      ); 
-      //      std::cerr << std::hex << "CAS: " << (void*)ptr << " " << (uint64_t)((*ptr) >> 64) << " " << (uint64_t)*ptr << " " << old_high << " " << old_low << " " << val_high << " " << val_low << " {" << (int)cas_result << "}\n" << std::dec;
-      return cas_result; 
-    */
   }
 
   DequeNode* AllocateNode() {
@@ -496,7 +467,7 @@ class GWL_ChaseLev_Dyn : private boost::noncopyable {
 
 public:
 
-  typedef GWL_ChaseLev_Dyn<T>  ConcurrentTy;
+  typedef GWL_ChaseLev_Dyn<T> ConcurrentTy;
   typedef GWL_ChaseLev_Dyn<T> SingleTy;
   enum {MAYSTEAL = true};
 

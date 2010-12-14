@@ -111,10 +111,6 @@ private:
 		exit(0);
 	}
 
-	int getId(GraphNode N){
-		return N.ID->idx;
-	}
-
 	int neighborsSize(GraphNode N, int adjIdx[], int adj[]) {
 
 		int idx = getId(N);
@@ -217,6 +213,10 @@ public:
 	      SimpleRuntimeContext::acquire(C, src.ID);
 
 		return edgeData[getEdgeIdx(src, dst)];
+	}
+
+	int getId(GraphNode N){
+		return N.ID->idx;
 	}
 
 	// General Things

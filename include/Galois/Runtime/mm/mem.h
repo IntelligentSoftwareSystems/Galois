@@ -25,7 +25,7 @@ public:
 	AutoFree = 1};
   
   void* allocate(unsigned int size) {
-    assert(size == AllocSize);
+    assert(size % AllocSize == 0);
     return _alloc();
   }
 

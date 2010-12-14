@@ -60,7 +60,7 @@ class SimpleRuntimeContext {
   extern __thread SimpleRuntimeContext* thread_cnx;
 
   static SimpleRuntimeContext* getThreadContext() {
-    assert(0);
+    //    assert(0);
     return thread_cnx;
   }
 

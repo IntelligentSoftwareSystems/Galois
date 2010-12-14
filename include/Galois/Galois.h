@@ -36,7 +36,7 @@ class GaloisWork : public Galois::Executable {
     
   public:
     ThreadLD()
-      :wl(0), conflicts(0), iterations(0)
+      :wl(0), conflicts(0), iterations(0), TotalTime(0)
     {}
     virtual ~ThreadLD() {}
 

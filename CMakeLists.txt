@@ -8,7 +8,7 @@ SET( PTHREAD ON)
 
 #Boost
 SET(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0")
-find_package( Boost 1.40.0 REQUIRED )
+find_package( Boost 1.34.0 REQUIRED )
 include_directories(${Boost_INCLUDE_DIRS})
 
 #PThreads
@@ -39,7 +39,6 @@ set(CMAKE_BUILD_TYPE Release)
 #Source finding
 include_directories("include")
 
-add_subdirectory(lib)
 add_subdirectory(src)
 add_subdirectory(apps)
 
