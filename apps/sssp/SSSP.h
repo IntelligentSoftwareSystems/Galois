@@ -44,14 +44,8 @@ private:
 	int maxWeight;
 
 public:
-	Graph* graph;
+	Graph graph;
 	int delta;
-	SSSP() {
-	}
-	;
-	virtual ~SSSP() {
-	}
-	;
 	void initializeGraph(char *filename);
 	void updateSourceAndSink(const int sourceId, const int sinkId);
 	int getEdgeData(GNode src, GNode dst);

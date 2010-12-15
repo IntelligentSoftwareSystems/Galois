@@ -47,7 +47,7 @@ public:
       return true;
     }
 #else
-    return __sync_bool_compare_and_swap(&_lock, 0, val);
+    return __sync_bool_compare_and_swap(&_lock, (T)0, val);
 #endif
   }
 

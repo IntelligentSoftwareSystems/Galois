@@ -74,7 +74,7 @@ int main(int argc, char* argv[]) {
 		for (int ii = 0; ii < barneshut.curr; ii++) {
 			wl.push_back(barneshut.leaf[ii]);
 		}
-		Galois::for_each(wl, process);
+		Galois::for_each(wl.begin(), wl.end(), process);
 
 		barneshut.advance(octree, barneshut.dthf, barneshut.dtime); // advance the position and velocity of each
 

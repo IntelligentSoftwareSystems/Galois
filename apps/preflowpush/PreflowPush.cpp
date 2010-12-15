@@ -19,14 +19,14 @@ void reduceCapacity(GNode& src, GNode& dst, int amount) {
 
 bool check(int h)
 {
-        int i;
-        if(gapYet[h]==0)
-        {
-                for(i=h+1;i<gapYet.size();i++)
-                        if(gapYet[i]>0)
-                                return true;
-        }
-        return false;
+  int i;
+  if(gapYet[h]==0)
+    {
+      for(i=h+1;i<(int)gapYet.size();i++)
+	if(gapYet[i]>0)
+	  return true;
+    }
+  return false;
 }
 
 
@@ -106,7 +106,7 @@ int main(int argc, char** argv) {
 	initializePreflow();
 	cout<<"Size of worklist is : "<<wl.size()<<endl;
 	cout<<"Source and sink are "<<source.getData().id<<"   "<<sink.getData().id<<endl;
-	int increment=1;	
+	//int increment=1;	
 	Galois::Launcher::startTiming();
 	/*while (wl.size()) {
 	  bool suc;
@@ -123,7 +123,7 @@ int main(int argc, char** argv) {
 	}*/
 	Galois::setMaxThreads(threads);
 	cout<<"Threads :"<<threads<<endl;
-	Galois::for_each(wl, process);
+	Galois::for_each(wl.begin(), wl.end(), process);
 	Galois::Launcher::stopTiming();
 
 	cerr << "Time: " << Galois::Launcher::elapsedTime() << " msec\n";
@@ -179,7 +179,7 @@ void process(GNode& item, Galois::Context<GNode>& lwl) {
 
 
 void  initializePreflow() {  
-	int count=0;
+  //	int count=0;
 	for (Graph::neighbor_iterator ii = config->neighbor_begin(source), ee = config->neighbor_end(source); ii != ee; ++ii) {
 		GNode neighbor = *ii;
 		Edge& edgeData = config->getEdgeData(source, neighbor,Galois::Graph::NONE,0);
@@ -208,8 +208,8 @@ bool discharge(GNode& src, Context* cnx) {
 
 	if (node.excess == 0 || node.height >= numNodes)
 		return retval;
-	static int i=0;
-	int j=0;	
+	//	static int i=0;
+	//	int j=0;	
 	Local l;
 	l.src = src;
 	while (true) {

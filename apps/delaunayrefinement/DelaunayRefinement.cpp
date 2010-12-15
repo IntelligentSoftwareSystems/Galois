@@ -110,8 +110,7 @@ void refine(Mesh& m, WLTY& wl) {
 #ifdef WITH_VTUNE
   __itt_resume();
 #endif
-  Galois::for_each(wl, process, 
-		   Priority.first<ChunkedFIFO>().thenLocally<LIFO>());
+  Galois::for_each(wl.begin(), wl.end(), process);
     //  }
 #ifdef WITH_VTUNE
   __itt_pause();

@@ -130,7 +130,7 @@ int main(int argc, char** argv) {
 #ifdef WITH_VTUNE
   __itt_resume();
 #endif
-  Galois::for_each(wl, process);
+  Galois::for_each(wl.begin(), wl.end(), process);
 #ifdef WITH_VTUNE
   __itt_pause();
 #endif

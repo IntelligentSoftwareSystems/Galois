@@ -79,8 +79,8 @@ class Builder{
 				tok2=strtok(NULL," \n");
 				int dcap=atoi(tok2);
 
-				Node& e1=nodes[src].getData(Galois::Graph::NONE,0);
-				Node& e2=nodes[dst].getData(Galois::Graph::NONE,0);
+				//Node& e1=nodes[src].getData(Galois::Graph::NONE);
+				//Node& e2=nodes[dst].getData(Galois::Graph::NONE);
 			
 				if(   ! (nodes[src]).hasNeighbor(nodes[dst])   )
 				{
