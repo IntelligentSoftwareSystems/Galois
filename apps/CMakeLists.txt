@@ -1,3 +1,16 @@
+function(app name)
+  file(GLOB Sources *.cpp)
+  add_executable(${name} ${Sources})
+  target_link_libraries (${name} galois) 
+  target_link_libraries (${name} ${CMAKE_THREAD_LIBS_INIT}) 
+
+  if(WITH_VTUNE)
+    target_link_libraries (${name} /opt/intel/vtune_amplifier_xe_2011/lib64/libittnotify.a)
+    target_link_libraries (${name} dl)
+    add_definitions(-DWITH_VTUNE)
+  endif(WITH_VTUNE)
+endfunction(app)
+
 add_subdirectory(delaunayrefinement)
 add_subdirectory(preflowpush)
 add_subdirectory(sssp)

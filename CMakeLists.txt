@@ -4,7 +4,7 @@ project (Galois)
 #Options
 SET( PTHREAD ON)
 #SET( CRAY ON )
-#SET( WITH_VTUNE ON )
+SET( WITH_VTUNE ON )
 
 #Boost
 SET(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0")
@@ -28,8 +28,8 @@ set(CMAKE_CXX_FLAGS_RELEASE        "-O3 -g -DNDEBUG")
 
 set(CMAKE_CXX_FLAGS_DEBUG          "-g")
 
-set(CMAKE_BUILD_TYPE Release)
-#set(CMAKE_BUILD_TYPE Debug)
+#set(CMAKE_BUILD_TYPE Release)
+set(CMAKE_BUILD_TYPE Debug)
 
 #set(CMAKE_CXX_COMPILER clang++)
 #set(CMAKE_CXX_COMPILER /opt/intel/Compiler/11.1/073/bin/intel64/icpc)
