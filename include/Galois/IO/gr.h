@@ -56,12 +56,15 @@ void readFile_gr(char *filename, GraphTy* graph) {
   int numEdges = 0;
   typename GraphTy::GraphNode* gnodes = NULL;
   while (!infile.eof()) {
-    char firstchar;
+    char firstchar = 0;
     infile >> firstchar;
-    if (firstchar == 'a') {
+    if (infile.fail()) {
+      break;
+    } else if (firstchar == 'a') {
       ++LEdgeCount;
       int src, dest, weight;
       infile >> src >> dest >> weight;
+      assert(weight > 0);
       AddEdge<weighted>::addEdge(graph, gnodes[src - 1], gnodes[dest - 1], weight);
     } else if (firstchar == 'c') {
       std::string line;
@@ -82,10 +85,14 @@ void readFile_gr(char *filename, GraphTy* graph) {
       abort();
     } 
   }
-  assert(LEdgeCount == numEdges);
   delete[] gnodes;
-  
+  if (LEdgeCount != numEdges) {
+    std::cerr << "Read edges " << LEdgeCount << " don't match claimed " << numEdges << "\n";
+    assert(LEdgeCount == numEdges);
+    abort();
+  }
   infile.close();
+  std::cout << "Read " << numNodes << " nodes and " << numEdges << " edges.\n";
 }
   
 }
