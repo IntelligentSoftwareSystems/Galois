@@ -61,6 +61,18 @@ public:
     return datum[i - 1].data;
   }
 
+  const T& getRemote(int i) const {
+    if (!i)
+      return zero_datum.data;
+    assert(i <= num);
+    assert(datum);
+    return datum[i - 1].data;
+  };
+
+  int getCount() const {
+    return num + 1;
+  }
+
   virtual void ThreadChange(int newnum) {
     reduce_and_reset();
     if (newnum)
