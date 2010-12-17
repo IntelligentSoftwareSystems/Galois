@@ -107,8 +107,8 @@ private:
     Chunk* curr;
     ProcRec() : next(0), nextSize(0), curr(0) {}
     static void merge( ProcRec& lhs, ProcRec& rhs) {
-      assert(!next || next->empty());
-      assert(!curr || curr->empty());
+      assert(!lhs.next || rhs.next->empty());
+      assert(!lhs.curr || rhs.curr->empty());
       assert(!rhs.next || rhs.next->empty());
       assert(!rhs.curr || rhs.curr->empty());
     }
