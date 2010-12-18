@@ -12,7 +12,8 @@
 #include <sstream>
 #include <limits>
 
-static const int DIST_INFINITY = std::numeric_limits<int>::max() / 2 - 1;
+static const int DIST_INFINITY = std::numeric_limits<int>::max();
+// / 2 - 1;
 
 class SNode {
 private:

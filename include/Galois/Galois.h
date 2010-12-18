@@ -8,6 +8,11 @@
 #include "Galois/Runtime/Threads.h"
 #include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/WorkList.h"
+#include "Galois/Runtime/Termination.h"
+
+#ifdef WITH_VTUNE
+#include "/opt/intel/vtune_amplifier_xe_2011/include/ittnotify.h"
+#endif
 
 namespace GaloisRuntime {
 
@@ -17,17 +22,18 @@ class GaloisWork : public Galois::Executable {
 
   WorkListTy& global_wl;
   Function f;
-  int threadmax;
-  int threadsWorking;
+  int do_halt;
+
+  TerminationDetection term;
 
   class ThreadLD : public Galois::Context<value_type> {
   public:
     WorkListTy* wl;
-    int conflicts;
-    int iterations;
+    unsigned int conflicts;
+    unsigned int iterations;
     unsigned long TotalTime;
     GaloisRuntime::SimpleRuntimeContext cnx;
-    
+
   public:
     ThreadLD()
       :wl(0), conflicts(0), iterations(0), TotalTime(0)
@@ -65,7 +71,7 @@ class GaloisWork : public Galois::Executable {
 
 public:
   GaloisWork(WorkListTy& _wl, Function _f)
-    :global_wl(_wl), f(_f), threadmax(0), threadsWorking(0), tdata(ThreadLD::merge) {}
+    :global_wl(_wl), f(_f), do_halt(0), tdata(ThreadLD::merge) {}
 
   ~GaloisWork() {
 
@@ -92,7 +98,6 @@ public:
   }
 
   virtual void preRun(int tmax) {
-    threadmax = tmax;
   }
 
   virtual void postRun() {
@@ -102,13 +107,17 @@ public:
     ThreadLD& tld = tdata.get();
     setThreadContext(&tld.cnx);
     tld.wl = &global_wl;
+    term.initialize(&tld.iterations);
     Timer T;
     T.start();
     do {
-      std::pair<bool, value_type> p = global_wl.pop();
-      if (p.first)
-	doProcess(p.second, tld);
-    } while (!global_wl.empty());
+      do {
+	std::pair<bool, value_type> p = global_wl.pop();
+	if (p.first)
+	  doProcess(p.second, tld);
+      } while (!global_wl.empty());
+      term.locallyDone();
+    } while (!term.areWeThereYet());
     T.stop();
     tld.TotalTime = T.get();
     setThreadContext(0);
@@ -117,9 +126,15 @@ public:
 
 template<class Function, class GWLTy>
 void for_each_simple(GWLTy& GWL, Function f) {
+#ifdef WITH_VTUNE
+  __itt_resume();
+#endif
   GaloisWork<GWLTy, Function> GW(GWL, f);
   ThreadPool& PTP = getSystemThreadPool();
   PTP.run(&GW);
+#ifdef WITH_VTUNE
+  __itt_pause();
+#endif
 }
 
 }

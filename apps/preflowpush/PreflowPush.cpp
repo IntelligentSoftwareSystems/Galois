@@ -6,8 +6,17 @@
 #include <string.h>
 #include <cassert>
 #include "include.h"   //containds Global variables and initialization
+#include "Lonestar/Banner.h"
+#include "Lonestar/CommandLine.h"
+
 int counting=0;
 using namespace std;
+
+static const char* name = "Preflow Push";
+static const char* description = "Finds the maximum flow in a given network using the preflow push technique\n";
+static const char* url = "http://iss.ices.utexas.edu/lonestar/preflowpush.html";
+static const char* help = "<input file> <expected flow>";
+
 
 void reduceCapacity(GNode& src, GNode& dst, int amount) {
         Edge& e1 = config->getEdgeData(src, dst,Galois::Graph::ALL,0);
@@ -50,43 +59,30 @@ void printHeights()
 }
 
 
-int main(int argc, char** argv) {
+int main(int argc, const char** argv) {
 
-	if (argc < 2) {
-		cerr << "Arguments: [-t threads] <input file> <expected flow>\n";
-		return 1;
-	}
+  std::vector<const char*> args = parse_command_line(argc, argv, help);
 
-	int inputFileAt = 1;
-	if (std::string("-t") == argv[1]) {
-		inputFileAt = 3;
-		threads = atoi(argv[2]);
-	}
+  if (args.size() < 1) {
+    std::cout << "not enough arguments, use -help for usage information\n";
+    return 1;
+  }
+  printBanner(std::cout, name, description, url);
 
-        if(argc==5)   //if expected flow value is provided 
-                expected=atoi(argv[4]);
-        else   //if expected flow value is not provided 
-        {
-                cout<<endl<<endl<<"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"<<endl;
-                cout<<"!! Expected flow value not provided as arguement !!"<<endl;
-                cout << "Arguments: [-t threads] <input file> <expected flow value>\n";
-                expected=0;
-        }
+  if (args.size() > 1)
+    expected=atoi(args[1]);
+  else   //if expected flow value is not provided 
+    {
+      cout<<"!! Expected flow value not provided as arguement !!\n";
+      cout << "Arguments: <input file> <expected flow value>\n";
+      cout << "Assuming 0\n";
+      expected=0;
+    }
 
-
-	cerr << "\nLonestar Benchmark Suite v3.0\n"
-		<< "Copyright (C) 2007, 2008, 2009, 2010 The University of Texas at Austin\n"
-		<< "http://iss.ices.utexas.edu/lonestar/\n"
-		<< "\n"
-		<< "application: Preflow Push Algorithm (c++ version)\n"
-		<< "Finds the maximum flow in a given network\n"
-		<< "Using the preflow push technique\n"
-		<< "http://iss.ices.utexas.edu/lonestar/preflowpush.html\n"
-		<< "\n";
 
 	config = new Graph();   //config is a variable of type Graph*
 	Builder b;	//Builder class has method to read from file and construct graphb.read_wash(config, argv[inputFileAt]);
-	b.read_rand(config, argv[inputFileAt]);
+	b.read_rand(config, args[0]);
 	cout<<"numNodes is "<< numNodes <<endl;   //debug code
 
 	gapYet.resize(numNodes+1,0);	
@@ -121,7 +117,7 @@ int main(int argc, char** argv) {
 		increment=0;
 	}
 	}*/
-	Galois::setMaxThreads(threads);
+	Galois::setMaxThreads(numThreads);
 	cout<<"Threads :"<<threads<<endl;
 	Galois::for_each(wl.begin(), wl.end(), process);
 	Galois::Launcher::stopTiming();

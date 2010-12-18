@@ -8,11 +8,6 @@
 typedef Galois::Graph::FirstGraph<Node,Edge,true>            Graph;
 typedef Galois::Graph::FirstGraph<Node,Edge,true>::GraphNode GNode;
 
-#ifdef WITH_VTUNE
-#include "/opt/intel/vtune_amplifier_xe_2011/include/libittnotify.h"
-#endif
-
-
 class Index
 {
 	public:

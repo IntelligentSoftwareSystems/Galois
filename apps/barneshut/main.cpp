@@ -14,6 +14,16 @@
 #include <algorithm>
 #include <sys/time.h>
 
+#include "Lonestar/Banner.h"
+#include "Lonestar/CommandLine.h"
+
+static const char* name = "Barnshut N-Body Simulator";
+static const char* description = "Simulation of the gravitational forces in a galactic cluster using the Barnes-Hut n-body algorithm\n";
+static const char* url = 0;
+static const char* help = "<input file>";
+
+
+
 Graph *octree;
 GNode root;
 int step;
@@ -24,33 +34,21 @@ void process(GNode& item, Galois::Context<GNode>& lwl) {
 			barneshut.itolsq, step, barneshut.dthf, barneshut.epssq);
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, const char** argv) {
   std::cout.setf(std::ios::right|std::ios::scientific|std::ios::showpoint);
 
-	if (Galois::Launcher::isFirstRun()) {
-		std::cerr << "Lonestar Benchmark Suite v3.0" << std::endl;
-		std::cerr
-				<< "Copyright (C) 2007, 2008, 2009, 2010 The University of Texas at Austin"
-				<< std::endl;
-		std::cerr << "http://iss.ices.utexas.edu/lonestar/" << std::endl;
-		std::cerr << std::endl;
-		std::cerr << "Simulation of the gravitational forces in a galactic"
-				<< std::endl;
-		std::cerr << "cluster using the Barnes-Hut n-body algorithm" << std::endl;
-		std::cerr << "http://iss.ices.utexas.edu/lonestar/barneshut.html"
-				<< std::endl;
-		std::cerr << std::endl;
-	}
-	if (argc != 3) {
-		std::cerr << "arguments: <num_threads> <input_file_name>" << std::endl;
-		exit(-1);
-	}
+  std::vector<const char*> args = parse_command_line(argc, argv, help);
+  
+  if (args.size() != 1) {
+    std::cout << "not enough arguments, use -help for usage information\n";
+    return 1;
+  }
+  printBanner(std::cout, name, description, url);
 
-	int threadnum = atoi(argv[1]);
-	barneshut.readInput(argv[2], true);
+	barneshut.readInput(args[0], true);
 	OctTreeNodeData res;
-	std::cout<<"Num. of threads: "<<threadnum<<std::endl;
-	Galois::setMaxThreads(threadnum);
+	std::cout<<"Num. of threads: "<<numThreads<<std::endl;
+	Galois::setMaxThreads(numThreads);
 	Galois::Launcher::startTiming();
 	for (step = 0; step < barneshut.ntimesteps; step++) { // time-step the system
 		barneshut.computeCenterAndDiameter();
@@ -91,7 +89,7 @@ int main(int argc, char* argv[]) {
 
 	if (Galois::Launcher::isFirstRun()) { // verify result
 		Barneshut barneshut2;
-		barneshut2.readInput(argv[2], false);
+		barneshut2.readInput(args[0], false);
 		OctTreeNodeData s_res;
 		for (step = 0; step < barneshut2.ntimesteps; step++) {
 			barneshut2.computeCenterAndDiameter();

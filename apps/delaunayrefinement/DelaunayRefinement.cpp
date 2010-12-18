@@ -40,6 +40,14 @@
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
 
+#include "Lonestar/Banner.h"
+#include "Lonestar/CommandLine.h"
+
+static const char* name = "Delaunay Mesh Refinement";
+static const char* description = "Refines a Delaunay triangulation mesh such that no angle in the mesh is less than 30 degrees\n";
+static const char* url = "http://iss.ices.utexas.edu/lonestar/delaunayrefinement.html";
+static const char* help = "<input file>";
+
 typedef Galois::Graph::FirstGraph<Element,void,false>            Graph;
 typedef Galois::Graph::FirstGraph<Element,void,false>::GraphNode GNode;
 
@@ -50,10 +58,6 @@ typedef Galois::Graph::FirstGraph<Element,void,false>::GraphNode GNode;
 
 #include "Support/ThreadSafe/simple_lock.h"
 #include "Support/ThreadSafe/TSQueue.h"
-
-#ifdef WITH_VTUNE
-#include "/opt/intel/vtune_amplifier_xe_2011/include/libittnotify.h"
-#endif
 
 Graph* mesh;
 int threads = 1;
@@ -98,55 +102,25 @@ void process(GNode item, Galois::Context<GNode>& lwl) {
 
 template<typename WLTY>
 void refine(Mesh& m, WLTY& wl) {
-  //  if (threads == 1) {
-  //    while (wl.size()) {
-  //      bool suc;
-  //      GNode N = wl.pop(suc);
-  //      process(N, wl);
-  //    }
-  //  } else {
-  //Galois::setMaxThreads(threads);
-  using namespace Galois::Scheduling;
-#ifdef WITH_VTUNE
-  __itt_resume();
-#endif
   Galois::for_each(wl.begin(), wl.end(), process);
-    //  }
-#ifdef WITH_VTUNE
-  __itt_pause();
-#endif
 }
 
 
 using namespace std;
 
-int main(int argc, char** argv) {
+int main(int argc, const char** argv) {
 
-  if (argc < 2) {
-    cout << "Arguments: [-t threads] <input file>\n";
+  std::vector<const char*> args = parse_command_line(argc, argv, help);
+
+  if (args.size() != 1) {
+    std::cout << "not enough arguments, use -help for usage information\n";
     return 1;
   }
-
-  int inputFileAt = 1;
-  if (std::string("-t").compare(argv[1]) == 0) {
-    inputFileAt = 3;
-    threads = atoi(argv[2]);
-  }
-
-  cout << "\nLonestar Benchmark Suite v3.0\n"
-       << "Copyright (C) 2007, 2008, 2009, 2010 The University of Texas at Austin\n"
-       << "http://iss.ices.utexas.edu/lonestar/\n"
-       << "\n"
-       << "application: Delaunay Mesh Refinement (c++ version)\n"
-       << "Refines a Delaunay triangulation mesh such that no angle\n"
-       << "in the mesh is less than 30 degrees\n"
-       << "http://iss.ices.utexas.edu/lonestar/delaunayrefinement.html\n"
-       << "\n";
+  printBanner(std::cout, name, description, url);
 
   mesh = new Graph();
   Mesh m;
-  m.read(mesh, argv[inputFileAt]);
-  //  threadsafe::ts_queue<GNode> wl;
+  m.read(mesh, args[0]);
   std::vector<GNode> wl;
   int numbad = m.getBad(mesh, wl);
 
@@ -154,25 +128,27 @@ int main(int argc, char** argv) {
        << "number of threads: " << threads << "\n"
        << "\n";
 
-  Galois::setMaxThreads(threads);
+  Galois::setMaxThreads(numThreads);
   Galois::Launcher::startTiming();
   refine(m, wl);
   Galois::Launcher::stopTiming();
   
   cout << "STAT: Time " << Galois::Launcher::elapsedTime() << "\n";
 
-  if (!m.verify(mesh)) {
-    cerr << "Refinement failed.\n";
-    assert(0 && "Refinement failed");
-    abort();
+  if (!skipVerify) {
+    if (!m.verify(mesh)) {
+      cerr << "Refinement failed.\n";
+      assert(0 && "Refinement failed");
+      abort();
+    }
+    
+    int size = m.getBad(mesh, wl);
+    if (size != 0) {
+      cerr << "Refinement failed with " << size << " remaining triangles.\n";
+      assert(0 && "Refinement failed");
+      abort();
+    }
+    cout << "Refinement OK\n";
   }
-  
-  int size = m.getBad(mesh, wl);
-  if (size != 0) {
-    cerr << "Refinement failed with " << size << " remaining triangles.\n";
-    assert(0 && "Refinement failed");
-    abort();
-  }
-  cout << "Refinement OK\n";
 }
 

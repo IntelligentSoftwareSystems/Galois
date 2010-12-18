@@ -8,6 +8,37 @@
 #include "SSSP.h"
 #include "Galois/IO/gr.h"
 
+#include "Lonestar/Banner.h"
+#include "Lonestar/CommandLine.h"
+
+#include <iostream>
+#include <fstream>
+using namespace std;
+
+static const char* name = "Single Source Shortest Path";
+static const char* description = "Computes the shortest path from a source node to all nodes in a directed graph using a modified Bellman-Ford algorithmRefines a Delaunay triangulation mesh such that no angle in the mesh is less than 30 degrees\n";
+static const char* url = "http://iss.ices.utexas.edu/lonestar/sssp.html";
+static const char* help = "<input file> <bfs> <startnode>";
+
+int main(int argc, const char **argv) {
+
+  std::vector<const char*> args = parse_command_line(argc, argv, help);
+
+  if (args.size() != 4) {
+    std::cout << "not enough arguments, use -help for usage information\n";
+    return 1;
+  }
+  printBanner(std::cout, name, description, url);
+  
+  const char* inputfile = args[0];
+  bool bfs = strcmp(args[1], "f") == 0 ? false : true;
+  int maxNodes = atoi(args[2]);
+  
+  SSSP sssp;
+  sssp.run(bfs, inputfile, numThreads, maxNodes);
+  return 0;
+}
+
 void SSSP::updateSourceAndSink(const int sourceId, const int sinkId) {
 	if (sourceId > numNodes || sourceId <= 0 || sinkId > numNodes || sinkId <= 0) {
 		cerr<<"Invalid maxNode!" <<endl;
@@ -17,6 +48,8 @@ void SSSP::updateSourceAndSink(const int sourceId, const int sinkId) {
 			graph.active_end(); src != ee; ++src) {
 		SNode& node = src->getData(Galois::Graph::NONE);
 		node.dist = DIST_INFINITY;
+		//std::cout << node.toString() << "\n";
+
 		if (node.id == sourceId) {
 			source = *src;
 			node.dist = 0;
@@ -24,20 +57,33 @@ void SSSP::updateSourceAndSink(const int sourceId, const int sinkId) {
 			sink = *src;
 		}
 	}
+	if (sink.isNull()) {
+	  std::cerr << "Failed to set sink (" << sinkId << ").\n";
+	  assert(0);
+	  abort();
+	}
+	if (source.isNull()) {
+	  std::cerr << "Failed to set source (" << sourceId << ".\n";
+	  assert(0);
+	  abort();
+	}
 }
 
 int SSSP::getEdgeData(GNode src, GNode dst) {
-	if (executorType.bfs)
-		return 1;
-	else
-	  return graph.getEdgeData(src, dst, Galois::Graph::NONE);
+  int retval;
+  if (executorType.bfs)
+    retval = 1;
+  else
+    retval = graph.getEdgeData(src, dst, Galois::Graph::NONE);
+  assert(retval >= 0);
+  return retval;
 }
 
-void SSSP::initializeGraph(char *filename) {
-  Galois::IO::readFile_gr<Graph, false>(filename, &graph);
+void SSSP::initializeGraph(const char *filename) {
+  Galois::IO::readFile_gr<Graph, true>(filename, &graph);
 }
 
-void SSSP::run(bool bfs, char *filename, int threadnum, int maxNodes) {
+void SSSP::run(bool bfs, const char *filename, int threadnum, int maxNodes) {
 	executorType = ExecutorType(bfs);
 	initializeGraph(filename);
 	updateSourceAndSink(maxNodes, numNodes - 1 - maxNodes); //FIXME:!!?
@@ -141,6 +187,7 @@ void SSSP::runBody(const GNode src) {
     UpdateRequest req = initial.top();
     initial.pop();
     SNode& data = req.n.getData(Galois::Graph::NONE);
+    //    std::cout << data.toString() << " -> " << req.w << " (" << initial.size() << ")\n";
     if (req.w < data.dist) {
       data.dist = req.w;
       for (Graph::neighbor_iterator ii = graph.neighbor_begin(req.n, Galois::Graph::NONE), 

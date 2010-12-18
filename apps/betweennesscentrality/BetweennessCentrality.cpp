@@ -3,6 +3,9 @@
 #include "Galois/Galois.h"
 #include "Galois/IO/gr.h"
 
+#include "Lonestar/Banner.h"
+#include "Lonestar/CommandLine.h"
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -10,6 +13,13 @@
 #include <stack>
 #include <queue>
 #include <vector>
+
+
+static const char* name = "Betweenness Centrality";
+static const char* description = "Computes the betweenness centrality of all nodes in a graph\n";
+static const char* url = 0;
+static const char* help = "<input file>";
+
 
 typedef Galois::Graph::FirstGraph<unsigned long long, int, false> GraphT;
 typedef GraphT::GraphNode GNodeT;
@@ -88,25 +98,15 @@ void merge(std::vector<double>& lhs, std::vector<double>& rhs) {
 }
 
 
-int main(int argc, char** argv) {
-  if (argc < 2) {
-    std::cout << "Arguments: [-t threads] <input file>\n";
+int main(int argc, const char** argv) {
+
+  std::vector<const char*> args = parse_command_line(argc, argv, help);
+
+  if (args.size() != 1 ) {
+    std::cout << "not enough arguments, use -help for usage information\n";
     return 1;
   }
-
-  int inputFileAt = 1;
-  int threads = 1;
-  if (std::string("-t").compare(argv[1]) == 0) {
-    inputFileAt = 3;
-    threads = atoi(argv[2]);
-  }
-
-  std::cout << "\nLonestar Benchmark Suite v3.0\n"
-	    << "Copyright (C) 2007, 2008, 2009, 2010 The University of Texas at Austin\n"
-	    << "http://iss.ices.utexas.edu/lonestar/\n"
-	    << "\n"
-	    << "application: Betweenness Centrality (c++ version)\n"
-	    << "\n";
+  printBanner(std::cout, name, description, url);
 
   GraphT gt;
   Graph  g;
@@ -115,7 +115,7 @@ int main(int argc, char** argv) {
   CB = &cb;
 
   //readTxtFile(argv[inputFileAt]);
-  Galois::IO::readFile_gr<GraphT, false>(argv[inputFileAt], &gt);
+  Galois::IO::readFile_gr<GraphT, false>(args[0], &gt);
   G->createGraph(&gt);
 
   NumNodes = G->size();
@@ -125,7 +125,7 @@ int main(int argc, char** argv) {
        ii != ee; ++ii)
     wl.push_back(*ii);
   
-  Galois::setMaxThreads(threads);
+  Galois::setMaxThreads(numThreads);
   Galois::Launcher::startTiming();
 #ifdef WITH_VTUNE
   __itt_resume();

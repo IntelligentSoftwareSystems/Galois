@@ -57,7 +57,7 @@ public:
 		}
 	}
 	//*/
-	void readInput(char *filename, bool print) {
+	void readInput(const char *filename, bool print) {
 		double vx, vy, vz;
 		std::ifstream infile;
 		infile.open(filename, std::ifstream::in); // opens the vector file

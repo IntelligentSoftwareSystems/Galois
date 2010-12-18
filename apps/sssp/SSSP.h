@@ -46,12 +46,12 @@ private:
 public:
 	Graph graph;
 	int delta;
-	void initializeGraph(char *filename);
+	void initializeGraph(const char *filename);
 	void updateSourceAndSink(const int sourceId, const int sinkId);
 	int getEdgeData(GNode src, GNode dst);
 	bool verify();
 	void runBody(const GNode src);
-	void run(bool bfs, char *filename, int threadnum, int maxNodes);
+	void run(bool bfs, const char *filename, int threadnum, int maxNodes);
 	template<typename T>
         void runBodyParallel(const GNode src, T& wl);
 	void runBodyParallel(const GNode src);

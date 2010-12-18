@@ -42,7 +42,7 @@ struct AddEdge<false> {
 
 
 template<typename GraphTy, bool weighted>
-void readFile_gr(char *filename, GraphTy* graph) {
+void readFile_gr(const char *filename, GraphTy* graph) {
   std::ifstream infile;
   infile.open(filename, std::ifstream::in); // opens the vector file
   if (!infile) { // file couldn't be opened

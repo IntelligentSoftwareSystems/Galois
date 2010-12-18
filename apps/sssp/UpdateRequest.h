@@ -13,7 +13,7 @@ private:
 public:
   GNode n;
   int w;
-  UpdateRequest() {};
+ UpdateRequest() :n(), w(0) {};
   UpdateRequest(GNode _n, int _w)
     :n(_n), w(_w)
   {}
