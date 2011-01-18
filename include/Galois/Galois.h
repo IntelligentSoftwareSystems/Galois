@@ -110,14 +110,14 @@ public:
     term.initialize(&tld.iterations);
     Timer T;
     T.start();
-    do {
+    //    do {
       do {
 	std::pair<bool, value_type> p = global_wl.pop();
 	if (p.first)
 	  doProcess(p.second, tld);
       } while (!global_wl.empty());
       term.locallyDone();
-    } while (!term.areWeThereYet());
+      //    } while (!term.areWeThereYet());
     T.stop();
     tld.TotalTime = T.get();
     setThreadContext(0);

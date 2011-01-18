@@ -150,5 +150,6 @@ int main(int argc, const char** argv) {
     }
     cout << "Refinement OK\n";
   }
+  return 0;
 }
 

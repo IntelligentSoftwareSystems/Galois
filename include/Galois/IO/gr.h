@@ -19,30 +19,30 @@
 namespace Galois {
 namespace IO {
 
-template<bool weighted>
-struct AddEdge {
+struct UnitWeights {
+  template<typename GraphTy, typename GraphNodeTy>
+  static void addEdge(GraphTy* graph, GraphNodeTy src, GraphNodeTy dst, int weight) {
+    graph->addEdge(src,dst, 1, Galois::Graph::NONE);
+  } 
 };
 
-template<>
-struct AddEdge<true> {
+struct ReadWeights {
   template<typename GraphTy, typename GraphNodeTy>
   static void addEdge(GraphTy* graph, GraphNodeTy src, GraphNodeTy dst, int weight) {
     graph->addEdge(src,dst, weight, Galois::Graph::NONE);
-  }
+  } 
 };
 
-template<>
-struct AddEdge<false> {
+struct VoidWeights {
   template<typename GraphTy, typename GraphNodeTy>
   static void addEdge(GraphTy* graph, GraphNodeTy src, GraphNodeTy dst, int weight) {
     graph->addEdge(src,dst, Galois::Graph::NONE);
-  }
+  } 
 };
 
 
-
-template<typename GraphTy, bool weighted>
-void readFile_gr(const char *filename, GraphTy* graph) {
+template<typename GraphTy, typename WeightTy>
+std::pair<unsigned int, unsigned int> readFile_gr_(const char *filename, GraphTy* graph, WeightTy ae) {
   std::ifstream infile;
   infile.open(filename, std::ifstream::in); // opens the vector file
   if (!infile) { // file couldn't be opened
@@ -51,9 +51,9 @@ void readFile_gr(const char *filename, GraphTy* graph) {
   }
   
   std::string name;
-  int LEdgeCount = 0;
-  int numNodes = 0;
-  int numEdges = 0;
+  unsigned int LEdgeCount = 0;
+  unsigned int numNodes = 0;
+  unsigned int numEdges = 0;
   typename GraphTy::GraphNode* gnodes = NULL;
   while (!infile.eof()) {
     char firstchar = 0;
@@ -65,7 +65,7 @@ void readFile_gr(const char *filename, GraphTy* graph) {
       int src, dest, weight;
       infile >> src >> dest >> weight;
       assert(weight > 0);
-      AddEdge<weighted>::addEdge(graph, gnodes[src - 1], gnodes[dest - 1], weight);
+      WeightTy::addEdge(graph, gnodes[src - 1], gnodes[dest - 1], weight);
     } else if (firstchar == 'c') {
       std::string line;
       getline(infile, line);
@@ -74,7 +74,7 @@ void readFile_gr(const char *filename, GraphTy* graph) {
       infile >> numNodes;
       infile >> numEdges;
       gnodes = new typename GraphTy::GraphNode[numNodes];
-      for (int i = 0; i < numNodes; i++) {
+      for (unsigned int i = 0; i < numNodes; i++) {
 	gnodes[i] = graph->createNode(i+1);
 	graph->addNode(gnodes[i], Galois::Graph::NONE);
       }
@@ -92,8 +92,26 @@ void readFile_gr(const char *filename, GraphTy* graph) {
     abort();
   }
   infile.close();
-  std::cout << "Read " << numNodes << " nodes and " << numEdges << " edges.\n";
+
+  return std::make_pair((unsigned)numNodes, (unsigned)numEdges);
 }
-  
+
+template<typename GraphTy>
+std::pair<unsigned int, unsigned int> readFile_gr(const char *filename, GraphTy* graph) {
+  return readFile_gr_(filename, graph, ReadWeights());
+}
+
+template<typename GraphTy>
+std::pair<unsigned int, unsigned int> readFile_gr_unit(const char *filename, GraphTy* graph) {
+  return readFile_gr_(filename, graph, UnitWeights());
+}
+
+template<typename GraphTy>
+std::pair<unsigned int, unsigned int> readFile_gr_void(const char *filename, GraphTy* graph) {
+  return readFile_gr_(filename, graph, VoidWeights());
+}
+
+
+
 }
 }

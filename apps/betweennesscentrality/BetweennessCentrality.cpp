@@ -115,7 +115,7 @@ int main(int argc, const char** argv) {
   CB = &cb;
 
   //readTxtFile(argv[inputFileAt]);
-  Galois::IO::readFile_gr<GraphT, false>(args[0], &gt);
+  Galois::IO::readFile_gr_void(args[0], &gt);
   G->createGraph(&gt);
 
   NumNodes = G->size();

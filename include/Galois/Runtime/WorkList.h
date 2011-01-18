@@ -82,14 +82,14 @@ public:
   }
 };
 
-template<typename T>
-class LIFO : public STLAdaptor<std::stack<T> > {};
+template<typename T, bool concurrent = true>
+class LIFO : public STLAdaptor<std::stack<T>, concurrent > {};
 
-template<typename T>
-class FIFO : public STLAdaptor<stdqueueFix<std::queue<T> > > {};
+template<typename T, bool concurrent = true>
+class FIFO : public STLAdaptor<stdqueueFix<std::queue<T> >, concurrent > {};
 
-template<typename T, class Compare = std::less<T> >
-class PriQueue : public STLAdaptor<std::priority_queue<T, std::vector<T>, Compare> > {};
+template<typename T, class Compare = std::less<T>, bool concurrent = true >
+class PriQueue : public STLAdaptor<std::priority_queue<T, std::vector<T>, Compare>, concurrent > {};
 
 
 template<typename T, int ChunkSize = 64, bool pushToLocal = true, typename BackingTy = LIFO<T> >
@@ -209,6 +209,74 @@ public:
     n.next = 0;
   }
 
+};
+
+
+template<class T, class Indexer >
+class OrderedByIntegerMetric {
+  FIFO<T>* data;
+  CPUSpaced<unsigned int> cursor;
+  int count;
+  unsigned int max;
+  Indexer I;
+
+  static void merge(unsigned int& x, unsigned int& y) {
+    x = 0;
+    y = 0;
+  }
+
+ public:
+
+  typedef T value_type;
+  
+  OrderedByIntegerMetric(unsigned int range, const Indexer& x = Indexer())
+    :cursor(&merge), count(0), max(range+1), I(x)
+  {
+    data = new FIFO<T>[range+1];
+  }
+  
+  ~OrderedByIntegerMetric() {
+    delete[] data;
+  }
+
+  void push(value_type val) {
+    unsigned int index = I(val);
+    __sync_fetch_and_add(&count,1);
+    data[index].push(val);
+    unsigned int& cur = cursor.get();
+    if (cur > index)
+      cur = index;
+  }
+
+  std::pair<bool, value_type> pop() {
+    unsigned int& cur = cursor.get();
+    //Find a successful pop
+    std::pair<bool, value_type> ret = data[cur].pop();
+    while (cur < max && !ret.first) {
+      ++cur;
+      ret = data[cur].pop();
+    }
+    if (ret.first)
+      __sync_fetch_and_sub(&count, 1);
+    else
+      cur = max - 1;
+    return ret;     
+  }
+
+  bool empty() const {
+    return (count==0);
+  }
+  void aborted(value_type val) {
+    push(val);
+  }
+
+  //Not Thread Safe
+  template<typename Iter>
+  void fill_initial(Iter ii, Iter ee) {
+    while (ii != ee) {
+      push(*ii++);
+    }
+  }
 };
 
 }

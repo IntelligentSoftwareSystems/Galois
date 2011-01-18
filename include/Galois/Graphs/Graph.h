@@ -208,6 +208,10 @@ public:
       return Parent->getData(ID, mflag, C);
     }
 
+    FirstGraph* getGraph() const {
+      return Parent;
+    }
+
     bool isNull() const {
       return !Parent;
     }
