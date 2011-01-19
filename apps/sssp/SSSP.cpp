@@ -64,9 +64,10 @@ struct UpdateRequest {
 };
 
 struct UpdateRequestIndexer
-  : std::unary_function<UpdateRequest, unsigned int> {
-  unsigned int operator() (const UpdateRequest& val) const {
-    return val.w >> 2;
+  : std::binary_function<UpdateRequest, unsigned int, unsigned int> {
+  unsigned int operator() (const UpdateRequest& val, unsigned int size) const {
+    unsigned int ret = val.w / 700;
+    return std::min(ret, size - 1);
   }
 };
 
@@ -127,7 +128,9 @@ void process(UpdateRequest& req, Galois::Context<UpdateRequest>& lwl) {
  
 void runBodyParallel(const GNode src, unsigned int numNodes) {
   //GaloisRuntime::WorkList::PriQueue<UpdateRequest> wl;
-  GaloisRuntime::WorkList::OrderedByIntegerMetric<UpdateRequest, UpdateRequestIndexer> wl(numNodes);
+  typedef GaloisRuntime::WorkList::OrderedByIntegerMetric<UpdateRequest, UpdateRequestIndexer> OBIM;
+  OBIM wl(30*1024);
+  //  GaloisRuntime::WorkList::CacheByIntegerMetric<OBIM, 1, UpdateRequestIndexer> wl2(wl);
   
   getInitialRequests(src, *src.getGraph(), wl);
   Galois::for_each(wl, process);

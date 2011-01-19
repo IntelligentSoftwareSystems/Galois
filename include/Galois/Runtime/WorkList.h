@@ -218,9 +218,9 @@ class OrderedByIntegerMetric {
   typedef FIFO<T> ContainerTy;
 
   ContainerTy* data;
-  CPUSpaced<unsigned int> cursor;
   unsigned int size;
   Indexer I;
+  CPUSpaced<unsigned int> cursor;
 
   static void merge(unsigned int& x, unsigned int& y) {
     x = 0;
@@ -232,7 +232,7 @@ class OrderedByIntegerMetric {
   typedef T value_type;
   
   OrderedByIntegerMetric(unsigned int range, const Indexer& x = Indexer())
-    :cursor(&merge), size(range+1), I(x)
+    :size(range+1), I(x), cursor(&merge)
   {
     data = new ContainerTy[size];
   }
@@ -242,7 +242,7 @@ class OrderedByIntegerMetric {
   }
 
   void push(value_type val) {
-    unsigned int index = I(val) % size; //Don't overflow if range is wrong
+    unsigned int index = I(val, size);
     data[index].push(val);
     unsigned int& cur = cursor.get();
     if (cur > index)
@@ -280,6 +280,95 @@ class OrderedByIntegerMetric {
     while (ii != ee) {
       push(*ii++);
     }
+  }
+};
+
+template<typename ParentTy, unsigned int size, class Indexer>
+class CacheByIntegerMetric {
+  
+  typedef typename ParentTy::value_type T;
+
+  ParentTy& data;
+
+  struct __cacheTy{
+    bool valid;
+    T data;
+    __cacheTy() :valid(0) {}
+  };
+  struct cacheTy {
+    __cacheTy cacheInst[size];
+  };
+  typedef __cacheTy (&cacheRef)[size];
+  typedef const __cacheTy (&constCacheRef)[size];
+
+  CPUSpaced<cacheTy> cache;
+  Indexer I;
+
+  static void merge(cacheTy& x, cacheTy& y) {
+  }
+
+ public:
+
+  typedef T value_type;
+  
+  CacheByIntegerMetric(ParentTy& P, const Indexer& x = Indexer())
+    :data(P), cache(merge), I(x,size)
+  { }
+  
+  void push(value_type val) {
+    cacheRef c = cache.get().cacheInst;
+    unsigned int valIndex = I(val,size);
+
+    for (unsigned int i = 0; i < size; ++i) {
+      if (c[i].valid) {
+	if (valIndex < I(c[i].data,size)) {
+	  //swap
+	  value_type tmp = c[i].data;
+	  c[i].data = val;
+	  val = tmp;
+	  valIndex = I(val,size);
+	}
+      } else { //slot open
+	c[i].valid = true;
+	c[i].data = val;
+	return;
+      }
+    }
+    //val is either an old cached entry or the pushed one
+    data.push(val);
+  }
+
+  std::pair<bool, value_type> pop() {
+    cacheRef c = cache.get().cacheInst;
+
+    for (unsigned int i = 0; i < size; ++i)
+      if (c[i].valid) {
+	value_type v = c[i].data;
+	c[i].valid = false;
+	return std::make_pair(true, v);
+      }
+
+    //cache was empty
+    return data.pop();
+  }
+
+  bool empty() const {
+    constCacheRef c = cache.get().cacheInst;
+
+    for (unsigned int i = 0; i < size; ++i)
+      if (c[i].valid)
+	return false;
+    return data.empty();
+  }
+
+  void aborted(value_type val) {
+    push(val);
+  }
+
+  //Not Thread Safe
+  template<typename Iter>
+  void fill_initial(Iter ii, Iter ee) {
+    data.fill_initial(ii, ee);
   }
 };
 

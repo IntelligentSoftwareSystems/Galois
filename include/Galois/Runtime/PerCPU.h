@@ -61,6 +61,15 @@ public:
     return datum[i - 1].data;
   }
 
+  const T& get() const {
+    int i = ThreadAware::getMyID();
+    if (!i)
+      return zero_datum.data;
+    assert(i <= num);
+    assert(datum);
+    return datum[i - 1].data;
+  }
+
   const T& getRemote(int i) const {
     if (!i)
       return zero_datum.data;

@@ -59,7 +59,7 @@ class ThreadAware : public HIDDEN::ThreadAwareHook {
 
 protected:
   void init();
-  int getMyID() { return ThreadPool::getMyID(); }
+  int getMyID() const { return ThreadPool::getMyID(); }
 
 public:
   ThreadAware();

@@ -112,11 +112,16 @@ public:
     T.start();
     //    do {
       do {
-	std::pair<bool, value_type> p = global_wl.pop();
-	if (p.first)
-	  doProcess(p.second, tld);
+	do {
+	  std::pair<bool, value_type> p = global_wl.pop();
+	  if (p.first)
+	    doProcess(p.second, tld);
+	  else
+	    break;
+	} while(true);
+	//break to here to do more expensive empty check
       } while (!global_wl.empty());
-      term.locallyDone();
+      //term.locallyDone();
       //    } while (!term.areWeThereYet());
     T.stop();
     tld.TotalTime = T.get();
