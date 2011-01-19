@@ -66,7 +66,7 @@ struct UpdateRequest {
 struct UpdateRequestIndexer
   : std::unary_function<UpdateRequest, unsigned int> {
   unsigned int operator() (const UpdateRequest& val) const {
-    return val.w;
+    return val.w >> 2;
   }
 };
 
@@ -85,7 +85,7 @@ void getInitialRequests(const GNode src, Graph& graph, WLTy& wl) {
 void runBody(const GNode src, Graph& graph) {
   priority_queue<UpdateRequest> initial;
   getInitialRequests(src, graph, initial);
-
+  
   while (!initial.empty()) {
     UpdateRequest req = initial.top();
     initial.pop();
@@ -105,7 +105,7 @@ void runBody(const GNode src, Graph& graph) {
     }
   }
 }
-
+  
 void process(UpdateRequest& req, Galois::Context<UpdateRequest>& lwl) {
   SNode& data = req.n.getData(Galois::Graph::NONE);
   Graph* graph = req.n.getGraph();
@@ -124,11 +124,11 @@ void process(UpdateRequest& req, Galois::Context<UpdateRequest>& lwl) {
     }
   }
 }
-
-void runBodyParallel(const GNode src) {
-  GaloisRuntime::WorkList::PriQueue<UpdateRequest> wl;
-  //GaloisRuntime::WorkList::OrderedByIntegerMetric<UpdateRequest, UpdateRequestIndexer> wl(10000);
-
+ 
+void runBodyParallel(const GNode src, unsigned int numNodes) {
+  //GaloisRuntime::WorkList::PriQueue<UpdateRequest> wl;
+  GaloisRuntime::WorkList::OrderedByIntegerMetric<UpdateRequest, UpdateRequestIndexer> wl(numNodes);
+  
   getInitialRequests(src, *src.getGraph(), wl);
   Galois::for_each(wl, process);
 }
@@ -237,7 +237,7 @@ int main(int argc, const char **argv) {
   } else {
     Galois::setMaxThreads(numThreads);
     Galois::Launcher::startTiming();
-    runBodyParallel(source);
+    runBodyParallel(source, numNodes);
     Galois::Launcher::stopTiming();
   }
 

@@ -212,12 +212,14 @@ public:
 };
 
 
-template<class T, class Indexer >
+template<class T, class Indexer>
 class OrderedByIntegerMetric {
-  FIFO<T>* data;
+
+  typedef FIFO<T> ContainerTy;
+
+  ContainerTy* data;
   CPUSpaced<unsigned int> cursor;
-  int count;
-  unsigned int max;
+  unsigned int size;
   Indexer I;
 
   static void merge(unsigned int& x, unsigned int& y) {
@@ -230,9 +232,9 @@ class OrderedByIntegerMetric {
   typedef T value_type;
   
   OrderedByIntegerMetric(unsigned int range, const Indexer& x = Indexer())
-    :cursor(&merge), count(0), max(range+1), I(x)
+    :cursor(&merge), size(range+1), I(x)
   {
-    data = new FIFO<T>[range+1];
+    data = new ContainerTy[size];
   }
   
   ~OrderedByIntegerMetric() {
@@ -240,8 +242,7 @@ class OrderedByIntegerMetric {
   }
 
   void push(value_type val) {
-    unsigned int index = I(val);
-    __sync_fetch_and_add(&count,1);
+    unsigned int index = I(val) % size; //Don't overflow if range is wrong
     data[index].push(val);
     unsigned int& cur = cursor.get();
     if (cur > index)
@@ -251,20 +252,23 @@ class OrderedByIntegerMetric {
   std::pair<bool, value_type> pop() {
     unsigned int& cur = cursor.get();
     //Find a successful pop
-    std::pair<bool, value_type> ret = data[cur].pop();
-    while (cur < max && !ret.first) {
+    if (cur == size) //handle out of range
+      cur = 0;
+
+    std::pair<bool, value_type> ret;
+    ret = data[cur].pop();
+    while (cur < size && !ret.first) {
       ++cur;
       ret = data[cur].pop();
     }
-    if (ret.first)
-      __sync_fetch_and_sub(&count, 1);
-    else
-      cur = max - 1;
     return ret;     
   }
 
   bool empty() const {
-    return (count==0);
+    for (unsigned int i = 0; i < size; ++i)
+      if (!data[i].empty())
+	return false;
+    return true;
   }
   void aborted(value_type val) {
     push(val);
