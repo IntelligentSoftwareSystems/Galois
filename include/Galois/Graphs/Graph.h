@@ -55,17 +55,17 @@ template<typename NTy, typename ETy>
 struct EdgeItem {
   NTy N;
   ETy E;
-  NTy getNeighbor() {
+  inline NTy getNeighbor() {
     return N;
   }
-  ETy& getData() {
+  inline ETy& getData() {
     return E;
   }
-  EdgeItem(NTy& n) :
+  inline EdgeItem(NTy& n) :
     N(n) {
   }
 
-  EdgeItem(){
+  inline EdgeItem(){
   }
 
 };
@@ -73,13 +73,13 @@ struct EdgeItem {
 template<typename NTy>
 struct EdgeItem<NTy, void> {
   NTy N;
-  NTy getNeighbor() {
+  inline NTy getNeighbor() {
     return N;
   }
-  typename VoidWrapper<void>::ref_type getData() {
+  inline typename VoidWrapper<void>::ref_type getData() {
     return VoidWrapper<void>::ref_type();
   }
-  EdgeItem(NTy& n) :
+  inline EdgeItem(NTy& n) :
     N(n) {
   }
 };
@@ -108,16 +108,17 @@ class FirstGraph {
       return edges.end();
     }
 
-    typedef typename boost::transform_iterator<boost::mem_fun_ref_t<gNode*,
-								    EITy>, iterator> neighbor_iterator;
+    struct getNeigh : public std::unary_function<EITy, gNode*> {
+      gNode* operator()(EITy& e) const { return e.getNeighbor(); }
+    };
+
+    typedef typename boost::transform_iterator<getNeigh, iterator> neighbor_iterator;
 
     neighbor_iterator neighbor_begin() {
-      return boost::make_transform_iterator(begin(), boost::mem_fun_ref(
-									&EITy::getNeighbor));
+      return boost::make_transform_iterator(begin(), getNeigh());
     }
     neighbor_iterator neighbor_end() {
-      return boost::make_transform_iterator(end(), boost::mem_fun_ref(
-								      &EITy::getNeighbor));
+      return boost::make_transform_iterator(end(), getNeigh());
     }
 
     gNode(const NodeTy& d, bool a) :
