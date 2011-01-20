@@ -11,22 +11,20 @@
 #include <queue>
 #include <stack>
 
-#include "Support/ThreadSafe/simple_lock.h"
-#include "Support/PackedInt.h"
+#include "Galois/Runtime/SimpleLock.h"
 
 #include <boost/utility.hpp>
-#include <boost/type_traits/is_member_function_pointer.hpp>
 
 namespace GaloisRuntime {
 namespace WorkList {
 
 template<typename MQ, bool concurrent = true>
-class STLAdaptor : private boost::noncopyable, private threadsafe::simpleLock<int, concurrent> {
+class STLAdaptor : private boost::noncopyable, private SimpleLock<int, concurrent> {
 
   MQ wl;
 
-  using threadsafe::simpleLock<int, concurrent>::lock;
-  using threadsafe::simpleLock<int, concurrent>::unlock;
+  using SimpleLock<int, concurrent>::lock;
+  using SimpleLock<int, concurrent>::unlock;
 
 public:
   typedef STLAdaptor<MQ, true>  ConcurrentTy;
@@ -212,10 +210,8 @@ public:
 };
 
 
-template<class T, class Indexer>
+template<class T, class Indexer, typename ContainerTy = FIFO<T> >
 class OrderedByIntegerMetric {
-
-  typedef FIFO<T> ContainerTy;
 
   ContainerTy* data;
   unsigned int size;
@@ -241,7 +237,7 @@ class OrderedByIntegerMetric {
     delete[] data;
   }
 
-  void push(value_type val) {
+  void push(value_type val) __attribute__((noinline)) {
     unsigned int index = I(val, size);
     data[index].push(val);
     unsigned int& cur = cursor.get();
@@ -249,7 +245,7 @@ class OrderedByIntegerMetric {
       cur = index;
   }
 
-  std::pair<bool, value_type> pop() {
+  std::pair<bool, value_type> pop()  __attribute__((noinline)) {
     unsigned int& cur = cursor.get();
     //Find a successful pop
     if (cur == size) //handle out of range

@@ -25,8 +25,6 @@ GNode sink;
 GNode source;
 
 #include "Builder2.h"
-//#include "Support/ThreadSafe/TSPQueue.h"
-#include "Support/ThreadSafe/TSQueue.h"
 //#include "PQ.h"
 
 void  initializePreflow();
@@ -56,7 +54,9 @@ double expected;
 //vector_wl<GNode> wl;
 //threadsafe::ts_pqueue< GNode, compare > wl;
 //ordered_wl<GNode, Index > wl;
-threadsafe::ts_queue<GNode> que;
+
+//threadsafe::ts_queue<GNode> que;
+GaloisRuntime::WorkList::FIFO<GNode> que;
 std::vector<GNode> wl;
 //threadsafe::ts_queue<GNode> wl;
 

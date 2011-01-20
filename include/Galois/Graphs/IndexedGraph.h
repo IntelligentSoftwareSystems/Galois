@@ -18,7 +18,6 @@
 
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/InsBag.h"
-#include "Support/ThreadSafe/TSIBag.h"
 #include "LLVM/SmallVector.h"
 
 namespace Galois {

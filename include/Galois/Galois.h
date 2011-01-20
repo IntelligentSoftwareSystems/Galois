@@ -14,6 +14,8 @@
 #include "/opt/intel/vtune_amplifier_xe_2011/include/ittnotify.h"
 #endif
 
+#include <iostream>
+
 namespace GaloisRuntime {
 
 template<class WorkListTy, class Function>

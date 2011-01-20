@@ -3,8 +3,9 @@
 #ifndef _GALOIS_RUNTIME_CONTEXT_H
 #define _GALOIS_RUNTIME_CONTEXT_H
 
-#include "Support/ThreadSafe/simple_lock.h"
 #include <boost/intrusive/slist.hpp>
+
+#include "Galois/Runtime/SimpleLock.h"
 
 namespace GaloisRuntime {
 
@@ -13,7 +14,7 @@ namespace GaloisRuntime {
 class LockableListTag;
 typedef boost::intrusive::slist_base_hook<boost::intrusive::tag<LockableListTag>,boost::intrusive::link_mode<boost::intrusive::normal_link> > LockableBaseHook;
 
-class Lockable : public LockableBaseHook, public threadsafe::simpleLock<void*, true> {
+class Lockable : public LockableBaseHook, public SimpleLock<void*, true> {
 };
 
 class SimpleRuntimeContext {

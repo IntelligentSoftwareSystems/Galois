@@ -4,13 +4,13 @@
 // FSB is modified from
 // http://warp.povusers.org/FSBAllocator/
 
-#include "Support/ThreadSafe/simple_lock.h"
-#include "Galois/Runtime/PerCPU.h"
-#include <iostream>
-#include <string.h>
-
 #ifndef _GALOISRUNTIME_MM_MEM_H
 #define _GALOISRUNTIME_MM_MEM_H
+
+#include "Galois/Runtime/SimpleLock.h"
+#include "Galois/Runtime/PerCPU.h"
+
+#include <memory.h>
 
 namespace GaloisRuntime {
 namespace MM {
@@ -57,7 +57,7 @@ public:
 //Apply a lock to a heap
 template<class RealHeap>
 class LockedHeap : public RealHeap {
-  threadsafe::simpleLock<int, true> lock;
+  SimpleLock<int, true> lock;
 public:
   enum { AllocSize = RealHeap::AllocSize };
 
@@ -204,7 +204,7 @@ public:
   }
 
   inline void* allocate(unsigned int size) {
-    static threadsafe::simpleLock<int, true> lock;
+    static SimpleLock<int, true> lock;
 
     lock.lock();
     FreeNode* OH = 0;

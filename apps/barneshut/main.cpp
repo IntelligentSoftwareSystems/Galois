@@ -8,7 +8,6 @@
 #include "Barneshut.h"
 #include "Galois/Launcher.h"
 #include "Galois/Runtime/Timer.h"
-#include "Support/ThreadSafe/TSQueue.h"
 #include <iostream>
 #include <math.h>
 #include <algorithm>

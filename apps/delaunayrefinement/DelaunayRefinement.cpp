@@ -56,9 +56,6 @@ typedef Galois::Graph::FirstGraph<Element,void,false>::GraphNode GNode;
 #include "Mesh.h"
 #include "Cavity.h"
 
-#include "Support/ThreadSafe/simple_lock.h"
-#include "Support/ThreadSafe/TSQueue.h"
-
 Graph* mesh;
 int threads = 1;
 

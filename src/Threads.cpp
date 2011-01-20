@@ -1,13 +1,12 @@
 #include "Galois/Runtime/Threads.h"
-
-#include "Support/ThreadSafe/simple_lock.h"
+#include "Galois/Runtime/SimpleLock.h"
 
 using namespace GaloisRuntime;
 
 typedef boost::intrusive::list<ThreadAware, boost::intrusive::constant_time_size<false>, boost::intrusive::base_hook<HIDDEN::ThreadAwareHook> > ListTy;
 
 static ListTy allObjects;
-static threadsafe::simpleLock<int, true> allObjectsLock;
+static SimpleLock<int, true> allObjectsLock;
 
 static int numThreads = 0;
 

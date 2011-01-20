@@ -5,16 +5,16 @@
 
 #include <cassert>
 
-namespace threadsafe {
+namespace GaloisRuntime {
 
 template<typename T, bool isALock>
-class simpleLock;
+class SimpleLock;
 
 template<typename T>
-class simpleLock<T, true> {
+class SimpleLock<T, true> {
   T _lock;
 public:
-  simpleLock() : _lock(0) {
+  SimpleLock() : _lock(0) {
 #ifdef GALOIS_CRAY
     writexf(&_lock, 0); // sets to full
 #endif
@@ -57,7 +57,7 @@ public:
 };
 
 template<typename T>
-class simpleLock<T, false> {
+class SimpleLock<T, false> {
 public:
   void lock(T val = 0) {}
   void unlock() {}

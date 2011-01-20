@@ -315,8 +315,8 @@ void globalRelabelSerial  (Context* cnx )
 	//Galois::setMaxThreads(threads);
 	//Galois::for_each(que,bfs);
 	while (!que.empty()) {
-		bool suc;
-		GNode src = que.pop(suc); //pollFirst();
+		std::pair<bool, GNode> ret = que.pop(); //pollFirst();
+		GNode src = ret.second;
 		for (Graph::neighbor_iterator ii = config->neighbor_begin(src), ee = config->neighbor_end(src); ii != ee; ++ii){
 			GNode dst=*ii;        	
 			Edge& edge = config->getEdgeData(dst,src,Galois::Graph::ALL,cnx->getRuntimeContext());

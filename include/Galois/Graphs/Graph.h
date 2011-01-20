@@ -8,7 +8,6 @@
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/InsBag.h"
 //#include "Galois/Runtime/MemRegionPool.h"
-#include "Support/ThreadSafe/TSIBag.h"
 #include "LLVM/SmallVector.h"
 
 using namespace GaloisRuntime;
@@ -170,7 +169,6 @@ class FirstGraph {
 
   //The graph manages the lifetimes of the data in the nodes and edges
   typedef GaloisRuntime::galois_insert_bag<gNode> nodeListTy;
-  //typedef threadsafe::ts_insert_bag<gNode> nodeListTy;
   nodeListTy nodes;
 
   //GaloisRuntime::MemRegionPool<gNode> NodePool;

@@ -22,9 +22,10 @@ if (CRAY)
 endif(CRAY)
 
 #Flags
-add_definitions("-Wall")
+#add_definitions("-Wall")
 
 set(CMAKE_CXX_FLAGS_RELEASE        "-O3 -g -DNDEBUG")
+#set(CMAKE_CXX_FLAGS_RELEASE        "-O3 -DNDEBUG")
 #set(CMAKE_CXX_FLAGS_DEBUG          "-g")
 set(CMAKE_CXX_FLAGS_DEBUG          "-g -DNDEBUG")
 
@@ -32,9 +33,9 @@ set(CMAKE_BUILD_TYPE Release)
 #set(CMAKE_BUILD_TYPE Debug)
 
 #set(CMAKE_CXX_COMPILER clang++)
-#set(CMAKE_CXX_COMPILER /opt/intel/Compiler/11.1/073/bin/intel64/icpc)
+#set(CMAKE_CXX_COMPILER /opt/intel/Compiler/11.1/072/bin/intel64/icpc)
 #These help the intel compiler
-#add_definitions("-wd981")
+#add_definitions("-wd981 -wd383 -wd869 -wd2196")
 
 #Source finding
 include_directories("include")
