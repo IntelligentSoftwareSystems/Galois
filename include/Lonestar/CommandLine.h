@@ -12,7 +12,7 @@ std::vector<const char*> parse_command_line(int argc, const char** argv, const c
   //-noverify
   //-help
 
-  for (int i = 0; i < argc; ++i) {
+  for (int i = 1; i < argc; ++i) {
     if (std::string("-t").compare(argv[i]) == 0) {
       if (i + 1 >= argc) {
 	std::cerr << "Error parsing -t option, missing number\n";
