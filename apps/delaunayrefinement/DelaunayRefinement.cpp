@@ -110,7 +110,7 @@ int main(int argc, const char** argv) {
   std::vector<const char*> args = parse_command_line(argc, argv, help);
 
   if (args.size() != 1) {
-    std::cout << "not enough arguments, use -help for usage information\n";
+    std::cout << "incorrect number of arguments, use -help for usage information\n";
     return 1;
   }
   printBanner(std::cout, name, description, url);
