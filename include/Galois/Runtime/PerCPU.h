@@ -16,63 +16,46 @@ class CPUSpaced : public ThreadAware {
     char* padding[64 - (sizeof(T) % 64)];
     item() :data() {}
   };
-  item zero_datum;
   item* datum;
-  int num;
+  unsigned int num;
   void (*reduce)(T&, T&);
   
-  void create(int i) {
-    assert(!datum && !num);
-    num = i;
-    datum = new item[num];
-  }
-
-  void reduce_and_reset() {
-    for (int i = 0; i < num; ++i)
-      reduce(zero_datum.data, datum[i].data);
-    delete[] datum;
-    datum = 0;
-    num = 0;
+  void __reduce() {
+    for (int i = 1; i <= num; ++i)
+      reduce(datum[0].data, datum[i].data);
   }
 
 public:
   CPUSpaced(void (*func)(T&, T&))
-    :datum(0), num(0), reduce(func)
+    :reduce(func)
   {
-    init();
+    num = getSystemThreadPool().size();
+    datum = new item[num + 1];
   }
   
   ~CPUSpaced() {
-    if (datum) {
-      delete[] datum;
-    }
+    delete[] datum;
   }
 
   T& getMaster() {
-    return zero_datum.data;
+    return datum[0].data;
   }
   
   T& get() {
-    int i = ThreadAware::getMyID();
-    if (!i)
-      return zero_datum.data;
+    int i = ThreadPool::getMyID();
     assert(i <= num);
     assert(datum);
-    return datum[i - 1].data;
+    return datum[i].data;
   }
 
   const T& get() const {
-    int i = ThreadAware::getMyID();
-    if (!i)
-      return zero_datum.data;
+    int i = ThreadPool::getMyID();
     assert(i <= num);
     assert(datum);
     return datum[i - 1].data;
   }
 
   const T& getRemote(int i) const {
-    if (!i)
-      return zero_datum.data;
     assert(i <= num);
     assert(datum);
     return datum[i - 1].data;
@@ -82,12 +65,10 @@ public:
     return num + 1;
   }
 
-  virtual void ThreadChange(int newnum) {
-    reduce_and_reset();
-    if (newnum)
-      create(newnum);
+  virtual void ThreadChange(bool starting) {
+    if (!starting)
+      __reduce();
   }
-  
 };
 
 }

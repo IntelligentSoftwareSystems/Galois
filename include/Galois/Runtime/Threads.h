@@ -12,6 +12,7 @@
 
 namespace GaloisRuntime {
 
+//declared out of line to correctly initialize data in Threads.cpp
 struct initMainThread {
   initMainThread();
 };
@@ -22,21 +23,21 @@ class ThreadPool {
   static int nextThreadID;
 
 protected:
-  static void NotifyAware(int n);
-  static void ResetThreadNumbers();
+  static void NotifyAware(bool starting);
 
 public:
   //!execute work on all threads
   //!The work object is not duplicated in any way 
   virtual void run(Galois::Executable* work) = 0;
   
-  //!change the number of preallocated threads
-  virtual void resize(int num) = 0;
+  //!change the number of preallocated threads to num
+  //!returns the number that the runtime chooses (may not be num)
+  virtual unsigned int setMaxThreads(unsigned int num) = 0;
   
   //!How many threads are kept around
-  virtual int size() = 0;
+  virtual unsigned int size() = 0;
 
-  static int getMyID();
+  static unsigned int getMyID();
 
 };
 
@@ -55,21 +56,16 @@ typedef boost::intrusive::list_base_hook<boost::intrusive::tag<ThreadAwareTag> >
 //This notifies when the number of threads change
 class ThreadAware : public HIDDEN::ThreadAwareHook {
   friend class ThreadPool;
-  static void NotifyOfChange(int num);
-
-protected:
-  void init();
-  int getMyID() const { return ThreadPool::getMyID(); }
+  static void NotifyOfChange(bool starting);
 
 public:
   ThreadAware();
   virtual ~ThreadAware();
 
-  //This is called to notify changes in the number of threads
-  //Thread 0 always exists (inital thread).
-  //Parallel code has threads labeled from [1 -> num]
-  //num is zero when Parallel code is exiting
-  virtual void ThreadChange(int num) = 0;
+  //This is called to notify the start and end of a parallel region
+  //starting = true -> parallel code is initializing
+  //starting = false -> parallel code is ending
+  virtual void ThreadChange(bool starting) = 0;
 
 };
 

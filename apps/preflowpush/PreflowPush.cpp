@@ -58,6 +58,50 @@ void printHeights()
 	}
 }
 
+struct process {
+  template<typename Context>
+  void operator()(GNode& item, Context& lwl) {
+/*	bool inRelabel = false;
+	try
+	{
+		while(lock==true);
+		__sync_fetch_and_add(&counter,1);
+		int increment = 1;*/
+		if(discharge(item, &lwl));
+		/*	increment += BETA;
+		__sync_fetch_and_add(&relabelYet, increment);
+		if(relabelYet > globalRelabelInterval)
+		{	
+			if( __sync_val_compare_and_swap(&lock, false, true) == false)
+			{
+				flag = 0;
+				//cout<<"Trying Global Relabel..."<<endl;
+				while(counter!=1);
+				inRelabel = true;
+				//cout<<"Doing Global Relabel...Counter is "<<counter<<endl;
+				globalRelabelSerial(&lwl);
+				counting++;
+				__sync_val_compare_and_swap(&relabelYet, relabelYet, 0);
+				//cout<<"Global relabel complete... "<<counter<<endl;
+				flag = 1;
+				lock = false;
+			}
+		}
+		__sync_fetch_and_add(&counter, -1);
+		//cout<<"Counter at end :"<<counter<<endl;
+	}catch(...)
+	{
+		if (inRelabel)
+		{
+			//cout<<"Exception in global relabel"<<endl;
+			__sync_val_compare_and_swap(&lock, true, false);
+			flag = 1;
+		}
+		__sync_fetch_and_add(&counter, -1);
+		throw;	
+	}*/
+  }
+};
 
 int main(int argc, const char** argv) {
 
@@ -119,7 +163,7 @@ int main(int argc, const char** argv) {
 	}*/
 	Galois::setMaxThreads(numThreads);
 	cout<<"Threads :"<<threads<<endl;
-	Galois::for_each(wl.begin(), wl.end(), process);
+	Galois::for_each(wl.begin(), wl.end(), process());
 	Galois::Launcher::stopTiming();
 
 	cerr << "Time: " << Galois::Launcher::elapsedTime() << " msec\n";
@@ -128,50 +172,6 @@ int main(int argc, const char** argv) {
 	//checkMaxFlow();
 	cout<<"Flow is OK"<<endl;
 }
-
-
-void process(GNode& item, Galois::Context<GNode>& lwl) {
-/*	bool inRelabel = false;
-	try
-	{
-		while(lock==true);
-		__sync_fetch_and_add(&counter,1);
-		int increment = 1;*/
-		if(discharge(item, &lwl));
-		/*	increment += BETA;
-		__sync_fetch_and_add(&relabelYet, increment);
-		if(relabelYet > globalRelabelInterval)
-		{	
-			if( __sync_val_compare_and_swap(&lock, false, true) == false)
-			{
-				flag = 0;
-				//cout<<"Trying Global Relabel..."<<endl;
-				while(counter!=1);
-				inRelabel = true;
-				//cout<<"Doing Global Relabel...Counter is "<<counter<<endl;
-				globalRelabelSerial(&lwl);
-				counting++;
-				__sync_val_compare_and_swap(&relabelYet, relabelYet, 0);
-				//cout<<"Global relabel complete... "<<counter<<endl;
-				flag = 1;
-				lock = false;
-			}
-		}
-		__sync_fetch_and_add(&counter, -1);
-		//cout<<"Counter at end :"<<counter<<endl;
-	}catch(...)
-	{
-		if (inRelabel)
-		{
-			//cout<<"Exception in global relabel"<<endl;
-			__sync_val_compare_and_swap(&lock, true, false);
-			flag = 1;
-		}
-		__sync_fetch_and_add(&counter, -1);
-		throw;	
-	}*/
-}
-
 
 
 void  initializePreflow() {  
@@ -197,7 +197,7 @@ void  initializePreflow() {
 
 template<typename Context>
 bool discharge(GNode& src, Context* cnx) {
-	Node& node = src.getData(Galois::Graph::ALL,cnx->getRuntimeContext());
+	Node& node = src.getData(Galois::Graph::ALL);
 	int prevHeight = node.height;
 	//cout<<"Height of node is "<<prevHeight<<"  Insert Time is : "<<node.insert_time<<endl;
 	bool retval = false;
@@ -213,11 +213,11 @@ bool discharge(GNode& src, Context* cnx) {
 
 		for (Graph::neighbor_iterator ii = config->neighbor_begin(src), ee = config->neighbor_end(src); ii != ee; ++ii) {
 			GNode dst=*ii;
-			Node& node2 = l.src.getData(Galois::Graph::ALL,cnx->getRuntimeContext());
-			Node& dnode = dst.getData(Galois::Graph::ALL,cnx->getRuntimeContext());
+			Node& node2 = l.src.getData(Galois::Graph::ALL);
+			Node& dnode = dst.getData(Galois::Graph::ALL);
 			if (l.finished)
 				break;
-			int cap = config->getEdgeData((l.src), dst,Galois::Graph::ALL,cnx->getRuntimeContext()).cap;  //this needs to be refined
+			int cap = config->getEdgeData((l.src), dst,Galois::Graph::ALL).cap;  //this needs to be refined
 			if (cap > 0 && l.cur >= node2.current) {
 				int amount = 0;
 				if (node2.height - 1 == dnode.height) {
@@ -270,9 +270,9 @@ void relabel(GNode& src, Local& l, Context* cnx) {
 
 	for (Graph::neighbor_iterator ii = config->neighbor_begin(src), ee = config->neighbor_end(src); ii != ee; ++ii){
 		GNode dst = *ii;
-		int cap = config->getEdgeData(src, dst,Galois::Graph::ALL,cnx->getRuntimeContext()).cap; //refined? check Graph.h file if that is the exact function
+		int cap = config->getEdgeData(src, dst,Galois::Graph::ALL).cap; //refined? check Graph.h file if that is the exact function
 		if (cap > 0) {
-			Node& dnode = dst.getData(Galois::Graph::ALL,cnx->getRuntimeContext());
+			Node& dnode = dst.getData(Galois::Graph::ALL);
 			if (dnode.height < l.minHeight) {
 				l.minHeight = dnode.height;
 				l.minEdge = l.relabelCur;
@@ -301,12 +301,12 @@ void globalRelabelSerial  (Context* cnx )
 	//deque<GNode> queue;
 	//usleep(50000);
 	for(Graph::active_iterator ii = config->active_begin(), ee = config->active_end(); ii != ee; ++ii) {
-		Node& node = ii->getData(Galois::Graph::ALL,cnx->getRuntimeContext());
+		Node& node = ii->getData(Galois::Graph::ALL);
 		// Max distance
 		node.height = numNodes;
 		node.current = 0;
 	}
-	Node& temp=sink.getData(Galois::Graph::ALL,cnx->getRuntimeContext());
+	Node& temp=sink.getData(Galois::Graph::ALL);
 	temp.height = 0;	
 	que.push(sink);
 //cout<<"End of Phase 1"<<endl; 
@@ -319,10 +319,10 @@ void globalRelabelSerial  (Context* cnx )
 		GNode src = ret.second;
 		for (Graph::neighbor_iterator ii = config->neighbor_begin(src), ee = config->neighbor_end(src); ii != ee; ++ii){
 			GNode dst=*ii;        	
-			Edge& edge = config->getEdgeData(dst,src,Galois::Graph::ALL,cnx->getRuntimeContext());
+			Edge& edge = config->getEdgeData(dst,src,Galois::Graph::ALL);
 			if (edge.cap > 0) {
-				Node& node = dst.getData(Galois::Graph::ALL,cnx->getRuntimeContext());
-				int newHeight=src.getData(Galois::Graph::ALL,cnx->getRuntimeContext()).height+1;
+				Node& node = dst.getData(Galois::Graph::ALL);
+				int newHeight=src.getData(Galois::Graph::ALL).height+1;
 				if(newHeight<node.height){
 					node.height = newHeight;
 					que.push(dst);
@@ -334,7 +334,7 @@ void globalRelabelSerial  (Context* cnx )
 //cout<<"End of Phase 2"<<endl; 
 	for(Graph::active_iterator ii = config->active_begin(), ee = config->active_end(); ii != ee; ++ii) {
 		GNode temp=*ii;
-		Node& node = ii->getData(Galois::Graph::ALL,cnx->getRuntimeContext());
+		Node& node = ii->getData(Galois::Graph::ALL);
 
 		if (node.isSink || node.isSource || node.height >= numNodes) {
 			continue;
@@ -348,7 +348,7 @@ void globalRelabelSerial  (Context* cnx )
 	}
 
 
-	cout<<"Global Relabel ends..Flow is "<<sink.getData(Galois::Graph::ALL,cnx->getRuntimeContext()).excess<<endl;
+	cout<<"Global Relabel ends..Flow is "<<sink.getData(Galois::Graph::ALL).excess<<endl;
 
 }
 
@@ -361,12 +361,12 @@ void bfs(GNode& src ,Context* cnx)
 		GNode dst=*ii;
 		//if (  visited.search(dst) )
 		//        continue;
-		Edge& edge = config->getEdgeData(dst,src,Galois::Graph::ALL,cnx->getRuntimeContext());
+		Edge& edge = config->getEdgeData(dst,src,Galois::Graph::ALL);
 		if (edge.cap > 0) {
 			//visited.push(dst);
-			Node& node = dst.getData(Galois::Graph::ALL,cnx->getRuntimeContext());
+			Node& node = dst.getData(Galois::Graph::ALL);
 			//Node& node2 = src.getData();
-			int newHeight=src.getData(Galois::Graph::ALL,cnx->getRuntimeContext()).height+1;
+			int newHeight=src.getData(Galois::Graph::ALL).height+1;
 			if(newHeight<node.height){
 				node.height = newHeight;
 				que.push(dst);

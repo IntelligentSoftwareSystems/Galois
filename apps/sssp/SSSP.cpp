@@ -106,25 +106,28 @@ void runBody(const GNode src, Graph& graph) {
     }
   }
 }
-  
-void process(UpdateRequest& req, Galois::Context<UpdateRequest>& lwl) {
-  SNode& data = req.n.getData(Galois::Graph::NONE);
-  Graph* graph = req.n.getGraph();
-  unsigned int v;
-  //  std::cerr << data.id << " " << data.dist << " " << req.w << "\n";
-  while (req.w < (v = data.dist)) {
-    if (__sync_bool_compare_and_swap(&data.dist, v, req.w)) {
-      for (Graph::neighbor_iterator ii = graph->neighbor_begin(req.n, Galois::Graph::NONE), ee = graph->neighbor_end(req.n, Galois::Graph::NONE); ii != ee; ++ii) {
-	GNode dst = *ii;
-	int d = graph->getEdgeData(req.n, dst, Galois::Graph::NONE);
-	unsigned int newDist = req.w + d;
-	if (newDist < dst.getData(Galois::Graph::NONE).dist)
-	  lwl.push(UpdateRequest(dst, newDist));
+
+struct process {
+  template<typename ContextTy>
+  void operator()(UpdateRequest& req, ContextTy& lwl) {
+    SNode& data = req.n.getData(Galois::Graph::NONE);
+    Graph* graph = req.n.getGraph();
+    unsigned int v;
+    //  std::cerr << data.id << " " << data.dist << " " << req.w << "\n";
+    while (req.w < (v = data.dist)) {
+      if (__sync_bool_compare_and_swap(&data.dist, v, req.w)) {
+	for (Graph::neighbor_iterator ii = graph->neighbor_begin(req.n, Galois::Graph::NONE), ee = graph->neighbor_end(req.n, Galois::Graph::NONE); ii != ee; ++ii) {
+	  GNode dst = *ii;
+	  int d = graph->getEdgeData(req.n, dst, Galois::Graph::NONE);
+	  unsigned int newDist = req.w + d;
+	  if (newDist < dst.getData(Galois::Graph::NONE).dist)
+	    lwl.push(UpdateRequest(dst, newDist));
+	}
+	break;
       }
-      break;
     }
   }
-}
+};
  
 void runBodyParallel(const GNode src, unsigned int numNodes) {
   //GaloisRuntime::WorkList::PriQueue<UpdateRequest> wl;
@@ -133,7 +136,7 @@ void runBodyParallel(const GNode src, unsigned int numNodes) {
   //  GaloisRuntime::WorkList::CacheByIntegerMetric<OBIM, 1, UpdateRequestIndexer> wl2(wl);
   
   getInitialRequests(src, *src.getGraph(), wl);
-  Galois::for_each(wl, process);
+  Galois::for_each(wl, process());
 }
 
 

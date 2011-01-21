@@ -59,47 +59,50 @@ typedef Galois::Graph::FirstGraph<Element,void,false>::GraphNode GNode;
 Graph* mesh;
 int threads = 1;
 
-void process(GNode item, Galois::Context<GNode>& lwl) {
-  if (!mesh->containsNode(item))
-    return;
+struct process {
+  template<typename Context>
+  void operator()(GNode item, Context& lwl) {
+    if (!mesh->containsNode(item))
+      return;
+    
+    item.getData(Galois::Graph::ALL); //lock
 
-  item.getData(Galois::Graph::ALL, lwl.getRuntimeContext()); //lock
-
-  Cavity cav(mesh, &lwl);
-  cav.initialize(item, &lwl);
-  cav.build(&lwl);
-  cav.update(&lwl);
-
-  for (Subgraph::iterator ii = cav.getPre().begin(),
-	 ee = cav.getPre().end(); ii != ee; ++ii) 
-    mesh->removeNode(*ii, Galois::Graph::NONE, lwl.getRuntimeContext());
-
-  //add new data
-  for (Subgraph::iterator ii = cav.getPost().begin(),
-	 ee = cav.getPost().end(); ii != ee; ++ii) {
-    GNode node = *ii;
-    mesh->addNode(node, Galois::Graph::ALL, lwl.getRuntimeContext());
-    Element& element = node.getData(Galois::Graph::ALL, lwl.getRuntimeContext());
-    if (element.isBad()) {
-      lwl.push(node);
+    Cavity cav(mesh, &lwl);
+    cav.initialize(item);
+    cav.build();
+    cav.update();
+    
+    for (Subgraph::iterator ii = cav.getPre().begin(),
+	   ee = cav.getPre().end(); ii != ee; ++ii) 
+      mesh->removeNode(*ii, Galois::Graph::NONE);
+    
+    //add new data
+    for (Subgraph::iterator ii = cav.getPost().begin(),
+	   ee = cav.getPost().end(); ii != ee; ++ii) {
+      GNode node = *ii;
+      mesh->addNode(node, Galois::Graph::ALL);
+      Element& element = node.getData(Galois::Graph::ALL);
+      if (element.isBad()) {
+	lwl.push(node);
+      }
+    }
+    
+    for (Subgraph::edge_iterator ii = cav.getPost().edge_begin(),
+	   ee = cav.getPost().edge_end(); ii != ee; ++ii) {
+      Subgraph::tmpEdge edge = *ii;
+      //bool ret = 
+      mesh->addEdge(edge.src, edge.dst, Galois::Graph::ALL); //, edge.data);
+      //assert ret;
+    }
+    if (mesh->containsNode(item)) {
+      lwl.push(item);
     }
   }
-
-  for (Subgraph::edge_iterator ii = cav.getPost().edge_begin(),
-	 ee = cav.getPost().edge_end(); ii != ee; ++ii) {
-    Subgraph::tmpEdge edge = *ii;
-    //bool ret = 
-    mesh->addEdge(edge.src, edge.dst, Galois::Graph::ALL, lwl.getRuntimeContext()); //, edge.data);
-    //assert ret;
-  }
-  if (mesh->containsNode(item)) {
-    lwl.push(item);
-  }
-}
+};
 
 template<typename WLTY>
 void refine(Mesh& m, WLTY& wl) {
-  Galois::for_each(wl.begin(), wl.end(), process);
+  Galois::for_each(wl.begin(), wl.end(), process());
 }
 
 

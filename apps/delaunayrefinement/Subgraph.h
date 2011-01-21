@@ -52,18 +52,18 @@ class Subgraph {
 
  private:
   // the nodes in the graph before updating
-  typedef std::vector<GNode,Galois::Context<GNode>::ItAllocTy::rebind<GNode>::other> nodesTy;
+  typedef std::vector<GNode,Galois::PerIterMem::ItAllocTy::rebind<GNode>::other> nodesTy;
 
   nodesTy nodes;
 
   // the edges that connect the subgraph to the rest of the graph
 
-  typedef std::vector<tmpEdge,Galois::Context<GNode>::ItAllocTy::rebind<tmpEdge>::other> edgesTy;
+  typedef std::vector<tmpEdge,Galois::PerIterMem::ItAllocTy::rebind<tmpEdge>::other> edgesTy;
 
   edgesTy edges;
 
  public:
-  explicit Subgraph(Galois::Context<GNode>* cnx) 
+  explicit Subgraph(Galois::PerIterMem* cnx) 
   : nodes(cnx->PerIterationAllocator), 
     edges(cnx->PerIterationAllocator)
   {}

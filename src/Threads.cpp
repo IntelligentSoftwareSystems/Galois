@@ -1,5 +1,6 @@
 #include "Galois/Runtime/Threads.h"
 #include "Galois/Runtime/SimpleLock.h"
+#include "Galois/Galois.h"
 
 using namespace GaloisRuntime;
 
@@ -7,8 +8,6 @@ typedef boost::intrusive::list<ThreadAware, boost::intrusive::constant_time_size
 
 static ListTy allObjects;
 static SimpleLock<int, true> allObjectsLock;
-
-static int numThreads = 0;
 
 //This, once initialized by a thread, stores an dense index/label for that thread
 __thread int ThreadPool::LocalThreadID = -1;
@@ -28,32 +27,20 @@ ThreadAware::~ThreadAware() {
   allObjectsLock.unlock();
 }
 
-void ThreadAware::NotifyOfChange(int num) {
+void ThreadAware::NotifyOfChange(bool starting) {
   allObjectsLock.lock();
-  if (numThreads != num) {
-    numThreads = num;
-    for (ListTy::iterator ii = allObjects.begin(), ee = allObjects.end(); ii != ee; ++ii) {
-      ii->ThreadChange(num);
-    }
+  for (ListTy::iterator ii = allObjects.begin(), ee = allObjects.end(); ii != ee; ++ii) {
+    ii->ThreadChange(starting);
   }
   allObjectsLock.unlock();
 }
 
-void ThreadAware::init() {
-  if (numThreads)
-    ThreadChange(numThreads);
+void ThreadPool::NotifyAware(bool starting) {
+  ThreadAware::NotifyOfChange(starting);
 }
 
-void ThreadPool::NotifyAware(int n) {
-  ThreadAware::NotifyOfChange(n);
-}
-
-void ThreadPool::ResetThreadNumbers() {
-  nextThreadID = 0;
-}
-
-int ThreadPool::getMyID() {
-  int retval = LocalThreadID;
+unsigned int ThreadPool::getMyID() {
+  unsigned int retval = LocalThreadID;
   if (retval == 0)
     return 0;
   if (retval == -1) {
@@ -68,3 +55,7 @@ initMainThread::initMainThread() {
 }
 
 static initMainThread mainThreadIDSetter;
+
+void Galois::setMaxThreads(unsigned int num) {
+  GaloisRuntime::getSystemThreadPool().setMaxThreads(num);
+}

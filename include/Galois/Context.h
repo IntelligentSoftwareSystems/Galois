@@ -36,7 +36,6 @@ public:
 
   virtual GaloisRuntime::SimpleRuntimeContext* getRuntimeContext() = 0;
 
-  virtual void push(T) = 0;
   virtual void finish() = 0;
   virtual void suspendWith(Executable*) = 0;
   

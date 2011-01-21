@@ -13,6 +13,7 @@
 /* Arc descriptor lines: Arc descriptors are of the form on the right, where U and V are the tail and the head node ids, respectively, and W is the arc weight. */
 /* a U V W */
 
+#include <iostream>
 #include <fstream>
 #include <string>
 
@@ -46,8 +47,8 @@ std::pair<unsigned int, unsigned int> readFile_gr_(const char *filename, GraphTy
   std::ifstream infile;
   infile.open(filename, std::ifstream::in); // opens the vector file
   if (!infile) { // file couldn't be opened
-    std::cerr << "Error: vector file could not be opened\n";
-    exit(-1);
+    std::cerr << "vector file could not be opened\n";
+    abort();
   }
   
   std::string name;

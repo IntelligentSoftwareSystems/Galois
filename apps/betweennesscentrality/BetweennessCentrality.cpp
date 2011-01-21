@@ -33,61 +33,64 @@ int NumNodes;
 
 GaloisRuntime::CPUSpaced<std::vector<double> >* CB;
 
-void process(GNode& _req, Galois::Context<GNode>& lwl) {
-  typedef Galois::Context<GNode>::ItAllocTy::rebind<GNode>::other GNodeAlloc;
-  std::vector<GNode> SQ(NumNodes);
-
-  std::vector<int> sigma(NumNodes);
-  std::vector<int> d(NumNodes);
-
-  typedef std::multimap<int,int> MMapTy;
-  MMapTy P;
-  
-  int QPush = 0;
-  int QAt = 0;
-
-  std::cerr << ".";
-
-  int req = G->getId(_req);
-
-  sigma[req] = 1;
-  d[req] = 1;
-
-  SQ[QPush++] = _req;
-
-  while (QAt != QPush) {
-    GNode _v = SQ[QAt++];
-    int v = G->getId(_v);
-    for (Graph::neighbor_iterator ii = G->neighbor_begin(_v, Galois::Graph::NONE), ee = G->neighbor_end(_v, Galois::Graph::NONE); ii != ee; ++ii) {
-      GNode _w = *ii;
-      int w = G->getId(_w);
-      if (!d[w]) {
-	SQ[QPush++] = _w;
-	d[w] = d[v] + 1;
+struct process {
+  template<typename Context>
+  void operator()(GNode& _req, Context& lwl) {
+    typedef Galois::PerIterMem::ItAllocTy::rebind<GNode>::other GNodeAlloc;
+    std::vector<GNode> SQ(NumNodes);
+    
+    std::vector<int> sigma(NumNodes);
+    std::vector<int> d(NumNodes);
+    
+    typedef std::multimap<int,int> MMapTy;
+    MMapTy P;
+    
+    int QPush = 0;
+    int QAt = 0;
+    
+    std::cerr << ".";
+    
+    int req = G->getId(_req);
+    
+    sigma[req] = 1;
+    d[req] = 1;
+    
+    SQ[QPush++] = _req;
+    
+    while (QAt != QPush) {
+      GNode _v = SQ[QAt++];
+      int v = G->getId(_v);
+      for (Graph::neighbor_iterator ii = G->neighbor_begin(_v, Galois::Graph::NONE), ee = G->neighbor_end(_v, Galois::Graph::NONE); ii != ee; ++ii) {
+	GNode _w = *ii;
+	int w = G->getId(_w);
+	if (!d[w]) {
+	  SQ[QPush++] = _w;
+	  d[w] = d[v] + 1;
+	}
+	if (d[w] == d[v] + 1) {
+	  sigma[w] = sigma[w] + sigma[v];
+	  P.insert(std::pair<int, int>(w,v));
+	}
       }
-      if (d[w] == d[v] + 1) {
-	sigma[w] = sigma[w] + sigma[v];
-	P.insert(std::pair<int, int>(w,v));
+    }
+    
+    std::vector<double> delta(NumNodes);
+    while (QAt) {
+      int w = G->getId(SQ[--QAt]);
+      std::pair<MMapTy::iterator, MMapTy::iterator> ppp = P.equal_range(w);
+      for (MMapTy::iterator ii = ppp.first, ee = ppp.second;
+	   ii != ee; ++ii) {
+	int v = ii->second;
+	delta[v] = delta[v] + ((double)sigma[v]/(double)sigma[w])*(1.0 + delta[w]);
+      }
+      if (w != req) {
+	if (CB->get().size() < (unsigned int)w + 1)
+	  CB->get().resize(w+1);
+	CB->get()[w] += delta[w];
       }
     }
   }
-
-  std::vector<double> delta(NumNodes);
-  while (QAt) {
-    int w = G->getId(SQ[--QAt]);
-    std::pair<MMapTy::iterator, MMapTy::iterator> ppp = P.equal_range(w);
-    for (MMapTy::iterator ii = ppp.first, ee = ppp.second;
-	 ii != ee; ++ii) {
-      int v = ii->second;
-      delta[v] = delta[v] + ((double)sigma[v]/(double)sigma[w])*(1.0 + delta[w]);
-    }
-    if (w != req) {
-      if (CB->get().size() < (unsigned int)w + 1)
-	CB->get().resize(w+1);
-      CB->get()[w] += delta[w];
-    }
-  }
-}
+};
 
 
 void merge(std::vector<double>& lhs, std::vector<double>& rhs) {
@@ -127,13 +130,7 @@ int main(int argc, const char** argv) {
   
   Galois::setMaxThreads(numThreads);
   Galois::Launcher::startTiming();
-#ifdef WITH_VTUNE
-  __itt_resume();
-#endif
-  Galois::for_each(wl.begin(), wl.end(), process);
-#ifdef WITH_VTUNE
-  __itt_pause();
-#endif
+  Galois::for_each(wl.begin(), wl.end(), process());
   Galois::Launcher::stopTiming();
 
   std::cout << "STAT: Time " << Galois::Launcher::elapsedTime() << "\n";

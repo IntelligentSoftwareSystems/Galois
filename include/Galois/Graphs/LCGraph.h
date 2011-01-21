@@ -1,9 +1,5 @@
 // simple graph -*- C++ -*-
 
-#include <list>
-#include <map>
-#include <vector>
-#include <iostream>
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/iterator/filter_iterator.hpp>
 #include <boost/functional.hpp>
@@ -12,6 +8,8 @@
 
 #include "Galois/Graphs/Graph.h"
 
+#include <vector>
+#include <map>
 
 namespace Galois {
 namespace Graph {
@@ -107,8 +105,8 @@ private:
 				return i;
 			}
 		}
-		std::cout<<"Error getting Edge idx. Exiting.";
-		exit(0);
+		assert(0 && "Error getting Edge idx. Exiting.");
+		abort();
 	}
 
 	int neighborsSize(GraphNode N, int adjIdx[], int adj[]) {
@@ -267,9 +265,9 @@ public:
 		return std::distance(active_begin(), active_end());
 	}
 
-	LCGraph() {
-		std::cout << "STAT: NodeSize " << (int) sizeof(gNode) << "\n";
-	}
+  LCGraph() {
+    reportStat("NodeSize", sizeof(gNode));
+  }
 };
 
 }

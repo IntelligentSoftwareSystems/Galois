@@ -8,10 +8,6 @@
 #ifndef INDEXEDGRAPH_H_
 #define INDEXEDGRAPH_H_
 
-#include <list>
-#include <map>
-#include <vector>
-#include <iostream>
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/iterator/filter_iterator.hpp>
 #include <boost/functional.hpp>

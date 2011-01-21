@@ -10,11 +10,11 @@ typedef Galois::Graph::FirstGraph<Node,Edge,true>::GraphNode GNode;
 
 class Index
 {
-	public:
-		int index_func(GNode n )
-		{
-			return n.getData(Galois::Graph::NONE,0).height;
-		}
+ public:
+  int index_func(GNode n )
+  {
+    return n.getData(Galois::Graph::NONE).height;
+  }
 };
 
 #include "Local.h"
@@ -28,7 +28,6 @@ GNode source;
 //#include "PQ.h"
 
 void  initializePreflow();
-void process(GNode& item , Galois::Context<GNode>& lwl);
 
 template<typename Context>
 void relabel(GNode& src, Local& l, Context* cnx);

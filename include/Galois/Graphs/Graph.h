@@ -1,10 +1,10 @@
 // simple graph -*- C++ -*-
 
-#include <iostream>
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/iterator/filter_iterator.hpp>
 #include <boost/functional.hpp>
 
+#include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/InsBag.h"
 //#include "Galois/Runtime/MemRegionPool.h"
@@ -441,7 +441,7 @@ public:
   }
 
   FirstGraph() {
-    std::cout << "STAT: NodeSize " << (int) sizeof(gNode) << "\n";
+    reportStat("NodeSize", sizeof(gNode));
   }
 
 };
