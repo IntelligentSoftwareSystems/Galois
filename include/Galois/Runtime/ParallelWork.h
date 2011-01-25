@@ -91,14 +91,13 @@ class ParallelWork : public Galois::Executable {
 
   WorkListTy& global_wl;
   Function& f;
-  int do_halt;
 
   CPUSpaced<PCTy> tdata;
 
 public:
   ParallelWork(WorkListTy& _wl, Function& _f)
     :global_wl(_wl), f(_f), tdata(PCTy::merge) {}
-
+  
   ~ParallelWork() {
     tdata.getMaster().report();
     assert(global_wl.empty());
@@ -114,7 +113,7 @@ public:
     tld.set_wl(&global_wl);
     Timer T;
     T.start();
-    //    do {
+
       do {
 	do {
 	  std::pair<bool, value_type> p = global_wl.pop();
@@ -125,8 +124,7 @@ public:
 	} while(true);
 	//break to here to do more expensive empty check
       } while (!global_wl.empty());
-      //term.locallyDone();
-      //    } while (!term.areWeThereYet());
+
     T.stop();
     tld.setTotalTime(T.get());
     setThreadContext(0);
