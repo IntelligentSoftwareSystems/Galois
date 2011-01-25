@@ -12,7 +12,7 @@ class SimpleLock;
 
 template<typename T>
 class SimpleLock<T, true> {
-  T _lock;
+  mutable T _lock; //Allow locking a const
 public:
   SimpleLock() : _lock(0) {
 #ifdef GALOIS_CRAY
@@ -20,11 +20,11 @@ public:
 #endif
   }
 
-  void lock(T val = 1) { 
+  void lock(T val = 1) const {
     while (!try_lock(val)) {} 
   }
 
-  void unlock() {
+  void unlock() const {
     assert(_lock);
 #ifdef GALOIS_CRAY
     readfe(&_lock); // sets to empty, acquiring the lock lock
@@ -34,7 +34,7 @@ public:
 #endif
   }
 
-  bool try_lock(T val) {
+  bool try_lock(T val) const {
 #ifdef GALOIS_CRAY
     T V = readfe(&_lock); // sets to empty, acquiring the lock lock
     if (V) {
@@ -51,7 +51,7 @@ public:
 #endif
   }
 
-  T getValue() {
+  T getValue() const {
     return _lock;
   }
 };
@@ -59,10 +59,10 @@ public:
 template<typename T>
 class SimpleLock<T, false> {
 public:
-  void lock(T val = 0) {}
-  void unlock() {}
-  bool try_lock(T val = 0) { return true; }
-  T getValue() { return 0; }
+  void lock(T val = 0) const {}
+  void unlock() const {}
+  bool try_lock(T val = 0) const { return true; }
+  T getValue() const { return 0; }
 };
 
 
