@@ -136,6 +136,7 @@ public:
 
   ~ThreadPool_pthread() {
     shutdown = true;
+    work = 0;
     start.release(threads.size());
     finish.acquire(threads.size());
     while(!threads.empty()) {
@@ -153,6 +154,7 @@ public:
     start.release(startNum);
     finish.acquire(startNum);
     work->postRun();
+    work = 0;
     ThreadPool::NotifyAware(false);
   }
 
