@@ -21,12 +21,13 @@ class CPUSpaced : public ThreadAware {
   void (*reduce)(T&, T&);
   
   void __reduce() {
-    for (int i = 1; i <= num; ++i)
-      reduce(datum[0].data, datum[i].data);
+    if (reduce)
+      for (int i = 1; i <= num; ++i)
+	reduce(datum[0].data, datum[i].data);
   }
 
 public:
-  CPUSpaced(void (*func)(T&, T&))
+  explicit CPUSpaced(void (*func)(T&, T&))
     :reduce(func)
   {
     num = getSystemThreadPool().size();
@@ -52,13 +53,19 @@ public:
     int i = ThreadPool::getMyID();
     assert(i <= num);
     assert(datum);
-    return datum[i - 1].data;
+    return datum[i].data;
   }
 
   const T& getRemote(int i) const {
     assert(i <= num);
     assert(datum);
-    return datum[i - 1].data;
+    return datum[i].data;
+  };
+
+  T& getRemote(int i) {
+    assert(i <= num);
+    assert(datum);
+    return datum[i].data;
   };
 
   int getCount() const {
