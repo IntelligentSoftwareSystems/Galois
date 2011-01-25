@@ -175,16 +175,16 @@ int main(int argc, const char **argv) {
 
   std::vector<const char*> args = parse_command_line(argc, argv, help);
 
-  if (args.size() < 4) {
+  if (args.size() < 3) {
     std::cout << "not enough arguments, use -help for usage information\n";
     return 1;
   }
   printBanner(std::cout, name, description, url);
   
-  const char* inputfile = args[1];
-  unsigned int startNode = atoi(args[2]);
-  unsigned int reportNode = atoi(args[3]);
-  bool bfs = args.size() == 5 && strcmp(args[4], "-bfs") == 0;
+  const char* inputfile = args[0];
+  unsigned int startNode = atoi(args[1]);
+  unsigned int reportNode = atoi(args[2]);
+  bool bfs = args.size() == 4 && strcmp(args[3], "-bfs") == 0;
 
   Graph graph;
   GNode source;
