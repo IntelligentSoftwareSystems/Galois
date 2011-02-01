@@ -1,4 +1,5 @@
 #include "Galois/Runtime/mm/mem.h"
+#include "Galois/Runtime/Support.h"
 
 #include <linux/mman.h>
 #include <sys/mman.h>
@@ -20,7 +21,11 @@ void* mmapWrapper::_alloc() {
   //Then try normal
   if (!ptr || ptr == MAP_FAILED)
     ptr = mmap(0, AllocSize, _PROT, _MAP_BASE, -1, 0);
-
+  if (!ptr || ptr == MAP_FAILED) {
+    reportWarning("Memory Allocation Failed");
+    assert(0 && "mmap failed");
+    abort();
+  }    
   return ptr;
 }
 
