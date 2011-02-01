@@ -1,12 +1,10 @@
 // Scalable Local worklists -*- C++ -*-
 // This contains final (leaf) worklists.  Some support stealing, some don't
 // All classes conform to:
-// Galois::WorkList (for virtual push)
-// T pop(bool&)
+// void push(T)
+// bool,T pop()
 // bool empty()
-// If they support stealing:
-// T steal(bool&)
-// bool canSteal
+// void fillInitial(begin, end)
 
 #include <queue>
 #include <stack>
@@ -19,12 +17,12 @@ namespace GaloisRuntime {
 namespace WorkList {
 
 template<typename MQ, bool concurrent = true>
-class STLAdaptor : private boost::noncopyable, private SimpleLock<int, concurrent> {
+class STLAdaptor : private boost::noncopyable, private SimpleLock<long, concurrent> {
 
   MQ wl;
 
-  using SimpleLock<int, concurrent>::lock;
-  using SimpleLock<int, concurrent>::unlock;
+  using SimpleLock<long, concurrent>::lock;
+  using SimpleLock<long, concurrent>::unlock;
 
 public:
   typedef STLAdaptor<MQ, true>  ConcurrentTy;
@@ -91,7 +89,7 @@ class PriQueue : public STLAdaptor<std::priority_queue<T, std::vector<T>, Compar
 
 
 template<typename T, int ChunkSize = 64, bool pushToLocal = true, typename BackingTy = LIFO<T> >
-class ChunkedFIFO {
+class ChunkedFIFO : private boost::noncopyable {
 public:
    typedef T value_type;
 private:
@@ -105,10 +103,15 @@ private:
     Chunk* curr;
     ProcRec() : next(0), nextSize(0), curr(0) {}
     static void merge( ProcRec& lhs, ProcRec& rhs) {
-      assert(!lhs.next || rhs.next->empty());
-      assert(!lhs.curr || rhs.curr->empty());
+      assert(!lhs.next || lhs.next->empty());
+      assert(!lhs.curr || lhs.curr->empty());
       assert(!rhs.next || rhs.next->empty());
       assert(!rhs.curr || rhs.curr->empty());
+    }
+    bool empty() const {
+      if (curr && !curr->empty()) return false;
+      if (next && !next->empty()) return false;
+      return true;
     }
   };
 
@@ -155,7 +158,9 @@ public:
 
   //typedef typename MQ::value_type value_type;
 
-  ChunkedFIFO() :data(ProcRec::merge) {}
+  ChunkedFIFO() :data(ProcRec::merge) {
+    assert(data.getCount() > 1);
+  }
 
   void push(value_type val) {
     ProcRec& n = data.get();
@@ -186,9 +191,12 @@ public:
     
   bool empty() {
     ProcRec& n = data.get();
-    if ( n.curr && !n.curr->empty()) return false;
-    if (n.next && !n.next->empty()) return false;
-    return Items.empty();
+    if (!n.empty()) return false;
+    if (!Items.empty()) return false;
+    for (int i = 0; i < data.getCount(); ++i)
+      if (!data.get(i).empty())
+	return false;
+    return true;
   }
 
   void aborted(value_type val) {
@@ -211,7 +219,7 @@ public:
 
 
 template<class T, class Indexer, typename ContainerTy = FIFO<T> >
-class OrderedByIntegerMetric {
+class OrderedByIntegerMetric : private boost::noncopyable {
 
   ContainerTy* data;
   unsigned int size;
@@ -239,6 +247,7 @@ class OrderedByIntegerMetric {
 
   void push(value_type val) __attribute__((noinline)) {
     unsigned int index = I(val, size);
+    assert(index < size);
     data[index].push(val);
     unsigned int& cur = cursor.get();
     if (cur > index)
@@ -252,12 +261,13 @@ class OrderedByIntegerMetric {
       cur = 0;
 
     std::pair<bool, value_type> ret;
-    ret = data[cur].pop();
-    while (cur < size && !ret.first) {
-      ++cur;
+    do {
       ret = data[cur].pop();
-    }
-    return ret;     
+      if (ret.first)
+	return ret;
+      ++cur;
+    } while (cur < size);
+    return ret;
   }
 
   bool empty() const {
@@ -280,7 +290,7 @@ class OrderedByIntegerMetric {
 };
 
 template<typename ParentTy, unsigned int size, class Indexer>
-class CacheByIntegerMetric {
+class CacheByIntegerMetric : private boost::noncopyable {
   
   typedef typename ParentTy::value_type T;
 
