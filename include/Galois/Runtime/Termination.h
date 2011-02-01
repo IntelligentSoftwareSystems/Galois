@@ -2,93 +2,83 @@
 
 namespace GaloisRuntime {
 
+
+//Dikstra dual-ring termination algorithm
 class TerminationDetection {
-  volatile unsigned int masterToken;
-  unsigned int allUnchangedToken;
 
-  bool AllDone;
-
-  SimpleLock<int,true> Lock;
-
-  struct pd {
-    unsigned int* counter;
-    unsigned int counterOld;
-    unsigned int token;
-    unsigned int changed;
-    pd() : counter(0), counterOld(0), token(0), changed(true) {}
-    static void merge(pd& lhs, pd& rhs) {}
+  struct tokenHolder {
+    bool tokenIsBlack;
+    bool hasToken;
+    bool processIsBlack;
+    tokenHolder() :tokenIsBlack(false), hasToken(false), processIsBlack(true) {}
   };
-  CPUSpaced<pd> Acks;
 
-  bool allAckedCurrent() {
-    for (int i = 1; i < Acks.getCount(); ++i)
-      if (Acks.getRemote(i).token != masterToken)
-	return false;
-    return true;
+  CPUSpaced<tokenHolder> data;
+  bool globalTerm;
+  bool lastWasWhite;
+public:
+
+  TerminationDetection()
+    :data(0), globalTerm(false), lastWasWhite(false)
+  {
+    data.get(0).hasToken = true;
   }
 
-  bool allUnChanged() {
-    for (int i = 1; i < Acks.getCount(); ++i)
-      if (Acks.getRemote(i).changed)
-	return false;
-    return true;
+  void workHappened() {
+    data.get().processIsBlack = true;
   }
 
-
-  //Query the relivent children for doneness
-  void masterQuery() {
-    //Let only one thread do this at a time, but don't care who it is
-    if (Lock.try_lock(1)) {
-      if (allAckedCurrent()) {
-	//Everyone has acked the current token
-	//Cases:
-	if (allUnChanged()) {
-	  //No one changed durring the last round
-	  //This could either be coincidence (and we need to send another token)
-	  //or this was the second token
-	  if (allUnchangedToken == masterToken) {
-	    AllDone = true;
-	  } else {
-	    //initiate another round
-	    ++masterToken;
-	    allUnchangedToken = masterToken;
-	  }
+  void localTermination() {
+    tokenHolder& th = data.get();
+    tokenHolder& thn = data.getNext();
+    if (ThreadPool::getMyID() == 1) {
+      //master
+      if (th.hasToken) {
+	if (th.tokenIsBlack || th.processIsBlack) {
+	  //failed circulation
+	  lastWasWhite = false;
+	  th.processIsBlack = false;
+	  th.hasToken = false;
+	  thn.tokenIsBlack = false;
+	  thn.hasToken = true;
 	} else {
-	  //Someone changed, issue a new token
-	  ++masterToken;
+	  if (lastWasWhite) {
+	    //This was the second time around
+	    globalTerm = true;
+	  } else {
+	    //Start a second round of voting
+	    lastWasWhite = true;
+	    th.hasToken = false;
+	    thn.tokenIsBlack = false;
+	    thn.hasToken = true;
+	  }
 	}
+      } else {
+	//Do nothing while waiting for the token
+      }
+    } else {
+      //Normal thread
+      if (th.processIsBlack) {
+	//Black process colors the token
+	//color resets to white
+	th.processIsBlack = false;
+	th.tokenIsBlack = false;
+	th.hasToken = false;
+	thn.tokenIsBlack = true;
+	thn.hasToken = true;
+      } else {
+	//white process pass the token
+	thn.tokenIsBlack = th.tokenIsBlack;
+	th.hasToken = false;
+	thn.hasToken = true;
       }
     }
   }
 
-public:
-
-  TerminationDetection() :masterToken(1), allUnchangedToken(0), AllDone(false), Acks(pd::merge) {}
-
-  bool areWeThereYet() {
-    return AllDone;
+  bool globalTermination() {
+    return globalTerm;
   }
 
-  void locallyDone() {
-    pd& ack = Acks.get();
-    unsigned int mToken = masterToken;
-    if (ack.token != mToken) {
-      //The master has put out a new query
-      //Ack it
-      //Order matters:
-      unsigned int newcounter = *ack.counter;
-      ack.changed = ack.counterOld != newcounter;
-      ack.counterOld = newcounter;
-      __sync_synchronize ();
-      ack.token = mToken;
-    }
-
-    masterQuery();
-  }
-
-  void initialize(unsigned int* count) {
-    Acks.get().counter = count;
-  }
 };
 
 }
