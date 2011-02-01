@@ -7,14 +7,14 @@ namespace GaloisRuntime {
 class TerminationDetection {
 
   struct tokenHolder {
-    bool tokenIsBlack;
-    bool hasToken;
-    bool processIsBlack;
+    volatile bool tokenIsBlack;
+    volatile bool hasToken;
+    volatile bool processIsBlack;
     tokenHolder() :tokenIsBlack(false), hasToken(false), processIsBlack(true) {}
   };
 
   CPUSpaced<tokenHolder> data;
-  bool globalTerm;
+  volatile bool globalTerm;
   bool lastWasWhite;
 public:
 
@@ -40,6 +40,7 @@ public:
 	  th.processIsBlack = false;
 	  th.hasToken = false;
 	  thn.tokenIsBlack = false;
+	  __sync_synchronize();
 	  thn.hasToken = true;
 	} else {
 	  if (lastWasWhite) {
@@ -50,6 +51,7 @@ public:
 	    lastWasWhite = true;
 	    th.hasToken = false;
 	    thn.tokenIsBlack = false;
+	    __sync_synchronize();
 	    thn.hasToken = true;
 	  }
 	}
@@ -65,11 +67,13 @@ public:
 	th.tokenIsBlack = false;
 	th.hasToken = false;
 	thn.tokenIsBlack = true;
+	__sync_synchronize();
 	thn.hasToken = true;
       } else {
 	//white process pass the token
 	thn.tokenIsBlack = th.tokenIsBlack;
 	th.hasToken = false;
+	__sync_synchronize();
 	thn.hasToken = true;
       }
     }
