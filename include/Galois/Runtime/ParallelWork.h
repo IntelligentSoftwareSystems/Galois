@@ -9,6 +9,7 @@
 #include "Galois/Runtime/Threads.h"
 #include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/WorkList.h"
+#include "Galois/Runtime/Termination.h"
 
 #ifdef WITH_VTUNE
 #include "/opt/intel/vtune_amplifier_xe_2011/include/ittnotify.h"
@@ -93,17 +94,19 @@ class ParallelWork : public Galois::Executable {
   Function& f;
 
   CPUSpaced<PCTy> tdata;
+  TerminationDetection term;
 
 public:
   ParallelWork(WorkListTy& _wl, Function& _f)
     :global_wl(_wl), f(_f), tdata(PCTy::merge) {}
   
   ~ParallelWork() {
-    tdata.getMaster().report();
+    tdata.get().report();
     assert(global_wl.empty());
   }
 
-  virtual void preRun(int tmax) {  }
+  virtual void preRun(int tmax) {
+  }
 
   virtual void postRun() {  }
 
@@ -113,18 +116,21 @@ public:
     tld.set_wl(&global_wl);
     Timer T;
     T.start();
-
+    do {
       do {
 	do {
 	  std::pair<bool, value_type> p = global_wl.pop();
-	  if (p.first)
+	  if (p.first) {
+	    term.workHappened();
 	    tld.doProcess(p.second, f);
-	  else
+	  } else {
 	    break;
+	  }
 	} while(true);
 	//break to here to do more expensive empty check
       } while (!global_wl.empty());
-
+      term.localTermination();
+    } while (!term.globalTermination());
     T.stop();
     tld.setTotalTime(T.get());
     setThreadContext(0);

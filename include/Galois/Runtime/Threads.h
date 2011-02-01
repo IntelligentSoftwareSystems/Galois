@@ -21,6 +21,9 @@ class ThreadPool {
   friend struct initMainThread;
   static __thread int LocalThreadID;
   static int nextThreadID;
+protected:
+  unsigned int activeThreads;
+  unsigned int maxThreads;
 
 protected:
   static void NotifyAware(bool starting);
@@ -35,7 +38,10 @@ public:
   virtual unsigned int setMaxThreads(unsigned int num) = 0;
   
   //!How many threads are kept around
-  virtual unsigned int size() = 0;
+  unsigned int getMaxThreads() const { return maxThreads; }
+
+  //!How many threads will be used
+  unsigned int getActiveThreads() const { return activeThreads; }
 
   static unsigned int getMyID();
 

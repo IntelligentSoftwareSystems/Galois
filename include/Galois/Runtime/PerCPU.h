@@ -9,6 +9,10 @@
 
 namespace GaloisRuntime {
 
+//Stores 1 item per thread
+//The master thread is thread 0
+//Durring Parallel regions the threads index
+//from 0 -> num - 1 (one thread pool thread shares an index with the user thread)
 template<typename T>
 class CPUSpaced : public ThreadAware {
   struct item {
@@ -22,54 +26,67 @@ class CPUSpaced : public ThreadAware {
   
   void __reduce() {
     if (reduce)
-      for (int i = 1; i <= num; ++i)
+      for (int i = 1; i < num; ++i)
 	reduce(datum[0].data, datum[i].data);
+  }
+
+  int myID() const {
+    int i = ThreadPool::getMyID();
+    return std::max(0, i - 1);
   }
 
 public:
   explicit CPUSpaced(void (*func)(T&, T&))
     :reduce(func)
   {
-    num = getSystemThreadPool().size();
-    datum = new item[num + 1];
+    num = getSystemThreadPool().getMaxThreads();
+    datum = new item[num];
   }
   
   ~CPUSpaced() {
     delete[] datum;
   }
 
-  T& getMaster() {
-    return datum[0].data;
-  }
-  
-  T& get() {
-    int i = ThreadPool::getMyID();
-    assert(i <= num);
+  T& get(int i) {
+    assert(i < num);
     assert(datum);
     return datum[i].data;
+  }
+
+  const T& get(int i) const {
+    assert(i < num);
+    assert(datum);
+    return datum[i].data;
+  }
+
+  T& get() {
+    return get(myID());
   }
 
   const T& get() const {
-    int i = ThreadPool::getMyID();
-    assert(i <= num);
-    assert(datum);
-    return datum[i].data;
+    return get(myID());
   }
 
-  const T& getRemote(int i) const {
-    assert(i <= num);
-    assert(datum);
-    return datum[i].data;
-  };
+  T& getNext() {
+    int i = ThreadPool::getMyID();
+    i += 1;
+    i %= getSystemThreadPool().getActiveThreads();
+    return get(i);
+  }
 
-  T& getRemote(int i) {
-    assert(i <= num);
-    assert(datum);
-    return datum[i].data;
-  };
+  const T& getNext() const {
+    int i = ThreadPool::getMyID();
+    i += 1;
+    i %= getSystemThreadPool().getActiveThreads();
+    return get(i);
+  }
 
   int getCount() const {
-    return num + 1;
+    return num;
+  }
+
+  int size() const {
+    return num;
   }
 
   virtual void ThreadChange(bool starting) {

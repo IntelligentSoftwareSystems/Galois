@@ -13,22 +13,22 @@
 #include <semaphore.h>
 #include <pthread.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <unistd.h>
+
 #include <iostream>
 #include <list>
 #include <cassert>
+#include <limits>
 
 using namespace GaloisRuntime;
 
 //! Generic check for pthread functions
-static void checkResults(int val, char* errmsg = 0, bool fail = true) {
+static void checkResults(int val) {
   if (val) {
-    std::cerr << "FAULT " << val;
-    if (errmsg)
-      std::cerr << ": " << errmsg;
-    std::cerr << "\n";
-    if (fail)
-      abort();
+    perror("PTHREADS: ");
+    assert(0 && "PThread check");
+    abort();
   }
 }
  
@@ -63,13 +63,41 @@ public:
   }
 };
 
+class Barrier {
+  pthread_barrier_t bar;
+public:
+  Barrier() {
+    //uninitialized barriers block a lot of threads to help with debugging
+    int rc = pthread_barrier_init(&bar, 0, std::numeric_limits<int>::max());
+    checkResults(rc);
+  }
+
+  ~Barrier() {
+    int rc = pthread_barrier_destroy(&bar);
+    checkResults(rc);
+  }
+
+  void reinit(int val) {
+   int rc = pthread_barrier_destroy(&bar);
+   checkResults(rc);
+   rc = pthread_barrier_init(&bar, 0, val);
+   checkResults(rc);
+   
+  }
+
+  void wait() {
+    int rc = pthread_barrier_wait(&bar);
+    if (rc && rc != PTHREAD_BARRIER_SERIAL_THREAD)
+      checkResults(rc);
+  }
+};
+
 class ThreadPool_pthread : public ThreadPool {
   Semaphore start; // Signal to release threads to run
-  Semaphore finish; // want on to block on running threads
+  Barrier finish; // want on to block on running threads
   Galois::Executable* work; // Thing to execute
   volatile bool shutdown; // Set and start threads to have them exit
   std::list<pthread_t> threads; // Set of threads
-  unsigned int startNum; // Number to release in parallel region
 
   // Return the number of processors on this hardware
   // This is the maximum number of threads that can be started
@@ -82,6 +110,13 @@ class ThreadPool_pthread : public ThreadPool {
   }
 
   void bindToProcessor(int proc) {
+    int id = proc;
+    int carry = 0;
+    if (id > 23) {
+      id -= 24;
+      carry = 24;
+    }
+    //proc = carry + ((id % 6) * 4) + (id / 6);
 #ifdef __linux__
     cpu_set_t mask;
     /* CPU_ZERO initializes all the bits in the mask to zero. */
@@ -106,13 +141,15 @@ class ThreadPool_pthread : public ThreadPool {
 
     while (true) {
       start.acquire();
-      if (work)
+      //std::cerr << "starting " << id << "\n";
+      if (work && id <= activeThreads) {
+	std::cerr << "using " << id << "\n";
 	(*work)();
+      }
       if(shutdown)
 	break;
-      finish.release();
+      finish.wait();
     }
-    finish.release();
   }
 
   static void* slaunch(void* V) {
@@ -122,11 +159,15 @@ class ThreadPool_pthread : public ThreadPool {
 
 public:
   ThreadPool_pthread() 
-    :start(0), finish(0), work(0), shutdown(false), startNum(1)
+    :start(0), work(0), shutdown(false)
   {
+    ThreadPool::activeThreads = 1;
+    ThreadPool::maxThreads = 0;
     unsigned int num = numProcessors();
+    finish.reinit(num + 1);
     while (num) {
       --num;
+      ++maxThreads;
       pthread_t t;
       int rc = pthread_create(&t, 0, &slaunch, this);
       checkResults(rc);
@@ -137,8 +178,8 @@ public:
   ~ThreadPool_pthread() {
     shutdown = true;
     work = 0;
+    __sync_synchronize();
     start.release(threads.size());
-    finish.acquire(threads.size());
     while(!threads.empty()) {
       pthread_t t = threads.front();
       threads.pop_front();
@@ -149,10 +190,12 @@ public:
 
   virtual void run(Galois::Executable* E) {
     work = E;
+    __sync_synchronize();
     ThreadPool::NotifyAware(true);
-    work->preRun(startNum);
-    start.release(startNum);
-    finish.acquire(startNum);
+    work->preRun(activeThreads);
+    __sync_synchronize();
+    start.release(maxThreads);
+    finish.wait();
     work->postRun();
     work = 0;
     ThreadPool::NotifyAware(false);
@@ -160,17 +203,16 @@ public:
 
   virtual unsigned int setMaxThreads(unsigned int num) {
     if (num == 0) {
-      startNum = 1;
-    } else if (num < threads.size()) {
-      startNum = num;
+      activeThreads = 1;
+    } else if (num <= maxThreads) {
+      activeThreads = num;
     } else {
-      startNum = threads.size();
+      activeThreads = maxThreads;
     }
-    return startNum;
-  }
-
-  virtual unsigned int size() {
-    return threads.size();
+    assert(activeThreads <= maxThreads);
+    assert(activeThreads <= threads.size());
+    std::cerr << "Threads set to " << num << " using " << activeThreads << " of " << maxThreads << "\n";
+    return activeThreads;
   }
 };
 }
