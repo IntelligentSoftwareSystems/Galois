@@ -143,7 +143,7 @@ class ThreadPool_pthread : public ThreadPool {
       start.acquire();
       //std::cerr << "starting " << id << "\n";
       if (work && id <= activeThreads) {
-	std::cerr << "using " << id << "\n";
+	//std::cerr << "using " << id << "\n";
 	(*work)();
       }
       if(shutdown)
