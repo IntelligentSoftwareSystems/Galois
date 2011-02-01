@@ -131,6 +131,7 @@ struct process {
  
 void runBodyParallel(const GNode src, unsigned int numNodes) {
   //GaloisRuntime::WorkList::PriQueue<UpdateRequest> wl;
+  //  typedef GaloisRuntime::WorkList::OrderedByIntegerMetric<UpdateRequest, UpdateRequestIndexer, GaloisRuntime::WorkList::ChunkedFIFO<UpdateRequest, 8, true, GaloisRuntime::WorkList::FIFO<UpdateRequest> > > OBIM;
   typedef GaloisRuntime::WorkList::OrderedByIntegerMetric<UpdateRequest, UpdateRequestIndexer> OBIM;
   OBIM wl(30*1024);
   //  GaloisRuntime::WorkList::CacheByIntegerMetric<OBIM, 1, UpdateRequestIndexer> wl2(wl);
