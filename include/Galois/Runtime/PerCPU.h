@@ -68,15 +68,13 @@ public:
   }
 
   T& getNext() {
-    int i = ThreadPool::getMyID();
-    i += 1;
+    int i = myID() + 1;
     i %= getSystemThreadPool().getActiveThreads();
     return get(i);
   }
 
   const T& getNext() const {
-    int i = ThreadPool::getMyID();
-    i += 1;
+    int i = myID() + 1;
     i %= getSystemThreadPool().getActiveThreads();
     return get(i);
   }
