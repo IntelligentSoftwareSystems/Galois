@@ -35,7 +35,7 @@ class ParallelThreadContext
 
 public:
   ParallelThreadContext()
-    :wl(0), conflicts(0), iterations(0), TotalTime(0)
+    :conflicts(0), iterations(0), TotalTime(0), wl(0)
   {}
   
   virtual ~ParallelThreadContext() {}

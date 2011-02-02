@@ -5,6 +5,10 @@ project (Galois)
 SET( PTHREAD ON)
 #SET( CRAY ON )
 SET( WITH_VTUNE ON )
+#SET( ASSERT_LOCKS ON )
+SET( WITH_DEBUG_INFO ON )
+#SET( WITH_WALL ON)
+SET( WITH_NO_ASSERTS ON )
 
 #Boost
 SET(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0")
@@ -21,13 +25,25 @@ if (CRAY)
   add_definitions(-DGALOIS_CRAY)
 endif(CRAY)
 
-#Flags
-#add_definitions("-Wall")
+if (ASSERT_LOCKS)
+  add_definitions(-DASSERT_LOCKS)
+endif(ASSERT_LOCKS)
 
-set(CMAKE_CXX_FLAGS_RELEASE        "-O3 -g -DNDEBUG")
-#set(CMAKE_CXX_FLAGS_RELEASE        "-O3 -DNDEBUG")
-set(CMAKE_CXX_FLAGS_DEBUG          "-g")
-#set(CMAKE_CXX_FLAGS_DEBUG          "-g -DNDEBUG")
+if (WITH_DEBUG_INFO)
+  add_definitions("-g")
+endif(WITH_DEBUG_INFO)
+
+if (WITH_WALL)
+  add_definitions("-Wall -Wno-sign-compare")
+endif(WITH_WALL)
+
+if(WITH_NO_ASSERTS)
+  add_definitions("-DNDEBUG")
+endif(WITH_NO_ASSERTS)
+
+#Flags
+
+set(CMAKE_CXX_FLAGS_RELEASE         "-O3")
 
 set(CMAKE_BUILD_TYPE Release)
 #set(CMAKE_BUILD_TYPE Debug)

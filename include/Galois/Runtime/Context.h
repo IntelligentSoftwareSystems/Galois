@@ -31,7 +31,13 @@ class SimpleRuntimeContext {
 	throw -1; //CONFLICT
     }
   }
-  
+
+  void assertAcquired_i(Lockable* C) {
+#ifdef ASSERT_LOCKS
+    assert(C->getValue() == this);
+#endif
+  }
+
 public:
   void start_iteration() {
     assert(locks.empty());
@@ -39,7 +45,7 @@ public:
   
   void cancel_iteration() {
     //FIXME: not handled yet
-    abort();
+    //abort();
     commit_iteration();
   }
   
@@ -58,6 +64,12 @@ public:
     if (C)
       C->acquire_i(L);
   }
+
+  static void assertAcquired(SimpleRuntimeContext* C, Lockable* L) {
+    if (C)
+      C->assertAcquired_i(L);
+  }
+
 };
 
 extern __thread SimpleRuntimeContext* thread_cnx;
@@ -76,6 +88,12 @@ static __attribute__((unused)) void acquire(Lockable* C) {
   SimpleRuntimeContext* cnx = getThreadContext();
   if (cnx)
     SimpleRuntimeContext::acquire(cnx, C);
+}
+
+static __attribute__((unused)) void assertAcquired(Lockable* C) {
+  SimpleRuntimeContext* cnx = getThreadContext();
+  if (cnx)
+    SimpleRuntimeContext::assertAcquired(cnx, C);
 }
 
 }

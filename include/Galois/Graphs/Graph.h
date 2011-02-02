@@ -32,7 +32,6 @@ static bool shouldLock(MethodFlag g) {
   abort();
 }
 
-
 ////////////////////////////////////////////////////////////////////////////////
 // Wrap void so that we can have a valid type on void nodes
 
@@ -179,6 +178,7 @@ class FirstGraph {
     assert(ID);
     if (shouldLock(mflag))
       SimpleRuntimeContext::acquire(C, ID);
+    SimpleRuntimeContext::assertAcquired(C, ID);
     return ID->data;
   }
 
@@ -275,6 +275,7 @@ public:
     assert(n.ID);
     if (shouldLock(mflag))
       SimpleRuntimeContext::acquire(C, n.ID);
+    SimpleRuntimeContext::assertAcquired(C, n.ID);
     bool oldActive = n.ID->active;
     if (!oldActive) {
       n.ID->active = true;
@@ -294,6 +295,7 @@ public:
     assert(n.ID);
     if (shouldLock(mflag))
       SimpleRuntimeContext::acquire(C, n.ID);
+    SimpleRuntimeContext::assertAcquired(C, n.ID);
     gNode* N = n.ID;
     bool wasActive = N->active;
     if (wasActive) {
@@ -319,11 +321,14 @@ public:
     assert(dst.ID);
     if (shouldLock(mflag)) 
       SimpleRuntimeContext::acquire(C, src.ID);
+    SimpleRuntimeContext::assertAcquired(C, src.ID);
+
     if (Directional) {
       src.ID->getOrCreateEdge(dst.ID) = data;
     } else {
       if (shouldLock(mflag))
 	SimpleRuntimeContext::acquire(C, dst.ID);
+      SimpleRuntimeContext::assertAcquired(C, dst.ID);
       EdgeTy& E1 = src.ID->getOrCreateEdge(dst.ID);
       EdgeTy& E2 = dst.ID->getOrCreateEdge(src.ID);
       if (src < dst)
@@ -339,11 +344,13 @@ public:
     assert(dst.ID);
     if (shouldLock(mflag))
       SimpleRuntimeContext::acquire(C, src.ID);
+    SimpleRuntimeContext::assertAcquired(C, src.ID);
     if (Directional) {
       src.ID->getOrCreateEdge(dst.ID);
     } else {
       if (shouldLock(mflag))
 	SimpleRuntimeContext::acquire(C, dst.ID);
+      SimpleRuntimeContext::assertAcquired(C, dst.ID);
       src.ID->getOrCreateEdge(dst.ID);
       dst.ID->getOrCreateEdge(src.ID);
     }
@@ -354,11 +361,13 @@ public:
     assert(dst.ID);
     if (shouldLock(mflag))
       SimpleRuntimeContext::acquire(C, src.ID);
+    SimpleRuntimeContext::assertAcquired(C, src.ID);
     if (Directional) {
       src.ID->eraseEdge(dst.ID);
     } else {
       if (shouldLock(mflag))
 	SimpleRuntimeContext::acquire(C, dst.ID);
+      SimpleRuntimeContext::assertAcquired(C, dst.ID);
       src.ID->eraseEdge(dst.ID);
       dst.ID->eraseEdge(src.ID);
     }
@@ -373,12 +382,14 @@ public:
     //yes, fault on null (no edge)
     if (shouldLock(mflag))
       SimpleRuntimeContext::acquire(C, src.ID);
+    SimpleRuntimeContext::assertAcquired(C, src.ID);
 
     if (Directional) {
       return src.ID->getEdgeData(dst.ID);
     } else {
       if (shouldLock(mflag))
 	SimpleRuntimeContext::acquire(C, dst.ID);
+      SimpleRuntimeContext::assertAcquired(C, dst.ID);
       if (src < dst)
 	return src.ID->getEdgeData(dst.ID);
       else
@@ -392,6 +403,7 @@ public:
     assert(N.ID);
     if (shouldLock(mflag))
       SimpleRuntimeContext::acquire(C, N.ID);
+    SimpleRuntimeContext::assertAcquired(C, N.ID);
     return N.ID->edges.size();
   }
 
@@ -402,11 +414,13 @@ public:
     assert(N.ID);
     if (shouldLock(mflag))
       SimpleRuntimeContext::acquire(C, N.ID);
+    SimpleRuntimeContext::assertAcquired(C, N.ID);
     for (typename gNode::neighbor_iterator ii = N.ID->neighbor_begin(), ee =
 	   N.ID->neighbor_end(); ii != ee; ++ii) {
       __builtin_prefetch(*ii);
-      if (!Directional && shouldLock(mflag))
+      if (shouldLock(mflag))
 	SimpleRuntimeContext::acquire(C, *ii);
+      SimpleRuntimeContext::assertAcquired(C, *ii);
     }
     return boost::make_transform_iterator(N.ID->neighbor_begin(),
 					  makeGraphNodePtr(this));
@@ -415,6 +429,7 @@ public:
     assert(N.ID);
     if (shouldLock(mflag)) // Probably not necessary (no valid use for an end pointer should ever require it)
       SimpleRuntimeContext::acquire(C, N.ID);
+    SimpleRuntimeContext::assertAcquired(C, N.ID);
     return boost::make_transform_iterator(N.ID->neighbor_end(),
 					  makeGraphNodePtr(this));
   }
