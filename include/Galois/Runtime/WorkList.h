@@ -193,9 +193,6 @@ public:
     ProcRec& n = data.get();
     if (!n.empty()) return false;
     if (!Items.empty()) return false;
-    for (int i = 0; i < data.getCount(); ++i)
-      if (!data.get(i).empty())
-	return false;
     return true;
   }
 
