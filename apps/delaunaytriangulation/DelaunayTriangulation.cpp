@@ -38,11 +38,12 @@ int threads = 1;
 struct process {
 	template<typename Context>
 	void operator()(GNode item, Context& lwl) {
+	  assert(!item.isNull());
 		DTElement& data = item.getData(Galois::Graph::CHECK_CONFLICT); //lock
 		if (data.isProcessed())
 			return;
 	
-		DTCavity cav(mesh, item, data.getTuples()->back(),  &lwl);
+		DTCavity cav(mesh, item, data.getTuples().back(),  &lwl);
 		cav.build();
 		
 		GNodeVector newNodes;
@@ -50,7 +51,7 @@ struct process {
 		for(GNodeVectorIter iter=newNodes.begin();iter!=newNodes.end();iter++){
 		   GNode node = *iter;
 		   
-		   if (node.getData(Galois::Graph::NONE).getTuples() != NULL) {
+		   if (!node.getData(Galois::Graph::NONE).getTuples().empty()) {
 			lwl.push(node);
 	           }
 		}
@@ -59,10 +60,13 @@ struct process {
 
 template<typename WLTY>
 void triangulate(WLTY& wl) {
-	//GaloisRuntime::WorkList::FIFO<GNode> wl2;
-	//wl2.fill_initial(wl.begin(), wl.end());
-	//Galois::for_each(wl2, process());
-	Galois::for_each(wl.begin(), wl.end(), process());
+	//GaloisRuntime::WorkList::LIFO<GNode> wl2;
+	GaloisRuntime::WorkList::FIFO<GNode> wl2;
+	//GaloisRuntime::WorkList::ChunkedFIFO<GNode, 16, false> wl2;
+	wl2.fill_initial(wl.begin(), wl.end());
+	Galois::for_each(wl2, process());
+	
+	//Galois::for_each(wl.begin(), wl.end(), process());
 }
 
 using namespace std;
@@ -86,8 +90,8 @@ int main(int argc, const char** argv) {
 	printBanner(std::cout, name, description, url);
 
 	mesh = new Graph();
-	vector<DTTuple>* tuples = new vector<DTTuple>();
-	DataManager::readTuplesFromFile(args[0], tuples);
+	vector<DTTuple> tuples;
+	DataManager::readTuplesFromFile(args[0], &tuples);
 
 	DTElement large_triangle(DataManager::t1, DataManager::t2, DataManager::t3);
 	GNode large_node = mesh->createNode(large_triangle);
@@ -114,11 +118,11 @@ int main(int argc, const char** argv) {
 	mesh->addEdge(border_node3, large_node, 0);
 	// END --- Create the main initial triangle
 	
-	large_node.getData().setTuples(tuples);
+	large_node.getData().getTuples().swap(tuples);
 	
 	std::vector<GNode> wl;
 	wl.push_back(large_node);
-	cout << "configuration: " << large_node.getData().getTuples()->size() << " total points\n"
+	cout << "configuration: " << large_node.getData().getTuples().size() << " total points\n"
 			<< "number of threads: " << threads << "\n"
 			<< "\n";
 

@@ -15,7 +15,7 @@ class DTElement{
 	DTTuple coords[3];
 	bool bDim; // true == 3, false == 2
 	bool processed;
-	std::vector<DTTuple>* _tuples;
+	std::vector<DTTuple> _tuples;
 
 public:
 	const bool isProcessed() const { return processed;};
@@ -23,25 +23,23 @@ public:
 	const DTTuple& getPoint(int i) const { return coords[i];};
 	bool getBDim(){ return bDim;}
 	void addTuple(DTTuple& newTuple){
-		_tuples->push_back(newTuple);
+		_tuples.push_back(newTuple);
 	};
 
-	void setTuples(vector<DTTuple>* tuples){  _tuples = tuples;};
+	//	void setTuples(vector<DTTuple>* tuples){  _tuples = tuples;};
 
-	std::vector<DTTuple>* getTuples(){ return _tuples; };
+	std::vector<DTTuple>& getTuples(){ return _tuples; };
 
 	explicit DTElement(const DTTuple& a, const DTTuple& b, const DTTuple& c):bDim(true), processed(false){
 		coords[0] = a;
 		coords[1] = b;
 		coords[2] = c;
-		_tuples = NULL;
 	}
 
 	explicit DTElement(const DTTuple& a, const DTTuple& b)
 	:bDim(false), processed(false){
 		coords[0] = a;
 		coords[1] = b;
-		_tuples=NULL;
 	}
 	
 	

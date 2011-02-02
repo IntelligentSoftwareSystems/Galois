@@ -66,7 +66,7 @@ public:
 
 	void update(GNodeVector* newNodes){
 		DTElement& nodeData = node.getData(Galois::Graph::NONE);
-		nodeData.getTuples()->pop_back();		
+		nodeData.getTuples().pop_back();		
 		//vector<DTElement, Galois::PerIterMem::ItAllocTy::rebind<DTElement>::other> newElements;
 		vector<DTElement*> newElements;
 		while(!connectionNodes.empty()){
@@ -124,22 +124,18 @@ public:
 		newElements.push_back(&nnode_data);
 
 		DTElement& oldNodeData = oldNode.getData(Galois::Graph::ALL);
-		vector<DTTuple>* tuples = oldNodeData.getTuples();
-		if (tuples != NULL) {		
-			std::vector<DTTuple>* newTuples=new std::vector<DTTuple>();
-			for (std::vector<DTTuple>::iterator iter = tuples->begin();iter!=tuples->end();iter++) {
+		vector<DTTuple>& tuples = oldNodeData.getTuples();
+		if (!tuples.empty()) {		
+			std::vector<DTTuple> newTuples;
+			for (std::vector<DTTuple>::iterator iter = tuples.begin();iter!=tuples.end();iter++) {
 				DTTuple t=*iter;
 				if (nnode_data.elementContains(t)) {					
-					if(nnode_data.getTuples()==NULL){
-					    nnode_data.setTuples(new std::vector<DTTuple>());
-					} 					
 					nnode_data.addTuple(t);
 				} else {
-					newTuples->push_back(t);
+					newTuples.push_back(t);
 				}
 			}
-			oldNodeData.setTuples(newTuples);
-			delete tuples;
+			oldNodeData.getTuples().swap(newTuples);
 		}
 		}
 		deletingNodes.insert(node);
@@ -158,18 +154,16 @@ public:
 		GNodeSetIter iter;
 		for (iter=deletingNodes.begin();iter!=deletingNodes.end();iter++) {
 			GNode dnode = *iter;
-			std::vector<DTTuple>* tuples = dnode.getData(Galois::Graph::NONE).getTuples();
-			if (tuples == NULL) {
+			std::vector<DTTuple>& tuples = dnode.getData(Galois::Graph::NONE).getTuples();
+			if (tuples.empty()) {
 				continue;
 			}
-			while (!tuples->empty()) {
-				DTTuple tup = tuples->back();
-				tuples->pop_back();
+			while (!tuples.empty()) {
+				DTTuple tup = tuples.back();
+				tuples.pop_back();
 				for (int i = 0; i < size; i++) {
 					
 					if (newElements[i]->elementContains(tup)) {
-					        if(newElements[i]->getTuples() == NULL)
-					            newElements[i]->setTuples(new std::vector<DTTuple>());
 						newElements[i]->addTuple(tup);
 						if (i != 0) {
 							DTElement* newNodeData = newElements[i];
@@ -180,7 +174,6 @@ public:
 					}
 				}
 			}
-			delete tuples;
 		}
 	}
 
