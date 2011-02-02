@@ -2,7 +2,7 @@
 
 #include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/Termination.h"
-//#include "Galois/Runtime/SimpleLock.h"
+#include "Galois/Runtime/SimpleLock.h"
 
 #include <iostream>
 
@@ -21,10 +21,15 @@ void TerminationDetection::localTermination() {
   //  static SimpleLock<int, true> L;
   //  L.lock();
   //  std::cerr << "th " << &th << " thn " << &thn << "\n";
-  //  L.unlock();
-  if (ThreadPool::getMyID() == 1) {
-    //master
-    if (th.hasToken) {
+  //  std::cerr << ThreadPool::getMyID() << "\n";
+  //  for (int i = 0; i < 4; ++i) {
+  //    tokenHolder& T = data.get(i);
+  //    std::cerr << "[" << i << " p " << T.processIsBlack << " t " << T.tokenIsBlack << " h " << T.hasToken << "] ";
+  //  }
+  //  std::cerr << "\n";
+  if (th.hasToken) {
+    if (ThreadPool::getMyID() == 1) {
+      //master
       if (th.tokenIsBlack || th.processIsBlack) {
 	//failed circulation
 	lastWasWhite = false;
@@ -47,25 +52,24 @@ void TerminationDetection::localTermination() {
 	}
       }
     } else {
-      //Do nothing while waiting for the token
-    }
-  } else {
-    //Normal thread
-    if (th.processIsBlack) {
-      //Black process colors the token
-      //color resets to white
-      th.processIsBlack = false;
-      th.tokenIsBlack = false;
-      th.hasToken = false;
-      thn.tokenIsBlack = true;
-      __sync_synchronize();
-      thn.hasToken = true;
-    } else {
-      //white process pass the token
-      thn.tokenIsBlack = th.tokenIsBlack;
-      th.hasToken = false;
-      __sync_synchronize();
-      thn.hasToken = true;
+      //Normal thread
+      if (th.processIsBlack) {
+	//Black process colors the token
+	//color resets to white
+	th.processIsBlack = false;
+	th.tokenIsBlack = false;
+	th.hasToken = false;
+	thn.tokenIsBlack = true;
+	__sync_synchronize();
+	thn.hasToken = true;
+      } else {
+	//white process pass the token
+	thn.tokenIsBlack = th.tokenIsBlack;
+	th.hasToken = false;
+	__sync_synchronize();
+	thn.hasToken = true;
+      }
     }
   }
+  //  L.unlock();
 }

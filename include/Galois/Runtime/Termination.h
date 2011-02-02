@@ -6,9 +6,9 @@ namespace GaloisRuntime {
 class TerminationDetection {
 
   struct tokenHolder {
-    volatile bool tokenIsBlack;
-    volatile bool hasToken;
-    volatile bool processIsBlack;
+    volatile long tokenIsBlack;
+    volatile long hasToken;
+    volatile long processIsBlack;
     tokenHolder() :tokenIsBlack(false), hasToken(false), processIsBlack(true) {}
   };
 
