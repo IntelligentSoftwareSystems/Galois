@@ -55,8 +55,7 @@ public:
 				GNode neighbor = *ii;
 				DTElement& neighborElement = neighbor.getData(Galois::Graph::CHECK_CONFLICT);
 
-				if (!graph->containsNode(neighbor) || neighbor == node || deletingNodes.find(neighbor) != deletingNodes.end()) {					
-					
+				if (!graph->containsNode(neighbor) || neighbor == node || deletingNodes.find(neighbor) != deletingNodes.end()) {			
 					continue;
 				};
 				if (neighborElement.getBDim() && neighborElement.inCircle(tuple)) {
@@ -74,7 +73,7 @@ public:
 		DTElement& nodeData = node.getData(Galois::Graph::NONE);
 		nodeData.getTuples().pop_back();		
 		//vector<DTElement, Galois::PerIterMem::ItAllocTy::rebind<DTElement>::other> newElements;
-		vector<DTElement*> newElements;
+		//vector<DTElement*> newElements;
 		while(!connectionNodes.empty()){
 			GNode neighbor = connectionNodes.front();
 			connectionNodes.pop_front();
@@ -85,8 +84,8 @@ public:
 			DTElement e(tuple, neighborElement.getPoint(index), neighborElement.getPoint((index + 1) % 3));
 			GNode nnode = graph->createNode(e);
 			graph->addNode(nnode, Galois::Graph::CHECK_CONFLICT);
-			graph->addEdge(nnode, neighbor, 1, Galois::Graph::ALL);
-			graph->addEdge(neighbor, nnode, index, Galois::Graph::ALL);			
+			graph->addEdge(nnode, neighbor, 1, Galois::Graph::CHECK_CONFLICT);
+			graph->addEdge(neighbor, nnode, index, Galois::Graph::CHECK_CONFLICT);			
 			
 			int numNeighborsFound = 0;
 
@@ -127,7 +126,7 @@ public:
 
 		newNodes->push_back(nnode);
 		DTElement& nnode_data = nnode.getData();
-		newElements.push_back(&nnode_data);
+		//newElements.push_back(&nnode_data);
 
 		DTElement& oldNodeData = oldNode.getData(Galois::Graph::NONE);
 		vector<DTTuple>& tuples = oldNodeData.getTuples();
@@ -145,7 +144,7 @@ public:
 		}
 		}
 		deletingNodes.insert(node);
-		dispatchTuples(newElements);
+		dispatchTuples(newNodes);
 		//dispatchTuples(newNodes);
 		GNodeSetIter setIter;
 		for (setIter = deletingNodes.begin();setIter != deletingNodes.end(); setIter++) {
@@ -155,8 +154,8 @@ public:
 		}
 	}
 
-	void dispatchTuples(std::vector<DTElement*>& newElements) {
-		int size = newElements.size();
+	void dispatchTuples(GNodeVector* newNodes) {
+		int size = newNodes->size();
 		GNodeSetIter iter;
 		for (iter=deletingNodes.begin();iter!=deletingNodes.end();iter++) {
 			GNode dnode = *iter;
@@ -168,13 +167,13 @@ public:
 				DTTuple tup = tuples.back();
 				tuples.pop_back();
 				for (int i = 0; i < size; i++) {
-					
-					if (newElements[i]->elementContains(tup)) {
-						newElements[i]->addTuple(tup);
+					DTElement& element = (*newNodes)[i].getData(Galois::Graph::NONE);
+					if ((element.elementContains(tup))) {
+						element.addTuple(tup);
 						if (i != 0) {
-							DTElement* newNodeData = newElements[i];
-							newElements[i] = newElements[0];
-							newElements[0] = newNodeData;
+							GNode newNode = (*newNodes)[i];
+							(*newNodes)[i] = (*newNodes)[0];
+							(*newNodes)[0] = newNode;
 						}
 						break;
 					}
