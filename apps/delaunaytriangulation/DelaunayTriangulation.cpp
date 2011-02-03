@@ -24,10 +24,10 @@ static const char* help = "<input file>";
 
 typedef Galois::Graph::FirstGraph<DTElement,int,true>            Graph;
 typedef Galois::Graph::FirstGraph<DTElement,int,true>::GraphNode GNode;
-//typedef std::vector<GNode, Galois::PerIterMem::ItAllocTy::rebind<GNode>::other> GNodeVector;
-//typedef std::vector<GNode, Galois::PerIterMem::ItAllocTy::rebind<GNode>::other>::iterator GNodeVectorIter;
-typedef std::vector<GNode> GNodeVector;
-typedef std::vector<GNode>::iterator GNodeVectorIter;
+typedef std::vector<GNode, Galois::PerIterMem::ItAllocTy::rebind<GNode>::other> GNodeVector;
+typedef std::vector<GNode, Galois::PerIterMem::ItAllocTy::rebind<GNode>::other>::iterator GNodeVectorIter;
+//typedef std::vector<GNode> GNodeVector;
+//typedef std::vector<GNode>::iterator GNodeVectorIter;
 
 	
 #include "Cavity.h"
@@ -46,7 +46,7 @@ struct process {
 		DTCavity cav(mesh, item, data.getTuples().back(),  &lwl);
 		cav.build();
 		
-		GNodeVector newNodes;
+		GNodeVector newNodes(lwl.PerIterationAllocator);
 		cav.update(&newNodes);
 		for(GNodeVectorIter iter=newNodes.begin();iter!=newNodes.end();iter++){
 		   GNode node = *iter;
@@ -61,8 +61,8 @@ struct process {
 template<typename WLTY>
 void triangulate(WLTY& wl) {
 	//GaloisRuntime::WorkList::LIFO<GNode> wl2;
-    GaloisRuntime::WorkList::FIFO<GNode> wl2;
-	//GaloisRuntime::WorkList::ChunkedFIFO<GNode, 16, false> wl2;
+    //GaloisRuntime::WorkList::FIFO<GNode> wl2;
+	GaloisRuntime::WorkList::ChunkedFIFO<GNode, 32, false> wl2;
 	wl2.fill_initial(wl.begin(), wl.end());
 	Galois::for_each(wl2, process());
 	

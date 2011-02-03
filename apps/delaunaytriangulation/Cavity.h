@@ -15,42 +15,45 @@
 #include <iostream>
 using namespace std;
 class DTCavity{
-	//typedef std::set<GNode, Galois::PerIterMem::ItAllocTy::rebind<GNode>::other>::iterator GNodeSetIter;
+	typedef std::set<GNode, Galois::PerIterMem::ItAllocTy::rebind<GNode>::other>::iterator GNodeSetIter;
 	
-	typedef std::set<GNode>::iterator GNodeSetIter;
+	//typedef std::set<GNode>::iterator GNodeSetIter;
 	Graph* graph;
-	//std::set<GNode, Galois::PerIterMem::ItAllocTy::rebind<GNode>::other> deletingNodes;
-	std::set<GNode> deletingNodes;
+	std::set<GNode, std::less<GNode>, Galois::PerIterMem::ItAllocTy::rebind<GNode>::other> deletingNodes;
+	//std::set<GNode> deletingNodes;
 	
-//	std::deque<GNode, Galois::PerIterMem::ItAllocTy::rebind<GNode>::other> oldNodes;
-//	std::deque<GNode, Galois::PerIterMem::ItAllocTy::rebind<GNode>::other> connectionNodes;
-	std::deque<GNode> oldNodes;
-	std::deque<GNode> connectionNodes;
+	std::deque<GNode, Galois::PerIterMem::ItAllocTy::rebind<GNode>::other> oldNodes;
+	std::deque<GNode, Galois::PerIterMem::ItAllocTy::rebind<GNode>::other> connectionNodes;
+	//std::deque<GNode> oldNodes;
+	//std::deque<GNode> connectionNodes;
 	DTTuple tuple;
 	GNode node;
-
+    Galois::PerIterMem* _cnx;
 public:
 
 	DTCavity(Graph* g, GNode& n, DTTuple& t, Galois::PerIterMem* cnx)
 	:
-	 //oldNodes(cnx->PerIterationAllocator),
-	 //connectionNodes(cnx->PerIterationAllocator),
-	 graph(g),
+	 oldNodes(cnx->PerIterationAllocator),
+	 connectionNodes(cnx->PerIterationAllocator),
+	 deletingNodes(std::less<GNode>(), cnx->PerIterationAllocator),
+     graph(g),
 	 node(n),
 	 tuple(t)
-	{}
+	{
+		_cnx = cnx;
+	}
 	void build() {
-//		std::vector<GNode, Galois::PerIterMem::ItAllocTy::rebind<GNode>::other> frontier;
-		std::vector<GNode> frontier;
+		std::vector<GNode, Galois::PerIterMem::ItAllocTy::rebind<GNode>::other> frontier(_cnx->PerIterationAllocator);
+		//std::vector<GNode> frontier;
 		frontier.push_back(node);
 		while(!frontier.empty()){
 			GNode curr = frontier.back();
 			frontier.pop_back();
-			for (Graph::neighbor_iterator ii = graph->neighbor_begin(curr,Galois::Graph::ALL),
-					ee = graph->neighbor_end(curr,Galois::Graph::ALL);
+			for (Graph::neighbor_iterator ii = graph->neighbor_begin(curr,Galois::Graph::CHECK_CONFLICT),
+					ee = graph->neighbor_end(curr,Galois::Graph::CHECK_CONFLICT);
 					ii != ee; ++ii) {
 				GNode neighbor = *ii;
-				DTElement& neighborElement = neighbor.getData(Galois::Graph::ALL);
+				DTElement& neighborElement = neighbor.getData(Galois::Graph::CHECK_CONFLICT);
 
 				if (!graph->containsNode(neighbor) || neighbor == node || deletingNodes.find(neighbor) != deletingNodes.end()) {					
 					
@@ -68,7 +71,7 @@ public:
 	}
 
 	void update(GNodeVector* newNodes){
-		DTElement& nodeData = node.getData(Galois::Graph::ALL);
+		DTElement& nodeData = node.getData(Galois::Graph::NONE);
 		nodeData.getTuples().pop_back();		
 		//vector<DTElement, Galois::PerIterMem::ItAllocTy::rebind<DTElement>::other> newElements;
 		vector<DTElement*> newElements;
@@ -81,7 +84,7 @@ public:
 			DTElement& neighborElement = neighbor.getData(Galois::Graph::NONE);
 			DTElement e(tuple, neighborElement.getPoint(index), neighborElement.getPoint((index + 1) % 3));
 			GNode nnode = graph->createNode(e);
-			graph->addNode(nnode, Galois::Graph::ALL);
+			graph->addNode(nnode, Galois::Graph::CHECK_CONFLICT);
 			graph->addEdge(nnode, neighbor, 1, Galois::Graph::ALL);
 			graph->addEdge(neighbor, nnode, index, Galois::Graph::ALL);			
 			
@@ -112,8 +115,8 @@ public:
 				}
 
 				if (found) {
-					graph->addEdge(newNode, nnode, indexForNewNode, Galois::Graph::ALL);
-					graph->addEdge(nnode, newNode, indexForNode, Galois::Graph::ALL);
+					graph->addEdge(newNode, nnode, indexForNewNode, Galois::Graph::CHECK_CONFLICT);
+					graph->addEdge(nnode, newNode, indexForNode, Galois::Graph::CHECK_CONFLICT);
 					numNeighborsFound++;
 				}
 				if (numNeighborsFound == 2) {
