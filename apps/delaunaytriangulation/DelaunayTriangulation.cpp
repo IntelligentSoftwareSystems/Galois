@@ -39,7 +39,7 @@ struct process {
 	template<typename Context>
 	void operator()(GNode item, Context& lwl) {
 	  assert(!item.isNull());
-		DTElement& data = item.getData(Galois::Graph::CHECK_CONFLICT); //lock
+		DTElement& data = item.getData(Galois::Graph::ALL); //lock
 		if (data.isProcessed())
 			return;
 	
@@ -52,7 +52,7 @@ struct process {
 		   GNode node = *iter;
 		   
 		   if (!node.getData(Galois::Graph::NONE).getTuples().empty()) {
-			lwl.push(node);
+				lwl.push(node);
 	           }
 		}
 	}
@@ -61,8 +61,8 @@ struct process {
 template<typename WLTY>
 void triangulate(WLTY& wl) {
 	//GaloisRuntime::WorkList::LIFO<GNode> wl2;
-        //GaloisRuntime::WorkList::FIFO<GNode> wl2;
-	GaloisRuntime::WorkList::ChunkedFIFO<GNode, 16, false> wl2;
+    GaloisRuntime::WorkList::FIFO<GNode> wl2;
+	//GaloisRuntime::WorkList::ChunkedFIFO<GNode, 16, false> wl2;
 	wl2.fill_initial(wl.begin(), wl.end());
 	Galois::for_each(wl2, process());
 	
