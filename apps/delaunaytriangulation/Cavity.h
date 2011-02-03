@@ -15,7 +15,9 @@
 #include <iostream>
 using namespace std;
 class DTCavity{
-	typedef std::set<GNode, Galois::PerIterMem::ItAllocTy::rebind<GNode>::other>::iterator GNodeSetIter;
+	//typedef std::set<GNode, Galois::PerIterMem::ItAllocTy::rebind<GNode>::other>::iterator GNodeSetIter;
+	
+	typedef std::set<GNode>::iterator GNodeSetIter;
 	Graph* graph;
 	//std::set<GNode, Galois::PerIterMem::ItAllocTy::rebind<GNode>::other> deletingNodes;
 	std::set<GNode> deletingNodes;
@@ -44,15 +46,16 @@ public:
 		while(!frontier.empty()){
 			GNode curr = frontier.back();
 			frontier.pop_back();
-			for (Graph::neighbor_iterator ii = graph->neighbor_begin(curr,Galois::Graph::CHECK_CONFLICT),
-					ee = graph->neighbor_end(curr,Galois::Graph::CHECK_CONFLICT);
+			for (Graph::neighbor_iterator ii = graph->neighbor_begin(curr,Galois::Graph::ALL),
+					ee = graph->neighbor_end(curr,Galois::Graph::ALL);
 					ii != ee; ++ii) {
 				GNode neighbor = *ii;
-				
-				if (neighbor == node || deletingNodes.find(neighbor) != deletingNodes.end()) {					
+				DTElement& neighborElement = neighbor.getData(Galois::Graph::ALL);
+
+				if (!graph->containsNode(neighbor) || neighbor == node || deletingNodes.find(neighbor) != deletingNodes.end()) {					
+					
 					continue;
 				};
-				DTElement& neighborElement = neighbor.getData(Galois::Graph::CHECK_CONFLICT);
 				if (neighborElement.getBDim() && neighborElement.inCircle(tuple)) {
 					deletingNodes.insert(neighbor);
 					frontier.push_back(neighbor);
@@ -65,7 +68,7 @@ public:
 	}
 
 	void update(GNodeVector* newNodes){
-		DTElement& nodeData = node.getData(Galois::Graph::NONE);
+		DTElement& nodeData = node.getData(Galois::Graph::ALL);
 		nodeData.getTuples().pop_back();		
 		//vector<DTElement, Galois::PerIterMem::ItAllocTy::rebind<DTElement>::other> newElements;
 		vector<DTElement*> newElements;
@@ -74,13 +77,13 @@ public:
 			connectionNodes.pop_front();
 			GNode oldNode = oldNodes.front();
 			oldNodes.pop_front();
-			int index = graph->getEdgeData(neighbor, oldNode, Galois::Graph::CHECK_CONFLICT);
+			int index = graph->getEdgeData(neighbor, oldNode, Galois::Graph::NONE);
 			DTElement& neighborElement = neighbor.getData(Galois::Graph::NONE);
 			DTElement e(tuple, neighborElement.getPoint(index), neighborElement.getPoint((index + 1) % 3));
 			GNode nnode = graph->createNode(e);
-			graph->addNode(nnode, Galois::Graph::CHECK_CONFLICT);
-			graph->addEdge(nnode, neighbor, 1, Galois::Graph::CHECK_CONFLICT);
-			graph->addEdge(neighbor, nnode, index, Galois::Graph::CHECK_CONFLICT);			
+			graph->addNode(nnode, Galois::Graph::ALL);
+			graph->addEdge(nnode, neighbor, 1, Galois::Graph::ALL);
+			graph->addEdge(neighbor, nnode, index, Galois::Graph::ALL);			
 			
 			int numNeighborsFound = 0;
 
@@ -109,8 +112,8 @@ public:
 				}
 
 				if (found) {
-					graph->addEdge(newNode, nnode, indexForNewNode, Galois::Graph::CHECK_CONFLICT);
-					graph->addEdge(nnode, newNode, indexForNode, Galois::Graph::CHECK_CONFLICT);
+					graph->addEdge(newNode, nnode, indexForNewNode, Galois::Graph::ALL);
+					graph->addEdge(nnode, newNode, indexForNode, Galois::Graph::ALL);
 					numNeighborsFound++;
 				}
 				if (numNeighborsFound == 2) {
@@ -123,7 +126,7 @@ public:
 		DTElement& nnode_data = nnode.getData();
 		newElements.push_back(&nnode_data);
 
-		DTElement& oldNodeData = oldNode.getData(Galois::Graph::ALL);
+		DTElement& oldNodeData = oldNode.getData(Galois::Graph::NONE);
 		vector<DTTuple>& tuples = oldNodeData.getTuples();
 		if (!tuples.empty()) {		
 			std::vector<DTTuple> newTuples;
@@ -145,7 +148,7 @@ public:
 		for (setIter = deletingNodes.begin();setIter != deletingNodes.end(); setIter++) {
 			GNode dnode = *setIter;
 			dnode.getData(Galois::Graph::NONE).setProcessed();
-			graph->removeNode(dnode, Galois::Graph::CHECK_CONFLICT);
+			graph->removeNode(dnode, Galois::Graph::NONE);
 		}
 	}
 
