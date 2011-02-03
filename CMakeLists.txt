@@ -5,10 +5,9 @@ project (Galois)
 SET( PTHREAD ON)
 #SET( CRAY ON )
 SET( WITH_VTUNE ON )
-#SET( ASSERT_LOCKS ON )
 SET( WITH_DEBUG_INFO ON )
 #SET( WITH_WALL ON)
-SET( WITH_NO_ASSERTS ON )
+#SET( WITH_NO_ASSERTS ON )
 
 #Boost
 SET(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0")
@@ -24,10 +23,6 @@ endif(PTHREAD)
 if (CRAY)
   add_definitions(-DGALOIS_CRAY)
 endif(CRAY)
-
-if (ASSERT_LOCKS)
-  add_definitions(-DASSERT_LOCKS)
-endif(ASSERT_LOCKS)
 
 if (WITH_DEBUG_INFO)
   add_definitions("-g")

@@ -20,9 +20,15 @@ class Lockable : public LockableBaseHook, public SimpleLock<void*, true> {
 class SimpleRuntimeContext {
   
   typedef boost::intrusive::slist<Lockable, boost::intrusive::base_hook<LockableBaseHook>, boost::intrusive::constant_time_size<false>, boost::intrusive::linear<true> > locksTy;
+
+  //The locks we hold
   locksTy locks;
-  
+
+  //Sanity check for failsafe point
+  bool failsafe;
+
   void acquire_i(Lockable* C) {
+    assert(!failsafe && "Acquiring a new lock after failsafe");
     bool suc = C->try_lock(this);
     if (suc) {
       locks.push_front(*C);
@@ -32,15 +38,10 @@ class SimpleRuntimeContext {
     }
   }
 
-  void assertAcquired_i(Lockable* C) {
-#ifdef ASSERT_LOCKS
-    assert(C->getValue() == this);
-#endif
-  }
-
 public:
   void start_iteration() {
     assert(locks.empty());
+    failsafe = false;
   }
   
   void cancel_iteration() {
@@ -58,16 +59,16 @@ public:
       locks.pop_front();
       L.unlock();
     }
+    failsafe = false;
+  }
+
+  void enter_failsafe() {
+    failsafe = true;
   }
   
   static void acquire(SimpleRuntimeContext* C, Lockable* L) {
     if (C)
       C->acquire_i(L);
-  }
-
-  static void assertAcquired(SimpleRuntimeContext* C, Lockable* L) {
-    if (C)
-      C->assertAcquired_i(L);
   }
 
 };
@@ -88,12 +89,6 @@ static __attribute__((unused)) void acquire(Lockable* C) {
   SimpleRuntimeContext* cnx = getThreadContext();
   if (cnx)
     SimpleRuntimeContext::acquire(cnx, C);
-}
-
-static __attribute__((unused)) void assertAcquired(Lockable* C) {
-  SimpleRuntimeContext* cnx = getThreadContext();
-  if (cnx)
-    SimpleRuntimeContext::assertAcquired(cnx, C);
 }
 
 }
