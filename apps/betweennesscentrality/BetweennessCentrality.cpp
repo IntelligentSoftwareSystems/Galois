@@ -31,7 +31,7 @@ typedef Graph::GraphNode GNode;
 Graph* G;
 int NumNodes;
 
-GaloisRuntime::CPUSpaced<std::vector<double> >* CB;
+GaloisRuntime::PerCPU<std::vector<double> >* CB;
 
 struct process {
   template<typename Context>
@@ -114,7 +114,7 @@ int main(int argc, const char** argv) {
   GraphT gt;
   Graph  g;
   G = &g;
-  GaloisRuntime::CPUSpaced<std::vector<double> > cb(merge);
+  GaloisRuntime::PerCPU<std::vector<double> > cb(merge);
   CB = &cb;
 
   //readTxtFile(argv[inputFileAt]);
