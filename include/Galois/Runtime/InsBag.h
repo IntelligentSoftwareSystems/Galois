@@ -30,7 +30,7 @@ class galois_insert_bag {
    				  boost::intrusive::base_hook<InsBagBaseHook>,
    				  boost::intrusive::constant_time_size<false>
    				  > ListTy;
-   CPUSpaced<ListTy> heads;
+   PerCPU<ListTy> heads;
   
   
   //GaloisRuntime::MM::TSBlockAlloc<holder> allocSrc;

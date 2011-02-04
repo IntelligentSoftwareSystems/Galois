@@ -115,7 +115,7 @@ private:
     }
   };
 
-  CPUSpaced<ProcRec> data;
+  PerCPU<ProcRec> data;
 
   void push_next(ProcRec& n, value_type val) {
     if (!n.next) {
@@ -221,7 +221,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
   ContainerTy* data;
   unsigned int size;
   Indexer I;
-  CPUSpaced<unsigned int> cursor;
+  PerCPU<unsigned int> cursor;
 
   static void merge(unsigned int& x, unsigned int& y) {
     x = 0;
@@ -304,7 +304,7 @@ class CacheByIntegerMetric : private boost::noncopyable {
   typedef __cacheTy (&cacheRef)[size];
   typedef const __cacheTy (&constCacheRef)[size];
 
-  CPUSpaced<cacheTy> cache;
+  PerCPU<cacheTy> cache;
   Indexer I;
 
   static void merge(cacheTy& x, cacheTy& y) {
@@ -374,6 +374,50 @@ class CacheByIntegerMetric : private boost::noncopyable {
     data.fill_initial(ii, ee);
   }
 };
+
+template<class T, typename ContainerTy = FIFO<T> >
+class StealingLocalWL : private boost::noncopyable {
+
+  PerCPU_ring<ContainerTy> data;
+
+  static void merge(ContainerTy& x, ContainerTy& y) {
+    assert(x.empty());
+    assert(y.empty());
+  }
+
+ public:
+
+  typedef T value_type;
+  
+  StealingLocalWL() :data(&merge) {}
+
+  void push(value_type val) __attribute__((noinline)) {
+    data.get().push(val);
+  }
+
+  std::pair<bool, value_type> pop()  __attribute__((noinline)) {
+    std::pair<bool, value_type> ret = data.get().pop();
+    if (ret.first)
+      return ret;
+    return data.getNext().pop();
+  }
+
+  bool empty() {
+    return data.get().empty();
+  }
+  void aborted(value_type val) {
+    push(val);
+  }
+
+  //Not Thread Safe
+  template<typename Iter>
+  void fill_initial(Iter ii, Iter ee) {
+    while (ii != ee) {
+      push(*ii++);
+    }
+  }
+};
+
 
 }
 }

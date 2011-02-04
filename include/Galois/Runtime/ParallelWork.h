@@ -93,7 +93,7 @@ class ParallelWork : public Galois::Executable {
   WorkListTy& global_wl;
   Function& f;
 
-  CPUSpaced<PCTy> tdata;
+  PerCPU<PCTy> tdata;
   TerminationDetection term;
 
 public:
