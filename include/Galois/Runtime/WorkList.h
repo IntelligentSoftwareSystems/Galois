@@ -159,7 +159,7 @@ public:
   //typedef typename MQ::value_type value_type;
 
   ChunkedFIFO() :data(ProcRec::merge) {
-    assert(data.getCount() > 1);
+    // assert(data.getCount() > 1);
   }
 
   void push(value_type val) {
