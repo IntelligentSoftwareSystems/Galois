@@ -239,19 +239,19 @@ public:
 	}
 
 	//These are not thread safe!!
-	typedef boost::transform_iterator<LCGraph::makeGraphNode, boost::filter_iterator<std::mem_fun_ref_t<bool, gNode>, typename std::vector<gNode>::iterator> >
+	typedef boost::transform_iterator<makeGraphNode, boost::filter_iterator<std::mem_fun_ref_t<bool, gNode>, typename std::vector<gNode>::iterator> >
 			active_iterator;
 
 	active_iterator active_begin() {
 	return boost::make_transform_iterator(boost::make_filter_iterator(
 									  std::mem_fun_ref(&gNode::isActive), nodes.begin(), nodes.end()),
-					  LCGraph::makeGraphNode(this));
+					  makeGraphNode(this));
 	}
 
 	active_iterator active_end() {
 	return boost::make_transform_iterator(boost::make_filter_iterator(
 									  std::mem_fun_ref(&gNode::isActive), nodes.end(), nodes.end()),
-					  LCGraph::makeGraphNode(this));
+					  makeGraphNode(this));
 	}
 
 	int neighborsSize(GraphNode N, MethodFlag mflag = ALL, SimpleRuntimeContext* C = getThreadContext()) {
