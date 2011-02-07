@@ -7,6 +7,7 @@ namespace GaloisRuntime {
 
 //Report Statistics
 void reportStat(const char* text, unsigned long val);
+void reportStat(const char* text, unsigned int val);
 void reportStat(const char* text, double val);
 
 //Report Warnings
