@@ -11,8 +11,8 @@
 #include "Galois/Runtime/WorkList.h"
 #include "Galois/Runtime/Termination.h"
 
-#ifdef WITH_VTUNE
-#include "/opt/intel/vtune_amplifier_xe_2011/include/ittnotify.h"
+#ifdef GALOIS_VTUNE
+#include "ittnotify.h"
 #endif
 
 namespace GaloisRuntime {
@@ -139,13 +139,13 @@ public:
 
 template<class Function, class GWLTy>
 void for_each_parallel(GWLTy& GWL, Function& f) {
-#ifdef WITH_VTUNE
+#ifdef GALOIS_VTUNE
   __itt_resume();
 #endif
   ParallelWork<GWLTy, Function> GW(GWL, f);
   ThreadPool& PTP = getSystemThreadPool();
   PTP.run(&GW);
-#ifdef WITH_VTUNE
+#ifdef GALOIS_VTUNE
   __itt_pause();
 #endif
 }

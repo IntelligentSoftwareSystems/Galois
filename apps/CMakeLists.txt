@@ -4,10 +4,11 @@ function(app name)
   target_link_libraries (${name} galois) 
   target_link_libraries (${name} ${CMAKE_THREAD_LIBS_INIT}) 
 
-  if(WITH_VTUNE)
+  IF(WITH_VTUNE)
+    add_definitions(-DGALOIS_VTUNE)
+    include_directories("/opt/intel/vtune_amplifier_xe_2011/include/")
     target_link_libraries (${name} /opt/intel/vtune_amplifier_xe_2011/lib64/libittnotify.a)
     target_link_libraries (${name} dl)
-    add_definitions(-DWITH_VTUNE)
   endif(WITH_VTUNE)
 endfunction(app)
 

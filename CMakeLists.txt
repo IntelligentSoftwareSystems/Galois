@@ -2,12 +2,26 @@ cmake_minimum_required (VERSION 2.6)
 project (Galois)
 
 #Options
+
+#use pthreads
 SET( PTHREAD ON)
+
+#compile for cray xmt
 #SET( CRAY ON )
-#SET( WITH_VTUNE ON )
+
+#compile with debug symbols (recommended)
 SET( WITH_DEBUG_INFO ON )
+
+#be extra pendantic (recommended)
 #SET( WITH_WALL ON)
-#SET( WITH_NO_ASSERTS ON )
+
+#disable expensive asserts (use on Release builds)
+SET( WITH_NO_ASSERTS ON )
+
+#build with optimizations (release build)
+SET( WITH_OPTIMIZATIONS ON)
+
+#find libraries
 
 #Boost
 SET(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0")
@@ -19,6 +33,12 @@ if (PTHREAD)
   find_package(Threads REQUIRED)
   add_definitions(-DGALOIS_PTHREAD)
 endif(PTHREAD)
+
+#vtune
+#apps/CMakeLists.txt also hardcodes this path
+IF(EXISTS "/opt/intel/vtune_amplifier_xe_2011/include/ittnotify.h")
+  SET(WITH_VTUNE ON)
+endif()
 
 if (CRAY)
   add_definitions(-DGALOIS_CRAY)
@@ -40,10 +60,13 @@ endif(WITH_NO_ASSERTS)
 
 set(CMAKE_CXX_FLAGS_RELEASE         "-O3")
 
-set(CMAKE_BUILD_TYPE Release)
-#set(CMAKE_BUILD_TYPE Debug)
+if (WITH_OPTIMIZATIONS)
+  set(CMAKE_BUILD_TYPE Release)
+else(WITH_OPTIMIZATIONS)
+  set(CMAKE_BUILD_TYPE Debug)
+endif(WITH_OPTIMIZATIONS)
 
-#set(CMAKE_CXX_COMPILER clang++)
+#set(CMAKE_CXX_COMPILER /h1/lenharth/local/bin/clang++)
 #set(CMAKE_CXX_COMPILER /opt/intel/Compiler/11.1/072/bin/intel64/icpc)
 #These help the intel compiler
 #add_definitions("-wd981 -wd383 -wd869 -wd2196")
