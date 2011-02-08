@@ -12,7 +12,7 @@ class SimpleLock;
 
 template<typename T>
 class SimpleLock<T, true> {
-  mutable T _lock; //Allow locking a const
+  volatile mutable T _lock; //Allow locking a const
 public:
   SimpleLock() : _lock(0) {
 #ifdef GALOIS_CRAY
@@ -21,7 +21,15 @@ public:
   }
 
   void lock(T val = 1) const {
-    while (!try_lock(val)) {} 
+    do {
+      while (_lock != 0) {
+#if defined(__i386__) || defined(__amd64__)
+	asm volatile ( "pause");
+#endif
+      }
+      if (try_lock(val))
+	break;
+    } while (true);
   }
 
   void unlock() const {
@@ -47,7 +55,9 @@ public:
       return true;
     }
 #else
-    return __sync_bool_compare_and_swap(&_lock, (T)0, val);
+    if (_lock != 0)
+      return false;
+    return __sync_bool_compare_and_swap(&_lock, 0, val);
 #endif
   }
 
