@@ -110,13 +110,15 @@ class ThreadPool_pthread : public ThreadPool {
   }
 
   void bindToProcessor(int proc) {
+#if 0
     int id = proc;
     int carry = 0;
     if (id > 23) {
       id -= 24;
       carry = 24;
     }
-    //proc = carry + ((id % 6) * 4) + (id / 6);
+    proc = carry + ((id % 6) * 4) + (id / 6);
+#endif
 #ifdef __linux__
     cpu_set_t mask;
     /* CPU_ZERO initializes all the bits in the mask to zero. */
