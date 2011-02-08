@@ -9,7 +9,8 @@
 
 namespace GaloisRuntime {
 
-#define CACHE_LINE_SIZE 64
+//xeons have 64 byte cache lines, but will prefetch 2 at a time
+#define CACHE_LINE_SIZE 128
 
 // Store an item with padding
 template<typename T>

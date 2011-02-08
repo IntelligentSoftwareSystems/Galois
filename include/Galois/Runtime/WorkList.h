@@ -10,19 +10,41 @@
 #include <stack>
 
 #include "Galois/Runtime/SimpleLock.h"
+#include "Galois/Runtime/PerCPU.h"
+#include "Galois/Runtime/QueuingLock.h"
 
 #include <boost/utility.hpp>
 
 namespace GaloisRuntime {
 namespace WorkList {
 
+template<bool concurrent>
+class PaddedLock;
+
+template<>
+class PaddedLock<true> {
+  cache_line_storage<SimpleLock<int, true> > Lock;
+
+public:
+  void lock() { Lock.data.lock(); }
+  void unlock() { Lock.data.unlock(); }
+};
+template<>
+class PaddedLock<false> {
+public:
+  void lock() {}
+  void unlock() {}
+};
+
+
+
 template<typename MQ, bool concurrent = true>
-class STLAdaptor : private boost::noncopyable, private SimpleLock<long, concurrent> {
+class STLAdaptor : private boost::noncopyable, private PaddedLock<concurrent> {
 
   MQ wl;
 
-  using SimpleLock<long, concurrent>::lock;
-  using SimpleLock<long, concurrent>::unlock;
+  using PaddedLock<concurrent>::lock;
+  using PaddedLock<concurrent>::unlock;
 
 public:
   typedef STLAdaptor<MQ, true>  ConcurrentTy;
@@ -236,6 +258,8 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     :size(range+1), I(x), cursor(&merge)
   {
     data = new ContainerTy[size];
+    for (int i = 0; i < cursor.size(); ++i)
+      cursor.get(i) = 0;
   }
   
   ~OrderedByIntegerMetric() {
@@ -253,17 +277,23 @@ class OrderedByIntegerMetric : private boost::noncopyable {
 
   std::pair<bool, value_type> pop()  __attribute__((noinline)) {
     unsigned int& cur = cursor.get();
-    //Find a successful pop
-    if (cur == size) //handle out of range
-      cur = 0;
-
     std::pair<bool, value_type> ret;
-    do {
+    //Find a successful pop
+    assert(cur < size);
+    ret = data[cur].pop();
+    if (ret.first)
+      return ret;
+
+    //cursor failed, scan from front
+    //assuming queues tend to be full, this should let us pick up good
+    //items sooner
+    for (cur = 0; cur < size; ++cur) {
       ret = data[cur].pop();
       if (ret.first)
 	return ret;
-      ++cur;
-    } while (cur < size);
+    }
+    cur = 0;
+    ret.first = false;
     return ret;
   }
 
