@@ -42,7 +42,7 @@ public:
 #endif
   }
 
-  bool try_lock(T val) const {
+  bool try_lock(T val = 1) const {
 #ifdef GALOIS_CRAY
     T V = readfe(&_lock); // sets to empty, acquiring the lock lock
     if (V) {
@@ -71,7 +71,7 @@ class SimpleLock<T, false> {
 public:
   void lock(T val = 0) const {}
   void unlock() const {}
-  bool try_lock(T val = 0) const { return true; }
+  bool try_lock(T val = 1) const { return true; }
   T getValue() const { return 0; }
 };
 
