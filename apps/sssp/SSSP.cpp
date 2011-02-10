@@ -132,10 +132,24 @@ struct process {
 void runBodyParallel(const GNode src, unsigned int numNodes) {
   //GaloisRuntime::WorkList::PriQueue<UpdateRequest> wl;
   //  typedef GaloisRuntime::WorkList::OrderedByIntegerMetric<UpdateRequest, UpdateRequestIndexer, GaloisRuntime::WorkList::ChunkedFIFO<UpdateRequest, 8, true, GaloisRuntime::WorkList::FIFO<UpdateRequest> > > OBIM;
-  typedef GaloisRuntime::WorkList::OrderedByIntegerMetric<UpdateRequest, UpdateRequestIndexer> OBIM;
-  OBIM wl(30*1024);
-  //  GaloisRuntime::WorkList::CacheByIntegerMetric<OBIM, 1, UpdateRequestIndexer> wl2(wl);
+
+  //typedef GaloisRuntime::WorkList::LocalQueues<UpdateRequest, GaloisRuntime::WorkList::PriQueue<UpdateRequest>, GaloisRuntime::WorkList::PriQueue<UpdateRequest> > OBIM;
+  //  OBIM wl;
+
+  typedef GaloisRuntime::WorkList::ApproxOrderByIntegerMetric<UpdateRequest, UpdateRequestIndexer> OBIM;
+  OBIM wl;
+
+  //typedef GaloisRuntime::WorkList::OrderedByIntegerMetric<UpdateRequest, UpdateRequestIndexer> OBIM;
+  //  typedef GaloisRuntime::WorkList::OrderedByIntegerMetric<UpdateRequest, UpdateRequestIndexer, GaloisRuntime::WorkList::StealingLocalWL<UpdateRequest> > OBIM;
+  //  OBIM wl(30*1024);
+
   
+
+  //  GaloisRuntime::WorkList::CacheByIntegerMetric<OBIM, 1, UpdateRequestIndexer> wl2(wl);
+
+  //  typedef GaloisRuntime::WorkList::AdaptiveOrderedByIntegerMetric<UpdateRequest, UpdateRequestIndexer> AOBIM;
+  //  AOBIM wl;
+   
   getInitialRequests(src, *src.getGraph(), wl);
   Galois::for_each(wl, process());
 }
