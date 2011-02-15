@@ -7,11 +7,11 @@
 
 #include "Galois/Runtime/SimpleLock.h"
 #include "Galois/Runtime/PerCPU.h"
-#include "Galois/Runtime/QueuingLock.h"
+//#include "Galois/Runtime/QueuingLock.h"
 
 #include <boost/utility.hpp>
 
-//#include <iostream>
+#include <iostream>
 
 namespace GaloisRuntime {
 namespace WorkList {
@@ -39,9 +39,6 @@ public:
   std::pair<bool, value_type> try_pop();
   //! return if the queue *may* be empty
   bool empty();
-  //! return the number of items in the list
-  //! this is not called size because it may not be constant
-  unsigned count();
   
   //! called in sequential mode to seed the worklist
   template<typename iter>
@@ -82,9 +79,6 @@ class PriQueue : private boost::noncopyable, private PaddedLock<concurrent> {
 public:
   typedef PriQueue<T, Compare, true>  ConcurrentTy;
   typedef PriQueue<T, Compare, false> SingleThreadTy;
-
-  friend class PriQueue<T, Compare, true>;
-  friend class PriQueue<T, Compare, false>;
 
   typedef T value_type;
 
@@ -127,13 +121,6 @@ public:
     return retval;
   }
 
-  unsigned count() {
-    lock();
-    unsigned ret = wl.size();
-    unlock();
-    return ret;
-  }
-
   void aborted(value_type val) {
     push(val);
   }
@@ -158,9 +145,6 @@ class LIFO : private boost::noncopyable, private PaddedLock<concurrent> {
 public:
   typedef LIFO<T, true>  ConcurrentTy;
   typedef LIFO<T, false> SingleThreadTy;
-
-  friend class LIFO<T, true>;
-  friend class LIFO<T, false>;
 
   typedef T value_type;
 
@@ -203,13 +187,6 @@ public:
     return retval;
   }
 
-  bool count() {
-    lock();
-    unsigned retval = wl.size();
-    unlock();
-    return retval;
-  }
-
   void aborted(value_type val) {
     push(val);
   }
@@ -224,7 +201,7 @@ public:
 };
 
 template<typename T, bool concurrent = true>
-class FIFO : private boost::noncopyable, private PaddedLock<concurrent> {
+class sFIFO : private boost::noncopyable, private PaddedLock<concurrent>  {
   std::deque<T> wl;
 
   using PaddedLock<concurrent>::lock;
@@ -232,11 +209,8 @@ class FIFO : private boost::noncopyable, private PaddedLock<concurrent> {
   using PaddedLock<concurrent>::unlock;
 
 public:
-  typedef FIFO<T, true>  ConcurrentTy;
-  typedef FIFO<T, false> SingleThreadTy;
-
-  friend class FIFO<T, true>;
-  friend class FIFO<T, false>;
+  typedef sFIFO<T, true>  ConcurrentTy;
+  typedef sFIFO<T, false> SingleThreadTy;
 
   typedef T value_type;
 
@@ -271,17 +245,10 @@ public:
     }
     return std::make_pair(false, value_type());
   }
-    
+
   bool empty() {
     lock();
     bool retval = wl.empty();
-    unlock();
-    return retval;
-  }
-
-  unsigned count() {
-    lock();
-    unsigned retval = wl.size();
     unlock();
     return retval;
   }
@@ -295,6 +262,148 @@ public:
   void fill_initial(Iter ii, Iter ee) {
     while (ii != ee) {
       wl.push(*ii++);
+    }
+  }
+};
+
+template<typename T, bool concurrent = true>
+class FIFO : private boost::noncopyable {
+
+  struct Chunk {
+    unsigned char start;
+    unsigned char end;
+    SimpleLock<unsigned char, concurrent> lock;
+    Chunk* next;
+    T data[256];
+    Chunk() :start(0), end(0), next(0) {}
+  };
+
+  //tail shall always be not null
+  Chunk* tail;
+  //head shall always be not null
+  Chunk* head;
+
+  SimpleLock<long, concurrent> tailLock;
+  SimpleLock<long, concurrent> headLock;
+
+public:
+  typedef FIFO<T, true>  ConcurrentTy;
+  typedef FIFO<T, false> SingleThreadTy;
+
+  typedef T value_type;
+
+  void dump(char c) {
+    // std::cerr << c << ' ' 
+    // 	      << head << '{' << (int)head->start << ',' << (int)head->end << '}'
+    // 	      << ' '
+    // 	      << tail << '{' << (int)tail->start << ',' << (int)tail->end << '}'
+    // 	      << '\n';
+  }
+
+
+  FIFO() {
+    tail = head = new Chunk();
+    dump('C');
+  }
+
+  void push(value_type val) {
+    dump('P');
+    tailLock.lock();
+    assert(tail);
+    tail->lock.lock();
+    //do all checks
+    assert (!tail->next);
+    if (tail->end == 255) {
+      Chunk* nc = new Chunk();
+      tail->next = nc;
+      nc->lock.lock();
+      Chunk* oldtail = tail;
+      tail = nc;
+      oldtail->lock.unlock();
+    }
+    tail->data[tail->end] = val;
+    ++tail->end;
+    tail->lock.unlock();
+    tailLock.unlock();
+    return;
+  }
+
+  std::pair<bool, value_type> pop() {
+    dump('G');
+    headLock.lock();
+    assert(head);
+    head->lock.lock();
+    if (head->start == head->end) {
+      //Chunk is empty
+      if (head->next) {
+    	//more chunks exist
+	Chunk* old = head;
+	head->next->lock.lock();
+	head = head->next;
+	old->lock.unlock();
+	delete old;
+	head->lock.unlock();
+	headLock.unlock();
+	//try again
+	return pop();
+      } else {
+    	// No more chunks
+	head->lock.unlock();
+	headLock.unlock();
+	return std::make_pair(false, value_type());
+      }
+    } else {
+      value_type retval = head->data[head->start];
+      ++head->start;
+      head->lock.unlock();
+      headLock.unlock();
+      return std::make_pair(true, retval);
+    }
+  }
+
+  std::pair<bool, value_type> try_pop() {
+    return pop();
+  }
+    
+  bool empty() {
+    dump('E');
+    headLock.lock();
+    assert(head);
+    head->lock.lock();
+    if (head->start == head->end) {
+      //Chunk is empty
+      if (head->next) {
+	//more chunks exist
+	Chunk* old = head;
+	head = head->next;
+	delete old;
+	head->lock.unlock();
+	headLock.unlock();
+	//try again
+	return empty();
+      } else {
+	// No more chunks
+	head->lock.unlock();
+	headLock.unlock();
+	return true;
+      }
+    } else {
+      head->lock.unlock();
+      headLock.unlock();
+      return false;
+    }
+  }
+
+  void aborted(value_type val) {
+    dump('A');
+    push(val);
+  }
+
+  //Not Thread Safe
+  template<typename Iter>
+  void fill_initial(Iter ii, Iter ee) {
+    while (ii != ee) {
+      push(*ii++);
     }
   }
 };
@@ -511,13 +620,6 @@ class OrderedByIntegerMetric : private boost::noncopyable {
       if (!data[i].empty())
 	return false;
     return true;
-  }
-
-  unsigned count() {
-    unsigned c = 0;
-    for (unsigned int i = 0; i < size; ++i)
-      c += data[i].size();
-    return c;
   }
 
   void aborted(value_type val) {
@@ -784,13 +886,6 @@ class ApproxOrderByIntegerMetric : private boost::noncopyable {
       if (!data[i].empty())
 	return false;
     return true;
-  }
-
-  unsigned count() {
-    unsigned c = 0;
-    for (unsigned int i = 0; i < num(); ++i)
-      c += data[i].count();
-    return c;
   }
 
   void aborted(value_type val) {
