@@ -136,11 +136,11 @@ void runBodyParallel(const GNode src, unsigned int numNodes) {
   //typedef GaloisRuntime::WorkList::LocalQueues<UpdateRequest, GaloisRuntime::WorkList::PriQueue<UpdateRequest>, GaloisRuntime::WorkList::PriQueue<UpdateRequest> > OBIM;
   //  OBIM wl;
 
-  //typedef GaloisRuntime::WorkList::ApproxOrderByIntegerMetric<UpdateRequest, UpdateRequestIndexer> OBIM;
-  //OBIM wl;
-
-  typedef GaloisRuntime::WorkList::FIFO<UpdateRequest> OBIM;
+  typedef GaloisRuntime::WorkList::ApproxOrderByIntegerMetric<UpdateRequest, UpdateRequestIndexer, GaloisRuntime::WorkList::ChunkedFIFO<UpdateRequest, 8> > OBIM;
   OBIM wl;
+
+  //typedef GaloisRuntime::WorkList::FIFO<UpdateRequest> OBIM;
+  //OBIM wl;
 
   //typedef GaloisRuntime::WorkList::OrderedByIntegerMetric<UpdateRequest, UpdateRequestIndexer> OBIM;
   //  typedef GaloisRuntime::WorkList::OrderedByIntegerMetric<UpdateRequest, UpdateRequestIndexer, GaloisRuntime::WorkList::StealingLocalWL<UpdateRequest> > OBIM;

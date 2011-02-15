@@ -30,9 +30,9 @@ public:
   typedef AbstractWorkList<typename T::X> SingleThreadTy;
   
   //! push a value onto the queue
-  void push(value_type);
+  bool push(value_type);
   //! push an aborted value onto the queue
-  void aborted(value_type);
+  bool aborted(value_type);
   //! pop a value from the queue.
   std::pair<bool, value_type> pop();
   //! pop a value from the queue trying not as hard to take locks
@@ -67,6 +67,96 @@ public:
   void unlock() {}
 };
 
+template<typename T, int chunksize = 64, bool concurrent = true>
+class FixedSizeRing :private boost::noncopyable {
+  PaddedLock<concurrent> lock;
+  unsigned start;
+  unsigned end;
+  T data[chunksize];
+
+  bool _i_empty() {
+    return start == end;
+  }
+
+  bool _i_full() {
+    return (end + 1) % chunksize == start;
+  }
+
+public:
+  typedef FixedSizeRing<T, chunksize, true>  ConcurrentTy;
+  typedef FixedSizeRing<T, chunksize, false> SingleThreadTy;
+
+  typedef T value_type;
+
+  FixedSizeRing() :start(0), end(0) {}
+
+  bool empty() {
+    lock.lock();
+    bool retval = _i_empty();
+    lock.unlock();
+    return retval;
+  }
+
+  bool full() {
+    lock.lock();
+    bool retval = _i_full();
+    lock.unlock();
+    return retval;
+  }
+
+  bool push_front(value_type val) {
+    lock.lock();
+    if (_i_full()) {
+      lock.unlock();
+      return false;
+    }
+    start += chunksize - 1;
+    start %= chunksize;
+    data[start] = val;
+    lock.unlock();
+    return true;
+  }
+
+  bool push_back(value_type val) {
+    lock.lock();
+    if (_i_full()) {
+      lock.unlock();
+      return false;
+    }
+    data[end] = val;
+    end += 1;
+    end %= chunksize;
+    lock.unlock();
+    return true;
+  }
+
+  std::pair<bool, value_type> pop_front() {
+    lock.lock();
+    if (_i_empty()) {
+      lock.unlock();
+      return std::make_pair(false, value_type());
+    }
+    value_type retval = data[start];
+    ++start;
+    start %= chunksize;
+    lock.unlock();
+    return std::make_pair(true, retval);
+  }
+
+  std::pair<bool, value_type> pop_back() {
+    lock.lock();
+    if (_i_empty()) {
+      lock.unlock();
+      return std::make_pair(false, value_type());
+    }
+    end += chunksize - 1;
+    end %= chunksize;
+    value_type retval = data[end];
+    lock.unlock();
+    return std::make_pair(true, retval);
+  }
+};
+
 template<typename T, class Compare = std::less<T>, bool concurrent = true>
 class PriQueue : private boost::noncopyable, private PaddedLock<concurrent> {
 
@@ -82,10 +172,11 @@ public:
 
   typedef T value_type;
 
-  void push(value_type val) {
+  bool push(value_type val) {
     lock();
     wl.push(val);
     unlock();
+    return true;
   }
 
   std::pair<bool, value_type> pop() {
@@ -121,8 +212,8 @@ public:
     return retval;
   }
 
-  void aborted(value_type val) {
-    push(val);
+  bool aborted(value_type val) {
+    return push(val);
   }
 
   //Not Thread Safe
@@ -148,10 +239,11 @@ public:
 
   typedef T value_type;
 
-  void push(value_type val) {
+  bool push(value_type val) {
     lock();
     wl.push_back(val);
     unlock();
+    return true;
   }
 
   std::pair<bool, value_type> pop() {
@@ -187,8 +279,8 @@ public:
     return retval;
   }
 
-  void aborted(value_type val) {
-    push(val);
+  bool aborted(value_type val) {
+    return push(val);
   }
 
   //Not Thread Safe
@@ -214,10 +306,11 @@ public:
 
   typedef T value_type;
 
-  void push(value_type val) {
+  bool push(value_type val) {
     lock();
     wl.push_back(val);
     unlock();
+    return true;
   }
 
   std::pair<bool, value_type> pop() {
@@ -253,8 +346,8 @@ public:
     return retval;
   }
 
-  void aborted(value_type val) {
-    push(val);
+  bool aborted(value_type val) {
+    return push(val);
   }
 
   //Not Thread Safe
@@ -306,7 +399,7 @@ public:
     dump('C');
   }
 
-  void push(value_type val) {
+  bool push(value_type val) {
     dump('P');
     tailLock.lock();
     assert(tail);
@@ -325,7 +418,7 @@ public:
     ++tail->end;
     tail->lock.unlock();
     tailLock.unlock();
-    return;
+    return true;
   }
 
   std::pair<bool, value_type> pop() {
@@ -394,9 +487,9 @@ public:
     }
   }
 
-  void aborted(value_type val) {
+  bool aborted(value_type val) {
     dump('A');
-    push(val);
+    return push(val);
   }
 
   //Not Thread Safe
@@ -408,123 +501,91 @@ public:
   }
 };
 
-template<typename T, int ChunkSize = 64, bool pushToLocal = true, typename BackingTy = LIFO<T> >
+template<typename T, int chunksize=64, bool concurrent=true>
 class ChunkedFIFO : private boost::noncopyable {
-public:
-   typedef T value_type;
-private:
-  typedef typename BackingTy::SingleThreadTy Chunk;
-
-  typename FIFO<Chunk*>::ConcurrentTy Items;
-
-  struct ProcRec {
+  typedef FixedSizeRing<T, chunksize, false> Chunk;
+  struct p {
+    Chunk* cur;
     Chunk* next;
-    int nextSize;
-    Chunk* curr;
-    ProcRec() : next(0), nextSize(0), curr(0) {}
-    static void merge( ProcRec& lhs, ProcRec& rhs) {
-      assert(!lhs.next || lhs.next->empty());
-      assert(!lhs.curr || lhs.curr->empty());
-      assert(!rhs.next || rhs.next->empty());
-      assert(!rhs.curr || rhs.curr->empty());
-    }
-    bool empty() const {
-      if (curr && !curr->empty()) return false;
-      if (next && !next->empty()) return false;
-      return true;
+    p() : cur(0), next(0) {}
+    ~p() {
+      delete cur;
+      delete next;
     }
   };
 
-  PerCPU<ProcRec> data;
+  PerCPU<p> data;
+  FIFO<Chunk*, concurrent> Items;
 
-  void push_next(ProcRec& n, value_type val) {
-    if (!n.next) {
-      n.next = new Chunk;
-      n.nextSize = 0;
-    }
-    if (n.nextSize == ChunkSize) {
-      Items.push(n.next);
-      n.next = new Chunk;
-      n.nextSize = 0;
-    }
-    n.next->push(val);
-    n.nextSize++;
-  }
-
-  void push_local(ProcRec& n, value_type val) {
-    if (!n.curr)
-      fill_curr(n);
-
-    if (n.curr)
-      n.curr->push(val);
-    else
-      push_next(n, val);
-  }
-
-  void fill_curr(ProcRec& n) {
-    std::pair<bool, Chunk*> r = Items.pop();
-    if (r.first) { // Got one
-      n.curr = r.second;
-    } else { //try taking over next
-      n.curr = n.next;
-      n.next = 0;
-    }
+  static void merge(p& lhs, p& rhs) {
+    assert(!lhs.cur || lhs.cur->empty());
+    assert(!rhs.cur || rhs.cur->empty());
+    assert(!lhs.next || lhs.next->empty());
+    assert(!rhs.next || rhs.next->empty());
   }
 
 public:
+
+  typedef T value_type;
   
-  //typedef STLAdaptor<MQ, true>  ConcurrentTy;
-  //typedef STLAdaptor<MQ, false> SingleThreadTy;
+  ChunkedFIFO() :data(merge) { }
 
-  //typedef typename MQ::value_type value_type;
-
-  ChunkedFIFO() :data(ProcRec::merge) {
-    // assert(data.getCount() > 1);
-  }
-
-  void push(value_type val) {
-    ProcRec& n = data.get();
-    if (pushToLocal)
-      push_local(n, val);
-    else
-      push_next(n, val);
+  bool push(value_type val) {
+    p& n = data.get();
+    if (n.next && n.next->full()) {
+      Items.push(n.next);
+      n.next = 0;
+    }
+    if (!n.next)
+      n.next = new Chunk;
+    bool retval = n.next->push_back(val);
+    assert(retval);
+    return retval;
   }
 
   std::pair<bool, value_type> pop() {
-    ProcRec& n = data.get();
-    if (!n.curr) //Curr is empty, graph a new chunk
-      fill_curr(n);
-
-    //n.curr may still be null
-    if (n.curr) {
-      if (n.curr->empty()) {
-	delete n.curr;
-	n.curr = 0;
-	return pop();
-      } else {
-	return n.curr->pop();
-      }
-    } else {
-      return std::make_pair(false, value_type());
+    p& n = data.get();
+    if (n.cur && n.cur->empty()) {
+      delete n.cur;
+      n.cur = 0;
     }
+    if (!n.cur) {
+      std::pair<bool, Chunk*> r = Items.pop();
+      if (r.first) {
+	//Shared queue had data
+	n.cur = r.second;
+      } else {
+	//Shared queue was empty, check next
+	n.cur = n.next;
+	n.next = 0;
+	if (!n.cur)
+	  return std::make_pair(false, value_type());
+      }
+    }
+
+    return n.cur->pop_front();
   }
-    
+  
+  std::pair<bool, value_type> try_pop() {
+    return pop();
+  }
+  
   bool empty() {
-    ProcRec& n = data.get();
-    if (!n.empty()) return false;
+    p& n = data.get();
+    if (n.cur && !n.cur->empty()) return false;
+    if (n.next && !n.next->empty()) return false;
     if (!Items.empty()) return false;
     return true;
   }
 
-  void aborted(value_type val) {
-    ProcRec& n = data.get();
-    push_next(n, val);
+  bool aborted(value_type val) {
+    return push(val);
   }
 
   //Not Thread Safe
   template<typename Iter>
   void fill_initial(Iter ii, Iter ee) {
-    ProcRec& n = data.get();
+    p& n = data.get();
     for( ; ii != ee; ++ii) {
       push_next(n, *ii);
     }
@@ -579,7 +640,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     delete[] data;
   }
 
-  void push(value_type val) __attribute__((noinline)) {
+  bool push(value_type val) __attribute__((noinline)) {
     unsigned int index = I(val, size);
     assert(index < size);
     data[index].push(val);
@@ -622,8 +683,8 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     return true;
   }
 
-  void aborted(value_type val) {
-    push(val);
+  bool aborted(value_type val) {
+    return push(val);
   }
 
   //Not Thread Safe
@@ -667,7 +728,7 @@ class CacheByIntegerMetric : private boost::noncopyable {
     :data(P), cache(merge), I(x,size)
   { }
   
-  void push(value_type val) {
+  bool push(value_type val) {
     cacheRef c = cache.get().cacheInst;
     unsigned int valIndex = I(val,size);
 
@@ -713,8 +774,8 @@ class CacheByIntegerMetric : private boost::noncopyable {
     return data.empty();
   }
 
-  void aborted(value_type val) {
-    push(val);
+  bool aborted(value_type val) {
+    return push(val);
   }
 
   //Not Thread Safe
@@ -740,7 +801,7 @@ class StealingLocalWL : private boost::noncopyable {
   
   StealingLocalWL() :data(&merge) {}
 
-  void push(value_type val) __attribute__((noinline)) {
+  bool push(value_type val) __attribute__((noinline)) {
     data.get().push(val);
   }
 
@@ -761,8 +822,8 @@ class StealingLocalWL : private boost::noncopyable {
   bool empty() {
     return data.get().empty();
   }
-  void aborted(value_type val) {
-    push(val);
+  bool aborted(value_type val) {
+    return push(val);
   }
 
   //Not Thread Safe
@@ -787,7 +848,7 @@ public:
 
   typedef T value_type;
   
-  void push(value_type val) {
+  bool push(value_type val) {
     if (starved) {
       global.push(val);
       starved = 0;
@@ -796,9 +857,9 @@ public:
     }
   }
 
-  void aborted(value_type val) {
+  bool aborted(value_type val) {
     //Fixme: should be configurable
-    global.push(val);
+    return global.push(val);
   }
 
   std::pair<bool, value_type> pop() {
@@ -839,7 +900,7 @@ class ApproxOrderByIntegerMetric : private boost::noncopyable {
   ContainerTy data[2048];
   
   Indexer I;
-  PerCPU<int> cursor;
+  PerCPU<unsigned int> cursor;
 
   int num() {
     return 2048;
@@ -851,9 +912,12 @@ class ApproxOrderByIntegerMetric : private boost::noncopyable {
   
   ApproxOrderByIntegerMetric(const Indexer& x = Indexer())
     :I(x), cursor(0)
-  {  }
+  {
+    for (int i = 0; i < cursor.size(); ++i)
+      cursor.get(i) = 0;
+  }
   
-  void push(value_type val) __attribute__((noinline)) {   
+  bool push(value_type val) __attribute__((noinline)) {   
     unsigned int index = I(val, std::numeric_limits<unsigned int>::max());
     index %= num();
     assert(index < num());
@@ -862,7 +926,7 @@ class ApproxOrderByIntegerMetric : private boost::noncopyable {
 
   std::pair<bool, value_type> pop()  __attribute__((noinline)) {
     // print();
-    int& cur = cursor.get();
+    unsigned int& cur = cursor.get();
     std::pair<bool, value_type> ret = data[cur].pop();
     if (ret.first)
       return ret;
@@ -882,14 +946,14 @@ class ApproxOrderByIntegerMetric : private boost::noncopyable {
   }
 
   bool empty() {
-    for (int i = 0; i < num(); ++i)
+    for (unsigned int i = 0; i < num(); ++i)
       if (!data[i].empty())
 	return false;
     return true;
   }
 
-  void aborted(value_type val) {
-    push(val);
+  bool aborted(value_type val) {
+    return push(val);
   }
 
   //Not Thread Safe
