@@ -587,7 +587,7 @@ public:
   void fill_initial(Iter ii, Iter ee) {
     p& n = data.get();
     for( ; ii != ee; ++ii) {
-      push_next(n, *ii);
+      push(*ii);
     }
     Items.push(n.next);
     n.next = 0;
