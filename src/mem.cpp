@@ -1,7 +1,9 @@
-#include "Galois/Runtime/mm/mem.h"
+ #include "Galois/Runtime/mm/mem.h"
 #include "Galois/Runtime/Support.h"
 
+#ifdef __linux__
 #include <linux/mman.h>
+#endif
 #include <sys/mman.h>
 
 using namespace GaloisRuntime;
