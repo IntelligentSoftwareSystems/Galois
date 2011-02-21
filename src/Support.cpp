@@ -3,15 +3,15 @@
 #include <iostream>
 
 void GaloisRuntime::reportStat(const char* text, unsigned long val) {
-  std::cerr << "STAT: " << text << " " << val << "\n";
+  std::cout << "STAT: " << text << " " << val << "\n";
 }
 
 void GaloisRuntime::reportStat(const char* text, unsigned int val) {
-  std::cerr << "STAT: " << text << " " << val << "\n";
+  std::cout << "STAT: " << text << " " << val << "\n";
 }
 
 void GaloisRuntime::reportStat(const char* text, double val) {
-  std::cerr << "STAT: " << text << " " << val << "\n";
+  std::cout << "STAT: " << text << " " << val << "\n";
 }
 
 //Report Warnings
