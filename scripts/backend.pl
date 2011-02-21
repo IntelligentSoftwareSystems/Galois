@@ -9,7 +9,7 @@ sub run_prog {
     my %options=();
     getopts("hr:t:s:", \%options);
     
-    my $threadcount = 8;
+    my $threadcount = 24;
     my $threadstart = 1;
     my $numruns = 5;
 
@@ -53,6 +53,40 @@ sub run_prog {
     }
 }
 
+sub vtune_prog {
+    my $appstr = shift;
+
+    my %options=();
+    getopts("hr:t:s:", \%options);
+    
+    my $threadcount = 24;
+    my $threadstart = 1;
+
+    if (defined $options{h}) {
+	print "-h      :help\n";
+	print "-t tmax :end at tmax threads\n";
+	print "-s tmin :start at tmin threads\n";
+	exit;
+    }
+    
+    if (defined $options{t}) {
+	$threadcount = $options{t};
+	print "setting threads ending point to $threadcount\n";
+    }
+    if (defined $options{s}) {
+	$threadstart = $options{s};
+	print "setting threads starting point to $threadstart\n";
+    }
+    
+    for(my $i = $threadstart; $i <= $threadcount; $i++) {
+	print "THREADS: $i\n";
+	print "*** Executing: " . "$appstr -t $i" . "\n";
+	system("rm -r r$i");
+	system("mkdir r$i");
+	system("/opt/intel/vtune_amplifier_xe_2011/bin64/amplxe-cl -collect nehalem_general-exploration -result-dir=r$i -start-paused -- $appstr -t $i");
+	system("/opt/intel/vtune_amplifier_xe_2011/bin64/amplxe-cl -R hw-events -r r$i -group-by source-line -csv-delimiter comma |perl prune_headers.pl > results.$i.csv");
+    }
+}
 
 return 1;
 exit;
