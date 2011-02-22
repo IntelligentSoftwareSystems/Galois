@@ -19,16 +19,23 @@ namespace WorkList {
 // Worklists may not be copied.
 // Worklists should be default instantiatable
 // All classes (should) conform to:
-template<typename T>
+template<typename T, bool concurrent>
 class AbstractWorkList {
 public:
   //! T is the value type of the WL
   typedef T value_type;
-  //! Optional for top-level queues
-  typedef AbstractWorkList<T> ConcurrentTy;
-  //! Optional for top-level queues
-  typedef AbstractWorkList<typename T::X> SingleThreadTy;
-  
+
+  //! change the concurrency flag
+  template<bool newconcurrent>
+  struct rethread {
+    typedef AbstractWorkList<T, newconcurrent> WL;
+  };
+  //! change the type of the container
+  template<typename T2>
+  struct retype {
+    typedef AbstractWorkList<T2, concurrent> WL;
+  };
+
   //! push a value onto the queue
   bool push(value_type);
   //! push an aborted value onto the queue
@@ -83,8 +90,14 @@ class FixedSizeRing :private boost::noncopyable {
   }
 
 public:
-  typedef FixedSizeRing<T, chunksize, true>  ConcurrentTy;
-  typedef FixedSizeRing<T, chunksize, false> SingleThreadTy;
+  template<bool newconcurrent>
+  struct rethread {
+    typedef FixedSizeRing<T, chunksize, newconcurrent> WL;
+  };
+  template<typename T2>
+  struct retype {
+    typedef FixedSizeRing<T2, chunksize, concurrent> WL;
+  };
 
   typedef T value_type;
 
@@ -167,8 +180,14 @@ class PriQueue : private boost::noncopyable, private PaddedLock<concurrent> {
   using PaddedLock<concurrent>::unlock;
 
 public:
-  typedef PriQueue<T, Compare, true>  ConcurrentTy;
-  typedef PriQueue<T, Compare, false> SingleThreadTy;
+  template<bool newconcurrent>
+  struct rethread {
+    typedef PriQueue<T, Compare, newconcurrent> WL;
+  };
+  template<typename T2>
+  struct retype {
+    typedef PriQueue<T2, Compare, concurrent> WL;
+  };
 
   typedef T value_type;
 
@@ -234,8 +253,14 @@ class LIFO : private boost::noncopyable, private PaddedLock<concurrent> {
   using PaddedLock<concurrent>::unlock;
 
 public:
-  typedef LIFO<T, true>  ConcurrentTy;
-  typedef LIFO<T, false> SingleThreadTy;
+  template<bool newconcurrent>
+  struct rethread {
+    typedef LIFO<T, newconcurrent> WL;
+  };
+  template<typename T2>
+  struct retype {
+    typedef LIFO<T2, concurrent> WL;
+  };
 
   typedef T value_type;
 
@@ -301,8 +326,14 @@ class sFIFO : private boost::noncopyable, private PaddedLock<concurrent>  {
   using PaddedLock<concurrent>::unlock;
 
 public:
-  typedef sFIFO<T, true>  ConcurrentTy;
-  typedef sFIFO<T, false> SingleThreadTy;
+  template<bool newconcurrent>
+  struct rethread {
+    typedef sFIFO<T, newconcurrent> WL;
+  };
+  template<typename T2>
+  struct retype {
+    typedef sFIFO<T2, concurrent> WL;
+  };
 
   typedef T value_type;
 
@@ -380,8 +411,14 @@ class FIFO : private boost::noncopyable {
   SimpleLock<long, concurrent> headLock;
 
 public:
-  typedef FIFO<T, true>  ConcurrentTy;
-  typedef FIFO<T, false> SingleThreadTy;
+  template<bool newconcurrent>
+  struct rethread {
+    typedef FIFO<T, newconcurrent> WL;
+  };
+  template<typename T2>
+  struct retype {
+    typedef FIFO<T2, concurrent> WL;
+  };
 
   typedef T value_type;
 
@@ -527,6 +564,14 @@ class ChunkedFIFO : private boost::noncopyable {
   }
 
 public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef ChunkedFIFO<T, chunksize, newconcurrent> WL;
+  };
+  template<typename T2>
+  struct retype {
+    typedef ChunkedFIFO<T2, chunksize, concurrent> WL;
+  };
 
   typedef T value_type;
   
@@ -600,7 +645,9 @@ public:
 template<class T, class Indexer, typename ContainerTy = FIFO<T>, bool concurrent = true >
 class OrderedByIntegerMetric : private boost::noncopyable {
 
-  ContainerTy* data;
+  typedef typename ContainerTy::template rethread<concurrent>::WL CTy;
+
+  CTy* data;
   unsigned int size;
   Indexer I;
   PerCPU<unsigned int> cursor;
@@ -626,15 +673,21 @@ class OrderedByIntegerMetric : private boost::noncopyable {
   // }
 
  public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef  OrderedByIntegerMetric<T,Indexer,ContainerTy,newconcurrent> WL;
+  };
+  template<typename T2>
+  struct retype {
+    typedef  OrderedByIntegerMetric<T2,Indexer,typename ContainerTy::template retype<T2>::WL, concurrent> WL;
+  };
 
   typedef T value_type;
-  typedef OrderedByIntegerMetric<T,Indexer,ContainerTy,false> SingleThreadTy;
-  typedef OrderedByIntegerMetric<T,Indexer,ContainerTy,true> ConcurrentTy;
 
   OrderedByIntegerMetric(unsigned int range = 32*1024, const Indexer& x = Indexer())
     :size(range+1), I(x), cursor(&merge)
   {
-    data = new ContainerTy[size];
+    data = new CTy[size];
     for (int i = 0; i < cursor.size(); ++i)
       cursor.get(i) = 0;
   }
@@ -699,95 +752,6 @@ class OrderedByIntegerMetric : private boost::noncopyable {
   }
 };
 
-template<typename ParentTy, unsigned int size, class Indexer>
-class CacheByIntegerMetric : private boost::noncopyable {
-  
-  typedef typename ParentTy::value_type T;
-
-  ParentTy& data;
-
-  struct __cacheTy{
-    bool valid;
-    T data;
-    __cacheTy() :valid(0) {}
-  };
-  struct cacheTy {
-    __cacheTy cacheInst[size];
-  };
-  typedef __cacheTy (&cacheRef)[size];
-  typedef const __cacheTy (&constCacheRef)[size];
-
-  PerCPU<cacheTy> cache;
-  Indexer I;
-
-  static void merge(cacheTy& x, cacheTy& y) {
-  }
-
- public:
-
-  typedef T value_type;
-  
-  CacheByIntegerMetric(ParentTy& P, const Indexer& x = Indexer())
-    :data(P), cache(merge), I(x,size)
-  { }
-  
-  bool push(value_type val) {
-    cacheRef c = cache.get().cacheInst;
-    unsigned int valIndex = I(val,size);
-
-    for (unsigned int i = 0; i < size; ++i) {
-      if (c[i].valid) {
-	if (valIndex < I(c[i].data,size)) {
-	  //swap
-	  value_type tmp = c[i].data;
-	  c[i].data = val;
-	  val = tmp;
-	  valIndex = I(val,size);
-	}
-      } else { //slot open
-	c[i].valid = true;
-	c[i].data = val;
-	return true;
-      }
-    }
-    //val is either an old cached entry or the pushed one
-    return data.push(val);
-  }
-
-  std::pair<bool, value_type> pop() {
-    cacheRef c = cache.get().cacheInst;
-
-    for (unsigned int i = 0; i < size; ++i)
-      if (c[i].valid) {
-	value_type v = c[i].data;
-	c[i].valid = false;
-	return std::make_pair(true, v);
-      }
-
-    //cache was empty
-    return data.pop();
-  }
-
-  bool empty() const {
-    constCacheRef c = cache.get().cacheInst;
-
-    for (unsigned int i = 0; i < size; ++i)
-      if (c[i].valid)
-	return false;
-    return data.empty();
-  }
-
-  bool aborted(value_type val) {
-    return push(val);
-  }
-
-  //Not Thread Safe
-  template<typename Iter>
-  void fill_initial(Iter ii, Iter ee) {
-    data.fill_initial(ii, ee);
-  }
-};
-
 template<class T, typename ContainerTy = FIFO<T> >
 class StealingLocalWL : private boost::noncopyable {
 
@@ -799,6 +763,14 @@ class StealingLocalWL : private boost::noncopyable {
   }
 
  public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef StealingLocalWL<T, ContainerTy> WL;
+  };
+  template<typename T2>
+  struct retype {
+    typedef StealingLocalWL<T2, typename ContainerTy::template retype<T2>::WL>  WL;
+  };
 
   typedef T value_type;
   
@@ -842,15 +814,24 @@ class StealingLocalWL : private boost::noncopyable {
 template<typename T, typename GlobalQueueTy, typename LocalQueueTy>
 class LocalQueues {
 
-  PerCPU<typename LocalQueueTy::SingleThreadTy> local;
+  PerCPU<typename LocalQueueTy::template rethread<false>::WL> local;
   GlobalQueueTy global;
   bool starved;
 
 public:
-  LocalQueues() :local(0), starved(false) {}
+  template<bool newconcurrent>
+  struct rethread {
+    typedef LocalQueues<T, GlobalQueueTy, LocalQueueTy> WL;
+  };
+  template<typename T2>
+  struct retype {
+    typedef LocalQueues<T2, typename GlobalQueueTy::template retype<T2>::WL, typename LocalQueueTy::template retype<T2>::WL> WL;
+  };
 
   typedef T value_type;
-  
+
+  LocalQueues() :local(0), starved(false) {}
+
   bool push(value_type val) {
     if (starved) {
       global.push(val);
@@ -897,10 +878,10 @@ public:
   }
 };
 
-template<class T, class Indexer, typename ContainerTy = FIFO<T> >
+template<class T, class Indexer, typename ContainerTy = FIFO<T>, bool concurrent=true >
 class ApproxOrderByIntegerMetric : private boost::noncopyable {
 
-  ContainerTy data[2048];
+  typename ContainerTy::template rethread<concurrent>::WL data[2048];
   
   Indexer I;
   PerCPU<unsigned int> cursor;
@@ -912,6 +893,15 @@ class ApproxOrderByIntegerMetric : private boost::noncopyable {
  public:
 
   typedef T value_type;
+  template<bool newconcurrent>
+  struct rethread {
+    typedef ApproxOrderByIntegerMetric<T, Indexer, ContainerTy, newconcurrent> WL;
+  };
+  template<typename T2>
+  struct retype {
+    //FIXME: How do you retype an index function
+    typedef ApproxOrderByIntegerMetric<T2, typename Indexer::template retype<T2>::WL, typename ContainerTy::template retype<T2>::WL, concurrent> WL;
+  };
   
   ApproxOrderByIntegerMetric(const Indexer& x = Indexer())
     :I(x), cursor(0)
@@ -929,7 +919,7 @@ class ApproxOrderByIntegerMetric : private boost::noncopyable {
 
   std::pair<bool, value_type> pop()  __attribute__((noinline)) {
     // print();
-    unsigned int& cur = cursor.get();
+    unsigned int& cur = concurrent ? cursor.get() : cursor.get(0);
     std::pair<bool, value_type> ret = data[cur].pop();
     if (ret.first)
       return ret;
