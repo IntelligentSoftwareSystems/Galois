@@ -408,8 +408,8 @@ public:
     assert (!tail->next);
     if (tail->end == 255) {
       Chunk* nc = new Chunk();
-      tail->next = nc;
       nc->lock.lock();
+      tail->next = nc;
       Chunk* oldtail = tail;
       tail = nc;
       oldtail->lock.unlock();
@@ -467,8 +467,10 @@ public:
       //Chunk is empty
       if (head->next) {
 	//more chunks exist
+	head->next->lock.lock();
 	Chunk* old = head;
 	head = head->next;
+	old->lock.unlock();
 	delete old;
 	head->lock.unlock();
 	headLock.unlock();
@@ -595,8 +597,7 @@ public:
 
 };
 
-
-template<class T, class Indexer, typename ContainerTy = FIFO<T> >
+template<class T, class Indexer, typename ContainerTy = FIFO<T>, bool concurrent = true >
 class OrderedByIntegerMetric : private boost::noncopyable {
 
   ContainerTy* data;
@@ -627,8 +628,10 @@ class OrderedByIntegerMetric : private boost::noncopyable {
  public:
 
   typedef T value_type;
-  
-  OrderedByIntegerMetric(unsigned int range, const Indexer& x = Indexer())
+  typedef OrderedByIntegerMetric<T,Indexer,ContainerTy,false> SingleThreadTy;
+  typedef OrderedByIntegerMetric<T,Indexer,ContainerTy,true> ConcurrentTy;
+
+  OrderedByIntegerMetric(unsigned int range = 32*1024, const Indexer& x = Indexer())
     :size(range+1), I(x), cursor(&merge)
   {
     data = new ContainerTy[size];
@@ -644,14 +647,14 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     unsigned int index = I(val, size);
     assert(index < size);
     data[index].push(val);
-    unsigned int& cur = cursor.get();
+    unsigned int& cur = concurrent ? cursor.get() : cursor.get(0);
     if (cur > index)
       cur = index;
   }
 
   std::pair<bool, value_type> pop()  __attribute__((noinline)) {
     // print();
-    unsigned int& cur = cursor.get();
+    unsigned int& cur = concurrent ? cursor.get() : cursor.get(0);
     std::pair<bool, value_type> ret;
     //Find a successful pop
     assert(cur < size);
@@ -744,11 +747,11 @@ class CacheByIntegerMetric : private boost::noncopyable {
       } else { //slot open
 	c[i].valid = true;
 	c[i].data = val;
-	return;
+	return true;
       }
     }
     //val is either an old cached entry or the pushed one
-    data.push(val);
+    return data.push(val);
   }
 
   std::pair<bool, value_type> pop() {
