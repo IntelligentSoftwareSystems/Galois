@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 #include <map>
+#include <fstream>
 
 namespace Galois {
 namespace Graph {
@@ -55,6 +56,21 @@ bool outputGraph(const char* file, Graph& G) {
 
   return true;
 }
+
+//Parsable 
+template<typename Graph>
+bool outputTextEdgeData(const char* ofile, Graph& G) {
+  std::ofstream file(ofile);
+  for (typename Graph::active_iterator ii = G.active_begin(),
+	 ee = G.active_end(); ii != ee; ++ii) {
+    for (typename Graph::neighbor_iterator ni = G.neighbor_begin(*ii),
+	   ne = G.neighbor_end(*ii); ni != ne; ++ni) {
+      file << G.getEdgeData(*ii, *ni) << '\n';
+    }
+  }
+  return true;
+}
+
 
 }
 }

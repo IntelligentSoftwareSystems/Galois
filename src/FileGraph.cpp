@@ -1,4 +1,6 @@
+#include "Galois/Graphs/Graph.h"
 #include "Galois/Graphs/FileGraph.h"
+
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -32,7 +34,7 @@ FileGraph::~FileGraph() {
     
 }
 
-bool FileGraph::fromFile(const char* filename) {
+bool FileGraph::structureFromFile(const char* filename) {
   masterFD = open(filename, O_RDONLY);
   
   struct stat buf;
