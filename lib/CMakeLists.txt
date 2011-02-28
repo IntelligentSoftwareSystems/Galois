@@ -5,7 +5,7 @@ include(ExternalProject)
 
 ExternalProject_Add(
    hwloc-1-1-1
-   URL ${CMAKE_CURRENT_SOURCE_DIR}/hwloc-1.1.1.tar.bz2
+   URL ${CMAKE_CURRENT_SOURCE_DIR}/hwloc-1.1.1.tar.gz
    INSTALL_DIR ${CMAKE_BINARY_DIR}/lib/install
    CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR> --enable-static=true
    BUILD_COMMAND make
