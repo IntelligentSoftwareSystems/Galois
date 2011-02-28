@@ -13,15 +13,17 @@ using namespace Galois::Graph;
 //File format V1:
 //all values are uint64_t LE
 //version (1)
+//EdgeType size
 //numNodes
 //numEdges
-//outindexs (outindex[nodeid] is index of first edge for nodeid + 1 (end interator.  node 0 has an implicit start iterator of 0.
-//outedges
+//outindexs[numNodes] (outindex[nodeid] is index of first edge for nodeid + 1 (end interator.  node 0 has an implicit start iterator of 0.
+//outedges[numEdges]
+//EdgeType[numEdges]
 
 
 FileGraph::FileGraph()
   : masterMapping(0), masterLength(0), masterFD(0),
-    outIdx(0), outs(0), 
+    outIdx(0), outs(0), edgeData(0),
     numEdges(0), numNodes(0)
 {
 }
@@ -31,7 +33,6 @@ FileGraph::~FileGraph() {
     munmap(masterMapping, masterLength);
   if (masterFD)
     close(masterFD);
-    
 }
 
 bool FileGraph::structureFromFile(const char* filename) {
@@ -52,8 +53,12 @@ bool FileGraph::structureFromFile(const char* filename) {
   uint64_t* fptr = (uint64_t*)m;
   uint64_t version = *fptr++;
   assert(version == 1);
+  sizeEdgeTy = *fptr++;
   numNodes = *fptr++;
   numEdges = *fptr++;
   outIdx = fptr;
-  outs = fptr + numNodes;
+  fptr += numNodes;
+  outs = fptr;
+  fptr += numEdges;
+  edgeData = (char*)fptr;
 }

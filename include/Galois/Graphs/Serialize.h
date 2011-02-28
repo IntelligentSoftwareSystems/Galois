@@ -19,6 +19,9 @@ bool outputGraph(const char* file, Graph& G) {
   uint64_t tmp = 1;
   write(fd, &tmp, sizeof(uint64_t));
 
+  tmp = sizeof(typename Graph::EdgeDataTy);
+  write(fd, &tmp, sizeof(uint64_t));
+
   //num nodes
   tmp = G.size();
   write(fd, &tmp, sizeof(uint64_t));
@@ -49,6 +52,15 @@ bool outputGraph(const char* file, Graph& G) {
 	   ne = G.neighbor_end(*ii); ni != ne; ++ni) {
       tmp = NodeIDs[*ni];
       write(fd, &tmp, sizeof(uint64_t));
+    }
+  }
+
+  //edgeData
+  for (typename Graph::active_iterator ii = G.active_begin(),
+	 ee = G.active_end(); ii != ee; ++ii) {
+    for (typename Graph::neighbor_iterator ni = G.neighbor_begin(*ii),
+	   ne = G.neighbor_end(*ii); ni != ne; ++ni) {
+      write(fd, &G.getEdgeData(*ii, *ni), sizeof(typename Graph::EdgeDataTy));
     }
   }
 
