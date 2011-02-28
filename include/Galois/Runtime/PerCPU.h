@@ -39,10 +39,13 @@ class PerCPU : public ThreadAware {
   }
 
 protected:
+
   int myID() const {
     int i = ThreadPool::getMyID();
     return std::max(0, i - 1);
   }
+
+
 public:
   explicit PerCPU(void (*func)(T&, T&))
     :reduce(func)
@@ -53,6 +56,10 @@ public:
   
   virtual ~PerCPU() {
     delete[] datum;
+  }
+
+  int myEffectiveID() const {
+    return myID();
   }
 
   T& get(int i) {
