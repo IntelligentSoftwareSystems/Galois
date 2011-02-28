@@ -11,7 +11,7 @@ namespace Graph {
 
 class FileGraph {
 public:
-  typedef uint64_t GraphNode;
+  typedef uint32_t GraphNode;
 
 protected:
   void* masterMapping;
@@ -20,7 +20,7 @@ protected:
   int masterFD;
 
   uint64_t* outIdx;
-  uint64_t* outs;
+  uint32_t* outs;
 
   char* edgeData;
 
@@ -52,7 +52,7 @@ public:
 
   // General Things
 
-  typedef uint64_t* neighbor_iterator;
+  typedef uint32_t* neighbor_iterator;
 
   neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = ALL) {
     if (N == 0)

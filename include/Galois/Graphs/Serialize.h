@@ -16,43 +16,49 @@ bool outputGraph(const char* file, Graph& G) {
   int fd = open(file, O_WRONLY | O_CREAT |O_TRUNC, mode);
   
   //version
-  uint64_t tmp = 1;
-  write(fd, &tmp, sizeof(uint64_t));
+  uint64_t tmp64 = 1;
+  write(fd, &tmp64, sizeof(uint64_t));
 
-  tmp = sizeof(typename Graph::EdgeDataTy);
-  write(fd, &tmp, sizeof(uint64_t));
+  tmp64 = sizeof(typename Graph::EdgeDataTy);
+  write(fd, &tmp64, sizeof(uint64_t));
 
   //num nodes
-  tmp = G.size();
-  write(fd, &tmp, sizeof(uint64_t));
+  tmp64 = G.size();
+  write(fd, &tmp64, sizeof(uint64_t));
 
   //num edges and outidx computation
-  tmp = 0;
+  tmp64 = 0;
   uint64_t offset = 0;
   std::vector<uint64_t> outIdx;
   uint64_t count = 0;
-  std::map<typename Graph::GraphNode, uint64_t> NodeIDs;
+  std::map<typename Graph::GraphNode, uint32_t> NodeIDs;
   for (typename Graph::active_iterator ii = G.active_begin(),
 	 ee = G.active_end(); ii != ee; ++ii) {
     NodeIDs[*ii] = count;
     ++count;
-    tmp += G.neighborsSize(*ii);
+    tmp64 += G.neighborsSize(*ii);
     offset += G.neighborsSize(*ii);
     outIdx.push_back(offset);
   }
-  write(fd, &tmp, sizeof(uint64_t));
+  write(fd, &tmp64, sizeof(uint64_t));
 
   //outIdx
   write(fd, &outIdx[0], sizeof(uint64_t) * outIdx.size());
 
   //outs
+  count = 0;
   for (typename Graph::active_iterator ii = G.active_begin(),
 	 ee = G.active_end(); ii != ee; ++ii) {
     for (typename Graph::neighbor_iterator ni = G.neighbor_begin(*ii),
 	   ne = G.neighbor_end(*ii); ni != ne; ++ni) {
-      tmp = NodeIDs[*ni];
-      write(fd, &tmp, sizeof(uint64_t));
+      uint32_t tmp32 = NodeIDs[*ni];
+      write(fd, &tmp32, sizeof(uint32_t));
+      ++count;
     }
+  }
+  if (count % 2) {
+    uint32_t tmp32 = 0;
+    write(fd, &tmp32, sizeof(uint32_t));
   }
 
   //edgeData
