@@ -9,6 +9,7 @@
 #include "Galois/Executable.h"
 
 #include <boost/intrusive/list.hpp>
+#include <vector>
 
 namespace GaloisRuntime {
 
@@ -23,7 +24,6 @@ class ThreadPool {
   static int nextThreadID;
 protected:
   unsigned int activeThreads;
-  unsigned int maxThreads;
 
 protected:
   static void NotifyAware(bool starting);
@@ -33,12 +33,9 @@ public:
   //!The work object is not duplicated in any way 
   virtual void run(Galois::Executable* work) = 0;
   
-  //!change the number of preallocated threads to num
+  //!change the number of threads to num
   //!returns the number that the runtime chooses (may not be num)
-  virtual unsigned int setMaxThreads(unsigned int num) = 0;
-  
-  //!How many threads are kept around
-  unsigned int getMaxThreads() const { return maxThreads; }
+  virtual unsigned int setActiveThreads(unsigned int num) = 0;
 
   //!How many threads will be used
   unsigned int getActiveThreads() const { return activeThreads; }
@@ -50,6 +47,43 @@ public:
 //Returns or creates the appropriate thread pool for the system
 ThreadPool& getSystemThreadPool();
 
+class ThreadPolicy {
+protected:
+  //num levels
+  int numLevels;
+  
+  //number of hw supported threads
+  int numThreads;
+  
+  //number of "real" processors
+  int numCores;
+
+  //example levels:
+  //thread(0), Cpu(1), numa(2), machine(3)
+
+  //Total number of threads in each level
+  std::vector<int> levelSize;
+
+  //[numLevels][numThreads] -> item index for thread at level
+  std::vector<int> levelMap;
+
+public:
+  int indexLevelMap(int level, int thr) {
+    return levelMap[level * numThreads + thr];
+  }
+
+  int getNumLevels() const { return numLevels; }
+
+  int getNumThreads() const { return numThreads; }
+
+  int getNumCores() const { return numCores; }
+
+  int getLevelSize(int S) const { return levelSize[S]; }
+
+  virtual void bindThreadToProcessor() = 0;
+};
+
+ThreadPolicy& getSystemThreadPolicy();
 
 namespace HIDDEN {
 //Tag for invasive list

@@ -98,48 +98,50 @@ class ThreadPool_pthread : public ThreadPool {
   Galois::Executable* work; // Thing to execute
   volatile bool shutdown; // Set and start threads to have them exit
   std::list<pthread_t> threads; // Set of threads
+  unsigned int maxThreads;
 
   // Return the number of processors on this hardware
   // This is the maximum number of threads that can be started
-  unsigned int numProcessors() {
-#ifdef __linux__
-    return sysconf(_SC_NPROCESSORS_CONF);
-#endif
-    reportWarning("Unknown number of processors (assuming 64)");
-    return 64;
-  }
+//   unsigned int numProcessors() {
+// #ifdef __linux__
+//     return sysconf(_SC_NPROCESSORS_CONF);
+// #endif
+//     reportWarning("Unknown number of processors (assuming 64)");
+//     return 64;
+//   }
 
-  void bindToProcessor(int proc) {
-#if 0
-    int id = proc;
-    int carry = 0;
-    if (id > 23) {
-      id -= 24;
-      carry = 24;
-    }
-    proc = carry + ((id % 6) * 4) + (id / 6);
-#endif
-#ifdef __linux__
-    cpu_set_t mask;
-    /* CPU_ZERO initializes all the bits in the mask to zero. */
-    CPU_ZERO( &mask );
+//   void bindToProcessor(int proc) {
+// #if 1
+//     int id = proc;
+//     int carry = 0;
+//     if (id > 23) {
+//       id -= 24;
+//       carry = 24;
+//     }
+//     proc = carry + ((id % 6) * 4) + (id / 6);
+// #endif
+// #ifdef __linux__
+//     cpu_set_t mask;
+//     /* CPU_ZERO initializes all the bits in the mask to zero. */
+//     CPU_ZERO( &mask );
       
-    /* CPU_SET sets only the bit corresponding to cpu. */
-    // void to cancel unused result warning
-    (void)CPU_SET( proc, &mask );
+//     /* CPU_SET sets only the bit corresponding to cpu. */
+//     // void to cancel unused result warning
+//     (void)CPU_SET( proc, &mask );
       
-    /* sched_setaffinity returns 0 in success */
-    if( sched_setaffinity( 0, sizeof(mask), &mask ) == -1 )
-      reportWarning("Could not set CPU Affinity for thread");
+//     /* sched_setaffinity returns 0 in success */
+//     if( sched_setaffinity( 0, sizeof(mask), &mask ) == -1 )
+//       reportWarning("Could not set CPU Affinity for thread");
 
-    return;
-#endif      
-    reportWarning("Don't know how to bind thread to cpu on this platform");
-  }
+//     return;
+// #endif      
+//     reportWarning("Don't know how to bind thread to cpu on this platform");
+//   }
 
   void launch(void) {
+    GaloisRuntime::getSystemThreadPolicy().bindThreadToProcessor();
     unsigned int id = ThreadPool::getMyID();
-    bindToProcessor(id - 1);
+    //bindToProcessor(id - 1);
 
     while (true) {
       start.acquire();
@@ -161,15 +163,14 @@ class ThreadPool_pthread : public ThreadPool {
 
 public:
   ThreadPool_pthread() 
-    :start(0), work(0), shutdown(false)
+    :start(0), work(0), shutdown(false), maxThreads(0)
   {
     ThreadPool::activeThreads = 1;
-    ThreadPool::maxThreads = 0;
-    unsigned int num = numProcessors();
+    unsigned int num = GaloisRuntime::getSystemThreadPolicy().getNumThreads();
     finish.reinit(num + 1);
     while (num) {
-      --num;
       ++maxThreads;
+      --num;
       pthread_t t;
       int rc = pthread_create(&t, 0, &slaunch, this);
       checkResults(rc);
@@ -203,7 +204,7 @@ public:
     ThreadPool::NotifyAware(false);
   }
 
-  virtual unsigned int setMaxThreads(unsigned int num) {
+  virtual unsigned int setActiveThreads(unsigned int num) {
     if (num == 0) {
       activeThreads = 1;
     } else if (num <= maxThreads) {
@@ -220,9 +221,9 @@ public:
 }
 
 //! Implement the global threadpool
-static ThreadPool_pthread pool;
-
+//static ThreadPool_pthread pool;
 ThreadPool& GaloisRuntime::getSystemThreadPool() {
+  static ThreadPool_pthread pool;
   return pool;
 }
 

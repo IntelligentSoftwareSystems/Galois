@@ -50,7 +50,7 @@ public:
   explicit PerCPU(void (*func)(T&, T&))
     :reduce(func)
   {
-    num = getSystemThreadPool().getMaxThreads();
+    num = getSystemThreadPolicy().getNumThreads();
     datum = new cache_line_storage<T>[num];
   }
   

@@ -52,10 +52,11 @@ unsigned int ThreadPool::getMyID() {
 
 initMainThread::initMainThread() {
   ThreadPool::LocalThreadID = 0;
+  //  GaloisRuntime::getSystemThreadPolicy();
 }
 
 static initMainThread mainThreadIDSetter;
 
 void Galois::setMaxThreads(unsigned int num) {
-  GaloisRuntime::getSystemThreadPool().setMaxThreads(num);
+  GaloisRuntime::getSystemThreadPool().setActiveThreads(num);
 }

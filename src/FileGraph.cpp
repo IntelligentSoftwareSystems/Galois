@@ -42,7 +42,7 @@ bool FileGraph::structureFromFile(const char* filename) {
   int f = fstat(masterFD, &buf);
   masterLength = buf.st_size;
 
-  void* m = mmap(0, masterLength, PROT_READ,MAP_PRIVATE, masterFD, 0);
+  void* m = mmap(0, masterLength, PROT_READ,MAP_PRIVATE|MAP_POPULATE, masterFD, 0);
   if (m == MAP_FAILED) {
     m = 0;
     return false;
