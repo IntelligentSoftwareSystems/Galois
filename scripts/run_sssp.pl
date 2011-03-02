@@ -2,4 +2,4 @@
 
 require "backend.pl";
 
-run_prog("../apps/sssp/sssp ../inputs/sssp/USA-road-d.W.gr 1 2");
+run_prog("../apps/sssp/sssp ../inputs/sssp/USA-road-d.W.structure 1 2");

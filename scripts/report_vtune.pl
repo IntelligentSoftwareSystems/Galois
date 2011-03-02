@@ -26,13 +26,13 @@ while (@ARGV) {
 
 foreach $nk (sort keys %name_keys) {
     print "$nk";
-    foreach $tk (sort keys %thread_keys) {
+    foreach $tk (sort { $a <=> $b } keys %thread_keys) {
 	print ",$tk";
     }
     print "\n";
     foreach $lk (sort keys %line_keys) {
 	print "$lk";
-	foreach $tk (sort keys %thread_keys) {
+	foreach $tk (sort { $a <=> $b } keys %thread_keys) {
 	    print "," . $stats{$nk}{$lk}{$tk};
 	}
 	print "\n";

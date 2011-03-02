@@ -14,20 +14,20 @@ while(<>) {
 }
 
 #output
-foreach my $th (sort keys %stats) {
+foreach my $th (sort { $a <=> $b } keys %stats) {
     print ",$th";
 } 
 print "\n";
 foreach my $st (sort keys %k) {
     print "$st";
-    foreach my $th (sort keys %stats) {
+    foreach my $th (sort { $a <=> $b } keys %stats) {
 	@values = @{$stats{$th}{$st}};
 	my $avg = sum(@values)/@values;
 	print ",$avg";
     }
     print "\n";
     print "$st Stdev";
-    foreach my $th (sort keys %stats) {
+    foreach my $th (sort { $a <=> $b } keys %stats) {
 	@values = @{$stats{$th}{$st}};
 	my $avg = sum(@values)/@values;
 	my $stdev = reduce {$a + ($b - $avg) * ($b - $avg)} 0, @values;
