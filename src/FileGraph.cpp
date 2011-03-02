@@ -7,6 +7,9 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <cassert>
+#ifdef __linux__
+#include <linux/mman.h>
+#endif
 
 using namespace Galois::Graph;
 
@@ -42,7 +45,13 @@ bool FileGraph::structureFromFile(const char* filename) {
   int f = fstat(masterFD, &buf);
   masterLength = buf.st_size;
 
-  void* m = mmap(0, masterLength, PROT_READ,MAP_PRIVATE|MAP_POPULATE, masterFD, 0);
+
+  int _MAP_BASE = MAP_PRIVATE;
+#ifdef MAP_POPULATE
+  _MAP_BASE  |= MAP_POPULATE;
+#endif
+  
+  void* m = mmap(0, masterLength, PROT_READ,_MAP_BASE, masterFD, 0);
   if (m == MAP_FAILED) {
     m = 0;
     return false;
