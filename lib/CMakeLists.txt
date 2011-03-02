@@ -12,4 +12,4 @@ ExternalProject_Add(
 )
 
 set_property(TARGET hwloc PROPERTY DEPENDS hwloc-1-1-1)
-include_directories(${CMAKE_BINARY_DIR}/lib/install/include)
+#include_directories(${CMAKE_BINARY_DIR}/lib/install/include)

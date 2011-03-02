@@ -56,6 +56,12 @@ if(WITH_NO_ASSERTS)
   add_definitions("-DNDEBUG")
 endif(WITH_NO_ASSERTS)
 
+#solaris
+IF(CMAKE_SYSTEM MATCHES "SunOs.*")
+  add_definitions("-mpcu=niagra2")
+  add_definitions("-lposix4")
+endif()
+
 #Flags
 
 set(CMAKE_CXX_FLAGS_RELEASE         "-O3")
@@ -71,12 +77,18 @@ endif(WITH_OPTIMIZATIONS)
 #These help the intel compiler
 #add_definitions("-wd981 -wd383 -wd869 -wd2196")
 
+#this is stupic, but imported libraries are scoped by directory
+add_library(hwloc SHARED IMPORTED)
+set_property(TARGET hwloc PROPERTY IMPORTED_LOCATION ${CMAKE_BINARY_DIR}/lib/install/lib/libhwloc.so)
+include_directories(${CMAKE_BINARY_DIR}/lib/install/include)
+
 #Source finding
 include_directories("include")
 
+add_subdirectory(lib)
 add_subdirectory(src)
 add_subdirectory(apps)
-
+add_subdirectory(tools)
 
 #Documentation
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
