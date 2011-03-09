@@ -355,5 +355,235 @@ public:
 
 };
 
+
+template<class T, class Indexer>
+class DistApproxOrderByIntegerMetric : private boost::noncopyable {
+
+  MP_SC_FIFO<T> data[2048];
+  
+  Indexer I;
+  PerCPU<unsigned int> cursor;
+
+  int num() {
+    return 2048;
+  }
+
+  int active() {
+    return getSystemThreadPool().getActiveThreads();
+  }
+
+ public:
+
+  typedef T value_type;
+  template<bool newconcurrent>
+  struct rethread {
+    typedef DistApproxOrderByIntegerMetric<T, Indexer> WL;
+  };
+  template<typename T2>
+  struct retype {
+    //FIXME: How do you retype an index function
+    typedef DistApproxOrderByIntegerMetric<T2, typename Indexer::template retype<T2>::WL> WL;
+  };
+  
+  DistApproxOrderByIntegerMetric(const Indexer& x = Indexer())
+    :I(x), cursor(0)
+  {
+    for (int i = 0; i < active(); ++i)
+      cursor.get(i) = i;
+  }
+  
+  bool push(value_type val) {   
+    unsigned int index = I(val, std::numeric_limits<unsigned int>::max());
+    index %= num();
+    assert(index < num());
+    data[index].push(val);
+  }
+
+  std::pair<bool, value_type> pop() {
+    // print();
+    unsigned int& cur = cursor.get();
+    std::pair<bool, value_type> ret = data[cur].pop();
+    if (ret.first)
+      return ret;
+
+    //must move cursor
+    for (int i = 0; i < (num() + active() - 1) / active(); ++i) {
+      cur += active();
+      if (cur >= num())
+	cur %= active();
+      ret = data[cur].try_pop();
+      if (ret.first)
+	return ret;
+    }
+    return std::pair<bool, value_type>(false, value_type());
+  }
+
+  std::pair<bool, value_type> try_pop() {
+    return pop();
+  }
+
+  bool empty() {
+    for (unsigned int i = 0; i < num(); ++i)
+      if (!data[i].empty())
+	return false;
+    return true;
+  }
+
+  bool aborted(value_type val) {
+    return push(val);
+  }
+
+  //Not Thread Safe
+  //Not ideal
+  template<typename Iter>
+  void fill_initial(Iter ii, Iter ee) {
+    while (ii != ee) {
+      push(*ii++);
+    }
+  }
+};
+
+
+template<typename T, int chunksize=64, bool concurrent=true>
+class dChunkedFIFO : private boost::noncopyable {
+  class Chunk : public FixedSizeRing<T, chunksize, false> {
+  public:
+    Chunk* next;
+  };
+
+  struct p {
+    Chunk* cur;
+    Chunk* next;
+    p() : cur(0), next(0) {}
+    ~p() {
+      delete cur;
+      delete next;
+    }
+  };
+
+  PerCPU<p> data;
+  PerLevel<Chunk*> Items;
+
+  void pushChunk(Chunk* C) {
+    Chunk*& I = Items.get();
+    Chunk* oldHead = 0;
+    do {
+      oldHead = I;
+      C->next = I;
+    } while(!__sync_bool_compare_and_swap(&I, oldHead, C));
+  }
+
+  Chunk* popChunkByID(unsigned int i) {
+    Chunk*& I = Items.get(i);
+    Chunk* newHead;
+    Chunk* retval;
+    do {
+      retval = I;
+      if (!retval) //no items
+	return retval;
+      newHead = retval->next;
+    } while (!__sync_bool_compare_and_swap(&I, retval, newHead));
+    retval->next = 0;
+    return retval;
+  }
+
+  Chunk* popChunk() {
+    int id = Items.myEffectiveID();
+    Chunk* r = popChunkByID(id);
+    if (r)
+      return r;
+
+    for (int i = 0; i < Items.size(); ++i) {
+      ++id;
+      id %= Items.size();
+      r = popChunkByID(id);
+      if (r)
+	return r;
+    }
+    return 0;
+  }
+
+public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef dChunkedFIFO<T, chunksize, newconcurrent> WL;
+  };
+
+  typedef T value_type;
+  
+  dChunkedFIFO() {
+    for (int i = 0; i < Items.size(); ++i)
+      Items.get(i) = 0;
+  }
+
+  bool push(value_type val) {
+    p& n = data.get();
+    if (n.next && n.next->full()) {
+      pushChunk(n.next);
+      n.next = 0;
+    }
+    if (!n.next)
+      n.next = new Chunk;
+    bool retval = n.next->push_back(val);
+    assert(retval);
+    return retval;
+  }
+
+  std::pair<bool, value_type> pop() {
+    p& n = data.get();
+    if (n.cur && n.cur->empty()) {
+      delete n.cur;
+      n.cur = 0;
+    }
+    if (n.next && !n.next->empty()) {
+      return n.next->pop_front();
+    }
+    if (!n.cur) {
+      Chunk* r = popChunk();
+      if (r) {
+	//Shared queue had data
+	n.cur = r;
+      } else {
+	//Shared queue was empty, check next
+	n.cur = n.next;
+	n.next = 0;
+	if (!n.cur)
+	  return std::make_pair(false, value_type());
+      }
+    }
+
+    return n.cur->pop_front();
+  }
+  
+  std::pair<bool, value_type> try_pop() {
+    return pop();
+  }
+  
+  bool empty() {
+    p& n = data.get();
+    if (n.cur && !n.cur->empty()) return false;
+    if (n.next && !n.next->empty()) return false;
+    if (Items.get()) return false;
+    return true;
+  }
+
+  bool aborted(value_type val) {
+    return push(val);
+  }
+
+  //Not Thread Safe
+  template<typename Iter>
+  void fill_initial(Iter ii, Iter ee) {
+    p& n = data.get();
+    for( ; ii != ee; ++ii) {
+      push(*ii);
+    }
+    pushChunk(n.next);
+    n.next = 0;
+  }
+
+};
+
+
 }
 }
