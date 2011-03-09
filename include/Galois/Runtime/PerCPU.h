@@ -27,16 +27,9 @@ struct cache_line_storage {
 //Durring Parallel regions the threads index
 //from 0 -> num - 1 (one thread pool thread shares an index with the user thread)
 template<typename T>
-class PerCPU : public ThreadAware {
+class PerCPU {
   cache_line_storage<T>* datum;
   unsigned int num;
-  void (*reduce)(T&, T&);
-
-  void __reduce() {
-    if (reduce)
-      for (int i = 1; i < num; ++i)
-	reduce(datum[0].data, datum[i].data);
-  }
 
 protected:
 
@@ -47,8 +40,7 @@ protected:
 
 
 public:
-  explicit PerCPU(void (*func)(T&, T&))
-    :reduce(func)
+  PerCPU()
   {
     num = getSystemThreadPolicy().getNumThreads();
     datum = new cache_line_storage<T>[num];
@@ -82,35 +74,73 @@ public:
     return get(myID());
   }
 
-  int size() const {
-    return num;
+  T& getNext() {
+    return get((myID() + 1) % getSystemThreadPool().getActiveThreads());
   }
 
-  virtual void ThreadChange(bool starting) {
-    if (!starting)
-      __reduce();
+  const T& getNext() const {
+    return get((myID() + 1) % getSystemThreadPool().getActiveThreads());
+  }
+
+  int size() const {
+    return num;
   }
 };
 
 template<typename T>
-class PerCPU_ring : public PerCPU<T> {
-  using PerCPU<T>::myID;
-public:
-  using PerCPU<T>::get;
-  explicit PerCPU_ring(void (*func)(T&, T&))
-    :PerCPU<T>(func)
-  {}
+class PerLevel {
+  cache_line_storage<T>* datum;
+  unsigned int num;
+  unsigned int level;
+  ThreadPolicy& P;
 
-  T& getNext() {
-    int i = myID() + 1;
-    i %= getSystemThreadPool().getActiveThreads();
-    return get(i);
+protected:
+
+  int myID() const {
+    int i = ThreadPool::getMyID();
+    return std::max(0, i - 1);
   }
 
-  const T& getNext() const {
-    int i = myID() + 1;
-    i %= getSystemThreadPool().getActiveThreads();
-    return get(i);
+
+public:
+  PerLevel() :P(getSystemThreadPolicy())
+  {
+    //last iteresting level (should be package)
+    level = P.getNumLevels() - 1;
+    num = P.getLevelSize(level);
+    datum = new cache_line_storage<T>[num];
+  }
+  
+  virtual ~PerLevel() {
+    delete[] datum;
+  }
+
+  int myEffectiveID() const {
+    return P.indexLevelMap(level, myID());
+  }
+
+  T& get(int i) {
+    assert(i < num);
+    assert(datum);
+    return datum[i].data;
+  }
+  
+  const T& get(int i) const {
+    assert(i < num);
+    assert(datum);
+    return datum[i].data;
+  }
+  
+  T& get() {
+    return get(myEffectiveID());
+  }
+
+  const T& get() const {
+    return get(myEffectiveID());
+  }
+
+  int size() const {
+    return num;
   }
 };
 
