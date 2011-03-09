@@ -95,7 +95,7 @@ class LC_FileGraph : public FileGraph {
   };
 
   //null if type is void
-  gNode* NodeData;
+  cache_line_storage<gNode>* NodeData;
 
 public:
   LC_FileGraph() :NodeData(0) {}
@@ -106,8 +106,8 @@ public:
   
   NodeTy& getData(GraphNode N, MethodFlag mflag = ALL) {
     if (shouldLock(mflag))
-      GaloisRuntime::acquire(&NodeData[N]);
-    return NodeData[N].data;
+      GaloisRuntime::acquire(&NodeData[N].data);
+    return NodeData[N].data.data;
   }
 
   EdgeTy& getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
@@ -122,9 +122,9 @@ public:
   }
   
   void emptyNodeData(NodeTy init = NodeTy()) {
-    NodeData = new gNode[numNodes];
+    NodeData = new cache_line_storage<gNode>[numNodes];
     for (uint64_t i = 0; i < numNodes; ++i)
-      NodeData[i].data = init;
+      NodeData[i].data.data = init;
   }
 
 
