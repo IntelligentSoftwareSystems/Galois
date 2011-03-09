@@ -240,7 +240,7 @@ private:
   class makeGraphNode: public std::unary_function<gNode, GraphNode> {
     FirstGraph* G;
   public:
-    makeGraphNode(FirstGraph* g) :
+    makeGraphNode(FirstGraph* g = 0) :
       G(g) {
     }
     GraphNode operator()(gNode& data) const {
@@ -250,7 +250,7 @@ private:
   class makeGraphNodePtr: public std::unary_function<gNode*, GraphNode> {
     FirstGraph* G;
   public:
-    makeGraphNodePtr(FirstGraph* g) :
+    makeGraphNodePtr(FirstGraph* g = 0) :
       G(g) {
     }
     GraphNode operator()(gNode* data) const {
@@ -259,6 +259,9 @@ private:
   };
 
 public:
+
+  typedef EdgeTy EdgeDataTy;
+  typedef NodeTy NodeDataTy;
 
   // Node Handling
 
@@ -280,6 +283,13 @@ public:
       //__sync_add_and_fetch(&numActive, 1);
     }
     return !oldActive;
+  }
+
+  NodeTy& getData(const GraphNode& n, MethodFlag mflag = ALL) {
+    assert(n.ID);
+    if (shouldLock(mflag))
+      GaloisRuntime::acquire(n.ID);
+    return n.ID->data;
   }
 
   // Check if a node is in the graph (already added)
