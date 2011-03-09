@@ -81,8 +81,11 @@ public:
       int lmax = hwloc_get_nbobjs_by_depth(topology, depth);
       int coresPerThing = numCores / lmax;
       for (int i = 0; i < threadsPerCore; ++i)
-	for (int j = 0; j < numCores; ++j)
-	  indexLevelMapL(depth, i * numCores + j) = j / coresPerThing;
+       	for (int j = 0; j < numCores; ++j)
+       	  indexLevelMapL(depth, i * numCores + j) = j / coresPerThing;
+      // int threadsPerThing = numThreads / lmax;
+      // for (int i = 0; i < numThreads; ++i)
+      // 	indexLevelMapL(depth, i ) = i / threadsPerThing;
     }
 
     // id -> proc map
@@ -90,6 +93,7 @@ public:
     for (int i = 0; i < numThreads; ++i) {
       //std::cerr << "[" << i << "," << (i % numCores) * threadsPerCore + (i / numCores) << "] ";
       bindObj[i] = hwloc_get_obj_by_depth(topology, numLevelsABS - 1, (i % numCores) * threadsPerCore + (i / numCores));
+      //bindObj[i] = hwloc_get_obj_by_depth(topology, numLevelsABS - 1, i);
     }
 
     //dump();

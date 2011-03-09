@@ -40,7 +40,7 @@ public:
   //!How many threads will be used
   unsigned int getActiveThreads() const { return activeThreads; }
 
-  static unsigned int getMyID();
+  static unsigned int getMyID() __attribute__((pure));
 
 };
 

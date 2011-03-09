@@ -12,7 +12,7 @@ class TerminationDetection {
     tokenHolder() :tokenIsBlack(false), hasToken(false), processIsBlack(true) {}
   };
 
-  PerCPU_ring<tokenHolder> data;
+  PerCPU<tokenHolder> data;
   volatile bool globalTerm;
   bool lastWasWhite;
 public:

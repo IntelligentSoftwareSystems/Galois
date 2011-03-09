@@ -9,7 +9,7 @@
 using namespace GaloisRuntime;
 
 TerminationDetection::TerminationDetection()
-  :data(0), globalTerm(false), lastWasWhite(false)
+  :globalTerm(false), lastWasWhite(false)
 {
   data.get(0).hasToken = true;
   data.get(0).tokenIsBlack = true;

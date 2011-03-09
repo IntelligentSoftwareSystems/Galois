@@ -98,9 +98,11 @@ class ParallelWork : public Galois::Executable {
 
 public:
   ParallelWork(WorkListTy& _wl, Function& _f)
-    :global_wl(_wl), f(_f), tdata(PCTy::merge) {}
+    :global_wl(_wl), f(_f) {}
   
   ~ParallelWork() {
+    for (int i = 1; i < tdata.size(); ++i)
+      PCTy::merge(tdata.get(0), tdata.get(i));
     tdata.get().report();
     assert(global_wl.empty());
   }
