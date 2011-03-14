@@ -28,10 +28,9 @@ struct cache_line_storage {
 //from 0 -> num - 1 (one thread pool thread shares an index with the user thread)
 template<typename T>
 class PerCPU {
+protected:
   cache_line_storage<T>* datum;
   unsigned int num;
-
-protected:
 
   int myID() const {
     int i = ThreadPool::getMyID();
@@ -84,6 +83,26 @@ public:
 
   int size() const {
     return num;
+  }
+};
+
+template<typename T>
+class PerCPU_merge : public PerCPU<T>, public ThreadAware{
+  void (*reduce)(T&, T&);
+
+  void __reduce() {
+    if (reduce)
+      for (int i = 1; i < PerCPU<T>::num; ++i)
+	reduce(PerCPU<T>::datum[0].data, PerCPU<T>::datum[i].data);
+  }
+
+public:
+  explicit PerCPU_merge(void (*func)(T&, T&))
+    :reduce(func)
+  {}
+  virtual void ThreadChange(bool starting) {
+    if (!starting)
+      __reduce();
   }
 };
 
