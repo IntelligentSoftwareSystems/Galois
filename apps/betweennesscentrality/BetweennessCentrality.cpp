@@ -114,7 +114,7 @@ int main(int argc, const char** argv) {
   GraphT gt;
   Graph  g;
   G = &g;
-  GaloisRuntime::PerCPU<std::vector<double> > cb(merge);
+  GaloisRuntime::PerCPU_merge<std::vector<double> > cb(merge);
   CB = &cb;
 
   //readTxtFile(argv[inputFileAt]);

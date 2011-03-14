@@ -13,6 +13,9 @@
 
 #include <iostream>
 
+//#define OPTNOINLINE __attribute__((noinline)) 
+#define OPTNOINLINE
+
 namespace GaloisRuntime {
 namespace WorkList {
 
@@ -247,14 +250,14 @@ public:
 
   typedef T value_type;
 
-  bool push(value_type val) {
+  bool push(value_type val) OPTNOINLINE {
     lock();
     wl.push_back(val);
     unlock();
     return true;
   }
 
-  std::pair<bool, value_type> pop() {
+  std::pair<bool, value_type> pop() OPTNOINLINE {
     lock();
     if (wl.empty()) {
       unlock();
@@ -267,7 +270,7 @@ public:
     }
   }
 
-  std::pair<bool, value_type> try_pop() {
+  std::pair<bool, value_type> try_pop() OPTNOINLINE {
     if (try_lock()) {
       if (!wl.empty()) {
 	value_type retval = wl.back();
@@ -280,7 +283,7 @@ public:
     return std::make_pair(false, value_type());
   }
 
-  bool empty() {
+  bool empty() OPTNOINLINE {
     lock();
     bool retval = wl.empty();
     unlock();
@@ -628,7 +631,7 @@ public:
     for( ; ii != ee; ++ii) {
       push(*ii);
     }
-    Items.push(n.next);
+    pushChunk(n.next);
     n.next = 0;
   }
 
@@ -886,14 +889,14 @@ class ApproxOrderByIntegerMetric : private boost::noncopyable {
       cursor.get(i) = 0;
   }
   
-  bool push(value_type val) {   
+  bool push(value_type val) OPTNOINLINE {   
     unsigned int index = I(val);
     index %= num();
     assert(index < num());
     data[index].push(val);
   }
 
-  std::pair<bool, value_type> pop() {
+  std::pair<bool, value_type> pop() OPTNOINLINE {
     // print();
     unsigned int& cur = concurrent ? cursor.get() : cursor.get(0);
     std::pair<bool, value_type> ret = data[cur].pop();
@@ -910,11 +913,11 @@ class ApproxOrderByIntegerMetric : private boost::noncopyable {
     return std::pair<bool, value_type>(false, value_type());
   }
 
-  std::pair<bool, value_type> try_pop() {
+  std::pair<bool, value_type> try_pop() OPTNOINLINE {
     return pop();
   }
 
-  bool empty() {
+  bool empty() OPTNOINLINE {
     for (unsigned int i = 0; i < num(); ++i)
       if (!data[i].empty())
 	return false;
@@ -1041,7 +1044,7 @@ public:
   };
 
   //! push a value onto the queue
-  bool push(value_type val) {
+  bool push(value_type val) OPTNOINLINE {
     unsigned int index = I(val);
     p& me = localQs.get();
     if (index <= me.current)
@@ -1056,7 +1059,7 @@ public:
   }
 
   //! pop a value from the queue.
-  std::pair<bool, value_type> pop() {
+  std::pair<bool, value_type> pop() OPTNOINLINE {
     std::pair<bool, value_type> r = localQs.get().Q.pop();
     if (r.first)
       return r;
@@ -1064,12 +1067,12 @@ public:
   }
 
   //! pop a value from the queue trying not as hard to take locks
-  std::pair<bool, value_type> try_pop() {
+  std::pair<bool, value_type> try_pop() OPTNOINLINE {
     return pop();
   }
 
   //! return if the queue *may* be empty
-  bool empty() {
+  bool empty() OPTNOINLINE {
     if (!localQs.get().Q.empty()) return false;
     return globalQ.empty();
   }
