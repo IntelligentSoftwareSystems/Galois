@@ -38,7 +38,7 @@ public:
 //Per-thread heaps using Galois thread aware construct
 template<class LocalHeap>
 class ThreadAwarePrivateHeap {
-  PerCPU<LocalHeap> heaps;
+  PerCPU_merge<LocalHeap> heaps;
 
 public:
   enum { AllocSize = LocalHeap::AllocSize };
