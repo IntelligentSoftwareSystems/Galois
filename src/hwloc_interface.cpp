@@ -39,9 +39,10 @@ class hwloc_policy : public GaloisRuntime::ThreadPolicy {
     for (int i = 0; i < numThreads; ++i) {
       char s[128];
       hwloc_obj_snprintf(s, sizeof(s), topology, bindObj[i], "#", 0);
-      cerr << s << "\n";
+      cerr << "[" << i << "," << s << "] ";
       //printf("%*s%s\n", 2*depth, "", string);
     }
+    cerr << "\n";
   }
 
 public:
@@ -91,12 +92,12 @@ public:
     // id -> proc map
     bindObj.resize(numThreads);
     for (int i = 0; i < numThreads; ++i) {
-      //std::cerr << "[" << i << "," << (i % numCores) * threadsPerCore + (i / numCores) << "] ";
+      std::cerr << "[" << i << "," << (i % numCores) * threadsPerCore + (i / numCores) << "] ";
       bindObj[i] = hwloc_get_obj_by_depth(topology, numLevelsABS - 1, (i % numCores) * threadsPerCore + (i / numCores));
       //bindObj[i] = hwloc_get_obj_by_depth(topology, numLevelsABS - 1, i);
     }
 
-    //dump();
+    dump();
   }
 
   ~hwloc_policy() {
@@ -105,6 +106,7 @@ public:
   }
 
   virtual void bindThreadToProcessor() {
+    return;
     int id = GaloisRuntime::getSystemThreadPool().getMyID();
     //cerr << "Binding Thread " << id << "\n";
     if (hwloc_set_cpubind(topology, bindObj[id - 1]->cpuset, 0) < 0) {
