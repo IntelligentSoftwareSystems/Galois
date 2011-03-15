@@ -18,6 +18,15 @@ static const int _MAP_POP  = MAP_POPULATE | _MAP_BASE;
 static const int _MAP_HUGE = MAP_HUGETLB | _MAP_POP;
 #endif
 
+mmapWrapper::mmapWrapper() {
+#ifndef MAP_POPULATE
+  reportWarning("No MAP_POPULATE");
+#endif
+#ifndef MAP_HUGETLB
+  reportWarning("No MAP_HUGETLB");
+#endif
+}
+
 void* mmapWrapper::_alloc() {
   void* ptr = 0;
 #ifdef MAP_HUGETLB
