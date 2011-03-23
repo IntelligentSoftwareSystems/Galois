@@ -523,10 +523,7 @@ struct NextPtr {
 
 template<typename T, int chunksize=64, bool concurrent=true>
 class ChunkedFIFO : private boost::noncopyable {
-  class Chunk : public FixedSizeRing<T, chunksize, false> {
-  public:
-    Chunk* next;
-  };
+  typedef FixedSizeRing<T, chunksize, false> Chunk;
 
   struct p {
     Chunk* cur;
@@ -539,27 +536,18 @@ class ChunkedFIFO : private boost::noncopyable {
   };
 
   PerCPU<p> data;
-  Chunk* Items;
+  sFIFO<Chunk*, concurrent> Items;
 
   void pushChunk(Chunk* C) {
-    Chunk* oldHead = 0;
-    do {
-      oldHead = Items;
-      C->next = Items;
-    } while(!__sync_bool_compare_and_swap(&Items, oldHead, C));
+    Items.push(C);
   }
 
   Chunk* popChunk() {
-    Chunk* newHead;
-    Chunk* retval;
-    do {
-      retval = Items;
-      if (!retval) //no items
-	return retval;
-      newHead = retval->next;
-    } while (!__sync_bool_compare_and_swap(&Items, retval, newHead));
-    retval->next = 0;
-    return retval;
+    std::pair<bool, Chunk*> r = Items.pop();
+    if (r.first)
+      return r.second;
+    else
+      return 0;
   }
 
 public:
@@ -570,7 +558,7 @@ public:
 
   typedef T value_type;
   
-  ChunkedFIFO() :Items(0) {}
+  ChunkedFIFO() :Items() {}
 
   bool push(value_type val) {
     p& n = data.get();
@@ -616,7 +604,7 @@ public:
     p& n = data.get();
     if (n.cur && !n.cur->empty()) return false;
     if (n.next && !n.next->empty()) return false;
-    if (Items) return false;
+    if (!Items.empty()) return false;
     return true;
   }
 
@@ -804,7 +792,6 @@ class LocalQueues {
 
   PerCPU<typename LocalQueueTy::template rethread<false>::WL> local;
   GlobalQueueTy global;
-  bool starved;
 
 public:
   template<bool newconcurrent>
@@ -814,15 +801,10 @@ public:
 
   typedef T value_type;
 
-  LocalQueues() :local(0), starved(false) {}
+  LocalQueues() {}
 
   bool push(value_type val) {
-    if (starved) {
-      global.push(val);
-      starved = 0;
-    } else {
-      local.get().push(val);
-    }
+    local.get().push(val);
   }
 
   bool aborted(value_type val) {
@@ -835,19 +817,11 @@ public:
     if (ret.first)
       return ret;
     ret = global.pop();
-    if (!ret.first)
-      starved = true;
     return ret;
   }
 
   std::pair<bool, value_type> try_pop() {
-    std::pair<bool, value_type> ret = local.get().try_pop();
-    if (ret.first)
-      return ret;
-    ret = global.try_pop();
-    if (!ret.first)
-      starved = true;
-    return ret;
+    return pop();
   }
 
   bool empty() {
@@ -1063,7 +1037,11 @@ public:
     std::pair<bool, value_type> r = localQs.get().Q.pop();
     if (r.first)
       return r;
-    return globalQ.pop();
+    
+    r = globalQ.pop();
+    if (r.first)
+      localQs.get().current = I(r.second);
+    return r;
   }
 
   //! pop a value from the queue trying not as hard to take locks
