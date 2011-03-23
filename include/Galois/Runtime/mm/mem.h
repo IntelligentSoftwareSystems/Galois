@@ -24,6 +24,8 @@ public:
 	Alighment = 4*1024,
 	AutoFree = 1};
   
+  mmapWrapper();
+
   void* allocate(unsigned int size) {
     assert(size % AllocSize == 0);
     return _alloc();
