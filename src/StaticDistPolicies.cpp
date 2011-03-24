@@ -90,7 +90,7 @@ struct MaxwellPolicy : public ThreadPolicy {
 
   MaxwellPolicy() {
     numLevels = 1;
-    numThreads = 16
+    numThreads = 16;
     numCores = 8;
     levelSize.push_back(2);
     for (int y = 0; y < 2; ++y)
