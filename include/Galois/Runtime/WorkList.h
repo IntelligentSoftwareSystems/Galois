@@ -1,6 +1,9 @@
 // Scalable Local worklists -*- C++ -*-
 // This contains final worklists.
 
+#ifndef __WORKLIST_H_
+#define __WORKLIST_H_
+
 #include <queue>
 #include <stack>
 #include <limits>
@@ -10,8 +13,6 @@
 //#include "Galois/Runtime/QueuingLock.h"
 
 #include <boost/utility.hpp>
-
-#include <iostream>
 
 //#define OPTNOINLINE __attribute__((noinline)) 
 #define OPTNOINLINE
@@ -73,8 +74,9 @@ public:
 };
 
 template<typename T, int chunksize = 64, bool concurrent = true>
-class FixedSizeRing :private boost::noncopyable {
-  PaddedLock<concurrent> lock;
+class FixedSizeRing :private boost::noncopyable, private PaddedLock<concurrent> {
+  using PaddedLock<concurrent>::lock;
+  using PaddedLock<concurrent>::unlock;
   unsigned start;
   unsigned end;
   T data[chunksize];
@@ -88,6 +90,7 @@ class FixedSizeRing :private boost::noncopyable {
   }
 
 public:
+  
   template<bool newconcurrent>
   struct rethread {
     typedef FixedSizeRing<T, chunksize, newconcurrent> WL;
@@ -98,68 +101,68 @@ public:
   FixedSizeRing() :start(0), end(0) {}
 
   bool empty() {
-    lock.lock();
+    lock();
     bool retval = _i_empty();
-    lock.unlock();
+    unlock();
     return retval;
   }
 
   bool full() {
-    lock.lock();
+    lock();
     bool retval = _i_full();
-    lock.unlock();
+    unlock();
     return retval;
   }
 
   bool push_front(value_type val) {
-    lock.lock();
+    lock();
     if (_i_full()) {
-      lock.unlock();
+      unlock();
       return false;
     }
     start += chunksize - 1;
     start %= chunksize;
     data[start] = val;
-    lock.unlock();
+    unlock();
     return true;
   }
 
   bool push_back(value_type val) {
-    lock.lock();
+    lock();
     if (_i_full()) {
-      lock.unlock();
+      unlock();
       return false;
     }
     data[end] = val;
     end += 1;
     end %= chunksize;
-    lock.unlock();
+    unlock();
     return true;
   }
 
   std::pair<bool, value_type> pop_front() {
-    lock.lock();
+    lock();
     if (_i_empty()) {
-      lock.unlock();
+      unlock();
       return std::make_pair(false, value_type());
     }
     value_type retval = data[start];
     ++start;
     start %= chunksize;
-    lock.unlock();
+    unlock();
     return std::make_pair(true, retval);
   }
 
   std::pair<bool, value_type> pop_back() {
-    lock.lock();
+    lock();
     if (_i_empty()) {
-      lock.unlock();
+      unlock();
       return std::make_pair(false, value_type());
     }
     end += chunksize - 1;
     end %= chunksize;
     value_type retval = data[end];
-    lock.unlock();
+    unlock();
     return std::make_pair(true, retval);
   }
 };
@@ -1127,3 +1130,5 @@ public:
 //End namespace
 }
 }
+
+#endif
