@@ -5,6 +5,7 @@
 
 #include "Galois/Runtime/Threads.h"
 
+#include <boost/utility.hpp>
 #include <cassert>
 
 namespace GaloisRuntime {
@@ -27,7 +28,7 @@ struct cache_line_storage {
 //Durring Parallel regions the threads index
 //from 0 -> num - 1 (one thread pool thread shares an index with the user thread)
 template<typename T>
-class PerCPU {
+class PerCPU : boost::noncopyable {
 protected:
   cache_line_storage<T>* datum;
   unsigned int num;
