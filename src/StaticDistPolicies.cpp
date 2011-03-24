@@ -76,9 +76,33 @@ struct VoltaPolicy : public ThreadPolicy {
   }
 };
 
+struct MaxwellPolicy : public ThreadPolicy {
+
+  virtual void bindThreadToProcessor(int id) {
+    //schedule inside each package first
+    int carry = 0;
+    if (id > 7) {
+      id -= 8;
+      carry = 8;
+    }
+    genericBindToProcessor(carry + ((id % 4) * 2) + (id / 4));
+  }
+
+  MaxwellPolicy() {
+    numLevels = 1;
+    numThreads = 16
+    numCores = 8;
+    levelSize.push_back(2);
+    for (int y = 0; y < 2; ++y)
+      for (int x = 0; x < 2; ++x)
+	for (int i = 0; i < 4; ++i)
+	  levelMap.push_back(x);
+  }
+};
+
 static FaradayPolicy a_FaradayPolicy;
 static VoltaPolicy a_VoltaPolicy;
-
+static MaxwellPolicy a_MaxwellPolicy;
 
 ThreadPolicy& GaloisRuntime::getSystemThreadPolicy() {
   return a_FaradayPolicy;
