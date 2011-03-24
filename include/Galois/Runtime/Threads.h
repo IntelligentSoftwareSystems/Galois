@@ -80,7 +80,7 @@ public:
 
   int getLevelSize(int S) const { return levelSize[S]; }
 
-  virtual void bindThreadToProcessor() = 0;
+  virtual void bindThreadToProcessor(int id) = 0;
 };
 
 ThreadPolicy& getSystemThreadPolicy();

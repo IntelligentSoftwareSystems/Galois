@@ -100,47 +100,9 @@ class ThreadPool_pthread : public ThreadPool {
   std::list<pthread_t> threads; // Set of threads
   unsigned int maxThreads;
 
-  // Return the number of processors on this hardware
-  // This is the maximum number of threads that can be started
-//   unsigned int numProcessors() {
-// #ifdef __linux__
-//     return sysconf(_SC_NPROCESSORS_CONF);
-// #endif
-//     reportWarning("Unknown number of processors (assuming 64)");
-//     return 64;
-//   }
-  void bindToProcessor(int proc) {
-#if 0
-    int id = proc;
-    int carry = 0;
-    if (id > 23) {
-      id -= 24;
-      carry = 24;
-    }
-    proc = carry + ((id % 6) * 4) + (id / 6);
-#endif
-#ifdef __linux__
-    cpu_set_t mask;
-    /* CPU_ZERO initializes all the bits in the mask to zero. */
-    CPU_ZERO( &mask );
-    
-    /* CPU_SET sets only the bit corresponding to cpu. */
-    // void to cancel unused result warning
-    (void)CPU_SET( proc, &mask );
-    
-    /* sched_setaffinity returns 0 in success */
-    if( sched_setaffinity( 0, sizeof(mask), &mask ) == -1 )
-      reportWarning("Could not set CPU Affinity for thread");
-    
-    return;
-#endif      
-    reportWarning("Don't know how to bind thread to cpu on this platform");
-  }
-
   void launch(void) {
-    GaloisRuntime::getSystemThreadPolicy().bindThreadToProcessor();
     unsigned int id = ThreadPool::getMyID();
-    bindToProcessor(id - 1);
+    GaloisRuntime::getSystemThreadPolicy().bindThreadToProcessor(id - 1);
 
     while (true) {
       start.acquire();

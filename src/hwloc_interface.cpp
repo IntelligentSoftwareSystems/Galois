@@ -92,12 +92,12 @@ public:
     // id -> proc map
     bindObj.resize(numThreads);
     for (int i = 0; i < numThreads; ++i) {
-      std::cerr << "[" << i << "," << (i % numCores) * threadsPerCore + (i / numCores) << "] ";
+      //std::cerr << "[" << i << "," << (i % numCores) * threadsPerCore + (i / numCores) << "] ";
       bindObj[i] = hwloc_get_obj_by_depth(topology, numLevelsABS - 1, (i % numCores) * threadsPerCore + (i / numCores));
       //bindObj[i] = hwloc_get_obj_by_depth(topology, numLevelsABS - 1, i);
     }
 
-    dump();
+    //dump();
   }
 
   ~hwloc_policy() {
@@ -117,7 +117,7 @@ public:
 };
 
 //hwloc_policy hwloc_SystemPolicy;
-GaloisRuntime::ThreadPolicy& GaloisRuntime::getSystemThreadPolicy() {
-  static hwloc_policy hwloc_SystemPolicy;
-  return hwloc_SystemPolicy;
-}
+// GaloisRuntime::ThreadPolicy& GaloisRuntime::getSystemThreadPolicy() {
+//   static hwloc_policy hwloc_SystemPolicy;
+//   return hwloc_SystemPolicy;
+// }

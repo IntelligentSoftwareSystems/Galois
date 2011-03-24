@@ -1,136 +1,13 @@
 // "Distributed" Shared Memory Worklists -*- C++ -*-
 
+#ifndef __DISTRIBUTEDWORKLIST_H_
+#define __DISTRIBUTEDWORKLIST_H_
+
 #include <algorithm>
+#include <tr1/unordered_map>
 
 namespace GaloisRuntime {
 namespace WorkList {
-
-
-struct FaradayPolicy {
-
-  //Total: 0 .. 47
-  //Assumed numbering: 0-23 package dense real cores, 24-47 package dense hyper cores
-
-  static const char level[3][48];
-  static const bool master[3][48];
-
-  static int getID() {
-    return std::max(0, (int)ThreadPool::getMyID() - 1);
-  }
-
-  //Hight of hirarchy
-  static int getNumLevels() {
-    return 3;
-  }
-
-  //number of queues in each level
-  static int getNumInLevel(int _level) {
-    switch (_level) {
-    case 0: return 48;
-    case 1: return 4;
-    case 2: return 1;
-    default: return 0;
-    };
-  }
-  //number of threads in each bin at a given level
-  static int getNumInBin(int _level) {
-    switch (_level) {
-    case 0: return 1;
-    case 1: return 6;
-    case 2: return 48;
-    default: return 0;
-    };
-  }
-
-  static int mapInto(int ID, int _level) {
-    return level[_level][ID];
-  }
-
-  static bool isMasterAtLevel(int ID, int _level) {
-    return master[_level][ID];
-  }
-
-  static int getNumIslands() { return 4; }
-  static int getThreadIsland() { 
-    int i = ThreadPool::getMyID();
-    i = std::max(0, i - 1);
-    //Round robin
-    //return i < getNumIslands();
-    //dense
-    return i % 6 == 0;
-  }
-  static bool isThreadMaster() { 
-    int i = ThreadPool::getMyID();
-    i = std::max(0, i - 1);
-    //Round robin
-    //i %= 4;
-    //dense
-    i /= 6;
-    return i;
-  }
- 
-};
-
-//FIXME: Not safe for multiple includes
-const char FaradayPolicy::level[3][48] = {
-  //Level 0: core
-  { 0 ,1 ,2 ,3 ,4 ,5 ,
-    6 ,7 ,8 ,9 ,10,11,
-    12,13,14,15,16,17,
-    18,19,20,21,22,23,
-    24,25,26,27,28,29,
-    30,31,32,33,34,35,
-    36,37,38,39,40,41,
-    42,43,44,45,49,47},
-  //Level 1: package
-  {0,0,0,0,0,0,
-   1,1,1,1,1,1,
-   2,2,2,2,2,2,
-   3,3,3,3,3,3,
-   0,0,0,0,0,0,
-   1,1,1,1,1,1,
-   2,2,2,2,2,2,
-   3,3,3,3,3,3},
-  //Level 2: top level
-  {0,0,0,0,0,0,
-   0,0,0,0,0,0,
-   0,0,0,0,0,0,
-   0,0,0,0,0,0,
-   0,0,0,0,0,0,
-   0,0,0,0,0,0,
-   0,0,0,0,0,0,
-   0,0,0,0,0,0}
-};
-
-const bool FaradayPolicy::master[3][48] = {
-  //Level0: individual queues
-  {1,1,1,1,1,1,
-   1,1,1,1,1,1,
-   1,1,1,1,1,1,
-   1,1,1,1,1,1,
-   1,1,1,1,1,1,
-   1,1,1,1,1,1,
-   1,1,1,1,1,1,
-   1,1,1,1,1,1},
-  //Level 1: first of each package
-  {1,0,0,0,0,0,
-   1,0,0,0,0,0,
-   1,0,0,0,0,0,
-   1,0,0,0,0,0,
-   0,0,0,0,0,0,
-   0,0,0,0,0,0,
-   0,0,0,0,0,0,
-   0,0,0,0,0,0},
-  //Level 2: one master queue
-  {0,0,0,0,0,0,
-   0,0,0,0,0,0,
-   0,0,0,0,0,0,
-   0,0,0,0,0,0,
-   0,0,0,0,0,0,
-   0,0,0,0,0,0,
-   0,0,0,0,0,0,
-   0,0,0,0,0,0}
-};
 
 template<typename T, typename LocalWL, typename GlobalWL, typename DistPolicy>
 class RequestHirarchy {
@@ -355,47 +232,31 @@ public:
 
 };
 
+#if 0
+template<class T, class Indexer, typename ContainerTy = FIFO<T>, bool concurrent=true>
+class dOrderByIntegerMetric : private boost::noncopyable {
 
-template<class T, class Indexer>
-class DistApproxOrderByIntegerMetric : private boost::noncopyable {
-
-  MP_SC_FIFO<T> data[2048];
   
-  Indexer I;
-  PerCPU<unsigned int> cursor;
+  ContainerTy* current;
+  TerminationDetection currentEmpty;
+  std::tr1::unordered_map<unsigned int, ContainerTy> data;
 
-  int num() {
-    return 2048;
-  }
-
-  int active() {
-    return getSystemThreadPool().getActiveThreads();
-  }
-
- public:
+public:
 
   typedef T value_type;
   template<bool newconcurrent>
   struct rethread {
-    typedef DistApproxOrderByIntegerMetric<T, Indexer> WL;
-  };
-  template<typename T2>
-  struct retype {
-    //FIXME: How do you retype an index function
-    typedef DistApproxOrderByIntegerMetric<T2, typename Indexer::template retype<T2>::WL> WL;
+    typedef dOrderByIntegerMetric<T, Indexer, typename ContainerTy::template rethread<newconcurrent>::WL, newconcurrent> WL;
   };
   
-  DistApproxOrderByIntegerMetric(const Indexer& x = Indexer())
-    :I(x), cursor(0)
+  dOrderByIntegerMetric(const Indexer& x = Indexer())
+    :I(x), numActive(getSystemThreadPool().getActiveThreads())
   {
-    for (int i = 0; i < active(); ++i)
-      cursor.get(i) = i;
+    
   }
   
-  bool push(value_type val) {   
-    unsigned int index = I(val, std::numeric_limits<unsigned int>::max());
-    index %= num();
-    assert(index < num());
+  bool push(value_type val) {
+    unsigned int index = I(val);
     data[index].push(val);
   }
 
@@ -442,7 +303,7 @@ class DistApproxOrderByIntegerMetric : private boost::noncopyable {
     }
   }
 };
-
+#endif
 
 template<typename T, int chunksize=64, bool concurrent=true>
 class dChunkedFIFO : private boost::noncopyable {
@@ -451,21 +312,22 @@ class dChunkedFIFO : private boost::noncopyable {
     Chunk* next;
   };
 
+  MM::ThreadAwarePrivateHeap<MM::FreeListHeap<MM::BlockAlloc<sizeof(Chunk), MM::SystemBaseAlloc> > > heap;
+
   struct p {
     Chunk* cur;
     Chunk* next;
     p() : cur(0), next(0) {}
     ~p() {
-      delete cur;
-      delete next;
+      //leak cur and next
     }
   };
 
   PerCPU<p> data;
-  PerLevel<Chunk*> Items;
+  PerLevel<std::pair<Chunk*, SimpleLock<int, concurrent> > > Items;
 
-  void pushChunk(Chunk* C) {
-    Chunk*& I = Items.get();
+  void pushChunk(Chunk* C) OPTNOINLINE {
+    Chunk*& I = Items.get().first;
     Chunk* oldHead = 0;
     do {
       oldHead = I;
@@ -473,21 +335,25 @@ class dChunkedFIFO : private boost::noncopyable {
     } while(!__sync_bool_compare_and_swap(&I, oldHead, C));
   }
 
-  Chunk* popChunkByID(unsigned int i) {
-    Chunk*& I = Items.get(i);
+  Chunk* popChunkByID(unsigned int i) OPTNOINLINE {
+    std::pair<Chunk*, SimpleLock<int, concurrent> >& I = Items.get(i);
     Chunk* newHead;
     Chunk* retval;
+    I.second.lock();
     do {
-      retval = I;
-      if (!retval) //no items
+      retval = I.first;
+      if (!retval) { //no items
+	I.second.unlock();
 	return retval;
+      }
       newHead = retval->next;
-    } while (!__sync_bool_compare_and_swap(&I, retval, newHead));
+    } while (!__sync_bool_compare_and_swap(&I.first, retval, newHead));
     retval->next = 0;
+    I.second.unlock();
     return retval;
   }
 
-  Chunk* popChunk() {
+  Chunk* popChunk() OPTNOINLINE {
     int id = Items.myEffectiveID();
     Chunk* r = popChunkByID(id);
     if (r)
@@ -513,26 +379,27 @@ public:
   
   dChunkedFIFO() {
     for (int i = 0; i < Items.size(); ++i)
-      Items.get(i) = 0;
+      Items.get(i).first = 0;
   }
 
-  bool push(value_type val) {
+  bool push(value_type val) OPTNOINLINE {
     p& n = data.get();
     if (n.next && n.next->full()) {
       pushChunk(n.next);
       n.next = 0;
     }
     if (!n.next)
-      n.next = new Chunk;
+      n.next = new (heap.allocate(sizeof(Chunk))) Chunk;
     bool retval = n.next->push_back(val);
     assert(retval);
     return retval;
   }
 
-  std::pair<bool, value_type> pop() {
+  std::pair<bool, value_type> pop() OPTNOINLINE {
     p& n = data.get();
     if (n.cur && n.cur->empty()) {
-      delete n.cur;
+      n.cur->~Chunk();
+      heap.deallocate(n.cur);
       n.cur = 0;
     }
     if (n.next && !n.next->empty()) {
@@ -559,11 +426,11 @@ public:
     return pop();
   }
   
-  bool empty() {
+  bool empty() OPTNOINLINE {
     p& n = data.get();
     if (n.cur && !n.cur->empty()) return false;
     if (n.next && !n.next->empty()) return false;
-    if (Items.get()) return false;
+    if (Items.get().first) return false;
     return true;
   }
 
@@ -587,3 +454,5 @@ public:
 
 }
 }
+
+#endif
