@@ -7,15 +7,18 @@
 #include <queue>
 #include <stack>
 #include <limits>
+#include <boost/utility.hpp>
 
-#include "Galois/Runtime/SimpleLock.h"
+#include "Galois/Runtime/PaddedLock.h"
 #include "Galois/Runtime/PerCPU.h"
 //#include "Galois/Runtime/QueuingLock.h"
 
 #include <boost/utility.hpp>
 
-//#define OPTNOINLINE __attribute__((noinline)) 
-#define OPTNOINLINE
+#include "WorkListHelpers.h"
+
+#define OPTNOINLINE __attribute__((noinline)) 
+//#define OPTNOINLINE
 
 namespace GaloisRuntime {
 namespace WorkList {
@@ -53,119 +56,10 @@ public:
 
 };
 
-template<bool concurrent>
-class PaddedLock;
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
-template<>
-class PaddedLock<true> {
-  cache_line_storage<SimpleLock<int, true> > Lock;
-
-public:
-  void lock() { Lock.data.lock(); }
-  bool try_lock() { return Lock.data.try_lock(); }
-  void unlock() { Lock.data.unlock(); }
-};
-template<>
-class PaddedLock<false> {
-public:
-  void lock() {}
-  bool try_lock() { return true; }
-  void unlock() {}
-};
-
-template<typename T, int chunksize = 64, bool concurrent = true>
-class FixedSizeRing :private boost::noncopyable, private PaddedLock<concurrent> {
-  using PaddedLock<concurrent>::lock;
-  using PaddedLock<concurrent>::unlock;
-  unsigned start;
-  unsigned end;
-  T data[chunksize];
-
-  bool _i_empty() {
-    return start == end;
-  }
-
-  bool _i_full() {
-    return (end + 1) % chunksize == start;
-  }
-
-public:
-  
-  template<bool newconcurrent>
-  struct rethread {
-    typedef FixedSizeRing<T, chunksize, newconcurrent> WL;
-  };
-
-  typedef T value_type;
-
-  FixedSizeRing() :start(0), end(0) {}
-
-  bool empty() {
-    lock();
-    bool retval = _i_empty();
-    unlock();
-    return retval;
-  }
-
-  bool full() {
-    lock();
-    bool retval = _i_full();
-    unlock();
-    return retval;
-  }
-
-  bool push_front(value_type val) {
-    lock();
-    if (_i_full()) {
-      unlock();
-      return false;
-    }
-    start += chunksize - 1;
-    start %= chunksize;
-    data[start] = val;
-    unlock();
-    return true;
-  }
-
-  bool push_back(value_type val) {
-    lock();
-    if (_i_full()) {
-      unlock();
-      return false;
-    }
-    data[end] = val;
-    end += 1;
-    end %= chunksize;
-    unlock();
-    return true;
-  }
-
-  std::pair<bool, value_type> pop_front() {
-    lock();
-    if (_i_empty()) {
-      unlock();
-      return std::make_pair(false, value_type());
-    }
-    value_type retval = data[start];
-    ++start;
-    start %= chunksize;
-    unlock();
-    return std::make_pair(true, retval);
-  }
-
-  std::pair<bool, value_type> pop_back() {
-    lock();
-    if (_i_empty()) {
-      unlock();
-      return std::make_pair(false, value_type());
-    }
-    end += chunksize - 1;
-    end %= chunksize;
-    value_type retval = data[end];
-    unlock();
-    return std::make_pair(true, retval);
-  }
-};
 
 template<typename T, class Compare = std::less<T>, bool concurrent = true>
 class PriQueue : private boost::noncopyable, private PaddedLock<concurrent> {
@@ -519,9 +413,6 @@ public:
       push(*ii++);
     }
   }
-};
-
-struct NextPtr {
 };
 
 template<typename T, int chunksize=64, bool concurrent=true>
