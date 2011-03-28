@@ -1,5 +1,7 @@
- #include "Galois/Runtime/mm/mem.h"
+#include "Galois/Runtime/mm/mem.h"
 #include "Galois/Runtime/Support.h"
+
+#include <map>
 
 #ifdef __linux__
 #include <linux/mman.h>
@@ -53,12 +55,20 @@ void mmapWrapper::_free(void* ptr) {
   munmap(ptr, AllocSize);
 }
 
-template<typename RealBase>
-SelfLockFreeListHeap<RealBase> SystemBaseAllocator<RealBase>::Source;
+//Anchor the class
+SelfLockFreeListHeap<mmapWrapper> SystemBaseAlloc::Source;
+SystemBaseAlloc::SystemBaseAlloc() {}
+SystemBaseAlloc::~SystemBaseAlloc() {}
 
-//Dummy function to force initialize SystemBaseAllocator<mmapWrapper>::Source
-static void dummy() __attribute__((used));
-static void dummy() {
-  SystemBaseAlloc B;
-  B.allocate(0);
+SizedAlloc* GaloisRuntime::MM::getAllocatorForSize(unsigned int size) {
+  static std::map<unsigned int, SizedAlloc*> allocators;
+  static SimpleLock<int, true> Lock;
+
+  Lock.lock();
+  SizedAlloc*& retval = allocators[size];
+  if (!retval)
+    retval = new SizedAlloc;
+  Lock.unlock();
+
+  return retval;
 }

@@ -40,12 +40,12 @@ public:
 //Per-thread heaps using Galois thread aware construct
 template<class LocalHeap>
 class ThreadAwarePrivateHeap {
-  PerCPU_merge<LocalHeap> heaps;
+  PerCPU<LocalHeap> heaps;
 
 public:
   enum { AllocSize = LocalHeap::AllocSize };
 
-  ThreadAwarePrivateHeap() : heaps(LocalHeap::merge) {}
+  ThreadAwarePrivateHeap() {}
 
   inline void* allocate(unsigned int size) {
     return heaps.get().allocate(size);
@@ -305,18 +305,6 @@ public:
 
   inline void deallocate(void* ptr) {}
 
-  static void merge(BlockAlloc& lhs, BlockAlloc& rhs) {
-    if (!lhs.head) { //Steal
-      lhs.head = rhs.head;
-      lhs.headIndex = rhs.headIndex;
-    } else { //Merge
-      Block* B = lhs.head;
-      while (B->next) { B = B->next; }
-      B->next = rhs.head;
-    }
-    rhs.head = 0;
-    rhs.headIndex = 0;
-  }
 };
 
 //This implements a bump pointer though chunks of memory
@@ -375,27 +363,17 @@ public:
 
   inline void deallocate(void* ptr) {}
 
-  static void merge(SimpleBumpPtr& lhs, SimpleBumpPtr& rhs) {
-    if (!lhs.head) { //Steal
-      lhs.head = rhs.head;
-      lhs.offset = rhs.offset;
-    } else { //Merge
-      Block* B = lhs.head;
-      while (B->next) { B = B->next; }
-      B->next = rhs.head;
-    }
-    rhs.head = 0;
-    rhs.offset = 0;
-  }
 };
 
 //This is the base source of memory for all allocators
 //It maintains a freelist of hunks acquired from the system
-template<typename RealBase>
-class SystemBaseAllocator {
-  static SelfLockFreeListHeap<RealBase> Source;
+class SystemBaseAlloc {
+  static SelfLockFreeListHeap<mmapWrapper> Source;
 public:
-  enum { AllocSize = SelfLockFreeListHeap<RealBase>::AllocSize };
+  enum { AllocSize = SelfLockFreeListHeap<mmapWrapper>::AllocSize };
+
+  SystemBaseAlloc();
+  ~SystemBaseAlloc();
 
   inline void* allocate(unsigned int size) {
     return Source.allocate(size);
@@ -406,11 +384,28 @@ public:
   }
 };
 
-typedef SystemBaseAllocator<mmapWrapper> SystemBaseAlloc;
+typedef ThreadAwarePrivateHeap<FreeListHeap<SimpleBumpPtr<SystemBaseAlloc> > > SizedAlloc;
 
+SizedAlloc* getAllocatorForSize(unsigned int);
 
+class FixedSizeAllocator {
+  SizedAlloc* alloc;
+  unsigned int size;
+public:
+  FixedSizeAllocator(unsigned int sz) {
+    size = sz;
+    alloc = getAllocatorForSize(sz);
+  }
 
+  inline void* allocate(unsigned int sz) {
+    assert(sz == size);
+    return alloc->allocate(sz);
+  }
 
+  inline void deallocate(void* ptr) {
+    alloc->deallocate(ptr);
+  }
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Now adapt to standard std allocators
@@ -420,7 +415,7 @@ typedef SystemBaseAllocator<mmapWrapper> SystemBaseAlloc;
 template<typename Ty>
 class FSBGaloisAllocator
 {
-  ThreadAwarePrivateHeap<BlockAlloc<sizeof(Ty), SystemBaseAlloc> > Alloc;
+  FixedSizeAllocator Alloc;
 
 public:
   typedef size_t size_type;

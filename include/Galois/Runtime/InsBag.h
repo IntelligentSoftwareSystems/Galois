@@ -34,7 +34,7 @@ class galois_insert_bag {
   
   
   //GaloisRuntime::MM::TSBlockAlloc<holder> allocSrc;
-  GaloisRuntime::MM::ThreadAwarePrivateHeap<GaloisRuntime::MM::BlockAlloc<sizeof(holder), GaloisRuntime::MM::SystemBaseAlloc> > allocSrc;
+  GaloisRuntime::MM::FixedSizeAllocator allocSrc;
 
   static void merge(ListTy& lhs, ListTy& rhs) {
     if (!rhs.empty())
@@ -43,8 +43,17 @@ class galois_insert_bag {
 
 public:
   galois_insert_bag()
-    :heads(merge)
+    :heads(merge), allocSrc(sizeof(holder))
   {}
+
+  ~galois_insert_bag() {
+    ListTy& L = heads.get();
+    while (!L.empty()) {
+      holder* H = &L.front();
+      L.pop_front();
+      allocSrc.deallocate(H);
+    }
+  }
 
   typedef T        value_type;
   typedef const T& const_reference;
