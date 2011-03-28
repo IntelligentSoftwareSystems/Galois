@@ -57,18 +57,16 @@ int main(int argc, const char** argv) {
 
     octree = new Graph;
 		root = createNode(octree, OctTreeNodeData(barneshut.centerx,
-				barneshut.centery, barneshut.centerz)); // create the
-		// tree's
-		// root
-		octree->addNode(root);
+				barneshut.centery, barneshut.centerz)); 
+    octree->addNode(root);
 		double radius = barneshut.diameter * 0.5;
 		for (int i = 0; i < barneshut.nbodies; i++) {
 			OctTreeNodeData &b = barneshut.body[i];
-			barneshut.insert(octree, root, b, radius); // grow the tree by inserting
-			// each body
+			barneshut.insert(octree, root, b, radius);
 		}
     barneshut.curr = 0;
-		barneshut.computeCenterOfMass(octree, root); // summarize subtree info in each internal node (plus restructure tree and sort bodies for performance reasons)
+    // summarize subtree info in each internal node (plus restructure tree and sort bodies for performance reasons)
+		barneshut.computeCenterOfMass(octree, root);
 
 		std::vector<GNode> wl;
 		for (int ii = 0; ii < barneshut.curr; ii++) {
@@ -79,13 +77,12 @@ int main(int argc, const char** argv) {
 		barneshut.advance(octree, barneshut.dthf, barneshut.dtime); // advance the position and velocity of each
 
 		if (Galois::Launcher::isFirstRun()) {
-			// print center of mass for this timestep
 			res = root.getData(Galois::Graph::NONE);
 			std::cout << "Timestep " << step << " Center of Mass = " << res.posx
 					<< " " << res.posy << " " << res.posz << std::endl;
 		}
 		delete octree;
-	} // end of time step
+	} 
 	Galois::Launcher::stopTiming();
 	std::cout << "STAT: Time " << Galois::Launcher::elapsedTime() << "\n";
 
