@@ -1,5 +1,8 @@
 // Debug Worklists Wrappers -*- C++ -*-
 
+#ifndef __DEBUGWORKLIST_H_
+#define __DEBUGWORKLIST_H_
+
 #include <fstream>
 #include <map>
 
@@ -131,13 +134,18 @@ public:
   }
 };
 
-template<typename WL>
+template<typename iWL>
 class NoInlineFilter {
-  WL wl;
+  iWL wl;
 
 public:
-  typedef typename WL::value_type value_type;
+  typedef typename iWL::value_type value_type;
   
+  template<bool concurrent>
+  struct rethread {
+    typedef NoInlineFilter<typename iWL::template rethread<concurrent>::WL> WL;
+  };
+
   //! push a value onto the queue
   bool push(value_type val) __attribute__((noinline)) {
     return wl.push(val);
@@ -168,3 +176,5 @@ public:
 
 }
 }
+
+#endif
