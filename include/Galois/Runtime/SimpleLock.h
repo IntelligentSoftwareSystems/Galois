@@ -3,6 +3,7 @@
 #ifndef _SIMPLE_LOCK_H
 #define _SIMPLE_LOCK_H
 
+#include <stdint.h>
 #include <cassert>
 
 namespace GaloisRuntime {
@@ -75,6 +76,68 @@ public:
   T getValue() const { return 0; }
 };
 
+
+//This wraps a pointer and uses the low order bit for the lock flag
+template<typename T, bool isALock>
+class PtrLock;
+
+template<typename T>
+class PtrLock<T, true> {
+  volatile uintptr_t _lock;
+public:
+  PtrLock() : _lock(0) {}
+
+  void lock() {
+    do {
+      while (_lock & 1 != 0) {
+#if defined(__i386__) || defined(__amd64__)
+	asm volatile ( "pause");
+#endif
+      }
+      if (try_lock())
+	break;
+    } while (true);
+  }
+
+  void unlock() {
+    unlock_and_set(getValue());
+  }
+
+  void unlock_and_clear() {
+    unlock_and_set(0);
+  }
+
+  void unlock_and_set(T val) {
+    assert(_lock & 1);
+    assert(!((uintptr_t)val & 1));
+    _lock = (uintptr_t)val;
+  }
+  
+  T getValue() const {
+    return (T)(_lock & ~1);
+  }
+
+  bool try_lock() {
+    uintptr_t oldval = _lock;
+    if (oldval & 1 != 0)
+      return false;
+    return __sync_bool_compare_and_swap(&_lock, oldval, oldval | 1);
+  }
+};
+
+template<typename T>
+class PtrLock<T, false> {
+  T _lock;
+public:
+  PtrLock() : _lock(0) {}
+
+  void lock() {}
+  void unlock() {}
+  void unlock_and_clear() { _lock = 0; }
+  void unlock_and_set(T val) { _lock = val; }
+  T getValue() const { return _lock; }
+  bool try_lock() { return true; }
+};
 
 }
 
