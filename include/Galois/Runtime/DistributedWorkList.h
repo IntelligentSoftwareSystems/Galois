@@ -312,44 +312,36 @@ class dChunkedFIFO : private boost::noncopyable {
     Chunk* next;
   };
 
-  MM::ThreadAwarePrivateHeap<MM::FreeListHeap<MM::BlockAlloc<sizeof(Chunk), MM::SystemBaseAlloc> > > heap;
+  MM::FixedSizeAllocator heap;
 
-  struct p {
-    Chunk* cur;
-    Chunk* next;
-    p() : cur(0), next(0) {}
-    ~p() {
-      //leak cur and next
-    }
-  };
 
-  PerCPU<p> data;
-  PerLevel<std::pair<Chunk*, SimpleLock<int, concurrent> > > Items;
+  typedef PtrLock<Chunk*, concurrent> LevelItem;
+
+  PerCPU<Chunk*> cur;
+  PerLevel<LevelItem > Items;
 
   void pushChunk(Chunk* C) OPTNOINLINE {
-    Chunk*& I = Items.get().first;
-    Chunk* oldHead = 0;
-    do {
-      oldHead = I;
-      C->next = I;
-    } while(!__sync_bool_compare_and_swap(&I, oldHead, C));
+    LevelItem& I = Items.get();
+    I.lock();
+    C->next = I.getValue();
+    I.unlock_and_set(C);
   }
 
   Chunk* popChunkByID(unsigned int i) OPTNOINLINE {
-    std::pair<Chunk*, SimpleLock<int, concurrent> >& I = Items.get(i);
-    Chunk* newHead;
-    Chunk* retval;
-    I.second.lock();
-    do {
-      retval = I.first;
-      if (!retval) { //no items
-	I.second.unlock();
-	return retval;
-      }
-      newHead = retval->next;
-    } while (!__sync_bool_compare_and_swap(&I.first, retval, newHead));
-    retval->next = 0;
-    I.second.unlock();
+    LevelItem& I = Items.get(i);
+    //fast-path (lock-free) empty case
+    if (!I.getValue())
+      return 0;
+
+    I.lock();
+    Chunk* retval = I.getValue();
+    if (retval) {
+      I.unlock_and_set(retval->next);
+      retval->next = 0;
+    } else {
+      I.unlock();
+    }
+
     return retval;
   }
 
@@ -377,49 +369,39 @@ public:
 
   typedef T value_type;
   
-  dChunkedFIFO() {
-    for (int i = 0; i < Items.size(); ++i)
-      Items.get(i).first = 0;
+  dChunkedFIFO() : heap(sizeof(Chunk)) {
   }
 
   bool push(value_type val) OPTNOINLINE {
-    p& n = data.get();
-    if (n.next && n.next->full()) {
-      pushChunk(n.next);
-      n.next = 0;
+    Chunk*& n = cur.get();
+    if (n && n->full()) {
+      pushChunk(n);
+      n = 0;
     }
-    if (!n.next)
-      n.next = new (heap.allocate(sizeof(Chunk))) Chunk;
-    bool retval = n.next->push_back(val);
+    if (!n)
+      n = new (heap.allocate(sizeof(Chunk))) Chunk;
+    bool retval = n->push_back(val);
     assert(retval);
     return retval;
   }
 
   std::pair<bool, value_type> pop() OPTNOINLINE {
-    p& n = data.get();
-    if (n.cur && n.cur->empty()) {
-      n.cur->~Chunk();
-      heap.deallocate(n.cur);
-      n.cur = 0;
-    }
-    if (n.next && !n.next->empty()) {
-      return n.next->pop_front();
-    }
-    if (!n.cur) {
-      Chunk* r = popChunk();
-      if (r) {
-	//Shared queue had data
-	n.cur = r;
+    Chunk*& n = cur.get();
+    if (n) {
+      if (n->empty()) {
+	n->~Chunk();
+	heap.deallocate(n);
+	n = 0;
       } else {
-	//Shared queue was empty, check next
-	n.cur = n.next;
-	n.next = 0;
-	if (!n.cur)
-	  return std::make_pair(false, value_type());
+	return n->pop_front();
       }
+    } else {
+      n = popChunk();
+      if (n)
+	return pop();
+      else
+	return std::make_pair(false, value_type());
     }
-
-    return n.cur->pop_front();
   }
   
   std::pair<bool, value_type> try_pop() {
@@ -427,10 +409,9 @@ public:
   }
   
   bool empty() OPTNOINLINE {
-    p& n = data.get();
-    if (n.cur && !n.cur->empty()) return false;
-    if (n.next && !n.next->empty()) return false;
-    if (Items.get().first) return false;
+    Chunk* n = cur.get();
+    if (n && !n->empty()) return false;
+    if (Items.get().getValue()) return false;
     return true;
   }
 
@@ -441,12 +422,9 @@ public:
   //Not Thread Safe
   template<typename Iter>
   void fill_initial(Iter ii, Iter ee) {
-    p& n = data.get();
     for( ; ii != ee; ++ii) {
       push(*ii);
     }
-    pushChunk(n.next);
-    n.next = 0;
   }
 
 };
