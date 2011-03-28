@@ -3,25 +3,13 @@
 #ifndef __GALOIS_PERCPU_H
 #define __GALOIS_PERCPU_H
 
-#include "Galois/Runtime/Threads.h"
+#include "Threads.h"
+#include "CacheLineStorage.h"
 
 #include <boost/utility.hpp>
 #include <cassert>
 
 namespace GaloisRuntime {
-
-//xeons have 64 byte cache lines, but will prefetch 2 at a time
-#define CACHE_LINE_SIZE 128
-
-// Store an item with padding
-template<typename T>
-struct cache_line_storage {
-  T data __attribute__((aligned(CACHE_LINE_SIZE)));
-  char pad[ CACHE_LINE_SIZE % sizeof(T) ?
-	    CACHE_LINE_SIZE - (sizeof(T) % CACHE_LINE_SIZE) :
-	    0 ];
-};
-
 
 //Stores 1 item per thread
 //The master thread is thread 0
