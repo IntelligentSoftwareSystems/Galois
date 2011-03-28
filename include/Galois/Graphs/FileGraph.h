@@ -50,6 +50,21 @@ public:
     return ((EdgeTy*)edgeData)[getEdgeIdx(src,dst)];
   }
 
+  void prefetch_edges(GraphNode N) {
+    __builtin_prefetch(neighbor_begin(N, NONE));
+  }
+
+  template<typename EdgeTy>
+  void prefetch_edgedata(GraphNode N) {
+    __builtin_prefetch(&((EdgeTy*)edgeData)[std::distance(outs, neighbor_begin(N))]);
+  }
+
+  void prefetch_pre(GraphNode N) {
+    if (N != 0)
+      __builtin_prefetch(&outIdx[N-1]);
+    __builtin_prefetch(&outIdx[N]);
+  }
+
   // General Things
 
   typedef uint32_t* neighbor_iterator;
@@ -127,6 +142,14 @@ public:
       NodeData[i].data.data = init;
   }
 
+  void prefetch_edgedata(GraphNode N) {
+    FileGraph::prefetch_edgedata<EdgeTy>(N);
+  }
+
+  void prefetch_neighbors(GraphNode N) {
+    for (neighbor_iterator ii = neighbor_begin(N, NONE), ee = neighbor_begin(N,NONE); ii != ee; ++ii)
+      __builtin_prefetch(&NodeData[*ii].data.data);
+  }
 
 };
 
