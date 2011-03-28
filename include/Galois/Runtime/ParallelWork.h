@@ -1,4 +1,6 @@
 // simple galois scheduler and runtime -*- C++ -*-
+#ifndef __PARALLELWORK_H_
+#define __PARALLELWORK_H_
 
 #include "Galois/Executable.h"
 #include "Galois/PerIterMem.h"
@@ -9,6 +11,8 @@
 #include "Galois/Runtime/Threads.h"
 #include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/WorkList.h"
+#include "Galois/Runtime/DistributedWorkList.h"
+#include "Galois/Runtime/DebugWorkList.h"
 #include "Galois/Runtime/Termination.h"
 
 #ifdef GALOIS_VTUNE
@@ -153,3 +157,5 @@ void for_each_parallel(GWLTy& GWL, Function& f) {
 }
 
 }
+
+#endif
