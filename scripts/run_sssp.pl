@@ -1,5 +1,5 @@
 #!/usr/bin/perl
 
 require "backend.pl";
-
-run_prog("../apps/sssp/sssp ../inputs/sssp/USA-road-d.W.structure 1 2");
+# ../inputs/sssp/USA-road-d.W.structure
+run_prog("../apps/sssp/sssp /net/faraday/workspace/inputs/weighted/random4-26.structure 1 2");

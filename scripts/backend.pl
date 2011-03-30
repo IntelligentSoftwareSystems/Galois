@@ -11,7 +11,7 @@ sub run_prog {
     
     my $threadcount = 24;
     my $threadstart = 1;
-    my $numruns = 5;
+    my $numruns = 9;
 
     if (defined $options{h}) {
 	print "-h      :help\n";
