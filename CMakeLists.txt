@@ -77,10 +77,10 @@ endif(WITH_OPTIMIZATIONS)
 #These help the intel compiler
 #add_definitions("-wd981 -wd383 -wd869 -wd2196")
 
-#this is stupic, but imported libraries are scoped by directory
-add_library(hwloc SHARED IMPORTED)
-set_property(TARGET hwloc PROPERTY IMPORTED_LOCATION ${CMAKE_BINARY_DIR}/lib/install/lib/libhwloc.so)
-include_directories(${CMAKE_BINARY_DIR}/lib/install/include)
+#this is stupid, but imported libraries are scoped by directory
+#add_library(hwloc SHARED IMPORTED)
+#set_property(TARGET hwloc PROPERTY IMPORTED_LOCATION ${CMAKE_BINARY_DIR}/lib/install/lib/libhwloc.so)
+#include_directories(${CMAKE_BINARY_DIR}/lib/install/include)
 
 #Source finding
 include_directories("include")

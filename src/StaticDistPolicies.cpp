@@ -2,6 +2,9 @@
 #include "Galois/Runtime/Support.h"
 
 #include <sched.h>
+#include <string.h>
+
+#include <iostream>
 
 using namespace GaloisRuntime;
 
@@ -100,10 +103,57 @@ struct MaxwellPolicy : public ThreadPolicy {
   }
 };
 
-static FaradayPolicy a_FaradayPolicy;
-static VoltaPolicy a_VoltaPolicy;
-static MaxwellPolicy a_MaxwellPolicy;
+
+struct DummyPolicy : public ThreadPolicy {
+
+  virtual void bindThreadToProcessor(int id) {
+    genericBindToProcessor(id);
+  }
+
+  DummyPolicy() {
+    numLevels = 1;
+
+#ifdef __linux__
+    numThreads = sysconf(_SC_NPROCESSORS_CONF);
+#endif
+    reportWarning("Unknown number of processors (assuming 64)");
+    numThreads = 64;
+  
+    numCores = numThreads;
+    levelSize.push_back(1);
+    for (int x = 0; x < numThreads; ++x)
+      levelMap.push_back(0);
+  }
+};
+
+static ThreadPolicy* TP = 0;
+
+void GaloisRuntime::setSystemThreadPolicy(const char* name) {
+  ThreadPolicy* newPolicy = 0;
+  if (strcmp(name, "faraday") == 0)
+    newPolicy = new FaradayPolicy();
+  else if (strcmp(name, "volta") == 0)
+    newPolicy = new VoltaPolicy();
+  else if (strcmp(name, "maxwell") == 0)
+    newPolicy = new MaxwellPolicy();
+  else if (strcmp(name, "dummy") == 0)
+    newPolicy = new DummyPolicy();
+  if (newPolicy)
+    std::cout << "Using " << name << " for policy\n";
+  if (TP)
+    delete TP;
+  TP = newPolicy;
+}
 
 ThreadPolicy& GaloisRuntime::getSystemThreadPolicy() {
-  return a_FaradayPolicy;
+  if (!TP) {
+    //try autodetecting policy from hostname
+    char name[256];
+    int r = gethostname(name, 256);
+    if (!r)
+      setSystemThreadPolicy(name);
+    else 
+      TP = new DummyPolicy();
+  }
+  return *TP;
 }

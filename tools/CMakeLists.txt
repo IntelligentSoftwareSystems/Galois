@@ -1,1 +1,1 @@
-add_subdirectory(hwloc-example)
+#add_subdirectory(hwloc-example)

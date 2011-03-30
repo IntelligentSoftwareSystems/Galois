@@ -84,6 +84,7 @@ public:
 };
 
 ThreadPolicy& getSystemThreadPolicy();
+void setSystemThreadPolicy(const char* name);
 
 namespace HIDDEN {
 //Tag for invasive list

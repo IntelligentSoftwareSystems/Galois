@@ -24,6 +24,7 @@ std::vector<const char*> parse_command_line(int argc, const char** argv, const c
 	std::cerr << "Error parsing -t option, number not recognized\n";
 	abort();
       }
+      Galois::setMaxThreads(numThreads);
       ++i; //eat arg value
     } else if (std::string("-noverify").compare(argv[i]) == 0) {
       skipVerify = true;

@@ -1,5 +1,3 @@
-#include "hwloc.h"
-
 #include "Galois/Runtime/Threads.h"
 #include "Galois/Runtime/Support.h"
 
@@ -7,6 +5,10 @@
 #include <iostream>
 
 using namespace std;
+
+#if 0
+
+#include "hwloc.h"
 
 class hwloc_policy : public GaloisRuntime::ThreadPolicy {
   hwloc_topology_t topology;
@@ -116,8 +118,10 @@ public:
 
 };
 
-//hwloc_policy hwloc_SystemPolicy;
-// GaloisRuntime::ThreadPolicy& GaloisRuntime::getSystemThreadPolicy() {
-//   static hwloc_policy hwloc_SystemPolicy;
-//   return hwloc_SystemPolicy;
-// }
+hwloc_policy hwloc_SystemPolicy;
+GaloisRuntime::ThreadPolicy& GaloisRuntime::getSystemThreadPolicy() {
+  static hwloc_policy hwloc_SystemPolicy;
+  return hwloc_SystemPolicy;
+}
+
+#endif

@@ -102,7 +102,7 @@ struct process {
 
 template<typename WLTY>
 void refine(Mesh& m, WLTY& wl) {
-  Galois::for_each(wl.begin(), wl.end(), process());
+  Galois::for_each(wl, process());
 }
 
 
@@ -128,9 +128,12 @@ int main(int argc, const char** argv) {
        << "number of threads: " << threads << "\n"
        << "\n";
 
-  Galois::setMaxThreads(numThreads);
+  using namespace GaloisRuntime::WorkList;
+  LocalQueues<GNode, ChunkedFIFO<GNode, 256>, LIFO<GNode> > wl2;
+  wl2.fillInitial(wl.begin(), wl.end());
+
   Galois::Launcher::startTiming();
-  refine(m, wl);
+  refine(m, wl2);
   Galois::Launcher::stopTiming();
   
   cout << "STAT: Time " << Galois::Launcher::elapsedTime() << "\n";
