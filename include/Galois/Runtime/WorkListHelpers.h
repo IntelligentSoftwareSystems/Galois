@@ -33,6 +33,66 @@ public:
 
   FixedSizeRing() :start(0), end(0) {}
 
+  //externally managed locking access methods
+
+  void external_lock() {
+    lock();
+  }
+
+  void external_unlock() {
+    unlock();
+  }
+
+  bool external_empty() {
+    return _i_empty();
+  }
+
+  bool external_full() {
+    return _i_full();
+  }
+
+  bool external_push_front(value_type val) {
+    if (_i_full()) {
+      return false;
+    }
+    start += chunksize - 1;
+    start %= chunksize;
+    data[start] = val;
+    return true;
+  }
+
+  bool external_push_back(value_type val) {
+    if (_i_full()) {
+      return false;
+    }
+    data[end] = val;
+    end += 1;
+    end %= chunksize;
+    return true;
+  }
+
+  std::pair<bool, value_type> external_pop_front() {
+    if (_i_empty()) {
+      return std::make_pair(false, value_type());
+    }
+    value_type retval = data[start];
+    ++start;
+    start %= chunksize;
+    return std::make_pair(true, retval);
+  }
+
+  std::pair<bool, value_type> external_pop_back() {
+    if (_i_empty()) {
+      return std::make_pair(false, value_type());
+    }
+    end += chunksize - 1;
+    end %= chunksize;
+    value_type retval = data[end];
+    return std::make_pair(true, retval);
+  }
+
+  //"Normal" access methods
+
   bool empty() {
     lock();
     bool retval = _i_empty();
@@ -99,8 +159,6 @@ public:
     return std::make_pair(true, retval);
   }
 };
-
-
 
 
 }
