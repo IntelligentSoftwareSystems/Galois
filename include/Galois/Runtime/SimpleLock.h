@@ -86,6 +86,7 @@ class PtrLock<T, true> {
   volatile uintptr_t _lock;
 public:
   PtrLock() : _lock(0) {}
+  explicit PtrLock(T val) : _lock(val) {}
 
   void lock() {
     do {
@@ -117,6 +118,16 @@ public:
     return (T)(_lock & ~1);
   }
 
+  void setValue(T val) const {
+    if (_lock & 1) {
+      //locked
+      _lock = (uintptr_t)val | 1;
+    } else {
+      //unlocked
+      _lock = (uintptr_t)val;
+    }
+  }
+
   bool try_lock() {
     uintptr_t oldval = _lock;
     if (oldval & 1 != 0)
@@ -130,12 +141,14 @@ class PtrLock<T, false> {
   T _lock;
 public:
   PtrLock() : _lock(0) {}
+  explicit PtrLock(T val) : _lock(val) {}
 
   void lock() {}
   void unlock() {}
   void unlock_and_clear() { _lock = 0; }
   void unlock_and_set(T val) { _lock = val; }
   T getValue() const { return _lock; }
+  void setValue(T val) { _lock = val; }
   bool try_lock() { return true; }
 };
 
