@@ -118,14 +118,8 @@ public:
     return (T)(_lock & ~1);
   }
 
-  void setValue(T val) const {
-    if (_lock & 1) {
-      //locked
-      _lock = (uintptr_t)val | 1;
-    } else {
-      //unlocked
-      _lock = (uintptr_t)val;
-    }
+  void setValue(T val) {
+    _lock = ((uintptr_t)val) | (_lock & 1);
   }
 
   bool try_lock() {
