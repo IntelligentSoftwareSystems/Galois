@@ -317,17 +317,17 @@ public:
     tail.lock();
     assert(tail.getValue());
     tail.getValue()->next.lock();
-    if (tail.getValue().push_back()) {
+    if (tail.getValue()->push_back(val)) {
       tail.getValue()->next.unlock();
       tail.unlock();
       return true;
     }
     //push didn't work, append a new element
     Chunk* nc = new (heap.allocate(sizeof(Chunk))) Chunk();
-    bool worked = nc->push(val);
+    bool worked = nc->push_back(val);
     assert(worked);
     nc->next.lock();
-    tail.getValue()->next->unlock_and_set(nc);
+    tail.getValue()->next.unlock_and_set(nc);
     nc->next.unlock();
     tail.unlock_and_set(nc);
     return true;
