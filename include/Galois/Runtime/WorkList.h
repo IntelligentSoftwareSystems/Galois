@@ -271,23 +271,33 @@ public:
 
 template<typename T, bool concurrent = true>
 class FIFO : private boost::noncopyable {
-
-  struct Chunk {
-    unsigned char start;
-    unsigned char end;
-    SimpleLock<unsigned char, concurrent> lock;
-    Chunk* next;
-    T data[256];
-    Chunk() :start(0), end(0), next(0) {}
+  class Chunk : public FixedSizeRing<T, 128, false> {
+  public:
+    PtrLock<Chunk*,concurrent> next;
   };
 
+  MM::FixedSizeAllocator heap;
+
   //tail shall always be not null
-  Chunk* tail;
+  PtrLock<Chunk*, concurrent> tail;
   //head shall always be not null
-  Chunk* head;
+  PtrLock<Chunk*, concurrent> head;
 
   SimpleLock<long, concurrent> tailLock;
   SimpleLock<long, concurrent> headLock;
+
+  void popEmptyChunksLocked() {
+    while (head.getValue()->empty() && head.getValue()->next.getValue()) {
+      //Chunk is empty and another exists
+      Chunk* old = head.getValue();
+      old->next.getValue()->next.lock();
+      head.setValue(old->next.getValue());
+      old->next.unlock();
+      old->~Chunk();
+      heap.deallocate(old);
+    }
+  }
+
 
 public:
   template<bool newconcurrent>
@@ -297,73 +307,41 @@ public:
 
   typedef T value_type;
 
-  void dump(char c) {
-    // std::cerr << c << ' ' 
-    // 	      << head << '{' << (int)head->start << ',' << (int)head->end << '}'
-    // 	      << ' '
-    // 	      << tail << '{' << (int)tail->start << ',' << (int)tail->end << '}'
-    // 	      << '\n';
-  }
-
-
-  FIFO() {
-    tail = head = new Chunk();
-    dump('C');
+  FIFO() :heap(sizeof(Chunk)) {
+    Chunk* nc = new (heap.allocate(sizeof(Chunk))) Chunk();
+    tail.setValue(nc);
+    head.setValue(nc);
   }
 
   bool push(value_type val) {
-    dump('P');
-    tailLock.lock();
-    assert(tail);
-    tail->lock.lock();
-    //do all checks
-    assert (!tail->next);
-    if (tail->end == 255) {
-      Chunk* nc = new Chunk();
-      nc->lock.lock();
-      tail->next = nc;
-      Chunk* oldtail = tail;
-      tail = nc;
-      oldtail->lock.unlock();
+    tail.lock();
+    assert(tail.getValue());
+    tail.getValue()->next.lock();
+    if (tail.getValue().push_back()) {
+      tail.getValue()->next.unlock();
+      tail.unlock();
+      return true;
     }
-    tail->data[tail->end] = val;
-    ++tail->end;
-    tail->lock.unlock();
-    tailLock.unlock();
+    //push didn't work, append a new element
+    Chunk* nc = new (heap.allocate(sizeof(Chunk))) Chunk();
+    bool worked = nc->push(val);
+    assert(worked);
+    nc->next.lock();
+    tail.getValue()->next->unlock_and_set(nc);
+    nc->next.unlock();
+    tail.unlock_and_set(nc);
     return true;
   }
 
   std::pair<bool, value_type> pop() {
-    dump('G');
-    headLock.lock();
-    assert(head);
-    head->lock.lock();
-    if (head->start == head->end) {
-      //Chunk is empty
-      if (head->next) {
-    	//more chunks exist
-	Chunk* old = head;
-	head->next->lock.lock();
-	head = head->next;
-	old->lock.unlock();
-	delete old;
-	head->lock.unlock();
-	headLock.unlock();
-	//try again
-	return pop();
-      } else {
-    	// No more chunks
-	head->lock.unlock();
-	headLock.unlock();
-	return std::make_pair(false, value_type());
-      }
-    } else {
-      value_type retval = head->data[head->start];
-      ++head->start;
-      head->lock.unlock();
-      headLock.unlock();
-      return std::make_pair(true, retval);
-    }
+    head.lock();
+    assert(head.getValue());
+    head.getValue()->next.lock();
+    popEmptyChunksLocked();
+    std::pair<bool, value_type> retval = head.getValue()->pop_front();
+    head.getValue()->next.unlock();
+    head.unlock();
+    return retval;
   }
 
   std::pair<bool, value_type> try_pop() {
@@ -371,38 +349,17 @@ public:
   }
     
   bool empty() {
-    dump('E');
-    headLock.lock();
-    assert(head);
-    head->lock.lock();
-    if (head->start == head->end) {
-      //Chunk is empty
-      if (head->next) {
-	//more chunks exist
-	head->next->lock.lock();
-	Chunk* old = head;
-	head = head->next;
-	old->lock.unlock();
-	delete old;
-	head->lock.unlock();
-	headLock.unlock();
-	//try again
-	return empty();
-      } else {
-	// No more chunks
-	head->lock.unlock();
-	headLock.unlock();
-	return true;
-      }
-    } else {
-      head->lock.unlock();
-      headLock.unlock();
-      return false;
-    }
+    head.lock();
+    assert(head.getValue());
+    head->next.lock();
+    popEmptyChunksLocked();
+    bool retval = head.getValue()->empty();
+    head->next.unlock();
+    head.unlock();
+    return retval;
   }
 
   bool aborted(value_type val) {
-    dump('A');
     return push(val);
   }
 
@@ -417,31 +374,44 @@ public:
 
 template<typename T, int chunksize=64, bool concurrent=true>
 class ChunkedFIFO : private boost::noncopyable {
-  typedef FixedSizeRing<T, chunksize, false> Chunk;
+  class Chunk : public FixedSizeRing<T, chunksize, false> {
+  public:
+    Chunk* next;
+  };
+
+  MM::FixedSizeAllocator heap;
 
   struct p {
     Chunk* cur;
     Chunk* next;
-    p() : cur(0), next(0) {}
-    ~p() {
-      delete cur;
-      delete next;
-    }
   };
 
   PerCPU<p> data;
-  sFIFO<Chunk*, concurrent> Items;
+  PtrLock<Chunk*, concurrent> head;
 
   void pushChunk(Chunk* C) {
-    Items.push(C);
+    head.lock();
+    if (Chunk* last = head.getValue()) {
+      while (last->next)
+	last = last->next;
+      last->next = C;
+      head.unlock();
+    } else {
+      head.unlock_and_set(C);
+    }
   }
 
   Chunk* popChunk() {
-    std::pair<bool, Chunk*> r = Items.pop();
-    if (r.first)
-      return r.second;
-    else
-      return 0;
+    Chunk* r = 0;
+    if (head.getValue()) {
+      head.lock();
+      r = head.getValue();
+      if (r)
+	head.unlock_and_set(r->next);
+      else
+	head.unlock();
+    }
+    return r;
   }
 
 public:
@@ -452,7 +422,29 @@ public:
 
   typedef T value_type;
   
-  ChunkedFIFO() :Items() {}
+  ChunkedFIFO() : heap(sizeof(Chunk)) {
+    for (int i = 0; i < data.size(); ++i) {
+      p& r = data.get(i);
+      r.next = 0;
+      r.cur = 0;
+    }
+  }
+
+  ~ChunkedFIFO() {
+    for (int i = 0; i < data.size(); ++i) {
+      p& r = data.get(i);
+      if (r.next) {
+	r.next->~Chunk();
+	heap.deallocate(r.next);
+	r.next = 0;
+      }
+      if (r.cur) {
+	r.cur->~Chunk();
+	heap.deallocate(r.cur);
+	r.cur = 0;
+      }
+    }
+  }
 
   bool push(value_type val) {
     p& n = data.get();
@@ -461,7 +453,7 @@ public:
       n.next = 0;
     }
     if (!n.next)
-      n.next = new Chunk;
+      n.next = new (heap.allocate(sizeof(Chunk))) Chunk;
     bool retval = n.next->push_back(val);
     assert(retval);
     return retval;
@@ -470,7 +462,8 @@ public:
   std::pair<bool, value_type> pop() {
     p& n = data.get();
     if (n.cur && n.cur->empty()) {
-      delete n.cur;
+      n.cur->~Chunk();
+      heap.deallocate(n.cur);
       n.cur = 0;
     }
     if (!n.cur) {
@@ -498,7 +491,7 @@ public:
     p& n = data.get();
     if (n.cur && !n.cur->empty()) return false;
     if (n.next && !n.next->empty()) return false;
-    if (!Items.empty()) return false;
+    if (!head.getValue()) return false;
     return true;
   }
 
