@@ -351,10 +351,10 @@ public:
   bool empty() {
     head.lock();
     assert(head.getValue());
-    head->next.lock();
+    head.getValue()->next.lock();
     popEmptyChunksLocked();
     bool retval = head.getValue()->empty();
-    head->next.unlock();
+    head.getValue()->next.unlock();
     head.unlock();
     return retval;
   }
