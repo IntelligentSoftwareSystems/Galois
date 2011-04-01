@@ -15,13 +15,24 @@
 
 #include <boost/utility.hpp>
 
+#include "mm/mem.h"
 #include "WorkListHelpers.h"
 
 #define OPTNOINLINE __attribute__((noinline)) 
 //#define OPTNOINLINE
 
+#ifndef WLCOMPILECHECK
+#define WLCOMPILECHECK(name) //
+#endif
+
 namespace GaloisRuntime {
 namespace WorkList {
+
+template<typename T>
+class DummyIndexer {
+public:
+  unsigned operator()(const T& x) { return 0; }
+};
 
 // Worklists may not be copied.
 // Worklists should be default instantiatable
@@ -130,6 +141,7 @@ public:
     }
   }
 };
+WLCOMPILECHECK(PriQueue);
 
 template<typename T, bool concurrent = true>
 class LIFO : private boost::noncopyable, private PaddedLock<concurrent> {
@@ -199,6 +211,7 @@ public:
     }
   }
 };
+WLCOMPILECHECK(LIFO);
 
 template<typename T, bool concurrent = true>
 class sFIFO : private boost::noncopyable, private PaddedLock<concurrent>  {
@@ -268,6 +281,7 @@ public:
     }
   }
 };
+WLCOMPILECHECK(sFIFO);
 
 template<typename T, bool concurrent = true>
 class FIFO : private boost::noncopyable {
@@ -374,6 +388,7 @@ public:
     }
   }
 };
+WLCOMPILECHECK(FIFO);
 
 template<typename T, int chunksize=64, bool concurrent=true>
 class ChunkedFIFO : private boost::noncopyable {
@@ -513,10 +528,10 @@ public:
     pushChunk(n.next);
     n.next = 0;
   }
-
 };
+WLCOMPILECHECK(ChunkedFIFO);
 
-template<class T, class Indexer, typename ContainerTy = FIFO<T>, bool concurrent = true >
+template<class T, class Indexer = DummyIndexer<T>, typename ContainerTy = FIFO<T>, bool concurrent = true >
 class OrderedByIntegerMetric : private boost::noncopyable {
 
   typedef typename ContainerTy::template rethread<concurrent>::WL CTy;
@@ -526,10 +541,10 @@ class OrderedByIntegerMetric : private boost::noncopyable {
   Indexer I;
   PerCPU<unsigned int> cursor;
 
-  static void merge(unsigned int& x, unsigned int& y) {
-    x = 0;
-    y = 0;
-  }
+  // static void merge(unsigned int& x, unsigned int& y) {
+  //   x = 0;
+  //   y = 0;
+  // }
 
   // void print() {
   //   static int iter = 0;
@@ -555,7 +570,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
   typedef T value_type;
 
   OrderedByIntegerMetric(unsigned int range = 32*1024, const Indexer& x = Indexer())
-    :size(range+1), I(x), cursor(&merge)
+    :size(range+1), I(x)
   {
     data = new CTy[size];
     for (int i = 0; i < cursor.size(); ++i)
@@ -622,16 +637,17 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     }
   }
 };
+WLCOMPILECHECK(OrderedByIntegerMetric);
 
 template<class T, typename ContainerTy = FIFO<T> >
 class StealingLocalWL : private boost::noncopyable {
 
   PerCPU<ContainerTy> data;
 
-  static void merge(ContainerTy& x, ContainerTy& y) {
-    assert(x.empty());
-    assert(y.empty());
-  }
+  // static void merge(ContainerTy& x, ContainerTy& y) {
+  //   assert(x.empty());
+  //   assert(y.empty());
+  // }
 
  public:
   template<bool newconcurrent>
@@ -641,7 +657,7 @@ class StealingLocalWL : private boost::noncopyable {
 
   typedef T value_type;
   
-  StealingLocalWL() :data(&merge) {}
+  StealingLocalWL() {}
 
   bool push(value_type val) {
     data.get().push(val);
@@ -676,9 +692,9 @@ class StealingLocalWL : private boost::noncopyable {
     }
   }
 };
+WLCOMPILECHECK(StealingLocalWL);
 
-
-template<typename T, typename GlobalQueueTy, typename LocalQueueTy>
+template<typename T, typename GlobalQueueTy = FIFO<T>, typename LocalQueueTy = FIFO<T> >
 class LocalQueues {
 
   PerCPU<typename LocalQueueTy::template rethread<false>::WL> local;
@@ -726,8 +742,9 @@ public:
       global.push(*begin++);
   }
 };
+WLCOMPILECHECK(LocalQueues);
 
-template<class T, class Indexer, typename ContainerTy = FIFO<T>, bool concurrent=true >
+template<class T, class Indexer = DummyIndexer<T>, typename ContainerTy = FIFO<T>, bool concurrent=true >
 class ApproxOrderByIntegerMetric : private boost::noncopyable {
 
   typename ContainerTy::template rethread<concurrent>::WL data[2048];
@@ -802,8 +819,9 @@ class ApproxOrderByIntegerMetric : private boost::noncopyable {
     }
   }
 };
+WLCOMPILECHECK(ApproxOrderByIntegerMetric);
 
-template<class T, class Indexer, typename ContainerTy = FIFO<T>, bool concurrent=true >
+template<class T, class Indexer = DummyIndexer<T>, typename ContainerTy = FIFO<T>, bool concurrent=true >
 class LogOrderByIntegerMetric : private boost::noncopyable {
 
   typename ContainerTy::template rethread<concurrent>::WL data[sizeof(unsigned int)*8 + 1];
@@ -829,7 +847,7 @@ class LogOrderByIntegerMetric : private boost::noncopyable {
   };
   
   LogOrderByIntegerMetric(const Indexer& x = Indexer())
-    :I(x), cursor(0)
+    :I(x)
   {
     for (int i = 0; i < cursor.size(); ++i)
       cursor.get(i) = 0;
@@ -882,8 +900,9 @@ class LogOrderByIntegerMetric : private boost::noncopyable {
     }
   }
 };
+WLCOMPILECHECK(LogOrderByIntegerMetric);
 
-template<typename T, typename Indexer, typename LocalTy, typename GlobalTy>
+template<typename T, typename Indexer = DummyIndexer<T>, typename LocalTy = FIFO<T>, typename GlobalTy = FIFO<T> >
 class LocalFilter {
   GlobalTy globalQ;
 
@@ -952,6 +971,7 @@ public:
     globalQ.fillInitial(begin,end);
   }
 };
+WLCOMPILECHECK(LocalFilter);
 
 //Queue per writer, reader cycles
 template<typename T>
@@ -962,7 +982,7 @@ class MP_SC_FIFO {
 public:
   typedef T value_type;
 
-  MP_SC_FIFO() :data(0), cursor(0) {}
+  MP_SC_FIFO() :cursor(0) {}
 
   template<bool newconcurrent>
   struct rethread {
@@ -1014,6 +1034,7 @@ public:
   }
 
 };
+WLCOMPILECHECK(MP_SC_FIFO);
 
 //End namespace
 }
