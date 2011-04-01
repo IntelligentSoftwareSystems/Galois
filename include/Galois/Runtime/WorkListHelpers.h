@@ -6,7 +6,7 @@
 namespace GaloisRuntime {
 namespace WorkList {
 
-template<typename T, int chunksize = 64, bool concurrent = true>
+template<typename T, unsigned chunksize = 64, bool concurrent = true>
 class FixedSizeRing :private boost::noncopyable, private PaddedLock<concurrent> {
   using PaddedLock<concurrent>::lock;
   using PaddedLock<concurrent>::unlock;
@@ -22,6 +22,11 @@ class FixedSizeRing :private boost::noncopyable, private PaddedLock<concurrent> 
     return (end + 1) % chunksize == start;
   }
 
+  inline void assertSE() {
+    assert(start <= chunksize);
+    assert(end <= chunksize);
+  }
+
 public:
   
   template<bool newconcurrent>
@@ -31,7 +36,7 @@ public:
 
   typedef T value_type;
 
-  FixedSizeRing() :start(0), end(0) {}
+  FixedSizeRing() :start(0), end(0) { assertSE(); }
 
   //externally managed locking access methods
 
@@ -95,20 +100,25 @@ public:
 
   bool empty() {
     lock();
+    assertSE();
     bool retval = _i_empty();
+    assertSE();
     unlock();
     return retval;
   }
 
   bool full() {
     lock();
+    assertSE();
     bool retval = _i_full();
+    assertSE();
     unlock();
     return retval;
   }
 
   bool push_front(value_type val) {
     lock();
+    assertSE();
     if (_i_full()) {
       unlock();
       return false;
@@ -116,12 +126,14 @@ public:
     start += chunksize - 1;
     start %= chunksize;
     data[start] = val;
+    assertSE();
     unlock();
     return true;
   }
 
   bool push_back(value_type val) {
     lock();
+    assertSE();
     if (_i_full()) {
       unlock();
       return false;
@@ -129,12 +141,14 @@ public:
     data[end] = val;
     end += 1;
     end %= chunksize;
+    assertSE();
     unlock();
     return true;
   }
 
   std::pair<bool, value_type> pop_front() {
     lock();
+    assertSE();
     if (_i_empty()) {
       unlock();
       return std::make_pair(false, value_type());
@@ -142,12 +156,14 @@ public:
     value_type retval = data[start];
     ++start;
     start %= chunksize;
+    assertSE();
     unlock();
     return std::make_pair(true, retval);
   }
 
   std::pair<bool, value_type> pop_back() {
     lock();
+    assertSE();
     if (_i_empty()) {
       unlock();
       return std::make_pair(false, value_type());
@@ -155,6 +171,7 @@ public:
     end += chunksize - 1;
     end %= chunksize;
     value_type retval = data[end];
+    assertSE();
     unlock();
     return std::make_pair(true, retval);
   }

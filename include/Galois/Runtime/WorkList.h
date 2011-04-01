@@ -376,6 +376,7 @@ template<typename T, int chunksize=64, bool concurrent=true>
 class ChunkedFIFO : private boost::noncopyable {
   class Chunk : public FixedSizeRing<T, chunksize, false> {
   public:
+    Chunk() :next(0) {}
     Chunk* next;
   };
 
@@ -453,7 +454,7 @@ public:
       n.next = 0;
     }
     if (!n.next)
-      n.next = new (heap.allocate(sizeof(Chunk))) Chunk;
+      n.next = new (heap.allocate(sizeof(Chunk))) Chunk();
     bool retval = n.next->push_back(val);
     assert(retval);
     return retval;

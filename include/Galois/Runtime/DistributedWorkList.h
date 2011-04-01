@@ -379,7 +379,7 @@ public:
       n = 0;
     }
     if (!n)
-      n = new (heap.allocate(sizeof(Chunk))) Chunk;
+      n = new (heap.allocate(sizeof(Chunk))) Chunk();
     bool retval = n->push_back(val);
     assert(retval);
     return retval;
