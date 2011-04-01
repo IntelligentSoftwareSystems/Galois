@@ -492,7 +492,7 @@ public:
     p& n = data.get();
     if (n.cur && !n.cur->empty()) return false;
     if (n.next && !n.next->empty()) return false;
-    if (!head.getValue()) return false;
+    if (head.getValue()) return false;
     return true;
   }
 

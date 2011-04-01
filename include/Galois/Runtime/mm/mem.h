@@ -170,6 +170,7 @@ public:
 
   inline void deallocate(void* ptr) {
     if (!ptr) return;
+    assert((uintptr_t)ptr > 0x100);
     FreeNode* NH = (FreeNode*)ptr;
     NH->next = head;
     head = NH;

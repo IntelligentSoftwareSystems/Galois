@@ -142,7 +142,7 @@ struct process {
 void runBodyParallel(const GNode src) {
   using namespace GaloisRuntime::WorkList;
 
-  typedef dChunkedFIFO<UpdateRequest, 16> IChunk;
+  typedef ChunkedFIFO<UpdateRequest, 16> IChunk;
   typedef LogOrderByIntegerMetric<UpdateRequest, UpdateRequestIndexer, IChunk> LOBIM;;
   typedef ApproxOrderByIntegerMetric<UpdateRequest, UpdateRequestIndexer, IChunk> AOBIM;
   typedef OrderedByIntegerMetric<UpdateRequest, UpdateRequestIndexer, IChunk> OBIM;
