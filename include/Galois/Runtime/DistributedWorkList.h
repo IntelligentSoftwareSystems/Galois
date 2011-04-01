@@ -309,6 +309,7 @@ template<typename T, int chunksize=64, bool concurrent=true>
 class dChunkedFIFO : private boost::noncopyable {
   class Chunk : public FixedSizeRing<T, chunksize, false> {
   public:
+    Chunk() :next(0) {}
     Chunk* next;
   };
 
