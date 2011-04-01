@@ -16,10 +16,10 @@ SET( WITH_DEBUG_INFO ON )
 #SET( WITH_WALL ON)
 
 #disable expensive asserts (use on Release builds)
-#SET( WITH_NO_ASSERTS ON )
+SET( WITH_NO_ASSERTS ON )
 
 #build with optimizations (release build)
-#SET( WITH_OPTIMIZATIONS ON)
+SET( WITH_OPTIMIZATIONS ON)
 
 #find libraries
 

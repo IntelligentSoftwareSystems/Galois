@@ -349,6 +349,9 @@ public:
   }
     
   bool empty() {
+    //fastpath
+    if (head.getValue() != tail.getValue())
+      return false;
     head.lock();
     assert(head.getValue());
     head.getValue()->next.lock();
