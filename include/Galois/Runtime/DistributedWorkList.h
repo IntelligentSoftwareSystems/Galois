@@ -371,6 +371,8 @@ public:
   typedef T value_type;
   
   dChunkedFIFO() : heap(sizeof(Chunk)) {
+    for (int i = 0; i < cur.size(); ++i)
+      cur.get(i) = 0;
   }
 
   bool push(value_type val) OPTNOINLINE {
