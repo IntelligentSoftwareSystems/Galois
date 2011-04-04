@@ -12,6 +12,8 @@
 
 #include <memory.h>
 
+//#define USEMALLOC
+
 namespace GaloisRuntime {
 namespace MM {
 
@@ -385,9 +387,27 @@ public:
   }
 };
 
-typedef ThreadAwarePrivateHeap<FreeListHeap<SimpleBumpPtr<SystemBaseAlloc> > > SizedAlloc;
+class MallocWrapper {
+public:
+  inline void* allocate(unsigned int size) {
+    return malloc(size);
+  }
 
+  inline void deallocate(void* ptr) {
+    free(ptr);
+  }
+};
+
+#ifdef USEMALLOC
+typedef MallocWrapper SizedAlloc;
+static MallocWrapper MasterAlloc;
+static SizedAlloc* getAllocatorForSize(unsigned int n) {
+  return &MasterAlloc;
+}
+#else
+typedef ThreadAwarePrivateHeap<FreeListHeap<SimpleBumpPtr<SystemBaseAlloc> > > SizedAlloc;
 SizedAlloc* getAllocatorForSize(unsigned int);
+#endif
 
 class FixedSizeAllocator {
   SizedAlloc* alloc;

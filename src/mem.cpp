@@ -60,6 +60,8 @@ SelfLockFreeListHeap<mmapWrapper> SystemBaseAlloc::Source;
 SystemBaseAlloc::SystemBaseAlloc() {}
 SystemBaseAlloc::~SystemBaseAlloc() {}
 
+#ifndef USEMALLOC
+
 SizedAlloc* GaloisRuntime::MM::getAllocatorForSize(unsigned int size) {
   static std::map<unsigned int, SizedAlloc*> allocators;
   static SimpleLock<int, true> Lock;
@@ -72,3 +74,5 @@ SizedAlloc* GaloisRuntime::MM::getAllocatorForSize(unsigned int size) {
 
   return retval;
 }
+
+#endif
