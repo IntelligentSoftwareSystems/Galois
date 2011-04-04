@@ -136,10 +136,14 @@ void GaloisRuntime::setSystemThreadPolicy(const char* name) {
     newPolicy = new VoltaPolicy();
   else if (strcmp(name, "maxwell") == 0)
     newPolicy = new MaxwellPolicy();
-  else if (strcmp(name, "dummy") == 0)
-    newPolicy = new DummyPolicy();
+
   if (newPolicy)
     std::cout << "Using " << name << " for policy\n";
+  else {
+    newPolicy = new DummyPolicy();
+    reportWarning("using default policy\n");
+  }
+
   if (TP)
     delete TP;
   TP = newPolicy;
