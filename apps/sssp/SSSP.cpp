@@ -201,22 +201,19 @@ int main(int argc, const char **argv) {
   if (args.size() >= 5 && strcmp(args[3], "-delta") == 0)
     stepSize = atoi(args[4]);
  
-  graph.structureFromFile(inputfile);
-  graph.emptyNodeData();
-  std::cout << "Read " << graph.size() << " nodes\n";
-
-  //new format
   GNode source = -1;
-  GNode sink = -1;
+  GNode report = -1;
   
   graph.structureFromFile(inputfile);
   graph.emptyNodeData();
   std::cout << "Read " << graph.size() << " nodes\n";
   std::cout << "Using delta-step of " << stepSize << "\n";
   
+  unsigned int id = 0;
   for (Graph::active_iterator src = graph.active_begin(), ee =
-	 graph.active_end(); src != ee; ++src) {
+      graph.active_end(); src != ee; ++src) {
     SNode& node = graph.getData(*src,Galois::Graph::NONE);
+    node.id = id++;
     node.dist = DIST_INFINITY;
     //std::cout << node.toString() << "\n";
     
@@ -226,11 +223,11 @@ int main(int argc, const char **argv) {
       node.dist = 0;
     } else if (*src == reportNode) {
       //} else if (node.id == reportNode) {
-      sink = *src;
+      report = *src;
     }
   }
-  if (sink == -1) {
-    std::cerr << "Failed to set sink (" << reportNode << ").\n";
+  if (report == -1) {
+    std::cerr << "Failed to set report (" << reportNode << ").\n";
     assert(0);
     abort();
   }
@@ -245,8 +242,8 @@ int main(int argc, const char **argv) {
   Galois::Launcher::stopTiming();
 
   GaloisRuntime::reportStat("Time", Galois::Launcher::elapsedTime());
-  cout << sink << " " 
-       << graph.getData(sink,Galois::Graph::NONE).toString() << endl;
+  cout << report << " " 
+       << graph.getData(report,Galois::Graph::NONE).toString() << endl;
   if (!skipVerify && !verify(source)) {
     cerr << "Verification failed.\n";
     assert(0 && "Verification failed");
@@ -255,3 +252,4 @@ int main(int argc, const char **argv) {
 
   return 0;
 }
+// vim sw=2:ts=8:sts=2
