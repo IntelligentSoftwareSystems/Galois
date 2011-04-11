@@ -13,6 +13,7 @@
 #include <iostream>
 #include <limits>
 #include <math.h>
+#include <boost/math/constants/constants.hpp>
 
 #include "OctTreeNodeData.h"
 #include "Galois/Launcher.h"
@@ -20,8 +21,7 @@
 #include "Galois/Graphs/IndexedGraph.h"
 #include "Galois/Galois.h"
 typedef Galois::Graph::IndexedGraph<OctTreeNodeData, int, true, 8> Graph;
-typedef Galois::Graph::IndexedGraph<OctTreeNodeData, int, true, 8>::GraphNode
-		GNode;
+typedef Galois::Graph::IndexedGraph<OctTreeNodeData, int, true, 8>::GraphNode GNode;
 
 GNode createNode(Graph *octree, OctTreeNodeData b) {
 	GNode newnode = octree->createNode(b);
@@ -34,18 +34,17 @@ GNode createNode(Graph *octree, OctTreeNodeData b) {
 
 class Barneshut {
 public:
-	int nbodies; // number of bodies in system
-	int ntimesteps; // number of time steps to run
 	double dtime; // length of one time step
 	double eps; // potential softening parameter
 	double tol; // tolerance for stopping recursion, should be less than 0.57 for 3D case to bound error
 	double dthf, epssq, itolsq;
+	double diameter, centerx, centery, centerz;
 	OctTreeNodeData *body; // the n bodies
 	GNode *leaf;
-	double diameter, centerx, centery, centerz;
 	int curr;
+	int nbodies; // number of bodies in system
+	int ntimesteps; // number of time steps to run
 
-	///*
 	~Barneshut() {
 		if (leaf != NULL) {
 			delete[] leaf;
@@ -56,12 +55,73 @@ public:
 			body = NULL;
 		}
 	}
-	//*/
-	void readInput(const char *filename, bool print) {
+
+private:
+  double nextDouble() {
+    return rand() / (double) RAND_MAX;
+  }
+
+  void init(int _nbodies, int _ntimesteps, double _dtime, double _eps, double _tol) {
+    nbodies = _nbodies;
+    ntimesteps = _ntimesteps;
+    dtime = _dtime;
+    eps = _eps;
+    tol = _tol;
+    dthf = 0.5 * dtime;
+    epssq = eps * eps;
+    itolsq = 1.0 / (tol * tol);
+    body = new OctTreeNodeData[nbodies];
+		leaf = new GNode[nbodies];
+  }
+
+public:
+  void genInput(int seed, int nbodies) {
+    double r, v, x, y, z, sq, scale;
+    double PI = boost::math::constants::pi<double>();
+
+    srand(seed);
+    init(nbodies, 1, 0.5, 0.05, 0.025);
+
+    double rsc = (3 * PI) / 16;
+    double vsc = sqrt(1.0 / rsc);
+
+    for (int i = 0; i < nbodies; i++) {
+      r = 1.0 / sqrt(pow(nextDouble() * 0.999, -2.0 / 3.0) - 1);
+      do {
+        x = nextDouble() * 2.0 - 1.0;
+        y = nextDouble() * 2.0 - 1.0;
+        z = nextDouble() * 2.0 - 1.0;
+        sq = x * x + y * y + z * z;
+      } while (sq > 1.0);
+      scale = rsc * r / sqrt(sq);
+
+      OctTreeNodeData &b = body[i];
+      b.mass = 1.0 / nbodies;
+      b.posx = x * scale;
+      b.posy = y * scale;
+      b.posz = z * scale;
+
+      do {
+        x = nextDouble();
+        y = nextDouble() * 0.1;
+      } while (y > x * x * pow(1 - x * x, 3.5));
+      v = x * sqrt(2.0 / sqrt(1 + r * r));
+      do {
+        x = nextDouble() * 2.0 - 1.0;
+        y = nextDouble() * 2.0 - 1.0;
+        z = nextDouble() * 2.0 - 1.0;
+        sq = x * x + y * y + z * z;
+      } while (sq > 1.0);
+      scale = vsc * v / sqrt(sq);
+      b.setVelocity(x * scale, y * scale, z * scale);
+    }
+  }
+
+	void readInput(const char *filename) {
 		double vx, vy, vz;
 		std::ifstream infile;
-		infile.open(filename, std::ifstream::in); // opens the vector file
-		if (!infile) { // file couldn't be opened
+		infile.open(filename, std::ifstream::in);
+		if (!infile) {
 			std::cerr << "Error: vector file could not be opened" << std::endl;
 			exit(-1);
 		}
@@ -77,15 +137,9 @@ public:
 		getline(infile, line);
 		infile >> tol;
 		getline(infile, line);
-		dthf = 0.5 * dtime;
-		epssq = eps * eps;
-		itolsq = 1.0 / (tol * tol);
-		if (print) {
-			std::cerr << "configuration: " << nbodies << " bodies, " << ntimesteps
-					<< " time steps" << std::endl << std::endl;
-		}
-		body = new OctTreeNodeData[nbodies];
-		leaf = new GNode[nbodies];
+
+    init(nbodies, ntimesteps, tol, eps, dtime);
+
 		for (int i = 0; i < nbodies; i++) {
 			OctTreeNodeData &b = body[i];
 			infile >> b.mass;
@@ -141,6 +195,7 @@ public:
 		centery = (maxy + miny) * 0.5;
 		centerz = (maxz + minz) * 0.5;
 	}
+
 	void insert(Graph *octree, GNode &root, OctTreeNodeData &b, double r) {
 		double x = 0.0, y = 0.0, z = 0.0;
 		OctTreeNodeData &n = root.getData(Galois::Graph::NONE);
@@ -177,6 +232,7 @@ public:
 			}
 		}
 	}
+
 	void computeCenterOfMass(Graph *octree, GNode &root) {
 		double m, px = 0.0, py = 0.0, pz = 0.0;
 		OctTreeNodeData &n = root.getData(Galois::Graph::NONE);
@@ -185,18 +241,19 @@ public:
 		for (int i = 0; i < 8; i++) {
 			GNode child = octree->getNeighbor(root, i, Galois::Graph::NONE);
 			if (!child.isNull()) {
+        // move non-null children to the front (needed later to make other code faster)
 				if (i != j) {
 					octree->setNeighbor(root, Graph::GraphNode::GraphNode(), i,
 							Galois::Graph::NONE);
-					octree->setNeighbor(root, child, j); // move non-null children to the
-					// front (needed later to make other code faster)
+					octree->setNeighbor(root, child, j);
 				}
 				j++;
 				OctTreeNodeData &ch = child.getData(Galois::Graph::NONE);
-				if (ch.isLeaf()) {
-					leaf[curr++] = child; // sort bodies in tree order (approximation of
-					// putting nearby nodes together for locality)
-				} else {
+			  // sort bodies in tree order (approximation of
+			  // putting nearby nodes together for locality)
+      	if (ch.isLeaf()) {
+					leaf[curr++] = child;
+        } else {
 					computeCenterOfMass(octree, child);
 				}
 				m = ch.mass;
@@ -211,6 +268,7 @@ public:
 		n.posy = py * m;
 		n.posz = pz * m;
 	}
+
 	void computeForce(GNode &leaf, Graph *octree, GNode &root, double size,
 			double itolsq, int step, double dthf, double epssq) {
 		double ax, ay, az;

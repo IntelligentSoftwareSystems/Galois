@@ -18,10 +18,8 @@
 
 static const char* name = "Barnshut N-Body Simulator";
 static const char* description = "Simulation of the gravitational forces in a galactic cluster using the Barnes-Hut n-body algorithm\n";
-static const char* url = 0;
-static const char* help = "<input file>";
-
-
+static const char* url = "http://iss.ices.utexas.edu/lonestar/barneshut.html";
+static const char* help = "[file <input file>|gen <seed> <numbodies>]";
 
 Graph *octree;
 GNode root;
@@ -36,22 +34,34 @@ struct process {
   }
 };
 
+void readInput(std::vector<const char*>& args, Barneshut& app) {
+  if (args.size() < 2) {
+    std::cerr << "not enough arguments, use -help for usage information\n";
+    exit(1);
+  } else if (strcmp(args[0], "file") == 0) {
+    app.readInput(args[1]);
+  } else if (strcmp(args[0], "gen") == 0) {
+    app.genInput(atoi(args[1]), atoi(args[2]));
+  } else {
+    std::cerr << "wrong arguments, use -help for usage information\n";
+    exit(1);
+  }
+}
+
 int main(int argc, const char** argv) {
   std::cout.setf(std::ios::right|std::ios::scientific|std::ios::showpoint);
 
   std::vector<const char*> args = parse_command_line(argc, argv, help);
-  
-  if (args.size() != 1) {
-    std::cout << "not enough arguments, use -help for usage information\n";
-    return 1;
-  }
+  readInput(args, barneshut);
   printBanner(std::cout, name, description, url);
-
-	barneshut.readInput(args[0], true);
-	OctTreeNodeData res;
-	std::cout<<"Num. of threads: "<<numThreads<<std::endl;
+  std::cerr << "configuration: "
+            << barneshut.nbodies << " bodies, "
+            << barneshut.ntimesteps << " time steps" << std::endl << std::endl;
+	std::cout << "Num. of threads: " << numThreads <<std::endl;
 	Galois::setMaxThreads(numThreads);
+
 	Galois::Launcher::startTiming();
+	OctTreeNodeData res;
 	for (step = 0; step < barneshut.ntimesteps; step++) { // time-step the system
 		barneshut.computeCenterAndDiameter();
 
@@ -65,7 +75,8 @@ int main(int argc, const char** argv) {
 			barneshut.insert(octree, root, b, radius);
 		}
     barneshut.curr = 0;
-    // summarize subtree info in each internal node (plus restructure tree and sort bodies for performance reasons)
+    // summarize subtree info in each internal node
+    // (plus restructure tree and sort bodies for performance reasons)
 		barneshut.computeCenterOfMass(octree, root);
 
 		std::vector<GNode> wl;
@@ -74,7 +85,8 @@ int main(int argc, const char** argv) {
 		}
 		Galois::for_each(wl.begin(), wl.end(), process());
 
-		barneshut.advance(octree, barneshut.dthf, barneshut.dtime); // advance the position and velocity of each
+    // advance the position and velocity of each
+		barneshut.advance(octree, barneshut.dthf, barneshut.dtime);
 
 		if (Galois::Launcher::isFirstRun()) {
 			res = root.getData(Galois::Graph::NONE);
@@ -87,29 +99,28 @@ int main(int argc, const char** argv) {
 	std::cout << "STAT: Time " << Galois::Launcher::elapsedTime() << "\n";
 
 	if (Galois::Launcher::isFirstRun()) { // verify result
-		Barneshut barneshut2;
-		barneshut2.readInput(args[0], false);
+		Barneshut b2;
+    readInput(args, b2);
 		OctTreeNodeData s_res;
-		for (step = 0; step < barneshut2.ntimesteps; step++) {
-			barneshut2.computeCenterAndDiameter();
+		for (step = 0; step < b2.ntimesteps; step++) {
+			b2.computeCenterAndDiameter();
 			Graph *octree2 = new Graph;
-			root = createNode(octree2, OctTreeNodeData(barneshut2.centerx,
-					barneshut2.centery, barneshut2.centerz)); // create the
+			root = createNode(octree2, OctTreeNodeData(b2.centerx, b2.centery, b2.centerz));
 			octree2->addNode(root);
-			double radius = barneshut2.diameter * 0.5;
-			for (int i = 0; i < barneshut2.nbodies; i++) {
-				OctTreeNodeData &b = barneshut2.body[i];
-				barneshut2.insert(octree2, root, b, radius);
+			double radius = b2.diameter * 0.5;
+			for (int i = 0; i < b2.nbodies; i++) {
+				OctTreeNodeData &b = b2.body[i];
+				b2.insert(octree2, root, b, radius);
 			}
-			barneshut2.curr = 0;
-			barneshut2.computeCenterOfMass(octree2, root);
+			b2.curr = 0;
+			b2.computeCenterOfMass(octree2, root);
 
-			for (int kk = 0; kk < barneshut2.curr; kk++) {
-				barneshut2.computeForce(barneshut2.leaf[kk], octree2, root,
-						barneshut2.diameter, barneshut2.itolsq, step, barneshut2.dthf,
-						barneshut2.epssq);
+			for (int kk = 0; kk < b2.curr; kk++) {
+				b2.computeForce(b2.leaf[kk], octree2, root,
+						b2.diameter, b2.itolsq, step, b2.dthf,
+						b2.epssq);
 			}
-			barneshut2.advance(octree2, barneshut2.dthf, barneshut2.dtime);
+			b2.advance(octree2, b2.dthf, b2.dtime);
 			s_res = root.getData(Galois::Graph::NONE);
 			delete octree2;
 		}
