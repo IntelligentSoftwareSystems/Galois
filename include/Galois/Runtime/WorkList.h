@@ -409,6 +409,7 @@ class ChunkedFIFO : private boost::noncopyable {
   PtrLock<Chunk*, concurrent> head;
 
   void pushChunk(Chunk* C) {
+    assert(C);
     head.lock();
     if (Chunk* last = head.getValue()) {
       while (last->next)
@@ -450,6 +451,140 @@ public:
   }
 
   ~ChunkedFIFO() {
+    for (int i = 0; i < data.size(); ++i) {
+      p& r = data.get(i);
+      if (r.next) {
+	r.next->~Chunk();
+	heap.deallocate(r.next);
+	r.next = 0;
+      }
+      if (r.cur) {
+	r.cur->~Chunk();
+	heap.deallocate(r.cur);
+	r.cur = 0;
+      }
+    }
+  }
+
+  bool push(value_type val) {
+    p& n = data.get();
+    if (n.next && n.next->full()) {
+      pushChunk(n.next);
+      n.next = 0;
+    }
+    if (!n.next)
+      n.next = new (heap.allocate(sizeof(Chunk))) Chunk();
+    bool retval = n.next->push_back(val);
+    assert(retval);
+    return retval;
+  }
+
+  std::pair<bool, value_type> pop() {
+    p& n = data.get();
+    if (n.cur && n.cur->empty()) {
+      n.cur->~Chunk();
+      heap.deallocate(n.cur);
+      n.cur = 0;
+    }
+    if (!n.cur)
+      n.cur = popChunk();
+    if (!n.cur) {
+      //Shared queue was empty, check next
+      n.cur = n.next;
+      n.next = 0;
+    }
+
+    if (!n.cur)
+      return std::make_pair(false, value_type());
+
+    return n.cur->pop_front();
+  }
+  
+  std::pair<bool, value_type> try_pop() {
+    return pop();
+  }
+  
+  bool empty() {
+    p& n = data.get();
+    if (n.cur && !n.cur->empty()) return false;
+    if (n.next && !n.next->empty()) return false;
+    if (head.getValue()) return false;
+    return true;
+  }
+
+  bool aborted(value_type val) {
+    return push(val);
+  }
+
+  //Not Thread Safe
+  template<typename Iter>
+  void fill_initial(Iter ii, Iter ee) {
+    p& n = data.get();
+    for( ; ii != ee; ++ii) {
+      push(*ii);
+    }
+    if (n.next) {
+      pushChunk(n.next);
+      n.next = 0;
+    }
+  }
+};
+WLCOMPILECHECK(ChunkedFIFO);
+
+template<typename T, int chunksize=64, bool concurrent=true>
+class ChunkedBag : private boost::noncopyable {
+  class Chunk : public FixedSizeRing<T, chunksize, false> {
+  public:
+    Chunk() :next(0) {}
+    Chunk* next;
+  };
+
+  MM::FixedSizeAllocator heap;
+
+  struct p {
+    Chunk* cur;
+    Chunk* next;
+  };
+
+  PerCPU<p> data;
+  PtrLock<Chunk*, concurrent> head;
+
+  void pushChunk(Chunk* C) {
+    head.lock();
+    C->next = head.getValue();
+    head.unlock_and_set(C);
+  }
+
+  Chunk* popChunk() {
+    Chunk* r = 0;
+    if (head.getValue()) {
+      head.lock();
+      r = head.getValue();
+      if (r)
+	head.unlock_and_set(r->next);
+      else
+	head.unlock();
+    }
+    return r;
+  }
+
+public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef ChunkedBag<T, chunksize, newconcurrent> WL;
+  };
+
+  typedef T value_type;
+  
+  ChunkedBag() : heap(sizeof(Chunk)) {
+    for (int i = 0; i < data.size(); ++i) {
+      p& r = data.get(i);
+      r.next = 0;
+      r.cur = 0;
+    }
+  }
+
+  ~ChunkedBag() {
     for (int i = 0; i < data.size(); ++i) {
       p& r = data.get(i);
       if (r.next) {
@@ -529,7 +664,7 @@ public:
     n.next = 0;
   }
 };
-WLCOMPILECHECK(ChunkedFIFO);
+WLCOMPILECHECK(ChunkedBag);
 
 template<class T, class Indexer = DummyIndexer<T>, typename ContainerTy = FIFO<T>, bool concurrent = true >
 class OrderedByIntegerMetric : private boost::noncopyable {
