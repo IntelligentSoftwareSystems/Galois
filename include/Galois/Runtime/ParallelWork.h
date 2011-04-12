@@ -90,7 +90,7 @@ public:
 };
 
 template<class WorkListTy, class Function>
-class ParallelWork : public Galois::Executable {
+class ForEachWork : public Galois::Executable {
   typedef typename WorkListTy::value_type value_type;
   typedef ParallelThreadContext<WorkListTy> PCTy;
 
@@ -101,10 +101,10 @@ class ParallelWork : public Galois::Executable {
   TerminationDetection term;
 
 public:
-  ParallelWork(WorkListTy& _wl, Function& _f)
+  ForEachWork(WorkListTy& _wl, Function& _f)
     :global_wl(_wl), f(_f) {}
   
-  ~ParallelWork() {
+  ~ForEachWork() {
     for (int i = 1; i < tdata.size(); ++i)
       PCTy::merge(tdata.get(0), tdata.get(i));
     tdata.get().report();
@@ -143,12 +143,35 @@ public:
   }
 };
 
+template<class Function>
+class ForAllWork : public Galois::Executable {
+  Function& f;
+
+public:
+  ForAllWork(Function& _f) : f(_f) {}
+  
+  ~ForAllWork() { }
+
+  virtual void preRun(int tmax) { }
+
+  virtual void postRun() {  }
+
+  virtual void operator()() {
+    Timer T;
+    T.start();
+    unsigned int id = ThreadPool::getMyID() - 1;
+    f(id);
+    T.stop();
+    reportStat("TotalTime ", T.get());
+  }
+};
+
 template<class Function, class GWLTy>
 void for_each_parallel(GWLTy& GWL, Function& f) {
 #ifdef GALOIS_VTUNE
   __itt_resume();
 #endif
-  ParallelWork<GWLTy, Function> GW(GWL, f);
+  ForEachWork<GWLTy, Function> GW(GWL, f);
   ThreadPool& PTP = getSystemThreadPool();
   PTP.run(&GW);
 #ifdef GALOIS_VTUNE
@@ -156,6 +179,12 @@ void for_each_parallel(GWLTy& GWL, Function& f) {
 #endif
 }
 
+template<class Function>
+void for_all_parallel(Function& f) {
+  ForAllWork<Function> GW(f);
+  ThreadPool& PTP = getSystemThreadPool();
+  PTP.run(&GW);
+}
 }
 
 #endif
