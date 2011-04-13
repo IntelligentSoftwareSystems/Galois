@@ -79,11 +79,9 @@ int main(int argc, const char** argv) {
     // (plus restructure tree and sort bodies for performance reasons)
 		barneshut.computeCenterOfMass(octree, root);
 
-		std::vector<GNode> wl;
-		for (int ii = 0; ii < barneshut.curr; ii++) {
-			wl.push_back(barneshut.leaf[ii]);
-		}
-		Galois::for_each(wl.begin(), wl.end(), process());
+		GaloisRuntime::WorkList::ChunkedBag<GNode, 256> wl;
+		wl.fill_initial(&barneshut.leaf[0], &barneshut.leaf[barneshut.curr]);
+		Galois::for_each(wl, process());
 
     // advance the position and velocity of each
 		barneshut.advance(octree, barneshut.dthf, barneshut.dtime);
