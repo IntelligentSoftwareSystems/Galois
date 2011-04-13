@@ -144,7 +144,7 @@ public:
 WLCOMPILECHECK(PriQueue);
 
 template<typename T, bool concurrent = true>
-class LIFO : private boost::noncopyable, private PaddedLock<concurrent> {
+class sLIFO : private boost::noncopyable, private PaddedLock<concurrent> {
   std::vector<T> wl;
 
   using PaddedLock<concurrent>::lock;
@@ -154,7 +154,7 @@ class LIFO : private boost::noncopyable, private PaddedLock<concurrent> {
 public:
   template<bool newconcurrent>
   struct rethread {
-    typedef LIFO<T, newconcurrent> WL;
+    typedef sLIFO<T, newconcurrent> WL;
   };
 
   typedef T value_type;
@@ -211,7 +211,7 @@ public:
     }
   }
 };
-WLCOMPILECHECK(LIFO);
+WLCOMPILECHECK(sLIFO);
 
 template<typename T, bool concurrent = true>
 class sFIFO : private boost::noncopyable, private PaddedLock<concurrent>  {
@@ -285,33 +285,14 @@ WLCOMPILECHECK(sFIFO);
 
 template<typename T, bool concurrent = true>
 class FIFO : private boost::noncopyable {
-  class Chunk : public FixedSizeRing<T, 128, false> {
-  public:
-    PtrLock<Chunk*,concurrent> next;
-  };
+  class Chunk : public FixedSizeRing<T, 128, false>, public ConExtLinkedQueue<Chunk, concurrent>::ListNode {};
 
   MM::FixedSizeAllocator heap;
 
-  //tail shall always be not null
-  PtrLock<Chunk*, concurrent> tail;
-  //head shall always be not null
+  ConExtLinkedQueue<Chunk, concurrent> queue;
+  
   PtrLock<Chunk*, concurrent> head;
-
-  SimpleLock<long, concurrent> tailLock;
-  SimpleLock<long, concurrent> headLock;
-
-  void popEmptyChunksLocked() {
-    while (head.getValue()->empty() && head.getValue()->next.getValue()) {
-      //Chunk is empty and another exists
-      Chunk* old = head.getValue();
-      old->next.getValue()->next.lock();
-      head.setValue(old->next.getValue());
-      old->next.unlock();
-      old->~Chunk();
-      heap.deallocate(old);
-    }
-  }
-
+  PtrLock<Chunk*, concurrent> tail;
 
 public:
   template<bool newconcurrent>
@@ -322,40 +303,50 @@ public:
   typedef T value_type;
 
   FIFO() :heap(sizeof(Chunk)) {
-    Chunk* nc = new (heap.allocate(sizeof(Chunk))) Chunk();
-    tail.setValue(nc);
-    head.setValue(nc);
+    tail.setValue(0);
+    head.setValue(0);
   }
 
   bool push(value_type val) {
     tail.lock();
-    assert(tail.getValue());
-    tail.getValue()->next.lock();
-    if (tail.getValue()->push_back(val)) {
-      tail.getValue()->next.unlock();
+    if (tail.getValue() && tail.getValue()->push_back(val)) {
       tail.unlock();
       return true;
     }
     //push didn't work, append a new element
+    if (tail.getValue()) {
+      queue.push(tail.getValue());
+      tail.setValue(0);
+    }
     Chunk* nc = new (heap.allocate(sizeof(Chunk))) Chunk();
     bool worked = nc->push_back(val);
     assert(worked);
-    nc->next.lock();
-    tail.getValue()->next.unlock_and_set(nc);
-    nc->next.unlock();
     tail.unlock_and_set(nc);
     return true;
   }
 
   std::pair<bool, value_type> pop() {
     head.lock();
-    assert(head.getValue());
-    head.getValue()->next.lock();
-    popEmptyChunksLocked();
-    std::pair<bool, value_type> retval = head.getValue()->pop_front();
-    head.getValue()->next.unlock();
-    head.unlock();
-    return retval;
+    std::pair<bool, value_type> retval;
+    do {
+      if (!head.getValue()) {
+	head.setValue(queue.pop());
+	if (!head.getValue()) {
+	  head.unlock();
+	  return std::make_pair(false, value_type());
+	}
+      }
+      retval = head.getValue()->pop_front();
+      if (retval.first) {
+	head.unlock();
+	return retval;
+      } else {
+	Chunk* C = head.getValue();
+	head.setValue(0);
+	C->~Chunk();
+	heap.deallocate(C);
+      }
+    } while (true);
   }
 
   std::pair<bool, value_type> try_pop() {
@@ -364,16 +355,9 @@ public:
     
   bool empty() {
     //fastpath
-    if (head.getValue() != tail.getValue())
+    if (head.getValue() || tail.getValue())
       return false;
-    head.lock();
-    assert(head.getValue());
-    head.getValue()->next.lock();
-    popEmptyChunksLocked();
-    bool retval = head.getValue()->empty();
-    head.getValue()->next.unlock();
-    head.unlock();
-    return retval;
+    return queue.empty();
   }
 
   bool aborted(value_type val) {
@@ -390,13 +374,98 @@ public:
 };
 WLCOMPILECHECK(FIFO);
 
+template<typename T, bool concurrent = true>
+class LIFO : private boost::noncopyable {
+  class Chunk : public FixedSizeRing<T, 128, false>, public ConExtLinkedStack<Chunk, concurrent>::ListNode {};
+
+  MM::FixedSizeAllocator heap;
+
+  ConExtLinkedStack<Chunk, concurrent> stack;
+  
+  PtrLock<Chunk*, concurrent> head;
+
+public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef LIFO<T, newconcurrent> WL;
+  };
+
+  typedef T value_type;
+
+  LIFO() :heap(sizeof(Chunk)) {
+    head.setValue(0);
+  }
+
+  bool push(value_type val) {
+    head.lock();
+    if (head.getValue() && head.getValue()->push_front(val)) {
+      head.unlock();
+      return true;
+    }
+    //push didn't work, append a new element
+    if (head.getValue()) {
+      stack.push(head.getValue());
+      head.setValue(0);
+    }
+    Chunk* nc = new (heap.allocate(sizeof(Chunk))) Chunk();
+    bool worked = nc->push_front(val);
+    assert(worked);
+    head.unlock_and_set(nc);
+    return true;
+  }
+
+  std::pair<bool, value_type> pop() {
+    head.lock();
+    std::pair<bool, value_type> retval;
+    do {
+      if (!head.getValue()) {
+	head.setValue(stack.pop());
+	if (!head.getValue()) {
+	  head.unlock();
+	  return std::make_pair(false, value_type());
+	}
+      }
+      retval = head.getValue()->pop_front();
+      if (retval.first) {
+	head.unlock();
+	return retval;
+      } else {
+	Chunk* C = head.getValue();
+	head.setValue(0);
+	C->~Chunk();
+	heap.deallocate(C);
+      }
+    } while (true);
+  }
+
+  std::pair<bool, value_type> try_pop() {
+    return pop();
+  }
+    
+  bool empty() {
+    //fastpath
+    if (head.getValue())
+      return false;
+    return stack.empty();
+  }
+
+  bool aborted(value_type val) {
+    return push(val);
+  }
+
+  //Not Thread Safe
+  template<typename Iter>
+  void fill_initial(Iter ii, Iter ee) {
+    while (ii != ee) {
+      push(*ii++);
+    }
+  }
+};
+WLCOMPILECHECK(LIFO);
+
 template<typename T, int chunksize=64, bool concurrent=true>
 class ChunkedFIFO : private boost::noncopyable {
-  class Chunk : public FixedSizeRing<T, chunksize, false> {
-  public:
-    Chunk() :next(0) {}
-    Chunk* next;
-  };
+  class Chunk : public FixedSizeRing<T, chunksize, false>, public ConExtLinkedQueue<Chunk, concurrent>::ListNode { };
 
   MM::FixedSizeAllocator heap;
 
@@ -406,33 +475,7 @@ class ChunkedFIFO : private boost::noncopyable {
   };
 
   PerCPU<p> data;
-  PtrLock<Chunk*, concurrent> head;
-
-  void pushChunk(Chunk* C) {
-    assert(C);
-    head.lock();
-    if (Chunk* last = head.getValue()) {
-      while (last->next)
-	last = last->next;
-      last->next = C;
-      head.unlock();
-    } else {
-      head.unlock_and_set(C);
-    }
-  }
-
-  Chunk* popChunk() {
-    Chunk* r = 0;
-    if (head.getValue()) {
-      head.lock();
-      r = head.getValue();
-      if (r)
-	head.unlock_and_set(r->next);
-      else
-	head.unlock();
-    }
-    return r;
-  }
+  ConExtLinkedQueue<Chunk, concurrent> queue;
 
 public:
   template<bool newconcurrent>
@@ -469,7 +512,7 @@ public:
   bool push(value_type val) {
     p& n = data.get();
     if (n.next && n.next->full()) {
-      pushChunk(n.next);
+      queue.push(n.next);
       n.next = 0;
     }
     if (!n.next)
@@ -487,7 +530,7 @@ public:
       n.cur = 0;
     }
     if (!n.cur)
-      n.cur = popChunk();
+      n.cur = queue.pop();
     if (!n.cur) {
       //Shared queue was empty, check next
       n.cur = n.next;
@@ -508,8 +551,7 @@ public:
     p& n = data.get();
     if (n.cur && !n.cur->empty()) return false;
     if (n.next && !n.next->empty()) return false;
-    if (head.getValue()) return false;
-    return true;
+    return queue.empty();
   }
 
   bool aborted(value_type val) {
@@ -524,7 +566,7 @@ public:
       push(*ii);
     }
     if (n.next) {
-      pushChunk(n.next);
+      queue.push(n.next);
       n.next = 0;
     }
   }
@@ -533,11 +575,7 @@ WLCOMPILECHECK(ChunkedFIFO);
 
 template<typename T, int chunksize=64, bool concurrent=true>
 class ChunkedBag : private boost::noncopyable {
-  class Chunk : public FixedSizeRing<T, chunksize, false> {
-  public:
-    Chunk() :next(0) {}
-    Chunk* next;
-  };
+  class Chunk : public FixedSizeRing<T, chunksize, false>, public ConExtLinkedStack<Chunk, concurrent>::ListNode {};
 
   MM::FixedSizeAllocator heap;
 
@@ -547,26 +585,7 @@ class ChunkedBag : private boost::noncopyable {
   };
 
   PerCPU<p> data;
-  PtrLock<Chunk*, concurrent> head;
-
-  void pushChunk(Chunk* C) {
-    head.lock();
-    C->next = head.getValue();
-    head.unlock_and_set(C);
-  }
-
-  Chunk* popChunk() {
-    Chunk* r = 0;
-    if (head.getValue()) {
-      head.lock();
-      r = head.getValue();
-      if (r)
-	head.unlock_and_set(r->next);
-      else
-	head.unlock();
-    }
-    return r;
-  }
+  ConExtLinkedStack<Chunk, concurrent> stack;
 
 public:
   template<bool newconcurrent>
@@ -603,7 +622,7 @@ public:
   bool push(value_type val) {
     p& n = data.get();
     if (n.next && n.next->full()) {
-      pushChunk(n.next);
+      stack.push(n.next);
       n.next = 0;
     }
     if (!n.next)
@@ -621,7 +640,7 @@ public:
       n.cur = 0;
     }
     if (!n.cur) {
-      Chunk* r = popChunk();
+      Chunk* r = stack.pop();
       if (r) {
 	//Shared queue had data
 	n.cur = r;
@@ -645,8 +664,7 @@ public:
     p& n = data.get();
     if (n.cur && !n.cur->empty()) return false;
     if (n.next && !n.next->empty()) return false;
-    if (head.getValue()) return false;
-    return true;
+    return stack.empty();
   }
 
   bool aborted(value_type val) {
@@ -660,8 +678,10 @@ public:
     for( ; ii != ee; ++ii) {
       push(*ii);
     }
-    pushChunk(n.next);
-    n.next = 0;
+    if (n.next) {
+      stack.push(n.next);
+      n.next = 0;
+    }
   }
 };
 WLCOMPILECHECK(ChunkedBag);

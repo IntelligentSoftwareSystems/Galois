@@ -4,7 +4,7 @@
 #define __DISTRIBUTEDWORKLIST_H_
 
 #include <algorithm>
-#include <tr1/unordered_map>
+//#include <tr1/unordered_map>
 
 namespace GaloisRuntime {
 namespace WorkList {
@@ -236,10 +236,17 @@ public:
 template<class T, class Indexer, typename ContainerTy = FIFO<T>, bool concurrent=true>
 class dOrderByIntegerMetric : private boost::noncopyable {
 
-  
-  ContainerTy* current;
-  TerminationDetection currentEmpty;
-  std::tr1::unordered_map<unsigned int, ContainerTy> data;
+  struct LevelItem {
+    unsigned int cur_pri;
+    unsigned int set_pri;
+    ContainerTy* cur;
+  };
+
+  PerLevel<LevelItem> items;
+  unsigned int global_min;
+
+  std::map<unsigned int, ContainerTy*> data;
+  SimpleLock<int, concurrent> mapLock;
 
 public:
 
@@ -307,43 +314,23 @@ public:
 
 template<typename T, int chunksize=64, bool concurrent=true>
 class dChunkedFIFO : private boost::noncopyable {
-  class Chunk : public FixedSizeRing<T, chunksize, false> {
-  public:
-    Chunk() :next(0) {}
-    Chunk* next;
-  };
+  class Chunk : public FixedSizeRing<T, chunksize, false>, public ConExtLinkedQueue<Chunk, concurrent>::ListNode {};
 
   MM::FixedSizeAllocator heap;
 
-
-  typedef PtrLock<Chunk*, concurrent> LevelItem;
+  typedef ConExtLinkedQueue<Chunk, concurrent> LevelItem;
 
   PerCPU<Chunk*> cur;
   PerLevel<LevelItem > Items;
 
   void pushChunk(Chunk* C) OPTNOINLINE {
     LevelItem& I = Items.get();
-    I.lock();
-    C->next = I.getValue();
-    I.unlock_and_set(C);
+    I.push(C);
   }
 
   Chunk* popChunkByID(unsigned int i) OPTNOINLINE {
     LevelItem& I = Items.get(i);
-    //fast-path (lock-free) empty case
-    if (!I.getValue())
-      return 0;
-
-    I.lock();
-    Chunk* retval = I.getValue();
-    if (retval) {
-      I.unlock_and_set(retval->next);
-      retval->next = 0;
-    } else {
-      I.unlock();
-    }
-
-    return retval;
+    return I.pop();
   }
 
   Chunk* popChunk() OPTNOINLINE {
@@ -414,7 +401,185 @@ public:
   bool empty() OPTNOINLINE {
     Chunk* n = cur.get();
     if (n && !n->empty()) return false;
-    if (Items.get().getValue()) return false;
+    return Items.get().empty();
+  }
+
+  bool aborted(value_type val) {
+    return push(val);
+  }
+
+  //Not Thread Safe
+  template<typename Iter>
+  void fill_initial(Iter ii, Iter ee) {
+    for( ; ii != ee; ++ii) {
+      push(*ii);
+    }
+  }
+
+};
+
+template<typename T, int chunksize=64, bool concurrent=true>
+class dChunkedBag : private boost::noncopyable {
+  class Chunk : public FixedSizeRing<T, chunksize, false>, public ConExtLinkedStack<Chunk, concurrent>::ListNode {};
+
+  MM::FixedSizeAllocator heap;
+
+
+  typedef ConExtLinkedStack<Chunk, concurrent> LevelItem;
+
+  PerCPU<Chunk*> cur;
+  PerLevel<LevelItem > Items;
+
+  void pushChunk(Chunk* C) OPTNOINLINE {
+    LevelItem& I = Items.get();
+    I.push(C);
+  }
+
+  Chunk* popChunkByID(unsigned int i) OPTNOINLINE {
+    LevelItem& I = Items.get(i);
+    return I.pop();
+  }
+
+  Chunk* popChunk() OPTNOINLINE {
+    int id = Items.myEffectiveID();
+    Chunk* r = popChunkByID(id);
+    if (r)
+      return r;
+
+    for (int i = 0; i < Items.size(); ++i) {
+      ++id;
+      id %= Items.size();
+      r = popChunkByID(id);
+      if (r)
+	return r;
+    }
+    return 0;
+  }
+
+public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef dChunkedBag<T, chunksize, newconcurrent> WL;
+  };
+
+  typedef T value_type;
+  
+  dChunkedBag() : heap(sizeof(Chunk)) {
+    for (int i = 0; i < cur.size(); ++i)
+      cur.get(i) = 0;
+  }
+
+  bool push(value_type val) OPTNOINLINE {
+    Chunk*& n = cur.get();
+    if (n && n->full()) {
+      pushChunk(n);
+      n = 0;
+    }
+    if (!n)
+      n = new (heap.allocate(sizeof(Chunk))) Chunk();
+    bool retval = n->push_back(val);
+    assert(retval);
+    return retval;
+  }
+
+  std::pair<bool, value_type> pop() OPTNOINLINE {
+    Chunk*& n = cur.get();
+    if (n) {
+      if (n->empty()) {
+	n->~Chunk();
+	heap.deallocate(n);
+	n = 0;
+      } else {
+	return n->pop_front();
+      }
+    } else {
+      n = popChunk();
+      if (n)
+	return pop();
+      else
+	return std::make_pair(false, value_type());
+    }
+  }
+  
+  std::pair<bool, value_type> try_pop() {
+    return pop();
+  }
+  
+  bool empty() OPTNOINLINE {
+    Chunk* n = cur.get();
+    if (n && !n->empty()) return false;
+    return Items.get().empty();
+  }
+
+  bool aborted(value_type val) {
+    return push(val);
+  }
+
+  //Not Thread Safe
+  template<typename Iter>
+  void fill_initial(Iter ii, Iter ee) {
+    for( ; ii != ee; ++ii) {
+      push(*ii);
+    }
+  }
+
+};
+
+template<typename T>
+class DummyPartitioner {
+  unsigned getNum() const {
+    return 1;
+  }
+  unsigned operator()(T& item) { return 0; }
+};
+
+template<typename T, typename Partitioner = DummyPartitioner<T>, typename ChildWLTy = dChunkedFIFO<T>, bool concurrent=true>
+class PartitionedWL : private boost::noncopyable {
+
+  Partitioner P;
+
+  ChildWLTy* worklists;
+
+  ThreadPolicy& TP;
+
+  ChildWLTy* getWLFor(const T& item) {
+    unsigned int index = P(item);
+    return &worklists[index];
+  }
+
+  PerCPU<int> current;
+
+public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef PartitionedWL<T, Partitioner, ChildWLTy, newconcurrent> WL;
+  };
+
+  typedef T value_type;
+  
+  PartitionedWL(const Partitioner& p = Partitioner()) :P(p), TP(getSystemThreadPolicy()) {
+    worklists = new ChildWLTy[p.getNum()];
+    for (int i = 0; i < current.size(); ++ i)
+      current.get(i) = i / 4;
+  }
+
+  ~PartitionedWL() { delete worklists; }
+
+  bool push(value_type val) OPTNOINLINE {
+    getWLFor(val)->push(val);
+  }
+
+  std::pair<bool, value_type> pop() OPTNOINLINE {
+    return worklists[current.get()].pop();
+  }
+  
+  std::pair<bool, value_type> try_pop() {
+    return pop();
+  }
+  
+  bool empty() OPTNOINLINE {
+    for (int i = 0; i < P.getNum(); ++i)
+      if (!worklists[i].empty()) return false;
     return true;
   }
 
