@@ -178,6 +178,94 @@ public:
 };
 
 
+template<typename T, bool concurrent>
+class ConExtLinkedStack {
+  PtrLock<T*, concurrent> head;
+
+public:
+  struct ListNode {
+    T* NextPtrLock;
+    T*& getNextPtr() {
+      return NextPtrLock;
+    }
+  };
+  
+  bool empty() {
+    return !head.getValue();
+  }
+
+  void push(T* C) {
+    head.lock();
+    C->getNextPtr() = head.getValue();
+    head.unlock_and_set(C);
+  }
+
+  T* pop() {
+    //lock free Fast path (empty)
+    if (empty()) return 0;
+
+    head.lock();
+    T* C = head.getValue();
+    if (C) {
+      head.unlock_and_set(C->getNextPtr());
+      C->getNextPtr() = 0;
+    } else {
+      head.unlock();
+    }
+    return C;
+  }
+};
+
+
+template<typename T, bool concurrent>
+class ConExtLinkedQueue {
+  PtrLock<T*, concurrent> head;
+  T* tail;
+
+public:
+  struct ListNode {
+    T* NextPtrLock;
+    T*& getNextPtr() {
+      return NextPtrLock;
+    }
+  };
+  
+  bool empty() {
+    return !head.getValue();
+  }
+
+  void push(T* C) {
+    head.lock();
+    C->getNextPtr() = 0;
+    if (tail) {
+      tail->getNextPtr() = C;
+      tail = C;
+      head.unlock();
+    } else {
+      tail = C;
+      head.unlock_and_set(C);
+    }
+  }
+
+  T* pop() {
+    //lock free Fast path empty case
+    if (empty()) return 0;
+
+    head.lock();
+    T* C = head.getValue();
+    if (C) {
+      if (tail == C)
+	tail = 0;
+      head.unlock_and_set(C->getNextPtr());
+      C->getNextPtr() = 0;
+    } else {
+      head.unlock();
+    }
+    return C;
+  }
+};
+
+
 }
 }
 
