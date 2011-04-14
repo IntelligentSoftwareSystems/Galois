@@ -7,7 +7,7 @@ while (<>) {
     $module = shift @line;
     $proc = shift @line;
     $pid = shift @line;
-    print "'$file:$line'," . join(',', @line) . "\n";
+    print "\"$file:$line\"," . join(',', @line) . "\n";
 }
 
 

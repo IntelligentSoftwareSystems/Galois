@@ -5,7 +5,7 @@ while (<>) {
     $module = shift @line;
     $proc = shift @line;
     $pid = shift @line;
-    print "'$module:$function'," . join(',', @line) . "\n";
+    print "\"$module:$function\"," . join(',', @line) . "\n";
 }
 
 
