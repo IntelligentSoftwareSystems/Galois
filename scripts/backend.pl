@@ -84,8 +84,8 @@ sub vtune_prog {
 	system("rm -r r$i");
 	system("mkdir r$i");
 	system("/opt/intel/vtune_amplifier_xe_2011/bin64/amplxe-cl -collect nehalem_general-exploration -result-dir=r$i -start-paused -- $appstr -t $i");
-	system("/opt/intel/vtune_amplifier_xe_2011/bin64/amplxe-cl -R hw-events -r r$i -group-by source-line -csv-delimiter comma |perl prune_headers_line.pl > results.line.$i.csv");
-	system("/opt/intel/vtune_amplifier_xe_2011/bin64/amplxe-cl -R hw-events -r r$i -group-by function -csv-delimiter comma |perl prune_headers_function.pl > results.function.$i.csv");
+	system("/opt/intel/vtune_amplifier_xe_2011/bin64/amplxe-cl -R hw-events -r r$i -group-by source-line -csv-delimiter tab |perl prune_headers_line.pl > results.line.$i.csv");
+	system("/opt/intel/vtune_amplifier_xe_2011/bin64/amplxe-cl -R hw-events -r r$i -group-by function -csv-delimiter tab |perl prune_headers_function.pl > results.function.$i.csv");
     }
 }
 

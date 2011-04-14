@@ -1,5 +1,5 @@
 while (<>) {
-    @line = split ',';
+    @line = split '\t';
     chomp @line;
     $file = shift @line;
     $path = shift @line;
@@ -7,7 +7,7 @@ while (<>) {
     $module = shift @line;
     $proc = shift @line;
     $pid = shift @line;
-    print "$file:$line," . join(',', @line) . "\n";
+    print "'$file:$line'," . join(',', @line) . "\n";
 }
 
 
