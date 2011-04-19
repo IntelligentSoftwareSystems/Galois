@@ -229,6 +229,8 @@ public:
       return NextPtrLock;
     }
   };
+
+  ConExtLinkedQueue() :tail(0) {}
   
   bool empty() {
     return !head.getValue();
