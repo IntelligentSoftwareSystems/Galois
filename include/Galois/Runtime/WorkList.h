@@ -303,50 +303,57 @@ public:
   typedef T value_type;
 
   FIFO() :heap(sizeof(Chunk)) {
-    tail.setValue(0);
-    head.setValue(0);
   }
 
   bool push(value_type val) {
     tail.lock();
-    if (tail.getValue() && tail.getValue()->push_back(val)) {
+    Chunk* C = tail.getValue();
+    if (C && C->push_back(val)) {
       tail.unlock();
       return true;
     }
     //push didn't work, append a new element
-    if (tail.getValue()) {
-      queue.push(tail.getValue());
-      tail.setValue(0);
-    }
-    Chunk* nc = new (heap.allocate(sizeof(Chunk))) Chunk();
-    bool worked = nc->push_back(val);
+    if (C)
+      queue.push(C);
+    C = new (heap.allocate(sizeof(Chunk))) Chunk();
+    bool worked = C->push_back(val);
     assert(worked);
-    tail.unlock_and_set(nc);
+    tail.unlock_and_set(C);
     return true;
   }
 
   std::pair<bool, value_type> pop() {
     head.lock();
+    Chunk* C = head.getValue();
     std::pair<bool, value_type> retval;
-    do {
-      if (!head.getValue()) {
-	head.setValue(queue.pop());
-	if (!head.getValue()) {
-	  head.unlock();
-	  return std::make_pair(false, value_type());
-	}
-      }
-      retval = head.getValue()->pop_front();
-      if (retval.first) {
-	head.unlock();
-	return retval;
-      } else {
-	Chunk* C = head.getValue();
-	head.setValue(0);
-	C->~Chunk();
-	heap.deallocate(C);
-      }
-    } while (true);
+    if (C && (retval = C->pop_front()).first) {
+      head.unlock();
+      return retval;
+    }
+
+    //pop didn't work, try dumping head
+    if (C) {
+      C->~Chunk();
+      heap.deallocate(C);
+    }
+    C = queue.pop();
+    if (C) {
+      retval = C->pop_front();
+      head.unlock_and_set(C);
+      return retval;
+    }
+    //queue was empty, try stealing tail
+    tail.lock();
+    C = tail.getValue();
+    tail.unlock_and_clear();
+    if (C) {
+      retval = C->pop_front();
+      head.unlock_and_set(C);
+      return retval;
+    } else {
+      head.unlock_and_clear();
+      return std::make_pair(false, value_type());
+    }
   }
 
   std::pair<bool, value_type> try_pop() {
@@ -380,10 +387,10 @@ class LIFO : private boost::noncopyable {
 
   MM::FixedSizeAllocator heap;
 
-  ConExtLinkedStack<Chunk, concurrent> stack;
-  
-  PtrLock<Chunk*, concurrent> head;
+  ConExtLinkedStack<Chunk, false> stack;
 
+  PtrLock<Chunk*, concurrent> head;
+  
 public:
   template<bool newconcurrent>
   struct rethread {
@@ -393,49 +400,47 @@ public:
   typedef T value_type;
 
   LIFO() :heap(sizeof(Chunk)) {
-    head.setValue(0);
   }
 
   bool push(value_type val) {
     head.lock();
-    if (head.getValue() && head.getValue()->push_front(val)) {
+    Chunk* C = head.getValue();
+    if (C && C->push_front(val)) {
       head.unlock();
       return true;
     }
     //push didn't work, append a new element
-    if (head.getValue()) {
-      stack.push(head.getValue());
-      head.setValue(0);
-    }
-    Chunk* nc = new (heap.allocate(sizeof(Chunk))) Chunk();
-    bool worked = nc->push_front(val);
+    if (C)
+      stack.push(C);
+    C = new (heap.allocate(sizeof(Chunk))) Chunk();
+    bool worked = C->push_front(val);
     assert(worked);
-    head.unlock_and_set(nc);
+    head.unlock_and_set(C);
     return true;
   }
 
   std::pair<bool, value_type> pop() {
     head.lock();
+    Chunk* C = head.getValue();
     std::pair<bool, value_type> retval;
-    do {
-      if (!head.getValue()) {
-	head.setValue(stack.pop());
-	if (!head.getValue()) {
-	  head.unlock();
-	  return std::make_pair(false, value_type());
-	}
-      }
-      retval = head.getValue()->pop_front();
-      if (retval.first) {
-	head.unlock();
-	return retval;
-      } else {
-	Chunk* C = head.getValue();
-	head.setValue(0);
-	C->~Chunk();
-	heap.deallocate(C);
-      }
-    } while (true);
+    if (C && (retval = C->pop_front()).first) {
+      head.unlock();
+      return retval;
+    }
+    //pop didn't work, try dumping the head
+    if (C) {
+      C->~Chunk();
+      heap.deallocate(C);
+    }
+    C = stack.pop();
+    if (C) {
+      retval = C->pop_front();
+      head.unlock_and_set(C);
+      return retval;
+    } else {
+      head.unlock_and_clear();
+      return std::make_pair(false, value_type());
+    }
   }
 
   std::pair<bool, value_type> try_pop() {
