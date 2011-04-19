@@ -101,11 +101,13 @@ public:
   }
 
   void unlock() {
-    unlock_and_set(getValue());
+    assert(_lock & 1);
+    _lock = _lock & ~1;
   }
 
   void unlock_and_clear() {
-    unlock_and_set(0);
+    assert(_lock & 1);
+    _lock = 0;
   }
 
   void unlock_and_set(T val) {
