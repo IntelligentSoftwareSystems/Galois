@@ -7,6 +7,7 @@
 #include <queue>
 #include <stack>
 #include <limits>
+#include <map>
 #include <boost/utility.hpp>
 
 #include "Galois/Runtime/PaddedLock.h"
@@ -145,7 +146,7 @@ WLCOMPILECHECK(PriQueue);
 
 template<typename T, bool concurrent = true>
 class LIFO : private boost::noncopyable, private PaddedLock<concurrent> {
-  std::vector<T> wl;
+  std::deque<T> wl;
 
   using PaddedLock<concurrent>::lock;
   using PaddedLock<concurrent>::try_lock;
@@ -207,7 +208,7 @@ public:
   template<typename Iter>
   void fill_initial(Iter ii, Iter ee) {
     while (ii != ee) {
-      wl.push(*ii++);
+      wl.push_back(*ii++);
     }
   }
 };
@@ -277,7 +278,7 @@ public:
   template<typename Iter>
   void fill_initial(Iter ii, Iter ee) {
     while (ii != ee) {
-      wl.push(*ii++);
+      wl.push_back(*ii++);
     }
   }
 };
@@ -506,11 +507,14 @@ public:
 };
 WLCOMPILECHECK(ChunkedBag);
 
+#if 0
 template<class T, class Indexer = DummyIndexer<T>, typename ContainerTy = FIFO<T>, bool concurrent = true >
 class OrderedByIntegerMetric : private boost::noncopyable {
 
   typedef typename ContainerTy::template rethread<concurrent>::WL CTy;
 
+  std::map<int, CTy> queues;
+  SimpleLock<int, concurrent>
   CTy* data;
   unsigned int size;
   Indexer I;
@@ -613,6 +617,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
   }
 };
 WLCOMPILECHECK(OrderedByIntegerMetric);
+#endif
 
 template<class T, typename ContainerTy = FIFO<T> >
 class StealingLocalWL : private boost::noncopyable {
@@ -712,7 +717,7 @@ public:
   }
 
   template<typename iter>
-  void fillInitial(iter begin, iter end) {
+  void fill_initial(iter begin, iter end) {
     while (begin != end)
       global.push(*begin++);
   }
@@ -942,8 +947,8 @@ public:
   
   //! called in sequential mode to seed the worklist
   template<typename iter>
-  void fillInitial(iter begin, iter end) {
-    globalQ.fillInitial(begin,end);
+  void fill_initial(iter begin, iter end) {
+    globalQ.fill_initial(begin,end);
   }
 };
 WLCOMPILECHECK(LocalFilter);
@@ -1003,7 +1008,7 @@ public:
   
   //! called in sequential mode to seed the worklist
   template<typename iter>
-  void fillInitial(iter begin, iter end) {
+  void fill_initial(iter begin, iter end) {
     while (begin != end)
       push(*begin++);
   }

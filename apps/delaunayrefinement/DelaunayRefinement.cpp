@@ -130,7 +130,7 @@ int main(int argc, const char** argv) {
 
   using namespace GaloisRuntime::WorkList;
   LocalQueues<GNode, ChunkedBag<GNode, 1024>, LIFO<GNode> > wl2;
-  wl2.fillInitial(wl.begin(), wl.end());
+  wl2.fill_initial(wl.begin(), wl.end());
 
   Galois::Launcher::startTiming();
   refine(m, wl2);

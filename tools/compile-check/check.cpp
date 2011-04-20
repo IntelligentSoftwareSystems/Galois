@@ -3,7 +3,9 @@
 template<typename T>
 struct checker {
   T wl;
-  void foo() {
+  checker() {
+    int a[2] = {1,2};
+    wl.fill_initial(&a[0], &a[2]);
     wl.push(0);
     wl.pop();
     wl.empty();
