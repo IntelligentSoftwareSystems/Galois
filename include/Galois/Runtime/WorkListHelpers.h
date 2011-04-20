@@ -3,6 +3,8 @@
 #ifndef __WORKLISTHELPERS_H_
 #define __WORKLISTHELPERS_H_
 
+#include <iostream>
+
 namespace GaloisRuntime {
 namespace WorkList {
 
@@ -37,66 +39,6 @@ public:
   typedef T value_type;
 
   FixedSizeRing() :start(0), end(0) { assertSE(); }
-
-  //externally managed locking access methods
-
-  void external_lock() {
-    lock();
-  }
-
-  void external_unlock() {
-    unlock();
-  }
-
-  bool external_empty() {
-    return _i_empty();
-  }
-
-  bool external_full() {
-    return _i_full();
-  }
-
-  bool external_push_front(value_type val) {
-    if (_i_full()) {
-      return false;
-    }
-    start += chunksize - 1;
-    start %= chunksize;
-    data[start] = val;
-    return true;
-  }
-
-  bool external_push_back(value_type val) {
-    if (_i_full()) {
-      return false;
-    }
-    data[end] = val;
-    end += 1;
-    end %= chunksize;
-    return true;
-  }
-
-  std::pair<bool, value_type> external_pop_front() {
-    if (_i_empty()) {
-      return std::make_pair(false, value_type());
-    }
-    value_type retval = data[start];
-    ++start;
-    start %= chunksize;
-    return std::make_pair(true, retval);
-  }
-
-  std::pair<bool, value_type> external_pop_back() {
-    if (_i_empty()) {
-      return std::make_pair(false, value_type());
-    }
-    end += chunksize - 1;
-    end %= chunksize;
-    value_type retval = data[end];
-    return std::make_pair(true, retval);
-  }
-
-  //"Normal" access methods
 
   bool empty() {
     lock();
@@ -238,12 +180,14 @@ public:
 
   void push(T* C) {
     head.lock();
+    //std::cerr << "in(" << C << ") ";
     C->getNextPtr() = 0;
     if (tail) {
       tail->getNextPtr() = C;
       tail = C;
       head.unlock();
     } else {
+      assert(!head.getValue());
       tail = C;
       head.unlock_and_set(C);
     }
@@ -260,7 +204,9 @@ public:
 	tail = 0;
       head.unlock_and_set(C->getNextPtr());
       C->getNextPtr() = 0;
+      //std::cerr << "pop(" << C << ") ";
     } else {
+      //std::cerr << "pop(" << C << ") ";
       head.unlock();
     }
     return C;

@@ -11,7 +11,7 @@ namespace WorkList {
 
 template<typename T, typename Indexer, typename realWL>
 class WorkListTracker {
-  PerCPU<sFIFO<std::pair<unsigned int, unsigned int>, false > > tracking;
+  PerCPU<FIFO<std::pair<unsigned int, unsigned int>, false > > tracking;
   //global clock
   cache_line_storage<unsigned int> clock;
   //master thread counting towards a tick

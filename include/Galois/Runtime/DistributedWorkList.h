@@ -6,6 +6,8 @@
 #include <algorithm>
 //#include <tr1/unordered_map>
 
+#include <iostream>
+
 namespace GaloisRuntime {
 namespace WorkList {
 
@@ -172,7 +174,7 @@ class ReductionWL {
 
   paddedLocalWL* WL;
 
-  sFIFO<T> backup;
+  FIFO<T> backup;
 
   int starving;
 
@@ -537,17 +539,8 @@ template<typename T, typename Partitioner = DummyPartitioner<T>, typename ChildW
 class PartitionedWL : private boost::noncopyable {
 
   Partitioner P;
-
-  ChildWLTy* worklists;
-
-  ThreadPolicy& TP;
-
-  ChildWLTy* getWLFor(const T& item) {
-    unsigned int index = P(item);
-    return &worklists[index];
-  }
-
-  PerCPU<int> current;
+  PerCPU<ChildWLTy> Items;
+  int active;
 
 public:
   template<bool newconcurrent>
@@ -557,20 +550,22 @@ public:
 
   typedef T value_type;
   
-  PartitionedWL(const Partitioner& p = Partitioner()) :P(p), TP(getSystemThreadPolicy()) {
-    worklists = new ChildWLTy[p.getNum()];
-    for (int i = 0; i < current.size(); ++ i)
-      current.get(i) = i / 4;
+  PartitionedWL(const Partitioner& p = Partitioner()) :P(p), active(getSystemThreadPool().getActiveThreads()) {
+    std::cerr << active << "\n";
   }
 
-  ~PartitionedWL() { delete worklists; }
-
   bool push(value_type val) OPTNOINLINE {
-    getWLFor(val)->push(val);
+    unsigned int index = P(val);
+    //std::cerr << "[" << index << "," << index % active << "]\n";
+    return Items.get(index % active).push(val);
   }
 
   std::pair<bool, value_type> pop() OPTNOINLINE {
-    return worklists[current.get()].pop();
+    std::pair<bool, value_type> r = Items.get().pop();
+    // std::cerr << "{" << Items.myEffectiveID() << "}";
+    // if (r.first)
+    //   std::cerr << r.first;
+    return r;
   }
   
   std::pair<bool, value_type> try_pop() {
@@ -578,9 +573,7 @@ public:
   }
   
   bool empty() OPTNOINLINE {
-    for (int i = 0; i < P.getNum(); ++i)
-      if (!worklists[i].empty()) return false;
-    return true;
+    return Items.get().empty();
   }
 
   bool aborted(value_type val) {
