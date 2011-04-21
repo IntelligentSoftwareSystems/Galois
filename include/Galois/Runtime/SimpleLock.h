@@ -90,7 +90,7 @@ public:
 
   void lock() {
     do {
-      while (_lock & 1 != 0) {
+      while ((_lock & 1) != 0) {
 #if defined(__i386__) || defined(__amd64__)
 	asm volatile ( "pause");
 #endif
@@ -126,7 +126,7 @@ public:
 
   bool try_lock() {
     uintptr_t oldval = _lock;
-    if (oldval & 1 != 0)
+    if ((oldval & 1) != 0)
       return false;
     return __sync_bool_compare_and_swap(&_lock, oldval, oldval | 1);
   }
