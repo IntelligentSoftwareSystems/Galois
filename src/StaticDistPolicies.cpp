@@ -138,10 +138,10 @@ void GaloisRuntime::setSystemThreadPolicy(const char* name) {
     newPolicy = new MaxwellPolicy();
 
   if (newPolicy)
-    std::cout << "Using " << name << " for policy\n";
+    std::cout << "Using " << name << " for thread assignment policy\n";
   else {
     newPolicy = new DummyPolicy();
-    reportWarning("using default policy\n");
+    reportWarning("using default thread assignment policy\n");
   }
 
   if (TP)
