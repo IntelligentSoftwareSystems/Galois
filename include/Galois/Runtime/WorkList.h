@@ -755,7 +755,7 @@ class ApproxOrderByIntegerMetric : private boost::noncopyable {
     unsigned int index = I(val);
     index %= num();
     assert(index < num());
-    data[index].push(val);
+    return data[index].push(val);
   }
 
   std::pair<bool, value_type> pop() OPTNOINLINE {

@@ -391,9 +391,8 @@ public:
       n = popChunk();
       if (n)
 	return pop();
-      else
-	return std::make_pair(false, value_type());
     }
+    return std::make_pair(false, value_type());
   }
   
   std::pair<bool, value_type> try_pop() {
