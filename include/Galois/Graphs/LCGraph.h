@@ -14,7 +14,7 @@
 namespace Galois {
 namespace Graph {
 
-template<typename NodeTy, typename EdgeTy, bool Directional>
+template<typename NodeTy, typename EdgeTy>
 class LCGraph {
 	std::vector<EdgeTy> edgeData;
 	std::vector<unsigned int> outIdx;
@@ -23,7 +23,6 @@ class LCGraph {
 	unsigned int numNodes;
 
 	struct gNode: public GaloisRuntime::Lockable {
-
 		NodeTy data;
 		unsigned int idx;
 
@@ -31,8 +30,6 @@ class LCGraph {
 	};
 
 	std::vector<gNode> nodes;
-
-
 
 public:
 	class GraphNode {
@@ -45,7 +42,6 @@ public:
 		}
 
 	public:
-
 		GraphNode() :
 			Parent(0), ID(0) {
 		}
@@ -73,9 +69,7 @@ public:
 		bool operator>(const GraphNode& rhs) const {
 			return Parent > rhs.Parent || (Parent == rhs.Parent && ID > rhs.ID);
 		}
-
 	};
-
 
 private:
 	//deal with the Node redirection
@@ -90,15 +84,15 @@ private:
 	unsigned int getEdgeIdx(GraphNode src, GraphNode dst){
 		unsigned int idx = getId(src);
 		unsigned int target = getId(dst);
-		unsigned int start = outIdx.at(idx);
-		unsigned int end = outIdx.at(idx+1);
+		unsigned int start = outIdx[idx];
+		unsigned int end = outIdx[idx+1];
 
-		for(unsigned int i = start; i < end; i++){
-			if(outs[i]==target){
+		for (unsigned int i = start; i < end; i++){
+			if (outs[i]==target){
 				return i;
 			}
 		}
-		assert(0 && "Error getting Edge idx. Exiting.");
+		assert(0 && "Error getting edge idx");
 		abort();
 	}
 
@@ -114,19 +108,16 @@ private:
 	class makeGraphNode: public std::unary_function<gNode, GraphNode> {
 		LCGraph* G;
 	public:
-		makeGraphNode(LCGraph* g) :
-			G(g) {
-		}
+		makeGraphNode(LCGraph* g) : G(g) { }
 		GraphNode operator()(gNode& data) const {
 			return GraphNode(G, &data);
 		}
 	};
+
 	class makeGraphNodePtr: public std::unary_function<gNode*, GraphNode> {
 		LCGraph* G;
 	public:
-		makeGraphNodePtr(LCGraph* g) :
-			G(g) {
-		}
+		makeGraphNodePtr(LCGraph* g) : G(g) { }
 		GraphNode operator()(gNode* data) const {
 			return GraphNode(G, data);
 		}
@@ -137,17 +128,16 @@ private:
 	public:
 		makeGraphNode3(LCGraph* g) : G(g) {}
 		GraphNode operator()(unsigned int idx) const {
-		return GraphNode(G, &(G->nodes.at(idx)));
+		  return GraphNode(G, &(G->nodes.at(idx)));
 		}
 	};
 
 
 public:
 	// Create Graph
-	typedef FirstGraph<NodeTy,EdgeTy,Directional> FGraph;
+	typedef FirstGraph<NodeTy,EdgeTy,true> FGraph;
 
 	void createGraph(FGraph *g){
-
 		typedef typename FGraph::GraphNode GNode;
 		typedef typename FGraph::active_iterator GraphActiveIterator;
 		typedef typename FGraph::neighbor_iterator GraphNeighborIterator;
@@ -168,7 +158,7 @@ public:
 		}
 
 		outIdx.push_back(0);
-		for(unsigned int i = 0; i < numNodes; i++){
+		for (unsigned int i = 0; i < numNodes; i++){
 			const GNode src = rnodes[i];
 
 			for(GraphNeighborIterator ii = g->neighbor_begin(src), ee = g->neighbor_end(src);
@@ -198,8 +188,8 @@ public:
 		assert(src.ID);
 		assert(dst.ID);
 
-	    if (shouldLock(mflag))
-	      SimpleRuntimeContext::acquire(C, src.ID);
+    if (shouldLock(mflag))
+      SimpleRuntimeContext::acquire(C, src.ID);
 
 		return edgeData[getEdgeIdx(src, dst)];
 	}
@@ -209,24 +199,25 @@ public:
 	}
 
 	// General Things
-    typedef boost::transform_iterator<makeGraphNode3,
-  			  	  typename std::vector<unsigned int>::iterator> neighbor_iterator;
+  typedef boost::transform_iterator<makeGraphNode3,
+            typename std::vector<unsigned int>::iterator> neighbor_iterator;
 
 	neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = ALL, SimpleRuntimeContext* C = getThreadContext()) {
-	    assert(N.ID);
-	    if (shouldLock(mflag))
-	      SimpleRuntimeContext::acquire(C, N.ID);
+	  assert(N.ID);
+	  if (shouldLock(mflag))
+	    SimpleRuntimeContext::acquire(C, N.ID);
 		typename std::vector<unsigned int>::iterator I = outs.begin() + outIdx[N.ID->idx];
 		return boost::make_transform_iterator(I,
 				makeGraphNode3(this));
 	}
+
 	neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = ALL, SimpleRuntimeContext* C = getThreadContext()) {
-	    assert(N.ID);
-	    if (shouldLock(mflag)) // Probably not necessary (no valid use for an end pointer should ever require it)
-	      SimpleRuntimeContext::acquire(C, N.ID);
+    assert(N.ID);
+    // Probably not necessary (no valid use for an end pointer should ever require it)
+    if (shouldLock(mflag))
+      SimpleRuntimeContext::acquire(C, N.ID);
 		typename std::vector<unsigned int>::iterator I = outs.begin() + outIdx[(N.ID->idx)+1];
-		return boost::make_transform_iterator(I,
-				makeGraphNode3(this));
+		return boost::make_transform_iterator(I, makeGraphNode3(this));
 	}
 
 	//These are not thread safe!!
@@ -234,11 +225,11 @@ public:
 			active_iterator;
 
 	active_iterator active_begin() {
-	return boost::make_transform_iterator(nodes.begin(), makeGraphNode(this));
+    return boost::make_transform_iterator(nodes.begin(), makeGraphNode(this));
 	}
 
 	active_iterator active_end() {
-	return boost::make_transform_iterator(nodes.end(), makeGraphNode(this));
+    return boost::make_transform_iterator(nodes.end(), makeGraphNode(this));
 	}
 
 	unsigned int neighborsSize(GraphNode N, MethodFlag mflag = ALL, SimpleRuntimeContext* C = getThreadContext()) {
@@ -247,7 +238,7 @@ public:
 		  SimpleRuntimeContext::acquire(C, N.ID);
 		return neighborsSize(N, outIdx, outs);
 	}
-	// The number of nodes in the graph
+
 	unsigned int size() {
 		return std::distance(active_begin(), active_end());
 	}
@@ -259,3 +250,4 @@ public:
 
 }
 }
+// vim:ts=2:sw=2:sts=2

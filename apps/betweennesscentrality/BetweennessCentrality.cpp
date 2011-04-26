@@ -1,5 +1,6 @@
 #include "Galois/Launcher.h"
 #include "Galois/Graphs/LCGraph.h"
+#include "Galois/Graphs/FileGraph.h"
 #include "Galois/Galois.h"
 #include "Galois/IO/gr.h"
 
@@ -21,11 +22,9 @@ static const char* url = 0;
 static const char* help = "<input file>";
 
 
-typedef Galois::Graph::FirstGraph<unsigned long long, int, false> GraphT;
-typedef GraphT::GraphNode GNodeT;
-
 //LCGraph should handle void edgedata
-typedef Galois::Graph::LCGraph<unsigned long long, int, false> Graph;
+// TODO(ddn): make undirected
+typedef Galois::Graph::LC_FileGraph<unsigned long long, int> Graph;
 typedef Graph::GraphNode GNode;
 
 Graph* G;
@@ -50,7 +49,7 @@ struct process {
     
     std::cerr << ".";
     
-    int req = G->getId(_req);
+    int req = _req;
     
     sigma[req] = 1;
     d[req] = 1;
@@ -59,10 +58,10 @@ struct process {
     
     while (QAt != QPush) {
       GNode _v = SQ[QAt++];
-      int v = G->getId(_v);
+      int v = _v;
       for (Graph::neighbor_iterator ii = G->neighbor_begin(_v, Galois::Graph::NONE), ee = G->neighbor_end(_v, Galois::Graph::NONE); ii != ee; ++ii) {
 	GNode _w = *ii;
-	int w = G->getId(_w);
+	int w = _w;
 	if (!d[w]) {
 	  SQ[QPush++] = _w;
 	  d[w] = d[v] + 1;
@@ -76,7 +75,7 @@ struct process {
     
     std::vector<double> delta(NumNodes);
     while (QAt) {
-      int w = G->getId(SQ[--QAt]);
+      int w = SQ[--QAt];
       std::pair<MMapTy::iterator, MMapTy::iterator> ppp = P.equal_range(w);
       for (MMapTy::iterator ii = ppp.first, ee = ppp.second;
 	   ii != ee; ++ii) {
@@ -111,15 +110,13 @@ int main(int argc, const char** argv) {
   }
   printBanner(std::cout, name, description, url);
 
-  GraphT gt;
-  Graph  g;
+  Graph g;
   G = &g;
   GaloisRuntime::PerCPU_merge<std::vector<double> > cb(merge);
   CB = &cb;
 
-  //readTxtFile(argv[inputFileAt]);
-  Galois::IO::readFile_gr_void(args[0], &gt);
-  G->createGraph(&gt);
+  G->structureFromFile(args[0]);
+  G->emptyNodeData();
 
   NumNodes = G->size();
 
@@ -138,3 +135,4 @@ int main(int argc, const char** argv) {
 
   return 0;
 }
+// vim:ts=8:sts=2:sw=2
