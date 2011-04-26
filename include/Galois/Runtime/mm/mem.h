@@ -23,7 +23,7 @@ class mmapWrapper {
   static void _free(void*);
 public:
   enum {AllocSize = 2*1024*1024,
-	Alighment = 4*1024,
+	Alignment = 4*1024,
 	AutoFree = 1};
   
   mmapWrapper();
