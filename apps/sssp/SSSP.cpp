@@ -145,7 +145,7 @@ void runBodyParallel(const GNode src) {
   typedef dChunkedFIFO<UpdateRequest, 16> IChunk;
   typedef LogOrderByIntegerMetric<UpdateRequest, UpdateRequestIndexer, IChunk> LOBIM;;
   typedef ApproxOrderByIntegerMetric<UpdateRequest, UpdateRequestIndexer, IChunk> AOBIM;
-  typedef OrderedByIntegerMetric<UpdateRequest, UpdateRequestIndexer, IChunk> OBIM;
+  //typedef OrderedByIntegerMetric<UpdateRequest, UpdateRequestIndexer, IChunk> OBIM;
 
   LocalFilter<UpdateRequest, UpdateRequestIndexer, LIFO<UpdateRequest>, AOBIM> wl;
 
