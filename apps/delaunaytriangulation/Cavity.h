@@ -19,24 +19,24 @@ class DTCavity{
 	
 	//typedef std::set<GNode>::iterator GNodeSetIter;
 	Graph* graph;
-	std::set<GNode, std::less<GNode>, Galois::PerIterMem::ItAllocTy::rebind<GNode>::other> deletingNodes;
 	//std::set<GNode> deletingNodes;
 	
 	std::deque<GNode, Galois::PerIterMem::ItAllocTy::rebind<GNode>::other> oldNodes;
 	std::deque<GNode, Galois::PerIterMem::ItAllocTy::rebind<GNode>::other> connectionNodes;
+	std::set<GNode, std::less<GNode>, Galois::PerIterMem::ItAllocTy::rebind<GNode>::other> deletingNodes;
 	//std::deque<GNode> oldNodes;
 	//std::deque<GNode> connectionNodes;
-	DTTuple tuple;
 	GNode node;
-    Galois::PerIterMem* _cnx;
+	DTTuple tuple;
+  Galois::PerIterMem* _cnx;
 public:
 
 	DTCavity(Graph* g, GNode& n, DTTuple& t, Galois::PerIterMem* cnx)
 	:
+   graph(g),
 	 oldNodes(cnx->PerIterationAllocator),
 	 connectionNodes(cnx->PerIterationAllocator),
 	 deletingNodes(std::less<GNode>(), cnx->PerIterationAllocator),
-     graph(g),
 	 node(n),
 	 tuple(t)
 	{

@@ -24,8 +24,8 @@ protected:
 
   char* edgeData;
 
-  uint64_t numNodes;
   uint64_t numEdges;
+  uint64_t numNodes;
 
   uint64_t getEdgeIdx(GraphNode src, GraphNode dst) {
     for (neighbor_iterator ii = neighbor_begin(src),
@@ -126,10 +126,10 @@ public:
   }
 
   EdgeTy& getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
-    return FileGraph::getEdgeData<EdgeTy>(src,dst, mflag);
+    return FileGraph::getEdgeData<EdgeTy>(src, dst, mflag);
   }
 
-  bool nodeDataFromFile(const char* filename) {
+  void nodeDataFromFile(const char* filename) {
     emptyNodeData();
     std::ifstream file(filename);
     for (uint64_t i = 0; i < numNodes; ++i)
@@ -153,6 +153,49 @@ public:
 
 };
 
+template<typename NodeTy>
+class LC_FileGraph<NodeTy, void>: public FileGraph { 
+
+  struct gNode : public GaloisRuntime::Lockable {
+    NodeTy data;
+    gNode() {}
+  };
+
+  //null if type is void
+  cache_line_storage<gNode>* NodeData;
+
+public:
+  LC_FileGraph() :NodeData(0) {}
+  ~LC_FileGraph() {
+    if (NodeData)
+      delete[] NodeData;
+  }
+  
+  NodeTy& getData(GraphNode N, MethodFlag mflag = ALL) {
+    if (shouldLock(mflag))
+      GaloisRuntime::acquire(&NodeData[N].data);
+    return NodeData[N].data.data;
+  }
+
+  void nodeDataFromFile(const char* filename) {
+    emptyNodeData();
+    std::ifstream file(filename);
+    for (uint64_t i = 0; i < numNodes; ++i)
+      file >> NodeData[i];
+  }
+  
+  void emptyNodeData(NodeTy init = NodeTy()) {
+    NodeData = new cache_line_storage<gNode>[numNodes];
+    for (uint64_t i = 0; i < numNodes; ++i)
+      NodeData[i].data.data = init;
+  }
+
+  void prefetch_neighbors(GraphNode N) {
+    for (neighbor_iterator ii = neighbor_begin(N, NONE), ee = neighbor_begin(N,NONE); ii != ee; ++ii)
+      __builtin_prefetch(&NodeData[*ii].data.data);
+  }
+};
+
 }
 }
-// vim: sw=2:ts=8
+// vim:sw=2:ts=8:sts=2

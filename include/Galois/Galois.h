@@ -19,4 +19,9 @@ void for_each(IterTy b, IterTy e, Function f) {
   for_each(GWL, f);
 }
 
+template<typename Function>
+void for_all(Function f) {
+  GaloisRuntime::for_all_parallel(f);
+}
+
 }

@@ -43,6 +43,7 @@ bool FileGraph::structureFromFile(const char* filename) {
   
   struct stat buf;
   int f = fstat(masterFD, &buf);
+  assert(f == 0 && "failed to read file");
   masterLength = buf.st_size;
 
 
@@ -51,7 +52,7 @@ bool FileGraph::structureFromFile(const char* filename) {
   _MAP_BASE  |= MAP_POPULATE;
 #endif
   
-  void* m = mmap(0, masterLength, PROT_READ,_MAP_BASE, masterFD, 0);
+  void* m = mmap(0, masterLength, PROT_READ, _MAP_BASE, masterFD, 0);
   if (m == MAP_FAILED) {
     m = 0;
     return false;
@@ -73,4 +74,5 @@ bool FileGraph::structureFromFile(const char* filename) {
   if (numEdges % 2)
     fptr32 += 1;
   edgeData = (char*)fptr32;
+  return true;
 }

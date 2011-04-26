@@ -19,8 +19,8 @@ public:
 	~DTTuple() {};
 	inline const double getX() const { return _x; };
 	inline const double getY() const { return _y; };
-	inline double setX(double x) { _x = x; };
-	inline double setY(double y) { _y = y; };
+	inline void setX(double x) { _x = x; };
+	inline void setY(double y) { _y = y; };
 	
 	bool operator==(const DTTuple& rhs) const {
       	   if (_x != rhs._x || _y !=rhs._y)

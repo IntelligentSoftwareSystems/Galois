@@ -117,7 +117,7 @@ public:
   bool push(value_type val) {
     int ID = DistPolicy::getID();
     int levelpush = getHighestStarvingLevel(ID);
-    pushByLevel(ID, levelpush, val);
+    return pushByLevel(ID, levelpush, val);
   }
 
   bool aborted(value_type val) {

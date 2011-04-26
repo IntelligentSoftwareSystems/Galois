@@ -640,7 +640,7 @@ class StealingLocalWL : private boost::noncopyable {
   StealingLocalWL() {}
 
   bool push(value_type val) {
-    data.get().push(val);
+    return data.get().push(val);
   }
 
   std::pair<bool, value_type> pop() {
@@ -691,7 +691,7 @@ public:
   LocalQueues() {}
 
   bool push(value_type val) {
-    local.get().push(val);
+    return local.get().push(val);
   }
 
   bool aborted(value_type val) {
@@ -836,7 +836,7 @@ class LogOrderByIntegerMetric : private boost::noncopyable {
   bool push(value_type val) {   
     unsigned int index = I(val);
     index = getBin(index);
-    data[index].push(val);
+    return data[index].push(val);
   }
 
   std::pair<bool, value_type> pop() {
@@ -919,7 +919,7 @@ public:
 
   //! push an aborted value onto the queue
   bool aborted(value_type val) {
-    push(val);
+    return push(val);
   }
 
   //! pop a value from the queue.
