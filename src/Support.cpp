@@ -1,18 +1,26 @@
 #include "Galois/Runtime/Support.h"
 #include "LLVM/SmallVector.h"
-
+#include <pthread.h>
 #include <iostream>
 
+static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+
 void GaloisRuntime::reportStat(const char* text, unsigned long val) {
+  pthread_mutex_lock(&lock);
   std::cout << "STAT: " << text << " " << val << "\n";
+  pthread_mutex_unlock(&lock);
 }
 
 void GaloisRuntime::reportStat(const char* text, unsigned int val) {
+  pthread_mutex_lock(&lock);
   std::cout << "STAT: " << text << " " << val << "\n";
+  pthread_mutex_unlock(&lock);
 }
 
 void GaloisRuntime::reportStat(const char* text, double val) {
+  pthread_mutex_lock(&lock);
   std::cout << "STAT: " << text << " " << val << "\n";
+  pthread_mutex_unlock(&lock);
 }
 
 //Report Warnings
