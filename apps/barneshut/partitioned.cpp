@@ -452,7 +452,7 @@ struct ComputeCenterOfMass {
   ComputeCenterOfMass(OctreeInternal* _root, const std::vector<int>& _part_map, std::vector<double>& _masses, int _levels) :
    root(_root), part_map(_part_map), masses(_masses), levels(_levels) { 
     int nleaves = pow(8, levels);
-    masses.reserve(nleaves);
+    masses.resize(nleaves);
   }
 
   void operator()(unsigned int id) {
@@ -473,10 +473,13 @@ private:
     }
 
     for (int i = 0; i < 8; i++) {
-      assert(!node->is_leaf());
+      if (node->child[i] == NULL)
+        continue;
+      else if (node->child[i]->is_leaf())
+        continue;
       OctreeInternal* child = static_cast<OctreeInternal*>(node->child[i]);
-      if (child != NULL)
-        traverse(child, id, (acc << 3) + i, level - 1);
+      assert(!child->is_leaf());
+      traverse(child, id, (acc << 3) + i, level - 1);
     }
   }
 
@@ -578,6 +581,7 @@ struct ComputeForces {
   void operator()(unsigned int id) {
     double dsq = diameter * diameter * config.itolsq;
 
+    int num = 0;
     for (Bag<Body>::part_iterator it = bodies.part_begin(id), end = bodies.part_end(id); it != end; ++it) {
       Body& b = *it;
       Point p = b.acc;
@@ -588,7 +592,9 @@ struct ComputeForces {
         for (int i = 0; i < 3; i++)
           b.vel[i] += (b.vel[i] - p[i]) * config.dthf;
       }
+      num++;
     }
+    std::cout << "( " << id << " " << num << " )" << std::endl;
   }
 
   void recurse(Body& b, Body* node, double dsq) {
@@ -741,7 +747,7 @@ void make_octree_top_rec(OctreeInternal* parent, double radius, int level) {
 }
 
 void make_octree_top(
-    const BoundingBox& box, int nparts,
+    const BoundingBox& box, int nparts, int nthreads,
     OctreeInternal*& root, std::vector<int>& part_map, int& levels) {
   double radius = box.diameter() / 2;
   Point p = box.center();
@@ -752,21 +758,20 @@ void make_octree_top(
     make_octree_top_rec(root, radius * 0.5, levels - 1);
 
   int nleaves = pow(8, levels);
-  int block_size = nleaves / nparts;
   int index = 0;
 
-  part_map.reserve(nleaves);
+  part_map.resize(nleaves);
   //std::fill(part_map.begin(), part_map.begin() + nleaves, 0);
   for (int i = 0; i < nparts; i++) {
-    for (int j = 0; j < block_size; j++) 
-      part_map[index++] = i;
+    part_map[index++] = i % nthreads;
   }
 
   for (; index < nleaves; index++) 
-    part_map[index] = index % nparts;
+    part_map[index] = index % nthreads;
 }
 
 void pmain(int nbodies, int ntimesteps, int seed) {
+  int numThreads = GaloisRuntime::getSystemThreadPool().getActiveThreads();
   Bag<Body> bodies;
 
   generate_input(bodies, seed, nbodies);
@@ -779,9 +784,11 @@ void pmain(int nbodies, int ntimesteps, int seed) {
     OctreeInternal* top;
     std::vector<int> part_map;
     int levels;
-    make_octree_top(box, GaloisRuntime::getSystemThreadPool().getActiveThreads(), top, part_map, levels);
+    make_octree_top(box, 10*numThreads, numThreads, top, part_map, levels);
 
     bodies.partition(Partitioner(top, part_map));
+    for (int i = 0; i < part_map.size(); i++)
+      std::cout << "[" << i << "] = " << part_map[i] << std::endl;
 
     Galois::for_all(BuildLocalOctree(bodies, top, box));
     std::vector<double> masses;
@@ -789,8 +796,11 @@ void pmain(int nbodies, int ntimesteps, int seed) {
     Galois::for_all(computeCenterOfMass);
     computeCenterOfMass.finish();
 
+    std::cout << "===== Computing Forces =====" << std::endl;
     Galois::for_all(ComputeForces(bodies, top, box.diameter(), step));
+    std::cout << "===== Middle =====" << std::endl;
     Galois::for_all(AdvanceBodies(bodies));
+    std::cout << "===== End =====" << std::endl;
 
     std::cout << "Timestep " << step << " Center of Mass = " << top->pos << std::endl;
     delete top;

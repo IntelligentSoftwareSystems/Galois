@@ -62,7 +62,10 @@ int main(int argc, const char** argv) {
 	std::cout << "Num. of threads: " << numThreads << std::endl;
 
   if (true) {
+    Galois::Launcher::startTiming();
     pmain(barneshut.nbodies, barneshut.ntimesteps, barneshut.seed);
+    Galois::Launcher::stopTiming();
+    std::cout << "STAT: Time " << Galois::Launcher::elapsedTime() << "\n";
   }
 
 	Galois::Launcher::startTiming();
