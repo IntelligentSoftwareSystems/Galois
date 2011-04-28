@@ -1,13 +1,4 @@
-The eclipse project has been configured to use this directory as the build directory.
+We use cmake. Run the following commands setup a basic build configuration.
 
-Pressing Ctrl+B will run make inside this directory.
-
-To initialize this directory you need to run cmake:
-make -C ${ProjDirPath}/build VERBOSE=1
-
-cd to the "build" directory and run "cmake .."
-
-user@host:~/workspace/galoiscpp$ cd build
-user@host:~/workspace/galoiscpp/build$ cmake ..
-
-Contact reza@cs if you have any questions.
+(mkdir default; cd default; cmake ../..)
+(mkdir debug; cd debug; cmake -DCMAKE_BUILD_TYPE=Debug ../..)
