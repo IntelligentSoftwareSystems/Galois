@@ -26,8 +26,7 @@ typedef Galois::Graph::IndexedGraph<OctTreeNodeData, int, true, 8>::GraphNode GN
 GNode createNode(Graph *octree, OctTreeNodeData b) {
 	GNode newnode = octree->createNode(b);
 	for (int i = 0; i < 8; i++) {
-		octree->setNeighbor(newnode, Graph::GraphNode::GraphNode(), i,
-				Galois::Graph::NONE);
+		octree->setNeighbor(newnode, GNode::GraphNode(), i, Galois::Graph::NONE);
 	}
 	return newnode;
 }
@@ -36,11 +35,12 @@ class Barneshut {
 public:
 	double dtime; // length of one time step
 	double eps; // potential softening parameter
-	double tol; // tolerance for stopping recursion, should be less than 0.57 for 3D case to bound error
+	double tol; // tolerance for stopping recursion, <0.57 to bound error
 	double dthf, epssq, itolsq;
 	double diameter, centerx, centery, centerz;
-	OctTreeNodeData *body; // the n bodies
-	GNode *leaf;
+  OctTreeNodeData* body; // the n bodies
+	GNode* leaf;
+  int seed;
 	int curr;
 	int nbodies; // number of bodies in system
 	int ntimesteps; // number of time steps to run
@@ -61,7 +61,7 @@ private:
     return rand() / (double) RAND_MAX;
   }
 
-  void init(int _nbodies, int _ntimesteps, double _dtime, double _eps, double _tol) {
+  void init(int _nbodies, int _ntimesteps, double _dtime, double _eps, double _tol, int _seed) {
     nbodies = _nbodies;
     ntimesteps = _ntimesteps;
     dtime = _dtime;
@@ -70,17 +70,57 @@ private:
     dthf = 0.5 * dtime;
     epssq = eps * eps;
     itolsq = 1.0 / (tol * tol);
+    seed = _seed;
+    GaloisRuntime::getSystemThreadPool().getActiveThreads();
     body = new OctTreeNodeData[nbodies];
-		leaf = new GNode[nbodies];
   }
 
+	void insert(Graph *octree, GNode &root, OctTreeNodeData &b, double r) {
+		double x = 0.0, y = 0.0, z = 0.0;
+		OctTreeNodeData &n = root.getData(Galois::Graph::NONE);
+		int i = 0;
+		if (n.posx < b.posx) {
+			i = 1;
+			x = r;
+		}
+		if (n.posy < b.posy) {
+			i += 2;
+			y = r;
+		}
+		if (n.posz < b.posz) {
+			i += 4;
+			z = r;
+		}
+		GNode child = octree->getNeighbor(root, i, Galois::Graph::NONE);
+		if (child.isNull()) {
+			GNode newnode = createNode(octree, b);
+			octree->addNode(newnode, Galois::Graph::NONE);
+			octree->setNeighbor(root, newnode, i, Galois::Graph::NONE);
+		} else {
+			double rh = 0.5 * r;
+			OctTreeNodeData &ch = child.getData(Galois::Graph::NONE);
+			if (!(ch.isLeaf())) {
+				insert(octree, child, b, rh);
+			} else {
+				GNode newnode = createNode(octree, OctTreeNodeData(n.posx - rh + x,
+						n.posy - rh + y, n.posz - rh + z));
+				octree->addNode(newnode, Galois::Graph::NONE);
+        assert(b.posx != n.posx && b.posy != n.posy && b.posz != n.posz);
+				insert(octree, newnode, b, rh);
+				insert(octree, newnode, ch, rh);
+				octree->setNeighbor(root, newnode, i, Galois::Graph::NONE);
+			}
+		}
+	}
+
+
 public:
-  void genInput(int seed, int nbodies) {
+  void genInput(int nbodies, int ntimesteps, int _seed) {
     double r, v, x, y, z, sq, scale;
     double PI = boost::math::constants::pi<double>();
 
+    init(nbodies, ntimesteps, 0.5, 0.05, 0.025, _seed);
     srand(seed);
-    init(nbodies, 1, 0.5, 0.05, 0.025);
 
     double rsc = (3 * PI) / 16;
     double vsc = sqrt(1.0 / rsc);
@@ -138,7 +178,7 @@ public:
 		infile >> tol;
 		getline(infile, line);
 
-    init(nbodies, ntimesteps, tol, eps, dtime);
+    init(nbodies, ntimesteps, tol, eps, dtime, 0);
 
 		for (int i = 0; i < nbodies; i++) {
 			OctTreeNodeData &b = body[i];
@@ -165,73 +205,37 @@ public:
 			posx = b.posx;
 			posy = b.posy;
 			posz = b.posz;
-			if (minx > posx) {
+			if (minx > posx) 
 				minx = posx;
-			}
-			if (miny > posy) {
+			if (miny > posy) 
 				miny = posy;
-			}
-			if (minz > posz) {
+			if (minz > posz) 
 				minz = posz;
-			}
-			if (maxx < posx) {
+			if (maxx < posx) 
 				maxx = posx;
-			}
-			if (maxy < posy) {
+			if (maxy < posy) 
 				maxy = posy;
-			}
-			if (maxz < posz) {
+			if (maxz < posz) 
 				maxz = posz;
-			}
 		}
 		diameter = maxx - minx;
-		if (diameter < (maxy - miny)) {
+		if (diameter < (maxy - miny)) 
 			diameter = (maxy - miny);
-		}
-		if (diameter < (maxz - minz)) {
+		if (diameter < (maxz - minz)) 
 			diameter = (maxz - minz);
-		}
 		centerx = (maxx + minx) * 0.5;
 		centery = (maxy + miny) * 0.5;
 		centerz = (maxz + minz) * 0.5;
 	}
 
-	void insert(Graph *octree, GNode &root, OctTreeNodeData &b, double r) {
-		double x = 0.0, y = 0.0, z = 0.0;
-		OctTreeNodeData &n = root.getData(Galois::Graph::NONE);
-		int i = 0;
-		if (n.posx < b.posx) {
-			i = 1;
-			x = r;
+	void insertPoints(Graph *octree, GNode &root) {
+		leaf = new GNode[nbodies];
+		double radius = diameter * 0.5;
+		for (int i = 0; i < nbodies; i++) {
+			OctTreeNodeData &b = body[i];
+			insert(octree, root, b, radius);
 		}
-		if (n.posy < b.posy) {
-			i += 2;
-			y = r;
-		}
-		if (n.posz < b.posz) {
-			i += 4;
-			z = r;
-		}
-		GNode child = octree->getNeighbor(root, i, Galois::Graph::NONE);
-		if (child.isNull()) {
-			GNode newnode = createNode(octree, b);
-			octree->addNode(newnode, Galois::Graph::NONE);
-			octree->setNeighbor(root, newnode, i, Galois::Graph::NONE);
-		} else {
-			double rh = 0.5 * r;
-			OctTreeNodeData &ch = child.getData(Galois::Graph::NONE);
-			if (!(ch.isLeaf())) {
-				insert(octree, child, b, rh);
-			} else {
-				GNode newnode = createNode(octree, OctTreeNodeData(n.posx - rh + x,
-						n.posy - rh + y, n.posz - rh + z));
-				octree->addNode(newnode, Galois::Graph::NONE);
-				insert(octree, newnode, b, rh);
-				insert(octree, newnode, ch, rh);
-				octree->setNeighbor(root, newnode, i, Galois::Graph::NONE);
-			}
-		}
-	}
+  }
 
 	void computeCenterOfMass(Graph *octree, GNode &root) {
 		double m, px = 0.0, py = 0.0, pz = 0.0;

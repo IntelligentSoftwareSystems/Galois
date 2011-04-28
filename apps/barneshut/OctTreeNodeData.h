@@ -53,7 +53,7 @@ public:
 	OctTreeNodeData(const OctTreeNodeData& copy) {
 		restoreFrom(copy);
 	}
-	bool isLeaf() {
+	bool isLeaf() const {
 		return leaf;
 	}
 	void setVelocity(double x, double y, double z) {
@@ -61,12 +61,13 @@ public:
 		vely = y;
 		velz = z;
 	}
-	std::string toString() {
+	std::string toString() const {
 		std::ostringstream s;
 		if (isLeaf()) {
-			s << OctTreeNodeData::toString();
-			s << "vel = (" << velx << "," << vely << "," << velz << ")";
-			s << "acc = (" << accx << "," << accy << "," << accz << ")";
+			s << "pos = (" << posx << "," << posy << "," << posz << ") ";
+			s << "vel = (" << velx << "," << vely << "," << velz << ") ";
+			s << "acc = (" << accx << "," << accy << "," << accz << ") ";
+                        s << "mass = " << mass;
 			return s.str();
 		} else {
 			s << "mass = " << mass << " pos = (" << posx << "," << posy << ","
@@ -101,5 +102,10 @@ public:
 		leaf = data.leaf;
 	}
 };
+
+std::ostream& operator<<(std::ostream& os, const OctTreeNodeData& b) {
+  os << b.toString();
+  return os;
+}
 
 #endif /* OCTTREENODEDATA_H_ */
