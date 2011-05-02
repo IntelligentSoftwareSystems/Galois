@@ -13,20 +13,20 @@ class PaddedLock;
 
 template<>
 class PaddedLock<true> {
-  cache_line_storage<SimpleLock<int, true> > Lock;
+  mutable cache_line_storage<SimpleLock<int, true> > Lock;
 
 public:
-  void lock() { Lock.data.lock(); }
-  bool try_lock() { return Lock.data.try_lock(); }
-  void unlock() { Lock.data.unlock(); }
+  void lock() const { Lock.data.lock(); }
+  bool try_lock() const { return Lock.data.try_lock(); }
+  void unlock() const { Lock.data.unlock(); }
 };
 
 template<>
 class PaddedLock<false> {
 public:
-  void lock() {}
-  bool try_lock() { return true; }
-  void unlock() {}
+  void lock() const {}
+  bool try_lock() const { return true; }
+  void unlock() const {}
 };
 
 }
