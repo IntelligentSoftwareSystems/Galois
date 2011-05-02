@@ -29,12 +29,6 @@
 namespace GaloisRuntime {
 namespace WorkList {
 
-template<typename T>
-class DummyIndexer {
-public:
-  unsigned operator()(const T& x) { return 0; }
-};
-
 // Worklists may not be copied.
 // Worklists should be default instantiatable
 // All classes (should) conform to:
@@ -56,14 +50,13 @@ public:
   bool aborted(value_type val);
   //! pop a value from the queue.
   std::pair<bool, value_type> pop();
-  //! pop a value from the queue trying not as hard to take locks
-  std::pair<bool, value_type> try_pop();
-  //! return if the queue *may* be empty
-  bool empty();
+  //! return if the queue is empty
+  //! *not thread safe*
+  bool empty() const;
   
   //! called in sequential mode to seed the worklist
   template<typename iter>
-  void fillInitial(iter begin, iter end);
+  void fill_initial(iter begin, iter end);
 
 
 };
@@ -109,25 +102,9 @@ public:
       return std::make_pair(true, retval);
     }
   }
-
-  std::pair<bool, value_type> try_pop() {
-    if (try_lock()) {
-      if (!wl.empty()) {
-	value_type retval = wl.top();
-	wl.pop();
-	unlock();
-	return std::make_pair(true, retval);
-      }
-      unlock();
-    }
-    return std::make_pair(false, value_type());
-  }
    
-  bool empty() {
-    lock();
-    bool retval = wl.empty();
-    unlock();
-    return retval;
+  bool empty() const {
+    return wl.empty();
   }
 
   bool aborted(value_type val) {
@@ -180,24 +157,8 @@ public:
     }
   }
 
-  std::pair<bool, value_type> try_pop() OPTNOINLINE {
-    if (try_lock()) {
-      if (!wl.empty()) {
-	value_type retval = wl.back();
-	wl.pop_back();
-	unlock();
-	return std::make_pair(true, retval);
-      }
-      unlock();
-    }
-    return std::make_pair(false, value_type());
-  }
-
-  bool empty() OPTNOINLINE {
-    lock();
-    bool retval = wl.empty();
-    unlock();
-    return retval;
+  bool empty() const OPTNOINLINE {
+    return wl.empty();
   }
 
   bool aborted(value_type val) {
@@ -250,24 +211,8 @@ public:
     }
   }
 
-  std::pair<bool, value_type> try_pop() {
-    if (try_lock()) {
-      if (!wl.empty()) {
-	value_type retval = wl.front();
-	wl.pop_front();
-	unlock();
-	return std::make_pair(true, retval);
-      }
-      unlock();
-    }
-    return std::make_pair(false, value_type());
-  }
-
-  bool empty() {
-    lock();
-    bool retval = wl.empty();
-    unlock();
-    return retval;
+  bool empty() const {
+    return wl.empty();
   }
 
   bool aborted(value_type val) {
@@ -286,7 +231,7 @@ WLCOMPILECHECK(FIFO);
 
 template<typename T, int chunksize=64, bool concurrent=true>
 class ChunkedFIFO : private boost::noncopyable {
-  class Chunk : public FixedSizeRing<T, chunksize, false>, public ConExtLinkedQueue<Chunk, concurrent>::ListNode { };
+  class Chunk : public FixedSizeRing<T, chunksize, false>, public ConExtListNode<Chunk> { };
 
   MM::FixedSizeAllocator heap;
 
@@ -297,6 +242,15 @@ class ChunkedFIFO : private boost::noncopyable {
 
   PerCPU<p> data;
   ConExtLinkedQueue<Chunk, concurrent> queue;
+
+  Chunk* mkChunk() {
+    return new (heap.allocate(sizeof(Chunk))) Chunk();
+  }
+
+  void delChunk(Chunk* C) {
+    C->~Chunk();
+    heap.deallocate(C);
+  }
 
 public:
   template<bool newconcurrent>
@@ -317,61 +271,51 @@ public:
   ~ChunkedFIFO() {
     for (int i = 0; i < data.size(); ++i) {
       p& r = data.get(i);
-      if (r.next) {
-	r.next->~Chunk();
-	heap.deallocate(r.next);
-	r.next = 0;
-      }
-      if (r.cur) {
-	r.cur->~Chunk();
-	heap.deallocate(r.cur);
-	r.cur = 0;
-      }
+      if (r.next)
+	delChunk(r.next);
+      if (r.cur)
+	delChunk(r.cur);
+      r.next = r.cur = 0;
     }
+    while (Chunk* C = queue.pop())
+      delChunk(C);
   }
 
   bool push(value_type val) {
     p& n = data.get();
-    if (n.next && n.next->full()) {
+    if (n.next && n.next->push_back(val))
+      return true;
+    if (n.next)
       queue.push(n.next);
-      n.next = 0;
-    }
-    if (!n.next)
-      n.next = new (heap.allocate(sizeof(Chunk))) Chunk();
-    bool retval = n.next->push_back(val);
-    assert(retval);
-    return retval;
+    n.next = mkChunk();
+    bool worked = n.next->push_back(val);
+    assert(worked);
+    return true;
   }
 
   std::pair<bool, value_type> pop() {
     p& n = data.get();
-    if (n.cur && n.cur->empty()) {
-      n.cur->~Chunk();
-      heap.deallocate(n.cur);
-      n.cur = 0;
-    }
-    if (!n.cur)
-      n.cur = queue.pop();
+    std::pair<bool, value_type> retval;
+    if (n.cur && (retval = n.cur->pop_front()).first)
+      return retval;
+    if(n.cur)
+      delChunk(n.cur);
+    n.cur = queue.pop();
     if (!n.cur) {
-      //Shared queue was empty, check next
       n.cur = n.next;
       n.next = 0;
     }
-
-    if (!n.cur)
-      return std::make_pair(false, value_type());
-
-    return n.cur->pop_front();
+    if (n.cur)
+      return n.cur->pop_front();
+    return std::make_pair(false, value_type());
   }
   
-  std::pair<bool, value_type> try_pop() {
-    return pop();
-  }
-  
-  bool empty() {
-    p& n = data.get();
-    if (n.cur && !n.cur->empty()) return false;
-    if (n.next && !n.next->empty()) return false;
+  bool empty() const {
+    for (int i = 0; i < data.size(); ++i) {
+      const p& n = data.get(i);
+      if (n.cur && !n.cur->empty()) return false;
+      if (n.next && !n.next->empty()) return false;
+    }
     return queue.empty();
   }
 
@@ -395,96 +339,81 @@ public:
 WLCOMPILECHECK(ChunkedFIFO);
 
 template<typename T, int chunksize=64, bool concurrent=true>
-class ChunkedBag : private boost::noncopyable {
-  class Chunk : public FixedSizeRing<T, chunksize, false>, public ConExtLinkedStack<Chunk, concurrent>::ListNode {};
+class ChunkedLIFO : private boost::noncopyable {
+  class Chunk : public FixedSizeRing<T, chunksize, false>, public ConExtListNode<Chunk> {};
 
   MM::FixedSizeAllocator heap;
 
   struct p {
     Chunk* cur;
-    Chunk* next;
   };
 
   PerCPU<p> data;
   ConExtLinkedStack<Chunk, concurrent> stack;
 
+  Chunk* mkChunk() {
+    return new (heap.allocate(sizeof(Chunk))) Chunk();
+  }
+
+  void delChunk(Chunk* C) {
+    C->~Chunk();
+    heap.deallocate(C);
+  }
+
 public:
   template<bool newconcurrent>
   struct rethread {
-    typedef ChunkedBag<T, chunksize, newconcurrent> WL;
+    typedef ChunkedLIFO<T, chunksize, newconcurrent> WL;
   };
 
   typedef T value_type;
   
-  ChunkedBag() : heap(sizeof(Chunk)) {
-    for (int i = 0; i < data.size(); ++i) {
-      p& r = data.get(i);
-      r.next = 0;
-      r.cur = 0;
-    }
+  ChunkedLIFO() : heap(sizeof(Chunk)) {
+    for (int i = 0; i < data.size(); ++i)
+      data.get(i).cur = 0;
   }
 
-  ~ChunkedBag() {
+  ~ChunkedLIFO() {
     for (int i = 0; i < data.size(); ++i) {
       p& r = data.get(i);
-      if (r.next) {
-	r.next->~Chunk();
-	heap.deallocate(r.next);
-	r.next = 0;
-      }
-      if (r.cur) {
-	r.cur->~Chunk();
-	heap.deallocate(r.cur);
-	r.cur = 0;
-      }
+      if (r.cur)
+	delChunk(r.cur);
+      r.cur = 0;
     }
+    while (Chunk* C = stack.pop())
+      delChunk(C);
   }
 
   bool push(value_type val) {
     p& n = data.get();
-    if (n.next && n.next->full()) {
-      stack.push(n.next);
-      n.next = 0;
-    }
-    if (!n.next)
-      n.next = new (heap.allocate(sizeof(Chunk))) Chunk();
-    bool retval = n.next->push_back(val);
-    assert(retval);
-    return retval;
+    if (n.cur && n.cur->push_back(val))
+      return true;
+    if (n.cur)
+      stack.push(n.cur);
+    n.cur = mkChunk();
+    bool worked = n.cur->push_back(val);
+    assert(worked);
+    return true;
   }
 
   std::pair<bool, value_type> pop() {
     p& n = data.get();
-    if (n.cur && n.cur->empty()) {
-      n.cur->~Chunk();
-      heap.deallocate(n.cur);
-      n.cur = 0;
-    }
-    if (!n.cur) {
-      Chunk* r = stack.pop();
-      if (r) {
-	//Shared queue had data
-	n.cur = r;
-      } else {
-	//Shared queue was empty, check next
-	n.cur = n.next;
-	n.next = 0;
-	if (!n.cur)
-	  return std::make_pair(false, value_type());
-      }
-    }
-
-    return n.cur->pop_front();
-  }
-  
-  std::pair<bool, value_type> try_pop() {
-    return pop();
+    std::pair<bool, value_type> retval;
+    if (n.cur && (retval = n.cur->pop_front()).first)
+      return retval;
+    if (n.cur)
+      delChunk(n.cur);
+    n.cur = stack.pop();
+    if (n.cur)
+      return n.cur->pop_front();
+    return std::make_pair(false, value_type());
   }
   
   bool empty() {
-    p& n = data.get();
-    if (n.cur && !n.cur->empty()) return false;
-    if (n.next && !n.next->empty()) return false;
+    for (int i = 0; i < data.size(); ++i) {
+      p& n = data.get(i);
+      if (n.cur && !n.cur->empty()) return false;
+    }
     return stack.empty();
   }
 
@@ -499,46 +428,30 @@ public:
     for( ; ii != ee; ++ii) {
       push(*ii);
     }
-    if (n.next) {
-      stack.push(n.next);
-      n.next = 0;
+    if (n.cur) {
+      stack.push(n.cur);
+      n.cur = 0;
     }
   }
 };
-WLCOMPILECHECK(ChunkedBag);
+WLCOMPILECHECK(ChunkedLIFO);
 
-#if 0
 template<class T, class Indexer = DummyIndexer<T>, typename ContainerTy = FIFO<T>, bool concurrent = true >
 class OrderedByIntegerMetric : private boost::noncopyable {
 
   typedef typename ContainerTy::template rethread<concurrent>::WL CTy;
 
-  std::map<int, CTy> queues;
-  SimpleLock<int, concurrent>
-  CTy* data;
-  unsigned int size;
+  struct perItem {
+    CTy* current;
+    std::map<int, CTy*> local;
+  };
+
+  std::map<int, CTy*> master;
+  SimpleLock<int, concurrent> masterLock;
+
   Indexer I;
-  PerCPU<unsigned int> cursor;
 
-  // static void merge(unsigned int& x, unsigned int& y) {
-  //   x = 0;
-  //   y = 0;
-  // }
-
-  // void print() {
-  //   static int iter = 0;
-  //   ++iter;
-  //   if (iter % 1024 == 0) {
-  //     unsigned c[32];
-  //     for (int i = 0; i < 32; ++i)
-  // 	c[i] = 0;
-  //     for (unsigned int i = 0; i < size; ++i)
-  // 	c[i % 32] += data[i].count();
-  //     for (int i = 0; i < 31; ++i)
-  // 	std::cout << c[i] << ",";
-  //     std::cout << c[31] << "\n";
-  //   }
-  // }
+  PerCPU<perItem> current;
 
  public:
   template<bool newconcurrent>
@@ -548,58 +461,57 @@ class OrderedByIntegerMetric : private boost::noncopyable {
 
   typedef T value_type;
 
-  OrderedByIntegerMetric(unsigned int range = 32*1024, const Indexer& x = Indexer())
-    :size(range+1), I(x)
+  OrderedByIntegerMetric(const Indexer& x = Indexer())
+    :I(x)
   {
-    data = new CTy[size];
-    for (int i = 0; i < cursor.size(); ++i)
-      cursor.get(i) = 0;
-  }
-  
-  ~OrderedByIntegerMetric() {
-    delete[] data;
+    for (int i = 0; i < current.size(); ++i)
+      current.get(i).current = 0;
   }
 
+  ~OrderedByIntegerMetric() {
+    for (typename std::map<int, CTy*>::iterator ii = master.begin(), ee = master.end(); ii != ee; ++ii)
+      delete ii->second;
+  }
+  
   bool push(value_type val) {
     unsigned int index = I(val);
-    index = std::min(index, size - 1);
-    assert(index < size);
-    data[index].push(val);
-    unsigned int& cur = concurrent ? cursor.get() : cursor.get(0);
-    if (cur > index)
-      cur = index;
+    perItem& pI = current.get();
+    CTy*& lC = pI.local[index];
+    if (!lC) {
+      masterLock.lock();
+      CTy*& gC = master[index];
+      if (!gC)
+	gC = new CTy();
+      lC = gC;
+      masterLock.unlock();
+    }
+    lC->push(val);
   }
 
   std::pair<bool, value_type> pop() {
-    // print();
-    unsigned int& cur = concurrent ? cursor.get() : cursor.get(0);
-    std::pair<bool, value_type> ret;
     //Find a successful pop
-    assert(cur < size);
-    ret = data[cur].try_pop();
-    if (ret.first)
-      return ret;
-
-    //cursor failed, scan from front
-    //assuming queues tend to be full, this should let us pick up good
-    //items sooner
-    for (cur = 0; cur < size; ++cur) {
-      ret = data[cur].try_pop();
-      if (ret.first)
-	return ret;
+    perItem& pI = current.get();
+    CTy*& C = pI.current;
+    std::pair<bool, value_type> retval;
+    if (C && (retval = C->pop()).first)
+      return retval;
+    //Failed, find minimum bin
+    masterLock.lock();
+    for (typename std::map<int, CTy*>::iterator ii = master.begin(), ee = master.end(); ii != ee; ++ii) {
+      C = ii->second;
+      if ((retval = C->pop()).first) {
+	masterLock.unlock();
+	return retval;
+      }
     }
-    cur = 0;
-    ret.first = false;
-    return ret;
-  }
-
-  std::pair<bool, value_type> try_pop() {
-    return pop();
+    masterLock.unlock();
+    retval.first = false;
+    return retval;
   }
 
   bool empty() const {
-    for (unsigned int i = 0; i < size; ++i)
-      if (!data[i].empty())
+    for (typename std::map<int, CTy*>::const_iterator ii = master.begin(), ee = master.end(); ii != ee; ++ii)
+      if (!ii->second->empty())
 	return false;
     return true;
   }
@@ -617,7 +529,6 @@ class OrderedByIntegerMetric : private boost::noncopyable {
   }
 };
 WLCOMPILECHECK(OrderedByIntegerMetric);
-#endif
 
 template<class T, typename ContainerTy = FIFO<T> >
 class StealingLocalWL : private boost::noncopyable {
@@ -648,13 +559,6 @@ class StealingLocalWL : private boost::noncopyable {
     if (ret.first)
       return ret;
     return data.getNext().pop();
-  }
-
-  std::pair<bool, value_type> try_pop() {
-    std::pair<bool, value_type> ret = data.get().try_pop();
-    if (ret.first)
-      return ret;
-    return data.getNext().try_pop();
   }
 
   bool empty() {
@@ -705,10 +609,6 @@ public:
       return ret;
     ret = global.pop();
     return ret;
-  }
-
-  std::pair<bool, value_type> try_pop() {
-    return pop();
   }
 
   bool empty() {
@@ -768,15 +668,11 @@ class ApproxOrderByIntegerMetric : private boost::noncopyable {
     //must move cursor
     for (int i = 0; i < num(); ++i) {
       cur = (cur + 1) % num();
-      ret = data[cur].try_pop();
+      ret = data[cur].pop();
       if (ret.first)
 	return ret;
     }
     return std::pair<bool, value_type>(false, value_type());
-  }
-
-  std::pair<bool, value_type> try_pop() OPTNOINLINE {
-    return pop();
   }
 
   bool empty() OPTNOINLINE {
@@ -856,10 +752,6 @@ class LogOrderByIntegerMetric : private boost::noncopyable {
     return std::pair<bool, value_type>(false, value_type());
   }
 
-  std::pair<bool, value_type> try_pop() {
-    return pop();
-  }
-
   bool empty() {
     for (unsigned int i = 0; i < num(); ++i)
       if (!data[i].empty())
@@ -934,11 +826,6 @@ public:
     return r;
   }
 
-  //! pop a value from the queue trying not as hard to take locks
-  std::pair<bool, value_type> try_pop() OPTNOINLINE {
-    return pop();
-  }
-
   //! return if the queue *may* be empty
   bool empty() OPTNOINLINE {
     if (!localQs.get().Q.empty()) return false;
@@ -994,10 +881,6 @@ public:
     return std::make_pair(false, value_type());
   }
 
-  std::pair<bool, value_type> try_pop() {
-    return pop();
-  }
-
   bool empty() {
     for (int i = 0; i < data.size(); ++i)
       if (!data.get(i).empty())
@@ -1016,6 +899,90 @@ public:
 };
 WLCOMPILECHECK(MP_SC_FIFO);
 
+#if 0
+//Bag per writer, reader steals entire bag
+template<typename T, int chunksize = 64>
+class MP_SC_Bag {
+  class Chunk : public FixedSizeRing<T, chunksize, false>, public ConExtListNode<Chunk>::ListNode {};
+
+  MM::FixedSizeAllocator heap;
+
+  PerCPU<PtrLock<Chunk*, true> > write_stack;
+
+  ConExtLinkedStack<Chunk, true> read_stack;
+  Chunk* current;
+
+public:
+  typedef T value_type;
+
+  template<bool newconcurrent>
+  struct rethread {
+    typedef MP_SC_Bag<T, chunksize> WL;
+  };
+
+  MP_SC_Bag() :heap(sizeof(Chunk)), current(0) {}
+
+  bool push(value_type val) {
+    PtrLock<Chunk*, true>& L = write_stack.get();
+    L.lock();
+    Chunk* OldL = L.getValue();
+    if (OldL && OldL->push_back(val)) {
+      L.unlock();
+      return true;
+    }
+    Chunk* nc = new (heap.allocate(sizeof(Chunk))) Chunk();
+    bool retval = nc->push_back(val);
+    assert(retval);
+    L.unlock_and_set(nc);
+    if (OldL)
+      read_stack.push(OldL);
+    return true;
+  }
+
+  bool aborted(value_type val) {
+    return push(val);
+  }
+
+  std::pair<bool, value_type> pop() {
+    //Read stack
+    if (!current)
+      current = read_stack.pop();
+    if (current)
+      std::pair<bool, value_type> ret = current->pop_front();
+    if (ret.first)
+      return ret;
+    //try taking from our write queue
+    read_stack.steal(write_stack.get());
+    ret = read_stack.pop();
+    if (ret.first)
+      return ret;
+    //try stealing from everywhere
+    for (int i = 0; i < write_stack.size(); ++i) {
+      read_stack.steal(write_stack.get(i));
+    }
+    return read_stack.pop();
+  }
+
+  bool empty() {
+    if (!read_stack.empty()) return false;
+    for (int i = 0; i < write_stack.size(); ++i)
+      if (!write_stack.get(i).empty())
+	return false;
+    return true;
+  }
+
+  
+  //! called in sequential mode to seed the worklist
+  template<typename iter>
+  void fill_initial(iter begin, iter end) {
+    while (begin != end)
+      push(*begin++);
+  }
+
+};
+WLCOMPILECHECK(MP_SC_Bag);
+
+#endif
 //End namespace
 }
 }

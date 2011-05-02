@@ -16,15 +16,15 @@ class FixedSizeRing :private boost::noncopyable, private PaddedLock<concurrent> 
   unsigned end;
   T data[chunksize];
 
-  bool _i_empty() {
+  bool _i_empty() const {
     return start == end;
   }
 
-  bool _i_full() {
+  bool _i_full() const {
     return (end + 1) % chunksize == start;
   }
 
-  inline void assertSE() {
+  inline void assertSE() const {
     assert(start <= chunksize);
     assert(end <= chunksize);
   }
@@ -40,7 +40,7 @@ public:
 
   FixedSizeRing() :start(0), end(0) { assertSE(); }
 
-  bool empty() {
+  bool empty() const {
     lock();
     assertSE();
     bool retval = _i_empty();
@@ -49,7 +49,7 @@ public:
     return retval;
   }
 
-  bool full() {
+  bool full() const {
     lock();
     assertSE();
     bool retval = _i_full();
@@ -119,20 +119,21 @@ public:
   }
 };
 
+template<typename T>
+struct ConExtListNode {
+  T* NextPtr;
+  T*& getNextPtr() {
+    return NextPtr;
+  }
+};
 
 template<typename T, bool concurrent>
 class ConExtLinkedStack {
   PtrLock<T*, concurrent> head;
 
 public:
-  struct ListNode {
-    T* NextPtrLock;
-    T*& getNextPtr() {
-      return NextPtrLock;
-    }
-  };
   
-  bool empty() {
+  bool empty() const {
     return !head.getValue();
   }
 
@@ -165,16 +166,10 @@ class ConExtLinkedQueue {
   T* tail;
 
 public:
-  struct ListNode {
-    T* NextPtrLock;
-    T*& getNextPtr() {
-      return NextPtrLock;
-    }
-  };
 
   ConExtLinkedQueue() :tail(0) {}
   
-  bool empty() {
+  bool empty() const {
     return !head.getValue();
   }
 
@@ -211,6 +206,20 @@ public:
     }
     return C;
   }
+};
+
+template<typename T>
+class DummyPartitioner {
+  unsigned getNum() const {
+    return 1;
+  }
+  unsigned operator()(T& item) { return 0; }
+};
+
+template<typename T>
+class DummyIndexer {
+public:
+  unsigned operator()(const T& x) { return 0; }
 };
 
 

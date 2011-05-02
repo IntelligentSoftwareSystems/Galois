@@ -316,34 +316,48 @@ public:
 
 template<typename T, int chunksize=64, bool concurrent=true>
 class dChunkedFIFO : private boost::noncopyable {
-  class Chunk : public FixedSizeRing<T, chunksize, false>, public ConExtLinkedQueue<Chunk, concurrent>::ListNode {};
+  class Chunk : public FixedSizeRing<T, chunksize, false>, public ConExtListNode<Chunk> {};
 
   MM::FixedSizeAllocator heap;
 
+  struct p {
+    Chunk* cur;
+    Chunk* next;
+  };
+
   typedef ConExtLinkedQueue<Chunk, concurrent> LevelItem;
 
-  PerCPU<Chunk*> cur;
-  PerLevel<LevelItem > Items;
+  PerCPU<p> data;
+  PerLevel<LevelItem > queues;
+
+  Chunk* mkChunk() {
+    return new (heap.allocate(sizeof(Chunk))) Chunk();
+  }
+  
+  void delChunk(Chunk* C) {
+    C->~Chunk();
+    heap.deallocate(C);
+  }
 
   void pushChunk(Chunk* C) OPTNOINLINE {
-    LevelItem& I = Items.get();
+    LevelItem& I = queues.get();
     I.push(C);
   }
 
   Chunk* popChunkByID(unsigned int i) OPTNOINLINE {
-    LevelItem& I = Items.get(i);
+    LevelItem& I = queues.get(i);
     return I.pop();
   }
 
   Chunk* popChunk() OPTNOINLINE {
-    int id = Items.myEffectiveID();
+    int id = queues.myEffectiveID();
     Chunk* r = popChunkByID(id);
     if (r)
       return r;
 
-    for (int i = 0; i < Items.size(); ++i) {
+    for (int i = 0; i < queues.size(); ++i) {
       ++id;
-      id %= Items.size();
+      id %= queues.size();
       r = popChunkByID(id);
       if (r)
 	return r;
@@ -360,49 +374,52 @@ public:
   typedef T value_type;
   
   dChunkedFIFO() : heap(sizeof(Chunk)) {
-    for (int i = 0; i < cur.size(); ++i)
-      cur.get(i) = 0;
+    for (int i = 0; i < data.size(); ++i) {
+      p& r = data.get(i);
+      r.cur = 0;
+      r.next = 0;
+    }
   }
 
   bool push(value_type val) OPTNOINLINE {
-    Chunk*& n = cur.get();
-    if (n && n->full()) {
-      pushChunk(n);
-      n = 0;
-    }
-    if (!n)
-      n = new (heap.allocate(sizeof(Chunk))) Chunk();
-    bool retval = n->push_back(val);
-    assert(retval);
-    return retval;
+    p& n = data.get();
+    if (n.next && n.next->push_back(val))
+      return true;
+    if (n.next)
+      pushChunk(n.next);
+    n.next = mkChunk();
+    bool worked = n.next->push_back(val);
+    assert(worked);
+    return true;
   }
 
   std::pair<bool, value_type> pop() OPTNOINLINE {
-    Chunk*& n = cur.get();
-    if (n) {
-      if (n->empty()) {
-	n->~Chunk();
-	heap.deallocate(n);
-	n = 0;
-      } else {
-	return n->pop_front();
-      }
-    } else {
-      n = popChunk();
-      if (n)
-	return pop();
+    p& n = data.get();
+    std::pair<bool, value_type> retval;
+    if (n.cur && (retval = n.cur->pop_front()).first)
+      return retval;
+    if(n.cur)
+      delChunk(n.cur);
+    n.cur = popChunk();
+    if (!n.cur) {
+      n.cur = n.next;
+      n.next = 0;
     }
+    if (n.cur)
+      return n.cur->pop_front();
     return std::make_pair(false, value_type());
   }
   
-  std::pair<bool, value_type> try_pop() {
-    return pop();
-  }
-  
   bool empty() OPTNOINLINE {
-    Chunk* n = cur.get();
-    if (n && !n->empty()) return false;
-    return Items.get().empty();
+    for (int i = 0; i < data.size(); ++i) {
+      const p& n = data.get(i);
+      if (n.cur && !n.cur->empty()) return false;
+      if (n.next && !n.next->empty()) return false;
+    }
+    for (int i = 0; i < queues.size(); ++i)
+      if (!queues.get(i).empty())
+	return false;
+    return true;
   }
 
   bool aborted(value_type val) {
@@ -421,7 +438,7 @@ public:
 
 template<typename T, int chunksize=64, bool concurrent=true>
 class dChunkedBag : private boost::noncopyable {
-  class Chunk : public FixedSizeRing<T, chunksize, false>, public ConExtLinkedStack<Chunk, concurrent>::ListNode {};
+  class Chunk : public FixedSizeRing<T, chunksize, false>, public ConExtListNode<Chunk> {};
 
   MM::FixedSizeAllocator heap;
 
@@ -524,14 +541,6 @@ public:
     }
   }
 
-};
-
-template<typename T>
-class DummyPartitioner {
-  unsigned getNum() const {
-    return 1;
-  }
-  unsigned operator()(T& item) { return 0; }
 };
 
 template<typename T, typename Partitioner = DummyPartitioner<T>, typename ChildWLTy = dChunkedFIFO<T>, bool concurrent=true>
