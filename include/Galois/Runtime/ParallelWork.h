@@ -123,18 +123,19 @@ public:
     Timer T;
     T.start();
     do {
-      do {
+      std::pair<bool, value_type> p = global_wl.pop();
+      if (p.first) {
+	term.workHappened();
+	tld.doProcess(p.second, f);
 	do {
-	  std::pair<bool, value_type> p = global_wl.pop();
+	  p = global_wl.pop();
 	  if (p.first) {
-	    term.workHappened();
 	    tld.doProcess(p.second, f);
 	  } else {
 	    break;
 	  }
 	} while(true);
-	//break to here to do more expensive empty check
-      } while (!global_wl.empty());
+      }
       term.localTermination();
     } while (!term.globalTermination());
     T.stop();
