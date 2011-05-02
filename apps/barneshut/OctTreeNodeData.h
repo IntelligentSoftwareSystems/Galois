@@ -63,6 +63,7 @@ public:
 	}
 	std::string toString() const {
 		std::ostringstream s;
+    s.flags(std::cout.flags());
 		if (isLeaf()) {
 			s << "pos = (" << posx << "," << posy << "," << posz << ") ";
 			s << "vel = (" << velx << "," << vely << "," << velz << ") ";

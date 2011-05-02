@@ -271,8 +271,9 @@ struct Octree {
 
 struct OctreeInternal : Octree {
   Point pos;
+  double mass;
   Octree* child[8];
-  OctreeInternal(Point _pos) : pos(_pos) { bzero(child, sizeof(*child) * 8); }
+  OctreeInternal(Point _pos) : pos(_pos), mass(0.0) { bzero(child, sizeof(*child) * 8); }
   virtual ~OctreeInternal() {
     for (int i = 0; i < 8; i++) {
       if (child[i] != NULL && !child[i]->is_leaf())
@@ -429,10 +430,11 @@ struct BuildLocalOctree {
     if (child->is_leaf()) {
       // Expand leaf
       Body* leaf = static_cast<Body*>(child);
-      Point new_pos(leaf->pos);
+      Point new_pos(node->pos);
       update_center(new_pos, index, radius);
-      assert(leaf->pos != b->pos);
       OctreeInternal* new_node = new OctreeInternal(new_pos);
+
+      assert(leaf->pos != b->pos);
       
       insert(b, new_node, radius);
       insert(leaf, new_node, radius);
@@ -446,13 +448,11 @@ struct BuildLocalOctree {
 struct ComputeCenterOfMass {
   OctreeInternal* root;
   const std::vector<int>& part_map;
-  std::vector<double>& masses;
   int levels;
 
-  ComputeCenterOfMass(OctreeInternal* _root, const std::vector<int>& _part_map, std::vector<double>& _masses, int _levels) :
-   root(_root), part_map(_part_map), masses(_masses), levels(_levels) { 
+  ComputeCenterOfMass(OctreeInternal* _root, const std::vector<int>& _part_map, int _levels) :
+   root(_root), part_map(_part_map), levels(_levels) { 
     int nleaves = pow(8, levels);
-    masses.resize(nleaves);
   }
 
   void operator()(unsigned int id) {
@@ -460,14 +460,15 @@ struct ComputeCenterOfMass {
   }
 
   double finish() {
-    return finish_recurse(root, 0, levels);
+    return recurse(root, levels);
   }
 
 private:
   void traverse(OctreeInternal* node, int id, int acc, int level) {
     if (level == 0) {
-      if (part_map[acc] == id) 
-        masses[acc] = recurse(node);
+      if (part_map[acc] == id) {
+        node->mass = recurse(node, -1);
+      }
       
       return;
     }
@@ -483,7 +484,13 @@ private:
     }
   }
 
-  double recurse(OctreeInternal* node) {
+  // If level >= 0, compute center of mass for first n levels starting at node.
+  // If level < 0, compute center of mass for whole subtree starting at node.
+  double recurse(OctreeInternal* node, int level) {
+    if (level == 0) {
+      return node->mass;
+    }
+
     double mass = 0.0;
 		int index = 0;
     Point accum;
@@ -509,7 +516,7 @@ private:
         p = &n->pos;
       } else {
         OctreeInternal* n = static_cast<OctreeInternal*>(child);
-        m = recurse(n);
+        m = recurse(n, level - 1);
         p = &n->pos;
       }
 
@@ -517,49 +524,9 @@ private:
       for (int j = 0; j < 3; j++) 
         accum[j] += (*p)[j] * m;
     }
+
+    node->mass = mass;
     
-    if (mass > 0.0) {
-      double inv_mass = 1.0 / mass;
-      for (int j = 0; j < 3; j++)
-        node->pos[j] = accum[j] * inv_mass;
-    }
-
-    return mass;
-  }
-
-  double finish_recurse(OctreeInternal* node, int acc, int level) {
-    if (level == 0) 
-      return masses[acc];
-
-    double mass = 0.0;
-    int index = 0;
-    Point accum;
-		for (int i = 0; i < 8; i++) {
-      Octree* child = node->child[i];
-      if (child == NULL)
-        continue;
-
-      // Reorganize leaves to be denser up front 
-      node->child[index++] = child;
-      
-      double m;
-      const Point* p;
-      if (child->is_leaf()) {
-        // TODO Copy to iterator --- partition here or use explicit partition function?
-        Body* n = static_cast<Body*>(child);
-        m = n->mass;
-        p = &n->pos;
-      } else {
-        OctreeInternal* n = static_cast<OctreeInternal*>(child);
-        m = finish_recurse(n, (acc << 3) + i, level - 1);
-        p = &n->pos;
-      }
-
-      mass += m;
-      for (int j = 0; j < 3; j++) 
-        accum[j] += (*p)[j] * m;
-    }
-
     if (mass > 0.0) {
       double inv_mass = 1.0 / mass;
       for (int j = 0; j < 3; j++)
@@ -590,7 +557,7 @@ struct ComputeForces {
       recurse(b, top, dsq);
       if (step > 0) {
         for (int i = 0; i < 3; i++)
-          b.vel[i] += (b.vel[i] - p[i]) * config.dthf;
+          b.vel[i] += (b.acc[i] - p[i]) * config.dthf;
       }
       num++;
     }
@@ -605,6 +572,7 @@ struct ComputeForces {
     double psq = p.x * p.x + p.y * p.y + p.z * p.z;
     psq += config.epssq;
     double idr = 1 / sqrt(psq);
+    // b.mass is fine because every body has the same mass
     double nphi = b.mass * idr;
     double scale = nphi * idr * idr;
     for (int i = 0; i < 3; i++) 
@@ -621,7 +589,7 @@ struct ComputeForces {
       // Node is far enough away, summarize contribution
       psq += config.epssq;
       double idr = 1 / sqrt(psq);
-      double nphi = b.mass * idr;
+      double nphi = node->mass * idr;
       double scale = nphi * idr * idr;
       for (int i = 0; i < 3; i++) 
         b.acc[i] += p[i] * scale;
@@ -637,8 +605,9 @@ struct ComputeForces {
         break;
       if (next->is_leaf()) {
         // Check if it is me
-        if (&b != next)
+        if (&b != next) {
           recurse(b, static_cast<Body*>(next), dsq);
+        }
       } else {
         recurse(b, static_cast<OctreeInternal*>(next), dsq);
       }
@@ -784,23 +753,19 @@ void pmain(int nbodies, int ntimesteps, int seed) {
     OctreeInternal* top;
     std::vector<int> part_map;
     int levels;
-    make_octree_top(box, 10*numThreads, numThreads, top, part_map, levels);
+    make_octree_top(box, numThreads, numThreads, top, part_map, levels);
 
     bodies.partition(Partitioner(top, part_map));
     for (int i = 0; i < part_map.size(); i++)
       std::cout << "[" << i << "] = " << part_map[i] << std::endl;
 
     Galois::for_all(BuildLocalOctree(bodies, top, box));
-    std::vector<double> masses;
-    ComputeCenterOfMass computeCenterOfMass(top, part_map, masses, levels);
+    ComputeCenterOfMass computeCenterOfMass(top, part_map, levels);
     Galois::for_all(computeCenterOfMass);
     computeCenterOfMass.finish();
 
-    std::cout << "===== Computing Forces =====" << std::endl;
     Galois::for_all(ComputeForces(bodies, top, box.diameter(), step));
-    std::cout << "===== Middle =====" << std::endl;
     Galois::for_all(AdvanceBodies(bodies));
-    std::cout << "===== End =====" << std::endl;
 
     std::cout << "Timestep " << step << " Center of Mass = " << top->pos << std::endl;
     delete top;

@@ -105,7 +105,6 @@ private:
 				GNode newnode = createNode(octree, OctTreeNodeData(n.posx - rh + x,
 						n.posy - rh + y, n.posz - rh + z));
 				octree->addNode(newnode, Galois::Graph::NONE);
-        assert(b.posx != n.posx && b.posy != n.posy && b.posz != n.posz);
 				insert(octree, newnode, b, rh);
 				insert(octree, newnode, ch, rh);
 				octree->setNeighbor(root, newnode, i, Galois::Graph::NONE);
@@ -345,7 +344,9 @@ public:
 					nd.accx += drx * scale;
 					nd.accy += dry * scale;
 					nd.accz += drz * scale;
-				}
+        } else {
+
+        }
 			}
 		} else { // node is far enough away, don't recurse any deeper
 			drsq += epssq;
