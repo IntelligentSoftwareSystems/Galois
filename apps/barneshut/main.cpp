@@ -85,7 +85,7 @@ int main(int argc, const char** argv) {
     barneshut.curr = 0;
 		barneshut.computeCenterOfMass(octree, root);
 
-		GaloisRuntime::WorkList::ChunkedBag<GNode, 256> wl;
+		GaloisRuntime::WorkList::ChunkedLIFO<GNode, 256> wl;
 		wl.fill_initial(&barneshut.leaf[0], &barneshut.leaf[barneshut.curr]);
 		Galois::for_each(wl, process());
 
