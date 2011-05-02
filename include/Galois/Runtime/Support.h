@@ -12,6 +12,9 @@ void reportStat(const char* text, double val);
 
 //Report Warnings
 void reportWarning(const char* text);
+void reportWarning(const char* text, unsigned int val);
+void reportWarning(const char* text, unsigned long val);
+void reportWarning(const char* text, const char* val);
 
 }
 
