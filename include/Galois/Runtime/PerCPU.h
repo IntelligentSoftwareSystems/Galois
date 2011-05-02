@@ -33,6 +33,13 @@ public:
     num = getSystemThreadPolicy().getNumThreads();
     datum = new cache_line_storage<T>[num];
   }
+  explicit PerCPU(const T& ival)
+  {
+    num = getSystemThreadPolicy().getNumThreads();
+    datum = new cache_line_storage<T>[num];
+    for (int i = 0; i < num; ++i)
+      datum[i] = ival;
+  }
   
   virtual ~PerCPU() {
     delete[] datum;
