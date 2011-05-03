@@ -5,47 +5,41 @@
 
 static GaloisRuntime::SimpleLock<int, true> lock;
 
-void GaloisRuntime::reportStat(const char* text, unsigned long val) {
+template<typename T>
+static void genericReport(bool error, const char* text1, const char* text2, T val) {
   lock.lock();
-  std::cout << "STAT: " << text << " " << val << "\n";
+  (error ? std::cerr : std::cout) <<
+    text1 << " " << text2 << " " << val << "\n";
   lock.unlock();
+}
+
+void GaloisRuntime::reportStat(const char* text, unsigned long val) {
+  genericReport(false, "STAT:", text, val);
 }
 
 void GaloisRuntime::reportStat(const char* text, unsigned int val) {
-  lock.lock();
-  std::cout << "STAT: " << text << " " << val << "\n";
-  lock.unlock();
+  genericReport(false, "STAT:", text, val);
 }
 
 void GaloisRuntime::reportStat(const char* text, double val) {
-  lock.lock();
-  std::cout << "STAT: " << text << " " << val << "\n";
-  lock.unlock();
+  genericReport(false, "STAT:", text, val);
 }
 
 //Report Warnings
 void GaloisRuntime::reportWarning(const char* text) {
-  lock.lock();
-  std::cerr << "WARNING: " << text << "\n";
-  lock.unlock();
+  genericReport(true, "WARNING:", text, "");
 }
 
 void GaloisRuntime::reportWarning(const char* text, unsigned int val) {
-  lock.lock();
-  std::cerr << "WARNING: " << text << " " << val << "\n";
-  lock.unlock();
+  genericReport(true, "WARNING:", text, val);
 }
 
 void GaloisRuntime::reportWarning(const char* text, unsigned long val) {
-  lock.lock();
-  std::cerr << "WARNING: " << text << " " << val << "\n";
-  lock.unlock();
+  genericReport(true, "WARNING:", text, val);
 }
 
 void GaloisRuntime::reportWarning(const char* text, const char* val) {
-  lock.lock();
-  std::cerr << "WARNING: " << text << " " << val << "\n";
-  lock.unlock();
+  genericReport(true, "WARNING:", text, val);
 }
 
 /// grow_pod - This is an implementation of the grow() method which only works
