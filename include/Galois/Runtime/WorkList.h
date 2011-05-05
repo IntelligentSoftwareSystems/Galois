@@ -443,11 +443,13 @@ class OrderedByIntegerMetric : private boost::noncopyable {
 
   struct perItem {
     CTy* current;
+    int lastMasterVersion;
     std::map<int, CTy*> local;
   };
 
   std::map<int, CTy*> master;
   SimpleLock<int, concurrent> masterLock;
+  int masterVersion;
 
   Indexer I;
 
@@ -462,10 +464,12 @@ class OrderedByIntegerMetric : private boost::noncopyable {
   typedef T value_type;
 
   OrderedByIntegerMetric(const Indexer& x = Indexer())
-    :I(x)
+    :masterVersion(1), I(x)
   {
-    for (int i = 0; i < current.size(); ++i)
+    for (int i = 0; i < current.size(); ++i) {
       current.get(i).current = 0;
+      current.get(i).lastMasterVersion = 0;
+    }
   }
 
   ~OrderedByIntegerMetric() {
@@ -480,8 +484,10 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     if (!lC) {
       masterLock.lock();
       CTy*& gC = master[index];
-      if (!gC)
+      if (!gC) {
 	gC = new CTy();
+	++masterVersion;
+      }
       lC = gC;
       masterLock.unlock();
     }
@@ -496,15 +502,17 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     if (C && (retval = C->pop()).first)
       return retval;
     //Failed, find minimum bin
-    masterLock.lock();
-    for (typename std::map<int, CTy*>::iterator ii = master.begin(), ee = master.end(); ii != ee; ++ii) {
-      C = ii->second;
-      if ((retval = C->pop()).first) {
-	masterLock.unlock();
-	return retval;
-      }
+    if (masterVersion != pI.lastMasterVersion) {
+      masterLock.lock();
+      pI.lastMasterVersion = masterVersion;
+      pI.local = master;
+      masterLock.unlock();
     }
-    masterLock.unlock();
+    for (typename std::map<int, CTy*>::iterator ii = pI.local.begin(), ee = pI.local.end(); ii != ee; ++ii) {
+      C = ii->second;
+      if ((retval = C->pop()).first)
+	return retval;
+    }
     retval.first = false;
     return retval;
   }
@@ -666,7 +674,7 @@ class ApproxOrderByIntegerMetric : private boost::noncopyable {
       return ret;
 
     //must move cursor
-    for (int i = 0; i < num(); ++i) {
+    for (int i = 0; i <= num(); ++i) {
       cur = (cur + 1) % num();
       ret = data[cur].pop();
       if (ret.first)
