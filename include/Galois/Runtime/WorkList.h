@@ -843,13 +843,31 @@ WLCOMPILECHECK(LocalFilter);
 //Queue per writer, reader cycles
 template<typename T>
 class MP_SC_FIFO {
-  PerCPU<FIFO<T> > data;
-  int cursor;
+  class Chunk : public FixedSizeRing<T, 128, false>, public ConExtListNode<Chunk> { };
   
+  MM::FixedSizeAllocator heap;
+  
+  struct p {
+    PtrLock<Chunk*, true> next;
+  };
+
+  PerCPU<p> data;
+  ConExtLinkedQueue<Chunk, true> queue;
+  Chunk* current;
+
+  Chunk* mkChunk() {
+    return new (heap.allocate(sizeof(Chunk))) Chunk();
+  }
+
+  void delChunk(Chunk* C) {
+    C->~Chunk();
+    heap.deallocate(C);
+  }
+
 public:
   typedef T value_type;
 
-  MP_SC_FIFO() :cursor(0) {}
+  MP_SC_FIFO() :heap(sizeof(Chunk)), current(0) {}
 
   template<bool newconcurrent>
   struct rethread {
@@ -857,35 +875,60 @@ public:
   };
 
   bool push(value_type val) {
-    return data.get().push(val);
+    p& n = data.get();
+    n.next.lock();
+    if (n.next.getValue() && n.next.getValue()->push_back(val)){
+      n.next.unlock();
+      return true;
+    }
+    if (n.next.getValue())
+      queue.push(n.next.getValue());
+    Chunk* C = mkChunk();
+    bool worked = C->push_back(val);
+    assert(worked);
+    n.next.unlock_and_set(C);
+    return true;
   }
 
   bool aborted(value_type val) {
-    return data.get().aborted(val);
+    push(val);
   }
 
   std::pair<bool, value_type> pop() {
-    //    ++cursor;
-    //    cursor %= data.size();
-    std::pair<bool, value_type> ret = data.get(cursor).pop();
-    if (ret.first)
-      return ret;
+#define ACT if (current && (ret = current->pop_front()).first) return ret; if (current) delChunk(current);
+
+    std::pair<bool, value_type> ret;
+    ACT;
+    //try queue
+    current = queue.pop();
+    ACT;
+    //try this node
+    current = data.get().next.getValue();
+    data.get().next.setValue(0);
+    ACT;
+    //Try all nodes
     for (int i = 0; i < data.size(); ++i) {
-      ++cursor;
-      cursor %= data.size();
-      ret = data.get(cursor).pop();
-      if (ret.first)
-	return ret;
+      p& n = data.get(i);
+      if (n.next.getValue()) {
+	n.next.lock();
+	current = n.next.getValue();
+	n.next.unlock_and_set(0);
+	ACT;
+      }
     }
+    current = 0;
     //failure
     return std::make_pair(false, value_type());
+#undef ACT
   }
 
   bool empty() {
-    for (int i = 0; i < data.size(); ++i)
-      if (!data.get(i).empty())
+    for (int i = 0; i < data.size(); ++i) {
+      p& n = data.get(i);
+      if (n.next.getValue() && !n.next.getValue()->empty())
 	return false;
-    return true;
+    }
+    return queue.empty();
   }
 
   
