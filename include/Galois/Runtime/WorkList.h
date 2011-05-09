@@ -448,7 +448,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
   };
 
   std::vector<std::pair<int, CTy*> > masterLog;
-  SimpleLock<int, concurrent> masterLock;
+  PaddedLock<concurrent> masterLock;
   int masterVersion;
 
   Indexer I;
