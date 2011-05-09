@@ -13,7 +13,6 @@
 #include "Galois/Graphs/Serialize.h"
 #include "Galois/Graphs/FileGraph.h"
 
-#include "Galois/Runtime/DistributedWorkList.h"
 #include "Galois/Runtime/DebugWorkList.h"
 
 #include "Lonestar/Banner.h"

@@ -14,7 +14,6 @@
 #include "Galois/Runtime/Threads.h"
 #include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/WorkList.h"
-#include "Galois/Runtime/DistributedWorkList.h"
 #include "Galois/Runtime/DebugWorkList.h"
 #include "Galois/Runtime/Termination.h"
 

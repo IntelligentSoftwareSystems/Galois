@@ -1,8 +1,6 @@
 /*
- * SSSP.cpp
+ * PageRankSSSP.cpp
  *
- *  Created on: Oct 18, 2010
- *      Author: amin, reza
  */
 
 #include "Galois/Launcher.h"
@@ -12,9 +10,6 @@
 
 #include "Galois/Graphs/Serialize.h"
 #include "Galois/Graphs/FileGraph.h"
-
-#include "Galois/Runtime/DistributedWorkList.h"
-#include "Galois/Runtime/DebugWorkList.h"
 
 #include "Lonestar/Banner.h"
 #include "Lonestar/CommandLine.h"
