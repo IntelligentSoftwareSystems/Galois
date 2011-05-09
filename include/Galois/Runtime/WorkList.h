@@ -19,7 +19,7 @@
 #include "mm/mem.h"
 #include "WorkListHelpers.h"
 
-#define OPTNOINLINE __attribute__((noinline)) 
+#define OPTNOINLINE __attribute__((noinline))
 //#define OPTNOINLINE
 
 #ifndef WLCOMPILECHECK
@@ -550,54 +550,6 @@ class OrderedByIntegerMetric : private boost::noncopyable {
 };
 WLCOMPILECHECK(OrderedByIntegerMetric);
 
-template<class T, typename ContainerTy = FIFO<T> >
-class StealingLocalWL : private boost::noncopyable {
-
-  PerCPU<ContainerTy> data;
-
-  // static void merge(ContainerTy& x, ContainerTy& y) {
-  //   assert(x.empty());
-  //   assert(y.empty());
-  // }
-
- public:
-  template<bool newconcurrent>
-  struct rethread {
-    typedef StealingLocalWL<T, ContainerTy> WL;
-  };
-
-  typedef T value_type;
-  
-  StealingLocalWL() {}
-
-  bool push(value_type val) {
-    return data.get().push(val);
-  }
-
-  std::pair<bool, value_type> pop() {
-    std::pair<bool, value_type> ret = data.get().pop();
-    if (ret.first)
-      return ret;
-    return data.getNext().pop();
-  }
-
-  bool empty() {
-    return data.get().empty();
-  }
-  bool aborted(value_type val) {
-    return push(val);
-  }
-
-  //Not Thread Safe
-  template<typename Iter>
-  void fill_initial(Iter ii, Iter ee) {
-    while (ii != ee) {
-      push(*ii++);
-    }
-  }
-};
-WLCOMPILECHECK(StealingLocalWL);
-
 template<typename T, typename GlobalQueueTy = FIFO<T>, typename LocalQueueTy = FIFO<T> >
 class LocalQueues {
 
@@ -643,222 +595,6 @@ public:
   }
 };
 WLCOMPILECHECK(LocalQueues);
-
-template<class T, class Indexer = DummyIndexer<T>, typename ContainerTy = FIFO<T>, bool concurrent=true >
-class ApproxOrderByIntegerMetric : private boost::noncopyable {
-
-  typename ContainerTy::template rethread<concurrent>::WL data[2048];
-  
-  Indexer I;
-  PerCPU<unsigned int> cursor;
-
-  int num() {
-    return 2048;
-  }
-
- public:
-
-  typedef T value_type;
-  template<bool newconcurrent>
-  struct rethread {
-    typedef ApproxOrderByIntegerMetric<T, Indexer, ContainerTy, newconcurrent> WL;
-  };
-  
-  ApproxOrderByIntegerMetric(const Indexer& x = Indexer())
-    :I(x)
-  {
-    for (int i = 0; i < cursor.size(); ++i)
-      cursor.get(i) = 0;
-  }
-  
-  bool push(value_type val) OPTNOINLINE {   
-    unsigned int index = I(val);
-    index %= num();
-    assert(index < num());
-    return data[index].push(val);
-  }
-
-  std::pair<bool, value_type> pop() OPTNOINLINE {
-    // print();
-    unsigned int& cur = concurrent ? cursor.get() : cursor.get(0);
-    std::pair<bool, value_type> ret = data[cur].pop();
-    if (ret.first)
-      return ret;
-
-    //must move cursor
-    for (int i = 0; i <= num(); ++i) {
-      cur = (cur + 1) % num();
-      ret = data[cur].pop();
-      if (ret.first)
-	return ret;
-    }
-    return std::pair<bool, value_type>(false, value_type());
-  }
-
-  bool empty() OPTNOINLINE {
-    for (unsigned int i = 0; i < num(); ++i)
-      if (!data[i].empty())
-	return false;
-    return true;
-  }
-
-  bool aborted(value_type val) {
-    return push(val);
-  }
-
-  //Not Thread Safe
-  //Not ideal
-  template<typename Iter>
-  void fill_initial(Iter ii, Iter ee) {
-    while (ii != ee) {
-      push(*ii++);
-    }
-  }
-};
-WLCOMPILECHECK(ApproxOrderByIntegerMetric);
-
-template<class T, class Indexer = DummyIndexer<T>, typename ContainerTy = FIFO<T>, bool concurrent=true >
-class LogOrderByIntegerMetric : private boost::noncopyable {
-
-  typename ContainerTy::template rethread<concurrent>::WL data[sizeof(unsigned int)*8 + 1];
-  
-  Indexer I;
-  PerCPU<unsigned int> cursor;
-
-  int num() {
-    return sizeof(unsigned int)*8 + 1;
-  }
-
-  int getBin(unsigned int i) {
-    if (i == 0) return 0;
-    return sizeof(unsigned int)*8 - __builtin_clz(i);
-  }
-
- public:
-
-  typedef T value_type;
-  template<bool newconcurrent>
-  struct rethread {
-    typedef LogOrderByIntegerMetric<T, Indexer, ContainerTy, newconcurrent> WL;
-  };
-  
-  LogOrderByIntegerMetric(const Indexer& x = Indexer())
-    :I(x)
-  {
-    for (int i = 0; i < cursor.size(); ++i)
-      cursor.get(i) = 0;
-  }
-  
-  bool push(value_type val) {   
-    unsigned int index = I(val);
-    index = getBin(index);
-    return data[index].push(val);
-  }
-
-  std::pair<bool, value_type> pop() {
-    // print();
-    unsigned int& cur = concurrent ? cursor.get() : cursor.get(0);
-    std::pair<bool, value_type> ret = data[cur].pop();
-    if (ret.first)
-      return ret;
-
-    //must move cursor
-    for (cur = 0; cur < num(); ++cur) {
-      ret = data[cur].pop();
-      if (ret.first)
-	return ret;
-    }
-    cur = 0;
-    return std::pair<bool, value_type>(false, value_type());
-  }
-
-  bool empty() {
-    for (unsigned int i = 0; i < num(); ++i)
-      if (!data[i].empty())
-	return false;
-    return true;
-  }
-
-  bool aborted(value_type val) {
-    return push(val);
-  }
-
-  //Not Thread Safe
-  //Not ideal
-  template<typename Iter>
-  void fill_initial(Iter ii, Iter ee) {
-    while (ii != ee) {
-      push(*ii++);
-    }
-  }
-};
-WLCOMPILECHECK(LogOrderByIntegerMetric);
-
-template<typename T, typename Indexer = DummyIndexer<T>, typename LocalTy = FIFO<T>, typename GlobalTy = FIFO<T> >
-class LocalFilter {
-  GlobalTy globalQ;
-
-  struct p {
-    typename LocalTy::template rethread<false>::WL Q;
-    unsigned int current;
-  };
-  PerCPU<p> localQs;
-  Indexer I;
-
-public:
-  typedef T value_type;
-
-  LocalFilter(const Indexer& x = Indexer()) : I(x) {
-    for (int i = 0; i < localQs.size(); ++i)
-      localQs.get(i).current = 0;
-  }
-
-    //! change the concurrency flag
-  template<bool newconcurrent>
-  struct rethread {
-    typedef LocalFilter WL;
-  };
-
-  //! push a value onto the queue
-  bool push(value_type val) OPTNOINLINE {
-    unsigned int index = I(val);
-    p& me = localQs.get();
-    if (index <= me.current)
-      return me.Q.push(val);
-    else
-      return globalQ.push(val);
-  }
-
-  //! push an aborted value onto the queue
-  bool aborted(value_type val) {
-    return push(val);
-  }
-
-  //! pop a value from the queue.
-  std::pair<bool, value_type> pop() OPTNOINLINE {
-    std::pair<bool, value_type> r = localQs.get().Q.pop();
-    if (r.first)
-      return r;
-    
-    r = globalQ.pop();
-    if (r.first)
-      localQs.get().current = I(r.second);
-    return r;
-  }
-
-  //! return if the queue *may* be empty
-  bool empty() OPTNOINLINE {
-    if (!localQs.get().Q.empty()) return false;
-    return globalQ.empty();
-  }
-  
-  //! called in sequential mode to seed the worklist
-  template<typename iter>
-  void fill_initial(iter begin, iter end) {
-    globalQ.fill_initial(begin,end);
-  }
-};
-WLCOMPILECHECK(LocalFilter);
 
 //Queue per writer, reader cycles
 template<typename T>
@@ -962,43 +698,112 @@ public:
 };
 WLCOMPILECHECK(MP_SC_FIFO);
 
-#if 0
-//Bag per writer, reader steals entire bag
-template<typename T, int chunksize = 64>
-class MP_SC_Bag {
-  class Chunk : public FixedSizeRing<T, chunksize, false>, public ConExtListNode<Chunk>::ListNode {};
+
+template<typename T, int chunksize=64, bool concurrent=true>
+class dChunkedFIFO : private boost::noncopyable {
+  class Chunk : public FixedSizeRing<T, chunksize, false>, public ConExtListNode<Chunk> {};
 
   MM::FixedSizeAllocator heap;
 
-  PerCPU<PtrLock<Chunk*, true> > write_stack;
-
-  ConExtLinkedStack<Chunk, true> read_stack;
-  Chunk* current;
-
-public:
-  typedef T value_type;
-
-  template<bool newconcurrent>
-  struct rethread {
-    typedef MP_SC_Bag<T, chunksize> WL;
+  struct p {
+    Chunk* cur;
+    Chunk* next;
   };
 
-  MP_SC_Bag() :heap(sizeof(Chunk)), current(0) {}
+  typedef ConExtLinkedQueue<Chunk, concurrent> LevelItem;
 
-  bool push(value_type val) {
-    PtrLock<Chunk*, true>& L = write_stack.get();
-    L.lock();
-    Chunk* OldL = L.getValue();
-    if (OldL && OldL->push_back(val)) {
-      L.unlock();
-      return true;
+  PerCPU<p> data;
+  PerLevel<LevelItem > queues;
+
+  Chunk* mkChunk() {
+    return new (heap.allocate(sizeof(Chunk))) Chunk();
+  }
+  
+  void delChunk(Chunk* C) {
+    C->~Chunk();
+    heap.deallocate(C);
+  }
+
+  void pushChunk(Chunk* C) OPTNOINLINE {
+    LevelItem& I = queues.get();
+    I.push(C);
+  }
+
+  Chunk* popChunkByID(unsigned int i) OPTNOINLINE {
+    LevelItem& I = queues.get(i);
+    return I.pop();
+  }
+
+  Chunk* popChunk() OPTNOINLINE {
+    int id = queues.myEffectiveID();
+    Chunk* r = popChunkByID(id);
+    if (r)
+      return r;
+
+    for (int i = 0; i < queues.size(); ++i) {
+      ++id;
+      id %= queues.size();
+      r = popChunkByID(id);
+      if (r)
+	return r;
     }
-    Chunk* nc = new (heap.allocate(sizeof(Chunk))) Chunk();
-    bool retval = nc->push_back(val);
-    assert(retval);
-    L.unlock_and_set(nc);
-    if (OldL)
-      read_stack.push(OldL);
+    return 0;
+  }
+
+public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef dChunkedFIFO<T, chunksize, newconcurrent> WL;
+  };
+
+  typedef T value_type;
+  
+  dChunkedFIFO() : heap(sizeof(Chunk)) {
+    for (int i = 0; i < data.size(); ++i) {
+      p& r = data.get(i);
+      r.cur = 0;
+      r.next = 0;
+    }
+  }
+
+  bool push(value_type val) OPTNOINLINE {
+    p& n = data.get();
+    if (n.next && n.next->push_back(val))
+      return true;
+    if (n.next)
+      pushChunk(n.next);
+    n.next = mkChunk();
+    bool worked = n.next->push_back(val);
+    assert(worked);
+    return true;
+  }
+
+  std::pair<bool, value_type> pop() OPTNOINLINE {
+    p& n = data.get();
+    std::pair<bool, value_type> retval;
+    if (n.cur && (retval = n.cur->pop_front()).first)
+      return retval;
+    if(n.cur)
+      delChunk(n.cur);
+    n.cur = popChunk();
+    if (!n.cur) {
+      n.cur = n.next;
+      n.next = 0;
+    }
+    if (n.cur)
+      return n.cur->pop_front();
+    return std::make_pair(false, value_type());
+  }
+  
+  bool empty() OPTNOINLINE {
+    for (int i = 0; i < data.size(); ++i) {
+      const p& n = data.get(i);
+      if (n.cur && !n.cur->empty()) return false;
+      if (n.next && !n.next->empty()) return false;
+    }
+    for (int i = 0; i < queues.size(); ++i)
+      if (!queues.get(i).empty())
+	return false;
     return true;
   }
 
@@ -1006,46 +811,178 @@ public:
     return push(val);
   }
 
-  std::pair<bool, value_type> pop() {
-    //Read stack
-    if (!current)
-      current = read_stack.pop();
-    if (current)
-      std::pair<bool, value_type> ret = current->pop_front();
-    if (ret.first)
-      return ret;
-    //try taking from our write queue
-    read_stack.steal(write_stack.get());
-    ret = read_stack.pop();
-    if (ret.first)
-      return ret;
-    //try stealing from everywhere
-    for (int i = 0; i < write_stack.size(); ++i) {
-      read_stack.steal(write_stack.get(i));
+  //Not Thread Safe
+  template<typename Iter>
+  void fill_initial(Iter ii, Iter ee) {
+    for( ; ii != ee; ++ii) {
+      push(*ii);
     }
-    return read_stack.pop();
-  }
-
-  bool empty() {
-    if (!read_stack.empty()) return false;
-    for (int i = 0; i < write_stack.size(); ++i)
-      if (!write_stack.get(i).empty())
-	return false;
-    return true;
-  }
-
-  
-  //! called in sequential mode to seed the worklist
-  template<typename iter>
-  void fill_initial(iter begin, iter end) {
-    while (begin != end)
-      push(*begin++);
   }
 
 };
-WLCOMPILECHECK(MP_SC_Bag);
 
-#endif
+template<typename T, int chunksize=64, bool concurrent=true>
+class dChunkedLIFO : private boost::noncopyable {
+  class Chunk : public FixedSizeRing<T, chunksize, false>, public ConExtListNode<Chunk> {};
+
+  MM::FixedSizeAllocator heap;
+
+
+  typedef ConExtLinkedStack<Chunk, concurrent> LevelItem;
+
+  PerCPU<Chunk*> cur;
+  PerLevel<LevelItem > Items;
+
+  void pushChunk(Chunk* C) OPTNOINLINE {
+    LevelItem& I = Items.get();
+    I.push(C);
+  }
+
+  Chunk* popChunkByID(unsigned int i) OPTNOINLINE {
+    LevelItem& I = Items.get(i);
+    return I.pop();
+  }
+
+  Chunk* popChunk() OPTNOINLINE {
+    int id = Items.myEffectiveID();
+    Chunk* r = popChunkByID(id);
+    if (r)
+      return r;
+
+    for (int i = 0; i < Items.size(); ++i) {
+      ++id;
+      id %= Items.size();
+      r = popChunkByID(id);
+      if (r)
+	return r;
+    }
+    return 0;
+  }
+
+public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef dChunkedLIFO<T, chunksize, newconcurrent> WL;
+  };
+
+  typedef T value_type;
+  
+  dChunkedLIFO() : heap(sizeof(Chunk)) {
+    for (int i = 0; i < cur.size(); ++i)
+      cur.get(i) = 0;
+  }
+
+  bool push(value_type val) OPTNOINLINE {
+    Chunk*& n = cur.get();
+    if (n && n->full()) {
+      pushChunk(n);
+      n = 0;
+    }
+    if (!n)
+      n = new (heap.allocate(sizeof(Chunk))) Chunk();
+    bool retval = n->push_back(val);
+    assert(retval);
+    return retval;
+  }
+
+  std::pair<bool, value_type> pop() OPTNOINLINE {
+    Chunk*& n = cur.get();
+    if (n) {
+      if (n->empty()) {
+	n->~Chunk();
+	heap.deallocate(n);
+	n = 0;
+      } else {
+	return n->pop_front();
+      }
+    } else {
+      n = popChunk();
+      if (n)
+	return pop();
+      else
+	return std::make_pair(false, value_type());
+    }
+  }
+  
+  std::pair<bool, value_type> try_pop() {
+    return pop();
+  }
+  
+  bool empty() OPTNOINLINE {
+    Chunk* n = cur.get();
+    if (n && !n->empty()) return false;
+    return Items.get().empty();
+  }
+
+  bool aborted(value_type val) {
+    return push(val);
+  }
+
+  //Not Thread Safe
+  template<typename Iter>
+  void fill_initial(Iter ii, Iter ee) {
+    for( ; ii != ee; ++ii) {
+      push(*ii);
+    }
+  }
+
+};
+
+template<typename T, typename Partitioner = DummyPartitioner<T>, typename ChildWLTy = dChunkedFIFO<T>, bool concurrent=true>
+class PartitionedWL : private boost::noncopyable {
+
+  Partitioner P;
+  PerCPU<ChildWLTy> Items;
+  int active;
+
+public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef PartitionedWL<T, Partitioner, ChildWLTy, newconcurrent> WL;
+  };
+
+  typedef T value_type;
+  
+  PartitionedWL(const Partitioner& p = Partitioner()) :P(p), active(getSystemThreadPool().getActiveThreads()) {
+    std::cerr << active << "\n";
+  }
+
+  bool push(value_type val) OPTNOINLINE {
+    unsigned int index = P(val);
+    //std::cerr << "[" << index << "," << index % active << "]\n";
+    return Items.get(index % active).push(val);
+  }
+
+  std::pair<bool, value_type> pop() OPTNOINLINE {
+    std::pair<bool, value_type> r = Items.get().pop();
+    // std::cerr << "{" << Items.myEffectiveID() << "}";
+    // if (r.first)
+    //   std::cerr << r.first;
+    return r;
+  }
+  
+  std::pair<bool, value_type> try_pop() {
+    return pop();
+  }
+  
+  bool empty() OPTNOINLINE {
+    return Items.get().empty();
+  }
+
+  bool aborted(value_type val) {
+    return push(val);
+  }
+
+  //Not Thread Safe
+  template<typename Iter>
+  void fill_initial(Iter ii, Iter ee) {
+    for( ; ii != ee; ++ii) {
+      push(*ii);
+    }
+  }
+
+};
+
 //End namespace
 }
 }

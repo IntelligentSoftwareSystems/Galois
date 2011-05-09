@@ -23,7 +23,8 @@
 #include <sstream>
 #include <limits>
 #include <iostream>
-#include <fstream>
+//#include <fstream>
+#include <set>
 using namespace std;
 
 static const char* name = "Single Source Shortest Path";
@@ -71,6 +72,16 @@ struct UpdateRequest {
   }
 };
 
+struct seq_less {
+  bool operator()(const UpdateRequest& lhs, const UpdateRequest& rhs) {
+    if (lhs.w < rhs.w) 
+      return true;
+    if (lhs.w > rhs.w)
+      return false;
+    return lhs.n < rhs.n;
+  }
+};
+
 struct UpdateRequestIndexer
   : std::binary_function<UpdateRequest, unsigned int, unsigned int> {
   unsigned int operator() (const UpdateRequest& val) const {
@@ -96,14 +107,26 @@ void getInitialRequests(const GNode src, WLTy& wl) {
 }
 
 void runBody(const GNode src) {
-  priority_queue<UpdateRequest> initial;
-  getInitialRequests(src, initial);
+  std::set<UpdateRequest, seq_less> initial;
+  for (Graph::neighbor_iterator ii = graph.neighbor_begin(src, Galois::Graph::NONE), 
+        ee = graph.neighbor_end(src, Galois::Graph::NONE); 
+       ii != ee; ++ii) {
+    GNode dst = *ii;
+    int w = graph.getEdgeData(src, dst, Galois::Graph::NONE);
+    UpdateRequest up(dst, w);
+    initial.insert(up);
+  }
+
+  unsigned int counter = 0;
+
+  Galois::Launcher::startTiming();
   
   while (!initial.empty()) {
-    UpdateRequest req = initial.top();
-    initial.pop();
+    ++counter;
+    UpdateRequest req = *initial.begin();
+    initial.erase(initial.begin());
     SNode& data = graph.getData(req.n, Galois::Graph::NONE);
-    //    std::cerr << data.id << " " << data.dist << " " << req.w << "\n";
+
     if (req.w < data.dist) {
       data.dist = req.w;
       for (Graph::neighbor_iterator ii = graph.neighbor_begin(req.n, Galois::Graph::NONE), 
@@ -113,10 +136,13 @@ void runBody(const GNode src) {
 	int d = graph.getEdgeData(req.n, dst, Galois::Graph::NONE);
 	unsigned int newDist = req.w + d;
 	if (newDist < graph.getData(dst,Galois::Graph::NONE).dist)
-	  initial.push(UpdateRequest(dst, newDist));
+	  initial.insert(UpdateRequest(dst, newDist));
       }
     }
   }
+
+  Galois::Launcher::stopTiming();
+  GaloisRuntime::reportStat("Iterations: ", counter);
 }
 
 struct process {
@@ -143,14 +169,14 @@ void runBodyParallel(const GNode src) {
   using namespace GaloisRuntime::WorkList;
 
   typedef dChunkedFIFO<UpdateRequest, 16> IChunk;
-  typedef LogOrderByIntegerMetric<UpdateRequest, UpdateRequestIndexer, IChunk> LOBIM;;
-  typedef ApproxOrderByIntegerMetric<UpdateRequest, UpdateRequestIndexer, IChunk> AOBIM;
-  //typedef OrderedByIntegerMetric<UpdateRequest, UpdateRequestIndexer, IChunk> OBIM;
+  typedef OrderedByIntegerMetric<UpdateRequest, UpdateRequestIndexer, IChunk> OBIM;
 
-  LocalFilter<UpdateRequest, UpdateRequestIndexer, LIFO<UpdateRequest>, AOBIM> wl;
+  OBIM wl;
 
   getInitialRequests(src, wl);
+  Galois::Launcher::startTiming();
   Galois::for_each(wl, process());
+  Galois::Launcher::stopTiming();
 }
 
 
@@ -237,9 +263,12 @@ int main(int argc, const char **argv) {
     abort();
   }
 
-  Galois::Launcher::startTiming();
-  runBodyParallel(source);
-  Galois::Launcher::stopTiming();
+  if (numThreads) {
+    runBodyParallel(source);
+  } else {
+    std::cout << "Running Sequentially\n";
+    runBody(source);
+  }
 
   GaloisRuntime::reportStat("Time", Galois::Launcher::elapsedTime());
   cout << report << " " 
