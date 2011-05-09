@@ -68,16 +68,16 @@ set(CMAKE_CXX_FLAGS_DEBUG
   "-g -Wall -Wno-sign-compare" CACHE STRING
   "CXX flags for debug target" FORCE )
 set(CMAKE_C_FLAGS_RELWITHDEBINFO
-  "-g -DNDEBUG -O3" CACHE STRING
+  "-g -O3" CACHE STRING
   "CXX Flags for release with debug info target" FORCE )
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO
-  "-g -DNDEBUG -O3" CACHE STRING
+  "-g -O3" CACHE STRING
   "CXX Flags for release with debug info target" FORCE )
 set(CMAKE_C_FLAGS_RELEASE
-  "-DNDEBUG -O3" CACHE STRING
+  "-g -DNDEBUG -O3" CACHE STRING
   "C flags for release target" FORCE )
 set(CMAKE_CXX_FLAGS_RELEASE
-  "-DNDEBUG -O3" CACHE STRING
+  "-g -DNDEBUG -O3" CACHE STRING
   "CXX flags for release target" FORCE )
 
 ###### Source finding ######
