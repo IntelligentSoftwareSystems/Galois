@@ -508,7 +508,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     unsigned int index = I(val);
     perItem& pI = current.get();
     CTy* lC = updateLocalOrCreate(pI, index);
-    lC->push(val);
+    return lC->push(val);
   }
 
   std::pair<bool, value_type> pop() {
@@ -911,7 +911,7 @@ public:
   }
 
   bool aborted(value_type val) {
-    push(val);
+    return push(val);
   }
 
   std::pair<bool, value_type> pop() {
