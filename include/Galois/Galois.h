@@ -20,8 +20,14 @@ void for_each(IterTy b, IterTy e, Function f) {
 }
 
 template<typename Function>
+void for_all(long start, long end, Function f) {
+  GaloisRuntime::for_all_parallel(start, end, f);
+}
+
+template<typename Function>
 void for_all(Function f) {
-  GaloisRuntime::for_all_parallel(f);
+  int numThreads = GaloisRuntime::getSystemThreadPool().getActiveThreads();
+  for_all(0, numThreads, f);
 }
 
 }

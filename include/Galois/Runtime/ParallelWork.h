@@ -1,7 +1,10 @@
 // simple galois scheduler and runtime -*- C++ -*-
 #ifndef __PARALLELWORK_H_
 #define __PARALLELWORK_H_
-
+#include <algorithm>
+#include <numeric>
+#include <sstream>
+#include <math.h>
 #include "Galois/Executable.h"
 #include "Galois/PerIterMem.h"
 
@@ -49,8 +52,8 @@ public:
 
   void report() const {
     reportStat("Conflicts", conflicts);
-    reportStat("Iterations ", iterations);
-    reportStat("TotalTime ", TotalTime);
+    reportStat("Iterations", iterations);
+    reportStat("TotalTime", TotalTime);
   }
 
   template<typename Function>
@@ -146,12 +149,46 @@ public:
 
 template<class Function>
 class ForAllWork : public Galois::Executable {
+  PerCPU<long> tdata;
   Function& f;
+  long start, end;
+  int numThreads;
 
 public:
-  ForAllWork(Function& _f) : f(_f) {}
+  ForAllWork(int _start, int _end, Function& _f) : f(_f), start(_start), end(_end) {
+    numThreads = GaloisRuntime::getSystemThreadPool().getActiveThreads();
+    assert(numThreads > 0);
+  }
   
-  ~ForAllWork() { }
+  ~ForAllWork() { 
+    std::vector<long> times;
+    for (int i = 0; i < numThreads; ++i)
+      times.push_back(tdata.get(i));
+    
+
+    long min = *std::min_element(times.begin(), times.end());
+    long max = *std::max_element(times.begin(), times.end());
+    double ave = std::accumulate(times.begin(), times.end(), 0.0) / times.size();
+   
+    double acc = 0.0;
+    for (std::vector<long>::const_iterator it = times.begin(), end = times.end(); it != end; ++it) {
+      acc += (*it - ave) * (*it - ave);
+    }
+
+    double stdev = 0.0;
+    if (times.size() > 1) {
+      stdev = sqrt(acc / (times.size() - 1));
+    }
+
+    std::ostringstream out;
+    out << "n: " << times.size();
+    out << " ave: " << ave;
+    out << " min: " << min;
+    out << " max: " << max;
+    out << " stdev: " << stdev;
+
+    reportStat("TotalTime", out.str().c_str());
+  }
 
   virtual void preRun(int tmax) { }
 
@@ -160,10 +197,21 @@ public:
   virtual void operator()() {
     Timer T;
     T.start();
+    // Simple blocked assignment
     unsigned int id = ThreadPool::getMyID() - 1;
-    f(id);
+    long range = end - start;
+    long block = range / numThreads;
+    long base = start + id * block;
+    long stop = base + block;
+    for (long i = base; i < stop; i++) {
+      f(i);
+    }
+    // Remainder (each thread executes at most one iteration)
+    for (long i = start + numThreads * block + id; i < end; i += numThreads) {
+      f(i);
+    }
     T.stop();
-    reportStat("TotalTime ", T.get());
+    tdata.get() = T.get();
   }
 };
 
@@ -181,8 +229,8 @@ void for_each_parallel(GWLTy& GWL, Function& f) {
 }
 
 template<class Function>
-void for_all_parallel(Function& f) {
-  ForAllWork<Function> GW(f);
+void for_all_parallel(long start, long end, Function& f) {
+  ForAllWork<Function> GW(start, end, f);
   ThreadPool& PTP = getSystemThreadPool();
   PTP.run(&GW);
 }
