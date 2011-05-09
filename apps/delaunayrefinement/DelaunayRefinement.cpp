@@ -57,7 +57,6 @@ typedef Galois::Graph::FirstGraph<Element,void,false>::GraphNode GNode;
 #include "Cavity.h"
 
 Graph* mesh;
-int threads = 1;
 
 struct process {
   template<typename Context>
@@ -124,9 +123,7 @@ int main(int argc, const char** argv) {
   std::vector<GNode> wl;
   int numbad = m.getBad(mesh, wl);
 
-  cout << "configuration: " << mesh->size() << " total triangles, " << numbad << " bad triangles\n"
-       << "number of threads: " << threads << "\n"
-       << "\n";
+  cout << "configuration: " << mesh->size() << " total triangles, " << numbad << " bad triangles\n";
 
   using namespace GaloisRuntime::WorkList;
   LocalQueues<GNode, ChunkedLIFO<GNode, 1024>, LIFO<GNode> > wl2;
