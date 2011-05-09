@@ -103,6 +103,26 @@ struct MaxwellPolicy : public ThreadPolicy {
   }
 };
 
+struct GaloisPolicy : public ThreadPolicy {
+
+  virtual void bindThreadToProcessor(int id) {
+    //1-1 works on galois
+    genericBindToProcessor(id);
+  }
+
+  GaloisPolicy() {
+    numLevels = 1;
+    numThreads = 16;
+    numCores = 16;
+    levelSize.push_back(4);
+    for (int y = 0; y < 2; ++y)
+      for (int x = 0; x < 4; ++x)
+        for (int i = 0; i < 4; ++i)
+          levelMap.push_back(x);
+  }
+};
+
+
 
 struct DummyPolicy : public ThreadPolicy {
 
@@ -136,6 +156,8 @@ void GaloisRuntime::setSystemThreadPolicy(const char* name) {
     newPolicy = new VoltaPolicy();
   else if (strcmp(name, "maxwell") == 0)
     newPolicy = new MaxwellPolicy();
+  else if (strcmp(name, "galois") == 0)
+    newPolicy = new GaloisPolicy();
 
   if (newPolicy)
     std::cout << "Using " << name << " for thread assignment policy\n";
