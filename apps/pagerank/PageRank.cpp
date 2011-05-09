@@ -1,5 +1,5 @@
 /*
- * PageRankSSSP.cpp
+ * PageRank.cpp
  *
  */
 
