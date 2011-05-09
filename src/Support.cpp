@@ -25,6 +25,10 @@ void GaloisRuntime::reportStat(const char* text, double val) {
   genericReport(false, "STAT:", text, val);
 }
 
+void GaloisRuntime::reportStat(const char* text, const char* val) {
+  genericReport(false, "STAT:", text, val);
+}
+
 //Report Warnings
 void GaloisRuntime::reportWarning(const char* text) {
   genericReport(true, "WARNING:", text, "");
