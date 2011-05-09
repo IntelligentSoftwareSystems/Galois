@@ -447,13 +447,45 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     std::map<int, CTy*> local;
   };
 
-  std::map<int, CTy*> master;
+  std::vector<std::pair<int, CTy*> > masterLog;
   SimpleLock<int, concurrent> masterLock;
   int masterVersion;
 
   Indexer I;
 
   PerCPU<perItem> current;
+
+  void updateLocal_i(perItem& p) {
+    //ASSERT masterLock
+    for (; p.lastMasterVersion < masterVersion; ++p.lastMasterVersion) {
+      std::pair<int, CTy*> logEntry = masterLog[p.lastMasterVersion];
+      p.local[logEntry.first] = logEntry.second;
+    }
+  }
+
+  void updateLocal(perItem& p) {
+    if (p.lastMasterVersion != masterVersion) {
+      masterLock.lock();
+      updateLocal_i(p);
+      masterLock.unlock();
+    }
+  }
+
+  CTy* updateLocalOrCreate(perItem& p, int i) {
+    //Try local then try update then find again or else create and update the master log
+    CTy*& lC = p.local[i];
+    if (lC)
+      return lC;
+    masterLock.lock();
+    updateLocal_i(p);
+    if (!lC) {
+      lC = new CTy();
+      ++masterVersion;
+      masterLog.push_back(std::make_pair(i, lC));
+    }
+    masterLock.unlock();
+    return lC;
+  }
 
  public:
   template<bool newconcurrent>
@@ -464,7 +496,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
   typedef T value_type;
 
   OrderedByIntegerMetric(const Indexer& x = Indexer())
-    :masterVersion(1), I(x)
+    :masterVersion(0), I(x)
   {
     for (int i = 0; i < current.size(); ++i) {
       current.get(i).current = 0;
@@ -472,25 +504,10 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     }
   }
 
-  ~OrderedByIntegerMetric() {
-    for (typename std::map<int, CTy*>::iterator ii = master.begin(), ee = master.end(); ii != ee; ++ii)
-      delete ii->second;
-  }
-  
   bool push(value_type val) {
     unsigned int index = I(val);
     perItem& pI = current.get();
-    CTy*& lC = pI.local[index];
-    if (!lC) {
-      masterLock.lock();
-      CTy*& gC = master[index];
-      if (!gC) {
-	gC = new CTy();
-	++masterVersion;
-      }
-      lC = gC;
-      masterLock.unlock();
-    }
+    CTy* lC = updateLocalOrCreate(pI, index);
     lC->push(val);
   }
 
@@ -502,12 +519,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     if (C && (retval = C->pop()).first)
       return retval;
     //Failed, find minimum bin
-    if (masterVersion != pI.lastMasterVersion) {
-      masterLock.lock();
-      pI.lastMasterVersion = masterVersion;
-      pI.local = master;
-      masterLock.unlock();
-    }
+    updateLocal(pI);
     for (typename std::map<int, CTy*>::iterator ii = pI.local.begin(), ee = pI.local.end(); ii != ee; ++ii) {
       C = ii->second;
       if ((retval = C->pop()).first)
@@ -518,7 +530,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
   }
 
   bool empty() const {
-    for (typename std::map<int, CTy*>::const_iterator ii = master.begin(), ee = master.end(); ii != ee; ++ii)
+    for (typename std::vector<std::pair<int, CTy*> >::const_iterator ii = masterLog.begin(), ee = masterLog.end(); ii != ee; ++ii)
       if (!ii->second->empty())
 	return false;
     return true;
