@@ -1,8 +1,8 @@
 cmake_minimum_required (VERSION 2.6)
 project (Galois)
+site_name(SITE_NAME)
 
 ###### Options ######
-
 #use pthreads
 set(PTHREAD ON)
 
@@ -11,6 +11,10 @@ set(PTHREAD ON)
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "RelWithDebInfo")
+endif()
+
+if(SITE_NAME MATCHES "volta.*")
+  set(NUMA ON)
 endif()
 
 ###### find libraries ######
@@ -26,6 +30,9 @@ if(PTHREAD)
   add_definitions(-DGALOIS_PTHREAD)
 endif(PTHREAD)
 
+if(NUMA)
+  add_definitions(-DGALOIS_NUMA)
+endif(NUMA)
 #vtune
 #apps/CMakeLists.txt also hardcodes this path
 if(EXISTS "/opt/intel/vtune_amplifier_xe_2011/include/ittnotify.h")
@@ -54,12 +61,24 @@ endif()
 #set_property(TARGET hwloc PROPERTY IMPORTED_LOCATION ${CMAKE_BINARY_DIR}/lib/install/lib/libhwloc.so)
 #include_directories(${CMAKE_BINARY_DIR}/lib/install/include)
 
-list(APPEND C_FLAGS_DEBUG "-g -Wall -Wno-sign-compare")
-list(APPEND CXX_FLAGS_DEBUG "-g -Wall -Wno-sign-compare")
-list(APPEND C_FLAGS_RELWITHDEBINFO "-g -DNDEBUG -O3")
-list(APPEND CXX_FLAGS_RELWITHDEBINFO "-g -DNDEBUG -O3")
-list(APPEND C_FLAGS_RELEASE "-DNDEBUG -O3")
-list(APPEND CXX_FLAGS_RELEASE "-DNDEBUG -O3")
+set(CMAKE_C_FLAGS_DEBUG
+  "-g -Wall -Wno-sign-compare" CACHE STRING
+  "C flags for debug target" FORCE )
+set(CMAKE_CXX_FLAGS_DEBUG
+  "-g -Wall -Wno-sign-compare" CACHE STRING
+  "CXX flags for debug target" FORCE )
+set(CMAKE_C_FLAGS_RELWITHDEBINFO
+  "-g -DNDEBUG -O3" CACHE STRING
+  "CXX Flags for release with debug info target" FORCE )
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO
+  "-g -DNDEBUG -O3" CACHE STRING
+  "CXX Flags for release with debug info target" FORCE )
+set(CMAKE_C_FLAGS_RELEASE
+  "-DNDEBUG -O3" CACHE STRING
+  "C flags for release target" FORCE )
+set(CMAKE_CXX_FLAGS_RELEASE
+  "-DNDEBUG -O3" CACHE STRING
+  "CXX flags for release target" FORCE )
 
 ###### Source finding ######
 include_directories("include")
