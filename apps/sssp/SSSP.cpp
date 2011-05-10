@@ -29,11 +29,11 @@ using namespace std;
 static const char* name = "Single Source Shortest Path";
 static const char* description = "Computes the shortest path from a source node to all nodes in a directed graph using a modified Bellman-Ford algorithm\n";
 static const char* url = "http://iss.ices.utexas.edu/lonestar/sssp.html";
-static const char* help = "<input file> <startnode> <reportnode> [-delta <delta>]";
+static const char* help = "<input file> <startnode> <reportnode> [-delta <deltaShift>]";
 
 static const unsigned int DIST_INFINITY = std::numeric_limits<unsigned int>::max() - 1;
 
-static unsigned int stepSize = 2000;
+static unsigned int stepShift = 10;
 
 struct SNode {
   unsigned int id;
@@ -84,11 +84,9 @@ struct seq_less {
 struct UpdateRequestIndexer
   : std::binary_function<UpdateRequest, unsigned int, unsigned int> {
   unsigned int operator() (const UpdateRequest& val) const {
-    return val.w / stepSize;
+    unsigned int t = val.w >> stepShift;
+    return t;
   }
-  unsigned int operator() (const unsigned int val) const {
-    return val / stepSize;
-  }  
 };
 
 Graph graph;
@@ -167,7 +165,7 @@ struct process {
 void runBodyParallel(const GNode src) {
   using namespace GaloisRuntime::WorkList;
 
-  typedef dChunkedFIFO<UpdateRequest, 16> IChunk;
+  typedef dChunkedLIFO<UpdateRequest, 16> IChunk;
   typedef OrderedByIntegerMetric<UpdateRequest, UpdateRequestIndexer, IChunk> OBIM;
 
   OBIM wl;
@@ -224,7 +222,7 @@ int main(int argc, const char **argv) {
   unsigned int startNode = atoi(args[1]);
   unsigned int reportNode = atoi(args[2]);
   if (args.size() >= 5 && strcmp(args[3], "-delta") == 0)
-    stepSize = atoi(args[4]);
+    stepShift = atoi(args[4]);
  
   GNode source = -1;
   GNode report = -1;
@@ -232,7 +230,7 @@ int main(int argc, const char **argv) {
   graph.structureFromFile(inputfile);
   graph.emptyNodeData();
   std::cout << "Read " << graph.size() << " nodes\n";
-  std::cout << "Using delta-step of " << stepSize << "\n";
+  std::cout << "Using delta-step of " << (1 << stepShift) << "\n";
   
   unsigned int id = 0;
   for (Graph::active_iterator src = graph.active_begin(), ee =
