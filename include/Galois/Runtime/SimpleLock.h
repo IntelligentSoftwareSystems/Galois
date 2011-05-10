@@ -130,6 +130,13 @@ public:
       return false;
     return __sync_bool_compare_and_swap(&_lock, oldval, oldval | 1);
   }
+
+  //CAS only works on unlocked values
+  //the lock bit will prevent a successful cas
+  bool CAS(T oldval, T newval) {
+    assert(!((uintptr_t)oldval & 1) && !((uintptr_t)newval & 1));
+    return __sync_bool_compare_and_swap(&_lock, oldval, newval);
+  }
 };
 
 template<typename T>

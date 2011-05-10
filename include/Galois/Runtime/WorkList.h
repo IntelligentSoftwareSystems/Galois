@@ -19,8 +19,8 @@
 #include "mm/mem.h"
 #include "WorkListHelpers.h"
 
-#define OPTNOINLINE __attribute__((noinline))
-//#define OPTNOINLINE
+//#define OPTNOINLINE __attribute__((noinline))
+#define OPTNOINLINE
 
 #ifndef WLCOMPILECHECK
 #define WLCOMPILECHECK(name) //
@@ -229,213 +229,6 @@ public:
 };
 WLCOMPILECHECK(FIFO);
 
-template<typename T, int chunksize=64, bool concurrent=true>
-class ChunkedFIFO : private boost::noncopyable {
-  class Chunk : public FixedSizeRing<T, chunksize, false>, public ConExtListNode<Chunk> { };
-
-  MM::FixedSizeAllocator heap;
-
-  struct p {
-    Chunk* cur;
-    Chunk* next;
-  };
-
-  PerCPU<p> data;
-  ConExtLinkedQueue<Chunk, concurrent> queue;
-
-  Chunk* mkChunk() {
-    return new (heap.allocate(sizeof(Chunk))) Chunk();
-  }
-
-  void delChunk(Chunk* C) {
-    C->~Chunk();
-    heap.deallocate(C);
-  }
-
-public:
-  template<bool newconcurrent>
-  struct rethread {
-    typedef ChunkedFIFO<T, chunksize, newconcurrent> WL;
-  };
-
-  typedef T value_type;
-  
-  ChunkedFIFO() : heap(sizeof(Chunk)) {
-    for (int i = 0; i < data.size(); ++i) {
-      p& r = data.get(i);
-      r.next = 0;
-      r.cur = 0;
-    }
-  }
-
-  ~ChunkedFIFO() {
-    for (int i = 0; i < data.size(); ++i) {
-      p& r = data.get(i);
-      if (r.next)
-	delChunk(r.next);
-      if (r.cur)
-	delChunk(r.cur);
-      r.next = r.cur = 0;
-    }
-    while (Chunk* C = queue.pop())
-      delChunk(C);
-  }
-
-  bool push(value_type val) {
-    p& n = data.get();
-    if (n.next && n.next->push_back(val))
-      return true;
-    if (n.next)
-      queue.push(n.next);
-    n.next = mkChunk();
-    bool worked = n.next->push_back(val);
-    assert(worked);
-    return true;
-  }
-
-  std::pair<bool, value_type> pop() {
-    p& n = data.get();
-    std::pair<bool, value_type> retval;
-    if (n.cur && (retval = n.cur->pop_front()).first)
-      return retval;
-    if(n.cur)
-      delChunk(n.cur);
-    n.cur = queue.pop();
-    if (!n.cur) {
-      n.cur = n.next;
-      n.next = 0;
-    }
-    if (n.cur)
-      return n.cur->pop_front();
-    return std::make_pair(false, value_type());
-  }
-  
-  bool empty() const {
-    for (int i = 0; i < data.size(); ++i) {
-      const p& n = data.get(i);
-      if (n.cur && !n.cur->empty()) return false;
-      if (n.next && !n.next->empty()) return false;
-    }
-    return queue.empty();
-  }
-
-  bool aborted(value_type val) {
-    return push(val);
-  }
-
-  //Not Thread Safe
-  template<typename Iter>
-  void fill_initial(Iter ii, Iter ee) {
-    p& n = data.get();
-    for( ; ii != ee; ++ii) {
-      push(*ii);
-    }
-    if (n.next) {
-      queue.push(n.next);
-      n.next = 0;
-    }
-  }
-};
-WLCOMPILECHECK(ChunkedFIFO);
-
-template<typename T, int chunksize=64, bool concurrent=true>
-class ChunkedLIFO : private boost::noncopyable {
-  class Chunk : public FixedSizeRing<T, chunksize, false>, public ConExtListNode<Chunk> {};
-
-  MM::FixedSizeAllocator heap;
-
-  struct p {
-    Chunk* cur;
-  };
-
-  PerCPU<p> data;
-  ConExtLinkedStack<Chunk, concurrent> stack;
-
-  Chunk* mkChunk() {
-    return new (heap.allocate(sizeof(Chunk))) Chunk();
-  }
-
-  void delChunk(Chunk* C) {
-    C->~Chunk();
-    heap.deallocate(C);
-  }
-
-public:
-  template<bool newconcurrent>
-  struct rethread {
-    typedef ChunkedLIFO<T, chunksize, newconcurrent> WL;
-  };
-
-  typedef T value_type;
-  
-  ChunkedLIFO() : heap(sizeof(Chunk)) {
-    for (int i = 0; i < data.size(); ++i)
-      data.get(i).cur = 0;
-  }
-
-  ~ChunkedLIFO() {
-    for (int i = 0; i < data.size(); ++i) {
-      p& r = data.get(i);
-      if (r.cur)
-	delChunk(r.cur);
-      r.cur = 0;
-    }
-    while (Chunk* C = stack.pop())
-      delChunk(C);
-  }
-
-  bool push(value_type val) {
-    p& n = data.get();
-    if (n.cur && n.cur->push_back(val))
-      return true;
-    if (n.cur)
-      stack.push(n.cur);
-    n.cur = mkChunk();
-    bool worked = n.cur->push_back(val);
-    assert(worked);
-    return true;
-  }
-
-  std::pair<bool, value_type> pop() {
-    p& n = data.get();
-    std::pair<bool, value_type> retval;
-    if (n.cur && (retval = n.cur->pop_front()).first)
-      return retval;
-    if (n.cur)
-      delChunk(n.cur);
-    n.cur = stack.pop();
-    if (n.cur)
-      return n.cur->pop_front();
-    return std::make_pair(false, value_type());
-  }
-  
-  bool empty() {
-    for (int i = 0; i < data.size(); ++i) {
-      p& n = data.get(i);
-      if (n.cur && !n.cur->empty()) return false;
-    }
-    return stack.empty();
-  }
-
-  bool aborted(value_type val) {
-    return push(val);
-  }
-
-  //Not Thread Safe
-  template<typename Iter>
-  void fill_initial(Iter ii, Iter ee) {
-    p& n = data.get();
-    for( ; ii != ee; ++ii) {
-      push(*ii);
-    }
-    if (n.cur) {
-      stack.push(n.cur);
-      n.cur = 0;
-    }
-  }
-};
-WLCOMPILECHECK(ChunkedLIFO);
-
 template<class T, class Indexer = DummyIndexer<T>, typename ContainerTy = FIFO<T>, bool concurrent = true >
 class OrderedByIntegerMetric : private boost::noncopyable {
 
@@ -599,7 +392,7 @@ WLCOMPILECHECK(LocalQueues);
 //Queue per writer, reader cycles
 template<typename T>
 class MP_SC_FIFO {
-  class Chunk : public FixedSizeRing<T, 128, false>, public ConExtListNode<Chunk> { };
+  class Chunk : public FixedSizeRing<T, 128, false>, public ConExtLinkedQueue<Chunk,true>::ListNode { };
   
   MM::FixedSizeAllocator heap;
   
@@ -698,10 +491,31 @@ public:
 };
 WLCOMPILECHECK(MP_SC_FIFO);
 
+//This overly comples specialization avoids a pointer indirection for non-distributed WL when accessing PerLevel
+template<bool d, typename TQ>
+struct squeues;
 
-template<typename T, int chunksize=64, bool concurrent=true>
-class dChunkedFIFO : private boost::noncopyable {
-  class Chunk : public FixedSizeRing<T, chunksize, false>, public ConExtListNode<Chunk> {};
+template<typename TQ>
+struct squeues<true,TQ> {
+  PerLevel<TQ> queues;
+  TQ& get(int i) { return queues.get(i); }
+  TQ& get() { return queues.get(); }
+  int myEffectiveID() { return queues.myEffectiveID(); }
+  int size() { return queues.size(); }
+};
+
+template<typename TQ>
+struct squeues<false,TQ> {
+  TQ queue;
+  TQ& get(int i) { return queue; }
+  TQ& get() { return queue; }
+  int myEffectiveID() { return 0; }
+  int size() { return 0; }
+};
+
+template<typename T, template<typename, bool> class QT, bool distributed = false, bool isStack = false, int chunksize=64, bool concurrent=true>
+class ChunkedMaster : private boost::noncopyable {
+  class Chunk : public FixedSizeRing<T, chunksize, false>, public QT<Chunk, concurrent>::ListNode {};
 
   MM::FixedSizeAllocator heap;
 
@@ -710,10 +524,10 @@ class dChunkedFIFO : private boost::noncopyable {
     Chunk* next;
   };
 
-  typedef ConExtLinkedQueue<Chunk, concurrent> LevelItem;
+  typedef QT<Chunk, concurrent> LevelItem;
 
   PerCPU<p> data;
-  PerLevel<LevelItem > queues;
+  squeues<distributed, LevelItem> Q;
 
   Chunk* mkChunk() {
     return new (heap.allocate(sizeof(Chunk))) Chunk();
@@ -725,24 +539,24 @@ class dChunkedFIFO : private boost::noncopyable {
   }
 
   void pushChunk(Chunk* C) OPTNOINLINE {
-    LevelItem& I = queues.get();
+    LevelItem& I = Q.get();
     I.push(C);
   }
 
   Chunk* popChunkByID(unsigned int i) OPTNOINLINE {
-    LevelItem& I = queues.get(i);
+    LevelItem& I = Q.get(i);
     return I.pop();
   }
 
   Chunk* popChunk() OPTNOINLINE {
-    int id = queues.myEffectiveID();
+    int id = Q.myEffectiveID();
     Chunk* r = popChunkByID(id);
     if (r)
       return r;
-
-    for (int i = 0; i < queues.size(); ++i) {
+    
+    for (int i = 0; i < Q.size(); ++i) {
       ++id;
-      id %= queues.size();
+      id %= Q.size();
       r = popChunkByID(id);
       if (r)
 	return r;
@@ -751,14 +565,9 @@ class dChunkedFIFO : private boost::noncopyable {
   }
 
 public:
-  template<bool newconcurrent>
-  struct rethread {
-    typedef dChunkedFIFO<T, chunksize, newconcurrent> WL;
-  };
-
   typedef T value_type;
   
-  dChunkedFIFO() : heap(sizeof(Chunk)) {
+  ChunkedMaster() : heap(sizeof(Chunk)) {
     for (int i = 0; i < data.size(); ++i) {
       p& r = data.get(i);
       r.cur = 0;
@@ -781,18 +590,29 @@ public:
   std::pair<bool, value_type> pop() OPTNOINLINE {
     p& n = data.get();
     std::pair<bool, value_type> retval;
-    if (n.cur && (retval = n.cur->pop_front()).first)
-      return retval;
-    if(n.cur)
-      delChunk(n.cur);
-    n.cur = popChunk();
-    if (!n.cur) {
-      n.cur = n.next;
-      n.next = 0;
+    if (isStack) {
+      if (n.next && (retval = n.next->pop_back()).first)
+	return retval;
+      if(n.next)
+	delChunk(n.next);
+      n.next = popChunk();
+      if (n.next)
+	return n.next->pop_back();
+      return std::make_pair(false, value_type());
+    } else {
+      if (n.cur && (retval = n.cur->pop_front()).first)
+	return retval;
+      if(n.cur)
+	delChunk(n.cur);
+      n.cur = popChunk();
+      if (!n.cur) {
+	n.cur = n.next;
+	n.next = 0;
+      }
+      if (n.cur)
+	return n.cur->pop_front();
+      return std::make_pair(false, value_type());
     }
-    if (n.cur)
-      return n.cur->pop_front();
-    return std::make_pair(false, value_type());
   }
   
   bool empty() OPTNOINLINE {
@@ -801,8 +621,10 @@ public:
       if (n.cur && !n.cur->empty()) return false;
       if (n.next && !n.next->empty()) return false;
     }
-    for (int i = 0; i < queues.size(); ++i)
-      if (!queues.get(i).empty())
+    //try this node first to make distributed==false work
+    if (!Q.get().empty()) return false;
+    for (int i = 0; i < Q.size(); ++i)
+      if (!Q.get(i).empty())
 	return false;
     return true;
   }
@@ -818,115 +640,47 @@ public:
       push(*ii);
     }
   }
-
 };
 
 template<typename T, int chunksize=64, bool concurrent=true>
-class dChunkedLIFO : private boost::noncopyable {
-  class Chunk : public FixedSizeRing<T, chunksize, false>, public ConExtListNode<Chunk> {};
+class ChunkedFIFO : public ChunkedMaster<T, ConExtLinkedQueue, false, false, chunksize, concurrent> {
+public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef ChunkedFIFO<T, chunksize, newconcurrent> WL;
+  };
+};
+WLCOMPILECHECK(ChunkedFIFO);
 
-  MM::FixedSizeAllocator heap;
+template<typename T, int chunksize=64, bool concurrent=true>
+class ChunkedLIFO : public ChunkedMaster<T, ConExtLinkedStack, false, true, chunksize, concurrent> {
+public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef ChunkedLIFO<T, chunksize, newconcurrent> WL;
+  };
+};
+WLCOMPILECHECK(ChunkedLIFO);
 
+template<typename T, int chunksize=64, bool concurrent=true>
+class dChunkedFIFO : public ChunkedMaster<T, ConExtLinkedQueue, true, false, chunksize, concurrent> {
+public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef dChunkedFIFO<T, chunksize, newconcurrent> WL;
+  };
+};
+WLCOMPILECHECK(dChunkedFIFO);
 
-  typedef ConExtLinkedStack<Chunk, concurrent> LevelItem;
-
-  PerCPU<Chunk*> cur;
-  PerLevel<LevelItem > Items;
-
-  void pushChunk(Chunk* C) OPTNOINLINE {
-    LevelItem& I = Items.get();
-    I.push(C);
-  }
-
-  Chunk* popChunkByID(unsigned int i) OPTNOINLINE {
-    LevelItem& I = Items.get(i);
-    return I.pop();
-  }
-
-  Chunk* popChunk() OPTNOINLINE {
-    int id = Items.myEffectiveID();
-    Chunk* r = popChunkByID(id);
-    if (r)
-      return r;
-
-    for (int i = 0; i < Items.size(); ++i) {
-      ++id;
-      id %= Items.size();
-      r = popChunkByID(id);
-      if (r)
-	return r;
-    }
-    return 0;
-  }
-
+template<typename T, int chunksize=64, bool concurrent=true>
+class dChunkedLIFO : public ChunkedMaster<T, ConExtLinkedStack, true, true, chunksize, concurrent> {
 public:
   template<bool newconcurrent>
   struct rethread {
     typedef dChunkedLIFO<T, chunksize, newconcurrent> WL;
   };
-
-  typedef T value_type;
-  
-  dChunkedLIFO() : heap(sizeof(Chunk)) {
-    for (int i = 0; i < cur.size(); ++i)
-      cur.get(i) = 0;
-  }
-
-  bool push(value_type val) OPTNOINLINE {
-    Chunk*& n = cur.get();
-    if (n && n->full()) {
-      pushChunk(n);
-      n = 0;
-    }
-    if (!n)
-      n = new (heap.allocate(sizeof(Chunk))) Chunk();
-    bool retval = n->push_back(val);
-    assert(retval);
-    return retval;
-  }
-
-  std::pair<bool, value_type> pop() OPTNOINLINE {
-    Chunk*& n = cur.get();
-    if (n) {
-      if (n->empty()) {
-	n->~Chunk();
-	heap.deallocate(n);
-	n = 0;
-      } else {
-	return n->pop_front();
-      }
-    } else {
-      n = popChunk();
-      if (n)
-	return pop();
-      else
-	return std::make_pair(false, value_type());
-    }
-  }
-  
-  std::pair<bool, value_type> try_pop() {
-    return pop();
-  }
-  
-  bool empty() OPTNOINLINE {
-    Chunk* n = cur.get();
-    if (n && !n->empty()) return false;
-    return Items.get().empty();
-  }
-
-  bool aborted(value_type val) {
-    return push(val);
-  }
-
-  //Not Thread Safe
-  template<typename Iter>
-  void fill_initial(Iter ii, Iter ee) {
-    for( ; ii != ee; ++ii) {
-      push(*ii);
-    }
-  }
-
 };
+WLCOMPILECHECK(dChunkedLIFO);
 
 template<typename T, typename Partitioner = DummyPartitioner<T>, typename ChildWLTy = dChunkedFIFO<T>, bool concurrent=true>
 class PartitionedWL : private boost::noncopyable {

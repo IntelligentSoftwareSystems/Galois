@@ -119,42 +119,44 @@ public:
   }
 };
 
-template<typename T>
-struct ConExtListNode {
-  T* NextPtr;
-  T*& getNextPtr() {
-    return NextPtr;
-  }
-};
-
 template<typename T, bool concurrent>
 class ConExtLinkedStack {
   PtrLock<T*, concurrent> head;
 
 public:
   
+  class ListNode {
+    T* NextPtr;
+  public:
+    ListNode() :NextPtr(0) {}
+    T*& getNextPtr() { return NextPtr; }
+  };
+
   bool empty() const {
     return !head.getValue();
   }
 
   void push(T* C) {
-    head.lock();
-    C->getNextPtr() = head.getValue();
-    head.unlock_and_set(C);
+    T* oldhead(0);
+    do {
+      oldhead = head.getValue();
+      C->getNextPtr() = oldhead;
+    } while (!head.CAS(oldhead, C));
   }
 
   T* pop() {
     //lock free Fast path (empty)
     if (empty()) return 0;
-
+    
+    //Disable CAS
     head.lock();
     T* C = head.getValue();
-    if (C) {
-      head.unlock_and_set(C->getNextPtr());
-      C->getNextPtr() = 0;
-    } else {
+    if (!C) {
       head.unlock();
+      return 0;
     }
+    head.unlock_and_set(C->getNextPtr());
+    C->getNextPtr() = 0;
     return C;
   }
 };
@@ -162,15 +164,22 @@ public:
 
 template<typename T, bool concurrent>
 class ConExtLinkedQueue {
-  PtrLock<T*, concurrent> head;
-  T* tail;
-
-public:
-
-  ConExtLinkedQueue() :tail(0) {}
   
+  PtrLock<T*,concurrent> head;
+  T* tail;
+  
+public:
+  class ListNode {
+    T* NextPtr;
+  public:
+    ListNode() :NextPtr(0) {}
+    T*& getNextPtr() { return NextPtr; }
+  };
+  
+  ConExtLinkedQueue() :tail(0) { }
+
   bool empty() const {
-    return !head.getValue();
+    return !tail;
   }
 
   void push(T* C) {
