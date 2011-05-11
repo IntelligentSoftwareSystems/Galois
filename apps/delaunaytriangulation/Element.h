@@ -18,7 +18,7 @@ class DTElement{
 	std::vector<DTTuple> _tuples;
 
 public:
-	const bool isProcessed() const { return processed;};
+	bool isProcessed() const { return processed;};
 	void setProcessed(){ processed = true;}
 	const DTTuple& getPoint(int i) const { return coords[i];};
 	bool getBDim(){ return bDim;}

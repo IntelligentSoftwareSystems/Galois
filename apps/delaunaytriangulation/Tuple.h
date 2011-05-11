@@ -17,8 +17,8 @@ public:
 	DTTuple(double x, double y){ _x=x; _y=y; }
 	DTTuple() {};
 	~DTTuple() {};
-	inline const double getX() const { return _x; };
-	inline const double getY() const { return _y; };
+	inline double getX() const { return _x; };
+	inline double getY() const { return _y; };
 	inline void setX(double x) { _x = x; };
 	inline void setY(double y) { _y = y; };
 	

@@ -16,7 +16,7 @@ namespace GaloisRuntime {
 //Durring Parallel regions the threads index
 //from 0 -> num - 1 (one thread pool thread shares an index with the user thread)
 template<typename T>
-class PerCPU : boost::noncopyable {
+class PerCPU : private boost::noncopyable {
 protected:
   cache_line_storage<T>* datum;
   unsigned int num;
