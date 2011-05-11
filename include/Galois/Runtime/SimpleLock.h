@@ -21,7 +21,7 @@ public:
 #endif
   }
 
-  inline void lock(T val = 1) const {
+  inline void lock(T val) const {
     do {
       while (_lock != 0) {
 #if defined(__i386__) || defined(__amd64__)
@@ -29,6 +29,18 @@ public:
 #endif
       }
       if (try_lock(val))
+	break;
+    } while (true);
+  }
+
+  inline void lock() const {
+    do {
+      while (_lock != 0) {
+#if defined(__i386__) || defined(__amd64__)
+	asm volatile ( "pause");
+#endif
+      }
+      if (try_lock())
 	break;
     } while (true);
   }
@@ -43,7 +55,7 @@ public:
 #endif
   }
 
-  inline bool try_lock(T val = 1) const {
+  inline bool try_lock(T val) const {
 #ifdef GALOIS_CRAY
     T V = readfe(&_lock); // sets to empty, acquiring the lock lock
     if (V) {
@@ -58,12 +70,18 @@ public:
 #else
     if (_lock != 0)
       return false;
-    if (val == 1) {
-      T oldval = __sync_fetch_and_or(&_lock, 1);
-      return !(oldval & 1);
-    } else {
-      return __sync_bool_compare_and_swap(&_lock, 0, val);
-    }
+    return __sync_bool_compare_and_swap(&_lock, 0, val);
+#endif
+  }
+
+  inline bool try_lock() const {
+#ifdef GALOIS_CRAY
+    return try_lock(1);
+#else
+    if (_lock != 0)
+      return false;
+    T oldval = __sync_fetch_and_or(&_lock, 1);
+    return !(oldval & 1);
 #endif
   }
 
