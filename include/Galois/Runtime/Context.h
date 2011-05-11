@@ -14,7 +14,7 @@ namespace GaloisRuntime {
 class LockableListTag;
 typedef boost::intrusive::slist_base_hook<boost::intrusive::tag<LockableListTag>,boost::intrusive::link_mode<boost::intrusive::normal_link> > LockableBaseHook;
 
-class Lockable : public LockableBaseHook, public SimpleLock<void*, true> {
+class Lockable : public LockableBaseHook, public PtrLock<void*, true> {
 };
 
 class SimpleRuntimeContext {
@@ -29,8 +29,9 @@ class SimpleRuntimeContext {
 
   void acquire_i(Lockable* C) {
     assert(!failsafe && "Acquiring a new lock after failsafe");
-    bool suc = C->try_lock(this);
+    bool suc = C->try_lock();
     if (suc) {
+      C->setValue(this);
       locks.push_front(*C);
     } else {
       if (C->getValue() != this)
@@ -57,7 +58,7 @@ public:
       //ORDER MATTERS!
       Lockable& L = locks.front();
       locks.pop_front();
-      L.unlock();
+      L.unlock_and_clear();
     }
     failsafe = false;
   }
