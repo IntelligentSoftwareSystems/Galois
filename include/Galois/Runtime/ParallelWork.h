@@ -46,13 +46,14 @@ public:
   
   virtual ~ParallelThreadContext() {}
 
+  unsigned long getTotalTime() { return TotalTime; }
   void setTotalTime(unsigned long L) { TotalTime = L; }
   void set_wl(WorkListTy* WL) { wl = WL; }
 
   void report() const {
     reportStat("Conflicts", conflicts);
     reportStat("Iterations", iterations);
-    reportStat("TotalTime", TotalTime);
+    //reportStat("TotalTime", TotalTime);
   }
 
   template<typename Function>
@@ -72,7 +73,6 @@ public:
     return true;
   }
 
-
   void push(value_type val) {
     wl->push(val);
   }
@@ -91,6 +91,31 @@ public:
   
 };
 
+static void summarizeTimes(const std::vector<long>& times) {
+  long min = *std::min_element(times.begin(), times.end());
+  long max = *std::max_element(times.begin(), times.end());
+  double ave = std::accumulate(times.begin(), times.end(), 0.0) / times.size();
+ 
+  double acc = 0.0;
+  for (std::vector<long>::const_iterator it = times.begin(), end = times.end(); it != end; ++it) {
+    acc += (*it - ave) * (*it - ave);
+  }
+
+  double stdev = 0.0;
+  if (times.size() > 1) {
+    stdev = sqrt(acc / (times.size() - 1));
+  }
+
+  std::ostringstream out;
+  out << "n: " << times.size();
+  out << " ave: " << ave;
+  out << " min: " << min;
+  out << " max: " << max;
+  out << " stdev: " << stdev;
+
+  reportStat("TotalTime", out.str().c_str());
+}
+
 template<class WorkListTy, class Function>
 class ForEachWork : public Galois::Executable {
   typedef typename WorkListTy::value_type value_type;
@@ -107,6 +132,14 @@ public:
     :global_wl(_wl), f(_f) {}
   
   ~ForEachWork() {
+    {
+      int numThreads = GaloisRuntime::getSystemThreadPool().getActiveThreads();
+      std::vector<long> times;
+      for (int i = 0; i < numThreads; ++i)
+        times.push_back(tdata.get(i).getTotalTime());
+      summarizeTimes(times);
+    }
+
     for (int i = 1; i < tdata.size(); ++i)
       PCTy::merge(tdata.get(0), tdata.get(i));
     tdata.get().report();
@@ -163,30 +196,7 @@ public:
     std::vector<long> times;
     for (int i = 0; i < numThreads; ++i)
       times.push_back(tdata.get(i));
-    
-
-    long min = *std::min_element(times.begin(), times.end());
-    long max = *std::max_element(times.begin(), times.end());
-    double ave = std::accumulate(times.begin(), times.end(), 0.0) / times.size();
-   
-    double acc = 0.0;
-    for (std::vector<long>::const_iterator it = times.begin(), end = times.end(); it != end; ++it) {
-      acc += (*it - ave) * (*it - ave);
-    }
-
-    double stdev = 0.0;
-    if (times.size() > 1) {
-      stdev = sqrt(acc / (times.size() - 1));
-    }
-
-    std::ostringstream out;
-    out << "n: " << times.size();
-    out << " ave: " << ave;
-    out << " min: " << min;
-    out << " max: " << max;
-    out << " stdev: " << stdev;
-
-    reportStat("TotalTime", out.str().c_str());
+    summarizeTimes(times);
   }
 
   virtual void preRun(int tmax) { }
