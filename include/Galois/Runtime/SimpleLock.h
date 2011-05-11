@@ -21,7 +21,7 @@ public:
 #endif
   }
 
-  void lock(T val = 1) const {
+  inline void lock(T val = 1) const {
     do {
       while (_lock != 0) {
 #if defined(__i386__) || defined(__amd64__)
@@ -43,7 +43,7 @@ public:
 #endif
   }
 
-  bool try_lock(T val = 1) const {
+  inline bool try_lock(T val = 1) const {
 #ifdef GALOIS_CRAY
     T V = readfe(&_lock); // sets to empty, acquiring the lock lock
     if (V) {
@@ -58,7 +58,12 @@ public:
 #else
     if (_lock != 0)
       return false;
-    return __sync_bool_compare_and_swap(&_lock, 0, val);
+    if (val == 1) {
+      T oldval = __sync_fetch_and_or(&_lock, 1);
+      return !(oldval & 1);
+    } else {
+      return __sync_bool_compare_and_swap(&_lock, 0, val);
+    }
 #endif
   }
 
@@ -88,7 +93,7 @@ public:
   PtrLock() : _lock(0) {}
   explicit PtrLock(T val) : _lock(val) {}
 
-  void lock() {
+  inline void lock() {
     do {
       while ((_lock & 1) != 0) {
 #if defined(__i386__) || defined(__amd64__)
@@ -124,11 +129,12 @@ public:
     _lock = ((uintptr_t)val) | (_lock & 1);
   }
 
-  bool try_lock() {
+  inline bool try_lock() {
     uintptr_t oldval = _lock;
     if ((oldval & 1) != 0)
       return false;
-    return __sync_bool_compare_and_swap(&_lock, oldval, oldval | 1);
+    oldval = __sync_fetch_and_or(&_lock, 1);
+    return !(oldval & 1);
   }
 
   //CAS only works on unlocked values
