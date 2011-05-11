@@ -31,7 +31,7 @@ typedef std::vector<GNode, Galois::PerIterMem::ItAllocTy::rebind<GNode>::other>:
 
 	
 #include "Cavity.h"
-
+#include "Verifier.h"
 Graph* mesh;
 int threads = 1;
 
@@ -61,8 +61,8 @@ struct process {
 template<typename WLTY>
 void triangulate(WLTY& wl) {
 	//GaloisRuntime::WorkList::LIFO<GNode> wl2;
-    //GaloisRuntime::WorkList::FIFO<GNode> wl2;
-	GaloisRuntime::WorkList::ChunkedLIFO<GNode, 64> wl2;
+//    GaloisRuntime::WorkList::FIFO<GNode> wl2;
+	GaloisRuntime::WorkList::ChunkedFIFO<GNode, 64> wl2;
 	wl2.fill_initial(wl.begin(), wl.end());
 	Galois::for_each(wl2, process());
 	
@@ -133,5 +133,14 @@ int main(int argc, const char** argv) {
 	cout << " mesh size:" << mesh->size() <<"\n";
 	cout << "STAT: Time " << Galois::Launcher::elapsedTime() << "\n";
 
+	if (!skipVerify) {
+		Verifier verifier;
+		if (!verifier.checkConsistency(mesh) || !verifier.checkReachability(mesh) || !verifier.checkDelaunayProperty(mesh)) {
+			cerr << "Triangulation failed.\n";
+			assert(0 && "Triangulation failed");
+			abort();
+		}
+		cout << "Triangulation OK\n";
+	}
 	return 0;
 }

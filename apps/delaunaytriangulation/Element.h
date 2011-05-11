@@ -22,6 +22,10 @@ public:
 	void setProcessed(){ processed = true;}
 	const DTTuple& getPoint(int i) const { return coords[i];};
 	bool getBDim(){ return bDim;}
+	int getDim() const {
+		return bDim ? 3 : 2;
+	}
+
 	void addTuple(DTTuple& newTuple){
 		_tuples.push_back(newTuple);
 	};
@@ -133,7 +137,7 @@ public:
 	/**
 	 * determine if the circumcircle of the triangle contains the tuple
 	 */
-	bool inCircle(DTTuple& p) {
+	bool inCircle(const DTTuple& p) {
 		// This version computes the determinant of a matrix including the
 		// coordinates of each points + distance of these points to the origin
 		// in order to check if a point is inside a triangle or not
@@ -200,6 +204,18 @@ public:
 		return det > 0;
 	}
 
+	 std::ostream& print(std::ostream& s) const {
+	    s << '[';
+	    for (int i = 0; i < getDim(); ++i)
+	      s << coords[i] << (i < (getDim() - 1) ? ", " : "");
+	    s << ']';
+	    return s;
+	  }
+
 };
+
+static std::ostream& operator<<(std::ostream& s, const DTElement& E) {
+  return E.print(s);
+}
 
 #endif /* ELEMENT_H_ */
