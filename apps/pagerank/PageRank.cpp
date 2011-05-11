@@ -19,7 +19,6 @@
 #include <limits>
 #include <iostream>
 #include <fstream>
-using namespace std;
 
 static const char* name = "Page Rank";
 static const char* description = "Computes page ranks a la Page and Brin\n";
@@ -92,7 +91,10 @@ void runBody() {
         lost_potential += getPageRank(sdata, iterations);
       }
       
-      double diff = abs(value - getPageRank(sdata, iterations));
+      double diff = value - getPageRank(sdata, iterations);
+      if (diff < 0)
+        diff = -diff;
+
       if (diff > max_delta)
         max_delta = diff;
       if (diff < tolerance)
@@ -227,7 +229,7 @@ int main(int argc, const char **argv) {
   phase.start();
   makeGraph(inputfile);
   phase.stop();
-  GaloisRuntime::reportStat("TimePhase1", phase.get());
+  GaloisRuntime::reportStat("ReadTotal", phase.get());
 
   Galois::Launcher::startTiming();
   runBody();
@@ -236,7 +238,7 @@ int main(int argc, const char **argv) {
 
   printTop(10);
   if (!skipVerify && !verify()) {
-    cerr << "Verification failed.\n";
+    std::cerr << "Verification failed.\n";
     assert(0 && "Verification failed");
     abort();
   }
