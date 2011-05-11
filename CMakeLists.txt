@@ -9,17 +9,16 @@ endif()
 
 ###### Options ######
 #use pthreads
-set(PTHREAD ON)
+set(USE_PTHREAD ON)
 
 #compile for cray xmt
-#SET( CRAY ON )
+#SET(USE_CRAY ON )
 
-if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE "RelWithDebInfo")
-endif()
+#use icc
+#SET(USE_ICC ON)
 
 if(SITE_NAME MATCHES "volta.*")
-  set(NUMA ON)
+  set(USE_NUMA ON)
 endif()
 
 ###### find libraries ######
@@ -30,23 +29,24 @@ find_package( Boost 1.34.0 REQUIRED )
 include_directories(${Boost_INCLUDE_DIRS})
 
 #PThreads
-if(PTHREAD)
+if(USE_PTHREAD)
   find_package(Threads REQUIRED)
   add_definitions(-DGALOIS_PTHREAD)
-endif(PTHREAD)
+endif(USE_PTHREAD)
 
-if(NUMA)
+if(USE_NUMA)
   add_definitions(-DGALOIS_NUMA)
-endif(NUMA)
+endif(USE_NUMA)
+
 #vtune
 #apps/CMakeLists.txt also hardcodes this path
 if(EXISTS "/opt/intel/vtune_amplifier_xe_2011/include/ittnotify.h")
-  set(WITH_VTUNE ON)
+  set(USE_VTUNE ON)
 endif()
 
-if(CRAY)
+if(USE_CRAY)
   add_definitions(-DGALOIS_CRAY)
-endif(CRAY)
+endif(USE_CRAY)
 
 #solaris
 if(CMAKE_SYSTEM MATCHES "SunOs.*")
@@ -54,12 +54,15 @@ if(CMAKE_SYSTEM MATCHES "SunOs.*")
   add_definitions("-lposix4")
 endif()
 
+if(USE_ICC)
+  set(CMAKE_CXX_COMPILER /opt/intel/Compiler/11.1/072/bin/intel64/icpc)
+  #These help the intel compiler
+  add_definitions("-wd981 -wd383 -wd869 -wd2196 -wd279")
+endif(USE_ICC)
+
 ###### Flags ######
 
 #set(CMAKE_CXX_COMPILER /h1/lenharth/local/bin/clang++)
-#set(CMAKE_CXX_COMPILER /opt/intel/Compiler/11.1/072/bin/intel64/icpc)
-#These help the intel compiler
-#add_definitions("-wd981 -wd383 -wd869 -wd2196")
 
 #this is stupid, but imported libraries are scoped by directory
 #add_library(hwloc SHARED IMPORTED)
