@@ -19,7 +19,7 @@ enum MethodFlag {
   NONE, ALL, CHECK_CONFLICT, SAVE_UNDO
 };
 
-static bool shouldLock(MethodFlag g) {
+static inline bool shouldLock(MethodFlag g) {
   switch(g) {
   case NONE:
   case SAVE_UNDO:
