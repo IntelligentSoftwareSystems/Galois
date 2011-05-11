@@ -66,24 +66,18 @@ endif()
 #set_property(TARGET hwloc PROPERTY IMPORTED_LOCATION ${CMAKE_BINARY_DIR}/lib/install/lib/libhwloc.so)
 #include_directories(${CMAKE_BINARY_DIR}/lib/install/include)
 
-set(CMAKE_C_FLAGS_DEBUG
-  "-g -Wall -Wno-sign-compare" CACHE STRING
-  "C flags for debug target" FORCE )
-set(CMAKE_CXX_FLAGS_DEBUG
-  "-g -Wall -Wno-sign-compare" CACHE STRING
-  "CXX flags for debug target" FORCE )
-set(CMAKE_C_FLAGS_RELWITHDEBINFO
-  "-g -O3" CACHE STRING
-  "CXX Flags for release with debug info target" FORCE )
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO
-  "-g -O3" CACHE STRING
-  "CXX Flags for release with debug info target" FORCE )
-set(CMAKE_C_FLAGS_RELEASE
-  "-g -DNDEBUG -O3" CACHE STRING
-  "C flags for release target" FORCE )
-set(CMAKE_CXX_FLAGS_RELEASE
-  "-g -DNDEBUG -O3" CACHE STRING
-  "CXX flags for release target" FORCE )
+#Always include debug symbols
+add_definitions("-g")
+
+#Disable asserts
+if (CMAKE_BUILD_TYPE MATCHES "Release")
+  add_definitions("-DNDEBUG")
+endif()
+
+#more warnings
+if (CMAKE_BUILD_TYPE MATCHES "Debug")
+  add_definitions("-Wall")
+endif()
 
 ###### Source finding ######
 include_directories("include")
