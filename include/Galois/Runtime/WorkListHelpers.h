@@ -203,15 +203,17 @@ public:
 
     head.lock();
     T* C = head.getValue();
-    if (C) {
-      if (tail == C)
-	tail = 0;
+    if (!C) {
+      head.unlock();
+      return 0;
+    }
+    if (tail == C) {
+      tail = 0;
+      assert(!C->getNextPtr());
+      head.unlock_and_clear();
+    } else {
       head.unlock_and_set(C->getNextPtr());
       C->getNextPtr() = 0;
-      //std::cerr << "pop(" << C << ") ";
-    } else {
-      //std::cerr << "pop(" << C << ") ";
-      head.unlock();
     }
     return C;
   }
