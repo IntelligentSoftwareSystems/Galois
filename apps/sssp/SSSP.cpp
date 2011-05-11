@@ -139,7 +139,7 @@ void runBody(const GNode src) {
   }
 
   Galois::Launcher::stopTiming();
-  GaloisRuntime::reportStat("Iterations: ", counter);
+  GaloisRuntime::reportStat("Iterations ", counter);
 }
 
 struct process {
