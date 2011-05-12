@@ -22,18 +22,26 @@ foreach my $st (sort keys %k) {
     print "$st";
     foreach my $th (sort { $a <=> $b } keys %stats) {
 	@values = @{$stats{$th}{$st}};
-	my $avg = sum(@values)/@values;
-	print ",$avg";
+	if (@values) {
+	    my $avg = sum(@values)/@values;
+	    print ",$avg";
+	} else {
+	    print ",0";
+	}
     }
     print "\n";
     print "$st Stdev";
     foreach my $th (sort { $a <=> $b } keys %stats) {
 	@values = @{$stats{$th}{$st}};
-	my $avg = sum(@values)/@values;
-	my $stdev = reduce {$a + ($b - $avg) * ($b - $avg)} 0, @values;
-	$stdev = $stdev / @values;
-	$stdev = sqrt($stdev);
-	print ",$stdev";
+	if (@values) {
+	    my $avg = sum(@values)/@values;
+	    my $stdev = reduce {$a + ($b - $avg) * ($b - $avg)} 0, @values;
+	    $stdev = $stdev / @values;
+	    $stdev = sqrt($stdev);
+	    print ",$stdev";
+	} else {
+	    print ",0";
+	}
     }
     print "\n";
 }
