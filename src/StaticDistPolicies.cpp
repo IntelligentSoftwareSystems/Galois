@@ -135,10 +135,11 @@ struct DummyPolicy : public ThreadPolicy {
 
 #ifdef __linux__
     numThreads = sysconf(_SC_NPROCESSORS_CONF);
-#endif
+#else
     reportWarning("Unknown number of processors (assuming 64)");
     numThreads = 64;
-  
+#endif
+
     numCores = numThreads;
     levelSize.push_back(1);
     for (int x = 0; x < numThreads; ++x)
