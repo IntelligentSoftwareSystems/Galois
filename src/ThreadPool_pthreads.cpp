@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <cerrno>
 
 #include <iostream>
 #include <list>
@@ -57,7 +58,8 @@ public:
   void acquire(int n = 1) {
     while (n) {
       --n;
-      int rc = sem_wait(&sem);
+      int rc;
+      while ((rc = sem_wait(&sem)) == EINTR) {}
       checkResults(rc);
     }
   }
