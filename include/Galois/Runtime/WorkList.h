@@ -383,8 +383,7 @@ public:
 
   template<typename iter>
   void fill_initial(iter begin, iter end) {
-    while (begin != end)
-      global.push(*begin++);
+    global.fill_initial(begin,end);
   }
 };
 WLCOMPILECHECK(LocalQueues);
