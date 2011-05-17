@@ -45,17 +45,17 @@ public:
     delete[] datum;
   }
 
-  int myEffectiveID() const {
+  unsigned int myEffectiveID() const {
     return myID();
   }
 
-  T& get(int i) {
+  T& get(unsigned int i) {
     assert(i < num);
     assert(datum);
     return datum[i].data;
   }
   
-  const T& get(int i) const {
+  const T& get(unsigned int i) const {
     assert(i < num);
     assert(datum);
     return datum[i].data;
@@ -88,7 +88,7 @@ class PerCPU_merge : public PerCPU<T>, public ThreadAware{
 
   void __reduce() {
     if (reduce)
-      for (int i = 1; i < PerCPU<T>::num; ++i)
+      for (unsigned int i = 1; i < PerCPU<T>::num; ++i)
 	reduce(PerCPU<T>::datum[0].data, PerCPU<T>::datum[i].data);
   }
 

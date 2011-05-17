@@ -10,7 +10,7 @@ static ListTy allObjects;
 static SimpleLock<int, true> allObjectsLock;
 
 //This, once initialized by a thread, stores an dense index/label for that thread
-__thread int ThreadPool::LocalThreadID = -1;
+__thread unsigned int ThreadPool::LocalThreadID = ~0;
 
 //This stores the next thread id
 int ThreadPool::nextThreadID = 0;
@@ -43,7 +43,7 @@ unsigned int ThreadPool::getMyID() {
   unsigned int retval = LocalThreadID;
   if (retval == 0)
     return 0;
-  if (retval == -1) {
+  if (retval == ~(unsigned int)0) {
     retval = __sync_add_and_fetch(&nextThreadID, 1);
     LocalThreadID = retval;
   }
