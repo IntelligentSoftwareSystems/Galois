@@ -111,7 +111,7 @@ class PerLevel {
 
 protected:
 
-  int myID() const {
+  unsigned int myID() const {
     int i = ThreadPool::getMyID();
     return std::max(0, i - 1);
   }
@@ -130,17 +130,17 @@ public:
     delete[] datum;
   }
 
-  int myEffectiveID() const {
+  unsigned int myEffectiveID() const {
     return P.indexLevelMap(level, myID());
   }
 
-  T& get(int i) {
+  T& get(unsigned int i) {
     assert(i < num);
     assert(datum);
     return datum[i].data;
   }
   
-  const T& get(int i) const {
+  const T& get(unsigned int i) const {
     assert(i < num);
     assert(datum);
     return datum[i].data;
@@ -154,7 +154,7 @@ public:
     return get(myEffectiveID());
   }
 
-  int size() const {
+  unsigned int size() const {
     return num;
   }
 };
