@@ -74,7 +74,7 @@ class IndexedGraph {
 	nodeListTy nodes;
 
 	//deal with the Node redirction
-	NodeTy& getData(gNode* ID, MethodFlag mflag = ALL) {
+	inline NodeTy& getData(gNode* ID, MethodFlag mflag = ALL) {
 		assert(ID);
 		if (shouldLock(mflag))
 			GaloisRuntime::acquire(ID);
@@ -102,7 +102,7 @@ public:
 				ID->prefetch_neighbors();
 		}
 
-		NodeTy& getData(MethodFlag mflag = ALL) {
+		inline NodeTy& getData(MethodFlag mflag = ALL) {
 			return Parent->getData(ID, mflag);
 		}
 
@@ -325,7 +325,7 @@ public:
 		else return makeGraphNodePtr(NULL)(NULL);
 	}
 	IndexedGraph() {
-		std::cout << "STAT: NodeSize " << (int) sizeof(gNode) << "\n";
+		std::cout << "STAT: NodeSize " << sizeof(gNode) << "\n";
 	}
 };
 

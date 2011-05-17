@@ -13,17 +13,17 @@
 
 class OctTreeNodeData {
 public:
-	double mass;
 	double posx;
 	double posy;
 	double posz;
+	double mass;
+	bool leaf;
 	double velx;
 	double vely;
 	double velz;
 	double accx;
 	double accy;
 	double accz;
-	bool leaf;
 	OctTreeNodeData() {
 		leaf = true;
 		mass = 0.0;

@@ -12,14 +12,26 @@
 #endif
 #include <sys/mman.h>
 
-//#define VALGRIND 1
-#ifdef VALGRIND
-#include <stdlib.h>
-#endif
+
+enum AllocType {
+  ALLOC_TYPE_DEBUG = 0, ALLOC_TYPE_MMAP, ALLOC_TYPE_INTERLEAVED, ALLOC_TYPE_STATIC, ALLOC_TYPE_LOCAL
+};
+// TODO factor out numa and allocation
+#ifdef GALOIS_NUMA
+# include <numa.h>
+# include <stdlib.h>
+static int alloc_type = ALLOC_TYPE_DEBUG;
+#else
+static int alloc_type = ALLOC_TYPE_DEBUG;
+#endif // GALOIS_NUMA
+
+namespace Partitioned {
 
 template<typename T>
 class Bag : boost::noncopyable {
-  static const size_t max_page_size = 4096 * 16;
+  // TODO change size
+  //static const size_t max_page_size = 1024 * 1024 * 2;
+  static const size_t max_page_size = 1024 * 4;
   static const size_t max_items = max_page_size / sizeof(T);
   static const size_t page_size = max_items * sizeof(T);
 
@@ -34,12 +46,7 @@ class Bag : boost::noncopyable {
     iterator end() const { return reinterpret_cast<T*>(end_ptr); }
 
     void alloc() {
-#ifdef VALGRIND
-      void *ptr = malloc(page_size);
-#else
-      void *ptr = mmap(0, page_size, PROT_READ | PROT_WRITE,
-        MAP_HUGETLB | MAP_POPULATE | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-#endif
+      void *ptr = my_alloc();
       begin_ptr = reinterpret_cast<T*>(ptr);
       if (begin_ptr == NULL) 
         assert(false && "failed to mmap memory");
@@ -48,12 +55,26 @@ class Bag : boost::noncopyable {
     }
 
     void dealloc() {
-#ifdef VALGRIND
-      bzero(begin_ptr, page_size);
-      free((void*)begin_ptr);
-#else
-      munmap(begin_ptr, page_size);
+      int r;
+      switch (alloc_type) {
+        case ALLOC_TYPE_DEBUG:
+          bzero(begin_ptr, page_size);
+          free((void*)begin_ptr);
+          break;
+        case ALLOC_TYPE_MMAP:
+          r = munmap(begin_ptr, page_size);
+          assert(r == 0 && "munmap failed");
+          break;
+        case ALLOC_TYPE_INTERLEAVED:
+        case ALLOC_TYPE_STATIC:
+        case ALLOC_TYPE_LOCAL:
+#ifdef GALOIS_NUMA
+          numa_free(begin_ptr, page_size);
+          break;
 #endif
+        default:
+          assert(false);
+      }
       end_ptr = begin_ptr = NULL;
     }
 
@@ -64,6 +85,24 @@ class Bag : boost::noncopyable {
 
     bool full() const {
       return end_ptr == begin_ptr + max_items;
+    }
+  private:
+    void *my_alloc() {
+      void *ptr;
+      switch (alloc_type) {
+        case ALLOC_TYPE_DEBUG: return malloc(page_size);
+        case ALLOC_TYPE_MMAP:
+          ptr = mmap(0, page_size, PROT_READ | PROT_WRITE,
+            //MAP_HUGETLB | 
+            MAP_POPULATE | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+          return ptr == MAP_FAILED ? NULL : ptr;
+#ifdef GALOIS_NUMA
+        case ALLOC_TYPE_INTERLEAVED: return numa_alloc_interleaved(page_size);
+        case ALLOC_TYPE_STATIC: return numa_alloc_onnode(page_size, 0);
+        case ALLOC_TYPE_LOCAL: return numa_alloc_local(page_size);
+#endif
+        default: assert(false); return NULL;
+      }
     }
   };
 
@@ -144,7 +183,12 @@ class Bag : boost::noncopyable {
               self->push_back(new_part, item);
           }
 
+#ifdef __INTEL_COMPILER
+          __sync_add_and_fetch(&it->refcount, 1);
+          if (it->refcount == numThreads) {
+#else
           if (__sync_add_and_fetch(&it->refcount, 1) == numThreads) {
+#endif
             it->dealloc();
             it = pages.erase(it);
             --it;
@@ -270,18 +314,60 @@ struct Octree {
 };
 
 struct OctreeInternal : Octree {
+  Octree* child[8];
+//  char padding[131];
   Point pos;
   double mass;
-  Octree* child[8];
-  OctreeInternal(Point _pos) : pos(_pos), mass(0.0) { bzero(child, sizeof(*child) * 8); }
+  int count;
+  OctreeInternal(Point _pos) : pos(_pos), mass(0.0), count(0) { bzero(child, sizeof(*child) * 8); }
   virtual ~OctreeInternal() {
     for (int i = 0; i < 8; i++) {
-      if (child[i] != NULL && !child[i]->is_leaf())
-        delete child[i];
+      if (child[i] != NULL && !child[i]->is_leaf()) {
+        dealloc(static_cast<OctreeInternal*>(child[i]));
+      }
+    }
+  }
+  static void dealloc(OctreeInternal* obj) {
+    switch (alloc_type) {
+    case ALLOC_TYPE_DEBUG:
+    case ALLOC_TYPE_MMAP:
+      delete obj;
+      break;
+#ifdef GALOIS_NUMA
+    case ALLOC_TYPE_INTERLEAVED:
+    case ALLOC_TYPE_STATIC:
+    case ALLOC_TYPE_LOCAL:
+      obj->~OctreeInternal();
+      numa_free(obj, sizeof(*obj));
+      break;
+#endif
+    default:
+      assert(false); abort();
     }
   }
   virtual bool is_leaf() const {
     return false;
+  }
+  static OctreeInternal* alloc(Point p) {
+    void *ptr;
+    switch (alloc_type) {
+    case ALLOC_TYPE_DEBUG:
+    case ALLOC_TYPE_MMAP:
+      return new OctreeInternal(p);
+#ifdef GALOIS_NUMA
+    case ALLOC_TYPE_INTERLEAVED:
+      ptr = numa_alloc_interleaved(sizeof(OctreeInternal));
+      return new (ptr) OctreeInternal(p);
+    case ALLOC_TYPE_STATIC:
+      ptr = numa_alloc_onnode(sizeof(OctreeInternal), 0);
+      return new (ptr) OctreeInternal(p);
+    case ALLOC_TYPE_LOCAL:
+      ptr = numa_alloc_local(sizeof(OctreeInternal));
+      return new (ptr) OctreeInternal(p);
+#endif
+    default:
+      assert(false); return NULL;
+    }
   }
 };
 
@@ -381,6 +467,24 @@ static inline void update_center(Point& p, int index, double radius) {
   }
 }
 
+struct APartitioner {
+  OctreeInternal* root;
+  
+  APartitioner(OctreeInternal* _root) : root(_root) { }
+  int operator()(const Body& b) {
+    int acc = 0;
+    OctreeInternal* node = root;
+    while (node != NULL) {
+      int index = get_index(node->pos, b.pos);
+      acc = (acc << 3) + index;
+      node = static_cast<OctreeInternal*>(node->child[index]);
+    } 
+    // acc is index of NULL cell, correct for that
+    acc = acc >> 3;
+    return acc;
+  }
+};
+
 struct Partitioner {
   OctreeInternal* root;
   const std::vector<int>& part_map;
@@ -419,6 +523,8 @@ struct BuildLocalOctree {
     int index = get_index(node->pos, b->pos);
 
     assert(!node->is_leaf());
+
+    node->count++;
     Octree *child = node->child[index];
     
     if (child == NULL) {
@@ -429,18 +535,19 @@ struct BuildLocalOctree {
     radius *= 0.5;
     if (child->is_leaf()) {
       // Expand leaf
-      Body* leaf = static_cast<Body*>(child);
+      Body* n = static_cast<Body*>(child);
       Point new_pos(node->pos);
       update_center(new_pos, index, radius);
-      OctreeInternal* new_node = new OctreeInternal(new_pos);
+      OctreeInternal* new_node = OctreeInternal::alloc(new_pos);
 
-      assert(leaf->pos != b->pos);
+      assert(n->pos != b->pos);
       
       insert(b, new_node, radius);
-      insert(leaf, new_node, radius);
+      insert(n, new_node, radius);
       node->child[index] = new_node;
     } else {
-      insert(b, static_cast<OctreeInternal*>(child), radius);
+      OctreeInternal* n = static_cast<OctreeInternal*>(child);
+      insert(b, n, radius);
     }
   }
 };
@@ -554,14 +661,14 @@ struct ComputeForces {
       Point p = b.acc;
       for (int i = 0; i < 3; i++)
         b.acc[i] = 0;
-      recurse(b, top, dsq);
+      //recurse(b, top, dsq);
+      iterate(b, dsq);
       if (step > 0) {
         for (int i = 0; i < 3; i++)
           b.vel[i] += (b.acc[i] - p[i]) * config.dthf;
       }
       num++;
     }
-    std::cout << "( " << id << " " << num << " )" << std::endl;
   }
 
   void recurse(Body& b, Body* node, double dsq) {
@@ -577,6 +684,55 @@ struct ComputeForces {
     double scale = nphi * idr * idr;
     for (int i = 0; i < 3; i++) 
       b.acc[i] += p[i] * scale;
+  }
+
+  struct Frame {
+    double dsq;
+    OctreeInternal* node;
+    Frame(OctreeInternal* _node, double _dsq) : dsq(_dsq), node(_node) { }
+  };
+
+  void iterate(Body& b, double root_dsq) {
+    std::vector<Frame> stack;
+    stack.push_back(Frame(top, root_dsq));
+
+    Point p;
+    while (!stack.empty()) {
+      Frame f = stack.back();
+      stack.pop_back();
+
+      for (int i = 0; i < 3; i++)
+        p[i] = f.node->pos[i] - b.pos[i];
+
+      double psq = p.x * p.x + p.y * p.y + p.z * p.z;
+      if (psq >= f.dsq) {
+        // Node is far enough away, summarize contribution
+        psq += config.epssq;
+        double idr = 1 / sqrt(psq);
+        double nphi = f.node->mass * idr;
+        double scale = nphi * idr * idr;
+        for (int i = 0; i < 3; i++) 
+          b.acc[i] += p[i] * scale;
+        
+        continue;
+      }
+
+      double dsq = f.dsq * 0.25;
+      
+      for (int i = 0; i < 8; i++) {
+        Octree *next = f.node->child[i];
+        if (next == NULL)
+          break;
+        if (next->is_leaf()) {
+          // Check if it is me
+          if (&b != next) {
+            recurse(b, static_cast<Body*>(next), dsq);
+          }
+        } else {
+          stack.push_back(Frame(static_cast<OctreeInternal*>(next), dsq));
+        }
+      }
+    }
   }
 
   void recurse(Body& b, OctreeInternal* node, double dsq) {
@@ -658,7 +814,28 @@ static double next_double() {
   return rand() / (double) RAND_MAX;
 }
 
-static void generate_input(Bag<Body>& bodies, int seed, int nbodies) {
+// Uses uniform distribution
+static void generate_uniform_input(Bag<Body>& bodies, int nbodies, int seed) {
+  double scale = 0.01;
+  srand(seed);
+
+  for (int body = 0; body < nbodies; body++) {
+    Body b;
+    b.mass = 1.0 / nbodies;
+    
+    for (int i = 0; i < 3; i++)
+      b.pos[i] = next_double();
+
+    for (int i = 0; i < 3; i++)
+      b.vel[i] = next_double() * scale;
+
+    bodies.push_back(b);
+  }
+}
+
+// Uses plummer model, which is more realistic but perhaps not so much so according
+// to astrophysicists 
+static void generate_input(Bag<Body>& bodies, int nbodies, int seed) {
   double v, sq, scale;
   Point p;
   double PI = boost::math::constants::pi<double>();
@@ -668,7 +845,7 @@ static void generate_input(Bag<Body>& bodies, int seed, int nbodies) {
   double rsc = (3 * PI) / 16;
   double vsc = sqrt(1.0 / rsc);
 
-  for (int i = 0; i < nbodies; i++) {
+  for (int body = 0; body < nbodies; body++) {
     double r = 1.0 / sqrt(pow(next_double() * 0.999, -2.0 / 3.0) - 1);
     do {
       for (int i = 0; i < 3; i++)
@@ -704,7 +881,7 @@ void make_octree_top_rec(OctreeInternal* parent, double radius, int level) {
   for (int i = 0; i < 8; i++) {
     Point p(parent->pos);
     update_center(p, i, radius);
-    parent->child[i] = new OctreeInternal(p);
+    parent->child[i] = OctreeInternal::alloc(p);
   }
 
   if (level > 1) {
@@ -721,10 +898,10 @@ void make_octree_top(
   double radius = box.diameter() / 2;
   Point p = box.center();
   levels = ceil(log(nparts) / log(8));
-  root = new OctreeInternal(p);
+  root = OctreeInternal::alloc(p);
 
   if (levels > 0)
-    make_octree_top_rec(root, radius * 0.5, levels - 1);
+    make_octree_top_rec(root, radius * 0.5, levels);
 
   int nleaves = pow(8, levels);
   int index = 0;
@@ -739,11 +916,29 @@ void make_octree_top(
     part_map[index] = index % nthreads;
 }
 
-void pmain(int nbodies, int ntimesteps, int seed) {
+static void set_numa_allocation(int numThreads) {
+#ifdef GALOIS_NUMA
+  struct bitmask* nodes;
+  //nodes = numa_allocate_nodemask();
+
+  //// numa_bitmask_clear_all(nodes);
+  //numa_bitmask_setbit(nodes, 0);
+  ////numa_set_preferred(0);
+
+  //numa_free_nodemask(nodes);
+#endif
+}
+
+void pmain(int nbodies, int ntimesteps, int seed, int _alloc_type) {
+  alloc_type = _alloc_type;
+
   int numThreads = GaloisRuntime::getSystemThreadPool().getActiveThreads();
   Bag<Body> bodies;
 
-  generate_input(bodies, seed, nbodies);
+  std::cout << sizeof(OctreeInternal) << " " << sizeof(Body) << std::endl;
+  //set_numa_allocation(numThreads);
+  //generate_input(bodies, nbodies, seed);
+  generate_uniform_input(bodies, nbodies, seed);
 
   for (int step = 0; step < ntimesteps; step++) {
     ReduceBoxes::result_type result(ReduceBoxes::mergeBoxes);
@@ -753,11 +948,22 @@ void pmain(int nbodies, int ntimesteps, int seed) {
     OctreeInternal* top;
     std::vector<int> part_map;
     int levels;
-    make_octree_top(box, numThreads, numThreads, top, part_map, levels);
+    int nparts = 4 * numThreads;
+    make_octree_top(box, nparts, numThreads, top, part_map, levels);
 
+    // TODO use count information to static load balance
     bodies.partition(Partitioner(top, part_map));
-    for (int i = 0; i < part_map.size(); i++)
-      std::cout << "[" << i << "] = " << part_map[i] << std::endl;
+
+    //APartitioner apartitioner(top);
+    //std::vector<int> hist(part_map.size());
+    //for (int id = 0; id < numThreads; id++) {
+    //  for (Bag<Body>::part_iterator it = bodies.part_begin(id), end = bodies.part_end(id); it != end; ++it) {
+    //    hist[apartitioner(*it)]++;
+    //  }
+    //}
+    //for (int i = 0; i < part_map.size(); i++) {
+    //  std::cout << hist[i] << std::endl;
+    //}
 
     Galois::for_all(BuildLocalOctree(bodies, top, box));
     ComputeCenterOfMass computeCenterOfMass(top, part_map, levels);
@@ -768,6 +974,8 @@ void pmain(int nbodies, int ntimesteps, int seed) {
     Galois::for_all(AdvanceBodies(bodies));
 
     std::cout << "Timestep " << step << " Center of Mass = " << top->pos << std::endl;
-    delete top;
+    OctreeInternal::dealloc(top);
   }
+}
+
 }
