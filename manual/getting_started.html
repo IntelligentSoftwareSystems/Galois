@@ -1,0 +1,109 @@
+<html> 
+  <head> 
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/> 
+    <link href="http://iss.ices.utexas.edu/galois/images/UT_tower.png" type="image/png" rel="icon" /> 
+    <title>.: Galois C++ :: ISS :: ICES :: UT@Austin :.</title> 
+  </head> 
+  <body> 
+    <h1>Getting Started with Galois C++</h1> 
+    <h2>Before You Begin</h2>
+    <p> <a href="http://iss.ices.utexas.edu/galois/index.php/documentation/getting_started">Galois
+    for Java</a> documentation should be read for an overview of
+    Galois.  This document will be concerned with the differences in
+    the C++ version.  </p>
+
+    <p><b>This version is not the complete Galois system</b>.  The
+    complete Galois system is available for Java, but the C++ version
+    is still incomplete and less tested.</p>
+
+    <h2>Compiling</h2>
+    <p>Galois C++ uses cmake to generate makefiles (or other project files).  To build Galois, from the source directory, type:</p>
+    <code>
+      <pre>
+	cd build
+	(mkdir release; cd release; cmake ../..)
+	(mkdir debug; cd debug; cmake -DCMAKE_BUILD_TYPE=Debug ../..)
+      </pre>
+    </code>
+    <p>This creates both a release and debug build tree from the
+    source.  Other build options are supported by cmake.  See the
+    cmake documentation for additional information.</p>
+
+    <h1>Differences in the C++ release</h1>
+    <h2>Limitations</h2>
+    <p>The Galois C++ release only supports cautious operators.
+      Cautious operations acquire all necessary locks before modifying
+      values or mutating the graph.</p>
+    <p>The Galois C++ release only supports unordered computations.
+      Unordered computations do not depend on a specific order of
+      processing items for correctness.  They may depend on an order for
+      efficiency.
+    <p> The current Galois C++ release includes a subset of the
+      benchmarks present in the Java release.  </p>
+
+    <h2>Graph Classes</h2>
+    <p>Galois C++ includes two tested graph classes:</p>
+    <code> 
+      <pre> 
+	1: Galois::Graph::FirstGraph&lt;NodeData, EdgeData, Directed&gt;
+	2: Galois::Graph::LC_FileGraph&lt;NodeData, EdgeData&gt;
+      </pre> 
+    </code> 
+    <p>Line 1 is FirstGraph which allows concurrent mutation of the
+    graph.  Line 2 is a local computation graph which does not allow
+    graph mutation.  The Local Computation graph directly mmaps a
+    binary representation of the graph into memory for fast load
+    times.  The format of the graph is documented in the FileGraph
+    class.</p>
+
+    <h2>Galois Loops</h2>
+    <p>Galois C++ executes parallel regions of code using
+    galois::for_each which is similar to std::for_each (and in some
+    cases has the same function signature).  This function takes
+    either a Galois worklist or a pair of iterators to use as the
+    initial work.  The operator is passed in as a C++ functor
+    (recommended) or a function pointer.  A templated functor is
+    recommended as the signature of the user operator depends on the
+    worklist being employed.  For example:</p>
+    <code>
+      <pre>
+	struct process {
+	template&lt;typename ContextTy&gt;
+	  void operator()(UpdateRequest&amp; req, ContextTy&amp; lwl) {
+	    //Do stuff
+	  }
+	};
+
+	void runBodyParallel(iter ibegin, iter iend) {
+	  Galois::for_each(ibegin,iend, process());
+	}
+      </pre>
+    </code>
+
+    <h2>Worklists</h2>
+    <p>Several worklists are available in the Galois C++ release.</p>
+    <p><b>PriQueue</b> implements a std::pri_queue compatable priority
+      queue. </p>
+    <p><b>FIFO</b> and <b>LIFO</b> implement std::queue and std::stack
+      like behaviors respectively. </p>
+    <p> <b>OrderedByIntegerMetric</b> implements a priority queue
+      based on a supplied function which maps a work item to an
+      integer priority.  Lower values are a higher priority.  An inner
+      queue may be passed to control how items within the same
+      priority are stored. </p>
+    <p><b>LocalQueues</b> create local non-shared worklists which are
+      used for all work generated durring concurrent operation and use
+      a global worklist for all initial work. </p>
+    <p> <b>ChunkedFIFO</b> and <b>ChunkedLIFO</b> implement a chunked
+      FIFO or LIFO strategy to reduce contention.  Each thread has a
+      chunk of work which it is filling when pushing and a chunk which
+      is being emptied by popping.  When a chunk is filled, it is
+      placed on the central FIFO or LIFO.  </p>
+    <p><b>dChunkedFIFO</b> and <b>dChunkedLIFO</b> behave like their
+      non-d counterparts, but maintain a FIFO or LIFO per CPU package
+      (usually L3 cache).  If a processor's package local FIFO or LIFO
+      is empty, it attempts to steal a chunk from another CPU
+      package.</p>
+ 
+    </body> 
+</html> 

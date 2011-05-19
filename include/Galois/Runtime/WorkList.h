@@ -490,7 +490,7 @@ public:
 };
 WLCOMPILECHECK(MP_SC_FIFO);
 
-//This overly comples specialization avoids a pointer indirection for non-distributed WL when accessing PerLevel
+//This overly complex specialization avoids a pointer indirection for non-distributed WL when accessing PerLevel
 template<bool d, typename TQ>
 struct squeues;
 
