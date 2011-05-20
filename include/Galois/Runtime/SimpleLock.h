@@ -177,6 +177,13 @@ public:
   T getValue() const { return _lock; }
   void setValue(T val) { _lock = val; }
   bool try_lock() { return true; }
+  bool CAS(T oldval, T newval) {
+    if (_lock == oldval) {
+      _lock = newval;
+      return true;
+    }
+    return false;
+  }
 };
 
 }
