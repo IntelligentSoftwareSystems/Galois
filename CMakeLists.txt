@@ -53,6 +53,7 @@ if(CMAKE_SYSTEM MATCHES "SunOS.*")
   add_definitions("-m64")
   add_definitions("-mcpu=niagara2")
   add_definitions("-lposix4")
+  SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -m64 -lposix4")
 endif()
 
 if(USE_ICC)
