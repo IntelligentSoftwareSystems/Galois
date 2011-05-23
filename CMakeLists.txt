@@ -49,8 +49,9 @@ if(USE_CRAY)
 endif(USE_CRAY)
 
 #solaris
-if(CMAKE_SYSTEM MATCHES "SunOs.*")
-  add_definitions("-mpcu=niagra2")
+if(CMAKE_SYSTEM MATCHES "SunOS.*")
+  add_definitions("-m64")
+  add_definitions("-mcpu=niagara2")
   add_definitions("-lposix4")
 endif()
 
