@@ -174,6 +174,11 @@ public:
   unsigned int size() const {
     return num;
   }
+
+  bool isFirstInLevel() const {
+    return P.isFirstInLevel(level, myID());
+  }
+
 };
 
 }

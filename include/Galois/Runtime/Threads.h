@@ -82,7 +82,7 @@ protected:
   std::vector<int> levelMap;
 
 public:
-  int indexLevelMap(int level, int thr) {
+  int indexLevelMap(int level, int thr) const {
     return levelMap[level * numThreads + thr];
   }
 
@@ -93,6 +93,15 @@ public:
   int getNumCores() const { return numCores; }
 
   int getLevelSize(int S) const { return levelSize[S]; }
+
+  int isFirstInLevel(int level, int thr) const {
+    int thrLevel = indexLevelMap(level, thr);
+    for (int i = 0; i < getNumThreads(); ++i)
+      if (indexLevelMap(level, i) == thrLevel)
+	return i == thr;
+    //Should be dead:
+    return false;
+  }
 
   virtual void bindThreadToProcessor(int id) = 0;
 };

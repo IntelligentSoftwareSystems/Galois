@@ -372,114 +372,33 @@ public:
 WLCOMPILECHECK(MP_SC_Bag);
 #endif
 
-
-template<typename T, typename LocalWL, typename GlobalWL, typename DistPolicy>
+//Per CPU and Per Level Queues, with staving flags
+template<typename T, typename LocalWL, typename GlobalWL>
 class RequestHirarchy {
 public:
   typedef T value_type;
 
 private:
-  typedef cache_line_storage<GlobalWL> paddedSharedWL;
-  
   PerCPU<typename LocalWL::template rethread<false>::WL> localQueues;
-  paddedSharedWL* sharedQueues;
-  unsigned long* starvingFlags;
-
-  int getIndexByLevel(int ID, int level) {
-    assert(level > 0);
-    int count = 0;
-    //skip over some levels
-    for (int i = 1; i < level; ++i)
-      count += DistPolicy::getNumInLevel(i);
-    //index into current level
-    count += DistPolicy::mapInto(ID, level);
-    return count;
-  }
-
-  paddedSharedWL& getSharedByLevel(int ID, int level) {
-    return sharedQueues[getIndexByLevel(ID,level)];
-  }
-
-  unsigned long& getStarvingByLevel(int ID, int level) {
-    return starvingFlags[getIndexByLevel(ID, level)];
-  }
-
-  std::pair<bool, value_type> popByLevel(int ID, int level) {
-    if (level == 0)
-      return localQueues.get(ID).pop();
-    return getSharedByLevel(ID, level).data.pop();
-  }
-
-  bool pushByLevel(int ID, int level, value_type val) {
-    if (level == 0)
-      return localQueues.get(ID).push(val);
-    return getSharedByLevel(ID, level).data.push(val);
-  }
-
-  bool emptyByLevel(int ID, int level) {
-    if (level == 0)
-      return localQueues.get(ID).empty();
-    return getSharedByLevel(ID, level).data.empty();
-  }
-
-  int getBitIndex(int ID, int level) {
-    return ID % DistPolicy::getNumInBin(level);
-  }
-
-  //Set the starving flag for all levels in which the thread
-  //is a master thread of a level below
-  void setStarving(int ID) {
-    for (int i = 1; i < DistPolicy::getNumLevels(); ++i)
-      if (DistPolicy::isMasterAtLevel(ID, i - 1)) {
-	int index = getBitIndex(ID, i);
-	unsigned long& L = getStarvingByLevel(ID, i);
-	if (!(L & (0x01UL << index)))
-	  __sync_fetch_and_or(&L, 0x01UL << index);
-      }
-  }
+  PerLevel<GlobalWL> sharedQueues;
+  PerLevel<unsigned long> starvingFlags;
+  GlobalWL gwl;
+  unsigned long gStarving;
 
   //Clear the starving flag for all levels in which the thread
   //is a master thread of a level below
-  void clearStarving(int ID) {
-    for (int i = 1; i < DistPolicy::getNumLevels(); ++i)
-      if (DistPolicy::isMasterAtLevel(ID, i - 1)) {
-	int index = getBitIndex(ID, i);
-	unsigned long& L = getStarvingByLevel(ID, i);
-	if (L & (0x01UL << index))
-	  __sync_fetch_and_and(&L, ~(0x01UL << index));
-      }
-  }
-
-  int getHighestStarvingLevel(int ID) {
-    int ret = 0;
-    for (int i = 1; i < DistPolicy::getNumLevels(); ++i)
-      if (DistPolicy::isMasterAtLevel(ID, i - 1) &&
-	  getStarvingByLevel(ID, i))
-	ret = i;
-    return ret;
+  void clearStarving() {
+    gStarving = 0;
+    starvingFlags.get() = 0;
   }
 
 public:
-  RequestHirarchy() :localQueues(0) {
-    //count shared queues
-    int count = 0;
-    for (int i = 1; i < DistPolicy::getNumLevels(); ++i)
-      count += DistPolicy::getNumInLevel(i);
-    //make shared queues
-    sharedQueues = new paddedSharedWL[count];
-    starvingFlags = new unsigned long[count];
-    for (int i = 0; i < count; ++i)
-      starvingFlags[i]= 0;
-  }
-
-  ~RequestHirarchy() {
-    delete[] sharedQueues;
-  }
-
   bool push(value_type val) {
-    int ID = DistPolicy::getID();
-    int levelpush = getHighestStarvingLevel(ID);
-    return pushByLevel(ID, levelpush, val);
+    if (gStarved)
+      return gwl.push(val);
+    if (starvingFlags.get())
+      return sharedQueues.push(val);
+    return localQueues.push(val);
   }
 
   bool aborted(value_type val) {
@@ -487,44 +406,37 @@ public:
   }
 
   std::pair<bool, value_type> pop() {
-    int ID = DistPolicy::getID();
     //Try the local queue first
-    std::pair<bool, value_type> ret = popByLevel(ID, 0);
+    std::pair<bool, value_type> ret = localQueues.get().pop();
     if (ret.first)
       return ret;
 
-    //walk up the levels
-    for (int i = 1; i < DistPolicy::getNumLevels(); ++i) {
-      //to go up a level, you have to be a master thread for your old level
-      if (!DistPolicy::isMasterAtLevel(ID, i - 1))
-	return ret;
-      ret = popByLevel(ID, i);
-      if (ret.first) {
-	clearStarving(ID);
-	return ret;
-      }
+    //check parent
+    ret = sharedQueues.get().pop();
+    if (ret.first) {
+      clearStarving();
+      return ret;
     }
-    setStarving(ID);
+
+    //check global
+    ret = gwl.pop();
+    if (ret.first) {
+      clearStarving();
+      return ret;
+    }
+    
+    //Any thread can set the package starving flag
+    starvingFlags.get() = 1;
+    //if we are master for the package, handle flags
+    if (sharedQueues.isFirstInLevel())
+
     return ret;
   }
 
-  std::pair<bool, value_type> try_pop() {
-    return pop();
-  }
-
-  bool empty() {
-    int ID = DistPolicy::getID();
-    for (int i = 0; i < DistPolicy::getNumLevels(); ++i) {
-      bool ret = emptyByLevel(ID, i);
-      if (!ret) return false;
-    }
-    return true;
-  }
-  
   //! called in sequential mode to seed the worklist
   template<typename iter>
-  void fillInitial(iter begin, iter end) {
-    getSharedByLevel(0, DistPolicy::getNumLevels() - 1).fillInitial(begin,end);
+  void fill_initial(iter begin, iter end) {
+    gwl.fill_initial(begin,end);
   }
 };
 
@@ -581,17 +493,9 @@ public:
     return val;
   }
 
-  std::pair<bool, value_type> try_pop() {
-    return WL[DistPolicy::getThreadIsland()].data.try_pop();
-  }
-
-  bool empty() {
-    return WL[DistPolicy::getThreadIsland()].data.empty();
-  }
-  
   template<typename iter>
   void fillInitial(iter begin, iter end) {
-    return WL[DistPolicy::getThreadIsland()].data.fillInitial(begin,end);
+    return gwl.fill_initial(begin,end);
   }
 };
 
