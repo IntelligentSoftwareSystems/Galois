@@ -142,6 +142,8 @@ void runBody(const GNode src) {
   GaloisRuntime::reportStat("Iterations ", counter);
 }
 
+GaloisRuntime::PerCPU<unsigned int> BadWork;
+
 struct process {
   template<typename ContextTy>
   void __attribute__((noinline)) operator()(UpdateRequest& req, ContextTy& lwl) {
@@ -149,6 +151,8 @@ struct process {
     unsigned int v;
     while (req.w < (v = data.dist)) {
       if (__sync_bool_compare_and_swap(&data.dist, v, req.w)) {
+	if (v != DIST_INFINITY)
+	  BadWork.get()++;
 	for (Graph::neighbor_iterator ii = graph.neighbor_begin(req.n, Galois::Graph::NONE), ee = graph.neighbor_end(req.n, Galois::Graph::NONE); ii != ee; ++ii) {
 	  GNode dst = *ii;
 	  int d = graph.getEdgeData(req.n, dst, Galois::Graph::NONE);
@@ -260,6 +264,9 @@ int main(int argc, const char **argv) {
     abort();
   }
 
+  for (int q = 0; q < BadWork.size(); ++q)
+    BadWork.get(q) = 0;
+
   if (numThreads) {
     runBodyParallel(source);
   } else {
@@ -267,7 +274,13 @@ int main(int argc, const char **argv) {
     runBody(source);
   }
 
+  unsigned long totalBad = 0;
+  for (int q = 0; q < BadWork.size(); ++q)
+    totalBad += BadWork.get(q);
+
   GaloisRuntime::reportStat("Time", Galois::Launcher::elapsedTime());
+  GaloisRuntime::reportStat("BadWork", totalBad);
+
   cout << report << " " 
        << graph.getData(report,Galois::Graph::NONE).toString() << endl;
   if (!skipVerify && !verify(source)) {
