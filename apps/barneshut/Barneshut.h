@@ -206,10 +206,7 @@ private:
 
 public:
   void genInput(int nbodies, int ntimesteps, int _seed) {
-    //generate_plummer_input(nbodies, ntimesteps, _seed);
-    // TODO(ddn) switch back to plummer model when we get workstealing
-    // in for forall
-    generate_uniform_input(nbodies, ntimesteps, _seed);
+    generate_plummer_input(nbodies, ntimesteps, _seed);
   }
 
 	void readInput(const char *filename) {

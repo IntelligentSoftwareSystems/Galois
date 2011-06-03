@@ -18,15 +18,12 @@
 static const char* name = "Barnshut N-Body Simulator";
 static const char* description = "Simulation of the gravitational forces in a galactic cluster using the Barnes-Hut n-body algorithm\n";
 static const char* url = "http://iss.ices.utexas.edu/lonestar/barneshut.html";
-static const char* help = "[--alloctype N | --runtype N] file <input file> | gen <numbodies> <ntimesteps> <seed>";
+static const char* help = "file <input file> | gen <numbodies> <ntimesteps> <seed>";
 
 Graph *octree;
 GNode root;
 int step;
 Barneshut barneshut;
-
-static int alloc_type;
-static int run_type;
 
 struct process {
   template<typename Context>
@@ -37,20 +34,8 @@ struct process {
 };
 
 void parse_args(const std::vector<const char*>& args, Barneshut& app) {
-  alloc_type = 0;
-  run_type = 0;
-
   int size = args.size();
-  int index;
-  for (index = 0; index < size; index++) {
-    if (std::string("-alloctype").compare(args[index]) == 0 && index + 1 < size) {
-      alloc_type = atoi(args[++index]);
-    } else if (std::string("-runtype").compare(args[index]) == 0 && index + 1 < size) {
-      run_type = atoi(args[++index]);
-    } else {
-      break;
-    }
-  }
+  int index = 0;
 
   if (index + 2 >= size) {
     std::cerr << "not enough arguments, use -help for usage information\n";
@@ -65,10 +50,6 @@ void parse_args(const std::vector<const char*>& args, Barneshut& app) {
   }
 }
 
-namespace Partitioned {
-void pmain(int, int, int, int);
-}
-
 OctTreeNodeData omain() {
 	OctTreeNodeData res;
 	for (step = 0; step < barneshut.ntimesteps; step++) {
@@ -79,9 +60,6 @@ OctTreeNodeData omain() {
 
     barneshut.insertPoints(octree, root);
 
-    // Partition
-    //barneshut.partition(octree, 3);
-
     // summarize subtree info in each internal node
     // (plus restructure tree and sort bodies for performance reasons)
     barneshut.curr = 0;
@@ -89,7 +67,6 @@ OctTreeNodeData omain() {
 
     GaloisRuntime::WorkList::dChunkedLIFO<OctTreeNodeData, 256> wl;
     wl.fill_initial(&barneshut.leaf[0], &barneshut.leaf[barneshut.curr]);
-    //wl.fill_initial(&barneshut.body[0], &barneshut.body[barneshut.curr]);
     Galois::for_each(wl, process());
 
     // advance the position and velocity of each
@@ -149,21 +126,11 @@ int main(int argc, const char** argv) {
             << barneshut.ntimesteps << " time steps" << std::endl << std::endl;
 	std::cout << "Num. of threads: " << numThreads << std::endl;
 
-  if (run_type == 1 || run_type == 2) {
-    Galois::Launcher::startTiming();
-    Partitioned::pmain(barneshut.nbodies, barneshut.ntimesteps, barneshut.seed, alloc_type);
-    Galois::Launcher::stopTiming();
-    std::cout << "STAT: Time (with input gen) " << Galois::Launcher::elapsedTime() << "\n";
+  Galois::Launcher::startTiming();
+  OctTreeNodeData res = omain();
+  Galois::Launcher::stopTiming();
+  std::cout << "STAT: Time (without input gen) " << Galois::Launcher::elapsedTime() << "\n";
+  if (Galois::Launcher::isFirstRun() && !skipVerify) { // verify result
+    verify(res, args);
   }
-
-  if (run_type == 0 || run_type == 2) {
-    Galois::Launcher::startTiming();
-    OctTreeNodeData res = omain();
-    Galois::Launcher::stopTiming();
-    std::cout << "STAT: Time (without input gen) " << Galois::Launcher::elapsedTime() << "\n";
-    if (Galois::Launcher::isFirstRun() && !skipVerify) { // verify result
-      verify(res, args);
-    }
-  }
-
 }
