@@ -80,7 +80,7 @@ class Mesh {
       double y;
       double z;
       scanner >> index >> x >> y >> z;
-      tuples[index] = Tuple(x, y, 0);
+      tuples[index] = Tuple(x, y);
     }
   }
 

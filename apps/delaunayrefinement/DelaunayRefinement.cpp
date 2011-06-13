@@ -82,7 +82,7 @@ struct process {
       mesh->addNode(node, Galois::Graph::ALL);
       Element& element = node.getData(Galois::Graph::ALL);
       if (element.isBad()) {
-	lwl.push(node);
+        lwl.push(node);
       }
     }
     
@@ -104,11 +104,7 @@ void refine(Mesh& m, WLTY& wl) {
   Galois::for_each(wl, process());
 }
 
-
-using namespace std;
-
 int main(int argc, const char** argv) {
-
   std::vector<const char*> args = parse_command_line(argc, argv, help);
 
   if (args.size() != 1) {
@@ -123,7 +119,7 @@ int main(int argc, const char** argv) {
   std::vector<GNode> wl;
   int numbad = m.getBad(mesh, wl);
 
-  cout << "configuration: " << mesh->size() << " total triangles, " << numbad << " bad triangles\n";
+  std::cout << "configuration: " << mesh->size() << " total triangles, " << numbad << " bad triangles\n";
 
   using namespace GaloisRuntime::WorkList;
   LocalQueues<GNode, ChunkedLIFO<GNode, 1024>, LIFO<GNode> > wl2;
@@ -133,22 +129,22 @@ int main(int argc, const char** argv) {
   refine(m, wl2);
   Galois::Launcher::stopTiming();
   
-  cout << "STAT: Time " << Galois::Launcher::elapsedTime() << "\n";
+  GaloisRuntime::reportStat("Time", Galois::Launcher::elapsedTime());
 
   if (!skipVerify) {
     if (!m.verify(mesh)) {
-      cerr << "Refinement failed.\n";
+      std::cerr << "Refinement failed.\n";
       assert(0 && "Refinement failed");
       abort();
     }
     
     int size = m.getBad(mesh, wl);
     if (size != 0) {
-      cerr << "Refinement failed with " << size << " remaining triangles.\n";
+      std::cerr << size << " bad triangles remaining.\n";
       assert(0 && "Refinement failed");
       abort();
     }
-    cout << "Refinement OK\n";
+    std::cout << "Refinement OK\n";
   }
   return 0;
 }

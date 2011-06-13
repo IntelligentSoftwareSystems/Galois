@@ -35,21 +35,20 @@
 #include <iostream>
 
 class Tuple {
-  double _t[3];
+  double _t[2];
 
 public:
   
-  Tuple(double a, double b, double c) {
+  Tuple(double a, double b) {
     _t[0] = a;
     _t[1] = b;
-    _t[2] = c;
   }
 
   Tuple() {};
   ~Tuple() {};
   
   bool operator==(const Tuple& rhs) const {
-    for (int x = 0; x < 3; ++x)
+    for (int x = 0; x < 2; ++x)
       if (_t[x] != rhs._t[x])
 	return false;
     return true;
@@ -60,33 +59,33 @@ public:
   }
 
   bool operator<(const Tuple& rhs) const {
-    for (int i = 0; i < 3; ++i)
+    for (int i = 0; i < 2; ++i)
       if (_t[i] < rhs._t[i]) return true;
       else if (_t[i] > rhs._t[i]) return false;
     return false;
   }
 
   bool operator>(const Tuple& rhs) const {
-    for (int i = 0; i < 3; ++i)
+    for (int i = 0; i < 2; ++i)
       if (_t[i] > rhs._t[i]) return true;
       else if (_t[i] < rhs._t[i]) return false;
     return false;
   }
   
   Tuple operator+(const Tuple& rhs) const {
-    return Tuple(_t[0]+rhs._t[0], _t[1]+rhs._t[1], _t[2]+rhs._t[2]);
+    return Tuple(_t[0]+rhs._t[0], _t[1]+rhs._t[1]);
   }
 
   Tuple operator-(const Tuple& rhs) const {
-    return Tuple(_t[0]-rhs._t[0], _t[1]-rhs._t[1], _t[2]-rhs._t[2]);
+    return Tuple(_t[0]-rhs._t[0], _t[1]-rhs._t[1]);
   }
 
   Tuple operator*(double d) const { //scalar product
-    return Tuple(_t[0]*d, _t[1]*d, _t[2]*d);
+    return Tuple(_t[0]*d, _t[1]*d);
   }
 
   double operator*(const Tuple& rhs) const { //dot product
-    return _t[0]*rhs._t[0] + _t[1]*rhs._t[1] + _t[2]*rhs._t[2];
+    return _t[0]*rhs._t[0] + _t[1]*rhs._t[1];
   }
 
   double operator[](int i) const {
@@ -103,7 +102,7 @@ public:
 
   double distance_squared(const Tuple& p) const { //squared distance between current tuple and x
     double sum = 0.0;
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < 2; ++i) {
       double d = _t[i] - p._t[i];
       sum += d * d;
     }
@@ -142,15 +141,13 @@ public:
  
 
   void print(std::ostream& os) const {
-    char *buf = new char[256];
-    sprintf(buf, "(%.4f, %.4f, %.4f)", _t[0], _t[1], _t[2]);
-    os << buf;
+    os << "(" << _t[0] << ", " << _t[1] << ")";
   }
   
   static int cmp(Tuple a, Tuple b) {return a.cmp(b);}
   static double distance(Tuple a, Tuple b) {return a.distance(b);}
   static double angle(const Tuple& a, const Tuple& b, const Tuple& c) {return b.angle(a, c);}
-  static void angleCheck(const Tuple& a, const Tuple& b, const Tuple& c, bool& ob, bool& sm, double M) { b.angleCheck(a, c, ob, sm, M);}
+  static void angleCheck(const Tuple& a, const Tuple& b, const Tuple& c, bool& ob, bool& sm, double M) { b.angleCheck(a, c, ob, sm, M); }
  
 };
 
