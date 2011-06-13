@@ -34,6 +34,12 @@ void reportWarning(const char* text, unsigned int val);
 void reportWarning(const char* text, unsigned long val);
 void reportWarning(const char* text, const char* val);
 
+//Report Info
+void reportInfo(const char* text);
+void reportInfo(const char* text, unsigned int val);
+void reportInfo(const char* text, unsigned long val);
+void reportInfo(const char* text, const char* val);
+
 }
 
 #endif

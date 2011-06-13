@@ -35,6 +35,7 @@ kind.
 #include <cerrno>
 
 #include <iostream>
+#include <sstream>
 #include <list>
 #include <cassert>
 #include <limits>
@@ -194,7 +195,9 @@ public:
     }
     assert(activeThreads <= maxThreads);
     assert(activeThreads <= threads.size());
-    std::cerr << "Threads set to " << num << " using " << activeThreads << " of " << maxThreads << "\n";
+    std::ostringstream out;
+    out << "Threads set to " << num << " using " << activeThreads << " of " << maxThreads;
+    reportInfo("ThreadPool", out.str().c_str());
     return activeThreads;
   }
 };
