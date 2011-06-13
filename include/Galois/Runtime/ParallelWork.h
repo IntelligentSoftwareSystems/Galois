@@ -47,7 +47,7 @@ class ParallelThreadContext
 {
   unsigned long conflicts;
   unsigned long iterations;
-  unsigned long TotalTime;
+  unsigned long ThreadTime;
   WorkListTy* wl;
 
   typedef typename WorkListTy::value_type value_type;
@@ -59,19 +59,19 @@ class ParallelThreadContext
 
 public:
   ParallelThreadContext()
-    :conflicts(0), iterations(0), TotalTime(0), wl(0)
+    :conflicts(0), iterations(0), ThreadTime(0), wl(0)
   {}
   
   virtual ~ParallelThreadContext() {}
 
-  unsigned long getTotalTime() { return TotalTime; }
-  void setTotalTime(unsigned long L) { TotalTime = L; }
+  unsigned long getThreadTime() { return ThreadTime; }
+  void setThreadTime(unsigned long L) { ThreadTime = L; }
   void set_wl(WorkListTy* WL) { wl = WL; }
 
   void report() const {
     reportStat("Conflicts", conflicts);
     reportStat("Iterations", iterations);
-    //reportStat("TotalTime", TotalTime);
+    //reportStat("ThreadTime", ThreadTime);
   }
 
   template<typename Function>
@@ -104,7 +104,7 @@ public:
   static void merge(ParallelThreadContext& lhs, ParallelThreadContext& rhs) {
     lhs.conflicts += rhs.conflicts;
     lhs.iterations += rhs.iterations;
-    lhs.TotalTime += rhs.TotalTime;
+    lhs.ThreadTime += rhs.ThreadTime;
   }
   
 };
@@ -131,7 +131,7 @@ static void summarizeTimes(const std::vector<long>& times) {
   out << " max: " << max;
   out << " stdev: " << stdev;
 
-  reportStat("TotalTime", out.str().c_str());
+  reportStat("ThreadTime", out.str().c_str());
 }
 
 template<class WorkListTy, class Function>
@@ -154,7 +154,7 @@ public:
       int numThreads = GaloisRuntime::getSystemThreadPool().getActiveThreads();
       std::vector<long> times;
       for (int i = 0; i < numThreads; ++i)
-        times.push_back(tdata.get(i).getTotalTime());
+        times.push_back(tdata.get(i).getThreadTime());
       summarizeTimes(times);
     }
 
@@ -192,7 +192,7 @@ public:
       term.localTermination();
     } while (!term.globalTermination());
     T.stop();
-    tld.setTotalTime(T.get());
+    tld.setThreadTime(T.get());
     setThreadContext(0);
   }
 };
