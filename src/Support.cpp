@@ -63,6 +63,23 @@ void GaloisRuntime::reportWarning(const char* text, const char* val) {
   genericReport(true, "WARNING:", text, val);
 }
 
+//Report Info
+void GaloisRuntime::reportInfo(const char* text) {
+  genericReport(false, "INFO:", text, "");
+}
+
+void GaloisRuntime::reportInfo(const char* text, unsigned int val) {
+  genericReport(false, "INFO:", text, val);
+}
+
+void GaloisRuntime::reportInfo(const char* text, unsigned long val) {
+  genericReport(false, "INFO:", text, val);
+}
+
+void GaloisRuntime::reportInfo(const char* text, const char* val) {
+  genericReport(false, "INFO:", text, val);
+}
+
 /// grow_pod - This is an implementation of the grow() method which only works
 /// on POD-like datatypes and is out of line to reduce code duplication.
 void llvm::SmallVectorBase::grow_pod(size_t MinSizeInBytes, size_t TSize) {
