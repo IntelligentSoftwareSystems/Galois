@@ -34,8 +34,6 @@
 #include <map>
 #include <fstream>
 #include <istream>
-//#include <boost/iostreams/filter/gzip.hpp>
-//#include <boost/iostreams/filtering_stream.hpp>
 
 /**
  * Helper class used providing methods to read in information and create the graph 
@@ -50,22 +48,21 @@ class Mesh {
    * @param mesh The graph representing the mesh
    * @return the bad triangles in the graph
    */
- public:
+public:
   template<typename Collection>
     int getBad(Graph* mesh, Collection& ret) {
     int retval = 0;
 
-    for(Graph::active_iterator ii = mesh->active_begin(), ee = mesh->active_end(); ii != ee; ++ii) {
+    for (Graph::active_iterator ii = mesh->active_begin(), ee = mesh->active_end(); ii != ee; ++ii) {
       if (ii->getData(Galois::Graph::NONE, 0).isBad()) {
-	ret.push_back(*ii);
-	++retval;
+        ret.push_back(*ii);
+        ++retval;
       }
     }
     return retval;
   }
 
- private:
-
+private:
   void readNodes(std::string filename, std::vector<Tuple>& tuples) {
     std::ifstream scanner(filename.append(".node").c_str());
     int ntups;
@@ -118,16 +115,6 @@ class Mesh {
     }
   }
   
-  // .poly contains the perimeter of the mesh; edges basically, which is why it contains pairs of nodes
- public:
-  void read(Graph* mesh, std::string basename) {
-    std::vector<Tuple> tuples;
-    readNodes(basename, tuples);
-    readElements(mesh, basename, tuples);
-    readPoly(mesh, basename, tuples);
-  }
-
- protected:
   GNode addElement(Graph* mesh, Element& element) {
     GNode node = mesh->createNode(element);
     mesh->addNode(node, Galois::Graph::NONE, 0);
@@ -142,8 +129,15 @@ class Mesh {
     }
     return node;
   }
+  // .poly contains the perimeter of the mesh; edges basically, which is why it contains pairs of nodes
+public:
+  void read(Graph* mesh, std::string basename) {
+    std::vector<Tuple> tuples;
+    readNodes(basename, tuples);
+    readElements(mesh, basename, tuples);
+    readPoly(mesh, basename, tuples);
+  }
 
- public:
   bool verify(Graph* mesh) {
     // ensure consistency of elements
     bool error = false;
@@ -153,18 +147,18 @@ class Mesh {
       GNode node = *ii;
       Element& element = node.getData(Galois::Graph::NONE, 0);
       if (element.getDim() == 2) {
-	if (mesh->neighborsSize(node, Galois::Graph::NONE, 0) != 1) {
-	  std::cerr << "-> Segment " << element << " has " << mesh->neighborsSize(node, Galois::Graph::NONE, 0) << " relation(s)\n";
-	  error = true;
-	}
+        if (mesh->neighborsSize(node, Galois::Graph::NONE, 0) != 1) {
+          std::cerr << "-> Segment " << element << " has " << mesh->neighborsSize(node, Galois::Graph::NONE, 0) << " relation(s)\n";
+          error = true;
+        }
       } else if (element.getDim() == 3) {
-	if (mesh->neighborsSize(node, Galois::Graph::NONE, 0) != 3) {
-	  std::cerr << "-> Triangle " << element << " has " << mesh->neighborsSize(node, Galois::Graph::NONE, 0) << " relation(s)";
-	  error = true;
-	}
+        if (mesh->neighborsSize(node, Galois::Graph::NONE, 0) != 3) {
+          std::cerr << "-> Triangle " << element << " has " << mesh->neighborsSize(node, Galois::Graph::NONE, 0) << " relation(s)";
+          error = true;
+        }
       } else {
-	std::cerr << "-> Figures with " << element.getDim() << " edges";
-	error = true;
+        std::cerr << "-> Figures with " << element.getDim() << " edges";
+        error = true;
       }
     }
     
@@ -180,17 +174,17 @@ class Mesh {
       GNode node = remaining.top();
       remaining.pop();
       if (!found.count(node)) {
-	assert(mesh->containsNode(node) && "Reachable node was removed from graph");
-	found.insert(node);
-	int i = 0;
-	for (Graph::neighbor_iterator ii = mesh->neighbor_begin(node, Galois::Graph::NONE, 0), ee = mesh->neighbor_end(node, Galois::Graph::NONE, 0); ii != ee; ++ii) {
-	  assert(i < 3);
-	  assert(mesh->containsNode(*ii));
-	  assert(node != *ii);
-	  ++i;
-	  //	  if (!found.count(*ii))
-	    remaining.push(*ii);
-	}
+        assert(mesh->containsNode(node) && "Reachable node was removed from graph");
+        found.insert(node);
+        int i = 0;
+        for (Graph::neighbor_iterator ii = mesh->neighbor_begin(node, Galois::Graph::NONE, 0), ee = mesh->neighbor_end(node, Galois::Graph::NONE, 0); ii != ee; ++ii) {
+          assert(i < 3);
+          assert(mesh->containsNode(*ii));
+          assert(node != *ii);
+          ++i;
+          //          if (!found.count(*ii))
+            remaining.push(*ii);
+        }
       }
     }
 

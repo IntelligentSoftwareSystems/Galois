@@ -48,9 +48,9 @@ public:
   ~Tuple() {};
   
   bool operator==(const Tuple& rhs) const {
-    for (int x = 0; x < 2; ++x)
-      if (_t[x] != rhs._t[x])
-	return false;
+    for (int x = 0; x < 2; ++x) {
+      if (_t[x] != rhs._t[x]) return false;
+    }
     return true;
   }
 
@@ -59,16 +59,18 @@ public:
   }
 
   bool operator<(const Tuple& rhs) const {
-    for (int i = 0; i < 2; ++i)
+    for (int i = 0; i < 2; ++i) {
       if (_t[i] < rhs._t[i]) return true;
       else if (_t[i] > rhs._t[i]) return false;
+    }
     return false;
   }
 
   bool operator>(const Tuple& rhs) const {
-    for (int i = 0; i < 2; ++i)
+    for (int i = 0; i < 2; ++i) {
       if (_t[i] > rhs._t[i]) return true;
       else if (_t[i] < rhs._t[i]) return false;
+    }
     return false;
   }
   
@@ -139,7 +141,6 @@ public:
     return;
   }
  
-
   void print(std::ostream& os) const {
     os << "(" << _t[0] << ", " << _t[1] << ")";
   }
@@ -148,7 +149,6 @@ public:
   static double distance(Tuple a, Tuple b) {return a.distance(b);}
   static double angle(const Tuple& a, const Tuple& b, const Tuple& c) {return b.angle(a, c);}
   static void angleCheck(const Tuple& a, const Tuple& b, const Tuple& c, bool& ob, bool& sm, double M) { b.angleCheck(a, c, ob, sm, M); }
- 
 };
 
 static inline std::ostream& operator<<(std::ostream& os, const Tuple& rhs) {
