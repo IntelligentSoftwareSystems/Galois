@@ -11,18 +11,21 @@
 #include "Tuple.h"
 #include <stack>
 #include <set>
-using namespace std;
+
 class Verifier {
 public:
-	Verifier(){}
-	virtual ~Verifier(){}
+	Verifier() { }
+	bool verify(Graph* graph) {
+		return checkConsistency(graph) && checkReachability(graph) && checkDelaunayProperty(graph);
+	}
 
+private:
 	bool checkConsistency(Graph* graph){
 		bool error = false;
 		for (Graph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
 			GNode node = *ii;
 
-			DTElement& element = node.getData(Galois::Graph::NONE, 0);
+			Element& element = node.getData(Galois::Graph::NONE, 0);
 
 			if (element.getDim() == 2) {
 				if (graph->neighborsSize(node, Galois::Graph::NONE, 0) != 1) {
@@ -68,8 +71,8 @@ public:
 		}
 
 		if (found.size() != graph->size()) {
-			std::cerr << "Not all elements are reachable \n";
-			std::cerr << "Found: " << found.size() << "\nMesh: " << graph->size() << "\n";
+			std::cerr << "Not all elements are reachable. ";
+			std::cerr << "Found: " << found.size() << " needed: " << graph->size() << ".\n";
 			assert(0 && "Not all elements are reachable");
 			return false;
 		}
@@ -79,18 +82,18 @@ public:
 	bool checkDelaunayProperty(Graph* graph){
 		for (Graph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
 			GNode node = *ii;
-			DTElement& e = node.getData(Galois::Graph::NONE, 0);
+			Element& e = node.getData(Galois::Graph::NONE, 0);
 			for (Graph::neighbor_iterator jj = graph->neighbor_begin(node, Galois::Graph::NONE, 0), eejj = graph->neighbor_end(node, Galois::Graph::NONE, 0); jj != eejj; ++jj) {
 				GNode neighborNode = *jj;
-				DTElement& e2 = neighborNode.getData(Galois::Graph::NONE, 0);
+				Element& e2 = neighborNode.getData(Galois::Graph::NONE, 0);
 				if (e.getDim() == 3 && e2.getDim() == 3) {
-					const DTTuple* t2 = getTupleT2OfRelatedEdge(e, e2);
+					const Tuple* t2 = getTupleT2OfRelatedEdge(e, e2);
 					if (!t2) {
-						std::cerr << "missing tuple \n";
+						std::cerr << "missing tuple\n";
 						return false;
 					}
 					if (e.inCircle(*t2)) {
-						std::cerr << "violate delaunay property \n";
+						std::cerr << "delaunay property violated\n";
 						return false;
 					}
 				}
@@ -99,8 +102,7 @@ public:
 		return true;
 	}
 
-private:
-	const DTTuple* getTupleT2OfRelatedEdge(DTElement& e1, DTElement& e2) {
+	const Tuple* getTupleT2OfRelatedEdge(Element& e1, Element& e2) {
 		int e2_0 = -1;
 		int e2_1 = -1;
 		int phase = 0;

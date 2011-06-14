@@ -5,77 +5,60 @@
  *      Author: xinsui
  */
 
-#ifndef DTELEMENT_H_
-#define DTELEMENT_H_
+#ifndef ELEMENT_H_
+#define ELEMENT_H_
 
 #include "Tuple.h"
 #include <vector>
-using namespace std;
-class DTElement{
-	DTTuple coords[3];
+
+class Element {
+	Tuple coords[3];
 	bool bDim; // true == 3, false == 2
-	bool processed;
-	std::vector<DTTuple> _tuples;
+	std::vector<Tuple> tuples;
 
 public:
-	bool isProcessed() const { return processed;};
-	void setProcessed(){ processed = true;}
-	const DTTuple& getPoint(int i) const { return coords[i];};
-	bool getBDim(){ return bDim;}
-	int getDim() const {
-		return bDim ? 3 : 2;
+	const Tuple& getPoint(int i) const { return coords[i]; }
+	bool getBDim(){ return bDim; }
+	int getDim() const { return bDim ? 3 : 2; }
+
+	void addTuple(Tuple& newTuple) {
+		tuples.push_back(newTuple);
 	}
 
-	void addTuple(DTTuple& newTuple){
-		_tuples.push_back(newTuple);
-	};
+	std::vector<Tuple>& getTuples() { return tuples; }
 
-	//	void setTuples(vector<DTTuple>* tuples){  _tuples = tuples;};
-
-	std::vector<DTTuple>& getTuples(){ return _tuples; };
-
-	explicit DTElement(const DTTuple& a, const DTTuple& b, const DTTuple& c):bDim(true), processed(false){
+	explicit Element(const Tuple& a, const Tuple& b, const Tuple& c): bDim(true) {
 		coords[0] = a;
 		coords[1] = b;
 		coords[2] = c;
 	}
 
-	explicit DTElement(const DTTuple& a, const DTTuple& b)
-	:bDim(false), processed(false){
+	explicit Element(const Tuple& a, const Tuple& b): bDim(false) {
 		coords[0] = a;
 		coords[1] = b;
 	}
 	
-	
-/*
-	 bool operator==(const DTElement& rhs) const {
-	    for (int x = 0; x < 3; ++x)
-	      if (coords[x] != rhs.coords[x])
-		return false;
-    	    return true;
-  	}
-*/
 	/**
 	 * determine if a tuple is inside the triangle
 	 */
-	bool elementContains(DTTuple& p) {
-		DTTuple p1 = coords[0];
-		DTTuple p2 = coords[1];
-		DTTuple p3 = coords[2];
+	bool elementContains(Tuple& p) {
+		Tuple p1 = coords[0];
+		Tuple p2 = coords[1];
+		Tuple p3 = coords[2];
 
 		if ((p1 == p) || (p2 == p) || (p3 == p)) {
 			return false;
 		}
 
 		int count = 0;
-		double px = p.getX();
-		double py = p.getY();
-		double p1x = p1.getX();
-		double p1y = p1.getY();
-		double p2x = p2.getX();
-		double p2y = p2.getY();
-		double p3x = p3.getX();
-		double p3y = p3.getY();
+		double px = p.x();
+		double py = p.y();
+		double p1x = p1.x();
+		double p1y = p1.y();
+		double p2x = p2.x();
+		double p2y = p2.y();
+		double p3x = p3.x();
+		double p3y = p3.y();
 
 		if (p2x < p1x) {
 			if ((p2x < px) && (p1x >= px)) {
@@ -134,24 +117,39 @@ public:
 		return count == 1;
 	}
 
+  bool clockwise() {
+		double t1_x = coords[0].x();
+		double t1_y = coords[0].y();
+
+		double t2_x = coords[1].x();
+		double t2_y = coords[1].y();
+
+		double t3_x = coords[2].x();
+		double t3_y = coords[2].y();
+
+		double counter_clockwise = (t2_x - t1_x) * (t3_y - t1_y) - (t3_x - t1_x) * (t2_y - t1_y);
+
+    return counter_clockwise < 0;
+  }
+
 	/**
 	 * determine if the circumcircle of the triangle contains the tuple
 	 */
-	bool inCircle(const DTTuple& p) {
+	bool inCircle(const Tuple& p) {
 		// This version computes the determinant of a matrix including the
 		// coordinates of each points + distance of these points to the origin
 		// in order to check if a point is inside a triangle or not
-		double t1_x = coords[0].getX();
-		double t1_y = coords[0].getY();
+		double t1_x = coords[0].x();
+		double t1_y = coords[0].y();
 
-		double t2_x = coords[1].getX();
-		double t2_y = coords[1].getY();
+		double t2_x = coords[1].x();
+		double t2_y = coords[1].y();
 
-		double t3_x = coords[2].getX();
-		double t3_y = coords[2].getY();
+		double t3_x = coords[2].x();
+		double t3_y = coords[2].y();
 
-		double p_x = p.getX();
-		double p_y = p.getY();
+		double p_x = p.x();
+		double p_y = p.y();
 
 		// Check if the points (t1,t2,t3) are sorted clockwise or
 		// counter-clockwise:
@@ -204,17 +202,16 @@ public:
 		return det > 0;
 	}
 
-	 std::ostream& print(std::ostream& s) const {
-	    s << '[';
-	    for (int i = 0; i < getDim(); ++i)
-	      s << coords[i] << (i < (getDim() - 1) ? ", " : "");
-	    s << ']';
-	    return s;
-	  }
-
+  std::ostream& print(std::ostream& s) const {
+    s << '[';
+    for (int i = 0; i < getDim(); ++i)
+      s << coords[i] << (i < (getDim() - 1) ? ", " : "");
+    s << ']';
+    return s;
+  }
 };
 
-static std::ostream& operator<<(std::ostream& s, const DTElement& E) {
+static std::ostream& operator<<(std::ostream& s, const Element& E) {
   return E.print(s);
 }
 
