@@ -22,6 +22,7 @@ kind.
 #include <string.h>
 
 #include <iostream>
+#include <sstream>
 
 using namespace GaloisRuntime;
 
@@ -177,11 +178,13 @@ void GaloisRuntime::setSystemThreadPolicy(const char* name) {
   else if (strcmp(name, "galois") == 0)
     newPolicy = new GaloisPolicy();
 
-  if (newPolicy)
-    std::cout << "Using " << name << " for thread assignment policy\n";
-  else {
+  if (newPolicy) {
+    std::ostringstream out;
+    out << "Using " << name << " for thread assignment policy";
+    reportInfo("ThreadPool", out.str().c_str());
+  } else {
     newPolicy = new DummyPolicy();
-    reportWarning("using default thread assignment policy\n");
+    reportWarning("using default thread assignment policy");
   }
 
   if (TP)
