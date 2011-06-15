@@ -21,8 +21,8 @@ public:
   inline double y() const { return _t[1]; }
   inline long id() const { return _id; }
   bool operator==(const Tuple& rhs) const {
-    for (int x = 0; x < 2; ++x) {
-      if (_t[x] != rhs._t[x]) return false;
+    for (int i = 0; i < 2; ++i) {
+      if (_t[i] != rhs._t[i]) return false;
     }
     return true;
   }

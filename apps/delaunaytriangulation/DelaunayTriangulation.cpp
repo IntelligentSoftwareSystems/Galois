@@ -42,7 +42,26 @@ struct process {
     if (!Mesh->containsNode(item)) 
       return;
   
-    Cavity cav(Mesh, item, data.getTuples().back(), &lwl);
+    // Discard duplicate tuples
+    std::vector<Tuple>& tuples = data.getTuples();
+    while (!tuples.empty()) {
+      Tuple& t = tuples.back();
+
+      int i;
+      for (i = 0; i < 3; ++i) {
+        if (data.getPoint(i) == t) {
+          tuples.pop_back();
+          break;
+        }
+      }
+      if (i == 3)
+        break;
+    }
+
+    if (tuples.empty())
+      return;
+
+    Cavity cav(Mesh, item, tuples.back(), &lwl);
     cav.build();
     
     GNodeVector newNodes(lwl.PerIterationAllocator);

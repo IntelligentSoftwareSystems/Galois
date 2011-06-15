@@ -46,7 +46,7 @@ public:
       GNode curr = frontier.back();
       frontier.pop_back();
       for (Graph::neighbor_iterator ii = graph->neighbor_begin(curr,Galois::Graph::CHECK_CONFLICT),
-          ee = graph->neighbor_end(curr,Galois::Graph::CHECK_CONFLICT);
+          ee = graph->neighbor_end(curr, Galois::Graph::CHECK_CONFLICT);
           ii != ee; ++ii) {
         GNode neighbor = *ii;
         Element& neighborElement = neighbor.getData(Galois::Graph::CHECK_CONFLICT);
