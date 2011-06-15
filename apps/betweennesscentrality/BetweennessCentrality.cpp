@@ -130,9 +130,6 @@ int main(int argc, const char** argv) {
   Galois::for_each(wl.begin(), wl.end(), process());
   Galois::Launcher::stopTiming();
 
-  std::cout << "STAT: Time " << Galois::Launcher::elapsedTime() << "\n";
-
-
   return 0;
 }
 // vim:ts=8:sts=2:sw=2

@@ -1,3 +1,4 @@
+// Accumulator type -*- C++ -*-
 /*
 Galois, a framework to exploit amorphous data-parallelism in irregular
 programs.
@@ -15,10 +16,42 @@ of Software or Documentation, including but not limited to those resulting from
 defects in Software and/or Documentation, or loss or inaccuracy of data of any
 kind.
 */
+
+#ifndef __GALOIS_ACCUMULATOR_H
+#define __GALOIS_ACCUMULATOR_H
+
+#include "Runtime/PerCPU.h"
+
 namespace Galois {
-  
-  namespace Launcher {
-    void startTiming();
-    void stopTiming();
+
+template<typename T>
+class accumulator {
+  GaloisRuntime::PerCPU_merge<T> data;
+
+  static void acc(T& lhs, T& rhs) {
+    lhs += rhs;
+    rhs = 0;
   }
+
+public:
+  accumulator() :data(acc) {}
+
+  accumulator& operator+=(const T& rhs) {
+    data.get() += rhs;
+    return *this;
+  }
+
+  accumulator& operator-=(const T& rhs) {
+    data.get() -= rhs;
+    return *this;
+  }
+ 
+  const T& get() const {
+    return data.get();
+  }
+
+};
+
 }
+
+#endif

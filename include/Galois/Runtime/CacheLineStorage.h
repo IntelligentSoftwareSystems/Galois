@@ -32,6 +32,7 @@ struct cache_line_storage {
   char pad[ CACHE_LINE_SIZE % sizeof(T) ?
 	    CACHE_LINE_SIZE - (sizeof(T) % CACHE_LINE_SIZE) :
 	    0 ];
+  cache_line_storage() :data() {}
 };
 
 }

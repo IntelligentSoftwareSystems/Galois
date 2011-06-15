@@ -291,7 +291,6 @@ int main(int argc, const char** argv) {
   triangulate(wl);
   Galois::Launcher::stopTiming();
   std::cout << "mesh size: " << Mesh->size() << "\n";
-  GaloisRuntime::reportStat("Time", Galois::Launcher::elapsedTime());
 
   if (!skipVerify) {
     Verifier verifier;

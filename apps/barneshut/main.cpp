@@ -51,6 +51,7 @@ void parse_args(const std::vector<const char*>& args, Barneshut& app) {
 }
 
 OctTreeNodeData omain() {
+  bool isFirstRun = true;
 	OctTreeNodeData res;
 	for (step = 0; step < barneshut.ntimesteps; step++) {
 		barneshut.computeCenterAndDiameter();
@@ -72,7 +73,8 @@ OctTreeNodeData omain() {
     // advance the position and velocity of each
 		barneshut.advance(octree, barneshut.dthf, barneshut.dtime);
 
-		if (Galois::Launcher::isFirstRun()) {
+		if (isFirstRun) {
+		  isFirstRun = false;
 			res = root->getData(Galois::Graph::NONE);
 			std::cout << "Timestep " << step << " Center of Mass = " << res.posx
 					<< " " << res.posy << " " << res.posz << std::endl;
@@ -129,8 +131,7 @@ int main(int argc, const char** argv) {
   Galois::Launcher::startTiming();
   OctTreeNodeData res = omain();
   Galois::Launcher::stopTiming();
-  std::cout << "STAT: Time (without input gen) " << Galois::Launcher::elapsedTime() << "\n";
-  if (Galois::Launcher::isFirstRun() && !skipVerify) { // verify result
+  if (!skipVerify) { // verify result
     verify(res, args);
   }
 }

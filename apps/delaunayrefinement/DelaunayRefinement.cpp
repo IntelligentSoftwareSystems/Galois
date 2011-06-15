@@ -4,9 +4,9 @@
    mesh to eliminate triangles with angles < 30 degrees, using a
    variation of Chew's algorithm.
  
-   Authors: Milind Kulkarni 
+   Authors: Milind Kulkarni, Andrew Lenharth
 
-   Copyright (C) 2007, 2008 The University of Texas at Austin
+   Copyright (C) 2007, 2008, 2011 The University of Texas at Austin
  
    Licensed under the Eclipse Public License, Version 1.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -21,9 +21,6 @@
    limitations under the License.
  
    File: DelaunayRefinement.cpp
- 
-   Created: February 5th, 2008 by Milind Kulkarni (initial version)
- 
 */ 
 
 #include <iostream>
@@ -129,8 +126,6 @@ int main(int argc, const char** argv) {
   refine(m, wl2);
   Galois::Launcher::stopTiming();
   
-  GaloisRuntime::reportStat("Time", Galois::Launcher::elapsedTime());
-
   if (!skipVerify) {
     if (!m.verify(mesh)) {
       std::cerr << "Refinement failed.\n";

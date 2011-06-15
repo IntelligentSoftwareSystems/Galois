@@ -1,3 +1,4 @@
+// Statistic type -*- C++ -*-
 /*
 Galois, a framework to exploit amorphous data-parallelism in irregular
 programs.
@@ -15,10 +16,25 @@ of Software or Documentation, including but not limited to those resulting from
 defects in Software and/or Documentation, or loss or inaccuracy of data of any
 kind.
 */
+
+#ifndef __GALOIS_STATISTIC_H
+#define __GALOIS_STATISTIC_H
+
+#include "Accumulator.h"
+#include "Runtime/Support.h"
+
 namespace Galois {
-  
-  namespace Launcher {
-    void startTiming();
-    void stopTiming();
+
+template<typename T>
+class statistic : public accumulator<T> {
+  const char* name;
+public:
+  statistic(const char* _name) :name(_name) {}
+  ~statistic() {
+    GaloisRuntime::reportStat(name, accumulator<T>::get());
   }
+};
+
 }
+
+#endif

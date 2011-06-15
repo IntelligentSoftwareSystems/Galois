@@ -234,7 +234,6 @@ int main(int argc, const char **argv) {
   Galois::Launcher::startTiming();
   runBody();
   Galois::Launcher::stopTiming();
-  GaloisRuntime::reportStat("Time", Galois::Launcher::elapsedTime());
 
   printTop(10);
   if (!skipVerify && !verify()) {

@@ -43,7 +43,6 @@ protected:
     return std::max(0, i - 1);
   }
 
-
 public:
   PerCPU()
   {

@@ -166,7 +166,6 @@ int main(int argc, const char** argv) {
 	Galois::for_each(wl.begin(), wl.end(), process());
 	Galois::Launcher::stopTiming();
 
-	cerr << "Time: " << Galois::Launcher::elapsedTime() << " msec\n";
 	cout<<"Number of global relabels is :"<<counting<<endl;	
 	cout<<"Flow is "<<sink.getData().excess<<endl;
 	//checkMaxFlow();

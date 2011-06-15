@@ -16,6 +16,7 @@ defects in Software and/or Documentation, or loss or inaccuracy of data of any
 kind.
 */
 #include "Galois/Launcher.h"
+#include "Galois/Statistic.h"
 #include "Galois/Runtime/Timer.h"
 
 // This is linux/bsd specific
@@ -23,12 +24,8 @@ kind.
 
 using namespace GaloisRuntime;
 
-static bool firstRun = true;
 static Timer LaunchTimer;
-
-bool Galois::Launcher::isFirstRun() {
-  return firstRun;
-}
+static Galois::statistic<unsigned long> TimerStat("Time");
 
 void Galois::Launcher::startTiming() {
   LaunchTimer.start();
@@ -36,14 +33,7 @@ void Galois::Launcher::startTiming() {
 
 void Galois::Launcher::stopTiming() {
   LaunchTimer.stop();
-}
-
-void Galois::Launcher::reset() {
-  firstRun = false;
-}
-
-unsigned long Galois::Launcher::elapsedTime() {
-  return LaunchTimer.get();
+  TimerStat += LaunchTimer.get();
 }
 
 Timer::Timer()
