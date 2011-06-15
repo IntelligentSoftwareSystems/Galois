@@ -6,6 +6,7 @@
  */
 
 #include "Galois/Launcher.h"
+#include "Galois/Statistic.h"
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
 #include "Galois/IO/gr.h"
@@ -142,7 +143,7 @@ void runBody(const GNode src) {
   GaloisRuntime::reportStat("Iterations ", counter);
 }
 
-GaloisRuntime::PerCPU<unsigned int> BadWork;
+static Galois::statistic<unsigned int> BadWork("BadWork");
 
 struct process {
   template<typename ContextTy>
@@ -152,7 +153,7 @@ struct process {
     while (req.w < (v = data.dist)) {
       if (__sync_bool_compare_and_swap(&data.dist, v, req.w)) {
 	if (v != DIST_INFINITY)
-	  BadWork.get()++;
+	  BadWork += 1;
 	for (Graph::neighbor_iterator ii = graph.neighbor_begin(req.n, Galois::Graph::NONE), ee = graph.neighbor_end(req.n, Galois::Graph::NONE); ii != ee; ++ii) {
 	  GNode dst = *ii;
 	  int d = graph.getEdgeData(req.n, dst, Galois::Graph::NONE);
@@ -264,22 +265,12 @@ int main(int argc, const char **argv) {
     abort();
   }
 
-  for (int q = 0; q < BadWork.size(); ++q)
-    BadWork.get(q) = 0;
-
   if (numThreads) {
     runBodyParallel(source);
   } else {
     std::cout << "Running Sequentially\n";
     runBody(source);
   }
-
-  unsigned long totalBad = 0;
-  for (int q = 0; q < BadWork.size(); ++q)
-    totalBad += BadWork.get(q);
-
-  GaloisRuntime::reportStat("Time", Galois::Launcher::elapsedTime());
-  GaloisRuntime::reportStat("BadWork", totalBad);
 
   cout << report << " " 
        << graph.getData(report,Galois::Graph::NONE).toString() << endl;
