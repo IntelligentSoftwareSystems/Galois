@@ -16,9 +16,12 @@ defects in Software and/or Documentation, or loss or inaccuracy of data of any
 kind.
 */
 
+#include "Galois/Runtime/Support.h"
+#include <sstream>
+#include <unistd.h>
+
 static bool skipVerify = false;
 static long numThreads = 1;
-
 
 //pulls out common options and returns the rest
 std::vector<const char*> parse_command_line(int argc, const char** argv, const char* proghelp) {
@@ -28,6 +31,17 @@ std::vector<const char*> parse_command_line(int argc, const char** argv, const c
   //-t threads
   //-noverify
   //-help
+
+  std::ostringstream out;
+  for (int i = 0; i < argc; ++i) {
+    out << argv[i];
+    if (i != argc - 1)
+      out << " ";
+  }
+  GaloisRuntime::reportStat("CommandLine", out.str().c_str());
+  char name[256];
+  gethostname(name, 256);
+  GaloisRuntime::reportStat("Hostname", name);
 
   for (int i = 1; i < argc; ++i) {
     if (std::string("-t").compare(argv[i]) == 0) {
