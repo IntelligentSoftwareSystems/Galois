@@ -40,7 +40,6 @@
 
 class Element {
   Tuple coords[3]; // The three endpoints of the triangle
-  //the last index is the center
 
   // if the triangle has an obtuse angle
   // obtuse - 1 is which one
@@ -130,7 +129,7 @@ class Element {
     return center.distance_squared(coords[0]);
   }
 
-  bool operator< (const Element& rhs) const {
+  bool operator<(const Element& rhs) const {
     //apparently a triangle is less than a line
     if (getDim() < rhs.getDim()) return false;
     if (getDim() > rhs.getDim()) return true;
@@ -201,7 +200,7 @@ class Element {
       return getEdge(2);
     case 3:
       return getEdge(0);
-    };
+    }
     assert(0 && "no obtuse edge");
     abort();
   }

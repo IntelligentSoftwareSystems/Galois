@@ -36,9 +36,7 @@
 
 class Tuple {
   double _t[2];
-
 public:
-  
   Tuple(double a, double b) {
     _t[0] = a;
     _t[1] = b;

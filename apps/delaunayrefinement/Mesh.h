@@ -63,20 +63,23 @@ public:
   }
 
 private:
+  void next_line(std::ifstream& scanner) {
+    scanner.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+  }
+
   void readNodes(std::string filename, std::vector<Tuple>& tuples) {
     std::ifstream scanner(filename.append(".node").c_str());
-    int ntups;
+    size_t ntups;
     scanner >> ntups;
-    int dummy;
-    scanner >> dummy >> dummy >> dummy;
+    next_line(scanner);
 
     tuples.resize(ntups);
     for (int i = 0; i < ntups; i++) {
-      int index;
+      size_t index;
       double x;
       double y;
-      double z;
-      scanner >> index >> x >> y >> z;
+      scanner >> index >> x >> y;
+      next_line(scanner);
       tuples[index] = Tuple(x, y);
     }
   }
@@ -84,15 +87,17 @@ private:
   void readElements(Graph* mesh, std::string filename, std::vector<Tuple>& tuples) {
     std::ifstream scanner(filename.append(".ele").c_str());
     
-    int nels;
-    int dummy;
-    scanner >> nels >> dummy >> dummy;
+    size_t nels;
+    scanner >> nels;
+    next_line(scanner);
+
     for (int i = 0; i < nels; i++) {
-      int index;
-      int n1;
-      int n2;
-      int n3;
+      size_t index;
+      size_t n1, n2, n3;
       scanner >> index >> n1 >> n2 >> n3;
+      assert(n1 >= 0 && n1 < tuples.size());
+      assert(n2 >= 0 && n2 < tuples.size());
+      assert(n3 >= 0 && n3 < tuples.size());
       Element e(tuples[n1], tuples[n2], tuples[n3]);
       addElement(mesh, e);
     }
@@ -100,16 +105,18 @@ private:
 
   void readPoly(Graph* mesh, std::string filename, std::vector<Tuple>& tuples) {
     std::ifstream scanner(filename.append(".poly").c_str());
-    int dummy;
-    scanner >> dummy >> dummy >> dummy >> dummy;
-    int nsegs;
+    next_line(scanner);
+    size_t nsegs;
     scanner >> nsegs;
-    scanner >> dummy;
+    next_line(scanner);
     for (int i = 0; i < nsegs; i++) {
-      int index;
-      int n1;
-      int n2;
-      scanner >> index >> n1 >> n2 >> dummy;
+      size_t index;
+      size_t n1;
+      size_t n2;
+      scanner >> index >> n1 >> n2;
+      assert(n1 >= 0 && n1 < tuples.size());
+      assert(n2 >= 0 && n2 < tuples.size());
+      next_line(scanner);
       Element e(tuples[n1], tuples[n2]);
       addElement(mesh, e);
     }
