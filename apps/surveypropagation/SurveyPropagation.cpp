@@ -122,7 +122,11 @@ void print_formula() {
 	std::cout << " | ";
       if (clauses[m].variables[k].second)
 	std::cout << "-";
-      std::cout << clauses[m].variables[k].first << " ";
+      int n = clauses[m].variables[k].first;
+      std::cout << n;
+      if (literals[n].solved)
+	std::cout << "[" << literals[n].value << "]";
+      std::cout << " ";
     }
     std::cout << " )";
   }
