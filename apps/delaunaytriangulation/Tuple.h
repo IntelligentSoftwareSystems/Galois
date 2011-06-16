@@ -32,7 +32,7 @@ public:
   }
 
   void print(std::ostream& os) const {
-    os << "(" << _t[0] << ", " << _t[1] << ")";
+    os << "(" << _t[0] << ", " << _t[1] << " id: " << _id << ")";
   }
 };
 

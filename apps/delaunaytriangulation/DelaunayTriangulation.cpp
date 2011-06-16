@@ -44,22 +44,22 @@ struct process {
   
     // Discard duplicate tuples
     std::vector<Tuple>& tuples = data.getTuples();
-    while (!tuples.empty()) {
-      Tuple& t = tuples.back();
+    //while (!tuples.empty()) {
+    //  Tuple& t = tuples.back();
 
-      int i;
-      for (i = 0; i < 3; ++i) {
-        if (data.getPoint(i) == t) {
-          tuples.pop_back();
-          break;
-        }
-      }
-      if (i == 3)
-        break;
-    }
+    //  int i;
+    //  for (i = 0; i < 3; ++i) {
+    //    if (data.getPoint(i) == t) {
+    //      tuples.pop_back();
+    //      break;
+    //    }
+    //  }
+    //  if (i == 3)
+    //    break;
+    //}
 
-    if (tuples.empty())
-      return;
+    //if (tuples.empty())
+    //  return;
 
     Cavity cav(Mesh, item, tuples.back(), &lwl);
     cav.build();
@@ -107,6 +107,7 @@ void read_points(const char* filename, std::vector<Tuple>& tuples) {
   for (long i = 0; i < numPoints; ++i) {
     scanner >> k; // point id
     scanner >> x >> y;
+    scanner.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
     if (x < min_x)
       min_x = x;
     else if (x > max_x)
@@ -121,13 +122,13 @@ void read_points(const char* filename, std::vector<Tuple>& tuples) {
 
   double width = max_x - min_x;
   double height = max_y - min_y;
-  double centerX = min_x + width / 2;
-  double centerY = min_y + height / 2;
-  double maxNum = std::max(width, height);
+  double max_length = std::max(width, height);
+  double centerX = min_x + width / 2.0;
+  double centerY = min_y + height / 2.0;
 
-  tuples[numPoints] = Tuple(centerX, centerY + 3 * maxNum, numPoints);
-  tuples[numPoints + 1] = Tuple(centerX - 3 * maxNum, centerY - 2 * maxNum, numPoints + 1);
-  tuples[numPoints + 2] = Tuple(centerX + 3 * maxNum, centerY - 2 * maxNum, numPoints + 2);
+  tuples[numPoints] = Tuple(centerX, centerY + 3.0 * max_length, numPoints);
+  tuples[numPoints + 1] = Tuple(centerX - 3.0 * max_length, centerY - 2.0 * max_length, numPoints + 1);
+  tuples[numPoints + 2] = Tuple(centerX + 3.0 * max_length, centerY - 2.0 * max_length, numPoints + 2);
 }
 
 void write_points(const char* filename, const std::vector<Tuple>& tuples) {
@@ -179,6 +180,10 @@ GNode make_graph(const char* filename) {
   Mesh->addEdge(border_node2, large_node, 0);
   Mesh->addEdge(border_node3, large_node, 0);
   
+  tuples.pop_back();
+  tuples.pop_back();
+  tuples.pop_back();
+
   large_node.getData().getTuples().swap(tuples);
 
   return large_node;
