@@ -45,12 +45,14 @@ template<class WorkListTy>
 class ParallelThreadContext
   : public SimpleRuntimeContext, public Galois::PerIterMem
 {
+  typedef typename WorkListTy::value_type value_type;
+  typedef GaloisRuntime::WorkList::MP_SC_FIFO<value_type> AbortedListTy;
+
   unsigned long conflicts;
   unsigned long iterations;
   unsigned long ThreadTime;
   WorkListTy* wl;
-
-  typedef typename WorkListTy::value_type value_type;
+  AbortedListTy* aborted;
   
   using SimpleRuntimeContext::start_iteration;
   using SimpleRuntimeContext::cancel_iteration;
@@ -59,7 +61,7 @@ class ParallelThreadContext
 
 public:
   ParallelThreadContext()
-    :conflicts(0), iterations(0), ThreadTime(0), wl(0)
+    :conflicts(0), iterations(0), ThreadTime(0), wl(0), aborted(0)
   {}
   
   virtual ~ParallelThreadContext() {}
@@ -67,6 +69,7 @@ public:
   unsigned long getThreadTime() { return ThreadTime; }
   void setThreadTime(unsigned long L) { ThreadTime = L; }
   void set_wl(WorkListTy* WL) { wl = WL; }
+  void set_aborted(AbortedListTy* WL) { aborted = WL; }
 
   void report() const {
     reportStat("Conflicts", conflicts);
@@ -74,16 +77,35 @@ public:
     //reportStat("ThreadTime", ThreadTime);
   }
 
-  template<typename Function>
+  bool drain_aborted() {
+    bool retval = false;
+    while (true) {
+      std::pair<bool, value_type> p = aborted->pop();
+
+      if (p.first) {
+        retval = true;
+        wl->push(p.second);
+      } else
+        break;
+    }
+    return retval;
+  }
+
+  template<bool is_leader, typename Function>
   bool doProcess(value_type val, Function& f) {
     ++iterations;
+    if (is_leader && (iterations & 1023) == 0) {
+      drain_aborted();
+    }
+    
     start_iteration();
     try {
       f(val, *this);
     } catch (int a) {
       cancel_iteration();
       ++conflicts;
-      wl->aborted(val);
+      //wl->aborted(val);
+      aborted->push(val);
       return false;
     }
     commit_iteration();
@@ -106,7 +128,6 @@ public:
     lhs.iterations += rhs.iterations;
     lhs.ThreadTime += rhs.ThreadTime;
   }
-  
 };
 
 static void summarizeTimes(const std::vector<long>& times) {
@@ -137,6 +158,7 @@ static void summarizeTimes(const std::vector<long>& times) {
 template<class WorkListTy, class Function>
 class ForEachWork : public Galois::Executable {
   typedef typename WorkListTy::value_type value_type;
+  typedef GaloisRuntime::WorkList::MP_SC_FIFO<value_type> AbortedListTy;
   typedef ParallelThreadContext<WorkListTy> PCTy;
 
   WorkListTy& global_wl;
@@ -144,6 +166,36 @@ class ForEachWork : public Galois::Executable {
 
   PerCPU<PCTy> tdata;
   TerminationDetection term;
+  AbortedListTy aborted;
+
+  template<bool is_leader>
+  void run_loop(PCTy& tld) {
+    setThreadContext(&tld);
+    Timer T;
+    T.start();
+    do {
+      std::pair<bool, value_type> p = global_wl.pop();
+      if (p.first) {
+	term.workHappened();
+	tld.template doProcess<is_leader>(p.second, f);
+	do {
+	  p = global_wl.pop();
+	  if (p.first) {
+	    tld.template doProcess<is_leader>(p.second, f);
+	  } else {
+	    break;
+	  }
+	} while(true);
+      }
+      if (is_leader && tld.drain_aborted())
+        continue;
+
+      term.localTermination();
+    } while (!term.globalTermination());
+    T.stop();
+    tld.setThreadTime(T.get());
+    setThreadContext(0);
+  }
 
 public:
   ForEachWork(WorkListTy& _wl, Function& _f)
@@ -164,36 +216,18 @@ public:
     assert(global_wl.empty());
   }
 
-  virtual void preRun(int tmax) {
-  }
+  virtual void preRun(int tmax) { }
 
   virtual void postRun() {  }
 
   virtual void operator()() {
     PCTy& tld = tdata.get();
-    setThreadContext(&tld);
     tld.set_wl(&global_wl);
-    Timer T;
-    T.start();
-    do {
-      std::pair<bool, value_type> p = global_wl.pop();
-      if (p.first) {
-	term.workHappened();
-	tld.doProcess(p.second, f);
-	do {
-	  p = global_wl.pop();
-	  if (p.first) {
-	    tld.doProcess(p.second, f);
-	  } else {
-	    break;
-	  }
-	} while(true);
-      }
-      term.localTermination();
-    } while (!term.globalTermination());
-    T.stop();
-    tld.setThreadTime(T.get());
-    setThreadContext(0);
+    tld.set_aborted(&aborted);
+    if (tdata.myEffectiveID() == 0)
+      run_loop<true>(tld);
+    else
+      run_loop<false>(tld);
   }
 };
 
@@ -225,7 +259,7 @@ public:
     Timer T;
     T.start();
     // Simple blocked assignment
-    unsigned int id = ThreadPool::getMyID() - 1;
+    unsigned int id = tdata.myEffectiveID();
     long range = end - start;
     long block = range / numThreads;
     long base = start + id * block;
