@@ -12,7 +12,7 @@ using namespace std;
 static const char* name = "Survey Propagation";
 static const char* description = "Solves SAT problems using survey propagation\n";
 static const char* url = "http://iss.ices.utexas.edu/lonestar/surveypropagation.html";
-static const char* help = "seed";
+static const char* help = "seed clauses variables k";
 
 
 //SAT problem:
@@ -54,12 +54,14 @@ struct literal {
   bool solved;
   bool value;
   std::vector<int> functions;
+  literal() :name(0), solved(0), value(0) {}
 };
 
 struct clause {
   int name;
   //var num, negated
   std::vector<std::pair<int, bool> > variables;
+  clause() :name(0) {}
 };
 
 std::vector<clause> clauses;
@@ -77,8 +79,8 @@ struct SPEdge {
 };
 
 struct SPNode {
-  bool isVariableNode;
-  bool isFunctionNode;
+  literal* lit;
+  clause* cla;
 };
 
 
@@ -86,6 +88,9 @@ typedef Galois::Graph::FirstGraph<SPNode, SPEdge, false> Graph;
 typedef Galois::Graph::FirstGraph<SPNode, SPEdge, false>::GraphNode GNode;
 
 Graph graph;
+
+std::vector<GNode> gliterals;
+std::vector<GNode> gclauses;
 
 void initalize_random_formula(int M, int N, int K) {
   //M clauses
@@ -95,6 +100,11 @@ void initalize_random_formula(int M, int N, int K) {
   //build up clauses and literals
   clauses.resize(M);
   literals.resize(N);
+
+  for (int m = 0; m < M; ++m)
+    clauses[m].name = m;
+  for (int n = 0; n < N; ++n)
+    literals[n].name = n;
 
   for (int m = 0; m < M; ++m) {
     //Generate K unique values
@@ -125,7 +135,7 @@ void print_formula() {
       int n = clauses[m].variables[k].first;
       std::cout << n;
       if (literals[n].solved)
-	std::cout << "[" << literals[n].value << "]";
+	std::cout << "[" << (literals[n].value ? 1 : 0) << "]";
       std::cout << " ";
     }
     std::cout << " )";
@@ -133,11 +143,17 @@ void print_formula() {
   std::cout << "\n";
 }
 
+//transform the clauses and literals into a graph
+void build_graph() {
+
+
+}
+
 
 //Update all pi products on all edges of the variable j
 struct update_pi {
   void operator()(GNode j) {
-    assert(j.getData().isVariableNode);
+    assert(j.getData().lit);
     
     //for each function a
     for (Graph::neighbor_iterator aii = graph.neighbor_begin(j), aee = graph.neighbor_end(j); aii != aee; ++aii) {
@@ -175,7 +191,7 @@ struct update_pi {
 //update all eta products (surveys) on all edges of the function a
 struct update_eta {
   void operator()(GNode a) {
-    assert(a.getData().isFunctionNode);
+    assert(a.getData().cla);
 
     //for each i
     for (Graph::neighbor_iterator iii = graph.neighbor_begin(a), iee = graph.neighbor_end(a); iii != iee; ++iii) {
