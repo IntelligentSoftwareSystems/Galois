@@ -2,9 +2,9 @@ cmake_minimum_required (VERSION 2.6)
 project (Galois)
 site_name(SITE_NAME)
 
-if (NOT CMAKE_BUILD_TYPE)
- 		message(STATUS "No build type selected, default to Release")
- 		set(CMAKE_BUILD_TYPE "Release")
+if(NOT CMAKE_BUILD_TYPE)
+  message(STATUS "No build type selected, default to Release")
+  set(CMAKE_BUILD_TYPE "Release")
 endif()
 
 ###### Options ######
@@ -75,7 +75,7 @@ endif(USE_ICC)
 add_definitions("-g")
 
 #Disable asserts
-if (CMAKE_BUILD_TYPE MATCHES "Release")
+if(CMAKE_BUILD_TYPE MATCHES "Release")
   add_definitions("-DNDEBUG")
 endif()
 
@@ -91,6 +91,7 @@ add_subdirectory(lib)
 add_subdirectory(src)
 add_subdirectory(apps)
 add_subdirectory(tools)
+add_subdirectory(inputs)
 
 ###### Documentation ######
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
