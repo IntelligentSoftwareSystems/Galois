@@ -50,7 +50,6 @@ class ParallelThreadContext
 
   unsigned long conflicts;
   unsigned long iterations;
-  unsigned long ThreadTime;
   WorkListTy* wl;
   AbortedListTy* aborted;
   
@@ -61,23 +60,21 @@ class ParallelThreadContext
 
 public:
   ParallelThreadContext()
-    :conflicts(0), iterations(0), ThreadTime(0), wl(0), aborted(0)
+    :conflicts(0), iterations(0), wl(0), aborted(0)
   {}
   
   virtual ~ParallelThreadContext() {}
 
-  unsigned long getThreadTime() { return ThreadTime; }
-  void setThreadTime(unsigned long L) { ThreadTime = L; }
-  void set_wl(WorkListTy* WL) { wl = WL; }
-  void set_aborted(AbortedListTy* WL) { aborted = WL; }
+  unsigned long getIterations() { return iterations; }
+  void setWl(WorkListTy* WL) { wl = WL; }
+  void setAborted(AbortedListTy* WL) { aborted = WL; }
 
   void report() const {
     reportStat("Conflicts", conflicts);
     reportStat("Iterations", iterations);
-    //reportStat("ThreadTime", ThreadTime);
   }
 
-  bool drain_aborted() {
+  bool drainAborted() {
     bool retval = false;
     while (true) {
       std::pair<bool, value_type> p = aborted->pop();
@@ -95,7 +92,7 @@ public:
   bool doProcess(value_type val, Function& f) {
     ++iterations;
     if (is_leader && (iterations & 1023) == 0) {
-      drain_aborted();
+      drainAborted();
     }
     
     start_iteration();
@@ -126,33 +123,34 @@ public:
   static void merge(ParallelThreadContext& lhs, ParallelThreadContext& rhs) {
     lhs.conflicts += rhs.conflicts;
     lhs.iterations += rhs.iterations;
-    lhs.ThreadTime += rhs.ThreadTime;
   }
 };
 
-static void summarizeTimes(const std::vector<long>& times) {
-  long min = *std::min_element(times.begin(), times.end());
-  long max = *std::max_element(times.begin(), times.end());
-  double ave = std::accumulate(times.begin(), times.end(), 0.0) / times.size();
+static void summarizeList(const char* name, const std::vector<long>& list) {
+  long min = *std::min_element(list.begin(), list.end());
+  long max = *std::max_element(list.begin(), list.end());
+  double ave = std::accumulate(list.begin(), list.end(), 0.0) / list.size();
  
   double acc = 0.0;
-  for (std::vector<long>::const_iterator it = times.begin(), end = times.end(); it != end; ++it) {
+  for (std::vector<long>::const_iterator it = list.begin(), end = list.end(); it != end; ++it) {
     acc += (*it - ave) * (*it - ave);
   }
 
   double stdev = 0.0;
-  if (times.size() > 1) {
-    stdev = sqrt(acc / (times.size() - 1));
+  if (list.size() > 1) {
+    stdev = sqrt(acc / (list.size() - 1));
   }
 
   std::ostringstream out;
-  out << "n: " << times.size();
+  out.setf(std::ios::fixed, std::ios::floatfield);
+  out.precision(1);
+  out << "n: " << list.size();
   out << " ave: " << ave;
   out << " min: " << min;
   out << " max: " << max;
   out << " stdev: " << stdev;
 
-  reportStat("ThreadTime", out.str().c_str());
+  reportStat(name, out.str().c_str());
 }
 
 template<class WorkListTy, class Function>
@@ -169,7 +167,7 @@ class ForEachWork : public Galois::Executable {
   AbortedListTy aborted;
 
   template<bool is_leader>
-  void run_loop(PCTy& tld) {
+  void runLoop(PCTy& tld) {
     setThreadContext(&tld);
     Timer T;
     T.start();
@@ -187,13 +185,12 @@ class ForEachWork : public Galois::Executable {
 	  }
 	} while(true);
       }
-      if (is_leader && tld.drain_aborted())
+      if (is_leader && tld.drainAborted())
         continue;
 
       term.localTermination();
     } while (!term.globalTermination());
     T.stop();
-    tld.setThreadTime(T.get());
     setThreadContext(0);
   }
 
@@ -204,10 +201,10 @@ public:
   ~ForEachWork() {
     {
       int numThreads = GaloisRuntime::getSystemThreadPool().getActiveThreads();
-      std::vector<long> times;
+      std::vector<long> list;
       for (int i = 0; i < numThreads; ++i)
-        times.push_back(tdata.get(i).getThreadTime());
-      summarizeTimes(times);
+        list.push_back(tdata.get(i).getIterations());
+      summarizeList("IterationDistribution", list);
     }
 
     for (int i = 1; i < tdata.size(); ++i)
@@ -222,12 +219,12 @@ public:
 
   virtual void operator()() {
     PCTy& tld = tdata.get();
-    tld.set_wl(&global_wl);
-    tld.set_aborted(&aborted);
+    tld.setWl(&global_wl);
+    tld.setAborted(&aborted);
     if (tdata.myEffectiveID() == 0)
-      run_loop<true>(tld);
+      runLoop<true>(tld);
     else
-      run_loop<false>(tld);
+      runLoop<false>(tld);
   }
 };
 
@@ -245,10 +242,10 @@ public:
   }
   
   ~ForAllWork() { 
-    std::vector<long> times;
+    std::vector<long> list;
     for (int i = 0; i < numThreads; ++i)
-      times.push_back(tdata.get(i));
-    summarizeTimes(times);
+      list.push_back(tdata.get(i));
+    summarizeList("TotalTime", list);
   }
 
   virtual void preRun(int tmax) { }
