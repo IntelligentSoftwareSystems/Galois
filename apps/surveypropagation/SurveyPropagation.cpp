@@ -81,6 +81,8 @@ struct SPEdge {
 struct SPNode {
   literal* lit;
   clause* cla;
+  SPNode(literal* l) :lit(l), cla(0) {}
+  SPNode(clause* c) :lit(0), cla(c) {}
 };
 
 
@@ -109,7 +111,7 @@ void initalize_random_formula(int M, int N, int K) {
   for (int m = 0; m < M; ++m) {
     //Generate K unique values
     std::vector<int> touse;
-    while (touse.size() != K) {
+    while (touse.size() != (unsigned)K) {
       //extra complex to generate uniform rand value
       int newK = (int)(((double)rand()/(double)RAND_MAX) * (double)N);
       if (std::find(touse.begin(), touse.end(), newK) 
@@ -123,17 +125,17 @@ void initalize_random_formula(int M, int N, int K) {
 }
 
 void print_formula() {
-  for (int m = 0; m < clauses.size(); ++m) {
+  for (unsigned m = 0; m < clauses.size(); ++m) {
     if (m != 0)
       std::cout << " & ";
-    std::cout << "( ";
-    for (int k = 0; k < clauses[m].variables.size(); ++k) {
+    std::cout << "c" << m << "( ";
+    for (unsigned k = 0; k < clauses[m].variables.size(); ++k) {
       if (k != 0)
 	std::cout << " | ";
       if (clauses[m].variables[k].second)
 	std::cout << "-";
       int n = clauses[m].variables[k].first;
-      std::cout << n;
+      std::cout << "v" << n;
       if (literals[n].solved)
 	std::cout << "[" << (literals[n].value ? 1 : 0) << "]";
       std::cout << " ";
@@ -146,9 +148,44 @@ void print_formula() {
 //transform the clauses and literals into a graph
 void build_graph() {
 
+  gliterals.resize(literals.size());
+  for (unsigned i = 0; i < literals.size(); ++i) {
+    GNode N = graph.createNode(&literals[i]);
+    graph.addNode(N, Galois::Graph::NONE);
+    gliterals[i] = N;
+  }
 
+  gclauses.resize(clauses.size());
+  for (unsigned i = 0; i < clauses.size(); ++i) {
+    GNode N = graph.createNode(&clauses[i]);
+    graph.addNode(N, Galois::Graph::NONE);
+    gclauses[i] = N;
+    for (unsigned j = 0; j < clauses[i].variables.size(); ++j)
+      graph.addEdge(N, gliterals[clauses[i].variables[j].first], Galois::Graph::NONE);
+  }
 }
 
+void print_graph() {
+  for (unsigned i = 0; i < clauses.size(); ++i) {
+    GNode N = gclauses[i];
+    for (Graph::neighbor_iterator ii = graph.neighbor_begin(N, Galois::Graph::NONE), ee = graph.neighbor_end( N, Galois::Graph::NONE); ii != ee; ++ii) {
+      cout << "c"
+	   << graph.getData(N, Galois::Graph::NONE).cla->name
+	   << "->v"
+	   << graph.getData(*ii, Galois::Graph::NONE).lit->name
+	   << " eta: "
+	   << graph.getEdgeData(N, *ii, Galois::Graph::NONE).eta
+	   << " PI[u,s,0]: "
+	   << graph.getEdgeData(N, *ii, Galois::Graph::NONE).PIu
+	   << " "
+	   << graph.getEdgeData(N, *ii, Galois::Graph::NONE).PIs
+	   << " "
+	   << graph.getEdgeData(N, *ii, Galois::Graph::NONE).PI0
+	   << "\n";
+    }
+  }
+  cout << "\n";
+}
 
 //Update all pi products on all edges of the variable j
 struct update_pi {
@@ -253,6 +290,22 @@ int main(int argc, const char** argv) {
 
   initalize_random_formula(M,N,K);
   print_formula();
+  build_graph();
+  print_graph();
+
+  for (int x = 0; x < 100; ++x) {
+
+    for (int i = 0; i < gliterals.size(); ++i)
+      update_pi()(gliterals[i]);
+    
+    print_graph();
+    
+    for (int i = 0; i < gclauses.size(); ++i)
+      update_eta()(gclauses[i]);
+    
+    print_graph();
+
+  }
 
   return 0;
 }
