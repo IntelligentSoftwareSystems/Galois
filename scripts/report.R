@@ -12,4 +12,6 @@ if (length(args) < 1) {
 } 
 
 df <- read.csv(args[1])
-qplot(Threads, Time, data=df) + geom_line() + ylim(0, max(df$Time))
+t1 <- mean(subset(df, Threads == 1)$Time)
+qplot(Threads, Time, data=df) + geom_smooth() + ylim(0, max(df$Time))
+qplot(Threads, t1 / Time, data=df) + geom_smooth()

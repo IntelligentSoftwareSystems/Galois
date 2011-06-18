@@ -77,7 +77,7 @@ def product(args):
     yield tuple(prod)
 
 
-def main(options, args):
+def main(args, options):
   variables = []
   ranges = []
   for extra in options.extra:
@@ -119,4 +119,4 @@ if __name__ == '__main__':
   if not args:
     parser.error('need command to run')
   options.extra.insert(0, '%s::%s::%s' % ('Threads', '-t', options.threads))
-  main(options, args)
+  main(args, options)
