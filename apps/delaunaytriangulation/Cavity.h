@@ -15,18 +15,22 @@
 #include <iostream>
 
 class Cavity {
-  typedef std::set<GNode, Galois::PerIterMem::ItAllocTy::rebind<GNode>::other>::iterator GNodeSetIter;
+  typedef Galois::PerIterMem::ItAllocTy::rebind<GNode>::other PerIterGNodeAlloc;
+  typedef std::set<GNode, std::less<GNode>, PerIterGNodeAlloc> GNodeSet;
+  typedef std::deque<GNode, PerIterGNodeAlloc> GNodeDeque;
   
   Graph* graph;
   
-  std::deque<GNode, Galois::PerIterMem::ItAllocTy::rebind<GNode>::other> oldNodes;
-  std::deque<GNode, Galois::PerIterMem::ItAllocTy::rebind<GNode>::other> connectionNodes;
-  std::set<GNode, std::less<GNode>, Galois::PerIterMem::ItAllocTy::rebind<GNode>::other> deletingNodes;
+  GNodeDeque oldNodes;
+  GNodeDeque connectionNodes;
+  GNodeSet deletingNodes;
   GNode node;
   Tuple tuple;
   Galois::PerIterMem* _cnx;
 
 public:
+  typedef std::vector<GNode, PerIterGNodeAlloc> GNodeVector;
+
   Cavity(Graph* g, GNode& n, Tuple& t, Galois::PerIterMem* cnx):
    graph(g),
    oldNodes(cnx->PerIterationAllocator),
@@ -39,13 +43,13 @@ public:
   }
 
   void build() {
-    std::vector<GNode, Galois::PerIterMem::ItAllocTy::rebind<GNode>::other> frontier(_cnx->PerIterationAllocator);
+    GNodeVector frontier(_cnx->PerIterationAllocator);
     //std::vector<GNode> frontier;
     frontier.push_back(node);
     while (!frontier.empty()){
       GNode curr = frontier.back();
       frontier.pop_back();
-      for (Graph::neighbor_iterator ii = graph->neighbor_begin(curr,Galois::Graph::CHECK_CONFLICT),
+      for (Graph::neighbor_iterator ii = graph->neighbor_begin(curr, Galois::Graph::CHECK_CONFLICT),
           ee = graph->neighbor_end(curr, Galois::Graph::CHECK_CONFLICT);
           ii != ee; ++ii) {
         GNode neighbor = *ii;
@@ -85,7 +89,7 @@ public:
       
       int numNeighborsFound = 0;
 
-      for (GNodeVectorIter iter = newNodes->begin(); iter != newNodes->end(); ++iter) {
+      for (GNodeVector::iterator iter = newNodes->begin(); iter != newNodes->end(); ++iter) {
         GNode newNode = *iter;
         bool found = false;
         int indexForNewNode = -1;
@@ -124,10 +128,10 @@ public:
       //newElements.push_back(&nnode_data);
 
       Element& oldNodeData = oldNode.getData(Galois::Graph::NONE);
-      std::vector<Tuple>& tuples = oldNodeData.getTuples();
+      Element::TupleList& tuples = oldNodeData.getTuples();
       if (!tuples.empty()) {    
-        std::vector<Tuple> newTuples;
-        for (std::vector<Tuple>::iterator iter = tuples.begin(); iter != tuples.end(); ++iter) {
+        Element::TupleList newTuples;
+        for (Element::TupleList::iterator iter = tuples.begin(); iter != tuples.end(); ++iter) {
           Tuple t = *iter;
           if (nnode_data.elementContains(t)) {          
             nnode_data.addTuple(t);
@@ -141,7 +145,7 @@ public:
 
     deletingNodes.insert(node);
     dispatchTuples(newNodes);
-    for (GNodeSetIter setIter = deletingNodes.begin(); setIter != deletingNodes.end(); ++setIter) {
+    for (GNodeSet::iterator setIter = deletingNodes.begin(); setIter != deletingNodes.end(); ++setIter) {
       GNode dnode = *setIter;
       graph->removeNode(dnode, Galois::Graph::NONE);
     }
@@ -149,9 +153,9 @@ public:
 
   void dispatchTuples(GNodeVector* newNodes) {
     int size = newNodes->size();
-    for (GNodeSetIter iter = deletingNodes.begin(); iter != deletingNodes.end(); ++iter) {
+    for (GNodeSet::iterator iter = deletingNodes.begin(); iter != deletingNodes.end(); ++iter) {
       GNode dnode = *iter;
-      std::vector<Tuple>& tuples = dnode.getData(Galois::Graph::NONE).getTuples();
+      Element::TupleList& tuples = dnode.getData(Galois::Graph::NONE).getTuples();
       if (tuples.empty()) {
         continue;
       }

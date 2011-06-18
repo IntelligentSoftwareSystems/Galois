@@ -12,10 +12,12 @@
 #include <vector>
 
 class Element {
+public:
+  typedef std::vector<Tuple, Galois::Allocator<Tuple> > TupleList;
+private:
   Tuple coords[3];
   bool bDim; // true == 3, false == 2
-  std::vector<Tuple> tuples;
-
+  TupleList tuples;
 public:
   const Tuple& getPoint(int i) const { return coords[i]; }
   bool getBDim(){ return bDim; }
@@ -25,7 +27,7 @@ public:
     tuples.push_back(newTuple);
   }
 
-  std::vector<Tuple>& getTuples() { return tuples; }
+  TupleList& getTuples() { return tuples; }
 
   explicit Element(const Tuple& a, const Tuple& b, const Tuple& c): bDim(true) {
     coords[0] = a;
