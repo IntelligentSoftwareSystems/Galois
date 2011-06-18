@@ -7,6 +7,9 @@
 #include <stdio.h>
 #include <malloc.h>
 
+#ifdef DISABLE_OVERLOADING
+#define CUSTOM_PREFIX(x) hoard_ ## x
+#endif
 
 #ifndef CUSTOM_PREFIX
 #define CUSTOM_PREFIX
@@ -39,7 +42,9 @@ extern "C" {
   static void *(*old_realloc_hook)(void *ptr, size_t size, const void *caller);
   static void *(*old_memalign_hook)(size_t alignment, size_t size, const void *caller);
 
+#ifndef DISABLE_OVERLOADING
   void (*__malloc_initialize_hook) (void) = my_init_hook;
+#endif
 
   static void my_init_hook (void) {
     // Store the old hooks.

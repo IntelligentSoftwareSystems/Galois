@@ -24,7 +24,7 @@ kind.
 #include <sstream>
 #include <math.h>
 #include "Galois/Executable.h"
-#include "Galois/PerIterMem.h"
+#include "Galois/Mem.h"
 
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Context.h"

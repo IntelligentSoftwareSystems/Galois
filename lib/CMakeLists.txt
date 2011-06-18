@@ -1,5 +1,5 @@
 #add_subdirectory(libhugetlbfs-2.10)
-#add_subdirectory(hoard-38)
+add_subdirectory(hoard-38)
 
 #include(ExternalProject)
 #

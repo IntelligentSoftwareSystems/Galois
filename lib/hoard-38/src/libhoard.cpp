@@ -30,6 +30,10 @@
  * @author Emery Berger <http://www.cs.umass.edu/~emery>
  */
 
+#ifdef DISABLE_OVERLOADING
+#define CUSTOM_PREFIX(x) hoard_ ## x
+#endif
+
 #include <new>
 
 // The undef below ensures that any pthread_* calls get strong

@@ -90,7 +90,9 @@ extern "C" {
 
   static malloc_zone_t * theZone = NULL;
 
+#ifndef DISABLE_OVERLOADING
   static void my_init_hook (void) __attribute__((constructor));
+#endif
 
   size_t mysize (malloc_zone_t * zone, const void * ptr) {
     size_t sz;
