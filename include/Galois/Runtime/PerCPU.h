@@ -53,12 +53,16 @@ public:
   {
     num = getSystemThreadPolicy().getNumThreads();
     datum = new cache_line_storage<T>[num];
-    for (int i = 0; i < num; ++i)
-      datum[i] = ival;
+    reset(ival);
   }
   
   virtual ~PerCPU() {
     delete[] datum;
+  }
+
+  void reset(const T& d) {
+    for (int i = 0; i < num; ++i)
+      datum[i] = d;
   }
 
   unsigned int myEffectiveID() const {

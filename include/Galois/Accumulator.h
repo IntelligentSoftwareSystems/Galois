@@ -50,6 +50,10 @@ public:
     return data.get();
   }
 
+  void reset(const T& d) {
+    data.reset(d);
+  }
+
 };
 
 }
