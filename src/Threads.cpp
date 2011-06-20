@@ -23,8 +23,15 @@ using namespace GaloisRuntime;
 
 typedef boost::intrusive::list<ThreadAware, boost::intrusive::constant_time_size<false>, boost::intrusive::base_hook<HIDDEN::ThreadAwareHook> > ListTy;
 
-static ListTy allObjects;
+//pointer because of undefined construct ordering
+static ListTy* allObjects = 0;
+//should just be a pod, so no constructor is needed
 static SimpleLock<int, true> allObjectsLock;
+
+static void createAllObjects(void) {
+  if (!allObjects)
+    allObjects = new ListTy();
+}
 
 //This, once initialized by a thread, stores an dense index/label for that thread
 __thread unsigned int ThreadPool::LocalThreadID = ~0;
@@ -33,20 +40,21 @@ __thread unsigned int ThreadPool::LocalThreadID = ~0;
 int ThreadPool::nextThreadID = 0;
 
 ThreadAware::ThreadAware() {
+  createAllObjects();
   allObjectsLock.lock();
-  allObjects.push_front(*this);
+  allObjects->push_front(*this);
   allObjectsLock.unlock();
 }
 
 ThreadAware::~ThreadAware() {
   allObjectsLock.lock();
-  allObjects.erase(allObjects.iterator_to(*this));
+  allObjects->erase(allObjects->iterator_to(*this));
   allObjectsLock.unlock();
 }
 
 void ThreadAware::NotifyOfChange(bool starting) {
   allObjectsLock.lock();
-  for (ListTy::iterator ii = allObjects.begin(), ee = allObjects.end(); ii != ee; ++ii) {
+  for (ListTy::iterator ii = allObjects->begin(), ee = allObjects->end(); ii != ee; ++ii) {
     ii->ThreadChange(starting);
   }
   allObjectsLock.unlock();
