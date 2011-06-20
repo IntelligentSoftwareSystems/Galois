@@ -20,6 +20,10 @@
 #include <iostream>
 #include <fstream>
 #include <set>
+ 
+#define BORUVKA_DEBUG 0
+
+
 static const char* name = "Boruvka MST";
 static const char* description = "Computes the Minimal Spanning Tree using Boruvka\n";
 static const char* url = "http://iss.ices.utexas.edu/lonestar/boruvka.html";
@@ -41,7 +45,6 @@ typedef Graph::GraphNode GNode;
 Graph graph;
 std::vector<GNode> nodes;
 
-
 void printGraph() {
 	int numEdges = 0;
 	for (Graph::active_iterator src = graph.active_begin(), esrc = graph.active_end();src != esrc; ++src) {
@@ -57,54 +60,6 @@ void printGraph() {
 	}
 	std::cout<<"Num edges "<<numEdges << std::endl;
 }
-//Alternate attempt to use methods.
-const Graph::GraphNode& findMinimum(GNode& src){
-	Graph::neighbor_iterator minNeighbor;
-	int minEdgeWeight=INT_MAX;
-	for (Graph::neighbor_iterator dst = graph.neighbor_begin(src, Galois::Graph::ALL), edst = graph.neighbor_end(src, Galois::Graph::ALL);dst != edst; ++dst) {
-		graph.getData(*dst);
-		int w = graph.getEdgeData(src, *dst, Galois::Graph::ALL);
-		if(w<minEdgeWeight){
-			minNeighbor = dst;
-			minEdgeWeight = w;
-		}
-	}
-	return (*minNeighbor);	
-}
-//TODO complete this.
-int contract(GNode & src, GNode& minNode){
-	int minEdgeWeight = graph.getEdgeData(src, minNode, Galois::Graph::NONE);
-	return minEdgeWeight;
-}
-//Alternate implementation, create a new node and then add it to the graph.
-template<typename ContextTy>void alternateBody(GNode & src, ContextTy& lwl){
-	Graph::GraphNode  minNbr = findMinimum(src);
-	std::set<Graph::GraphNode> newNeighbors;
-	Node n(++nodeID);
-	GNode newNode = graph.createNode(n);
-	graph.addNode(newNode);
-	for(Graph::neighbor_iterator mDst = graph.neighbor_begin(minNbr, Galois::Graph::ALL), mEDst = graph.neighbor_end(minNbr, Galois::Graph::ALL);
-		mDst!=mEDst;++mDst){
-		if(*mDst != src){
-			newNeighbors.insert(*mDst);	
-			graph.removeEdge(*mDst, minNbr);
-		}
-	}
-	for(Graph::neighbor_iterator mDst = graph.neighbor_begin(src, Galois::Graph::ALL), mEDst = graph.neighbor_end(src, Galois::Graph::ALL);
-		mDst!=mEDst;++mDst){
-		if(*mDst != minNbr){
-			newNeighbors.insert(*mDst);	
-			graph.removeEdge(*mDst, src);
-		}
-	}
-	for(std::set<Graph::GraphNode>::iterator it = newNeighbors.begin(), itEnd = newNeighbors.end(); it!=itEnd;++it){
-		graph.addEdge(newNode, *it, 0, Galois::Graph::ALL);
-	}
-	graph.removeNode(src);
-	graph.removeNode(minNbr);
-	
-}
-
 GaloisRuntime::PerCPU<unsigned int> MSTWeight;
 struct process {
 	template<typename ContextTy>
@@ -114,9 +69,17 @@ struct process {
 			graph.getData(src);
 			Graph::neighbor_iterator minNeighbor;
 			int minNeighborID=-1;
+#if BORUVKA_DEBUG
 			std::cout<<"Processing "<<graph.getData(src).toString()<<std::endl;
+#endif
 			int minEdgeWeight=INT_MAX;
 			int numNeighbors = 0;
+			//Acquire locks on neighborhood.
+			for (Graph::neighbor_iterator dst = graph.neighbor_begin(src, Galois::Graph::ALL), edst = graph.neighbor_end(src, Galois::Graph::ALL);dst != edst; ++dst) {
+				graph.getData(*dst);
+				graph.getEdgeData(src,*dst, Galois::Graph::ALL);
+				graph.getEdgeData(*dst,src, Galois::Graph::ALL);
+			}
 			for (Graph::neighbor_iterator dst = graph.neighbor_begin(src, Galois::Graph::ALL), edst = graph.neighbor_end(src, Galois::Graph::ALL);dst != edst; ++dst) {
 				numNeighbors++;
 				graph.getData(*dst);
@@ -133,7 +96,15 @@ struct process {
 				return;
 			}
 			graph.getData(*minNeighbor);
+#if BORUVKA_DEBUG
 			std::cout << " Min edge from "<<graph.getData(src).toString() << " to "<<graph.getData(*minNeighbor).toString()<<" " <<minEdgeWeight << " "<<std::endl ;
+#endif
+			//Acquire locks on neighborhood of min neighbor.
+			for (Graph::neighbor_iterator dst = graph.neighbor_begin(*minNeighbor, Galois::Graph::ALL), edst = graph.neighbor_end(*minNeighbor, Galois::Graph::ALL);dst != edst; ++dst) {
+				graph.getData(*dst);
+				graph.getEdgeData(*minNeighbor,*dst, Galois::Graph::ALL);
+				graph.getEdgeData(*dst,*minNeighbor, Galois::Graph::ALL);
+			}
 
 			//update MST weight.
 			MSTWeight.get()+=minEdgeWeight;
@@ -194,14 +165,18 @@ void runBodyParallel() {
 		all.insert(*src);
 	}
 	wl.fill_initial(all.begin() , all.end());
+#if BORUVKA_DEBUG
 	std::cout<<"Begining to process with worklist size :: "<<all.size()<<std::endl;
 	std::cout<<"Graph size "<<graph.size()<<std::endl;
+#endif
 	for(int i=0;i<MSTWeight.size();i++)
 		MSTWeight.get(i)=0;
 	Galois::for_each(wl, process());
 	unsigned int res = 0;
 	for(int i=0;i<MSTWeight.size();i++){
+#if BORUVKA_DEBUG
 		std::cout<<"MST +=" << MSTWeight.get(i)<<std::endl;
+#endif
 		res+=MSTWeight.get(i);
 	}
 	std::cout<<"MST Weight is "<< res << std::endl;
@@ -233,7 +208,9 @@ static void makeGraph(const char* input) {
 			numEdges++;
 		}
 	}
+#if BORUVKA_DEBUG
 	std::cout<<"Number of edges "<<numEdges<<std::endl;
+#endif
 	unsigned int id = 0;
 
 	//std::vector<GNode> nodes(in_graph.size());
@@ -265,7 +242,9 @@ static void makeGraph(const char* input) {
 		}
 		id++;
 	}
+#if BORUVKA_DEBUG
 	std::cout<<"Final num edges "<<numEdges<< " Dups "<<numDups<<std::endl;
+#endif
 }
 
 
@@ -278,7 +257,9 @@ int main(int argc, const char **argv) {
 	printBanner(std::cout, name, description, url);
 	const char* inputfile = args[0];
 	makeGraph(inputfile);
+#if BORUVKA_DEBUG
 	printGraph();
+#endif
 	Galois::Launcher::startTiming();
 	runBodyParallel();
 	Galois::Launcher::stopTiming();
