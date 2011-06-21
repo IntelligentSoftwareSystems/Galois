@@ -9,6 +9,8 @@
 #include "Lonestar/Banner.h"
 #include "Lonestar/CommandLine.h"
 
+#include "Galois/TypeTraits.h"
+
 int counting=0;
 using namespace std;
 
@@ -59,6 +61,8 @@ void printHeights()
 }
 
 struct process {
+  typedef int tt_needs_parallel_pause;
+
   template<typename Context>
   void operator()(GNode& item, Context& lwl) {
 /*	bool inRelabel = false;
@@ -103,7 +107,12 @@ struct process {
   }
 };
 
+static void foo() {
+  std::cout << "Typetrait: " << Galois::needs_parallel_pause<process>::value << "\n";
+}
+
 int main(int argc, const char** argv) {
+  foo();
 
   std::vector<const char*> args = parse_command_line(argc, argv, help);
 
