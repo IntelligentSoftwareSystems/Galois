@@ -61,8 +61,8 @@ public:
   }
 
   void reset(const T& d) {
-    for (int i = 0; i < num; ++i)
-      datum[i] = d;
+    for (unsigned int i = 0; i < num; ++i)
+      datum[i].data = d;
   }
 
   unsigned int myEffectiveID() const {

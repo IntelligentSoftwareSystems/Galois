@@ -1,6 +1,7 @@
 #include "Galois/Launcher.h"
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
+#include "Galois/Accumulator.h"
 
 #include "Lonestar/Banner.h"
 #include "Lonestar/CommandLine.h"
@@ -73,7 +74,8 @@ struct SPEdge {
   double PI0;
   double eta;
   bool isNegative;
-  SPEdge() {
+  SPEdge() {}
+  SPEdge(bool isNeg) :isNegative(isNeg) {
     eta = (double)rand() / (double)RAND_MAX;
   }
 };
@@ -81,6 +83,10 @@ struct SPEdge {
 struct SPNode {
   literal* lit;
   clause* cla;
+  double BiasP;
+  double BiasN;
+  double Bias0;
+  double Bias;
   SPNode(literal* l) :lit(l), cla(0) {}
   SPNode(clause* c) :lit(0), cla(c) {}
 };
@@ -89,10 +95,20 @@ struct SPNode {
 typedef Galois::Graph::FirstGraph<SPNode, SPEdge, false> Graph;
 typedef Galois::Graph::FirstGraph<SPNode, SPEdge, false>::GraphNode GNode;
 
-Graph graph;
+static Graph graph;
 
-std::vector<GNode> gliterals;
-std::vector<GNode> gclauses;
+static std::vector<GNode> gliterals;
+static std::vector<GNode> gclauses;
+
+static Galois::accumulator<unsigned int> unconverged;
+static Galois::accumulator<unsigned int> nontrivial;
+
+static Galois::reduce_max<double> maxBias;
+static Galois::reduce_average<double> averageBias;
+
+//interesting parameters:
+static const double epsilon = 0.00001;
+static const int tmax = 100;
 
 void initalize_random_formula(int M, int N, int K) {
   //M clauses
@@ -161,7 +177,7 @@ void build_graph() {
     graph.addNode(N, Galois::Graph::NONE);
     gclauses[i] = N;
     for (unsigned j = 0; j < clauses[i].variables.size(); ++j)
-      graph.addEdge(N, gliterals[clauses[i].variables[j].first], Galois::Graph::NONE);
+      graph.addEdge(N, gliterals[clauses[i].variables[j].first], SPEdge(clauses[i].variables[j].second), Galois::Graph::NONE);
   }
 }
 
@@ -187,14 +203,29 @@ void print_graph() {
   cout << "\n";
 }
 
+static bool isVu(bool JajNegative, bool JbjNegative) {
+  if (JajNegative)
+    return JbjNegative;
+  else
+    return !JbjNegative;
+}
+
+static bool isVs(bool JajNegative, bool JbjNegative) {
+  if (JajNegative)
+    return !JbjNegative;
+  else
+    return JbjNegative;
+}
+
 //Update all pi products on all edges of the variable j
 struct update_pi {
-  void operator()(GNode j) {
-    assert(j.getData().lit);
+  template<typename Context>
+  void operator()(GNode j, const Context& ctx) {
+    assert(j.getData(Galois::Graph::NONE).lit);
     
     //for each function a
-    for (Graph::neighbor_iterator aii = graph.neighbor_begin(j), aee = graph.neighbor_end(j); aii != aee; ++aii) {
-      SPEdge& jae = graph.getEdgeData(j, *aii);
+    for (Graph::neighbor_iterator aii = graph.neighbor_begin(j, Galois::Graph::NONE), aee = graph.neighbor_end(j, Galois::Graph::NONE); aii != aee; ++aii) {
+      SPEdge& jae = graph.getEdgeData(j, *aii, Galois::Graph::NONE);
       //Now we have j->a, compute each pi product
       double prodVuu = 1.0;
       double prodVus = 1.0;
@@ -202,12 +233,11 @@ struct update_pi {
       double prodVsu = 1.0;
       double prodVa = 1.0;
       //for each b
-      for (Graph::neighbor_iterator bii = graph.neighbor_begin(j), bee = graph.neighbor_end(j); bii != bee; ++bii) {
-	SPEdge& bje = graph.getEdgeData(j, *bii);
+      for (Graph::neighbor_iterator bii = graph.neighbor_begin(j, Galois::Graph::NONE), bee = graph.neighbor_end(j, Galois::Graph::NONE); bii != bee; ++bii) {
+	SPEdge& bje = graph.getEdgeData(j, *bii, Galois::Graph::NONE);
 	double etabj = bje.eta;
 	if (bii != aii) { //all of these terms ignore the source
-	  if ((bje.isNegative && jae.isNegative) 
-	      || (!bje.isNegative && !jae.isNegative)) {
+	  if (isVu(jae.isNegative, bje.isNegative)) {
 	    prodVuu *= (1.0 - etabj); //1st term
 	    prodVsu *= (1.0 - etabj); //2nd term
 	  } else {
@@ -227,37 +257,134 @@ struct update_pi {
 
 //update all eta products (surveys) on all edges of the function a
 struct update_eta {
-  void operator()(GNode a) {
-    assert(a.getData().cla);
-
+  template<typename Context>
+  void operator()(GNode a, const Context& ctx) {
+    assert(a.getData(Galois::Graph::NONE).cla);
+    
     //for each i
-    for (Graph::neighbor_iterator iii = graph.neighbor_begin(a), iee = graph.neighbor_end(a); iii != iee; ++iii) {
-      SPEdge& aie = graph.getEdgeData(a, *iii);
+    for (Graph::neighbor_iterator iii = graph.neighbor_begin(a, Galois::Graph::NONE), iee = graph.neighbor_end(a, Galois::Graph::NONE); iii != iee; ++iii) {
+      SPEdge& aie = graph.getEdgeData(a, *iii, Galois::Graph::NONE);
       double prod = 1.0;
       //for each j
-      for (Graph::neighbor_iterator jii = graph.neighbor_begin(a), jee = graph.neighbor_end(a); jii != jee; ++jii) {
+      for (Graph::neighbor_iterator jii = graph.neighbor_begin(a, Galois::Graph::NONE), jee = graph.neighbor_end(a, Galois::Graph::NONE); jii != jee; ++jii) {
 	if (jii != iii) { //ignore i
-	  SPEdge& jae = graph.getEdgeData(a, *jii);
+	  SPEdge& jae = graph.getEdgeData(a, *jii, Galois::Graph::NONE);
 	  prod *= (jae.PIu / (jae.PIu + jae.PIs + jae.PI0));
 	}
-    }
+      }
+      double delta = aie.eta < prod ? prod - aie.eta : aie.eta - prod;
+      if (delta > epsilon)
+	unconverged += 1;
+      if (prod > epsilon)
+	nontrivial += 1;
       aie.eta = prod;
     }
   }
 };
 
-void SP_algorithm() {
+//compute biases on each node
+struct update_biases {
+  template<typename Context>
+  void operator()(GNode i, const Context& ctx) {
+    SPNode& idata = i.getData(Galois::Graph::NONE);
+    assert(idata.lit);
+    
+    double pp1 = 1.0;
+    double pp2 = 1.0;
+    double pn1 = 1.0;
+    double pn2 = 1.0;
+    double p0 = 1.0;
+
+    //for each function a
+    for (Graph::neighbor_iterator aii = graph.neighbor_begin(i, Galois::Graph::NONE), aee = graph.neighbor_end(i, Galois::Graph::NONE); aii != aee; ++aii) {
+      SPEdge& aie = graph.getEdgeData(i, *aii, Galois::Graph::NONE);
+
+      double etaai = aie.eta;
+      if (aie.isNegative) {
+	pp2 *= (1.0 - etaai);
+	pn1 *= (1.0 - etaai);
+      } else {
+	pp1 *= (1.0 - etaai);
+	pn2 *= (1.0 - etaai);
+      }
+      p0 *= (1.0 - etaai);
+    }
+    double pp = (1.0 - pp1) * pp2;
+    double pn = (1.0 - pn1) * pn2;
+    
+    idata.BiasP = pp / (pp + pn + p0);
+    idata.BiasN = pn / (pp + pn + p0);
+    idata.Bias0 = 1.0 - idata.BiasP - idata.BiasN;
+
+    double d = idata.BiasP - idata.BiasN;
+    if (d < 0.0)
+      d = idata.BiasN - idata.BiasP;
+    idata.Bias = d;
+
+    maxBias.insert(d);
+    averageBias.insert(d);
+  }
+};
+
+//return true if converged
+bool SP_algorithm() {
   //0) at t = 0, for every edge a->i, randomly initialize the message sigma a->i(t=0) in [0,1]
   //1) for t = 1 to tmax:
   //1.1) sweep the set of edges in a random order, and update sequentially the warnings on all the edges of the graph, generating the values sigma a->i (t) using SP_update
   //1.2) if (|sigma a->i(t) - sigma a->i (t-1) < E on all the edges, the iteration has converged and generated sigma* a->i = sigma a->i(t), goto 2
   //2) if t = tmax return un-converged.  if (t < tmax) then return the set of fixed point warnings sigma* a->i = sigma a->i (t)
   
-  
+  int x = tmax;
+  do {
+    unconverged.reset(0);
+    nontrivial.reset(0);
+    --x;
 
+    // for (unsigned int i = 0; i < gliterals.size(); ++i)
+    //   update_pi()(gliterals[i], 0);
+
+    Galois::for_each(gliterals.begin(), gliterals.end(), update_pi());
+    
+    //print_graph();
+    
+    // for (unsigned int i = 0; i < gclauses.size(); ++i)
+    //   update_eta()(gclauses[i], 0);
+
+    Galois::for_each(gclauses.begin(), gclauses.end(), update_eta());
+   
+    //print_graph();
+
+    std::cout << "U: " << unconverged.get() << " NT: " << nontrivial.get() << "\n";
+
+  } while (x && unconverged.get());
+
+  return unconverged.get() == 0;
 }
 
-void survey_inspired_decimation() {
+struct fix_variables {
+  double limit;
+  fix_variables(double d) :limit(d) {}
+  template<typename Context>
+  void operator()(GNode i, const Context& ctx) {
+    SPNode& idata = i.getData(Galois::Graph::NONE);
+    if (idata.Bias > limit) {
+      idata.lit->solved = true;
+      idata.lit->value = (idata.BiasP > idata.BiasN);
+      //TODO: simplify graph
+    }
+  }
+};
+
+void decimate() {
+  maxBias.reset(0.0);
+  averageBias.reset(0.0);
+  Galois::for_each(gliterals.begin(), gliterals.end(), update_biases());
+  std::cout << "\n" << maxBias.get() << " " << averageBias.get() << "\n";
+  double d = ((maxBias.get() - averageBias.get()) * 0.25) + averageBias.get();
+  Galois::for_each(gliterals.begin(), gliterals.end(), fix_variables(d));
+}
+
+bool survey_inspired_decimation() {
   //0) Randomize initial conditions for the surveys
   //1) run SP
   //   if (SP does not converge, return SP UNCONVEREGED and stop
@@ -269,6 +396,20 @@ void survey_inspired_decimation() {
   //   c) clean the graph
   //2.2) if all surveys are trivial(n = 0), output simplified subformula
   //4) if solved, output SAT, if no contradiction, continue at 1, if contridiction, stop
+  do {
+    if (SP_algorithm()) {
+      if (nontrivial.get()) {
+	decimate();
+      } else {
+	std::cout << "SIMPLIFIED\n";
+	return false;
+      }
+    } else {
+      std::cout << "UNCONVERGED\n";
+      return false; // unconverged
+    }
+  } while (false); // while (true);
+  return true;
 }
 
 
@@ -289,23 +430,13 @@ int main(int argc, const char** argv) {
   int K = atoi(args[3]);
 
   initalize_random_formula(M,N,K);
-  print_formula();
+  //print_formula();
   build_graph();
-  print_graph();
+  //print_graph();
 
-  for (int x = 0; x < 100; ++x) {
+  survey_inspired_decimation();
 
-    for (int i = 0; i < gliterals.size(); ++i)
-      update_pi()(gliterals[i]);
-    
-    print_graph();
-    
-    for (int i = 0; i < gclauses.size(); ++i)
-      update_eta()(gclauses[i]);
-    
-    print_graph();
-
-  }
+  //print_formula();
 
   return 0;
 }

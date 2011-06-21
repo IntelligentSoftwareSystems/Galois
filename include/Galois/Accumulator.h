@@ -30,7 +30,6 @@ class accumulator {
 
   static void acc(T& lhs, T& rhs) {
     lhs += rhs;
-    rhs = 0;
   }
 
 public:
@@ -54,6 +53,63 @@ public:
     data.reset(d);
   }
 
+};
+
+template<typename T>
+class reduce_max {
+  GaloisRuntime::PerCPU_merge<T> data;
+
+  static void acc(T& lhs, T& rhs) {
+    lhs = std::max(lhs, rhs);
+  }
+public:
+  reduce_max() :data(acc) {}
+
+  reduce_max& insert(const T& rhs) {
+    T& d = data.get();
+    if (d < rhs)
+      d = rhs;
+    return *this;
+  }
+
+  const T& get() const {
+    return data.get();
+  }
+
+  void reset(const T& d) {
+    data.reset(d);
+  }
+
+
+};
+
+template<typename T>
+class reduce_average {
+  typedef std::pair<T, unsigned> TP;
+  GaloisRuntime::PerCPU_merge<TP> data;
+
+  static void acc(TP& lhs, TP& rhs) {
+    lhs.first += rhs.first;
+    lhs.second += rhs.second;
+  }
+public:
+  reduce_average() :data(acc) {}
+
+  reduce_average& insert(const T& rhs) {
+    TP& d = data.get();
+    d.first += rhs;
+    d.second++;
+    return *this;
+  }
+
+  T get() const {
+    const TP& d = data.get();
+    return d.first / d.second;
+  }
+
+  void reset(const T& d) {
+    data.reset(std::make_pair(d,0) );
+  }
 };
 
 }
