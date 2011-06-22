@@ -12,6 +12,20 @@ if (length(args) < 1) {
 } 
 
 df <- read.csv(args[1])
-t1 <- mean(subset(df, Threads == 1)$Time)
-qplot(Threads, Time, data=df) + geom_smooth() + ylim(0, max(df$Time))
-qplot(Threads, t1 / Time, data=df) + geom_smooth()
+
+if (F) {
+  # For comparing multiple variants at once assuming that "Kind"
+  # is a column that organizes the different variants
+  T1 <- subset(df, Threads == 1)[,c("Kind","Time")]
+  colnames(T1) <- c("Kind", "T1")
+  T1 <- cast(melt(T1), fun.aggregate=mean)
+  df <- join(df, T1, by="Kind")
+} else {
+  # Simplier case if no variants
+  T1 <- mean(subset(df, Threads == 1)$Time)
+}
+qplot(Threads, Time, data=df) + geom_line() + ylim(0, max(df$Time))
+qplot(Threads, T1 / Time, data=df) + geom_smooth()
+
+
+
