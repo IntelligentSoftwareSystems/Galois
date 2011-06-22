@@ -29,13 +29,13 @@ public:
 
   TupleList& getTuples() { return tuples; }
 
-  explicit Element(const Tuple& a, const Tuple& b, const Tuple& c): bDim(true) {
+  explicit Element(const Tuple a, const Tuple b, const Tuple c): bDim(true) {
     coords[0] = a;
     coords[1] = b;
     coords[2] = c;
   }
 
-  explicit Element(const Tuple& a, const Tuple& b): bDim(false) {
+  explicit Element(const Tuple a, const Tuple b): bDim(false) {
     coords[0] = a;
     coords[1] = b;
   }
@@ -43,7 +43,7 @@ public:
   /**
    * determine if a tuple is inside the triangle
    */
-  bool elementContains(Tuple& p) {
+  bool elementContains(Tuple p) {
     Tuple p1 = coords[0];
     Tuple p2 = coords[1];
     Tuple p3 = coords[2];

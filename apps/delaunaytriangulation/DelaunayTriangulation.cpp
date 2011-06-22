@@ -76,7 +76,8 @@ struct process {
 
 template<typename WLTY>
 void triangulate(WLTY& wl) {
-  GaloisRuntime::WorkList::ChunkedFIFO<GNode, 64> wl2;
+  // GaloisRuntime::WorkList::ChunkedFIFO<GNode, 64> wl2;
+  GaloisRuntime::WorkList::dChunkedFIFO<GNode, 512> wl2;
   wl2.fill_initial(wl.begin(), wl.end());
   Galois::for_each(wl2, process());
 }
