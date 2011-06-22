@@ -32,15 +32,15 @@ public:
 	KdTreeConflictManager * cm;
 
 private:
-//	static const int MAX_POINTS_IN_CELL;//= 4;
-//	static const int RETRY_LIMIT;// = 100;
+	//	static const int MAX_POINTS_IN_CELL;//= 4;
+	//	static const int RETRY_LIMIT;// = 100;
 	bool removedFromTree;
 
 public:
-//	static const int SPLIT_X;// = 0;
-//	static const int SPLIT_Y;// = 1;
-//	static const int SPLIT_Z;// = 2;
-//	static const int LEAF;// = 3;
+	//	static const int SPLIT_X;// = 0;
+	//	static const int SPLIT_Y;// = 1;
+	//	static const int SPLIT_Z;// = 2;
+	//	static const int LEAF;// = 3;
 
 	//bounding box of points contained in this cell (and all descendents)
 	float xMin;
@@ -369,6 +369,7 @@ protected:
 			std::cout << "badness splittype:" << type << " value:" << value
 					<< " size:" << size << " sx:" << sx << " sy:" << sy
 					<< " sz:" << sz << std::endl;
+			assert(false);
 		}
 		int leftCount = splitList(list, offset, size, value, type);
 		if (leftCount <= 1 || leftCount >= size - 1) {
@@ -377,6 +378,7 @@ protected:
 					<< " leftCount:" << leftCount << " rightCount: " << (size
 					- leftCount) << " sx:" << sx << " sy:" << sy << " sz:"
 					<< sz;
+			assert(false);
 		}
 		KdCell *cell = factory->createNewBlankCell(type, value);
 		cell->xMin = xMin;
@@ -461,20 +463,21 @@ public:
 		 }
 		 });
 		 }
-		 for (int i = 0; i < RETRY_LIMIT; i++) {
-		 int ret = addPoint(inPoint, null);
-		 if (ret == -1) {
-		 if (isFineLoggable) {
-		 logger.info("retrying addPoint");
-		 }
-		 } else if (ret == 0 || ret == 1) {
-		 return true;
-		 } else {
-		 throw new RuntimeException();
-		 }
-		 }
-		 throw new RuntimeException("repeated retries of concurrent op still failed");
 		 */
+		for (int i = 0; i < RETRY_LIMIT; i++) {
+			int ret = addPoint(inPoint, NULL);
+			if (ret == -1) {
+				//		 if (isFineLoggable) {
+				//		 logger.info("retrying addPoint");
+				//		 }
+			} else if (ret == 0 || ret == 1) {
+				return true;
+			} else {
+				//		 throw new RuntimeException();
+			}
+		}
+		//		 throw new RuntimeException("repeated retries of concurrent op still failed");
+
 	}
 
 	//return value is true if child stats changed (and so need to potentially update this node)
@@ -570,23 +573,26 @@ public:
 		 add(cluster, MethodFlag.NONE);
 		 }
 		 });
-		 }
+		 }*/
 		 for (int i = 0; i < RETRY_LIMIT; i++) {
-		 int ret = removePoint(cluster, null, null);
+		 int ret = removePoint(cluster, NULL, NULL);
 		 if (ret == -2) {
-		 throw new RuntimeException("cannot remove cluster");
+			 assert(false&&"cannot remove cluster");
+//		 throw new RuntimeException("cannot remove cluster");
 		 } else if (ret == -1) {
-		 if (isFineLoggable) {
-		 logger.fine("retrying removal");
-		 }
+//		 if (isFineLoggable) {
+//		 logger.fine("retrying removal");
+//		 }
 		 } else if (ret == 0 || ret == 1) {
 		 return true;
 		 } else {
-		 throw new RuntimeException();
+//		 throw new RuntimeException();
+			 assert(false&&"Runtimeexception");
 		 }
 		 }
-		 throw new RuntimeException("remove failed after repeated retries");
-		 */
+		 assert(false&&"remove failed after repeated retries");
+//		 throw new RuntimeException("remove failed after repeated retries");
+
 	}
 
 private:
@@ -683,14 +689,14 @@ public:
 	//TODO Fix this!!!
 	//  NodeWrapper *getAny(double ranNum, byte flags) {
 	NodeWrapper *getAny(double ranNum, unsigned char flags) {
-		/*bool checkConflict = GaloisRuntime.needMethodFlag(flags, MethodFlag.CHECK_CONFLICT);
-		 KdTreeConflictManager.LocalEntryLog finishedTail = checkConflict ? cm.readBestMatchProlog() : null;
-		 NodeWrapper retval = internalGetAny(ranNum);
-		 if (checkConflict) {
-		 cm.readEpilog(retval, finishedTail);
-		 }
-		 return retval;*/
-		return NULL;
+//		bool checkConflict = GaloisRuntime.needMethodFlag(flags, MethodFlag.CHECK_CONFLICT);
+//		 KdTreeConflictManager.LocalEntryLog finishedTail = checkConflict ? cm.readBestMatchProlog() : null;
+		 NodeWrapper *retval = internalGetAny(ranNum);
+//		 if (checkConflict)
+//		 {
+//		 cm.readEpilog(retval, finishedTail);
+//		 }
+		 return retval;
 	}
 
 	/**
@@ -748,7 +754,7 @@ public:
 		if (splitType == LEAF) {
 			//look for it in list of points
 			//      for (NodeWrapper aPointList : pointList) {
-			for (int i = 0; i < pointList->size(); i++) {
+			for (unsigned int i = 0; i < pointList->size(); i++) {
 				NodeWrapper* aPointList = (*pointList)[i];
 				if (aPointList == point) {
 					return true;
@@ -806,69 +812,68 @@ public:
 			}
 			if (xMin != xMinNew || yMin != yMinNew || zMin != zMinNew) {
 				//        throw new IllegalStateException("bad bounding box");
-				std::cout << "bad bounding box" << std::endl;
+				assert(false&&"bad bounding box");
 			}
 			if (xMax != xMaxNew || yMax != yMaxNew || zMax != zMaxNew) {
 				//        throw new IllegalStateException("bad bounding box");
-				std::cout << "bad bounding box" << std::endl;
+				assert(false&&"bad bounding box");
 			}
 		} else { //its an interior node
 			leftChild->isOkay();
 			rightChild->isOkay();
 			if (pointList != NULL) {
 				//          throw new IllegalStateException("split nodes should not contain points");
-				std::cout << "split nodes should not contain points"
-						<< std::endl;
+				assert(false&&"split nodes should not contain points");
 			}
 			if (xMin != min(leftChild->xMin, rightChild->xMin)) {
 				//          throw new IllegalStateException("bad bounding box");
-				std::cout << "bad bounding box" << std::endl;
+				assert(false&&"bad bounding box");
 			}
 			if (yMin != min(leftChild->yMin, rightChild->yMin)) {
 				//        throw new IllegalStateException("bad bounding box");
-				std::cout << "bad bounding box" << std::endl;
+				assert(false&&"bad bounding box");
 			}
 			if (zMin != min(leftChild->zMin, rightChild->zMin)) {
 				//          throw new IllegalStateException("bad bounding box");
-				std::cout << "bad bounding box" << std::endl;
+				assert(false&&"bad bounding box");
 			}
 			if (xMax != max(leftChild->xMax, rightChild->xMax)) {
 				//        throw new IllegalStateException("bad bounding box");
-				std::cout << "bad bounding box" << std::endl;
+				assert(false&&"bad bounding box");
 			}
 			if (yMax != max(leftChild->yMax, rightChild->yMax)) {
 				//        throw new IllegalStateException("bad bounding box");
-				std::cout << "bad bounding box" << std::endl;
+				assert(false&&"bad bounding box");
 			}
 			if (zMax != max(leftChild->zMax, rightChild->zMax)) {
 				//        throw new IllegalStateException("bad bounding box");
-				std::cout << "bad bounding box" << std::endl;
+				assert(false&&"bad bounding box");
 			}
 			switch (splitType) {
 			case SPLIT_X:
 				if (leftChild->xMax > splitValue || rightChild->xMin
 						< splitValue) {
 					//            throw new IllegalStateException("incorrect split");
-					std::cout<<"incorrect split" << std::endl;
+					assert(false&&"incorrect split");
 				}
 				break;
 			case SPLIT_Y:
 				if (leftChild->yMax > splitValue || rightChild->yMin
 						< splitValue) {
 					//          throw new IllegalStateException("incorrect split");
-					std::cout << "incorrect split" << std::endl;
+					assert(false&&"incorrect split");
 				}
 				break;
 			case SPLIT_Z:
 				if (leftChild->zMax > splitValue || rightChild->zMin
 						< splitValue) {
 					//            throw new IllegalStateException("incorrect split");
-					std::cout << "incorrect split" << std::endl;
+					assert(false&&"incorrect split");
 				}
 				break;
 			default:
 				//        throw new IllegalStateException("bad split type");
-				std::cout << "bad split type" << std::endl;
+				assert(false&&"bad split type");
 			}
 		}
 		return true;
