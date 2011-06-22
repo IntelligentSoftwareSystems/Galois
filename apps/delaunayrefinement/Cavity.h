@@ -31,7 +31,6 @@
 #include <algorithm>
 
 class Cavity {
-
   Tuple center;
   GNode centerNode;
   Element* centerElement;
@@ -46,7 +45,6 @@ class Cavity {
   connTy connections;
 
   Graph* graph;
-	
 
   /**
    * find the node that is opposite the obtuse angle of the element
