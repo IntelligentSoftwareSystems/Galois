@@ -42,22 +42,22 @@ struct process {
   
     Element::TupleList& tuples = data.getTuples();
     // Discard duplicate tuples
-    //while (!tuples.empty()) {
-    //  Tuple& t = tuples.back();
+    while (!tuples.empty()) {
+      Tuple& t = tuples.back();
 
-    //  int i;
-    //  for (i = 0; i < 3; ++i) {
-    //    if (data.getPoint(i) == t) {
-    //      tuples.pop_back();
-    //      break;
-    //    }
-    //  }
-    //  if (i == 3)
-    //    break;
-    //}
+      int i;
+      for (i = 0; i < 3; ++i) {
+        if (data.getPoint(i) == t) {
+          tuples.pop_back();
+          break;
+        }
+      }
+      if (i == 3)
+        break;
+    }
 
-    //if (tuples.empty())
-    //  return;
+    if (tuples.empty())
+      return;
 
     Cavity cav(Mesh, item, tuples.back(), &lwl);
     cav.build();
