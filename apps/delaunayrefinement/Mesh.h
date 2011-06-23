@@ -74,7 +74,7 @@ private:
     next_line(scanner);
 
     tuples.resize(ntups);
-    for (int i = 0; i < ntups; i++) {
+    for (size_t i = 0; i < ntups; i++) {
       size_t index;
       double x;
       double y;
@@ -91,7 +91,7 @@ private:
     scanner >> nels;
     next_line(scanner);
 
-    for (int i = 0; i < nels; i++) {
+    for (size_t i = 0; i < nels; i++) {
       size_t index;
       size_t n1, n2, n3;
       scanner >> index >> n1 >> n2 >> n3;
@@ -109,7 +109,7 @@ private:
     size_t nsegs;
     scanner >> nsegs;
     next_line(scanner);
-    for (int i = 0; i < nsegs; i++) {
+    for (size_t i = 0; i < nsegs; i++) {
       size_t index;
       size_t n1;
       size_t n2;
