@@ -121,7 +121,7 @@ public:
                         if (!tuples.empty()) {
                                 std::vector<Tuple, Galois::Allocator<Tuple> > newTuples;
                                 unsigned tSize = tuples.size();
-                                for (int i=0; i<tSize; i++)
+                                for (unsigned i=0; i<tSize; i++)
                                 {
                                         Tuple t=tuples[i];
                                         if (nnode_data.elementContains(t)) {
@@ -152,7 +152,7 @@ public:
       std::vector<Tuple, Galois::Allocator<Tuple> >& tuples = dnode.getData(Galois::Graph::NONE).getTuples();
 
                         unsigned tSize = tuples.size();
-                        for (int j=0; j<tSize; j++)
+                        for (unsigned j=0; j<tSize; j++)
                         {
                                 Tuple tup=tuples[tSize-j-1];
 
