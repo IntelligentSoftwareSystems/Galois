@@ -14,17 +14,18 @@
 #include <stack>
 #include <queue>
 #include <vector>
+#include <cstdlib>
 
+#define DEBUG 0
 
 static const char* name = "Betweenness Centrality";
 static const char* description = "Computes the betweenness centrality of all nodes in a graph\n";
 static const char* url = 0;
-static const char* help = "<input file>";
-
+static const char* help = "<input file> <number iterations>";
 
 //LCGraph should handle void edgedata
 // TODO(ddn): make undirected
-typedef Galois::Graph::LC_FileGraph<unsigned long long, int> Graph;
+typedef Galois::Graph::LC_FileGraph<int, int> Graph;
 typedef Graph::GraphNode GNode;
 
 Graph* G;
@@ -35,20 +36,24 @@ GaloisRuntime::PerCPU<std::vector<double> >* CB;
 struct process {
   template<typename Context>
   void operator()(GNode& _req, Context& lwl) {
-    typedef Galois::PerIterMem::ItAllocTy::rebind<GNode>::other GNodeAlloc;
-    std::vector<GNode> SQ(NumNodes);
     
-    std::vector<int> sigma(NumNodes);
-    std::vector<int> d(NumNodes);
+    int initSize = NumNodes;
     
+    std::vector<GNode> SQ(initSize);
+    
+    std::vector<double> sigma(initSize);
+    std::vector<int> d(initSize);
+ 
     typedef std::multimap<int,int> MMapTy;
     MMapTy P;
     
     int QPush = 0;
     int QAt = 0;
     
+#if DEBUG
     std::cerr << ".";
-    
+#endif
+
     int req = _req;
     
     sigma[req] = 1;
@@ -77,35 +82,60 @@ struct process {
     while (QAt) {
       int w = SQ[--QAt];
       std::pair<MMapTy::iterator, MMapTy::iterator> ppp = P.equal_range(w);
+      
+      double sigma_w = sigma[w];
+      double delta_w = delta[w];
+
       for (MMapTy::iterator ii = ppp.first, ee = ppp.second;
 	   ii != ee; ++ii) {
 	int v = ii->second;
-	delta[v] = delta[v] + ((double)sigma[v]/(double)sigma[w])*(1.0 + delta[w]);
+	delta[v] = delta[v] + (sigma[v]/sigma_w)*(1.0 + delta_w);
       }
       if (w != req) {
 	if (CB->get().size() < (unsigned int)w + 1)
 	  CB->get().resize(w+1);
-	CB->get()[w] += delta[w];
+	CB->get()[w] += delta_w;
       }
     }
   }
 };
 
 
-void merge(std::vector<double>& lhs, std::vector<double>& rhs) {
-  if (lhs.size() < rhs.size())
+  void merge(std::vector<double>& lhs, std::vector<double>& rhs) {
+    if (lhs.size() < rhs.size())
     lhs.resize(rhs.size());
   for (unsigned int i = 0; i < rhs.size(); i++)
     lhs[i] += rhs[i];
 }
 
+// Verification for reference taurous graph inputs. 
+// All nodes should have the same betweenness value.
+void verify() {
+    double sampleBC = 0.0;
+    bool firstTime = true;
+    for (int i=0; i<NumNodes; ++i) {
+      if (firstTime) {
+        sampleBC = CB->get()[i];
+        std::cerr << "BC: " << sampleBC << std::endl;
+        firstTime = false;
+      } else {
+        double bc = CB->get()[i];
+        if (!((bc - sampleBC) <= 0.0001)) {
+          std::cerr << "Verification failed! " << (bc - sampleBC) << std::endl;
+	  assert ((bc - sampleBC) <= 0.0001);
+	  return;
+	}
+      }
+    }
+    std::cerr << "Verification ok!" << std::endl;
+}
 
 int main(int argc, const char** argv) {
 
   std::vector<const char*> args = parse_command_line(argc, argv, help);
 
-  if (args.size() != 1 ) {
-    std::cout << "not enough arguments, use -help for usage information\n";
+  if (args.size() > 2 ) {
+    std::cout << "incorrect number of arguments, use -help for usage information\n";
     return 1;
   }
   printBanner(std::cout, name, description, url);
@@ -119,17 +149,38 @@ int main(int argc, const char** argv) {
   G->emptyNodeData();
 
   NumNodes = G->size();
-
-  std::vector<GNode> wl;
-  for (Graph::active_iterator ii = g.active_begin(), ee = g.active_end();
-       ii != ee; ++ii)
-    wl.push_back(*ii);
   
+  int iterations = NumNodes;
+  if (args.size() == 2) {
+    iterations = atoi(args[1]);
+  }
+
+  std::cerr << "NumNodes = " << NumNodes << " Iterations: " << iterations << std::endl;
+  std::vector<GNode> tmp;
+  int cnt = 0;
+  for (Graph::active_iterator ii = g.active_begin(), ee = g.active_end();
+       ii != ee; ++ii) {
+    if (cnt == iterations)
+      break;
+    // Only process nodes that actually have (out-)neighbors
+    if (std::distance(g.neighbor_begin(*ii, Galois::Graph::NONE), g.neighbor_end(*ii, Galois::Graph::NONE)) > 0) {
+      cnt++;
+      tmp.push_back(*ii);
+    }
+  }
+  GaloisRuntime::WorkList::ChunkedLIFO<GNode, 16,  true> wl;
+  wl.fill_initial(tmp.begin(), tmp.end());
   Galois::setMaxThreads(numThreads);
   Galois::Launcher::startTiming();
-  Galois::for_each(wl.begin(), wl.end(), process());
+  Galois::for_each(wl, process());
   Galois::Launcher::stopTiming();
 
+  if (!skipVerify) {
+    verify();
+  } else { // print bc value for first 10 nodes
+    for (int i=0; i<10; ++i) 
+      std::cout << i << ": " << CB->get()[i] << std::endl;
+  }
   return 0;
 }
 // vim:ts=8:sts=2:sw=2
