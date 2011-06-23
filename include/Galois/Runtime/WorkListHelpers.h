@@ -236,17 +236,17 @@ public:
   }
 };
 
-template<typename T>
 class DummyPartitioner {
   unsigned getNum() const {
     return 1;
   }
+  template<typename T>
   unsigned operator()(T& item) { return 0; }
 };
 
-template<typename T>
 class DummyIndexer {
 public:
+  template<typename T>
   unsigned operator()(const T& x) { return 0; }
 };
 
