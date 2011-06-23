@@ -33,15 +33,6 @@ public:
     zMin = zMax = z;
   }
 
-//  void addPoint(float x, float y, float z) {
-//    xMin = xMin >= x ? x : xMin;
-//    xMax = xMax >= x ? xMax : x;
-//    yMin = yMin >= y ? y : yMin;
-//    yMax = yMax >= y ? yMax : y;
-//    zMin = zMin >= z ? z : zMin;
-//    zMax = zMax >= z ? zMax : z;
-//  }
-
   void addBox(const Box3d box) {
     xMin = xMin >= box.xMin ? box.xMin 	: xMin;
     xMax = xMax >= box.xMax ? xMax 		: box.xMax;
@@ -50,6 +41,11 @@ public:
     zMin = zMin >= box.zMin ? box.zMin 	: zMin;
     zMax = zMax >= box.zMax ? zMax 		: box.zMax;
   }
+  friend std::ostream& operator<<(std::ostream& s, Box3d & b);
 
 } ;
+std::ostream& operator<<(std::ostream& s, Box3d & b){
+	s<<"Box :["<<b.xMin<<","<<b.yMin<<","<<b.zMin<<"]-["<<b.xMax<<","<<b.yMax<<","<<b.zMax<<"]";
+	return s;
+}
 #endif /* BOX3D_H_ */

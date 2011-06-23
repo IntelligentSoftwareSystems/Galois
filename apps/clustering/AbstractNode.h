@@ -240,8 +240,17 @@ public:
 	virtual bool isLeaf()=0;
 
 	virtual int size()=0;
-
+	friend std::ostream& operator<<(std::ostream& s , AbstractNode & a);
 };
+std::ostream& operator<<(std::ostream& s , AbstractNode & a){
+	s<<"AbsNode:: ID:"<<a.nodeIdAndFlags<<",["<<a.x<<","<<a.y<<","<<a.z<<"], T:["<<a.startTime<<","<<a.endTime<<"]";
+	s<<"I: ["<<a.intensityRed<<","<<a.intensityGreen<<","<<a.intensityBlue<<"]"<<"\nTime Vector:";
+
+	for(int i=0;i<(int)a.timeVector.size();i++)
+		s<<""<<a.timeVector[i]<<",";
+	return s;
+
+}
 int AbstractNode::globalNumReps = -1;
 bool AbstractNode::globalMultitime = false;
 std::vector<TimeVector> AbstractNode::repRandomNums;

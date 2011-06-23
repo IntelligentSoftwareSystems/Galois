@@ -20,6 +20,7 @@ private:
 	float coneCos;
 public:
 	ClusterNode() {
+		leftChild = rightChild=NULL;
 		//TODO Fix this!
 		//		leftChild=rightChild = *(new LeafNode(0,0,0,0,0,0));
 	}
@@ -190,6 +191,10 @@ public:
 		return leftChild->size() + rightChild->size();
 	}
 	//TODO : implement this.
+	bool operator==(ClusterNode & other){
+		return (this->leftChild==other.leftChild)&& (this->rightChild==other.rightChild);
+//		return false;
+	}
 //	bool equals(void *obj) {
 //		ClusterNode * other = dynamic_cast<ClusterNode*> (obj);
 //		if (other != NULL) {
