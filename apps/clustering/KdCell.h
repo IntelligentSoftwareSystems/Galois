@@ -244,16 +244,26 @@ private:
 	 * Return the appropriate splitting component (x,y, or z) which is relevant for this node
 	 */
 	static float findSplitComponent(NodeWrapper * cluster, int splitType) {
+		float retVal = 0;
 		switch (splitType) {
 		case SPLIT_X:
-			return cluster->getX();
+//			return cluster->getX();
+//			std::cout << "X  ";
+			retVal  = cluster->getX();
+			break;
 		case SPLIT_Y:
-			return cluster->getY();
+//			std::cout << "Y  ";
+			retVal  =  cluster->getY();
+			break;
 		case SPLIT_Z:
-			return cluster->getZ();
+//			std::cout << "Z  ";
+			retVal  =  cluster->getZ();
+			break;
 		default:
 			std::cout << "Error in findSplitComponent!!!" << std::endl;
 		}
+//		std::cout<<"Find split component " << retVal << std::endl;
+		return retVal;
 	}
 
 	/**
@@ -295,11 +305,9 @@ private:
 	 * we can pass in to reduce the allocation of additional temporary space.
 	 */
 protected:
-	static KdCell* subdivide(std::vector<NodeWrapper*> *list, int offset,
-			int size, std::vector<float> *floatArr, KdCell *factory) {
+	static KdCell* subdivide(std::vector<NodeWrapper*> *list, int offset,int size, std::vector<float> *floatArr, KdCell *factory) {
 		if (size <= MAX_POINTS_IN_CELL) {
-			KdCell * cell = factory->createNewBlankCell(LEAF,
-					std::numeric_limits<float>::max());
+			KdCell * cell = factory->createNewBlankCell(LEAF,std::numeric_limits<float>::max());
 			//System.arraycopy(list, offset, cell.pointList, 0, size);
 			//list->clear();
 			for (int i = 0; i < size; i++)
@@ -313,12 +321,12 @@ protected:
 			floatArr = new std::vector<float>(size);
 		}
 		//compute bounding box of points
-		float xMin = std::numeric_limits<float>::max(), yMin =
-				std::numeric_limits<float>::max(), zMin = std::numeric_limits<
-				float>::max();
-		float xMax = std::numeric_limits<float>::min(), yMax =
-				std::numeric_limits<float>::min(), zMax = std::numeric_limits<
-				float>::min();
+		float xMin = std::numeric_limits<float>::max(),
+			  yMin = std::numeric_limits<float>::max(),
+			  zMin = std::numeric_limits<float>::max();
+		float xMax = std::numeric_limits<float>::min(),
+			  yMax = std::numeric_limits<float>::min(),
+			  zMax = std::numeric_limits<float>::min();
 		for (int i = offset; i < size + offset; i++) {
 			float x = (*list)[i]->getX();
 			float y = (*list)[i]->getY();
@@ -337,6 +345,7 @@ protected:
 		int type;
 		float value;
 		int type0, type1, type2;
+//		std::cout<<"In subdivide X:"<<sx<<" Y:"<<sy<<" Z:"<<sz<<std::endl;
 		if (sz > sx && sz > sy) {
 			type0 = SPLIT_Z;
 			bool cond = sx > sy;
@@ -394,8 +403,7 @@ protected:
 		return cell;
 	}
 
-	static float computeSplitValue(std::vector<NodeWrapper*>* list, int offset,
-			int size, int splitType, std::vector<float>* floatArr) {
+	static float computeSplitValue(std::vector<NodeWrapper*>* list, int offset,int size, int splitType, std::vector<float>* floatArr) {
 		for (int i = 0; i < size; i++) {
 			(*floatArr)[i] = findSplitComponent((*list)[offset + i], splitType);
 		}
@@ -410,6 +418,11 @@ private:
 	static float findMedianGapSplit(std::vector<float> * val, int size) {
 		//this is not very efficient at the moment, there are faster median finding algorithms
 		sort(val->begin(), val->end());
+//		std::cout<<" Sorted";
+//		for(std::vector<float>::iterator it = val->begin(), itEnd = val->end();it!=itEnd;++it)
+//			std::cout<<" "<<(*it)<<",";
+//		std::cout<<std::endl;
+//		assert(false);
 		//Arrays.sort(val, 0, size);
 		int start = ((size - 1) >> 1) - ((size + 7) >> 3);
 		int end = (size >> 1) + ((size + 7) >> 3);
@@ -442,7 +455,7 @@ private:
 public:
 	bool add(NodeWrapper *inAdd) {
 		//return add(inAdd, MethodFlag.ALL);
-		return add(inAdd);
+		return add(inAdd,'a');
 	}
 
 	/**
@@ -477,7 +490,7 @@ public:
 			}
 		}
 		//		 throw new RuntimeException("repeated retries of concurrent op still failed");
-
+		return false;
 	}
 
 	//return value is true if child stats changed (and so need to potentially update this node)
@@ -551,7 +564,7 @@ private:
 public:
 	bool remove(NodeWrapper *cluster) {
 		//    return remove(cluster, MethodFlag.ALL);
-		return remove(cluster);
+		return remove(cluster,'a');
 	}
 
 	/**
@@ -574,24 +587,24 @@ public:
 		 }
 		 });
 		 }*/
-		 for (int i = 0; i < RETRY_LIMIT; i++) {
-		 int ret = removePoint(cluster, NULL, NULL);
-		 if (ret == -2) {
-			 assert(false&&"cannot remove cluster");
-//		 throw new RuntimeException("cannot remove cluster");
-		 } else if (ret == -1) {
-//		 if (isFineLoggable) {
-//		 logger.fine("retrying removal");
-//		 }
-		 } else if (ret == 0 || ret == 1) {
-		 return true;
-		 } else {
-//		 throw new RuntimeException();
-			 assert(false&&"Runtimeexception");
-		 }
-		 }
-		 assert(false&&"remove failed after repeated retries");
-//		 throw new RuntimeException("remove failed after repeated retries");
+		for (int i = 0; i < RETRY_LIMIT; i++) {
+			int ret = removePoint(cluster, NULL, NULL);
+			if (ret == -2) {
+				assert(false&&"cannot remove cluster");
+				//		 throw new RuntimeException("cannot remove cluster");
+			} else if (ret == -1) {
+				//		 if (isFineLoggable) {
+				//		 logger.fine("retrying removal");
+				//		 }
+			} else if (ret == 0 || ret == 1) {
+				return true;
+			} else {
+				//		 throw new RuntimeException();
+				assert(false&&"Runtimeexception");
+			}
+		}
+		assert(false&&"remove failed after repeated retries");
+		//		 throw new RuntimeException("remove failed after repeated retries");
 
 	}
 
@@ -607,7 +620,7 @@ private:
 				}
 				int index = -1;
 				int count = 0;
-				for (int i = 0; i < pointList->size(); i++) {
+				for (int i = 0; i < (int)pointList->size(); i++) {
 					if ((*pointList)[i] == inRemove) {
 						index = i;
 					}
@@ -689,14 +702,14 @@ public:
 	//TODO Fix this!!!
 	//  NodeWrapper *getAny(double ranNum, byte flags) {
 	NodeWrapper *getAny(double ranNum, unsigned char flags) {
-//		bool checkConflict = GaloisRuntime.needMethodFlag(flags, MethodFlag.CHECK_CONFLICT);
-//		 KdTreeConflictManager.LocalEntryLog finishedTail = checkConflict ? cm.readBestMatchProlog() : null;
-		 NodeWrapper *retval = internalGetAny(ranNum);
-//		 if (checkConflict)
-//		 {
-//		 cm.readEpilog(retval, finishedTail);
-//		 }
-		 return retval;
+		//		bool checkConflict = GaloisRuntime.needMethodFlag(flags, MethodFlag.CHECK_CONFLICT);
+		//		 KdTreeConflictManager.LocalEntryLog finishedTail = checkConflict ? cm.readBestMatchProlog() : null;
+		NodeWrapper *retval = internalGetAny(ranNum);
+		//		 if (checkConflict)
+		//		 {
+		//		 cm.readEpilog(retval, finishedTail);
+		//		 }
+		return retval;
 	}
 
 	/**
@@ -737,7 +750,7 @@ public:
 public:
 	bool contains(NodeWrapper *inPoint) {
 		//    return contains(inPoint, MethodFlag.ALL);
-		return contains(inPoint);
+		return contains(inPoint,'a');
 	}
 
 	//  bool contains(NodeWrapper *point, byte flags) {

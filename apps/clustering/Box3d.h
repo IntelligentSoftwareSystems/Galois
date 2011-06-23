@@ -33,22 +33,22 @@ public:
     zMin = zMax = z;
   }
 
-  void addPoint(float x, float y, float z) {
-    xMin = xMin >= x ? x : xMin;
-    xMax = xMax >= x ? xMax : x;
-    yMin = yMin >= y ? y : yMin;
-    yMax = yMax >= y ? yMax : y;
-    zMin = zMin >= z ? z : zMin;
-    zMax = zMax >= z ? zMax : z;
-  }
+//  void addPoint(float x, float y, float z) {
+//    xMin = xMin >= x ? x : xMin;
+//    xMax = xMax >= x ? xMax : x;
+//    yMin = yMin >= y ? y : yMin;
+//    yMax = yMax >= y ? yMax : y;
+//    zMin = zMin >= z ? z : zMin;
+//    zMax = zMax >= z ? zMax : z;
+//  }
 
   void addBox(const Box3d box) {
-    xMin = xMin >= box.xMin ? box.xMin : xMin;
-    xMax = xMax >= box.xMax ? xMax : box.xMax;
-    yMin = yMin >= box.yMin ? box.yMin : yMin;
-    yMax = yMax >= box.yMax ? yMax : box.yMax;
-    zMin = zMin >= box.zMin ? box.zMin : zMin;
-    zMax = zMax >= box.zMax ? zMax : box.zMax;
+    xMin = xMin >= box.xMin ? box.xMin 	: xMin;
+    xMax = xMax >= box.xMax ? xMax 		: box.xMax;
+    yMin = yMin >= box.yMin ? box.yMin 	: yMin;
+    yMax = yMax >= box.yMax ? yMax 		: box.yMax;
+    zMin = zMin >= box.zMin ? box.zMin 	: zMin;
+    zMax = zMax >= box.zMax ? zMax 		: box.zMax;
   }
 
 } ;

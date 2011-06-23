@@ -8,38 +8,43 @@
 #include<vector>
 #include"LeafNode.h"
 #include"NodeWrapper.h"
+#include"RandomGenerator.h"
 #include<stdlib.h>
 #include"KdTree.h"
 void loopBody(NodeWrapper * cluster, KdTree *kdTree,
 		std::vector<NodeWrapper*> * wl, std::vector<ClusterNode*> *clusterArr,
-		std::vector<float> * floatArr);
+		std::vector<float> * floatArr, RandomGenerator *);
 
 std::vector<LeafNode*> randomGenerate(int count) {
-	//RandomGenerator ranGen = new RandomGenerator(12);
-	srand(12);
+	RandomGenerator ranGen (12);
+	srand(time(NULL));
 	std::vector<LeafNode*> lights;// = new LeafNode[count];
 	float dirX = 0;
 	float dirY = 0;
 	float dirZ = 1;
+	std::cout<<"Setting global multi time to false"<<std::endl;
 	AbstractNode::setGlobalMultitime();
+	std::cout<<"Done\nSetting global num reps."<<std::endl;
 	AbstractNode::setGlobalNumReps();
+	std::cout<<"About to create lights"<<std::endl;
 	//generating random lights
 	for (int i = 0; i < count; i++) {
-		float x = (float) rand() / (rand() + 1);
-		float y = (float) rand() / (rand() + 1);
-		float z = (float) rand() / (rand() + 1);
-		LeafNode ln(x, y, z, dirX, dirY, dirZ);
+		float x = (float) ranGen.nextDouble();
+		float y = (float) ranGen.nextDouble();
+		float z = (float) ranGen.nextDouble();
+		LeafNode * ln = new LeafNode(x, y, z, dirX, dirY, dirZ);
 		//lights.push_back( new LeafNode(x, y, z, dirX, dirY, dirZ));
-		lights.push_back(&ln);
+		lights.push_back(ln);
 	}
+	std::cout<<"Done creating lights"<<std::endl;
 	return lights;
 }
 
 void clustering(std::vector<LeafNode*> *inLights) {
 	//Launcher launcher = Launcher.getLauncher();
 	//used to choose which light is the representative light
-	//final RandomGenerator repRanGen = new RandomGenerator(4523489623489L);
-	srand(452);
+	RandomGenerator repRanGen (4523489623489L);
+	srand(time(NULL));
 
 	int tempSize = (1 << NodeWrapper::CONE_RECURSE_DEPTH) + 1;
 	std::vector<float> floatArr = std::vector<float>(3 * tempSize);
@@ -48,8 +53,8 @@ void clustering(std::vector<LeafNode*> *inLights) {
 	int numLights = inLights->size();
 
 	std::vector<NodeWrapper*> initialWorklist(numLights);// = new NodeWrapper[numLights];
-	for (unsigned int i = 0; i < numLights; i++) {
-		std::cout<<"Initializing ... " << i << std::endl;
+	for (int i = 0; i < numLights; i++) {
+//		std::cout<<"Initializing ... " << i << std::endl;
 		NodeWrapper * clusterWrapper = new NodeWrapper((*inLights)[i]);
 		initialWorklist[i] = clusterWrapper;
 	}
@@ -59,7 +64,7 @@ void clustering(std::vector<LeafNode*> *inLights) {
 	while (initialWorklist.size() > 0) {
 		NodeWrapper* currWork = initialWorklist.back();
 		initialWorklist.pop_back();
-		loopBody(currWork, kdTree, &initialWorklist, &clusterArr, &floatArr);
+		loopBody(currWork, kdTree, &initialWorklist, &clusterArr, &floatArr, &repRanGen);
 	}
 	// O(1) operation, there is no copy of data but just the creation of an arraylist backed by 'initialWorklist'
 	//    const  std::vector<NodeWrapper> wrappers = Arrays.asList(initialWorklist);
@@ -106,7 +111,7 @@ void clustering(std::vector<LeafNode*> *inLights) {
 
 void loopBody(NodeWrapper * cluster, KdTree *kdTree,
 		std::vector<NodeWrapper*> * wl, std::vector<ClusterNode*> *clusterArr,
-		std::vector<float> * floatArr) {
+		std::vector<float> * floatArr, RandomGenerator * repRandGen) {
 	NodeWrapper *current = cluster;
 	while (current != NULL && kdTree->contains(current)) {
 		NodeWrapper *match = kdTree->findBestMatch(current);
@@ -115,9 +120,9 @@ void loopBody(NodeWrapper * cluster, KdTree *kdTree,
 		}
 		NodeWrapper *matchMatch = kdTree->findBestMatch(match);
 		if (current == matchMatch) {
+
 			if (kdTree->remove(match)) {
-				NodeWrapper *newCluster = new NodeWrapper(current, match,
-						*floatArr, *clusterArr);
+				NodeWrapper *newCluster = new NodeWrapper(current, match,*floatArr, *clusterArr, repRandGen);
 				wl->push_back(newCluster);
 				//	              ctx.add(newCluster);
 				kdTree->add(newCluster);
@@ -134,7 +139,7 @@ void loopBody(NodeWrapper * cluster, KdTree *kdTree,
 	}
 }
 int main(int argc, const char **argv) {
-	int numPoints = 1000;
+	int numPoints = 100;
 	std::vector<LeafNode*> points = randomGenerate(numPoints);
 	std::cout << "Generated random points " << numPoints << std::endl;
 	clustering(&points);

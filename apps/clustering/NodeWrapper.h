@@ -4,13 +4,20 @@
  *  Created on: Jun 22, 2011
  *      Author: rashid
  */
-#include"Box3d.h"
-#include"ClusterNode.h"
-#include<vector>
-#include<math.h>
+//#include"Box3d.h"
+//#include"ClusterNode.h"
+//#include"RandomGenerator.h"
+//#include<vector>
+//#include<math.h>
 
 #ifndef NODEWRAPPER_H_
 #define NODEWRAPPER_H_
+#include"Box3d.h"
+#include"ClusterNode.h"
+#include"RandomGenerator.h"
+#include<vector>
+#include<math.h>
+
 class NodeWrapper : public Box3d {
 
 public:
@@ -29,6 +36,7 @@ public:
 	/*const */AbstractNode * light;
 	//bounding box of light directions on the unit sphere
 	/*const */float coneCos;
+private:
 	/*const */float x;
 	/*const */float y;
 	/*const */float z;
@@ -42,36 +50,8 @@ private:
 	long rid;
 
 public:
-	NodeWrapper(ClusterNode *inNode):light(inNode),x(inNode->getX()),y(inNode->getY()),z(inNode->getZ()),descendents(inNode->size()) {
-		coneDirs = NULL;
-		coneClusters = NULL;
-		//light = inNode;
-		//x = inNode.getX();
-		//y = inNode.getY();
-		//z = inNode.getZ();
-		xMin = x - inNode->getBoxRadiusX();
-		xMax = x + inNode->getBoxRadiusX();
-		yMin = y - inNode->getBoxRadiusY();
-		yMax = y + inNode->getBoxRadiusY();
-		zMin = z - inNode->getBoxRadiusZ();
-		zMax = z + inNode->getBoxRadiusZ();
-		coneCos = inNode->getConeCos();
-		if (coneCos != 1.0) {
-			//throw new RuntimeException("not yet implemented");
-			std::cout<<"Error, not implemented yet!"<<std::endl;
-		}
-		if (dirBox == NULL) {
-			dirBox = new Box3d();
-		}
-		dirBox->addPoint(inNode->getConeDirX(), inNode->getConeDirY(), inNode->getConeDirZ());
-		coneDirs = new std::vector<float>(3);
-		//coneDirs.resize(3);/// = new float[3];
-		(*coneDirs)[0] = inNode->getConeDirX();
-		(*coneDirs)[1] = inNode->getConeDirY();
-		(*coneDirs)[2] = inNode->getConeDirZ();
-	}
-
 	NodeWrapper(LeafNode *inNode):light(inNode) {
+//		std::cout<<"Creating nodewrapper from "<< (*inNode);
 		coneDirs = NULL;
 		coneClusters = NULL;
 		descendents = 1;
@@ -89,9 +69,10 @@ public:
 		x = 0.5f * (xMax + xMin);
 		y = 0.5f * (yMax + yMin);
 		z = 0.5f * (zMax + zMin);
+//		std::cout<<"Creating node wrapper ["<< x<<","<<y<<","<<z<<"]" <<std::endl;
 	}
 
-	NodeWrapper(NodeWrapper* leftChild, NodeWrapper *rightChild, std::vector<float> tempFloatArr, std::vector<ClusterNode*> tempClusterArr) :light(new ClusterNode()){
+	NodeWrapper(NodeWrapper* leftChild, NodeWrapper *rightChild, std::vector<float> tempFloatArr, std::vector<ClusterNode*> tempClusterArr, RandomGenerator * repRandGen) :light(new ClusterNode()){
 		if ((leftChild->x > rightChild->x) || ((leftChild->x == rightChild->x) && (leftChild->y > rightChild->y))
 				|| ((leftChild->x == rightChild->x) && (leftChild->y == rightChild->y) && (leftChild->z > rightChild->z))) {
 			//swap them to make sure we are consistent about which node becomes the left and the right
@@ -109,7 +90,7 @@ public:
 		//create new cluster
 		ClusterNode * cluster = new ClusterNode();
 		cluster->setBox(xMin, xMax, yMin, yMax, zMin, zMax);
-		cluster->setChildren((leftChild->light), (rightChild->light), rand()/(rand()+1));
+		cluster->setChildren((leftChild->light), (rightChild->light), repRandGen->nextDouble());
 		light = cluster;
 		//compute direction cone and set it in the cluster
 		coneCos = computeCone(leftChild, rightChild, cluster);

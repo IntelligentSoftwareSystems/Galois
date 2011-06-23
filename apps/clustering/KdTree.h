@@ -38,6 +38,7 @@ private:
 
 public:
   static KdTree *createTree(std::vector<NodeWrapper*> * inPoints) {
+//	  std::cout<<"Creating tree with " << inPoints->size()<< " points"<<std::endl;
     KdTree *root = (KdTree*) subdivide(inPoints, 0, inPoints->size(), NULL, new KdTree());
     root->cm = new KdTreeConflictManager();
     return root;
@@ -54,11 +55,11 @@ public:
     if (splitType == LEAF) {
       findNearestRecursive(cluster);
     } else if (splitType == SPLIT_X) {
-      recurse(cluster, inLight->x);
+      recurse(cluster, inLight->getX());
     } else if (splitType == SPLIT_Y) {
-      recurse(cluster, inLight->y);
+      recurse(cluster, inLight->getY());
     } else if (splitType == SPLIT_Z) {
-      recurse(cluster, inLight->z);
+      recurse(cluster, inLight->getZ());
     } else {
 //      throw new RuntimeException();
       std::cout<<"Err in findBestMatch"<<std::endl;
@@ -88,11 +89,11 @@ private:
         }
       }
     } else if (splitType == SPLIT_X) {
-      recurse(potentialCluster, from->x);
+      recurse(potentialCluster, from->getX());
     } else if (splitType == SPLIT_Y) {
-      recurse(potentialCluster, from->y);
+      recurse(potentialCluster, from->getY());
     } else if (splitType == SPLIT_Z) {
-      recurse(potentialCluster, from->z);
+      recurse(potentialCluster, from->getZ());
     } else {
 //      throw new RuntimeException("badness");
       std::cout<<"Error in badness...."<<std::endl;
@@ -124,12 +125,12 @@ protected:
     //first check to see if we can prove that none of our contents could be closer than the current closest
     NodeWrapper * from = outCluster->original;
     //compute minumum offset to bounding box
-    float a2 = xMin - from->x >= from->x - xMax ? xMin - from->x : from->x - xMax;
+    float a2 = xMin - from->getX() >= from->getX() - xMax ? xMin - from->getX() : from->getX() - xMax;
     //more than twice as fast as Math.max(a,0)
     float dx = (a2 >= 0) ? a2 : 0;
-    float a1 = (yMin - from->y >= from->y - yMax) ? yMin - from->y : from->y - yMax;
+    float a1 = (yMin - from->getY() >= from->getY() - yMax) ? yMin - from->getY() : from->getY() - yMax;
     float dy = a1 >= 0 ? a1 : 0;
-    float a = (zMin - from->z >= from->z - zMax) ? zMin - from->z : from->z - zMax;
+    float a = (zMin - from->getZ() >= from->getZ() - zMax) ? zMin - from->getZ() : from->getZ() - zMax;
     float dz = a >= 0 ? a : 0;
     //expand distance by half size of from's bounding box (distance is min to center of box)
     //and by half the minimum bounding box extents of any node in this cell

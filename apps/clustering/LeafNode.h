@@ -26,7 +26,7 @@ public:
     this->y = y;
     this->z = z;
     setIntensity(1.0 / MATH_PI, (short) 0);
-
+//    std::cout<<"Creating Leaf node ["<<x<<","<<y<<","<<z<<"]"<<std::endl;
   }
 
   float getDirX() {
@@ -49,6 +49,10 @@ public:
   int size() {
     return 1;
   }
+  friend std::ostream & operator<<(std::ostream& s, LeafNode & l);
 };
-
+std::ostream & operator<<(std::ostream& s, LeafNode & l){
+	s<<"Leaf node ["<<l.x<<","<<l.y<<","<<l.z<<"]"<<std::endl;
+	return s;
+}
 #endif /* LEAFNODE_H_ */
