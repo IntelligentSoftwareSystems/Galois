@@ -1,6 +1,7 @@
 #add_subdirectory(hwloc-example)
 add_subdirectory(compile-check)
 add_subdirectory(random-2d-points)
+add_subdirectory(sfg_conv)
 
 if(USE_MORE_TOOLS)
   include(ExternalProject)
