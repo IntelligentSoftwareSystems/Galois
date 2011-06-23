@@ -37,7 +37,6 @@
 
 /**
  * Helper class used providing methods to read in information and create the graph 
- *
  */
 class Mesh {
   // used during reading of the data and creation of the graph, to record edges between nodes of the graph 
