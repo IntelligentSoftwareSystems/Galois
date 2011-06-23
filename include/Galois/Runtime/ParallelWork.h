@@ -329,7 +329,6 @@ public:
   }
   
   ~ForEachWork() {
-    int numThreads = GaloisRuntime::getSystemThreadPool().getActiveThreads();
     typename PCTy::stat_sum s;
     for (int i = 0; i < s.num(); ++i)
       s.add(tdata.get(i));
