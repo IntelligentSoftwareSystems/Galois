@@ -158,4 +158,5 @@ static inline Tuple operator*(double d, Tuple rhs) {
   return rhs * d;
 }
 
+
 #endif
