@@ -131,22 +131,58 @@ public:
 
 
 //Handle Parallel Pause
-template<bool SRC_ACTIVE>
+template<bool PAUSE_ACTIVE>
 class API_Pause;
+template<bool PAUSE_ACTIVE>
+class PauseImpl;
+
+template<>
+class PauseImpl<true> {
+  long atBarrier;
+public:
+  Galois::Executable* E;
+
+  PauseImpl() :atBarrier(0), E(0) {}
+
+  void handlePause(Galois::Executable* nE) {
+    E = nE;
+  }
+
+  void checkPause() {
+    if (E) {
+      __sync_add_and_fetch(&atBarrier, 1);
+      int numThreads = GaloisRuntime::getSystemThreadPool().getActiveThreads();
+      while (atBarrier != numThreads) {}
+      if (ThreadPool::getMyID() == 1) {
+	E->operator()();
+	E = 0;
+      } else {
+	while (E) {}
+      }
+    }
+  }
+};
+
+template<>
+class PauseImpl<false> {
+public:
+  void checkPause() {}
+};
 
 template<>
 class API_Pause<true> {
+  PauseImpl<true>* p;
+protected:
+  void init_pause(PauseImpl<true>* pi) {
+    p = pi;
+  }
 public:
   void suspendWith(Galois::Executable* E) {
-    abort();
+    p->handlePause(E);
   }
 };
 template<>
 class API_Pause<false> {
-public:
-  void suspendWith(Galois::Executable* E) {
-    abort();
-  }
 };
 
 //Handle Per Iter Allocator
@@ -232,7 +268,8 @@ class ParallelThreadContext
 public:
   class UserAPI
     :public API_PerIter<Configurator<Function>::NeedsPIA>,
-     public API_Push<Configurator<Function>::NeedsPush, WorkListTy>
+     public API_Push<Configurator<Function>::NeedsPush, WorkListTy>,
+     public API_Pause<Configurator<Function>::NeedsPause>
   {
     friend class ParallelThreadContext;
   };
@@ -250,10 +287,12 @@ public:
 
   void initialize(TerminationDetection::tokenHolder* t,
 		  bool _leader,
-		  WorkListTy* wl) {
+		  WorkListTy* wl,
+		  PauseImpl<Configurator<Function>::NeedsPause>* p) {
     lterm = t;
     leader = _leader;
     facing.init_wl(wl);
+    facing.init_pause(p);
   }
 
   void workHappened() {
@@ -282,6 +321,7 @@ class ForEachWork : public Galois::Executable {
   
 
   WorkListTy global_wl;
+  PauseImpl<Configurator<Function>::NeedsPause> pauser;
   Function& f;
 
   PerCPU<PCTy> tdata;
@@ -344,7 +384,8 @@ public:
     PCTy& tld = tdata.get();
     tld.initialize(term.getLocalTokenHolder(), 
 		   tdata.myEffectiveID() == 0,
-		   &global_wl);
+		   &global_wl,
+		   &pauser);
     tld.start_parallel_region();
 
     do {
@@ -356,6 +397,7 @@ public:
 	if (tld.is_leader() && abort_happened) {
 	  drainAborted();
 	}
+	pauser.checkPause();
 	p = global_wl.pop();
 	if (p.first) {
 	  doProcess(p.second, tld);
@@ -366,6 +408,8 @@ public:
     }
     if (tld.is_leader() && drainAborted())
       continue;
+
+    pauser.checkPause();
 
       term.localTermination();
     } while (!term.globalTermination());
