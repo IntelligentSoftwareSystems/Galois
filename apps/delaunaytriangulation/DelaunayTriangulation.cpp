@@ -59,10 +59,10 @@ struct process {
     if (tuples.empty())
       return;
 
-    Cavity cav(Mesh, item, tuples.back(), &lwl);
+    Cavity cav(Mesh, item, tuples.back(), lwl.getPerIterAlloc());
     cav.build();
     
-    Cavity::GNodeVector newNodes(lwl.PerIterationAllocator);
+    Cavity::GNodeVector newNodes(lwl.getPerIterAlloc());
     cav.update(&newNodes);
     for (Cavity::GNodeVector::iterator iter = newNodes.begin(); iter != newNodes.end(); ++iter) {
       GNode node = *iter;
@@ -76,10 +76,7 @@ struct process {
 
 template<typename WLTY>
 void triangulate(WLTY& wl) {
-  // GaloisRuntime::WorkList::ChunkedFIFO<GNode, 64> wl2;
-  GaloisRuntime::WorkList::dChunkedFIFO<GNode, 512> wl2;
-  wl2.fill_initial(wl.begin(), wl.end());
-  Galois::for_each(wl2, process());
+  Galois::for_each<GaloisRuntime::WorkList::ChunkedFIFO<512> >(wl.begin(), wl.end(), process());
 }
 
 void read_points(const char* filename, Element::TupleList& tuples) {
@@ -157,7 +154,7 @@ GNode make_graph(const char* filename) {
   Element large_triangle(t1, t2, t3);
   GNode large_node = Mesh->createNode(large_triangle);
   
-  Mesh->addNode(large_node, Galois::Graph::NONE, 0);
+  Mesh->addNode(large_node, Galois::Graph::NONE);
 
   Element border_ele1(t1, t2);
   Element border_ele2(t2, t3);
@@ -167,9 +164,9 @@ GNode make_graph(const char* filename) {
   GNode border_node2 = Mesh->createNode(border_ele2);
   GNode border_node3 = Mesh->createNode(border_ele3);
 
-  Mesh->addNode(border_node1, Galois::Graph::NONE, 0);
-  Mesh->addNode(border_node2, Galois::Graph::NONE, 0);
-  Mesh->addNode(border_node3, Galois::Graph::NONE, 0);
+  Mesh->addNode(border_node1, Galois::Graph::NONE);
+  Mesh->addNode(border_node2, Galois::Graph::NONE);
+  Mesh->addNode(border_node3, Galois::Graph::NONE);
 
   Mesh->addEdge(large_node, border_node1, 0);
   Mesh->addEdge(large_node, border_node2, 1);
@@ -192,7 +189,7 @@ void write_mesh(const char* filename) {
   long num_triangles = 0, num_segments = 0;
   for (Graph::active_iterator ii = Mesh->active_begin(), ee = Mesh->active_end(); ii != ee; ++ii) {
     GNode node = *ii;
-    Element& e = node.getData(Galois::Graph::NONE, 0);
+    Element& e = node.getData(Galois::Graph::NONE);
     if (e.getBDim()) {
       num_triangles++;
     } else {
@@ -212,7 +209,7 @@ void write_mesh(const char* filename) {
   pout << num_segments << " 1\n";
   for (Graph::active_iterator ii = Mesh->active_begin(), ee = Mesh->active_end(); ii != ee; ++ii) {
     GNode node = *ii;
-    Element& e = node.getData(Galois::Graph::NONE, 0);
+    Element& e = node.getData(Galois::Graph::NONE);
     if (e.getBDim()) {
       // <triangle id> <vertex> <vertex> <vertex> [in ccw order]
       eout << tid << " " << e.getPoint(0).id() << " ";

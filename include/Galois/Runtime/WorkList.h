@@ -60,6 +60,12 @@ public:
     typedef AbstractWorkList<T, newconcurrent> WL;
   };
 
+  //! change the type the worklist holds
+  template<typename Tnew>
+  struct retype {
+    typedef AbstractWorkList<Tnew, concurrent> WL;
+  };
+
   //! push a value onto the queue
   bool push(value_type val);
   //! push an aborted value onto the queue
@@ -82,7 +88,7 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 
 
-template<typename T, class Compare = std::less<T>, bool concurrent = true>
+template<class Compare = std::less<int>, typename T = int, bool concurrent = true>
 class PriQueue : private boost::noncopyable, private PaddedLock<concurrent> {
 
   std::priority_queue<T, std::vector<T>, Compare> wl;
@@ -94,7 +100,11 @@ class PriQueue : private boost::noncopyable, private PaddedLock<concurrent> {
 public:
   template<bool newconcurrent>
   struct rethread {
-    typedef PriQueue<T, Compare, newconcurrent> WL;
+    typedef PriQueue<Compare, T, newconcurrent> WL;
+  };
+  template<typename Tnew>
+  struct retype {
+    typedef PriQueue<Compare, Tnew, concurrent> WL;
   };
 
   typedef T value_type;
@@ -137,7 +147,7 @@ public:
 };
 WLCOMPILECHECK(PriQueue);
 
-template<typename T, bool concurrent = true>
+template<typename T = int, bool concurrent = true>
 class LIFO : private boost::noncopyable, private PaddedLock<concurrent> {
   std::deque<T> wl;
 
@@ -149,6 +159,10 @@ public:
   template<bool newconcurrent>
   struct rethread {
     typedef LIFO<T, newconcurrent> WL;
+  };
+  template<typename Tnew>
+  struct retype {
+    typedef LIFO<Tnew, concurrent> WL;
   };
 
   typedef T value_type;
@@ -191,7 +205,7 @@ public:
 };
 WLCOMPILECHECK(LIFO);
 
-template<typename T, bool concurrent = true>
+template<typename T = int, bool concurrent = true>
 class FIFO : private boost::noncopyable, private PaddedLock<concurrent>  {
   std::deque<T> wl;
 
@@ -203,6 +217,10 @@ public:
   template<bool newconcurrent>
   struct rethread {
     typedef FIFO<T, newconcurrent> WL;
+  };
+  template<typename Tnew>
+  struct retype {
+    typedef FIFO<Tnew, concurrent> WL;
   };
 
   typedef T value_type;
@@ -245,7 +263,7 @@ public:
 };
 WLCOMPILECHECK(FIFO);
 
-template<class T, class Indexer = DummyIndexer<T>, typename ContainerTy = FIFO<T>, bool concurrent = true >
+template<class Indexer = DummyIndexer, typename ContainerTy = FIFO<>, typename T = int, bool concurrent = true >
 class OrderedByIntegerMetric : private boost::noncopyable {
 
   typedef typename ContainerTy::template rethread<concurrent>::WL CTy;
@@ -299,7 +317,11 @@ class OrderedByIntegerMetric : private boost::noncopyable {
  public:
   template<bool newconcurrent>
   struct rethread {
-    typedef  OrderedByIntegerMetric<T,Indexer,ContainerTy,newconcurrent> WL;
+    typedef  OrderedByIntegerMetric<Indexer,ContainerTy,T,newconcurrent> WL;
+  };
+  template<typename Tnew>
+  struct retype {
+    typedef OrderedByIntegerMetric<Indexer,typename ContainerTy::template retype<Tnew>::WL,Tnew,concurrent> WL;
   };
 
   typedef T value_type;
@@ -359,7 +381,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
 };
 WLCOMPILECHECK(OrderedByIntegerMetric);
 
-template<typename T, typename GlobalQueueTy = FIFO<T>, typename LocalQueueTy = FIFO<T> >
+template<typename GlobalQueueTy = FIFO<>, typename LocalQueueTy = FIFO<>, typename T = int >
 class LocalQueues {
 
   PerCPU<typename LocalQueueTy::template rethread<false>::WL> local;
@@ -368,7 +390,11 @@ class LocalQueues {
 public:
   template<bool newconcurrent>
   struct rethread {
-    typedef LocalQueues<T, GlobalQueueTy, LocalQueueTy> WL;
+    typedef LocalQueues<GlobalQueueTy, LocalQueueTy, T> WL;
+  };
+  template<typename Tnew>
+  struct retype {
+    typedef LocalQueues<typename GlobalQueueTy::template retype<Tnew>::WL, typename LocalQueueTy::template retype<Tnew>::WL, Tnew> WL;
   };
 
   typedef T value_type;
@@ -405,7 +431,7 @@ public:
 WLCOMPILECHECK(LocalQueues);
 
 //Queue per writer, reader cycles
-template<typename T>
+template<typename T = int>
 class MP_SC_FIFO {
   class Chunk : public FixedSizeRing<T, 128, false>, public ConExtLinkedQueue<Chunk,true>::ListNode { };
   
@@ -436,6 +462,10 @@ public:
   template<bool newconcurrent>
   struct rethread {
     typedef MP_SC_FIFO<T> WL;
+  };
+  template<typename Tnew>
+  struct retype {
+    typedef MP_SC_FIFO<Tnew> WL;
   };
 
   bool push(value_type val) {
@@ -581,7 +611,16 @@ class ChunkedMaster : private boost::noncopyable {
 
 public:
   typedef T value_type;
-  
+
+  template<bool newconcurrent>
+  struct rethread {
+    typedef ChunkedMaster<T, QT, distributed, isStack, chunksize, newconcurrent> WL;
+  };
+  template<typename Tnew>
+  struct retype {
+    typedef ChunkedMaster<Tnew, QT, distributed, isStack, chunksize, concurrent> WL;
+  };
+
   ChunkedMaster() : heap(sizeof(Chunk)) {
     for (int i = 0; i < data.size(); ++i) {
       p& r = data.get(i);
@@ -657,47 +696,23 @@ public:
   }
 };
 
-template<typename T, int chunksize=64, bool concurrent=true>
-class ChunkedFIFO : public ChunkedMaster<T, ConExtLinkedQueue, false, false, chunksize, concurrent> {
-public:
-  template<bool newconcurrent>
-  struct rethread {
-    typedef ChunkedFIFO<T, chunksize, newconcurrent> WL;
-  };
-};
+template<int chunksize=64, typename T = int, bool concurrent=true>
+class ChunkedFIFO : public ChunkedMaster<T, ConExtLinkedQueue, false, false, chunksize, concurrent> {};
 WLCOMPILECHECK(ChunkedFIFO);
 
-template<typename T, int chunksize=64, bool concurrent=true>
-class ChunkedLIFO : public ChunkedMaster<T, ConExtLinkedStack, false, true, chunksize, concurrent> {
-public:
-  template<bool newconcurrent>
-  struct rethread {
-    typedef ChunkedLIFO<T, chunksize, newconcurrent> WL;
-  };
-};
+template<int chunksize=64, typename T = int, bool concurrent=true>
+class ChunkedLIFO : public ChunkedMaster<T, ConExtLinkedStack, false, true, chunksize, concurrent> {};
 WLCOMPILECHECK(ChunkedLIFO);
 
-template<typename T, int chunksize=64, bool concurrent=true>
-class dChunkedFIFO : public ChunkedMaster<T, ConExtLinkedQueue, true, false, chunksize, concurrent> {
-public:
-  template<bool newconcurrent>
-  struct rethread {
-    typedef dChunkedFIFO<T, chunksize, newconcurrent> WL;
-  };
-};
+template<int chunksize=64, typename T = int, bool concurrent=true>
+class dChunkedFIFO : public ChunkedMaster<T, ConExtLinkedQueue, true, false, chunksize, concurrent> {};
 WLCOMPILECHECK(dChunkedFIFO);
 
-template<typename T, int chunksize=64, bool concurrent=true>
-class dChunkedLIFO : public ChunkedMaster<T, ConExtLinkedStack, true, true, chunksize, concurrent> {
-public:
-  template<bool newconcurrent>
-  struct rethread {
-    typedef dChunkedLIFO<T, chunksize, newconcurrent> WL;
-  };
-};
+template<int chunksize=64, typename T = int, bool concurrent=true>
+class dChunkedLIFO : public ChunkedMaster<T, ConExtLinkedStack, true, true, chunksize, concurrent> {};
 WLCOMPILECHECK(dChunkedLIFO);
 
-template<typename T, typename Partitioner = DummyPartitioner<T>, typename ChildWLTy = dChunkedFIFO<T>, bool concurrent=true>
+template<typename Partitioner = DummyPartitioner, typename T = int, typename ChildWLTy = dChunkedFIFO<>, bool concurrent=true>
 class PartitionedWL : private boost::noncopyable {
 
   Partitioner P;

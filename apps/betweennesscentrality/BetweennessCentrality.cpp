@@ -168,11 +168,9 @@ int main(int argc, const char** argv) {
       tmp.push_back(*ii);
     }
   }
-  GaloisRuntime::WorkList::ChunkedLIFO<GNode, 16,  true> wl;
-  wl.fill_initial(tmp.begin(), tmp.end());
   Galois::setMaxThreads(numThreads);
   Galois::Launcher::startTiming();
-  Galois::for_each(wl, process());
+  Galois::for_each<GaloisRuntime::WorkList::ChunkedLIFO<16> >(tmp.begin(), tmp.end(), process());
   Galois::Launcher::stopTiming();
 
   if (!skipVerify) {

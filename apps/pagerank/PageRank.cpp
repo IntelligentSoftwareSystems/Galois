@@ -130,12 +130,11 @@ struct process {
 void runBodyParallel(const GNode src) {
   using namespace GaloisRuntime::WorkList;
 
-  ChunkedFIFO<GNode, 32> wl;
-
   unsigned int iterations = 0;
   double max_delta = 0;
   do {
-    Galois::for_each(wl, process());
+    //??? wl never had anything in it
+    Galois::for_each<ChunkedFIFO<32> >((GNode*)0,(GNode*)0, process());
     iterations++;
     std::cout << "iteration: " << iterations << " max delta: " << max_delta << "\n";
   } while (iterations < max_iterations && max_delta > tolerance);

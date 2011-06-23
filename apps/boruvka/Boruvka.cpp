@@ -159,19 +159,14 @@ struct process {
 //End body of for-each.
 void runBodyParallel() {
 	using namespace GaloisRuntime::WorkList;
-	ChunkedFIFO<GNode, 32> wl;
-	std::set<GNode> all;
-	for(Graph::active_iterator src= graph.active_begin(), esrc=graph.active_end(); src!=esrc;++src){
-		all.insert(*src);
-	}
-	wl.fill_initial(all.begin() , all.end());
+	std::vector<GNode> all(graph.active_begin(), graph.active_end());
 #if BORUVKA_DEBUG
 	std::cout<<"Begining to process with worklist size :: "<<all.size()<<std::endl;
 	std::cout<<"Graph size "<<graph.size()<<std::endl;
 #endif
 	for(int i=0;i<MSTWeight.size();i++)
 		MSTWeight.get(i)=0;
-	Galois::for_each(wl, process());
+	Galois::for_each<ChunkedFIFO<32> >(all.begin(), all.end(), process());
 	unsigned int res = 0;
 	for(int i=0;i<MSTWeight.size();i++){
 #if BORUVKA_DEBUG

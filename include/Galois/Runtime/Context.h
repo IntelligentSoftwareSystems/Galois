@@ -41,30 +41,13 @@ class SimpleRuntimeContext {
   //The locks we hold
   locksTy locks;
 
-  //Sanity check for failsafe point
-  bool failsafe;
-
-  void acquire_i(Lockable* C) {
-    assert(!failsafe && "Acquiring a new lock after failsafe");
-    bool suc = C->try_lock();
-    if (suc) {
-      C->setValue(this);
-      locks.push_front(*C);
-    } else {
-      if (C->getValue() != this)
-	throw -1; //CONFLICT
-    }
-  }
-
 public:
   void start_iteration() {
     assert(locks.empty());
-    failsafe = false;
   }
   
   void cancel_iteration() {
     //FIXME: not handled yet
-    //abort();
     commit_iteration();
   }
   
@@ -77,16 +60,17 @@ public:
       locks.pop_front();
       L.unlock_and_clear();
     }
-    failsafe = false;
   }
 
-  void enter_failsafe() {
-    failsafe = true;
-  }
-  
-  static void acquire(SimpleRuntimeContext* C, Lockable* L) {
-    if (C)
-      C->acquire_i(L);
+  void acquire(Lockable* L) {
+    bool suc = L->try_lock();
+    if (suc) {
+      L->setValue(this);
+      locks.push_front(*L);
+    } else {
+      if (L->getValue() != this)
+	throw -1; //CONFLICT
+    }
   }
 
 };
@@ -98,15 +82,12 @@ static SimpleRuntimeContext* getThreadContext() {
   return thread_cnx;
 }
 
-static __attribute__((unused)) void setThreadContext(SimpleRuntimeContext* n) {
-  thread_cnx = n;
-}
-
+void setThreadContext(SimpleRuntimeContext* n);
 
 static __attribute__((unused)) void acquire(Lockable* C) {
   SimpleRuntimeContext* cnx = getThreadContext();
   if (cnx)
-    SimpleRuntimeContext::acquire(cnx, C);
+    cnx->acquire(C);
 }
 
 }

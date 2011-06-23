@@ -40,7 +40,7 @@ class Builder{
 			if (i == sinkId)
 				n.setSink();
 			nodes[i] = (b->createNode(n));
-			b->addNode((nodes[i]),Galois::Graph::NONE,0);
+			b->addNode((nodes[i]),Galois::Graph::NONE);
 		}
 		source=nodes[sourceId];
 		sink=nodes[sinkId];
@@ -112,7 +112,7 @@ class Builder{
 	   {	
 		Node n(i);           
                 nodes[i] = (b->createNode(n));
-                b->addNode(nodes[i],Galois::Graph::NONE,0);
+                b->addNode(nodes[i],Galois::Graph::NONE);
 	   }
 
 	   scanner.getline(str,100);
@@ -129,13 +129,13 @@ class Builder{
 		 {
 		    source=nodes[id];
 		    cout<<"Source is "<<id<<endl;
-		    source.getData(Galois::Graph::NONE,0).setSource(numNodes);
+		    source.getData(Galois::Graph::NONE).setSource(numNodes);
 		 }
 		 else if(strcmp(dummy,"t")==0)
 		 {
 		    sink=nodes[id];
 		    cout<<"Sink is "<<id<<endl;
-		    sink.getData(Galois::Graph::NONE,0).setSink();
+		    sink.getData(Galois::Graph::NONE).setSink();
 		 }
 	      }
 	      else if(strrchr(str,'a')!=NULL)
@@ -161,8 +161,8 @@ class Builder{
 	{
 
 
-		Node& n1=src.getData(Galois::Graph::NONE,0);
-		Node& n2=dst.getData(Galois::Graph::NONE,0);
+		Node& n1=src.getData(Galois::Graph::NONE);
+		Node& n2=dst.getData(Galois::Graph::NONE);
 
 		Edge e1(n1.id,n2.id,scap);
 		Edge e2(n2.id,n1.id,dcap);
@@ -190,15 +190,15 @@ class Builder{
 		}*/
 
 		if (src.hasNeighbor(dst)) {
-		      b->getEdgeData(src, dst,Galois::Graph::NONE,0).addOriginalCapacity(scap);
+		      b->getEdgeData(src, dst,Galois::Graph::NONE).addOriginalCapacity(scap);
     		} else {
-      		      b->addEdge(src, dst,e1,Galois::Graph::NONE,0);
+      		      b->addEdge(src, dst,e1,Galois::Graph::NONE);
     		}
 
 	        if (dst.hasNeighbor(src)) {
- 		      b->getEdgeData(dst, src,Galois::Graph::NONE,0).addOriginalCapacity(dcap);
+ 		      b->getEdgeData(dst, src,Galois::Graph::NONE).addOriginalCapacity(dcap);
 	        } else {
-     		      b->addEdge(dst, src,e2,Galois::Graph::NONE,0);
+     		      b->addEdge(dst, src,e2,Galois::Graph::NONE);
     		}
 	}
 

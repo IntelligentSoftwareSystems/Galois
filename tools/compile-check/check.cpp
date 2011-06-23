@@ -16,8 +16,9 @@ defects in Software and/or Documentation, or loss or inaccuracy of data of any
 kind.
 */
 
-template<typename T>
+template<typename T2>
 struct checker {
+  typedef typename T2::template retype<int>::WL T;
   T wl;
   typename T::template rethread<true>::WL wl2;
   typename T::template rethread<true>::WL wl3;
@@ -46,7 +47,7 @@ struct checker {
 };
 
 
-#define WLCOMPILECHECK(name) checker<name<int> > ck_##name;
+#define WLCOMPILECHECK(name) checker<name<> > ck_##name;
 #include "Galois/Runtime/WorkList.h"
 
 int main() {

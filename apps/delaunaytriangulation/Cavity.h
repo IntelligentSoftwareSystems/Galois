@@ -15,7 +15,7 @@
 #include <iostream>
 
 class Cavity {
-  typedef Galois::PerIterMem::ItAllocTy::rebind<GNode>::other PerIterGNodeAlloc;
+  typedef Galois::PerIterAllocTy::rebind<GNode>::other PerIterGNodeAlloc;
   typedef std::set<GNode, std::less<GNode>, PerIterGNodeAlloc> GNodeSet;
   typedef std::deque<GNode, PerIterGNodeAlloc> GNodeDeque;
 
@@ -26,24 +26,23 @@ class Cavity {
   GNodeSet deletingNodes;
   GNode node;
   Tuple tuple;
-  Galois::PerIterMem* _cnx;
+  Galois::PerIterAllocTy& _cnx;
 
 public:
   typedef std::vector<GNode, PerIterGNodeAlloc> GNodeVector;
-
-  Cavity(Graph* g, GNode& n, Tuple& t, Galois::PerIterMem* cnx):
+  
+ Cavity(Graph* g, GNode& n, Tuple& t, Galois::PerIterAllocTy& cnx):
    graph(g),
-   oldNodes(cnx->PerIterationAllocator),
-   connectionNodes(cnx->PerIterationAllocator),
-   deletingNodes(std::less<GNode>(), cnx->PerIterationAllocator),
+   oldNodes(cnx),
+   connectionNodes(cnx),
+   deletingNodes(std::less<GNode>(), cnx),
    node(n),
-   tuple(t)
-  {
-    _cnx = cnx;
-  }
+   tuple(t),
+   _cnx(cnx)
+  {}
 
   void build() {
-    GNodeVector frontier(_cnx->PerIterationAllocator);
+    GNodeVector frontier(_cnx);
     //std::vector<GNode> frontier;
     frontier.push_back(node);
     while (!frontier.empty()){

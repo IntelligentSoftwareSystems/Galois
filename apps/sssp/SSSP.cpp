@@ -100,7 +100,7 @@ void getInitialRequests(const GNode src, WLTy& wl) {
     GNode dst = *ii;
     int w = graph.getEdgeData(src, dst, Galois::Graph::NONE);
     UpdateRequest up(dst, w);
-    wl.push(up);
+    wl.push_back(up);
   }
 }
 
@@ -169,15 +169,13 @@ struct process {
 
 void runBodyParallel(const GNode src) {
   using namespace GaloisRuntime::WorkList;
+  typedef dChunkedLIFO<16> IChunk;
+  typedef OrderedByIntegerMetric<UpdateRequestIndexer, IChunk> OBIM;
 
-  typedef dChunkedLIFO<UpdateRequest, 16> IChunk;
-  typedef OrderedByIntegerMetric<UpdateRequest, UpdateRequestIndexer, IChunk> OBIM;
-
-  OBIM wl;
-
+  std::vector<UpdateRequest> wl;
   getInitialRequests(src, wl);
   Galois::Launcher::startTiming();
-  Galois::for_each(wl, process());
+  Galois::for_each<OBIM>(wl.begin(), wl.end(), process());
   Galois::Launcher::stopTiming();
 }
 

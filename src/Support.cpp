@@ -18,9 +18,42 @@ kind.
 #include "Galois/Runtime/SimpleLock.h"
 #include "Galois/Runtime/Support.h"
 #include "LLVM/SmallVector.h"
+#include <sstream>
 #include <iostream>
+#include <algorithm>
+#include <numeric>
+#include <cmath>
 
 static GaloisRuntime::SimpleLock<int, true> lock;
+
+void GaloisRuntime::summarizeList(const char* name, const long* b, const long* e) {
+  long size = std::distance(b,e);
+  long min = *std::min_element(b, e);
+  long max = *std::max_element(b, e);
+  double ave = std::accumulate(b, e, 0.0) / size;
+ 
+  double acc = 0.0;
+  for (const long* it = b; it != e; ++it) {
+    acc += (*it - ave) * (*it - ave);
+  }
+
+  double stdev = 0.0;
+  if (size > 1) {
+    stdev = sqrt(acc / (size - 1));
+  }
+
+  std::ostringstream out;
+  out.setf(std::ios::fixed, std::ios::floatfield);
+  out.precision(1);
+  out << "n: " << size;
+  out << " ave: " << ave;
+  out << " min: " << min;
+  out << " max: " << max;
+  out << " stdev: " << stdev;
+
+  reportStat(name, out.str().c_str());
+}
+
 
 template<typename T>
 static void genericReport(bool error, const char* text1, const char* text2, T val) {

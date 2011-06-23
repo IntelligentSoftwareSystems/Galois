@@ -21,8 +21,8 @@ static const char* help = "<input file> <expected flow>";
 
 
 void reduceCapacity(GNode& src, GNode& dst, int amount) {
-        Edge& e1 = config->getEdgeData(src, dst,Galois::Graph::ALL,0);
-        Edge& e2 = config->getEdgeData(dst, src,Galois::Graph::ALL,0);
+        Edge& e1 = config->getEdgeData(src, dst,Galois::Graph::ALL);
+        Edge& e2 = config->getEdgeData(dst, src,Galois::Graph::ALL);
         e1.cap -= amount;
         e2.cap += amount;
 }
@@ -43,7 +43,7 @@ bool check(int h)
 
 void checkHeight(int h){
     for(Graph::active_iterator ii = config->active_begin(), ee = config->active_end(); ii != ee; ++ii) {
-	    Node& node = (*ii).getData(Galois::Graph::ALL,0);
+	    Node& node = (*ii).getData(Galois::Graph::ALL);
 	    if (node.isSink || node.isSource)
 		    continue;
 	    if (h < node.height && node.height < numNodes)
@@ -55,7 +55,7 @@ void checkHeight(int h){
 void printHeights()
 {
 	for(Graph::active_iterator ii = config->active_begin(), ee = config->active_end(); ii != ee; ++ii) {
-		Node& node = (*ii).getData(Galois::Graph::ALL,0);
+		Node& node = (*ii).getData(Galois::Graph::ALL);
 		cout<<" Inside printHeight func.. node.height = "<<node.height<<endl;
 	}
 }
@@ -186,7 +186,7 @@ void  initializePreflow() {
   //	int count=0;
 	for (Graph::neighbor_iterator ii = config->neighbor_begin(source), ee = config->neighbor_end(source); ii != ee; ++ii) {
 		GNode neighbor = *ii;
-		Edge& edgeData = config->getEdgeData(source, neighbor,Galois::Graph::NONE,0);
+		Edge& edgeData = config->getEdgeData(source, neighbor,Galois::Graph::NONE);
 
 		int cap = edgeData.cap;
 		reduceCapacity(source, neighbor, cap);

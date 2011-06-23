@@ -50,7 +50,7 @@ void readRMATFileAndSerialize(const char *infilename, const char *outfilename) {
       for (int i=0; i<nnodes; ++i) {
         GNode1 n = inputGr.createNode(i);
         graphNodes.push_back(n);
-        inputGr.addNode(n, Galois::Graph::NONE, 0);
+        inputGr.addNode(n, Galois::Graph::NONE);
       }
       firstLineAfterComments = false;
       continue;
@@ -62,7 +62,7 @@ void readRMATFileAndSerialize(const char *infilename, const char *outfilename) {
       edgeNum++;
       int nbrId, edgW; // current neighbor and edge weight
       slb >> nbrId >> edgW;
-      inputGr.addEdge(graphNodes[nid], graphNodes[nbrId], Galois::Graph::NONE, 0);
+      inputGr.addEdge(graphNodes[nid], graphNodes[nbrId], Galois::Graph::NONE);
       //std::cerr << "Added edge " << graphNodes[nid].getData(Galois::Graph::NONE) << " -> " << graphNodes[nbrId].getData(Galois::Graph::NONE) << std::endl;
     }
   }

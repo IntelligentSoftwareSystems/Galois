@@ -176,11 +176,11 @@ public:
     work = E;
     __sync_synchronize();
     ThreadPool::NotifyAware(true);
-    work->preRun(activeThreads);
+    //work->preRun(activeThreads);
     __sync_synchronize();
     start.release(maxThreads);
     finish.wait();
-    work->postRun();
+    //work->postRun();
     work = 0;
     ThreadPool::NotifyAware(false);
   }

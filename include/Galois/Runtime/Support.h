@@ -22,6 +22,9 @@ kind.
 
 namespace GaloisRuntime {
 
+//Report complex Statistics
+void summarizeList(const char* name, const long* b, const long* e);
+
 //Report Statistics
 void reportStat(const char* text, unsigned long val);
 void reportStat(const char* text, unsigned int val);

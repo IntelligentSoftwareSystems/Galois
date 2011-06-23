@@ -19,10 +19,27 @@ kind.
 
 namespace Galois {
 
+//needs_parallel_pause indicates the operator may request the parallel loop to be suspended and a given function run in serial
+
 BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_needs_parallel_pause)
 
 template<typename T>
 struct needs_parallel_pause : public has_tt_needs_parallel_pause<T> {};
+
+
+//does_not_need_parallel_push indicates the operator may generate new work and push it on the worklist
+
+BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_does_not_need_parallel_push)
+
+template<typename T>
+struct does_not_need_parallel_push : public has_tt_does_not_need_parallel_push<T> {};
+
+//needs_per_iter_mem indicates the operator may request the access to a per-iteration parallel memory pool
+
+BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_needs_per_iter_mem)
+
+template<typename T>
+struct needs_per_iter_mem : public has_tt_needs_per_iter_mem<T> {};
 
 }
 

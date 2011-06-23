@@ -35,13 +35,13 @@ class Cavity {
   GNode centerNode;
   Element* centerElement;
   int dim;
-  std::vector<GNode,Galois::PerIterMem::ItAllocTy::rebind<GNode>::other> frontier;
+  std::vector<GNode,Galois::PerIterAllocTy::rebind<GNode>::other> frontier;
   // the cavity itself
   Subgraph pre;
   // what the new elements should look like
   Subgraph post;
   // the edge-relations that connect the boundary to the cavity
-  typedef std::vector<Subgraph::tmpEdge,Galois::PerIterMem::ItAllocTy::rebind<Subgraph::tmpEdge>::other> connTy;
+  typedef std::vector<Subgraph::tmpEdge,Galois::PerIterAllocTy::rebind<Subgraph::tmpEdge>::other> connTy;
   connTy connections;
 
   Graph* graph;
@@ -100,11 +100,11 @@ class Cavity {
 
 public:
   
-  Cavity(Graph* g, Galois::PerIterMem* cnx)
-    :frontier(cnx->PerIterationAllocator),
+  Cavity(Graph* g, Galois::PerIterAllocTy& cnx)
+    :frontier(cnx),
      pre(cnx),
      post(cnx),
-     connections(cnx->PerIterationAllocator),
+     connections(cnx),
      graph(g)
   {}
   

@@ -41,192 +41,340 @@ kind.
 
 namespace GaloisRuntime {
 
-template<class WorkListTy>
-class ParallelThreadContext
-  : public SimpleRuntimeContext, public Galois::PerIterMem
-{
-  typedef typename WorkListTy::value_type value_type;
-  typedef GaloisRuntime::WorkList::MP_SC_FIFO<value_type> AbortedListTy;
+//Handle Runtime Conflict Detection
+template<bool SRC_ACTIVE>
+class SimpleRuntimeContextHandler;
 
-  unsigned long conflicts;
-  unsigned long iterations;
-  WorkListTy* wl;
-  AbortedListTy* aborted;
-  
-  using SimpleRuntimeContext::start_iteration;
-  using SimpleRuntimeContext::cancel_iteration;
-  using SimpleRuntimeContext::commit_iteration;
-  using PerIterMem::__resetAlloc;
-
+template<>
+class SimpleRuntimeContextHandler<true> {
+  SimpleRuntimeContext src;
 public:
-  ParallelThreadContext()
-    :conflicts(0), iterations(0), wl(0), aborted(0)
-  {}
-  
-  virtual ~ParallelThreadContext() {}
-
-  unsigned long getIterations() { return iterations; }
-  void setWl(WorkListTy* WL) { wl = WL; }
-  void setAborted(AbortedListTy* WL) { aborted = WL; }
-
-  void report() const {
-    reportStat("Conflicts", conflicts);
-    reportStat("Iterations", iterations);
+  void start_iteration() {
+    src.start_iteration();
   }
-
-  bool drainAborted() {
-    bool retval = false;
-    while (true) {
-      std::pair<bool, value_type> p = aborted->pop();
-
-      if (p.first) {
-        retval = true;
-        wl->push(p.second);
-      } else
-        break;
-    }
-    return retval;
+  void cancel_iteration() {
+    src.cancel_iteration();
   }
-
-  template<bool is_leader, typename Function>
-  bool doProcess(value_type val, Function& f) {
-    ++iterations;
-    if (is_leader && (iterations & 1023) == 0) {
-      drainAborted();
-    }
-    
-    start_iteration();
-    try {
-      f(val, *this);
-    } catch (int a) {
-      cancel_iteration();
-      ++conflicts;
-      //wl->aborted(val);
-      aborted->push(val);
-      return false;
-    }
-    commit_iteration();
-    __resetAlloc();
-    return true;
+  void commit_iteration() {
+    src.commit_iteration();
   }
-
-  void push(value_type val) {
-    wl->push(val);
+  void start_parallel_region() {
+    setThreadContext(&src);
   }
-
-  void finish() { }
-  
-  void suspendWith(Galois::Executable* E) {
-    abort();
-  }
-
-  static void merge(ParallelThreadContext& lhs, ParallelThreadContext& rhs) {
-    lhs.conflicts += rhs.conflicts;
-    lhs.iterations += rhs.iterations;
+  void end_parallel_region() {
+    setThreadContext(0);
   }
 };
 
-static void summarizeList(const char* name, const std::vector<long>& list) {
-  long min = *std::min_element(list.begin(), list.end());
-  long max = *std::max_element(list.begin(), list.end());
-  double ave = std::accumulate(list.begin(), list.end(), 0.0) / list.size();
- 
-  double acc = 0.0;
-  for (std::vector<long>::const_iterator it = list.begin(), end = list.end(); it != end; ++it) {
-    acc += (*it - ave) * (*it - ave);
+template<>
+class SimpleRuntimeContextHandler<false> {
+public:
+  void start_iteration() {}
+  void cancel_iteration() {}
+  void commit_iteration() {}
+  void start_parallel_region() {}
+  void end_parallel_region() {}
+};
+
+//Handle Statistic gathering
+template<bool STAT_ACTIVE>
+class StatisticHandler;
+
+template<>
+class StatisticHandler<true> {
+  unsigned long conflicts;
+  unsigned long iterations;
+public:
+  StatisticHandler() :conflicts(0), iterations(0) {}
+  void inc_iterations() {
+    ++iterations;
+  }
+  void inc_conflicts() {
+    ++conflicts;
+  }
+  void report_stat() const {
+    reportStat("Conflicts", conflicts);
+    reportStat("Iterations", iterations);
+  }
+  void merge_stat(const StatisticHandler& rhs) {
+    conflicts += rhs.conflicts;
+    iterations += rhs.iterations;
+  }
+  struct stat_sum {
+    std::vector<long> list;
+    void add(StatisticHandler& x) {
+      list.push_back(x.iterations);
+    }
+    void done() {
+      GaloisRuntime::summarizeList("IterationDistribution", 
+				   &list[0], &list[list.size()]);
+    }
+    int num() {
+      return GaloisRuntime::getSystemThreadPool().getActiveThreads();
+    }
+  };
+};
+
+template<>
+class StatisticHandler<false> {
+public:
+  void inc_iterations() {}
+  void inc_conflicts() {}
+  void report_stat() const {}
+  void merge_stat(const StatisticHandler& rhs) {}
+  struct stat_sum {
+    void add(StatisticHandler& x) {}
+    void done() {}
+    int num() { return 0; }
+  };
+};
+
+
+//Handle Parallel Pause
+template<bool SRC_ACTIVE>
+class API_Pause;
+
+template<>
+class API_Pause<true> {
+public:
+  void suspendWith(Galois::Executable* E) {
+    abort();
+  }
+};
+template<>
+class API_Pause<false> {
+public:
+  void suspendWith(Galois::Executable* E) {
+    abort();
+  }
+};
+
+//Handle Per Iter Allocator
+template<bool PIA_ACTIVE>
+class API_PerIter;
+
+template<>
+class API_PerIter<true>
+{
+  Galois::ItAllocBaseTy IterationAllocatorBase;
+  Galois::PerIterAllocTy PerIterationAllocator;
+
+protected:
+  void __resetAlloc() {
+    IterationAllocatorBase.clear();
   }
 
-  double stdev = 0.0;
-  if (list.size() > 1) {
-    stdev = sqrt(acc / (list.size() - 1));
+public:
+  API_PerIter()
+    :IterationAllocatorBase(), 
+     PerIterationAllocator(&IterationAllocatorBase)
+  {}
+
+  virtual ~API_PerIter() {
+    IterationAllocatorBase.clear();
   }
 
-  std::ostringstream out;
-  out.setf(std::ios::fixed, std::ios::floatfield);
-  out.precision(1);
-  out << "n: " << list.size();
-  out << " ave: " << ave;
-  out << " min: " << min;
-  out << " max: " << max;
-  out << " stdev: " << stdev;
+  Galois::PerIterAllocTy& getPerIterAlloc() {
+    return PerIterationAllocator;
+  }
+};
 
-  reportStat(name, out.str().c_str());
-}
+template<>
+class API_PerIter<false>
+{
+protected:
+  void __resetAlloc() {}
+};
+
+
+//Handle Parallel Pause
+template<bool PUSH_ACTIVE, typename WLT>
+class API_Push;
+
+template<typename WLT>
+class API_Push<true, WLT> {
+  typedef typename WLT::value_type value_type;
+  WLT* wl;
+protected:
+  void init_wl(WLT* _wl) {
+    wl = _wl;
+  }
+public:
+  void push(const value_type& v) {
+    wl->push(v);
+  }
+};
+
+template<typename WLT>
+class API_Push<false, WLT> {
+protected:
+  void init_wl(WLT* _wl) {}
+};
+
+
+template<typename Function>
+struct Configurator {
+  enum {
+    CollectStats = 1,
+    NeedsPause = 1,
+    NeedsPush = 1,
+    NeedsContext = 1,
+    NeedsPIA = 1
+  };
+};
+
+template<typename Function, class WorkListTy>
+class ParallelThreadContext
+  : public SimpleRuntimeContextHandler<Configurator<Function>::NeedsContext>,
+    public StatisticHandler<Configurator<Function>::CollectStats>
+{
+  typedef typename WorkListTy::value_type value_type;
+public:
+  class UserAPI
+    :public API_PerIter<Configurator<Function>::NeedsPIA>,
+     public API_Push<Configurator<Function>::NeedsPush, WorkListTy>
+  {
+    friend class ParallelThreadContext;
+  };
+
+private:
+
+  UserAPI facing;
+  TerminationDetection::tokenHolder* lterm;
+  bool leader;
+
+public:
+  ParallelThreadContext() {}
+  
+  virtual ~ParallelThreadContext() {}
+
+  void initialize(TerminationDetection::tokenHolder* t,
+		  bool _leader,
+		  WorkListTy* wl) {
+    lterm = t;
+    leader = _leader;
+    facing.init_wl(wl);
+  }
+
+  void workHappened() {
+    lterm->workHappened();
+  }
+
+  bool is_leader() const {
+    return leader;
+  }
+
+  UserAPI& userFacing() {
+    return facing;
+  }
+
+  void resetAlloc() {
+    facing.__resetAlloc();
+  }
+
+};
 
 template<class WorkListTy, class Function>
 class ForEachWork : public Galois::Executable {
   typedef typename WorkListTy::value_type value_type;
   typedef GaloisRuntime::WorkList::MP_SC_FIFO<value_type> AbortedListTy;
-  typedef ParallelThreadContext<WorkListTy> PCTy;
+  typedef ParallelThreadContext<Function, WorkListTy> PCTy;
+  
 
-  WorkListTy& global_wl;
+  WorkListTy global_wl;
   Function& f;
 
   PerCPU<PCTy> tdata;
   TerminationDetection term;
   AbortedListTy aborted;
+  volatile long abort_happened; //hit flag
 
-  template<bool is_leader>
-  void runLoop(PCTy& tld) {
-    setThreadContext(&tld);
-    Timer T;
-    T.start();
-    do {
-      std::pair<bool, value_type> p = global_wl.pop();
-      if (p.first) {
-	term.workHappened();
-	tld.template doProcess<is_leader>(p.second, f);
-	do {
-	  p = global_wl.pop();
-	  if (p.first) {
-	    tld.template doProcess<is_leader>(p.second, f);
-	  } else {
-	    break;
-	  }
-	} while(true);
-      }
-      if (is_leader && tld.drainAborted())
-        continue;
+  bool drainAborted() {
+    bool retval = false;
+    abort_happened = 0;
+    std::pair<bool, value_type> p = aborted.pop();
+    while(p.first) {
+      retval = true;
+      global_wl.push(p.second);
+      p = aborted.pop();
+    };
+    return retval;
+  }
 
-      term.localTermination();
-    } while (!term.globalTermination());
-    T.stop();
-    setThreadContext(0);
+  void doAborted(value_type val) {
+    aborted.push(val);
+    abort_happened = 1;
+  }
+
+  void doProcess(value_type val, PCTy& tld) {
+    tld.inc_iterations();
+    tld.start_iteration();
+    try {
+      f(val, tld.userFacing());
+    } catch (int a) {
+      tld.cancel_iteration();
+      tld.inc_conflicts();
+      doAborted(val);
+      return;
+    }
+    tld.commit_iteration();
+    tld.resetAlloc();
   }
 
 public:
-  ForEachWork(WorkListTy& _wl, Function& _f)
-    :global_wl(_wl), f(_f) {}
+  template<typename IterTy>
+  ForEachWork(IterTy b, IterTy e, Function& _f)
+    :f(_f) {
+    global_wl.fill_initial(b, e);
+  }
   
   ~ForEachWork() {
-    {
-      int numThreads = GaloisRuntime::getSystemThreadPool().getActiveThreads();
-      std::vector<long> list;
-      for (int i = 0; i < numThreads; ++i)
-        list.push_back(tdata.get(i).getIterations());
-      summarizeList("IterationDistribution", list);
-    }
-
-    for (int i = 1; i < tdata.size(); ++i)
-      PCTy::merge(tdata.get(0), tdata.get(i));
-    tdata.get().report();
+    int numThreads = GaloisRuntime::getSystemThreadPool().getActiveThreads();
+    typename PCTy::stat_sum s;
+    for (int i = 0; i < s.num(); ++i)
+      s.add(tdata.get(i));
+    s.done();
+    
+    for (int i = 1; i < s.num(); ++i)
+      tdata.get(0).merge_stat(tdata.get(i));
+    tdata.get(0).report_stat();
     assert(global_wl.empty());
   }
 
-  virtual void preRun(int tmax) { }
-
-  virtual void postRun() {  }
-
   virtual void operator()() {
     PCTy& tld = tdata.get();
-    tld.setWl(&global_wl);
-    tld.setAborted(&aborted);
-    if (tdata.myEffectiveID() == 0)
-      runLoop<true>(tld);
-    else
-      runLoop<false>(tld);
+    tld.initialize(term.getLocalTokenHolder(), 
+		   tdata.myEffectiveID() == 0,
+		   &global_wl);
+    tld.start_parallel_region();
+
+    do {
+    std::pair<bool, value_type> p = global_wl.pop();
+    if (p.first) {
+      tld.workHappened();
+      doProcess(p.second, tld);
+      do {
+	if (tld.is_leader() && abort_happened) {
+	  drainAborted();
+	}
+	p = global_wl.pop();
+	if (p.first) {
+	  doProcess(p.second, tld);
+	} else {
+	  break;
+	}
+      } while(true);
+    }
+    if (tld.is_leader() && drainAborted())
+      continue;
+
+      term.localTermination();
+    } while (!term.globalTermination());
+
+    tld.end_parallel_region();
   }
 };
+
 
 template<class Function>
 class ForAllWork : public Galois::Executable {
@@ -245,12 +393,8 @@ public:
     std::vector<long> list;
     for (int i = 0; i < numThreads; ++i)
       list.push_back(tdata.get(i));
-    summarizeList("TotalTime", list);
+    summarizeList("TotalTime", &list[0], &list[list.size()]);
   }
-
-  virtual void preRun(int tmax) { }
-
-  virtual void postRun() {  }
 
   virtual void operator()() {
     Timer T;
@@ -273,14 +417,18 @@ public:
   }
 };
 
-template<class Function, class GWLTy>
-void for_each_parallel(GWLTy& GWL, Function& f) {
+template<typename WLTy, typename IterTy, typename Function>
+void for_each_impl(IterTy b, IterTy e, Function f) {
 #ifdef GALOIS_VTUNE
   __itt_resume();
 #endif
-  ForEachWork<GWLTy, Function> GW(GWL, f);
+
+  typedef typename WLTy::template retype<typename std::iterator_traits<IterTy>::value_type>::WL aWLTy;
+
+  ForEachWork<aWLTy, Function> GW(b, e, f);
   ThreadPool& PTP = getSystemThreadPool();
   PTP.run(&GW);
+
 #ifdef GALOIS_VTUNE
   __itt_pause();
 #endif

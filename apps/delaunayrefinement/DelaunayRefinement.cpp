@@ -63,7 +63,7 @@ struct process {
     
     item.getData(Galois::Graph::ALL); //lock
 
-    Cavity cav(mesh, &lwl);
+    Cavity cav(mesh, lwl.getPerIterAlloc());
     cav.initialize(item);
     cav.build();
     cav.update();
@@ -96,11 +96,6 @@ struct process {
   }
 };
 
-template<typename WLTY>
-void refine(Mesh& m, WLTY& wl) {
-  Galois::for_each(wl, process());
-}
-
 int main(int argc, const char** argv) {
   std::vector<const char*> args = parse_command_line(argc, argv, help);
 
@@ -118,12 +113,9 @@ int main(int argc, const char** argv) {
 
   std::cout << "configuration: " << mesh->size() << " total triangles, " << numbad << " bad triangles\n";
 
-  using namespace GaloisRuntime::WorkList;
-  LocalQueues<GNode, ChunkedLIFO<GNode, 1024>, LIFO<GNode> > wl2;
-  wl2.fill_initial(wl.begin(), wl.end());
-
   Galois::Launcher::startTiming();
-  refine(m, wl2);
+  using namespace GaloisRuntime::WorkList;
+  Galois::for_each<LocalQueues<ChunkedLIFO<1024>, LIFO<> > >(wl.begin(), wl.end(), process());
   Galois::Launcher::stopTiming();
   
   if (!skipVerify) {

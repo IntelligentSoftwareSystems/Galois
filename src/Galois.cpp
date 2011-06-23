@@ -19,3 +19,8 @@ kind.
 #include "Galois/Galois.h"
 
 __thread GaloisRuntime::SimpleRuntimeContext* GaloisRuntime::thread_cnx;
+
+void GaloisRuntime::setThreadContext(SimpleRuntimeContext* n)
+{
+  thread_cnx = n;
+}
