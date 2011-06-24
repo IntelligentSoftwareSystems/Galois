@@ -9,7 +9,9 @@
 #include "Lonestar/CommandLine.h"
 
 static const char* name = "Barnshut N-Body Simulator";
-static const char* description = "Simulation of the gravitational forces in a galactic cluster using the Barnes-Hut n-body algorithm\n";
+static const char* description =
+  "Simulation of the gravitational forces in a galactic cluster using the "
+  "Barnes-Hut n-body algorithm\n";
 static const char* url = "http://iss.ices.utexas.edu/lonestar/barneshut.html";
 static const char* help = "<numbodies> <ntimesteps> <seed>";
 
@@ -69,22 +71,24 @@ std::ostream& operator<<(std::ostream& os, const Point& p) {
 
 struct Octree {
   virtual ~Octree() { }
-  virtual bool is_leaf() const = 0;
+  virtual bool isLeaf() const = 0;
 };
 
 struct OctreeInternal : Octree {
   Octree* child[8];
   Point pos;
   double mass;
-  OctreeInternal(Point _pos) : pos(_pos), mass(0.0) { bzero(child, sizeof(*child) * 8); }
+  OctreeInternal(Point _pos) : pos(_pos), mass(0.0) {
+    bzero(child, sizeof(*child) * 8);
+  }
   virtual ~OctreeInternal() {
     for (int i = 0; i < 8; i++) {
-      if (child[i] != NULL && !child[i]->is_leaf()) {
+      if (child[i] != NULL && !child[i]->isLeaf()) {
         delete child[i];
       }
     }
   }
-  virtual bool is_leaf() const {
+  virtual bool isLeaf() const {
     return false;
   }
 };
@@ -95,13 +99,16 @@ struct Body : Octree {
   Point acc;
   double mass;
   Body() { }
-  virtual bool is_leaf() const {
+  virtual bool isLeaf() const {
     return true;
   }
 };
 
 std::ostream& operator<<(std::ostream& os, const Body& b) {
-  os << "(pos:" << b.pos << " vel:" << b.vel << " acc:" << b.acc << " mass:" << b.mass << ")";
+  os << "(pos:" << b.pos
+     << " vel:" << b.vel
+     << " acc:" << b.acc
+     << " mass:" << b.mass << ")";
   return os;
 }
 
@@ -109,7 +116,9 @@ struct BoundingBox {
   Point min;
   Point max;
   explicit BoundingBox(const Point& p) : min(p), max(p) { }
-  BoundingBox() : min(std::numeric_limits<double>::max()), max(std::numeric_limits<double>::min()) { }
+  BoundingBox() :
+    min(std::numeric_limits<double>::max()),
+    max(std::numeric_limits<double>::min()) { }
 
   void merge(const BoundingBox& other) {
     for (int i = 0; i < 3; i++) {
@@ -148,7 +157,10 @@ struct BoundingBox {
   }
 
   Point center() const {
-    return Point((max.x + min.x) * 0.5, (max.y + min.y) * 0.5, (max.z + min.z) * 0.5);
+    return Point(
+        (max.x + min.x) * 0.5,
+        (max.y + min.y) * 0.5,
+        (max.z + min.z) * 0.5);
   }
 };
 
@@ -162,12 +174,18 @@ struct Config {
   const double eps; // potential softening parameter
   const double tol; // tolerance for stopping recursion, <0.57 to bound error
   const double dthf, epssq, itolsq;
-  Config() : dtime(0.5), eps(0.05), tol(0.025), dthf(dtime * 0.5), epssq(eps * eps), itolsq(1.0 / (tol * tol))  { }
+  Config() :
+    dtime(0.5),
+    eps(0.05),
+    tol(0.025),
+    dthf(dtime * 0.5),
+    epssq(eps * eps),
+    itolsq(1.0 / (tol * tol))  { }
 };
 
 Config config;
 
-static inline int get_index(const Point& a, const Point& b) {
+static inline int getIndex(const Point& a, const Point& b) {
   int index = 0;
   if (a.x < b.x)
     index += 1;
@@ -178,7 +196,7 @@ static inline int get_index(const Point& a, const Point& b) {
   return index;
 }
 
-static inline void update_center(Point& p, int index, double radius) {
+static inline void updateCenter(Point& p, int index, double radius) {
   for (int i = 0; i < 3; i++) {
     double v = (index & (1 << i)) > 0 ? radius : -radius;
     p[i] += v;
@@ -192,7 +210,9 @@ struct BuildOctree {
   OctreeInternal* root;
   double root_radius;
 
-  BuildOctree(OctreeInternal* _root, double radius) : root(_root), root_radius(radius) { }
+  BuildOctree(OctreeInternal* _root, double radius) :
+    root(_root),
+    root_radius(radius) { }
 
   template<typename Context>
   void operator()(Body* b, Context&) {
@@ -200,9 +220,9 @@ struct BuildOctree {
   }
 
   void insert(Body* b, OctreeInternal* node, double radius) {
-    int index = get_index(node->pos, b->pos);
+    int index = getIndex(node->pos, b->pos);
 
-    assert(!node->is_leaf());
+    assert(!node->isLeaf());
 
     Octree *child = node->child[index];
     
@@ -212,11 +232,11 @@ struct BuildOctree {
     }
     
     radius *= 0.5;
-    if (child->is_leaf()) {
+    if (child->isLeaf()) {
       // Expand leaf
       Body* n = static_cast<Body*>(child);
       Point new_pos(node->pos);
-      update_center(new_pos, index, radius);
+      updateCenter(new_pos, index, radius);
       OctreeInternal* new_node = new OctreeInternal(new_pos);
 
       assert(n->pos != b->pos);
@@ -261,7 +281,7 @@ private:
       
       double m;
       const Point* p;
-      if (child->is_leaf()) {
+      if (child->isLeaf()) {
         Body* n = static_cast<Body*>(child);
         m = n->mass;
         p = &n->pos;
@@ -295,7 +315,10 @@ struct ComputeForces {
   double root_dsq;
   int step;
 
-  ComputeForces(OctreeInternal* _top, double _diameter, int _step) : top(_top), diameter(_diameter), step(_step) {
+  ComputeForces(OctreeInternal* _top, double _diameter, int _step) :
+    top(_top),
+    diameter(_diameter),
+    step(_step) {
     root_dsq = diameter * diameter * config.itolsq;
   }
   
@@ -365,7 +388,7 @@ struct ComputeForces {
         Octree *next = f.node->child[i];
         if (next == NULL)
           break;
-        if (next->is_leaf()) {
+        if (next->isLeaf()) {
           // Check if it is me
           if (&b != next) {
             recurse(b, static_cast<Body*>(next), dsq);
@@ -401,7 +424,7 @@ struct ComputeForces {
       Octree *next = node->child[i];
       if (next == NULL)
         break;
-      if (next->is_leaf()) {
+      if (next->isLeaf()) {
         // Check if it is me
         if (&b != next) {
           recurse(b, static_cast<Body*>(next), dsq);
@@ -445,13 +468,13 @@ struct ReduceBoxes {
   }
 };
 
-static double next_double() {
+static double nextDouble() {
   return rand() / (double) RAND_MAX;
 }
 
 // Uses plummer model, which is more realistic but perhaps not so much
 // so according to astrophysicists 
-static void generate_input(Bodies& bodies, int nbodies, int seed) {
+static void generateInput(Bodies& bodies, int nbodies, int seed) {
   double v, sq, scale;
   Point p;
   double PI = boost::math::constants::pi<double>();
@@ -462,10 +485,10 @@ static void generate_input(Bodies& bodies, int nbodies, int seed) {
   double vsc = sqrt(1.0 / rsc);
 
   for (int body = 0; body < nbodies; body++) {
-    double r = 1.0 / sqrt(pow(next_double() * 0.999, -2.0 / 3.0) - 1);
+    double r = 1.0 / sqrt(pow(nextDouble() * 0.999, -2.0 / 3.0) - 1);
     do {
       for (int i = 0; i < 3; i++)
-        p[i] = next_double() * 2.0 - 1.0;
+        p[i] = nextDouble() * 2.0 - 1.0;
       sq = p.x * p.x + p.y * p.y + p.z * p.z;
     } while (sq > 1.0);
     scale = rsc * r / sqrt(sq);
@@ -476,13 +499,13 @@ static void generate_input(Bodies& bodies, int nbodies, int seed) {
       b.pos[i] = p[i] * scale;
 
     do {
-      p.x = next_double();
-      p.y = next_double() * 0.1;
+      p.x = nextDouble();
+      p.y = nextDouble() * 0.1;
     } while (p.y > p.x * p.x * pow(1 - p.x * p.x, 3.5));
     v = p.x * sqrt(2.0 / sqrt(1 + r * r));
     do {
       for (int i = 0; i < 3; i++)
-        p[i] = next_double() * 2.0 - 1.0;
+        p[i] = nextDouble() * 2.0 - 1.0;
       sq = p.x * p.x + p.y * p.y + p.z * p.z;
     } while (sq > 1.0);
     scale = vsc * v / sqrt(sq);
@@ -498,32 +521,38 @@ struct Deref : public std::unary_function<T, T*> {
   T* operator()(T& item) const { return &item; }
 };
 
-static boost::transform_iterator<Deref<Body>, Bodies::iterator> wrap(Bodies::iterator it) {
+static boost::transform_iterator<Deref<Body>, Bodies::iterator> 
+wrap(Bodies::iterator it) {
   return boost::make_transform_iterator(it, Deref<Body>());
 }
 
 static void run(int nbodies, int ntimesteps, int seed) {
   Bodies bodies;
-  generate_input(bodies, nbodies, seed);
+  generateInput(bodies, nbodies, seed);
 
   typedef GaloisRuntime::WorkList::dChunkedLIFO<256> WL;
 
   for (int step = 0; step < ntimesteps; step++) {
     BoundingBox box;
     ReduceBoxes reduceBoxes(box);
-    Galois::for_each<WL>(wrap(bodies.begin()), wrap(bodies.end()), ReduceBoxes(box));
+    Galois::for_each<WL>(wrap(bodies.begin()), wrap(bodies.end()),
+        ReduceBoxes(box));
     OctreeInternal* top = new OctreeInternal(box.center());
 
-    Galois::for_each<WL>(wrap(bodies.begin()), wrap(bodies.end()), BuildOctree(top, box.radius()));
+    Galois::for_each<WL>(wrap(bodies.begin()), wrap(bodies.end()),
+        BuildOctree(top, box.radius()));
 
     ComputeCenterOfMass computeCenterOfMass(top);
     computeCenterOfMass();
 
-    Galois::for_each<WL>(wrap(bodies.begin()), wrap(bodies.end()), ComputeForces(top, box.diameter(), step));
+    Galois::for_each<WL>(wrap(bodies.begin()), wrap(bodies.end()),
+        ComputeForces(top, box.diameter(), step));
+    Galois::for_each<WL>(wrap(bodies.begin()), wrap(bodies.end()),
+        AdvanceBodies());
 
-    Galois::for_each<WL>(wrap(bodies.begin()), wrap(bodies.end()), AdvanceBodies());
-
-    std::cout << "Timestep " << step << " Center of Mass = " << top->pos << std::endl;
+    std::cout 
+      << "Timestep " << step
+      << " Center of Mass = " << top->pos << "\n";
     delete top;
   }
 }
@@ -546,7 +575,8 @@ int main(int argc, const char** argv) {
             << ntimesteps << " time steps" << std::endl << std::endl;
   std::cout << "Num. of threads: " << numThreads << std::endl;
 
-  // TODO(ddn): broken for numThreads > 1 until we get the sequential annotations in
+  // TODO(ddn): broken for numThreads > 1 until we get the sequential
+  // annotations in
   if (numThreads > 1) {
     assert(numThreads == 1);
     abort();
