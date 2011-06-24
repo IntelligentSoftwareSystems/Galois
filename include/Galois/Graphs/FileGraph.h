@@ -97,6 +97,10 @@ public:
     return &outs[outIdx[N]];
   }
 
+  bool has_neighbor(GraphNode N1, GraphNode N2, MethodFlag mflag = ALL) {
+    return std::find(neighbor_begin(N1), neighbor_end(N1), N2) != neighbor_end(N1);
+  }
+
   //These are not thread safe!!
   typedef boost::counting_iterator<uint64_t> active_iterator;
 
