@@ -21,8 +21,8 @@ run() {
 
 run apps/delaunaytriangulation/delaunaytriangulation -t 2 ${BASE}/inputs/meshes/r10k.node
 run apps/delaunayrefinement/delaunayrefinement -t 2 ${BASE}/inputs/meshes/r10k.1
-run apps/barneshut/barneshut -t 2 gen 1000 1 0
-run apps/betweennesscentrality/betweennesscentrality -t 2 ${BASE}/inputs/structured/taurous5.gr
+run apps/barneshut/barneshut -t 2 1000 1 0
+run apps/betweennesscentrality/betweennesscentrality -t 2 ${BASE}/inputs/structured/torus5.gr
 
 echo -en '\033[1;32m'
 echo -n ALL OK
