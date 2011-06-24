@@ -39,8 +39,9 @@ if(USE_NUMA)
 endif(USE_NUMA)
 
 #vtune
-#apps/CMakeLists.txt also hardcodes this path
-if(EXISTS "/opt/intel/vtune_amplifier_xe_2011/include/ittnotify.h")
+set(VTUNE_INCLUDE "/opt/intel/vtune_amplifier_xe_2011/include")
+set(VTUNE_LIB "/opt/intel/vtune_amplifier_xe_2011/lib64/libittnotify.a")
+if(EXISTS ${VTUNE_INCLUDE})
   set(USE_VTUNE ON)
 endif()
 

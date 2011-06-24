@@ -7,8 +7,8 @@ function(app name)
 
   if(USE_VTUNE)
     add_definitions(-DGALOIS_VTUNE)
-    include_directories("/opt/intel/vtune_amplifier_xe_2011/include/")
-    target_link_libraries(${name} /opt/intel/vtune_amplifier_xe_2011/lib64/libittnotify.a)
+    include_directories(${VTUNE_INCLUDE})
+    target_link_libraries(${name} ${VTUNE_LIB})
     target_link_libraries(${name} dl)
   endif(USE_VTUNE)
 
