@@ -143,7 +143,7 @@ public:
 			int index = nodeData.getPartition();
 			GGraph* subGraph = subGraphs[index].getGraph();
 			metisGraph->getSubGraphMapTo(nodeData.getNodeId()).getData().setAdjWgtSum(nodeData.getAdjWgtSum());
-			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(node, Galois::Graph::NONE, 0), eejj = graph->neighbor_end(node, Galois::Graph::NONE, 0); jj != eejj; ++jj) {
+			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(node, Galois::Graph::NONE), eejj = graph->neighbor_end(node, Galois::Graph::NONE); jj != eejj; ++jj) {
 				GNode neighbor = *jj;
 
 				MetisNode& neighborData = neighbor.getData();

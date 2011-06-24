@@ -10,7 +10,7 @@
 #include "GMetisConfig.h"
 void projectNeighbors(GGraph* graph, GNode node, int* map, int& ndegrees, int& ed) {
 	MetisNode& nodeData = node.getData(Galois::Graph::NONE);
-	for (GGraph::neighbor_iterator jj = graph->neighbor_begin(node, Galois::Graph::NONE, 0), eejj = graph->neighbor_end(node, Galois::Graph::NONE, 0); jj != eejj; ++jj) {
+	for (GGraph::neighbor_iterator jj = graph->neighbor_begin(node, Galois::Graph::NONE), eejj = graph->neighbor_end(node, Galois::Graph::NONE); jj != eejj; ++jj) {
 			GNode neighbor = *jj;
 			MetisNode& neighborData = neighbor.getData(Galois::Graph::NONE);
 			if (nodeData.getPartition() != neighborData.getPartition()) {
@@ -66,9 +66,7 @@ struct projectInfo {
 void computeKWayPartInfo(int nparts, MetisGraph* finer,
 		GGraph* coarseGraph, GGraph* graph){
 	projectInfo pi(nparts, finer);
-	GaloisRuntime::WorkList::ChunkedFIFO<GNode, 64> wl;
-	wl.fill_initial(graph->active_begin(), graph->active_end());
-	Galois::for_each(wl, pi);
+	Galois::for_each<GaloisRuntime::WorkList::ChunkedFIFO<64> >(graph->active_begin(), graph->active_end(), pi);
 }
 
 void projectKWayPartition(MetisGraph* metisGraph, int nparts){

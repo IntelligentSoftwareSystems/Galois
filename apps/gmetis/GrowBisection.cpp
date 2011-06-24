@@ -64,7 +64,7 @@ void bisection(GGraph* graph, GNode* nodes, int numNodes, int minWgtPart1, int m
 
 		drain = false;
 
-		for (GGraph::neighbor_iterator jj = graph->neighbor_begin(nodes[i], Galois::Graph::NONE, 0), eejj = graph->neighbor_end(nodes[i], Galois::Graph::NONE, 0); jj != eejj; ++jj) {
+		for (GGraph::neighbor_iterator jj = graph->neighbor_begin(nodes[i], Galois::Graph::NONE), eejj = graph->neighbor_end(nodes[i], Galois::Graph::NONE); jj != eejj; ++jj) {
 			GNode neighbor = *jj;
 			int k = neighbor.getData().getNodeId();//id is same as the position in nodes array
 			if (visited[k] == 0) {

@@ -45,9 +45,7 @@ public:
 			int oldcut = metisGraph->getMinCut();
 			GaloisRuntime::PerCPU_merge<PerCPUValue> perCPUValues(merge);
 			parallelRefine pr(metisGraph, this, &perCPUValues);
-			GaloisRuntime::WorkList::ChunkedFIFO<GNode, 64> wl;
-			wl.fill_initial(metisGraph->getBoundaryNodes()->begin(), metisGraph->getBoundaryNodes()->end());
-			Galois::for_each(wl, pr);
+			Galois::for_each<GaloisRuntime::WorkList::ChunkedFIFO<64, GNode> >(metisGraph->getBoundaryNodes()->begin(), metisGraph->getBoundaryNodes()->end(), pr);
 			metisGraph->incMinCut(perCPUValues.get().mincutInc);
 			GNodeSet& changedNodes = perCPUValues.get().changedBndNodes;
 			for(GNodeSet::iterator iter=changedNodes.begin();iter!=changedNodes.end();++iter){
@@ -118,7 +116,7 @@ private:
 			 */
 			//dummy for cautious
 //			if(!GaloisRuntime.getRuntime().useSerial()){
-			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(n, Galois::Graph::CHECK_CONFLICT, 0), eejj = graph->neighbor_end(n, Galois::Graph::CHECK_CONFLICT, 0); jj != eejj; ++jj) {
+			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(n, Galois::Graph::CHECK_CONFLICT), eejj = graph->neighbor_end(n, Galois::Graph::CHECK_CONFLICT); jj != eejj; ++jj) {
 				GNode neighbor = *jj;
 				neighbor.getData(Galois::Graph::CHECK_CONFLICT);
 			}
@@ -153,7 +151,7 @@ private:
 			/*
 			 * update the degrees of adjacent vertices
 			 */
-			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(n, Galois::Graph::NONE, 0), eejj = graph->neighbor_end(n, Galois::Graph::NONE, 0); jj != eejj; ++jj) {
+			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(n, Galois::Graph::NONE), eejj = graph->neighbor_end(n, Galois::Graph::NONE); jj != eejj; ++jj) {
 				GNode neighbor = *jj;
 				MetisNode& neighborData = neighbor.getData(Galois::Graph::NONE);
 				if (neighborData.getPartEd().size() == 0) {

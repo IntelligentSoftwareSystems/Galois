@@ -47,14 +47,14 @@ void partition(MetisGraph* metisGraph, int nparts) {
 	cout<<"initial partion"<<endl;
 	pmetis.mlevelRecursiveBisection(mcg, nparts, totalPartitionWeights, 0, 0);
 //	Galois::Launcher::stopTiming();
-	cout << "initial partition time: " << Galois::Launcher::elapsedTime() << " ms";
+	cout << "initial partition time: "  << " ms";
 	//	mcg->setNParts(nparts);
 //	Galois::Launcher::startTiming();
 	arrayFill(totalPartitionWeights, nparts, 1 / (float) nparts);
 	refineKWay(mcg, metisGraph, totalPartitionWeights, (float) 1.03, nparts);
-	Galois::Launcher::stopTiming();
-	cout << "refine time: " << Galois::Launcher::elapsedTime() << " ms"<<endl;
+//	cout << "refine time: " << Galois::Launcher::elapsedTime() << " ms"<<endl;
 	delete[] totalPartitionWeights;
+	Galois::Launcher::stopTiming();
 }
 
 void verify(MetisGraph* metisGraph) {

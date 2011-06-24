@@ -28,7 +28,7 @@ public:
 			return;
 		}
 		GNode matchNode = node;
-		for (GGraph::neighbor_iterator jj = graph->neighbor_begin(node, Galois::Graph::CHECK_CONFLICT, 0), eejj = graph->neighbor_end(node, Galois::Graph::CHECK_CONFLICT, 0); jj != eejj; ++jj) {
+		for (GGraph::neighbor_iterator jj = graph->neighbor_begin(node, Galois::Graph::CHECK_CONFLICT), eejj = graph->neighbor_end(node, Galois::Graph::CHECK_CONFLICT); jj != eejj; ++jj) {
 			GNode neighbor = *jj;
 			MetisNode& neighMNode = neighbor.getData(Galois::Graph::CHECK_CONFLICT);
 			if (!metisGraph->isMatched(neighMNode.getNodeId()) && node.getData(Galois::Graph::NONE).getWeight() + neighMNode.getWeight() <= maxVertexWeight) {

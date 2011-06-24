@@ -112,14 +112,10 @@ private:
 
 		if (notFirstTime) {
 			parallelMatchNodes<HEMMatcher> pHEM(metisGraph, coarser, maxVertexWeight);
-			GaloisRuntime::WorkList::ChunkedFIFO<GNode, 64> wl;
-			wl.fill_initial(graph->active_begin(), graph->active_end());
-			Galois::for_each(wl, pHEM);
+			Galois::for_each<GaloisRuntime::WorkList::ChunkedFIFO<64, GNode> >(graph->active_begin(), graph->active_end(), pHEM);
 		} else {
 			parallelMatchNodes<RMMatcher> pRM(metisGraph, coarser, maxVertexWeight);
-			GaloisRuntime::WorkList::ChunkedFIFO<GNode, 64> wl;
-			wl.fill_initial(graph->active_begin(), graph->active_end());
-			Galois::for_each(wl, pRM);
+			Galois::for_each<GaloisRuntime::WorkList::ChunkedFIFO<64, GNode> >(graph->active_begin(), graph->active_end(), pRM);
 			notFirstTime = true;
 		}
 		return notFirstTime;
@@ -139,7 +135,7 @@ private:
 		GNode matched = metisGraph->getMatch(node.getData(Galois::Graph::NONE).getNodeId());//.getMatch();
 		GNode nodeMapTo = metisGraph->getCoarseGraphMap(node.getData(Galois::Graph::NONE).getNodeId());//node.getData(Galois::Graph::NONE).getMapTo();
 		GGraph* coarseGraph = coarseMetisGraph->getGraph();
-		for (GGraph::neighbor_iterator jj = graph->neighbor_begin(node, Galois::Graph::NONE, 0), eejj = graph->neighbor_end(node, Galois::Graph::NONE, 0); jj != eejj; ++jj) {
+		for (GGraph::neighbor_iterator jj = graph->neighbor_begin(node, Galois::Graph::NONE), eejj = graph->neighbor_end(node, Galois::Graph::NONE); jj != eejj; ++jj) {
 			GNode neighbor = *jj;
 			if (neighbor == matched) {
 				continue;
@@ -212,11 +208,11 @@ private:
 			GNode matched = metisGraph->getMatch(nodeData.getNodeId());
 			matched.getData(Galois::Graph::CHECK_CONFLICT);
 			// dummy loops for making cautious
-			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(item, Galois::Graph::CHECK_CONFLICT, 0), eejj = graph->neighbor_end(item, Galois::Graph::CHECK_CONFLICT, 0); jj != eejj; ++jj) {
+			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(item, Galois::Graph::CHECK_CONFLICT), eejj = graph->neighbor_end(item, Galois::Graph::CHECK_CONFLICT); jj != eejj; ++jj) {
 				GNode neighbor = *jj;
 				metisGraph->getCoarseGraphMap(neighbor.getData(Galois::Graph::CHECK_CONFLICT).getNodeId()).getData(Galois::Graph::CHECK_CONFLICT);
 			}
-			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(matched, Galois::Graph::CHECK_CONFLICT, 0), eejj = graph->neighbor_end(matched, Galois::Graph::CHECK_CONFLICT, 0); jj != eejj; ++jj) {
+			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(matched, Galois::Graph::CHECK_CONFLICT), eejj = graph->neighbor_end(matched, Galois::Graph::CHECK_CONFLICT); jj != eejj; ++jj) {
 				GNode neighbor = *jj;
 				metisGraph->getCoarseGraphMap(neighbor.getData(Galois::Graph::CHECK_CONFLICT).getNodeId()).getData(Galois::Graph::CHECK_CONFLICT);
 			}
@@ -228,9 +224,7 @@ private:
 		bool* visited = new bool[metisGraph->getGraph()->size()];
 		cout<<"start create graph"<<endl;
 		parallelAddingEdges pae(metisGraph, coarseMetisGraph, this, visited);
-		GaloisRuntime::WorkList::ChunkedFIFO<GNode, 64> wl;
-		wl.fill_initial(graph->active_begin(), graph->active_end());
-		Galois::for_each(wl, pae);
+		Galois::for_each<GaloisRuntime::WorkList::ChunkedFIFO<64, GNode> >(graph->active_begin(), graph->active_end(), pae);
 		cout<<"finish create graph"<<endl;
 		delete[] visited;
 	}
