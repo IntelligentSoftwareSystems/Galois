@@ -1,5 +1,5 @@
 /** Barnes-hut application -*- C++ -*-
- *
+ * @file
  * @section License
  *
  * Galois, a framework to exploit amorphous data-parallelism in irregular
@@ -31,12 +31,13 @@
 #include "Lonestar/Banner.h"
 #include "Lonestar/CommandLine.h"
 
-static const char* name = "Barnshut N-Body Simulator";
-static const char* description =
+namespace {
+const char* name = "Barnshut N-Body Simulator";
+const char* description =
   "Simulation of the gravitational forces in a galactic cluster using the "
   "Barnes-Hut n-body algorithm\n";
-static const char* url = "http://iss.ices.utexas.edu/lonestar/barneshut.html";
-static const char* help = "<numbodies> <ntimesteps> <seed>";
+const char* url = "http://iss.ices.utexas.edu/lonestar/barneshut.html";
+const char* help = "<numbodies> <ntimesteps> <seed>";
 
 struct Point {
   double x, y, z;
@@ -211,7 +212,7 @@ struct Config {
 
 Config config;
 
-static inline int getIndex(const Point& a, const Point& b) {
+inline int getIndex(const Point& a, const Point& b) {
   int index = 0;
   if (a.x < b.x)
     index += 1;
@@ -222,7 +223,7 @@ static inline int getIndex(const Point& a, const Point& b) {
   return index;
 }
 
-static inline void updateCenter(Point& p, int index, double radius) {
+inline void updateCenter(Point& p, int index, double radius) {
   for (int i = 0; i < 3; i++) {
     double v = (index & (1 << i)) > 0 ? radius : -radius;
     p[i] += v;
@@ -494,7 +495,7 @@ struct ReduceBoxes {
   }
 };
 
-static double nextDouble() {
+double nextDouble() {
   return rand() / (double) RAND_MAX;
 }
 
@@ -502,7 +503,7 @@ static double nextDouble() {
  * Generates random input according to the Plummer model, which is more
  * realistic but perhaps not so much so according to astrophysicists
  */
-static void generateInput(Bodies& bodies, int nbodies, int seed) {
+void generateInput(Bodies& bodies, int nbodies, int seed) {
   double v, sq, scale;
   Point p;
   double PI = boost::math::constants::pi<double>();
@@ -549,12 +550,12 @@ struct Deref : public std::unary_function<T, T*> {
   T* operator()(T& item) const { return &item; }
 };
 
-static boost::transform_iterator<Deref<Body>, Bodies::iterator> 
+boost::transform_iterator<Deref<Body>, Bodies::iterator> 
 wrap(Bodies::iterator it) {
   return boost::make_transform_iterator(it, Deref<Body>());
 }
 
-static void run(int nbodies, int ntimesteps, int seed) {
+void run(int nbodies, int ntimesteps, int seed) {
   Bodies bodies;
   generateInput(bodies, nbodies, seed);
 
@@ -584,6 +585,8 @@ static void run(int nbodies, int ntimesteps, int seed) {
     delete top;
   }
 }
+
+} // end namespace
 
 int main(int argc, const char** argv) {
   std::cout.setf(std::ios::right|std::ios::scientific|std::ios::showpoint);

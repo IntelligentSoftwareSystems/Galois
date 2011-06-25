@@ -31,12 +31,13 @@
 #include "Lonestar/Banner.h"
 #include "Lonestar/CommandLine.h"
 
-static const char* name = "Preflow Push";
-static const char* description =
+namespace {
+
+const char* name = "Preflow Push";
+const char* description =
   "Finds the maximum flow in a network using the preflow push technique\n";
-static const char* url = "http://iss.ices.utexas.edu/lonestar/preflowpush.html";
-static const char* help =
-  "<input file> <source id> <sink id> [global relabel interval]";
+const char* url = "http://iss.ices.utexas.edu/lonestar/preflowpush.html";
+const char* help = "<input file> <source id> <sink id> [global relabel interval]";
 
 /**
  * Alpha parameter the original Goldberg algorithm to control when global
@@ -44,7 +45,7 @@ static const char* help =
  * before, but it is possible to achieve much better performance by adjusting
  * the global relabel frequency.
  */
-static const int ALPHA = 6;
+const int ALPHA = 6;
 
 /**
  * Beta parameter the original Goldberg algorithm to control when global
@@ -52,7 +53,7 @@ static const int ALPHA = 6;
  * before, but it is possible to achieve much better performance by adjusting
  * the global relabel frequency.
  */
-static const int BETA = 12;
+const int BETA = 12;
 
 struct Node {
   size_t excess;
@@ -87,7 +88,7 @@ struct Config {
 
 Config app;
 
-static void checkAugmentingPath() {
+void checkAugmentingPath() {
   // Use id field as visited flag
   for (Graph::active_iterator ii = app.graph.active_begin(), 
       ee = app.graph.active_end(); ii != ee; ++ii) {
@@ -120,7 +121,7 @@ static void checkAugmentingPath() {
   }
 }
 
-static void checkHeights() {
+void checkHeights() {
   for (Graph::active_iterator i = app.graph.active_begin(),
       iend = app.graph.active_end(); i != iend; ++i) {
     GNode src = *i;
@@ -138,7 +139,7 @@ static void checkHeights() {
   }
 }
 
-static void checkConservation(Config& orig) {
+void checkConservation(Config& orig) {
   std::vector<GNode> map;
   map.resize(app.numNodes);
 
@@ -192,14 +193,14 @@ static void checkConservation(Config& orig) {
   }
 }
 
-static void verify(Config& orig) {
+void verify(Config& orig) {
   // FIXME: doesn't fully check result
   checkHeights();
   checkConservation(orig);
   checkAugmentingPath();
 }
 
-static void reduceCapacity(const GNode& src, const GNode& dst, int amount) {
+void reduceCapacity(const GNode& src, const GNode& dst, int amount) {
   int& cap1 = app.graph.getEdgeData(src, dst, Galois::Graph::NONE);
   int& cap2 = app.graph.getEdgeData(dst, src, Galois::Graph::NONE);
   cap1 -= amount;
@@ -222,7 +223,7 @@ struct CleanGap {
   }
 };
 
-static void gapAt(int height) {
+void gapAt(int height) {
   using namespace GaloisRuntime::WorkList;
   typedef LocalQueues<ChunkedLIFO<1024>, LIFO<> > WL;
   Galois::for_each<WL>(app.graph.active_begin(), app.graph.active_end(),
@@ -271,7 +272,7 @@ struct FindWork {
 };
 
 template<typename C>
-static void globalRelabel(C& newWork) {
+void globalRelabel(C& newWork) {
   // TODO could parallelize this too
   for (Graph::active_iterator ii = app.graph.active_begin(),
       ee = app.graph.active_end(); ii != ee; ++ii) {
@@ -418,7 +419,8 @@ struct Process {
   }
 };
 
-static void initializeGraph(const char* inputFile, int sourceId, int sinkId, Config *newApp) {
+void initializeGraph(const char* inputFile,
+    int sourceId, int sinkId, Config *newApp) {
   typedef Galois::Graph::LC_FileGraph<int, int> ReaderGraph;
   typedef ReaderGraph::GraphNode ReaderGNode;
 
@@ -478,7 +480,7 @@ static void initializeGraph(const char* inputFile, int sourceId, int sinkId, Con
   }
 }
 
-static void initializeGaps() {
+void initializeGaps() {
   for (Graph::active_iterator ii = app.graph.active_begin(),
       ee = app.graph.active_end(); ii != ee; ++ii) {
     GNode src = *ii;
@@ -490,7 +492,7 @@ static void initializeGaps() {
 }
 
 template<typename C>
-static void initializePreflow(C& initial) {
+void initializePreflow(C& initial) {
   for (Graph::neighbor_iterator ii = app.graph.neighbor_begin(app.source),
       ee = app.graph.neighbor_end(app.source); ii != ee; ++ii) {
     GNode dst = *ii;
@@ -509,6 +511,8 @@ struct Indexer : std::binary_function<GNode, int, int> {
     return app.numNodes - node.getData(Galois::Graph::NONE).height;
   }
 };
+
+} // end namespace
 
 int main(int argc, const char** argv) {
   std::cout << "Typetrait: " 
@@ -558,4 +562,3 @@ int main(int argc, const char** argv) {
 
   return 0;
 }
-
