@@ -1,21 +1,64 @@
-// simple graph -*- C++ -*-
-/*
-Galois, a framework to exploit amorphous data-parallelism in irregular
-programs.
-
-Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
-UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS SOFTWARE
-AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR ANY
-PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF PERFORMANCE, AND ANY
-WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF DEALING OR USAGE OF TRADE.
-NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH RESPECT TO THE USE OF THE
-SOFTWARE OR DOCUMENTATION. Under no circumstances shall University be liable
-for incidental, special, indirect, direct or consequential damages or loss of
-profits, interruption of business, or related expenses which may arise from use
-of Software or Documentation, including but not limited to those resulting from
-defects in Software and/or Documentation, or loss or inaccuracy of data of any
-kind.
-*/
+/** Basic graphs -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @section Description
+ *
+ * An example of use:
+ * 
+ * \code
+ * struct Node {
+ *   ... // Definition of node data
+ * };
+ *
+ * typedef Galois::Graph::FirstGraph<Node,int,true> Graph;
+ * 
+ * // Create graph
+ * Graph g;
+ * Node n1, n2;
+ * Graph::GraphNode a, b;
+ * a = g.createNode(n1);
+ * g.addNode(a);
+ * b = g.createNode(n2);
+ * g.addNode(b);
+ * g.addEdge(a, b, 5);
+ *
+ * // Traverse graph
+ * for (Graph::active_iterator i = g.active_begin(), iend = g.active_end();
+ *      i != iend;
+ *      ++i) {
+ *   Graph::GraphNode src = *i;
+ *   for (Graph::neighbor_iterator j = g.neighbor_begin(src),
+ *                                 jend = g.neighbor_end(src);
+ *        j != jend;
+ *        ++j) {
+ *     Graph::GraphNode dst = *j;
+ *     int edgeData = g.getEdgeData(src, dst);
+ *     assert(edgeData == 5);
+ *   }
+ * }
+ * \endcode
+ *
+ * @author Andrew Lenharth <andrewl@lenharth.org>
+ */
+#ifndef GALOIS_GRAPHS_GRAPH_H
+#define GALOIS_GRAPHS_GRAPH_H
 
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/iterator/filter_iterator.hpp>
@@ -32,6 +75,13 @@ using namespace GaloisRuntime;
 namespace Galois {
 namespace Graph {
 
+/**
+ * What should the runtime do when executing a method.
+ *
+ * Graph methods take an optional parameter indicating what actions the runtime
+ * should do on the user's behalf: (1) checking for conflicts, and/or (2)
+ * saving undo information. By default, both are performed (ALL).
+ */
 enum MethodFlag {
   NONE, ALL, CHECK_CONFLICT, SAVE_UNDO
 };
@@ -50,8 +100,10 @@ static inline bool shouldLock(MethodFlag g) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Wrap void so that we can have a valid type on void nodes
 
+/**
+ * Wrapper class to have a valid type on void nodes
+ */
 template<typename T>
 struct VoidWrapper {
   typedef T type;
@@ -66,6 +118,9 @@ struct VoidWrapper<void> {
   typedef unit ref_type;
 };
 
+/**
+ * Wrapper class to have a valid type on void edges
+ */
 template<typename NTy, typename ETy>
 struct EdgeItem {
   NTy N;
@@ -76,13 +131,10 @@ struct EdgeItem {
   inline ETy& getData() {
     return E;
   }
-  inline EdgeItem(NTy& n) :
-    N(n) {
+  inline EdgeItem(NTy& n) : N(n) {
   }
 
-  inline EdgeItem(){
-  }
-
+  inline EdgeItem(){ }
 };
 
 template<typename NTy>
@@ -94,20 +146,26 @@ struct EdgeItem<NTy, void> {
   inline typename VoidWrapper<void>::ref_type getData() {
     return VoidWrapper<void>::ref_type();
   }
-  inline EdgeItem(NTy& n) :
-    N(n) {
+  inline EdgeItem(NTy& n) : N(n) {
   }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 
+/**
+ * A Graph.
+ *
+ * @param NodeTy Type of node data
+ * @param EdgeTy Type of edge data
+ * @param Directional true if graph is directed
+ */
 template<typename NodeTy, typename EdgeTy, bool Directional>
 class FirstGraph {
 
   struct gNode: public GaloisRuntime::Lockable {
-    //The storage type for edges
+    //! The storage type for edges
     typedef EdgeItem<gNode*, EdgeTy> EITy;
-    //The return type for edge data
+    //! The return type for edge data
     typedef typename VoidWrapper<EdgeTy>::ref_type REdgeTy;
     typedef llvm::SmallVector<EITy, 3> edgesTy;
     edgesTy edges;
@@ -198,6 +256,9 @@ class FirstGraph {
   }
 
 public:
+  /**
+   * An opaque handle to a graph node.
+   */
   class GraphNode {
     friend class FirstGraph;
     FirstGraph* Parent;
@@ -208,7 +269,6 @@ public:
     }
 
   public:
-
     GraphNode() :
       Parent(0), ID(0) {
     }
@@ -218,7 +278,7 @@ public:
 	ID->prefetch_neighbors();
     }
 
-    NodeTy& getData(MethodFlag mflag = ALL) {
+    NodeTy& getData(MethodFlag mflag = ALL) const {
       return Parent->getData(ID, mflag);
     }
 
@@ -246,7 +306,7 @@ public:
       return Parent > rhs.Parent || (Parent == rhs.Parent && ID > rhs.ID);
     }
 
-    bool hasNeighbor(GraphNode& N) {
+    bool hasNeighbor(GraphNode& N) const {
       return ID->hasNeighbor(N.ID);
     }
   };
@@ -263,6 +323,7 @@ private:
       return GraphNode(G, &data);
     }
   };
+
   class makeGraphNodePtr: public std::unary_function<gNode*, GraphNode> {
     FirstGraph* G;
   public:
@@ -275,20 +336,21 @@ private:
   };
 
 public:
-
   typedef EdgeTy EdgeDataTy;
   typedef NodeTy NodeDataTy;
 
-  // Node Handling
-
-  // Creates a new node holding the indicated data.
-  // Node is not added to the graph
+  //// Node Handling ////
+  
+  /**
+   * Creates a new node holding the indicated data. The node is not added to
+   * the graph (see addNode() instead).
+   */
   GraphNode createNode(const NodeTy& n) {
     gNode N(n, false);
     return GraphNode(this, &(nodes.push(N)));
   }
 
-  // Adds a node to the graph.
+  //! Adds a node to the graph.
   bool addNode(const GraphNode& n, MethodFlag mflag = ALL) {
     assert(n.ID);
     if (shouldLock(mflag))
@@ -301,19 +363,24 @@ public:
     return !oldActive;
   }
 
-  NodeTy& getData(const GraphNode& n, MethodFlag mflag = ALL) {
+  //! Gets the node data for a node.
+  NodeTy& getData(const GraphNode& n, MethodFlag mflag = ALL) const {
     assert(n.ID);
     if (shouldLock(mflag))
       acquire(n.ID);
     return n.ID->data;
   }
 
-  // Check if a node is in the graph (already added)
-  bool containsNode(const GraphNode& n) {
+  //! Checks if a node is in the graph (already added)
+  bool containsNode(const GraphNode& n) const {
     return n.ID && (n.Parent == this) && n.ID->active;
   }
 
-  // Removes a node from the graph along with all its outgoing/incoming edges.
+  /**
+   * Removes a node from the graph along with all its outgoing/incoming edges
+   * for undirected graphs or outgoing edges for directed graphs.
+   * 
+   */
   // FIXME: incoming edges aren't handled here for directed graphs
   bool removeNode(GraphNode n, MethodFlag mflag = ALL) {
     assert(n.ID);
@@ -334,9 +401,9 @@ public:
     return wasActive;
   }
 
-  // Edge Handling
+  //// Edge Handling ////
 
-  // Adds an edge to the graph containing the specified data.
+  //! Adds an edge to the graph containing the specified data.
   void addEdge(GraphNode src, GraphNode dst,
 	       const typename VoidWrapper<EdgeTy>::type& data, 
 	       MethodFlag mflag = ALL) {
@@ -359,7 +426,7 @@ public:
     }
   }
 
-  // Adds an edge to the graph
+  //! Adds an edge to the graph
   void addEdge(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
     assert(src.ID);
     assert(dst.ID);
@@ -375,6 +442,7 @@ public:
     }
   }
 
+  //! Removes an edge from the graph
   void removeEdge(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
     assert(src.ID);
     assert(dst.ID);
@@ -390,6 +458,10 @@ public:
     }
   }
 
+  /**
+   * Returns the edge data associated with the edge. It is an error to
+   * get the edge data for a non-existent edge.
+   */
   typename VoidWrapper<EdgeTy>::type& getEdgeData(GraphNode src, GraphNode dst,
 						  MethodFlag mflag = ALL) {
     assert(src.ID);
@@ -411,8 +483,9 @@ public:
     }
   }
 
-  // General Things
+  //// General Things ////
 
+  //! Returns the number of neighbors
   int neighborsSize(GraphNode N, MethodFlag mflag = ALL) {
     assert(N.ID);
     if (shouldLock(mflag))
@@ -421,8 +494,10 @@ public:
   }
 
   typedef typename boost::transform_iterator<makeGraphNodePtr,
-					     typename gNode::neighbor_iterator> neighbor_iterator;
+					     typename gNode::neighbor_iterator>
+                                               neighbor_iterator;
 
+  //! Returns an iterator to the neighbors of a node 
   neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = ALL) {
     assert(N.ID);
     if (shouldLock(mflag))
@@ -436,31 +511,43 @@ public:
     return boost::make_transform_iterator(N.ID->neighbor_begin(),
 					  makeGraphNodePtr(this));
   }
+
+  //! Returns the end of the neighbor iterator 
   neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = ALL) {
     assert(N.ID);
-    if (shouldLock(mflag)) // Probably not necessary (no valid use for an end pointer should ever require it)
+    if (shouldLock(mflag))
+      // Probably not necessary (no valid use for an end pointer should ever
+      // require it)
       acquire(N.ID);
     return boost::make_transform_iterator(N.ID->neighbor_end(),
 					  makeGraphNodePtr(this));
   }
 
-  //These are not thread safe!!
-  typedef boost::transform_iterator<makeGraphNode, boost::filter_iterator<
-						     std::mem_fun_ref_t<bool, gNode>, typename nodeListTy::iterator> >
-  active_iterator;
+  typedef boost::transform_iterator<makeGraphNode,
+            boost::filter_iterator<std::mem_fun_ref_t<bool, gNode>,
+              typename nodeListTy::iterator> > active_iterator;
 
+  /**
+   * Returns an iterator to all the nodes in the graph. Not thread-safe.
+   */
   active_iterator active_begin() {
-    return boost::make_transform_iterator(boost::make_filter_iterator(
-								      std::mem_fun_ref(&gNode::isActive), nodes.begin(), nodes.end()),
-					  makeGraphNode(this));
+    return boost::make_transform_iterator(
+        boost::make_filter_iterator(
+          std::mem_fun_ref(&gNode::isActive), nodes.begin(), nodes.end()),
+        makeGraphNode(this));
   }
 
+  //! Returns the end of the node iterator. Not thread-safe.
   active_iterator active_end() {
-    return boost::make_transform_iterator(boost::make_filter_iterator(
-								      std::mem_fun_ref(&gNode::isActive), nodes.end(), nodes.end()),
-					  makeGraphNode(this));
+    return boost::make_transform_iterator(
+        boost::make_filter_iterator(
+          std::mem_fun_ref(&gNode::isActive), nodes.end(), nodes.end()), 
+        makeGraphNode(this));
   }
-  // The number of nodes in the graph
+
+  /**
+   * Returns the number of nodes in the graph. Not thread-safe.
+   */
   unsigned int size() {
     return std::distance(active_begin(), active_end());
   }
@@ -468,9 +555,8 @@ public:
   FirstGraph() {
     reportStat("NodeSize", sizeof(gNode));
   }
-
 };
 
 }
 }
-// vim: sw=2:ts=8
+#endif
