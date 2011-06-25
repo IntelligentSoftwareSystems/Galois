@@ -463,7 +463,7 @@ public:
    * get the edge data for a non-existent edge.
    */
   typename VoidWrapper<EdgeTy>::type& getEdgeData(GraphNode src, GraphNode dst,
-						  MethodFlag mflag = ALL) {
+						  MethodFlag mflag = ALL) const {
     assert(src.ID);
     assert(dst.ID);
 
@@ -486,7 +486,7 @@ public:
   //// General Things ////
 
   //! Returns the number of neighbors
-  int neighborsSize(GraphNode N, MethodFlag mflag = ALL) {
+  int neighborsSize(GraphNode N, MethodFlag mflag = ALL) const {
     assert(N.ID);
     if (shouldLock(mflag))
       acquire(N.ID);
