@@ -61,6 +61,8 @@ void clustering(std::vector<LeafNode*> *inLights) {
 
 	//launcher.startTiming();
 	KdTree * kdTree = KdTree::createTree(&initialWorklist);
+	if(1!=2)
+		return;
 	while (initialWorklist.size() > 0) {
 		NodeWrapper* currWork = initialWorklist.back();
 		initialWorklist.pop_back();

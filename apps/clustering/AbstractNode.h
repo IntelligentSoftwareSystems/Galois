@@ -66,12 +66,12 @@ public:
 	/**
 	 * What fraction of the total intensity was at the given time instant
 	 */
-//	float getRelativeIntensity(int inTime) {
-//		if (inTime < startTime || inTime > endTime) {
-//			return 0;
-//		}
-//		return timeVector[inTime - startTime];
-//	}
+	//	float getRelativeIntensity(int inTime) {
+	//		if (inTime < startTime || inTime > endTime) {
+	//			return 0;
+	//		}
+	//		return timeVector[inTime - startTime];
+	//	}
 	/**
 	 * Set the Intensity of this node to be equal to the specified
 	 * spectrum scaled by the specified factor and at the single instant specified
@@ -169,7 +169,7 @@ public:
 		repRandomNums.resize(256);
 		for (int i = 0; i < 256; i++) {
 			std::vector<float> * ranVec = new std::vector<float>(1);// = new float[1];
-//			std::cout<<"Starting "<<i<<std::endl;
+			//			std::cout<<"Starting "<<i<<std::endl;
 			//fill vector with uniform randomized numbers (uniformly distributed, jittered)
 			//					for (unsigned int j = 0; j < ranVec.size(); j++)
 			//					{
@@ -177,36 +177,30 @@ public:
 			//					}
 			(*ranVec)[0] = (float) ((0 + ranGen.nextDouble()) * inc);
 			//now randomly permute the numbers
-			//					for (unsigned int j = ranVec.size() - 1; j > 0; j--)
-			//					{
-			//						unsigned int index = (unsigned int) ((j + 1) * ranGen.nextDouble());
-			//						if (index > j) {
-			//							//throw new RuntimeException("badness " + index);
-			//							std::cout << "Error in SetGlobalReps" << std::endl;
-			//						}
-			//						//swap index element with jth element
-			//						float temp = ranVec[j];
-			//						ranVec[j] = ranVec[index];
-			//						ranVec[index] = temp;
-			//					}
-			int index = (int) ((0 + 1) * ranGen.nextDouble());
-			if (index > 0) {
-				//throw new RuntimeException("badness " + index);
-				std::cout << "Error in SetGlobalReps" << std::endl;
+			for (unsigned int j = ranVec->size() - 1; j > 0; j--) {
+				unsigned int index = (unsigned int) ((j + 1)* ranGen.nextDouble());
+				if (index > j) {
+					//throw new RuntimeException("badness " + index);
+					std::cout << "Error in SetGlobalReps" << std::endl;
+				}
+				//swap index element with jth element
+				float temp = (*ranVec)[j];
+				(*ranVec)[j] = (*ranVec)[index];
+				(*ranVec)[index] = temp;
 			}
 			//swap index element with jth element
-//			std::cout<<"Done "<<i<<" :: "<<(*ranVec)[0]<< " inc "<<inc<<"  "<<ranGen.nextDouble()<<std::endl;
-			float temp = (*ranVec)[0];
-			(*ranVec)[0] = (*ranVec)[index];
-			(*ranVec)[index] = temp;
+			//			std::cout<<"Done "<<i<<" :: "<<(*ranVec)[0]<< " inc "<<inc<<"  "<<ranGen.nextDouble()<<std::endl;
+//			float temp = (*ranVec)[0];
+//			(*ranVec)[0] = (*ranVec)[index];
+//			(*ranVec)[index] = temp;
 			//that's all now store the random vector for later use
 			repRandomNums[i] = *ranVec;
 		}
 		/*
-		for(int i=0;i<256;i++){
-			std::cout<<" V:: "<< (repRandomNums[i])[0] << std::endl;
-		}
-		*/
+		 for(int i=0;i<256;i++){
+		 std::cout<<" V:: "<< (repRandomNums[i])[0] << std::endl;
+		 }
+		 */
 	}
 
 	static void setGlobalMultitime() {
@@ -240,14 +234,16 @@ public:
 	virtual bool isLeaf()=0;
 
 	virtual int size()=0;
-	friend std::ostream& operator<<(std::ostream& s , AbstractNode & a);
+	friend std::ostream& operator<<(std::ostream& s, AbstractNode & a);
 };
-std::ostream& operator<<(std::ostream& s , AbstractNode & a){
-	s<<"AbsNode:: ID:"<<a.nodeIdAndFlags<<",["<<a.x<<","<<a.y<<","<<a.z<<"], T:["<<a.startTime<<","<<a.endTime<<"]";
-	s<<"I: ["<<a.intensityRed<<","<<a.intensityGreen<<","<<a.intensityBlue<<"]"<<"\nTime Vector:";
+std::ostream& operator<<(std::ostream& s, AbstractNode & a) {
+	s << "AbsNode:: ID:" << a.nodeIdAndFlags << ",[" << a.x << "," << a.y
+			<< "," << a.z << "], T:[" << a.startTime << "," << a.endTime << "]";
+	s << "I: [" << a.intensityRed << "," << a.intensityGreen << ","
+			<< a.intensityBlue << "]" << "\nTime Vector:";
 
-	for(int i=0;i<(int)a.timeVector.size();i++)
-		s<<""<<a.timeVector[i]<<",";
+	for (int i = 0; i < (int) a.timeVector.size(); i++)
+		s << "" << a.timeVector[i] << ",";
 	return s;
 
 }

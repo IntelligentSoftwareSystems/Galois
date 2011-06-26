@@ -215,12 +215,12 @@ private:
 	 * Computes this cells bounding box to just contain the specified points
 	 */
 	void computeBoundingBoxFromPoints(std::vector<NodeWrapper*> *list, int size) {
-		float xMinNew = std::numeric_limits<float>::max(), yMinNew =
-				std::numeric_limits<float>::max(), zMinNew =
-				std::numeric_limits<float>::max();
-		float xMaxNew = std::numeric_limits<float>::min(), yMaxNew =
-				std::numeric_limits<float>::min(), zMaxNew =
-				std::numeric_limits<float>::min();
+		float   xMinNew = std::numeric_limits<float>::max(),
+				yMinNew = std::numeric_limits<float>::max(),
+				zMinNew = std::numeric_limits<float>::max();
+		float xMaxNew = std::numeric_limits<float>::min(),
+			  yMaxNew =	std::numeric_limits<float>::min(),
+			  zMaxNew = std::numeric_limits<float>::min();
 		for (int i = 0; i < size; i++) {
 			float x = (*list)[i]->getX();
 			float y = (*list)[i]->getY();
@@ -272,8 +272,7 @@ private:
 	 * which fell below the plane.
 	 */
 private:
-	static int splitList(std::vector<NodeWrapper*>* list, int startIndex,
-			int size, float splitValue, int splitType) {
+	static int splitList(std::vector<NodeWrapper*>* list, int startIndex,int size, float splitValue, int splitType) {
 		int lo = startIndex;
 		int hi = startIndex + size - 1;
 		//split into a low group that contains all points <= the split value and
@@ -305,12 +304,12 @@ private:
 	 * we can pass in to reduce the allocation of additional temporary space.
 	 */
 protected:
-	static KdCell* subdivide(std::vector<NodeWrapper*> *list, int offset,int size, std::vector<float> *floatArr, KdCell *factory) {
+	static KdCell* subdivide(std::vector<NodeWrapper*> *list, int offset,int size, float *floatArr, KdCell *factory) {
+		std::cout<<"Starting subdivision with list size:: "<<list->size()<<", off:"<< offset<<", size: "<<size<<std::endl;//", floatArr:"<<floatArr->size()<<""<<std::endl;
 		if (size <= MAX_POINTS_IN_CELL) {
+			//If less than or equal to 4 nodes, then create a new bounding box and return it.
 			KdCell * cell = factory->createNewBlankCell(LEAF,std::numeric_limits<float>::max());
-			//System.arraycopy(list, offset, cell.pointList, 0, size);
-			//list->clear();
-			for (int i = 0; i < size; i++)
+			for (int i = 0; i <= size; i++)
 				(*(cell->pointList))[i] = (*list)[offset + i];
 			cell->computeBoundingBoxFromPoints(cell->pointList, size);
 			cell->notifyContentsRebuilt(true);
@@ -318,7 +317,7 @@ protected:
 		}
 		//otherwise its an interior node and we need to choose a split plane
 		if (floatArr == NULL) {
-			floatArr = new std::vector<float>(size);
+			floatArr = new float [size];
 		}
 		//compute bounding box of points
 		float xMin = std::numeric_limits<float>::max(),
@@ -363,6 +362,7 @@ protected:
 			type2 = cond ? SPLIT_Z : SPLIT_Y;
 		}
 		type = type0;
+
 		value = computeSplitValue(list, offset, size, type0, floatArr);
 		if (value == std::numeric_limits<float>::max()) {
 			//attempt to split failed so try another axis
@@ -387,6 +387,7 @@ protected:
 					<< " leftCount:" << leftCount << " rightCount: " << (size
 					- leftCount) << " sx:" << sx << " sy:" << sy << " sz:"
 					<< sz;
+			//TODO FIX THIS!!!
 			assert(false);
 		}
 		KdCell *cell = factory->createNewBlankCell(type, value);
@@ -403,9 +404,9 @@ protected:
 		return cell;
 	}
 
-	static float computeSplitValue(std::vector<NodeWrapper*>* list, int offset,int size, int splitType, std::vector<float>* floatArr) {
+	static float computeSplitValue(std::vector<NodeWrapper*>* list, int offset,int size, int splitType, float* floatArr) {
 		for (int i = 0; i < size; i++) {
-			(*floatArr)[i] = findSplitComponent((*list)[offset + i], splitType);
+			floatArr[i] = findSplitComponent((*list)[offset + i], splitType);
 		}
 		return findMedianGapSplit(floatArr, size);
 	}
@@ -415,9 +416,9 @@ protected:
 	 * near the median, and returns a value in the middle of that gap
 	 */
 private:
-	static float findMedianGapSplit(std::vector<float> * val, int size) {
+	static float findMedianGapSplit(float * val, int size) {
 		//this is not very efficient at the moment, there are faster median finding algorithms
-		sort(val->begin(), val->end());
+		sort(val, val+size);
 //		std::cout<<" Sorted";
 //		for(std::vector<float>::iterator it = val->begin(), itEnd = val->end();it!=itEnd;++it)
 //			std::cout<<" "<<(*it)<<",";
@@ -430,13 +431,14 @@ private:
 			//should never happen
 			//throw new RuntimeException();
 			std::cout << "Error in findMedianGapSplit" << std::endl;
+			assert(false);
 		}
 		float largestGap = 0;
 		float splitValue = 0;
-		float nextValue = (*val)[start];
+		float nextValue = val[start];
 		for (int i = start; i < end; i++) {
 			float curValue = nextValue; //ie val[i]
-			nextValue = (*val)[i + 1];
+			nextValue = val[i + 1];
 			if ((nextValue - curValue) > largestGap) {
 				largestGap = nextValue - curValue;
 				splitValue = 0.5f * (curValue + nextValue);
