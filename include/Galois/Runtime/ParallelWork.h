@@ -1,28 +1,37 @@
-// simple galois scheduler and runtime -*- C++ -*-
-/*
-Galois, a framework to exploit amorphous data-parallelism in irregular
-programs.
-
-Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
-UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS SOFTWARE
-AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR ANY
-PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF PERFORMANCE, AND ANY
-WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF DEALING OR USAGE OF TRADE.
-NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH RESPECT TO THE USE OF THE
-SOFTWARE OR DOCUMENTATION. Under no circumstances shall University be liable
-for incidental, special, indirect, direct or consequential damages or loss of
-profits, interruption of business, or related expenses which may arise from use
-of Software or Documentation, including but not limited to those resulting from
-defects in Software and/or Documentation, or loss or inaccuracy of data of any
-kind.
-*/
-
-#ifndef __PARALLELWORK_H_
-#define __PARALLELWORK_H_
+/** Galois scheduler and runtime -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @section Description
+ *
+ * Implementation of the Galois foreach iterator. Includes various 
+ * specializations to operators to reduce runtime overhead.
+ *
+ * @author Andrew Lenharth <andrewl@lenharth.org>
+ */
+#ifndef GALOIS_RUNTIME_PARALLELWORK_H
+#define GALOIS_RUNTIME_PARALLELWORK_H
 #include <algorithm>
 #include <numeric>
 #include <sstream>
 #include <math.h>
+#include "Galois/TypeTraits.h"
 #include "Galois/Executable.h"
 #include "Galois/Mem.h"
 
@@ -183,6 +192,8 @@ public:
 };
 template<>
 class API_Pause<false> {
+protected:
+  void init_pause(PauseImpl<false>* pi) { }
 };
 
 //Handle Per Iter Allocator
@@ -223,7 +234,7 @@ protected:
 };
 
 
-//Handle Parallel Pause
+//Handle Parallel Push
 template<bool PUSH_ACTIVE, typename WLT>
 class API_Push;
 
@@ -251,10 +262,10 @@ protected:
 template<typename Function>
 struct Configurator {
   enum {
-    CollectStats = 1,
-    NeedsPause = 1,
-    NeedsPush = 1,
-    NeedsContext = 1,
+    CollectStats = !Galois::does_not_need_stats<Function>::value,
+    NeedsPause = Galois::needs_parallel_pause<Function>::value,
+    NeedsPush = !Galois::does_not_need_parallel_push<Function>::value,
+    NeedsContext = !Galois::does_not_need_context<Function>::value,
     NeedsPIA = 1
   };
 };
@@ -319,7 +330,6 @@ class ForEachWork : public Galois::Executable {
   typedef GaloisRuntime::WorkList::MP_SC_FIFO<value_type> AbortedListTy;
   typedef ParallelThreadContext<Function, WorkListTy> PCTy;
   
-
   WorkListTy global_wl;
   PauseImpl<Configurator<Function>::NeedsPause> pauser;
   Function& f;
@@ -386,77 +396,35 @@ public:
 		   tdata.myEffectiveID() == 0,
 		   &global_wl,
 		   &pauser);
+
     tld.start_parallel_region();
-
     do {
-    std::pair<bool, value_type> p = global_wl.pop();
-    if (p.first) {
-      tld.workHappened();
-      doProcess(p.second, tld);
-      do {
-	if (tld.is_leader() && abort_happened) {
-	  drainAborted();
-	}
-	pauser.checkPause();
-	p = global_wl.pop();
-	if (p.first) {
-	  doProcess(p.second, tld);
-	} else {
-	  break;
-	}
-      } while(true);
-    }
-    if (tld.is_leader() && drainAborted())
-      continue;
+      std::pair<bool, value_type> p = global_wl.pop();
+      if (p.first) {
+        tld.workHappened();
+        doProcess(p.second, tld);
+        do {
+          if (tld.is_leader() && abort_happened) {
+            drainAborted();
+          }
+          pauser.checkPause();
+          p = global_wl.pop();
+          if (p.first) {
+            doProcess(p.second, tld);
+          } else {
+            break;
+          }
+        } while(true);
+      }
+      if (tld.is_leader() && drainAborted())
+        continue;
 
-    pauser.checkPause();
+      pauser.checkPause();
 
       term.localTermination();
     } while (!term.globalTermination());
 
     tld.end_parallel_region();
-  }
-};
-
-
-template<class Function>
-class ForAllWork : public Galois::Executable {
-  PerCPU<long> tdata;
-  Function& f;
-  long start, end;
-  int numThreads;
-
-public:
-  ForAllWork(int _start, int _end, Function& _f) : f(_f), start(_start), end(_end) {
-    numThreads = GaloisRuntime::getSystemThreadPool().getActiveThreads();
-    assert(numThreads > 0);
-  }
-  
-  ~ForAllWork() { 
-    std::vector<long> list;
-    for (int i = 0; i < numThreads; ++i)
-      list.push_back(tdata.get(i));
-    summarizeList("TotalTime", &list[0], &list[list.size()]);
-  }
-
-  virtual void operator()() {
-    Timer T;
-    T.start();
-    // Simple blocked assignment
-    unsigned int id = tdata.myEffectiveID();
-    long range = end - start;
-    long block = range / numThreads;
-    long base = start + id * block;
-    long stop = base + block;
-    for (long i = base; i < stop; i++) {
-      f(i);
-    }
-    // Remainder (each thread executes at most one iteration)
-    for (long i = start + numThreads * block + id; i < end; i += numThreads) {
-      f(i);
-    }
-    T.stop();
-    tdata.get() = T.get();
   }
 };
 
@@ -470,6 +438,7 @@ void for_each_impl(IterTy b, IterTy e, Function f) {
 
   ForEachWork<aWLTy, Function> GW(b, e, f);
   ThreadPool& PTP = getSystemThreadPool();
+
   PTP.run(&GW);
 
 #ifdef GALOIS_VTUNE
@@ -477,12 +446,6 @@ void for_each_impl(IterTy b, IterTy e, Function f) {
 #endif
 }
 
-template<class Function>
-void for_all_parallel(long start, long end, Function& f) {
-  ForAllWork<Function> GW(start, end, f);
-  ThreadPool& PTP = getSystemThreadPool();
-  PTP.run(&GW);
-}
 }
 
 #endif
