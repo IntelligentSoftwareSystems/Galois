@@ -233,7 +233,9 @@ inline void updateCenter(Point& p, int index, double radius) {
 typedef std::vector<Body> Bodies;
 
 struct BuildOctree {
-  // TODO sequential trait
+  // NB: only correct when run sequentially
+  typedef int tt_does_not_need_stats;
+
   OctreeInternal* root;
   double root_radius;
 
@@ -279,7 +281,8 @@ struct BuildOctree {
 };
 
 struct ComputeCenterOfMass {
-  // TODO tree trait
+  // NB: only correct when run sequentially or tree-like reduction
+  typedef int tt_does_not_need_stats;
   OctreeInternal* root;
 
   ComputeCenterOfMass(OctreeInternal* _root) : root(_root) { }
@@ -336,7 +339,9 @@ private:
 };
 
 struct ComputeForces {
-  // TODO no conflict trait
+  // Optimize runtime for no conflict case
+  typedef int tt_does_not_need_context;
+
   OctreeInternal* top;
   double diameter;
   double root_dsq;
@@ -464,7 +469,9 @@ struct ComputeForces {
 };
 
 struct AdvanceBodies {
-  // TODO no conflict trait
+  // Optimize runtime for no conflict case
+  typedef int tt_does_not_need_context;
+
   AdvanceBodies() { }
 
   template<typename Context>
@@ -484,7 +491,8 @@ struct AdvanceBodies {
 };
 
 struct ReduceBoxes {
-  // TODO reduction operator
+  // NB: only correct when run sequentially or tree-like reduction
+  typedef int tt_does_not_need_stats;
   BoundingBox& initial;
 
   ReduceBoxes(BoundingBox& _initial): initial(_initial) { }
@@ -562,6 +570,9 @@ void run(int nbodies, int ntimesteps, int seed) {
   typedef GaloisRuntime::WorkList::dChunkedLIFO<256> WL;
 
   for (int step = 0; step < ntimesteps; step++) {
+    // Do tree building sequentially
+    Galois::setMaxThreads(1);
+
     BoundingBox box;
     ReduceBoxes reduceBoxes(box);
     Galois::for_each<WL>(wrap(bodies.begin()), wrap(bodies.end()),
@@ -573,6 +584,8 @@ void run(int nbodies, int ntimesteps, int seed) {
 
     ComputeCenterOfMass computeCenterOfMass(top);
     computeCenterOfMass();
+
+    Galois::setMaxThreads(numThreads);
 
     Galois::for_each<WL>(wrap(bodies.begin()), wrap(bodies.end()),
         ComputeForces(top, box.diameter(), step));
@@ -605,13 +618,6 @@ int main(int argc, const char** argv) {
             << nbodies << " bodies, "
             << ntimesteps << " time steps" << std::endl << std::endl;
   std::cout << "Num. of threads: " << numThreads << std::endl;
-
-  // TODO(ddn): broken for numThreads > 1 until we get the sequential
-  // annotations in
-  if (numThreads > 1) {
-    assert(numThreads == 1);
-    abort();
-  }
 
   Galois::Launcher::startTiming();
   run(nbodies, ntimesteps, seed);

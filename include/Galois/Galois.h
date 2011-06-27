@@ -1,27 +1,35 @@
-// The user interface -*- C++ -*-
-/*
-Galois, a framework to exploit amorphous data-parallelism in irregular
-programs.
-
-Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
-UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS SOFTWARE
-AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR ANY
-PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF PERFORMANCE, AND ANY
-WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF DEALING OR USAGE OF TRADE.
-NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH RESPECT TO THE USE OF THE
-SOFTWARE OR DOCUMENTATION. Under no circumstances shall University be liable
-for incidental, special, indirect, direct or consequential damages or loss of
-profits, interruption of business, or related expenses which may arise from use
-of Software or Documentation, including but not limited to those resulting from
-defects in Software and/or Documentation, or loss or inaccuracy of data of any
-kind.
-*/
-
+/** Galois user interface -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ */
+#ifndef GALOIS_GALOIS_H
+#define GALOIS_GALOIS_H
 #include "Galois/Runtime/ParallelWork.h"
 
 namespace Galois {
 
-void setMaxThreads(unsigned int num);
+/**
+ * Sets the number of threads to use in runtime system. Returns
+ * the actual value of threads used, which could be less than
+ * the requested value.
+ */
+unsigned int setMaxThreads(unsigned int num);
 
 template<typename WLTy, typename IterTy, typename Function>
 void for_each(IterTy b, IterTy e, Function f) {
@@ -34,15 +42,5 @@ void for_each(IterTy b, IterTy e, Function f) {
   for_each<WLTy, IterTy, Function>(b, e, f);
 }
 
-template<typename Function>
-void for_all(long start, long end, Function f) {
-  GaloisRuntime::for_all_parallel(start, end, f);
 }
-
-template<typename Function>
-void for_all(Function f) {
-  int numThreads = GaloisRuntime::getSystemThreadPool().getActiveThreads();
-  for_all(0, numThreads, f);
-}
-
-}
+#endif
