@@ -1,24 +1,28 @@
-/*
-Galois, a framework to exploit amorphous data-parallelism in irregular
-programs.
-
-Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
-UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS SOFTWARE
-AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR ANY
-PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF PERFORMANCE, AND ANY
-WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF DEALING OR USAGE OF TRADE.
-NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH RESPECT TO THE USE OF THE
-SOFTWARE OR DOCUMENTATION. Under no circumstances shall University be liable
-for incidental, special, indirect, direct or consequential damages or loss of
-profits, interruption of business, or related expenses which may arise from use
-of Software or Documentation, including but not limited to those resulting from
-defects in Software and/or Documentation, or loss or inaccuracy of data of any
-kind.
-*/
+/** Support functions -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @author Andrew Lenharth <andrewl@lenharth.org>
+ */
 #include "Galois/Runtime/SimpleLock.h"
 #include "Galois/Runtime/Support.h"
 #include "LLVM/SmallVector.h"
-#include <sstream>
 #include <algorithm>
 #include <numeric>
 #include <cmath>
@@ -42,18 +46,12 @@ void GaloisRuntime::summarizeList(const char* name, const long* b, const long* e
     stdev = sqrt(acc / (size - 1));
   }
 
-  std::ostringstream out;
-  out.setf(std::ios::fixed, std::ios::floatfield);
-  out.precision(1);
-  out << "n: " << size;
-  out << " ave: " << ave;
-  out << " min: " << min;
-  out << " max: " << max;
-  out << " stdev: " << stdev;
+  char buf[128];
+  snprintf(buf, 128, "n: %ld ave: %.1f min: %ld max: %ld stdev: %.1f",
+      size, ave, min, max, stdev);
 
-  reportStat(name, out.str().c_str());
+  reportStat(name, buf);
 }
-
 
 static void genericReport(bool error, const char* text1,
     const char* text2, const char* val) {
