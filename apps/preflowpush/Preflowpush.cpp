@@ -23,7 +23,7 @@
 #include <algorithm>
 #include <limits>
 #include <set>
-#include "Galois/Launcher.h"
+#include "Galois/Timer.h"
 #include "Galois/Galois.h"
 #include "Galois/TypeTraits.h"
 #include "Galois/Graphs/Graph.h"
@@ -683,10 +683,11 @@ int main(int argc, const char** argv) {
   initializeGraph(inputFile, sourceId, sinkId, &app);
   assert(sourceId < app.numNodes && sinkId < app.numNodes);
   
-  if (args.size() > 3)
+  if (args.size() > 3) {
     app.globalRelabelInterval = atoi(args[3]);
-  else
+  } else {
     app.globalRelabelInterval = app.numNodes * ALPHA + app.numEdges;
+  }
 
   std::cout << "number of nodes: " << app.numNodes << "\n";
   std::cout << "global relabel interval: " << app.globalRelabelInterval << "\n";
@@ -699,7 +700,7 @@ int main(int argc, const char** argv) {
   typedef dChunkedFIFO<16> Chunk;
   typedef OrderedByIntegerMetric<Indexer,Chunk> WL;
 
-  Galois::Launcher::startTiming();
+  Galois::startTiming();
   while (true) {
     Galois::for_each<Chunk>(initial.begin(), initial.end(), Process());
     int gh;
@@ -719,7 +720,7 @@ int main(int argc, const char** argv) {
       break;
     }
   }
-  Galois::Launcher::stopTiming();
+  Galois::stopTiming();
 
   std::cout << "Flow is " << app.sink.getData().excess << "\n";
   

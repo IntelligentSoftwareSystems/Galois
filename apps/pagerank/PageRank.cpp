@@ -1,9 +1,26 @@
-/*
- * PageRank.cpp
+/** Page rank application -*- C++ -*-
+ * @file
+ * @section License
  *
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-
-#include "Galois/Launcher.h"
+#include "Galois/Timer.h"
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
 #include "Galois/IO/gr.h"
@@ -72,12 +89,13 @@ void runBody() {
     max_delta = std::numeric_limits<double>::min();
     unsigned int small_delta = 0;
     double lost_potential = 0;
-    for (Graph::active_iterator src = graph.active_begin(), esrc = graph.active_end();
-        src != esrc; ++src) {
+    for (Graph::active_iterator src = graph.active_begin(),
+        esrc = graph.active_end(); src != esrc; ++src) {
       double value = 0;
-      for (Graph::neighbor_iterator dst = graph.neighbor_begin(*src, Galois::Graph::NONE), 
-           edst = graph.neighbor_end(*src, Galois::Graph::NONE);
-           dst != edst; ++dst) {
+      for (Graph::neighbor_iterator
+          dst = graph.neighbor_begin(*src, Galois::Graph::NONE), 
+          edst = graph.neighbor_end(*src, Galois::Graph::NONE);
+          dst != edst; ++dst) {
         double w = graph.getEdgeData(*src, *dst, Galois::Graph::NONE);
         Node& ddata = graph.getData(*dst, Galois::Graph::NONE);
         value += getPageRank(ddata, iterations) * w;
@@ -104,11 +122,13 @@ void runBody() {
 
     // Redistribute lost potential
     if (lost_potential > 0) {
-      for (Graph::active_iterator src = graph.active_begin(), esrc = graph.active_end();
+      for (Graph::active_iterator src = graph.active_begin(),
+          esrc = graph.active_end();
           src != esrc; ++src) {
         Node& sdata = graph.getData(*src, Galois::Graph::NONE);
         double value = getPageRank(sdata, iterations);
-        setPageRank(sdata, iterations, value + (1 - alpha) * (lost_potential * 1/numNodes));
+        double delta = (1 - alpha) * (lost_potential * 1/numNodes);
+        setPageRank(sdata, iterations, value + delta);
       }
     }
 
@@ -136,7 +156,8 @@ void runBodyParallel(const GNode src) {
     //??? wl never had anything in it
     Galois::for_each<ChunkedFIFO<32> >((GNode*)0,(GNode*)0, process());
     iterations++;
-    std::cout << "iteration: " << iterations << " max delta: " << max_delta << "\n";
+    std::cout << "iteration: " << iterations 
+      << " max delta: " << max_delta << "\n";
   } while (iterations < max_iterations && max_delta > tolerance);
 }
 
@@ -149,7 +170,7 @@ static void makeGraph(const char* input) {
   typedef Galois::Graph::LC_FileGraph<Node, void> InGraph;
   typedef InGraph::GraphNode InGNode;
   InGraph in_graph;
-  Timer phase;
+  Galois::Timer phase;
 
   phase.start();
   in_graph.structureFromFile(input);
@@ -165,13 +186,17 @@ static void makeGraph(const char* input) {
   
   Map in_edges(in_graph.size());
   std::vector<bool> has_out_edges(in_graph.size());
-  for (InGraph::active_iterator src = in_graph.active_begin(), esrc = in_graph.active_end();
+  for (InGraph::active_iterator src = in_graph.active_begin(),
+      esrc = in_graph.active_end();
       src != esrc; ++src) {
-    int neighbors = std::distance(in_graph.neighbor_begin(*src, Galois::Graph::NONE), 
-           in_graph.neighbor_end(*src, Galois::Graph::NONE));
-    for (InGraph::neighbor_iterator dst = in_graph.neighbor_begin(*src, Galois::Graph::NONE), 
-         edst = in_graph.neighbor_end(*src, Galois::Graph::NONE);
-         dst != edst; ++dst) {
+    int neighbors =
+      std::distance(in_graph.neighbor_begin(*src, Galois::Graph::NONE), 
+          in_graph.neighbor_end(*src, Galois::Graph::NONE));
+
+    for (InGraph::neighbor_iterator
+        dst = in_graph.neighbor_begin(*src, Galois::Graph::NONE), 
+        edst = in_graph.neighbor_end(*src, Galois::Graph::NONE);
+        dst != edst; ++dst) {
       Element e(*src, 1.0/neighbors);
       in_edges[*dst].push_back(e);
     }
@@ -205,7 +230,8 @@ static void makeGraph(const char* input) {
 }
 
 void printTop(int topn) {
-  for (Graph::active_iterator src = graph.active_begin(), esrc = graph.active_end();
+  for (Graph::active_iterator src = graph.active_begin(),
+      esrc = graph.active_end();
       src != esrc; ++src) {
     // TODO
   }
@@ -224,15 +250,15 @@ int main(int argc, const char **argv) {
   if (args.size() > 1)
     max_iterations = atoi(args[1]);
  
-  Timer phase;
+  Galois::Timer phase;
   phase.start();
   makeGraph(inputfile);
   phase.stop();
   GaloisRuntime::reportStat("ReadTotal", phase.get());
 
-  Galois::Launcher::startTiming();
+  Galois::startTiming();
   runBody();
-  Galois::Launcher::stopTiming();
+  Galois::stopTiming();
 
   printTop(10);
   if (!skipVerify && !verify()) {
@@ -243,5 +269,3 @@ int main(int argc, const char **argv) {
 
   return 0;
 }
-
-// vim:sw=2:sts=2:ts=8

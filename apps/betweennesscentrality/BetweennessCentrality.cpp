@@ -1,4 +1,26 @@
-#include "Galois/Launcher.h"
+/** Betweenness centrality application -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @author Dimitrios Prountzos <dprountz@cs.utexas.edu>
+ */
+#include "Galois/Timer.h"
 #include "Galois/Graphs/LCGraph.h"
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Galois.h"
@@ -19,7 +41,8 @@
 #define DEBUG 0
 
 static const char* name = "Betweenness Centrality";
-static const char* description = "Computes the betweenness centrality of all nodes in a graph\n";
+static const char* description =
+  "Computes the betweenness centrality of all nodes in a graph\n";
 static const char* url = 0;
 static const char* help = "<input file> <number iterations>";
 
@@ -64,7 +87,9 @@ struct process {
     while (QAt != QPush) {
       GNode _v = SQ[QAt++];
       int v = _v;
-      for (Graph::neighbor_iterator ii = G->neighbor_begin(_v, Galois::Graph::NONE), ee = G->neighbor_end(_v, Galois::Graph::NONE); ii != ee; ++ii) {
+      for (Graph::neighbor_iterator
+          ii = G->neighbor_begin(_v, Galois::Graph::NONE),
+          ee = G->neighbor_end(_v, Galois::Graph::NONE); ii != ee; ++ii) {
 	GNode _w = *ii;
 	int w = _w;
 	if (!d[w]) {
@@ -134,8 +159,9 @@ int main(int argc, const char** argv) {
 
   std::vector<const char*> args = parse_command_line(argc, argv, help);
 
-  if (args.size() > 2 ) {
-    std::cout << "incorrect number of arguments, use -help for usage information\n";
+  if (args.size() > 2) {
+    std::cerr
+      << "incorrect number of arguments, use -help for usage information\n";
     return 1;
   }
   printBanner(std::cout, name, description, url);
@@ -155,7 +181,8 @@ int main(int argc, const char** argv) {
     iterations = atoi(args[1]);
   }
 
-  std::cerr << "NumNodes = " << NumNodes << " Iterations: " << iterations << std::endl;
+  std::cerr << "NumNodes = " << NumNodes 
+    << " Iterations: " << iterations << "\n";
   std::vector<GNode> tmp;
   int cnt = 0;
   for (Graph::active_iterator ii = g.active_begin(), ee = g.active_end();
@@ -169,15 +196,15 @@ int main(int argc, const char** argv) {
     }
   }
   Galois::setMaxThreads(numThreads);
-  Galois::Launcher::startTiming();
+  Galois::startTiming();
   Galois::for_each<GaloisRuntime::WorkList::ChunkedLIFO<16> >(tmp.begin(), tmp.end(), process());
-  Galois::Launcher::stopTiming();
+  Galois::stopTiming();
 
   if (!skipVerify) {
     verify();
   } else { // print bc value for first 10 nodes
     for (int i=0; i<10; ++i) 
-      std::cout << i << ": " << CB->get()[i] << std::endl;
+      std::cout << i << ": " << CB->get()[i] << "\n";
   }
   return 0;
 }

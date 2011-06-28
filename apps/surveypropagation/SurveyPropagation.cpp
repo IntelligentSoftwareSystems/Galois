@@ -1,4 +1,27 @@
-#include "Galois/Launcher.h"
+/** Survey propagation -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @author Martin Burtscher <burtscher@txstate.edu>
+ * @author Andrew Lenharth <andrewl@lenharth.org>
+ */
+#include "Galois/Timer.h"
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
 #include "Galois/Accumulator.h"
@@ -8,12 +31,11 @@
 
 #include <cstdlib>
 
-using namespace std;
-
 static const char* name = "Survey Propagation";
 static const char* description = "Solves SAT problems using survey propagation\n";
-static const char* url = "http://iss.ices.utexas.edu/lonestar/surveypropagation.html";
-static const char* help = "seed clauses variables k";
+static const char* url = 
+  "http://iss.ices.utexas.edu/lonestar/surveypropagation.html";
+static const char* help = "<seed> <num_clauses> <num_variables> <k>";
 
 
 //SAT problem:
@@ -177,30 +199,33 @@ void build_graph() {
     graph.addNode(N, Galois::Graph::NONE);
     gclauses[i] = N;
     for (unsigned j = 0; j < clauses[i].variables.size(); ++j)
-      graph.addEdge(N, gliterals[clauses[i].variables[j].first], SPEdge(clauses[i].variables[j].second), Galois::Graph::NONE);
+      graph.addEdge(N, gliterals[clauses[i].variables[j].first],
+          SPEdge(clauses[i].variables[j].second), Galois::Graph::NONE);
   }
 }
 
 void print_graph() {
   for (unsigned i = 0; i < clauses.size(); ++i) {
     GNode N = gclauses[i];
-    for (Graph::neighbor_iterator ii = graph.neighbor_begin(N, Galois::Graph::NONE), ee = graph.neighbor_end( N, Galois::Graph::NONE); ii != ee; ++ii) {
-      cout << "c"
-	   << graph.getData(N, Galois::Graph::NONE).cla->name
-	   << "->v"
-	   << graph.getData(*ii, Galois::Graph::NONE).lit->name
-	   << " eta: "
-	   << graph.getEdgeData(N, *ii, Galois::Graph::NONE).eta
-	   << " PI[u,s,0]: "
-	   << graph.getEdgeData(N, *ii, Galois::Graph::NONE).PIu
-	   << " "
-	   << graph.getEdgeData(N, *ii, Galois::Graph::NONE).PIs
-	   << " "
-	   << graph.getEdgeData(N, *ii, Galois::Graph::NONE).PI0
-	   << "\n";
+    for (Graph::neighbor_iterator
+        ii = graph.neighbor_begin(N, Galois::Graph::NONE),
+        ee = graph.neighbor_end(N, Galois::Graph::NONE); ii != ee; ++ii) {
+      std::cout << "c"
+	<< graph.getData(N, Galois::Graph::NONE).cla->name
+	<< "->v"
+	<< graph.getData(*ii, Galois::Graph::NONE).lit->name
+	<< " eta: "
+	<< graph.getEdgeData(N, *ii, Galois::Graph::NONE).eta
+	<< " PI[u,s,0]: "
+	<< graph.getEdgeData(N, *ii, Galois::Graph::NONE).PIu
+	<< " "
+	<< graph.getEdgeData(N, *ii, Galois::Graph::NONE).PIs
+	<< " "
+	<< graph.getEdgeData(N, *ii, Galois::Graph::NONE).PI0
+	<< "\n";
     }
   }
-  cout << "\n";
+  std::cout << "\n";
 }
 
 static bool isVu(bool JajNegative, bool JbjNegative) {
@@ -224,7 +249,9 @@ struct update_pi {
     assert(j.getData(Galois::Graph::NONE).lit);
     
     //for each function a
-    for (Graph::neighbor_iterator aii = graph.neighbor_begin(j, Galois::Graph::NONE), aee = graph.neighbor_end(j, Galois::Graph::NONE); aii != aee; ++aii) {
+    for (Graph::neighbor_iterator
+        aii = graph.neighbor_begin(j, Galois::Graph::NONE),
+        aee = graph.neighbor_end(j, Galois::Graph::NONE); aii != aee; ++aii) {
       SPEdge& jae = graph.getEdgeData(j, *aii, Galois::Graph::NONE);
       //Now we have j->a, compute each pi product
       double prodVuu = 1.0;
@@ -233,7 +260,9 @@ struct update_pi {
       double prodVsu = 1.0;
       double prodVa = 1.0;
       //for each b
-      for (Graph::neighbor_iterator bii = graph.neighbor_begin(j, Galois::Graph::NONE), bee = graph.neighbor_end(j, Galois::Graph::NONE); bii != bee; ++bii) {
+      for (Graph::neighbor_iterator 
+          bii = graph.neighbor_begin(j, Galois::Graph::NONE),
+          bee = graph.neighbor_end(j, Galois::Graph::NONE); bii != bee; ++bii) {
 	SPEdge& bje = graph.getEdgeData(j, *bii, Galois::Graph::NONE);
 	double etabj = bje.eta;
 	if (bii != aii) { //all of these terms ignore the source
@@ -262,11 +291,15 @@ struct update_eta {
     assert(a.getData(Galois::Graph::NONE).cla);
     
     //for each i
-    for (Graph::neighbor_iterator iii = graph.neighbor_begin(a, Galois::Graph::NONE), iee = graph.neighbor_end(a, Galois::Graph::NONE); iii != iee; ++iii) {
+    for (Graph::neighbor_iterator 
+        iii = graph.neighbor_begin(a, Galois::Graph::NONE),
+        iee = graph.neighbor_end(a, Galois::Graph::NONE); iii != iee; ++iii) {
       SPEdge& aie = graph.getEdgeData(a, *iii, Galois::Graph::NONE);
       double prod = 1.0;
       //for each j
-      for (Graph::neighbor_iterator jii = graph.neighbor_begin(a, Galois::Graph::NONE), jee = graph.neighbor_end(a, Galois::Graph::NONE); jii != jee; ++jii) {
+      for (Graph::neighbor_iterator
+          jii = graph.neighbor_begin(a, Galois::Graph::NONE),
+          jee = graph.neighbor_end(a, Galois::Graph::NONE); jii != jee; ++jii) {
 	if (jii != iii) { //ignore i
 	  SPEdge& jae = graph.getEdgeData(a, *jii, Galois::Graph::NONE);
 	  prod *= (jae.PIu / (jae.PIu + jae.PIs + jae.PI0));
@@ -296,7 +329,9 @@ struct update_biases {
     double p0 = 1.0;
 
     //for each function a
-    for (Graph::neighbor_iterator aii = graph.neighbor_begin(i, Galois::Graph::NONE), aee = graph.neighbor_end(i, Galois::Graph::NONE); aii != aee; ++aii) {
+    for (Graph::neighbor_iterator
+        aii = graph.neighbor_begin(i, Galois::Graph::NONE),
+        aee = graph.neighbor_end(i, Galois::Graph::NONE); aii != aee; ++aii) {
       SPEdge& aie = graph.getEdgeData(i, *aii, Galois::Graph::NONE);
 
       double etaai = aie.eta;
@@ -328,11 +363,17 @@ struct update_biases {
 
 //return true if converged
 bool SP_algorithm() {
-  //0) at t = 0, for every edge a->i, randomly initialize the message sigma a->i(t=0) in [0,1]
+  //0) at t = 0, for every edge a->i, randomly initialize the
+  //   message sigma a->i(t=0) in [0,1]
   //1) for t = 1 to tmax:
-  //1.1) sweep the set of edges in a random order, and update sequentially the warnings on all the edges of the graph, generating the values sigma a->i (t) using SP_update
-  //1.2) if (|sigma a->i(t) - sigma a->i (t-1) < E on all the edges, the iteration has converged and generated sigma* a->i = sigma a->i(t), goto 2
-  //2) if t = tmax return un-converged.  if (t < tmax) then return the set of fixed point warnings sigma* a->i = sigma a->i (t)
+  //1.1) sweep the set of edges in a random order, and update sequentially
+  //     the warnings on all the edges of the graph, generating the values
+  //     sigma a->i (t) using SP_update
+  //1.2) if (|sigma a->i(t) - sigma a->i (t-1) < E on all the edges, the
+  //     iteration has converged and generated sigma* a->i = sigma a->i(t),
+  //     goto 2
+  //2) if t = tmax return un-converged.  if (t < tmax) then return the set
+  //   of fixed point warnings sigma* a->i = sigma a->i (t)
   
   int x = tmax;
   do {
@@ -395,7 +436,8 @@ bool survey_inspired_decimation() {
   //   b) fix largest |W+ - W-| to x =  W+ > W-
   //   c) clean the graph
   //2.2) if all surveys are trivial(n = 0), output simplified subformula
-  //4) if solved, output SAT, if no contradiction, continue at 1, if contridiction, stop
+  //4) if solved, output SAT, if no contradiction, continue at 1, if
+  //   contridiction, stop
   do {
     if (SP_algorithm()) {
       if (nontrivial.get()) {

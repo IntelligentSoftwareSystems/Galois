@@ -1,11 +1,30 @@
-/*
- * SSSP.cpp
+/** Single source shortest paths -*- C++ -*-
+ * @file
+ * @section License
  *
- *  Created on: Oct 18, 2010
- *      Author: amin, reza
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @section Description
+ *
+ * Single source shortest paths.
+ *
+ * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-
-#include "Galois/Launcher.h"
+#include "Galois/Timer.h"
 #include "Galois/Statistic.h"
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
@@ -25,14 +44,17 @@
 #include <iostream>
 //#include <fstream>
 #include <set>
-using namespace std;
 
 static const char* name = "Single Source Shortest Path";
-static const char* description = "Computes the shortest path from a source node to all nodes in a directed graph using a modified Bellman-Ford algorithm\n";
+static const char* description =
+  "Computes the shortest path from a source node to all nodes in a directed "
+  "graph using a modified Bellman-Ford algorithm\n";
 static const char* url = "http://iss.ices.utexas.edu/lonestar/sssp.html";
-static const char* help = "<input file> <startnode> <reportnode> [-delta <deltaShift>]";
+static const char* help =
+  "<input file> <startnode> <reportnode> [-delta <deltaShift>]";
 
-static const unsigned int DIST_INFINITY = std::numeric_limits<unsigned int>::max() - 1;
+static const unsigned int DIST_INFINITY =
+  std::numeric_limits<unsigned int>::max() - 1;
 
 static unsigned int stepShift = 10;
 
@@ -94,9 +116,10 @@ Graph graph;
 
 template<typename WLTy>
 void getInitialRequests(const GNode src, WLTy& wl) {
-  for (Graph::neighbor_iterator ii = graph.neighbor_begin(src, Galois::Graph::NONE), 
-	 ee = graph.neighbor_end(src, Galois::Graph::NONE); 
-       ii != ee; ++ii) {
+  for (Graph::neighbor_iterator
+      ii = graph.neighbor_begin(src, Galois::Graph::NONE), 
+      ee = graph.neighbor_end(src, Galois::Graph::NONE); 
+      ii != ee; ++ii) {
     GNode dst = *ii;
     int w = graph.getEdgeData(src, dst, Galois::Graph::NONE);
     UpdateRequest up(dst, w);
@@ -106,9 +129,10 @@ void getInitialRequests(const GNode src, WLTy& wl) {
 
 void runBody(const GNode src) {
   std::set<UpdateRequest, seq_less> initial;
-  for (Graph::neighbor_iterator ii = graph.neighbor_begin(src, Galois::Graph::NONE), 
-        ee = graph.neighbor_end(src, Galois::Graph::NONE); 
-       ii != ee; ++ii) {
+  for (Graph::neighbor_iterator
+      ii = graph.neighbor_begin(src, Galois::Graph::NONE), 
+      ee = graph.neighbor_end(src, Galois::Graph::NONE); 
+      ii != ee; ++ii) {
     GNode dst = *ii;
     int w = graph.getEdgeData(src, dst, Galois::Graph::NONE);
     UpdateRequest up(dst, w);
@@ -117,7 +141,7 @@ void runBody(const GNode src) {
 
   unsigned int counter = 0;
 
-  Galois::Launcher::startTiming();
+  Galois::startTiming();
   
   while (!initial.empty()) {
     ++counter;
@@ -127,9 +151,10 @@ void runBody(const GNode src) {
 
     if (req.w < data.dist) {
       data.dist = req.w;
-      for (Graph::neighbor_iterator ii = graph.neighbor_begin(req.n, Galois::Graph::NONE), 
-	     ee = graph.neighbor_end(req.n, Galois::Graph::NONE);
-	   ii != ee; ++ii) {
+      for (Graph::neighbor_iterator
+          ii = graph.neighbor_begin(req.n, Galois::Graph::NONE), 
+	  ee = graph.neighbor_end(req.n, Galois::Graph::NONE);
+	  ii != ee; ++ii) {
 	GNode dst = *ii;
 	int d = graph.getEdgeData(req.n, dst, Galois::Graph::NONE);
 	unsigned int newDist = req.w + d;
@@ -139,7 +164,7 @@ void runBody(const GNode src) {
     }
   }
 
-  Galois::Launcher::stopTiming();
+  Galois::stopTiming();
   GaloisRuntime::reportStat("Iterations ", counter);
 }
 
@@ -154,7 +179,9 @@ struct process {
       if (__sync_bool_compare_and_swap(&data.dist, v, req.w)) {
 	if (v != DIST_INFINITY)
 	  BadWork += 1;
-	for (Graph::neighbor_iterator ii = graph.neighbor_begin(req.n, Galois::Graph::NONE), ee = graph.neighbor_end(req.n, Galois::Graph::NONE); ii != ee; ++ii) {
+	for (Graph::neighbor_iterator
+            ii = graph.neighbor_begin(req.n, Galois::Graph::NONE),
+            ee = graph.neighbor_end(req.n, Galois::Graph::NONE); ii != ee; ++ii) {
 	  GNode dst = *ii;
 	  int d = graph.getEdgeData(req.n, dst, Galois::Graph::NONE);
 	  unsigned int newDist = req.w + d;
@@ -174,15 +201,15 @@ void runBodyParallel(const GNode src) {
 
   std::vector<UpdateRequest> wl;
   getInitialRequests(src, wl);
-  Galois::Launcher::startTiming();
+  Galois::startTiming();
   Galois::for_each<OBIM>(wl.begin(), wl.end(), process());
-  Galois::Launcher::stopTiming();
+  Galois::stopTiming();
 }
 
 
 bool verify(GNode source) {
   if (graph.getData(source,Galois::Graph::NONE).dist != 0) {
-    cerr << "source has non-zero dist value" << endl;
+    std::cerr << "source has non-zero dist value\n";
     return false;
   }
   
@@ -190,22 +217,24 @@ bool verify(GNode source) {
 	 graph.active_end(); src != ee; ++src) {
     unsigned int dist = graph.getData(*src,Galois::Graph::NONE).dist;
     if (dist >= DIST_INFINITY) {
-      cerr << "found node = " << graph.getData(*src,Galois::Graph::NONE).id
-	   << " with label >= INFINITY = " << dist << endl;
+      std::cerr << "found node = " << graph.getData(*src,Galois::Graph::NONE).id
+	   << " with label >= INFINITY = " << dist << "\n";
       return false;
     }
     
-    for (Graph::neighbor_iterator ii = graph.neighbor_begin(*src, Galois::Graph::NONE), ee =
-	   graph.neighbor_end(*src, Galois::Graph::NONE); ii != ee; ++ii) {
+    for (Graph::neighbor_iterator 
+        ii = graph.neighbor_begin(*src, Galois::Graph::NONE),
+        ee = graph.neighbor_end(*src, Galois::Graph::NONE); ii != ee; ++ii) {
       GNode neighbor = *ii;
       unsigned int ddist = graph.getData(*src,Galois::Graph::NONE).dist;
       
       if (ddist > dist + graph.getEdgeData(*src, neighbor, Galois::Graph::NONE)) {
-	cerr << "bad level value at " << graph.getData(*src,Galois::Graph::NONE).id
-	     << " which is a neighbor of " << graph.getData(neighbor,Galois::Graph::NONE).id << endl;
+        std::cerr << "bad level value at "
+          << graph.getData(*src,Galois::Graph::NONE).id
+	  << " which is a neighbor of " 
+          << graph.getData(neighbor,Galois::Graph::NONE).id << "\n";
 	return false;
       }
-      
     }
   }
   return true;
@@ -270,10 +299,10 @@ int main(int argc, const char **argv) {
     runBody(source);
   }
 
-  cout << report << " " 
-       << graph.getData(report,Galois::Graph::NONE).toString() << endl;
+  std::cout << report << " " 
+       << graph.getData(report,Galois::Graph::NONE).toString() << "\n";
   if (!skipVerify && !verify(source)) {
-    cerr << "Verification failed.\n";
+    std::cerr << "Verification failed.\n";
     assert(0 && "Verification failed");
     abort();
   }

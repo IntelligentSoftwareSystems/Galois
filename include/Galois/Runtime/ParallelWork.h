@@ -37,7 +37,6 @@
 
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Context.h"
-#include "Galois/Runtime/Timer.h"
 #include "Galois/Runtime/Threads.h"
 #include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/WorkList.h"

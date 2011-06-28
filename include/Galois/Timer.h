@@ -1,4 +1,4 @@
-/** Common command line processing for benchmarks -*- C++ -*-
+/** Simple timer support -*- C++ -*-
  * @file
  * @section License
  *
@@ -20,22 +20,47 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#ifndef LONESTAR_BANNER_H
-#define LONESTAR_BANNER_H
 
-#include <iostream>
+#ifndef GALOIS_TIMER_H
+#define GALOIS_TIMER_H
 
-//! Print uniform banner for a benchmark
-void printBanner(std::ostream& os, const char* app, const char* desc, const char* url) {
-  os << "\nLonestar Benchmark Suite v3.0 (C++)\n"
-       << "Copyright (C) 2011 The University of Texas at Austin\n"
-       << "http://iss.ices.utexas.edu/lonestar/\n"
-       << "\n"
-       << "application: " << app << "\n";
-  if (desc)
-    os << desc << "\n";
-  if (url)
-    os << url << "\n";
-  os << "\n";
+namespace Galois {
+
+  //! A simple timer
+  class Timer {
+    //This is so that implementations can vary without
+    //forcing includes of target specific headers
+    unsigned long _start_hi;
+    unsigned long _start_low;
+    unsigned long _stop_hi;
+    unsigned long _stop_low;
+  public:
+    Timer();
+    void start();
+    void stop();
+    unsigned long get() const;
+    unsigned long get_usec() const;
+  };
+
+  //! A multi-start time accumulator.
+  //! Gives the final runtime for a series of intervals
+  class TimeAccumulator {
+    Timer ltimer;
+    unsigned long acc;
+  public:
+    TimeAccumulator();
+    void start();
+    //!adds the current timed interval to the total
+    void stop(); 
+    unsigned long get() const;
+    TimeAccumulator& operator+=(const TimeAccumulator& rhs);
+  };
+
+  //! Start the default timer
+  void startTiming();
+
+  //! Stop the default timer
+  void stopTiming();
 }
 #endif
+
