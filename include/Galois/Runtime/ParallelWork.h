@@ -139,61 +139,58 @@ public:
 };
 
 
-//Handle Parallel Pause
-template<bool PAUSE_ACTIVE>
-class API_Pause;
-template<bool PAUSE_ACTIVE>
-class PauseImpl;
+//Handle Parallel Break
+template<bool BREAK_ACTIVE>
+class API_Break;
+template<bool BREAK_ACTIVE>
+class BreakImpl;
 
 template<>
-class PauseImpl<true> {
-  long atBarrier;
+class BreakImpl<true> {
+  volatile bool break_;
 public:
-  Galois::Executable* E;
+  BreakImpl() : break_(false) {}
 
-  PauseImpl() :atBarrier(0), E(0) {}
-
-  void handlePause(Galois::Executable* nE) {
-    E = nE;
+  void handleBreak() {
+    break_ = true;
   }
 
-  void checkPause() {
-    if (E) {
-      __sync_add_and_fetch(&atBarrier, 1);
-      int numThreads = GaloisRuntime::getSystemThreadPool().getActiveThreads();
-      while (atBarrier != numThreads) {}
-      if (ThreadPool::getMyID() == 1) {
-	E->operator()();
-	E = 0;
-      } else {
-	while (E) {}
+  template<typename WLTy>
+  void check(WLTy* wl) {
+    typedef typename WLTy::value_type value_type;
+    if (break_) {
+      while (true) {
+        std::pair<bool, value_type> p = wl->pop();
+        if (!p.first)
+          break;
       }
     }
   }
 };
 
 template<>
-class PauseImpl<false> {
+class BreakImpl<false> {
 public:
-  void checkPause() {}
+  template<typename WLTy>
+  void check(WLTy*) {}
 };
 
 template<>
-class API_Pause<true> {
-  PauseImpl<true>* p;
+class API_Break<true> {
+  BreakImpl<true>* p_;
 protected:
-  void init_pause(PauseImpl<true>* pi) {
-    p = pi;
+  void init_break(BreakImpl<true>* p) {
+    p_ = p;
   }
 public:
-  void suspendWith(Galois::Executable* E) {
-    p->handlePause(E);
+  void breakLoop() {
+    p_->handleBreak();
   }
 };
 template<>
-class API_Pause<false> {
+class API_Break<false> {
 protected:
-  void init_pause(PauseImpl<false>* pi) { }
+  void init_break(BreakImpl<false>* p) { }
 };
 
 //Handle Per Iter Allocator
@@ -263,7 +260,7 @@ template<typename Function>
 struct Configurator {
   enum {
     CollectStats = !Galois::does_not_need_stats<Function>::value,
-    NeedsPause = Galois::needs_parallel_pause<Function>::value,
+    NeedsBreak = Galois::needs_parallel_break<Function>::value,
     NeedsPush = !Galois::does_not_need_parallel_push<Function>::value,
     NeedsContext = !Galois::does_not_need_context<Function>::value,
     NeedsPIA = 1
@@ -280,7 +277,7 @@ public:
   class UserAPI
     :public API_PerIter<Configurator<Function>::NeedsPIA>,
      public API_Push<Configurator<Function>::NeedsPush, WorkListTy>,
-     public API_Pause<Configurator<Function>::NeedsPause>
+     public API_Break<Configurator<Function>::NeedsBreak>
   {
     friend class ParallelThreadContext;
   };
@@ -299,11 +296,11 @@ public:
   void initialize(TerminationDetection::tokenHolder* t,
 		  bool _leader,
 		  WorkListTy* wl,
-		  PauseImpl<Configurator<Function>::NeedsPause>* p) {
+		  BreakImpl<Configurator<Function>::NeedsBreak>* p) {
     lterm = t;
     leader = _leader;
     facing.init_wl(wl);
-    facing.init_pause(p);
+    facing.init_break(p);
   }
 
   void workHappened() {
@@ -331,7 +328,7 @@ class ForEachWork : public Galois::Executable {
   typedef ParallelThreadContext<Function, WorkListTy> PCTy;
   
   WorkListTy global_wl;
-  PauseImpl<Configurator<Function>::NeedsPause> pauser;
+  BreakImpl<Configurator<Function>::NeedsBreak> breaker;
   Function& f;
 
   PerCPU<PCTy> tdata;
@@ -343,11 +340,11 @@ class ForEachWork : public Galois::Executable {
     bool retval = false;
     abort_happened = 0;
     std::pair<bool, value_type> p = aborted.pop();
-    while(p.first) {
+    while (p.first) {
       retval = true;
       global_wl.push(p.second);
       p = aborted.pop();
-    };
+    }
     return retval;
   }
 
@@ -395,7 +392,7 @@ public:
     tld.initialize(term.getLocalTokenHolder(), 
 		   tdata.myEffectiveID() == 0,
 		   &global_wl,
-		   &pauser);
+		   &breaker);
 
     tld.start_parallel_region();
     do {
@@ -407,7 +404,7 @@ public:
           if (tld.is_leader() && abort_happened) {
             drainAborted();
           }
-          pauser.checkPause();
+          breaker.check(&global_wl);
           p = global_wl.pop();
           if (p.first) {
             doProcess(p.second, tld);
@@ -419,7 +416,7 @@ public:
       if (tld.is_leader() && drainAborted())
         continue;
 
-      pauser.checkPause();
+      breaker.check(&global_wl);
 
       term.localTermination();
     } while (!term.globalTermination());

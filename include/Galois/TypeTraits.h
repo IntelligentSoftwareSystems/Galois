@@ -24,7 +24,7 @@
  * valid name declaration:
  * \code
  * struct MyClass {
- *   typedef int tt_needs_parallel_pause;
+ *   typedef int tt_needs_parallel_break;
  *   ....
  * };
  * \endcode
@@ -33,7 +33,7 @@
  * \code
  * namespace Galois {
  *   template<>
- *   struct needs_parallel_pause<MyClass> : public boost::true_type {};
+ *   struct needs_parallel_break<MyClass> : public boost::true_type {};
  * }
  * \endcode
  *
@@ -49,9 +49,9 @@ namespace Galois {
  * Indicates the operator may request the parallel loop to be suspended and a
  * given function run in serial
  */
-BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_needs_parallel_pause)
+BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_needs_parallel_break)
 template<typename T>
-struct needs_parallel_pause : public has_tt_needs_parallel_pause<T> {};
+struct needs_parallel_break : public has_tt_needs_parallel_break<T> {};
 
 /**
  * Indicates the operator does not generate new work and push it on the worklist

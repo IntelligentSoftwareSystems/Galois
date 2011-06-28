@@ -31,7 +31,122 @@
 #include "Lonestar/Banner.h"
 #include "Lonestar/CommandLine.h"
 
+#include "Galois/Runtime/PerCPU.h" // remove me after we figure out Reducer impl
+#include <limits>
 namespace {
+
+template<typename C>
+struct CollectionGroup {
+  typedef typename C::value_type value_type;
+  typedef C result_type;
+  static C zero() { return C(); }
+  static void add(result_type& lhs, const value_type& rhs) {
+    lhs.push_back(rhs);
+  }
+  static void add(result_type& lhs, result_type& rhs) {
+    for (typename result_type::iterator it = rhs.begin(), end = rhs.end();
+        it != end; ++it) {
+      lhs.push_back(*it);
+    }
+  }
+};
+
+template<typename T>
+struct AddGroup {
+  typedef T value_type;
+  typedef T result_type;
+  static result_type zero() { return 0; }
+  static void add(result_type& lhs, const value_type& rhs) {
+    lhs += rhs;
+  }
+  static void add(result_type& lhs, result_type& rhs) {
+    lhs += rhs;
+  }
+};
+
+template<typename T>
+struct MaxGroup {
+  typedef T value_type;
+  typedef T result_type;
+  static result_type zero() { return std::numeric_limits<T>::min(); }
+  static void add(result_type& lhs, const value_type& rhs) {
+    if (rhs > lhs)
+      lhs = rhs;
+  }
+  static void add(result_type& lhs, result_type& rhs) {
+    if (rhs > lhs)
+      lhs = rhs;
+  }
+};
+
+template<typename T>
+struct MinGroup {
+  typedef T value_type;
+  typedef T result_type;
+  static result_type zero() { return std::numeric_limits<T>::max(); }
+  static void add(result_type& lhs, const value_type& rhs) {
+    if (rhs < lhs)
+      lhs = rhs;
+  }
+  static void add(result_type& lhs, result_type& rhs) {
+    if (rhs < lhs)
+      lhs = rhs;
+  }
+};
+
+template<typename Group, bool NeedIntermediate>
+class Reducer {
+  typedef typename Group::value_type value_type;
+  typedef typename Group::result_type result_type;
+public:
+  void add(const value_type& delta);
+  value_type addAndGet(const value_type& delta);
+  void zero();
+  result_type& get();
+};
+
+template<typename Group>
+class Reducer<Group, false> {
+  typedef typename Group::value_type value_type;
+  typedef typename Group::result_type result_type;
+
+  GaloisRuntime::PerCPU_merge<result_type> value_;
+
+public:
+  Reducer() : value_(Group::add) {
+    zero();
+  }
+  void add(const value_type& delta) {
+    Group::add(value_.get(), delta);
+  }
+  void zero() {
+    value_.reset(Group::zero());
+  }
+  result_type& get() {
+    return value_.get();
+  }
+};
+
+template<>
+class Reducer<AddGroup<int>, true> {
+  int value_;
+public:
+  Reducer() : value_(0) {}
+  void add(const int& delta) {
+    __sync_add_and_fetch(&value_, delta);
+  }
+  int addAndGet(const int& delta) {
+    return __sync_add_and_fetch(&value_, delta);
+  }
+  void zero() {
+    value_ = 0;
+  }
+  int& get() {
+    return value_;
+  }
+};
+ 
+
 
 const char* name = "Preflow Push";
 const char* description =
@@ -76,14 +191,19 @@ std::ostream& operator<<(std::ostream& os, const Node& n) {
 
 typedef Galois::Graph::FirstGraph<Node, int, true> Graph;
 typedef Graph::GraphNode GNode;
+typedef Reducer<AddGroup<int>,true> Gap;
 
 struct Config {
   Graph graph;
   GNode sink;
   GNode source;
+  Gap* gaps;
   int numNodes;
   int numEdges;
   int globalRelabelInterval;
+  Reducer<MinGroup<int>,false> shouldGapRelabel;
+  bool shouldGlobalRelabel;
+  Config() : shouldGlobalRelabel(false) {}
 };
 
 Config app;
@@ -171,7 +291,7 @@ void checkConservation(Config& orig) {
       abort();
     }
 
-    int sum = 0;
+    size_t sum = 0;
     for (Graph::neighbor_iterator j = app.graph.neighbor_begin(src),
         jend = app.graph.neighbor_end(src); j != jend; ++j) {
       GNode dst = *j;
@@ -207,9 +327,14 @@ void reduceCapacity(const GNode& src, const GNode& dst, int amount) {
   cap2 += amount;
 }
 
+template<typename ReducerTy>
 struct CleanGap {
+  typedef int tt_does_not_need_context;
+  typedef int tt_does_not_need_stats;
+  ReducerTy& reducer;
+
   int height;
-  CleanGap(int _height) : height(_height) { }
+  CleanGap(int h, ReducerTy& r) : height(h), reducer(r) { }
 
   template<typename Context>
   void operator()(const GNode& src, Context& ctx) {
@@ -220,27 +345,39 @@ struct CleanGap {
     assert(node.height != height);
     if (height < node.height && node.height < app.numNodes)
       node.height = app.numNodes;
+    if (node.height != app.numNodes && node.excess > 0)
+      reducer.add(src);
   }
 };
 
-void gapAt(int height) {
+template<typename IncomingWL>
+void gapRelabel(int height, IncomingWL& incoming) {
   using namespace GaloisRuntime::WorkList;
   typedef LocalQueues<ChunkedLIFO<1024>, LIFO<> > WL;
+
+  typedef std::vector<GNode> CTy;
+  typedef Reducer<CollectionGroup<CTy>,false> RTy;
+  RTy reducer;
   Galois::for_each<WL>(app.graph.active_begin(), app.graph.active_end(),
-      CleanGap(height));
-  // TODO
-  // gapCounters[height + 1: numNodes] = reset
+      CleanGap<RTy>(height, reducer));
+  CTy& c = reducer.get();
+  for (CTy::iterator it = c.begin(), end = c.end(); it != end; ++it) 
+    incoming.push_back(*it);
+
+  for (int i = height + 1; i < app.numNodes; ++i)
+    app.gaps[i].zero();
 }
 
-struct GlobalRelabel {
+struct UpdateHeights {
+  typedef int tt_does_not_need_stats;
   /**
    * Do reverse BFS on residual graph.
    */
   template<typename Context>
   void operator()(const GNode& src, Context& ctx) {
     for (Graph::neighbor_iterator
-        ii = app.graph.neighbor_begin(src, Galois::Graph::CHECK_CONFLICT, ctx),
-        ee = app.graph.neighbor_end(src, Galois::Graph::CHECK_CONFLICT, ctx);
+        ii = app.graph.neighbor_begin(src, Galois::Graph::CHECK_CONFLICT),
+        ee = app.graph.neighbor_end(src, Galois::Graph::CHECK_CONFLICT);
         ii != ee; ++ii) {
       GNode dst = *ii;
       if (app.graph.getEdgeData(dst, src, Galois::Graph::NONE) > 0) {
@@ -255,52 +392,68 @@ struct GlobalRelabel {
   }
 };
 
-template<typename C>
-struct FindWork {
-  C& wl;
-  FindWork(C& _wl) : wl(_wl) { }
+struct ResetHeights {
+  typedef int tt_does_not_need_context;
+  typedef int tt_does_not_need_stats;
 
   template<typename Context>
   void operator()(const GNode& src, Context&) {
     Node& node = src.getData(Galois::Graph::NONE);
-    if (src == app.sink || src == app.source || node.height > app.numNodes)
-      return;
-    if (node.excess > 0)
-      wl.push_back(src);
-    // TODO incrementGap(node.height)
+    node.height = app.numNodes;
+    node.current = 0;
+    if (src == app.sink)
+      node.height = 0;
   }
 };
 
-template<typename C>
-void globalRelabel(C& newWork) {
-  // TODO could parallelize this too
-  for (Graph::active_iterator ii = app.graph.active_begin(),
-      ee = app.graph.active_end(); ii != ee; ++ii) {
-    Node& node = ii->getData(Galois::Graph::NONE);
-    node.height = app.numNodes;
-    node.current = 0;
-    if (*ii == app.sink)
-      node.height = 0;
+template<typename ReducerTy>
+struct UpdateGaps {
+  typedef int tt_does_not_need_context;
+  typedef int tt_does_not_need_stats;
+  ReducerTy& reducer;
+  UpdateGaps(ReducerTy& r) : reducer(r) {}
+
+  template<typename Context>
+  void operator()(const GNode& src, Context&) {
+    Node& node = src.getData(Galois::Graph::NONE);
+    if (src == app.sink || src == app.source || node.height >= app.numNodes)
+      return;
+    if (node.excess > 0) 
+      reducer.add(src);
+    
+    app.gaps[node.height].add(1);
   }
+};
 
-  // TODO
-  // reset gapCounters
+template<typename IncomingWL>
+void globalRelabel(IncomingWL& incoming) {
+  typedef GaloisRuntime::WorkList::dChunkedLIFO<1024> WLH;
+  Galois::for_each<WLH>(app.graph.active_begin(), app.graph.active_end(),
+      ResetHeights());
 
-  typedef GaloisRuntime::WorkList::dChunkedLIFO<8> WL;
+  // TODO could parallelize this too
+  for (int i = 0; i < app.numNodes; ++i)
+    app.gaps[i].zero();
+
+  typedef GaloisRuntime::WorkList::dChunkedFIFO<8> WL;
   std::vector<GNode> single;
   single.push_back(app.sink);
-  Galois::for_each<WL>(single.begin(), single.end(), GlobalRelabel());
+  Galois::for_each<WL>(single.begin(), single.end(), UpdateHeights());
 
-  Galois::for_each<WL>(app.graph.active_begin(), app.graph.active_end(),
-      FindWork<std::vector<GNode> >(newWork));
-
-  std::cout 
-    << " Flow after global relabel: "
-    << app.sink.getData().excess << "\n";
+  typedef std::vector<GNode> CTy;
+  typedef Reducer<CollectionGroup<CTy>,false> RTy;
+  RTy reducer;
+  Galois::for_each<WLH>(app.graph.active_begin(), app.graph.active_end(),
+      UpdateGaps<RTy>(reducer));
+  CTy& c = reducer.get();
+  for (CTy::iterator it = c.begin(), end = c.end(); it != end; ++it) {
+    incoming.push_back(*it);
+  }
 }
 
-struct Process {
-  typedef int tt_needs_parallel_pause;
+struct Process  {
+  typedef int tt_needs_parallel_break;
+  int counter;
 
   template<typename Context>
   void operator()(const GNode& src, Context& ctx) {
@@ -309,17 +462,13 @@ struct Process {
       increment += BETA;
     }
 
-    // TODO if value >= globalRelabelInterval : globalRelabel
-  }
-
-  template<typename Context>
-  void updateGap(int height, int delta, Context& ctx) {
-    // TODO
-    // atomic {
-    //   if (gapCounters[height] += delta == 0) {
-    //     gapAt(height);
-    //   }
-
+    counter += increment;
+    if (counter >= app.globalRelabelInterval) {
+      // TODO fix interval by dividing by numThreads ?
+      app.shouldGlobalRelabel = true;
+      ctx.breakLoop();
+      return;
+    }
   }
 
   template<typename Context>
@@ -374,12 +523,15 @@ struct Process {
       relabel(src);
       relabeled = true;
 
-      updateGap<Context>(prevHeight, -1, ctx);
+      //if (app.gaps[prevHeight].addAndGet(-1) == 0) {
+      //  app.shouldGapRelabel.add(prevHeight);
+      //  ctx.breakLoop();
+      //}
 
       if (node.height == app.numNodes)
         break;
 
-      updateGap<Context>(node.height, 1, ctx);
+      //app.gaps[node.height].add(1);
       prevHeight = node.height;
     }
 
@@ -481,12 +633,13 @@ void initializeGraph(const char* inputFile,
 }
 
 void initializeGaps() {
+  app.gaps = new Gap[app.numNodes];
   for (Graph::active_iterator ii = app.graph.active_begin(),
       ee = app.graph.active_end(); ii != ee; ++ii) {
     GNode src = *ii;
     Node& node = src.getData();
     if (src != app.source && src != app.sink) {
-      // TODO increment gap for node.height
+      app.gaps[node.height].add(1);
     }
   }
 }
@@ -515,9 +668,6 @@ struct Indexer : std::binary_function<GNode, int, int> {
 } // end namespace
 
 int main(int argc, const char** argv) {
-  std::cout << "Typetrait: " 
-    << Galois::needs_parallel_pause<Process>::value << "\n";
-
   std::vector<const char*> args = parse_command_line(argc, argv, help);
   if (args.size() < 3) {
     std::cout << "not enough arguments, use -help for usage information\n";
@@ -538,6 +688,7 @@ int main(int argc, const char** argv) {
   else
     app.globalRelabelInterval = app.numNodes * ALPHA + app.numEdges;
 
+  std::cout << "number of nodes: " << app.numNodes << "\n";
   std::cout << "global relabel interval: " << app.globalRelabelInterval << "\n";
 
   initializeGaps();
@@ -547,8 +698,27 @@ int main(int argc, const char** argv) {
   using namespace GaloisRuntime::WorkList;
   typedef dChunkedFIFO<16> Chunk;
   typedef OrderedByIntegerMetric<Indexer,Chunk> WL;
+
   Galois::Launcher::startTiming();
-  Galois::for_each<Chunk>(initial.begin(), initial.end(), Process());
+  while (true) {
+    Galois::for_each<Chunk>(initial.begin(), initial.end(), Process());
+    int gh;
+    if (app.shouldGlobalRelabel) {
+      initial.clear();
+      globalRelabel(initial);
+      app.shouldGlobalRelabel = false;
+      std::cout 
+        << " Flow after global relabel: "
+        << app.sink.getData().excess << "\n";
+    } else if ((gh = app.shouldGapRelabel.get()) != MinGroup<int>::zero()) {
+      std::cout << " Gap relabel at: " << gh << "\n";
+      initial.clear();
+      gapRelabel(gh, initial);
+      app.shouldGapRelabel.zero();
+    } else {
+      break;
+    }
+  }
   Galois::Launcher::stopTiming();
 
   std::cout << "Flow is " << app.sink.getData().excess << "\n";
