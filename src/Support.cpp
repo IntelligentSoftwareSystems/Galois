@@ -19,10 +19,10 @@ kind.
 #include "Galois/Runtime/Support.h"
 #include "LLVM/SmallVector.h"
 #include <sstream>
-#include <iostream>
 #include <algorithm>
 #include <numeric>
 #include <cmath>
+#include <stdio.h>
 
 static GaloisRuntime::SimpleLock<int, true> lock;
 
@@ -55,24 +55,30 @@ void GaloisRuntime::summarizeList(const char* name, const long* b, const long* e
 }
 
 
-template<typename T>
-static void genericReport(bool error, const char* text1, const char* text2, T val) {
+static void genericReport(bool error, const char* text1,
+    const char* text2, const char* val) {
   lock.lock();
-  (error ? std::cerr : std::cout) <<
-    text1 << " " << text2 << " " << val << "\n";
+  FILE *out = error ? stderr : stdout;
+  fprintf(out, "%s %s %s\n", text1, text2, val);
   lock.unlock();
 }
 
 void GaloisRuntime::reportStat(const char* text, unsigned long val) {
-  genericReport(false, "STAT:", text, val);
+  char buf[128];
+  snprintf(buf, 128, "%lu", val);
+  genericReport(false, "STAT:", text, buf);
 }
 
 void GaloisRuntime::reportStat(const char* text, unsigned int val) {
-  genericReport(false, "STAT:", text, val);
+  char buf[128];
+  snprintf(buf, 128, "%u", val);
+  genericReport(false, "STAT:", text, buf);
 }
 
 void GaloisRuntime::reportStat(const char* text, double val) {
-  genericReport(false, "STAT:", text, val);
+  char buf[128];
+  snprintf(buf, 128, "%f", val);
+  genericReport(false, "STAT:", text, buf);
 }
 
 void GaloisRuntime::reportStat(const char* text, const char* val) {
@@ -85,11 +91,15 @@ void GaloisRuntime::reportWarning(const char* text) {
 }
 
 void GaloisRuntime::reportWarning(const char* text, unsigned int val) {
-  genericReport(true, "WARNING:", text, val);
+  char buf[128];
+  snprintf(buf, 128, "%u", val);
+  genericReport(true, "WARNING:", text, buf);
 }
 
 void GaloisRuntime::reportWarning(const char* text, unsigned long val) {
-  genericReport(true, "WARNING:", text, val);
+  char buf[128];
+  snprintf(buf, 128, "%lu", val);
+  genericReport(true, "WARNING:", text, buf);
 }
 
 void GaloisRuntime::reportWarning(const char* text, const char* val) {
@@ -102,11 +112,15 @@ void GaloisRuntime::reportInfo(const char* text) {
 }
 
 void GaloisRuntime::reportInfo(const char* text, unsigned int val) {
-  genericReport(false, "INFO:", text, val);
+  char buf[128];
+  snprintf(buf, 128, "%u", val);
+  genericReport(false, "INFO:", text, buf);
 }
 
 void GaloisRuntime::reportInfo(const char* text, unsigned long val) {
-  genericReport(false, "INFO:", text, val);
+  char buf[128];
+  snprintf(buf, 128, "%lu", val);
+  genericReport(false, "INFO:", text, buf);
 }
 
 void GaloisRuntime::reportInfo(const char* text, const char* val) {
