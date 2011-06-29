@@ -31,7 +31,7 @@ class statistic : public accumulator<T> {
 public:
   statistic(const char* _name) :name(_name) {}
   ~statistic() {
-    GaloisRuntime::reportStat(name, accumulator<T>::get());
+    GaloisRuntime::reportStatSum(name, accumulator<T>::get());
   }
 };
 

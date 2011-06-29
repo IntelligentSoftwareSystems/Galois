@@ -287,11 +287,11 @@ void SP_algorithm() {
   //1.2) if (|sigma a->i(t) - sigma a->i (t-1) < E on all the edges, the iteration has converged and generated sigma* a->i = sigma a->i(t), goto 2
   //2) if t = tmax return un-converged.  if (t < tmax) then return the set of fixed point warnings sigma* a->i = sigma a->i (t)
   
-  Galois::for_each(clauses.begin(), clauses.end(), update_eta());
+  Galois::for_each(clauses.begin(), clauses.end(), update_eta(), "update_eta");
   maxBias.reset(0.0);
   averageBias.reset(0.0);
   nontrivial.reset(0);
-  Galois::for_each(literals.begin(), literals.end(), update_biases());
+  Galois::for_each(literals.begin(), literals.end(), update_biases(), "update_bias");
 }
 
 struct fix_variables {
@@ -317,9 +317,9 @@ struct fix_variables {
 };
 
 void decimate() {
-  std::cout << "\nNonTrivial " << nontrivial.get() << " MaxBias " << maxBias.get() << " Average Bias " << averageBias.get() << "\n";
+  std::cout << "NonTrivial " << nontrivial.get() << " MaxBias " << maxBias.get() << " Average Bias " << averageBias.get() << "\n";
   double d = ((maxBias.get() - averageBias.get()) * 0.25) + averageBias.get();
-  Galois::for_each(literals.begin(), literals.end(), fix_variables(d));
+  Galois::for_each(literals.begin(), literals.end(), fix_variables(d), "fix_variables");
 }
 
 bool survey_inspired_decimation() {

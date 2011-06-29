@@ -100,41 +100,28 @@ public:
   void inc_conflicts() {
     ++conflicts;
   }
-  void report_stat() const {
-    reportStat("Conflicts", conflicts);
-    reportStat("Iterations", iterations);
+  void report_stat(const char* loopname) const {
+    reportStatSum("Conflicts", conflicts, loopname);
+    reportStatSum("Iterations", iterations, loopname);
+    reportStatAvg("ConflictsDistribution", conflicts, loopname);
+    reportStatAvg("IterationsDistribution", iterations, loopname);
   }
-  void merge_stat(const StatisticHandler& rhs) {
-    conflicts += rhs.conflicts;
-    iterations += rhs.iterations;
+  void done() {
+    GaloisRuntime::statDone();
   }
-  struct stat_sum {
-    std::vector<long> list;
-    void add(StatisticHandler& x) {
-      list.push_back(x.iterations);
-    }
-    void done() {
-      GaloisRuntime::summarizeList("IterationDistribution", 
-				   &list[0], &list[list.size()]);
-    }
-    int num() {
-      return GaloisRuntime::getSystemThreadPool().getActiveThreads();
-    }
-  };
+  int num() {
+    return GaloisRuntime::getSystemThreadPool().getActiveThreads();
+  }
 };
 
 template<>
 class StatisticHandler<false> {
 public:
-  void inc_iterations() {}
-  void inc_conflicts() {}
-  void report_stat() const {}
-  void merge_stat(const StatisticHandler& rhs) {}
-  struct stat_sum {
-    void add(StatisticHandler& x) {}
-    void done() {}
-    int num() { return 0; }
-  };
+  inline void inc_iterations() const {}
+  inline void inc_conflicts() const {}
+  inline void report_stat(const char*) const {}
+  inline void done() const {}
+  inline int num() const { return 0; }
 };
 
 
@@ -329,6 +316,7 @@ class ForEachWork : public Galois::Executable {
   WorkListTy global_wl;
   BreakImpl<Configurator<Function>::NeedsBreak> breaker;
   Function& f;
+  const char* loopname;
 
   PerCPU<PCTy> tdata;
   TerminationDetection term;
@@ -369,20 +357,15 @@ class ForEachWork : public Galois::Executable {
 
 public:
   template<typename IterTy>
-  ForEachWork(IterTy b, IterTy e, Function& _f)
-    :f(_f) {
+  ForEachWork(IterTy b, IterTy e, Function& _f, const char* _loopname)
+    :f(_f), loopname(_loopname) {
     global_wl.fill_initial(b, e);
   }
   
   ~ForEachWork() {
-    typename PCTy::stat_sum s;
-    for (int i = 0; i < s.num(); ++i)
-      s.add(tdata.get(i));
-    s.done();
-    
-    for (int i = 1; i < s.num(); ++i)
-      tdata.get(0).merge_stat(tdata.get(i));
-    tdata.get(0).report_stat();
+    for (int i = 0; i < tdata.get(0).num(); ++i)
+      tdata.get(i).report_stat(loopname);
+    tdata.get(0).done();
     assert(global_wl.empty());
   }
 
@@ -425,14 +408,14 @@ public:
 };
 
 template<typename WLTy, typename IterTy, typename Function>
-void for_each_impl(IterTy b, IterTy e, Function f) {
+void for_each_impl(IterTy b, IterTy e, Function f, const char* loopname) {
 #ifdef GALOIS_VTUNE
   __itt_resume();
 #endif
 
   typedef typename WLTy::template retype<typename std::iterator_traits<IterTy>::value_type>::WL aWLTy;
 
-  ForEachWork<aWLTy, Function> GW(b, e, f);
+  ForEachWork<aWLTy, Function> GW(b, e, f, loopname);
   ThreadPool& PTP = getSystemThreadPool();
 
   PTP.run(&GW);

@@ -176,7 +176,7 @@ static void makeGraph(const char* input) {
   in_graph.structureFromFile(input);
   std::cout << "Read " << in_graph.size() << " nodes\n";
   phase.stop();
-  GaloisRuntime::reportStat("Read1", phase.get());
+  GaloisRuntime::reportStatSum("Read1", phase.get());
   
   // TODO(ddn): Bag map
   phase.start();
@@ -203,7 +203,7 @@ static void makeGraph(const char* input) {
     has_out_edges[*src] = neighbors != 0;
   }
   phase.stop();
-  GaloisRuntime::reportStat("Read2", phase.get());
+  GaloisRuntime::reportStatSum("Read2", phase.get());
 
   // TODO(ddn): better way of making
   phase.start();
@@ -226,7 +226,7 @@ static void makeGraph(const char* input) {
     id++;
   }
   phase.stop();
-  GaloisRuntime::reportStat("Read3", phase.get());
+  GaloisRuntime::reportStatSum("Read3", phase.get());
 }
 
 void printTop(int topn) {
@@ -254,7 +254,7 @@ int main(int argc, const char **argv) {
   phase.start();
   makeGraph(inputfile);
   phase.stop();
-  GaloisRuntime::reportStat("ReadTotal", phase.get());
+  GaloisRuntime::reportStatSum("ReadTotal", phase.get());
 
   Galois::startTiming();
   runBody();

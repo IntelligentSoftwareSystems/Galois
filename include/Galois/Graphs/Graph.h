@@ -613,7 +613,7 @@ public:
   }
 
   FirstGraph() {
-    reportStat("NodeSize", sizeof(gNode));
+    reportStatSum("NodeSize", sizeof(gNode));
   }
 };
 

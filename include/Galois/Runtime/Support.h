@@ -22,14 +22,13 @@ kind.
 
 namespace GaloisRuntime {
 
-//Report complex Statistics
-void summarizeList(const char* name, const long* b, const long* e);
-
 //Report Statistics
-void reportStat(const char* text, unsigned long val);
-void reportStat(const char* text, unsigned int val);
-void reportStat(const char* text, double val);
-void reportStat(const char* text, const char* val);
+void reportStatSum(const char* text, unsigned long val, const char* loopname = 0);
+
+void reportStatAvg(const char* text, unsigned long val, const char* loopname = 0);
+
+//Done with one loop and trigger list summary
+void statDone();
 
 //Report Warnings
 void reportWarning(const char* text);

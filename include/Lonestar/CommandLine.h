@@ -46,10 +46,10 @@ std::vector<const char*> parse_command_line(int argc, const char** argv, const c
     if (i != argc - 1)
       out << " ";
   }
-  GaloisRuntime::reportStat("CommandLine", out.str().c_str());
+  GaloisRuntime::reportInfo("CommandLine", out.str().c_str());
   char name[256];
   gethostname(name, 256);
-  GaloisRuntime::reportStat("Hostname", name);
+  GaloisRuntime::reportInfo("Hostname", name);
 
   for (int i = 1; i < argc; ++i) {
     if (std::string("-t").compare(argv[i]) == 0) {

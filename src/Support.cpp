@@ -23,21 +23,28 @@
 #include "Galois/Runtime/SimpleLock.h"
 #include "Galois/Runtime/Support.h"
 #include "LLVM/SmallVector.h"
+#include <map>
+#include <vector>
 #include <algorithm>
 #include <numeric>
 #include <cmath>
-#include <stdio.h>
+#include <cstdio>
 
+typedef std::pair<const char*, const char*> strPair;
 static GaloisRuntime::SimpleLock<int, true> lock;
+static std::map<strPair, unsigned long> stats;
+static std::map<strPair, std::map<int, std::vector<unsigned long> > > distStats;
+static int gcounter = 0;
 
-void GaloisRuntime::summarizeList(const char* name, const long* b, const long* e) {
+typedef std::vector<unsigned long>::iterator vli;
+static void summarizeList(int iternum, const char* first, const char* second, vli b, vli e) {
   long size = std::distance(b,e);
   long min = *std::min_element(b, e);
   long max = *std::max_element(b, e);
   double ave = std::accumulate(b, e, 0.0) / size;
  
   double acc = 0.0;
-  for (const long* it = b; it != e; ++it) {
+  for (vli it = b; it != e; ++it) {
     acc += (*it - ave) * (*it - ave);
   }
 
@@ -46,11 +53,8 @@ void GaloisRuntime::summarizeList(const char* name, const long* b, const long* e
     stdev = sqrt(acc / (size - 1));
   }
 
-  char buf[128];
-  snprintf(buf, 128, "n: %ld ave: %.1f min: %ld max: %ld stdev: %.1f",
-      size, ave, min, max, stdev);
-
-  reportStat(name, buf);
+  printf("STAT DISTRIBUTION %d %s %s n: %ld ave: %.1f min: %ld max: %ld stdev: %.1f\n",
+	 iternum, first, second, size, ave, min, max, stdev);
 }
 
 static void genericReport(bool error, const char* text1,
@@ -61,27 +65,31 @@ static void genericReport(bool error, const char* text1,
   lock.unlock();
 }
 
-void GaloisRuntime::reportStat(const char* text, unsigned long val) {
-  char buf[128];
-  snprintf(buf, 128, "%lu", val);
-  genericReport(false, "STAT:", text, buf);
+void GaloisRuntime::reportStatSum(const char* text, unsigned long val, const char* loopname) {
+  stats[std::make_pair(text,loopname)] += val;
 }
 
-void GaloisRuntime::reportStat(const char* text, unsigned int val) {
-  char buf[128];
-  snprintf(buf, 128, "%u", val);
-  genericReport(false, "STAT:", text, buf);
+void GaloisRuntime::reportStatAvg(const char* text, unsigned long val, const char* loopname) {
+  distStats[std::make_pair(text,loopname)][gcounter].push_back(val);
 }
 
-void GaloisRuntime::reportStat(const char* text, double val) {
-  char buf[128];
-  snprintf(buf, 128, "%f", val);
-  genericReport(false, "STAT:", text, buf);
+void GaloisRuntime::statDone() {
+  ++gcounter;
 }
 
-void GaloisRuntime::reportStat(const char* text, const char* val) {
-  genericReport(false, "STAT:", text, val);
+namespace {
+class PrintStats {
+public:
+  ~PrintStats() {
+    for (std::map<strPair, unsigned long>::iterator ii = stats.begin(), ee = stats.end(); ii != ee; ++ii)
+      printf("STAT SINGLE %s %s %ld\n", ii->first.first, ii->first.second, ii->second);
+    for(std::map<strPair, std::map<int, std::vector<unsigned long> > >::iterator ii = distStats.begin(), ee = distStats.end(); ii != ee; ++ii)
+      for(std::map<int, std::vector<unsigned long> >::iterator i = ii->second.begin(), e = ii->second.end(); i != e; ++i)
+  summarizeList(i->first, ii->first.first, ii->first.second, i->second.begin(), i->second.end());
+  }
+};
 }
+PrintStats P;
 
 //Report Warnings
 void GaloisRuntime::reportWarning(const char* text) {

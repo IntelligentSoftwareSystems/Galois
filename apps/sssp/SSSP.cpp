@@ -165,7 +165,7 @@ void runBody(const GNode src) {
   }
 
   Galois::stopTiming();
-  GaloisRuntime::reportStat("Iterations ", counter);
+  GaloisRuntime::reportStatSum("Iterations ", counter);
 }
 
 static Galois::statistic<unsigned int> BadWork("BadWork");

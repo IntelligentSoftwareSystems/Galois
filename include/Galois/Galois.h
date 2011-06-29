@@ -32,14 +32,14 @@ namespace Galois {
 unsigned int setMaxThreads(unsigned int num);
 
 template<typename WLTy, typename IterTy, typename Function>
-void for_each(IterTy b, IterTy e, Function f) {
-  GaloisRuntime::for_each_impl<WLTy>(b, e, f);
+void for_each(IterTy b, IterTy e, Function f, const char* loopname = 0) {
+  GaloisRuntime::for_each_impl<WLTy>(b, e, f, loopname);
 }
 
 template<typename IterTy, typename Function>
-void for_each(IterTy b, IterTy e, Function f) {
+void for_each(IterTy b, IterTy e, Function f, const char* loopname = 0) {
   typedef GaloisRuntime::WorkList::ChunkedFIFO<256> WLTy;
-  for_each<WLTy, IterTy, Function>(b, e, f);
+  for_each<WLTy, IterTy, Function>(b, e, f, loopname);
 }
 
 }
