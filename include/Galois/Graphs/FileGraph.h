@@ -1,31 +1,70 @@
-// simple graph -*- C++ -*-
-/*
-Galois, a framework to exploit amorphous data-parallelism in irregular
-programs.
+/** Basic serialized graphs -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @section Description
+ *
+ * There are two main classes, ::FileGraph and ::LC_FileGraph. The former
+ * represents the pure structure of a graph (i.e., whether an edge exists between
+ * two nodes) and cannot be modified. The latter allows values to be stored on
+ * nodes and edges, but the structure of the graph cannot be modified.
+ *
+ * An example of use:
+ * 
+ * \code
+ * typedef Galois::Graph::LC_FileGraph<int,int> Graph;
+ * 
+ * // Create graph
+ * Graph g;
+ * g.structureFromFile(inputfile);
+ *
+ * // Traverse graph
+ * for (Graph::active_iterator i = g.active_begin(), iend = g.active_end();
+ *      i != iend;
+ *      ++i) {
+ *   Graph::GraphNode src = *i;
+ *   for (Graph::neighbor_iterator j = g.neighbor_begin(src),
+ *                                 jend = g.neighbor_end(src);
+ *        j != jend;
+ *        ++j) {
+ *     Graph::GraphNode dst = *j;
+ *     int edgeData = g.getEdgeData(src, dst);
+ *     int nodeData = g.getData(dst);
+ *   }
+ * }
+ * \endcode
+ *
+ * @author Andrew Lenharth <andrewl@lenharth.org>
+ */
+#ifndef GALOIS_GRAPHS_FILEGRAPH_H
+#define GALOIS_GRAPHS_FILEGRAPH_H
 
-Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
-UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS SOFTWARE
-AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR ANY
-PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF PERFORMANCE, AND ANY
-WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF DEALING OR USAGE OF TRADE.
-NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH RESPECT TO THE USE OF THE
-SOFTWARE OR DOCUMENTATION. Under no circumstances shall University be liable
-for incidental, special, indirect, direct or consequential damages or loss of
-profits, interruption of business, or related expenses which may arise from use
-of Software or Documentation, including but not limited to those resulting from
-defects in Software and/or Documentation, or loss or inaccuracy of data of any
-kind.
-*/
-
+// TODO(ddn): needed until we move method flags out of Graph.h
+#include "Galois/Graphs/Graph.h"
 #include <boost/iterator/counting_iterator.hpp>
-
-//#include "Galois/Graphs/Graph.h"
 
 using namespace GaloisRuntime;
 
 namespace Galois {
 namespace Graph {
 
+//! Graph serialized to a file
 class FileGraph {
 public:
   typedef uint32_t GraphNode;
@@ -55,7 +94,7 @@ protected:
 public:
   // Node Handling
 
-  // Check if a node is in the graph (already added)
+  //! Check if a node is in the graph (already added)
   bool containsNode(const GraphNode n) {
     return n < numNodes;
   }
@@ -73,7 +112,8 @@ public:
 
   template<typename EdgeTy>
   void prefetch_edgedata(GraphNode N) {
-    __builtin_prefetch(&((EdgeTy*)edgeData)[std::distance(outs, neighbor_begin(N))]);
+    __builtin_prefetch(
+        &((EdgeTy*)edgeData)[std::distance(outs, neighbor_begin(N))]);
   }
 
   void prefetch_pre(GraphNode N) {
@@ -101,9 +141,9 @@ public:
     return std::find(neighbor_begin(N1), neighbor_end(N1), N2) != neighbor_end(N1);
   }
 
-  //These are not thread safe!!
   typedef boost::counting_iterator<uint64_t> active_iterator;
 
+  //! Iterate over nodes in graph (not thread safe)
   active_iterator active_begin() {
     return active_iterator(0);
   }
@@ -111,7 +151,8 @@ public:
   active_iterator active_end() {
     return active_iterator(numNodes);
   }
-  // The number of nodes in the graph
+
+  //! The number of nodes in the graph
   unsigned int size() {
     return numNodes;
   }
@@ -119,9 +160,11 @@ public:
   FileGraph();
   ~FileGraph();
 
+  //! Read graph connectivity information from file
   bool structureFromFile(const char* filename);
 };
 
+//! Local computation graph (i.e., graph structure does not change)
 template<typename NodeTy, typename EdgeTy>
 class LC_FileGraph : public FileGraph {
 
@@ -168,7 +211,8 @@ public:
   }
 
   void prefetch_neighbors(GraphNode N) {
-    for (neighbor_iterator ii = neighbor_begin(N, NONE), ee = neighbor_begin(N,NONE); ii != ee; ++ii)
+    for (neighbor_iterator ii = neighbor_begin(N, NONE),
+        ee = neighbor_begin(N,NONE); ii != ee; ++ii)
       __builtin_prefetch(&NodeData[*ii].data.data);
   }
 
@@ -212,11 +256,16 @@ public:
   }
 
   void prefetch_neighbors(GraphNode N) {
-    for (neighbor_iterator ii = neighbor_begin(N, NONE), ee = neighbor_begin(N,NONE); ii != ee; ++ii)
+    for (neighbor_iterator ii = neighbor_begin(N, NONE),
+        ee = neighbor_begin(N,NONE); ii != ee; ++ii)
       __builtin_prefetch(&NodeData[*ii].data.data);
   }
 };
 
+template<>
+class LC_FileGraph<void, void>: public FileGraph { 
+};
+
 }
 }
-// vim:sw=2:ts=8:sts=2
+#endif

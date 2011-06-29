@@ -21,7 +21,6 @@
  * @author Dimitrios Prountzos <dprountz@cs.utexas.edu>
  */
 #include "Galois/Timer.h"
-#include "Galois/Graphs/LCGraph.h"
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Galois.h"
 #include "Galois/IO/gr.h"
