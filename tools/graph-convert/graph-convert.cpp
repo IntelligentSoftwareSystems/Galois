@@ -20,7 +20,6 @@
  *
  * @author Dimitrios Prountzos <dprountz@cs.utexas.edu>
  */
-#include "Galois/Graphs/LCGraph.h"
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Galois.h"
 #include "Galois/IO/gr.h"
@@ -30,10 +29,13 @@
 #include <iostream>
 #include <vector>
 
-static const char* help = "[-rmat | -dimacs] <input file> <output file>";
+static const char* help =
+  "[-dimacs2gr | -rmat2gr | -gr2dimacs] <input file> <output file>\n"
+  "Converts graph formats.\n"
+  "Default: converts dimacs to binary gr format (-dimacs2gr)\n";
 
-void readRMAT(const char *infilename, const char *outfilename) {
-  typedef Galois::Graph::FirstGraph<int,int,true> Graph;
+void rmat2gr(const char *infilename, const char *outfilename) {
+  typedef Galois::Graph::FirstGraph<void,int,true> Graph;
   typedef Graph::GraphNode GNode;
   Graph graph;
 
@@ -54,7 +56,7 @@ void readRMAT(const char *infilename, const char *outfilename) {
   std::vector<GNode> nodes;
   nodes.resize(nnodes);
   for (int i = 0; i < nnodes; ++i) {
-    GNode n = graph.createNode(i);
+    GNode n = graph.createNode(Galois::Graph::GraphUnit());
     nodes[i] = n;
     graph.addNode(n, Galois::Graph::NONE);
   }
@@ -62,9 +64,12 @@ void readRMAT(const char *infilename, const char *outfilename) {
   for (int edge_num = 0; edge_num < nedges; ++edge_num) {
     int cur_id, cur_edges;
     infile >> cur_id >> cur_edges;
+    assert(0 <= cur_id && cur_id < nnodes);
+    assert(cur_edges >= 0);
     for (int j = 0; j < cur_edges; ++j) {
       int neighbor_id, weight;
       infile >> neighbor_id >> weight;
+      assert(0 <= neighbor_id && neighbor_id < nnodes);
       graph.addEdge(nodes[cur_id], nodes[neighbor_id], weight);
     }
 
@@ -77,8 +82,47 @@ void readRMAT(const char *infilename, const char *outfilename) {
   outputGraph(outfilename, graph);
 }
 
-void readDIMACS(const char *infilename, const char *outfilename) {
-  typedef Galois::Graph::FirstGraph<int,int,true> Graph;
+void gr2dimacs(const char *infilename, const char *outfilename) {
+  typedef Galois::Graph::LC_FileGraph<int, int> Graph;
+  typedef Graph::GraphNode GNode;
+
+  Graph graph;
+  graph.structureFromFile(infilename);
+  graph.emptyNodeData();
+
+  int nnodes = 0;
+  int nedges = 0;
+  for (Graph::active_iterator i = graph.active_begin(), e = graph.active_end();
+      i != e; ++i) {
+    GNode src = *i;
+    graph.getData(src) = nnodes++;
+    nedges += std::distance(graph.neighbor_begin(*i), graph.neighbor_end(*i));
+  }
+
+  std::ofstream file(outfilename);
+  file << "p sp " << nnodes << " " << nedges << "\n";
+  for (Graph::active_iterator i = graph.active_begin(), e = graph.active_end();
+      i != e; ++i) {
+    GNode src = *i;
+    for (Graph::neighbor_iterator j = graph.neighbor_begin(src),
+        f = graph.neighbor_end(src); j != f; ++j) {
+      GNode dst = *j;
+      int weight = graph.getEdgeData(src, dst);
+      file << "a " << graph.getData(src)
+        << " " << graph.getData(dst)
+        << " " << weight << "\n";
+    }
+  }
+  file.close();
+
+  std::cout << "Finished reading graph. "
+    << "Nodes: " << nnodes << " Edges: " << nedges 
+    << "\n";
+
+}
+
+void dimacs2gr(const char *infilename, const char *outfilename) {
+  typedef Galois::Graph::FirstGraph<void,int,true> Graph;
   typedef Graph::GraphNode GNode;
   Graph graph;
 
@@ -99,7 +143,7 @@ void readDIMACS(const char *infilename, const char *outfilename) {
   std::vector<GNode> nodes;
   nodes.resize(nnodes);
   for (int i = 0; i < nnodes; ++i) {
-    GNode n = graph.createNode(i);
+    GNode n = graph.createNode(Galois::Graph::GraphUnit());
     nodes[i] = n;
     graph.addNode(n, Galois::Graph::NONE);
   }
@@ -122,21 +166,25 @@ void readDIMACS(const char *infilename, const char *outfilename) {
 }
 
 int main(int argc, const char** argv) {
-  bool use_dimacs = true;
+  int func = 0;
   for (int index = 1; index < argc; ++index) {
     const char* tok = argv[index];
     if (strcmp(tok, "-help") == 0) {
       std::cout << help;
       return 0;
-    } else if (strcmp(tok, "-dimacs") == 0) {
-      use_dimacs = true;
-    } else if (strcmp(tok, "-rmat") == 0) {
-      use_dimacs = false;
+    } else if (strcmp(tok, "-dimacs2gr") == 0) {
+      func = 0;
+    } else if (strcmp(tok, "-rmat2gr") == 0) {
+      func = 1;
+    } else if (strcmp(tok, "-gr2dimacs") == 0) {
+      func = 2;
     } else if (argc - index == 2) {
-      if (use_dimacs) 
-        readDIMACS(argv[index], argv[index+1]);
-      else
-        readRMAT(argv[index], argv[index+1]);
+      switch (func) {
+        case 2: gr2dimacs(argv[index], argv[index+1]); break;
+        case 1: rmat2gr(argv[index], argv[index+1]); break;
+        case 0: dimacs2gr(argv[index], argv[index+1]); break;
+        default: assert(false);
+      }
       return 0;
     } else {
       std::cerr << "unknown arguments, use -help for usage information\n";

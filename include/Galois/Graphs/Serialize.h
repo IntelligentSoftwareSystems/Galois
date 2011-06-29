@@ -36,7 +36,10 @@
 namespace Galois {
 namespace Graph {
 
-//! Writes graph out to binary file
+/**
+ * Writes graph out to binary file. Note: does not currently save node
+ * data.
+ */
 template<typename Graph>
 bool outputGraph(const char* file, Graph& G) {
   //ASSUME LE machine

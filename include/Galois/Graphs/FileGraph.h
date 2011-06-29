@@ -193,6 +193,7 @@ public:
     return FileGraph::getEdgeData<EdgeTy>(src, dst, mflag);
   }
 
+  //! Loads node data from file
   void nodeDataFromFile(const char* filename) {
     emptyNodeData();
     std::ifstream file(filename);
@@ -200,6 +201,7 @@ public:
       file >> NodeData[i];
   }
   
+  //! Initializes node data for the graph to default values
   void emptyNodeData(NodeTy init = NodeTy()) {
     NodeData = new cache_line_storage<gNode>[numNodes];
     for (uint64_t i = 0; i < numNodes; ++i)

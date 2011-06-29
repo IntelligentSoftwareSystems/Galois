@@ -102,20 +102,44 @@ static inline bool shouldLock(MethodFlag g) {
 ////////////////////////////////////////////////////////////////////////////////
 
 /**
- * Wrapper class to have a valid type on void nodes
+ * Wrapper class to have a valid type on void 
  */
 template<typename T>
 struct VoidWrapper {
   typedef T type;
   typedef T& ref_type;
+  typedef const T& const_ref_type;
 };
 
 template<>
 struct VoidWrapper<void> {
-  struct unit {
-  };
+  struct unit { };
   typedef unit type;
   typedef unit ref_type;
+  typedef const unit const_ref_type;
+};
+
+//! Short name for unit for use with FirstGraph::createNode for unit node data
+typedef VoidWrapper<void>::unit GraphUnit;
+
+/**
+ * Wrapper class to have a valid type on void nodes
+ */
+template<typename NTy>
+struct NodeItem {
+  NTy N;
+  NodeItem(typename VoidWrapper<NTy>::const_ref_type n) : N(n) { }
+  inline typename VoidWrapper<NTy>::ref_type getData() {
+    return N;
+  }
+};
+
+template<>
+struct NodeItem<void> {
+  NodeItem(VoidWrapper<void>::const_ref_type n) { }
+  inline VoidWrapper<void>::ref_type getData() {
+    return VoidWrapper<void>::ref_type();
+  }
 };
 
 /**
@@ -161,18 +185,30 @@ struct EdgeItem<NTy, void> {
  */
 template<typename NodeTy, typename EdgeTy, bool Directional>
 class FirstGraph {
+public:
+  //! A reference to an edge
+  typedef typename VoidWrapper<EdgeTy>::ref_type edge_reference;
+  //! A reference to a const edge
+  typedef typename VoidWrapper<EdgeTy>::const_ref_type const_edge_reference;
+  //! A reference to a node
+  typedef typename VoidWrapper<NodeTy>::ref_type node_reference;
+  //! A reference to a const node
+  typedef typename VoidWrapper<NodeTy>::const_ref_type const_node_reference;
 
+private:
   struct gNode: public GaloisRuntime::Lockable {
-    //! The storage type for edges
+    //! The storage type for an edge
     typedef EdgeItem<gNode*, EdgeTy> EITy;
-    //! The return type for edge data
-    typedef typename VoidWrapper<EdgeTy>::ref_type REdgeTy;
-    typedef llvm::SmallVector<EITy, 3> edgesTy;
-    edgesTy edges;
-    NodeTy data;
-    bool active;
+    //! The storage type for a node
+    typedef NodeItem<NodeTy> NITy;
 
-    typedef typename edgesTy::iterator iterator;
+    //! The storage type for edges
+    typedef llvm::SmallVector<EITy, 3> EdgesTy;
+    typedef typename EdgesTy::iterator iterator;
+
+    EdgesTy edges;
+    NITy data;
+    bool active;
 
     iterator begin() {
       return edges.begin();
@@ -194,7 +230,7 @@ class FirstGraph {
       return boost::make_transform_iterator(end(), getNeigh());
     }
 
-    gNode(const NodeTy& d, bool a) :
+    gNode(const_node_reference d, bool a) :
       data(d), active(a) {
     }
 
@@ -213,7 +249,7 @@ class FirstGraph {
       }
     }
 
-    REdgeTy getEdgeData(gNode* N) {
+    edge_reference getEdgeData(gNode* N) {
       for (iterator ii = begin(), ee = end(); ii != ee; ++ii)
 	if (ii->getNeighbor() == N)
 	  return ii->getData();
@@ -221,11 +257,11 @@ class FirstGraph {
       abort();
     }
 
-    REdgeTy getEdgeData(iterator ii) {
+    edge_reference getEdgeData(iterator ii) {
       return ii->getData();
     }
 
-    REdgeTy getOrCreateEdge(gNode* N) {
+    edge_reference getOrCreateEdge(gNode* N) {
       for (iterator ii = begin(), ee = end(); ii != ee; ++ii)
 	if (ii->getNeighbor() == N)
 	  return ii->getData();
@@ -246,17 +282,17 @@ class FirstGraph {
   };
 
   //The graph manages the lifetimes of the data in the nodes and edges
-  typedef GaloisRuntime::galois_insert_bag<gNode> nodeListTy;
-  nodeListTy nodes;
+  typedef GaloisRuntime::galois_insert_bag<gNode> NodeListTy;
+  NodeListTy nodes;
 
   //GaloisRuntime::MemRegionPool<gNode> NodePool;
 
   //deal with the Node redirction
-  NodeTy& getData(gNode* ID, MethodFlag mflag = ALL) {
+  node_reference getData(gNode* ID, MethodFlag mflag = ALL) {
     assert(ID);
     if (shouldLock(mflag))
       acquire(ID);
-    return ID->data;
+    return ID->data.getData();
   }
 
 public:
@@ -282,7 +318,7 @@ public:
 	ID->prefetch_neighbors();
     }
 
-    NodeTy& getData(MethodFlag mflag = ALL) const {
+    node_reference getData(MethodFlag mflag = ALL) const {
       return Parent->getData(ID, mflag);
     }
 
@@ -347,9 +383,10 @@ public:
   
   /**
    * Creates a new node holding the indicated data. The node is not added to
-   * the graph (see addNode() instead).
+   * the graph (see addNode() instead). For graphs with void node data, 
+   * pass ::GraphUnit instead.
    */
-  GraphNode createNode(const NodeTy& n) {
+  GraphNode createNode(const_node_reference n) {
     gNode N(n, false);
     return GraphNode(this, &(nodes.push(N)));
   }
@@ -368,11 +405,11 @@ public:
   }
 
   //! Gets the node data for a node.
-  NodeTy& getData(const GraphNode& n, MethodFlag mflag = ALL) const {
+  node_reference getData(const GraphNode& n, MethodFlag mflag = ALL) const {
     assert(n.ID);
     if (shouldLock(mflag))
       acquire(n.ID);
-    return n.ID->data;
+    return n.ID->data.getData();
   }
 
   //! Checks if a node is in the graph (already added)
@@ -409,7 +446,7 @@ public:
 
   //! Adds an edge to the graph containing the specified data.
   void addEdge(GraphNode src, GraphNode dst,
-	       const typename VoidWrapper<EdgeTy>::type& data, 
+	       const_edge_reference data, 
 	       MethodFlag mflag = ALL) {
     assert(src.ID);
     assert(dst.ID);
@@ -466,8 +503,8 @@ public:
    * Returns the edge data associated with the edge. It is an error to
    * get the edge data for a non-existent edge.
    */
-  typename VoidWrapper<EdgeTy>::type& getEdgeData(GraphNode src, GraphNode dst,
-						  MethodFlag mflag = ALL) const {
+  edge_reference getEdgeData(GraphNode src, GraphNode dst,
+      MethodFlag mflag = ALL) const {
     assert(src.ID);
     assert(dst.ID);
 
@@ -527,8 +564,8 @@ public:
 					  makeGraphNodePtr(this));
   }
 
-  typename VoidWrapper<EdgeTy>::type& getEdgeData(GraphNode src, neighbor_iterator dst,
-						  MethodFlag mflag = ALL) {
+  edge_reference getEdgeData(GraphNode src, neighbor_iterator dst,
+      MethodFlag mflag = ALL) {
     assert(src.ID);
 
     //yes, fault on null (no edge)
@@ -548,7 +585,7 @@ public:
   //These are not thread safe!!
   typedef boost::transform_iterator<makeGraphNode,
             boost::filter_iterator<std::mem_fun_ref_t<bool, gNode>,
-              typename nodeListTy::iterator> > active_iterator;
+              typename NodeListTy::iterator> > active_iterator;
 
   /**
    * Returns an iterator to all the nodes in the graph. Not thread-safe.
