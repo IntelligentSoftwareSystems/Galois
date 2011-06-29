@@ -281,12 +281,12 @@ int main(int argc, const char **argv) {
       report = *src;
     }
   }
-  if (report == -1) {
+  if (report == GNode(-1)) {
     std::cerr << "Failed to set report (" << reportNode << ").\n";
     assert(0);
     abort();
   }
-  if (source == -1) {
+  if (source == GNode(-1)) {
     std::cerr << "Failed to set source (" << startNode << ".\n";
     assert(0);
     abort();
