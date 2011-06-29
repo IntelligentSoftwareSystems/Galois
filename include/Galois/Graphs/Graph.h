@@ -221,6 +221,10 @@ class FirstGraph {
       abort();
     }
 
+    REdgeTy getEdgeData(iterator ii) {
+      return ii->getData();
+    }
+
     REdgeTy getOrCreateEdge(gNode* N) {
       for (iterator ii = begin(), ee = end(); ii != ee; ++ii)
 	if (ii->getNeighbor() == N)
@@ -523,6 +527,25 @@ public:
 					  makeGraphNodePtr(this));
   }
 
+  typename VoidWrapper<EdgeTy>::type& getEdgeData(GraphNode src, neighbor_iterator dst,
+						  MethodFlag mflag = ALL) {
+    assert(src.ID);
+
+    //yes, fault on null (no edge)
+    if (shouldLock(mflag))
+      acquire(src.ID);
+
+    if (Directional) {
+      return src.ID->getEdgeData(dst.base().base());
+    } else {
+      if (src.ID < dst.base().base()->getNeighbor())
+	return src.ID->getEdgeData(dst.base().base()->getNeighbor());
+      else
+	return dst.base().base()->getNeighbor()->getEdgeData(src.ID);
+    }
+  }
+
+  //These are not thread safe!!
   typedef boost::transform_iterator<makeGraphNode,
             boost::filter_iterator<std::mem_fun_ref_t<bool, gNode>,
               typename nodeListTy::iterator> > active_iterator;
