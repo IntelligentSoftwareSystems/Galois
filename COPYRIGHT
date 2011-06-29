@@ -1,7 +1,8 @@
+
 Galois, a framework to exploit amorphous data-parallelism in irregular
 programs.
 
-Copyright (C) 2010, The University of Texas at Austin. All rights reserved.
+Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
 UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS SOFTWARE
 AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR ANY
 PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF PERFORMANCE, AND ANY
@@ -13,3 +14,14 @@ profits, interruption of business, or related expenses which may arise from use
 of Software or Documentation, including but not limited to those resulting from
 defects in Software and/or Documentation, or loss or inaccuracy of data of any
 kind.
+
+This software is released under the terms of the University of Texas at Austin
+Research License available at
+
+ http://www.otc.utexas.edu/Forms/ResearchLicense_SourceCode_11142005.doc ,
+
+which makes this software available without charge to anyone for academic,
+research, experimental, or personal use. For all other uses, please contact the
+University of Texas at Austin's Office of Technology Commercialization
+ 
+ http://www.otc.utexas.edu/

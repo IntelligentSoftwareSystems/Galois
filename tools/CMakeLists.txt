@@ -1,6 +1,5 @@
 add_subdirectory(compile-check)
-add_subdirectory(random-2d-points)
-add_subdirectory(random-graph)
+add_subdirectory(generators)
 add_subdirectory(graph-convert)
 
 ### External Projects
