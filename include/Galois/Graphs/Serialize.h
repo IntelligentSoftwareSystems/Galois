@@ -82,7 +82,9 @@ bool outputGraph(const char* file, Graph& G) {
     nodes.push_back(*ii);
   }
 
-  std::stable_sort(nodes.begin(), nodes.end(), CompareNodeData<Graph>());
+  // TODO(ddn): for some reason stable_sort crashes with:
+  //  free(): invalid pointer
+  std::sort(nodes.begin(), nodes.end(), CompareNodeData<Graph>());
 
   //num edges and outidx computation
   uint64_t offset = 0;
