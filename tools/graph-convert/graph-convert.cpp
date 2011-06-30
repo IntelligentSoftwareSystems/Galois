@@ -22,7 +22,6 @@
  */
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Galois.h"
-#include "Galois/IO/gr.h"
 
 #include "Galois/Graphs/Serialize.h"
 
