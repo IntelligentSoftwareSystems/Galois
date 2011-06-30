@@ -113,7 +113,11 @@ struct VoidWrapper {
 
 template<>
 struct VoidWrapper<void> {
-  struct unit { };
+  struct unit { 
+    bool operator<(const unit& a) {
+      return true;
+    }
+  };
   typedef unit type;
   typedef unit ref_type;
   typedef const unit const_ref_type;

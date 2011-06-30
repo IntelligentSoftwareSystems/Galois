@@ -30,89 +30,103 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#include <map>
 #include <fstream>
+#include <algorithm>
 
 namespace Galois {
 namespace Graph {
 
+template<typename Graph>
+struct CompareNodeData {
+  typedef typename Graph::GraphNode GNode;
+  bool operator()(const GNode& a, const GNode& b) {
+    return a.getData() < b.getData();
+  }
+};
+
 /**
- * Writes graph out to binary file. Note: does not currently save node
- * data.
+ * Writes graph out to binary file. Does not currently save node
+ * data. Does try to make node ids stable by sorting Graph::GraphNodes
+ * using NodeData::operator<() first, so if you want nodes to appear
+ * in certain order set the node data appropriately.
  */
 template<typename Graph>
 bool outputGraph(const char* file, Graph& G) {
+  ssize_t retval;
   //ASSUME LE machine
   mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
   int fd = open(file, O_WRONLY | O_CREAT |O_TRUNC, mode);
   
-  ssize_t retval;
   //version
-  uint64_t tmp64 = 1;
-  retval = write(fd, &tmp64, sizeof(uint64_t));
+  uint64_t version = 1;
+  retval = write(fd, &version, sizeof(uint64_t));
   if (retval == -1)
     error_at_line(1, errno, __FILE__, __LINE__, "error writing file");
 
-  tmp64 = sizeof(typename Graph::EdgeDataTy);
-  retval = write(fd, &tmp64, sizeof(uint64_t));
+  uint64_t sizeof_edge_data = sizeof(typename Graph::EdgeDataTy);
+  retval = write(fd, &sizeof_edge_data, sizeof(uint64_t));
   if (retval == -1)
     error_at_line(1, errno, __FILE__, __LINE__, "error writing file");
 
   //num nodes
-  tmp64 = G.size();
-  retval = write(fd, &tmp64, sizeof(uint64_t));
+  uint64_t num_nodes = G.size();
+  retval = write(fd, &num_nodes, sizeof(uint64_t));
   if (retval == -1)
     error_at_line(1, errno, __FILE__, __LINE__, "error writing file");
 
-  //num edges and outidx computation
-  tmp64 = 0;
-  uint64_t offset = 0;
-  std::vector<uint64_t> outIdx;
-  uint64_t count = 0;
-  std::map<typename Graph::GraphNode, uint32_t> NodeIDs;
+  typedef typename Graph::GraphNode GNode;
+  typedef std::vector<GNode> Nodes;
+  Nodes nodes;
   for (typename Graph::active_iterator ii = G.active_begin(),
-	 ee = G.active_end(); ii != ee; ++ii) {
-    NodeIDs[*ii] = count;
-    ++count;
-    tmp64 += G.neighborsSize(*ii);
-    offset += G.neighborsSize(*ii);
-    outIdx.push_back(offset);
+      ee = G.active_end(); ii != ee; ++ii) {
+    nodes.push_back(*ii);
   }
-  retval = write(fd, &tmp64, sizeof(uint64_t));
+
+  std::stable_sort(nodes.begin(), nodes.end(), CompareNodeData<Graph>());
+
+  //num edges and outidx computation
+  uint64_t offset = 0;
+  std::vector<uint64_t> out_idx;
+  std::map<typename Graph::GraphNode, uint32_t> node_ids;
+  for (uint32_t id = 0; id < num_nodes; ++id) {
+    GNode& node = nodes[id];
+    node_ids[node] = id;
+    offset += G.neighborsSize(node);
+    out_idx.push_back(offset);
+  }
+  retval = write(fd, &offset, sizeof(uint64_t));
   if (retval == -1)
     error_at_line(1, errno, __FILE__, __LINE__, "error writing file");
 
   //outIdx
-  retval = write(fd, &outIdx[0], sizeof(uint64_t) * outIdx.size());
+  retval = write(fd, &out_idx[0], sizeof(uint64_t) * out_idx.size());
   if (retval == -1)
     error_at_line(1, errno, __FILE__, __LINE__, "error writing file");
 
-
   //outs
-  count = 0;
-  for (typename Graph::active_iterator ii = G.active_begin(),
-	 ee = G.active_end(); ii != ee; ++ii) {
+  size_t num_edges = 0;
+  for (typename Nodes::iterator ii = nodes.begin(), ee = nodes.end();
+      ii != ee; ++ii) {
     for (typename Graph::neighbor_iterator ni = G.neighbor_begin(*ii),
-	   ne = G.neighbor_end(*ii); ni != ne; ++ni) {
-      uint32_t tmp32 = NodeIDs[*ni];
-      retval = write(fd, &tmp32, sizeof(uint32_t));
+        ne = G.neighbor_end(*ii); ni != ne; ++ni, ++num_edges) {
+      uint32_t id = node_ids[*ni];
+      retval = write(fd, &id, sizeof(uint32_t));
       if (retval == -1)
         error_at_line(1, errno, __FILE__, __LINE__, "error writing file");
-      ++count;
     }
   }
-  if (count % 2) {
-    uint32_t tmp32 = 0;
-    retval = write(fd, &tmp32, sizeof(uint32_t));
+  if (num_edges % 2) {
+    uint32_t padding = 0;
+    retval = write(fd, &padding, sizeof(uint32_t));
     if (retval == -1)
       error_at_line(1, errno, __FILE__, __LINE__, "error writing file");
   }
 
   //edgeData
-  for (typename Graph::active_iterator ii = G.active_begin(),
-	 ee = G.active_end(); ii != ee; ++ii) {
+  for (typename Nodes::iterator ii = nodes.begin(), ee = nodes.end();
+      ii != ee; ++ii) {
     for (typename Graph::neighbor_iterator ni = G.neighbor_begin(*ii),
-	   ne = G.neighbor_end(*ii); ni != ne; ++ni) {
+        ne = G.neighbor_end(*ii); ni != ne; ++ni) {
       retval = write(fd, &G.getEdgeData(*ii, *ni),
           sizeof(typename Graph::EdgeDataTy));
       if (retval == -1)

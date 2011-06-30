@@ -34,7 +34,7 @@ static const char* help =
   "Default: converts dimacs to binary gr format (-dimacs2gr)\n";
 
 void rmat2gr(const char *infilename, const char *outfilename) {
-  typedef Galois::Graph::FirstGraph<void,int,true> Graph;
+  typedef Galois::Graph::FirstGraph<int,int,true> Graph;
   typedef Graph::GraphNode GNode;
   Graph graph;
 
@@ -55,7 +55,7 @@ void rmat2gr(const char *infilename, const char *outfilename) {
   std::vector<GNode> nodes;
   nodes.resize(nnodes);
   for (int i = 0; i < nnodes; ++i) {
-    GNode n = graph.createNode(Galois::Graph::GraphUnit());
+    GNode n = graph.createNode(i);
     nodes[i] = n;
     graph.addNode(n, Galois::Graph::NONE);
   }
@@ -117,11 +117,10 @@ void gr2dimacs(const char *infilename, const char *outfilename) {
   std::cout << "Finished reading graph. "
     << "Nodes: " << nnodes << " Edges: " << nedges 
     << "\n";
-
 }
 
 void dimacs2gr(const char *infilename, const char *outfilename) {
-  typedef Galois::Graph::FirstGraph<void,int,true> Graph;
+  typedef Galois::Graph::FirstGraph<int,int,true> Graph;
   typedef Graph::GraphNode GNode;
   Graph graph;
 
@@ -142,7 +141,7 @@ void dimacs2gr(const char *infilename, const char *outfilename) {
   std::vector<GNode> nodes;
   nodes.resize(nnodes);
   for (int i = 0; i < nnodes; ++i) {
-    GNode n = graph.createNode(Galois::Graph::GraphUnit());
+    GNode n = graph.createNode(i);
     nodes[i] = n;
     graph.addNode(n, Galois::Graph::NONE);
   }
