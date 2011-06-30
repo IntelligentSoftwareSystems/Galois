@@ -22,7 +22,6 @@
  */
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Galois.h"
-
 #include "Galois/Graphs/Serialize.h"
 
 #include <iostream>
@@ -60,23 +59,125 @@ void rmat2gr(const char *infilename, const char *outfilename) {
     graph.addNode(n, Galois::Graph::NONE);
   }
 
+  int edges_added = 0;
   for (int edge_num = 0; edge_num < nedges; ++edge_num) {
     int cur_id, cur_edges;
     infile >> cur_id >> cur_edges;
-    assert(0 <= cur_id && cur_id < nnodes);
-    assert(cur_edges >= 0);
+    if (cur_id < 0 || cur_id >= nnodes) {
+      std::cerr << "node id out of range: " << cur_id << "\n";
+      abort();
+    }
+    if (cur_edges < 0) {
+      std::cerr << "num edges out of range: " << cur_edges << "\n";
+      abort();
+    }
+    
     for (int j = 0; j < cur_edges; ++j) {
       int neighbor_id, weight;
       infile >> neighbor_id >> weight;
-      assert(0 <= neighbor_id && neighbor_id < nnodes);
-      graph.addEdge(nodes[cur_id], nodes[neighbor_id], weight);
+      if (neighbor_id < 0 || neighbor_id >= nnodes) {
+        std::cerr << "neighbor id out of range: " << neighbor_id << "\n";
+        abort();
+      }
+      GNode& src = nodes[cur_id];
+      GNode& dst = nodes[neighbor_id];
+      if (src.hasNeighbor(dst)) {
+        std::cerr << "Warning: Duplicate edge ("
+          << cur_id << ", " << neighbor_id << ") weight " << weight
+          << " ignored\n";
+      } else {
+        graph.addEdge(src, dst, weight);
+        edges_added++;
+      }
     }
 
     infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
   }
 
+  infile.peek();
+  if (!infile.eof()) {
+    std::cerr << "additional lines in file\n";
+    abort();
+  }
+
   std::cout << "Finished reading graph. "
-    << "Nodes: " << nnodes << " Edges: " << nedges << "\n";
+    << "Nodes: " << nnodes
+    << " Edges read: " << nedges 
+    << " Edges added: " << edges_added
+    << "\n";
+
+  outputGraph(outfilename, graph);
+}
+
+void dimacs2gr(const char *infilename, const char *outfilename) {
+  typedef Galois::Graph::FirstGraph<int,int,true> Graph;
+  typedef Graph::GraphNode GNode;
+  Graph graph;
+
+  std::ifstream infile(infilename);
+
+  while (true) {
+    if (infile.peek() != 'c') {
+      break;
+    }
+    infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+  }
+
+  std::string tmp;
+  int nnodes, nedges;
+  infile >> tmp >> tmp >> nnodes >> nedges;
+  infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+
+  std::vector<GNode> nodes;
+  nodes.resize(nnodes);
+  for (int i = 0; i < nnodes; ++i) {
+    GNode n = graph.createNode(i);
+    nodes[i] = n;
+    graph.addNode(n, Galois::Graph::NONE);
+  }
+
+  int edges_added = 0;
+  for (int edge_num = 0; edge_num < nedges; ++edge_num) {
+    int cur_id, neighbor_id, weight;
+    infile >> tmp >> cur_id >> neighbor_id >> weight;
+    if (tmp.compare("a") != 0) {
+      std::cerr << "unknown line type\n";
+      abort();
+    }
+    if (cur_id < 0 || cur_id >= nnodes) {
+      std::cerr << "node id out of range: " << cur_id << "\n";
+      abort();
+    }
+    if (neighbor_id < 0 || neighbor_id >= nnodes) {
+      std::cerr << "neighbor id out of range: " << neighbor_id << "\n";
+      abort();
+    }
+    
+    GNode& src = nodes[cur_id];
+    GNode& dst = nodes[neighbor_id];
+    if (src.hasNeighbor(dst)) {
+      std::cerr << "Warning: Duplicate edge ("
+        << cur_id << ", " << neighbor_id << ") weight " << weight
+        << " ignored\n";
+    } else {
+      graph.addEdge(src, dst, weight);
+      edges_added++;
+    }
+
+    infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+  }
+
+  infile.peek();
+  if (!infile.eof()) {
+    std::cerr << "additional lines in file\n";
+    abort();
+  }
+
+  std::cout << "Finished reading graph. "
+    << "Nodes: " << nnodes
+    << " Edges read: " << nedges 
+    << " Edges added: " << edges_added
+    << "\n";
 
   outputGraph(outfilename, graph);
 }
@@ -117,50 +218,6 @@ void gr2dimacs(const char *infilename, const char *outfilename) {
   std::cout << "Finished reading graph. "
     << "Nodes: " << nnodes << " Edges: " << nedges 
     << "\n";
-}
-
-void dimacs2gr(const char *infilename, const char *outfilename) {
-  typedef Galois::Graph::FirstGraph<int,int,true> Graph;
-  typedef Graph::GraphNode GNode;
-  Graph graph;
-
-  std::ifstream infile(infilename);
-
-  while (true) {
-    if (infile.peek() != 'c') {
-      break;
-    }
-    infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-  }
-
-  std::string tmp;
-  int nnodes, nedges;
-  infile >> tmp >> tmp >> nnodes >> nedges;
-  infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-
-  std::vector<GNode> nodes;
-  nodes.resize(nnodes);
-  for (int i = 0; i < nnodes; ++i) {
-    GNode n = graph.createNode(i);
-    nodes[i] = n;
-    graph.addNode(n, Galois::Graph::NONE);
-  }
-
-  for (int edge_num = 0; edge_num < nedges; ++edge_num) {
-    int cur_id, neighbor_id, weight;
-    infile >> tmp >> cur_id >> neighbor_id >> weight;
-    assert(tmp.compare("a") == 0);
-    assert(0 <= cur_id && cur_id < nnodes);
-    assert(0 <= neighbor_id && neighbor_id < nnodes);
-    graph.addEdge(nodes[cur_id], nodes[neighbor_id], weight);
-
-    infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-  }
-
-  std::cout << "Finished reading graph. "
-    << "Nodes: " << nnodes << " Edges: " << nedges << "\n";
-
-  outputGraph(outfilename, graph);
 }
 
 int main(int argc, const char** argv) {

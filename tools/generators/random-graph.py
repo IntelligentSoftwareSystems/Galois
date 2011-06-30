@@ -24,36 +24,35 @@ from __future__ import print_function
 import sys
 import optparse
 import random
-
-#my $num = 268435456; #28
-#my $num = 134217728; #27
-#my $num =  67108864; #26
-#my $num =  33554432; #25
-#my $num =  16777216; #24
-#my $num =   8388608; #23
-#my $num =   4194304; #22
-#my $num =   2097152; #21
+import collections
 
 def main(num_nodes, seed, options):
   random.seed(seed)
   max_weight = int(options.max_weight)
   num_edges = int(options.density) * num_nodes
+  adj = collections.defaultdict(set)
 
   print('p sp %d %d' % (num_nodes, num_edges))
 
   def nextN():
     return random.randint(0, num_nodes - 1)
-
   def nextE():
     return random.randint(1, max_weight)
+  def addEdge(src, dst, w):
+    if dst in adj[src]:
+      return False
+    print('a %d %d %d' % (src, dst, w))
+    adj[src].add(dst)
+    return True
 
   # Form a connected graph
-  for index in xrange(num_nodes):
-    print('a %d %d %d' % (index, index + 1, nextE()))
-  print('a %d %d %d' % (num_nodes - 1, 0, nextE()))
+  for index in xrange(num_nodes - 1):
+    addEdge(index, index+1, nextE())
 
+  addEdge(num_nodes - 1, 0, nextE())
   for index in xrange(num_edges - num_nodes):
-    print('a %d %d %d' % (nextN(), nextN(), nextE()))
+    while not addEdge(nextN(), nextN(), nextE()):
+      pass
 
 
 if __name__ == '__main__':
