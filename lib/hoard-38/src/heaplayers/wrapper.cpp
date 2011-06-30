@@ -269,6 +269,7 @@ extern "C"  char * MYCDECL CUSTOM_GETCWD(char * buf, size_t size)
 #endif
 
 
+#ifndef	DISABLE_OVERLOADING
 #ifndef _NEW_INCLUDED_
 #define _NEW_INCLUDED_
 
@@ -327,6 +328,7 @@ void operator delete[] (void * ptr)
 
 #endif
 #endif
+#endif	/* !DISABLE_OVERLOADING */
 
 /***** replacement functions for GNU libc extensions to malloc *****/
 
