@@ -30,34 +30,36 @@ import optparse
 import collections
 
 def main(options):
-  frame = {
-      'cols': set(),
-      'rows': [],
-      'row': collections.defaultdict(str)
-    }
+  class Mutable:
+    pass
 
-  def add_stat(f, key, value):
+  cols = set()
+  rows = []
+  row = Mutable() # Wrap row in object to allow assignment in nested functions
+  row.r = collections.defaultdict(str)
+
+  def add_stat(key, value):
     try:
-      if f['row'][key]:
-        f['row'][key] = int(f['row'][key]) + int(value)
+      if row.r[key]:
+        row.r[key] = int(row.r[key]) + int(value)
       else:
-        f['row'][key] = value
+        row.r[key] = value
     except ValueError:
-      f['row'][key] = value
-    f['cols'].add(key)
-  def add_stat_l(f, key, value, loop):
-    add_stat(f, key, value)
-    add_stat(f, "%s-%s" % (key, loop), value)
-  def do_start_line(f, m):
-    if f['row']:
-      f['rows'].append(f['row'])
-      f['row'] = collections.defaultdict(str)
-  def do_var_line(f, m):
-    add_stat(f, m.group('key'), m.group('value'))
-  def do_stat_line(f, m):
-    add_stat_l(f, m.group('key'), m.group('value'), m.group('loop'))
-  def do_dist_line(f, m):
-    add_stat_l(f, m.group('key'), m.group('value'),
+      row.r[key] = value
+    cols.add(key)
+  def add_stat_l(key, value, loop):
+    add_stat(key, value)
+    add_stat("%s-%s" % (key, loop), value)
+  def do_start_line(m):
+    if row.r:
+      rows.append(row.r)
+      row.r = collections.defaultdict(str)
+  def do_var_line(m):
+    add_stat(m.group('key'), m.group('value'))
+  def do_stat_line(m):
+    add_stat_l(m.group('key'), m.group('value'), m.group('loop'))
+  def do_dist_line(m):
+    add_stat_l(m.group('key'), m.group('value'),
         '%s-%s' % (m.group('loop'), m.group('loopn')))
 
   table = {
@@ -73,20 +75,20 @@ def main(options):
     for (regex, fn) in matcher:
       m = regex.match(line)
       if m:
-        fn(frame, m)
+        fn(m)
         break
-  if frame['row']:
-    frame['rows'].append(frame['row'])
+  if row.r:
+    rows.append(row.r)
   
   if options.include:
-    frame['cols'] = frame['cols'].intersect(options.include)
+    cols = cols.intersect(options.include)
   elif options.exclude:
-    frame['cols'] = frame['cols'].difference(options.exclude)
-  frame['cols'] = sorted(frame['cols'])
+    cols = cols.difference(options.exclude)
+  cols = sorted(cols)
 
-  print(','.join(frame['cols']))
-  for r in frame['rows']:
-    print(','.join([str(r[c]) for c in frame['cols']]))
+  print(','.join(cols))
+  for r in rows:
+    print(','.join([str(r[c]) for c in cols]))
 
 
 if __name__ == '__main__':
