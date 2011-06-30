@@ -13,7 +13,7 @@
 
 class Element {
 public:
-  typedef std::vector<Tuple, Galois::Allocator<Tuple> > TupleList;
+  typedef std::vector<Tuple, std::allocator<Tuple> > TupleList;
 private:
   Tuple coords[3];
   bool bDim; // true == 3, false == 2

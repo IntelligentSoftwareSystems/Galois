@@ -130,10 +130,10 @@ public:
       //newElements.push_back(&nnode_data);
 
                         Element& oldNodeData = oldNode.getData(Galois::Graph::NONE);
-                        std::vector<Tuple, Galois::Allocator<Tuple> >& ntuples = nnode_data.getTuples();
-                        std::vector<Tuple, Galois::Allocator<Tuple> >& tuples = oldNodeData.getTuples();
+                        std::vector<Tuple, std::allocator<Tuple> >& ntuples = nnode_data.getTuples();
+                        std::vector<Tuple, std::allocator<Tuple> >& tuples = oldNodeData.getTuples();
                         if (!tuples.empty()) {
-                                std::vector<Tuple, Galois::Allocator<Tuple> > newTuples;
+                                std::vector<Tuple, std::allocator<Tuple> > newTuples;
                                 unsigned tSize = tuples.size();
                                 for (unsigned i=0; i<tSize; i++)
                                 {
@@ -163,7 +163,7 @@ public:
     int size = newNodes->size();
     for (GNodeSet::iterator iter = deletingNodes.begin(); iter != deletingNodes.end(); ++iter) {
       GNode dnode = *iter;
-      std::vector<Tuple, Galois::Allocator<Tuple> >& tuples = dnode.getData(Galois::Graph::NONE).getTuples();
+      std::vector<Tuple, std::allocator<Tuple> >& tuples = dnode.getData(Galois::Graph::NONE).getTuples();
 
                         unsigned tSize = tuples.size();
                         for (unsigned j=0; j<tSize; j++)
