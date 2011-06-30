@@ -30,31 +30,49 @@ import optparse
 import collections
 
 def main(options):
-  end_row = re.compile(r'^RUN: Start')
-  run_var = re.compile(r'^RUN: Variable (\S+) = (\S+)')
-  stat_var = re.compile(r'^STAT: (\S+) (.*)')
-
   cols = set()
   rows = []
   row = collections.defaultdict(str)
-  for line in sys.stdin:
-    m = run_var.match(line)
-    if not m:
-      m = stat_var.match(line)
-    if m:
-      k = m.group(1)
-      v = m.group(2)
-      try:
-        if row[k]:
-          row[k] = int(row[k]) + int(v)
-        else:
-          row[k] = v
-      except ValueError:
-        row[k] = v
-      cols.add(k)
-    elif end_row.match(line) and row:
+
+  def add_stat(key, value):
+    try:
+      if row[key]:
+        row[key] = int(row[key]) + int(value)
+      else:
+        row[key] = value
+    except ValueError:
+      row[key] = value
+    cols.add(key)
+  def add_stat_l(key, value, loop):
+    add_stat(key, value)
+    add_stat("%s-%s" % (key, loop), value)
+  def do_start_line(m):
+    if row:
       rows.append(row)
       row = collections.defaultdict(str)
+  def do_var_line(m):
+    add_stat(m.group('key'), m.group('value'))
+  def do_stat_line(m):
+    add_stat_l(m.group('key'), m.group('value'), m.group('loop'))
+  def do_dist_line(m):
+    add_stat_l(m.group('key'), m.group('value'),
+        '%s-%s' % (m.group('loop'), m.group('loopn')))
+
+  table = {
+      r'^RUN: Start': do_start_line,
+      r'^RUN: Variable (?P<key>\S+) = (?P<value>\S+)': do_var_line,
+      r'^STAT SINGLE (?P<key>\S+) (?P<loop>\S+) (?P<value>.*)': do_stat_line,
+      r'^INFO: (?P<key>CommandLine) (?P<value>.*)': do_var_line,
+      r'^STAT DISTRIBUTION (?P<loopn>\d+) (?P<key>\S+) (?P<loop>\S+) (?P<value>.*)': do_dist_line
+      }
+  
+  matcher = [(re.compile(s), fn) for (s,fn) in table.iteritems()]
+  for line in sys.stdin:
+    for (regex, fn) in matcher:
+      m = regex.match(line)
+      if m:
+        fn(m)
+        break
   if row:
     rows.append(row)
   
