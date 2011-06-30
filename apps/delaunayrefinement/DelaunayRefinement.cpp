@@ -36,7 +36,7 @@
 
 #include "Element.h"
 
-#include "Galois/Timer.h"
+#include "Galois/Statistic.h"
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
 
@@ -116,10 +116,11 @@ int main(int argc, const char** argv) {
 
   std::cout << "configuration: " << mesh->size() << " total triangles, " << numbad << " bad triangles\n";
 
-  Galois::startTiming();
+  Galois::StatTimer T;
+  T.start();
   using namespace GaloisRuntime::WorkList;
   Galois::for_each<LocalQueues<ChunkedLIFO<1024>, LIFO<> > >(wl.begin(), wl.end(), process());
-  Galois::stopTiming();
+  T.stop();
   
   if (!skipVerify) {
     if (!m.verify(mesh)) {

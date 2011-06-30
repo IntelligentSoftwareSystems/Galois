@@ -22,6 +22,7 @@ kind.
 
 #include "Accumulator.h"
 #include "Runtime/Support.h"
+#include "Timer.h"
 
 namespace Galois {
 
@@ -32,6 +33,16 @@ public:
   statistic(const char* _name) :name(_name) {}
   ~statistic() {
     GaloisRuntime::reportStatSum(name, accumulator<T>::get());
+  }
+};
+
+class StatTimer : public Timer {
+  const char* name;
+  const char* loopname;
+public:
+  StatTimer(const char* n = "Time", const char* l = 0) :name(n), loopname(l) {}
+  ~StatTimer() {
+    GaloisRuntime::reportStatSum(name, get(), loopname);
   }
 };
 

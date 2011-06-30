@@ -20,7 +20,7 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#include "Galois/Timer.h"
+#include "Galois/Statistic.h"
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
 
@@ -255,9 +255,10 @@ int main(int argc, const char **argv) {
   phase.stop();
   GaloisRuntime::reportStatSum("ReadTotal", phase.get());
 
-  Galois::startTiming();
+  Galois::StatTimer T;
+  T.start();
   runBody();
-  Galois::stopTiming();
+  T.stop();
 
   printTop(10);
   if (!skipVerify && !verify()) {

@@ -55,12 +55,6 @@ namespace Galois {
     unsigned long get() const;
     TimeAccumulator& operator+=(const TimeAccumulator& rhs);
   };
-
-  //! Start the default timer
-  void startTiming();
-
-  //! Stop the default timer
-  void stopTiming();
 }
 #endif
 

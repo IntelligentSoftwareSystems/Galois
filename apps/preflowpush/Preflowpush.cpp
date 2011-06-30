@@ -20,7 +20,7 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#include "Galois/Timer.h"
+#include "Galois/Statistic.h"
 #include "Galois/Galois.h"
 #include "Galois/TypeTraits.h"
 #include "Galois/Graphs/Graph.h"
@@ -702,7 +702,8 @@ int main(int argc, const char** argv) {
   typedef dChunkedFIFO<16> Chunk;
   typedef OrderedByIntegerMetric<Indexer,Chunk> WL;
 
-  Galois::startTiming();
+  Galois::StatTimer T;
+  T.start();
   while (true) {
     Galois::for_each<Chunk>(initial.begin(), initial.end(), Process());
     int gh;
@@ -722,7 +723,7 @@ int main(int argc, const char** argv) {
       break;
     }
   }
-  Galois::stopTiming();
+  T.stop();
 
   std::cout << "Flow is " << app.sink.getData().excess << "\n";
   

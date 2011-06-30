@@ -28,18 +28,6 @@
 
 namespace Galois {
 
-static Timer LaunchTimer;
-static statistic<unsigned long> TimerStat("Time");
-
-void startTiming() {
-  LaunchTimer.start();
-}
-
-void stopTiming() {
-  LaunchTimer.stop();
-  TimerStat += LaunchTimer.get();
-}
-
 Timer::Timer()
   :_start_hi(0), _start_low(0), _stop_hi(0), _stop_low(0)
 {}

@@ -29,7 +29,7 @@
 #include <string.h>
 #include <limits>
 #include <unistd.h>
-#include "Galois/Timer.h"
+#include "Galois/Statistic.h"
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
 #include "Tuple.h"
@@ -307,9 +307,10 @@ int main(int argc, const char** argv) {
   std::cout << "configuration: " << initial_triangle.getData().getTuples().size() << " points\n";
 
   Galois::setMaxThreads(numThreads);
-  Galois::startTiming();
+  Galois::StatTimer T;
+  T.start();
   triangulate(wl);
-  Galois::stopTiming();
+  T.stop();
   std::cout << "mesh size: " << Mesh->size() << "\n";
 
   if (!skipVerify) {

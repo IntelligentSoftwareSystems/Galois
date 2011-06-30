@@ -21,7 +21,7 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  * @author Rashid Kaleem <rashid@ices.utexas.edu>
  */
-#include "Galois/Timer.h"
+#include "Galois/Statistic.h"
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
 
@@ -292,8 +292,9 @@ int main(int argc, const char **argv) {
 #if BORUVKA_DEBUG
   printGraph();
 #endif
-  Galois::startTiming();
+  Galois::StatTimer T;
+  T.start();
   runBodyParallel();
-  Galois::stopTiming();
+  T.stop();
   return 0;
 }

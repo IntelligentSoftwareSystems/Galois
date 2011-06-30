@@ -25,7 +25,7 @@
  * @author Martin Burtscher <burtscher@txstate.edu>
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#include "Galois/Timer.h"
+#include "Galois/Statistic.h"
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
 #include "Galois/Accumulator.h"
@@ -397,9 +397,10 @@ int main(int argc, const char** argv) {
   //build_graph();
   //print_graph();
 
-  Galois::startTiming();
+  Galois::StatTimer T;
+  T.start();
   survey_inspired_decimation();
-  Galois::stopTiming();
+  T.stop();
 
   //print_formula();
   //print_fixed();

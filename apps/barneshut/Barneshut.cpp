@@ -27,7 +27,7 @@
 #include <boost/math/constants/constants.hpp>
 #include <boost/iterator/transform_iterator.hpp>
 #include "Galois/Galois.h"
-#include "Galois/Timer.h"
+#include "Galois/Statistic.h"
 #include "Lonestar/Banner.h"
 #include "Lonestar/CommandLine.h"
 
@@ -619,7 +619,8 @@ int main(int argc, const char** argv) {
             << ntimesteps << " time steps" << std::endl << std::endl;
   std::cout << "Num. of threads: " << numThreads << std::endl;
 
-  Galois::startTiming();
+  Galois::StatTimer T;
+  T.start();
   run(nbodies, ntimesteps, seed);
-  Galois::stopTiming();
+  T.stop();
 }

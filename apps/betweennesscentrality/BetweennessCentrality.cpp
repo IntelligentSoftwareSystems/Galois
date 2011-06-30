@@ -20,7 +20,7 @@
  *
  * @author Dimitrios Prountzos <dprountz@cs.utexas.edu>
  */
-#include "Galois/Timer.h"
+#include "Galois/Statistic.h"
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Galois.h"
 
@@ -194,9 +194,10 @@ int main(int argc, const char** argv) {
     }
   }
   Galois::setMaxThreads(numThreads);
-  Galois::startTiming();
+  Galois::StatTimer T;
+  T.start();
   Galois::for_each<GaloisRuntime::WorkList::ChunkedLIFO<16> >(tmp.begin(), tmp.end(), process());
-  Galois::stopTiming();
+  T.stop();
 
   if (!skipVerify) {
     verify();

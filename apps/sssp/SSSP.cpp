@@ -135,12 +135,12 @@ void runBody(const GNode src) {
     initial.insert(up);
   }
 
-  unsigned int counter = 0;
-
-  Galois::startTiming();
+  Galois::statistic<unsigned int> counter("Iterations");
+  Galois::StatTimer T;
+  T.start();
   
   while (!initial.empty()) {
-    ++counter;
+    counter += 1;
     UpdateRequest req = *initial.begin();
     initial.erase(initial.begin());
     SNode& data = graph.getData(req.n, Galois::Graph::NONE);
@@ -159,9 +159,7 @@ void runBody(const GNode src) {
       }
     }
   }
-
-  Galois::stopTiming();
-  GaloisRuntime::reportStatSum("Iterations ", counter);
+  T.stop();
 }
 
 static Galois::statistic<unsigned int> BadWork("BadWork");
@@ -197,9 +195,10 @@ void runBodyParallel(const GNode src) {
 
   std::vector<UpdateRequest> wl;
   getInitialRequests(src, wl);
-  Galois::startTiming();
+  Galois::StatTimer T;
+  T.start();
   Galois::for_each<OBIM>(wl.begin(), wl.end(), process());
-  Galois::stopTiming();
+  T.stop();
 }
 
 
