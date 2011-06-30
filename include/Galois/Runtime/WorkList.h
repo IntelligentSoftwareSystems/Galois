@@ -198,9 +198,7 @@ public:
   //Not Thread Safe
   template<typename Iter>
   void fill_initial(Iter ii, Iter ee) {
-    while (ii != ee) {
-      wl.push_back(*ii++);
-    }
+    wl.insert(wl.end(), ii, ee);
   }
 };
 WLCOMPILECHECK(LIFO);
@@ -256,9 +254,7 @@ public:
   //Not Thread Safe
   template<typename Iter>
   void fill_initial(Iter ii, Iter ee) {
-    while (ii != ee) {
-      wl.push_back(*ii++);
-    }
+    wl.insert(wl.end(), ii, ee);
   }
 };
 WLCOMPILECHECK(FIFO);
