@@ -26,6 +26,7 @@
 #include "Galois/Runtime/Support.h"
 #include <sstream>
 #include <unistd.h>
+#include <stdio.h>
 
 static bool skipVerify = false;
 static long numThreads = 1;
@@ -54,13 +55,13 @@ std::vector<const char*> parse_command_line(int argc, const char** argv, const c
   for (int i = 1; i < argc; ++i) {
     if (std::string("-t").compare(argv[i]) == 0) {
       if (i + 1 >= argc) {
-	std::cerr << "Error parsing -t option, missing number\n";
+        fputs("Error parsing -t option, missing number\n", stderr);
 	abort();
       }
       char* endptr = 0;
       numThreads = strtol(argv[i+1], &endptr, 10);
       if (endptr == argv[i+1]) {
-	std::cerr << "Error parsing -t option, number not recognized\n";
+	fputs("Error parsing -t option, number not recognized\n", stderr);
 	abort();
       }
       numThreads = Galois::setMaxThreads(numThreads);
@@ -68,9 +69,9 @@ std::vector<const char*> parse_command_line(int argc, const char** argv, const c
     } else if (std::string("-noverify").compare(argv[i]) == 0) {
       skipVerify = true;
     } else if (std::string("-help").compare(argv[i]) == 0) {
-      std::cout << "[-t numThreads] use numThreads threads (1)\n"
-		<< "[-noverify] skip verification\n"
-		<< proghelp << "\n";
+      fprintf(stderr, "%s%s%s\n", "%s%s%s\n",
+          "[-t numThreads] use numThreads threads (1)\n",
+          "[-noverify] skip verification\n");
     } else {
       retval.push_back(argv[i]);
     }

@@ -28,11 +28,7 @@
 #include "Galois/Statistic.h"
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
-#include "Galois/IO/gr.h"
-
-#include "Galois/Graphs/Serialize.h"
 #include "Galois/Graphs/FileGraph.h"
-
 #include "Galois/Runtime/DebugWorkList.h"
 
 #include "Lonestar/Banner.h"
@@ -42,7 +38,6 @@
 #include <sstream>
 #include <limits>
 #include <iostream>
-//#include <fstream>
 #include <set>
 
 static const char* name = "Single Source Shortest Path";
@@ -51,7 +46,7 @@ static const char* description =
   "graph using a modified Bellman-Ford algorithm\n";
 static const char* url = "http://iss.ices.utexas.edu/lonestar/sssp.html";
 static const char* help =
-  "<input file> <startnode> <reportnode> [-delta <deltaShift>]";
+  "<input file> <startnode> <reportnode> [-delta <deltaShift>] [-bfs]";
 
 static const unsigned int DIST_INFINITY =
   std::numeric_limits<unsigned int>::max() - 1;
@@ -113,6 +108,7 @@ struct UpdateRequestIndexer
 };
 
 Graph graph;
+bool do_bfs = false;
 
 template<typename WLTy>
 void getInitialRequests(const GNode src, WLTy& wl) {
@@ -121,7 +117,7 @@ void getInitialRequests(const GNode src, WLTy& wl) {
       ee = graph.neighbor_end(src, Galois::Graph::NONE); 
       ii != ee; ++ii) {
     GNode dst = *ii;
-    int w = graph.getEdgeData(src, dst, Galois::Graph::NONE);
+    int w = do_bfs ? 1 : graph.getEdgeData(src, dst, Galois::Graph::NONE);
     UpdateRequest up(dst, w);
     wl.push_back(up);
   }
@@ -134,7 +130,7 @@ void runBody(const GNode src) {
       ee = graph.neighbor_end(src, Galois::Graph::NONE); 
       ii != ee; ++ii) {
     GNode dst = *ii;
-    int w = graph.getEdgeData(src, dst, Galois::Graph::NONE);
+    int w = do_bfs ? 1 : graph.getEdgeData(src, dst, Galois::Graph::NONE);
     UpdateRequest up(dst, w);
     initial.insert(up);
   }
@@ -156,7 +152,7 @@ void runBody(const GNode src) {
 	  ee = graph.neighbor_end(req.n, Galois::Graph::NONE);
 	  ii != ee; ++ii) {
 	GNode dst = *ii;
-	int d = graph.getEdgeData(req.n, dst, Galois::Graph::NONE);
+	int d = do_bfs ? 1 : graph.getEdgeData(req.n, dst, Galois::Graph::NONE);
 	unsigned int newDist = req.w + d;
 	if (newDist < graph.getData(dst,Galois::Graph::NONE).dist)
 	  initial.insert(UpdateRequest(dst, newDist));
@@ -183,7 +179,7 @@ struct process {
             ii = graph.neighbor_begin(req.n, Galois::Graph::NONE),
             ee = graph.neighbor_end(req.n, Galois::Graph::NONE); ii != ee; ++ii) {
 	  GNode dst = *ii;
-	  int d = graph.getEdgeData(req.n, dst, Galois::Graph::NONE);
+	  int d = do_bfs ? 1 : graph.getEdgeData(req.n, dst, Galois::Graph::NONE);
 	  unsigned int newDist = req.w + d;
 	  if (newDist < graph.getData(dst,Galois::Graph::NONE).dist)
 	    lwl.push(UpdateRequest(dst, newDist));
@@ -227,8 +223,8 @@ bool verify(GNode source) {
         ee = graph.neighbor_end(*src, Galois::Graph::NONE); ii != ee; ++ii) {
       GNode neighbor = *ii;
       unsigned int ddist = graph.getData(*src,Galois::Graph::NONE).dist;
-      
-      if (ddist > dist + graph.getEdgeData(*src, neighbor, Galois::Graph::NONE)) {
+      int d = do_bfs ? 1 : graph.getEdgeData(*src, neighbor, Galois::Graph::NONE);
+      if (ddist > dist + d) {
         std::cerr << "bad level value at "
           << graph.getData(*src,Galois::Graph::NONE).id
 	  << " which is a neighbor of " 
@@ -241,11 +237,10 @@ bool verify(GNode source) {
 }
 
 int main(int argc, const char **argv) {
-
   std::vector<const char*> args = parse_command_line(argc, argv, help);
 
   if (args.size() < 3) {
-    std::cout << "not enough arguments, use -help for usage information\n";
+    std::cerr << "not enough arguments, use -help for usage information\n";
     return 1;
   }
   printBanner(std::cout, name, description, url);
@@ -253,6 +248,18 @@ int main(int argc, const char **argv) {
   const char* inputfile = args[0];
   unsigned int startNode = atoi(args[1]);
   unsigned int reportNode = atoi(args[2]);
+  for (unsigned i = 3; i < args.size(); ++i) {
+    if (strcmp(args[i], "-delta") == 0 && i + 1 < args.size()) {
+      stepShift = atoi(args[i+1]);
+      ++i;
+    } else if (strcmp(args[i], "-bfs") == 0) {
+      do_bfs = true;
+    } else {
+      std::cerr << "unknown argument, use -help for usage information\n";
+      return 1;
+    }
+  }
+
   if (args.size() >= 5 && strcmp(args[3], "-delta") == 0)
     stepShift = atoi(args[4]);
  

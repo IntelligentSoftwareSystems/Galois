@@ -23,7 +23,7 @@
 #ifndef LONESTAR_BANNER_H
 #define LONESTAR_BANNER_H
 
-#include <iostream>
+#include <iosfwd>
 
 //! Print uniform banner for a benchmark
 void printBanner(std::ostream& os, const char* app, const char* desc, const char* url) {

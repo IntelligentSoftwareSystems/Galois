@@ -1,8 +1,26 @@
 #!/usr/bin/env python
-#
-# Parse the output of an application into a csv file
-# Run a series of performance tests and pretty print and export csv
-# the results.
+"""
+Parse the output of an application into a csv file
+Run a series of performance tests and pretty print and export csv
+the results.
+
+@section License
+
+Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS SOFTWARE
+AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR ANY
+PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF PERFORMANCE, AND ANY
+WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF DEALING OR USAGE OF TRADE.
+NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH RESPECT TO THE USE OF THE
+SOFTWARE OR DOCUMENTATION. Under no circumstances shall University be liable
+for incidental, special, indirect, direct or consequential damages or loss of
+profits, interruption of business, or related expenses which may arise from use
+of Software or Documentation, including but not limited to those resulting from
+defects in Software and/or Documentation, or loss or inaccuracy of data of any
+kind.
+
+@author Donald Nguyen <ddn@cs.utexas.edu> 
+"""
 
 from __future__ import print_function
 import sys
@@ -24,8 +42,16 @@ def main(options):
     if not m:
       m = stat_var.match(line)
     if m:
-      row[m.group(1)] = m.group(2)
-      cols.add(m.group(1))
+      k = m.group(1)
+      v = m.group(2)
+      try:
+        if row[k]:
+          row[k] = int(row[k]) + int(v)
+        else:
+          row[k] = v
+      except ValueError:
+        row[k] = v
+      cols.add(k)
     elif end_row.match(line) and row:
       rows.append(row)
       row = collections.defaultdict(str)
@@ -40,7 +66,7 @@ def main(options):
 
   print(','.join(cols))
   for r in rows:
-    print(','.join([r[c] for c in cols]))
+    print(','.join([str(r[c]) for c in cols]))
 
 
 if __name__ == '__main__':

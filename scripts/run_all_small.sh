@@ -7,7 +7,7 @@ set -e
 BASE="$(cd $(dirname $0); cd ..; pwd)"
 
 if [[ ! -e Makefile ]]; then
-  echo "Execute this script from your build directory" 1>&2
+  echo "Execute this script from the base of your build directory" 1>&2
   exit 1
 fi
 

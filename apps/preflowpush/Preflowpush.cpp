@@ -20,9 +20,6 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#include <algorithm>
-#include <limits>
-#include <set>
 #include "Galois/Timer.h"
 #include "Galois/Galois.h"
 #include "Galois/TypeTraits.h"
@@ -31,8 +28,13 @@
 #include "Lonestar/Banner.h"
 #include "Lonestar/CommandLine.h"
 
-#include "Galois/Runtime/PerCPU.h" // remove me after we figure out Reducer impl
 #include <limits>
+#include <algorithm>
+#include <limits>
+#include <set>
+#include <iostream>
+
+#include "Galois/Runtime/PerCPU.h" // remove me after we figure out Reducer impl
 namespace {
 
 template<typename C>
@@ -334,7 +336,7 @@ struct CleanGap {
   ReducerTy& reducer;
 
   int height;
-  CleanGap(int h, ReducerTy& r) : height(h), reducer(r) { }
+  CleanGap(int h, ReducerTy& r) : reducer(r), height(h) { }
 
   template<typename Context>
   void operator()(const GNode& src, Context& ctx) {

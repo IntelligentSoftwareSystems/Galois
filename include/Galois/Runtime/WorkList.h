@@ -728,7 +728,7 @@ public:
   typedef T value_type;
   
   PartitionedWL(const Partitioner& p = Partitioner()) :P(p), active(getSystemThreadPool().getActiveThreads()) {
-    std::cerr << active << "\n";
+    //std::cerr << active << "\n";
   }
 
   bool push(value_type val) OPTNOINLINE {

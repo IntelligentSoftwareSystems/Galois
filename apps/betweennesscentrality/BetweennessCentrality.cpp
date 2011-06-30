@@ -23,7 +23,6 @@
 #include "Galois/Timer.h"
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Galois.h"
-#include "Galois/IO/gr.h"
 
 #include "Lonestar/Banner.h"
 #include "Lonestar/CommandLine.h"
