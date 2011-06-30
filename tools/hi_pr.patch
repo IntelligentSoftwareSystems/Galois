@@ -3,6 +3,6 @@ diff -Naur src/CMakeLists.txt src.patched/CMakeLists.txt
 +++ src.patched/CMakeLists.txt  2011-06-22 11:50:25.697422244 -0500
 @@ -0,0 +1,4 @@
 +cmake_minimum_required(VERSION 2.8)
-+add_definitions(-DCUT_ONLY -DPRINT_STAT -DPRINT_FLOW)
++add_definitions(-DCUT_ONLY -DPRINT_STAT)
 +add_executable(hi_pr 3.7/hi_pr.c)
 +install(TARGETS hi_pr DESTINATION bin)
