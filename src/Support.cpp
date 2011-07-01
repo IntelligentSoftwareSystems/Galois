@@ -32,8 +32,11 @@
 
 typedef std::pair<const char*, const char*> strPair;
 static GaloisRuntime::SimpleLock<int, true> lock;
-static std::map<strPair, unsigned long> stats;
-static std::map<strPair, std::map<int, std::vector<unsigned long> > > distStats;
+typedef std::map<strPair, unsigned long> StatsMap;
+static StatsMap* stats;
+typedef std::map<int, std::vector<unsigned long> > DistStatsValue;
+typedef std::map<strPair, DistStatsValue> DistStatsMap;
+static DistStatsMap* distStats;
 static int gcounter = 0;
 
 typedef std::vector<unsigned long>::iterator vli;
@@ -66,11 +69,15 @@ static void genericReport(bool error, const char* text1,
 }
 
 void GaloisRuntime::reportStatSum(const char* text, unsigned long val, const char* loopname) {
-  stats[std::make_pair(text,loopname)] += val;
+  if (!stats)
+    stats = new StatsMap();
+  (*stats)[std::make_pair(text,loopname)] += val;
 }
 
 void GaloisRuntime::reportStatAvg(const char* text, unsigned long val, const char* loopname) {
-  distStats[std::make_pair(text,loopname)][gcounter].push_back(val);
+  if (!distStats)
+    distStats = new DistStatsMap();
+  (*distStats)[std::make_pair(text,loopname)][gcounter].push_back(val);
 }
 
 void GaloisRuntime::statDone() {
@@ -81,11 +88,26 @@ namespace {
 class PrintStats {
 public:
   ~PrintStats() {
-    for (std::map<strPair, unsigned long>::iterator ii = stats.begin(), ee = stats.end(); ii != ee; ++ii)
-      printf("STAT SINGLE %s %s %ld\n", ii->first.first, ii->first.second, ii->second);
-    for(std::map<strPair, std::map<int, std::vector<unsigned long> > >::iterator ii = distStats.begin(), ee = distStats.end(); ii != ee; ++ii)
-      for(std::map<int, std::vector<unsigned long> >::iterator i = ii->second.begin(), e = ii->second.end(); i != e; ++i)
-  summarizeList(i->first, ii->first.first, ii->first.second, i->second.begin(), i->second.end());
+    for (StatsMap::iterator ii = stats->begin(), ee = stats->end();
+        ii != ee; ++ii) {
+      printf("STAT SINGLE %s %s %ld\n",
+          ii->first.first, 
+          ii->first.second ? ii->first.second : "(null)",
+          ii->second);
+    }
+    for (DistStatsMap::iterator ii = distStats->begin(), ee = distStats->end();
+        ii != ee; ++ii) {
+      for (DistStatsValue::iterator i = ii->second.begin(), e = ii->second.end();
+          i != e; ++i) {
+        summarizeList(i->first,
+            ii->first.first ? ii->first.first : "(null)",
+            ii->first.second ? ii->first.second : "(null)",
+            i->second.begin(),
+            i->second.end());
+      } 
+    }
+    delete stats;
+    delete distStats;
   }
 };
 }
@@ -137,7 +159,7 @@ void GaloisRuntime::reportInfo(const char* text, const char* val) {
 /// on POD-like datatypes and is out of line to reduce code duplication.
 void llvm::SmallVectorBase::grow_pod(size_t MinSizeInBytes, size_t TSize) {
   size_t CurSizeBytes = size_in_bytes();
-  size_t NewCapacityInBytes = 2 * capacity_in_bytes() + TSize; // Always grow.                                                                                                                      
+  size_t NewCapacityInBytes = 2 * capacity_in_bytes() + TSize; // Always grow.
   if (NewCapacityInBytes < MinSizeInBytes)
     NewCapacityInBytes = MinSizeInBytes;
 
@@ -145,10 +167,10 @@ void llvm::SmallVectorBase::grow_pod(size_t MinSizeInBytes, size_t TSize) {
   if (this->isSmall()) {
     NewElts = malloc(NewCapacityInBytes);
 
-    // Copy the elements over.  No need to run dtors on PODs.                                                                                                                                       
+    // Copy the elements over.  No need to run dtors on PODs.
     memcpy(NewElts, this->BeginX, CurSizeBytes);
   } else {
-    // If this wasn't grown from the inline copy, grow the allocated space.                                                                                                                         
+    // If this wasn't grown from the inline copy, grow the allocated space.
     NewElts = realloc(this->BeginX, NewCapacityInBytes);
   }
 
