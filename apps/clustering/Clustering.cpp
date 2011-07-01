@@ -43,7 +43,7 @@ std::vector<LeafNode*> randomGenerate(int count) {
 void clustering(std::vector<LeafNode*> *inLights) {
 	//Launcher launcher = Launcher.getLauncher();
 	//used to choose which light is the representative light
-	RandomGenerator repRanGen (4523489623489L);
+	RandomGenerator repRanGen (4523489623489ULL);
 	srand(time(NULL));
 
 	int tempSize = (1 << NodeWrapper::CONE_RECURSE_DEPTH) + 1;

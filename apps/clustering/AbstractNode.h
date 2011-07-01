@@ -164,7 +164,7 @@ public:
 		//trees must be rebuilt for this to take effect
 		globalNumReps = 1;
 		double inc = 1.0f / 1;
-		RandomGenerator ranGen(452389425623145845L);
+		RandomGenerator ranGen(452389425623145845ULL);
 		repRandomNums.clear(); //= new float[256][];
 		repRandomNums.resize(256);
 		for (int i = 0; i < 256; i++) {
