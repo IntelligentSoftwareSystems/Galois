@@ -24,7 +24,6 @@
 #define GALOIS_RUNTIME_THREADS_H
 
 #include "Galois/Executable.h"
-
 #include <boost/intrusive/list.hpp>
 #include <vector>
 

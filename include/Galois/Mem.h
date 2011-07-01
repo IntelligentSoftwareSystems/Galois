@@ -17,8 +17,8 @@ defects in Software and/or Documentation, or loss or inaccuracy of data of any
 kind.
 */
 
-#ifndef _GALOIS_MEM_H
-#define _GALOIS_MEM_H
+#ifndef GALOIS_MEM_H
+#define GALOIS_MEM_H
 
 #include "Galois/Runtime/mm/mem.h"
 
@@ -78,13 +78,20 @@ public:
   pointer allocate(size_type size) {
     if (size > max_size())
       throw std::bad_alloc();
-    //return static_cast<Ty*>(::operator new(size * sizeof(Ty)));
+#ifdef SOLARIS
+    return static_cast<Ty*>(malloc(size * sizeof(Ty)));
+#else
     return static_cast<Ty*>(hoard_malloc(size * sizeof(Ty)));
+#endif
   }
 
   void deallocate(pointer p, size_type) {
     //::operator delete(p);
+#ifdef SOLARIS
+    free(p);
+#else
     hoard_free(p);
+#endif
   }
 
   size_type max_size() const throw() { 
@@ -92,8 +99,7 @@ public:
   }
 
   void construct(pointer p, const Ty& val) {
-    // TODO
-    ::new(p) Ty(val);
+    new(p) Ty(val);
   }
 
   void destroy(pointer p) {

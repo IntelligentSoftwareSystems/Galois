@@ -1,5 +1,9 @@
 #add_subdirectory(libhugetlbfs-2.10)
-add_subdirectory(hoard-38)
+if(USE_SOLARIS)
+  message("Hoard not supported on solaris (yet)")
+else()
+  add_subdirectory(hoard-38)
+endif()
 
 #include(ExternalProject)
 #

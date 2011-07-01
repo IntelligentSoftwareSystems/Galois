@@ -23,8 +23,6 @@
 #ifndef GALOIS_GRAPHS_SERIALIZE_H
 #define GALOIS_GRAPHS_SERIALIZE_H
 
-#include <error.h>
-#include <errno.h>
 #include <sys/stat.h>
 #include <stdio.h>
 #include <fcntl.h>
@@ -60,19 +58,25 @@ bool outputGraph(const char* file, Graph& G) {
   //version
   uint64_t version = 1;
   retval = write(fd, &version, sizeof(uint64_t));
-  if (retval == -1)
-    error_at_line(1, errno, __FILE__, __LINE__, "error writing file");
+  if (retval == -1) {
+    perror(__FILE__);
+    abort();
+  }
 
   uint64_t sizeof_edge_data = sizeof(typename Graph::EdgeDataTy);
   retval = write(fd, &sizeof_edge_data, sizeof(uint64_t));
-  if (retval == -1)
-    error_at_line(1, errno, __FILE__, __LINE__, "error writing file");
+  if (retval == -1) {
+    perror(__FILE__);
+    abort();
+  }
 
   //num nodes
   uint64_t num_nodes = G.size();
   retval = write(fd, &num_nodes, sizeof(uint64_t));
-  if (retval == -1)
-    error_at_line(1, errno, __FILE__, __LINE__, "error writing file");
+  if (retval == -1) {
+    perror(__FILE__);
+    abort();
+  }
 
   typedef typename Graph::GraphNode GNode;
   typedef std::vector<GNode> Nodes;
@@ -97,13 +101,17 @@ bool outputGraph(const char* file, Graph& G) {
     out_idx.push_back(offset);
   }
   retval = write(fd, &offset, sizeof(uint64_t));
-  if (retval == -1)
-    error_at_line(1, errno, __FILE__, __LINE__, "error writing file");
+  if (retval == -1) {
+    perror(__FILE__);
+    abort();
+  }
 
   //outIdx
   retval = write(fd, &out_idx[0], sizeof(uint64_t) * out_idx.size());
-  if (retval == -1)
-    error_at_line(1, errno, __FILE__, __LINE__, "error writing file");
+  if (retval == -1) {
+    perror(__FILE__);
+    abort();
+  }
 
   //outs
   size_t num_edges = 0;
@@ -113,15 +121,19 @@ bool outputGraph(const char* file, Graph& G) {
         ne = G.neighbor_end(*ii); ni != ne; ++ni, ++num_edges) {
       uint32_t id = node_ids[*ni];
       retval = write(fd, &id, sizeof(uint32_t));
-      if (retval == -1)
-        error_at_line(1, errno, __FILE__, __LINE__, "error writing file");
+      if (retval == -1) {
+        perror(__FILE__);
+        abort();
+      }
     }
   }
   if (num_edges % 2) {
     uint32_t padding = 0;
     retval = write(fd, &padding, sizeof(uint32_t));
-    if (retval == -1)
-      error_at_line(1, errno, __FILE__, __LINE__, "error writing file");
+    if (retval == -1) {
+      perror(__FILE__);
+      abort();
+    }
   }
 
   //edgeData
@@ -131,8 +143,10 @@ bool outputGraph(const char* file, Graph& G) {
         ne = G.neighbor_end(*ii); ni != ne; ++ni) {
       retval = write(fd, &G.getEdgeData(*ii, *ni),
           sizeof(typename Graph::EdgeDataTy));
-      if (retval == -1)
-        error_at_line(1, errno, __FILE__, __LINE__, "error writing file");
+      if (retval == -1) {
+        perror(__FILE__);
+        abort();
+      }
     }
   }
 

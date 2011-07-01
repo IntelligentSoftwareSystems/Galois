@@ -21,8 +21,20 @@ set(USE_PTHREAD ON)
 #use profiling
 #set(USE_PROFILING ON)
 
+##### Machine-specific settings (probably not useful to you) ######
 if(SITE_NAME MATCHES "volta.*")
   set(USE_NUMA ON)
+endif()
+
+if(SITE_NAME MATCHES "delaunay.*")
+  set(CMAKE_CXX_COMPILER /opt/csw/gcc4/bin/g++)
+  set(CMAKE_CC_COMPILER /opt/csw/gcc4/bin/gcc)
+  # Override broken include files in
+  #  /opt/csw/gcc4/lib/gcc/sparc-sun-solaris2.8/4.5.1/include-fixed/
+  add_definitions(-nostdinc)
+  add_definitions(-I/usr/include)
+  add_definitions(-I/opt/csw/gcc4/include/c++/4.5.1)
+  add_definitions(-I/opt/csw/gcc4/include/c++/4.5.1/sparc-sun-solaris2.8)
 endif()
 
 if(CMAKE_SYSTEM MATCHES "SunOS.*")
@@ -38,7 +50,8 @@ include_directories(${Boost_INCLUDE_DIRS})
 
 #PThreads
 if(USE_PTHREAD)
-  find_package(Threads REQUIRED)
+  #find_package(Threads REQUIRED)
+  find_package(Threads)
   add_definitions(-DGALOIS_PTHREAD)
 endif(USE_PTHREAD)
 
@@ -66,8 +79,8 @@ endif(USE_PROFILING)
 if(USE_SOLARIS)
   add_definitions(-DSOLARIS)
   add_definitions("-m64")
-  #add_definitions("-mcpu=niagara2")
-  #add_definitions("-lposix4")
+  add_definitions("-mcpu=niagara2")
+  add_definitions("-lposix4")
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -m64 -lposix4")
 endif()
 
