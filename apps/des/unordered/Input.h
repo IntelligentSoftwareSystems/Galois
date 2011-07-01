@@ -52,7 +52,7 @@ protected:
    * @see des.unordered.circuitlib.LogicGate#evalOutput()
    */
   virtual LogicVal evalOutput() const {
-    return BaseOneInputGate::inputVal;
+    return this->BaseOneInputGate::inputVal;
   }
 
   /* (non-Javadoc)
@@ -68,12 +68,12 @@ protected:
     } else {
 
       LogicUpdate lu = (LogicUpdate) event.getAction ();
-      if (BaseOneInputGate::outputName == lu.getNetName()) {
-        BaseOneInputGate::inputVal = lu.getNetVal();
+      if (this->BaseOneInputGate::outputName == lu.getNetName()) {
+        this->BaseOneInputGate::inputVal = lu.getNetVal();
 
-        BaseOneInputGate::outputVal = BaseOneInputGate::inputVal;
+        this->BaseOneInputGate::outputVal = this->BaseOneInputGate::inputVal;
 
-        LogicUpdate drvFanout(BaseOneInputGate::outputName, BaseOneInputGate::outputVal);
+        LogicUpdate drvFanout(this->BaseOneInputGate::outputName, this->BaseOneInputGate::outputVal);
 
         sendEventsToFanout(graph, myNode, event, Event<GNodeTy, LogicUpdate>::REGULAR_EVENT, drvFanout);
       } else {

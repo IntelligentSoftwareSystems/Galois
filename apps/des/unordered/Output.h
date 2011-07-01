@@ -54,7 +54,7 @@ protected:
    * @see des.unordered.circuitlib.LogicGate#evalOutput()
    */
   virtual LogicVal evalOutput() const {
-    return BaseOneInputGate::inputVal;
+    return this->BaseOneInputGate::inputVal;
   }
 
   /* (non-Javadoc)
@@ -67,9 +67,9 @@ protected:
      } else {
        // update the inputs of fanout gates
        LogicUpdate lu = (LogicUpdate) event.getAction();
-       if (BaseOneInputGate::inputName == (lu.getNetName())) {
-         BaseOneInputGate::inputVal = lu.getNetVal();
-         BaseOneInputGate::outputVal = BaseOneInputGate::inputVal;
+       if (this->BaseOneInputGate::inputName == (lu.getNetName())) {
+         this->BaseOneInputGate::inputVal = lu.getNetVal();
+         this->BaseOneInputGate::outputVal = this->BaseOneInputGate::inputVal;
 
        } else {
          LogicGate<GraphTy, GNodeTy>::netNameMismatch(lu);
