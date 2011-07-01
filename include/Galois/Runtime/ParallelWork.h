@@ -358,7 +358,7 @@ class ForEachWork : public Galois::Executable {
 public:
   template<typename IterTy>
   ForEachWork(IterTy b, IterTy e, Function& _f, const char* _loopname)
-    :f(_f), loopname(_loopname) {
+    :f(_f), loopname(_loopname), abort_happened(0) {
     global_wl.fill_initial(b, e);
   }
   
