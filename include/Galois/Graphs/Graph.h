@@ -350,7 +350,7 @@ public:
       return Parent > rhs.Parent || (Parent == rhs.Parent && ID > rhs.ID);
     }
 
-    bool hasNeighbor(GraphNode& N) const {
+    bool hasNeighbor(const GraphNode& N) const {
       return ID->hasNeighbor(N.ID);
     }
   };
