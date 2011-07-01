@@ -42,7 +42,6 @@ static void genericBindToProcessor(int proc) {
   
   return;
 #endif      
-  reportWarning("Don't know how to bind thread to cpu on this platform");
 }
 
 struct FaradayPolicy : public ThreadPolicy {
@@ -154,6 +153,7 @@ struct DummyPolicy : public ThreadPolicy {
 #ifdef __linux__
     numThreads = sysconf(_SC_NPROCESSORS_CONF);
 #else
+    reportWarning("Don't know how to bind thread to cpu on this platform");
     reportWarning("Unknown number of processors (assuming 64)");
     numThreads = 64;
 #endif
