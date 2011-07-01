@@ -1,0 +1,291 @@
+// Lonestar Benchmark Suite for irregular applications that exhibit 
+// amorphous data-parallelism.
+// 
+// Center for Grid and Distributed Computing
+// The University of Texas at Austin
+// 
+// Copyright (C) 2007, 2008, 2009 The University of Texas at Austin
+// 
+// Licensed under the Eclipse Public License, Version 1.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+// http://www.eclipse.org/legal/epl-v10.html
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+// 
+// File: adder8.net 
+
+
+
+finish 10000
+
+inputs cin, a0, a1, a2, a3, a4, a5, a6, a7, b0, b1, b2, b3, b4, b5, b6, b7
+end
+
+outputs cout, s0, s1, s2, s3, s4, s5, s6, s7 
+end
+
+outvalues
+s0 1,  s1 1,  s2 1,  s3 1,  s4 1,  s5 1,  s6 1,  s7 1, 
+, cout 1, 
+end
+
+initlist a0 0,0 34, 1 end 
+ initlist a1 0,0 43, 1 end 
+ initlist a2 0,0 2, 1 end 
+ initlist a3 0,0 78, 1 end 
+ initlist a4 0,0 79, 1 end 
+ initlist a5 0,0 57, 1 end 
+ initlist a6 0,0 22, 1 end 
+ initlist a7 0,0 97, 1 end 
+
+
+initlist b0 0,0 98, 1 end 
+ initlist b1 0,0 81, 1 end 
+ initlist b2 0,0 32, 1 end 
+ initlist b3 0,0 98, 1 end 
+ initlist b4 0,0 87, 1 end 
+ initlist b5 0,0 1, 1 end 
+ initlist b6 0,0 59, 1 end 
+ initlist b7 0,0 37, 1 end 
+
+
+initlist cin 0, 0 50, 1 end
+
+
+netlist
+
+inv(a0n,a0)#4
+inv(b0n,b0)#4
+inv(cinn,cin)#4
+
+and2(a0nb0n,a0n,b0n)#2
+and2(a0nb0,a0n,b0)#2
+and2(a0b0n,a0,b0n)#2
+and2(a0b0,a0,b0)#3
+
+and2(a0b0cin,a0b0,cin)#2
+and2(a0nb0ncin,a0nb0n,cin)#2
+and2(a0nb0cinn,a0nb0,cinn)#2
+and2(a0b0ncinn,a0b0n,cinn)#2
+
+and2(b0cin,b0,cin)#2
+and2(a0cin,cin,a0)#2
+
+or2(s0w42,a0b0ncinn,a0nb0cinn)#3
+or2(s0w71,a0b0cin, a0nb0ncin)#3
+or2(s0,s0w42,s0w71)#3
+
+or2(s0w35, b0cin, a0cin)#3
+or2(c0,s0w35,a0b0)#5
+
+
+end
+
+netlist
+
+inv(a1n,a1)#4
+inv(b1n,b1)#4
+inv(c0n,c0)#4
+
+and2(a1nb1n,a1n,b1n)#2
+and2(a1nb1,a1n,b1)#2
+and2(a1b1n,a1,b1n)#2
+and2(a1b1,a1,b1)#3
+
+and2(a1b1c0,a1b1,c0)#2
+and2(a1nb1nc0,a1nb1n,c0)#2
+and2(a1nb1c0n,a1nb1,c0n)#2
+and2(a1b1nc0n,a1b1n,c0n)#2
+
+and2(b1c0,b1,c0)#2
+and2(a1c0,c0,a1)#2
+
+or2(s1w42,a1b1nc0n,a1nb1c0n)#3
+or2(s1w71,a1b1c0, a1nb1nc0)#3
+or2(s1,s1w42,s1w71)#3
+
+or2(s1w35, b1c0, a1c0)#3
+or2(c1,s1w35,a1b1)#5
+
+
+end
+
+netlist
+
+inv(a2n,a2)#4
+inv(b2n,b2)#4
+inv(c1n,c1)#4
+
+and2(a2nb2n,a2n,b2n)#2
+and2(a2nb2,a2n,b2)#2
+and2(a2b2n,a2,b2n)#2
+and2(a2b2,a2,b2)#3
+
+and2(a2b2c1,a2b2,c1)#2
+and2(a2nb2nc1,a2nb2n,c1)#2
+and2(a2nb2c1n,a2nb2,c1n)#2
+and2(a2b2nc1n,a2b2n,c1n)#2
+
+and2(b2c1,b2,c1)#2
+and2(a2c1,c1,a2)#2
+
+or2(s2w42,a2b2nc1n,a2nb2c1n)#3
+or2(s2w71,a2b2c1, a2nb2nc1)#3
+or2(s2,s2w42,s2w71)#3
+
+or2(s2w35, b2c1, a2c1)#3
+or2(c2,s2w35,a2b2)#5
+
+
+end
+
+netlist
+
+inv(a3n,a3)#4
+inv(b3n,b3)#4
+inv(c2n,c2)#4
+
+and2(a3nb3n,a3n,b3n)#2
+and2(a3nb3,a3n,b3)#2
+and2(a3b3n,a3,b3n)#2
+and2(a3b3,a3,b3)#3
+
+and2(a3b3c2,a3b3,c2)#2
+and2(a3nb3nc2,a3nb3n,c2)#2
+and2(a3nb3c2n,a3nb3,c2n)#2
+and2(a3b3nc2n,a3b3n,c2n)#2
+
+and2(b3c2,b3,c2)#2
+and2(a3c2,c2,a3)#2
+
+or2(s3w42,a3b3nc2n,a3nb3c2n)#3
+or2(s3w71,a3b3c2, a3nb3nc2)#3
+or2(s3,s3w42,s3w71)#3
+
+or2(s3w35, b3c2, a3c2)#3
+or2(c3,s3w35,a3b3)#5
+
+
+end
+
+netlist
+
+inv(a4n,a4)#4
+inv(b4n,b4)#4
+inv(c3n,c3)#4
+
+and2(a4nb4n,a4n,b4n)#2
+and2(a4nb4,a4n,b4)#2
+and2(a4b4n,a4,b4n)#2
+and2(a4b4,a4,b4)#3
+
+and2(a4b4c3,a4b4,c3)#2
+and2(a4nb4nc3,a4nb4n,c3)#2
+and2(a4nb4c3n,a4nb4,c3n)#2
+and2(a4b4nc3n,a4b4n,c3n)#2
+
+and2(b4c3,b4,c3)#2
+and2(a4c3,c3,a4)#2
+
+or2(s4w42,a4b4nc3n,a4nb4c3n)#3
+or2(s4w71,a4b4c3, a4nb4nc3)#3
+or2(s4,s4w42,s4w71)#3
+
+or2(s4w35, b4c3, a4c3)#3
+or2(c4,s4w35,a4b4)#5
+
+
+end
+
+netlist
+
+inv(a5n,a5)#4
+inv(b5n,b5)#4
+inv(c4n,c4)#4
+
+and2(a5nb5n,a5n,b5n)#2
+and2(a5nb5,a5n,b5)#2
+and2(a5b5n,a5,b5n)#2
+and2(a5b5,a5,b5)#3
+
+and2(a5b5c4,a5b5,c4)#2
+and2(a5nb5nc4,a5nb5n,c4)#2
+and2(a5nb5c4n,a5nb5,c4n)#2
+and2(a5b5nc4n,a5b5n,c4n)#2
+
+and2(b5c4,b5,c4)#2
+and2(a5c4,c4,a5)#2
+
+or2(s5w42,a5b5nc4n,a5nb5c4n)#3
+or2(s5w71,a5b5c4, a5nb5nc4)#3
+or2(s5,s5w42,s5w71)#3
+
+or2(s5w35, b5c4, a5c4)#3
+or2(c5,s5w35,a5b5)#5
+
+
+end
+
+netlist
+
+inv(a6n,a6)#4
+inv(b6n,b6)#4
+inv(c5n,c5)#4
+
+and2(a6nb6n,a6n,b6n)#2
+and2(a6nb6,a6n,b6)#2
+and2(a6b6n,a6,b6n)#2
+and2(a6b6,a6,b6)#3
+
+and2(a6b6c5,a6b6,c5)#2
+and2(a6nb6nc5,a6nb6n,c5)#2
+and2(a6nb6c5n,a6nb6,c5n)#2
+and2(a6b6nc5n,a6b6n,c5n)#2
+
+and2(b6c5,b6,c5)#2
+and2(a6c5,c5,a6)#2
+
+or2(s6w42,a6b6nc5n,a6nb6c5n)#3
+or2(s6w71,a6b6c5, a6nb6nc5)#3
+or2(s6,s6w42,s6w71)#3
+
+or2(s6w35, b6c5, a6c5)#3
+or2(c6,s6w35,a6b6)#5
+
+
+end
+
+netlist
+
+inv(a7n,a7)#4
+inv(b7n,b7)#4
+inv(c6n,c6)#4
+
+and2(a7nb7n,a7n,b7n)#2
+and2(a7nb7,a7n,b7)#2
+and2(a7b7n,a7,b7n)#2
+and2(a7b7,a7,b7)#3
+
+and2(a7b7c6,a7b7,c6)#2
+and2(a7nb7nc6,a7nb7n,c6)#2
+and2(a7nb7c6n,a7nb7,c6n)#2
+and2(a7b7nc6n,a7b7n,c6n)#2
+
+and2(b7c6,b7,c6)#2
+and2(a7c6,c6,a7)#2
+
+or2(s7w42,a7b7nc6n,a7nb7c6n)#3
+or2(s7w71,a7b7c6, a7nb7nc6)#3
+or2(s7,s7w42,s7w71)#3
+
+or2(s7w35, b7c6, a7c6)#3
+or2(cout,s7w35,a7b7)#5
+
+
+end

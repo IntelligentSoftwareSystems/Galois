@@ -1,0 +1,1201 @@
+
+finish 100000
+
+inputs
+a0, a1, a2, a3, 
+b0, b1, b2, b3, 
+GND
+end
+
+outputs
+m0, m1, m2, m3, m4, m5, m6, m7, 
+end
+
+outvalues
+m0 1,  m1 0,  m2 0,  m3 0,  m4 0,  m5 1,  m6 1,  m7 1, 
+end
+
+initlist GND 0 0 end
+initlist a0 0,0 63, 1 end 
+ initlist a1 0,0 8, 1 end 
+ initlist a2 0,0 6, 1 end 
+ initlist a3 0,0 10, 1 end 
+
+initlist b0 0,0 72, 1 end 
+ initlist b1 0,0 100, 1 end 
+ initlist b2 0,0 70, 1 end 
+ initlist b3 0,0 13, 1 end 
+
+
+netlist
+
+// mux2x1 Bth0.0( PP_0_0, GND, a0, b0 )
+
+inv(b0_n.Bth0.0, b0 )#4
+and2(w0.Bth0.0, b0_n.Bth0.0, GND )#4
+and2(w1.Bth0.0, b0, a0 )#4
+or2(PP_0_0, w0.Bth0.0, w1.Bth0.0 )#4
+
+// end mux2x1 Bth0.0
+
+
+end
+
+netlist
+
+// mux2x1 Bth0.1( PP_0_1, GND, a1, b0 )
+
+inv(b0_n.Bth0.1, b0 )#4
+and2(w0.Bth0.1, b0_n.Bth0.1, GND )#4
+and2(w1.Bth0.1, b0, a1 )#4
+or2(PP_0_1, w0.Bth0.1, w1.Bth0.1 )#4
+
+// end mux2x1 Bth0.1
+
+
+end
+
+netlist
+
+// mux2x1 Bth0.2( PP_0_2, GND, a2, b0 )
+
+inv(b0_n.Bth0.2, b0 )#4
+and2(w0.Bth0.2, b0_n.Bth0.2, GND )#4
+and2(w1.Bth0.2, b0, a2 )#4
+or2(PP_0_2, w0.Bth0.2, w1.Bth0.2 )#4
+
+// end mux2x1 Bth0.2
+
+
+end
+
+netlist
+
+// mux2x1 Bth0.3( PP_0_3, GND, a3, b0 )
+
+inv(b0_n.Bth0.3, b0 )#4
+and2(w0.Bth0.3, b0_n.Bth0.3, GND )#4
+and2(w1.Bth0.3, b0, a3 )#4
+or2(PP_0_3, w0.Bth0.3, w1.Bth0.3 )#4
+
+// end mux2x1 Bth0.3
+
+
+end
+
+netlist
+
+// mux2x1 Bth0.4( PP_0_4, GND, GND, b0 )
+
+inv(b0_n.Bth0.4, b0 )#4
+and2(w0.Bth0.4, b0_n.Bth0.4, GND )#4
+and2(w1.Bth0.4, b0, GND )#4
+or2(PP_0_4, w0.Bth0.4, w1.Bth0.4 )#4
+
+// end mux2x1 Bth0.4
+
+
+end
+
+netlist
+
+// mux2x1 Bth0.5( PP_0_5, GND, GND, b0 )
+
+inv(b0_n.Bth0.5, b0 )#4
+and2(w0.Bth0.5, b0_n.Bth0.5, GND )#4
+and2(w1.Bth0.5, b0, GND )#4
+or2(PP_0_5, w0.Bth0.5, w1.Bth0.5 )#4
+
+// end mux2x1 Bth0.5
+
+
+end
+
+netlist
+
+// mux2x1 Bth0.6( PP_0_6, GND, GND, b0 )
+
+inv(b0_n.Bth0.6, b0 )#4
+and2(w0.Bth0.6, b0_n.Bth0.6, GND )#4
+and2(w1.Bth0.6, b0, GND )#4
+or2(PP_0_6, w0.Bth0.6, w1.Bth0.6 )#4
+
+// end mux2x1 Bth0.6
+
+
+end
+
+netlist
+
+// mux2x1 Bth0.7( PP_0_7, GND, GND, b0 )
+
+inv(b0_n.Bth0.7, b0 )#4
+and2(w0.Bth0.7, b0_n.Bth0.7, GND )#4
+and2(w1.Bth0.7, b0, GND )#4
+or2(PP_0_7, w0.Bth0.7, w1.Bth0.7 )#4
+
+// end mux2x1 Bth0.7
+
+
+end
+
+netlist
+
+// mux2x1 Bth1.0( PP_1_0, GND, GND, b1 )
+
+inv(b1_n.Bth1.0, b1 )#4
+and2(w0.Bth1.0, b1_n.Bth1.0, GND )#4
+and2(w1.Bth1.0, b1, GND )#4
+or2(PP_1_0, w0.Bth1.0, w1.Bth1.0 )#4
+
+// end mux2x1 Bth1.0
+
+
+end
+
+netlist
+
+// mux2x1 Bth1.1( PP_1_1, GND, a0, b1 )
+
+inv(b1_n.Bth1.1, b1 )#4
+and2(w0.Bth1.1, b1_n.Bth1.1, GND )#4
+and2(w1.Bth1.1, b1, a0 )#4
+or2(PP_1_1, w0.Bth1.1, w1.Bth1.1 )#4
+
+// end mux2x1 Bth1.1
+
+
+end
+
+netlist
+
+// mux2x1 Bth1.2( PP_1_2, GND, a1, b1 )
+
+inv(b1_n.Bth1.2, b1 )#4
+and2(w0.Bth1.2, b1_n.Bth1.2, GND )#4
+and2(w1.Bth1.2, b1, a1 )#4
+or2(PP_1_2, w0.Bth1.2, w1.Bth1.2 )#4
+
+// end mux2x1 Bth1.2
+
+
+end
+
+netlist
+
+// mux2x1 Bth1.3( PP_1_3, GND, a2, b1 )
+
+inv(b1_n.Bth1.3, b1 )#4
+and2(w0.Bth1.3, b1_n.Bth1.3, GND )#4
+and2(w1.Bth1.3, b1, a2 )#4
+or2(PP_1_3, w0.Bth1.3, w1.Bth1.3 )#4
+
+// end mux2x1 Bth1.3
+
+
+end
+
+netlist
+
+// mux2x1 Bth1.4( PP_1_4, GND, a3, b1 )
+
+inv(b1_n.Bth1.4, b1 )#4
+and2(w0.Bth1.4, b1_n.Bth1.4, GND )#4
+and2(w1.Bth1.4, b1, a3 )#4
+or2(PP_1_4, w0.Bth1.4, w1.Bth1.4 )#4
+
+// end mux2x1 Bth1.4
+
+
+end
+
+netlist
+
+// mux2x1 Bth1.5( PP_1_5, GND, GND, b1 )
+
+inv(b1_n.Bth1.5, b1 )#4
+and2(w0.Bth1.5, b1_n.Bth1.5, GND )#4
+and2(w1.Bth1.5, b1, GND )#4
+or2(PP_1_5, w0.Bth1.5, w1.Bth1.5 )#4
+
+// end mux2x1 Bth1.5
+
+
+end
+
+netlist
+
+// mux2x1 Bth1.6( PP_1_6, GND, GND, b1 )
+
+inv(b1_n.Bth1.6, b1 )#4
+and2(w0.Bth1.6, b1_n.Bth1.6, GND )#4
+and2(w1.Bth1.6, b1, GND )#4
+or2(PP_1_6, w0.Bth1.6, w1.Bth1.6 )#4
+
+// end mux2x1 Bth1.6
+
+
+end
+
+netlist
+
+// mux2x1 Bth1.7( PP_1_7, GND, GND, b1 )
+
+inv(b1_n.Bth1.7, b1 )#4
+and2(w0.Bth1.7, b1_n.Bth1.7, GND )#4
+and2(w1.Bth1.7, b1, GND )#4
+or2(PP_1_7, w0.Bth1.7, w1.Bth1.7 )#4
+
+// end mux2x1 Bth1.7
+
+
+end
+
+netlist
+
+// mux2x1 Bth2.0( PP_2_0, GND, GND, b2 )
+
+inv(b2_n.Bth2.0, b2 )#4
+and2(w0.Bth2.0, b2_n.Bth2.0, GND )#4
+and2(w1.Bth2.0, b2, GND )#4
+or2(PP_2_0, w0.Bth2.0, w1.Bth2.0 )#4
+
+// end mux2x1 Bth2.0
+
+
+end
+
+netlist
+
+// mux2x1 Bth2.1( PP_2_1, GND, GND, b2 )
+
+inv(b2_n.Bth2.1, b2 )#4
+and2(w0.Bth2.1, b2_n.Bth2.1, GND )#4
+and2(w1.Bth2.1, b2, GND )#4
+or2(PP_2_1, w0.Bth2.1, w1.Bth2.1 )#4
+
+// end mux2x1 Bth2.1
+
+
+end
+
+netlist
+
+// mux2x1 Bth2.2( PP_2_2, GND, a0, b2 )
+
+inv(b2_n.Bth2.2, b2 )#4
+and2(w0.Bth2.2, b2_n.Bth2.2, GND )#4
+and2(w1.Bth2.2, b2, a0 )#4
+or2(PP_2_2, w0.Bth2.2, w1.Bth2.2 )#4
+
+// end mux2x1 Bth2.2
+
+
+end
+
+netlist
+
+// mux2x1 Bth2.3( PP_2_3, GND, a1, b2 )
+
+inv(b2_n.Bth2.3, b2 )#4
+and2(w0.Bth2.3, b2_n.Bth2.3, GND )#4
+and2(w1.Bth2.3, b2, a1 )#4
+or2(PP_2_3, w0.Bth2.3, w1.Bth2.3 )#4
+
+// end mux2x1 Bth2.3
+
+
+end
+
+netlist
+
+// mux2x1 Bth2.4( PP_2_4, GND, a2, b2 )
+
+inv(b2_n.Bth2.4, b2 )#4
+and2(w0.Bth2.4, b2_n.Bth2.4, GND )#4
+and2(w1.Bth2.4, b2, a2 )#4
+or2(PP_2_4, w0.Bth2.4, w1.Bth2.4 )#4
+
+// end mux2x1 Bth2.4
+
+
+end
+
+netlist
+
+// mux2x1 Bth2.5( PP_2_5, GND, a3, b2 )
+
+inv(b2_n.Bth2.5, b2 )#4
+and2(w0.Bth2.5, b2_n.Bth2.5, GND )#4
+and2(w1.Bth2.5, b2, a3 )#4
+or2(PP_2_5, w0.Bth2.5, w1.Bth2.5 )#4
+
+// end mux2x1 Bth2.5
+
+
+end
+
+netlist
+
+// mux2x1 Bth2.6( PP_2_6, GND, GND, b2 )
+
+inv(b2_n.Bth2.6, b2 )#4
+and2(w0.Bth2.6, b2_n.Bth2.6, GND )#4
+and2(w1.Bth2.6, b2, GND )#4
+or2(PP_2_6, w0.Bth2.6, w1.Bth2.6 )#4
+
+// end mux2x1 Bth2.6
+
+
+end
+
+netlist
+
+// mux2x1 Bth2.7( PP_2_7, GND, GND, b2 )
+
+inv(b2_n.Bth2.7, b2 )#4
+and2(w0.Bth2.7, b2_n.Bth2.7, GND )#4
+and2(w1.Bth2.7, b2, GND )#4
+or2(PP_2_7, w0.Bth2.7, w1.Bth2.7 )#4
+
+// end mux2x1 Bth2.7
+
+
+end
+
+netlist
+
+// mux2x1 Bth3.0( PP_3_0, GND, GND, b3 )
+
+inv(b3_n.Bth3.0, b3 )#4
+and2(w0.Bth3.0, b3_n.Bth3.0, GND )#4
+and2(w1.Bth3.0, b3, GND )#4
+or2(PP_3_0, w0.Bth3.0, w1.Bth3.0 )#4
+
+// end mux2x1 Bth3.0
+
+
+end
+
+netlist
+
+// mux2x1 Bth3.1( PP_3_1, GND, GND, b3 )
+
+inv(b3_n.Bth3.1, b3 )#4
+and2(w0.Bth3.1, b3_n.Bth3.1, GND )#4
+and2(w1.Bth3.1, b3, GND )#4
+or2(PP_3_1, w0.Bth3.1, w1.Bth3.1 )#4
+
+// end mux2x1 Bth3.1
+
+
+end
+
+netlist
+
+// mux2x1 Bth3.2( PP_3_2, GND, GND, b3 )
+
+inv(b3_n.Bth3.2, b3 )#4
+and2(w0.Bth3.2, b3_n.Bth3.2, GND )#4
+and2(w1.Bth3.2, b3, GND )#4
+or2(PP_3_2, w0.Bth3.2, w1.Bth3.2 )#4
+
+// end mux2x1 Bth3.2
+
+
+end
+
+netlist
+
+// mux2x1 Bth3.3( PP_3_3, GND, a0, b3 )
+
+inv(b3_n.Bth3.3, b3 )#4
+and2(w0.Bth3.3, b3_n.Bth3.3, GND )#4
+and2(w1.Bth3.3, b3, a0 )#4
+or2(PP_3_3, w0.Bth3.3, w1.Bth3.3 )#4
+
+// end mux2x1 Bth3.3
+
+
+end
+
+netlist
+
+// mux2x1 Bth3.4( PP_3_4, GND, a1, b3 )
+
+inv(b3_n.Bth3.4, b3 )#4
+and2(w0.Bth3.4, b3_n.Bth3.4, GND )#4
+and2(w1.Bth3.4, b3, a1 )#4
+or2(PP_3_4, w0.Bth3.4, w1.Bth3.4 )#4
+
+// end mux2x1 Bth3.4
+
+
+end
+
+netlist
+
+// mux2x1 Bth3.5( PP_3_5, GND, a2, b3 )
+
+inv(b3_n.Bth3.5, b3 )#4
+and2(w0.Bth3.5, b3_n.Bth3.5, GND )#4
+and2(w1.Bth3.5, b3, a2 )#4
+or2(PP_3_5, w0.Bth3.5, w1.Bth3.5 )#4
+
+// end mux2x1 Bth3.5
+
+
+end
+
+netlist
+
+// mux2x1 Bth3.6( PP_3_6, GND, a3, b3 )
+
+inv(b3_n.Bth3.6, b3 )#4
+and2(w0.Bth3.6, b3_n.Bth3.6, GND )#4
+and2(w1.Bth3.6, b3, a3 )#4
+or2(PP_3_6, w0.Bth3.6, w1.Bth3.6 )#4
+
+// end mux2x1 Bth3.6
+
+
+end
+
+netlist
+
+// mux2x1 Bth3.7( PP_3_7, GND, GND, b3 )
+
+inv(b3_n.Bth3.7, b3 )#4
+and2(w0.Bth3.7, b3_n.Bth3.7, GND )#4
+and2(w1.Bth3.7, b3, GND )#4
+or2(PP_3_7, w0.Bth3.7, w1.Bth3.7 )#4
+
+// end mux2x1 Bth3.7
+
+
+end
+
+// instantiating csa4x2Vec at lvl 0 
+
+netlist
+   // csa4x2 (csa4x2_0_lvl0.0, s0_lvl0_0,t0_lvl0_0,cout_csa4x2_0_lvl0.0,PP_0_0,PP_1_0,PP_2_0,PP_3_0,GND) ;
+
+
+   // adder1bit Adder0.csa4x2_0_lvl0.0( sintcsa4x2_0_lvl0.0, cout_csa4x2_0_lvl0.0, PP_0_0, PP_1_0, PP_2_0)
+
+// sum 
+nand2( w0.Adder0.csa4x2_0_lvl0.0, PP_0_0, PP_1_0 )#5
+nand2( w1.Adder0.csa4x2_0_lvl0.0, PP_0_0, w0.Adder0.csa4x2_0_lvl0.0 )#5
+nand2( w2.Adder0.csa4x2_0_lvl0.0, PP_1_0, w0.Adder0.csa4x2_0_lvl0.0 )#5
+nand2( w3.Adder0.csa4x2_0_lvl0.0, w1.Adder0.csa4x2_0_lvl0.0, w2.Adder0.csa4x2_0_lvl0.0 )#5
+
+nand2( w4.Adder0.csa4x2_0_lvl0.0, PP_2_0, w3.Adder0.csa4x2_0_lvl0.0 )#5
+nand2( w5.Adder0.csa4x2_0_lvl0.0, PP_2_0, w4.Adder0.csa4x2_0_lvl0.0 )#5
+nand2( w6.Adder0.csa4x2_0_lvl0.0, w3.Adder0.csa4x2_0_lvl0.0, w4.Adder0.csa4x2_0_lvl0.0 )#5
+nand2( sintcsa4x2_0_lvl0.0, w5.Adder0.csa4x2_0_lvl0.0, w6.Adder0.csa4x2_0_lvl0.0 )#5
+
+//cout
+and2( w7.Adder0.csa4x2_0_lvl0.0, PP_0_0, PP_1_0 )#5
+and2( w8.Adder0.csa4x2_0_lvl0.0, PP_0_0, PP_2_0 )#5
+and2( w9.Adder0.csa4x2_0_lvl0.0, PP_2_0, PP_1_0 )#5
+
+or2( w10.Adder0.csa4x2_0_lvl0.0, w7.Adder0.csa4x2_0_lvl0.0, w8.Adder0.csa4x2_0_lvl0.0  )#5
+or2( cout_csa4x2_0_lvl0.0, w9.Adder0.csa4x2_0_lvl0.0, w10.Adder0.csa4x2_0_lvl0.0  )#5
+
+// end adder1bit
+
+
+   // adder1bit Adder1.csa4x2_0_lvl0.0( s0_lvl0_0, t0_lvl0_0, sintcsa4x2_0_lvl0.0, PP_3_0, GND)
+
+// sum 
+nand2( w0.Adder1.csa4x2_0_lvl0.0, sintcsa4x2_0_lvl0.0, PP_3_0 )#5
+nand2( w1.Adder1.csa4x2_0_lvl0.0, sintcsa4x2_0_lvl0.0, w0.Adder1.csa4x2_0_lvl0.0 )#5
+nand2( w2.Adder1.csa4x2_0_lvl0.0, PP_3_0, w0.Adder1.csa4x2_0_lvl0.0 )#5
+nand2( w3.Adder1.csa4x2_0_lvl0.0, w1.Adder1.csa4x2_0_lvl0.0, w2.Adder1.csa4x2_0_lvl0.0 )#5
+
+nand2( w4.Adder1.csa4x2_0_lvl0.0, GND, w3.Adder1.csa4x2_0_lvl0.0 )#5
+nand2( w5.Adder1.csa4x2_0_lvl0.0, GND, w4.Adder1.csa4x2_0_lvl0.0 )#5
+nand2( w6.Adder1.csa4x2_0_lvl0.0, w3.Adder1.csa4x2_0_lvl0.0, w4.Adder1.csa4x2_0_lvl0.0 )#5
+nand2( s0_lvl0_0, w5.Adder1.csa4x2_0_lvl0.0, w6.Adder1.csa4x2_0_lvl0.0 )#5
+
+//cout
+and2( w7.Adder1.csa4x2_0_lvl0.0, sintcsa4x2_0_lvl0.0, PP_3_0 )#5
+and2( w8.Adder1.csa4x2_0_lvl0.0, sintcsa4x2_0_lvl0.0, GND )#5
+and2( w9.Adder1.csa4x2_0_lvl0.0, GND, PP_3_0 )#5
+
+or2( w10.Adder1.csa4x2_0_lvl0.0, w7.Adder1.csa4x2_0_lvl0.0, w8.Adder1.csa4x2_0_lvl0.0  )#5
+or2( t0_lvl0_0, w9.Adder1.csa4x2_0_lvl0.0, w10.Adder1.csa4x2_0_lvl0.0  )#5
+
+// end adder1bit
+
+
+   // end csa4x2
+
+
+end
+
+netlist
+   // csa4x2 (csa4x2_0_lvl0.1, s0_lvl0_1,t0_lvl0_1,cout_csa4x2_0_lvl0.1,PP_0_1,PP_1_1,PP_2_1,PP_3_1,cout_csa4x2_0_lvl0.0) ;
+
+
+   // adder1bit Adder0.csa4x2_0_lvl0.1( sintcsa4x2_0_lvl0.1, cout_csa4x2_0_lvl0.1, PP_0_1, PP_1_1, PP_2_1)
+
+// sum 
+nand2( w0.Adder0.csa4x2_0_lvl0.1, PP_0_1, PP_1_1 )#5
+nand2( w1.Adder0.csa4x2_0_lvl0.1, PP_0_1, w0.Adder0.csa4x2_0_lvl0.1 )#5
+nand2( w2.Adder0.csa4x2_0_lvl0.1, PP_1_1, w0.Adder0.csa4x2_0_lvl0.1 )#5
+nand2( w3.Adder0.csa4x2_0_lvl0.1, w1.Adder0.csa4x2_0_lvl0.1, w2.Adder0.csa4x2_0_lvl0.1 )#5
+
+nand2( w4.Adder0.csa4x2_0_lvl0.1, PP_2_1, w3.Adder0.csa4x2_0_lvl0.1 )#5
+nand2( w5.Adder0.csa4x2_0_lvl0.1, PP_2_1, w4.Adder0.csa4x2_0_lvl0.1 )#5
+nand2( w6.Adder0.csa4x2_0_lvl0.1, w3.Adder0.csa4x2_0_lvl0.1, w4.Adder0.csa4x2_0_lvl0.1 )#5
+nand2( sintcsa4x2_0_lvl0.1, w5.Adder0.csa4x2_0_lvl0.1, w6.Adder0.csa4x2_0_lvl0.1 )#5
+
+//cout
+and2( w7.Adder0.csa4x2_0_lvl0.1, PP_0_1, PP_1_1 )#5
+and2( w8.Adder0.csa4x2_0_lvl0.1, PP_0_1, PP_2_1 )#5
+and2( w9.Adder0.csa4x2_0_lvl0.1, PP_2_1, PP_1_1 )#5
+
+or2( w10.Adder0.csa4x2_0_lvl0.1, w7.Adder0.csa4x2_0_lvl0.1, w8.Adder0.csa4x2_0_lvl0.1  )#5
+or2( cout_csa4x2_0_lvl0.1, w9.Adder0.csa4x2_0_lvl0.1, w10.Adder0.csa4x2_0_lvl0.1  )#5
+
+// end adder1bit
+
+
+   // adder1bit Adder1.csa4x2_0_lvl0.1( s0_lvl0_1, t0_lvl0_1, sintcsa4x2_0_lvl0.1, PP_3_1, cout_csa4x2_0_lvl0.0)
+
+// sum 
+nand2( w0.Adder1.csa4x2_0_lvl0.1, sintcsa4x2_0_lvl0.1, PP_3_1 )#5
+nand2( w1.Adder1.csa4x2_0_lvl0.1, sintcsa4x2_0_lvl0.1, w0.Adder1.csa4x2_0_lvl0.1 )#5
+nand2( w2.Adder1.csa4x2_0_lvl0.1, PP_3_1, w0.Adder1.csa4x2_0_lvl0.1 )#5
+nand2( w3.Adder1.csa4x2_0_lvl0.1, w1.Adder1.csa4x2_0_lvl0.1, w2.Adder1.csa4x2_0_lvl0.1 )#5
+
+nand2( w4.Adder1.csa4x2_0_lvl0.1, cout_csa4x2_0_lvl0.0, w3.Adder1.csa4x2_0_lvl0.1 )#5
+nand2( w5.Adder1.csa4x2_0_lvl0.1, cout_csa4x2_0_lvl0.0, w4.Adder1.csa4x2_0_lvl0.1 )#5
+nand2( w6.Adder1.csa4x2_0_lvl0.1, w3.Adder1.csa4x2_0_lvl0.1, w4.Adder1.csa4x2_0_lvl0.1 )#5
+nand2( s0_lvl0_1, w5.Adder1.csa4x2_0_lvl0.1, w6.Adder1.csa4x2_0_lvl0.1 )#5
+
+//cout
+and2( w7.Adder1.csa4x2_0_lvl0.1, sintcsa4x2_0_lvl0.1, PP_3_1 )#5
+and2( w8.Adder1.csa4x2_0_lvl0.1, sintcsa4x2_0_lvl0.1, cout_csa4x2_0_lvl0.0 )#5
+and2( w9.Adder1.csa4x2_0_lvl0.1, cout_csa4x2_0_lvl0.0, PP_3_1 )#5
+
+or2( w10.Adder1.csa4x2_0_lvl0.1, w7.Adder1.csa4x2_0_lvl0.1, w8.Adder1.csa4x2_0_lvl0.1  )#5
+or2( t0_lvl0_1, w9.Adder1.csa4x2_0_lvl0.1, w10.Adder1.csa4x2_0_lvl0.1  )#5
+
+// end adder1bit
+
+
+   // end csa4x2
+
+
+end
+
+netlist
+   // csa4x2 (csa4x2_0_lvl0.2, s0_lvl0_2,t0_lvl0_2,cout_csa4x2_0_lvl0.2,PP_0_2,PP_1_2,PP_2_2,PP_3_2,cout_csa4x2_0_lvl0.1) ;
+
+
+   // adder1bit Adder0.csa4x2_0_lvl0.2( sintcsa4x2_0_lvl0.2, cout_csa4x2_0_lvl0.2, PP_0_2, PP_1_2, PP_2_2)
+
+// sum 
+nand2( w0.Adder0.csa4x2_0_lvl0.2, PP_0_2, PP_1_2 )#5
+nand2( w1.Adder0.csa4x2_0_lvl0.2, PP_0_2, w0.Adder0.csa4x2_0_lvl0.2 )#5
+nand2( w2.Adder0.csa4x2_0_lvl0.2, PP_1_2, w0.Adder0.csa4x2_0_lvl0.2 )#5
+nand2( w3.Adder0.csa4x2_0_lvl0.2, w1.Adder0.csa4x2_0_lvl0.2, w2.Adder0.csa4x2_0_lvl0.2 )#5
+
+nand2( w4.Adder0.csa4x2_0_lvl0.2, PP_2_2, w3.Adder0.csa4x2_0_lvl0.2 )#5
+nand2( w5.Adder0.csa4x2_0_lvl0.2, PP_2_2, w4.Adder0.csa4x2_0_lvl0.2 )#5
+nand2( w6.Adder0.csa4x2_0_lvl0.2, w3.Adder0.csa4x2_0_lvl0.2, w4.Adder0.csa4x2_0_lvl0.2 )#5
+nand2( sintcsa4x2_0_lvl0.2, w5.Adder0.csa4x2_0_lvl0.2, w6.Adder0.csa4x2_0_lvl0.2 )#5
+
+//cout
+and2( w7.Adder0.csa4x2_0_lvl0.2, PP_0_2, PP_1_2 )#5
+and2( w8.Adder0.csa4x2_0_lvl0.2, PP_0_2, PP_2_2 )#5
+and2( w9.Adder0.csa4x2_0_lvl0.2, PP_2_2, PP_1_2 )#5
+
+or2( w10.Adder0.csa4x2_0_lvl0.2, w7.Adder0.csa4x2_0_lvl0.2, w8.Adder0.csa4x2_0_lvl0.2  )#5
+or2( cout_csa4x2_0_lvl0.2, w9.Adder0.csa4x2_0_lvl0.2, w10.Adder0.csa4x2_0_lvl0.2  )#5
+
+// end adder1bit
+
+
+   // adder1bit Adder1.csa4x2_0_lvl0.2( s0_lvl0_2, t0_lvl0_2, sintcsa4x2_0_lvl0.2, PP_3_2, cout_csa4x2_0_lvl0.1)
+
+// sum 
+nand2( w0.Adder1.csa4x2_0_lvl0.2, sintcsa4x2_0_lvl0.2, PP_3_2 )#5
+nand2( w1.Adder1.csa4x2_0_lvl0.2, sintcsa4x2_0_lvl0.2, w0.Adder1.csa4x2_0_lvl0.2 )#5
+nand2( w2.Adder1.csa4x2_0_lvl0.2, PP_3_2, w0.Adder1.csa4x2_0_lvl0.2 )#5
+nand2( w3.Adder1.csa4x2_0_lvl0.2, w1.Adder1.csa4x2_0_lvl0.2, w2.Adder1.csa4x2_0_lvl0.2 )#5
+
+nand2( w4.Adder1.csa4x2_0_lvl0.2, cout_csa4x2_0_lvl0.1, w3.Adder1.csa4x2_0_lvl0.2 )#5
+nand2( w5.Adder1.csa4x2_0_lvl0.2, cout_csa4x2_0_lvl0.1, w4.Adder1.csa4x2_0_lvl0.2 )#5
+nand2( w6.Adder1.csa4x2_0_lvl0.2, w3.Adder1.csa4x2_0_lvl0.2, w4.Adder1.csa4x2_0_lvl0.2 )#5
+nand2( s0_lvl0_2, w5.Adder1.csa4x2_0_lvl0.2, w6.Adder1.csa4x2_0_lvl0.2 )#5
+
+//cout
+and2( w7.Adder1.csa4x2_0_lvl0.2, sintcsa4x2_0_lvl0.2, PP_3_2 )#5
+and2( w8.Adder1.csa4x2_0_lvl0.2, sintcsa4x2_0_lvl0.2, cout_csa4x2_0_lvl0.1 )#5
+and2( w9.Adder1.csa4x2_0_lvl0.2, cout_csa4x2_0_lvl0.1, PP_3_2 )#5
+
+or2( w10.Adder1.csa4x2_0_lvl0.2, w7.Adder1.csa4x2_0_lvl0.2, w8.Adder1.csa4x2_0_lvl0.2  )#5
+or2( t0_lvl0_2, w9.Adder1.csa4x2_0_lvl0.2, w10.Adder1.csa4x2_0_lvl0.2  )#5
+
+// end adder1bit
+
+
+   // end csa4x2
+
+
+end
+
+netlist
+   // csa4x2 (csa4x2_0_lvl0.3, s0_lvl0_3,t0_lvl0_3,cout_csa4x2_0_lvl0.3,PP_0_3,PP_1_3,PP_2_3,PP_3_3,cout_csa4x2_0_lvl0.2) ;
+
+
+   // adder1bit Adder0.csa4x2_0_lvl0.3( sintcsa4x2_0_lvl0.3, cout_csa4x2_0_lvl0.3, PP_0_3, PP_1_3, PP_2_3)
+
+// sum 
+nand2( w0.Adder0.csa4x2_0_lvl0.3, PP_0_3, PP_1_3 )#5
+nand2( w1.Adder0.csa4x2_0_lvl0.3, PP_0_3, w0.Adder0.csa4x2_0_lvl0.3 )#5
+nand2( w2.Adder0.csa4x2_0_lvl0.3, PP_1_3, w0.Adder0.csa4x2_0_lvl0.3 )#5
+nand2( w3.Adder0.csa4x2_0_lvl0.3, w1.Adder0.csa4x2_0_lvl0.3, w2.Adder0.csa4x2_0_lvl0.3 )#5
+
+nand2( w4.Adder0.csa4x2_0_lvl0.3, PP_2_3, w3.Adder0.csa4x2_0_lvl0.3 )#5
+nand2( w5.Adder0.csa4x2_0_lvl0.3, PP_2_3, w4.Adder0.csa4x2_0_lvl0.3 )#5
+nand2( w6.Adder0.csa4x2_0_lvl0.3, w3.Adder0.csa4x2_0_lvl0.3, w4.Adder0.csa4x2_0_lvl0.3 )#5
+nand2( sintcsa4x2_0_lvl0.3, w5.Adder0.csa4x2_0_lvl0.3, w6.Adder0.csa4x2_0_lvl0.3 )#5
+
+//cout
+and2( w7.Adder0.csa4x2_0_lvl0.3, PP_0_3, PP_1_3 )#5
+and2( w8.Adder0.csa4x2_0_lvl0.3, PP_0_3, PP_2_3 )#5
+and2( w9.Adder0.csa4x2_0_lvl0.3, PP_2_3, PP_1_3 )#5
+
+or2( w10.Adder0.csa4x2_0_lvl0.3, w7.Adder0.csa4x2_0_lvl0.3, w8.Adder0.csa4x2_0_lvl0.3  )#5
+or2( cout_csa4x2_0_lvl0.3, w9.Adder0.csa4x2_0_lvl0.3, w10.Adder0.csa4x2_0_lvl0.3  )#5
+
+// end adder1bit
+
+
+   // adder1bit Adder1.csa4x2_0_lvl0.3( s0_lvl0_3, t0_lvl0_3, sintcsa4x2_0_lvl0.3, PP_3_3, cout_csa4x2_0_lvl0.2)
+
+// sum 
+nand2( w0.Adder1.csa4x2_0_lvl0.3, sintcsa4x2_0_lvl0.3, PP_3_3 )#5
+nand2( w1.Adder1.csa4x2_0_lvl0.3, sintcsa4x2_0_lvl0.3, w0.Adder1.csa4x2_0_lvl0.3 )#5
+nand2( w2.Adder1.csa4x2_0_lvl0.3, PP_3_3, w0.Adder1.csa4x2_0_lvl0.3 )#5
+nand2( w3.Adder1.csa4x2_0_lvl0.3, w1.Adder1.csa4x2_0_lvl0.3, w2.Adder1.csa4x2_0_lvl0.3 )#5
+
+nand2( w4.Adder1.csa4x2_0_lvl0.3, cout_csa4x2_0_lvl0.2, w3.Adder1.csa4x2_0_lvl0.3 )#5
+nand2( w5.Adder1.csa4x2_0_lvl0.3, cout_csa4x2_0_lvl0.2, w4.Adder1.csa4x2_0_lvl0.3 )#5
+nand2( w6.Adder1.csa4x2_0_lvl0.3, w3.Adder1.csa4x2_0_lvl0.3, w4.Adder1.csa4x2_0_lvl0.3 )#5
+nand2( s0_lvl0_3, w5.Adder1.csa4x2_0_lvl0.3, w6.Adder1.csa4x2_0_lvl0.3 )#5
+
+//cout
+and2( w7.Adder1.csa4x2_0_lvl0.3, sintcsa4x2_0_lvl0.3, PP_3_3 )#5
+and2( w8.Adder1.csa4x2_0_lvl0.3, sintcsa4x2_0_lvl0.3, cout_csa4x2_0_lvl0.2 )#5
+and2( w9.Adder1.csa4x2_0_lvl0.3, cout_csa4x2_0_lvl0.2, PP_3_3 )#5
+
+or2( w10.Adder1.csa4x2_0_lvl0.3, w7.Adder1.csa4x2_0_lvl0.3, w8.Adder1.csa4x2_0_lvl0.3  )#5
+or2( t0_lvl0_3, w9.Adder1.csa4x2_0_lvl0.3, w10.Adder1.csa4x2_0_lvl0.3  )#5
+
+// end adder1bit
+
+
+   // end csa4x2
+
+
+end
+
+netlist
+   // csa4x2 (csa4x2_0_lvl0.4, s0_lvl0_4,t0_lvl0_4,cout_csa4x2_0_lvl0.4,PP_0_4,PP_1_4,PP_2_4,PP_3_4,cout_csa4x2_0_lvl0.3) ;
+
+
+   // adder1bit Adder0.csa4x2_0_lvl0.4( sintcsa4x2_0_lvl0.4, cout_csa4x2_0_lvl0.4, PP_0_4, PP_1_4, PP_2_4)
+
+// sum 
+nand2( w0.Adder0.csa4x2_0_lvl0.4, PP_0_4, PP_1_4 )#5
+nand2( w1.Adder0.csa4x2_0_lvl0.4, PP_0_4, w0.Adder0.csa4x2_0_lvl0.4 )#5
+nand2( w2.Adder0.csa4x2_0_lvl0.4, PP_1_4, w0.Adder0.csa4x2_0_lvl0.4 )#5
+nand2( w3.Adder0.csa4x2_0_lvl0.4, w1.Adder0.csa4x2_0_lvl0.4, w2.Adder0.csa4x2_0_lvl0.4 )#5
+
+nand2( w4.Adder0.csa4x2_0_lvl0.4, PP_2_4, w3.Adder0.csa4x2_0_lvl0.4 )#5
+nand2( w5.Adder0.csa4x2_0_lvl0.4, PP_2_4, w4.Adder0.csa4x2_0_lvl0.4 )#5
+nand2( w6.Adder0.csa4x2_0_lvl0.4, w3.Adder0.csa4x2_0_lvl0.4, w4.Adder0.csa4x2_0_lvl0.4 )#5
+nand2( sintcsa4x2_0_lvl0.4, w5.Adder0.csa4x2_0_lvl0.4, w6.Adder0.csa4x2_0_lvl0.4 )#5
+
+//cout
+and2( w7.Adder0.csa4x2_0_lvl0.4, PP_0_4, PP_1_4 )#5
+and2( w8.Adder0.csa4x2_0_lvl0.4, PP_0_4, PP_2_4 )#5
+and2( w9.Adder0.csa4x2_0_lvl0.4, PP_2_4, PP_1_4 )#5
+
+or2( w10.Adder0.csa4x2_0_lvl0.4, w7.Adder0.csa4x2_0_lvl0.4, w8.Adder0.csa4x2_0_lvl0.4  )#5
+or2( cout_csa4x2_0_lvl0.4, w9.Adder0.csa4x2_0_lvl0.4, w10.Adder0.csa4x2_0_lvl0.4  )#5
+
+// end adder1bit
+
+
+   // adder1bit Adder1.csa4x2_0_lvl0.4( s0_lvl0_4, t0_lvl0_4, sintcsa4x2_0_lvl0.4, PP_3_4, cout_csa4x2_0_lvl0.3)
+
+// sum 
+nand2( w0.Adder1.csa4x2_0_lvl0.4, sintcsa4x2_0_lvl0.4, PP_3_4 )#5
+nand2( w1.Adder1.csa4x2_0_lvl0.4, sintcsa4x2_0_lvl0.4, w0.Adder1.csa4x2_0_lvl0.4 )#5
+nand2( w2.Adder1.csa4x2_0_lvl0.4, PP_3_4, w0.Adder1.csa4x2_0_lvl0.4 )#5
+nand2( w3.Adder1.csa4x2_0_lvl0.4, w1.Adder1.csa4x2_0_lvl0.4, w2.Adder1.csa4x2_0_lvl0.4 )#5
+
+nand2( w4.Adder1.csa4x2_0_lvl0.4, cout_csa4x2_0_lvl0.3, w3.Adder1.csa4x2_0_lvl0.4 )#5
+nand2( w5.Adder1.csa4x2_0_lvl0.4, cout_csa4x2_0_lvl0.3, w4.Adder1.csa4x2_0_lvl0.4 )#5
+nand2( w6.Adder1.csa4x2_0_lvl0.4, w3.Adder1.csa4x2_0_lvl0.4, w4.Adder1.csa4x2_0_lvl0.4 )#5
+nand2( s0_lvl0_4, w5.Adder1.csa4x2_0_lvl0.4, w6.Adder1.csa4x2_0_lvl0.4 )#5
+
+//cout
+and2( w7.Adder1.csa4x2_0_lvl0.4, sintcsa4x2_0_lvl0.4, PP_3_4 )#5
+and2( w8.Adder1.csa4x2_0_lvl0.4, sintcsa4x2_0_lvl0.4, cout_csa4x2_0_lvl0.3 )#5
+and2( w9.Adder1.csa4x2_0_lvl0.4, cout_csa4x2_0_lvl0.3, PP_3_4 )#5
+
+or2( w10.Adder1.csa4x2_0_lvl0.4, w7.Adder1.csa4x2_0_lvl0.4, w8.Adder1.csa4x2_0_lvl0.4  )#5
+or2( t0_lvl0_4, w9.Adder1.csa4x2_0_lvl0.4, w10.Adder1.csa4x2_0_lvl0.4  )#5
+
+// end adder1bit
+
+
+   // end csa4x2
+
+
+end
+
+netlist
+   // csa4x2 (csa4x2_0_lvl0.5, s0_lvl0_5,t0_lvl0_5,cout_csa4x2_0_lvl0.5,PP_0_5,PP_1_5,PP_2_5,PP_3_5,cout_csa4x2_0_lvl0.4) ;
+
+
+   // adder1bit Adder0.csa4x2_0_lvl0.5( sintcsa4x2_0_lvl0.5, cout_csa4x2_0_lvl0.5, PP_0_5, PP_1_5, PP_2_5)
+
+// sum 
+nand2( w0.Adder0.csa4x2_0_lvl0.5, PP_0_5, PP_1_5 )#5
+nand2( w1.Adder0.csa4x2_0_lvl0.5, PP_0_5, w0.Adder0.csa4x2_0_lvl0.5 )#5
+nand2( w2.Adder0.csa4x2_0_lvl0.5, PP_1_5, w0.Adder0.csa4x2_0_lvl0.5 )#5
+nand2( w3.Adder0.csa4x2_0_lvl0.5, w1.Adder0.csa4x2_0_lvl0.5, w2.Adder0.csa4x2_0_lvl0.5 )#5
+
+nand2( w4.Adder0.csa4x2_0_lvl0.5, PP_2_5, w3.Adder0.csa4x2_0_lvl0.5 )#5
+nand2( w5.Adder0.csa4x2_0_lvl0.5, PP_2_5, w4.Adder0.csa4x2_0_lvl0.5 )#5
+nand2( w6.Adder0.csa4x2_0_lvl0.5, w3.Adder0.csa4x2_0_lvl0.5, w4.Adder0.csa4x2_0_lvl0.5 )#5
+nand2( sintcsa4x2_0_lvl0.5, w5.Adder0.csa4x2_0_lvl0.5, w6.Adder0.csa4x2_0_lvl0.5 )#5
+
+//cout
+and2( w7.Adder0.csa4x2_0_lvl0.5, PP_0_5, PP_1_5 )#5
+and2( w8.Adder0.csa4x2_0_lvl0.5, PP_0_5, PP_2_5 )#5
+and2( w9.Adder0.csa4x2_0_lvl0.5, PP_2_5, PP_1_5 )#5
+
+or2( w10.Adder0.csa4x2_0_lvl0.5, w7.Adder0.csa4x2_0_lvl0.5, w8.Adder0.csa4x2_0_lvl0.5  )#5
+or2( cout_csa4x2_0_lvl0.5, w9.Adder0.csa4x2_0_lvl0.5, w10.Adder0.csa4x2_0_lvl0.5  )#5
+
+// end adder1bit
+
+
+   // adder1bit Adder1.csa4x2_0_lvl0.5( s0_lvl0_5, t0_lvl0_5, sintcsa4x2_0_lvl0.5, PP_3_5, cout_csa4x2_0_lvl0.4)
+
+// sum 
+nand2( w0.Adder1.csa4x2_0_lvl0.5, sintcsa4x2_0_lvl0.5, PP_3_5 )#5
+nand2( w1.Adder1.csa4x2_0_lvl0.5, sintcsa4x2_0_lvl0.5, w0.Adder1.csa4x2_0_lvl0.5 )#5
+nand2( w2.Adder1.csa4x2_0_lvl0.5, PP_3_5, w0.Adder1.csa4x2_0_lvl0.5 )#5
+nand2( w3.Adder1.csa4x2_0_lvl0.5, w1.Adder1.csa4x2_0_lvl0.5, w2.Adder1.csa4x2_0_lvl0.5 )#5
+
+nand2( w4.Adder1.csa4x2_0_lvl0.5, cout_csa4x2_0_lvl0.4, w3.Adder1.csa4x2_0_lvl0.5 )#5
+nand2( w5.Adder1.csa4x2_0_lvl0.5, cout_csa4x2_0_lvl0.4, w4.Adder1.csa4x2_0_lvl0.5 )#5
+nand2( w6.Adder1.csa4x2_0_lvl0.5, w3.Adder1.csa4x2_0_lvl0.5, w4.Adder1.csa4x2_0_lvl0.5 )#5
+nand2( s0_lvl0_5, w5.Adder1.csa4x2_0_lvl0.5, w6.Adder1.csa4x2_0_lvl0.5 )#5
+
+//cout
+and2( w7.Adder1.csa4x2_0_lvl0.5, sintcsa4x2_0_lvl0.5, PP_3_5 )#5
+and2( w8.Adder1.csa4x2_0_lvl0.5, sintcsa4x2_0_lvl0.5, cout_csa4x2_0_lvl0.4 )#5
+and2( w9.Adder1.csa4x2_0_lvl0.5, cout_csa4x2_0_lvl0.4, PP_3_5 )#5
+
+or2( w10.Adder1.csa4x2_0_lvl0.5, w7.Adder1.csa4x2_0_lvl0.5, w8.Adder1.csa4x2_0_lvl0.5  )#5
+or2( t0_lvl0_5, w9.Adder1.csa4x2_0_lvl0.5, w10.Adder1.csa4x2_0_lvl0.5  )#5
+
+// end adder1bit
+
+
+   // end csa4x2
+
+
+end
+
+netlist
+   // csa4x2 (csa4x2_0_lvl0.6, s0_lvl0_6,t0_lvl0_6,cout_csa4x2_0_lvl0.6,PP_0_6,PP_1_6,PP_2_6,PP_3_6,cout_csa4x2_0_lvl0.5) ;
+
+
+   // adder1bit Adder0.csa4x2_0_lvl0.6( sintcsa4x2_0_lvl0.6, cout_csa4x2_0_lvl0.6, PP_0_6, PP_1_6, PP_2_6)
+
+// sum 
+nand2( w0.Adder0.csa4x2_0_lvl0.6, PP_0_6, PP_1_6 )#5
+nand2( w1.Adder0.csa4x2_0_lvl0.6, PP_0_6, w0.Adder0.csa4x2_0_lvl0.6 )#5
+nand2( w2.Adder0.csa4x2_0_lvl0.6, PP_1_6, w0.Adder0.csa4x2_0_lvl0.6 )#5
+nand2( w3.Adder0.csa4x2_0_lvl0.6, w1.Adder0.csa4x2_0_lvl0.6, w2.Adder0.csa4x2_0_lvl0.6 )#5
+
+nand2( w4.Adder0.csa4x2_0_lvl0.6, PP_2_6, w3.Adder0.csa4x2_0_lvl0.6 )#5
+nand2( w5.Adder0.csa4x2_0_lvl0.6, PP_2_6, w4.Adder0.csa4x2_0_lvl0.6 )#5
+nand2( w6.Adder0.csa4x2_0_lvl0.6, w3.Adder0.csa4x2_0_lvl0.6, w4.Adder0.csa4x2_0_lvl0.6 )#5
+nand2( sintcsa4x2_0_lvl0.6, w5.Adder0.csa4x2_0_lvl0.6, w6.Adder0.csa4x2_0_lvl0.6 )#5
+
+//cout
+and2( w7.Adder0.csa4x2_0_lvl0.6, PP_0_6, PP_1_6 )#5
+and2( w8.Adder0.csa4x2_0_lvl0.6, PP_0_6, PP_2_6 )#5
+and2( w9.Adder0.csa4x2_0_lvl0.6, PP_2_6, PP_1_6 )#5
+
+or2( w10.Adder0.csa4x2_0_lvl0.6, w7.Adder0.csa4x2_0_lvl0.6, w8.Adder0.csa4x2_0_lvl0.6  )#5
+or2( cout_csa4x2_0_lvl0.6, w9.Adder0.csa4x2_0_lvl0.6, w10.Adder0.csa4x2_0_lvl0.6  )#5
+
+// end adder1bit
+
+
+   // adder1bit Adder1.csa4x2_0_lvl0.6( s0_lvl0_6, t0_lvl0_6, sintcsa4x2_0_lvl0.6, PP_3_6, cout_csa4x2_0_lvl0.5)
+
+// sum 
+nand2( w0.Adder1.csa4x2_0_lvl0.6, sintcsa4x2_0_lvl0.6, PP_3_6 )#5
+nand2( w1.Adder1.csa4x2_0_lvl0.6, sintcsa4x2_0_lvl0.6, w0.Adder1.csa4x2_0_lvl0.6 )#5
+nand2( w2.Adder1.csa4x2_0_lvl0.6, PP_3_6, w0.Adder1.csa4x2_0_lvl0.6 )#5
+nand2( w3.Adder1.csa4x2_0_lvl0.6, w1.Adder1.csa4x2_0_lvl0.6, w2.Adder1.csa4x2_0_lvl0.6 )#5
+
+nand2( w4.Adder1.csa4x2_0_lvl0.6, cout_csa4x2_0_lvl0.5, w3.Adder1.csa4x2_0_lvl0.6 )#5
+nand2( w5.Adder1.csa4x2_0_lvl0.6, cout_csa4x2_0_lvl0.5, w4.Adder1.csa4x2_0_lvl0.6 )#5
+nand2( w6.Adder1.csa4x2_0_lvl0.6, w3.Adder1.csa4x2_0_lvl0.6, w4.Adder1.csa4x2_0_lvl0.6 )#5
+nand2( s0_lvl0_6, w5.Adder1.csa4x2_0_lvl0.6, w6.Adder1.csa4x2_0_lvl0.6 )#5
+
+//cout
+and2( w7.Adder1.csa4x2_0_lvl0.6, sintcsa4x2_0_lvl0.6, PP_3_6 )#5
+and2( w8.Adder1.csa4x2_0_lvl0.6, sintcsa4x2_0_lvl0.6, cout_csa4x2_0_lvl0.5 )#5
+and2( w9.Adder1.csa4x2_0_lvl0.6, cout_csa4x2_0_lvl0.5, PP_3_6 )#5
+
+or2( w10.Adder1.csa4x2_0_lvl0.6, w7.Adder1.csa4x2_0_lvl0.6, w8.Adder1.csa4x2_0_lvl0.6  )#5
+or2( t0_lvl0_6, w9.Adder1.csa4x2_0_lvl0.6, w10.Adder1.csa4x2_0_lvl0.6  )#5
+
+// end adder1bit
+
+
+   // end csa4x2
+
+
+end
+
+netlist
+   // csa4x2 (csa4x2_0_lvl0.7, s0_lvl0_7,t0_lvl0_7,cout_csa4x2_0_lvl0.7,PP_0_7,PP_1_7,PP_2_7,PP_3_7,cout_csa4x2_0_lvl0.6) ;
+
+
+   // adder1bit Adder0.csa4x2_0_lvl0.7( sintcsa4x2_0_lvl0.7, cout_csa4x2_0_lvl0.7, PP_0_7, PP_1_7, PP_2_7)
+
+// sum 
+nand2( w0.Adder0.csa4x2_0_lvl0.7, PP_0_7, PP_1_7 )#5
+nand2( w1.Adder0.csa4x2_0_lvl0.7, PP_0_7, w0.Adder0.csa4x2_0_lvl0.7 )#5
+nand2( w2.Adder0.csa4x2_0_lvl0.7, PP_1_7, w0.Adder0.csa4x2_0_lvl0.7 )#5
+nand2( w3.Adder0.csa4x2_0_lvl0.7, w1.Adder0.csa4x2_0_lvl0.7, w2.Adder0.csa4x2_0_lvl0.7 )#5
+
+nand2( w4.Adder0.csa4x2_0_lvl0.7, PP_2_7, w3.Adder0.csa4x2_0_lvl0.7 )#5
+nand2( w5.Adder0.csa4x2_0_lvl0.7, PP_2_7, w4.Adder0.csa4x2_0_lvl0.7 )#5
+nand2( w6.Adder0.csa4x2_0_lvl0.7, w3.Adder0.csa4x2_0_lvl0.7, w4.Adder0.csa4x2_0_lvl0.7 )#5
+nand2( sintcsa4x2_0_lvl0.7, w5.Adder0.csa4x2_0_lvl0.7, w6.Adder0.csa4x2_0_lvl0.7 )#5
+
+//cout
+and2( w7.Adder0.csa4x2_0_lvl0.7, PP_0_7, PP_1_7 )#5
+and2( w8.Adder0.csa4x2_0_lvl0.7, PP_0_7, PP_2_7 )#5
+and2( w9.Adder0.csa4x2_0_lvl0.7, PP_2_7, PP_1_7 )#5
+
+or2( w10.Adder0.csa4x2_0_lvl0.7, w7.Adder0.csa4x2_0_lvl0.7, w8.Adder0.csa4x2_0_lvl0.7  )#5
+or2( cout_csa4x2_0_lvl0.7, w9.Adder0.csa4x2_0_lvl0.7, w10.Adder0.csa4x2_0_lvl0.7  )#5
+
+// end adder1bit
+
+
+   // adder1bit Adder1.csa4x2_0_lvl0.7( s0_lvl0_7, t0_lvl0_7, sintcsa4x2_0_lvl0.7, PP_3_7, cout_csa4x2_0_lvl0.6)
+
+// sum 
+nand2( w0.Adder1.csa4x2_0_lvl0.7, sintcsa4x2_0_lvl0.7, PP_3_7 )#5
+nand2( w1.Adder1.csa4x2_0_lvl0.7, sintcsa4x2_0_lvl0.7, w0.Adder1.csa4x2_0_lvl0.7 )#5
+nand2( w2.Adder1.csa4x2_0_lvl0.7, PP_3_7, w0.Adder1.csa4x2_0_lvl0.7 )#5
+nand2( w3.Adder1.csa4x2_0_lvl0.7, w1.Adder1.csa4x2_0_lvl0.7, w2.Adder1.csa4x2_0_lvl0.7 )#5
+
+nand2( w4.Adder1.csa4x2_0_lvl0.7, cout_csa4x2_0_lvl0.6, w3.Adder1.csa4x2_0_lvl0.7 )#5
+nand2( w5.Adder1.csa4x2_0_lvl0.7, cout_csa4x2_0_lvl0.6, w4.Adder1.csa4x2_0_lvl0.7 )#5
+nand2( w6.Adder1.csa4x2_0_lvl0.7, w3.Adder1.csa4x2_0_lvl0.7, w4.Adder1.csa4x2_0_lvl0.7 )#5
+nand2( s0_lvl0_7, w5.Adder1.csa4x2_0_lvl0.7, w6.Adder1.csa4x2_0_lvl0.7 )#5
+
+//cout
+and2( w7.Adder1.csa4x2_0_lvl0.7, sintcsa4x2_0_lvl0.7, PP_3_7 )#5
+and2( w8.Adder1.csa4x2_0_lvl0.7, sintcsa4x2_0_lvl0.7, cout_csa4x2_0_lvl0.6 )#5
+and2( w9.Adder1.csa4x2_0_lvl0.7, cout_csa4x2_0_lvl0.6, PP_3_7 )#5
+
+or2( w10.Adder1.csa4x2_0_lvl0.7, w7.Adder1.csa4x2_0_lvl0.7, w8.Adder1.csa4x2_0_lvl0.7  )#5
+or2( t0_lvl0_7, w9.Adder1.csa4x2_0_lvl0.7, w10.Adder1.csa4x2_0_lvl0.7  )#5
+
+// end adder1bit
+
+
+   // end csa4x2
+
+
+end
+
+// genKoggeStoneVec(2*numBits, outVec, "cout", currRow->[0], currRow->[1], 'GND' );
+
+netlist
+// PGgen (g0,p0,s0_lvl0_0,GND)
+   xor2(p0,s0_lvl0_0,GND)#5
+   and2(g0,s0_lvl0_0,GND)#5
+
+
+end
+
+netlist
+// PGgen (g1,p1,s0_lvl0_1,t0_lvl0_0)
+   xor2(p1,s0_lvl0_1,t0_lvl0_0)#5
+   and2(g1,s0_lvl0_1,t0_lvl0_0)#5
+
+
+end
+
+netlist
+// PGgen (g2,p2,s0_lvl0_2,t0_lvl0_1)
+   xor2(p2,s0_lvl0_2,t0_lvl0_1)#5
+   and2(g2,s0_lvl0_2,t0_lvl0_1)#5
+
+
+end
+
+netlist
+// PGgen (g3,p3,s0_lvl0_3,t0_lvl0_2)
+   xor2(p3,s0_lvl0_3,t0_lvl0_2)#5
+   and2(g3,s0_lvl0_3,t0_lvl0_2)#5
+
+
+end
+
+netlist
+// PGgen (g4,p4,s0_lvl0_4,t0_lvl0_3)
+   xor2(p4,s0_lvl0_4,t0_lvl0_3)#5
+   and2(g4,s0_lvl0_4,t0_lvl0_3)#5
+
+
+end
+
+netlist
+// PGgen (g5,p5,s0_lvl0_5,t0_lvl0_4)
+   xor2(p5,s0_lvl0_5,t0_lvl0_4)#5
+   and2(g5,s0_lvl0_5,t0_lvl0_4)#5
+
+
+end
+
+netlist
+// PGgen (g6,p6,s0_lvl0_6,t0_lvl0_5)
+   xor2(p6,s0_lvl0_6,t0_lvl0_5)#5
+   and2(g6,s0_lvl0_6,t0_lvl0_5)#5
+
+
+end
+
+netlist
+// PGgen (g7,p7,s0_lvl0_7,t0_lvl0_6)
+   xor2(p7,s0_lvl0_7,t0_lvl0_6)#5
+   and2(g7,s0_lvl0_7,t0_lvl0_6)#5
+
+
+end
+
+netlist
+// Gcombine (g_0_GND, g0, GND, p0 )
+   and2(w0g_0_GND, p0, GND )#5
+   or2( g_0_GND, w0g_0_GND, g0 )#5
+
+
+end
+
+netlist
+// PGcombine (g_1_0,p_1_0,g1,g0,p1,p0)
+   and2(  w0g_1_0, g0, p1 )#5
+   or2( g_1_0,  w0g_1_0, g1 )#5
+   and2( p_1_0,  g0, p0)#5
+
+
+end
+
+netlist
+// PGcombine (g_2_1,p_2_1,g2,g1,p2,p1)
+   and2(  w0g_2_1, g1, p2 )#5
+   or2( g_2_1,  w0g_2_1, g2 )#5
+   and2( p_2_1,  g1, p1)#5
+
+
+end
+
+netlist
+// PGcombine (g_3_2,p_3_2,g3,g2,p3,p2)
+   and2(  w0g_3_2, g2, p3 )#5
+   or2( g_3_2,  w0g_3_2, g3 )#5
+   and2( p_3_2,  g2, p2)#5
+
+
+end
+
+netlist
+// PGcombine (g_4_3,p_4_3,g4,g3,p4,p3)
+   and2(  w0g_4_3, g3, p4 )#5
+   or2( g_4_3,  w0g_4_3, g4 )#5
+   and2( p_4_3,  g3, p3)#5
+
+
+end
+
+netlist
+// PGcombine (g_5_4,p_5_4,g5,g4,p5,p4)
+   and2(  w0g_5_4, g4, p5 )#5
+   or2( g_5_4,  w0g_5_4, g5 )#5
+   and2( p_5_4,  g4, p4)#5
+
+
+end
+
+netlist
+// PGcombine (g_6_5,p_6_5,g6,g5,p6,p5)
+   and2(  w0g_6_5, g5, p6 )#5
+   or2( g_6_5,  w0g_6_5, g6 )#5
+   and2( p_6_5,  g5, p5)#5
+
+
+end
+
+netlist
+// PGcombine (g_7_6,p_7_6,g7,g6,p7,p6)
+   and2(  w0g_7_6, g6, p7 )#5
+   or2( g_7_6,  w0g_7_6, g7 )#5
+   and2( p_7_6,  g6, p6)#5
+
+
+end
+
+netlist
+// Gcombine (g_1_GND, g_1_0, GND, p_1_0 )
+   and2(w0g_1_GND, p_1_0, GND )#5
+   or2( g_1_GND, w0g_1_GND, g_1_0 )#5
+
+
+end
+
+netlist
+// Gcombine (g_2_GND, g_2_1, g_0_GND, p_2_1 )
+   and2(w0g_2_GND, p_2_1, g_0_GND )#5
+   or2( g_2_GND, w0g_2_GND, g_2_1 )#5
+
+
+end
+
+netlist
+// PGcombine (g_3_0,p_3_0,g_3_2,g_1_0,p_3_2,p_1_0)
+   and2(  w0g_3_0, g_1_0, p_3_2 )#5
+   or2( g_3_0,  w0g_3_0, g_3_2 )#5
+   and2( p_3_0,  g_1_0, p_1_0)#5
+
+
+end
+
+netlist
+// PGcombine (g_4_1,p_4_1,g_4_3,g_2_1,p_4_3,p_2_1)
+   and2(  w0g_4_1, g_2_1, p_4_3 )#5
+   or2( g_4_1,  w0g_4_1, g_4_3 )#5
+   and2( p_4_1,  g_2_1, p_2_1)#5
+
+
+end
+
+netlist
+// PGcombine (g_5_2,p_5_2,g_5_4,g_3_2,p_5_4,p_3_2)
+   and2(  w0g_5_2, g_3_2, p_5_4 )#5
+   or2( g_5_2,  w0g_5_2, g_5_4 )#5
+   and2( p_5_2,  g_3_2, p_3_2)#5
+
+
+end
+
+netlist
+// PGcombine (g_6_3,p_6_3,g_6_5,g_4_3,p_6_5,p_4_3)
+   and2(  w0g_6_3, g_4_3, p_6_5 )#5
+   or2( g_6_3,  w0g_6_3, g_6_5 )#5
+   and2( p_6_3,  g_4_3, p_4_3)#5
+
+
+end
+
+netlist
+// PGcombine (g_7_4,p_7_4,g_7_6,g_5_4,p_7_6,p_5_4)
+   and2(  w0g_7_4, g_5_4, p_7_6 )#5
+   or2( g_7_4,  w0g_7_4, g_7_6 )#5
+   and2( p_7_4,  g_5_4, p_5_4)#5
+
+
+end
+
+netlist
+// Gcombine (g_3_GND, g_3_0, GND, p_3_0 )
+   and2(w0g_3_GND, p_3_0, GND )#5
+   or2( g_3_GND, w0g_3_GND, g_3_0 )#5
+
+
+end
+
+netlist
+// Gcombine (g_4_GND, g_4_1, g_0_GND, p_4_1 )
+   and2(w0g_4_GND, p_4_1, g_0_GND )#5
+   or2( g_4_GND, w0g_4_GND, g_4_1 )#5
+
+
+end
+
+netlist
+// Gcombine (g_5_GND, g_5_2, g_1_GND, p_5_2 )
+   and2(w0g_5_GND, p_5_2, g_1_GND )#5
+   or2( g_5_GND, w0g_5_GND, g_5_2 )#5
+
+
+end
+
+netlist
+// Gcombine (g_6_GND, g_6_3, g_2_GND, p_6_3 )
+   and2(w0g_6_GND, p_6_3, g_2_GND )#5
+   or2( g_6_GND, w0g_6_GND, g_6_3 )#5
+
+
+end
+
+netlist
+// PGcombine (g_7_0,p_7_0,g_7_4,g_3_0,p_7_4,p_3_0)
+   and2(  w0g_7_0, g_3_0, p_7_4 )#5
+   or2( g_7_0,  w0g_7_0, g_7_4 )#5
+   and2( p_7_0,  g_3_0, p_3_0)#5
+
+
+end
+
+netlist
+// Gcombine (cout, g_7_0, GND, p_7_0 )
+   and2(w0cout, p_7_0, GND )#5
+   or2( cout, w0cout, g_7_0 )#5
+
+
+end
+
+netlist
+
+xor2( m0, p0,GND ) 
+
+xor2( m1, p1,g_0_GND )
+
+xor2( m2, p2,g_1_GND )
+
+xor2( m3, p3,g_2_GND )
+
+xor2( m4, p4,g_3_GND )
+
+xor2( m5, p5,g_4_GND )
+
+xor2( m6, p6,g_5_GND )
+
+xor2( m7, p7,g_6_GND )
+
+end

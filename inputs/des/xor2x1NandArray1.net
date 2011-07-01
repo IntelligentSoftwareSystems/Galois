@@ -1,0 +1,24 @@
+inputs a0, b0, 
+end
+
+outputs o0, 
+end
+
+finish=10000
+
+initlist a0
+0, 0
+end
+initlist b0
+0, 0
+end
+
+outvalues
+o0 0,
+end
+netlist 
+nand2(x0,a0,b0)#40
+nand2(y0,a0,x0)#40
+nand2(z0,b0,x0)#40
+nand2(o0,y0,z0)#40
+end
