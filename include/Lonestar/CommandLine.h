@@ -69,9 +69,10 @@ std::vector<const char*> parse_command_line(int argc, const char** argv, const c
     } else if (std::string("-noverify").compare(argv[i]) == 0) {
       skipVerify = true;
     } else if (std::string("-help").compare(argv[i]) == 0) {
-      fprintf(stderr, "%s%s%s\n", "%s%s%s\n",
+      fprintf(stderr, "%s%s%s\n", 
           "[-t numThreads] use numThreads threads (1)\n",
-          "[-noverify] skip verification\n");
+          "[-noverify] skip verification\n",
+          proghelp);
     } else {
       retval.push_back(argv[i]);
     }
