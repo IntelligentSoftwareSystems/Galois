@@ -45,8 +45,8 @@ __thread unsigned int ThreadPool::LocalThreadID = ~0;
 int ThreadPool::nextThreadID = 0;
 
 ThreadAware::ThreadAware() {
-  createAllObjects();
   allObjectsLock.lock();
+  createAllObjects();
   allObjects->push_front(*this);
   allObjectsLock.unlock();
 }
@@ -59,6 +59,7 @@ ThreadAware::~ThreadAware() {
 
 void ThreadAware::NotifyOfChange(bool starting) {
   allObjectsLock.lock();
+  createAllObjects();
   for (ListTy::iterator ii = allObjects->begin(), ee = allObjects->end(); ii != ee; ++ii) {
     ii->ThreadChange(starting);
   }
