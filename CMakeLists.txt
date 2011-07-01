@@ -7,21 +7,29 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Release")
 endif()
 
-###### Options ######
+###### Options (alternatively pass as options to cmake -DName=Value ######
+
 #use pthreads
 set(USE_PTHREAD ON)
 
 #compile for cray xmt
-#SET(USE_CRAY ON )
+#set(USE_CRAY ON)
 
 #use icc
-#SET(USE_ICC ON)
+#set(USE_ICC ON)
+
+#use profiling
+#set(USE_PROFILING ON)
 
 if(SITE_NAME MATCHES "volta.*")
   set(USE_NUMA ON)
 endif()
 
-###### find libraries ######
+if(CMAKE_SYSTEM MATCHES "SunOS.*")
+  set(USE_SOLARIS ON)
+endif()
+
+###### Configure (users don't need to go beyond here) ######
 
 #Boost
 set(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0")
@@ -49,12 +57,18 @@ if(USE_CRAY)
   add_definitions(-DGALOIS_CRAY)
 endif(USE_CRAY)
 
+if(USE_PROFILING)
+  add_definitions(-pg)
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pg")
+endif(USE_PROFILING)
+
 #solaris
-if(CMAKE_SYSTEM MATCHES "SunOS.*")
+if(USE_SOLARIS)
+  add_definitions(-DSOLARIS)
   add_definitions("-m64")
-  add_definitions("-mcpu=niagara2")
-  add_definitions("-lposix4")
-  SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -m64 -lposix4")
+  #add_definitions("-mcpu=niagara2")
+  #add_definitions("-lposix4")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -m64 -lposix4")
 endif()
 
 if(USE_ICC)
@@ -63,14 +77,7 @@ if(USE_ICC)
   add_definitions("-wd981 -wd383 -wd869 -wd2196 -wd279")
 endif(USE_ICC)
 
-###### Flags ######
-
 #set(CMAKE_CXX_COMPILER /h1/lenharth/local/bin/clang++)
-
-#this is stupid, but imported libraries are scoped by directory
-#add_library(hwloc SHARED IMPORTED)
-#set_property(TARGET hwloc PROPERTY IMPORTED_LOCATION ${CMAKE_BINARY_DIR}/lib/install/lib/libhwloc.so)
-#include_directories(${CMAKE_BINARY_DIR}/lib/install/include)
 
 #Always include debug symbols
 add_definitions("-g")
@@ -81,7 +88,7 @@ if(CMAKE_BUILD_TYPE MATCHES "Release")
 endif()
 
 #more warnings
-if (CMAKE_BUILD_TYPE MATCHES "Debug")
+if(CMAKE_BUILD_TYPE MATCHES "Debug")
   add_definitions("-Wall")
 endif()
 
