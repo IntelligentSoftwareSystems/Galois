@@ -101,7 +101,19 @@ public:
   }
 };
 }
-PrintStats* P;
+PrintStats P;
+
+void GaloisRuntime::reportStatSum(const char* text, unsigned long val, const char* loopname) {
+  P.reportStatSum(text, val, loopname);
+}
+
+void GaloisRuntime::reportStatAvg(const char* text, unsigned long val, const char* loopname) {
+  P.reportStatAvg(text, val, loopname);
+}
+
+void GaloisRuntime::statDone() {
+  P.incIteration();
+}
 
 static void genericReport(bool error, const char* text1,
     const char* text2, const char* val) {
@@ -109,24 +121,6 @@ static void genericReport(bool error, const char* text1,
   FILE *out = error ? stderr : stdout;
   fprintf(out, "%s %s %s\n", text1, text2, val);
   lock.unlock();
-}
-
-void GaloisRuntime::reportStatSum(const char* text, unsigned long val, const char* loopname) {
-  if (!P)
-    P = new PrintStats;
-  P->reportStatSum(text, val, loopname);
-}
-
-void GaloisRuntime::reportStatAvg(const char* text, unsigned long val, const char* loopname) {
-  if (!P)
-    P = new PrintStats;
-  P->reportStatAvg(text, val, loopname);
-}
-
-void GaloisRuntime::statDone() {
-  if (!P)
-    P = new PrintStats;
-  P->incIteration();
 }
 
 //Report Warnings
