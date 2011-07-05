@@ -69,7 +69,7 @@ struct process {
  
     typedef std::multimap<int,int, std::less<int>,
             typename PerIt<std::pair<const int,int> >::Ty> MMapTy;
-    MMapTy P(std::lhess<int>(), lalloc);
+    MMapTy P(std::less<int>(), lalloc);
     
     int QPush = 0;
     int QAt = 0;
