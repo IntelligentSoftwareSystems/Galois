@@ -59,7 +59,7 @@ struct process {
     if (!Mesh->containsNode(item)) 
       return;
   
-    Element::TupleList& tuples = data.getTuples();
+    TupleList& tuples = data.getTuples();
     // Discard duplicate tuples
     while (!tuples.empty()) {
       Tuple& t = tuples.back();
@@ -98,7 +98,7 @@ void triangulate(WLTY& wl) {
   Galois::for_each<GaloisRuntime::WorkList::ChunkedFIFO<512> >(wl.begin(), wl.end(), process());
 }
 
-void read_points(const char* filename, Element::TupleList& tuples) {
+void read_points(const char* filename, TupleList& tuples) {
   double x, y, min_x, max_x, min_y, max_y;
   long numPoints;
 
@@ -146,14 +146,14 @@ void read_points(const char* filename, Element::TupleList& tuples) {
   tuples[numPoints + 2] = Tuple(centerX + 3.0 * max_length, centerY - 2.0 * max_length, numPoints + 2);
 }
 
-void write_points(const char* filename, const Element::TupleList& tuples) {
+void write_points(const char* filename, const TupleList& tuples) {
   std::ofstream out(filename);
   // <num vertices> <dimension> <num attributes> <has boundary markers>
   out << tuples.size() << " 2 0 0\n";
   //out.setf(std::ios::fixed, std::ios::floatfield);
   out.precision(10);
   long id = 0;
-  for (Element::TupleList::const_iterator it = tuples.begin(), end = tuples.end(); it != end; ++it) {
+  for (TupleList::const_iterator it = tuples.begin(), end = tuples.end(); it != end; ++it) {
     const Tuple &t = *it;
     out << id++ << " " << t.x() << " " << t.y() << " 0\n";
   }
@@ -162,7 +162,7 @@ void write_points(const char* filename, const Element::TupleList& tuples) {
 }
 
 GNode make_graph(const char* filename) {
-  Element::TupleList tuples;
+  TupleList tuples;
   read_points(filename, tuples);
   
   Tuple& t1 = tuples[tuples.size() - 3];
@@ -328,7 +328,7 @@ int main(int argc, const char** argv) {
     std::cout << "Writing " << base << "\n";
     write_mesh(base.c_str());
 
-    Element::TupleList tuples;
+    TupleList tuples;
     read_points(args[0], tuples);
     write_points(std::string(base).append(".node").c_str(), tuples);
   }

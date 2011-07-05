@@ -101,59 +101,62 @@ public:
       graph->addEdge(neighbor, nnode, index, Galois::Graph::NONE);
 
       int numNeighborsFound = 0;
+      GNodeVector::iterator nEnd = newNodes->end();
+      for (GNodeVector::iterator iter=newNodes->begin();iter!=nEnd;iter++) {
+        GNode newNode = *iter;
+        bool found = false;
+        int indexForNewNode = -1;
+        int indexForNode = -1;
+        Element& newNodeData = newNode.getData(Galois::Graph::NONE);
 
-                        GNodeVector::iterator nEnd = newNodes->end();
-                        for (GNodeVector::iterator iter=newNodes->begin();iter!=nEnd;iter++) {
-                                GNode newNode = *iter;
-                                bool found = false;
-                                int indexForNewNode = -1;
-                                int indexForNode = -1;
-                                Element& newNodeData = newNode.getData(Galois::Graph::NONE);
+        for (int x=2; x>=1; x--) {
+          for (int y=2; y>=1; y--) {
+            if (newNodeData.getPoint(x) == e.getPoint(y)) {
+              indexForNewNode = x & 2, indexForNode = y & 2, found = true;
+            }
+          }
+        }
 
-                                for (int x=2; x>=1; x--)
-                                        for (int y=2; y>=1; y--)
-                                                if (newNodeData.getPoint(x) == e.getPoint(y))
-                                                        indexForNewNode = x & 2, indexForNode = y & 2, found = true;
-
-                                if (found) {
-                                        graph->addEdge(newNode, nnode, indexForNewNode, Galois::Graph::CHECK_CONFLICT);
-                                        graph->addEdge(nnode, newNode, indexForNode, Galois::Graph::CHECK_CONFLICT);
-                                        numNeighborsFound++;
-                                }
-                                if (numNeighborsFound == 2) {
-                                        break;
-                                }
-                        }
+        if (found) {
+          graph->addEdge(newNode, nnode, indexForNewNode,
+              Galois::Graph::CHECK_CONFLICT);
+          graph->addEdge(nnode, newNode, indexForNode, 
+              Galois::Graph::CHECK_CONFLICT);
+          numNeighborsFound++;
+        }
+        if (numNeighborsFound == 2) {
+          break;
+        }
+      }
 
       newNodes->push_back(nnode);
       Element& nnode_data = nnode.getData(Galois::Graph::NONE);
       //newElements.push_back(&nnode_data);
 
-                        Element& oldNodeData = oldNode.getData(Galois::Graph::NONE);
-                        std::vector<Tuple, std::allocator<Tuple> >& ntuples = nnode_data.getTuples();
-                        std::vector<Tuple, std::allocator<Tuple> >& tuples = oldNodeData.getTuples();
-                        if (!tuples.empty()) {
-                                std::vector<Tuple, std::allocator<Tuple> > newTuples;
-                                unsigned tSize = tuples.size();
-                                for (unsigned i=0; i<tSize; i++)
-                                {
-                                        Tuple t=tuples[i];
-                                        if (nnode_data.elementContains(t)) {
-                                                // nnode_data.addTuple(t);
-                                                ntuples.push_back(t);
-                                        }
-                                         else {
-                                                newTuples.push_back(t);
-                                        }
-                                }
+      Element& oldNodeData = oldNode.getData(Galois::Graph::NONE);
+      TupleList& ntuples = nnode_data.getTuples();
+      TupleList& tuples = oldNodeData.getTuples();
+      if (!tuples.empty()) {
+        TupleList newTuples;
+        unsigned tSize = tuples.size();
+        for (unsigned i=0; i<tSize; i++) {
+          Tuple t=tuples[i];
+          if (nnode_data.elementContains(t)) {
+            // nnode_data.addTuple(t);
+            ntuples.push_back(t);
+          } else {
+            newTuples.push_back(t);
+          }
+        }
 
-                                tuples.swap(newTuples);
-                        }
+        tuples.swap(newTuples);
+      }
     }
 
     deletingNodes.insert(node);
     dispatchTuples(newNodes);
-    for (GNodeSet::iterator setIter = deletingNodes.begin(); setIter != deletingNodes.end(); ++setIter) {
+    for (GNodeSet::iterator setIter = deletingNodes.begin();
+        setIter != deletingNodes.end(); ++setIter) {
       GNode dnode = *setIter;
       graph->removeNode(dnode, Galois::Graph::NONE);
     }
@@ -161,28 +164,28 @@ public:
 
   void dispatchTuples(GNodeVector* newNodes) {
     int size = newNodes->size();
-    for (GNodeSet::iterator iter = deletingNodes.begin(); iter != deletingNodes.end(); ++iter) {
+    for (GNodeSet::iterator iter = deletingNodes.begin();
+        iter != deletingNodes.end(); ++iter) {
       GNode dnode = *iter;
-      std::vector<Tuple, std::allocator<Tuple> >& tuples = dnode.getData(Galois::Graph::NONE).getTuples();
+      TupleList& tuples = dnode.getData(Galois::Graph::NONE).getTuples();
 
-                        unsigned tSize = tuples.size();
-                        for (unsigned j=0; j<tSize; j++)
-                        {
-                                Tuple tup=tuples[tSize-j-1];
+      unsigned tSize = tuples.size();
+      for (unsigned j=0; j<tSize; j++) {
+        Tuple tup=tuples[tSize-j-1];
 
-                                for (int i = 0; i < size; i++) {
-                                        Element& element = (*newNodes)[i].getData(Galois::Graph::NONE);
-                                        if ((element.elementContains(tup))) {
-                                                element.addTuple(tup);
-                                                if (i != 0) {
-                                                        GNode newNode = (*newNodes)[i];
-                                                        (*newNodes)[i] = (*newNodes)[0];
-                                                        (*newNodes)[0] = newNode;
-                                                }
-                                                break;
-                                        }
-                                }
-                        }
+        for (int i = 0; i < size; i++) {
+          Element& element = (*newNodes)[i].getData(Galois::Graph::NONE);
+          if ((element.elementContains(tup))) {
+            element.addTuple(tup);
+            if (i != 0) {
+              GNode newNode = (*newNodes)[i];
+              (*newNodes)[i] = (*newNodes)[0];
+              (*newNodes)[0] = newNode;
+            }
+            break;
+          }
+        }
+      }
     }
   }
 };
