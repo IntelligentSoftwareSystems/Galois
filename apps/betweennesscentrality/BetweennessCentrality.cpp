@@ -44,8 +44,6 @@ static const char* description =
 static const char* url = 0;
 static const char* help = "<input file> <number iterations>";
 
-//LCGraph should handle void edgedata
-// TODO(ddn): make undirected
 typedef Galois::Graph::LC_FileGraph<int, int> Graph;
 typedef Graph::GraphNode GNode;
 
@@ -55,18 +53,23 @@ int NumNodes;
 GaloisRuntime::PerCPU<std::vector<double> >* CB;
 
 struct process {
+  template<typename T>
+  struct PerIt {
+    typedef typename Galois::PerIterAllocTy::rebind<T>::other Ty;
+  };
+
   template<typename Context>
-  void operator()(GNode& _req, Context& lwl) {
-    
+  void operator()(GNode& _req, Context& ctx) {
     int initSize = NumNodes;
+    Galois::PerIterAllocTy& lalloc = ctx.getPerIterAlloc();
     
-    std::vector<GNode> SQ(initSize);
-    
-    std::vector<double> sigma(initSize);
-    std::vector<int> d(initSize);
+    std::vector<GNode,typename PerIt<GNode>::Ty> SQ(initSize, GNode(), lalloc);
+    std::vector<double,typename PerIt<double>::Ty> sigma(initSize, 0.0, lalloc);
+    std::vector<int,typename PerIt<int>::Ty> d(initSize, 0, lalloc);
  
-    typedef std::multimap<int,int> MMapTy;
-    MMapTy P;
+    typedef std::multimap<int,int, std::less<int>,
+            typename PerIt<std::pair<const int,int> >::Ty> MMapTy;
+    MMapTy P(std::lhess<int>(), lalloc);
     
     int QPush = 0;
     int QAt = 0;
@@ -131,7 +134,7 @@ struct process {
     lhs[i] += rhs[i];
 }
 
-// Verification for reference taurous graph inputs. 
+// Verification for reference torus graph inputs. 
 // All nodes should have the same betweenness value.
 void verify() {
     double sampleBC = 0.0;
@@ -144,7 +147,7 @@ void verify() {
       } else {
         double bc = CB->get()[i];
         if (!((bc - sampleBC) <= 0.0001)) {
-          std::cerr << "Verification failed! " << (bc - sampleBC) << std::endl;
+          std::cerr << "If torus graph, verification failed " << (bc - sampleBC) << std::endl;
 	  assert ((bc - sampleBC) <= 0.0001);
 	  return;
 	}
@@ -157,7 +160,7 @@ int main(int argc, const char** argv) {
 
   std::vector<const char*> args = parse_command_line(argc, argv, help);
 
-  if (args.size() > 2) {
+  if (args.size() < 1) {
     std::cerr
       << "incorrect number of arguments, use -help for usage information\n";
     return 1;
@@ -179,7 +182,7 @@ int main(int argc, const char** argv) {
     iterations = atoi(args[1]);
   }
 
-  std::cerr << "NumNodes = " << NumNodes 
+  std::cerr << "NumNodes: " << NumNodes 
     << " Iterations: " << iterations << "\n";
   std::vector<GNode> tmp;
   int cnt = 0;
@@ -188,7 +191,8 @@ int main(int argc, const char** argv) {
     if (cnt == iterations)
       break;
     // Only process nodes that actually have (out-)neighbors
-    if (std::distance(g.neighbor_begin(*ii, Galois::Graph::NONE), g.neighbor_end(*ii, Galois::Graph::NONE)) > 0) {
+    if (std::distance(g.neighbor_begin(*ii, Galois::Graph::NONE),
+          g.neighbor_end(*ii, Galois::Graph::NONE)) > 0) {
       cnt++;
       tmp.push_back(*ii);
     }
