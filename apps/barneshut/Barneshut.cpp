@@ -30,6 +30,7 @@
 #include "Galois/Statistic.h"
 #include "Lonestar/Banner.h"
 #include "Lonestar/CommandLine.h"
+#include <strings.h>
 
 namespace {
 const char* name = "Barnshut N-Body Simulator";
@@ -52,6 +53,7 @@ struct Point {
       case 2: return z;
     }
     assert(false && "index out of bounds");
+    abort();
   }
 
   double& operator[](const int index) {
@@ -61,6 +63,7 @@ struct Point {
       case 2: return z;
     }
     assert(false && "index out of bounds");
+    abort();
   }
 
   bool operator==(const Point& other) {
@@ -345,12 +348,10 @@ struct ComputeForces {
   OctreeInternal* top;
   double diameter;
   double root_dsq;
-  int step;
 
-  ComputeForces(OctreeInternal* _top, double _diameter, int _step) :
+  ComputeForces(OctreeInternal* _top, double _diameter) :
     top(_top),
-    diameter(_diameter),
-    step(_step) {
+    diameter(_diameter) {
     root_dsq = diameter * diameter * config.itolsq;
   }
   
@@ -362,10 +363,8 @@ struct ComputeForces {
       b.acc[i] = 0;
     //recurse(b, top, root_dsq);
     iterate(b, root_dsq);
-    if (step > 0) {
-      for (int i = 0; i < 3; i++)
-        b.vel[i] += (b.acc[i] - p[i]) * config.dthf;
-    }
+    for (int i = 0; i < 3; i++)
+      b.vel[i] += (b.acc[i] - p[i]) * config.dthf;
   }
 
   void recurse(Body& b, Body* node, double dsq) {
@@ -585,12 +584,15 @@ void run(int nbodies, int ntimesteps, int seed) {
     ComputeCenterOfMass computeCenterOfMass(top);
     computeCenterOfMass();
 
+    Galois::StatTimer T_parallel("ParallelTime");
+    T_parallel.start();
     Galois::setMaxThreads(numThreads);
 
     Galois::for_each<WL>(wrap(bodies.begin()), wrap(bodies.end()),
-        ComputeForces(top, box.diameter(), step));
+        ComputeForces(top, box.diameter()));
     Galois::for_each<WL>(wrap(bodies.begin()), wrap(bodies.end()),
         AdvanceBodies());
+    T_parallel.stop();
 
     std::cout 
       << "Timestep " << step
