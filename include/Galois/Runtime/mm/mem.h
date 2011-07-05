@@ -32,15 +32,18 @@
 
 #include "Galois/Runtime/SimpleLock.h"
 #include "Galois/Runtime/PerCPU.h"
-
+#include <boost/utility.hpp>
 #include <memory.h>
 
 //#define USEMALLOC
+#ifndef USEMALLOC
+#include <map>
+#endif
 
 namespace GaloisRuntime {
 namespace MM {
 
-//Base mmap wrapper
+//! Base mmap wrapper
 class mmapWrapper {
   static void* _alloc();
   static void _free(void*);
@@ -62,7 +65,7 @@ public:
 };
 
 
-//Per-thread heaps using Galois thread aware construct
+//! Per-thread heaps using Galois thread aware construct
 template<class LocalHeap>
 class ThreadAwarePrivateHeap {
   PerCPU<LocalHeap> heaps;
@@ -81,7 +84,7 @@ public:
   }
 };
 
-//Apply a lock to a heap
+//! Apply a lock to a heap
 template<class RealHeap>
 class LockedHeap : public RealHeap {
   SimpleLock<int, true> lock;
@@ -117,7 +120,7 @@ public:
   }
 };
 
-//Add a header to objects
+//! Add a header to objects
 template<typename Header, typename SourceHeap>
 class AddHeader : public SourceHeap {
   enum { offset = (sizeof(Header) + (sizeof(double) - 1)) & ~(sizeof(double) - 1) };
@@ -139,7 +142,7 @@ public:
   }
 };
 
-//Allow looking up parent heap pointers
+//! Allow looking up parent heap pointers
 template<class SourceHeap>
 class OwnerTaggedHeap : public AddHeader<void*, SourceHeap> {
   typedef AddHeader<OwnerTaggedHeap*, SourceHeap> Src;
@@ -160,7 +163,7 @@ public:
   }
 };
 
-//Maintain a freelist
+//! Maintain a freelist
 template<class SourceHeap>
 class FreeListHeap : public SourceHeap {
   struct FreeNode {
@@ -203,7 +206,7 @@ public:
 
 };
 
-//Maintain a freelist using a lock which doesn't cover SourceHeap
+//! Maintain a freelist using a lock which doesn't cover SourceHeap
 template<class SourceHeap>
 class SelfLockFreeListHeap : public SourceHeap {
   struct FreeNode {
@@ -333,7 +336,7 @@ public:
 
 };
 
-//This implements a bump pointer though chunks of memory
+//! This implements a bump pointer though chunks of memory
 template<typename SourceHeap>
 class SimpleBumpPtr : public SourceHeap {
 
@@ -391,8 +394,8 @@ public:
 
 };
 
-//This is the base source of memory for all allocators
-//It maintains a freelist of hunks acquired from the system
+//! This is the base source of memory for all allocators.
+//! It maintains a freelist of hunks acquired from the system
 class SystemBaseAlloc {
   static SelfLockFreeListHeap<mmapWrapper> Source;
 public:
@@ -421,24 +424,55 @@ public:
   }
 };
 
+class SizedAllocatorFactory: private boost::noncopyable {
+public:
 #ifdef USEMALLOC
-typedef MallocWrapper SizedAlloc;
-static MallocWrapper MasterAlloc;
-static SizedAlloc* getAllocatorForSize(unsigned int n) {
-  return &MasterAlloc;
-}
+  typedef MallocWrapper SizedAlloc;
+
+  SizedAlloc* getAllocatorForSize(unsigned int) {
+    return &MasterAlloc;
+  }
 #else
-typedef ThreadAwarePrivateHeap<FreeListHeap<SimpleBumpPtr<SystemBaseAlloc> > > SizedAlloc;
-SizedAlloc* getAllocatorForSize(unsigned int);
+  typedef ThreadAwarePrivateHeap<
+    FreeListHeap<SimpleBumpPtr<SystemBaseAlloc> > > SizedAlloc;
+  SizedAlloc* getAllocatorForSize(unsigned int);
 #endif
 
+  static SizedAllocatorFactory* getInstance() {
+    SizedAllocatorFactory* f = instance.getValue();
+    if (f)
+      return f;
+
+    instance.lock();
+    f = instance.getValue();
+    if (f) {
+      instance.unlock();
+    } else {
+      f = new SizedAllocatorFactory;
+      instance.unlock_and_set(f);
+    }
+    return f;
+  }
+
+private:
+  static PtrLock<SizedAllocatorFactory*, true> instance;
+#ifdef USEMALLOC
+  MallocWrapper MasterAlloc;
+#else
+  typedef std::map<unsigned int, SizedAlloc*> AllocatorsTy;
+  AllocatorsTy allocators;
+  SimpleLock<int, true> lock;
+  ~SizedAllocatorFactory();
+#endif
+};
+
 class FixedSizeAllocator {
-  SizedAlloc* alloc;
+  SizedAllocatorFactory::SizedAlloc* alloc;
   unsigned int size;
 public:
   FixedSizeAllocator(unsigned int sz) {
     size = sz;
-    alloc = getAllocatorForSize(sz);
+    alloc = SizedAllocatorFactory::getInstance()->getAllocatorForSize(sz);
   }
 
   inline void* allocate(unsigned int sz) {
