@@ -249,7 +249,7 @@ struct Configurator {
     NeedsBreak = Galois::needs_parallel_break<Function>::value,
     NeedsPush = !Galois::does_not_need_parallel_push<Function>::value,
     NeedsContext = !Galois::does_not_need_context<Function>::value,
-    NeedsPIA = 1
+    NeedsPIA = Galois::needs_per_iter_alloc<Function>::value
   };
 };
 

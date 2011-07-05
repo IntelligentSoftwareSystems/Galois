@@ -59,6 +59,8 @@ typedef Galois::Graph::FirstGraph<Element,void,false>::GraphNode GNode;
 Graph* mesh;
 
 struct process {
+  typedef int tt_needs_per_iter_alloc;
+
   template<typename Context>
   void operator()(GNode item, Context& lwl) {
     if (!mesh->containsNode(item))

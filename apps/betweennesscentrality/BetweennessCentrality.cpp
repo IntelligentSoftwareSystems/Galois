@@ -58,6 +58,8 @@ struct process {
     typedef typename Galois::PerIterAllocTy::rebind<T>::other Ty;
   };
 
+  typedef int tt_needs_per_iter_alloc;
+
   template<typename Context>
   void operator()(GNode& _req, Context& ctx) {
     int initSize = NumNodes;

@@ -52,6 +52,8 @@ typedef Galois::Graph::FirstGraph<Element,int,true>::GraphNode GNode;
 Graph* Mesh;
 
 struct process {
+  typedef int tt_needs_per_iter_alloc;
+
   template<typename Context>
   void operator()(GNode item, Context& lwl) {
     Element& data = item.getData(Galois::Graph::ALL); //lock
