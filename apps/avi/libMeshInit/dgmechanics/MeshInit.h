@@ -1,0 +1,307 @@
+/*
+ * MeshInit.h
+ *
+ *  Created on: Jun 17, 2011
+ *      Author: amber
+ */
+
+#ifndef MESHINIT_H_
+#define MESHINIT_H_
+
+#include <vector>
+#include <string>
+#include <algorithm>
+#include <exception>
+
+#include <cassert>
+#include <cmath>
+#include <cstdio>
+
+#include <boost/noncopyable.hpp>
+
+#include "AuxDefs.h"
+#include "StandardAVI.h"
+#include "Element.h"
+#include "Femap.h"
+#include "Material.h"
+#include "CoordConn.h"
+#include "TriLinearCoordConn.h"
+#include "TetLinearCoordConn.h"
+
+class MeshInit : boost::noncopyable {
+
+public:
+  typedef StandardAVI::BCFunc BCFunc;
+  typedef StandardAVI::BCImposedType BCImposedType;
+
+private:
+  static const double RHO = 1.0;
+  static const double MU = 0.5;
+  static const double LAMBDA = 0.0;
+  static const int PID = 0;
+
+  static const double DELTA = 0.1;
+  static const double T_INIT = 0.0;
+
+  // length of filenames
+  static const size_t MAX_FNAME = 1024;
+
+
+
+private:
+  double simEndTime;
+  bool wave;
+
+
+
+
+  LocalToGlobalMap* l2gMap;
+  CoordConn* cc;
+  SimpleMaterial* ile;
+
+  // vectors to keep track of all the memory
+  std::vector<ElementGeometry*> geomVec;
+  std::vector<Element*> elemVec;
+  std::vector<Residue*> massResidueVec;
+  std::vector<DResidue*> operationsVec;
+  std::vector<AVI*> aviVec;
+
+
+  std::vector<size_t> fieldsUsed;
+
+  double writeInc;
+  int writeInterval;
+  std::vector<size_t> aviWriteInterval;
+  FILE* syncFileWriter;
+
+private:
+  void stretchInternal (VecDouble& dispOrVel, bool isVel) const ;
+  void getBCs (const Element& e, std::vector< std::vector<BCImposedType> >& itypeMat, 
+      std::vector<BCFunc>&  bcfuncVec) const;
+
+  static bool computeDiffAVI (std::vector<AVI*> listA, std::vector<AVI*> listB, bool printDiff);
+
+  template <typename T>
+  static void destroyVecOfPtr (std::vector<T*>& vec) {
+    for (typename std::vector<T*>::iterator i = vec.begin (), ei = vec.end (); 
+        i != ei; ++i) {
+
+      delete *i;
+      *i = NULL;
+    }
+  }
+
+  void destroy () {
+
+    destroyVecOfPtr (geomVec);
+    destroyVecOfPtr (elemVec);
+    destroyVecOfPtr (massResidueVec);
+    destroyVecOfPtr (operationsVec);
+    destroyVecOfPtr (aviVec);
+
+    delete l2gMap;
+    delete cc;
+    delete ile;
+
+  }
+
+public:
+
+  MeshInit (double simEndTime, bool wave):
+    simEndTime (simEndTime), wave(wave) {
+
+    //TODO: writeInc should depend on simEndTime and 
+    // number of intervals intended
+    if (wave) {
+      this->writeInc = 0.005; // XXX: from testPAVI2D
+    }
+    else {
+      this->writeInc = 0.1;
+    }
+
+    writeInterval = 0;
+    syncFileWriter = NULL;
+
+  }
+
+  virtual ~MeshInit () {
+    destroy ();
+  }
+
+  void initializeMesh (const std::string& fileName, int ndiv);
+
+  virtual size_t getSpatialDim () const = 0;
+  virtual size_t getNodesPerElem () const = 0;
+
+  bool isWave () const { return wave; }
+
+  double getSimEndTime () const { return simEndTime; }
+
+  int getNumElements () const { return cc->getNumElements (); }
+  int getNumNodes () const { return cc->getNumNodes (); }
+
+  unsigned int getTotalNumDof () const { return l2gMap->getTotalNumDof (); }
+
+  const std::vector<AVI*>&  getAVIVec () const { return aviVec; }
+
+  const LocalToGlobalMap& getLocalToGlobalMap () const { return *l2gMap; }
+
+  void setupDisplacements (VecDouble& disp) const { stretchInternal (disp, false); }
+
+  void setupVelocities (VecDouble& vel) const { stretchInternal (vel, true); }
+
+  void writeSync (const AVI& avi, const VecDouble& Qval, const VecDouble&  Vbval, const VecDouble& Tval) ;
+
+  bool cmpState (const MeshInit& that) const { return computeDiffAVI (this->aviVec, that.aviVec, false); }
+
+  void printDiff (const MeshInit& that) const { computeDiffAVI (this->aviVec, that.aviVec, true); }
+
+
+
+protected:
+
+  virtual BCFunc getBCFunc (const double* coord) const = 0;
+  virtual CoordConn* makeCoordConn () const = 0;
+  virtual const double* getParam () const = 0;
+  virtual double initDisp (const double* coord, int f) const = 0;
+  virtual double initVel (const double* coord, int f) const = 0;
+  virtual size_t numFields () const = 0;
+
+};
+
+class TriMeshInit: public MeshInit {
+private:
+
+  static double topBC (int f, int a, double t) {
+    if (f == 0) {
+      return (0.1 * cos (t));
+    } else {
+      return (0.0);
+    }
+  }
+
+  static double botBC (int f, int a, double t) {
+    return (0.0);
+  }
+
+public:
+  static const double PARAM[];
+
+  TriMeshInit (double simEndTime, bool wave=false): MeshInit(simEndTime, wave) {
+  }
+
+
+  virtual size_t getSpatialDim () const {
+    return TriLinearTraits::SPD;
+  }
+  virtual size_t getNodesPerElem () const {
+    return TriLinearTraits::NODES_PER_ELEM;
+  }
+
+
+protected:
+
+
+  virtual CoordConn* makeCoordConn () const { return new TriLinearCoordConn(); }
+
+  virtual const double* getParam () const { return PARAM; }
+
+  virtual size_t numFields () const { return TriLinearTraits::NFIELDS;}
+
+  virtual BCFunc getBCFunc (const double* coord) const {
+    if (coord[0] == 0.0) {
+      return botBC;
+    } else if (coord[0] == 10.0) {
+      return topBC;
+    } else {
+      return NULL;
+    }
+  }
+
+  virtual double initDisp (const double* coord, int f) const {
+    double stretch;
+    if (f == 0) {
+      // XXX: some weird code???
+      stretch = coord[0] * 0.2 - 1.0;
+      stretch = coord[0] * 0.01 - 0.05;
+    } else {
+      stretch = coord[1] * 0.2 - 1.0;
+      stretch = coord[1] * 0.01 - 0.05;
+    }
+
+    return stretch;
+  }
+
+  virtual double initVel (const double* coord, int f) const {
+    if (coord[0] == 0.0) {
+      return 0.1;
+    } else {
+      return 0.0;
+    }
+  }
+
+};
+
+class TetMeshInit: public MeshInit {
+private:
+
+  static double topBC (int f, int a, double t) {
+    if (f == 2) {
+      return (0.1 * sin (t));
+    } else {
+      return (0.0);
+    }
+  }
+
+  static double botBC (int f, int a, double t) {
+    return (0.0);
+  }
+
+
+public:
+  static const double PARAM[];
+
+  TetMeshInit (double simEndTime, bool wave=false): MeshInit(simEndTime, wave) {
+  }
+
+
+  virtual size_t getSpatialDim () const {
+    return TetLinearTraits::SPD;
+  }
+  virtual size_t getNodesPerElem () const {
+    return TetLinearTraits::NODES_PER_ELEM;
+  }
+
+
+protected:
+
+
+  virtual CoordConn* makeCoordConn () const { return new TetLinearCoordConn(); }
+
+  virtual const double* getParam () const { return PARAM; }
+
+  virtual size_t numFields () const { return TetLinearTraits::NFIELDS;}
+
+  virtual BCFunc getBCFunc (const double* coord) const {
+    if (fabs (coord[0]) < 0.01) {
+      return botBC;
+    } else if (fabs (coord[0] - 5.0) < 0.01) {
+      return topBC;
+    } else {
+      return NULL;
+    }
+  }
+
+  virtual double initDisp (const double* coord, int f) const {
+    double stretch = coord[f] * 0.10 - 0.25;
+    return stretch;
+  }
+
+  virtual double initVel (const double* coord, int f) const {
+    return 0.0;
+  }
+
+};
+
+
+#endif /* MESHINIT_H_ */

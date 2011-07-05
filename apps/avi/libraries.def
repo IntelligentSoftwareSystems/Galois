@@ -1,0 +1,7 @@
+DGPLUS_LIBDIR	= -L${DGPLUS_HOME}/lib/${PETSC_ARCH}
+# DGPLUS_LIB  	= -lElOp -lElm -lMat -lFrc -lAVI
+DGPLUS_LIB  	= -lElOp -lElm -lMat  -lAVI
+DGPLUS_INC  	= -I${DGPLUS_HOME}/include
+BLASLAPACK_LIB  = /System/Library/Frameworks/vecLib.framework/vecLib
+# PARMETISINC =  standard
+PARMETISLIBS = -lparmetis

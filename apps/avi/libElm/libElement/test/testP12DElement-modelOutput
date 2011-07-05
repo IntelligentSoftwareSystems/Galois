@@ -1,0 +1,59 @@
+Number of fields: 2 should be 2
+Number of dof field(0): 3 should be 3
+Number of dof field(1): 3 should be 3
+Shape function values at quad points field(0):
+0.666667 0.166667 0.166667 0.166667 0.666667 0.166667 0.166667 0.166667 0.666667 
+Shape function values at quad points field(1):
+0.666667 0.166667 0.166667 0.166667 0.666667 0.166667 0.166667 0.166667 0.666667 
+Shape function derivatives values at quad points field(0):
+1 0 0 1 -1 -1 1 0 0 1 -1 -1 1 0 0 1 -1 -1 
+Shape function derivatives values at quad points field(1):
+1 0 0 1 -1 -1 1 0 0 1 -1 -1 1 0 0 1 -1 -1 
+Integration weight values at quad points field(0):
+0.166667 0.166667 0.166667 
+Integration weight values at quad points field(1):
+0.166667 0.166667 0.166667 
+Quad points coordinates for field(0):
+0.666667 0.166667 0.166667 0.666667 0.166667 0.166667 
+Quad points coordinates for field(1):
+0.666667 0.166667 0.166667 0.666667 0.166667 0.166667 
+Test Copy Constructor
+Number of fields: 2 should be 2
+Number of dof field(0): 3 should be 3
+Number of dof field(1): 3 should be 3
+Shape function values at quad points field(0):
+0.666667 0.166667 0.166667 0.166667 0.666667 0.166667 0.166667 0.166667 0.666667 
+Shape function values at quad points field(1):
+0.666667 0.166667 0.166667 0.166667 0.666667 0.166667 0.166667 0.166667 0.666667 
+Shape function derivatives values at quad points field(0):
+1 0 0 1 -1 -1 1 0 0 1 -1 -1 1 0 0 1 -1 -1 
+Shape function derivatives values at quad points field(1):
+1 0 0 1 -1 -1 1 0 0 1 -1 -1 1 0 0 1 -1 -1 
+Integration weight values at quad points field(0):
+0.166667 0.166667 0.166667 
+Integration weight values at quad points field(1):
+0.166667 0.166667 0.166667 
+Quad points coordinates for field(0):
+0.666667 0.166667 0.166667 0.666667 0.166667 0.166667 
+Quad points coordinates for field(1):
+0.666667 0.166667 0.166667 0.666667 0.166667 0.166667 
+Cloned element before destruction. Test cloning mechanism
+Number of fields: 2 should be 2
+Number of dof field(0): 3 should be 3
+Number of dof field(1): 3 should be 3
+Shape function values at quad points field(0):
+0.666667 0.166667 0.166667 0.166667 0.666667 0.166667 0.166667 0.166667 0.666667 
+Shape function values at quad points field(1):
+0.666667 0.166667 0.166667 0.166667 0.666667 0.166667 0.166667 0.166667 0.666667 
+Shape function derivatives values at quad points field(0):
+1 0 0 1 -1 -1 1 0 0 1 -1 -1 1 0 0 1 -1 -1 
+Shape function derivatives values at quad points field(1):
+1 0 0 1 -1 -1 1 0 0 1 -1 -1 1 0 0 1 -1 -1 
+Integration weight values at quad points field(0):
+0.166667 0.166667 0.166667 
+Integration weight values at quad points field(1):
+0.166667 0.166667 0.166667 
+Quad points coordinates for field(0):
+0.666667 0.166667 0.166667 0.666667 0.166667 0.166667 
+Quad points coordinates for field(1):
+0.666667 0.166667 0.166667 0.666667 0.166667 0.166667 

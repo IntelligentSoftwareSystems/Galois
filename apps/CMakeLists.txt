@@ -17,6 +17,7 @@ function(app name)
   endif(USE_NUMA)
 endfunction(app)
 
+add_subdirectory(avi)
 add_subdirectory(barneshut)
 add_subdirectory(betweennesscentrality)
 add_subdirectory(boruvka)

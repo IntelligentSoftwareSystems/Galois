@@ -1,0 +1,95 @@
+
+Print data before deleting original shapes
+
+
+Test BasisFunctionProvided
+Function values
+0.666667 0.166667 0.166667 0.166667 0.666667 0.166667 0.166667 0.166667 0.666667 
+Function derivative values
+1 0 0 1 -1 -1 1 0 0 1 -1 -1 1 0 0 1 -1 -1 
+Integration weights
+0.166667 0.166667 0.166667 
+Quadrature point coordinates
+0.666667 0.166667 0.166667 0.666667 0.166667 0.166667 
+
+
+Test BasisFunctionProvidedExternalQuad
+Function values
+0.666667 0.166667 0.166667 0.166667 0.666667 0.166667 0.166667 0.166667 0.666667 
+Function derivative values
+1 0 0 1 -1 -1 1 0 0 1 -1 -1 1 0 0 1 -1 -1 
+Integration weights
+0.166667 0.166667 0.166667 
+Quadrature point coordinates
+0.666667 0.166667 0.166667 0.666667 0.166667 0.166667 
+
+
+Test BasisFunctionProvidedExternalQuadNoShapes
+Function values
+
+Function derivative values
+1 0 0 1 -1 -1 1 0 0 1 -1 -1 1 0 0 1 -1 -1 
+Integration weights
+0.166667 0.166667 0.166667 
+Quadrature point coordinates
+0.666667 0.166667 0.166667 0.666667 0.166667 0.166667 
+
+
+Test Copy constructors
+
+
+Test BasisFunctionProvided
+Function values
+0.666667 0.166667 0.166667 0.166667 0.666667 0.166667 0.166667 0.166667 0.666667 
+Function derivative values
+1 0 0 1 -1 -1 1 0 0 1 -1 -1 1 0 0 1 -1 -1 
+Integration weights
+0.166667 0.166667 0.166667 
+Quadrature point coordinates
+0.166667 0.166667 0.166667 
+
+
+Test BasisFunctionProvidedExternalQuad
+Function values
+0.666667 0.166667 0.166667 0.166667 0.666667 0.166667 0.166667 0.166667 0.666667 
+Function derivative values
+1 0 0 1 -1 -1 1 0 0 1 -1 -1 1 0 0 1 -1 -1 
+Integration weights
+0.166667 0.166667 0.166667 
+Quadrature point coordinates
+0.666667 0.166667 0.166667 0.666667 0.166667 0.166667 
+
+
+Test cloning
+
+
+Test BasisFunctionProvided
+Function values
+0.666667 0.166667 0.166667 0.166667 0.666667 0.166667 0.166667 0.166667 0.666667 
+Function derivative values
+1 0 0 1 -1 -1 1 0 0 1 -1 -1 1 0 0 1 -1 -1 
+Integration weights
+0.166667 0.166667 0.166667 
+Quadrature point coordinates
+0.166667 0.166667 0.166667 
+
+
+Test BasisFunctionProvidedExternalQuad
+Function values
+0.666667 0.166667 0.166667 0.166667 0.666667 0.166667 0.166667 0.166667 0.666667 
+Function derivative values
+1 0 0 1 -1 -1 1 0 0 1 -1 -1 1 0 0 1 -1 -1 
+Integration weights
+0.166667 0.166667 0.166667 
+Quadrature point coordinates
+0.666667 0.166667 0.166667 0.666667 0.166667 0.166667 
+
+Print data  after deleted original shapes 
+Function values
+0.666667 0.166667 0.166667 0.166667 0.666667 0.166667 0.166667 0.166667 0.666667 
+Function derivative values
+1 0 0 1 -1 -1 1 0 0 1 -1 -1 1 0 0 1 -1 -1 
+Integration weights
+0.166667 0.166667 0.166667 
+Quadrature point coordinates
+0.666667 0.166667 0.166667 0.666667 0.166667 0.166667 
