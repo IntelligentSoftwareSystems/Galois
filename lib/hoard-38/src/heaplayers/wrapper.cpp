@@ -269,7 +269,7 @@ extern "C"  char * MYCDECL CUSTOM_GETCWD(char * buf, size_t size)
 #endif
 
 
-#ifndef	DISABLE_OVERLOADING
+#ifndef DISABLE_OVERLOADING
 #ifndef _NEW_INCLUDED_
 #define _NEW_INCLUDED_
 
