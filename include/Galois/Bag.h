@@ -27,6 +27,11 @@
 
 namespace Galois {
 
+/**
+ * Bag for only concurrent insertions. This data structure
+ * supports scalable concurrent pushes but reading the bag
+ * can only be done serially.
+ */
 template<typename T>
 class InsertBag: public GaloisRuntime::galois_insert_bag<T> {
 
