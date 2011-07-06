@@ -281,14 +281,14 @@ struct FindWork {
 
 template<Galois::Graph::MethodFlag flag, typename IncomingWL>
 void globalRelabel(IncomingWL& incoming) {
-  typedef GaloisRuntime::WorkList::dChunkedLIFO<8*1024> SimpleScheduler;
+  typedef GaloisRuntime::WorkList::dChunkedLIFO<1024> SimpleScheduler;
   Galois::for_each<SimpleScheduler>(app.graph.active_begin(),
       app.graph.active_end(),
       ResetHeights());
 
   Galois::StatTimer T("BfsTime");
   T.start();
-  typedef GaloisRuntime::WorkList::dChunkedFIFO<8*1024> WL;
+  typedef GaloisRuntime::WorkList::dChunkedFIFO<1024> WL;
   std::vector<GNode> single;
   single.push_back(app.sink);
   Galois::for_each<WL>(single.begin(), single.end(), UpdateHeights<flag>());
@@ -496,8 +496,7 @@ void initializePreflow(C& initial) {
 
 template<Galois::Graph::MethodFlag flag>
 void run() {
-  using namespace GaloisRuntime::WorkList;
-  typedef dChunkedFIFO<64> Chunk;
+  typedef GaloisRuntime::WorkList::dChunkedFIFO<256> Chunk;
 
   std::vector<GNode> initial;
   initializePreflow(initial);
