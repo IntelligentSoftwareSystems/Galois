@@ -1,12 +1,12 @@
 /*
- * AbstractDESmain.h
+ * DESabstractMain.h
  *
  *  Created on: Jun 24, 2011
  *      Author: amber
  */
 
-#ifndef _ABSTRACT_DES_MAIN_H_
-#define _ABSTRACT_DES_MAIN_H_
+#ifndef DES_ABSTRACT_MAIN_H_
+#define DES_ABSTRACT_MAIN_H_
 
 #include <iostream>
 #include <string>
@@ -32,9 +32,9 @@ static const char* url = "http://iss.ices.utexas.edu/lonestar/des.html";
 static const char* help = "<progname> netlistFile";
 
 /**
- * The Class AbstractDESmain holds common functionality for {@link DESunorderedSerial} and {@link DESunordered}.
+ * The Class DESabstractMain holds common functionality for {@link DESunorderedSerial} and {@link DESunordered}.
  */
-class AbstractDESmain {
+class DESabstractMain {
 public:
   typedef SimObject::Graph Graph;
   typedef SimObject::GNode GNode;
@@ -146,4 +146,4 @@ public:
 
 };
 
-#endif // _ABSTRACT_DES_MAIN_H_ 
+#endif // DES_ABSTRACT_MAIN_H_ 

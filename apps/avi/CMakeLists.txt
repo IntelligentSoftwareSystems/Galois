@@ -28,6 +28,13 @@ target_link_libraries(AVIunordered hoard)
 target_link_libraries(AVIunordered lapack)
 
 
+add_executable(AVIunorderedNoLock main/AVIunorderedNoLock.cpp  ${Sources})
+target_link_libraries(AVIunorderedNoLock galois) 
+target_link_libraries(AVIunorderedNoLock ${CMAKE_THREAD_LIBS_INIT}) 
+target_link_libraries(AVIunorderedNoLock hoard)
+target_link_libraries(AVIunorderedNoLock lapack)
+
+
 
 include_directories (libElm)
 include_directories (libElm/libQuad)

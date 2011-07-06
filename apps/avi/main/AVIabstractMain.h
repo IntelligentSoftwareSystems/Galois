@@ -47,7 +47,7 @@ static const char* description = "Elasto-dynamic simulation of a mesh with minim
 static const char* url = "http://iss.ices.utexas.edu/lonestar/pavi.html";
 
 class AVIabstractMain {
-protected:
+private:
   // TODO: add support for verifying from a file
   struct InputConfig {
 
@@ -57,10 +57,23 @@ protected:
     double simEndTime;
     std::string verifile;
 
-    InputConfig (const std::string& fileName, int spDim, int ndiv, double simEndTime, const std::string& verifile):
-      fileName (fileName), spDim (spDim), ndiv (ndiv), simEndTime (simEndTime), verifile (verifile) {
+    InputConfig (const std::string& fileName, int spDim, int ndiv, double simEndTime, const std::string& verifile)
+      :fileName (fileName), spDim (spDim), ndiv (ndiv), simEndTime (simEndTime), verifile (verifile) {
     }
   };
+
+private:
+  static const std::string getUsage ();
+
+  static void printUsage ();
+
+  static InputConfig readCmdLine (std::vector<const char*> args);
+
+  static MeshInit* initMesh (const InputConfig& input);
+
+  static void initGlobalVec (const MeshInit& meshInit, GlobalVec& g);
+
+protected:
 
 
   virtual const std::string getVersion () const = 0;
@@ -77,8 +90,6 @@ protected:
 
 public:
 
-  void verify (const InputConfig& input, const MeshInit& meshInit, const GlobalVec& g) const;
-
   /**
    *
    * @param meshInit
@@ -88,90 +99,12 @@ public:
    */
   virtual  void runLoop (MeshInit& meshInit, GlobalVec& g, bool createSyncFiles) = 0;
 
-
   void run (int argc, const char* argv[]);
 
-private:
-  static const std::string getUsage () {
-    std::stringstream ss;
-    ss << fileNameOpt << " fileName.neu " << spDimOpt << " spDim " << ndivOpt << " ndiv " 
-      << simEndTimeOpt << " simEndTime" << std::endl;
-    return ss.str ();
+  void verify (const InputConfig& input, const MeshInit& meshInit, const GlobalVec& g) const;
 
-  }
-
-  static void printUsage () {
-    fprintf (stderr, "%s\n", getUsage ().c_str ());
-    abort ();
-  }
-
-  static InputConfig readCmdLine (std::vector<const char*> args) {
-    const char* fileName = NULL;
-    int spDim = 2;
-    int ndiv = 0;
-    double simEndTime = 1.0;
-
-    if (args.size() == 0) {
-      printUsage ();
-    }
-
-    for (std::vector<const char*>::const_iterator i = args.begin (), e = args.end (); i != e; ++i) {
-      
-      if (std::string (*i) == fileNameOpt) {
-        ++i;
-        fileName = *i;
-
-      } else if (std::string (*i) == spDimOpt) {
-        ++i;
-        spDim = atoi (*i);
-
-      } else if (std::string (*i) == ndivOpt) {
-        ++i;
-        ndiv = atoi (*i);
-
-      } else if (std::string (*i) == simEndTimeOpt) {
-        ++i;
-        simEndTime = atof (*i);
-      } else {
-        fprintf (stderr, "Unkown option: %s\n Exiting ...\n", *i);
-        printUsage ();
-      }
-    }
-
-
-    
-    return InputConfig (fileName, spDim, ndiv, simEndTime, "");
-  }
-
-  static MeshInit* initMesh (const InputConfig& input) {
-    MeshInit* meshInit = NULL;
-
-    if (input.spDim == 2) {
-      meshInit = new TriMeshInit (input.simEndTime);
-    }
-    else if (input.spDim == 3) {
-      meshInit = new TetMeshInit (input.simEndTime);
-    }
-    else {
-      printUsage ();
-    }
-
-    // read in the mesh from file and setup the mesh, bc etc
-    meshInit->initializeMesh (input.fileName, input.ndiv);
-
-    return meshInit;
-  }
-
-  static void initGlobalVec (const MeshInit& meshInit, GlobalVec& g) {
-    if (meshInit.isWave ()) {
-      meshInit.setupVelocities (g.vecV);
-      meshInit.setupVelocities (g.vecV_b);
-    }
-    else {
-      meshInit.setupDisplacements (g.vecQ);
-    }
-  }
-
+  inline static void simulate (AVI* avi, MeshInit& meshInit,
+        GlobalVec& g, LocalVec& l, bool createSyncFiles);
 };
 
 class AVIorderedSerial: public AVIabstractMain {
@@ -189,6 +122,86 @@ public:
 
   virtual void runLoop (MeshInit& meshInit, GlobalVec& g, bool createSyncFiles);
 };
+
+const std::string AVIabstractMain::getUsage () {
+  std::stringstream ss;
+  ss << fileNameOpt << " fileName.neu " << spDimOpt << " spDim " << ndivOpt << " ndiv " 
+    << simEndTimeOpt << " simEndTime" << std::endl;
+  return ss.str ();
+
+}
+
+void AVIabstractMain::printUsage () {
+  fprintf (stderr, "%s\n", getUsage ().c_str ());
+  abort ();
+}
+
+AVIabstractMain::InputConfig AVIabstractMain::readCmdLine (std::vector<const char*> args) {
+  const char* fileName = NULL;
+  int spDim = 2;
+  int ndiv = 0;
+  double simEndTime = 1.0;
+
+  if (args.size() == 0) {
+    printUsage ();
+  }
+
+  for (std::vector<const char*>::const_iterator i = args.begin (), e = args.end (); i != e; ++i) {
+
+    if (std::string (*i) == fileNameOpt) {
+      ++i;
+      fileName = *i;
+
+    } else if (std::string (*i) == spDimOpt) {
+      ++i;
+      spDim = atoi (*i);
+
+    } else if (std::string (*i) == ndivOpt) {
+      ++i;
+      ndiv = atoi (*i);
+
+    } else if (std::string (*i) == simEndTimeOpt) {
+      ++i;
+      simEndTime = atof (*i);
+    } else {
+      fprintf (stderr, "Unkown option: %s\n Exiting ...\n", *i);
+      printUsage ();
+    }
+  }
+
+
+
+  return InputConfig (fileName, spDim, ndiv, simEndTime, "");
+}
+
+MeshInit* AVIabstractMain::initMesh (const AVIabstractMain::InputConfig& input) {
+  MeshInit* meshInit = NULL;
+
+  if (input.spDim == 2) {
+    meshInit = new TriMeshInit (input.simEndTime);
+  }
+  else if (input.spDim == 3) {
+    meshInit = new TetMeshInit (input.simEndTime);
+  }
+  else {
+    printUsage ();
+  }
+
+  // read in the mesh from file and setup the mesh, bc etc
+  meshInit->initializeMesh (input.fileName, input.ndiv);
+
+  return meshInit;
+}
+
+void AVIabstractMain::initGlobalVec (const MeshInit& meshInit, GlobalVec& g) {
+  if (meshInit.isWave ()) {
+    meshInit.setupVelocities (g.vecV);
+    meshInit.setupVelocities (g.vecV_b);
+  }
+  else {
+    meshInit.setupDisplacements (g.vecQ);
+  }
+}
 
 void AVIabstractMain::run (int argc, const char* argv[]) {
 
@@ -210,7 +223,6 @@ void AVIabstractMain::run (int argc, const char* argv[]) {
 
 
   initGlobalVec (*meshInit, g);
-
 
 
   // derived classes may have some data to initialze before running the loop
@@ -235,6 +247,7 @@ void AVIabstractMain::run (int argc, const char* argv[]) {
   delete meshInit;
 
 }
+
 
 void AVIabstractMain::verify (const InputConfig& input, const MeshInit& meshInit, const GlobalVec& g) const {
 
@@ -275,74 +288,81 @@ void AVIabstractMain::verify (const InputConfig& input, const MeshInit& meshInit
   }
 }
 
-void AVIorderedSerial::runLoop (MeshInit& meshInit, GlobalVec& g, bool createSyncFiles) {
-    // temporary matrices
-    int nrows = meshInit.getSpatialDim ();
-    int ncols = meshInit.getNodesPerElem ();
-    
-    LocalVec l(nrows, ncols);
-    
-    const LocalToGlobalMap& l2gMap = meshInit.getLocalToGlobalMap ();
 
-    const std::vector<AVI*>& aviList = meshInit.getAVIVec ();
+void AVIabstractMain::simulate (AVI* avi, MeshInit& meshInit,
+    GlobalVec& g, LocalVec& l, bool createSyncFiles) {
 
-    for (size_t i = 0; i < aviList.size (); ++i) {
-      assert (aviList[i]->getOperation ().getFields ().size () == meshInit.getSpatialDim());
-    }
-
-
-    std::priority_queue<AVI*, std::vector<AVI*>, AVIReverseComparator> pq;
-    for (std::vector<AVI*>::const_iterator i = aviList.begin (), e = aviList.end (); i != e; ++i) {
-      pq.push (*i);
-    }
-
-
-    int iter = 0;
-    while (!pq.empty ()) {
-
-      AVI* avi = pq.top ();
-      pq.pop ();
-
-      assert (avi != NULL);
-
-      if (createSyncFiles) {
-        meshInit.writeSync (*avi, g.vecQ, g.vecV_b, g.vecT);
-      }
-      
-      avi->gather (l2gMap, g.vecQ, g.vecV, g.vecV_b, g.vecT,
-          l.q, l.v, l.vb, l.ti);
-      
-      avi->computeLocalTvec (l.tnew);
-
-      if (avi->getTimeStamp () == 0.0) {
-        avi->vbInit (l.q, l.v, l.vb, l.ti, l.tnew,
-            l.qnew, l.vbinit,
-            l.forcefield, l.funcval, l.deltaV);
-        avi->update (l.q, l.v, l.vbinit, l.ti, l.tnew,
-            l.qnew, l.vnew, l.vbnew,
-            l.forcefield, l.funcval, l.deltaV);
-      }
-      else {
-        avi->update (l.q, l.v, l.vb, l.ti, l.tnew,
-            l.qnew, l.vnew, l.vbnew,
-            l.forcefield, l.funcval, l.deltaV);
-      }
-      
-      avi->incTimeStamp ();
-
-      avi->assemble (l2gMap, l.qnew, l.vnew, l.vbnew, l.tnew, g.vecQ, g.vecV, g.vecV_b, g.vecT, g.vecLUpdate);
-
-      if (avi->getNextTimeStamp () <= meshInit.getSimEndTime ()) {
-        pq.push (avi);
-      }
-
-      ++iter;
-    }
-
-
-    // printf ("iterations = %d, time taken (in ms) = %d, average time per iter = %g\n", iter, time, ((double)time)/iter);
-    printf ("iterations = %d\n", iter);
-    
+  if (createSyncFiles) {
+    meshInit.writeSync (*avi, g.vecQ, g.vecV_b, g.vecT);
   }
 
+  const LocalToGlobalMap& l2gMap = meshInit.getLocalToGlobalMap();
+
+  avi->gather (l2gMap, g.vecQ, g.vecV, g.vecV_b, g.vecT,
+      l.q, l.v, l.vb, l.ti);
+
+  avi->computeLocalTvec (l.tnew);
+
+  if (avi->getTimeStamp () == 0.0) {
+    avi->vbInit (l.q, l.v, l.vb, l.ti, l.tnew,
+        l.qnew, l.vbinit,
+        l.forcefield, l.funcval, l.deltaV);
+    avi->update (l.q, l.v, l.vbinit, l.ti, l.tnew,
+        l.qnew, l.vnew, l.vbnew,
+        l.forcefield, l.funcval, l.deltaV);
+  }
+  else {
+    avi->update (l.q, l.v, l.vb, l.ti, l.tnew,
+        l.qnew, l.vnew, l.vbnew,
+        l.forcefield, l.funcval, l.deltaV);
+  }
+
+  avi->incTimeStamp ();
+
+  avi->assemble (l2gMap, l.qnew, l.vnew, l.vbnew, l.tnew, g.vecQ, g.vecV, g.vecV_b, g.vecT, g.vecLUpdate);
+}
+
+void AVIorderedSerial::runLoop (MeshInit& meshInit, GlobalVec& g, bool createSyncFiles) {
+  // temporary matrices
+  int nrows = meshInit.getSpatialDim ();
+  int ncols = meshInit.getNodesPerElem ();
+
+  LocalVec l(nrows, ncols);
+
+  const std::vector<AVI*>& aviList = meshInit.getAVIVec ();
+
+  for (size_t i = 0; i < aviList.size (); ++i) {
+    assert (aviList[i]->getOperation ().getFields ().size () == meshInit.getSpatialDim());
+  }
+
+
+  std::priority_queue<AVI*, std::vector<AVI*>, AVIReverseComparator> pq;
+  for (std::vector<AVI*>::const_iterator i = aviList.begin (), e = aviList.end (); i != e; ++i) {
+    pq.push (*i);
+  }
+
+
+  int iter = 0;
+  while (!pq.empty ()) {
+
+    AVI* avi = pq.top ();
+    pq.pop ();
+
+    assert (avi != NULL);
+
+    AVIabstractMain::simulate (avi, meshInit, g, l, createSyncFiles);
+
+
+    if (avi->getNextTimeStamp () <= meshInit.getSimEndTime ()) {
+      pq.push (avi);
+    }
+
+    ++iter;
+  }
+
+
+  // printf ("iterations = %d, time taken (in ms) = %d, average time per iter = %g\n", iter, time, ((double)time)/iter);
+  printf ("iterations = %d\n", iter);
+
+}
 #endif // AVI_ABSTRACT_MAIN_H_ 

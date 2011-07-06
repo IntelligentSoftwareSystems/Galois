@@ -5,25 +5,24 @@
 #include "Galois/Runtime/WorkList.h"
 #include "Galois/util/Atomic.h"
 
-#include "AbstractDESmain.h"
+#include "DESabstractMain.h"
 
 using Galois::AtomicInteger;
-using Galois::AtomicBool;
 
-class DESunordered: public AbstractDESmain {
+class DESunordered: public DESabstractMain {
 
 
 
   struct process {
     Graph& graph;
-    std::vector<AtomicBool>& onWlFlags;
+    std::vector<bool>& onWlFlags;
     AtomicInteger& numEvents;
     AtomicInteger& numIter;
 
     
     process (
     Graph& graph,
-    std::vector<AtomicBool>& onWlFlags,
+    std::vector<bool>& onWlFlags,
     AtomicInteger& numEvents,
     AtomicInteger& numIter)
       : graph (graph), onWlFlags (onWlFlags), numEvents (numEvents), numIter (numIter) {}
@@ -59,9 +58,12 @@ class DESunordered: public AbstractDESmain {
           dstObj->updateActive ();
 
           if (dstObj->isActive ()) {
-            if (onWlFlags[dstObj->getId ()].cas (false, true)) {
+
+            if (!onWlFlags[dstObj->getId ()]) {
+              onWlFlags[dstObj->getId ()] = true;
               lwl.push (dst);
             }
+
           }
         }
 
@@ -71,7 +73,7 @@ class DESunordered: public AbstractDESmain {
           lwl.push (activeNode);
         }
         else {
-          onWlFlags[srcObj->getId ()].set (false);
+          onWlFlags[srcObj->getId ()] = false;
         }
 
         numIter.incrementAndGet();
@@ -87,12 +89,12 @@ class DESunordered: public AbstractDESmain {
     const std::vector<GNode>& initialActive = simInit.getInputNodes();
 
 
-    std::vector<AtomicBool> onWlFlags (simInit.getNumNodes ());
+    std::vector<bool> onWlFlags (simInit.getNumNodes (), false);
     // set onWlFlags for input objects
     for (std::vector<GNode>::const_iterator i = simInit.getInputNodes ().begin (), ei = simInit.getInputNodes ().end ();
         i != ei; ++i) {
       SimObject* srcObj = graph.getData (*i, Galois::Graph::NONE);
-      onWlFlags[srcObj->getId ()].set (true);
+      onWlFlags[srcObj->getId ()] = true;
     }
 
 

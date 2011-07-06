@@ -12,9 +12,9 @@
 
 #include <cassert>
 
-#include "AbstractDESmain.h"
+#include "DESabstractMain.h"
 
-class DESunorderedSerial: public AbstractDESmain {
+class DESunorderedSerial: public DESabstractMain {
 
   virtual bool isSerial () const { return true; }
 
