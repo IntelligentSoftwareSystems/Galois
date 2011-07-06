@@ -138,9 +138,9 @@ public:
       TupleList& tuples = oldNodeData.getTuples();
       if (!tuples.empty()) {
         TupleList newTuples;
-        unsigned tSize = tuples.size();
-        for (unsigned i=0; i<tSize; i++) {
-          Tuple t=tuples[i];
+        for(TupleList::iterator list_iter = tuples.begin(); list_iter != tuples.end(); ++list_iter)
+        {
+          Tuple t=*list_iter;
           if (nnode_data.elementContains(t)) {
             // nnode_data.addTuple(t);
             ntuples.push_back(t);
@@ -169,10 +169,9 @@ public:
       GNode dnode = *iter;
       TupleList& tuples = dnode.getData(Galois::Graph::NONE).getTuples();
 
-      unsigned tSize = tuples.size();
-      for (unsigned j=0; j<tSize; j++) {
-        Tuple tup=tuples[tSize-j-1];
-
+      for(TupleList::reverse_iterator list_iter = tuples.rbegin(), end = tuples.rend(); list_iter != end; ++list_iter)
+      {
+        Tuple tup=*list_iter;
         for (int i = 0; i < size; i++) {
           Element& element = (*newNodes)[i].getData(Galois::Graph::NONE);
           if ((element.elementContains(tup))) {

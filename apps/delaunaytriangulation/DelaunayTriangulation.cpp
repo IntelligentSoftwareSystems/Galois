@@ -110,7 +110,6 @@ void read_points(const char* filename, TupleList& tuples) {
   std::ifstream scanner(filename);
   scanner >> numPoints;
   tuples.clear();
-  tuples.resize(numPoints + 3);
 
   int dim;
   scanner >> dim;
@@ -133,7 +132,7 @@ void read_points(const char* filename, TupleList& tuples) {
       min_y = y;
     else if (y > max_y)
       max_y = y;
-    tuples[i] = Tuple(x, y, i);          
+    tuples.push_back(Tuple(x, y, i));
   }
   scanner.close();
 
@@ -143,9 +142,9 @@ void read_points(const char* filename, TupleList& tuples) {
   double centerX = min_x + width / 2.0;
   double centerY = min_y + height / 2.0;
 
-  tuples[numPoints] = Tuple(centerX, centerY + 3.0 * max_length, numPoints);
-  tuples[numPoints + 1] = Tuple(centerX - 3.0 * max_length, centerY - 2.0 * max_length, numPoints + 1);
-  tuples[numPoints + 2] = Tuple(centerX + 3.0 * max_length, centerY - 2.0 * max_length, numPoints + 2);
+  tuples.push_back(Tuple(centerX, centerY + 3.0 * max_length, numPoints));
+  tuples.push_back(Tuple(centerX - 3.0 * max_length, centerY - 2.0 * max_length, numPoints + 1));
+  tuples.push_back(Tuple(centerX + 3.0 * max_length, centerY - 2.0 * max_length, numPoints + 2));
 }
 
 void write_points(const char* filename, const TupleList& tuples) {
@@ -167,10 +166,15 @@ GNode make_graph(const char* filename) {
   TupleList tuples;
   read_points(filename, tuples);
   
-  Tuple& t1 = tuples[tuples.size() - 3];
-  Tuple& t2 = tuples[tuples.size() - 2];
-  Tuple& t3 = tuples[tuples.size() - 1];
-  
+  Tuple t1 = tuples.back();
+  tuples.pop_back();
+
+  Tuple t2 = tuples.back();
+  tuples.pop_back();
+
+  Tuple t3 = tuples.back();
+  tuples.pop_back();
+
   Mesh = new Graph();
   Element large_triangle(t1, t2, t3);
   GNode large_node = Mesh->createNode(large_triangle);
@@ -197,10 +201,6 @@ GNode make_graph(const char* filename) {
   Mesh->addEdge(border_node2, large_node, 0);
   Mesh->addEdge(border_node3, large_node, 0);
   
-  tuples.pop_back();
-  tuples.pop_back();
-  tuples.pop_back();
-
   large_node.getData().getTuples().swap(tuples);
 
   return large_node;
