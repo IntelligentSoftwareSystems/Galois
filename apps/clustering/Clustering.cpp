@@ -130,7 +130,7 @@ void runGaloisBody (std::vector<LeafNode*>* inLights) {
 	using namespace GaloisRuntime::WorkList;
 	std::set<NodeWrapper*> *wrappers = new std::set<NodeWrapper*>();
 	for (int i = 0; i < numLights; i++) {
-		std::cout<<"Serial "<<i<<" :: "<<(*(*inLights)[i])<<std::endl;
+//		std::cout<<"Serial "<<i<<" :: "<<(*(*inLights)[i])<<std::endl;
 		LeafNode * cp = new LeafNode((*inLights)[i]->getX(),(*inLights)[i]->getY(),(*inLights)[i]->getZ(), (*inLights)[i]->getDirX(), (*inLights)[i]->getDirY(), (*inLights)[i]->getDirZ());
 		(*copyLights)[i]=cp;
 		NodeWrapper *clusterWrapper = new NodeWrapper(*(*inLights)[i]);
@@ -139,21 +139,25 @@ void runGaloisBody (std::vector<LeafNode*>* inLights) {
 	}
 	//	launcher.startTiming();
 	Galois::StatTimer T;
-	T.start();
 	KdTree *kdTree = KdTree::createTree(&initialWorklist);
+	std::cout<<"Before ::" <<*kdTree<<std::endl;
+	T.start();
 	// O(1) operation, there is no copy of data but just the creation of an
 	// arraylist backed by 'initialWorklist'
 	std::set<NodeWrapper *> newWl;
 	std::map<NodeWrapper*, NodeWrapper*> matchings;
 	while (wrappers->size() > 1) {
+		std::cout<<"Beginning iteration "<<std::endl;
 		matchings.clear();
 		FindMatching f(kdTree, newWl,matchings);
 		Galois::for_each(wrappers->begin(),wrappers->end(), f);
+		std::cout<<"Found matching"<<std::endl;
 		PerformMatching p(kdTree, newWl,matchings, floatArr,clusterArr);
 		std::set<pair<NodeWrapper*,NodeWrapper*> > work;
 		for(std::map<NodeWrapper*,NodeWrapper*>::iterator it = matchings.begin(), itEnd = matchings.end(); it!=itEnd;it++)
 			work.insert(pair<NodeWrapper*,NodeWrapper*>((*it).first,(*it).second));
 		Galois::for_each(work.begin(),work.end(), p);
+		std::cout<<"Performed matching"<<std::endl;
 		wrappers->clear();
 		for(std::set<NodeWrapper*>::iterator itW = newWl.begin(), itWEnd = newWl.end();
 				itW!=itWEnd; itW++){
@@ -163,6 +167,7 @@ void runGaloisBody (std::vector<LeafNode*>* inLights) {
 
 	}
 	T.stop();
+	std::cout<<"Solution is ::" <<*kdTree<<std::endl;
 	{
 //		std::cout<<"verifying... "<<std::endl;
 //		NodeWrapper * retval = kdTree->getAny(0.5);

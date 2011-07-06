@@ -572,21 +572,21 @@ public:
 	//  bool remove(NodeWrapper * cluster, byte flags) {
 	bool remove(NodeWrapper *&cluster) {
 		//		std::cout << "Removing node " << (*cluster) << std::endl;
-		int ret=0;
-		for(int i=0; i<5;i++){
-		ret = removePoint(cluster, NULL, NULL);
-		if (ret == -2) {
-			assert(false&&"cannot remove cluster");
-		} else if (ret == -1) {
-			std::cout << "Retrying to remove" << std::endl;
-		} else if (ret == 0 || ret == 1) {
-			//			std::cout << "Done Removing node " << (*cluster) << std::endl;
-			return true;
-		} else {
-			assert(false&&"Runtime exception");
+		int ret = 0;
+		for (int i = 0; i < 5; i++) {
+			ret = removePoint(cluster, NULL, NULL);
+			if (ret == -2) {
+				assert(false&&"cannot remove cluster");
+			} else if (ret == -1) {
+				std::cout << "Retrying to remove" << std::endl;
+			} else if (ret == 0 || ret == 1) {
+				//			std::cout << "Done Removing node " << (*cluster) << std::endl;
+				return true;
+			} else {
+				assert(false&&"Runtime exception");
+			}
 		}
-		}
-		std::cout<<"Returned "<<ret<<std::endl;
+		std::cout << "Returned " << ret << std::endl;
 		assert(false&&"remove failed after repeated retries");
 
 	}
@@ -850,5 +850,15 @@ public:
 		}
 		return true;
 	}
+	friend std::ostream& operator<<(std::ostream &s, KdCell & c);
 };
+std::ostream& operator<<(std::ostream &s, KdCell & c) {
+	if (c.splitType == LEAF) {
+		s<<"Leaf : " << (*c.pointList)[0] << ", " << (*c.pointList)[1] << ", "<< (*c.pointList)[2] << ", " << (*c.pointList)[3];
+	}
+	else {
+		s<<"SUBTREE [\nLeft " << *c.leftChild << " \n Right " <<*c.rightChild<< "\nSUBTREEEND]";
+	}
+	return s;
+}
 #endif /* KDCELL_H_ */
