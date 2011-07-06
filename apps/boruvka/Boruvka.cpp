@@ -102,10 +102,11 @@ struct process {
 			}
 			for (Graph::neighbor_iterator dst = graph.neighbor_begin(src, Galois::Graph::NONE), edst = graph.neighbor_end(src, Galois::Graph::NONE);dst != edst; ++dst) {
 				numNeighbors++;
-				graph.getData(*dst);
+				int minNbrId = graph.getData(*dst).id;
+				
 				int w = graph.getEdgeData(src, *dst, Galois::Graph::NONE);
 				if(w<minEdgeWeight){
-					minNeighbor = &(*dst);
+					minNeighbor = &nodes[minNbrId];
 					minEdgeWeight = w;
 				}
 			}
