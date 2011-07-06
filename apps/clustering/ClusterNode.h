@@ -14,10 +14,10 @@ class ClusterNode: public AbstractNode {
 private:
 	AbstractNode * leftChild;
 	AbstractNode * rightChild;
+	vector<LeafNode*> *reps;
 	float boxRadiusX;
 	float boxRadiusY;
 	float boxRadiusZ;
-	vector<LeafNode*> *reps;
 	float coneDirX;
 	float coneDirY;
 	float coneDirZ;
@@ -26,6 +26,7 @@ private:
 public:
 	ClusterNode() {
 		leftChild = rightChild = NULL;
+		reps=NULL;
 	}
 	friend std::ostream & operator<<(std::ostream & s , ClusterNode & n);
 

@@ -57,6 +57,7 @@ public:
 	 * Creates a new instance of MLIntensity
 	 */
 	AbstractNode() {
+		timeVector=NULL;
 		startTime = -1; //deliberately invalid value
 		nodeIdAndFlags = -1 << ML_ID_SHIFT; //must be set to a correct value later
 	}

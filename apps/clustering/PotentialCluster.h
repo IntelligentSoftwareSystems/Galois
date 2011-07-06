@@ -12,11 +12,11 @@ class PotentialCluster{
 public:
 	  NodeWrapper *original;
 	  NodeWrapper  *closest;
-	  double clusterSize;
-	  PotentialCluster(NodeWrapper *original) {
+	  float clusterSize;
+	  PotentialCluster(NodeWrapper *&original) {
 	    this->original = original;
 	    closest = NULL;
-	    clusterSize = std::numeric_limits<double>::max();
+	    clusterSize = std::numeric_limits<float>::max();
 	  }
 };
 

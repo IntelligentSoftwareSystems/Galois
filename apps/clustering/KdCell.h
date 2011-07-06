@@ -12,6 +12,7 @@
 #include<algorithm>
 #include<vector>
 #include"KdTreeConflictManager.h"
+#include "Galois/Runtime/Context.h"
 
 #ifndef KDCELL_H_
 #define KDCELL_H_
@@ -23,7 +24,7 @@
 #define SPLIT_Z  2
 #define LEAF  3
 using namespace std;
-class KdCell {
+class KdCell : public GaloisRuntime::Lockable{
 public:
 	// only set for the root
 	KdTreeConflictManager * cm;
@@ -84,15 +85,22 @@ public:
 			(*pointList)[i] = NULL;
 		leftChild = NULL;
 		rightChild = NULL;
+		removedFromTree=false;
 	}
 
 	//special constructor used internally
 protected:
 	KdCell(int inSplitType, float inSplitValue) :
 		splitType(inSplitType), splitValue(inSplitValue) {
+		leftChild=rightChild=NULL;
 		//we don't set the bounding box as we assume it will be set next
 		pointList = (inSplitType == LEAF) ? new std::vector<NodeWrapper*>(
 				MAX_POINTS_IN_CELL) : NULL;
+		if(inSplitType==LEAF)
+		for(int i=0;i<MAX_POINTS_IN_CELL;i++)
+			(*pointList)[i]=NULL;
+		removedFromTree=false;
+
 	}
 public:
 	/**
@@ -100,7 +108,7 @@ public:
 	 * uninitialized cell (also tried to reuse any preallocated array for holding children)
 	 * Used during cell subdivision.
 	 */
-	KdCell *createNewBlankCell(int inSplitType, float inSplitValue) {
+	KdCell * createNewBlankCell(int inSplitType, float inSplitValue) {
 		return new KdCell(inSplitType, inSplitValue);
 	}
 
@@ -310,8 +318,7 @@ private:
 	 * we can pass in to reduce the allocation of additional temporary space.
 	 */
 protected:
-	static KdCell* subdivide(std::vector<NodeWrapper*> *list, int offset,
-			int size, float *floatArr, KdCell *factory) {
+	static KdCell* subdivide(std::vector<NodeWrapper*> *list, int offset,int size, float *floatArr, KdCell *const &factory) {
 		//		std::cout << "Starting subdivision with list size:: " << list->size() << ", off:" << offset << ", size: " << size << std::endl;//", floatArr:"<<floatArr->size()<<""<<std::endl;
 		if (size <= MAX_POINTS_IN_CELL) {
 			//If less than or equal to 4 nodes, then create a new bounding box and return it.
@@ -414,9 +421,8 @@ protected:
 		cell->yMax = yMax;
 		cell->zMin = zMin;
 		cell->zMax = zMax;
-		cell->leftChild = subdivide(list, offset, leftCount, floatArr, factory);
-		cell->rightChild = subdivide(list, offset + leftCount,
-				size - leftCount, floatArr, factory);
+		cell->leftChild = &(*subdivide(list, offset, leftCount, floatArr, factory));
+		cell->rightChild = &(*subdivide(list, offset + leftCount, size - leftCount, floatArr, factory));
 		cell->notifyContentsRebuilt(true);
 		return cell;
 	}
@@ -514,8 +520,7 @@ private:
 					(*fullList)[i] = (*pointList)[i];
 				//        System.arraycopy(pointList, 0, fullList, 0, numPoints);
 				(*fullList)[numPoints] = cluster;
-				KdCell *subtree = subdivide(fullList, 0, numPoints + 1, NULL,
-						this);
+				KdCell *subtree = subdivide(fullList, 0, numPoints + 1, NULL,this);
 				//substitute refined subtree for ourself by changing parent's child ptr
 				//        synchronized (parent)
 				{
@@ -576,7 +581,9 @@ public:
 		for (int i = 0; i < 5; i++) {
 			ret = removePoint(cluster, NULL, NULL);
 			if (ret == -2) {
-				assert(false&&"cannot remove cluster");
+				std::cout<<"Unable to remove "<<*cluster;
+				return false;
+//				assert(false&&"cannot remove cluster");
 			} else if (ret == -1) {
 				std::cout << "Retrying to remove" << std::endl;
 			} else if (ret == 0 || ret == 1) {
@@ -627,8 +634,7 @@ private:
 					{
 						//            synchronized (grandparent)
 						{
-							if (parent->removedFromTree
-									|| grandparent->removedFromTree) {
+							if (parent->removedFromTree|| grandparent->removedFromTree) {
 								//tree structure status, so retry op
 								return -1;
 							}
@@ -849,6 +855,9 @@ public:
 			}
 		}
 		return true;
+	}
+	KdCell & operator=(KdCell & other){
+		assert(false&&"Not implemented");
 	}
 	friend std::ostream& operator<<(std::ostream &s, KdCell & c);
 };

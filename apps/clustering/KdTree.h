@@ -37,22 +37,18 @@ private:
 public:
 	static KdTree *createTree(std::vector<NodeWrapper*> * inPoints) {
 		//	  std::cout<<"Creating tree with " << inPoints->size()<< " points"<<std::endl;
-		KdTree *root = (KdTree*) subdivide(inPoints, 0, inPoints->size(), NULL,
-				new KdTree());
+		KdTree *root = (KdTree*) subdivide(inPoints, 0, inPoints->size(), NULL, new KdTree());
 		root->cm = new KdTreeConflictManager();
 		return root;
 	}
 
-	NodeWrapper* findBestMatch(NodeWrapper *inLight) {
-		return findBestMatch(inLight, MethodFlagALL);
-	}
-
-	NodeWrapper* findBestMatch(NodeWrapper *inLight, unsigned char flags) {
-		//    bool checkConflict = GaloisRuntime.needMethodFlag(flags, MethodFlagCHECK_CONFLICT);
-		//    KdTreeConflictManager.LocalEntryLog finishedTail = checkConflict ? cm.readBestMatchProlog() : null;
+	NodeWrapper* findBestMatch(NodeWrapper *&inLight) {
+		acquire(this);
 		PotentialCluster *cluster = new PotentialCluster(inLight);
+//		std::cout<<"split type "<<splitType<<std::endl;
 		if (splitType == LEAF) {
 			findNearestRecursive(cluster);
+//			std::cout<<"split type is leaf"<<std::endl;
 		} else if (splitType == SPLIT_X) {
 			recurse(cluster, inLight->getX());
 		} else if (splitType == SPLIT_Y) {
@@ -60,17 +56,14 @@ public:
 		} else if (splitType == SPLIT_Z) {
 			recurse(cluster, inLight->getZ());
 		} else {
-			//      throw new RuntimeException();
-			std::cout << "Err in findBestMatch" << std::endl;
+			assert(false&&"Err in findBestMatch");
 		}
-		//    if (checkConflict) {
-		//      cm.bestMatchEpilog(cluster, finishedTail);
-		//    }
 		return cluster->closest;
 	}
 
 private:
-	void findNearestRecursive(PotentialCluster *potentialCluster) {
+	void findNearestRecursive(PotentialCluster *&potentialCluster) {
+		acquire(this);
 		if (!couldBeCloser(potentialCluster)) {
 			return;
 		}
@@ -104,7 +97,7 @@ private:
 	}
 
 private:
-	void recurse(PotentialCluster * potentialCluster, float which) {
+	void recurse(PotentialCluster *& potentialCluster, float which) {
 		//if its a interior node recurse on the closer child first
 		if (which <= splitValue) {
 			((KdTree*) leftChild)->findNearestRecursive(potentialCluster);
@@ -124,7 +117,7 @@ private:
 	 * @return true if an element could be closer, false otherwise
 	 */
 protected:
-	bool couldBeCloser(PotentialCluster * outCluster) {
+	bool couldBeCloser(PotentialCluster *& outCluster) {
 		//first check to see if we can prove that none of our contents could be closer than the current closest
 		NodeWrapper * from = outCluster->original;
 		//compute minumum offset to bounding box
@@ -140,7 +133,8 @@ protected:
 		float dz = a >= 0 ? a : 0;
 		//expand distance by half size of from's bounding box (distance is min to center of box)
 		//and by half the minimum bounding box extents of any node in this cell
-		dx += from->getHalfSizeX() + minHalfSizeX;
+		float t = from->getHalfSizeX();
+		dx += t+ minHalfSizeX;
 		dy += from->getHalfSizeY() + minHalfSizeY;
 		dz += from->getHalfSizeZ() + minHalfSizeZ;
 		//cone must be at least as big as the larger of from's and the smallest in this cell
