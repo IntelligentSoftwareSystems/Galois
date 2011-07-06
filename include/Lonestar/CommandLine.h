@@ -73,6 +73,7 @@ std::vector<const char*> parse_command_line(int argc, const char** argv, const c
           "[-t numThreads] use numThreads threads (1)\n",
           "[-noverify] skip verification\n",
           proghelp);
+      exit(0);
     } else {
       retval.push_back(argv[i]);
     }
