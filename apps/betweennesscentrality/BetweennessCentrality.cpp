@@ -31,12 +31,18 @@
 #include <fstream>
 #include <sstream>
 #include <map>
+#include <set>
 #include <stack>
 #include <queue>
 #include <vector>
 #include <cstdlib>
 
+#ifdef GALOIS_VTUNE
+#include "ittnotify.h"
+#endif
+
 #define DEBUG 0
+#define USE_MMAP 0 
 
 static const char* name = "Betweenness Centrality";
 static const char* description =
@@ -49,29 +55,39 @@ typedef Graph::GraphNode GNode;
 
 Graph* G;
 int NumNodes;
+  
 
 GaloisRuntime::PerCPU<std::vector<double> >* CB;
 
 struct process {
+  
   template<typename T>
-  struct PerIt {
-    typedef typename Galois::PerIterAllocTy::rebind<T>::other Ty;
-  };
+    struct PerIt {  
+      typedef typename Galois::PerIterAllocTy::rebind<T>::other Ty;
+    };
 
   typedef int tt_needs_per_iter_alloc;
 
   template<typename Context>
-  void operator()(GNode& _req, Context& ctx) {
+  void operator()(GNode& _req, Context& lwl) {
+    
     int initSize = NumNodes;
-    Galois::PerIterAllocTy& lalloc = ctx.getPerIterAlloc();
+    
+    Galois::PerIterAllocTy& lalloc = lwl.getPerIterAlloc();
     
     std::vector<GNode,typename PerIt<GNode>::Ty> SQ(initSize, GNode(), lalloc);
     std::vector<double,typename PerIt<double>::Ty> sigma(initSize, 0.0, lalloc);
     std::vector<int,typename PerIt<int>::Ty> d(initSize, 0, lalloc);
  
+#if USE_MMAP
     typedef std::multimap<int,int, std::less<int>,
             typename PerIt<std::pair<const int,int> >::Ty> MMapTy;
-    MMapTy P(std::less<int>(), lalloc);
+    MMapTy Succs(std::less<int>(), lalloc);
+#else
+//    std::cerr << "Not using mmap" << std::endl;
+    typedef std::vector<GNode, typename PerIt<GNode>::Ty> VecTy;
+    std::vector<VecTy*, typename PerIt<VecTy*>::Ty > Succs(NumNodes,  NULL, lalloc);
+#endif
     
     int QPush = 0;
     int QAt = 0;
@@ -101,24 +117,50 @@ struct process {
 	}
 	if (d[w] == d[v] + 1) {
 	  sigma[w] = sigma[w] + sigma[v];
-	  P.insert(std::pair<int, int>(w,v));
+#if USE_MMAP
+	  Succs.insert(std::pair<int, int>(v,w));
+#else
+	  VecTy * slist = Succs[v];
+	  if (slist == 0) {
+	    slist = new (lalloc.allocate(sizeof(VecTy))) VecTy(lalloc);
+	    Succs[v] = slist;
+	  }
+	  slist->push_back(w);
+#endif
 	}
       }
     }
     
-    std::vector<double> delta(NumNodes);
+    std::vector<double, typename PerIt<double>::Ty> delta(NumNodes, 0.0, lalloc);
+    --QAt;
     while (QAt) {
       int w = SQ[--QAt];
-      std::pair<MMapTy::iterator, MMapTy::iterator> ppp = P.equal_range(w);
       
       double sigma_w = sigma[w];
       double delta_w = delta[w];
 
+#if USE_MMAP
+      std::pair<MMapTy::iterator, MMapTy::iterator> ppp = Succs.equal_range(w);
       for (MMapTy::iterator ii = ppp.first, ee = ppp.second;
-	   ii != ee; ++ii) {
+	  ii != ee; ++ii) {
 	int v = ii->second;
-	delta[v] = delta[v] + (sigma[v]/sigma_w)*(1.0 + delta_w);
+	delta_w += (sigma_w/sigma[v])*(1.0 + delta[v]);
       }
+      delta[w] = delta_w;
+#else
+      VecTy *slist = Succs[w];
+      //std::cerr << "Processing node " << w << std::endl;
+      if (slist != NULL) {
+	VecTy::const_iterator it = slist->begin(); 
+	VecTy::const_iterator iend = slist->end();
+	while (it != iend) {
+	  GNode v = *it;
+	  delta_w += (sigma_w/sigma[v])*(1.0 + delta[v]);
+	  it++;
+	}
+	delta[w] = delta_w;
+      }
+#endif
       if (w != req) {
 	if (CB->get().size() < (unsigned int)w + 1)
 	  CB->get().resize(w+1);
@@ -129,7 +171,7 @@ struct process {
 };
 
 
-  void merge(std::vector<double>& lhs, std::vector<double>& rhs) {
+  void merge(std::vector<double >& lhs, std::vector<double>& rhs) {
     if (lhs.size() < rhs.size())
     lhs.resize(rhs.size());
   for (unsigned int i = 0; i < rhs.size(); i++)
@@ -160,7 +202,7 @@ void verify() {
 
 int main(int argc, const char** argv) {
 
-  std::vector<const char*> args = parse_command_line(argc, argv, help);
+  std::vector<const char* > args = parse_command_line(argc, argv, help);
 
   if (args.size() < 1) {
     std::cerr
@@ -171,14 +213,15 @@ int main(int argc, const char** argv) {
 
   Graph g;
   G = &g;
-  GaloisRuntime::PerCPU_merge<std::vector<double> > cb(merge);
-  CB = &cb;
 
   G->structureFromFile(args[0]);
   G->emptyNodeData();
 
   NumNodes = G->size();
-  
+
+  GaloisRuntime::PerCPU_merge<std::vector<double> > cb(merge);
+  CB = &cb;
+
   int iterations = NumNodes;
   if (args.size() == 2) {
     iterations = atoi(args[1]);
@@ -202,13 +245,13 @@ int main(int argc, const char** argv) {
   Galois::setMaxThreads(numThreads);
   Galois::StatTimer T;
   T.start();
-  Galois::for_each<GaloisRuntime::WorkList::ChunkedLIFO<16> >(tmp.begin(), tmp.end(), process());
+  Galois::for_each<GaloisRuntime::WorkList::LIFO<GNode> >(tmp.begin(), tmp.end(), process());
   T.stop();
 
   if (!skipVerify) {
     verify();
   } else { // print bc value for first 10 nodes
-    for (int i=0; i<10; ++i) 
+    for (int i=0; i<10; ++i)
       std::cout << i << ": " << CB->get()[i] << "\n";
   }
   return 0;
