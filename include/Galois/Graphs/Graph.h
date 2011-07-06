@@ -577,11 +577,13 @@ public:
     assert(N.ID);
     if (shouldLock(mflag))
       acquire(N.ID);
-    for (typename gNode::neighbor_iterator ii = N.ID->neighbor_begin(), ee =
-	   N.ID->neighbor_end(); ii != ee; ++ii) {
-      __builtin_prefetch(*ii);
-      if (shouldLock(mflag))
-	acquire(*ii);
+    if (shouldLock(mflag)) {
+      for (typename gNode::neighbor_iterator ii = N.ID->neighbor_begin(), ee =
+             N.ID->neighbor_end(); ii != ee; ++ii) {
+        //__builtin_prefetch(*ii);
+        //if (shouldLock(mflag))
+        acquire(*ii);
+      }
     }
     return boost::make_transform_iterator(N.ID->neighbor_begin(),
 					  makeGraphNodePtr(this));
@@ -590,10 +592,10 @@ public:
   //! Returns the end of the neighbor iterator 
   neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = ALL) {
     assert(N.ID);
-    if (shouldLock(mflag))
-      // Probably not necessary (no valid use for an end pointer should ever
-      // require it)
-      acquire(N.ID);
+    // Probably not necessary (no valid use for an end pointer should ever
+    // require it)
+    //if (shouldLock(mflag))
+    //  acquire(N.ID);
     return boost::make_transform_iterator(N.ID->neighbor_end(),
 					  makeGraphNodePtr(this));
   }
