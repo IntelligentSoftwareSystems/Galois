@@ -24,8 +24,9 @@
 
 #include"LeafNode.h"
 #include"NodeWrapper.h"
-#include<stdlib.h>
 #include"KdTree.h"
+#include"ClusteringSerial.h"
+#include<stdlib.h>
 static const char* name = "Agglomorative Clustering";
 static const char* description =
 "Computes the Minimal Spanning Tree using Boruvka\n";
@@ -33,8 +34,7 @@ static const char* url = "http://iss.ices.utexas.edu/lonestar/agglomerativeclust
 static const char* help = "[num points]";
 
 
-void loopBody(NodeWrapper * cluster, KdTree *kdTree, std::vector<NodeWrapper*> * wl, std::vector<ClusterNode*> *clusterArr, std::vector<
-		float> * floatArr);
+
 //*********************************************************************
 std::vector<LeafNode*> randomGenerate(int count) {
 	std::vector<LeafNode*> lights;
@@ -57,75 +57,19 @@ std::vector<LeafNode*> randomGenerate(int count) {
 	//	std::cout << "Done creating lights" << std::endl;
 	return lights;
 }
-//*********************************************************************
-void clustering(std::vector<LeafNode*> *inLights) {
-	//used to choose which light is the representative light
 
-	int tempSize = (1 << NodeWrapper::CONE_RECURSE_DEPTH) + 1;
-	std::vector<float> floatArr(3 * tempSize);
-	std::vector<ClusterNode *> clusterArr(tempSize);
-	int numLights = inLights->size();
-	std::vector<NodeWrapper*> initialWorklist(numLights);
-	for (int i = 0; i < numLights; i++) {
-		NodeWrapper * clusterWrapper = new NodeWrapper(*(*inLights)[i]);
-		initialWorklist[i] = clusterWrapper;
-	}
-	KdTree * kdTree = KdTree::createTree(&initialWorklist);
-	while (initialWorklist.size() > 0) {
-		NodeWrapper* currWork = initialWorklist.back();
-		initialWorklist.pop_back();
-		loopBody(currWork, kdTree, &initialWorklist, &clusterArr, &floatArr);
-	}
-	NodeWrapper *retval = kdTree->getAny(0.5);
-}
 //*********************************************************************
-struct findMatching {
+struct FindMatching {
 	KdTree * kdTree;
-	std::set<NodeWrapper*> *wrappers;
+	//std::set<NodeWrapper*> *wrappers;
 	std::set<NodeWrapper *> newWl;
-		std::map<NodeWrapper*, NodeWrapper*> matchings;
-	template<typename ContextTy>
-		void __attribute__((noinline)) operator()(NodeWrapper * curr, ContextTy& lwl) {
-		}
-};
-//*********************************************************************
-struct performMatching {
-	template<typename ContextTy>
-		void __attribute__((noinline)) operator()(pair<NodeWrapper *,NodeWrapper*> match, ContextTy& lwl) {
-		}
-};
-
-//*********************************************************************
-void loopBody(NodeWrapper * cluster, KdTree *kdTree, std::vector<NodeWrapper*> * wl, std::vector<ClusterNode*> *clusterArr, std::vector<
-		float> * floatArr) {
-	NodeWrapper *current = cluster;
-	while (current != NULL && kdTree->contains(current)) {
-		NodeWrapper *match = kdTree->findBestMatch(current);
-		if (match == NULL) {
-			break;
-		}
-		NodeWrapper *matchMatch = kdTree->findBestMatch(match);
-		if (current->equals(matchMatch)) {
-			if (kdTree->remove(match)) {
-				NodeWrapper *newCluster = new NodeWrapper(current, (match), *floatArr, *clusterArr);
-				wl->push_back(newCluster);
-				kdTree->add(newCluster);
-				kdTree->remove(current);
-			}
-			break;
-		} else {
-			if (current->equals(cluster)) {
-				wl->push_back(current);
-			}
-			current = match;
-		}
-	}
-}
-//******************************************************************************************
-void findMatchings(KdTree *& kdTree, std::set<NodeWrapper*> *&wrappers,std::set<NodeWrapper *> &newWl,
-		std::map<NodeWrapper*, NodeWrapper*> &matchings){
-	for (std::set<NodeWrapper*>::iterator it = wrappers->begin(), itEnd = wrappers->end(); it != itEnd; it++) {
-		NodeWrapper * cluster = *it;
+	std::map<NodeWrapper*, NodeWrapper*> matchings;
+	//FindMatching(KdTree *& pk, std::set<NodeWrapper*> *& pW, std::set<NodeWrapper*> & pNW, std::map<NodeWrapper*, NodeWrapper*> &pM):
+	FindMatching(KdTree *& pk, std::set<NodeWrapper*> & pNW, std::map<NodeWrapper*, NodeWrapper*> &pM):
+		kdTree(pk), newWl(pNW), matchings(pM)
+	{
+	}	template<typename ContextTy>
+	void __attribute__((noinline)) operator()(NodeWrapper * cluster, ContextTy& lwl) {
 		NodeWrapper *current = cluster;
 		while (current != NULL && kdTree->contains(current)) {
 			NodeWrapper *match = kdTree->findBestMatch(current);
@@ -145,49 +89,57 @@ void findMatchings(KdTree *& kdTree, std::set<NodeWrapper*> *&wrappers,std::set<
 		}
 
 	}
-}
-//******************************************************************************************
-void performMatchings(KdTree *& kdTree, std::set<NodeWrapper*> *&wrappers,std::set<NodeWrapper *> &newWl,
-		std::map<NodeWrapper*, NodeWrapper*> &matchings, std::vector<float>  &floatArr,  std::vector<ClusterNode *> &clusterArr){
-	for (std::map<NodeWrapper*, NodeWrapper*>::iterator itM = matchings.begin(), itMEnd = matchings.end(); itM != itMEnd; itM++) {
-
-		NodeWrapper *match = (*itM).second;
-		NodeWrapper *current = (*itM).first;
-		if (matchings.count((*itM).second))
-			if (match < current)
-				continue;
-		if (kdTree->remove(match)) {
-			NodeWrapper *newCluster = new NodeWrapper(current, (match), floatArr, clusterArr);
-			newWl.insert(newCluster);
-			kdTree->add(newCluster);
-			kdTree->remove(current);
+};
+//*********************************************************************
+struct PerformMatching {
+	KdTree *& kdTree;
+	//std::set<NodeWrapper*> *&wrappers;
+	std::set<NodeWrapper *> &newWl;
+	std::map<NodeWrapper*, NodeWrapper*> &matchings;
+	std::vector<float>  &floatArr;
+	std::vector<ClusterNode *> &clusterArr;
+	//PerformMatching(KdTree *& pk, std::set<NodeWrapper*> *& pW, std::set<NodeWrapper*> & pNW, std::map<NodeWrapper*, NodeWrapper*> &pM, std::vector<float> & pF, std::vector<ClusterNode*>& pC):
+	PerformMatching(KdTree *& pk, std::set<NodeWrapper*> & pNW, std::map<NodeWrapper*, NodeWrapper*> &pM, std::vector<float> & pF, std::vector<ClusterNode*>& pC):
+		kdTree(pk), newWl(pNW), matchings(pM), floatArr(pF), clusterArr(pC)
+	{
+	} 
+	template<typename ContextTy>
+		void __attribute__((noinline)) operator()(pair<NodeWrapper *,NodeWrapper*> &itM, ContextTy& lwl) {
+			NodeWrapper *match = (itM).second;
+			NodeWrapper *current = (itM).first;
+			if (matchings.count((itM).second))
+				if (match < current)
+					return;
+			if (kdTree->remove(match)) {
+				NodeWrapper *newCluster = new NodeWrapper(current, (match), floatArr, clusterArr);
+				newWl.insert(newCluster);
+				kdTree->add(newCluster);
+				kdTree->remove(current);
+			}
 		}
+};
 
-	}
-	wrappers->clear();
-	for(std::set<NodeWrapper*>::iterator itW = newWl.begin(), itWEnd = newWl.end();
-			itW!=itWEnd; itW++){
-		wrappers->insert(*itW);
-	}
-	newWl.clear();
-}
-//******************************************************************************************
-
-void serialClustering(std::vector<LeafNode*>* inLights) {
+//*********************************************************************
+void runGaloisBody (std::vector<LeafNode*>* inLights) {
 	int tempSize = (1 << NodeWrapper::CONE_RECURSE_DEPTH) + 1;
 	std::vector<float> floatArr(3 * tempSize);
 	std::vector<ClusterNode *> clusterArr(tempSize);
 	int numLights = inLights->size();
+	std::vector<LeafNode*> *copyLights = new std::vector<LeafNode*>(numLights);
 	std::vector<NodeWrapper*> initialWorklist(numLights);
+	using namespace GaloisRuntime::WorkList;
 	std::set<NodeWrapper*> *wrappers = new std::set<NodeWrapper*>();
 	for (int i = 0; i < numLights; i++) {
+		std::cout<<"Serial "<<i<<" :: "<<(*(*inLights)[i])<<std::endl;
+		LeafNode * cp = new LeafNode((*inLights)[i]->getX(),(*inLights)[i]->getY(),(*inLights)[i]->getZ(), (*inLights)[i]->getDirX(), (*inLights)[i]->getDirY(), (*inLights)[i]->getDirZ());
+		(*copyLights)[i]=cp;
 		NodeWrapper *clusterWrapper = new NodeWrapper(*(*inLights)[i]);
 		initialWorklist[i] = clusterWrapper;
 		wrappers->insert(clusterWrapper);
 	}
 	//	launcher.startTiming();
-	//Galois::StatTime T;
-	//T.start();
+	Galois::StatTimer T;
+	T.start();
 	KdTree *kdTree = KdTree::createTree(&initialWorklist);
 	// O(1) operation, there is no copy of data but just the creation of an
 	// arraylist backed by 'initialWorklist'
@@ -195,16 +147,33 @@ void serialClustering(std::vector<LeafNode*>* inLights) {
 	std::map<NodeWrapper*, NodeWrapper*> matchings;
 	while (wrappers->size() > 1) {
 		matchings.clear();
-		findMatchings(kdTree, wrappers,newWl,matchings);
-		performMatchings(kdTree,wrappers, newWl,matchings, floatArr,clusterArr);
+		FindMatching f(kdTree, newWl,matchings);
+		Galois::for_each(wrappers->begin(),wrappers->end(), f);
+		PerformMatching p(kdTree, newWl,matchings, floatArr,clusterArr);
+		std::set<pair<NodeWrapper*,NodeWrapper*> > work;
+		for(std::map<NodeWrapper*,NodeWrapper*>::iterator it = matchings.begin(), itEnd = matchings.end(); it!=itEnd;it++)
+			work.insert(pair<NodeWrapper*,NodeWrapper*>((*it).first,(*it).second));
+		Galois::for_each(work.begin(),work.end(), p);
+		wrappers->clear();
+		for(std::set<NodeWrapper*>::iterator itW = newWl.begin(), itWEnd = newWl.end();
+				itW!=itWEnd; itW++){
+			wrappers->insert(*itW);
+		}
+		newWl.clear();
+
 	}
-	//T.stop();
+	T.stop();
 	{
-		std::cout<<"verifying... "<<std::endl;
-		NodeWrapper * retval = kdTree->getAny(0.5);
+//		std::cout<<"verifying... "<<std::endl;
+//		NodeWrapper * retval = kdTree->getAny(0.5);
+//		AbstractNode * serialVal = serialClustering(copyLights);
+//		if(serialVal->equals(*retval->light)==false)
+//			std::cout<<"Invalid output!";
 	}
 
 }
+//
+
 //******************************************************************************************
 
 int main(int argc, const char **argv) {
@@ -225,7 +194,8 @@ int main(int argc, const char **argv) {
 
 	std::vector<LeafNode*> points = randomGenerate(numPoints);
 	std::cout << "Generated random points " << numPoints << std::endl;
-	serialClustering(&points);
+	//serialClustering(&points);
+	runGaloisBody(&points);
 	std::cout << "Terminated normally" << std::endl;
 	return 0;
 }

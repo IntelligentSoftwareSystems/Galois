@@ -76,8 +76,10 @@ public:
 		coneDirs = NULL;
 		coneClusters = NULL;
 		setBox(inNode.getX(), inNode.getY(), inNode.getZ());
-		if (dirBox == NULL) {
+//		if (dirBox == NULL)
+		{
 			dirBox = new Box3d();
+			assert(dirBox!=NULL);
 		}
 		dirBox->setBox(inNode.getDirX(), inNode.getDirY(), inNode.getDirZ());
 		coneCos = 1.0f;
