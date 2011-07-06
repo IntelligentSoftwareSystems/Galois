@@ -528,6 +528,36 @@ public:
     }
   }
 
+  /**
+    * Returns the edge data associated with the edge if the edge exists, otherwise it add an edge with
+    * the edge data created by default constructor for a non-existent edge.
+    */
+   edge_reference getOrCreateEdge(GraphNode src, GraphNode dst,
+       MethodFlag mflag = ALL) const {
+     assert(src.ID);
+     assert(dst.ID);
+
+     if (shouldLock(mflag))
+       acquire(src.ID);
+
+     if (Directional) {
+       return src.ID->getOrCreateEdge(dst.ID);
+     } else {
+       if (shouldLock(mflag))
+ 	acquire(dst.ID);
+
+       if (src < dst){
+    	   dst.ID->getOrCreateEdge(src.ID);
+           return src.ID->getOrCreateEdge(dst.ID);
+       }
+       else{
+    	   src.ID->getOrCreateEdge(dst.ID);
+    	   return dst.ID->getOrCreateEdge(src.ID);
+
+       }
+     }
+   }
+
   //// General Things ////
 
   //! Returns the number of neighbors
