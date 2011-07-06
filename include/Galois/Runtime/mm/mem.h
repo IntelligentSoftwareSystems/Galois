@@ -483,6 +483,10 @@ public:
   inline void deallocate(void* ptr) {
     alloc->deallocate(ptr);
   }
+
+  inline bool operator!=(const FixedSizeAllocator& rhs) const {
+    return size != rhs.size;
+  }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -545,6 +549,10 @@ public:
   }
   
   size_type max_size() const throw() { return 1; }
+
+  bool operator!=(const FSBGaloisAllocator& rhs) const {
+    return Alloc != rhs.Alloc;
+  }
 };
 
 //Keep a reference to an external allocator
