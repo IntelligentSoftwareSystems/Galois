@@ -81,7 +81,9 @@ private:
       for(unsigned int i =0; i<pointList->size();i++) {
     	  NodeWrapper *aPointList = (*pointList)[i];
         if (aPointList != NULL && aPointList != potentialCluster->original) {
-          double size = NodeWrapper::potentialClusterSize(from, aPointList);
+//        	std::cout<<"A Point list :: " <<aPointList<<" val : "<< *aPointList<<std::endl;
+//        	std::cout<<"A Point list :: " <<aPointList<<" val : "<<std::endl;
+          double size = NodeWrapper::potentialClusterSize(*from, *aPointList);
           if (size < potentialCluster->clusterSize) {
             potentialCluster->closest = aPointList;
             potentialCluster->clusterSize = size;

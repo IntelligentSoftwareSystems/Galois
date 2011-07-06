@@ -1,35 +1,20 @@
-/** A cell -*- C++ -*-
- * @file
- * @section License
+/*
+ * KdCell.h
  *
- * Galois, a framework to exploit amorphous data-parallelism in irregular
- * programs.
- *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
- *
- * @author Rashid Kaleem <rashid@cs.utexas.edu>
+ *  Created on: Jun 22, 2011
+ *      Author: rashid
  */
+#include<iostream>
+#include<stdlib.h>
+#include<limits>
+#include<math.h>
+#include<assert.h>
+#include<algorithm>
+#include<vector>
+#include"KdTreeConflictManager.h"
+
 #ifndef KDCELL_H_
 #define KDCELL_H_
-
-#include <stdlib.h>
-#include <limits>
-#include <math.h>
-#include <assert.h>
-#include <algorithm>
-#include <vector>
-#include "KdTreeConflictManager.h"
 
 #define MAX_POINTS_IN_CELL 4
 #define RETRY_LIMIT 100
@@ -40,23 +25,13 @@
 using namespace std;
 class KdCell {
 public:
-	// private Logger logger = Logger.getLogger("apps.clustering");
-	// private boolean isFineLoggable = Logger.getLogger("apps.clustering").isLoggable(Level.FINE);
-
 	// only set for the root
 	KdTreeConflictManager * cm;
 
 private:
-	//	static const int MAX_POINTS_IN_CELL;//= 4;
-	//	static const int RETRY_LIMIT;// = 100;
 	bool removedFromTree;
 
-public:
-	//	static const int SPLIT_X;// = 0;
-	//	static const int SPLIT_Y;// = 1;
-	//	static const int SPLIT_Z;// = 2;
-	//	static const int LEAF;// = 3;
-
+protected:
 	//bounding box of points contained in this cell (and all descendents)
 	float xMin;
 	float yMin;
@@ -73,7 +48,28 @@ public:
 	//else if its not a leaf node, we need children
 	KdCell *leftChild;
 	KdCell *rightChild;
+public:
 	//set to true when a node is removed from the main kdtree
+	bool isEqual(KdCell * other) {
+		if (xMin != other->xMin)
+			return false;
+		if (yMin != other->yMin)
+			return false;
+		if (zMin != other->zMin)
+			return false;
+		if (xMax != other->xMax)
+			return false;
+		if (yMax != other->yMax)
+			return false;
+		if (zMax != other->zMax)
+			return false;
+		if (splitType != other->splitType)
+			return false;
+		if (this->splitType == LEAF)
+			return true;
+		return leftChild->isEqual(other->leftChild) && rightChild->isEqual(other->rightChild);
+
+	}
 public:
 	/**
 	 * Create a new empty KDTree
@@ -81,21 +77,22 @@ public:
 	KdCell() :
 		splitType(LEAF), splitValue(std::numeric_limits<float>::max()) {
 		xMin = yMin = zMin = std::numeric_limits<float>::max();
-		xMax = yMax = zMax = std::numeric_limits<float>::min();
+		xMax = yMax = zMax = (-1 * std::numeric_limits<float>::max());
 		pointList = new std::vector<NodeWrapper*>(MAX_POINTS_IN_CELL);
+		for (int i = 0; i < MAX_POINTS_IN_CELL; i++)
+			(*pointList)[i] = NULL;
 		leftChild = NULL;
 		rightChild = NULL;
 	}
 
 	//special constructor used internally
-
+protected:
 	KdCell(int inSplitType, float inSplitValue) :
 		splitType(inSplitType), splitValue(inSplitValue) {
 		//we don't set the bounding box as we assume it will be set next
-		pointList = (inSplitType == LEAF) ? new std::vector<NodeWrapper*>(
-				MAX_POINTS_IN_CELL) : NULL;
+		pointList = (inSplitType == LEAF) ? new std::vector<NodeWrapper*>(MAX_POINTS_IN_CELL) : NULL;
 	}
-
+public:
 	/**
 	 * We provide this factory method so that KDCell can be subclassed.  Returns a new
 	 * uninitialized cell (also tried to reuse any preallocated array for holding children)
@@ -157,18 +154,17 @@ private:
 	}
 
 	bool recomputeLeafBoundingBoxIfChanges() {
-		float xMinNew = std::numeric_limits<float>::max(), yMinNew =
-				std::numeric_limits<float>::max(), zMinNew =
-				std::numeric_limits<float>::max();
-		float xMaxNew = std::numeric_limits<float>::min(), yMaxNew =
-				std::numeric_limits<float>::min(), zMaxNew =
-				std::numeric_limits<float>::min();
-		for (std::vector<NodeWrapper*>::iterator it = pointList->begin(),
-				itEnd = pointList->end(); it != itEnd; ++it) {
+		float xMinNew = std::numeric_limits<float>::max();
+		float yMinNew = std::numeric_limits<float>::max();
+		float zMinNew = std::numeric_limits<float>::max();
+		float xMaxNew = (-1 * std::numeric_limits<float>::max());
+		float yMaxNew = (-1 * std::numeric_limits<float>::max());
+		float zMaxNew = (-1 * std::numeric_limits<float>::max());
+		for (std::vector<NodeWrapper*>::iterator it = pointList->begin(), itEnd = pointList->end(); it != itEnd; ++it) {
 			if (*it == NULL) {
 				continue;
 			}
-			NodeWrapper *pt = *it;
+			NodeWrapper * pt = (*it);
 			float x = pt->getX();
 			float y = pt->getY();
 			float z = pt->getZ();
@@ -179,8 +175,7 @@ private:
 			yMaxNew = std::max(y, yMaxNew);
 			zMaxNew = std::max(z, zMaxNew);
 		}
-		return updateBoundingBox(xMinNew, yMinNew, zMinNew, xMaxNew, yMaxNew,
-				zMaxNew);
+		return updateBoundingBox(xMinNew, yMinNew, zMinNew, xMaxNew, yMaxNew, zMaxNew);
 	}
 
 	bool recomputeParentBoundingBoxIfChanges() {
@@ -192,12 +187,10 @@ private:
 		float yMaxNew = std::max(left->yMax, right->yMax);
 		float zMinNew = std::min(left->zMin, right->zMin);
 		float zMaxNew = std::max(left->zMax, right->zMax);
-		return updateBoundingBox(xMinNew, yMinNew, zMinNew, xMaxNew, yMaxNew,
-				zMaxNew);
+		return updateBoundingBox(xMinNew, yMinNew, zMinNew, xMaxNew, yMaxNew, zMaxNew);
 	}
 
-	bool updateBoundingBox(float xMinNew, float yMinNew, float zMinNew,
-			float xMaxNew, float yMaxNew, float zMaxNew) {
+	bool updateBoundingBox(float xMinNew, float yMinNew, float zMinNew, float xMaxNew, float yMaxNew, float zMaxNew) {
 		bool retval = false;
 		if (xMinNew != xMin) {
 			xMin = xMinNew;
@@ -230,12 +223,12 @@ private:
 	 * Computes this cells bounding box to just contain the specified points
 	 */
 	void computeBoundingBoxFromPoints(std::vector<NodeWrapper*> *list, int size) {
-		float   xMinNew = std::numeric_limits<float>::max(),
-				yMinNew = std::numeric_limits<float>::max(),
-				zMinNew = std::numeric_limits<float>::max();
-		float xMaxNew = std::numeric_limits<float>::min(),
-			  yMaxNew =	std::numeric_limits<float>::min(),
-			  zMaxNew = std::numeric_limits<float>::min();
+		float xMinNew = std::numeric_limits<float>::max();
+		float yMinNew = std::numeric_limits<float>::max();
+		float zMinNew = std::numeric_limits<float>::max();
+		float xMaxNew = (-1 * std::numeric_limits<float>::max());
+		float yMaxNew = (-1 * std::numeric_limits<float>::max());
+		float zMaxNew = (-1 * std::numeric_limits<float>::max());
 		for (int i = 0; i < size; i++) {
 			float x = (*list)[i]->getX();
 			float y = (*list)[i]->getY();
@@ -259,26 +252,16 @@ private:
 	 * Return the appropriate splitting component (x,y, or z) which is relevant for this node
 	 */
 	static float findSplitComponent(NodeWrapper * cluster, int splitType) {
-		float retVal = 0;
 		switch (splitType) {
 		case SPLIT_X:
-//			return cluster->getX();
-//			std::cout << "X  ";
-			retVal  = cluster->getX();
-			break;
+			return cluster->getX();
 		case SPLIT_Y:
-//			std::cout << "Y  ";
-			retVal  =  cluster->getY();
-			break;
+			return cluster->getY();
 		case SPLIT_Z:
-//			std::cout << "Z  ";
-			retVal  =  cluster->getZ();
-			break;
+			return cluster->getZ();
 		default:
 			std::cout << "Error in findSplitComponent!!!" << std::endl;
 		}
-//		std::cout<<"Find split component " << retVal << std::endl;
-		return retVal;
 	}
 
 	/**
@@ -287,19 +270,17 @@ private:
 	 * which fell below the plane.
 	 */
 private:
-	static int splitList(std::vector<NodeWrapper*>* list, int startIndex,int size, float splitValue, int splitType) {
+	static int splitList(std::vector<NodeWrapper*>* list, int startIndex, int size, float splitValue, int splitType) {
 		int lo = startIndex;
 		int hi = startIndex + size - 1;
 		//split into a low group that contains all points <= the split value and
 		//a high group with all the points > the split value
 		//note: after splitting, (lo - startIndex) will be the size of the low group
 		while (lo <= hi) {
-			while (lo <= hi && splitValue >= findSplitComponent((*list)[lo],
-					splitType)) {
+			while (lo <= hi && splitValue >= findSplitComponent((*list)[lo], splitType)) {
 				lo++;
 			}
-			while (lo <= hi && splitValue < findSplitComponent((*list)[hi],
-					splitType)) {
+			while (lo <= hi && splitValue < findSplitComponent((*list)[hi], splitType)) {
 				hi--;
 			}
 			if (lo < hi) {
@@ -319,28 +300,38 @@ private:
 	 * we can pass in to reduce the allocation of additional temporary space.
 	 */
 protected:
-	static KdCell* subdivide(std::vector<NodeWrapper*> *list, int offset,int size, float *floatArr, KdCell *factory) {
-		std::cout<<"Starting subdivision with list size:: "<<list->size()<<", off:"<< offset<<", size: "<<size<<std::endl;//", floatArr:"<<floatArr->size()<<""<<std::endl;
+	static KdCell* subdivide(std::vector<NodeWrapper*> *list, int offset, int size, float *floatArr, KdCell *factory) {
+		//		std::cout << "Starting subdivision with list size:: " << list->size() << ", off:" << offset << ", size: " << size << std::endl;//", floatArr:"<<floatArr->size()<<""<<std::endl;
 		if (size <= MAX_POINTS_IN_CELL) {
 			//If less than or equal to 4 nodes, then create a new bounding box and return it.
-			KdCell * cell = factory->createNewBlankCell(LEAF,std::numeric_limits<float>::max());
-			for (int i = 0; i <= size; i++)
-				(*(cell->pointList))[i] = (*list)[offset + i];
+			KdCell * cell = factory->createNewBlankCell(LEAF, std::numeric_limits<float>::max());
+			//			std::cout<<"Copying to a new BlankCell "<<std::endl;
+			for (int i = 0; i < size; i++) {
+				NodeWrapper * temp = (*list)[offset + i];
+				//TODO : remove temporary!
+				if (temp == NULL) {
+					std::cout << "NULL!!! Copy :: " << (*temp) << std::endl;
+					assert(false&& "Should not get here, attempting to copy a null node.");
+				}
+				//				std::cout << "In subdivide leaf case " << temp << std::endl;
+				(*(cell->pointList))[i] = temp;
+			}
 			cell->computeBoundingBoxFromPoints(cell->pointList, size);
 			cell->notifyContentsRebuilt(true);
 			return cell;
 		}
 		//otherwise its an interior node and we need to choose a split plane
 		if (floatArr == NULL) {
-			floatArr = new float [size];
+			floatArr = new float[size];
 		}
 		//compute bounding box of points
-		float xMin = std::numeric_limits<float>::max(),
-			  yMin = std::numeric_limits<float>::max(),
-			  zMin = std::numeric_limits<float>::max();
-		float xMax = std::numeric_limits<float>::min(),
-			  yMax = std::numeric_limits<float>::min(),
-			  zMax = std::numeric_limits<float>::min();
+		float xMin = std::numeric_limits<float>::max();
+		float yMin = std::numeric_limits<float>::max();
+		float zMin = std::numeric_limits<float>::max();
+		float xMax = (-1 * std::numeric_limits<float>::max());
+		float yMax = (-1 * std::numeric_limits<float>::max());
+		float zMax = (-1 * std::numeric_limits<float>::max());
+
 		for (int i = offset; i < size + offset; i++) {
 			float x = (*list)[i]->getX();
 			float y = (*list)[i]->getY();
@@ -359,7 +350,7 @@ protected:
 		int type;
 		float value;
 		int type0, type1, type2;
-//		std::cout<<"In subdivide X:"<<sx<<" Y:"<<sy<<" Z:"<<sz<<std::endl;
+		//		std::cout<<"In subdivide X:"<<sx<<" Y:"<<sy<<" Z:"<<sz<<std::endl;
 		if (sz > sx && sz > sy) {
 			type0 = SPLIT_Z;
 			bool cond = sx > sy;
@@ -377,7 +368,6 @@ protected:
 			type2 = cond ? SPLIT_Z : SPLIT_Y;
 		}
 		type = type0;
-
 		value = computeSplitValue(list, offset, size, type0, floatArr);
 		if (value == std::numeric_limits<float>::max()) {
 			//attempt to split failed so try another axis
@@ -390,18 +380,15 @@ protected:
 		}
 		if (value == std::numeric_limits<float>::max()) {
 			//throw new RuntimeException("badness splittype:" + type + " value:" + value + " size:" + size + " sx:" + sx+ " sy:" + sy + " sz:" + sz);
-			std::cout << "badness splittype:" << type << " value:" << value
-					<< " size:" << size << " sx:" << sx << " sy:" << sy
-					<< " sz:" << sz << std::endl;
+			std::cout << "badness splittype:" << type << " value:" << value << " size:" << size << " sx:" << sx << " sy:" << sy << " sz:"
+					<< sz << std::endl;
 			assert(false);
 		}
 		int leftCount = splitList(list, offset, size, value, type);
 		if (leftCount <= 1 || leftCount >= size - 1) {
 			//throw new RuntimeException("badness splittype:" + type + " value:" + value + " leftCount:" + leftCount+ " rightCount: " + (size - leftCount) + " sx:" + sx + " sy:" + sy + " sz:" + sz);
-			std::cout << "badness splittype:" << type << " value:" << value
-					<< " leftCount:" << leftCount << " rightCount: " << (size
-					- leftCount) << " sx:" << sx << " sy:" << sy << " sz:"
-					<< sz;
+			std::cout << "badness splittype:" << type << " value:" << value << " leftCount:" << leftCount << " rightCount: " << (size
+					- leftCount) << " sx:" << sx << " sy:" << sy << " sz:" << sz;
 			//TODO FIX THIS!!!
 			assert(false);
 		}
@@ -413,13 +400,12 @@ protected:
 		cell->zMin = zMin;
 		cell->zMax = zMax;
 		cell->leftChild = subdivide(list, offset, leftCount, floatArr, factory);
-		cell->rightChild = subdivide(list, offset + leftCount,
-				size - leftCount, floatArr, factory);
+		cell->rightChild = subdivide(list, offset + leftCount, size - leftCount, floatArr, factory);
 		cell->notifyContentsRebuilt(true);
 		return cell;
 	}
 
-	static float computeSplitValue(std::vector<NodeWrapper*>* list, int offset,int size, int splitType, float* floatArr) {
+	static float computeSplitValue(std::vector<NodeWrapper*>* list, int offset, int size, int splitType, float* floatArr) {
 		for (int i = 0; i < size; i++) {
 			floatArr[i] = findSplitComponent((*list)[offset + i], splitType);
 		}
@@ -433,12 +419,12 @@ protected:
 private:
 	static float findMedianGapSplit(float * val, int size) {
 		//this is not very efficient at the moment, there are faster median finding algorithms
-		sort(val, val+size);
-//		std::cout<<" Sorted";
-//		for(std::vector<float>::iterator it = val->begin(), itEnd = val->end();it!=itEnd;++it)
-//			std::cout<<" "<<(*it)<<",";
-//		std::cout<<std::endl;
-//		assert(false);
+		sort(val, val + size);
+		//		std::cout<<" Sorted";
+		//		for(std::vector<float>::iterator it = val->begin(), itEnd = val->end();it!=itEnd;++it)
+		//			std::cout<<" "<<(*it)<<",";
+		//		std::cout<<std::endl;
+		//		assert(false);
 		//Arrays.sort(val, 0, size);
 		int start = ((size - 1) >> 1) - ((size + 7) >> 3);
 		int end = (size >> 1) + ((size + 7) >> 3);
@@ -470,41 +456,16 @@ private:
 	}
 
 public:
-	bool add(NodeWrapper *inAdd) {
-		//return add(inAdd, MethodFlag.ALL);
-		return add(inAdd,'a');
-	}
-
-	/**
-	 * Add a ClusterKDWrapper to the kdtree, subdividing if necessary
-	 */
-	//TODO Finish this!!
-public:
-	bool add(NodeWrapper * inPoint, unsigned char flags) {
-		/*
-		 if (GaloisRuntime.needMethodFlag(flags, MethodFlag.CHECK_CONFLICT)) {
-		 cm.addRemoveProlog(inPoint);
-		 }
-		 if (GaloisRuntime.needMethodFlag(flags, MethodFlag.SAVE_UNDO)) {
-		 GaloisRuntime.getRuntime().onUndo(Iteration.getCurrentIteration(), new Lambda0Void() {
-		 //@Override
-		 public void call() {
-		 remove(inPoint, MethodFlag.NONE);
-		 }
-		 });
-		 }
-		 */
-		for (int i = 0; i < RETRY_LIMIT; i++) {
-			int ret = addPoint(inPoint, NULL);
-			if (ret == -1) {
-				//		 if (isFineLoggable) {
-				//		 logger.info("retrying addPoint");
-				//		 }
-			} else if (ret == 0 || ret == 1) {
-				return true;
-			} else {
-				//		 throw new RuntimeException();
-			}
+	bool add(NodeWrapper *inPoint) {
+		int ret = addPoint(inPoint, NULL);
+		if (ret == -1) {
+			std::cout << "Retrying to add" << std::endl;
+		} else if (ret == 0 || ret == 1) {
+			//			std::cout<<"Added node "<<(*inPoint)<<std::endl;
+			return true;
+		} else {
+			//		 throw new RuntimeException();
+			assert(false&& "Unable to add point!");
 		}
 		//		 throw new RuntimeException("repeated retries of concurrent op still failed");
 		return false;
@@ -530,13 +491,12 @@ private:
 					}
 				}
 				//if we get here the point list was full so we need to subdivide the node
-				std::vector<NodeWrapper*> fullList(numPoints + 1);
+				std::vector<NodeWrapper*> *fullList = new std::vector<NodeWrapper*>(numPoints + 1);
 				for (int i = 0; i < numPoints; i++)
-					fullList[i] = (*pointList)[i];
+					(*fullList)[i] = (*pointList)[i];
 				//        System.arraycopy(pointList, 0, fullList, 0, numPoints);
-				fullList[numPoints] = cluster;
-				KdCell *subtree = subdivide(&fullList, 0, numPoints + 1, NULL,
-						this);
+				(*fullList)[numPoints] = cluster;
+				KdCell *subtree = subdivide(fullList, 0, numPoints + 1, NULL, this);
 				//substitute refined subtree for ourself by changing parent's child ptr
 				//        synchronized (parent)
 				{
@@ -551,7 +511,7 @@ private:
 					} else {
 						//pointer was changed by someone else
 						//            throw new RuntimeException();
-						std::cout << "Error in addPint, parent" << std::endl;
+						assert(false && "Error in addPint, parent");
 					}
 					this->removedFromTree = true;
 				}
@@ -579,10 +539,10 @@ private:
 	}
 
 public:
-	bool remove(NodeWrapper *cluster) {
-		//    return remove(cluster, MethodFlag.ALL);
-		return remove(cluster,'a');
-	}
+	//	bool remove(NodeWrapper *cluster) {
+	//		//    return remove(cluster, MethodFlag.ALL);
+	//		return remove(cluster, 'a');
+	//	}
 
 	/**
 	 * Remove a ClusterKDWrapper from the octree.  Returns true if found and removed
@@ -591,62 +551,50 @@ public:
 	 */
 	//TODO fix this!
 	//  bool remove(NodeWrapper * cluster, byte flags) {
-	bool remove(NodeWrapper * cluster, unsigned char flags) {
-		/*
-		 if (GaloisRuntime.needMethodFlag(flags, MethodFlag.CHECK_CONFLICT)) {
-		 cm.addRemoveProlog(cluster);
-		 }
-		 if (GaloisRuntime.needMethodFlag(flags, MethodFlag.SAVE_UNDO)) {
-		 GaloisRuntime.getRuntime().onUndo(Iteration.getCurrentIteration(), new Lambda0Void() {
-		 //					@Override
-		 public void call() {
-		 add(cluster, MethodFlag.NONE);
-		 }
-		 });
-		 }*/
-		for (int i = 0; i < RETRY_LIMIT; i++) {
-			int ret = removePoint(cluster, NULL, NULL);
-			if (ret == -2) {
-				assert(false&&"cannot remove cluster");
-				//		 throw new RuntimeException("cannot remove cluster");
-			} else if (ret == -1) {
-				//		 if (isFineLoggable) {
-				//		 logger.fine("retrying removal");
-				//		 }
-			} else if (ret == 0 || ret == 1) {
-				return true;
-			} else {
-				//		 throw new RuntimeException();
-				assert(false&&"Runtimeexception");
-			}
+	bool remove(NodeWrapper *&cluster) {
+		//		std::cout << "Removing node " << (*cluster) << std::endl;
+		int ret = removePoint(cluster, NULL, NULL);
+		if (ret == -2) {
+			assert(false&&"cannot remove cluster");
+		} else if (ret == -1) {
+			std::cout << "Retrying to remove" << std::endl;
+		} else if (ret == 0 || ret == 1) {
+			//			std::cout << "Done Removing node " << (*cluster) << std::endl;
+			return true;
+		} else {
+			assert(false&&"Runtime exception");
 		}
 		assert(false&&"remove failed after repeated retries");
-		//		 throw new RuntimeException("remove failed after repeated retries");
 
 	}
 
 private:
-	int removePoint(NodeWrapper *inRemove, KdCell *parent, KdCell *grandparent) {
+	int removePoint(NodeWrapper *&inRemove, KdCell *parent, KdCell *grandparent) {
 		if (splitType == LEAF) {
 			//look for it in list of points
 			//      synchronized (this)
 			{
+				//				std::cout<<"Removing at Leaf";
 				if (removedFromTree) {
 					//this leaf node is no longer in the tree
 					return -1;
 				}
 				int index = -1;
 				int count = 0;
-				for (int i = 0; i < (int)pointList->size(); i++) {
-					if ((*pointList)[i] == inRemove) {
-						index = i;
-					}
+				for (int i = 0; i < (int) pointList->size(); i++) {
 					if ((*pointList)[i] != NULL) {
-						count++;
+						if ((*pointList)[i]->isEqual(inRemove)) {
+							index = i;
+						}
+						//TODO Verify this is correct?
+						if ((*pointList)[i] != NULL) {
+							count++;
+						}
 					}
 				}
 				if (index < 0) {
 					// instead of throwing NoSuchElementException
+					std::cout << "Unable to remove :: " << (*inRemove) << std::endl;
 					return -2;
 				}
 				if (count == 1 && parent != NULL && grandparent != NULL) {
@@ -655,15 +603,14 @@ private:
 					{
 						//            synchronized (grandparent)
 						{
-							if (parent->removedFromTree
-									|| grandparent->removedFromTree) {
+							if (parent->removedFromTree || grandparent->removedFromTree) {
 								//tree structure status, so retry op
 								return -1;
 							}
 							KdCell *otherChild = NULL;
-							if (parent->leftChild == this) {
+							if ((parent->leftChild)->isEqual(this)) {
 								otherChild = parent->rightChild;
-							} else if (parent->rightChild == this) {
+							} else if ((parent->rightChild)->isEqual(this)) {
 								otherChild = parent->leftChild;
 							} else {
 								//                throw new RuntimeException();
@@ -671,9 +618,9 @@ private:
 							}
 							this->removedFromTree = true;
 							parent->removedFromTree = true;
-							if (grandparent->leftChild == parent) {
+							if ((grandparent->leftChild)->isEqual(parent)) {
 								grandparent->leftChild = otherChild;
-							} else if (grandparent->rightChild == parent) {
+							} else if ((grandparent->rightChild)->isEqual(parent)) {
 								grandparent->rightChild = otherChild;
 							} else {
 								//                throw new RuntimeException();
@@ -684,6 +631,8 @@ private:
 					}
 				}
 				//once found, remove the point and recompute our bounding box
+				//TODO : Fix this?
+				//				delete (*pointList)[index];
 				(*pointList)[index] = NULL;
 				bool changed = recomputeLeafBoundingBoxIfChanges();
 				changed = notifyContentsRebuilt(changed);
@@ -713,19 +662,7 @@ private:
 
 public:
 	NodeWrapper *getAny(double ranNum) {
-		//    return getAny(ranNum, MethodFlag.ALL);
-		return getAny(ranNum);
-	}
-	//TODO Fix this!!!
-	//  NodeWrapper *getAny(double ranNum, byte flags) {
-	NodeWrapper *getAny(double ranNum, unsigned char flags) {
-		//		bool checkConflict = GaloisRuntime.needMethodFlag(flags, MethodFlag.CHECK_CONFLICT);
-		//		 KdTreeConflictManager.LocalEntryLog finishedTail = checkConflict ? cm.readBestMatchProlog() : null;
 		NodeWrapper *retval = internalGetAny(ranNum);
-		//		 if (checkConflict)
-		//		 {
-		//		 cm.readEpilog(retval, finishedTail);
-		//		 }
 		return retval;
 	}
 
@@ -766,18 +703,8 @@ public:
 
 public:
 	bool contains(NodeWrapper *inPoint) {
-		//    return contains(inPoint, MethodFlag.ALL);
-		return contains(inPoint,'a');
-	}
+		return internalContains(inPoint);
 
-	//  bool contains(NodeWrapper *point, byte flags) {
-	//TODO Fix this!!!
-	bool contains(NodeWrapper *point, unsigned char flags) {
-		//    if (GaloisRuntime.needMethodFlag(flags, MethodFlag.CHECK_CONFLICT)) {
-		//      cm.addRemoveProlog(point);
-		//    }
-		bool retval = internalContains(point);
-		return retval;
 	}
 
 	bool internalContains(NodeWrapper *point) {
@@ -786,7 +713,9 @@ public:
 			//      for (NodeWrapper aPointList : pointList) {
 			for (unsigned int i = 0; i < pointList->size(); i++) {
 				NodeWrapper* aPointList = (*pointList)[i];
-				if (aPointList == point) {
+				if (aPointList == NULL)
+					continue;
+				if (aPointList->isEqual(point)) {
 					return true;
 				}
 			}
@@ -805,8 +734,7 @@ public:
 	bool isOkay() {
 		if (removedFromTree) {
 			//        throw new IllegalStateException("removed flag set for node still in tree");
-			std::cout << "ERR !! removed flag set for node still in tree"
-					<< std::endl;
+			std::cout << "ERR !! removed flag set for node still in tree" << std::endl;
 		}
 		if (splitType == LEAF) {
 			if (leftChild != NULL || rightChild != NULL) {
@@ -818,12 +746,12 @@ public:
 				std::cout << "ERR !! point list is wrong size" << std::endl;
 			}
 			//check that the bounding box is right
-			float xMinNew = std::numeric_limits<float>::max(), yMinNew =
-					std::numeric_limits<float>::max(), zMinNew =
-					std::numeric_limits<float>::max();
-			float xMaxNew = std::numeric_limits<float>::min(), yMaxNew =
-					std::numeric_limits<float>::min(), zMaxNew =
-					std::numeric_limits<float>::min();
+			float xMinNew = std::numeric_limits<float>::max();
+			float yMinNew = std::numeric_limits<float>::max();
+			float zMinNew = std::numeric_limits<float>::max();
+			float xMaxNew = (-1 * std::numeric_limits<float>::max());
+			float yMaxNew = (-1 * std::numeric_limits<float>::max());
+			float zMaxNew = (-1 * std::numeric_limits<float>::max());
 			//      for (NodeWrapper aPointList : pointList) {
 			for (unsigned int i = 0; i < pointList->size(); i++) {
 				NodeWrapper * aPointList = (*pointList)[i];
@@ -841,78 +769,56 @@ public:
 				zMaxNew = max(z, zMaxNew);
 			}
 			if (xMin != xMinNew || yMin != yMinNew || zMin != zMinNew) {
-				//        throw new IllegalStateException("bad bounding box");
 				assert(false&&"bad bounding box");
 			}
 			if (xMax != xMaxNew || yMax != yMaxNew || zMax != zMaxNew) {
-				//        throw new IllegalStateException("bad bounding box");
 				assert(false&&"bad bounding box");
 			}
 		} else { //its an interior node
 			leftChild->isOkay();
 			rightChild->isOkay();
 			if (pointList != NULL) {
-				//          throw new IllegalStateException("split nodes should not contain points");
 				assert(false&&"split nodes should not contain points");
 			}
 			if (xMin != min(leftChild->xMin, rightChild->xMin)) {
-				//          throw new IllegalStateException("bad bounding box");
 				assert(false&&"bad bounding box");
 			}
 			if (yMin != min(leftChild->yMin, rightChild->yMin)) {
-				//        throw new IllegalStateException("bad bounding box");
 				assert(false&&"bad bounding box");
 			}
 			if (zMin != min(leftChild->zMin, rightChild->zMin)) {
-				//          throw new IllegalStateException("bad bounding box");
 				assert(false&&"bad bounding box");
 			}
 			if (xMax != max(leftChild->xMax, rightChild->xMax)) {
-				//        throw new IllegalStateException("bad bounding box");
 				assert(false&&"bad bounding box");
 			}
 			if (yMax != max(leftChild->yMax, rightChild->yMax)) {
-				//        throw new IllegalStateException("bad bounding box");
 				assert(false&&"bad bounding box");
 			}
 			if (zMax != max(leftChild->zMax, rightChild->zMax)) {
-				//        throw new IllegalStateException("bad bounding box");
 				assert(false&&"bad bounding box");
 			}
 			switch (splitType) {
 			case SPLIT_X:
-				if (leftChild->xMax > splitValue || rightChild->xMin
-						< splitValue) {
-					//            throw new IllegalStateException("incorrect split");
+				if (leftChild->xMax > splitValue || rightChild->xMin < splitValue) {
 					assert(false&&"incorrect split");
 				}
 				break;
 			case SPLIT_Y:
-				if (leftChild->yMax > splitValue || rightChild->yMin
-						< splitValue) {
-					//          throw new IllegalStateException("incorrect split");
+				if (leftChild->yMax > splitValue || rightChild->yMin < splitValue) {
 					assert(false&&"incorrect split");
 				}
 				break;
 			case SPLIT_Z:
-				if (leftChild->zMax > splitValue || rightChild->zMin
-						< splitValue) {
-					//            throw new IllegalStateException("incorrect split");
+				if (leftChild->zMax > splitValue || rightChild->zMin < splitValue) {
 					assert(false&&"incorrect split");
 				}
 				break;
 			default:
-				//        throw new IllegalStateException("bad split type");
 				assert(false&&"bad split type");
 			}
 		}
 		return true;
 	}
 };
-//const int KdCell::MAX_POINTS_IN_CELL = 4;
-//const int KdCell::RETRY_LIMIT = 100;
-//const int KdCell::SPLIT_X = 0;
-//const int KdCell::SPLIT_Y = 1;
-//const int KdCell::SPLIT_Z = 2;
-//const int KdCell::LEAF = 3;
 #endif /* KDCELL_H_ */

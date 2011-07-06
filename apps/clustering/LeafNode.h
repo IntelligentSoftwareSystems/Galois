@@ -1,7 +1,7 @@
 /*
  * LeafNode.h
  *
- *  Created on: Jun 22, 2011
+ *  Created on: Jun 30, 2011
  *      Author: rashid
  */
 
@@ -11,7 +11,7 @@
 #define MATH_PI 3.14159
 
 class LeafNode: public AbstractNode {
-private:
+protected:
 	//direction of maximum emission
 	/*const */
 	float dirX;
@@ -24,12 +24,14 @@ private:
 	 * Creates a new instance of MLTreeLeafNode
 	 */
 public:
-	LeafNode(float x, float y, float z, float px, float py, float pz) :
-		dirX(px), dirY(py), dirZ(pz) {
+	LeafNode(float x, float y, float z, float px, float py, float pz) {
 		this->x = x;
 		this->y = y;
 		this->z = z;
 		setIntensity(1.0 / MATH_PI, (short) 0);
+		dirX = px;
+		dirY = py;
+		dirZ = pz;
 	}
 
 	float getDirX() {
@@ -51,10 +53,14 @@ public:
 	int size() {
 		return 1;
 	}
-	bool operator==(LeafNode & other) {
+	/*bool operator==(LeafNode & other) {
 		return x == other.x && y == other.y && z == other.z && dirX
 				== other.dirX && dirY == other.dirY && dirZ == other.dirZ;
-	}
+	}*/
+	bool isEqual(LeafNode * other) {
+			return x == other->x && y == other->y && z == other->z && dirX
+					== other->dirX && dirY == other->dirY && dirZ == other->dirZ;
+		}
 	friend std::ostream & operator<<(std::ostream& s, LeafNode & l);
 };
 std::ostream & operator<<(std::ostream& s, LeafNode & l) {
