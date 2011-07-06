@@ -514,9 +514,13 @@ public:
   };
 
   template <class U>
-  FSBGaloisAllocator ( const FSBGaloisAllocator<U>& ) throw() {}
+  FSBGaloisAllocator ( const FSBGaloisAllocator<U>& ) throw() 
+    :Alloc(sizeof(Ty))
+  {}
 
-  FSBGaloisAllocator() throw() {}
+  FSBGaloisAllocator() throw()
+  :Alloc(sizeof(Ty))
+  {}
   
   pointer allocate(int x)
   {
