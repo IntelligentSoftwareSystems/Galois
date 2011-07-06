@@ -1,9 +1,26 @@
-/*
- * FM2WayRefining.cpp
+/** GMetis -*- C++ -*-
+ * @file
+ * @section License
  *
- *  Created on: Jun 16, 2011
- *      Author: xinsui
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @author Xin Sui <xinsui@cs.utexas.edu>
  */
+
 #include "GMetisConfig.h"
 #include "MetisGraph.h"
 #include "PQueue.h"
@@ -30,7 +47,7 @@ void moveNode(PQueue* parts[],MetisGraph* metisGraph, GNode higain, int to, int*
 		GNode neighbor = *jj;
 		MetisNode& neighborData = neighbor.getData();
 		int oldgain = neighborData.getGain();
-		int edgeWeight = (int) graph->getEdgeData(higain, neighbor);
+		int edgeWeight = (int) graph->getEdgeData(higain, jj);
 		int kwgt = (to == neighborData.getPartition() ? edgeWeight : -edgeWeight);
 		neighborData.setEdegree(neighborData.getEdegree() - kwgt);
 		neighborData.setIdegree(neighborData.getIdegree() + kwgt);
@@ -58,6 +75,7 @@ void moveNode(PQueue* parts[],MetisGraph* metisGraph, GNode higain, int to, int*
 		 */
 			metisGraph->setBoundaryNode(neighbor);
 			if (moved[neighborData.getNodeId()] == -1) {
+				assert(neighborData.getPartition() < 2);
 				parts[neighborData.getPartition()]->insert(neighbor, neighborData.getGain());
 			}
 		}
@@ -85,7 +103,7 @@ void moveBackNode(MetisGraph* metisGraph, GNode higain) {
 	for (GGraph::neighbor_iterator jj = graph->neighbor_begin(higain, Galois::Graph::NONE), eejj = graph->neighbor_end(higain, Galois::Graph::NONE); jj != eejj; ++jj) {
 		GNode neighbor = *jj;
 		MetisNode& neighborData = neighbor.getData();
-		int edgeWeight = (int)metisGraph->getGraph()->getEdgeData(higain, neighbor);
+		int edgeWeight = (int)metisGraph->getGraph()->getEdgeData(higain, jj);
 		int kwgt = (to == neighborData.getPartition() ? edgeWeight : -edgeWeight);
 		neighborData.setEdegree(neighborData.getEdegree() - kwgt);
 		neighborData.setIdegree(neighborData.getIdegree() + kwgt);
@@ -131,7 +149,7 @@ void fmTwoWayEdgeRefine(MetisGraph* metisGraph, int* tpwgts, int npasses) {
 			GNode boundaryNode = *bndIter;
 			MetisNode& boundaryNodeData = boundaryNode.getData();
 			boundaryNodeData.updateGain();
-			assert(boundaryNodeData.getNodeId()<graph->size());
+//			assert(boundaryNodeData.getNodeId()<graph->size());
 			parts[boundaryNodeData.getPartition()]->insert(boundaryNode, boundaryNodeData.getGain());
 
 		}
@@ -190,7 +208,7 @@ void fmTwoWayEdgeRefine(MetisGraph* metisGraph, int* tpwgts, int npasses) {
 
 	}
 	delete[] swaps;
-
+	delete[] moved;
 	delete parts[0];
 	delete parts[1];
 }

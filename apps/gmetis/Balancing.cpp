@@ -1,8 +1,24 @@
-/*
- * Balancing.cpp
+/** GMetis -*- C++ -*-
+ * @file
+ * @section License
  *
- *  Created on: Jun 14, 2011
- *      Author: xinsui
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @author Xin Sui <xinsui@cs.utexas.edu>
  */
 
 #include "MetisGraph.h"
@@ -80,7 +96,7 @@ void generalTwoWayBalance(MetisGraph* metisGraph, int* tpwgts) {
 
 			MetisNode& neighborData = neighbor.getData();
 			int oldgain = neighborData.getGain();
-			int edgeWeight = (int)graph->getEdgeData(higain, neighbor);
+			int edgeWeight = (int)graph->getEdgeData(higain, jj);
 			int kwgt = (to == neighborData.getPartition() ? edgeWeight : -edgeWeight);
 			neighborData.setEdegree(neighborData.getEdegree() - kwgt);
 			neighborData.setIdegree(neighborData.getIdegree() + kwgt);
@@ -156,7 +172,7 @@ void boundaryTwoWayBalance(MetisGraph* metisGraph, int* tpwgts) {
 			GNode neighbor = *jj;
 			MetisNode& neighborData = neighbor.getData();
 			int oldgain = neighborData.getGain();
-			int edgeWeight = (int)graph->getEdgeData(higain, neighbor);
+			int edgeWeight = (int)graph->getEdgeData(higain, jj);
 			int kwgt = (to == neighborData.getPartition() ? edgeWeight : -edgeWeight);
 			neighborData.setEdegree(neighborData.getEdegree() - kwgt);
 			neighborData.setIdegree(neighborData.getIdegree() + kwgt);
@@ -332,7 +348,7 @@ void greedyKWayEdgeBalance(MetisGraph* metisGraph, int nparts, float* tpwgts, fl
 //					neighborData.partEd = new int[numEdges];
 					neighborData.initPartEdAndIndex(numEdges);
 				}
-				int edgeWeight = graph->getEdgeData(higain, neighbor);
+				int edgeWeight = graph->getEdgeData(higain, jj);
 				if (neighborData.getPartition() == from) {
 					neighborData.setEdegree(neighborData.getEdegree() + edgeWeight);
 					neighborData.setIdegree(neighborData.getIdegree() - edgeWeight);
@@ -400,4 +416,7 @@ void greedyKWayEdgeBalance(MetisGraph* metisGraph, int nparts, float* tpwgts, fl
 		}
 	}
 	delete[] moved;
+	delete[] itpwgts;
+	delete[] maxwgts;
+	delete[] minwgts;
 }

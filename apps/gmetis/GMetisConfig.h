@@ -1,8 +1,24 @@
-/*
- * GMetisConfig.h
+/** GMetis -*- C++ -*-
+ * @file
+ * @section License
  *
- *  Created on: Jun 13, 2011
- *      Author: xinsui
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @author Xin Sui <xinsui@cs.utexas.edu>
  */
 
 #ifndef GMETISCONFIG_H_
@@ -13,7 +29,9 @@
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
 #include "MetisNode.h"
+#include "Galois/Timer.h"
 #include <stdlib.h>
+#include "ArraySet.h"
 typedef int METISINT;
 typedef double METISDOUBLE;
 
@@ -21,7 +39,8 @@ typedef Galois::Graph::FirstGraph<MetisNode,METISINT,true>            GGraph;
 typedef Galois::Graph::FirstGraph<MetisNode,METISINT,true>::GraphNode GNode;
 #include <set>
 using namespace std;
-typedef set< GNode > GNodeSet;
+typedef ArraySet< GNode > GNodeSet;
+typedef set<GNode> GNodeSTLSet;
 template <typename T>
 void arrayFill(T* array, int length, T value){
 	for(int i=0;i<length;++i){
@@ -34,12 +53,12 @@ int getRandom(int num);
 
 struct PerCPUValue{
 	int mincutInc;
-	GNodeSet changedBndNodes;
+	GNodeSTLSet changedBndNodes;
 	PerCPUValue(){
 		mincutInc = 0;
 	}
 };
 void merge(PerCPUValue& a, PerCPUValue& b);
 
-
+int intlog2(int a);
 #endif /* GMETISCONFIG_H_ */

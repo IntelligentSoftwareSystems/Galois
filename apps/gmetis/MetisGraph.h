@@ -1,8 +1,24 @@
-/*
- * MetisGraph.h
+/** GMetis -*- C++ -*-
+ * @file
+ * @section License
  *
- *  Created on: Jun 13, 2011
- *      Author: xinsui
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @author Xin Sui <xinsui@cs.utexas.edu>
  */
 
 #ifndef METISGRAPH_H_
@@ -10,24 +26,29 @@
 #include "MetisNode.h"
 #include "GMetisConfig.h"
 #include <vector>
-
+#include <iostream>
 using namespace std;
 
 class MetisGraph{
 public:
-	MetisGraph() {
+	MetisGraph(){
 		mincut =0;
 		numEdges =0;
 		numNodes = 0;
+		boundaryNodes = NULL;
+		coarseGraphMapTo = NULL;
 	}
 
 	~MetisGraph() {
+		if(boundaryNodes != NULL){
+			delete boundaryNodes;
+		}
 	}
 
 	void initMatches(){
-		matches = new GNode[graph->size()];
-		matchFlag = new bool[graph->size()];
-		arrayFill(matchFlag, graph->size(), false);
+		matches = new GNode[numNodes];
+		matchFlag = new bool[numNodes];
+		arrayFill(matchFlag, numNodes, false);
 	}
 
 	void releaseMatches(){
@@ -44,19 +65,30 @@ public:
 	}
 
 	void initSubGraphMapTo(){
-		subGraphMaps = new GNode[graph->size()];
+		subGraphMaps = new GNode[numNodes];
 	}
 
 	GNode getSubGraphMapTo(int id){
 		return subGraphMaps[id];
 	}
 
+	void releaseSubGraphMapTo(){
+		delete[] subGraphMaps;
+	}
+
 	GNode getCoarseGraphMap(int id){
 		return coarseGraphMapTo[id];
 	}
 
+	void releaseCoarseGraphMap(){
+		if(coarseGraphMapTo!=NULL){
+			delete[] coarseGraphMapTo;
+			coarseGraphMapTo = NULL;
+		}
+	}
+
 	void initCoarseGraphMap(){
-		coarseGraphMapTo = new GNode[graph->size()];
+		coarseGraphMapTo = new GNode[numNodes];
 	}
 
 	void setMatch(int id, GNode node){
@@ -76,10 +108,11 @@ public:
 	 * add weight to the weight of a partition
 	 * @param index the index of the partition
 	 * @param weight the weight to increase
+	 * Galois C++ currently does not support abstract lock on integer,
+	 * so __sync_fetch_and_add is used to add atomically.
+	 * In the future, this will be changed to use abstract lock
 	 */
 	void incPartWeight(int index, int weight) {
-//		int oldWeight = partWeights[index];
-//		partWeights[index] += weight;
 		__sync_fetch_and_add(&partWeights[index], weight);
 	}
 
@@ -146,7 +179,12 @@ public:
 		partWeights.resize(2);
 		partWeights[0] = 0;
 		partWeights[1] = 0;
-		unsetAllBoundaryNodes();
+		//unsetAllBoundaryNodes();
+		if(boundaryNodes == NULL){
+			boundaryNodes = new GNodeSet(numNodes, &gNodeToInt);
+		}else{
+			unsetAllBoundaryNodes();
+		}
 		int mincut = 0;
 		for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
 			GNode node = *ii;
@@ -181,7 +219,12 @@ public:
 	 * compute the parameters for kway refining
 	 */
 	void computeKWayPartitionParams(int nparts) {
-		unsetAllBoundaryNodes();
+//		unsetAllBoundaryNodes();
+		if(boundaryNodes == NULL){
+			boundaryNodes = new GNodeSet(numNodes, &gNodeToInt);
+		}else{
+			unsetAllBoundaryNodes();
+		}
 		partWeights.resize(nparts);
 		for (int i = 0; i < nparts; i++) {
 			partWeights[i] = 0;
@@ -202,7 +245,7 @@ public:
 					GNode neighbor = *jj;
 					MetisNode& neighborData = neighbor.getData(Galois::Graph::NONE);
 					if (me != neighborData.getPartition()) {
-						int edgeWeight = (int) graph->getEdgeData(node, neighbor, Galois::Graph::NONE);
+						int edgeWeight = (int) graph->getEdgeData(node, jj, Galois::Graph::NONE);
 						int k = 0;
 						for (; k < nodeData.getNDegrees(); k++) {
 							if (nodeData.getPartIndex()[k] == neighborData.getPartition()) {
@@ -236,7 +279,7 @@ public:
 		MetisNode& nodeData = node.getData(Galois::Graph::NONE);
 		for (GGraph::neighbor_iterator jj = graph->neighbor_begin(node, Galois::Graph::NONE), eejj = graph->neighbor_end(node, Galois::Graph::NONE); jj != eejj; ++jj) {
 			GNode neighbor = *jj;
-			int weight = (int) graph->getEdgeData(node, neighbor, Galois::Graph::NONE);
+			int weight = (int) graph->getEdgeData(node, jj, Galois::Graph::NONE);
 			if (nodeData.getPartition() != neighbor.getData(Galois::Graph::NONE).getPartition()) {
 				ed = ed + weight;
 			} else {
@@ -304,16 +347,16 @@ public:
 	 * return the number of boundary nodes in the graph
 	 */
 	int getNumOfBoundaryNodes() {
-		return boundaryNodes.size();
+		return boundaryNodes->size();
 	}
 
 	/**
-	 * mark a node as a boundary node
+	 * set a node as a boundary node
 	 */
 	void setBoundaryNode(GNode node) {
 		node.getData(Galois::Graph::NONE).setBoundary(true);
 //		 pthread_mutex_lock(&mutex);
-		boundaryNodes.insert(node);
+		boundaryNodes->insert(node);
 //		 pthread_mutex_unlock(&mutex);
 	}
 	//only marks
@@ -332,27 +375,35 @@ public:
 		node.getData(Galois::Graph::NONE).setBoundary(false);
 //		 pthread_mutex_lock(&mutex);
 
-		boundaryNodes.erase(node);
+		boundaryNodes->erase(node);
 //		 pthread_mutex_unlock(&mutex);
 	}
 
 	/**
-	 * unmark all the boundary nodes
+	 * unset all the boundary nodes
 	 */
 	void unsetAllBoundaryNodes() {
-		for(GNodeSet::iterator iter = boundaryNodes.begin();iter != boundaryNodes.end();++iter){
+		for(GNodeSet::iterator iter = boundaryNodes->begin();iter != boundaryNodes->end();++iter){
 			GNode node = *iter;
 			node.getData(Galois::Graph::NONE).setBoundary(false);
 		}
-		boundaryNodes.clear();
+		boundaryNodes->clear();
 	}
 
 	/**
 	 * return the set of boundary nodes
 	 */
 	GNodeSet* getBoundaryNodes() {
-		return &boundaryNodes;
+		return boundaryNodes;
 	}
+
+    void initBoundarySet(){
+    	if(boundaryNodes == NULL){
+    		boundaryNodes = new GNodeSet(numNodes, &gNodeToInt);
+    	}else{
+    		unsetAllBoundaryNodes();
+    	}
+    }
 
 	/**
 	 * Compute the sum of the weights of all the outgoing edges for each node in the graph
@@ -374,7 +425,7 @@ public:
 			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(node, Galois::Graph::NONE), eejj = graph->neighbor_end(node, Galois::Graph::NONE); jj != eejj; ++jj) {
 				GNode neighbor = *jj;
 				if (neighbor.getData(Galois::Graph::NONE).getPartition() != node.getData(Galois::Graph::NONE).getPartition()) {
-					int edgeWeight = (int) graph->getEdgeData(node, neighbor, Galois::Graph::NONE);
+					int edgeWeight = (int) graph->getEdgeData(node, jj, Galois::Graph::NONE);
 					cut = cut + edgeWeight;
 				}
 			}
@@ -403,7 +454,7 @@ public:
 		int num = 0;
 		for (GGraph::neighbor_iterator jj = graph->neighbor_begin(node, Galois::Graph::NONE), eejj = graph->neighbor_end(node, Galois::Graph::NONE); jj != eejj; ++jj) {
 			GNode neighbor = *jj;
-			int weight = (int) graph->getEdgeData(node, neighbor, Galois::Graph::NONE);
+			int weight = (int) graph->getEdgeData(node, jj, Galois::Graph::NONE);
 			num = num + weight;
 		}
 		return num;
@@ -470,7 +521,7 @@ private:
 	int numNodes;
 	MetisGraph* finerGraph;
 	GGraph* graph;
-	GNodeSet boundaryNodes;
+	GNodeSet* boundaryNodes;
 	GNode* matches;
 	bool* matchFlag;
 	GNode* subGraphMaps;

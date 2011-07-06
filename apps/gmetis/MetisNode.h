@@ -1,8 +1,24 @@
-/*
- * MetisNode.h
+/** GMetis -*- C++ -*-
+ * @file
+ * @section License
  *
- *  Created on: Jun 13, 2011
- *      Author: xinsui
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @author Xin Sui <xinsui@cs.utexas.edu>
  */
 
 #ifndef METISNODE_H_
@@ -12,11 +28,12 @@ typedef int METISINT;
 typedef double METISDOUBLE;
 #include <stddef.h>
 #include <vector>
+#include <iostream>
 using namespace std;
 class MetisNode{
 public:
 
-	MetisNode(int id, int weight) {
+	MetisNode(int id, int weight){
 		init();
 		_id = id;
 		_weight = weight;
@@ -38,8 +55,8 @@ public:
 	void init(){
 //		_partEd = NULL;
 //		_partIndex = NULL;
-		_partEd.resize(0);
-		_partIndex.resize(0);
+//		_partEd.resize(0);
+//		_partIndex.resize(0);
 		_edgeWgtSum = 0;
 		_isBoundary = false;
 		_gain = 0;
@@ -173,7 +190,13 @@ public:
 		_numEdges++;
 	}
 
-
+//	METISINT* getPartEd(){
+//		return _partEd;
+//	}
+//
+//	METISINT* getPartIndex(){
+//		return _partIndex;
+//	}
 
 	vector<METISINT>& getPartEd(){
 		return _partEd;
@@ -186,12 +209,18 @@ public:
 	void initPartEdAndIndex(int num){
 //		_partEd = new int[num];
 //		_partIndex = new int[num];
+//		if(_partEd == NULL){
+//			_partEd = new int[num]; //.resize(num);
+//			_partIndex = new int[num];
+//		}
 		_partEd.resize(num);
 		_partIndex.resize(num);
+
 		for(int i=0;i<num;i++){
 			_partEd[i] = 0;
 			_partIndex[i] = 0;
 		}
+
 	}
 
 private:
@@ -220,6 +249,8 @@ private:
 	METISINT _ndgrees;
 	vector<METISINT> _partEd;
 	vector<METISINT> _partIndex;
+//	METISINT* _partEd;
+//	METISINT* _partIndex;
 };
 
 #endif /* METISNODE_H_ */

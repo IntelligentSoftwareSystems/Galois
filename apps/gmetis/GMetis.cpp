@@ -1,8 +1,24 @@
-/*
- * GMetis.cpp
+/** GMetis -*- C++ -*-
+ * @file
+ * @section License
  *
- *  Created on: Jun 13, 2011
- *      Author: xinsui
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @author Xin Sui <xinsui@cs.utexas.edu>
  */
 
 #include "GMetisConfig.h"
@@ -10,7 +26,6 @@
 #include <vector>
 #include <iostream>
 #include <string.h>
-#include "Galois/Launcher.h"
 #include "Lonestar/Banner.h"
 #include "Lonestar/CommandLine.h"
 #include <stdlib.h>
@@ -18,26 +33,29 @@
 #include <cmath>
 #include "PMetis.h"
 #include "Galois/Graphs/FileGraph.h"
-
+#include "Galois/Statistic.h"
 static const char* name = "GMetis";
 static const char* description = "Partion a graph into K parts and minimize the graph cut\n";
 static const char* url = "http://iss.ices.utexas.edu/lonestar/gmetis.html";
-static const char* help = "<input file> numPartitions";
+static const char* help = "<input file> numPartitions [weighted graph(true/false)] [directed input graph(true/false)]";
 
 /**
  * KMetis Algorithm
  */
 void partition(MetisGraph* metisGraph, int nparts) {
 	GGraph* graph= metisGraph->getGraph();
-
-	int coarsenTo = (int) max(graph->size() / (40 * log(nparts)), (double)20 * (nparts));
-	int maxVertexWeight = (int) (1.5 * ((graph->size()) / (double) coarsenTo));
+	int coarsenTo = (int) max(metisGraph->getNumNodes() / (40 * intlog2(nparts)), 20 * (nparts));
+	int maxVertexWeight = (int) (1.5 * ((metisGraph->getNumNodes()) / (double) coarsenTo));
 	Coarsener coarsener(false, coarsenTo, maxVertexWeight);
 	cout<<"start coarsening"<<endl;
-	Galois::Launcher::startTiming();
+	Galois::StatTimer T;
+	T.start();
+	Galois::Timer t;
+	t.start();
 	MetisGraph* mcg = coarsener.coarsen(metisGraph);
 //	Galois::Launcher::stopTiming();
-//	cout<<"coarsening time: " << Galois::Launcher::elapsedTime() << " ms";
+	t.stop();
+	cout<<"coarsening time: " << t.get() << " ms"<<endl;
 
 	float* totalPartitionWeights = new float[nparts];
 	arrayFill(totalPartitionWeights, nparts, 1 / (float) nparts);
@@ -45,16 +63,20 @@ void partition(MetisGraph* metisGraph, int nparts) {
 	maxVertexWeight = (int) (1.5 * ((mcg->getGraph()->size()) / Coarsener::COARSEN_FRACTION));
 	PMetis pmetis(20, maxVertexWeight);
 	cout<<"initial partion"<<endl;
+	Galois::Timer init_part_t;
+	init_part_t.start();
 	pmetis.mlevelRecursiveBisection(mcg, nparts, totalPartitionWeights, 0, 0);
-//	Galois::Launcher::stopTiming();
-	cout << "initial partition time: "  << " ms";
-	//	mcg->setNParts(nparts);
-//	Galois::Launcher::startTiming();
+	init_part_t.stop();
+	cout << "initial partition time: "<< init_part_t.get()  << " ms";
+	Galois::Timer refine_t;
+
 	arrayFill(totalPartitionWeights, nparts, 1 / (float) nparts);
+	refine_t.start();
 	refineKWay(mcg, metisGraph, totalPartitionWeights, (float) 1.03, nparts);
-//	cout << "refine time: " << Galois::Launcher::elapsedTime() << " ms"<<endl;
+	refine_t.stop();
+	cout << "refine time: " << refine_t.get() << " ms"<<endl;
 	delete[] totalPartitionWeights;
-	Galois::Launcher::stopTiming();
+	T.stop();
 }
 
 void verify(MetisGraph* metisGraph) {
@@ -104,10 +126,11 @@ typedef Galois::Graph::LC_FileGraph<int, unsigned int>::GraphNode InputGNode;
 //}
 
 
-void readGraph(MetisGraph* metisGraph, const char* filename){
+void readGraph(MetisGraph* metisGraph, const char* filename, bool weighted = false, bool directed = true){
 	InputGraph inputGraph;
 	inputGraph.structureFromFile(filename);
 	inputGraph.emptyNodeData();
+	cout<<"read weighted:"<<weighted<<" directed:"<<directed<<"graph"<<endl;
 	cout<<"start to transfer data to GGraph"<<endl;
 	int id = 0;
 	//	vector<InputGNode> inNodes(inputGraph.size());
@@ -125,7 +148,7 @@ void readGraph(MetisGraph* metisGraph, const char* filename){
 		gnodes[id++] = node;
 
 	}
-	cout<<"finish create node "<<id<<endl;
+
 	int numEdges = 0;
 	for (InputGraph::active_iterator ii = inputGraph.active_begin(), ee = inputGraph.active_end(); ii != ee; ++ii) {
 		InputGNode inNode = *ii;
@@ -137,23 +160,48 @@ void readGraph(MetisGraph* metisGraph, const char* filename){
 
 		for (InputGraph::neighbor_iterator jj = inputGraph.neighbor_begin(inNode), eejj = inputGraph.neighbor_end(inNode); jj != eejj; ++jj) {
 			InputGNode inNeighbor = *jj;
+			if(inNode == inNeighbor) continue;
 			int neighId = inputGraph.getData(inNeighbor);
-			graph->addEdge(node, gnodes[neighId], 1);//inputGraph.getEdgeData(inNode, inNeighbor));
-			nodeData.incNumEdges();
-			nodeData.addEdgeWeight(1);//inputGraph.getEdgeData(inNode, inNeighbor));
-			numEdges++;
+			int weight = 1;
+			if(weighted){
+				weight = inputGraph.getEdgeData(inNode, inNeighbor);
+			}
+			if(!directed){
+				graph->addEdge(node, gnodes[neighId], weight);//
+				nodeData.incNumEdges();
+				nodeData.addEdgeWeight(weight);//inputGraph.getEdgeData(inNode, inNeighbor));
+				numEdges++;
+			}else{
+				graph->addEdge(node, gnodes[neighId], weight);//
+				graph->addEdge(gnodes[neighId], node, weight);//
+			}
 		}
+
 	}
 
+	if(directed){
+		for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+			GNode node = *ii;
+			MetisNode& nodeData = node.getData();
+			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(node), eejj = graph->neighbor_end(node); jj != eejj; ++jj) {
+				GNode neighbor = *jj;
+				nodeData.incNumEdges();
+				nodeData.addEdgeWeight(graph->getEdgeData(node, neighbor));
+				assert(graph->getEdgeData(node, neighbor) == graph->getEdgeData(neighbor, node));
+				numEdges++;
+			}
+		}
+	}
+	cout<<"numNodes: "<<inputGraph.size()<<"|numEdges: "<<numEdges/2<<endl;
 	metisGraph->setNumEdges(numEdges/2);
 	metisGraph->setNumNodes(gnodes.size());
 	cout<<"end of transfer data to GGraph"<<endl;
 }
 
 int main(int argc, const char** argv) {
-	srand(3);
+	srand(4321);
 	std::vector<const char*> args = parse_command_line(argc, argv, help);
-	if (args.size() != 2) {
+	if (args.size() < 2) {
 		std::cout << "incorrect number of arguments, use -help for usage information\n";
 		return 1;
 	}
@@ -161,9 +209,17 @@ int main(int argc, const char** argv) {
 	MetisGraph metisGraph;
 	GGraph graph;
 	metisGraph.setGraph(&graph);
-	readGraph(&metisGraph, argv[1]);
+	bool weighted = false;
+	bool directed = true;
+	if(args.size()>2){
+		weighted = (string(args[2]).compare("true") == 0);
+		if(args.size()>3){
+			directed = (string(args[3]).compare("true") == 0);
+		}
+	}
+	readGraph(&metisGraph, args[0], weighted, directed);
 	//	Galois::setMaxThreads(4);
-	partition(&metisGraph, atoi(argv[2]));
+	partition(&metisGraph, atoi(args[1]));
 	verify(&metisGraph);
 }
 
@@ -179,4 +235,9 @@ int gNodeToInt(GNode node){
 void merge(PerCPUValue& a, PerCPUValue& b){
 	a.mincutInc+=b.mincutInc;
 	a.changedBndNodes.insert(b.changedBndNodes.begin(), b.changedBndNodes.end());
+}
+int intlog2(int a){
+	int i;
+	for (i=1; a > 1; i++, a = a>>1);
+	return i-1;
 }

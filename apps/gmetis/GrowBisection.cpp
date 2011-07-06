@@ -1,9 +1,26 @@
-/*
- * GrowBisection.cpp
+/** GMetis -*- C++ -*-
+ * @file
+ * @section License
  *
- *  Created on: Jun 16, 2011
- *      Author: xinsui
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @author Xin Sui <xinsui@cs.utexas.edu>
  */
+
 #include "GMetisConfig.h"
 #include "MetisGraph.h"
 #include "PMetis.h"
@@ -11,11 +28,9 @@
 #include <climits>
 static const int SMALL_NUM_ITER_PARTITION = 3;
 static const int LARGE_NUM_ITER_PARTITION = 8;
-//private static Random random = Launcher.getLauncher().getRandom(0);
 
-void bisection(GGraph* graph, GNode* nodes, int numNodes, int minWgtPart1, int maxWgtPart1, int* pwgts) {
-	int* visited = new int[numNodes];
-	int* queue = new int[numNodes];
+void bisection(GGraph* graph, GNode* nodes, int numNodes, int minWgtPart1, int maxWgtPart1, int* pwgts, int* visited, int* queue) {
+
 	arrayFill(visited, numNodes, 0);
 	queue[0] = getRandom(numNodes);
 	visited[queue[0]] = 1;
@@ -94,6 +109,8 @@ void bisection(MetisGraph* metisGraph, int* tpwgts, int coarsenTo) {
 
 	int bestMinCut = INT_MAX;
 	int* bestWhere = new int[numNodes];
+	int* visited = new int[numNodes];
+	int* queue = new int[numNodes];
 
 	for (; nbfs > 0; nbfs--) {
 
@@ -105,7 +122,7 @@ void bisection(MetisGraph* metisGraph, int* tpwgts, int coarsenTo) {
 			nodes[i].getData().setPartition(1);
 		}
 
-		bisection(graph, nodes, numNodes, minWgtPart1, maxWgtPart1, pwgts);
+		bisection(graph, nodes, numNodes, minWgtPart1, maxWgtPart1, pwgts, visited, queue);
 		/* Check to see if we hit any bad limiting cases */
 		if (pwgts[1] == 0) {
 			int i = getRandom(numNodes);
@@ -116,7 +133,7 @@ void bisection(MetisGraph* metisGraph, int* tpwgts, int coarsenTo) {
 		}
 
 		metisGraph->computeTwoWayPartitionParams();
-//		balanceTwoWay(metisGraph, tpwgts);
+		balanceTwoWay(metisGraph, tpwgts);
 		fmTwoWayEdgeRefine(metisGraph, tpwgts, 4);
 
 		if (bestMinCut > metisGraph->getMinCut()) {
@@ -126,12 +143,15 @@ void bisection(MetisGraph* metisGraph, int* tpwgts, int coarsenTo) {
 			}
 		}
 	}
+	delete[] visited;
+	delete[] queue;
 	for (int i = 0; i < numNodes; i++) {
 		nodes[i].getData().setPartition(bestWhere[i]);
 		assert(nodes[i].getData().getPartition()>=0);
 	}
 	delete[] bestWhere;
 	metisGraph->setMinCut(bestMinCut);
+	delete[] nodes;
 //	metisGraph->verify();
 }
 

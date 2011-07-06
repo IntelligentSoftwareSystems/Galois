@@ -1,8 +1,24 @@
-/*
- * RandomKWayRefiner.h
+/** GMetis -*- C++ -*-
+ * @file
+ * @section License
  *
- *  Created on: Jun 16, 2011
- *      Author: xinsui
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @author Xin Sui <xinsui@cs.utexas.edu>
  */
 
 #ifndef RANDOMKWAYREFINER_H_
@@ -43,12 +59,13 @@ public:
 
 		for (int pass = 0; pass < npasses; pass++) {
 			int oldcut = metisGraph->getMinCut();
+
 			GaloisRuntime::PerCPU_merge<PerCPUValue> perCPUValues(merge);
 			parallelRefine pr(metisGraph, this, &perCPUValues);
 			Galois::for_each<GaloisRuntime::WorkList::ChunkedFIFO<64, GNode> >(metisGraph->getBoundaryNodes()->begin(), metisGraph->getBoundaryNodes()->end(), pr);
 			metisGraph->incMinCut(perCPUValues.get().mincutInc);
-			GNodeSet& changedNodes = perCPUValues.get().changedBndNodes;
-			for(GNodeSet::iterator iter=changedNodes.begin();iter!=changedNodes.end();++iter){
+			GNodeSTLSet& changedNodes = perCPUValues.get().changedBndNodes;
+			for(GNodeSTLSet::iterator iter=changedNodes.begin();iter!=changedNodes.end();++iter){
 				GNode changed = *iter;
 				if(changed.getData().isBoundary()){
 					metisGraph->getBoundaryNodes()->insert(changed);
@@ -121,7 +138,6 @@ private:
 				neighbor.getData(Galois::Graph::CHECK_CONFLICT);
 			}
 //			}
-			//TODO
 
 //			metisGraph->incMinCut(-(nodeData.getPartEd()[k] - nodeData.getIdegree()));
 			perCPUValues->get().mincutInc+=-(nodeData.getPartEd()[k] - nodeData.getIdegree());
@@ -160,7 +176,7 @@ private:
 //					neighborData.partEd = new int[numEdges];
 					neighborData.initPartEdAndIndex(numEdges);
 				}
-				int edgeWeight = graph->getEdgeData(n, neighbor, Galois::Graph::NONE);
+				int edgeWeight = graph->getEdgeData(n, jj, Galois::Graph::NONE);
 				if (neighborData.getPartition() == from) {
 					neighborData.setEdegree(neighborData.getEdegree() + edgeWeight);
 					neighborData.setIdegree(neighborData.getIdegree() - edgeWeight);
