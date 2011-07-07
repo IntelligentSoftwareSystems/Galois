@@ -28,6 +28,7 @@
 
 //#include "Galois/Mem.h"
 //typedef std::vector<Tuple, Galois::Allocator<Tuple> > TupleList;
+//typedef std::list<Tuple, GaloisRuntime::MM::FSBGaloisAllocator<Tuple> > TupleList;
 typedef std::vector<Tuple> TupleList;
 
 class Element {

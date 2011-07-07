@@ -37,6 +37,8 @@
 #endif
 #include <sys/mman.h>
 
+#include <iostream>
+
 using namespace GaloisRuntime;
 using namespace MM;
 
@@ -94,6 +96,7 @@ PtrLock<SizedAllocatorFactory*, true> SizedAllocatorFactory::instance;
 SizedAllocatorFactory::SizedAlloc* 
 SizedAllocatorFactory::getAllocatorForSize(unsigned int size) {
   lock.lock();
+  //std::cout << "Sz : " << size << "\n";
   SizedAlloc*& retval = allocators[size];
   if (!retval)
     retval = new SizedAlloc;

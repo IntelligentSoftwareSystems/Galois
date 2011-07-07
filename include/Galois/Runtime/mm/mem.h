@@ -468,15 +468,12 @@ private:
 
 class FixedSizeAllocator {
   SizedAllocatorFactory::SizedAlloc* alloc;
-  unsigned int size;
 public:
   FixedSizeAllocator(unsigned int sz) {
-    size = sz;
     alloc = SizedAllocatorFactory::getInstance()->getAllocatorForSize(sz);
   }
 
   inline void* allocate(unsigned int sz) {
-    assert(sz == size);
     return alloc->allocate(sz);
   }
 
@@ -485,7 +482,7 @@ public:
   }
 
   inline bool operator!=(const FixedSizeAllocator& rhs) const {
-    return size != rhs.size;
+    return alloc != rhs.alloc;
   }
 };
 

@@ -136,21 +136,33 @@ public:
       Element& oldNodeData = oldNode.getData(Galois::Graph::NONE);
       TupleList& ntuples = nnode_data.getTuples();
       TupleList& tuples = oldNodeData.getTuples();
-      if (!tuples.empty()) {
-        TupleList newTuples;
-        for(TupleList::iterator list_iter = tuples.begin(); list_iter != tuples.end(); ++list_iter)
-        {
-          Tuple t=*list_iter;
-          if (nnode_data.elementContains(t)) {
-            // nnode_data.addTuple(t);
-            ntuples.push_back(t);
-          } else {
-            newTuples.push_back(t);
-          }
-        }
+      // for (TupleList::iterator li = tuples.begin(); li != tuples.end(); ) {
+      // 	if (nnode_data.elementContains(*li)) {
+      // 	  ntuples.push_back(*li);
+      // 	  // *li = *(tuples.rbegin());
+      // 	  // tuples.pop_back();
+      // 	  ++li;
+      // 	} else {
+      // 	  ++li;
+      // 	}
+      // }
 
-        tuples.swap(newTuples);
-      }
+      // if (!tuples.empty()) {
+      //   TupleList newTuples;
+      // 	newTuples.reserve(tuples.size());
+      //   for(TupleList::iterator list_iter = tuples.begin(); list_iter != tuples.end(); ++list_iter)
+      //   {
+      //     Tuple t=*list_iter;
+      //     if (nnode_data.elementContains(t)) {
+      //       // nnode_data.addTuple(t);
+      //       ntuples.push_back(t);
+      //     } else {
+      //       newTuples.push_back(t);
+      //     }
+      //   }
+
+      //   tuples.swap(newTuples);
+      // }
     }
 
     deletingNodes.insert(node);
@@ -171,7 +183,7 @@ public:
 
       for(TupleList::reverse_iterator list_iter = tuples.rbegin(), end = tuples.rend(); list_iter != end; ++list_iter)
       {
-        Tuple tup=*list_iter;
+        Tuple& tup=*list_iter;
         for (int i = 0; i < size; i++) {
           Element& element = (*newNodes)[i].getData(Galois::Graph::NONE);
           if ((element.elementContains(tup))) {
