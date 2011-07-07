@@ -41,8 +41,9 @@
 #include "ittnotify.h"
 #endif
 
-#define DEBUG 0
+#define DEBUG 0 
 #define USE_MMAP 0 
+#define USE_GLOBALS 1 
 
 static const char* name = "Betweenness Centrality";
 static const char* description =
@@ -59,34 +60,110 @@ int NumNodes;
 
 GaloisRuntime::PerCPU<std::vector<double> >* CB;
 
+#if USE_GLOBALS
+GaloisRuntime::PerCPU<std::vector<GNode>*> SQG;
+std::vector<GNode> & getSQ() {
+  std::vector<GNode> *ans;
+  if ((ans = SQG.get()) == 0) {
+    ans = new std::vector<GNode>(NumNodes); 
+    SQG.get() = ans;
+  } else {
+    std::fill(ans->begin(), ans->end(), 0);
+  }
+  return *ans;
+}
+
+GaloisRuntime::PerCPU<std::vector<double> *> sigmaG;
+std::vector<double> & getSigma() {
+  std::vector<double> *ans;
+  if ((ans = sigmaG.get()) == 0) {
+    ans = new std::vector<double>(NumNodes); 
+    sigmaG.get() = ans;
+  } else {
+    std::fill(ans->begin(), ans->end(), 0.0);
+  }
+  return *ans;
+}
+
+GaloisRuntime::PerCPU<std::vector<double> *> deltaG;
+std::vector<double> & getDelta() {
+  std::vector<double> *ans;
+  if ((ans = deltaG.get()) == 0) {
+    ans = new std::vector<double>(NumNodes); 
+    deltaG.get() = ans;
+  } else {
+    std::fill(ans->begin(), ans->end(), 0.0);
+  }
+  return *ans;
+}
+
+GaloisRuntime::PerCPU<std::vector<int>*> distG;
+std::vector<int> & getDist() {
+  std::vector<int> *ans;
+  if ((ans = distG.get()) == 0) {
+    ans = new std::vector<int>(NumNodes); 
+    distG.get() = ans;
+  } else {
+    std::fill(ans->begin(), ans->end(), 0);
+  }
+  return *ans;
+}
+#endif
+
+template<typename T>
+struct PerIt {  
+  typedef typename Galois::PerIterAllocTy::rebind<T>::other Ty;
+};
+
+GaloisRuntime::PerCPU< std::vector<std::vector<GNode> > > succsGlobal;
+
+std::vector<GNode> & getSuccs(GNode n) {
+  return (succsGlobal.get())[n];
+}
+
+void resetNodeSuccs() {
+  std::vector< std::vector<GNode> > & svec = succsGlobal.get();
+  std::vector< std::vector<GNode> >::iterator it = svec.begin();
+  std::vector< std::vector<GNode> >::iterator end = svec.end();
+  while (it != end) {
+    std::vector<GNode> & v = *it;
+//    std::fill(v.begin(), v.end(), 0);
+    (*it).resize(0);
+    ++it;
+  }
+}
+
 struct process {
   
-  template<typename T>
-    struct PerIt {  
-      typedef typename Galois::PerIterAllocTy::rebind<T>::other Ty;
-    };
 
   typedef int tt_needs_per_iter_alloc;
 
   template<typename Context>
   void operator()(GNode& _req, Context& lwl) {
     
+    resetNodeSuccs();
+
     int initSize = NumNodes;
     
     Galois::PerIterAllocTy& lalloc = lwl.getPerIterAlloc();
-    
+
+#if USE_GLOBALS
+    std::vector<GNode> & SQ = getSQ();
+    std::vector<double> & sigma = getSigma();
+    std::vector<int> &d = getDist();
+#else 
     std::vector<GNode,typename PerIt<GNode>::Ty> SQ(initSize, GNode(), lalloc);
     std::vector<double,typename PerIt<double>::Ty> sigma(initSize, 0.0, lalloc);
     std::vector<int,typename PerIt<int>::Ty> d(initSize, 0, lalloc);
- 
+#endif
+
 #if USE_MMAP
     typedef std::multimap<int,int, std::less<int>,
             typename PerIt<std::pair<const int,int> >::Ty> MMapTy;
     MMapTy Succs(std::less<int>(), lalloc);
 #else
 //    std::cerr << "Not using mmap" << std::endl;
-    typedef std::vector<GNode, typename PerIt<GNode>::Ty> VecTy;
-    std::vector<VecTy*, typename PerIt<VecTy*>::Ty > Succs(NumNodes,  NULL, lalloc);
+    //std::vector<VecTy*, typename PerIt<VecTy*>::Ty > Succs(NumNodes,  NULL, lalloc);
 #endif
     
     int QPush = 0;
@@ -120,18 +197,17 @@ struct process {
 #if USE_MMAP
 	  Succs.insert(std::pair<int, int>(v,w));
 #else
-	  VecTy * slist = Succs[v];
-	  if (slist == 0) {
-	    slist = new (lalloc.allocate(sizeof(VecTy))) VecTy(lalloc);
-	    Succs[v] = slist;
-	  }
-	  slist->push_back(w);
+          std::vector<GNode> & slist = getSuccs(v);
+          slist.push_back(w);
 #endif
 	}
       }
     }
-    
+#if USE_GLOBALS
+    std::vector<double> & delta = getDelta();
+#else
     std::vector<double, typename PerIt<double>::Ty> delta(NumNodes, 0.0, lalloc);
+#endif
     --QAt;
     while (QAt) {
       int w = SQ[--QAt];
@@ -148,18 +224,17 @@ struct process {
       }
       delta[w] = delta_w;
 #else
-      VecTy *slist = Succs[w];
-      //std::cerr << "Processing node " << w << std::endl;
-      if (slist != NULL) {
-	VecTy::const_iterator it = slist->begin(); 
-	VecTy::const_iterator iend = slist->end();
-	while (it != iend) {
-	  GNode v = *it;
-	  delta_w += (sigma_w/sigma[v])*(1.0 + delta[v]);
-	  it++;
-	}
-	delta[w] = delta_w;
+      std::vector<GNode> & slist = getSuccs(w);
+      std::vector<GNode>::iterator it = slist.begin();
+      std::vector<GNode>::iterator end = slist.end();
+      while (it != end) {
+        //std::cerr << "Processing node " << w << std::endl;
+        GNode v = *it;
+	delta_w += (sigma_w/sigma[v])*(1.0 + delta[v]);
+        ++it;
       }
+      delta[w] = delta_w;
+
 #endif
       if (w != req) {
 	if (CB->get().size() < (unsigned int)w + 1)
@@ -171,7 +246,7 @@ struct process {
 };
 
 
-  void merge(std::vector<double >& lhs, std::vector<double>& rhs) {
+void merge(std::vector<double >& lhs, std::vector<double>& rhs) {
     if (lhs.size() < rhs.size())
     lhs.resize(rhs.size());
   for (unsigned int i = 0; i < rhs.size(); i++)
@@ -200,6 +275,21 @@ void verify() {
     std::cerr << "Verification ok!" << std::endl;
 }
 
+void initNodeSuccs() {
+  std::vector< std::vector<GNode> > tmp(NumNodes);
+  for (Graph::active_iterator ii = G->active_begin(), ee = G->active_end();
+      ii != ee; ++ii) {
+    int nnbrs = std::distance(G->neighbor_begin(*ii, Galois::Graph::NONE),
+        G->neighbor_end(*ii, Galois::Graph::NONE));
+    //std::cerr << "Node : " << *ii << " has " << nnbrs << " neighbors " << std::endl;
+    tmp[*ii].reserve(nnbrs); 
+  }
+  for (int i=0; i<numThreads; ++i) {
+    succsGlobal.get(i) = tmp;
+  }
+  //succsGlobal.reset(tmp);
+}
+
 int main(int argc, const char** argv) {
 
   std::vector<const char* > args = parse_command_line(argc, argv, help);
@@ -220,7 +310,9 @@ int main(int argc, const char** argv) {
   NumNodes = G->size();
 
   GaloisRuntime::PerCPU_merge<std::vector<double> > cb(merge);
-  CB = &cb;
+  CB = &cb; 
+  
+  initNodeSuccs();
 
   int iterations = NumNodes;
   if (args.size() == 2) {
