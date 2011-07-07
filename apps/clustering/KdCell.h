@@ -27,7 +27,7 @@ using namespace std;
 class KdCell : public GaloisRuntime::Lockable{
 public:
 	// only set for the root
-	KdTreeConflictManager * cm;
+//	KdTreeConflictManager * cm;
 
 private:
 	bool removedFromTree;
@@ -70,7 +70,6 @@ public:
 			return true;
 		return leftChild->isEqual(other->leftChild) && rightChild->isEqual(
 				other->rightChild);
-
 	}
 public:
 	/**
@@ -94,13 +93,11 @@ protected:
 		splitType(inSplitType), splitValue(inSplitValue) {
 		leftChild=rightChild=NULL;
 		//we don't set the bounding box as we assume it will be set next
-		pointList = (inSplitType == LEAF) ? new std::vector<NodeWrapper*>(
-				MAX_POINTS_IN_CELL) : NULL;
+		pointList = (inSplitType == LEAF) ? (new std::vector<NodeWrapper*>(MAX_POINTS_IN_CELL)) : NULL;
 		if(inSplitType==LEAF)
-		for(int i=0;i<MAX_POINTS_IN_CELL;i++)
-			(*pointList)[i]=NULL;
+			for(int i=0;i<MAX_POINTS_IN_CELL;i++)
+				(*pointList)[i]=NULL;
 		removedFromTree=false;
-
 	}
 public:
 	/**
@@ -108,7 +105,7 @@ public:
 	 * uninitialized cell (also tried to reuse any preallocated array for holding children)
 	 * Used during cell subdivision.
 	 */
-	KdCell * createNewBlankCell(int inSplitType, float inSplitValue) {
+	virtual KdCell * createNewBlankCell(int inSplitType, float inSplitValue) {
 		return new KdCell(inSplitType, inSplitValue);
 	}
 
@@ -118,11 +115,11 @@ public:
 	//stating if the cell's statistics (eg, bounding box, etc) are known to have actually
 	//changed and should return a boolean indicating if they found any changes.
 
-	bool notifyPointAdded(NodeWrapper *inPoint, bool inChanged) {
+	virtual bool notifyPointAdded(NodeWrapper *inPoint, bool inChanged) {
 		return inChanged;
 	}
 
-	bool notifyContentsRebuilt(bool inChanged) {
+	virtual bool notifyContentsRebuilt(bool inChanged) {
 		return inChanged;
 	}
 
@@ -285,8 +282,7 @@ private:
 	 * which fell below the plane.
 	 */
 private:
-	static int splitList(std::vector<NodeWrapper*>* list, int startIndex,
-			int size, float splitValue, int splitType) {
+	static int splitList(std::vector<NodeWrapper*>* &list, int startIndex,int size, float splitValue, int splitType) {
 		int lo = startIndex;
 		int hi = startIndex + size - 1;
 		//split into a low group that contains all points <= the split value and
@@ -318,22 +314,14 @@ private:
 	 * we can pass in to reduce the allocation of additional temporary space.
 	 */
 protected:
-	static KdCell* subdivide(std::vector<NodeWrapper*> *list, int offset,int size, float *floatArr, KdCell *const &factory) {
+	static KdCell* subdivide(std::vector<NodeWrapper*> *&list, int offset,int size, float *floatArr, KdCell * factory) {
 		//		std::cout << "Starting subdivision with list size:: " << list->size() << ", off:" << offset << ", size: " << size << std::endl;//", floatArr:"<<floatArr->size()<<""<<std::endl;
 		if (size <= MAX_POINTS_IN_CELL) {
 			//If less than or equal to 4 nodes, then create a new bounding box and return it.
-			KdCell * cell = factory->createNewBlankCell(LEAF,
-					std::numeric_limits<float>::max());
+			KdCell * cell = factory->createNewBlankCell(LEAF,std::numeric_limits<float>::max());
 			//			std::cout<<"Copying to a new BlankCell "<<std::endl;
 			for (int i = 0; i < size; i++) {
-				NodeWrapper * temp = (*list)[offset + i];
-				//TODO : remove temporary!
-				if (temp == NULL) {
-					std::cout << "NULL!!! Copy :: " << (*temp) << std::endl;
-					assert(false&& "Should not get here, attempting to copy a null node.");
-				}
-				//				std::cout << "In subdivide leaf case " << temp << std::endl;
-				(*(cell->pointList))[i] = temp;
+				(*(cell->pointList))[i] = (*list)[offset + i];
 			}
 			cell->computeBoundingBoxFromPoints(cell->pointList, size);
 			cell->notifyContentsRebuilt(true);
@@ -421,14 +409,14 @@ protected:
 		cell->yMax = yMax;
 		cell->zMin = zMin;
 		cell->zMax = zMax;
-		cell->leftChild = &(*subdivide(list, offset, leftCount, floatArr, factory));
-		cell->rightChild = &(*subdivide(list, offset + leftCount, size - leftCount, floatArr, factory));
+		cell->leftChild = (subdivide(list, offset, leftCount, floatArr, factory));
+		cell->rightChild = (subdivide(list, offset + leftCount, size - leftCount, floatArr, factory));
 		cell->notifyContentsRebuilt(true);
 		return cell;
 	}
 
-	static float computeSplitValue(std::vector<NodeWrapper*>* list, int offset,
-			int size, int splitType, float* floatArr) {
+	static float computeSplitValue(std::vector<NodeWrapper*>*& list, int offset,
+			int size, int splitType, float*& floatArr) {
 		for (int i = 0; i < size; i++) {
 			floatArr[i] = findSplitComponent((*list)[offset + i], splitType);
 		}
@@ -440,22 +428,14 @@ protected:
 	 * near the median, and returns a value in the middle of that gap
 	 */
 private:
-	static float findMedianGapSplit(float * val, int size) {
+	static float findMedianGapSplit(float *& val, int size) {
 		//this is not very efficient at the moment, there are faster median finding algorithms
 		sort(val, val + size);
-		//		std::cout<<" Sorted";
-		//		for(std::vector<float>::iterator it = val->begin(), itEnd = val->end();it!=itEnd;++it)
-		//			std::cout<<" "<<(*it)<<",";
-		//		std::cout<<std::endl;
-		//		assert(false);
-		//Arrays.sort(val, 0, size);
 		int start = ((size - 1) >> 1) - ((size + 7) >> 3);
 		int end = (size >> 1) + ((size + 7) >> 3);
 		if (start == end) {
 			//should never happen
-			//throw new RuntimeException();
-			std::cout << "Error in findMedianGapSplit" << std::endl;
-			assert(false);
+			assert(false&&"Error in findMedianGapSplit");
 		}
 		float largestGap = 0;
 		float splitValue = 0;
@@ -480,6 +460,8 @@ private:
 
 public:
 	bool add(NodeWrapper *inPoint) {
+		acquire(this);
+//		acquire(inPoint);
 		int ret = addPoint(inPoint, NULL);
 		if (ret == -1) {
 			std::cout << "Retrying to add" << std::endl;
@@ -514,11 +496,9 @@ private:
 					}
 				}
 				//if we get here the point list was full so we need to subdivide the node
-				std::vector<NodeWrapper*> *fullList = new std::vector<
-						NodeWrapper*>(numPoints + 1);
+				std::vector<NodeWrapper*> *fullList = new std::vector<NodeWrapper*>(numPoints + 1);
 				for (int i = 0; i < numPoints; i++)
 					(*fullList)[i] = (*pointList)[i];
-				//        System.arraycopy(pointList, 0, fullList, 0, numPoints);
 				(*fullList)[numPoints] = cluster;
 				KdCell *subtree = subdivide(fullList, 0, numPoints + 1, NULL,this);
 				//substitute refined subtree for ourself by changing parent's child ptr
@@ -577,11 +557,12 @@ public:
 	//  bool remove(NodeWrapper * cluster, byte flags) {
 	bool remove(NodeWrapper *&cluster) {
 		//		std::cout << "Removing node " << (*cluster) << std::endl;
+		acquire(this);
 		int ret = 0;
 		for (int i = 0; i < 5; i++) {
 			ret = removePoint(cluster, NULL, NULL);
 			if (ret == -2) {
-				std::cout<<"Unable to remove "<<*cluster;
+//				std::cout<<"Unable to remove "<<*cluster;
 				return false;
 //				assert(false&&"cannot remove cluster");
 			} else if (ret == -1) {
@@ -593,7 +574,7 @@ public:
 				assert(false&&"Runtime exception");
 			}
 		}
-		std::cout << "Returned " << ret << std::endl;
+//		std::cout << "Returned " << ret << std::endl;
 		assert(false&&"remove failed after repeated retries");
 
 	}
@@ -624,8 +605,7 @@ private:
 				}
 				if (index < 0) {
 					// instead of throwing NoSuchElementException
-					std::cout << "Unable to remove :: " << (*inRemove)
-							<< std::endl;
+//					std::cout << "Unable to remove :: " << (*inRemove)<< std::endl;
 					return -2;
 				}
 				if (count == 1 && parent != NULL && grandparent != NULL) {
@@ -735,6 +715,7 @@ public:
 
 public:
 	bool contains(NodeWrapper *inPoint) {
+		acquire (this);
 		return internalContains(inPoint);
 
 	}
@@ -763,7 +744,7 @@ public:
 	 * Perform a variety of consistency checks on the tree and throws an error if any of them fail
 	 * This method is not concurrent safe.
 	 */
-	bool isOkay() {
+	virtual bool isOkay() {
 		if (removedFromTree) {
 			//        throw new IllegalStateException("removed flag set for node still in tree");
 			std::cout << "ERR !! removed flag set for node still in tree"

@@ -17,18 +17,17 @@ void clustering(std::vector<LeafNode*> *inLights) {
 	std::vector<float> floatArr(3 * tempSize);
 	std::vector<ClusterNode *> clusterArr(tempSize);
 	int numLights = inLights->size();
-	std::vector<NodeWrapper*> initialWorklist(numLights);
+	std::vector<NodeWrapper*> *initialWorklist= new std::vector<NodeWrapper *>(numLights);
 	for (int i = 0; i < numLights; i++) {
 		NodeWrapper * clusterWrapper = new NodeWrapper(*(*inLights)[i]);
-		initialWorklist[i] = clusterWrapper;
+		(*initialWorklist)[i] = clusterWrapper;
 	}
-	KdTree * kdTree = KdTree::createTree(&initialWorklist);
-	while (initialWorklist.size() > 0) {
-		NodeWrapper* currWork = initialWorklist.back();
-		initialWorklist.pop_back();
-		loopBody(currWork, kdTree, &initialWorklist, &clusterArr, &floatArr);
+	KdTree * kdTree = &KdTree::createTree(initialWorklist);
+	while (initialWorklist->size() > 0) {
+		NodeWrapper* currWork = initialWorklist->back();
+		initialWorklist->pop_back();
+		loopBody(currWork, kdTree, initialWorklist, &clusterArr, &floatArr);
 	}
-	//	NodeWrapper *retval = kdTree->getAny(0.5);
 }
 //*********************************************************************
 void loopBody(NodeWrapper * cluster, KdTree *kdTree,
@@ -121,18 +120,18 @@ AbstractNode* serialClustering(std::vector<LeafNode*>* inLights) {
 	std::vector<float> floatArr(3 * tempSize);
 	std::vector<ClusterNode *> clusterArr(tempSize);
 	int numLights = inLights->size();
-	std::vector<NodeWrapper*> initialWorklist(numLights);
+	std::vector<NodeWrapper*> *initialWorklist= new std::vector<NodeWrapper *>(numLights);
 	std::set<NodeWrapper*> *wrappers = new std::set<NodeWrapper*>();
 	for (int i = 0; i < numLights; i++) {
 		std::cout<<"Serial "<<i<<" :: "<<(*(*inLights)[i])<<std::endl;
 		NodeWrapper *clusterWrapper = new NodeWrapper(*(*inLights)[i]);
-		initialWorklist[i] = clusterWrapper;
+		(*initialWorklist)[i] = clusterWrapper;
 		wrappers->insert(clusterWrapper);
 	}
 	//	launcher.startTiming();
 	//Galois::StatTime T;
 	//T.start();
-	KdTree *kdTree = KdTree::createTree(&initialWorklist);
+	KdTree *kdTree = &KdTree::createTree(initialWorklist);
 	// O(1) operation, there is no copy of data but just the creation of an
 	// arraylist backed by 'initialWorklist'
 	std::set<NodeWrapper *> newWl;

@@ -4,7 +4,7 @@
  *  Created on: Jun 22, 2011
  *      Author: rashid
  */
-#include "Galois/Statistic.h"
+//#include "Galois/Statistic.h"
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
 
@@ -27,9 +27,9 @@
 #include"KdTree.h"
 #include"ClusteringSerial.h"
 #include<stdlib.h>
-static const char* name = "Agglomorative Clustering";
-static const char* description =
-"Computes the Minimal Spanning Tree using Boruvka\n";
+#include <sys/time.h>
+static const char* name = "Unordered Agglomerative Clustering";
+static const char* description = "Unordered Implementation of the well-known data-mining algorithm\n";
 static const char* url = "http://iss.ices.utexas.edu/lonestar/agglomerativeclustering.html";
 static const char* help = "[num points]";
 
@@ -38,9 +38,6 @@ static const char* help = "[num points]";
 //*********************************************************************
 std::vector<LeafNode*> randomGenerate(int count) {
 	std::vector<LeafNode*> lights;
-	float dirX = 0;
-	float dirY = 0;
-	float dirZ = 1;
 	//	std::cout << "Setting global multi time to false" << std::endl;
 	AbstractNode::setGlobalMultitime();
 	//	std::cout << "Done\nSetting global num reps." << std::endl;
@@ -51,7 +48,7 @@ std::vector<LeafNode*> randomGenerate(int count) {
 		float x = ((float) rand()) / std::numeric_limits<int>::max();
 		float y = ((float) rand()) / std::numeric_limits<int>::max();
 		float z = ((float) rand()) / std::numeric_limits<int>::max();
-		LeafNode * ln = new LeafNode(x, y, z, dirX, dirY, dirZ);
+		LeafNode * ln = new LeafNode(x, y, z, 0, 0, 1);
 		lights.push_back(ln);
 	}
 	//	std::cout << "Done creating lights" << std::endl;
@@ -61,15 +58,13 @@ std::vector<LeafNode*> randomGenerate(int count) {
 //*********************************************************************
 struct FindMatching {
 	KdTree * kdTree;
-	//std::set<NodeWrapper*> *wrappers;
-	GaloisRuntime::galois_insert_bag<NodeWrapper *> &newWl;
-	std::map<NodeWrapper*, NodeWrapper*> &matchings;
-	//FindMatching(KdTree *& pk, std::set<NodeWrapper*> *& pW, std::set<NodeWrapper*> & pNW, std::map<NodeWrapper*, NodeWrapper*> &pM):
-	FindMatching(KdTree *& pk, GaloisRuntime::galois_insert_bag<NodeWrapper *> & pNW, std::map<NodeWrapper*, NodeWrapper*> &pM):
+	GaloisRuntime::galois_insert_bag<NodeWrapper *> *&newWl;
+	GaloisRuntime::galois_insert_bag<std::pair<NodeWrapper *,NodeWrapper*> > * &matchings;
+	FindMatching(KdTree *& pk, GaloisRuntime::galois_insert_bag<NodeWrapper *> *& pNW, GaloisRuntime::galois_insert_bag<std::pair<NodeWrapper *,NodeWrapper*> >* &pM):
 		kdTree(pk), newWl(pNW), matchings(pM)
 	{
 	}	template<typename ContextTy>
-	void __attribute__((noinline)) operator()(NodeWrapper * cluster, ContextTy& lwl) {
+	void __attribute__((noinline)) operator()(NodeWrapper *& cluster, ContextTy& lwl) {
 		NodeWrapper *current = cluster;
 		while (current != NULL && kdTree->contains(current)) {
 			NodeWrapper *match = kdTree->findBestMatch(current);
@@ -78,11 +73,12 @@ struct FindMatching {
 			}
 			NodeWrapper *matchMatch = kdTree->findBestMatch(match);
 			if (current->equals(matchMatch)) {
-				matchings[current] = match;
+				if(current<match)
+					matchings->push(std::pair<NodeWrapper*,NodeWrapper*>(current,match));
 				break;
 			} else {
 				if (current == cluster) {
-					newWl.push(current);
+					newWl->push(current);
 				}
 				current = match;
 			}
@@ -93,14 +89,11 @@ struct FindMatching {
 //*********************************************************************
 struct PerformMatching {
 	KdTree *& kdTree;
-	//std::set<NodeWrapper*> *&wrappers;
-//	std::vector<NodeWrapper *> &newWl;
-	GaloisRuntime::galois_insert_bag<NodeWrapper *> &newWl;
-	std::map<NodeWrapper*, NodeWrapper*> &matchings;
+	GaloisRuntime::galois_insert_bag<NodeWrapper *>* &newWl;
+	GaloisRuntime::galois_insert_bag<pair<NodeWrapper *,NodeWrapper*> > *&matchings;
 	std::vector<float>  &floatArr;
 	std::vector<ClusterNode *> &clusterArr;
-	//PerformMatching(KdTree *& pk, std::set<NodeWrapper*> *& pW, std::set<NodeWrapper*> & pNW, std::map<NodeWrapper*, NodeWrapper*> &pM, std::vector<float> & pF, std::vector<ClusterNode*>& pC):
-	PerformMatching(KdTree *& pk,GaloisRuntime::galois_insert_bag<NodeWrapper *> & pNW, std::map<NodeWrapper*, NodeWrapper*> &pM, std::vector<float> & pF, std::vector<ClusterNode*>& pC):
+		PerformMatching(KdTree *& pk,GaloisRuntime::galois_insert_bag<NodeWrapper *> *& pNW, GaloisRuntime::galois_insert_bag<std::pair<NodeWrapper *,NodeWrapper*> > * &pM, std::vector<float> & pF, std::vector<ClusterNode*>& pC):
 		kdTree(pk), newWl(pNW), matchings(pM), floatArr(pF), clusterArr(pC)
 	{
 	} 
@@ -108,12 +101,9 @@ struct PerformMatching {
 		void __attribute__((noinline)) operator()(pair<NodeWrapper *,NodeWrapper*> &itM, ContextTy& lwl) {
 			NodeWrapper *match = (itM).second;
 			NodeWrapper *current = (itM).first;
-			if (matchings.count((itM).second))
-				if (match < current)
-					return;
 			if (kdTree->remove(match)) {
 				NodeWrapper *newCluster = new NodeWrapper(current, (match), floatArr, clusterArr);
-				newWl.push(newCluster);
+				newWl->push(newCluster);
 				kdTree->add(newCluster);
 				kdTree->remove(current);
 			}
@@ -126,48 +116,55 @@ void runGaloisBody (std::vector<LeafNode*>* inLights) {
 	std::vector<float> floatArr(3 * tempSize);
 	std::vector<ClusterNode *> clusterArr(tempSize);
 	int numLights = inLights->size();
-	std::vector<LeafNode*> *copyLights = new std::vector<LeafNode*>(numLights);
-	std::vector<NodeWrapper*> initialWorklist(numLights);
+	std::vector<NodeWrapper*> *initialWorklist= new std::vector<NodeWrapper *>(numLights);
 	using namespace GaloisRuntime::WorkList;
 	std::vector<NodeWrapper*> *wrappers = new std::vector<NodeWrapper*>();
-
 	for (int i = 0; i < numLights; i++) {
 //		std::cout<<"Serial "<<i<<" :: "<<(*(*inLights)[i])<<std::endl;
-		LeafNode * cp = new LeafNode((*inLights)[i]->getX(),(*inLights)[i]->getY(),(*inLights)[i]->getZ(), (*inLights)[i]->getDirX(), (*inLights)[i]->getDirY(), (*inLights)[i]->getDirZ());
-		(*copyLights)[i]=cp;
 		NodeWrapper *clusterWrapper = new NodeWrapper(*(*inLights)[i]);
-		initialWorklist[i] = clusterWrapper;
+		(*initialWorklist)[i] = clusterWrapper;
 		wrappers->push_back(clusterWrapper);
 	}
-	Galois::StatTimer T;
-	KdTree *kdTree = KdTree::createTree(&initialWorklist);
+//	Galois::StatTimer T;
+	KdTree *kdTree = &KdTree::createTree(initialWorklist);
 //	std::cout<<"Before ::" <<*kdTree<<std::endl;
-	T.start();
 	//TODO replace w/ vector and list
 	GaloisRuntime::galois_insert_bag<NodeWrapper *> *newWl = new GaloisRuntime::galois_insert_bag<NodeWrapper *>();
-	std::map<NodeWrapper*, NodeWrapper*> matchings;
+	GaloisRuntime::galois_insert_bag<pair<NodeWrapper *,NodeWrapper*> > * matchings = new GaloisRuntime::galois_insert_bag<std::pair<NodeWrapper *,NodeWrapper*> >();
+	FindMatching f(kdTree, newWl,matchings);
+	PerformMatching p(kdTree, newWl,matchings, floatArr,clusterArr);
+//	T.start();
+	timeval start,stop,result;
+	gettimeofday(&start,NULL);
+
 	while (wrappers->size() > 1) {
-		std::cout<<"Beginning iteration "<<wrappers->size()<<std::endl;
-		matchings.clear();
-		FindMatching f(kdTree, *newWl,matchings);
-		Galois::for_each(wrappers->begin(),wrappers->end(), f);
-		std::cout<<"Found matching"<<matchings.size()<<std::endl;
-		PerformMatching p(kdTree, *newWl,matchings, floatArr,clusterArr);
+//		std::cout<<"Beginning iteration "<<wrappers->size()<<std::endl;
+		matchings = new GaloisRuntime::galois_insert_bag<std::pair<NodeWrapper *,NodeWrapper*> >();
+		f.matchings=matchings;
+		f.newWl=newWl;
+		p.newWl = newWl;
+		p.matchings=matchings;
+		Galois::for_each<GaloisRuntime::WorkList::ChunkedFIFO<32> >(wrappers->begin(),wrappers->end(), f);
+//		std::cout<<"Found matching"<<matchings.size()<<std::endl;
 		std::vector<pair<NodeWrapper*,NodeWrapper*> > work;
-		for(std::map<NodeWrapper*,NodeWrapper*>::iterator it = matchings.begin(), itEnd = matchings.end(); it!=itEnd;it++)
+		for(GaloisRuntime::galois_insert_bag<std::pair<NodeWrapper *,NodeWrapper*> >::iterator it = matchings->begin(), itEnd = matchings->end(); it!=itEnd;it++)
 			work.push_back(pair<NodeWrapper*,NodeWrapper*>((*it).first,(*it).second));
 		Galois::for_each<GaloisRuntime::WorkList::ChunkedFIFO<32> >(work.begin(),work.end(), p);
-		std::cout<<"Performed matching"<<std::endl;//newWl.size()<<std::endl;
+//		std::cout<<"Performed matching"<<std::endl;//newWl.size()<<std::endl;
 		wrappers->clear();
 		for(GaloisRuntime::galois_insert_bag<NodeWrapper *>::iterator itW = newWl->begin(), itWEnd = newWl->end();
 				itW!=itWEnd; itW++){
 			wrappers->push_back(*itW);
 		}
 		delete newWl;
+		delete matchings;
 		newWl = new GaloisRuntime::galois_insert_bag<NodeWrapper *>();
-//		newWl.clear();
 	}
-	T.stop();
+	gettimeofday(&stop,NULL);
+	timersub(&stop,&start,&result);
+	double t = result.tv_sec + result.tv_usec/1000000.0; // 1000000 microseconds per second
+	std::cout<<"Time inside loop :: "<<t<<std::endl;
+//	T.stop();
 //	std::cout<<"Solution is ::" <<*kdTree<<std::endl;
 	{
 //		std::cout<<"verifying... "<<std::endl;
@@ -199,8 +196,7 @@ int main(int argc, const char **argv) {
 	printBanner(std::cout, name, description, url);
 
 	std::vector<LeafNode*> points = randomGenerate(numPoints);
-	std::cout << "Generated random points " << numPoints << std::endl;
-	//serialClustering(&points);
+//	std::cout << "Generated random points " << numPoints << std::endl;
 	runGaloisBody(&points);
 	std::cout << "Terminated normally" << std::endl;
 	return 0;

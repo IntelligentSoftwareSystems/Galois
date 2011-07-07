@@ -36,7 +36,7 @@ protected:
 	vector<float> * timeVector; //fractional intensity per time interval
 	//**********STATIC DATA MEMBERS********************//
 	//if startTime==endTime then the Intensity time is always the same and points to this one
-	static const float singleTimeVector [];//[] = { 1.0f };
+	static const float singleTimeVector [];
 	static const int ML_CLAMP ;//= 0x02; //subject to clamping?
 	static const int ML_COMBO_MASK;// = 0xFC; //flags that should be shared with a parent
 	static const int ML_MATCH_MASK;// = 0xFC;

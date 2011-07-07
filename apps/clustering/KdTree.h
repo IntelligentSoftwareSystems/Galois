@@ -35,10 +35,9 @@ private:
 		KdCell(inSplitType, inSplitValue) {
 	}
 public:
-	static KdTree *createTree(std::vector<NodeWrapper*> * inPoints) {
+	static KdTree& createTree(std::vector<NodeWrapper*> *& inPoints) {
 		//	  std::cout<<"Creating tree with " << inPoints->size()<< " points"<<std::endl;
-		KdTree *root = (KdTree*) subdivide(inPoints, 0, inPoints->size(), NULL, new KdTree());
-		root->cm = new KdTreeConflictManager();
+		KdTree &root = *(KdTree*) subdivide(inPoints, 0, inPoints->size(), NULL, new KdTree());
 		return root;
 	}
 
@@ -159,13 +158,13 @@ protected:
 	 */
 	//  @Override
 protected:
-	KdCell *createNewBlankCell(int inSplitType, float inSplitValue) {
+	virtual KdCell *createNewBlankCell(int inSplitType, float inSplitValue) {
 		return new KdTree(inSplitType, inSplitValue);
 	}
 
 	//  @Override
 protected:
-	bool notifyContentsRebuilt(bool changed) {
+	virtual bool notifyContentsRebuilt(bool changed) {
 		//must recompute the min light intensity since the cells contents have changed
 		if (splitType == LEAF) {
 			float newMinInten = numeric_limits<float>::max();
@@ -284,7 +283,7 @@ protected:
 
 	//  @Override
 protected:
-	bool notifyPointAdded(NodeWrapper *inPoint, bool changed) {
+	virtual bool notifyPointAdded(NodeWrapper *inPoint, bool changed) {
 		if (changed) {
 			float b3 = inPoint->light->getScalarTotalIntensity();
 			minLightIntensity = (minLightIntensity >= b3) ? b3
@@ -361,7 +360,6 @@ public:
 			minHX = std::min(left->minHalfSizeX, right->minHalfSizeX);
 			minHY = std::min(left->minHalfSizeY, right->minHalfSizeY);
 			minHZ = std::min(left->minHalfSizeZ, right->minHalfSizeZ);
-//			return left->isOkay()&&right->isOkay();
 		}
 		if (minLight != this->minLightIntensity) {
 			assert(false&&"bad min light intensity");

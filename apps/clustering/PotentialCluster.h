@@ -13,6 +13,7 @@ public:
 	  NodeWrapper *original;
 	  NodeWrapper  *closest;
 	  float clusterSize;
+
 	  PotentialCluster(NodeWrapper *&original) {
 	    this->original = original;
 	    closest = NULL;
