@@ -61,6 +61,10 @@ public:
 		startTime = -1; //deliberately invalid value
 		nodeIdAndFlags = -1 << ML_ID_SHIFT; //must be set to a correct value later
 	}
+	~AbstractNode(){
+		if(timeVector!=NULL)
+			delete timeVector;
+	}
 
 	short getStartTime(){
 		return startTime;

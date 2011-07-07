@@ -42,6 +42,8 @@ private:
 		minHalfSizeY = std::numeric_limits<float>::max();
 		minHalfSizeZ = std::numeric_limits<float>::max();
 	}
+	~KdTree(){
+	}
 	//special constructor used internally when space for point list has already been allocated
 	KdTree(int inSplitType, float inSplitValue) :
 		KdCell(inSplitType, inSplitValue) {
@@ -321,8 +323,12 @@ public:
 	}
 public:
 	static KdTree& createTree(std::vector<NodeWrapper*> *& inPoints) {
-		KdTree &root = *(KdTree*) subdivide(inPoints, 0, inPoints->size(), NULL, new KdTree());
-		return root;
+		KdTree * root = new KdTree();
+		KdTree &res = *(KdTree*) subdivide(inPoints, 0, inPoints->size(), NULL, root);
+		if(root->isEqual(&res))
+			return res;
+		delete root;
+		return res;
 	}
 	NodeWrapper* findBestMatch(NodeWrapper *&inLight) {
 		//TODO : uncomment if findBestMatch is being called in parallel.
@@ -341,7 +347,9 @@ public:
 		} else {
 			assert(false&&"Err in findBestMatch");
 		}
-		return cluster->closest;
+		NodeWrapper * res = cluster->closest;
+		delete cluster;
+		return res;
 	}
 
 

@@ -102,6 +102,14 @@ public:
 		rightChild = NULL;
 		removedFromTree=false;
 	}
+	~KdCell(){
+		if(pointList!=NULL)
+			delete pointList;
+		if(leftChild!=NULL)
+			delete leftChild;
+		if(rightChild!=NULL)
+			delete rightChild;
+	}
 
 	//special constructor used internally
 protected:
@@ -344,7 +352,9 @@ protected:
 			return cell;
 		}
 		//otherwise its an interior node and we need to choose a split plane
+		bool clearFloats = false;
 		if (floatArr == NULL) {
+			clearFloats = true;
 			floatArr = new float[size];
 		}
 		//compute bounding box of points
@@ -428,6 +438,8 @@ protected:
 		cell->leftChild = (subdivide(list, offset, leftCount, floatArr, factory));
 		cell->rightChild = (subdivide(list, offset + leftCount, size - leftCount, floatArr, factory));
 		cell->notifyContentsRebuilt(true);
+		if(clearFloats)
+			delete [] floatArr;
 		return cell;
 	}
 
@@ -514,6 +526,7 @@ private:
 			acquire(parent);
 			if (parent->removedFromTree) {
 				//if parent no longer valid, retry from beginning
+				delete [] fullList;
 				return -1;
 			}
 			if (parent->leftChild == this) {
@@ -525,6 +538,7 @@ private:
 				assert(false && "Error in addPint, parent");
 			}
 			this->removedFromTree = true;
+			delete fullList;
 			//assume changed as its not easy to check for changes when refining leaf to subtree
 			return 1;
 		}
