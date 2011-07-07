@@ -1,9 +1,26 @@
-/*
- * KdCell.h
+/** Unordered Agglomerative Clustering -*- C++ -*-
+ * @file
+ * @section License
  *
- *  Created on: Jun 22, 2011
- *      Author: rashid
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @author Rashid Kaleem <rashid@cs.utexas.edu>
  */
+
 #include<iostream>
 #include<stdlib.h>
 #include<limits>
@@ -11,7 +28,6 @@
 #include<assert.h>
 #include<algorithm>
 #include<vector>
-#include"KdTreeConflictManager.h"
 #include "Galois/Runtime/Context.h"
 
 #ifndef KDCELL_H_
@@ -461,65 +477,54 @@ private:
 public:
 	bool add(NodeWrapper *inPoint) {
 		acquire(this);
-//		acquire(inPoint);
 		int ret = addPoint(inPoint, NULL);
 		if (ret == -1) {
 			std::cout << "Retrying to add" << std::endl;
 		} else if (ret == 0 || ret == 1) {
-			//			std::cout<<"Added node "<<(*inPoint)<<std::endl;
 			return true;
 		} else {
-			//		 throw new RuntimeException();
 			assert(false&& "Unable to add point!");
 		}
-		//		 throw new RuntimeException("repeated retries of concurrent op still failed");
 		return false;
 	}
-
 	//return value is true if child stats changed (and so need to potentially update this node)
 
 private:
 	int addPoint(NodeWrapper *cluster, KdCell *parent) {
 		if (splitType == LEAF) {
-			//      synchronized (this)
-			{
-				if (removedFromTree) {
-					//this leaf node is no longer in the tree
-					return -1;
-				}
-				const int numPoints = pointList->size();
-				for (int i = 0; i < numPoints; i++) {
-					if ((*pointList)[i] == NULL) {
-						(*pointList)[i] = cluster;
-						bool changed = addToBoundingBoxIfChanges(cluster);
-						return notifyPointAdded(cluster, changed) ? 1 : 0;
-					}
-				}
-				//if we get here the point list was full so we need to subdivide the node
-				std::vector<NodeWrapper*> *fullList = new std::vector<NodeWrapper*>(numPoints + 1);
-				for (int i = 0; i < numPoints; i++)
-					(*fullList)[i] = (*pointList)[i];
-				(*fullList)[numPoints] = cluster;
-				KdCell *subtree = subdivide(fullList, 0, numPoints + 1, NULL,this);
-				//substitute refined subtree for ourself by changing parent's child ptr
-				//        synchronized (parent)
-				{
-					if (parent->removedFromTree) {
-						//if parent no longer valid, retry from beginning
-						return -1;
-					}
-					if (parent->leftChild == this) {
-						parent->leftChild = subtree;
-					} else if (parent->rightChild == this) {
-						parent->rightChild = subtree;
-					} else {
-						//pointer was changed by someone else
-						//            throw new RuntimeException();
-						assert(false && "Error in addPint, parent");
-					}
-					this->removedFromTree = true;
+			if (removedFromTree) {
+				//this leaf node is no longer in the tree
+				return -1;
+			}
+			const int numPoints = pointList->size();
+			for (int i = 0; i < numPoints; i++) {
+				if ((*pointList)[i] == NULL) {
+					(*pointList)[i] = cluster;
+					bool changed = addToBoundingBoxIfChanges(cluster);
+					return notifyPointAdded(cluster, changed) ? 1 : 0;
 				}
 			}
+			//if we get here the point list was full so we need to subdivide the node
+			std::vector<NodeWrapper*> *fullList =new std::vector<NodeWrapper*>(numPoints + 1);
+			for (int i = 0; i < numPoints; i++)
+				(*fullList)[i] = (*pointList)[i];
+			(*fullList)[numPoints] = cluster;
+			KdCell *subtree = subdivide(fullList, 0, numPoints + 1, NULL, this);
+			//substitute refined subtree for ourself by changing parent's child ptr
+			acquire(parent);
+			if (parent->removedFromTree) {
+				//if parent no longer valid, retry from beginning
+				return -1;
+			}
+			if (parent->leftChild == this) {
+				parent->leftChild = subtree;
+			} else if (parent->rightChild == this) {
+				parent->rightChild = subtree;
+			} else {
+				//pointer was changed by someone else
+				assert(false && "Error in addPint, parent");
+			}
+			this->removedFromTree = true;
 			//assume changed as its not easy to check for changes when refining leaf to subtree
 			return 1;
 		}
@@ -528,132 +533,101 @@ private:
 		KdCell *child = val <= splitValue ? leftChild : rightChild;
 		int status = child->addPoint(cluster, this);
 		if (status == 1) {
-			//      synchronized (this)
-			{
-				if (removedFromTree) {
-					return 1;
-				}
-				//if node is no longer in the tree, tell parent to check for changes, but don't bother updating this node
-				bool changed = addToBoundingBoxIfChanges(cluster);
-				changed = notifyPointAdded(cluster, changed);
-				status = changed ? 1 : 0;
+			if (removedFromTree) {
+				return 1;
 			}
+			//if node is no longer in the tree, tell parent to check for changes, but don't bother updating this node
+			bool changed = addToBoundingBoxIfChanges(cluster);
+			changed = notifyPointAdded(cluster, changed);
+			status = changed ? 1 : 0;
 		}
 		return status;
 	}
 
 public:
-	//	bool remove(NodeWrapper *cluster) {
-	//		//    return remove(cluster, MethodFlag.ALL);
-	//		return remove(cluster, 'a');
-	//	}
-
 	/**
 	 * Remove a ClusterKDWrapper from the octree.  Returns true if found and removed
 	 * and false otherwise.  Will un-subdivide if count is low enough but does not
 	 * trigger rebalancing of the tree.
 	 */
-	//TODO fix this!
-	//  bool remove(NodeWrapper * cluster, byte flags) {
 	bool remove(NodeWrapper *&cluster) {
-		//		std::cout << "Removing node " << (*cluster) << std::endl;
 		acquire(this);
-		int ret = 0;
-		for (int i = 0; i < 5; i++) {
-			ret = removePoint(cluster, NULL, NULL);
-			if (ret == -2) {
-//				std::cout<<"Unable to remove "<<*cluster;
-				return false;
-//				assert(false&&"cannot remove cluster");
-			} else if (ret == -1) {
-				std::cout << "Retrying to remove" << std::endl;
-			} else if (ret == 0 || ret == 1) {
-				//			std::cout << "Done Removing node " << (*cluster) << std::endl;
-				return true;
-			} else {
-				assert(false&&"Runtime exception");
-			}
+		int ret = removePoint(cluster, NULL, NULL);
+		if (ret == -2) {
+			return false;
+		} else if (ret == -1) {
+			std::cout << "Retrying to remove" << std::endl;
+		} else if (ret == 0 || ret == 1) {
+			return true;
+		} else {
+			assert(false&&"Runtime exception");
 		}
-//		std::cout << "Returned " << ret << std::endl;
 		assert(false&&"remove failed after repeated retries");
-
 	}
 
 private:
 	int removePoint(NodeWrapper *&inRemove, KdCell *parent, KdCell *grandparent) {
 		if (splitType == LEAF) {
+			if (removedFromTree) {
+				//this leaf node is no longer in the tree
+				return -1;
+			}
+			int index = -1;
+			int count = 0;
 			//look for it in list of points
-			//      synchronized (this)
-			{
-				//				std::cout<<"Removing at Leaf";
-				if (removedFromTree) {
-					//this leaf node is no longer in the tree
+			for (int i = 0; i < (int) pointList->size(); i++) {
+				if ((*pointList)[i] != NULL) {
+					if ((*pointList)[i]->isEqual(inRemove)) {
+						index = i;
+					}
+					if ((*pointList)[i] != NULL) {
+						count++;
+					}
+				}
+			}
+			if (index < 0) {
+				// Could not find the element to delete.
+				return -2;
+			}
+			if (count == 1 && parent != NULL && grandparent != NULL) {
+				//snip parent and this node out of the tree and replace with parent's other child
+				acquire(parent);
+				acquire(grandparent);
+				if (parent->removedFromTree || grandparent->removedFromTree) {
+					//tree structure status, so retry op
 					return -1;
 				}
-				int index = -1;
-				int count = 0;
-				for (int i = 0; i < (int) pointList->size(); i++) {
-					if ((*pointList)[i] != NULL) {
-						if ((*pointList)[i]->isEqual(inRemove)) {
-							index = i;
-						}
-						//TODO Verify this is correct?
-						if ((*pointList)[i] != NULL) {
-							count++;
-						}
-					}
+				KdCell *otherChild = NULL;
+				if ((parent->leftChild)->isEqual(this)) {
+					otherChild = parent->rightChild;
+				} else if ((parent->rightChild)->isEqual(this)) {
+					otherChild = parent->leftChild;
+				} else {
+					assert(false);
 				}
-				if (index < 0) {
-					// instead of throwing NoSuchElementException
-//					std::cout << "Unable to remove :: " << (*inRemove)<< std::endl;
-					return -2;
+				this->removedFromTree = true;
+				parent->removedFromTree = true;
+				if ((grandparent->leftChild)->isEqual(parent)) {
+					grandparent->leftChild = otherChild;
+				} else if ((grandparent->rightChild)->isEqual(parent)) {
+					grandparent->rightChild = otherChild;
+				} else {
+					assert(false);
 				}
-				if (count == 1 && parent != NULL && grandparent != NULL) {
-					//snip parent and this node out of the tree and replace with parent's other child
-					//          synchronized (parent)
-					{
-						//            synchronized (grandparent)
-						{
-							if (parent->removedFromTree|| grandparent->removedFromTree) {
-								//tree structure status, so retry op
-								return -1;
-							}
-							KdCell *otherChild = NULL;
-							if ((parent->leftChild)->isEqual(this)) {
-								otherChild = parent->rightChild;
-							} else if ((parent->rightChild)->isEqual(this)) {
-								otherChild = parent->leftChild;
-							} else {
-								//                throw new RuntimeException();
-								assert(false);
-							}
-							this->removedFromTree = true;
-							parent->removedFromTree = true;
-							if ((grandparent->leftChild)->isEqual(parent)) {
-								grandparent->leftChild = otherChild;
-							} else if ((grandparent->rightChild)->isEqual(
-									parent)) {
-								grandparent->rightChild = otherChild;
-							} else {
-								//                throw new RuntimeException();
-								assert(false);
-							}
-							return 1;
-						}
-					}
-				}
-				//once found, remove the point and recompute our bounding box
-				//TODO : Fix this?
-				//				delete (*pointList)[index];
-				(*pointList)[index] = NULL;
-				bool changed = recomputeLeafBoundingBoxIfChanges();
-				changed = notifyContentsRebuilt(changed);
-				return changed ? 1 : 0;
+				return 1;
 			}
+			//once found, remove the point and recompute our bounding box
+			//TODO : Fix this?
+			//delete (*pointList)[index];
+			(*pointList)[index] = NULL;
+			bool changed = recomputeLeafBoundingBoxIfChanges();
+			changed = notifyContentsRebuilt(changed);
+			return changed ? 1 : 0;
 		}
 		//otherwise its an interior node, so find which child should contain the point
 		float val = findSplitComponent(inRemove, splitType);
 		KdCell *child = val <= splitValue ? leftChild : rightChild;
+		//release(grandparent);
 		int status = child->removePoint(inRemove, this, parent);
 		if (status == 1) {
 			//      synchronized (this)
@@ -715,15 +689,20 @@ public:
 
 public:
 	bool contains(NodeWrapper *inPoint) {
-		acquire (this);
+		//TODO : uncomment if you are modifying the tree at the same time you
+		// are calling this method. Right now we are only invoking this in parallel
+		// when no modifications to the tree are being made.
+		//acquire (this);
 		return internalContains(inPoint);
 
 	}
-
+	//TODO : release the flag of the parent.
+	// Figure out what are the conditions under which this can be done.
+	// Since this is being called in the first process, we do not need to acquire locks since
+	// the tree is not being modified.
 	bool internalContains(NodeWrapper *point) {
 		if (splitType == LEAF) {
 			//look for it in list of points
-			//      for (NodeWrapper aPointList : pointList) {
 			for (unsigned int i = 0; i < pointList->size(); i++) {
 				NodeWrapper* aPointList = (*pointList)[i];
 				if (aPointList == NULL)
