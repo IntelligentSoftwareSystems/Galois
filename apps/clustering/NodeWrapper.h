@@ -93,7 +93,14 @@ public:
 		y = 0.5f * (yMax + yMin);
 		z = 0.5f * (zMax + zMin);
 	}
-
+	~NodeWrapper(){
+		if(dirBox!=NULL)
+			delete dirBox;
+		if(coneClusters!=NULL)
+			delete coneClusters;
+		if(coneDirs!=NULL)
+			delete coneDirs;
+	}
 	NodeWrapper(NodeWrapper * leftChild, NodeWrapper * rightChild,
 			vector<float>& tempFloatArr, vector<ClusterNode*> & tempClusterArr) :
 		Box3d() {

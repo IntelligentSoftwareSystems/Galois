@@ -40,15 +40,11 @@
 #define SPLIT_Z  2
 #define LEAF  3
 using namespace std;
-class KdCell : public GaloisRuntime::Lockable{
-public:
-	// only set for the root
-//	KdTreeConflictManager * cm;
-
+class KdCell {
 private:
 	bool removedFromTree;
-
 protected:
+	PaddedLock<true> lock;
 	//bounding box of points contained in this cell (and all descendents)
 	float xMin;
 	float yMin;
@@ -412,7 +408,6 @@ protected:
 			}
 		}
 		if (value == std::numeric_limits<float>::max()) {
-			//throw new RuntimeException("badness splittype:" + type + " value:" + value + " size:" + size + " sx:" + sx+ " sy:" + sy + " sz:" + sz);
 			std::cout << "badness splittype:" << type << " value:" << value
 					<< " size:" << size << " sx:" << sx << " sy:" << sy
 					<< " sz:" << sz << std::endl;
@@ -420,12 +415,10 @@ protected:
 		}
 		int leftCount = splitList(list, offset, size, value, type);
 		if (leftCount <= 1 || leftCount >= size - 1) {
-			//throw new RuntimeException("badness splittype:" + type + " value:" + value + " leftCount:" + leftCount+ " rightCount: " + (size - leftCount) + " sx:" + sx + " sy:" + sy + " sz:" + sz);
 			std::cout << "badness splittype:" << type << " value:" << value
 					<< " leftCount:" << leftCount << " rightCount: " << (size
 					- leftCount) << " sx:" << sx << " sy:" << sy << " sz:"
 					<< sz;
-			//TODO FIX THIS!!!
 			assert(false);
 		}
 		KdCell *cell = factory->createNewBlankCell(type, value);
@@ -488,7 +481,6 @@ private:
 
 public:
 	bool add(NodeWrapper *inPoint) {
-		acquire(this);
 		int ret = addPoint(inPoint, NULL);
 		if (ret == -1) {
 			std::cout << "Retrying to add" << std::endl;
@@ -503,6 +495,7 @@ public:
 
 private:
 	int addPoint(NodeWrapper *cluster, KdCell *parent) {
+		this->lock.lock();
 		if (splitType == LEAF) {
 			if (removedFromTree) {
 				//this leaf node is no longer in the tree
@@ -513,6 +506,7 @@ private:
 				if ((*pointList)[i] == NULL) {
 					(*pointList)[i] = cluster;
 					bool changed = addToBoundingBoxIfChanges(cluster);
+					this->lock.unlock();
 					return notifyPointAdded(cluster, changed) ? 1 : 0;
 				}
 			}
@@ -523,10 +517,13 @@ private:
 			(*fullList)[numPoints] = cluster;
 			KdCell *subtree = subdivide(fullList, 0, numPoints + 1, NULL, this);
 			//substitute refined subtree for ourself by changing parent's child ptr
-			acquire(parent);
+
+			parent->lock.lock();
 			if (parent->removedFromTree) {
 				//if parent no longer valid, retry from beginning
 				delete [] fullList;
+				this->lock.unlock();
+				parent->lock.unlock();
 				return -1;
 			}
 			if (parent->leftChild == this) {
@@ -540,11 +537,14 @@ private:
 			this->removedFromTree = true;
 			delete fullList;
 			//assume changed as its not easy to check for changes when refining leaf to subtree
+			this->lock.unlock();
+			parent->lock.unlock();
 			return 1;
 		}
 		//its an interior node, so see which child should receive this new point
 		float val = findSplitComponent(cluster, splitType);
 		KdCell *child = val <= splitValue ? leftChild : rightChild;
+		this->lock.unlock();
 		int status = child->addPoint(cluster, this);
 		if (status == 1) {
 			if (removedFromTree) {
@@ -565,27 +565,29 @@ public:
 	 * trigger rebalancing of the tree.
 	 */
 	bool remove(NodeWrapper *&cluster) {
-		acquire(this);
 		int ret = removePoint(cluster, NULL, NULL);
 		if (ret == -2) {
 			return false;
 		} else if (ret == -1) {
-			std::cout << "Retrying to remove" << std::endl;
+//			std::cout << "Retrying to remove" << std::endl;
 		} else if (ret == 0 || ret == 1) {
 			return true;
 		} else {
 			assert(false&&"Runtime exception");
 		}
-		assert(false&&"remove failed after repeated retries");
+//		assert(false&&"remove failed after repeated retries");
+		return false;
 	}
 
 private:
 	int removePoint(NodeWrapper *&inRemove, KdCell *parent, KdCell *grandparent) {
+
 		if (splitType == LEAF) {
 			if (removedFromTree) {
 				//this leaf node is no longer in the tree
 				return -1;
 			}
+			this->lock.lock();
 			int index = -1;
 			int count = 0;
 			//look for it in list of points
@@ -601,16 +603,18 @@ private:
 			}
 			if (index < 0) {
 				// Could not find the element to delete.
+				this->lock.unlock();
 				return -2;
 			}
 			if (count == 1 && parent != NULL && grandparent != NULL) {
 				//snip parent and this node out of the tree and replace with parent's other child
-				acquire(parent);
-				acquire(grandparent);
 				if (parent->removedFromTree || grandparent->removedFromTree) {
 					//tree structure status, so retry op
+					this->lock.unlock();
 					return -1;
 				}
+				parent->lock.lock();
+				grandparent->lock.lock();
 				KdCell *otherChild = NULL;
 				if ((parent->leftChild)->isEqual(this)) {
 					otherChild = parent->rightChild;
@@ -628,21 +632,26 @@ private:
 				} else {
 					assert(false);
 				}
+				this->lock.unlock();
+				parent->lock.unlock();
+				grandparent->lock.unlock();
 				return 1;
 			}
 			//once found, remove the point and recompute our bounding box
 			//TODO : Fix this?
-			//delete (*pointList)[index];
+//			delete (*pointList)[index];
 			(*pointList)[index] = NULL;
 			bool changed = recomputeLeafBoundingBoxIfChanges();
 			changed = notifyContentsRebuilt(changed);
+			this->lock.unlock();
 			return changed ? 1 : 0;
 		}
 		//otherwise its an interior node, so find which child should contain the point
 		float val = findSplitComponent(inRemove, splitType);
 		KdCell *child = val <= splitValue ? leftChild : rightChild;
-		//release(grandparent);
+//		this->lock.unlock();
 		int status = child->removePoint(inRemove, this, parent);
+//		this->lock.lock();
 		if (status == 1) {
 			//      synchronized (this)
 			{
@@ -702,20 +711,12 @@ public:
 	}
 
 public:
-	bool contains(NodeWrapper *inPoint) {
+	bool contains(NodeWrapper *point) {
 		//TODO : uncomment if you are modifying the tree at the same time you
 		// are calling this method. Right now we are only invoking this in parallel
 		// when no modifications to the tree are being made.
 		//acquire (this);
-		return internalContains(inPoint);
-
-	}
-	//TODO : release the flag of the parent.
-	// Figure out what are the conditions under which this can be done.
-	// Since this is being called in the first process, we do not need to acquire locks since
-	// the tree is not being modified.
-	bool internalContains(NodeWrapper *point) {
-		if (splitType == LEAF) {
+			if (splitType == LEAF) {
 			//look for it in list of points
 			for (unsigned int i = 0; i < pointList->size(); i++) {
 				NodeWrapper* aPointList = (*pointList)[i];
@@ -730,7 +731,7 @@ public:
 		//otherwise its an interior node, so find which child should contain the point
 		float val = findSplitComponent(point, splitType);
 		KdCell *child = val <= splitValue ? leftChild : rightChild;
-		return child->internalContains(point);
+		return child->contains(point);
 	}
 
 	/**

@@ -21,7 +21,7 @@
  * @author Rashid Kaleem <rashid@cs.utexas.edu>
  */
 
-//#include "Galois/Statistic.h"
+#include "Galois/Statistic.h"
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
 
@@ -113,9 +113,11 @@ struct PerformMatching {
 	GaloisRuntime::galois_insert_bag<pair<NodeWrapper *,NodeWrapper*> > *&matchings;
 	std::vector<float>  &floatArr;
 	std::vector<ClusterNode *> &clusterArr;
+//	Galois::Allocator<NodeWrapper> alloc;
 		PerformMatching(KdTree *& pk,GaloisRuntime::galois_insert_bag<NodeWrapper *> *& pNW, GaloisRuntime::galois_insert_bag<std::pair<NodeWrapper *,NodeWrapper*> > * &pM, std::vector<float> & pF, std::vector<ClusterNode*>& pC):
 		kdTree(pk), newWl(pNW), matchings(pM), floatArr(pF), clusterArr(pC)
 	{
+//			Galois::Allocator<NodeWrapper> alloc;
 	} 
 	template<typename ContextTy>
 		void __attribute__((noinline)) operator()(pair<NodeWrapper *,NodeWrapper*> &itM, ContextTy& lwl) {
@@ -123,6 +125,8 @@ struct PerformMatching {
 			NodeWrapper *current = (itM).first;
 			if (kdTree->remove(match)) {
 				NodeWrapper *newCluster = new NodeWrapper(current, (match), floatArr, clusterArr);
+//				alloc.allocate(sizeof(NodeWrapper));
+//				NodeWrapper *newCluster = alloc.allocate(sizeof(NodeWrapper)); NodeWrapper(current, (match), floatArr, clusterArr);
 				newWl->push(newCluster);
 				kdTree->add(newCluster);
 				kdTree->remove(current);
@@ -145,7 +149,7 @@ void runGaloisBody (std::vector<LeafNode*>* inLights) {
 		(*initialWorklist)[i] = clusterWrapper;
 		wrappers->push_back(clusterWrapper);
 	}
-//	Galois::StatTimer T;
+	Galois::StatTimer T;
 	KdTree *kdTree = &KdTree::createTree(initialWorklist);
 //	std::cout<<"Before ::" <<*kdTree<<std::endl;
 	//TODO replace w/ vector and list
@@ -153,7 +157,7 @@ void runGaloisBody (std::vector<LeafNode*>* inLights) {
 	GaloisRuntime::galois_insert_bag<pair<NodeWrapper *,NodeWrapper*> > * matchings = new GaloisRuntime::galois_insert_bag<std::pair<NodeWrapper *,NodeWrapper*> >();
 	FindMatching f(kdTree, newWl,matchings);
 	PerformMatching p(kdTree, newWl,matchings, floatArr,clusterArr);
-//	T.start();
+	T.start();
 	timeval start,stop,result;
 	gettimeofday(&start,NULL);
 
@@ -184,7 +188,7 @@ void runGaloisBody (std::vector<LeafNode*>* inLights) {
 	timersub(&stop,&start,&result);
 	double t = result.tv_sec + result.tv_usec/1000000.0; // 1000000 microseconds per second
 	std::cout<<"Time inside loop :: "<<t<<std::endl;
-//	T.stop();
+	T.stop();
 //	std::cout<<"Solution is ::" <<*kdTree<<std::endl;
 	{
 //		std::cout<<"verifying... "<<std::endl;

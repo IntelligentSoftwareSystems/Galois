@@ -50,7 +50,7 @@ private:
 	}
 private:
 	void findNearestRecursive(PotentialCluster *&potentialCluster) {
-		acquire(this);
+//		this->lock.lock();
 		if (!couldBeCloser(potentialCluster)) {
 			return;
 		}
@@ -76,6 +76,7 @@ private:
 		} else {
 			assert(false&&"Badness error in findNearestRecursive....");
 		}
+//		this->lock.unlock();
 	}
 
 	void recurse(PotentialCluster *& potentialCluster, float which) {
