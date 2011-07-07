@@ -1,9 +1,28 @@
-/*
- * SimInit.h
+/** SimInit initializes the circuit graph and creates initial set of events -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
  *
  *  Created on: Jun 23, 2011
- *      Author: amber
+ *
+ * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
  */
+
 
 #ifndef SIMINIT_H_
 #define SIMINIT_H_
@@ -46,22 +65,22 @@ private:
   GraphTy& graph; // should contain all the gates, inputs and outputs
 
 
-  /** The parser. */
+  /** The netlist parser. */
   NetlistParser parser;
 
-  /** The input objs. */
+  /** The input simulation objs. */
   std::vector<SimObject*> inputObjs;
 
   /** The input nodes. */
   std::vector<GNodeTy> inputNodes;
 
-  /** The output objs. */
+  /** The output simulation objs. */
   std::vector<SimObject*> outputObjs;
 
   /** The initial events. */
   std::vector<Event<GNodeTy, LogicUpdate> > initEvents;
 
-  /** The gates. */
+  /** The gates i.e. other than input and output ports. */
   std::vector<SimObject*> gateObjs;
 
   /** The num edges. */
@@ -71,12 +90,20 @@ private:
   size_t numNodes;
 
 
+  /**
+   * A mapping from string name (in the netlist) to functor that implements
+   * the corresponding functionality. Helps in initialization
+   */
   static const std::map<std::string, OneInputFunc* > oneInputFuncMap () {
     static std::map<std::string, OneInputFunc*>  oneInMap;
     oneInMap.insert(std::make_pair (toLowerCase ("INV"), new INV()));
     return oneInMap;
   }
 
+  /**
+   * A mapping from string name (in the netlist) to functor that implements
+   * the corresponding functionality. Helps in initialization
+   */
   static const std::map<std::string, TwoInputFunc*> twoInputFuncMap () {
     static std::map<std::string, TwoInputFunc*> twoInMap;
     twoInMap.insert(std::make_pair (toLowerCase ("AND2") , new AND2()));
@@ -98,8 +125,9 @@ private:
   static std::string addOutPrefix (const std::string& name) {
     return "out_" + name;
   }
+
   /**
-   * Creates the input objs.
+   * Creates the input simulation objs.
    */
   void createInputObjs() {
     const std::vector<std::string>& inputNames = parser.getInputNames ();
@@ -112,7 +140,7 @@ private:
   }
 
   /**
-   * Creates the output objs.
+   * Creates the output simulation objs.
    */
   void createOutputObjs() {
     const std::vector<std::string>& outputNames = parser.getOutputNames ();
@@ -228,6 +256,10 @@ private:
 
   }
 
+  /**
+   * helper function, which creates graph nodes corresponding to any simulation object
+   * and add the node to the graph. No connections made yet
+   */
   void createGraphNodes (const std::vector<SimObject*>& simObjs) {
     for (typename std::vector<SimObject*>::const_iterator i = simObjs.begin (), ei = simObjs.end (); i != ei; ++i) {
       SimObject* so = *i;
@@ -237,9 +269,10 @@ private:
     }
   }
   /**
-   * Creates the connections.
+   * Creates the connections i.e. edges in the graph
+   * An edge is created whenever a gate's output is connected to 
+   * another gate's input.
    */
-  // assumes that all the nodes have been added to the graph
   void createConnections() {
 
     // read in all nodes first, since iterator may not support concurrent modification
@@ -279,17 +312,14 @@ private:
 
   }
 
-  /*
+  /**
+   * Initialize.
+   *
    * Processing steps
    * create the input and output objects and add to netlistArrays
    * create the gate objects
    * connect the netlists by populating the fanout lists
    * create a list of initial events
-   *
-   */
-
-  /**
-   * Initialize.
    */
   void initialize() {
     numNodes = 0;
@@ -329,6 +359,10 @@ private:
     createConnections();
   }
 
+  /**
+   * freeing pointers in a vector
+   * before the vector itself is destroyed
+   */
   template <typename T>
   void destroyVec (std::vector<T*>& vec) {
     for (typename std::vector<T*>::iterator i = vec.begin (), ei = vec.end (); i != ei; ++i) {
@@ -337,6 +371,9 @@ private:
     }
   }
 
+  /**
+   * destructor helper
+   */
   void destroy () {
     destroyVec (inputObjs);
     destroyVec (outputObjs);
@@ -358,8 +395,6 @@ public:
   ~SimInit () {
     destroy ();
   }
-
-  // TODO: write a destructor to free the memory etc.
 
   /**
    * Gets the graph.

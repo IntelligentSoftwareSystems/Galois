@@ -1,8 +1,26 @@
-/*
- * NetlistParser.h
+/** NetlistParser reads a circuit netlist containing logic gates and wires etc  -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
  *
  *  Created on: Jun 23, 2011
- *      Author: amber
+ *  
+ * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
  */
 
 #ifndef NETLISTPARSER_H_
@@ -25,47 +43,68 @@
 #include "logicDefs.h"
 #include "comDefs.h"
 
+/**
+ * NetlistTokenizer is a simple string tokenizer, which 
+ * usings C strtok () function from <pre>cstring</pre>
+ */
+
 class NetlistTokenizer: public boost::noncopyable {
-  // correct way to use is to first check if hasMoreTokens and then call nextToken
-  // 
-  // need to read one token ahead so because hasMoreTokens is called before nextToken
-  //
-  // basic algorithm
-  //
-  // initially currTokPtr = NULL, nextTokPtr = nextTokenInt
-  //
-  // In nextToken
-  //    return string at currTokPtr
-  //    currTokPtr = nextTokPtr
-  //    nextTokPtr = read next token
-  //
-  // algorithm for reading next token
-  // read next token (with NULL)
-  // while next token is null or beginning of comment {
-  //    read next line (break out the loop if file has ended)
-  //    read first token
-  // }
-  // create a string and return
-  //
-  // things to check for
-  // - end of file, reading error (in this case getNextLine() should return NULL)
-  // 
-  // initialization:
-  // - initially nextTokPtr should be NULL and this fine because
-  // reading nextTok with null should return null;
+  /**
+   * correct way to use is to first check if hasMoreTokens and then call nextToken
+   * 
+   * need to read one token ahead so because hasMoreTokens is called before nextToken
+   *
+   * basic algorithm
+   *
+   * initially currTokPtr = NULL, nextTokPtr = nextTokenInt
+   *
+   * In nextToken
+   *    return string at currTokPtr
+   *    currTokPtr = nextTokPtr
+   *    nextTokPtr = read next token
+   *
+   * algorithm for reading next token
+   * read next token (with NULL)
+   * while next token is null or beginning of comment {
+   *    read next line (break out the loop if file has ended)
+   *    read first token
+   * }
+   * create a string and return
+   *
+   * things to check for
+   * - end of file, reading error (in this case getNextLine() should return NULL)
+   * 
+   * initialization:
+   * - initially nextTokPtr should be NULL and this fine because
+   * reading nextTok with null should return null;
+   *
+   */
   
 private:
+  /** file handle for input stream */
   std::ifstream ifs;
 
+  /** what characters mark end of a token */
   const char* delim;
+
+  /** string representing beginning of a line comment */
   const char* comments;
 
 
+  /** current line read from the file */
   char* linePtr;
+
+  /** ptr to next token */
   char* nextTokPtr;
+
+  /** ptr to current token, returned on  a call to nextToken () */
   char* currTokPtr;
 
 private:
+
+  /** 
+   * @returns true if nextTokPtr starts with comment pattern
+   */
   bool isCommentBegin () const {
     std::string tok(nextTokPtr);
     if (tok.find (comments) == 0) {
@@ -75,6 +114,10 @@ private:
     }
   }
 
+  /** 
+   * read next line from the file
+   * and return it as a C string
+   */
   char* getNextLine () {
     // read next line
     std::string currLine;
@@ -94,6 +137,9 @@ private:
     return linePtr;
   }
 
+  /**
+   * read next token as a C string
+   */
   char* readNextToken () {
     nextTokPtr = strtok (NULL, delim);
 
@@ -109,6 +155,13 @@ private:
   }
 
 public:
+  /**
+   * Constructor
+   * 
+   * @param fileName: the file to read from
+   * @param delim: a string containing characters that mark end of a token
+   * @param comments: a string that contains beginning of a comment
+   */
   NetlistTokenizer (const char* fileName, const char* delim, const char* comments)
     : ifs(fileName), delim (delim), comments(comments), linePtr (NULL), currTokPtr (NULL)  {
 
@@ -117,6 +170,9 @@ public:
 
   }
 
+  /**
+   * returns the next token from the file
+   */
   const std::string nextToken () {
     assert (nextTokPtr != NULL);
     
@@ -132,7 +188,8 @@ public:
 };
 
 /**
- * The Class GateRec stores the data for a specific gate.
+ * The Class GateRec stores the data for a specific gate, after reading it 
+ * from a netlist file
  */
 struct GateRec {
 
@@ -149,7 +206,7 @@ struct GateRec {
   SimTime delay;
 
   /**
-   * Adds the output.
+   * Adds the output to a list.
    *
    * @param net the net
    */
@@ -158,7 +215,7 @@ struct GateRec {
   }
 
   /**
-   * Adds the input.
+   * Adds the input to a list.
    *
    * @param net the net
    */
@@ -199,8 +256,11 @@ struct GateRec {
  */
 class NetlistParser {
 public:
-  //following is the list of token separators; characters meant to be ignored
+
+  /** following is the list of token separators; characters meant to be ignored */
   static const char* DELIM;
+
+  /**  beginning of a comment string */
   static const char* COMMENTS;
 
 public:
@@ -232,13 +292,18 @@ private:
 
 private:
 
-  // initializer block
+  /**
+   * A set of names of valid logic gates with one input
+   */
   static const std::set<std::string>  oneInputGates () {
     std::set<std::string> oneInSet;
     oneInSet.insert (toLowerCase (std::string("INV")));
     return oneInSet;
   }
 
+  /**
+   * A set of names of valid logic gates with two inputs
+   */
   static const std::set<std::string> twoInputGates () {
     std::set<std::string> twoInSet;
     twoInSet.insert (toLowerCase (std::string ("AND2")));
@@ -252,7 +317,7 @@ private:
 
 
   /**
-   * Parses the port list.
+   * Parses the port list i.e. inputs and outputs
    *
    * @param tokenizer the tokenizer
    * @param portNames the net names for input/output ports
@@ -266,7 +331,8 @@ private:
   }
 
   /**
-   * Parses the out values.
+   * Parses the out values, which are the expected values of the circuit outputs at the end of
+   * simulation
    *
    * @param tokenizer the tokenizer
    * @param outValues the expected out values at the end of the simulation
@@ -389,7 +455,9 @@ public:
     parse(netlistFile);
   }
 
-  /*
+  /**
+   * Parses the netlist contained in fileName.
+   *
    * Parsing steps
    * parse input signal names
    * parse output signal names
@@ -397,13 +465,9 @@ public:
    * parse stimulus lists for each input signal
    * parse the netlist
    *
-   */
-
-  /**
-   * Parses the netlist contained in fileName.
-   *
    * @param fileName the file name
    */
+
   void parse(const char* fileName) {
     std::cout << "input: reading circuit from file: " << fileName << std::endl;
 

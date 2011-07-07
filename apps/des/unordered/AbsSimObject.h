@@ -1,5 +1,30 @@
+/** Abstract Simulation Object -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
+ */
+
 #ifndef _ABS_SIMOBJECT_H_
 #define _ABS_SIMOBJECT_H_
+
+
 
 #include <vector>
 #include <queue>
@@ -15,8 +40,9 @@
 
 
 
-//TODO: modeling one output for now. Need to extend for multiple outputs
 /**
+ * @section Description
+ *
  * The Class AbsSimObject represents an abstract simulation object (processing station). A simulation application
  * would inherit from this class.
  */
@@ -28,7 +54,10 @@ private:
 
   typedef std::priority_queue<EventTy, std::vector<EventTy>, EventRecvTimeTieBrkCmp<EventTy> > PriorityQueue;
 
-  /** The id counter. */
+  /** The id counter.
+   * each object has an id, which is assigned at the 
+   * time of creation by incrementing a counter
+   */
   static size_t idCntr;
 
   /** The id. */
@@ -46,8 +75,8 @@ private:
   /** local clock value, is the minimum of events received on all input lines */
   SimTime clock;
 
-  /** readyEvents set, is a pq of events that can safely be processed now
-    if minRecv = min latest timestamp received on any event i.e. min of inputTimes
+  /** readyEvents set, is a pq of events that can safely be processed, if this AbsSimObject is
+   * active.  If minRecv is the min. of the latest timestamp received on any event i.e. min of inputTimes
     then events with timestamp <= minRecv go into readyEvents
    */
   PriorityQueue readyEvents;
@@ -135,6 +164,12 @@ private:
   }
    */
 
+  /**
+   * compute the min. of the timestamps of latest message received so far
+   * for every input
+   * if pq is not empty then take the time of min event in the pq
+   * else take the time of the last event received on the input.
+   */
   void computeClock() {
     SimTime min = INFINITY_SIM_TIME;
     for (size_t i = 0; i < numInputs; ++i) {
@@ -147,13 +182,6 @@ private:
   }
 
 
-  /**
-   * Send event.
-   *
-   * @param outIndex the out index
-   * @param target the target
-   * @param e the e
-   */
   // void sendEvent(size_t outIndex, SimObject target, Event<?> e) {
     // //TODO: not implemented yet
   // }
@@ -161,7 +189,8 @@ private:
   /**
    * Populate ready events.
    *
-   * @return PriorityQueue of events that have recvTime <= this->clock
+   * computes a PriorityQueue of events that have recvTime <= this->clock
+   * called after @see computeClock () has been called
    */
   void populateReadyEvents() {
     assert (readyEvents.empty ());
@@ -199,16 +228,17 @@ public:
   virtual ~AbsSimObject () {}
   /**
    * a way to construct different subtypes
-   * @return a new instance of subtype
+   * @return a copy of this
    */
   virtual AbsSimObject<GraphTy, GNodeTy, EventTy>* clone() const = 0;
 
 
   /**
    * Recv event.
+   * put in the input indexed by inputIndex
    *
-   * @param in the in
-   * @param e the e
+   * @param inputIndex
+   * @param e the event
    */
   void recvEvent(size_t inputIndex, const EventTy& e) {
 
@@ -219,19 +249,28 @@ public:
       this->inputTimes[inputIndex] = e.getRecvTime();
     }
   }
-  // The user code should override this method inorder to
-  // define the semantics of executing and event on
+
   /**
    * Exec event.
    *
-   * @param myNode the node in the graph that has this SimObject as its node data
-   * @param e the input event
+   * The user code should override this method inorder to
+   * define the semantics of executing and event on a sub-type
+   *
+   * @param graph: the graph containg simulation objects as nodes and communication links as edges
+   * @param myNode: the node in the graph that has this SimObject as its node data
+   * @param e: the input event
    */
-  virtual void execEvent(GraphTy&, GNodeTy& myNode, const EventTy& e) = 0;
+  virtual void execEvent(GraphTy& graph, GNodeTy& myNode, const EventTy& e) = 0;
 
   /**
    * Simulate.
    *
+   * pre-condition: The object should be active
+   *
+   * Computes the set of readyEvents, then executes the events
+   * in time-stamp order
+   *
+   * @param graph: the graph containg simulation objects as nodes and communication links as edges
    * @param myNode the node in the graph that has this SimObject as its node data
    * @return number of events ready to be executed.
    */
@@ -300,8 +339,8 @@ public:
   }
 
 
-  /* (non-Javadoc)
-   * @see java.lang.Object#toString()
+  /** 
+   * @return a string representation for printing purposes
    */
   virtual const std::string toString() const {
     std::ostringstream ss;
@@ -316,6 +355,9 @@ public:
    */
   size_t getId() const { return id; }
 
+  /**
+   * resets the id counter to 0
+   */
   static void resetIdCounter () {
     idCntr = 0;
   }

@@ -1,9 +1,26 @@
-/*
- * TwoInputGate.h
+/** TwoInputGate: represents a general gate with two inputs and one output -*- C++ -*-
+ * @file
+ * @section License
  *
- *  Created on: Jun 23, 2011
- *      Author: amber
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
  */
+
 
 #ifndef TWOINPUTGATE_H_
 #define TWOINPUTGATE_H_
@@ -26,15 +43,23 @@ template <typename GraphTy, typename GNodeTy>
 class TwoInputGate: public LogicGate<GraphTy, GNodeTy>, public BaseTwoInputGate {
 
 private:
-  const TwoInputFunc& func;
   typedef typename LogicGate<GraphTy, GNodeTy>::AbsSimObj AbsSimObj;
+
+  /**
+   * The functor that computes a value for the output of the gate
+   * when provided with the values of the input
+   */
+
+  const TwoInputFunc& func;
 
 public:
   /**
-   * Instantiates a new one input gate.
+   * Instantiates a new two input gate.
    *
+   * @param func: functor implementing the function from inputs to outputs
    * @param outputName the output name
-   * @param inputName the input name
+   * @param input1Name the input 1 name
+   * @param input2Name the input 2 name
    * @param delay the delay
    */
   TwoInputGate(const TwoInputFunc& func, const std::string& outputName, const std::string& input1Name, const std::string& input2Name,
@@ -51,20 +76,22 @@ public:
 
 
 
-  // override the SimObject methods
-  /*
-   * execEvent follows the same logic as TwoInputGate.execEvent()
-   *
-   */
 
 protected:
 
+  /**
+   * compute the new value of the output by calling the functor
+   */
   virtual LogicVal evalOutput () const {
     return func (getInput1Val (), getInput2Val ());
   }
 
-  /* (non-Javadoc)
-   * @see des.unordered.SimObject#execEvent(galois.objects.graph.GNode, des.unordered.Event)
+  /**
+   *
+   * The basic idea is to find which input is updated by the LogicUpdate stored in the event. 
+   * Then after updating the input, the output is evaluated, and the updated value of the output
+   * is sent as a LogicUpdate to all the out-going neighbors to which the output feeds
+   *
    */
   virtual void execEvent (GraphTy& graph, GNodeTy& myNode, const Event<GNodeTy, LogicUpdate>& event) {
 
@@ -109,7 +136,7 @@ public:
    * Checks for input name.
    *
    * @param net the net
-   * @return true, if successful
+   * @return true, if this gate has an input with the name net
    */
   virtual bool hasInputName(const std::string& net) const {
     return BaseTwoInputGate::hasInputName (net);
@@ -119,7 +146,7 @@ public:
    * Checks for output name.
    *
    * @param net the net
-   * @return true, if successful
+   * @return true, if this gate has an output with the name net
    */
   virtual bool hasOutputName(const std::string& net) const {
     return BaseTwoInputGate::hasOutputName (net);
@@ -133,9 +160,16 @@ public:
   virtual const std::string& getOutputName() const {
     return BaseTwoInputGate::getOutputName ();
   }
-  /* (non-Javadoc)
-   * @see des.unordered.circuitlib.LogicGate#getInputIndex(java.lang.const std::string&)
+
+  /**
+   *
+   * @param net name of the wire to query
+   *
+   * @returns 0 if the first input has the same name as 'net'
+   *  and 1 if the 2nd input has the same name as 'net'
+   *  otherwise throws and error
    */
+
   virtual size_t getInputIndex(const std::string& net) const {
     if (this->input2Name == (net)) {
       return 1;
@@ -144,18 +178,19 @@ public:
       return 0;
 
     } else {
-      assert (false);
+      abort ();
       return -1; // error
     }
   }
 
+  /**
+   * The name of the gate depends on the functionality it's implementing
+   */
   virtual const std::string getGateName () const {
     return func.toString ();
   }
+
   // for debugging
-  /* (non-Javadoc)
-   * @see des.unordered.SimObject#toString()
-   */
   virtual const std::string toString() const {
     std::ostringstream ss;
     ss << AbsSimObj::toString () << getGateName () << ": " << BaseTwoInputGate::toString () 
