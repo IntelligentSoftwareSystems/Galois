@@ -40,6 +40,12 @@ class DESunorderedSerial: public DESabstractMain {
    * Run loop.
    * Does not use GaloisRuntime or Galois worklists
    *
+   * To ensure uniqueness of items on the worklist, we keep a list of boolean flags for each node,
+   * which indicate whether the node is on the worklist. When adding a node to the worklist, the
+   * flag corresponding to a node is set to True if it was previously False. The flag reset to False
+   * when the node is removed from the worklist. This list of flags provides a cheap way of
+   * implementing set semantics.
+   *
    */
 
   virtual void runLoop (const SimInit<Graph, GNode>& simInit) {
@@ -76,6 +82,7 @@ class DESunorderedSerial: public DESabstractMain {
 
         if (dstObj->isActive ()) {
           if (!onWlFlags[dstObj->getId ()]) {
+            // set the flag to indicate presence on the worklist
             onWlFlags[dstObj->getId ()] = true;
             worklist.push_back (dst);
           }

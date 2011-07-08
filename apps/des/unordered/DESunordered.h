@@ -119,6 +119,12 @@ class DESunordered: public DESabstractMain {
   /**
    * Run loop.
    *
+   * Galois worklists, currently, do not support set semantics, therefore, duplicates can be present on the workset. 
+   * To ensure uniqueness of items on the worklist, we keep a list of boolean flags for each node,
+   * which indicate whether the node is on the worklist. When adding a node to the worklist, the
+   * flag corresponding to a node is set to True if it was previously False. The flag reset to False
+   * when the node is removed from the worklist. This list of flags provides a cheap way of
+   * implementing set semantics.
    */
   virtual void runLoop (const SimInit<Graph, GNode>& simInit) {
     const std::vector<GNode>& initialActive = simInit.getInputNodes();
