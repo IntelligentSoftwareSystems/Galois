@@ -32,7 +32,7 @@
 class AVIunordered: public AVIabstractMain {
 
 protected:
-  typedef Galois::AtomicInteger AtomicInteger;
+  typedef Galois::GAtomic<int> AtomicInteger;
 
   static const bool DEBUG = false;
 
@@ -242,7 +242,7 @@ protected:
 
 
         // for debugging, remove later
-        iter.incrementAndGet ();
+        ++iter;
 
 
       }
@@ -313,7 +313,7 @@ public:
     Galois::for_each< GaloisRuntime::WorkList::FIFO<GNode> >(initWl.begin (), initWl.end (), p);
 
 
-    printf ("iterations = %d\n", iter.get ());
+    printf ("iterations = %d\n", (int)iter);
 
   }
 

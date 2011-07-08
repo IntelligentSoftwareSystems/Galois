@@ -47,7 +47,7 @@ private:
    * this id
    * The counter is atomic so that events created dynamically don't have duplicate ids
    */
-  static Galois::AtomicInteger idCntr;
+  static Galois::GAtomic<int> idCntr;
 
   /** The id. */
   size_t id;
@@ -81,7 +81,7 @@ public:
    * @param recvTime the recv time
    */
   BaseEvent (const S& sendObj, const S& recvObj, const A& action, const SimTime& sendTime, const SimTime& recvTime):
-    id (idCntr.getAndIncrement ()), sendObj (sendObj), recvObj (recvObj), action (action), sendTime (sendTime), recvTime (recvTime) {}
+    id (idCntr++), sendObj (sendObj), recvObj (recvObj), action (action), sendTime (sendTime), recvTime (recvTime) {}
 
 
   /**
@@ -191,11 +191,11 @@ public:
 };
 
 template <typename S, typename A>
-Galois::AtomicInteger BaseEvent<S, A>::idCntr(0);
+Galois::GAtomic<int> BaseEvent<S, A>::idCntr(0);
 
 template <typename S, typename A>
 void BaseEvent<S, A>::resetIdCounter () {
-  BaseEvent<S, A>::idCntr.set(0);
+  BaseEvent<S, A>::idCntr = 0;
 }
 
 

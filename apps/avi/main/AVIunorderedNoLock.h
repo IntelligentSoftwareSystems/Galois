@@ -88,7 +88,7 @@ protected:
       void operator () (const GNode& src, ContextTy& lwl) {
         AVI* srcAVI = graph.getData (src, Galois::Graph::NONE);
 
-        int inDeg = inDegVec[srcAVI->getGlobalIndex ()].get ();
+        int inDeg = (int)inDegVec[srcAVI->getGlobalIndex ()];
         // assert  inDeg == 0 : String.format ("active node %s with inDeg = %d\n", srcAVI, inDeg);
 
 //        // TODO: DEBUG
@@ -126,7 +126,7 @@ protected:
           }
         }
         else {
-          inDegVec[srcAVI->getGlobalIndex ()].addAndGet (addAmt);
+          inDegVec[srcAVI->getGlobalIndex ()] += addAmt;
 
           std::vector<GNode> toAdd = perIterAddList.get ();
           toAdd.clear ();
@@ -138,7 +138,7 @@ protected:
             AVI* dstAVI = graph.getData (dst, Galois::Graph::NONE);
 
             if (aviCmp.compare (srcAVI, dstAVI) > 0) {
-              int din = inDegVec[dstAVI->getGlobalIndex ()].decrementAndGet ();
+              int din = --inDegVec[dstAVI->getGlobalIndex ()];
 
               assert (din >= 0);
 
@@ -164,7 +164,7 @@ protected:
 
 
         // for debugging, remove later
-        iter.incrementAndGet ();
+        ++iter;
 
 
       }
@@ -191,12 +191,12 @@ public:
         
         AVI* dstAVI = graph.getData (*n, Galois::Graph::NONE);
         if (aviCmp.compare (srcAVI, dstAVI) > 0) {
-          inDegVec[srcAVI->getGlobalIndex ()].incrementAndGet ();
+          ++inDegVec[srcAVI->getGlobalIndex ()];
         }
       }
 
       // if src is less than all its neighbors then add to initWl
-      if (inDegVec[srcAVI->getGlobalIndex ()].get () == 0) {
+      if ((int)inDegVec[srcAVI->getGlobalIndex ()] == 0) {
         initWl.push_back (src);
       }
     }
@@ -239,7 +239,7 @@ public:
     Galois::for_each< GaloisRuntime::WorkList::FIFO<GNode> >(initWl.begin (), initWl.end (), p);
 
 
-    printf ("iterations = %d\n", iter.get ());
+    printf ("iterations = %d\n", (int)iter);
 
   }
 

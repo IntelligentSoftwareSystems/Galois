@@ -31,7 +31,7 @@
 
 #include "DESabstractMain.h"
 
-using Galois::AtomicInteger;
+typedef Galois::GAtomic<int> AtomicInteger;
 
 class DESunordered: public DESabstractMain {
 
@@ -82,7 +82,7 @@ class DESunordered: public DESabstractMain {
 
 
         int proc = srcObj->simulate(graph, activeNode); // number of events processed
-        numEvents.addAndGet(proc);
+        numEvents += proc;
 
         for (Graph::neighbor_iterator i = graph.neighbor_begin (activeNode, Galois::Graph::NONE)
             , ei = graph.neighbor_end (activeNode, Galois::Graph::NONE); i != ei; ++i) {
@@ -111,7 +111,7 @@ class DESunordered: public DESabstractMain {
           onWlFlags[srcObj->getId ()] = false;
         }
 
-        numIter.incrementAndGet();
+        ++numIter;
 
     }
   };
@@ -142,8 +142,8 @@ class DESunordered: public DESabstractMain {
 
     Galois::for_each < GaloisRuntime::WorkList::FIFO<GNode> > (initialActive.begin (), initialActive.end (), p);
 
-    std::cout << "Number of events processed = " << numEvents.get () << std::endl;
-    std::cout << "Number of iterations performed = " << numIter.get () << std::endl;
+    std::cout << "Number of events processed = " << (int)numEvents << std::endl;
+    std::cout << "Number of iterations performed = " << (int)numIter << std::endl;
   }
 
   virtual bool isSerial () const { return false; }

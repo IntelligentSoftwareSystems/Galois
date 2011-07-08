@@ -22,76 +22,58 @@ kind.
 
 namespace Galois {
 
-  //TODO: it may be a good idea to add buffering to these classes so that the object is store one per cache line
+//TODO: it may be a good idea to add buffering to these classes so that the object is store one per cache line
 
-  class AtomicBool {
-    volatile bool val;
+//! wrap a data item with atomic updates
+//! operators return void so as to force only one update per statement
+template<typename T>
+class GAtomic {
+  T val;
 
-  public:
-    AtomicBool (bool val = false) :
-      val (val) {
-    }
+public:
+  explicit GAtomic(const T& i) :val(i) {}
+  GAtomic& operator+=(const T& rhs) {
+    __sync_add_and_fetch(&val, rhs); 
+    return *this; 
+  }
+  GAtomic& operator-=(const T& rhs) {
+    __sync_sub_and_fetch(&val, rhs); 
+    return *this;
+  }
+  GAtomic& operator++() {
+    __sync_add_and_fetch(&val, 1);
+    return *this;
+  }
+  GAtomic& operator++(int) {
+    __sync_fetch_and_add(&val, 1);
+    return *this;
+  }
+  GAtomic& operator--() { 
+    __sync_sub_and_fetch(&val, 1); 
+    return *this;
+  }
+  GAtomic& operator--(int) {
+    __sync_fetch_and_sub(&val, 1);
+    return *this;
+  }
+  
+  operator T() {
+    return val;
+  }
+  
+  GAtomic& operator=(const T& i) {
+    val = i;
+    return *this;
+  }
+  GAtomic& operator=(const GAtomic& i) {
+    val = i.val;
+    return *this;
+  }
+  bool cas (const T& expected, const T& updated) {
+    return __sync_bool_compare_and_swap (&val, expected, updated);
+  }
+};
 
-    inline bool get () const {
-      return val;
-    }
-
-    inline void set (bool v) {
-      val = v;
-    }
-
-    inline bool cas (bool expected, bool updated) {
-      return (__sync_bool_compare_and_swap (&val, expected, updated));
-    }
-
-  };
-
-  class AtomicInteger {
-    volatile int val;
-
-  public:
-    AtomicInteger (int val = 0) :
-      val (val) {
-    }
-    ;
-
-    inline int get () const {
-      return val;
-    }
-
-    inline void set (int v) {
-      val = v;
-    }
-
-    inline bool cas (int expected, int update) {
-      return __sync_bool_compare_and_swap (&val, expected, update);
-    }
-
-    inline int addAndGet (int delta) {
-      return __sync_add_and_fetch (&val, delta);
-    }
-
-    inline int incrementAndGet () {
-      return addAndGet (1);
-    }
-
-    inline int decrementAndGet () {
-      return addAndGet (-1);
-    }
-
-    inline int getAndAdd (int delta) {
-      return __sync_fetch_and_add (&val, delta);
-    }
-
-    inline int getAndIncrement () {
-      return getAndAdd (1);
-    }
-
-    inline int getAndDecrement () {
-      return getAndAdd (-1);
-    }
-
-  };
 }
 
 
