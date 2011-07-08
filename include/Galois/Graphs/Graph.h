@@ -161,6 +161,8 @@ struct EdgeItem {
   }
   inline EdgeItem(NTy& n) : N(n) {
   }
+  inline EdgeItem(NTy& n, ETy e) : N(n), E(e) {
+  }
 
   inline EdgeItem(){ }
 };
@@ -271,6 +273,15 @@ private:
 	  return ii->getData();
       edges.push_back(EITy(N));
       return edges.back().getData();
+    }
+
+    edge_reference getOrCreateEdge(gNode* N,  const_edge_reference data) {
+    	for (iterator ii = begin(), ee = end(); ii != ee; ++ii)
+    		if (ii->getNeighbor() == N)
+    			return ii->getData();
+
+    	edges.push_back(EITy(N, data));
+    	return edges.back().getData();
     }
 
     bool isActive() {
@@ -530,10 +541,10 @@ public:
 
   /**
     * Returns the edge data associated with the edge if the edge exists, otherwise it add an edge with
-    * the edge data created by default constructor for a non-existent edge.
+    * the given edge data for a non-existent edge.
     */
    edge_reference getOrCreateEdge(GraphNode src, GraphNode dst,
-       MethodFlag mflag = ALL) const {
+		   const_edge_reference data, MethodFlag mflag = ALL) const {
      assert(src.ID);
      assert(dst.ID);
 
@@ -541,18 +552,18 @@ public:
        acquire(src.ID);
 
      if (Directional) {
-       return src.ID->getOrCreateEdge(dst.ID);
+       return src.ID->getOrCreateEdge(dst.ID, data);
      } else {
        if (shouldLock(mflag))
  	acquire(dst.ID);
 
        if (src < dst){
-    	   dst.ID->getOrCreateEdge(src.ID);
-           return src.ID->getOrCreateEdge(dst.ID);
+    	   dst.ID->getOrCreateEdge(src.ID, data);
+           return src.ID->getOrCreateEdge(dst.ID, data);
        }
        else{
-    	   src.ID->getOrCreateEdge(dst.ID);
-    	   return dst.ID->getOrCreateEdge(src.ID);
+    	   src.ID->getOrCreateEdge(dst.ID, data);
+    	   return dst.ID->getOrCreateEdge(src.ID, data);
 
        }
      }
