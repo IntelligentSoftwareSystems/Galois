@@ -115,6 +115,7 @@ void generalTwoWayBalance(MetisGraph* metisGraph, int* tpwgts) {
 		}
 
 	}
+	delete[] moved;
 	metisGraph->setMinCut(mincut);
 };
 
@@ -201,6 +202,7 @@ void boundaryTwoWayBalance(MetisGraph* metisGraph, int* tpwgts) {
 			}
 		}
 	}
+	delete[] moved;
 	metisGraph->setMinCut(mincut);
 }
 
@@ -209,7 +211,7 @@ void balanceTwoWay(MetisGraph* metisGraph, int* tpwgts) {
 	int pwgts1 = metisGraph->getPartWeight(1);
 
 	int mindiff = abs(tpwgts[0] - pwgts0);
-	if (mindiff < 3 * (pwgts0 + pwgts1) / metisGraph->getGraph()->size()) {
+	if (mindiff < 3 * (pwgts0 + pwgts1) / metisGraph->getNumNodes()) {
 		return;
 	}
 	if (pwgts0 > tpwgts[0] && pwgts0 < (int) (PMetis::UB_FACTOR * tpwgts[0])) {
@@ -231,7 +233,6 @@ void balanceTwoWay(MetisGraph* metisGraph, int* tpwgts) {
 
 void greedyKWayEdgeBalance(MetisGraph* metisGraph, int nparts, float* tpwgts, float ubfactor,
 		int npasses) {
-
 	int* minwgts = new int[nparts];
 	int* maxwgts = new int[nparts];
 	int* itpwgts = new int[nparts];
@@ -246,10 +247,11 @@ void greedyKWayEdgeBalance(MetisGraph* metisGraph, int nparts, float* tpwgts, fl
 	}
 	GGraph* graph = metisGraph->getGraph();
 
-	PQueue queue(graph->size(), metisGraph->getMaxAdjSum());
-	int* moved = new int[graph->size()];
+	PQueue queue(metisGraph->getNumNodes(), metisGraph->getMaxAdjSum());
+	int* moved = new int[metisGraph->getNumNodes()];
 
 	for (int pass = 0; pass < npasses; pass++) {
+
 		int i = 0;
 		for (; i < nparts; i++) {
 			if (metisGraph->getPartWeight(i) > maxwgts[i]) {
@@ -259,9 +261,10 @@ void greedyKWayEdgeBalance(MetisGraph* metisGraph, int nparts, float* tpwgts, fl
 		if (i == nparts)
 			break;
 //		cout<<"pass----------------------------------------------"<<pass<<endl;
-		arrayFill(moved, graph->size(), -1);
+		int graphSize = metisGraph->getNumNodes();
+		arrayFill(moved, graphSize, -1);
 		queue.reset();
-		int graphSize = graph->size();
+
 		GNodeSet* boundaryNodeSet= metisGraph->getBoundaryNodes();
 		for (GNodeSet::iterator bndIter = boundaryNodeSet->begin(); bndIter != boundaryNodeSet->end(); ++bndIter) {
 			GNode boundaryNode = *bndIter;
@@ -272,15 +275,11 @@ void greedyKWayEdgeBalance(MetisGraph* metisGraph, int nparts, float* tpwgts, fl
 			moved[boundaryNodeData.getNodeId()] = 2;
 		}
 
-
-//		cout<<queue.size()<<endl;
-
 		while (true) {
 			if (queue.size()==0)
 				break;
 			GNode higain = queue.getMax();
 			MetisNode& higainData = higain.getData();
-//			cout<<"higainData:"<<higainData.getNodeId()<<endl;
 			assert(higainData.getNodeId()<graphSize);
 			moved[higainData.getNodeId()] = 1;
 			int from = higainData.getPartition();
@@ -312,7 +311,7 @@ void greedyKWayEdgeBalance(MetisGraph* metisGraph, int nparts, float* tpwgts, fl
 			/*=====================================================================
 			 * If we got here, we can now move the vertex from 'from' to 'to'
 			 *======================================================================*/
-
+//			cout<<"weights original:"<<metisGraph->getPartWeight(from)<<" "<<metisGraph->getPartWeight(to)<<" "<<higainData.getGain()<<endl;
 			metisGraph->setMinCut(metisGraph->getMinCut() - (higainData.getPartEd()[k] - higainData.getIdegree()));
 
 			/* Update where, weight, and ID/ED information of the vertex you moved */
@@ -339,7 +338,7 @@ void greedyKWayEdgeBalance(MetisGraph* metisGraph, int nparts, float* tpwgts, fl
 			/* Update the degrees of adjacent vertices */
 			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(higain, Galois::Graph::NONE), eejj = graph->neighbor_end(higain, Galois::Graph::NONE); jj != eejj; ++jj) {
 				GNode neighbor = *jj;
-				MetisNode& neighborData = neighbor.getData();
+				MetisNode& neighborData = neighbor.getData(Galois::Graph::NONE);
 				assert(neighborData.getNodeId()<graphSize);
 				int oldgain = neighborData.getGain();
 				if (neighborData.getPartEd().size() == 0) {
@@ -352,13 +351,15 @@ void greedyKWayEdgeBalance(MetisGraph* metisGraph, int nparts, float* tpwgts, fl
 				if (neighborData.getPartition() == from) {
 					neighborData.setEdegree(neighborData.getEdegree() + edgeWeight);
 					neighborData.setIdegree(neighborData.getIdegree() - edgeWeight);
-					if (neighborData.getEdegree() - neighborData.getIdegree() > 0 && !neighborData.isBoundary())
+					if (neighborData.getEdegree() > 0 && !neighborData.isBoundary()){
 						metisGraph->setBoundaryNode(neighbor);
+					}
 				} else if (neighborData.getPartition() == to) {
 					neighborData.setEdegree(neighborData.getEdegree() - edgeWeight);
 					neighborData.setIdegree(neighborData.getIdegree() + edgeWeight);
-					if (neighborData.getEdegree() - neighborData.getIdegree() == 0 && neighborData.isBoundary())
+					if (neighborData.getEdegree() == 0 && neighborData.isBoundary()){
 						metisGraph->unsetBoundaryNode(neighbor);
+					}
 				}
 
 				/* Remove contribution from the .ed of 'from' */
@@ -415,6 +416,7 @@ void greedyKWayEdgeBalance(MetisGraph* metisGraph, int nparts, float* tpwgts, fl
 			}
 		}
 	}
+//	metisGraph->verify();
 	delete[] moved;
 	delete[] itpwgts;
 	delete[] maxwgts;

@@ -30,27 +30,24 @@
 #include "defs.h"
 class PMetis{
 public:
-	PMetis(int coasenTo, int maxVertexWeight) {
-		coarsener = new Coarsener(true, coasenTo, maxVertexWeight);
+	PMetis(int coasenTo, int maxVertexWeight):coarsener(true, coasenTo, maxVertexWeight) {
 	}
 
-	/**
-	 * Partition the graph using PMetis
-	 */
-	void partition(MetisGraph* metisGraph, int nparts){
-		int maxVertexWeight = (int) (1.5 * ((metisGraph->getGraph()->size()) / Coarsener::COARSEN_FRACTION));
-//		metisGraph->setNParts(2);
-		float* totalPartitionWeights = new float[nparts];
-		arrayFill(totalPartitionWeights, nparts, 1 / (float) nparts);
-		metisGraph->computeAdjWgtSums();
-		//    PMetis pmetis = new PMetis(maxVertexWeight, 20);
-//		mlevelRecursiveBisection(metisGraph, nparts, totalPartitionWeights, 0, 0);
-	}
+//	/**
+//	 * Partition the graph using PMetis
+//	 */
+//	void partition(MetisGraph* metisGraph, int nparts){
+//		int maxVertexWeight = (int) (1.5 * ((metisGraph->getGraph()->size()) / Coarsener::COARSEN_FRACTION));
+//		float* totalPartitionWeights = new float[nparts];
+//		arrayFill(totalPartitionWeights, nparts, 1 / (float) nparts);
+//		metisGraph->computeAdjWgtSums();
+//		//    PMetis pmetis = new PMetis(maxVertexWeight, 20);
+////		mlevelRecursiveBisection(metisGraph, nparts, totalPartitionWeights, 0, 0);
+//	}
 
 	/**
 	 * totalPartWeights: This is an array containing "nparts" floating point numbers. For partition i , totalPartitionWeights[i] stores the fraction
-	 * of the total weight that should be assigned to it. See tpwgts in manual of metis.
-	 * @throws ExecutionException
+	 * of the total weight that should be assigned to it.
 	 */
 	void mlevelRecursiveBisection(MetisGraph* metisGraph, int nparts, float* totalPartWeights, int tpindex,
 			int partStartIndex) {
@@ -71,8 +68,8 @@ public:
 		bisectionWeights[0] = (int) (totalVertexWeight * vertexWeightRatio);
 		bisectionWeights[1] = totalVertexWeight - bisectionWeights[0];
 
-		MetisGraph* mcg = coarsener->coarsen(metisGraph);
-		bisection(mcg, bisectionWeights, coarsener->getCoarsenTo());
+		MetisGraph* mcg = coarsener.coarsen(metisGraph);
+		bisection(mcg, bisectionWeights, coarsener.getCoarsenTo());
 		refineTwoWay(mcg, metisGraph, bisectionWeights);
 
 		if (nparts <= 2) {
@@ -87,7 +84,7 @@ public:
 			}
 			//nparts/2 may not be equal to nparts-nparts/2
 			for (int i = 0; i < nparts - nparts / 2; i++) {
-				totalPartWeights[i + tpindex + nparts / 2] *= (1 / vertexWeightRatio);
+				totalPartWeights[i + tpindex + nparts / 2] *= (1 / (1 - vertexWeightRatio));
 			}
 			MetisGraph* subGraphs = new MetisGraph[2];
 			splitGraph(metisGraph, subGraphs);
@@ -99,7 +96,7 @@ public:
 			} else if (nparts == 3) {
 				for (GGraph::active_iterator ii = subGraphs[0].getGraph()->active_begin(), ee = subGraphs[0].getGraph()->active_end(); ii != ee; ++ii) {
 					GNode node = *ii;
-					MetisNode& nodeData = node.getData();
+					MetisNode& nodeData = node.getData(Galois::Graph::NONE);
 					nodeData.setPartition(partStartIndex);
 					assert(nodeData.getPartition()>=0);
 				}
@@ -129,10 +126,8 @@ public:
 		// = new MetisGraph[2];
 		//    subGraphs[0] = new MetisGraph();
 		//    subGraphs[1] = new MetisGraph();
-		GGraph* empty = new GGraph();
-		subGraphs[0].setGraph(empty);
-		empty = new GGraph();
-		subGraphs[1].setGraph(empty);
+		subGraphs[0].setGraph(new GGraph());
+		subGraphs[1].setGraph(new GGraph());
 		metisGraph->initSubGraphMapTo();
 		for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
 			GNode node = *ii;
@@ -141,20 +136,21 @@ public:
 			GNode newNode = subGraphs[nodeData.getPartition()].getGraph()->createNode(
 					MetisNode(subGraphNodeNum[nodeData.getPartition()], nodeData.getWeight()));
 //			nodeData.setSubGraphMap(newNode);
+			subGraphs[nodeData.getPartition()].getGraph()->addNode(newNode);
 			metisGraph->setSubGraphMapTo(nodeData.getNodeId(), newNode);
 			subGraphNodeNum[nodeData.getPartition()]++;
 		}
 
-		for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
-			GNode node = *ii;
-			MetisNode& nodeData = node.getData();
-			subGraphs[nodeData.getPartition()].getGraph()->addNode(metisGraph->getSubGraphMapTo(nodeData.getNodeId()));
-		}
+//		for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+//			GNode node = *ii;
+//			MetisNode& nodeData = node.getData();
+//			subGraphs[nodeData.getPartition()].getGraph()->addNode(metisGraph->getSubGraphMapTo(nodeData.getNodeId()));
+//		}
 
 		subGraphs[0].setNumNodes(subGraphNodeNum[0]);
 		subGraphs[1].setNumNodes(subGraphNodeNum[1]);
-		assert(subGraphs[0].getGraph()->size() == subGraphNodeNum[0]);
-		assert(subGraphs[1].getGraph()->size() == subGraphNodeNum[1]);
+		assert(subGraphs[0].getNumNodes() == subGraphNodeNum[0]);
+		assert(subGraphs[1].getNumNodes() == subGraphNodeNum[1]);
 
 		for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
 			GNode node = *ii;
@@ -182,7 +178,7 @@ public:
 	}
 	const static double UB_FACTOR = 1;
 private:
-	Coarsener* coarsener;
+	Coarsener coarsener;
 
 };
 

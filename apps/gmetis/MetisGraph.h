@@ -57,10 +57,12 @@ public:
 	}
 
 	bool isMatched(int id){
+		assert(id < numNodes);
 		return matchFlag[id];
 	}
 
 	GNode getMatch(int id){
+		assert(id < numNodes);
 		return matches[id];
 	}
 
@@ -69,6 +71,7 @@ public:
 	}
 
 	GNode getSubGraphMapTo(int id){
+		assert(id < numNodes);
 		return subGraphMaps[id];
 	}
 
@@ -92,16 +95,19 @@ public:
 	}
 
 	void setMatch(int id, GNode node){
+		assert(id < numNodes);
 		matchFlag[id] = true;
 		matches[id] = node;
 	}
 
 	void setSubGraphMapTo(int id, GNode node){
+		assert(id < numNodes);
 		 subGraphMaps[id] = node;
 	}
 
 	void setCoarseGraphMap(int id, GNode node){
-		 coarseGraphMapTo[id] = node;
+		assert(id < numNodes);
+		coarseGraphMapTo[id] = node;
 	}
 
 	/**
@@ -119,10 +125,10 @@ public:
 	/**
 	 * initialize the partition weights variable
 	 */
-	void initPartWeight(int nparts) {
-		if(partWeights.size()!=nparts){
+	void initPartWeight(size_t nparts) {
+		if(partWeights.size() != nparts){
 			partWeights.resize(nparts);
-			for (int i = 0; i < partWeights.size(); i++) {
+			for (size_t i = 0; i < partWeights.size(); ++i) {
 				partWeights[i] = 0;
 			}
 		}
@@ -169,6 +175,7 @@ public:
 		numNodes = num;
 	}
 	int getNumNodes(){
+		assert(numNodes > 0);
 		return numNodes;
 	}
 
@@ -226,7 +233,7 @@ public:
 			unsetAllBoundaryNodes();
 		}
 		partWeights.resize(nparts);
-		for (int i = 0; i < nparts; i++) {
+		for (int i = 0; i < nparts; ++i) {
 			partWeights[i] = 0;
 		}
 		int mincut = 0;
@@ -479,12 +486,14 @@ public:
 	 * check if the partitioning is balanced
 	 */
 	bool isBalanced(float* tpwgts, float ubfactor) {
+
 		int sum = 0;
-		for (int i = 0; i < partWeights.size(); i++) {
+		for (size_t i = 0; i < partWeights.size(); i++) {
 			sum += partWeights[i];
 		}
-		for (int i = 0; i < partWeights.size(); i++) {
+		for (size_t i = 0; i < partWeights.size(); i++) {
 			if (partWeights[i] > tpwgts[i] * sum * (ubfactor + 0.005)) {
+				cout<<"partWeights[i]:"<<partWeights[i]<<" | "<<tpwgts[i] * sum * (ubfactor + 0.005)<<endl;
 				return false;
 			}
 		}
@@ -512,6 +521,23 @@ public:
 			}
 		}
 	}
+
+	float computePartitionBalance(int nparts){
+	  	vector<int> kpwgts(nparts);
+
+	  	for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+	  		GNode node = *ii;
+	  		kpwgts[node.getData().getPartition()]++;
+	  	}
+	  	float sumKpwgts=0;
+	  	int maxKpwgts=0;
+	  	for(int i=0;i<nparts;i++){
+	  		sumKpwgts+=kpwgts[i];
+	  		if(maxKpwgts < kpwgts[i])
+	  			maxKpwgts = kpwgts[i];
+	  	}
+	  	return nparts * maxKpwgts / sumKpwgts;
+	  }
 
 
 private:

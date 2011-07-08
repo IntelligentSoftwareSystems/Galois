@@ -120,8 +120,7 @@ void moveBackNode(MetisGraph* metisGraph, GNode higain) {
 
 void fmTwoWayEdgeRefine(MetisGraph* metisGraph, int* tpwgts, int npasses) {
 	PQueue* parts[2];
-	GGraph* graph = metisGraph->getGraph();
-	int numNodes = graph->size();
+	int numNodes = metisGraph->getNumNodes();
 	GNode* swaps = new GNode[numNodes];
 
 	int* moved = new int[numNodes];

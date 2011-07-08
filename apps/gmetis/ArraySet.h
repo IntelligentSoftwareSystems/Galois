@@ -30,11 +30,12 @@ template<typename T>
 class ArraySet{
 public:
 	ArraySet(){
-
+		setsize= 0;
 	}
 	ArraySet(int maxSize, int (*mapToInt)(T)):indexes(maxSize){
 		this->mapToInt = mapToInt;
 		fill(indexes.begin(), indexes.end(), -1);
+		setsize = 0;
 	}
 	typedef typename vector<T>::iterator iterator;
 	iterator begin(){
@@ -46,6 +47,7 @@ public:
 	bool insert(T ele){
 		int index = (*mapToInt)(ele);
 		if(indexes[index]==-1){
+			setsize++;
 			indexes[index] = setElements.size();
 			setElements.push_back(ele);
 			return true;
@@ -55,6 +57,7 @@ public:
 	bool erase(T ele){
 		int index = (*mapToInt)(ele);
 		if(indexes[index]!=-1){
+			setsize--;
 			int indexEle = indexes[index];
 			//swap(setElements[indexEle], setElements[setElements.size()-1]);
 			setElements[indexEle] = setElements[setElements.size()-1];
@@ -69,16 +72,19 @@ public:
 	void clear(){
 		fill(indexes.begin(), indexes.end(), -1);
 		setElements.clear();
+		setsize = 0;
 	}
 
 	int size(){
-		return setElements.size();
+//		return setElements.size();
+		return setsize;
 	}
 
 private:
 	vector<int> indexes;
 	vector<T> setElements;
 	int (*mapToInt)(T);
+	int setsize;
 };
 
 #endif /* ARRAYSET_H_ */

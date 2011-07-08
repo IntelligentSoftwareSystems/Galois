@@ -115,7 +115,7 @@ void projectKWayPartition(MetisGraph* metisGraph, int nparts){
 		MetisNode& nodeData = node.getData();
 		nodeData.setPartition(finer->getCoarseGraphMap(nodeData.getNodeId()).getData().getPartition());
 		nodeData.initPartEdAndIndex(nodeData.getNumEdges());
-		assert(nodeData.getPartition()>=0);
+//		assert(nodeData.getPartition()>=0);
 	}
 	Galois::Timer p_Time;
 	p_Time.start();
@@ -168,7 +168,7 @@ void refineKWay(MetisGraph* metisGraph, MetisGraph* orgGraph, float* tpwgts, flo
 		metisGraph->releaseCoarseGraphMap();
 		delete coarseGraph->getGraph();
 		delete coarseGraph;
-
+//		cout<<"cut in current level:"<<metisGraph->getMinCut()<<endl;
 		i++;
 	}
 	if (2 * i >= nlevels && !metisGraph->isBalanced(tpwgts, (float) 1.04 * ubfactor)) {

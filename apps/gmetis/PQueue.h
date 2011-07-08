@@ -60,6 +60,7 @@ public:
 	virtual	T getMax() = 0;
 	virtual	void reset() = 0;
 	virtual	int size() = 0;
+	virtual ~SuperPQueue(){};
 };
 
 template <class T>
@@ -73,6 +74,8 @@ public:
 		//arrayFill(locator, maxNumNodes, -1);
 		fill(locator.begin(),locator.end(), -1);
 		this->maxNumNodes = maxNumNodes;
+	}
+	virtual ~HeapQueue(){
 	}
 	void insert(T value, int priority) {
 		//heap
@@ -250,7 +253,7 @@ public:
 		_mapToInt = mapToInt;
 		numNodes = 0;
 	}
-	~LimitedPriorityQueue(){
+	virtual ~LimitedPriorityQueue(){
 		delete[] nodes;
 	}
 	void insert(T value, int priority) {

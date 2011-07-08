@@ -94,7 +94,7 @@ void bisection(GGraph* graph, GNode* nodes, int numNodes, int minWgtPart1, int m
 void bisection(MetisGraph* metisGraph, int* tpwgts, int coarsenTo) {
 
 	GGraph* graph = metisGraph->getGraph();
-	int numNodes = graph->size();
+	int numNodes = metisGraph->getNumNodes();
 	GNode* nodes = new GNode[numNodes];
 
 	for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
