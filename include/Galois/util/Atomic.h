@@ -22,53 +22,57 @@ kind.
 
 namespace Galois {
 
-//TODO: it may be a good idea to add buffering to these classes so that the object is store one per cache line
-
-//! wrap a data item with atomic updates
-//! operators return void so as to force only one update per statement
+//! Atomic Wrapper for any integer or bool type
+/*!  An atomic wrapper that provides sensible atomic behavior for most
+  primative data types.  Operators return the value of type T so as to
+  retain atomic RMW semantics.  */
 template<typename T>
 class GAtomic {
   T val;
 
 public:
+  //! Initialize with a value
   explicit GAtomic(const T& i) :val(i) {}
-  GAtomic& operator+=(const T& rhs) {
-    __sync_add_and_fetch(&val, rhs); 
-    return *this; 
+  //! atomic add and fetch
+  T operator+=(const T& rhs) {
+    return __sync_add_and_fetch(&val, rhs); 
   }
-  GAtomic& operator-=(const T& rhs) {
-    __sync_sub_and_fetch(&val, rhs); 
-    return *this;
+  //! atomic sub and fetch
+  T operator-=(const T& rhs) {
+    return __sync_sub_and_fetch(&val, rhs); 
   }
-  GAtomic& operator++() {
-    __sync_add_and_fetch(&val, 1);
-    return *this;
+  //! atomic increment and fetch
+  T operator++() {
+    return __sync_add_and_fetch(&val, 1);
   }
-  GAtomic& operator++(int) {
-    __sync_fetch_and_add(&val, 1);
-    return *this;
+  //! atomic fetch and increment
+  T operator++(int) {
+    return __sync_fetch_and_add(&val, 1);
   }
-  GAtomic& operator--() { 
-    __sync_sub_and_fetch(&val, 1); 
-    return *this;
+  //! atomic decrement and fetch
+  T operator--() { 
+    return __sync_sub_and_fetch(&val, 1); 
   }
-  GAtomic& operator--(int) {
-    __sync_fetch_and_sub(&val, 1);
-    return *this;
+  //! atomic fetch and decrement
+  T operator--(int) {
+    return __sync_fetch_and_sub(&val, 1);
   }
-  
-  operator T() {
+  //! conversion operator to base data type (atomic get)
+  operator T() const {
     return val;
   }
-  
-  GAtomic& operator=(const T& i) {
+  //! atomic assign
+  T operator=(const T& i) {
     val = i;
-    return *this;
+    return i;
   }
-  GAtomic& operator=(const GAtomic& i) {
-    val = i.val;
-    return *this;
+  //! atomic assign
+  T operator=(const GAtomic& i) {
+    T iv = (int)i;
+    val = iv;
+    return iv;
   }
+  //! direct compare and swap
   bool cas (const T& expected, const T& updated) {
     return __sync_bool_compare_and_swap (&val, expected, updated);
   }
