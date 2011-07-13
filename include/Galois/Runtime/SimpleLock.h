@@ -33,9 +33,6 @@ class SimpleLock<T, true> {
   volatile mutable T _lock; //Allow locking a const
 public:
   SimpleLock() : _lock(0) {
-#ifdef GALOIS_CRAY
-    writexf(&_lock, 0); // sets to full
-#endif
   }
 
   inline void lock(T val) const {
@@ -62,47 +59,25 @@ public:
     } while (true);
   }
 
-  void unlock() const {
+  inline void unlock() const {
     assert(_lock);
-#ifdef GALOIS_CRAY
-    readfe(&_lock); // sets to empty, acquiring the lock lock
-    writeef(&_lock, 0); // clears the lock and clears the lock lock
-#else
     _lock = 0;
-#endif
   }
 
   inline bool try_lock(T val) const {
-#ifdef GALOIS_CRAY
-    T V = readfe(&_lock); // sets to empty, acquiring the lock lock
-    if (V) {
-      //failed
-      writeef(&_lock, V); //write back the same value and clear the lock lock
-      return false;
-    } else {
-      //can grab
-      writeef(&_lock, val); //write our value into the lock (acquire) and clear the lock lock
-      return true;
-    }
-#else
     if (_lock != 0)
       return false;
     return __sync_bool_compare_and_swap(&_lock, 0, val);
-#endif
   }
 
   inline bool try_lock() const {
-#ifdef GALOIS_CRAY
-    return try_lock(1);
-#else
     if (_lock != 0)
       return false;
     T oldval = __sync_fetch_and_or(&_lock, 1);
     return !(oldval & 1);
-#endif
   }
 
-  T getValue() const {
+  inline T getValue() const {
     return _lock;
   }
 };
@@ -110,10 +85,10 @@ public:
 template<typename T>
 class SimpleLock<T, false> {
 public:
-  void lock(T val = 0) const {}
-  void unlock() const {}
-  bool try_lock(T val = 1) const { return true; }
-  T getValue() const { return 0; }
+  inline void lock(T val = 0) const {}
+  inline void unlock() const {}
+  inline bool try_lock(T val = 1) const { return true; }
+  inline T getValue() const { return 0; }
 };
 
 
@@ -140,27 +115,27 @@ public:
     } while (true);
   }
 
-  void unlock() {
+  inline void unlock() {
     assert(_lock & 1);
     _lock = _lock & ~1;
   }
 
-  void unlock_and_clear() {
+  inline void unlock_and_clear() {
     assert(_lock & 1);
     _lock = 0;
   }
 
-  void unlock_and_set(T val) {
+  inline void unlock_and_set(T val) {
     assert(_lock & 1);
     assert(!((uintptr_t)val & 1));
     _lock = (uintptr_t)val;
   }
   
-  T getValue() const {
+  inline T getValue() const {
     return (T)(_lock & ~1);
   }
 
-  void setValue(T val) {
+  inline void setValue(T val) {
     _lock = ((uintptr_t)val) | (_lock & 1);
   }
 
@@ -174,7 +149,7 @@ public:
 
   //CAS only works on unlocked values
   //the lock bit will prevent a successful cas
-  bool CAS(T oldval, T newval) {
+  inline bool CAS(T oldval, T newval) {
     assert(!((uintptr_t)oldval & 1) && !((uintptr_t)newval & 1));
     return __sync_bool_compare_and_swap(&_lock, oldval, newval);
   }
@@ -187,14 +162,14 @@ public:
   PtrLock() : _lock(0) {}
   explicit PtrLock(T val) : _lock(val) {}
 
-  void lock() {}
-  void unlock() {}
-  void unlock_and_clear() { _lock = 0; }
-  void unlock_and_set(T val) { _lock = val; }
-  T getValue() const { return _lock; }
-  void setValue(T val) { _lock = val; }
-  bool try_lock() { return true; }
-  bool CAS(T oldval, T newval) {
+  inline void lock() {}
+  inline void unlock() {}
+  inline void unlock_and_clear() { _lock = 0; }
+  inline void unlock_and_set(T val) { _lock = val; }
+  inline T getValue() const { return _lock; }
+  inline void setValue(T val) { _lock = val; }
+  inline bool try_lock() { return true; }
+  inline bool CAS(T oldval, T newval) {
     if (_lock == oldval) {
       _lock = newval;
       return true;
