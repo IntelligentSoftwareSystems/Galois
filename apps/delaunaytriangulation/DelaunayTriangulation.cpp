@@ -85,19 +85,14 @@ struct process {
     
     Cavity::GNodeVector newNodes(lwl.getPerIterAlloc());
     cav.update(&newNodes);
-    for (Cavity::GNodeVector::iterator iter = newNodes.begin(); iter != newNodes.end(); ++iter) {
-      GNode node = *iter;
-
-      if (!node.getData(Galois::NONE).getTuples().empty()) {
-        lwl.push(node);
-      }
-    }
+    for (Cavity::GNodeVector::iterator iter = newNodes.begin(); iter != newNodes.end(); ++iter)
+        lwl.push(*iter);
   }
 };
 
 template<typename WLTY>
 void triangulate(WLTY& wl) {
-  Galois::for_each<GaloisRuntime::WorkList::ChunkedFIFO<512> >(wl.begin(), wl.end(), process());
+  Galois::for_each<GaloisRuntime::WorkList::dChunkedFIFO<1024> >(wl.begin(), wl.end(), process());
 }
 
 void read_points(const char* filename, TupleList& tuples) {
