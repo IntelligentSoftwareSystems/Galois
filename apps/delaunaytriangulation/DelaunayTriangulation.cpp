@@ -56,7 +56,7 @@ struct process {
 
   template<typename Context>
   void operator()(GNode item, Context& lwl) {
-    Element& data = item.getData(Galois::Graph::ALL); //lock
+    Element& data = item.getData(Galois::ALL); //lock
 
     if (!Mesh->containsNode(item)) 
       return;
@@ -88,7 +88,7 @@ struct process {
     for (Cavity::GNodeVector::iterator iter = newNodes.begin(); iter != newNodes.end(); ++iter) {
       GNode node = *iter;
 
-      if (!node.getData(Galois::Graph::NONE).getTuples().empty()) {
+      if (!node.getData(Galois::NONE).getTuples().empty()) {
         lwl.push(node);
       }
     }
@@ -179,7 +179,7 @@ GNode make_graph(const char* filename) {
   Element large_triangle(t1, t2, t3);
   GNode large_node = Mesh->createNode(large_triangle);
   
-  Mesh->addNode(large_node, Galois::Graph::NONE);
+  Mesh->addNode(large_node, Galois::NONE);
 
   Element border_ele1(t1, t2);
   Element border_ele2(t2, t3);
@@ -189,9 +189,9 @@ GNode make_graph(const char* filename) {
   GNode border_node2 = Mesh->createNode(border_ele2);
   GNode border_node3 = Mesh->createNode(border_ele3);
 
-  Mesh->addNode(border_node1, Galois::Graph::NONE);
-  Mesh->addNode(border_node2, Galois::Graph::NONE);
-  Mesh->addNode(border_node3, Galois::Graph::NONE);
+  Mesh->addNode(border_node1, Galois::NONE);
+  Mesh->addNode(border_node2, Galois::NONE);
+  Mesh->addNode(border_node3, Galois::NONE);
 
   Mesh->addEdge(large_node, border_node1, 0);
   Mesh->addEdge(large_node, border_node2, 1);
@@ -210,7 +210,7 @@ void write_mesh(const char* filename) {
   long num_triangles = 0, num_segments = 0;
   for (Graph::active_iterator ii = Mesh->active_begin(), ee = Mesh->active_end(); ii != ee; ++ii) {
     GNode node = *ii;
-    Element& e = node.getData(Galois::Graph::NONE);
+    Element& e = node.getData(Galois::NONE);
     if (e.getBDim()) {
       num_triangles++;
     } else {
@@ -230,7 +230,7 @@ void write_mesh(const char* filename) {
   pout << num_segments << " 1\n";
   for (Graph::active_iterator ii = Mesh->active_begin(), ee = Mesh->active_end(); ii != ee; ++ii) {
     GNode node = *ii;
-    Element& e = node.getData(Galois::Graph::NONE);
+    Element& e = node.getData(Galois::NONE);
     if (e.getBDim()) {
       // <triangle id> <vertex> <vertex> <vertex> [in ccw order]
       eout << tid << " " << e.getPoint(0).id() << " ";

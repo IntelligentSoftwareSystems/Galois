@@ -86,7 +86,7 @@ protected:
 
     template <typename ContextTy> 
       void operator () (const GNode& src, ContextTy& lwl) {
-        AVI* srcAVI = graph.getData (src, Galois::Graph::NONE);
+        AVI* srcAVI = graph.getData (src, Galois::NONE);
 
         int inDeg = (int)inDegVec[srcAVI->getGlobalIndex ()];
         // assert  inDeg == 0 : String.format ("active node %s with inDeg = %d\n", srcAVI, inDeg);
@@ -106,10 +106,10 @@ protected:
         
         int addAmt = 0;
 
-        for (Graph::neighbor_iterator j = graph.neighbor_begin (src, Galois::Graph::NONE), ej = graph.neighbor_end (src, Galois::Graph::NONE);
+        for (Graph::neighbor_iterator j = graph.neighbor_begin (src, Galois::NONE), ej = graph.neighbor_end (src, Galois::NONE);
             j != ej; ++j) {
 
-          AVI* dstAVI = graph.getData (*j, Galois::Graph::NONE);
+          AVI* dstAVI = graph.getData (*j, Galois::NONE);
 
           if (aviCmp.compare (srcAVI, dstAVI) > 0) {
             ++addAmt;
@@ -131,11 +131,11 @@ protected:
           std::vector<GNode> toAdd = perIterAddList.get ();
           toAdd.clear ();
 
-          for (Graph::neighbor_iterator j = graph.neighbor_begin (src, Galois::Graph::NONE), ej = graph.neighbor_end(src, Galois::Graph::NONE);
+          for (Graph::neighbor_iterator j = graph.neighbor_begin (src, Galois::NONE), ej = graph.neighbor_end(src, Galois::NONE);
               j != ej; ++j) {
 
             GNode dst = *j;
-            AVI* dstAVI = graph.getData (dst, Galois::Graph::NONE);
+            AVI* dstAVI = graph.getData (dst, Galois::NONE);
 
             if (aviCmp.compare (srcAVI, dstAVI) > 0) {
               int din = --inDegVec[dstAVI->getGlobalIndex ()];
@@ -183,13 +183,13 @@ public:
 
     for (Graph::active_iterator i = graph.active_begin (), e = graph.active_end (); i != e; ++i) {
       const GNode& src = *i;
-      AVI* srcAVI = graph.getData (src, Galois::Graph::NONE);
+      AVI* srcAVI = graph.getData (src, Galois::NONE);
 
       // calculate the in degree of src by comparing it against its neighbors
-      for (Graph::neighbor_iterator n = graph.neighbor_begin (src, Galois::Graph::NONE), 
-          en= graph.neighbor_end (src, Galois::Graph::NONE); n != en; ++n) {
+      for (Graph::neighbor_iterator n = graph.neighbor_begin (src, Galois::NONE), 
+          en= graph.neighbor_end (src, Galois::NONE); n != en; ++n) {
         
-        AVI* dstAVI = graph.getData (*n, Galois::Graph::NONE);
+        AVI* dstAVI = graph.getData (*n, Galois::NONE);
         if (aviCmp.compare (srcAVI, dstAVI) > 0) {
           ++inDegVec[srcAVI->getGlobalIndex ()];
         }
@@ -208,7 +208,7 @@ public:
 //    // TODO: DEBUG
 //    std::cout << "Initial Worklist = " << std::endl;
 //    for (size_t i = 0; i < initWl.size (); ++i) {
-//      std::cout << graph.getData (initWl[i], Galois::Graph::NONE)->toString () << ", ";
+//      std::cout << graph.getData (initWl[i], Galois::NONE)->toString () << ", ";
 //    }
 //    std::cout << std::endl;
 

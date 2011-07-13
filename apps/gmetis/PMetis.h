@@ -96,7 +96,7 @@ public:
 			} else if (nparts == 3) {
 				for (GGraph::active_iterator ii = subGraphs[0].getGraph()->active_begin(), ee = subGraphs[0].getGraph()->active_end(); ii != ee; ++ii) {
 					GNode node = *ii;
-					MetisNode& nodeData = node.getData(Galois::Graph::NONE);
+					MetisNode& nodeData = node.getData(Galois::NONE);
 					nodeData.setPartition(partStartIndex);
 					assert(nodeData.getPartition()>=0);
 				}
@@ -158,7 +158,7 @@ public:
 			int index = nodeData.getPartition();
 			GGraph* subGraph = subGraphs[index].getGraph();
 			metisGraph->getSubGraphMapTo(nodeData.getNodeId()).getData().setAdjWgtSum(nodeData.getAdjWgtSum());
-			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(node, Galois::Graph::NONE), eejj = graph->neighbor_end(node, Galois::Graph::NONE); jj != eejj; ++jj) {
+			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(node, Galois::NONE), eejj = graph->neighbor_end(node, Galois::NONE); jj != eejj; ++jj) {
 				GNode neighbor = *jj;
 
 				MetisNode& neighborData = neighbor.getData();

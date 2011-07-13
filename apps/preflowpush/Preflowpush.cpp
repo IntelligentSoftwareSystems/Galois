@@ -206,13 +206,13 @@ void verify(Config& orig) {
 }
 
 void reduceCapacity(const GNode& src, const GNode& dst, int amount) {
-  int& cap1 = app.graph.getEdgeData(src, dst, Galois::Graph::NONE);
-  int& cap2 = app.graph.getEdgeData(dst, src, Galois::Graph::NONE);
+  int& cap1 = app.graph.getEdgeData(src, dst, Galois::NONE);
+  int& cap2 = app.graph.getEdgeData(dst, src, Galois::NONE);
   cap1 -= amount;
   cap2 += amount;
 }
 
-template<Galois::Graph::MethodFlag flag, bool useCAS = false>
+template<Galois::MethodFlag flag, bool useCAS = false>
 struct UpdateHeights {
   //typedef int tt_does_not_need_stats;
 //#define CAS
@@ -222,13 +222,13 @@ struct UpdateHeights {
   template<typename Context>
   void operator()(const GNode& src, Context& ctx) {
     for (Graph::neighbor_iterator
-        ii = app.graph.neighbor_begin(src, useCAS ? Galois::Graph::NONE : flag),
-        ee = app.graph.neighbor_end(src, useCAS ? Galois::Graph::NONE : flag);
+        ii = app.graph.neighbor_begin(src, useCAS ? Galois::NONE : flag),
+        ee = app.graph.neighbor_end(src, useCAS ? Galois::NONE : flag);
         ii != ee; ++ii) {
       GNode dst = *ii;
-      if (app.graph.getEdgeData(dst, src, Galois::Graph::NONE) > 0) {
-        Node& node = dst.getData(Galois::Graph::NONE);
-        int newHeight = src.getData(Galois::Graph::NONE).height + 1;
+      if (app.graph.getEdgeData(dst, src, Galois::NONE) > 0) {
+        Node& node = dst.getData(Galois::NONE);
+        int newHeight = src.getData(Galois::NONE).height + 1;
         if (useCAS) {
           int oldHeight;
           while (newHeight < (oldHeight = node.height)) {
@@ -254,7 +254,7 @@ struct ResetHeights {
 
   template<typename Context>
   void operator()(const GNode& src, Context&) {
-    Node& node = src.getData(Galois::Graph::NONE);
+    Node& node = src.getData(Galois::NONE);
     node.height = app.num_nodes;
     node.current = 0;
     if (src == app.sink)
@@ -271,7 +271,7 @@ struct FindWork {
 
   template<typename Context>
   void operator()(const GNode& src, Context&) {
-    Node& node = src.getData(Galois::Graph::NONE);
+    Node& node = src.getData(Galois::NONE);
     if (src == app.sink || src == app.source || node.height >= app.num_nodes)
       return;
     if (node.excess > 0) 
@@ -279,7 +279,7 @@ struct FindWork {
   }
 };
 
-template<Galois::Graph::MethodFlag flag, typename IncomingWL>
+template<Galois::MethodFlag flag, typename IncomingWL>
 void globalRelabel(IncomingWL& incoming) {
   typedef GaloisRuntime::WorkList::dChunkedLIFO<1024> SimpleScheduler;
   Galois::for_each<SimpleScheduler>(app.graph.active_begin(),
@@ -305,7 +305,7 @@ void globalRelabel(IncomingWL& incoming) {
   }
 }
 
-template<Galois::Graph::MethodFlag flag>
+template<Galois::MethodFlag flag>
 struct Process  {
   typedef int tt_needs_parallel_break;
   int counter;
@@ -338,8 +338,8 @@ struct Process  {
     }
 
     while (true) {
-      Galois::Graph::MethodFlag f =
-        relabeled ? Galois::Graph::NONE : flag;
+      Galois::MethodFlag f =
+        relabeled ? Galois::NONE : flag;
       bool finished = false;
       int current = 0;
 
@@ -347,11 +347,11 @@ struct Process  {
           ee = app.graph.neighbor_end(src, f);
           ii != ee; ++ii, ++current) {
         GNode dst = *ii;
-        int cap = app.graph.getEdgeData(src, ii, Galois::Graph::NONE);
+        int cap = app.graph.getEdgeData(src, ii, Galois::NONE);
         if (cap == 0 || current < node.current) 
           continue;
 
-        Node& dnode = dst.getData(Galois::Graph::NONE);
+        Node& dnode = dst.getData(Galois::NONE);
         if (node.height - 1 != dnode.height) 
           continue;
 
@@ -394,13 +394,13 @@ struct Process  {
 
     int current = 0;
     for (Graph::neighbor_iterator 
-        ii = app.graph.neighbor_begin(src, Galois::Graph::NONE),
-        ee = app.graph.neighbor_end(src, Galois::Graph::NONE);
+        ii = app.graph.neighbor_begin(src, Galois::NONE),
+        ee = app.graph.neighbor_end(src, Galois::NONE);
         ii != ee; ++ii, ++current) {
       GNode dst = *ii;
-      int cap = app.graph.getEdgeData(src, ii, Galois::Graph::NONE);
+      int cap = app.graph.getEdgeData(src, ii, Galois::NONE);
       if (cap > 0) {
-        Node& dnode = dst.getData(Galois::Graph::NONE);
+        Node& dnode = dst.getData(Galois::NONE);
         if (dnode.height < minHeight) {
           minHeight = dnode.height;
           minEdge = current;
@@ -411,7 +411,7 @@ struct Process  {
     assert(minHeight != std::numeric_limits<int>::max());
     ++minHeight;
 
-    Node& node = src.getData(Galois::Graph::NONE);
+    Node& node = src.getData(Galois::NONE);
     if (minHeight < app.num_nodes) {
       node.height = minHeight;
       node.current = minEdge;
@@ -494,7 +494,7 @@ void initializePreflow(C& initial) {
   }
 }
 
-template<Galois::Graph::MethodFlag flag>
+template<Galois::MethodFlag flag>
 void run() {
   typedef GaloisRuntime::WorkList::dChunkedFIFO<256> Chunk;
 
@@ -569,9 +569,9 @@ int main(int argc, const char** argv) {
   T.start();
   if (serial) {
     assert(numThreads == 1);
-    run<Galois::Graph::NONE>();
+    run<Galois::NONE>();
   } else {
-    run<Galois::Graph::CHECK_CONFLICT>();
+    run<Galois::CHECK_CONFLICT>();
   }
   T.stop();
 

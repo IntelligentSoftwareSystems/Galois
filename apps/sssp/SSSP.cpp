@@ -113,11 +113,11 @@ bool do_bfs = false;
 template<typename WLTy>
 void getInitialRequests(const GNode src, WLTy& wl) {
   for (Graph::neighbor_iterator
-      ii = graph.neighbor_begin(src, Galois::Graph::NONE), 
-      ee = graph.neighbor_end(src, Galois::Graph::NONE); 
+      ii = graph.neighbor_begin(src, Galois::NONE), 
+      ee = graph.neighbor_end(src, Galois::NONE); 
       ii != ee; ++ii) {
     GNode dst = *ii;
-    int w = do_bfs ? 1 : graph.getEdgeData(src, dst, Galois::Graph::NONE);
+    int w = do_bfs ? 1 : graph.getEdgeData(src, dst, Galois::NONE);
     UpdateRequest up(dst, w);
     wl.push_back(up);
   }
@@ -126,11 +126,11 @@ void getInitialRequests(const GNode src, WLTy& wl) {
 void runBody(const GNode src) {
   std::set<UpdateRequest, seq_less> initial;
   for (Graph::neighbor_iterator
-      ii = graph.neighbor_begin(src, Galois::Graph::NONE), 
-      ee = graph.neighbor_end(src, Galois::Graph::NONE); 
+      ii = graph.neighbor_begin(src, Galois::NONE), 
+      ee = graph.neighbor_end(src, Galois::NONE); 
       ii != ee; ++ii) {
     GNode dst = *ii;
-    int w = do_bfs ? 1 : graph.getEdgeData(src, dst, Galois::Graph::NONE);
+    int w = do_bfs ? 1 : graph.getEdgeData(src, dst, Galois::NONE);
     UpdateRequest up(dst, w);
     initial.insert(up);
   }
@@ -143,18 +143,18 @@ void runBody(const GNode src) {
     counter += 1;
     UpdateRequest req = *initial.begin();
     initial.erase(initial.begin());
-    SNode& data = graph.getData(req.n, Galois::Graph::NONE);
+    SNode& data = graph.getData(req.n, Galois::NONE);
 
     if (req.w < data.dist) {
       data.dist = req.w;
       for (Graph::neighbor_iterator
-          ii = graph.neighbor_begin(req.n, Galois::Graph::NONE), 
-	  ee = graph.neighbor_end(req.n, Galois::Graph::NONE);
+          ii = graph.neighbor_begin(req.n, Galois::NONE), 
+	  ee = graph.neighbor_end(req.n, Galois::NONE);
 	  ii != ee; ++ii) {
 	GNode dst = *ii;
-	int d = do_bfs ? 1 : graph.getEdgeData(req.n, dst, Galois::Graph::NONE);
+	int d = do_bfs ? 1 : graph.getEdgeData(req.n, dst, Galois::NONE);
 	unsigned int newDist = req.w + d;
-	if (newDist < graph.getData(dst,Galois::Graph::NONE).dist)
+	if (newDist < graph.getData(dst,Galois::NONE).dist)
 	  initial.insert(UpdateRequest(dst, newDist));
       }
     }
@@ -167,19 +167,19 @@ static Galois::statistic<unsigned int> BadWork("BadWork");
 struct process {
   template<typename ContextTy>
   void __attribute__((noinline)) operator()(UpdateRequest& req, ContextTy& lwl) {
-    SNode& data = graph.getData(req.n,Galois::Graph::NONE);
+    SNode& data = graph.getData(req.n,Galois::NONE);
     unsigned int v;
     while (req.w < (v = data.dist)) {
       if (__sync_bool_compare_and_swap(&data.dist, v, req.w)) {
 	if (v != DIST_INFINITY)
 	  BadWork += 1;
 	for (Graph::neighbor_iterator
-            ii = graph.neighbor_begin(req.n, Galois::Graph::NONE),
-            ee = graph.neighbor_end(req.n, Galois::Graph::NONE); ii != ee; ++ii) {
+            ii = graph.neighbor_begin(req.n, Galois::NONE),
+            ee = graph.neighbor_end(req.n, Galois::NONE); ii != ee; ++ii) {
 	  GNode dst = *ii;
-	  int d = do_bfs ? 1 : graph.getEdgeData(req.n, dst, Galois::Graph::NONE);
+	  int d = do_bfs ? 1 : graph.getEdgeData(req.n, dst, Galois::NONE);
 	  unsigned int newDist = req.w + d;
-	  if (newDist < graph.getData(dst,Galois::Graph::NONE).dist)
+	  if (newDist < graph.getData(dst,Galois::NONE).dist)
 	    lwl.push(UpdateRequest(dst, newDist));
 	}
 	break;
@@ -203,31 +203,31 @@ void runBodyParallel(const GNode src) {
 
 
 bool verify(GNode source) {
-  if (graph.getData(source,Galois::Graph::NONE).dist != 0) {
+  if (graph.getData(source,Galois::NONE).dist != 0) {
     std::cerr << "source has non-zero dist value\n";
     return false;
   }
   
   for (Graph::active_iterator src = graph.active_begin(), ee =
 	 graph.active_end(); src != ee; ++src) {
-    unsigned int dist = graph.getData(*src,Galois::Graph::NONE).dist;
+    unsigned int dist = graph.getData(*src,Galois::NONE).dist;
     if (dist >= DIST_INFINITY) {
-      std::cerr << "found node = " << graph.getData(*src,Galois::Graph::NONE).id
+      std::cerr << "found node = " << graph.getData(*src,Galois::NONE).id
 	   << " with label >= INFINITY = " << dist << "\n";
       return false;
     }
     
     for (Graph::neighbor_iterator 
-        ii = graph.neighbor_begin(*src, Galois::Graph::NONE),
-        ee = graph.neighbor_end(*src, Galois::Graph::NONE); ii != ee; ++ii) {
+        ii = graph.neighbor_begin(*src, Galois::NONE),
+        ee = graph.neighbor_end(*src, Galois::NONE); ii != ee; ++ii) {
       GNode neighbor = *ii;
-      unsigned int ddist = graph.getData(*src,Galois::Graph::NONE).dist;
-      int d = do_bfs ? 1 : graph.getEdgeData(*src, neighbor, Galois::Graph::NONE);
+      unsigned int ddist = graph.getData(*src,Galois::NONE).dist;
+      int d = do_bfs ? 1 : graph.getEdgeData(*src, neighbor, Galois::NONE);
       if (ddist > dist + d) {
         std::cerr << "bad level value at "
-          << graph.getData(*src,Galois::Graph::NONE).id
+          << graph.getData(*src,Galois::NONE).id
 	  << " which is a neighbor of " 
-          << graph.getData(neighbor,Galois::Graph::NONE).id << "\n";
+          << graph.getData(neighbor,Galois::NONE).id << "\n";
 	return false;
       }
     }
@@ -273,7 +273,7 @@ int main(int argc, const char **argv) {
   unsigned int id = 0;
   for (Graph::active_iterator src = graph.active_begin(), ee =
       graph.active_end(); src != ee; ++src) {
-    SNode& node = graph.getData(*src,Galois::Graph::NONE);
+    SNode& node = graph.getData(*src,Galois::NONE);
     node.id = id++;
     node.dist = DIST_INFINITY;
     //std::cout << node.toString() << "\n";
@@ -306,7 +306,7 @@ int main(int argc, const char **argv) {
   }
 
   std::cout << report << " " 
-       << graph.getData(report,Galois::Graph::NONE).toString() << "\n";
+       << graph.getData(report,Galois::NONE).toString() << "\n";
   if (!skipVerify && !verify(source)) {
     std::cerr << "Verification failed.\n";
     assert(0 && "Verification failed");

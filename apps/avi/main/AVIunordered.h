@@ -100,7 +100,7 @@ protected:
 
     for (std::vector<GNode>::const_iterator i = aviAdjNodes.begin (), ei = aviAdjNodes.end (); i != ei; ++i) {
       GNode aviAdjN = *i;
-      AVI* avi = graph.getData (aviAdjN, Galois::Graph::NONE);
+      AVI* avi = graph.getData (aviAdjN, Galois::NONE);
       const std::vector<GlobalNodalIndex>& conn = avi->getGeometry ().getConnectivity ();
 
       for (std::vector<GlobalNodalIndex>::const_iterator j = conn.begin (), ej = conn.end (); j != ej; ++j) {
@@ -187,10 +187,10 @@ protected:
         // one-shot optimization: acquire abstract locks on active node and
         // neighbors (all its neighbors, in this case) before performing any modifications
 
-        AVI* srcAVI = graph.getData (src, Galois::Graph::CHECK_CONFLICT);
+        AVI* srcAVI = graph.getData (src, Galois::CHECK_CONFLICT);
 
-        for (Graph::neighbor_iterator j = graph.neighbor_begin (src, Galois::Graph::CHECK_CONFLICT)
-            , ej = graph.neighbor_end (src, Galois::Graph::CHECK_CONFLICT); j != ej; ++j) {
+        for (Graph::neighbor_iterator j = graph.neighbor_begin (src, Galois::CHECK_CONFLICT)
+            , ej = graph.neighbor_end (src, Galois::CHECK_CONFLICT); j != ej; ++j) {
         }
 
         int inDeg = inDegVec[srcAVI->getGlobalIndex ()];
@@ -210,11 +210,11 @@ protected:
         // update the inEdges count and determine
         // which neighbor is at local minimum and needs to be added to the worklist
 
-        for (Graph::neighbor_iterator j = graph.neighbor_begin (src, Galois::Graph::NONE), ej = graph.neighbor_end (src, Galois::Graph::NONE);
+        for (Graph::neighbor_iterator j = graph.neighbor_begin (src, Galois::NONE), ej = graph.neighbor_end (src, Galois::NONE);
             j != ej; ++j) {
 
           const GNode& dst = *j;
-          AVI* dstAVI = graph.getData (*j, Galois::Graph::NONE);
+          AVI* dstAVI = graph.getData (*j, Galois::NONE);
 
           if (aviCmp.compare (srcAVI, dstAVI) > 0) {
             // if srcAVI has a higher time stamp that dstAVI
@@ -262,13 +262,13 @@ public:
 
     for (Graph::active_iterator i = graph.active_begin (), e = graph.active_end (); i != e; ++i) {
       const GNode& src = *i;
-      AVI* srcAVI = graph.getData (src, Galois::Graph::NONE);
+      AVI* srcAVI = graph.getData (src, Galois::NONE);
 
       // calculate the in degree of src by comparing it against its neighbors
-      for (Graph::neighbor_iterator n = graph.neighbor_begin (src, Galois::Graph::NONE), 
-          en= graph.neighbor_end (src, Galois::Graph::NONE); n != en; ++n) {
+      for (Graph::neighbor_iterator n = graph.neighbor_begin (src, Galois::NONE), 
+          en= graph.neighbor_end (src, Galois::NONE); n != en; ++n) {
         
-        AVI* dstAVI = graph.getData (*n, Galois::Graph::NONE);
+        AVI* dstAVI = graph.getData (*n, Galois::NONE);
         if (aviCmp.compare (srcAVI, dstAVI) > 0) {
           ++inDegVec[srcAVI->getGlobalIndex ()];
         }
@@ -287,7 +287,7 @@ public:
 //    // TODO: DEBUG
 //    std::cout << "Initial Worklist = " << std::endl;
 //    for (size_t i = 0; i < initWl.size (); ++i) {
-//      std::cout << graph.getData (initWl[i], Galois::Graph::NONE)->toString () << ", ";
+//      std::cout << graph.getData (initWl[i], Galois::NONE)->toString () << ", ";
 //    }
 //    std::cout << std::endl;
 

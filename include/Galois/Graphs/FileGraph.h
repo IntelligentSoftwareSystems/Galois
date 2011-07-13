@@ -184,8 +184,7 @@ public:
   }
   
   NodeTy& getData(GraphNode N, MethodFlag mflag = ALL) {
-    if (shouldLock(mflag))
-      GaloisRuntime::acquire(&NodeData[N].data);
+    GaloisRuntime::acquire(&NodeData[N].data, mflag);
     return NodeData[N].data.data;
   }
 
@@ -239,8 +238,7 @@ public:
   }
   
   NodeTy& getData(GraphNode N, MethodFlag mflag = ALL) {
-    if (shouldLock(mflag))
-      GaloisRuntime::acquire(&NodeData[N].data);
+    GaloisRuntime::acquire(&NodeData[N].data, mflag);
     return NodeData[N].data.data;
   }
 

@@ -43,7 +43,7 @@ void moveNode(PQueue* parts[],MetisGraph* metisGraph, GNode higain, int to, int*
 		metisGraph->unsetBoundaryNode(higain);
 	}
 
-	for (GGraph::neighbor_iterator jj = graph->neighbor_begin(higain, Galois::Graph::NONE), eejj = graph->neighbor_end(higain, Galois::Graph::NONE); jj != eejj; ++jj) {
+	for (GGraph::neighbor_iterator jj = graph->neighbor_begin(higain, Galois::NONE), eejj = graph->neighbor_end(higain, Galois::NONE); jj != eejj; ++jj) {
 		GNode neighbor = *jj;
 		MetisNode& neighborData = neighbor.getData();
 		int oldgain = neighborData.getGain();
@@ -100,7 +100,7 @@ void moveBackNode(MetisGraph* metisGraph, GNode higain) {
 	metisGraph->incPartWeight((to + 1) % 2, -higainData.getWeight());
 	metisGraph->incPartWeight(to, higainData.getWeight());
 
-	for (GGraph::neighbor_iterator jj = graph->neighbor_begin(higain, Galois::Graph::NONE), eejj = graph->neighbor_end(higain, Galois::Graph::NONE); jj != eejj; ++jj) {
+	for (GGraph::neighbor_iterator jj = graph->neighbor_begin(higain, Galois::NONE), eejj = graph->neighbor_end(higain, Galois::NONE); jj != eejj; ++jj) {
 		GNode neighbor = *jj;
 		MetisNode& neighborData = neighbor.getData();
 		int edgeWeight = (int)metisGraph->getGraph()->getEdgeData(higain, jj);

@@ -54,7 +54,7 @@ public:
     int retval = 0;
 
     for (Graph::active_iterator ii = mesh->active_begin(), ee = mesh->active_end(); ii != ee; ++ii) {
-      if (ii->getData(Galois::Graph::NONE).isBad()) {
+      if (ii->getData(Galois::NONE).isBad()) {
         ret.push_back(*ii);
         ++retval;
       }
@@ -124,13 +124,13 @@ private:
   
   GNode addElement(Graph* mesh, Element& element) {
     GNode node = mesh->createNode(element);
-    mesh->addNode(node, Galois::Graph::NONE);
+    mesh->addNode(node, Galois::NONE);
     for (int i = 0; i < element.numEdges(); i++) {
       Edge edge = element.getEdge(i);
       if (edge_map.find(edge) == edge_map.end()) {
         edge_map[edge] = node;
       } else {
-        mesh->addEdge(node, edge_map[edge], Galois::Graph::NONE);//, edge);
+        mesh->addEdge(node, edge_map[edge], Galois::NONE);//, edge);
         edge_map.erase(edge);
       }
     }
@@ -152,15 +152,15 @@ public:
     for (Graph::active_iterator ii = mesh->active_begin(), ee = mesh->active_end(); ii != ee; ++ii) {
  
       GNode node = *ii;
-      Element& element = node.getData(Galois::Graph::NONE);
+      Element& element = node.getData(Galois::NONE);
       if (element.getDim() == 2) {
-        if (mesh->neighborsSize(node, Galois::Graph::NONE) != 1) {
-          std::cerr << "-> Segment " << element << " has " << mesh->neighborsSize(node, Galois::Graph::NONE) << " relation(s)\n";
+        if (mesh->neighborsSize(node, Galois::NONE) != 1) {
+          std::cerr << "-> Segment " << element << " has " << mesh->neighborsSize(node, Galois::NONE) << " relation(s)\n";
           error = true;
         }
       } else if (element.getDim() == 3) {
-        if (mesh->neighborsSize(node, Galois::Graph::NONE) != 3) {
-          std::cerr << "-> Triangle " << element << " has " << mesh->neighborsSize(node, Galois::Graph::NONE) << " relation(s)";
+        if (mesh->neighborsSize(node, Galois::NONE) != 3) {
+          std::cerr << "-> Triangle " << element << " has " << mesh->neighborsSize(node, Galois::NONE) << " relation(s)";
           error = true;
         }
       } else {
@@ -184,7 +184,7 @@ public:
         assert(mesh->containsNode(node) && "Reachable node was removed from graph");
         found.insert(node);
         int i = 0;
-        for (Graph::neighbor_iterator ii = mesh->neighbor_begin(node, Galois::Graph::NONE), ee = mesh->neighbor_end(node, Galois::Graph::NONE); ii != ee; ++ii) {
+        for (Graph::neighbor_iterator ii = mesh->neighbor_begin(node, Galois::NONE), ee = mesh->neighbor_end(node, Galois::NONE); ii != ee; ++ii) {
           assert(i < 3);
           assert(mesh->containsNode(*ii));
           assert(node != *ii);

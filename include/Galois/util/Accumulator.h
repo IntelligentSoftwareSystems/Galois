@@ -20,7 +20,7 @@ kind.
 #ifndef __GALOIS_ACCUMULATOR_H
 #define __GALOIS_ACCUMULATOR_H
 
-#include "Runtime/PerCPU.h"
+#include "Galois/Runtime/PerCPU.h"
 
 namespace Galois {
 

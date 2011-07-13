@@ -92,18 +92,18 @@ void runBody() {
         esrc = graph.active_end(); src != esrc; ++src) {
       double value = 0;
       for (Graph::neighbor_iterator
-          dst = graph.neighbor_begin(*src, Galois::Graph::NONE), 
-          edst = graph.neighbor_end(*src, Galois::Graph::NONE);
+          dst = graph.neighbor_begin(*src, Galois::NONE), 
+          edst = graph.neighbor_end(*src, Galois::NONE);
           dst != edst; ++dst) {
-        double w = graph.getEdgeData(*src, *dst, Galois::Graph::NONE);
-        Node& ddata = graph.getData(*dst, Galois::Graph::NONE);
+        double w = graph.getEdgeData(*src, *dst, Galois::NONE);
+        Node& ddata = graph.getData(*dst, Galois::NONE);
         value += getPageRank(ddata, iterations) * w;
       }
         
       if (alpha > 0)
         value = value * (1 - alpha) + 1/numNodes * alpha;
 
-      Node& sdata = graph.getData(*src, Galois::Graph::NONE);
+      Node& sdata = graph.getData(*src, Galois::NONE);
       if (sdata.hasNoOuts) {
         lost_potential += getPageRank(sdata, iterations);
       }
@@ -124,7 +124,7 @@ void runBody() {
       for (Graph::active_iterator src = graph.active_begin(),
           esrc = graph.active_end();
           src != esrc; ++src) {
-        Node& sdata = graph.getData(*src, Galois::Graph::NONE);
+        Node& sdata = graph.getData(*src, Galois::NONE);
         double value = getPageRank(sdata, iterations);
         double delta = (1 - alpha) * (lost_potential * 1/numNodes);
         setPageRank(sdata, iterations, value + delta);
@@ -189,12 +189,12 @@ static void makeGraph(const char* input) {
       esrc = in_graph.active_end();
       src != esrc; ++src) {
     int neighbors =
-      std::distance(in_graph.neighbor_begin(*src, Galois::Graph::NONE), 
-          in_graph.neighbor_end(*src, Galois::Graph::NONE));
+      std::distance(in_graph.neighbor_begin(*src, Galois::NONE), 
+          in_graph.neighbor_end(*src, Galois::NONE));
 
     for (InGraph::neighbor_iterator
-        dst = in_graph.neighbor_begin(*src, Galois::Graph::NONE), 
-        edst = in_graph.neighbor_end(*src, Galois::Graph::NONE);
+        dst = in_graph.neighbor_begin(*src, Galois::NONE), 
+        edst = in_graph.neighbor_end(*src, Galois::NONE);
         dst != edst; ++dst) {
       Element e(*src, 1.0/neighbors);
       in_edges[*dst].push_back(e);

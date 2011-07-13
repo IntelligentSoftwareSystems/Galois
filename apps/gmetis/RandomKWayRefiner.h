@@ -83,7 +83,7 @@ private:
 
 	void refineOneNode(MetisGraph* metisGraph, GNode n,  GaloisRuntime::PerCPU<PerCPUValue>* perCPUValues) {
 		GGraph* graph = metisGraph->getGraph();
-		MetisNode& nodeData = n.getData(Galois::Graph::CHECK_CONFLICT);
+		MetisNode& nodeData = n.getData(Galois::CHECK_CONFLICT);
 		if (nodeData.getEdegree() >= nodeData.getIdegree()) {
 			int from = nodeData.getPartition();
 			//TODO
@@ -133,9 +133,9 @@ private:
 			 */
 			//dummy for cautious
 //			if(!GaloisRuntime.getRuntime().useSerial()){
-			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(n, Galois::Graph::CHECK_CONFLICT), eejj = graph->neighbor_end(n, Galois::Graph::CHECK_CONFLICT); jj != eejj; ++jj) {
+			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(n, Galois::CHECK_CONFLICT), eejj = graph->neighbor_end(n, Galois::CHECK_CONFLICT); jj != eejj; ++jj) {
 				GNode neighbor = *jj;
-				neighbor.getData(Galois::Graph::CHECK_CONFLICT);
+				neighbor.getData(Galois::CHECK_CONFLICT);
 			}
 //			}
 
@@ -167,16 +167,16 @@ private:
 			/*
 			 * update the degrees of adjacent vertices
 			 */
-			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(n, Galois::Graph::NONE), eejj = graph->neighbor_end(n, Galois::Graph::NONE); jj != eejj; ++jj) {
+			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(n, Galois::NONE), eejj = graph->neighbor_end(n, Galois::NONE); jj != eejj; ++jj) {
 				GNode neighbor = *jj;
-				MetisNode& neighborData = neighbor.getData(Galois::Graph::NONE);
+				MetisNode& neighborData = neighbor.getData(Galois::NONE);
 				if (neighborData.getPartEd().size() == 0) {
 					int numEdges = neighborData.getNumEdges();
 //					neighborData.partIndex = new int[numEdges];
 //					neighborData.partEd = new int[numEdges];
 					neighborData.initPartEdAndIndex(numEdges);
 				}
-				int edgeWeight = graph->getEdgeData(n, jj, Galois::Graph::NONE);
+				int edgeWeight = graph->getEdgeData(n, jj, Galois::NONE);
 				if (neighborData.getPartition() == from) {
 					neighborData.setEdegree(neighborData.getEdegree() + edgeWeight);
 					neighborData.setIdegree(neighborData.getIdegree() - edgeWeight);

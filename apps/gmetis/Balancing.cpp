@@ -91,7 +91,7 @@ void generalTwoWayBalance(MetisGraph* metisGraph, int* tpwgts) {
 			metisGraph->setBoundaryNode(higain);
 		}
 
-		for (GGraph::neighbor_iterator jj = graph->neighbor_begin(higain, Galois::Graph::NONE), eejj = graph->neighbor_end(higain, Galois::Graph::NONE); jj != eejj; ++jj) {
+		for (GGraph::neighbor_iterator jj = graph->neighbor_begin(higain, Galois::NONE), eejj = graph->neighbor_end(higain, Galois::NONE); jj != eejj; ++jj) {
 			GNode neighbor = *jj;
 
 			MetisNode& neighborData = neighbor.getData();
@@ -169,7 +169,7 @@ void boundaryTwoWayBalance(MetisGraph* metisGraph, int* tpwgts) {
 		}
 
 		int fromConstant=from;
-		for (GGraph::neighbor_iterator jj = graph->neighbor_begin(higain, Galois::Graph::NONE), eejj = graph->neighbor_end(higain, Galois::Graph::NONE); jj != eejj; ++jj) {
+		for (GGraph::neighbor_iterator jj = graph->neighbor_begin(higain, Galois::NONE), eejj = graph->neighbor_end(higain, Galois::NONE); jj != eejj; ++jj) {
 			GNode neighbor = *jj;
 			MetisNode& neighborData = neighbor.getData();
 			int oldgain = neighborData.getGain();
@@ -336,9 +336,9 @@ void greedyKWayEdgeBalance(MetisGraph* metisGraph, int nparts, float* tpwgts, fl
 			}
 
 			/* Update the degrees of adjacent vertices */
-			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(higain, Galois::Graph::NONE), eejj = graph->neighbor_end(higain, Galois::Graph::NONE); jj != eejj; ++jj) {
+			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(higain, Galois::NONE), eejj = graph->neighbor_end(higain, Galois::NONE); jj != eejj; ++jj) {
 				GNode neighbor = *jj;
-				MetisNode& neighborData = neighbor.getData(Galois::Graph::NONE);
+				MetisNode& neighborData = neighbor.getData(Galois::NONE);
 				assert(neighborData.getNodeId()<graphSize);
 				int oldgain = neighborData.getGain();
 				if (neighborData.getPartEd().size() == 0) {

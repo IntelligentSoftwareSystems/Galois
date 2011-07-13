@@ -41,7 +41,7 @@
 #include "ittnotify.h"
 #endif
 
-#define DEBUG 0 
+#define DEBUG 0
 #define USE_MMAP 0 
 #define USE_GLOBALS 1 
 
@@ -56,7 +56,7 @@ typedef Graph::GraphNode GNode;
 
 Graph* G;
 int NumNodes;
-  
+
 
 GaloisRuntime::PerCPU<std::vector<double> >* CB;
 
@@ -184,8 +184,8 @@ struct process {
       GNode _v = SQ[QAt++];
       int v = _v;
       for (Graph::neighbor_iterator
-          ii = G->neighbor_begin(_v, Galois::Graph::NONE),
-          ee = G->neighbor_end(_v, Galois::Graph::NONE); ii != ee; ++ii) {
+          ii = G->neighbor_begin(_v, Galois::NONE),
+          ee = G->neighbor_end(_v, Galois::NONE); ii != ee; ++ii) {
 	GNode _w = *ii;
 	int w = _w;
 	if (!d[w]) {
@@ -246,7 +246,7 @@ struct process {
 };
 
 
-void merge(std::vector<double >& lhs, std::vector<double>& rhs) {
+void merge(std::vector<double>& lhs, std::vector<double>& rhs) {
     if (lhs.size() < rhs.size())
     lhs.resize(rhs.size());
   for (unsigned int i = 0; i < rhs.size(); i++)
@@ -279,8 +279,8 @@ void initNodeSuccs() {
   std::vector< std::vector<GNode> > tmp(NumNodes);
   for (Graph::active_iterator ii = G->active_begin(), ee = G->active_end();
       ii != ee; ++ii) {
-    int nnbrs = std::distance(G->neighbor_begin(*ii, Galois::Graph::NONE),
-        G->neighbor_end(*ii, Galois::Graph::NONE));
+    int nnbrs = std::distance(G->neighbor_begin(*ii, Galois::NONE),
+        G->neighbor_end(*ii, Galois::NONE));
     //std::cerr << "Node : " << *ii << " has " << nnbrs << " neighbors " << std::endl;
     tmp[*ii].reserve(nnbrs); 
   }
@@ -311,7 +311,7 @@ int main(int argc, const char** argv) {
 
   GaloisRuntime::PerCPU_merge<std::vector<double> > cb(merge);
   CB = &cb; 
-  
+
   initNodeSuccs();
 
   int iterations = NumNodes;
@@ -328,16 +328,17 @@ int main(int argc, const char** argv) {
     if (cnt == iterations)
       break;
     // Only process nodes that actually have (out-)neighbors
-    if (std::distance(g.neighbor_begin(*ii, Galois::Graph::NONE),
-          g.neighbor_end(*ii, Galois::Graph::NONE)) > 0) {
+    if (std::distance(g.neighbor_begin(*ii, Galois::NONE),
+          g.neighbor_end(*ii, Galois::NONE)) > 0) {
       cnt++;
       tmp.push_back(*ii);
     }
   }
+  std::cout << "Going Parallel\n";
   Galois::setMaxThreads(numThreads);
   Galois::StatTimer T;
   T.start();
-  Galois::for_each<GaloisRuntime::WorkList::LIFO<GNode> >(tmp.begin(), tmp.end(), process());
+  Galois::for_each<GaloisRuntime::WorkList::LIFO<> >(tmp.begin(), tmp.end(), process());
   T.stop();
 
   if (!skipVerify) {

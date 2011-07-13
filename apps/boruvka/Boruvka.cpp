@@ -68,12 +68,12 @@ std::vector<GNode> nodes;
 void printGraph() {
 	int numEdges = 0;
 	for (Graph::active_iterator src = graph.active_begin(), esrc = graph.active_end();src != esrc; ++src) {
-		Node& sdata = graph.getData(*src, Galois::Graph::NONE);
+		Node& sdata = graph.getData(*src, Galois::NONE);
 		if(graph.containsNode(*src))
-			for (Graph::neighbor_iterator dst = graph.neighbor_begin(*src, Galois::Graph::NONE), edst = graph.neighbor_end(*src, Galois::Graph::NONE);dst != edst; ++dst) {
-				int w = graph.getEdgeData(*src, *dst, Galois::Graph::NONE);
-				int x = graph.getEdgeData(*dst, *src, Galois::Graph::NONE);
-				Node& ddata = graph.getData(*dst, Galois::Graph::NONE);
+			for (Graph::neighbor_iterator dst = graph.neighbor_begin(*src, Galois::NONE), edst = graph.neighbor_end(*src, Galois::NONE);dst != edst; ++dst) {
+				int w = graph.getEdgeData(*src, *dst, Galois::NONE);
+				int x = graph.getEdgeData(*dst, *src, Galois::NONE);
+				Node& ddata = graph.getData(*dst, Galois::NONE);
 				std::cout<<"1) "<<sdata.toString()<<" => "<< ddata.toString() << " [ "<<w << " ] "<<x << std::endl;
 				numEdges++;
 			}
@@ -95,16 +95,16 @@ struct process {
 			int minEdgeWeight=INT_MAX;
 			int numNeighbors = 0;
 			//Acquire locks on neighborhood.
-			for (Graph::neighbor_iterator dst = graph.neighbor_begin(src, Galois::Graph::ALL), edst = graph.neighbor_end(src, Galois::Graph::ALL);dst != edst; ++dst) {
+			for (Graph::neighbor_iterator dst = graph.neighbor_begin(src, Galois::ALL), edst = graph.neighbor_end(src, Galois::ALL);dst != edst; ++dst) {
 				graph.getData(*dst);
-				graph.getEdgeData(src,*dst, Galois::Graph::ALL);
-				graph.getEdgeData(*dst,src, Galois::Graph::ALL);
+				graph.getEdgeData(src,*dst, Galois::ALL);
+				graph.getEdgeData(*dst,src, Galois::ALL);
 			}
-			for (Graph::neighbor_iterator dst = graph.neighbor_begin(src, Galois::Graph::NONE), edst = graph.neighbor_end(src, Galois::Graph::NONE);dst != edst; ++dst) {
+			for (Graph::neighbor_iterator dst = graph.neighbor_begin(src, Galois::NONE), edst = graph.neighbor_end(src, Galois::NONE);dst != edst; ++dst) {
 				numNeighbors++;
 				int minNbrId = graph.getData(*dst).id;
 				
-				int w = graph.getEdgeData(src, *dst, Galois::Graph::NONE);
+				int w = graph.getEdgeData(src, *dst, Galois::NONE);
 				if(w<minEdgeWeight){
 					minNeighbor = &nodes[minNbrId];
 					minEdgeWeight = w;
@@ -112,7 +112,7 @@ struct process {
 			}
 			//If there are no outgoing neighbors.
 			if(numNeighbors==0  || minEdgeWeight == INT_MAX){
-				graph.removeNode(src, Galois::Graph::NONE);
+				graph.removeNode(src, Galois::NONE);
 				return;
 			}
 			graph.getData(*minNeighbor);
@@ -120,10 +120,10 @@ struct process {
 			std::cout << " Min edge from "<<graph.getData(src).toString() << " to "<<graph.getData(*minNeighbor).toString()<<" " <<minEdgeWeight << " "<<std::endl ;
 #endif
 			//Acquire locks on neighborhood of min neighbor.
-			for (Graph::neighbor_iterator dst = graph.neighbor_begin(*minNeighbor, Galois::Graph::ALL), edst = graph.neighbor_end(*minNeighbor, Galois::Graph::ALL);dst != edst; ++dst) {
+			for (Graph::neighbor_iterator dst = graph.neighbor_begin(*minNeighbor, Galois::ALL), edst = graph.neighbor_end(*minNeighbor, Galois::ALL);dst != edst; ++dst) {
 				graph.getData(*dst);
-				graph.getEdgeData(*minNeighbor,*dst, Galois::Graph::ALL);
-				graph.getEdgeData(*dst,*minNeighbor, Galois::Graph::ALL);
+				graph.getEdgeData(*minNeighbor,*dst, Galois::ALL);
+				graph.getEdgeData(*dst,*minNeighbor, Galois::ALL);
 			}
 
 			//update MST weight.
@@ -134,15 +134,15 @@ struct process {
 			std::set<EdgeData> toAdd;
 			//std::set<int> toAdd;
 
-			for(Graph::neighbor_iterator mdst = graph.neighbor_begin(*minNeighbor, Galois::Graph::NONE), medst = graph.neighbor_end(*minNeighbor, Galois::Graph::NONE); mdst!=medst;++mdst){
+			for(Graph::neighbor_iterator mdst = graph.neighbor_begin(*minNeighbor, Galois::NONE), medst = graph.neighbor_end(*minNeighbor, Galois::NONE); mdst!=medst;++mdst){
 				graph.getData(*mdst);
-				int edgeWeight = graph.getEdgeData(*minNeighbor, *mdst, Galois::Graph::NONE);
+				int edgeWeight = graph.getEdgeData(*minNeighbor, *mdst, Galois::NONE);
 				if(*mdst!=src){
 					GNode dstNode = (*mdst);
 					if(src.hasNeighbor(dstNode) || dstNode.hasNeighbor(src)){
-						if(graph.getEdgeData(src,*mdst, Galois::Graph::NONE)<edgeWeight)
-							edgeWeight = graph.getEdgeData(src,*mdst, Galois::Graph::NONE);
-						graph.getEdgeData(src,*mdst,Galois::Graph::NONE)=edgeWeight;
+						if(graph.getEdgeData(src,*mdst, Galois::NONE)<edgeWeight)
+							edgeWeight = graph.getEdgeData(src,*mdst, Galois::NONE);
+						graph.getEdgeData(src,*mdst,Galois::NONE)=edgeWeight;
 					}
 					else
 					{
@@ -154,12 +154,12 @@ struct process {
 			}
 
 			for(std::set<int>::iterator it = toRemove.begin(), endIt = toRemove.end();it!=endIt; it++){
-				graph.removeEdge(*minNeighbor, nodes[*it], Galois::Graph::NONE);
+				graph.removeEdge(*minNeighbor, nodes[*it], Galois::NONE);
 			}
 			for(std::set<EdgeData>::iterator it = toAdd.begin(), endIt = toAdd.end();it!=endIt; it++){
-				graph.addEdge(src, nodes[it->first], it->second, Galois::Graph::NONE);
+				graph.addEdge(src, nodes[it->first], it->second, Galois::NONE);
 			}
-			graph.removeNode(*minNeighbor, Galois::Graph::NONE);
+			graph.removeNode(*minNeighbor, Galois::NONE);
 			lwl.push(src);
 		}
 };
@@ -186,7 +186,7 @@ void runBodyParallel() {
 
 static void makeGraph(const char* input) {
 	//Create local computation graph.
-	typedef Galois::Graph::LC_FileGraph<Node, int> InGraph;
+  typedef Galois::Graph::LC_FileGraph<Node, int> InGraph;
 	typedef InGraph::GraphNode InGNode;
 	InGraph in_graph;
 	//Read graph from file.
@@ -203,8 +203,8 @@ static void makeGraph(const char* input) {
 	// 
 	int numEdges = 0;
 	for (InGraph::active_iterator src = in_graph.active_begin(), esrc = in_graph.active_end();src != esrc; ++src) {
-		for (InGraph::neighbor_iterator dst = in_graph.neighbor_begin(*src, Galois::Graph::NONE), edst = in_graph.neighbor_end(*src, Galois::Graph::NONE);dst != edst; ++dst) {
-			int w = in_graph.getEdgeData(*src, *dst, Galois::Graph::NONE);
+		for (InGraph::neighbor_iterator dst = in_graph.neighbor_begin(*src, Galois::NONE), edst = in_graph.neighbor_end(*src, Galois::NONE);dst != edst; ++dst) {
+			int w = in_graph.getEdgeData(*src, *dst, Galois::NONE);
 			Element e(*src, w);
 			edges[*dst].push_back(e);
 			numEdges++;
@@ -233,9 +233,9 @@ static void makeGraph(const char* input) {
 		for (Elements::iterator j = i->begin(), ej = i->end(); j != ej; ++j) {
 			if(src.hasNeighbor(nodes[j->first])){
 				numDups++;
-				int w = (graph.getEdgeData(src,nodes[j->first],Galois::Graph::NONE));	
+				int w = (graph.getEdgeData(src,nodes[j->first],Galois::NONE));	
 				if(j->second<w)
-					graph.getEdgeData(src,nodes[j->first],Galois::Graph::NONE)=j->second;
+					graph.getEdgeData(src,nodes[j->first],Galois::NONE)=j->second;
 			}
 			else{
 				graph.addEdge(src, nodes[j->first], j->second);

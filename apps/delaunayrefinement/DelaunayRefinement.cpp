@@ -66,7 +66,7 @@ struct process {
     if (!mesh->containsNode(item))
       return;
     
-    item.getData(Galois::Graph::ALL); //lock
+    item.getData(Galois::ALL); //lock
 
     Cavity cav(mesh, lwl.getPerIterAlloc());
     cav.initialize(item);
@@ -75,14 +75,14 @@ struct process {
     
     for (Subgraph::iterator ii = cav.getPre().begin(),
 	   ee = cav.getPre().end(); ii != ee; ++ii) 
-      mesh->removeNode(*ii, Galois::Graph::NONE);
+      mesh->removeNode(*ii, Galois::NONE);
     
     //add new data
     for (Subgraph::iterator ii = cav.getPost().begin(),
 	   ee = cav.getPost().end(); ii != ee; ++ii) {
       GNode node = *ii;
-      mesh->addNode(node, Galois::Graph::ALL);
-      Element& element = node.getData(Galois::Graph::ALL);
+      mesh->addNode(node, Galois::ALL);
+      Element& element = node.getData(Galois::ALL);
       if (element.isBad()) {
         lwl.push(node);
       }
@@ -92,7 +92,7 @@ struct process {
 	   ee = cav.getPost().edge_end(); ii != ee; ++ii) {
       Subgraph::tmpEdge edge = *ii;
       //bool ret = 
-      mesh->addEdge(edge.src, edge.dst, Galois::Graph::ALL); //, edge.data);
+      mesh->addEdge(edge.src, edge.dst, Galois::ALL); //, edge.data);
       //assert ret;
     }
     if (mesh->containsNode(item)) {

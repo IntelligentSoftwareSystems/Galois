@@ -1,4 +1,4 @@
-// Statistic type -*- C++ -*-
+// Galois Conflict flags -*- C++ -*-
 /*
 Galois, a framework to exploit amorphous data-parallelism in irregular
 programs.
@@ -17,35 +17,18 @@ defects in Software and/or Documentation, or loss or inaccuracy of data of any
 kind.
 */
 
-#ifndef __GALOIS_STATISTIC_H
-#define __GALOIS_STATISTIC_H
-
-#include "util/Accumulator.h"
-#include "Runtime/Support.h"
-#include "Timer.h"
+#ifndef GALOIS_CONFLICTFLAGS_H
+#define GALOIS_CONFLICTFLAGS_H
 
 namespace Galois {
 
-template<typename T>
-class statistic : public accumulator<T> {
-  const char* name;
-public:
-  statistic(const char* _name) :name(_name) {}
-  ~statistic() {
-    GaloisRuntime::reportStatSum(name, accumulator<T>::get());
-  }
-};
-
-class StatTimer : public Timer {
-  const char* name;
-  const char* loopname;
-public:
-  StatTimer(const char* n = "Time", const char* l = 0) :name(n), loopname(l) {}
-  ~StatTimer() {
-    GaloisRuntime::reportStatSum(name, get(), loopname);
-  }
+//! What should the runtime do when executing a method.
+/*! Various methods take an optional parameter indicating what actions the runtime should do on the user's behalf: (1) checking for conflicts, and/or (2) saving undo information. By default, both are performed (ALL).
+ */
+enum MethodFlag {
+  NONE, ALL, CHECK_CONFLICT, SAVE_UNDO
 };
 
 }
 
-#endif
+#endif //GALOIS_CONFLICTFLAGS_H

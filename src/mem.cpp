@@ -42,6 +42,8 @@
 using namespace GaloisRuntime;
 using namespace MM;
 
+// Abstract away mmap
+
 static const int _PROT = PROT_READ | PROT_WRITE;
 static const int _MAP_BASE = MAP_ANONYMOUS | MAP_PRIVATE;
 #ifdef MAP_POPULATE

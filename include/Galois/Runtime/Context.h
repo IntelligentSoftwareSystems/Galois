@@ -23,6 +23,7 @@ kind.
 #include <boost/intrusive/slist.hpp>
 
 #include "Galois/Runtime/SimpleLock.h"
+#include "Galois/ConflictFlags.h"
 
 namespace GaloisRuntime {
 
@@ -77,17 +78,36 @@ public:
 
 extern __thread SimpleRuntimeContext* thread_cnx;
 
+//! get the current conflict detection class, may be null if not in parallel region
 static SimpleRuntimeContext* getThreadContext() {
-  //    assert(0);
   return thread_cnx;
 }
 
+//! used by the parallel code to set up conflict detection per thread
 void setThreadContext(SimpleRuntimeContext* n);
 
-static __attribute__((unused)) void acquire(Lockable* C) {
-  SimpleRuntimeContext* cnx = getThreadContext();
-  if (cnx)
-    cnx->acquire(C);
+
+//! Helper function to decide if the conflict detection lock should be taken
+static inline bool shouldLock(Galois::MethodFlag g) {
+  switch(g) {
+  case Galois::NONE:
+  case Galois::SAVE_UNDO:
+    return false;
+  case Galois::ALL:
+  case Galois::CHECK_CONFLICT:
+    return true;
+  }
+  assert(0 && "Shouldn't get here");
+  abort();
+}
+
+//! Master function which handles conflict detection
+static __attribute__((unused)) void acquire(Lockable* C, Galois::MethodFlag m) {
+  if (shouldLock(m)) {
+    SimpleRuntimeContext* cnx = getThreadContext();
+    if (cnx)
+      cnx->acquire(C);
+  }
 }
 
 }

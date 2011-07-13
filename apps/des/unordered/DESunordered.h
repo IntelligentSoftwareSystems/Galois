@@ -67,13 +67,13 @@ class DESunordered: public DESabstractMain {
 
     template <typename ContextTy>
     void operator () (GNode& activeNode, ContextTy& lwl) {
-        SimObject* srcObj = graph.getData (activeNode, Galois::Graph::CHECK_CONFLICT);
+        SimObject* srcObj = graph.getData (activeNode, Galois::CHECK_CONFLICT);
 
         // acquire locks on neighborhood: one shot
-        for (Graph::neighbor_iterator i = graph.neighbor_begin (activeNode, Galois::Graph::CHECK_CONFLICT)
-            , ei = graph.neighbor_end (activeNode, Galois::Graph::CHECK_CONFLICT); i != ei; ++i) {
+        for (Graph::neighbor_iterator i = graph.neighbor_begin (activeNode, Galois::CHECK_CONFLICT)
+            , ei = graph.neighbor_end (activeNode, Galois::CHECK_CONFLICT); i != ei; ++i) {
           // const GNode& dst = *i;
-          // SimObject* dstObj = graph.getData (dst, Galois::Graph::CHECK_CONFLICT);
+          // SimObject* dstObj = graph.getData (dst, Galois::CHECK_CONFLICT);
         }
 
 
@@ -84,11 +84,11 @@ class DESunordered: public DESabstractMain {
         int proc = srcObj->simulate(graph, activeNode); // number of events processed
         numEvents += proc;
 
-        for (Graph::neighbor_iterator i = graph.neighbor_begin (activeNode, Galois::Graph::NONE)
-            , ei = graph.neighbor_end (activeNode, Galois::Graph::NONE); i != ei; ++i) {
+        for (Graph::neighbor_iterator i = graph.neighbor_begin (activeNode, Galois::NONE)
+            , ei = graph.neighbor_end (activeNode, Galois::NONE); i != ei; ++i) {
           const GNode& dst = *i;
 
-          SimObject* dstObj = graph.getData (dst, Galois::Graph::NONE);
+          SimObject* dstObj = graph.getData (dst, Galois::NONE);
 
           dstObj->updateActive ();
 
@@ -134,7 +134,7 @@ class DESunordered: public DESabstractMain {
     // set onWlFlags for input objects
     for (std::vector<GNode>::const_iterator i = simInit.getInputNodes ().begin (), ei = simInit.getInputNodes ().end ();
         i != ei; ++i) {
-      SimObject* srcObj = graph.getData (*i, Galois::Graph::NONE);
+      SimObject* srcObj = graph.getData (*i, Galois::NONE);
       onWlFlags[srcObj->getId ()] = true;
     }
 

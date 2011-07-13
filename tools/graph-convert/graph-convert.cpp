@@ -56,7 +56,7 @@ void rmat2gr(const char *infilename, const char *outfilename) {
   for (int i = 0; i < nnodes; ++i) {
     GNode n = graph.createNode(i);
     nodes[i] = n;
-    graph.addNode(n, Galois::Graph::NONE);
+    graph.addNode(n, Galois::NONE);
   }
 
   int edges_added = 0;
@@ -133,7 +133,7 @@ void dimacs2gr(const char *infilename, const char *outfilename) {
   for (int i = 0; i < nnodes; ++i) {
     GNode n = graph.createNode(i);
     nodes[i] = n;
-    graph.addNode(n, Galois::Graph::NONE);
+    graph.addNode(n, Galois::NONE);
   }
 
   int edges_added = 0;

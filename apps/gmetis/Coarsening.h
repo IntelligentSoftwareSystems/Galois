@@ -91,7 +91,7 @@ public:
 			}
 			int numEdges = 0;
 			for (GGraph::active_iterator ii = coarser->active_begin(), ee = coarser->active_end(); ii != ee; ++ii) {
-				numEdges += graph->neighborsSize(*ii, Galois::Graph::NONE);
+				numEdges += graph->neighborsSize(*ii, Galois::NONE);
 			}
 			metisGraph->releaseMatches();
 			coarseMetisGraph->setNumEdges(numEdges / 2);
@@ -169,19 +169,19 @@ private:
 	}
 
 	void addNeighbors(int nodeId, GNode node, GGraph* graph, MetisGraph* coarseMetisGraph, IntVec& lmap) {
-		//int nodeId = node.getData(Galois::Graph::NONE).getNodeId();
+		//int nodeId = node.getData(Galois::NONE).getNodeId();
 		GNode matched = metisGraph->getMatch(nodeId);//.getMatch();
-		GNode nodeMapTo = metisGraph->getCoarseGraphMap(nodeId);//node.getData(Galois::Graph::NONE).getMapTo();
-		MetisNode& nodeMapToData = nodeMapTo.getData(Galois::Graph::NONE);
+		GNode nodeMapTo = metisGraph->getCoarseGraphMap(nodeId);//node.getData(Galois::NONE).getMapTo();
+		MetisNode& nodeMapToData = nodeMapTo.getData(Galois::NONE);
 		GGraph* coarseGraph = coarseMetisGraph->getGraph();
-		for (GGraph::neighbor_iterator jj = graph->neighbor_begin(node, Galois::Graph::NONE), eejj = graph->neighbor_end(node, Galois::Graph::NONE); jj != eejj; ++jj) {
+		for (GGraph::neighbor_iterator jj = graph->neighbor_begin(node, Galois::NONE), eejj = graph->neighbor_end(node, Galois::NONE); jj != eejj; ++jj) {
 			GNode neighbor = *jj;
 			if (neighbor == matched) {
 				continue;
 			}
-			int edgeWeight = graph->getEdgeData(node, jj, Galois::Graph::NONE);
-			GNode neighborMapTo = metisGraph->getCoarseGraphMap(neighbor.getData(Galois::Graph::NONE).getNodeId());//neighbor.getData(Galois::Graph::NONE).getMapTo();
-			int neighMapToId = neighborMapTo.getData(Galois::Graph::NONE).getNodeId();
+			int edgeWeight = graph->getEdgeData(node, jj, Galois::NONE);
+			GNode neighborMapTo = metisGraph->getCoarseGraphMap(neighbor.getData(Galois::NONE).getNodeId());//neighbor.getData(Galois::NONE).getMapTo();
+			int neighMapToId = neighborMapTo.getData(Galois::NONE).getNodeId();
 //			int& weight = lmap[neighMapToId];
 			int pos = -1;
 			for(int i=lmap.size()-1;i>=0;i--){
@@ -190,55 +190,55 @@ private:
 				}
 			}
 			if(pos == -1){
-				coarseGraph->addEdge(nodeMapTo, neighborMapTo, edgeWeight, Galois::Graph::NONE);
+				coarseGraph->addEdge(nodeMapTo, neighborMapTo, edgeWeight, Galois::NONE);
 				coarseMetisGraph->incNumEdges();
 				nodeMapToData.incNumEdges();
 				nodeMapToData.addEdgeWeight(edgeWeight);
 				lmap.push_back(neighMapToId);
 			} else {
-				coarseGraph->getEdgeData(nodeMapTo, neighborMapTo, Galois::Graph::NONE) += edgeWeight;
+				coarseGraph->getEdgeData(nodeMapTo, neighborMapTo, Galois::NONE) += edgeWeight;
 				nodeMapToData.addEdgeWeight(edgeWeight);
 			}
 
 
 //			weight += edgeWeight;
-//			coarseGraph->addEdge(nodeMapTo, neighborMapTo, weight, Galois::Graph::NONE);
+//			coarseGraph->addEdge(nodeMapTo, neighborMapTo, weight, Galois::NONE);
 //			coarseMetisGraph->incNumEdges();
 //			nodeMapToData.incNumEdges();
 //			nodeMapToData.addEdgeWeight(edgeWeight);
 
 //			if (lmap.find(neighMapToId)==lmap.end()) {
-//				coarseGraph->addEdge(nodeMapTo, neighborMapTo, edgeWeight, Galois::Graph::NONE);
+//				coarseGraph->addEdge(nodeMapTo, neighborMapTo, edgeWeight, Galois::NONE);
 //				coarseMetisGraph->incNumEdges();
-//				MetisNode& nodeMapToData = nodeMapTo.getData(Galois::Graph::NONE);
+//				MetisNode& nodeMapToData = nodeMapTo.getData(Galois::NONE);
 //				nodeMapToData.incNumEdges();
 //				nodeMapToData.addEdgeWeight(edgeWeight);
 //				lmap[neighMapToId] = edgeWeight;
 //			} else {
 //				int newEdgeWeight = lmap[neighMapToId];
 //				lmap[neighMapToId] = edgeWeight + newEdgeWeight;
-//				coarseGraph->getEdgeData(nodeMapTo, neighborMapTo, Galois::Graph::NONE) += edgeWeight;
-//				nodeMapTo.getData(Galois::Graph::NONE).addEdgeWeight(edgeWeight);
+//				coarseGraph->getEdgeData(nodeMapTo, neighborMapTo, Galois::NONE) += edgeWeight;
+//				nodeMapTo.getData(Galois::NONE).addEdgeWeight(edgeWeight);
 //			}
 		}
 	}
 
 	void addNeighbors(int nodeId, GNode node, GGraph* graph, MetisGraph* coarseMetisGraph) {
-		//int nodeId = node.getData(Galois::Graph::NONE).getNodeId();
+		//int nodeId = node.getData(Galois::NONE).getNodeId();
 		GNode matched = metisGraph->getMatch(nodeId);//.getMatch();
-		GNode nodeMapTo = metisGraph->getCoarseGraphMap(nodeId);//node.getData(Galois::Graph::NONE).getMapTo();
-		MetisNode& nodeMapToData = nodeMapTo.getData(Galois::Graph::NONE);
+		GNode nodeMapTo = metisGraph->getCoarseGraphMap(nodeId);//node.getData(Galois::NONE).getMapTo();
+		MetisNode& nodeMapToData = nodeMapTo.getData(Galois::NONE);
 		GGraph* coarseGraph = coarseMetisGraph->getGraph();
-		for (GGraph::neighbor_iterator jj = graph->neighbor_begin(node, Galois::Graph::NONE), eejj = graph->neighbor_end(node, Galois::Graph::NONE); jj != eejj; ++jj) {
+		for (GGraph::neighbor_iterator jj = graph->neighbor_begin(node, Galois::NONE), eejj = graph->neighbor_end(node, Galois::NONE); jj != eejj; ++jj) {
 			GNode neighbor = *jj;
 			if (neighbor == matched) {
 				continue;
 			}
-			int edgeWeight = graph->getEdgeData(node, jj, Galois::Graph::NONE);
-			GNode neighborMapTo = metisGraph->getCoarseGraphMap(neighbor.getData(Galois::Graph::NONE).getNodeId());//neighbor.getData(Galois::Graph::NONE).getMapTo();
-//			int neighMapToId = neighborMapTo.getData(Galois::Graph::NONE).getNodeId();
-			int& weight = coarseGraph->getOrCreateEdge(nodeMapTo, neighborMapTo, Galois::Graph::NONE);
-//			int& weight = coarseGraph->getEdgeData(nodeMapTo, neighborMapTo, Galois::Graph::NONE);
+			int edgeWeight = graph->getEdgeData(node, jj, Galois::NONE);
+			GNode neighborMapTo = metisGraph->getCoarseGraphMap(neighbor.getData(Galois::NONE).getNodeId());//neighbor.getData(Galois::NONE).getMapTo();
+//			int neighMapToId = neighborMapTo.getData(Galois::NONE).getNodeId();
+			int& weight = coarseGraph->getOrCreateEdge(nodeMapTo, neighborMapTo, Galois::NONE);
+//			int& weight = coarseGraph->getEdgeData(nodeMapTo, neighborMapTo, Galois::NONE);
 
 			if(weight == 0){
 				weight = edgeWeight;
@@ -253,23 +253,23 @@ private:
 	}
 
 	void addNeighbors(int nodeId, GNode node, GGraph* graph, MetisGraph* coarseMetisGraph, IntIntMap& lmap) {
-			//int nodeId = node.getData(Galois::Graph::NONE).getNodeId();
+			//int nodeId = node.getData(Galois::NONE).getNodeId();
 			GNode matched = metisGraph->getMatch(nodeId);//.getMatch();
-			GNode nodeMapTo = metisGraph->getCoarseGraphMap(nodeId);//node.getData(Galois::Graph::NONE).getMapTo();
-			MetisNode& nodeMapToData = nodeMapTo.getData(Galois::Graph::NONE);
+			GNode nodeMapTo = metisGraph->getCoarseGraphMap(nodeId);//node.getData(Galois::NONE).getMapTo();
+			MetisNode& nodeMapToData = nodeMapTo.getData(Galois::NONE);
 			GGraph* coarseGraph = coarseMetisGraph->getGraph();
-			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(node, Galois::Graph::NONE), eejj = graph->neighbor_end(node, Galois::Graph::NONE); jj != eejj; ++jj) {
+			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(node, Galois::NONE), eejj = graph->neighbor_end(node, Galois::NONE); jj != eejj; ++jj) {
 				GNode neighbor = *jj;
 				if (neighbor == matched) {
 					continue;
 				}
-				int edgeWeight = graph->getEdgeData(node, jj, Galois::Graph::NONE);
-				GNode neighborMapTo = metisGraph->getCoarseGraphMap(neighbor.getData(Galois::Graph::NONE).getNodeId());//neighbor.getData(Galois::Graph::NONE).getMapTo();
-//				int neighMapToId = neighborMapTo.getData(Galois::Graph::NONE).getNodeId();
+				int edgeWeight = graph->getEdgeData(node, jj, Galois::NONE);
+				GNode neighborMapTo = metisGraph->getCoarseGraphMap(neighbor.getData(Galois::NONE).getNodeId());//neighbor.getData(Galois::NONE).getMapTo();
+//				int neighMapToId = neighborMapTo.getData(Galois::NONE).getNodeId();
 //				int& weight = lmap[neighMapToId];
 //				weight += edgeWeight;
-//				coarseGraph->addEdge(nodeMapTo, neighborMapTo, weight, Galois::Graph::NONE);
-				int& weight = coarseGraph->getOrCreateEdge(nodeMapTo, neighborMapTo, Galois::Graph::NONE);
+//				coarseGraph->addEdge(nodeMapTo, neighborMapTo, weight, Galois::NONE);
+				int& weight = coarseGraph->getOrCreateEdge(nodeMapTo, neighborMapTo, Galois::NONE);
 
 				if(weight == 0){
 					weight = edgeWeight;
@@ -281,23 +281,23 @@ private:
 				nodeMapToData.addEdgeWeight(edgeWeight);
 
 //				if (lmap.find(neighMapToId)==lmap.end()) {
-//					coarseGraph->addEdge(nodeMapTo, neighborMapTo, edgeWeight, Galois::Graph::NONE);
+//					coarseGraph->addEdge(nodeMapTo, neighborMapTo, edgeWeight, Galois::NONE);
 //					coarseMetisGraph->incNumEdges();
-//					MetisNode& nodeMapToData = nodeMapTo.getData(Galois::Graph::NONE);
+//					MetisNode& nodeMapToData = nodeMapTo.getData(Galois::NONE);
 //					nodeMapToData.incNumEdges();
 //					nodeMapToData.addEdgeWeight(edgeWeight);
 //					lmap[neighMapToId] = edgeWeight;
 //				} else {
 //					int newEdgeWeight = lmap[neighMapToId];
 //					lmap[neighMapToId] = edgeWeight + newEdgeWeight;
-//					coarseGraph->getEdgeData(nodeMapTo, neighborMapTo, Galois::Graph::NONE) += edgeWeight;
-//					nodeMapTo.getData(Galois::Graph::NONE).addEdgeWeight(edgeWeight);
+//					coarseGraph->getEdgeData(nodeMapTo, neighborMapTo, Galois::NONE) += edgeWeight;
+//					nodeMapTo.getData(Galois::NONE).addEdgeWeight(edgeWeight);
 //				}
 			}
 	}
 
 	void addEdges(int nodeId, GNode node, bool* visited, MetisGraph* coarseMetisGraph) {
-//		MetisNode& nodeData = node.getData(Galois::Graph::NONE);
+//		MetisNode& nodeData = node.getData(Galois::NONE);
 //		int nodeId = nodeData.getNodeId();
 		if (visited[nodeId])
 			return;
@@ -306,11 +306,11 @@ private:
 		addNeighbors(nodeId, node, graph, coarseMetisGraph);
 		if (matched != node) {
 			//matched.map(new buildNeighborClosure(graph, coarseMetisGraph, matched, node, lmap), matched);
-			MetisNode& matchedData = matched.getData(Galois::Graph::NONE);
+			MetisNode& matchedData = matched.getData(Galois::NONE);
 			addNeighbors(matchedData.getNodeId(), matched, graph, coarseMetisGraph);
 			visited[matchedData.getNodeId()] = true;
 		}
-		//cout<<"nodeID:___"<<graph->neighborsSize(node,Galois::Graph::NONE)<<"|"<<graph->neighborsSize(matched,Galois::Graph::NONE)<<endl;
+		//cout<<"nodeID:___"<<graph->neighborsSize(node,Galois::NONE)<<"|"<<graph->neighborsSize(matched,Galois::NONE)<<endl;
 //		cout<<"maxNeighborSize:"<<maxNeighborSize<<endl;
 //		if(maxNeighborSize>100){
 //			IntIntMap lmap;
@@ -318,7 +318,7 @@ private:
 //			addNeighbors(nodeId, node, graph, coarseMetisGraph, lmap);
 //			if (matched != node) {
 //				//matched.map(new buildNeighborClosure(graph, coarseMetisGraph, matched, node, lmap), matched);
-//				MetisNode& matchedData = matched.getData(Galois::Graph::NONE);
+//				MetisNode& matchedData = matched.getData(Galois::NONE);
 //				addNeighbors(matchedData.getNodeId(), matched, graph, coarseMetisGraph, lmap);
 //				visited[matchedData.getNodeId()] = true;
 //			}
@@ -328,7 +328,7 @@ private:
 //			addNeighbors(nodeId, node, graph, coarseMetisGraph, lmap);
 //			if (matched != node) {
 //				//matched.map(new buildNeighborClosure(graph, coarseMetisGraph, matched, node, lmap), matched);
-//				MetisNode& matchedData = matched.getData(Galois::Graph::NONE);
+//				MetisNode& matchedData = matched.getData(Galois::NONE);
 //				addNeighbors(matchedData.getNodeId(), matched, graph, coarseMetisGraph, lmap);
 //				visited[matchedData.getNodeId()] = true;
 //
@@ -342,10 +342,10 @@ private:
 
 		for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
 			GNode node = *ii;
-			MetisNode& nodeData = node.getData(Galois::Graph::NONE);
+			MetisNode& nodeData = node.getData(Galois::NONE);
 			int id = nodeData.getNodeId();
-			MetisNode& matchData = metisGraph->getMatch(id).getData(Galois::Graph::NONE);
-			addEdges(node.getData(Galois::Graph::NONE).getNodeId(), node, visited, coarseMetisGraph);
+			MetisNode& matchData = metisGraph->getMatch(id).getData(Galois::NONE);
+			addEdges(node.getData(Galois::NONE).getNodeId(), node, visited, coarseMetisGraph);
 		}
 		delete[] visited;
 	}
@@ -369,17 +369,17 @@ private:
 		//		 }
 		template<typename Context>
 		void operator()(GNode item, Context& lwl) {
-			MetisNode& nodeData = item.getData(Galois::Graph::CHECK_CONFLICT);
+			MetisNode& nodeData = item.getData(Galois::CHECK_CONFLICT);
 			GNode matched = metisGraph->getMatch(nodeData.getNodeId());
-			matched.getData(Galois::Graph::CHECK_CONFLICT);
+			matched.getData(Galois::CHECK_CONFLICT);
 			// dummy loops for making cautious
-//			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(item, Galois::Graph::CHECK_CONFLICT), eejj = graph->neighbor_end(item, Galois::Graph::CHECK_CONFLICT); jj != eejj; ++jj) {
+//			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(item, Galois::CHECK_CONFLICT), eejj = graph->neighbor_end(item, Galois::CHECK_CONFLICT); jj != eejj; ++jj) {
 //				GNode neighbor = *jj;
-//				metisGraph->getCoarseGraphMap(neighbor.getData(Galois::Graph::CHECK_CONFLICT).getNodeId()).getData(Galois::Graph::CHECK_CONFLICT);
+//				metisGraph->getCoarseGraphMap(neighbor.getData(Galois::CHECK_CONFLICT).getNodeId()).getData(Galois::CHECK_CONFLICT);
 //			}
-//			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(matched, Galois::Graph::CHECK_CONFLICT), eejj = graph->neighbor_end(matched, Galois::Graph::CHECK_CONFLICT); jj != eejj; ++jj) {
+//			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(matched, Galois::CHECK_CONFLICT), eejj = graph->neighbor_end(matched, Galois::CHECK_CONFLICT); jj != eejj; ++jj) {
 //				GNode neighbor = *jj;
-//				metisGraph->getCoarseGraphMap(neighbor.getData(Galois::Graph::CHECK_CONFLICT).getNodeId()).getData(Galois::Graph::CHECK_CONFLICT);
+//				metisGraph->getCoarseGraphMap(neighbor.getData(Galois::CHECK_CONFLICT).getNodeId()).getData(Galois::CHECK_CONFLICT);
 //			}
 			coarsener->addEdges(nodeData.getNodeId(), item, visited, coarseMetisGraph);
 		}

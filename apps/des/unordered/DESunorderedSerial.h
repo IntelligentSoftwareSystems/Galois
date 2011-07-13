@@ -56,7 +56,7 @@ class DESunorderedSerial: public DESabstractMain {
     // set onWlFlags for input objects
     for (std::vector<GNode>::const_iterator i = simInit.getInputNodes ().begin (), ei = simInit.getInputNodes ().end ();
         i != ei; ++i) {
-      SimObject* srcObj = graph.getData (*i, Galois::Graph::NONE);
+      SimObject* srcObj = graph.getData (*i, Galois::NONE);
       onWlFlags[srcObj->getId ()] = true;
     }
 
@@ -67,16 +67,16 @@ class DESunorderedSerial: public DESabstractMain {
       GNode activeNode = worklist.front ();
       worklist.pop_front ();
 
-      SimObject* srcObj = graph.getData (activeNode, Galois::Graph::NONE);
+      SimObject* srcObj = graph.getData (activeNode, Galois::NONE);
 
       numEvents += srcObj->simulate(graph, activeNode);
 
 
-      for (Graph::neighbor_iterator i = graph.neighbor_begin (activeNode, Galois::Graph::NONE), ei =
-          graph.neighbor_end (activeNode, Galois::Graph::NONE); i != ei; ++i) {
+      for (Graph::neighbor_iterator i = graph.neighbor_begin (activeNode, Galois::NONE), ei =
+          graph.neighbor_end (activeNode, Galois::NONE); i != ei; ++i) {
         const GNode& dst = *i;
 
-        SimObject* dstObj = graph.getData (dst, Galois::Graph::NONE);
+        SimObject* dstObj = graph.getData (dst, Galois::NONE);
 
         dstObj->updateActive ();
 

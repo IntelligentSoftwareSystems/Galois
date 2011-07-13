@@ -90,12 +90,12 @@ protected:
 
     // assert (&myNode == &inputEvent.getRecvObj());
 
-    assert (graph.getData (myNode, Galois::Graph::NONE) == this);
+    assert (graph.getData (myNode, Galois::NONE) == this);
 
     SimTime sendTime = inputEvent.getRecvTime();
 
-    for (typename GraphTy::neighbor_iterator i = graph.neighbor_begin (myNode, Galois::Graph::NONE), 
-        e = graph.neighbor_end (myNode, Galois::Graph::NONE); i != e; ++i) {
+    for (typename GraphTy::neighbor_iterator i = graph.neighbor_begin (myNode, Galois::NONE), 
+        e = graph.neighbor_end (myNode, Galois::NONE); i != e; ++i) {
 
       const GNodeTy& dst = *i;
 
@@ -103,7 +103,7 @@ protected:
           BaseLogicGate::getDelay ());
 
 
-      SimObject* dstObj = graph.getData (dst, Galois::Graph::NONE);
+      SimObject* dstObj = graph.getData (dst, Galois::NONE);
       LogicGate<GraphTy, GNodeTy>* dstGate = dynamic_cast< LogicGate<GraphTy, GNodeTy>* > (dstObj);
 
       if (dstGate == NULL) {

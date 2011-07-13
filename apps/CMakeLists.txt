@@ -32,3 +32,4 @@ add_subdirectory(pagerank)
 add_subdirectory(preflowpush)
 add_subdirectory(sssp)
 add_subdirectory(surveypropagation)
+

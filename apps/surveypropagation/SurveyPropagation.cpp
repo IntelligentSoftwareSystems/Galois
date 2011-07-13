@@ -28,7 +28,7 @@
 #include "Galois/Statistic.h"
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
-#include "Galois/Accumulator.h"
+#include "Galois/util/Accumulator.h"
 
 #include "Lonestar/Banner.h"
 #include "Lonestar/CommandLine.h"
@@ -126,12 +126,12 @@ void initalize_random_formula(int M, int N, int K) {
 
   for (int m = 0; m < M; ++m) {
     GNode N = graph.createNode(SPNode(m, true));
-    graph.addNode(N, Galois::Graph::NONE);
+    graph.addNode(N, Galois::NONE);
     clauses[m] = N;
   }
   for (int n = 0; n < N; ++n) {
     GNode N = graph.createNode(SPNode(n, false));
-    graph.addNode(N, Galois::Graph::NONE);
+    graph.addNode(N, Galois::NONE);
     literals[n] = N;
   }
 
@@ -144,7 +144,7 @@ void initalize_random_formula(int M, int N, int K) {
       if (std::find(touse.begin(), touse.end(), newK) 
 	  == touse.end()) {
 	touse.push_back(newK);
-	graph.addEdge(clauses[m], literals[newK], SPEdge((bool)(rand() % 2)), Galois::Graph::NONE);
+	graph.addEdge(clauses[m], literals[newK], SPEdge((bool)(rand() % 2)), Galois::NONE);
       }
     }
   }
@@ -156,14 +156,14 @@ void print_formula() {
       std::cout << " & ";
     std::cout << "c" << m << "( ";
     GNode N = clauses[m];
-    for (Graph::neighbor_iterator ii = graph.neighbor_begin(N, Galois::Graph::NONE), ee = graph.neighbor_end( N, Galois::Graph::NONE); ii != ee; ++ii) {
-      if (ii != graph.neighbor_begin(N, Galois::Graph::NONE))
+    for (Graph::neighbor_iterator ii = graph.neighbor_begin(N, Galois::NONE), ee = graph.neighbor_end( N, Galois::NONE); ii != ee; ++ii) {
+      if (ii != graph.neighbor_begin(N, Galois::NONE))
 	std::cout << " | ";
-      SPEdge& E = graph.getEdgeData(N, ii, Galois::Graph::NONE);
+      SPEdge& E = graph.getEdgeData(N, ii, Galois::NONE);
       if (E.isNegative)
 	std::cout << "-";
       
-      SPNode& V = graph.getData(*ii, Galois::Graph::NONE);
+      SPNode& V = graph.getData(*ii, Galois::NONE);
       std::cout << "v" << V.name;
       if (V.solved)
 	std::cout << "[" << (V.value ? 1 : 0) << "]";
@@ -178,7 +178,7 @@ void print_formula() {
 void print_fixed() {
   for (unsigned n = 0; n < literals.size(); ++n) {
     GNode N = literals[n];
-    SPNode& V = graph.getData(N, Galois::Graph::NONE);
+    SPNode& V = graph.getData(N, Galois::NONE);
     if (V.solved)
       std::cout << V.name << "[" << (V.value ? 1 : 0) << "] ";
   }
@@ -189,7 +189,7 @@ int count_fixed() {
   int retval = 0;
   for (unsigned n = 0; n < literals.size(); ++n) {
     GNode N = literals[n];
-    SPNode& V = graph.getData(N, Galois::Graph::NONE);
+    SPNode& V = graph.getData(N, Galois::NONE);
     if (V.solved)
       ++retval;
   }
@@ -263,7 +263,7 @@ struct update_eta {
 struct update_biases {
   template<typename Context>
   void operator()(GNode i, const Context& ctx) {
-    SPNode& idata = i.getData(Galois::Graph::NONE);
+    SPNode& idata = i.getData(Galois::NONE);
     if (idata.solved) return;
 
     double pp1 = 1.0;
@@ -273,8 +273,8 @@ struct update_biases {
     double p0 = 1.0;
 
     //for each function a
-    for (Graph::neighbor_iterator aii = graph.neighbor_begin(i, Galois::Graph::NONE), aee = graph.neighbor_end(i, Galois::Graph::NONE); aii != aee; ++aii) {
-      SPEdge& aie = graph.getEdgeData(i, *aii, Galois::Graph::NONE);
+    for (Graph::neighbor_iterator aii = graph.neighbor_begin(i, Galois::NONE), aee = graph.neighbor_end(i, Galois::NONE); aii != aee; ++aii) {
+      SPEdge& aie = graph.getEdgeData(i, *aii, Galois::NONE);
 
       double etaai = aie.eta;
       if (etaai > epsilon)

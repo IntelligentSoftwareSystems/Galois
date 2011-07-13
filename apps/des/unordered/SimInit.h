@@ -164,7 +164,7 @@ private:
 
       const GNodeTy& n = *i;
       Input<GraphTy, GNodeTy>* currInput = 
-        dynamic_cast<Input<GraphTy, GNodeTy>* > (graph.getData (n, Galois::Graph::NONE));
+        dynamic_cast<Input<GraphTy, GNodeTy>* > (graph.getData (n, Galois::NONE));
 
       assert ((currInput != NULL));
 
@@ -264,7 +264,7 @@ private:
     for (typename std::vector<SimObject*>::const_iterator i = simObjs.begin (), ei = simObjs.end (); i != ei; ++i) {
       SimObject* so = *i;
       GNodeTy n = graph.createNode(so);
-      graph.addNode(n, Galois::Graph::NONE);
+      graph.addNode(n, Galois::NONE);
       ++numNodes;
     }
   }
@@ -285,7 +285,7 @@ private:
     for (typename std::vector<GNodeTy>::iterator i = allNodes.begin (), ei = allNodes.end (); i != ei; ++i) {
       GNodeTy& src = *i;
       LogicGate<GraphTy, GNodeTy>* srcGate = 
-        dynamic_cast<LogicGate<GraphTy, GNodeTy>* > (graph.getData (src, Galois::Graph::NONE));
+        dynamic_cast<LogicGate<GraphTy, GNodeTy>* > (graph.getData (src, Galois::NONE));
 
       assert (srcGate != NULL);
       const std::string& srcOutName = srcGate->getOutputName ();
@@ -293,7 +293,7 @@ private:
       for (typename std::vector<GNodeTy>::iterator j = allNodes.begin (), ej = allNodes.end (); j != ej; ++j) {
         GNodeTy& dst = *j;
         LogicGate<GraphTy, GNodeTy>* dstGate = 
-           dynamic_cast<LogicGate<GraphTy, GNodeTy>* > (graph.getData (dst, Galois::Graph::NONE));
+           dynamic_cast<LogicGate<GraphTy, GNodeTy>* > (graph.getData (dst, Galois::NONE));
 
         assert (dstGate != NULL);
 
@@ -301,7 +301,7 @@ private:
           assert (srcGate != dstGate); // disallowing self loops
           if (!src.hasNeighbor (dst)) {
             ++numEdges;
-            graph.addEdge (src, dst, Galois::Graph::NONE);
+            graph.addEdge (src, dst, Galois::NONE);
           }
 
         }
@@ -342,7 +342,7 @@ private:
       SimObject* so = *i;
 
       GNodeTy n = graph.createNode(so);
-      graph.addNode(n, Galois::Graph::NONE);
+      graph.addNode(n, Galois::NONE);
       ++numNodes;
       inputNodes.push_back(n);
     }

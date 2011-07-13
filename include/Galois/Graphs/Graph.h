@@ -64,6 +64,7 @@
 #include <boost/iterator/filter_iterator.hpp>
 #include <boost/functional.hpp>
 
+#include "Galois/ConflictFlags.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/InsBag.h"
@@ -74,30 +75,6 @@ using namespace GaloisRuntime;
 
 namespace Galois {
 namespace Graph {
-
-/**
- * What should the runtime do when executing a method.
- *
- * Graph methods take an optional parameter indicating what actions the runtime
- * should do on the user's behalf: (1) checking for conflicts, and/or (2)
- * saving undo information. By default, both are performed (ALL).
- */
-enum MethodFlag {
-  NONE, ALL, CHECK_CONFLICT, SAVE_UNDO
-};
-
-static inline bool shouldLock(MethodFlag g) {
-  switch(g) {
-  case NONE:
-  case SAVE_UNDO:
-    return false;
-  case ALL:
-  case CHECK_CONFLICT:
-    return true;
-  }
-  assert(0 && "Shouldn't get here");
-  abort();
-}
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -303,10 +280,9 @@ private:
   //GaloisRuntime::MemRegionPool<gNode> NodePool;
 
   //deal with the Node redirction
-  node_reference getData(gNode* ID, MethodFlag mflag = ALL) {
+  node_reference getData(gNode* ID, Galois::MethodFlag mflag = ALL) {
     assert(ID);
-    if (shouldLock(mflag))
-      acquire(ID);
+    acquire(ID, mflag);
     return ID->data.getData();
   }
 
@@ -333,7 +309,7 @@ public:
 	ID->prefetch_neighbors();
     }
 
-    node_reference getData(MethodFlag mflag = ALL) const {
+    node_reference getData(Galois::MethodFlag mflag = ALL) const {
       return Parent->getData(ID, mflag);
     }
 
@@ -407,10 +383,9 @@ public:
   }
 
   //! Adds a node to the graph.
-  bool addNode(const GraphNode& n, MethodFlag mflag = ALL) {
+  bool addNode(const GraphNode& n, Galois::MethodFlag mflag = ALL) {
     assert(n.ID);
-    if (shouldLock(mflag))
-      acquire(n.ID);
+    acquire(n.ID, mflag);
     bool oldActive = n.ID->active;
     if (!oldActive) {
       n.ID->active = true;
@@ -420,10 +395,9 @@ public:
   }
 
   //! Gets the node data for a node.
-  node_reference getData(const GraphNode& n, MethodFlag mflag = ALL) const {
+  node_reference getData(const GraphNode& n, Galois::MethodFlag mflag = ALL) const {
     assert(n.ID);
-    if (shouldLock(mflag))
-      acquire(n.ID);
+    acquire(n.ID, mflag);
     return n.ID->data.getData();
   }
 
@@ -438,10 +412,9 @@ public:
    * 
    */
   // FIXME: incoming edges aren't handled here for directed graphs
-  bool removeNode(GraphNode n, MethodFlag mflag = ALL) {
+  bool removeNode(GraphNode n, Galois::MethodFlag mflag = ALL) {
     assert(n.ID);
-    if (shouldLock(mflag))
-      acquire(n.ID);
+    acquire(n.ID, mflag);
     gNode* N = n.ID;
     bool wasActive = N->active;
     if (wasActive) {
@@ -462,17 +435,15 @@ public:
   //! Adds an edge to the graph containing the specified data.
   void addEdge(GraphNode src, GraphNode dst,
 	       const_edge_reference data, 
-	       MethodFlag mflag = ALL) {
+	       Galois::MethodFlag mflag = ALL) {
     assert(src.ID);
     assert(dst.ID);
-    if (shouldLock(mflag)) 
-      acquire(src.ID);
+    acquire(src.ID, mflag);
 
     if (Directional) {
       src.ID->getOrCreateEdge(dst.ID) = data;
     } else {
-      if (shouldLock(mflag))
-	acquire(dst.ID);
+      acquire(dst.ID, mflag);
       EdgeTy& E1 = src.ID->getOrCreateEdge(dst.ID);
       EdgeTy& E2 = dst.ID->getOrCreateEdge(src.ID);
       if (src < dst)
@@ -483,32 +454,28 @@ public:
   }
 
   //! Adds an edge to the graph
-  void addEdge(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
+  void addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {
     assert(src.ID);
     assert(dst.ID);
-    if (shouldLock(mflag))
-      acquire(src.ID);
+    acquire(src.ID, mflag);
     if (Directional) {
       src.ID->getOrCreateEdge(dst.ID);
     } else {
-      if (shouldLock(mflag))
-	acquire(dst.ID);
+      acquire(dst.ID, mflag);
       src.ID->getOrCreateEdge(dst.ID);
       dst.ID->getOrCreateEdge(src.ID);
     }
   }
 
   //! Removes an edge from the graph
-  void removeEdge(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
+  void removeEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {
     assert(src.ID);
     assert(dst.ID);
-    if (shouldLock(mflag))
-      acquire(src.ID);
+    acquire(src.ID, mflag);
     if (Directional) {
       src.ID->eraseEdge(dst.ID);
     } else {
-      if (shouldLock(mflag))
-	acquire(dst.ID);
+      acquire(dst.ID, mflag);
       src.ID->eraseEdge(dst.ID);
       dst.ID->eraseEdge(src.ID);
     }
@@ -519,19 +486,17 @@ public:
    * get the edge data for a non-existent edge.
    */
   edge_reference getEdgeData(GraphNode src, GraphNode dst,
-      MethodFlag mflag = ALL) const {
+      Galois::MethodFlag mflag = ALL) const {
     assert(src.ID);
     assert(dst.ID);
 
     //yes, fault on null (no edge)
-    if (shouldLock(mflag))
-      acquire(src.ID);
+    acquire(src.ID, mflag);
 
     if (Directional) {
       return src.ID->getEdgeData(dst.ID);
     } else {
-      if (shouldLock(mflag))
-	acquire(dst.ID);
+      acquire(dst.ID, mflag);
       if (src < dst)
 	return src.ID->getEdgeData(dst.ID);
       else
@@ -544,18 +509,16 @@ public:
     * the given edge data for a non-existent edge.
     */
    edge_reference getOrCreateEdge(GraphNode src, GraphNode dst,
-		   const_edge_reference data, MethodFlag mflag = ALL) const {
+		   const_edge_reference data, Galois::MethodFlag mflag = ALL) const {
      assert(src.ID);
      assert(dst.ID);
 
-     if (shouldLock(mflag))
-       acquire(src.ID);
+     acquire(src.ID, mflag);
 
      if (Directional) {
        return src.ID->getOrCreateEdge(dst.ID, data);
      } else {
-       if (shouldLock(mflag))
- 	acquire(dst.ID);
+       acquire(dst.ID, mflag);
 
        if (src < dst){
     	   dst.ID->getOrCreateEdge(src.ID, data);
@@ -572,10 +535,9 @@ public:
   //// General Things ////
 
   //! Returns the number of neighbors
-  int neighborsSize(GraphNode N, MethodFlag mflag = ALL) const {
+  int neighborsSize(GraphNode N, Galois::MethodFlag mflag = ALL) const {
     assert(N.ID);
-    if (shouldLock(mflag))
-      acquire(N.ID);
+    acquire(N.ID, mflag);
     return N.ID->edges.size();
   }
 
@@ -584,24 +546,24 @@ public:
                                                neighbor_iterator;
 
   //! Returns an iterator to the neighbors of a node 
-  neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = ALL) {
+  neighbor_iterator neighbor_begin(GraphNode N, Galois::MethodFlag mflag = ALL) {
     assert(N.ID);
-    if (shouldLock(mflag))
-      acquire(N.ID);
-    if (shouldLock(mflag)) {
-      for (typename gNode::neighbor_iterator ii = N.ID->neighbor_begin(), ee =
-             N.ID->neighbor_end(); ii != ee; ++ii) {
-        //__builtin_prefetch(*ii);
-        //if (shouldLock(mflag))
-        acquire(*ii);
-      }
+    acquire(N.ID, mflag);
+    //    if (shouldLock(mflag)) {
+    //Trust the compliler to remove this loop if the body disappears from the right mflag
+    for (typename gNode::neighbor_iterator ii = N.ID->neighbor_begin(), ee =
+	   N.ID->neighbor_end(); ii != ee; ++ii) {
+      //__builtin_prefetch(*ii);
+      //if (shouldLock(mflag))
+      acquire(*ii, mflag);
     }
+    //}
     return boost::make_transform_iterator(N.ID->neighbor_begin(),
 					  makeGraphNodePtr(this));
   }
 
   //! Returns the end of the neighbor iterator 
-  neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = ALL) {
+  neighbor_iterator neighbor_end(GraphNode N, Galois::MethodFlag mflag = ALL) {
     assert(N.ID);
     // Probably not necessary (no valid use for an end pointer should ever
     // require it)
@@ -612,12 +574,11 @@ public:
   }
 
   edge_reference getEdgeData(GraphNode src, neighbor_iterator dst,
-      MethodFlag mflag = ALL) {
+      Galois::MethodFlag mflag = ALL) {
     assert(src.ID);
 
     //yes, fault on null (no edge)
-    if (shouldLock(mflag))
-      acquire(src.ID);
+    acquire(src.ID, mflag);
 
     if (Directional) {
       return src.ID->getEdgeData(dst.base().base());

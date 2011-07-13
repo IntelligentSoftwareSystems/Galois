@@ -62,11 +62,11 @@ public:
     while (!frontier.empty()){
       GNode curr = frontier.back();
       frontier.pop_back();
-      for (Graph::neighbor_iterator ii = graph->neighbor_begin(curr, Galois::Graph::CHECK_CONFLICT),
-          ee = graph->neighbor_end(curr, Galois::Graph::CHECK_CONFLICT);
+      for (Graph::neighbor_iterator ii = graph->neighbor_begin(curr, Galois::CHECK_CONFLICT),
+          ee = graph->neighbor_end(curr, Galois::CHECK_CONFLICT);
           ii != ee; ++ii) {
         GNode neighbor = *ii;
-        Element& neighborElement = neighbor.getData(Galois::Graph::CHECK_CONFLICT);
+        Element& neighborElement = neighbor.getData(Galois::CHECK_CONFLICT);
 
         if (!graph->containsNode(neighbor) || neighbor == node || deletingNodes.find(neighbor) != deletingNodes.end()) {
           continue;
@@ -83,7 +83,7 @@ public:
   }
 
   void update(GNodeVector* newNodes){
-    Element& nodeData = node.getData(Galois::Graph::NONE);
+    Element& nodeData = node.getData(Galois::NONE);
     nodeData.getTuples().pop_back();
     //vector<Element, Galois::PerIterMem::ItAllocTy::rebind<Element>::other> newElements;
     //vector<Element*> newElements;
@@ -92,13 +92,13 @@ public:
       connectionNodes.pop_front();
       GNode oldNode = oldNodes.front();
       oldNodes.pop_front();
-      int index = graph->getEdgeData(neighbor, oldNode, Galois::Graph::NONE);
-      Element& neighborElement = neighbor.getData(Galois::Graph::NONE);
+      int index = graph->getEdgeData(neighbor, oldNode, Galois::NONE);
+      Element& neighborElement = neighbor.getData(Galois::NONE);
       Element e(tuple, neighborElement.getPoint(index), neighborElement.getPoint((index + 1) % 3));
       GNode nnode = graph->createNode(e);
-      graph->addNode(nnode, Galois::Graph::NONE);
-      graph->addEdge(nnode, neighbor, 1, Galois::Graph::NONE);
-      graph->addEdge(neighbor, nnode, index, Galois::Graph::NONE);
+      graph->addNode(nnode, Galois::NONE);
+      graph->addEdge(nnode, neighbor, 1, Galois::NONE);
+      graph->addEdge(neighbor, nnode, index, Galois::NONE);
 
       int numNeighborsFound = 0;
       GNodeVector::iterator nEnd = newNodes->end();
@@ -107,7 +107,7 @@ public:
         bool found = false;
         int indexForNewNode = -1;
         int indexForNode = -1;
-        Element& newNodeData = newNode.getData(Galois::Graph::NONE);
+        Element& newNodeData = newNode.getData(Galois::NONE);
 
         for (int x=2; x>=1; x--) {
           for (int y=2; y>=1; y--) {
@@ -119,9 +119,9 @@ public:
 
         if (found) {
           graph->addEdge(newNode, nnode, indexForNewNode,
-              Galois::Graph::CHECK_CONFLICT);
+              Galois::CHECK_CONFLICT);
           graph->addEdge(nnode, newNode, indexForNode, 
-              Galois::Graph::CHECK_CONFLICT);
+              Galois::CHECK_CONFLICT);
           numNeighborsFound++;
         }
         if (numNeighborsFound == 2) {
@@ -130,10 +130,10 @@ public:
       }
 
       newNodes->push_back(nnode);
-      Element& nnode_data = nnode.getData(Galois::Graph::NONE);
+      Element& nnode_data = nnode.getData(Galois::NONE);
       //newElements.push_back(&nnode_data);
 
-      Element& oldNodeData = oldNode.getData(Galois::Graph::NONE);
+      Element& oldNodeData = oldNode.getData(Galois::NONE);
       TupleList& ntuples = nnode_data.getTuples();
       TupleList& tuples = oldNodeData.getTuples();
       // for (TupleList::iterator li = tuples.begin(); li != tuples.end(); ) {
@@ -170,7 +170,7 @@ public:
     for (GNodeSet::iterator setIter = deletingNodes.begin();
         setIter != deletingNodes.end(); ++setIter) {
       GNode dnode = *setIter;
-      graph->removeNode(dnode, Galois::Graph::NONE);
+      graph->removeNode(dnode, Galois::NONE);
     }
   }
 
@@ -179,13 +179,13 @@ public:
     for (GNodeSet::iterator iter = deletingNodes.begin();
         iter != deletingNodes.end(); ++iter) {
       GNode dnode = *iter;
-      TupleList& tuples = dnode.getData(Galois::Graph::NONE).getTuples();
+      TupleList& tuples = dnode.getData(Galois::NONE).getTuples();
 
       for(TupleList::reverse_iterator list_iter = tuples.rbegin(), end = tuples.rend(); list_iter != end; ++list_iter)
       {
         Tuple& tup=*list_iter;
         for (int i = 0; i < size; i++) {
-          Element& element = (*newNodes)[i].getData(Galois::Graph::NONE);
+          Element& element = (*newNodes)[i].getData(Galois::NONE);
           if ((element.elementContains(tup))) {
             element.addTuple(tup);
             if (i != 0) {
