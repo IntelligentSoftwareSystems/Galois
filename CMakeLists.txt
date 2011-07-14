@@ -43,6 +43,14 @@ endif()
 
 ###### Configure (users don't need to go beyond here) ######
 
+#LAPACK
+find_package(LAPACK)
+if(LAPACK_FOUND)
+  message("Found LAPACK, building avi")
+else()
+  message("No LAPACK, not building avi")
+endif()
+
 #Boost
 set(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0")
 find_package( Boost 1.34.0 REQUIRED )
