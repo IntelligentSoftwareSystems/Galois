@@ -1,9 +1,26 @@
-/*
- * AVIabstractMain.h
+/** Common code for different AVI algorithms -*- C++ -*-
+ * @file
+ * @section License
  *
- *  Created on: Jun 20, 2011
- *      Author: amber
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
  */
+
 
 #ifndef AVI_ABSTRACT_MAIN_H_
 #define AVI_ABSTRACT_MAIN_H_
@@ -42,10 +59,13 @@ static const char* ndivOpt = "-n";
 static const char* simEndTimeOpt = "-e";
 
 
-static const char* name = "Parallel Asynchronous Variational Integrators";
+static const char* name = "Asynchronous Variational Integrators";
 static const char* description = "Elasto-dynamic simulation of a mesh with minimal number of simulation updates";
-static const char* url = "http://iss.ices.utexas.edu/lonestar/pavi.html";
+static const char* url = "http://iss.ices.utexas.edu/lonestar/asynchronous_variational_integrators";
 
+/**
+ * Common functionality for different versions and algorithms
+ */
 class AVIabstractMain {
 private:
   // TODO: add support for verifying from a file
@@ -76,6 +96,7 @@ private:
 protected:
 
 
+  /** version name */
   virtual const std::string getVersion () const = 0;
 
   /**
@@ -94,19 +115,36 @@ public:
    *
    * @param meshInit
    * @param g
-   * @return number of loop iterations
-   * @throws ExecutionException
+   * @param createSyncFiles
    */
-  virtual  void runLoop (MeshInit& meshInit, GlobalVec& g, bool createSyncFiles) = 0;
+  virtual void runLoop (MeshInit& meshInit, GlobalVec& g, bool createSyncFiles) = 0;
 
+  /**
+   * The main method to call 
+   * @param argc
+   * @param argv
+   */
   void run (int argc, const char* argv[]);
 
   void verify (const InputConfig& input, const MeshInit& meshInit, const GlobalVec& g) const;
 
+  /**
+   * Code common to loop body of different versions
+   * Performs the updates to avi parameter
+   *
+   * @param avi
+   * @param meshInit
+   * @param g
+   * @param l
+   * @param createSyncFiles
+   */
   inline static void simulate (AVI* avi, MeshInit& meshInit,
         GlobalVec& g, LocalVec& l, bool createSyncFiles);
 };
 
+/**
+ * Serial ordered AVI algorithm
+ */
 class AVIorderedSerial: public AVIabstractMain {
 
 protected:
@@ -274,7 +312,8 @@ void AVIabstractMain::verify (const InputConfig& input, const MeshInit& meshInit
 
       meshInit.printDiff (*serialMesh);
 
-      throw std::runtime_error ("BAD: results don't match against Serial");
+      std::cerr << "BAD: results don't match against Serial" << std::endl;
+      abort ();
     }
 
     std::cout << ">>> OK: result verified against serial" << std::endl;
@@ -284,7 +323,8 @@ void AVIabstractMain::verify (const InputConfig& input, const MeshInit& meshInit
 
   }
   else {
-    throw std::runtime_error ("TODO: cmp against file data needs implementation");
+    std::cerr << "TODO: cmp against file data needs implementation" << std::endl;
+    abort ();
   }
 }
 

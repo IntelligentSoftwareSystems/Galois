@@ -1,4 +1,4 @@
-/*
+/**
  * Material.h
  * DG++
  *
@@ -62,6 +62,7 @@ class SimpleMaterial: public Material {
 public:
 
   // (amber) some constants collected here
+  //! Some constants collected together here
   static const double EPS = 1.e-6;
   static const double PERT = 1.e-1;
   static const double DET_MIN = 1.e-10;
@@ -72,6 +73,13 @@ public:
 
   static const double I_MAT[MAT_SIZE];
 
+  //! for use with getConstitutiveResponse
+  //! optional to compute the tangents or skip
+  //! the computation
+  enum ConstRespMode {
+    COMPUTE_TANGENTS,
+    SKIP_TANGENTS,
+  };
 
   //! \param rhoInput Density in reference configuration. If not provided, assumed to be zero.
   inline SimpleMaterial(double rhoInput = 0) :
@@ -106,12 +114,14 @@ public:
    @param strain strain tensor, input
    @param stress array where the stress tensor is returned
    @param tangents array where the constitutive tangents are returned. If not provided, not computed.
+   @param mode tells whether to compute tangents vector or skip it @see ConstRespMode
 
    If cannot compute the constitutive relation for some reason, for example a
    negative determinant in the strain, it returns false. If successful, returns true.
    */
 
-  virtual bool getConstitutiveResponse(const std::vector<double> * strain, std::vector<double> * stress, std::vector<double> * tangents = 0) const = 0;
+  virtual bool getConstitutiveResponse(const std::vector<double>& strain, std::vector<double>& stress, std::vector<double>& tangents
+      , const ConstRespMode& mode) const = 0;
 
   //! Returns the (uniform) density of the reference configuration.
   double getDensityInReference() const {
@@ -149,6 +159,7 @@ public:
   //! strain.
   static bool consistencyTest(const SimpleMaterial &Smat);
 
+  //! @return speed of sound 
   virtual double getSoundSpeed(void) const = 0;
 private:
   double RefRho;
@@ -175,7 +186,8 @@ public:
     return new NeoHookean(*this);
   }
 
-  bool getConstitutiveResponse(const std::vector<double> * strain, std::vector<double> * stress, std::vector<double> * tangents = 0) const;
+  bool getConstitutiveResponse(const std::vector<double>& strain, std::vector<double>& stress, std::vector<double>& tangents
+      , const ConstRespMode& mode) const;
 
   const std::string getMaterialName() const {
     return "NeoHookean";
@@ -213,7 +225,8 @@ public:
   }
   virtual LinearElasticBase * clone() const = 0;
 
-  bool getConstitutiveResponse(const std::vector<double> * strain, std::vector<double> * stress, std::vector<double> * tangents = 0) const;
+  bool getConstitutiveResponse(const std::vector<double>& strain, std::vector<double>& stress, std::vector<double>& tangents
+      , const ConstRespMode& mode) const;
 
   const std::string getMaterialName() const {
     return "LinearElasticBase";

@@ -1,4 +1,4 @@
-/*
+/**
  * Shape.h
  * DG++
  *
@@ -57,6 +57,7 @@ public:
   virtual size_t getNumVariables () const = 0; //!< Number of arguments of the functions
 
   //! Value of shape \f$N_a(x)\f$
+  //! @param a node id
   //! @param x coordinates of the point x
   //!
   //! We have purposedly left the type of coordinates the point should have unspecified, for flexibility.
@@ -68,7 +69,8 @@ public:
   virtual double getVal (size_t a, const double *x) const = 0;
 
   //! Value of \f$\frac{\partial N_a}{\partial x_i}(x)\f$
-  //! @param x coordinates of the point x
+  //! @param a node id
+  //! @param x coordinates of the point a
   //! @param i coordinate number 
   //!
   //! We have purposedly left the type of coordinates the point should have unspecified, for flexibility.

@@ -73,10 +73,10 @@ bool DResidue::consistencyTest(const DResidue & DRes, const std::vector<size_t> 
       double ival = largval[f][a];
 
       largval[f][a] = ival + EPS * maxval;
-      DRes.getVal(largval, &funcvalplus);
+      DRes.getVal(largval, funcvalplus);
 
       largval[f][a] = ival - EPS * maxval;
-      DRes.getVal(largval, &funcvalminus);
+      DRes.getVal(largval, funcvalminus);
 
       largval[f][a] = ival;
 
@@ -90,7 +90,7 @@ bool DResidue::consistencyTest(const DResidue & DRes, const std::vector<size_t> 
     }
   }
 
-  DRes.getDVal(largval, &funcval, &dfuncval);
+  DRes.getDVal(largval, funcval, dfuncval);
 
   double error = 0;
   double norm = 0;
@@ -116,15 +116,21 @@ bool DResidue::consistencyTest(const DResidue & DRes, const std::vector<size_t> 
   return true;
 }
 
-template<class T> bool Assemble_(std::vector<T *> &DResArray, const LocalToGlobalMap & L2G, const VecDouble & Dofs, VecDouble * ResVec,
-    MatDouble * DResMat) {
+enum AssembleMode {
+  RESIDUE,
+  DRESIDUE,
+};
+
+template<typename T> 
+static bool _Assemble(std::vector<T *> &DResArray, const LocalToGlobalMap & L2G
+    , const VecDouble & Dofs, VecDouble&  ResVec, MatDouble& DResMat, const AssembleMode& mode) {
 
   // VecZeroEntries(*ResVec);
-  std::fill (ResVec->begin(), ResVec->end (), 0.0 );
+  std::fill (ResVec.begin(), ResVec.end (), 0.0 );
 
-  if (DResMat) {
-    // MatZeroEntries(*DResMat);
-    for (MatDouble::iterator i = DResMat->begin (); i != DResMat->end (); ++i) {
+  if (mode == DRESIDUE) {
+    // MatZeroEntries(DResMat);
+    for (MatDouble::iterator i = DResMat.begin (); i != DResMat.end (); ++i) {
       std::fill (i->begin(), i->end (), 0.0);
     }
   }
@@ -157,14 +163,14 @@ template<class T> bool Assemble_(std::vector<T *> &DResArray, const LocalToGloba
       }
     }
 
-    if (DResMat) {
+    if (mode == DRESIDUE) {
       // I am using a dynamic_cast to prevent writing two versions of essentially the
       // same code, one for residue and another for dresidue. However, I think that there is
       // a flaw in the abstraction, since I cannot apparently do it with polymorphism here.
 
       DResidue * dr = dynamic_cast<DResidue *> (DResArray[e]);
       if (dr) {
-        if (!dr->getDVal(argval, &funcval, &dfuncval)) {
+        if (!dr->getDVal(argval, funcval, dfuncval)) {
           std::cerr << "ElementalOperation.cpp::Assemble Error in residual computation\n";
           return false;
         }
@@ -173,7 +179,7 @@ template<class T> bool Assemble_(std::vector<T *> &DResArray, const LocalToGloba
           " derivatives of a non-dresidue type\n";
         return false;
       }
-    } else if (!DResArray[e]->getVal(argval, &funcval)) {
+    } else if (!DResArray[e]->getVal(argval, funcval)) {
       std::cerr << "ElementalOperation.cpp::Assemble Error in residual computation\n";
       return false;
     }
@@ -189,7 +195,7 @@ template<class T> bool Assemble_(std::vector<T *> &DResArray, const LocalToGloba
     size_t * indices = new size_t[localsize];
     double * dresvals;
 
-    if (DResMat) {
+    if (mode == DRESIDUE) {
       dresvals = new double[localsize * localsize];
     }
 
@@ -198,7 +204,7 @@ template<class T> bool Assemble_(std::vector<T *> &DResArray, const LocalToGloba
         resvals[i] = funcval[f][a];
         indices[i] = L2G.map(f, a, e);
 
-        if (DResMat)
+        if (mode == DRESIDUE)
           for (size_t g = 0; g < DPF.size(); g++)
             for (size_t b = 0; b < DResArray[e]->getFieldDof(g); b++, j++)
               dresvals[j] = dfuncval[f][a][g][b];
@@ -208,10 +214,10 @@ template<class T> bool Assemble_(std::vector<T *> &DResArray, const LocalToGloba
     // signature (Vec, size_of_indices, size_t indices[], double[] vals, Mode)
     // VecSetValues(*ResVec, localsize, indices, resvals, ADD_VALUES);
     for (size_t i = 0; i < localsize; ++i) {
-      (*ResVec)[indices[i]] += resvals[i];
+      ResVec[indices[i]] += resvals[i];
     }
 
-    if (DResMat) {
+    if (mode == DRESIDUE) {
       // signature (Mat, nrows_of_indices, size_t row_indices[], ncols_of_indices, size_t col_indices[],
       //       double vals[], Mode)
       // algo
@@ -222,7 +228,7 @@ template<class T> bool Assemble_(std::vector<T *> &DResArray, const LocalToGloba
       // MatSetValues(*DResMat, localsize, indices, localsize, indices, dresvals, ADD_VALUES);
       for (size_t i = 0; i < localsize; ++i) {
         for (size_t j = 0; j < localsize; ++j) {
-          (*DResMat)[ indices[i] ][ indices[j] ] += dresvals [localsize * i + j];
+          DResMat[ indices[i] ][ indices[j] ] += dresvals [localsize * i + j];
         }
       }
     }
@@ -230,7 +236,7 @@ template<class T> bool Assemble_(std::vector<T *> &DResArray, const LocalToGloba
     delete[] resvals;
     delete[] indices;
 
-    if (DResMat) {
+    if (mode == DRESIDUE) {
       delete[] dresvals;
     }
   }
@@ -239,11 +245,12 @@ template<class T> bool Assemble_(std::vector<T *> &DResArray, const LocalToGloba
 
   return true;
 }
-
-bool DResidue::assemble(std::vector<DResidue *> &DResArray, const LocalToGlobalMap & L2G, const VecDouble & Dofs, VecDouble * ResVec, MatDouble *DResMat) {
-  return Assemble_<DResidue> (DResArray, L2G, Dofs, ResVec, DResMat);
+bool Residue::assemble(std::vector<Residue *> &ResArray, const LocalToGlobalMap & L2G, const VecDouble & Dofs, VecDouble&  ResVec) {
+  MatDouble d;
+  return _Assemble<Residue> (ResArray, L2G, Dofs, ResVec, d, RESIDUE);
 }
 
-bool Residue::assemble(std::vector<Residue *> &ResArray, const LocalToGlobalMap & L2G, const VecDouble & Dofs, VecDouble * ResVec) {
-  return Assemble_<Residue> (ResArray, L2G, Dofs, ResVec, 0);
+bool DResidue::assemble(std::vector<DResidue *> &DResArray, const LocalToGlobalMap & L2G, const VecDouble & Dofs, VecDouble& ResVec, MatDouble& DResMat) {
+  return _Assemble<DResidue> (DResArray, L2G, Dofs, ResVec, DResMat, DRESIDUE);
 }
+

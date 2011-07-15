@@ -57,19 +57,20 @@ bool StandardAVI::gather ( const LocalToGlobalMap& L2G, const VecDouble& Qval, c
     ti.resize (nfields);
 
   for (size_t f = 0; f < nfields; f++) {
-    if (q[f].size () < getFieldDof (f))
-      q[f].resize (getFieldDof (f));
+    size_t fieldDof = getFieldDof (f);
+    if (q[f].size () < fieldDof)
+      q[f].resize (fieldDof);
 
-    if (v[f].size () < getFieldDof (f))
-      v[f].resize (getFieldDof (f));
+    if (v[f].size () < fieldDof)
+      v[f].resize (fieldDof);
 
-    if (vb[f].size () < getFieldDof (f))
-      vb[f].resize (getFieldDof (f));
+    if (vb[f].size () < fieldDof)
+      vb[f].resize (fieldDof);
 
-    if (ti[f].size () < getFieldDof (f))
-      ti[f].resize (getFieldDof (f));
+    if (ti[f].size () < fieldDof)
+      ti[f].resize (fieldDof);
 
-    for (size_t a = 0; a < getFieldDof (f); a++) {
+    for (size_t a = 0; a < fieldDof; a++) {
       size_t index = L2G.map (f, a, this->globalIdx);
       q[f][a] = Qval[index];
       v[f][a] = Vval[index];
@@ -184,13 +185,18 @@ bool StandardAVI::update (const MatDouble& q,
   // MatDouble funcval (nfields);
   getForceField (qnew, forcefield);
 
-  assert (funcval.size () == nfields);
+  if (funcval.size () != nfields) {
+    funcval.resize (nfields);
+  }
 
   for (size_t f = 0; f < nfields; f++) {
+    size_t fieldDof = getFieldDof (f);
 
-    assert (funcval[f].size () == getFieldDof (f));
+    if (funcval[f].size () != fieldDof) {
+      funcval[f].resize (fieldDof);
+    }
 
-    for (size_t a = 0; a < getFieldDof (f); a++) {
+    for (size_t a = 0; a < fieldDof; a++) {
       funcval[f][a] = -(getTimeStep ()) * (forcefield)[f][a];
     }
   }
@@ -222,29 +228,6 @@ bool StandardAVI::update (const MatDouble& q,
   return (true);
 }
 ;
-
-//! Initialization routine to set values at the half time step
-//! This function is called only once per element and is called after gather
-//! and before update and assemble.
-//! @param q used to calculate the velocity at the half step.
-//! local vector with the last known values of the degrees of freedom, \f$q_a^{i-1}\f$ in
-//! the notation above.  \n
-//! @param vb Upon exit, local vector with the initial values of the time derivatives at the
-//! middle of a time step
-//! of the degrees of freedom,  \f$v_a^{i-1/2}\f$ in the notation above.\n
-//! @param ti local vector with the last update time of a the degrees of freedom,
-//! \f$t_a^{i-1}\f$ in the notation above.\n
-//! @param ElementIndex GlobalElementIndex or index of the force field in the AVI object, used to
-//! identify its global degrees of freedom. This information is not embedded in the object. \n
-//! @param L2G Local to Global map used to find the values in the Global arrays\n
-//! @param imposedFlags Upon exit, local vector with true when a degree of freedom has its values
-//! imposed. \n
-//! @param imposedValues Upon exit, local vector with value to impose on a degree of freedom, if its
-//! value should be imposed. \n
-//!
-//! For example, q[f][b] = Q[L2G.map(ElementIndex,getFields()[f],b)]
-//!
-//! This function uses getImposedValues to fill the imposed values arrays.
 
 bool StandardAVI::vbInit (
     const MatDouble& q,
@@ -289,12 +272,18 @@ bool StandardAVI::vbInit (
 #endif
 
   // MatDouble funcval (nfields);
-  assert (funcval.size () == nfields);
+  if (funcval.size () != nfields) {
+    funcval.resize (nfields);
+  }
 
   for (size_t f = 0; f < nfields; f++) {
+    size_t fieldDof = getFieldDof (f);
 
-    assert (funcval[f].size () == getFieldDof (f));
-    for (size_t a = 0; a < getFieldDof (f); a++) {
+    if (funcval[f].size () != fieldDof) {
+      funcval[f].resize (fieldDof);
+    }
+
+    for (size_t a = 0; a < fieldDof; a++) {
       funcval[f][a] = -(getTimeStep ()) * (forcefield)[f][a];
     }
   }
@@ -333,16 +322,17 @@ void StandardAVI::computeDeltaV(const MatDouble& funcval,
   }
 
   for(size_t f=0;f<nfields;f++) {
-    if(DeltaV[f].size()<getFieldDof(f)) {
-      DeltaV[f].resize(getFieldDof(f));
+    size_t fieldDof = getFieldDof (f);
+
+    if(DeltaV[f].size() < fieldDof) {
+      DeltaV[f].resize (fieldDof);
     } 
-    for(size_t a=0;a<getFieldDof(f);a++) {
+    for(size_t a=0;a<fieldDof;a++) {
       DeltaV[f][a] = funcval[f][a]/(MMdiag[f][a]);
     }
   }
 };
 
-//! \todo -- Test this function.  The velocity values, in particular, need to be fixed
 bool StandardAVI::getImposedValues (const GlobalElementIndex& ElementIndex,
     const LocalToGlobalMap& L2G, size_t field, size_t dof,
     double& qvalue, double& vvalue) const {
@@ -397,9 +387,12 @@ void StandardAVI::setDiagVals (const VecDouble& MassVec,
   MMdiag.resize (getFields ().size ());
 
   for (size_t f = 0; f < getFields ().size (); f++) {
-    localsize += getFieldDof (f);
-    MMdiag[f].resize (getFieldDof (f), 0.);
-    for (size_t a = 0; a < getFieldDof (f); a++) {
+    size_t fieldDof = getFieldDof (f);
+
+    localsize += fieldDof;
+
+    MMdiag[f].resize (fieldDof, 0.);
+    for (size_t a = 0; a < fieldDof; a++) {
       MMdiag[f][a] = MMVec[L2G.map (f, a, elem_index)];
     }
   }

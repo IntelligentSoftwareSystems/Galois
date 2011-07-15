@@ -1,5 +1,5 @@
-/*
- * ElementGeometry.h
+/**
+ * ElementGeometry.h: Geometry of an element. e.g. a triangle or tetrahedron
  * DG++
  *
  * Created by Adrian Lew on 9/4/06.
@@ -64,14 +64,16 @@ class ElementGeometry
 
   virtual ElementGeometry * clone() const = 0;
   
+  //! @return number of vertices 
   virtual const size_t getNumVertices() const = 0; 
-  //!< Vertices of the polytope. 
+
+  //!@return  ref to Vertices of the polytope. 
   virtual const std::vector <GlobalNodalIndex> &getConnectivity() const = 0; 
 
-  //! Name of type of polytope. 
-  //! It clarifies the meaning of the connectivity array.
+  //! @return Name of type of polytope. 
   virtual const std::string getPolytopeName() const = 0; 
   
+  //! @return spatial dimension e.g. 2 for 2D
   virtual size_t getSpatialDimension () const = 0;
 
   //! Number of dimensions in parametric configuration
@@ -122,10 +124,16 @@ class ElementGeometry
   //! This is defined as the radius of the smallest sphere that contains the object.
   virtual const double getOutRadius() const = 0;
 
+  //! Compute external normal for a face
+  //!
+  //! @param e: face number for which the normal is desired
+  //! @param vNormal: output of the three Cartesian components of the normal vector
   virtual void computeNormal (size_t e, std::vector<double>& vNormal) const = 0;
 };
 
-
+/**
+ * Base class with common functionality
+ */
 template <size_t SPD>
 class AbstractGeom : public ElementGeometry {
 private:
@@ -133,6 +141,12 @@ private:
   std::vector<GlobalNodalIndex> connectivity;
 
 public:
+  /**
+   * @param globalCoordVec is a reference to the vector containing coordinates of all nodes
+   * Coordinates of node i in N dimensional space are in locations [N*i, N*(i+1))
+   * @param connectivity is a vector containing ids of nodes of this element in the mesh
+   */
+
   AbstractGeom (const std::vector<double>& globalCoordVec, const std::vector<GlobalNodalIndex>& connectivity)
     :ElementGeometry (), globalCoordVec(globalCoordVec), connectivity (connectivity) {
 
@@ -215,12 +229,20 @@ public:
 
 protected:
 
+  /**
+   * @param a node id
+   * @param i dimension id
+   * @return value of dimension 'i' of coordinates of node 'a'
+   */
   double getCoordinate (size_t a, size_t i) const {
     // 0-based numbering of nodes in the mesh
     size_t index = getConnectivity ()[a] * getSpatialDimension() + i;
     return  globalCoordVec[index];
   }
 
+  /**
+   * @return ref to the vector that contains global coordinates for all mesh nodes
+   */
   const std::vector<double>& getGlobalCoordVec () const { return globalCoordVec; }
 
 

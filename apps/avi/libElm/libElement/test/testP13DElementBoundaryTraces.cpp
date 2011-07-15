@@ -31,8 +31,8 @@ int main()
       std::cout<<" \n FaceNumber :"<<facenumber<<"\n";
       
       std::cout<<"\n Normal to face: ";
-      for(unsigned int q=0; q<EBT.GetNormal(a).size(); q++)
-	std::cout<< EBT.GetNormal(a)[q]<<", ";
+      for(unsigned int q=0; q<EBT.getNormal(a).size(); q++)
+	std::cout<< EBT.getNormal(a)[q]<<", ";
       std::cout<<"\n";
 
     }

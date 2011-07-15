@@ -1,4 +1,4 @@
-/*
+/**
  * ElementalOperation.h
  * DG++
  *
@@ -128,8 +128,7 @@ class Residue
   //! 
   //!
   //! The function returns true if successful, false otherwise.
-  virtual bool getVal(const MatDouble &argval,
-		      MatDouble * funcval ) const = 0;
+  virtual bool getVal(const MatDouble &argval, MatDouble& funcval ) const = 0;
 
   virtual const Element& getElement () const = 0;
 
@@ -175,10 +174,49 @@ class Residue
   static bool assemble(std::vector<Residue *> &ResArray, 
 		       const LocalToGlobalMap & L2G,
 		       const VecDouble  & Dofs,
-		       VecDouble  * ResVec);
+		       VecDouble&  ResVec);
 };
 
 
+/**
+ * Base class for common functionality
+ */
+
+class BaseResidue: public Residue {
+
+protected:
+  const Element& element;
+  const SimpleMaterial& material;
+  const std::vector<size_t>& fieldsUsed;
+
+
+  BaseResidue (const Element& element, const SimpleMaterial& material, const std::vector<size_t>& fieldsUsed)
+  : element (element), material (material), fieldsUsed (fieldsUsed) {
+  }
+
+  BaseResidue (const BaseResidue& that) : element (that.element), material (that.material)
+  , fieldsUsed (that.fieldsUsed) {
+
+  }
+
+public:
+  virtual const Element& getElement () const {
+    return element;
+  }
+
+  virtual const std::vector<size_t>& getFields () const {
+    return fieldsUsed;
+  }
+
+  virtual const SimpleMaterial& getMaterial () const {
+    return material;
+  }
+
+  virtual size_t getFieldDof (size_t fieldNum) const {
+    return element.getDof (fieldsUsed[fieldNum]);
+  }
+
+};
 
 
 
@@ -193,15 +231,15 @@ class Residue
 
 */
 
-class DResidue: virtual public Residue
-{
+class DResidue: public BaseResidue {
  public: 
-  DResidue() {}
-  virtual ~DResidue() {}
-  DResidue(const DResidue &NewEl) {}
+  DResidue (const Element& element, const SimpleMaterial& material, const std::vector<size_t>& fieldsUsed)
+  : BaseResidue(element, material, fieldsUsed) {}
+
+  DResidue(const DResidue &NewEl): BaseResidue(NewEl) {}
+
   virtual DResidue * clone() const = 0;
  
-
 
   //! Returns the value of the residue and its derivative given the values of the fields.
   //!
@@ -221,9 +259,8 @@ class DResidue: virtual public Residue
   //! The vector dfuncval is resized and zeroed in getVal.
   //!
   //! The function returns true if successful, false otherwise.
-  virtual bool getDVal(const MatDouble &argval,
-		       MatDouble * funcval,
-		       FourDVecDouble* dfuncval) const = 0;
+  virtual bool getDVal(const MatDouble& argval, MatDouble& funcval,
+		       FourDVecDouble& dfuncval) const = 0;
 
   
   //! Consistency test for DResidues. 
@@ -271,63 +308,9 @@ class DResidue: virtual public Residue
   static bool assemble(std::vector<DResidue *> &DResArray, 
 		       const LocalToGlobalMap & L2G,
 		       const VecDouble  & Dofs,
-		       VecDouble  * ResVec,
-		       MatDouble  *DResMat);
+		       VecDouble&  ResVec,
+		       MatDouble&  DResMat);
 };
-
-
-/**
- * extending from DResidue so that the class can hold code common to both hierarchies
- * Class defines a default implementation of getDVal, which aborts. Thus classes inheriting
- * from DResidue must provide an implementatin of getDVal.
- */
-
-class BaseResidue: public DResidue {
-
-protected:
-  const Element& element;
-  const SimpleMaterial& material;
-  const std::vector<size_t>& fieldsUsed;
-
-
-  BaseResidue (const Element& element, const SimpleMaterial& material, const std::vector<size_t>& fieldsUsed)
-  : element (element), material (material), fieldsUsed (fieldsUsed) {
-  }
-
-  BaseResidue (const BaseResidue& that) : element (that.element), material (that.material)
-  , fieldsUsed (that.fieldsUsed) {
-
-  }
-
-public:
-  virtual const Element& getElement () const {
-    return element;
-  }
-
-  virtual const std::vector<size_t>& getFields () const {
-    return fieldsUsed;
-  }
-
-  virtual const SimpleMaterial& getMaterial () const {
-    return material;
-  }
-
-  virtual size_t getFieldDof (size_t fieldNum) const {
-    return element.getDof (fieldsUsed[fieldNum]);
-  }
-
-  virtual bool getDVal(const MatDouble &argval,
-             MatDouble * funcval,
-             FourDVecDouble* dfuncval) const {
-
-    std::cerr << "Derived class must overried this function" << std::endl;
-    abort ();
-  }
-
-
-};
-
-
 
 
 

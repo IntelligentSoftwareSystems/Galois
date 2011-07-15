@@ -1,5 +1,5 @@
-/*
- * BasisFunctions.h
+/**
+ * BasisFunctionsProvided.h
  * DG++
  *
  * Created by Adrian Lew on 10/21/06.
@@ -125,15 +125,15 @@ public:
   }
 
   //!  Shape functions at quadrature points
-  //!  GetShapes()[q*Shape::getNumFunctions()+a]
+  //!  getShapes()[q*Shape::getNumFunctions()+a]
   //!  gives the value of shape function a at quadrature point q
   inline const std::vector<double> & getShapes () const {
     return LocalShapes;
   }
 
   //! Derivatives of shape functions at quadrature points 
-  //! GetDShapes()[q*Shape::getNumFunctions()*ElementGeometry::GetEmbeddingDimensions()
-  //! +a*ElementGeometry::GetEmbeddingDimensions()+i] gives the
+  //! getDShapes()[q*Shape::getNumFunctions()*ElementGeometry::getEmbeddingDimensions()+a*ElementGeometry::getEmbeddingDimensions()+i] 
+  //! gives the
   //! derivative in the i-th direction of degree of freedom a at quadrature point q
   inline const std::vector<double> & getDShapes () const {
     return LocalDShapes;
@@ -145,7 +145,7 @@ public:
   }
 
   //! Coordinates of quadrature points in the real configuration
-  //! GetQuadraturePointCoordinates()
+  //! getQuadraturePointCoordinates()
   //! [q*ElementGeometry::getEmbeddingDimension()+i]
   //! returns the i-th coordinate in real space of quadrature point q 
   inline const std::vector<double> & getQuadraturePointCoordinates () const {

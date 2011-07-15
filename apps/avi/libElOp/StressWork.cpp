@@ -30,10 +30,9 @@
 #include "StressWork.h"
 #include "Material.h"
 
-bool StressWork::getDVal(const MatDouble &argval, MatDouble * funcval, FourDVecDouble * dfuncval) const {
+bool StressWork::getDValIntern (const MatDouble &argval, MatDouble& funcval, FourDVecDouble& dfuncval
+    , const GetValMode& mode) const {
   const size_t Dim = fieldsUsed.size();
-
-  assert (Dim == fieldsUsed.size());
 
   // We should have the same quadrature points in  all fields used
   size_t nquad = element.getIntegrationWeights(fieldsUsed[0]).size();
@@ -48,7 +47,7 @@ bool StressWork::getDVal(const MatDouble &argval, MatDouble * funcval, FourDVecD
   const size_t MAT_SIZE = SimpleMaterial::MAT_SIZE;
   const size_t NDM = SimpleMaterial::NDM;
 
-  VecDouble *A = 0;
+  VecDouble A(MAT_SIZE * MAT_SIZE, 0.0);
   VecDouble F(MAT_SIZE);
   VecDouble P(MAT_SIZE, 0);
 
@@ -59,46 +58,46 @@ bool StressWork::getDVal(const MatDouble &argval, MatDouble * funcval, FourDVecD
     IntWeights[f] = element.getIntegrationWeights(fieldsUsed[f]);
   }
 
-  if (funcval->size() < Dim) {
-    funcval->resize(Dim);
+  if (funcval.size() < Dim) {
+    funcval.resize(Dim);
   }
 
   for (size_t f = 0; f < Dim; f++) {
-    if ((*funcval)[f].size() < nDof[f]) {
-      (*funcval)[f].resize(nDof[f], 0.);
+    if (funcval[f].size() < nDof[f]) {
+      funcval[f].resize(nDof[f], 0.);
     } else {
-      for (size_t a = 0; a < nDof[f]; ++a) {
-        (*funcval)[f][a] = 0.;
-      }
+      std::fill(funcval[f].begin(), funcval[f].end(), 0.0);
+//      for (size_t a = 0; a < nDof[f]; ++a) {
+//        funcval[f][a] = 0.;
+//      }
     }
 
   }
 
 
 
-  if (dfuncval != 0) {
-    A = new VecDouble(MAT_SIZE * MAT_SIZE, 0);
+  if (mode == DVAL) {
 
-    if (dfuncval->size() < Dim) {
-      dfuncval->resize(Dim);
+    if (dfuncval.size() < Dim) {
+      dfuncval.resize(Dim);
     }
 
     for (size_t f = 0; f < Dim; ++f) {
-      if ((*dfuncval)[f].size() < nDof[f]) {
-        (*dfuncval)[f].resize(nDof[f]);
+      if (dfuncval[f].size() < nDof[f]) {
+        dfuncval[f].resize(nDof[f]);
       }
 
       for (size_t a = 0; a < nDof[f]; ++a) {
-        if ((*dfuncval)[f][a].size() < Dim) {
-          (*dfuncval)[f][a].resize(Dim);
+        if (dfuncval[f][a].size() < Dim) {
+          dfuncval[f][a].resize(Dim);
         }
 
         for (size_t g = 0; g < Dim; ++g) {
-          if ((*dfuncval)[f][a][g].size() < nDof[g]) {
-            (*dfuncval)[f][a][g].resize(nDof[g], 0.);
+          if (dfuncval[f][a][g].size() < nDof[g]) {
+            dfuncval[f][a][g].resize(nDof[g], 0.);
           } else {
             for (size_t b = 0; b < nDof[g]; ++b) {
-              (*dfuncval)[f][a][g][b] = 0.;
+              dfuncval[f][a][g][b] = 0.;
             }
           }
 
@@ -111,8 +110,10 @@ bool StressWork::getDVal(const MatDouble &argval, MatDouble * funcval, FourDVecD
 
   for (size_t q = 0; q < nquad; ++q) {
     // Compute gradients
-    F[0] = F[4] = F[8] = 1.;
-    F[1] = F[2] = F[3] = F[5] = F[6] = F[7] = 0.;
+
+    //    F[0] = F[4] = F[8] = 1.;
+    //    F[1] = F[2] = F[3] = F[5] = F[6] = F[7] = 0.;
+    std::copy (SimpleMaterial::I_MAT, SimpleMaterial::I_MAT + MAT_SIZE, F.begin ());
 
     for (size_t f = 0; f < Dim; ++f) {
       for (size_t a = 0; a < nDof[f]; ++a) {
@@ -124,7 +125,7 @@ bool StressWork::getDVal(const MatDouble &argval, MatDouble * funcval, FourDVecD
       }
     }
 
-    if (!material.getConstitutiveResponse(&F, &P, A)) {
+    if (!material.getConstitutiveResponse(F, P, A, SimpleMaterial::SKIP_TANGENTS)) {
       std::cerr << "StressWork.cpp: Error in the constitutive response\n";
       return false;
     }
@@ -132,20 +133,20 @@ bool StressWork::getDVal(const MatDouble &argval, MatDouble * funcval, FourDVecD
     for (size_t f = 0; f < Dim; ++f) {
       for (size_t a = 0; a < nDof[f]; ++a) {
         for (size_t J = 0; J < nDiv[f]; ++J) {
-          (*funcval)[f][a] += IntWeights[f][q] * P[f * NDM + J] * DShape[f][q * nDof[f] * nDiv[f] + a * nDiv[f] + J];
+          funcval[f][a] += IntWeights[f][q] * P[f * NDM + J] * DShape[f][q * nDof[f] * nDiv[f] + a * nDiv[f] + J];
         }
       }
     }
 
 
-    if (dfuncval != 0) {
+    if (mode == DVAL) {
       for (size_t f = 0; f < Dim; ++f) {
         for (size_t a = 0; a < nDof[f]; ++a) {
           for (size_t g = 0; g < Dim; ++g) {
             for (size_t b = 0; b < nDof[g]; ++b) {
               for (register size_t J = 0; J < nDiv[f]; ++J) {
                 for (register size_t L = 0; L < nDiv[g]; ++L) {
-                  (*dfuncval)[f][a][g][b] += IntWeights[f][q] * (*A)[f * NDM * MAT_SIZE + J * MAT_SIZE + g * NDM + L] * DShape[f][q * nDof[f] * nDiv[f] + a * nDiv[f] + J]
+                  dfuncval[f][a][g][b] += IntWeights[f][q] * A[f * NDM * MAT_SIZE + J * MAT_SIZE + g * NDM + L] * DShape[f][q * nDof[f] * nDiv[f] + a * nDiv[f] + J]
                       * DShape[g][q * nDof[g] * nDiv[g] + b * nDiv[g] + L];
                 }
               }
@@ -156,10 +157,6 @@ bool StressWork::getDVal(const MatDouble &argval, MatDouble * funcval, FourDVecD
     }
 
 
-  }
-
-  if (A) {
-    delete A;
   }
 
   return true;

@@ -1,4 +1,4 @@
-/*
+/**
  * AVI.h
  * DG++
  *
@@ -168,6 +168,7 @@ public:
 
   //! write the updated time vector into the argument provided
   //! value filled in is the one obtained from getNextTimeStamp ()
+  //! @param tnew
   virtual void computeLocalTvec (MatDouble& tnew) const = 0;
 
   //! Initialization routine to set values at the half time step
@@ -176,19 +177,19 @@ public:
   //! @param q used to calculate the velocity at the half step.
   //! local vector with the last known values of the degrees of freedom, \f$q_a^{i-1}\f$ in
   //! the notation above.  \n
-  //! @param vb Upon exit, local vector with the initial values of the time derivatives at the
+  //! @param v previous values of the time derivatives of velocity
+  //! @param vb previous  values of the time derivatives at the
   //! middle of a time step
   //! of the degrees of freedom,  \f$v_a^{i-1/2}\f$ in the notation above.\n
   //! @param ti local vector with the last update time of a the degrees of freedom,
   //! \f$t_a^{i-1}\f$ in the notation above.\n
-  //! @param ElementIndex GlobalElementIndex or index of the force field in the AVI object, used to
-  //! identify its global degrees of freedom. This information is not embedded in the object. \n
-  //! @param L2G Local to Global map used to find the values in the Global arrays\n
-  //! @param imposedFlags Upon exit, local vector with true when a degree of freedom has its values
-  //! imposed. \n
-  //! @param imposedValues Upon exit, local vector with value to impose on a degree of freedom, if its
-  //! value should be imposed. \n
   //!
+  //! @param tnew updated local time vector @see AVI::computeLocalTvec ()
+  //! @param qnew updated value of q vector
+  //! @param vbinit initialized value of vb vector
+  //! @param forcefield temporary intermediate vector 
+  //! @param funcval temporary intermediate vector 
+  //! @param deltaV temporary intermediate vector 
   //! For example, q[f][b] = Q[L2G.map(ElementIndex,getFields()[f],b)]
   //!
   //! This function uses getImposedValues to fill the imposed values arrays.
@@ -235,6 +236,7 @@ public:
   //! of the degrees of freedom,  \f$v_a^{i-1/2}\f$ in the notation above.\n
   //! @param ti vector with the last update time of a the degrees of freedom, \f$t_a^{i-1}\f$ in 
   //! the notation above.\n
+  //! @param tnew vector with the updated time of a the degrees of freedom, \f$t_a^{i}\f$ in 
   //! @param qnew Upon exit, new values of the degrees of freedom, \f$q_a^{i}\f$ in 
   //! the notation above.\n
   //! @param vnew Upon exit, new values of the time derivatives of the degrees of freedom, 
@@ -242,11 +244,9 @@ public:
   //! @param vbnew Upon exit, new values of the time derivatives at the middle of a time step
   //!  of the degrees of freedom, \f$v_a^{i+1/2}\f$ in  the notation above.\n
   //!
-  //! @param imposedFlags  degree of freedom with imposed values or not. imposedFlags[f][b]==True if and 
-  //! only if the value of q[f][b] should be imposed, instead of computed. \n
-  //! @param imposedValues  imposedValues[f][b] contains the value to impose on a degree of freedom.  
-  //! If imposedFlags[f][b]==False, then imposedValues[f][b] is not used. \n
-  //!
+  //! @param forcefield temporary intermediate vector 
+  //! @param funcval temporary intermediate vector 
+  //! @param deltaV temporary intermediate vector 
   //!
 
 
@@ -267,7 +267,6 @@ public:
   //! Gathers the values needed from the global arrays to perform the force field computation.
   //! 
   //! 
-  //! @param ElementIndex GlobalElementIndex or index of the force field in the AVI object, used to
   //! identify its global degrees of freedom. This information is not embedded in the object. \n
   //! @param L2G Local to Global map used to find the values in the Global arrays\n
   //! @param Qval Global array with the last updated values of the degrees of freedom.\n
@@ -286,10 +285,6 @@ public:
   //! of the degrees of freedom,  \f$v_a^{i-1/2}\f$ in the notation above.\n
   //! @param ti Upon exit, local vector with the last update time of a the degrees of freedom, 
   //! \f$t_a^{i-1}\f$ in the notation above.\n
-  //! @param imposedFlags Upon exit, local vector with true when a degree of freedom has its values 
-  //! imposed. \n 
-  //! @param imposedValues Upon exit, local vector with value to impose on a degree of freedom, if its 
-  //! value should be imposed. \n 
   //!
   //! For example, q[f][b] = Q[L2G.map(ElementIndex,getFields()[f],b)]
   //!
@@ -309,17 +304,17 @@ public:
   //! degrees of freedom in the object.
   //! 
   //! 
-  //! @param ElementIndex GlobalElementIndex or index of the force field in the AVI object, used to
   //! identify its global degrees of freedom. This information is not embedded in the object. \n
   //! @param L2G Local to Global map used to find the values in the Global arrays\n
-  //! @param q  local vector with the updated values of the degrees of freedom, \f$q_a^{i}\f$ in 
+  //! @param qnew  local vector with the updated values of the degrees of freedom, \f$q_a^{i}\f$ in 
   //! the notation above.  \n
-  //! @param v Upon exit, local vector with the updated values of the time derivatives of the 
+  //! @param vnew Upon exit, local vector with the updated values of the time derivatives of the 
   //! degrees of freedom,  
   //! \f$v_a^{i}\f$ in the notation above.\n
-  //! @param vb Upon exit, local vector with the updated values of the time derivatives at the 
+  //! @param vbnew Upon exit, local vector with the updated values of the time derivatives at the 
   //! middle of a time step
   //! of the degrees of freedom,  \f$v_a^{i+1/2}\f$ in the notation above.\n
+  //! @param tnew updated values of time vector
   //! @param Qval Global array where to assemble the updated values of the degrees of freedom.\n
   //! @param Vval Global array where to assemble the  time derivatives of the
   //! degrees of freedom.\n
@@ -384,12 +379,14 @@ protected:
       double& qvalue, double& vvalue) const = 0;
 
 public:
+  //! @return string representation for printing debugging etc
   virtual const std::string toString () const {
     std::ostringstream ss;
     ss << "AVI(id: " << getGlobalIndex() << ", " << getNextTimeStamp() << " )";
     return ss.str ();
   }
 
+  //! @return for use with std::ostream
   friend std::ostream& operator << (std::ostream& out, const AVI& avi) {
     out << avi.toString ();
     return out;
@@ -397,10 +394,16 @@ public:
 };
 
 
+/**
+ * A comparator class for comparing two AVI objects
+ * according to their time stamps
+ */
 struct AVIComparator {
   static const double EPS = 1e-12;
 
   //! tie break comparison
+  //! @param left pointer to first AVI object
+  //! @param right pointer to second AVI object
   int compare (const AVI* left, const AVI* right) const {
     int result = 0;
     double tdiff = left->getNextTimeStamp() - right->getNextTimeStamp();
@@ -417,16 +420,20 @@ struct AVIComparator {
   }
 
   //! return true if left < right
+  //! @param left pointer to first AVI object
+  //! @param right pointer to second AVI object
   bool operator () (const AVI* left, const AVI* right) const {
     return compare (left, right) < 0;
   }
 };
 
 //! since C++ priority_queue is a max heap, this 
-//! comparator allows using C++ priority_queue has a 
+//! comparator allows using C++ priority_queue as a 
 //! min heap by inverting the comparison
 struct AVIReverseComparator: public AVIComparator {
   //! @returns true if left > right
+  //! @param left pointer to first AVI object
+  //! @param right pointer to second AVI object
   bool operator () (const AVI* left, const AVI* right) const {
     return compare (left, right) > 0;
   }

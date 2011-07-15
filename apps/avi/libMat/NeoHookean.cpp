@@ -70,7 +70,8 @@ static void matlib_mults(double *A, double *B, double *C) {
   C[8] = A[6] * B[6] + A[7] * B[7] + A[8] * B[8];
 }
 
-bool NeoHookean::getConstitutiveResponse(const std::vector<double>* strain, std::vector<double>* stress, std::vector<double>* tangents) const {
+bool NeoHookean::getConstitutiveResponse(const std::vector<double>& strain, std::vector<double>& stress, std::vector<double>& tangents
+    , const ConstRespMode& mode) const {
   // XXX: (amber) replaced unknown 3's with NDM, 9 & 81 with MAT_SIZE & MAT_SIZE ^ 2
 
   size_t i, j, k, l, m, n, ij, jj, kl, jk, il, ik, im, jl, kj, kn, mj, nl, ijkl, indx;
@@ -87,7 +88,7 @@ bool NeoHookean::getConstitutiveResponse(const std::vector<double>* strain, std:
   /*Fill in the deformation gradient*/
   for (i = 0; i < NDF; i++) {
     for (J = 0; J < NDM; J++) {
-      F[i * NDM + J] = (*strain)[i * NDM + J];
+      F[i * NDM + J] = strain[i * NDM + J];
     }
   }
 
@@ -117,7 +118,7 @@ bool NeoHookean::getConstitutiveResponse(const std::vector<double>* strain, std:
     S[jj] += Mu;
   }
 
-  if (tangents) {
+  if (mode == COMPUTE_TANGENTS) {
     coef = Mu - p;
     for (l = 0, kl = 0, ijkl = 0; l < NDM; l++) {
       for (k = 0, jk = 0; k < NDM; k++, kl++) {
@@ -130,23 +131,23 @@ bool NeoHookean::getConstitutiveResponse(const std::vector<double>* strain, std:
     }
   }
 
-  if (stress->size() != MAT_SIZE) {
-    stress->resize(MAT_SIZE);
+  if (stress.size() != MAT_SIZE) {
+    stress.resize(MAT_SIZE);
   }
 
   /* PK2 -> PK1 */
   for (j = 0, ij = 0; j < NDM; j++) {
     for (i = 0; i < NDM; i++, ij++) {
-      (*stress)[ij] = 0.e0;
+      stress[ij] = 0.e0;
       for (k = 0, ik = i, kj = j * NDM; k < NDM; k++, ik += NDM, kj++) {
-        (*stress)[ij] += F[ik] * S[kj];
+        stress[ij] += F[ik] * S[kj];
       }
     }
   }
 
-  if (tangents) {
-    if (tangents->size() != MAT_SIZE * MAT_SIZE) {
-      tangents->resize(MAT_SIZE * MAT_SIZE);
+  if (mode == COMPUTE_TANGENTS) {
+    if (tangents.size() != MAT_SIZE * MAT_SIZE) {
+      tangents.resize(MAT_SIZE * MAT_SIZE);
     }
 
     /* apply partial push-forward and add geometrical term */
@@ -155,19 +156,19 @@ bool NeoHookean::getConstitutiveResponse(const std::vector<double>* strain, std:
         for (j = 0, jl = l * NDF; j < NDM; j++, jl++) {
           for (i = 0; i < NDF; i++, ijkl++) {
 
-            (*tangents)[ijkl] = 0.e0;
+            tangents[ijkl] = 0.e0;
 
             /* push-forward */
             for (n = 0, kn = k, nl = l * NDF; n < NDM; n++, kn += NDM, nl++) {
               indx = nl * MAT_SIZE;
               for (m = 0, im = i, mj = j * NDM; m < NDM; m++, im += NDM, mj++) {
-                (*tangents)[ijkl] += F[im] * M[mj + indx] * F[kn];
+                tangents[ijkl] += F[im] * M[mj + indx] * F[kn];
               }
             }
 
             /* geometrical term */
             if (i == k) {
-              (*tangents)[ijkl] += S[jl];
+              tangents[ijkl] += S[jl];
             }
 
           }

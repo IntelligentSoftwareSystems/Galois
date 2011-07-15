@@ -1,3 +1,31 @@
+/**
+ * Tetrahedron.h
+ * DG++
+ *
+ * Created by Adrian Lew on 9/4/06.
+ *  
+ * Copyright (c) 2006 Adrian Lew
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including 
+ * without limitation the rights to use, copy, modify, merge, publish, 
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject
+ * to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included 
+ * in all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+ * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+ * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+ * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */ 
+
 #ifndef TETRAHEDRON
 #define TETRAHEDRON
 
@@ -40,14 +68,11 @@ private:
 
 public:
   
-  //! Connectivity in Tetrahedron::GlobalCoordinatesArray
   Tetrahedron (const std::vector<double>& globalCoordVec, const std::vector<GlobalNodalIndex>& connectivity)
     :AbstractGeom<TET_SPD> (globalCoordVec, connectivity) {
       assert (connectivity.size () == 4);
   }
 
-
-  inline virtual ~Tetrahedron(){}
 
   Tetrahedron(const Tetrahedron & that) : AbstractGeom<TET_SPD>(that) {
   }
@@ -129,12 +154,12 @@ public:
       // AbstractGeom<TET_SPD>::getConnectivity()[FaceNodes[3*e+2]]);
     }
     else {
-      std::cout<<"\nTetrahedron::GetFaceGeometry() : Request for invalid face. Quitting...\n";
+      std::cout<<"\nTetrahedron::getFaceGeometry() : Request for invalid face. Quitting...\n";
       exit(1);
     }
   }
 
-  //! Get the inradius
+  //! get the inradius
   const double getInRadius(void) const {
   double a[3],b[3],c[3],o,t[3],d[3],t1[3],t2[3], t3[3];
   for(size_t i=0;i<3;i++) {
@@ -161,12 +186,12 @@ public:
   return(rv);
   }
 
-  //! Get the outradius -- radius of the circumscribed sphere
+  //! get the outradius -- radius of the circumscribed sphere
   const double getOutRadius(void) const {
     double x[4],y[4],z[4],r2[4],ones[4]; 
     double M11, M12, M13, M14, M15;
     double **a;
-    a = (double **) malloc(4*sizeof(double *));
+    a = new double*[4];
 
     for(size_t i = 0; i < 4; i++) {
       x[i] = AbstractGeom<TET_SPD>::getCoordinate(i,0);
@@ -194,7 +219,7 @@ public:
     y0 = -0.5 * M13/M11;
     z0 = 0.5 * M14/M11;
 
-    free(a);
+    delete[] a;
     return(sqrt(x0*x0 + y0*y0 + z0*z0 - M15/M11));
   }
 
@@ -242,24 +267,33 @@ public:
   }
 
 protected:
-static double mag(double *a) {
+//! a vector array
+//! @return  magnitued of the vector
+static double mag(const double *a) {
   double rv = sqrt(dot(a,a));
   return(rv); 
 };
 
-static double dot(double *a,double *b) {
+//! @param a vector size 3
+//! @param b vector size 3
+//! @return dot product of vectors a and b
+static double dot(const double *a,const double *b) {
   return(a[0]*b[0] + a[1]*b[1] + a[2]*b[2]);
 };
 
-static void cross(double *a,double *b, double *rv) {
+//! @param a first input vector size 3
+//! @param b second input vector size 3
+//! @param rv output vector containing cross product of a and b (size 3)
+static void cross(const double *a,const double *b, double *rv) {
   rv[0] =  a[1]*b[2] - a[2]*b[1];
   rv[1] =  a[2]*b[0] - a[0]*b[2];
   rv[2] =  a[0]*b[1] - a[1]*b[0];
 };
 
+//! @param a square matrix 
+//! @param n number of rows and cols in matrix
+//! @return determinant of the matrix
 static double determinant(double **a,size_t n) {
-  // TODO: replace malloc with new
-
   size_t i,j,j1,j2;
   double det = 0;
   double **m = NULL;
@@ -273,9 +307,9 @@ static double determinant(double **a,size_t n) {
   } else {
     det = 0;
     for (j1=0;j1<n;j1++) {
-      m = (double**) malloc((n-1)*sizeof(double *));
+      m = new double*[n-1];
       for (i=0;i<n-1;i++) {
-        m[i] = (double *) malloc((n-1)*sizeof(double));
+        m[i] = new double[n-1];
       }
       for (i=1;i<n;i++) {
         j2 = 0;
@@ -289,9 +323,9 @@ static double determinant(double **a,size_t n) {
       }
       det += pow(-1.0,1.0+j1+1.0) * a[0][j1] * determinant(m,n-1);
       for (i=0;i<n-1;i++) {
-        free(m[i]);
+        delete[] m[i];
       }
-      free(m);
+      delete[] m;
     }
   }
   return(det);

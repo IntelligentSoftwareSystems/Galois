@@ -1,3 +1,26 @@
+/** AVI unordered algorithm with no abstract locks -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
+ */
+
 #ifndef AVI_UNORDERED_NO_LOCK_H_
 #define AVI_UNORDERED_NO_LOCK_H_
 
@@ -30,6 +53,10 @@
 #include "AVIabstractMain.h"
 #include "AVIunordered.h"
 
+/**
+ * AVI unordered algorithm that uses atomic integers 
+ * and no abstract locks
+ */
 class AVIunorderedNoLock: public AVIunordered {
 
 protected:
@@ -38,6 +65,9 @@ protected:
     return "Parallel Unordered, no abstract locks";
   }
   
+  /**
+   * Functor for loop body
+   */
   struct process {
 
     Graph& graph;
@@ -48,7 +78,7 @@ protected:
     GaloisRuntime::PerCPU< std::vector<GNode> >& perIterAddList;
     const AVIComparator& aviCmp;
     bool createSyncFiles;
-    AtomicInteger& iter;
+    IterCounter& iter;
 
     process (
         Graph& graph,
@@ -59,7 +89,7 @@ protected:
         GaloisRuntime::PerCPU< std::vector<GNode> >& perIterAddList,
         const AVIComparator& aviCmp,
         bool createSyncFiles,
-        AtomicInteger& iter):
+        IterCounter& iter):
 
         graph (graph),
         inDegVec (inDegVec),
@@ -84,6 +114,24 @@ protected:
         iter (that.iter) {}
 
 
+    /**
+     * Loop body
+     *
+     * The key condition is that a node and its neighbor cannot be active at the same time,
+     * and it must be impossible for two of them to be processed in parallel
+     * Therefore a node can add its newly active neighbors to the workset as the last step only when
+     * it has finished performing all other updates
+     * For the same reason, active node src must update its own in degree before updating the
+     * indegree of any of the neighbors. Imagine the alternative, where active node updates its in
+     * degree and that of it's neighbor in the same loop. For example A is current active node and
+     * has a neighbor B. A > B, therefore A increments its own in degree and decrements that of B to
+     * 1. Another active node C is neighbor of B but not of A, and C decreases in degree of B to 0
+     * and adds B to the workset while A is not finished yet. This violates our key condition
+     * mentioned above
+     *
+     * @param src is active elemtn
+     * @param lwl is the worklist handle
+     */
     template <typename ContextTy> 
       void operator () (const GNode& src, ContextTy& lwl) {
         AVI* srcAVI = graph.getData (src, Galois::NONE);
@@ -134,7 +182,7 @@ protected:
           for (Graph::neighbor_iterator j = graph.neighbor_begin (src, Galois::NONE), ej = graph.neighbor_end(src, Galois::NONE);
               j != ej; ++j) {
 
-            GNode dst = *j;
+            const GNode& dst = *j;
             AVI* dstAVI = graph.getData (dst, Galois::NONE);
 
             if (aviCmp.compare (srcAVI, dstAVI) > 0) {
@@ -155,7 +203,7 @@ protected:
           } // end for
 
 
-          for (std::vector<GNode>::const_iterator i = toAdd.begin (), e = toAdd.end (); i != e; ++i) {
+          for (std::vector<GNode>::const_iterator i = toAdd.begin (), ei = toAdd.end (); i != ei; ++i) {
             const GNode& gn = (*i);
             lwl.push (gn);
           }
@@ -164,7 +212,7 @@ protected:
 
 
         // for debugging, remove later
-        ++iter;
+        ++(iter.get ());
 
 
       }
@@ -172,6 +220,11 @@ protected:
 
 public:
 
+  /**
+   * For the in degree vector, we use a vector of atomic integers
+   * This along with other changes in the loop body allow us to 
+   * no use abstract locks. @see process
+   */
   virtual  void runLoop (MeshInit& meshInit, GlobalVec& g, bool createSyncFiles) {
     /////////////////////////////////////////////////////////////////
     // populate an initial  worklist
@@ -230,16 +283,16 @@ public:
 
 
 
-    AtomicInteger iter(0);
+    IterCounter iter(0);
 
 
     process p( graph, inDegVec, meshInit, g, perIterLocalVec, perIterAddList, aviCmp, createSyncFiles, iter);
 
 
-    Galois::for_each< GaloisRuntime::WorkList::FIFO<GNode> >(initWl.begin (), initWl.end (), p);
+    Galois::for_each< AVIWorkList >(initWl.begin (), initWl.end (), p);
 
 
-    printf ("iterations = %d\n", (int)iter);
+    printf ("iterations = %d\n", iter.get ());
 
   }
 
@@ -248,3 +301,4 @@ public:
 };
 
 #endif
+

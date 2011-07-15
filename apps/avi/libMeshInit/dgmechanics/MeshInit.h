@@ -1,8 +1,24 @@
-/*
- * MeshInit.h
+/** MeshInit combines reading and initializtion of mesh -*- C++ -*-
+ * @file
+ * @section License
  *
- *  Created on: Jun 17, 2011
- *      Author: amber
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
  */
 
 #ifndef MESHINIT_H_
@@ -55,11 +71,12 @@ private:
 
 
 
+  //! to be freed
   LocalToGlobalMap* l2gMap;
   CoordConn* cc;
   SimpleMaterial* ile;
 
-  // vectors to keep track of all the memory
+  //! vectors to keep track of all the memory
   std::vector<ElementGeometry*> geomVec;
   std::vector<Element*> elemVec;
   std::vector<Residue*> massResidueVec;
@@ -107,6 +124,11 @@ private:
 
 public:
 
+  /**
+   *
+   * @param simEndTime 
+   * @param wave
+   */
   MeshInit (double simEndTime, bool wave):
     simEndTime (simEndTime), wave(wave) {
 
@@ -128,43 +150,110 @@ public:
     destroy ();
   }
 
+  /**
+   *
+   * main function to call after creating an instance. This
+   * initializes all the data structures by reading this file
+   *
+   * @param fileName
+   * @param ndiv: number of times the mesh (read in from the file) should be subdivided
+   */
   void initializeMesh (const std::string& fileName, int ndiv);
 
   virtual size_t getSpatialDim () const = 0;
+
   virtual size_t getNodesPerElem () const = 0;
 
   bool isWave () const { return wave; }
 
   double getSimEndTime () const { return simEndTime; }
 
+  //! Number of elements in the mesh
   int getNumElements () const { return cc->getNumElements (); }
+
+  //! number of nodes (vertices) in the mesh
   int getNumNodes () const { return cc->getNumNodes (); }
 
+  //! number of nodes times the dimensionality
   unsigned int getTotalNumDof () const { return l2gMap->getTotalNumDof (); }
 
   const std::vector<AVI*>&  getAVIVec () const { return aviVec; }
 
+  //! mapping function from local per element vectors (for target functions) to global vectors
+  //! this tells what indices in the global vector each element contributes to 
+  
   const LocalToGlobalMap& getLocalToGlobalMap () const { return *l2gMap; }
 
+  /**
+   * setup initial conditions
+   * to be called before starting the simulation loop
+   *
+   * @param disp: global dispalcements vector
+   */
   void setupDisplacements (VecDouble& disp) const { stretchInternal (disp, false); }
 
+  /**
+   * setup initial conditions
+   * to be called before starting the simulation loop
+   *
+   * @param vel: global velocities vector
+   */
   void setupVelocities (VecDouble& vel) const { stretchInternal (vel, true); }
 
+  /**
+   * Write the values in global vectors corresponding to this avi element
+   * to a file at regular intervals
+   *
+   * @param avi
+   * @param Qval
+   * @param Vbval
+   * @param Tval
+   */
   void writeSync (const AVI& avi, const VecDouble& Qval, const VecDouble&  Vbval, const VecDouble& Tval) ;
 
+
+  /**
+   * Compare state of avi vector against other object
+   * Use for verification between different versions
+   * 
+   * @param that
+   */
   bool cmpState (const MeshInit& that) const { return computeDiffAVI (this->aviVec, that.aviVec, false); }
 
+  /**
+   * Compare state of avi vector against other object
+   * Use for verification between different versions
+   * and also print out the differences
+   * 
+   * @param that
+   */
   void printDiff (const MeshInit& that) const { computeDiffAVI (this->aviVec, that.aviVec, true); }
 
 
 
 protected:
 
+  //! functions to compute boundary condtions
+  //! @param coord
   virtual BCFunc getBCFunc (const double* coord) const = 0;
+
+  //! returns the correct derived type of CoordConn
   virtual CoordConn* makeCoordConn () const = 0;
+
+  //! parametric node numbering of an element (triangle or tetrahedron)
   virtual const double* getParam () const = 0;
+
+  //! internal function used by @see setupDisplacements
+  //! @param coord
+  //! @param f
   virtual double initDisp (const double* coord, int f) const = 0;
+
+  //! internal function used by @see setupVelocities
+  //! @param coord
+  //! @param f
   virtual double initVel (const double* coord, int f) const = 0;
+
+  //! number of fields often the same as dimensionality
   virtual size_t numFields () const = 0;
 
 };

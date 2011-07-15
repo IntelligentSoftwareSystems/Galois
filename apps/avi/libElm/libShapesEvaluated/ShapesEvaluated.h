@@ -1,4 +1,4 @@
-/*
+/**
  * ShapesEvaluated.h
  * DG++
  *

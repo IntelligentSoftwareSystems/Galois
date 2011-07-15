@@ -24,7 +24,7 @@ int main()
   
   sleep(2);
   
-  std::cout << "Number of fields: " << TestElement.GetFields() << " should be 2\n";
+  std::cout << "Number of fields: " << TestElement.getFields() << " should be 2\n";
   std::cout << "Number of dof field(0): " << TestElement.getDof(0) << " should be 4\n";
   std::cout << "Number of dof field(1): " << TestElement.getDof(1) << " should be 4\n";
   for(int a=0; a<2; a++)
@@ -65,7 +65,7 @@ int main()
     P13DElement<2> CopyElement(TestElement);
     std::cout <<  "Test Copy Constructor\n";
     
-    std::cout<<"Number of fields: " << CopyElement.GetFields() << " should be 2\n";
+    std::cout<<"Number of fields: " << CopyElement.getFields() << " should be 2\n";
     std::cout<<"Number of dof field(0): " <<CopyElement.getDof(0)<< " should be 4\n";
     std::cout<<"Number of dof field(1): " <<CopyElement.getDof(1)<< " should be 4\n";
 

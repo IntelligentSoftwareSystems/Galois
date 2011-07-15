@@ -1,5 +1,5 @@
-/*
- * Linear.h
+/**
+ * Linear.h: a set of linear shape functions
  * DG++
  *
  * Created by Adrian Lew on 9/4/06.
@@ -46,11 +46,11 @@
 
  The possibility of shuffling becomes useful, for example, in tetrahedra. Without shuffling the class
  would have
- \f[
- N_a(\lambda_0,\lambda_1,\lambda_2), \qquad a=0,1,2,3
+ \f[ 
+ N_a(\lambda_0,\lambda_1,\lambda_2), \qquad a=0,1,2,3 
  \f]
  and the derivatives of the shape function with respect to the same arguments. With a shuffling  of the form
- \f(\lambda_0,\lambda_1,\lambda_2,\lambda_3)\f to \f(\lambda_0,\lambda_1,\lambda_3,\lambda_2)\f it is
+ \f$(\lambda_0,\lambda_1,\lambda_2,\lambda_3)\f$ to \f$(\lambda_0,\lambda_1,\lambda_3,\lambda_2)\f$ it is
  possible to have
  \f[
  N_a(\lambda_0,\lambda_1,\lambda_3), \qquad a=0,1,2,3.

@@ -44,6 +44,7 @@ endif()
 ###### Configure (users don't need to go beyond here) ######
 
 #LAPACK
+enable_language(Fortran)
 find_package(LAPACK)
 if(LAPACK_FOUND)
   message("Found LAPACK, building avi")

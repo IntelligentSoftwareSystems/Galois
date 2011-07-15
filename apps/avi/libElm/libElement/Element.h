@@ -1,5 +1,7 @@
-/*
- * Element.h
+/**
+ * Element.h: Basic Element over which fields are defined. 
+ * It contains an element geometry, shape functions etc.
+ *
  * DG++
  *
  * Created by Adrian Lew on 9/2/06.
@@ -273,21 +275,21 @@ public:
   }
   virtual LocalToGlobalMap * clone () const = 0;
 
-  //! @param ElementMapped: GlobalElementIndex of the Element to be mapped. 
-  //! This sets
-  //! the default Element  object whose field degrees of freedom are
-  //! mapped.
-  // XXX: commented out (amber)
-  // virtual void set (const GlobalElementIndex &ElementMapped) = 0;
-
-  //! @param field field number in the element, 0\f$ \le \f$ field \f$\le\f$ Nfields-1\n
-  //! @param dof   number of degree of freedom in that field, 
-  //! \f$ 0 \le \f$ dof \f$\le\f$ Ndofs-1 \n
-  //! map returns the GlobalDofIndex associated to degree of freedom "dof" of field "field" 
-  //! in the default Element object. The latter is  
-  //! set with the function set(const Element &).
-  // XXX: commented out (amber)
-  // virtual const GlobalDofIndex map (size_t field, size_t dof) const = 0;
+  // //! @param ElementMapped: GlobalElementIndex of the Element to be mapped. 
+  // //! This sets
+  // //! the default Element  object whose field degrees of freedom are
+  // //! mapped.
+  // // XXX: commented out (amber)
+  // // virtual void set (const GlobalElementIndex &ElementMapped) = 0;
+ 
+  // //! @param field field number in the element, 0\f$ \le \f$ field \f$\le\f$ Nfields-1\n
+  // //! @param dof   number of degree of freedom in that field, 
+  // //! \f$ 0 \le \f$ dof \f$\le\f$ Ndofs-1 \n
+  // //! map returns the GlobalDofIndex associated to degree of freedom "dof" of field "field" 
+  // //! in the default Element object. The latter is  
+  // //! set with the function set(const Element &).
+  // // XXX: commented out (amber)
+  // // virtual const GlobalDofIndex map (size_t field, size_t dof) const = 0;
 
   //! @param field field number in the element, 0\f$  \le \f$ field \f$\le\f$ Nfields-1\n
   //! @param dof   number of degree of freedom in that field, \f$ 0 \le \f$ dof \f$\le\f$ Ndofs-1 \n

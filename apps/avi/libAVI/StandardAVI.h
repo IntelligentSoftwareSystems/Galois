@@ -1,3 +1,31 @@
+/**
+ * StandardAVI.h
+ * DG++
+ *
+ * Created by Adrian Lew on 9/23/08.
+ *  
+ * Copyright (c) 2008 Adrian Lew
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including 
+ * without limitation the rights to use, copy, modify, merge, publish, 
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject
+ * to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included 
+ * in all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+ * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+ * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+ * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+
 #ifndef _STANDARD_AVI_H_
 #define _STANDARD_AVI_H_
 
@@ -9,21 +37,23 @@
 
 class StandardAVI: public AVI {
 public:
+  //! function used for obtaining value of boundary conditions
   typedef double (*BCFunc) (int, int, double);
 
+  //! type of boundary conditions imposed
+  //! ZERO means no boundary conditions
   enum BCImposedType {
     ZERO, ONE, TWO
   };
 
     //! StandardAVI constructor designed to handle integration of an individual element
     //! 
-    //! @param MyRes  pointer to a Stresswork for this element
-    //! @param MassVec pointer to the assembled mass vector for this element
     //! @param L2G local to global map for access to Petsc vectors
-    //! @param local_index is the Element's index on the local processor
+    //! @param MyRes  ref to a Stresswork for this element
+    //! @param MassVec ref to the assembled mass vector for the mesh 
     //! @param globalIdx is the Element's unique global index
-    //! @param IFlag is a pointer to the Boundary values indicator
-    //! @param IVAl is a pointer to the actual values of boundary conditions, if IFlag is not false
+    //! @param IFlag is a ref to the Boundary values indicator
+    //! @param IVal is a ref to the actual values of boundary conditions, if IFlag is not false
     //! @param delta is a double that is used as a safety factor in computing the times step for an element
     //! @param time allows the AVI object's time to be set to some value
     //! 
@@ -64,6 +94,17 @@ public:
         }
     }
 
+    //! StandardAVI constructor designed to handle integration of an individual element
+    //! 
+    //! @param MyRes  ref to a Stresswork for this element
+    //! @param MassVec ref to the assembled mass vector for the mesh 
+    //! @param L2G local to global map for access to Petsc vectors
+    //! @param globalIdx is the Element's unique global index
+    //! @param IType is a vector containing types of imposed boundary conditons @see StandardAVI::BCImposedType
+    //! @param bcfunc_vec is a vector of function pointers used to obtain the value of boundary conditions
+    //! @param delta is a double that is used as a safety factor in computing the times step for an element
+    //! @param time allows the AVI object's time to be set to some value
+    //! 
     StandardAVI(
         const LocalToGlobalMap& L2G, 
         const DResidue& MyRes, 
@@ -197,8 +238,7 @@ public:
 
   //! Updates the force field through the operation Stresswork class
   bool getForceField (const MatDouble& argval, MatDouble& forcefield) const {
-    // TODO: change getVal so that a reference can be passed instead of pointer
-    operation.getVal (argval, &forcefield);
+    operation.getVal (argval, forcefield);
     return (true);
   }
   ;
@@ -266,7 +306,7 @@ public:
 protected:
   //! Sets the time step for the element based upon the element geometry and sound speed.  The safety factor, delta, is set
   //! during the construction of the AVI object.  The optional parameter, epsilon, allows the time step to be adjusted further.
-  //! @param epsilon--optional parameter which allows the time step to be set to a fraction of its normal value.
+  //! @param epsilon:  optional parameter which allows the time step to be set to a fraction of its normal value.
   virtual void setTimeStep (double epsilon = 1.0) {
      timeStep = epsilon * delta * (operation.getElement ().getGeometry ().getInRadius ()) / operation.getMaterial ().getSoundSpeed ();
 

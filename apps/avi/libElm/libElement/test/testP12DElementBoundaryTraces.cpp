@@ -57,8 +57,8 @@ int main()
 	std::cout << "Face number : " << facenumber << std::endl;
 	
 	std::cout << "Normal components\n";
-	for(unsigned int q=0;q<TestElementBoundary.GetNormal(a).size();q++)
-	  std::cout << TestElementBoundary.GetNormal(a)[q] << " ";
+	for(unsigned int q=0;q<TestElementBoundary.getNormal(a).size();q++)
+	  std::cout << TestElementBoundary.getNormal(a)[q] << " ";
 	std::cout << "\n";
       }
     
@@ -96,8 +96,8 @@ int main()
 	std::cout << "Face number : " << facenumber << std::endl;
 	
 	std::cout << "Normal components\n";
-	for(unsigned int q=0;q<TestElementBoundaryCopy.GetNormal(a).size();q++)
-	  std::cout << TestElementBoundaryCopy.GetNormal(a)[q] << " ";
+	for(unsigned int q=0;q<TestElementBoundaryCopy.getNormal(a).size();q++)
+	  std::cout << TestElementBoundaryCopy.getNormal(a)[q] << " ";
 	std::cout << "\n";
       }
     
@@ -177,8 +177,8 @@ int main()
 	  std::cout << "Face number : " << facenumber << std::endl;
 	
 	  std::cout << "Normal components\n";
-	  for(unsigned int q=0;q<TestElementBoundary.GetNormal(a).size();q++)
-	    std::cout << TestElementBoundary.GetNormal(a)[q] << " ";
+	  for(unsigned int q=0;q<TestElementBoundary.getNormal(a).size();q++)
+	    std::cout << TestElementBoundary.getNormal(a)[q] << " ";
 	  std::cout << "\n";
 	}
       

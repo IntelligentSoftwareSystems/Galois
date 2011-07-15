@@ -1,10 +1,38 @@
+/**
+ * DiagonalMassForSW.h
+ * DG++
+ *
+ * Created by Adrian Lew on 10/24/06.
+ *  
+ * Copyright (c) 2006 Adrian Lew
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including 
+ * without limitation the rights to use, copy, modify, merge, publish, 
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject
+ * to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included 
+ * in all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+ * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+ * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+ * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+
 // Sriramajayam
 
 #ifndef DIAGONALMASSMATRIXFORSW
 #define DIAGONALMASSMATRIXFORSW
 
-#include "StressWork.h"
 #include "AuxDefs.h"
+#include "ElementalOperation.h"
 
 //! \brief Class to compute a diagonal mass matrix for StressWork.
 /** This class computes a diagonalized form of the (exact) mass matrix 
@@ -35,9 +63,7 @@ public:
   //! Constructor 
   //! \param IElm Pointer to element over which mass is to be compued.
   //! \param SM SimpleMaterial over the element.
-  //! \param field1 Field number of first field.
-  //! \param field2 Field number of second field.
-  //! \param field3 Field number of third field, assumed to be non-existant by default.
+  //! \param fieldsUsed vector containing ids of fields being computed starting with 0
   inline DiagonalMassForSW (const Element& IElm, const SimpleMaterial &SM, const std::vector<size_t>& fieldsUsed)
   : BaseResidue (IElm, SM, fieldsUsed) {
   assert (fieldsUsed.size() > 0 && fieldsUsed.size () <= 3);
@@ -62,7 +88,7 @@ public:
   //! Computes the elemental contribution to the mass-vector.
   //! \param argval See Residue. It is a dummy argument since integrations are done over the reference.
   //! \param funcval See Residue.
-  bool getVal(const MatDouble &argval, MatDouble* funcval) const;
+  bool getVal(const MatDouble &argval, MatDouble& funcval) const;
 
 };
 

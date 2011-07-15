@@ -32,13 +32,13 @@
 
 
 // XXX: (amber) replaced 3,9. 27, 81 with NDM, MAT_SIZE
-bool LinearElasticBase::getConstitutiveResponse(const std::vector<double> * lstrain, std::vector<double> * lstress, std::vector<double> * ltangents) const {
-  const std::vector<double> &strain = *lstrain;
-  std::vector<double> &stress = *lstress;
+bool LinearElasticBase::getConstitutiveResponse(const std::vector<double>&  strain, std::vector<double>& stress, std::vector<double> & tangents, const ConstRespMode& mode) const {
 
 
   // Compute stress
-  stress.resize(MAT_SIZE);
+  if (stress.size () != MAT_SIZE) {
+    stress.resize(MAT_SIZE);
+  }
 
   for (size_t i = 0; i < NDM; i++) {
     for (size_t J = 0; J < NDM; J++) {
@@ -53,10 +53,11 @@ bool LinearElasticBase::getConstitutiveResponse(const std::vector<double> * lstr
   }
 
   // Compute tangents, if needed
-  if (ltangents) {
-    std::vector<double> &tangents = *ltangents;
+  if (mode == COMPUTE_TANGENTS) {
 
-    tangents.resize(MAT_SIZE * MAT_SIZE);
+    if (tangents.size () != MAT_SIZE * MAT_SIZE) {
+      tangents.resize(MAT_SIZE * MAT_SIZE);
+    }
 
     for (size_t i = 0; i < NDM; i++)
       for (size_t J = 0; J < NDM; J++)

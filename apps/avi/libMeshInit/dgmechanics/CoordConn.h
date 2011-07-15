@@ -1,9 +1,27 @@
-/*
- * CoordConn.h
+/** CoordConn Represents the connectivity and coordinates of mesh -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
  *
  *  Created on: Jun 16, 2011
- *      Author: amber
+ * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
  */
+
 
 #ifndef COORDCONN_H_
 #define COORDCONN_H_
@@ -25,6 +43,12 @@
 #include <vector>
 #include <stdexcept>
 
+/**
+ * This class maintains connectivity and coordinates of the mesh read from a file.
+ * Connectivity is the ids of the nodes of each element, where nodes are numbered from * 0..numNodes-1
+ * Coordinates is the 2D or 3D coordinates of each node in the mesh
+ * The elements themselves have ids 0..numElements-1
+ */
 class CoordConn {
 
 
@@ -33,16 +57,34 @@ public:
 
   virtual ~CoordConn () {}
 
+  /**
+   * Connectivity of all elements in a single vector. Let NPE = nodes per element, then connectivity of 
+   * element i is in the range [NPE*i, NPE*(i+1))
+   *
+   * @return ref to vector
+   */
   virtual const std::vector<GlobalNodalIndex>& getConnectivity () const = 0;
 
+  /** 
+   * Coordinates of all nodes in the mesh in a single vector. Let SPD = number of spatial dimensions
+   * e.g. 2D or 3D, the coordinates for node i are in the range [i*SPD, (i+1)*SPD)
+   *
+   * @return ref to vector
+   */
   virtual const std::vector<double>& getCoordinates () const = 0;
 
   virtual size_t getSpatialDim () const = 0;
 
   virtual size_t getNodesPerElem () const = 0;
 
+  /**
+   * specific to file input format
+   */
   virtual size_t getTopology () const = 0;
 
+  /**
+   * subdivide each element into smaller elements
+   */
   virtual void subdivide () = 0;
 
   virtual void initFromFileData (const FemapInput& neu) = 0;
@@ -51,14 +93,36 @@ public:
 
   virtual size_t getNumElements () const = 0;
 
+  /**
+   * helper for MeshInit
+   * The derived class decides the kind of element and element geometry to 
+   * instantiate for each element addressed by elemIndex
+   *
+   * @param elemIndex
+   * @return Element*
+   */
   virtual Element* makeElem (const size_t elemIndex) const = 0;
 
 protected:
+
+  /**
+   * populates vector elemConn with 
+   * the connectivity of element indexed by elemIndex
+   * @see CoordConn::getConnectivity()
+   *
+   * @param elemIndex
+   * @param elemConn
+   *
+   */
   virtual void genElemConnectivity (size_t elemIndex, std::vector<GlobalNodalIndex>& elemConn) const = 0;
 
 
 };
 
+/**
+ *
+ * Common functionality and data structures
+ */
 template <size_t SPD, size_t NODES_PER_ELEM, size_t TOPO>
 class AbstractCoordConn: public CoordConn {
 protected:
@@ -179,6 +243,9 @@ private:
 
 
 
+/**
+ * represents an edge between two mesh nodes
+ */
 struct edgestruct {
   size_t elemId;
   size_t edgeId;
@@ -205,12 +272,25 @@ struct edgestruct {
   }
 
 
+  /**
+   * ordering based on node ids
+   *
+   * @param that
+   */
   bool operator < (const edgestruct &that) const {
     // compare the nodes of the two edges
     int result = compare (that);
     return result < 0;
   }
 
+  /**
+   * comparison function that compares
+   * two objects based on the node ids in the edge
+   * Therefore it's necessary to store the node ids within an edge
+   * in sorted order to allow lexicographic comparison
+   *
+   * @param that
+   */
   inline int compare (const edgestruct& that) const {
     int result = this->node0 - that.node0;
     if (result == 0) {

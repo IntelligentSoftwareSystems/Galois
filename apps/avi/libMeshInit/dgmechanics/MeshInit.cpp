@@ -11,7 +11,6 @@ const double TetMeshInit::PARAM[] =
 /**
  *
  * @param fileName
- * @param spatialDim
  * @param ndiv
  *          number of times to subdivide the initial mesh
  */
@@ -69,7 +68,7 @@ void MeshInit::initializeMesh (const std::string& fileName, int ndiv) {
 
   VecDouble dofArray (totalDof, 0.0);
 
-  Residue::assemble (massResidueVec, *l2gMap, dofArray, &massVec);
+  Residue::assemble (massResidueVec, *l2gMap, dofArray, massVec);
 
 
   aviVec.clear ();

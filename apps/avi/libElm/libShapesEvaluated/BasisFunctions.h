@@ -1,4 +1,4 @@
-/*
+/**
  * BasisFunctions.h
  * DG++
  *
@@ -46,11 +46,11 @@
 
    
    \todo So far the number of spatial dimensions, needed to transverse 
-   the GetDShapes and GetQuadraturePointArrays is not provided, but should be 
+   the getDShapes and getQuadraturePointArrays is not provided, but should be 
    obtained from the ElementGeometry where these basis functions are in. One 
    way in which this may be computed is using the fact that 
-   GetQuadraturePointCoordinates().size()/getIntegrationWeights().size() = 
-   GetDShapes().size()/GetShapes().size() = spatial dimensions
+   getQuadraturePointCoordinates().size()/getIntegrationWeights().size() = 
+   getDShapes().size()/getShapes().size() = spatial dimensions
 
 */
 
@@ -63,26 +63,27 @@ class BasisFunctions
   virtual BasisFunctions *  clone() const = 0;
   
   //!  Shape functions at quadrature points
-  //!  GetShapes()[q*GetBasisDimension()+a]
+  //!  getShapes()[q*getBasisDimension()+a]
   //!  gives the value of shape function a at quadrature point q
   //!  
-  //!  GetShapes returns an empty vector if no shape functions are available
+  //!  getShapes returns an empty vector if no shape functions are available
   virtual const std::vector<double> & getShapes() const = 0; 
   
   //! Derivatives of shape functions at quadrature points 
-  //! GetDShapes()[q*GetBasisDimension()*GetNumberOfDerivativesPerFunction()+
-  //! +a*GetNumberOfDerivativesPerFunction()+i] gives the
+  //! getDShapes()[q*getBasisDimension()*getNumberOfDerivativesPerFunction()+
+  //! +a*getNumberOfDerivativesPerFunction()+i] gives the
   //! derivative in the i-th direction of degree of freedom a at quadrature point q
   //!
-  //! GetDShapes returns an empty vector if no derivatives are
+  //! getDShapes returns an empty vector if no derivatives are
   //! available
   virtual const std::vector<double> & getDShapes() const = 0; 
   
+  //! @return vector of integration weights
   virtual const std::vector<double> & getIntegrationWeights() const = 0;  //!< Integration weights 
 
   //! Coordinates of quadrature points in the real configuration
-  //! GetQuadraturePointCoordinates()
-  //! [q*ElementGeometry::getEmbeddingDimension()+i]
+  //! getQuadraturePointCoordinates()
+  //! q*ElementGeometry::getEmbeddingDimension()+i]
   //! returns the i-th coordinate in real space of quadrature point q 
   virtual const std::vector<double> & getQuadraturePointCoordinates() const = 0; 
 

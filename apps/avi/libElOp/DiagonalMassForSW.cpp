@@ -3,7 +3,7 @@
 #include "DiagonalMassForSW.h"
 #include "Material.h"
 
-bool DiagonalMassForSW::getVal(const MatDouble &argval, MatDouble *funcval) const {
+bool DiagonalMassForSW::getVal(const MatDouble &argval, MatDouble& funcval) const {
   size_t Dim = fieldsUsed.size();
 
   // Assume that all fields use the same quadrature rules
@@ -20,17 +20,17 @@ bool DiagonalMassForSW::getVal(const MatDouble &argval, MatDouble *funcval) cons
   }
 
   // Resize funcval if required.
-  if ((*funcval).size() < fieldsUsed.size()) {
-    funcval->resize(fieldsUsed.size());
+  if (funcval.size() < fieldsUsed.size()) {
+    funcval.resize(fieldsUsed.size());
   }
 
   for (size_t f = 0; f < fieldsUsed.size(); f++) {
-    if ((*funcval)[f].size() < nDof[f]) {
-      (*funcval)[f].resize(nDof[f], 0.);
+    if (funcval[f].size() < nDof[f]) {
+      funcval[f].resize(nDof[f], 0.);
     }
     else {
       for (size_t a = 0; a < nDof[f]; a++) {
-        (*funcval)[f][a] = 0.;
+        funcval[f][a] = 0.;
       }
     }
   }
@@ -52,7 +52,7 @@ bool DiagonalMassForSW::getVal(const MatDouble &argval, MatDouble *funcval) cons
 
     for (size_t f = 0; f < fieldsUsed.size(); f++) {
       for (size_t a = 0; a < nDof[f]; a++) {
-        (*funcval)[f][a] += IntWeights[f][q] * Ref_rho * Shape[f][nDof[f] * q + a];
+        funcval[f][a] += IntWeights[f][q] * Ref_rho * Shape[f][nDof[f] * q + a];
       }
     }
   }

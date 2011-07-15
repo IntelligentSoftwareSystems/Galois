@@ -1,4 +1,4 @@
-/*
+/**
  * Quadrature.h
  * DG++
  *

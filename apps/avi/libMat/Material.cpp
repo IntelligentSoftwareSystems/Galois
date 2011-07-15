@@ -57,13 +57,14 @@ bool SimpleMaterial::consistencyTest(const SimpleMaterial &SMat) {
   strain[8] = 1 + double(rand()) / double(RAND_MAX) * PERT;
 
   for (unsigned int i = 0; i < MAT_SIZE; i++) {
+    std::vector<double> t;
     double Forig = strain[i];
 
     strain[i] = Forig + EPS;
-    SMat.getConstitutiveResponse(&strain, &stressplus);
+    SMat.getConstitutiveResponse(strain, stressplus, t, SKIP_TANGENTS);
 
     strain[i] = Forig - EPS;
-    SMat.getConstitutiveResponse(&strain, &stressminus);
+    SMat.getConstitutiveResponse(strain, stressminus, t, SKIP_TANGENTS);
 
     for (unsigned j = 0; j < MAT_SIZE; j++) {
       tangentsnum[j * MAT_SIZE + i] = (stressplus[j] - stressminus[j]) / (2 * EPS);
@@ -72,7 +73,7 @@ bool SimpleMaterial::consistencyTest(const SimpleMaterial &SMat) {
     strain[i] = Forig;
   }
 
-  SMat.getConstitutiveResponse(&strain, &stress, &tangents);
+  SMat.getConstitutiveResponse(strain, stress, tangents, COMPUTE_TANGENTS);
 
   double error = 0;
   double norm = 0;

@@ -15,20 +15,25 @@ libMeshInit/dgmechanics/*.cpp
 libMeshInit/*.cpp
 )
 
-add_executable(AVIorderedSerial main/AVIorderedSerial.cpp  ${Sources})
+add_library(AVI ${Sources})
+
+add_executable(AVIorderedSerial main/AVIorderedSerial.cpp)
+target_link_libraries(AVIorderedSerial AVI)
 target_link_libraries(AVIorderedSerial galois) 
 target_link_libraries(AVIorderedSerial ${CMAKE_THREAD_LIBS_INIT}) 
 target_link_libraries(AVIorderedSerial hoard)
 target_link_libraries(AVIorderedSerial ${LAPACK_LIBRARIES})
 
-add_executable(AVIunordered main/AVIunordered.cpp  ${Sources})
+add_executable(AVIunordered main/AVIunordered.cpp)
+target_link_libraries(AVIunordered AVI)
 target_link_libraries(AVIunordered galois) 
 target_link_libraries(AVIunordered ${CMAKE_THREAD_LIBS_INIT}) 
 target_link_libraries(AVIunordered hoard)
 target_link_libraries(AVIunordered ${LAPACK_LIBRARIES})
 
 
-add_executable(AVIunorderedNoLock main/AVIunorderedNoLock.cpp  ${Sources})
+add_executable(AVIunorderedNoLock main/AVIunorderedNoLock.cpp)
+target_link_libraries(AVIunorderedNoLock AVI)
 target_link_libraries(AVIunorderedNoLock galois) 
 target_link_libraries(AVIunorderedNoLock ${CMAKE_THREAD_LIBS_INIT}) 
 target_link_libraries(AVIunorderedNoLock hoard)

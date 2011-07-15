@@ -1,6 +1,32 @@
+/** TetLinearCoordConn represents a mesh containing linear tetrahedra -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
+ */
+
 #ifndef _TET_LINEAR_COORD_CONN_H_
 #define _TET_LINEAR_COORD_CONN_H_
 
+/**
+ * important constants for linear tetrahedron
+ */
 struct TetLinearTraits {
   enum {
     SPD = 3,
@@ -17,6 +43,10 @@ class TetLinearCoordConn
     static const int NUM_EDGES = TetLinearTraits::NUM_EDGES;
 
   protected:
+    /**
+     * Return an instance of 3D with linear shape functions
+     * and linear tetrahedron as geometry
+     */
     virtual Element* makeElem (const size_t elemIndex) const {
       std::vector<GlobalNodalIndex> conn;
 
@@ -29,10 +59,12 @@ class TetLinearCoordConn
   private:
     /**
      *
-     * @return for each element p, populate an indexed list L of pairs (q,j), where i is index of each pair,
-     *  such that
+     * @param neighbors: the output vector
+     * for each element p, populate an indexed list L of pairs (q,j), where i is index of each pair,
+     * such that
      * p shares it's i with q's edge j.
      * There should be a corresponding entry (p,i) in q's list at index j.
+     *
      */
 
     void getEdgeNeighborList (std::vector<std::vector<std::vector<int> > > &neighbors) const {
@@ -110,7 +142,8 @@ class TetLinearCoordConn
     }
 
   public:
-    /* Function: SubdivideTet
+
+    /**
      * Purpose : Subdivide a tetrahedron in 8 smaller ones.
      * Algorithm to subdivide a test:
      * Parent tet: ABCD.
@@ -128,7 +161,6 @@ class TetLinearCoordConn
      * Tet7: M1-M4-M2-M3,
      * Tet8: M1-M4-M3-M5.
      */
-
     virtual void subdivide () {
 
       int sd = getSpatialDim();

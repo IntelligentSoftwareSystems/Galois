@@ -1,5 +1,5 @@
-/*
- * ElementBoundaryTraces.h
+/**
+ * ElementBoundaryTraces.h 
  * DG++
  *
  * Created by Adrian Lew on 10/12/06.
@@ -90,7 +90,7 @@ class ElementBoundaryTraces
   virtual size_t getTraceNumberOfFace(size_t FaceIndex) const = 0;
   
   //! Returns a constant reference to the Element that contains
-  //! the traces of the face GetTraceFacesNumbers()[FaceIndex]. \n
+  //! the traces of the face getTraceFacesNumbers()[FaceIndex]. \n
   //! FaceIndex ranges from 0
   //! to the getNumTraceFaces()-1. 
   virtual const Element & getTrace(size_t FaceIndex) const = 0;

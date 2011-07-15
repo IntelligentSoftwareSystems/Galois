@@ -1,3 +1,26 @@
+/** AVI unordered algorithm with abstract locks -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
+ */
+
 #ifndef AVI_UNORDERED_H_
 #define AVI_UNORDERED_H_
 
@@ -10,6 +33,7 @@
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Runtime/PerCPU.h"
 #include "Galois/util/Atomic.h"
+#include "Galois/util/Accumulator.h"
 
 #include "Lonestar/Banner.h"
 #include "Lonestar/CommandLine.h"
@@ -29,36 +53,44 @@
 
 #include "AVIabstractMain.h"
 
+/**
+ *
+ * Unordered AVI algorithm uses two key data structures
+ *
+ * 1) Element Adjacency Graph
+ * 2) in degree vector
+ *
+ * This graph has a node for each mesh element and 
+ * keeps track of node-adjacency between AVI elements. Two elements
+ * are adjacent if they share a node in the mesh between them.
+ * We create a graph by connecting adjacent elements with an edge.
+ * Conceptually the edge is directed from the avi element with smaller
+ * time stamp to the greater one. But in implementation this direction information
+ * is not kept in the graph but in an array 'inDegVec', which has an entry corresponding
+ * to each AVI element. 
+ * An avi element with 0 in edges has the minimum time stamp among its neighbors
+ * and is therefore eligible for an update
+ * It is assumed that AVI elements have unique integer id's 0..numElements-1, and 
+ * the id is used to index into inDegVec
+ *
+ */
+
 class AVIunordered: public AVIabstractMain {
 
 protected:
   typedef Galois::GAtomic<int> AtomicInteger;
+  typedef Galois::PerCPUcounter IterCounter;
 
   static const bool DEBUG = false;
 
-  static const int CHUNK_SIZE = 4;
+  static const int CHUNK_SIZE = 64;
 
-// TODO: investigate  padding of AtomicInteger so that it can be put in an array 
 // TODO: use LCGraph 
-
   typedef Galois::Graph::FirstGraph<AVI*, void, false> Graph;
   typedef Graph::GraphNode GNode;
 
-  /**
-   * Keeps track of node-adjacency between AVI elements. Two elements
-   * are adjacent if they share a node in the mesh between them.
-   * We create a graph by connecting adjacent elements with an edge.
-   * Conceptually the edge is directed from the avi element with smaller
-   * time stamp to the greater one. But in implementation this direction information
-   * is not kept in the graph but in an array 'inDegVec', which has an entry corresponding
-   * to each AVI element. 
-   * An avi element with 0 in edges has the minimum time stamp among its neighbors
-   * and is therefore eligible for an update
-   * It is assumed that AVI elements have unique integer id's 0..numElements-1, and 
-   * the id is used to index into inDegVec
-   * @author ahassaan
-   *
-   */
+  typedef GaloisRuntime::WorkList::ChunkedFIFO<CHUNK_SIZE, GNode> AVIWorkList;
+
 
   Graph graph;
 
@@ -140,6 +172,7 @@ protected:
     genElemAdjGraph (meshInit, g);
   }
 
+  //! Functor for loop body
   struct process {
 
     Graph& graph;
@@ -149,7 +182,7 @@ protected:
     GaloisRuntime::PerCPU<LocalVec>& perIterLocalVec;
     const AVIComparator& aviCmp;
     bool createSyncFiles;
-    AtomicInteger& iter;
+    IterCounter& iter;
 
     process (
         Graph& graph,
@@ -159,7 +192,7 @@ protected:
         GaloisRuntime::PerCPU<LocalVec>& perIterLocalVec,
         const AVIComparator& aviCmp,
         bool createSyncFiles,
-        AtomicInteger& iter):
+        IterCounter& iter):
 
         graph (graph),
         inDegVec (inDegVec),
@@ -182,6 +215,17 @@ protected:
         iter (that.iter) {}
 
 
+    /**
+     * Loop body
+     *
+     * The loop body uses one-shot optimization, where we grab abstract locks on the node
+     * and its neighbors before performing the udpates. This removes the need for saving 
+     * and performing undo operations.
+     *
+     *
+     * @param src is active elemtn
+     * @param lwl is the worklist handle
+     */
     template <typename ContextTy> 
       void operator () (const GNode& src, ContextTy& lwl) {
         // one-shot optimization: acquire abstract locks on active node and
@@ -241,8 +285,7 @@ protected:
         }
 
 
-        // for debugging, remove later
-        ++iter;
+        ++ (iter.get ());
 
 
       }
@@ -305,15 +348,15 @@ public:
 
     GaloisRuntime::PerCPU<LocalVec> perIterLocalVec (l);
 
-    AtomicInteger iter(0);
+    IterCounter iter(0);
 
     process p( graph, inDegVec, meshInit, g, perIterLocalVec, aviCmp, createSyncFiles, iter);
 
 
-    Galois::for_each< GaloisRuntime::WorkList::FIFO<GNode> >(initWl.begin (), initWl.end (), p);
+    Galois::for_each< AVIWorkList >(initWl.begin (), initWl.end (), p);
 
 
-    printf ("iterations = %d\n", (int)iter);
+    printf ("iterations = %d\n", iter.get ());
 
   }
 

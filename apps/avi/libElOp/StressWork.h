@@ -1,4 +1,4 @@
-/*
+/**
  * StressWork.h
  * DG++
  *
@@ -28,6 +28,9 @@
 
 #ifndef STRESSWORK
 #define STRESSWORK
+
+#include <vector>
+#include <algorithm>
 
 #include <cassert>
 
@@ -62,7 +65,16 @@
  \f]
  where \f$A\f$ are the elastic moduli \f$\partial{\bf P}/\partial {\bf F}\f$.
  */
-class StressWork:  public BaseResidue {
+class StressWork:  public DResidue {
+protected:
+  enum GetValMode {
+    VAL,
+    DVAL,
+  };
+
+  //! \warning argval should contain displacements, not deformation mapping
+  bool getDValIntern(const MatDouble &argval, MatDouble& funcval, FourDVecDouble& dfuncval, const GetValMode& mode) const;
+
 public:
   //! Construct a StressWork object with fields "field1, field2 and field3" as 
   //! the three dimensional displacement fields. 
@@ -71,15 +83,11 @@ public:
   //! operation.  The object pointed to is not destroyed when the operation is.
   //! @param SM SimpleMaterial object used to compute the stress and moduli. It is
   //! only referenced, not copied.
-  //! @param field1 field number in the Element that represents the first 
-  //! Cartesian component  of the displacement field
-  //! @param field2 field number in the Element that represents the second
-  //! Cartesian component  of the displacement field
-  //! @param field3 field number in the Element that represents the third
+  //! @param fieldsUsed vector containing ids of fields being computed starting with 0
   //! Cartesian component  of the displacement field. If not provided, it is
   //! assumed that it is a plane strain case.
   StressWork(const Element& IElm, const SimpleMaterial &SM, const std::vector<size_t>& fieldsUsed)
-    : BaseResidue (IElm, SM, fieldsUsed) {
+    : DResidue (IElm, SM, fieldsUsed) {
     assert (fieldsUsed.size() > 0 && fieldsUsed.size () <= 3);
   }
 
@@ -87,7 +95,7 @@ public:
   }
 
 
-  StressWork(const StressWork & SW) : BaseResidue (SW) {
+  StressWork(const StressWork & SW) : DResidue (SW) {
   }
 
 
@@ -101,12 +109,14 @@ public:
   }
 
   //! \warning argval should contain displacements, not deformation mapping
-  bool getDVal(const MatDouble &argval, MatDouble * funcval,
-      FourDVecDouble * dfuncval) const;
+  bool getDVal(const MatDouble &argval, MatDouble& funcval, FourDVecDouble& dfuncval) const {
+    return getDValIntern (argval, funcval, dfuncval, DVAL);
+  }
 
   //! \warning argval should contain displacements, not deformation mapping
-  bool getVal(const MatDouble &argval, MatDouble * funcval) const {
-    return getDVal(argval, funcval, 0);
+  bool getVal(const MatDouble &argval, MatDouble& funcval) const {
+    FourDVecDouble d;
+    return getDValIntern(argval, funcval, d, VAL);
   }
 
 };

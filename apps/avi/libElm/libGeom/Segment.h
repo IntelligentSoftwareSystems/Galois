@@ -1,5 +1,5 @@
-/*
- * Segment.h
+/**
+ * Segment.h: a line segment
  * DG++
  *
  * Created by Adrian Lew on 10/7/06.
@@ -54,10 +54,6 @@
    \warning Neither map nor dMap check for bounds of
    their array arguments
 
-   \todo Segment and Triangle are too similar in code. Perhaps it would be good to
-   generate and intermediate class that has all the common code.
-
-
 */
 
 
@@ -65,7 +61,6 @@ template<size_t SPD>
 class Segment:public AbstractGeom<SPD>
 {
  public:
-  //! Connectivity in Segment<SPD> GlobalCoordinatesArray
   Segment (const std::vector<double> globalCoordVec, const std::vector<GlobalNodalIndex>& connectivity)
     :AbstractGeom<SPD> (globalCoordVec, connectivity) {
       assert (connectivity.size () == 2);
@@ -100,11 +95,9 @@ class Segment:public AbstractGeom<SPD>
 
   //! \warning not implemented
   ElementGeometry * getFaceGeometry(size_t e) const 
-    { std::cerr << "Segment<SPD>::GetFaceGeometry. "
+    { std::cerr << "Segment<SPD>::getFaceGeometry. "
 	"Not implemented!\n\n";  return 0; }
 
-  //! set the only static member of the class GlobalCoordinateArray
-  //! @param coord pointer to the array of all vertex coordinates
   const double getInRadius(void) const{
     double l;
     l = 0.0;
@@ -121,7 +114,8 @@ class Segment:public AbstractGeom<SPD>
   };
 
   virtual void computeNormal (size_t e, std::vector<double>& vNormal) const {
-    throw (1);
+    std::cerr << "Segment::computeNormal not implemented yet" << std::endl;
+    abort ();
   }
 
 

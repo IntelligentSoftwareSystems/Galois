@@ -53,7 +53,7 @@ int main()
   for(int i=0; i<3; i++)
     {
       std::cout << "\nTesting Face: "<< i+1 << "\n";
-      std::cout << "Number of fields: " << Faces[i]->GetFields() << " should be 2\n";
+      std::cout << "Number of fields: " << Faces[i]->getFields() << " should be 2\n";
       std::cout << "Number of dof field(0): " << Faces[i]->getDof(0) << " should be 2\n";
       std::cout << "Number of dof field(1): " << Faces[i]->getDof(1) << " should be 2\n";
 
@@ -90,7 +90,7 @@ int main()
       P12DTrace<2> CopyTraceOne(TestTraceOne);
       std::cout <<  "\nTest Copy Constructor for Face 1\n";
 
-      std::cout << "Number of fields: " << CopyTraceOne.GetFields() << " should be 2\n";
+      std::cout << "Number of fields: " << CopyTraceOne.getFields() << " should be 2\n";
       std::cout << "Number of dof field(0): " << CopyTraceOne.getDof(0) << " should be 2\n";
       std::cout << "Number of dof field(1): " << CopyTraceOne.getDof(1) << " should be 2\n";
 
@@ -125,7 +125,7 @@ int main()
   }
 
 
-  std::cout << "Number of fields: " << VirtualTraceOne->GetFields() << " should be 2\n";
+  std::cout << "Number of fields: " << VirtualTraceOne->getFields() << " should be 2\n";
   std::cout << "Number of dof field(0): " << VirtualTraceOne->getDof(0) << " should be 2\n";
   std::cout << "Number of dof field(1): " << VirtualTraceOne->getDof(1) << " should be 2\n";
   
@@ -170,7 +170,7 @@ int main()
   for(int i=0; i<3; i++)
     {
       std::cout << "\nTesting Face: "<< i+1 << "\n";
-      std::cout << "Number of fields: " << Faces[i]->GetFields() << " should be 2\n";
+      std::cout << "Number of fields: " << Faces[i]->getFields() << " should be 2\n";
       std::cout << "Number of dof field(0): " << Faces[i]->getDof(0) << " should be 3\n";
       std::cout << "Number of dof field(1): " << Faces[i]->getDof(1) << " should be 3\n";
       

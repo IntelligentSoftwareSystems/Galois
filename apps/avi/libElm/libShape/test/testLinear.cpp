@@ -37,8 +37,8 @@ int main()
 
   Linear<2> Linear2D;
   
-  std::cout << Linear2D.GetNumberOfFunctions() << " should be " << 3 << "\n";
-  std::cout << Linear2D.GetNumberOfVariables() << " should be " << 2 << "\n";
+  std::cout << Linear2D.getNumberOfFunctions() << " should be " << 3 << "\n";
+  std::cout << Linear2D.getNumberOfVariables() << " should be " << 2 << "\n";
 
   if(Linear2D.consistencyTest(coord2,1.e-6))
     std::cout << "Consistency test successful" << "\n";
@@ -51,7 +51,7 @@ int main()
   Linear<2> Linear2DCopy(Linear2D);
   double flag = 0;
 
-  for(int a=0; a<Linear2D.GetNumberOfFunctions(); a++)
+  for(int a=0; a<Linear2D.getNumberOfFunctions(); a++)
     if(Linear2DCopy.Val(a,coord2) != Linear2D.Val(a,coord2))
       flag = 1;
   if(flag)
@@ -63,7 +63,7 @@ int main()
 
   Shape *Linear2DClone = Linear2D.clone();
 
-  for(int a=0; a<Linear2D.GetNumberOfFunctions(); a++)
+  for(int a=0; a<Linear2D.getNumberOfFunctions(); a++)
     if(Linear2DClone->getVal(a,coord2) != Linear2D.Val(a,coord2))
       flag = 1;
   if(flag)
@@ -78,8 +78,8 @@ int main()
 
   Linear<3> Linear3D;
   
-  std::cout << Linear3D.GetNumberOfFunctions() << " should be " << 4 << "\n";
-  std::cout << Linear3D.GetNumberOfVariables() << " should be " << 3 << "\n\n";
+  std::cout << Linear3D.getNumberOfFunctions() << " should be " << 4 << "\n";
+  std::cout << Linear3D.getNumberOfVariables() << " should be " << 3 << "\n\n";
 
   if(Linear3D.consistencyTest(coord3,1.e-6))
     std::cout << "Consistency test successful" << "\n";

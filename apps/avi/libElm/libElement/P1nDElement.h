@@ -1,9 +1,31 @@
-/*
- * P1nDElement.h
+/**
+ * P1nDElement.h: Common base class for 2D/3D elements with linear shape functions
  *
- *  Created on: Jun 13, 2011
- *      Author: amber
- */
+ * DG++
+ *
+ * Created by Adrian Lew on 9/2/06.
+ *  
+ * Copyright (c) 2006 Adrian Lew
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including 
+ * without limitation the rights to use, copy, modify, merge, publish, 
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject
+ * to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included 
+ * in all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+ * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+ * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+ * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */ 
 
 #ifndef P1NDELEMENT_H_
 #define P1NDELEMENT_H_
@@ -22,28 +44,38 @@ private:
   const ElementGeometry& elemGeom;
 
 public:
+  //! constructor
+  //! @param _elemGeom element geometry
   P1nDElement (const ElementGeometry& _elemGeom) : Element_(), elemGeom(_elemGeom) {
 
   }
 
+  //! copy constructor
+  //! @param that
   P1nDElement (const P1nDElement& that) : Element_(that), elemGeom (that.elemGeom) {
 
   }
 
+  //! @see Element::getNumFields
   virtual const size_t getNumFields () const {
     return NF;
   }
 
+  //! @see Element::getGeometry
   virtual const ElementGeometry& getGeometry () const {
     return elemGeom;
   }
 
 protected:
+  //! @see Element_::getFieldShapes
   size_t getFieldShapes (size_t field) const {
     return 0;
   }
 };
 
+/**
+ * Common base class for 2D/3D linear traces
+ */
 template <size_t NF>
 class P1nDTrace: public P1nDElement<NF> {
 public:
@@ -57,6 +89,7 @@ public:
   //! TwoDofs indicates Segment<2> boundary elements, with two dofs per field \n
   //! ThreeDofs indicates Triangle<2> boundary elements, with three dofs per field. The
   //! shape functions in P12DElement are just evaluated at quadrature points on each face\n
+  //! FourDofs is a Tetrahedron
   enum ShapeType {
     TwoDofs, ThreeDofs, FourDofs
   };
@@ -74,6 +107,11 @@ public:
 
 };
 
+
+/**
+ * Common base class for boundary traces
+ * @see ElementBoundaryTraces
+ */
 
 template <size_t NF>
 class P1nDBoundaryTraces: public ElementBoundaryTraces_ {
@@ -120,8 +158,8 @@ protected:
 
 
 /**
- \brief StandardP1nDMap class: standard local to global map when only P12D type of
- Elements are used.
+ \brief StandardP1nDMap class: standard local to global map for 2D/3D elements with
+ linear shape functions
 
  StandardP1nDMap assumes that\n
  1) The GlobalNodalIndex of a node is an size_t\n

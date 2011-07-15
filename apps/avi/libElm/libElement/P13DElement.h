@@ -1,5 +1,6 @@
-/*
- * P13DElement.h
+/**
+ * P13DElement.h: A 3D element with linear shape functions
+ *
  * DG++
  *
  * Created by Ramsharan Rangarajan
@@ -40,14 +41,11 @@
 #include <vector>
 #include <cassert>
 
-//! \brief three-dimensional linear tetrahedra with NField different fields.
+//! \brief three-dimensional linear tetrahedra with NF different fields.
 template<size_t NF>
 class P13DElement: public P1nDElement<NF> {
 public:
-  //! \param i1 vertex 0
-  //! \param i2 vertex 1
-  //! \param i3 vertex 2
-  //! \param i4 vertex 3
+  //! \param _elemGeom A reference to element geometry
   P13DElement (const Tetrahedron& _elemGeom): P1nDElement<NF> (_elemGeom) {
     ShapesP13D::Bulk modelShape (_elemGeom);
     Element_::addBasisFunctions (modelShape);
@@ -122,9 +120,13 @@ public:
   }
 
 protected:
+  //! canonical numbering of the nodes. Used to construct face edges
   static const size_t FaceNodes[];
 
 private:
+  //! checks if arguments are consistend with 3D element
+  //! @param flabel 
+  //! @param shType
   void checkArgs (const typename P1nDTrace<NF>::FaceLabel& flabel, const typename P1nDTrace<NF>::ShapeType& shType) {
     assert (shType != P1nDTrace<NF>::TwoDofs);
   }
@@ -199,10 +201,7 @@ class P13DElementBoundaryTraces: public P1nDBoundaryTraces<NF> {
 public:
 
   //! \param BaseElement Element for which to build traces.
-  //! \param FaceOne If true, build trace for face one.
-  //! \param FaceTwo If true, build trace for face two.
-  //! \param FaceThree If true, build trace for face three.
-  //! \param FaceFour If true, build trace for face four.
+  //! \param faceLabels is a vector telling which faces to build
   //! \param Type type of trace element to use. 
   P13DElementBoundaryTraces (const P13DElement<NF> &BaseElement,
       const std::vector<typename P1nDTrace<NF>::FaceLabel>& faceLabels,
@@ -249,7 +248,7 @@ size_t P13DElementBoundaryTraces<NF>::dofMap (size_t FaceIndex, size_t field, si
   return val;
 }
 
-//! \brief Family of elements over tetrahedra with NField linearly interpolated fields.
+//! \brief Family of elements over tetrahedra with NF linearly interpolated fields.
 template<size_t NF>
 class P13D: public SpecificElementFamily {
 

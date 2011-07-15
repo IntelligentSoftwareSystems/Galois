@@ -1,5 +1,6 @@
-/*
- * P12DElement.h
+/**
+ * P12DElement.h: 2D Element with linear shape functions
+ *
  * DG++
  *
  * Created by Adrian Lew on 9/22/06.
@@ -83,13 +84,6 @@ public:
  to decide which type of shape functions to use. This is accomplished by specifying
  the type ShapeType.
 
- \warning As opposed to P12DElements, there is no local copy of the
- geometry of the element here, but only a reference to it.
- Hence, the destruction of the base geometry before the destruction
- of this element will render the implementation inconsistent.
-
- \todo I think I have to change TriGeom to become a pointer and not a reference,
- since I believe this is a reference to a copy of the original geometry.
  */
 
 template<size_t NF>
@@ -113,6 +107,10 @@ public:
     return new P12DTrace<NF> (*this);
   }
 private:
+  //! check if the faceLabel and shapeType are consistent with
+  //! 2D element trace
+  //! @param faceLabel
+  //! @param shapeType
   void checkArgs (const typename P1nDTrace<NF>::FaceLabel& faceLabel,
       const typename P1nDTrace<NF>::ShapeType& shapeType) {
     // Triangle has only 3 faces
@@ -198,10 +196,8 @@ template<size_t NF>
 class P12DElementBoundaryTraces: public P1nDBoundaryTraces<NF> {
 public:
   //! @param BaseElement Element for which traces are to be build
-  //! @param FaceOne   If true, build trace for face one
-  //! @param FaceTwo   If true, build trace for face two
-  //! @param FaceThree If true, build trace for face three
-  //! @param Type type of trace element to use. See P12DTrace<NF>
+  //! @param flabels   a vector of face labels (size is 3 for triangles)
+  //! @param shType type of trace element to use. See P12DTrace<NF>
   P12DElementBoundaryTraces (const P12DElement<NF> &BaseElement,
       const std::vector<typename P1nDTrace<NF>::FaceLabel>& flabels,
       const typename P1nDTrace<NF>::ShapeType& shType):
@@ -256,7 +252,7 @@ template<size_t NF> size_t P12DElementBoundaryTraces<NF>::dofMap (
 }
 
 /**
- \brief P12D<NField> family of elements over triangles with NField linearly
+ \brief P12D<NF> family of elements over triangles with NF linearly
  interpolated fields.
  */
 
@@ -271,8 +267,6 @@ public:
   //! Traces on the boundary for P12DElement<NF> 
   typedef P12DElementBoundaryTraces<NF> Traces;
 };
-
-
 
 
 

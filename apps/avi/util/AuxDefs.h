@@ -1,5 +1,5 @@
 /*
- * AuxDefs.h
+ * AuxDefs.h: Common definitions
  * DG++
  *
  * Created by Adrian Lew on 9/4/06.
