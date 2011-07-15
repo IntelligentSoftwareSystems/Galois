@@ -437,7 +437,7 @@ private:
         }
       } else {
         std::cerr << "Unknown type of gate " << token << std::endl;
-        assert (false);
+        abort ();
       }
 
       //necessary to move forward in the while loop

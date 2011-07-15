@@ -27,14 +27,16 @@
 
 #include "Galois/Galois.h"
 #include "Galois/Runtime/WorkList.h"
-#include "Galois/util/Atomic.h"
+#include "Galois/util/Accumulator.h"
 
 #include "DESabstractMain.h"
 
-typedef Galois::GAtomic<int> AtomicInteger;
+
+static const bool DEBUG = false;
+
+using Galois::PerCPUcounter;
 
 class DESunordered: public DESabstractMain {
-
 
   /**
    * contains the loop body, called 
@@ -42,16 +44,16 @@ class DESunordered: public DESabstractMain {
    */
   struct process {
     Graph& graph;
-    std::vector<bool>& onWlFlags;
-    AtomicInteger& numEvents;
-    AtomicInteger& numIter;
+    std::vector<unsigned int>& onWlFlags;
+    PerCPUcounter& numEvents;
+    PerCPUcounter& numIter;
 
     
     process (
     Graph& graph,
-    std::vector<bool>& onWlFlags,
-    AtomicInteger& numEvents,
-    AtomicInteger& numIter)
+    std::vector<unsigned int>& onWlFlags,
+    PerCPUcounter& numEvents,
+    PerCPUcounter& numIter)
       : graph (graph), onWlFlags (onWlFlags), numEvents (numEvents), numIter (numIter) {}
 
 
@@ -80,9 +82,13 @@ class DESunordered: public DESabstractMain {
 
         // should be past the fail-safe point by now
 
+        if (DEBUG) {
+          // DEBUG
+          printf ("%d processing : %s\n", ThreadPool::getMyID (), srcObj->toString ().c_str ());
+        }
 
         int proc = srcObj->simulate(graph, activeNode); // number of events processed
-        numEvents += proc;
+        numEvents.get () += proc;
 
         for (Graph::neighbor_iterator i = graph.neighbor_begin (activeNode, Galois::NONE)
             , ei = graph.neighbor_end (activeNode, Galois::NONE); i != ei; ++i) {
@@ -94,9 +100,14 @@ class DESunordered: public DESabstractMain {
 
           if (dstObj->isActive ()) {
 
-            if (!onWlFlags[dstObj->getId ()]) {
-              onWlFlags[dstObj->getId ()] = true;
+            if (onWlFlags[dstObj->getId ()] == 0) {
+              if (DEBUG) {
+                // DEBUG
+                printf ("%d Added %d neighbor: %s\n" , ThreadPool::getMyID (), onWlFlags[dstObj->getId ()], dstObj->toString ().c_str ());
+              }
+              onWlFlags[dstObj->getId ()] = 1;
               lwl.push (dst);
+
             }
 
           }
@@ -106,12 +117,22 @@ class DESunordered: public DESabstractMain {
 
         if (srcObj->isActive()) {
           lwl.push (activeNode);
+          
+          if (DEBUG) {
+            //DEBUG
+            printf ("%d Added %d self: %s\n" , ThreadPool::getMyID (), onWlFlags[srcObj->getId ()], srcObj->toString ().c_str ());
+          }
+
         }
         else {
-          onWlFlags[srcObj->getId ()] = false;
+          onWlFlags[srcObj->getId ()] = 0;
+          if (DEBUG) {
+            //DEBUG
+            printf ("%d not adding %d self: %s\n" , ThreadPool::getMyID (), onWlFlags[srcObj->getId ()], srcObj->toString ().c_str ());
+          }
         }
 
-        ++numIter;
+        ++(numIter.get ());
 
     }
   };
@@ -125,31 +146,37 @@ class DESunordered: public DESabstractMain {
    * flag corresponding to a node is set to True if it was previously False. The flag reset to False
    * when the node is removed from the worklist. This list of flags provides a cheap way of
    * implementing set semantics.
+   *
+   * Normally, one would use a vector<bool>, but std::vector<bool> uses bit vector implementation,
+   * where different indices i!=j share a common memory word. To protect against concurrent
+   * accesses, we would need to acquire abstract locks corresponding to the memory word rather than acquiring locks
+   * on locations iand j. This requires knowledge of std::vector<bool> implementation. Instead, we use a
+   * std::vector<unsigned int> so that each index i!=j is stored in a separate word and we can
+   * acquire lock on i safely.
    */
   virtual void runLoop (const SimInit<Graph, GNode>& simInit) {
     const std::vector<GNode>& initialActive = simInit.getInputNodes();
 
 
-    std::vector<bool> onWlFlags (simInit.getNumNodes (), false);
+    std::vector<unsigned int> onWlFlags (simInit.getNumNodes (), 0);
     // set onWlFlags for input objects
     for (std::vector<GNode>::const_iterator i = simInit.getInputNodes ().begin (), ei = simInit.getInputNodes ().end ();
         i != ei; ++i) {
       SimObject* srcObj = graph.getData (*i, Galois::NONE);
-      onWlFlags[srcObj->getId ()] = true;
+      onWlFlags[srcObj->getId ()] = 1;
     }
 
 
 
-    AtomicInteger numEvents(0);
-    AtomicInteger numIter(0);
-
+    PerCPUcounter numEvents;
+    PerCPUcounter numIter;
 
     process p(graph, onWlFlags, numEvents, numIter);
 
     Galois::for_each < GaloisRuntime::WorkList::FIFO<GNode> > (initialActive.begin (), initialActive.end (), p);
 
-    std::cout << "Number of events processed = " << (int)numEvents << std::endl;
-    std::cout << "Number of iterations performed = " << (int)numIter << std::endl;
+    std::cout << "Number of events processed = " << numEvents.get () << std::endl;
+    std::cout << "Number of iterations performed = " << numIter.get () << std::endl;
   }
 
   virtual bool isSerial () const { return false; }
@@ -157,3 +184,4 @@ class DESunordered: public DESabstractMain {
 
 
 #endif // _DES_UNORDERED_H_
+

@@ -123,7 +123,7 @@ public:
    */
   const std::string toString () const {
     std::ostringstream ss;
-    ss << getRecvTime;
+    ss << getRecvTime ();
     return ss.str ();
   }
 

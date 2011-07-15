@@ -83,7 +83,7 @@ protected:
        // do nothing
      } else {
        // update the inputs of fanout gates
-       LogicUpdate lu = (LogicUpdate) event.getAction();
+       const LogicUpdate& lu = (LogicUpdate) event.getAction();
        if (this->BaseOneInputGate::inputName == (lu.getNetName())) {
          this->BaseOneInputGate::inputVal = lu.getNetVal();
          this->BaseOneInputGate::outputVal = this->BaseOneInputGate::inputVal;

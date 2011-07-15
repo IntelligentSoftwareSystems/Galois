@@ -71,7 +71,7 @@ protected:
    * @param le the le
    */
   void netNameMismatch (const LogicUpdate& le) const {
-    std::cerr << "Received logic event : " << le.toString () << " with mismatching net name, this = " << 
+    std::cerr << "Received logic update : " << le.toString () << " with mismatching net name, this = " <<
       AbsSimObj::toString () << std::endl;
     exit (-1);
   }
@@ -108,7 +108,7 @@ protected:
 
       if (dstGate == NULL) {
         std::cerr << "dynamic_cast failed" << std::endl;
-        assert (false);
+        abort ();
 
       } else {
         const std::string& outNet = getOutputName();

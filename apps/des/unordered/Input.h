@@ -82,7 +82,7 @@ protected:
 
     } else {
 
-      LogicUpdate lu = (LogicUpdate) event.getAction ();
+     const LogicUpdate& lu = (LogicUpdate) event.getAction ();
       if (this->BaseOneInputGate::outputName == lu.getNetName()) {
         this->BaseOneInputGate::inputVal = lu.getNetVal();
 

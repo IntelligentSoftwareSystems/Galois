@@ -94,7 +94,7 @@ protected:
 
     } else {
       // update the inputs of fanout gates
-      LogicUpdate lu =  event.getAction();
+      const LogicUpdate& lu =  event.getAction();
       if (inputName == (lu.getNetName())) {
         inputVal = lu.getNetVal();
       } else {

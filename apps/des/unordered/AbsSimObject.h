@@ -49,8 +49,12 @@
 
 template <typename GraphTy, typename GNodeTy, typename EventTy>
 class AbsSimObject: public SimObject {
+public:
+  static size_t NEVENTS_PER_ITER;
 
 private:
+
+  static const bool DEBUG = false;
 
   typedef std::priority_queue<EventTy, std::vector<EventTy>, EventRecvTimeTieBrkCmp<EventTy> > PriorityQueue;
 
@@ -66,8 +70,7 @@ private:
   /** The number of inputs. */
   size_t numInputs;
 
-  /** store the incoming events on each input */
-  std::vector<PriorityQueue> inputEvents;
+  // std::vector<PriorityQueue> inputEvents;
 
   /** store the timestamp of latest event received on an input line */
   std::vector<SimTime> inputTimes;
@@ -75,17 +78,20 @@ private:
   /** local clock value, is the minimum of events received on all input lines */
   SimTime clock;
 
-  /** readyEvents set, is a pq of events that can safely be processed, if this AbsSimObject is
-   * active.  If minRecv is the min. of the latest timestamp received on any event i.e. min of inputTimes
-    then events with timestamp <= minRecv go into readyEvents
+  /** 
+   * Events received on any input go into pendingEvents and are stored here until processed.
+   * readyEvents set, is a set of events that can safely be processed, if this AbsSimObject is
+   * active.  If minRecv is the min. of the latest timestamp received on any input i.e. min of inputTimes[i] for all i
+   * then events with timestamp <= minRecv go into readyEvents set. readyEvents set is a 
+   * subset of pendingEvents.
    */
-  PriorityQueue readyEvents;
+  PriorityQueue pendingEvents;
 
   /** time stamp of the  last message sent on output
   protected SimTime lastSent = 0; */
 
 
-  /** whether it can process some events received on the input. i.e. if readyEvents
+  /** whether it can process some events received on the input. i.e. if pendingEvents
     is computed, it'll be non-empty
    */
   bool active;
@@ -102,15 +108,17 @@ private:
     this->id = idCntr++;
 
     this->numInputs = numInputs;
-    inputEvents.resize (numInputs);
     inputTimes.resize (numInputs);
 
     for (size_t i = 0; i < numInputs; ++i) {
-      inputTimes[i] = 0;
-      inputEvents[i] = PriorityQueue();
+      inputTimes[i] = SimTime(0);
     }
 
-    readyEvents = PriorityQueue();
+    pendingEvents = PriorityQueue();
+
+    // NEVENTS_PER_ITER * numInputs because each input can get fed with NEVENTS_PER_ITER on average
+    // pendingEvents.reserve (numInputs * NEVENTS_PER_ITER);
+
     clock = 0;
 
   }
@@ -124,14 +132,12 @@ private:
     init(that.numInputs, 1);
     for (size_t i = 0; i < numInputs; ++i) {
       this->inputTimes[i] = that.inputTimes[i];
+    }
 
-      PriorityQueue cpyQ(that.inputEvents[i]);
-
-      while (!cpyQ.empty ()) {
-        this->inputEvents[i].push (cpyQ.top ());
-        cpyQ.pop ();
-      }
-
+    PriorityQueue cpyQ(that.pendingEvents);
+    while (!cpyQ.empty ()) {
+      this->pendingEvents.push (cpyQ.top ());
+      cpyQ.pop ();
     }
 
     // defensive
@@ -139,41 +145,13 @@ private:
   }
 
   /**
-   * compute the minimum time of a message received so far
-   * for every input
-   * if pq is not empty then take the time of min event in the pq
-   * else take the time of the last event received on the input.
-   */
-  /*
-  protected void computeClock() {
-    SimTime min = INFINITY_SIM_TIME;
-    for(int i = 0; i < numInputs; ++i) {
-      PriorityQueue<Event> pq = this->inputEvents[i];
-      if(!pq.isEmpty()) {
-        if(pq.peek().recvTime < min ) {
-          min = pq.peek().recvTime;
-        }
-      }
-      else {
-        min = this->inputTimes[i];
-      }
-    }
-
-    this->clock = min;
-
-  }
-   */
-
-  /**
    * compute the min. of the timestamps of latest message received so far
    * for every input
-   * if pq is not empty then take the time of min event in the pq
-   * else take the time of the last event received on the input.
    */
-  void computeClock() {
+  void updateClock() {
     SimTime min = INFINITY_SIM_TIME;
     for (size_t i = 0; i < numInputs; ++i) {
-      if (min < this->inputTimes[i]) {
+      if (this->inputTimes[i] < min) {
         min = this->inputTimes[i];
       }
     }
@@ -185,30 +163,6 @@ private:
   // void sendEvent(size_t outIndex, SimObject target, Event<?> e) {
     // //TODO: not implemented yet
   // }
-
-  /**
-   * Populate ready events.
-   *
-   * computes a PriorityQueue of events that have recvTime <= this->clock
-   * called after @see computeClock () has been called
-   */
-  void populateReadyEvents() {
-    assert (readyEvents.empty ());
-    for (typename std::vector<PriorityQueue>::iterator i = inputEvents.begin (), e = inputEvents.end (); i != e; ++i) {
-      PriorityQueue& pq = *i;
-      while (!pq.empty () && pq.top ().getRecvTime () <= this->clock) {
-        this->readyEvents.push (pq.top ());
-        pq.pop ();
-      }
-
-      // In while(!pq.isEmpty() && pq.peek().recvTime <= this.clock) {
-      // changing 'while' to 'if' results into processing one event per input per iteration
-      // this increases parallelism, 'while' reduces parallelism but increases the 
-      // work performed per iteration (total work remains the same).
-    }
-
-  }
-
 
 public:
   /**
@@ -242,9 +196,10 @@ public:
    */
   void recvEvent(size_t inputIndex, const EventTy& e) {
 
-    assert (inputIndex >= 0 && inputIndex < inputEvents.size ());
+    assert (inputIndex >= 0 && inputIndex < numInputs);
 
-    this->inputEvents[inputIndex].push (e);
+    this->pendingEvents.push (e);
+
     if (this->inputTimes[inputIndex] < e.getRecvTime()) {
       this->inputTimes[inputIndex] = e.getRecvTime();
     }
@@ -270,23 +225,34 @@ public:
    * Computes the set of readyEvents, then executes the events
    * in time-stamp order
    *
+   * Here the set of readyEvents is the subset of pendingEvents that have a 
+   * recvTime <= this->clock
+   *
+   * The parameter NEVENTS_PER_ITER defines an upper limit on the number of ready events
+   * that can be processed in one call to simulate
+   *
    * @param graph: the graph containg simulation objects as nodes and communication links as edges
    * @param myNode the node in the graph that has this SimObject as its node data
    * @return number of events ready to be executed.
    */
   size_t simulate(GraphTy& graph, GNodeTy& myNode) {
-    computeClock();// update the clock, can do at the end if null msgs are propagated initially
-    populateReadyEvents(); // fill up readyEvents,
-    size_t retVal = this->readyEvents.size();
+    assert (isActive ());
 
-    while (!readyEvents.empty()) {
-      EventTy e = readyEvents.top ();
-      readyEvents.pop ();
+    updateClock();// update the clock, 
+
+    size_t retVal = 0;
+
+    while ((!pendingEvents.empty())
+        && (pendingEvents.top ().getRecvTime () <= this->clock)
+        && (retVal < NEVENTS_PER_ITER)) {
+
+      EventTy e = pendingEvents.top ();
+      pendingEvents.pop ();
 
       //DEBUG
-      if (!readyEvents.empty ()) {
-        EventTy curr (e);
-        EventTy next (readyEvents.top ());
+      if (!pendingEvents.empty ()) {
+        const EventTy& curr = e;
+        const EventTy& next = (pendingEvents.top ());
 
         // assert (EventRecvTimeTieBrkCmp<EventTy> ().compare (prev, curr) < 0);
         if (EventRecvTimeTieBrkCmp<EventTy> ().compare (curr, next) >= 0) {
@@ -296,12 +262,14 @@ public:
       }
 
 
-      assert (graph.getData(myNode, Galois::Graph::NONE) == this); // should already own a lock
+      assert (graph.getData(myNode, Galois::NONE) == this); // should already own a lock
 
       execEvent(graph, myNode, e);
+
+      ++retVal;
     }
 
-    return retVal;
+    return (retVal);
   }
 
 
@@ -317,25 +285,52 @@ public:
   }
 
   /**
-   * active is set to true if there exists an event on each input pq
-   * or if an input pq is empty and an event with INFINITY_SIM_TIME has been received
+   * active is set to true if there exists a pending event(s) on each input pq
+   * or if one input pq (not all) is empty and an event with INFINITY_SIM_TIME has already been received
    * telling that no more events on this input will be received.
+   *
+   * We can tell if there are pending events on input i if inputTimes[i] >= pendingEvents.top ()
+   * We can tell if there are no pending events by checking pendingEvents.empty ();
+   *
    */
   void updateActive() {
+
+    bool allEmpty = pendingEvents.empty ();
+
     bool isWaiting = false; // is Waiting on an input event
-    // i.e. pq of the input is empty and the time of last evetn is not INFINITY_SIM_TIME
-    bool allEmpty = true;
-    for (size_t i = 0; i < numInputs; ++i) {
-      if (inputEvents[i].empty ()) {
-        if (inputTimes[i] < INFINITY_SIM_TIME) {
+
+    if (allEmpty) {
+      // pendingEvents is empty, but how do we know whether this is the beginning of simulation
+      // or the end. In the beginning we are waiting on input events with empty queue in the
+      // end we're not.
+      // we are not waiting only if the time stamp of latest event is >= INFINITY_SIM_TIME
+      for (size_t i = 0; i < numInputs; ++i) {
+        if (inputTimes[i] <  INFINITY_SIM_TIME) {
           isWaiting = true;
+          break;
         }
-      } else {
-        allEmpty = false;
+      }
+
+    } else {
+      // still some pending events to process
+      // what we need to determine now is whether we can process the pending events safely
+      // which can be determined by checking pendingEvents.top () against inputTimes[i] for input i
+      // because if inputTimes[i] < pendingEvents.top () then we cannot safely process any
+      // pendingEvents because there's a possibility of receiving more events on input i which have
+      // a time stamp less that pendingEvents.top ()
+
+
+      const SimTime& top = pendingEvents.top ().getRecvTime ();
+      for (size_t i = 0; i < numInputs; ++i) {
+        if (inputTimes[i] < top) {
+          isWaiting = true;
+          break;
+        }
       }
     }
-    active = !allEmpty && !isWaiting;
 
+
+    active = !allEmpty && !isWaiting;
   }
 
 
@@ -345,6 +340,18 @@ public:
   virtual const std::string toString() const {
     std::ostringstream ss;
     ss << "SimObject-" << id << " ";
+    if (DEBUG) {
+      for (size_t i = 0; i < numInputs; ++i) {
+        ss << ", inputTimes[" << i << "] = " << inputTimes[i];
+      }
+      ss << std::endl;
+
+      ss << ", active = " << active << ", clock = " << clock << ", pendingEvents.size() = " << pendingEvents.size ()
+          << ", pendingEvent.top () = " << pendingEvents.top ().toString () << std::endl;
+
+
+    }
+
     return ss.str ();
   }
 
@@ -367,4 +374,6 @@ public:
 template <typename GraphTy, typename GNodeTy, typename EventTy>
 size_t AbsSimObject<GraphTy, GNodeTy, EventTy>::idCntr = 0;
 
+template <typename GraphTy, typename GNodeTy, typename EventTy>
+size_t AbsSimObject<GraphTy, GNodeTy, EventTy>::NEVENTS_PER_ITER = 1;
 #endif 

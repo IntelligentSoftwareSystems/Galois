@@ -249,7 +249,7 @@ private:
 
       } else {
         std::cerr << "Found a gate with unknown name: " << grec.getName() << std::endl;
-        assert (false);
+        abort ();
       }
 
     }

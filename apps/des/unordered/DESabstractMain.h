@@ -47,7 +47,7 @@
 static const char* name = "Discrete Event Simulation";
 static const char* description = "Uses Chandy-Misra's algorithm, which is unordered, to perform logic circuit simulations";
 static const char* url = "http://iss.ices.utexas.edu/lonestar/des.html";
-static const char* help = "<progname> netlistFile";
+static const char* help = "<progname> netlistFile [NEVENTS_PER_ITER]";
 
 /**
  * The Class DESabstractMain holds common functionality for {@link DESunorderedSerial} and {@link DESunordered}.
@@ -56,6 +56,8 @@ class DESabstractMain {
 public:
   typedef SimObject::Graph Graph;
   typedef SimObject::GNode GNode;
+
+  typedef AbsSimObject<Graph, GNode, Event<GNode, LogicUpdate> > AbsSimObj;
 
 protected:
 
@@ -93,15 +95,28 @@ public:
   void run(int argc, const char* argv[]) {
     std::vector<const char*> args = parse_command_line (argc, argv, help);
 
-
-    if (args.size () < 1) {
+    if (args.size () < 1 || args.size () > 2) {
       std::cerr << help << std::endl;
-      assert (false);
+      abort ();
     }
 
     printBanner(std::cout, name, description, url);
 
     const char* netlistFile = args[0];
+
+    if (args.size () == 2) {
+      size_t epi = AbsSimObj::NEVENTS_PER_ITER;
+      std::istringstream iss (args[1]);
+      iss >> epi;
+      
+      assert (epi >= 0);
+      AbsSimObj::NEVENTS_PER_ITER = epi;
+
+      printf ("Processing %zd events per iteration\n", epi);
+    }
+
+
+
     SimInit<Graph, GNode> simInit(graph, netlistFile);
 
 
@@ -161,7 +176,7 @@ public:
         std::cerr << outObj->toString () << std::endl;
       }
 
-      assert (false);
+      abort ();
     } else {
       std::cout << ">>> OK: Simulation verified as correct" << std::endl;
     }
