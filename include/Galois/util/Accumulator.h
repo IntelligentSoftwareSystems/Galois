@@ -24,6 +24,56 @@ kind.
 
 namespace Galois {
 
+/**
+ * GReducible stores per thread values
+ * of a variable of type T
+ *
+ * At the end of a for_each section, the final value is obtained by performing
+ * a reduction on per thread values using the
+ * provided binary functor BinFunc
+ * 
+ */
+
+template <typename T, typename BinFunc>
+class GReducible: public GaloisRuntime::PerCPU_merge<T> {
+  typedef GaloisRuntime::PerCPU_merge<T> SuperType;
+
+  static BinFunc _func;
+
+  static BinFunc getFunc () {
+    return _func;
+  }
+
+  static void reduce (T& lhs, T& rhs) {
+    lhs = getFunc() (lhs, rhs);
+  }
+
+public:
+  /**
+   * @param val initial per thread value
+   * @param func the binary functor acting as the reduction operator
+   */
+  explicit GReducible (const T& val = T(), BinFunc func = BinFunc()) 
+    : GaloisRuntime::PerCPU_merge<T> (reduce, val) {
+    _func = func;
+  }
+
+  /**
+   * updates the thread local value
+   * by applying the reduction operator to 
+   * current and newly provided value
+   *
+   * @param _newVal
+   */
+  const T& update (const T& _newVal) {
+    reduce (SuperType::get (), _newVal);
+    return SuperType::get ();
+  }
+};
+
+
+typedef GReducible<int, std::plus<int> > PerCPUcounter;
+
 template<typename T>
 class accumulator {
   GaloisRuntime::PerCPU_merge<T> data;

@@ -57,18 +57,18 @@ public:
   T operator--(int) {
     return __sync_fetch_and_sub(&val, 1);
   }
-  //! conversion operator to base data type (atomic get)
+  //! conversion operator to base data type 
   operator T() const {
     return val;
   }
-  //! atomic assign
+  //! assign from underlying type
   T operator=(const T& i) {
     val = i;
     return i;
   }
-  //! atomic assign
+  //! assignment operator
   T operator=(const GAtomic& i) {
-    T iv = (int)i;
+    T iv = (T)i;
     val = iv;
     return iv;
   }
@@ -78,8 +78,38 @@ public:
   }
 };
 
+template<>
+class GAtomic<bool> {
+  bool val;
+public:
+  //! Initialize with a value
+  explicit GAtomic(bool i) :val(i) {}
+
+  //! conversion operator to base data type 
+  operator bool() const {
+    return val;
+  }
+
+  //! assign from underlying type
+  bool operator=(bool i) {
+    val = i;
+    return i;
+  }
+  //! assignment operator
+  bool operator=(const GAtomic<bool>& i) {
+    bool iv = (bool)i;
+    val = iv;
+    return iv;
+  }
+  //! direct compare and swap
+  bool cas (bool expected, bool updated) {
+    return __sync_bool_compare_and_swap (&val, expected, updated);
+  }
+};
+
 }
 
 
 
 #endif //  _GALOIS_UTIL_ATOMIC_H
+

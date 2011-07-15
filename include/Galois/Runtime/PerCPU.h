@@ -113,9 +113,13 @@ class PerCPU_merge : public PerCPU<T>, public ThreadAware{
   }
 
 public:
-  explicit PerCPU_merge(void (*func)(T&, T&))
-    :reduce(func)
+  explicit PerCPU_merge (void (*func) (T&, T&))
+    : PerCPU<T>(), reduce (func) {}
+
+  explicit PerCPU_merge(void (*func)(T&, T&), const T& val)
+    :PerCPU<T> (val), reduce(func)
   {}
+
   virtual void ThreadChange(bool starting) {
     if (!starting)
       __reduce();
