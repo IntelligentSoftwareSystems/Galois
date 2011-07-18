@@ -107,10 +107,10 @@ static Graph graph;
 static std::vector<GNode> literals;
 static std::vector<GNode> clauses;
 
-static Galois::accumulator<unsigned int> nontrivial;
+static Galois::GAccumulator<unsigned int> nontrivial;
 
-static Galois::reduce_max<double> maxBias;
-static Galois::reduce_average<double> averageBias;
+static Galois::GReduceMax<double> maxBias;
+static Galois::GReduceAverage<double> averageBias;
 
 //interesting parameters:
 static const double epsilon = 0.000001;
@@ -302,8 +302,8 @@ struct update_biases {
     idata.value = (BiasP > BiasN);
 
     assert(d != NAN && -d != NAN);
-    maxBias.insert(d);
-    averageBias.insert(d);
+    maxBias.update(d);
+    averageBias.update(d);
   }
 };
 

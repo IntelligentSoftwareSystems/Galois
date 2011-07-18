@@ -58,7 +58,10 @@ struct PerCPUValue{
 		mincutInc = 0;
 	}
 };
-void merge(PerCPUValue& a, PerCPUValue& b);
+
+struct mergeP {
+  void operator()(PerCPUValue& a, PerCPUValue& b);
+};
 
 int intlog2(int a);
 #endif /* GMETISCONFIG_H_ */

@@ -103,30 +103,6 @@ public:
 };
 
 template<typename T>
-class PerCPU_merge : public PerCPU<T>, public ThreadAware{
-  void (*reduce)(T&, T&);
-
-  void __reduce() {
-    if (reduce)
-      for (unsigned int i = 1; i < PerCPU<T>::num; ++i)
-	reduce(PerCPU<T>::datum[0].data, PerCPU<T>::datum[i].data);
-  }
-
-public:
-  explicit PerCPU_merge (void (*func) (T&, T&))
-    : PerCPU<T>(), reduce (func) {}
-
-  explicit PerCPU_merge(void (*func)(T&, T&), const T& val)
-    :PerCPU<T> (val), reduce(func)
-  {}
-
-  virtual void ThreadChange(bool starting) {
-    if (!starting)
-      __reduce();
-  }
-};
-
-template<typename T>
 class PerLevel {
   cache_line_storage<T>* datum;
   unsigned int num;

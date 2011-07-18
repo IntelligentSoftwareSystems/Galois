@@ -249,7 +249,7 @@ int gNodeToInt(GNode node){
 	return node.getData().getNodeId();
 }
 
-void merge(PerCPUValue& a, PerCPUValue& b){
+void mergeP::operator()(PerCPUValue& a, PerCPUValue& b){
 	a.mincutInc+=b.mincutInc;
 	a.changedBndNodes.insert(b.changedBndNodes.begin(), b.changedBndNodes.end());
 }

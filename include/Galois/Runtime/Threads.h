@@ -124,14 +124,14 @@ class ThreadAware : public HIDDEN::ThreadAwareHook {
   friend class ThreadPool;
   static void NotifyOfChange(bool starting);
 
-public:
-  ThreadAware();
-  virtual ~ThreadAware();
-
   //This is called to notify the start and end of a parallel region
   //starting = true -> parallel code is initializing
   //starting = false -> parallel code is ending
   virtual void ThreadChange(bool starting) = 0;
+
+public:
+  ThreadAware();
+  virtual ~ThreadAware();
 
 };
 

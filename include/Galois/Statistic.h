@@ -27,12 +27,12 @@ kind.
 namespace Galois {
 
 template<typename T>
-class statistic : public accumulator<T> {
+class statistic : public GAccumulator<T> {
   const char* name;
 public:
   statistic(const char* _name) :name(_name) {}
   ~statistic() {
-    GaloisRuntime::reportStatSum(name, accumulator<T>::get());
+    GaloisRuntime::reportStatSum(name, GAccumulator<T>::get());
   }
 };
 

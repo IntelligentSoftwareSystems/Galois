@@ -23,9 +23,8 @@
 #ifndef GALOIS_RUNTIME_INSBAG_H
 #define GALOIS_RUNTIME_INSBAG_H
 
-#include "Galois/Runtime/PerCPU.h"
+#include "Galois/util/Accumulator.h"
 #include "Galois/Runtime/mm/mem.h" 
-//#include "Galois/Runtime/mm/BlockAlloc.h"
 #include <list>
 
 #include <boost/functional.hpp>
@@ -50,20 +49,23 @@ class galois_insert_bag {
    				  boost::intrusive::base_hook<InsBagBaseHook>,
    				  boost::intrusive::constant_time_size<false>
    				  > ListTy;
-   PerCPU_merge<ListTy> heads;
+
+  struct splicer {
+    void operator()(ListTy& lhs, ListTy& rhs) {
+      if (!rhs.empty())
+	lhs.splice(lhs.begin(), rhs);
+    }
+  };
+
+  Galois::GReducible<ListTy, splicer> heads;
   
   
   //GaloisRuntime::MM::TSBlockAlloc<holder> allocSrc;
   GaloisRuntime::MM::FixedSizeAllocator allocSrc;
 
-  static void merge(ListTy& lhs, ListTy& rhs) {
-    if (!rhs.empty())
-      lhs.splice(lhs.begin(), rhs);
-  }
-
 public:
   galois_insert_bag()
-    :heads(merge), allocSrc(sizeof(holder))
+    :allocSrc(sizeof(holder))
   {}
 
   ~galois_insert_bag() {

@@ -21,6 +21,7 @@ kind.
 #define __GALOIS_ACCUMULATOR_H
 
 #include "Galois/Runtime/PerCPU.h"
+#include <boost/function.hpp>
 
 namespace Galois {
 
@@ -35,17 +36,19 @@ namespace Galois {
  */
 
 template <typename T, typename BinFunc>
-class GReducible: public GaloisRuntime::PerCPU_merge<T> {
-  typedef GaloisRuntime::PerCPU_merge<T> SuperType;
+class GReducible: public GaloisRuntime::ThreadAware {
+  BinFunc _func;
+  GaloisRuntime::PerCPU<T> _data;
 
-  static BinFunc _func;
-
-  static BinFunc getFunc () {
-    return _func;
+  void reduce() {
+    T& d0 = _data.get(0);
+    for (unsigned int i = 1; i < _data.size(); ++i)
+      _func(d0, _data.get(i));
   }
 
-  static void reduce (T& lhs, T& rhs) {
-    lhs = getFunc() (lhs, rhs);
+  virtual void ThreadChange(bool starting) {
+    if (!starting)
+      reduce();
   }
 
 public:
@@ -53,10 +56,14 @@ public:
    * @param val initial per thread value
    * @param func the binary functor acting as the reduction operator
    */
-  explicit GReducible (const T& val = T(), BinFunc func = BinFunc()) 
-    : GaloisRuntime::PerCPU_merge<T> (reduce, val) {
-    _func = func;
-  }
+  explicit GReducible (const T val)
+    : _data(val) { }
+  explicit GReducible (BinFunc F)
+    : _func(F) { }
+  GReducible (const T val, BinFunc F)
+    : _func(F), _data(val) { }
+
+  GReducible () {}
 
   /**
    * updates the thread local value
@@ -66,99 +73,98 @@ public:
    * @param _newVal
    */
   const T& update (const T& _newVal) {
-    reduce (SuperType::get (), _newVal);
-    return SuperType::get ();
-  }
-};
-
-
-typedef GReducible<int, std::plus<int> > PerCPUcounter;
-
-template<typename T>
-class accumulator {
-  GaloisRuntime::PerCPU_merge<T> data;
-
-  static void acc(T& lhs, T& rhs) {
-    lhs += rhs;
+    T& lhs = _data.get();
+    _func(lhs, _newVal);
+    return lhs;
   }
 
-public:
-  accumulator() :data(acc) {}
-
-  accumulator& operator+=(const T& rhs) {
-    data.get() += rhs;
-    return *this;
-  }
-
-  accumulator& operator-=(const T& rhs) {
-    data.get() -= rhs;
-    return *this;
-  }
- 
-  const T& get() const {
-    return data.get();
+  /**
+   * returns the thread local value if in a parallel loop or
+   * the final reduction if in serial mode
+   */
+  T& get() {
+    return _data.get();
   }
 
   void reset(const T& d) {
-    data.reset(d);
+    _data.reset(d);
   }
-
 };
 
-template<typename T>
-class reduce_max {
-  GaloisRuntime::PerCPU_merge<T> data;
 
-  static void acc(T& lhs, T& rhs) {
-    lhs = std::max(lhs, rhs);
+//Derived types
+
+template<typename BinFunc>
+struct ReduceAssignWrap {
+  BinFunc F;
+  ReduceAssignWrap(BinFunc f = BinFunc()) :F(f) {}
+  template<typename T>
+  void operator()(T& lhs, const T& rhs) {
+    lhs = F(lhs, rhs);
   }
-public:
-  reduce_max() :data(acc) {}
+};
 
-  reduce_max& insert(const T& rhs) {
-    T& d = data.get();
-    if (d < rhs)
-      d = rhs;
+typedef GReducible<int, ReduceAssignWrap<std::plus<int> > > PerCPUcounter;
+
+template<typename T>
+class GAccumulator : public GReducible<T, ReduceAssignWrap<std::plus<T> > > {
+public:
+  GAccumulator& operator+=(const T& rhs) {
+    update(rhs);
     return *this;
   }
 
-  const T& get() const {
-    return data.get();
+  GAccumulator& operator-=(const T& rhs) {
+    update(-rhs);
+    return *this;
   }
-
-  void reset(const T& d) {
-    data.reset(d);
-  }
-
-
 };
 
+namespace HIDDEN {
 template<typename T>
-class reduce_average {
+struct gmax {
+  void operator()(T& lhs, const T& rhs) const {
+    lhs = std::max(lhs,rhs);
+  }
+};
+}
+
+template<typename T>
+class GReduceMax : public GReducible<T, HIDDEN::gmax<T> > {};
+
+template<typename T>
+class GReduceAverage {
   typedef std::pair<T, unsigned> TP;
-  GaloisRuntime::PerCPU_merge<TP> data;
-
-  static void acc(TP& lhs, TP& rhs) {
-    lhs.first += rhs.first;
-    lhs.second += rhs.second;
-  }
+  struct AVG {
+    void operator() (TP& lhs, const TP& rhs) const {
+      lhs.first += rhs.first;
+      lhs.second += rhs.second;
+    }
+  };
+  GReducible<std::pair<T, unsigned>, AVG> data;
 public:
-  reduce_average() :data(acc) {}
-
-  reduce_average& insert(const T& rhs) {
-    TP& d = data.get();
-    d.first += rhs;
-    d.second++;
-    return *this;
+  void update (const T& _newVal) {
+    data.update(std::make_pair(_newVal, 1));
   }
 
-  T get() const {
+  /**
+   * returns the thread local value if in a parallel loop or
+   * the final reduction if in serial mode
+   */
+  const T get() {
     const TP& d = data.get();
     return d.first / d.second;
   }
 
   void reset(const T& d) {
-    data.reset(std::make_pair(d,0) );
+    data.reset(std::make_pair(d, 0));
+  }
+
+  GReduceAverage& insert(const T& rhs) {
+    TP& d = data.get();
+    d.first += rhs;
+    d.second++;
+    return *this;
   }
 };
 

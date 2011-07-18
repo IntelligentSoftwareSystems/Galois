@@ -57,8 +57,16 @@ typedef Graph::GraphNode GNode;
 Graph* G;
 int NumNodes;
 
+struct merge {
+  void operator()(std::vector<double>& lhs, std::vector<double>& rhs) {
+    if (lhs.size() < rhs.size())
+      lhs.resize(rhs.size());
+    for (unsigned int i = 0; i < rhs.size(); i++)
+      lhs[i] += rhs[i];
+  }
+};
 
-GaloisRuntime::PerCPU<std::vector<double> >* CB;
+Galois::GReducible<std::vector<double>, merge >* CB;
 
 #if USE_GLOBALS
 GaloisRuntime::PerCPU<std::vector<GNode>*> SQG;
@@ -245,14 +253,6 @@ struct process {
   }
 };
 
-
-void merge(std::vector<double>& lhs, std::vector<double>& rhs) {
-    if (lhs.size() < rhs.size())
-    lhs.resize(rhs.size());
-  for (unsigned int i = 0; i < rhs.size(); i++)
-    lhs[i] += rhs[i];
-}
-
 // Verification for reference torus graph inputs. 
 // All nodes should have the same betweenness value.
 void verify() {
@@ -309,7 +309,7 @@ int main(int argc, const char** argv) {
 
   NumNodes = G->size();
 
-  GaloisRuntime::PerCPU_merge<std::vector<double> > cb(merge);
+  Galois::GReducible<std::vector<double>, merge > cb;
   CB = &cb; 
 
   initNodeSuccs();

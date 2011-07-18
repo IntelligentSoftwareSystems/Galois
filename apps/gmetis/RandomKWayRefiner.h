@@ -60,7 +60,7 @@ public:
 		for (int pass = 0; pass < npasses; pass++) {
 			int oldcut = metisGraph->getMinCut();
 
-			GaloisRuntime::PerCPU_merge<PerCPUValue> perCPUValues(merge);
+			Galois::GReducible<PerCPUValue, mergeP> perCPUValues;
 			parallelRefine pr(metisGraph, this, &perCPUValues);
 			Galois::for_each<GaloisRuntime::WorkList::ChunkedFIFO<64, GNode> >(metisGraph->getBoundaryNodes()->begin(), metisGraph->getBoundaryNodes()->end(), pr);
 			metisGraph->incMinCut(perCPUValues.get().mincutInc);
@@ -81,7 +81,7 @@ public:
 
 private:
 
-	void refineOneNode(MetisGraph* metisGraph, GNode n,  GaloisRuntime::PerCPU<PerCPUValue>* perCPUValues) {
+  void refineOneNode(MetisGraph* metisGraph, GNode n,  Galois::GReducible<PerCPUValue, mergeP>* perCPUValues) {
 		GGraph* graph = metisGraph->getGraph();
 		MetisNode& nodeData = n.getData(Galois::CHECK_CONFLICT);
 		if (nodeData.getEdegree() >= nodeData.getIdegree()) {
@@ -239,15 +239,15 @@ private:
 	struct parallelRefine {
 		MetisGraph* metisGraph;
 		RandomKwayEdgeRefiner* refiner;
-		GaloisRuntime::PerCPU<PerCPUValue>* perCPUValues;
-		parallelRefine(MetisGraph* metisGraph, RandomKwayEdgeRefiner* refiner, GaloisRuntime::PerCPU<PerCPUValue>* perCPUValues){
+	  Galois::GReducible<PerCPUValue, mergeP>* perCPUValues;
+	  parallelRefine(MetisGraph* metisGraph, RandomKwayEdgeRefiner* refiner, Galois::GReducible<PerCPUValue, mergeP>* perCPUValues){
 			this->metisGraph = metisGraph;
 			this->refiner = refiner;
 			this->perCPUValues = perCPUValues;
 		}
 		template<typename Context>
 		void operator()(GNode item, Context& lwl) {
-			refiner->refineOneNode(metisGraph, item, perCPUValues);
+		  refiner->refineOneNode(metisGraph, item, perCPUValues);
 		}
 	};
 

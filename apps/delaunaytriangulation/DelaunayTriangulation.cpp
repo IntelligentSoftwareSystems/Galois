@@ -90,11 +90,6 @@ struct process {
   }
 };
 
-template<typename WLTY>
-void triangulate(WLTY& wl) {
-  Galois::for_each<GaloisRuntime::WorkList::dChunkedFIFO<1024> >(wl.begin(), wl.end(), process());
-}
-
 void read_points(const char* filename, TupleList& tuples) {
   double x, y, min_x, max_x, min_y, max_y;
   long numPoints;
@@ -306,7 +301,7 @@ int main(int argc, const char** argv) {
   Galois::setMaxThreads(numThreads);
   Galois::StatTimer T;
   T.start();
-  triangulate(wl);
+  Galois::for_each<GaloisRuntime::WorkList::ChunkedFIFO<512> >(wl.begin(), wl.end(), process());
   T.stop();
   std::cout << "mesh size: " << Mesh->size() << "\n";
 
