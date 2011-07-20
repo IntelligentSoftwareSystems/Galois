@@ -1,4 +1,4 @@
-/** Unordered Agglomerative Clustering -*- C++ -*-
+/** Single source shortest paths -*- C++ -*-
  * @file
  * @section License
  *
@@ -18,289 +18,262 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
- * @author Rashid Kaleem <rashid@cs.utexas.edu>
+ * @section Description
+ *
+ * Agglomerative Clustering.
+ *
+ * @author Rashid Kaleem <rashid.kaleem@gmail.com>
  */
+
 #ifndef NODEWRAPPER_H_
 #define NODEWRAPPER_H_
-#include"Box3d.h"
+#include"LeafNode.h"
 #include"ClusterNode.h"
-#include<vector>
+#include"Box3d.h"
+#include"Point3.h"
 #include<math.h>
-/**
- * This class builds a light tree hierarchy using a bottom-up greedy approach
- * A tree builder object can only be used once
- */
-class NodeWrapper: public Box3d {
+class NodeWrapper :public Box3d{
 public:
-	static const int CONE_RECURSE_DEPTH;// = 4;
-	static const float GLOBAL_SCENE_DIAGONAL;// = 2.0;
-	AbstractNode * light;
-	float coneCos;
-	float x;
-	float y;
-	float z;
+	static const int CONE_RECURSE_SIZE;
+	static const double GLOBAL_SCENE_DIAGONAL;
+
 private:
-	Box3d * dirBox;
-	vector<float>* coneDirs;
-	vector<ClusterNode*>* coneClusters;
-	int descendents;
 
-	//  private long rid;
+	AbstractNode & light;
+	Box3d direction;
+	double coneCosine;
+	Point3 location;
+	Point3 coneDirection;
+	const int descendents;
+	vector<ClusterNode *> coneClusters;
+	const bool cleanLight;
+	NodeWrapper * _l, *_r;
 
 public:
-	NodeWrapper(ClusterNode &inNode) :
-		light(&inNode), x(inNode.getX()), y(inNode.getY()), z(inNode.getZ()) {
-		dirBox=NULL;
-		coneDirs=NULL;
-		coneClusters=NULL;
-		descendents = inNode.size();
-		coneCos = inNode.getConeCos();
-		xMin = x - inNode.getBoxRadiusX();
-		xMax = x + inNode.getBoxRadiusX();
-		yMin = y - inNode.getBoxRadiusY();
-		yMax = y + inNode.getBoxRadiusY();
-		zMin = z - inNode.getBoxRadiusZ();
-		zMax = z + inNode.getBoxRadiusZ();
-		if (coneCos != 1.0) {
-			assert(false && "not yet implemented");
-		}
-		if (dirBox == NULL) {
-			dirBox = new Box3d();
-		}
-		dirBox->addPoint(inNode.getConeDirX(), inNode.getConeDirY(),
-				inNode.getConeDirZ());
-		coneDirs = new vector<float> (3);
-		(*coneDirs)[0] = inNode.getConeDirX();
-		(*coneDirs)[1] = inNode.getConeDirY();
-		(*coneDirs)[2] = inNode.getConeDirZ();
+	/**
+	 *
+	 */
+	NodeWrapper(LeafNode & inNode):light(inNode),location(0),coneDirection(0),descendents(1),cleanLight(false){
+		setBox(inNode.getPoint());
+		direction.setBox(inNode.getDirection());
+		coneCosine=1.0f;
+		coneDirection.set(inNode.getDirection());
+		location.set(getMin());
+		location.add(getMax());
+		location.scale(0.5f);
+		_l=_r=NULL;
 	}
+	/**
+	 *
+	 */
+	NodeWrapper(NodeWrapper & pLeft, NodeWrapper & pRight, vector<double> * coordArr, vector<ClusterNode*> & tempClusterArr)
+				:light(*(new ClusterNode())),
+				location(0),coneDirection(0), descendents(pLeft.descendents + pRight.descendents), cleanLight(true){
+		NodeWrapper * l = &pLeft, *r = &pRight;
+		if( 	(pLeft.location.getX() > pRight.location.getX())  ||
+				( (pLeft.location.getX()==pRight.location.getX()) && (pLeft.location.getY() > pRight.location.getY()) ) ||
+				( (pLeft.location.getX()==pRight.location.getX()) && (pLeft.location.getY() == pRight.location.getY()) && (pLeft.location.getZ() > pRight.location.getZ()) )
+				){
+			l = &pRight;
+			r = &pLeft;
 
-	NodeWrapper(LeafNode &inNode) {
-		descendents = 1;
-		light = &inNode;
-		dirBox=NULL;
-		coneDirs=NULL;
-		coneClusters=NULL;
-		setBox(inNode.getX(), inNode.getY(), inNode.getZ());
-		dirBox = new Box3d();
-		dirBox->setBox(inNode.getDirX(), inNode.getDirY(), inNode.getDirZ());
-		coneCos = 1.0f;
-		coneDirs = new vector<float> (3);
-		(*coneDirs)[0] = inNode.getDirX();
-		(*coneDirs)[1] = inNode.getDirY();
-		(*coneDirs)[2] = inNode.getDirZ();
-		x = 0.5f * (xMax + xMin);
-		y = 0.5f * (yMax + yMin);
-		z = 0.5f * (zMax + zMin);
-	}
-	~NodeWrapper(){
-		if(dirBox!=NULL)
-			delete dirBox;
-		if(coneClusters!=NULL)
-			delete coneClusters;
-		if(coneDirs!=NULL)
-			delete coneDirs;
-	}
-	NodeWrapper(NodeWrapper * leftChild, NodeWrapper * rightChild,
-			vector<float>& tempFloatArr, vector<ClusterNode*> & tempClusterArr) :
-		Box3d() {
-		dirBox=NULL;
-				coneDirs=NULL;
-				coneClusters=NULL;
-
-		descendents = (leftChild->descendents + rightChild->descendents);
-		if ((leftChild->x > rightChild->x) || ((leftChild->x == rightChild->x)
-				&& (leftChild->y > rightChild->y)) || ((leftChild->x
-				== rightChild->x) && (leftChild->y == rightChild->y)
-				&& (leftChild->z > rightChild->z))) {
-			//swap them to make sure we are consistent about which node becomes the left and the right
-			//this makes the trees easier to compare for equivalence when checking against another building method
-			NodeWrapper *temp = leftChild;
-			leftChild = rightChild;
-			rightChild = temp;
 		}
-		addBox(*rightChild);
-		addBox(*leftChild);
-		x = 0.5f * (xMax + xMin);
-		y = 0.5f * (yMax + yMin);
-		z = 0.5f * (zMax + zMin);
-		//create new cluster
-		ClusterNode *cluster = new ClusterNode();
-		cluster->setBox(xMin, xMax, yMin, yMax, zMin, zMax);
-		cluster->setChildren(*leftChild->light, *rightChild->light,
-				((double) rand()) / std::numeric_limits<int>::max());
-		light = cluster;
-		//compute direction cone and set it in the cluster
-		coneCos = computeCone(*leftChild, *rightChild, *cluster);
-		if (coneCos > -0.9f) {
-			dirBox = new Box3d();
-			dirBox->addBox(*leftChild->dirBox);
-			dirBox->addBox(*rightChild->dirBox);
-			cluster->findConeDirsRecursive(tempFloatArr, tempClusterArr);
-			int numClus = 0;
-			for (; tempClusterArr[numClus] != NULL; numClus++) {
+		addBox(*r);
+		addBox(*l);
+		location.set(max);
+		location.add(min);
+		location.scale(0.5);
+		((ClusterNode&)light).setBox(min, max);
+		((ClusterNode&)light).setChildren(&l->light, &r->light, ((double) rand())/numeric_limits<double>::max());
+		coneCosine = computeCone(*l,*r,((ClusterNode&)light));
+		if(coneCosine>-0.9f){
+			direction.addBox(l->direction);
+			direction.addBox(r->direction);
+			((ClusterNode&)light).findConeDirsRecursive(coordArr,tempClusterArr);
+			int numClus=0;
+			for(; tempClusterArr[numClus]!=NULL;numClus++){
 			}
-			if (numClus > 0) {
-				coneClusters = new vector<ClusterNode*> (numClus);
-				for (int j = 0; j < numClus; j++) {
-					(*coneClusters)[j] = tempClusterArr[j];
-					tempClusterArr[j] = NULL;
+			if(numClus>0){
+				this->coneClusters.resize(numClus);
+				for(int j=0;j<numClus;j++){
+					coneClusters[j]=tempClusterArr[j];
+					tempClusterArr[j]=NULL;
 				}
 			}
 		}
+		_l=l;
+		_r=r;
+//		cout<<"Creating new node wrapper["<<*l<<" , "<<*r<<"] w/ two children"<<*this<<endl;
 	}
-
-	static float computeCone(NodeWrapper &a, NodeWrapper& b,
-			ClusterNode& outCluster) {
-		if (a.dirBox == NULL || b.dirBox == NULL) {
-			return -1.0f;
+	/**
+	 *
+	 */
+	~NodeWrapper(){
+		if(cleanLight){
+//		cout<<"Deleting nodewrapper "<<endl;
+			delete (ClusterNode*)(&light);
 		}
-		//we use the circumscribed sphere around the dirBox to compute a conservative bounding cone
-		float xMin = a.dirBox->xMin >= b.dirBox->xMin ? b.dirBox->xMin
-				: a.dirBox->xMin;
-		float yMin = a.dirBox->yMin >= b.dirBox->yMin ? b.dirBox->yMin
-				: a.dirBox->yMin;
-		float zMin = a.dirBox->zMin >= b.dirBox->zMin ? b.dirBox->zMin
-				: a.dirBox->zMin;
-		float xMax = a.dirBox->xMax >= b.dirBox->xMax ? a.dirBox->xMax
-				: b.dirBox->xMax;
-		float yMax = a.dirBox->yMax >= b.dirBox->yMax ? a.dirBox->yMax
-				: b.dirBox->yMax;
-		float zMax = a.dirBox->zMax >= b.dirBox->zMax ? a.dirBox->zMax
-				: b.dirBox->zMax;
-
-		float rad2 = ((xMax - xMin) * (xMax - xMin) + (yMax - yMin) * (yMax
-				- yMin) + (zMax - zMin) * (zMax - zMin));
-		float coneX = (xMin + xMax);
-		float coneY = (yMin + yMax);
-		float coneZ = (zMin + zMax);
-		float center2 = coneX * coneX + coneY * coneY + coneZ * coneZ;
-		if (center2 < 0.01) {
-			return -1.0f; //too large to produce any reasonable cone smaller than the whole sphere
-		}
-		float invLen = 1.0f / (float) sqrt(center2);
-		//given the unit sphere and another sphere width radius^2 (rad2) and center^2 (center2)
-		//we can compute the cos(angle) cone defined by its intersection with the unit sphere
-		//note we actually keep 4*cetner2 and 4*rad2 to reduce number of multipications needed
-		float minCos = (center2 + 4.0f - rad2) * 0.25f * invLen;
-		if (minCos < -1.0f) {
-			minCos = -1.0f;
-		}
-		outCluster.setDirectionCone(coneX * invLen, coneY * invLen, coneZ
-				* invLen, minCos);
-		return minCos;
-	}
-	static float computeCone(NodeWrapper &a, NodeWrapper& b) {
-		if (a.dirBox == NULL || b.dirBox == NULL) {
-			return -1.0f;
-		}
-		//we use the circumscribed sphere around the dirBox to compute a conservative bounding cone
-		float xMin = a.dirBox->xMin >= b.dirBox->xMin ? b.dirBox->xMin
-				: a.dirBox->xMin;
-		float yMin = a.dirBox->yMin >= b.dirBox->yMin ? b.dirBox->yMin
-				: a.dirBox->yMin;
-		float zMin = a.dirBox->zMin >= b.dirBox->zMin ? b.dirBox->zMin
-				: a.dirBox->zMin;
-		float xMax = a.dirBox->xMax >= b.dirBox->xMax ? a.dirBox->xMax
-				: b.dirBox->xMax;
-		float yMax = a.dirBox->yMax >= b.dirBox->yMax ? a.dirBox->yMax
-				: b.dirBox->yMax;
-		float zMax = a.dirBox->zMax >= b.dirBox->zMax ? a.dirBox->zMax
-				: b.dirBox->zMax;
-
-		float rad2 = ((xMax - xMin) * (xMax - xMin) + (yMax - yMin) * (yMax
-				- yMin) + (zMax - zMin) * (zMax - zMin));
-		float coneX = (xMin + xMax);
-		float coneY = (yMin + yMax);
-		float coneZ = (zMin + zMax);
-		float center2 = coneX * coneX + coneY * coneY + coneZ * coneZ;
-		if (center2 < 0.01) {
-			return -1.0f; //too large to produce any reasonable cone smaller than the whole sphere
-		}
-		float invLen = 1.0f / (float) sqrt(center2);
-		//given the unit sphere and another sphere width radius^2 (rad2) and center^2 (center2)
-		//we can compute the cos(angle) cone defined by its intersection with the unit sphere
-		//note we actually keep 4*cetner2 and 4*rad2 to reduce number of multipications needed
-		float minCos = (center2 + 4.0f - rad2) * 0.25f * invLen;
-		if (minCos < -1.0f) {
-			minCos = -1.0f;
-		}
-		return minCos;
-	}
-
-	float getX() {
-		return x;
-	}
-
-	float getY() {
-		return y;
-	}
-
-	float getZ() {
-		return z;
-	}
-
-	float getHalfSizeX() {
-		return xMax - x;
-	}
-
-	float getHalfSizeY() {
-		return yMax - y;
-	}
-
-	float getHalfSizeZ() {
-		return zMax - z;
-	}
-
-	static double potentialClusterSize(NodeWrapper& a, NodeWrapper &b) {
-		float dx = (a.xMax >= b.xMax ? a.xMax : b.xMax)
-				- (a.xMin >= b.xMin ? b.xMin : a.xMin);
-		float dy = (a.yMax >= b.yMax ? a.yMax : b.yMax)
-				- (a.yMin >= b.yMin ? b.yMin : a.yMin);
-		float dz = (a.zMax >= b.zMax ? a.zMax : b.zMax)
-				- (a.zMin >= b.zMin ? b.zMin : a.zMin);
-		float minCos = computeCone(a, b);
-		float maxIntensity = a.light->getScalarTotalIntensity()
-				+ b.light->getScalarTotalIntensity();
-		return clusterSizeMetric(dx, dy, dz, minCos, maxIntensity);
 	}
 
 	/**
-	 * Compute a measure of the size of a light cluster
+	 *
 	 */
-	static double clusterSizeMetric(float xSize, float ySize, float zSize,
-			float cosSemiAngle, float intensity) {
-		float len2 = xSize * xSize + ySize * ySize + zSize * zSize;
-		float angleFactor = (1 - cosSemiAngle) * GLOBAL_SCENE_DIAGONAL;
-		return intensity * (len2 + angleFactor * angleFactor);
+	static double computeCone(const NodeWrapper & a, const NodeWrapper & b, ClusterNode & cluster){
+		if(a.direction.isInitialized()==false || b.direction.isInitialized()==false)
+			return -1.0f;
+		Point3 min(a.direction.getMin());
+		min.setIfMin(b.direction.getMin());
+		Point3 max(a.direction.getMax());
+		max.setIfMax(b.direction.getMax());
+		Point3 temp(max);
+		temp.sub(min);
+		double radiusSq = temp.getLen();
+		temp.set(max);
+		temp.add(min);
+		double centerSq = temp.getLen();
+		if(centerSq <0.01){
+			return -1.0f;
+		}
+		double invLen = 1.0f/sqrt(centerSq);
+		double minCos = (centerSq+4.0f - radiusSq)*0.25f * invLen;
+		if(minCos < -1.0f){
+			minCos = -1.0f;
+		}
+		temp.scale(invLen);
+		cluster.setDirectionCone(temp.getX(),temp.getY(),temp.getZ(),minCos);
+		return minCos;
 	}
-	bool equals(NodeWrapper * other) {
-		if (this->coneCos != other->coneCos)
-			return false;
-		if (this->x != other->x)
-			return false;
-		if (this->y != other->y)
-			return false;
-		if (this->z != other->z)
-			return false;
-		if ((this->dirBox)->isEqual(other->dirBox) == false)
-			return false;
-		return true;
+	/**
+	 *
+	 */
+	static double computeCone(const NodeWrapper & a, const NodeWrapper & b){
+			if(a.direction.isInitialized()==false || b.direction.isInitialized()==false)
+				return -1.0f;
+			Point3 min(a.direction.getMin());
+			min.setIfMin(b.direction.getMin());
+			Point3 max(a.direction.getMax());
+			max.setIfMax(b.direction.getMax());
+			Point3 temp(max);
+			temp.sub(min);
+			double radiusSq = temp.getLen();
+			temp.set(max);
+			temp.add(min);
+			double centerSq = temp.getLen();
+			if(centerSq <0.01){
+				return -1.0f;
+			}
+			double invLen = 1.0f/sqrt(centerSq);
+			double minCos = (centerSq+4.0f - radiusSq)*0.25f * invLen;
+			if(minCos < -1.0f){
+				minCos = -1.0f;
+			}
+			temp.scale(invLen);
+			return minCos;
+		}
+		/**
+		 *
+		 */
+	AbstractNode & getLight()const {
+		return light;
+	}
+	/**
+	 *
+	 */
+	double getLocationX()const {
+		return location.getX();
+	}
+	double getLocationY()const{
+			return location.getY();
+		}
 
+	double getLocationZ()const{
+			return location.getZ();
+		}
+	double getConeCosine()const{
+		return coneCosine;
 	}
-	NodeWrapper & operator=(NodeWrapper & other) {
-		std::cout << "In assignment operator" << std::endl;
-		return *this;
+	double getHalfSizeX()const{
+		return max.getX()-location.getX();
 	}
-	friend std::ostream& operator<<(std::ostream&s, const NodeWrapper & n);
+	double getHalfSizeY()const{
+			return max.getY()-location.getY();
+		}
+	double getHalfSizeZ()const{
+			return max.getZ()-location.getZ();
+		}
+	/**
+	 *
+	 */
+	const Point3 & getLocation()const {
+		return location;
+	}
+	/**
+	 *
+	 */
+	bool equals(const NodeWrapper & other){
+		bool retVal=true;
+		if(this->direction.equals(other.direction)==false)
+			retVal &= false;
+		if(this->coneCosine != other.coneCosine)
+			retVal &= false;
+		if(this->location.equals(other.location)==false)
+			retVal &= false;
+		if(this->coneDirection.equals(other.coneDirection)==false)
+			retVal &= false;
+		if(this->direction.equals(other.direction)==false)
+			retVal &= false;
+		//TODO : Add light comparison logic here!
+		return retVal;
+	}
+	/**
+	 *
+	 */
+
+	static double potentialClusterSize(const NodeWrapper &a, NodeWrapper &b) {
+		Point3 max(a.max);
+		max.setIfMax(b.max);
+		Point3 min(a.min);
+		min.setIfMin(b.min);
+		Point3 diff(max);
+		diff.sub(min);
+	    double minCos = computeCone(a, b);
+	    double maxIntensity = a.light.getScalarTotalIntensity() + b.light.getScalarTotalIntensity();
+	    return clusterSizeMetric(diff, minCos, maxIntensity);
+	  }
+
+	  /**
+	   * Compute a measure of the size of a light cluster
+	   */
+	  static double clusterSizeMetric(Point3 & size, double cosSemiAngle, double intensity) {
+	    double len2 = size.getLen();
+	    double angleFactor = (1 - cosSemiAngle) * GLOBAL_SCENE_DIAGONAL;
+	    double res = intensity * (len2 + angleFactor * angleFactor);
+//	    cout<<">>>>>>>>>>> "<<len2<<" "<<angleFactor << " " <<res<<endl;
+	    return res;
+	  }
+	/**
+	 *
+	 */
+	friend ostream& operator<<(ostream& s, const NodeWrapper & node);
+
 };
-std::ostream& operator<<(std::ostream&s, const NodeWrapper & n) {
-	s << "NodeWrapper :: [" << n.x << "," << n.y << "," << n.z << "] BaseBox::";
-	operator<<(s, (Box3d(n)));
-	s << "Dir:" << (*n.dirBox);
+const int NodeWrapper::CONE_RECURSE_SIZE=4;
+const double NodeWrapper::GLOBAL_SCENE_DIAGONAL = 2.0;
+
+/**
+ *
+ */
+ostream& operator<<(ostream& s, const NodeWrapper & node){
+	s<<"NW::["<<node.location<<"] ConeClus :: ";
+	for(unsigned int i=0;i<node.coneClusters.size();i++){
+		if(node.coneClusters[i]!=NULL)
+			s<<""<< (*node.coneClusters[i])<<",";
+	}
+	if(node._l!=NULL)
+		s<<"{LEFT "<<*node._l<<"}";
+	if(node._r!=NULL)
+			s<<"{RIGHT "<<*node._r<<"}";
+	s<<endl;
 	return s;
 }
-const int NodeWrapper::CONE_RECURSE_DEPTH = 4;
-const float NodeWrapper::GLOBAL_SCENE_DIAGONAL = 2.0;
-
 #endif /* NODEWRAPPER_H_ */

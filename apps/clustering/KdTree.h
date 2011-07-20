@@ -1,4 +1,4 @@
-/** Unordered Agglomerative Clustering -*- C++ -*-
+/** Single source shortest paths -*- C++ -*-
  * @file
  * @section License
  *
@@ -18,341 +18,211 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
- * @author Rashid Kaleem <rashid@cs.utexas.edu>
+ * @section Description
+ *
+ * Agglomerative Clustering.
+ *
+ * @author Rashid Kaleem <rashid.kaleem@gmail.com>
  */
-#include"KdCell.h"
-#include"PotentialCluster.h"
+
 #ifndef KDTREE_H_
 #define KDTREE_H_
+
+#include<vector>
+#include<limits>
+#include"Point3.h"
+#include"NodeWrapper.h"
+#include"KdCell.h"
+#include"PotentialCluster.h"
+
+using namespace std;
+
 class KdTree: public KdCell {
-
-//minimum intensity of any light or cluster in this node, needed as part of cluster size metric
 private:
-	float minLightIntensity;
-	float maxConeCos;
-	float minHalfSizeX;
-	float minHalfSizeY;
-	float minHalfSizeZ;
+	double minLightIntensity;
+	double maxConeCosine;
+	Point3 minHalfSize;
 
-private:
-	KdTree():KdCell() {
-		minLightIntensity = std::numeric_limits<float>::max();
-		maxConeCos = -1.0f;
-		minHalfSizeX = std::numeric_limits<float>::max();
-		minHalfSizeY = std::numeric_limits<float>::max();
-		minHalfSizeZ = std::numeric_limits<float>::max();
+	KdTree():KdCell(), minHalfSize(std::numeric_limits<double>::max()){
+		minLightIntensity=std::numeric_limits<double>::max();
+		maxConeCosine = -1.0f;
 	}
-	~KdTree(){
-	}
-	//special constructor used internally when space for point list has already been allocated
-	KdTree(int inSplitType, float inSplitValue) :
-		KdCell(inSplitType, inSplitValue) {
-	}
-private:
-	void findNearestRecursive(PotentialCluster *&potentialCluster) {
-//		this->lock.lock();
-		if (!couldBeCloser(potentialCluster)) {
-			return;
-		}
-		NodeWrapper *from = potentialCluster->original;
-		if (splitType == LEAF) {
-			//if it is a leaf then compute potential cluster size with each individual light or cluster
-			for (unsigned int i = 0; i < pointList->size(); i++) {
-				NodeWrapper *aPointList = (*pointList)[i];
-				if (aPointList != NULL && aPointList!= potentialCluster->original) {
-					double size = NodeWrapper::potentialClusterSize(*from,*aPointList);
-					if (size < potentialCluster->clusterSize) {
-						potentialCluster->closest = aPointList;
-						potentialCluster->clusterSize = size;
-					}
-				}
-			}
-		} else if (splitType == SPLIT_X) {
-			recurse(potentialCluster, from->getX());
-		} else if (splitType == SPLIT_Y) {
-			recurse(potentialCluster, from->getY());
-		} else if (splitType == SPLIT_Z) {
-			recurse(potentialCluster, from->getZ());
-		} else {
-			assert(false&&"Badness error in findNearestRecursive....");
-		}
-//		this->lock.unlock();
+	KdTree(int st, double sv):KdCell(st,sv), minHalfSize(0){
+		minLightIntensity=0;
+		maxConeCosine = -1.0f;
 	}
 
-	void recurse(PotentialCluster *& potentialCluster, float which) {
-		//if its a interior node recurse on the closer child first
-		if (which <= splitValue) {
-			((KdTree*) leftChild)->findNearestRecursive(potentialCluster);
-			((KdTree*) rightChild)->findNearestRecursive(potentialCluster);
-		} else {
-			((KdTree*) rightChild)->findNearestRecursive(potentialCluster);
-			((KdTree*) leftChild)->findNearestRecursive(potentialCluster);
-		}
-	}
-
+public:
 	/**
-	 * Determines if any element of this cell could be closer to the the cluster, outCluster, using
-	 * the metrics defined in inBuilder.
 	 *
-	 * @param outCluster the cluster to test
-	 * @param inBuilder  the builder defining closeness
-	 * @return true if an element could be closer, false otherwise
 	 */
-protected:
-	bool couldBeCloser(PotentialCluster *& outCluster) {
-		//first check to see if we can prove that none of our contents could be closer than the current closest
-		NodeWrapper * from = outCluster->original;
-		//compute minumum offset to bounding box
-		float a2 = xMin - from->getX() >= from->getX() - xMax ? xMin
-				- from->getX() : from->getX() - xMax;
-		//more than twice as fast as Math.max(a,0)
-		float dx = (a2 >= 0) ? a2 : 0;
-		float a1 = (yMin - from->getY() >= from->getY() - yMax) ? yMin
-				- from->getY() : from->getY() - yMax;
-		float dy = a1 >= 0 ? a1 : 0;
-		float a = (zMin - from->getZ() >= from->getZ() - zMax) ? zMin
-				- from->getZ() : from->getZ() - zMax;
-		float dz = a >= 0 ? a : 0;
-		//expand distance by half size of from's bounding box (distance is min to center of box)
-		//and by half the minimum bounding box extents of any node in this cell
-		float t = from->getHalfSizeX();
-		dx += t+ minHalfSizeX;
-		dy += from->getHalfSizeY() + minHalfSizeY;
-		dz += from->getHalfSizeZ() + minHalfSizeZ;
-		//cone must be at least as big as the larger of from's and the smallest in this cell
-		float coneCos = (maxConeCos >= from->coneCos) ? from->coneCos
-				: maxConeCos;
-		//minimum cluster intensity would be from's intensity plus smallest intensity inside this cell
-		float intensity = minLightIntensity
-				+ from->light->getScalarTotalIntensity();
-		double testSize = NodeWrapper::clusterSizeMetric(dx, dy, dz, coneCos,
-				intensity);
-		//return if our contents could be closer and so need to be checked
-		//extra factor of 0.9999 is to correct for any roundoff error in computing minimum size
-		return (outCluster->clusterSize >= 0.9999 * testSize);
+	static KdTree * createTree(vector<NodeWrapper*> & inPoints){
+		KdTree * factory = new KdTree();
+		KdTree * root = (KdTree *) KdTree::subDivide(inPoints, 0, inPoints.size(), NULL, *factory);
+		delete factory;
+		return root;
 	}
-
-	/*--- Methods needed to implement as an extended KDCell in a KDTree ---*/
-
 	/**
-	 * We provide this factory method so that KDCell can be subclassed.  Returns a new
-	 * uninitialized cell (also tried to reuse any preallocated array for holding children)
-	 * Used during cell subdivision.
+	 *
 	 */
-
-	virtual KdCell *createNewBlankCell(int inSplitType, float inSplitValue) {
-		return new KdTree(inSplitType, inSplitValue);
-	}
-
-	virtual bool notifyContentsRebuilt(bool changed) {
-		//must recompute the min light intensity since the cells contents have changed
-		if (splitType == LEAF) {
-			float newMinInten = numeric_limits<float>::max();
-			float newMaxCos = -1.0f;
-			float newMinHX = numeric_limits<float>::max(), newMinHY =
-					numeric_limits<float>::max(), newMinHZ = numeric_limits<
-					float>::max();
-			for (unsigned int i = 0; i < pointList->size(); i++) {
-				NodeWrapper *aPointList = (*pointList)[i];
-				if (aPointList == NULL) {
-					continue;
-				}
-				float b3 = aPointList->light->getScalarTotalIntensity();
-				newMinInten = (newMinInten >= b3) ? b3 : newMinInten;
-				newMaxCos = (newMaxCos >= aPointList->coneCos) ? newMaxCos: aPointList->coneCos;
-				float b2 = aPointList->getHalfSizeX();
-				newMinHX = (newMinHX >= b2) ? b2 : newMinHX;
-				float b1 = aPointList->getHalfSizeY();
-				newMinHY = (newMinHY >= b1) ? b1 : newMinHY;
-				float b = aPointList->getHalfSizeZ();
-				newMinHZ = (newMinHZ >= b) ? b : newMinHZ;
-			}
-			if (changed) {
-				minLightIntensity = newMinInten;
-				maxConeCos = newMaxCos;
-				minHalfSizeX = newMinHX;
-				minHalfSizeY = newMinHY;
-				minHalfSizeZ = newMinHZ;
-			} else {
-				if (minLightIntensity != newMinInten) {
-					minLightIntensity = newMinInten;
-					changed = true;
-				}
-				if (maxConeCos != newMaxCos) {
-					maxConeCos = newMaxCos;
-					changed = true;
-				}
-				if (minHalfSizeX != newMinHX) {
-					minHalfSizeX = newMinHX;
-					changed = true;
-				}
-				if (minHalfSizeY != newMinHY) {
-					minHalfSizeY = newMinHY;
-					changed = true;
-				}
-				if (minHalfSizeZ != newMinHZ) {
-					minHalfSizeZ = newMinHZ;
-					changed = true;
-				}
-			}
-		} else {
-			//its a split node
-			KdTree* left = (KdTree*) leftChild;
-			KdTree* right = (KdTree*) rightChild;
-			if (changed) {
-				minLightIntensity = (left->minLightIntensity>= right->minLightIntensity) ? right->minLightIntensity : left->minLightIntensity;
-				maxConeCos		  = (left->maxConeCos >= right->maxConeCos) 			 ? left->maxConeCos			: right->maxConeCos;
-				minHalfSizeX	  = (left->minHalfSizeX >= right->minHalfSizeX) 		 ? right->minHalfSizeX		: left->minHalfSizeX;
-				minHalfSizeY 	  = (left->minHalfSizeY >= right->minHalfSizeY) 		 ? right->minHalfSizeY		: left->minHalfSizeY;
-				minHalfSizeZ 	  = (left->minHalfSizeZ >= right->minHalfSizeZ) 		 ? right->minHalfSizeZ		: left->minHalfSizeZ;
-			} else {
-				float newMinInten = (left->minLightIntensity>= right->minLightIntensity) ? right->minLightIntensity: left->minLightIntensity;
-				float newMaxCos = (left->maxConeCos >= right->maxConeCos) ? left->maxConeCos: right->maxConeCos;
-				float newMinHX =(left->minHalfSizeX >= right->minHalfSizeX) ? right->minHalfSizeX: left->minHalfSizeX;
-				float newMinHY = (left->minHalfSizeY >= right->minHalfSizeY) ? right->minHalfSizeY : left->minHalfSizeY;
-				float newMinHZ = (left->minHalfSizeZ >= right->minHalfSizeZ) ? right->minHalfSizeZ : left->minHalfSizeZ;
-				if (minLightIntensity != newMinInten) {
-					minLightIntensity = newMinInten;
-					changed = true;
-				}
-				if (maxConeCos != newMaxCos) {
-					maxConeCos = newMaxCos;
-					changed = true;
-				}
-				if (minHalfSizeX != newMinHX) {
-					minHalfSizeX = newMinHX;
-					changed = true;
-				}
-				if (minHalfSizeY != newMinHY) {
-					minHalfSizeY = newMinHY;
-					changed = true;
-				}
-				if (minHalfSizeZ != newMinHZ) {
-					minHalfSizeZ = newMinHZ;
-					changed = true;
-				}
-			}
-		}
-		return changed;
-	}
-	virtual bool notifyPointAdded(NodeWrapper *inPoint, bool changed) {
-		if (changed) {
-			float b3 = inPoint->light->getScalarTotalIntensity();
-			minLightIntensity = (minLightIntensity >= b3) ? b3
-					: minLightIntensity;
-			maxConeCos = (maxConeCos >= inPoint->coneCos) ? maxConeCos
-					: inPoint->coneCos;
-			float b2 = inPoint->getHalfSizeX();
-			minHalfSizeX = (minHalfSizeX >= b2) ? b2 : minHalfSizeX;
-			float b1 = inPoint->getHalfSizeY();
-			minHalfSizeY = (minHalfSizeY >= b1) ? b1 : minHalfSizeY;
-			float b = inPoint->getHalfSizeZ();
-			minHalfSizeZ = (minHalfSizeZ >= b) ? b : minHalfSizeZ;
-		} else {
-			float newInten = inPoint->light->getScalarTotalIntensity();
-			float hx = inPoint->getHalfSizeX();
-			float hy = inPoint->getHalfSizeY();
-			float hz = inPoint->getHalfSizeZ();
-			if (minLightIntensity > newInten) {
-				minLightIntensity = newInten;
-				changed = true;
-			}
-			if (maxConeCos < inPoint->coneCos) {
-				maxConeCos = inPoint->coneCos;
-				changed = true;
-			}
-			if (minHalfSizeX > hx) {
-				minHalfSizeX = hx;
-				changed = true;
-			}
-			if (minHalfSizeY > hy) {
-				minHalfSizeY = hy;
-				changed = true;
-			}
-			if (minHalfSizeZ > hz) {
-				minHalfSizeZ = hz;
-				changed = true;
-			}
-		}
-		return changed;
-	}
-
+	virtual KdCell *createNewBlankCell(int inSplitType, double inSplitValue) {
+//		cout<<"CALLED !!!!! "<<endl;
+    return new KdTree(inSplitType, inSplitValue);
+  }
 	/**
-	 * Perform a variety of consistency checks on the tree and throws an error if any of them fail
+	 *
 	 */
-public:
-	bool isOkay() {
-		KdCell::isOkay();
-		float minLight = numeric_limits<float>::max();
-		float maxCos = -1.0f;
-		float minHX = numeric_limits<float>::max();
-		float minHY = numeric_limits<float>::max();
-		float minHZ = numeric_limits<float>::max();
-		if (splitType == LEAF) {
-			for (unsigned int i = 0; i < pointList->size(); i++) {
-				NodeWrapper *aPointList = (*pointList)[i];
-				if (aPointList == NULL) {
-					continue;
-				}
-				minLight = std::min(minLight,
-						aPointList->light->getScalarTotalIntensity());
-				maxCos = std::max(maxCos, aPointList->coneCos);
-				minHX = std::min(minHX, aPointList->getHalfSizeX());
-				minHY = std::min(minHY, aPointList->getHalfSizeY());
-				minHZ = std::min(minHZ, aPointList->getHalfSizeZ());
+	static void getAll(KdCell & tree, vector<NodeWrapper * > & allLeaves){
+		tree.getAll(allLeaves);
+	}
+	/**
+	 *
+	 */
+	bool notifyPointAdded(NodeWrapper & nw, bool inChange){
+		if(inChange){
+			double b3 = nw.getLight().getScalarTotalIntensity();
+			      minLightIntensity = (minLightIntensity >= b3) ? b3 : minLightIntensity;
+			      maxConeCosine = (maxConeCosine >= nw.getConeCosine()) ? maxConeCosine : nw.getConeCosine();
+			      double b2 = nw.getHalfSizeX();
+			      double minHalfSizeX = (minHalfSizeX >= b2) ? b2 : minHalfSizeX;
+			      double b1 = nw.getHalfSizeY();
+			      double minHalfSizeY = (minHalfSizeY >= b1) ? b1 : minHalfSizeY;
+			      double b = nw.getHalfSizeZ();
+			      double minHalfSizeZ = (minHalfSizeZ >= b) ? b : minHalfSizeZ;
+			      minHalfSize.set(minHalfSizeX,minHalfSizeY,minHalfSizeZ);
 
+		}
+		else{
+			double newIntensity = nw.getLight().getScalarTotalIntensity();
+			if(minLightIntensity>newIntensity){
+				minLightIntensity = newIntensity;
+				inChange=true;
 			}
-		} else {
-			KdTree* left = (KdTree*) leftChild;
-			KdTree* right = (KdTree*) rightChild;
-			minLight = std::min(left->minLightIntensity, right->minLightIntensity);
-			maxCos = std::max(left->maxConeCos, right->maxConeCos);
-			minHX = std::min(left->minHalfSizeX, right->minHalfSizeX);
-			minHY = std::min(left->minHalfSizeY, right->minHalfSizeY);
-			minHZ = std::min(left->minHalfSizeZ, right->minHalfSizeZ);
+			if(maxConeCosine < nw.getConeCosine()){
+				maxConeCosine= nw.getConeCosine();
+				inChange=true;
+			}
+			inChange |= minHalfSize.setIfMin(nw.getHalfSizeX(),nw.getHalfSizeY(),nw.getHalfSizeZ());
 		}
-		if (minLight != this->minLightIntensity) {
-			assert(false&&"bad minimum light intensity");
-		}
-		if (maxCos != this->maxConeCos) {
-			assert(false&&"bad max cone cos");
-		}
-		if (minHX != this->minHalfSizeX || minHY != this->minHalfSizeY || minHZ != this->minHalfSizeZ) {
-			assert(false&&"bad minimum half size");
-		}
-		return true;
+		return inChange;
 	}
-public:
-	static KdTree& createTree(std::vector<NodeWrapper*> *& inPoints) {
-		KdTree * root = new KdTree();
-		KdTree &res = *(KdTree*) subdivide(inPoints, 0, inPoints->size(), NULL, root);
-		if(root->isEqual(&res))
-			return res;
-		delete root;
-		return res;
-	}
-	NodeWrapper* findBestMatch(NodeWrapper *&inLight) {
-		//TODO : uncomment if findBestMatch is being called in parallel.
-		// right now we only call it in the first process-body, which does
-		// not modify the tree.
-		//		acquire(this);
-		PotentialCluster *cluster = new PotentialCluster(inLight);
+	/**
+	 *
+	 */
+	NodeWrapper *findBestMatch(NodeWrapper &inLight) {
+//		cout<<"********************************************"<<endl
+//				<<"Finding match for "<<inLight<<endl;
+		PotentialCluster cluster(inLight);
 		if (splitType == LEAF) {
 			findNearestRecursive(cluster);
-		} else if (splitType == SPLIT_X) {
-			recurse(cluster, inLight->getX());
-		} else if (splitType == SPLIT_Y) {
-			recurse(cluster, inLight->getY());
-		} else if (splitType == SPLIT_Z) {
-			recurse(cluster, inLight->getZ());
+		} else if (splitType == KdCell::SPLIT_X) {
+			recurse(cluster, inLight.getLocationX());
+		} else if (splitType == KdCell::SPLIT_Y) {
+			recurse(cluster, inLight.getLocationY());
+		} else if (splitType == KdCell::SPLIT_Z) {
+			recurse(cluster, inLight.getLocationZ());
 		} else {
-			assert(false&&"Err in findBestMatch");
+			assert(false&& "Invalid split type!");
 		}
-		NodeWrapper * res = cluster->closest;
-		delete cluster;
+		NodeWrapper * res = cluster.closest;
+//		if(res==NULL){
+//			cout<<"##################################\nUnable to find a match for node "<<inLight
+//					<<"Tree :: "<< *this<<"#######################"<<endl;
+//		}
 		return res;
 	}
 
+  void findNearestRecursive(PotentialCluster &potentialCluster) {
+//	  cout<<"Recurse Base?"<<potentialCluster<<endl;
+//	  cout<<"Find nearest recursive "<<(potentialCluster)<<endl;
+    if (couldBeCloser(potentialCluster)==false) {
+      return;
+    }
+    const NodeWrapper &from = potentialCluster.original;
+    if (splitType == KdCell::LEAF) {
+      //if it is a leaf then compute potential cluster size with each individual light or cluster
+    	for(int i=0;i<KdCell::MAX_POINTS_IN_CELL;i++){
+    		if(pointList[i]!=NULL && pointList[i]->equals(potentialCluster.original)==false){
+    	          double size = NodeWrapper::potentialClusterSize(from, *(pointList[i]));
+    	          if (size < potentialCluster.clusterSize) {
+//    	        	  cout<<"Found close match!!! " << *pointList[i]<<endl;
+    	            potentialCluster.closest = pointList[i];
+    	            potentialCluster.clusterSize = size;
+    	          }
+
+    		}
+    	}
+    } else if (splitType == KdCell::SPLIT_X) {
+      recurse(potentialCluster, from.getLocationX());
+    } else if (splitType == KdCell::SPLIT_Y) {
+      recurse(potentialCluster, from.getLocationY());
+    } else if (splitType == KdCell::SPLIT_Z) {
+      recurse(potentialCluster, from.getLocationZ());
+    } else {
+      assert(false&&"Invalid split type in find nearest recursive");
+    }
+  }
+
+  void recurse(PotentialCluster &potentialCluster, double which) {
+//	  cout<<"Inner node, recursing for "<<potentialCluster<<" Split?"<<which<< " <= "<<splitValue<<endl;
+    //if its a interior node recurse on the closer child first
+//	  cout<<"Recurse "<<*this<<endl;
+    if (which <= splitValue) {
+    	if(leftChild!=NULL &&
+    			leftChild->removeFromTree==false)
+      ((KdTree*) leftChild)->findNearestRecursive(potentialCluster);
+    	if(rightChild!=NULL && rightChild->removeFromTree==false)
+      ((KdTree*) rightChild)->findNearestRecursive(potentialCluster);
+    } else {
+    	if(rightChild!=NULL && rightChild->removeFromTree==false)
+      ((KdTree*) rightChild)->findNearestRecursive(potentialCluster);
+    	if(leftChild!=NULL && leftChild->removeFromTree==false)
+      ((KdTree*) leftChild)->findNearestRecursive(potentialCluster);
+    }
+  }
+
+  /**
+   * Determines if any element of this cell could be closer to the the cluster, outCluster, using
+   * the metrics defined in inBuilder.
+   *
+   * @param outCluster the cluster to test
+   * @param inBuilder  the builder defining closeness
+   * @return true if an element could be closer, false otherwise
+   */
+  bool couldBeCloser(PotentialCluster &outCluster) {
+    //first check to see if we can prove that none of our contents could be closer than the current closest
+    const NodeWrapper &from = outCluster.original;
+    //compute minumum offset to bounding box
+    double a2 = min.getX() - from.getLocationX() >= from.getLocationX() - max.getX() ? min.getX() - from.getLocationX() : from.getLocationX() - max.getX();
+    //more than twice as fast as Math.max(a,0)
+    double dx = (a2 >= 0) ? a2 : 0;
+    double a1 = (min.getY() - from.getLocationY() >= from.getLocationY()- max.getY()) ? min.getY() - from.getLocationY() : from.getLocationY() - max.getY();
+    double dy = a1 >= 0 ? a1 : 0;
+    double a = (min.getZ() - from.getLocationZ() >= from.getLocationZ() - max.getZ()) ? min.getZ() - from.getLocationZ() : from.getLocationZ() - max.getZ();
+    double dz = a >= 0 ? a : 0;
+    //expand distance by half size of from's bounding box (distance is min to center of box)
+    //and by half the minimum bounding box extents of any node in this cell
+//    cout<<"From :: " << minHalfSize<<endl;
+    dx += from.getHalfSizeX() + minHalfSize.getX();
+    dy += from.getHalfSizeY() + minHalfSize.getY();
+    dz += from.getHalfSizeZ() + minHalfSize.getZ();
+    //cone must be at least as big as the larger of from's and the smallest in this cell
+    double coneCos = (maxConeCosine >= from.getConeCosine()) ? from.getConeCosine() : maxConeCosine;
+    //minimum cluster intensity would be from's intensity plus smallest intensity inside this cell
+    double intensity = minLightIntensity + from.getLight().getScalarTotalIntensity();
+    Point3 diff(dx,dy,dz);
+
+    double testSize = NodeWrapper::clusterSizeMetric(diff, coneCos, intensity);
+    //return if our contents could be closer and so need to be checked
+    //extra factor of 0.9999 is to correct for any roundoff error in computing minimum size
+//    cout<<"Could be closer computed :: "<<diff<<" , " <<outCluster.clusterSize << " versus "<<testSize<<endl;
+    return (outCluster.clusterSize >= 0.9999 * testSize);
+  }
+
+
+
+private:
 
 };
+
 #endif /* KDTREE_H_ */

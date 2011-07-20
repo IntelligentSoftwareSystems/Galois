@@ -1,4 +1,4 @@
-/** Unordered Agglomerative Clustering -*- C++ -*-
+/** Single source shortest paths -*- C++ -*-
  * @file
  * @section License
  *
@@ -18,69 +18,66 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
- * @author Rashid Kaleem <rashid@cs.utexas.edu>
+ * @section Description
+ *
+ * Agglomerative Clustering.
+ *
+ * @author Rashid Kaleem <rashid.kaleem@gmail.com>
  */
 
-#include "AbstractNode.h"
 #ifndef LEAFNODE_H_
 #define LEAFNODE_H_
-#define MATH_PI 3.14159
-
-class LeafNode: public AbstractNode {
+#define MATH_PI 3.1415926
+#include<iostream>
+#include "AbstractNode.h"
+#include "Point3.h"
+using namespace std;
+class LeafNode : public AbstractNode{
 protected:
-	//direction of maximum emission
-	/*const */
-	float dirX;
-	/*const */
-	float dirY;
-	/*const */
-	float dirZ;
-
-	/**
-	 * Creates a new instance of MLTreeLeafNode
-	 */
+ //direction of maximum emission
+  Point3 direction;
+  /**
+   * Creates a new instance of MLTreeLeafNode
+   */
 public:
-	LeafNode(float x, float y, float z, float px, float py, float pz) {
-		this->x = x;
-		this->y = y;
-		this->z = z;
-		setIntensity(1.0 / MATH_PI, (short) 0);
-		dirX = px;
-		dirY = py;
-		dirZ = pz;
-	}
+  LeafNode(double x, double y, double z, double dirX, double dirY, double dirZ):AbstractNode(x,y,z), direction(dirX,dirY,dirZ) {
+//    this->myLoc.x = x;
+//    this->myLoc.y = y;
+//    this->myLoc.z = z;
+    setIntensity(1.0 / MATH_PI, 0);
+//    this->direction.x = dirX;
+//    this->direction.y = dirY;
+//    this->direction.z = dirZ;
+  }
 
-	float getDirX() {
-		return dirX;
-	}
+  Point3 & getDirection(){
+	  return direction;
+  }
+  double getDirX(){
+	  return direction.getX();
+  }
+  double getDirY(){
+  	  return direction.getY();
+    }
+  double getDirZ(){
+  	  return direction.getZ();
+    }
+  bool isLeaf() {
+    return true;
+  }
 
-	float getDirY() {
-		return dirY;
-	}
+  int size() {
+    return 1;
+  }
+	friend ostream & operator<<(ostream & s , LeafNode & pt);
 
-	float getDirZ() {
-		return dirZ;
-	}
-
-	bool isLeaf() {
-		return true;
-	}
-
-	int size() {
-		return 1;
-	}
-	/*bool operator==(LeafNode & other) {
-		return x == other.x && y == other.y && z == other.z && dirX
-				== other.dirX && dirY == other.dirY && dirZ == other.dirZ;
-	}*/
-	bool isEqual(LeafNode * other) {
-			return x == other->x && y == other->y && z == other->z && dirX
-					== other->dirX && dirY == other->dirY && dirZ == other->dirZ;
-		}
-	friend std::ostream & operator<<(std::ostream& s, LeafNode & l);
 };
-std::ostream & operator<<(std::ostream& s, LeafNode & l) {
-	s << "Leaf node [" << l.x << "," << l.y << "," << l.z << "]";
+ ostream & operator<<(ostream & s , LeafNode& pt){
+	s<<"LeafNode :: ";
+	operator<<(s,(AbstractNode&)pt);
+	s<<"Dir::"<<pt.direction;
 	return s;
 }
+
+
 #endif /* LEAFNODE_H_ */
