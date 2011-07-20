@@ -1,19 +1,33 @@
-/*
-Galois, a framework to exploit amorphous data-parallelism in irregular
-programs.
-
-Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
-UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS SOFTWARE
-AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR ANY
-PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF PERFORMANCE, AND ANY
-WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF DEALING OR USAGE OF TRADE.
-NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH RESPECT TO THE USE OF THE
-SOFTWARE OR DOCUMENTATION. Under no circumstances shall University be liable
-for incidental, special, indirect, direct or consequential damages or loss of
-profits, interruption of business, or related expenses which may arise from use
-of Software or Documentation, including but not limited to those resulting from
-defects in Software and/or Documentation, or loss or inaccuracy of data of any
-kind.
+/** Machine Descriptions -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS SOFTWARE
+ * AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR ANY
+ * PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF PERFORMANCE, AND ANY
+ * WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF DEALING OR USAGE OF TRADE.
+ * NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH RESPECT TO THE USE OF THE
+ * SOFTWARE OR DOCUMENTATION. Under no circumstances shall University be liable
+ * for incidental, special, indirect, direct or consequential damages or loss of
+ * profits, interruption of business, or related expenses which may arise from use
+ * of Software or Documentation, including but not limited to those resulting from
+ * defects in Software and/or Documentation, or loss or inaccuracy of data of any
+ * kind.
+ *
+ * @section Description
+ *
+ * This contains descriptions of machine topologies.  These describes levels in
+ * the machine.  The lowest level is a package.
+ *
+ * This also matches OS cpu numbering to galois thread numbering and binds threads
+ * to processors.  Threads are assigned densly in each package before the next 
+ * package.  SMT hardware contexts are bound after all real cores (int x86).
+ *
+ * @author Andrew Lenharth <andrewl@lenharth.org>
 */
 #include "Galois/Runtime/Threads.h"
 #include "Galois/Runtime/Support.h"
@@ -44,6 +58,7 @@ static void genericBindToProcessor(int proc) {
 #endif      
 }
 
+//6 Cores per package, 4 packages
 struct FaradayPolicy : public ThreadPolicy {
 
   virtual void bindThreadToProcessor(int id) {
@@ -68,6 +83,7 @@ struct FaradayPolicy : public ThreadPolicy {
   }
 };
 
+//4 Cores per package, 2 packages per blade, 4 blades
 struct VoltaPolicy : public ThreadPolicy {
 
   virtual void bindThreadToProcessor(int id) {
@@ -96,6 +112,7 @@ struct VoltaPolicy : public ThreadPolicy {
   }
 };
 
+//4 Cores per package, 2 packages
 struct MaxwellPolicy : public ThreadPolicy {
 
   virtual void bindThreadToProcessor(int id) {
@@ -120,6 +137,7 @@ struct MaxwellPolicy : public ThreadPolicy {
   }
 };
 
+// 4 Cores per package, 4 packages
 struct GaloisPolicy : public ThreadPolicy {
 
   virtual void bindThreadToProcessor(int id) {
