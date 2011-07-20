@@ -113,7 +113,7 @@ struct FindMatching {
 						if(nodeA->equals(*nodeBMatch) && nodeA->equals(*nodeB)==false) {
 							//Create a new node here.
 							if(nodeA<nodeB){
-								Galois::Allocator::
+								//Galois::Allocator::
 								NodeWrapper * newNode = new NodeWrapper(*nodeA, *nodeB, coordinatesArray,clusterArray);
 								newNodes->push(newNode);
 								allocs.push(newNode);
