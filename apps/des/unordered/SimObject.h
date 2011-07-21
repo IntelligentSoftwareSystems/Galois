@@ -51,7 +51,7 @@ class SimObject {
 public:
   typedef Galois::Graph::FirstGraph <SimObject*, void, true>  Graph;
   typedef Graph::GraphNode GNode;
-  typedef Event<GNode, LogicUpdate> EventType;
+  typedef Event<SimObject*, LogicUpdate> EventTy;
 
 
 public:
@@ -63,6 +63,41 @@ public:
   virtual SimObject* clone() const = 0;
 
 
+  /**
+   * Make event.
+   *
+   * @param sendObj the send obj
+   * @param recvObj the recv obj
+   * @param type the type
+   * @param act the action to be performed
+   * @param sendTime the send time
+   * @param delay the delay
+   * @return the event
+   */
+   virtual EventTy makeEvent(SimObject* sendObj, SimObject* recvObj, const EventTy::Type& type, const LogicUpdate&  act
+      , const SimTime& sendTime, SimTime delay = MIN_DELAY) = 0;
+
+  /**
+   * Recv event.
+   *
+   * @param inputIndex is the index of the input on which the event e is received
+   * @param e the event to be received
+   */
+  virtual void recvEvent(size_t inputIndex, const EventTy& e) = 0;
+
+  /**
+   * Exec event.  
+   *
+   * The user code should override this method inorder to
+   * define the semantics of executing and event on
+   *
+   * @param graph: the graph whose nodes contain simulation objects and edges model the
+   * communication links
+   *
+   * @param myNode the node in the graph that has this SimObject as its node data
+   * @param e the input event
+   */
+  virtual void execEvent(Graph& graph, GNode& myNode, const EventTy& e) = 0;
 
   /**
    * Simulate.
@@ -89,6 +124,8 @@ public:
    */
   virtual void updateActive() = 0; 
 
+  virtual size_t numPendingEvents () const = 0;
+
   /**
    * string representation for printing
    */
@@ -101,27 +138,10 @@ public:
    */
   virtual size_t getId() const = 0;
 
-  /**
-   * Recv event.
-   *
-   * @param inputIndex is the index of the input on which the event e is received
-   * @param e the event to be received
-   */
-  virtual void recvEvent(size_t inputIndex, const EventType& e) = 0;
+protected:
+  /** The MIN_DELAY allowed for new events */
+  static const SimTime MIN_DELAY = 1l;
 
-  /**
-   * Exec event.  
-   *
-   * The user code should override this method inorder to
-   * define the semantics of executing and event on
-   *
-   * @param graph: the graph whose nodes contain simulation objects and edges model the
-   * communication links
-   *
-   * @param myNode the node in the graph that has this SimObject as its node data
-   * @param e the input event
-   */
-  virtual void execEvent(Graph& graph, GNode& myNode, const EventType& e) = 0;
 
 }; // end class
 

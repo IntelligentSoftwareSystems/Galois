@@ -29,8 +29,6 @@
 
 #include "comDefs.h"
 
-#include "Galois/util/Atomic.h"
-
 /**
  * The Class BaseEvent.
  *
@@ -41,15 +39,7 @@ template <typename S, typename A>
 class BaseEvent {
 
 private:
-  /** The id counter for assigning ids to events.
-   * Events need to be globally ordered for correctness. The
-   * ties between events having same receive time are broken using
-   * this id
-   * The counter is atomic so that events created dynamically don't have duplicate ids
-   */
-  static Galois::GAtomic<int> idCntr;
-
-  /** The id. */
+  /** The id: not guaranteed to be unique. */
   size_t id;
   
   /** The send obj. */
@@ -70,19 +60,22 @@ private:
 
 
 
-public:
+protected:
   /**
    * Instantiates a new base event.
    *
+   * @param id: not guaranteed to be unique
    * @param sendObj the sending simulation obj
    * @param recvObj the receiving simulatio obj
    * @param action the action
    * @param sendTime the send time
    * @param recvTime the recv time
    */
-  BaseEvent (const S& sendObj, const S& recvObj, const A& action, const SimTime& sendTime, const SimTime& recvTime):
-    id (idCntr++), sendObj (sendObj), recvObj (recvObj), action (action), sendTime (sendTime), recvTime (recvTime) {}
+  BaseEvent (size_t id, const S& sendObj, const S& recvObj, const A& action, const SimTime& sendTime, const SimTime& recvTime):
+    id (id), sendObj (sendObj), recvObj (recvObj), action (action), sendTime (sendTime), recvTime (recvTime) {}
 
+
+public:
 
   /**
    * copy constructor copies over id as well
@@ -183,59 +176,9 @@ public:
     return id;
   }
 
-
-  /**
-   * Reset id counter
-   */
-  static void resetIdCounter(); 
 };
 
-template <typename S, typename A>
-Galois::GAtomic<int> BaseEvent<S, A>::idCntr(0);
 
-template <typename S, typename A>
-void BaseEvent<S, A>::resetIdCounter () {
-  BaseEvent<S, A>::idCntr = 0;
-}
-
-
-/**
- * EventRecvTimeTieBrkCmp is used to compare two events and 
- * break ties when the receiving time of two events is the same
- * Ties are resolved based on the ids of the events. Such global
- * ordering is necessary to ensure the events are added and removed
- * from an min-heap (used to implement priority queue) in a consistend order
- */
-
-template <typename EventTy> 
-struct EventRecvTimeTieBrkCmp {
-
-  int compare (const EventTy& left, const EventTy& right) const {
-    int res;
-    if ( left.getRecvTime () < right.getRecvTime ()) {
-      res = -1;
-
-    } else if (left.getRecvTime () > right.getRecvTime ()) {
-      res = 1;
-
-    } else {
-      res = left.getId () - right.getId ();
-    }
-
-    return res;
-
-  }
-
-  /**
-   * returns true if left > right
-   * Since std::priority_queue is a max heap, we use > semantics instead of <
-   * in order to get a min heap and thus process events in increasing order of recvTime.
-   */
-  bool operator () (const EventTy& left, const EventTy& right) const {
-    return compare (left, right) > 0;
-  }
-
-};
 
 
 

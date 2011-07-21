@@ -34,9 +34,10 @@
 
 static const bool DEBUG = false;
 
-using Galois::PerCPUcounter;
 
 class DESunordered: public DESabstractMain {
+  typedef Galois::GAccumulator<int> PerCPUcounter;
+  typedef Galois::GReduceMax<size_t> ReduceMax;
 
   /**
    * contains the loop body, called 
@@ -47,14 +48,16 @@ class DESunordered: public DESabstractMain {
     std::vector<unsigned int>& onWlFlags;
     PerCPUcounter& numEvents;
     PerCPUcounter& numIter;
+    ReduceMax& maxPending;
 
     
     process (
     Graph& graph,
     std::vector<unsigned int>& onWlFlags,
     PerCPUcounter& numEvents,
-    PerCPUcounter& numIter)
-      : graph (graph), onWlFlags (onWlFlags), numEvents (numEvents), numIter (numIter) {}
+    PerCPUcounter& numIter,
+    ReduceMax& maxPending)
+      : graph (graph), onWlFlags (onWlFlags), numEvents (numEvents), numIter (numIter), maxPending (maxPending) {}
 
 
 
@@ -86,6 +89,8 @@ class DESunordered: public DESabstractMain {
           // DEBUG
           printf ("%d processing : %s\n", ThreadPool::getMyID (), srcObj->toString ().c_str ());
         }
+
+        maxPending.update (srcObj->numPendingEvents ());
 
         int proc = srcObj->simulate(graph, activeNode); // number of events processed
         numEvents.get () += proc;
@@ -154,7 +159,7 @@ class DESunordered: public DESabstractMain {
    * std::vector<unsigned int> so that each index i!=j is stored in a separate word and we can
    * acquire lock on i safely.
    */
-  virtual void runLoop (const SimInit<Graph, GNode>& simInit) {
+  virtual void runLoop (const SimInit& simInit) {
     const std::vector<GNode>& initialActive = simInit.getInputNodes();
 
 
@@ -170,13 +175,15 @@ class DESunordered: public DESabstractMain {
 
     PerCPUcounter numEvents;
     PerCPUcounter numIter;
+    ReduceMax maxPending;
 
-    process p(graph, onWlFlags, numEvents, numIter);
+    process p(graph, onWlFlags, numEvents, numIter, maxPending);
 
     Galois::for_each < GaloisRuntime::WorkList::FIFO<GNode> > (initialActive.begin (), initialActive.end (), p);
 
     std::cout << "Number of events processed = " << numEvents.get () << std::endl;
     std::cout << "Number of iterations performed = " << numIter.get () << std::endl;
+    std::cout << "Maximum size of pending events = " << maxPending.get () << std::endl;
   }
 
   virtual bool isSerial () const { return false; }

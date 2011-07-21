@@ -27,6 +27,7 @@
 #define _DES_UNORDERED_SERIAL_H_
 
 #include <deque>
+#include <functional>
 
 #include <cassert>
 
@@ -48,7 +49,7 @@ class DESunorderedSerial: public DESabstractMain {
    *
    */
 
-  virtual void runLoop (const SimInit<Graph, GNode>& simInit) {
+  virtual void runLoop (const SimInit& simInit) {
     std::deque<GNode> worklist (simInit.getInputNodes ().begin (), simInit.getInputNodes ().end ());
 
     std::vector<bool> onWlFlags (simInit.getNumNodes (), false);
@@ -60,14 +61,19 @@ class DESunorderedSerial: public DESabstractMain {
       onWlFlags[srcObj->getId ()] = true;
     }
 
+    size_t maxPending = 0;
+
     size_t numEvents = 0;
     size_t numIter = 0;
+
     while (!worklist.empty ()) {
 
       GNode activeNode = worklist.front ();
       worklist.pop_front ();
 
       SimObject* srcObj = graph.getData (activeNode, Galois::NONE);
+
+      maxPending = std::max (maxPending, srcObj->numPendingEvents ());
 
       numEvents += srcObj->simulate(graph, activeNode);
 
@@ -105,6 +111,8 @@ class DESunorderedSerial: public DESabstractMain {
 
     std::cout << "Simulation ended" << std::endl;
     std::cout << "Number of events processed = " << numEvents << " Iterations = " << numIter << std::endl;
+    std::cout << "Max size of pending events = " << maxPending << std::endl;
+
   }
 
 };

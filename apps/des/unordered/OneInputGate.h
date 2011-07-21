@@ -38,11 +38,9 @@
 /**
  * The Class OneInputGate.
  */
-template <typename GraphTy, typename GNodeTy>
-class OneInputGate: public LogicGate<GraphTy, GNodeTy>, public BaseOneInputGate {
+class OneInputGate: public LogicGate, public BaseOneInputGate {
 
 private:
-  typedef typename LogicGate<GraphTy, GNodeTy>::AbsSimObj AbsSimObj;
 
   /**
    * a functor which computes an output LogicVal when
@@ -54,19 +52,20 @@ public:
   /**
    * Instantiates a new one input gate.
    *
+   * @param id
    * @param func: the functor providing mapping from input values to output values
    * @param outputName the output name
    * @param inputName the input name
    * @param delay the delay
    */
-  OneInputGate(const OneInputFunc& func, const std::string& outputName, const std::string& inputName, const SimTime& delay)
-    : LogicGate<GraphTy, GNodeTy> (1, 1, delay), BaseOneInputGate (outputName, inputName), func (func) {}
+  OneInputGate(size_t id, const OneInputFunc& func, const std::string& outputName, const std::string& inputName, const SimTime& delay)
+    : LogicGate (id, 1, 1, delay), BaseOneInputGate (outputName, inputName), func (func) {}
 
-  OneInputGate (const OneInputGate<GraphTy, GNodeTy>& that)
-    : LogicGate<GraphTy, GNodeTy> (that), BaseOneInputGate (that), func(that.func) {}
+  OneInputGate (const OneInputGate& that)
+    : LogicGate (that), BaseOneInputGate (that), func(that.func) {}
 
-  virtual OneInputGate<GraphTy, GNodeTy>* clone () const {
-    return new OneInputGate<GraphTy, GNodeTy> (*this);
+  virtual OneInputGate* clone () const {
+    return new OneInputGate (*this);
   }
 
 
@@ -86,11 +85,11 @@ protected:
     return func (getInputVal());
   }
 
-  virtual void execEvent (GraphTy& graph, GNodeTy& myNode, const Event<GNodeTy, LogicUpdate>& event) {
+  virtual void execEvent (Graph& graph, GNode& myNode, const EventTy& event) {
 
-    if (event.getType() == Event<GNodeTy, LogicUpdate>::NULL_EVENT) {
+    if (event.getType() == EventTy::NULL_EVENT) {
       // send out null messages
-      sendEventsToFanout(graph, myNode, event, Event<GNodeTy, LogicUpdate>::NULL_EVENT, LogicUpdate ());
+      sendEventsToFanout(graph, myNode, event, EventTy::NULL_EVENT, LogicUpdate ());
 
     } else {
       // update the inputs of fanout gates
@@ -98,7 +97,7 @@ protected:
       if (inputName == (lu.getNetName())) {
         inputVal = lu.getNetVal();
       } else {
-        LogicGate<GraphTy, GNodeTy>::netNameMismatch(lu);
+        LogicGate::netNameMismatch(lu);
       }
 
       // output has been changed
@@ -109,7 +108,7 @@ protected:
 
       LogicUpdate drvFanout(outputName, newOutput);
 
-      sendEventsToFanout(graph, myNode, event, Event<GNodeTy, LogicUpdate>::REGULAR_EVENT, drvFanout);
+      sendEventsToFanout(graph, myNode, event, EventTy::REGULAR_EVENT, drvFanout);
 
     }
 
@@ -171,7 +170,7 @@ public:
    */
   virtual const std::string toString() const {
     std::ostringstream ss;
-    ss << AbsSimObj::toString () << getGateName () << ": " << BaseOneInputGate::toString () 
+    ss << AbstractSimObject::toString () << getGateName () << ": " << BaseOneInputGate::toString () 
        << " delay = " << BaseLogicGate::getDelay ();
     return ss.str ();
   }

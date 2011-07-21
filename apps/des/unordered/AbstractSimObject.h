@@ -28,13 +28,15 @@
 
 #include <vector>
 #include <queue>
+#include <algorithm>
 
 #include <cassert>
 
 #include "Galois/Graphs/Graph.h"
 
 #include "comDefs.h"
-#include "BaseEvent.h"
+#include "Event.h"
+
 
 #include "SimObject.h"
 
@@ -43,32 +45,104 @@
 /**
  * @section Description
  *
- * The Class AbsSimObject represents an abstract simulation object (processing station). A simulation application
+ * The Class AbstractSimObject represents an abstract simulation object (processing station). A simulation application
  * would inherit from this class.
  */
 
-template <typename GraphTy, typename GNodeTy, typename EventTy>
-class AbsSimObject: public SimObject {
+class AbstractSimObject: public SimObject {
+private:
+  
+  /**
+   * This implementation of PriorityQueue imitates std::prioirty_queue but
+   * allows reserving space in the underlying std::vector
+   */
+  template <typename T, typename Cmp> 
+  class CustomPriorityQueue {
+
+    Cmp cmp;
+    std::vector<T> vec;
+    
+  public:
+    typedef std::vector<T> container_type;
+
+    typedef typename container_type::value_type value_type;
+    typedef typename container_type::reference reference;
+    typedef typename container_type::const_reference const_reference;
+    typedef typename container_type::size_type size_type;
+
+
+    CustomPriorityQueue (const Cmp& cmp = Cmp(), const std::vector<T>& vec = std::vector<T>()) 
+      : cmp(cmp), vec(vec) {
+      std::make_heap ( this->vec.begin (), this->vec.end (), cmp);
+    }
+
+    template <typename Iter> 
+    CustomPriorityQueue (Iter b, Iter e, const Cmp& cmp = Cmp ()) : cmp (cmp) {
+      vec.insert (vec.end (), b, e);
+
+      std::make_heap (vec.begin (), vec.end (), cmp);
+    }
+
+    CustomPriorityQueue (const CustomPriorityQueue& that): cmp(that.cmp), vec (that.vec) {
+    }
+
+
+    bool empty () const {
+      return vec.empty ();
+    }
+
+    size_type size () const {
+      return vec.size ();
+    }
+
+    const_reference top () const {
+      return vec.front ();
+    }
+
+    void push (const value_type& x) {
+      vec.push_back (x);
+      std::push_heap (vec.begin (), vec.end (), cmp);
+    }
+
+    void pop () {
+      std::pop_heap (vec.begin (), vec.end (), cmp);
+
+      vec.pop_back ();
+    }
+
+    void reserve (size_type s) {
+      assert (s > 0);
+      vec.reserve (s);
+    }
+
+  };
+
 public:
+  /**
+   * Upper limit on the number of events processed by a SimObject
+   * during a call to @see SimObject::simulate
+   */
   static size_t NEVENTS_PER_ITER;
+
 
 private:
 
   static const bool DEBUG = false;
 
-  typedef std::priority_queue<EventTy, std::vector<EventTy>, EventRecvTimeTieBrkCmp<EventTy> > PriorityQueue;
+  /** multiplication factor for space reserved in the prioirty queue */
+  static const size_t PQ_OVER_RESERVE = 1024;
 
-  /** The id counter.
-   * each object has an id, which is assigned at the 
-   * time of creation by incrementing a counter
-   */
-  static size_t idCntr;
+  // typedef std::priority_queue<EventTy, std::vector<EventTy>, EventRecvTimeLocalTieBrkCmp<EventTy> > PriorityQueue;
+  typedef CustomPriorityQueue<EventTy, EventRecvTimeLocalTieBrkCmp<EventTy> > PriorityQueue;
 
   /** The id. */
   size_t id;
 
   /** The number of inputs. */
   size_t numInputs;
+
+  /** number of outputs */
+  size_t numOutputs;
 
   // std::vector<PriorityQueue> inputEvents;
 
@@ -80,7 +154,7 @@ private:
 
   /** 
    * Events received on any input go into pendingEvents and are stored here until processed.
-   * readyEvents set, is a set of events that can safely be processed, if this AbsSimObject is
+   * readyEvents set, is a set of events that can safely be processed, if this AbstractSimObject is
    * active.  If minRecv is the min. of the latest timestamp received on any input i.e. min of inputTimes[i] for all i
    * then events with timestamp <= minRecv go into readyEvents set. readyEvents set is a 
    * subset of pendingEvents.
@@ -97,17 +171,28 @@ private:
   bool active;
 
 
+  /**
+   * Counter to assign id's to events sent by this SimObject
+   */
+  size_t eventIdCntr;
 
   /**
    * Inits the object.
    *
+   * @param id unique identifier for this object 
    * @param numOutputs the number of outputs
    * @param numInputs the number of  inputs
    */
-  void init(size_t numOutputs, size_t numInputs) {
-    this->id = idCntr++;
+  void init(size_t id, size_t numOutputs, size_t numInputs) {
+    eventIdCntr = 0; 
+    this->id = id;
+
+    assert (numOutputs == 1);
+    this->numOutputs = numOutputs;
 
     this->numInputs = numInputs;
+
+
     inputTimes.resize (numInputs);
 
     for (size_t i = 0; i < numInputs; ++i) {
@@ -116,8 +201,8 @@ private:
 
     pendingEvents = PriorityQueue();
 
-    // NEVENTS_PER_ITER * numInputs because each input can get fed with NEVENTS_PER_ITER on average
-    // pendingEvents.reserve (numInputs * NEVENTS_PER_ITER);
+    // reserving space upfront to avoid memory allocation due to doubling of the PriorityQueue etc
+    pendingEvents.reserve (numInputs * NEVENTS_PER_ITER * PQ_OVER_RESERVE);
 
     clock = 0;
 
@@ -128,8 +213,10 @@ private:
    *
    * @param that the that
    */
-  void deepCopy(const AbsSimObject<GraphTy, GNodeTy, EventTy>& that) {
-    init(that.numInputs, 1);
+  void deepCopy(const AbstractSimObject& that) {
+
+    init(that.id, that.numOutputs, that.numInputs);
+
     for (size_t i = 0; i < numInputs; ++i) {
       this->inputTimes[i] = that.inputTimes[i];
     }
@@ -164,27 +251,63 @@ private:
     // //TODO: not implemented yet
   // }
 
+
+
+
+
+
 public:
   /**
    * Instantiates a new simulation object.
    *
+   * @param id Must be unique 
    * @param numOutputs the number of outputs
    * @param numInputs the number of  inputs
    */
-  AbsSimObject(size_t numOutputs, size_t numInputs): SimObject() {
-    init(numOutputs, numInputs);
+  AbstractSimObject(size_t id, size_t numOutputs, size_t numInputs): SimObject() {
+    assert (numOutputs == 1);
+    init(id, numOutputs, numInputs);
   }
 
-  AbsSimObject (const AbsSimObject<GraphTy, GNodeTy, EventTy>& that): SimObject (that) {
+  AbstractSimObject (const AbstractSimObject& that): SimObject (that) {
     deepCopy (that);
   }
 
-  virtual ~AbsSimObject () {}
+  virtual ~AbstractSimObject () {}
   /**
    * a way to construct different subtypes
    * @return a copy of this
    */
-  virtual AbsSimObject<GraphTy, GNodeTy, EventTy>* clone() const = 0;
+  virtual AbstractSimObject* clone() const = 0;
+
+  /**
+   * Make event.
+   *
+   * @param sendObj the send obj
+   * @param recvObj the recv obj
+   * @param type the type
+   * @param act the action to be performed
+   * @param sendTime the send time
+   * @param delay the delay
+   * @return the event
+   */
+   EventTy makeEvent(SimObject* sendObj, SimObject* recvObj, const EventTy::Type& type, const LogicUpdate&  act
+      , const SimTime& sendTime, SimTime delay = MIN_DELAY) {
+
+    assert (sendObj == this);
+
+    if (delay <= 0) {
+      delay = MIN_DELAY;
+    }
+
+    SimTime recvTime;
+    if (sendTime == INFINITY_SIM_TIME) {
+      recvTime = INFINITY_SIM_TIME;
+    } else {
+      recvTime = sendTime + delay;
+    }
+    return  EventTy((eventIdCntr++), sendObj, recvObj, act, type, sendTime, recvTime);
+  }
 
 
   /**
@@ -215,7 +338,7 @@ public:
    * @param myNode: the node in the graph that has this SimObject as its node data
    * @param e: the input event
    */
-  virtual void execEvent(GraphTy& graph, GNodeTy& myNode, const EventTy& e) = 0;
+  virtual void execEvent(Graph& graph, GNode& myNode, const EventTy& e) = 0;
 
   /**
    * Simulate.
@@ -235,7 +358,7 @@ public:
    * @param myNode the node in the graph that has this SimObject as its node data
    * @return number of events ready to be executed.
    */
-  size_t simulate(GraphTy& graph, GNodeTy& myNode) {
+  size_t simulate(Graph& graph, GNode& myNode) {
     assert (isActive ());
 
     updateClock();// update the clock, 
@@ -254,15 +377,16 @@ public:
         const EventTy& curr = e;
         const EventTy& next = (pendingEvents.top ());
 
-        // assert (EventRecvTimeTieBrkCmp<EventTy> ().compare (prev, curr) < 0);
-        if (EventRecvTimeTieBrkCmp<EventTy> ().compare (curr, next) >= 0) {
-          std::cerr << "EventRecvTimeTieBrkCmp ().compare (curr, next) >= 0" << std::endl;
+        // assert (EventRecvTimeLocalTieBrkCmp<EventTy> ().compare (prev, curr) < 0);
+        if (EventRecvTimeLocalTieBrkCmp<EventTy> ().compare (curr, next) >= 0) {
+          std::cerr << "EventRecvTimeLocalTieBrkCmp ().compare (curr, next) >= 0" << std::endl;
           std::cerr << "curr = " << curr.detailedString () << std::endl << "next = " << next.detailedString () << std::endl;
         }
       }
 
 
       assert (graph.getData(myNode, Galois::NONE) == this); // should already own a lock
+      assert (e.getRecvObj () == this);
 
       execEvent(graph, myNode, e);
 
@@ -334,6 +458,10 @@ public:
   }
 
 
+  virtual size_t numPendingEvents () const { 
+    return pendingEvents.size ();
+  }
+
   /** 
    * @return a string representation for printing purposes
    */
@@ -362,18 +490,8 @@ public:
    */
   size_t getId() const { return id; }
 
-  /**
-   * resets the id counter to 0
-   */
-  static void resetIdCounter () {
-    idCntr = 0;
-  }
-
 }; // end class
 
-template <typename GraphTy, typename GNodeTy, typename EventTy>
-size_t AbsSimObject<GraphTy, GNodeTy, EventTy>::idCntr = 0;
 
-template <typename GraphTy, typename GNodeTy, typename EventTy>
-size_t AbsSimObject<GraphTy, GNodeTy, EventTy>::NEVENTS_PER_ITER = 1;
+size_t AbstractSimObject::NEVENTS_PER_ITER = 1024;
 #endif 

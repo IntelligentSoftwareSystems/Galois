@@ -5,16 +5,11 @@ file (GLOB Sources
 )
 
 add_executable(DESunorderedSerial unordered/DESunorderedSerial.cpp  ${Sources})
-target_link_libraries(DESunorderedSerial galois) 
-target_link_libraries(DESunorderedSerial ${CMAKE_THREAD_LIBS_INIT}) 
-target_link_libraries(DESunorderedSerial hoard)
+linkRuntime (DESunorderedSerial)
 
 
 add_executable(DESunordered unordered/DESunordered.cpp  ${Sources})
-target_link_libraries(DESunordered galois) 
-target_link_libraries(DESunordered ${CMAKE_THREAD_LIBS_INIT}) 
-target_link_libraries(DESunordered hoard)
-
+linkRuntime (DESunordered)
 
 
 include_directories (.)

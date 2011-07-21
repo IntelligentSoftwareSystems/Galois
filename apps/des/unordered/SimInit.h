@@ -50,19 +50,21 @@
 #include "OneInputGate.h"
 #include "Output.h"
 #include "SimObject.h"
-#include "AbsSimObject.h"
+#include "AbstractSimObject.h"
 #include "TwoInputGate.h"
 
-template <typename GraphTy, typename GNodeTy>
 class SimInit {
+
 public:
   typedef NetlistParser::StimulusMapType StimulusMapType;
-  typedef AbsSimObject<GraphTy, GNodeTy, Event<GNodeTy, LogicUpdate> > AbsSimObj;
+  typedef SimObject::Graph Graph;
+  typedef SimObject::GNode GNode;
+  typedef SimObject::EventTy EventTy;
 
 private:
 
   /** The graph. */
-  GraphTy& graph; // should contain all the gates, inputs and outputs
+  Graph& graph; // should contain all the gates, inputs and outputs
 
 
   /** The netlist parser. */
@@ -72,13 +74,13 @@ private:
   std::vector<SimObject*> inputObjs;
 
   /** The input nodes. */
-  std::vector<GNodeTy> inputNodes;
+  std::vector<GNode> inputNodes;
 
   /** The output simulation objs. */
   std::vector<SimObject*> outputObjs;
 
   /** The initial events. */
-  std::vector<Event<GNodeTy, LogicUpdate> > initEvents;
+  std::vector<EventTy > initEvents;
 
   /** The gates i.e. other than input and output ports. */
   std::vector<SimObject*> gateObjs;
@@ -89,6 +91,8 @@ private:
   /** The num nodes. */
   size_t numNodes;
 
+  /** Counter for SimObject's */
+  size_t simObjCntr;
 
   /**
    * A mapping from string name (in the netlist) to functor that implements
@@ -135,7 +139,7 @@ private:
       const std::string& out = *i;
       std::string in = addInPrefix(out);
 
-      inputObjs.push_back(new Input<GraphTy, GNodeTy>(out, in));
+      inputObjs.push_back(new Input((simObjCntr++), out, in));
     }
   }
 
@@ -148,7 +152,7 @@ private:
       const std::string& in = *i;
       std::string out = addOutPrefix(in);
 
-      outputObjs.push_back(new Output<GraphTy, GNodeTy>(out, in));
+      outputObjs.push_back(new Output((simObjCntr++), out, in));
     }
   }
 
@@ -160,46 +164,41 @@ private:
 
     const StimulusMapType& inputStimulusMap = parser.getInputStimulusMap();
 
-    for (typename std::vector<GNodeTy>::const_iterator i = inputNodes.begin (), ei = inputNodes.end (); i != ei; ++i ) {
+    for (std::vector<GNode>::const_iterator i = inputNodes.begin (), ei = inputNodes.end (); i != ei; ++i ) {
 
-      const GNodeTy& n = *i;
-      Input<GraphTy, GNodeTy>* currInput = 
-        dynamic_cast<Input<GraphTy, GNodeTy>* > (graph.getData (n, Galois::NONE));
+      const GNode& n = *i;
+      Input* currInput = 
+        dynamic_cast<Input* > (graph.getData (n, Galois::NONE));
 
       assert ((currInput != NULL));
+
+      size_t in = currInput->getInputIndex (currInput->getInputName ());
 
       StimulusMapType::const_iterator it = inputStimulusMap.find (currInput->getOutputName ());
       assert ((it != inputStimulusMap.end ()));
       const std::vector<std::pair<SimTime, LogicVal> >& tvList = it->second;
 
-      std::vector<Event<GNodeTy, LogicUpdate> > myEvents;
+      std::vector<EventTy > myEvents;
 
       for (std::vector< std::pair<SimTime, LogicVal> >::const_iterator j = tvList.begin (), ej = tvList.end ();
           j != ej; ++j) {
         const std::pair<SimTime, LogicVal>& p = *j;
         LogicUpdate lu(currInput->getOutputName(), p.second);
 
-        Event<GNodeTy, LogicUpdate> e = Event<GNodeTy, LogicUpdate>::makeEvent(n, n, Event<GNodeTy, LogicUpdate>::REGULAR_EVENT, lu,
-            p.first);
+        EventTy e = currInput->makeEvent(currInput, currInput, EventTy::REGULAR_EVENT, lu, p.first);
+
+        // adding the event to currInput's pending events 
+        currInput->recvEvent(in, e);
 
         initEvents.push_back(e);
         myEvents.push_back(e);
       }
 
-      // adding the initial events to the respective input
-      size_t in = currInput->getInputIndex(currInput->getInputName());
-      for (typename std::vector< Event<GNodeTy, LogicUpdate> >::const_iterator j = myEvents.begin ()
-          , ej = myEvents.end (); j != ej; ++j) {
-
-        const Event<GNodeTy, LogicUpdate>& event = *j;
-        currInput->recvEvent(in, event);
-
-      }
 
       // add a final null event with infinity as the time, to allow termination
-      currInput->recvEvent (in,
-          Event<GNodeTy, LogicUpdate>::makeEvent (n, n, Event<GNodeTy, LogicUpdate>::NULL_EVENT,
-              LogicUpdate (), INFINITY_SIM_TIME));
+      EventTy fe = currInput->makeEvent (currInput, currInput, EventTy::NULL_EVENT, LogicUpdate (), INFINITY_SIM_TIME);
+
+      currInput->recvEvent (in, fe);
 
       currInput->updateActive (); // mark all inputs active
 
@@ -227,7 +226,7 @@ private:
 
         const SimTime& delay = grec.delay;
 
-        OneInputGate<GraphTy, GNodeTy>* g = new OneInputGate<GraphTy, GNodeTy> (*func, out, in, delay);
+        OneInputGate* g = new OneInputGate ((simObjCntr++), *func, out, in, delay);
 
         this->gateObjs.push_back(g);
 
@@ -243,7 +242,7 @@ private:
 
         const SimTime& delay = grec.delay;
 
-        TwoInputGate<GraphTy, GNodeTy>* g = new TwoInputGate<GraphTy, GNodeTy> (*func, out, in1, in2, delay);
+        TwoInputGate* g = new TwoInputGate ((simObjCntr++), *func, out, in1, in2, delay);
 
         this->gateObjs.push_back(g);
 
@@ -261,9 +260,9 @@ private:
    * and add the node to the graph. No connections made yet
    */
   void createGraphNodes (const std::vector<SimObject*>& simObjs) {
-    for (typename std::vector<SimObject*>::const_iterator i = simObjs.begin (), ei = simObjs.end (); i != ei; ++i) {
+    for (std::vector<SimObject*>::const_iterator i = simObjs.begin (), ei = simObjs.end (); i != ei; ++i) {
       SimObject* so = *i;
-      GNodeTy n = graph.createNode(so);
+      GNode n = graph.createNode(so);
       graph.addNode(n, Galois::NONE);
       ++numNodes;
     }
@@ -276,24 +275,24 @@ private:
   void createConnections() {
 
     // read in all nodes first, since iterator may not support concurrent modification
-    std::vector<GNodeTy> allNodes;
+    std::vector<GNode> allNodes;
 
-    for (typename GraphTy::active_iterator i = graph.active_begin (), ei = graph.active_end (); i != ei; ++i) {
+    for (Graph::active_iterator i = graph.active_begin (), ei = graph.active_end (); i != ei; ++i) {
       allNodes.push_back (*i);
     }
 
-    for (typename std::vector<GNodeTy>::iterator i = allNodes.begin (), ei = allNodes.end (); i != ei; ++i) {
-      GNodeTy& src = *i;
-      LogicGate<GraphTy, GNodeTy>* srcGate = 
-        dynamic_cast<LogicGate<GraphTy, GNodeTy>* > (graph.getData (src, Galois::NONE));
+    for (std::vector<GNode>::iterator i = allNodes.begin (), ei = allNodes.end (); i != ei; ++i) {
+      GNode& src = *i;
+      LogicGate* srcGate = 
+        dynamic_cast<LogicGate* > (graph.getData (src, Galois::NONE));
 
       assert (srcGate != NULL);
       const std::string& srcOutName = srcGate->getOutputName ();
 
-      for (typename std::vector<GNodeTy>::iterator j = allNodes.begin (), ej = allNodes.end (); j != ej; ++j) {
-        GNodeTy& dst = *j;
-        LogicGate<GraphTy, GNodeTy>* dstGate = 
-           dynamic_cast<LogicGate<GraphTy, GNodeTy>* > (graph.getData (dst, Galois::NONE));
+      for (std::vector<GNode>::iterator j = allNodes.begin (), ej = allNodes.end (); j != ej; ++j) {
+        GNode& dst = *j;
+        LogicGate* dstGate = 
+           dynamic_cast<LogicGate* > (graph.getData (dst, Galois::NONE));
 
         assert (dstGate != NULL);
 
@@ -326,11 +325,6 @@ private:
     numEdges = 0;
 
 
-    // reset the id counters for SimObject and Event class so that the ids are numbered 0 .. numItems
-    AbsSimObj::resetIdCounter ();
-    BaseEvent<GNodeTy, LogicUpdate>::resetIdCounter ();
-    
-
     // create input and output objects
     createInputObjs();
     createOutputObjs();
@@ -338,10 +332,10 @@ private:
     createGateObjs();
 
     // add all gates, inputs and outputs to the Graph graph
-    for (typename std::vector<SimObject*>::const_iterator i = inputObjs.begin (), ei = inputObjs.end (); i != ei; ++i) {
+    for (std::vector<SimObject*>::const_iterator i = inputObjs.begin (), ei = inputObjs.end (); i != ei; ++i) {
       SimObject* so = *i;
 
-      GNodeTy n = graph.createNode(so);
+      GNode n = graph.createNode(so);
       graph.addNode(n, Galois::NONE);
       ++numNodes;
       inputNodes.push_back(n);
@@ -364,7 +358,7 @@ private:
    * before the vector itself is destroyed
    */
   template <typename T>
-  void destroyVec (std::vector<T*>& vec) {
+  static void destroyVec (std::vector<T*>& vec) {
     for (typename std::vector<T*>::iterator i = vec.begin (), ei = vec.end (); i != ei; ++i) {
       delete *i;
       *i = NULL;
@@ -387,8 +381,8 @@ public:
    * @param graph the graph
    * @param netlistFile the netlist file
    */
-  SimInit(GraphTy& graph, const char* netlistFile) 
-    : graph(graph), parser(netlistFile) {
+  SimInit(Graph& graph, const char* netlistFile) 
+    : graph(graph), parser(netlistFile), simObjCntr(0) {
     initialize();
   }
 
@@ -401,7 +395,7 @@ public:
    *
    * @return the graph
    */
-  const GraphTy& getGraph() const {
+  const Graph& getGraph() const {
     return graph;
   }
 
@@ -410,7 +404,7 @@ public:
    *
    * @return the inits the events
    */
-  const std::vector<Event<GNodeTy, LogicUpdate> >& getInitEvents() const {
+  const std::vector<EventTy >& getInitEvents() const {
     return initEvents;
   }
 
@@ -482,7 +476,7 @@ public:
    *
    * @return the input nodes
    */
-  const std::vector<GNodeTy>& getInputNodes() const {
+  const std::vector<GNode>& getInputNodes() const {
     return inputNodes;
   }
 };

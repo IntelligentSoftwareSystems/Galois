@@ -48,18 +48,15 @@ public:
   };
 
 private:
-  /** The MIN_DELAY allowed for new events */
-  static const SimTime MIN_DELAY = 1l;
 
 
   /** type of the event */
   Type type;
 
-protected:
-
   /**
    * Constructor
    *
+   * @param id: not guaranteed to be unique. Only events from same sender must have unique id's
    * @param sendObj: the sending node in the graph
    * @param recvObj: the receiving node in the graph
    * @param action: a user defined object describing the action to be performed on the receipt of
@@ -69,9 +66,12 @@ protected:
    * @param recvTime: receiving time
    */
 
-  Event (const S& sendObj, const S& recvObj, const A& action, const Type type, const SimTime& sendTime, const SimTime& recvTime)
-    : BaseEvent <S, A> (sendObj, recvObj, action, sendTime, recvTime), type (type) {}
+  Event (size_t id, const S& sendObj, const S& recvObj, const A& action, const Type type, const SimTime& sendTime, const SimTime& recvTime)
+    : BaseEvent <S, A> (id, sendObj, recvObj, action, sendTime, recvTime), type (type) {}
 
+
+  // only this class can use the constructor
+  friend class AbstractSimObject;
 public:
 
   /**
@@ -94,35 +94,83 @@ public:
     }
   }
 
-  /**
-   * Make event.
-   *
-   * @param sendObj the send obj
-   * @param recvObj the recv obj
-   * @param type the type
-   * @param act the action to be performed
-   * @param sendTime the send time
-   * @param delay the delay
-   * @return the event
-   */
-  static Event<S, A> makeEvent(const S& sendObj, const S& recvObj, const Type& type, const A&  act
-      , const SimTime& sendTime, SimTime delay = MIN_DELAY) {
-
-    if (delay <= 0) {
-      delay = MIN_DELAY;
-    }
-
-    SimTime recvTime;
-    if (sendTime == INFINITY_SIM_TIME) {
-      recvTime = INFINITY_SIM_TIME;
-    } else {
-      recvTime = sendTime + delay;
-    }
-    return  Event<S, A>(sendObj, recvObj, act, type, sendTime, recvTime);
-  }
-
 };
 
 
+/**
+ * EventRecvTimeLocalTieBrkCmp is used to compare two events and 
+ * break ties when the receiving time of two events is the same
+ *
+ * Ties between events with same recvTime need to be borken consistently,
+ * i.e. compare(m,n) and compare (n,m) are consistent with each other during 
+ * the life of events 'm' and 'n'. 
+ *
+ * There are at least two reasons for breaking ties between events of same time stamps:
+ *
+ * - Chandy-Misra's algorithm requires FIFO communication channels on edges between the 
+ *   stations. i.e. On a given input edge, two events with the same time stamp should not be
+ *   reordered. Therefore ties must be resolved for events received on the same input i.e. when
+ *   the sender is the same for two events.
+ *
+ * - PriorityQueue's are usually implemented using heaps and trees, which rebalance when an item is
+ *   removed/added. This means if we add two items 'a' and 'b' with the same priority in the time
+ *   order (a,b), then depending on what other itmes are added and removed, we may end up removing 'a' and
+ *   'b' in the order (b,a), i.e. PriorityQueue may reorder elements of same priority. Therefor,
+ *   If we break ties between events on same input and not break ties between events
+ *   on different inputs, this may result in reordering events on the same input.
+ *
+ */
+
+template <typename EventTy> 
+struct EventRecvTimeLocalTieBrkCmp {
+
+  /**
+   * 
+   * Compares two events 'left' and 'right' based on getRecvTime().
+   * if recvTime is same, then we compare the sender (using id), because two events from the same
+   * sender should not be reordered. 
+   * If the sender is the same then we use the id on the event to 
+   * break the tie, since, sender is guaranteed to assign a unique
+   * id to events
+   *
+   *
+   * @param left
+   * @param right
+   * @return -1 if left < right. 1 if left > right. Should not return 0 unless left and right are
+   * aliases
+   */
+
+  int compare (const EventTy& left, const EventTy& right) const {
+    int res;
+    if ( left.getRecvTime () < right.getRecvTime ()) {
+      res = -1;
+
+    } else if (left.getRecvTime () > right.getRecvTime ()) {
+      res = 1;
+
+    } else {
+
+      res = left.getSendObj ()->getId () - right.getSendObj ()->getId ();
+
+      if (res == 0) { // same sender
+        res = left.getId () - right.getId ();
+      }
+        
+    }
+
+    return res;
+
+  }
+
+  /**
+   * returns true if left > right
+   * Since std::priority_queue is a max heap, we use > semantics instead of <
+   * in order to get a min heap and thus process events in increasing order of recvTime.
+   */
+  bool operator () (const EventTy& left, const EventTy& right) const {
+    return compare (left, right) > 0;
+  }
+
+};
 
 #endif

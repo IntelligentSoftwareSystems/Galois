@@ -37,28 +37,28 @@
 /**
  * The Class Output.
  */
-template <typename GraphTy, typename GNodeTy>
-class Output: public OneInputGate <GraphTy, GNodeTy> {
+class Output: public OneInputGate {
 
 public: 
   /**
    * Instantiates a new Output.
    *
+   * @param id
    * @param outputName the output name
    * @param inputName the Output name
    */
-  Output(const std::string& outputName, const std::string& inputName)
-    : OneInputGate<GraphTy, GNodeTy> (BUF(), outputName, inputName, 0l)
+  Output(size_t id, const std::string& outputName, const std::string& inputName)
+    : OneInputGate (id, BUF(), outputName, inputName, 0l)
   {}
 
 
 
-  Output (const Output<GraphTy, GNodeTy> & that) 
-    : OneInputGate<GraphTy, GNodeTy> (that) {}
+  Output (const Output & that) 
+    : OneInputGate (that) {}
 
 
-  virtual Output<GraphTy, GNodeTy>* clone () const {
-    return new Output<GraphTy, GNodeTy> (*this);
+  virtual Output* clone () const {
+    return new Output (*this);
   }
 
   virtual const std::string getGateName() const {
@@ -77,9 +77,9 @@ protected:
   /**
    * Output just receives events and updates its state, does not send out any events
    */
-  virtual void execEvent(GNodeTy& myNode, const Event<GNodeTy, LogicUpdate>& event) {
+  virtual void execEvent(Graph& g, GNode& myNode, const EventTy& event) {
 
-     if (event.getType() == Event<GNodeTy, LogicUpdate>::NULL_EVENT) {
+     if (event.getType() == EventTy::NULL_EVENT) {
        // do nothing
      } else {
        // update the inputs of fanout gates
@@ -89,7 +89,7 @@ protected:
          this->BaseOneInputGate::outputVal = this->BaseOneInputGate::inputVal;
 
        } else {
-         LogicGate<GraphTy, GNodeTy>::netNameMismatch(lu);
+         LogicGate::netNameMismatch(lu);
        }
 
      }

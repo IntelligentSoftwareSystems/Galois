@@ -57,7 +57,6 @@ public:
   typedef SimObject::Graph Graph;
   typedef SimObject::GNode GNode;
 
-  typedef AbsSimObject<Graph, GNode, Event<GNode, LogicUpdate> > AbsSimObj;
 
 protected:
 
@@ -75,7 +74,7 @@ protected:
    *
    * @throws Exception the exception
    */
-  virtual void runLoop(const SimInit<Graph, GNode>& simInit) = 0;
+  virtual void runLoop(const SimInit& simInit) = 0;
 
   /**
    * Gets the version.
@@ -105,19 +104,19 @@ public:
     const char* netlistFile = args[0];
 
     if (args.size () == 2) {
-      size_t epi = AbsSimObj::NEVENTS_PER_ITER;
+      size_t epi = AbstractSimObject::NEVENTS_PER_ITER;
       std::istringstream iss (args[1]);
       iss >> epi;
       
       assert (epi >= 0);
-      AbsSimObj::NEVENTS_PER_ITER = epi;
+      AbstractSimObject::NEVENTS_PER_ITER = epi;
 
-      printf ("Processing %zd events per iteration\n", epi);
     }
 
+    printf ("Processing %zd events per iteration\n", AbstractSimObject::NEVENTS_PER_ITER);
 
 
-    SimInit<Graph, GNode> simInit(graph, netlistFile);
+    SimInit simInit(graph, netlistFile);
 
 
     printf("circuit graph: %u nodes, %zd edges\n", graph.size(), simInit.getNumEdges());
@@ -141,7 +140,7 @@ public:
    * Verify the output by comparing the final values of the outputs of the circuit
    * from simulation against the values precomputed in the netlist file
    */
-  void verify(const SimInit<Graph, GNode>& simInit) {
+  void verify(const SimInit& simInit) {
     const std::vector<SimObject*>& outputObjs = simInit.getOutputObjs();
     const std::map<std::string, LogicVal>& outValues = simInit.getOutValues();
 
@@ -150,7 +149,7 @@ public:
     for (std::vector<SimObject*>::const_iterator i = outputObjs.begin (), ei = outputObjs.end (); i != ei; ++i) {
       SimObject* so = *i;
 
-      Output<Graph, GNode>* outObj = dynamic_cast< Output<Graph, GNode>* > (so);
+      Output* outObj = dynamic_cast< Output* > (so);
 
       assert (outObj != NULL);
 
@@ -170,7 +169,7 @@ public:
       for (std::vector<SimObject*>::const_iterator i = outputObjs.begin (), ei = outputObjs.end (); i != ei; ++i) {
         SimObject* so = *i;
 
-        Output<Graph, GNode>* outObj = dynamic_cast< Output<Graph, GNode>* > (so);
+        Output* outObj = dynamic_cast< Output* > (so);
         assert (outObj != NULL);
 
         std::cerr << outObj->toString () << std::endl;

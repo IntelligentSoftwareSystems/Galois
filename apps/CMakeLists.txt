@@ -1,6 +1,9 @@
-function(app name)
+function (compileApp name) 
   file(GLOB Sources *.cpp)
   add_executable(${name} ${Sources})
+endfunction (compileApp)
+
+function (linkRuntime name) 
   target_link_libraries(${name} galois) 
   target_link_libraries(${name} ${CMAKE_THREAD_LIBS_INIT}) 
   if(NOT USE_SOLARIS)
@@ -17,6 +20,12 @@ function(app name)
   if(USE_NUMA)
     target_link_libraries(${name} numa)
   endif(USE_NUMA)
+endfunction (linkRuntime)
+
+
+function(app name)
+  compileApp (${name})
+  linkRuntime (${name})
 endfunction(app)
 
 if(LAPACK_FOUND)

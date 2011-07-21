@@ -32,27 +32,27 @@
 #include "OneInputGate.h"
 
 // may as well be inherited from OneInputGate
-template <typename GraphTy, typename GNodeTy>
-class Input: public OneInputGate <GraphTy, GNodeTy> {
+class Input: public OneInputGate {
 
 public: 
   /**
    * Instantiates a new Input.
    *
+   * @param id
    * @param outputName the output name
    * @param inputName the Input name
    */
-  Input(const std::string& outputName, const std::string& inputName)
-    : OneInputGate<GraphTy, GNodeTy> (BUF(), outputName, inputName, 0l)
+  Input(size_t id, const std::string& outputName, const std::string& inputName)
+    : OneInputGate (id, BUF(), outputName, inputName, 0l)
   {}
 
 
-  Input (const Input<GraphTy, GNodeTy> & that) 
-    : OneInputGate<GraphTy, GNodeTy> (that) {}
+  Input (const Input & that) 
+    : OneInputGate (that) {}
 
 
-  virtual Input<GraphTy, GNodeTy>* clone () const {
-    return new Input<GraphTy, GNodeTy> (*this);
+  virtual Input* clone () const {
+    return new Input (*this);
   }
 
   virtual const std::string getGateName() const {
@@ -73,12 +73,12 @@ protected:
    * @see OneInputGate::execEvent()
    *
    */
-  virtual void execEvent(GraphTy& graph, GNodeTy& myNode, const Event<GNodeTy, LogicUpdate>& event) {
+  virtual void execEvent(Graph& graph, GNode& myNode, const EventTy& event) {
 
-    if (event.getType () == Event<GNodeTy, LogicUpdate>::NULL_EVENT) {
+    if (event.getType () == EventTy::NULL_EVENT) {
       // send out null messages
 
-      OneInputGate<GraphTy, GNodeTy>::execEvent(graph, myNode, event); // same functionality as OneInputGate
+      OneInputGate::execEvent(graph, myNode, event); // same functionality as OneInputGate
 
     } else {
 
@@ -90,9 +90,9 @@ protected:
 
         LogicUpdate drvFanout(this->BaseOneInputGate::outputName, this->BaseOneInputGate::outputVal);
 
-        sendEventsToFanout(graph, myNode, event, Event<GNodeTy, LogicUpdate>::REGULAR_EVENT, drvFanout);
+        sendEventsToFanout(graph, myNode, event, EventTy::REGULAR_EVENT, drvFanout);
       } else {
-        LogicGate<GraphTy, GNodeTy>::netNameMismatch(lu);
+        LogicGate::netNameMismatch(lu);
       }
 
     }

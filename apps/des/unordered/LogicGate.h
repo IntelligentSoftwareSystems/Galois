@@ -36,7 +36,7 @@
 
 
 #include "Event.h"
-#include "AbsSimObject.h"
+#include "AbstractSimObject.h"
 #include "SimObject.h"
 #include "BaseLogicGate.h"
 #include "logicDefs.h"
@@ -45,16 +45,14 @@
 /**
  * The Class LogicGate represents an abstract logic gate.
  */
-template <typename GraphTy, typename GNodeTy>
-class LogicGate: public AbsSimObject<GraphTy, GNodeTy, Event<GNodeTy, LogicUpdate> >, public BaseLogicGate  {
+class LogicGate: public AbstractSimObject, public BaseLogicGate  {
 
 public:
-  typedef AbsSimObject< GraphTy, GNodeTy, Event<GNodeTy, LogicUpdate> > AbsSimObj;
-  typedef typename Event<GNodeTy, LogicUpdate>::Type EventType;
+  typedef EventTy::Type EventKind;
 
-  LogicGate (size_t numOutputs, size_t numInputs, SimTime delay): AbsSimObj (numOutputs, numInputs), BaseLogicGate (delay)  {}
+  LogicGate (size_t id, size_t numOutputs, size_t numInputs, SimTime delay): AbstractSimObject (id, numOutputs, numInputs), BaseLogicGate (delay)  {}
 
-  LogicGate (const LogicGate<GraphTy, GNodeTy>& that): AbsSimObj (that), BaseLogicGate (that) {}
+  LogicGate (const LogicGate& that): AbstractSimObject (that), BaseLogicGate (that) {}
 
   /**
    * Gets the index of the input whose name is matching the net
@@ -72,7 +70,7 @@ protected:
    */
   void netNameMismatch (const LogicUpdate& le) const {
     std::cerr << "Received logic update : " << le.toString () << " with mismatching net name, this = " <<
-      AbsSimObj::toString () << std::endl;
+      AbstractSimObject::toString () << std::endl;
     exit (-1);
   }
 
@@ -85,26 +83,27 @@ protected:
    * @param type: the type
    * @param msg: the logic update
    */
-  void sendEventsToFanout(GraphTy& graph, GNodeTy& myNode, const Event<GNodeTy, LogicUpdate>& inputEvent, 
-      const EventType& type, const LogicUpdate& msg) const {
+  void sendEventsToFanout(Graph& graph, GNode& myNode, const EventTy& inputEvent, 
+      const EventKind& type, const LogicUpdate& msg) {
 
     // assert (&myNode == &inputEvent.getRecvObj());
 
-    assert (graph.getData (myNode, Galois::NONE) == this);
+    SimObject* srcObj = graph.getData (myNode, Galois::NONE);
+    assert (srcObj == this);
 
     SimTime sendTime = inputEvent.getRecvTime();
 
-    for (typename GraphTy::neighbor_iterator i = graph.neighbor_begin (myNode, Galois::NONE), 
+    for (Graph::neighbor_iterator i = graph.neighbor_begin (myNode, Galois::NONE), 
         e = graph.neighbor_end (myNode, Galois::NONE); i != e; ++i) {
 
-      const GNodeTy& dst = *i;
+      const GNode& dst = *i;
+      SimObject* dstObj = graph.getData (dst, Galois::NONE);
 
-      Event<GNodeTy, LogicUpdate> ne = Event<GNodeTy, LogicUpdate>::makeEvent (myNode, dst, type, msg, sendTime,
+      EventTy ne = srcObj->makeEvent (srcObj, dstObj, type, msg, sendTime,
           BaseLogicGate::getDelay ());
 
 
-      SimObject* dstObj = graph.getData (dst, Galois::NONE);
-      LogicGate<GraphTy, GNodeTy>* dstGate = dynamic_cast< LogicGate<GraphTy, GNodeTy>* > (dstObj);
+      LogicGate* dstGate = dynamic_cast< LogicGate* > (dstObj);
 
       if (dstGate == NULL) {
         std::cerr << "dynamic_cast failed" << std::endl;
