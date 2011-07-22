@@ -28,34 +28,66 @@
 #include <iostream>
 
 #include "StressWork.h"
-#include "Material.h"
+
+StressWork::PerCPUtmpVecTy* StressWork::perCPUtmpVec = NULL;
+
+void StressWork::initPerCPUtmpVec (size_t Dim) {
+  if (StressWork::perCPUtmpVec == NULL) {
+    StressWork::perCPUtmpVec = new StressWork::PerCPUtmpVecTy (StressWork::StressWorkTmpVec (Dim));
+  }
+}
+
+
+static void copyVecDouble (const VecDouble& vin, VecDouble& vout) {
+  if (vout.size () != vin.size ()) {
+    vout.resize (vin.size ());
+  }
+
+  std::copy (vin.begin (), vin.end (), vout.begin ());
+}
 
 bool StressWork::getDValIntern (const MatDouble &argval, MatDouble& funcval, FourDVecDouble& dfuncval
     , const GetValMode& mode) const {
   const size_t Dim = fieldsUsed.size();
 
-  // We should have the same quadrature points in  all fields used
-  size_t nquad = element.getIntegrationWeights(fieldsUsed[0]).size();
-
-  std::vector<size_t> nDof;
-  std::vector<size_t> nDiv;
-
-  MatDouble DShape(Dim);
-  MatDouble IntWeights(Dim);
-
   // XXX: (amber) replaced 3 with NDM, 9 with MAT_SIZE and so on ...
   const size_t MAT_SIZE = SimpleMaterial::MAT_SIZE;
   const size_t NDM = SimpleMaterial::NDM;
 
-  VecDouble A(MAT_SIZE * MAT_SIZE, 0.0);
-  VecDouble F(MAT_SIZE);
-  VecDouble P(MAT_SIZE, 0);
+  // We should have the same quadrature points in  all fields used
+  size_t nquad = element.getIntegrationWeights(fieldsUsed[0]).size();
+
+
+
+  assert (StressWork::perCPUtmpVec != NULL);
+  StressWorkTmpVec& tmpVec = StressWork::perCPUtmpVec->get ();
+
+  std::vector<size_t>& nDof = tmpVec.nDof;
+  std::vector<size_t>& nDiv = tmpVec.nDiv;
+
+  MatDouble& DShape = tmpVec.DShape;
+  MatDouble& IntWeights = tmpVec.IntWeights;
+
+  VecDouble& A = tmpVec.A;
+  VecDouble& F = tmpVec.F;
+  VecDouble& P = tmpVec.P;
+
+  assert (nDof.size () == Dim);
+  assert (nDiv.size () == Dim);
+  assert (DShape.size () == Dim);
+  assert (IntWeights.size () == Dim);
 
   for (size_t f = 0; f < Dim; ++f) {
-    nDof.push_back(element.getDof(fieldsUsed[f]));
-    nDiv.push_back(element.getNumDerivatives(fieldsUsed[f]));
-    DShape[f] = element.getDShapes(fieldsUsed[f]);
-    IntWeights[f] = element.getIntegrationWeights(fieldsUsed[f]);
+    nDof[f] = element.getDof(fieldsUsed[f]);
+    nDiv[f] = element.getNumDerivatives(fieldsUsed[f]);
+
+    // DShape[f] = element.getDShapes(fieldsUsed[f]);
+    // do copy instead of assignment to pervent calls to allocator
+    copyVecDouble (element.getDShapes (fieldsUsed[f]), DShape[f]);
+
+    // IntWeights[f] = element.getIntegrationWeights(fieldsUsed[f]);
+    // do copy instead of assignment to pervent calls to allocator
+    copyVecDouble (element.getIntegrationWeights (fieldsUsed[f]), IntWeights[f]);
   }
 
   if (funcval.size() < Dim) {

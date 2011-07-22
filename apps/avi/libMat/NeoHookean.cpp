@@ -28,7 +28,10 @@
 
 #include "Material.h"
 
-static double matlib_determinant(double *A) {
+// calling default constructor
+GaloisRuntime::PerCPU<NeoHookean::NeoHookenTmpVec> NeoHookean::perCPUtmpVec;
+
+static double matlib_determinant(const double *A) {
   double det;
 
   det = A[0] * (A[4] * A[8] - A[5] * A[7]) - A[1] * (A[3] * A[8] - A[5] * A[6]) + A[2] * (A[3] * A[7] - A[4] * A[6]);
@@ -36,7 +39,7 @@ static double matlib_determinant(double *A) {
   return det;
 }
 
-static double matlib_inverse(double *A, double *Ainv) {
+static double matlib_inverse(const double *A, double *Ainv) {
   double det, detinv;
 
   det = matlib_determinant(A);
@@ -58,7 +61,7 @@ static double matlib_inverse(double *A, double *Ainv) {
   return det;
 }
 
-static void matlib_mults(double *A, double *B, double *C) {
+static void matlib_mults(const double *A, const double *B, double *C) {
   C[0] = A[0] * B[0] + A[1] * B[1] + A[2] * B[2];
   C[1] = A[3] * B[0] + A[4] * B[1] + A[5] * B[2];
   C[2] = A[6] * B[0] + A[7] * B[1] + A[8] * B[2];
@@ -74,16 +77,47 @@ bool NeoHookean::getConstitutiveResponse(const std::vector<double>& strain, std:
     , const ConstRespMode& mode) const {
   // XXX: (amber) replaced unknown 3's with NDM, 9 & 81 with MAT_SIZE & MAT_SIZE ^ 2
 
-  size_t i, j, k, l, m, n, ij, jj, kl, jk, il, ik, im, jl, kj, kn, mj, nl, ijkl, indx;
+  size_t i;
+  size_t j;
+  size_t k;
+  size_t l;
+  size_t m;
+  size_t n;
+  size_t ij;
+  size_t jj;
+  size_t kl;
+  size_t jk;
+  size_t il;
+  size_t ik;
+  size_t im;
+  size_t jl;
+  size_t kj;
+  size_t kn;
+  size_t mj;
+  size_t nl;
+  size_t ijkl;
+  size_t indx;
 
-  double coef, defVol, detC, p, trace;
+  double coef;
+  double defVol;
+  double detC;
+  double p;
+  double trace;
 
-  double F[MAT_SIZE];
-  std::copy (I_MAT, I_MAT + MAT_SIZE, F);
+  NeoHookenTmpVec& tmpVec = perCPUtmpVec.get ();
+  double* F = tmpVec.F;
+  double* Finv = tmpVec.Finv;
+  double* C = tmpVec.C;
+  double* Cinv = tmpVec.Cinv;
+  double* S = tmpVec.S;
+  double* M = tmpVec.M;
 
-  double C[MAT_SIZE], Cinv[MAT_SIZE], S[MAT_SIZE], M[MAT_SIZE * MAT_SIZE];
-  double Finv[MAT_SIZE], detF;
+  
+  double detF;
+
   size_t J;
+
+  std::copy (I_MAT, I_MAT + MAT_SIZE, F);
 
   /*Fill in the deformation gradient*/
   for (i = 0; i < NDF; i++) {

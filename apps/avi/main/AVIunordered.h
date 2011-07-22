@@ -78,12 +78,11 @@
 class AVIunordered: public AVIabstractMain {
 
 protected:
-  typedef Galois::GAtomic<int> AtomicInteger;
-  typedef Galois::PerCPUcounter IterCounter;
+  typedef Galois::GAccumulator<int> IterCounter;
 
   static const bool DEBUG = false;
 
-  static const int CHUNK_SIZE = 64;
+  static const int CHUNK_SIZE = 32;
 
 // TODO: use LCGraph 
   typedef Galois::Graph::FirstGraph<AVI*, void, false> Graph;
@@ -204,17 +203,6 @@ protected:
         iter (iter) {}
     
 
-    process (const process& that):
-        graph (that.graph),
-        inDegVec (that.inDegVec),
-        meshInit (that.meshInit),
-        g (that.g),
-        perIterLocalVec (that.perIterLocalVec),
-        aviCmp (that.aviCmp),
-        createSyncFiles (that.createSyncFiles),
-        iter (that.iter) {}
-
-
     /**
      * Loop body
      *
@@ -236,6 +224,10 @@ protected:
         for (Graph::neighbor_iterator j = graph.neighbor_begin (src, Galois::CHECK_CONFLICT)
             , ej = graph.neighbor_end (src, Galois::CHECK_CONFLICT); j != ej; ++j) {
         }
+
+
+        // past the fail-safe point now
+
 
         int inDeg = inDegVec[srcAVI->getGlobalIndex ()];
         // assert  inDeg == 0 : String.format ("active node %s with inDeg = %d\n", srcAVI, inDeg);

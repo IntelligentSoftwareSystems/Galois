@@ -58,6 +58,7 @@
  * and no abstract locks
  */
 class AVIunorderedNoLock: public AVIunordered {
+  typedef Galois::GAtomic<int> AtomicInteger;
 
 protected:
 

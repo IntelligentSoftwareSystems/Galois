@@ -36,6 +36,8 @@
 
 #include <cmath>
 #include <cassert>
+
+#include "Galois/Runtime/PerCPU.h"
 /**
  \brief Base class for all materials.
 
@@ -173,6 +175,30 @@ private:
  */
 
 class NeoHookean: public SimpleMaterial {
+
+  /**
+   * Holds temporary vectors used by getConstitutiveResponse
+   * Instead of allocating new arrays on the stack, we reuse
+   * the same memory in the hope of better cache efficiency
+   * There is on instance of this struct per thread
+   */
+  struct NeoHookenTmpVec {
+    static const size_t MAT_SIZE = SimpleMaterial::MAT_SIZE;
+
+    double F[MAT_SIZE];
+    double Finv[MAT_SIZE]; 
+    double C[MAT_SIZE]; 
+    double Cinv[MAT_SIZE]; 
+    double S[MAT_SIZE]; 
+    double M[MAT_SIZE * MAT_SIZE];
+
+  };
+
+  /**
+   * Per thread storage for NeoHookenTmpVec 
+   */
+  static GaloisRuntime::PerCPU<NeoHookenTmpVec> perCPUtmpVec;
+
 public:
   NeoHookean(double LambdaInput, double MuInput, double rhoInput = 0) :
     SimpleMaterial(rhoInput), Lambda(LambdaInput), Mu(MuInput) {

@@ -34,6 +34,8 @@
 
 #include <cassert>
 
+#include "Galois/Runtime/PerCPU.h"
+
 #include "ElementalOperation.h"
 #include "AuxDefs.h"
 
@@ -75,6 +77,54 @@ protected:
   //! \warning argval should contain displacements, not deformation mapping
   bool getDValIntern(const MatDouble &argval, MatDouble& funcval, FourDVecDouble& dfuncval, const GetValMode& mode) const;
 
+private:
+
+  /**
+   * Contains the temporary vectors used by @see getDValIntern
+   * Instead of creating and destroying new vectors on every call, 
+   * which happens at least once per iteration, we reuse vectors
+   * from this struct. There's one instance per thread of this struct
+   */
+  struct StressWorkTmpVec {
+    static const size_t MAT_SIZE = SimpleMaterial::MAT_SIZE;
+
+    std::vector<size_t> nDof;
+    std::vector<size_t> nDiv;
+
+    MatDouble DShape;
+    MatDouble IntWeights;
+
+    VecDouble A;
+    VecDouble F;
+    VecDouble P;
+
+    StressWorkTmpVec ()
+      : A (MAT_SIZE * MAT_SIZE, 0.0),
+        F (MAT_SIZE, 0.0),
+        P (MAT_SIZE, 0.0) {}
+
+    explicit StressWorkTmpVec (size_t Dim)
+      : nDof(Dim), 
+        nDiv(Dim),
+        DShape(Dim), 
+        IntWeights(Dim),
+        A (MAT_SIZE * MAT_SIZE, 0.0),
+        F (MAT_SIZE, 0.0),
+        P (MAT_SIZE, 0.0) {}
+    
+
+
+  };
+
+  /**
+   * Per thread storage for temporary vectors used in @see getDValIntern
+   */
+  typedef GaloisRuntime::PerCPU<StressWorkTmpVec> PerCPUtmpVecTy;
+
+  static PerCPUtmpVecTy* perCPUtmpVec;
+
+  static void initPerCPUtmpVec (size_t Dim);
+
 public:
   //! Construct a StressWork object with fields "field1, field2 and field3" as 
   //! the three dimensional displacement fields. 
@@ -89,6 +139,9 @@ public:
   StressWork(const Element& IElm, const SimpleMaterial &SM, const std::vector<size_t>& fieldsUsed)
     : DResidue (IElm, SM, fieldsUsed) {
     assert (fieldsUsed.size() > 0 && fieldsUsed.size () <= 3);
+
+    initPerCPUtmpVec (this->fieldsUsed.size ());
+
   }
 
   virtual ~StressWork() {
@@ -96,6 +149,7 @@ public:
 
 
   StressWork(const StressWork & SW) : DResidue (SW) {
+    initPerCPUtmpVec (this->fieldsUsed.size ());
   }
 
 

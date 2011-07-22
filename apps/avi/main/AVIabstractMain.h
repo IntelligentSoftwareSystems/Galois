@@ -280,7 +280,9 @@ void AVIabstractMain::run (int argc, const char* argv[]) {
 
   t.stop ();
 
-  verify (input, *meshInit, g);
+  if (!skipVerify) {
+    verify (input, *meshInit, g);
+  }
 
   delete meshInit;
 
