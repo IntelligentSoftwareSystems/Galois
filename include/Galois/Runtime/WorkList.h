@@ -325,7 +325,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
   OrderedByIntegerMetric(const Indexer& x = Indexer())
     :masterVersion(0), I(x)
   {
-    for (int i = 0; i < current.size(); ++i) {
+    for (unsigned int i = 0; i < current.size(); ++i) {
       current.get(i).current = 0;
       current.get(i).lastMasterVersion = 0;
     }
@@ -497,7 +497,7 @@ public:
     data.get().next.setValue(0);
     ACT;
     //Try all nodes
-    for (int i = 0; i < data.size(); ++i) {
+    for (unsigned int i = 0; i < data.size(); ++i) {
       p& n = data.get(i);
       if (n.next.getValue()) {
 	n.next.lock();
@@ -513,7 +513,7 @@ public:
   }
 
   bool empty() {
-    for (int i = 0; i < data.size(); ++i) {
+    for (unsigned int i = 0; i < data.size(); ++i) {
       p& n = data.get(i);
       if (n.next.getValue() && !n.next.getValue()->empty())
 	return false;
@@ -618,7 +618,7 @@ public:
   };
 
   ChunkedMaster() : heap(sizeof(Chunk)) {
-    for (int i = 0; i < data.size(); ++i) {
+    for (unsigned int i = 0; i < data.size(); ++i) {
       p& r = data.get(i);
       r.cur = 0;
       r.next = 0;
@@ -666,7 +666,7 @@ public:
   }
   
   bool empty() OPTNOINLINE {
-    for (int i = 0; i < data.size(); ++i) {
+    for (unsigned int i = 0; i < data.size(); ++i) {
       const p& n = data.get(i);
       if (n.cur && !n.cur->empty()) return false;
       if (n.next && !n.next->empty()) return false;

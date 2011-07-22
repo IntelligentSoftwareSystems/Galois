@@ -97,7 +97,7 @@ public:
     return get((myID() + 1) % getSystemThreadPool().getActiveThreads());
   }
 
-  int size() const {
+  unsigned int size() const {
     return num;
   }
 };

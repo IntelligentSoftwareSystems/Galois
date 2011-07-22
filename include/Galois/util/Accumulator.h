@@ -54,12 +54,18 @@ class GReducible: public GaloisRuntime::ThreadAware {
 public:
   /**
    * @param val initial per thread value
-   * @param func the binary functor acting as the reduction operator
    */
-  explicit GReducible (const T val)
+  explicit GReducible (const T& val)
     : _data(val) { }
+  /**
+   * @param F the binary functor acting as the reduction operator
+   */
   explicit GReducible (BinFunc F)
     : _func(F) { }
+  /**
+   * @param val initial per thread value
+   * @param F the binary functor acting as the reduction operator
+   */
   GReducible (const T val, BinFunc F)
     : _func(F), _data(val) { }
 
@@ -86,6 +92,11 @@ public:
     return _data.get();
   }
 
+  /**
+   * reset thread local value to the arg provided
+   *
+   * @param d
+   */
   void reset(const T& d) {
     _data.reset(d);
   }
@@ -104,11 +115,12 @@ struct ReduceAssignWrap {
   }
 };
 
-typedef GReducible<int, ReduceAssignWrap<std::plus<int> > > PerCPUcounter;
-
 template<typename T>
 class GAccumulator : public GReducible<T, ReduceAssignWrap<std::plus<T> > > {
+  typedef GReducible<T, ReduceAssignWrap<std::plus<T> > > SuperType;
 public:
+  explicit GAccumulator (const T& val = T()): SuperType(val) {}
+
   GAccumulator& operator+=(const T& rhs) {
     update(rhs);
     return *this;
