@@ -121,9 +121,7 @@ private:
    */
   typedef GaloisRuntime::PerCPU<StressWorkTmpVec> PerCPUtmpVecTy;
 
-  static PerCPUtmpVecTy* perCPUtmpVec;
-
-  static void initPerCPUtmpVec (size_t Dim);
+  static PerCPUtmpVecTy perCPUtmpVec;
 
 public:
   //! Construct a StressWork object with fields "field1, field2 and field3" as 
@@ -138,19 +136,15 @@ public:
   //! assumed that it is a plane strain case.
   StressWork(const Element& IElm, const SimpleMaterial &SM, const std::vector<size_t>& fieldsUsed)
     : DResidue (IElm, SM, fieldsUsed) {
+
     assert (fieldsUsed.size() > 0 && fieldsUsed.size () <= 3);
 
-    initPerCPUtmpVec (this->fieldsUsed.size ());
-
   }
 
-  virtual ~StressWork() {
-  }
+  virtual ~StressWork() {}
 
 
-  StressWork(const StressWork & SW) : DResidue (SW) {
-    initPerCPUtmpVec (this->fieldsUsed.size ());
-  }
+  StressWork(const StressWork & SW) : DResidue (SW) {}
 
 
   virtual StressWork * clone() const {

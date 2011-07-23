@@ -165,7 +165,10 @@ public:
   NetlistTokenizer (const char* fileName, const char* delim, const char* comments)
     : ifs(fileName), delim (delim), comments(comments), linePtr (NULL), currTokPtr (NULL)  {
 
-    assert (ifs.good ());      
+    if (!ifs.good ()) {
+      std::cerr << "Failed to open this file for reading: " << fileName << std::endl; 
+      abort ();
+    }
     nextTokPtr = readNextToken();
 
   }

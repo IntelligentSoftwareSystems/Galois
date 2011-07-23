@@ -29,13 +29,8 @@
 
 #include "StressWork.h"
 
-StressWork::PerCPUtmpVecTy* StressWork::perCPUtmpVec = NULL;
+StressWork::PerCPUtmpVecTy StressWork::perCPUtmpVec;
 
-void StressWork::initPerCPUtmpVec (size_t Dim) {
-  if (StressWork::perCPUtmpVec == NULL) {
-    StressWork::perCPUtmpVec = new StressWork::PerCPUtmpVecTy (StressWork::StressWorkTmpVec (Dim));
-  }
-}
 
 
 static void copyVecDouble (const VecDouble& vin, VecDouble& vout) {
@@ -59,8 +54,7 @@ bool StressWork::getDValIntern (const MatDouble &argval, MatDouble& funcval, Fou
 
 
 
-  assert (StressWork::perCPUtmpVec != NULL);
-  StressWorkTmpVec& tmpVec = StressWork::perCPUtmpVec->get ();
+  StressWorkTmpVec& tmpVec = StressWork::perCPUtmpVec.get ();
 
   std::vector<size_t>& nDof = tmpVec.nDof;
   std::vector<size_t>& nDiv = tmpVec.nDiv;
@@ -72,10 +66,10 @@ bool StressWork::getDValIntern (const MatDouble &argval, MatDouble& funcval, Fou
   VecDouble& F = tmpVec.F;
   VecDouble& P = tmpVec.P;
 
-  assert (nDof.size () == Dim);
-  assert (nDiv.size () == Dim);
-  assert (DShape.size () == Dim);
-  assert (IntWeights.size () == Dim);
+  if (nDof.size () != Dim) { nDof.resize (Dim); }
+  if (nDiv.size () != Dim) { nDiv.resize (Dim); }
+  if (DShape.size () != Dim) { DShape.resize (Dim); }
+  if (IntWeights.size () != Dim) { IntWeights.resize (Dim); }
 
   for (size_t f = 0; f < Dim; ++f) {
     nDof[f] = element.getDof(fieldsUsed[f]);

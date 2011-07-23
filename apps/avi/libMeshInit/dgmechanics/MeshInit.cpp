@@ -166,8 +166,13 @@ void MeshInit::writeSync (const AVI& avi, const VecDouble& Qval, const VecDouble
 
       char syncFileName[MAX_FNAME];
       sprintf(syncFileName, "sync.%d_%d.dat", this->writeInterval, PID);
-      this->syncFileWriter = fopen (syncFileName, "w+");
-      assert (syncFileWriter != NULL);
+
+      this->syncFileWriter = fopen (syncFileName, "w");
+
+      if (syncFileWriter == NULL) {
+        std::cerr << "Failed to open log file for writing: " << syncFileName << std::endl;
+        abort ();
+      }
       
       // increment to define the end limit for the new interval.
       ++this->writeInterval;
