@@ -27,6 +27,7 @@
 #include "Galois/Statistic.h"
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
+#include "Galois/util/Accumulator.h"
 
 #include "Galois/Graphs/Serialize.h"
 #include "Galois/Graphs/FileGraph.h"
@@ -90,7 +91,7 @@ void getRandomPoints(vector<LeafNode*> & lights, int numPoints){
 	    return;
 }
 /*********************************************************************************************/
-GaloisRuntime::PerCPU<unsigned int> addedNodes;
+Galois::GAccumulator<size_t> addedNodes;
 struct FindMatching {
 	KdTree * tree;
 	GaloisRuntime::galois_insert_bag<NodeWrapper *> *newNodes;
@@ -189,7 +190,7 @@ void clusterGalois(vector<LeafNode*> & lights) {
 	vector<NodeWrapper*> workListOld(0);
 	KdTree::getAll(*tree, workListOld);
 	vector<NodeWrapper*> workList(0);
-	int size = 0;
+	size_t size = 0;
 	for(unsigned int i=0;i<workListOld.size();i++){
 		workList.push_back(workListOld[i]);
 	}
@@ -201,14 +202,16 @@ void clusterGalois(vector<LeafNode*> & lights) {
 
 	while(true){
 		newNodes = new GaloisRuntime::galois_insert_bag<NodeWrapper*>();
-		for(int i=0;i<addedNodes.size();i++)
-			addedNodes.get(i)=0;
+
+		addedNodes.reset(0);
+
 		findMatchingLambda.newNodes=newNodes;
 		findMatchingLambda.tree=tree;
 
 		Galois::for_each(workList.begin(),workList.end(),findMatchingLambda);
-		for(int i=0;i<addedNodes.size();i++)
-			size+=addedNodes.get(i);
+
+		size += addedNodes.get();
+
 		workList.clear();
 		for(GaloisRuntime::galois_insert_bag<NodeWrapper*>::iterator it = newNodes->begin(), itEnd = newNodes->end();it!=itEnd;it++)
 			workList.push_back(*it);
