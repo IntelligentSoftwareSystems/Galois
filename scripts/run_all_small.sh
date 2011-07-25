@@ -30,7 +30,7 @@ run apps/preflowpush/preflowpush -t 2 ${BASE}/inputs/structured/rome99.gr 0 100
 run apps/sssp/sssp -t 2 ${BASE}/inputs/structured/rome99.gr 1 2
 run apps/boruvka/boruvka -t 2 ${BASE}/inputs/structured/rome99.gr 1 2
 run apps/clustering/clustering -t 2 1000 1 2
-
+run apps/gmetis/gmetis -t 2 ${BASE}/inputs/structured/rome99.gr 4 false true false
 echo -en '\033[1;32m'
 echo -n ALL OK
 echo -e '\033[0m'
