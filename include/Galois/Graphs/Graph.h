@@ -394,6 +394,19 @@ public:
     return !oldActive;
   }
 
+  //add a node and reserve the space for edges
+  bool addNode(const GraphNode& n, int maxDegree, MethodFlag mflag = ALL) {
+	  assert(n.ID);
+	  acquire(n.ID, mflag);
+	  bool oldActive = n.ID->active;
+	  if (!oldActive) {
+		  n.ID->active = true;
+		  //__sync_add_and_fetch(&numActive, 1);
+	  }
+	  n.ID->edges.reserve(maxDegree);
+	  return !oldActive;
+  }
+
   //! Gets the node data for a node.
   node_reference getData(const GraphNode& n, Galois::MethodFlag mflag = ALL) const {
     assert(n.ID);
