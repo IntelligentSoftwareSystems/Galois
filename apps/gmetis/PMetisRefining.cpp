@@ -78,7 +78,7 @@ void refineTwoWay(MetisGraph* metisGraph, MetisGraph* orgGraph, int* tpwgts) {
 	metisGraph->computeTwoWayPartitionParams();
 
 	while (metisGraph != orgGraph) {
-		balanceTwoWay(metisGraph, tpwgts);
+//		balanceTwoWay(metisGraph, tpwgts);
 		fmTwoWayEdgeRefine(metisGraph, tpwgts, 8);
 		projectTwoWayPartition(metisGraph);
 		MetisGraph* coarseGraph = metisGraph;

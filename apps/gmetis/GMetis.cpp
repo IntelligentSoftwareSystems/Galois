@@ -37,7 +37,7 @@
 static const char* name = "GMetis";
 static const char* description = "Partion a graph into K parts and minimize the graph cut\n";
 static const char* url = "http://iss.ices.utexas.edu/lonestar/gmetis.html";
-static const char* help = "<input file> numPartitions [weighted graph(true/false)] [directed input graph(true/false)]";
+static const char* help = "<input file> numPartitions [metisStyle:true (default) or false] [weighted graph:true or false(default) ]";
 
 /**
  * KMetis Algorithm
@@ -46,7 +46,6 @@ void partition(MetisGraph* metisGraph, int nparts) {
 	int coarsenTo = (int) max(metisGraph->getNumNodes() / (40 * intlog2(nparts)), 20 * (nparts));
 	int maxVertexWeight = (int) (1.5 * ((metisGraph->getNumNodes()) / (double) coarsenTo));
 	Coarsener coarsener(false, coarsenTo, maxVertexWeight);
-	cout<<"start coarsening"<<endl;
 	Galois::StatTimer T;
 	T.start();
 	Galois::Timer t;
@@ -61,12 +60,12 @@ void partition(MetisGraph* metisGraph, int nparts) {
 //	Galois::Launcher::startTiming();
 	maxVertexWeight = (int) (1.5 * ((mcg->getNumNodes()) / Coarsener::COARSEN_FRACTION));
 	PMetis pmetis(20, maxVertexWeight);
-	cout<<"initial partion:"<<mcg->getNumNodes()<<endl;
+//	cout<<"initial partion:"<<mcg->getNumNodes()<<endl;
 	Galois::Timer init_part_t;
 	init_part_t.start();
 	pmetis.mlevelRecursiveBisection(mcg, nparts, totalPartitionWeights, 0, 0);
 	init_part_t.stop();
-	cout<<"initial mincut:"<<mcg->getMinCut()<<endl;
+//	cout<<"initial mincut:"<<mcg->getMinCut()<<endl;
 	cout << "initial partition time: "<< init_part_t.get()  << " ms";
 	Galois::Timer refine_t;
 
@@ -120,6 +119,9 @@ void readMetisGraph(MetisGraph* metisGraph, const char* filename){
 			if(index < 0) break;
 			items = remaining;
 			GNode n2 = nodes[index];
+			if(n1==n2){
+				continue;
+			}
 			graph->addEdge(n1, n2, 1);
 			n1.getData().addEdgeWeight(1);
 			n1.getData().incNumEdges();
@@ -138,7 +140,7 @@ void readGraph(MetisGraph* metisGraph, const char* filename, bool weighted = fal
 	InputGraph inputGraph;
 	inputGraph.structureFromFile(filename);
 	inputGraph.emptyNodeData();
-	cout<<"read weighted:"<<weighted<<" directed:"<<directed<<"graph"<<endl;
+//	cout<<"read weighted:"<<weighted<<" directed:"<<directed<<"graph"<<endl;
 	cout<<"start to transfer data to GGraph"<<endl;
 	int id = 0;
 	//	vector<InputGNode> inNodes(inputGraph.size());
@@ -206,7 +208,7 @@ void readGraph(MetisGraph* metisGraph, const char* filename, bool weighted = fal
 }
 
 int main(int argc, const char** argv) {
-	srand(4321);
+	srand(-1);
 	std::vector<const char*> args = parse_command_line(argc, argv, help);
 	if (args.size() < 2) {
 		std::cout << "incorrect number of arguments, use -help for usage information\n";
@@ -220,12 +222,9 @@ int main(int argc, const char** argv) {
 	bool directed = true;
 	bool metisStyle = true;
 	if(args.size()>2){
-		weighted = (string(args[2]).compare("true") == 0);
+		metisStyle = (string(args[2]).compare("true") == 0);
 		if(args.size()>3){
-			directed = (string(args[3]).compare("true") == 0);
-			if(args.size()>4){
-				metisStyle = (string(args[4]).compare("true") == 0);
-			}
+			weighted = (string(args[3]).compare("true") == 0);
 		}
 	}
 	if(!metisStyle){
@@ -233,7 +232,6 @@ int main(int argc, const char** argv) {
 	}else{
 		readMetisGraph(&metisGraph, args[0]);
 	}
-	//	Galois::setMaxThreads(4);
 	partition(&metisGraph, atoi(args[1]));
 	verify(&metisGraph);
 }
@@ -241,8 +239,8 @@ int main(int argc, const char** argv) {
 int getRandom(int num){
 //	int randNum = rand()%num;
 //	return (rand()>>3)%(num);
+	//	return randNum;
 	return ((int)(drand48()*((double)(num))));
-//	return randNum;
 }
 
 int gNodeToInt(GNode node){
@@ -251,6 +249,7 @@ int gNodeToInt(GNode node){
 
 void mergeP::operator()(PerCPUValue& a, PerCPUValue& b){
 	a.mincutInc+=b.mincutInc;
+//	a.changedBndNodes.insert(a.changedBndNodes.end(), b.changedBndNodes.begin(), b.changedBndNodes.end());
 	a.changedBndNodes.insert(b.changedBndNodes.begin(), b.changedBndNodes.end());
 }
 int intlog2(int a){

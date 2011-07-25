@@ -26,21 +26,34 @@
 
 
 
-#include "Galois/Graphs/Graph.h"
+//#include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/NonRemovingGraph.h"
 #include "Galois/Galois.h"
 #include "MetisNode.h"
 #include "Galois/Timer.h"
+#include "Galois/Runtime/mm/mem.h"
 #include <stdlib.h>
 #include "ArraySet.h"
 typedef int METISINT;
 typedef double METISDOUBLE;
 
-typedef Galois::Graph::FirstGraph<MetisNode,METISINT,true>            GGraph;
-typedef Galois::Graph::FirstGraph<MetisNode,METISINT,true>::GraphNode GNode;
+
+typedef Galois::Graph::FirstGraph<MetisNode,METISINT, true>            GGraph;
+typedef Galois::Graph::FirstGraph<MetisNode,METISINT, true>::GraphNode GNode;
+
 #include <set>
 using namespace std;
 typedef ArraySet< GNode > GNodeSet;
-typedef set<GNode> GNodeSTLSet;
+struct GNodeSetCompare
+{
+  bool operator()(const GNode s1, const GNode s2) const
+  {
+    return s1.getData(Galois::NONE).getNodeId() < s2.getData(Galois::NONE).getNodeId();
+  }
+};
+typedef set< GNode, GNodeSetCompare, GaloisRuntime::MM::FSBGaloisAllocator<GNode> > GNodeSTLSet;
+//typedef vector<GNode> GNodeSTLSet;
+
 template <typename T>
 void arrayFill(T* array, int length, T value){
 	for(int i=0;i<length;++i){

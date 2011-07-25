@@ -46,9 +46,18 @@ public:
 	}
 
 	void initMatches(){
-		matches = new GNode[numNodes];
+//		matches = new cache_line_storage<GNode>[numNodes];
+//		matchFlag = new cache_line_storage<bool>[numNodes];
+//		for(int i=0;i<numNodes;i++){
+//			matchFlag[i].data = false;
+//		}
 		matchFlag = new bool[numNodes];
+		matches =  new GNode[numNodes];
 		arrayFill(matchFlag, numNodes, false);
+//		for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+//			GNode node = *ii;
+//			matches[node.getData().getNodeId()] = node;
+//		}
 	}
 
 	void releaseMatches(){
@@ -58,11 +67,13 @@ public:
 
 	bool isMatched(int id){
 		assert(id < numNodes);
+//		return matchFlag[id].data;
 		return matchFlag[id];
 	}
 
 	GNode getMatch(int id){
 		assert(id < numNodes);
+//		return matches[id].data;
 		return matches[id];
 	}
 
@@ -80,6 +91,7 @@ public:
 	}
 
 	GNode getCoarseGraphMap(int id){
+//		return coarseGraphMapTo[id].data;
 		return coarseGraphMapTo[id];
 	}
 
@@ -91,11 +103,14 @@ public:
 	}
 
 	void initCoarseGraphMap(){
+//		coarseGraphMapTo = new cache_line_storage<GNode>[numNodes];
 		coarseGraphMapTo = new GNode[numNodes];
 	}
 
 	void setMatch(int id, GNode node){
 		assert(id < numNodes);
+//		matchFlag[id].data = true;
+//		matches[id].data = node;
 		matchFlag[id] = true;
 		matches[id] = node;
 	}
@@ -107,6 +122,7 @@ public:
 
 	void setCoarseGraphMap(int id, GNode node){
 		assert(id < numNodes);
+//		coarseGraphMapTo[id].data = node;
 		coarseGraphMapTo[id] = node;
 	}
 
@@ -215,6 +231,7 @@ public:
 		for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
 			GNode node = *ii;
 			int adjwgtsum = node.getData(Galois::NONE).getAdjWgtSum();
+			assert(adjwgtsum>=0||numEdges == 0);
 			if (maxAdjSum < adjwgtsum) {
 				maxAdjSum = adjwgtsum;
 			}
@@ -493,7 +510,6 @@ public:
 		}
 		for (size_t i = 0; i < partWeights.size(); i++) {
 			if (partWeights[i] > tpwgts[i] * sum * (ubfactor + 0.005)) {
-				cout<<"partWeights[i]:"<<partWeights[i]<<" | "<<tpwgts[i] * sum * (ubfactor + 0.005)<<endl;
 				return false;
 			}
 		}
@@ -548,9 +564,12 @@ private:
 	MetisGraph* finerGraph;
 	GGraph* graph;
 	GNodeSet* boundaryNodes;
+//	cache_line_storage<GNode>* matches;
 	GNode* matches;
 	bool* matchFlag;
+//	cache_line_storage<bool>* matchFlag;
 	GNode* subGraphMaps;
+//	cache_line_storage<GNode>* coarseGraphMapTo;
 	GNode* coarseGraphMapTo;
 };
 #endif /* METISGRAPH_H_ */

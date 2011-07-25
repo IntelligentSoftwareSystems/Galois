@@ -62,7 +62,7 @@ public:
 
 			Galois::GReducible<PerCPUValue, mergeP> perCPUValues;
 			parallelRefine pr(metisGraph, this, &perCPUValues);
-			Galois::for_each<GaloisRuntime::WorkList::ChunkedFIFO<64, GNode> >(metisGraph->getBoundaryNodes()->begin(), metisGraph->getBoundaryNodes()->end(), pr);
+			Galois::for_each<GaloisRuntime::WorkList::ChunkedLIFO<32, GNode> >(metisGraph->getBoundaryNodes()->begin(), metisGraph->getBoundaryNodes()->end(), pr, "RandomKWAYRefine");
 			metisGraph->incMinCut(perCPUValues.get().mincutInc);
 			GNodeSTLSet& changedNodes = perCPUValues.get().changedBndNodes;
 			for(GNodeSTLSet::iterator iter=changedNodes.begin();iter!=changedNodes.end();++iter){
@@ -73,6 +73,15 @@ public:
 					metisGraph->getBoundaryNodes()->erase(changed);
 				}
 			}
+//			GGraph* graph = metisGraph->getGraph();
+//			for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+//				GNode node = *ii;
+//				if(node.getData().isBoundary()){
+//					metisGraph->getBoundaryNodes()->insert(node);
+//				}else{
+//					metisGraph->getBoundaryNodes()->erase(node);
+//				}
+//			}
 			if (metisGraph->getMinCut() == oldcut) {
 				break;
 			}
@@ -135,7 +144,8 @@ private:
 //			if(!GaloisRuntime.getRuntime().useSerial()){
 			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(n, Galois::CHECK_CONFLICT), eejj = graph->neighbor_end(n, Galois::CHECK_CONFLICT); jj != eejj; ++jj) {
 				GNode neighbor = *jj;
-				neighbor.getData(Galois::CHECK_CONFLICT);
+
+				neighbor.getData(Galois::NONE);
 			}
 //			}
 
@@ -161,6 +171,7 @@ private:
 			if (nodeData.getEdegree() - nodeData.getIdegree() < 0){
 //				metisGraph->unsetBoundaryNode(n);
 				metisGraph->unMarkBoundaryNode(n);
+//				perCPUValues->get().changedBndNodes.push_back(n);
 				perCPUValues->get().changedBndNodes.insert(n);
 			}
 
@@ -174,6 +185,7 @@ private:
 					int numEdges = neighborData.getNumEdges();
 //					neighborData.partIndex = new int[numEdges];
 //					neighborData.partEd = new int[numEdges];
+//					cout<<"init"<<endl;
 					neighborData.initPartEdAndIndex(numEdges);
 				}
 				int edgeWeight = graph->getEdgeData(n, jj, Galois::NONE);
@@ -184,6 +196,7 @@ private:
 					{
 //						metisGraph->setBoundaryNode(neighbor);
 						metisGraph->markBoundaryNode(neighbor);
+//						perCPUValues->get().changedBndNodes.push_back(neighbor);
 						perCPUValues->get().changedBndNodes.insert(neighbor);
 					}
 				} else if (neighborData.getPartition() == to) {
@@ -193,6 +206,7 @@ private:
 					{
 //						metisGraph->unsetBoundaryNode(neighbor);
 						metisGraph->unMarkBoundaryNode(neighbor);
+//						perCPUValues->get().changedBndNodes.push_back(neighbor);
 						perCPUValues->get().changedBndNodes.insert(neighbor);
 					}
 
@@ -246,7 +260,11 @@ private:
 			this->perCPUValues = perCPUValues;
 		}
 		template<typename Context>
-		void operator()(GNode item, Context& lwl) {
+		void __attribute__((noinline)) operator()(GNode item, Context& lwl) {
+//			if(perCPUValues->get().changedBndNodes.size() == 0){
+//				perCPUValues->get().changedBndNodes.reserve(metisGraph->getNumOfBoundaryNodes());
+//				cout<<"resize to "<<metisGraph->getNumOfBoundaryNodes()<<endl;
+//			}
 		  refiner->refineOneNode(metisGraph, item, perCPUValues);
 		}
 	};

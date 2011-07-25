@@ -56,11 +56,10 @@ struct projectInfo {
 		this->graph = finer->getGraph();
 	}
 	template<typename Context>
-	void operator()(GNode node, Context& lwl) {
+	void __attribute__((noinline)) operator()(GNode node, Context& lwl) {
+
 		MetisNode& nodeData = node.getData(Galois::NONE);
 //		int numEdges = graph->neighborsSize(node, Galois::NONE);
-//		nodeData.partIndex = new int[numEdges];
-//		nodeData.partEd = new int[numEdges];
 //		nodeData.initPartEdAndIndex(numEdges);
 		nodeData.setIdegree(nodeData.getAdjWgtSum());
 		if (finer->getCoarseGraphMap(nodeData.getNodeId()).getData(Galois::NONE).getEdegree() > 0) {
@@ -99,7 +98,7 @@ struct projectPartition {
 void computeKWayPartInfo(int nparts, MetisGraph* finer,
 		GGraph* coarseGraph, GGraph* graph){
 	projectInfo pi(nparts, finer);
-	Galois::for_each<GaloisRuntime::WorkList::ChunkedFIFO<64> >(graph->active_begin(), graph->active_end(), pi);
+	Galois::for_each<GaloisRuntime::WorkList::ChunkedLIFO<32> >(graph->active_begin(), graph->active_end(), pi, "ProjectInfo");
 }
 
 void projectKWayPartition(MetisGraph* metisGraph, int nparts){
@@ -108,20 +107,28 @@ void projectKWayPartition(MetisGraph* metisGraph, int nparts){
 	GGraph* graph = finer->getGraph();
 	finer->initBoundarySet();
 //	projectPartition pp(finer);
-//	Galois::for_each<GaloisRuntime::WorkList::ChunkedFIFO<64> >(graph->active_begin(), graph->active_end(), pp);
+//	Galois::for_each<GaloisRuntime::WorkList::ChunkedFIFO<128> >(graph->active_begin(), graph->active_end(), pp);
+//	Galois::Timer alloc_Time;
+//	alloc_Time.start();
 
 	for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
 		GNode node = *ii;
 		MetisNode& nodeData = node.getData();
-		nodeData.setPartition(finer->getCoarseGraphMap(nodeData.getNodeId()).getData().getPartition());
-		nodeData.initPartEdAndIndex(nodeData.getNumEdges());
+		nodeData.setPartition(finer->getCoarseGraphMap(nodeData.getNodeId()).getData(Galois::NONE).getPartition());
+//		nodeData.initPartEdAndIndex(nodeData.getNumEdges());
+		if(finer->getCoarseGraphMap(nodeData.getNodeId()).getData(Galois::NONE).getEdegree() > 0){
+			nodeData.initPartEdAndIndex(nodeData.getNumEdges());
+		}
 //		assert(nodeData.getPartition()>=0);
 	}
-	Galois::Timer p_Time;
-	p_Time.start();
+//	alloc_Time.stop();
+//	cout<<"+++alloc++++:"<<alloc_Time.get()<<endl;
+
+//	Galois::Timer p_Time;
+//	p_Time.start();
 	computeKWayPartInfo(nparts, finer, coarseGraph, graph);
-	p_Time.stop();
-	cout<<"------------projectParallel:"<<p_Time.get()<<endl;
+//	p_Time.stop();
+//	cout<<"------------projectParallel:"<<p_Time.get()<<endl;
 	for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
 		GNode node = *ii;
 		MetisNode& nodeData = node.getData(Galois::NONE);
@@ -158,11 +165,11 @@ void refineKWay(MetisGraph* metisGraph, MetisGraph* orgGraph, float* tpwgts, flo
 		}
 
 		rkRefiner.refine(metisGraph);
-		Galois::Timer p_Time;
-		p_Time.start();
+//		Galois::Timer p_Time;
+//		p_Time.start();
 		projectKWayPartition(metisGraph, nparts);
-		p_Time.stop();
-		cout<<"project time:"<<p_Time.get()<<endl;
+//		p_Time.stop();
+//		cout<<"project time:"<<p_Time.get()<<endl;
 		MetisGraph* coarseGraph = metisGraph;
 		metisGraph = metisGraph->getFinerGraph();
 		metisGraph->releaseCoarseGraphMap();
