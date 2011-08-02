@@ -26,7 +26,7 @@
 
 
 
-//#include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
 #include "MetisNode.h"
 #include "Galois/Timer.h"
