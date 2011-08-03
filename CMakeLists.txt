@@ -1,5 +1,5 @@
-cmake_minimum_required (VERSION 2.6)
-project (Galois)
+cmake_minimum_required(VERSION 2.6)
+project(Galois)
 site_name(SITE_NAME)
 
 if(NOT CMAKE_BUILD_TYPE)
@@ -15,8 +15,9 @@ set(USE_PTHREAD ON)
 #compile for cray xmt
 #set(USE_CRAY ON)
 
-#use icc
+#use icc (should pick right path for icc)
 #set(USE_ICC ON)
+#set(ICC_COMPILER /opt/intel/Compiler/11.1/072/bin/intel64/icpc)
 
 #use profiling
 #set(USE_PROFILING ON)
@@ -94,12 +95,10 @@ if(USE_SOLARIS)
 endif()
 
 if(USE_ICC)
-  set(CMAKE_CXX_COMPILER /opt/intel/Compiler/11.1/072/bin/intel64/icpc)
+  set(CMAKE_CXX_COMPILER ${ICC_COMPILER})
   #These help the intel compiler
   add_definitions("-wd981 -wd383 -wd869 -wd2196 -wd279")
 endif(USE_ICC)
-
-#set(CMAKE_CXX_COMPILER /h1/lenharth/local/bin/clang++)
 
 #Always include debug symbols
 add_definitions("-g")
@@ -126,3 +125,16 @@ add_subdirectory(inputs)
 ###### Documentation ######
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
 include(UseDoxygen OPTIONAL)
+
+###### Distribution ######
+include(InstallRequiredSystemLibraries)
+set(CPACK_GENERATOR "TGZ")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/COPYRIGHT")
+set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README")
+set(CPACK_PACKAGE_VERSION_MAJOR "2")
+set(CPACK_PACKAGE_VERSION_MINOR "1")
+set(CPACK_PACKAGE_VERSION_PATCH "0")
+include(CPack)
+
+###### Installation ######
+install(DIRECTORY include/ DESTINATION include PATTERN ".svn" EXCLUDE)

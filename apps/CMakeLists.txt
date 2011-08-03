@@ -24,8 +24,9 @@ endfunction (linkRuntime)
 
 
 function(app name)
-  compileApp (${name})
-  linkRuntime (${name})
+  compileApp(${name})
+  linkRuntime(${name})
+  install(TARGETS ${name} DESTINATION bin)
 endfunction(app)
 
 if(LAPACK_FOUND)
@@ -45,4 +46,3 @@ add_subdirectory(preflowpush)
 add_subdirectory(sssp)
 add_subdirectory(surveypropagation)
 add_subdirectory(spanningtree)
-
