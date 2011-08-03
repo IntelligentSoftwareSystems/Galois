@@ -22,13 +22,21 @@ kind.
 
 #include <fstream>
 #include <map>
+#include "Galois/util/OnlineStats.h"
 
 namespace GaloisRuntime {
 namespace WorkList {
 
-template<typename T, typename Indexer, typename realWL>
+template<typename Indexer, typename realWL, typename T = int>
 class WorkListTracker {
-  PerCPU<FIFO<std::pair<unsigned int, unsigned int>, false > > tracking;
+  struct p {
+    OnlineStat stat;
+    unsigned int epoch;
+    std::map<unsigned int, OnlineStat> values;
+  };
+
+  //online collection of stats
+  PerCPU<p> tracking;
   //global clock
   cache_line_storage<unsigned int> clock;
   //master thread counting towards a tick
@@ -37,23 +45,16 @@ class WorkListTracker {
   realWL wl;
   Indexer I;
 
-  struct info {
-    unsigned int min;
-    unsigned int max;
-    unsigned int count;
-    unsigned int sum;
-    info() :min(std::numeric_limits<unsigned int>::max()), max(0), count(0), sum(0) {}
-    void add(unsigned int val) {
-      if (val < min)
-	min = val;
-      if (val > max)
-	max = val;
-      sum += val;
-      ++count;
-    }
-  };
-  
 public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef WorkListTracker<Indexer, typename realWL::template rethread<newconcurrent>::WL, T> WL;
+  };
+  template<typename Tnew>
+  struct retype {
+    typedef WorkListTracker<Indexer, typename realWL::template retype<Tnew>::WL, Tnew> WL;
+  };
+
   typedef T value_type;
 
   WorkListTracker()
@@ -64,55 +65,45 @@ public:
 
   ~WorkListTracker() {
 
-    static const char* translation[] = {
-      "00", "01", "02", "03", "04", "05", "06", "07", "08", "09",
-      "10", "11", "12", "13", "14", "15", "16", "17", "18", "19",
-      "20", "21", "22", "23", "24", "25", "26", "27", "28", "29",
-      "30", "31", "32", "33", "34", "35", "36", "37", "38", "39",
-      "40", "41", "42", "43", "44", "45", "46", "47", "48", "49",
-      "50", "51", "52", "53", "54", "55", "56", "57", "58", "59"
-    };
-
-    
-    std::map<unsigned int, info> AMap;
+    //First flush the stats
     for (int t = 0; t < tracking.size(); ++t) {
-      //For each thread
-      std::string name = "tracking.";
-      name += translation[t];
-      name += ".txt";
-      std::ofstream file(name.c_str());
-      
-      std::map<unsigned int, info> LMap;
-      while (!tracking.get(t).empty()) {
-	std::pair<bool, std::pair<unsigned int, unsigned int> > r = tracking.get(t).pop();
-	if (r.first) {
-	  LMap[r.second.first].add(r.second.second);
-	  AMap[r.second.first].add(r.second.second);
+      p& P = tracking.get(t);
+      if (P.stat.getCount()) {
+	P.values[P.epoch] = P.stat;
+      }
+    }
+
+    std::ofstream file("tracking.csv");
+
+    //print header
+    file << "Epoch";
+    for (int t = 0; t < tracking.size(); ++t)
+      file << t << ",_count,"
+	   << t << "_mean,"
+	   << t << "_variance,"
+	   << t << "_stddev";
+    file << "\n";
+
+    //for each epoch
+    for (unsigned int x = 0; x <= clock.data; ++x) {
+      file << x;
+      //for each thread
+      for (int t = 0; t < tracking.size(); ++t) {
+	p& P = tracking.get(t);
+	if (P.values.find(x) != P.values.end()) {
+	  OnlineStat& S = P.values[x];
+	  file << "," << S.getCount()
+	       << "," << S.getMean()
+	       << "," << S.getVariance()
+	       << "," << S.getStdDeviation();
+	} else {
+	  file << ",,,,";
 	}
       }
-
-      for (int x = 0; x < clock.data + 1; ++x) {
-	info& i = LMap[x];
-	if (i.count)
-	  file << x << " " 
-	       << ((double)i.sum / (double)i.count) << " "
-	       << i.min << " "
-	       << i.max << " "
-	       << i.count << "\n";
-      }
-    }
-    std::ofstream file("tracking.avg.txt");
-    for (int x = 0; x < clock.data + 1; ++x) {
-      info& i = AMap[x];
-      if (i.count)
-	file << x << " " 
-	     << ((double)i.sum / (double)i.count) << " "
-	     << i.min << " "
-	     << i.max << " "
-	     << i.count << "\n";
+      file << "\n";
     }
   }
-
+    
   //! push a value onto the queue
   bool push(value_type val) {
     return wl.push(val);
@@ -125,13 +116,22 @@ public:
   std::pair<bool, value_type> pop() {
     std::pair<bool, value_type> ret = wl.pop();
     if (!ret.first) return ret;
+    p& P = tracking.get();
+    unsigned int cclock = clock.data;
+    if (P.epoch != cclock) {
+      if (P.stat.getCount())
+	P.values[P.epoch] = P.stat;
+      P.stat.reset();
+      P.epoch = clock.data;
+    }
     unsigned int index = I(ret.second);
-    tracking.get().push(std::make_pair(clock.data, index));
+    P.stat.insert(index);
     if (tracking.myEffectiveID() == 0) {
       ++thread_clock.data;
       if (thread_clock.data == 1024*10) {
 	thread_clock.data = 0;
-	__sync_fetch_and_add(&clock.data, 1);
+	clock.data += 1; //only on thread updates
+	//__sync_fetch_and_add(&clock.data, 1);
       }
     }
     return ret;
@@ -146,8 +146,8 @@ public:
   }
   
   template<typename iter>
-  void fillInitial(iter begin, iter end) {
-    return wl.fillInitial(begin, end);
+  void fill_initial(iter begin, iter end) {
+    return wl.fill_initial(begin, end);
   }
 };
 
