@@ -40,7 +40,7 @@
 
 static const char* name = "Delaunay Triangulation";
 static const char* description = "Produces a Delaunay triangulation from a given a set of points\n";
-static const char* url = "http://iss.ices.utexas.edu/lonestar/delaunaytriangulation.html";
+static const char* url = "delaunay_triangulation";
 static const char* help = "[-writemesh] <input file>";
 
 typedef Galois::Graph::FirstGraph<Element,int,true>            Graph;

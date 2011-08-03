@@ -38,7 +38,7 @@
 
 static const char* name = "Page Rank";
 static const char* description = "Computes page ranks a la Page and Brin\n";
-static const char* url = "http://iss.ices.utexas.edu/lonestar/pagerank.html";
+static const char* url = NULL;
 static const char* help = "<input file> [max_iterations]";
 
 // damping factor: prob that user will continue to next link

@@ -46,7 +46,7 @@
 
 static const char* name = "Boruvka MST";
 static const char* description = "Computes the Minimal Spanning Tree using Boruvka\n";
-static const char* url = "http://iss.ices.utexas.edu/lonestar/boruvka.html";
+static const char* url = "boruvkas_algorithm";
 static const char* help = "<input file> ";
 static unsigned int nodeID = 0;
 struct Node {

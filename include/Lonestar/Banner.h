@@ -34,8 +34,11 @@ void printBanner(std::ostream& os, const char* app, const char* desc, const char
        << "application: " << app << "\n";
   if (desc)
     os << desc << "\n";
-  if (url)
-    os << url << "\n";
+  if (url) {
+    os 
+      << "http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/" 
+      << url << "\n";
+  }
   os << "\n";
 }
 #endif

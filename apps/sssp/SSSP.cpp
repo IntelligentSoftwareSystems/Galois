@@ -44,7 +44,7 @@ static const char* name = "Single Source Shortest Path";
 static const char* description =
   "Computes the shortest path from a source node to all nodes in a directed "
   "graph using a modified Bellman-Ford algorithm\n";
-static const char* url = "http://iss.ices.utexas.edu/lonestar/sssp.html";
+static const char* url = "single_source_shortest_path";
 static const char* help =
   "<input file> <startnode> <reportnode> [-delta <deltaShift>] [-bfs]";
 

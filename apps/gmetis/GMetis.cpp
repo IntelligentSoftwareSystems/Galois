@@ -36,7 +36,7 @@
 #include "Galois/Statistic.h"
 static const char* name = "GMetis";
 static const char* description = "Partion a graph into K parts and minimize the graph cut\n";
-static const char* url = "http://iss.ices.utexas.edu/lonestar/gmetis.html";
+static const char* url = "gMetis";
 static const char* help = "<input file> numPartitions [metisStyle:true (default) or false] [weighted graph:true or false(default) ]";
 
 /**

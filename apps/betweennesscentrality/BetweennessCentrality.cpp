@@ -53,7 +53,7 @@
 static const char* name = "Betweenness Centrality";
 static const char* description =
   "Computes the betweenness centrality of all nodes in a graph\n";
-static const char* url = 0;
+static const char* url = "betweenness_centrality";
 static const char* help = "<input file> <number iterations>";
 
 typedef Galois::Graph::LC_FileGraph<void, void> Graph;

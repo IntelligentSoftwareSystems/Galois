@@ -39,7 +39,7 @@ namespace {
 const char* name = "Preflow Push";
 const char* description =
   "Finds the maximum flow in a network using the preflow push technique\n";
-const char* url = "http://iss.ices.utexas.edu/lonestar/preflowpush.html";
+const char* url = "preflow_push";
 const char* help = "[-serial] <input file> <source id> <sink id> [global relabel interval]";
 
 /**

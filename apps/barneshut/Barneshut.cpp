@@ -24,20 +24,20 @@
 #include <limits>
 #include <iostream>
 #include <vector>
+#include <strings.h>
 #include <boost/math/constants/constants.hpp>
 #include <boost/iterator/transform_iterator.hpp>
 #include "Galois/Galois.h"
 #include "Galois/Statistic.h"
 #include "Lonestar/Banner.h"
 #include "Lonestar/CommandLine.h"
-#include <strings.h>
 
 namespace {
 const char* name = "Barnshut N-Body Simulator";
 const char* description =
   "Simulation of the gravitational forces in a galactic cluster using the "
   "Barnes-Hut n-body algorithm\n";
-const char* url = "http://iss.ices.utexas.edu/lonestar/barneshut.html";
+const char* url = "barneshut";
 const char* help = "<numbodies> <ntimesteps> <seed>";
 
 struct Point {

@@ -61,7 +61,7 @@ static const char* simEndTimeOpt = "-e";
 
 static const char* name = "Asynchronous Variational Integrators";
 static const char* description = "Elasto-dynamic simulation of a mesh with minimal number of simulation updates";
-static const char* url = "http://iss.ices.utexas.edu/lonestar/asynchronous_variational_integrators";
+static const char* url = "asynchronous_variational_integrators";
 
 /**
  * Common functionality for different versions and algorithms
@@ -245,7 +245,7 @@ void AVIabstractMain::run (int argc, const char* argv[]) {
 
   std::vector<const char*> args = parse_command_line (argc, argv, getUsage ().c_str ());
 
-  printBanner (std::cout, name, description, url);
+  printBanner(std::cout, name, description, url);
 
   // print messages e.g. version, input etc.
   InputConfig input = readCmdLine (args);

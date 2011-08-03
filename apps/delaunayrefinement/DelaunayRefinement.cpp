@@ -45,8 +45,8 @@
 
 static const char* name = "Delaunay Mesh Refinement";
 static const char* description = "Refines a Delaunay triangulation mesh such that no angle in the mesh is less than 30 degrees\n";
-static const char* url = "http://iss.ices.utexas.edu/lonestar/delaunayrefinement.html";
-static const char* help = "<input file>";
+static const char* url = "delaunay_mesh_refinement";
+static const char* help = "<input base filename>";
 
 typedef Galois::Graph::FirstGraph<Element,void,false>            Graph;
 typedef Galois::Graph::FirstGraph<Element,void,false>::GraphNode GNode;
@@ -105,7 +105,8 @@ int main(int argc, const char** argv) {
   std::vector<const char*> args = parse_command_line(argc, argv, help);
 
   if (args.size() != 1) {
-    std::cout << "incorrect number of arguments, use -help for usage information\n";
+    std::cerr
+      << "incorrect number of arguments, use -help for usage information\n";
     return 1;
   }
   printBanner(std::cout, name, description, url);
@@ -116,7 +117,8 @@ int main(int argc, const char** argv) {
   std::vector<GNode> wl;
   int numbad = m.getBad(mesh, wl);
 
-  std::cout << "configuration: " << mesh->size() << " total triangles, " << numbad << " bad triangles\n";
+  std::cout << "configuration: " << mesh->size()
+    << " total triangles, " << numbad << " bad triangles\n";
 
   Galois::StatTimer T;
   T.start();

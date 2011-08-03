@@ -46,7 +46,7 @@
 
 static const char* name = "Discrete Event Simulation";
 static const char* description = "Uses Chandy-Misra's algorithm, which is unordered, to perform logic circuit simulations";
-static const char* url = "http://iss.ices.utexas.edu/lonestar/des.html";
+static const char* url = "discrete_event_simulation";
 static const char* help = "<progname> netlistFile [NEVENTS_PER_ITER]";
 
 /**

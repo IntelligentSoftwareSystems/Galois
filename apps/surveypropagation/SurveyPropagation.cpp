@@ -40,8 +40,8 @@ using namespace std;
 
 static const char* name = "Survey Propagation";
 static const char* description = "Solves SAT problems using survey propagation\n";
-static const char* url = "http://iss.ices.utexas.edu/lonestar/surveypropagation.html";
-static const char* help = "seed clauses variables k";
+static const char* url = "survey_propagation";
+static const char* help = "<seed> <num clauses> <num variables> <k>";
 
 
 //SAT problem:

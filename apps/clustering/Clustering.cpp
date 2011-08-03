@@ -51,7 +51,7 @@
 #include <sys/time.h>
 static const char* name = "Unordered Agglomerative Clustering";
 static const char* description = "Unordered Implementation of the well-known data-mining algorithm\n";
-static const char* url = "http://iss.ices.utexas.edu/lonestar/agglomerativeclustering.html";
+static const char* url = "agglomerative_clustering";
 static const char* help = "[num points]";
 
 
