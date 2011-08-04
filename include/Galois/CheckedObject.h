@@ -1,4 +1,4 @@
-/** Statistic type -*- C++ -*-
+/** Galois Managed Conflict type wrapper -*- C++ -*-
  * @file
  * @section License
  *
@@ -20,35 +20,30 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#ifndef GALOIS_STATISTIC_H
-#define GALOIS_STATISTIC_H
+#ifndef GALOIS_CHECKEDOBJECT_H
+#define GALOIS_CHECKEDOBJECT_H
 
-#include "Accumulator.h"
-#include "Runtime/Support.h"
-#include "Timer.h"
+#include "Galois/Runtime/Context.h"
 
 namespace Galois {
 
+//! Conflict-checking wapper for any type
+/*! A wrapper which performs global conflict detection on the enclosed object.
+  This enables arbitrary types to be managed by the Galois runtime. */
 template<typename T>
-class Statistic : public GAccumulator<T> {
-  const char* name;
-public:
-  Statistic(const char* _name) :name(_name) {}
-  ~Statistic() {
-    GaloisRuntime::reportStatSum(name, GAccumulator<T>::get());
-  }
-};
+class GChecked : public GaloisRuntime::Lockable {
+  T val;
 
-class StatTimer : public Timer {
-  const char* name;
-  const char* loopname;
 public:
-  StatTimer(const char* n = "Time", const char* l = 0) :name(n), loopname(l) {}
-  ~StatTimer() {
-    GaloisRuntime::reportStatSum(name, get(), loopname);
+  GChecked(const T& v) :val(v) {}
+
+  T& get(Galois::Graph::MethodFlag m = ALL) const
+  {
+    GaloisRuntime::acquire(this, m);
+    return val;
   }
 };
 
 }
 
-#endif
+#endif // GALOIS_CHECKEDOBJECT_H

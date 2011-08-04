@@ -28,7 +28,7 @@
 #include "Galois/Statistic.h"
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
-#include "Galois/util/Accumulator.h"
+#include "Galois/Accumulator.h"
 
 #include "Lonestar/Banner.h"
 #include "Lonestar/CommandLine.h"

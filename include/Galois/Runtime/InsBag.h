@@ -23,12 +23,12 @@
 #ifndef GALOIS_RUNTIME_INSBAG_H
 #define GALOIS_RUNTIME_INSBAG_H
 
-#include "Galois/util/Accumulator.h"
+#include "Galois/Accumulator.h"
 #include "Galois/Runtime/mm/mem.h" 
-#include <list>
-
 #include <boost/functional.hpp>
 #include <boost/iterator/transform_iterator.hpp>
+#include <list>
+
 
 namespace GaloisRuntime {
   

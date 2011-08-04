@@ -32,8 +32,8 @@
 #include "Galois/Graphs/Serialize.h"
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Runtime/PerCPU.h"
-#include "Galois/util/Atomic.h"
-#include "Galois/util/Accumulator.h"
+#include "Galois/Atomic.h"
+#include "Galois/Accumulator.h"
 
 #include "Lonestar/Banner.h"
 #include "Lonestar/CommandLine.h"

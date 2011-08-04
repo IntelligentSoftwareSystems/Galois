@@ -27,7 +27,7 @@
 
 #include "Galois/Galois.h"
 #include "Galois/Runtime/WorkList.h"
-#include "Galois/util/Accumulator.h"
+#include "Galois/Accumulator.h"
 
 #include "DESabstractMain.h"
 

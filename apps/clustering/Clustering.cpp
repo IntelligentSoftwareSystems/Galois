@@ -27,7 +27,7 @@
 #include "Galois/Statistic.h"
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
-#include "Galois/util/Accumulator.h"
+#include "Galois/Accumulator.h"
 
 #include "Galois/Graphs/Serialize.h"
 #include "Galois/Graphs/FileGraph.h"

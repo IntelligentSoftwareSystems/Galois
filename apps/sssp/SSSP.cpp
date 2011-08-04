@@ -135,7 +135,7 @@ void runBody(const GNode src) {
     initial.insert(up);
   }
 
-  Galois::statistic<unsigned int> counter("Iterations");
+  Galois::Statistic<unsigned int> counter("Iterations");
   Galois::StatTimer T;
   T.start();
   
@@ -162,7 +162,7 @@ void runBody(const GNode src) {
   T.stop();
 }
 
-static Galois::statistic<unsigned int> BadWork("BadWork");
+static Galois::Statistic<unsigned int> BadWork("BadWork");
 
 struct process {
   template<typename ContextTy>
