@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 2.6)
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 project(Galois)
 site_name(SITE_NAME)
 
@@ -11,6 +12,9 @@ endif()
 
 #use pthreads
 set(USE_PTHREAD ON)
+
+#use intel tbb
+#set(USE_TBB ON)
 
 #compile for cray xmt
 #set(USE_CRAY ON)
@@ -47,20 +51,14 @@ endif()
 #LAPACK
 enable_language(Fortran)
 find_package(LAPACK)
-if(LAPACK_FOUND)
-  message("Found LAPACK, building avi")
-else()
-  message("No LAPACK, not building avi")
-endif()
 
 #Boost
 set(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0")
-find_package( Boost 1.34.0 REQUIRED )
+find_package(Boost 1.34.0 REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 
 #PThreads
 if(USE_PTHREAD)
-  #find_package(Threads REQUIRED)
   find_package(Threads)
   add_definitions(-DGALOIS_PTHREAD)
 endif(USE_PTHREAD)
@@ -76,6 +74,18 @@ if(EXISTS ${VTUNE_INCLUDE})
   set(USE_VTUNE ON)
 endif()
 
+#tbb
+find_package(TBB)
+
+if(TBB_FOUND)
+  add_definitions(-DGALOIS_TBB)  
+  include_directories(${TBB_INCLUDE_DIRS})
+else()
+  # wget http://threadingbuildingblocks.org/uploads/77/173/3.0%20update%208/tbb30_20110704oss_lin.tgz
+  message("TBB not found; have your sourced TBB_INSTALL_DIR/bin/tbbvars.sh?")
+endif()
+
+#cray
 if(USE_CRAY)
   add_definitions(-DGALOIS_CRAY)
 endif(USE_CRAY)
@@ -123,7 +133,6 @@ add_subdirectory(tools)
 add_subdirectory(inputs)
 
 ###### Documentation ######
-set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
 include(UseDoxygen OPTIONAL)
 
 ###### Distribution ######

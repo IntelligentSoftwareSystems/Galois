@@ -5,7 +5,6 @@ else()
   add_subdirectory(hoard-38)
 endif()
 
-#include(ExternalProject)
 #
 #ExternalProject_Add(
 #   hwloc-1-1-1

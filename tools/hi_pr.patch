@@ -4,5 +4,5 @@ diff -Naur src/CMakeLists.txt src.patched/CMakeLists.txt
 @@ -0,0 +1,4 @@
 +cmake_minimum_required(VERSION 2.8)
 +add_definitions(-DCUT_ONLY -DPRINT_STAT)
-+add_executable(hi_pr 3.7/hi_pr.c)
++add_executable(hi_pr hi_pr.c)
 +install(TARGETS hi_pr DESTINATION bin)

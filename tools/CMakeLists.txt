@@ -22,6 +22,7 @@ ExternalProject_Add(cats-gens
 )
 
 find_program(UNZIP unzip)
+# Manually specify steps because ExternalProject doesn't know about unzip
 ExternalProject_Add(triangle
   PREFIX triangle
   LIST_SEPARATOR |
@@ -37,8 +38,7 @@ ExternalProject_Add(hi_pr
   PREFIX hi_pr
   LIST_SEPARATOR |
   DOWNLOAD_DIR hi_pr/src/hi_pr
-  DOWNLOAD_COMMAND bash -c "if [ ! -e hipr.tar ] | then ${WGET} --quiet http://www.avglab.com/andrew/soft/hipr.tar | fi"
-  UPDATE_COMMAND bash -c "if [ ! -e 3.7 ] | then ${TAR} xf hipr.tar | fi"
+  URL http://www.avglab.com/andrew/soft/hipr.tar
   PATCH_COMMAND bash -c "if [ ! -e CMakeLists.txt ] | then patch -p1 < ${CMAKE_CURRENT_SOURCE_DIR}/hi_pr.patch | fi"
   CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}
 )

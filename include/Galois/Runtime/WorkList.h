@@ -42,6 +42,11 @@ kind.
 #define WLCOMPILECHECK(name) //
 #endif
 
+#ifdef GALOIS_TBB
+#define TBB_PREVIEW_CONCURRENT_PRIORITY_QUEUE 1
+#include <tbb/concurrent_priority_queue.h>
+#endif
+
 namespace GaloisRuntime {
 namespace WorkList {
 
@@ -146,6 +151,56 @@ public:
   }
 };
 WLCOMPILECHECK(PriQueue);
+
+#ifdef GALOIS_TBB
+template<class Compare = std::less<int>, typename T = int, bool concurrent = true>
+class TbbPriQueue : private boost::noncopyable, private tbb::concurrent_priority_queue<T,Compare> {
+  typedef tbb::concurrent_priority_queue<T,Compare> Parent;
+
+public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef TbbPriQueue<Compare, T, newconcurrent> WL;
+  };
+  template<typename Tnew>
+  struct retype {
+    typedef TbbPriQueue<Compare, Tnew, concurrent> WL;
+  };
+
+  typedef T value_type;
+
+  bool push(value_type val) {
+    Parent::push(val);
+    return true;
+  }
+
+  std::pair<bool, value_type> pop() {
+    value_type retval;
+    if (try_pop(retval)) {
+      return std::make_pair(true, retval);
+    } else {
+      return std::make_pair(false, value_type());
+    }
+  }
+   
+  bool empty() const {
+    return Parent::empty();
+  }
+
+  bool aborted(value_type val) {
+    return push(val);
+  }
+
+  //Not Thread Safe
+  template<typename Iter>
+  void fill_initial(Iter ii, Iter ee) {
+    while (ii != ee) {
+      push(*ii++);
+    }
+  }
+};
+WLCOMPILECHECK(TbbPriQueue);
+#endif
 
 template<typename T = int, bool concurrent = true>
 class LIFO : private boost::noncopyable, private PaddedLock<concurrent> {
