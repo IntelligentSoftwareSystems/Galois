@@ -37,6 +37,12 @@ class GAtomic {
 public:
   //! Initialize with a value
   explicit GAtomic(const T& i) :val(i) {}
+  //! default constructor
+  explicit GAtomic(){}
+  //! copy constructor
+  GAtomic(const GAtomic& src){
+     val = src.val;
+  }
   //! atomic add and fetch
   T operator+=(const T& rhs) {
     return __sync_add_and_fetch(&val, rhs); 

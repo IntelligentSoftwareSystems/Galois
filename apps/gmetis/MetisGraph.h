@@ -27,9 +27,11 @@
 #include "GMetisConfig.h"
 #include <vector>
 #include <iostream>
+#include "Galois/Atomic.h"
 using namespace std;
 
 class MetisGraph{
+typedef Galois::GAtomic<int> AtomicInteger;
 public:
 	MetisGraph(){
 		mincut =0;
@@ -135,7 +137,8 @@ public:
 	 * In the future, this will be changed to use abstract lock
 	 */
 	void incPartWeight(int index, int weight) {
-		__sync_fetch_and_add(&partWeights[index], weight);
+		//__sync_fetch_and_add(&partWeights[index], weight);
+		partWeights[index] += weight;
 	}
 
 	/**
@@ -557,7 +560,7 @@ public:
 
 
 private:
-	vector<int> partWeights;
+	vector<AtomicInteger> partWeights;
 	int mincut;
 	int numEdges;
 	int numNodes;
