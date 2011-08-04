@@ -52,7 +52,7 @@ static void genericBindToProcessor(int proc) {
   
   /* sched_setaffinity returns 0 in success */
   if( sched_setaffinity( 0, sizeof(mask), &mask ) == -1 )
-    reportWarning("Could not set CPU Affinity for thread");
+    reportWarning("Could not set CPU Affinity for thread", (unsigned)proc);
   
   return;
 #endif      
@@ -122,7 +122,7 @@ struct MaxwellPolicy : public ThreadPolicy {
       id -= 8;
       carry = 8;
     }
-    genericBindToProcessor(carry + ((id % 4) * 2) + (id / 4));
+    genericBindToProcessor(carry + (id * 2) - ((id /4) * 7));
   }
 
   MaxwellPolicy() {
