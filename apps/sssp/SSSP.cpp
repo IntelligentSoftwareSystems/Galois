@@ -91,11 +91,7 @@ struct UpdateRequest {
 
 struct seq_less {
   bool operator()(const UpdateRequest& lhs, const UpdateRequest& rhs) {
-    if (lhs.w < rhs.w) 
-      return true;
-    if (lhs.w > rhs.w)
-      return false;
-    return lhs.n < rhs.n;
+    return (lhs.w  >> stepShift) < (rhs.w >> stepShift);
   }
 };
 
@@ -192,6 +188,19 @@ void runBodyParallel(const GNode src) {
   using namespace GaloisRuntime::WorkList;
   typedef dChunkedLIFO<16> IChunk;
   typedef OrderedByIntegerMetric<UpdateRequestIndexer, IChunk> OBIM;
+
+  typedef PriQueue<seq_less> PQ;
+  typedef LocalStealing<PQ> LPQ;
+
+  typedef PriQueueTree<seq_less> PQT;
+  typedef LocalStealing<PQT> LPQT;
+
+  typedef WorkListTracker<UpdateRequestIndexer, OBIM> TR_OBIM;
+  typedef WorkListTracker<UpdateRequestIndexer, PQ> TR_PQ;
+  typedef WorkListTracker<UpdateRequestIndexer, LPQ> TR_LPQ;
+  typedef WorkListTracker<UpdateRequestIndexer, PQT> TR_PQT;
+  typedef WorkListTracker<UpdateRequestIndexer, LPQT> TR_LPQT;
+
 
   std::vector<UpdateRequest> wl;
   getInitialRequests(src, wl);

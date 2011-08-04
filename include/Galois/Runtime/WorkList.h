@@ -24,6 +24,7 @@ kind.
 #include <stack>
 #include <limits>
 #include <map>
+#include <set>
 #include <boost/utility.hpp>
 
 #include "Galois/Runtime/PaddedLock.h"
@@ -151,6 +152,65 @@ public:
   }
 };
 WLCOMPILECHECK(PriQueue);
+
+template<class Compare = std::less<int>, typename T = int, bool concurrent = true>
+class PriQueueTree : private boost::noncopyable, private PaddedLock<concurrent> {
+
+  std::multiset<T, Compare> wl;
+
+  using PaddedLock<concurrent>::lock;
+  using PaddedLock<concurrent>::try_lock;
+  using PaddedLock<concurrent>::unlock;
+
+public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef PriQueueTree<Compare, T, newconcurrent> WL;
+  };
+  template<typename Tnew>
+  struct retype {
+    typedef PriQueueTree<Compare, Tnew, concurrent> WL;
+  };
+
+  typedef T value_type;
+
+  bool push(value_type val) {
+    lock();
+    wl.insert(val);
+    unlock();
+    return true;
+  }
+
+  std::pair<bool, value_type> pop() {
+    lock();
+    if (wl.empty()) {
+      unlock();
+      return std::make_pair(false, value_type());
+    } else {
+      value_type retval = *wl.begin();
+      wl.erase(wl.begin());
+      unlock();
+      return std::make_pair(true, retval);
+    }
+  }
+   
+  bool empty() const {
+    return wl.empty();
+  }
+
+  bool aborted(value_type val) {
+    return push(val);
+  }
+
+  //Not Thread Safe
+  template<typename Iter>
+  void fill_initial(Iter ii, Iter ee) {
+    while (ii != ee) {
+      wl.insert(*ii++);
+    }
+  }
+};
+WLCOMPILECHECK(PriQueueTree);
 
 #ifdef GALOIS_TBB
 template<class Compare = std::less<int>, typename T = int, bool concurrent = true>
@@ -433,7 +493,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
 WLCOMPILECHECK(OrderedByIntegerMetric);
 
 template<typename GlobalQueueTy = FIFO<>, typename LocalQueueTy = FIFO<>, typename T = int >
-class LocalQueues {
+class LocalQueues : private boost::noncopyable {
 
   PerCPU<typename LocalQueueTy::template rethread<false>::WL> local;
   GlobalQueueTy global;
@@ -480,6 +540,54 @@ public:
   }
 };
 WLCOMPILECHECK(LocalQueues);
+
+template<typename ContainerTy = FIFO<>, typename T = int >
+class LocalStealing : private boost::noncopyable {
+
+  PerCPU<typename ContainerTy::template rethread<true>::WL> local;
+
+ public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef LocalStealing<ContainerTy, T> WL;
+  };
+  template<typename Tnew>
+  struct retype {
+    typedef LocalStealing<typename ContainerTy::template retype<Tnew>::WL, Tnew> WL;
+  };
+
+  typedef T value_type;
+  
+  LocalStealing() {}
+
+  bool push(value_type val) {
+    return local.get().push(val);
+  }
+
+  std::pair<bool, value_type> pop() {
+    std::pair<bool, value_type> ret = local.get().pop();
+    if (ret.first)
+      return ret;
+    return local.getNext().pop();
+  }
+
+  bool empty() {
+    return local.get().empty();
+  }
+
+  bool aborted(value_type val) {
+    return push(val);
+  }
+
+  //Not Thread Safe
+  template<typename Iter>
+  void fill_initial(Iter ii, Iter ee) {
+    while (ii != ee) {
+      push(*ii++);
+    }
+  }
+};
+WLCOMPILECHECK(LocalStealing);
 
 //Queue per writer, reader cycles
 template<typename T = int>

@@ -24,54 +24,6 @@ namespace GaloisRuntime {
 namespace WorkList {
 namespace Experimental {
 
-template<class T, typename ContainerTy = FIFO<T> >
-class StealingLocalWL : private boost::noncopyable {
-
-  PerCPU<ContainerTy> data;
-
-  // static void merge(ContainerTy& x, ContainerTy& y) {
-  //   assert(x.empty());
-  //   assert(y.empty());
-  // }
-
- public:
-  template<bool newconcurrent>
-  struct rethread {
-    typedef StealingLocalWL<T, ContainerTy> WL;
-  };
-
-  typedef T value_type;
-  
-  StealingLocalWL() {}
-
-  bool push(value_type val) {
-    return data.get().push(val);
-  }
-
-  std::pair<bool, value_type> pop() {
-    std::pair<bool, value_type> ret = data.get().pop();
-    if (ret.first)
-      return ret;
-    return data.getNext().pop();
-  }
-
-  bool empty() {
-    return data.get().empty();
-  }
-  bool aborted(value_type val) {
-    return push(val);
-  }
-
-  //Not Thread Safe
-  template<typename Iter>
-  void fill_initial(Iter ii, Iter ee) {
-    while (ii != ee) {
-      push(*ii++);
-    }
-  }
-};
-WLCOMPILECHECK(StealingLocalWL);
-
 template<class T, class Indexer = DummyIndexer<T>, typename ContainerTy = FIFO<T>, bool concurrent=true >
 class ApproxOrderByIntegerMetric : private boost::noncopyable {
 
