@@ -51,22 +51,18 @@ void partition(MetisGraph* metisGraph, int nparts) {
 	Galois::Timer t;
 	t.start();
 	MetisGraph* mcg = coarsener.coarsen(metisGraph);
-//	Galois::Launcher::stopTiming();
 	t.stop();
 	cout<<"coarsening time: " << t.get() << " ms"<<endl;
 
 	float* totalPartitionWeights = new float[nparts];
 	arrayFill(totalPartitionWeights, nparts, 1 / (float) nparts);
-//	Galois::Launcher::startTiming();
 	maxVertexWeight = (int) (1.5 * ((mcg->getNumNodes()) / Coarsener::COARSEN_FRACTION));
 	PMetis pmetis(20, maxVertexWeight);
-//	cout<<"initial partion:"<<mcg->getNumNodes()<<endl;
 	Galois::Timer init_part_t;
 	init_part_t.start();
 	pmetis.mlevelRecursiveBisection(mcg, nparts, totalPartitionWeights, 0, 0);
 	init_part_t.stop();
-//	cout<<"initial mincut:"<<mcg->getMinCut()<<endl;
-	cout << "initial partition time: "<< init_part_t.get()  << " ms";
+	cout << "initial partition time: "<< init_part_t.get()  << " ms"<<endl;
 	Galois::Timer refine_t;
 
 	arrayFill(totalPartitionWeights, nparts, 1 / (float) nparts);
@@ -140,10 +136,8 @@ void readGraph(MetisGraph* metisGraph, const char* filename, bool weighted = fal
 	InputGraph inputGraph;
 	inputGraph.structureFromFile(filename);
 	inputGraph.emptyNodeData();
-//	cout<<"read weighted:"<<weighted<<" directed:"<<directed<<"graph"<<endl;
 	cout<<"start to transfer data to GGraph"<<endl;
 	int id = 0;
-	//	vector<InputGNode> inNodes(inputGraph.size());
 	for (InputGraph::active_iterator ii = inputGraph.active_begin(), ee = inputGraph.active_end(); ii != ee; ++ii) {
 		InputGNode node = *ii;
 		inputGraph.getData(node)=id++;
@@ -249,7 +243,6 @@ int gNodeToInt(GNode node){
 
 void mergeP::operator()(PerCPUValue& a, PerCPUValue& b){
 	a.mincutInc+=b.mincutInc;
-//	a.changedBndNodes.insert(a.changedBndNodes.end(), b.changedBndNodes.begin(), b.changedBndNodes.end());
 	a.changedBndNodes.insert(b.changedBndNodes.begin(), b.changedBndNodes.end());
 }
 int intlog2(int a){

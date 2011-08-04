@@ -132,7 +132,6 @@ void boundaryTwoWayBalance(MetisGraph* metisGraph, int* tpwgts) {
 		from = 1;
 		to = 0;
 	}
-//	cout<<"queue:"<<numNodes<<" "<<metisGraph->getMaxAdjSum()<<endl;
 	PQueue queue(numNodes, metisGraph->getMaxAdjSum());
 
 	for(GNodeSet::iterator iter = metisGraph->getBoundaryNodes()->begin();iter != metisGraph->getBoundaryNodes()->end();++iter){
@@ -140,7 +139,6 @@ void boundaryTwoWayBalance(MetisGraph* metisGraph, int* tpwgts) {
 		MetisNode& boundaryNodeData = boundaryNode.getData();
 		boundaryNodeData.updateGain();
 		if (boundaryNodeData.getPartition() == from && boundaryNodeData.getWeight() <= mindiff) {
-//			cout<<"nodeId:"<<boundaryNodeData.getNodeId()<<endl;
 			queue.insert(boundaryNode, boundaryNodeData.getGain());
 		}
 	}
@@ -260,7 +258,6 @@ void greedyKWayEdgeBalance(MetisGraph* metisGraph, int nparts, float* tpwgts, fl
 		}
 		if (i == nparts)
 			break;
-//		cout<<"pass----------------------------------------------"<<pass<<endl;
 		int graphSize = metisGraph->getNumNodes();
 		arrayFill(moved, graphSize, -1);
 		queue.reset();
@@ -311,7 +308,6 @@ void greedyKWayEdgeBalance(MetisGraph* metisGraph, int nparts, float* tpwgts, fl
 			/*=====================================================================
 			 * If we got here, we can now move the vertex from 'from' to 'to'
 			 *======================================================================*/
-//			cout<<"weights original:"<<metisGraph->getPartWeight(from)<<" "<<metisGraph->getPartWeight(to)<<" "<<higainData.getGain()<<endl;
 			metisGraph->setMinCut(metisGraph->getMinCut() - (higainData.getPartEd()[k] - higainData.getIdegree()));
 
 			/* Update where, weight, and ID/ED information of the vertex you moved */
@@ -343,8 +339,6 @@ void greedyKWayEdgeBalance(MetisGraph* metisGraph, int nparts, float* tpwgts, fl
 				int oldgain = neighborData.getGain();
 				if (neighborData.getPartEd().size() == 0) {
 					int numEdges = neighborData.getNumEdges();
-//					neighborData.partIndex = new int[numEdges];
-//					neighborData.partEd = new int[numEdges];
 					neighborData.initPartEdAndIndex(numEdges);
 				}
 				int edgeWeight = graph->getEdgeData(higain, jj);

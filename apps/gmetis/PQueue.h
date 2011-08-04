@@ -71,7 +71,6 @@ public:
 		heap.resize(maxNumNodes);
 		locator.resize(maxNumNodes); //= new int[maxNumNodes];
 		this->mapToInt = mapToInt;
-		//arrayFill(locator, maxNumNodes, -1);
 		fill(locator.begin(),locator.end(), -1);
 		this->maxNumNodes = maxNumNodes;
 	}
@@ -243,7 +242,7 @@ public:
 		nPrioritySpan = min(NEG_PRIORITYSPAN, maxPriority);
 		nodes = new ListNode<T>[maxNumNodes];
 		bucketSize = pPrioritySpan + nPrioritySpan + 1;
-		buckets.resize(bucketSize);// = new ListNode<T>*[bucketSize];
+		buckets.resize(bucketSize);
 		for(int i=0;i<pPrioritySpan + nPrioritySpan + 1;i++){
 			buckets[i] = NULL;
 		}
@@ -260,7 +259,7 @@ public:
 		numNodes++;
 		int id = (*_mapToInt)(value);
 
-		nodes[id].value = value;// = new ListNode(node);
+		nodes[id].value = value;
 		ListNode<T>* newNode = &nodes[id];
 		newNode->prev = NULL;
 		newNode->next = buckets[priority + bucketIndex];
@@ -347,10 +346,8 @@ class PQueue{
 public:
 	PQueue(int maxNumNodes, int maxGain) {
 		if (maxGain > PLUS_GAINSPAN || maxNumNodes < 500) {
-//			cout<<"Heap Queue"<<endl;
 			internalQueue = new HeapQueue<GNode>(maxNumNodes, maxGain, &gNodeToInt);
 		} else {
-//			internalQueue = new HeapQueue<GNode>(maxNumNodes, maxGain, &gNodeToInt);
 			internalQueue = new LimitedPriorityQueue<GNode>(maxNumNodes, maxGain, &gNodeToInt);
 		}
 	}

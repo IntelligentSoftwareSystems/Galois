@@ -53,10 +53,6 @@ public:
 	}
 
 	void init(){
-//		_partEd = NULL;
-//		_partIndex = NULL;
-//		_partEd.resize(0);
-//		_partIndex.resize(0);
 		_edgeWgtSum = 0;
 		_isBoundary = false;
 		_gain = 0;
@@ -66,23 +62,6 @@ public:
 		_numEdges = 0;
 		_partition = -1;
 	}
-//	MetisNode(const MetisNode& node) {
-//		_id = node._id;
-//		_weight = node._weight;
-//		_edgeWgtSum = node._edgeWgtSum;
-//	}
-
-
-//	~MetisNode(){
-//		if(_partEd!=NULL){
-//			delete[] _partEd;
-//			_partEd = NULL;
-//		}
-//		if(_partIndex!=NULL){
-//			delete[] _partIndex;
-//			_partIndex = NULL;
-//		}
-//	}
 
 	int getNodeId() {
 		return _id;

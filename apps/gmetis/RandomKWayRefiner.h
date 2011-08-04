@@ -141,15 +141,12 @@ private:
 			 * if we got here, we can now move the vertex from 'from' to 'to'
 			 */
 			//dummy for cautious
-//			if(!GaloisRuntime.getRuntime().useSerial()){
 			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(n, Galois::CHECK_CONFLICT), eejj = graph->neighbor_end(n, Galois::CHECK_CONFLICT); jj != eejj; ++jj) {
 				GNode neighbor = *jj;
 
 				neighbor.getData(Galois::NONE);
 			}
-//			}
 
-//			metisGraph->incMinCut(-(nodeData.getPartEd()[k] - nodeData.getIdegree()));
 			perCPUValues->get().mincutInc+=-(nodeData.getPartEd()[k] - nodeData.getIdegree());
 			nodeData.setPartition(to);
 			metisGraph->incPartWeight(to, vwgt);

@@ -33,92 +33,6 @@ public:
 	PMetis(int coasenTo, int maxVertexWeight):coarsener(true, coasenTo, maxVertexWeight) {
 	}
 
-//	/**
-//	 * Partition the graph using PMetis
-//	 */
-//	void partition(MetisGraph* metisGraph, int nparts){
-//		int maxVertexWeight = (int) (1.5 * ((metisGraph->getGraph()->size()) / Coarsener::COARSEN_FRACTION));
-//		float* totalPartitionWeights = new float[nparts];
-//		arrayFill(totalPartitionWeights, nparts, 1 / (float) nparts);
-//		metisGraph->computeAdjWgtSums();
-//		//    PMetis pmetis = new PMetis(maxVertexWeight, 20);
-////		mlevelRecursiveBisection(metisGraph, nparts, totalPartitionWeights, 0, 0);
-//	}
-
-//private:
-//	int* mincutCollection;
-//
-//	void mlevelBisection(MetisGraph* metisGraph, int nparts, float* totalPartWeights, int tpindex,
-//			int partStartIndex){
-//
-//		GGraph* graph = metisGraph->getGraph();
-//		int totalVertexWeight = 0;
-//		for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
-//			GNode node = *ii;
-//			totalVertexWeight += node.getData().getWeight();
-//		}
-//
-//
-//		float vertexWeightRatio = 0;
-//		for (int i = 0; i < nparts / 2; i++) {
-//			vertexWeightRatio += totalPartWeights[tpindex + i];
-//		}
-//		int bisectionWeights[2];
-//		bisectionWeights[0] = (int) (totalVertexWeight * vertexWeightRatio);
-//		bisectionWeights[1] = totalVertexWeight - bisectionWeights[0];
-//
-//		MetisGraph* mcg = coarsener.coarsen(metisGraph);
-//		bisection(mcg, bisectionWeights, coarsener.getCoarsenTo());
-//		refineTwoWay(mcg, metisGraph, bisectionWeights);
-//
-//		if (nparts <= 2) {
-//			for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
-//				GNode node = *ii;
-//				assert(node.getData().getPartition()>=0);
-//				node.getData().setPartition(node.getData().getPartition() + partStartIndex);
-//			}
-//		} else {
-//			for (int i = 0; i < nparts / 2; i++) {
-//				totalPartWeights[i + tpindex] *= (1 / vertexWeightRatio);
-//			}
-//			//nparts/2 may not be equal to nparts-nparts/2
-//			for (int i = 0; i < nparts - nparts / 2; i++) {
-//				totalPartWeights[i + tpindex + nparts / 2] *= (1 / (1 - vertexWeightRatio));
-//			}
-//			MetisGraph* subGraphs = new MetisGraph[2];
-////			cout<<"split graph"<<endl;
-//			splitGraph(metisGraph, subGraphs);
-//			if (nparts > 3) {
-//				mlevelRecursiveBisection(&subGraphs[0], nparts / 2, totalPartWeights, tpindex, partStartIndex);
-//				mlevelRecursiveBisection(&subGraphs[1], nparts - nparts / 2, totalPartWeights, tpindex + nparts / 2,
-//						partStartIndex + nparts / 2);
-//				metisGraph->setMinCut(metisGraph->getMinCut() + subGraphs[0].getMinCut() + subGraphs[1].getMinCut());
-//			} else if (nparts == 3) {
-//				for (GGraph::active_iterator ii = subGraphs[0].getGraph()->active_begin(), ee = subGraphs[0].getGraph()->active_end(); ii != ee; ++ii) {
-//					GNode node = *ii;
-//					MetisNode& nodeData = node.getData(Galois::Graph::NONE);
-//					nodeData.setPartition(partStartIndex);
-//					assert(nodeData.getPartition()>=0);
-//				}
-//				mlevelRecursiveBisection(&subGraphs[1], nparts - nparts / 2, totalPartWeights, tpindex + nparts / 2,
-//						partStartIndex + nparts / 2);
-//				metisGraph->setMinCut(metisGraph->getMinCut() + subGraphs[1].getMinCut());
-//			}
-//			for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
-//				GNode node = *ii;
-//				MetisNode& nodeData = node.getData();
-//				nodeData.setPartition(metisGraph->getSubGraphMapTo(nodeData.getNodeId()).getData().getPartition());
-//				assert(nodeData.getPartition()>=0);
-//			}
-////			cout<<"split finish"<<endl;
-//			metisGraph->releaseSubGraphMapTo();
-//			delete subGraphs[0].getGraph();
-//			delete subGraphs[1].getGraph();
-//			delete[] subGraphs;
-//		}
-//
-//
-//	}
 public:
 	/**
 	 * totalPartWeights: This is an array containing "nparts" floating point numbers. For partition i , totalPartitionWeights[i] stores the fraction
@@ -134,7 +48,6 @@ public:
 			totalVertexWeight += node.getData().getWeight();
 		}
 
-//		cout<<"pmtis-----------"<<endl;
 		float vertexWeightRatio = 0;
 		for (int i = 0; i < nparts / 2; i++) {
 			vertexWeightRatio += totalPartWeights[tpindex + i];
@@ -144,7 +57,6 @@ public:
 		bisectionWeights[1] = totalVertexWeight - bisectionWeights[0];
 
 		MetisGraph* mcg = coarsener.coarsen(metisGraph);
-//		cout<<"finish coarsening-----------"<<endl;
 		bisection(mcg, bisectionWeights, coarsener.getCoarsenTo());
 		refineTwoWay(mcg, metisGraph, bisectionWeights);
 
@@ -163,7 +75,6 @@ public:
 				totalPartWeights[i + tpindex + nparts / 2] *= (1 / (1 - vertexWeightRatio));
 			}
 			MetisGraph* subGraphs = new MetisGraph[2];
-//			cout<<"split graph"<<endl;
 			splitGraph(metisGraph, subGraphs);
 			if (nparts > 3) {
 				mlevelRecursiveBisection(&subGraphs[0], nparts / 2, totalPartWeights, tpindex, partStartIndex);
@@ -201,9 +112,6 @@ public:
 		subGraphNodeNum[1] = 0;
 		GGraph* graph = metisGraph->getGraph();
 
-		// = new MetisGraph[2];
-		//    subGraphs[0] = new MetisGraph();
-		//    subGraphs[1] = new MetisGraph();
 		subGraphs[0].setGraph(new GGraph());
 		subGraphs[1].setGraph(new GGraph());
 		metisGraph->initSubGraphMapTo();
@@ -213,17 +121,10 @@ public:
 			assert(nodeData.getPartition()>=0);
 			GNode newNode = subGraphs[nodeData.getPartition()].getGraph()->createNode(
 					MetisNode(subGraphNodeNum[nodeData.getPartition()], nodeData.getWeight()));
-//			nodeData.setSubGraphMap(newNode);
 			subGraphs[nodeData.getPartition()].getGraph()->addNode(newNode);
 			metisGraph->setSubGraphMapTo(nodeData.getNodeId(), newNode);
 			subGraphNodeNum[nodeData.getPartition()]++;
 		}
-
-//		for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
-//			GNode node = *ii;
-//			MetisNode& nodeData = node.getData();
-//			subGraphs[nodeData.getPartition()].getGraph()->addNode(metisGraph->getSubGraphMapTo(nodeData.getNodeId()));
-//		}
 
 		subGraphs[0].setNumNodes(subGraphNodeNum[0]);
 		subGraphs[1].setNumNodes(subGraphNodeNum[1]);
@@ -243,11 +144,8 @@ public:
 				MetisNode& neighborData = neighbor.getData();
 				int edgeWeight = graph->getEdgeData(node, jj);
 				if (!nodeData.isBoundary() || nodeData.getPartition() == neighborData.getPartition()) {
-//					subGraph->addEdge(nodeData.getSubGraphMap(), neighborData.getSubGraphMap(), edgeWeight);
 					subGraph->addEdge(metisGraph->getSubGraphMapTo(nodeData.getNodeId()), metisGraph->getSubGraphMapTo(neighborData.getNodeId()), edgeWeight);
 				} else {
-//					nodeData.getSubGraphMap().getData().setAdjWgtSum(
-//							nodeData.getSubGraphMap().getData().getAdjWgtSum() - edgeWeight);
 					metisGraph->getSubGraphMapTo(nodeData.getNodeId()).getData().setAdjWgtSum(
 							metisGraph->getSubGraphMapTo(nodeData.getNodeId()).getData().getAdjWgtSum() - edgeWeight);
 

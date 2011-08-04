@@ -205,7 +205,7 @@ void randomBisection(MetisGraph* metisGraph, int* tpwgts, int coarsenTo){
 	delete[] bestWhere;
 	metisGraph->setMinCut(bestMinCut);
 	delete[] nodes;
-	assert(metisGraph->verify());
+	//assert(metisGraph->verify());
 }
 
 
@@ -270,7 +270,7 @@ void growBisection(MetisGraph* metisGraph, int* tpwgts, int coarsenTo) {
 	delete[] bestWhere;
 	metisGraph->setMinCut(bestMinCut);
 	delete[] nodes;
-	assert(metisGraph->verify());
+	//assert(metisGraph->verify());
 }
 
 void bisection(MetisGraph* metisGraph, int* tpwgts, int coarsenTo) {

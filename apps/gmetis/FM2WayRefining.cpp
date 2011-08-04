@@ -170,7 +170,6 @@ void fmTwoWayEdgeRefine(MetisGraph* metisGraph, int* tpwgts, int npasses) {
 			GNode higain = parts[from]->getMax();
 
 			MetisNode& higainData = higain.getData();
-//			cout<<higainData.getNodeId()<<" "<<higainData.getGain()<<endl;
 
 			newcut -= higainData.getGain();
 
