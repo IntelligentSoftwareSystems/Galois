@@ -78,7 +78,7 @@ public:
     //print header
     file << "Epoch";
     for (int t = 0; t < tracking.size(); ++t)
-      file << t << ",_count,"
+      file << "," << t << "_count,"
 	   << t << "_mean,"
 	   << t << "_variance,"
 	   << t << "_stddev";
