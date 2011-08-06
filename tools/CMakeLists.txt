@@ -1,4 +1,3 @@
-add_subdirectory(compile-check)
 add_subdirectory(generators)
 add_subdirectory(comparisons)
 add_subdirectory(graph-convert)

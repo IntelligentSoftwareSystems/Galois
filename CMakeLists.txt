@@ -47,6 +47,7 @@ if(CMAKE_SYSTEM MATCHES "SunOS.*")
 endif()
 
 ###### Configure (users don't need to go beyond here) ######
+enable_testing()
 
 #LAPACK
 enable_language(Fortran)
@@ -123,6 +124,30 @@ if(CMAKE_BUILD_TYPE MATCHES "Debug")
   add_definitions("-Wall")
 endif()
 
+###### Global Functions ######
+function(linkRuntime name) 
+  target_link_libraries(${name} galois) 
+  target_link_libraries(${name} ${CMAKE_THREAD_LIBS_INIT}) 
+  if(NOT USE_SOLARIS)
+    target_link_libraries(${name} hoard)
+  endif()
+
+  if(USE_VTUNE)
+    add_definitions(-DGALOIS_VTUNE)
+    include_directories(${VTUNE_INCLUDE})
+    target_link_libraries(${name} ${VTUNE_LIB})
+    target_link_libraries(${name} dl)
+  endif()
+
+  if(USE_NUMA)
+    target_link_libraries(${name} numa)
+  endif()
+
+  if(TBB_FOUND)
+    target_link_libraries(${name} ${TBB_LIBRARIES})
+  endif()
+endfunction (linkRuntime)
+
 ###### Source finding ######
 include_directories("include")
 
@@ -131,6 +156,7 @@ add_subdirectory(src)
 add_subdirectory(apps)
 add_subdirectory(tools)
 add_subdirectory(inputs)
+add_subdirectory(test)
 
 ###### Documentation ######
 include(UseDoxygen OPTIONAL)

@@ -1,7 +1,4 @@
 See online documentation at:
-http://iss.ices.utexas.edu/galois/index.php/documentation/getting_started
+ http://iss.ices.utexas.edu/?p=projects/galois/doc/current/getting_started
 
-Building:
-
-cmake .
-make
+See build/readme.txt for build instructions
