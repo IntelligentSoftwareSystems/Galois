@@ -24,9 +24,11 @@
 #define GALOIS_QUEUE_H
 
 #include "Galois/Runtime/PerCPU.h"
+#include "Galois/Runtime/mm/mem.h"
 #include <boost/utility.hpp>
 #include <stdlib.h>
 #include <limits>
+#include <vector>
 #include <sys/time.h>
 
 namespace Galois {
@@ -41,7 +43,8 @@ struct ConcurrentSkipListMapHelper {
 /**
  * Lock-free priority queue based on ConcurrentSkipListMap from the
  * Java Concurrent Collections. Translated from Java to C++ by
- * Donald Nguyen. 
+ * Donald Nguyen. No attempt was made to add explicit garbage collection,
+ * so this implementation leaks memory.
  *
  * It is likely that this implementation provides more functionality than you
  * need, and you will find better performance with a more specific data
@@ -301,6 +304,10 @@ class ConcurrentSkipListMap : private boost::noncopyable {
   GaloisRuntime::PerCPU<int> randomSeed;
   Compare comp;
 
+  GaloisRuntime::MM::FixedSizeAllocator node_heap;
+  GaloisRuntime::MM::FixedSizeAllocator index_heap;
+  GaloisRuntime::MM::FixedSizeAllocator head_index_heap;
+
   /**
    * Initialize or reset state. Needed by constructors, clone, clear,
    * readObject. and ConcurrentSkipListSet.clone. (Note that comparator must be
@@ -315,7 +322,10 @@ class ConcurrentSkipListMap : private boost::noncopyable {
       randomSeed.get(i) = (1000000 + i) * time.tv_sec + time.tv_usec;
     }
 
-    head = new HeadIndex(new Node(K(), &ConcurrentSkipListMapHelper::BASE_HEADER, NULL), NULL, NULL, 1);
+    Node *node = new (node_heap.allocate(sizeof(Node))) 
+      Node(K(), &ConcurrentSkipListMapHelper::BASE_HEADER, NULL);
+    head = new (head_index_heap.allocate(sizeof(HeadIndex)))
+      HeadIndex(node, NULL, NULL, 1);
   }
 
   /**
@@ -360,6 +370,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
      * @return true if successful
      */
     bool appendMarker(Node* f) {
+      // TODO(ddn): Cannot easily switch this allocate to FixedSizeAllocator (yet)
       return casNext(f, new Node(f));
     }
 
@@ -674,7 +685,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
           // else c < 0; fall through
         }
 
-        Node* z = new Node(kkey, value, n);
+        Node* z = new (node_heap.allocate(sizeof(Node))) Node(kkey, value, n);
         if (!b->casNext(n, z))
           break; // restart if lost race to append to b
         int level = randomLevel();
@@ -722,7 +733,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
     if (level <= max) {
       Index* idx = NULL;
       for (int i = 1; i <= level; ++i)
-        idx = new Index(z, idx, NULL);
+        idx = new (index_heap.allocate(sizeof(Index))) Index(z, idx, NULL);
       addIndex(idx, h, level);
 
     } else { // Add a new level
@@ -733,10 +744,12 @@ class ConcurrentSkipListMap : private boost::noncopyable {
        * creating new head index nodes from the opposite direction.
        */
       level = max + 1;
-      Index** idxs = new Index*[level+1];
+      //Index** idxs = new Index*[level+1];
+      std::vector<Index*> idxs;
+      idxs.resize(level+1);
       Index* idx = NULL;
       for (int i = 1; i <= level; ++i)
-        idxs[i] = idx = new Index(z, idx, NULL);
+        idxs[i] = idx = new (index_heap.allocate(sizeof(Index))) Index(z, idx, NULL);
 
       HeadIndex* oldh;
       int k;
@@ -750,7 +763,8 @@ class ConcurrentSkipListMap : private boost::noncopyable {
         HeadIndex* newh = oldh;
         Node* oldbase = oldh->node;
         for (int j = oldLevel + 1; j <= level; ++j)
-          newh = new HeadIndex(oldbase, newh, idxs[j], j);
+          newh = new (head_index_heap.allocate(sizeof(HeadIndex))) 
+            HeadIndex(oldbase, newh, idxs[j], j);
         if (casHead(oldh, newh)) {
           k = oldLevel;
           break;
@@ -930,7 +944,10 @@ public:
   /**
    * Constructs a new empty map, sorted according to the keys' natural order.
    */
-  ConcurrentSkipListMap() {
+  ConcurrentSkipListMap():
+    node_heap(sizeof(Node)),
+    index_heap(sizeof(Index)),
+    head_index_heap(sizeof(HeadIndex)) {
     initialize();
   }
 
