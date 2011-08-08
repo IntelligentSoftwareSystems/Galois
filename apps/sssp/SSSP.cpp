@@ -53,6 +53,8 @@ static const unsigned int DIST_INFINITY =
 
 static unsigned int stepShift = 10;
 
+static std::string wlName;
+
 struct SNode {
   unsigned int id;
   unsigned int dist;
@@ -91,7 +93,18 @@ struct UpdateRequest {
 
 struct seq_less {
   bool operator()(const UpdateRequest& lhs, const UpdateRequest& rhs) {
-    return (lhs.w  >> stepShift) < (rhs.w >> stepShift);
+    //return (lhs.w  >> stepShift) < (rhs.w >> stepShift);
+    if (lhs.w < rhs.w) return true;
+    else if (lhs.w > rhs.w) return false;
+    else return lhs.n < rhs.n;
+  }
+};
+struct seq_gt {
+  bool operator()(const UpdateRequest& lhs, const UpdateRequest& rhs) {
+    //return (lhs.w  >> stepShift) < (rhs.w >> stepShift);
+    if (lhs.w > rhs.w) return true;
+    else if (lhs.w < rhs.w) return false;
+    else return lhs.n > rhs.n;
   }
 };
 
@@ -189,25 +202,59 @@ void runBodyParallel(const GNode src) {
   typedef dChunkedLIFO<16> IChunk;
   typedef OrderedByIntegerMetric<UpdateRequestIndexer, IChunk> OBIM;
 
-  typedef PriQueue<seq_less> PQ;
-  typedef LocalStealing<PQ> LPQ;
+  typedef TbbPriQueue<seq_gt> TBB;
+  typedef LocalStealing<TBB > LTBB;
 
-  typedef PriQueueTree<seq_less> PQT;
-  typedef LocalStealing<PQT> LPQT;
+  typedef SkipListQueue<seq_less> SLQ;
 
   typedef WorkListTracker<UpdateRequestIndexer, OBIM> TR_OBIM;
-  typedef WorkListTracker<UpdateRequestIndexer, PQ> TR_PQ;
-  typedef WorkListTracker<UpdateRequestIndexer, LPQ> TR_LPQ;
-  typedef WorkListTracker<UpdateRequestIndexer, PQT> TR_PQT;
-  typedef WorkListTracker<UpdateRequestIndexer, LPQT> TR_LPQT;
+  typedef WorkListTracker<UpdateRequestIndexer, TBB> TR_TBB;
+  typedef WorkListTracker<UpdateRequestIndexer, LTBB> TR_LTBB;
+  typedef WorkListTracker<UpdateRequestIndexer, SLQ> TR_SLQ;
 
 
   std::vector<UpdateRequest> wl;
   getInitialRequests(src, wl);
   Galois::StatTimer T;
-  T.start();
-  Galois::for_each<OBIM>(wl.begin(), wl.end(), process());
-  T.stop();
+
+  if (wlName == "obim") {
+    T.start();
+    Galois::for_each<OBIM>(wl.begin(), wl.end(), process());
+    T.stop();
+  } else if (wlName == "tbb") {
+    T.start();
+    Galois::for_each<TBB>(wl.begin(), wl.end(), process());
+    T.stop();
+  } else if (wlName == "ltbb") {
+    T.start();
+    Galois::for_each<LTBB>(wl.begin(), wl.end(), process());
+    T.stop();
+  } else if (wlName == "slq") {
+    T.start();
+    Galois::for_each<SLQ>(wl.begin(), wl.end(), process());
+    T.stop();
+  } else if (wlName == "tr_obim") {
+    T.start();
+    Galois::for_each<TR_OBIM>(wl.begin(), wl.end(), process());
+    T.stop();
+  } else if (wlName == "tr_tbb") {
+    T.start();
+    Galois::for_each<TR_TBB>(wl.begin(), wl.end(), process());
+    T.stop();
+  } else if (wlName == "tr_ltbb") {
+    T.start();
+    Galois::for_each<TR_LTBB>(wl.begin(), wl.end(), process());
+    T.stop();
+  } else if (wlName == "tr_slq") {
+    T.start();
+    Galois::for_each<TR_SLQ>(wl.begin(), wl.end(), process());
+    T.stop();
+  } else {
+    std::cout << "Unrecognized worklist " << wlName << " using obim\n";
+    T.start();
+    Galois::for_each<OBIM>(wl.begin(), wl.end(), process());
+    T.stop();
+  }
 }
 
 
@@ -262,15 +309,15 @@ int main(int argc, const char **argv) {
       ++i;
     } else if (strcmp(args[i], "-bfs") == 0) {
       do_bfs = true;
+    } else if (strcmp(args[i], "-wl") == 0) {
+      wlName = args[i+1];
+      ++i;
     } else {
       std::cerr << "unknown argument, use -help for usage information\n";
       return 1;
     }
   }
 
-  if (args.size() >= 5 && strcmp(args[3], "-delta") == 0)
-    stepShift = atoi(args[4]);
- 
   GNode source = -1;
   GNode report = -1;
   
@@ -278,6 +325,7 @@ int main(int argc, const char **argv) {
   graph.emptyNodeData();
   std::cout << "Read " << graph.size() << " nodes\n";
   std::cout << "Using delta-step of " << (1 << stepShift) << "\n";
+  std::cout << "Using worklist of " << wlName << "\n";
   
   unsigned int id = 0;
   for (Graph::active_iterator src = graph.active_begin(), ee =
