@@ -315,7 +315,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
       randomSeed.get(i) = (1000000 + i) * time.tv_sec + time.tv_usec;
     }
 
-    head = new HeadIndex(new Node(NULL, &ConcurrentSkipListMapHelper::BASE_HEADER, NULL), NULL, NULL, 1);
+    head = new HeadIndex(new Node(K(), &ConcurrentSkipListMapHelper::BASE_HEADER, NULL), NULL, NULL, 1);
   }
 
   /**
@@ -860,7 +860,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * 
    * @return first node or null if empty
    */
-  Node* findFirst() {
+  Node* findFirst() const {
     for (;;) {
       Node* b = head->node;
       Node* n = b->next;
@@ -1060,7 +1060,7 @@ public:
    * 
    * @return <tt>true</tt> if this map contains no key-value mappings.
    */
-  bool isEmpty() {
+  bool isEmpty() const {
     return findFirst() == NULL;
   }
 

@@ -30,6 +30,7 @@ kind.
 #include "Galois/Runtime/PaddedLock.h"
 #include "Galois/Runtime/PerCPU.h"
 //#include "Galois/Runtime/QueuingLock.h"
+#include "Galois/Queue.h"
 
 #include <boost/utility.hpp>
 
@@ -925,6 +926,52 @@ public:
   }
 
 };
+
+template<class Compare = std::less<int>, typename T = int>
+class SkipListQueue : private boost::noncopyable {
+
+  Galois::ConcurrentSkipListMap<T,int,Compare> wl;
+  int magic;
+
+public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef SkipListQueue<Compare, T> WL;
+  };
+  template<typename Tnew>
+  struct retype {
+    typedef SkipListQueue<Compare, Tnew> WL;
+  };
+
+  typedef T value_type;
+
+  bool push(value_type val) {
+    wl.putIfAbsent(val, &magic);
+    return true;
+  }
+
+  std::pair<bool, value_type> pop() {
+    return wl.pollFirstKey();
+  }
+   
+  bool empty() const {
+    return wl.isEmpty();
+  }
+
+  bool aborted(value_type val) {
+    return push(val);
+  }
+
+  //Not Thread Safe
+  template<typename Iter>
+  void fill_initial(Iter ii, Iter ee) {
+    while (ii != ee) {
+      push(*ii++);
+    }
+  }
+};
+WLCOMPILECHECK(SkipListQueue);
+
 
 //End namespace
 }
