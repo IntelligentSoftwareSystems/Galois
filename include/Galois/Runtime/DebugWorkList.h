@@ -162,6 +162,10 @@ public:
   struct rethread {
     typedef NoInlineFilter<typename iWL::template rethread<concurrent>::WL> WL;
   };
+  template<typename Tnew>
+  struct retype {
+    typedef NoInlineFilter<typename iWL::template retype<Tnew>::WL> WL;
+  };
 
   //! push a value onto the queue
   bool push(value_type val) __attribute__((noinline)) {
@@ -185,8 +189,8 @@ public:
   }
   
   template<typename iter>
-  void fillInitial(iter begin, iter end) {
-    return wl.fillInitial(begin, end);
+  void fill_initial(iter begin, iter end) {
+    return wl.fill_initial(begin, end);
   }
 };
 
