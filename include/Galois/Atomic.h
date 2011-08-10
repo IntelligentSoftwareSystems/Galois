@@ -38,7 +38,7 @@ public:
   //! Initialize with a value
   explicit GAtomic(const T& i) :val(i) {}
   //! default constructor
-  explicit GAtomic(){}
+  GAtomic() {}
   //! copy constructor
   GAtomic(const GAtomic& src){
      val = src.val;
