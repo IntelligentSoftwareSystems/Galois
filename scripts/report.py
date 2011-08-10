@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 """
 Parse the output of an application into a csv file
-Run a series of performance tests and pretty print and export csv
-the results.
 
 @section License
 
@@ -67,6 +65,7 @@ def main(options):
       r'^RUN: Variable (?P<key>\S+) = (?P<value>\S+)': do_var_line,
       r'^STAT SINGLE (?P<key>\S+) (?P<loop>\S+) (?P<value>.*)': do_stat_line,
       r'^INFO: (?P<key>CommandLine) (?P<value>.*)': do_var_line,
+      r'^INFO: (?P<key>Hostname) (?P<value>.*)': do_var_line,
       r'^STAT DISTRIBUTION (?P<loopn>\d+) (?P<key>\S+) (?P<loop>\S+) (?P<value>.*)': do_dist_line
       }
   
@@ -93,12 +92,15 @@ def main(options):
 
 if __name__ == '__main__':
   parser = optparse.OptionParser(usage='usage: %prog [options]')
-  parser.add_option('-i', '--include', dest="include", default=[], action='append',
-      help='column to include in output. Multiple columns can be specified with multiple options'
-           + 'or a comma separated list of columns.')
-  parser.add_option('-e', '--exclude', dest="exclude", default=[], action='append',
-      help='column to include in output. Multiple columns can be specified with multiple options'
-           + 'or a comma separated list of columns.')
+  parser.add_option('-i', '--include',
+      dest="include", default=[], action='append',
+      help='column to include in output. Multiple columns can be specified '
+           + 'with multiple options or a comma separated list of columns.')
+  parser.add_option('-e', '--exclude',
+      dest="exclude", default=[], action='append',
+      help='column to include in output. Multiple columns can be specified '
+           + 'with multiple options or a comma separated list of columns.')
+
   (options, args) = parser.parse_args()
   if (not options.include and options.exclude) or (options.include and not options.exclude):
     parser.error('include and exclude are mutually exclusive')
