@@ -209,6 +209,7 @@ void runBodyParallel(const GNode src) {
   typedef SkipListQueue<seq_less> SLQ;
   typedef SimpleOrderedByIntegerMetric<UpdateRequestIndexer, FIFO<> > SOBIM;
   typedef LocalStealing<SimpleOrderedByIntegerMetric<UpdateRequestIndexer> > LSOBIM;
+  typedef FCPairingHeapQueue<seq_less> FCPH;
 
   typedef WorkListTracker<UpdateRequestIndexer, OBIM> TR_OBIM;
   typedef WorkListTracker<UpdateRequestIndexer, TBB>  TR_TBB;
@@ -229,7 +230,11 @@ void runBodyParallel(const GNode src) {
   getInitialRequests(src, wl);
   Galois::StatTimer T;
 
-  if (wlName == "obim") {
+  if (wlName == "fcph") {
+    T.start();
+    Galois::for_each<FCPH>(wl.begin(), wl.end(), process());
+    T.stop();
+  } else if (wlName == "obim") {
     T.start();
     Galois::for_each<OBIM>(wl.begin(), wl.end(), process());
     T.stop();

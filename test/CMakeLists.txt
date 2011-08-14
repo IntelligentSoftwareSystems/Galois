@@ -4,5 +4,7 @@ function(makeTest name)
   add_test(${name} ${name})
 endfunction()
 
+add_definitions(-O0)
 makeTest(compile-check)
-makeTest(queue)
+makeTest(skiplist)
+makeTest(pairingheap)

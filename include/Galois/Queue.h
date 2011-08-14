@@ -24,6 +24,7 @@
 #define GALOIS_QUEUE_H
 
 #include "Galois/Runtime/PerCPU.h"
+#include "Galois/Runtime/PaddedLock.h"
 #include "Galois/Runtime/mm/mem.h"
 #include <boost/utility.hpp>
 #include <stdlib.h>
@@ -1158,6 +1159,494 @@ public:
       return std::make_pair(false, K());
   }
 };
+
+
+template<class T,class Compare=std::less<T> >
+class PairingHeap: private boost::noncopyable {
+  struct Node {
+    T value;
+    Node* leftChild;
+    Node* nextSibling;
+    Node* prev;
+    Node(T v) : value(v), leftChild(NULL), nextSibling(NULL), prev(NULL) {}
+  };
+
+  Compare comp;
+  std::vector<Node*> tree;
+  Node* root;
+  int capacity;
+
+  Node* compareAndLink(Node* first, Node* second) {
+    if (!second)
+      return first;
+    if (comp(second->value, first->value)) {
+      // Attach first as leftmost child of second
+      second->prev = first->prev;
+      first->prev = second;
+      first->nextSibling = second->leftChild;
+      if (first->nextSibling)
+        first->nextSibling->prev = first;
+      second->leftChild = first;
+      return second;
+    } else {
+      // Attach second as leftmost child of first
+      second->prev = first;
+      first->nextSibling = second->nextSibling;
+      if (first->nextSibling)
+        first->nextSibling->prev = first;
+      second->nextSibling = first->leftChild;
+      if (second->nextSibling)
+        second->nextSibling->prev = second;
+      first->leftChild = second;
+      return first;
+    }
+  }
+
+  void redouble(int index) {
+    if (index == capacity) {
+      Node** old = tree;
+      capacity = 2 * index;
+      tree = new Node*[2*index];
+      memcpy(tree, old, sizeof(*tree) * index);
+      delete [] old;
+    }
+  }
+
+  Node* combineSiblings(Node* firstSibling) {
+    if (!firstSibling->nextSibling)
+      return firstSibling;
+    int numSiblings = 0;
+    for (; firstSibling; ++numSiblings) {
+      if (numSiblings == tree.size())
+        tree.resize(numSiblings * 2);
+      tree[numSiblings] = firstSibling;
+      firstSibling->prev->nextSibling = NULL;
+      firstSibling = firstSibling->nextSibling;
+    }
+    if (numSiblings == tree.size())
+      tree.resize(numSiblings * 2);
+    tree[numSiblings] = NULL;
+
+    int i = 0;
+    for (; i + 1 < numSiblings; i += 2) 
+      tree[i] = compareAndLink(tree[i], tree[i+1]);
+
+    int j = i - 2;
+    if (numSiblings - 3 == j)
+      tree[j] = compareAndLink(tree[j], tree[j+2]);
+    for (; j >= 2; j -=2)
+      tree[j-2] = compareAndLink(tree[j-2], tree[j]);
+    return tree[0];
+  }
+
+public:
+  PairingHeap(int capacity = 5): root(NULL), tree(capacity, NULL) { }
+
+  ~PairingHeap() {
+    delete root;
+  }
+
+  bool empty() const {
+    return root == NULL;
+  }
+
+  void add(T x) {
+    Node* node = new Node(x);
+    if (!root)
+      root = node;
+    else
+      root = compareAndLink(root, node);
+  }
+
+  std::pair<bool,T> pollMin() {
+    if (empty())
+      return std::make_pair(false, T());
+    T retval = root->value;
+    if (!root->leftChild) {
+      delete root;
+      root = NULL;
+    } else {
+      Node* t = root;
+      root = combineSiblings(root->leftChild);
+      delete t;
+    }
+    return std::make_pair(true, retval);
+  }
+};
+
+template<class T,class Compare=std::less<T>,bool Concurrent=true>
+class FCPairingHeap: private boost::noncopyable {
+  struct Op {
+    T item;
+    std::pair<bool,T> retval;
+    Op* response;
+    bool req;
+  };
+
+  struct Slot {
+    Op* volatile req __attribute__((aligned(64)));
+    Slot* volatile next;
+    Slot* volatile prev;
+    Slot(): req(NULL), next(NULL), prev(NULL) { }
+  };
+
+  GaloisRuntime::PerCPU<Slot*> localSlots;
+  GaloisRuntime::PerCPU<std::vector<Op*> > ops;
+  GaloisRuntime::PaddedLock<Concurrent> lock;
+  PairingHeap<T,Compare> heap;
+  Slot* slots;
+  const int maxTries;
+
+  void flatCombine() {
+    for (int tries = 0; tries < maxTries; ++tries) {
+      _GLIBCXX_READ_MEM_BARRIER;
+      int changes = 0;
+      Slot* cur = slots;
+      while (cur->next) {
+        Op* op = cur->req;
+        if (op && op->req) {
+          ++changes;
+          if (op->response) {
+            // pollMin op
+            op->response->retval = heap.pollMin();
+          } else {
+            // add op
+            heap.add(op->item);
+          }
+          cur->req = op->response;
+        } 
+
+        cur = cur->next;
+      }
+      if (changes)
+        break;
+    }
+  }
+
+  void addSlot(Slot* slot) {
+    Slot* cur;
+    do {
+      cur = slots;
+      slot->next = cur;
+    } while (!__sync_bool_compare_and_swap(&slots, cur, slot));
+    cur->prev = slot;
+  }
+
+  Slot* getMySlot() {
+    Slot*& mySlot = localSlots.get();
+    if (mySlot == NULL) {
+      mySlot = new Slot();
+      addSlot(mySlot);
+    }
+
+    return mySlot;
+  }
+
+  Op* getOp() {
+    std::vector<Op*>& myOps = ops.get();
+    if (myOps.empty()) {
+      return new Op;
+    }
+    Op* retval = myOps.back();
+    myOps.pop_back();
+    return retval;
+  }
+
+  void recycleOp(Op* op) {
+    ops.get().push_back(op);
+  }
+
+  Op* makeAddReq(const T& value) {
+    Op* req = getOp();
+    req->item = value;
+    req->response = NULL;
+    req->req = true;
+    return req;
+  }
+
+  Op* makePollReq() {
+    Op* response = getOp();
+    response->req = false;
+    response->response = NULL;
+
+    Op* req = getOp();
+    req->req = true;
+    req->response = response;
+
+    return req;
+  }
+
+public:
+  FCPairingHeap(): maxTries(1) { 
+    slots = new Slot();
+  }
+  
+  ~FCPairingHeap() {
+    Slot* cur = slots;
+    while (cur) {
+      Slot* t = cur->next;
+      delete cur;
+      cur = t;
+    }
+
+    for (int i = 0; i < ops.size(); ++i) {
+      std::vector<Op*>& v = ops.get(i);
+      for (typename std::vector<Op*>::iterator ii = v.begin(), ee = v.end(); ii != ee ; ++ii) {
+        delete *ii;
+      }
+    }
+  }
+
+  void add(T value) {
+    Slot* mySlot = getMySlot();
+    Slot* volatile& myNext = mySlot->next;
+    Op* volatile& myReq = mySlot->req;
+    Op* req = makeAddReq(value);
+    myReq = req;
+
+    do {
+      //if (!myNext) {
+      //  addSlot(mySlot);
+      //  assert(0 && "should never happen");
+      //  abort();
+      //}
+
+      if (lock.try_lock()) {
+        flatCombine();
+        lock.unlock();
+        recycleOp(req);
+        return;
+      } else {
+        _GLIBCXX_WRITE_MEM_BARRIER;
+        while (myReq == req) {
+#if defined(__i386__) || defined(__amd64__)
+          asm volatile ( "pause");
+#endif
+        }
+        _GLIBCXX_READ_MEM_BARRIER;
+        recycleOp(req);
+        return;
+      }
+    } while(1);
+  }
+
+  std::pair<bool,T> pollMin() {
+    Slot* mySlot = getMySlot();
+    Slot* volatile& myNext = mySlot->next;
+    Op* volatile& myReq = mySlot->req;
+    Op* req = makePollReq();
+    myReq = req;
+
+    do {
+      //if (!myNext) {
+      //  addSlot(mySlot);
+      //  assert(0 && "should never happen");
+      //  abort();
+      //}
+
+      if (lock.try_lock()) {
+        flatCombine();
+        lock.unlock();
+
+        std::pair<bool,T> retval = myReq->retval;
+        recycleOp(req->response);
+        recycleOp(req);
+        return retval;
+      } else {
+        _GLIBCXX_WRITE_MEM_BARRIER;
+        while (myReq == req) {
+#if defined(__i386__) || defined(__amd64__)
+          asm volatile ( "pause");
+#endif
+        }
+        _GLIBCXX_READ_MEM_BARRIER;
+        std::pair<bool,T> retval = myReq->retval;
+        recycleOp(req->response);
+        recycleOp(req);
+        return retval;
+      }
+    } while(1);
+  }
+
+  bool empty() const {
+    lock.lock();
+    bool retval = heap.empty();
+    lock.unlock();
+    return retval;
+  }
+
+};
+
+#if 0
+template<class T>
+struct PairingHeap1 {
+  struct PairNode {
+    T element;
+    PairNode* leftChild;
+    PairNode* nextSibling;
+    PairNode* prev;
+    PairNode(T e) : element(e), leftChild(NULL), nextSibling(NULL), prev(NULL) { }
+  };
+
+  PairNode* root;
+
+  PairingHeap1(): root(NULL) { }
+
+  ~PairingHeap1() {
+    makeEmpty();
+  }
+
+  PairNode * insert(const T & x) {
+    PairNode* newNode = new PairNode( x );
+
+    if( root == NULL )
+      root = newNode;
+    else
+      compareAndLink( root, newNode );
+    return newNode;
+  }
+
+  const T& findMin() const
+  {
+      if (isEmpty( ))
+          throw 1;
+      return root->element;
+  }
+
+  void deleteMin( )
+  {
+      if( isEmpty( ) )
+          throw 1;
+
+      PairNode *oldRoot = root;
+
+      if( root->leftChild == NULL )
+          root = NULL;
+      else
+          root = combineSiblings( root->leftChild );
+
+      delete oldRoot;
+  }
+
+  void deleteMin( T& minItem ) {
+      minItem = findMin( );
+      deleteMin( );
+  }
+
+  bool isEmpty( ) const {
+      return root == NULL;
+  }
+
+  void makeEmpty( )
+  {
+      reclaimMemory( root );
+      root = NULL;
+  }
+
+  /**
+   * Internal method to make the tree empty.
+   * WARNING: This is prone to running out of stack space.
+   */
+  void reclaimMemory( PairNode* t ) const {
+      if( t != NULL )
+      {
+          reclaimMemory( t->leftChild );
+          reclaimMemory( t->nextSibling );
+          delete t;
+      }
+  }
+
+  /**
+   * Internal method that is the basic operation to maintain order.
+   * Links first and second together to satisfy heap order.
+   * first is root of tree 1, which may not be NULL.
+   *    first->nextSibling MUST be NULL on entry.
+   * second is root of tree 2, which may be NULL.
+   * first becomes the result of the tree merge.
+   */
+  void compareAndLink( PairNode * & first,
+                  PairNode *second ) const
+  {
+      if( second == NULL )
+          return;
+
+      if( second->element < first->element )
+      {
+          // Attach first as leftmost child of second
+          second->prev = first->prev;
+          first->prev = second;
+          first->nextSibling = second->leftChild;
+          if( first->nextSibling != NULL )
+              first->nextSibling->prev = first;
+          second->leftChild = first;
+          first = second;
+      }
+      else
+      {
+          // Attach second as leftmost child of first
+          second->prev = first;
+          first->nextSibling = second->nextSibling;
+          if( first->nextSibling != NULL )
+              first->nextSibling->prev = first;
+          second->nextSibling = first->leftChild;
+          if( second->nextSibling != NULL )
+              second->nextSibling->prev = second;
+          first->leftChild = second;
+      }
+  }
+
+  /**
+   * Internal method that implements two-pass merging.
+   * firstSibling the root of the conglomerate;
+   *     assumed not NULL.
+   */
+  PairNode *
+  combineSiblings( PairNode *firstSibling ) const
+  {
+      if( firstSibling->nextSibling == NULL )
+          return firstSibling;
+
+      std::cerr << "ASDFASDFSADF" << "\n";
+          // Allocate the array
+      static std::vector<PairNode *> treeArray( 5 );
+
+          // Store the subtrees in an array
+      int numSiblings = 0;
+      for( ; firstSibling != NULL; numSiblings++ )
+      {
+          if( numSiblings == treeArray.size( ) )
+              treeArray.resize( numSiblings * 2 );
+          treeArray[ numSiblings ] = firstSibling;
+          firstSibling->prev->nextSibling = NULL;  // break links
+          firstSibling = firstSibling->nextSibling;
+      }
+      if( numSiblings == treeArray.size( ) )
+          treeArray.resize( numSiblings + 1 );
+      treeArray[ numSiblings ] = NULL;
+
+          // Combine subtrees two at a time, going left to right
+      int i = 0;
+      for( ; i + 1 < numSiblings; i += 2 )
+          compareAndLink( treeArray[ i ], treeArray[ i + 1 ] );
+
+      int j = i - 2;
+
+          // j has the result of last compareAndLink.
+          // If an odd number of trees, get the last one.
+      if( j == numSiblings - 3 )
+          compareAndLink( treeArray[ j ], treeArray[ j + 2 ] );
+
+          // Now go right to left, merging last tree with
+          // next to last. The result becomes the new last.
+      for( ; j >= 2; j -= 2 )
+          compareAndLink( treeArray[ j - 2 ], treeArray[ j ] );
+      return treeArray[ 0 ];
+  }
+};
+#endif
+
+
+
 
 }
 #endif

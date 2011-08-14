@@ -972,6 +972,50 @@ public:
 };
 WLCOMPILECHECK(SkipListQueue);
 
+template<class Compare = std::less<int>, typename T = int>
+class FCPairingHeapQueue : private boost::noncopyable {
+
+  Galois::FCPairingHeap<T,Compare> wl;
+
+public:
+
+  template<bool newconcurrent>
+  struct rethread {
+    typedef FCPairingHeapQueue<Compare, T> WL;
+  };
+  template<typename Tnew>
+  struct retype {
+    typedef FCPairingHeapQueue<Compare, Tnew> WL;
+  };
+
+  typedef T value_type;
+
+  bool push(value_type val) {
+    wl.add(val);
+    return true;
+  }
+
+  std::pair<bool, value_type> pop() {
+    return wl.pollMin();
+  }
+   
+  bool empty() const {
+    return wl.empty();
+  }
+
+  bool aborted(value_type val) {
+    return push(val);
+  }
+
+  //Not Thread Safe
+  template<typename Iter>
+  void fill_initial(Iter ii, Iter ee) {
+    while (ii != ee) {
+      push(*ii++);
+    }
+  }
+};
+WLCOMPILECHECK(FCPairingHeapQueue);
 
 //End namespace
 }
