@@ -83,10 +83,7 @@ struct process {
     Cavity cav(Mesh, item, tuples.back(), lwl.getPerIterAlloc());
     cav.build();
     
-    Cavity::GNodeVector newNodes(lwl.getPerIterAlloc());
-    cav.update(&newNodes);
-    for (Cavity::GNodeVector::iterator iter = newNodes.begin(); iter != newNodes.end(); ++iter)
-        lwl.push(*iter);
+    cav.update(lwl);
   }
 };
 
