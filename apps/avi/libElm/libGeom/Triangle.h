@@ -33,6 +33,8 @@
 #include "ElementGeometry.h"
 #include "Segment.h"
 
+#include <algorithm>
+
 #include <cmath>
 #include <cassert>
 
@@ -108,9 +110,14 @@ class Triangle: public AbstractGeom<SPD> {
 
   virtual void computeNormal (size_t e, std::vector<double>& vNormal) const;
 
+  virtual void computeCenter (std::vector<double>& center) const;
+
 private:
   static const size_t    SegmentNodes[];
+
   static const double ParamCoord[];
+
+  static double midpoint (double x1, double x2) { return (x1 + x2) / 2; }
 };
 
 
@@ -254,5 +261,66 @@ void Triangle<SPD>::computeNormal(size_t e, std::vector<double> &VNormal) const 
   VNormal.push_back(-v[0]/norm);
 }
 
+/**
+ * computes the center of the in-circle of a triangle
+ * by computing the point of intersection of bisectors of the 
+ * sides, which are perpendicular to the sides
+ */
+template <size_t SPD>
+void Triangle<SPD>::computeCenter (std::vector<double>& center) const {
+
+  double x1 = AbstractGeom<SPD>::getCoordinate (0, 0); // node 0, x coord
+  double y1 = AbstractGeom<SPD>::getCoordinate (0, 1); // node 0, y coord
+
+  double x2 = AbstractGeom<SPD>::getCoordinate (1, 0); // node 0, y coord
+  double y2 = AbstractGeom<SPD>::getCoordinate (1, 1); // node 0, y coord
+
+
+  double x3 = AbstractGeom<SPD>::getCoordinate (2, 0); // node 0, y coord
+  double y3 = AbstractGeom<SPD>::getCoordinate (2, 1); // node 0, y coord
+
+
+  // check if the slope of some side will come out to inf
+  // and swap with third side 
+  if (fabs(x2 - x1) < TOLERANCE) { // almost zero
+    std::swap (x2, x3);
+    std::swap (y2, y3);
+  } 
+
+  if (fabs(x3 - x2) < TOLERANCE) {
+    std::swap (x1, x2);
+    std::swap (y1, y2);
+  }
+
+
+  // mid points of the sides
+  double xb1 = midpoint (x1, x2);
+  double yb1 = midpoint (y1, y2);
+
+  double xb2 = midpoint (x2, x3);
+  double yb2 = midpoint (y2, y3);
+
+  double xb3 = midpoint (x3, x1);
+  double yb3 = midpoint (y3, y1);
+
+  // slopes of all sides
+  double m1 = (y2 - y1) / (x2 - x1);
+  double m2 = (y3 - y2) / (x3 - x2);
+  double m3 = (y3 - y1) / (x3 - x1);
+
+  // solve simultaneous equations for first 2 bisectors
+  double cy = (xb2 - xb1 + m2 * yb2 - m1 * yb1) / (m2 - m1);
+  double cx = (m2 * xb1 - m1 * xb2 + m2 * m1 * yb1 - m2 * m1 * yb2) / (m2 - m1);
+
+  // check against the third bisector
+  if (fabs(x3-x1) > 0) { // checks if m3 == inf
+    double diff = (cx + m3 * cy) - (xb3 + m3 * yb3);
+    assert (fabs (diff) < 1e-9);
+  }
+
+  // output the computed values
+  center[0] = cx;
+  center[1] = cy;
+}
 
 #endif

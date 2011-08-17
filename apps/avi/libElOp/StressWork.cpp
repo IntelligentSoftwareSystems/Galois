@@ -33,13 +33,6 @@ StressWork::PerCPUtmpVecTy StressWork::perCPUtmpVec;
 
 
 
-static void copyVecDouble (const VecDouble& vin, VecDouble& vout) {
-  if (vout.size () != vin.size ()) {
-    vout.resize (vin.size ());
-  }
-
-  std::copy (vin.begin (), vin.end (), vout.begin ());
-}
 
 bool StressWork::getDValIntern (const MatDouble &argval, MatDouble& funcval, FourDVecDouble& dfuncval
     , const GetValMode& mode) const {
@@ -55,6 +48,7 @@ bool StressWork::getDValIntern (const MatDouble &argval, MatDouble& funcval, Fou
 
 
   StressWorkTmpVec& tmpVec = StressWork::perCPUtmpVec.get ();
+  tmpVec.adjustSizes (Dim);
 
   std::vector<size_t>& nDof = tmpVec.nDof;
   std::vector<size_t>& nDiv = tmpVec.nDiv;
@@ -66,10 +60,6 @@ bool StressWork::getDValIntern (const MatDouble &argval, MatDouble& funcval, Fou
   VecDouble& F = tmpVec.F;
   VecDouble& P = tmpVec.P;
 
-  if (nDof.size () != Dim) { nDof.resize (Dim); }
-  if (nDiv.size () != Dim) { nDiv.resize (Dim); }
-  if (DShape.size () != Dim) { DShape.resize (Dim); }
-  if (IntWeights.size () != Dim) { IntWeights.resize (Dim); }
 
   for (size_t f = 0; f < Dim; ++f) {
     nDof[f] = element.getDof(fieldsUsed[f]);
@@ -77,11 +67,11 @@ bool StressWork::getDValIntern (const MatDouble &argval, MatDouble& funcval, Fou
 
     // DShape[f] = element.getDShapes(fieldsUsed[f]);
     // do copy instead of assignment to pervent calls to allocator
-    copyVecDouble (element.getDShapes (fieldsUsed[f]), DShape[f]);
+    StressWork::copyVecDouble (element.getDShapes (fieldsUsed[f]), DShape[f]);
 
     // IntWeights[f] = element.getIntegrationWeights(fieldsUsed[f]);
     // do copy instead of assignment to pervent calls to allocator
-    copyVecDouble (element.getIntegrationWeights (fieldsUsed[f]), IntWeights[f]);
+    StressWork::copyVecDouble (element.getIntegrationWeights (fieldsUsed[f]), IntWeights[f]);
   }
 
   if (funcval.size() < Dim) {

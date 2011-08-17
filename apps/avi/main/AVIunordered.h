@@ -279,6 +279,10 @@ protected:
 
         ++ (iter.get ());
 
+        // if (iter.get () == 5000) {
+           // meshInit.plotMesh ();
+           // meshInit.plotMeshCenters ();
+        // }
 
       }
   };
@@ -330,7 +334,9 @@ public:
     // perform the simulation
     /////////////////////////////////////////////////////////////////
 
-
+    // uncomment to plot the mesh
+    meshInit.plotMesh ();
+    // meshInit.plotMeshCenters ();
 
     // temporary matrices
     size_t nrows = meshInit.getSpatialDim ();

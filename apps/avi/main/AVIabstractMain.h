@@ -93,6 +93,8 @@ private:
 
   static void initGlobalVec (const MeshInit& meshInit, GlobalVec& g);
 
+
+
 protected:
 
 
@@ -140,6 +142,8 @@ public:
    */
   inline static void simulate (AVI* avi, MeshInit& meshInit,
         GlobalVec& g, LocalVec& l, bool createSyncFiles);
+
+
 };
 
 /**

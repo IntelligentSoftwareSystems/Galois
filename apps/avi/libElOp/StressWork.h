@@ -103,14 +103,21 @@ private:
         F (MAT_SIZE, 0.0),
         P (MAT_SIZE, 0.0) {}
 
-    explicit StressWorkTmpVec (size_t Dim)
-      : nDof(Dim), 
-        nDiv(Dim),
-        DShape(Dim), 
-        IntWeights(Dim),
-        A (MAT_SIZE * MAT_SIZE, 0.0),
-        F (MAT_SIZE, 0.0),
-        P (MAT_SIZE, 0.0) {}
+    void adjustSizes (size_t Dim) {
+      if (nDof.size () != Dim) { nDof.resize (Dim); }
+
+      if (nDiv.size () != Dim) { nDiv.resize (Dim); }
+
+      if (DShape.size () != Dim) { DShape.resize (Dim); }
+
+      if (IntWeights.size () != Dim) { IntWeights.resize (Dim); }
+
+      if (A.size () != MAT_SIZE * MAT_SIZE) { A.resize (MAT_SIZE * MAT_SIZE, 0.0); }
+
+      if (F.size () != MAT_SIZE) { F.resize (MAT_SIZE, 0.0); }
+      
+      if (P.size () != MAT_SIZE) { P.resize (MAT_SIZE, 0.0); }
+    }
     
 
 
@@ -165,6 +172,17 @@ public:
   bool getVal(const MatDouble &argval, MatDouble& funcval) const {
     FourDVecDouble d;
     return getDValIntern(argval, funcval, d, VAL);
+  }
+
+
+private:
+
+  static void copyVecDouble (const VecDouble& vin, VecDouble& vout) {
+    if (vout.size () != vin.size ()) {
+      vout.resize (vin.size ());
+    }
+
+    std::copy (vin.begin (), vin.end (), vout.begin ());
   }
 
 };

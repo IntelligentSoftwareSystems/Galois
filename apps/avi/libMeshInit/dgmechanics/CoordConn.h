@@ -228,10 +228,9 @@ private:
         }
 
       } else {
-        std::ostringstream ss;
-        ss << "Warning: topology of element " << neu.getElementId (e.id)
+        std::cerr << "Warning: topology " << e.topology << " of element " << neu.getElementId (e.id)
           << " is not supported for conversion to ADLIB.  Skipping. " << std::endl;
-        throw std::runtime_error (ss.str ());
+        abort ();
       }
     }
 

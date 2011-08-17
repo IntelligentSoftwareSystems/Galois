@@ -230,6 +230,9 @@ public:
   void printDiff (const MeshInit& that) const { computeDiffAVI (this->aviVec, that.aviVec, true); }
 
 
+  void plotMeshCenters () const;
+
+  void plotMesh () const;
 
 protected:
 

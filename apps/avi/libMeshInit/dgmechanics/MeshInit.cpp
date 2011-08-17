@@ -282,3 +282,95 @@ bool MeshInit::computeDiffAVI (std::vector<AVI*> listA, std::vector<AVI*> listB,
 
 }
 
+
+void MeshInit::plotMeshCenters () const {
+
+  if (getSpatialDim () != 2) {
+    std::cerr << "Mesh plotting implemented for 2D elements only" << std::endl;
+    abort ();
+  }
+
+  FILE* plotFile = fopen ("mesh.csv", "w");
+
+  if (plotFile == NULL) { abort (); }
+
+  std::vector<double> center (getSpatialDim(), 0);
+
+  fprintf (plotFile , "center_x, center_y, timestamp\n");
+  for (std::vector<AVI*>::const_iterator i = getAVIVec ().begin (), ei = getAVIVec ().end (); 
+      i != ei ; ++i) {
+
+    const AVI& avi = **i;
+
+    std::fill (center.begin (), center.end (), 0.0);
+    avi.getElement ().getGeometry ().computeCenter (center);
+
+    fprintf (plotFile, "%g, %g, %g\n", center[0], center[1], avi.getNextTimeStamp ());
+
+  }
+
+  fclose (plotFile);
+}
+
+
+void MeshInit::plotMesh () const {
+
+
+  FILE* polyFile = fopen ("mesh-poly.csv", "w");
+
+  if (polyFile == NULL) { abort (); }
+
+  for (size_t i = 0; i < cc->getNodesPerElem (); ++i) {
+    fprintf (polyFile, "node%zd, ", i);
+  }
+  fprintf (polyFile , "timestamp\n");
+
+  for (std::vector<AVI*>::const_iterator i = getAVIVec ().begin (), ei = getAVIVec ().end (); 
+      i != ei ; ++i) {
+
+    const AVI& avi = **i;
+
+    const std::vector<GlobalNodalIndex>& conn = avi.getElement ().getGeometry ().getConnectivity ();
+
+    for (size_t j = 0; j < conn.size (); ++j) {
+      fprintf (polyFile, "%zd, ", conn[j]);
+    }
+
+    fprintf (polyFile, "%g\n", avi.getNextTimeStamp ());
+
+  }
+
+  fclose (polyFile);
+
+
+  FILE* coordFile = fopen ("mesh-coord.csv", "w");
+  
+  if (coordFile == NULL) { abort (); }
+
+  for (size_t i = 0; i < cc->getNodesPerElem (); ++i) {
+    fprintf (coordFile, "dim%zd", i);
+
+    if (i < cc->getNodesPerElem () - 1) {
+      fprintf (coordFile, ", ");
+    } else {
+      fprintf (coordFile, "\n");
+    }
+
+    
+  }
+
+  const std::vector<double>& coord = cc->getCoordinates ();
+  for (size_t i = 0; i < coord.size (); i += cc->getSpatialDim ()) {
+    for (size_t j = i; j < i + cc->getSpatialDim (); ++j) {
+      if (j != i) { // not first iter
+        fprintf (coordFile, ", ");
+      }
+      fprintf (coordFile, "%g", coord[j]);
+    }
+
+    fprintf (coordFile, "\n");
+  }
+
+  fclose (coordFile);
+
+}

@@ -129,6 +129,24 @@ class ElementGeometry
   //! @param e: face number for which the normal is desired
   //! @param vNormal: output of the three Cartesian components of the normal vector
   virtual void computeNormal (size_t e, std::vector<double>& vNormal) const = 0;
+
+
+  /**
+   * Returns the value of dimension 'i' of local node 'a' of the eleement
+   * 
+   * @param a local index of the node in [0..numNodes)
+   * @param i local index of dimension (x or y or z) in [0..Dim)
+   */
+  virtual double getCoordinate (size_t a, size_t i) const = 0;
+
+  /**
+   * Computes the center of the element (the way center is defined may be
+   * different for different elements)
+   *
+   * @param center output vector containing the coordinates of the center
+   */
+  virtual void computeCenter (std::vector<double>& center) const = 0;
+
 };
 
 /**
@@ -139,6 +157,12 @@ class AbstractGeom : public ElementGeometry {
 private:
   const std::vector<double>& globalCoordVec;
   std::vector<GlobalNodalIndex> connectivity;
+
+protected:
+  /**
+   * @return ref to the vector that contains global coordinates for all mesh nodes
+   */
+  const std::vector<double>& getGlobalCoordVec () const { return globalCoordVec; }
 
 public:
   /**
@@ -227,23 +251,22 @@ public:
 
 
 
-protected:
 
   /**
    * @param a node id
    * @param i dimension id
    * @return value of dimension 'i' of coordinates of node 'a'
    */
-  double getCoordinate (size_t a, size_t i) const {
+  virtual double getCoordinate (size_t a, size_t i) const {
     // 0-based numbering of nodes in the mesh
     size_t index = getConnectivity ()[a] * getSpatialDimension() + i;
     return  globalCoordVec[index];
   }
 
-  /**
-   * @return ref to the vector that contains global coordinates for all mesh nodes
-   */
-  const std::vector<double>& getGlobalCoordVec () const { return globalCoordVec; }
+  virtual void computeCenter (std::vector<double>& center) const {
+    std::cerr << "computeCenter not implemented" << std::endl;
+    abort ();
+  }
 
 
 };
