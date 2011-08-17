@@ -47,6 +47,7 @@ kind.
 #ifdef GALOIS_TBB
 #define TBB_PREVIEW_CONCURRENT_PRIORITY_QUEUE 1
 #include <tbb/concurrent_priority_queue.h>
+#include <tbb/concurrent_queue.h>
 #endif
 
 namespace GaloisRuntime {
@@ -261,6 +262,51 @@ public:
   }
 };
 WLCOMPILECHECK(TbbPriQueue);
+
+template<typename T = int>
+class TbbFIFO : private boost::noncopyable  {
+  tbb::concurrent_queue<T> wl;
+
+public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef TbbFIFO<T> WL;
+  };
+  template<typename Tnew>
+  struct retype {
+    typedef TbbFIFO<Tnew> WL;
+  };
+
+  typedef T value_type;
+
+  bool push(value_type val) {
+    wl.push(val);
+    return true;
+  }
+
+  std::pair<bool, value_type> pop() {
+    T V = T();
+    bool B = wl.try_pop(V);
+    return std::make_pair(B, V);
+  }
+
+  bool empty() const {
+    return wl.empty();
+  }
+
+  bool aborted(value_type val) {
+    return push(val);
+  }
+
+  //Not Thread Safe
+  template<typename Iter>
+  void fill_initial(Iter ii, Iter ee) {
+    for (; ++ii; ii != ee)
+      wl.push(*ii);
+  }
+};
+WLCOMPILECHECK(TbbFIFO);
+
 #endif
 
 template<typename T = int, bool concurrent = true>

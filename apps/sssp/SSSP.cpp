@@ -207,8 +207,8 @@ void runBodyParallel(const GNode src) {
   typedef TbbPriQueue<seq_gt> TBB;
   typedef LocalStealing<TBB > LTBB;
   typedef SkipListQueue<seq_less> SLQ;
-  typedef SimpleOrderedByIntegerMetric<UpdateRequestIndexer, FIFO<> > SOBIM;
-  typedef LocalStealing<SimpleOrderedByIntegerMetric<UpdateRequestIndexer> > LSOBIM;
+  typedef SimpleOrderedByIntegerMetric<UpdateRequestIndexer> SOBIM;
+  typedef LocalStealing<SOBIM > LSOBIM;
   typedef FCPairingHeapQueue<seq_less> FCPH;
 
   typedef WorkListTracker<UpdateRequestIndexer, OBIM> TR_OBIM;

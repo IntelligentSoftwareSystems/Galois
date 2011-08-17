@@ -1,24 +1,29 @@
-
-template<class Indexer, typename ContainerTy = GaloisRuntime::WorkList::LIFO<>, typename T = int, bool concurrent = true >
+template<class Indexer, typename ContainerTy = GaloisRuntime::WorkList::TbbFIFO<>, typename T = int, bool concurrent = true >
 class SimpleOrderedByIntegerMetric : private boost::noncopyable, private PaddedLock<concurrent> {
 
   using PaddedLock<concurrent>::lock;
   using PaddedLock<concurrent>::try_lock;
   using PaddedLock<concurrent>::unlock;
-  
+
   typedef ContainerTy CTy;
-  
+
   CTy* current;
+  int cint;
   std::map<int, CTy*> mapping;
   Indexer I;
 
   CTy* updateLocalOrCreate(int i) {
     //Try local then try update then find again or else create and update the master log
-    //Assumed lock is held
+    //check if current bin is the right thing to use (lock-free)
+    if (i == cint) {
+      CTy* n = current;
+      if (n) return n;
+    }
+    lock();
     CTy*& lC = mapping[i];
-    if (lC)
-      return lC;
-    lC = new CTy();
+    if (!lC)
+      lC = new CTy();
+    unlock();
     return lC;
   }
 
@@ -40,10 +45,7 @@ class SimpleOrderedByIntegerMetric : private boost::noncopyable, private PaddedL
 
   bool push(value_type val) {
     unsigned int index = I(val);
-    //TODO: This is really bad
-    lock();
     CTy* lC = updateLocalOrCreate(index);
-    unlock();
     bool retval = lC->push(val);
     return retval;
   }
@@ -57,17 +59,23 @@ class SimpleOrderedByIntegerMetric : private boost::noncopyable, private PaddedL
 
     //Failed, find minimum bin
     retval.first = false;
-    if (ThreadPool::getMyID() == 1) {
+    //    if (ThreadPool::getMyID() == 1) {
       lock();
+    if (current != c) {
+      unlock();
+      return pop();
+    }
       for (typename std::map<int, CTy*>::iterator ii = mapping.begin(), ee = mapping.end(); ii != ee; ++ii) {
 	current = ii->second;
-	if ((retval = current->pop()).first)
+	if ((retval = current->pop()).first) {
+	  cint = ii->first;
 	  goto exit;
+	}
       }
       retval.first = false;
     exit:
       unlock();
-    }
+    //   }
     return retval;
   }
 
