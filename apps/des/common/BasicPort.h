@@ -1,4 +1,4 @@
-/** Implementation corresponding to @file comDefs.h -*- C++ -*-
+/** OneInputGate implements the basic structure of a one input logic gate -*- C++ -*-
  * @file
  * @section License
  *
@@ -21,9 +21,26 @@
  * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
  */
 
-#include "comDefs.h"
+#ifndef _BASIC_PORT_H
+#define _BASIC_PORT_H
 
-std::string  toLowerCase (std::string str) {
-  std::transform (str.begin (), str.end (), str.begin (), ::tolower);
-  return str;
-}
+#include <string>
+
+#include "LogicFunctions.h"
+#include "OneInputGate.h"
+
+class BasicPort: public OneInputGate {
+private:
+  static const BUF& BUFFER;
+
+public:
+  BasicPort (const std::string&  outputName, const std::string& inputName)
+    : OneInputGate (BUFFER, outputName, inputName)  {}
+
+  BasicPort* makeClone () const { return new BasicPort (*this); }
+
+
+};
+
+
+#endif // BASIC_PORT_H

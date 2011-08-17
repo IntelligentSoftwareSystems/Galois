@@ -27,6 +27,7 @@
 #include <limits>
 #include <string>
 #include <algorithm>
+#include <vector>
 
 /**
  * type for time in simulation world
@@ -45,4 +46,16 @@ const SimTime INFINITY_SIM_TIME = (1 << 30);
  * Helper function to convert a string to lower case
  */
 std::string  toLowerCase (std::string str);
+
+/**
+ * freeing pointers in a vector
+ * before the vector itself is destroyed
+ */
+template <typename T>
+void destroyVec (std::vector<T*>& vec) {
+  for (typename std::vector<T*>::iterator i = vec.begin (), ei = vec.end (); i != ei; ++i) {
+    delete *i;
+    *i = NULL;
+  }
+}
 #endif

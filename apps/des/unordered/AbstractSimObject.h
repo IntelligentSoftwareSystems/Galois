@@ -37,7 +37,6 @@
 #include "comDefs.h"
 #include "Event.h"
 
-
 #include "SimObject.h"
 
 
@@ -229,6 +228,7 @@ private:
 
     // defensive
     this->clock = that.clock;
+    this->eventIdCntr = that.eventIdCntr;
   }
 
   /**
@@ -301,7 +301,7 @@ public:
     }
 
     SimTime recvTime;
-    if (sendTime == INFINITY_SIM_TIME) {
+    if (sendTime >= INFINITY_SIM_TIME) {
       recvTime = INFINITY_SIM_TIME;
     } else {
       recvTime = sendTime + delay;
@@ -400,11 +400,12 @@ public:
 
 
   /**
-   * Checks if is active.
+   * Checks if is active after recomputing and updating active state
    *
    * @return true, if is active
    */
-  bool isActive() const {
+  bool isActive() {
+    updateActive ();
     return active;
   }
 

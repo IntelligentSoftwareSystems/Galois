@@ -1,7 +1,6 @@
 file (GLOB Sources 
 ./*.cpp
 ./common/*.cpp
-./common/circuitlib/*.cpp
 )
 
 add_executable(DESunorderedSerial unordered/DESunorderedSerial.cpp  ${Sources})

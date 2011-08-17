@@ -1,4 +1,4 @@
-/** Implementation corresponding to @file comDefs.h -*- C++ -*-
+/** LogicGate implements the basic structure of a logic gate -*- C++ -*-
  * @file
  * @section License
  *
@@ -21,9 +21,7 @@
  * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
  */
 
-#include "comDefs.h"
+#include "LogicGate.h"
 
-std::string  toLowerCase (std::string str) {
-  std::transform (str.begin (), str.end (), str.begin (), ::tolower);
-  return str;
-}
+// allocate space of static member
+const SimTime LogicGate::MIN_DELAY;

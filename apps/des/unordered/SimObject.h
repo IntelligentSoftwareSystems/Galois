@@ -115,7 +115,7 @@ public:
    *
    * @return true, if is active
    */
-  virtual bool isActive() const = 0;
+  virtual bool isActive() = 0;
 
   /**
    * active is set to true if there exists an event on each input pq

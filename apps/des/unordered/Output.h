@@ -26,18 +26,18 @@
 #define OUTPUT_H_
 
 
+#include <iostream>
 #include <string>
 #include <cassert>
 
-#include "OneInputGate.h"
-#include "Event.h"
-#include "LogicFunctions.h"
+
+#include "Input.h"
 
 // may as well be inherited from OneInputGate
 /**
  * The Class Output.
  */
-class Output: public OneInputGate {
+class Output: public Input {
 
 public: 
   /**
@@ -47,51 +47,34 @@ public:
    * @param outputName the output name
    * @param inputName the Output name
    */
-  Output(size_t id, const std::string& outputName, const std::string& inputName)
-    : OneInputGate (id, BUF(), outputName, inputName, 0l)
-  {}
+  Output(size_t id, BasicPort& impl)
+    : Input (id, impl) {}
 
-
-
-  Output (const Output & that) 
-    : OneInputGate (that) {}
 
 
   virtual Output* clone () const {
     return new Output (*this);
   }
 
-  virtual const std::string getGateName() const {
-    return "Output";
-  }
-  
-protected:
-
   /**
-   * just replicates the output
+   * A string representation
    */
-  virtual LogicVal evalOutput() const {
-    return this->BaseOneInputGate::inputVal;
+  virtual const std::string toString () const {
+    std::ostringstream ss;
+    ss << AbstractSimObject::toString () << ": " << "Output " << getImpl ().toString ();
+    return ss.str ();
   }
+
+protected:
 
   /**
    * Output just receives events and updates its state, does not send out any events
    */
   virtual void execEvent(Graph& g, GNode& myNode, const EventTy& event) {
 
-     if (event.getType() == EventTy::NULL_EVENT) {
-       // do nothing
-     } else {
-       // update the inputs of fanout gates
-       const LogicUpdate& lu = (LogicUpdate) event.getAction();
-       if (this->BaseOneInputGate::inputName == (lu.getNetName())) {
-         this->BaseOneInputGate::inputVal = lu.getNetVal();
-         this->BaseOneInputGate::outputVal = this->BaseOneInputGate::inputVal;
-
-       } else {
-         LogicGate::netNameMismatch(lu);
-       }
-
+     if (event.getType() != EventTy::NULL_EVENT) {
+       const LogicUpdate& lu = event.getAction ();
+       getImpl ().applyUpdate (lu);
      }
   }
 

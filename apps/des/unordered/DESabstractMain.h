@@ -150,15 +150,16 @@ public:
       SimObject* so = *i;
 
       Output* outObj = dynamic_cast< Output* > (so);
-
       assert (outObj != NULL);
 
-      const LogicVal& simulated = outObj->getOutputVal();
-      const LogicVal& expected = (outValues.find (outObj->getInputName ()))->second;
+      BasicPort& outp = outObj->getImpl ();
+
+      const LogicVal& simulated = outp.getOutputVal();
+      const LogicVal& expected = (outValues.find (outp.getInputName ()))->second;
 
       if (simulated != expected) {
         exitStatus = 1;
-        std::cerr << "Wrong output value for " << outObj->getOutputName() 
+        std::cerr << "Wrong output value for " << outp.getInputName () 
           << ", simulated : " << simulated << " expected : " << expected << std::endl;
       }
     }

@@ -27,12 +27,11 @@
 #include <string>
 #include <cassert>
 
-#include "BaseOneInputGate.h"
-#include "LogicFunctions.h"
-#include "OneInputGate.h"
+#include "SimGate.h"
+#include "BasicPort.h"
 
 // may as well be inherited from OneInputGate
-class Input: public OneInputGate {
+class Input: public SimGate {
 
 public: 
   /**
@@ -42,32 +41,30 @@ public:
    * @param outputName the output name
    * @param inputName the Input name
    */
-  Input(size_t id, const std::string& outputName, const std::string& inputName)
-    : OneInputGate (id, BUF(), outputName, inputName, 0l)
-  {}
-
-
-  Input (const Input & that) 
-    : OneInputGate (that) {}
+  Input(size_t id, BasicPort& impl)
+    : SimGate (id, impl) {}
 
 
   virtual Input* clone () const {
     return new Input (*this);
   }
 
-  virtual const std::string getGateName() const {
-    return "Input";
+  virtual BasicPort& getImpl () const {
+    BasicPort* ptr = dynamic_cast<BasicPort*> (&SimGate::getImpl ());
+    assert (ptr != NULL);
+    return *ptr;
   }
   
-protected:
-
-  /** 
-   * @see LogicGate::evalOutput()
+  /**
+   * A string representation
    */
-  virtual LogicVal evalOutput() const {
-    return this->BaseOneInputGate::inputVal;
+  virtual const std::string toString () const {
+    std::ostringstream ss;
+    ss << AbstractSimObject::toString () << ": " << "Input " << getImpl ().toString ();
+    return ss.str ();
   }
 
+protected:
   /**
    * Sends a copy of event at the input to all the outputs in the circuit
    * @see OneInputGate::execEvent()
@@ -78,21 +75,20 @@ protected:
     if (event.getType () == EventTy::NULL_EVENT) {
       // send out null messages
 
-      OneInputGate::execEvent(graph, myNode, event); // same functionality as OneInputGate
+      SimGate::execEvent(graph, myNode, event); // same functionality as OneInputGate
 
     } else {
 
-     const LogicUpdate& lu = (LogicUpdate) event.getAction ();
-      if (this->BaseOneInputGate::outputName == lu.getNetName()) {
-        this->BaseOneInputGate::inputVal = lu.getNetVal();
+     const LogicUpdate& lu = event.getAction ();
+      if (getImpl().getOutputName () == lu.getNetName()) {
+        getImpl().setInputVal (lu.getNetVal());
+        getImpl().setOutputVal (lu.getNetVal());
 
-        this->BaseOneInputGate::outputVal = this->BaseOneInputGate::inputVal;
+        LogicUpdate drvFanout (getImpl ().getOutputName (), getImpl ().getOutputVal ());
 
-        LogicUpdate drvFanout(this->BaseOneInputGate::outputName, this->BaseOneInputGate::outputVal);
-
-        sendEventsToFanout(graph, myNode, event, EventTy::REGULAR_EVENT, drvFanout);
+        sendEventsToFanout (graph, myNode, event, EventTy::REGULAR_EVENT, drvFanout);
       } else {
-        LogicGate::netNameMismatch(lu);
+        getImpl ().netNameMismatch (lu);
       }
 
     }

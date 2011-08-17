@@ -91,6 +91,8 @@ public:
       case NULL_EVENT:
         return BaseEvent<S, A>::detailedString () + "type: NULL_EVENT";
 
+      default:
+        return "";
     }
   }
 

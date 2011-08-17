@@ -40,8 +40,13 @@
 #include <cassert>
 #include <cstdio>
 
-#include "logicDefs.h"
 #include "comDefs.h"
+#include "logicDefs.h"
+#include "LogicFunctions.h"
+#include "LogicGate.h"
+#include "OneInputGate.h"
+#include "TwoInputGate.h"
+#include "BasicPort.h"
 
 /**
  * NetlistTokenizer is a simple string tokenizer, which 
@@ -191,70 +196,6 @@ public:
 };
 
 /**
- * The Class GateRec stores the data for a specific gate, after reading it 
- * from a netlist file
- */
-struct GateRec {
-
-  /** The name. */
-  std::string name;
-
-  /** The net names outputs. */
-  std::vector<std::string> outputs;
-
-  /** The net names inputs. */
-  std::vector<std::string> inputs;
-
-  /** The delay. */
-  SimTime delay;
-
-  /**
-   * Adds the output to a list.
-   *
-   * @param net the net
-   */
-  void addOutput(const std::string& net) {
-    outputs.push_back(net);
-  }
-
-  /**
-   * Adds the input to a list.
-   *
-   * @param net the net
-   */
-  void addInput(const std::string& net) {
-    inputs.push_back(net);
-  }
-
-  /**
-   * Sets the delay.
-   *
-   * @param delay the new delay
-   */
-  void setDelay(const SimTime& delay) {
-    this->delay = delay;
-  }
-
-  /**
-   * Sets the name.
-   *
-   * @param name the new name
-   */
-  void setName(const std::string& name) {
-    this->name = name;
-  }
-
-  /**
-   * Gets the name.
-   *
-   * @return the name
-   */
-  const std::string& getName() const {
-    return name;
-  }
-};
-
-/**
  * The Class NetlistParser parses an input netlist file.
  */
 class NetlistParser {
@@ -270,14 +211,22 @@ public:
   typedef std::map<std::string, std::vector<std::pair<SimTime, LogicVal> > > StimulusMapType;
 
 private:
+
+
   /** The netlist file. */
   const char* netlistFile;
 
   /** The input names. */
   std::vector<std::string> inputNames;
 
+  /** input ports */
+  std::vector<BasicPort*> inputPorts;
+
   /** The output names. */
   std::vector<std::string> outputNames;
+
+  /** output ports */
+  std::vector<BasicPort*> outputPorts;
 
   /** The out values. */
   std::map<std::string, LogicVal> outValues;
@@ -286,7 +235,7 @@ private:
   StimulusMapType inputStimulusMap;
 
   /** The gates. */
-  std::vector<GateRec> gates;
+  std::vector<LogicGate*> gates;
 
   /** The finish time. */
   SimTime finishTime;
@@ -294,28 +243,29 @@ private:
 
 
 private:
-
   /**
-   * A set of names of valid logic gates with one input
+   * A mapping from string name (in the netlist) to functor that implements
+   * the corresponding functionality. Helps in initialization
    */
-  static const std::set<std::string>  oneInputGates () {
-    std::set<std::string> oneInSet;
-    oneInSet.insert (toLowerCase (std::string("INV")));
-    return oneInSet;
+  static const std::map<std::string, OneInputFunc* > oneInputGates () {
+    static std::map<std::string, OneInputFunc*>  oneInMap;
+    oneInMap.insert(std::make_pair (toLowerCase ("INV"), new INV()));
+    return oneInMap;
   }
 
   /**
-   * A set of names of valid logic gates with two inputs
+   * A mapping from string name (in the netlist) to functor that implements
+   * the corresponding functionality. Helps in initialization
    */
-  static const std::set<std::string> twoInputGates () {
-    std::set<std::string> twoInSet;
-    twoInSet.insert (toLowerCase (std::string ("AND2")));
-    twoInSet.insert (toLowerCase (std::string ("OR2")));
-    twoInSet.insert (toLowerCase (std::string ("NAND2")));
-    twoInSet.insert (toLowerCase (std::string ("NOR2")));
-    twoInSet.insert (toLowerCase (std::string ("XOR2")));
-    twoInSet.insert (toLowerCase (std::string ("XNOR2")));
-    return twoInSet;
+  static const std::map<std::string, TwoInputFunc*> twoInputGates () {
+    static std::map<std::string, TwoInputFunc*> twoInMap;
+    twoInMap.insert(std::make_pair (toLowerCase ("AND2") , new AND2()));
+    twoInMap.insert(std::make_pair (toLowerCase ("NAND2") , new NAND2()));
+    twoInMap.insert(std::make_pair (toLowerCase ("OR2") , new OR2()));
+    twoInMap.insert(std::make_pair (toLowerCase ("NOR2") , new NOR2()));
+    twoInMap.insert(std::make_pair (toLowerCase ("XOR2") , new XOR2()));
+    twoInMap.insert(std::make_pair (toLowerCase ("XNOR2") , new XNOR2()));
+    return twoInMap;
   }
 
 
@@ -330,6 +280,26 @@ private:
     while (token != ("end")) {
       portNames.push_back(token);
       token = toLowerCase (tokenizer.nextToken ());
+    }
+  }
+
+  static const char* getInPrefix () { return "in_"; }
+
+  static const char* getOutPrefix () { return "out_"; }
+
+  void createInputPorts () {
+    for (std::vector<std::string>::const_iterator i = inputNames.begin (), ei = inputNames.end (); i != ei; ++i) {
+      const std::string& out = *i;
+      std::string in = getInPrefix() + out;
+      inputPorts.push_back (new BasicPort (out, in));
+    }
+  }
+
+  void createOutputPorts () {
+    for (std::vector<std::string>::const_iterator i = outputNames.begin (), ei = outputNames.end (); i != ei; ++i) {
+      const std::string& in = *i;
+      std::string out = getOutPrefix() + in;
+      outputPorts.push_back (new BasicPort (out, in));
     }
   }
 
@@ -367,7 +337,7 @@ private:
     std::vector<std::pair<SimTime, LogicVal> > timeValList;
     while (token != ("end")) {
 
-      SimTime t = static_cast<SimTime> (atol (token.c_str ())); // SimTime.parseLong(token);
+      SimTime t(atol (token.c_str ())); // SimTime.parseLong(token);
 
       token = toLowerCase (tokenizer.nextToken ());
       LogicVal v = token[0];
@@ -386,7 +356,7 @@ private:
    * @param tokenizer the tokenizer
    * @param gates the gates
    */
-  static void parseNetlist(NetlistTokenizer& tokenizer, std::vector<GateRec>& gates) {
+  static void parseNetlist(NetlistTokenizer& tokenizer, std::vector<LogicGate*>& gates) {
 
     std::string token = toLowerCase (tokenizer.nextToken ());
 
@@ -394,48 +364,46 @@ private:
 
       if (oneInputGates().count (token) > 0) {
 
-        GateRec g;
-        g.setName(token); // set the gate name
+        const OneInputFunc* func = (oneInputGates ().find (token))->second;
 
-        token = toLowerCase (tokenizer.nextToken ()); // output name
-        g.addOutput(token);
+        std::string outputName = toLowerCase (tokenizer.nextToken ()); // output name
 
-        token = toLowerCase (tokenizer.nextToken ()); // input
-        g.addInput(token);
+        std::string inputName = toLowerCase (tokenizer.nextToken ()); // input
+
+
+        OneInputGate* g = new OneInputGate (*func, outputName, inputName);
+        gates.push_back (g);
 
         // possibly delay, if no delay then next gate or end
         token = toLowerCase (tokenizer.nextToken ());
         if (token[0] == '#') {
           token = token.substr(1);
-          SimTime d = static_cast<SimTime> (atol (token.c_str ())); // SimTime.parseLong(token);
-          g.setDelay(d);
-          gates.push_back (g);
+          SimTime d(atol (token.c_str ())); // SimTime.parseLong(token);
+          g->setDelay(d);
+
         } else {
-          gates.push_back (g);
           continue;
         }
       } else if (twoInputGates().count (token) > 0) {
-        GateRec g;
-        g.setName(token); // set the gate name
 
-        token = toLowerCase (tokenizer.nextToken ()); // output name
-        g.addOutput(token);
+        const TwoInputFunc* func = (twoInputGates ().find (token))->second;
 
-        token = toLowerCase (tokenizer.nextToken ()); // input 1
-        g.addInput(token);
+        std::string outputName = toLowerCase (tokenizer.nextToken ()); // output name
+        std::string input1Name = toLowerCase (tokenizer.nextToken ()); // input 1
 
-        token = toLowerCase (tokenizer.nextToken ()); // input 2
-        g.addInput(token);
+        std::string input2Name = toLowerCase (tokenizer.nextToken ()); // input 2
+
+        TwoInputGate* g = new TwoInputGate (*func, outputName, input1Name, input2Name);
+        gates.push_back (g);
 
         // possibly delay, if no delay then next gate or end
         token = toLowerCase (tokenizer.nextToken ());
         if (token[0] == '#') {
           token = token.substr(1);
-          SimTime d = static_cast<SimTime> (atol (token.c_str ())); // SimTime.parseLong(token);
-          g.setDelay(d);
-          gates.push_back (g);
+          SimTime d(atol (token.c_str ())); // SimTime.parseLong(token);
+          g->setDelay(d);
+
         } else {
-          gates.push_back (g);
           continue;
         }
       } else {
@@ -448,6 +416,11 @@ private:
     } // end of while
   }
 
+
+  void destroy () {
+    destroyVec (gates);
+  }
+
 public:
   /**
    * Instantiates a new netlist parser.
@@ -456,6 +429,11 @@ public:
    */
   NetlistParser(const char* netlistFile): netlistFile(netlistFile) {
     parse(netlistFile);
+  }
+
+
+  ~NetlistParser () {
+    destroy ();
   }
 
   /**
@@ -485,13 +463,15 @@ public:
 
       if (token == ("inputs")) {
         parsePortList(tokenizer, inputNames);
+        createInputPorts ();
       } else if (token == ("outputs")) {
         parsePortList(tokenizer, outputNames);
+        createOutputPorts ();
       } else if (token == ("outvalues")) {
         parseOutValues(tokenizer, outValues);
       } else if (token == ("finish")) {
         token = toLowerCase (tokenizer.nextToken ());
-        finishTime = static_cast<SimTime> (atol (token.c_str ())); // SimTime.parseLong(token);
+        finishTime = SimTime (atol (token.c_str ())); // SimTime.parseLong(token);
       } else if (token == ("initlist")) {
         parseInitList(tokenizer, inputStimulusMap);
       } else if (token == ("netlist")) {
@@ -530,12 +510,28 @@ public:
   }
 
   /**
+   *
+   * @return input ports vector
+   */
+  const std::vector<BasicPort*>& getInputPorts () const { 
+    return inputPorts;
+  }
+
+  /**
    * Gets the output names.
    *
    * @return the output names
    */
   const std::vector<std::string>& getOutputNames() const {
     return outputNames;
+  }
+
+  /**
+   *
+   * @return output ports vector
+   */
+  const std::vector<BasicPort*>& getOutputPorts () const {
+    return outputPorts;
   }
 
   /**
@@ -561,7 +557,7 @@ public:
    *
    * @return the gates
    */
-  const std::vector<GateRec>& getGates() const {
+  const std::vector<LogicGate*>& getGates() const {
     return gates;
   }
 
