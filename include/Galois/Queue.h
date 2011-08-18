@@ -364,6 +364,14 @@ class ConcurrentSkipListMap : private boost::noncopyable {
     }
 
     /**
+     * Return true if this node is the header of base-level list.
+     * @return true if this node is header node
+     */
+    bool isBaseHeader() {
+      return value == &ConcurrentSkipListMapHelper::BASE_HEADER;
+    }
+    
+    /**
      * Tries to append a deletion marker to this node.
      * 
      * @param f
@@ -426,7 +434,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
     /**
      * Creates a new regular node.
      */
-    Node(K k, V* v, Node* n): key(k), value(v), next(n)  { }
+    Node(K k, void* v, Node* n): key(k), value(v), next(n)  { }
 
     /**
      * Creates a new marker node. A marker is distinguished by having its value
@@ -637,6 +645,78 @@ class ConcurrentSkipListMap : private boost::noncopyable {
         b = n;
         n = f;
       }
+    }
+  }
+
+  /**
+   * Specialized variant of findNode to perform Map.get. Does a weak
+   * traversal, not bothering to fix any deleted index nodes,
+   * returning early if it happens to see key in index, and passing
+   * over any deleted base nodes, falling back to getUsingFindNode
+   * only if it would otherwise return value from an ongoing
+   * deletion. Also uses "bound" to eliminate need for some
+   * comparisons (see Pugh Cookbook). Also folds uses of null checks
+   * and node-skipping because markers have null keys.
+   * @param okey the key
+   * @return the value, or null if absent
+   */
+  V* doGet(K key) {
+    const K* bound = 0;
+    Index* q = head;
+    for (;;) {
+      const K* rk;
+      Index* d;
+      Index* r;
+      if ((r = q->right) != 0 &&
+	  (rk = &r->key) != 0 && rk != bound) {
+	if (comp(r->key,key)) {
+	  q = r;
+	  continue;
+	}
+	if (!comp(r->key,key) && !comp(key,r->key)) {
+	  V* v = (V*)r->node->value;
+	  return (v != 0) ? (V*)v : getUsingFindNode(key);
+	}
+	bound = rk;
+      }
+      if ((d = q->down) != 0)
+	q = d;
+      else {
+	for (Node* n = q->node->next; n != 0; n = n->next) {
+	  K nk = n->key;
+	  if (nk != 0) {
+	    if (!comp(nk,key) && !comp(key,nk)) {
+	      V* v = (V*)n->value;
+	      return (v != 0) ? v : getUsingFindNode(key);
+	    }
+	    if (comp(key,nk))
+	      return 0;
+	  }
+	}
+	return 0;
+      }
+    }
+  }
+  
+  /**
+   * Perform map.get via findNode.  Used as a backup if doGet
+   * encounters an in-progress deletion.
+   * @param key the key
+   * @return the value, or null if absent
+   */
+  V* getUsingFindNode(K key) {
+    /*
+     * Loop needed here and elsewhere in case value field goes
+     * null just as it is about to be returned, in which case we
+     * lost a race with a deletion, so must retry.
+     */
+    for (;;) {
+      Node* n = findNode(key);
+      if (n == 0)
+	return 0;
+      V* v = (V*)n->value;
+      if (v != 0)
+	return v;
     }
   }
 
@@ -1028,6 +1108,22 @@ public:
   /* ------ Map API methods ------ */
 
   /**
+   * Returns the value to which this map maps the specified key.  Returns
+   * <tt>null</tt> if the map contains no mapping for this key.
+   *
+   * @param key key whose associated value is to be returned.
+   * @return the value to which this map maps the specified key, or
+   *               <tt>null</tt> if the map contains no mapping for the key.
+   * @throws ClassCastException if the key cannot be compared with the keys
+   *                  currently in the map.
+   * @throws NullPointerException if the key is <tt>null</tt>.
+   */
+  V* get(K key) {
+    return doGet(key);
+  }
+
+
+  /**
    * Associates the specified value with the specified key in this map. If the
    * map previously contained a mapping for this key, the old value is replaced.
    * 
@@ -1133,6 +1229,26 @@ public:
   }
 
   /**
+   * Returns a key-value mapping associated with the greatest
+   * key in this map, or <tt>null</tt> if the map is empty.
+   * The returned entry does <em>not</em> support
+   * the <tt>Entry.setValue</tt> method.
+   *
+   * @return an Entry with greatest key, or <tt>null</tt>
+   * if the map is empty.
+   */
+  std::pair<K, V*> lastEntry() {
+    for (;;) {
+      Node* n = findLast();
+      if (n == 0)
+	return std::make_pair((K)0,(V*)NULL);
+      SnapshotEntry e = n->createSnapshot();
+      if (e.valid)
+	return std::make_pair((K)e.key, (V*)e.value);
+    }
+  }
+
+  /**
    * Removes and returns a key-value mapping associated with the least key in
    * this map, or <tt>null</tt> if the map is empty. The returned entry does
    * <em>not</em> support the <tt>Entry.setValue</tt> method.
@@ -1158,6 +1274,56 @@ public:
     else
       return std::make_pair(false, K());
   }
+
+  /* ---------------- Finding and removing last element -------------- */
+
+  /**
+   * Specialized version of find to get last valid node
+   * @return last node or null if empty
+   */
+  Node* findLast() {
+    /*
+     * findPredecessor can't be used to traverse index level
+     * because this doesn't use comparisons.  So traversals of
+     * both levels are folded together.
+     */
+    Index* q = head;
+    for (;;) {
+      Index* d;
+      Index* r;
+      if ((r = q->right) != 0) {
+	if (r->indexesDeletedNode()) {
+	  q->unlink(r);
+	  q = head; // restart
+	}
+	else
+	  q = r;
+      } else if ((d = q->down) != 0) {
+	q = d;
+      } else {
+	Node* b = q->node;
+	Node* n = b->next;
+	for (;;) {
+	  if (n == 0)
+	    return b->isBaseHeader() ? 0 : b;
+	  Node* f = n->next;            // inconsistent read
+	  if (n != b->next)
+	    break;
+	  void* v = n->value;
+	  if (v == 0) {                 // n is deleted
+	    n->helpDelete(b, f);
+	    break;
+	  }
+	  if (v == n || b->value == 0)   // b is deleted
+	    break;
+	  b = n;
+	  n = f;
+	}
+	q = head; // restart
+      }
+    }
+  }
+
 };
 
 
