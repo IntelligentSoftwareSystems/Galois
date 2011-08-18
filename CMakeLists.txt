@@ -55,7 +55,8 @@ find_package(LAPACK)
 
 #Boost
 set(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0")
-find_package(Boost 1.34.0 REQUIRED)
+set(BOOST_LIBS thread)
+find_package(Boost 1.34.0 COMPONENTS ${BOOST_LIBS} REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 
 #PThreads
@@ -127,7 +128,7 @@ endif()
 ###### Global Functions ######
 function(linkRuntime name) 
   target_link_libraries(${name} galois) 
-  target_link_libraries(${name} ${CMAKE_THREAD_LIBS_INIT}) 
+  target_link_libraries(${name} ${CMAKE_THREAD_LIBS_INIT})
   if(NOT USE_SOLARIS)
     target_link_libraries(${name} hoard)
   endif()
@@ -146,6 +147,9 @@ function(linkRuntime name)
   if(TBB_FOUND)
     target_link_libraries(${name} ${TBB_LIBRARIES})
   endif()
+  
+  target_link_libraries(${name} ${Boost_LIBRARIES})
+
 endfunction (linkRuntime)
 
 ###### Source finding ######

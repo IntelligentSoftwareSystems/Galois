@@ -202,12 +202,16 @@ struct process {
 void runBodyParallel(const GNode src) {
   using namespace GaloisRuntime::WorkList;
   typedef dChunkedLIFO<16> IChunk;
+  typedef ChunkedLIFO<16> NAChunk;
 
   typedef OrderedByIntegerMetric<UpdateRequestIndexer, IChunk> OBIM;
   typedef TbbPriQueue<seq_gt> TBB;
   typedef LocalStealing<TBB > LTBB;
   typedef SkipListQueue<seq_less> SLQ;
   typedef SimpleOrderedByIntegerMetric<UpdateRequestIndexer> SOBIM;
+  typedef LocalStealing<SOBIM > LSOBIM;
+  typedef OrderedByIntegerMetric<UpdateRequestIndexer, NAChunk> NAOBIM;
+  typedef CTOrderedByIntegerMetric<UpdateRequestIndexer, IChunk> CTOBIM;
   typedef LocalStealing<SOBIM > LSOBIM;
   typedef FCPairingHeapQueue<seq_less> FCPH;
 
@@ -217,6 +221,8 @@ void runBodyParallel(const GNode src) {
   typedef WorkListTracker<UpdateRequestIndexer, SLQ>  TR_SLQ;
   typedef WorkListTracker<UpdateRequestIndexer, SOBIM> TR_SOBIM;
   typedef WorkListTracker<UpdateRequestIndexer, LSOBIM> TR_LSOBIM;
+  typedef WorkListTracker<UpdateRequestIndexer, NAOBIM> TR_NAOBIM;
+  typedef WorkListTracker<UpdateRequestIndexer, CTOBIM> TR_CTOBIM;
 
   typedef NoInlineFilter<OBIM> NI_OBIM;
   typedef NoInlineFilter<TBB>  NI_TBB;
@@ -224,93 +230,31 @@ void runBodyParallel(const GNode src) {
   typedef NoInlineFilter<SLQ>  NI_SLQ;
   typedef NoInlineFilter<SOBIM> NI_SOBIM;
   typedef NoInlineFilter<LSOBIM> NI_LSOBIM;
+  typedef NoInlineFilter<NAOBIM> NI_NAOBIM;
+  typedef NoInlineFilter<CTOBIM> NI_CTOBIM;
 
 
   std::vector<UpdateRequest> wl;
   getInitialRequests(src, wl);
   Galois::StatTimer T;
 
+#define WLFOO(__x, __y) else if (wlName == #__x) { T.start(); Galois::for_each<__y>(wl.begin(), wl.end(), process()); T.stop(); } else if (wlName == "tr_" #__x) { T.start(); Galois::for_each<TR_ ## __y>(wl.begin(), wl.end(), process()); T.stop(); }else if (wlName == "ni_" #__x) { T.start(); Galois::for_each<NI_ ## __y>(wl.begin(), wl.end(), process()); T.stop(); }
+
   if (wlName == "fcph") {
     T.start();
     Galois::for_each<FCPH>(wl.begin(), wl.end(), process());
     T.stop();
-  } else if (wlName == "obim") {
-    T.start();
-    Galois::for_each<OBIM>(wl.begin(), wl.end(), process());
-    T.stop();
-  } else if (wlName == "sobim") {
-    T.start();
-    Galois::for_each<SOBIM>(wl.begin(), wl.end(), process());
-    T.stop();
-  } else if (wlName == "lsobim") {
-    T.start();
-    Galois::for_each<LSOBIM>(wl.begin(), wl.end(), process());
-    T.stop();
-  } else if (wlName == "tbb") {
-    T.start();
-    Galois::for_each<TBB>(wl.begin(), wl.end(), process());
-    T.stop();
-  } else if (wlName == "ltbb") {
-    T.start();
-    Galois::for_each<LTBB>(wl.begin(), wl.end(), process());
-    T.stop();
-  } else if (wlName == "slq") {
-    T.start();
-    Galois::for_each<SLQ>(wl.begin(), wl.end(), process());
-    T.stop();
-  } else if (wlName == "tr_obim") {
-    T.start();
-    Galois::for_each<TR_OBIM>(wl.begin(), wl.end(), process());
-    T.stop();
-  } else if (wlName == "tr_sobim") {
-    T.start();
-    Galois::for_each<TR_SOBIM>(wl.begin(), wl.end(), process());
-    T.stop();
-  } else if (wlName == "tr_lsobim") {
-    T.start();
-    Galois::for_each<TR_LSOBIM>(wl.begin(), wl.end(), process());
-    T.stop();
-  } else if (wlName == "tr_tbb") {
-    T.start();
-    Galois::for_each<TR_TBB>(wl.begin(), wl.end(), process());
-    T.stop();
-  } else if (wlName == "tr_ltbb") {
-    T.start();
-    Galois::for_each<TR_LTBB>(wl.begin(), wl.end(), process());
-    T.stop();
-  } else if (wlName == "tr_slq") {
-    T.start();
-    Galois::for_each<TR_SLQ>(wl.begin(), wl.end(), process());
-    T.stop();
-  } else if (wlName == "ni_obim") {
-    T.start();
-    Galois::for_each<NI_OBIM>(wl.begin(), wl.end(), process());
-    T.stop();
-  } else if (wlName == "ni_sobim") {
-    T.start();
-    Galois::for_each<NI_SOBIM>(wl.begin(), wl.end(), process());
-    T.stop();
-  } else if (wlName == "ni_lsobim") {
-    T.start();
-    Galois::for_each<NI_LSOBIM>(wl.begin(), wl.end(), process());
-    T.stop();
-  } else if (wlName == "ni_tbb") {
-    T.start();
-    Galois::for_each<NI_TBB>(wl.begin(), wl.end(), process());
-    T.stop();
-  } else if (wlName == "ni_ltbb") {
-    T.start();
-    Galois::for_each<NI_LTBB>(wl.begin(), wl.end(), process());
-    T.stop();
-  } else if (wlName == "ni_slq") {
-    T.start();
-    Galois::for_each<NI_SLQ>(wl.begin(), wl.end(), process());
-    T.stop();
-  } else {
-    std::cout << "Unrecognized worklist " << wlName << " using obim\n";
-    T.start();
-    Galois::for_each<OBIM>(wl.begin(), wl.end(), process());
-    T.stop();
+  }
+  WLFOO(obim, OBIM)
+  WLFOO(sobim, SOBIM)
+  WLFOO(lsobim, LSOBIM)
+  WLFOO(naobim, NAOBIM)
+  WLFOO(ctobim, CTOBIM)
+  WLFOO(slq, SLQ)
+  WLFOO(tbb, TBB)
+  WLFOO(ltbb, LTBB)
+  else {
+    std::cout << "Unrecognized worklist " << wlName << "\n";
   }
 }
 
