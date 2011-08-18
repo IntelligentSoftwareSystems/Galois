@@ -13,9 +13,6 @@ endif()
 #use pthreads
 set(USE_PTHREAD ON)
 
-#use intel tbb
-#set(USE_TBB ON)
-
 #compile for cray xmt
 #set(USE_CRAY ON)
 
@@ -54,7 +51,12 @@ enable_language(Fortran)
 find_package(LAPACK)
 
 #Boost
-set(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0")
+# not needed now but will be needed for newer version of Boost after 1.4X ish
+#set(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0")
+set(Boost_USE_STATIC_LIBS ON) # Should prefer non static libs 
+set(Boost_USE_MULTITHREADED OFF) # newer boost builds don't use -mt extension
+#set(BOOST_ROOT /net/faraday/workspace/ddn/local)
+#find_package(Boost 1.34.0 REQUIRED COMPONENTS system serialization graph_parallel mpi)
 set(BOOST_LIBS thread)
 find_package(Boost 1.34.0 COMPONENTS ${BOOST_LIBS} REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
@@ -64,6 +66,12 @@ if(USE_PTHREAD)
   find_package(Threads)
   add_definitions(-DGALOIS_PTHREAD)
 endif(USE_PTHREAD)
+
+find_package(MPI)
+if(MPI_FOUND)
+  add_definitions(-DGALOIS_MPI)
+  include_directories(${MPI_INCLUDE_PATH})
+endif()
 
 if(USE_NUMA)
   add_definitions(-DGALOIS_NUMA)
@@ -147,9 +155,12 @@ function(linkRuntime name)
   if(TBB_FOUND)
     target_link_libraries(${name} ${TBB_LIBRARIES})
   endif()
+
+  if(MPI_FOUND)
+    target_link_libraries(${name} ${MPI_LIBRARIES})
+  endif()
   
   target_link_libraries(${name} ${Boost_LIBRARIES})
-
 endfunction (linkRuntime)
 
 ###### Source finding ######

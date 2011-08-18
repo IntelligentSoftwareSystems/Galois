@@ -95,7 +95,7 @@ public:
   // Node Handling
 
   //! Check if a node is in the graph (already added)
-  bool containsNode(const GraphNode n) {
+  bool containsNode(const GraphNode n) const {
     return n < numNodes;
   }
 
@@ -106,17 +106,17 @@ public:
     return ((EdgeTy*)edgeData)[getEdgeIdx(src,dst)];
   }
 
-  void prefetch_edges(GraphNode N) {
+  void prefetch_edges(GraphNode N) const {
     __builtin_prefetch(neighbor_begin(N, NONE));
   }
 
   template<typename EdgeTy>
-  void prefetch_edgedata(GraphNode N) {
+  void prefetch_edgedata(GraphNode N) const {
     __builtin_prefetch(
         &((EdgeTy*)edgeData)[std::distance(outs, neighbor_begin(N))]);
   }
 
-  void prefetch_pre(GraphNode N) {
+  void prefetch_pre(GraphNode N) const {
     if (N != 0)
       __builtin_prefetch(&outIdx[N-1]);
     __builtin_prefetch(&outIdx[N]);
@@ -126,35 +126,40 @@ public:
 
   typedef uint32_t* neighbor_iterator;
 
-  neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = ALL) {
+  neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = ALL) const {
     if (N == 0)
       return &outs[0];
     else
       return &outs[outIdx[N-1]];
   }
 
-  neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = ALL) {
+  neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = ALL) const {
     return &outs[outIdx[N]];
   }
 
-  bool has_neighbor(GraphNode N1, GraphNode N2, MethodFlag mflag = ALL) {
+  bool has_neighbor(GraphNode N1, GraphNode N2, MethodFlag mflag = ALL) const {
     return std::find(neighbor_begin(N1), neighbor_end(N1), N2) != neighbor_end(N1);
   }
 
   typedef boost::counting_iterator<uint64_t> active_iterator;
 
   //! Iterate over nodes in graph (not thread safe)
-  active_iterator active_begin() {
+  active_iterator active_begin() const {
     return active_iterator(0);
   }
 
-  active_iterator active_end() {
+  active_iterator active_end() const {
     return active_iterator(numNodes);
   }
 
   //! The number of nodes in the graph
-  unsigned int size() {
+  unsigned int size() const {
     return numNodes;
+  }
+
+  //! The number of edges in the graph
+  unsigned int sizeEdges () const {
+    return numEdges;
   }
 
   FileGraph();
@@ -217,6 +222,39 @@ public:
       __builtin_prefetch(&NodeData[*ii].data.data);
   }
 
+};
+
+//! Local computation graph (i.e., graph structure does not change)
+template<typename EdgeTy>
+class LC_FileGraph<void, EdgeTy> : public FileGraph {
+
+  struct gNode : public GaloisRuntime::Lockable {
+    gNode() {}
+  };
+
+  //null if type is void
+  cache_line_storage<gNode>* NodeData;
+
+public:
+  LC_FileGraph() :NodeData(0) {}
+  ~LC_FileGraph() {
+    if (NodeData)
+      delete[] NodeData;
+  }
+  
+  EdgeTy& getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
+    return FileGraph::getEdgeData<EdgeTy>(src, dst, mflag);
+  }
+
+  void prefetch_edgedata(GraphNode N) {
+    FileGraph::prefetch_edgedata<EdgeTy>(N);
+  }
+
+  void prefetch_neighbors(GraphNode N) {
+    for (neighbor_iterator ii = neighbor_begin(N, NONE),
+        ee = neighbor_begin(N,NONE); ii != ee; ++ii)
+      __builtin_prefetch(&NodeData[*ii].data.data);
+  }
 };
 
 template<typename NodeTy>

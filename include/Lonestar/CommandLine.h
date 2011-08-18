@@ -33,8 +33,9 @@ static long numThreads = 1;
 
 //! Pulls out common options (-t threads, -noverify, -help)
 //! and returns the rest. Sets #numThreads and #skipVerify variables.
-std::vector<const char*> parse_command_line(int argc, const char** argv, const char* proghelp) {
-  std::vector<const char*> retval;
+template<typename T>
+std::vector<T*> parse_command_line(int argc, T** argv, const char* proghelp) {
+  std::vector<T*> retval;
 
   //known options
   //-t threads

@@ -76,9 +76,10 @@ private:
     int ndiv;
     double simEndTime;
     std::string verifile;
+    std::string wltype;
 
-    InputConfig (const std::string& fileName, int spDim, int ndiv, double simEndTime, const std::string& verifile)
-      :fileName (fileName), spDim (spDim), ndiv (ndiv), simEndTime (simEndTime), verifile (verifile) {
+    InputConfig (const std::string& fileName, int spDim, int ndiv, double simEndTime, const std::string& verifile, std::string w)
+      :fileName (fileName), spDim (spDim), ndiv (ndiv), simEndTime (simEndTime), verifile (verifile), wltype(w) {
     }
   };
 
@@ -97,6 +98,7 @@ private:
 
 protected:
 
+  std::string wltype;
 
   /** version name */
   virtual const std::string getVersion () const = 0;
@@ -183,6 +185,7 @@ AVIabstractMain::InputConfig AVIabstractMain::readCmdLine (std::vector<const cha
   int spDim = 2;
   int ndiv = 0;
   double simEndTime = 1.0;
+  std::string wltype;
 
   if (args.size() == 0) {
     printUsage ();
@@ -205,6 +208,9 @@ AVIabstractMain::InputConfig AVIabstractMain::readCmdLine (std::vector<const cha
     } else if (std::string (*i) == simEndTimeOpt) {
       ++i;
       simEndTime = atof (*i);
+    } else if (std::string(*i) == "-wl") {
+      ++i;
+      wltype = *i;
     } else {
       fprintf (stderr, "Unkown option: %s\n Exiting ...\n", *i);
       printUsage ();
@@ -213,7 +219,7 @@ AVIabstractMain::InputConfig AVIabstractMain::readCmdLine (std::vector<const cha
 
 
 
-  return InputConfig (fileName, spDim, ndiv, simEndTime, "");
+  return InputConfig (fileName, spDim, ndiv, simEndTime, "", wltype);
 }
 
 MeshInit* AVIabstractMain::initMesh (const AVIabstractMain::InputConfig& input) {
@@ -253,6 +259,7 @@ void AVIabstractMain::run (int argc, const char* argv[]) {
 
   // print messages e.g. version, input etc.
   InputConfig input = readCmdLine (args);
+  wltype = input.wltype;
 
   MeshInit* meshInit = initMesh (input);
 

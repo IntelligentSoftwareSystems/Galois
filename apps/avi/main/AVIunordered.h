@@ -165,7 +165,6 @@ protected:
     printf ("Graph created with %d nodes and %d edges\n", graph.size (), numEdges);
 
   }
-
   
   virtual void initRemaining (const MeshInit& meshInit, const GlobalVec& g) {
     genElemAdjGraph (meshInit, g);
@@ -287,6 +286,13 @@ protected:
       }
   };
 
+  struct Indexer : std::binary_function<GNode, unsigned, unsigned> {
+    unsigned operator()(const GNode& val) const {
+      double ts = val.getData(Galois::NONE)->getNextTimeStamp();
+      unsigned r = static_cast<unsigned>(ts * 1000000);
+      return r;
+    }
+  };
 public:
 
   virtual  void runLoop (MeshInit& meshInit, GlobalVec& g, bool createSyncFiles) {
@@ -350,9 +356,25 @@ public:
 
     process p( graph, inDegVec, meshInit, g, perIterLocalVec, aviCmp, createSyncFiles, iter);
 
+    using namespace GaloisRuntime::WorkList;
 
-    Galois::for_each< AVIWorkList >(initWl.begin (), initWl.end (), p);
+    typedef ChunkedLIFO<64> LChunk;
+    typedef ChunkedFIFO<32> Chunk;
+    typedef dChunkedFIFO<16> dChunk;
+    typedef OrderedByIntegerMetric<Indexer, dChunk> OBIM;
 
+    if (wltype == "obim") {
+      std::cout << wltype << "\n";
+      Galois::for_each<OBIM>(initWl.begin (), initWl.end (), p);
+    } else if (wltype == "lifo") {
+      std::cout << wltype << "\n";
+      Galois::for_each<LIFO<> >(initWl.begin (), initWl.end (), p);
+    } else if (wltype == "clifo") {
+      std::cout << wltype << "\n";
+      Galois::for_each<LChunk>(initWl.begin (), initWl.end (), p);
+    } else {
+      Galois::for_each<Chunk>(initWl.begin (), initWl.end (), p);
+    }
 
     printf ("iterations = %d\n", iter.get ());
 
