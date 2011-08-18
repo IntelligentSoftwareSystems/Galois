@@ -265,7 +265,7 @@ WLCOMPILECHECK(TbbPriQueue);
 
 template<typename T = int>
 class TbbFIFO : private boost::noncopyable  {
-  tbb::concurrent_queue<T> wl;
+  tbb::concurrent_bounded_queue<T> wl;
 
 public:
   template<bool newconcurrent>
@@ -428,6 +428,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
 
   struct perItem {
     CTy* current;
+    int curVersion;
     int lastMasterVersion;
     std::map<int, CTy*> local;
   };
@@ -496,6 +497,10 @@ class OrderedByIntegerMetric : private boost::noncopyable {
   bool push(value_type val) {
     unsigned int index = I(val);
     perItem& pI = current.get();
+    //fastpath
+    if (index == pI.curVersion && pI.current)
+      return pI.current->push(val);
+    //slow path
     CTy* lC = updateLocalOrCreate(pI, index);
     return lC->push(val);
   }
@@ -511,6 +516,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     updateLocal(pI);
     for (typename std::map<int, CTy*>::iterator ii = pI.local.begin(), ee = pI.local.end(); ii != ee; ++ii) {
       C = ii->second;
+      pI.curVersion = ii->first;
       if ((retval = C->pop()).first)
 	return retval;
     }
