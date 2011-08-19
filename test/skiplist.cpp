@@ -25,6 +25,27 @@ void testSerial() {
   }
 }
 
+void testSerial1() {
+  Galois::ConcurrentSkipListMap<int,int> map;
+  std::vector<int> keys;
+
+  for (int i = 0; i < 100; ++i)
+    keys.push_back(i);
+
+  std::random_shuffle(keys.begin(), keys.end());
+  
+  for (int i = 0; i < 100; ++i)
+    map.put(keys[i], &keys[i]);
+  
+  for (int i = 0; i < 100; ++i) {
+    int* v = map.get(keys[i]);
+    if (v != &keys[i]) {
+      std::cerr << "Expected " << &keys[i] << " not " << v << " for key " << i << "\n";
+      abort();
+    }
+  }
+}
+
 struct Process {
   Galois::ConcurrentSkipListMap<int,int>& map;
   int dummy;
@@ -58,6 +79,7 @@ void testConcurrent() {
 
 int main() {
   testSerial();
+  testSerial1();
   testConcurrent();
   return 0;
 }

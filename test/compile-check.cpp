@@ -46,7 +46,6 @@ struct checker {
     wl3.pop();
     wl3.empty();
     wl3.aborted(34);
-
   }
 };
 

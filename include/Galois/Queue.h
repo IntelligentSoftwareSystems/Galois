@@ -57,6 +57,9 @@ struct ConcurrentSkipListMapHelper {
  * It is likely that this implementation provides more functionality than you
  * need, and you will find better performance with a more specific data
  * structure.
+ *
+ * From:
+ *  http://www.java2s.com/Code/Java/Collections-Data-Structure/ConcurrentSkipListMap.htm
  */
 /*
  * Written by Doug Lea with assistance from members of JCP JSR-166
@@ -327,7 +330,8 @@ class ConcurrentSkipListMap : private boost::noncopyable {
       int c = gettimeofday(&time, NULL);
       assert(c == 0);
       // Add slight jitter so threads will get different seeds
-      randomSeed.get(i) = (1000000 + i) * time.tv_sec + time.tv_usec;
+      // and ensure non-zero
+      randomSeed.get(i) = ((1000000 + i) * time.tv_sec + time.tv_usec) | 0x0100;
     }
 
     Node *node = new (node_heap.allocate(sizeof(Node))) 
@@ -657,6 +661,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
     }
   }
 
+#if 0
   /**
    * Specialized variant of findNode to perform Map.get. Does a weak
    * traversal, not bothering to fix any deleted index nodes,
@@ -735,6 +740,82 @@ class ConcurrentSkipListMap : private boost::noncopyable {
       V* v = (V*)n->value;
       if (v != 0)
 	return v;
+    }
+  }
+#endif
+    /**
+   * Specialized variant of findNode to perform Map.get. Does a weak traversal,
+   * not bothering to fix any deleted index nodes, returning early if it happens
+   * to see key in index, and passing over any deleted base nodes, falling back
+   * to getUsingFindNode only if it would otherwise return value from an ongoing
+   * deletion. Also uses "bound" to eliminate need for some comparisons (see
+   * Pugh Cookbook). Also folds uses of null checks and node-skipping because
+   * markers have null keys.
+   * 
+   * @param okey
+   *          the key
+   * @return the value, or null if absent
+   */
+  V* doGet(const K key) {
+    //return getUsingFindNode(key);
+    Node* bound = NULL;
+    Index* q = head;
+    for (;;) {
+      K rk;
+      Index *d, *r;
+      if ((r = q->right) && (rk = r->key) && r->node != bound) {
+        int c = JComp(comp, key, rk);
+        if (c > 0) {
+          q = r;
+          continue;
+        }
+        if (c == 0) {
+          V* v = static_cast<V*>(r->node->value);
+          return v ? v : getUsingFindNode(key);
+        }
+        bound = r->node; 
+      }
+      if ((d = q->down))
+        q = d;
+      else {
+        for (Node* n = q->node->next; n; n = n->next) {
+          K nk = n->key;
+          if (!n->voidKey) {
+            int c = JComp(comp, key, nk);
+            if (c == 0) {
+              V* v = static_cast<V*>(n->value);
+              return v ? v : getUsingFindNode(key);
+            }
+            if (c < 0)
+              return NULL;
+          }
+        }
+        return NULL;
+      }
+    }
+  }
+
+  /**
+   * Perform map.get via findNode. Used as a backup if doGet encounters an
+   * in-progress deletion.
+   * 
+   * @param key
+   *          the key
+   * @return the value, or null if absent
+   */
+  V* getUsingFindNode(K key) {
+    /*
+     * Loop needed here and elsewhere in case value field goes null just as it
+     * is about to be returned, in which case we lost a race with a deletion, so
+     * must retry.
+     */
+    for (;;) {
+      Node* n = findNode(key);
+      if (!n)
+        return NULL;
+      V* v = static_cast<V*>(n->value);
+      if (v)
+        return v;
     }
   }
 
