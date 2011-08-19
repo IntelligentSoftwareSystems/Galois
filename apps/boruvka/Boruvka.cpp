@@ -163,9 +163,20 @@ struct process {
 			lwl.push(src);
 		}
 };
+
+struct Indexer {
+  unsigned operator()(GNode n) {
+    return std::distance(graph.neighbor_begin(n, Galois::NONE),
+        graph.neighbor_end(n, Galois::NONE));
+  }
+};
+
 //End body of for-each.
 void runBodyParallel() {
 	using namespace GaloisRuntime::WorkList;
+        typedef ChunkedFIFO<32> Chunk;
+        typedef OrderedByIntegerMetric<Indexer, Chunk> OBIM;
+
 	std::vector<GNode> all(graph.active_begin(), graph.active_end());
 #if BORUVKA_DEBUG
 	std::cout<<"Begining to process with worklist size :: "<<all.size()<<std::endl;
@@ -173,7 +184,8 @@ void runBodyParallel() {
 #endif
 	for(int i=0;i<MSTWeight.size();i++)
 		MSTWeight.get(i)=0;
-	Galois::for_each<ChunkedFIFO<32> >(all.begin(), all.end(), process());
+	//Galois::for_each<ChunkedFIFO<32> >(all.begin(), all.end(), process());
+	Galois::for_each<OBIM>(all.begin(), all.end(), process());
 	unsigned int res = 0;
 	for(int i=0;i<MSTWeight.size();i++){
 #if BORUVKA_DEBUG
@@ -256,6 +268,8 @@ int main(int argc, const char **argv) {
 		std::cout << "not enough arguments, use -help for usage information\n";
 		return 1;
 	}
+        if (args.size() > 1) {
+        }
 	printBanner(std::cout, name, description, url);
 	const char* inputfile = args[0];
 	makeGraph(inputfile);
@@ -268,5 +282,3 @@ int main(int argc, const char **argv) {
 	T.stop();
 	return 0;
 }
-
-// vim:sw=2:sts=2:ts=8
