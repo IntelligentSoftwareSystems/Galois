@@ -1,4 +1,5 @@
 //#include <boost/thread/shared_mutex.hpp>
+#include <iostream>
 
 template<class Indexer, typename ContainerTy = GaloisRuntime::WorkList::TbbFIFO<>, typename T = int, bool concurrent = true >
 class SimpleOrderedByIntegerMetric : private boost::noncopyable, private PaddedLock<concurrent> {
@@ -140,23 +141,25 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
 
   bool push(value_type val) {
     bool retval;
-    unsigned int index = I(val);
+    unsigned int index = I(val) + 1;
     perItem& pI = current.get();
     //fastpath
     if (index == pI.curVersion && pI.current)
       return pI.current->push(val);
     //slow path
     CTy* c = wl.get(index);
+    std::cerr << "getpush " << index << " -> " << c << "\n"; //DEBUG
     if (c)
       return c->push(val);    
     CTy* n = new CTy();
     c = wl.putIfAbsent(index, n);
+    std::cerr << "pIA " << index << " " << n << " -> " << c << "\n"; //DEBUG
     if (c)
       delete n;
     else
       c = n;
     int oldMax;
-    while ((oldMax = maxV) > index)
+    while ((oldMax = maxV) < index)
       __sync_bool_compare_and_swap(&maxV, oldMax, index);
     return c->push(val);
   }
@@ -169,12 +172,13 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
     if (C && (retval = C->pop()).first)
       return retval;
     //Failed, find minimum bin
-    for (int i = 0; i < maxV; ++i) {
+    std::cout << "failed " << maxV << "\n";
+    for (int i = 1; i <= maxV; ++i) {
       C = wl.get(i);
-      if (C && (retval = C->pop()).first) {
-	pI.curVersion = i;
+      pI.curVersion = i;
+      std::cerr << "getpop " << i << " -> " << C << "\n"; //DEBUG
+       if (C && (retval = C->pop()).first)
 	return retval;
-      }
     }
     retval.first = false;
     return retval;

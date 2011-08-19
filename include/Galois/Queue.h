@@ -34,6 +34,13 @@
 
 namespace Galois {
 
+template<typename T, typename K>
+int JComp(T& c, const K& k1, const K& k2) {
+  if (c(k1, k2)) return -1;
+  if (c(k2, k1)) return 1;
+  else return 0;
+}
+
 struct ConcurrentSkipListMapHelper {
   /**
    * Special value used to identify base-level header
@@ -346,6 +353,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    */
   struct Node {
     K key;
+    bool voidKey;
     /*volatile*/ void* value;
     /*volatile*/ Node* next;
 
@@ -434,7 +442,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
     /**
      * Creates a new regular node.
      */
-    Node(K k, void* v, Node* n): key(k), value(v), next(n)  { }
+    Node(K k, void* v, Node* n): key(k), voidKey(false), value(v), next(n)  { }
 
     /**
      * Creates a new marker node. A marker is distinguished by having its value
@@ -442,7 +450,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
      * exploited in a few places, but this doesn't distinguish markers from the
      * base-level header node (head.node), which also has a null key.
      */
-    Node(Node* n): value(this), next(n) { }
+    Node(Node* n): voidKey(true), value(this), next(n) { }
   };
 
   /* ---------------- Indexing -------------- */
@@ -570,7 +578,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
             else
               break; // restart
           }
-          if (!comp(key, r->key)) {
+          if (JComp(comp,key, r->key) > 0) {
             q = r;
             continue;
           }
@@ -638,10 +646,11 @@ class ConcurrentSkipListMap : private boost::noncopyable {
         }
         if (v == n || b->value == NULL) // b is deleted
           break;
-        if (comp(key, n->key))
-          return NULL;
-        else if (!comp(n->key, key))
+	int c = JComp(comp,key,n->key);
+	if (c == 0)
           return n;
+        else if (c < 0)
+          return NULL;
         b = n;
         n = f;
       }
@@ -660,42 +669,51 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * @param okey the key
    * @return the value, or null if absent
    */
-  V* doGet(K key) {
-    const K* bound = 0;
+  V* doGet(const K key) {
+    Node* bound = 0;
     Index* q = head;
+    Index* r = q->right;
+    Node* n = 0;
+    K k;
+    int c;
     for (;;) {
-      const K* rk;
       Index* d;
-      Index* r;
-      if ((r = q->right) != 0 &&
-	  (rk = &r->key) != 0 && rk != bound) {
-	if (comp(r->key,key)) {
-	  q = r;
-	  continue;
+      // Traverse rights
+      if (r != 0 && (n = r->node) != bound) {
+	k = n->key;
+	if (!n->voidKey) {
+	  if ((c = JComp(comp, key,k) > 0)) {
+	    q = r;
+	    r = r->right;
+	    continue;
+	  } else if (c == 0) {
+	    V* v = (V*)n->value;
+	    return (v != 0) ? v : getUsingFindNode(key);
+	  } else
+	    bound = n;
 	}
-	if (!comp(r->key,key) && !comp(key,r->key)) {
-	  V* v = (V*)r->node->value;
-	  return (v != 0) ? (V*)v : getUsingFindNode(key);
-	}
-	bound = rk;
       }
-      if ((d = q->down) != 0)
+      
+      // Traverse down
+      if ((d = q->down) != 0) {
 	q = d;
-      else {
-	for (Node* n = q->node->next; n != 0; n = n->next) {
-	  K nk = n->key;
-	  if (nk != 0) {
-	    if (!comp(nk,key) && !comp(key,nk)) {
-	      V* v = (V*)n->value;
-	      return (v != 0) ? v : getUsingFindNode(key);
-	    }
-	    if (comp(key,nk))
-	      return 0;
-	  }
-	}
-	return 0;
+	r = d->right;
+      } else
+	break;
+    }
+    
+    // Traverse nexts
+    for (n = q->node->next;  n != 0; n = n->next) {
+      k = n->key;
+      if (!n->voidKey) {
+	if ((c = JComp(comp,key,k)) == 0) {
+	  V* v = (V*)n->value;
+	  return (v != 0) ? v : getUsingFindNode(key);
+	} else if (c < 0)
+	  break;
       }
     }
+    return 0;
   }
   
   /**
@@ -751,18 +769,18 @@ class ConcurrentSkipListMap : private boost::noncopyable {
           }
           if (v == n || b->value == NULL) // b is deleted
             break;
-          if (!comp(kkey, n->key)) {
-            if (!comp(n->key, kkey)) {
-              if (onlyIfAbsent || n->casValue(v, value))
-                return static_cast<V*>(v);
-              else
-                break; // restart if lost race to replace value
-            } else {
-              b = n;
-              n = f;
-              continue;
-            }
-          }
+          int c = JComp(comp, kkey, n->key);
+	  if (c > 0) {
+	    b = n;
+	    n = f;
+	    continue;
+	  }
+	  if (c == 0) {
+	    if (onlyIfAbsent || n->casValue(v, value))
+	      return static_cast<V*>(v);
+	    else
+	      break; // restart if lost race to replace value
+	  }
           // else c < 0; fall through
         }
 
@@ -880,14 +898,14 @@ class ConcurrentSkipListMap : private boost::noncopyable {
         Index* r = q->right;
         if (r != NULL) {
           // compare before deletion check avoids needing recheck
-          bool greater = !comp(idx->key, r->key) && comp(r->key, idx->key);
+	  int c = JComp(comp, idx->key, r->key);
           if (r->indexesDeletedNode()) {
             if (q->unlink(r))
               continue;
             else
               break;
           }
-          if (greater) {
+          if (c > 0) {
             q = r;
             continue;
           }
@@ -1120,6 +1138,7 @@ public:
    */
   V* get(K key) {
     return doGet(key);
+    //return getUsingFindNode(key);
   }
 
 
