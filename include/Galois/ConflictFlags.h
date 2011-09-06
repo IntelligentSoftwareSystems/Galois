@@ -17,8 +17,8 @@ defects in Software and/or Documentation, or loss or inaccuracy of data of any
 kind.
 */
 
-#ifndef GALOIS_CONFLICTFLAGS_H
-#define GALOIS_CONFLICTFLAGS_H
+#ifndef _GALOIS_CONFLICTFLAGS_H
+#define _GALOIS_CONFLICTFLAGS_H
 
 namespace Galois {
 
@@ -31,4 +31,4 @@ enum MethodFlag {
 
 }
 
-#endif //GALOIS_CONFLICTFLAGS_H
+#endif //_GALOIS_CONFLICTFLAGS_H

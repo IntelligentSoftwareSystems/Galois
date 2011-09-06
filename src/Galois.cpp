@@ -16,11 +16,71 @@ defects in Software and/or Documentation, or loss or inaccuracy of data of any
 kind.
 */
 #include <cassert>
-#include "Galois/Galois.h"
+#include <stdlib.h>
 
-__thread GaloisRuntime::SimpleRuntimeContext* GaloisRuntime::thread_cnx;
+#include "Galois/Runtime/Context.h"
 
-void GaloisRuntime::setThreadContext(SimpleRuntimeContext* n)
+static __thread GaloisRuntime::SimpleRuntimeContext* thread_cnx;
+
+//! Helper function to decide if the conflict detection lock should be taken
+static inline bool shouldLock(Galois::MethodFlag g) {
+  switch(g) {
+  case Galois::NONE:
+  case Galois::SAVE_UNDO:
+    return false;
+  case Galois::ALL:
+  case Galois::CHECK_CONFLICT:
+    return true;
+  }
+  assert(0 && "Shouldn't get here");
+  abort();
+}
+
+
+void GaloisRuntime::setThreadContext(GaloisRuntime::SimpleRuntimeContext* n)
 {
   thread_cnx = n;
+}
+
+GaloisRuntime::SimpleRuntimeContext* GaloisRuntime::getThreadContext() 
+{
+  return thread_cnx;
+}
+
+void GaloisRuntime::acquire(GaloisRuntime::Lockable* C, Galois::MethodFlag m) {
+  if (shouldLock(m)) {
+    SimpleRuntimeContext* cnx = getThreadContext();
+    if (cnx)
+      cnx->acquire(C);
+  }
+}
+
+void GaloisRuntime::SimpleRuntimeContext::cancel_iteration() {
+  //FIXME: not handled yet
+  commit_iteration();
+}
+
+void GaloisRuntime::SimpleRuntimeContext::commit_iteration() {
+  //Although the destructor for the list would do the unlink,
+  //we do it here since we already are iterating
+  while (locks) {
+    //ORDER MATTERS!
+    //FIXME: compiler optimization barrier
+    Lockable* L = locks;
+    locks = L->next;
+    L->next = 0;
+    L->Owner.unlock_and_clear();
+  }
+}
+
+void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
+  bool suc = L->Owner.try_lock();
+  if (suc) {
+    L->Owner.setValue(this);
+    L->next = locks;
+    locks = L;
+  } else {
+    if (L->Owner.getValue() != this)
+      throw -1; //CONFLICT
+  }
 }

@@ -20,8 +20,8 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#ifndef GALOIS_CHECKEDOBJECT_H
-#define GALOIS_CHECKEDOBJECT_H
+#ifndef _GALOIS_CHECKEDOBJECT_H
+#define _GALOIS_CHECKEDOBJECT_H
 
 #include "Galois/Runtime/Context.h"
 
@@ -37,7 +37,7 @@ class GChecked : public GaloisRuntime::Lockable {
 public:
   GChecked(const T& v) :val(v) {}
 
-  T& get(Galois::Graph::MethodFlag m = ALL) const
+  T& get(Galois::MethodFlag m = ALL) const
   {
     GaloisRuntime::acquire(this, m);
     return val;
@@ -46,4 +46,4 @@ public:
 
 }
 
-#endif // GALOIS_CHECKEDOBJECT_H
+#endif // _GALOIS_CHECKEDOBJECT_H
