@@ -28,45 +28,33 @@ kind.
 
 namespace GaloisRuntime {
 
-//Stores 1 item per thread
-//The master thread is thread 0
-//Durring Parallel regions the threads index
-//from 0 -> num - 1 (one thread pool thread shares an index with the user thread)
+namespace HIDDEN {
 template<typename T>
-class PerCPU : private boost::noncopyable {
+class PERTHING :private boost::noncopyable {
 protected:
   cache_line_storage<T>* datum;
   unsigned int num;
 
   int myID() const {
     int i = ThreadPool::getMyID();
-    return std::max(0, i - 1);
+    if (i)
+      --i;
+    return i;
+  }
+
+  void create(int n) {
+    num = n;
+    datum = new cache_line_storage<T>[num];
   }
 
 public:
-  PerCPU()
-  {
-    num = getSystemThreadPolicy().getNumThreads();
-    datum = new cache_line_storage<T>[num];
-  }
-  explicit PerCPU(const T& ival)
-  {
-    num = getSystemThreadPolicy().getNumThreads();
-    datum = new cache_line_storage<T>[num];
-    reset(ival);
-  }
-  
-  virtual ~PerCPU() {
+  ~PERTHING() {
     delete[] datum;
   }
 
   void reset(const T& d) {
     for (unsigned int i = 0; i < num; ++i)
       datum[i].data = d;
-  }
-
-  unsigned int myEffectiveID() const {
-    return myID();
   }
 
   T& get(unsigned int i) {
@@ -79,6 +67,38 @@ public:
     assert(i < num);
     assert(datum);
     return datum[i].data;
+  }
+
+  unsigned int size() const {
+    return num;
+  }
+
+};
+}
+
+//Stores 1 item per thread
+//The master thread is thread 0
+//Durring Parallel regions the threads index
+//from 0 -> num - 1 (one thread pool thread shares an index with the user thread)
+template<typename T>
+class PerCPU : public HIDDEN::PERTHING<T> {
+  using HIDDEN::PERTHING<T>::create;
+  using HIDDEN::PERTHING<T>::myID;
+  using HIDDEN::PERTHING<T>::get;
+
+public:
+  PerCPU()
+  {
+    create(getSystemThreadPolicy().getNumThreads());
+  }
+  explicit PerCPU(const T& ival)
+  {
+    create(getSystemThreadPolicy().getNumThreads());
+    reset(ival);
+  }
+  
+  unsigned int myEffectiveID() const {
+    return myID();
   }
   
   T& get() {
@@ -97,65 +117,41 @@ public:
     return get((myID() + 1) % getSystemThreadPool().getActiveThreads());
   }
 
-  unsigned int size() const {
-    return num;
-  }
 };
 
 template<typename T>
-class PerLevel {
-  cache_line_storage<T>* datum;
-  unsigned int num;
+class PerLevel : public HIDDEN::PERTHING<T> {
+  using HIDDEN::PERTHING<T>::create;
+  using HIDDEN::PERTHING<T>::myID;
+  using HIDDEN::PERTHING<T>::get;
+
   unsigned int level;
   ThreadPolicy& P;
-
-protected:
-
-  unsigned int myID() const {
-    int i = ThreadPool::getMyID();
-    return std::max(0, i - 1);
-  }
-
 
 public:
   PerLevel() :P(getSystemThreadPolicy())
   {
     //last iteresting level (should be package)
     level = P.getNumLevels() - 1;
-    num = P.getLevelSize(level);
-    datum = new cache_line_storage<T>[num];
+    create(P.getLevelSize(level));
   }
-  
-  virtual ~PerLevel() {
-    delete[] datum;
+  explicit PerLevel(const T& ival)
+  {
+    level = P.getNumLevels() - 1;
+    create(P.getLevelSize(level));
+    reset(ival);
   }
 
   unsigned int myEffectiveID() const {
     return P.indexLevelMap(level, myID());
   }
 
-  T& get(unsigned int i) {
-    assert(i < num);
-    assert(datum);
-    return datum[i].data;
-  }
-  
-  const T& get(unsigned int i) const {
-    assert(i < num);
-    assert(datum);
-    return datum[i].data;
-  }
-  
   T& get() {
     return get(myEffectiveID());
   }
 
   const T& get() const {
     return get(myEffectiveID());
-  }
-
-  unsigned int size() const {
-    return num;
   }
 
   bool isFirstInLevel() const {
