@@ -283,14 +283,14 @@ bool MeshInit::computeDiffAVI (std::vector<AVI*> listA, std::vector<AVI*> listB,
 }
 
 
-void MeshInit::plotMeshCenters () const {
+void MeshInit::writeMeshCenters (const char* outFileName) const {
 
   if (getSpatialDim () != 2) {
     std::cerr << "Mesh plotting implemented for 2D elements only" << std::endl;
     abort ();
   }
 
-  FILE* plotFile = fopen ("mesh.csv", "w");
+  FILE* plotFile = fopen (outFileName, "w");
 
   if (plotFile == NULL) { abort (); }
 
@@ -313,10 +313,10 @@ void MeshInit::plotMeshCenters () const {
 }
 
 
-void MeshInit::plotMesh () const {
+void MeshInit::writeMesh (const char* polyFileName, const char* coordFileName) const {
 
 
-  FILE* polyFile = fopen ("mesh-poly.csv", "w");
+  FILE* polyFile = fopen (polyFileName, "w");
 
   if (polyFile == NULL) { abort (); }
 
@@ -343,7 +343,7 @@ void MeshInit::plotMesh () const {
   fclose (polyFile);
 
 
-  FILE* coordFile = fopen ("mesh-coord.csv", "w");
+  FILE* coordFile = fopen (coordFileName, "w");
   
   if (coordFile == NULL) { abort (); }
 

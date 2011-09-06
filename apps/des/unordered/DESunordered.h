@@ -101,8 +101,6 @@ class DESunordered: public DESabstractMain {
 
           SimObject* dstObj = graph.getData (dst, Galois::NONE);
 
-          dstObj->updateActive ();
-
           if (dstObj->isActive ()) {
 
             if (onWlFlags[dstObj->getId ()] == 0) {
@@ -117,8 +115,6 @@ class DESunordered: public DESabstractMain {
 
           }
         }
-
-        srcObj->updateActive();
 
         if (srcObj->isActive()) {
           lwl.push (activeNode);

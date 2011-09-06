@@ -84,8 +84,6 @@ class DESunorderedSerial: public DESabstractMain {
 
         SimObject* dstObj = graph.getData (dst, Galois::NONE);
 
-        dstObj->updateActive ();
-
         if (dstObj->isActive ()) {
           if (!onWlFlags[dstObj->getId ()]) {
             // set the flag to indicate presence on the worklist
@@ -95,7 +93,6 @@ class DESunorderedSerial: public DESabstractMain {
         }
       }
 
-      srcObj->updateActive();
       if (srcObj->isActive()) {
         worklist.push_back (activeNode);
 

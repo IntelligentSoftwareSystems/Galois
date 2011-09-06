@@ -44,6 +44,7 @@
 #include <iostream>
 #include <fstream>
 #include <set>
+#include <utility>
 
 #include <cassert>
 
@@ -279,7 +280,7 @@ protected:
         ++ (iter.get ());
 
         // if (iter.get () == 5000) {
-           // meshInit.plotMesh ();
+           // meshInit.writeMesh ();
            // meshInit.plotMeshCenters ();
         // }
 
@@ -311,7 +312,7 @@ public:
 
       // calculate the in degree of src by comparing it against its neighbors
       for (Graph::neighbor_iterator n = graph.neighbor_begin (src, Galois::NONE), 
-          en= graph.neighbor_end (src, Galois::NONE); n != en; ++n) {
+          en = graph.neighbor_end (src, Galois::NONE); n != en; ++n) {
         
         AVI* dstAVI = graph.getData (*n, Galois::NONE);
         if (aviCmp.compare (srcAVI, dstAVI) > 0) {
@@ -341,8 +342,9 @@ public:
     /////////////////////////////////////////////////////////////////
 
     // uncomment to plot the mesh
-    meshInit.plotMesh ();
+    meshInit.writeMesh ();
     // meshInit.plotMeshCenters ();
+    writeAdjacencyGraph (meshInit, graph); 
 
     // temporary matrices
     size_t nrows = meshInit.getSpatialDim ();
@@ -381,6 +383,73 @@ public:
   }
 
 
+  static void writeAdjacencyGraph (const MeshInit& meshInit, Graph& graph,
+      const char* nodesFileName="mesh-nodes.csv", const char* edgesFileName="mesh-edges.csv") {
+
+    if (meshInit.getSpatialDim () != 2) {
+        std::cerr << "implemented for 2D elements only" << std::endl;
+        abort ();
+    }
+
+
+    FILE* nodesFile = fopen (nodesFileName, "w");
+    if (nodesFile == NULL) { abort (); }
+
+    fprintf (nodesFile, "nodeId, inDeg, outDeg, centerX, centerY, timeStamp\n");
+
+    // a set of edges computed by picking outgoing edges for each node
+    std::vector<std::pair<GNode, GNode> > outEdges;
+
+    std::vector<double> center (meshInit.getSpatialDim(), 0.0);
+    AVIComparator aviCmp;
+
+    for (Graph::active_iterator i = graph.active_begin (), e = graph.active_end (); i != e; ++i) {
+      const GNode& src = *i;
+      AVI* srcAVI = graph.getData (src, Galois::NONE);
+
+      size_t inDeg = 0;
+      // calculate the in degree of src by comparing it against its neighbors
+      for (Graph::neighbor_iterator n = graph.neighbor_begin (src, Galois::NONE), en =
+          graph.neighbor_end (src, Galois::NONE); n != en; ++n) {
+
+        AVI* dstAVI = graph.getData (*n, Galois::NONE);
+        if (aviCmp.compare (srcAVI, dstAVI) > 0) {
+          ++inDeg;
+
+        } else { // is an out-going edge
+          outEdges.push_back (std::make_pair(src, *n));
+        }
+      }
+
+      size_t outDeg = graph.neighborsSize(src, Galois::NONE) - inDeg;
+
+      std::fill (center.begin (), center.end (), 0.0);
+      srcAVI->getElement ().getGeometry ().computeCenter (center);
+
+      fprintf (nodesFile, "%zd, %zd, %zd, %g, %g, %g\n",
+          srcAVI->getGlobalIndex(), inDeg, outDeg, center[0], center[1], srcAVI->getNextTimeStamp());
+
+    }
+
+    fclose (nodesFile);
+
+    FILE* edgesFile = fopen (edgesFileName, "w");
+    if (edgesFile == NULL) { abort (); }
+
+
+    fprintf (edgesFile, "srcId, dstId\n");
+    for (std::vector<std::pair<GNode, GNode> >::const_iterator i = outEdges.begin(), ei = outEdges.end();
+        i != ei; ++i) {
+       size_t srcId = graph.getData (i->first, Galois::NONE)->getGlobalIndex ();
+       size_t dstId = graph.getData (i->second, Galois::NONE)->getGlobalIndex ();
+
+       fprintf (edgesFile, "%zd, %zd\n", srcId, dstId);
+
+    }
+
+    fclose (edgesFile);
+
+  }
 
 };
 

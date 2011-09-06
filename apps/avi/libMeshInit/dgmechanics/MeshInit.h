@@ -230,9 +230,9 @@ public:
   void printDiff (const MeshInit& that) const { computeDiffAVI (this->aviVec, that.aviVec, true); }
 
 
-  void plotMeshCenters () const;
+  void writeMeshCenters (const char* outFileName="mesh-centers.csv") const;
 
-  void plotMesh () const;
+  void writeMesh (const char* polyFileName="mesh-poly.csv", const char* coordFileName="mesh-coord.csv") const;
 
 protected:
 
