@@ -17,8 +17,8 @@ defects in Software and/or Documentation, or loss or inaccuracy of data of any
 kind.
 */
 
-#ifndef __CACHE_LINE_STORAGE_H
-#define __CACHE_LINE_STORAGE_H
+#ifndef _GALOIS_RUNTIME_CACHELINESTORAGE_H
+#define _GALOIS_RUNTIME_CACHELINESTORAGE_H
 
 namespace GaloisRuntime {
 
@@ -35,17 +35,6 @@ struct cache_line_storage {
   cache_line_storage() :data() {}
 };
 
-// Store an item with padding
-template<typename T>
-class cache_line_storage2 {
-  T data __attribute__((aligned(CACHE_LINE_SIZE)));
-  char pad[ CACHE_LINE_SIZE % sizeof(T) ?
-	    CACHE_LINE_SIZE - (sizeof(T) % CACHE_LINE_SIZE) :
-	    0 ];
-  cache_line_storage2() :data() {}
-  explicit cache_line_storage2(const T& d) :data(d) {}
-};
-
 }
 
-#endif
+#endif //_GALOIS_RUNTIME_CACHELINESTORAGE_H
