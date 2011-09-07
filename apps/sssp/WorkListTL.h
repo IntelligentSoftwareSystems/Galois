@@ -1,5 +1,5 @@
 //#include <boost/thread/shared_mutex.hpp>
-#include <iostream>
+#include <tbb/concurrent_hash_map.h>
 
 template<class Indexer, typename ContainerTy = GaloisRuntime::WorkList::TbbFIFO<>, typename T = int, bool concurrent = true >
 class SimpleOrderedByIntegerMetric : private boost::noncopyable, private PaddedLock<concurrent> {
@@ -110,10 +110,11 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
 
   struct perItem {
     CTy* current;
-    int curVersion;
+    unsigned int curVersion;
   };
 
-  Galois::ConcurrentSkipListMap<int, CTy, std::less<int> > wl;
+  typedef tbb::concurrent_hash_map<int, CTy*> HM;
+  HM wl;
   int maxV;
 
   Indexer I;
@@ -140,28 +141,28 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
   }
 
   bool push(value_type val) {
-    bool retval;
-    unsigned int index = I(val) + 1;
+    unsigned int index = I(val);
     perItem& pI = current.get();
     //fastpath
     if (index == pI.curVersion && pI.current)
       return pI.current->push(val);
     //slow path
-    CTy* c = wl.get(index);
-    std::cerr << "getpush " << index << " -> " << c << "\n"; //DEBUG
-    if (c)
-      return c->push(val);    
-    CTy* n = new CTy();
-    c = wl.putIfAbsent(index, n);
-    std::cerr << "pIA " << index << " " << n << " -> " << c << "\n"; //DEBUG
-    if (c)
-      delete n;
-    else
-      c = n;
-    int oldMax;
+    bool retval;
+    if (wl.count(index)) {
+      typename HM::const_accessor a;
+      wl.find(a, index);
+      retval = a->second->push(val);
+    } else {
+      typename HM::accessor a;
+      wl.insert(a, index);
+      if (!a->second)
+	a->second = new CTy();
+      retval = a->second->push(val);
+    }
+    unsigned int oldMax;
     while ((oldMax = maxV) < index)
       __sync_bool_compare_and_swap(&maxV, oldMax, index);
-    return c->push(val);
+    return retval;
   }
 
   std::pair<bool, value_type> pop() {
@@ -172,24 +173,25 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
     if (C && (retval = C->pop()).first)
       return retval;
     //Failed, find minimum bin
-    std::cout << "failed " << maxV << "\n";
-    for (int i = 1; i <= maxV; ++i) {
-      C = wl.get(i);
-      pI.curVersion = i;
-      std::cerr << "getpop " << i << " -> " << C << "\n"; //DEBUG
-       if (C && (retval = C->pop()).first)
-	return retval;
+    for (int i = 0; i <= maxV; ++i) {
+      typename HM::const_accessor a;
+      if (wl.find(a, i)) {
+	pI.curVersion = i;
+	C = a->second;
+	if (C && (retval = C->pop()).first)
+	  return retval;
+      }
     }
     retval.first = false;
     return retval;
   }
 
-  bool empty() const {
-    for (typename std::map<int, CTy*>::iterator ii = wl.begin(), ee = wl.end(); ii != ee; ++ii)
-      if (!ii->second->empty())
-	return false;
-    return true;
-  }
+  /* bool empty() const { */
+  /*   for (typename std::map<int, CTy*>::iterator ii = wl.begin(), ee = wl.end(); ii != ee; ++ii) */
+  /*     if (!ii->second->empty()) */
+  /* 	return false; */
+  /*   return true; */
+  /* } */
 
   bool aborted(value_type val) {
     return push(val);
