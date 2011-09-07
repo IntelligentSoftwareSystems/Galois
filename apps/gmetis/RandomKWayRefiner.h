@@ -26,6 +26,7 @@
 #include "MetisGraph.h"
 #include "GMetisConfig.h"
 #include "defs.h"
+#include "Galois/Accumulator.h"
 
 class RandomKwayEdgeRefiner {
 
