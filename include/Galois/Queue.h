@@ -1481,7 +1481,7 @@ class PairingHeap: private boost::noncopyable {
   Node* combineSiblings(Node* firstSibling) {
     if (!firstSibling->nextSibling)
       return firstSibling;
-    int numSiblings = 0;
+    unsigned int numSiblings = 0;
     for (; firstSibling; ++numSiblings) {
       if (numSiblings == tree.size())
         tree.resize(numSiblings * 2);
@@ -1493,12 +1493,12 @@ class PairingHeap: private boost::noncopyable {
       tree.resize(numSiblings * 2);
     tree[numSiblings] = NULL;
 
-    int i = 0;
+    unsigned int i = 0;
     for (; i + 1 < numSiblings; i += 2) 
       tree[i] = compareAndLink(tree[i], tree[i+1]);
 
     int j = i - 2;
-    if (numSiblings - 3 == j)
+    if ((int)numSiblings - 3 == j)
       tree[j] = compareAndLink(tree[j], tree[j+2]);
     for (; j >= 2; j -=2)
       tree[j-2] = compareAndLink(tree[j-2], tree[j]);
@@ -1506,7 +1506,7 @@ class PairingHeap: private boost::noncopyable {
   }
 
 public:
-  PairingHeap(int capacity = 5): root(NULL), tree(capacity, NULL) { }
+  PairingHeap(int capacity = 5): tree(capacity, NULL), root(NULL) { }
 
   ~PairingHeap() {
     delete root;
@@ -1655,7 +1655,7 @@ public:
       cur = t;
     }
 
-    for (int i = 0; i < ops.size(); ++i) {
+    for (unsigned int i = 0; i < ops.size(); ++i) {
       std::vector<Op*>& v = ops.get(i);
       for (typename std::vector<Op*>::iterator ii = v.begin(), ee = v.end(); ii != ee ; ++ii) {
         delete *ii;
@@ -1665,7 +1665,7 @@ public:
 
   void add(T value) {
     Slot* mySlot = getMySlot();
-    Slot* volatile& myNext = mySlot->next;
+    //Slot* volatile& myNext = mySlot->next;
     Op* volatile& myReq = mySlot->req;
     Op* req = makeAddReq(value);
     myReq = req;
@@ -1698,7 +1698,7 @@ public:
 
   std::pair<bool,T> pollMin() {
     Slot* mySlot = getMySlot();
-    Slot* volatile& myNext = mySlot->next;
+    //Slot* volatile& myNext = mySlot->next;
     Op* volatile& myReq = mySlot->req;
     Op* req = makePollReq();
     myReq = req;
