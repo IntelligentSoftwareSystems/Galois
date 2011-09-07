@@ -20,6 +20,7 @@ kind.
 
 #include "Galois/Runtime/Context.h"
 
+//! Global thread context for each active thread
 static __thread GaloisRuntime::SimpleRuntimeContext* thread_cnx;
 
 //! Helper function to decide if the conflict detection lock should be taken

@@ -20,7 +20,6 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#include "Galois/Statistic.h"
 #include "Galois/Timer.h"
 
 // This is linux/bsd specific

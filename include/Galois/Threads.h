@@ -18,25 +18,19 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  */
-#ifndef GALOIS_GALOIS_H
-#define GALOIS_GALOIS_H
+#ifndef GALOIS_THREADS_H
+#define GALOIS_THREADS_H
 
-#include "Galois/Runtime/ParallelWork.h"
-
-#include "Galois/Threads.h"
+//This is a separate file so that Threads.cpp can include almost nothing
 
 namespace Galois {
 
-template<typename WLTy, typename IterTy, typename Function>
-void for_each(IterTy b, IterTy e, Function f, const char* loopname = 0) {
-  GaloisRuntime::for_each_impl<WLTy>(b, e, f, loopname);
-}
-
-template<typename IterTy, typename Function>
-void for_each(IterTy b, IterTy e, Function f, const char* loopname = 0) {
-  typedef GaloisRuntime::WorkList::ChunkedFIFO<256> WLTy;
-  for_each<WLTy, IterTy, Function>(b, e, f, loopname);
-}
+/**
+ * Sets the number of threads to use in runtime system. Returns
+ * the actual value of threads used, which could be less than
+ * the requested value.
+ */
+unsigned int setMaxThreads(unsigned int num);
 
 }
 #endif
