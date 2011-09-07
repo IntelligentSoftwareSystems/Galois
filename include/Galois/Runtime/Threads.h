@@ -23,31 +23,21 @@
 #ifndef GALOIS_RUNTIME_THREADS_H
 #define GALOIS_RUNTIME_THREADS_H
 
-#include "Galois/Executable.h"
+#include <tr1/functional>
 #include <boost/intrusive/list.hpp>
 #include <vector>
 
 namespace GaloisRuntime {
 
-//declared out of line to correctly initialize data in Threads.cpp
-struct initMainThread {
-  initMainThread();
-};
-
 class ThreadPool {
-  friend struct initMainThread;
+protected:
   static __thread unsigned int LocalThreadID;
-  static int nextThreadID;
-protected:
   unsigned int activeThreads;
-
-protected:
-  static void NotifyAware(bool starting);
 
 public:
   //!execute work on all threads
   //!The work object is not duplicated in any way 
-  virtual void run(Galois::Executable* work) = 0;
+  virtual void run(std::tr1::function<void (void)> work) = 0;
   
   //!change the number of threads to num
   //!returns the number that the runtime chooses (may not be num)
@@ -56,7 +46,9 @@ public:
   //!How many threads will be used
   unsigned int getActiveThreads() const { return activeThreads; }
 
-  static unsigned int getMyID() __attribute__((pure));
+  //!My thread id (dense, user thread is 0, galois threads 1..num)
+  static unsigned int getMyID() { return LocalThreadID; }
+
 
 };
 
@@ -109,31 +101,6 @@ public:
 };
 
 ThreadPolicy& getSystemThreadPolicy();
-void setSystemThreadPolicy(const char* name);
-
-namespace HIDDEN {
-//Tag for invasive list
-class ThreadAwareTag;
-
-//Hook type for invasive list
-typedef boost::intrusive::list_base_hook<boost::intrusive::tag<ThreadAwareTag> > ThreadAwareHook;
-}
-
-//This notifies when the number of threads change
-class ThreadAware : public HIDDEN::ThreadAwareHook {
-  friend class ThreadPool;
-  static void NotifyOfChange(bool starting);
-
-  //This is called to notify the start and end of a parallel region
-  //starting = true -> parallel code is initializing
-  //starting = false -> parallel code is ending
-  virtual void ThreadChange(bool starting) = 0;
-
-public:
-  ThreadAware();
-  virtual ~ThreadAware();
-
-};
 
 }
 

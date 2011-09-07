@@ -1,4 +1,4 @@
-/** Simple executable base class -*- C++ -*-
+/** Loop Entry/Exit Hooks -*- C++ -*-
  * @file
  * @section License
  *
@@ -17,18 +17,30 @@
  * related expenses which may arise from use of Software or Documentation,
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#ifndef GALOIS_EXECUTABLE_H
-#define GALOIS_EXECUTABLE_H
 
-namespace Galois {
-  
-class Executable {
+#ifndef GALOIS_RUNTIME_LOOPHOOKS_H
+#define GALOIS_RUNTIME_LOOPHOOKS_H
+
+namespace GaloisRuntime {
+
+void runAllLoopExitHandlers(void);
+
+//Base notification class for parallel loop exits
+//Implement the LoopExit function
+class AtLoopExit {
+  friend void runAllLoopExitHandlers(void);
+  virtual void LoopExit(void) = 0;
+protected:
+  AtLoopExit* next;
 public:
-  //! run work.
-  virtual void operator()() = 0;
+  AtLoopExit();
+  ~AtLoopExit();
 };
 
 }
 
-#endif
+#endif //GALOIS_RUNTIME_LOOPHOOKS_H
+

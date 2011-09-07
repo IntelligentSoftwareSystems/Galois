@@ -27,12 +27,12 @@
  */
 #ifndef GALOIS_RUNTIME_PARALLELWORK_H
 #define GALOIS_RUNTIME_PARALLELWORK_H
+
 #include <algorithm>
 #include <numeric>
 #include <sstream>
 #include <math.h>
 #include "Galois/TypeTraits.h"
-#include "Galois/Executable.h"
 #include "Galois/Mem.h"
 
 #include "Galois/Runtime/Support.h"
@@ -42,6 +42,7 @@
 #include "Galois/Runtime/WorkList.h"
 #include "Galois/Runtime/DebugWorkList.h"
 #include "Galois/Runtime/Termination.h"
+#include "Galois/Runtime/LoopHooks.h"
 
 #ifdef GALOIS_VTUNE
 #include "ittnotify.h"
@@ -308,7 +309,7 @@ public:
 };
 
 template<class WorkListTy, class Function>
-class ForEachWork : public Galois::Executable {
+class ForEachWork {
   typedef typename WorkListTy::value_type value_type;
   typedef GaloisRuntime::WorkList::MP_SC_FIFO<value_type> AbortedListTy;
   typedef ParallelThreadContext<Function, WorkListTy> PCTy;
@@ -361,15 +362,14 @@ public:
     :f(_f), loopname(_loopname), abort_happened(0) {
     global_wl.fill_initial(b, e);
   }
-  
+
   ~ForEachWork() {
     for (int i = 0; i < tdata.get(0).num(); ++i)
       tdata.get(i).report_stat(loopname);
     tdata.get(0).done();
-    assert(global_wl.empty());
   }
 
-  virtual void operator()() {
+  void operator()() {
     PCTy& tld = tdata.get();
     tld.initialize(term.getLocalTokenHolder(), 
 		   tdata.myEffectiveID() == 0,
@@ -416,9 +416,12 @@ void for_each_impl(IterTy b, IterTy e, Function f, const char* loopname) {
   typedef typename WLTy::template retype<typename std::iterator_traits<IterTy>::value_type>::WL aWLTy;
 
   ForEachWork<aWLTy, Function> GW(b, e, f, loopname);
+  //ForEachWork<aWLTy, Function> GW(f, loopname);
   ThreadPool& PTP = getSystemThreadPool();
 
-  PTP.run(&GW);
+  PTP.run(std::tr1::ref(GW));
+
+  runAllLoopExitHandlers();
 
 #ifdef GALOIS_VTUNE
   __itt_pause();

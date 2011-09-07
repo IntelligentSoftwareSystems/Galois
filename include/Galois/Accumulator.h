@@ -25,6 +25,7 @@
 #define GALOIS_ACCUMULATOR_H
 
 #include "Galois/Runtime/PerCPU.h"
+#include "Galois/Runtime/LoopHooks.h"
 #include <boost/function.hpp>
 
 namespace Galois {
@@ -39,7 +40,7 @@ namespace Galois {
  * 
  */
 template <typename T, typename BinFunc>
-class GReducible: public GaloisRuntime::ThreadAware {
+class GReducible : public GaloisRuntime::AtLoopExit {
   BinFunc _func;
   GaloisRuntime::PerCPU<T> _data;
 
@@ -49,9 +50,8 @@ class GReducible: public GaloisRuntime::ThreadAware {
       _func(d0, _data.get(i));
   }
 
-  virtual void ThreadChange(bool starting) {
-    if (!starting)
-      reduce();
+  virtual void LoopExit() {
+    reduce();
   }
 
 public:

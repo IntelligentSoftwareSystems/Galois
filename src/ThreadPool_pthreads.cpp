@@ -22,7 +22,6 @@
  */
 #ifdef GALOIS_PTHREAD
 
-#include "Galois/Executable.h"
 #include "Galois/Runtime/Threads.h"
 #include "Galois/Runtime/Support.h"
 
@@ -116,13 +115,14 @@ public:
 class ThreadPool_pthread : public ThreadPool {
   Semaphore start; // Signal to release threads to run
   Barrier finish; // want on to block on running threads
-  Galois::Executable* work; // Thing to execute
+  std::tr1::function<void (void)> work; //Thing to execute
   volatile bool shutdown; // Set and start threads to have them exit
   std::list<pthread_t> threads; // Set of threads
   unsigned int maxThreads;
+  unsigned int nextThread;
 
   void launch(void) {
-    unsigned int id = ThreadPool::getMyID();
+    unsigned int id = LocalThreadID = __sync_fetch_and_add(&nextThread, 1);
     GaloisRuntime::getSystemThreadPolicy().bindThreadToProcessor(id - 1);
 
     while (true) {
@@ -130,7 +130,7 @@ class ThreadPool_pthread : public ThreadPool {
       //std::cerr << "starting " << id << "\n";
       if (work && id <= activeThreads) {
 	//std::cerr << "using " << id << "\n";
-	(*work)();
+	work();
       }
       if(shutdown)
 	break;
@@ -142,11 +142,12 @@ class ThreadPool_pthread : public ThreadPool {
     ((ThreadPool_pthread*)V)->launch();
     return 0;
   }
-
+  
 public:
   ThreadPool_pthread() 
-    :start(0), work(0), shutdown(false), maxThreads(0)
+    :start(0), work(0), shutdown(false), maxThreads(0), nextThread(1)
   {
+    LocalThreadID = 0;
     ThreadPool::activeThreads = 1;
     unsigned int num = GaloisRuntime::getSystemThreadPolicy().getNumThreads();
     finish.reinit(num + 1);
@@ -173,26 +174,19 @@ public:
     }
   }
 
-  virtual void run(Galois::Executable* E) {
+  virtual void run(std::tr1::function<void (void)> E) {
     work = E;
-    __sync_synchronize();
-    ThreadPool::NotifyAware(true);
-    //work->preRun(activeThreads);
     __sync_synchronize();
     start.release(maxThreads);
     finish.wait();
-    //work->postRun();
     work = 0;
-    ThreadPool::NotifyAware(false);
   }
 
   virtual unsigned int setActiveThreads(unsigned int num) {
     if (num == 0) {
       activeThreads = 1;
-    } else if (num <= maxThreads) {
-      activeThreads = num;
     } else {
-      activeThreads = maxThreads;
+      activeThreads = std::min(num, maxThreads);
     }
     assert(activeThreads <= maxThreads);
     assert(activeThreads <= threads.size());
@@ -212,6 +206,11 @@ ThreadPool& GaloisRuntime::getSystemThreadPool() {
   return pool;
 }
 
+//FIXME: May need to factor this out to initialize all objects in the correct order
+struct Init {
+  Init() { getSystemThreadPool(); }
+};
 
+static Init iii;
 
 #endif
