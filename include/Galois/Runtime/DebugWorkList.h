@@ -66,7 +66,7 @@ public:
   ~WorkListTracker() {
 
     //First flush the stats
-    for (int t = 0; t < tracking.size(); ++t) {
+    for (unsigned int t = 0; t < tracking.size(); ++t) {
       p& P = tracking.get(t);
       if (P.stat.getCount()) {
 	P.values[P.epoch] = P.stat;
@@ -77,7 +77,7 @@ public:
 
     //print header
     file << "Epoch";
-    for (int t = 0; t < tracking.size(); ++t)
+    for (unsigned int t = 0; t < tracking.size(); ++t)
       file << "," << t << "_count,"
 	   << t << "_mean,"
 	   << t << "_variance,"
@@ -88,7 +88,7 @@ public:
     for (unsigned int x = 0; x <= clock.data; ++x) {
       file << x;
       //for each thread
-      for (int t = 0; t < tracking.size(); ++t) {
+      for (unsigned int t = 0; t < tracking.size(); ++t) {
 	p& P = tracking.get(t);
 	if (P.values.find(x) != P.values.end()) {
 	  OnlineStat& S = P.values[x];
@@ -141,10 +141,6 @@ public:
     return pop();
   }
 
-  bool empty() {
-    return wl.empty();
-  }
-  
   template<typename iter>
   void fill_initial(iter begin, iter end) {
     return wl.fill_initial(begin, end);
@@ -184,10 +180,6 @@ public:
     return wl.try_pop();
   }
 
-  bool empty() __attribute__((noinline)) {
-    return wl.empty();
-  }
-  
   template<typename iter>
   void fill_initial(iter begin, iter end) {
     return wl.fill_initial(begin, end);

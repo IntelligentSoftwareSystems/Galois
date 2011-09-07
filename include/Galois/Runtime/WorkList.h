@@ -25,6 +25,7 @@ kind.
 #include <limits>
 #include <map>
 #include <set>
+#include <algorithm>
 #include <boost/utility.hpp>
 
 #include "Galois/Runtime/PaddedLock.h"
@@ -36,9 +37,6 @@ kind.
 
 #include "mm/mem.h"
 #include "WorkListHelpers.h"
-
-//#define OPTNOINLINE __attribute__((noinline))
-#define OPTNOINLINE
 
 #ifndef WLCOMPILECHECK
 #define WLCOMPILECHECK(name) //
@@ -76,13 +74,8 @@ public:
 
   //! push a value onto the queue
   bool push(value_type val);
-  //! push an aborted value onto the queue
-  bool aborted(value_type val);
   //! pop a value from the queue.
   std::pair<bool, value_type> pop();
-  //! return if the queue is empty
-  //! *not thread safe*
-  bool empty() const;
   
   //! called in sequential mode to seed the worklist
   template<typename iter>
@@ -137,14 +130,6 @@ public:
     }
   }
    
-  bool empty() const {
-    return wl.empty();
-  }
-
-  bool aborted(value_type val) {
-    return push(val);
-  }
-
   //Not Thread Safe
   template<typename Iter>
   void fill_initial(Iter ii, Iter ee) {
@@ -196,14 +181,6 @@ public:
     }
   }
    
-  bool empty() const {
-    return wl.empty();
-  }
-
-  bool aborted(value_type val) {
-    return push(val);
-  }
-
   //Not Thread Safe
   template<typename Iter>
   void fill_initial(Iter ii, Iter ee) {
@@ -245,14 +222,6 @@ public:
     }
   }
    
-  bool empty() const {
-    return Parent::empty();
-  }
-
-  bool aborted(value_type val) {
-    return push(val);
-  }
-
   //Not Thread Safe
   template<typename Iter>
   void fill_initial(Iter ii, Iter ee) {
@@ -290,14 +259,6 @@ public:
     return std::make_pair(B, V);
   }
 
-  bool empty() const {
-    return wl.empty();
-  }
-
-  bool aborted(value_type val) {
-    return push(val);
-  }
-
   //Not Thread Safe
   template<typename Iter>
   void fill_initial(Iter ii, Iter ee) {
@@ -329,14 +290,14 @@ public:
 
   typedef T value_type;
 
-  bool push(value_type val) OPTNOINLINE {
+  bool push(value_type val) {
     lock();
     wl.push_back(val);
     unlock();
     return true;
   }
 
-  std::pair<bool, value_type> pop() OPTNOINLINE {
+  std::pair<bool, value_type> pop()  {
     lock();
     if (wl.empty()) {
       unlock();
@@ -347,14 +308,6 @@ public:
       unlock();
       return std::make_pair(true, retval);
     }
-  }
-
-  bool empty() const OPTNOINLINE {
-    return wl.empty();
-  }
-
-  bool aborted(value_type val) {
-    return push(val);
   }
 
   //Not Thread Safe
@@ -405,14 +358,6 @@ public:
     }
   }
 
-  bool empty() const {
-    return wl.empty();
-  }
-
-  bool aborted(value_type val) {
-    return push(val);
-  }
-
   //Not Thread Safe
   template<typename Iter>
   void fill_initial(Iter ii, Iter ee) {
@@ -428,14 +373,14 @@ class OrderedByIntegerMetric : private boost::noncopyable {
 
   struct perItem {
     CTy* current;
-    int curVersion;
-    int lastMasterVersion;
+    unsigned int curVersion;
+    unsigned int lastMasterVersion;
     std::map<int, CTy*> local;
   };
 
   std::vector<std::pair<int, CTy*> > masterLog;
   PaddedLock<concurrent> masterLock;
-  int masterVersion;
+  unsigned int masterVersion;
 
   Indexer I;
 
@@ -524,17 +469,6 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     return retval;
   }
 
-  bool empty() const {
-    for (typename std::vector<std::pair<int, CTy*> >::const_iterator ii = masterLog.begin(), ee = masterLog.end(); ii != ee; ++ii)
-      if (!ii->second->empty())
-	return false;
-    return true;
-  }
-
-  bool aborted(value_type val) {
-    return push(val);
-  }
-
   //Not Thread Safe
   template<typename Iter>
   void fill_initial(Iter ii, Iter ee) {
@@ -569,22 +503,12 @@ public:
     return local.get().push(val);
   }
 
-  bool aborted(value_type val) {
-    //Fixme: should be configurable
-    return global.push(val);
-  }
-
   std::pair<bool, value_type> pop() {
     std::pair<bool, value_type> ret = local.get().pop();
     if (ret.first)
       return ret;
     ret = global.pop();
     return ret;
-  }
-
-  bool empty() {
-    if (!local.get().empty()) return false;
-    return global.empty();
   }
 
   template<typename iter>
@@ -622,14 +546,6 @@ class LocalStealing : private boost::noncopyable {
     if (ret.first)
       return ret;
     return local.getNext().pop();
-  }
-
-  bool empty() {
-    return local.get().empty();
-  }
-
-  bool aborted(value_type val) {
-    return push(val);
   }
 
   //Not Thread Safe
@@ -696,10 +612,6 @@ public:
     return true;
   }
 
-  bool aborted(value_type val) {
-    return push(val);
-  }
-
   std::pair<bool, value_type> pop() {
 #define ACT if (current && (ret = current->pop_front()).first) return ret; if (current) delChunk(current);
 
@@ -728,16 +640,6 @@ public:
 #undef ACT
   }
 
-  bool empty() {
-    for (unsigned int i = 0; i < data.size(); ++i) {
-      p& n = data.get(i);
-      if (n.next.getValue() && !n.next.getValue()->empty())
-	return false;
-    }
-    return queue.empty();
-  }
-
-  
   //! called in sequential mode to seed the worklist
   template<typename iter>
   void fill_initial(iter begin, iter end) {
@@ -795,17 +697,17 @@ class ChunkedMaster : private boost::noncopyable {
     heap.deallocate(C);
   }
 
-  void pushChunk(Chunk* C) OPTNOINLINE {
+  void pushChunk(Chunk* C)  {
     LevelItem& I = Q.get();
     I.push(C);
   }
 
-  Chunk* popChunkByID(unsigned int i) OPTNOINLINE {
+  Chunk* popChunkByID(unsigned int i)  {
     LevelItem& I = Q.get(i);
     return I.pop();
   }
 
-  Chunk* popChunk() OPTNOINLINE {
+  Chunk* popChunk()  {
     int id = Q.myEffectiveID();
     Chunk* r = popChunkByID(id);
     if (r)
@@ -815,8 +717,12 @@ class ChunkedMaster : private boost::noncopyable {
       ++id;
       id %= Q.size();
       r = popChunkByID(id);
-      if (r)
+      if (r) {
+	//Chunk* r2 = popChunkByID(id);
+	//if (r2)
+	//pushChunk(r2);
 	return r;
+      }
     }
     return 0;
   }
@@ -841,7 +747,7 @@ public:
     }
   }
 
-  bool push(value_type val) OPTNOINLINE {
+  bool push(value_type val)  {
     p& n = data.get();
     if (n.next && n.next->push_back(val))
       return true;
@@ -853,7 +759,7 @@ public:
     return true;
   }
 
-  std::pair<bool, value_type> pop() OPTNOINLINE {
+  std::pair<bool, value_type> pop()  {
     p& n = data.get();
     std::pair<bool, value_type> retval;
     if (isStack) {
@@ -881,24 +787,6 @@ public:
     }
   }
   
-  bool empty() OPTNOINLINE {
-    for (unsigned int i = 0; i < data.size(); ++i) {
-      const p& n = data.get(i);
-      if (n.cur && !n.cur->empty()) return false;
-      if (n.next && !n.next->empty()) return false;
-    }
-    //try this node first to make distributed==false work
-    if (!Q.get().empty()) return false;
-    for (int i = 0; i < Q.size(); ++i)
-      if (!Q.get(i).empty())
-	return false;
-    return true;
-  }
-
-  bool aborted(value_type val) {
-    return push(val);
-  }
-
   //Not Thread Safe
   template<typename Iter>
   void fill_initial(Iter ii, Iter ee) {
@@ -943,13 +831,13 @@ public:
     //std::cerr << active << "\n";
   }
 
-  bool push(value_type val) OPTNOINLINE {
+  bool push(value_type val)  {
     unsigned int index = P(val);
     //std::cerr << "[" << index << "," << index % active << "]\n";
     return Items.get(index % active).push(val);
   }
 
-  std::pair<bool, value_type> pop() OPTNOINLINE {
+  std::pair<bool, value_type> pop()  {
     std::pair<bool, value_type> r = Items.get().pop();
     // std::cerr << "{" << Items.myEffectiveID() << "}";
     // if (r.first)
@@ -961,14 +849,6 @@ public:
     return pop();
   }
   
-  bool empty() OPTNOINLINE {
-    return Items.get().empty();
-  }
-
-  bool aborted(value_type val) {
-    return push(val);
-  }
-
   //Not Thread Safe
   template<typename Iter>
   void fill_initial(Iter ii, Iter ee) {
@@ -1006,14 +886,6 @@ public:
     return wl.pollFirstKey();
   }
    
-  bool empty() const {
-    return wl.isEmpty();
-  }
-
-  bool aborted(value_type val) {
-    return push(val);
-  }
-
   //Not Thread Safe
   template<typename Iter>
   void fill_initial(Iter ii, Iter ee) {
@@ -1051,14 +923,6 @@ public:
     return wl.pollMin();
   }
    
-  bool empty() const {
-    return wl.empty();
-  }
-
-  bool aborted(value_type val) {
-    return push(val);
-  }
-
   //Not Thread Safe
   template<typename Iter>
   void fill_initial(Iter ii, Iter ee) {
@@ -1068,6 +932,64 @@ public:
   }
 };
 WLCOMPILECHECK(FCPairingHeapQueue);
+
+template<typename Iter = int*, typename T = int>
+class InitialIterator {
+  struct Range {
+    Iter ii;
+    Iter ee;
+  };
+  Range Master;
+  PaddedLock<true> L;
+  PerCPU<Range> Ranges;
+public:
+  typedef T value_type;
+
+  //! change the concurrency flag
+  template<bool newconcurrent>
+  struct rethread {
+    typedef InitialIterator<Iter, T> WL;
+  };
+
+  //! change the type the worklist holds
+  template<typename Tnew>
+  struct retype {
+    typedef InitialIterator<Iter, Tnew> WL;
+  };
+
+  bool push(value_type val) {
+    assert(0 && "cannot push into InitialIterator Worklist");
+    abort();
+  }
+
+  std::pair<bool, value_type> pop() {
+    Range& myR = Ranges.get();
+    if (myR.ii != myR.ee)
+      return std::make_pair(true, *myR.ii++);
+
+    L.lock();
+    myR.ii = Master.ii;
+    //FIXME: specialize for random access iterators
+    //for (int i = 0; i < 1024 && Master.ii != Master.ee; ++i, ++Master.ii) ;
+    //int num = std::min(256, (int)std::distance(Master.ii, Master.ee));
+    int d = (int)std::distance(Master.ii, Master.ee);
+    int num = std::min(std::max(16, d / 32), d);
+    std::advance(Master.ii, num);
+    myR.ee = Master.ii;
+    L.unlock();
+
+    if (myR.ii == myR.ee)
+      return std::make_pair(false, value_type());
+    else
+      return std::make_pair(true, *myR.ii++);
+  }
+
+  void fill_initial(Iter b, Iter e) {
+    Master.ii = b;
+    Master.ee = e;
+  }
+};
+WLCOMPILECHECK(InitialIterator);
 
 //End namespace
 }
