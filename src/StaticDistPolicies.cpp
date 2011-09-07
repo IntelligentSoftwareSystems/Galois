@@ -185,7 +185,7 @@ struct DummyPolicy : public ThreadPolicy {
 
 static ThreadPolicy* TP = 0;
 
-void GaloisRuntime::setSystemThreadPolicy(const char* name) {
+static void setSystemThreadPolicy(const char* name) {
   ThreadPolicy* newPolicy = 0;
   if (strcmp(name, "faraday") == 0)
     newPolicy = new FaradayPolicy();
