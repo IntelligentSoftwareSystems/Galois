@@ -53,12 +53,16 @@ find_package(LAPACK)
 #Boost
 # not needed now but will be needed for newer version of Boost after 1.4X ish
 #set(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0")
-set(Boost_USE_STATIC_LIBS ON) # Should prefer non static libs 
+#set(Boost_USE_STATIC_LIBS ON)
 set(Boost_USE_MULTITHREADED OFF) # newer boost builds don't use -mt extension
 #set(BOOST_ROOT /net/faraday/workspace/ddn/local)
 #find_package(Boost 1.34.0 REQUIRED COMPONENTS system serialization graph_parallel mpi)
 set(BOOST_LIBS thread)
-find_package(Boost 1.34.0 COMPONENTS ${BOOST_LIBS} REQUIRED)
+if(SITE_NAME MATCHES "delaunay.*")
+  find_package(Boost 1.34.0 COMPONENTS ${BOOST_LIBS})
+else()
+  find_package(Boost 1.34.0 COMPONENTS ${BOOST_LIBS} REQUIRED)
+endif()
 include_directories(${Boost_INCLUDE_DIRS})
 
 #PThreads
