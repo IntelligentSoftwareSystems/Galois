@@ -58,18 +58,17 @@ void GaloisRuntime::acquire(GaloisRuntime::Lockable* C, Galois::MethodFlag m) {
 
 void GaloisRuntime::SimpleRuntimeContext::cancel_iteration() {
   //FIXME: not handled yet
-  commit_iteration();
+  commit_iteration(0);
 }
 
-void GaloisRuntime::SimpleRuntimeContext::commit_iteration() {
-  //Although the destructor for the list would do the unlink,
-  //we do it here since we already are iterating
+void GaloisRuntime::SimpleRuntimeContext::commit_iteration(unsigned id) {
   while (locks) {
     //ORDER MATTERS!
     //FIXME: compiler optimization barrier
     Lockable* L = locks;
     locks = L->next;
     L->next = 0;
+    L->last_holder = id;
     L->Owner.unlock_and_clear();
   }
 }
