@@ -17,8 +17,8 @@ defects in Software and/or Documentation, or loss or inaccuracy of data of any
 kind.
 */
 
-#ifndef __GALOIS_PERCPU_H
-#define __GALOIS_PERCPU_H
+#ifndef _GALOIS_RUNTIME_PERCPU_H
+#define _GALOIS_RUNTIME_PERCPU_H
 
 #include "Threads.h"
 #include "CacheLineStorage.h"
@@ -84,7 +84,6 @@ template<typename T>
 class PerCPU : public HIDDEN::PERTHING<T> {
   using HIDDEN::PERTHING<T>::create;
   using HIDDEN::PERTHING<T>::myID;
-  using HIDDEN::PERTHING<T>::get;
 
 public:
   PerCPU()
@@ -109,6 +108,17 @@ public:
     return get(myID());
   }
 
+  // Duplicate superclass functions because superclass is dependent name and
+  // thus are difficult to access directly, especially by clients of this
+  // class
+  T& get(unsigned i) {
+    return HIDDEN::PERTHING<T>::get(i);
+  }
+
+  const T& get(unsigned i) const {
+    return HIDDEN::PERTHING<T>::get(i);
+  }
+
   T& getNext() {
     return get((myID() + 1) % getSystemThreadPool().getActiveThreads());
   }
@@ -123,7 +133,6 @@ template<typename T>
 class PerLevel : public HIDDEN::PERTHING<T> {
   using HIDDEN::PERTHING<T>::create;
   using HIDDEN::PERTHING<T>::myID;
-  using HIDDEN::PERTHING<T>::get;
 
   unsigned int level;
   ThreadPolicy& P;
@@ -152,6 +161,17 @@ public:
 
   const T& get() const {
     return get(myEffectiveID());
+  }
+
+  // Duplicate superclass functions because superclass is dependent name and
+  // thus are difficult to access directly, especially by clients of this
+  // class
+  T& get(unsigned i) {
+    return HIDDEN::PERTHING<T>::get(i);
+  }
+
+  const T& get(unsigned i) const {
+    return HIDDEN::PERTHING<T>::get(i);
   }
 
   bool isFirstInLevel() const {

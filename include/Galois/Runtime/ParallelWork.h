@@ -64,8 +64,8 @@ public:
   void cancel_iteration() {
     src.cancel_iteration();
   }
-  void commit_iteration() {
-    src.commit_iteration();
+  void commit_iteration(unsigned id) {
+    src.commit_iteration(id);
   }
   void start_parallel_region() {
     setThreadContext(&src);
@@ -80,7 +80,7 @@ class SimpleRuntimeContextHandler<false> {
 public:
   void start_iteration() {}
   void cancel_iteration() {}
-  void commit_iteration() {}
+  void commit_iteration(unsigned) {}
   void start_parallel_region() {}
   void end_parallel_region() {}
 };
@@ -269,6 +269,7 @@ public:
     friend class ParallelThreadContext;
   };
 
+  unsigned id;
 private:
 
   UserAPI facing;
@@ -281,11 +282,12 @@ public:
   virtual ~ParallelThreadContext() {}
 
   void initialize(TerminationDetection::tokenHolder* t,
-		  bool _leader,
+		  unsigned _id,
 		  WorkListTy* wl,
 		  BreakImpl<Configurator<Function>::NeedsBreak>* p) {
     lterm = t;
-    leader = _leader;
+    id = _id;
+    leader = _id == 0;
     facing.init_wl(wl);
     facing.init_break(p);
   }
@@ -305,7 +307,6 @@ public:
   void resetAlloc() {
     facing.__resetAlloc();
   }
-
 };
 
 template<class WorkListTy, class Function>
@@ -352,7 +353,7 @@ class ForEachWork {
       doAborted(val);
       return;
     }
-    tld.commit_iteration();
+    tld.commit_iteration(tld.id);
     tld.resetAlloc();
   }
 
@@ -372,7 +373,7 @@ public:
   void operator()() {
     PCTy& tld = tdata.get();
     tld.initialize(term.getLocalTokenHolder(), 
-		   tdata.myEffectiveID() == 0,
+		   tdata.myEffectiveID(),
 		   &global_wl,
 		   &breaker);
 

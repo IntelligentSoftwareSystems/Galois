@@ -17,6 +17,8 @@ defects in Software and/or Documentation, or loss or inaccuracy of data of any
 kind.
 */
 
+#ifndef GALOIS_RUNTIME_TERMINATION_H
+#define GALOIS_RUNTIME_TERMINATION_H
 namespace GaloisRuntime {
 
 //Dikstra dual-ring termination algorithm
@@ -37,8 +39,8 @@ private:
   PerCPU<tokenHolder> data;
   volatile bool globalTerm;
   bool lastWasWhite;
-public:
 
+public:
   TerminationDetection();
 
   inline void workHappened() {
@@ -59,3 +61,4 @@ public:
 };
 
 }
+#endif
