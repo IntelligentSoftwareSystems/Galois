@@ -160,7 +160,7 @@ void touchGraph() {
    for (Graph::neighbor_iterator
           jj = G->neighbor_begin(v, Galois::NONE),
           ee = G->neighbor_end(v, Galois::NONE); jj != ee; ++jj) {
-	GNode w = *jj;
+	//GNode w = *jj;
 	dummyCnt++;
    } 
  }

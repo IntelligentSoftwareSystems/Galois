@@ -182,12 +182,12 @@ void runBodyParallel() {
 	std::cout<<"Begining to process with worklist size :: "<<all.size()<<std::endl;
 	std::cout<<"Graph size "<<graph.size()<<std::endl;
 #endif
-	for(int i=0;i<MSTWeight.size();i++)
+	for(unsigned i=0;i<MSTWeight.size();i++)
 		MSTWeight.get(i)=0;
 	//Galois::for_each<ChunkedFIFO<32> >(all.begin(), all.end(), process());
 	Galois::for_each<OBIM>(all.begin(), all.end(), process());
 	unsigned int res = 0;
-	for(int i=0;i<MSTWeight.size();i++){
+	for(unsigned i=0;i<MSTWeight.size();i++){
 #if BORUVKA_DEBUG
 		std::cout<<"MST +=" << MSTWeight.get(i)<<std::endl;
 #endif

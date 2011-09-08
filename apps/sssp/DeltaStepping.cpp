@@ -82,7 +82,7 @@ public:
       assert(0 && "Too many theads");
       abort();
     }
-    for (int i = 0; i < num_threads * num_threads; ++i) {
+    for (unsigned i = 0; i < num_threads * num_threads; ++i) {
       queues.push_back(Queue());
     }
   }
@@ -127,7 +127,7 @@ public:
 
     T result = *static_cast<T*>(rdata[0].data);
 
-    for (int i = 1; i < num_threads; ++i) {
+    for (unsigned i = 1; i < num_threads; ++i) {
       result = f(result, *static_cast<T*>(rdata[i].data));
     }
     rc = pthread_barrier_wait(&reducer2);
@@ -394,7 +394,7 @@ public:
   void run() {
     pthread_t threads[1024];
     
-    for (int i = 0; i < num_threads; ++i) {
+    for (unsigned i = 0; i < num_threads; ++i) {
       int rc = pthread_create(&threads[i], NULL, threadBegin, processes[i]);
       if (rc) {
         assert(0 && "Couldn't create thread");
@@ -402,7 +402,7 @@ public:
       }
     }
 
-    for (int i = 0; i < num_threads; ++i) {
+    for (unsigned i = 0; i < num_threads; ++i) {
       int rc = pthread_join(threads[i], NULL);
       if (rc) {
         assert(0 && "Problem");
