@@ -31,7 +31,6 @@ class SimpleRuntimeContext;
 class Lockable {
   PtrLock<SimpleRuntimeContext*, true> Owner;
   Lockable* next;
-  unsigned last_holder;
   friend class SimpleRuntimeContext;
 public:
   Lockable() :next(0) {}
@@ -50,7 +49,7 @@ public:
   }
   
   void cancel_iteration();
-  void commit_iteration(unsigned id);
+  void commit_iteration();
   void acquire(Lockable* L);
 
 };

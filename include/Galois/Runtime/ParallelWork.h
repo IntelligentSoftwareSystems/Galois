@@ -64,8 +64,8 @@ public:
   void cancel_iteration() {
     src.cancel_iteration();
   }
-  void commit_iteration(unsigned id) {
-    src.commit_iteration(id);
+  void commit_iteration() {
+    src.commit_iteration();
   }
   void start_parallel_region() {
     setThreadContext(&src);
@@ -80,7 +80,7 @@ class SimpleRuntimeContextHandler<false> {
 public:
   void start_iteration() {}
   void cancel_iteration() {}
-  void commit_iteration(unsigned) {}
+  void commit_iteration() {}
   void start_parallel_region() {}
   void end_parallel_region() {}
 };
@@ -180,6 +180,17 @@ protected:
   void init_break(BreakImpl<false>* p) { }
 };
 
+template<bool ID_ACTIVE>
+class API_Id;
+
+template<>
+class API_Id<true> {
+  unsigned id;
+protected:
+  void init_id(unsigned _id) { id = _id; }
+  unsigned getId() { return id; }
+};
+
 //Handle Per Iter Allocator
 template<bool PIA_ACTIVE>
 class API_PerIter;
@@ -264,14 +275,13 @@ public:
   class UserAPI
     :public API_PerIter<Configurator<Function>::NeedsPIA>,
      public API_Push<Configurator<Function>::NeedsPush, WorkListTy>,
-     public API_Break<Configurator<Function>::NeedsBreak>
+     public API_Break<Configurator<Function>::NeedsBreak>,
+     public API_Id<true>
   {
     friend class ParallelThreadContext;
   };
 
-  unsigned id;
 private:
-
   UserAPI facing;
   TerminationDetection::tokenHolder* lterm;
   bool leader;
@@ -282,12 +292,12 @@ public:
   virtual ~ParallelThreadContext() {}
 
   void initialize(TerminationDetection::tokenHolder* t,
-		  unsigned _id,
+		  unsigned id,
 		  WorkListTy* wl,
 		  BreakImpl<Configurator<Function>::NeedsBreak>* p) {
     lterm = t;
-    id = _id;
-    leader = _id == 0;
+    leader = id == 0;
+    facing.init_id(id);
     facing.init_wl(wl);
     facing.init_break(p);
   }
@@ -353,7 +363,7 @@ class ForEachWork {
       doAborted(val);
       return;
     }
-    tld.commit_iteration(tld.id);
+    tld.commit_iteration();
     tld.resetAlloc();
   }
 
