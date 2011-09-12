@@ -23,7 +23,7 @@
 #ifndef GALOIS_RUNTIME_INSBAG_H
 #define GALOIS_RUNTIME_INSBAG_H
 
-#include "Galois/Runtime/mm/mem.h" 
+#include "Galois/Runtime/mem.h" 
 #include <iterator>
 
 namespace GaloisRuntime {

@@ -35,7 +35,7 @@ kind.
 
 #include <boost/utility.hpp>
 
-#include "mm/mem.h"
+#include "mem.h"
 #include "WorkListHelpers.h"
 
 #ifndef WLCOMPILECHECK

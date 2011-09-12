@@ -20,12 +20,7 @@ kind.
 #ifndef GALOIS_MEM_H
 #define GALOIS_MEM_H
 
-#include "Galois/Runtime/mm/mem.h"
-
-#include <boost/utility.hpp>
-
-extern "C" void* hoard_malloc(size_t);
-extern "C" void hoard_free(void*);
+#include "Galois/Runtime/mem.h"
 
 namespace Galois {
 
@@ -81,7 +76,7 @@ public:
 #ifdef SOLARIS
     return static_cast<Ty*>(malloc(size * sizeof(Ty)));
 #else
-    return static_cast<Ty*>(hoard_malloc(size * sizeof(Ty)));
+    return static_cast<Ty*>(malloc(size * sizeof(Ty)));
 #endif
   }
 
@@ -90,7 +85,7 @@ public:
 #ifdef SOLARIS
     free(p);
 #else
-    hoard_free(p);
+    free(p);
 #endif
   }
 
