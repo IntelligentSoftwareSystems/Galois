@@ -33,6 +33,7 @@ struct cache_line_storage {
 	    CACHE_LINE_SIZE - (sizeof(T) % CACHE_LINE_SIZE) :
 	    0 ];
   cache_line_storage() :data() {}
+  explicit cache_line_storage(const T& v) :data(v) {}
 };
 
 }
