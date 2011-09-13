@@ -24,7 +24,6 @@
 
 #include "Galois/Runtime/Threads.h"
 #include "Galois/Runtime/Support.h"
-
 #include "Galois/Runtime/SimpleLock.h"
 
 #include <semaphore.h>
@@ -115,7 +114,7 @@ public:
 class ThreadPool_pthread : public ThreadPool {
   Semaphore start; // Signal to release threads to run
   Barrier finish; // want on to block on running threads
-  std::tr1::function<void (void)> work; //Thing to execute
+  config::function<void (void)> work; //Thing to execute
   volatile bool shutdown; // Set and start threads to have them exit
   std::list<pthread_t> threads; // Set of threads
   unsigned int maxThreads;
@@ -174,7 +173,7 @@ public:
     }
   }
 
-  virtual void run(std::tr1::function<void (void)> E) {
+  virtual void run(config::function<void (void)> E) {
     work = E;
     __sync_synchronize();
     start.release(maxThreads);
