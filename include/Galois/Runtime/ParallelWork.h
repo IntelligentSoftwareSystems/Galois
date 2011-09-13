@@ -32,9 +32,10 @@
 #include <numeric>
 #include <sstream>
 #include <math.h>
+
 #include "Galois/TypeTraits.h"
 #include "Galois/Mem.h"
-
+#include "Galois/Runtime/Config.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Threads.h"
@@ -430,7 +431,7 @@ void for_each_impl(IterTy b, IterTy e, Function f, const char* loopname) {
   //ForEachWork<aWLTy, Function> GW(f, loopname);
   ThreadPool& PTP = getSystemThreadPool();
 
-  PTP.run(std::tr1::ref(GW));
+  PTP.run(config::ref(GW));
 
   runAllLoopExitHandlers();
 

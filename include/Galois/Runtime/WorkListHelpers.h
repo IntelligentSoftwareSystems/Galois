@@ -237,7 +237,7 @@ public:
   }
 };
 
-class DummyPartitioner {
+struct DummyPartitioner {
   unsigned getNum() const {
     return 1;
   }
@@ -245,12 +245,10 @@ class DummyPartitioner {
   unsigned operator()(T& item) { return 0; }
 };
 
-class DummyIndexer {
-public:
+struct DummyIndexer {
   template<typename T>
   unsigned operator()(const T& x) { return 0; }
 };
-
 
 }
 }

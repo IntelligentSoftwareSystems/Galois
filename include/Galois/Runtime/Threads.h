@@ -23,9 +23,10 @@
 #ifndef GALOIS_RUNTIME_THREADS_H
 #define GALOIS_RUNTIME_THREADS_H
 
-#include <tr1/functional>
 #include <boost/intrusive/list.hpp>
 #include <vector>
+
+#include "Galois/Runtime/Config.h"
 
 namespace GaloisRuntime {
 
@@ -37,7 +38,7 @@ protected:
 public:
   //!execute work on all threads
   //!The work object is not duplicated in any way 
-  virtual void run(std::tr1::function<void (void)> work) = 0;
+  virtual void run(config::function<void (void)> work) = 0;
   
   //!change the number of threads to num
   //!returns the number that the runtime chooses (may not be num)
