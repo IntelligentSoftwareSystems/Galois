@@ -28,6 +28,11 @@ if(SITE_NAME MATCHES "volta.*")
   set(USE_NUMA ON)
 endif()
 
+find_program(CXX_4.5 g++-4.5)
+if(NOT ${CXX_4.5} STREQUAL "CXX_4.5-NOTFOUND")
+  set(CMAKE_CXX_COMPILER ${CXX_4.5})
+endif()
+
 if(SITE_NAME MATCHES "delaunay.*")
   set(CMAKE_CXX_COMPILER /opt/csw/gcc4/bin/g++)
   set(CMAKE_CC_COMPILER /opt/csw/gcc4/bin/gcc)
@@ -88,6 +93,17 @@ if(EXISTS ${VTUNE_INCLUDE})
   set(USE_VTUNE ON)
 endif()
 
+# c++0x features
+
+# enable -std=c++0x if possible
+include(CheckCXXCompilerFlag)
+check_cxx_compiler_flag(-std=c++0x HAS_CXX0X)
+if(HAS_CXX0X)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
+endif()
+
+include(CheckCXX0xFeatures)
+
 #tbb
 find_package(TBB)
 
@@ -96,7 +112,7 @@ if(TBB_FOUND)
   include_directories(${TBB_INCLUDE_DIRS})
 else()
   # wget http://threadingbuildingblocks.org/uploads/77/173/3.0%20update%208/tbb30_20110704oss_lin.tgz
-  message("TBB not found; have your sourced TBB_INSTALL_DIR/bin/tbbvars.sh?")
+  message(STATUS "Could NOT find TBB; have your sourced TBB_INSTALL_DIR/bin/tbbvars.sh?")
 endif()
 
 #cray
