@@ -172,8 +172,7 @@ protected:
   }
 
   //! Functor for loop body
-  struct process {
-
+  struct Process {
     Graph& graph;
     std::vector<int>& inDegVec;
     MeshInit& meshInit;
@@ -183,7 +182,7 @@ protected:
     bool createSyncFiles;
     IterCounter& iter;
 
-    process (
+    Process (
         Graph& graph,
         std::vector<int>& inDegVec,
         MeshInit& meshInit,
@@ -215,7 +214,7 @@ protected:
      * @param lwl is the worklist handle
      */
     template <typename ContextTy> 
-      void operator () (const GNode& src, ContextTy& lwl) {
+      void operator () (GNode& src, ContextTy& lwl) {
         // one-shot optimization: acquire abstract locks on active node and
         // neighbors (all its neighbors, in this case) before performing any modifications
 
@@ -356,7 +355,7 @@ public:
 
     IterCounter iter(0);
 
-    process p( graph, inDegVec, meshInit, g, perIterLocalVec, aviCmp, createSyncFiles, iter);
+    Process p(graph, inDegVec, meshInit, g, perIterLocalVec, aviCmp, createSyncFiles, iter);
 
     using namespace GaloisRuntime::WorkList;
 

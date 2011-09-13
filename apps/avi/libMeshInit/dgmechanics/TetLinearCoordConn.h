@@ -89,7 +89,7 @@ class TetLinearCoordConn
       for (unsigned int e = 0; e < iElements; e++) {
         neighbors[e].resize(NUM_EDGES);
 
-        int econn[] = { connectivity[e * 4 + 0], connectivity[e * 4 + 1], connectivity[e * 4 + 2], connectivity[e * 4 + 3] };
+        long unsigned int econn[] = { connectivity[e * 4 + 0], connectivity[e * 4 + 1], connectivity[e * 4 + 2], connectivity[e * 4 + 3] };
 
         for (int edgenum = 0; edgenum < NUM_EDGES; edgenum++) {
           GlobalNodalIndex node0;
@@ -243,25 +243,25 @@ class TetLinearCoordConn
 
       for (unsigned int e = 0; e < iElements; e++) {
         // tet 1
-        int t1conn[] = { connectivity[e * eNodes + 0], midconn[e][0], midconn[e][2], midconn[e][4] };
+        long unsigned int t1conn[] = { connectivity[e * eNodes + 0], midconn[e][0], midconn[e][2], midconn[e][4] };
         for (int i = 0; i < eNodes; i++) {
           newConn.push_back(t1conn[i]);
         }
 
         // tet 2
-        int t2conn[] = { midconn[e][0], connectivity[e * eNodes + 1], midconn[e][1], midconn[e][5] };
+        long unsigned int t2conn[] = { midconn[e][0], connectivity[e * eNodes + 1], midconn[e][1], midconn[e][5] };
         for (int i = 0; i < eNodes; i++) {
           newConn.push_back(t2conn[i]);
         }
 
         // tet3
-        int t3conn[] = { midconn[e][2], midconn[e][1], connectivity[e * eNodes + 2], midconn[e][3] };
+        long unsigned int t3conn[] = { midconn[e][2], midconn[e][1], connectivity[e * eNodes + 2], midconn[e][3] };
         for (int i = 0; i < eNodes; i++) {
           newConn.push_back(t3conn[i]);
         }
 
         // tet4
-        int t4conn[] = { midconn[e][4], midconn[e][5], midconn[e][3], connectivity[e * eNodes + 3] };
+        long unsigned int t4conn[] = { midconn[e][4], midconn[e][5], midconn[e][3], connectivity[e * eNodes + 3] };
 
         for (int i = 0; i < eNodes; i++) {
           newConn.push_back(t4conn[i]);

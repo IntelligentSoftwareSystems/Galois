@@ -102,7 +102,6 @@ class SimpleOrderedByIntegerMetric : private boost::noncopyable, private PaddedL
   }
 };
 
-
 template<class Indexer, typename ContainerTy = GaloisRuntime::WorkList::ChunkedLIFO<16>, typename T = int, bool concurrent = true >
 class CTOrderedByIntegerMetric : private boost::noncopyable {
 

@@ -20,6 +20,9 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
+//#include <algorithm>
+#include <iostream>
+
 #include "Galois/Statistic.h"
 #include "Galois/Galois.h"
 #include "Galois/Bag.h"
@@ -27,12 +30,6 @@
 #include "Galois/Graphs/FileGraph.h"
 #include "Lonestar/Banner.h"
 #include "Lonestar/CommandLine.h"
-
-#include <limits>
-#include <algorithm>
-#include <limits>
-#include <set>
-#include <iostream>
 
 namespace {
 
@@ -214,8 +211,7 @@ void reduceCapacity(const GNode& src, const GNode& dst, int amount) {
 
 template<Galois::MethodFlag flag, bool useCAS = false>
 struct UpdateHeights {
-  //typedef int tt_does_not_need_stats;
-//#define CAS
+  typedef int tt_does_not_need_stats;
   /**
    * Do reverse BFS on residual graph.
    */
@@ -281,19 +277,24 @@ struct FindWork {
 
 template<Galois::MethodFlag flag, typename IncomingWL>
 void globalRelabel(IncomingWL& incoming) {
+  Galois::StatTimer T1("ASDF");
+  T1.start();
   typedef GaloisRuntime::WorkList::dChunkedLIFO<1024> SimpleScheduler;
   Galois::for_each<SimpleScheduler>(app.graph.active_begin(),
       app.graph.active_end(),
       ResetHeights());
+  T1.stop();
 
   Galois::StatTimer T("BfsTime");
   T.start();
-  typedef GaloisRuntime::WorkList::dChunkedFIFO<1024> WL;
+  typedef GaloisRuntime::WorkList::dChunkedFIFO<16> WL;
   std::vector<GNode> single;
   single.push_back(app.sink);
   Galois::for_each<WL>(single.begin(), single.end(), UpdateHeights<flag>());
   T.stop();
 
+  Galois::StatTimer T2("FF");
+  T2.start();
   typedef Galois::InsertBag<GNode> NewWorkTy;
   NewWorkTy new_work;
   Galois::for_each<SimpleScheduler>(app.graph.active_begin(),
@@ -303,24 +304,24 @@ void globalRelabel(IncomingWL& incoming) {
       it != end; ++it) {
     incoming.push_back(*it);
   }
+  T2.stop();
 }
 
-template<Galois::MethodFlag flag>
-struct Process  {
+struct Process {
   typedef int tt_needs_parallel_break;
   int counter;
 
   Process() : counter(0) { }
 
   template<typename Context>
-  void operator()(const GNode& src, Context& ctx) {
+  void operator()(GNode& src, Context& ctx) {
     int increment = 1;
     if (discharge<Context>(src, ctx)) {
       increment += BETA;
     }
 
     counter += increment;
-    if (counter >= app.global_relabel_interval) {
+    if (app.global_relabel_interval && counter >= app.global_relabel_interval) {
       app.should_global_relabel = true;
       ctx.breakLoop();
       return;
@@ -329,7 +330,7 @@ struct Process  {
 
   template<typename Context>
   bool discharge(const GNode& src, Context& ctx) {
-    Node& node = src.getData(flag);
+    Node& node = src.getData(Galois::CHECK_CONFLICT);
     int prevHeight = node.height;
     bool relabeled = false;
 
@@ -339,7 +340,7 @@ struct Process  {
 
     while (true) {
       Galois::MethodFlag f =
-        relabeled ? Galois::NONE : flag;
+        relabeled ? Galois::NONE : Galois::CHECK_CONFLICT;
       bool finished = false;
       int current = 0;
 
@@ -494,9 +495,15 @@ void initializePreflow(C& initial) {
   }
 }
 
-template<Galois::MethodFlag flag>
+struct Indexer :std::binary_function<GNode, int, int> {
+  int operator()(GNode n) const {
+    return (-app.graph.getData(n, Galois::NONE).height) >> 2;
+  }
+};
+
 void run() {
-  typedef GaloisRuntime::WorkList::dChunkedFIFO<256> Chunk;
+  typedef GaloisRuntime::WorkList::dChunkedFIFO<16> Chunk;
+  typedef GaloisRuntime::WorkList::OrderedByIntegerMetric<Indexer,Chunk> OBIM;
 
   std::vector<GNode> initial;
   initializePreflow(initial);
@@ -504,14 +511,14 @@ void run() {
   while (!initial.empty()) {
     Galois::StatTimer T_discharge("DischargeTime");
     T_discharge.start();
-    Galois::for_each<Chunk>(initial.begin(), initial.end(), Process<flag>());
+    Galois::for_each(initial.begin(), initial.end(), Process());
     T_discharge.stop();
 
     if (app.should_global_relabel) {
       Galois::StatTimer T_global_relabel("GlobalRelabelTime");
       T_global_relabel.start();
       initial.clear();
-      globalRelabel<flag>(initial);
+      globalRelabel<Galois::CHECK_CONFLICT>(initial);
       app.should_global_relabel = false;
       std::cout 
         << " Flow after global relabel: "
@@ -567,12 +574,7 @@ int main(int argc, const char** argv) {
 
   Galois::StatTimer T;
   T.start();
-  if (serial) {
-    assert(numThreads == 1);
-    run<Galois::NONE>();
-  } else {
-    run<Galois::CHECK_CONFLICT>();
-  }
+  run();
   T.stop();
 
   std::cout << "Flow is " << app.sink.getData().excess << "\n";

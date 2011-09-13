@@ -231,7 +231,13 @@ public:
 
       // Find the smallest bucket (over all processes) that has vertices
       // that need to be processed.
-      current_bucket = sync.reduce(id, current_bucket, std::min<BucketIndex>);
+      
+      // ddn: Cast is sometimes needed because some versions of gcc have
+      // problems with templates:
+      //  http://stackoverflow.com/questions/2861497/c-boost-function-overloaded-template
+      typedef const BucketIndex& (*MinFn)(const BucketIndex&, const BucketIndex&);
+      current_bucket = sync.reduce(id, current_bucket,
+          static_cast<MinFn>(&std::min<BucketIndex>));
 
       if (current_bucket == max_bucket)
         // There are no non-empty buckets in any process; exit. 
