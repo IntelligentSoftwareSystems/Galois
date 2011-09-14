@@ -46,7 +46,7 @@ void TerminationDetection::localTermination() {
   //  }
   //  std::cerr << "\n";
   if (th.hasToken) {
-    if (ThreadPool::getMyID() == 1) {
+    if (data.myEffectiveID() == 0) {
       //master
       if (th.tokenIsBlack || th.processIsBlack) {
 	//failed circulation

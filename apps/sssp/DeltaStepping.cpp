@@ -39,6 +39,7 @@
 #include <iostream>
 #include <list>
 #include <vector>
+#include <algorithm>
 
 //#define _DEBUG
 

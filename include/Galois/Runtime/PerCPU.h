@@ -25,6 +25,7 @@ kind.
 
 #include <boost/utility.hpp>
 #include <cassert>
+//#include <iostream>
 
 namespace GaloisRuntime {
 
@@ -36,10 +37,7 @@ protected:
   unsigned int num;
 
   int myID() const {
-    int i = ThreadPool::getMyID();
-    if (i)
-      --i;
-    return i;
+    return ThreadPool::getMyID();
   }
 
   void create(int n) {
@@ -120,7 +118,9 @@ public:
   }
 
   T& getNext() {
-    return get((myID() + 1) % getSystemThreadPool().getActiveThreads());
+    int n = (myID() + 1) % getSystemThreadPool().getActiveThreads();
+    //std::cerr << myID() << " " << n << "\n";
+    return get(n);
   }
 
   const T& getNext() const {

@@ -21,19 +21,24 @@
 #ifndef GALOIS_GALOIS_H
 #define GALOIS_GALOIS_H
 
-#include "Galois/Runtime/ParallelWork.h"
+
+//! It is the intention of this file to be the only file user applications
+//! need to include for full galois functionality
 
 #include "Galois/Threads.h"
+#include "Galois/UserContext.h"
+
+#include "Galois/Runtime/ParallelWork.h"
 
 namespace Galois {
 
 template<typename WLTy, typename IterTy, typename Function>
-void for_each(IterTy b, IterTy e, Function f, const char* loopname = 0) {
+static inline void for_each(IterTy b, IterTy e, Function f, const char* loopname = 0) {
   GaloisRuntime::for_each_impl<WLTy>(b, e, f, loopname);
 }
 
 template<typename IterTy, typename Function>
-void for_each(IterTy b, IterTy e, Function f, const char* loopname = 0) {
+static inline void for_each(IterTy b, IterTy e, Function f, const char* loopname = 0) {
   typedef GaloisRuntime::WorkList::ChunkedFIFO<256> WLTy;
   for_each<WLTy, IterTy, Function>(b, e, f, loopname);
 }

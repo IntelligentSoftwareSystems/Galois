@@ -29,10 +29,10 @@ typedef GaloisRuntime::MM::SimpleBumpPtr<GaloisRuntime::MM::FreeListHeap<GaloisR
 typedef GaloisRuntime::MM::ExternRefGaloisAllocator<char, ItAllocBaseTy> PerIterAllocTy;
 
 template<typename Ty>
-class Allocator;
+class GAllocator;
 
 template<>
-class Allocator<void> {
+class GAllocator<void> {
 public:
   typedef size_t size_type;
   typedef ptrdiff_t difference_type;
@@ -41,11 +41,11 @@ public:
   typedef void value_type;
 
   template<typename Other>
-  struct rebind { typedef Allocator<Other> other; };
+  struct rebind { typedef GAllocator<Other> other; };
 };
 
 template<typename Ty>
-class Allocator {
+class GAllocator {
   inline void destruct(char*) {}
   inline void destruct(wchar_t*) { }
   template<typename T> inline void destruct(T* t) { t->~T(); }
@@ -60,12 +60,12 @@ public:
   typedef Ty value_type;
 
   template<class Other>
-  struct rebind { typedef Allocator<Other> other; };
+  struct rebind { typedef GAllocator<Other> other; };
 
-  Allocator() throw() { }
-  Allocator(const Allocator&) throw() { }
-  template <class U> Allocator(const Allocator<U>&) throw() { }
-  ~Allocator() { }
+  GAllocator() throw() { }
+  GAllocator(const GAllocator&) throw() { }
+  template <class U> GAllocator(const GAllocator<U>&) throw() { }
+  ~GAllocator() { }
 
   pointer address(reference val) const { return &val; }
   const_pointer address(const_reference val) const { return &val; }
@@ -73,20 +73,12 @@ public:
   pointer allocate(size_type size) {
     if (size > max_size())
       throw std::bad_alloc();
-#ifdef SOLARIS
     return static_cast<Ty*>(malloc(size * sizeof(Ty)));
-#else
-    return static_cast<Ty*>(malloc(size * sizeof(Ty)));
-#endif
   }
 
   void deallocate(pointer p, size_type) {
     //::operator delete(p);
-#ifdef SOLARIS
     free(p);
-#else
-    free(p);
-#endif
   }
 
   size_type max_size() const throw() { 
@@ -103,12 +95,12 @@ public:
 };
 
 template<typename T1, typename T2>
-inline bool operator==(const Allocator<T1>&, const Allocator<T2>&) throw() {
+inline bool operator==(const GAllocator<T1>&, const GAllocator<T2>&) throw() {
   return true;
 }
 
 template<typename T1, typename T2>
-inline bool operator!=(const Allocator<T1>&, const Allocator<T2>&) throw() {
+inline bool operator!=(const GAllocator<T1>&, const GAllocator<T2>&) throw() {
   return false;
 }
 }

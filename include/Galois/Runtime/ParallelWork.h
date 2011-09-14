@@ -45,57 +45,13 @@
 #include "Galois/Runtime/Termination.h"
 #include "Galois/Runtime/LoopHooks.h"
 
-#ifdef GALOIS_VTUNE
-#include "ittnotify.h"
-#endif
-
 namespace GaloisRuntime {
 
-//Handle Runtime Conflict Detection
-template<bool SRC_ACTIVE>
-class SimpleRuntimeContextHandler;
-
-template<>
-class SimpleRuntimeContextHandler<true> {
-  SimpleRuntimeContext src;
-public:
-  void start_iteration() {
-    src.start_iteration();
-  }
-  void cancel_iteration() {
-    src.cancel_iteration();
-  }
-  void commit_iteration() {
-    src.commit_iteration();
-  }
-  void start_parallel_region() {
-    setThreadContext(&src);
-  }
-  void end_parallel_region() {
-    setThreadContext(0);
-  }
-};
-
-template<>
-class SimpleRuntimeContextHandler<false> {
-public:
-  void start_iteration() {}
-  void cancel_iteration() {}
-  void commit_iteration() {}
-  void start_parallel_region() {}
-  void end_parallel_region() {}
-};
-
-//Handle Statistic gathering
-template<bool STAT_ACTIVE>
-class StatisticHandler;
-
-template<>
-class StatisticHandler<true> {
+class LoopStatistics {
   unsigned long conflicts;
   unsigned long iterations;
 public:
-  StatisticHandler() :conflicts(0), iterations(0) {}
+  LoopStatistics() :conflicts(0), iterations(0) {}
   void inc_iterations() {
     ++iterations;
   }
@@ -108,152 +64,7 @@ public:
     reportStatAvg("ConflictsDistribution", conflicts, loopname);
     reportStatAvg("IterationsDistribution", iterations, loopname);
   }
-  void done() {
-    GaloisRuntime::statDone();
-  }
-  int num() {
-    return GaloisRuntime::getSystemThreadPool().getActiveThreads();
-  }
 };
-
-template<>
-class StatisticHandler<false> {
-public:
-  inline void inc_iterations() const {}
-  inline void inc_conflicts() const {}
-  inline void report_stat(const char*) const {}
-  inline void done() const {}
-  inline int num() const { return 0; }
-};
-
-
-//Handle Parallel Break
-template<bool BREAK_ACTIVE>
-class API_Break;
-template<bool BREAK_ACTIVE>
-class BreakImpl;
-
-template<>
-class BreakImpl<true> {
-  volatile bool break_;
-public:
-  BreakImpl() : break_(false) {}
-
-  void handleBreak() {
-    break_ = true;
-  }
-
-  template<typename WLTy>
-  void check(WLTy* wl) {
-    typedef typename WLTy::value_type value_type;
-    if (break_) {
-      while (true) {
-        std::pair<bool, value_type> p = wl->pop();
-        if (!p.first)
-          break;
-      }
-    }
-  }
-};
-
-template<>
-class BreakImpl<false> {
-public:
-  template<typename WLTy>
-  void check(WLTy*) {}
-};
-
-template<>
-class API_Break<true> {
-  BreakImpl<true>* p_;
-protected:
-  void init_break(BreakImpl<true>* p) {
-    p_ = p;
-  }
-public:
-  void breakLoop() {
-    p_->handleBreak();
-  }
-};
-template<>
-class API_Break<false> {
-protected:
-  void init_break(BreakImpl<false>* p) { }
-};
-
-template<bool ID_ACTIVE>
-class API_Id;
-
-template<>
-class API_Id<true> {
-  unsigned id;
-protected:
-  void init_id(unsigned _id) { id = _id; }
-  unsigned getId() { return id; }
-};
-
-//Handle Per Iter Allocator
-template<bool PIA_ACTIVE>
-class API_PerIter;
-
-template<>
-class API_PerIter<true>
-{
-  Galois::ItAllocBaseTy IterationAllocatorBase;
-  Galois::PerIterAllocTy PerIterationAllocator;
-
-protected:
-  void __resetAlloc() {
-    IterationAllocatorBase.clear();
-  }
-
-public:
-  API_PerIter()
-    :IterationAllocatorBase(), 
-     PerIterationAllocator(&IterationAllocatorBase)
-  {}
-
-  virtual ~API_PerIter() {
-    IterationAllocatorBase.clear();
-  }
-
-  Galois::PerIterAllocTy& getPerIterAlloc() {
-    return PerIterationAllocator;
-  }
-};
-
-template<>
-class API_PerIter<false>
-{
-protected:
-  void __resetAlloc() {}
-};
-
-
-//Handle Parallel Push
-template<bool PUSH_ACTIVE, typename WLT>
-class API_Push;
-
-template<typename WLT>
-class API_Push<true, WLT> {
-  typedef typename WLT::value_type value_type;
-  WLT* wl;
-protected:
-  void init_wl(WLT* _wl) {
-    wl = _wl;
-  }
-public:
-  void push(const value_type& v) {
-    wl->push(v);
-  }
-};
-
-template<typename WLT>
-class API_Push<false, WLT> {
-protected:
-  void init_wl(WLT* _wl) {}
-};
-
 
 template<typename Function>
 struct Configurator {
@@ -266,106 +77,63 @@ struct Configurator {
   };
 };
 
-template<typename Function, class WorkListTy>
-class ParallelThreadContext
-  : public SimpleRuntimeContextHandler<Configurator<Function>::NeedsContext>,
-    public StatisticHandler<Configurator<Function>::CollectStats>
-{
-  typedef typename WorkListTy::value_type value_type;
-public:
-  class UserAPI
-    :public API_PerIter<Configurator<Function>::NeedsPIA>,
-     public API_Push<Configurator<Function>::NeedsPush, WorkListTy>,
-     public API_Break<Configurator<Function>::NeedsBreak>,
-     public API_Id<true>
-  {
-    friend class ParallelThreadContext;
-  };
-
-private:
-  UserAPI facing;
-  TerminationDetection::tokenHolder* lterm;
-  bool leader;
-
-public:
-  ParallelThreadContext() {}
-  
-  virtual ~ParallelThreadContext() {}
-
-  void initialize(TerminationDetection::tokenHolder* t,
-		  unsigned id,
-		  WorkListTy* wl,
-		  BreakImpl<Configurator<Function>::NeedsBreak>* p) {
-    lterm = t;
-    leader = id == 0;
-    facing.init_id(id);
-    facing.init_wl(wl);
-    facing.init_break(p);
-  }
-
-  void workHappened() {
-    lterm->workHappened();
-  }
-
-  bool is_leader() const {
-    return leader;
-  }
-
-  UserAPI& userFacing() {
-    return facing;
-  }
-
-  void resetAlloc() {
-    facing.__resetAlloc();
-  }
-};
-
 template<class WorkListTy, class Function>
 class ForEachWork {
   typedef typename WorkListTy::value_type value_type;
-  typedef GaloisRuntime::WorkList::MP_SC_FIFO<value_type> AbortedListTy;
-  typedef ParallelThreadContext<Function, WorkListTy> PCTy;
+  typedef GaloisRuntime::WorkList::FIFO<value_type, true> AbortedListTy;
   
+  struct tldTy {
+    Galois::UserContext<value_type> facing;
+    SimpleRuntimeContext cnx;
+    LoopStatistics stat;
+    TerminationDetection::tokenHolder* lterm;
+  };
+
   WorkListTy global_wl;
-  BreakImpl<Configurator<Function>::NeedsBreak> breaker;
   Function& f;
   const char* loopname;
 
-  PerCPU<PCTy> tdata;
+  PerCPU<tldTy> tdata;
   TerminationDetection term;
   AbortedListTy aborted;
   volatile long abort_happened; //hit flag
-
-  bool drainAborted() {
-    bool retval = false;
-    abort_happened = 0;
-    std::pair<bool, value_type> p = aborted.pop();
-    while (p.first) {
-      retval = true;
-      global_wl.push(p.second);
-      p = aborted.pop();
-    }
-    return retval;
-  }
 
   void doAborted(value_type val) {
     aborted.push(val);
     abort_happened = 1;
   }
 
-  void doProcess(value_type val, PCTy& tld) {
-    tld.inc_iterations();
-    tld.start_iteration();
+  void doProcess(value_type val, tldTy& tld) {
+    tld.stat.inc_iterations();
+    tld.cnx.start_iteration();
     try {
-      f(val, tld.userFacing());
+      f(val, tld.facing);
     } catch (int a) {
-      tld.cancel_iteration();
-      tld.inc_conflicts();
+      tld.cnx.cancel_iteration();
+      tld.stat.inc_conflicts();
       doAborted(val);
       return;
     }
-    tld.commit_iteration();
-    tld.resetAlloc();
+    tld.cnx.commit_iteration();
+    global_wl.push(tld.facing.__getPushBuffer().begin(), tld.facing.__getPushBuffer().end());
+    tld.facing.__getPushBuffer().clear();
+    tld.facing.__resetAlloc();
+  }
+
+  void drainAborted(tldTy& tld) {
+    tld.lterm->workHappened();
+    abort_happened = 0;
+    std::pair<bool, value_type> p = aborted.pop();
+    while (p.first) {
+      doProcess(p.second, tld);
+      p = aborted.pop();
+    }
+  }
+
+  void drainWL() {
+    std::pair<bool, value_type> p = global_wl.pop();
+    while (p.first)
+      p = global_wl.pop();
   }
 
 public:
@@ -374,70 +142,106 @@ public:
     :f(_f), loopname(_loopname), abort_happened(0) {
     global_wl.fill_initial(b, e);
   }
-
-  ~ForEachWork() {
-    for (int i = 0; i < tdata.get(0).num(); ++i)
-      tdata.get(i).report_stat(loopname);
-    tdata.get(0).done();
+  ForEachWork(Function& _f, const char* _loopname)
+    :f(_f), loopname(_loopname), abort_happened(0) {
   }
 
-  void operator()() {
-    PCTy& tld = tdata.get();
-    tld.initialize(term.getLocalTokenHolder(), 
-		   tdata.myEffectiveID(),
-		   &global_wl,
-		   &breaker);
+  ~ForEachWork() {
+    for (unsigned int i = 0; i < GaloisRuntime::getSystemThreadPool().getActiveThreads(); ++i)
+      tdata.get(i).stat.report_stat(loopname);
+    GaloisRuntime::statDone();
+  }
 
-    tld.start_parallel_region();
+  template<typename IT>
+  void AddInitialWork(IT& b, IT& e) {
+    global_wl.push(b,e);
+  }
+
+  //FIXME: Add back in function based typetrait specialization
+  template<bool isLeader>
+  void go() {
+    tldTy& tld = tdata.get();
+    setThreadContext(&tld.cnx);
+    tld.lterm = term.getLocalTokenHolder();
+
     do {
       std::pair<bool, value_type> p = global_wl.pop();
-      if (p.first) {
-        tld.workHappened();
+      if (p.first)
+        tld.lterm->workHappened();
+      while (p.first) {
         doProcess(p.second, tld);
-        do {
-          if (tld.is_leader() && abort_happened) {
-            drainAborted();
-          }
-          breaker.check(&global_wl);
-          p = global_wl.pop();
-          if (p.first) {
-            doProcess(p.second, tld);
-          } else {
-            break;
-          }
-        } while(true);
+	if (isLeader && abort_happened)
+	  drainAborted(tld);
+	if (tld.facing.__breakHappened())
+	  drainWL();
+	p = global_wl.pop();
       }
-      if (tld.is_leader() && drainAborted())
-        continue;
 
-      breaker.check(&global_wl);
+      if (isLeader && abort_happened) {
+	drainAborted(tld);
+        continue;
+      }
 
       term.localTermination();
     } while (!term.globalTermination());
+    setThreadContext(0);
+  }
 
-    tld.end_parallel_region();
+  void operator()() {
+    if (tdata.myEffectiveID() == 0)
+      go<true>();
+    else
+      go<false>();
+  }
+};
+
+template<typename T1, typename T2>
+class FillWork {
+  public:
+  T1 b;
+  T1 e;
+  T2& g;
+  int num;
+  int a;
+  FillWork(T1& _b, T1& _e, T2& _g) :b(_b), e(_e), g(_g) {
+    a = getSystemThreadPool().getActiveThreads();
+    num = std::distance(b,e) / a;
+  }
+  void operator()(void) {
+    int id = ThreadPool::getMyID();
+    T1 b2 = b;
+    std::advance(b2, num * id);
+    T1 e2 = b;
+    if (id == (a - 1))
+      e2 = e;
+    else
+      std::advance(e2, num * (id + 1));
+    g.AddInitialWork(b2,e2);
   }
 };
 
 template<typename WLTy, typename IterTy, typename Function>
 void for_each_impl(IterTy b, IterTy e, Function f, const char* loopname) {
-#ifdef GALOIS_VTUNE
-  __itt_resume();
-#endif
 
   typedef typename WLTy::template retype<typename std::iterator_traits<IterTy>::value_type>::WL aWLTy;
 
-  ForEachWork<aWLTy, Function> GW(b, e, f, loopname);
+  ForEachWork<aWLTy, Function> GW(f, loopname);
   //ForEachWork<aWLTy, Function> GW(f, loopname);
-  ThreadPool& PTP = getSystemThreadPool();
 
-  PTP.run(config::ref(GW));
+  FillWork<IterTy, ForEachWork<aWLTy, Function> > fw2(b,e,GW);
 
-  runAllLoopExitHandlers();
+  runCMD w[3];
+  w[0].work = config::ref(fw2);
+  w[0].isParallel = true;
+  w[0].barrierAfter = false;
+  w[1].work = config::ref(GW);
+  w[1].isParallel = true;
+  w[1].barrierAfter = true;
+  w[2].work = &runAllLoopExitHandlers;
+  w[2].isParallel = false;
+  w[2].barrierAfter = true;
 
-#ifdef GALOIS_VTUNE
-  __itt_pause();
-#endif
+  getSystemThreadPool().run(&w[0], &w[3]);
 }
 
 }

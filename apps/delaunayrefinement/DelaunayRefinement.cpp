@@ -123,7 +123,10 @@ int main(int argc, const char** argv) {
   Galois::StatTimer T;
   T.start();
   using namespace GaloisRuntime::WorkList;
-  Galois::for_each<LocalQueues<ChunkedLIFO<1024>, LIFO<> > >(wl.begin(), wl.end(), process());
+  //Galois::for_each<LocalQueues<ChunkedLIFO<1024>, LIFO<> > >(wl.begin(), wl.end(), process());
+  //Galois::for_each<LocalQueues<InitialIterator<std::vector<GNode>::iterator>, LIFO<> > >(wl.begin(), wl.end(), process());
+  //Galois::for_each<LocalQueues<InitialIterator<GNode*>, LIFO<> > >(&wl[0], &wl[wl.size()], process());
+  Galois::for_each<dChunkedLIFO<1024> >(wl.begin(), wl.end(), process());
   T.stop();
   
   if (!skipVerify) {

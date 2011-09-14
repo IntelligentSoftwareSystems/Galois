@@ -109,8 +109,9 @@ public:
     return wl.push(val);
   }
 
-  bool aborted(value_type val) {
-    return wl.push(val);
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    return wl.push(b,e);
   }
 
   std::pair<bool, value_type> pop() {
@@ -136,15 +137,6 @@ public:
     }
     return ret;
   }
-
-  std::pair<bool, value_type> try_pop() {
-    return pop();
-  }
-
-  template<typename iter>
-  void fill_initial(iter begin, iter end) {
-    return wl.fill_initial(begin, end);
-  }
 };
 
 template<typename iWL>
@@ -168,21 +160,13 @@ public:
     return wl.push(val);
   }
 
-  bool aborted(value_type val) __attribute__((noinline)) {
-    return wl.push(val);
+  template<typename Iter>
+  __attribute__((noinline)) bool push(Iter b, Iter e) {
+    return wl.push(b,e);
   }
 
   std::pair<bool, value_type> pop() __attribute__((noinline)) {
     return wl.pop();
-  }
-
-  std::pair<bool, value_type> try_pop() __attribute__((noinline)) {
-    return wl.try_pop();
-  }
-
-  template<typename iter>
-  void fill_initial(iter begin, iter end) {
-    return wl.fill_initial(begin, end);
   }
 };
 

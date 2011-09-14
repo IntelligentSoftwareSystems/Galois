@@ -42,7 +42,7 @@ class SimpleRuntimeContext {
   Lockable* locks;
 
 public:
-  SimpleRuntimeContext(): locks(0) { }
+  SimpleRuntimeContext() :locks(0) {}
 
   void start_iteration() {
     assert(!locks);
@@ -60,9 +60,28 @@ SimpleRuntimeContext* getThreadContext();
 //! used by the parallel code to set up conflict detection per thread
 void setThreadContext(SimpleRuntimeContext* n);
 
+//! Helper function to decide if the conflict detection lock should be taken
+static inline bool shouldLock(Galois::MethodFlag g) {
+  switch(g) {
+  case Galois::NONE:
+  case Galois::SAVE_UNDO:
+    return false;
+  case Galois::ALL:
+  case Galois::CHECK_CONFLICT:
+    return true;
+  }
+  assert(0 && "Shouldn't get here");
+  abort();
+}
+
+void doAcquire(Lockable* C);
+
 //! Master function which handles conflict detection
 //! used to acquire a lockable thing
-void acquire(Lockable* C, Galois::MethodFlag m);
+static inline void acquire(Lockable* C, Galois::MethodFlag m) {
+  if (shouldLock(m))
+    doAcquire(C);
+}
 
 }
 

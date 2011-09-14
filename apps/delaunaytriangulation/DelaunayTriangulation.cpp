@@ -298,7 +298,7 @@ int main(int argc, const char** argv) {
   Galois::setMaxThreads(numThreads);
   Galois::StatTimer T;
   T.start();
-  Galois::for_each<GaloisRuntime::WorkList::dChunkedFIFO<1024> >(wl.begin(), wl.end(), process());
+  Galois::for_each<GaloisRuntime::WorkList::dChunkedFIFO<32> >(wl.begin(), wl.end(), process());
   T.stop();
   std::cout << "mesh size: " << Mesh->size() << "\n";
 

@@ -30,7 +30,7 @@
 #include "Galois/Galois.h"
 #include "MetisNode.h"
 #include "Galois/Timer.h"
-#include "Galois/Runtime/mm/mem.h"
+#include "Galois/Runtime/mem.h"
 #include <stdlib.h>
 #include "ArraySet.h"
 typedef int METISINT;

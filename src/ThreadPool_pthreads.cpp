@@ -39,6 +39,10 @@
 #include <cassert>
 #include <limits>
 
+#ifdef GALOIS_VTUNE
+#include "ittnotify.h"
+#endif
+
 using namespace GaloisRuntime;
 
 //! Generic check for pthread functions
@@ -114,45 +118,56 @@ public:
 class ThreadPool_pthread : public ThreadPool {
   Semaphore start; // Signal to release threads to run
   Barrier finish; // want on to block on running threads
-  config::function<void (void)> work; //Thing to execute
-  volatile bool shutdown; // Set and start threads to have them exit
   std::list<pthread_t> threads; // Set of threads
   unsigned int maxThreads;
   unsigned int nextThread;
+  volatile bool shutdown; // Set and start threads to have them exit
+  volatile runCMD* workBegin; //Begin iterator for work commands
+  volatile runCMD* workEnd; //End iterator for work commands
 
-  void launch(void) {
+  void initThread() {
     unsigned int id = LocalThreadID = __sync_fetch_and_add(&nextThread, 1);
-    GaloisRuntime::getSystemThreadPolicy().bindThreadToProcessor(id - 1);
+    GaloisRuntime::getSystemThreadPolicy().bindThreadToProcessor(id);
+  }
 
-    while (true) {
-      start.acquire();
-      //std::cerr << "starting " << id << "\n";
-      if (work && id <= activeThreads) {
-	//std::cerr << "using " << id << "\n";
-	work();
+  void doWork(void) {
+    start.acquire();
+    runCMD* workPtr = (runCMD*)workBegin;
+    runCMD* workEndL = (runCMD*)workEnd;
+    while (workPtr != workEndL) {
+      if (LocalThreadID < activeThreads) {
+	if (workPtr->isParallel)
+	  workPtr->work();
+	else if (LocalThreadID == 0)
+	  workPtr->work();
       }
-      if(shutdown)
-	break;
-      finish.wait();
+      if (workPtr->barrierAfter)
+	finish.wait();
+      ++workPtr;
     }
   }
 
+  void launch(void) {
+    while (!shutdown) doWork();
+  }
+
   static void* slaunch(void* V) {
-    ((ThreadPool_pthread*)V)->launch();
+    ThreadPool_pthread* TP = (ThreadPool_pthread*)V;
+    TP->initThread();
+    TP->launch();
     return 0;
   }
   
 public:
-  ThreadPool_pthread() 
-    :start(0), work(0), shutdown(false), maxThreads(0), nextThread(1)
+  ThreadPool_pthread()
+    :start(0), maxThreads(0), nextThread(0), shutdown(false), workBegin(0), workEnd(0)
   {
-    LocalThreadID = 0;
+    initThread();
     ThreadPool::activeThreads = 1;
     unsigned int num = GaloisRuntime::getSystemThreadPolicy().getNumThreads();
-    finish.reinit(num + 1);
-    while (num) {
-      ++maxThreads;
-      --num;
+    finish.reinit(num);
+    maxThreads = num;
+    for (unsigned i = 1; i < num; ++i) {
       pthread_t t;
       int rc = pthread_create(&t, 0, &slaunch, this);
       checkResults(rc);
@@ -162,7 +177,7 @@ public:
 
   ~ThreadPool_pthread() {
     shutdown = true;
-    work = 0;
+    workBegin = workEnd = 0;
     __sync_synchronize();
     start.release(threads.size());
     while(!threads.empty()) {
@@ -173,12 +188,25 @@ public:
     }
   }
 
-  virtual void run(config::function<void (void)> E) {
-    work = E;
+  virtual void run(runCMD* begin, runCMD* end) {
+#ifdef GALOIS_VTUNE
+    __itt_resume();
+#endif
+    
+    workBegin = begin;
+    workEnd = end;
     __sync_synchronize();
+    //start all threads
     start.release(maxThreads);
-    finish.wait();
-    work = 0;
+    //Do master thread work
+    doWork();
+    //clean up
+    workBegin = workEnd = 0;
+
+#ifdef GALOIS_VTUNE
+    __itt_pause();
+#endif
+    
   }
 
   virtual unsigned int setActiveThreads(unsigned int num) {
@@ -207,7 +235,9 @@ ThreadPool& GaloisRuntime::getSystemThreadPool() {
 
 //FIXME: May need to factor this out to initialize all objects in the correct order
 struct Init {
-  Init() { getSystemThreadPool(); }
+  Init() { 
+    getSystemThreadPool();
+  }
 };
 
 static Init iii;

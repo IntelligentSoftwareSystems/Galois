@@ -21,7 +21,7 @@ kind.
 #include "Galois/Runtime/Context.h"
 
 //! Global thread context for each active thread
-static __thread GaloisRuntime::SimpleRuntimeContext* thread_cnx;
+static __thread GaloisRuntime::SimpleRuntimeContext* thread_cnx = 0;
 
 //! Helper function to decide if the conflict detection lock should be taken
 static inline bool shouldLock(Galois::MethodFlag g) {
@@ -48,12 +48,10 @@ GaloisRuntime::SimpleRuntimeContext* GaloisRuntime::getThreadContext()
   return thread_cnx;
 }
 
-void GaloisRuntime::acquire(GaloisRuntime::Lockable* C, Galois::MethodFlag m) {
-  if (shouldLock(m)) {
-    SimpleRuntimeContext* cnx = getThreadContext();
-    if (cnx)
-      cnx->acquire(C);
-  }
+void GaloisRuntime::doAcquire(GaloisRuntime::Lockable* C) {
+  SimpleRuntimeContext* cnx = getThreadContext();
+  if (cnx)
+    cnx->acquire(C);
 }
 
 void GaloisRuntime::SimpleRuntimeContext::cancel_iteration() {

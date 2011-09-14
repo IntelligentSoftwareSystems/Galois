@@ -74,14 +74,14 @@ public:
 
   //! push a value onto the queue
   bool push(value_type val);
+
+  //! push a range onto the queue
+  template<typename Iter>
+  bool push(Iter b, Iter e);
+
   //! pop a value from the queue.
   std::pair<bool, value_type> pop();
   
-  //! called in sequential mode to seed the worklist
-  template<typename iter>
-  void fill_initial(iter begin, iter end);
-
-
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -117,6 +117,15 @@ public:
     return true;
   }
 
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    lock();
+    while (b != e)
+      wl.push(*b++);
+    unlock();
+    return true;
+  }
+
   std::pair<bool, value_type> pop() {
     lock();
     if (wl.empty()) {
@@ -127,14 +136,6 @@ public:
       wl.pop();
       unlock();
       return std::make_pair(true, retval);
-    }
-  }
-   
-  //Not Thread Safe
-  template<typename Iter>
-  void fill_initial(Iter ii, Iter ee) {
-    while (ii != ee) {
-      wl.push(*ii++);
     }
   }
 };
@@ -168,6 +169,15 @@ public:
     return true;
   }
 
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    lock();
+    while (b != e)
+      wl.insert(*b++);
+    unlock();
+    return true;
+  }
+
   std::pair<bool, value_type> pop() {
     lock();
     if (wl.empty()) {
@@ -180,53 +190,44 @@ public:
       return std::make_pair(true, retval);
     }
   }
-   
-  //Not Thread Safe
-  template<typename Iter>
-  void fill_initial(Iter ii, Iter ee) {
-    while (ii != ee) {
-      wl.insert(*ii++);
-    }
-  }
 };
 WLCOMPILECHECK(PriQueueTree);
 
 #ifdef GALOIS_TBB
-template<class Compare = std::less<int>, typename T = int, bool concurrent = true>
-class TbbPriQueue : private boost::noncopyable, private tbb::concurrent_priority_queue<T,Compare> {
-  typedef tbb::concurrent_priority_queue<T,Compare> Parent;
+template<class Compare = std::less<int>, typename T = int>
+class TbbPriQueue : private boost::noncopyable {
+  tbb::concurrent_priority_queue<T,Compare> wl;
 
 public:
   template<bool newconcurrent>
   struct rethread {
-    typedef TbbPriQueue<Compare, T, newconcurrent> WL;
+    typedef TbbPriQueue<Compare, T> WL;
   };
   template<typename Tnew>
   struct retype {
-    typedef TbbPriQueue<Compare, Tnew, concurrent> WL;
+    typedef TbbPriQueue<Compare, Tnew> WL;
   };
 
   typedef T value_type;
 
   bool push(value_type val) {
-    Parent::push(val);
+    wl.push(val);
+    return true;
+  }
+
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    while (b != e)
+      wl.push(*b++);
     return true;
   }
 
   std::pair<bool, value_type> pop() {
     value_type retval;
-    if (try_pop(retval)) {
+    if (wl.try_pop(retval)) {
       return std::make_pair(true, retval);
     } else {
       return std::make_pair(false, value_type());
-    }
-  }
-   
-  //Not Thread Safe
-  template<typename Iter>
-  void fill_initial(Iter ii, Iter ee) {
-    while (ii != ee) {
-      push(*ii++);
     }
   }
 };
@@ -253,17 +254,17 @@ public:
     return true;
   }
 
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    while (b != e)
+      wl.push(*b++);
+    return true;
+  }
+
   std::pair<bool, value_type> pop() {
     T V = T();
     bool B = wl.try_pop(V);
     return std::make_pair(B, V);
-  }
-
-  //Not Thread Safe
-  template<typename Iter>
-  void fill_initial(Iter ii, Iter ee) {
-    for (; ii != ee; ++ii)
-      wl.push(*ii);
   }
 };
 WLCOMPILECHECK(TbbFIFO);
@@ -297,6 +298,15 @@ public:
     return true;
   }
 
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    lock();
+    while (b != e)
+      wl.push_back(*b++);
+    unlock();
+    return true;
+  }
+
   std::pair<bool, value_type> pop()  {
     lock();
     if (wl.empty()) {
@@ -308,12 +318,6 @@ public:
       unlock();
       return std::make_pair(true, retval);
     }
-  }
-
-  //Not Thread Safe
-  template<typename Iter>
-  void fill_initial(Iter ii, Iter ee) {
-    wl.insert(wl.end(), ii, ee);
   }
 };
 WLCOMPILECHECK(LIFO);
@@ -345,6 +349,15 @@ public:
     return true;
   }
 
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    lock();
+    while (b != e)
+      wl.push_back(*b++);
+    unlock();
+    return true;
+  }
+
   std::pair<bool, value_type> pop() {
     lock();
     if (wl.empty()) {
@@ -356,12 +369,6 @@ public:
       unlock();
       return std::make_pair(true, retval);
     }
-  }
-
-  //Not Thread Safe
-  template<typename Iter>
-  void fill_initial(Iter ii, Iter ee) {
-    wl.insert(wl.end(), ii, ee);
   }
 };
 WLCOMPILECHECK(FIFO);
@@ -459,6 +466,13 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     return lC->push(val);
   }
 
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    while (b != e)
+      push(*b++);
+    return true;
+  }
+
   std::pair<bool, value_type> pop() {
     //Find a successful pop
     perItem& pI = current.get();
@@ -476,14 +490,6 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     }
     retval.first = false;
     return retval;
-  }
-
-  //Not Thread Safe
-  template<typename Iter>
-  void fill_initial(Iter ii, Iter ee) {
-    while (ii != ee) {
-      push(*ii++);
-    }
   }
 };
 WLCOMPILECHECK(OrderedByIntegerMetric);
@@ -612,12 +618,12 @@ class LocalizedOrderedByIntegerMetric : private boost::noncopyable {
     return retval;
   }
 
-  //Not Thread Safe
   template<typename Iter>
-  void fill_initial(Iter ii, Iter ee) {
+  bool push(Iter ii, Iter ee) {
     while (ii != ee) {
       push(*ii++);
     }
+    return true;
   }
 };
 WLCOMPILECHECK(LocalizedOrderedByIntegerMetric);
@@ -646,17 +652,17 @@ public:
     return local.get().push(val);
   }
 
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    return local.get().push(b,e);
+  }
+
   std::pair<bool, value_type> pop() {
     std::pair<bool, value_type> ret = local.get().pop();
     if (ret.first)
       return ret;
     ret = global.pop();
     return ret;
-  }
-
-  template<typename iter>
-  void fill_initial(iter begin, iter end) {
-    global.fill_initial(begin,end);
   }
 };
 WLCOMPILECHECK(LocalQueues);
@@ -684,114 +690,19 @@ class LocalStealing : private boost::noncopyable {
     return local.get().push(val);
   }
 
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    return local.get().push(b,e);
+  }
+
   std::pair<bool, value_type> pop() {
     std::pair<bool, value_type> ret = local.get().pop();
     if (ret.first)
       return ret;
     return local.getNext().pop();
   }
-
-  //Not Thread Safe
-  template<typename Iter>
-  void fill_initial(Iter ii, Iter ee) {
-    while (ii != ee) {
-      push(*ii++);
-    }
-  }
 };
 WLCOMPILECHECK(LocalStealing);
-
-//Queue per writer, reader cycles
-template<typename T = int>
-class MP_SC_FIFO {
-  class Chunk : public FixedSizeRing<T, 128, false>, public ConExtLinkedQueue<Chunk,true>::ListNode { };
-  
-  MM::FixedSizeAllocator heap;
-  
-  struct p {
-    PtrLock<Chunk*, true> next;
-  };
-
-  PerCPU<p> data;
-  ConExtLinkedQueue<Chunk, true> queue;
-  Chunk* current;
-
-  Chunk* mkChunk() {
-    return new (heap.allocate(sizeof(Chunk))) Chunk();
-  }
-
-  void delChunk(Chunk* C) {
-    C->~Chunk();
-    heap.deallocate(C);
-  }
-
-public:
-  typedef T value_type;
-
-  MP_SC_FIFO() :heap(sizeof(Chunk)), current(0) {}
-
-  template<bool newconcurrent>
-  struct rethread {
-    typedef MP_SC_FIFO<T> WL;
-  };
-  template<typename Tnew>
-  struct retype {
-    typedef MP_SC_FIFO<Tnew> WL;
-  };
-
-  bool push(value_type val) {
-    p& n = data.get();
-    n.next.lock();
-    if (n.next.getValue() && n.next.getValue()->push_back(val)){
-      n.next.unlock();
-      return true;
-    }
-    if (n.next.getValue())
-      queue.push(n.next.getValue());
-    Chunk* C = mkChunk();
-    bool worked = C->push_back(val);
-    assert(worked);
-    n.next.unlock_and_set(C);
-    return true;
-  }
-
-  std::pair<bool, value_type> pop() {
-#define ACT if (current && (ret = current->pop_front()).first) return ret; if (current) delChunk(current);
-
-    std::pair<bool, value_type> ret;
-    ACT;
-    //try queue
-    current = queue.pop();
-    ACT;
-    //try this node
-    current = data.get().next.getValue();
-    data.get().next.setValue(0);
-    ACT;
-    //Try all nodes
-    for (unsigned int i = 0; i < data.size(); ++i) {
-      p& n = data.get(i);
-      if (n.next.getValue()) {
-	n.next.lock();
-	current = n.next.getValue();
-	n.next.unlock_and_set(0);
-	ACT;
-      }
-    }
-    current = 0;
-    //failure
-    return std::make_pair(false, value_type());
-#undef ACT
-  }
-
-  //! called in sequential mode to seed the worklist
-  template<typename iter>
-  void fill_initial(iter begin, iter end) {
-    while (begin != end)
-      push(*begin++);
-  }
-
-};
-WLCOMPILECHECK(MP_SC_FIFO);
 
 //This overly complex specialization avoids a pointer indirection for non-distributed WL when accessing PerLevel
 template<bool d, typename TQ>
@@ -902,6 +813,13 @@ public:
     return true;
   }
 
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    while (b != e)
+      push(*b++);
+    return true;
+  }
+
   std::pair<bool, value_type> pop()  {
     p& n = data.get();
     std::pair<bool, value_type> retval;
@@ -927,14 +845,6 @@ public:
       if (n.cur)
 	return n.cur->pop_front();
       return std::make_pair(false, value_type());
-    }
-  }
-  
-  //Not Thread Safe
-  template<typename Iter>
-  void fill_initial(Iter ii, Iter ee) {
-    for( ; ii != ee; ++ii) {
-      push(*ii);
     }
   }
 };
@@ -980,6 +890,12 @@ public:
     return Items.get(index % active).push(val);
   }
 
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    while (b != e)
+      push(*b++);
+  }
+
   std::pair<bool, value_type> pop()  {
     std::pair<bool, value_type> r = Items.get().pop();
     // std::cerr << "{" << Items.myEffectiveID() << "}";
@@ -991,15 +907,6 @@ public:
   std::pair<bool, value_type> try_pop() {
     return pop();
   }
-  
-  //Not Thread Safe
-  template<typename Iter>
-  void fill_initial(Iter ii, Iter ee) {
-    for( ; ii != ee; ++ii) {
-      push(*ii);
-    }
-  }
-
 };
 
 template<class Compare = std::less<int>, typename T = int>
@@ -1025,16 +932,14 @@ public:
     return true;
   }
 
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    while (b != e)
+      push(*b++);
+  }
+
   std::pair<bool, value_type> pop() {
     return wl.pollFirstKey();
-  }
-   
-  //Not Thread Safe
-  template<typename Iter>
-  void fill_initial(Iter ii, Iter ee) {
-    while (ii != ee) {
-      push(*ii++);
-    }
   }
 };
 WLCOMPILECHECK(SkipListQueue);
@@ -1062,16 +967,14 @@ public:
     return true;
   }
 
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    while (b != e)
+      push(*b++);
+  }
+
   std::pair<bool, value_type> pop() {
     return wl.pollMin();
-  }
-   
-  //Not Thread Safe
-  template<typename Iter>
-  void fill_initial(Iter ii, Iter ee) {
-    while (ii != ee) {
-      push(*ii++);
-    }
   }
 };
 WLCOMPILECHECK(FCPairingHeapQueue);
@@ -1101,6 +1004,12 @@ public:
   };
 
   bool push(value_type val) {
+    assert(0 && "cannot push into InitialIterator Worklist");
+    abort();
+  }
+
+  template<typename Iter2>
+  bool push(Iter2 b, Iter2 e) {
     assert(0 && "cannot push into InitialIterator Worklist");
     abort();
   }

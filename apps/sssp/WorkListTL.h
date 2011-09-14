@@ -53,6 +53,12 @@ class SimpleOrderedByIntegerMetric : private boost::noncopyable, private PaddedL
     return retval;
   }
 
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    while (b != e)
+      push(*b++);
+  }
+
   std::pair<bool, value_type> pop() {
     //Fastpath
     CTy* c = current;
@@ -80,25 +86,6 @@ class SimpleOrderedByIntegerMetric : private boost::noncopyable, private PaddedL
       unlock();
     //   }
     return retval;
-  }
-
-  bool empty() const {
-    for (typename std::map<int, CTy*>::iterator ii = mapping.begin(), ee = mapping.end(); ii != ee; ++ii)
-      if (!ii->second->empty())
-	return false;
-    return true;
-  }
-
-  bool aborted(value_type val) {
-    return push(val);
-  }
-
-  //Not Thread Safe
-  template<typename Iter>
-  void fill_initial(Iter ii, Iter ee) {
-    while (ii != ee) {
-      push(*ii++);
-    }
   }
 };
 
@@ -164,6 +151,12 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
     return retval;
   }
 
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    while (b != e)
+      push(*b++);
+  }
+
   std::pair<bool, value_type> pop() {
     //Find a successful pop
     perItem& pI = current.get();
@@ -183,25 +176,6 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
     }
     retval.first = false;
     return retval;
-  }
-
-  /* bool empty() const { */
-  /*   for (typename std::map<int, CTy*>::iterator ii = wl.begin(), ee = wl.end(); ii != ee; ++ii) */
-  /*     if (!ii->second->empty()) */
-  /* 	return false; */
-  /*   return true; */
-  /* } */
-
-  bool aborted(value_type val) {
-    return push(val);
-  }
-
-  //Not Thread Safe
-  template<typename Iter>
-  void fill_initial(Iter ii, Iter ee) {
-    while (ii != ee) {
-      push(*ii++);
-    }
   }
 };
 WLCOMPILECHECK(CTOrderedByIntegerMetric);

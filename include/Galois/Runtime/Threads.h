@@ -23,12 +23,17 @@
 #ifndef GALOIS_RUNTIME_THREADS_H
 #define GALOIS_RUNTIME_THREADS_H
 
-#include <boost/intrusive/list.hpp>
 #include <vector>
 
 #include "Galois/Runtime/Config.h"
 
 namespace GaloisRuntime {
+
+struct runCMD {
+  config::function<void (void)> work;
+  bool isParallel;
+  bool barrierAfter;
+};
 
 class ThreadPool {
 protected:
@@ -36,9 +41,10 @@ protected:
   unsigned int activeThreads;
 
 public:
+
   //!execute work on all threads
-  //!The work object is not duplicated in any way 
-  virtual void run(config::function<void (void)> work) = 0;
+  //!preWork and postWork are executed only on the master thread
+  virtual void run(runCMD* begin, runCMD* end) = 0;
   
   //!change the number of threads to num
   //!returns the number that the runtime chooses (may not be num)
@@ -49,7 +55,6 @@ public:
 
   //!My thread id (dense, user thread is 0, galois threads 1..num)
   static unsigned int getMyID() { return LocalThreadID; }
-
 
 };
 
