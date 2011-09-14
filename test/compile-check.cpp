@@ -25,21 +25,21 @@ struct checker {
   typedef typename T2::template retype<int>::WL T;
   T wl;
   typename T::template rethread<true>::WL wl2;
-  typename T::template rethread<true>::WL wl3;
+  typename T::template rethread<false>::WL wl3;
 
   checker() {
     int a[2] = {1,2};
-    wl.fill_initial(&a[0], &a[2]);
     wl.push(0);
     wl.pop();
+    wl.push(&a[0], &a[2]);
 
-    wl2.fill_initial(&a[0], &a[2]);
     wl2.push(0);
     wl2.pop();
+    wl2.push(&a[0], &a[2]);
 
-    wl3.fill_initial(&a[0], &a[2]);
     wl3.push(0);
     wl3.pop();
+    wl3.push(&a[0], &a[2]);
   }
 };
 
