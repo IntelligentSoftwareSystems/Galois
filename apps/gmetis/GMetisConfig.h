@@ -24,15 +24,15 @@
 #ifndef GMETISCONFIG_H_
 #define GMETISCONFIG_H_
 
-
+#include "MetisNode.h"
+#include "ArraySet.h"
 
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
-#include "MetisNode.h"
 #include "Galois/Timer.h"
-#include "Galois/Runtime/mem.h"
+
 #include <stdlib.h>
-#include "ArraySet.h"
+
 typedef int METISINT;
 typedef double METISDOUBLE;
 

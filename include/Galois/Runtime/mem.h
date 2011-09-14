@@ -34,6 +34,7 @@
 #include "Galois/Runtime/PerCPU.h"
 #include <boost/utility.hpp>
 #include <memory.h>
+#include <stdlib.h>
 
 //#define USEMALLOC
 #ifndef USEMALLOC

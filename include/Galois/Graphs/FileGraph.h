@@ -58,7 +58,8 @@
 #include "Galois/ConflictFlags.h"
 #include "Galois/Runtime/Context.h"
 #include <boost/iterator/counting_iterator.hpp>
-
+#include <boost/iterator/transform_iterator.hpp>
+#include <boost/detail/endian.hpp>
 
 using namespace GaloisRuntime;
 
@@ -85,12 +86,68 @@ protected:
   uint64_t numNodes;
 
   uint64_t getEdgeIdx(GraphNode src, GraphNode dst) {
-    for (neighbor_iterator ii = neighbor_begin(src),
-	   ee = neighbor_end(src); ii != ee; ++ii)
-      if (*ii == dst)
+    for (uint32_t* ii = raw_neighbor_begin(src),
+	   *ee = raw_neighbor_end(src); ii != ee; ++ii)
+      if (convert32(*ii) == dst)
 	return std::distance(outs, ii);
     return ~(uint64_t)0;
   }
+
+  static uint32_t swap32(int32_t x) {
+#ifdef __GNUC__
+    return __builtin_bswap32(x);
+#else
+    return (x >> 24) | 
+           ((x << 8) & 0x00FF0000) |
+           ((x >> 8) & 0x0000FF00) |
+           (x << 24);
+#endif
+  }
+
+  static uint64_t swap64(int64_t x) {
+#ifdef __GNUC__
+    return __builtin_bswap64(x);
+#else
+    return (x>>56) | 
+        ((x<<40) & 0x00FF000000000000) |
+        ((x<<24) & 0x0000FF0000000000) |
+        ((x<<8)  & 0x000000FF00000000) |
+        ((x>>8)  & 0x00000000FF000000) |
+        ((x>>24) & 0x0000000000FF0000) |
+        ((x>>40) & 0x000000000000FF00) |
+        (x<<56);
+#endif
+  }
+
+  static uint32_t convert32(int32_t x) {
+#ifdef BOOST_BIG_ENDIAN
+    return swap32(x);
+#else
+    return x;
+#endif
+  }
+
+  static uint64_t convert64(int64_t x) {
+#ifdef BOOST_BIG_ENDIAN
+    return swap64(x);
+#else
+    return x;
+#endif
+  }
+
+  uint32_t* raw_neighbor_begin(GraphNode N, MethodFlag mflag = ALL) const {
+    return (N == 0) ? &outs[0] : &outs[convert64(outIdx[N-1])];
+  }
+
+  uint32_t* raw_neighbor_end(GraphNode N, MethodFlag mflag = ALL) const {
+    return &outs[convert64(outIdx[N])];
+  }
+
+  struct Convert : public std::unary_function<uint32_t, uint32_t> {
+    uint32_t operator()(uint32_t x) const {
+      return convert32(x);
+    }
+  };
 
 public:
   // Node Handling
@@ -104,38 +161,30 @@ public:
   template<typename EdgeTy>
   EdgeTy& getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
     assert(sizeEdgeTy == sizeof(EdgeTy));
-    return ((EdgeTy*)edgeData)[getEdgeIdx(src,dst)];
-  }
-
-  void prefetch_edges(GraphNode N) const {
-    __builtin_prefetch(neighbor_begin(N, NONE));
-  }
-
-  template<typename EdgeTy>
-  void prefetch_edgedata(GraphNode N) const {
-    __builtin_prefetch(
-        &((EdgeTy*)edgeData)[std::distance(outs, neighbor_begin(N))]);
-  }
-
-  void prefetch_pre(GraphNode N) const {
-    if (N != 0)
-      __builtin_prefetch(&outIdx[N-1]);
-    __builtin_prefetch(&outIdx[N]);
+    return ((EdgeTy*)edgeData)[getEdgeIdx(src, dst)];
   }
 
   // General Things
-
+#ifdef BOOST_LITTLE_ENDIAN
   typedef uint32_t* neighbor_iterator;
+#else
+  typedef boost::transform_iterator<Convert, uint32_t*> neighbor_iterator;
+#endif
 
   neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = ALL) const {
-    if (N == 0)
-      return &outs[0];
-    else
-      return &outs[outIdx[N-1]];
+#ifdef BOOST_LITTLE_ENDIAN
+      return raw_neighbor_begin(N, mflag);
+#else
+      return boost::make_transform_iterator(raw_neighbor_begin(N, mflag), Convert());
+#endif
   }
 
   neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = ALL) const {
-    return &outs[outIdx[N]];
+#ifdef BOOST_LITTLE_ENDIAN
+      return raw_neighbor_end(N, mflag);
+#else
+      return boost::make_transform_iterator(raw_neighbor_end(N, mflag), Convert());
+#endif
   }
 
   bool has_neighbor(GraphNode N1, GraphNode N2, MethodFlag mflag = ALL) const {
@@ -212,17 +261,6 @@ public:
     for (uint64_t i = 0; i < numNodes; ++i)
       NodeData[i].data.data = init;
   }
-
-  void prefetch_edgedata(GraphNode N) {
-    FileGraph::prefetch_edgedata<EdgeTy>(N);
-  }
-
-  void prefetch_neighbors(GraphNode N) {
-    for (neighbor_iterator ii = neighbor_begin(N, NONE),
-        ee = neighbor_begin(N,NONE); ii != ee; ++ii)
-      __builtin_prefetch(&NodeData[*ii].data.data);
-  }
-
 };
 
 //! Local computation graph (i.e., graph structure does not change)
@@ -245,16 +283,6 @@ public:
   
   EdgeTy& getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
     return FileGraph::getEdgeData<EdgeTy>(src, dst, mflag);
-  }
-
-  void prefetch_edgedata(GraphNode N) {
-    FileGraph::prefetch_edgedata<EdgeTy>(N);
-  }
-
-  void prefetch_neighbors(GraphNode N) {
-    for (neighbor_iterator ii = neighbor_begin(N, NONE),
-        ee = neighbor_begin(N,NONE); ii != ee; ++ii)
-      __builtin_prefetch(&NodeData[*ii].data.data);
   }
 };
 
@@ -292,12 +320,6 @@ public:
     NodeData = new cache_line_storage<gNode>[numNodes];
     for (uint64_t i = 0; i < numNodes; ++i)
       NodeData[i].data.data = init;
-  }
-
-  void prefetch_neighbors(GraphNode N) {
-    for (neighbor_iterator ii = neighbor_begin(N, NONE),
-        ee = neighbor_begin(N,NONE); ii != ee; ++ii)
-      __builtin_prefetch(&NodeData[*ii].data.data);
   }
 };
 

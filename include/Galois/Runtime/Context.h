@@ -22,6 +22,8 @@ kind.
 
 #include "Galois/Runtime/SimpleLock.h"
 #include "Galois/ConflictFlags.h"
+#include <stdlib.h>
+
 namespace GaloisRuntime {
 
 class SimpleRuntimeContext;
