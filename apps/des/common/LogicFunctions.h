@@ -80,7 +80,7 @@ struct INV : public OneInputFunc, public std::unary_function<LogicVal, LogicVal>
     } else if (in == '1') {
       return '0';
     } else {
-      return _X;
+      return UNKNOWN_VALUE;
     }
   }
 
@@ -108,7 +108,7 @@ struct AND2: public TwoInputFunc, public std::binary_function<LogicVal, LogicVal
       return x;
 
     } else {
-      return _X;
+      return UNKNOWN_VALUE;
     }
 
   }
@@ -147,7 +147,7 @@ struct OR2: public TwoInputFunc, public std::binary_function<LogicVal, LogicVal,
     } else if (y == '0') {
       return x;
     } else {
-      return _X;
+      return UNKNOWN_VALUE;
     }
   }
 
@@ -178,8 +178,8 @@ struct NOR2: public OR2 {
  */
 struct XOR2: public TwoInputFunc, public std::binary_function<LogicVal, LogicVal, LogicVal> {
   LogicVal _xor_ (const LogicVal& x, const LogicVal& y) const {
-    if (x == _X || y == _X) {
-      return _X;
+    if (x == UNKNOWN_VALUE || y == UNKNOWN_VALUE) {
+      return UNKNOWN_VALUE;
     } else if (INV()._not_(x) == y) {
       return '1';
     } else if (x == y) {

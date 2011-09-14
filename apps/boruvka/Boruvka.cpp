@@ -184,8 +184,8 @@ void runBodyParallel() {
 #endif
 	for(unsigned i=0;i<MSTWeight.size();i++)
 		MSTWeight.get(i)=0;
-	//Galois::for_each<ChunkedFIFO<32> >(all.begin(), all.end(), process());
-	Galois::for_each<OBIM>(all.begin(), all.end(), process());
+	Galois::for_each<ChunkedFIFO<32> >(all.begin(), all.end(), process());
+	//Galois::for_each<OBIM>(all.begin(), all.end(), process());
 	unsigned int res = 0;
 	for(unsigned i=0;i<MSTWeight.size();i++){
 #if BORUVKA_DEBUG

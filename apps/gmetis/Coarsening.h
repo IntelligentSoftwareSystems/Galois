@@ -27,10 +27,9 @@
 #include "HEM.h"
 #include "RM.h"
 #include <map>
-using namespace boost;
-using namespace std;
 #include <boost/unordered_map.hpp>
-//typedef unordered_map<int, int> IntIntMap;
+
+using namespace std;
 typedef map<int, int> IntIntMap;
 typedef vector<int> IntVec;
 #include <boost/lexical_cast.hpp>

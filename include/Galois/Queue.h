@@ -1506,10 +1506,11 @@ class PairingHeap: private boost::noncopyable {
   }
 
 public:
-  PairingHeap(int capacity = 5): tree(capacity, NULL), root(NULL) { }
+  PairingHeap(int capacity = 5): tree(capacity), root(NULL) { }
 
   ~PairingHeap() {
-    delete root;
+    if (root)
+      delete root;
   }
 
   bool empty() const {

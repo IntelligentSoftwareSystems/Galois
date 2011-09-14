@@ -55,9 +55,10 @@
 #ifndef GALOIS_GRAPHS_FILEGRAPH_H
 #define GALOIS_GRAPHS_FILEGRAPH_H
 
-// TODO(ddn): needed until we move method flags out of Graph.h
-#include "Galois/Graphs/Graph.h"
+#include "Galois/ConflictFlags.h"
+#include "Galois/Runtime/Context.h"
 #include <boost/iterator/counting_iterator.hpp>
+
 
 using namespace GaloisRuntime;
 

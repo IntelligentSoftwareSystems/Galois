@@ -28,6 +28,6 @@
 typedef char LogicVal;
 
 /** the unknown logic value */
-const char _X = 'X';
+const char UNKNOWN_VALUE = 'X';
 
 #endif

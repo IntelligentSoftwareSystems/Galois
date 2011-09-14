@@ -1,4 +1,4 @@
 
 int main(void) {
-  return [](int x) { return x; }(1);
+  return [](int x) { return x; }(0);
 }

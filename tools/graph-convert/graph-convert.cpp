@@ -20,8 +20,9 @@
  *
  * @author Dimitrios Prountzos <dprountz@cs.utexas.edu>
  */
-#include "Galois/Graphs/FileGraph.h"
 #include "Galois/Galois.h"
+#include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/FileGraph.h"
 #include "Galois/Graphs/Serialize.h"
 
 #include <iostream>

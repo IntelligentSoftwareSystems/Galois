@@ -33,16 +33,16 @@ if(NOT ${CXX_4.5} STREQUAL "CXX_4.5-NOTFOUND")
   set(CMAKE_CXX_COMPILER ${CXX_4.5})
 endif()
 
-if(SITE_NAME MATCHES "delaunay.*")
-  set(CMAKE_CXX_COMPILER /opt/csw/gcc4/bin/g++)
-  set(CMAKE_CC_COMPILER /opt/csw/gcc4/bin/gcc)
-  # Override broken include files in
-  #  /opt/csw/gcc4/lib/gcc/sparc-sun-solaris2.8/4.5.1/include-fixed/
-  add_definitions(-nostdinc)
-  add_definitions(-I/usr/include)
-  add_definitions(-I/opt/csw/gcc4/include/c++/4.5.1)
-  add_definitions(-I/opt/csw/gcc4/include/c++/4.5.1/sparc-sun-solaris2.8)
-endif()
+#if(SITE_NAME MATCHES "delaunay.*")
+#  set(CMAKE_CXX_COMPILER /opt/csw/gcc4/bin/g++)
+#  set(CMAKE_CC_COMPILER /opt/csw/gcc4/bin/gcc)
+#  # Override broken include files in
+#  #  /opt/csw/gcc4/lib/gcc/sparc-sun-solaris2.8/4.5.1/include-fixed/
+#  add_definitions(-nostdinc)
+#  add_definitions(-I/usr/include)
+#  add_definitions(-I/opt/csw/gcc4/include/c++/4.5.1)
+#  add_definitions(-I/opt/csw/gcc4/include/c++/4.5.1/sparc-sun-solaris2.8)
+#endif()
 
 if(CMAKE_SYSTEM MATCHES "SunOS.*")
   set(USE_SOLARIS ON)
@@ -57,12 +57,12 @@ find_package(LAPACK)
 
 #Boost
 # not needed now but will be needed for newer version of Boost after 1.4X ish
-#set(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0")
+set(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0" "1.47" "1.47.0")
 #set(Boost_USE_STATIC_LIBS ON)
 set(Boost_USE_MULTITHREADED OFF) # newer boost builds don't use -mt extension
 #set(BOOST_ROOT /net/faraday/workspace/ddn/local)
 #find_package(Boost 1.34.0 REQUIRED COMPONENTS system serialization graph_parallel mpi)
-set(BOOST_LIBS thread)
+#set(BOOST_LIBS thread)
 if(SITE_NAME MATCHES "delaunay.*")
   find_package(Boost 1.34.0 COMPONENTS ${BOOST_LIBS})
 else()

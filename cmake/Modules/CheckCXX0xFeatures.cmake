@@ -2,7 +2,7 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 
 MACRO(CXX0X_CHECK_FEATURE FEATURE_NAME FEATURE_NUMBER RESULT_VAR)
   IF (NOT DEFINED ${RESULT_VAR})
-    set(_bindir "${CMAKE_CURRENT_BINARY_DIR}/cxx0x_${FEATURE_NAME}")
+    set(_bindir "${CMAKE_CURRENT_BINARY_DIR}/CXX0xCheck/${FEATURE_NAME}")
 
     # force find_file to be run always instead of caching last result
     set(_SRCFILE_ALL "_SRCFILE_ALL-NOTFOUND")

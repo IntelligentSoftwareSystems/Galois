@@ -21,19 +21,22 @@
  * @author Xin Sui <xinsui@cs.utexas.edu>
  */
 
-#include "GMetisConfig.h"
-#include "MetisGraph.h"
 #include <vector>
 #include <iostream>
 #include <string.h>
-#include "Lonestar/Banner.h"
-#include "Lonestar/CommandLine.h"
 #include <stdlib.h>
 #include <algorithm>
 #include <cmath>
+
+#include "GMetisConfig.h"
+#include "MetisGraph.h"
 #include "PMetis.h"
+
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Statistic.h"
+#include "Lonestar/Banner.h"
+#include "Lonestar/CommandLine.h"
+
 static const char* name = "GMetis";
 static const char* description = "Partion a graph into K parts and minimize the graph cut\n";
 static const char* url = "gMetis";
