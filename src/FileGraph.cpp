@@ -56,12 +56,19 @@ FileGraph::~FileGraph() {
     close(masterFD);
 }
 
-bool FileGraph::structureFromFile(const char* filename) {
+void FileGraph::structureFromFile(const char* filename) {
   masterFD = open(filename, O_RDONLY);
-  
+  if (masterFD == -1) {
+    perror("FileGraph::structureFromFile");
+    abort();
+  }
+
   struct stat buf;
   int f = fstat(masterFD, &buf);
-  assert(f == 0 && "failed to read file");
+  if (f == -1) {
+    perror("FileGraph::structureFromFile");
+    abort();
+  }
   masterLength = buf.st_size;
 
 
@@ -73,17 +80,18 @@ bool FileGraph::structureFromFile(const char* filename) {
   void* m = mmap(0, masterLength, PROT_READ, _MAP_BASE, masterFD, 0);
   if (m == MAP_FAILED) {
     m = 0;
-    return false;
+    perror("FileGraph::structureFromFile");
+    abort();
   }
   masterMapping = m;
 
   //parse file
   uint64_t* fptr = (uint64_t*)m;
-  uint64_t version = *fptr++;
+  uint64_t version = convert64(*fptr++);
   assert(version == 1);
-  sizeEdgeTy = *fptr++;
-  numNodes = *fptr++;
-  numEdges = *fptr++;
+  sizeEdgeTy = convert64(*fptr++);
+  numNodes = convert64(*fptr++);
+  numEdges = convert64(*fptr++);
   outIdx = fptr;
   fptr += numNodes;
   uint32_t* fptr32 = (uint32_t*)fptr;
@@ -92,5 +100,4 @@ bool FileGraph::structureFromFile(const char* filename) {
   if (numEdges % 2)
     fptr32 += 1;
   edgeData = (char*)fptr32;
-  return true;
 }
