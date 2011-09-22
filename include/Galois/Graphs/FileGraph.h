@@ -216,7 +216,7 @@ public:
   ~FileGraph();
 
   //! Read graph connectivity information from file
-  bool structureFromFile(const char* filename);
+  void structureFromFile(const char* filename);
 };
 
 //! Local computation graph (i.e., graph structure does not change)
