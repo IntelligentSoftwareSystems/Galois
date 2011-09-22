@@ -27,10 +27,6 @@
 #include "Runtime/Support.h"
 #include "Timer.h"
 
-#ifdef GALOIS_VTUNE
-#include "ittnotify.h"
-#endif
-
 namespace Galois {
 
 template<typename T>
@@ -53,17 +49,11 @@ public:
   }
 
   void start() {
-#ifdef GALOIS_VTUNE
-    __itt_resume();
-#endif
     Timer::start();
   }
 
   void stop() {
     Timer::stop();
-#ifdef GALOIS_VTUNE
-  __itt_pause();
-#endif
   }
 };
 
