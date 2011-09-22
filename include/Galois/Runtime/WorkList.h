@@ -397,7 +397,6 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     //ASSERT masterLock
     for (; p.lastMasterVersion < masterVersion; ++p.lastMasterVersion) {
       std::pair<int, CTy*> logEntry = masterLog[p.lastMasterVersion];
-      CTy*& x = p.local[logEntry.first];
       p.local[logEntry.first] = logEntry.second;
     }
   }
@@ -758,6 +757,7 @@ public:
   bool push(Iter b, Iter e) {
     while (b != e)
       push(*b++);
+    return true;
   }
 
   std::pair<bool, value_type> pop()  {
@@ -800,6 +800,7 @@ public:
   bool push(Iter b, Iter e) {
     while (b != e)
       push(*b++);
+    return true;
   }
 
   std::pair<bool, value_type> pop() {
@@ -835,6 +836,7 @@ public:
   bool push(Iter b, Iter e) {
     while (b != e)
       push(*b++);
+    return true;
   }
 
   std::pair<bool, value_type> pop() {
