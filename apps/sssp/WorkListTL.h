@@ -57,6 +57,7 @@ class SimpleOrderedByIntegerMetric : private boost::noncopyable, private PaddedL
   bool push(Iter b, Iter e) {
     while (b != e)
       push(*b++);
+    return true;
   }
 
   std::pair<bool, value_type> pop() {
@@ -155,6 +156,7 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
   bool push(Iter b, Iter e) {
     while (b != e)
       push(*b++);
+    return true;
   }
 
   std::pair<bool, value_type> pop() {
