@@ -27,6 +27,10 @@
 #include "Runtime/Support.h"
 #include "Timer.h"
 
+#ifdef GALOIS_VTUNE
+#include "ittnotify.h"
+#endif
+
 namespace Galois {
 
 template<typename T>
@@ -46,6 +50,20 @@ public:
   StatTimer(const char* n = "Time", const char* l = 0) :name(n), loopname(l) {}
   ~StatTimer() {
     GaloisRuntime::reportStatSum(name, get(), loopname);
+  }
+
+  void start() {
+#ifdef GALOIS_VTUNE
+    __itt_resume();
+#endif
+    Timer::start();
+  }
+
+  void stop() {
+    Timer::stop();
+#ifdef GALOIS_VTUNE
+  __itt_pause();
+#endif
   }
 };
 
