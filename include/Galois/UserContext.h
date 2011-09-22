@@ -20,6 +20,8 @@
  *
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
+#ifndef GALOIS_USERCONTEXT_H
+#define GALOIS_USERCONTEXT_H
 
 #include "Galois/Mem.h"
 
@@ -80,3 +82,4 @@ public:
 };
 
 }
+#endif
