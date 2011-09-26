@@ -63,7 +63,15 @@ mmapWrapper::mmapWrapper() {
 }
 
 void* mmapWrapper::_alloc() {
-  void* ptr = 0;
+#ifdef __linux__
+  //serialize mmap in userspace because it prevents
+  //linux from sleeping for undefined amounts of time
+  static SimpleLock<int, true> L;
+#else
+  static SimpleLock<int,false> L;
+#endif
+  L.lock();
+ void* ptr = 0;
 #ifdef MAP_HUGETLB
   //First try huge
   ptr = mmap(0, AllocSize, _PROT, _MAP_HUGE, -1, 0);
@@ -77,10 +85,12 @@ void* mmapWrapper::_alloc() {
   if (!ptr || ptr == MAP_FAILED)
     ptr = mmap(0, AllocSize, _PROT, _MAP_BASE, -1, 0);
   if (!ptr || ptr == MAP_FAILED) {
+    L.unlock();
     reportWarning("Memory Allocation Failed");
     assert(0 && "mmap failed");
     abort();
-  }    
+  }
+  L.unlock();
   return ptr;
 }
 
