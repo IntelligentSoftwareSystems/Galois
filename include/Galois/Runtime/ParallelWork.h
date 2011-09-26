@@ -80,7 +80,8 @@ struct Configurator {
 template<class WorkListTy, class Function>
 class ForEachWork {
   typedef typename WorkListTy::value_type value_type;
-  typedef GaloisRuntime::WorkList::FIFO<value_type, true> AbortedListTy;
+  typedef GaloisRuntime::WorkList::LevelStealing<GaloisRuntime::WorkList::FIFO<value_type>, value_type> AbortedListTy;
+  //typedef GaloisRuntime::WorkList::FIFO<value_type, true> AbortedListTy;
   
   struct tldTy {
     Galois::UserContext<value_type> facing;
@@ -96,11 +97,11 @@ class ForEachWork {
   PerCPU<tldTy> tdata;
   TerminationDetection term;
   AbortedListTy aborted;
-  volatile long abort_happened; //hit flag
+  cache_line_storage<volatile long> abort_happened; //hit flag
 
   void doAborted(value_type val) {
     aborted.push(val);
-    abort_happened = 1;
+    abort_happened.data = 1;
   }
 
   void doProcess(value_type val, tldTy& tld) {
@@ -115,14 +116,20 @@ class ForEachWork {
       return;
     }
     tld.cnx.commit_iteration();
-    global_wl.push(tld.facing.__getPushBuffer().begin(), tld.facing.__getPushBuffer().end());
-    tld.facing.__getPushBuffer().clear();
-    tld.facing.__resetAlloc();
+    if (Configurator<Function>::NeedsPush) {
+      global_wl.push(tld.facing.__getPushBuffer().begin(), tld.facing.__getPushBuffer().end());
+      tld.facing.__getPushBuffer().clear();
+    }
+    if (Configurator<Function>::NeedsPIA)
+      tld.facing.__resetAlloc();
   }
 
-  void drainAborted(tldTy& tld) {
+  template<bool isLeader>
+  inline void drainAborted(tldTy& tld) {
+    if (!isLeader) return;
+    if (!abort_happened.data) return;
     tld.lterm->workHappened();
-    abort_happened = 0;
+    abort_happened.data = 0;
     std::pair<bool, value_type> p = aborted.pop();
     while (p.first) {
       doProcess(p.second, tld);
@@ -130,20 +137,25 @@ class ForEachWork {
     }
   }
 
-  void drainWL() {
-    std::pair<bool, value_type> p = global_wl.pop();
-    while (p.first)
-      p = global_wl.pop();
+  inline void drainBreak(tldTy& tld) {
+    if (!Configurator<Function>::NeedsBreak) return;
+    if (tld.facing.__breakHappened()) {
+      std::pair<bool, value_type> p = global_wl.pop();
+      while (p.first)
+	p = global_wl.pop();
+    }
   }
 
 public:
   template<typename IterTy>
   ForEachWork(IterTy b, IterTy e, Function& _f, const char* _loopname)
-    :f(_f), loopname(_loopname), abort_happened(0) {
+    :f(_f), loopname(_loopname) {
     global_wl.fill_initial(b, e);
+    abort_happened.data = 0;
   }
   ForEachWork(Function& _f, const char* _loopname)
-    :f(_f), loopname(_loopname), abort_happened(0) {
+    :f(_f), loopname(_loopname) {
+    abort_happened.data = 0;
   }
 
   ~ForEachWork() {
@@ -170,18 +182,12 @@ public:
         tld.lterm->workHappened();
       while (p.first) {
         doProcess(p.second, tld);
-	if (isLeader && abort_happened)
-	  drainAborted(tld);
-	if (tld.facing.__breakHappened())
-	  drainWL();
+	drainAborted<isLeader>(tld);
+	drainBreak(tld);
 	p = global_wl.pop();
       }
 
-      if (isLeader && abort_happened) {
-	drainAborted(tld);
-        continue;
-      }
-
+      drainAborted<isLeader>(tld);
       term.localTermination();
     } while (!term.globalTermination());
     setThreadContext(0);
