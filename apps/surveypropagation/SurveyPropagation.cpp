@@ -20,9 +20,8 @@
  *
  * @section Description
  *
- * Single source shortest paths.
+ * Survey Propagation
  *
- * @author Martin Burtscher <burtscher@txstate.edu>
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 #include "Galois/Statistic.h"
@@ -37,6 +36,7 @@
 #include <iostream>
 
 using namespace std;
+using namespace GaloisRuntime::WorkList;
 
 static const char* name = "Survey Propagation";
 static const char* description = "Solves SAT problems using survey propagation\n";
@@ -148,6 +148,9 @@ void initalize_random_formula(int M, int N, int K) {
       }
     }
   }
+
+  //std::random_shuffle(literals.begin(), literals.end());
+  //std::random_shuffle(clauses.begin(), clauses.end());
 }
 
 void print_formula() {
@@ -239,6 +242,16 @@ struct update_eta {
 
   template<typename Context>
   void operator()(GNode a, Context& ctx) {
+    
+    for (Graph::neighbor_iterator iii = graph.neighbor_begin(a), 
+	   iee = graph.neighbor_end(a); iii != iee; ++iii)
+      for (Graph::neighbor_iterator bii = graph.neighbor_begin(*iii), 
+	     bee = graph.neighbor_end(*iii); bii != bee; ++bii)
+	for (Graph::neighbor_iterator jii = graph.neighbor_begin(*bii), 
+	       jee = graph.neighbor_end(*bii); 
+	     jii != jee; ++jii)
+	  {}
+
     //for each i
     for (Graph::neighbor_iterator iii = graph.neighbor_begin(a), 
 	   iee = graph.neighbor_end(a); iii != iee; ++iii) {
@@ -315,11 +328,11 @@ void SP_algorithm() {
   //1.2) if (|sigma a->i(t) - sigma a->i (t-1) < E on all the edges, the iteration has converged and generated sigma* a->i = sigma a->i(t), goto 2
   //2) if t = tmax return un-converged.  if (t < tmax) then return the set of fixed point warnings sigma* a->i = sigma a->i (t)
   
-  Galois::for_each(clauses.begin(), clauses.end(), update_eta(), "update_eta");
+  Galois::for_each<dChunkedLIFO<1024> >(clauses.begin(), clauses.end(), update_eta(), "update_eta");
   maxBias.reset(0.0);
   averageBias.reset(0.0);
   nontrivial.reset(0);
-  Galois::for_each(literals.begin(), literals.end(), update_biases(), "update_bias");
+  Galois::for_each<dChunkedLIFO<1024> >(literals.begin(), literals.end(), update_biases(), "update_bias");
 }
 
 struct fix_variables {
@@ -347,7 +360,7 @@ struct fix_variables {
 void decimate() {
   std::cout << "NonTrivial " << nontrivial.get() << " MaxBias " << maxBias.get() << " Average Bias " << averageBias.get() << "\n";
   double d = ((maxBias.get() - averageBias.get()) * 0.25) + averageBias.get();
-  Galois::for_each(literals.begin(), literals.end(), fix_variables(d), "fix_variables");
+  Galois::for_each<dChunkedLIFO<1024> >(literals.begin(), literals.end(), fix_variables(d), "fix_variables");
 }
 
 bool survey_inspired_decimation() {
@@ -396,6 +409,8 @@ int main(int argc, const char** argv) {
   //print_formula();
   //build_graph();
   //print_graph();
+
+  std::cout << "Starting...\n";
 
   Galois::StatTimer T;
   T.start();
