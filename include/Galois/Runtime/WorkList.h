@@ -567,6 +567,48 @@ class LocalStealing : private boost::noncopyable {
 };
 WLCOMPILECHECK(LocalStealing);
 
+template<typename ContainerTy = FIFO<>, typename T = int >
+class LevelStealing : private boost::noncopyable {
+
+  PerLevel<typename ContainerTy::template rethread<true>::WL> local;
+
+ public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef LevelStealing<ContainerTy, T> WL;
+  };
+  template<typename Tnew>
+  struct retype {
+    typedef LevelStealing<typename ContainerTy::template retype<Tnew>::WL, Tnew> WL;
+  };
+
+  typedef T value_type;
+  
+  LevelStealing() {}
+
+  bool push(value_type val) {
+    return local.get().push(val);
+  }
+
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    return local.get().push(b,e);
+  }
+
+  std::pair<bool, value_type> pop() {
+    std::pair<bool, value_type> ret = local.get().pop();
+    if (ret.first)
+      return ret;
+    for (int i = 0; i < local.size(); ++i) {
+      ret = local.get(i).pop();
+      if (ret.first)
+	return ret;
+    }
+    return ret;
+  }
+};
+WLCOMPILECHECK(LevelStealing);
+
 //This overly complex specialization avoids a pointer indirection for non-distributed WL when accessing PerLevel
 template<bool d, typename TQ>
 struct squeues;
