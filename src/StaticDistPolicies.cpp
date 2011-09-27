@@ -34,8 +34,6 @@
 
 #include <sched.h>
 #include <string.h>
-
-#include <iostream>
 #include <sstream>
 
 using namespace GaloisRuntime;
@@ -137,6 +135,25 @@ struct MaxwellPolicy : public ThreadPolicy {
   }
 };
 
+//4 Cores per package, 2 packages
+struct DelaunayPolicy : public ThreadPolicy {
+
+  virtual void bindThreadToProcessor(int id) {
+    genericBindToProcessor(id);
+  }
+
+  DelaunayPolicy() {
+    numLevels = 1;
+    numThreads = 128;
+    numCores = 128;
+    levelSize.push_back(2);
+    for (int y = 0; y < 2; ++y)
+      for (int x = 0; x < 64; ++x)
+	for (int i = 0; i < 64; ++i)
+	  levelMap.push_back(x);
+  }
+};
+
 // 4 Cores per package, 4 packages
 struct GaloisPolicy : public ThreadPolicy {
 
@@ -194,6 +211,8 @@ static void setSystemThreadPolicy(const char* name) {
   else if (strcmp(name, "maxwell") == 0)
     newPolicy = new MaxwellPolicy();
   else if (strcmp(name, "galois") == 0)
+    newPolicy = new GaloisPolicy();
+  else if (strcmp(name, "delaunay") == 0)
     newPolicy = new GaloisPolicy();
 
   if (newPolicy) {
