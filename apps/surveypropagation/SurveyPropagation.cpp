@@ -35,6 +35,8 @@
 #include <cstdlib>
 #include <iostream>
 
+#include <math.h>
+
 using namespace std;
 using namespace GaloisRuntime::WorkList;
 
@@ -125,14 +127,14 @@ void initalize_random_formula(int M, int N, int K) {
   literals.resize(N);
 
   for (int m = 0; m < M; ++m) {
-    GNode N = graph.createNode(SPNode(m, true));
-    graph.addNode(N, Galois::NONE);
-    clauses[m] = N;
+    GNode node = graph.createNode(SPNode(m, true));
+    graph.addNode(node, Galois::NONE);
+    clauses[m] = node;
   }
   for (int n = 0; n < N; ++n) {
-    GNode N = graph.createNode(SPNode(n, false));
-    graph.addNode(N, Galois::NONE);
-    literals[n] = N;
+    GNode node = graph.createNode(SPNode(n, false));
+    graph.addNode(node, Galois::NONE);
+    literals[n] = node;
   }
 
   for (int m = 0; m < M; ++m) {
@@ -140,9 +142,8 @@ void initalize_random_formula(int M, int N, int K) {
     std::vector<int> touse;
     while (touse.size() != (unsigned)K) {
       //extra complex to generate uniform rand value
-      int newK = (int)(((double)rand()/(double)RAND_MAX) * (double)N);
-      if (std::find(touse.begin(), touse.end(), newK) 
-	  == touse.end()) {
+      int newK = (int)(((double)rand()/(double)RAND_MAX + 1) * (double)(N));
+      if (std::find(touse.begin(), touse.end(), newK) == touse.end()) {
 	touse.push_back(newK);
 	graph.addEdge(clauses[m], literals[newK], SPEdge((bool)(rand() % 2)), Galois::NONE);
       }
@@ -314,7 +315,7 @@ struct update_biases {
     idata.Bias = d;
     idata.value = (BiasP > BiasN);
 
-    assert(d != NAN && -d != NAN);
+    assert(!isnan(d) && !isnan(-d));
     maxBias.update(d);
     averageBias.update(d);
   }
