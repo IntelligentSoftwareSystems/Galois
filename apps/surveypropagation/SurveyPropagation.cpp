@@ -142,7 +142,7 @@ void initalize_random_formula(int M, int N, int K) {
     std::vector<int> touse;
     while (touse.size() != (unsigned)K) {
       //extra complex to generate uniform rand value
-      int newK = (int)(((double)rand()/(double)RAND_MAX + 1) * (double)(N));
+      int newK = (int)(((double)rand()/((double)RAND_MAX + 1)) * (double)(N));
       if (std::find(touse.begin(), touse.end(), newK) == touse.end()) {
 	touse.push_back(newK);
 	graph.addEdge(clauses[m], literals[newK], SPEdge((bool)(rand() % 2)), Galois::NONE);

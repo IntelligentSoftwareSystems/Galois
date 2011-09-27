@@ -32,6 +32,8 @@
 #include "Galois/Runtime/Threads.h"
 #include "Galois/Runtime/Support.h"
 
+#include <boost/algorithm/string/predicate.hpp>
+
 #include <sched.h>
 #include <string.h>
 #include <sstream>
@@ -202,22 +204,26 @@ struct DummyPolicy : public ThreadPolicy {
 
 static ThreadPolicy* TP = 0;
 
-static void setSystemThreadPolicy(const char* name) {
+static bool hostnameMatches(std::string hostname, std::string m) {
+  return hostname == m || boost::starts_with(hostname, m + ".");
+}
+
+static void setSystemThreadPolicy(std::string hostname) {
   ThreadPolicy* newPolicy = 0;
-  if (strcmp(name, "faraday") == 0)
+  if (hostnameMatches(hostname, "faraday"))
     newPolicy = new FaradayPolicy();
-  else if (strcmp(name, "volta") == 0)
+  else if (hostnameMatches(hostname, "volta"))
     newPolicy = new VoltaPolicy();
-  else if (strcmp(name, "maxwell") == 0)
+  else if (hostnameMatches(hostname, "maxwell"))
     newPolicy = new MaxwellPolicy();
-  else if (strcmp(name, "galois") == 0)
+  else if (hostnameMatches(hostname, "galois"))
     newPolicy = new GaloisPolicy();
-  else if (strcmp(name, "delaunay") == 0)
-    newPolicy = new GaloisPolicy();
+  else if (hostnameMatches(hostname, "delaunay"))
+    newPolicy = new DelaunayPolicy();
 
   if (newPolicy) {
     std::ostringstream out;
-    out << "Using " << name << " for thread assignment policy";
+    out << "Using " << hostname << " for thread assignment policy";
     reportInfo("ThreadPool", out.str().c_str());
   } else {
     newPolicy = new DummyPolicy();
