@@ -31,19 +31,15 @@
 #include "Galois/Runtime/Support.h"
 
 #include <map>
-
 #ifdef __linux__
 #include <linux/mman.h>
 #endif
 #include <sys/mman.h>
 
-#include <iostream>
-
 using namespace GaloisRuntime;
 using namespace MM;
 
 // Abstract away mmap
-
 static const int _PROT = PROT_READ | PROT_WRITE;
 static const int _MAP_BASE = MAP_ANONYMOUS | MAP_PRIVATE;
 #ifdef MAP_POPULATE
@@ -71,25 +67,32 @@ void* mmapWrapper::_alloc() {
   static SimpleLock<int,false> L;
 #endif
   L.lock();
- void* ptr = 0;
+  void* ptr = 0;
+
 #ifdef MAP_HUGETLB
   //First try huge
   ptr = mmap(0, AllocSize, _PROT, _MAP_HUGE, -1, 0);
 #endif
-#ifdef MAP_POPULATE
+
+#ifndef GALOIS_ISS
+  // Force huge pages on ISS machines for performance 
+# ifdef MAP_POPULATE
   //Then try populate
   if (!ptr || ptr == MAP_FAILED)
     ptr = mmap(0, AllocSize, _PROT, _MAP_POP, -1, 0);
-#endif
+# endif
   //Then try normal
   if (!ptr || ptr == MAP_FAILED)
     ptr = mmap(0, AllocSize, _PROT, _MAP_BASE, -1, 0);
+#endif
+
   if (!ptr || ptr == MAP_FAILED) {
     L.unlock();
     reportWarning("Memory Allocation Failed");
     assert(0 && "mmap failed");
     abort();
   }
+
   L.unlock();
   return ptr;
 }
@@ -108,7 +111,6 @@ PtrLock<SizedAllocatorFactory*, true> SizedAllocatorFactory::instance;
 SizedAllocatorFactory::SizedAlloc* 
 SizedAllocatorFactory::getAllocatorForSize(unsigned int size) {
   lock.lock();
-  //std::cout << "Sz : " << size << "\n";
   SizedAlloc*& retval = allocators[size];
   if (!retval)
     retval = new SizedAlloc;

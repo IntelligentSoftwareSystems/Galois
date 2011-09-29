@@ -23,6 +23,9 @@ set(USE_PTHREAD ON)
 #use profiling
 #set(USE_PROFILING ON)
 
+# Enable iss specific options; should be OFF in the general release
+set(USE_ISS ON)
+
 ##### Machine-specific settings (probably not useful to you) ######
 if(SITE_NAME MATCHES "volta.*")
   set(USE_NUMA ON)
@@ -126,6 +129,10 @@ if(USE_PROFILING)
   add_definitions(-pg)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pg")
 endif(USE_PROFILING)
+
+if(USE_ISS)
+  add_definitions(-DGALOIS_ISS)
+endif()
 
 #solaris
 if(USE_SOLARIS)
