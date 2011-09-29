@@ -74,8 +74,8 @@ void* mmapWrapper::_alloc() {
   ptr = mmap(0, AllocSize, _PROT, _MAP_HUGE, -1, 0);
 #endif
 
-#ifndef GALOIS_ISS
-  // Force huge pages on ISS machines for performance 
+#if !defined GALOIS_ISS || !defined __linux__
+  // Force huge pages on ISS linux machines for performance 
 # ifdef MAP_POPULATE
   //Then try populate
   if (!ptr || ptr == MAP_FAILED)
