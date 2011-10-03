@@ -37,6 +37,11 @@
 #include <sched.h>
 #include <string.h>
 #include <sstream>
+#include <fstream>
+#include <cstdio>
+#include <map>
+#include <iostream>
+
 
 using namespace GaloisRuntime;
 
@@ -58,147 +63,128 @@ static void genericBindToProcessor(int proc) {
 #endif      
 }
 
-//6 Cores per package, 4 packages
-struct FaradayPolicy : public ThreadPolicy {
 
-  virtual void bindThreadToProcessor(int id) {
-    //schedule inside each package first
-    int carry = 0;
-    if (id > 23) {
-      id -= 24;
-      carry = 24;
+struct cpuinfo {
+  int proc;
+  int physid;
+  int sib;
+  int coreid;
+  int cpucores;
+};
+
+bool cmp_procinv(const cpuinfo& m1, const cpuinfo& m2) {
+  return m1.proc > m2.proc;
+}
+
+struct AutoLinuxPolicy : public ThreadPolicy {
+    std::vector<int> mapping; //index (galois) -> proc (OS)
+
+  virtual void bindThreadToProcessor() {
+    genericBindToProcessor(mapping[ThreadPool::getMyID()]);
+  }
+
+  AutoLinuxPolicy() {
+
+    name = "AutoLinux";
+
+    std::vector<cpuinfo> vals;
+    int cur = -1;
+    
+    //PARSE:
+    
+    std::ifstream fcpuinfo("/proc/cpuinfo");
+    char line[1024];
+    while (fcpuinfo.getline(line, sizeof(line))) {
+      //std::cout << "*" << line << "*\n";
+      int num;
+      if (sscanf(line, "processor : %d", &num) == 1) {
+	assert(cur < num);
+	cur = num;
+	vals.resize(num + 1);
+	vals.at(cur).proc = num;
+      } else if (sscanf(line, "physical id : %d", &num) == 1) {
+	vals.at(cur).physid = num;
+      } else if (sscanf(line, "siblings : %d", &num) == 1) {
+	vals.at(cur).sib = num;
+      } else if (sscanf(line, "core id : %d", &num) == 1) {
+	vals.at(cur).coreid = num;
+      } else if (sscanf(line, "cpu cores : %d", &num) == 1) {
+	vals.at(cur).cpucores = num;
+      }
     }
-    genericBindToProcessor(carry + ((id % 6) * 4) + (id / 6));
-  }
-
-  FaradayPolicy() {
-    numLevels = 1;
-    numThreads = 48;
-    numCores = 24;
-    levelSize.push_back(4);
-    for (int y = 0; y < 2; ++y)
-      for (int x = 0; x < 4; ++x)
-	for (int i = 0; i < 6; ++i)
-	  levelMap.push_back(x);
-  }
-};
-
-//4 Cores per package, 2 packages per blade, 4 blades
-struct VoltaPolicy : public ThreadPolicy {
-
-  virtual void bindThreadToProcessor(int id) {
-    //1-1 works on volota
-    genericBindToProcessor(id);
-  }
-
-  VoltaPolicy() {
-    numLevels = 2;
-    numThreads = 64;
-    numCores = 32;
-
-    //NUMA Nodes
-    levelSize.push_back(4);
-    for (int y = 0; y < 2; ++y)
-      for (int x = 0; x < 4; ++x)
-	for (int i = 0; i < 8; ++i)
-	  levelMap.push_back(x);
-
-    //Packages
-    levelSize.push_back(8);
-    for (int y = 0; y < 2; ++y)
-      for (int x = 0; x < 8; ++x)
-	for (int i = 0; i < 4; ++i)
-	  levelMap.push_back(x);
-  }
-};
-
-//4 Cores per package, 2 packages
-struct MaxwellPolicy : public ThreadPolicy {
-
-  virtual void bindThreadToProcessor(int id) {
-    //schedule inside each package first
-    int carry = 0;
-    if (id > 7) {
-      id -= 8;
-      carry = 8;
+    fcpuinfo.close();
+    
+    //GROUP:
+    typedef std::vector<cpuinfo> L;
+    typedef std::map<int, std::map<int, L > > M;
+    M byPhysCoreID;
+    htRatio = 0;
+    for (cur = 0; (unsigned)cur < vals.size(); ++cur) {
+      cpuinfo& x = vals[cur];
+      byPhysCoreID[x.physid][x.coreid].push_back(x);
+      if (htRatio) {
+	assert(htRatio == x.sib / x.cpucores);
+      } else {
+	htRatio = x.sib / x.cpucores;
+      }
     }
-    genericBindToProcessor(carry + (id * 2) - ((id /4) * 7));
+    
+    numThreads = vals.size();
+    numCores = byPhysCoreID.size() * byPhysCoreID.begin()->second.begin()->second.begin()->cpucores;
+    numPackages = byPhysCoreID.size();
+
+    levelSize.push_back(1);
+    levelSize.push_back(numCores / numPackages);
+    
+    // GERNATE MAPPING:
+    for (int ht = 0; ht < htRatio; ++ht) {
+      for (M::iterator ii = byPhysCoreID.begin(), ee = byPhysCoreID.end();
+	   ii != ee; ++ii) {
+	std::map<int, L>& coreids = ii->second;
+	for (std::map<int, L>::iterator cii = coreids.begin(), cee = coreids.end(); cii != cee; ++cii) {
+	  //assign galois thread num to lowest proc id for this core, phys
+	  std::sort(cii->second.begin(), cii->second.end(), cmp_procinv);
+	  mapping.push_back(cii->second.back().proc);
+	  cii->second.pop_back();
+	}
+      }
+    }
+    
+    // PRINT MAPPING:
+    //    printf("htRatio, numPackages, numCores, numThreads: %d, %d, %d, %d\n", htRatio, numPackages, numCores, numThreads);
+    for( unsigned i = 0; i < mapping.size(); ++i)
+      printf("(%d,%d) ", i, mapping[i]);
+    printf("\n");
+    
+    // PRINT LEVELMAP for levels
+    for (int x = 0; x < getNumLevels(); ++x) {
+      printf("Level %d\n", x);
+      for (int y = 0; y < getNumThreads(); ++y) {
+	printf(" (%d,%d)", y, indexLevelMap(x,y));
+      }
+      printf("\n");
+    }
+
   }
 
-  MaxwellPolicy() {
-    numLevels = 1;
-    numThreads = 16;
-    numCores = 8;
-    levelSize.push_back(2);
-    for (int y = 0; y < 2; ++y)
-      for (int x = 0; x < 2; ++x)
-	for (int i = 0; i < 4; ++i)
-	  levelMap.push_back(x);
-  }
 };
-
-//4 Cores per package, 2 packages
-struct DelaunayPolicy : public ThreadPolicy {
-
-  virtual void bindThreadToProcessor(int id) {
-    genericBindToProcessor(id);
-  }
-
-  DelaunayPolicy() {
-    numLevels = 1;
-    numThreads = 128;
-    numCores = 128;
-    levelSize.push_back(2);
-    for (int y = 0; y < 2; ++y)
-      for (int x = 0; x < 64; ++x)
-	for (int i = 0; i < 64; ++i)
-	  levelMap.push_back(x);
-  }
-};
-
-// 4 Cores per package, 4 packages
-struct GaloisPolicy : public ThreadPolicy {
-
-  virtual void bindThreadToProcessor(int id) {
-    //1-1 works on galois
-    genericBindToProcessor(id);
-  }
-
-  GaloisPolicy() {
-    numLevels = 1;
-    numThreads = 16;
-    numCores = 16;
-    levelSize.push_back(4);
-    for (int y = 0; y < 2; ++y)
-      for (int x = 0; x < 4; ++x)
-        for (int i = 0; i < 4; ++i)
-          levelMap.push_back(x);
-  }
-};
-
-
 
 struct DummyPolicy : public ThreadPolicy {
 
-  virtual void bindThreadToProcessor(int id) {
-    genericBindToProcessor(id);
+  virtual void bindThreadToProcessor() {
+    genericBindToProcessor(ThreadPool::getMyID());
   }
 
   DummyPolicy() {
-    numLevels = 1;
+    htRatio = 1;
 
-#ifdef __linux__
-    numThreads = sysconf(_SC_NPROCESSORS_CONF);
-#else
+    name = "Dummy";
+
     reportWarning("Don't know how to bind thread to cpu on this platform");
     reportWarning("Unknown number of processors (assuming 64)");
-    numThreads = 64;
-#endif
-
+    numThreads = 128;
     numCores = numThreads;
     levelSize.push_back(1);
-    for (int x = 0; x < numThreads; ++x)
-      levelMap.push_back(0);
   }
 };
 
@@ -210,20 +196,13 @@ static bool hostnameMatches(std::string hostname, std::string m) {
 
 static void setSystemThreadPolicy(std::string hostname) {
   ThreadPolicy* newPolicy = 0;
-  if (hostnameMatches(hostname, "faraday"))
-    newPolicy = new FaradayPolicy();
-  else if (hostnameMatches(hostname, "volta"))
-    newPolicy = new VoltaPolicy();
-  else if (hostnameMatches(hostname, "maxwell"))
-    newPolicy = new MaxwellPolicy();
-  else if (hostnameMatches(hostname, "galois"))
-    newPolicy = new GaloisPolicy();
-  else if (hostnameMatches(hostname, "delaunay"))
-    newPolicy = new DelaunayPolicy();
+#ifdef __linux__
+  newPolicy = new AutoLinuxPolicy();
+#endif
 
   if (newPolicy) {
     std::ostringstream out;
-    out << "Using " << hostname << " for thread assignment policy";
+    out << "Using " << newPolicy->getName() << " for thread assignment policy";
     reportInfo("ThreadPool", out.str().c_str());
   } else {
     newPolicy = new DummyPolicy();

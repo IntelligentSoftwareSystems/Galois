@@ -126,8 +126,8 @@ class ThreadPool_pthread : public ThreadPool {
   volatile runCMD* workEnd; //End iterator for work commands
 
   void initThread() {
-    unsigned int id = LocalThreadID = __sync_fetch_and_add(&nextThread, 1);
-    GaloisRuntime::getSystemThreadPolicy().bindThreadToProcessor(id);
+    LocalThreadID = __sync_fetch_and_add(&nextThread, 1);
+    GaloisRuntime::getSystemThreadPolicy().bindThreadToProcessor();
   }
 
   void doWork(void) {

@@ -142,12 +142,12 @@ public:
   {
     //last iteresting level (should be package)
     level = P.getNumLevels() - 1;
-    create(P.getLevelSize(level));
+    create(P.getLevelBins(level));
   }
   explicit PerLevel(const T& ival)
   {
     level = P.getNumLevels() - 1;
-    create(P.getLevelSize(level));
+    create(P.getLevelBins(level));
     reset(ival);
   }
 

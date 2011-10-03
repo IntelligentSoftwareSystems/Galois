@@ -63,47 +63,51 @@ ThreadPool& getSystemThreadPool();
 
 class ThreadPolicy {
 protected:
-  //num levels
-  int numLevels;
-  
+  const char* name;
+
   //number of hw supported threads
   int numThreads;
   
   //number of "real" processors
   int numCores;
 
-  //example levels:
-  //thread(0), Cpu(1), numa(2), machine(3)
+  //number of packages
+  int numPackages;
 
-  //Total number of threads in each level
+  //number of threads per core
+  int htRatio;
+
+  //number of threads in each level
+  // it is assumed that (thread id % numCores) / levelSize == bin for that level
+  // this works because threads are densely numbered in this way
+  //commonly this is structured as:
+  // level[0] = non-SMT Threads/core (Each core is it's own thing)
+  // level[1] = non-SMT Threads/L3 (thread to L3 mapping)
+  // level[2] = non-SMT Threads/NUMA Node (optional)
   std::vector<int> levelSize;
 
-  //[numLevels][numThreads] -> item index for thread at level
-  std::vector<int> levelMap;
-
 public:
+  const char* getName() const { return name; }
+
+  //Return the bin for thread thr at level level
   int indexLevelMap(int level, int thr) const {
-    return levelMap[level * numThreads + thr];
+    return (thr % numCores) / levelSize[level];
   }
 
-  int getNumLevels() const { return numLevels; }
+  int getNumLevels() const { return levelSize.size(); }
 
   int getNumThreads() const { return numThreads; }
 
   int getNumCores() const { return numCores; }
 
-  int getLevelSize(int S) const { return levelSize[S]; }
+  int getLevelBins(int level) const { return numCores / levelSize[level]; }
 
   int isFirstInLevel(int level, int thr) const {
-    int thrLevel = indexLevelMap(level, thr);
-    for (int i = 0; i < getNumThreads(); ++i)
-      if (indexLevelMap(level, i) == thrLevel)
-	return i == thr;
-    //Should be dead:
-    return false;
+    return thr % levelSize[level] == 0 &&
+      thr / numCores == 0;
   }
 
-  virtual void bindThreadToProcessor(int id) = 0;
+  virtual void bindThreadToProcessor() = 0;
 };
 
 ThreadPolicy& getSystemThreadPolicy();
