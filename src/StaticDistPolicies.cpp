@@ -32,18 +32,26 @@
 #include "Galois/Runtime/Threads.h"
 #include "Galois/Runtime/Support.h"
 
-#include <boost/algorithm/string/predicate.hpp>
-
+#ifdef __linux__
 #include <sched.h>
-#include <string.h>
-#include <sstream>
+#endif
+
+#if defined(sun) || defined(__sun)
+#include <thread.h>
+#include <sys/types.h>
+#include <sys/processor.h>
+#include <sys/procset.h>
+#endif
+
 #include <fstream>
 #include <cstdio>
+#include <cassert>
 #include <map>
-#include <iostream>
-
+#include <algorithm>
 
 using namespace GaloisRuntime;
+
+namespace {
 
 static void genericBindToProcessor(int proc) {
 #ifdef __linux__
@@ -56,14 +64,25 @@ static void genericBindToProcessor(int proc) {
   (void)CPU_SET( proc, &mask );
   
   /* sched_setaffinity returns 0 in success */
-  if( sched_setaffinity( 0, sizeof(mask), &mask ) == -1 )
+  if( sched_setaffinity( 0, sizeof(mask), &mask ) == -1 ) {
+    perror("Error");
     reportWarning("Could not set CPU Affinity for thread", (unsigned)proc);
-  
+  }
   return;
-#endif      
+#endif
+#if defined(sun) || defined(__sun)
+  if (processor_bind(P_LWPID,  thr_self(), proc, 0) == -1) {
+    perror("Error");
+    reportWarning("Could not set CPU Affinity for thread", (unsigned)proc);
+  }
+  return;
+#endif
+
+  reportWarning("Don't know how to bind thread to cpu on this platform");
+  return;
 }
 
-
+#ifdef __linux__
 struct cpuinfo {
   int proc;
   int physid;
@@ -150,24 +169,58 @@ struct AutoLinuxPolicy : public ThreadPolicy {
       }
     }
     
-    // PRINT MAPPING:
-    //    printf("htRatio, numPackages, numCores, numThreads: %d, %d, %d, %d\n", htRatio, numPackages, numCores, numThreads);
-    for( unsigned i = 0; i < mapping.size(); ++i)
-      printf("(%d,%d) ", i, mapping[i]);
-    printf("\n");
+    // // PRINT MAPPING:
+    // //    printf("htRatio, numPackages, numCores, numThreads: %d, %d, %d, %d\n", htRatio, numPackages, numCores, numThreads);
+    // for( unsigned i = 0; i < mapping.size(); ++i)
+    //   printf("(%d,%d) ", i, mapping[i]);
+    // printf("\n");
     
-    // PRINT LEVELMAP for levels
-    for (int x = 0; x < getNumLevels(); ++x) {
-      printf("Level %d\n", x);
-      for (int y = 0; y < getNumThreads(); ++y) {
-	printf(" (%d,%d)", y, indexLevelMap(x,y));
-      }
-      printf("\n");
-    }
+    // // PRINT LEVELMAP for levels
+    // for (int x = 0; x < getNumLevels(); ++x) {
+    //   printf("Level %d\n", x);
+    //   for (int y = 0; y < getNumThreads(); ++y) {
+    // 	printf(" (%d,%d)", y, indexLevelMap(x,y));
+    //   }
+    //   printf("\n");
+    // }
 
   }
 
 };
+#endif
+
+#if defined(sun) || defined(__sun)
+//Flat machine with the correct number of threads and binding
+struct AutoSunPolicy : public ThreadPolicy {
+  
+  std::vector<int> procmap; //Galoid id -> solaris id
+
+  virtual void bindThreadToProcessor() {
+    genericBindToProcessor(procmap[ThreadPool::getMyID()]);
+  }
+
+  AutoSunPolicy() {
+
+    name = "AutoSunPolicy";
+
+    processorid_t i, cpuid_max;
+    cpuid_max = sysconf(_SC_CPUID_MAX);
+    for (i = 0; i <= cpuid_max; i++) {
+      if (p_online(i, P_STATUS) != -1) {
+	procmap.push_back(i);
+	//printf("processor %d present\n", i);
+      }
+    }
+
+    numThreads = procmap.size();
+    numCores = procmap.size();
+    numPackages = 1;
+    htRatio = 1;
+
+    levelSize.push_back(1);
+  }
+};
+#endif
 
 struct DummyPolicy : public ThreadPolicy {
 
@@ -180,49 +233,29 @@ struct DummyPolicy : public ThreadPolicy {
 
     name = "Dummy";
 
-    reportWarning("Don't know how to bind thread to cpu on this platform");
-    reportWarning("Unknown number of processors (assuming 64)");
+    reportWarning("Unknown number of processors (assuming 128)");
     numThreads = 128;
     numCores = numThreads;
     levelSize.push_back(1);
   }
 };
 
+}
+
 static ThreadPolicy* TP = 0;
 
-static bool hostnameMatches(std::string hostname, std::string m) {
-  return hostname == m || boost::starts_with(hostname, m + ".");
-}
-
-static void setSystemThreadPolicy(std::string hostname) {
-  ThreadPolicy* newPolicy = 0;
-#ifdef __linux__
-  newPolicy = new AutoLinuxPolicy();
-#endif
-
-  if (newPolicy) {
-    std::ostringstream out;
-    out << "Using " << newPolicy->getName() << " for thread assignment policy";
-    reportInfo("ThreadPool", out.str().c_str());
-  } else {
-    newPolicy = new DummyPolicy();
-    reportWarning("using default thread assignment policy");
-  }
-
-  if (TP)
-    delete TP;
-  TP = newPolicy;
-}
-
 ThreadPolicy& GaloisRuntime::getSystemThreadPolicy() {
-  if (!TP) {
-    //try autodetecting policy from hostname
-    char name[256];
-    int r = gethostname(name, 256);
-    if (!r)
-      setSystemThreadPolicy(name);
-    else 
-      TP = new DummyPolicy();
-  }
+  bool printthing = !TP;
+#ifdef __linux__
+  if (!TP) TP = new AutoLinuxPolicy();
+#endif
+#if defined(sun) || defined(__sun)
+  if (!TP) TP = new AutoSunPolicy();
+#endif
+  if (!TP) TP = new DummyPolicy();
+  
+  if (printthing)
+    reportInfo("Thread Policy", TP->getName());
+
   return *TP;
 }
