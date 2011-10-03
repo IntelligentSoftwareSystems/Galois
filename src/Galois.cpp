@@ -23,21 +23,6 @@ kind.
 //! Global thread context for each active thread
 static __thread GaloisRuntime::SimpleRuntimeContext* thread_cnx = 0;
 
-//! Helper function to decide if the conflict detection lock should be taken
-static inline bool shouldLock(Galois::MethodFlag g) {
-  switch(g) {
-  case Galois::NONE:
-  case Galois::SAVE_UNDO:
-    return false;
-  case Galois::ALL:
-  case Galois::CHECK_CONFLICT:
-    return true;
-  }
-  assert(0 && "Shouldn't get here");
-  abort();
-}
-
-
 void GaloisRuntime::setThreadContext(GaloisRuntime::SimpleRuntimeContext* n)
 {
   thread_cnx = n;
