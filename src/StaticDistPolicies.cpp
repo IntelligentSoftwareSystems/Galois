@@ -152,8 +152,8 @@ struct AutoLinuxPolicy : public ThreadPolicy {
     numCores = byPhysCoreID.size() * byPhysCoreID.begin()->second.begin()->second.begin()->cpucores;
     numPackages = byPhysCoreID.size();
 
-    levelSize.push_back(1);
-    levelSize.push_back(numCores / numPackages);
+    levelSize[0] = 1;
+    levelSize[1] = numCores / numPackages;
     
     // GERNATE MAPPING:
     for (int ht = 0; ht < htRatio; ++ht) {
@@ -217,7 +217,8 @@ struct AutoSunPolicy : public ThreadPolicy {
     numPackages = 1;
     htRatio = 1;
 
-    levelSize.push_back(1);
+    levelSize[0] = 1;
+    levelSize[1] = 1;
   }
 };
 #endif
@@ -236,7 +237,8 @@ struct DummyPolicy : public ThreadPolicy {
     reportWarning("Unknown number of processors (assuming 128)");
     numThreads = 128;
     numCores = numThreads;
-    levelSize.push_back(1);
+    levelSize[0] = 1;
+    levelSize[1] = 1;
   }
 };
 

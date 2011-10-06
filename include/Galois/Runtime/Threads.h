@@ -83,8 +83,8 @@ protected:
   //commonly this is structured as:
   // level[0] = non-SMT Threads/core (Each core is it's own thing)
   // level[1] = non-SMT Threads/L3 (thread to L3 mapping)
-  // level[2] = non-SMT Threads/NUMA Node (optional)
-  std::vector<int> levelSize;
+  // NOT YET: level[2] = non-SMT Threads/NUMA Node
+  int levelSize[2];
 
 public:
   const char* getName() const { return name; }
@@ -94,7 +94,7 @@ public:
     return (thr % numCores) / levelSize[level];
   }
 
-  int getNumLevels() const { return levelSize.size(); }
+  int getNumLevels() const { return 2; }
 
   int getNumThreads() const { return numThreads; }
 
