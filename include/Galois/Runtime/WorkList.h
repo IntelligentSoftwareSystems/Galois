@@ -599,7 +599,7 @@ class LevelStealing : private boost::noncopyable {
     std::pair<bool, value_type> ret = local.get().pop();
     if (ret.first)
       return ret;
-    for (int i = 0; i < local.size(); ++i) {
+    for (unsigned i = 0; i < local.size(); ++i) {
       ret = local.get(i).pop();
       if (ret.first)
 	return ret;
@@ -886,70 +886,6 @@ public:
   }
 };
 WLCOMPILECHECK(FCPairingHeapQueue);
-
-template<typename Iter = int*, typename T = int>
-class InitialIterator {
-  struct Range {
-    Iter ii;
-    Iter ee;
-  };
-  Range Master;
-  PaddedLock<true> L;
-  PerCPU<Range> Ranges;
-public:
-  typedef T value_type;
-
-  //! change the concurrency flag
-  template<bool newconcurrent>
-  struct rethread {
-    typedef InitialIterator<Iter, T> WL;
-  };
-
-  //! change the type the worklist holds
-  template<typename Tnew>
-  struct retype {
-    typedef InitialIterator<Iter, Tnew> WL;
-  };
-
-  bool push(value_type val) {
-    assert(0 && "cannot push into InitialIterator Worklist");
-    abort();
-  }
-
-  template<typename Iter2>
-  bool push(Iter2 b, Iter2 e) {
-    assert(0 && "cannot push into InitialIterator Worklist");
-    abort();
-  }
-
-  std::pair<bool, value_type> pop() {
-    Range& myR = Ranges.get();
-    if (myR.ii != myR.ee)
-      return std::make_pair(true, *myR.ii++);
-
-    L.lock();
-    myR.ii = Master.ii;
-    //FIXME: specialize for random access iterators
-    //for (int i = 0; i < 1024 && Master.ii != Master.ee; ++i, ++Master.ii) ;
-    //int num = std::min(256, (int)std::distance(Master.ii, Master.ee));
-    int d = (int)std::distance(Master.ii, Master.ee);
-    int num = std::min(std::max(16, d / 32), d);
-    std::advance(Master.ii, num);
-    myR.ee = Master.ii;
-    L.unlock();
-
-    if (myR.ii == myR.ee)
-      return std::make_pair(false, value_type());
-    else
-      return std::make_pair(true, *myR.ii++);
-  }
-
-  void fill_initial(Iter b, Iter e) {
-    Master.ii = b;
-    Master.ee = e;
-  }
-};
-WLCOMPILECHECK(InitialIterator);
 
 //End namespace
 }
