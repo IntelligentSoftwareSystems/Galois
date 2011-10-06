@@ -147,12 +147,6 @@ class ForEachWork {
   }
 
 public:
-  template<typename IterTy>
-  ForEachWork(IterTy b, IterTy e, Function& _f, const char* _loopname)
-    :f(_f), loopname(_loopname) {
-    global_wl.fill_initial(b, e);
-    abort_happened.data = 0;
-  }
   ForEachWork(Function& _f, const char* _loopname)
     :f(_f), loopname(_loopname) {
     abort_happened.data = 0;
@@ -164,12 +158,11 @@ public:
     GaloisRuntime::statDone();
   }
 
-  template<typename IT>
-  void AddInitialWork(IT& b, IT& e) {
-    global_wl.push(b,e);
+  template<typename Iter>
+  bool AddInitialWork(Iter b, Iter e) {
+    return global_wl.push(b,e);
   }
 
-  //FIXME: Add back in function based typetrait specialization
   template<bool isLeader>
   void go() {
     tldTy& tld = tdata.get();
@@ -232,7 +225,6 @@ void for_each_impl(IterTy b, IterTy e, Function f, const char* loopname) {
   typedef typename WLTy::template retype<typename std::iterator_traits<IterTy>::value_type>::WL aWLTy;
 
   ForEachWork<aWLTy, Function> GW(f, loopname);
-  //ForEachWork<aWLTy, Function> GW(f, loopname);
 
   FillWork<IterTy, ForEachWork<aWLTy, Function> > fw2(b,e,GW);
 
@@ -246,7 +238,6 @@ void for_each_impl(IterTy b, IterTy e, Function f, const char* loopname) {
   w[2].work = &runAllLoopExitHandlers;
   w[2].isParallel = false;
   w[2].barrierAfter = true;
-
   getSystemThreadPool().run(&w[0], &w[3]);
 }
 
