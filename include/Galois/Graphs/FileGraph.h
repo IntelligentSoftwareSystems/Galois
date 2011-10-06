@@ -61,6 +61,10 @@
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/detail/endian.hpp>
 
+#ifdef GALOIS_NUMA
+#include <numa.h>
+#endif
+
 using namespace GaloisRuntime;
 
 namespace Galois {
@@ -72,7 +76,7 @@ public:
   typedef uint32_t GraphNode;
 
 protected:
-  void* masterMapping;
+  void* volatile masterMapping;
   size_t masterLength;
   uint64_t sizeEdgeTy;
   int masterFD;
@@ -149,7 +153,20 @@ protected:
     }
   };
 
+  void parse(void* m);
+
 public:
+  bool isLoaded() {
+    return masterMapping != 0;
+  }
+
+  void* getBasePtr() {
+    return masterMapping;
+  }
+  size_t getBaseLength() {
+    return masterLength;
+  }
+
   // Node Handling
 
   //! Check if a node is in the graph (already added)
@@ -217,11 +234,100 @@ public:
 
   //! Read graph connectivity information from file
   void structureFromFile(const char* filename);
+
+  //! Read graph connectivity information from memory
+  void structureFromMem(void* mem, size_t len, bool clone = false);
 };
+
+#ifdef GALOIS_NUMA
+class NumaFileGraph {
+public:
+  typedef uint32_t GraphNode;
+
+protected:
+  GaloisRuntime::PerLevel<FileGraph> graphs;
+  GaloisRuntime::PerLevel<GaloisRuntime::SimpleLock<int, true> > locks;
+
+  FileGraph& ldIfNeeded() {
+    FileGraph& g = graphs.get();
+    while (!g.isLoaded()) {
+      __sync_synchronize();
+      if (locks.get().try_lock()) {
+	if (!g.isLoaded()) {
+	  g.structureFromMem(graphs.get(0).getBasePtr(), graphs.get(0).getBaseLength(), true);
+	  //std::cout << "Fixed " << graphs.myEffectiveID() << " by " << graphs.myID() << "\n";
+	}
+	locks.get().unlock();
+      }
+      //std::cout << graphs.myID() << ' ';
+    }
+    return g;
+  }
+
+public:
+  // Node Handling
+
+  //! Check if a node is in the graph (already added)
+  bool containsNode(const GraphNode n) {
+    return ldIfNeeded().containsNode(n);
+  }
+
+  // Edge Handling
+  template<typename EdgeTy>
+  EdgeTy& getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
+    return ldIfNeeded().getEdgeData<EdgeTy>(src,dst,mflag);
+  }
+
+  // General Things
+  typedef FileGraph::neighbor_iterator neighbor_iterator;
+
+  neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = ALL) {
+    return ldIfNeeded().neighbor_begin(N,mflag);
+  }
+
+  neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = ALL) {
+    return ldIfNeeded().neighbor_end(N,mflag);
+  }
+
+  bool has_neighbor(GraphNode N1, GraphNode N2, MethodFlag mflag = ALL) {
+    return ldIfNeeded().has_neighbor(N1,N2, mflag);
+  }
+
+  typedef boost::counting_iterator<uint64_t> active_iterator;
+
+  //! Iterate over nodes in graph (not thread safe)
+  active_iterator active_begin() {
+    return ldIfNeeded().active_begin();
+  }
+
+  active_iterator active_end() {
+    return ldIfNeeded().active_end();
+  }
+
+  //! The number of nodes in the graph
+  unsigned int size() {
+    return ldIfNeeded().size();
+  }
+
+  //! The number of edges in the graph
+  unsigned int sizeEdges () {
+    return ldIfNeeded().sizeEdges();
+  }
+
+  NumaFileGraph();
+  ~NumaFileGraph();
+
+  //! Read graph connectivity information from file
+  void structureFromFile(const char* filename) {
+    graphs.get(0).structureFromFile(filename);
+  }
+};
+#endif
 
 //! Local computation graph (i.e., graph structure does not change)
 template<typename NodeTy, typename EdgeTy>
 class LC_FileGraph : public FileGraph {
+  typedef FileGraph Par;
 
   struct gNode : public GaloisRuntime::Lockable {
     NodeTy data;
@@ -235,7 +341,8 @@ public:
   LC_FileGraph() :NodeData(0) {}
   ~LC_FileGraph() {
     if (NodeData)
-      delete[] NodeData;
+      //      delete[] NodeData;
+      numa_free(NodeData,sizeof(cache_line_storage<gNode>)*size());
   }
   
   NodeTy& getData(GraphNode N, MethodFlag mflag = ALL) {
@@ -244,21 +351,22 @@ public:
   }
 
   EdgeTy& getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
-    return FileGraph::getEdgeData<EdgeTy>(src, dst, mflag);
+    return Par::getEdgeData<EdgeTy>(src, dst, mflag);
   }
 
   //! Loads node data from file
   void nodeDataFromFile(const char* filename) {
     emptyNodeData();
     std::ifstream file(filename);
-    for (uint64_t i = 0; i < numNodes; ++i)
+    for (uint64_t i = 0; i < size(); ++i)
       file >> NodeData[i];
   }
   
   //! Initializes node data for the graph to default values
   void emptyNodeData(NodeTy init = NodeTy()) {
-    NodeData = new cache_line_storage<gNode>[numNodes];
-    for (uint64_t i = 0; i < numNodes; ++i)
+    NodeData = new cache_line_storage<gNode>[size()];
+    //NodeData = (cache_line_storage<gNode>*)numa_alloc_interleaved(sizeof(cache_line_storage<gNode>)*size());
+    for (uint64_t i = 0; i < size(); ++i)
       NodeData[i].data.data = init;
   }
 };

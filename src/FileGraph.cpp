@@ -56,35 +56,7 @@ FileGraph::~FileGraph() {
     close(masterFD);
 }
 
-void FileGraph::structureFromFile(const char* filename) {
-  masterFD = open(filename, O_RDONLY);
-  if (masterFD == -1) {
-    perror("FileGraph::structureFromFile");
-    abort();
-  }
-
-  struct stat buf;
-  int f = fstat(masterFD, &buf);
-  if (f == -1) {
-    perror("FileGraph::structureFromFile");
-    abort();
-  }
-  masterLength = buf.st_size;
-
-
-  int _MAP_BASE = MAP_PRIVATE;
-#ifdef MAP_POPULATE
-  _MAP_BASE  |= MAP_POPULATE;
-#endif
-  
-  void* m = mmap(0, masterLength, PROT_READ, _MAP_BASE, masterFD, 0);
-  if (m == MAP_FAILED) {
-    m = 0;
-    perror("FileGraph::structureFromFile");
-    abort();
-  }
-  masterMapping = m;
-
+void FileGraph::parse(void* m) {
   //parse file
   uint64_t* fptr = (uint64_t*)m;
   uint64_t version = convert64(*fptr++);
@@ -101,3 +73,66 @@ void FileGraph::structureFromFile(const char* filename) {
     fptr32 += 1;
   edgeData = (char*)fptr32;
 }
+
+void FileGraph::structureFromMem(void* mem, size_t len, bool clone) {
+  masterLength = len;
+
+  if (clone) {
+    int _MAP_BASE = MAP_ANONYMOUS | MAP_PRIVATE;
+#ifdef MAP_POPULATE
+    _MAP_BASE  |= MAP_POPULATE;
+#endif
+    
+    void* m = mmap(0, masterLength, PROT_READ | PROT_WRITE, _MAP_BASE, -1, 0);
+    if (m == MAP_FAILED) {
+      m = 0;
+      perror("FileGraph::structureFromMem");
+      abort();
+    }
+    memcpy(m, mem, len);
+    parse(m);
+    masterMapping = m;
+  } else {
+    parse(mem);
+    masterMapping = mem;
+  }
+}
+
+void FileGraph::structureFromFile(const char* filename) {
+  masterFD = open(filename, O_RDONLY);
+  if (masterFD == -1) {
+    perror("FileGraph::structureFromFile");
+    abort();
+  }
+
+  struct stat buf;
+  int f = fstat(masterFD, &buf);
+  if (f == -1) {
+    perror("FileGraph::structureFromFile");
+    abort();
+  }
+  masterLength = buf.st_size;
+
+  int _MAP_BASE = MAP_PRIVATE;
+#ifdef MAP_POPULATE
+  _MAP_BASE  |= MAP_POPULATE;
+#endif
+  
+  void* m = mmap(0, masterLength, PROT_READ, _MAP_BASE, masterFD, 0);
+  if (m == MAP_FAILED) {
+    m = 0;
+    perror("FileGraph::structureFromFile");
+    abort();
+  }
+  parse(m);
+  masterMapping = m;
+}
+
+#ifdef GALOIS_NUMA
+NumaFileGraph::NumaFileGraph() {
+  graphs.reset(FileGraph());
+}
+
+NumaFileGraph::~NumaFileGraph() {
+}
+#endif
