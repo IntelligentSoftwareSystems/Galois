@@ -45,6 +45,8 @@ static const char* description = "Solves SAT problems using survey propagation\n
 static const char* url = "survey_propagation";
 static const char* help = "<seed> <num clauses> <num variables> <k>";
 
+//#define WLWL LocalQueues<ChunkedFIFO<1024>, FIFO<> >
+#define WLWL dChunkedFIFO<1024>
 
 //SAT problem:
 //variables Xi E {0,1}, i E {1 .. N), M constraints
@@ -95,10 +97,11 @@ struct SPNode {
   int name;
   bool solved;
   bool value;
+  int t;
   
   double Bias;
 
-  SPNode(int n, bool b) :isClause(b), name(n), solved(false), value(false) {}
+  SPNode(int n, bool b) :isClause(b), name(n), solved(false), value(false), t(0) {}
 };
 
 typedef Galois::Graph::FirstGraph<SPNode, SPEdge, false> Graph;
@@ -116,6 +119,8 @@ static Galois::GReduceAverage<double> averageBias;
 
 //interesting parameters:
 static const double epsilon = 0.000001;
+static const int tmax = 100;
+static int tlimit = 0;
 
 void initalize_random_formula(int M, int N, int K) {
   //M clauses
@@ -205,20 +210,20 @@ struct update_eta {
   double eta_for_a_i(GNode a, GNode i) {
     double etaNew = 1.0;
     //for each j
-    for (Graph::neighbor_iterator jii = graph.neighbor_begin(a), 
-	   jee = graph.neighbor_end(a); jii != jee; ++jii) {
+    for (Graph::neighbor_iterator jii = graph.neighbor_begin(a, Galois::NONE), 
+	   jee = graph.neighbor_end(a, Galois::NONE); jii != jee; ++jii) {
       GNode j = *jii;
       if (j != i) {
-	bool ajNegative = graph.getEdgeData(a,jii).isNegative;
+	bool ajNegative = graph.getEdgeData(a,jii, Galois::NONE).isNegative;
 	double prodP = 1.0;
 	double prodN = 1.0;
 	double prod0 = 1.0;
 	//for each b
-	for (Graph::neighbor_iterator bii = graph.neighbor_begin(j), 
-	       bee = graph.neighbor_end(j); 
+	for (Graph::neighbor_iterator bii = graph.neighbor_begin(j, Galois::NONE), 
+	       bee = graph.neighbor_end(j, Galois::NONE); 
 	     bii != bee; ++bii) {
 	  GNode b = *bii;
-	  SPEdge& Ebj = graph.getEdgeData(j, bii);
+	  SPEdge Ebj = graph.getEdgeData(j, bii, Galois::NONE);
 	  if (b != a)
 	    prod0 *= (1.0 - Ebj.eta);
 	  if (Ebj.isNegative)
@@ -243,29 +248,34 @@ struct update_eta {
 
   template<typename Context>
   void operator()(GNode a, Context& ctx) {
-    
-    for (Graph::neighbor_iterator iii = graph.neighbor_begin(a), 
-	   iee = graph.neighbor_end(a); iii != iee; ++iii)
-      for (Graph::neighbor_iterator bii = graph.neighbor_begin(*iii), 
-	     bee = graph.neighbor_end(*iii); bii != bee; ++bii)
-	for (Graph::neighbor_iterator jii = graph.neighbor_begin(*bii), 
-	       jee = graph.neighbor_end(*bii); 
-	     jii != jee; ++jii)
-	  {}
+    //std::cerr << graph.getData(a).t << " ";
+    // if (graph.getData(a, Galois::NONE).t >= tlimit)
+    //   return;
+
+    //    for (Graph::neighbor_iterator iii = graph.neighbor_begin(a), 
+    //      	   iee = graph.neighbor_end(a); iii != iee; ++iii)
+    //   for (Graph::neighbor_iterator bii = graph.neighbor_begin(*iii), 
+    // 	     bee = graph.neighbor_end(*iii); bii != bee; ++bii)
+    // 	//	for (Graph::neighbor_iterator jii = graph.neighbor_begin(*bii), 
+    // 	//     	       jee = graph.neighbor_end(*bii); 
+    // 	//     	     jii != jee; ++jii)
+    //{}
+
+    ++graph.getData(a).t;
 
     //for each i
-    for (Graph::neighbor_iterator iii = graph.neighbor_begin(a), 
-	   iee = graph.neighbor_end(a); iii != iee; ++iii) {
+    for (Graph::neighbor_iterator iii = graph.neighbor_begin(a, Galois::NONE), 
+	   iee = graph.neighbor_end(a, Galois::NONE); iii != iee; ++iii) {
       GNode i = *iii;
       double e = eta_for_a_i(a, i);
-      double olde = graph.getEdgeData(a,iii).eta;
+      double olde = graph.getEdgeData(a,iii, Galois::NONE).eta;
       graph.getEdgeData(a,iii).eta = e;
       //std::cout << olde << ',' << e << " ";
       if (fabs(olde - e) > epsilon) {
-	for (Graph::neighbor_iterator bii = graph.neighbor_begin(i), 
-	   bee = graph.neighbor_end(i); bii != bee; ++bii) {
+	for (Graph::neighbor_iterator bii = graph.neighbor_begin(i, Galois::NONE), 
+	   bee = graph.neighbor_end(i, Galois::NONE); bii != bee; ++bii) {
 	  GNode b = *bii;
-	  if (a != b)
+	  if (a != b) // && graph.getData(b, Galois::NONE).t < tlimit)
 	    ctx.push(b);
 	}
       }
@@ -329,11 +339,13 @@ void SP_algorithm() {
   //1.2) if (|sigma a->i(t) - sigma a->i (t-1) < E on all the edges, the iteration has converged and generated sigma* a->i = sigma a->i(t), goto 2
   //2) if t = tmax return un-converged.  if (t < tmax) then return the set of fixed point warnings sigma* a->i = sigma a->i (t)
   
-  Galois::for_each<dChunkedLIFO<1024> >(clauses.begin(), clauses.end(), update_eta(), "update_eta");
+  //  tlimit += tmax;
+  Galois::for_each<WLWL>(clauses.begin(), clauses.end(), update_eta(), "update_eta");
+
   maxBias.reset(0.0);
   averageBias.reset(0.0);
   nontrivial.reset(0);
-  Galois::for_each<dChunkedLIFO<1024> >(literals.begin(), literals.end(), update_biases(), "update_bias");
+  Galois::for_each<WLWL>(literals.begin(), literals.end(), update_biases(), "update_bias");
 }
 
 struct fix_variables {
@@ -361,7 +373,7 @@ struct fix_variables {
 void decimate() {
   std::cout << "NonTrivial " << nontrivial.get() << " MaxBias " << maxBias.get() << " Average Bias " << averageBias.get() << "\n";
   double d = ((maxBias.get() - averageBias.get()) * 0.25) + averageBias.get();
-  Galois::for_each<dChunkedLIFO<1024> >(literals.begin(), literals.end(), fix_variables(d), "fix_variables");
+  Galois::for_each<WLWL>(literals.begin(), literals.end(), fix_variables(d), "fix_variables");
 }
 
 bool survey_inspired_decimation() {
