@@ -20,7 +20,6 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#ifdef GALOIS_PTHREAD
 
 #include "Galois/Runtime/Threads.h"
 #include "Galois/Runtime/Support.h"
@@ -242,4 +241,3 @@ struct Init {
 
 static Init iii;
 
-#endif
