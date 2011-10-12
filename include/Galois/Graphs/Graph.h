@@ -136,11 +136,8 @@ struct EdgeItem {
   inline ETy& getData() {
     return E;
   }
-  inline EdgeItem(NTy& n) : N(n) {
-  }
-  inline EdgeItem(NTy& n, ETy e) : N(n), E(e) {
-  }
-
+  inline EdgeItem(NTy& n) : N(n) { }
+  inline EdgeItem(NTy& n, ETy e) : N(n), E(e) { }
   inline EdgeItem(){ }
 };
 
@@ -153,8 +150,7 @@ struct EdgeItem<NTy, void> {
   inline typename VoidWrapper<void>::ref_type getData() {
     return VoidWrapper<void>::ref_type();
   }
-  inline EdgeItem(NTy& n) : N(n) {
-  }
+  inline EdgeItem(NTy& n) : N(n) { }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -177,6 +173,10 @@ public:
   typedef typename VoidWrapper<NodeTy>::ref_type node_reference;
   //! A reference to a const node
   typedef typename VoidWrapper<NodeTy>::const_ref_type const_node_reference;
+  //! A node 
+  typedef typename VoidWrapper<NodeTy>::type node_type;
+  //! An edge
+  typedef typename VoidWrapper<EdgeTy>::type edge_type;
 
 private:
   struct gNode: public GaloisRuntime::Lockable {

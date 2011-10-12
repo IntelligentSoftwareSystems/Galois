@@ -341,8 +341,8 @@ public:
   LC_FileGraph() :NodeData(0) {}
   ~LC_FileGraph() {
     if (NodeData)
-      //      delete[] NodeData;
-      numa_free(NodeData,sizeof(cache_line_storage<gNode>)*size());
+      delete[] NodeData;
+      //numa_free(NodeData,sizeof(cache_line_storage<gNode>)*size());
   }
   
   NodeTy& getData(GraphNode N, MethodFlag mflag = ALL) {
