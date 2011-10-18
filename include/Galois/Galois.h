@@ -32,6 +32,7 @@
 
 namespace Galois {
 
+//Iterator based versions
 template<typename WLTy, typename IterTy, typename Function>
 static inline void for_each(IterTy b, IterTy e, Function f, const char* loopname = 0) {
   GaloisRuntime::for_each_impl<WLTy>(b, e, f, loopname);
@@ -41,6 +42,20 @@ template<typename IterTy, typename Function>
 static inline void for_each(IterTy b, IterTy e, Function f, const char* loopname = 0) {
   typedef GaloisRuntime::WorkList::ChunkedFIFO<256> WLTy;
   for_each<WLTy, IterTy, Function>(b, e, f, loopname);
+}
+
+//Single initial item versions
+template<typename WLTy, typename InitItemTy, typename Function>
+static inline void for_each(InitItemTy i, Function f, const char* loopname = 0) {
+  InitItemTy wl[1];
+  wl[0] = i;
+  GaloisRuntime::for_each_impl<WLTy>(&wl[0], &wl[1], f, loopname);
+}
+
+template<typename InitItemTy, typename Function>
+static inline void for_each(InitItemTy i, Function f, const char* loopname = 0) {
+  typedef GaloisRuntime::WorkList::ChunkedFIFO<256> WLTy;
+  for_each<WLTy, InitItemTy, Function>(i, f, loopname);
 }
 
 }
