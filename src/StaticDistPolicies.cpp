@@ -168,22 +168,22 @@ struct AutoLinuxPolicy : public ThreadPolicy {
 	}
       }
     }
+#if 0
+    // PRINT MAPPING:
+    printf("htRatio, numPackages, numCores, numThreads: %d, %d, %d, %d\n", htRatio, numPackages, numCores, numThreads);
+    for( unsigned i = 0; i < mapping.size(); ++i)
+      printf("(%d,%d) ", i, mapping[i]);
+    printf("\n");
     
-    // // PRINT MAPPING:
-    // //    printf("htRatio, numPackages, numCores, numThreads: %d, %d, %d, %d\n", htRatio, numPackages, numCores, numThreads);
-    // for( unsigned i = 0; i < mapping.size(); ++i)
-    //   printf("(%d,%d) ", i, mapping[i]);
-    // printf("\n");
-    
-    // // PRINT LEVELMAP for levels
-    // for (int x = 0; x < getNumLevels(); ++x) {
-    //   printf("Level %d\n", x);
-    //   for (int y = 0; y < getNumThreads(); ++y) {
-    // 	printf(" (%d,%d)", y, indexLevelMap(x,y));
-    //   }
-    //   printf("\n");
-    // }
-
+    // PRINT LEVELMAP for levels
+    for (int x = 0; x < getNumLevels(); ++x) {
+      printf("Level %d\n", x);
+      for (int y = 0; y < getNumThreads(); ++y) {
+	printf(" (%d,%d)", y, indexLevelMap(x,y));
+      }
+      printf("\n");
+    }
+#endif
   }
 
 };
@@ -244,20 +244,21 @@ struct DummyPolicy : public ThreadPolicy {
 
 }
 
-static ThreadPolicy* TP = 0;
-
 ThreadPolicy& GaloisRuntime::getSystemThreadPolicy() {
-  bool printthing = !TP;
+  static bool printthing = true;
 #ifdef __linux__
-  if (!TP) TP = new AutoLinuxPolicy();
-#endif
+  static AutoLinuxPolicy TP;
+#else
 #if defined(sun) || defined(__sun)
-  if (!TP) TP = new AutoSunPolicy();
+  static AutoSunPolicy TP;
+#else
+  static DummyPolicy TP;
 #endif
-  if (!TP) TP = new DummyPolicy();
-  
-  if (printthing)
-    reportInfo("Thread Policy", TP->getName());
+#endif
+  if (printthing) {
+    reportInfo("Thread Policy", TP.getName());
+    printthing = false;
+  }
 
-  return *TP;
+  return TP;
 }
