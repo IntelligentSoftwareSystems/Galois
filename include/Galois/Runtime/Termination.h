@@ -58,6 +58,8 @@ public:
     return globalTerm;
   }
 
+  void reset();
+
 };
 
 }

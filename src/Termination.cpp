@@ -33,6 +33,14 @@ TerminationDetection::TerminationDetection()
   data.get(0).tokenIsBlack = true;
 }
 
+void TerminationDetection::reset() {
+  assert(data.get().hasToken);
+  globalTerm = false;
+  lastWasWhite = false;
+  data.get(0).hasToken = true;
+  data.get(0).tokenIsBlack = true;
+}
+
 void TerminationDetection::localTermination() {
   tokenHolder& th = data.get();
   tokenHolder& thn = data.getNext();
