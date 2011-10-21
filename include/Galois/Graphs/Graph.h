@@ -636,6 +636,26 @@ public:
   FirstGraph() {
     reportStatSum("NodeSize", sizeof(gNode));
   }
+
+  template<typename GTy>
+  void copyGraph(GTy& graph) {
+    //mapping between nodes
+    std::map<typename GTy::GraphNode, GraphNode> NodeMap;
+    //copy nodes
+    for (typename GTy::active_iterator ii = graph.active_begin(), 
+	   ee = graph.active_end(); ii != ee; ++ii) {
+      GraphNode N = createNode(graph.getData(*ii));
+      addNode(N);
+      NodeMap[*ii] = N;
+    }
+    //copy edges
+    for (typename GTy::active_iterator ii = graph.active_begin(), 
+	   ee = graph.active_end(); ii != ee; ++ii)
+      for(typename GTy::neighbor_iterator ni = graph.neighbor_begin(*ii), 
+	    ne = graph.neighbor_end(*ii);
+	  ni != ne; ++ni)
+	addEdge(NodeMap[*ii], NodeMap[*ni], graph.getEdgeData(*ii, *ni));
+  }
 };
 
 }
