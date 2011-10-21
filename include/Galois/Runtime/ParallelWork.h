@@ -201,20 +201,23 @@ class FillWork {
   T1 e;
   T2& g;
   int num;
+  int dist;
   int a;
   FillWork(T1& _b, T1& _e, T2& _g) :b(_b), e(_e), g(_g) {
     a = getSystemThreadPool().getActiveThreads();
-    num = std::distance(b,e) / a;
+    dist = std::distance(b,e);
+    num = (dist + a - 1) / a; //round up
+    //std::cout << dist << " " << num << "\n";
   }
   void operator()(void) {
     int id = ThreadPool::getMyID();
     T1 b2 = b;
-    std::advance(b2, num * id);
     T1 e2 = b;
-    if (id == (a - 1))
-      e2 = e;
-    else
-      std::advance(e2, num * (id + 1));
+    //stay in bounds
+    int A = std::min(num * id, dist);
+    int B = std::min(num * (id + 1), dist);
+    std::advance(b2, A);
+    std::advance(e2, B);
     g.AddInitialWork(b2,e2);
   }
 };
