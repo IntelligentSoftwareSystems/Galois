@@ -49,7 +49,7 @@ template<typename WLTy, typename InitItemTy, typename Function>
 static inline void for_each(InitItemTy i, Function f, const char* loopname = 0) {
   InitItemTy wl[1];
   wl[0] = i;
-  GaloisRuntime::for_each_impl<WLTy>(&wl[0], &wl[1], f, loopname);
+  for_each<WLTy>(&wl[0], &wl[1], f, loopname);
 }
 
 template<typename InitItemTy, typename Function>
