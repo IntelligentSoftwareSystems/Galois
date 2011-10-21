@@ -128,6 +128,35 @@ void FileGraph::structureFromFile(const char* filename) {
   masterMapping = m;
 }
 
+void FileGraph::structureToFile(char* file) {
+  ssize_t retval;
+  //ASSUME LE machine
+  mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+  int fd = open(file, O_WRONLY | O_CREAT |O_TRUNC, mode);
+  retval = write(fd, masterMapping, masterLength);
+  if (retval == -1) {
+    perror(__FILE__);
+    abort();
+  }
+  close(fd);
+}
+
+void FileGraph::swap(FileGraph& other) {
+  std::swap(masterMapping, other.masterMapping);
+  std::swap(masterLength, other.masterLength);
+  std::swap(sizeEdgeTy, other.sizeEdgeTy);
+  std::swap(masterFD, other.masterFD);
+  std::swap(outIdx, other.outIdx);
+  std::swap(outs, other.outs);
+  std::swap(edgeData, other.edgeData);
+  std::swap(numEdges, other.numEdges);
+  std::swap(numNodes, other.numNodes);
+}
+
+void FileGraph::clone(FileGraph& other) {
+  structureFromMem(other.masterMapping, other.masterLength, true);
+}
+
 #ifdef GALOIS_NUMA
 NumaFileGraph::NumaFileGraph() {
   graphs.reset(FileGraph());

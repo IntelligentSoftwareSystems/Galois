@@ -60,6 +60,7 @@
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/detail/endian.hpp>
+#include <map>
 
 #ifdef GALOIS_NUMA
 #include <numa.h>
@@ -237,6 +238,106 @@ public:
 
   //! Read graph connectivity information from memory
   void structureFromMem(void* mem, size_t len, bool clone = false);
+
+  //! Read graph connectivity information from graph
+  template<typename TyG>
+  void structureFromGraph(TyG& G) {
+
+    struct CompareNodeData {
+      typedef typename TyG::GraphNode GNode;
+      bool operator()(const GNode& a, const GNode& b) {
+	return a.getData() < b.getData();
+      }
+    };
+
+    //version
+    uint64_t version = 1;
+    uint64_t sizeof_edge_data = sizeof(typename TyG::EdgeDataTy);
+    uint64_t num_nodes = G.size();
+
+    uint64_t nBytes = sizeof(uint64_t) * 3;
+
+    typedef typename TyG::GraphNode GNode;
+    typedef std::vector<GNode> Nodes;
+    Nodes nodes;
+    for (typename TyG::active_iterator ii = G.active_begin(),
+	   ee = G.active_end(); ii != ee; ++ii) {
+      nodes.push_back(*ii);
+    }
+
+    // TODO(ddn): for some reason stable_sort crashes with:
+    //  free(): invalid pointer
+    std::sort(nodes.begin(), nodes.end(), CompareNodeData());
+
+    //num edges and outidx computation
+    uint64_t offset = 0;
+    std::vector<uint64_t> out_idx;
+    std::map<typename TyG::GraphNode, uint32_t> node_ids;
+    for (uint32_t id = 0; id < num_nodes; ++id) {
+      GNode& node = nodes[id];
+      node_ids[node] = id;
+      offset += G.neighborsSize(node);
+      out_idx.push_back(offset);
+    }
+
+    nBytes += sizeof(uint64_t);
+    nBytes += sizeof(uint64_t) * out_idx.size();
+
+    //outs
+    std::vector<uint32_t> outs;
+    size_t num_edges = 0;
+    for (typename Nodes::iterator ii = nodes.begin(), ee = nodes.end();
+	 ii != ee; ++ii) {
+      for (typename TyG::neighbor_iterator ni = G.neighbor_begin(*ii),
+	     ne = G.neighbor_end(*ii); ni != ne; ++ni, ++num_edges) {
+	uint32_t id = node_ids[*ni];
+	outs.push_back(id);
+      }
+    }
+    if (num_edges % 2) {
+      outs.push_back(0);
+    }
+
+    nBytes += sizeof(uint32_t) * outs.size();
+    
+    //edgeData
+    std::vector<typename TyG::EdgeDataTy> edgeData;
+    for (typename Nodes::iterator ii = nodes.begin(), ee = nodes.end();
+	 ii != ee; ++ii) {
+      for (typename TyG::neighbor_iterator ni = G.neighbor_begin(*ii),
+	     ne = G.neighbor_end(*ii); ni != ne; ++ni) {
+	edgeData.push_back(G.getEdgeData(*ii, *ni));
+      }
+    }
+    
+    nBytes += sizeof(TyG::EdgeDataTy) * edgeData.size();
+
+    char* t = (char*)malloc(nBytes);
+    char* base = t;
+    memcpy(t, &version, sizeof(uint64_t));
+    t += sizeof(uint64_t);
+    memcpy(t, &sizeof_edge_data, sizeof(uint64_t));
+    t += sizeof(uint64_t);
+    memcpy(t, &num_nodes, sizeof(uint64_t));
+    t += sizeof(uint64_t);
+    memcpy(t, &offset, sizeof(uint64_t));
+    t += sizeof(uint64_t);
+    memcpy(t, &out_idx[0], sizeof(uint64_t) * out_idx.size());
+    t += sizeof(uint64_t) * out_idx.size();
+    memcpy(t, &outs[0], sizeof(uint32_t) * outs.size());
+    t += sizeof(uint32_t) * outs.size();
+    memcpy(t, &edgeData[0], sizeof(TyG::EdgeDataTy) * edgeData.size());
+    
+    structureFromMem(base, nBytes, true);
+    free(t);
+  }
+
+  //! Write graph connectivity information to file
+  void structureToFile(char* file);
+
+  void swap(FileGraph& other);
+  void clone(FileGraph& other);
+
 };
 
 #ifdef GALOIS_NUMA
@@ -368,6 +469,26 @@ public:
     //NodeData = (cache_line_storage<gNode>*)numa_alloc_interleaved(sizeof(cache_line_storage<gNode>)*size());
     for (uint64_t i = 0; i < size(); ++i)
       NodeData[i].data.data = init;
+  }
+
+  void swap(LC_FileGraph& other) {
+    std::swap(NodeData, other.NodeData);
+    FileGraph::swap(other);
+  }
+
+  void clone(LC_FileGraph& other) {
+    NodeData = other.NodeData;
+    FileGraph::clone(other);
+  }
+
+  template<typename GTy>
+  void copyGraph(GTy& graph) {
+    structureFromGraph(graph);
+    emptyNodeData();
+    int i = 0;
+    for (typename GTy::active_iterator ii = graph.begin(),
+	   ee = graph.end(); ii != ee; ++ii, ++i)
+      NodeData[i] = graph.getData(*ii);
   }
 };
 
