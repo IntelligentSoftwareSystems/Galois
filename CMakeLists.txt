@@ -23,17 +23,9 @@ set(USE_PTHREAD ON)
 #use profiling
 #set(USE_PROFILING ON)
 
-# Enable iss specific options; should be OFF in the general release
-set(USE_ISS ON)
-
 ##### Machine-specific settings (probably not useful to you) ######
 if(SITE_NAME MATCHES "volta.*")
   set(USE_NUMA ON)
-endif()
-
-find_program(CXX_4.5 g++-4.5)
-if(NOT ${CXX_4.5} STREQUAL "CXX_4.5-NOTFOUND")
-  set(CMAKE_CXX_COMPILER ${CXX_4.5})
 endif()
 
 #if(SITE_NAME MATCHES "delaunay.*")
@@ -120,6 +112,17 @@ else()
   message(STATUS "Could NOT find TBB; have your sourced TBB_INSTALL_DIR/bin/tbbvars.sh?")
 endif()
 
+#libdai XXX(ddn): remove dependency later
+set(DAI_BASE "IGNORE${CMAKE_CURRENT_SOURCE_DIR}/../libdai")
+if(EXISTS "${DAI_BASE}")
+  set(DAI_FOUND on)
+  set(DAI_INCLUDE_DIRS "${DAI_BASE}/include")
+  set(DAI_LIBRARIES "${DAI_BASE}/lib/libdai.a" "gmp")
+  include_directories(${DAI_INCLUDE_DIRS})
+else()
+  set(DAI_FOUND off)
+endif()
+
 #cray
 if(USE_CRAY)
   add_definitions(-DGALOIS_CRAY)
@@ -129,10 +132,6 @@ if(USE_PROFILING)
   add_definitions(-pg)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pg")
 endif(USE_PROFILING)
-
-if(USE_ISS)
-  add_definitions(-DGALOIS_ISS)
-endif()
 
 #solaris
 if(USE_SOLARIS)
@@ -187,6 +186,10 @@ function(linkRuntime name)
     target_link_libraries(${name} ${MPI_LIBRARIES})
   endif()
   
+  if(DAI_FOUND)
+    target_link_libraries(${name} ${DAI_LIBRARIES})
+  endif()
+
   target_link_libraries(${name} ${Boost_LIBRARIES})
 endfunction (linkRuntime)
 
