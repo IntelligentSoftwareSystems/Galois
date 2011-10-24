@@ -40,7 +40,7 @@ static inline void for_each(IterTy b, IterTy e, Function f, const char* loopname
 
 template<typename IterTy, typename Function>
 static inline void for_each(IterTy b, IterTy e, Function f, const char* loopname = 0) {
-  typedef GaloisRuntime::WorkList::ChunkedFIFO<256> WLTy;
+  typedef GaloisRuntime::WorkList::dChunkedFIFO<1024> WLTy;
   for_each<WLTy, IterTy, Function>(b, e, f, loopname);
 }
 
