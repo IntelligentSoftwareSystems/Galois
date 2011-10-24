@@ -74,17 +74,14 @@ void* mmapWrapper::_alloc() {
   ptr = mmap(0, AllocSize, _PROT, _MAP_HUGE, -1, 0);
 #endif
 
-#if !defined GALOIS_ISS || !defined __linux__
-  // Force huge pages on ISS linux machines for performance 
-# ifdef MAP_POPULATE
+#ifdef MAP_POPULATE
   //Then try populate
   if (!ptr || ptr == MAP_FAILED)
     ptr = mmap(0, AllocSize, _PROT, _MAP_POP, -1, 0);
-# endif
+#endif
   //Then try normal
   if (!ptr || ptr == MAP_FAILED)
     ptr = mmap(0, AllocSize, _PROT, _MAP_BASE, -1, 0);
-#endif
 
   if (!ptr || ptr == MAP_FAILED) {
     L.unlock();
@@ -109,7 +106,7 @@ SystemBaseAlloc::~SystemBaseAlloc() {}
 PtrLock<SizedAllocatorFactory*, true> SizedAllocatorFactory::instance;
 #ifndef USEMALLOC
 SizedAllocatorFactory::SizedAlloc* 
-SizedAllocatorFactory::getAllocatorForSize(unsigned int size) {
+SizedAllocatorFactory::getAllocatorForSize(size_t size) {
   lock.lock();
   SizedAlloc*& retval = allocators[size];
   if (!retval)

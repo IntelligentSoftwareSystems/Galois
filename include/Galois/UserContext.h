@@ -33,12 +33,12 @@ class ForEachWork;
 namespace Galois {
 
 template<typename T>
-class UserContext {
+class UserContext: private boost::noncopyable {
   template<class WorkListTy, class Function>
   friend class GaloisRuntime::ForEachWork;
 
   //! Allocator stuff
-  ItAllocBaseTy IterationAllocatorBase;
+  IterAllocBaseTy IterationAllocatorBase;
   PerIterAllocTy PerIterationAllocator;
 
   void __resetAlloc() {

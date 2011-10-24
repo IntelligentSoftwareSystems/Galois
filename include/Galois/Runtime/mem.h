@@ -55,7 +55,7 @@ public:
   
   mmapWrapper();
 
-  void* allocate(unsigned int size) {
+  void* allocate(size_t size) {
     assert(size % AllocSize == 0);
     return _alloc();
   }
@@ -76,7 +76,7 @@ public:
 
   ThreadAwarePrivateHeap() {}
 
-  inline void* allocate(unsigned int size) {
+  inline void* allocate(size_t size) {
     return heaps.get().allocate(size);
   }
 
@@ -89,10 +89,10 @@ public:
 template<class RealHeap>
 class LockedHeap : public RealHeap {
   SimpleLock<int, true> lock;
-public:
+public :
   enum { AllocSize = RealHeap::AllocSize };
 
-  inline void* allocate(unsigned int size) {
+  inline void* allocate(size_t size) {
     lock.lock();
     void* retval = RealHeap::allocate(size);
     lock.unlock();
@@ -110,7 +110,7 @@ template<typename SourceHeap>
 class ZeroOut : public SourceHeap {
 public:
   enum { AllocSize = SourceHeap::AllocSize } ;
-  inline void* allocate(unsigned int size) {
+  inline void* allocate(size_t size) {
     void* retval = SourceHeap::allocate(size);
     memset(retval, 0, size);
     return retval;
@@ -127,7 +127,7 @@ class AddHeader : public SourceHeap {
   enum { offset = (sizeof(Header) + (sizeof(double) - 1)) & ~(sizeof(double) - 1) };
 
 public:
-  inline void* allocate(unsigned int size) {
+  inline void* allocate(size_t size) {
     //First increase the size of the header to be aligned to a double
     void* ptr = SourceHeap::allocate(size + offset);
     //Now return the offseted pointer
@@ -148,7 +148,7 @@ template<class SourceHeap>
 class OwnerTaggedHeap : public AddHeader<void*, SourceHeap> {
   typedef AddHeader<OwnerTaggedHeap*, SourceHeap> Src;
 public:
-  inline void* allocate(unsigned int size) {
+  inline void* allocate(size_t size) {
     void* retval = Src::allocate(size);
     *(Src::getHeader(retval)) = this;
     return retval;
@@ -188,7 +188,7 @@ public:
     clear();
   }
 
-  inline void* allocate(unsigned int size) {
+  inline void* allocate(size_t size) {
     if (head) {
       void* ptr = head;
       head = head->next;
@@ -235,7 +235,7 @@ public:
     clear();
   }
 
-  inline void* allocate(unsigned int size) {
+  inline void* allocate(size_t size) {
     static SimpleLock<int, true> lock;
 
     lock.lock();
@@ -326,7 +326,7 @@ public:
     clear();
   }
 
-  inline void* allocate(unsigned int size) {
+  inline void* allocate(size_t size) {
     assert(size == ElemSize);
     if (!head || headIndex == TotalFit)
       refill();
@@ -361,20 +361,20 @@ class SimpleBumpPtr : public SourceHeap {
 public:
   enum { AllocSize = 0 };
 
-  SimpleBumpPtr() :SourceHeap(), head(0), offset(0) {}
+  SimpleBumpPtr(): SourceHeap(), head(0), offset(0) {}
   ~SimpleBumpPtr() {
     clear();
   }
 
   void clear() {
-    while(head) {
+    while (head) {
       Block* B = head;
       head = B->next;
       SourceHeap::deallocate(B);
     }
   }
 
-  inline void* allocate(unsigned int size) {
+  inline void* allocate(size_t size) {
     //increase to alignment
     size = (size + sizeof(double) - 1) & ~(sizeof(double) - 1);
     //Check current block
@@ -392,7 +392,74 @@ public:
   }
 
   inline void deallocate(void* ptr) {}
+};
 
+/**
+ * This implements a bump pointer though chunks of memory that falls back
+ * to malloc if the source heap cannot accommodate an allocation.
+ */
+template<typename SourceHeap>
+class SimpleBumpPtrWithMallocFallback : public SourceHeap {
+  struct Block {
+    union {
+      Block* next;
+      double dummy; // for alignment
+    };
+  };
+
+  Block* head;
+  Block* fallbackHead;
+  int offset;
+
+  //! Given block of memory P, update head pointer and offset metadata
+  void refill(void* P, Block*& h, int* o) {
+    Block* BP = (Block*)P;
+    BP->next = h;
+    h = BP;
+    if (o)
+      *o = sizeof(Block);
+  }
+public:
+  enum { AllocSize = 0 };
+
+  SimpleBumpPtrWithMallocFallback(): SourceHeap(), head(0), fallbackHead(0), offset(0) { }
+
+  ~SimpleBumpPtrWithMallocFallback() {
+    clear();
+  }
+
+  void clear() {
+    while (head) {
+      Block* B = head;
+      head = B->next;
+      SourceHeap::deallocate(B);
+    }
+    while (fallbackHead) {
+      Block* B = fallbackHead;
+      fallbackHead = B->next;
+      free(B);
+    }
+  }
+
+  inline void* allocate(size_t size) {
+    //increase to alignment
+    size = (size + sizeof(double) - 1) & ~(sizeof(double) - 1);
+    //Check current block
+    if (!head || offset + size > SourceHeap::AllocSize)
+      refill(SourceHeap::allocate(SourceHeap::AllocSize), head, &offset);
+    //Make sure this will fit
+    if (offset + size > SourceHeap::AllocSize) {
+      void* p = malloc(size + sizeof(Block));
+      refill(p, fallbackHead, NULL);
+      return (char*)p + sizeof(Block);
+    }
+    char* retval = (char*)head;
+    retval += offset;
+    offset += size;
+    return retval;
+  }
+
+  inline void deallocate(void* ptr) {}
 };
 
 //! This is the base source of memory for all allocators.
@@ -405,7 +472,7 @@ public:
   SystemBaseAlloc();
   ~SystemBaseAlloc();
 
-  inline void* allocate(unsigned int size) {
+  inline void* allocate(size_t size) {
     return Source.allocate(size);
   }
 
@@ -416,7 +483,7 @@ public:
 
 class MallocWrapper {
 public:
-  inline void* allocate(unsigned int size) {
+  inline void* allocate(size_t size) {
     return malloc(size);
   }
 
@@ -430,13 +497,13 @@ public:
 #ifdef USEMALLOC
   typedef MallocWrapper SizedAlloc;
 
-  SizedAlloc* getAllocatorForSize(unsigned int) {
+  SizedAlloc* getAllocatorForSize(size_t) {
     return &MasterAlloc;
   }
 #else
   typedef ThreadAwarePrivateHeap<
     FreeListHeap<SimpleBumpPtr<SystemBaseAlloc> > > SizedAlloc;
-  SizedAlloc* getAllocatorForSize(unsigned int);
+  SizedAlloc* getAllocatorForSize(size_t);
 #endif
 
   static SizedAllocatorFactory* getInstance() {
@@ -460,7 +527,7 @@ private:
 #ifdef USEMALLOC
   MallocWrapper MasterAlloc;
 #else
-  typedef std::map<unsigned int, SizedAlloc*> AllocatorsTy;
+  typedef std::map<size_t, SizedAlloc*> AllocatorsTy;
   AllocatorsTy allocators;
   SimpleLock<int, true> lock;
   ~SizedAllocatorFactory();
@@ -470,11 +537,11 @@ private:
 class FixedSizeAllocator {
   SizedAllocatorFactory::SizedAlloc* alloc;
 public:
-  FixedSizeAllocator(unsigned int sz) {
+  FixedSizeAllocator(size_t sz) {
     alloc = SizedAllocatorFactory::getInstance()->getAllocatorForSize(sz);
   }
 
-  inline void* allocate(unsigned int sz) {
+  inline void* allocate(size_t sz) {
     return alloc->allocate(sz);
   }
 
@@ -491,10 +558,28 @@ public:
 // Now adapt to standard std allocators
 ////////////////////////////////////////////////////////////////////////////////
 
-//A fixed size block allocator
+//!A fixed size block allocator
 template<typename Ty>
-class FSBGaloisAllocator
-{
+class FSBGaloisAllocator;
+
+template<>
+struct FSBGaloisAllocator<void> {
+  typedef size_t size_type;
+  typedef ptrdiff_t difference_type;
+  typedef void* pointer;
+  typedef const void* const_pointer;
+  typedef void value_type;
+
+  template<typename Other>
+  struct rebind { typedef FSBGaloisAllocator<Other> other; };
+};
+
+template<typename Ty>
+class FSBGaloisAllocator {
+  inline void destruct(char*) {}
+  inline void destruct(wchar_t*) { }
+  template<typename T> inline void destruct(T* t) { t->~T(); }
+
   FixedSizeAllocator Alloc;
 
 public:
@@ -506,57 +591,64 @@ public:
   typedef const Ty& const_reference;
   typedef Ty value_type;
   
+  template<class Other>
+  struct rebind { typedef FSBGaloisAllocator<Other> other; };
+
+  FSBGaloisAllocator() throw(): Alloc(sizeof(Ty)) {}
+  template <class U> FSBGaloisAllocator (const FSBGaloisAllocator<U>&) throw(): Alloc(sizeof(Ty)) {}
+
   pointer address(reference val) const { return &val; }
   const_pointer address(const_reference val) const { return &val; }
-  
-  template<class Other>
-  struct rebind
-  {
-    typedef FSBGaloisAllocator<Other> other;
-  };
 
-  template <class U>
-  FSBGaloisAllocator ( const FSBGaloisAllocator<U>& ) throw() 
-    :Alloc(sizeof(Ty))
-  {}
-
-  FSBGaloisAllocator() throw()
-  :Alloc(sizeof(Ty))
-  {}
-  
-  pointer allocate(int x)
-  {
-    assert(x == 1);
+  pointer allocate(size_type size) {
+    if (size > max_size())
+      throw std::bad_alloc();
     return static_cast<pointer>(Alloc.allocate(sizeof(Ty)));
   }
   
-  void deallocate(pointer ptr, size_type)
-  {
+  void deallocate(pointer ptr, size_type) {
     Alloc.deallocate(ptr);
   }
   
   template<typename TyC>
-  void construct(pointer ptr, const TyC& val)
-  {
-    new ((void *)ptr) Ty(val);
+  void construct(pointer ptr, const TyC& val) {
+    new (ptr) Ty(val);
   }
   
-  void destroy(pointer ptr)
-  {
-    ptr->Ty::~Ty();
+  void destroy(pointer ptr) {
+    destruct(ptr);
   }
   
   size_type max_size() const throw() { return 1; }
-
-  bool operator!=(const FSBGaloisAllocator& rhs) const {
-    return Alloc != rhs.Alloc;
-  }
 };
 
-//Keep a reference to an external allocator
+template<typename T1,typename T2>
+bool operator!=(const FSBGaloisAllocator<T1>& lhs, const FSBGaloisAllocator<T2>& rhs) {
+  return lhs.Alloc != rhs.Alloc;
+}
+
+//!Keep a reference to an external allocator
 template<typename Ty, typename AllocTy>
-class ExternRefGaloisAllocator
-{
+class ExternRefGaloisAllocator;
+
+template<typename AllocTy>
+struct ExternRefGaloisAllocator<void,AllocTy> {
+  typedef size_t size_type;
+  typedef ptrdiff_t difference_type;
+  typedef void* pointer;
+  typedef const void* const_pointer;
+  typedef void value_type;
+
+  template<typename Other>
+  struct rebind { typedef ExternRefGaloisAllocator<Other,AllocTy> other; };
+};
+
+template<typename Ty, typename AllocTy>
+class ExternRefGaloisAllocator {
+  inline void destruct(char*) {}
+  inline void destruct(wchar_t*) { }
+  template<typename T> inline void destruct(T* t) { t->~T(); }
+
 public:
   AllocTy* Alloc; // Should be private except that makes copy hard
 
@@ -568,50 +660,47 @@ public:
   typedef const Ty& const_reference;
   typedef Ty value_type;
   
-  pointer address(reference val) const { return &val; }
-  const_pointer address(const_reference val) const { return &val; }
-  
   template<class Other>
-  struct rebind
-  {
+  struct rebind {
     typedef ExternRefGaloisAllocator<Other, AllocTy> other;
   };
 
+  explicit ExternRefGaloisAllocator(AllocTy* a) throw(): Alloc(a) {}
   template <class U>
-  ExternRefGaloisAllocator ( const ExternRefGaloisAllocator<U,AllocTy>& rhs)
-    throw() {
+  ExternRefGaloisAllocator (const ExternRefGaloisAllocator<U,AllocTy>& rhs) throw() {
     Alloc = rhs.Alloc;
   }
-
-  explicit ExternRefGaloisAllocator(AllocTy* a) throw() 
-  :Alloc(a)
-  {}
   
-  pointer allocate(int x)
-  {
-    return static_cast<pointer>(Alloc->allocate(x*sizeof(Ty)));
+  pointer address(reference val) const { return &val; }
+  const_pointer address(const_reference val) const { return &val; }
+  
+  pointer allocate(size_type size) {
+    if (size > max_size())
+      throw std::bad_alloc();
+    return static_cast<pointer>(Alloc->allocate(size*sizeof(Ty)));
   }
   
-  void deallocate(pointer ptr, size_type x)
-  {
+  void deallocate(pointer ptr, size_type x) {
     Alloc->deallocate(ptr);
   }
   
   template<typename TyC>
-  void construct(pointer ptr, const TyC& val)
-  {
-    new ((void *)ptr) Ty(val);
+  void construct(pointer ptr, const TyC& val) {
+    new (ptr) Ty(val);
   }
   
-  void destroy(pointer ptr)
-  {
-    ptr->Ty::~Ty();
+  void destroy(pointer ptr) {
+    destruct(ptr);
   }
   
-  size_type max_size() const throw() { return 1024*1024; }
+  size_type max_size() const throw() { return size_t(-1)/sizeof(Ty); }
 };
 
-}
+template<typename T1,typename T2,typename A1,typename A2>
+bool operator!=(const ExternRefGaloisAllocator<T1,A1>& lhs, const ExternRefGaloisAllocator<T2,A2>& rhs) {
+  return lhs.Alloc != rhs.Alloc;
 }
 
+}
+}
 #endif

@@ -24,85 +24,20 @@ kind.
 
 namespace Galois {
 
-typedef GaloisRuntime::MM::SimpleBumpPtr<GaloisRuntime::MM::FreeListHeap<GaloisRuntime::MM::SystemBaseAlloc> > ItAllocBaseTy;
+typedef GaloisRuntime::MM::SimpleBumpPtrWithMallocFallback<GaloisRuntime::MM::FreeListHeap<GaloisRuntime::MM::SystemBaseAlloc> > IterAllocBaseTy;
 
-typedef GaloisRuntime::MM::ExternRefGaloisAllocator<char, ItAllocBaseTy> PerIterAllocTy;
+typedef GaloisRuntime::MM::ExternRefGaloisAllocator<char, IterAllocBaseTy> PerIterAllocTy;
 
 template<typename Ty>
-class GAllocator;
-
-template<>
-class GAllocator<void> {
+class GAllocator : public GaloisRuntime::MM::ExternRefGaloisAllocator<Ty, GaloisRuntime::MM::MallocWrapper> { 
+  typedef GaloisRuntime::MM::ExternRefGaloisAllocator<Ty, GaloisRuntime::MM::MallocWrapper> Super;
+  GaloisRuntime::MM::MallocWrapper wrapper;
 public:
-  typedef size_t size_type;
-  typedef ptrdiff_t difference_type;
-  typedef void* pointer;
-  typedef const void* const_pointer;
-  typedef void value_type;
-
-  template<typename Other>
-  struct rebind { typedef GAllocator<Other> other; };
+  GAllocator(): Super(&wrapper) { }
 };
 
 template<typename Ty>
-class GAllocator {
-  inline void destruct(char*) {}
-  inline void destruct(wchar_t*) { }
-  template<typename T> inline void destruct(T* t) { t->~T(); }
+struct GFixedAllocator : public GaloisRuntime::MM::FSBGaloisAllocator<Ty> { };
 
-public:
-  typedef size_t size_type;
-  typedef ptrdiff_t difference_type;
-  typedef Ty *pointer;
-  typedef const Ty *const_pointer;
-  typedef Ty& reference;
-  typedef const Ty& const_reference;
-  typedef Ty value_type;
-
-  template<class Other>
-  struct rebind { typedef GAllocator<Other> other; };
-
-  GAllocator() throw() { }
-  GAllocator(const GAllocator&) throw() { }
-  template <class U> GAllocator(const GAllocator<U>&) throw() { }
-  ~GAllocator() { }
-
-  pointer address(reference val) const { return &val; }
-  const_pointer address(const_reference val) const { return &val; }
-
-  pointer allocate(size_type size) {
-    if (size > max_size())
-      throw std::bad_alloc();
-    return static_cast<Ty*>(malloc(size * sizeof(Ty)));
-  }
-
-  void deallocate(pointer p, size_type) {
-    //::operator delete(p);
-    free(p);
-  }
-
-  size_type max_size() const throw() { 
-    return size_t(-1) / sizeof(Ty);
-  }
-
-  void construct(pointer p, const Ty& val) {
-    new(p) Ty(val);
-  }
-
-  void destroy(pointer p) {
-    destruct(p);
-  }
-};
-
-template<typename T1, typename T2>
-inline bool operator==(const GAllocator<T1>&, const GAllocator<T2>&) throw() {
-  return true;
 }
-
-template<typename T1, typename T2>
-inline bool operator!=(const GAllocator<T1>&, const GAllocator<T2>&) throw() {
-  return false;
-}
-}
-
 #endif
