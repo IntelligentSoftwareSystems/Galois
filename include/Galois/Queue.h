@@ -1426,120 +1426,195 @@ public:
 
 };
 
-
-template<class T,class Compare=std::less<T> >
+template<class T, class Compare=std::less<T>, class Alloc=std::allocator<T> >
 class PairingHeap: private boost::noncopyable {
+  /*
+   * Conceptually a pairing heap is an n-ary tree. We represent this using
+   * a fixed number of fields:
+   *  left: the node's first child
+   *  prev, next: a doubly linked list of a node's siblings, where the first
+   *    child's prev points to the parent, i.e., x->left->prev == x.
+   */
   struct Node {
     T value;
-    Node* leftChild;
-    Node* nextSibling;
+    Node* left;
+    Node* next;
     Node* prev;
-    Node(T v) : value(v), leftChild(NULL), nextSibling(NULL), prev(NULL) {}
+    Node(T v) : value(v), left(NULL), next(NULL), prev(NULL) { }
   };
 
+public:
+  typedef typename Alloc::template rebind<Node>::other allocator_type;
+
+private:
   Compare comp;
-  std::vector<Node*> tree;
-  Node* root;
-  int capacity;
+  const allocator_type& alloc;
+  std::vector<Node*, typename allocator_type::template rebind<Node*>::other> m_tree;
+  Node* m_root;
+  int m_capacity;
 
-  Node* compareAndLink(Node* first, Node* second) {
-    if (!second)
-      return first;
-    if (comp(second->value, first->value)) {
-      // Attach first as leftmost child of second
-      second->prev = first->prev;
-      first->prev = second;
-      first->nextSibling = second->leftChild;
-      if (first->nextSibling)
-        first->nextSibling->prev = first;
-      second->leftChild = first;
-      return second;
+  allocator_type get_alloc() {
+    return allocator_type(alloc);
+  }
+
+  /**
+   * Merge two trees together, preserving heap property. Make the least tree the
+   * parent of the other. Return new root.
+   */
+  Node* merge(Node* a, Node* b) {
+    assert(!a->next);
+    assert(!b->next);
+    assert(!a->prev);
+    assert(!b->prev);
+
+    Node *first = a, *second = b;
+    if (comp(b->value, a->value)) {
+      first = b;
+      second = a;
+    }
+
+    second->prev = first;
+    second->next = first->left;
+    if (first->left)
+      first->left->prev = second;
+    first->left = second;
+
+    assert(!first->prev);
+    assert(!first->next);
+    return first;
+  }
+
+  /**
+   * Heapify children, return new root.
+   */
+  Node* mergeChildren(Node* root) {
+    if (!root->left)
+      return NULL;
+
+    // Breakup kids
+    for (Node* kid = root->left; kid; kid = kid->next) {
+      m_tree.push_back(kid);
+      kid->prev->next = NULL;
+      kid->prev = NULL;
+    }
+
+    Node* retval;
+    if (m_tree.size() == 1) {
+      retval = m_tree[0];
     } else {
-      // Attach second as leftmost child of first
-      second->prev = first;
-      first->nextSibling = second->nextSibling;
-      if (first->nextSibling)
-        first->nextSibling->prev = first;
-      second->nextSibling = first->leftChild;
-      if (second->nextSibling)
-        second->nextSibling->prev = second;
-      first->leftChild = second;
-      return first;
+      // Merge in pairs
+      unsigned i = 0;
+      for (; i + 1 < m_tree.size(); i += 2) {
+        m_tree[i] = merge(m_tree[i], m_tree[i+1]);
+      }
+
+      // Merge pairs together
+      if (i != m_tree.size()) {
+        // odd number of siblings and m_tree[i] is the last
+        m_tree[i-2] = merge(m_tree[i-2], m_tree[i]);
+      }
+      for (unsigned j = (m_tree.size() >> 1) - 1; j > 0; --j) {
+        m_tree[2*(j-1)] = merge(m_tree[2*(j-1)], m_tree[2*j]);
+      }
+
+      retval = m_tree[0];
     }
+    m_tree.clear();
+    return retval;
   }
 
-  void redouble(int index) {
-    if (index == capacity) {
-      Node** old = tree;
-      capacity = 2 * index;
-      tree = new Node*[2*index];
-      memcpy(tree, old, sizeof(*tree) * index);
-      delete [] old;
-    }
+  /**
+   * Remove and deallocate root node and return new root.
+   */
+  Node* deleteMin(Node* root) {
+    Node* retval = mergeChildren(root);
+    get_alloc().destroy(root);
+    get_alloc().deallocate(root, 1);
+    return retval;
   }
 
-  Node* combineSiblings(Node* firstSibling) {
-    if (!firstSibling->nextSibling)
-      return firstSibling;
-    unsigned int numSiblings = 0;
-    for (; firstSibling; ++numSiblings) {
-      if (numSiblings == tree.size())
-        tree.resize(numSiblings * 2);
-      tree[numSiblings] = firstSibling;
-      firstSibling->prev->nextSibling = NULL;
-      firstSibling = firstSibling->nextSibling;
+  /**
+   * Remove node from heap, putting node in it's own heap.
+   */
+  void detach(Node* node) {
+    if (node == m_root)
+      return;
+
+    if (node->prev->left == node) {
+      // node is someone's left-most child
+      node->prev->left = node->next;
+    } else {
+      node->prev->next = node->next;
     }
-    if (numSiblings == tree.size())
-      tree.resize(numSiblings * 2);
-    tree[numSiblings] = NULL;
-
-    unsigned int i = 0;
-    for (; i + 1 < numSiblings; i += 2) 
-      tree[i] = compareAndLink(tree[i], tree[i+1]);
-
-    int j = i - 2;
-    if ((int)numSiblings - 3 == j)
-      tree[j] = compareAndLink(tree[j], tree[j+2]);
-    for (; j >= 2; j -=2)
-      tree[j-2] = compareAndLink(tree[j-2], tree[j]);
-    return tree[0];
+    if (node->next)
+      node->next->prev = node->prev;
+    node->next = NULL;
+    node->prev = NULL;
   }
 
 public:
-  PairingHeap(int capacity = 5): tree(capacity), root(NULL) { }
+  typedef Node* Handle;
+
+  PairingHeap(const allocator_type& a = allocator_type()):
+    alloc(a), m_tree(a), m_root(NULL) { }
 
   ~PairingHeap() {
-    if (root)
-      delete root;
+    while (!empty()) {
+      pollMin();
+    }
   }
 
   bool empty() const {
-    return root == NULL;
+    return m_root == NULL;
   }
 
-  void add(T x) {
-    Node* node = new Node(x);
-    if (!root)
-      root = node;
+  Handle add(T x) {
+    typename allocator_type::pointer node = get_alloc().allocate(1);
+    get_alloc().construct(node, Node(x));
+
+    if (!m_root)
+      m_root = node;
     else
-      root = compareAndLink(root, node);
+      m_root = merge(m_root, node);
+
+    return node;
+  }
+
+  T value(Handle node) {
+    return node->value;
+  }
+
+  void decreaseKey(Handle node, const T& val) {
+    assert(comp(val, node->value));
+
+    node->value = val;
+    if (node != m_root) {
+      detach(node);
+      m_root = merge(m_root, node);
+    }
+  }
+
+  void deleteNode(Handle node) {
+    if (node == m_root) {
+      pollMin();
+    } else {
+      detach(node);
+      node = deleteMin(node);
+      if (node)
+        m_root = merge(m_root, node);
+    }
   }
 
   std::pair<bool,T> pollMin() {
     if (empty())
       return std::make_pair(false, T());
-    T retval = root->value;
-    if (!root->leftChild) {
-      delete root;
-      root = NULL;
-    } else {
-      Node* t = root;
-      root = combineSiblings(root->leftChild);
-      delete t;
-    }
+    T retval = m_root->value;
+    m_root = deleteMin(m_root);
+
     return std::make_pair(true, retval);
   }
 };
+
 
 template<class T,class Compare=std::less<T>,bool Concurrent=true>
 class FCPairingHeap: private boost::noncopyable {
@@ -1743,177 +1818,6 @@ public:
   }
 
 };
-
-#if 0
-template<class T>
-struct PairingHeap1 {
-  struct PairNode {
-    T element;
-    PairNode* leftChild;
-    PairNode* nextSibling;
-    PairNode* prev;
-    PairNode(T e) : element(e), leftChild(NULL), nextSibling(NULL), prev(NULL) { }
-  };
-
-  PairNode* root;
-
-  PairingHeap1(): root(NULL) { }
-
-  ~PairingHeap1() {
-    makeEmpty();
-  }
-
-  PairNode * insert(const T & x) {
-    PairNode* newNode = new PairNode( x );
-
-    if( root == NULL )
-      root = newNode;
-    else
-      compareAndLink( root, newNode );
-    return newNode;
-  }
-
-  const T& findMin() const
-  {
-      if (isEmpty( ))
-          throw 1;
-      return root->element;
-  }
-
-  void deleteMin( )
-  {
-      if( isEmpty( ) )
-          throw 1;
-
-      PairNode *oldRoot = root;
-
-      if( root->leftChild == NULL )
-          root = NULL;
-      else
-          root = combineSiblings( root->leftChild );
-
-      delete oldRoot;
-  }
-
-  void deleteMin( T& minItem ) {
-      minItem = findMin( );
-      deleteMin( );
-  }
-
-  bool isEmpty( ) const {
-      return root == NULL;
-  }
-
-  void makeEmpty( )
-  {
-      reclaimMemory( root );
-      root = NULL;
-  }
-
-  /**
-   * Internal method to make the tree empty.
-   * WARNING: This is prone to running out of stack space.
-   */
-  void reclaimMemory( PairNode* t ) const {
-      if( t != NULL )
-      {
-          reclaimMemory( t->leftChild );
-          reclaimMemory( t->nextSibling );
-          delete t;
-      }
-  }
-
-  /**
-   * Internal method that is the basic operation to maintain order.
-   * Links first and second together to satisfy heap order.
-   * first is root of tree 1, which may not be NULL.
-   *    first->nextSibling MUST be NULL on entry.
-   * second is root of tree 2, which may be NULL.
-   * first becomes the result of the tree merge.
-   */
-  void compareAndLink( PairNode * & first,
-                  PairNode *second ) const
-  {
-      if( second == NULL )
-          return;
-
-      if( second->element < first->element )
-      {
-          // Attach first as leftmost child of second
-          second->prev = first->prev;
-          first->prev = second;
-          first->nextSibling = second->leftChild;
-          if( first->nextSibling != NULL )
-              first->nextSibling->prev = first;
-          second->leftChild = first;
-          first = second;
-      }
-      else
-      {
-          // Attach second as leftmost child of first
-          second->prev = first;
-          first->nextSibling = second->nextSibling;
-          if( first->nextSibling != NULL )
-              first->nextSibling->prev = first;
-          second->nextSibling = first->leftChild;
-          if( second->nextSibling != NULL )
-              second->nextSibling->prev = second;
-          first->leftChild = second;
-      }
-  }
-
-  /**
-   * Internal method that implements two-pass merging.
-   * firstSibling the root of the conglomerate;
-   *     assumed not NULL.
-   */
-  PairNode *
-  combineSiblings( PairNode *firstSibling ) const
-  {
-      if( firstSibling->nextSibling == NULL )
-          return firstSibling;
-
-      std::cerr << "ASDFASDFSADF" << "\n";
-          // Allocate the array
-      static std::vector<PairNode *> treeArray( 5 );
-
-          // Store the subtrees in an array
-      int numSiblings = 0;
-      for( ; firstSibling != NULL; numSiblings++ )
-      {
-          if( numSiblings == treeArray.size( ) )
-              treeArray.resize( numSiblings * 2 );
-          treeArray[ numSiblings ] = firstSibling;
-          firstSibling->prev->nextSibling = NULL;  // break links
-          firstSibling = firstSibling->nextSibling;
-      }
-      if( numSiblings == treeArray.size( ) )
-          treeArray.resize( numSiblings + 1 );
-      treeArray[ numSiblings ] = NULL;
-
-          // Combine subtrees two at a time, going left to right
-      int i = 0;
-      for( ; i + 1 < numSiblings; i += 2 )
-          compareAndLink( treeArray[ i ], treeArray[ i + 1 ] );
-
-      int j = i - 2;
-
-          // j has the result of last compareAndLink.
-          // If an odd number of trees, get the last one.
-      if( j == numSiblings - 3 )
-          compareAndLink( treeArray[ j ], treeArray[ j + 2 ] );
-
-          // Now go right to left, merging last tree with
-          // next to last. The result becomes the new last.
-      for( ; j >= 2; j -= 2 )
-          compareAndLink( treeArray[ j - 2 ], treeArray[ j ] );
-      return treeArray[ 0 ];
-  }
-};
-#endif
-
-
-
 
 }
 #endif

@@ -52,7 +52,7 @@ struct Process {
   Process(Galois::ConcurrentSkipListMap<int,int>& m) : map(m) { }
 
   template<typename Context>
-  void operator()(int& item, Context ctx) {
+  void operator()(int& item, Context& ctx) {
     map.put(item, &dummy);
   }
 };
