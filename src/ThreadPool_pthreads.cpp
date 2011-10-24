@@ -217,16 +217,12 @@ public:
     assert(activeThreads <= maxThreads);
     assert(activeThreads <= threads.size());
 
-    //std::ostringstream out;
-    //out << "Threads set to " << num << " using " << activeThreads << " of " << maxThreads;
-    //reportInfo("ThreadPool", out.str().c_str());
     return activeThreads;
   }
 };
 }
 
 //! Implement the global threadpool
-//static ThreadPool_pthread pool;
 ThreadPool& GaloisRuntime::getSystemThreadPool() {
   static ThreadPool_pthread pool;
   return pool;
