@@ -92,7 +92,7 @@ struct process {
 #if BORUVKA_DEBUG
 			std::cout<<"Processing "<<graph.getData(src).toString()<<std::endl;
 #endif
-			int minEdgeWeight=INT_MAX;
+			int minEdgeWeight=std::numeric_limits<int>::max();
 			int numNeighbors = 0;
 			//Acquire locks on neighborhood.
 			for (Graph::neighbor_iterator dst = graph.neighbor_begin(src, Galois::ALL), edst = graph.neighbor_end(src, Galois::ALL);dst != edst; ++dst) {
@@ -111,7 +111,7 @@ struct process {
 				}
 			}
 			//If there are no outgoing neighbors.
-			if(numNeighbors==0  || minEdgeWeight == INT_MAX){
+			if(numNeighbors==0  || minEdgeWeight == std::numeric_limits<int>::max()){
 				graph.removeNode(src, Galois::NONE);
 				return;
 			}
