@@ -196,6 +196,7 @@ private:
     iterator begin() {
       return edges.begin();
     }
+
     iterator end() {
       return edges.end();
     }
@@ -215,12 +216,6 @@ private:
 
     gNode(const_node_reference d, bool a) :
       data(d), active(a) {
-    }
-
-    void prefetch_neighbors() {
-      for (iterator ii = begin(), ee = end(); ii != ee; ++ii)
-	if (ii->getNeighbor())
-	  __builtin_prefetch(ii->getNeighbor());
     }
 
     void eraseEdge(gNode* N) {
@@ -244,21 +239,28 @@ private:
       return ii->getData();
     }
 
-    edge_reference getOrCreateEdge(gNode* N) {
-      for (iterator ii = begin(), ee = end(); ii != ee; ++ii)
-	if (ii->getNeighbor() == N)
-	  return ii->getData();
+    edge_reference createEdge(gNode* N) {
       edges.push_back(EITy(N));
       return edges.back().getData();
     }
 
-    edge_reference getOrCreateEdge(gNode* N,  const_edge_reference data) {
-    	for (iterator ii = begin(), ee = end(); ii != ee; ++ii)
-    		if (ii->getNeighbor() == N)
-    			return ii->getData();
+    edge_reference getOrCreateEdge(gNode* N) {
+      for (iterator ii = begin(), ee = end(); ii != ee; ++ii)
+	if (ii->getNeighbor() == N)
+	  return ii->getData();
+      return createEdge(N);
+    }
 
-    	edges.push_back(EITy(N, data));
-    	return edges.back().getData();
+    edge_reference createEdge(gNode* N, const_edge_reference data) {
+      edges.push_back(EITy(N, data));
+      return edges.back().getData();
+    }
+
+    edge_reference getOrCreateEdge(gNode* N, const_edge_reference data) {
+      for (iterator ii = begin(), ee = end(); ii != ee; ++ii)
+        if (ii->getNeighbor() == N)
+          return ii->getData();
+      return createEdge(N, data);
     }
 
     bool isActive() {
@@ -445,38 +447,72 @@ public:
 
   //// Edge Handling ////
 
-  //! Adds an edge to the graph containing the specified data.
-  void addEdge(GraphNode src, GraphNode dst,
+  //! Adds an edge to graph, replacing existing value if edge already exists
+  edge_reference addEdge(GraphNode src, GraphNode dst,
 	       const_edge_reference data, 
 	       Galois::MethodFlag mflag = ALL) {
     assert(src.ID);
     assert(dst.ID);
     acquire(src.ID, mflag);
-
     if (Directional) {
-      src.ID->getOrCreateEdge(dst.ID) = data;
+      return src.ID->getOrCreateEdge(dst.ID, data);
     } else {
       acquire(dst.ID, mflag);
-      EdgeTy& E1 = src.ID->getOrCreateEdge(dst.ID);
-      EdgeTy& E2 = dst.ID->getOrCreateEdge(src.ID);
-      if (src < dst)
-	E1 = data;
-      else
-	E2 = data;
+      if (src < dst) {
+        dst.ID->getOrCreateEdge(src.ID, data);
+        return src.ID->getOrCreateEdge(dst.ID, data);
+      } else {
+        src.ID->getOrCreateEdge(dst.ID, data);
+        return dst.ID->getOrCreateEdge(src.ID, data);
+      }
     }
   }
 
-  //! Adds an edge to the graph
-  void addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {
+  //! Adds an edge to graph, always adding new value, thus permiting multiple edges to from
+  //! one node to another. Not defined for undirected graphs.
+  edge_reference addMultiEdge(GraphNode src, GraphNode dst, const_edge_reference data,
+      Galois::MethodFlag mflag = ALL) {
     assert(src.ID);
     assert(dst.ID);
     acquire(src.ID, mflag);
     if (Directional) {
-      src.ID->getOrCreateEdge(dst.ID);
+      return src.ID->createEdge(dst.ID, data);
+    } else {
+      assert(0 && "Not defined for undirected graphs");
+      abort();
+    }
+  }
+
+  //! Adds an edge to graph, replacing existing value if edge already exists
+  edge_reference addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {
+    assert(src.ID);
+    assert(dst.ID);
+    acquire(src.ID, mflag);
+    if (Directional) {
+      return src.ID->getOrCreateEdge(dst.ID);
     } else {
       acquire(dst.ID, mflag);
-      src.ID->getOrCreateEdge(dst.ID);
-      dst.ID->getOrCreateEdge(src.ID);
+      if (src < dst) {
+        dst.ID->getOrCreateEdge(src.ID);
+        return src.ID->getOrCreateEdge(dst.ID);
+      } else {
+        src.ID->getOrCreateEdge(dst.ID);
+        return dst.ID->getOrCreateEdge(src.ID);
+      }
+    }
+  }
+
+  //! Adds an edge to graph, always adding new value, thus permiting multiple edges to from
+  //! one node to another. Not defined for undirected graphs.
+  edge_reference addMultiEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {
+    assert(src.ID);
+    assert(dst.ID);
+    acquire(src.ID, mflag);
+    if (Directional) {
+      return src.ID->createEdge(dst.ID);
+    } else {
+      assert(0 && "Not defined for undirected graphs");
+      abort();
     }
   }
 
@@ -517,34 +553,6 @@ public:
     }
   }
 
-  /**
-    * Returns the edge data associated with the edge if the edge exists, otherwise it add an edge with
-    * the given edge data for a non-existent edge.
-    */
-   edge_reference getOrCreateEdge(GraphNode src, GraphNode dst,
-		   const_edge_reference data, Galois::MethodFlag mflag = ALL) const {
-     assert(src.ID);
-     assert(dst.ID);
-
-     acquire(src.ID, mflag);
-
-     if (Directional) {
-       return src.ID->getOrCreateEdge(dst.ID, data);
-     } else {
-       acquire(dst.ID, mflag);
-
-       if (src < dst){
-    	   dst.ID->getOrCreateEdge(src.ID, data);
-           return src.ID->getOrCreateEdge(dst.ID, data);
-       }
-       else{
-    	   src.ID->getOrCreateEdge(dst.ID, data);
-    	   return dst.ID->getOrCreateEdge(src.ID, data);
-
-       }
-     }
-   }
-
   //// General Things ////
 
   //! Returns the number of neighbors
@@ -562,15 +570,11 @@ public:
   neighbor_iterator neighbor_begin(GraphNode N, Galois::MethodFlag mflag = ALL) {
     assert(N.ID);
     acquire(N.ID, mflag);
-    //    if (shouldLock(mflag)) {
     //Trust the compliler to remove this loop if the body disappears from the right mflag
     for (typename gNode::neighbor_iterator ii = N.ID->neighbor_begin(), ee =
 	   N.ID->neighbor_end(); ii != ee; ++ii) {
-      //__builtin_prefetch(*ii);
-      //if (shouldLock(mflag))
       acquire(*ii, mflag);
     }
-    //}
     return boost::make_transform_iterator(N.ID->neighbor_begin(),
 					  makeGraphNodePtr(this));
   }
@@ -578,8 +582,7 @@ public:
   //! Returns the end of the neighbor iterator 
   neighbor_iterator neighbor_end(GraphNode N, Galois::MethodFlag mflag = ALL) {
     assert(N.ID);
-    // Probably not necessary (no valid use for an end pointer should ever
-    // require it)
+    // Not necessary; no valid use for an end pointer should ever require it
     //if (shouldLock(mflag))
     //  acquire(N.ID);
     return boost::make_transform_iterator(N.ID->neighbor_end(),

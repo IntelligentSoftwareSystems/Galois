@@ -44,7 +44,7 @@ static const char* description =
   "maximum cardinality matching is the matching with the most number of edges.";
 static const char* url = 0;
 static const char* help = "[-algo N] <N> <numEdges> <numGroups> <seed>";
-
+static int WlType = 0;
 
 template<typename NodeTy,typename EdgeTy>
 struct BipartiteGraph: public Galois::Graph::FirstGraph<NodeTy,EdgeTy,true> {
@@ -383,11 +383,14 @@ struct MatchingABMP {
   typedef typename G::node_type node_type;
   typedef typename GraphTypes<G>::Edge Edge;
   typedef std::vector<Edge, typename Galois::PerIterAllocTy::rebind<Edge>::other> Revs;
-  typedef typename TypeWrapper<GaloisRuntime::WorkList::FIFO< >,
-          GaloisRuntime::WorkList::dChunkedFIFO<64>,
-          Concurrent >::Type WL;
-
   static const Galois::MethodFlag flag = Concurrent ? Galois::CHECK_CONFLICT : Galois::NONE;
+
+  struct Indexer: public std::unary_function<const GraphNode&,unsigned> {
+    unsigned operator()(const GraphNode& n) const {
+      return n.getData(Galois::NONE).layer;
+    }
+  };
+
 
   std::string name() { 
     return std::string(Concurrent ? "Concurrent" : "Serial") + " Alt-Blum-Mehlhorn-Paul"; 
@@ -461,12 +464,16 @@ struct MatchingABMP {
     
     void operator()(const GraphNode& node, Galois::UserContext<GraphNode>& ctx) {
       unsigned curLayer = node.getData(flag).layer;
-      if (curLayer > maxLayer)
+      if (curLayer > maxLayer) {
+        std::cout << "Reached max layer: " << curLayer << "\n";
         ctx.breakLoop();
-      if (size <= 50 * curLayer)
-        ctx.breakLoop();
+      }
+      //if (size <= 50 * curLayer) {
+      //  std::cout << "Reached min size: " << size << "\n";
+      //  ctx.breakLoop();
+      //}
       if (!parent(g, node, ctx)) {
-        __sync_fetch_and_add(&size, -1);
+        //__sync_fetch_and_add(&size, -1);
       }
     }
   };
@@ -482,7 +489,27 @@ struct MatchingABMP {
     unsigned maxLayer = (unsigned) (0.1*sqrt(g.size()));
     size_t size = initial.size();
     Galois::setMaxThreads(Concurrent ? numThreads : 1);
-    Galois::for_each<WL>(initial.begin(), initial.end(), Process(*this, g, maxLayer, size));
+    
+    using namespace GaloisRuntime::WorkList;
+
+    typedef dChunkedFIFO<64> Chunked;
+    typedef OrderedByIntegerMetric<Indexer, Chunked> OBIM;
+
+    switch (WlType) {
+      case 2:
+        std::cout << "Using obim scheduler\n";
+        Galois::for_each<OBIM>(initial.begin(), initial.end(), Process(*this, g, maxLayer, size));
+        break;
+      case 1:
+        std::cout << "Using chunked scheduler\n";
+        Galois::for_each<Chunked>(initial.begin(), initial.end(), Process(*this, g, maxLayer, size));
+        break;
+      default:
+      case 0:
+        std::cout << "Using fifo scheduler\n";
+        Galois::for_each<FIFO<> >(initial.begin(), initial.end(), Process(*this, g, maxLayer, size));
+        break;
+    }
 
     Galois::StatTimer t("serial");
     t.start();
@@ -709,8 +736,7 @@ struct MatchingMF {
 
     Galois::StatTimer T("BfsTime");
     T.start();
-    typedef GaloisRuntime::WorkList::dChunkedFIFO<16> WL;
-    Galois::for_each<WL>(sink, UpdateHeights<false>(g));
+    Galois::for_each(sink, UpdateHeights<false>(g));
     T.stop();
 
     for (active_iterator ii = g.active_begin(), ei = g.active_end(); ii != ei; ++ii) {
@@ -726,7 +752,7 @@ struct MatchingMF {
   void initializePreflow(G& g, const GraphNode& source, std::vector<GraphNode>& initial) {
     for (neighbor_iterator dst = g.neighbor_begin(source),
         edst = g.neighbor_end(source); dst != edst; ++dst) {
-      edge_type& edge = g.getEdgeData(source, *dst);
+      edge_type& edge = g.getEdgeData(source, dst);
       int cap = edge.cap;
       if (cap > 0)
         initial.push_back(*dst);
@@ -751,22 +777,22 @@ struct MatchingMF {
     for (typename NodeList::iterator src = g.A.begin(), esrc = g.A.end(); src != esrc; ++src) {
       for (neighbor_iterator dst = g.neighbor_begin(*src), edst = g.neighbor_end(*src);
           dst != edst; ++dst) {
-        g.addEdge(*dst, *src, edge_type(0));
+        g.addMultiEdge(*dst, *src, edge_type(0));
         ++numEdges;
       }
     }
 
     // Add edge from source to each node in A
     for (typename NodeList::iterator src = g.A.begin(), esrc = g.A.end(); src != esrc; ++src) {
-      g.addEdge(source, *src, edge_type());
-      g.addEdge(*src, source, edge_type(0));
+      g.addMultiEdge(source, *src, edge_type());
+      g.addMultiEdge(*src, source, edge_type(0));
       ++numEdges;
     }
 
     // Add edge to sink from each node in B
     for (typename NodeList::iterator src = g.B.begin(), esrc = g.B.end(); src != esrc; ++src) {
-      g.addEdge(*src, sink, edge_type());
-      g.addEdge(sink, *src, edge_type(0));
+      g.addMultiEdge(*src, sink, edge_type());
+      g.addMultiEdge(sink, *src, edge_type(0));
       ++numEdges;
     }
 
@@ -778,7 +804,7 @@ struct MatchingMF {
     for (typename NodeList::iterator src = g.A.begin(), esrc = g.A.end(); src != esrc; ++src) {
       for (neighbor_iterator dst = g.neighbor_begin(*src), edst = g.neighbor_end(*src);
           dst != edst; ++dst) {
-        if (g.getEdgeData(*src, *dst).cap == 0) {
+        if (g.getEdgeData(*src, dst).cap == 0) {
           src->getData().free = dst->getData().free = false;
         }
       }
@@ -800,6 +826,7 @@ struct MatchingMF {
     t.stop();
 
     bool shouldGlobalRelabel = false;
+    Galois::setMaxThreads(Concurrent ? numThreads : 1);
     while (!initial.empty()) {
       Galois::for_each(initial.begin(), initial.end(), 
           Process(*this, g, source, sink, numNodes, interval, shouldGlobalRelabel));
@@ -822,8 +849,6 @@ struct MatchingMF {
     g.removeNode(source);
     extractMatching(g);
     t.stop();
-    //sink.getData().covered = true;
-    //source.getData().covered = true;
   }
 };
 
@@ -1002,6 +1027,14 @@ int main(int argc, const char** argv) {
       algo = atoi(ii[1]);
       ii = args.erase(ii);
       ii = args.erase(ii);
+      --ii;
+      ei = args.end();
+    } else if (strcmp(*ii, "-wltype") == 0 && ii + 1 != ei) {
+      WlType = atoi(ii[1]);
+      ii = args.erase(ii);
+      ii = args.erase(ii);
+      --ii;
+      ei = args.end();
     }
   }
   
