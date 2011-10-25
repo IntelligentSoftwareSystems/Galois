@@ -128,10 +128,12 @@ class ForEachWork {
   inline void drainAborted(tldTy& tld) {
     if (!isLeader) return;
     if (!abort_happened.data) return;
+    if (Configurator<Function>::NeedsBreak && tld.facing.__breakHappened()) return;
     tld.lterm->workHappened();
     abort_happened.data = 0;
     std::pair<bool, value_type> p = aborted.pop();
     while (p.first) {
+      if (Configurator<Function>::NeedsBreak && tld.facing.__breakHappened()) return;
       doProcess(p.second, tld);
       p = aborted.pop();
     }
