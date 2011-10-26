@@ -181,3 +181,90 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
   }
 };
 WLCOMPILECHECK(CTOrderedByIntegerMetric);
+
+template<class Indexer, typename ContainerTy, bool concurrent = true, int binmax = 1024*1024 >
+class BarrierOBIM : private boost::noncopyable {
+  typedef typename ContainerTy::template rethread<concurrent>::WL CTy;
+
+  volatile unsigned int current;
+  volatile unsigned int pushmax;
+
+  CTy* B;
+
+  Indexer I;
+
+  TerminationDetection term;
+  pthread_barrier_t barr1;
+  pthread_barrier_t barr2;
+
+ public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef BarrierOBIM<Indexer,ContainerTy,newconcurrent,binmax> WL;
+  };
+  template<typename Tnew>
+  struct retype {
+    typedef BarrierOBIM<Indexer,typename ContainerTy::template retype<Tnew>::WL,concurrent, binmax> WL;
+  };
+
+  typedef typename CTy::value_type value_type;
+
+  BarrierOBIM(const Indexer& x = Indexer())
+    :current(0), pushmax(0), I(x)
+  {
+    B = new CTy[binmax];
+    //std::cerr << "$"<<getSystemThreadPool().getActiveThreads() <<"$";
+    pthread_barrier_init(&barr1, NULL, getSystemThreadPool().getActiveThreads());
+    pthread_barrier_init(&barr2, NULL, getSystemThreadPool().getActiveThreads());
+  }
+  ~BarrierOBIM() {
+    delete[] B;
+  }
+
+  bool push(value_type val) {
+    unsigned int index = I(val);
+    //std::cerr << "P: " << index << "\n";
+    assert(index >= current);
+    assert(index < binmax);
+    term.workHappened();
+    unsigned int oldi;
+    while (index > (oldi = pushmax)) {
+      __sync_bool_compare_and_swap(&pushmax, oldi, index);
+    }
+    return B[index].push(val);
+  }
+
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    while (b != e)
+      push(*b++);
+    return true;
+  }
+
+  std::pair<bool, value_type> pop() {
+    do {
+      if (current > pushmax)
+	return std::make_pair(false, value_type());
+      do {
+	//Find a successful pop
+	std::pair<bool, value_type> retval = B[current].pop();
+	if (retval.first) {
+	  term.workHappened();
+	  return retval;
+	}
+	term.localTermination();
+      } while (!term.globalTermination());
+      
+      pthread_barrier_wait(&barr1);
+  
+      if (ThreadPool::getMyID() == 0) {
+	//std::cerr << "inc: " << current << "\n";
+	term.reset();
+	if (current <= pushmax)
+	  __sync_fetch_and_add(&current, 1);
+      }
+
+      pthread_barrier_wait(&barr2);
+    } while (true);
+  }
+};
