@@ -589,6 +589,8 @@ public:
 					  makeGraphNodePtr(this));
   }
 
+  //! Returns edge data given a neighbor iterator; neighbor iterator should be
+  //! from neighbor_begin with the same src.
   edge_reference getEdgeData(GraphNode src, neighbor_iterator dst,
       Galois::MethodFlag mflag = ALL) {
     assert(src.ID);
@@ -596,6 +598,7 @@ public:
     //yes, fault on null (no edge)
     acquire(src.ID, mflag);
 
+    //TODO(ddn): check that neighbor iterator is from the same source node as src
     if (Directional) {
       return src.ID->getEdgeData(dst.base().base());
     } else {
