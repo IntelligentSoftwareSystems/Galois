@@ -112,16 +112,17 @@ else()
   message(STATUS "Could NOT find TBB; have your sourced TBB_INSTALL_DIR/bin/tbbvars.sh?")
 endif()
 
+#Example of how to include external libraries
 #libdai XXX(ddn): remove dependency later
-set(DAI_BASE "IGNORE${CMAKE_CURRENT_SOURCE_DIR}/../libdai")
-if(EXISTS "${DAI_BASE}")
-  set(DAI_FOUND on)
-  set(DAI_INCLUDE_DIRS "${DAI_BASE}/include")
-  set(DAI_LIBRARIES "${DAI_BASE}/lib/libdai.a" "gmp")
-  include_directories(${DAI_INCLUDE_DIRS})
-else()
-  set(DAI_FOUND off)
-endif()
+#set(DAI_BASE "${CMAKE_CURRENT_SOURCE_DIR}/../libdai")
+#if(EXISTS "${DAI_BASE}")
+#  set(DAI_FOUND on)
+#  set(DAI_INCLUDE_DIRS "${DAI_BASE}/include")
+#  set(DAI_LIBRARIES "${DAI_BASE}/lib/libdai.a" "gmp")
+#  include_directories(${DAI_INCLUDE_DIRS})
+#else()
+#  set(DAI_FOUND off)
+#endif()
 
 #cray
 if(USE_CRAY)
@@ -186,9 +187,7 @@ function(linkRuntime name)
     target_link_libraries(${name} ${MPI_LIBRARIES})
   endif()
   
-  if(DAI_FOUND)
-    target_link_libraries(${name} ${DAI_LIBRARIES})
-  endif()
+  target_link_libraries(${name} ${ARGN})
 
   target_link_libraries(${name} ${Boost_LIBRARIES})
 endfunction (linkRuntime)
