@@ -29,15 +29,13 @@
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
 #include "Galois/Graphs/FileGraph.h"
-
-//#include "Lonestar/WL_fiddling.h"
-#include "Lonestar/Banner.h"
-#include "Lonestar/CommandLine.h"
-
-//#include "WorkListTL.h"
 #include "Galois/Runtime/DebugWorkList.h"
 
+#include "Lonestar/Banner.h"
+#include "Lonestar/CommandLine.h"
 #include "SSSP.h"
+
+#include "Exp/PriorityScheduling/WorkListTL.h"
 
 #include <string>
 #include <sstream>
@@ -50,34 +48,26 @@ static const char* description =
   "Computes the shortest path from a source node to all nodes in a directed "
   "graph using a modified Bellman-Ford algorithm\n";
 static const char* url = "single_source_shortest_path";
-static const char* help =
-  "<input file> <startnode> <reportnode> [-delta <deltaShift>] [-bfs]";
+static const char* help = "[-delta <deltaShift>] [-bfs] <input file> <startnode> <reportnode>";
 
 static unsigned int stepShift = 10;
 
-//static std::string wlName = "obim";
 
 typedef Galois::Graph::LC_FileGraph<SNode, unsigned int> Graph;
 typedef Galois::Graph::LC_FileGraph<SNode, unsigned int>::GraphNode GNode;
 
 typedef UpdateRequestCommon<GNode> UpdateRequest;
 
-struct seq_less {
-  bool operator()(const UpdateRequest& lhs, const UpdateRequest& rhs) {
+
+
+struct seq_less: public std::binary_function<const UpdateRequest&,const UpdateRequest&,bool> {
+  bool operator()(const UpdateRequest& lhs, const UpdateRequest& rhs) const {
     //return (lhs.w  >> stepShift) < (rhs.w >> stepShift);
     if (lhs.w < rhs.w) return true;
     else if (lhs.w > rhs.w) return false;
     else return lhs.n < rhs.n;
   }
 };
-// struct seq_gt {
-//   bool operator()(const UpdateRequest& lhs, const UpdateRequest& rhs) {
-//     //return (lhs.w  >> stepShift) < (rhs.w >> stepShift);
-//     if (lhs.w > rhs.w) return true;
-//     else if (lhs.w < rhs.w) return false;
-//     else return lhs.n > rhs.n;
-//   }
-// };
 
 struct UpdateRequestIndexer
   : std::binary_function<UpdateRequest, unsigned int, unsigned int> {
@@ -159,40 +149,14 @@ struct process {
 void runBodyParallel(const GNode src) {
   using namespace GaloisRuntime::WorkList;
   typedef NoInlineFilter<dChunkedLIFO<16> > IChunk;
-  // typedef ChunkedLIFO<16> NAChunk;
-
-  typedef NoInlineFilter<OrderedByIntegerMetric<UpdateRequestIndexer, IChunk> > OBIM;
-  // typedef TbbPriQueue<seq_gt> TBB;
-  // typedef LocalStealing<TBB > LTBB;
-  // typedef SkipListQueue<seq_less> SLQ;
-  // typedef SimpleOrderedByIntegerMetric<UpdateRequestIndexer> SOBIM;
-  // typedef LocalStealing<SOBIM > LSOBIM;
-  // typedef OrderedByIntegerMetric<UpdateRequestIndexer, NAChunk> NAOBIM;
-  // typedef CTOrderedByIntegerMetric<UpdateRequestIndexer, IChunk> CTOBIM;
-  // typedef CTOrderedByIntegerMetric<UpdateRequestIndexer, NAChunk> NACTOBIM;
-
-  // typedef LocalStealing<SOBIM > LSOBIM;
-  // typedef FCPairingHeapQueue<seq_less> FCPH;
+  typedef OrderedByIntegerMetric<UpdateRequestIndexer, IChunk> OBIM;
 
   Galois::StatTimer T;
 
-  typedef UpdateRequestIndexer Indexer;
-
+  UpdateRequest one[1] = { UpdateRequest(src, 0) };
   T.start();
-  Galois::for_each<OBIM>(UpdateRequest(src,(unsigned)0), process());
+  Exp::StartWorklistExperiment<OBIM,UpdateRequestIndexer,seq_less>()(std::cout, &one[0], &one[1], process());
   T.stop();
-
-  // if (wlName == "fcph") {
-  //   T.start();
-  //   Galois::for_each<FCPH>(UpdateRequest(src,0), process());
-  //   T.stop();
-  // }
-  // else WLFOO4(&wl[0], &wl[1], process(), obim, OBIM, sobim, SOBIM, lsobim, LSOBIM, naobim, NAOBIM)
-  //   else WLFOO4(&wl[0], &wl[1], process(), ctobim, CTOBIM, slq, SLQ, tbb, TBB, ltbb, LTBB)
-  //     else WLFOO3(&wl[0], &wl[1], process(), nactobim, NACTOBIM, dchunk, IChunk, chunk, NAChunk)
-  // 	else {
-  // 	  std::cout << "Unrecognized worklist " << wlName << "\n";
-  // 	}
 }
 
 
@@ -231,37 +195,33 @@ bool verify(GNode source) {
 
 int main(int argc, const char **argv) {
   std::vector<const char*> args = parse_command_line(argc, argv, help);
+  Exp::parse_worklist_command_line(args);
 
+  for (std::vector<const char*>::iterator ii = args.begin(), ei = args.end(); ii != ei; ++ii) {
+    if (strcmp(*ii, "-delta") == 0 && ii + 1 != ei) {
+      stepShift = atoi(ii[1]);
+      ii = args.erase(ii);
+      ii = args.erase(ii);
+      --ii;
+      ei = args.end();
+    } else if (strcmp(*ii, "bfs") == 0) {
+      do_bfs = true;
+      ii = args.erase(ii);
+      --ii;
+      ei = args.end();
+    }
+  }
+  
   if (args.size() < 3) {
     std::cerr << "not enough arguments, use -help for usage information\n";
     return 1;
   }
+
   printBanner(std::cout, name, description, url);
   
-  unsigned int i = 0;
-  if (strcmp(args[i], "-delta") == 0 && i + 1 < args.size()) {
-    stepShift = atoi(args[i+1]);
-    i += 2;
-  }
-
-  const char* inputfile = args[i];
-  unsigned int startNode = atoi(args[i+1]);
-  unsigned int reportNode = atoi(args[i+2]);
-  i += 3;
-  for (; i < args.size(); ++i) {
-    if (strcmp(args[i], "-delta") == 0 && i + 1 < args.size()) {
-      stepShift = atoi(args[i+1]);
-      ++i;
-    } else if (strcmp(args[i], "-bfs") == 0) {
-      do_bfs = true;
-    // } else if (strcmp(args[i], "-wl") == 0) {
-    //   wlName = args[i+1];
-    //   ++i;
-    } else {
-      std::cerr << "unknown argument, use -help for usage information\n";
-      return 1;
-    }
-  }
+  const char* inputfile = args[0];
+  unsigned int startNode = atoi(args[1]);
+  unsigned int reportNode = atoi(args[2]);
 
   GNode source = -1;
   GNode report = -1;
@@ -270,7 +230,6 @@ int main(int argc, const char **argv) {
   graph.emptyNodeData();
   std::cout << "Read " << graph.size() << " nodes\n";
   std::cout << "Using delta-step of " << (1 << stepShift) << "\n";
-  //  std::cout << "Using worklist of " << wlName << "\n";
   
   unsigned int id = 0;
   for (Graph::active_iterator src = graph.active_begin(), ee =

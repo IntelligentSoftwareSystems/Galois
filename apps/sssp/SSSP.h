@@ -21,6 +21,10 @@ struct UpdateRequestCommon {
   bool operator<(const UpdateRequestCommon& rhs) const {
     return w < rhs.w;
   }
+
+  bool operator!=(const UpdateRequestCommon& other) const {
+    return w != other.w;
+  }
 };
 
 struct SNode {

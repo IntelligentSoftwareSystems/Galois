@@ -24,14 +24,16 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
+// XXX(ddn): To evaluate:
+//  apps/matching/max-card-bipartite -t 1 -algo 3 -wltype 0 1000000 100000000 10000 12
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
 #include "Galois/Graphs/FileGraph.h"
-
 #include "Lonestar/Banner.h"
 #include "Lonestar/CommandLine.h"
+#include "Exp/PriorityScheduling/WorkListTL.h"
 
 #include <string>
 #include <vector>
@@ -44,7 +46,6 @@ static const char* description =
   "maximum cardinality matching is the matching with the most number of edges.";
 static const char* url = 0;
 static const char* help = "[-algo N] <N> <numEdges> <numGroups> <seed>";
-static int WlType = 0;
 
 template<typename NodeTy,typename EdgeTy>
 struct BipartiteGraph: public Galois::Graph::FirstGraph<NodeTy,EdgeTy,true> {
@@ -391,6 +392,12 @@ struct MatchingABMP {
     }
   };
 
+  struct Less: public std::binary_function<const GraphNode&,const GraphNode&,bool> {
+    unsigned operator()(const GraphNode& n1, const GraphNode& n2) const {
+      return n1.getData(Galois::NONE).layer < n2.getData(Galois::NONE).layer;
+    }
+  };
+
 
   std::string name() { 
     return std::string(Concurrent ? "Concurrent" : "Serial") + " Alt-Blum-Mehlhorn-Paul"; 
@@ -479,12 +486,15 @@ struct MatchingABMP {
   };
 
   void operator()(G& g) {
+    Galois::StatTimer t("serial");
+    t.start();
     std::vector<GraphNode> initial;
     for (typename NodeList::iterator ii = g.A.begin(), ei = g.A.end(); ii != ei; ++ii) {
       ii->getData().layer = 1;
       if (ii->getData().free)
         initial.push_back(*ii);
     }
+    t.stop();
 
     unsigned maxLayer = (unsigned) (0.1*sqrt(g.size()));
     size_t size = initial.size();
@@ -494,24 +504,10 @@ struct MatchingABMP {
 
     typedef dChunkedFIFO<64> Chunked;
     typedef OrderedByIntegerMetric<Indexer, Chunked> OBIM;
-
-    switch (WlType) {
-      case 2:
-        std::cout << "Using obim scheduler\n";
-        Galois::for_each<OBIM>(initial.begin(), initial.end(), Process(*this, g, maxLayer, size));
-        break;
-      case 1:
-        std::cout << "Using chunked scheduler\n";
-        Galois::for_each<Chunked>(initial.begin(), initial.end(), Process(*this, g, maxLayer, size));
-        break;
-      default:
-      case 0:
-        std::cout << "Using fifo scheduler\n";
-        Galois::for_each<FIFO<> >(initial.begin(), initial.end(), Process(*this, g, maxLayer, size));
-        break;
-    }
-
-    Galois::StatTimer t("serial");
+    
+    Exp::StartWorklistExperiment<OBIM,Indexer,Less>()(
+        std::cout, initial.begin(), initial.end(), Process(*this, g, maxLayer, size));
+    
     t.start();
     MatchingFF<G,false> algo;
     std::cout << "Switching to " << algo.name() << "\n";
@@ -1022,15 +1018,11 @@ void start(int N, int numEdges, int numGroups) {
 int main(int argc, const char** argv) {
   int algo = 0;
   std::vector<const char*> args = parse_command_line(argc, argv, help);
+  Exp::parse_worklist_command_line(args);
+
   for (std::vector<const char*>::iterator ii = args.begin(), ei = args.end(); ii != ei; ++ii) {
     if (strcmp(*ii, "-algo") == 0 && ii + 1 != ei) {
       algo = atoi(ii[1]);
-      ii = args.erase(ii);
-      ii = args.erase(ii);
-      --ii;
-      ei = args.end();
-    } else if (strcmp(*ii, "-wltype") == 0 && ii + 1 != ei) {
-      WlType = atoi(ii[1]);
       ii = args.erase(ii);
       ii = args.erase(ii);
       --ii;

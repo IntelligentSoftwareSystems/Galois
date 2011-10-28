@@ -1,1 +1,1 @@
-app(pmst)
+app(pmst REQUIRES TBB_FOUND)

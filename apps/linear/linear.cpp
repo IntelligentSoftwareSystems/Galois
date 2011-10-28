@@ -582,6 +582,8 @@ int main(int argc,  const char **argv) {
       algo = atoi(ii[1]);
       ii = args.erase(ii);
       ii = args.erase(ii);
+      --ii;
+      ei = args.end();
     }
   }
   

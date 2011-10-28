@@ -1,5 +1,14 @@
-//#include <boost/thread/shared_mutex.hpp>
+/**
+ * Common support for worklist experiments.
+ */
+#include "Galois/Runtime/WorkList.h"
 #include <tbb/concurrent_hash_map.h>
+
+#include <iosfwd>
+
+namespace Exp {
+static std::string WorklistName;
+
 
 template<class Indexer, typename ContainerTy = GaloisRuntime::WorkList::TbbFIFO<>, typename T = int, bool concurrent = true >
 class SimpleOrderedByIntegerMetric : private boost::noncopyable, private PaddedLock<concurrent> {
@@ -182,89 +191,93 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
 };
 WLCOMPILECHECK(CTOrderedByIntegerMetric);
 
-template<class Indexer, typename ContainerTy, bool concurrent = true, int binmax = 1024*1024 >
-class BarrierOBIM : private boost::noncopyable {
-  typedef typename ContainerTy::template rethread<concurrent>::WL CTy;
-
-  volatile unsigned int current;
-  volatile unsigned int pushmax;
-
-  CTy* B;
-
-  Indexer I;
-
-  TerminationDetection term;
-  pthread_barrier_t barr1;
-  pthread_barrier_t barr2;
-
- public:
-  template<bool newconcurrent>
-  struct rethread {
-    typedef BarrierOBIM<Indexer,ContainerTy,newconcurrent,binmax> WL;
-  };
-  template<typename Tnew>
-  struct retype {
-    typedef BarrierOBIM<Indexer,typename ContainerTy::template retype<Tnew>::WL,concurrent, binmax> WL;
-  };
-
-  typedef typename CTy::value_type value_type;
-
-  BarrierOBIM(const Indexer& x = Indexer())
-    :current(0), pushmax(0), I(x)
-  {
-    B = new CTy[binmax];
-    //std::cerr << "$"<<getSystemThreadPool().getActiveThreads() <<"$";
-    pthread_barrier_init(&barr1, NULL, getSystemThreadPool().getActiveThreads());
-    pthread_barrier_init(&barr2, NULL, getSystemThreadPool().getActiveThreads());
-  }
-  ~BarrierOBIM() {
-    delete[] B;
-  }
-
-  bool push(value_type val) {
-    unsigned int index = I(val);
-    //std::cerr << "P: " << index << "\n";
-    assert(index >= current);
-    assert(index < binmax);
-    term.workHappened();
-    unsigned int oldi;
-    while (index > (oldi = pushmax)) {
-      __sync_bool_compare_and_swap(&pushmax, oldi, index);
+static void parse_worklist_command_line(std::vector<const char*>& args) {
+  for (std::vector<const char*>::iterator ii = args.begin(), ei = args.end(); ii != ei; ++ii) {
+    if (strcmp(*ii, "-wl") == 0 && ii + 1 != ei) {
+      WorklistName = ii[1];
+      ii = args.erase(ii);
+      ii = args.erase(ii);
+      --ii;
+      ei = args.end();
     }
-    return B[index].push(val);
   }
+}
 
-  template<typename Iter>
-  bool push(Iter b, Iter e) {
-    while (b != e)
-      push(*b++);
-    return true;
-  }
-
-  std::pair<bool, value_type> pop() {
-    do {
-      if (current > pushmax)
-	return std::make_pair(false, value_type());
-      do {
-	//Find a successful pop
-	std::pair<bool, value_type> retval = B[current].pop();
-	if (retval.first) {
-	  term.workHappened();
-	  return retval;
-	}
-	term.localTermination();
-      } while (!term.globalTermination());
-      
-      pthread_barrier_wait(&barr1);
+//! there is std::not1() but worklists take types not instances :(
+template<typename Functor>
+struct NotLess: public std::binary_function<
+                typename Functor::first_argument_type,
+                typename Functor::second_argument_type,
+                bool> {
+    Functor m_fn;
   
-      if (ThreadPool::getMyID() == 0) {
-	//std::cerr << "inc: " << current << "\n";
-	term.reset();
-	if (current <= pushmax)
-	  __sync_fetch_and_add(&current, 1);
-      }
-
-      pthread_barrier_wait(&barr2);
-    } while (true);
+  bool operator()(
+      typename Functor::first_argument_type x,
+      typename Functor::second_argument_type y) const {
+    // XXX(ddn): != is not right because it will usually be between GraphNodes...
+    return !m_fn(x, y) && x != y;
   }
 };
+
+template<typename DefaultWorklist,typename Indexer,typename Less>
+struct StartWorklistExperiment {
+  template<typename Iterator,typename Functor>
+  void operator()(std::ostream& out, Iterator ii, Iterator ei, Functor fn) {
+    using namespace GaloisRuntime::WorkList;
+    typedef dChunkedLIFO<16> IChunk;
+    typedef ChunkedLIFO<16> NAChunk;
+
+    typedef OrderedByIntegerMetric<Indexer, IChunk> OBIM;
+    typedef TbbPriQueue<NotLess<Less> > TBB;
+    typedef LocalStealing<TBB> LTBB;
+    typedef SkipListQueue<Less> SLQ;
+    typedef SimpleOrderedByIntegerMetric<Indexer> SOBIM;
+    typedef LocalStealing<SOBIM> LSOBIM;
+    typedef OrderedByIntegerMetric<Indexer, NAChunk> NAOBIM;
+    typedef CTOrderedByIntegerMetric<Indexer, IChunk> CTOBIM;
+
+    typedef WorkListTracker<Indexer, OBIM> TR_OBIM;
+    typedef WorkListTracker<Indexer, TBB>  TR_TBB;
+    typedef WorkListTracker<Indexer, LTBB> TR_LTBB;
+    typedef WorkListTracker<Indexer, SLQ>  TR_SLQ;
+    typedef WorkListTracker<Indexer, SOBIM> TR_SOBIM;
+    typedef WorkListTracker<Indexer, LSOBIM> TR_LSOBIM;
+    typedef WorkListTracker<Indexer, NAOBIM> TR_NAOBIM;
+    typedef WorkListTracker<Indexer, CTOBIM> TR_CTOBIM;
+
+    typedef NoInlineFilter<OBIM> NI_OBIM;
+    typedef NoInlineFilter<TBB>  NI_TBB;
+    typedef NoInlineFilter<LTBB> NI_LTBB;
+    typedef NoInlineFilter<SLQ>  NI_SLQ;
+    typedef NoInlineFilter<SOBIM> NI_SOBIM;
+    typedef NoInlineFilter<LSOBIM> NI_LSOBIM;
+    typedef NoInlineFilter<NAOBIM> NI_NAOBIM;
+    typedef NoInlineFilter<CTOBIM> NI_CTOBIM;
+
+#define WLFOO(__x, __y) else if (WorklistName == #__x) {\
+  out << "Using worklist: " << WorklistName << "\n"; \
+  Galois::for_each<__y >(ii, ei, fn); } 
+
+    if (WorklistName == "default" || WorklistName == "") {
+      out << "Using worklist: default\n";
+      Galois::for_each<DefaultWorklist>(ii, ei, fn); 
+    }
+    WLFOO(obim, OBIM)
+    WLFOO(sobim, SOBIM)
+    WLFOO(lsobim, LSOBIM)
+    WLFOO(naobim, NAOBIM)
+    WLFOO(ctobim, CTOBIM)
+    WLFOO(slq, SLQ)
+    WLFOO(tbb, TBB)
+    WLFOO(ltbb, LTBB)
+    WLFOO(chunkedfifo, dChunkedFIFO<16> )
+    WLFOO(fifo, FIFO<> )
+    WLFOO(lifo, LIFO<> )
+    else {
+      out << "Unrecognized worklist " << WorklistName << "\n";
+    }
+#undef WLFOO
+  }
+};
+
+} // end namespace

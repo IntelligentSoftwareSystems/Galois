@@ -1,1 +1,1 @@
-app(max-card-bipartite)
+app(max-card-bipartite REQUIRES TBB_FOUND)
