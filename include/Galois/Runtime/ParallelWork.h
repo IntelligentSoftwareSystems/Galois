@@ -110,8 +110,11 @@ class ForEachWork {
     try {
       f(val, tld.facing);
     } catch (int a) {
+      __sync_synchronize();
+      //      clearConflictLock();
       tld.cnx.cancel_iteration();
       tld.stat.inc_conflicts();
+      __sync_synchronize();
       doAborted(val);
       return;
     }
@@ -204,9 +207,8 @@ class FillWork {
   T2& g;
   int num;
   int dist;
-  int a;
   FillWork(T1& _b, T1& _e, T2& _g) :b(_b), e(_e), g(_g) {
-    a = getSystemThreadPool().getActiveThreads();
+    int a = getSystemThreadPool().getActiveThreads();
     dist = std::distance(b,e);
     num = (dist + a - 1) / a; //round up
     //std::cout << dist << " " << num << "\n";
@@ -236,7 +238,7 @@ void for_each_impl(IterTy b, IterTy e, Function f, const char* loopname) {
   runCMD w[3];
   w[0].work = config::ref(fw2);
   w[0].isParallel = true;
-  w[0].barrierAfter = false;
+  w[0].barrierAfter = true;
   w[1].work = config::ref(GW);
   w[1].isParallel = true;
   w[1].barrierAfter = true;
