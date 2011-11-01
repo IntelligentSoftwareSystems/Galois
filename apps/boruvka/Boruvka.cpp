@@ -34,6 +34,8 @@
 #include "Lonestar/Banner.h"
 #include "Lonestar/CommandLine.h"
 
+#include "Exp/PriorityScheduling/WorkListTL.h"
+
 #include <string>
 #include <sstream>
 #include <limits>
@@ -49,6 +51,10 @@ static const char* description = "Computes the Minimal Spanning Tree using Boruv
 static const char* url = "boruvkas_algorithm";
 static const char* help = "<input file> ";
 static unsigned int nodeID = 0;
+
+static std::string wlName = "obim";
+static int stepShift = 0;
+
 struct Node {
 	unsigned int id;
 	Node(int _id = -1 ): id(_id){}
@@ -165,35 +171,64 @@ struct process {
 };
 
 struct Indexer {
-  unsigned operator()(GNode n) {
+  unsigned operator()(const GNode& n) {
     return std::distance(graph.neighbor_begin(n, Galois::NONE),
-        graph.neighbor_end(n, Galois::NONE));
+			 graph.neighbor_end(n, Galois::NONE));
+  }
+  static unsigned foo(const GNode& n) {
+    return std::distance(graph.neighbor_begin(n, Galois::NONE),
+			 graph.neighbor_end(n, Galois::NONE));
+  }
+};
+struct seq_less: public std::binary_function<const GNode&,const GNode&,bool> {
+  bool operator()(const GNode& lhs, const GNode& rhs) const {
+    if (Indexer::foo(lhs) < Indexer::foo(rhs)) return true;
+    if (Indexer::foo(lhs) > Indexer::foo(rhs)) return false;
+    return lhs < rhs;
+  }
+};
+struct seq_gt {
+  bool operator()(const GNode& lhs, const GNode& rhs) const {
+    if (Indexer::foo(lhs) > Indexer::foo(rhs)) return true;
+    if (Indexer::foo(lhs) < Indexer::foo(rhs)) return false;
+    return lhs > rhs;
   }
 };
 
+
 //End body of for-each.
 void runBodyParallel() {
-	using namespace GaloisRuntime::WorkList;
-        typedef ChunkedFIFO<32> Chunk;
-        typedef OrderedByIntegerMetric<Indexer, Chunk> OBIM;
+  using namespace GaloisRuntime::WorkList;
+  typedef dChunkedFIFO<64> IChunk;
+  typedef OrderedByIntegerMetric<Indexer, IChunk> OBIM;
 
-	std::vector<GNode> all(graph.active_begin(), graph.active_end());
 #if BORUVKA_DEBUG
-	std::cout<<"Begining to process with worklist size :: "<<all.size()<<std::endl;
-	std::cout<<"Graph size "<<graph.size()<<std::endl;
+  std::cout<<"Begining to process with worklist size :: "<<all.size()<<std::endl;
+  std::cout<<"Graph size "<<graph.size()<<std::endl;
 #endif
-	for(unsigned i=0;i<MSTWeight.size();i++)
-		MSTWeight.get(i)=0;
-	Galois::for_each<ChunkedFIFO<32> >(all.begin(), all.end(), process());
-	//Galois::for_each<OBIM>(all.begin(), all.end(), process());
-	unsigned int res = 0;
-	for(unsigned i=0;i<MSTWeight.size();i++){
+
+  for(int i=0;i<MSTWeight.size();i++)
+    MSTWeight.get(i)=0;
+
+  Galois::StatTimer T;
+
+  //Galois::for_each<ChunkedFIFO<32> >(all.begin(), all.end(), process());
+  //Galois::for_each<OBIM>(all.begin(), all.end(), process());
+  T.start();
+  Exp::StartWorklistExperiment<OBIM, Indexer, seq_less>()(std::cout, graph.active_begin(), graph.active_end(), process());
+  T.stop();
+
+  //TODO: use a reduction variable here
+  unsigned int res = 0;
+  for(int i=0;i<MSTWeight.size();i++){
+
 #if BORUVKA_DEBUG
-		std::cout<<"MST +=" << MSTWeight.get(i)<<std::endl;
+    std::cout<<"MST +=" << MSTWeight.get(i)<<std::endl;
 #endif
-		res+=MSTWeight.get(i);
-	}
-	std::cout<<"MST Weight is "<< res << std::endl;
+
+    res+=MSTWeight.get(i);
+  }
+  std::cout<<"MST Weight is "<< res << std::endl;
 }
 
 static void makeGraph(const char* input) {
@@ -263,22 +298,35 @@ static void makeGraph(const char* input) {
 
 
 int main(int argc, const char **argv) {
-	std::vector<const char*> args = parse_command_line(argc, argv, help);
-	if (args.size() < 1) {
-		std::cout << "not enough arguments, use -help for usage information\n";
-		return 1;
-	}
-        if (args.size() > 1) {
-        }
-	printBanner(std::cout, name, description, url);
-	const char* inputfile = args[0];
-	makeGraph(inputfile);
+  std::vector<const char*> args = parse_command_line(argc, argv, help);
+  if (args.size() < 1) {
+    std::cout << "not enough arguments, use -help for usage information\n";
+    return 1;
+  }
+  printBanner(std::cout, name, description, url);
+  const char* inputfile = args[0];
+  for (unsigned i = 1; i < args.size(); ++i) {
+    if (strcmp(args[i], "-delta") == 0 && i + 1 < args.size()) {
+      stepShift = atoi(args[i+1]);
+      ++i;
+    } else if (strcmp(args[i], "-wl") == 0) {
+      wlName = args[i+1];
+      ++i;
+    } else {
+      std::cerr << "unknown argument, use -help for usage information\n";
+      return 1;
+    }
+  }
+
+  std::cout << "Using worklist of " << wlName << "\n";
+
+  makeGraph(inputfile);
 #if BORUVKA_DEBUG
-	printGraph();
+  printGraph();
 #endif
-	Galois::StatTimer T;
-	T.start();
-	runBodyParallel();
-	T.stop();
-	return 0;
+  //	Galois::StatTimer T;
+  //	T.start();
+  runBodyParallel();
+  //	T.stop();
+  return 0;
 }
