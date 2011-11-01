@@ -209,17 +209,17 @@ public:
 		unsigned ventry = 0;
 		bool changed = false;
 
-		lockAll();
 		for (std::vector<SparseBitVectorElement *>::iterator ii = bits.begin(), jj = second.bits.begin(); ii != bits.end(); ++ii, ++jj) {
 			if (*jj) {
+				lock(ventry);
 				if (!*ii) {
 					*ii = getNew();
 				}
 				changed |= (*ii)->unify(**jj);
+				unlock(ventry);
 			}
-			//unlock(ventry++);	// instead of unlockAll in the end, we can unlock individual elements as soon as unified.
+			++ventry;
 		}
-		unlockAll();
 		return changed;
 	}
 	bool equals(SparseBitVector &second) {
