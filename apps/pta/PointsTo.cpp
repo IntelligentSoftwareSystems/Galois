@@ -73,17 +73,17 @@ public:
 	}
 	void print() {
 		if (type == Store) {
-			std::cout << "*";
+			std::cerr << "*";
 		}
-		std::cout << "v" << dst;
-		std::cout << " = ";
+		std::cerr << "v" << dst;
+		std::cerr << " = ";
 		if (type == Load) {
-			std::cout << "*";
+			std::cerr << "*";
 		} else if (type == AddressOf) {
-			std::cout << "&";
+			std::cerr << "&";
 		}
-		std::cout << "v" << src;
-		std::cout << std::endl;
+		std::cerr << "v" << src;
+		std::cerr << std::endl;
 	}
 private:
 	unsigned src, dst;
@@ -254,7 +254,7 @@ void processAddressOfCopy(PointsToConstraints &constraints, WorkList &worklist) 
 			if (result[dst].set(src)) {
 				//std::cout << "debug: saving v" << dst << "->v" << src << std::endl;
 			}
-		} else {	// copy.
+		} else if (src != dst) {	// copy.
 			graph.addEdge(nodes[src], nodes[dst]);
 			//std::cout << "debug: adding edge from " << src << " to " << dst << std::endl;
 			worklist.push_back(nodes[src]);
@@ -359,7 +359,18 @@ void runParallel(PointsToConstraints &addrcopyconstraints, PointsToConstraints &
 	while (!worklist.empty()) {
 		//std::cout << "debug: iteration " << ++niteration << std::endl;
 		using namespace GaloisRuntime::WorkList;
-	  	Galois::for_each(worklist.begin(), worklist.end(), Process());
+	  	Galois::for_each<LocalQueues<dChunkedFIFO<1024> > >(worklist.begin(), worklist.end(), Process());
+	  	//Galois::for_each<FIFO<> >(worklist.begin(), worklist.end(), Process());
+	  	//Galois::for_each<ChunkedFIFO<1024> >(worklist.begin(), worklist.end(), Process());
+	  	//Galois::for_each<dChunkedFIFO<1024> >(worklist.begin(), worklist.end(), Process());
+	  	//Galois::for_each<ChunkedLIFO<32> >(worklist.begin(), worklist.end(), Process());
+	  	//Galois::for_each<LocalQueues<ChunkedLIFO<32> > >(worklist.begin(), worklist.end(), Process());
+	  	//Galois::for_each<LocalQueues<FIFO<1024> > >(worklist.begin(), worklist.end(), Process());
+	  	//Galois::for_each<LocalQueues<ChunkedFIFO<32> > >(worklist.begin(), worklist.end(), Process());
+	  	//Galois::for_each<LocalQueues<dChunkedLIFO<32>, FIFO<> > >(worklist.begin(), worklist.end(), Process());
+	  	//Galois::for_each<LocalQueues<ChunkedLIFO<1024>, FIFO<> > >(worklist.begin(), worklist.end(), Process());
+	  	//Galois::for_each<LocalQueues<ChunkedFIFO<1024>, FIFO<> > >(worklist.begin(), worklist.end(), Process());
+	  	//Galois::for_each(worklist.begin(), worklist.end(), Process());
 		worklist.clear();	// important.
 		processLoadStore(loadstoreconstraints, worklist);
 		ocd.process(worklist);	// changes the graph, doesn't change the worklist.
@@ -444,16 +455,16 @@ int main(int argc, const char** argv) {
 
 	//numThreads = 0;
   if (numThreads) {
-	std::cout << "-------- Parallel version: " << numThreads << " threads.\n";
+	//std::cout << "-------- Parallel version: " << numThreads << " threads.\n";
     runParallel(addrcopyconstraints, loadstoreconstraints);
   } else {
-	std::cout << "-------- Sequential version.\n";
+	//std::cout << "-------- Sequential version.\n";
     runSerial(addrcopyconstraints, loadstoreconstraints);
   }
   T.stop();
 
 
-	std::cout << "No of points-to facts computed = " << countPointsToFacts() << std::endl;
+	//std::cout << "No of points-to facts computed = " << countPointsToFacts() << std::endl;
 	//checkReprPointsTo();
 	//printPointsToInfo(result);
   /*if (!skipVerify && !verify(result)) {
