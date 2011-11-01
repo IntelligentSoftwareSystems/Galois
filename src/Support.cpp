@@ -101,18 +101,22 @@ public:
   }
 };
 }
-PrintStats P;
+
+static PrintStats& getPS() {
+  static PrintStats P;
+  return P;
+}
 
 void GaloisRuntime::reportStatSum(const char* text, unsigned long val, const char* loopname) {
-  P.reportStatSum(text, val, loopname);
+  getPS().reportStatSum(text, val, loopname);
 }
 
 void GaloisRuntime::reportStatAvg(const char* text, unsigned long val, const char* loopname) {
-  P.reportStatAvg(text, val, loopname);
+  getPS().reportStatAvg(text, val, loopname);
 }
 
 void GaloisRuntime::statDone() {
-  P.incIteration();
+  getPS().incIteration();
 }
 
 static void genericReport(bool error, const char* text1,
