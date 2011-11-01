@@ -242,14 +242,6 @@ public:
   //! Read graph connectivity information from graph
   template<typename TyG>
   void structureFromGraph(TyG& G) {
-
-    struct CompareNodeData {
-      typedef typename TyG::GraphNode GNode;
-      bool operator()(const GNode& a, const GNode& b) {
-	return a.getData() < b.getData();
-      }
-    };
-
     //version
     uint64_t version = 1;
     uint64_t sizeof_edge_data = sizeof(typename TyG::EdgeDataTy);
@@ -259,15 +251,7 @@ public:
 
     typedef typename TyG::GraphNode GNode;
     typedef std::vector<GNode> Nodes;
-    Nodes nodes;
-    for (typename TyG::active_iterator ii = G.active_begin(),
-	   ee = G.active_end(); ii != ee; ++ii) {
-      nodes.push_back(*ii);
-    }
-
-    // TODO(ddn): for some reason stable_sort crashes with:
-    //  free(): invalid pointer
-    std::sort(nodes.begin(), nodes.end(), CompareNodeData());
+    Nodes nodes(G.active_begin(), G.active_end());
 
     //num edges and outidx computation
     uint64_t offset = 0;
@@ -310,7 +294,7 @@ public:
       }
     }
     
-    nBytes += sizeof(TyG::EdgeDataTy) * edgeData.size();
+    nBytes += sizeof(typename TyG::EdgeDataTy) * edgeData.size();
 
     char* t = (char*)malloc(nBytes);
     char* base = t;
@@ -326,7 +310,7 @@ public:
     t += sizeof(uint64_t) * out_idx.size();
     memcpy(t, &outs[0], sizeof(uint32_t) * outs.size());
     t += sizeof(uint32_t) * outs.size();
-    memcpy(t, &edgeData[0], sizeof(TyG::EdgeDataTy) * edgeData.size());
+    memcpy(t, &edgeData[0], sizeof(typename TyG::EdgeDataTy) * edgeData.size());
     
     structureFromMem(base, nBytes, true);
     free(t);
@@ -486,9 +470,9 @@ public:
     structureFromGraph(graph);
     emptyNodeData();
     int i = 0;
-    for (typename GTy::active_iterator ii = graph.begin(),
-	   ee = graph.end(); ii != ee; ++ii, ++i)
-      NodeData[i] = graph.getData(*ii);
+    for (typename GTy::active_iterator ii = graph.active_begin(),
+	   ee = graph.active_end(); ii != ee; ++ii, ++i)
+      NodeData[i].data.data = graph.getData(*ii);
   }
 };
 
