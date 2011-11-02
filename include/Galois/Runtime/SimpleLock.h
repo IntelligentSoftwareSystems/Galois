@@ -136,7 +136,9 @@ public:
   }
 
   inline void setValue(T val) {
-    _lock = ((uintptr_t)val) | (_lock & 1);
+    uintptr_t nval = (uintptr_t)val;
+    nval |= (_lock & 1);
+    _lock = nval;
   }
 
   inline bool try_lock() {
