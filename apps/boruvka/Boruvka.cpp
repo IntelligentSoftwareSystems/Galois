@@ -52,7 +52,6 @@ static const char* url = "boruvkas_algorithm";
 static const char* help = "<input file> ";
 static unsigned int nodeID = 0;
 
-static std::string wlName = "obim";
 static int stepShift = 0;
 
 struct Node {
@@ -72,102 +71,104 @@ Graph graph;
 std::vector<GNode> nodes;
 
 void printGraph() {
-	int numEdges = 0;
-	for (Graph::active_iterator src = graph.active_begin(), esrc = graph.active_end();src != esrc; ++src) {
-		Node& sdata = graph.getData(*src, Galois::NONE);
-		if(graph.containsNode(*src))
-			for (Graph::neighbor_iterator dst = graph.neighbor_begin(*src, Galois::NONE), edst = graph.neighbor_end(*src, Galois::NONE);dst != edst; ++dst) {
-				int w = graph.getEdgeData(*src, *dst, Galois::NONE);
-				int x = graph.getEdgeData(*dst, *src, Galois::NONE);
-				Node& ddata = graph.getData(*dst, Galois::NONE);
-				std::cout<<"1) "<<sdata.toString()<<" => "<< ddata.toString() << " [ "<<w << " ] "<<x << std::endl;
-				numEdges++;
-			}
-	}
-	std::cout<<"Num edges "<<numEdges << std::endl;
+  int numEdges = 0;
+  for (Graph::active_iterator src = graph.active_begin(), esrc = graph.active_end();src != esrc; ++src) {
+    Node& sdata = graph.getData(*src, Galois::NONE);
+    if(graph.containsNode(*src))
+      for (Graph::neighbor_iterator dst = graph.neighbor_begin(*src, Galois::NONE), edst = graph.neighbor_end(*src, Galois::NONE);dst != edst; ++dst) {
+	int w = graph.getEdgeData(*src, *dst, Galois::NONE);
+	int x = graph.getEdgeData(*dst, *src, Galois::NONE);
+	Node& ddata = graph.getData(*dst, Galois::NONE);
+	std::cout<<"1) "<<sdata.toString()<<" => "<< ddata.toString() << " [ "<<w << " ] "<<x << std::endl;
+	numEdges++;
+      }
+  }
+  std::cout<<"Num edges "<<numEdges << std::endl;
 }
 GaloisRuntime::PerCPU<unsigned int> MSTWeight;
 struct process {
-	template<typename ContextTy>
-		void __attribute__((noinline)) operator()(GNode& src, ContextTy& lwl) {
-			if(graph.containsNode(src)==false)
-				return;
-			graph.getData(src);
-			//Graph::neighbor_iterator minNeighbor;
-			GNode * minNeighbor;
+  template<typename ContextTy>
+  void __attribute__((noinline)) operator()(GNode& src, ContextTy& lwl) {
+    if(graph.containsNode(src)==false)
+      return;
+    graph.getData(src);
+    //Graph::neighbor_iterator minNeighbor;
+    GNode * minNeighbor;
 #if BORUVKA_DEBUG
-			std::cout<<"Processing "<<graph.getData(src).toString()<<std::endl;
+    std::cout<<"Processing "<<graph.getData(src).toString()<<std::endl;
 #endif
-			int minEdgeWeight=std::numeric_limits<int>::max();
-			int numNeighbors = 0;
-			//Acquire locks on neighborhood.
-			for (Graph::neighbor_iterator dst = graph.neighbor_begin(src, Galois::ALL), edst = graph.neighbor_end(src, Galois::ALL);dst != edst; ++dst) {
-				graph.getData(*dst);
-				graph.getEdgeData(src,*dst, Galois::ALL);
-				graph.getEdgeData(*dst,src, Galois::ALL);
-			}
-			for (Graph::neighbor_iterator dst = graph.neighbor_begin(src, Galois::NONE), edst = graph.neighbor_end(src, Galois::NONE);dst != edst; ++dst) {
-				numNeighbors++;
-				int minNbrId = graph.getData(*dst).id;
+    int minEdgeWeight=std::numeric_limits<int>::max();
+    int numNeighbors = 0;
+    //Acquire locks on neighborhood.
+    for (Graph::neighbor_iterator dst = graph.neighbor_begin(src, Galois::ALL), edst = graph.neighbor_end(src, Galois::ALL);dst != edst; ++dst) {
+      graph.getData(*dst);
+      graph.getEdgeData(src,*dst, Galois::ALL);
+      graph.getEdgeData(*dst,src, Galois::ALL);
+    }
+    for (Graph::neighbor_iterator dst = graph.neighbor_begin(src, Galois::NONE), edst = graph.neighbor_end(src, Galois::NONE);dst != edst; ++dst) {
+      numNeighbors++;
+      int minNbrId = graph.getData(*dst).id;
 				
-				int w = graph.getEdgeData(src, *dst, Galois::NONE);
-				if(w<minEdgeWeight){
-					minNeighbor = &nodes[minNbrId];
-					minEdgeWeight = w;
-				}
-			}
-			//If there are no outgoing neighbors.
-			if(numNeighbors==0  || minEdgeWeight == std::numeric_limits<int>::max()){
-				graph.removeNode(src, Galois::NONE);
-				return;
-			}
-			graph.getData(*minNeighbor);
+      int w = graph.getEdgeData(src, *dst, Galois::NONE);
+      if(w<minEdgeWeight){
+	minNeighbor = &nodes[minNbrId];
+	minEdgeWeight = w;
+      }
+    }
+    //If there are no outgoing neighbors.
+    if(numNeighbors==0  || minEdgeWeight == std::numeric_limits<int>::max()){
+      graph.removeNode(src, Galois::NONE);
+      return;
+    }
+    graph.getData(*minNeighbor);
 #if BORUVKA_DEBUG
-			std::cout << " Min edge from "<<graph.getData(src).toString() << " to "<<graph.getData(*minNeighbor).toString()<<" " <<minEdgeWeight << " "<<std::endl ;
+    std::cout << " Min edge from "<<graph.getData(src).toString() << " to "<<graph.getData(*minNeighbor).toString()<<" " <<minEdgeWeight << " "<<std::endl ;
 #endif
-			//Acquire locks on neighborhood of min neighbor.
-			for (Graph::neighbor_iterator dst = graph.neighbor_begin(*minNeighbor, Galois::ALL), edst = graph.neighbor_end(*minNeighbor, Galois::ALL);dst != edst; ++dst) {
-				graph.getData(*dst);
-				graph.getEdgeData(*minNeighbor,*dst, Galois::ALL);
-				graph.getEdgeData(*dst,*minNeighbor, Galois::ALL);
-			}
+    //Acquire locks on neighborhood of min neighbor.
+    for (Graph::neighbor_iterator dst = graph.neighbor_begin(*minNeighbor, Galois::ALL), edst = graph.neighbor_end(*minNeighbor, Galois::ALL);dst != edst; ++dst) {
+      graph.getData(*dst);
+      graph.getEdgeData(*minNeighbor,*dst, Galois::ALL);
+      graph.getEdgeData(*dst,*minNeighbor, Galois::ALL);
+    }
 
-			//update MST weight.
-			MSTWeight.get()+=minEdgeWeight;
-			//std::set<GNode> toRemove;
-			std::set<int> toRemove;
-			typedef std::pair<int,int> EdgeData;
-			std::set<EdgeData> toAdd;
-			//std::set<int> toAdd;
+    //update MST weight.
+    MSTWeight.get()+=minEdgeWeight;
+    //std::set<GNode> toRemove;
+    typedef std::set<int, std::less<int>, Galois::PerIterAllocTy::rebind<int>::other> intsetTy;
+    intsetTy toRemove(std::less<int>(), Galois::PerIterAllocTy::rebind<int>::other(lwl.getPerIterAlloc()));
+    typedef std::pair<int,int> EdgeData;
+    typedef std::set<EdgeData, std::less<EdgeData>, Galois::PerIterAllocTy::rebind<EdgeData>::other> edsetTy;
+    edsetTy toAdd(std::less<EdgeData>(), Galois::PerIterAllocTy::rebind<EdgeData>::other(lwl.getPerIterAlloc()));
+    //std::set<int> toAdd;
 
-			for(Graph::neighbor_iterator mdst = graph.neighbor_begin(*minNeighbor, Galois::NONE), medst = graph.neighbor_end(*minNeighbor, Galois::NONE); mdst!=medst;++mdst){
-				graph.getData(*mdst);
-				int edgeWeight = graph.getEdgeData(*minNeighbor, *mdst, Galois::NONE);
-				if(*mdst!=src){
-					GNode dstNode = (*mdst);
-					if(src.hasNeighbor(dstNode) || dstNode.hasNeighbor(src)){
-						if(graph.getEdgeData(src,*mdst, Galois::NONE)<edgeWeight)
-							edgeWeight = graph.getEdgeData(src,*mdst, Galois::NONE);
-						graph.getEdgeData(src,*mdst,Galois::NONE)=edgeWeight;
-					}
-					else
-					{
-						EdgeData e (graph.getData(*mdst).id, edgeWeight);
-						toAdd.insert(e);
-					}
-				}
-				toRemove.insert(graph.getData(*mdst).id);
-			}
+    for(Graph::neighbor_iterator mdst = graph.neighbor_begin(*minNeighbor, Galois::NONE), medst = graph.neighbor_end(*minNeighbor, Galois::NONE); mdst!=medst;++mdst){
+      graph.getData(*mdst);
+      int edgeWeight = graph.getEdgeData(*minNeighbor, *mdst, Galois::NONE);
+      if(*mdst!=src){
+	GNode dstNode = (*mdst);
+	if(src.hasNeighbor(dstNode) || dstNode.hasNeighbor(src)){
+	  if(graph.getEdgeData(src,*mdst, Galois::NONE)<edgeWeight)
+	    edgeWeight = graph.getEdgeData(src,*mdst, Galois::NONE);
+	  graph.getEdgeData(src,*mdst,Galois::NONE)=edgeWeight;
+	}
+	else
+	  {
+	    EdgeData e (graph.getData(*mdst).id, edgeWeight);
+	    toAdd.insert(e);
+	  }
+      }
+      toRemove.insert(graph.getData(*mdst).id);
+    }
 
-			for(std::set<int>::iterator it = toRemove.begin(), endIt = toRemove.end();it!=endIt; it++){
-				graph.removeEdge(*minNeighbor, nodes[*it], Galois::NONE);
-			}
-			for(std::set<EdgeData>::iterator it = toAdd.begin(), endIt = toAdd.end();it!=endIt; it++){
-				graph.addEdge(src, nodes[it->first], it->second, Galois::NONE);
-			}
-			graph.removeNode(*minNeighbor, Galois::NONE);
-			lwl.push(src);
-		}
+    for(intsetTy::iterator it = toRemove.begin(), endIt = toRemove.end();it!=endIt; it++){
+      graph.removeEdge(*minNeighbor, nodes[*it], Galois::NONE);
+    }
+    for(edsetTy::iterator it = toAdd.begin(), endIt = toAdd.end();it!=endIt; it++){
+      graph.addEdge(src, nodes[it->first], it->second, Galois::NONE);
+    }
+    graph.removeNode(*minNeighbor, Galois::NONE);
+    lwl.push(src);
+  }
 };
 
 struct Indexer {
@@ -232,73 +233,75 @@ void runBodyParallel() {
 }
 
 static void makeGraph(const char* input) {
-	//Create local computation graph.
+  //Create local computation graph.
   typedef Galois::Graph::LC_FileGraph<Node, int> InGraph;
-	typedef InGraph::GraphNode InGNode;
-	InGraph in_graph;
-	//Read graph from file.
-	in_graph.structureFromFile(input);
-	std::cout << "Read " << in_graph.size() << " nodes\n";
-	//A node and a int is an element.
-	typedef std::pair<InGNode, int> Element;
-	//A vector of element is 'Elements'
-	typedef std::vector<Element> Elements;
-	//A vector of 'Elements' is a 'Map'
-	typedef std::vector<Elements> Map;
-	//'in_edges' is a vector of vector of pairs of nodes and int. 
-	Map edges(in_graph.size());
-	// 
-	int numEdges = 0;
-	for (InGraph::active_iterator src = in_graph.active_begin(), esrc = in_graph.active_end();src != esrc; ++src) {
-		for (InGraph::neighbor_iterator dst = in_graph.neighbor_begin(*src, Galois::NONE), edst = in_graph.neighbor_end(*src, Galois::NONE);dst != edst; ++dst) {
-			int w = in_graph.getEdgeData(*src, *dst, Galois::NONE);
-			Element e(*src, w);
-			edges[*dst].push_back(e);
-			numEdges++;
-		}
-	}
+  typedef InGraph::GraphNode InGNode;
+  InGraph in_graph;
+  //Read graph from file.
+  in_graph.structureFromFile(input);
+  std::cout << "Read " << in_graph.size() << " nodes\n";
+  //A node and a int is an element.
+  typedef std::pair<InGNode, int> Element;
+  //A vector of element is 'Elements'
+  typedef std::vector<Element> Elements;
+  //A vector of 'Elements' is a 'Map'
+  typedef std::vector<Elements> Map;
+  //'in_edges' is a vector of vector of pairs of nodes and int. 
+  Map edges(in_graph.size());
+  // 
+  int numEdges = 0;
+  for (InGraph::active_iterator src = in_graph.active_begin(), esrc = in_graph.active_end();src != esrc; ++src) {
+    for (InGraph::neighbor_iterator dst = in_graph.neighbor_begin(*src, Galois::NONE), edst = in_graph.neighbor_end(*src, Galois::NONE);dst != edst; ++dst) {
+      int w = in_graph.getEdgeData(*src, *dst, Galois::NONE);
+      Element e(*src, w);
+      edges[*dst].push_back(e);
+      numEdges++;
+    }
+  }
 #if BORUVKA_DEBUG
-	std::cout<<"Number of edges "<<numEdges<<std::endl;
+  std::cout<<"Number of edges "<<numEdges<<std::endl;
 #endif
-	unsigned int id = 0;
+  unsigned int id = 0;
 
-	//std::vector<GNode> nodes(in_graph.size());
-	nodes.resize(in_graph.size());
-	for (Map::iterator i = edges.begin(), ei = edges.end(); i != ei; ++i) {
-		Node n(nodeID);
-		GNode node = graph.createNode(n);
-		graph.addNode(node);
-		nodes[nodeID] = node;
-		nodeID++;
-	}
+  //std::vector<GNode> nodes(in_graph.size());
+  nodes.resize(in_graph.size());
+  for (Map::iterator i = edges.begin(), ei = edges.end(); i != ei; ++i) {
+    Node n(nodeID);
+    GNode node = graph.createNode(n);
+    graph.addNode(node);
+    nodes[nodeID] = node;
+    nodeID++;
+  }
 
-	id = 0;
-	numEdges=0;
-	int numDups = 0;
-	for (Map::iterator i = edges.begin(), ei = edges.end(); i != ei; ++i) {
-		GNode src = nodes[id];
-		for (Elements::iterator j = i->begin(), ej = i->end(); j != ej; ++j) {
-			if(src.hasNeighbor(nodes[j->first])){
-				numDups++;
-				int w = (graph.getEdgeData(src,nodes[j->first],Galois::NONE));	
-				if(j->second<w)
-					graph.getEdgeData(src,nodes[j->first],Galois::NONE)=j->second;
-			}
-			else{
-				graph.addEdge(src, nodes[j->first], j->second);
-			}
-			numEdges++;
-		}
-		id++;
-	}
+  id = 0;
+  numEdges=0;
+  int numDups = 0;
+  for (Map::iterator i = edges.begin(), ei = edges.end(); i != ei; ++i) {
+    GNode src = nodes[id];
+    for (Elements::iterator j = i->begin(), ej = i->end(); j != ej; ++j) {
+      if(src.hasNeighbor(nodes[j->first])){
+	numDups++;
+	int w = (graph.getEdgeData(src,nodes[j->first],Galois::NONE));	
+	if(j->second<w)
+	  graph.getEdgeData(src,nodes[j->first],Galois::NONE)=j->second;
+      }
+      else{
+	graph.addEdge(src, nodes[j->first], j->second);
+      }
+      numEdges++;
+    }
+    id++;
+  }
 #if BORUVKA_DEBUG
-	std::cout<<"Final num edges "<<numEdges<< " Dups "<<numDups<<std::endl;
+  std::cout<<"Final num edges "<<numEdges<< " Dups "<<numDups<<std::endl;
 #endif
 }
 
 
 int main(int argc, const char **argv) {
   std::vector<const char*> args = parse_command_line(argc, argv, help);
+  Exp::parse_worklist_command_line(args);
+
   if (args.size() < 1) {
     std::cout << "not enough arguments, use -help for usage information\n";
     return 1;
@@ -309,16 +312,12 @@ int main(int argc, const char **argv) {
     if (strcmp(args[i], "-delta") == 0 && i + 1 < args.size()) {
       stepShift = atoi(args[i+1]);
       ++i;
-    } else if (strcmp(args[i], "-wl") == 0) {
-      wlName = args[i+1];
-      ++i;
     } else {
       std::cerr << "unknown argument, use -help for usage information\n";
       return 1;
     }
   }
-
-  std::cout << "Using worklist of " << wlName << "\n";
+  std::cout << "Using delta-step of " << (1 << stepShift) << "\n";
 
   makeGraph(inputfile);
 #if BORUVKA_DEBUG
