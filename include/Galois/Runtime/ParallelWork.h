@@ -29,9 +29,6 @@
 #define GALOIS_RUNTIME_PARALLELWORK_H
 
 #include <algorithm>
-#include <numeric>
-#include <sstream>
-#include <math.h>
 
 #include "Galois/TypeTraits.h"
 #include "Galois/Mem.h"
@@ -115,14 +112,18 @@ class ForEachWork {
       tld.cnx.cancel_iteration();
       tld.stat.inc_conflicts();
       __sync_synchronize();
+      if (Configurator<Function>::NeedsPush)
+	tld.facing.__getPushBuffer().clear();
+      if (Configurator<Function>::NeedsPIA)
+	tld.facing.__resetAlloc();
       doAborted(val);
       return;
     }
-    tld.cnx.commit_iteration();
     if (Configurator<Function>::NeedsPush) {
       global_wl.push(tld.facing.__getPushBuffer().begin(), tld.facing.__getPushBuffer().end());
       tld.facing.__getPushBuffer().clear();
     }
+    tld.cnx.commit_iteration();
     if (Configurator<Function>::NeedsPIA)
       tld.facing.__resetAlloc();
   }
@@ -171,7 +172,6 @@ public:
   template<bool isLeader>
   void go() {
     tldTy& tld = tdata.get();
-    //    std::cerr << "I: " << tdata.myEffectiveID() << " " << &tld.cnx << "\n";
     setThreadContext(&tld.cnx);
     tld.lterm = term.getLocalTokenHolder();
 
