@@ -67,13 +67,20 @@ void GaloisRuntime::SimpleRuntimeContext::commit_iteration() {
 void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
   bool suc = L->Owner.try_lock();
   if (suc) {
+    assert(!L->Owner.getValue());
+    assert(!L->next);
     L->Owner.setValue(this);
     L->next = locks;
     locks = L;
   } else {
     if (L->Owner.getValue() != this) {
       ConflictLock.lock();
-      //      std::cerr << "C: " << L->Owner.getValue() << " != " << this << "\n";
+      // SimpleRuntimeContext* other = L->Owner.getValue();
+      // int rid = -1;
+      // int rb = 0;
+      // if (other) rid = other->ID;
+      // if (other) rb = other->bored;
+      // std::cerr << "C: " << rid << "(" << rb << ") != " << ID << "(" << bored << ") " << L << "\n";
       throw -1; //CONFLICT
     }
   }
