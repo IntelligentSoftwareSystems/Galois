@@ -62,6 +62,10 @@ SimpleRuntimeContext* getThreadContext();
 //! used by the parallel code to set up conflict detection per thread
 void setThreadContext(SimpleRuntimeContext* n);
 
+//! used to release the conflict lock
+//! gcc exception handling can deadlock :(
+void clearConflictLock();
+
 //! Helper function to decide if the conflict detection lock should be taken
 static inline bool shouldLock(Galois::MethodFlag g) {
   switch(g) {

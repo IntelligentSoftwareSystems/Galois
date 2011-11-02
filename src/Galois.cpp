@@ -20,8 +20,16 @@ kind.
 
 #include "Galois/Runtime/Context.h"
 
+//#include <iostream>
+
 //! Global thread context for each active thread
 static __thread GaloisRuntime::SimpleRuntimeContext* thread_cnx = 0;
+
+static GaloisRuntime::SimpleLock<int, true> ConflictLock;
+
+void GaloisRuntime::clearConflictLock() {
+  ConflictLock.unlock();
+}
 
 void GaloisRuntime::setThreadContext(GaloisRuntime::SimpleRuntimeContext* n)
 {
@@ -51,6 +59,7 @@ void GaloisRuntime::SimpleRuntimeContext::commit_iteration() {
     Lockable* L = locks;
     locks = L->next;
     L->next = 0;
+    __sync_synchronize();
     L->Owner.unlock_and_clear();
   }
 }
@@ -62,7 +71,10 @@ void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
     L->next = locks;
     locks = L;
   } else {
-    if (L->Owner.getValue() != this)
+    if (L->Owner.getValue() != this) {
+      ConflictLock.lock();
+      //      std::cerr << "C: " << L->Owner.getValue() << " != " << this << "\n";
       throw -1; //CONFLICT
+    }
   }
 }

@@ -111,7 +111,7 @@ class ForEachWork {
       f(val, tld.facing);
     } catch (int a) {
       __sync_synchronize();
-      //      clearConflictLock();
+      clearConflictLock();
       tld.cnx.cancel_iteration();
       tld.stat.inc_conflicts();
       __sync_synchronize();
@@ -171,6 +171,7 @@ public:
   template<bool isLeader>
   void go() {
     tldTy& tld = tdata.get();
+    //    std::cerr << "I: " << tdata.myEffectiveID() << " " << &tld.cnx << "\n";
     setThreadContext(&tld.cnx);
     tld.lterm = term.getLocalTokenHolder();
 
