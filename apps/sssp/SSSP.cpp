@@ -97,7 +97,7 @@ void runBody(const GNode src) {
       ii != ee; ++ii) {
     GNode dst = *ii;
     int w = do_bfs ? 1 : graph.getEdgeData(src, dst, Galois::NONE);
-    UpdateRequest up(dst, w);
+    UpdateRequest up(dst, w, 0);
     initial.insert(up);
   }
 
@@ -121,24 +121,27 @@ void runBody(const GNode src) {
 	int d = do_bfs ? 1 : graph.getEdgeData(req.n, dst, Galois::NONE);
 	unsigned int newDist = req.w + d;
 	if (newDist < graph.getData(dst,Galois::NONE).dist)
-	  initial.insert(UpdateRequest(dst, newDist));
+	  initial.insert(UpdateRequest(dst, newDist, 0));
       }
     }
   }
   T.stop();
 }
 
-//static Galois::Statistic<unsigned int> BadWork("BadWork");
+static Galois::Statistic<unsigned int>* BadWork;
+static Galois::Statistic<unsigned int>* WLEmptyWork;
 
 struct process {
   template<typename ContextTy>
   void __attribute__((noinline)) operator()(UpdateRequest& req, ContextTy& lwl) {
     SNode& data = graph.getData(req.n,Galois::NONE);
+    if (req.w >= data.dist)
+      *WLEmptyWork += 1;
     unsigned int v;
     while (req.w < (v = data.dist)) {
       if (__sync_bool_compare_and_swap(&data.dist, v, req.w)) {
-	//	if (v != DIST_INFINITY)
-	//	  BadWork += 1;
+	if (v != DIST_INFINITY)
+	  *BadWork += 1;
 	for (Graph::neighbor_iterator
             ii = graph.neighbor_begin(req.n, Galois::NONE),
             ee = graph.neighbor_end(req.n, Galois::NONE); ii != ee; ++ii) {
@@ -147,7 +150,7 @@ struct process {
 	  unsigned int newDist = req.w + d;
 	  SNode& rdata = graph.getData(dst,Galois::NONE);
 	  if (newDist < rdata.dist)
-	    lwl.push(UpdateRequest(dst, newDist));
+	    lwl.push(UpdateRequest(dst, newDist, rdata.id));
 	}
 	break;
       }
@@ -163,7 +166,7 @@ void runBodyParallel(const GNode src) {
 
   Galois::StatTimer T;
 
-  UpdateRequest one[1] = { UpdateRequest(src, 0) };
+  UpdateRequest one[1] = { UpdateRequest(src, 0, graph.getData(src,Galois::NONE).id ) };
   T.start();
   Exp::StartWorklistExperiment<OBIM,dChunk,Chunk,UpdateRequestIndexer,seq_less,seq_greater>()(std::cout, &one[0], &one[1], process());
   T.stop();
@@ -206,6 +209,11 @@ bool verify(GNode source) {
 int main(int argc, const char **argv) {
   std::vector<const char*> args = parse_command_line(argc, argv, help);
   Exp::parse_worklist_command_line(args);
+
+  Galois::Statistic<unsigned int> sBadWork("BadWork");
+  Galois::Statistic<unsigned int> sWLEmptyWork("WLEmptyWork");
+  BadWork = &sBadWork;
+  WLEmptyWork = &sWLEmptyWork;
 
   for (std::vector<const char*>::iterator ii = args.begin(), ei = args.end(); ii != ei; ++ii) {
     if (strcmp(*ii, "-delta") == 0 && ii + 1 != ei) {

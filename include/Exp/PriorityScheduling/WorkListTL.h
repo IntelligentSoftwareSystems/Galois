@@ -289,7 +289,6 @@ template<typename T = int, bool concurrent = true>
 class Random : private boost::noncopyable, private PaddedLock<concurrent>  {
   std::vector<T> wl;
   unsigned int seed;
-
   using PaddedLock<concurrent>::lock;
   using PaddedLock<concurrent>::try_lock;
   using PaddedLock<concurrent>::unlock;
@@ -348,6 +347,50 @@ public:
 WLCOMPILECHECK(Random);
 
 
+template<class Compare = std::less<int>, typename T = int>
+class PTbb : private boost::noncopyable {
+  typedef tbb::concurrent_priority_queue<T,Compare> TBBTy;
+  
+  PerCPU<TBBTy> wl;
+  int nactive;
+
+public:
+  PTbb() {
+    nactive = getSystemThreadPool().getActiveThreads();
+  }
+  template<bool newconcurrent>
+  struct rethread {
+    typedef PTbb<Compare, T> WL;
+  };
+  template<typename Tnew>
+  struct retype {
+    typedef PTbb<Compare, Tnew> WL;
+  };
+  
+  typedef T value_type;
+  
+  bool push(value_type val) {
+    wl.get(val.getID() % nactive).push(val);
+    return true;
+  }
+  
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    while (b != e)
+      push(*b++);
+    return true;
+  }
+  
+  std::pair<bool, value_type> pop() {
+    value_type retval;
+    if (wl.get().try_pop(retval)) {
+      return std::make_pair(true, retval);
+    } else {
+      return std::make_pair(false, value_type());
+    }
+  }
+};
+
 
 static void parse_worklist_command_line(std::vector<const char*>& args) {
   for (std::vector<const char*>::iterator ii = args.begin(), ei = args.end(); ii != ei; ++ii) {
@@ -379,6 +422,7 @@ struct StartWorklistExperiment {
     typedef CTOrderedByIntegerMetric<Indexer, dChunk> CTOBIM;
     typedef CTOrderedByIntegerMetric<Indexer, Chunk> NACTOBIM;
     typedef LevelStealing<Random<> > Random;
+    typedef PTbb<NotLess<Less> > PTBB;
 
     typedef WorkListTracker<Indexer, OBIM> TR_OBIM;
     typedef WorkListTracker<Indexer, TBB>  TR_TBB;
@@ -390,6 +434,7 @@ struct StartWorklistExperiment {
     typedef WorkListTracker<Indexer, CTOBIM> TR_CTOBIM;
     typedef WorkListTracker<Indexer, NACTOBIM> TR_NACTOBIM;
     typedef WorkListTracker<Indexer, BOBIM> TR_BOBIM;
+    typedef WorkListTracker<Indexer, PTBB> TR_PTBB;
 
     typedef NoInlineFilter<OBIM> NI_OBIM;
     typedef NoInlineFilter<TBB>  NI_TBB;
@@ -401,6 +446,7 @@ struct StartWorklistExperiment {
     typedef NoInlineFilter<CTOBIM> NI_CTOBIM;
     typedef NoInlineFilter<NACTOBIM> NI_NACTOBIM;
     typedef NoInlineFilter<BOBIM> NI_BOBIM;
+    typedef NoInlineFilter<PTBB> NI_PTBB;
 
     std::string name = (wlname == "") ? WorklistName : wlname;
 #define WLFOO(__x, __y) else if (name == #__x) {\
@@ -421,6 +467,7 @@ struct StartWorklistExperiment {
     WLFOO(tbb, TBB)
     WLFOO(ltbb, LTBB)
     WLFOO(bobim, BOBIM)
+    WLFOO(ptbb, PTBB)
     WLFOO(tr-obim, TR_OBIM)
     WLFOO(bag, dChunk)
     WLFOO(random, Random)
