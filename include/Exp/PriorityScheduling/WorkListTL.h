@@ -233,8 +233,10 @@ class BarrierOBIM : private boost::noncopyable {
   bool push(value_type val) {
     unsigned int index = I(val);
     //std::cerr << "P: " << index << "\n";
-    assert(index >= current);
-    assert(index < binmax);
+    if (index < current)
+      index = current;
+    if (index >= binmax)
+      index = binmax - 1;
     term.workHappened();
     unsigned int oldi;
     while (index > (oldi = pushmax)) {
@@ -323,6 +325,7 @@ struct StartWorklistExperiment {
     typedef LocalStealing<SOBIM> LSOBIM;
     typedef OrderedByIntegerMetric<Indexer, NAChunk> NAOBIM;
     typedef CTOrderedByIntegerMetric<Indexer, IChunk> CTOBIM;
+    typedef CTOrderedByIntegerMetric<Indexer, NAChunk> NACTOBIM;
     typedef BarrierOBIM<Indexer, IChunk> BOBIM;
 
     typedef WorkListTracker<Indexer, OBIM> TR_OBIM;
@@ -333,6 +336,7 @@ struct StartWorklistExperiment {
     typedef WorkListTracker<Indexer, LSOBIM> TR_LSOBIM;
     typedef WorkListTracker<Indexer, NAOBIM> TR_NAOBIM;
     typedef WorkListTracker<Indexer, CTOBIM> TR_CTOBIM;
+    typedef WorkListTracker<Indexer, NACTOBIM> TR_NACTOBIM;
     typedef WorkListTracker<Indexer, BOBIM> TR_BOBIM;
 
     typedef NoInlineFilter<OBIM> NI_OBIM;
@@ -343,6 +347,7 @@ struct StartWorklistExperiment {
     typedef NoInlineFilter<LSOBIM> NI_LSOBIM;
     typedef NoInlineFilter<NAOBIM> NI_NAOBIM;
     typedef NoInlineFilter<CTOBIM> NI_CTOBIM;
+    typedef NoInlineFilter<NACTOBIM> NI_NACTOBIM;
     typedef NoInlineFilter<BOBIM> NI_BOBIM;
 
 #define WLFOO(__x, __y) else if (WorklistName == #__x) {\
@@ -358,6 +363,7 @@ struct StartWorklistExperiment {
     WLFOO(lsobim, LSOBIM)
     WLFOO(naobim, NAOBIM)
     WLFOO(ctobim, CTOBIM)
+    WLFOO(nactobim, NACTOBIM)
     WLFOO(slq, SLQ)
     WLFOO(tbb, TBB)
     WLFOO(ltbb, LTBB)
