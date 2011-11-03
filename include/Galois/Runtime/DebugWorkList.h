@@ -73,7 +73,7 @@ public:
       }
     }
 
-    std::ofstream file("tracking.csv");
+    std::ofstream file("tracking.csv", std::ofstream::app);
 
     //print header
     file << "Epoch";
