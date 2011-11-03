@@ -285,6 +285,69 @@ class BarrierOBIM : private boost::noncopyable {
   }
 };
 
+template<typename T = int, bool concurrent = true>
+class Random : private boost::noncopyable, private PaddedLock<concurrent>  {
+  std::vector<T> wl;
+  unsigned int seed;
+
+  using PaddedLock<concurrent>::lock;
+  using PaddedLock<concurrent>::try_lock;
+  using PaddedLock<concurrent>::unlock;
+
+  unsigned int nextRand() {
+    seed = 214013*seed + 2531011; 
+    return (seed >> 16) & 0x7FFF;
+  }
+
+public:
+  Random(): seed(0xDEADBEEF) { }
+
+  template<bool newconcurrent>
+  struct rethread {
+    typedef Random<T, newconcurrent> WL;
+  };
+  template<typename Tnew>
+  struct retype {
+    typedef Random<Tnew, concurrent> WL;
+  };
+
+  typedef T value_type;
+
+  bool push(value_type val) {
+    lock();
+    wl.push_back(val);
+    unlock();
+    return true;
+  }
+
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    lock();
+    while (b != e)
+      wl.push_back(*b++);
+    unlock();
+    return true;
+  }
+
+  std::pair<bool, value_type> pop() {
+    lock();
+    if (wl.empty()) {
+      unlock();
+      return std::make_pair(false, value_type());
+    } else {
+      size_t size = wl.size();
+      unsigned int index = nextRand() % size;
+      value_type retval = wl[index];
+      std::swap(wl[index], wl[size-1]);
+      wl.pop_back();
+      unlock();
+      return std::make_pair(true, retval);
+    }
+  }
+};
+WLCOMPILECHECK(Random);
+
+
 
 static void parse_worklist_command_line(std::vector<const char*>& args) {
   for (std::vector<const char*>::iterator ii = args.begin(), ei = args.end(); ii != ei; ++ii) {
@@ -315,6 +378,7 @@ struct StartWorklistExperiment {
     typedef BarrierOBIM<Indexer, dChunk> BOBIM;
     typedef CTOrderedByIntegerMetric<Indexer, dChunk> CTOBIM;
     typedef CTOrderedByIntegerMetric<Indexer, Chunk> NACTOBIM;
+    typedef LevelStealing<Random<> > Random;
 
     typedef WorkListTracker<Indexer, OBIM> TR_OBIM;
     typedef WorkListTracker<Indexer, TBB>  TR_TBB;
@@ -358,6 +422,8 @@ struct StartWorklistExperiment {
     WLFOO(ltbb, LTBB)
     WLFOO(bobim, BOBIM)
     WLFOO(tr-obim, TR_OBIM)
+    WLFOO(bag, dChunk)
+    WLFOO(random, Random)
     else {
       out << "Unrecognized worklist " << name << "\n";
     }
