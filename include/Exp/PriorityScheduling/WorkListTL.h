@@ -2,6 +2,11 @@
  * Common support for worklist experiments.
  */
 #include "Galois/Runtime/WorkList.h"
+#include "Galois/Runtime/PaddedLock.h"
+#include "Galois/Runtime/PerCPU.h"
+#include "Galois/Runtime/Termination.h"
+#include "Galois/Runtime/Threads.h"
+#include <boost/utility.hpp>
 #include <tbb/concurrent_hash_map.h>
 
 #include <iosfwd>
@@ -11,11 +16,11 @@ static std::string WorklistName;
 
 
 template<class Indexer, typename ContainerTy = GaloisRuntime::WorkList::TbbFIFO<>, typename T = int, bool concurrent = true >
-class SimpleOrderedByIntegerMetric : private boost::noncopyable, private PaddedLock<concurrent> {
+class SimpleOrderedByIntegerMetric : private boost::noncopyable, private GaloisRuntime::PaddedLock<concurrent> {
 
-  using PaddedLock<concurrent>::lock;
-  using PaddedLock<concurrent>::try_lock;
-  using PaddedLock<concurrent>::unlock;
+  using GaloisRuntime::PaddedLock<concurrent>::lock;
+  using GaloisRuntime::PaddedLock<concurrent>::try_lock;
+  using GaloisRuntime::PaddedLock<concurrent>::unlock;
 
   typedef ContainerTy CTy;
 
@@ -114,7 +119,7 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
   int maxV;
 
   Indexer I;
-  PerCPU<perItem> current;
+  GaloisRuntime::PerCPU<perItem> current;
 
  public:
   template<bool newconcurrent>
@@ -202,7 +207,7 @@ class BarrierOBIM : private boost::noncopyable {
 
   Indexer I;
 
-  TerminationDetection term;
+  GaloisRuntime::TerminationDetection term;
   pthread_barrier_t barr1;
   pthread_barrier_t barr2;
 
@@ -223,8 +228,8 @@ class BarrierOBIM : private boost::noncopyable {
   {
     B = new CTy[binmax];
     //std::cerr << "$"<<getSystemThreadPool().getActiveThreads() <<"$";
-    pthread_barrier_init(&barr1, NULL, getSystemThreadPool().getActiveThreads());
-    pthread_barrier_init(&barr2, NULL, getSystemThreadPool().getActiveThreads());
+    pthread_barrier_init(&barr1, NULL, GaloisRuntime::getSystemThreadPool().getActiveThreads());
+    pthread_barrier_init(&barr2, NULL, GaloisRuntime::getSystemThreadPool().getActiveThreads());
   }
   ~BarrierOBIM() {
     delete[] B;
@@ -268,7 +273,7 @@ class BarrierOBIM : private boost::noncopyable {
       
       pthread_barrier_wait(&barr1);
   
-      if (ThreadPool::getMyID() == 0) {
+      if (GaloisRuntime::ThreadPool::getMyID() == 0) {
 	//std::cerr << "inc: " << current << "\n";
 	term.reset();
 	if (current <= pushmax)
@@ -293,40 +298,23 @@ static void parse_worklist_command_line(std::vector<const char*>& args) {
   }
 }
 
-//! there is std::not1() but worklists take types not instances :(
-template<typename Functor>
-struct NotLess: public std::binary_function<
-                typename Functor::first_argument_type,
-                typename Functor::second_argument_type,
-                bool> {
-    Functor m_fn;
-  
-  bool operator()(
-      typename Functor::first_argument_type x,
-      typename Functor::second_argument_type y) const {
-    // XXX(ddn): != is not right because it will usually be between GraphNodes...
-    return !m_fn(x, y) && x != y;
-  }
-};
 
- template<typename DefaultWorklist,typename Indexer,typename Less, int ChunkSize=16>
+template<typename DefaultWorklist,typename dChunk,typename Chunk,typename Indexer,typename Less,typename Greater>
 struct StartWorklistExperiment {
   template<typename Iterator,typename Functor>
-  void operator()(std::ostream& out, Iterator ii, Iterator ei, Functor fn) {
+  void operator()(std::ostream& out, Iterator ii, Iterator ei, Functor fn, std::string wlname = "") {
     using namespace GaloisRuntime::WorkList;
-    typedef dChunkedLIFO<ChunkSize> IChunk;
-    typedef ChunkedLIFO<ChunkSize> NAChunk;
 
-    typedef OrderedByIntegerMetric<Indexer, IChunk> OBIM;
-    typedef TbbPriQueue<NotLess<Less> > TBB;
+    typedef OrderedByIntegerMetric<Indexer, dChunk> OBIM;
+    typedef TbbPriQueue<Greater> TBB;
     typedef LocalStealing<TBB> LTBB;
     typedef SkipListQueue<Less> SLQ;
     typedef SimpleOrderedByIntegerMetric<Indexer> SOBIM;
     typedef LocalStealing<SOBIM> LSOBIM;
-    typedef OrderedByIntegerMetric<Indexer, NAChunk> NAOBIM;
-    typedef CTOrderedByIntegerMetric<Indexer, IChunk> CTOBIM;
-    typedef CTOrderedByIntegerMetric<Indexer, NAChunk> NACTOBIM;
-    typedef BarrierOBIM<Indexer, IChunk> BOBIM;
+    typedef OrderedByIntegerMetric<Indexer, Chunk> NAOBIM;
+    typedef BarrierOBIM<Indexer, dChunk> BOBIM;
+    typedef CTOrderedByIntegerMetric<Indexer, dChunk> CTOBIM;
+    typedef CTOrderedByIntegerMetric<Indexer, Chunk> NACTOBIM;
 
     typedef WorkListTracker<Indexer, OBIM> TR_OBIM;
     typedef WorkListTracker<Indexer, TBB>  TR_TBB;
@@ -350,11 +338,12 @@ struct StartWorklistExperiment {
     typedef NoInlineFilter<NACTOBIM> NI_NACTOBIM;
     typedef NoInlineFilter<BOBIM> NI_BOBIM;
 
-#define WLFOO(__x, __y) else if (WorklistName == #__x) {\
-  out << "Using worklist: " << WorklistName << "\n"; \
+    std::string name = (wlname == "") ? WorklistName : wlname;
+#define WLFOO(__x, __y) else if (name == #__x) {\
+  out << "Using worklist: " << name << "\n"; \
   Galois::for_each<__y >(ii, ei, fn); } 
 
-    if (WorklistName == "default" || WorklistName == "") {
+    if (name == "default" || name == "") {
       out << "Using worklist: default\n";
       Galois::for_each<DefaultWorklist>(ii, ei, fn); 
     }
@@ -367,12 +356,10 @@ struct StartWorklistExperiment {
     WLFOO(slq, SLQ)
     WLFOO(tbb, TBB)
     WLFOO(ltbb, LTBB)
-    WLFOO(chunkedfifo, dChunkedFIFO<16> )
-    WLFOO(fifo, FIFO<> )
-    WLFOO(lifo, LIFO<> )
     WLFOO(bobim, BOBIM)
+    WLFOO(tr-obim, TR_OBIM)
     else {
-      out << "Unrecognized worklist " << WorklistName << "\n";
+      out << "Unrecognized worklist " << name << "\n";
     }
 #undef WLFOO
   }

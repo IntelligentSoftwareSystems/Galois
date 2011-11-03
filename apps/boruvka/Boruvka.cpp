@@ -171,7 +171,7 @@ struct process {
   }
 };
 
-struct Indexer {
+struct Indexer: public std::unary_function<const GNode&, unsigned int> {
   unsigned operator()(const GNode& n) {
     return std::distance(graph.neighbor_begin(n, Galois::NONE),
 			 graph.neighbor_end(n, Galois::NONE));
@@ -188,7 +188,7 @@ struct seq_less: public std::binary_function<const GNode&,const GNode&,bool> {
     return lhs < rhs;
   }
 };
-struct seq_gt {
+struct seq_gt: public std::binary_function<const GNode&,const GNode&,bool> {
   bool operator()(const GNode& lhs, const GNode& rhs) const {
     if (Indexer::foo(lhs) > Indexer::foo(rhs)) return true;
     if (Indexer::foo(lhs) < Indexer::foo(rhs)) return false;
@@ -200,8 +200,9 @@ struct seq_gt {
 //End body of for-each.
 void runBodyParallel() {
   using namespace GaloisRuntime::WorkList;
-  typedef dChunkedFIFO<64> IChunk;
-  typedef OrderedByIntegerMetric<Indexer, IChunk> OBIM;
+  typedef dChunkedFIFO<64> dChunk;
+  typedef ChunkedFIFO<64> Chunk;
+  typedef OrderedByIntegerMetric<Indexer, dChunk> OBIM;
 
 #if BORUVKA_DEBUG
   std::cout<<"Begining to process with worklist size :: "<<all.size()<<std::endl;
@@ -216,7 +217,7 @@ void runBodyParallel() {
   //Galois::for_each<ChunkedFIFO<32> >(all.begin(), all.end(), process());
   //Galois::for_each<OBIM>(all.begin(), all.end(), process());
   T.start();
-  Exp::StartWorklistExperiment<OBIM, Indexer, seq_less>()(std::cout, graph.active_begin(), graph.active_end(), process());
+  Exp::StartWorklistExperiment<OBIM,dChunk,Chunk,Indexer,seq_less,seq_gt>()(std::cout, graph.active_begin(), graph.active_end(), process());
   T.stop();
 
   //TODO: use a reduction variable here
