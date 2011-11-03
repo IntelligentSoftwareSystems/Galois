@@ -69,8 +69,17 @@ struct seq_less: public std::binary_function<const UpdateRequest&,const UpdateRe
   }
 };
 
+struct seq_greater: public std::binary_function<const UpdateRequest&,const UpdateRequest&,bool> {
+  bool operator()(const UpdateRequest& lhs, const UpdateRequest& rhs) const {
+    //return (lhs.w  >> stepShift) < (rhs.w >> stepShift);
+    if (lhs.w > rhs.w) return true;
+    else if (lhs.w < rhs.w) return false;
+    else return lhs.n > rhs.n;
+  }
+};
+
 struct UpdateRequestIndexer
-  : std::binary_function<UpdateRequest, unsigned int, unsigned int> {
+  : std::unary_function<UpdateRequest, unsigned int> {
   unsigned int operator() (const UpdateRequest& val) const {
     unsigned int t = val.w >> stepShift;
     return t;
@@ -148,14 +157,15 @@ struct process {
 
 void runBodyParallel(const GNode src) {
   using namespace GaloisRuntime::WorkList;
-  typedef NoInlineFilter<dChunkedLIFO<16> > IChunk;
-  typedef OrderedByIntegerMetric<UpdateRequestIndexer, IChunk> OBIM;
+  typedef dChunkedLIFO<16> dChunk;
+  typedef ChunkedLIFO<16> Chunk;
+  typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
 
   Galois::StatTimer T;
 
   UpdateRequest one[1] = { UpdateRequest(src, 0) };
   T.start();
-  Exp::StartWorklistExperiment<OBIM,UpdateRequestIndexer,seq_less>()(std::cout, &one[0], &one[1], process());
+  Exp::StartWorklistExperiment<OBIM,dChunk,Chunk,UpdateRequestIndexer,seq_less,seq_greater>()(std::cout, &one[0], &one[1], process());
   T.stop();
 }
 
@@ -204,7 +214,7 @@ int main(int argc, const char **argv) {
       ii = args.erase(ii);
       --ii;
       ei = args.end();
-    } else if (strcmp(*ii, "bfs") == 0) {
+    } else if (strcmp(*ii, "-bfs") == 0) {
       do_bfs = true;
       ii = args.erase(ii);
       --ii;
