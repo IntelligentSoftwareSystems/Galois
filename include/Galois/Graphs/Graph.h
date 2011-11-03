@@ -398,15 +398,15 @@ public:
 
   //add a node and reserve the space for edges
   bool addNode(const GraphNode& n, int maxDegree, MethodFlag mflag = ALL) {
-	  assert(n.ID);
-	  acquire(n.ID, mflag);
-	  bool oldActive = n.ID->active;
-	  if (!oldActive) {
-		  n.ID->active = true;
-		  //__sync_add_and_fetch(&numActive, 1);
-	  }
-	  n.ID->edges.reserve(maxDegree);
-	  return !oldActive;
+    assert(n.ID);
+    acquire(n.ID, mflag);
+    bool oldActive = n.ID->active;
+    if (!oldActive) {
+            n.ID->active = true;
+            //__sync_add_and_fetch(&numActive, 1);
+    }
+    n.ID->edges.reserve(maxDegree);
+    return !oldActive;
   }
 
   //! Gets the node data for a node.
@@ -570,10 +570,12 @@ public:
   neighbor_iterator neighbor_begin(GraphNode N, Galois::MethodFlag mflag = ALL) {
     assert(N.ID);
     acquire(N.ID, mflag);
-    //Trust the compliler to remove this loop if the body disappears from the right mflag
-    for (typename gNode::neighbor_iterator ii = N.ID->neighbor_begin(), ee =
-	   N.ID->neighbor_end(); ii != ee; ++ii) {
-      acquire(*ii, mflag);
+
+    if (shouldLock(mflag)) {
+      for (typename gNode::neighbor_iterator ii = N.ID->neighbor_begin(), ee =
+             N.ID->neighbor_end(); ii != ee; ++ii) {
+        acquire(*ii, mflag);
+      }
     }
     return boost::make_transform_iterator(N.ID->neighbor_begin(),
 					  makeGraphNodePtr(this));
