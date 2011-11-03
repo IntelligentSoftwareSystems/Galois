@@ -78,6 +78,7 @@ template<class WorkListTy, class Function>
 class ForEachWork {
   typedef typename WorkListTy::value_type value_type;
   typedef GaloisRuntime::WorkList::LevelStealing<GaloisRuntime::WorkList::FIFO<value_type>, value_type> AbortedListTy;
+  //typedef GaloisRuntime::WorkList::LevelStealing<GaloisRuntime::WorkList::Random<value_type>, value_type> AbortedListTy;
   //typedef GaloisRuntime::WorkList::FIFO<value_type, true> AbortedListTy;
   
   struct tldTy {
@@ -95,10 +96,34 @@ class ForEachWork {
   TerminationDetection term;
   AbortedListTy aborted;
   cache_line_storage<volatile long> abort_happened; //hit flag
+  cache_line_storage<volatile long> break_happened;
 
-  void doAborted(value_type val) {
-    aborted.push(val);
-    abort_happened.data = 1;
+  void finishIteration(bool aborting, value_type val, tldTy& tld) {
+    if (aborting) {
+      __sync_synchronize();
+      clearConflictLock();
+      tld.cnx.cancel_iteration();
+      tld.stat.inc_conflicts();
+      __sync_synchronize();
+      aborted.push(val);
+      abort_happened.data = 1;
+    }
+    if (Configurator<Function>::NeedsPush) {
+      if (!aborting) {
+        global_wl.push(tld.facing.__getPushBuffer().begin(), tld.facing.__getPushBuffer().end());
+      }
+      tld.facing.__getPushBuffer().clear();
+    }
+    if (Configurator<Function>::NeedsPIA)
+      tld.facing.__resetAlloc();
+    if (Configurator<Function>::NeedsBreak) {
+      if (!aborting && tld.facing.__breakHappened()) {
+        break_happened.data = 1;
+      }
+      tld.facing.__resetBreakHappened();
+    }
+    if (!aborting)
+      tld.cnx.commit_iteration();
   }
 
   void doProcess(value_type val, tldTy& tld) {
@@ -107,45 +132,32 @@ class ForEachWork {
     try {
       f(val, tld.facing);
     } catch (int a) {
-      __sync_synchronize();
-      clearConflictLock();
-      tld.cnx.cancel_iteration();
-      tld.stat.inc_conflicts();
-      __sync_synchronize();
-      if (Configurator<Function>::NeedsPush)
-	tld.facing.__getPushBuffer().clear();
-      if (Configurator<Function>::NeedsPIA)
-	tld.facing.__resetAlloc();
-      doAborted(val);
+      finishIteration(true, val, tld);
       return;
     }
-    if (Configurator<Function>::NeedsPush) {
-      global_wl.push(tld.facing.__getPushBuffer().begin(), tld.facing.__getPushBuffer().end());
-      tld.facing.__getPushBuffer().clear();
-    }
-    tld.cnx.commit_iteration();
-    if (Configurator<Function>::NeedsPIA)
-      tld.facing.__resetAlloc();
+    finishIteration(false, val, tld);
   }
 
   template<bool isLeader>
   inline void drainAborted(tldTy& tld) {
     if (!isLeader) return;
     if (!abort_happened.data) return;
-    if (Configurator<Function>::NeedsBreak && tld.facing.__breakHappened()) return;
     tld.lterm->workHappened();
     abort_happened.data = 0;
     std::pair<bool, value_type> p = aborted.pop();
     while (p.first) {
-      if (Configurator<Function>::NeedsBreak && tld.facing.__breakHappened()) return;
-      doProcess(p.second, tld);
+      if (Configurator<Function>::NeedsBreak && break_happened.data) {
+        ;
+      } else {
+        doProcess(p.second, tld);
+      }
       p = aborted.pop();
     }
   }
 
   inline void drainBreak(tldTy& tld) {
     if (!Configurator<Function>::NeedsBreak) return;
-    if (tld.facing.__breakHappened()) {
+    if (break_happened.data) {
       std::pair<bool, value_type> p = global_wl.pop();
       while (p.first)
 	p = global_wl.pop();
@@ -156,6 +168,7 @@ public:
   ForEachWork(Function& _f, const char* _loopname)
     :f(_f), loopname(_loopname) {
     abort_happened.data = 0;
+    break_happened.data = 0;
   }
 
   ~ForEachWork() {
@@ -180,13 +193,14 @@ public:
       if (p.first)
         tld.lterm->workHappened();
       while (p.first) {
+        if (Configurator<Function>::NeedsBreak && break_happened.data) break;
         doProcess(p.second, tld);
 	drainAborted<isLeader>(tld);
-	drainBreak(tld);
 	p = global_wl.pop();
       }
 
       drainAborted<isLeader>(tld);
+      drainBreak(tld);
       term.localTermination();
     } while (!term.globalTermination());
     setThreadContext(0);

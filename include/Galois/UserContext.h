@@ -51,6 +51,10 @@ class UserContext: private boost::noncopyable {
     return breakFlag.data;
   }
 
+  void __resetBreakHappened() {
+    breakFlag.data = 0;
+  }
+
   //! push stuff
   typedef std::vector<T> pushBufferTy;
   pushBufferTy pushBuffer;
@@ -66,6 +70,7 @@ public:
      breakFlag(0)
   {}
 
+  //! Signal break in parallel loop
   void breakLoop() {
     breakFlag.data = 1;
   }
@@ -74,11 +79,10 @@ public:
     return PerIterationAllocator;
   }
 
+  //! Push new work 
   void push(T val) {
     pushBuffer.push_back(val);
   }
-
-
 };
 
 }
