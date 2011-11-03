@@ -116,7 +116,7 @@ int main(int argc,  const char **argv) {
 
   bp.init();
 
-  Galois::StatTimer T("bp");
+  Galois::StatTimer T;
   T.start();
   bp.run();
   T.stop();
