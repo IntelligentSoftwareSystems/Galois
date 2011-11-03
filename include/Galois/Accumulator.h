@@ -26,9 +26,11 @@
 
 #include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/LoopHooks.h"
+
 #include <boost/function.hpp>
 
 namespace Galois {
+
 
 /**
  * GReducible stores per thread values
@@ -58,21 +60,21 @@ public:
   /**
    * @param val initial per thread value
    */
-  explicit GReducible (const T& val)
+  explicit GReducible(const T& val)
     : _data(val) { }
   /**
    * @param F the binary functor acting as the reduction operator
    */
-  explicit GReducible (BinFunc F)
+  explicit GReducible(BinFunc F)
     : _func(F) { }
   /**
    * @param val initial per thread value
    * @param F the binary functor acting as the reduction operator
    */
-  GReducible (const T val, BinFunc F)
+  GReducible(const T val, BinFunc F)
     : _func(F), _data(val) { }
 
-  GReducible () {}
+  GReducible() {}
 
   /**
    * updates the thread local value
@@ -81,7 +83,7 @@ public:
    *
    * @param _newVal
    */
-  const T& update (const T& _newVal) {
+  const T& update(const T& _newVal) {
     T& lhs = _data.get();
     _func(lhs, _newVal);
     return lhs;
@@ -122,7 +124,7 @@ template<typename T>
 class GAccumulator : public GReducible<T, ReduceAssignWrap<std::plus<T> > > {
   typedef GReducible<T, ReduceAssignWrap<std::plus<T> > > SuperType;
 public:
-  explicit GAccumulator (const T& val = T()): SuperType(val) {}
+  explicit GAccumulator(const T& val = T()): SuperType(val) {}
 
   GAccumulator& operator+=(const T& rhs) {
     update(rhs);
@@ -145,7 +147,11 @@ struct gmax {
 }
 
 template<typename T>
-class GReduceMax : public GReducible<T, HIDDEN::gmax<T> > {};
+class GReduceMax : public GReducible<T, HIDDEN::gmax<T> > {
+  typedef GReducible<T, HIDDEN::gmax<T> > Super;
+public:
+  explicit GReduceMax(const T& val = T()): Super(val) {}
+};
 
 template<typename T>
 class GReduceAverage {
@@ -157,8 +163,9 @@ class GReduceAverage {
     }
   };
   GReducible<std::pair<T, unsigned>, AVG> data;
+
 public:
-  void update (const T& _newVal) {
+  void update(const T& _newVal) {
     data.update(std::make_pair(_newVal, 1));
   }
 
