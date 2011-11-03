@@ -28,8 +28,8 @@ namespace GaloisRuntime {
 
 class SimpleRuntimeContext;
 
-//All objects that may be locked (nodes primarily) must inherit from Lockable
-//Use an intrusive list to track objects in a context without allocation overhead
+//! All objects that may be locked (nodes primarily) must inherit from Lockable.
+//! Use an intrusive list to track objects in a context without allocation overhead
 class Lockable {
   PtrLock<SimpleRuntimeContext*, true> Owner;
   Lockable* next;
@@ -39,8 +39,7 @@ public:
 };
 
 class SimpleRuntimeContext {
-  
-  //The locks we hold
+  //! The locks we hold
   Lockable* locks;
 
 public:
@@ -53,7 +52,6 @@ public:
   void cancel_iteration();
   void commit_iteration();
   void acquire(Lockable* L);
-
 };
 
 //! get the current conflict detection class, may be null if not in parallel region

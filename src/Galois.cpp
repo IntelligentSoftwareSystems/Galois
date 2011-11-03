@@ -81,7 +81,8 @@ void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
       // if (other) rid = other->ID;
       // if (other) rb = other->bored;
       // std::cerr << "C: " << rid << "(" << rb << ") != " << ID << "(" << bored << ") " << L << "\n";
-      throw -1; //CONFLICT
+      throw -1; // Conflict
     }
   }
 }
+

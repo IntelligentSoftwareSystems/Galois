@@ -37,8 +37,7 @@ class GChecked : public GaloisRuntime::Lockable {
 public:
   GChecked(const T& v) :val(v) {}
 
-  T& get(Galois::MethodFlag m = ALL) const
-  {
+  T& get(Galois::MethodFlag m = ALL) {
     GaloisRuntime::acquire(this, m);
     return val;
   }
