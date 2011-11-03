@@ -336,6 +336,7 @@ struct MatchingFF {
 
   //! Main entry point for Galois::for_each
   struct Process {
+    typedef int tt_needs_per_iter_alloc;
     MatchingFF<G,Concurrent>& parent;
     G& g;
     SerialRevs& serialRevs;
@@ -347,6 +348,7 @@ struct MatchingFF {
     void operator()(const GraphNode& node, Galois::UserContext<GraphNode>& ctx) {
       if (!node.getData(flag).free)
         return;
+
       ParallelRevs parallelRevs(ctx.getPerIterAlloc());
       ParallelReached parallelReached(ctx.getPerIterAlloc());
 
@@ -398,6 +400,11 @@ struct MatchingABMP {
     }
   };
 
+  struct Greater: public std::binary_function<const GraphNode&,const GraphNode&,bool> {
+    unsigned operator()(const GraphNode& n1, const GraphNode& n2) const {
+      return n1.getData(Galois::NONE).layer > n2.getData(Galois::NONE).layer;
+    }
+  };
 
   std::string name() { 
     return std::string(Concurrent ? "Concurrent" : "Serial") + " Alt-Blum-Mehlhorn-Paul"; 
@@ -426,11 +433,13 @@ struct MatchingABMP {
   //! Returns true if we've added a new element
   bool operator()(G& g, const GraphNode& root, Galois::UserContext<GraphNode>& ctx) {
     Revs revs(ctx.getPerIterAlloc());
+
     GraphNode cur = root;
 
     while (true) {
       GraphNode next;
       if (cur.getData(Galois::NONE).free && cur.getData(Galois::NONE).layer == 0) {
+        assert(root.getData(Galois::NONE).free);
         // (1) Breakthrough
         cur.getData(Galois::NONE).free = root.getData(Galois::NONE).free = false;
         
@@ -461,12 +470,13 @@ struct MatchingABMP {
 
   struct Process {
     typedef int tt_needs_parallel_break;
+    typedef int tt_needs_per_iter_alloc;
     MatchingABMP<G,Concurrent>& parent;
     G& g;
-    unsigned maxLayer;
+    unsigned& maxLayer;
     size_t& size;
 
-    Process(MatchingABMP<G,Concurrent>& p, G& _g, unsigned m, size_t& s):
+    Process(MatchingABMP<G,Concurrent>& p, G& _g, unsigned& m, size_t& s):
       parent(p), g(_g), maxLayer(m), size(s) { }
     
     void operator()(const GraphNode& node, Galois::UserContext<GraphNode>& ctx) {
@@ -474,6 +484,7 @@ struct MatchingABMP {
       if (curLayer > maxLayer) {
         std::cout << "Reached max layer: " << curLayer << "\n";
         ctx.breakLoop();
+        return;
       }
       //if (size <= 50 * curLayer) {
       //  std::cout << "Reached min size: " << size << "\n";
@@ -502,10 +513,11 @@ struct MatchingABMP {
     
     using namespace GaloisRuntime::WorkList;
 
-    typedef dChunkedFIFO<64> Chunked;
-    typedef OrderedByIntegerMetric<Indexer, Chunked> OBIM;
+    typedef ChunkedFIFO<1024> Chunk;
+    typedef dChunkedFIFO<1024> dChunk;
+    typedef OrderedByIntegerMetric<Indexer,dChunk> OBIM;
     
-    Exp::StartWorklistExperiment<OBIM,Indexer,Less>()(
+    Exp::StartWorklistExperiment<OBIM,dChunk,Chunk,Indexer,Less,Greater>()(
         std::cout, initial.begin(), initial.end(), Process(*this, g, maxLayer, size));
     
     t.start();
@@ -896,7 +908,7 @@ struct Verifier {
         // Good
       } else {
         std::cerr << "Error: not a node cover, node " << dii.id 
-          << " not covered nor incident to covered node\n";
+          << " with degree " << dii.degree << " not covered nor incident to covered node\n";
         retval = false;
       }
     }
@@ -933,7 +945,7 @@ static double nextRand() {
  * Generate a random bipartite graph as used in LEDA evaluation and
  * refererenced in [CGM+97]. Nodes are divided into numGroups groups of size
  * numA/numGroups each. Each node in A has degree d = numEdges/numA and the
- * edges out of ! a node in group i of A go to random nodes in groups i+1 and
+ * edges out of a node in group i of A go to random nodes in groups i+1 and
  * i-1  of B. If numGroups == 0, just randomly assign nodes of A to nodes of
  * B.
  */
