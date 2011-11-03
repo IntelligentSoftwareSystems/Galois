@@ -61,7 +61,7 @@ void rmat2gr(const char *infilename, const char *outfilename) {
   }
 
   int edges_added = 0;
-  for (int edge_num = 0; edge_num < nedges; ++edge_num) {
+  for (int edge_num = 0; edge_num < nnodes; ++edge_num) {
     int cur_id, cur_edges;
     infile >> cur_id >> cur_edges;
     if (cur_id < 0 || cur_id >= nnodes) {
