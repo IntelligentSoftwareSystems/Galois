@@ -5,10 +5,9 @@ template<typename GrNode>
 struct UpdateRequestCommon {
   GrNode n;
   unsigned int w;
-  int id;
 
-UpdateRequestCommon(const GrNode& N, unsigned int W, int ID)
-  :n(N), w(W), id(ID)
+UpdateRequestCommon(const GrNode& N, unsigned int W)
+  :n(N), w(W)
   {}
 
   UpdateRequestCommon()
@@ -28,7 +27,7 @@ UpdateRequestCommon(const GrNode& N, unsigned int W, int ID)
   }
 
   int getID() const {
-    return id;
+    return (int)n;
   }
 };
 

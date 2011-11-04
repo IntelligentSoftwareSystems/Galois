@@ -97,7 +97,7 @@ void runBody(const GNode src) {
       ii != ee; ++ii) {
     GNode dst = *ii;
     int w = do_bfs ? 1 : graph.getEdgeData(src, dst, Galois::NONE);
-    UpdateRequest up(dst, w, 0);
+    UpdateRequest up(dst, w);
     initial.insert(up);
   }
 
@@ -121,7 +121,7 @@ void runBody(const GNode src) {
 	int d = do_bfs ? 1 : graph.getEdgeData(req.n, dst, Galois::NONE);
 	unsigned int newDist = req.w + d;
 	if (newDist < graph.getData(dst,Galois::NONE).dist)
-	  initial.insert(UpdateRequest(dst, newDist, 0));
+	  initial.insert(UpdateRequest(dst, newDist));
       }
     }
   }
@@ -150,7 +150,7 @@ struct process {
 	  unsigned int newDist = req.w + d;
 	  SNode& rdata = graph.getData(dst,Galois::NONE);
 	  if (newDist < rdata.dist)
-	    lwl.push(UpdateRequest(dst, newDist, rdata.id));
+	    lwl.push(UpdateRequest(dst, newDist));
 	}
 	break;
       }
@@ -166,7 +166,7 @@ void runBodyParallel(const GNode src) {
 
   Galois::StatTimer T;
 
-  UpdateRequest one[1] = { UpdateRequest(src, 0, graph.getData(src,Galois::NONE).id ) };
+  UpdateRequest one[1] = { UpdateRequest(src, 0) };
   T.start();
   Exp::StartWorklistExperiment<OBIM,dChunk,Chunk,UpdateRequestIndexer,seq_less,seq_greater>()(std::cout, &one[0], &one[1], process());
   T.stop();
