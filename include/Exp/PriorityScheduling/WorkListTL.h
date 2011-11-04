@@ -8,6 +8,8 @@
 #include "Galois/Runtime/Threads.h"
 #include <boost/utility.hpp>
 #include <tbb/concurrent_hash_map.h>
+#include "Galois/Runtime/DebugWorkList.h"
+
 
 #include <iosfwd>
 
@@ -286,12 +288,12 @@ class BarrierOBIM : private boost::noncopyable {
 };
 
 template<typename T = int, bool concurrent = true>
-class Random : private boost::noncopyable, private PaddedLock<concurrent>  {
+class Random : private boost::noncopyable, private GaloisRuntime::PaddedLock<concurrent>  {
   std::vector<T> wl;
   unsigned int seed;
-  using PaddedLock<concurrent>::lock;
-  using PaddedLock<concurrent>::try_lock;
-  using PaddedLock<concurrent>::unlock;
+  using GaloisRuntime::PaddedLock<concurrent>::lock;
+  using GaloisRuntime::PaddedLock<concurrent>::try_lock;
+  using GaloisRuntime::PaddedLock<concurrent>::unlock;
 
   unsigned int nextRand() {
     seed = 214013*seed + 2531011; 
@@ -351,12 +353,12 @@ template<class Compare = std::less<int>, typename T = int>
 class PTbb : private boost::noncopyable {
   typedef tbb::concurrent_priority_queue<T,Compare> TBBTy;
   
-  PerCPU<TBBTy> wl;
+  GaloisRuntime::PerCPU<TBBTy> wl;
   int nactive;
 
 public:
   PTbb() {
-    nactive = getSystemThreadPool().getActiveThreads();
+    nactive = GaloisRuntime::getSystemThreadPool().getActiveThreads();
   }
   template<bool newconcurrent>
   struct rethread {
@@ -424,54 +426,38 @@ struct StartWorklistExperiment {
     typedef LevelStealing<Random<> > Random;
     typedef PTbb<Greater> PTBB;
 
-    typedef WorkListTracker<Indexer, OBIM> TR_OBIM;
-    typedef WorkListTracker<Indexer, TBB>  TR_TBB;
-    typedef WorkListTracker<Indexer, LTBB> TR_LTBB;
-    typedef WorkListTracker<Indexer, SLQ>  TR_SLQ;
-    typedef WorkListTracker<Indexer, SOBIM> TR_SOBIM;
-    typedef WorkListTracker<Indexer, LSOBIM> TR_LSOBIM;
-    typedef WorkListTracker<Indexer, NAOBIM> TR_NAOBIM;
-    typedef WorkListTracker<Indexer, CTOBIM> TR_CTOBIM;
-    typedef WorkListTracker<Indexer, NACTOBIM> TR_NACTOBIM;
-    typedef WorkListTracker<Indexer, BOBIM> TR_BOBIM;
-    typedef WorkListTracker<Indexer, PTBB> TR_PTBB;
-
-    typedef NoInlineFilter<OBIM> NI_OBIM;
-    typedef NoInlineFilter<TBB>  NI_TBB;
-    typedef NoInlineFilter<LTBB> NI_LTBB;
-    typedef NoInlineFilter<SLQ>  NI_SLQ;
-    typedef NoInlineFilter<SOBIM> NI_SOBIM;
-    typedef NoInlineFilter<LSOBIM> NI_LSOBIM;
-    typedef NoInlineFilter<NAOBIM> NI_NAOBIM;
-    typedef NoInlineFilter<CTOBIM> NI_CTOBIM;
-    typedef NoInlineFilter<NACTOBIM> NI_NACTOBIM;
-    typedef NoInlineFilter<BOBIM> NI_BOBIM;
-    typedef NoInlineFilter<PTBB> NI_PTBB;
-
     std::string name = (wlname == "") ? WorklistName : wlname;
-#define WLFOO(__x, __y) else if (name == #__x) {\
-  out << "Using worklist: " << name << "\n"; \
-  Galois::for_each<__y >(ii, ei, fn); } 
+
+#define WLFOO(__b, __e, __p, __x, __y)					\
+  if (name == #__x) {							\
+    out << "Using worklist: " << name << "\n";				\
+    Galois::for_each<__y>(__b, __e, __p);				\
+  } else if (name == "tr_" #__x) {					\
+    out << "Using worklist: " << name << "\n";			\
+    Galois::for_each<WorkListTracker<Indexer, __y > >(__b, __e, __p);	\
+  } else if (name == "ni_" #__x) {					\
+    out << "Using worklist: " << name << "\n";			\
+    Galois::for_each<NoInlineFilter< __y > >(__b, __e, __p);		\
+  }
 
     if (name == "default" || name == "") {
       out << "Using worklist: default\n";
       Galois::for_each<DefaultWorklist>(ii, ei, fn); 
-    }
-    WLFOO(obim, OBIM)
-    WLFOO(sobim, SOBIM)
-    WLFOO(lsobim, LSOBIM)
-    WLFOO(naobim, NAOBIM)
-    WLFOO(ctobim, CTOBIM)
-    WLFOO(nactobim, NACTOBIM)
-    WLFOO(slq, SLQ)
-    WLFOO(tbb, TBB)
-    WLFOO(ltbb, LTBB)
-    WLFOO(bobim, BOBIM)
-    WLFOO(ptbb, PTBB)
-    WLFOO(tr-obim, TR_OBIM)
-    WLFOO(bag, dChunk)
-    WLFOO(random, Random)
-    else {
+    } else
+    WLFOO(ii, ei, fn, obim,     OBIM)     else
+    WLFOO(ii, ei, fn, sobim,    SOBIM)    else
+    WLFOO(ii, ei, fn, lsobim,   LSOBIM)   else
+    WLFOO(ii, ei, fn, naobim,   NAOBIM)   else
+    WLFOO(ii, ei, fn, ctobim,   CTOBIM)   else
+    WLFOO(ii, ei, fn, nactobim, NACTOBIM) else
+    WLFOO(ii, ei, fn, slq,      SLQ)      else
+    WLFOO(ii, ei, fn, tbb,      TBB)      else
+    WLFOO(ii, ei, fn, ltbb,     LTBB)     else
+    WLFOO(ii, ei, fn, bobim,    BOBIM)    else
+    WLFOO(ii, ei, fn, ptbb,     PTBB)     else
+    WLFOO(ii, ei, fn, bag,      dChunk)   else
+    WLFOO(ii, ei, fn, random,   Random)   else
+    {
       out << "Unrecognized worklist " << name << "\n";
     }
 #undef WLFOO
