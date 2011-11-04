@@ -353,7 +353,14 @@ template<class Compare = std::less<int>, typename T = int>
 class PTbb : private boost::noncopyable {
   typedef tbb::concurrent_priority_queue<T,Compare> TBBTy;
   
-  GaloisRuntime::PerCPU<TBBTy> wl;
+  struct PTD {
+    TBBTy wl;
+    GaloisRuntime::PaddedLock<true> L;
+    bool V;
+    std::vector<T> inq;
+  };
+
+  GaloisRuntime::PerCPU<PTD> tld;
   int nactive;
 
 public:
@@ -372,7 +379,16 @@ public:
   typedef T value_type;
   
   bool push(value_type val) {
-    wl.get(val.getID() % nactive).push(val);
+    int index = val.getID() % nactive;
+    PTD& N = tld.get(index);
+    if (index == tld.myEffectiveID())
+      N.wl.push(val);
+    else {
+      N.L.lock();
+      N.inq.push_back(val);
+      N.V = true;
+      N.L.unlock();
+    }
     return true;
   }
   
@@ -385,7 +401,17 @@ public:
   
   std::pair<bool, value_type> pop() {
     value_type retval;
-    if (wl.get().try_pop(retval)) {
+    PTD& N = tld.get();
+    if (N.V) {
+      N.L.lock();
+      for (typename std::vector<T>::iterator ii = N.inq.begin(), ee = N.inq.end();
+	   ii != ee; ++ii)
+	N.wl.push(*ii);
+      N.inq.clear();
+      N.V = false;
+      N.L.unlock();
+    }
+    if (N.wl.try_pop(retval)) {
       return std::make_pair(true, retval);
     } else {
       return std::make_pair(false, value_type());
