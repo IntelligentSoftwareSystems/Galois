@@ -189,8 +189,7 @@ struct Boruvkas {
       return lhs.getData(Galois::NONE) < rhs.getData(Galois::NONE);
     }
   };
-
-  struct seq_gt {
+  struct Greater: public std::binary_function<const GraphNode&,const GraphNode&,bool> {
     bool operator()(const GraphNode& lhs, const GraphNode& rhs) const {
       return lhs.getData(Galois::NONE) > rhs.getData(Galois::NONE);
     }
@@ -305,7 +304,7 @@ struct Boruvkas {
     typedef dChunkedLIFO<16> IChunk;
     typedef OrderedByIntegerMetric<Indexer, IChunk> OBIM;
 
-    Exp::StartWorklistExperiment<OBIM,Indexer,Less>()(
+    Exp::StartWorklistExperiment<OBIM,dChunkedLIFO<16>, ChunkedLIFO<16>,Indexer,Less,Greater>()(
         std::cout, g.active_begin(), g.active_end(), Process(*this, g, w));
   }
 };
