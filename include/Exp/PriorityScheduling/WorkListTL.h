@@ -422,7 +422,7 @@ struct StartWorklistExperiment {
     typedef CTOrderedByIntegerMetric<Indexer, dChunk> CTOBIM;
     typedef CTOrderedByIntegerMetric<Indexer, Chunk> NACTOBIM;
     typedef LevelStealing<Random<> > Random;
-    typedef PTbb<NotLess<Less> > PTBB;
+    typedef PTbb<Greater> PTBB;
 
     typedef WorkListTracker<Indexer, OBIM> TR_OBIM;
     typedef WorkListTracker<Indexer, TBB>  TR_TBB;

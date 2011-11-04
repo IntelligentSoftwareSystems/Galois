@@ -306,6 +306,11 @@ public:
       Parent(0), ID(0) {
     }
 
+    //XXX(ddn): erase after experiment is done
+    uintptr_t getID() const {
+      return reinterpret_cast<uintptr_t>(ID);
+    }
+
     void prefetch_all() {
       if (ID)
 	ID->prefetch_neighbors();
