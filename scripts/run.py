@@ -100,10 +100,24 @@ def main(args, options):
         print('RUN: Variable %s = %s' % (name, value))
 
       sys.stdout.flush()
-      retcode = subprocess.call(cmd)
+      if options.timeout:
+        import subprocess, datetime, os, time, signal
+        start = datetime.datetime.now()
+        process = subprocess.Popen(cmd)
+        while process.poll() is None:
+          time.sleep(1)
+          now = datetime.datetime.now()
+          if (now-start).seconds > options.timeout:
+            os.kill(process.pid, signal.SIGKILL)
+            os.waitpid(-1, os.WNOHANG)
+            sys.stderr.write("RUN: Error Timeout %d seconds\n" % (now-start).seconds)
+            break
+        retcode = process.returncode
+      else:
+        retcode = subprocess.call(cmd)
       if retcode != 0:
-        sys.stderr.write("Error running command: %s\n" % cmd)
-        sys.exit(1)
+        sys.stderr.write("RUN: Error running command: %s\n" % cmd)
+        #sys.exit(1)
 
 
 if __name__ == '__main__':
@@ -115,6 +129,8 @@ if __name__ == '__main__':
       help="set number of runs")
   parser.add_option('-x', '--extra', dest="extra", default=[], action='append',
       help='add another parameter to range over (format: <name>::<arg>::<range>). E.g., delta::-delta::1,5')
+  parser.add_option('-o', '--timeout', dest="timeout", default=0, type='int',
+      help="timeout a run after SEC seconds", metavar='SEC')
   (options, args) = parser.parse_args()
   if not args:
     parser.error('need command to run')
