@@ -349,6 +349,18 @@ public:
 WLCOMPILECHECK(Random);
 
 
+template <typename T> struct GETID {
+  int operator()(const T& v) {
+    return v.getID();
+  }
+};
+// This is a pointer to T specialization!
+template <typename T> struct GETID<T*> {
+  unsigned operator()(const T* v) {
+    return (unsigned)(((uintptr_t) v) >> 7);
+  }
+};
+
 template<class Compare = std::less<int>, typename T = int>
 class PTbb : private boost::noncopyable {
   typedef tbb::concurrent_priority_queue<T,Compare> TBBTy;
@@ -379,7 +391,7 @@ public:
   typedef T value_type;
   
   bool push(value_type val) {
-    int index = val.getID() % nactive;
+    unsigned index = GETID<value_type>()(val) % nactive;
     PTD& N = tld.get(index);
     if (index == tld.myEffectiveID())
       N.wl.push(val);
