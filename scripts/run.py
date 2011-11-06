@@ -99,9 +99,9 @@ def main(args, options):
       for (name, value) in values:
         print('RUN: Variable %s = %s' % (name, value))
 
+      import subprocess, datetime, os, time, signal
       sys.stdout.flush()
       if options.timeout:
-        import subprocess, datetime, os, time, signal
         start = datetime.datetime.now()
         process = subprocess.Popen(cmd)
         while process.poll() is None:
