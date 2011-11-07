@@ -42,6 +42,7 @@ void reportInfo(const char* text, unsigned int val);
 void reportInfo(const char* text, unsigned long val);
 void reportInfo(const char* text, const char* val);
 
+void reportFlush();
 }
 
 #endif

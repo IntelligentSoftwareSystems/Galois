@@ -105,18 +105,20 @@ def main(args, options):
         start = datetime.datetime.now()
         process = subprocess.Popen(cmd)
         while process.poll() is None:
-          time.sleep(1)
+          time.sleep(5)
           now = datetime.datetime.now()
-          if (now-start).seconds > options.timeout:
+          diff = (now-start).seconds
+          if diff > options.timeout:
             os.kill(process.pid, signal.SIGKILL)
             os.waitpid(-1, os.WNOHANG)
-            sys.stderr.write("RUN: Error Timeout %d seconds\n" % (now-start).seconds)
+            print("RUN: Variable Timeout = %d\n" % (diff*1000))
             break
         retcode = process.returncode
       else:
         retcode = subprocess.call(cmd)
       if retcode != 0:
-        sys.stderr.write("RUN: Error running command: %s\n" % cmd)
+        print("INFO: CommandLine %s\n", % ' ',join(cmd))
+        print("RUN: Error command: %s\n" % cmd)
         #sys.exit(1)
 
 

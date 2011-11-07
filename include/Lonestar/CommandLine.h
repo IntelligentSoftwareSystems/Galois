@@ -52,6 +52,7 @@ std::vector<T*> parse_command_line(int argc, T** argv, const char* proghelp) {
   char name[256];
   gethostname(name, 256);
   GaloisRuntime::reportInfo("Hostname", name);
+  GaloisRuntime::reportFlush();
 
   for (int i = 1; i < argc; ++i) {
     if (std::string("-t").compare(argv[i]) == 0) {
