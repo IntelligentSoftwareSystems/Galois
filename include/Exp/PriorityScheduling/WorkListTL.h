@@ -461,7 +461,7 @@ struct StartWorklistExperiment {
     typedef BarrierOBIM<Indexer, dChunk> BOBIM;
     typedef CTOrderedByIntegerMetric<Indexer, dChunk> CTOBIM;
     typedef CTOrderedByIntegerMetric<Indexer, Chunk> NACTOBIM;
-    typedef LevelStealing<Random<> > Random;
+    typedef LevelStealing<Random<> > RANDOM;
     typedef PTbb<Greater> PTBB;
 
     std::string name = (wlname == "") ? WorklistName : wlname;
@@ -494,7 +494,7 @@ struct StartWorklistExperiment {
     WLFOO(ii, ei, fn, bobim,    BOBIM)    else
     WLFOO(ii, ei, fn, ptbb,     PTBB)     else
     WLFOO(ii, ei, fn, bag,      dChunk)   else
-    WLFOO(ii, ei, fn, random,   Random)   else
+    WLFOO(ii, ei, fn, random,   RANDOM)   else
     {
       out << "Unrecognized worklist " << name << "\n";
     }

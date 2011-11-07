@@ -308,7 +308,7 @@ public:
 
     //XXX(ddn): erase after experiment is done
     uintptr_t getID() const {
-      return reinterpret_cast<uintptr_t>(ID);
+      return reinterpret_cast<uintptr_t>(ID) >> 7;
     }
 
     void prefetch_all() {
