@@ -46,13 +46,13 @@ class UserContext: private boost::noncopyable {
   }
 
   //! break stuff
-  GaloisRuntime::cache_line_storage<int> breakFlag;
+  int breakFlag;
   bool __breakHappened() {
-    return breakFlag.data;
+    return breakFlag;
   }
 
   void __resetBreakHappened() {
-    breakFlag.data = 0;
+    breakFlag = 0;
   }
 
   //! push stuff
@@ -72,7 +72,7 @@ public:
 
   //! Signal break in parallel loop
   void breakLoop() {
-    breakFlag.data = 1;
+    breakFlag = 1;
   }
 
   PerIterAllocTy& getPerIterAlloc() {
