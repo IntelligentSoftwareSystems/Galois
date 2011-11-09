@@ -188,7 +188,8 @@ public:
       }
 
       drainAborted<isLeader>(tld);
-      drainBreak(tld);
+      if (Configurator<Function>::NeedsBreak && break_happened.data)
+	goto leaveLoop;
       term.localTermination();
     } while (!term.globalTermination());
   leaveLoop:
