@@ -78,8 +78,6 @@ template<class WorkListTy, class Function>
 class ForEachWork {
   typedef typename WorkListTy::value_type value_type;
   typedef GaloisRuntime::WorkList::LevelStealing<GaloisRuntime::WorkList::FIFO<value_type>, value_type> AbortedListTy;
-  //typedef GaloisRuntime::WorkList::LevelStealing<GaloisRuntime::WorkList::Random<value_type>, value_type> AbortedListTy;
-  //typedef GaloisRuntime::WorkList::FIFO<value_type, true> AbortedListTy;
   
   struct tldTy {
     Galois::UserContext<value_type> facing;
@@ -95,33 +93,31 @@ class ForEachWork {
   PerCPU<tldTy> tdata;
   TerminationDetection term;
   AbortedListTy aborted;
+  cache_line_storage<volatile long> break_happened; //hit flag
   cache_line_storage<volatile long> abort_happened; //hit flag
-  cache_line_storage<volatile long> break_happened;
 
   void finishIteration(bool aborting, value_type val, tldTy& tld) {
     if (aborting) {
-      __sync_synchronize();
       clearConflictLock();
       tld.cnx.cancel_iteration();
       tld.stat.inc_conflicts();
       __sync_synchronize();
       aborted.push(val);
       abort_happened.data = 1;
-    }
+      //don't listen to breaks from aborted iterations
+      tld.facing.__resetBreakHappened();
+     }
+
     if (Configurator<Function>::NeedsPush) {
-      if (!aborting) {
+      if (!aborting)
         global_wl.push(tld.facing.__getPushBuffer().begin(), tld.facing.__getPushBuffer().end());
-      }
       tld.facing.__getPushBuffer().clear();
     }
     if (Configurator<Function>::NeedsPIA)
       tld.facing.__resetAlloc();
-    if (Configurator<Function>::NeedsBreak) {
-      if (!aborting && tld.facing.__breakHappened()) {
+    if (Configurator<Function>::NeedsBreak)
+      if (tld.facing.__breakHappened())
         break_happened.data = 1;
-      }
-      tld.facing.__resetBreakHappened();
-    }
     if (!aborting)
       tld.cnx.commit_iteration();
   }
@@ -129,13 +125,14 @@ class ForEachWork {
   void doProcess(value_type val, tldTy& tld) {
     tld.stat.inc_iterations();
     tld.cnx.start_iteration();
+    bool aborted = false;
     try {
       f(val, tld.facing);
     } catch (int a) {
-      finishIteration(true, val, tld);
+      aborted = true;
       return;
     }
-    finishIteration(false, val, tld);
+    finishIteration(aborted, val, tld);
   }
 
   template<bool isLeader>
@@ -146,21 +143,10 @@ class ForEachWork {
     abort_happened.data = 0;
     std::pair<bool, value_type> p = aborted.pop();
     while (p.first) {
-      if (Configurator<Function>::NeedsBreak && break_happened.data) {
-        ;
-      } else {
-        doProcess(p.second, tld);
-      }
+      if (Configurator<Function>::NeedsBreak && break_happened.data) 
+	return;
+      doProcess(p.second, tld);
       p = aborted.pop();
-    }
-  }
-
-  inline void drainBreak(tldTy& tld) {
-    if (!Configurator<Function>::NeedsBreak) return;
-    if (break_happened.data) {
-      std::pair<bool, value_type> p = global_wl.pop();
-      while (p.first)
-	p = global_wl.pop();
     }
   }
 
@@ -193,7 +179,8 @@ public:
       if (p.first)
         tld.lterm->workHappened();
       while (p.first) {
-        if (Configurator<Function>::NeedsBreak && break_happened.data) break;
+        if (Configurator<Function>::NeedsBreak && break_happened.data)
+	  goto leaveLoop;
         doProcess(p.second, tld);
 	drainAborted<isLeader>(tld);
 	p = global_wl.pop();
@@ -203,6 +190,7 @@ public:
       drainBreak(tld);
       term.localTermination();
     } while (!term.globalTermination());
+  leaveLoop:
     setThreadContext(0);
   }
 
