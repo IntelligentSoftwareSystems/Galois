@@ -106,11 +106,12 @@ class ForEachWork {
       abort_happened.data = 1;
       //don't listen to breaks from aborted iterations
       tld.facing.__resetBreakHappened();
+      //clear push buffer
+      tld.facing.__getPushBuffer().clear();
      }
 
     if (Configurator<Function>::NeedsPush) {
-      if (!aborting)
-        global_wl.push(tld.facing.__getPushBuffer().begin(), tld.facing.__getPushBuffer().end());
+      global_wl.push(tld.facing.__getPushBuffer().begin(), tld.facing.__getPushBuffer().end());
       tld.facing.__getPushBuffer().clear();
     }
     if (Configurator<Function>::NeedsPIA)
