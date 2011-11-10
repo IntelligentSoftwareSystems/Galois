@@ -146,8 +146,8 @@ void bisection(GGraph* graph, GNode* nodes, int numNodes, int minWgtPart1, int m
 
 void randomBisection(MetisGraph* metisGraph, int* tpwgts, int coarsenTo){
 	GGraph* graph = metisGraph->getGraph();
-	int maxWgtPart0 = (int) (PMetis::UB_FACTOR * tpwgts[0]);
-	int minWgtPart0 = (int) ((1.0 / PMetis::UB_FACTOR) * tpwgts[0]);
+	int maxWgtPart0 = (int) (UB_FACTOR * tpwgts[0]);
+	int minWgtPart0 = (int) ((1.0 / UB_FACTOR) * tpwgts[0]);
 	int numNodes = metisGraph->getNumNodes();
 	int nbfs = (numNodes <= coarsenTo ? SMALL_NUM_ITER_PARTITION : LARGE_NUM_ITER_PARTITION);
 
@@ -222,8 +222,8 @@ void growBisection(MetisGraph* metisGraph, int* tpwgts, int coarsenTo) {
 
 	int nbfs = (numNodes <= coarsenTo ? SMALL_NUM_ITER_PARTITION : LARGE_NUM_ITER_PARTITION);
 
-	int maxWgtPart1 = (int) PMetis::UB_FACTOR * tpwgts[1];
-	int minWgtPart1 = (int) (1.0 / PMetis::UB_FACTOR) * tpwgts[1];
+	int maxWgtPart1 = (int) UB_FACTOR * tpwgts[1];
+	int minWgtPart1 = (int) (1.0 / UB_FACTOR) * tpwgts[1];
 
 	int bestMinCut = INT_MAX;
 	int* bestWhere = new int[numNodes];

@@ -28,6 +28,9 @@
 #include "MetisGraph.h"
 #include "Coarsening.h"
 #include "defs.h"
+
+const static double UB_FACTOR = 1;
+
 class PMetis{
 public:
 	PMetis(int coasenTo, int maxVertexWeight):coarsener(true, coasenTo, maxVertexWeight) {
@@ -153,7 +156,6 @@ public:
 			}
 		}
 	}
-	const static double UB_FACTOR = 1;
 private:
 	Coarsener coarsener;
 

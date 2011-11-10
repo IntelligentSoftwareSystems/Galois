@@ -59,7 +59,7 @@ void partition(MetisGraph* metisGraph, int nparts) {
 
 	float* totalPartitionWeights = new float[nparts];
 	arrayFill(totalPartitionWeights, nparts, 1 / (float) nparts);
-	maxVertexWeight = (int) (1.5 * ((mcg->getNumNodes()) / Coarsener::COARSEN_FRACTION));
+	maxVertexWeight = (int) (1.5 * ((mcg->getNumNodes()) / COARSEN_FRACTION));
 	PMetis pmetis(20, maxVertexWeight);
 	Galois::Timer init_part_t;
 	init_part_t.start();

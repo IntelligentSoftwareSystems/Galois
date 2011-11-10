@@ -212,10 +212,10 @@ void balanceTwoWay(MetisGraph* metisGraph, int* tpwgts) {
 	if (mindiff < 3 * (pwgts0 + pwgts1) / metisGraph->getNumNodes()) {
 		return;
 	}
-	if (pwgts0 > tpwgts[0] && pwgts0 < (int) (PMetis::UB_FACTOR * tpwgts[0])) {
+	if (pwgts0 > tpwgts[0] && pwgts0 < (int) (UB_FACTOR * tpwgts[0])) {
 		return;
 	}
-	if (pwgts1 > tpwgts[1] && pwgts1 < (int) (PMetis::UB_FACTOR * tpwgts[1])) {
+	if (pwgts1 > tpwgts[1] && pwgts1 < (int) (UB_FACTOR * tpwgts[1])) {
 		return;
 	}
 

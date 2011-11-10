@@ -33,6 +33,9 @@ using namespace std;
 typedef map<int, int> IntIntMap;
 typedef vector<int> IntVec;
 #include <boost/lexical_cast.hpp>
+
+static const double COARSEN_FRACTION = 0.90;
+
 class Coarsener {
 public:
 
@@ -298,8 +301,6 @@ private:
 //		cout<<"createTime::"<<t2.get()<<endl;
 	}
 
-public:
-	static const double COARSEN_FRACTION = 0.90;
 private:
 	int coarsenTo;
 	int maxVertexWeight;
