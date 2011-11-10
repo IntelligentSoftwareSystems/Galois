@@ -696,12 +696,11 @@ Real BP::run() {
           typedef dChunkedFIFO<64> dChunk;
           typedef ChunkedFIFO<64> Chunk;
           typedef OrderedByIntegerMetric<Indexer,dChunk> OBIM;
-          typedef TbbPriQueue<TaskGreater> TBB;
           unsigned count = 0;
 
           Galois::Timer t;
           t.start();
-          Exp::StartWorklistExperiment<TBB,dChunk,Chunk,Indexer,TaskLess,TaskGreater>()(std::cout, initial.begin(), initial.end(), Process(*this, edgeData, count), props.worklist);
+          Exp::StartWorklistExperiment<OBIM,dChunk,Chunk,Indexer,TaskLess,TaskGreater>()(std::cout, initial.begin(), initial.end(), Process(*this, edgeData, count), props.worklist);
           t.stop();
           GlobalTime += t.get();
         } else {
