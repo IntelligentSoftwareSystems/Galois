@@ -84,6 +84,7 @@ class PerCPU : public HIDDEN::PERTHING<T> {
   using HIDDEN::PERTHING<T>::myID;
 
 public:
+  using HIDDEN::PERTHING<T>::reset;
   PerCPU()
   {
     create(getSystemThreadPolicy().getNumThreads());
