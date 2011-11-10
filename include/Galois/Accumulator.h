@@ -123,6 +123,7 @@ struct ReduceAssignWrap {
 template<typename T>
 class GAccumulator : public GReducible<T, ReduceAssignWrap<std::plus<T> > > {
   typedef GReducible<T, ReduceAssignWrap<std::plus<T> > > SuperType;
+  using GReducible<T, ReduceAssignWrap<std::plus<T> > >::update;
 public:
   explicit GAccumulator(const T& val = T()): SuperType(val) {}
 
