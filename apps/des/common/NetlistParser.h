@@ -247,7 +247,7 @@ private:
    * A mapping from string name (in the netlist) to functor that implements
    * the corresponding functionality. Helps in initialization
    */
-  static const std::map<std::string, OneInputFunc* > oneInputGates () {
+  static const std::map<std::string, OneInputFunc* >& oneInputGates () {
     static std::map<std::string, OneInputFunc*>  oneInMap;
     oneInMap.insert(std::make_pair (toLowerCase ("INV"), new INV()));
     return oneInMap;
@@ -257,7 +257,7 @@ private:
    * A mapping from string name (in the netlist) to functor that implements
    * the corresponding functionality. Helps in initialization
    */
-  static const std::map<std::string, TwoInputFunc*> twoInputGates () {
+  static const std::map<std::string, TwoInputFunc*>& twoInputGates () {
     static std::map<std::string, TwoInputFunc*> twoInMap;
     twoInMap.insert(std::make_pair (toLowerCase ("AND2") , new AND2()));
     twoInMap.insert(std::make_pair (toLowerCase ("NAND2") , new NAND2()));

@@ -141,7 +141,7 @@ protected:
 public:
 
   BaseLogicGate (const std::string& outputName, const LogicVal& outVal, const SimTime& delay)
-    : outputName (outputName), outputVal (outputVal) {
+    : outputName (outputName), outputVal (outVal) {
     setDelay (delay);
   }
 
