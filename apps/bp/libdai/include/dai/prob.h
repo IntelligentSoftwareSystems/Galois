@@ -429,7 +429,7 @@ class TProb {
         template<typename unaryOp> this_type pwUnaryTr( unaryOp op ) const {
             this_type r;
             r._p.reserve( size() );
-            std::transform( _p.begin(), _p.end(), back_inserter( r._p ), op );
+            std::transform( _p.begin(), _p.end(), std::back_inserter( r._p ), op );
             return r;
         }
 
@@ -656,7 +656,7 @@ class TProb {
             DAI_DEBASSERT( size() == q.size() );
             TProb<T> r;
             r._p.reserve( size() );
-            std::transform( _p.begin(), _p.end(), q._p.begin(), back_inserter( r._p ), op );
+            std::transform( _p.begin(), _p.end(), q._p.begin(), std::back_inserter( r._p ), op );
             return r;
         }
 
