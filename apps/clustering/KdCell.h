@@ -257,6 +257,7 @@ public:
 		if (pSplitType == KdCell::SPLIT_Z)
 			return n.getLocationZ();
 		assert(false && "Invalid splitType requested in findSplitComponent");
+		abort();
 	}
 	/**
 	 *
