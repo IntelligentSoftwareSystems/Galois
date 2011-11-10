@@ -153,7 +153,7 @@ public:
   //the lock bit will prevent a successful cas
   inline bool CAS(T oldval, T newval) {
     assert(!((uintptr_t)oldval & 1) && !((uintptr_t)newval & 1));
-    return __sync_bool_compare_and_swap(&_lock, oldval, newval);
+    return __sync_bool_compare_and_swap(&_lock, (uintptr_t)oldval, (uintptr_t)newval);
   }
 };
 
