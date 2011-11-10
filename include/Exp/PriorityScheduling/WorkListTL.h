@@ -10,14 +10,56 @@
 #include <tbb/concurrent_hash_map.h>
 #include "Galois/Runtime/DebugWorkList.h"
 
+#ifdef GALOIS_TBB
+#define TBB_PREVIEW_CONCURRENT_PRIORITY_QUEUE 1
+#include <tbb/concurrent_priority_queue.h>
+#include <tbb/concurrent_queue.h>
+#endif
+
 
 #include <iosfwd>
 
 namespace Exp {
 static std::string WorklistName;
 
+template<typename T = int>
+class TbbFIFO : private boost::noncopyable  {
+  tbb::concurrent_bounded_queue<T> wl;
 
-template<class Indexer, typename ContainerTy = GaloisRuntime::WorkList::TbbFIFO<>, typename T = int, bool concurrent = true >
+public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef TbbFIFO<T> WL;
+  };
+  template<typename Tnew>
+  struct retype {
+    typedef TbbFIFO<Tnew> WL;
+  };
+
+  typedef T value_type;
+
+  bool push(value_type val) {
+    wl.push(val);
+    return true;
+  }
+
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    while (b != e)
+      wl.push(*b++);
+    return true;
+  }
+
+  std::pair<bool, value_type> pop() {
+    T V = T();
+    bool B = wl.try_pop(V);
+    return std::make_pair(B, V);
+  }
+};
+WLCOMPILECHECK(TbbFIFO);
+
+
+template<class Indexer, typename ContainerTy = TbbFIFO<>, typename T = int, bool concurrent = true >
 class SimpleOrderedByIntegerMetric : private boost::noncopyable, private GaloisRuntime::PaddedLock<concurrent> {
 
   using GaloisRuntime::PaddedLock<concurrent>::lock;
@@ -443,6 +485,46 @@ static void parse_worklist_command_line(std::vector<const char*>& args) {
     }
   }
 }
+
+
+template<class Compare = std::less<int>, typename T = int>
+class TbbPriQueue : private boost::noncopyable {
+  tbb::concurrent_priority_queue<T,Compare> wl;
+
+public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef TbbPriQueue<Compare, T> WL;
+  };
+  template<typename Tnew>
+  struct retype {
+    typedef TbbPriQueue<Compare, Tnew> WL;
+  };
+
+  typedef T value_type;
+
+  bool push(value_type val) {
+    wl.push(val);
+    return true;
+  }
+
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    while (b != e)
+      wl.push(*b++);
+    return true;
+  }
+
+  std::pair<bool, value_type> pop() {
+    value_type retval;
+    if (wl.try_pop(retval)) {
+      return std::make_pair(true, retval);
+    } else {
+      return std::make_pair(false, value_type());
+    }
+  }
+};
+WLCOMPILECHECK(TbbPriQueue);
 
 
 template<typename DefaultWorklist,typename dChunk,typename Chunk,typename Indexer,typename Less,typename Greater>
