@@ -79,9 +79,7 @@ public:
     }
   }
 
-  template<typename Context>
-  void update(Context& cnx){
-    Cavity::GNodeVector newNodes(cnx.getPerIterAlloc());
+  void update(GNodeVector* newNodes) {
     Element& nodeData = node.getData(Galois::NONE);
     nodeData.getTuples().pop_back();
     //vector<Element, Galois::PerIterMem::ItAllocTy::rebind<Element>::other> newElements;
@@ -101,7 +99,7 @@ public:
 	  graph->addEdge(nnode, neighbor, 1, Galois::NONE);
 	  graph->addEdge(neighbor, nnode, index, Galois::NONE);
 	  
-	  newNodes.push_back(nnode);
+	  newNodes->push_back(nnode);
 	  Element& nnode_data = nnode.getData(Galois::NONE);
 	  //newElements.push_back(&nnode_data);
 	  
@@ -111,27 +109,27 @@ public:
 	  if (!tuples.empty()) {
 	    TupleList newTuples;
 	    for(TupleList::iterator list_iter = tuples.begin(); list_iter != tuples.end(); ++list_iter) {
-	      Tuple t=*list_iter;
-	      if (nnode_data.elementContains(t)) {
-		// nnode_data.addTuple(t);
-		ntuples.push_back(t);
-	      } else {
-		newTuples.push_back(t);
+		Tuple t=*list_iter;
+		if (nnode_data.elementContains(t)) {
+		  // nnode_data.addTuple(t);
+		  ntuples.push_back(t);
+		} else {
+		  newTuples.push_back(t);
+		}
 	      }
-	    }
 	    
 	    tuples.swap(newTuples);
 	  }
 	}
       }
     }
-    
-    for (unsigned int i=0; i<newNodes.size(); i++) {
-      GNode n1 = newNodes[i];
+
+    for (int i=0; i<newNodes->size(); i++) {
+      GNode n1 = (*newNodes)[i];
       Element& newNodeData = n1.getData(Galois::NONE);
-      for (unsigned int j=i+1; j<newNodes.size(); j++) {
+      for (int j=i+1; j<newNodes->size(); j++) {
 	if (i != j) {
-	  GNode n2 = newNodes[j];;
+	  GNode n2 = (*newNodes)[j];;
 	  Element& e = n2.getData(Galois::NONE);
 	  
 	  bool found = false;
@@ -153,42 +151,43 @@ public:
 	}
       }
     }
-    
+
     deletingNodes.insert(node);
-    
-    int size = newNodes.size();
+
+    int size = newNodes->size();
     for (GNodeSet::iterator iter = deletingNodes.begin();
 	 iter != deletingNodes.end(); ++iter) {
       GNode dnode = *iter;
       TupleList& tuples = dnode.getData(Galois::NONE).getTuples();
-      
+
       for(TupleList::reverse_iterator list_iter = tuples.rbegin(), end = tuples.rend(); list_iter != end; ++list_iter) {
-        Tuple tup=*list_iter;
-        for (int i = 0; i < size; i++) {
-          Element& element = newNodes[i].getData(Galois::NONE);
-          if ((element.elementContains(tup))) {
-            element.addTuple(tup);
-            if (i != 0) {
-              GNode newNode = newNodes[i];
-              newNodes[i] = newNodes[0];
-              newNodes[0] = newNode;
-            }
-            break;
-          }
-        }
-      }
-      
+	  Tuple tup=*list_iter;
+	  for (int i = 0; i < size; i++) {
+	    Element& element = (*newNodes)[i].getData(Galois::NONE);
+	    if ((element.elementContains(tup))) {
+	      element.addTuple(tup);
+	      if (i != 0) {
+		GNode newNode = (*newNodes)[i];
+		(*newNodes)[i] = (*newNodes)[0];
+		(*newNodes)[0] = newNode;
+	      }
+	      break;
+	    }
+	  }
+	}
+
       Element& nodeData = dnode.getData(Galois::NONE);
       nodeData.getTuples().clear();
       graph->removeNode(dnode, Galois::NONE);
     }
-    
-    for (GNodeVector::iterator iter = newNodes.begin(); iter != newNodes.end(); ++iter) {
-      if (iter->getData(Galois::NONE).getTuples().empty()) {
-      } else {
-	cnx.push(*iter);
+
+    for (GNodeVector::iterator iter = newNodes->begin(); iter != newNodes->end(); )
+      {
+        if ((*iter).getData(Galois::NONE).getTuples().empty())
+	  iter = newNodes->erase(iter);
+        else
+	  iter++;
       }
-    }
   }
 };
 

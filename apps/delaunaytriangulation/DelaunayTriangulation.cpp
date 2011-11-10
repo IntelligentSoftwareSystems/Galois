@@ -51,11 +51,28 @@ typedef Galois::Graph::FirstGraph<Element,int,true>::GraphNode GNode;
 
 Graph* Mesh;
 
-struct process {
+struct Process {
   typedef int tt_needs_per_iter_alloc;
+
+  std::vector<GNode>* m_shadow_wl;
+  int m_prologue_count;
+  const int m_prologue_iterations;
+
+  Process(std::vector<GNode>* wl, int it):
+    m_shadow_wl(wl), m_prologue_count(0), m_prologue_iterations(it) { }
+  Process(): m_shadow_wl(NULL), m_prologue_iterations(0) { }
 
   template<typename Context>
   void operator()(GNode item, Context& lwl) {
+    if (m_shadow_wl != NULL) {
+      if (m_prologue_count >= m_prologue_iterations) {
+        m_shadow_wl->push_back(item);
+        return;
+      } else {
+        ++m_prologue_count;
+      }
+    } 
+
     Element& data = item.getData(Galois::ALL); //lock
 
     if (!Mesh->containsNode(item)) 
@@ -83,7 +100,10 @@ struct process {
     Cavity cav(Mesh, item, tuples.back(), lwl.getPerIterAlloc());
     cav.build();
     
-    cav.update(lwl);
+    Cavity::GNodeVector newNodes(lwl.getPerIterAlloc());
+    cav.update(&newNodes);
+    for (Cavity::GNodeVector::iterator iter = newNodes.begin(); iter != newNodes.end(); ++iter)
+        lwl.push(*iter);
   }
 };
 
@@ -295,10 +315,28 @@ int main(int argc, const char** argv) {
   wl.push_back(initial_triangle);
   std::cout << "configuration: " << initial_triangle.getData().getTuples().size() << " points\n";
 
-  Galois::setMaxThreads(numThreads);
   Galois::StatTimer T;
   T.start();
-  Galois::for_each<GaloisRuntime::WorkList::dChunkedFIFO<32> >(wl.begin(), wl.end(), process());
+  const int chunkSize = 1024; //1024; // XXX: Set this correctly
+  using namespace GaloisRuntime::WorkList;
+  //typedef LocalQueues<dChunkedFIFO<chunkSize>, FIFO<> > WL;
+  typedef ChunkedLIFO<chunkSize> WL;
+  if (true) {
+    Galois::StatTimer T1("serial"), T2("parallel");
+    T1.start();
+    Galois::setMaxThreads(1);
+    std::vector<GNode> shadow_wl;
+    int num_prologue_iterations = numThreads*8; //1024; //std::max<int>(chunkSize*numThreads*4, 512);
+    Galois::for_each(wl.begin(), wl.end(), Process(&shadow_wl, num_prologue_iterations));
+    T1.stop();
+
+    T2.start();
+    Galois::setMaxThreads(numThreads);
+    Galois::for_each<WL>(shadow_wl.begin(), shadow_wl.end(), Process());
+    T2.stop();
+  } else {
+    Galois::for_each<WL>(wl.begin(), wl.end(), Process());
+  }
   T.stop();
   std::cout << "mesh size: " << Mesh->size() << "\n";
 
