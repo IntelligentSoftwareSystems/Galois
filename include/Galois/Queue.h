@@ -1322,7 +1322,7 @@ public:
       Node* n = findFirst();
       if (n == NULL)
         return SnapshotEntry();
-      SnapshotEntry e = n.createSnapshot();
+      SnapshotEntry e = n->createSnapshot();
       if (e.valid)
         return e;
     }
