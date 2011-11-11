@@ -22,7 +22,7 @@
 #include <functional>
 #include <dai/util.h>
 #include <dai/exceptions.h>
-#include "LLVM/SmallVector.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace dai {
 
