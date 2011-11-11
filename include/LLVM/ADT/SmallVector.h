@@ -14,7 +14,7 @@
 #ifndef LLVM_ADT_SMALLVECTOR_H
 #define LLVM_ADT_SMALLVECTOR_H
 
-#include "LLVM/type_traits.h"
+#include "LLVM/Support/type_traits.h"
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
