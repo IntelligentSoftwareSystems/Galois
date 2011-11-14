@@ -22,20 +22,14 @@
  */
 
 #include "Galois/Runtime/Threads.h"
-#include "Galois/Runtime/Support.h"
-#include "Galois/Runtime/SimpleLock.h"
 
 #include <semaphore.h>
 #include <pthread.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
+#include <cstdlib>
+#include <cstdio>
 #include <cerrno>
-
-//#include <iostream>
-//#include <sstream>
-#include <list>
 #include <cassert>
+#include <list>
 #include <limits>
 
 #ifdef GALOIS_VTUNE
@@ -227,13 +221,3 @@ ThreadPool& GaloisRuntime::getSystemThreadPool() {
   static ThreadPool_pthread pool;
   return pool;
 }
-
-//FIXME: May need to factor this out to initialize all objects in the correct order
-struct Init {
-  Init() { 
-    getSystemThreadPool();
-  }
-};
-
-static Init iii;
-

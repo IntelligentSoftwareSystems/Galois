@@ -47,6 +47,7 @@
 #include <cstdio>
 #include <cassert>
 #include <map>
+#include <vector>
 #include <algorithm>
 
 using namespace GaloisRuntime;
@@ -245,7 +246,6 @@ struct DummyPolicy : public ThreadPolicy {
 }
 
 ThreadPolicy& GaloisRuntime::getSystemThreadPolicy() {
-  static bool printthing = true;
 #ifdef __linux__
   static AutoLinuxPolicy TP;
 #else
@@ -255,10 +255,5 @@ ThreadPolicy& GaloisRuntime::getSystemThreadPolicy() {
   static DummyPolicy TP;
 #endif
 #endif
-  if (printthing) {
-    reportInfo("Thread Policy", TP.getName());
-    printthing = false;
-  }
-
   return TP;
 }
