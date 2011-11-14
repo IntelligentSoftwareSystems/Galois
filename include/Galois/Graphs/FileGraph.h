@@ -61,6 +61,7 @@
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/detail/endian.hpp>
 #include <map>
+#include <vector>
 #include <fstream>
 
 #ifdef GALOIS_NUMA
