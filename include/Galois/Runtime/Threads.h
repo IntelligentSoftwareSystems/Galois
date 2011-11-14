@@ -23,8 +23,6 @@
 #ifndef GALOIS_RUNTIME_THREADS_H
 #define GALOIS_RUNTIME_THREADS_H
 
-#include <vector>
-
 #include "Galois/Runtime/Config.h"
 
 namespace GaloisRuntime {
@@ -110,6 +108,7 @@ public:
   virtual void bindThreadToProcessor() = 0;
 };
 
+//Returns or creates the appropriate thread policy for the system
 ThreadPolicy& getSystemThreadPolicy();
 
 }
