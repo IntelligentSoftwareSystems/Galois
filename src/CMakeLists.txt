@@ -1,4 +1,4 @@
-file(GLOB Sources *.cpp)
+file(GLOB Sources *.cpp llvm/*.cpp)
 
 add_library(galois ${Sources})
 
