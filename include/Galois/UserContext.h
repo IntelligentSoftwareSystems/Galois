@@ -23,6 +23,8 @@
 #ifndef GALOIS_USERCONTEXT_H
 #define GALOIS_USERCONTEXT_H
 
+#include <vector>
+
 #include "Galois/Mem.h"
 
 namespace GaloisRuntime {
