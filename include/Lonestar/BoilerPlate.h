@@ -20,25 +20,32 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#ifndef LONESTAR_BANNER_H
-#define LONESTAR_BANNER_H
+#ifndef LONESTAR_BOILERPLATE_H
+#define LONESTAR_BOILERPLATE_H
 
-#include <iosfwd>
+//! standard global options to the benchmarks
+static llvm::cl::opt<bool> skipVerify("noverify", llvm::cl::desc("Skip verification step"), llvm::cl::init(false));
+static llvm::cl::opt<int> numThreads("t", llvm::cl::desc("Number of threads"), llvm::cl::init(1));
 
-//! Print uniform banner for a benchmark
-void printBanner(std::ostream& os, const char* app, const char* desc, const char* url) {
-  os << "\nLonestar Benchmark Suite v3.0 (C++)\n"
-       << "Copyright (C) 2011 The University of Texas at Austin\n"
-       << "http://iss.ices.utexas.edu/lonestar/\n"
-       << "\n"
-       << "application: " << app << "\n";
+//! initialize lonestar benchmark
+template<typename OS>
+void LonestarStart(int argc, char** argv, OS& out, const char* app, const char* desc = 0, const char* url = 0) {
+  llvm::cl::ParseCommandLineOptions(argc, argv);
+  out << "\nLonestar Benchmark Suite v3.0 (C++)\n"
+      << "Copyright (C) 2011 The University of Texas at Austin\n"
+      << "http://iss.ices.utexas.edu/lonestar/\n"
+      << "\n"
+      << "application: " << app << "\n";
   if (desc)
-    os << desc << "\n";
+    out << desc << "\n";
   if (url) {
-    os 
+    out 
       << "http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/" 
       << url << "\n";
   }
-  os << "\n";
+  out << "\n";
 }
+
+
+
 #endif
