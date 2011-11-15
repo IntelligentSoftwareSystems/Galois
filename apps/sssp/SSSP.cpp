@@ -30,9 +30,9 @@
 #include "Galois/Galois.h"
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Runtime/DebugWorkList.h"
+#include "llvm/Support/CommandLine.h"
 
-#include "Lonestar/Banner.h"
-#include "Lonestar/CommandLine.h"
+#include "Lonestar/BoilerPlate.h"
 #include "SSSP.h"
 
 #include "Exp/PriorityScheduling/WorkListTL.h"
@@ -44,21 +44,20 @@
 #include <set>
 
 static const char* name = "Single Source Shortest Path";
-static const char* description =
+static const char* desc =
   "Computes the shortest path from a source node to all nodes in a directed "
   "graph using a modified Bellman-Ford algorithm\n";
 static const char* url = "single_source_shortest_path";
-static const char* help = "[-delta <deltaShift>] [-bfs] <input file> <startnode> <reportnode>";
 
-static unsigned int stepShift = 10;
-
+static llvm::cl::opt<int> startNode("startnode", llvm::cl::desc("Node to start search from"), llvm::cl::init(1));
+static llvm::cl::opt<int> reportNode("reportnode", llvm::cl::desc("Node to report distance to"), llvm::cl::init(2));
+static llvm::cl::opt<std::string> filename(llvm::cl::Positional, llvm::cl::desc("<input file>"), llvm::cl::Required);
+static llvm::cl::opt<int> stepShift("delta", llvm::cl::desc("Shift value for the deltastep"), llvm::cl::init(10));
 
 typedef Galois::Graph::LC_FileGraph<SNode, unsigned int> Graph;
 typedef Galois::Graph::LC_FileGraph<SNode, unsigned int>::GraphNode GNode;
 
 typedef UpdateRequestCommon<GNode> UpdateRequest;
-
-
 
 struct seq_less: public std::binary_function<const UpdateRequest&,const UpdateRequest&,bool> {
   bool operator()(const UpdateRequest& lhs, const UpdateRequest& rhs) const {
@@ -206,45 +205,19 @@ bool verify(GNode source) {
   return true;
 }
 
-int main(int argc, const char **argv) {
-  std::vector<const char*> args = parse_command_line(argc, argv, help);
-  Exp::parse_worklist_command_line(args);
+int main(int argc, char **argv) {
+  LonestarStart(argc, argv, std::cout, name, desc, url);
+  //  Exp::parse_worklist_command_line(args);
 
   Galois::Statistic<unsigned int> sBadWork("BadWork");
   Galois::Statistic<unsigned int> sWLEmptyWork("WLEmptyWork");
   BadWork = &sBadWork;
   WLEmptyWork = &sWLEmptyWork;
 
-  for (std::vector<const char*>::iterator ii = args.begin(), ei = args.end(); ii != ei; ++ii) {
-    if (strcmp(*ii, "-delta") == 0 && ii + 1 != ei) {
-      stepShift = atoi(ii[1]);
-      ii = args.erase(ii);
-      ii = args.erase(ii);
-      --ii;
-      ei = args.end();
-    } else if (strcmp(*ii, "-bfs") == 0) {
-      do_bfs = true;
-      ii = args.erase(ii);
-      --ii;
-      ei = args.end();
-    }
-  }
-  
-  if (args.size() < 3) {
-    std::cerr << "not enough arguments, use -help for usage information\n";
-    return 1;
-  }
-
-  printBanner(std::cout, name, description, url);
-  
-  const char* inputfile = args[0];
-  unsigned int startNode = atoi(args[1]);
-  unsigned int reportNode = atoi(args[2]);
-
   GNode source = -1;
   GNode report = -1;
   
-  graph.structureFromFile(inputfile);
+  graph.structureFromFile(filename.c_str());
   graph.emptyNodeData();
   std::cout << "Read " << graph.size() << " nodes\n";
   std::cout << "Using delta-step of " << (1 << stepShift) << "\n";
@@ -255,13 +228,11 @@ int main(int argc, const char **argv) {
     SNode& node = graph.getData(*src,Galois::NONE);
     node.id = id++;
     node.dist = DIST_INFINITY;
-    //std::cout << node.toString() << "\n";
-    
+
     if (*src == startNode) {
-      //if (node.id == startNode) {
       source = *src;
-    } else if (*src == reportNode) {
-      //} else if (node.id == reportNode) {
+    } 
+    if (*src == reportNode) {
       report = *src;
     }
   }
