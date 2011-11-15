@@ -30,14 +30,14 @@
 #include "Galois/Statistic.h"
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Galois.h"
+#include "llvm/Support/CommandLine.h"
 
 #if SHARE_SINGLE_BC
 #include "Galois/Runtime/SimpleLock.h"
 #include "Galois/Runtime/CacheLineStorage.h"
 #endif
 
-#include "Lonestar/Banner.h"
-#include "Lonestar/CommandLine.h"
+#include "Lonestar/BoilerPlate.h"
 
 #include <iostream>
 #include <iomanip>
@@ -51,10 +51,13 @@
 #include <cstdlib>
 
 static const char* name = "Betweenness Centrality";
-static const char* description =
+static const char* desc =
   "Computes the betweenness centrality of all nodes in a graph\n";
 static const char* url = "betweenness_centrality";
 static const char* help = "<input file> <number iterations>";
+
+static llvm::cl::opt<std::string> filename(llvm::cl::Positional, llvm::cl::desc("<input file>"), llvm::cl::Required);
+static llvm::cl::opt<int> iterLimit("limit", llvm::cl::desc("Limit number of iterations to value (0 is all nodes)"), llvm::cl::init(0));
 
 typedef Galois::Graph::LC_FileGraph<void, void> Graph;
 typedef Graph::GraphNode GNode;
@@ -302,21 +305,13 @@ void printBCcertificate() {
   outf.close();
 }
 
-int main(int argc, const char** argv) {
-
-  std::vector<const char* > args = parse_command_line(argc, argv, help);
-
-  if (args.size() < 1) {
-    std::cerr
-      << "incorrect number of arguments, use -help for usage information\n";
-    return 1;
-  }
-  printBanner(std::cout, name, description, url);
+int main(int argc, char** argv) {
+  LonestarStart(argc, argv, std::cout, name, desc, url);
 
   Graph g;
   G = &g;
 
-  G->structureFromFile(args[0]);
+  G->structureFromFile(filename.c_str());
 
   NumNodes = G->size();
 
@@ -331,9 +326,8 @@ int main(int argc, const char** argv) {
   initGraphData();
 
   int iterations = NumNodes;
-  if (args.size() == 2) {
-    iterations = atoi(args[1]);
-  }
+  if (iterLimit)
+    iterations = iterLimit;
 
   std::cerr << "NumNodes: " << NumNodes 
     << " Iterations: " << iterations << "\n";
