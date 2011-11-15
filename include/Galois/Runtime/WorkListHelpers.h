@@ -26,32 +26,34 @@
 namespace GaloisRuntime {
 namespace WorkList {
 
-template<typename T, unsigned chunksize = 64, bool concurrent = true>
+template<typename T, unsigned __chunksize = 64, bool concurrent = true>
 class FixedSizeRing :private boost::noncopyable, private PaddedLock<concurrent> {
   using PaddedLock<concurrent>::lock;
   using PaddedLock<concurrent>::unlock;
   unsigned start;
   unsigned end;
-  T data[chunksize];
+  T data[__chunksize + 1];
+
+  int chunksize() { return __chunksize + 1; }
 
   bool _i_empty() const {
     return start == end;
   }
 
   bool _i_full() const {
-    return (end + 1) % chunksize == start;
+    return (end + 1) % chunksize() == start;
   }
 
   inline void assertSE() const {
-    assert(start <= chunksize);
-    assert(end <= chunksize);
+    assert(start <= chunksize());
+    assert(end <= chunksize());
   }
 
 public:
   
   template<bool newconcurrent>
   struct rethread {
-    typedef FixedSizeRing<T, chunksize, newconcurrent> WL;
+    typedef FixedSizeRing<T, chunksize(), newconcurrent> WL;
   };
 
   typedef T value_type;
@@ -83,8 +85,8 @@ public:
       unlock();
       return false;
     }
-    start += chunksize - 1;
-    start %= chunksize;
+    start += chunksize() - 1;
+    start %= chunksize();
     data[start] = val;
     assertSE();
     unlock();
@@ -100,7 +102,7 @@ public:
     }
     data[end] = val;
     end += 1;
-    end %= chunksize;
+    end %= chunksize();
     assertSE();
     unlock();
     return true;
@@ -115,7 +117,7 @@ public:
     }
     value_type retval = data[start];
     ++start;
-    start %= chunksize;
+    start %= chunksize();
     assertSE();
     unlock();
     return std::make_pair(true, retval);
@@ -128,8 +130,8 @@ public:
       unlock();
       return std::make_pair(false, value_type());
     }
-    end += chunksize - 1;
-    end %= chunksize;
+    end += chunksize() - 1;
+    end %= chunksize();
     value_type retval = data[end];
     assertSE();
     unlock();
