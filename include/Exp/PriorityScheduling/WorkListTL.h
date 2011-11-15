@@ -20,7 +20,7 @@
 #include <iosfwd>
 
 namespace Exp {
-static std::string WorklistName;
+  static llvm::cl::opt<std::string> WorklistName("wl", llvm::cl::desc("Worklist to use"));
 
 template<typename T = int>
 class TbbFIFO : private boost::noncopyable  {
@@ -473,20 +473,6 @@ public:
   }
 };
 
-
-static void parse_worklist_command_line(std::vector<const char*>& args) {
-  for (std::vector<const char*>::iterator ii = args.begin(), ei = args.end(); ii != ei; ++ii) {
-    if (strcmp(*ii, "-wl") == 0 && ii + 1 != ei) {
-      WorklistName = ii[1];
-      ii = args.erase(ii);
-      ii = args.erase(ii);
-      --ii;
-      ei = args.end();
-    }
-  }
-}
-
-
 template<class Compare = std::less<int>, typename T = int>
 class TbbPriQueue : private boost::noncopyable {
   tbb::concurrent_priority_queue<T,Compare> wl;
@@ -530,7 +516,7 @@ WLCOMPILECHECK(TbbPriQueue);
 template<typename DefaultWorklist,typename dChunk,typename Chunk,typename Indexer,typename Less,typename Greater>
 struct StartWorklistExperiment {
   template<typename Iterator,typename Functor>
-  void operator()(std::ostream& out, Iterator ii, Iterator ei, Functor fn, std::string wlname = "") {
+  void operator()(std::ostream& out, Iterator ii, Iterator ei, Functor fn) {
     using namespace GaloisRuntime::WorkList;
 
     typedef OrderedByIntegerMetric<Indexer, dChunk> OBIM;
@@ -546,7 +532,7 @@ struct StartWorklistExperiment {
     typedef LevelStealing<Random<> > RANDOM;
     typedef PTbb<Greater> PTBB;
 
-    std::string name = (wlname == "") ? WorklistName : wlname;
+    std::string name = WorklistName;
 
 #define WLFOO(__b, __e, __p, __x, __y)					\
   if (name == #__x) {							\
