@@ -14,12 +14,12 @@
 #include "llvm/Support/DataTypes.h"
 #include <cassert>
 #include <string>
+#include <iostream>
 
 namespace llvm {
   template <typename T>
   class SmallVectorImpl;
   class StringRef;
-  class raw_ostream;
 
   /// Twine - A lightweight data structure for efficiently representing the
   /// concatenation of temporary values as strings.
@@ -239,10 +239,10 @@ namespace llvm {
     NodeKind getRHSKind() const { return (NodeKind) RHSKind; }
 
     /// printOneChild - Print one child from a twine.
-    void printOneChild(raw_ostream &OS, Child Ptr, NodeKind Kind) const;
+    void printOneChild(std::ostream &OS, Child Ptr, NodeKind Kind) const;
 
     /// printOneChildRepr - Print the representation of one child from a twine.
-    void printOneChildRepr(raw_ostream &OS, Child Ptr,
+    void printOneChildRepr(std::ostream &OS, Child Ptr,
                            NodeKind Kind) const;
 
   public:
@@ -448,13 +448,13 @@ namespace llvm {
 
     /// print - Write the concatenated string represented by this twine to the
     /// stream \arg OS.
-    void print(raw_ostream &OS) const;
+    void print(std::ostream &OS) const;
 
     /// dump - Dump the concatenated string represented by this twine to stderr.
     void dump() const;
 
     /// print - Write the representation of this twine to the stream \arg OS.
-    void printRepr(raw_ostream &OS) const;
+    void printRepr(std::ostream &OS) const;
 
     /// dumpRepr - Dump the representation of this twine to stderr.
     void dumpRepr() const;
@@ -512,7 +512,7 @@ namespace llvm {
     return Twine(LHS, RHS);
   }
 
-  inline raw_ostream &operator<<(raw_ostream &OS, const Twine &RHS) {
+inline std::ostream &operator<<(std::ostream &OS, const Twine &RHS) {
     RHS.print(OS);
     return OS;
   }
