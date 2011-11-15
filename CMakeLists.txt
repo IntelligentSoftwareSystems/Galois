@@ -10,34 +10,43 @@ endif()
 
 ###### Options (alternatively pass as options to cmake -DName=Value ######
 
-#use pthreads
-set(USE_PTHREAD ON)
-
-#compile for cray xmt
-#set(USE_CRAY ON)
-
-#use icc (should pick right path for icc)
-#set(USE_ICC ON)
-#set(ICC_COMPILER /opt/intel/Compiler/11.1/072/bin/intel64/icpc)
-
 #use profiling
 #set(USE_PROFILING ON)
+set(DAI_FOUND off)
 
-##### Machine-specific settings (probably not useful to you) ######
-if(SITE_NAME MATCHES "volta.*")
-  set(USE_NUMA ON)
+# Enable iss specific options; should be OFF in the general release
+if(SITE_NAME MATCHES ".*.ices.utexas.edu")
+  set(USE_ISS ON)
 endif()
 
-#if(SITE_NAME MATCHES "delaunay.*")
-#  set(CMAKE_CXX_COMPILER /opt/csw/gcc4/bin/g++)
-#  set(CMAKE_CC_COMPILER /opt/csw/gcc4/bin/gcc)
-#  # Override broken include files in
-#  #  /opt/csw/gcc4/lib/gcc/sparc-sun-solaris2.8/4.5.1/include-fixed/
-#  add_definitions(-nostdinc)
-#  add_definitions(-I/usr/include)
-#  add_definitions(-I/opt/csw/gcc4/include/c++/4.5.1)
-#  add_definitions(-I/opt/csw/gcc4/include/c++/4.5.1/sparc-sun-solaris2.8)
-#endif()
+#use alternate compiler
+#set(USE_ICC ON)
+#set(USE_CLANG ON)
+
+###### Optional programs and default paths ######
+
+#find better c++ compilers
+find_program(CLANGXX clang++)
+find_program(CXX_4.5 g++-4.5)
+find_program(ICCXX icpc)
+
+#always use newer gcc
+if(NOT ${CXX_4.5} STREQUAL "CXX_4.5-NOTFOUND")
+  set(CMAKE_CXX_COMPILER ${CXX_4.5})
+endif()
+
+if(NOT ${CLANGXX} STREQUAL "CLANGXX-NOTFOUND")
+  if(USE_CLANG)
+    set(CMAKE_CXX_COMPILER ${CLANGXX})  
+  endif()
+endif()
+
+if(NOT ${ICCXX} STREQUAL "ICCXX-NOTFOUND")
+  if(USE_ICC)
+    set(CMAKE_CXX_COMPILER ${ICCXX})
+    add_definitions("-wd981 -wd383 -wd869 -wd2196 -wd279")
+  endif()
+endif()
 
 if(CMAKE_SYSTEM MATCHES "SunOS.*")
   set(USE_SOLARIS ON)
@@ -45,6 +54,23 @@ endif()
 
 ###### Configure (users don't need to go beyond here) ######
 enable_testing()
+
+#PThreads
+find_package(Threads)
+set(RT_LINK ${CMAKE_THREAD_LIBS_INIT} ${RT_LINK})
+
+#NUMA (linux)
+find_library(LIBNUMA numa)
+set(USE_LIBNUMA TRUE CACHE BOOL "Use libnuma to control memory allocation.")
+if(USE_LIBNUMA)
+  if (LIBNUMA)
+    message(STATUS "NUMA in use")
+    set(RT_LINK numa ${RT_LINK})
+    add_definitions(-DGALOIS_NUMA)
+  else()
+    message(STATUS "NUMA specified but libnuma not found")
+  endif()
+endif()
 
 #LAPACK
 enable_language(Fortran)
@@ -64,30 +90,37 @@ else()
   find_package(Boost 1.34.0 COMPONENTS ${BOOST_LIBS} REQUIRED)
 endif()
 include_directories(${Boost_INCLUDE_DIRS})
-
-#PThreads
-if(USE_PTHREAD)
-  find_package(Threads)
-  add_definitions(-DGALOIS_PTHREAD)
-endif(USE_PTHREAD)
+set(RT_LINK ${Boost_LIBRARIES} ${RT_LINK})
 
 find_package(MPI)
 if(MPI_FOUND)
   add_definitions(-DGALOIS_MPI)
   include_directories(${MPI_INCLUDE_PATH})
+  set(RT_LINK ${MPI_LIBRARIES} ${RT_LINK})
 endif()
-
-if(USE_NUMA)
-  add_definitions(-DGALOIS_NUMA)
-endif(USE_NUMA)
 
 #vtune
 set(VTUNE_INCLUDE "/opt/intel/vtune_amplifier_xe_2011/include")
 set(VTUNE_LIB "/opt/intel/vtune_amplifier_xe_2011/lib64/libittnotify.a")
 if(EXISTS ${VTUNE_INCLUDE})
-  set(USE_VTUNE ON)
   add_definitions(-DGALOIS_VTUNE)
   include_directories(${VTUNE_INCLUDE})
+  set(RT_LINK ${VTUNE_LIB} dl ${RT_LINK})
+endif()
+
+#tbb
+find_package(TBB)
+if(TBB_FOUND)
+  add_definitions(-DGALOIS_TBB)  
+  include_directories(${TBB_INCLUDE_DIRS})
+  set(RT_LINK ${TBB_LIBRARIES} ${RT_LINK})
+else()
+  # wget http://threadingbuildingblocks.org/uploads/77/173/3.0%20update%208/tbb30_20110704oss_lin.tgz
+  message(STATUS "Could NOT find TBB; have your sourced TBB_INSTALL_DIR/bin/tbbvars.sh?")
+endif()
+
+if(NOT USE_SOLARIS)
+#  set(RT_LINK hoard ${RT_LINK})
 endif()
 
 # c++0x features
@@ -96,38 +129,10 @@ endif()
 include(CheckCXXCompilerFlag)
 check_cxx_compiler_flag(-std=c++0x HAS_CXX0X)
 if(HAS_CXX0X)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
+#  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
 endif()
 
 include(CheckCXX0xFeatures)
-
-#tbb
-find_package(TBB)
-
-if(TBB_FOUND)
-  add_definitions(-DGALOIS_TBB)  
-  include_directories(${TBB_INCLUDE_DIRS})
-else()
-  # wget http://threadingbuildingblocks.org/uploads/77/173/3.0%20update%208/tbb30_20110704oss_lin.tgz
-  message(STATUS "Could NOT find TBB; have your sourced TBB_INSTALL_DIR/bin/tbbvars.sh?")
-endif()
-
-#Example of how to include external libraries
-#libdai XXX(ddn): remove dependency later
-#set(DAI_BASE "${CMAKE_CURRENT_SOURCE_DIR}/../libdai")
-#if(EXISTS "${DAI_BASE}")
-#  set(DAI_FOUND on)
-#  set(DAI_INCLUDE_DIRS "${DAI_BASE}/include")
-#  set(DAI_LIBRARIES "${DAI_BASE}/lib/libdai.a" "gmp")
-#  include_directories(${DAI_INCLUDE_DIRS})
-#else()
-#  set(DAI_FOUND off)
-#endif()
-
-#cray
-if(USE_CRAY)
-  add_definitions(-DGALOIS_CRAY)
-endif(USE_CRAY)
 
 if(USE_PROFILING)
   add_definitions(-pg)
@@ -143,12 +148,6 @@ if(USE_SOLARIS)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -m64 -lposix4")
 endif()
 
-if(USE_ICC)
-  set(CMAKE_CXX_COMPILER ${ICC_COMPILER})
-  #These help the intel compiler
-  add_definitions("-wd981 -wd383 -wd869 -wd2196 -wd279")
-endif(USE_ICC)
-
 #Always include debug symbols
 add_definitions("-g")
 
@@ -162,37 +161,20 @@ if(CMAKE_BUILD_TYPE MATCHES "Debug")
   add_definitions("-Wall")
 endif()
 
+#always import c99 stdint functions into c++
+add_definitions(-D__STDC_LIMIT_MACROS)
+add_definitions(-D__STDC_CONSTANT_MACROS)
+
+
 ###### Global Functions ######
 function(linkRuntime name) 
-  target_link_libraries(${name} galois) 
-  target_link_libraries(${name} ${CMAKE_THREAD_LIBS_INIT})
-  if(NOT USE_SOLARIS)
-    target_link_libraries(${name} hoard)
-  endif()
-
-  if(USE_VTUNE)
-    target_link_libraries(${name} ${VTUNE_LIB})
-    target_link_libraries(${name} dl)
-  endif()
-
-  if(USE_NUMA)
-    target_link_libraries(${name} numa)
-  endif()
-
-  if(TBB_FOUND)
-    target_link_libraries(${name} ${TBB_LIBRARIES})
-  endif()
-
-  if(MPI_FOUND)
-    target_link_libraries(${name} ${MPI_LIBRARIES})
-  endif()
-  
   target_link_libraries(${name} ${ARGN})
-
-  target_link_libraries(${name} ${Boost_LIBRARIES})
+  target_link_libraries(${name} galois ${RT_LINK})
 endfunction (linkRuntime)
 
 ###### Source finding ######
+include(llvm-extras)
+
 include_directories("include")
 
 add_subdirectory(lib)
@@ -217,3 +199,5 @@ include(CPack)
 
 ###### Installation ######
 install(DIRECTORY include/ DESTINATION include PATTERN ".svn" EXCLUDE)
+
+execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/scripts ${CMAKE_BINARY_DIR}/scripts)
