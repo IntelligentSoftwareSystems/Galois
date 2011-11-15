@@ -17,20 +17,18 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/ManagedStatic.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/system_error.h"
-#include "llvm/Support/Host.h"
-#include "llvm/Support/Path.h"
-#include "llvm/ADT/OwningPtr.h"
+//#include "llvm/Support/ErrorHandling.h"
+//#include "llvm/Support/MemoryBuffer.h"
+//#include "llvm/Support/system_error.h"
+//#include "llvm/Support/Host.h"
+//#include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/Twine.h"
-//#include "llvm/Config/config.h"
+
+#include <iostream>
+#include <sstream>
 #include <cerrno>
 #include <cstdlib>
 using namespace llvm;
@@ -71,17 +69,12 @@ void parser<char>::anchor() {}
 
 //===----------------------------------------------------------------------===//
 
-// Globals for name and overview of program.  Program name is not a string to
-// avoid static ctor/dtor issues.
-static char ProgramName[80] = "<premain>";
-static const char *ProgramOverview = 0;
-
 // This collects additional help to be printed.
-static ManagedStatic<std::vector<const char*> > MoreHelp;
+static std::vector<const char*> MoreHelp;
 
 extrahelp::extrahelp(const char *Help)
   : morehelp(Help) {
-  MoreHelp->push_back(Help);
+  MoreHelp.push_back(Help);
 }
 
 static bool OptionListChanged = false;
@@ -108,6 +101,14 @@ void Option::addArgument() {
 // Basic, shared command line option processing machinery.
 //
 
+std::string getIndent(int n) {
+  std::string indent;
+  for (int x = 0; x < n; ++x)
+    indent.push_back(' ');
+  return indent;
+}
+
+
 /// GetOptionInfo - Scan the list of registered options, turning them into data
 /// structures that are easier to handle.
 static void GetOptionInfo(SmallVectorImpl<Option*> &PositionalOpts,
@@ -126,7 +127,7 @@ static void GetOptionInfo(SmallVectorImpl<Option*> &PositionalOpts,
     for (size_t i = 0, e = OptionNames.size(); i != e; ++i) {
       // Add argument to the argument map!
       if (OptionsMap.GetOrCreateValue(OptionNames[i], O).second != O) {
-        errs() << ProgramName << ": CommandLine Error: Argument '"
+        std::cerr << "CommandLine Error: Argument '"
              << OptionNames[i] << "' defined more than once!\n";
       }
     }
@@ -291,10 +292,9 @@ static inline bool ProvideOption(Option *Handler, StringRef ArgName,
     break;
 
   default:
-    errs() << ProgramName
-         << ": Bad ValueMask flag! CommandLine usage error:"
-         << Handler->getValueExpectedFlag() << "\n";
-    llvm_unreachable(0);
+    std::cerr << "Bad ValueMask flag! CommandLine usage error:"
+	      << Handler->getValueExpectedFlag() << "\n";
+    abort();
   }
 
   // If this isn't a multi-arg option, just run the handler.
@@ -467,7 +467,7 @@ static void ParseCStringVector(std::vector<char *> &OutputVector,
 /// an environment variable (whose name is given in ENVVAR).
 ///
 void cl::ParseEnvironmentOptions(const char *progName, const char *envVar,
-                                 const char *Overview, bool ReadResponseFiles) {
+                                 const char *Overview) {
   // Check args.
   assert(progName && "Program name not specified");
   assert(envVar && "Environment variable name missing");
@@ -486,7 +486,7 @@ void cl::ParseEnvironmentOptions(const char *progName, const char *envVar,
   // and hand it off to ParseCommandLineOptions().
   ParseCStringVector(newArgv, envValue);
   int newArgc = static_cast<int>(newArgv.size());
-  ParseCommandLineOptions(newArgc, &newArgv[0], Overview, ReadResponseFiles);
+  ParseCommandLineOptions(newArgc, &newArgv[0], Overview);
 
   // Free all the strdup()ed strings.
   for (std::vector<char*>::iterator i = newArgv.begin(), e = newArgv.end();
@@ -495,44 +495,8 @@ void cl::ParseEnvironmentOptions(const char *progName, const char *envVar,
 }
 
 
-/// ExpandResponseFiles - Copy the contents of argv into newArgv,
-/// substituting the contents of the response files for the arguments
-/// of type @file.
-static void ExpandResponseFiles(unsigned argc, char** argv,
-                                std::vector<char*>& newArgv) {
-  for (unsigned i = 1; i != argc; ++i) {
-    char *arg = argv[i];
-
-    if (arg[0] == '@') {
-      sys::PathWithStatus respFile(++arg);
-
-      // Check that the response file is not empty (mmap'ing empty
-      // files can be problematic).
-      const sys::FileStatus *FileStat = respFile.getFileStatus();
-      if (FileStat && FileStat->getSize() != 0) {
-
-        // If we could open the file, parse its contents, otherwise
-        // pass the @file option verbatim.
-
-        // TODO: we should also support recursive loading of response files,
-        // since this is how gcc behaves. (From their man page: "The file may
-        // itself contain additional @file options; any such options will be
-        // processed recursively.")
-
-        // Mmap the response file into memory.
-        OwningPtr<MemoryBuffer> respFilePtr;
-        if (!MemoryBuffer::getFile(respFile.c_str(), respFilePtr)) {
-          ParseCStringVector(newArgv, respFilePtr->getBufferStart());
-          continue;
-        }
-      }
-    }
-    newArgv.push_back(strdup(arg));
-  }
-}
-
 void cl::ParseCommandLineOptions(int argc, char **argv,
-                                 const char *Overview, bool ReadResponseFiles) {
+                                 const char *Overview) {
   // Process all registered options.
   SmallVector<Option*, 4> PositionalOpts;
   SmallVector<Option*, 4> SinkOpts;
@@ -542,22 +506,6 @@ void cl::ParseCommandLineOptions(int argc, char **argv,
   assert((!Opts.empty() || !PositionalOpts.empty()) &&
          "No options specified!");
 
-  // Expand response files.
-  std::vector<char*> newArgv;
-  if (ReadResponseFiles) {
-    newArgv.push_back(strdup(argv[0]));
-    ExpandResponseFiles(argc, argv, newArgv);
-    argv = &newArgv[0];
-    argc = static_cast<int>(newArgv.size());
-  }
-
-  // Copy the program name into ProgName, making sure not to overflow it.
-  std::string ProgName = sys::path::filename(argv[0]);
-  size_t Len = std::min(ProgName.size(), size_t(79));
-  memcpy(ProgramName, ProgName.data(), Len);
-  ProgramName[Len] = '\0';
-
-  ProgramOverview = Overview;
   bool ErrorParsing = false;
 
   // Check out the positional arguments to collect information about them.
@@ -703,12 +651,12 @@ void cl::ParseCommandLineOptions(int argc, char **argv,
 
     if (Handler == 0) {
       if (SinkOpts.empty()) {
-        errs() << ProgramName << ": Unknown command line argument '"
+        std::cerr << "Unknown command line argument '"
              << argv[i] << "'.  Try: '" << argv[0] << " -help'\n";
 
         if (NearestHandler) {
           // If we know a near match, report it as well.
-          errs() << ProgramName << ": Did you mean '-"
+          std::cerr << "Did you mean '-"
                  << NearestHandlerString << "'?\n";
         }
 
@@ -731,16 +679,16 @@ void cl::ParseCommandLineOptions(int argc, char **argv,
 
   // Check and handle positional arguments now...
   if (NumPositionalRequired > PositionalVals.size()) {
-    errs() << ProgramName
-         << ": Not enough positional command line arguments specified!\n"
+    std::cerr 
+         << "Not enough positional command line arguments specified!\n"
          << "Must specify at least " << NumPositionalRequired
          << " positional arguments: See: " << argv[0] << " -help\n";
 
     ErrorParsing = true;
   } else if (!HasUnlimitedPositionals &&
              PositionalVals.size() > PositionalOpts.size()) {
-    errs() << ProgramName
-         << ": Too many positional arguments specified!\n"
+    std::cerr 
+         << "Too many positional arguments specified!\n"
          << "Can specify at most " << PositionalOpts.size()
          << " positional arguments: See: " << argv[0] << " -help\n";
     ErrorParsing = true;
@@ -774,8 +722,9 @@ void cl::ParseCommandLineOptions(int argc, char **argv,
           ValNo++;
           break;
         default:
-          llvm_unreachable("Internal error, unexpected NumOccurrences flag in "
+	  assert(0 && "Internal error, unexpected NumOccurrences flag in "
                  "positional argument processing!");
+	  abort();
         }
       }
     }
@@ -826,28 +775,11 @@ void cl::ParseCommandLineOptions(int argc, char **argv,
     }
   }
 
-  // Now that we know if -debug is specified, we can use it.
-  // Note that if ReadResponseFiles == true, this must be done before the
-  // memory allocated for the expanded command line is free()d below.
-  DEBUG(dbgs() << "Args: ";
-        for (int i = 0; i < argc; ++i)
-          dbgs() << argv[i] << ' ';
-        dbgs() << '\n';
-       );
-
   // Free all of the memory allocated to the map.  Command line options may only
   // be processed once!
   Opts.clear();
   PositionalOpts.clear();
-  MoreHelp->clear();
-
-  // Free the memory allocated by ExpandResponseFiles.
-  if (ReadResponseFiles) {
-    // Free all the strdup()ed strings.
-    for (std::vector<char*>::iterator i = newArgv.begin(), e = newArgv.end();
-         i != e; ++i)
-      free(*i);
-  }
+  MoreHelp.clear();
 
   // If we had an error processing our arguments, don't let the program execute
   if (ErrorParsing) exit(1);
@@ -860,11 +792,11 @@ void cl::ParseCommandLineOptions(int argc, char **argv,
 bool Option::error(const Twine &Message, StringRef ArgName) {
   if (ArgName.data() == 0) ArgName = ArgStr;
   if (ArgName.empty())
-    errs() << HelpStr;  // Be nice for positional arguments
+    std::cerr << HelpStr;  // Be nice for positional arguments
   else
-    errs() << ProgramName << ": for the -" << ArgName;
+    std::cerr << "for the -" << ArgName.str();
 
-  errs() << " option: " << Message << "\n";
+  std::cerr << " option: " << Message.str() << "\n";
   return true;
 }
 
@@ -912,8 +844,8 @@ size_t alias::getOptionWidth() const {
 // Print out the option for the alias.
 void alias::printOptionInfo(size_t GlobalWidth) const {
   size_t L = std::strlen(ArgStr);
-  outs() << "  -" << ArgStr;
-  outs().indent(GlobalWidth-L-6) << " - " << HelpStr << "\n";
+  std::cout << "  -" << ArgStr;
+  std::cout << getIndent(GlobalWidth-L-6) << " - " << HelpStr << "\n";
 }
 
 //===----------------------------------------------------------------------===//
@@ -937,18 +869,18 @@ size_t basic_parser_impl::getOptionWidth(const Option &O) const {
 //
 void basic_parser_impl::printOptionInfo(const Option &O,
                                         size_t GlobalWidth) const {
-  outs() << "  -" << O.ArgStr;
+  std::cout << "  -" << O.ArgStr;
 
   if (const char *ValName = getValueName())
-    outs() << "=<" << getValueStr(O, ValName) << '>';
+    std::cout << "=<" << getValueStr(O, ValName) << '>';
 
-  outs().indent(GlobalWidth-getOptionWidth(O)) << " - " << O.HelpStr << '\n';
+  std::cout << getIndent(GlobalWidth-getOptionWidth(O)) << " - " << O.HelpStr << '\n';
 }
 
 void basic_parser_impl::printOptionName(const Option &O,
                                         size_t GlobalWidth) const {
-  outs() << "  -" << O.ArgStr;
-  outs().indent(GlobalWidth-std::strlen(O.ArgStr));
+  std::cout << "  -" << O.ArgStr;
+  std::cout << getIndent(GlobalWidth-std::strlen(O.ArgStr));
 }
 
 
@@ -1084,21 +1016,21 @@ void generic_parser_base::printOptionInfo(const Option &O,
                                           size_t GlobalWidth) const {
   if (O.hasArgStr()) {
     size_t L = std::strlen(O.ArgStr);
-    outs() << "  -" << O.ArgStr;
-    outs().indent(GlobalWidth-L-6) << " - " << O.HelpStr << '\n';
+    std::cout << "  -" << O.ArgStr;
+    std::cout << getIndent(GlobalWidth-L-6) << " - " << O.HelpStr << '\n';
 
     for (unsigned i = 0, e = getNumOptions(); i != e; ++i) {
       size_t NumSpaces = GlobalWidth-strlen(getOption(i))-8;
-      outs() << "    =" << getOption(i);
-      outs().indent(NumSpaces) << " -   " << getDescription(i) << '\n';
+      std::cout << "    =" << getOption(i);
+      std::cout << getIndent(NumSpaces) << " -   " << getDescription(i) << '\n';
     }
   } else {
     if (O.HelpStr[0])
-      outs() << "  " << O.HelpStr << '\n';
+      std::cout << "  " << O.HelpStr << '\n';
     for (unsigned i = 0, e = getNumOptions(); i != e; ++i) {
       size_t L = std::strlen(getOption(i));
-      outs() << "    -" << getOption(i);
-      outs().indent(GlobalWidth-L-8) << " - " << getDescription(i) << '\n';
+      std::cout << "    -" << getOption(i);
+      std::cout << getIndent(GlobalWidth-L-8) << " - " << getDescription(i) << '\n';
     }
   }
 }
@@ -1112,28 +1044,28 @@ void generic_parser_base::
 printGenericOptionDiff(const Option &O, const GenericOptionValue &Value,
                        const GenericOptionValue &Default,
                        size_t GlobalWidth) const {
-  outs() << "  -" << O.ArgStr;
-  outs().indent(GlobalWidth-std::strlen(O.ArgStr));
+  std::cout << "  -" << O.ArgStr;
+  std::cout << getIndent(GlobalWidth-std::strlen(O.ArgStr));
 
   unsigned NumOpts = getNumOptions();
   for (unsigned i = 0; i != NumOpts; ++i) {
     if (Value.compare(getOptionValue(i)))
       continue;
 
-    outs() << "= " << getOption(i);
+    std::cout << "= " << getOption(i);
     size_t L = std::strlen(getOption(i));
     size_t NumSpaces = MaxOptWidth > L ? MaxOptWidth - L : 0;
-    outs().indent(NumSpaces) << " (default: ";
+    std::cout << getIndent(NumSpaces) << " (default: ";
     for (unsigned j = 0; j != NumOpts; ++j) {
       if (Default.compare(getOptionValue(j)))
         continue;
-      outs() << getOption(j);
+      std::cout << getOption(j);
       break;
     }
-    outs() << ")\n";
+    std::cout << ")\n";
     return;
   }
-  outs() << "= *unknown option value*\n";
+  std::cout << "= *unknown option value*\n";
 }
 
 // printOptionDiff - Specializations for printing basic value types.
@@ -1143,19 +1075,16 @@ printGenericOptionDiff(const Option &O, const GenericOptionValue &Value,
   printOptionDiff(const Option &O, T V, OptionValue<T> D,               \
                   size_t GlobalWidth) const {                           \
     printOptionName(O, GlobalWidth);                                    \
-    std::string Str;                                                    \
-    {                                                                   \
-      raw_string_ostream SS(Str);                                       \
-      SS << V;                                                          \
-    }                                                                   \
-    outs() << "= " << Str;                                              \
-    size_t NumSpaces = MaxOptWidth > Str.size() ? MaxOptWidth - Str.size() : 0;\
-    outs().indent(NumSpaces) << " (default: ";                          \
+    std::stringstream Str;						\
+    Str << V;								\
+    std::cout << "= " << Str.str();					\
+    size_t NumSpaces = MaxOptWidth > Str.str().size() ? MaxOptWidth - Str.str().size() : 0; \
+    std::cout << getIndent(NumSpaces) << " (default: ";                          \
     if (D.hasValue())                                                   \
-      outs() << D.getValue();                                           \
+      std::cout << D.getValue();                                           \
     else                                                                \
-      outs() << "*no default*";                                         \
-    outs() << ")\n";                                                    \
+      std::cout << "*no default*";                                         \
+    std::cout << ")\n";                                                    \
   }                                                                     \
 
 PRINT_OPT_DIFF(bool)
@@ -1171,21 +1100,24 @@ void parser<std::string>::
 printOptionDiff(const Option &O, StringRef V, OptionValue<std::string> D,
                 size_t GlobalWidth) const {
   printOptionName(O, GlobalWidth);
-  outs() << "= " << V;
+  std::cout << "= " << V.str();
   size_t NumSpaces = MaxOptWidth > V.size() ? MaxOptWidth - V.size() : 0;
-  outs().indent(NumSpaces) << " (default: ";
+  std::string indent;
+  for (int x = 0; x < NumSpaces; ++x)
+    indent.push_back(' ');
+  std::cout << getIndent << " (default: ";
   if (D.hasValue())
-    outs() << D.getValue();
+    std::cout << D.getValue();
   else
-    outs() << "*no default*";
-  outs() << ")\n";
+    std::cout << "*no default*";
+  std::cout << ")\n";
 }
 
 // Print a placeholder for options that don't yet support printOptionDiff().
 void basic_parser_impl::
 printOptionNoValue(const Option &O, size_t GlobalWidth) const {
   printOptionName(O, GlobalWidth);
-  outs() << "= *cannot print option value*\n";
+  std::cout << "= *cannot print option value*\n";
 }
 
 //===----------------------------------------------------------------------===//
@@ -1251,10 +1183,7 @@ public:
     SmallVector<std::pair<const char *, Option*>, 128> Opts;
     sortOpts(OptMap, Opts, ShowHidden);
 
-    if (ProgramOverview)
-      outs() << "OVERVIEW: " << ProgramOverview << "\n";
-
-    outs() << "USAGE: " << ProgramName << " [options]";
+    std::cout << "USAGE: ";
 
     // Print out the positional options.
     Option *CAOpt = 0;   // The cl::ConsumeAfter option, if it exists...
@@ -1264,29 +1193,29 @@ public:
 
     for (size_t i = CAOpt != 0, e = PositionalOpts.size(); i != e; ++i) {
       if (PositionalOpts[i]->ArgStr[0])
-        outs() << " --" << PositionalOpts[i]->ArgStr;
-      outs() << " " << PositionalOpts[i]->HelpStr;
+        std::cout << " --" << PositionalOpts[i]->ArgStr;
+      std::cout << " " << PositionalOpts[i]->HelpStr;
     }
 
     // Print the consume after option info if it exists...
-    if (CAOpt) outs() << " " << CAOpt->HelpStr;
+    if (CAOpt) std::cout << " " << CAOpt->HelpStr;
 
-    outs() << "\n\n";
+    std::cout << "\n\n";
 
     // Compute the maximum argument length...
     MaxArgLen = 0;
     for (size_t i = 0, e = Opts.size(); i != e; ++i)
       MaxArgLen = std::max(MaxArgLen, Opts[i].second->getOptionWidth());
 
-    outs() << "OPTIONS:\n";
+    std::cout << "OPTIONS:\n";
     for (size_t i = 0, e = Opts.size(); i != e; ++i)
       Opts[i].second->printOptionInfo(MaxArgLen);
 
     // Print any extra help the user has declared.
-    for (std::vector<const char *>::iterator I = MoreHelp->begin(),
-          E = MoreHelp->end(); I != E; ++I)
-      outs() << *I;
-    MoreHelp->clear();
+    for (std::vector<const char *>::iterator I = MoreHelp.begin(),
+          E = MoreHelp.end(); I != E; ++I)
+      std::cout << *I;
+    MoreHelp.clear();
 
     // Halt the program since help information was printed
     exit(1);
@@ -1348,9 +1277,8 @@ namespace {
 class VersionPrinter {
 public:
   void print() {
-    raw_ostream &OS = outs();
     //ADL: GALOIS CHANGE
-    OS << "Galois Runtime 2.1";
+    std::cout << "Galois Runtime 2.1";
   }
   void operator=(bool OptionWasSpecified) {
     if (!OptionWasSpecified) return;
@@ -1364,7 +1292,7 @@ public:
     // Iterate over any registered extra printers and call them to add further
     // information.
     if (ExtraVersionPrinters != 0) {
-      outs() << '\n';
+      std::cout << '\n';
       for (std::vector<void (*)()>::iterator I = ExtraVersionPrinters->begin(),
                                              E = ExtraVersionPrinters->end();
            I != E; ++I)
