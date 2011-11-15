@@ -29,16 +29,19 @@
 #include <boost/iterator/transform_iterator.hpp>
 #include "Galois/Galois.h"
 #include "Galois/Statistic.h"
-#include "Lonestar/Banner.h"
-#include "Lonestar/CommandLine.h"
+#include "llvm/Support/CommandLine.h"
+#include "Lonestar/BoilerPlate.h"
 
 namespace {
 const char* name = "Barnshut N-Body Simulator";
-const char* description =
+const char* desc =
   "Simulation of the gravitational forces in a galactic cluster using the "
   "Barnes-Hut n-body algorithm\n";
 const char* url = "barneshut";
-const char* help = "<numbodies> <ntimesteps> <seed>";
+
+static llvm::cl::opt<int> nbodies("n", llvm::cl::desc("Number of bodies"), llvm::cl::init(10000));
+static llvm::cl::opt<int> ntimesteps("steps", llvm::cl::desc("Number of steps"), llvm::cl::init(1));
+static llvm::cl::opt<int> seed("seed", llvm::cl::desc("Random seed"), llvm::cl::init(7));
 
 struct Point {
   double x, y, z;
@@ -603,19 +606,10 @@ void run(int nbodies, int ntimesteps, int seed) {
 
 } // end namespace
 
-int main(int argc, const char** argv) {
+int main(int argc, char** argv) {
+  LonestarStart(argc, argv, std::cout, name, desc, url);
   std::cout.setf(std::ios::right|std::ios::scientific|std::ios::showpoint);
 
-  std::vector<const char*> args = parse_command_line(argc, argv, help);
-  if (args.size() != 3) {
-    std::cerr << "not enough arguments, use -help for usage information\n";
-    exit(1);
-  }
-  int nbodies = atoi(args[0]);
-  int ntimesteps = atoi(args[1]);
-  int seed = atoi(args[2]);
-
-  printBanner(std::cout, name, description, url);
   std::cerr << "configuration: "
             << nbodies << " bodies, "
             << ntimesteps << " time steps" << std::endl << std::endl;
