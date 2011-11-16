@@ -1,8 +1,8 @@
 #include "Galois/Galois.h"
 #include "Galois/Statistic.h"
 #include "Galois/Graphs/Graph.h"
-#include "Lonestar/Banner.h"
-#include "Lonestar/CommandLine.h"
+#include "llvm/Support/CommandLine.h"
+#include "Lonestar/BoilerPlate.h"
 
 #include "Exp/PriorityScheduling/WorkListTL.h"
 
@@ -11,15 +11,21 @@
 #include <strstream>
 #include <dai/bp.h>
 
-
+namespace cll = llvm::cl;
 
 static const char* name = "Belief propagation";
-static const char* description = "Belief propagation on Ising Grids";
+static const char* desc = "Belief propagation on Ising Grids";
 static const char* url = 0;
-static const char* help = "[-algo N] <N> <hardness> <seed> <max iterations> <damping>";
+
+static cll::opt<int> algo("algo", cll::desc("Node to start search from"), cll::init(1));
+static cll::opt<int> N(cll::Positional, cll::desc("<N>"), cll::Required);
+static cll::opt<double> hardness(cll::Positional, cll::desc("<hardness>"), cll::Required);
+static cll::opt<int> seed(cll::Positional, cll::desc("<seed>"), cll::Required);
+static cll::opt<int> MaxIterations(cll::Positional, cll::desc("<max iterations>"), cll::Required);
+static cll::opt<double> damping(cll::Positional, cll::desc("<damping>"), cll::Required);
+
 
 static const double TOL = 1e-4;
-static int MaxIterations;
 
 long GlobalTime = 0;
 
@@ -56,33 +62,9 @@ void generateInput(int N, double hardness, int seed,
   }
 }
 
-int main(int argc,  const char **argv) {
-  int algo = 0;
-  std::vector<const char*> args = parse_command_line(argc, argv, help);
-  Exp::parse_worklist_command_line(args);
+int main(int argc, char **argv) {
+  LonestarStart(argc, argv, std::cout, name, desc, url);
 
-  for (std::vector<const char*>::iterator ii = args.begin(), ei = args.end(); ii != ei; ++ii) {
-    if (strcmp(*ii, "-algo") == 0 && ii + 1 != ei) {
-      algo = atoi(ii[1]);
-      ii = args.erase(ii);
-      ii = args.erase(ii);
-      --ii;
-      ei = args.end();
-    }
-  }
-  
-  if (args.size() < 5) {
-    std::cerr << "incorrect number of arguments, use -help for usage information\n";
-    return 1;
-  }
-
-  int N = atoi(args[0]);
-  double hardness = atof(args[1]);
-  int seed = atoi(args[2]);
-  MaxIterations = atoi(args[3]);
-  double damping = atof(args[4]);
-
-  printBanner(std::cout, name, description, url);
   std::cout << "N: " << N << " hardness: " << hardness << " seed: " << seed
     << " maxiterations: " << MaxIterations << " damping: " << damping << " algo: " << algo << "\n";
 

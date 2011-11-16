@@ -84,6 +84,8 @@ class BP : public DAIAlgFG {
           bool operator<(const Task& t) const {
             return dist < t.dist;
           }
+
+	  int getID() const { return i ^ _I; }
         };
 
         struct EdgeData {

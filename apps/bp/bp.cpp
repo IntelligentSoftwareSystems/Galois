@@ -1,23 +1,28 @@
 #include "Galois/Galois.h"
 #include "Galois/Statistic.h"
 #include "Galois/Graphs/Graph.h"
-#include "Lonestar/Banner.h"
-#include "Lonestar/CommandLine.h"
+#include "llvm/Support/CommandLine.h"
+#include "Lonestar/BoilerPlate.h"
 
 #include <cmath>
 #include <iostream>
 #include <algorithm>
 #include <utility>
 
+namespace cll = llvm::cl;
+
 static const char* name = "Belief propagation";
-static const char* description = "Belief propagation on Ising Grids";
+static const char* desc = "Belief propagation on Ising Grids";
 static const char* url = 0;
-static const char* help = "[-algo N] <N> <hardness> <seed> <max iterations>";
+
+static cll::opt<int> algo("algo", cll::desc("Node to start search from"), cll::init(1));
+static cll::opt<int> N(cll::Positional, cll::desc("<N>"), cll::Required);
+static cll::opt<int> hardness(cll::Positional, cll::desc("<hardness>"), cll::Required);
+static cll::opt<int> seed(cll::Positional, cll::desc("<seed>"), cll::Required);
+static cll::opt<int> MaxIterations(cll::Positional, cll::desc("<max iterations>"), cll::Required);
 
 static const double DAMPING = 0.2;
 static const double TOL = 1e-10;
-static int MaxIterations;
-
 
 template<typename NodeTy,typename EdgeTy>
 struct BipartiteGraph: public Galois::Graph::FirstGraph<NodeTy,EdgeTy,true> {
@@ -511,30 +516,8 @@ static void start(int N, int hardness, int seed) {
   T.stop();
 }
 
-int main(int argc,  const char **argv) {
-  int algo = 0;
-  std::vector<const char*> args = parse_command_line(argc, argv, help);
-  for (std::vector<const char*>::iterator ii = args.begin(), ei = args.end(); ii != ei; ++ii) {
-    if (strcmp(*ii, "-algo") == 0 && ii + 1 != ei) {
-      algo = atoi(ii[1]);
-      ii = args.erase(ii);
-      ii = args.erase(ii);
-      --ii;
-      ei = args.end();
-    }
-  }
-  
-  if (args.size() < 4) {
-    std::cerr << "incorrect number of arguments, use -help for usage information\n";
-    return 1;
-  }
-
-  int N = atoi(args[0]);
-  int hardness = atoi(args[1]);
-  int seed = atoi(args[2]);
-  MaxIterations = atoi(args[3]);
-
-  printBanner(std::cout, name, description, url);
+int main(int argc,  char **argv) {
+  LonestarStart(argc, argv, std::cout, name, desc, url);
 
   switch (algo) {
     case 3: std::cout << "Using BP-MAX-RES\n"; start<BP<BP_MAX_RES> >(N, hardness, seed); break;
