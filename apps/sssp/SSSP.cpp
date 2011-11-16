@@ -43,16 +43,18 @@
 #include <iostream>
 #include <set>
 
+namespace cll = llvm::cl;
+
 static const char* name = "Single Source Shortest Path";
 static const char* desc =
   "Computes the shortest path from a source node to all nodes in a directed "
   "graph using a modified Bellman-Ford algorithm\n";
 static const char* url = "single_source_shortest_path";
 
-static llvm::cl::opt<int> startNode("startnode", llvm::cl::desc("Node to start search from"), llvm::cl::init(1));
-static llvm::cl::opt<int> reportNode("reportnode", llvm::cl::desc("Node to report distance to"), llvm::cl::init(2));
-static llvm::cl::opt<std::string> filename(llvm::cl::Positional, llvm::cl::desc("<input file>"), llvm::cl::Required);
-static llvm::cl::opt<int> stepShift("delta", llvm::cl::desc("Shift value for the deltastep"), llvm::cl::init(10));
+static cll::opt<int> startNode("startnode", cll::desc("Node to start search from"), cll::init(1));
+static cll::opt<int> reportNode("reportnode", cll::desc("Node to report distance to"), cll::init(2));
+static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<int> stepShift("delta", cll::desc("Shift value for the deltastep"), cll::init(10));
 
 typedef Galois::Graph::LC_FileGraph<SNode, unsigned int> Graph;
 typedef Galois::Graph::LC_FileGraph<SNode, unsigned int>::GraphNode GNode;
