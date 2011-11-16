@@ -24,9 +24,8 @@ std::string Twine::str() const {
 }
 
 void Twine::toVector(SmallVectorImpl<char> &Out) const {
-  std::stringstream OS;
-  print(OS);
-  Out.append(OS.str().c_str(), OS.str().c_str() + OS.str().size());
+  // raw_svector_ostream OS(Out);
+  // print(OS);
 }
 
 StringRef Twine::toStringRef(SmallVectorImpl<char> &Out) const {
