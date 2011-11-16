@@ -527,7 +527,7 @@ public:
     n.next = mkChunk();
     bool worked = n.next->push_back(val);
     assert(worked);
-    return true;
+    return worked;
   }
 
   template<typename Iter>
