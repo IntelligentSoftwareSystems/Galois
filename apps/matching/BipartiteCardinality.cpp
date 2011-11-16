@@ -145,14 +145,14 @@ struct PrepareForVerifier {
     typename GraphTypes<G>::template Functions<Algo>::ExistsFn exists;
 
     for (typename NodeList::iterator src = g.B.begin(), esrc = g.B.end(); src != esrc; ++src) {
-      unsigned found = 0;
+      //      unsigned found = 0;
       for (neighbor_iterator dst = g.neighbor_begin(*src),
           edst = g.neighbor_end(*src); dst != edst; ++dst) {
         if (exists(g, *src, *dst)) {
           matching->push_back(Edge(*src, *dst));
         }
       }
-      assert(found <= 1);
+      //      assert(found <= 1);
     }
 
     for (typename NodeList::iterator ii = g.A.begin(), ei = g.A.end(); ii != ei; ++ii) {

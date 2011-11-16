@@ -124,10 +124,10 @@ public:
       }
     }
 
-    for (int i=0; i<newNodes->size(); i++) {
+    for (unsigned i=0; i<newNodes->size(); i++) {
       GNode n1 = (*newNodes)[i];
       Element& newNodeData = n1.getData(Galois::NONE);
-      for (int j=i+1; j<newNodes->size(); j++) {
+      for (unsigned j=i+1; j<newNodes->size(); j++) {
 	if (i != j) {
 	  GNode n2 = (*newNodes)[j];;
 	  Element& e = n2.getData(Galois::NONE);

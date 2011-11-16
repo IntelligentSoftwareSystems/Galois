@@ -54,7 +54,6 @@ static const char* name = "Betweenness Centrality";
 static const char* desc =
   "Computes the betweenness centrality of all nodes in a graph\n";
 static const char* url = "betweenness_centrality";
-static const char* help = "<input file> <number iterations>";
 
 static llvm::cl::opt<std::string> filename(llvm::cl::Positional, llvm::cl::desc("<input file>"), llvm::cl::Required);
 static llvm::cl::opt<int> iterLimit("limit", llvm::cl::desc("Limit number of iterations to value (0 is all nodes)"), llvm::cl::init(0));

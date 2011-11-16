@@ -43,7 +43,7 @@ static const char* desc = "Computes page ranks a la Page and Brin\n";
 static const char* url = NULL;
 
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<int> max_iterations("maxiter", cll::desc("Maximum iterations"), cll::init(10));
+static cll::opt<unsigned int> max_iterations("maxiter", cll::desc("Maximum iterations"), cll::init(10));
 
 
 // damping factor: prob that user will continue to next link
