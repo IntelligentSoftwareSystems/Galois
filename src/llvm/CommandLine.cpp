@@ -1102,10 +1102,7 @@ printOptionDiff(const Option &O, StringRef V, OptionValue<std::string> D,
   printOptionName(O, GlobalWidth);
   std::cout << "= " << V.str();
   size_t NumSpaces = MaxOptWidth > V.size() ? MaxOptWidth - V.size() : 0;
-  std::string indent;
-  for (int x = 0; x < NumSpaces; ++x)
-    indent.push_back(' ');
-  std::cout << getIndent << " (default: ";
+  std::cout << getIndent(NumSpaces) << " (default: ";
   if (D.hasValue())
     std::cout << D.getValue();
   else
