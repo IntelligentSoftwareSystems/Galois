@@ -34,13 +34,13 @@ class FixedSizeRing :private boost::noncopyable, private PaddedLock<concurrent> 
   unsigned end;
   T data[__chunksize + 1];
 
-  int chunksize() { return __chunksize + 1; }
+  inline int chunksize() const { return __chunksize + 1; }
 
-  bool _i_empty() const {
+  inline bool _i_empty() const {
     return start == end;
   }
 
-  bool _i_full() const {
+  inline bool _i_full() const {
     return (end + 1) % chunksize() == start;
   }
 
@@ -53,7 +53,7 @@ public:
   
   template<bool newconcurrent>
   struct rethread {
-    typedef FixedSizeRing<T, chunksize(), newconcurrent> WL;
+    typedef FixedSizeRing<T, __chunksize, newconcurrent> WL;
   };
 
   typedef T value_type;
