@@ -28,20 +28,25 @@
 #include "Galois/Statistic.h"
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Graphs/FileGraph.h"
-#include "Lonestar/Banner.h"
-#include "Lonestar/CommandLine.h"
+#include "llvm/Support/CommandLine.h"
+
+#include "Lonestar/BoilerPlate.h"
 
 #include <utility>
 #include <vector>
 #include <algorithm>
 #include <iostream>
 
+namespace cll = llvm::cl;
+
 namespace {
 
 const char* name = "Spanning-tree Algorithm";
-const char* description = "Compute the spanning tree (not mimimal) of a graph";
+const char* desc = "Compute the spanning tree (not mimimal) of a graph";
 const char* url = NULL;
-const char* help = "<root id> <graph>";
+
+static cll::opt<int> rootNode(cll::Positional, cll::desc("<root id>"), cll::Required);
+static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 
 struct Node {
   bool in_mst;
@@ -162,18 +167,12 @@ void readGraph(const char* filename, int root_id, GNode* root) {
 
 }
 
-int main(int argc, const char** argv) {
-  std::vector<const char*> args = parse_command_line(argc, argv, help);
+int main(int argc, char** argv) {
+  LonestarStart(argc, argv, std::cout, name, desc, url);
 
-  if (args.size() != 2) {
-    std::cerr 
-      << "incorrect number of arguments, use -help for usage information\n";
-    return 1;
-  }
-  printBanner(std::cout, name, description, url);
 
   GNode root;
-  readGraph(args[1], atoi(args[0]), &root);
+  readGraph(filename.c_str(), rootNode, &root);
 
   std::vector<GNode> initial;
   graph.getData(root).in_mst = true;

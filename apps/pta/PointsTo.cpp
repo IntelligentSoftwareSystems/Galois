@@ -29,9 +29,10 @@
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/util/SparseBitVector2.h"
-#include "Lonestar/Banner.h"
-#include "Lonestar/CommandLine.h"
 #include "Galois/Runtime/WorkList.h"
+#include "llvm/Support/CommandLine.h"
+
+#include "Lonestar/BoilerPlate.h"
 
 
 #include <vector>
@@ -41,12 +42,15 @@
 #include <cstdlib>
 #include <stack>
 
+namespace cll = llvm::cl;
+
 namespace {
 
 const char* name = "Points-to Analysis";
-const char* description = "Performs inclusion-based points-to analysis over the input constraints.";
+const char* desc = "Performs inclusion-based points-to analysis over the input constraints.";
 const char* url = NULL;
-const char* help = "<constraints>";
+
+static cll::opt<std::string> input(cll::Positional, cll::desc("<constraints>"), cll::Required);
 
 const unsigned THRESHOLD_LOADSTORE = 500;	// no of nodes to be processed before adding load/store edges.
 const unsigned THRESHOLD_OCD = 500;
@@ -538,17 +542,10 @@ void printConstraints(PointsToConstraints &constraints) {
 
 }
 
-int main(int argc, const char** argv) {
-  std::vector<const char*> args = parse_command_line(argc, argv, help);
+int main(int argc, char** argv) {
+  LonestarStart(argc, argv, std::cout, name, desc, url);
 
-  if (args.size() != 1) {
-    std::cerr 
-      << "incorrect number of arguments, use -help for usage information\n";
-    return 1;
-  }
-  printBanner(std::cout, name, description, url);
-
-  numNodes = readConstraints(args[0], addrcopyconstraints, loadstoreconstraints);
+  numNodes = readConstraints(input.c_str(), addrcopyconstraints, loadstoreconstraints);
   //printConstraints(addrcopyconstraints);
   //printConstraints(loadstoreconstraints);
 

@@ -28,16 +28,22 @@
 #include "Galois/Bag.h"
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Graphs/FileGraph.h"
-#include "Lonestar/Banner.h"
-#include "Lonestar/CommandLine.h"
+#include "llvm/Support/CommandLine.h"
+
+#include "Lonestar/BoilerPlate.h"
+
+namespace cll = llvm::cl;
 
 namespace {
 
 const char* name = "Preflow Push";
-const char* description =
-  "Finds the maximum flow in a network using the preflow push technique\n";
+const char* desc = "Finds the maximum flow in a network using the preflow push technique\n";
 const char* url = "preflow_push";
-const char* help = "[-serial] <input file> <source id> <sink id> [global relabel interval]";
+
+static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<int> sourceId(cll::Positional, cll::desc("sourceID"), cll::Required);
+static cll::opt<int> sinkId(cll::Positional, cll::desc("sinkID"), cll::Required);
+static cll::opt<int> relabelInt("relabel", cll::desc("relabel interval"), cll::init(0));
 
 /**
  * Alpha parameter the original Goldberg algorithm to control when global
@@ -532,36 +538,22 @@ void run() {
 
 } // end namespace
 
-int main(int argc, const char** argv) {
+int main(int argc, char** argv) {
   bool serial = false;
-  std::vector<const char*> args = parse_command_line(argc, argv, help);
-  if (args.size() > 1 && strcmp(args[0], "-serial") == 0) {
-    serial = true;
-    args.erase(args.begin());
-  }
-
-  if (args.size() < 3) {
-    std::cout << "not enough arguments, use -help for usage information\n";
-    return 1;
-  }
-  printBanner(std::cout, name, description, url);
-
-  const char* inputFile = args[0];
-  int sourceId = atoi(args[1]);
-  int sinkId = atoi(args[2]);
+  LonestarStart(argc, argv, std::cout, name, desc, url);
 
   if (sourceId < 0 || sinkId < 0 || sourceId == sinkId) {
     std::cerr << "invalid source or sink id\n";
     abort();
   }
-  initializeGraph(inputFile, sourceId, sinkId, &app);
+  initializeGraph(filename.c_str(), sourceId, sinkId, &app);
   if (sourceId >= app.num_nodes || sinkId >= app.num_nodes) {
     std::cerr << "invalid source or sink id\n";
     abort();
   }
   
-  if (args.size() > 3) {
-    app.global_relabel_interval = atoi(args[3]);
+  if (relabelInt) {
+    app.global_relabel_interval = relabelInt;
   } else {
     app.global_relabel_interval = app.num_nodes * ALPHA + app.num_edges;
     // TODO fix interval by dividing by numThreads ?
@@ -581,7 +573,7 @@ int main(int argc, const char** argv) {
   
   if (!skipVerify) {
     Config orig;
-    initializeGraph(inputFile, sourceId, sinkId, &orig);
+    initializeGraph(filename.c_str(), sourceId, sinkId, &orig);
     verify(orig);
     std::cout << "(Partially) Verified\n";
   }

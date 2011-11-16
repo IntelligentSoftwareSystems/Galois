@@ -29,8 +29,9 @@
 #include "Galois/Galois.h"
 #include "Galois/Accumulator.h"
 
-#include "Lonestar/Banner.h"
-#include "Lonestar/CommandLine.h"
+#include "llvm/Support/CommandLine.h"
+
+#include "Lonestar/BoilerPlate.h"
 
 #include <cstdlib>
 #include <iostream>
@@ -40,10 +41,16 @@
 using namespace std;
 using namespace GaloisRuntime::WorkList;
 
+namespace cll = llvm::cl;
+
 static const char* name = "Survey Propagation";
-static const char* description = "Solves SAT problems using survey propagation\n";
+static const char* desc = "Solves SAT problems using survey propagation\n";
 static const char* url = "survey_propagation";
-static const char* help = "<seed> <num clauses> <num variables> <k>";
+
+static cll::opt<int> seed(cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<int> M(cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<int> N(cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<int> K(cll::Positional, cll::desc("<input file>"), cll::Required);
 
 //#define WLWL LocalQueues<ChunkedFIFO<1024>, FIFO<> >
 #define WLWL dChunkedFIFO<1024>
@@ -120,7 +127,7 @@ static Galois::GReduceAverage<double> averageBias;
 //interesting parameters:
 static const double epsilon = 0.000001;
 static const int tmax = 100;
-static int tlimit = 0;
+//static int tlimit = 0;
 
 void initalize_random_formula(int M, int N, int K) {
   //M clauses
@@ -402,22 +409,9 @@ bool survey_inspired_decimation() {
 }
 
 
-int main(int argc, const char** argv) {
-  std::vector<const char*> args = parse_command_line(argc, argv, help);
-
-  if (args.size() < 4) {
-    std::cout << "not enough arguments, use -help for usage information\n";
-    return 1;
-  }
-  printBanner(std::cout, name, description, url);
-
-  int seed = atoi(args[0]);
+int main(int argc, char** argv) {
+  LonestarStart(argc, argv, std::cout, name, desc, url);
   srand(seed);
-
-  int M = atoi(args[1]);
-  int N = atoi(args[2]);
-  int K = atoi(args[3]);
-
   initalize_random_formula(M,N,K);
   //print_formula();
   //build_graph();

@@ -31,8 +31,9 @@
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Runtime/DebugWorkList.h"
-#include "Lonestar/Banner.h"
-#include "Lonestar/CommandLine.h"
+#include "llvm/Support/CommandLine.h"
+
+#include "Lonestar/BoilerPlate.h"
 
 #include "Exp/PriorityScheduling/WorkListTL.h"
 
@@ -40,14 +41,19 @@
 #include <algorithm>
 #include <vector>
 #include <iostream>
+
+namespace cll = llvm::cl;
  
 #define BORUVKA_DEBUG 0 
 
 static const char* name = "Parallel MST";
-static const char* description = "Computes the Minimal Spanning Tree using combination of "
+static const char* desc = "Computes the Minimal Spanning Tree using combination of "
   "Boruvka's and Prim's algorithm\n";
 static const char* url = 0;
-static const char* help = "[-algo N] [-wl string] <input file>";
+
+static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<int> algo("algo", cll::desc("Algorithm to use"), cll::init(0));
+
 
 typedef int Weight;
 typedef Galois::GAccumulator<size_t> MstWeight;
@@ -381,34 +387,13 @@ void start(const char* in) {
   std::cout << "MST Weight is " << w.get() << "\n";
 }
 
-int main(int argc, const char **argv) {
-  int algo = 0;
-  std::vector<const char*> args = parse_command_line(argc, argv, help);
-  Exp::parse_worklist_command_line(args);
-
-  for (std::vector<const char*>::iterator ii = args.begin(), ei = args.end(); ii != ei; ++ii) {
-    if (strcmp(*ii, "-algo") == 0 && ii + 1 != ei) {
-      algo = atoi(ii[1]);
-      ii = args.erase(ii);
-      ii = args.erase(ii);
-      --ii;
-      ei = args.end();
-    }
-  }
-
-  if (args.size() < 1) {
-    std::cout << "not enough arguments, use -help for usage information\n";
-    return 1;
-  }
-
-  const char* in = args[0];
-
-  printBanner(std::cout, name, description, url);
+int main(int argc, char **argv) {
+  LonestarStart(argc, argv, std::cout, name, desc, url);
 
   switch (algo) {
-    case 1: start<Prims>(in); break;
+  case 1: start<Prims>(filename.c_str()); break;
     case 0:
-    default: start<Boruvkas>(in); break;
+  default: start<Boruvkas>(filename.c_str()); break;
   }
 
   return 0;
