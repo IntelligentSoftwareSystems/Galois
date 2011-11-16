@@ -31,8 +31,9 @@
 #include "Galois/Graphs/Serialize.h"
 #include "Galois/Graphs/FileGraph.h"
 
-#include "Lonestar/Banner.h"
-#include "Lonestar/CommandLine.h"
+#include "llvm/Support/CommandLine.h"
+
+#include "Lonestar/BoilerPlate.h"
 
 #include "Exp/PriorityScheduling/WorkListTL.h"
 
@@ -45,14 +46,17 @@
  
 #define BORUVKA_DEBUG 0 
 
+namespace cll = llvm::cl;
 
 static const char* name = "Boruvka MST";
-static const char* description = "Computes the Minimal Spanning Tree using Boruvka\n";
+static const char* desc = "Computes the Minimal Spanning Tree using Boruvka\n";
 static const char* url = "boruvkas_algorithm";
-static const char* help = "<input file> ";
-static unsigned int nodeID = 0;
 
-static int stepShift = 0;
+static cll::opt<int> stepShift("delta", cll::desc("Shift value for the deltastep"), cll::init(10));
+static cll::opt<std::string> inputfile(cll::Positional, cll::desc("<input file>"), cll::Required);
+
+
+static unsigned int nodeID = 0;
 
 struct Node {
 	unsigned int id;
@@ -209,7 +213,7 @@ void runBodyParallel() {
   std::cout<<"Graph size "<<graph.size()<<std::endl;
 #endif
 
-  for(int i=0;i<MSTWeight.size();i++)
+  for(unsigned i=0;i<MSTWeight.size();i++)
     MSTWeight.get(i)=0;
 
   Galois::StatTimer T;
@@ -222,7 +226,7 @@ void runBodyParallel() {
 
   //TODO: use a reduction variable here
   unsigned int res = 0;
-  for(int i=0;i<MSTWeight.size();i++){
+  for(unsigned i=0;i<MSTWeight.size();i++){
 
 #if BORUVKA_DEBUG
     std::cout<<"MST +=" << MSTWeight.get(i)<<std::endl;
@@ -299,28 +303,11 @@ static void makeGraph(const char* input) {
 }
 
 
-int main(int argc, const char **argv) {
-  std::vector<const char*> args = parse_command_line(argc, argv, help);
-  Exp::parse_worklist_command_line(args);
-
-  if (args.size() < 1) {
-    std::cout << "not enough arguments, use -help for usage information\n";
-    return 1;
-  }
-  printBanner(std::cout, name, description, url);
-  const char* inputfile = args[0];
-  for (unsigned i = 1; i < args.size(); ++i) {
-    if (strcmp(args[i], "-delta") == 0 && i + 1 < args.size()) {
-      stepShift = atoi(args[i+1]);
-      ++i;
-    } else {
-      std::cerr << "unknown argument, use -help for usage information\n";
-      return 1;
-    }
-  }
+int main(int argc, char **argv) {
+  LonestarStart(argc, argv, std::cout, name, desc, url);
   std::cout << "Using delta-step of " << (1 << stepShift) << "\n";
 
-  makeGraph(inputfile);
+  makeGraph(inputfile.c_str());
 #if BORUVKA_DEBUG
   printGraph();
 #endif

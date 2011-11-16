@@ -32,8 +32,10 @@
 #include "Galois/Graphs/Serialize.h"
 #include "Galois/Graphs/FileGraph.h"
 
-#include "Lonestar/Banner.h"
-#include "Lonestar/CommandLine.h"
+#include "llvm/Support/CommandLine.h"
+
+#include "Lonestar/BoilerPlate.h"
+
 #include <vector>
 #include <map>
 #include <string>
@@ -42,6 +44,12 @@
 #include <iostream>
 #include <fstream>
 #include <set>
+#include<iostream>
+#include<vector>
+#include<limits>
+#include<set>
+#include<map>
+#include<stdlib.h>
 
 #include "LeafNode.h"
 #include "NodeWrapper.h"
@@ -49,18 +57,14 @@
 #include"ClusterNode.h"
 #include <stdlib.h>
 #include <sys/time.h>
+
+namespace cll = llvm::cl;
+
 static const char* name = "Unordered Agglomerative Clustering";
-static const char* description = "Unordered Implementation of the well-known data-mining algorithm\n";
+static const char* desc = "Unordered Implementation of the well-known data-mining algorithm\n";
 static const char* url = "agglomerative_clustering";
-static const char* help = "[num points]";
 
-
-#include<iostream>
-#include<vector>
-#include<limits>
-#include<set>
-#include<map>
-#include<stdlib.h>
+static cll::opt<int> numPoints("numPoints", cll::desc("Number of Points"), cll::init(1000));
 
 #define DEBUG_CONSOLE 0
 
@@ -325,16 +329,8 @@ void clusterSerial(vector<LeafNode*> & lights) {
 
 }
 ///////////////////////////////////////////
-int main(int argc, const char ** argv){
-	std::vector<const char*> args = parse_command_line(argc, argv, help);
-	int numPoints=0;
-	if (args.size() == 1) {
-		numPoints = atoi(args[0]);
-	}
-	else if(args.size()==0){
-		numPoints = 1000;
-	}
-	printBanner(std::cout, name, description, url);
+int main(int argc, char ** argv){
+  LonestarStart(argc, argv, std::cout, name, desc, url);
 	std::cout<<"Starting Clustering app...["<<numPoints<<"]"<<std::endl;
 	//Initializing...
 
