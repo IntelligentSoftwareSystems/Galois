@@ -20,7 +20,7 @@
 #include <iosfwd>
 
 namespace Exp {
-  static llvm::cl::opt<std::string> WorklistName("wl", llvm::cl::desc("Worklist to use"));
+  __attribute__((weak)) llvm::cl::opt<std::string> WorklistName("wl", llvm::cl::desc("Worklist to use"));
 
 template<typename T = int>
 class TbbFIFO : private boost::noncopyable  {
