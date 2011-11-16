@@ -329,6 +329,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
       struct timeval time;
       int c = gettimeofday(&time, NULL);
       assert(c == 0);
+      c = 0; // suppress warning
       // Add slight jitter so threads will get different seeds
       // and ensure non-zero
       randomSeed.get(i) = ((1000000 + i) * time.tv_sec + time.tv_usec) | 0x0100;
