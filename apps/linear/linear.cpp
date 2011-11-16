@@ -1,17 +1,23 @@
 #include "Galois/Galois.h"
 #include "Galois/Statistic.h"
 #include "Galois/Graphs/Graph.h"
-#include "Lonestar/Banner.h"
-#include "Lonestar/CommandLine.h"
+#include "llvm/Support/CommandLine.h"
+#include "Lonestar/BoilerPlate.h"
 
 #include <cmath>
 #include <iostream>
 #include <algorithm>
 
+namespace cll = llvm::cl;
+
 static const char* name = "Iterative methods";
-static const char* description = "Iterative methods for solving PD linear systems Ax=b\n";
+static const char* desc = "Iterative methods for solving PD linear systems Ax=b\n";
 static const char* url = 0;
-static const char* help = "[-algo N] <N> <nonzeros in L> <seed>";
+
+static cll::opt<int> algo("algo", cll::desc("Node to start search from"), cll::init(0));
+static cll::opt<int> N(cll::Positional, cll::desc("<N>"), cll::Required);
+static cll::opt<int> sparsity(cll::Positional, cll::desc("<nonzeros>"), cll::Required);
+static cll::opt<int> seed(cll::Positional, cll::desc("<seed>"), cll::Required);
 
 static const double TOL = 1e-10;
 static int MaxIterations;
@@ -574,31 +580,10 @@ static void start(int N, int sparsity, int seed) {
   std::cout << "Residual is: " << residual(g) << "\n";
 }
 
-int main(int argc,  const char **argv) {
-  int algo = 0;
-  std::vector<const char*> args = parse_command_line(argc, argv, help);
-  for (std::vector<const char*>::iterator ii = args.begin(), ei = args.end(); ii != ei; ++ii) {
-    if (strcmp(*ii, "-algo") == 0 && ii + 1 != ei) {
-      algo = atoi(ii[1]);
-      ii = args.erase(ii);
-      ii = args.erase(ii);
-      --ii;
-      ei = args.end();
-    }
-  }
-  
-  if (args.size() < 3) {
-    std::cerr << "incorrect number of arguments, use -help for usage information\n";
-    return 1;
-  }
-
-  int N = atoi(args[0]);
-  int sparsity = atoi(args[1]);
-  int seed = atoi(args[2]);
+int main(int argc, char **argv) {
+  LonestarStart(argc, argv, std::cout, name, desc, url);
 
   MaxIterations = N;
-
-  printBanner(std::cout, name, description, url);
 
   switch (algo) {
     // TODO add cholesky

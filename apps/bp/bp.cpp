@@ -15,7 +15,7 @@ static const char* name = "Belief propagation";
 static const char* desc = "Belief propagation on Ising Grids";
 static const char* url = 0;
 
-static cll::opt<int> algo("algo", cll::desc("Node to start search from"), cll::init(1));
+static cll::opt<int> algo("algo", cll::desc("Algorithm"), cll::init(1));
 static cll::opt<int> N(cll::Positional, cll::desc("<N>"), cll::Required);
 static cll::opt<int> hardness(cll::Positional, cll::desc("<hardness>"), cll::Required);
 static cll::opt<int> seed(cll::Positional, cll::desc("<seed>"), cll::Required);

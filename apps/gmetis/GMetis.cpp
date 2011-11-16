@@ -34,12 +34,21 @@
 
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Statistic.h"
-#include "Lonestar/Banner.h"
-#include "Lonestar/CommandLine.h"
+#include "llvm/Support/CommandLine.h"
+
+#include "Lonestar/BoilerPlate.h"
+
+namespace cll = llvm::cl;
 
 static const char* name = "GMetis";
-static const char* description = "Partion a graph into K parts and minimize the graph cut\n";
+static const char* desc = "Partion a graph into K parts and minimize the graph cut\n";
 static const char* url = "gMetis";
+
+static cll::opt<int> metisStyle("metisStype", cll::desc("MetisStyle"), cll::init(true));
+static cll::opt<int> weighted("weighted", cll::desc("weighted"), cll::init(false));
+static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<int> numPartitions(cll::Positional, cll::desc("<Number of partitions>"), cll::Required);
+
 static const char* help = "<input file> numPartitions [metisStyle:true (default) or false] [weighted graph:true or false(default) ]";
 
 /**
@@ -204,32 +213,20 @@ void readGraph(MetisGraph* metisGraph, const char* filename, bool weighted = fal
 	cout<<"end of transfer data to GGraph"<<endl;
 }
 
-int main(int argc, const char** argv) {
+int main(int argc, char** argv) {
+  LonestarStart(argc, argv, std::cout, name, desc, url);
+
 	srand(-1);
-	std::vector<const char*> args = parse_command_line(argc, argv, help);
-	if (args.size() < 2) {
-		std::cout << "incorrect number of arguments, use -help for usage information\n";
-		return 1;
-	}
-	printBanner(std::cout, name, description, url);
 	MetisGraph metisGraph;
 	GGraph graph;
 	metisGraph.setGraph(&graph);
-	bool weighted = false;
 	bool directed = true;
-	bool metisStyle = true;
-	if(args.size()>2){
-		metisStyle = (string(args[2]).compare("true") == 0);
-		if(args.size()>3){
-			weighted = (string(args[3]).compare("true") == 0);
-		}
-	}
 	if(!metisStyle){
-		readGraph(&metisGraph, args[0], weighted, directed);
+	  readGraph(&metisGraph, filename.c_str(), weighted, directed);
 	}else{
-		readMetisGraph(&metisGraph, args[0]);
+	  readMetisGraph(&metisGraph, filename.c_str());
 	}
-	partition(&metisGraph, atoi(args[1]));
+	partition(&metisGraph, numPartitions);
 	verify(&metisGraph);
 }
 

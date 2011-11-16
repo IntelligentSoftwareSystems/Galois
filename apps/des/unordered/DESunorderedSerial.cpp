@@ -24,11 +24,9 @@
 
 #include "DESunorderedSerial.h"
 
-int main (int argc, const char* argv[]) {
+int main (int argc, char* argv[]) {
 
-  DESunorderedSerial* s = new DESunorderedSerial();
-  s->run (argc, argv);
-  delete s;
-
+  DESunorderedSerial s;
+  s.run (argc, argv);
   return 0;
 }

@@ -31,8 +31,8 @@
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
 #include "Galois/Graphs/FileGraph.h"
-#include "Lonestar/Banner.h"
-#include "Lonestar/CommandLine.h"
+#include "llvm/Support/CommandLine.h"
+#include "Lonestar/BoilerPlate.h"
 #include "Exp/PriorityScheduling/WorkListTL.h"
 
 #include <string>
@@ -40,12 +40,19 @@
 #include <algorithm>
 #include <iostream>
 
+namespace cll = llvm::cl;
+
 static const char* name = "Maximum cardinality matching in bipartite graphs";
-static const char* description =
+static const char* desc =
   "A matching of G is a subset of edges that do not share an endpoint. The "
   "maximum cardinality matching is the matching with the most number of edges.";
 static const char* url = 0;
-static const char* help = "[-algo N] <N> <numEdges> <numGroups> <seed>";
+
+static cll::opt<int> algo("algo", cll::desc("Algorithm"), cll::init(1));
+static cll::opt<int> N(cll::Positional, cll::desc("<N>"), cll::Required);
+static cll::opt<int> numEdges(cll::Positional, cll::desc("<numEdges>"), cll::Required);
+static cll::opt<int> numGroups(cll::Positional, cll::desc("<numGroups>"), cll::Required);
+static cll::opt<int> seed(cll::Positional, cll::desc("<seed>"), cll::Required);
 
 template<typename NodeTy,typename EdgeTy>
 struct BipartiteGraph: public Galois::Graph::FirstGraph<NodeTy,EdgeTy,true> {
@@ -1027,32 +1034,9 @@ void start(int N, int numEdges, int numGroups) {
   }
 }
 
-int main(int argc, const char** argv) {
-  int algo = 0;
-  std::vector<const char*> args = parse_command_line(argc, argv, help);
-  Exp::parse_worklist_command_line(args);
+int main(int argc, char** argv) {
+  LonestarStart(argc, argv, std::cout, name, desc, url);
 
-  for (std::vector<const char*>::iterator ii = args.begin(), ei = args.end(); ii != ei; ++ii) {
-    if (strcmp(*ii, "-algo") == 0 && ii + 1 != ei) {
-      algo = atoi(ii[1]);
-      ii = args.erase(ii);
-      ii = args.erase(ii);
-      --ii;
-      ei = args.end();
-    }
-  }
-  
-  if (args.size() < 4) {
-    std::cerr << "incorrect number of arguments, use -help for usage information\n";
-    return 1;
-  }
-
-  int N = atoi(args[0]);
-  int numEdges = atoi(args[1]);
-  int numGroups = atoi(args[2]);
-  int seed = atoi(args[3]);
-
-  printBanner(std::cout, name, description, url);
   std::cout << "N: " << N 
     << " numEdges: " << numEdges 
     << " numGroups: " << numGroups

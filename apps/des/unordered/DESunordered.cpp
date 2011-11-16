@@ -24,11 +24,10 @@
 
 #include "DESunordered.h"
 
-int main (int argc, const char* argv[]) {
+int main (int argc, char* argv[]) {
 
-  DESunordered* m = new DESunordered();
-  m->run (argc, argv);
-  delete m;
+  DESunordered m;
+  m.run (argc, argv);
 
   return 0;
 }

@@ -38,16 +38,21 @@
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
 
-#include "Lonestar/Banner.h"
-#include "Lonestar/CommandLine.h"
+#include "llvm/Support/CommandLine.h"
+
+#include "Lonestar/BoilerPlate.h"
 
 #include "SimObject.h"
 #include "SimInit.h"
 
+namespace cll = llvm::cl;
+
 static const char* name = "Discrete Event Simulation";
-static const char* description = "Uses Chandy-Misra's algorithm, which is unordered, to perform logic circuit simulations";
+static const char* desc = "Uses Chandy-Misra's algorithm, which is unordered, to perform logic circuit simulations";
 static const char* url = "discrete_event_simulation";
-static const char* help = "<progname> netlistFile [NEVENTS_PER_ITER]";
+
+static cll::opt<std::string> netlistFile(cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<int> epi("epi", cll::desc("Events per iteration"));
 
 /**
  * The Class DESabstractMain holds common functionality for {@link DESunorderedSerial} and {@link DESunordered}.
@@ -91,32 +96,17 @@ public:
    * @param argc
    * @param argv
    */
-  void run(int argc, const char* argv[]) {
-    std::vector<const char*> args = parse_command_line (argc, argv, help);
+  void run(int argc, char* argv[]) {
+  LonestarStart(argc, argv, std::cout, name, desc, url);
 
-    if (args.size () < 1 || args.size () > 2) {
-      std::cerr << help << std::endl;
-      abort ();
-    }
-
-    printBanner(std::cout, name, description, url);
-
-    const char* netlistFile = args[0];
-
-    if (args.size () == 2) {
-      size_t epi = AbstractSimObject::NEVENTS_PER_ITER;
-      std::istringstream iss (args[1]);
-      iss >> epi;
-      
-      assert (epi >= 0);
-      AbstractSimObject::NEVENTS_PER_ITER = epi;
-
-    }
+  if (epi) {
+    AbstractSimObject::NEVENTS_PER_ITER = epi;
+  }
 
     printf ("Processing %zd events per iteration\n", AbstractSimObject::NEVENTS_PER_ITER);
 
 
-    SimInit simInit(graph, netlistFile);
+    SimInit simInit(graph, netlistFile.c_str());
 
 
     printf("circuit graph: %u nodes, %zd edges\n", graph.size(), simInit.getNumEdges());

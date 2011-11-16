@@ -35,13 +35,18 @@
 #include "Tuple.h"
 #include "Element.h"
 
-#include "Lonestar/Banner.h"
-#include "Lonestar/CommandLine.h"
+#include "llvm/Support/CommandLine.h"
+
+#include "Lonestar/BoilerPlate.h"
+
+namespace cll = llvm::cl;
 
 static const char* name = "Delaunay Triangulation";
-static const char* description = "Produces a Delaunay triangulation from a given a set of points\n";
+static const char* desc = "Produces a Delaunay triangulation from a given a set of points\n";
 static const char* url = "delaunay_triangulation";
-static const char* help = "[-writemesh] <input file>";
+
+cll::opt<std::string> writeMesh("writemesh", cll::desc("Write the mesh out ot filename"), cll::value_desc("filename"));
+static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 
 typedef Galois::Graph::FirstGraph<Element,int,true>            Graph;
 typedef Galois::Graph::FirstGraph<Element,int,true>::GraphNode GNode;
@@ -291,25 +296,15 @@ std::string gen_name(const char* filename) {
   abort();
 }
 
-int main(int argc, const char** argv) {
-  std::vector<const char*> args = parse_command_line(argc, argv, help);
-  bool skipWriteMesh = true;
+int main(int argc, char** argv) {
+  LonestarStart(argc, argv, std::cout, name, desc, url);
 
-  if (args.size() > 0 && strcmp(args[0], "-writemesh") == 0) {
-    skipWriteMesh = false;
-    args.erase(args.begin());
-  }
-  if (args.size() != 1) {
-    std::cout << "incorrect number of arguments, use -help for usage information\n";
-    return 1;
-  }
-  if (!ends_with(args[0], ".node")) {
+  if (!ends_with(filename.c_str(), ".node")) {
     std::cout << "must pass .node file, use -help for usage information\n";
     return 1;
   }
-  printBanner(std::cout, name, description, url);
 
-  GNode initial_triangle = make_graph(args[0]);
+  GNode initial_triangle = make_graph(filename.c_str());
   
   std::vector<GNode> wl;
   wl.push_back(initial_triangle);
@@ -350,14 +345,14 @@ int main(int argc, const char** argv) {
     std::cout << "Triangulation OK\n";
   }
 
-  if (!skipWriteMesh) {
-    std::string base = gen_name(args[0]);
+  if (writeMesh.size()) {
+    std::string base = gen_name(writeMesh.c_str());
     std::cout << "Writing " << base << "\n";
     write_mesh(base.c_str());
 
     TupleList tuples;
-    read_points(args[0], tuples);
-    write_points(std::string(base).append(".node").c_str(), tuples);
+    read_points(filename.c_str(), tuples);
+    write_points(base.append(".node").c_str(), tuples);
   }
 
   delete Mesh;

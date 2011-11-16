@@ -27,8 +27,8 @@
 #include "Galois/Graphs/Serialize.h"
 #include "Galois/Graphs/FileGraph.h"
 
-#include "Lonestar/Banner.h"
-#include "Lonestar/CommandLine.h"
+#include "llvm/Support/CommandLine.h"
+#include "Lonestar/BoilerPlate.h"
 
 #include <string>
 #include <sstream>
@@ -36,15 +36,19 @@
 #include <iostream>
 #include <fstream>
 
+namespace cll = llvm::cl;
+
 static const char* name = "Page Rank";
-static const char* description = "Computes page ranks a la Page and Brin\n";
+static const char* desc = "Computes page ranks a la Page and Brin\n";
 static const char* url = NULL;
-static const char* help = "<input file> [max_iterations]";
+
+static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<int> max_iterations("maxiter", cll::desc("Maximum iterations"), cll::init(10));
+
 
 // damping factor: prob that user will continue to next link
 static const double alpha = 0.85;
 static const double tolerance = 0.00001;
-static unsigned int max_iterations = 10;
 
 struct Node {
   double v0;
@@ -236,22 +240,12 @@ void printTop(int topn) {
   }
 }
 
-int main(int argc, const char **argv) {
-  std::vector<const char*> args = parse_command_line(argc, argv, help);
-
-  if (args.size() < 1) {
-    std::cout << "not enough arguments, use -help for usage information\n";
-    return 1;
-  }
-  printBanner(std::cout, name, description, url);
-  
-  const char* inputfile = args[0];
-  if (args.size() > 1)
-    max_iterations = atoi(args[1]);
+int main(int argc, char **argv) {
+  LonestarStart(argc, argv, std::cout, name, desc, url);
  
   Galois::Timer phase;
   phase.start();
-  makeGraph(inputfile);
+  makeGraph(filename.c_str());
   phase.stop();
   GaloisRuntime::reportStatSum("ReadTotal", phase.get());
 
