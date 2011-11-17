@@ -185,7 +185,7 @@ public:
 };
 WLCOMPILECHECK(FIFO);
 
-template<class Indexer = DummyIndexer, typename ContainerTy = FIFO<>, typename T = int, bool concurrent = true >
+template<class Indexer = DummyIndexer<int>, typename ContainerTy = FIFO<>, typename T = int, bool concurrent = true >
 class OrderedByIntegerMetric : private boost::noncopyable {
 
   typedef typename ContainerTy::template rethread<concurrent>::WL CTy;
