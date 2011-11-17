@@ -35,6 +35,7 @@ class PERTHING :private boost::noncopyable {
 protected:
   cache_line_storage<T>* datum;
   unsigned int num;
+  ThreadPolicy& P;
 
   int myID() const {
     return ThreadPool::getMyID();
@@ -46,6 +47,9 @@ protected:
   }
 
 public:
+  PERTHING() :P(GaloisRuntime::getSystemThreadPolicy()) {
+  }
+
   ~PERTHING() {
     delete[] datum;
   }
@@ -82,15 +86,14 @@ template<typename T>
 class PerCPU : public HIDDEN::PERTHING<T> {
   using HIDDEN::PERTHING<T>::create;
   using HIDDEN::PERTHING<T>::myID;
+  using HIDDEN::PERTHING<T>::P;
 
 public:
   using HIDDEN::PERTHING<T>::reset;
-  PerCPU()
-  {
+  PerCPU() :HIDDEN::PERTHING<T>() {
     create(getSystemThreadPolicy().getNumThreads());
   }
-  explicit PerCPU(const T& ival)
-  {
+  explicit PerCPU(const T& ival) :HIDDEN::PERTHING<T>() {
     create(getSystemThreadPolicy().getNumThreads());
     reset(ival);
   }
@@ -134,19 +137,17 @@ template<typename T>
 class PerLevel : public HIDDEN::PERTHING<T> {
   using HIDDEN::PERTHING<T>::create;
   using HIDDEN::PERTHING<T>::myID;
+  using HIDDEN::PERTHING<T>::P;
 
   unsigned int level;
-  ThreadPolicy& P;
 
 public:
-  PerLevel() :P(getSystemThreadPolicy())
-  {
+  PerLevel() :HIDDEN::PERTHING<T>() {
     //last iteresting level (should be package)
     level = P.getNumLevels() - 1;
     create(P.getLevelBins(level));
   }
-  explicit PerLevel(const T& ival)
-  {
+  explicit PerLevel(const T& ival) :HIDDEN::PERTHING<T>() {
     level = P.getNumLevels() - 1;
     create(P.getLevelBins(level));
     reset(ival);
