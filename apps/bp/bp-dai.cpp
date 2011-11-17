@@ -84,14 +84,19 @@ int main(int argc, char **argv) {
     default: algostring = "SEQRND"; break;
   }
 
+  // Put values in the right types for propertyset
   dai::PropertySet opts;
   size_t maxiter = MaxIterations;
   size_t verb = 3;
+  std::string worklist(Exp::WorklistName);
+  std::ostringstream dampingStream;
+  dampingStream << damping;
+
   opts.set("maxiter", maxiter);  // Maximum number of iterations
   opts.set("tol", TOL);          // Tolerance for convergence
   opts.set("verbose", verb);     // Verbosity (amount of output generated)
-  opts.set("damping", damping);  //
-  opts.set("worklist", Exp::WorklistName);
+  opts.set("damping", dampingStream.str()); 
+  opts.set("worklist", worklist);
   opts.set("logdomain", false);
 
   dai::BP bp(fg, opts("updates", algostring));

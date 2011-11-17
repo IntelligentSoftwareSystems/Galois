@@ -6,4 +6,4 @@ add_definitions(-DDAI_WITH_LC -DDAI_WITH_TREEEP -DDAI_WITH_JTREE -DDAI_WITH_MR -
 add_definitions(-DDAI_WITH_CBP -DDAI_WITH_DECMAP)
 file(GLOB Sources libdai/src/*.cpp)
 include_directories("libdai/include")
-app(bp-dai bp-dai.cpp ${Sources} EXTLIBS gmp gmpxx)
+app(bp-dai bp-dai.cpp ${Sources} EXTLIBS gmp gmpxx REQUIRES TBB_FOUND)

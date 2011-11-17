@@ -49,8 +49,6 @@ static cll::opt<int> weighted("weighted", cll::desc("weighted"), cll::init(false
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<int> numPartitions(cll::Positional, cll::desc("<Number of partitions>"), cll::Required);
 
-static const char* help = "<input file> numPartitions [metisStyle:true (default) or false] [weighted graph:true or false(default) ]";
-
 /**
  * KMetis Algorithm
  */

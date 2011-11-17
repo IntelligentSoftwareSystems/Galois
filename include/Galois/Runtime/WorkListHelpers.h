@@ -34,7 +34,7 @@ class FixedSizeRing :private boost::noncopyable, private PaddedLock<concurrent> 
   unsigned end;
   T data[__chunksize + 1];
 
-  inline int chunksize() const { return __chunksize + 1; }
+  inline unsigned chunksize() const { return __chunksize + 1; }
 
   inline bool _i_empty() const {
     return start == end;
@@ -247,8 +247,8 @@ struct DummyPartitioner {
   unsigned operator()(T& item) { return 0; }
 };
 
-struct DummyIndexer {
-  template<typename T>
+template<typename T>
+struct DummyIndexer: public std::unary_function<const T&,unsigned> {
   unsigned operator()(const T& x) { return 0; }
 };
 

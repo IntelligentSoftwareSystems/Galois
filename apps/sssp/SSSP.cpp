@@ -55,6 +55,7 @@ static cll::opt<unsigned int> startNode("startnode", cll::desc("Node to start se
 static cll::opt<unsigned int> reportNode("reportnode", cll::desc("Node to report distance to"), cll::init(2));
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<int> stepShift("delta", cll::desc("Shift value for the deltastep"), cll::init(10));
+static cll::opt<bool> useBfs("bfs", cll::desc("Use BFS"), cll::init(false));
 
 typedef Galois::Graph::LC_FileGraph<SNode, unsigned int> Graph;
 typedef Galois::Graph::LC_FileGraph<SNode, unsigned int>::GraphNode GNode;
@@ -70,7 +71,7 @@ struct UpdateRequestIndexer
 };
 
 Graph graph;
-bool do_bfs = false;
+bool doBfs = false;
 
 void runBody(const GNode src) {
   std::set<UpdateRequest, std::less<UpdateRequest> > initial;
@@ -79,7 +80,7 @@ void runBody(const GNode src) {
       ee = graph.neighbor_end(src, Galois::NONE); 
       ii != ee; ++ii) {
     GNode dst = *ii;
-    int w = do_bfs ? 1 : graph.getEdgeData(src, dst, Galois::NONE);
+    int w = doBfs ? 1 : graph.getEdgeData(src, dst, Galois::NONE);
     UpdateRequest up(dst, w);
     initial.insert(up);
   }
@@ -101,7 +102,7 @@ void runBody(const GNode src) {
 	  ee = graph.neighbor_end(req.n, Galois::NONE);
 	  ii != ee; ++ii) {
 	GNode dst = *ii;
-	int d = do_bfs ? 1 : graph.getEdgeData(req.n, dst, Galois::NONE);
+	int d = doBfs ? 1 : graph.getEdgeData(req.n, dst, Galois::NONE);
 	unsigned int newDist = req.w + d;
 	if (newDist < graph.getData(dst,Galois::NONE).dist)
 	  initial.insert(UpdateRequest(dst, newDist));
@@ -129,7 +130,7 @@ struct process {
             ii = graph.neighbor_begin(req.n, Galois::NONE),
             ee = graph.neighbor_end(req.n, Galois::NONE); ii != ee; ++ii) {
 	  GNode dst = *ii;
-	  int d = do_bfs ? 1 : graph.getEdgeData(req.n, dst, Galois::NONE);
+	  int d = doBfs ? 1 : graph.getEdgeData(req.n, dst, Galois::NONE);
 	  unsigned int newDist = req.w + d;
 	  SNode& rdata = graph.getData(dst,Galois::NONE);
 	  if (newDist < rdata.dist)
@@ -176,7 +177,7 @@ bool verify(GNode source) {
         ee = graph.neighbor_end(*src, Galois::NONE); ii != ee; ++ii) {
       GNode neighbor = *ii;
       unsigned int ddist = graph.getData(*src,Galois::NONE).dist;
-      int d = do_bfs ? 1 : graph.getEdgeData(*src, neighbor, Galois::NONE);
+      int d = doBfs ? 1 : graph.getEdgeData(*src, neighbor, Galois::NONE);
       if (ddist > dist + d) {
         std::cerr << "bad level value at "
           << graph.getData(*src,Galois::NONE).id
@@ -191,6 +192,8 @@ bool verify(GNode source) {
 
 int main(int argc, char **argv) {
   LonestarStart(argc, argv, std::cout, name, desc, url);
+
+  doBfs = useBfs;
 
   Galois::Statistic<unsigned int> sBadWork("BadWork");
   Galois::Statistic<unsigned int> sWLEmptyWork("WLEmptyWork");
