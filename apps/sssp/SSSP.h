@@ -15,15 +15,20 @@ UpdateRequestCommon(const GrNode& N, unsigned int W)
   {}
 
   bool operator>(const UpdateRequestCommon& rhs) const {
-    return w > rhs.w;
+    if (w > rhs.w) return true;
+    if (w < rhs.w) return false;
+    return n > rhs.n;
   }
 
   bool operator<(const UpdateRequestCommon& rhs) const {
-    return w < rhs.w;
+    if (w < rhs.w) return true;
+    if (w > rhs.w) return false;
+    return n < rhs.n;
   }
 
   bool operator!=(const UpdateRequestCommon& other) const {
-    return w != other.w;
+    if (w != other.w) return true;
+    return n != other.n;
   }
 
   int getID() const {

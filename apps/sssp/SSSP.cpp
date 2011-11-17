@@ -51,8 +51,8 @@ static const char* desc =
   "graph using a modified Bellman-Ford algorithm\n";
 static const char* url = "single_source_shortest_path";
 
-static cll::opt<int> startNode("startnode", cll::desc("Node to start search from"), cll::init(1));
-static cll::opt<int> reportNode("reportnode", cll::desc("Node to report distance to"), cll::init(2));
+static cll::opt<unsigned int> startNode("startnode", cll::desc("Node to start search from"), cll::init(1));
+static cll::opt<unsigned int> reportNode("reportnode", cll::desc("Node to report distance to"), cll::init(2));
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<int> stepShift("delta", cll::desc("Shift value for the deltastep"), cll::init(10));
 
@@ -60,24 +60,6 @@ typedef Galois::Graph::LC_FileGraph<SNode, unsigned int> Graph;
 typedef Galois::Graph::LC_FileGraph<SNode, unsigned int>::GraphNode GNode;
 
 typedef UpdateRequestCommon<GNode> UpdateRequest;
-
-struct seq_less: public std::binary_function<const UpdateRequest&,const UpdateRequest&,bool> {
-  bool operator()(const UpdateRequest& lhs, const UpdateRequest& rhs) const {
-    //return (lhs.w  >> stepShift) < (rhs.w >> stepShift);
-    if (lhs.w < rhs.w) return true;
-    else if (lhs.w > rhs.w) return false;
-    else return lhs.n < rhs.n;
-  }
-};
-
-struct seq_greater: public std::binary_function<const UpdateRequest&,const UpdateRequest&,bool> {
-  bool operator()(const UpdateRequest& lhs, const UpdateRequest& rhs) const {
-    //return (lhs.w  >> stepShift) < (rhs.w >> stepShift);
-    if (lhs.w > rhs.w) return true;
-    else if (lhs.w < rhs.w) return false;
-    else return lhs.n > rhs.n;
-  }
-};
 
 struct UpdateRequestIndexer
   : std::unary_function<UpdateRequest, unsigned int> {
@@ -91,7 +73,7 @@ Graph graph;
 bool do_bfs = false;
 
 void runBody(const GNode src) {
-  std::set<UpdateRequest, seq_less> initial;
+  std::set<UpdateRequest, std::less<UpdateRequest> > initial;
   for (Graph::neighbor_iterator
       ii = graph.neighbor_begin(src, Galois::NONE), 
       ee = graph.neighbor_end(src, Galois::NONE); 
@@ -169,7 +151,7 @@ void runBodyParallel(const GNode src) {
 
   UpdateRequest one[1] = { UpdateRequest(src, 0) };
   T.start();
-  Exp::StartWorklistExperiment<OBIM,dChunk,Chunk,UpdateRequestIndexer,seq_less,seq_greater>()(std::cout, &one[0], &one[1], process());
+  Exp::StartWorklistExperiment<OBIM,dChunk,Chunk,UpdateRequestIndexer,std::less<UpdateRequest>, std::greater<UpdateRequest> >()(std::cout, &one[0], &one[1], process());
   T.stop();
 }
 
