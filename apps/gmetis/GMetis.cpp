@@ -44,8 +44,8 @@ static const char* name = "GMetis";
 static const char* desc = "Partion a graph into K parts and minimize the graph cut\n";
 static const char* url = "gMetis";
 
-static cll::opt<int> metisStyle("metisStype", cll::desc("MetisStyle"), cll::init(true));
-static cll::opt<int> weighted("weighted", cll::desc("weighted"), cll::init(false));
+static cll::opt<bool> binaryInput("binaryinput", cll::desc("Use binary grpah files instead text based ones"), cll::init(true));
+static cll::opt<bool> weighted("weighted", cll::desc("weighted"), cll::init(false));
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<int> numPartitions(cll::Positional, cll::desc("<Number of partitions>"), cll::Required);
 
@@ -219,7 +219,7 @@ int main(int argc, char** argv) {
 	GGraph graph;
 	metisGraph.setGraph(&graph);
 	bool directed = true;
-	if(!metisStyle){
+	if(binaryInput){
 	  readGraph(&metisGraph, filename.c_str(), weighted, directed);
 	}else{
 	  readMetisGraph(&metisGraph, filename.c_str());
