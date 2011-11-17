@@ -27,6 +27,10 @@
 
 namespace GaloisRuntime {
 
+class ThreadPool;
+//Returns or creates the appropriate thread pool for the system
+ThreadPool& getSystemThreadPool();
+
 struct runCMD {
   config::function<void (void)> work;
   bool isParallel;
@@ -52,12 +56,15 @@ public:
   unsigned int getActiveThreads() const { return activeThreads; }
 
   //!My thread id (dense, user thread is 0, galois threads 1..num)
-  static unsigned int getMyID() { return LocalThreadID; }
-
+  static unsigned int getMyID() {
+    unsigned int L = ThreadPool::LocalThreadID;
+    if (L == ~0U) {
+      getSystemThreadPool();
+      L = ThreadPool::LocalThreadID;
+    }
+    return L;
+  }
 };
-
-//Returns or creates the appropriate thread pool for the system
-ThreadPool& getSystemThreadPool();
 
 class ThreadPolicy {
 protected:
