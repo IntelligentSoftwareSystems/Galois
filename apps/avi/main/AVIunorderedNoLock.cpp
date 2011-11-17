@@ -7,7 +7,7 @@
 
 #include "AVIunorderedNoLock.h"
 
-int main (int argc, const char* argv[]) {
+int main (int argc, char* argv[]) {
   AVIunorderedNoLock* um = new AVIunorderedNoLock ();
   um->run (argc, argv);
   delete um;

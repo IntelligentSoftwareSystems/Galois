@@ -7,7 +7,7 @@
 
 #include "AVIunordered.h"
 
-int main (int argc, const char* argv[]) {
+int main (int argc, char* argv[]) {
   AVIunordered* um = new AVIunordered ();
   um->run (argc, argv);
   delete um;

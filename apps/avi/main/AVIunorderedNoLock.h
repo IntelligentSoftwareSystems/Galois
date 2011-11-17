@@ -34,9 +34,6 @@
 #include "Galois/Runtime/PerCPU.h"
 #include "Galois/Atomic.h"
 
-#include "Lonestar/Banner.h"
-#include "Lonestar/CommandLine.h"
-
 #include <string>
 #include <sstream>
 #include <limits>

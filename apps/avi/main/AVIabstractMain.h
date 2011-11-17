@@ -49,18 +49,25 @@
 #include "Galois/Statistic.h"
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
+#include "llvm/Support/CommandLine.h"
 
-#include "Lonestar/Banner.h"
-#include "Lonestar/CommandLine.h"
+#include "Lonestar/BoilerPlate.h"
+
+namespace cll = llvm::cl;
 
 static const char* fileNameOpt = "-f";
 static const char* spDimOpt = "-d";
 static const char* ndivOpt = "-n";
 static const char* simEndTimeOpt = "-e";
 
+static cll::opt<std::string> _fileName("f", cll::desc("<input file>"), cll::Required);
+static cll::opt<int> _spDim("d", cll::desc("spDim"), cll::init(2));
+static cll::opt<int> _ndiv("n", cll::desc("ndiv"), cll::init(0));
+static cll::opt<double> _simEndTime("e", cll::desc("simEndTime"), cll::init(1.0));
+
 
 static const char* name = "Asynchronous Variational Integrators";
-static const char* description = "Elasto-dynamic simulation of a mesh with minimal number of simulation updates";
+static const char* desc = "Elasto-dynamic simulation of a mesh with minimal number of simulation updates";
 static const char* url = "asynchronous_variational_integrators";
 
 /**
@@ -88,7 +95,7 @@ private:
 
   static void printUsage ();
 
-  static InputConfig readCmdLine (std::vector<const char*> args);
+  static InputConfig readCmdLine ();
 
   static MeshInit* initMesh (const InputConfig& input);
 
@@ -128,7 +135,7 @@ public:
    * @param argc
    * @param argv
    */
-  void run (int argc, const char* argv[]);
+  void run (int argc, char* argv[]);
 
   void verify (const InputConfig& input, const MeshInit& meshInit, const GlobalVec& g) const;
 
@@ -180,44 +187,12 @@ void AVIabstractMain::printUsage () {
   abort ();
 }
 
-AVIabstractMain::InputConfig AVIabstractMain::readCmdLine (std::vector<const char*> args) {
-  const char* fileName = NULL;
-  int spDim = 2;
-  int ndiv = 0;
-  double simEndTime = 1.0;
+AVIabstractMain::InputConfig AVIabstractMain::readCmdLine () {
+  const char* fileName = _fileName.c_str();
+  int spDim = _spDim;
+  int ndiv = _ndiv;
+  double simEndTime = _simEndTime;
   std::string wltype;
-
-  if (args.size() == 0) {
-    printUsage ();
-  }
-
-  for (std::vector<const char*>::const_iterator i = args.begin (), e = args.end (); i != e; ++i) {
-
-    if (std::string (*i) == fileNameOpt) {
-      ++i;
-      fileName = *i;
-
-    } else if (std::string (*i) == spDimOpt) {
-      ++i;
-      spDim = atoi (*i);
-
-    } else if (std::string (*i) == ndivOpt) {
-      ++i;
-      ndiv = atoi (*i);
-
-    } else if (std::string (*i) == simEndTimeOpt) {
-      ++i;
-      simEndTime = atof (*i);
-    } else if (std::string(*i) == "-wl") {
-      ++i;
-      wltype = *i;
-    } else {
-      fprintf (stderr, "Unkown option: %s\n Exiting ...\n", *i);
-      printUsage ();
-    }
-  }
-
-
 
   return InputConfig (fileName, spDim, ndiv, simEndTime, "", wltype);
 }
@@ -251,14 +226,11 @@ void AVIabstractMain::initGlobalVec (const MeshInit& meshInit, GlobalVec& g) {
   }
 }
 
-void AVIabstractMain::run (int argc, const char* argv[]) {
-
-  std::vector<const char*> args = parse_command_line (argc, argv, getUsage ().c_str ());
-
-  printBanner(std::cout, name, description, url);
+void AVIabstractMain::run (int argc, char* argv[]) {
+  LonestarStart(argc, argv, std::cout, name, desc, url);
 
   // print messages e.g. version, input etc.
-  InputConfig input = readCmdLine (args);
+  InputConfig input = readCmdLine ();
   wltype = input.wltype;
 
   MeshInit* meshInit = initMesh (input);

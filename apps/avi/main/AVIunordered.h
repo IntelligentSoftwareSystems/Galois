@@ -35,9 +35,6 @@
 #include "Galois/Atomic.h"
 #include "Galois/Accumulator.h"
 
-#include "Lonestar/Banner.h"
-#include "Lonestar/CommandLine.h"
-
 #include <string>
 #include <sstream>
 #include <limits>

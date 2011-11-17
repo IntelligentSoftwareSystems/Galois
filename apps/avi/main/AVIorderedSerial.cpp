@@ -6,7 +6,7 @@
  */
 #include "AVIabstractMain.h"
 
-int main (int argc, const char* argv[]) {
+int main (int argc, char* argv[]) {
   AVIorderedSerial* serial = new AVIorderedSerial ();
   serial->run (argc, argv);
   delete serial;
