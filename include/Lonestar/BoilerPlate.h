@@ -23,6 +23,7 @@
 #ifndef LONESTAR_BOILERPLATE_H
 #define LONESTAR_BOILERPLATE_H
 
+#include <sstream>
 #include "llvm/Support/CommandLine.h"
 #include "Galois/Galois.h"
 
@@ -33,6 +34,19 @@ static llvm::cl::opt<int> numThreads("t", llvm::cl::desc("Number of threads"), l
 //! initialize lonestar benchmark
 template<typename OS>
 void LonestarStart(int argc, char** argv, OS& out, const char* app, const char* desc = 0, const char* url = 0) {
+
+  std::ostringstream cmdout;
+  for (int i = 0; i < argc; ++i) {
+    cmdout << argv[i];
+    if (i != argc - 1)
+      cmdout << " ";
+  }
+  GaloisRuntime::reportInfo("CommandLine", cmdout.str().c_str());
+  char name[256];
+  gethostname(name, 256);
+  GaloisRuntime::reportInfo("Hostname", name);
+  GaloisRuntime::reportFlush();
+
   llvm::cl::ParseCommandLineOptions(argc, argv);
   out << "\nLonestar Benchmark Suite v3.0 (C++)\n"
       << "Copyright (C) 2011 The University of Texas at Austin\n"
@@ -46,8 +60,10 @@ void LonestarStart(int argc, char** argv, OS& out, const char* app, const char* 
       << "http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/" 
       << url << "\n";
   }
-  Galois::setMaxThreads(numThreads);
   out << "\n";
+
+  numThreads = Galois::setMaxThreads(numThreads); 
+
 }
 
 #endif
