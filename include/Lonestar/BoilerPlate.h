@@ -23,6 +23,9 @@
 #ifndef LONESTAR_BOILERPLATE_H
 #define LONESTAR_BOILERPLATE_H
 
+#include "llvm/Support/CommandLine.h"
+#include "Galois/Galois.h"
+
 //! standard global options to the benchmarks
 static llvm::cl::opt<bool> skipVerify("noverify", llvm::cl::desc("Skip verification step"), llvm::cl::init(false));
 static llvm::cl::opt<int> numThreads("t", llvm::cl::desc("Number of threads"), llvm::cl::init(1));
@@ -43,9 +46,8 @@ void LonestarStart(int argc, char** argv, OS& out, const char* app, const char* 
       << "http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/" 
       << url << "\n";
   }
+  Galois::setMaxThreads(numThreads);
   out << "\n";
 }
-
-
 
 #endif
