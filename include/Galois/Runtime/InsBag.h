@@ -38,19 +38,17 @@ class galois_insert_bag {
 
   PtrLock<holder*, true> head;
   GaloisRuntime::PerCPU<holder*> heads;
-  
   GaloisRuntime::MM::FixedSizeAllocator allocSrc;
 
 public:
-  galois_insert_bag()
-    :allocSrc(sizeof(holder))
-  {}
+  galois_insert_bag(): allocSrc(sizeof(holder)) {}
 
   ~galois_insert_bag() {
     while (head.getValue()) {
-      holder* H = head.getValue();
-      head.setValue(H->next);
-      allocSrc.deallocate(H);
+      holder* h = head.getValue();
+      head.setValue(h->next);
+      h->~holder();
+      allocSrc.deallocate(h);
     }
   }
 
@@ -58,8 +56,7 @@ public:
   typedef const T& const_reference;
   typedef T&       reference;
 
-  class iterator : public std::iterator<std::forward_iterator_tag, T>
-  {
+  class iterator : public std::iterator<std::forward_iterator_tag, T> {
     holder* p;
   public:
     iterator(holder* x) :p(x) {}
@@ -80,8 +77,8 @@ public:
 
   //Only this is thread safe
   reference push(const T& val) {
-    holder* h = (holder*)allocSrc.allocate(sizeof(holder));
-    new ((void *)&h->data) T(val);
+    holder* h = static_cast<holder*>(allocSrc.allocate(sizeof(holder)));
+    new (static_cast<void *>(&h->data)) T(val);
     holder* H = heads.get();
     if (!H) { //no thread local head, use the new node as one
       heads.get() = h;

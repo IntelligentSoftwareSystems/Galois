@@ -45,7 +45,7 @@ static const char* name = "Delaunay Triangulation";
 static const char* desc = "Produces a Delaunay triangulation from a given a set of points\n";
 static const char* url = "delaunay_triangulation";
 
-cll::opt<std::string> writeMesh("writemesh", cll::desc("Write the mesh out ot filename"), cll::value_desc("filename"));
+cll::opt<std::string> writeMesh("writemesh", cll::desc("Write the mesh out to files with basename"), cll::value_desc("basename"));
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 
 typedef Galois::Graph::FirstGraph<Element,int,true>            Graph;
@@ -274,28 +274,6 @@ bool ends_with(const char* str, const char* end) {
   return strcmp(str + diff, end) == 0;
 }
 
-std::string gen_name(const char* filename) {
-  assert(ends_with(filename, ".node"));
-  std::string base = std::string(filename).substr(0, strlen(filename) - strlen(".node"));
-  for (int i = 1; i < 16; ++i) {
-    std::string path(base);
-    char num[16];
-    sprintf(num, ".%d.node", i);
-    path.append(num);
-    if (access(path.c_str(), F_OK) == 0)
-      continue;
-    else {
-      sprintf(num, ".%d", i);
-      base.append(num);
-      return base;
-    }
-  }
-
-  std::cerr << "Unable to output mesh.\n";
-  assert(0 && "Output failed");
-  abort();
-}
-
 int main(int argc, char** argv) {
   LonestarStart(argc, argv, std::cout, name, desc, url);
 
@@ -312,16 +290,15 @@ int main(int argc, char** argv) {
 
   Galois::StatTimer T;
   T.start();
-  const int chunkSize = 1024; //1024; // XXX: Set this correctly
+  const int chunkSize = 1024; // XXX: Set this correctly
   using namespace GaloisRuntime::WorkList;
-  //typedef LocalQueues<dChunkedFIFO<chunkSize>, FIFO<> > WL;
   typedef ChunkedLIFO<chunkSize> WL;
-  if (true) {
+  if (false) {
     Galois::StatTimer T1("serial"), T2("parallel");
     T1.start();
     Galois::setMaxThreads(1);
     std::vector<GNode> shadow_wl;
-    int num_prologue_iterations = numThreads*8; //1024; //std::max<int>(chunkSize*numThreads*4, 512);
+    int num_prologue_iterations = 1; //numThreads*8; //1024; //std::max<int>(chunkSize*numThreads*4, 512);
     Galois::for_each(wl.begin(), wl.end(), Process(&shadow_wl, num_prologue_iterations));
     T1.stop();
 
@@ -346,7 +323,7 @@ int main(int argc, char** argv) {
   }
 
   if (writeMesh.size()) {
-    std::string base = gen_name(writeMesh.c_str());
+    std::string base = writeMesh;
     std::cout << "Writing " << base << "\n";
     write_mesh(base.c_str());
 

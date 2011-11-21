@@ -185,6 +185,7 @@ public:
 };
 WLCOMPILECHECK(FIFO);
 
+//#define ASDF 1
 template<class Indexer = DummyIndexer<int>, typename ContainerTy = FIFO<>, typename T = int, bool concurrent = true >
 class OrderedByIntegerMetric : private boost::noncopyable {
 
@@ -194,10 +195,13 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     CTy* current;
     unsigned int curVersion;
     unsigned int lastMasterVersion;
-    std::map<int, CTy*> local;
+    std::map<unsigned int, CTy*> local;
+#if ASDF
+    std::map<unsigned int, bool> cache;
+#endif
   };
 
-  std::vector<std::pair<int, CTy*> > masterLog;
+  std::vector<std::pair<unsigned int, CTy*> > masterLog;
   PaddedLock<concurrent> masterLock;
   unsigned int masterVersion;
 
@@ -208,8 +212,12 @@ class OrderedByIntegerMetric : private boost::noncopyable {
   void updateLocal_i(perItem& p) {
     //ASSERT masterLock
     for (; p.lastMasterVersion < masterVersion; ++p.lastMasterVersion) {
-      std::pair<int, CTy*> logEntry = masterLog[p.lastMasterVersion];
+      std::pair<unsigned int, CTy*> logEntry = masterLog[p.lastMasterVersion];
       p.local[logEntry.first] = logEntry.second;
+      assert(logEntry.second);
+#if ASDF
+      p.cache[logEntry.first] = true;
+#endif
     }
   }
 
@@ -221,7 +229,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     }
   }
 
-  CTy* updateLocalOrCreate(perItem& p, int i) {
+  CTy* updateLocalOrCreate(perItem& p, unsigned int i) {
     //Try local then try update then find again or else create and update the master log
     CTy*& lC = p.local[i];
     if (lC)
@@ -253,25 +261,33 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     :masterVersion(0), I(x)
   {
     for (unsigned int i = 0; i < current.size(); ++i) {
-      current.get(i).current = 0;
+      current.get(i).current = NULL;
       current.get(i).lastMasterVersion = 0;
     }
   }
 
   ~OrderedByIntegerMetric() {
-    for (typename std::vector<std::pair<int, CTy*> >::iterator ii = masterLog.begin(), ee = masterLog.end(); ii != ee; ++ii) {
+    for (typename std::vector<std::pair<unsigned int, CTy*> >::iterator ii = masterLog.begin(), ee = masterLog.end(); ii != ee; ++ii) {
       delete ii->second;
     }
   }
 
   bool push(value_type val) {
     unsigned int index = I(val);
-    perItem& pI = current.get();
+    perItem& p = current.get();
     //fastpath
-    if (index == pI.curVersion && pI.current)
-      return pI.current->push(val);
+    if (index == p.curVersion && p.current)
+      return p.current->push(val);
     //slow path
-    CTy* lC = updateLocalOrCreate(pI, index);
+    CTy* lC = updateLocalOrCreate(p, index);
+    //opportunistically move to higher priority work
+#if ASDF
+    if (index < p.curVersion) {
+      p.curVersion = index;
+      p.current = lC;
+    }
+    p.cache[index] = true;
+#endif
     return lC->push(val);
   }
 
@@ -284,18 +300,45 @@ class OrderedByIntegerMetric : private boost::noncopyable {
 
   std::pair<bool, value_type> pop() {
     //Find a successful pop
-    perItem& pI = current.get();
-    CTy*& C = pI.current;
+    perItem& p = current.get();
+    CTy*& C = p.current;
     std::pair<bool, value_type> retval;
     if (C && (retval = C->pop()).first)
       return retval;
     //Failed, find minimum bin
-    updateLocal(pI);
-    for (typename std::map<int, CTy*>::iterator ii = pI.local.begin(), ee = pI.local.end(); ii != ee; ++ii) {
+#if ASDF
+    {
+      //ltbb-style
+      typename std::map<unsigned int, bool>::iterator ii = p.cache.begin(), ee = p.cache.end(), old;
+      while (ii != ee) {
+        p.curVersion = ii->first;
+        C = p.local[ii->first];
+        // why can C be null?
+        if (C && (retval = C->pop()).first) {
+          return retval;
+        }
+        old = ii;
+        ++ii;
+        p.cache.erase(old);
+      }
+    }
+#endif
+
+    updateLocal(p);
+    for (typename std::map<unsigned int, CTy*>::iterator ii = p.local.begin(),
+        ee = p.local.end(); ii != ee; ++ii) {
+      p.curVersion = ii->first;
       C = ii->second;
-      pI.curVersion = ii->first;
-      if ((retval = C->pop()).first)
+      if ((retval = C->pop()).first) {
+#if ASDF
+        p.cache[ii->first] = true;
+#endif
 	return retval;
+      } else {
+#if ASDF
+        p.cache.erase(ii->first);
+#endif
+      }
     }
     retval.first = false;
     return retval;

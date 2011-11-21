@@ -21,6 +21,7 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
+#if 0
 #include "Galois/Runtime/Threads.h"
 #include "Galois/Runtime/Support.h"
 
@@ -29,10 +30,12 @@ struct Init {
   Init() {
     GaloisRuntime::getSystemThreadPolicy();
     GaloisRuntime::getSystemThreadPool();
-
+    
+    abort();    
 
     GaloisRuntime::reportInfo("Thread Policy", GaloisRuntime::getSystemThreadPolicy().getName());
   }
 };
 
 static Init iii;
+#endif

@@ -47,10 +47,10 @@ static const char* name = "Survey Propagation";
 static const char* desc = "Solves SAT problems using survey propagation\n";
 static const char* url = "survey_propagation";
 
-static cll::opt<int> seed(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<int> M(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<int> N(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<int> K(cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<int> seed(cll::Positional, cll::desc("<seed>"), cll::Required);
+static cll::opt<int> M(cll::Positional, cll::desc("<num variables>"), cll::Required);
+static cll::opt<int> N(cll::Positional, cll::desc("<num clauses>"), cll::Required);
+static cll::opt<int> K(cll::Positional, cll::desc("<variables per clause>"), cll::Required);
 
 //#define WLWL LocalQueues<ChunkedFIFO<1024>, FIFO<> >
 #define WLWL dChunkedFIFO<1024>
@@ -129,7 +129,7 @@ static const double epsilon = 0.000001;
 static const int tmax = 100;
 //static int tlimit = 0;
 
-void initalize_random_formula(int M, int N, int K) {
+void initialize_random_formula(int M, int N, int K) {
   //M clauses
   //N variables
   //K vars per clause
@@ -412,7 +412,7 @@ bool survey_inspired_decimation() {
 int main(int argc, char** argv) {
   LonestarStart(argc, argv, std::cout, name, desc, url);
   srand(seed);
-  initalize_random_formula(M,N,K);
+  initialize_random_formula(M,N,K);
   //print_formula();
   //build_graph();
   //print_graph();
