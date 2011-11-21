@@ -35,7 +35,7 @@ def main(num_nodes, seed, options):
   print('p sp %d %d' % (num_nodes, num_edges))
 
   def nextN():
-    return random.randint(0, num_nodes - 1)
+    return random.randint(1, num_nodes)
   def nextE():
     return random.randint(1, max_weight)
   def addEdge(src, dst, w):
@@ -46,10 +46,10 @@ def main(num_nodes, seed, options):
     return True
 
   # Form a connected graph
-  for index in xrange(num_nodes - 1):
+  for index in xrange(1, num_nodes):
     addEdge(index, index+1, nextE())
 
-  addEdge(num_nodes - 1, 0, nextE())
+  addEdge(num_nodes, 1, nextE())
   for index in xrange(num_edges - num_nodes):
     while not addEdge(nextN(), nextN(), nextE()):
       pass

@@ -4,7 +4,7 @@ function(mesh base numpoints)
       ${numpoints} 1 > ${base}.node)
   add_custom_command(OUTPUT ${base}.1.node ${base}.1.ele ${base}.1.poly
     COMMAND ${CMAKE_BINARY_DIR}/apps/delaunaytriangulation/delaunaytriangulation
-      -noverify -writemesh ${base}.node
+      -noverify -writemesh ${base}.1 ${base}.node 
     DEPENDS delaunaytriangulation ${base}.node)
 endfunction(mesh)
 

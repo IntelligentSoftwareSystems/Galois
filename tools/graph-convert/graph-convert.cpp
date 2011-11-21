@@ -41,28 +41,28 @@ void rmat2gr(const char *infilename, const char *outfilename) {
   std::ifstream infile(infilename);
 
   // Skip to first non-comment line
-  while (true) {
+  while (!infile.eof()) {
     if (infile.peek() != '%') {
       break;
     }
     infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
   }
 
-  int nnodes, nedges;
+  size_t nnodes, nedges;
   infile >> nnodes >> nedges;
   infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 
   std::vector<GNode> nodes;
   nodes.resize(nnodes);
-  for (int i = 0; i < nnodes; ++i) {
+  for (size_t i = 0; i < nnodes; ++i) {
     GNode n = graph.createNode(i);
     nodes[i] = n;
     graph.addNode(n, Galois::NONE);
   }
 
-  int edges_added = 0;
-  for (int edge_num = 0; edge_num < nnodes; ++edge_num) {
-    int cur_id, cur_edges;
+  size_t edges_added = 0;
+  for (size_t edge_num = 0; edge_num < nnodes; ++edge_num) {
+    size_t cur_id, cur_edges;
     infile >> cur_id >> cur_edges;
     if (cur_id < 0 || cur_id >= nnodes) {
       std::cerr << "node id out of range: " << cur_id << "\n";
@@ -73,8 +73,8 @@ void rmat2gr(const char *infilename, const char *outfilename) {
       abort();
     }
     
-    for (int j = 0; j < cur_edges; ++j) {
-      int neighbor_id, weight;
+    for (size_t j = 0; j < cur_edges; ++j) {
+      size_t neighbor_id, weight;
       infile >> neighbor_id >> weight;
       if (neighbor_id < 0 || neighbor_id >= nnodes) {
         std::cerr << "neighbor id out of range: " << neighbor_id << "\n";
@@ -117,45 +117,55 @@ void dimacs2gr(const char *infilename, const char *outfilename) {
 
   std::ifstream infile(infilename);
 
-  while (true) {
+  while (!infile.eof()) {
     if (infile.peek() != 'c') {
       break;
     }
     infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
   }
 
+  if (infile.peek() != 'p') {
+    std::cerr << "Missing problem specification line\n";
+    abort();
+  }
+
   std::string tmp;
-  int nnodes, nedges;
+  size_t nnodes, nedges;
   infile >> tmp >> tmp >> nnodes >> nedges;
   infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 
   std::vector<GNode> nodes;
   nodes.resize(nnodes);
-  for (int i = 0; i < nnodes; ++i) {
+  for (size_t i = 0; i < nnodes; ++i) {
     GNode n = graph.createNode(i);
     nodes[i] = n;
     graph.addNode(n, Galois::NONE);
   }
 
-  int edges_added = 0;
-  for (int edge_num = 0; edge_num < nedges; ++edge_num) {
-    int cur_id, neighbor_id, weight;
-    infile >> tmp >> cur_id >> neighbor_id >> weight;
+  size_t edges_added = 0;
+  for (size_t edge_num = 0; edge_num < nedges; ++edge_num) {
+    size_t cur_id, neighbor_id;
+    int weight;
+    infile >> tmp;
+
     if (tmp.compare("a") != 0) {
-      std::cerr << "unknown line type\n";
-      abort();
+      --edge_num;
+      infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+      continue;
     }
-    if (cur_id < 0 || cur_id >= nnodes) {
+
+    infile >> cur_id >> neighbor_id >> weight;
+    if (cur_id == 0 || cur_id > nnodes) {
       std::cerr << "node id out of range: " << cur_id << "\n";
       abort();
     }
-    if (neighbor_id < 0 || neighbor_id >= nnodes) {
+    if (neighbor_id == 0 || neighbor_id > nnodes) {
       std::cerr << "neighbor id out of range: " << neighbor_id << "\n";
       abort();
     }
     
-    GNode& src = nodes[cur_id];
-    GNode& dst = nodes[neighbor_id];
+    GNode& src = nodes[cur_id - 1]; // 1 indexed
+    GNode& dst = nodes[neighbor_id - 1];
     if (src.hasNeighbor(dst)) {
       std::cerr << "Warning: Duplicate edge ("
         << cur_id << ", " << neighbor_id << ") weight " << weight
@@ -184,15 +194,15 @@ void dimacs2gr(const char *infilename, const char *outfilename) {
 }
 
 void gr2dimacs(const char *infilename, const char *outfilename) {
-  typedef Galois::Graph::LC_FileGraph<int, int> Graph;
+  typedef Galois::Graph::LC_FileGraph<size_t, int> Graph;
   typedef Graph::GraphNode GNode;
 
   Graph graph;
   graph.structureFromFile(infilename);
   graph.emptyNodeData();
 
-  int nnodes = 0;
-  int nedges = 0;
+  size_t nnodes = 0;
+  size_t nedges = 0;
   for (Graph::active_iterator i = graph.active_begin(), e = graph.active_end();
       i != e; ++i) {
     GNode src = *i;
@@ -209,8 +219,8 @@ void gr2dimacs(const char *infilename, const char *outfilename) {
         f = graph.neighbor_end(src); j != f; ++j) {
       GNode dst = *j;
       int weight = graph.getEdgeData(src, dst);
-      file << "a " << graph.getData(src)
-        << " " << graph.getData(dst)
+      file << "a " << graph.getData(src) + 1
+        << " " << graph.getData(dst) + 1
         << " " << weight << "\n";
     }
   }
