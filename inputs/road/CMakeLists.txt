@@ -5,7 +5,7 @@ function(dlgraph base url)
   add_custom_command(OUTPUT ${base}.gz
     COMMAND ${WGET} -O ${base}.gz ${url})
   add_custom_command(OUTPUT ${base}.dimacs
-    COMMAND bash -c "${GUNZIP} -c ${base}.gz >${base}.dimacs"
+    COMMAND ${GUNZIP} -c ${base}.gz > ${base}.dimacs
     DEPENDS ${base}.gz)
   add_custom_command(OUTPUT ${base}.gr
     COMMAND ${CMAKE_BINARY_DIR}/tools/graph-convert/graph-convert -dimacs2gr ${base}.dimacs ${base}.gr

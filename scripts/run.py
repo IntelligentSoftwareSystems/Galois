@@ -117,7 +117,7 @@ def main(args, options):
       else:
         retcode = subprocess.call(cmd)
       if retcode != 0:
-        print("INFO: CommandLine %s\n", % ' ',join(cmd))
+        print("INFO: CommandLine %s\n" % ' '.join(cmd))
         print("RUN: Error command: %s\n" % cmd)
         #sys.exit(1)
 
