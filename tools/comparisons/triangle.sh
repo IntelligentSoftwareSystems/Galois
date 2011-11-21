@@ -33,5 +33,5 @@ shift
 
 run ${BASE}/tools/bin/triangle -i -P -N -E -q30 $F
 run ${BASE}/apps/delaunaytriangulation/delaunaytriangulation $* $F
-M=$(dirname $F)/$(basename $F .node).1
+M=$(dirname $F)/$(basename $F .node)
 run ${BASE}/apps/delaunayrefinement/delaunayrefinement $* $M
