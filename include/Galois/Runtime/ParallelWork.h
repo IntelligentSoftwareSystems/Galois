@@ -131,7 +131,6 @@ class ForEachWork {
       f(val, tld.facing);
     } catch (int a) {
       aborted = true;
-      return;
     }
     finishIteration(aborted, val, tld);
   }
