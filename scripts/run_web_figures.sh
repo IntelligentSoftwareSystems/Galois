@@ -30,7 +30,7 @@ run() {
     echo -en '\033[1;31m'
     echo -n "$cmd"
     echo -e '\033[0m'
-    $BASE/scripts/run.py -t 1:$NUMTHREADS -- $cmd 2>&1 | tee "$logfile"
+    $BASE/scripts/run.py --threads 1:$NUMTHREADS --timeout $((60*20)) -- $cmd 2>&1 | tee "$logfile"
   else
     echo -en '\033[1;31m'
     echo -n Skipping $1
@@ -45,7 +45,7 @@ run apps/avi/AVIunordered -noverify -d 2 -n 1 -e 0.1 -f "$BASEINPUT/avi/10x10_42
 run apps/clustering/clustering -numPoints 10000
 run apps/barneshut/barneshut -noverify -n 50000 -steps 1 -seed 0
 run apps/betweennesscentrality/betweennesscentrality "$BASEINPUT/scalefree/rmat13.gr"
-#run apps/boruvka/boruvka "$BASEINPUT/road/USA-road-d.USA.gr"
+run apps/boruvka/boruvka "$BASEINPUT/road/USA-road-d.USA.gr"
 run apps/delaunayrefinement/delaunayrefinement "$BASEINPUT/meshes/r5M"
 run apps/delaunaytriangulation/delaunaytriangulation "$BASEINPUT/meshes/r5M.node"
 run apps/des/DESunordered -noverify -epi 512 "$BASEINPUT/des/koggeStone64bit.net"

@@ -25,15 +25,14 @@
 #define AVI_UNORDERED_H_
 
 
-#include "Galois/Graphs/Graph.h"
+#include "Galois/Atomic.h"
+#include "Galois/Accumulator.h"
 #include "Galois/Galois.h"
-
-
+#include "Galois/Graphs/Graph.h"
 #include "Galois/Graphs/Serialize.h"
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Runtime/PerCPU.h"
-#include "Galois/Atomic.h"
-#include "Galois/Accumulator.h"
+#include "Galois/Runtime/WorkList.h"
 
 #include <string>
 #include <sstream>
@@ -86,7 +85,7 @@ protected:
   typedef Galois::Graph::FirstGraph<AVI*, void, false> Graph;
   typedef Graph::GraphNode GNode;
 
-  typedef GaloisRuntime::WorkList::ChunkedFIFO<CHUNK_SIZE, GNode> AVIWorkList;
+  typedef GaloisRuntime::WorkList::dChunkedFIFO<CHUNK_SIZE> AVIWorkList;
 
 
   Graph graph;
@@ -354,7 +353,7 @@ public:
 
     Process p(graph, inDegVec, meshInit, g, perIterLocalVec, aviCmp, createSyncFiles, iter);
 
-    Galois::for_each(initWl.begin (), initWl.end (), p);
+    Galois::for_each<AVIWorkList>(initWl.begin (), initWl.end (), p);
 
     printf ("iterations = %d\n", iter.get ());
 

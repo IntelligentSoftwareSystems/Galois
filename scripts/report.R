@@ -1,31 +1,148 @@
 # Generate pretty graphs from csv
 #  usage: Rscript report.R <report.csv>
 
-#theme_set(theme_bw())
-
 library(ggplot2)
-args <- commandArgs(trailingOnly=TRUE)
 
-if (length(args) < 1) {
-  cat("usage: Rscript report.R <report.csv>\n")
-  quit(save = "no", status=1)
-} 
+Columns <- c("Algo","Kind","Hostname","Threads","CommandLine","Iterations","Time","Timeout","Iterations")
+Id.Vars <- c("Algo","Kind","Hostname","Threads","CommandLine")
 
-df <- read.csv(args[1])
-
-if (F) {
-  # For comparing multiple variants at once assuming that "Kind"
-  # is a column that organizes the different variants
-  T1 <- subset(df, Threads == 1)[,c("Kind","Time")]
-  colnames(T1) <- c("Kind", "T1")
-  T1 <- cast(melt(T1), fun.aggregate=mean)
-  df <- join(df, T1, by="Kind")
+outputfile <- ""
+if (interactive()) {
+  theme_grey()
+  inputfile <- "~/report.csv"
+  outputfile <- ""
 } else {
-  # Simplier case if no variants
-  T1 <- mean(subset(df, Threads == 1)$Time)
+  theme_set(theme_bw(base_size=9))
+  arguments <- commandArgs(trailingOnly=TRUE)
+  if (length(arguments) < 1) {
+    cat("usage: Rscript report.R <report.csv> [output.json]\n")
+    quit(save = "no", status=1)
+  } 
+  inputfile <- arguments[1]
+  if (length(arguments) > 1) {
+    outputfile <- arguments[2]
+  }
 }
-qplot(Threads, Time, data=df) + geom_line() + ylim(0, max(df$Time))
-qplot(Threads, T1 / Time, data=df) + geom_smooth()
 
+summarizeBy <- function(d, f, fun.aggregate=mean, suffix=".Y", merge.with=d, idvars=Id.Vars) {
+  m <- cast(melt(d[,Columns], id.vars=idvars), f, fun.aggregate)
+  vars <- all.vars(f)
+  merge(merge.with, m, by=vars[-length(vars)], all.x=T, suffixes=c("", suffix))
+}
 
+### Replace orig[i] with repl[i] in x
+mreplace <- function(x, orig, repl, defaultIndex=1) {
+  stopifnot(length(orig) == length(repl))
+  indices <- numeric(length(x))
+  for (i in 1:length(orig)) {
+    indices[grep(orig[i], x, fixed=T)] <- i
+  }
+  if (sum(indices == 0) > 0) {
+    warning("Some entries were unmatched, using default index")
+    indices[indices == 0] <- defaultIndex
+  }
+  return(sapply(indices, function(x) { repl[x] }))
+}
 
+printMapping <- function(lhs, rhs) {
+  cat("Using following mapping from command line to (Algo,Kind):\n")
+  cat(paste("  ", paste(lhs, rhs, sep=" -> ")), sep="\n")
+}
+
+### Generate unique and short set of Algo and Kind names from CommandLine
+parseAlgo <- function(res) {
+  cmds.orig <- sub(" -t \\d+", "", res$CommandLine)
+  cmds.uniq <- unique(cmds.orig)
+
+  make <- function(rhs) {
+    cmds.new <- mreplace(cmds.orig, cmds.uniq, rhs)
+    printMapping(cmds.uniq, rhs)
+    parts <- strsplit(cmds.new, "\\s+") 
+    res$Algo <- sapply(parts, function(x) { x[1] })
+    res$Kind <- sapply(parts, function(x) { ifelse(length(x) > 1, x[2], "") })
+    return(res)
+  }
+
+  # Try various uniquification patterns until one works
+  # Case 1: Extract algo and give kinds unique within an algo
+  algos <- sub("^\\S*?(\\w+)\\s.*$", "\\1", cmds.uniq, perl=T)
+  kinds <- numeric(length(algos))
+  dupes <- duplicated(algos)
+  version <- 1
+  while (sum(dupes) > 0) {
+    kinds[!dupes] <- version
+    dupes <- duplicated(paste(algos, kinds))
+    version <- version + 1
+  }
+  rhs <- unique(paste(algos, kinds))
+  if (length(cmds.uniq) == length(rhs)) {
+    return(make(rhs))
+  }
+
+  # Case 2: XXX/XXX/algo ... kind
+  rhs <- unique(sub("^\\S*?(\\w+)\\s.*?((?:\\w|\\.)+)$", "\\1 \\2", cmds.uniq, perl=T))
+  if (length(cmds.uniq) == length(rhs)) {
+    return(make(rhs))
+  }
+  
+  # Case 3: Make all algos unique
+  return(make(1:length(cmds.uniq)))
+}
+
+res.raw <- read.csv(inputfile, stringsAsFactors=F)
+res <- res.raw[res.raw$CommandLine != "",]
+cat(sprintf("Dropped %d empty rows\n", nrow(res.raw) - nrow(res)))
+res <- parseAlgo(res)
+
+# Timeouts
+timeouts <- !is.na(res$Timeout)
+res[timeouts,]$Time <- res[timeouts,]$Timeout
+res$Timeout <- timeouts
+cat(sprintf("Timed out rows: %d\n", sum(timeouts)))
+
+# Process partial results
+partial <- is.na(res$Time)
+res <- res[!partial,]
+cat(sprintf("Dropped %d partial runs\n", sum(partial)))
+
+# Drop unused columns
+res <- res[,Columns]
+
+# Make factors
+res <- data.frame(lapply(res, function(x) if (is.character(x)) { factor(x)} else {x}))
+
+# Summarize
+res <- summarizeBy(subset(res, Threads==1),
+                   Algo + Hostname ~ variable,
+                   min, ".Ref", merge.with=res)
+
+ggplot(res,
+       aes(x=Threads, y=Time.Ref/Time, color=Kind)) +
+       geom_point() + 
+       facet_grid(Hostname ~ Algo, scale="free")
+
+ggplot(res,
+       aes(x=Threads, y=Iterations/Iterations.Ref, color=Kind)) +
+       geom_point() + 
+       facet_grid(Hostname ~ Algo, scale="free")
+
+cat("Results in Rplots.pdf\n")
+
+###
+# Might as well generate simplified json output
+###
+if (outputfile != "") {
+  library(plyr)
+  library(rjson)
+  idvars <- setdiff(Id.Vars, c("Threads","CommandLine"))
+  json <- toJSON(dlply(res, idvars, function(x) {
+    # Just pick representative command line
+    cmd <- x[1,]$CommandLine
+    cmd <- sub(" -t \\d+", "", cmd)
+    # Drop columns being selected on because they are redundant
+    d <- x[,setdiff(Columns, c("CommandLine", idvars))]
+    list(command=cmd, data=d)
+  }))
+  cat(json, file=outputfile)
+  cat(sprintf("Results in %s\n", outputfile))
+}
