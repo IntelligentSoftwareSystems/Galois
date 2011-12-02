@@ -47,12 +47,16 @@ run apps/barneshut/barneshut -noverify -n 50000 -steps 1 -seed 0
 run apps/betweennesscentrality/betweennesscentrality "$BASEINPUT/scalefree/rmat13.gr"
 run apps/boruvka/boruvka "$BASEINPUT/road/USA-road-d.USA.gr"
 run apps/delaunayrefinement/delaunayrefinement "$BASEINPUT/meshes/r5M"
-run apps/delaunaytriangulation/delaunaytriangulation "$BASEINPUT/meshes/r5M.node"
+run apps/delaunaytriangulation/delaunaytriangulation "$BASEINPUT/meshes/r1M.node"
 run apps/des/DESunordered -noverify -epi 512 "$BASEINPUT/des/koggeStone64bit.net"
 run apps/gmetis/gmetis -mtxinput "$BASEINPUT/matrix/cage15.mtx" 256
 run apps/preflowpush/preflowpush "$BASEINPUT/random/r4-2e23.gr" 0 100
 run apps/sssp/sssp -delta 14 "$BASEINPUT/random/r4-2e25.gr"
 run apps/surveypropagation/surveypropagation 9 1000000 3000000 3
+
+# Generate results
+cat $RESULTDIR/*.log | python "$BASE/scripts/report.py" report.csv
+Rscript "$BASE/scripts/report.R" report.csv report.json
 
 if (($SKIPPED)); then
   echo -en '\033[1;32m'
