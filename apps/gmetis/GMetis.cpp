@@ -32,9 +32,8 @@
 #include "MetisGraph.h"
 #include "PMetis.h"
 
-#include "Galois/Graphs/FileGraph.h"
+#include "Galois/Graphs/LCGraph.h"
 #include "Galois/Statistic.h"
-#include "llvm/Support/CommandLine.h"
 
 #include "Lonestar/BoilerPlate.h"
 
@@ -92,8 +91,8 @@ void verify(MetisGraph* metisGraph) {
 	}
 }
 
-typedef Galois::Graph::LC_FileGraph<int, unsigned int> InputGraph;
-typedef Galois::Graph::LC_FileGraph<int, unsigned int>::GraphNode InputGNode;
+typedef Galois::Graph::LC_CRS_Graph<int, unsigned int> InputGraph;
+typedef Galois::Graph::LC_CRS_Graph<int, unsigned int>::GraphNode InputGNode;
 
 void readMetisGraph(MetisGraph* metisGraph, const char* filename){
 	std::ifstream file(filename);
@@ -145,7 +144,6 @@ void readMetisGraph(MetisGraph* metisGraph, const char* filename){
 void readGraph(MetisGraph* metisGraph, const char* filename, bool weighted = false, bool directed = true){
 	InputGraph inputGraph;
 	inputGraph.structureFromFile(filename);
-	inputGraph.emptyNodeData();
 	cout<<"start to transfer data to GGraph"<<endl;
 	int id = 0;
 	for (InputGraph::active_iterator ii = inputGraph.active_begin(), ee = inputGraph.active_end(); ii != ee; ++ii) {
@@ -171,13 +169,13 @@ void readGraph(MetisGraph* metisGraph, const char* filename, bool weighted = fal
 
 		MetisNode& nodeData = node.getData();
 
-		for (InputGraph::neighbor_iterator jj = inputGraph.neighbor_begin(inNode), eejj = inputGraph.neighbor_end(inNode); jj != eejj; ++jj) {
-			InputGNode inNeighbor = *jj;
+		for (InputGraph::edge_iterator jj = inputGraph.edge_begin(inNode), eejj = inputGraph.edge_end(inNode); jj != eejj; ++jj) {
+		  InputGNode inNeighbor = inputGraph.getEdgeDst(jj);
 			if(inNode == inNeighbor) continue;
 			int neighId = inputGraph.getData(inNeighbor);
 			int weight = 1;
 			if(weighted){
-				weight = inputGraph.getEdgeData(inNode, inNeighbor);
+			  weight = inputGraph.getEdgeData(jj);
 			}
 			if(!directed){
 				graph->addEdge(node, gnodes[neighId], weight);//

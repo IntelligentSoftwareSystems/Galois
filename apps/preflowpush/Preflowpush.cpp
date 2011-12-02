@@ -27,7 +27,7 @@
 #include "Galois/Galois.h"
 #include "Galois/Bag.h"
 #include "Galois/Graphs/Graph.h"
-#include "Galois/Graphs/FileGraph.h"
+#include "Galois/Graphs/LCGraph.h"
 #include "llvm/Support/CommandLine.h"
 
 #include "Lonestar/BoilerPlate.h"
@@ -430,12 +430,11 @@ struct Process {
 
 void initializeGraph(const char* inputFile,
     int sourceId, int sinkId, Config *newApp) {
-  typedef Galois::Graph::LC_FileGraph<int, int> ReaderGraph;
+  typedef Galois::Graph::LC_CRS_Graph<int, int> ReaderGraph;
   typedef ReaderGraph::GraphNode ReaderGNode;
 
   ReaderGraph reader;
   reader.structureFromFile(inputFile);
-  reader.emptyNodeData();
 
   // Assign ids to ReaderGNodes
   newApp->num_nodes = 0;
@@ -471,11 +470,11 @@ void initializeGraph(const char* inputFile,
       ee = reader.active_end(); ii != ee; ++ii) {
     ReaderGNode rsrc = *ii;
     int rsrcId = reader.getData(rsrc);
-    for (ReaderGraph::neighbor_iterator jj = reader.neighbor_begin(rsrc),
-        ff = reader.neighbor_end(rsrc); jj != ff; ++jj) {
-      ReaderGNode rdst = *jj;
+    for (ReaderGraph::edge_iterator jj = reader.edge_begin(rsrc),
+        ff = reader.edge_end(rsrc); jj != ff; ++jj) {
+      ReaderGNode rdst = reader.getEdgeDst(jj);
       int rdstId = reader.getData(rdst);
-      int cap = reader.getEdgeData(rsrc, rdst);
+      int cap = reader.getEdgeData(jj);
       newApp->graph.addEdge(nodes[rsrcId], nodes[rdstId], cap);
       ++newApp->num_edges;
       // Add reverse edge if not already there

@@ -27,7 +27,7 @@
 #include "Galois/Bag.h"
 #include "Galois/Statistic.h"
 #include "Galois/Graphs/Graph.h"
-#include "Galois/Graphs/FileGraph.h"
+#include "Galois/Graphs/LCGraph.h"
 #include "llvm/Support/CommandLine.h"
 
 #include "Lonestar/BoilerPlate.h"
@@ -124,12 +124,11 @@ bool verify(Galois::InsertBag<Edge>& result) {
 }
 
 void readGraph(const char* filename, int root_id, GNode* root) {
-  typedef Galois::Graph::LC_FileGraph<int,void> ReaderGraph;
+  typedef Galois::Graph::LC_CRS_Graph<int,int> ReaderGraph;
   typedef ReaderGraph::GraphNode ReaderGNode;
 
   ReaderGraph reader;
   reader.structureFromFile(filename);
-  reader.emptyNodeData();
 
   int num_nodes = 0;
   for (ReaderGraph::active_iterator ii = reader.active_begin(),
@@ -150,9 +149,9 @@ void readGraph(const char* filename, int root_id, GNode* root) {
       ei = reader.active_end(); ii != ei; ++ii) {
     ReaderGNode src = *ii;
     int src_id = reader.getData(src);
-    for (ReaderGraph::neighbor_iterator jj = reader.neighbor_begin(src),
-        ej = reader.neighbor_end(src); jj != ej; ++jj) {
-      int dst_id = reader.getData(*jj);
+    for (ReaderGraph::edge_iterator jj = reader.edge_begin(src),
+        ej = reader.edge_end(src); jj != ej; ++jj) {
+      int dst_id = reader.getData(reader.getEdgeDst(jj));
       graph.addEdge(nodes[src_id], nodes[dst_id]);
     }
   }

@@ -28,8 +28,8 @@
 #include "Galois/Timer.h"
 #include "Galois/Galois.h"
 
-#include "Galois/Graphs/Serialize.h"
-#include "Galois/Graphs/FileGraph.h"
+//#include "Galois/Graphs/Serialize.h"
+#include "Galois/Graphs/LCGraph.h"
 
 #include "llvm/Support/CommandLine.h"
 
@@ -238,7 +238,7 @@ void runBodyParallel() {
 
 static void makeGraph(const char* input) {
   //Create local computation graph.
-  typedef Galois::Graph::LC_FileGraph<Node, int> InGraph;
+  typedef Galois::Graph::LC_CRS_Graph<Node, int> InGraph;
   typedef InGraph::GraphNode InGNode;
   InGraph in_graph;
   //Read graph from file.
@@ -255,10 +255,10 @@ static void makeGraph(const char* input) {
   // 
   int numEdges = 0;
   for (InGraph::active_iterator src = in_graph.active_begin(), esrc = in_graph.active_end();src != esrc; ++src) {
-    for (InGraph::neighbor_iterator dst = in_graph.neighbor_begin(*src, Galois::NONE), edst = in_graph.neighbor_end(*src, Galois::NONE);dst != edst; ++dst) {
-      int w = in_graph.getEdgeData(*src, *dst, Galois::NONE);
+    for (InGraph::edge_iterator dst = in_graph.edge_begin(*src, Galois::NONE), edst = in_graph.edge_end(*src, Galois::NONE);dst != edst; ++dst) {
+      int w = in_graph.getEdgeData(dst);
       Element e(*src, w);
-      edges[*dst].push_back(e);
+      edges[in_graph.getEdgeDst(dst)].push_back(e);
       numEdges++;
     }
   }

@@ -29,11 +29,6 @@
 #include "Galois/Galois.h"
 #include "Galois/Accumulator.h"
 
-#include "Galois/Graphs/Serialize.h"
-#include "Galois/Graphs/FileGraph.h"
-
-#include "llvm/Support/CommandLine.h"
-
 #include "Lonestar/BoilerPlate.h"
 
 #include <vector>

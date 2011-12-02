@@ -24,10 +24,8 @@
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
 
-#include "Galois/Graphs/Serialize.h"
-#include "Galois/Graphs/FileGraph.h"
+#include "Galois/Graphs/LCGraph.h"
 
-#include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
 #include <string>
@@ -170,7 +168,7 @@ bool verify() {
 }
 
 static void makeGraph(const char* input) {
-  typedef Galois::Graph::LC_FileGraph<Node, void> InGraph;
+  typedef Galois::Graph::LC_CRS_Graph<Node, int> InGraph;
   typedef InGraph::GraphNode InGNode;
   InGraph in_graph;
   Galois::Timer phase;
@@ -193,15 +191,15 @@ static void makeGraph(const char* input) {
       esrc = in_graph.active_end();
       src != esrc; ++src) {
     int neighbors =
-      std::distance(in_graph.neighbor_begin(*src, Galois::NONE), 
-          in_graph.neighbor_end(*src, Galois::NONE));
+      std::distance(in_graph.edge_begin(*src, Galois::NONE), 
+          in_graph.edge_end(*src, Galois::NONE));
 
-    for (InGraph::neighbor_iterator
-        dst = in_graph.neighbor_begin(*src, Galois::NONE), 
-        edst = in_graph.neighbor_end(*src, Galois::NONE);
+    for (InGraph::edge_iterator
+        dst = in_graph.edge_begin(*src, Galois::NONE), 
+        edst = in_graph.edge_end(*src, Galois::NONE);
         dst != edst; ++dst) {
       Element e(*src, 1.0/neighbors);
-      in_edges[*dst].push_back(e);
+      in_edges[in_graph.getEdgeDst(dst)].push_back(e);
     }
     has_out_edges[*src] = neighbors != 0;
   }

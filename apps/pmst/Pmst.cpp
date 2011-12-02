@@ -29,7 +29,7 @@
 #include "Galois/Queue.h"
 #include "Galois/UserContext.h"
 #include "Galois/Graphs/Graph.h"
-#include "Galois/Graphs/FileGraph.h"
+#include "Galois/Graphs/LCGraph.h"
 #include "Galois/Runtime/DebugWorkList.h"
 #include "llvm/Support/CommandLine.h"
 
@@ -318,12 +318,11 @@ struct Boruvkas {
 template<typename Graph>
 void makeGraph(const char* in, Graph& g) {
   typedef typename Graph::GraphNode GraphNode;
-  typedef Galois::Graph::LC_FileGraph<int, Weight> ReaderGraph;
+  typedef Galois::Graph::LC_CRS_Graph<int, Weight> ReaderGraph;
   typedef ReaderGraph::GraphNode ReaderGNode;
 
   ReaderGraph reader;
   reader.structureFromFile(in);
-  reader.emptyNodeData();
 
   // Assign ids to ReaderGNodes
   size_t numNodes = 0;
@@ -348,11 +347,11 @@ void makeGraph(const char* in, Graph& g) {
       ei = reader.active_end(); ii != ei; ++ii) {
     ReaderGNode rsrc = *ii;
     int rsrcId = reader.getData(rsrc);
-    for (ReaderGraph::neighbor_iterator jj = reader.neighbor_begin(rsrc),
-        ej = reader.neighbor_end(rsrc); jj != ej; ++jj) {
-      ReaderGNode rdst = *jj;
+    for (ReaderGraph::edge_iterator jj = reader.edge_begin(rsrc),
+        ej = reader.edge_end(rsrc); jj != ej; ++jj) {
+      ReaderGNode rdst = reader.getEdgeDst(jj);
       int rdstId = reader.getData(rdst);
-      const Weight& w = reader.getEdgeData(rsrc, rdst);
+      const Weight& w = reader.getEdgeData(jj);
       GraphNode gsrc = nodes[rsrcId];
       GraphNode gdst = nodes[rdstId];
       if (gsrc.hasNeighbor(gdst)) {
