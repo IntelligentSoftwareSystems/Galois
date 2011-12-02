@@ -22,7 +22,7 @@
  */
 #include "Galois/Galois.h"
 #include "Galois/Graphs/Graph.h"
-#include "Galois/Graphs/FileGraph.h"
+#include "Galois/Graphs/LCGraph.h"
 #include "Galois/Graphs/Serialize.h"
 
 #include <iostream>
@@ -194,12 +194,11 @@ void dimacs2gr(const char *infilename, const char *outfilename) {
 }
 
 void gr2dimacs(const char *infilename, const char *outfilename) {
-  typedef Galois::Graph::LC_FileGraph<size_t, int> Graph;
+  typedef Galois::Graph::LC_CRS_Graph<size_t, int> Graph;
   typedef Graph::GraphNode GNode;
 
   Graph graph;
   graph.structureFromFile(infilename);
-  graph.emptyNodeData();
 
   size_t nnodes = 0;
   size_t nedges = 0;
@@ -207,7 +206,7 @@ void gr2dimacs(const char *infilename, const char *outfilename) {
       i != e; ++i) {
     GNode src = *i;
     graph.getData(src) = nnodes++;
-    nedges += std::distance(graph.neighbor_begin(*i), graph.neighbor_end(*i));
+    nedges += std::distance(graph.edge_begin(*i), graph.edge_end(*i));
   }
 
   std::ofstream file(outfilename);
@@ -215,10 +214,10 @@ void gr2dimacs(const char *infilename, const char *outfilename) {
   for (Graph::active_iterator i = graph.active_begin(), e = graph.active_end();
       i != e; ++i) {
     GNode src = *i;
-    for (Graph::neighbor_iterator j = graph.neighbor_begin(src),
-        f = graph.neighbor_end(src); j != f; ++j) {
-      GNode dst = *j;
-      int weight = graph.getEdgeData(src, dst);
+    for (Graph::edge_iterator j = graph.edge_begin(src),
+        f = graph.edge_end(src); j != f; ++j) {
+      GNode dst = graph.getEdgeDst(j);
+      int weight = graph.getEdgeData(j);
       file << "a " << graph.getData(src) + 1
         << " " << graph.getData(dst) + 1
         << " " << weight << "\n";
