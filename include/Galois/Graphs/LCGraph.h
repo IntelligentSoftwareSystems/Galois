@@ -150,10 +150,10 @@ public:
     FileGraph graph;
     graph.structureFromFile(fname);
     numNodes = graph.size();
-    NodeData = GaloisRuntime::MM::largeAlloc(sizeof(NodeInfo) * numNodes);
-    EdgeIndData = GaloisRuntime::MM::largeAlloc(sizeof(uint64_t) * numNodes);
-    EdgeData = GaloisRuntime::MM::largeAlloc(sizeof(EdgeTy) * graph.sizeEdges());
-    EdgeDst = GaloisRuntime::MM::largeAlloc(sizeof(uint32_t) * graph.sizeEdges());
+    NodeData = reinterpret_cast<NodeInfo*>(GaloisRuntime::MM::largeAlloc(sizeof(NodeInfo) * numNodes));
+    EdgeIndData = reinterpret_cast<uint64_t*>(GaloisRuntime::MM::largeAlloc(sizeof(uint64_t) * numNodes));
+    EdgeData = reinterpret_cast<EdgeTy*>(GaloisRuntime::MM::largeAlloc(sizeof(EdgeTy) * graph.sizeEdges()));
+    EdgeDst = reinterpret_cast<uint32_t*>(GaloisRuntime::MM::largeAlloc(sizeof(uint32_t) * graph.sizeEdges()));
     std::copy(graph.outIdx_begin(), graph.outIdx_end(), &EdgeIndData[0]);
     std::copy(graph.outs_begin(), graph.outs_end(), &EdgeDst[0]);
     std::copy(graph.edgeData_begin<EdgeTy>(), graph.edgeData_end<EdgeTy>(),
