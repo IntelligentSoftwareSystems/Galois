@@ -52,7 +52,6 @@ static const char* name = "Boruvka MST";
 static const char* desc = "Computes the Minimal Spanning Tree using Boruvka\n";
 static const char* url = "boruvkas_algorithm";
 
-static cll::opt<int> stepShift("delta", cll::desc("Shift value for the deltastep"), cll::init(10));
 static cll::opt<std::string> inputfile(cll::Positional, cll::desc("<input file>"), cll::Required);
 
 
@@ -89,7 +88,7 @@ void printGraph() {
   }
   std::cout<<"Num edges "<<numEdges << std::endl;
 }
-GaloisRuntime::PerCPU<unsigned int> MSTWeight;
+GaloisRuntime::PerCPU<size_t> MSTWeight;
 struct process {
   template<typename ContextTy>
   void __attribute__((noinline)) operator()(GNode& src, ContextTy& lwl) {
@@ -305,7 +304,6 @@ static void makeGraph(const char* input) {
 
 int main(int argc, char **argv) {
   LonestarStart(argc, argv, std::cout, name, desc, url);
-  std::cout << "Using delta-step of " << (1 << stepShift) << "\n";
 
   makeGraph(inputfile.c_str());
 #if BORUVKA_DEBUG
