@@ -44,6 +44,9 @@
 namespace GaloisRuntime {
 namespace MM {
 
+void* largeAlloc(size_t bytes);
+void  largeFree (void* mem, size_t bytes);
+
 //! Base mmap wrapper
 class mmapWrapper {
   static void* _alloc();

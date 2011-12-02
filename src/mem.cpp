@@ -123,3 +123,28 @@ SizedAllocatorFactory::~SizedAllocatorFactory() {
   }
 }
 #endif
+
+void* GaloisRuntime::MM::largeAlloc(size_t len) {
+  void* data = 0;
+#ifdef GALOIS_NUMA
+  bitmask* nm = numa_allocate_nodemask();
+  unsigned int num = GaloisRuntime::getSystemThreadPool().getActiveThreads();
+  for (int y = 0; y < num; ++y)
+    numa_bitmask_setbit(nm, y/4);
+  data = numa_alloc_interleaved_subset(len, nm);
+  numa_free_nodemask(nm);
+#else
+  data = malloc(len);
+#endif
+  if (!data)
+    abort();
+  return data;
+}
+
+void GaloisRuntime::MM::largeFree(void* m, size_t len) {
+#ifdef GALOIS_NUMA
+  numa_free(m, len);
+#else
+  free(m);
+#endif
+}
