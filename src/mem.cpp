@@ -36,6 +36,10 @@
 #endif
 #include <sys/mman.h>
 
+#ifdef GALOIS_NUMA
+#include <numa.h>
+#endif
+
 using namespace GaloisRuntime;
 using namespace MM;
 
@@ -129,7 +133,7 @@ void* GaloisRuntime::MM::largeAlloc(size_t len) {
 #ifdef GALOIS_NUMA
   bitmask* nm = numa_allocate_nodemask();
   unsigned int num = GaloisRuntime::getSystemThreadPool().getActiveThreads();
-  for (int y = 0; y < num; ++y)
+  for (unsigned y = 0; y < num; ++y)
     numa_bitmask_setbit(nm, y/4);
   data = numa_alloc_interleaved_subset(len, nm);
   numa_free_nodemask(nm);
