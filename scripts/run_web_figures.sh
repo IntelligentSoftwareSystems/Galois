@@ -51,11 +51,11 @@ run apps/delaunaytriangulation/delaunaytriangulation "$BASEINPUT/meshes/r1M.node
 run apps/des/DESunordered -noverify -epi 512 "$BASEINPUT/des/koggeStone64bit.net"
 run apps/gmetis/gmetis -mtxinput "$BASEINPUT/matrix/cage15.mtx" 256
 run apps/preflowpush/preflowpush "$BASEINPUT/random/r4-2e23.gr" 0 100
-run apps/sssp/sssp -delta 14 "$BASEINPUT/random/r4-2e25.gr"
+run apps/sssp/sssp -delta 14 "$BASEINPUT/random/r4-2e26.gr"
 run apps/surveypropagation/surveypropagation 9 1000000 3000000 3
 
 # Generate results
-cat $RESULTDIR/*.log | python "$BASE/scripts/report.py" report.csv
+cat $RESULTDIR/*.log | python "$BASE/scripts/report.py" > report.csv
 Rscript "$BASE/scripts/report.R" report.csv report.json
 
 if (($SKIPPED)); then
