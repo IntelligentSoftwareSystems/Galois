@@ -561,7 +561,7 @@ public:
   //// General Things ////
 
   //! Returns the number of neighbors
-  int neighborsSize(GraphNode N, Galois::MethodFlag mflag = ALL) const {
+  size_t neighborsSize(GraphNode N, Galois::MethodFlag mflag = ALL) const {
     assert(N.ID);
     acquire(N.ID, mflag);
     return N.ID->edges.size();

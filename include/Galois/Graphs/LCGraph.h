@@ -126,6 +126,14 @@ public:
     return numNodes;
   }
 
+  bool hasNeighbor(GraphNode N1, GraphNode N2, MethodFlag mflag = ALL) {
+    for (edge_iterator ii = edge_begin(N1, mflag), ei = edge_end(N1, mflag); ii != ei; ++ii) {
+      if (getEdgeDst(ii) == N2)
+        return true;
+    }
+    return false;
+  }
+
   active_iterator active_begin() const {
     return active_iterator(0);
   }
@@ -154,9 +162,9 @@ public:
     EdgeIndData = reinterpret_cast<uint64_t*>(GaloisRuntime::MM::largeAlloc(sizeof(uint64_t) * numNodes));
     EdgeData = reinterpret_cast<EdgeTy*>(GaloisRuntime::MM::largeAlloc(sizeof(EdgeTy) * graph.sizeEdges()));
     EdgeDst = reinterpret_cast<uint32_t*>(GaloisRuntime::MM::largeAlloc(sizeof(uint32_t) * graph.sizeEdges()));
-    std::copy(graph.outIdx_begin(), graph.outIdx_end(), &EdgeIndData[0]);
-    std::copy(graph.outs_begin(), graph.outs_end(), &EdgeDst[0]);
-    std::copy(graph.edgeData_begin<EdgeTy>(), graph.edgeData_end<EdgeTy>(),
+    std::copy(graph.edgeid_begin(), graph.edgeid_end(), &EdgeIndData[0]);
+    std::copy(graph.nodeid_begin(), graph.nodeid_end(), &EdgeDst[0]);
+    std::copy(graph.edgedata_begin<EdgeTy>(), graph.edgedata_end<EdgeTy>(),
 	      &EdgeData[0]);
     for (int x = 0; x < numNodes; ++x)
       new (&NodeData[0]) NodeTy; // inplace new
@@ -408,7 +416,7 @@ public:
     for (FileGraph::active_iterator ii = graph.active_begin(),
 	   ee = graph.active_end(); ii != ee; ++ii) {
       new (&curNode->data) NodeTy; //inplace new
-      curNode->numEdges = graph.numEdgesFor(*ii);
+      curNode->numEdges = graph.neighborsSize(*ii);
       node_ids[*ii] = curNode;
       curNode = curNode->next();
     }

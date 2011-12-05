@@ -157,14 +157,7 @@ void FileGraph::clone(FileGraph& other) {
   structureFromMem(other.masterMapping, other.masterLength, true);
 }
 
-uint64_t FileGraph::getEdgeIdx(GraphNode src, GraphNode dst) {
-  for (uint32_t* ii = neighbor_begin(src),
-	 *ee = neighbor_end(src); ii != ee; ++ii)
-    if (*ii == dst)
-      return std::distance(outs, ii);
-  return ~(uint64_t)0;
-}
-
+#if 0
 uint64_t FileGraph::getEdgeIdx(uint32_t* iter) {
   return std::distance(outs, iter);
 }
@@ -173,6 +166,14 @@ unsigned int FileGraph::numEdgesFor(GraphNode N) const {
   uint32_t b = (N == 0) ? 0 : outIdx[N-1];
   uint32_t e = outIdx[N];
   return e - b;
+}
+
+uint64_t FileGraph::getEdgeIdx(GraphNode src, GraphNode dst) {
+  for (uint32_t* ii = neighbor_begin(src),
+	 *ee = neighbor_end(src); ii != ee; ++ii)
+    if (*ii == dst)
+      return std::distance(outs, ii);
+  return ~(uint64_t)0;
 }
 
 bool FileGraph::containsNode(const GraphNode n) const {
@@ -207,3 +208,4 @@ unsigned int FileGraph::sizeEdges () const {
   return numEdges;
 }
 
+#endif

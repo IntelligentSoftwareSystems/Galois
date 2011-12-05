@@ -34,8 +34,6 @@
 
 namespace cll = llvm::cl;
 
-namespace {
-
 const char* name = "Preflow Push";
 const char* desc = "Finds the maximum flow in a network using the preflow push technique\n";
 const char* url = "preflow_push";
@@ -435,6 +433,7 @@ void initializeGraph(const char* inputFile,
 
   ReaderGraph reader;
   reader.structureFromFile(inputFile);
+  //reader.emptyNodeData();
 
   // Assign ids to ReaderGNodes
   newApp->num_nodes = 0;
@@ -478,7 +477,7 @@ void initializeGraph(const char* inputFile,
       newApp->graph.addEdge(nodes[rsrcId], nodes[rdstId], cap);
       ++newApp->num_edges;
       // Add reverse edge if not already there
-      if (!reader.has_neighbor(rdst, rsrc)) {
+      if (!reader.hasNeighbor(rdst, rsrc)) {
         newApp->graph.addEdge(nodes[rdstId], nodes[rsrcId], 0);
         ++newApp->num_edges;
       }
@@ -535,7 +534,6 @@ void run() {
   }
 }
 
-} // end namespace
 
 int main(int argc, char** argv) {
   bool serial = false;
