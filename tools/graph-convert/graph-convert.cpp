@@ -25,20 +25,35 @@
 #include "Galois/Graphs/LCGraph.h"
 #include "Galois/Graphs/Serialize.h"
 
+#include "llvm/Support/CommandLine.h"
+
 #include <iostream>
 #include <vector>
+#include <string>
 
-static const char* help =
-  "[-dimacs2gr | -rmat2gr | -gr2dimacs] <input file> <output file>\n"
-  "Converts graph formats.\n"
-  "Default: converts dimacs to binary gr format (-dimacs2gr)\n";
+namespace cll = llvm::cl;
 
-void rmat2gr(const char *infilename, const char *outfilename) {
+enum ConvertMode {
+  dimacs2gr,
+  rmat2gr,
+  gr2dimacs
+};
+
+static cll::opt<std::string> inputfilename(cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<std::string> outputfilename(cll::Positional, cll::desc("<output file>"), cll::Required);
+static cll::opt<ConvertMode> convertMode(cll::desc("Choose a conversion mode:"),
+    cll::values(
+      clEnumVal(dimacs2gr, "Convert dimacs to binary gr (default)"),
+      clEnumVal(rmat2gr, "Convert rmat to binary gr"),
+      clEnumVal(gr2dimacs, "Convert binary gr to dimacs"),
+      clEnumValEnd), cll::init(dimacs2gr));
+
+void convert_rmat2gr(const std::string& infilename, const std::string& outfilename) {
   typedef Galois::Graph::FirstGraph<int,int,true> Graph;
   typedef Graph::GraphNode GNode;
   Graph graph;
 
-  std::ifstream infile(infilename);
+  std::ifstream infile(infilename.c_str());
 
   // Skip to first non-comment line
   while (!infile.eof()) {
@@ -107,15 +122,15 @@ void rmat2gr(const char *infilename, const char *outfilename) {
     << " Edges added: " << edges_added
     << "\n";
 
-  outputGraph(outfilename, graph);
+  outputGraph(outfilename.c_str(), graph);
 }
 
-void dimacs2gr(const char *infilename, const char *outfilename) {
+void convert_dimacs2gr(const std::string& infilename, const std::string& outfilename) {
   typedef Galois::Graph::FirstGraph<int,int,true> Graph;
   typedef Graph::GraphNode GNode;
   Graph graph;
 
-  std::ifstream infile(infilename);
+  std::ifstream infile(infilename.c_str());
 
   while (!infile.eof()) {
     if (infile.peek() != 'c') {
@@ -190,10 +205,10 @@ void dimacs2gr(const char *infilename, const char *outfilename) {
     << " Edges added: " << edges_added
     << "\n";
 
-  outputGraph(outfilename, graph);
+  outputGraph(outfilename.c_str(), graph);
 }
 
-void gr2dimacs(const char *infilename, const char *outfilename) {
+void convert_gr2dimacs(const std::string& infilename, const std::string& outfilename) {
   typedef Galois::Graph::LC_CRS_Graph<size_t, int> Graph;
   typedef Graph::GraphNode GNode;
 
@@ -209,7 +224,7 @@ void gr2dimacs(const char *infilename, const char *outfilename) {
     nedges += std::distance(graph.edge_begin(*i), graph.edge_end(*i));
   }
 
-  std::ofstream file(outfilename);
+  std::ofstream file(outfilename.c_str());
   file << "p sp " << nnodes << " " << nedges << "\n";
   for (Graph::active_iterator i = graph.active_begin(), e = graph.active_end();
       i != e; ++i) {
@@ -230,32 +245,13 @@ void gr2dimacs(const char *infilename, const char *outfilename) {
     << "\n";
 }
 
-int main(int argc, const char** argv) {
-  int func = 0;
-  for (int index = 1; index < argc; ++index) {
-    const char* tok = argv[index];
-    if (strcmp(tok, "-help") == 0) {
-      std::cout << help;
-      return 0;
-    } else if (strcmp(tok, "-dimacs2gr") == 0) {
-      func = 0;
-    } else if (strcmp(tok, "-rmat2gr") == 0) {
-      func = 1;
-    } else if (strcmp(tok, "-gr2dimacs") == 0) {
-      func = 2;
-    } else if (argc - index == 2) {
-      switch (func) {
-        case 2: gr2dimacs(argv[index], argv[index+1]); break;
-        case 1: rmat2gr(argv[index], argv[index+1]); break;
-        case 0: dimacs2gr(argv[index], argv[index+1]); break;
-        default: assert(false);
-      }
-      return 0;
-    } else {
-      std::cerr << "unknown arguments, use -help for usage information\n";
-      return 1;
-    }
+int main(int argc, char** argv) {
+  llvm::cl::ParseCommandLineOptions(argc, argv);
+  switch (convertMode) {
+    case rmat2gr: convert_rmat2gr(inputfilename, outputfilename); break;
+    case gr2dimacs: convert_gr2dimacs(inputfilename, outputfilename); break;
+    default:
+    case dimacs2gr: convert_dimacs2gr(inputfilename, outputfilename); break;
   }
-  std::cerr << help;
-  return 1;
+  return 0;
 }

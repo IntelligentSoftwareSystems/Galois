@@ -1,6 +1,7 @@
 add_subdirectory(generators)
 add_subdirectory(comparisons)
 add_subdirectory(graph-convert)
+add_subdirectory(graph-stats)
 
 ### External Projects
 
