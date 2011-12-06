@@ -256,6 +256,12 @@ static void makeGraph(const char* input) {
   int numEdges = 0;
   for (InGraph::active_iterator src = in_graph.active_begin(), esrc = in_graph.active_end();src != esrc; ++src) {
     for (InGraph::edge_iterator dst = in_graph.edge_begin(*src, Galois::NONE), edst = in_graph.edge_end(*src, Galois::NONE);dst != edst; ++dst) {
+      if(*src==*dst){
+#if BORUVKA_DEBUG
+         std::cout<<"ERR:: Self loop at "<<*src<<std::endl;
+#endif
+         continue;
+      }
       int w = in_graph.getEdgeData(dst);
       Element e(*src, w);
       edges[in_graph.getEdgeDst(dst)].push_back(e);
