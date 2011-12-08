@@ -108,7 +108,11 @@ public:
     GaloisRuntime::acquire(&NI, mflag);
     return NI.data;
   }
-  
+
+  bool hasNeighbor(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
+    return getEdgeIdx(src,dst) != ~static_cast<uint64_t>(0);
+  }
+
   EdgeTy& getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
     GaloisRuntime::acquire(&NodeData[src], mflag);
     return EdgeData[getEdgeIdx(src,dst)];
@@ -124,14 +128,6 @@ public:
 
   uint64_t size() const {
     return numNodes;
-  }
-
-  bool hasNeighbor(GraphNode N1, GraphNode N2, MethodFlag mflag = ALL) {
-    for (edge_iterator ii = edge_begin(N1, mflag), ei = edge_end(N1, mflag); ii != ei; ++ii) {
-      if (getEdgeDst(ii) == N2)
-        return true;
-    }
-    return false;
   }
 
   active_iterator active_begin() const {
