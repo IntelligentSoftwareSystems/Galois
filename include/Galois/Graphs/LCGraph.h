@@ -162,7 +162,7 @@ public:
     std::copy(graph.nodeid_begin(), graph.nodeid_end(), &EdgeDst[0]);
     std::copy(graph.edgedata_begin<EdgeTy>(), graph.edgedata_end<EdgeTy>(),
 	      &EdgeData[0]);
-    for (int x = 0; x < numNodes; ++x)
+    for (unsigned x = 0; x < numNodes; ++x)
       new (&NodeData[0]) NodeTy; // inplace new
   }
 };
