@@ -173,6 +173,7 @@ function(linkRuntime name)
 endfunction (linkRuntime)
 
 ###### Source finding ######
+set(LLVM_ENABLE_ASSERTIONS on) # enable assertions in non-release builds
 include(llvm-extras)
 
 include_directories("include")
