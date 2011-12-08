@@ -22,6 +22,7 @@
 namespace Exp {
   __attribute__((weak)) llvm::cl::opt<std::string> WorklistName("wl", llvm::cl::desc("Worklist to use"));
 
+#ifdef GALOIS_TBB
 template<typename T = int>
 class TbbFIFO : private boost::noncopyable  {
   tbb::concurrent_bounded_queue<T> wl;
@@ -58,8 +59,10 @@ public:
 };
 WLCOMPILECHECK(TbbFIFO);
 
+#endif // GALOIS_TBB
 
-template<class Indexer, typename ContainerTy = TbbFIFO<>, typename T = int, bool concurrent = true >
+
+ template<class Indexer, typename ContainerTy = GaloisRuntime::WorkList::FIFO<>, typename T = int, bool concurrent = true >
 class SimpleOrderedByIntegerMetric : private boost::noncopyable, private GaloisRuntime::PaddedLock<concurrent> {
 
   using GaloisRuntime::PaddedLock<concurrent>::lock;
@@ -403,6 +406,7 @@ template <typename T> struct GETID<T*> {
   }
 };
 
+#ifdef GALOIS_TBB
 template<class Compare = std::less<int>, typename T = int>
 class PTbb : private boost::noncopyable {
   typedef tbb::concurrent_priority_queue<T,Compare> TBBTy;
@@ -511,17 +515,27 @@ public:
   }
 };
 WLCOMPILECHECK(TbbPriQueue);
+#endif //TBB
 
-
-template<typename DefaultWorklist,typename dChunk,typename Chunk,typename Indexer,typename Less,typename Greater>
+ template<
+   typename DefaultWorklist,
+   typename dChunk,
+   typename Chunk,
+   typename Indexer,
+   typename Less,
+   typename Greater
+   >
 struct StartWorklistExperiment {
   template<typename Iterator,typename Functor>
   void operator()(std::ostream& out, Iterator ii, Iterator ei, Functor fn) {
     using namespace GaloisRuntime::WorkList;
 
     typedef OrderedByIntegerMetric<Indexer, dChunk> OBIM;
+#ifdef GALOIS_TBB
     typedef TbbPriQueue<Greater> TBB;
     typedef LocalStealing<TBB> LTBB;
+    typedef PTbb<Greater> PTBB;
+#endif
     typedef SkipListQueue<Less> SLQ;
     typedef SimpleOrderedByIntegerMetric<Indexer> SOBIM;
     typedef LocalStealing<SOBIM> LSOBIM;
@@ -530,7 +544,6 @@ struct StartWorklistExperiment {
     typedef CTOrderedByIntegerMetric<Indexer, dChunk> CTOBIM;
     typedef CTOrderedByIntegerMetric<Indexer, Chunk> NACTOBIM;
     typedef LevelStealing<Random<> > RANDOM;
-    typedef PTbb<Greater> PTBB;
 
     std::string name = WorklistName;
 
@@ -557,12 +570,14 @@ struct StartWorklistExperiment {
     WLFOO(ii, ei, fn, ctobim,   CTOBIM)   else
     WLFOO(ii, ei, fn, nactobim, NACTOBIM) else
     WLFOO(ii, ei, fn, slq,      SLQ)      else
-    WLFOO(ii, ei, fn, tbb,      TBB)      else
-    WLFOO(ii, ei, fn, ltbb,     LTBB)     else
     WLFOO(ii, ei, fn, bobim,    BOBIM)    else
-    WLFOO(ii, ei, fn, ptbb,     PTBB)     else
     WLFOO(ii, ei, fn, bag,      dChunk)   else
     WLFOO(ii, ei, fn, random,   RANDOM)   else
+#ifdef GALOIS_TBB
+    WLFOO(ii, ei, fn, tbb,      TBB)      else
+    WLFOO(ii, ei, fn, ltbb,     LTBB)     else
+    WLFOO(ii, ei, fn, ptbb,     PTBB)     else
+#endif
     {
       out << "Unrecognized worklist " << name << "\n";
     }
