@@ -59,15 +59,10 @@
 #include "Galois/Runtime/Context.h"
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/iterator/transform_iterator.hpp>
-#include <boost/detail/endian.hpp>
 #include <endian.h>
 #include <map>
 #include <vector>
 #include <fstream>
-
-#ifdef GALOIS_NUMA
-#include <numa.h>
-#endif
 
 using namespace GaloisRuntime;
 
@@ -93,21 +88,9 @@ protected:
   uint64_t numEdges;
   uint64_t numNodes;
 
-  uint64_t getEdgeIdx(GraphNode src, GraphNode dst) {
-    for (uint32_t* ii = raw_neighbor_begin(src),
-	   *ee = raw_neighbor_end(src); ii != ee; ++ii)
-      if (le32toh(*ii) == dst)
-	return std::distance(outs, ii);
-    return ~(uint64_t)0;
-  }
-
-  uint32_t* raw_neighbor_begin(GraphNode N, MethodFlag mflag = ALL) const {
-    return (N == 0) ? &outs[0] : &outs[le64toh(outIdx[N-1])];
-  }
-
-  uint32_t* raw_neighbor_end(GraphNode N, MethodFlag mflag = ALL) const {
-    return &outs[le64toh(outIdx[N])];
-  }
+  uint64_t getEdgeIdx(GraphNode src, GraphNode dst) const;
+  uint32_t* raw_neighbor_begin(GraphNode N) const;
+  uint32_t* raw_neighbor_end(GraphNode N) const;
 
   struct Convert32: public std::unary_function<uint32_t, uint32_t> {
     uint32_t operator()(uint32_t x) const {
@@ -125,23 +108,10 @@ protected:
   void parse(void* m);
 
 public:
-  bool isLoaded() {
-    return masterMapping != 0;
-  }
-
-  void* getBasePtr() {
-    return masterMapping;
-  }
-  size_t getBaseLength() {
-    return masterLength;
-  }
-
   // Node Handling
 
   //! Check if a node is in the graph (already added)
-  bool containsNode(const GraphNode n) const {
-    return n < numNodes;
-  }
+  bool containsNode(const GraphNode n) const;
 
   // Edge Handling
   template<typename EdgeTy>
@@ -150,78 +120,37 @@ public:
     return reinterpret_cast<EdgeTy*>(edgeData)[getEdgeIdx(src, dst)];
   }
 
-  size_t neighborsSize(GraphNode N, Galois::MethodFlag mflag = ALL) const {
-    return std::distance(neighbor_begin(N, mflag), neighbor_end(N, mflag));
-  }
+  size_t neighborsSize(GraphNode N, Galois::MethodFlag mflag = ALL) const;
 
   // Iterators
   typedef boost::counting_iterator<uint64_t> edge_iterator;
-  edge_iterator edge_begin(GraphNode N, MethodFlag mflag = ALL) const {
-    return edge_iterator(N == 0 ? 0 : le64toh(outIdx[N-1]));
-  }
-  edge_iterator edge_end(GraphNode N, MethodFlag mflag = ALL) const {
-    return edge_iterator(le64toh(outIdx[N]));
-  }
+  edge_iterator edge_begin(GraphNode N, MethodFlag mflag = ALL) const;
+  edge_iterator edge_end(GraphNode N, MethodFlag mflag = ALL) const;
+
   template<typename EdgeTy> EdgeTy& getEdgeData(edge_iterator it, MethodFlag mflag = ALL) const {
     return reinterpret_cast<EdgeTy*>(edgeData)[*it];
   }
-  GraphNode getEdgeDst(edge_iterator it, MethodFlag mflag = ALL) const {
-    return le32toh(outs[*it]);
-  }
-#ifdef BOOST_LITTLE_ENDIAN
-  typedef uint32_t* neighbor_iterator;
-  typedef uint32_t* nodeid_iterator;
-  typedef uint64_t* edgeid_iterator;
 
-  neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = ALL) const {
-    return raw_neighbor_begin(N, mflag);
-  }
-  neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = ALL) const {
-    return raw_neighbor_end(N, mflag);
-  }
-  nodeid_iterator nodeid_begin() const {
-    return &outs[0];
-  }
-  nodeid_iterator nodeid_end() const {
-    return &outs[numEdges];
-  }
-  edgeid_iterator edgeid_begin() const {
-    return &outIdx[0];
-  }
-  edgeid_iterator edgeid_end() const {
-    return &outIdx[numNodes];
-  }
-  template<typename EdgeTy>
-  EdgeTy& getEdgeData(neighbor_iterator it, MethodFlag mflag = ALL) {
-    return reinterpret_cast<EdgeTy*>(edgeData)[std::distance(outs, it)];
-  }
-#else
+  GraphNode getEdgeDst(edge_iterator it, MethodFlag mflag = ALL) const;
+
   typedef boost::transform_iterator<Convert32, uint32_t*> neighbor_iterator;
   typedef boost::transform_iterator<Convert32, uint32_t*> nodeid_iterator;
   typedef boost::transform_iterator<Convert64, uint64_t*> edgeid_iterator;
   neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = ALL) const {
-    return boost::make_transform_iterator(raw_neighbor_begin(N, mflag), Convert32());
+    return boost::make_transform_iterator(raw_neighbor_begin(N), Convert32());
   }
   neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = ALL) const {
-    return boost::make_transform_iterator(raw_neighbor_end(N, mflag), Convert32());
+    return boost::make_transform_iterator(raw_neighbor_end(N), Convert32());
   }
-  nodeid_iterator nodeid_begin() const {
-    return boost::make_transform_iterator(&outs[0], Convert32());
-  }
-  nodeid_iterator nodeid_end() const {
-    return boost::make_transform_iterator(&outs[numEdges], Convert32());
-  }
-  edgeid_iterator edgeid_begin() const {
-    return boost::make_transform_iterator(&outIdx[0], Convert64());
-  }
-  edgeid_iterator edgeid_end() const {
-    return boost::make_transform_iterator(&outIdx[numNodes], Convert64());
-  }
+  nodeid_iterator nodeid_begin() const;
+  nodeid_iterator nodeid_end() const;
+  edgeid_iterator edgeid_begin() const;
+  edgeid_iterator edgeid_end() const;
+
   template<typename EdgeTy>
   EdgeTy& getEdgeData(neighbor_iterator it, MethodFlag mflag = ALL) {
     return reinterpret_cast<EdgeTy*>(edgeData)[std::distance(outs, it.base())];
   }
-#endif
 
   template<typename EdgeTy> EdgeTy* edgedata_begin() const {
     return reinterpret_cast<EdgeTy*>(edgeData);
@@ -232,30 +161,20 @@ public:
     return &r[numEdges];
   }
 
-  bool hasNeighbor(GraphNode N1, GraphNode N2, MethodFlag mflag = ALL) const {
-    return std::find(neighbor_begin(N1), neighbor_end(N1), N2) != neighbor_end(N1);
-  }
+  bool hasNeighbor(GraphNode N1, GraphNode N2, MethodFlag mflag = ALL) const;
 
   typedef boost::counting_iterator<uint64_t> active_iterator;
 
   //! Iterate over nodes in graph (not thread safe)
-  active_iterator active_begin() const {
-    return active_iterator(0);
-  }
+  active_iterator active_begin() const;
 
-  active_iterator active_end() const {
-    return active_iterator(numNodes);
-  }
+  active_iterator active_end() const;
 
   //! The number of nodes in the graph
-  unsigned int size() const {
-    return numNodes;
-  }
+  unsigned int size() const;
 
   //! The number of edges in the graph
-  unsigned int sizeEdges() const {
-    return numEdges;
-  }
+  unsigned int sizeEdges() const;
 
   FileGraph();
   ~FileGraph();

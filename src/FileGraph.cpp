@@ -56,6 +56,7 @@ FileGraph::~FileGraph() {
     close(masterFD);
 }
 
+//FIXME: perform le -> host on data here too
 void FileGraph::parse(void* m) {
   //parse file
   uint64_t* fptr = (uint64_t*)m;
@@ -128,6 +129,7 @@ void FileGraph::structureFromFile(const std::string& filename) {
   masterMapping = m;
 }
 
+//FIXME: perform host -> le on data
 void FileGraph::structureToFile(char* file) {
   ssize_t retval;
   //ASSUME LE machine
@@ -157,39 +159,55 @@ void FileGraph::clone(FileGraph& other) {
   structureFromMem(other.masterMapping, other.masterLength, true);
 }
 
-#if 0
-uint64_t FileGraph::getEdgeIdx(uint32_t* iter) {
-  return std::distance(outs, iter);
-}
-
-unsigned int FileGraph::numEdgesFor(GraphNode N) const {
-  uint32_t b = (N == 0) ? 0 : outIdx[N-1];
-  uint32_t e = outIdx[N];
-  return e - b;
-}
-
-uint64_t FileGraph::getEdgeIdx(GraphNode src, GraphNode dst) {
-  for (uint32_t* ii = neighbor_begin(src),
-	 *ee = neighbor_end(src); ii != ee; ++ii)
-    if (*ii == dst)
+uint64_t FileGraph::getEdgeIdx(GraphNode src, GraphNode dst) const {
+  for (uint32_t* ii = raw_neighbor_begin(src),
+	 *ee = raw_neighbor_end(src); ii != ee; ++ii)
+    if (le32toh(*ii) == dst)
       return std::distance(outs, ii);
-  return ~(uint64_t)0;
+  return ~static_cast<uint64_t>(0);
 }
 
-bool FileGraph::containsNode(const GraphNode n) const {
-  return n < numNodes;
+uint32_t* FileGraph::raw_neighbor_begin(GraphNode N) const {
+  return (N == 0) ? &outs[0] : &outs[le64toh(outIdx[N-1])];
 }
 
-FileGraph::neighbor_iterator FileGraph::neighbor_begin(GraphNode N) const {
-  return (N == 0) ? &outs[0] : &outs[outIdx[N-1]];
+uint32_t* FileGraph::raw_neighbor_end(GraphNode N) const {
+  return &outs[le64toh(outIdx[N])];
 }
 
-FileGraph::neighbor_iterator FileGraph::neighbor_end(GraphNode N) const {
-  return &outs[outIdx[N]];
+size_t FileGraph::neighborsSize(GraphNode N, Galois::MethodFlag mflag) const {
+  return std::distance(raw_neighbor_begin(N), raw_neighbor_end(N));
 }
 
-bool FileGraph::has_neighbor(GraphNode N1, GraphNode N2) const {
-  return std::find(neighbor_begin(N1), neighbor_end(N1), N2) != neighbor_end(N1);
+FileGraph::edge_iterator FileGraph::edge_begin(GraphNode N, MethodFlag mflag) const {
+  return edge_iterator(N == 0 ? 0 : le64toh(outIdx[N-1]));
+}
+FileGraph::edge_iterator FileGraph::edge_end(GraphNode N, MethodFlag mflag) const {
+  return edge_iterator(le64toh(outIdx[N]));
+}
+
+FileGraph::GraphNode FileGraph::getEdgeDst(edge_iterator it, MethodFlag mflag) const {
+  return le32toh(outs[*it]);
+}
+
+FileGraph::nodeid_iterator FileGraph::nodeid_begin() const {
+  return boost::make_transform_iterator(&outs[0], Convert32());
+}
+
+FileGraph::nodeid_iterator FileGraph::nodeid_end() const {
+  return boost::make_transform_iterator(&outs[numEdges], Convert32());
+}
+
+FileGraph::edgeid_iterator FileGraph::edgeid_begin() const {
+  return boost::make_transform_iterator(&outIdx[0], Convert64());
+}
+
+FileGraph::edgeid_iterator FileGraph::edgeid_end() const {
+  return boost::make_transform_iterator(&outIdx[numNodes], Convert64());
+}
+
+bool FileGraph::hasNeighbor(GraphNode N1, GraphNode N2, MethodFlag mflag) const {
+  return getEdgeIdx(N1,N2) != ~static_cast<uint64_t>(0);
 }
 
 FileGraph::active_iterator FileGraph::active_begin() const {
@@ -208,4 +226,7 @@ unsigned int FileGraph::sizeEdges () const {
   return numEdges;
 }
 
-#endif
+bool FileGraph::containsNode(const GraphNode n) const {
+  return n < numNodes;
+}
+
