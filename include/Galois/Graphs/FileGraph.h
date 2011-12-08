@@ -351,95 +351,9 @@ public:
 
 };
 
-#ifdef GALOIS_NUMA
-class NumaFileGraph {
-public:
-  typedef uint32_t GraphNode;
-
-protected:
-  GaloisRuntime::PerLevel<FileGraph> graphs;
-  GaloisRuntime::PerLevel<GaloisRuntime::SimpleLock<int, true> > locks;
-
-  FileGraph& ldIfNeeded() {
-    FileGraph& g = graphs.get();
-    while (!g.isLoaded()) {
-      __sync_synchronize();
-      if (locks.get().try_lock()) {
-	if (!g.isLoaded()) {
-	  g.structureFromMem(graphs.get(0).getBasePtr(), graphs.get(0).getBaseLength(), true);
-	  //std::cout << "Fixed " << graphs.myEffectiveID() << " by " << graphs.myID() << "\n";
-	}
-	locks.get().unlock();
-      }
-      //std::cout << graphs.myID() << ' ';
-    }
-    return g;
-  }
-
-public:
-  // Node Handling
-
-  //! Check if a node is in the graph (already added)
-  bool containsNode(const GraphNode n) {
-    return ldIfNeeded().containsNode(n);
-  }
-
-  // Edge Handling
-  template<typename EdgeTy>
-  EdgeTy& getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
-    return ldIfNeeded().getEdgeData<EdgeTy>(src,dst,mflag);
-  }
-
-  // General Things
-  typedef FileGraph::neighbor_iterator neighbor_iterator;
-
-  neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = ALL) {
-    return ldIfNeeded().neighbor_begin(N,mflag);
-  }
-
-  neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = ALL) {
-    return ldIfNeeded().neighbor_end(N,mflag);
-  }
-
-  bool hasNeighbor(GraphNode N1, GraphNode N2, MethodFlag mflag = ALL) {
-    return ldIfNeeded().hasNeighbor(N1,N2, mflag);
-  }
-
-  typedef boost::counting_iterator<uint64_t> active_iterator;
-
-  //! Iterate over nodes in graph (not thread safe)
-  active_iterator active_begin() {
-    return ldIfNeeded().active_begin();
-  }
-
-  active_iterator active_end() {
-    return ldIfNeeded().active_end();
-  }
-
-  //! The number of nodes in the graph
-  unsigned int size() {
-    return ldIfNeeded().size();
-  }
-
-  //! The number of edges in the graph
-  unsigned int sizeEdges () {
-    return ldIfNeeded().sizeEdges();
-  }
-
-  NumaFileGraph();
-  ~NumaFileGraph();
-
-  //! Read graph connectivity information from file
-  void structureFromFile(const char* filename) {
-    graphs.get(0).structureFromFile(filename);
-  }
-};
-#endif
-
 //! Local computation graph (i.e., graph structure does not change)
 template<typename NodeTy, typename EdgeTy>
 class LC_FileGraph : public FileGraph {
-  typedef FileGraph Par;
 
   struct gNode : public GaloisRuntime::Lockable {
     NodeTy data;
@@ -463,14 +377,14 @@ public:
   }
 
   EdgeTy& getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
-    return Par::getEdgeData<EdgeTy>(src, dst, mflag);
+    return FileGraph::getEdgeData<EdgeTy>(src, dst, mflag);
   }
 
-  EdgeTy& getEdgeData(Par::edge_iterator it, MethodFlag mflag = ALL) {
-    return Par::getEdgeData<EdgeTy>(it, mflag);
+  EdgeTy& getEdgeData(FileGraph::edge_iterator it, MethodFlag mflag = ALL) {
+    return FileGraph::getEdgeData<EdgeTy>(it, mflag);
   }
-  EdgeTy& getEdgeData(Par::neighbor_iterator it, MethodFlag mflag = ALL) {
-    return Par::getEdgeData<EdgeTy>(it, mflag);
+  EdgeTy& getEdgeData(FileGraph::neighbor_iterator it, MethodFlag mflag = ALL) {
+    return FileGraph::getEdgeData<EdgeTy>(it, mflag);
   }
 
   //! Loads node data from file
