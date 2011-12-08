@@ -16,7 +16,6 @@ defects in Software and/or Documentation, or loss or inaccuracy of data of any
 kind.
 */
 
-#include "Galois/Graphs/Graph.h"
 #include "Galois/Graphs/FileGraph.h"
 
 #include <sys/mman.h>

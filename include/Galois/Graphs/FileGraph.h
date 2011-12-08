@@ -57,6 +57,7 @@
 
 #include "Galois/ConflictFlags.h"
 #include "Galois/Runtime/Context.h"
+#include "Galois/Runtime/CacheLineStorage.h"
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/iterator/transform_iterator.hpp>
 #include <endian.h>
@@ -271,6 +272,7 @@ public:
 };
 
 //! Local computation graph (i.e., graph structure does not change)
+//! THIS GRAPH SHOULD GO AWAY
 template<typename NodeTy, typename EdgeTy>
 class LC_FileGraph : public FileGraph {
 
