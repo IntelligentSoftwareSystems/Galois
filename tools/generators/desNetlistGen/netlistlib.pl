@@ -115,8 +115,8 @@ sub genKoggeStoneTest {
    my $outputList = genPortVector("s", $numBits );
    print $FH "\noutputs cout, $outputList \nend\n";
 
-   my $initListA = genInitListNbit($numBits, "a", $a, 1000 );
-   my $initListB = genInitListNbit($numBits, "b", $b, 1000 );
+   my $initListA = genInitListNbit($numBits, "a", $a, 256 );
+   my $initListB = genInitListNbit($numBits, "b", $b, 256 );
    my $initListCin = genInitList1bit("cin", $cin);
 
 

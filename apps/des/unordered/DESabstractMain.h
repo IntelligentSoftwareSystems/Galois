@@ -52,7 +52,6 @@ static const char* desc = "Uses Chandy-Misra's algorithm, which is unordered, to
 static const char* url = "discrete_event_simulation";
 
 static cll::opt<std::string> netlistFile(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<int> epi("epi", cll::desc("Events per iteration"));
 
 /**
  * The Class DESabstractMain holds common functionality for {@link DESunorderedSerial} and {@link DESunordered}.
@@ -97,14 +96,10 @@ public:
    * @param argv
    */
   void run(int argc, char* argv[]) {
-  LonestarStart(argc, argv, std::cout, name, desc, url);
 
-  if (epi) {
-    AbstractSimObject::NEVENTS_PER_ITER = epi;
-  }
+    LonestarStart(argc, argv, std::cout, name, desc, url);
 
     printf ("Processing %zd events per iteration\n", AbstractSimObject::NEVENTS_PER_ITER);
-
 
     SimInit simInit(graph, netlistFile.c_str());
 
@@ -116,7 +111,7 @@ public:
 
     t.start ();
 
-      runLoop(simInit);
+    runLoop(simInit);
 
     t.stop ();
 

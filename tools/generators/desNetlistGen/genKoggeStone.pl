@@ -4,8 +4,8 @@
 use strict;
 use warnings;
 
-require "../scripts/netlistlib.pl";
-require "../scripts/devicelib.pl";
+require "netlistlib.pl";
+require "devicelib.pl";
 
 my $numBits = 8;
 my $FinishTime = 10000;

@@ -39,6 +39,10 @@ class DESunordered: public DESabstractMain {
   typedef Galois::GAccumulator<int> PerCPUcounter;
   typedef Galois::GReduceMax<size_t> ReduceMax;
 
+
+  static const size_t CHUNK_SIZE = 16;
+  typedef GaloisRuntime::WorkList::dChunkedFIFO<CHUNK_SIZE> WLType;
+
   /**
    * contains the loop body, called 
    * by @see for_each
@@ -175,7 +179,8 @@ class DESunordered: public DESabstractMain {
 
     process p(graph, onWlFlags, numEvents, numIter, maxPending);
 
-    Galois::for_each < GaloisRuntime::WorkList::FIFO<GNode> > (initialActive.begin (), initialActive.end (), p);
+    // Galois::for_each < GaloisRuntime::WorkList::FIFO<GNode> > (initialActive.begin (), initialActive.end (), p);
+    Galois::for_each<WLType>(initialActive.begin (), initialActive.end (), p);
 
     std::cout << "Number of events processed = " << numEvents.get () << std::endl;
     std::cout << "Number of iterations performed = " << numIter.get () << std::endl;

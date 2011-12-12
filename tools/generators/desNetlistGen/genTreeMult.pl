@@ -5,8 +5,8 @@ use strict;
 use warnings;
 
 
-require "../scripts/devicelib.pl";
-require "../scripts/netlistlib.pl";
+require "devicelib.pl";
+require "netlistlib.pl";
 
 
 

@@ -3,12 +3,16 @@ file (GLOB Sources
 ./common/*.cpp
 )
 
-add_executable(DESunorderedSerial unordered/DESunorderedSerial.cpp  ${Sources})
-linkRuntime (DESunorderedSerial)
+function (DEStarget name) 
+  add_executable (${name} unordered/${name}.cpp ${Sources})
+  linkRuntime (${name})
+endfunction (DEStarget)
 
+DEStarget (DESunorderedSerial)
 
-add_executable(DESunordered unordered/DESunordered.cpp  ${Sources})
-linkRuntime (DESunordered)
+DEStarget (DESunordered)
+
+DEStarget (DESunorderedParaMeter)
 
 
 include_directories (.)

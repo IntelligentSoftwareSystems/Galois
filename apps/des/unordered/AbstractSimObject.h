@@ -494,5 +494,5 @@ public:
 }; // end class
 
 
-size_t AbstractSimObject::NEVENTS_PER_ITER = 1024;
+size_t AbstractSimObject::NEVENTS_PER_ITER = 16; // a good value for many inputs
 #endif 
