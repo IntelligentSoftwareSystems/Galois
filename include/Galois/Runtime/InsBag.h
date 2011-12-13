@@ -1,4 +1,4 @@
-/** Insert Bag -*- C++ -*-
+/** Insert Bag v2 -*- C++ -*-
  * @file
  * @section License
  *
@@ -26,48 +26,62 @@
 #include "Galois/Runtime/mem.h" 
 #include <iterator>
 
-#include <iostream>
-
 namespace GaloisRuntime {
-  
+
 template< class T>
 class galois_insert_bag {
   
-  struct holder {
-    T data;
-    holder* next;
+  struct header {
+    header* next;
+    T* dbegin; //start of interesting data
+    T* dend; //end of valid data
+    T* dlast; //end of storage
   };
 
-  PtrLock<holder*, true> head;
-  GaloisRuntime::PerCPU<holder*> heads;
-  GaloisRuntime::MM::FixedSizeAllocator allocSrc;
+  PtrLock<header*, true> realHead;
+  GaloisRuntime::PerCPU<header*> heads;
 
-  void insHolder(holder* h) {
-    holder* H = heads.get();
+  void insHeader(header* h) {
+    header* H = heads.get();
     if (!H) { //no thread local head, use the new node as one
-      heads.get() = h;
       //splice new list of one onto the head
-      head.lock();
-      h->next = head.getValue();
-      head.unlock_and_set(h);
+      realHead.lock();
+      h->next = realHead.getValue();
+      realHead.unlock_and_set(h);
     } else {
       //existing thread local head, just append
       h->next = H->next;
       H->next = h;
     }
+    heads.get() = h;
+  }
+
+  header* newHeader() {
+    void* m = MM::pageAlloc();
+    header* H = new (m) header();
+    int offset = 1;
+    if (sizeof(T) < sizeof(header))
+      offset += sizeof(header)/sizeof(T);
+    T* a = reinterpret_cast<T*>(m);
+    H->dbegin = &a[offset];
+    H->dend = H->dbegin;
+    H->dlast = &a[(MM::pageSize / sizeof(T))];
+    H->next = 0;
+    return H;
   }
 
 public:
-  galois_insert_bag(): allocSrc(sizeof(holder)) {
-    std::cerr << "HolderSize " << sizeof(holder) << "\n";
-  }
+  galois_insert_bag() {}
 
   ~galois_insert_bag() {
-    while (head.getValue()) {
-      holder* h = head.getValue();
-      head.setValue(h->next);
-      h->~holder();
-      allocSrc.deallocate(h);
+    while (realHead.getValue()) {
+      header* h = realHead.getValue();
+      realHead.setValue(h->next);
+      for(T* ii = h->dbegin, *ee = h->dend; ii != ee; ++ii) {
+	ii->~T();
+	++ii;
+      }
+      MM::pageFree(h);
     }
   }
 
@@ -76,40 +90,50 @@ public:
   typedef T&       reference;
 
   class iterator : public std::iterator<std::forward_iterator_tag, T> {
-    holder* p;
+    header* p;
+    T* v;
   public:
-    iterator(holder* x) :p(x) {}
-    iterator(const iterator& mit) : p(mit.p) {}
-    iterator& operator++() {if (p) p = p->next; return *this;}
+    iterator(header* x) :p(x), v(x ? x->dbegin : 0) {}
+    iterator(const iterator& mit) : p(mit.p), v(mit.v) {}
+    iterator& operator++() {
+      if (p) {
+	++v;
+	if (v == p->dend) {
+	  p = p->next;
+	  v = (p ? p->dbegin : 0);
+	}
+      }
+      return *this;
+    }
     iterator operator++(int) {iterator tmp(*this); operator++(); return tmp;}
-    bool operator==(const iterator& rhs) const {return p==rhs.p;}
-    bool operator!=(const iterator& rhs) const {return p!=rhs.p;}
-    T& operator*() const {return p->data;}
+    bool operator==(const iterator& rhs) const {
+      return (p==rhs.p && rhs.v == rhs.v);
+    }
+    bool operator!=(const iterator& rhs) const {
+      return !(p==rhs.p);
+    }
+    T& operator*() const {return *v;}
   };
 
   iterator begin() {
-    return iterator(head.getValue());
+    return iterator(realHead.getValue());
   }
   iterator end() {
-    return iterator((holder*)0);
+    return iterator((header*)0);
   }
 
   //Only this is thread safe
   reference push(const T& val) {
-    holder* h = static_cast<holder*>(allocSrc.allocate(sizeof(holder)));
-    new (static_cast<void *>(&h->data)) T(val);
-    insHolder(h);
-    return h->data;
+    header* H = heads.get();
+    T* rv;
+    if (!H || H->dend == H->dlast) {
+      H = newHeader();
+      insHeader(H);
+    }
+    rv = new (H->dend) T(val);
+    H->dend++;
+    return *rv;
   }
-
-  //Only this is thread safe
-  reference pushNew() {
-    holder* h = static_cast<holder*>(allocSrc.allocate(sizeof(holder)));
-    new (static_cast<void*>(&h->data)) T();
-    insHolder(h);
-    return h->data;
-  }
-  
 };
 }
 #endif
