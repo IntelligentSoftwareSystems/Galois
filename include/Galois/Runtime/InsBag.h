@@ -26,22 +26,41 @@
 #include "Galois/Runtime/mem.h" 
 #include <iterator>
 
+#include <iostream>
+
 namespace GaloisRuntime {
   
 template< class T>
 class galois_insert_bag {
   
   struct holder {
-    holder* next;
     T data;
+    holder* next;
   };
 
   PtrLock<holder*, true> head;
   GaloisRuntime::PerCPU<holder*> heads;
   GaloisRuntime::MM::FixedSizeAllocator allocSrc;
 
+  void insHolder(holder* h) {
+    holder* H = heads.get();
+    if (!H) { //no thread local head, use the new node as one
+      heads.get() = h;
+      //splice new list of one onto the head
+      head.lock();
+      h->next = head.getValue();
+      head.unlock_and_set(h);
+    } else {
+      //existing thread local head, just append
+      h->next = H->next;
+      H->next = h;
+    }
+  }
+
 public:
-  galois_insert_bag(): allocSrc(sizeof(holder)) {}
+  galois_insert_bag(): allocSrc(sizeof(holder)) {
+    std::cerr << "HolderSize " << sizeof(holder) << "\n";
+  }
 
   ~galois_insert_bag() {
     while (head.getValue()) {
@@ -79,18 +98,15 @@ public:
   reference push(const T& val) {
     holder* h = static_cast<holder*>(allocSrc.allocate(sizeof(holder)));
     new (static_cast<void *>(&h->data)) T(val);
-    holder* H = heads.get();
-    if (!H) { //no thread local head, use the new node as one
-      heads.get() = h;
-      //splice new list of one onto the head
-      head.lock();
-      h->next = head.getValue();
-      head.unlock_and_set(h);
-    } else {
-      //existing thread local head, just append
-      h->next = H->next;
-      H->next = h;
-    }
+    insHolder(h);
+    return h->data;
+  }
+
+  //Only this is thread safe
+  reference pushNew() {
+    holder* h = static_cast<holder*>(allocSrc.allocate(sizeof(holder)));
+    new (static_cast<void*>(&h->data)) T();
+    insHolder(h);
     return h->data;
   }
   
