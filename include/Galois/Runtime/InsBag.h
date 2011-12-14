@@ -28,7 +28,7 @@
 
 namespace GaloisRuntime {
 
-template< class T>
+template<class T>
 class galois_insert_bag {
   
   struct header {
@@ -79,7 +79,6 @@ public:
       realHead.setValue(h->next);
       for(T* ii = h->dbegin, *ee = h->dend; ii != ee; ++ii) {
 	ii->~T();
-	++ii;
       }
       MM::pageFree(h);
     }
