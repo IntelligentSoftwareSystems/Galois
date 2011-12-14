@@ -44,30 +44,12 @@
 namespace GaloisRuntime {
 namespace MM {
 
+const size_t pageSize = 2*1024*1024;
+void* pageAlloc();
+void pageFree(void*);
+
 void* largeAlloc(size_t bytes);
 void  largeFree (void* mem, size_t bytes);
-
-//! Base mmap wrapper
-class mmapWrapper {
-  static void* _alloc();
-  static void _free(void*);
-public:
-  enum {AllocSize = 2*1024*1024,
-	Alignment = 4*1024,
-	AutoFree = 1};
-  
-  mmapWrapper();
-
-  void* allocate(size_t size) {
-    assert(size % AllocSize == 0);
-    return _alloc();
-  }
-
-  void deallocate(void* ptr) {
-    _free(ptr);
-  }
-};
-
 
 //! Per-thread heaps using Galois thread aware construct
 template<class LocalHeap>
@@ -468,46 +450,26 @@ public:
 //! This is the base source of memory for all allocators.
 //! It maintains a freelist of hunks acquired from the system
 class SystemBaseAlloc {
-  static SelfLockFreeListHeap<mmapWrapper> Source;
 public:
-  enum { AllocSize = SelfLockFreeListHeap<mmapWrapper>::AllocSize };
+  enum { AllocSize = pageSize };
 
   SystemBaseAlloc();
   ~SystemBaseAlloc();
 
   inline void* allocate(size_t size) {
-    return Source.allocate(size);
+    return pageAlloc();
   }
 
   inline void deallocate(void* ptr) {
-    Source.deallocate(ptr);
-  }
-};
-
-class MallocWrapper {
-public:
-  inline void* allocate(size_t size) {
-    return malloc(size);
-  }
-
-  inline void deallocate(void* ptr) {
-    free(ptr);
+    pageFree(ptr);
   }
 };
 
 class SizedAllocatorFactory: private boost::noncopyable {
 public:
-#ifdef USEMALLOC
-  typedef MallocWrapper SizedAlloc;
-
-  SizedAlloc* getAllocatorForSize(size_t) {
-    return &MasterAlloc;
-  }
-#else
   typedef ThreadAwarePrivateHeap<
     FreeListHeap<SimpleBumpPtr<SystemBaseAlloc> > > SizedAlloc;
   SizedAlloc* getAllocatorForSize(size_t);
-#endif
 
   static SizedAllocatorFactory* getInstance() {
     SizedAllocatorFactory* f = instance.getValue();
@@ -527,14 +489,10 @@ public:
 
 private:
   static PtrLock<SizedAllocatorFactory*, true> instance;
-#ifdef USEMALLOC
-  MallocWrapper MasterAlloc;
-#else
   typedef std::map<size_t, SizedAlloc*> AllocatorsTy;
   AllocatorsTy allocators;
   SimpleLock<int, true> lock;
   ~SizedAllocatorFactory();
-#endif
 };
 
 class FixedSizeAllocator {

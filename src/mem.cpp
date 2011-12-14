@@ -40,10 +40,12 @@
 #include <numa.h>
 #endif
 
+#include <iostream>
+
 using namespace GaloisRuntime;
 using namespace MM;
 
-// Abstract away mmap
+// mmap flags
 static const int _PROT = PROT_READ | PROT_WRITE;
 static const int _MAP_BASE = MAP_ANONYMOUS | MAP_PRIVATE;
 #ifdef MAP_POPULATE
@@ -53,57 +55,7 @@ static const int _MAP_POP  = MAP_POPULATE | _MAP_BASE;
 static const int _MAP_HUGE = MAP_HUGETLB | _MAP_POP;
 #endif
 
-mmapWrapper::mmapWrapper() {
-#ifndef MAP_POPULATE
-  reportWarning("No MAP_POPULATE");
-#endif
-#ifndef MAP_HUGETLB
-  reportWarning("No MAP_HUGETLB");
-#endif
-}
-
-void* mmapWrapper::_alloc() {
-#ifdef __linux__
-  //serialize mmap in userspace because it prevents
-  //linux from sleeping for undefined amounts of time
-  static SimpleLock<int, true> L;
-#else
-  static SimpleLock<int,false> L;
-#endif
-  L.lock();
-  void* ptr = 0;
-
-#ifdef MAP_HUGETLB
-  //First try huge
-  ptr = mmap(0, AllocSize, _PROT, _MAP_HUGE, -1, 0);
-#endif
-
-#ifdef MAP_POPULATE
-  //Then try populate
-  if (!ptr || ptr == MAP_FAILED)
-    ptr = mmap(0, AllocSize, _PROT, _MAP_POP, -1, 0);
-#endif
-  //Then try normal
-  if (!ptr || ptr == MAP_FAILED)
-    ptr = mmap(0, AllocSize, _PROT, _MAP_BASE, -1, 0);
-
-  if (!ptr || ptr == MAP_FAILED) {
-    L.unlock();
-    reportWarning("Memory Allocation Failed");
-    assert(0 && "mmap failed");
-    abort();
-  }
-
-  L.unlock();
-  return ptr;
-}
-
-void mmapWrapper::_free(void* ptr) {
-  munmap(ptr, AllocSize);
-}
-
 //Anchor the class
-SelfLockFreeListHeap<mmapWrapper> SystemBaseAlloc::Source;
 SystemBaseAlloc::SystemBaseAlloc() {}
 SystemBaseAlloc::~SystemBaseAlloc() {}
 
@@ -116,7 +68,7 @@ SizedAllocatorFactory::getAllocatorForSize(size_t size) {
   if (!retval)
     retval = new SizedAlloc;
   lock.unlock();
-
+ 
   return retval;
 }
 
@@ -127,6 +79,115 @@ SizedAllocatorFactory::~SizedAllocatorFactory() {
   }
 }
 #endif
+
+namespace {
+class LowLevelAllocator {
+  struct FreeNode {
+    FreeNode* next;
+  };
+  PtrLock<FreeNode*, true> heads;
+#ifdef __linux__
+  //serialize mmap in userspace because it prevents
+  //linux from sleeping for undefined amounts of time
+  SimpleLock<int, true> allocLock;
+#else
+  SimpleLock<int,false> allocLock;
+#endif
+
+  void* allocPage() {
+#ifdef GALOIS_USEMALLOC
+    return malloc(pageSize);
+#else
+
+    void* ptr = 0;
+    allocLock.lock();
+#ifdef MAP_HUGETLB
+    //First try huge
+    ptr = mmap(0, pageSize, _PROT, _MAP_HUGE, -1, 0);
+#endif
+    
+#ifdef MAP_POPULATE
+    //Then try populate
+    if (!ptr || ptr == MAP_FAILED)
+      ptr = mmap(0, pageSize, _PROT, _MAP_POP, -1, 0);
+#endif
+    //Then try normal
+    if (!ptr || ptr == MAP_FAILED)
+      ptr = mmap(0, pageSize, _PROT, _MAP_BASE, -1, 0);
+    
+    if (!ptr || ptr == MAP_FAILED) {
+      allocLock.unlock();
+      reportWarning("Memory Allocation Failed");
+      assert(0 && "mmap failed");
+      abort();
+    }
+    allocLock.unlock();
+    return ptr;
+#endif
+  }
+
+  void freePage(void* ptr) {
+#ifdef GALOIS_USEMALLOC
+    free(ptr); // This is broken for multi-page allocs
+#else
+    munmap(ptr, pageSize);
+#endif   
+  }
+
+public:
+  LowLevelAllocator() {
+#ifndef MAP_POPULATE
+    reportWarning("No MAP_POPULATE");
+#endif
+#ifndef MAP_HUGETLB
+    reportWarning("No MAP_HUGETLB");
+#endif
+  }
+
+  ~LowLevelAllocator() {
+    FreeNode* h = heads.getValue();
+    heads.setValue(0);
+    while (h) {
+      FreeNode* n = h->next;
+      freePage(h);
+      h = n;
+    }
+  }
+
+  void* allocate() {
+    //has data
+    if (heads.getValue()) {
+      heads.lock();
+      FreeNode* h = heads.getValue();
+      if (h) {
+	heads.unlock_and_set(h->next);
+	return h;
+      }
+      heads.unlock();
+    }
+    return allocPage();
+  }
+
+  void deallocate(void* m) {
+    PtrLock<FreeNode*, true>& H = heads;
+    H.lock();
+    FreeNode* nh = reinterpret_cast<FreeNode*>(m);
+    nh->next = H.getValue();
+    H.unlock_and_set(nh);
+  }
+};
+}
+
+static LowLevelAllocator SysAlloc;
+
+void* GaloisRuntime::MM::pageAlloc() {
+  return SysAlloc.allocate();
+}
+
+void GaloisRuntime::MM::pageFree(void* m) {
+  SysAlloc.deallocate(m);
+}
+
 
 void* GaloisRuntime::MM::largeAlloc(size_t len) {
   void* data = 0;
