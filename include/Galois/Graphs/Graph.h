@@ -110,6 +110,7 @@ template<typename NTy>
 struct NodeItem {
   NTy N;
   NodeItem(typename VoidWrapper<NTy>::const_ref_type n) : N(n) { }
+  NodeItem() :N() { }
   inline typename VoidWrapper<NTy>::ref_type getData() {
     return N;
   }
@@ -189,9 +190,11 @@ private:
     typedef llvm::SmallVector<EITy, 3> EdgesTy;
     typedef typename EdgesTy::iterator iterator;
 
-    EdgesTy edges;
     NITy data;
     bool active;
+    EdgesTy edges;
+    //NITy data;
+    //bool active;
 
     iterator begin() {
       return edges.begin();
@@ -214,8 +217,10 @@ private:
       return boost::make_transform_iterator(end(), getNeigh());
     }
 
-    gNode(const_node_reference d, bool a) :
-      data(d), active(a) {
+    gNode(const_node_reference d, bool a)
+      :data(d), active(a) {
+    }
+    gNode() :active(false) {
     }
 
     void eraseEdge(gNode* N) {
@@ -647,7 +652,7 @@ public:
   }
 
   FirstGraph() {
-    reportStatSum("NodeSize", sizeof(gNode));
+    //std::cerr << "NodeSize " << sizeof(gNode) << "\n";
   }
 
   template<typename GTy>
