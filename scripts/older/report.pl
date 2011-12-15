@@ -4,10 +4,10 @@ use List::Util qw(sum reduce);
 my $curthread = 0;
 
 while(<>) {
-    if (/THREADS: (\d+)/) {
+    if (/RUN: Variable Threads = (\d+)/) {
 	$curthread = $1;
     }
-    if (/STAT: (\w+)\s+(\d+)/) {
+    if (/STAT SINGLE (\w+)\s+\(null\)\s+(\d+)/) {
 	push(@{$stats{$curthread}{"$1"} }, $2);
 	$k{"$1"} = 1;
     }
