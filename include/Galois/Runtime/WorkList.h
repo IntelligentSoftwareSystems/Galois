@@ -69,10 +69,6 @@ public:
   //! push a value onto the queue
   bool push(value_type val);
 
-  //! push a range onto the queue
-  template<typename Iter>
-  bool push(Iter b, Iter e);
-
   //! pop a value from the queue.
   std::pair<bool, value_type> pop();
   
@@ -106,15 +102,6 @@ public:
   bool push(value_type val) {
     lock();
     wl.push_back(val);
-    unlock();
-    return true;
-  }
-
-  template<typename Iter>
-  bool push(Iter b, Iter e) {
-    lock();
-    while (b != e)
-      wl.push_back(*b++);
     unlock();
     return true;
   }
@@ -157,15 +144,6 @@ public:
   bool push(value_type val) {
     lock();
     wl.push_back(val);
-    unlock();
-    return true;
-  }
-
-  template<typename Iter>
-  bool push(Iter b, Iter e) {
-    lock();
-    while (b != e)
-      wl.push_back(*b++);
     unlock();
     return true;
   }
@@ -291,13 +269,6 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     return lC->push(val);
   }
 
-  template<typename Iter>
-  bool push(Iter b, Iter e) {
-    while (b != e)
-      push(*b++);
-    return true;
-  }
-
   std::pair<bool, value_type> pop() {
     //Find a successful pop
     perItem& p = current.get();
@@ -370,11 +341,6 @@ public:
     return local.get().push(val);
   }
 
-  template<typename Iter>
-  bool push(Iter b, Iter e) {
-    return local.get().push(b,e);
-  }
-
   std::pair<bool, value_type> pop() {
     std::pair<bool, value_type> ret = local.get().pop();
     if (ret.first)
@@ -408,11 +374,6 @@ class LocalStealing : private boost::noncopyable {
     return local.get().push(val);
   }
 
-  template<typename Iter>
-  bool push(Iter b, Iter e) {
-    return local.get().push(b,e);
-  }
-
   std::pair<bool, value_type> pop() {
     std::pair<bool, value_type> ret = local.get().pop();
     if (ret.first)
@@ -443,11 +404,6 @@ class LevelStealing : private boost::noncopyable {
 
   bool push(value_type val) {
     return local.get().push(val);
-  }
-
-  template<typename Iter>
-  bool push(Iter b, Iter e) {
-    return local.get().push(b,e);
   }
 
   std::pair<bool, value_type> pop() {
@@ -573,13 +529,6 @@ public:
     return worked;
   }
 
-  template<typename Iter>
-  bool push(Iter b, Iter e) {
-    while (b != e)
-      push(*b++);
-    return true;
-  }
-
   std::pair<bool, value_type> pop()  {
     p& n = data.get();
     std::pair<bool, value_type> retval;
@@ -650,13 +599,6 @@ public:
     return Items.get(index % active).push(val);
   }
 
-  template<typename Iter>
-  bool push(Iter b, Iter e) {
-    while (b != e)
-      push(*b++);
-    return true;
-  }
-
   std::pair<bool, value_type> pop()  {
     std::pair<bool, value_type> r = Items.get().pop();
     // std::cerr << "{" << Items.myEffectiveID() << "}";
@@ -693,13 +635,6 @@ public:
     return true;
   }
 
-  template<typename Iter>
-  bool push(Iter b, Iter e) {
-    while (b != e)
-      push(*b++);
-    return true;
-  }
-
   std::pair<bool, value_type> pop() {
     return wl.pollFirstKey();
   }
@@ -726,13 +661,6 @@ public:
 
   bool push(value_type val) {
     wl.add(val);
-    return true;
-  }
-
-  template<typename Iter>
-  bool push(Iter b, Iter e) {
-    while (b != e)
-      push(*b++);
     return true;
   }
 
