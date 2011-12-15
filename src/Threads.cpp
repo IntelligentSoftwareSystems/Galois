@@ -22,8 +22,8 @@
  */
 #include "Galois/Runtime/Threads.h"
 #include "Galois/Threads.h"
-#include "Galois/Runtime/Support.h"
-#include <stdlib.h>
+//#include "Galois/Runtime/Support.h"
+//#include <stdlib.h>
 
 using namespace GaloisRuntime;
 
@@ -39,8 +39,7 @@ struct Init {
   Init() {
     GaloisRuntime::getSystemThreadPolicy();
     GaloisRuntime::getSystemThreadPool();
-    
-    GaloisRuntime::reportInfo("Thread Policy", GaloisRuntime::getSystemThreadPolicy().getName());
+    //GaloisRuntime::reportInfo("Thread Policy", GaloisRuntime::getSystemThreadPolicy().getName());
   }
 };
 
