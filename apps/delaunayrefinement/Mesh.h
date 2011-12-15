@@ -35,6 +35,14 @@
 #include <fstream>
 #include <istream>
 
+struct is_bad {
+  Graph* mesh;
+  is_bad(Graph* g) :mesh(g) {}
+  bool operator()(const GNode& n) const {
+    return mesh->getData(n, Galois::NONE).isBad();
+  }
+};
+
 /**
  * Helper class used providing methods to read in information and create the graph 
  *
@@ -42,25 +50,6 @@
 class Mesh {
   // used during reading of the data and creation of the graph, to record edges between nodes of the graph 
   std::map<Edge, GNode> edge_map;
-
-  /**
-   * 
-   * @param mesh The graph representing the mesh
-   * @return the bad triangles in the graph
-   */
-public:
-  template<typename Collection>
-    int getBad(Graph* mesh, Collection& ret) {
-    int retval = 0;
-
-    for (Graph::active_iterator ii = mesh->active_begin(), ee = mesh->active_end(); ii != ee; ++ii) {
-      if (ii->getData(Galois::NONE).isBad()) {
-        ret.push_back(*ii);
-        ++retval;
-      }
-    }
-    return retval;
-  }
 
 private:
   void next_line(std::ifstream& scanner) {
@@ -124,7 +113,6 @@ private:
   
   GNode addElement(Graph* mesh, Element& element) {
     GNode node = mesh->createNode(element);
-    mesh->addNode(node, Galois::NONE);
     for (int i = 0; i < element.numEdges(); i++) {
       Edge edge = element.getEdge(i);
       if (edge_map.find(edge) == edge_map.end()) {
@@ -152,15 +140,16 @@ public:
     for (Graph::active_iterator ii = mesh->active_begin(), ee = mesh->active_end(); ii != ee; ++ii) {
  
       GNode node = *ii;
-      Element& element = node.getData(Galois::NONE);
+      Element& element = mesh->getData(node,Galois::NONE);
+      int nsize = std::distance(mesh->edge_begin(node, Galois::NONE), mesh->edge_end(node, Galois::NONE));
       if (element.getDim() == 2) {
-        if (mesh->neighborsSize(node, Galois::NONE) != 1) {
-          std::cerr << "-> Segment " << element << " has " << mesh->neighborsSize(node, Galois::NONE) << " relation(s)\n";
+        if (nsize != 1) {
+          std::cerr << "-> Segment " << element << " has " << nsize << " relation(s)\n";
           error = true;
         }
       } else if (element.getDim() == 3) {
-        if (mesh->neighborsSize(node, Galois::NONE) != 3) {
-          std::cerr << "-> Triangle " << element << " has " << mesh->neighborsSize(node, Galois::NONE) << " relation(s)";
+        if (nsize != 3) {
+          std::cerr << "-> Triangle " << element << " has " << nsize << " relation(s)";
           error = true;
         }
       } else {
@@ -184,20 +173,21 @@ public:
         assert(mesh->containsNode(node) && "Reachable node was removed from graph");
         found.insert(node);
         int i = 0;
-        for (Graph::neighbor_iterator ii = mesh->neighbor_begin(node, Galois::NONE), ee = mesh->neighbor_end(node, Galois::NONE); ii != ee; ++ii) {
+        for (Graph::edge_iterator ii = mesh->edge_begin(node, Galois::NONE), ee = mesh->edge_end(node, Galois::NONE); ii != ee; ++ii) {
           assert(i < 3);
           assert(mesh->containsNode(*ii));
           assert(node != *ii);
           ++i;
           //          if (!found.count(*ii))
-            remaining.push(*ii);
+	  remaining.push(mesh->getEdgeDst(ii));
         }
       }
     }
+    int msize = std::distance(mesh->active_begin(), mesh->active_end());
 
-    if (found.size() != mesh->size()) {
+    if (found.size() != msize) {
       std::cerr << "Not all elements are reachable \n";
-      std::cerr << "Found: " << found.size() << "\nMesh: " << mesh->size() << "\n";
+      std::cerr << "Found: " << found.size() << "\nMesh: " << msize << "\n";
       assert(0 && "Not all elements are reachable");
       return false;
     }

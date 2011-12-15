@@ -49,6 +49,8 @@ class Element {
 
  public:
   
+  Element() {}
+
  explicit Element(const Tuple& a, const Tuple& b, const Tuple& c)
    :obtuse(0), bBad(0), bDim(true)
   { //constructor for Triangles

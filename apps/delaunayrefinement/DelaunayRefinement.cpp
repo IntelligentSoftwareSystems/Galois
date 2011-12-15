@@ -37,7 +37,7 @@
 #include "Element.h"
 
 #include "Galois/Statistic.h"
-#include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/FastGraph.h"
 #include "Galois/Galois.h"
 
 #include "llvm/Support/CommandLine.h"
@@ -67,11 +67,9 @@ struct process {
 
   template<typename Context>
   void operator()(GNode item, Context& lwl) {
-    if (!mesh->containsNode(item))
+    if (!mesh->containsNode(item)) //locks
       return;
     
-    item.getData(Galois::ALL); //lock
-
     Cavity cav(mesh, lwl.getPerIterAlloc());
     cav.initialize(item);
     cav.build();
@@ -85,8 +83,7 @@ struct process {
     for (Subgraph::iterator ii = cav.getPost().begin(),
 	   ee = cav.getPost().end(); ii != ee; ++ii) {
       GNode node = *ii;
-      mesh->addNode(node, Galois::ALL);
-      Element& element = node.getData(Galois::ALL);
+      Element& element = mesh->getData(node,Galois::ALL);
       if (element.isBad()) {
         lwl.push(node);
       }
@@ -111,19 +108,17 @@ int main(int argc, char** argv) {
   mesh = new Graph();
   Mesh m;
   m.read(mesh, filename.c_str());
-  std::vector<GNode> wl;
-  int numbad = m.getBad(mesh, wl);
 
-  std::cout << "configuration: " << mesh->size()
-    << " total triangles, " << numbad << " bad triangles\n";
+  std::cout << "configuration: " << std::distance(mesh->active_begin(), mesh->active_end())
+	    << " total triangles, " << std::count_if(mesh->active_begin(), mesh->active_end(), is_bad(mesh)) << " bad triangles\n";
 
   Galois::StatTimer T;
   T.start();
   using namespace GaloisRuntime::WorkList;
-  //Galois::for_each<LocalQueues<ChunkedLIFO<1024>, LIFO<> > >(wl.begin(), wl.end(), process());
+  Galois::for_each<LocalQueues<dChunkedLIFO<256>, LIFO<> > >(mesh->active_begin(), mesh->active_end(), process(), is_bad(mesh));
   //Galois::for_each<LocalQueues<InitialIterator<std::vector<GNode>::iterator>, LIFO<> > >(wl.begin(), wl.end(), process());
   //Galois::for_each<LocalQueues<InitialIterator<GNode*>, LIFO<> > >(&wl[0], &wl[wl.size()], process());
-  Galois::for_each<dChunkedLIFO<1024> >(wl.begin(), wl.end(), process());
+  //Galois::for_each<dChunkedLIFO<1024> >(wl.begin(), wl.end(), process());
   T.stop();
   
   if (!skipVerify) {
@@ -133,7 +128,7 @@ int main(int argc, char** argv) {
       abort();
     }
     
-    int size = m.getBad(mesh, wl);
+    int size = std::count_if(mesh->active_begin(), mesh->active_end(), is_bad(mesh));
     if (size != 0) {
       std::cerr << size << " bad triangles remaining.\n";
       assert(0 && "Refinement failed");
