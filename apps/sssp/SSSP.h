@@ -31,8 +31,9 @@ UpdateRequestCommon(const GrNode& N, unsigned int W)
     return n != other.n;
   }
 
-  int getID() const {
-    return (int)n;
+  uintptr_t getID() const {
+    //return static_cast<uintptr_t>(n);
+    return reinterpret_cast<uintptr_t>(n);
   }
 };
 
