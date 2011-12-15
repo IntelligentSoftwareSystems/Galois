@@ -23,7 +23,7 @@
  * Refinement of an initial, unrefined Delaunay mesh to eliminate triangles
  * with angles < 30 degrees, using a variation of Chew's algorithm.
  *
- * @author Milind Kulkarni <milind@purdue.edu>>
+ * @author Milind Kulkarni <milind@purdue.edu>
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 #include <iostream>
@@ -71,6 +71,7 @@ struct process {
       return;
     
     Cavity cav(mesh, lwl.getPerIterAlloc());
+    
     cav.initialize(item);
     cav.build();
     cav.update();
@@ -92,9 +93,7 @@ struct process {
     for (Subgraph::edge_iterator ii = cav.getPost().edge_begin(),
 	   ee = cav.getPost().edge_end(); ii != ee; ++ii) {
       Subgraph::tmpEdge edge = *ii;
-      //bool ret = 
-      mesh->addEdge(edge.src, edge.dst, Galois::ALL); //, edge.data);
-      //assert ret;
+      mesh->addEdge(edge.src, edge.dst, Galois::ALL);
     }
     if (mesh->containsNode(item)) {
       lwl.push(item);
@@ -115,10 +114,10 @@ int main(int argc, char** argv) {
   Galois::StatTimer T;
   T.start();
   using namespace GaloisRuntime::WorkList;
+
   Galois::for_each<LocalQueues<dChunkedLIFO<256>, LIFO<> > >(mesh->active_begin(), mesh->active_end(), process(), is_bad(mesh));
   //Galois::for_each<LocalQueues<InitialIterator<std::vector<GNode>::iterator>, LIFO<> > >(wl.begin(), wl.end(), process());
   //Galois::for_each<LocalQueues<InitialIterator<GNode*>, LIFO<> > >(&wl[0], &wl[wl.size()], process());
-  //Galois::for_each<dChunkedLIFO<1024> >(wl.begin(), wl.end(), process());
   T.stop();
   
   if (!skipVerify) {
