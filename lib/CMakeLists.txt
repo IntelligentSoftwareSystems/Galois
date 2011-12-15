@@ -2,7 +2,7 @@
 if(USE_SOLARIS)
   message("Hoard not supported on solaris (yet)")
 else()
-  add_subdirectory(hoard-38)
+#  add_subdirectory(hoard-38)
 endif()
 
 #
