@@ -15,12 +15,7 @@ of Software or Documentation, including but not limited to those resulting from
 defects in Software and/or Documentation, or loss or inaccuracy of data of any
 kind.
 */
-#include <cassert>
-#include <stdlib.h>
-
 #include "Galois/Runtime/Context.h"
-
-//#include <iostream>
 
 //! Global thread context for each active thread
 static __thread GaloisRuntime::SimpleRuntimeContext* thread_cnx = 0;

@@ -22,7 +22,8 @@ kind.
 
 #include "Galois/Runtime/SimpleLock.h"
 #include "Galois/ConflictFlags.h"
-#include <stdlib.h>
+#include <cassert>
+#include <cstdlib>
 
 namespace GaloisRuntime {
 
