@@ -106,10 +106,10 @@ public:
     }
     iterator operator++(int) {iterator tmp(*this); operator++(); return tmp;}
     bool operator==(const iterator& rhs) const {
-      return (p==rhs.p && rhs.v == rhs.v);
+      return (p==rhs.p && v == rhs.v);
     }
     bool operator!=(const iterator& rhs) const {
-      return !(p==rhs.p);
+      return !(p==rhs.p && v == rhs.v);
     }
     T& operator*() const {return *v;}
   };
