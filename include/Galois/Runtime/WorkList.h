@@ -69,6 +69,9 @@ public:
   //! push a value onto the queue
   bool push(value_type val);
 
+  //! push initial value onto the queue
+  bool pushi(value_type val);
+
   //! pop a value from the queue.
   std::pair<bool, value_type> pop();
   
@@ -104,6 +107,10 @@ public:
     wl.push_back(val);
     unlock();
     return true;
+  }
+
+  bool pushi(value_type val)  {
+    return push(val);
   }
 
   std::pair<bool, value_type> pop()  {
@@ -146,6 +153,10 @@ public:
     wl.push_back(val);
     unlock();
     return true;
+  }
+
+  bool pushi(value_type val)  {
+    return push(val);
   }
 
   std::pair<bool, value_type> pop() {
@@ -269,6 +280,10 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     return lC->push(val);
   }
 
+  bool pushi(value_type val)  {
+    return push(val);
+  }
+
   std::pair<bool, value_type> pop() {
     //Find a successful pop
     perItem& p = current.get();
@@ -341,6 +356,10 @@ public:
     return local.get().push(val);
   }
 
+  bool pushi(value_type val) {
+    return global.pushi(val);
+  }
+
   std::pair<bool, value_type> pop() {
     std::pair<bool, value_type> ret = local.get().pop();
     if (ret.first)
@@ -374,6 +393,10 @@ class LocalStealing : private boost::noncopyable {
     return local.get().push(val);
   }
 
+  bool pushi(value_type val)  {
+    return push(val);
+  }
+
   std::pair<bool, value_type> pop() {
     std::pair<bool, value_type> ret = local.get().pop();
     if (ret.first)
@@ -404,6 +427,10 @@ class LevelStealing : private boost::noncopyable {
 
   bool push(value_type val) {
     return local.get().push(val);
+  }
+
+  bool pushi(value_type val)  {
+    return push(val);
   }
 
   std::pair<bool, value_type> pop() {
@@ -529,6 +556,10 @@ public:
     return worked;
   }
 
+  bool pushi(value_type val) {
+    return push(val);
+  }
+
   std::pair<bool, value_type> pop()  {
     p& n = data.get();
     std::pair<bool, value_type> retval;
@@ -599,6 +630,10 @@ public:
     return Items.get(index % active).push(val);
   }
 
+  bool pushi(value_type val)  {
+    return push(val);
+  }
+
   std::pair<bool, value_type> pop()  {
     std::pair<bool, value_type> r = Items.get().pop();
     // std::cerr << "{" << Items.myEffectiveID() << "}";
@@ -635,6 +670,10 @@ public:
     return true;
   }
 
+  bool pushi(value_type val)  {
+    return push(val);
+  }
+
   std::pair<bool, value_type> pop() {
     return wl.pollFirstKey();
   }
@@ -662,6 +701,10 @@ public:
   bool push(value_type val) {
     wl.add(val);
     return true;
+  }
+
+  bool pushi(value_type val)  {
+    return push(val);
   }
 
   std::pair<bool, value_type> pop() {

@@ -30,12 +30,15 @@ struct checker {
   checker() {
     int a[2] = {1,2};
     wl.push(0);
+    wl.pushi(3);
     wl.pop();
 
     wl2.push(0);
+    wl2.pushi(3);
     wl2.pop();
 
     wl3.push(0);
+    wl3.pushi(3);
     wl3.pop();
   }
 };

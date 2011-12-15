@@ -171,7 +171,7 @@ public:
   bool AddInitialWork(Iter b, Iter e, Filter fil) {
     for(; b != e; ++b)
       if (fil(*b))
-	global_wl.push(*b);
+	global_wl.pushi(*b);
   }
 
   template<bool isLeader>

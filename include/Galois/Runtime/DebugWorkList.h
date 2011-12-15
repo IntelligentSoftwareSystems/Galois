@@ -109,9 +109,8 @@ public:
     return wl.push(val);
   }
 
-  template<typename Iter>
-  bool push(Iter b, Iter e) {
-    return wl.push(b,e);
+  bool pushi(value_type val) {
+    return wl.pushi(val);
   }
 
   std::pair<bool, value_type> pop() {
@@ -160,9 +159,8 @@ public:
     return wl.push(val);
   }
 
-  template<typename Iter>
-  __attribute__((noinline)) bool push(Iter b, Iter e) {
-    return wl.push(b,e);
+  bool pushi(value_type val) __attribute__((noinline)) {
+    return wl.pushi(val);
   }
 
   std::pair<bool, value_type> pop() __attribute__((noinline)) {

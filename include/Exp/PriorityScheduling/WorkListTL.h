@@ -44,11 +44,8 @@ public:
     return true;
   }
 
-  template<typename Iter>
-  bool push(Iter b, Iter e) {
-    while (b != e)
-      wl.push(*b++);
-    return true;
+  bool pushi(value_type val) {
+    return push(val);
   }
 
   std::pair<bool, value_type> pop() {
@@ -114,13 +111,10 @@ class SimpleOrderedByIntegerMetric : private boost::noncopyable, private GaloisR
     return retval;
   }
 
-  template<typename Iter>
-  bool push(Iter b, Iter e) {
-    while (b != e)
-      push(*b++);
-    return true;
+  bool pushi(value_type val) {
+    return push(val);
   }
-
+  
   std::pair<bool, value_type> pop() {
     //Fastpath
     CTy* c = current;
@@ -213,11 +207,8 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
     return retval;
   }
 
-  template<typename Iter>
-  bool push(Iter b, Iter e) {
-    while (b != e)
-      push(*b++);
-    return true;
+  bool pushi(value_type val) {
+    return push(val);
   }
 
   std::pair<bool, value_type> pop() {
@@ -297,11 +288,8 @@ class BarrierOBIM : private boost::noncopyable {
     return B[index].push(val);
   }
 
-  template<typename Iter>
-  bool push(Iter b, Iter e) {
-    while (b != e)
-      push(*b++);
-    return true;
+  bool pushi(value_type val) {
+    return push(val);
   }
 
   std::pair<bool, value_type> pop() {
@@ -366,13 +354,8 @@ public:
     return true;
   }
 
-  template<typename Iter>
-  bool push(Iter b, Iter e) {
-    lock();
-    while (b != e)
-      wl.push_back(*b++);
-    unlock();
-    return true;
+  bool pushi(value_type val) {
+    return push(val);
   }
 
   std::pair<bool, value_type> pop() {
@@ -449,14 +432,11 @@ public:
     }
     return true;
   }
-  
-  template<typename Iter>
-  bool push(Iter b, Iter e) {
-    while (b != e)
-      push(*b++);
-    return true;
+
+  bool pushi(value_type val) {
+    return push(val);
   }
-  
+
   std::pair<bool, value_type> pop() {
     value_type retval;
     PTD& N = tld.get();
@@ -498,11 +478,8 @@ public:
     return true;
   }
 
-  template<typename Iter>
-  bool push(Iter b, Iter e) {
-    while (b != e)
-      wl.push(*b++);
-    return true;
+  bool pushi(value_type val) {
+    return push(val);
   }
 
   std::pair<bool, value_type> pop() {
