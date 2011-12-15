@@ -74,7 +74,7 @@
 
 #include <algorithm>
 #include <deque>
-#include <iostream>
+//#include <iostream>
 
 using namespace GaloisRuntime;
 
@@ -346,9 +346,9 @@ public:
   }
 
   FirstGraph() {
-    std::cerr << "NodeSize " << sizeof(gNode) << "\n";
-    std::cerr << "NodeDataSize " << sizeof(NodeTy) << "\n";
-    std::cerr << "NodeEdgesSize " << sizeof(typename gNode::EdgesTy) << "\n";
+    // std::cerr << "NodeSize " << sizeof(gNode) << "\n";
+    // std::cerr << "NodeDataSize " << sizeof(NodeTy) << "\n";
+    // std::cerr << "NodeEdgesSize " << sizeof(typename gNode::EdgesTy) << "\n";
   }
 
   template<typename GTy>
