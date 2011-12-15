@@ -28,13 +28,13 @@ typedef GaloisRuntime::MM::SimpleBumpPtrWithMallocFallback<GaloisRuntime::MM::Fr
 
 typedef GaloisRuntime::MM::ExternRefGaloisAllocator<char, IterAllocBaseTy> PerIterAllocTy;
 
-template<typename Ty>
-class GAllocator : public GaloisRuntime::MM::ExternRefGaloisAllocator<Ty, GaloisRuntime::MM::MallocWrapper> { 
-  typedef GaloisRuntime::MM::ExternRefGaloisAllocator<Ty, GaloisRuntime::MM::MallocWrapper> Super;
-  GaloisRuntime::MM::MallocWrapper wrapper;
-public:
-  GAllocator(): Super(&wrapper) { }
-};
+// template<typename Ty>
+// class GAllocator : public GaloisRuntime::MM::ExternRefGaloisAllocator<Ty, GaloisRuntime::MM::MallocWrapper> { 
+//   typedef GaloisRuntime::MM::ExternRefGaloisAllocator<Ty, GaloisRuntime::MM::MallocWrapper> Super;
+//   GaloisRuntime::MM::MallocWrapper wrapper;
+// public:
+//   GAllocator(): Super(&wrapper) { }
+// };
 
 template<typename Ty>
 struct GFixedAllocator : public GaloisRuntime::MM::FSBGaloisAllocator<Ty> { };
