@@ -94,6 +94,8 @@ class LowLevelAllocator {
   SimpleLock<int,false> allocLock;
 #endif
 
+  unsigned num;
+
   void* allocPage() {
 #ifdef GALOIS_USEMALLOC
     return malloc(pageSize);
@@ -101,6 +103,7 @@ class LowLevelAllocator {
 
     void* ptr = 0;
     allocLock.lock();
+    ++num;
 #ifdef MAP_HUGETLB
     //First try huge
     ptr = mmap(0, pageSize, _PROT, _MAP_HUGE, -1, 0);
@@ -135,7 +138,7 @@ class LowLevelAllocator {
   }
 
 public:
-  LowLevelAllocator() {
+  LowLevelAllocator() :num(0) {
 #ifndef MAP_POPULATE
     reportWarning("No MAP_POPULATE");
 #endif
@@ -152,6 +155,7 @@ public:
       freePage(h);
       h = n;
     }
+    reportInfo("Allocated: ", num);
   }
 
   void* allocate() {
