@@ -92,12 +92,12 @@ endif()
 include_directories(${Boost_INCLUDE_DIRS})
 set(RT_LINK ${Boost_LIBRARIES} ${RT_LINK})
 
-find_package(MPI)
-if(MPI_FOUND)
-  add_definitions(-DGALOIS_MPI)
-  include_directories(${MPI_INCLUDE_PATH})
-  set(RT_LINK ${MPI_LIBRARIES} ${RT_LINK})
-endif()
+#find_package(MPI)
+#if(MPI_FOUND)
+#  add_definitions(-DGALOIS_MPI)
+#  include_directories(${MPI_INCLUDE_PATH})
+#  set(RT_LINK ${MPI_LIBRARIES} ${RT_LINK})
+#endif()
 
 #vtune
 set(VTUNE_INCLUDE "/opt/intel/vtune_amplifier_xe_2011/include")
