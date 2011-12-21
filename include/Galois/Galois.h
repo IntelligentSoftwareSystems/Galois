@@ -1,5 +1,7 @@
 /** Galois user interface -*- C++ -*-
  * @file
+ * This is the only file to include for basic Galois functionality.
+ *
  * @section License
  *
  * Galois, a framework to exploit amorphous data-parallelism in irregular
@@ -21,13 +23,8 @@
 #ifndef GALOIS_GALOIS_H
 #define GALOIS_GALOIS_H
 
-
-//! It is the intention of this file to be the only file user applications
-//! need to include for full galois functionality
-
 #include "Galois/Threads.h"
 #include "Galois/UserContext.h"
-
 #include "Galois/Runtime/ParallelWork.h"
 
 namespace Galois {
