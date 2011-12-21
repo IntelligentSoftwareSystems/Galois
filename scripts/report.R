@@ -3,7 +3,7 @@
 
 library(ggplot2)
 
-Columns <- c("Algo","Kind","Hostname","Threads","CommandLine","Iterations","Time","Timeout","Iterations")
+Columns <- c("Algo","Kind","Hostname","Threads","CommandLine","Iterations","Time","Timeout")
 Id.Vars <- c("Algo","Kind","Hostname","Threads","CommandLine")
 
 outputfile <- ""
@@ -68,9 +68,9 @@ parseAlgo <- function(res) {
   algos <- sub("^\\S*?(\\w+)\\s.*$", "\\1", cmds.uniq, perl=T)
   kinds <- numeric(length(algos))
   dupes <- duplicated(algos)
-  version <- 1
+  version <- 0
   while (sum(dupes) > 0) {
-    kinds[!dupes] <- version
+    kinds[dupes] <- version
     dupes <- duplicated(paste(algos, kinds))
     version <- version + 1
   }
@@ -95,8 +95,12 @@ cat(sprintf("Dropped %d empty rows\n", nrow(res.raw) - nrow(res)))
 res <- parseAlgo(res)
 
 # Timeouts
-timeouts <- !is.na(res$Timeout)
-res[timeouts,]$Time <- res[timeouts,]$Timeout
+if ("Timeout" %in% colnames(res)) {
+  timeouts <- !is.na(res$Timeout)
+  res[timeouts,]$Time <- res[timeouts,]$Timeout
+} else {
+  timeouts <- FALSE
+}
 res$Timeout <- timeouts
 cat(sprintf("Timed out rows: %d\n", sum(timeouts)))
 
@@ -111,19 +115,36 @@ res <- res[,Columns]
 # Make factors
 res <- data.frame(lapply(res, function(x) if (is.character(x)) { factor(x)} else {x}))
 
+# Take mean of multiple runs
+#res <- recast(res, ... ~ variable, mean, id.var=Id.Vars)
+
 # Summarize
 res <- summarizeBy(subset(res, Threads==1),
                    Algo + Hostname ~ variable,
                    min, ".Ref", merge.with=res)
+res <- summarizeBy(res,
+                   Algo + Kind + Hostname + Threads + CommandLine ~ variable,
+                   mean, ".Mean")
 
 ggplot(res,
-       aes(x=Threads, y=Time.Ref/Time, color=Kind)) +
+       aes(x=Threads, y=Time.Ref/Time.Mean, color=Kind)) +
        geom_point() + 
+       geom_line() + 
+       scale_y_continuous("Speedup (rel. to best at t=1)") +
        facet_grid(Hostname ~ Algo, scale="free")
 
 ggplot(res,
-       aes(x=Threads, y=Iterations/Iterations.Ref, color=Kind)) +
+       aes(x=Threads, y=Time.Mean/1000, color=Kind)) +
        geom_point() + 
+       geom_line() + 
+       scale_y_continuous("Time (s)") +
+       facet_grid(Hostname ~ Algo, scale="free")
+
+ggplot(res,
+       aes(x=Threads, y=Iterations.Mean/Iterations.Ref, color=Kind)) +
+       geom_point() + 
+       geom_line() + 
+       scale_y_continuous("Iterations relative to serial") +
        facet_grid(Hostname ~ Algo, scale="free")
 
 cat("Results in Rplots.pdf\n")
