@@ -36,10 +36,7 @@
 #include <memory.h>
 #include <stdlib.h>
 
-//#define USEMALLOC
-#ifndef USEMALLOC
 #include <map>
-#endif
 
 namespace GaloisRuntime {
 namespace MM {
@@ -60,6 +57,9 @@ public:
   enum { AllocSize = LocalHeap::AllocSize };
 
   ThreadAwarePrivateHeap() {}
+  ~ThreadAwarePrivateHeap() {
+    clear();
+  }
 
   inline void* allocate(size_t size) {
     return heaps.get().allocate(size);
@@ -67,6 +67,11 @@ public:
 
   inline void deallocate(void* ptr) {
     heaps.get().deallocate(ptr);
+  }
+
+  void clear() {
+    for (unsigned int i = 0; i < heaps.size(); i++)
+      heaps.get(i).clear();
   }
 };
 
