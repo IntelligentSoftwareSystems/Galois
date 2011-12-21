@@ -60,10 +60,12 @@
 #include "Galois/Runtime/CacheLineStorage.h"
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/iterator/transform_iterator.hpp>
-#include <endian.h>
 #include <map>
 #include <vector>
 #include <fstream>
+
+#include <string.h>
+#include <endian.h>
 
 using namespace GaloisRuntime;
 
