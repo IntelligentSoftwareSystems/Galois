@@ -27,19 +27,15 @@
 #include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/LoopHooks.h"
 
-#include <boost/function.hpp>
-
 namespace Galois {
 
+// TODO(ddn): Rename to Galois/Reducers.h
 
 /**
- * GReducible stores per thread values
- * of a variable of type T
+ * GReducible stores per thread values of a variable of type T
  *
  * At the end of a for_each section, the final value is obtained by performing
- * a reduction on per thread values using the
- * provided binary functor BinFunc
- * 
+ * a reduction on per thread values using the provided binary functor BinFunc
  */
 template <typename T, typename BinFunc>
 class GReducible : public GaloisRuntime::AtLoopExit {
@@ -71,7 +67,7 @@ public:
    * @param val initial per thread value
    * @param F the binary functor acting as the reduction operator
    */
-  GReducible(const T val, BinFunc F)
+  GReducible(const T& val, BinFunc F)
     : _func(F), _data(val) { }
 
   GReducible() {}
