@@ -115,8 +115,8 @@ class ThreadPool_pthread : public ThreadPool {
   unsigned int maxThreads;
   unsigned int nextThread;
   volatile bool shutdown; // Set and start threads to have them exit
-  volatile runCMD* workBegin; //Begin iterator for work commands
-  volatile runCMD* workEnd; //End iterator for work commands
+  volatile RunCommand* workBegin; //Begin iterator for work commands
+  volatile RunCommand* workEnd; //End iterator for work commands
 
   void initThread() {
     LocalThreadID = __sync_fetch_and_add(&nextThread, 1);
@@ -125,8 +125,8 @@ class ThreadPool_pthread : public ThreadPool {
 
   void doWork(void) {
     start.acquire();
-    runCMD* workPtr = (runCMD*)workBegin;
-    runCMD* workEndL = (runCMD*)workEnd;
+    RunCommand* workPtr = (RunCommand*)workBegin;
+    RunCommand* workEndL = (RunCommand*)workEnd;
     while (workPtr != workEndL) {
       if (LocalThreadID < activeThreads) {
 	if (workPtr->isParallel)
@@ -181,7 +181,7 @@ public:
     }
   }
 
-  virtual void run(runCMD* begin, runCMD* end) {
+  virtual void run(RunCommand* begin, RunCommand* end) {
 #ifdef GALOIS_VTUNE
     __itt_resume();
 #endif

@@ -25,9 +25,6 @@
 #include "llvm/ADT/SmallVector.h"
 #include <map>
 #include <vector>
-#include <algorithm>
-#include <numeric>
-#include <cmath>
 #include <cstdio>
 
 static GaloisRuntime::SimpleLock<int, true> lock;
@@ -36,60 +33,43 @@ namespace {
 class PrintStats {
   typedef std::pair<const char*, const char*> strPair;
   typedef std::map<strPair, unsigned long> StatsMap;
-  typedef std::map<int, std::vector<unsigned long> > DistStatsValue;
+  typedef std::map<int, GaloisRuntime::OnlineStatistics> DistStatsValue;
   typedef std::map<strPair, DistStatsValue> DistStatsMap;
-  typedef std::vector<unsigned long>::iterator long_iterator;
   StatsMap stats;
   DistStatsMap distStats;
   int gcounter;
 
   void summarizeList(int iternum, const char* first, const char* second,
-      long_iterator b, long_iterator e) {
-    long size = std::distance(b,e);
-    long min = *std::min_element(b, e);
-    long max = *std::max_element(b, e);
-    double ave = std::accumulate(b, e, 0.0) / size;
-   
-    double acc = 0.0;
-    for (long_iterator it = b; it != e; ++it) {
-      acc += (*it - ave) * (*it - ave);
-    }
-
-    double stdev = 0.0;
-    if (size > 1) {
-      stdev = sqrt(acc / (size - 1));
-    }
-
+      const GaloisRuntime::OnlineStatistics& x) {
     printf("STAT DISTRIBUTION %d %s %s n: %ld ave: %.1f "
-        "min: %ld max: %ld stdev: %.1f\n",
-           iternum, first, second, size, ave, min, max, stdev);
+      "min: %.0f max: %.0f stdev: %.1f\n",
+      iternum, first, second, x.n(), x.mean(), x.min(), x.max(), sqrt(x.sample_variance()));
   }
 
 public:
   PrintStats() : gcounter(0) { }
   ~PrintStats() {
-    for (StatsMap::iterator ii = stats.begin(), ee = stats.end();
+    for (typename StatsMap::iterator ii = stats.begin(), ee = stats.end();
         ii != ee; ++ii) {
       printf("STAT SINGLE %s %s %ld\n",
           ii->first.first, 
           ii->first.second ? ii->first.second : "(null)",
           ii->second);
     }
-    for (DistStatsMap::iterator ii = distStats.begin(), ee = distStats.end();
+    for (typename DistStatsMap::iterator ii = distStats.begin(), ee = distStats.end();
         ii != ee; ++ii) {
-      for (DistStatsValue::iterator i = ii->second.begin(), e = ii->second.end();
+      for (typename DistStatsValue::iterator i = ii->second.begin(), e = ii->second.end();
           i != e; ++i) {
         summarizeList(i->first,
             ii->first.first ? ii->first.first : "(null)",
             ii->first.second ? ii->first.second : "(null)",
-            i->second.begin(),
-            i->second.end());
+            i->second);
       } 
     }
   }
 
-  void reportStatAvg(const char* text, unsigned long val, const char* loopname) {
-    distStats[std::make_pair(text,loopname)][gcounter].push_back(val);
+  void reportStatAvg(const char* text, double val, const char* loopname) {
+    distStats[std::make_pair(text,loopname)][gcounter].push(val);
   }
 
   void reportStatSum(const char* text, unsigned long val, const char* loopname) {

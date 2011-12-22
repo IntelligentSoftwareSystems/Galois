@@ -38,7 +38,6 @@
 #include "Galois/Runtime/Threads.h"
 #include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/WorkList.h"
-#include "Galois/Runtime/DebugWorkList.h"
 #include "Galois/Runtime/Termination.h"
 #include "Galois/Runtime/LoopHooks.h"
 
@@ -47,56 +46,58 @@ namespace GaloisRuntime {
 class LoopStatistics {
   unsigned long conflicts;
   unsigned long iterations;
+  OnlineStatistics iterationTimes;
+
 public:
-  LoopStatistics() :conflicts(0), iterations(0) {}
+  LoopStatistics() :conflicts(0), iterations(0) { }
   void inc_iterations() {
     ++iterations;
   }
   void inc_conflicts() {
     ++conflicts;
   }
-  void report_stat(const char* loopname) const {
+  void report_stat(unsigned int tid, const char* loopname) const {
     reportStatSum("Conflicts", conflicts, loopname);
     reportStatSum("Iterations", iterations, loopname);
-    reportStatAvg("ConflictsDistribution", conflicts, loopname);
-    reportStatAvg("IterationsDistribution", iterations, loopname);
+    reportStatAvg("ConflictsThreadDistribution", conflicts, loopname);
+    reportStatAvg("IterationsThreadDistribution", iterations, loopname);
   }
 };
 
-template<typename Function>
+template<typename FunctionTy>
 struct Configurator {
   enum {
-    CollectStats = !Galois::does_not_need_stats<Function>::value,
-    NeedsBreak = Galois::needs_parallel_break<Function>::value,
-    NeedsPush = !Galois::does_not_need_parallel_push<Function>::value,
-    NeedsContext = !Galois::does_not_need_context<Function>::value,
-    NeedsPIA = Galois::needs_per_iter_alloc<Function>::value
+    CollectStats = !Galois::does_not_need_stats<FunctionTy>::value,
+    NeedsBreak = Galois::needs_parallel_break<FunctionTy>::value,
+    NeedsPush = !Galois::does_not_need_parallel_push<FunctionTy>::value,
+    NeedsContext = !Galois::does_not_need_context<FunctionTy>::value,
+    NeedsPIA = Galois::needs_per_iter_alloc<FunctionTy>::value
   };
 };
 
-template<class WorkListTy, class Function>
+template<class WorkListTy, class FunctionTy>
 class ForEachWork {
   typedef typename WorkListTy::value_type value_type;
-  typedef GaloisRuntime::WorkList::LevelStealing<GaloisRuntime::WorkList::FIFO<value_type>, value_type> AbortedListTy;
+  typedef WorkList::LevelStealing<WorkList::FIFO<value_type>, value_type> AbortedList;
   
-  struct tldTy {
+  struct ThreadLocalData {
     Galois::UserContext<value_type> facing;
     SimpleRuntimeContext cnx;
     LoopStatistics stat;
-    TerminationDetection::tokenHolder* lterm;
+    TerminationDetection::TokenHolder* lterm;
   };
 
   WorkListTy global_wl;
-  Function& f;
+  FunctionTy& f;
   const char* loopname;
 
-  PerCPU<tldTy> tdata;
+  PerCPU<ThreadLocalData> tdata;
   TerminationDetection term;
-  AbortedListTy aborted;
+  AbortedList aborted;
   cache_line_storage<volatile long> break_happened; //hit flag
   cache_line_storage<volatile long> abort_happened; //hit flag
 
-  void finishIteration(bool aborting, value_type val, tldTy& tld) {
+  void finishIteration(bool aborting, value_type val, ThreadLocalData& tld) {
     if (aborting) {
       clearConflictLock();
       tld.cnx.cancel_iteration();
@@ -110,7 +111,7 @@ class ForEachWork {
       tld.facing.__getPushBuffer().clear();
      }
 
-    if (Configurator<Function>::NeedsPush) {
+    if (Configurator<FunctionTy>::NeedsPush) {
       for (typename Galois::UserContext<value_type>::pushBufferTy::iterator
 	     b = tld.facing.__getPushBuffer().begin(),
 	     e = tld.facing.__getPushBuffer().end();
@@ -118,16 +119,16 @@ class ForEachWork {
 	global_wl.push(*b);
       tld.facing.__getPushBuffer().clear();
     }
-    if (Configurator<Function>::NeedsPIA)
+    if (Configurator<FunctionTy>::NeedsPIA)
       tld.facing.__resetAlloc();
-    if (Configurator<Function>::NeedsBreak)
+    if (Configurator<FunctionTy>::NeedsBreak)
       if (tld.facing.__breakHappened())
         break_happened.data = 1;
     if (!aborting)
       tld.cnx.commit_iteration();
   }
 
-  void doProcess(value_type val, tldTy& tld) {
+  void doProcess(value_type val, ThreadLocalData& tld) {
     tld.stat.inc_iterations();
     tld.cnx.start_iteration();
     bool aborted = false;
@@ -140,14 +141,14 @@ class ForEachWork {
   }
 
   template<bool isLeader>
-  inline void drainAborted(tldTy& tld) {
+  inline void drainAborted(ThreadLocalData& tld) {
     if (!isLeader) return;
     if (!abort_happened.data) return;
     tld.lterm->workHappened();
     abort_happened.data = 0;
     std::pair<bool, value_type> p = aborted.pop();
     while (p.first) {
-      if (Configurator<Function>::NeedsBreak && break_happened.data) 
+      if (Configurator<FunctionTy>::NeedsBreak && break_happened.data) 
 	return;
       doProcess(p.second, tld);
       p = aborted.pop();
@@ -155,7 +156,7 @@ class ForEachWork {
   }
 
 public:
-  ForEachWork(Function& _f, const char* _loopname)
+  ForEachWork(FunctionTy& _f, const char* _loopname)
     :f(_f), loopname(_loopname) {
     abort_happened.data = 0;
     break_happened.data = 0;
@@ -163,7 +164,7 @@ public:
 
   ~ForEachWork() {
     for (unsigned int i = 0; i < GaloisRuntime::getSystemThreadPool().getActiveThreads(); ++i)
-      tdata.get(i).stat.report_stat(loopname);
+      tdata.get(i).stat.report_stat(i, loopname);
     GaloisRuntime::statDone();
   }
 
@@ -172,11 +173,12 @@ public:
     for(; b != e; ++b)
       if (fil(*b))
 	global_wl.pushi(*b);
+    return true;
   }
 
   template<bool isLeader>
   void go() {
-    tldTy& tld = tdata.get();
+    ThreadLocalData& tld = tdata.get();
     setThreadContext(&tld.cnx);
     tld.lterm = term.getLocalTokenHolder();
 
@@ -185,7 +187,7 @@ public:
       if (p.first)
         tld.lterm->workHappened();
       while (p.first) {
-        if (Configurator<Function>::NeedsBreak && break_happened.data)
+        if (Configurator<FunctionTy>::NeedsBreak && break_happened.data)
 	  goto leaveLoop;
         doProcess(p.second, tld);
 	drainAborted<isLeader>(tld);
@@ -193,8 +195,9 @@ public:
       }
 
       drainAborted<isLeader>(tld);
-      if (Configurator<Function>::NeedsBreak && break_happened.data)
+      if (Configurator<FunctionTy>::NeedsBreak && break_happened.data)
 	goto leaveLoop;
+
       term.localTermination();
     } while (!term.globalTermination());
   leaveLoop:
@@ -210,27 +213,27 @@ public:
 };
 
 template<typename T1, typename T2, typename T3>
-class FillWork {
-  public:
+struct FillWork {
   T1 b;
   T1 e;
   T2& g;
   T3 f;
-  int num;
-  int dist;
+  unsigned int num;
+  unsigned int dist;
+  
   FillWork(T1& _b, T1& _e, T2& _g, T3& _f) :b(_b), e(_e), g(_g), f(_f) {
-    int a = getSystemThreadPool().getActiveThreads();
-    dist = std::distance(b,e);
+    unsigned int a = getSystemThreadPool().getActiveThreads();
+    dist = std::distance(b, e);
     num = (dist + a - 1) / a; //round up
-    //std::cout << dist << " " << num << "\n";
   }
+
   void operator()(void) {
-    int id = ThreadPool::getMyID();
+    unsigned int id = ThreadPool::getMyID();
     T1 b2 = b;
     T1 e2 = b;
     //stay in bounds
-    int A = std::min(num * id, dist);
-    int B = std::min(num * (id + 1), dist);
+    unsigned int A = std::min(num * id, dist);
+    unsigned int B = std::min(num * (id + 1), dist);
     std::advance(b2, A);
     std::advance(e2, B);
     g.AddInitialWork(b2,e2,f);
@@ -248,10 +251,9 @@ void for_each_impl(IterTy b, IterTy e, Function f, Filter fil, const char* loopn
   typedef typename WLTy::template retype<typename std::iterator_traits<IterTy>::value_type>::WL aWLTy;
 
   ForEachWork<aWLTy, Function> GW(f, loopname);
-
   FillWork<IterTy, ForEachWork<aWLTy, Function>, Filter > fw2(b,e,GW,fil);
 
-  runCMD w[3];
+  RunCommand w[3];
   w[0].work = config::ref(fw2);
   w[0].isParallel = true;
   w[0].barrierAfter = true;

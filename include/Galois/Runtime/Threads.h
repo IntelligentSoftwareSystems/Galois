@@ -28,10 +28,11 @@
 namespace GaloisRuntime {
 
 class ThreadPool;
-//Returns or creates the appropriate thread pool for the system
+
+//!Returns or creates the appropriate thread pool for the system
 ThreadPool& getSystemThreadPool();
 
-struct runCMD {
+struct RunCommand {
   config::function<void (void)> work;
   bool isParallel;
   bool barrierAfter;
@@ -46,7 +47,7 @@ public:
 
   //!execute work on all threads
   //!preWork and postWork are executed only on the master thread
-  virtual void run(runCMD* begin, runCMD* end) = 0;
+  virtual void run(RunCommand* begin, RunCommand* end) = 0;
   
   //!change the number of threads to num
   //!returns the number that the runtime chooses (may not be num)

@@ -24,19 +24,19 @@ namespace GaloisRuntime {
 //Dikstra dual-ring termination algorithm
 class TerminationDetection {
 public:
-  class tokenHolder {
+  class TokenHolder {
     friend class TerminationDetection;
     volatile long tokenIsBlack;
     volatile long hasToken;
     volatile long processIsBlack;
   public:
-    tokenHolder() :tokenIsBlack(false), hasToken(false), processIsBlack(true) {}
+    TokenHolder() :tokenIsBlack(false), hasToken(false), processIsBlack(true) {}
     inline void workHappened() {
       processIsBlack = true;
     }
   };
 private:
-  PerCPU<tokenHolder> data;
+  PerCPU<TokenHolder> data;
   volatile bool globalTerm;
   bool lastWasWhite;
 
@@ -47,7 +47,7 @@ public:
     data.get().workHappened();
   }
 
-  tokenHolder* getLocalTokenHolder() {
+  TokenHolder* getLocalTokenHolder() {
     return &data.get();
   }
 

@@ -42,8 +42,8 @@ void TerminationDetection::reset() {
 }
 
 void TerminationDetection::localTermination() {
-  tokenHolder& th = data.get();
-  tokenHolder& thn = data.getNext();
+  TokenHolder& th = data.get();
+  TokenHolder& thn = data.getNext();
   //  static SimpleLock<int, true> L;
   //  L.lock();
   //  std::cerr << "th " << &th << " thn " << &thn << "\n";
