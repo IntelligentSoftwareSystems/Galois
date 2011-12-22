@@ -112,7 +112,7 @@ struct process {
 		if (graph.containsNode(src) == false)
 			return;
 		graph.getData(src);
-		GNode * minNeighbor;
+		GNode minNeighbor;
 #if BORUVKA_DEBUG
 		std::cout<<"Processing "<<graph.getData(src).toString()<<std::endl;
 #endif
@@ -132,7 +132,7 @@ struct process {
 			int w = graph.getEdgeData(src, *dst, Galois::NONE);
 			assert (graph.getEdgeData(src, *dst, Galois::NONE) == graph.getEdgeData(*dst, src, Galois::NONE));
 			if (w < minEdgeWeight) {
-				minNeighbor = &(*dst);
+				minNeighbor = *dst;
 				minEdgeWeight = w;
 			}
 		}
@@ -143,13 +143,13 @@ struct process {
 			return;
 		}
 #if BORUVKA_DEBUG
-		std::cout << " Min edge from "<<graph.getData(src).toString() << " to "<<graph.getData(*minNeighbor).toString()<<" " <<minEdgeWeight << " "<<std::endl;
+		std::cout << " Min edge from "<<graph.getData(src).toString() << " to "<<graph.getDataminNeighbor.toString()<<" " <<minEdgeWeight << " "<<std::endl;
 #endif
 		//Acquire locks on neighborhood of min neighbor.
-		for (Graph::neighbor_iterator dst = graph.neighbor_begin(*minNeighbor,Galois::ALL), edst = graph.neighbor_end(*minNeighbor,Galois::ALL); dst != edst; ++dst) {
+		for (Graph::neighbor_iterator dst = graph.neighbor_begin(minNeighbor,Galois::ALL), edst = graph.neighbor_end(minNeighbor,Galois::ALL); dst != edst; ++dst) {
 			graph.getData(*dst);
-			graph.getEdgeData(*minNeighbor, *dst, Galois::ALL);
-			graph.getEdgeData(*dst, *minNeighbor, Galois::ALL);
+			graph.getEdgeData(minNeighbor, *dst, Galois::ALL);
+			graph.getEdgeData(*dst, minNeighbor, Galois::ALL);
 		}
 		//update MST weight.
 		MSTWeight.get() += minEdgeWeight;
@@ -159,9 +159,9 @@ struct process {
 		typedef std::set<EdgeData, std::less<EdgeData>,Galois::PerIterAllocTy::rebind<EdgeData>::other> edsetTy;
 		edsetTy toAdd(std::less<EdgeData>(), Galois::PerIterAllocTy::rebind<EdgeData>::other(lwl.getPerIterAlloc()));
 
-		for (Graph::neighbor_iterator mdst = graph.neighbor_begin(*minNeighbor,Galois::NONE), medst = graph.neighbor_end(*minNeighbor,Galois::NONE); mdst != medst; ++mdst) {
+		for (Graph::neighbor_iterator mdst = graph.neighbor_begin(minNeighbor,Galois::NONE), medst = graph.neighbor_end(minNeighbor,Galois::NONE); mdst != medst; ++mdst) {
 			graph.getData(*mdst);
-			int edgeWeight = graph.getEdgeData(*minNeighbor, *mdst,Galois::NONE);
+			int edgeWeight = graph.getEdgeData(minNeighbor, *mdst,Galois::NONE);
 			if (*mdst != src) {
 				GNode dstNode = (*mdst);
 				if (src.hasNeighbor(dstNode) || dstNode.hasNeighbor(src)) {
@@ -175,7 +175,7 @@ struct process {
 			}
 			toRemove.insert(*mdst);
 		}
-		graph.removeNode(*minNeighbor, Galois::NONE);
+		graph.removeNode(minNeighbor, Galois::NONE);
 		for (edsetTy::iterator it = toAdd.begin(), endIt = toAdd.end(); it!= endIt; it++) {
 			graph.addEdge(src, it->first, it->second, Galois::NONE);
 		}
