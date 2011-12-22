@@ -163,7 +163,7 @@ public:
     std::copy(graph.edgedata_begin<EdgeTy>(), graph.edgedata_end<EdgeTy>(),
 	      &EdgeData[0]);
     for (unsigned x = 0; x < numNodes; ++x)
-      new (&NodeData[0]) NodeTy; // inplace new
+      new (&NodeData[x]) NodeTy; // inplace new
   }
 };
 
