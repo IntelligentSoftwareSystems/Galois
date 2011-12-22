@@ -17,8 +17,10 @@ defects in Software and/or Documentation, or loss or inaccuracy of data of any
 kind.
 */
 
-#ifndef __WORKLISTEXPERIMENTAL_H_
-#define __WORKLISTEXPERIMENTAL_H_
+#ifndef GALOIS_RUNTIME_WORKLISTEXPERIMENTAL_H
+#define GALOIS_RUNTIME_WORKLISTEXPERIMENTAL_H
+
+#define OPTNOINLINE
 
 namespace GaloisRuntime {
 namespace WorkList {
@@ -346,7 +348,7 @@ private:
 
 public:
   bool push(value_type val) {
-    if (gStarved)
+    if (gStarving)
       return gwl.push(val);
     if (starvingFlags.get())
       return sharedQueues.push(val);
@@ -443,11 +445,6 @@ public:
     if (!starving & IFlag)
       __sync_fetch_and_or(&starving, IFlag);
     return val;
-  }
-
-  template<typename iter>
-  void fillInitial(iter begin, iter end) {
-    return gwl.fill_initial(begin,end);
   }
 };
 
@@ -922,132 +919,6 @@ public:
 
 };
 
-
-template<typename T>
-class GWL_Idempotent_FIFO : private boost::noncopyable {
-
-  struct TaskArrayWithSize {
-    int size;
-    T array[1];
-  };
-
-  TaskArrayWithSize* mkArray(int num) {
-    TaskArrayWithSize* r = (TaskArrayWithSize*)malloc(sizeof(TaskArrayWithSize)+sizeof(T[num]));
-    r->size = num;
-    return r;
-  }
-
-  int head;
-  int tail;
-  TaskArrayWithSize* volatile tasks;
-    
-  inline void order() {
-    //Compiler barier
-    __asm__("":::"memory");
-  }
-
-  bool Empty() {
-    return head == tail;
-  }
-
-  void put(T t_ask) {
-    //Order write at 4 before write at 5
-    int h = head;
-    int t = tail;
-    if (t == h+tasks->size) {
-      expand();
-      put(t_ask);
-      return;
-    }
-    tasks->array[t%tasks->size] = t_ask;
-    order();
-    tail = t+1;
-  }
-    
-  T take(bool& EMPTY) {
-    EMPTY = false;
-    int h = head;
-    int t = tail;
-    if (h == t) {
-      EMPTY = true;
-      return T();
-    }
-    T t_ask = tasks->array[h%tasks->size];
-    head = h+1;
-    return t_ask;
-  }
-    
-  T i_steal(bool& EMPTY) {
-    EMPTY = false;
-    //Order read in 1 before read in 2
-    //Order read in 1 before read in 4
-    //Order read in 5 before CAS in 6
-    int h = head;
-    order();
-    int t = tail;
-    order();
-    if (h == t) {
-      EMPTY = true;
-      return T();
-    }
-    TaskArrayWithSize* a = tasks;
-    T t_ask = a->array[h%a->size];
-    order();
-    if (!__sync_bool_compare_and_swap(&head,h,h+1)) {
-      return i_steal(EMPTY);
-    }
-    return t_ask;
-  }
-    
-  void expand() {
-    //Order writes in 2 and 4 before write in 5
-    //Order write in 5 before write in put:5
-    int size = tasks->size;
-    TaskArrayWithSize* a = mkArray(2*size);
-    for (int i = head; i < tail; ++i)
-      a->array[i%a->size] = tasks->array[i%tasks->size];
-    order();
-    tasks = a;
-    order();
-  }
-   
-public:
-  typedef GWL_Idempotent_FIFO<T> ConcurrentTy;
-  typedef GWL_Idempotent_FIFO<T> SingleTy;
-  enum {MAYSTEAL = true};
-
-  GWL_Idempotent_FIFO(int size = 256)
-    :head(0), tail(0)
-  {
-    tasks = mkArray(size);
-  }
-
-  void push(T val) {
-    put(val);
-  }
-
-  T pop(bool& succeeded) {
-    bool Empty;
-    T retval = take(Empty);
-    succeeded = !Empty;
-    return retval;
-  }
-    
-  //This can be called by any thread
-  T steal(bool& succeeded) {
-    bool Empty;
-    T retval = i_steal(Empty);
-    succeeded = !Empty;
-    return retval;
-  }
-
-  bool empty() {
-    return Empty();
-  }
-
-};
-
-
 template<typename T>
 class GWL_Idempotent_FIFO_SB : private boost::noncopyable {
 
@@ -1174,7 +1045,132 @@ public:
   }
 
 };
+
 #endif
+
+
+template<typename T>
+class GWL_Idempotent_FIFO: private boost::noncopyable {
+
+  struct TaskArrayWithSize {
+    int size;
+    T array[1];
+  };
+
+  TaskArrayWithSize* mkArray(int num) {
+    TaskArrayWithSize* r = (TaskArrayWithSize*)malloc(sizeof(TaskArrayWithSize)+sizeof(T[num]));
+    r->size = num;
+    return r;
+  }
+
+  int head;
+  int tail;
+  TaskArrayWithSize* volatile tasks;
+    
+  inline void order() {
+    //Compiler barier
+    __asm__("":::"memory");
+  }
+
+  bool Empty() {
+    return head == tail;
+  }
+
+  void put(T t_ask) {
+    //Order write at 4 before write at 5
+    int h = head;
+    int t = tail;
+    if (t == h+tasks->size) {
+      expand();
+      put(t_ask);
+      return;
+    }
+    tasks->array[t%tasks->size] = t_ask;
+    order();
+    tail = t+1;
+  }
+    
+  T take(bool& EMPTY) {
+    EMPTY = false;
+    int h = head;
+    int t = tail;
+    if (h == t) {
+      EMPTY = true;
+      return T();
+    }
+    T t_ask = tasks->array[h%tasks->size];
+    head = h+1;
+    return t_ask;
+  }
+    
+  T i_steal(bool& EMPTY) {
+    EMPTY = false;
+    //Order read in 1 before read in 2
+    //Order read in 1 before read in 4
+    //Order read in 5 before CAS in 6
+    int h = head;
+    order();
+    int t = tail;
+    order();
+    if (h == t) {
+      EMPTY = true;
+      return T();
+    }
+    TaskArrayWithSize* a = tasks;
+    T t_ask = a->array[h%a->size];
+    order();
+    if (!__sync_bool_compare_and_swap(&head,h,h+1)) {
+      return i_steal(EMPTY);
+    }
+    return t_ask;
+  }
+    
+  void expand() {
+    //Order writes in 2 and 4 before write in 5
+    //Order write in 5 before write in put:5
+    int size = tasks->size;
+    TaskArrayWithSize* a = mkArray(2*size);
+    for (int i = head; i < tail; ++i)
+      a->array[i%a->size] = tasks->array[i%tasks->size];
+    order();
+    tasks = a;
+    order();
+  }
+   
+public:
+  typedef GWL_Idempotent_FIFO<T> ConcurrentTy;
+  typedef GWL_Idempotent_FIFO<T> SingleTy;
+  enum {MAYSTEAL = true};
+
+  GWL_Idempotent_FIFO(int size = 256): head(0), tail(0) {
+    tasks = mkArray(size);
+  }
+
+  void push(T val) {
+    put(val);
+  }
+
+  T pop(bool& succeeded) {
+    bool Empty;
+    T retval = take(Empty);
+    succeeded = !Empty;
+    return retval;
+  }
+    
+  //This can be called by any thread
+  T steal(bool& succeeded) {
+    bool Empty;
+    T retval = i_steal(Empty);
+    succeeded = !Empty;
+    return retval;
+  }
+
+  bool empty() {
+    return Empty();
+  }
+
+};
+
 
 }
 }
