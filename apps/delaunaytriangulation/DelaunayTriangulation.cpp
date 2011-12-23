@@ -26,9 +26,11 @@
  */
 #include <vector>
 #include <iostream>
+#include <fstream>
 #include <string.h>
 #include <limits>
 #include <unistd.h>
+
 #include "Galois/Statistic.h"
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
