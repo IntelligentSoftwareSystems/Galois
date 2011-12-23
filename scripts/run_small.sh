@@ -31,7 +31,7 @@ run() {
 run apps/avi/AVIunordered -t 2 -n 0 -d 2 -f ${BASE}/inputs/avi/squareCoarse.NEU
 run apps/delaunaytriangulation/delaunaytriangulation -t 2 ${BASE}/inputs/meshes/r10k.node
 run apps/delaunayrefinement/delaunayrefinement -t 2 ${BASE}/inputs/meshes/r10k.1
-run apps/des/DESunordered -t 2 -epi 512 ${BASE}/inputs/des/multTree6bit.net 
+run apps/des/DESunordered -t 2 ${BASE}/inputs/des/multTree6bit.net 
 run apps/barneshut/barneshut -t 2 -n 1000 -steps 1 -seed 0
 run apps/betweennesscentrality/betweennesscentrality -t 2 ${BASE}/inputs/structured/torus5.gr
 run apps/surveypropagation/surveypropagation -t 2 9 100 300 3
