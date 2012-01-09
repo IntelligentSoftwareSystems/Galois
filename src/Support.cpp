@@ -49,16 +49,16 @@ class PrintStats {
 public:
   PrintStats() : gcounter(0) { }
   ~PrintStats() {
-    for (typename StatsMap::iterator ii = stats.begin(), ee = stats.end();
+    for (StatsMap::iterator ii = stats.begin(), ee = stats.end();
         ii != ee; ++ii) {
       printf("STAT SINGLE %s %s %ld\n",
           ii->first.first, 
           ii->first.second ? ii->first.second : "(null)",
           ii->second);
     }
-    for (typename DistStatsMap::iterator ii = distStats.begin(), ee = distStats.end();
+    for (DistStatsMap::iterator ii = distStats.begin(), ee = distStats.end();
         ii != ee; ++ii) {
-      for (typename DistStatsValue::iterator i = ii->second.begin(), e = ii->second.end();
+      for (DistStatsValue::iterator i = ii->second.begin(), e = ii->second.end();
           i != e; ++i) {
         summarizeList(i->first,
             ii->first.first ? ii->first.first : "(null)",
