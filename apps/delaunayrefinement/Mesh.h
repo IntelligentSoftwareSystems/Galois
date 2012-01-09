@@ -175,8 +175,8 @@ public:
         int i = 0;
         for (Graph::edge_iterator ii = mesh->edge_begin(node, Galois::NONE), ee = mesh->edge_end(node, Galois::NONE); ii != ee; ++ii) {
           assert(i < 3);
-          assert(mesh->containsNode(*ii));
-          assert(node != *ii);
+          assert(mesh->containsNode(mesh->getEdgeDst(ii)));
+          assert(node != mesh->getEdgeDst(ii));
           ++i;
           //          if (!found.count(*ii))
 	  remaining.push(mesh->getEdgeDst(ii));
