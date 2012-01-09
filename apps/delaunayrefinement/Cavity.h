@@ -60,11 +60,11 @@ class Cavity {
       //Edge& edgeData = graph->getEdgeData(node, neighbor);
       Edge edgeData = element.getRelatedEdge(graph->getData(neighbor,Galois::ALL));
       if (elementTuple != edgeData.getPoint(0) && elementTuple != edgeData.getPoint(1)) {
-	assert(dst.isNull());
+	assert(!dst);
 	dst = neighbor;
       }
     }
-    assert(!dst.isNull());
+    assert(dst);
     return dst;
   }
 
