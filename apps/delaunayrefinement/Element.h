@@ -48,8 +48,6 @@ class Element {
   bool bDim; // true == 3, false == 2
 
  public:
-  
-  Element() {}
 
  explicit Element(const Tuple& a, const Tuple& b, const Tuple& c)
    :obtuse(0), bBad(0), bDim(true)
