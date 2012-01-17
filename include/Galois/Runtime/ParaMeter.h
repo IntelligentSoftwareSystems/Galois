@@ -391,9 +391,11 @@ private:
     allSteps.push_back (stat);
     stat.dump (*pstatsFile, loopname);
     workList.switchWorkLists ();
+    setThreadContext (NULL);
   }
 
   void finishLoop () {
+    setThreadContext (NULL);
     pstatsFile->close ();
   }
 
