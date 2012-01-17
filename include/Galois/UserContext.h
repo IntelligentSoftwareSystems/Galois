@@ -28,16 +28,22 @@
 #include "Galois/Mem.h"
 
 namespace GaloisRuntime {
-template<class WorkListTy, class Function>
+template <typename WorkListTy, typename Function>
 class ForEachWork;
+
+template <typename WorkListTy, typename Function> 
+class ParaMeterExecutor;
 }
 
 namespace Galois {
 
 template<typename T>
 class UserContext: private boost::noncopyable {
-  template<class WorkListTy, class Function>
+  template <typename WorkListTy, typename Function>
   friend class GaloisRuntime::ForEachWork;
+
+  template <typename WorkListTy, typename Function>
+  friend class GaloisRuntime::ParaMeterExecutor;
 
   //! Allocator stuff
   IterAllocBaseTy IterationAllocatorBase;
@@ -53,7 +59,7 @@ class UserContext: private boost::noncopyable {
     return breakFlag;
   }
 
-  void __resetBreakHappened() {
+  void __resetBreak() {
     breakFlag = 0;
   }
 

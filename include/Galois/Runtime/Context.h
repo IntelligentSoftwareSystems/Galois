@@ -50,8 +50,8 @@ public:
     assert(!locks);
   }
   
-  void cancel_iteration();
-  void commit_iteration();
+  unsigned cancel_iteration();
+  unsigned commit_iteration();
   void acquire(Lockable* L);
 };
 

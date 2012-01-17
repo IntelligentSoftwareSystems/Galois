@@ -30,8 +30,9 @@
 
 #include <algorithm>
 
-#include "Galois/TypeTraits.h"
+
 #include "Galois/Mem.h"
+#include "Galois/Runtime/ForeachTraits.h"
 #include "Galois/Runtime/Config.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Context.h"
@@ -62,17 +63,6 @@ public:
     reportStatAvg("ConflictsThreadDistribution", conflicts, loopname);
     reportStatAvg("IterationsThreadDistribution", iterations, loopname);
   }
-};
-
-template<typename FunctionTy>
-struct Configurator {
-  enum {
-    CollectStats = !Galois::does_not_need_stats<FunctionTy>::value,
-    NeedsBreak = Galois::needs_parallel_break<FunctionTy>::value,
-    NeedsPush = !Galois::does_not_need_parallel_push<FunctionTy>::value,
-    NeedsContext = !Galois::does_not_need_context<FunctionTy>::value,
-    NeedsPIA = Galois::needs_per_iter_alloc<FunctionTy>::value
-  };
 };
 
 template<class WorkListTy, class FunctionTy>
@@ -106,12 +96,12 @@ class ForEachWork {
       aborted.push(val);
       abort_happened.data = 1;
       //don't listen to breaks from aborted iterations
-      tld.facing.__resetBreakHappened();
+      tld.facing.__resetBreak();
       //clear push buffer
       tld.facing.__getPushBuffer().clear();
      }
 
-    if (Configurator<FunctionTy>::NeedsPush) {
+    if (ForeachTraits<FunctionTy>::NeedsPush) {
       for (typename Galois::UserContext<value_type>::pushBufferTy::iterator
 	     b = tld.facing.__getPushBuffer().begin(),
 	     e = tld.facing.__getPushBuffer().end();
@@ -119,9 +109,9 @@ class ForEachWork {
 	global_wl.push(*b);
       tld.facing.__getPushBuffer().clear();
     }
-    if (Configurator<FunctionTy>::NeedsPIA)
+    if (ForeachTraits<FunctionTy>::NeedsPIA)
       tld.facing.__resetAlloc();
-    if (Configurator<FunctionTy>::NeedsBreak)
+    if (ForeachTraits<FunctionTy>::NeedsBreak)
       if (tld.facing.__breakHappened())
         break_happened.data = 1;
     if (!aborting)
@@ -148,7 +138,7 @@ class ForEachWork {
     abort_happened.data = 0;
     std::pair<bool, value_type> p = aborted.pop();
     while (p.first) {
-      if (Configurator<FunctionTy>::NeedsBreak && break_happened.data) 
+      if (ForeachTraits<FunctionTy>::NeedsBreak && break_happened.data) 
 	return;
       doProcess(p.second, tld);
       p = aborted.pop();
@@ -187,7 +177,7 @@ public:
       if (p.first)
         tld.lterm->workHappened();
       while (p.first) {
-        if (Configurator<FunctionTy>::NeedsBreak && break_happened.data)
+        if (ForeachTraits<FunctionTy>::NeedsBreak && break_happened.data)
 	  goto leaveLoop;
         doProcess(p.second, tld);
 	drainAborted<isLeader>(tld);
@@ -195,7 +185,7 @@ public:
       }
 
       drainAborted<isLeader>(tld);
-      if (Configurator<FunctionTy>::NeedsBreak && break_happened.data)
+      if (ForeachTraits<FunctionTy>::NeedsBreak && break_happened.data)
 	goto leaveLoop;
 
       term.localTermination();

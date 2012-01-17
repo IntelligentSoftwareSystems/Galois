@@ -26,13 +26,20 @@
 #include "Galois/Threads.h"
 #include "Galois/UserContext.h"
 #include "Galois/Runtime/ParallelWork.h"
+#include "Galois/Runtime/ParaMeter.h"
 
 namespace Galois {
 
 //Iterator with filter based versions
 template<typename WLTy, typename IterTy, typename Function, typename Filter>
 static inline void for_each(IterTy b, IterTy e, Function f, Filter fil, const char* loopname = 0) {
-  GaloisRuntime::for_each_impl<WLTy>(b, e, f, fil, loopname);
+
+  if (GaloisRuntime::usingParaMeter ()) {
+    GaloisRuntime::ParaMeter::for_each_impl <WLTy> (b, e, f, fil, loopname);
+
+  } else {
+    GaloisRuntime::for_each_impl<WLTy>(b, e, f, fil, loopname);
+  }
 }
 
 template<typename IterTy, typename Function, typename Filter>

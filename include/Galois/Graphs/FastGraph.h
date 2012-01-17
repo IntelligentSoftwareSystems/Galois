@@ -290,7 +290,7 @@ public:
    */
   template<typename rval> //Don't compile this with void edgedata
   rval& getEdgeData(edge_iterator dst) const {
-    return *dst->second();
+    return rval (*dst->second());
   }
 
   GraphNode getEdgeDst(edge_iterator ii) {
@@ -343,6 +343,13 @@ public:
            boost::make_filter_iterator(is_active_node(),
 				       nodes.end(), nodes.end()), 
 	   makeGraphNode());
+  }
+
+  /**
+   * Returns the number of nodes in the graph. Not thread-safe.
+   */
+  unsigned int size () {
+    return std::distance (active_begin (), active_end ());
   }
 
   FirstGraph() {
