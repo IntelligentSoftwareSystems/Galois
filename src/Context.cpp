@@ -42,12 +42,13 @@ void GaloisRuntime::doAcquire(GaloisRuntime::Lockable* C) {
     cnx->acquire(C);
 }
 
-void GaloisRuntime::SimpleRuntimeContext::cancel_iteration() {
+unsigned GaloisRuntime::SimpleRuntimeContext::cancel_iteration() {
   //FIXME: not handled yet
-  commit_iteration();
+  return commit_iteration();
 }
 
-void GaloisRuntime::SimpleRuntimeContext::commit_iteration() {
+unsigned GaloisRuntime::SimpleRuntimeContext::commit_iteration() {
+  unsigned numLocks = 0;
   while (locks) {
     //ORDER MATTERS!
     //FIXME: compiler optimization barrier
@@ -56,7 +57,11 @@ void GaloisRuntime::SimpleRuntimeContext::commit_iteration() {
     L->next = 0;
     __sync_synchronize();
     L->Owner.unlock_and_clear();
+
+    ++numLocks;
   }
+
+  return numLocks;
 }
 
 void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
