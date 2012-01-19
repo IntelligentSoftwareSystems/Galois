@@ -26,6 +26,7 @@
 #include <sstream>
 #include "llvm/Support/CommandLine.h"
 #include "Galois/Galois.h"
+#include "Galois/Runtime/ParaMeter.h"
 
 //! standard global options to the benchmarks
 static llvm::cl::opt<bool> skipVerify("noverify", llvm::cl::desc("Skip verification step"), llvm::cl::init(false));
