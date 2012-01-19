@@ -161,14 +161,14 @@ public:
     return getInit ().statsFname;
   }
 
-  template <typename WLTy, typename IterTy, typename Func, typename Filter>
-  static void for_each_impl (IterTy b, IterTy e, Func func, Filter filter, const char* loopname) {
+  template <typename WLTy, typename IterTy, typename Func>
+  static void for_each_impl (IterTy b, IterTy e, Func func, const char* loopname) {
 
     typedef typename WLTy::template retype<typename std::iterator_traits<IterTy>::value_type>::WL ActualWLTy;
 
     ParaMeterExecutor<ActualWLTy, Func> executor (func, loopname);
 
-    executor.addInitialWork (b, e, filter);
+    executor.addInitialWork (b, e);
 
     executor.run ();
 
@@ -254,13 +254,10 @@ public:
     pstatsFile = NULL;
   }
 
-  template <typename Iter, typename Filter>
-  bool addInitialWork (Iter b, Iter e, Filter filter) {
-    for (; b != e; ++b) {
-      if (filter (*b)) {
-        workList.getCurr ().pushi (*b);
-      }
-    }
+  template <typename Iter>
+  bool addInitialWork (Iter b, Iter e) {
+    for (; b != e; ++b)
+      workList.getCurr ().pushi (*b);
 
     return true;
   }

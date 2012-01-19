@@ -158,11 +158,10 @@ public:
     GaloisRuntime::statDone();
   }
 
-  template<typename Iter, typename Filter>
-  bool AddInitialWork(Iter b, Iter e, Filter fil) {
+  template<typename Iter>
+  bool AddInitialWork(Iter b, Iter e) {
     for(; b != e; ++b)
-      if (fil(*b))
-	global_wl.pushi(*b);
+      global_wl.pushi(*b);
     return true;
   }
 
@@ -202,16 +201,15 @@ public:
   }
 };
 
-template<typename T1, typename T2, typename T3>
+template<typename T1, typename T2>
 struct FillWork {
   T1 b;
   T1 e;
   T2& g;
-  T3 f;
   unsigned int num;
   unsigned int dist;
   
-  FillWork(T1& _b, T1& _e, T2& _g, T3& _f) :b(_b), e(_e), g(_g), f(_f) {
+  FillWork(T1& _b, T1& _e, T2& _g) :b(_b), e(_e), g(_g) {
     unsigned int a = getSystemThreadPool().getActiveThreads();
     dist = std::distance(b, e);
     num = (dist + a - 1) / a; //round up
@@ -226,22 +224,17 @@ struct FillWork {
     unsigned int B = std::min(num * (id + 1), dist);
     std::advance(b2, A);
     std::advance(e2, B);
-    g.AddInitialWork(b2,e2,f);
+    g.AddInitialWork(b2,e2);
   }
 };
 
-struct select_all {
-  template<typename T>
-  bool operator() (T v) { return true; }
-};
-
-template<typename WLTy, typename IterTy, typename Function, typename Filter>
-void for_each_impl(IterTy b, IterTy e, Function f, Filter fil, const char* loopname) {
+template<typename WLTy, typename IterTy, typename Function>
+void for_each_impl(IterTy b, IterTy e, Function f, const char* loopname) {
 
   typedef typename WLTy::template retype<typename std::iterator_traits<IterTy>::value_type>::WL aWLTy;
 
   ForEachWork<aWLTy, Function> GW(f, loopname);
-  FillWork<IterTy, ForEachWork<aWLTy, Function>, Filter > fw2(b,e,GW,fil);
+  FillWork<IterTy, ForEachWork<aWLTy, Function> > fw2(b,e,GW);
 
   RunCommand w[3];
   w[0].work = config::ref(fw2);
