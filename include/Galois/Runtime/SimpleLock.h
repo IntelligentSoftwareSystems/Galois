@@ -61,7 +61,9 @@ public:
 
   inline void unlock() const {
     assert(_lock);
+    asm volatile ("":::"memory");
     _lock = 0;
+    asm volatile ("":::"memory");
   }
 
   inline bool try_lock(T val) const {
@@ -86,7 +88,7 @@ template<typename T>
 class SimpleLock<T, false> {
 public:
   inline void lock(T val = 0) const {}
-  inline void unlock() const {}
+  inline void unlock() const {asm volatile ("":::"memory");}
   inline bool try_lock(T val = 1) const { return true; }
   inline T getValue() const { return 0; }
 };
@@ -117,18 +119,24 @@ public:
 
   inline void unlock() {
     assert(_lock & 1);
+    asm volatile ("":::"memory");
     _lock = _lock & ~1;
+    asm volatile ("":::"memory");
   }
 
   inline void unlock_and_clear() {
     assert(_lock & 1);
+    asm volatile ("":::"memory");
     _lock = 0;
+    asm volatile ("":::"memory");
   }
 
   inline void unlock_and_set(T val) {
     assert(_lock & 1);
     assert(!((uintptr_t)val & 1));
+    asm volatile ("":::"memory");
     _lock = (uintptr_t)val;
+    asm volatile ("":::"memory");
   }
   
   inline T getValue() const {
@@ -165,9 +173,9 @@ public:
   explicit PtrLock(T val) : _lock(val) {}
 
   inline void lock() {}
-  inline void unlock() {}
-  inline void unlock_and_clear() { _lock = 0; }
-  inline void unlock_and_set(T val) { _lock = val; }
+  inline void unlock() { asm volatile ("":::"memory"); }
+  inline void unlock_and_clear() { asm volatile ("":::"memory"); _lock = 0; asm volatile ("":::"memory"); }
+  inline void unlock_and_set(T val) { asm volatile ("":::"memory"); _lock = val; asm volatile ("":::"memory"); }
   inline T getValue() const { return _lock; }
   inline void setValue(T val) { _lock = val; }
   inline bool try_lock() { return true; }
