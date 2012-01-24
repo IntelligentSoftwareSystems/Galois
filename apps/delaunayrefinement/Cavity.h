@@ -54,7 +54,7 @@ class Cavity {
     Element& element = graph->getData(node,Galois::ALL);
     Tuple elementTuple = element.getObtuse();
     Edge ObtuseEdge = element.getOppositeObtuse();
-    GNode dst;
+    GNode dst(0);
     for (Graph::edge_iterator ii = graph->edge_begin(node,Galois::ALL), ee = graph->edge_end(node,Galois::ALL); ii != ee; ++ii) {
       GNode neighbor = graph->getEdgeDst(ii);
       //Edge& edgeData = graph->getEdgeData(node, neighbor);
