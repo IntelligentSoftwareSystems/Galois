@@ -23,7 +23,7 @@
  * Refinement of an initial, unrefined Delaunay mesh to eliminate triangles
  * with angles < 30 degrees, using a variation of Chew's algorithm.
  *
- * @author Milind Kulkarni <milind@purdue.edu>
+ * @author Milind Kulkarni <milind@purdue.edu>>
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 #include <iostream>
@@ -71,7 +71,6 @@ struct process {
       return;
     
     Cavity cav(mesh, lwl.getPerIterAlloc());
-    
     cav.initialize(item);
     cav.build();
     cav.update();
@@ -93,7 +92,9 @@ struct process {
     for (Subgraph::edge_iterator ii = cav.getPost().edge_begin(),
 	   ee = cav.getPost().edge_end(); ii != ee; ++ii) {
       Subgraph::tmpEdge edge = *ii;
-      mesh->addEdge(edge.src, edge.dst, Galois::ALL);
+      //bool ret = 
+      mesh->addEdge(edge.src, edge.dst, Galois::ALL); //, edge.data);
+      //assert ret;
     }
     if (mesh->containsNode(item)) {
       lwl.push(item);
@@ -111,15 +112,30 @@ int main(int argc, char** argv) {
   std::cout << "configuration: " << std::distance(mesh->active_begin(), mesh->active_end())
 	    << " total triangles, " << std::count_if(mesh->active_begin(), mesh->active_end(), is_bad(mesh)) << " bad triangles\n";
 
+  std::vector<GNode> wl;
+  for (Graph::active_iterator ii = mesh->active_begin(), ee = mesh->active_end();
+       ii != ee; ++ii)
+    if (mesh->getData(*ii).isBad())
+      wl.push_back(*ii);
+  
+  std::cout << "MEMINFO PRE: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
+
+  Galois::preAlloc(5600);
+  std::cout << "MEMINFO MID: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
+
+
   Galois::StatTimer T;
   T.start();
   using namespace GaloisRuntime::WorkList;
-
-  Galois::for_each<LocalQueues<dChunkedLIFO<256>, LIFO<> > >(mesh->active_begin(), mesh->active_end(), process(), is_bad(mesh));
+  Galois::for_each<LocalQueues<dChunkedLIFO<256>, LIFO<> > >(wl.begin(),wl.end(), process());
+  //Galois::for_each<LocalQueues<dChunkedLIFO<256>, LIFO<> > >(mesh->active_begin(), mesh->active_end(), process(), is_bad(mesh));
   //Galois::for_each<LocalQueues<InitialIterator<std::vector<GNode>::iterator>, LIFO<> > >(wl.begin(), wl.end(), process());
   //Galois::for_each<LocalQueues<InitialIterator<GNode*>, LIFO<> > >(&wl[0], &wl[wl.size()], process());
+  //Galois::for_each<dChunkedLIFO<1024> >(wl.begin(), wl.end(), process());
   T.stop();
-  
+
+  std::cout << "MEMINFO POST: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
+
   if (!skipVerify) {
     if (!m.verify(mesh)) {
       std::cerr << "Refinement failed.\n";

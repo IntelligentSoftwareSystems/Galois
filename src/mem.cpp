@@ -1,4 +1,4 @@
-/** heap building blocks implementation -*- C++ -*-
+/** Memory allocator implementation -*- C++ -*-
  * @file
  * @section License
  *
@@ -85,7 +85,8 @@ class LowLevelAllocator {
   struct FreeNode {
     FreeNode* next;
   };
-  PtrLock<FreeNode*, true> heads;
+  
+PtrLock<FreeNode*, true> heads;
 #ifdef __linux__
   //serialize mmap in userspace because it prevents
   //linux from sleeping for undefined amounts of time
@@ -145,6 +146,8 @@ public:
 #ifndef MAP_HUGETLB
     reportWarning("No MAP_HUGETLB");
 #endif
+    // for (int x = 0; x < 6200; ++x)
+    //   deallocate(allocPage()); //preallocate
   }
 
   ~LowLevelAllocator() {
@@ -156,6 +159,10 @@ public:
       h = n;
     }
     reportInfo("Allocated: ", num);
+  }
+
+  void print() {
+    reportInfo("Allocated Early ", num);
   }
 
   void* allocate() {
@@ -173,24 +180,26 @@ public:
   }
 
   void deallocate(void* m) {
-    PtrLock<FreeNode*, true>& H = heads;
-    H.lock();
     FreeNode* nh = reinterpret_cast<FreeNode*>(m);
-    nh->next = H.getValue();
-    H.unlock_and_set(nh);
+    heads.lock();
+    nh->next = heads.getValue();
+    heads.unlock_and_set(nh);
   }
 };
 }
 
 static LowLevelAllocator SysAlloc;
 
-void* GaloisRuntime::MM::pageAlloc() {
-  return SysAlloc.allocate();
-}
+// void* GaloisRuntime::MM::pageAlloc() {
+//   return SysAlloc.allocate();
+// }
 
-void GaloisRuntime::MM::pageFree(void* m) {
-  SysAlloc.deallocate(m);
-}
+// void GaloisRuntime::MM::pageFree(void* m) {
+//   SysAlloc.deallocate(m);
+// }
+// void GaloisRuntime::MM::pagePrintInfo() {
+//   SysAlloc.print();
+// }
 
 
 void* GaloisRuntime::MM::largeAlloc(size_t len) {

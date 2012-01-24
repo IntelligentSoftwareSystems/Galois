@@ -43,10 +43,15 @@ namespace MM {
 
 const size_t pageSize = 2*1024*1024;
 void* pageAlloc();
-void pageFree(void*);
+void  pageFree(void*);
+unsigned pageAllocInfo();
+void pagePreAlloc(int numpages);
 
 void* largeAlloc(size_t bytes);
 void  largeFree (void* mem, size_t bytes);
+
+void* galoisMalloc(size_t bytes);
+void  galoisFree(void*);
 
 //! Per-thread heaps using Galois thread aware construct
 template<class LocalHeap>

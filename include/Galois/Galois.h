@@ -30,6 +30,10 @@
 
 namespace Galois {
 
+////////////////////////////////////////////////////////////////////////////////
+// Foreach
+////////////////////////////////////////////////////////////////////////////////
+
 //Iterator based versions
 template<typename WLTy, typename IterTy, typename Function>
 static inline void for_each(IterTy b, IterTy e, Function f, const char* loopname = 0) {
@@ -59,6 +63,29 @@ template<typename InitItemTy, typename Function>
 static inline void for_each(InitItemTy i, Function f, const char* loopname = 0) {
   typedef GaloisRuntime::WorkList::ChunkedFIFO<256> WLTy;
   for_each<WLTy, InitItemTy, Function>(i, f, loopname);
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// PreAlloc
+////////////////////////////////////////////////////////////////////////////////
+
+struct WPreAlloc {
+  int n;
+  void operator()(void) {
+    GaloisRuntime::MM::pagePreAlloc(n);
+  }
+};
+
+static inline void preAlloc(int num) {
+  WPreAlloc fw;
+  int a = GaloisRuntime::getSystemThreadPool().getActiveThreads();
+  fw.n = (num + a - 1) / a;
+  GaloisRuntime::RunCommand w[1];
+  w[0].work = GaloisRuntime::config::ref(fw);
+  w[0].isParallel = true;
+  w[0].barrierAfter = true;
+  GaloisRuntime::getSystemThreadPool().run(&w[0], &w[1]);
 }
 
 }
