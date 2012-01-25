@@ -38,9 +38,9 @@ class WorkListTracker {
   //online collection of stats
   PerCPU<p> tracking;
   //global clock
-  cache_line_storage<unsigned int> clock;
+  LL::CacheLineStorage<unsigned int> clock;
   //master thread counting towards a tick
-  cache_line_storage<unsigned int> thread_clock;
+  LL::CacheLineStorage<unsigned int> thread_clock;
 
   realWL wl;
   Indexer I;

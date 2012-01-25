@@ -23,7 +23,7 @@ kind.
 #define _GALOIS_SPARSEBITVECTOR_H
 
 
-#include "Galois/Runtime/SimpleLock.h"
+#include "Galois/Runtime/ll/SimpleLock.h"
 
 #include <vector>
 #include <iostream>
@@ -40,7 +40,7 @@ namespace Galois {
     Saves space when the data to be stored is sparsely populated. */
 
 typedef unsigned long WORD;
-typedef GaloisRuntime::SimpleLock<int, true> LockType;
+typedef GaloisRuntime::LL::SimpleLock<int, true> LockType;
 
 static const unsigned wordsize = sizeof(WORD)*8;
 

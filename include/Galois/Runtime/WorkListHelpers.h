@@ -23,13 +23,15 @@
 #ifndef GALOIS_RUNTIME_WORKLISTHELPERS_H
 #define GALOIS_RUNTIME_WORKLISTHELPERS_H
 
+#include "ll/PtrLock.h"
+
 namespace GaloisRuntime {
 namespace WorkList {
 
 template<typename T, unsigned __chunksize = 64, bool concurrent = true>
-class FixedSizeRing :private boost::noncopyable, private PaddedLock<concurrent> {
-  using PaddedLock<concurrent>::lock;
-  using PaddedLock<concurrent>::unlock;
+class FixedSizeRing :private boost::noncopyable, private LL::PaddedLock<concurrent> {
+  using LL::PaddedLock<concurrent>::lock;
+  using LL::PaddedLock<concurrent>::unlock;
   unsigned start;
   unsigned end;
   T data[__chunksize + 1];
@@ -59,6 +61,18 @@ public:
   typedef T value_type;
 
   FixedSizeRing() :start(0), end(0) { assertSE(); }
+
+  int size() const {
+    unsigned s = start;
+    unsigned e = end;
+    int retval = 0;
+    while (s != e) {
+      ++retval;
+      ++s;
+      s %= chunksize();
+    }
+    return retval;
+  }
 
   bool empty() const {
     lock();
@@ -141,7 +155,7 @@ public:
 
 template<typename T, bool concurrent>
 class ConExtLinkedStack {
-  PtrLock<T*, concurrent> head;
+  LL::PtrLock<T*, concurrent> head;
 
 public:
   
@@ -185,7 +199,7 @@ public:
 template<typename T, bool concurrent>
 class ConExtLinkedQueue {
   
-  PtrLock<T*,concurrent> head;
+  LL::PtrLock<T*,concurrent> head;
   T* tail;
   
 public:

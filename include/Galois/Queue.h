@@ -24,7 +24,7 @@
 #define GALOIS_QUEUE_H
 
 #include "Galois/Runtime/PerCPU.h"
-#include "Galois/Runtime/PaddedLock.h"
+#include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/mem.h"
 #include <boost/utility.hpp>
 #include <stdlib.h>
@@ -1635,7 +1635,7 @@ class FCPairingHeap: private boost::noncopyable {
 
   GaloisRuntime::PerCPU<Slot*> localSlots;
   GaloisRuntime::PerCPU<std::vector<Op*> > ops;
-  GaloisRuntime::PaddedLock<Concurrent> lock;
+  GaloisRuntime::LL::PaddedLock<Concurrent> lock;
   PairingHeap<T,Compare> heap;
   Slot* slots;
   const int maxTries;

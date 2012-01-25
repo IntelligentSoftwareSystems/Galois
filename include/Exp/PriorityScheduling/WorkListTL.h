@@ -2,7 +2,7 @@
  * Common support for worklist experiments.
  */
 #include "Galois/Runtime/WorkList.h"
-#include "Galois/Runtime/PaddedLock.h"
+#include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/Termination.h"
 #include "Galois/Runtime/Threads.h"
@@ -60,11 +60,11 @@ WLCOMPILECHECK(TbbFIFO);
 
 
  template<class Indexer, typename ContainerTy = GaloisRuntime::WorkList::FIFO<>, typename T = int, bool concurrent = true >
-class SimpleOrderedByIntegerMetric : private boost::noncopyable, private GaloisRuntime::PaddedLock<concurrent> {
+   class SimpleOrderedByIntegerMetric : private boost::noncopyable, private GaloisRuntime::LL::PaddedLock<concurrent> {
 
-  using GaloisRuntime::PaddedLock<concurrent>::lock;
-  using GaloisRuntime::PaddedLock<concurrent>::try_lock;
-  using GaloisRuntime::PaddedLock<concurrent>::unlock;
+   using GaloisRuntime::LL::PaddedLock<concurrent>::lock;
+   using GaloisRuntime::LL::PaddedLock<concurrent>::try_lock;
+   using GaloisRuntime::LL::PaddedLock<concurrent>::unlock;
 
   typedef ContainerTy CTy;
 
@@ -321,12 +321,12 @@ class BarrierOBIM : private boost::noncopyable {
 };
 
 template<typename T = int, bool concurrent = true>
-class Random : private boost::noncopyable, private GaloisRuntime::PaddedLock<concurrent>  {
+  class Random : private boost::noncopyable, private GaloisRuntime::LL::PaddedLock<concurrent>  {
   std::vector<T> wl;
   unsigned int seed;
-  using GaloisRuntime::PaddedLock<concurrent>::lock;
-  using GaloisRuntime::PaddedLock<concurrent>::try_lock;
-  using GaloisRuntime::PaddedLock<concurrent>::unlock;
+  using GaloisRuntime::LL::PaddedLock<concurrent>::lock;
+  using GaloisRuntime::LL::PaddedLock<concurrent>::try_lock;
+  using GaloisRuntime::LL::PaddedLock<concurrent>::unlock;
 
   unsigned int nextRand() {
     seed = 214013*seed + 2531011; 
@@ -396,7 +396,7 @@ class PTbb : private boost::noncopyable {
   
   struct PTD {
     TBBTy wl;
-    GaloisRuntime::PaddedLock<true> L;
+    GaloisRuntime::LL::PaddedLock<true> L;
     bool V;
     std::vector<T> inq;
   };

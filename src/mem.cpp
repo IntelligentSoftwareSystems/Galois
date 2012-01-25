@@ -44,6 +44,7 @@
 
 using namespace GaloisRuntime;
 using namespace MM;
+using namespace LL;
 
 // mmap flags
 static const int _PROT = PROT_READ | PROT_WRITE;

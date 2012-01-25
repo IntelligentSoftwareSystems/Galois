@@ -28,7 +28,7 @@ kind.
 #include <algorithm>
 #include <boost/utility.hpp>
 
-#include "Galois/Runtime/PaddedLock.h"
+#include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/PerCPU.h"
 //#include "Galois/Runtime/QueuingLock.h"
 #include "Galois/Queue.h"
@@ -83,12 +83,12 @@ public:
 
 
 template<typename T = int, bool concurrent = true>
-class LIFO : private boost::noncopyable, private PaddedLock<concurrent> {
+class LIFO : private boost::noncopyable, private LL::PaddedLock<concurrent> {
   std::deque<T> wl;
 
-  using PaddedLock<concurrent>::lock;
-  using PaddedLock<concurrent>::try_lock;
-  using PaddedLock<concurrent>::unlock;
+  using LL::PaddedLock<concurrent>::lock;
+  using LL::PaddedLock<concurrent>::try_lock;
+  using LL::PaddedLock<concurrent>::unlock;
 
 public:
   template<bool newconcurrent>
@@ -129,12 +129,12 @@ public:
 WLCOMPILECHECK(LIFO);
 
 template<typename T = int, bool concurrent = true>
-class FIFO : private boost::noncopyable, private PaddedLock<concurrent>  {
+class FIFO : private boost::noncopyable, private LL::PaddedLock<concurrent>  {
   std::deque<T> wl;
 
-  using PaddedLock<concurrent>::lock;
-  using PaddedLock<concurrent>::try_lock;
-  using PaddedLock<concurrent>::unlock;
+  using LL::PaddedLock<concurrent>::lock;
+  using LL::PaddedLock<concurrent>::try_lock;
+  using LL::PaddedLock<concurrent>::unlock;
 
 public:
   template<bool newconcurrent>
@@ -191,7 +191,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
   };
 
   std::vector<std::pair<unsigned int, CTy*> > masterLog;
-  PaddedLock<concurrent> masterLock;
+  LL::PaddedLock<concurrent> masterLock;
   unsigned int masterVersion;
 
   Indexer I;

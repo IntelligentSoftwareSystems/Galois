@@ -20,7 +20,7 @@ kind.
 #ifndef _GALOIS_RUNTIME_CONTEXT_H
 #define _GALOIS_RUNTIME_CONTEXT_H
 
-#include "Galois/Runtime/SimpleLock.h"
+#include "Galois/Runtime/ll/PtrLock.h"
 #include "Galois/ConflictFlags.h"
 #include <cassert>
 #include <cstdlib>
@@ -32,7 +32,7 @@ class SimpleRuntimeContext;
 //! All objects that may be locked (nodes primarily) must inherit from Lockable.
 //! Use an intrusive list to track objects in a context without allocation overhead
 class Lockable {
-  PtrLock<SimpleRuntimeContext*, true> Owner;
+  LL::PtrLock<SimpleRuntimeContext*, true> Owner;
   Lockable* next;
   friend class SimpleRuntimeContext;
 public:

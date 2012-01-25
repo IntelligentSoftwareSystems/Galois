@@ -48,7 +48,7 @@ struct FreeNode {
   FreeNode* next;
 };
  
-typedef GaloisRuntime::PtrLock<FreeNode*, true> HeadPtr;
+typedef GaloisRuntime::LL::PtrLock<FreeNode*, true> HeadPtr;
 
 //Number of pages allocated
 static unsigned num = 0;
@@ -59,8 +59,8 @@ static std::map<void*, HeadPtr*> ownerMap;
 #else
 #define DoAllocLock false
 #endif
-static GaloisRuntime::SimpleLock<int,DoAllocLock> allocLock;
-static GaloisRuntime::SimpleLock<int,true> dataLock;
+static GaloisRuntime::LL::SimpleLock<int,DoAllocLock> allocLock;
+static GaloisRuntime::LL::SimpleLock<int,true> dataLock;
 static __thread HeadPtr* head = 0;
 
 void* allocFromOS() {

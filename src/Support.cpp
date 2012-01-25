@@ -20,14 +20,14 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#include "Galois/Runtime/SimpleLock.h"
+#include "Galois/Runtime/ll/SimpleLock.h"
 #include "Galois/Runtime/Support.h"
 #include "llvm/ADT/SmallVector.h"
 #include <map>
 #include <vector>
 #include <cstdio>
 
-static GaloisRuntime::SimpleLock<int, true> lock;
+static GaloisRuntime::LL::SimpleLock<int, true> lock;
 
 namespace {
 class PrintStats {

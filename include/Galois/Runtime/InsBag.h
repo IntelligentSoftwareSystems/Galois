@@ -24,6 +24,7 @@
 #define GALOIS_RUNTIME_INSBAG_H
 
 #include "Galois/Runtime/mem.h" 
+#include "Galois/Runtime/ll/PtrLock.h"
 #include <iterator>
 
 namespace GaloisRuntime {
@@ -38,7 +39,7 @@ class galois_insert_bag {
     T* dlast; //end of storage
   };
 
-  PtrLock<header*, true> realHead;
+  LL::PtrLock<header*, true> realHead;
   GaloisRuntime::PerCPU<header*> heads;
 
   void insHeader(header* h) {

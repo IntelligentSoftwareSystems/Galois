@@ -57,7 +57,7 @@
 
 #include "Galois/ConflictFlags.h"
 #include "Galois/Runtime/Context.h"
-#include "Galois/Runtime/CacheLineStorage.h"
+#include "Galois/Runtime/ll/CacheLineStorage.h"
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/iterator/transform_iterator.hpp>
 #include <map>
@@ -284,7 +284,7 @@ class LC_FileGraph : public FileGraph {
   };
 
   //null if type is void
-  cache_line_storage<gNode>* NodeData;
+  LL::CacheLineStorage<gNode>* NodeData;
 
 public:
   LC_FileGraph() :NodeData(0) {}
@@ -320,8 +320,8 @@ public:
   
   //! Initializes node data for the graph to default values
   void emptyNodeData(NodeTy init = NodeTy()) {
-    NodeData = new cache_line_storage<gNode>[size()];
-    //NodeData = (cache_line_storage<gNode>*)numa_alloc_interleaved(sizeof(cache_line_storage<gNode>)*size());
+    NodeData = new LL::CacheLineStorage<gNode>[size()];
+    //NodeData = (LL::CacheLineStorage<gNode>*)numa_alloc_interleaved(sizeof(LL::CacheLineStorage<gNode>)*size());
     for (uint64_t i = 0; i < size(); ++i)
       NodeData[i].data.data = init;
   }
@@ -356,7 +356,7 @@ class LC_FileGraph<void, EdgeTy> : public FileGraph {
   };
 
   //null if type is void
-  cache_line_storage<gNode>* NodeData;
+  LL::CacheLineStorage<gNode>* NodeData;
 
 public:
   LC_FileGraph() :NodeData(0) {}
@@ -386,7 +386,7 @@ class LC_FileGraph<NodeTy, void>: public FileGraph {
   };
 
   //null if type is void
-  cache_line_storage<gNode>* NodeData;
+  LL::CacheLineStorage<gNode>* NodeData;
 
 public:
   LC_FileGraph() :NodeData(0) {}
@@ -408,7 +408,7 @@ public:
   }
   
   void emptyNodeData(NodeTy init = NodeTy()) {
-    NodeData = new cache_line_storage<gNode>[numNodes];
+    NodeData = new LL::CacheLineStorage<gNode>[numNodes];
     for (uint64_t i = 0; i < numNodes; ++i)
       NodeData[i].data.data = init;
   }

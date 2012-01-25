@@ -20,9 +20,6 @@ kind.
 
 #include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/Termination.h"
-#include "Galois/Runtime/SimpleLock.h"
-
-#include <iostream>
 
 using namespace GaloisRuntime;
 
@@ -44,15 +41,6 @@ void TerminationDetection::reset() {
 void TerminationDetection::localTermination() {
   TokenHolder& th = data.get();
   TokenHolder& thn = data.getNext();
-  //  static SimpleLock<int, true> L;
-  //  L.lock();
-  //  std::cerr << "th " << &th << " thn " << &thn << "\n";
-  //  std::cerr << ThreadPool::getMyID() << "\n";
-  //  for (int i = 0; i < 4; ++i) {
-  //    tokenHolder& T = data.get(i);
-  //    std::cerr << "[" << i << " p " << T.processIsBlack << " t " << T.tokenIsBlack << " h " << T.hasToken << "] ";
-  //  }
-  //  std::cerr << "\n";
   if (th.hasToken) {
     if (data.myEffectiveID() == 0) {
       //master

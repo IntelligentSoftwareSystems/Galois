@@ -21,7 +21,7 @@ kind.
 #define _GALOIS_RUNTIME_PERCPU_H
 
 #include "Threads.h"
-#include "CacheLineStorage.h"
+#include "ll/CacheLineStorage.h"
 
 #include <boost/utility.hpp>
 #include <cassert>
@@ -33,7 +33,7 @@ namespace HIDDEN {
 template<typename T>
 class PERTHING :private boost::noncopyable {
 protected:
-  cache_line_storage<T>* datum;
+  LL::CacheLineStorage<T>* datum;
   unsigned int num;
   ThreadPolicy& P;
 
@@ -43,7 +43,7 @@ protected:
 
   void create(int n) {
     num = n;
-    datum = new cache_line_storage<T>[num];
+    datum = new LL::CacheLineStorage<T>[num];
   }
 
 public:

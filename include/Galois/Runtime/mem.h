@@ -30,7 +30,8 @@
 #ifndef GALOIS_RUNTIME_MM_MEM_H
 #define GALOIS_RUNTIME_MM_MEM_H
 
-#include "Galois/Runtime/SimpleLock.h"
+#include "Galois/Runtime/ll/SimpleLock.h"
+#include "Galois/Runtime/ll/PtrLock.h"
 #include "Galois/Runtime/PerCPU.h"
 #include <boost/utility.hpp>
 #include <memory.h>
@@ -83,7 +84,7 @@ public:
 //! Apply a lock to a heap
 template<class RealHeap>
 class LockedHeap : public RealHeap {
-  SimpleLock<int, true> lock;
+  LL::SimpleLock<int, true> lock;
 public :
   enum { AllocSize = RealHeap::AllocSize };
 
@@ -231,7 +232,7 @@ public:
   }
 
   inline void* allocate(size_t size) {
-    static SimpleLock<int, true> lock;
+    static LL::SimpleLock<int, true> lock;
 
     lock.lock();
     FreeNode* OH = 0;
@@ -498,10 +499,10 @@ public:
   }
 
 private:
-  static PtrLock<SizedAllocatorFactory*, true> instance;
+  static LL::PtrLock<SizedAllocatorFactory*, true> instance;
   typedef std::map<size_t, SizedAlloc*> AllocatorsTy;
   AllocatorsTy allocators;
-  SimpleLock<int, true> lock;
+  LL::SimpleLock<int, true> lock;
   ~SizedAllocatorFactory();
 };
 

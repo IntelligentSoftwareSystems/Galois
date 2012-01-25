@@ -84,8 +84,8 @@ class ForEachWork {
   PerCPU<ThreadLocalData> tdata;
   TerminationDetection term;
   AbortedList aborted;
-  cache_line_storage<volatile long> break_happened; //hit flag
-  cache_line_storage<volatile long> abort_happened; //hit flag
+  LL::CacheLineStorage<volatile long> break_happened; //hit flag
+  LL::CacheLineStorage<volatile long> abort_happened; //hit flag
 
   void finishIteration(bool aborting, value_type val, ThreadLocalData& tld) {
     if (aborting) {

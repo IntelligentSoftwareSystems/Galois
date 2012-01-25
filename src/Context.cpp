@@ -16,11 +16,12 @@ defects in Software and/or Documentation, or loss or inaccuracy of data of any
 kind.
 */
 #include "Galois/Runtime/Context.h"
+#include "Galois/Runtime/ll/SimpleLock.h"
 
 //! Global thread context for each active thread
 static __thread GaloisRuntime::SimpleRuntimeContext* thread_cnx = 0;
 
-static GaloisRuntime::SimpleLock<int, true> ConflictLock;
+static GaloisRuntime::LL::SimpleLock<int, true> ConflictLock;
 
 void GaloisRuntime::clearConflictLock() {
   ConflictLock.unlock();
