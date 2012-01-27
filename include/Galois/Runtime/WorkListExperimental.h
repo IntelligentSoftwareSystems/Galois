@@ -398,7 +398,7 @@ public:
 template<typename T, typename LocalWL, typename DistPolicy>
 class ReductionWL {
 
-  typedef cache_line_storage<LocalWL> paddedLocalWL;
+  typedef LL::CacheLineStorage<LocalWL> paddedLocalWL;
 
   paddedLocalWL* WL;
 
