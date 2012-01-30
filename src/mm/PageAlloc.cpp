@@ -124,9 +124,9 @@ void* GaloisRuntime::MM::pageAlloc() {
 }
 
 void GaloisRuntime::MM::pageFree(void* m) {
-  allocLock.lock();
+  dataLock.lock();
   HeadPtr* phead = ownerMap[m];
-  allocLock.unlock();
+  dataLock.unlock();
   assert(phead);
   phead->lock();
   FreeNode* nh = reinterpret_cast<FreeNode*>(m);
