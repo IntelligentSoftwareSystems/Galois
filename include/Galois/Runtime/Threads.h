@@ -27,11 +27,6 @@
 
 namespace GaloisRuntime {
 
-class ThreadPool;
-
-//!Returns or creates the appropriate thread pool for the system
-ThreadPool& getSystemThreadPool();
-
 struct RunCommand {
   config::function<void (void)> work;
   bool isParallel;
@@ -40,7 +35,6 @@ struct RunCommand {
 
 class ThreadPool {
 protected:
-  static __thread unsigned int LocalThreadID;
   unsigned int activeThreads;
 
 public:
@@ -56,68 +50,10 @@ public:
   //!How many threads will be used
   unsigned int getActiveThreads() const { return activeThreads; }
 
-  //!My thread id (dense, user thread is 0, galois threads 1..num)
-  static unsigned int getMyID() {
-    unsigned int L = ThreadPool::LocalThreadID;
-    if (L == ~0U) {
-      getSystemThreadPool();
-      L = ThreadPool::LocalThreadID;
-    }
-    return L;
-  }
 };
 
-class ThreadPolicy {
-protected:
-  const char* name;
-
-  //number of hw supported threads
-  int numThreads;
-  
-  //number of "real" processors
-  int numCores;
-
-  //number of packages
-  int numPackages;
-
-  //number of threads per core
-  int htRatio;
-
-  //number of threads in each level
-  // it is assumed that (thread id % numCores) / levelSize == bin for that level
-  // this works because threads are densely numbered in this way
-  //commonly this is structured as:
-  // level[0] = non-SMT Threads/core (Each core is it's own thing)
-  // level[1] = non-SMT Threads/L3 (thread to L3 mapping)
-  // NOT YET: level[2] = non-SMT Threads/NUMA Node
-  int levelSize[2];
-
-public:
-  const char* getName() const { return name; }
-
-  //Return the bin for thread thr at level level
-  int indexLevelMap(int level, int thr) const {
-    return (thr % numCores) / levelSize[level];
-  }
-
-  int getNumLevels() const { return 2; }
-
-  int getNumThreads() const { return numThreads; }
-
-  int getNumCores() const { return numCores; }
-
-  int getLevelBins(int level) const { return numCores / levelSize[level]; }
-
-  int isFirstInLevel(int level, int thr) const {
-    return thr % levelSize[level] == 0 &&
-      thr / numCores == 0;
-  }
-
-  virtual void bindThreadToProcessor() = 0;
-};
-
-//Returns or creates the appropriate thread policy for the system
-ThreadPolicy& getSystemThreadPolicy();
+//!Returns or creates the appropriate thread pool for the system
+ThreadPool& getSystemThreadPool();
 
 }
 

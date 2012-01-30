@@ -22,25 +22,9 @@
  */
 #include "Galois/Runtime/Threads.h"
 #include "Galois/Threads.h"
-//#include "Galois/Runtime/Support.h"
-//#include <stdlib.h>
 
 using namespace GaloisRuntime;
-
-//! This, once initialized by a thread, stores an dense index/label for that thread
-__thread unsigned int ThreadPool::LocalThreadID = ~0;
 
 unsigned int Galois::setMaxThreads(unsigned int num) {
   return GaloisRuntime::getSystemThreadPool().setActiveThreads(num);
 }
-
-//Order calls to constructors
-struct Init {
-  Init() {
-    GaloisRuntime::getSystemThreadPolicy();
-    GaloisRuntime::getSystemThreadPool();
-    //GaloisRuntime::reportInfo("Thread Policy", GaloisRuntime::getSystemThreadPolicy().getName());
-  }
-};
-
-static Init iii;

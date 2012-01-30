@@ -30,6 +30,7 @@ kind.
 
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/PerCPU.h"
+#include "Galois/Runtime/Threads.h"
 //#include "Galois/Runtime/QueuingLock.h"
 #include "Galois/Queue.h"
 
@@ -401,7 +402,7 @@ class LocalStealing : private boost::noncopyable {
     std::pair<bool, value_type> ret = local.get().pop();
     if (ret.first)
       return ret;
-    return local.getNext().pop();
+    return local.getNext(getSystemThreadPool().getActiveThreads()).pop();
   }
 };
 WLCOMPILECHECK(LocalStealing);

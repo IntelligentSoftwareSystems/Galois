@@ -308,7 +308,7 @@ class BarrierOBIM : private boost::noncopyable {
       
       pthread_barrier_wait(&barr1);
   
-      if (GaloisRuntime::ThreadPool::getMyID() == 0) {
+      if (GaloisRuntime::LL::getTID() == 0) {
 	//std::cerr << "inc: " << current << "\n";
 	term.reset();
 	if (current <= pushmax)

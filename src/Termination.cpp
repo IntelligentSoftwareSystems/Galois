@@ -19,6 +19,7 @@ kind.
 //Dikstra dual-ring termination algorithm
 
 #include "Galois/Runtime/PerCPU.h"
+#include "Galois/Runtime/Threads.h"
 #include "Galois/Runtime/Termination.h"
 
 using namespace GaloisRuntime;
@@ -40,7 +41,7 @@ void TerminationDetection::reset() {
 
 void TerminationDetection::localTermination() {
   TokenHolder& th = data.get();
-  TokenHolder& thn = data.getNext();
+  TokenHolder& thn = data.getNext(getSystemThreadPool().getActiveThreads());
   if (th.hasToken) {
     if (data.myEffectiveID() == 0) {
       //master

@@ -22,6 +22,8 @@
  */
 
 #include "Galois/Runtime/Threads.h"
+#include "Galois/Runtime/ll/HWTopo.h"
+#include "Galois/Runtime/ll/TID.h"
 
 #include <semaphore.h>
 #include <pthread.h>
@@ -119,14 +121,15 @@ class ThreadPool_pthread : public ThreadPool {
   volatile RunCommand* workEnd; //End iterator for work commands
 
   void initThread() {
-    LocalThreadID = __sync_fetch_and_add(&nextThread, 1);
-    GaloisRuntime::getSystemThreadPolicy().bindThreadToProcessor();
+    int LocalThreadID = GaloisRuntime::LL::getTID();
+    GaloisRuntime::LL::bindThreadToProcessor(LocalThreadID);
   }
 
   void doWork(void) {
     start.acquire();
     RunCommand* workPtr = (RunCommand*)workBegin;
     RunCommand* workEndL = (RunCommand*)workEnd;
+    int LocalThreadID = GaloisRuntime::LL::getTID();
     while (workPtr != workEndL) {
       if (LocalThreadID < activeThreads) {
 	if (workPtr->isParallel)
@@ -157,7 +160,7 @@ public:
   {
     initThread();
     ThreadPool::activeThreads = 1;
-    unsigned int num = GaloisRuntime::getSystemThreadPolicy().getNumThreads();
+    unsigned int num = GaloisRuntime::LL::getMaxThreads();
     finish.reinit(num);
     maxThreads = num;
     for (unsigned i = 1; i < num; ++i) {

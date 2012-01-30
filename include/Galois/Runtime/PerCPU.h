@@ -20,7 +20,8 @@ kind.
 #ifndef _GALOIS_RUNTIME_PERCPU_H
 #define _GALOIS_RUNTIME_PERCPU_H
 
-#include "Threads.h"
+#include "ll/TID.h"
+#include "ll/HWTopo.h"
 #include "ll/CacheLineStorage.h"
 
 #include <boost/utility.hpp>
@@ -30,24 +31,18 @@ kind.
 namespace GaloisRuntime {
 
 namespace HIDDEN {
-template<typename T>
-class PERTHING :private boost::noncopyable {
+template<typename T, typename BASE>
+class PERTHING :private BASE, private boost::noncopyable {
 protected:
   LL::CacheLineStorage<T>* datum;
-  unsigned int num;
-  ThreadPolicy& P;
-
-  int myID() const {
-    return ThreadPool::getMyID();
-  }
-
-  void create(int n) {
-    num = n;
-    datum = new LL::CacheLineStorage<T>[num];
-  }
 
 public:
-  PERTHING() :P(GaloisRuntime::getSystemThreadPolicy()) {
+  PERTHING() {
+    datum = new LL::CacheLineStorage<T>[BASE::getMaxSize()];
+  }
+  explicit PERTHING(const T& v) {
+    datum = new LL::CacheLineStorage<T>[BASE::getMaxSize()];
+    reset(v);
   }
 
   ~PERTHING() {
@@ -55,27 +50,66 @@ public:
   }
 
   void reset(const T& d) {
-    for (unsigned int i = 0; i < num; ++i)
+    for (unsigned int i = 0; i < BASE::getMaxSize(); ++i)
       datum[i].data = d;
   }
 
   T& get(unsigned int i) {
-    assert(i < num);
+    assert(i < BASE::getMaxSize());
     assert(datum);
     return datum[i].data;
   }
   
   const T& get(unsigned int i) const {
-    assert(i < num);
+    assert(i < BASE::getMaxSize());
     assert(datum);
     return datum[i].data;
   }
 
-  unsigned int size() const {
-    return num;
+  T& get() {
+    return get(BASE::myEID());
   }
 
+  const T& get() const {
+    return get(BASE::myEID());
+  }
+
+  T& getNext(unsigned num) {
+    int n = (BASE::myEID() + 1) % num;
+    return get((BASE::myEID() + 1) % num);
+  }
+  
+  const T& getNext(unsigned num) const {
+    return get((BASE::myEID() + 1) % num);
+  }
+
+  unsigned int size() const {
+    return BASE::getMaxSize();
+  }
+
+  unsigned myEffectiveID() const {
+    return BASE::myEID();
+  }
 };
+
+struct H_PERCPU {
+  unsigned myEID() const {
+    return LL::getTID();
+  }
+  unsigned getMaxSize() const {
+    return LL::getMaxThreads();
+  }
+};
+
+struct H_PERPACKAGE {
+  unsigned myEID() const {
+    return LL::getPackageForThread(LL::getTID());
+  }
+  unsigned getMaxSize() const {
+    return LL::getMaxPackages();
+  }
+};
+
 }
 
 //Stores 1 item per thread
@@ -83,103 +117,18 @@ public:
 //Durring Parallel regions the threads index
 //from 0 -> num - 1 (one thread pool thread shares an index with the user thread)
 template<typename T>
-class PerCPU : public HIDDEN::PERTHING<T> {
-  using HIDDEN::PERTHING<T>::create;
-  using HIDDEN::PERTHING<T>::myID;
-  using HIDDEN::PERTHING<T>::P;
-
+class PerCPU : public HIDDEN::PERTHING<T, HIDDEN::H_PERCPU> {
 public:
-  using HIDDEN::PERTHING<T>::reset;
-  PerCPU() :HIDDEN::PERTHING<T>() {
-    create(getSystemThreadPolicy().getNumThreads());
-  }
-  explicit PerCPU(const T& ival) :HIDDEN::PERTHING<T>() {
-    create(getSystemThreadPolicy().getNumThreads());
-    reset(ival);
-  }
-  
-  unsigned int myEffectiveID() const {
-    return myID();
-  }
-  
-  T& get() {
-    return get(myID());
-  }
-
-  const T& get() const {
-    return get(myID());
-  }
-
-  // Duplicate superclass functions because superclass is dependent name and
-  // thus are difficult to access directly, especially by clients of this
-  // class
-  T& get(unsigned i) {
-    return HIDDEN::PERTHING<T>::get(i);
-  }
-
-  const T& get(unsigned i) const {
-    return HIDDEN::PERTHING<T>::get(i);
-  }
-
-  T& getNext() {
-    int n = (myID() + 1) % getSystemThreadPool().getActiveThreads();
-    //std::cerr << myID() << " " << n << "\n";
-    return get(n);
-  }
-
-  const T& getNext() const {
-    return get((myID() + 1) % getSystemThreadPool().getActiveThreads());
-  }
+  PerCPU() :HIDDEN::PERTHING<T, HIDDEN::H_PERCPU>() {}
+  explicit PerCPU(const T& v) :HIDDEN::PERTHING<T, HIDDEN::H_PERCPU>(v) {}
 
 };
 
 template<typename T>
-class PerLevel : public HIDDEN::PERTHING<T> {
-  using HIDDEN::PERTHING<T>::create;
-  using HIDDEN::PERTHING<T>::myID;
-  using HIDDEN::PERTHING<T>::P;
-
-  unsigned int level;
-
+class PerLevel : public HIDDEN::PERTHING<T, HIDDEN::H_PERPACKAGE> {
 public:
-  PerLevel() :HIDDEN::PERTHING<T>() {
-    //last iteresting level (should be package)
-    level = P.getNumLevels() - 1;
-    create(P.getLevelBins(level));
-  }
-  explicit PerLevel(const T& ival) :HIDDEN::PERTHING<T>() {
-    level = P.getNumLevels() - 1;
-    create(P.getLevelBins(level));
-    reset(ival);
-  }
-
-  unsigned int myEffectiveID() const {
-    return P.indexLevelMap(level, myID());
-  }
-
-  T& get() {
-    return get(myEffectiveID());
-  }
-
-  const T& get() const {
-    return get(myEffectiveID());
-  }
-
-  // Duplicate superclass functions because superclass is dependent name and
-  // thus are difficult to access directly, especially by clients of this
-  // class
-  T& get(unsigned i) {
-    return HIDDEN::PERTHING<T>::get(i);
-  }
-
-  const T& get(unsigned i) const {
-    return HIDDEN::PERTHING<T>::get(i);
-  }
-
-  bool isFirstInLevel() const {
-    return P.isFirstInLevel(level, myID());
-  }
-
+  PerLevel() :HIDDEN::PERTHING<T, HIDDEN::H_PERPACKAGE>() {}
+  explicit PerLevel(const T& v) :HIDDEN::PERTHING<T, HIDDEN::H_PERPACKAGE>(v) {}
 };
 
 }

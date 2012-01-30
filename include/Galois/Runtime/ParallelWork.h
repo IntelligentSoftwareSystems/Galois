@@ -216,7 +216,7 @@ struct FillWork {
   }
 
   void operator()(void) {
-    unsigned int id = ThreadPool::getMyID();
+    unsigned int id = LL::getTID();
     T1 b2 = b;
     T1 e2 = b;
     //stay in bounds

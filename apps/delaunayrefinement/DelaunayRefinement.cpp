@@ -42,6 +42,8 @@
 
 #include "llvm/Support/CommandLine.h"
 
+#include "Galois/Runtime/ll/HWTopo.h"
+
 #include "Lonestar/BoilerPlate.h"
 
 namespace cll = llvm::cl;
