@@ -91,7 +91,7 @@ class DESunordered: public DESabstractMain {
 
         if (DEBUG) {
           // DEBUG
-          printf ("%d processing : %s\n", ThreadPool::getMyID (), srcObj->toString ().c_str ());
+          printf ("%d processing : %s\n", GaloisRuntime::LL::getTID (), srcObj->toString ().c_str ());
         }
 
         maxPending.update (srcObj->numPendingEvents ());
@@ -110,7 +110,7 @@ class DESunordered: public DESabstractMain {
             if (onWlFlags[dstObj->getId ()] == 0) {
               if (DEBUG) {
                 // DEBUG
-                printf ("%d Added %d neighbor: %s\n" , ThreadPool::getMyID (), onWlFlags[dstObj->getId ()], dstObj->toString ().c_str ());
+                printf ("%d Added %d neighbor: %s\n" , GaloisRuntime::LL::getTID(), onWlFlags[dstObj->getId ()], dstObj->toString ().c_str ());
               }
               onWlFlags[dstObj->getId ()] = 1;
               lwl.push (dst);
@@ -125,7 +125,7 @@ class DESunordered: public DESabstractMain {
           
           if (DEBUG) {
             //DEBUG
-            printf ("%d Added %d self: %s\n" , ThreadPool::getMyID (), onWlFlags[srcObj->getId ()], srcObj->toString ().c_str ());
+            printf ("%d Added %d self: %s\n" , GaloisRuntime::LL::getTID(), onWlFlags[srcObj->getId ()], srcObj->toString ().c_str ());
           }
 
         }
@@ -133,7 +133,7 @@ class DESunordered: public DESabstractMain {
           onWlFlags[srcObj->getId ()] = 0;
           if (DEBUG) {
             //DEBUG
-            printf ("%d not adding %d self: %s\n" , ThreadPool::getMyID (), onWlFlags[srcObj->getId ()], srcObj->toString ().c_str ());
+            printf ("%d not adding %d self: %s\n" , GaloisRuntime::LL::getTID(), onWlFlags[srcObj->getId ()], srcObj->toString ().c_str ());
           }
         }
 
