@@ -27,6 +27,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "Galois/Galois.h"
 #include "Galois/Runtime/ParaMeter.h"
+#include "Galois/Runtime/ll/gio.h"
 
 //! standard global options to the benchmarks
 static llvm::cl::opt<bool> skipVerify("noverify", llvm::cl::desc("Skip verification step"), llvm::cl::init(false));
@@ -36,6 +37,20 @@ static llvm::cl::opt<bool> useParaMeter("p", llvm::cl::desc("Use ParaMeter to ex
 //! initialize lonestar benchmark
 template<typename OS>
 void LonestarStart(int argc, char** argv, OS& out, const char* app, const char* desc = 0, const char* url = 0) {
+  using namespace GaloisRuntime::LL;
+
+  gPrint("\nLonestar Benchmark Suite v3.0 (C++)\n"
+	 "Copyright (C) 2011 The University of Texas at Austin\n"
+	 "http://iss.ices.utexas.edu/lonestar/\n"
+	 "\n"
+	 "application: %s\n"
+	 "%s%s"
+	 "%s%s%s"
+	 "\n",
+	 app,
+	 desc ? desc : "", desc ? "\n" : "",
+	 url ? "http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/" : "", url ? url : "", url ? "\n" : ""
+	 );
 
   std::ostringstream cmdout;
   for (int i = 0; i < argc; ++i) {
@@ -43,29 +58,14 @@ void LonestarStart(int argc, char** argv, OS& out, const char* app, const char* 
     if (i != argc - 1)
       cmdout << " ";
   }
-  GaloisRuntime::reportInfo("CommandLine", cmdout.str().c_str());
+  gInfo("CommandLine %s", cmdout.str().c_str());
   char name[256];
   gethostname(name, 256);
-  GaloisRuntime::reportInfo("Hostname", name);
-  GaloisRuntime::reportFlush();
+  gInfo("Hostname %s", name);
+  gFlush();
 
   llvm::cl::ParseCommandLineOptions(argc, argv);
-  out << "\nLonestar Benchmark Suite v3.0 (C++)\n"
-      << "Copyright (C) 2011 The University of Texas at Austin\n"
-      << "http://iss.ices.utexas.edu/lonestar/\n"
-      << "\n"
-      << "application: " << app << "\n";
-  if (desc)
-    out << desc << "\n";
-  if (url) {
-    out 
-      << "http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/" 
-      << url << "\n";
-  }
-  out << "\n";
-
   numThreads = Galois::setMaxThreads(numThreads); 
-
   if (useParaMeter) {
     GaloisRuntime::enableParaMeter ();
   }

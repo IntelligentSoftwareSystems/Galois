@@ -32,24 +32,20 @@
 #ifdef __linux__
 
 #include "Galois/Runtime/ll/HWTopo.h"
+#include "Galois/Runtime/ll/gio.h"
 
 #define DEBUG_HWTOPOLINUX 0
 
+#include <stdio.h>
 #include <sched.h>
 #include <errno.h>
-#include <stdio.h>
 #include <string.h>
 #include <assert.h>
 
 #include <vector>
 #include <algorithm>
 
-#if DEBUG_HWTOPOLINUX
-#include <iostream>
-#include <iterator>
-#endif
-
-using namespace GaloisRuntime;
+using namespace GaloisRuntime::LL;
 
 namespace {
 
@@ -65,15 +61,9 @@ static const char* sProcInfo = "/proc/cpuinfo";
 static const char* sCPUSet   = "/proc/self/cpuset";
 
 #if DEBUG_HWTOPOLINUX
-std::ostream& operator<< (std::ostream &o, const cpuinfo &p)
-{
-  o << "(proc " << p.proc
-    << ", physid " << p.physid
-    << ", sib " << p.sib
-    << ", coreid " << p.coreid
-    << ", cpucores " << p.cpucores
-    << ")";
-  return o;
+void printCPUINFO(const cpuinfo& p) {
+  gPrint("(proc %d, physid %d, sib %d, coreid %d, cpucores %d\n",
+	 p.proc, p.physid, p.sib, p.coreid, p.cpucores);
 }
 #endif
 
@@ -87,17 +77,14 @@ static void linuxBindToProcessor(int proc) {
   (void)CPU_SET( proc, &mask );
   
   /* sched_setaffinity returns 0 in success */
-  if( sched_setaffinity( 0, sizeof(mask), &mask ) == -1 ) {
-    perror("Error");
-    //reportWarning("Could not set CPU Affinity for thread", (unsigned)proc);
-    //std::cout << "W: proc: " << proc << "\n";
-  }
+  if( sched_setaffinity( 0, sizeof(mask), &mask ) == -1 )
+    gWarn("Could not set CPU affinity for thread %d (%s)", proc, strerror(errno));
+
   return;
 }
 
 static void openFailed(const char* s) {
-  printf("opening %s failed with %s\n", s, strerror(errno)); //FIXME:gerror
-  abort();
+  gError(true, "opening %s failed with %s\n", s, strerror(errno));
 }
 
 static std::vector<cpuinfo> parseCPUInfo() {
@@ -109,7 +96,6 @@ static std::vector<cpuinfo> parseCPUInfo() {
   FILE* f = fopen(sProcInfo, "r");
   if (!f) {
     openFailed(sProcInfo);
-    assert(0);
     return vals; //Shouldn't get here
   }
 
@@ -177,7 +163,6 @@ std::vector<int> parseCPUSet() {
     free(path2);
     free(path);
     openFailed(path2);
-    assert(0);
     return vals; //Shouldn't get here
   }
 
@@ -239,9 +224,11 @@ struct AutoLinuxPolicy {
 
 #if DEBUG_HWTOPOLINUX
     //DEBUG:
-    std::copy(vals.begin(), vals.end(), std::ostream_iterator<cpuinfo>(std::cout, "\n"));
-    std::copy(virtmap.begin(), virtmap.end(), std::ostream_iterator<int>(std::cout, ", "));
-    std::cout << "\n";
+    for (int i = 0; i < vals.size(); ++i)
+      printCPUINFO(vals[i]);
+    for (int i = 0; i < virtmap.size(); ++i)
+      gPrint("%d, ", virtmap[i]);
+    gPrint("\n");
     //End DEBUG
 #endif
 
@@ -295,15 +282,15 @@ struct AutoLinuxPolicy {
  
 #if DEBUG_HWTOPOLINUX
     //DEBUG: PRINT Stuff
-    printf("Threads: %d, %d (raw)\n", numThreads, numThreadsRaw);
-    printf("Cores: %d, %d (raw)\n", numCores, numCoresRaw);
-    printf("Packages: %d, %d (raw)\n", numPackages, numPackagesRaw);
+    gPrint("Threads: %d, %d (raw)\n", numThreads, numThreadsRaw);
+    gPrint("Cores: %d, %d (raw)\n", numCores, numCoresRaw);
+    gPrint("Packages: %d, %d (raw)\n", numPackages, numPackagesRaw);
 
     for (int i = 0; i < virtmap.size(); ++i) {
-      printf("T %3d P %3d Tr %3d", i, packages[i], virtmap[i]);
+      gPrint("T %3d P %3d Tr %3d", i, packages[i], virtmap[i]);
       if (i >= numCores)
-	printf(" HT");
-      printf("\n");
+	gPrint(" HT");
+      gPrint("\n");
     }
 #endif
   }

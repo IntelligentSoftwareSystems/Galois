@@ -97,18 +97,6 @@ void reportStatAvg(const char* text, unsigned long val, const char* loopname = 0
 //Done with one loop and trigger list summary
 void statDone();
 
-//Report Warnings
-void reportWarning(const char* text);
-void reportWarning(const char* text, unsigned int val);
-void reportWarning(const char* text, unsigned long val);
-void reportWarning(const char* text, const char* val);
-
-//Report Info
-void reportInfo(const char* text);
-void reportInfo(const char* text, unsigned int val);
-void reportInfo(const char* text, unsigned long val);
-void reportInfo(const char* text, const char* val);
-
 void reportFlush();
 }
 

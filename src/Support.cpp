@@ -107,48 +107,6 @@ static void genericReport(bool error, const char* text1,
   lock.unlock();
 }
 
-//Report Warnings
-void GaloisRuntime::reportWarning(const char* text) {
-  genericReport(true, "WARNING:", text, "");
-}
-
-void GaloisRuntime::reportWarning(const char* text, unsigned int val) {
-  char buf[128];
-  snprintf(buf, 128, "%u", val);
-  genericReport(true, "WARNING:", text, buf);
-}
-
-void GaloisRuntime::reportWarning(const char* text, unsigned long val) {
-  char buf[128];
-  snprintf(buf, 128, "%lu", val);
-  genericReport(true, "WARNING:", text, buf);
-}
-
-void GaloisRuntime::reportWarning(const char* text, const char* val) {
-  genericReport(true, "WARNING:", text, val);
-}
-
-//Report Info
-void GaloisRuntime::reportInfo(const char* text) {
-  genericReport(false, "INFO:", text, "");
-}
-
-void GaloisRuntime::reportInfo(const char* text, unsigned int val) {
-  char buf[128];
-  snprintf(buf, 128, "%u", val);
-  genericReport(false, "INFO:", text, buf);
-}
-
-void GaloisRuntime::reportInfo(const char* text, unsigned long val) {
-  char buf[128];
-  snprintf(buf, 128, "%lu", val);
-  genericReport(false, "INFO:", text, buf);
-}
-
-void GaloisRuntime::reportInfo(const char* text, const char* val) {
-  genericReport(false, "INFO:", text, val);
-}
-
 void GaloisRuntime::reportFlush() {
   fflush(stdout);
 }
