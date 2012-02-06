@@ -122,7 +122,7 @@ int main(int argc, char** argv) {
   
   std::cout << "MEMINFO PRE: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
 
-  Galois::preAlloc(5600);
+  Galois::preAlloc(10 * numThreads + GaloisRuntime::MM::pageAllocInfo() * 10);
   std::cout << "MEMINFO MID: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
 
 
