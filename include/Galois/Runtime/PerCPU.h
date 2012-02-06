@@ -75,7 +75,6 @@ public:
   }
 
   T& getNext(unsigned num) {
-    int n = (BASE::myEID() + 1) % num;
     return get((BASE::myEID() + 1) % num);
   }
   
