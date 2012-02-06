@@ -28,7 +28,6 @@ struct checker {
   typename T::template rethread<false>::WL wl3;
 
   checker() {
-    int a[2] = {1,2};
     wl.push(0);
     wl.pushi(3);
     wl.pop();
