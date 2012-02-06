@@ -240,12 +240,15 @@ void for_each_impl(IterTy b, IterTy e, Function f, const char* loopname) {
   w[0].work = config::ref(fw2);
   w[0].isParallel = true;
   w[0].barrierAfter = true;
+  w[0].profile = true;
   w[1].work = config::ref(GW);
   w[1].isParallel = true;
   w[1].barrierAfter = true;
+  w[1].profile = true;
   w[2].work = &runAllLoopExitHandlers;
   w[2].isParallel = false;
   w[2].barrierAfter = true;
+  w[2].profile = true;
   getSystemThreadPool().run(&w[0], &w[3]);
 }
 

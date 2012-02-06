@@ -85,6 +85,7 @@ static inline void preAlloc(int num) {
   w[0].work = GaloisRuntime::config::ref(fw);
   w[0].isParallel = true;
   w[0].barrierAfter = true;
+  w[0].profile = false;
   GaloisRuntime::getSystemThreadPool().run(&w[0], &w[1]);
 }
 

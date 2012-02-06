@@ -110,6 +110,28 @@ public:
   }
 };
 
+#ifdef GALOIS_VTUNE
+class SampleProfiler {
+  bool IsOn;
+public:
+  SampleProfiler() :IsOn(false) {}
+  void startIf(int TID, bool ON) {
+    if (IsOn != ON && TID == 0) {
+      if (ON)
+	__itt_resume();
+      else
+	__itt_pause();
+      IsOn = ON;
+    }
+  }
+};
+#else
+class SampleProfiler {
+public:
+  void startIf(int TID, bool ON) {}
+};
+#endif
+
 class ThreadPool_pthread : public ThreadPool {
   Semaphore start; // Signal to release threads to run
   Barrier finish; // want on to block on running threads
@@ -130,7 +152,9 @@ class ThreadPool_pthread : public ThreadPool {
     RunCommand* workPtr = (RunCommand*)workBegin;
     RunCommand* workEndL = (RunCommand*)workEnd;
     int LocalThreadID = GaloisRuntime::LL::getTID();
+    SampleProfiler VT;
     while (workPtr != workEndL) {
+      VT.startIf(LocalThreadID, workPtr->profile);
       if (LocalThreadID < activeThreads) {
 	if (workPtr->isParallel)
 	  workPtr->work();
@@ -141,6 +165,7 @@ class ThreadPool_pthread : public ThreadPool {
 	finish.wait();
       ++workPtr;
     }
+    VT.startIf(LocalThreadID, false);
   }
 
   void launch(void) {
@@ -185,10 +210,6 @@ public:
   }
 
   virtual void run(RunCommand* begin, RunCommand* end) {
-#ifdef GALOIS_VTUNE
-    __itt_resume();
-#endif
-    
     workBegin = begin;
     workEnd = end;
     __sync_synchronize();
@@ -198,11 +219,6 @@ public:
     doWork();
     //clean up
     workBegin = workEnd = 0;
-
-#ifdef GALOIS_VTUNE
-    __itt_pause();
-#endif
-    
   }
 
   virtual unsigned int setActiveThreads(unsigned int num) {

@@ -31,6 +31,7 @@ struct RunCommand {
   config::function<void (void)> work;
   bool isParallel;
   bool barrierAfter;
+  bool profile;
 };
 
 class ThreadPool {
