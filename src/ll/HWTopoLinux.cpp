@@ -67,7 +67,7 @@ void printCPUINFO(const cpuinfo& p) {
 }
 #endif
 
-static void linuxBindToProcessor(int proc) {
+static bool linuxBindToProcessor(int proc) {
   cpu_set_t mask;
   /* CPU_ZERO initializes all the bits in the mask to zero. */
   CPU_ZERO( &mask );
@@ -77,10 +77,11 @@ static void linuxBindToProcessor(int proc) {
   (void)CPU_SET( proc, &mask );
   
   /* sched_setaffinity returns 0 in success */
-  if( sched_setaffinity( 0, sizeof(mask), &mask ) == -1 )
+  if( sched_setaffinity( 0, sizeof(mask), &mask ) == -1 ) {
     gWarn("Could not set CPU affinity for thread %d (%s)", proc, strerror(errno));
-
-  return;
+    return false;
+  }
+  return true;
 }
 
 static void openFailed(const char* s) {
@@ -218,7 +219,7 @@ struct AutoLinuxPolicy {
 
     if (virtmap.empty()) {
       //1-1 mapping for non-cpuset using systems
-      for (int i = 0; i < vals.size(); ++i)
+      for (int i = 0; i < (int)vals.size(); ++i)
 	virtmap.push_back(i);
     }
 
@@ -239,7 +240,7 @@ struct AutoLinuxPolicy {
     //Get package level stuff
     int maxrawpackage;
     //First get raw info
-    for (int i = 0; i < vals.size(); ++i)
+    for (int i = 0; i < (int)vals.size(); ++i)
       packages.push_back(vals[i].physid);
     maxrawpackage = *std::max_element(packages.begin(), packages.end());
     std::sort(packages.begin(), packages.end());
@@ -247,7 +248,7 @@ struct AutoLinuxPolicy {
     numPackagesRaw = std::distance(packages.begin(), tempi);
     packages.clear();
     //Second get cpuset info
-    for (int i = 0; i < virtmap.size(); ++i)
+    for (int i = 0; i < (int)virtmap.size(); ++i)
       packages.push_back(vals[virtmap[i]].physid);
     std::sort(packages.begin(), packages.end());
     tempi = std::unique(packages.begin(), packages.end());
@@ -257,7 +258,7 @@ struct AutoLinuxPolicy {
     {
       std::vector<int> mapping(maxrawpackage+1);
       int nextval = 1;
-      for (int i = 0; i < virtmap.size(); ++i) {
+      for (int i = 0; i < (int)virtmap.size(); ++i) {
 	int x = vals[virtmap[i]].physid;
 	if (!mapping[x])
 	  mapping[x] = nextval++;
@@ -268,13 +269,13 @@ struct AutoLinuxPolicy {
     //Get core count
     std::vector<std::pair<int, int> > cores;
     //but first get the raw numbers
-    for (int i = 0; i < vals.size(); ++i)
+    for (int i = 0; i < (int)vals.size(); ++i)
       cores.push_back(std::make_pair(vals[i].physid, vals[i].coreid));
     std::sort(cores.begin(), cores.end());
     std::vector<std::pair<int,int> >::iterator core_u = std::unique(cores.begin(), cores.end());
     numCoresRaw = std::distance(cores.begin(), core_u);
     cores.clear();
-    for (int i = 0; i < virtmap.size(); ++i)
+    for (int i = 0; i < (int)virtmap.size(); ++i)
       cores.push_back(std::make_pair(vals[virtmap[i]].physid, vals[virtmap[i]].coreid));
     std::sort(cores.begin(), cores.end());
     core_u = std::unique(cores.begin(), cores.end());
@@ -304,8 +305,8 @@ AutoLinuxPolicy A;
 
 
 bool GaloisRuntime::LL::bindThreadToProcessor(int id) {
-  assert(id < A.virtmap.size());
-  linuxBindToProcessor(A.virtmap[id]);
+  assert(id < (int)A.virtmap.size());
+  return linuxBindToProcessor(A.virtmap[id]);
 }
 
 unsigned GaloisRuntime::LL::getMaxThreads() {
@@ -321,7 +322,7 @@ unsigned GaloisRuntime::LL::getMaxPackages() {
 }
 
 unsigned GaloisRuntime::LL::getPackageForThread(int id) {
-  assert(id < packages.size());
+  assert(id < (int)A.packages.size());
   return A.packages[id];
 }
 
