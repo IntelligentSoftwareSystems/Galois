@@ -43,13 +43,13 @@ public:
   void lock()
   {
     int myplace = __sync_fetch_and_add(&queuelast, 1); // get ticket
-    while (!flags.get(myplace % getSystemThreadPool().getActiveThreads())) {};
+    while (!flags.get(myplace % ThreadPool::getActiveThreads())) {};
     //now in CS
     myplaceL = myplace;
   }
   void unlock() {
-    flags.get(myplaceL % getSystemThreadPool().getActiveThreads()) = 0;
-    flags.get((myplaceL + 1) % getSystemThreadPool().getActiveThreads()) = 1;
+    flags.get(myplaceL % ThreadPool::getActiveThreads()) = 0;
+    flags.get((myplaceL + 1) % ThreadPool::getActiveThreads()) = 1;
   }
 };
 

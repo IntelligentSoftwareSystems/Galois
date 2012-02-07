@@ -36,7 +36,7 @@ struct RunCommand {
 
 class ThreadPool {
 protected:
-  unsigned int activeThreads;
+  static unsigned int activeThreads;
 
 public:
 
@@ -49,7 +49,7 @@ public:
   virtual unsigned int setActiveThreads(unsigned int num) = 0;
 
   //!How many threads will be used
-  unsigned int getActiveThreads() const { return activeThreads; }
+  static unsigned int getActiveThreads() { return activeThreads; }
 
 };
 

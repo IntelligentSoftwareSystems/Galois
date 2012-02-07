@@ -70,7 +70,7 @@ void* GaloisRuntime::MM::largeAlloc(size_t len) {
   void* data = 0;
 #ifdef GALOIS_NUMA
   bitmask* nm = numa_allocate_nodemask();
-  unsigned int num = GaloisRuntime::getSystemThreadPool().getActiveThreads();
+  unsigned int num = GaloisRuntime::ThreadPool::getActiveThreads();
   for (unsigned y = 0; y < num; ++y)
     numa_bitmask_setbit(nm, y/4);
   data = numa_alloc_interleaved_subset(len, nm);

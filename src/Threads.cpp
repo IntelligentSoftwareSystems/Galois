@@ -28,3 +28,5 @@ using namespace GaloisRuntime;
 unsigned int Galois::setMaxThreads(unsigned int num) {
   return GaloisRuntime::getSystemThreadPool().setActiveThreads(num);
 }
+
+unsigned int GaloisRuntime::ThreadPool::activeThreads;

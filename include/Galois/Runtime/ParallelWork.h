@@ -153,7 +153,7 @@ public:
   }
 
   ~ForEachWork() {
-    for (unsigned int i = 0; i < GaloisRuntime::getSystemThreadPool().getActiveThreads(); ++i)
+    for (unsigned int i = 0; i < GaloisRuntime::ThreadPool::getActiveThreads(); ++i)
       tdata.get(i).stat.report_stat(i, loopname);
     GaloisRuntime::statDone();
   }
@@ -210,7 +210,7 @@ struct FillWork {
   unsigned int dist;
   
   FillWork(T1& _b, T1& _e, T2& _g) :b(_b), e(_e), g(_g) {
-    unsigned int a = getSystemThreadPool().getActiveThreads();
+    unsigned int a = ThreadPool::getActiveThreads();
     dist = std::distance(b, e);
     num = (dist + a - 1) / a; //round up
   }

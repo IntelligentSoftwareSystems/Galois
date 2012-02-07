@@ -41,7 +41,7 @@ void TerminationDetection::reset() {
 
 void TerminationDetection::localTermination() {
   TokenHolder& th = data.get();
-  TokenHolder& thn = data.getNext(getSystemThreadPool().getActiveThreads());
+  TokenHolder& thn = data.getNext(ThreadPool::getActiveThreads());
   if (th.hasToken) {
     if (data.myEffectiveID() == 0) {
       //master

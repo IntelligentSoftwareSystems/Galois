@@ -474,7 +474,7 @@ public:
   };
   
   dOrderByIntegerMetric(const Indexer& x = Indexer())
-    :I(x), numActive(getSystemThreadPool().getActiveThreads())
+    :I(x), numActive(ThreadPool::getActiveThreads())
   {
     
   }
