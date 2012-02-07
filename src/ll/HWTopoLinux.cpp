@@ -330,7 +330,7 @@ unsigned GaloisRuntime::LL::getMaxPackages() {
   return A.numPackages;
 }
 
-unsigned GaloisRuntime::LL::getPackageForThread(int id) {
+unsigned GaloisRuntime::LL::getPackageForThreadInternal(int id) {
   assert(id < (int)A.packages.size());
   return A.packages[id];
 }

@@ -42,10 +42,20 @@ namespace LL {
   //get number of packages supported
   unsigned getMaxPackages();
   //map thread to package
-  unsigned getPackageForThread(int galois_thread_id);
+  unsigned getPackageForThreadInternal(int galois_thread_id);
   //find the maximum package number for all threads up to and including id
   unsigned getMaxPackageForThread(int galois_thread_id);
 
+  extern __thread unsigned PACKAGE_ID;
+
+  static unsigned getPackageForThread(int galois_thread_id) {
+    unsigned x = PACKAGE_ID;
+    if (x & 1)
+      return x >> 1;
+    x = getPackageForThreadInternal(galois_thread_id);
+    PACKAGE_ID = (x << 1) | 1;
+    return x;
+  }
 }
 }
 
