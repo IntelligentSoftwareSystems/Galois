@@ -208,6 +208,7 @@ struct AutoLinuxPolicy {
   int numPackages, numPackagesRaw;
 
   std::vector<int> packages;
+  std::vector<int> maxPackage;
   std::vector<int> virtmap;
 
   AutoLinuxPolicy() {
@@ -281,6 +282,14 @@ struct AutoLinuxPolicy {
     core_u = std::unique(cores.begin(), cores.end());
     numCores = std::distance(cores.begin(), core_u);
  
+    //Compute cummulative max package
+    int p = 0;
+    maxPackage.resize(packages.size());
+    for (int i = 0; i < (int)packages.size(); ++i) {
+      p = std::max(packages[i],p);
+      maxPackage[i] = p;
+    }
+
 #if DEBUG_HWTOPOLINUX
     //DEBUG: PRINT Stuff
     gPrint("Threads: %d, %d (raw)\n", numThreads, numThreadsRaw);
@@ -324,6 +333,11 @@ unsigned GaloisRuntime::LL::getMaxPackages() {
 unsigned GaloisRuntime::LL::getPackageForThread(int id) {
   assert(id < (int)A.packages.size());
   return A.packages[id];
+}
+
+unsigned GaloisRuntime::LL::getMaxPackageForThread(int id) {
+  assert(id < (int)A.maxPackage.size());
+  return A.maxPackage[id];
 }
 
 #endif //__linux__

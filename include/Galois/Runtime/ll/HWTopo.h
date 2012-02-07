@@ -43,6 +43,8 @@ namespace LL {
   unsigned getMaxPackages();
   //map thread to package
   unsigned getPackageForThread(int galois_thread_id);
+  //find the maximum package number for all threads up to and including id
+  unsigned getMaxPackageForThread(int galois_thread_id);
 
 }
 }
