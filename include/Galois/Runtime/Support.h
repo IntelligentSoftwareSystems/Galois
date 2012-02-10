@@ -89,14 +89,7 @@ public:
   size_t n() const { return m_n; }
 };
 
-static std::ostream& operator<<(std::ostream& os, const OnlineStatistics& x) {
-  os << "n: " << x.n()
-    << " ave: " << x.mean()
-    << " min: " << x.min()
-    << " max: " << x.max()
-    << " stdev: " << x.sample_variance();
-  return os;
-}
+std::ostream& operator<<(std::ostream& os, const OnlineStatistics& x);
 
 //Report Statistics
 void reportStatSum(const char* text, unsigned long val, const char* loopname = 0);

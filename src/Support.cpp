@@ -82,6 +82,15 @@ public:
 };
 }
 
+std::ostream& operator<<(std::ostream& os, const GaloisRuntime::OnlineStatistics& x) {
+  os << "n: " << x.n()
+    << " ave: " << x.mean()
+    << " min: " << x.min()
+    << " max: " << x.max()
+    << " stdev: " << x.sample_variance();
+  return os;
+}
+
 static PrintStats& getPS() {
   static PrintStats P;
   return P;
@@ -97,14 +106,6 @@ void GaloisRuntime::reportStatAvg(const char* text, unsigned long val, const cha
 
 void GaloisRuntime::statDone() {
   getPS().incIteration();
-}
-
-static void genericReport(bool error, const char* text1,
-    const char* text2, const char* val) {
-  lock.lock();
-  FILE *out = error ? stderr : stdout;
-  fprintf(out, "%s %s %s\n", text1, text2, val);
-  lock.unlock();
 }
 
 void GaloisRuntime::reportFlush() {
