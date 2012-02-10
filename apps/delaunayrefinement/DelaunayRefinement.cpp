@@ -46,6 +46,8 @@
 
 #include "Lonestar/BoilerPlate.h"
 
+#include "Galois/Runtime/WorkListAlt.h"
+
 namespace cll = llvm::cl;
 
 static const char* name = "Delaunay Mesh Refinement";
@@ -129,7 +131,9 @@ int main(int argc, char** argv) {
   Galois::StatTimer T;
   T.start();
   using namespace GaloisRuntime::WorkList;
-  Galois::for_each<LocalQueues<dChunkedLIFO<256>, LIFO<> > >(wl.begin(),wl.end(), process());
+  //  Galois::for_each<LocalQueues<dChunkedLIFO<256>, LIFO<> > >(wl.begin(),wl.end(), process());
+  Galois::for_each< Alt::ChunkedAdaptor<Alt::LevelStealingAlt<Alt::LIFO_SB<> >, 256, true > >(wl.begin(),wl.end(), process());
+
   //Galois::for_each<LocalQueues<dChunkedLIFO<256>, LIFO<> > >(mesh->active_begin(), mesh->active_end(), process(), is_bad(mesh));
   //Galois::for_each<LocalQueues<InitialIterator<std::vector<GNode>::iterator>, LIFO<> > >(wl.begin(), wl.end(), process());
   //Galois::for_each<LocalQueues<InitialIterator<GNode*>, LIFO<> > >(&wl[0], &wl[wl.size()], process());
