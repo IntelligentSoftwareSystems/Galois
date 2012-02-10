@@ -42,6 +42,10 @@ namespace LL {
 template<bool concurrent>
 class PaddedLock;
 
+static inline void LockPairOrdered(PaddedLock<true>& L1, PaddedLock<true>& L2); 
+static inline bool TryLockPairOrdered(PaddedLock<true>& L1, PaddedLock<true>& L2); 
+static inline void UnLockPairOrdered(PaddedLock<true>& L1, PaddedLock<true>& L2);
+
 template<>
 class PaddedLock<true> {
   mutable CacheLineStorage<SimpleLock<int, true> > Lock;
@@ -50,6 +54,9 @@ public:
   void lock() const { Lock.data.lock(); }
   bool try_lock() const { return Lock.data.try_lock(); }
   void unlock() const { Lock.data.unlock(); }
+  friend void LockPairOrdered(PaddedLock<true>& L1, PaddedLock<true>& L2);
+  friend bool TryLockPairOrdered(PaddedLock<true>& L1, PaddedLock<true>& L2);
+  friend void UnLockPairOrdered(PaddedLock<true>& L1, PaddedLock<true>& L2);
 };
 
 template<>
@@ -59,6 +66,22 @@ public:
   bool try_lock() const { return true; }
   void unlock() const {}
 };
+
+static inline void LockPairOrdered(PaddedLock<true>& L1, PaddedLock<true>& L2) {
+  LockPairOrdered(L1.Lock.data, L2.Lock.data);
+}
+static inline bool TryLockPairOrdered(PaddedLock<true>& L1, PaddedLock<true>& L2) {
+  return TryLockPairOrdered(L1.Lock.data, L2.Lock.data);
+}
+static inline void UnLockPairOrdered(PaddedLock<true>& L1, PaddedLock<true>& L2) {
+  UnLockPairOrdered(L1.Lock.data, L2.Lock.data);
+}
+static inline void LockPairOrdered(PaddedLock<false>& L1, PaddedLock<false>& L2) {
+}
+static inline bool TryLockPairOrdered(PaddedLock<false>& L1, PaddedLock<false>& L2) {
+}
+static inline void UnLockPairOrdered(PaddedLock<false>& L1, PaddedLock<false>& L2) {
+}
 
 }
 }
