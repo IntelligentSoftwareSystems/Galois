@@ -31,15 +31,23 @@ namespace Galois {
 /*! A wrapper which performs global conflict detection on the enclosed object.
   This enables arbitrary types to be managed by the Galois runtime. */
 template<typename T>
-class GChecked : public GaloisRuntime::Lockable {
+class GWrapped : public GaloisRuntime::Lockable {
   T val;
 
 public:
-  GChecked(const T& v) :val(v) {}
+  GWrapped(const T& v) :val(v) {}
 
   T& get(Galois::MethodFlag m = ALL) {
     GaloisRuntime::acquire(this, m);
     return val;
+  }
+};
+
+
+struct GChecked : public GaloisRuntime::Lockable {
+  void acquire(Galois::MethodFlag m = ALL) const {
+    // Allow locking of const objects
+    GaloisRuntime::acquire(const_cast<GChecked*>(this), m);
   }
 };
 
