@@ -427,7 +427,9 @@ public:
   }
 
   //! Checks if a node is in the graph (already added)
-  bool containsNode(const GraphNode& n) const {
+  bool containsNode(const GraphNode& n, Galois::MethodFlag mflag = ALL) const {
+    assert(n.ID);
+    acquire(n.ID, mflag);
     return n.ID && (n.Parent == this) && n.ID->active;
   }
 
