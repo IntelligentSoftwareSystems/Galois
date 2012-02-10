@@ -294,14 +294,14 @@ void Triangle<SPD>::computeCenter (std::vector<double>& center) const {
 
 
   // mid points of the sides
-  double xb1 = midpoint (x1, x2);
-  double yb1 = midpoint (y1, y2);
+  double xb1 = midpoint(x1, x2);
+  double yb1 = midpoint(y1, y2);
 
-  double xb2 = midpoint (x2, x3);
-  double yb2 = midpoint (y2, y3);
+  double xb2 = midpoint(x2, x3);
+  double yb2 = midpoint(y2, y3);
 
-  double xb3 = midpoint (x3, x1);
-  double yb3 = midpoint (y3, y1);
+  double xb3 = midpoint(x3, x1);
+  double yb3 = midpoint(y3, y1);
 
   // slopes of all sides
   double m1 = (y2 - y1) / (x2 - x1);
@@ -314,8 +314,7 @@ void Triangle<SPD>::computeCenter (std::vector<double>& center) const {
 
   // check against the third bisector
   if (fabs(x3-x1) > 0) { // checks if m3 == inf
-    double diff = (cx + m3 * cy) - (xb3 + m3 * yb3);
-    assert (fabs (diff) < 1e-9);
+    assert(fabs((cx + m3 * cy) - (xb3 + m3 * yb3)) < 1e-9);
   }
 
   // output the computed values
