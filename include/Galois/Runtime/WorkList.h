@@ -75,13 +75,11 @@ public:
 
   //! pop a value from the queue.
   std::pair<bool, value_type> pop();
-  
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
-
 
 template<typename T = int, bool concurrent = true>
 class LIFO : private boost::noncopyable, private LL::PaddedLock<concurrent> {
@@ -402,7 +400,7 @@ class LocalStealing : private boost::noncopyable {
     std::pair<bool, value_type> ret = local.get().pop();
     if (ret.first)
       return ret;
-    return local.getNext(getSystemThreadPool().getActiveThreads()).pop();
+    return local.getNext(ThreadPool::getActiveThreads()).pop();
   }
 };
 WLCOMPILECHECK(LocalStealing);
@@ -438,10 +436,17 @@ class LevelStealing : private boost::noncopyable {
     std::pair<bool, value_type> ret = local.get().pop();
     if (ret.first)
       return ret;
-    for (unsigned i = 0; i < local.size(); ++i) {
-      ret = local.get(i).pop();
-      if (ret.first)
-	return ret;
+
+    int mp = LL::getMaxPackageForThread(ThreadPool::getActiveThreads() - 1);
+    int id = local.myEffectiveID();
+    for (int i = 0; i < local.size(); ++i) {
+      ++id;
+      id %= local.size();
+      if (id <= mp) {
+	ret = local.get(id).pop();
+	if (ret.first)
+	  return ret;
+      }
     }
     return ret;
   }
@@ -511,6 +516,16 @@ class ChunkedMaster : private boost::noncopyable {
     if (r)
       return r;
     
+    // int mp = LL::getMaxPackageForThread(ThreadPool::getActiveThreads() - 1);
+    // for (int i = 0; i < Q.size(); ++i) {
+    //   ++id;
+    //   id %= Q.size();
+    //   if (id <= mp) {
+    // 	r = popChunkByID(id);
+    // 	if (r)
+    // 	  return r;
+    //   }
+    // }
 
     for (int i = id + 1; i < Q.size(); ++i) {
       r = popChunkByID(i);
@@ -623,7 +638,7 @@ public:
 
   typedef T value_type;
   
-  PartitionedWL(const Partitioner& p = Partitioner()) :P(p), active(getSystemThreadPool().getActiveThreads()) {
+  PartitionedWL(const Partitioner& p = Partitioner()) :P(p), active(ThreadPool::getActiveThreads()) {
     //std::cerr << active << "\n";
   }
 
