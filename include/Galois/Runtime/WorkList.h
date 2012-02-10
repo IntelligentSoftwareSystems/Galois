@@ -511,17 +511,19 @@ class ChunkedMaster : private boost::noncopyable {
     if (r)
       return r;
     
-    for (int i = 0; i < Q.size(); ++i) {
-      ++id;
-      id %= Q.size();
-      r = popChunkByID(id);
-      if (r) {
-	//Chunk* r2 = popChunkByID(id);
-	//if (r2)
-	//pushChunk(r2);
+
+    for (int i = id + 1; i < Q.size(); ++i) {
+      r = popChunkByID(i);
+      if (r) 
 	return r;
-      }
     }
+
+    for (int i = 0; i < id; ++i) {
+      r = popChunkByID(i);
+      if (r)
+	return r;
+    }
+
     return 0;
   }
 
@@ -567,7 +569,7 @@ public:
     if (isStack) {
       if (n.next && (retval = n.next->pop_back()).first)
 	return retval;
-      if(n.next)
+      if (n.next)
 	delChunk(n.next);
       n.next = popChunk();
       if (n.next)
@@ -576,7 +578,7 @@ public:
     } else {
       if (n.cur && (retval = n.cur->pop_front()).first)
 	return retval;
-      if(n.cur)
+      if (n.cur)
 	delChunk(n.cur);
       n.cur = popChunk();
       if (!n.cur) {
