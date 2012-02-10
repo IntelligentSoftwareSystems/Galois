@@ -113,7 +113,7 @@ struct H_PERPACKAGE {
 
 //Stores 1 item per thread
 //The master thread is thread 0
-//Durring Parallel regions the threads index
+//During Parallel regions the threads index
 //from 0 -> num - 1 (one thread pool thread shares an index with the user thread)
 template<typename T>
 class PerCPU : public HIDDEN::PERTHING<T, HIDDEN::H_PERCPU> {
