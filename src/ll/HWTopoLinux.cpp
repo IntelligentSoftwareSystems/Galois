@@ -43,6 +43,7 @@
 #include <assert.h>
 
 #include <vector>
+#include <functional>
 #include <algorithm>
 
 using namespace GaloisRuntime::LL;
@@ -128,6 +129,7 @@ static std::vector<cpuinfo> parseCPUInfo() {
   return vals;
 }
 
+//! Returns physical ids in current cpuset
 std::vector<int> parseCPUSet() {
   std::vector<int> vals;
   vals.reserve(64);
@@ -143,7 +145,10 @@ std::vector<int> parseCPUSet() {
   char* path = (char*)malloc(len);
   path[0] = '/';
   path[1] = '\0';
-  fgets(path, len, f);
+  if (!fgets(path, len, f)) {
+    fclose(f);
+    return vals;
+  }
   fclose(f);
 
   if(char* t = index(path, '\n'))
@@ -169,7 +174,10 @@ std::vector<int> parseCPUSet() {
 
   //reuse path
   char* np = path;
-  fgets(np, len, f);
+  if (!fgets(np, len, f)) {
+    fclose(f);
+    return vals;
+  }
   while (np && strlen(np)) {
     char* c = index(np, ',');  
     if (c) { //slice string at comma (np is old string, c is next string
@@ -211,8 +219,37 @@ struct AutoLinuxPolicy {
   std::vector<int> maxPackage;
   std::vector<int> virtmap;
 
-  AutoLinuxPolicy() {
+  //! Sort in package-dense manner
+  struct DensePackageLessThan: public std::binary_function<int,int,bool> {
+    const std::vector<cpuinfo>& vals;
+    DensePackageLessThan(const std::vector<cpuinfo>& v): vals(v) { }
+    bool operator()(int a, int b) const {
+      if (vals[a].physid < vals[b].physid) {
+        return true;
+      } else if (vals[a].physid == vals[b].physid) {
+        if (vals[a].coreid < vals[b].coreid) {
+          return true;
+        } else if (vals[a].coreid == vals[b].coreid) {
+          return vals[a].proc < vals[b].proc;
+        } else {
+          return false;
+        }
+      } else {
+        return false;
+      }
+    }
+  };
 
+  struct DensePackageEqual: public std::binary_function<int,int,bool> {
+    const std::vector<cpuinfo>& vals;
+    DensePackageEqual(const std::vector<cpuinfo>& v): vals(v) { }
+    bool operator()(int a, int b) const {
+      return vals[a].physid == vals[b].physid && vals[a].coreid == vals[b].coreid;
+    }
+  };
+
+
+  AutoLinuxPolicy() {
     std::vector<cpuinfo> vals = parseCPUInfo();
     virtmap = parseCPUSet();
 
@@ -240,7 +277,7 @@ struct AutoLinuxPolicy {
 
     //Get package level stuff
     int maxrawpackage;
-    //First get raw info
+    //First, get raw info
     for (int i = 0; i < (int)vals.size(); ++i)
       packages.push_back(vals[i].physid);
     maxrawpackage = *std::max_element(packages.begin(), packages.end());
@@ -248,14 +285,34 @@ struct AutoLinuxPolicy {
     tempi = std::unique(packages.begin(), packages.end());
     numPackagesRaw = std::distance(packages.begin(), tempi);
     packages.clear();
-    //Second get cpuset info
+    
+    //Second, get cpuset info
     for (int i = 0; i < (int)virtmap.size(); ++i)
       packages.push_back(vals[virtmap[i]].physid);
     std::sort(packages.begin(), packages.end());
     tempi = std::unique(packages.begin(), packages.end());
     numPackages = std::distance(packages.begin(), tempi);
     packages.clear();
-    //finally renumber for virtual processor numbers
+    
+    //Third, Sort by package to get package-dense mapping
+    std::sort(virtmap.begin(), virtmap.end(), DensePackageLessThan(vals));
+    //Find duplicates, which are hyperthreads, and place them at the end
+    {
+      // annoyingly, values after tempi are unspecified for std::unique, so copy in and out instead
+      std::vector<int> dense(numThreads);
+      tempi = std::unique_copy(virtmap.begin(), virtmap.end(), 
+          dense.begin(), DensePackageEqual(vals));
+      std::vector<bool> mask(numThreadsRaw);
+      for (std::vector<int>::iterator ii = dense.begin(); ii < tempi; ++ii)
+        mask[*ii] = true;
+      for (std::vector<int>::iterator ii = virtmap.begin(), ei = virtmap.end(); ii < ei; ++ii) {
+        if (!mask[*ii])
+          *tempi++ = *ii;
+      }
+      virtmap = dense;
+    }
+
+    //Finally renumber for virtual processor numbers
     {
       std::vector<int> mapping(maxrawpackage+1);
       int nextval = 1;
