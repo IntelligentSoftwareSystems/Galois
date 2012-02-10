@@ -23,7 +23,7 @@ kind.
 #include <cmath>
 #include <algorithm>
 #include <limits>
-
+#include <ostream>
 
 // Hack to get full times out easily
 //#define __HAS_DUMP 1
@@ -60,8 +60,8 @@ public:
 #ifdef __HAS_DUMP
     m_values.push_back(x);
 #endif
-    m_min = std::min(m_min, x);
-    m_max = std::max(m_max, x);
+    m_min = std::min(m_min, static_cast<double>(x));
+    m_max = std::max(m_max, static_cast<double>(x));
     ++m_n;
     double delta = x - m_mean;
     m_mean += delta/m_n;
@@ -88,6 +88,15 @@ public:
   double max() const { return m_max; }
   size_t n() const { return m_n; }
 };
+
+static std::ostream& operator<<(std::ostream& os, const OnlineStatistics& x) {
+  os << "n: " << x.n()
+    << " ave: " << x.mean()
+    << " min: " << x.min()
+    << " max: " << x.max()
+    << " stdev: " << x.sample_variance();
+  return os;
+}
 
 //Report Statistics
 void reportStatSum(const char* text, unsigned long val, const char* loopname = 0);
