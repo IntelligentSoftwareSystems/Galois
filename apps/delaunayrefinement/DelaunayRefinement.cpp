@@ -132,7 +132,8 @@ int main(int argc, char** argv) {
   T.start();
   using namespace GaloisRuntime::WorkList;
   //  Galois::for_each<LocalQueues<dChunkedLIFO<256>, LIFO<> > >(wl.begin(),wl.end(), process());
-  Galois::for_each< Alt::ChunkedAdaptor<Alt::LevelStealingAlt<Alt::LIFO_SB<> >, 256, true > >(wl.begin(),wl.end(), process());
+  //Galois::for_each< Alt::ChunkedAdaptor<Alt::LevelStealingAlt, 256*4> >(wl.begin(),wl.end(), process());
+  Galois::for_each<Alt::ChunkedAdaptor<Alt::InitialQueue<Alt::LevelStealingAlt, Alt::LevelLocalAlt>, 256*4*4> >(wl.begin(),wl.end(), process());
 
   //Galois::for_each<LocalQueues<dChunkedLIFO<256>, LIFO<> > >(mesh->active_begin(), mesh->active_end(), process(), is_bad(mesh));
   //Galois::for_each<LocalQueues<InitialIterator<std::vector<GNode>::iterator>, LIFO<> > >(wl.begin(), wl.end(), process());
