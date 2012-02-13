@@ -24,7 +24,7 @@ static __thread GaloisRuntime::SimpleRuntimeContext* thread_cnx = 0;
 static GaloisRuntime::LL::SimpleLock<int, true> ConflictLock;
 
 void GaloisRuntime::clearConflictLock() {
-  ConflictLock.unlock();
+  //ConflictLock.unlock();
 }
 
 void GaloisRuntime::setThreadContext(GaloisRuntime::SimpleRuntimeContext* n)
@@ -75,7 +75,7 @@ void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
     locks = L;
   } else {
     if (L->Owner.getValue() != this) {
-      ConflictLock.lock();
+      //ConflictLock.lock();
       // SimpleRuntimeContext* other = L->Owner.getValue();
       // int rid = -1;
       // int rb = 0;
