@@ -256,9 +256,7 @@ public:
 
   template <typename Iter>
   bool addInitialWork (Iter b, Iter e) {
-    for (; b != e; ++b)
-      workList.getCurr ().pushi (*b);
-
+    workList.getCurr().push_initial(b,e);
     return true;
   }
 

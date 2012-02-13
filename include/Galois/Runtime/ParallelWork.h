@@ -102,11 +102,13 @@ class ForEachWork {
      }
 
     if (ForeachTraits<FunctionTy>::NeedsPush) {
-      for (typename Galois::UserContext<value_type>::pushBufferTy::iterator
-	     b = tld.facing.__getPushBuffer().begin(),
-	     e = tld.facing.__getPushBuffer().end();
-	   b != e; ++b)
-	global_wl.push(*b);
+      global_wl.push(tld.facing.__getPushBuffer().begin(),
+		     tld.facing.__getPushBuffer().end());
+      // for (typename Galois::UserContext<value_type>::pushBufferTy::iterator
+      // 	     b = tld.facing.__getPushBuffer().begin(),
+      // 	     e = tld.facing.__getPushBuffer().end();
+      // 	   b != e; ++b)
+      // 	global_wl.push(*b);
       tld.facing.__getPushBuffer().clear();
     }
     if (ForeachTraits<FunctionTy>::NeedsPIA)
@@ -160,8 +162,7 @@ public:
 
   template<typename Iter>
   bool AddInitialWork(Iter b, Iter e) {
-    for(; b != e; ++b)
-      global_wl.pushi(*b);
+    global_wl.push_initial(b,e);
     return true;
   }
 

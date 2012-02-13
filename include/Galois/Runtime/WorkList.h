@@ -574,8 +574,16 @@ public:
     return worked;
   }
 
-  bool pushi(value_type val) {
-    return push(val);
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    while (b != e)
+      push(*b++);
+  }
+
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    while (b != e)
+      push(*b++);
   }
 
   std::pair<bool, value_type> pop()  {

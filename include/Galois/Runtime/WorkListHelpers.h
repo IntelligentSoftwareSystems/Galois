@@ -122,6 +122,20 @@ public:
     return true;
   }
 
+  template<typename Iter>
+  Iter push_back(Iter b, Iter e) {
+    lock();
+    assertSE();
+    while (!_i_full() && b != e) {
+      data[end] = *b++;
+      ++end;
+      end %= chunksize();
+    }
+    assertSE();
+    unlock();
+    return b;
+  }
+
   std::pair<bool, value_type> pop_front() {
     lock();
     assertSE();
