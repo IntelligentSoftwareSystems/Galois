@@ -6,240 +6,263 @@ namespace GaloisRuntime {
 namespace WorkList {
 namespace Alt {
 
-template<typename T = int, bool concurrent = true>
-class LIFO_SB : private boost::noncopyable, private LL::PaddedLock<concurrent> {
-  std::deque<T> wl;
-  LL::CacheLineStorage<int> size;
-  std::vector<T> holder; //put this here to avoid reallocations
+class ChunkHeader {
+public:
+  ChunkHeader* next;
+  ChunkHeader() :next(0) {}
+};
 
-  using LL::PaddedLock<concurrent>::lock;
-  using LL::PaddedLock<concurrent>::try_lock;
-  using LL::PaddedLock<concurrent>::unlock;
+template<typename T, int chunksize>
+class Chunk : public ChunkHeader {
+  T data[chunksize];
+  int num;
+public:
+  Chunk() :num(0) {}
+  std::pair<bool, T> pop() {
+    if (num)
+      return std::make_pair(true, data[--num]);
+    else
+      return std::make_pair(false, T());
+  }
+  bool push(T val) {
+    if (num < chunksize) {
+      data[num++] = val;
+      return true;
+    }
+    return false;
+  }
+  template<typename Iter>
+  Iter push(Iter b, Iter e) {
+    while (b != e && num < chunksize)
+      data[num++] = *b++;
+    return b;
+  }
+  bool empty() const { 
+    return num == 0;
+  }
+  bool full() const {
+    return num == chunksize;
+  }
+};
+
+class LIFO_SB : private boost::noncopyable {
+  LL::PtrLock<ChunkHeader*, true> head;
 
 public:
-  template<bool newconcurrent>
-  struct rethread {
-    typedef LIFO_SB<T, newconcurrent> WL;
-  };
-  template<typename Tnew>
-  struct retype {
-    typedef LIFO_SB<Tnew, concurrent> WL;
-  };
 
-  typedef T value_type;
-
-  bool push(value_type val) {
-    lock();
-    __sync_fetch_and_add(&size.data, 1);
-    wl.push_back(val);
-    unlock();
-    return true;
+  bool empty() const {
+    return !head.getValue();
   }
 
-  bool pushi(value_type val)  {
-    return push(val);
+  void push(ChunkHeader* val) {
+    ChunkHeader* oldhead = 0;
+    do {
+      oldhead = head.getValue();
+      val->next = oldhead;
+    } while (!head.CAS(oldhead, val));
   }
 
-  std::pair<bool, value_type> pop()  {
-    if (!size.data)
-      return std::make_pair(false, value_type());
-    lock();
-    if (wl.empty()) {
-      unlock();
-      return std::make_pair(false, value_type());
-    } else {
-      __sync_fetch_and_sub(&size.data, 1);
-      value_type retval = wl.back();
-      wl.pop_back();
-      unlock();
-      return std::make_pair(true, retval);
+  void pushi(ChunkHeader* val) {
+    push(val);
+  }
+
+  ChunkHeader* pop() {
+    //lock free Fast path (empty)
+    if (empty()) return 0;
+    
+    //Disable CAS
+    head.lock();
+    ChunkHeader* C = head.getValue();
+    if (!C) {
+      head.unlock();
+      return 0;
     }
+    head.unlock_and_set(C->next);
+    C->next = 0;
+    return C;
   }
 
-  std::pair<bool,value_type> steal(LIFO_SB& victim) {
-    std::pair<bool, value_type> retval(false, value_type());
-    if (size.data)
-      return pop();
-    if (!victim.size.data)
-      return retval;
-    if (&victim == this)
-      return retval;
-    if (!LL::TryLockPairOrdered(*this, victim))
-      return retval;
-    if (victim.wl.empty()) {
-      LL::UnLockPairOrdered(*this, victim);
-      return std::make_pair(false, value_type());
-    } else {
-      int num = (victim.wl.size() + 1) / 2;
-      __sync_fetch_and_sub(&victim.size.data, num);
-      holder.reserve(num);
-      for (int i = 0; i < num; ++i) {
-	holder.push_back(victim.wl.front());
-	victim.wl.pop_front();
-      }
-      __sync_fetch_and_add(&size.data, num - 1);
-      for (int i = 1; i < num; ++i)
-	wl.push_back(holder[i]);
-      retval.first = true;
-      retval.second = holder[0];
-      holder.clear();
-      LL::UnLockPairOrdered(*this, victim);
-      return retval;
+  //returns a chain
+  ChunkHeader* steal(LIFO_SB& victim) {
+    //lock free Fast path (empty)
+    if (victim.empty()) return 0;
+    
+    //Disable CAS
+    if (!victim.head.try_lock())
+      return 0;
+    ChunkHeader* C = victim.head.getValue();
+    if (!C) {
+      victim.head.unlock();
+      return 0;
     }
+    victim.head.unlock_and_set(C->next);
+    C->next = 0;
+    return C;
   }
 };
-WLCOMPILECHECK(LIFO_SB);
 
-template<typename ContainerTy = LIFO_SB<>, typename T = int >
-class LevelStealingAlt : private boost::noncopyable {
-  typedef typename ContainerTy::template rethread<true>::WL LWL;
-
-  PerLevel<LWL> local;
-  //  PerLevel<LL::SimpleLock<int, true> > steallock;
-
- public:
-  template<bool newconcurrent>
-  struct rethread {
-    typedef LevelStealingAlt<ContainerTy, T> WL;
-  };
-  template<typename Tnew>
-  struct retype {
-    typedef LevelStealingAlt<typename ContainerTy::template retype<Tnew>::WL, Tnew> WL;
-  };
-
-  typedef T value_type;
+class LevelLocalAlt : private boost::noncopyable {
+  PerLevel<LIFO_SB> local;
   
-  bool push(value_type val) {
-    return local.get().push(val);
+public:
+  void push(ChunkHeader* val) {
+    local.get().push(val);
   }
 
-  bool pushi(value_type val)  {
-    return push(val);
+  void pushi(ChunkHeader* val) {
+    push(val);
   }
 
-  std::pair<bool, value_type> pop() {
-    LWL& me = local.get();
-    std::pair<bool, value_type> ret = me.pop();
-    if (ret.first)
-      return ret;
-    //    LL::SimpleLock<int, true>& myLock = steallock.get();
-    //    if (myLock.try_lock()) {
-      //no one else on this package stealing
-      int id = local.myEffectiveID();
-      for (int i = 0; i < local.size(); ++i) {
-	++id;
-	id %= local.size();
-	ret = me.steal(local.get(id));
-	if (ret.first)
-	  break;
-      }
-      //      myLock.unlock();
-      return ret;
-      //    }
-    //else
-    //someone else on this package is stealing 
-    //so just do nothing until they are done
-      //    myLock.lock();
-      //    myLock.unlock();
-      //    return pop();
+  ChunkHeader* pop() {
+    return local.get().pop();
   }
 };
-WLCOMPILECHECK(LevelStealingAlt);
+
+class LevelStealingAlt : private boost::noncopyable {
+  PerLevel<LIFO_SB> local;
+  
+public:
+  void push(ChunkHeader* val) {
+    local.get().push(val);
+  }
+
+  void pushi(ChunkHeader* val) {
+    push(val);
+  }
+
+  ChunkHeader* pop() {
+    LIFO_SB& me = local.get();
+
+    ChunkHeader* ret = me.pop();
+    if (ret)
+      return ret;
+    
+    //steal
+    int id = local.myEffectiveID();
+    for (int i = 0; i < local.size(); ++i) {
+      ++id;
+      id %= local.size();
+      ret = me.steal(local.get(id));
+      if (ret)
+	break;
+    }
+      // if (id) {
+      // 	--id;
+      // 	id %= local.size();
+      // 	ret = me.steal(local.get(id));
+      // }
+      //      myLock.unlock();
+    return ret;
+  }
+};
+
+template<typename InitWl, typename RunningWl>
+class InitialQueue : private boost::noncopyable {
+  InitWl global;
+  RunningWl local;
+public:
+  void push(ChunkHeader* val) {
+    local.push(val);
+  }
+
+  void pushi(ChunkHeader* val) {
+    global.pushi(val);
+  }
+
+  ChunkHeader* pop() {
+    ChunkHeader* ret = local.pop();
+    if (ret)
+      return ret;
+    return global.pop();
+  }
+};
 
 
-template<typename gWL = LIFO_SB<>, int chunksize = 64, bool isStack = true, typename T = int>
+template<typename gWL = LIFO_SB, int chunksize = 64, typename T = int>
 class ChunkedAdaptor : private boost::noncopyable {
-  typedef FixedSizeRing<T, chunksize, false> Chunk;
+  typedef Chunk<T, chunksize> ChunkTy;
 
   MM::FixedSizeAllocator heap;
 
-  class p {
-    Chunk* cur;
-    Chunk* next;
-  public:
-    Chunk*& getCur() { return cur; }
-    Chunk*& getNext() { if (isStack) return cur; else return next; }
-    std::pair<bool, T> pop() { 
-      if (isStack)
-	return cur->pop_back(); 
-      else
-	return cur->pop_front();
-    }
-  };
+  PerCPU<ChunkTy*> data;
 
-  PerCPU<p> data;
+  gWL worklist;
 
-  typename gWL::template retype<Chunk*>::WL worklist;
-
-  Chunk* mkChunk() {
-    return new (heap.allocate(sizeof(Chunk))) Chunk();
+  ChunkTy* mkChunk() {
+    return new (heap.allocate(sizeof(ChunkTy))) ChunkTy();
   }
   
-  void delChunk(Chunk* C) {
-    C->~Chunk();
+  void delChunk(ChunkTy* C) {
+    C->~ChunkTy();
     heap.deallocate(C);
   }
 
 public:
   template<typename Tnew>
   struct retype {
-    typedef ChunkedAdaptor<gWL, chunksize, isStack, Tnew> WL;
-  };
-  template<bool newconcurrent>
-  struct rethread {
-    typedef ChunkedAdaptor WL;
+    typedef ChunkedAdaptor<gWL, chunksize, Tnew> WL;
   };
 
   typedef T value_type;
 
-  ChunkedAdaptor() : heap(sizeof(Chunk)) {
-    for (unsigned int i = 0; i  < data.size(); ++i) {
-      p& r = data.get(i);
-      r.getCur() = 0;
-      r.getNext() = 0;
-    }
+  ChunkedAdaptor() : heap(sizeof(ChunkTy)) {
+    for (unsigned int i = 0; i  < data.size(); ++i)
+      data.get(i) = 0;
   }
 
   bool push(value_type val) {
-    p& n = data.get();
+    ChunkTy*& n = data.get();
     //Simple case, space in current chunk
-    if (n.getNext() && n.getNext()->push_back(val))
+    if (n && n->push(val))
       return true;
     //full chunk, push
-    if (n.getNext())
-      worklist.push(n.getNext());
+    if (n)
+      worklist.push(static_cast<ChunkHeader*>(n));
     //get empty chunk;
-    n.getNext() = mkChunk();
+    n = mkChunk();
     //There better be something in the new chunk
-    bool worked = n.getNext()->push_back(val);
-    assert(worked);
-    return worked;
+    n->push(val);
+    return true;
   }
 
-  bool pushi(value_type val)  {
-    return push(val);
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    ChunkTy*& n = data.get();
+    while (b != e) {
+      if (!n)
+	n = mkChunk();
+      b = n->push(b, e);
+      if (b != e) {
+	worklist.push(static_cast<ChunkHeader*>(n));
+	n = 0;
+      }
+    }
+    return true;
+  }
+
+  template<typename Iter>
+  void push_initial(Iter b, Iter e)  {
+    while (b != e) {
+      ChunkTy* n = mkChunk();
+      b = n->push(b,e);
+      worklist.pushi(static_cast<ChunkHeader*>(n));
+    }
   }
 
   std::pair<bool, value_type> pop()  {
-    p& n = data.get();
+    ChunkTy*& n = data.get();
     std::pair<bool, value_type> retval;
     //simple case, things in current chunk
-    if (n.getCur() && (retval = n.pop()).first)
+    if (n && (retval = n->pop()).first)
       return retval;
     //empty chunk, trash it
-    if (n.getCur())
-      delChunk(n.getCur());
+    if (n)
+      delChunk(n);
     //get a new chunk
-    std::pair<bool, Chunk*> t = worklist.pop();
-    if (t.first) {
-      n.getCur() = t.second;
-      assert(t.second);
-      retval = n.pop();
-      //new chunk better have something in it
-      assert(retval.first);
-      return retval;     
+    n = static_cast<ChunkTy*>(worklist.pop());
+    if (n) {
+      return n->pop();
     } else {
-      n.getCur() = 0;
       return std::make_pair(false, value_type());
     }
   }
