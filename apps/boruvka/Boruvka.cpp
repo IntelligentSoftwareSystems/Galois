@@ -29,10 +29,7 @@
 #include "Galois/Graphs/LCGraph.h"
 
 #include "llvm/Support/CommandLine.h"
-
 #include "Lonestar/BoilerPlate.h"
-
-#include "Exp/PriorityScheduling/WorkListTL.h"
 
 #include <string>
 #include <sstream>
@@ -231,9 +228,8 @@ void runBodyParallel() {
 	Galois::StatTimer T;
 
 	T.start();
-	//Galois::for_each<ChunkedFIFO<32> >(graph.active_begin(), graph.active_end(), process());
-	//Galois::for_each<OBIM>(all.begin(), all.end(), process());
-	Exp::StartWorklistExperiment<OBIM, dChunk, Chunk, Indexer, seq_less, seq_gt>()(std::cout, graph.active_begin(), graph.active_end(), process());
+	//Exp::StartWorklistExperiment<OBIM, dChunk, Chunk, Indexer, seq_less, seq_gt>()(std::cout, graph.active_begin(), graph.active_end(), process());
+	Galois::for_each<dChunk>(graph.active_begin(), graph.active_end(), process());
 	T.stop();
 
 	//TODO: use a reduction variable here
