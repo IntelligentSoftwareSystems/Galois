@@ -99,7 +99,7 @@ class ForEachWork {
       tld.facing.__resetBreak();
       //clear push buffer
       tld.facing.__getPushBuffer().clear();
-     }
+    }
 
     if (ForeachTraits<FunctionTy>::NeedsPush) {
       for (typename Galois::UserContext<value_type>::pushBufferTy::iterator
@@ -109,6 +109,7 @@ class ForEachWork {
 	global_wl.push(*b);
       tld.facing.__getPushBuffer().clear();
     }
+    // NB: since push buffer uses PIA, reset after getting push buffer
     if (ForeachTraits<FunctionTy>::NeedsPIA)
       tld.facing.__resetAlloc();
     if (ForeachTraits<FunctionTy>::NeedsBreak)
