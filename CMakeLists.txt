@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 2.6)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 project(Galois)
+set(GALOIS_VERSION_MAJOR "2")
+set(GALOIS_VERSION_MINOR "1")
+set(GALOIS_VERSION_PATCH "3")
+set(GALOIS_COPYRIGHT_YEAR "2012") # Also in COPYRIGHT
 site_name(SITE_NAME)
 
 if(NOT CMAKE_BUILD_TYPE)
@@ -204,7 +208,9 @@ endfunction(app)
 set(LLVM_ENABLE_ASSERTIONS on) # enable assertions in non-release builds
 include(llvm-extras)
 
-include_directories("include")
+configure_file("${PROJECT_SOURCE_DIR}/include/config.h.in" "${PROJECT_BINARY_DIR}/include/config.h")
+include_directories("include" "${PROJECT_BINARY_DIR}/include")
+configure_file("${PROJECT_SOURCE_DIR}/scripts/make_dist.sh.in" "${PROJECT_BINARY_DIR}/scripts/make_dist.sh")
 
 add_subdirectory(lib)
 add_subdirectory(src)
@@ -225,12 +231,11 @@ include(InstallRequiredSystemLibraries)
 set(CPACK_GENERATOR "TGZ")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/COPYRIGHT")
 set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README")
-set(CPACK_PACKAGE_VERSION_MAJOR "2")
-set(CPACK_PACKAGE_VERSION_MINOR "1")
-set(CPACK_PACKAGE_VERSION_PATCH "2")
+set(CPACK_PACKAGE_VERSION_MAJOR ${GALOIS_VERSION_MAJOR})
+set(CPACK_PACKAGE_VERSION_MINOR ${GALOIS_VERSION_MINOR})
+set(CPACK_PACKAGE_VERSION_PATCH ${GALOIS_VERSION_PATCH})
 include(CPack)
 
 ###### Installation ######
-install(DIRECTORY include/ DESTINATION include PATTERN ".svn" EXCLUDE)
-
-execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/scripts ${CMAKE_BINARY_DIR}/scripts)
+install(DIRECTORY include/ DESTINATION include PATTERN ".svn" EXCLUDE PATTERN ".in" EXCLUDE)
+install(DIRECTORY scripts/ DESTINATION scripts PATTERN ".svn" EXCLUDE PATTERN ".in" EXCLUDE)

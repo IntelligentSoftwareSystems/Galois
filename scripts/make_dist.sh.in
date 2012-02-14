@@ -2,7 +2,7 @@
 #
 # Make distribution tarball
 
-NAME="Galois-2.1.3"
+NAME="Galois-@GALOIS_VERSION_MAJOR@.@GALOIS_VERSION_MINOR@.@GALOIS_VERSION_PATCH@"
 
 if [[ ! -e COPYRIGHT ]]; then
   echo "Run this from the root source directory" 1>&2
