@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -23,241 +23,352 @@
  * Delaunay triangulation of points in 2d.
  *
  * @author Xin Sui <xinsui@cs.utexas.edu>
+ * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#include <vector>
-#include <iostream>
-#include <fstream>
-#include <string.h>
-#include <limits>
-#include <unistd.h>
 
-#include "Galois/Statistic.h"
-#include "Galois/Graphs/Graph.h"
+#include "Point.h"
+#include "Cavity.h"
+#include "QuadTree.h"
+#include "Verifier.h"
+
 #include "Galois/Galois.h"
-#include "Tuple.h"
-#include "Element.h"
-
-#include "llvm/Support/CommandLine.h"
+#include "Galois/Statistic.h"
+#include "Galois/UserContext.h"
 
 #include "Lonestar/BoilerPlate.h"
+#include "llvm/Support/CommandLine.h"
+
+#include <boost/iterator/transform_iterator.hpp>
+
+#include <algorithm>
+#include <deque>
+#include <fstream>
+#include <iostream>
+#include <limits>
+#include <vector>
+
+#include <string.h>
+#include <unistd.h>
 
 namespace cll = llvm::cl;
 
 static const char* name = "Delaunay Triangulation";
-static const char* desc = "Produces a Delaunay triangulation from a given a set of points\n";
+static const char* desc = "Produces a Delaunay triangulation for a set of points\n";
 static const char* url = "delaunay_triangulation";
 
-cll::opt<std::string> writeMesh("writemesh", cll::desc("Write the mesh out to files with basename"), cll::value_desc("basename"));
-static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<std::string> doWriteMesh("writemesh", 
+    cll::desc("Write the mesh out to files with basename"),
+    cll::value_desc("basename"));
+static cll::opt<std::string> inputname(cll::Positional, cll::desc("<input file>"), cll::Required);
 
-typedef Galois::Graph::FirstGraph<Element,int,true>            Graph;
-typedef Galois::Graph::FirstGraph<Element,int,true>::GraphNode GNode;
+typedef std::vector<Point> PointList;
 
-#include "Cavity.h"
-#include "Verifier.h"
+Graph* graph;
 
-Graph* Mesh;
+struct GetPointer: public std::unary_function<Point,Point*> {
+  Point* operator()(Point& p) const { return &p; }
+};
 
+//! Our main functor
 struct Process {
   typedef int tt_needs_per_iter_alloc;
+  typedef int tt_does_not_need_parallel_push;
+  typedef Galois::PerIterAllocTy Alloc;
 
-  std::vector<GNode>* m_shadow_wl;
-  int m_prologue_count;
-  const int m_prologue_iterations;
+  QuadTree* tree;
 
-  Process(std::vector<GNode>* wl, int it):
-    m_shadow_wl(wl), m_prologue_count(0), m_prologue_iterations(it) { }
-  Process(): m_shadow_wl(NULL), m_prologue_iterations(0) { }
+  struct ContainsTuple {
+    Tuple tuple;
+    ContainsTuple(const Tuple& t): tuple(t) { }
+    bool operator()(const GNode& n) const {
+      return n.getData(Galois::NONE).inTriangle(tuple);
+    }
+  };
 
-  template<typename Context>
-  void operator()(GNode item, Context& lwl) {
-    if (m_shadow_wl != NULL) {
-      if (m_prologue_count >= m_prologue_iterations) {
-        m_shadow_wl->push_back(item);
-        return;
-      } else {
-        ++m_prologue_count;
-      }
-    } 
+  Process(QuadTree* t): tree(t) { }
 
-    Element& data = item.getData(Galois::ALL); //lock
-
-    if (!Mesh->containsNode(item)) 
-      return;
-  
-    TupleList& tuples = data.getTuples();
-    // Discard duplicate tuples
-    while (!tuples.empty()) {
-      Tuple& t = tuples.back();
-
-      int i;
-      for (i = 0; i < 3; ++i) {
-        if (data.getPoint(i) == t) {
-          tuples.pop_back();
-          break;
-        }
-      }
-      if (i == 3)
-        break;
+  template<typename Alloc>
+  bool findContainingElement(const Point* p, const Alloc& alloc, GNode& node) {
+    Point* result;
+    if (!tree->find(p, result)) {
+      return false;
     }
 
-    if (tuples.empty())
-      return;
+    result->acquire(Galois::CHECK_CONFLICT);
 
-    Cavity cav(Mesh, item, tuples.back(), lwl.getPerIterAlloc());
+    GNode someNode = result->someElement();
+
+    if (someNode == GNode()) {
+      // Not in mesh yet
+      return false;
+    }
+
+    ContainsTuple contains(p->t());
+    Searcher<Alloc> searcher(*graph, alloc);
+    searcher.useMark(p, 0, p->numTries());
+    searcher.findFirst(someNode, contains);
+
+    if (searcher.matches.empty()) {
+      return false;
+    }
+
+    node = searcher.matches.front();
+    return true;
+  }
+
+  //! Parallel operator
+  void operator()(Point* p, Galois::UserContext<Point*>& ctx) {
+    p->acquire();
+    p->nextTry();
+    assert(!p->inMesh());
+
+    GNode node;
+    if (!findContainingElement(p, ctx.getPerIterAlloc(), node)) {
+      // Someone updated an element while we were searching, producing
+      // a semi-consistent state
+      ctx.push(p);
+      return;
+    }
+  
+    assert(node.getData().inTriangle(p->t()));
+    assert(graph->containsNode(node));
+
+    Cavity<Alloc> cav(*graph, ctx.getPerIterAlloc());
+    cav.init(node, p);
     cav.build();
-    
-    Cavity::GNodeVector newNodes(lwl.getPerIterAlloc());
-    cav.update(&newNodes);
-    for (Cavity::GNodeVector::iterator iter = newNodes.begin(); iter != newNodes.end(); ++iter)
-        lwl.push(*iter);
+    cav.update();
+  }
+
+  //! Serial operator
+  void operator()(Point* p) {
+    p->acquire();
+    p->nextTry();
+    assert(!p->inMesh());
+
+    GNode node;
+    if (!findContainingElement(p, std::allocator<char>(), node)) {
+      std::cerr << "Couldn't find triangle containing point\n";
+      abort();
+    }
+  
+    assert(node.getData().inTriangle(p->t()));
+    assert(graph->containsNode(node));
+
+    Cavity<> cav(*graph);
+    cav.init(node, p);
+    cav.build();
+    cav.update();
   }
 };
 
-void read_points(const char* filename, TupleList& tuples) {
-  double x, y, min_x, max_x, min_y, max_y;
-  long numPoints;
+struct ReadPoints {
+  PointList& result;
+  ReadPoints(PointList& r): result(r) { }
 
-  min_x = min_y = std::numeric_limits<double>::max();
-  max_x = max_y = std::numeric_limits<double>::min();
+  void from(const std::string& name) {
+    PointList points;
+    std::ifstream scanner(name.c_str());
+    if (!scanner.good()) {
+      std::cerr << "Couldn't open file: " << name << "\n";
+      abort();
+    }
+    if (name.find(".node") == name.size() - 5) {
+      fromTriangle(scanner, points);
+    } else {
+      fromPointList(scanner, points);
+    }
+    scanner.close();
+    
+    // Improve locality
+    QuadTree t(
+      boost::make_transform_iterator(&points[0], GetPointer()),
+      boost::make_transform_iterator(&points[points.size()], GetPointer()));
+    t.output(std::back_insert_iterator<PointList>(result));
+    //std::copy(points.begin(), points.end(), std::back_insert_iterator<PointList>(result));
 
-  std::ifstream scanner(filename);
-  scanner >> numPoints;
-  tuples.clear();
-
-  int dim;
-  scanner >> dim;
-  assert(dim == 2);
-  int k;
-  scanner >> k; // number of attributes
-  assert(k == 0);
-  scanner >> k; // has boundary markers?
-  assert(k == 0);
-
-  for (long i = 0; i < numPoints; ++i) {
-    scanner >> k; // point id
-    scanner >> x >> y;
-    scanner.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-    if (x < min_x)
-      min_x = x;
-    else if (x > max_x)
-      max_x = x;
-    if (y < min_y)
-      min_y = y;
-    else if (y > max_y)
-      max_y = y;
-    tuples.push_back(Tuple(x, y, i));
+    addBoundaryPoints();
   }
-  scanner.close();
 
-  double width = max_x - min_x;
-  double height = max_y - min_y;
-  double max_length = std::max(width, height);
-  double centerX = min_x + width / 2.0;
-  double centerY = min_y + height / 2.0;
+  void addBoundaryPoints() {
+    double minX, maxX, minY, maxY;
 
-  tuples.push_back(Tuple(centerX, centerY + 3.0 * max_length, numPoints));
-  tuples.push_back(Tuple(centerX - 3.0 * max_length, centerY - 2.0 * max_length, numPoints + 1));
-  tuples.push_back(Tuple(centerX + 3.0 * max_length, centerY - 2.0 * max_length, numPoints + 2));
-}
+    minX = minY = std::numeric_limits<double>::max();
+    maxX = maxY = std::numeric_limits<double>::min();
 
-void write_points(const char* filename, const TupleList& tuples) {
-  std::ofstream out(filename);
+    for (PointList::iterator ii = result.begin(), ei = result.end(); ii != ei; ++ii) {
+      double x = ii->t().x();
+      double y = ii->t().y();
+      if (x < minX)
+        minX = x;
+      else if (x > maxX)
+        maxX = x;
+      if (y < minY)
+        minY = y;
+      else if (y > maxY)
+        maxY = y;
+    }
+
+    size_t size = result.size();
+    double width = maxX - minX;
+    double height = maxY - minY;
+    double maxLength = std::max(width, height);
+    double centerX = minX + width / 2.0;
+    double centerY = minY + height / 2.0;
+    double radius = maxLength * 3.0; // radius of circle that should cover all points
+
+    for (int i = 0; i < 3; ++i) {
+      double dX = radius * cos(2*M_PI*(i/3.0));
+      double dY = radius * sin(2*M_PI*(i/3.0));
+      result.push_back(Point(centerX + dX, centerY + dY, size + i));
+    }
+  }
+
+  void nextLine(std::ifstream& scanner) {
+    scanner.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+  }
+
+  void fromTriangle(std::ifstream& scanner, PointList& points) {
+    double x, y;
+    long numPoints;
+
+    scanner >> numPoints;
+
+    int dim;
+    scanner >> dim;
+    assert(dim == 2);
+    int k;
+    scanner >> k; // number of attributes
+    assert(k == 0);
+    scanner >> k; // has boundary markers?
+
+    for (long id = 0; id < numPoints; ++id) {
+      scanner >> k; // point id
+      scanner >> x >> y;
+      nextLine(scanner);
+      points.push_back(Point(x, y, id));
+    }
+  }
+
+  void fromPointList(std::ifstream& scanner, PointList& points) {
+    double x, y;
+
+    // comment line
+    nextLine(scanner);
+    size_t id = 0;
+    while (!scanner.eof()) {
+      scanner >> x >> y;
+      if (x == 0 && y == 0)
+        break;
+      points.push_back(Point(x, y, id++));
+      x = y = 0;
+      nextLine(scanner);
+    }
+  }
+};
+
+static void writePoints(const std::string& filename, const PointList& points) {
+  std::ofstream out(filename.c_str());
   // <num vertices> <dimension> <num attributes> <has boundary markers>
-  out << tuples.size() << " 2 0 0\n";
+  out << points.size() << " 2 0 0\n";
   //out.setf(std::ios::fixed, std::ios::floatfield);
   out.precision(10);
   long id = 0;
-  for (TupleList::const_iterator it = tuples.begin(), end = tuples.end(); it != end; ++it) {
-    const Tuple &t = *it;
+  for (PointList::const_iterator it = points.begin(), end = points.end(); it != end; ++it) {
+    const Tuple& t = it->t();
     out << id++ << " " << t.x() << " " << t.y() << " 0\n";
   }
 
   out.close();
 }
 
-GNode make_graph(const char* filename) {
-  TupleList tuples;
-  read_points(filename, tuples);
+static void addBoundaryNodes(PointList& points) {
+  size_t last = points.size();
+  Point* p1 = &points[last-1];
+  Point* p2 = &points[last-2];
+  Point* p3 = &points[last-3];
+
+  Element large_triangle(p1, p2, p3);
+  GNode large_node = graph->createNode(large_triangle);
   
-  Tuple t1 = tuples.back();
-  tuples.pop_back();
+  graph->addNode(large_node);
 
-  Tuple t2 = tuples.back();
-  tuples.pop_back();
+  p1->addElement(large_node);
+  p2->addElement(large_node);
+  p3->addElement(large_node);
 
-  Tuple t3 = tuples.back();
-  tuples.pop_back();
-
-  Mesh = new Graph();
-  Element large_triangle(t1, t2, t3);
-  GNode large_node = Mesh->createNode(large_triangle);
-  
-  Mesh->addNode(large_node, Galois::NONE);
-
-  Element border_ele1(t1, t2);
-  Element border_ele2(t2, t3);
-  Element border_ele3(t3, t1);
+  Element border_ele1(p1, p2);
+  Element border_ele2(p2, p3);
+  Element border_ele3(p3, p1);
     
-  GNode border_node1 = Mesh->createNode(border_ele1);
-  GNode border_node2 = Mesh->createNode(border_ele2);
-  GNode border_node3 = Mesh->createNode(border_ele3);
+  GNode border_node1 = graph->createNode(border_ele1);
+  GNode border_node2 = graph->createNode(border_ele2);
+  GNode border_node3 = graph->createNode(border_ele3);
 
-  Mesh->addNode(border_node1, Galois::NONE);
-  Mesh->addNode(border_node2, Galois::NONE);
-  Mesh->addNode(border_node3, Galois::NONE);
+  graph->addNode(border_node1);
+  graph->addNode(border_node2);
+  graph->addNode(border_node3);
 
-  Mesh->addEdge(large_node, border_node1, 0);
-  Mesh->addEdge(large_node, border_node2, 1);
-  Mesh->addEdge(large_node, border_node3, 2);
+  graph->addEdge(large_node, border_node1, 0);
+  graph->addEdge(large_node, border_node2, 1);
+  graph->addEdge(large_node, border_node3, 2);
 
-  Mesh->addEdge(border_node1, large_node, 0);
-  Mesh->addEdge(border_node2, large_node, 0);
-  Mesh->addEdge(border_node3, large_node, 0);
-  
-  large_node.getData().getTuples().swap(tuples);
-
-  return large_node;
+  graph->addEdge(border_node1, large_node, 0);
+  graph->addEdge(border_node2, large_node, 0);
+  graph->addEdge(border_node3, large_node, 0);
 }
 
-void write_mesh(const char* filename) {
-  long num_triangles = 0, num_segments = 0;
-  for (Graph::active_iterator ii = Mesh->active_begin(), ee = Mesh->active_end(); ii != ee; ++ii) {
-    GNode node = *ii;
-    Element& e = node.getData(Galois::NONE);
-    if (e.getBDim()) {
-      num_triangles++;
+static void makeGraph(const std::string& filename, PointList& points) {
+  ReadPoints(points).from(filename);
+
+  graph = new Graph();
+
+  addBoundaryNodes(points);
+}
+
+static void writeMesh(const std::string& filename) {
+  long numTriangles = 0;
+  long numSegments = 0;
+  for (Graph::active_iterator ii = graph->active_begin(), ei = graph->active_end(); ii != ei; ++ii) {
+    Element& e = ii->getData();
+    if (e.boundary()) {
+      numSegments++;
     } else {
-      num_segments++;
+      numTriangles++;
     }
   }
 
-  long tid = 0, sid = 0;
-  std::ofstream eout(std::string(filename).append(".ele").c_str());
-  std::ofstream pout(std::string(filename).append(".poly").c_str());
+  long tid = 0;
+  long sid = 0;
+  std::string elementName(filename);
+  std::string polyName(filename);
+  
+  elementName.append(".ele");
+  polyName.append(".poly");
+
+  std::ofstream eout(elementName.c_str());
+  std::ofstream pout(polyName.c_str());
   // <num triangles> <nodes per triangle> <num attributes>
-  eout << num_triangles << " 3 0\n";
+  eout << numTriangles << " 3 0\n";
   // <num vertices> <dimension> <num attributes> <has boundary markers>
   // ...
   // <num segments> <has boundary markers>
   pout << "0 2 0 0\n";
-  pout << num_segments << " 1\n";
-  for (Graph::active_iterator ii = Mesh->active_begin(), ee = Mesh->active_end(); ii != ee; ++ii) {
-    GNode node = *ii;
-    Element& e = node.getData(Galois::NONE);
-    if (e.getBDim()) {
+  pout << numSegments << " 1\n";
+  for (Graph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+    const Element& e = ii->getData();
+    if (e.boundary()) {
+      // <segment id> <vertex> <vertex> <is boundary>
+      pout << sid << " " << e.getPoint(0)->id() << " " << e.getPoint(1)->id() << " 1\n";
+      sid++;
+    } else {
       // <triangle id> <vertex> <vertex> <vertex> [in ccw order]
-      eout << tid << " " << e.getPoint(0).id() << " ";
+      eout << tid << " " << e.getPoint(0)->id() << " ";
       if (e.clockwise()) {
-        eout << e.getPoint(2).id() << " " << e.getPoint(1).id() << "\n";
+        eout << e.getPoint(2)->id() << " " << e.getPoint(1)->id() << "\n";
       } else {
-        eout << e.getPoint(1).id() << " " << e.getPoint(2).id() << "\n";
+        eout << e.getPoint(1)->id() << " " << e.getPoint(2)->id() << "\n";
       }
       tid++;
-    } else {
-      // <segment id> <vertex> <vertex> <is boundary>
-      pout << sid << " " << e.getPoint(0).id() << " " << e.getPoint(1).id() << " 1\n";
-      sid++;
     }
   }
 
@@ -267,56 +378,81 @@ void write_mesh(const char* filename) {
   pout.close();
 }
 
-bool ends_with(const char* str, const char* end) {
-  size_t slen = strlen(str);
-  size_t elen = strlen(end);
-  if (elen > slen)
-    return false;
-  size_t diff = slen - elen;
-  return strcmp(str + diff, end) == 0;
+static void generateMesh(PointList& points) {
+  size_t end = points.size();
+  size_t eend = end - 3; // end of "real" points
+
+  // Random order is the best algorithmically
+  Galois::StatTimer T("build");
+  T.start();
+  typedef std::vector<Point*> OrderTy;
+  OrderTy order;
+  order.reserve(eend);
+  std::copy(
+      boost::make_transform_iterator(&points[0], GetPointer()),
+      boost::make_transform_iterator(&points[end], GetPointer()),
+      std::back_insert_iterator<OrderTy>(order));
+  // But don't randomize boundary points
+  std::random_shuffle(&order[0], &order[eend]);
+  T.stop();
+
+  size_t prefix = eend - std::min(16UL*numThreads, eend);
+ 
+  Galois::StatTimer T1("serial");
+  T1.start();
+  QuadTree q(&order[eend], &order[end]);
+  std::for_each(&order[prefix], &order[eend], Process(&q));
+  T1.stop();
+
+  const int multiplier = 8;
+  size_t nextStep = multiplier;
+  size_t top = prefix;
+  size_t prevTop = end;
+
+  using namespace GaloisRuntime::WorkList;
+  typedef GaloisRuntime::WorkList::dChunkedLIFO<32> WL;
+
+  do {
+    Galois::StatTimer T("build");
+    T.start();
+    //QuadTree q(&order[top], &order[prevTop]);
+    QuadTree q(&order[top], &order[end]);
+    prevTop = top;
+    top = top > nextStep ? top - nextStep : 0;
+    nextStep = nextStep*multiplier; //std::min(nextStep*multiplier, 1000000UL);
+    T.stop();
+
+    Galois::for_each<WL>(&order[top], &order[prevTop], Process(&q));
+  } while (top > 0);
 }
 
 int main(int argc, char** argv) {
   LonestarStart(argc, argv, std::cout, name, desc, url);
 
-  if (!ends_with(filename.c_str(), ".node")) {
-    std::cout << "must pass .node file, use -help for usage information\n";
-    return 1;
-  }
-
-  GNode initial_triangle = make_graph(filename.c_str());
+  PointList points;
+  makeGraph(inputname, points);
   
-  std::vector<GNode> wl;
-  wl.push_back(initial_triangle);
-  std::cout << "configuration: " << initial_triangle.getData().getTuples().size() << " points\n";
+  std::cout << "configuration: " << points.size() << " points\n";
+
+  std::cout << "MEMINFO PRE: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
+  Galois::preAlloc(1 * numThreads // some per-thread state
+      + 2 * points.size() * sizeof(Element) // mesh is about 2x number of points (for random points)
+      * 32 // include graph node size
+      / (GaloisRuntime::MM::pageSize) // in pages
+      );
+  std::cout << "MEMINFO MID: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
 
   Galois::StatTimer T;
   T.start();
-  const int chunkSize = 1024; // XXX: Set this correctly
-  using namespace GaloisRuntime::WorkList;
-  typedef ChunkedLIFO<chunkSize> WL;
-  if (false) {
-    Galois::StatTimer T1("serial"), T2("parallel");
-    T1.start();
-    Galois::setMaxThreads(1);
-    std::vector<GNode> shadow_wl;
-    int num_prologue_iterations = 1; //numThreads*8; //1024; //std::max<int>(chunkSize*numThreads*4, 512);
-    Galois::for_each(wl.begin(), wl.end(), Process(&shadow_wl, num_prologue_iterations));
-    T1.stop();
-
-    T2.start();
-    Galois::setMaxThreads(numThreads);
-    Galois::for_each<WL>(shadow_wl.begin(), shadow_wl.end(), Process());
-    T2.stop();
-  } else {
-    Galois::for_each<WL>(wl.begin(), wl.end(), Process());
-  }
+  generateMesh(points);
   T.stop();
-  std::cout << "mesh size: " << Mesh->size() << "\n";
+  std::cout << "mesh size: " << graph->size() << "\n";
+
+  std::cout << "MEMINFO POST: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
 
   if (!skipVerify) {
     Verifier verifier;
-    if (!verifier.verify(Mesh)) {
+    if (!verifier.verify(graph)) {
       std::cerr << "Triangulation failed.\n";
       assert(0 && "Triangulation failed");
       abort();
@@ -324,17 +460,17 @@ int main(int argc, char** argv) {
     std::cout << "Triangulation OK\n";
   }
 
-  if (writeMesh.size()) {
-    std::string base = writeMesh;
+  if (doWriteMesh.size()) {
+    std::string base = doWriteMesh;
     std::cout << "Writing " << base << "\n";
-    write_mesh(base.c_str());
+    writeMesh(base.c_str());
 
-    TupleList tuples;
-    read_points(filename.c_str(), tuples);
-    write_points(base.append(".node").c_str(), tuples);
+    PointList points;
+    ReadPoints(points).from(inputname);
+    writePoints(base.append(".node"), points);
   }
 
-  delete Mesh;
+  delete graph;
 
   return 0;
 }

@@ -19,176 +19,156 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  *
  * @author Xin Sui <xinsui@cs.utexas.edu>
+ * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#ifndef CAVITY_H_
-#define CAVITY_H_
+#ifndef CAVITY_H
+#define CAVITY_H
 
-#include "Tuple.h"
-#include "Element.h"
-#include <set>
+#include "Graph.h"
+
 #include <vector>
 
-class Cavity {
-  typedef Galois::PerIterAllocTy::rebind<GNode>::other PerIterGNodeAlloc;
-  typedef std::set<GNode, std::less<GNode>, PerIterGNodeAlloc> GNodeSet;
-  typedef std::deque<GNode, PerIterGNodeAlloc> GNodeDeque;
+//! A cavity which will be retrangulated
+template<typename Alloc=std::allocator<char> >
+class Cavity: private boost::noncopyable {
+  typedef std::vector<GNode, Alloc> GNodeVector;
+  typedef std::vector<std::pair<GNode,int>, Alloc> GNodeIntPairVector;
 
-  Graph* graph;
+  struct InCircumcenter {
+    Tuple tuple;
+    InCircumcenter(const Tuple& t): tuple(t) { }
+    bool operator()(const GNode& n) const {
+      Element& e = n.getData(Galois::NONE);
+      return e.inCircle(tuple);
+    }
+  };
 
-  GNodeSet oldNodes;
-  GNodeSet deletingNodes;
-  GNode node;
-  Tuple tuple;
-  Galois::PerIterAllocTy& _cnx;
+  Searcher<Alloc> searcher;
+  GNodeVector newNodes;
+  GNode center;
+  Point* point;
+  Graph& graph;
+  const Alloc& alloc;
 
-public:
-  typedef std::vector<GNode, PerIterGNodeAlloc> GNodeVector;
-  
- Cavity(Graph* g, GNode& n, Tuple& t, Galois::PerIterAllocTy& cnx):
-   graph(g),
-   oldNodes(std::less<GNode>(), cnx),
-   deletingNodes(std::less<GNode>(), cnx),
-   node(n),
-   tuple(t),
-   _cnx(cnx)
-  {}
+  //! Find triangles that border cavity but are not in the cavity
+  void findOutside(GNodeIntPairVector& outside) {
+    for (typename Searcher<Alloc>::GNodeVector::iterator ii = searcher.inside.begin(),
+        ei = searcher.inside.end(); ii != ei; ++ii) {
 
-  void build() {
-    GNodeDeque frontier(_cnx);
-    //std::vector<GNode> frontier;
-    frontier.push_back(node);
-    while (!frontier.empty()){
-      GNode curr = frontier.back();
-      frontier.pop_back();
-      for (Graph::neighbor_iterator ii = graph->neighbor_begin(curr, Galois::CHECK_CONFLICT),
-          ee = graph->neighbor_end(curr, Galois::CHECK_CONFLICT);
-          ii != ee; ++ii) {
-        GNode neighbor = *ii;
-        Element& neighborElement = neighbor.getData(Galois::CHECK_CONFLICT);
+      for (Graph::neighbor_iterator jj = graph.neighbor_begin(*ii, Galois::NONE),
+          ej = graph.neighbor_end(*ii, Galois::NONE); jj != ej; ++jj) {
 
-        if (!graph->containsNode(neighbor) || neighbor == node || deletingNodes.find(neighbor) != deletingNodes.end()) {
+        // i.e., if (!e.boundary() && e.inCircle(point->t())) 
+        if (std::find(searcher.matches.begin(), searcher.matches.end(), *jj)
+            != searcher.matches.end())
           continue;
-        }
-        if (neighborElement.getBDim() && neighborElement.inCircle(tuple)) {
-          deletingNodes.insert(neighbor);
-          frontier.push_back(neighbor);
-        } else {
-          oldNodes.insert(curr);
-        }
+
+        int index = graph.getEdgeData(*jj, *ii, Galois::NONE);
+        outside.push_back(std::make_pair(*jj, index));
+
+        Element& e = jj->getData(Galois::NONE);
+        Point* p2 = e.getPoint(index);
+        Point* p3 = e.getPoint((index + 1) % 3);
+
+        p2->acquire(Galois::CHECK_CONFLICT);
+        p3->acquire(Galois::CHECK_CONFLICT);
       }
     }
   }
 
-  void update(GNodeVector* newNodes) {
-    Element& nodeData = node.getData(Galois::NONE);
-    nodeData.getTuples().pop_back();
-    //vector<Element, Galois::PerIterMem::ItAllocTy::rebind<Element>::other> newElements;
-    //vector<Element*> newElements;
-    for (GNodeSet::iterator it=oldNodes.begin(); it != oldNodes.end(); it++) {
-      GNode oldNode = *it;
-      for (Graph::neighbor_iterator ii = graph->neighbor_begin(oldNode, Galois::NONE), ee = graph->neighbor_end(oldNode, Galois::NONE); ii != ee; ++ii) {
-	GNode neighbor = *ii;
-	Element& neighborElement = neighbor.getData(Galois::NONE);
-	if (!neighborElement.getBDim() || !neighborElement.inCircle(tuple)) {
-	  // Process neighbor
-	  int index = graph->getEdgeData(neighbor, oldNode, Galois::NONE);
-	  //Element& neighborElement = neighbor.getData(Galois::NONE);
-	  Element e(tuple, neighborElement.getPoint(index), neighborElement.getPoint((index + 1) % 3));
-	  GNode nnode = graph->createNode(e);
-	  graph->addNode(nnode, Galois::NONE);
-	  graph->addEdge(nnode, neighbor, 1, Galois::NONE);
-	  graph->addEdge(neighbor, nnode, index, Galois::NONE);
-	  
-	  newNodes->push_back(nnode);
-	  Element& nnode_data = nnode.getData(Galois::NONE);
-	  //newElements.push_back(&nnode_data);
-	  
-	  Element& oldNodeData = oldNode.getData(Galois::NONE);
-	  TupleList& ntuples = nnode_data.getTuples();
-	  TupleList& tuples = oldNodeData.getTuples();
-	  if (!tuples.empty()) {
-	    TupleList newTuples;
-	    for(TupleList::iterator list_iter = tuples.begin(); list_iter != tuples.end(); ++list_iter) {
-		Tuple t=*list_iter;
-		if (nnode_data.elementContains(t)) {
-		  // nnode_data.addTuple(t);
-		  ntuples.push_back(t);
-		} else {
-		  newTuples.push_back(t);
-		}
-	      }
-	    
-	    tuples.swap(newTuples);
-	  }
-	}
-      }
+  void addElements(GNodeIntPairVector& outside) {
+    GNodeVector newNodes(alloc);
+
+    // Create new nodes
+    for (typename GNodeIntPairVector::iterator ii = outside.begin(),
+        ei = outside.end(); ii != ei; ++ii) {
+      const GNode& n = ii->first;
+      int& index = ii->second;
+
+      Element& e = n.getData(Galois::NONE);
+
+      Point* p2 = e.getPoint(index);
+      Point* p3 = e.getPoint((index + 1) % 3);
+
+      Element newE(point, p2, p3);
+      GNode newNode = graph.createNode(newE);
+
+      point->addElement(newNode);
+      p2->addElement(newNode);
+      p3->addElement(newNode);
+
+      graph.addNode(newNode, Galois::NONE);
+      graph.addEdge(newNode, n, 1, Galois::NONE);
+      graph.addEdge(n, newNode, index, Galois::NONE);
+      
+      newNodes.push_back(newNode);
     }
 
-    for (unsigned i=0; i<newNodes->size(); i++) {
-      GNode n1 = (*newNodes)[i];
-      Element& newNodeData = n1.getData(Galois::NONE);
-      for (unsigned j=i+1; j<newNodes->size(); j++) {
+    // Update new node connectivity
+    for (unsigned i = 0; i < newNodes.size(); ++i) {
+      const GNode& n1 = newNodes[i];
+      const Element& e1 = n1.getData(Galois::NONE);
+      for (unsigned j = i + 1; j < newNodes.size(); ++j) {
 	if (i != j) {
-	  GNode n2 = (*newNodes)[j];;
-	  Element& e = n2.getData(Galois::NONE);
+	  const GNode& n2 = newNodes[j];
+	  const Element& e2 = n2.getData(Galois::NONE);
 	  
 	  bool found = false;
-	  int indexForNewNode = -1;
-	  int indexForNode = -1;
+	  int indexForNewNode;
+	  int indexForNode;
 	  
-	  for (int x=2; x>=1; x--) {
-	    for (int y=2; y>=1; y--) {
-	      if (newNodeData.getPoint(x) == e.getPoint(y)) {
-		indexForNewNode = x & 2, indexForNode = y & 2, found = true;
+	  for (int x = 2; x >= 1; --x) {
+	    for (int y = 2; y >= 1; --y) {
+	      if (e1.getPoint(x) == e2.getPoint(y)) {
+		indexForNewNode = x & 2;
+                indexForNode = y & 2;
+                found = true;
 	      }
 	    }
 	  }
 	  
 	  if (found) {
-	    graph->addEdge(n1, n2, indexForNewNode,	Galois::CHECK_CONFLICT);
-	    graph->addEdge(n2, n1, indexForNode, Galois::CHECK_CONFLICT);
+	    graph.addEdge(n1, n2, indexForNewNode, Galois::NONE);
+	    graph.addEdge(n2, n1, indexForNode, Galois::NONE);
 	  }
 	}
       }
     }
+  }
 
-    deletingNodes.insert(node);
-
-    int size = newNodes->size();
-    for (GNodeSet::iterator iter = deletingNodes.begin();
-	 iter != deletingNodes.end(); ++iter) {
-      GNode dnode = *iter;
-      TupleList& tuples = dnode.getData(Galois::NONE).getTuples();
-
-      for(TupleList::reverse_iterator list_iter = tuples.rbegin(), end = tuples.rend(); list_iter != end; ++list_iter) {
-	  Tuple tup=*list_iter;
-	  for (int i = 0; i < size; i++) {
-	    Element& element = (*newNodes)[i].getData(Galois::NONE);
-	    if ((element.elementContains(tup))) {
-	      element.addTuple(tup);
-	      if (i != 0) {
-		GNode newNode = (*newNodes)[i];
-		(*newNodes)[i] = (*newNodes)[0];
-		(*newNodes)[0] = newNode;
-	      }
-	      break;
-	    }
-	  }
-	}
-
-      Element& nodeData = dnode.getData(Galois::NONE);
-      nodeData.getTuples().clear();
-      graph->removeNode(dnode, Galois::NONE);
+  void removeElements() {
+    for (typename Searcher<Alloc>::GNodeVector::iterator ii = searcher.matches.begin(),
+        ei = searcher.matches.end(); ii != ei; ++ii) {
+      graph.removeNode(*ii, Galois::NONE);
     }
+  }
 
-    for (GNodeVector::iterator iter = newNodes->begin(); iter != newNodes->end(); )
-      {
-        if ((*iter).getData(Galois::NONE).getTuples().empty())
-	  iter = newNodes->erase(iter);
-        else
-	  iter++;
-      }
+public:
+  Cavity(Graph& g, const Alloc& a = Alloc()):
+    searcher(g, a),
+    newNodes(a),
+    graph(g),
+    alloc(a)
+    { }
+
+  void init(const GNode& c, Point* p) {
+    searcher.useMark(p, 1, p->numTries());
+    center = c;
+    point = p;
+  }
+
+  void build() {
+    assert(center.getData().inCircle(point->t()));
+    searcher.findAll(center, InCircumcenter(point->t()));
+    assert(!searcher.inside.empty());
+  }
+
+  void update() {
+    GNodeIntPairVector outside(alloc);
+    findOutside(outside);
+    removeElements();
+    addElements(outside);
   }
 };
 
-#endif /* CAVITY_H_ */
+#endif
