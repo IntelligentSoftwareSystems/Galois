@@ -238,4 +238,5 @@ include(CPack)
 
 ###### Installation ######
 install(DIRECTORY include/ DESTINATION include PATTERN ".svn" EXCLUDE PATTERN ".in" EXCLUDE)
-install(DIRECTORY scripts/ DESTINATION scripts PATTERN ".svn" EXCLUDE PATTERN ".in" EXCLUDE)
+#install(DIRECTORY scripts/ DESTINATION scripts PATTERN ".svn" EXCLUDE PATTERN ".in" EXCLUDE)
+execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/scripts ${CMAKE_BINARY_DIR}/scripts)

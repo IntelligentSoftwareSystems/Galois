@@ -24,5 +24,6 @@
  */
 #ifndef GALOIS_VERSION_H
 #define GALOIS_VERSION_H
-#define GALOIS_VERSION_STRING "2.1.3"
+
+#include "config.h"
 #endif
