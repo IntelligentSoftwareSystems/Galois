@@ -13,8 +13,6 @@ touch "$NAME.tar.gz" # Prevent . from changing during tar
 (svn status | grep '^\?' | sed -e 's/^\? *//'; \
   echo "*.swp"; \
   echo "*~"; \
-  echo "apps/bp"; \
-  echo "apps/linear"; \
-  echo "apps/betweennesscentrality"; \
+  echo "exp"; \
   echo "$NAME.tar.gz") | \
   tar --exclude-from=- --exclude-vcs --transform "s,^\./,$NAME/," -cz -f "$NAME.tar.gz" .
