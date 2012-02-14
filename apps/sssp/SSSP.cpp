@@ -30,7 +30,6 @@
 #include "Galois/Statistic.h"
 #include "Galois/Galois.h"
 #include "Galois/Graphs/LCGraph.h"
-#include "Galois/Runtime/DebugWorkList.h"
 #include "llvm/Support/CommandLine.h"
 
 #include "Lonestar/BoilerPlate.h"
