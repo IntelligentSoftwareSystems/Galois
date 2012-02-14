@@ -225,6 +225,10 @@ public:
     return true;
   }
 
+  bool pushi(value_type val) {
+    return push(val);
+  }
+
   template<typename Iter>
   bool push(Iter b, Iter e) {
     ChunkTy*& n = data.get();
@@ -241,7 +245,7 @@ public:
   }
 
   template<typename Iter>
-  void push_initial(Iter b, Iter e)  {
+  void pushi(Iter b, Iter e)  {
     while (b != e) {
       ChunkTy* n = mkChunk();
       b = n->push(b,e);
