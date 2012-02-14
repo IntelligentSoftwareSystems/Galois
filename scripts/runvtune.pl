@@ -2,24 +2,33 @@
 
 use strict;
 
-print "*** Collect vtune profiles. Run as: run.py -- runvtune.pl output app args*\n";
-
-exit 1 unless ($#ARGV > 1);
-
-shift @ARGV;
-
-my $threads = shift @ARGV;
-my $outfile = shift @ARGV;
-my $num_args = $#ARGV + 1;
+# TODO: check for other common places
 my $vtune = "/opt/intel/vtune_amplifier_xe_2011/bin64/amplxe-cl";
+my $symbol = "/usr/lib/debug/boot/" . `uname -r`;
+chomp($symbol);
+
+die("Run as: runvtune.pl [-t N] output app args*") unless ($#ARGV > 1);
+
+my $threads = 1;
+if (@ARGV[0] == "-t") {
+  shift @ARGV;
+  $threads = shift @ARGV;
+}
+
+my $outfile = shift @ARGV;
 my $cmdline = join(" ", @ARGV) . " -t $threads";
 
 print "*** Executing: " . $cmdline . "\n";
 
-system("rm -r tmp.vtune.r$threads");
+my $rdir = "-result-dir=tmp.vtune.r$threads";
+my $report = "-R hw-events -csv-delimiter tab";
+my $collect = "-analyze-system -collect nehalem_general-exploration -start-paused";
+my $sdir = "-search-dir all=$symbol";
+
+system("rm -rf tmp.vtune.r$threads");
 system("mkdir tmp.vtune.r$threads");
-system("$vtune -collect nehalem_general-exploration -result-dir=tmp.vtune.r$threads -start-paused -- $cmdline");
+system("$vtune $collect $rdir $sdir -- $cmdline");
 system("echo THREADS\t$threads >>$outfile.line.log");
-system("$vtune -R hw-events -r tmp.vtune.r$threads -group-by source-line -csv-delimiter tab >> $outfile.line.log");
+system("$vtune $report $rdir -group-by source-line >> $outfile.line.log");
 system("echo THREADS\t$threads >>$outfile.function.log");
-system("$vtune -R hw-events -r tmp.vtune.r$threads -group-by function -csv-delimiter tab >> $outfile.function.log");
+system("$vtune $report $rdir -group-by function >> $outfile.function.log");
