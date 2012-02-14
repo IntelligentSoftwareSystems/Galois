@@ -23,11 +23,13 @@
 #ifndef LONESTAR_BOILERPLATE_H
 #define LONESTAR_BOILERPLATE_H
 
-#include <sstream>
-#include "llvm/Support/CommandLine.h"
+#include "Galois/Version.h"
 #include "Galois/Galois.h"
 #include "Galois/Runtime/ParaMeter.h"
 #include "Galois/Runtime/ll/gio.h"
+#include "llvm/Support/CommandLine.h"
+
+#include <sstream>
 
 //! standard global options to the benchmarks
 static llvm::cl::opt<bool> skipVerify("noverify", llvm::cl::desc("Skip verification step"), llvm::cl::init(false));
@@ -39,17 +41,17 @@ template<typename OS>
 void LonestarStart(int argc, char** argv, OS& out, const char* app, const char* desc = 0, const char* url = 0) {
   using namespace GaloisRuntime::LL;
 
-  gPrint("\nLonestar Benchmark Suite v3.0 (C++)\n"
-	 "Copyright (C) 2011 The University of Texas at Austin\n"
-	 "http://iss.ices.utexas.edu/lonestar/\n"
+  gPrint("Galois Benchmark Suite v" GALOIS_VERSION_STRING "\n"
+	 "Copyright (C) 2012 The University of Texas at Austin\n"
+	 "http://iss.ices.utexas.edu/galois/\n"
 	 "\n"
 	 "application: %s\n"
+	 "%s"
 	 "%s%s"
-	 "%s%s%s"
 	 "\n",
 	 app,
-	 desc ? desc : "", desc ? "\n" : "",
-	 url ? "http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/" : "", url ? url : "", url ? "\n" : ""
+	 desc ? desc : "",
+	 url ? "http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/" : "", url ? url : ""
 	 );
 
   std::ostringstream cmdout;
@@ -67,7 +69,7 @@ void LonestarStart(int argc, char** argv, OS& out, const char* app, const char* 
   llvm::cl::ParseCommandLineOptions(argc, argv);
   numThreads = Galois::setMaxThreads(numThreads); 
   if (useParaMeter) {
-    GaloisRuntime::enableParaMeter ();
+    GaloisRuntime::enableParaMeter();
   }
 }
 
