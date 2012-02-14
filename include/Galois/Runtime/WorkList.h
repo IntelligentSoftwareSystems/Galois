@@ -439,7 +439,7 @@ class LevelStealing : private boost::noncopyable {
 
     int mp = LL::getMaxPackageForThread(ThreadPool::getActiveThreads() - 1);
     int id = local.myEffectiveID();
-    for (int i = 0; i < local.size(); ++i) {
+    for (int i = 0; i < (int) local.size(); ++i) {
       ++id;
       id %= local.size();
       if (id <= mp) {
@@ -527,7 +527,7 @@ class ChunkedMaster : private boost::noncopyable {
     //   }
     // }
 
-    for (int i = id + 1; i < Q.size(); ++i) {
+    for (int i = id + 1; i < (int) Q.size(); ++i) {
       r = popChunkByID(i);
       if (r) 
 	return r;
