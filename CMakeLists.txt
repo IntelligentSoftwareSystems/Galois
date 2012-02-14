@@ -8,20 +8,18 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Release")
 endif()
 
-###### Options (alternatively pass as options to cmake -DName=Value ######
+###### Options (alternatively pass as options to cmake -DName=Value) ######
 
 #use profiling
 #set(USE_PROFILING ON)
-set(DAI_FOUND off)
-
-# Enable iss specific options; should be OFF in the general release
-if(SITE_NAME MATCHES ".*.ices.utexas.edu")
-  set(USE_ISS ON)
-endif()
 
 #use alternate compiler
 #set(USE_ICC ON)
 #set(USE_CLANG ON)
+
+#Enable iss specific options; should be OFF in the general release
+#use experimental features
+set(USE_EXP ON) 
 
 ###### Optional programs and default paths ######
 
@@ -77,14 +75,15 @@ enable_language(Fortran)
 find_package(LAPACK)
 
 #Boost
-# not needed now but will be needed for newer version of Boost after 1.4X ish
+#not needed now but will be needed for newer version of Boost after 1.4X ish
 set(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0" "1.47" "1.47.0")
-#set(Boost_USE_STATIC_LIBS ON)
 set(Boost_USE_MULTITHREADED OFF) # newer boost builds don't use -mt extension
-#set(BOOST_ROOT /net/faraday/workspace/ddn/local)
-#find_package(Boost 1.34.0 REQUIRED COMPONENTS system serialization graph_parallel mpi)
-#set(BOOST_LIBS system)
-if(SITE_NAME MATCHES "delaunay.*")
+#Other options that can be used with find_package(Boost)
+# set(BOOST_ROOT /path/)
+# set(Boost_USE_STATIC_LIBS ON)
+# find_package(Boost 1.34.0 REQUIRED COMPONENTS system serialization graph_parallel mpi)
+# set(BOOST_LIBS system)
+if(${SITE_NAME} MATCHES "delaunay.*")
   find_package(Boost 1.34.0 COMPONENTS ${BOOST_LIBS})
 else()
   find_package(Boost 1.34.0 COMPONENTS ${BOOST_LIBS} REQUIRED)
@@ -92,35 +91,36 @@ endif()
 include_directories(${Boost_INCLUDE_DIRS})
 set(RT_LINK ${Boost_LIBRARIES} ${RT_LINK})
 
-#find_package(MPI)
-#if(MPI_FOUND)
-#  add_definitions(-DGALOIS_MPI)
-#  include_directories(${MPI_INCLUDE_PATH})
-#  set(RT_LINK ${MPI_LIBRARIES} ${RT_LINK})
-#endif()
+if(USE_EXP)
+  set(VTUNE_INCLUDE "/opt/intel/vtune_amplifier_xe_2011/include")
+  set(VTUNE_LIB "/opt/intel/vtune_amplifier_xe_2011/lib64/libittnotify.a")
+  if(EXISTS ${VTUNE_INCLUDE})
+    add_definitions(-DGALOIS_VTUNE)
+    include_directories(${VTUNE_INCLUDE})
+    set(RT_LINK ${VTUNE_LIB} dl ${RT_LINK})
+  endif()
 
-#vtune
-set(VTUNE_INCLUDE "/opt/intel/vtune_amplifier_xe_2011/include")
-set(VTUNE_LIB "/opt/intel/vtune_amplifier_xe_2011/lib64/libittnotify.a")
-if(EXISTS ${VTUNE_INCLUDE})
-  add_definitions(-DGALOIS_VTUNE)
-  include_directories(${VTUNE_INCLUDE})
-  set(RT_LINK ${VTUNE_LIB} dl ${RT_LINK})
-endif()
+  find_package(OpenMP)
+  if(OPENMP_FOUND)
+    set(RT_LINK -lgomp ${RT_LINK})
+  endif()
 
-#tbb
-find_package(TBB)
-if(TBB_FOUND)
-  add_definitions(-DGALOIS_TBB -DTBB_USE_THREADING_TOOLS=0)
-  include_directories(${TBB_INCLUDE_DIRS})
-  set(RT_LINK ${TBB_LIBRARIES} ${RT_LINK})
-else()
-  # wget http://threadingbuildingblocks.org/uploads/77/173/3.0%20update%208/tbb30_20110704oss_lin.tgz
-  message(STATUS "Could NOT find TBB; have your sourced TBB_INSTALL_DIR/bin/tbbvars.sh?")
-endif()
+  find_package(TBB)
+  if(TBB_FOUND)
+    add_definitions(-DGALOIS_TBB -DTBB_USE_THREADING_TOOLS=0)
+    include_directories(${TBB_INCLUDE_DIRS})
+    set(RT_LINK ${TBB_LIBRARIES} ${RT_LINK})
+  else()
+    # wget http://threadingbuildingblocks.org/uploads/77/173/3.0%20update%208/tbb30_20110704oss_lin.tgz
+    message(STATUS "Could NOT find TBB; have your sourced TBB_INSTALL_DIR/bin/tbbvars.sh?")
+  endif()
 
-if(NOT USE_SOLARIS)
-#  set(RT_LINK hoard ${RT_LINK})
+  find_package(MPI)
+  if(MPI_FOUND)
+    add_definitions(-DGALOIS_MPI)
+    include_directories(${MPI_INCLUDE_PATH})
+    set(RT_LINK ${MPI_LIBRARIES} ${RT_LINK})
+  endif()
 endif()
 
 # c++0x features
@@ -165,12 +165,40 @@ endif()
 add_definitions(-D__STDC_LIMIT_MACROS)
 add_definitions(-D__STDC_CONSTANT_MACROS)
 
-
 ###### Global Functions ######
 function(linkRuntime name) 
   target_link_libraries(${name} ${ARGN})
   target_link_libraries(${name} galois ${RT_LINK})
+  if(USE_EXP)
+    target_link_libraries(${name} galois_exp ${RT_LINK})
+  endif()
 endfunction (linkRuntime)
+
+include(ParseArguments)
+
+function(compileApp name) 
+  if(ARGN)
+    set(Sources ${ARGN})
+  else()
+    file(GLOB Sources *.cpp)
+  endif()
+  add_executable(${name} ${Sources})
+endfunction (compileApp)
+
+function(app name)
+  PARSE_ARGUMENTS(APP "REQUIRES;EXTLIBS" "" ${ARGN})
+
+  foreach(required ${APP_REQUIRES})
+    if(NOT ${${required}})
+      message(WARNING "NOT compiling ${name} (missing: ${required})")
+      return()
+    endif()
+  endforeach()
+
+  compileApp(${name} ${APP_DEFAULT_ARGS})
+  linkRuntime(${name} ${APP_EXTLIBS})
+  install(TARGETS ${name} DESTINATION bin)
+endfunction(app)
 
 ###### Source finding ######
 set(LLVM_ENABLE_ASSERTIONS on) # enable assertions in non-release builds
@@ -184,6 +212,10 @@ add_subdirectory(apps)
 add_subdirectory(tools)
 add_subdirectory(inputs)
 add_subdirectory(test)
+
+if(USE_EXP)
+  add_subdirectory(exp)
+endif()
 
 ###### Documentation ######
 include(UseDoxygen OPTIONAL)
