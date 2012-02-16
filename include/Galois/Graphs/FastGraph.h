@@ -69,12 +69,10 @@
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/InsBag.h"
 
-//#include "Galois/Runtime/MemRegionPool.h"
 #include "llvm/ADT/SmallVector.h"
 
 #include <algorithm>
-#include <deque>
-//#include <iostream>
+#include <map>
 
 using namespace GaloisRuntime;
 
