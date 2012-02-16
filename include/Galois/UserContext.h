@@ -75,9 +75,10 @@ public:
   UserContext()
     :IterationAllocatorBase(), 
      PerIterationAllocator(&IterationAllocatorBase),
-     breakFlag(0),
-     pushBuffer(64)
-  {}
+     breakFlag(0)
+  {
+    pushBuffer.reserve(64);
+  }
 
   //! Signal break in parallel loop
   void breakLoop() {
