@@ -27,7 +27,7 @@
  *   ... // Definition of node data
  * };
  *
- * typedef Galois::Graph::FirstGraph<Node,int,true> Graph;
+ * typedef Galois::Graph::FastGraph<Node,int,true> Graph;
  * 
  * // Create graph
  * Graph g;
@@ -87,13 +87,13 @@ namespace Graph {
 template<typename NTy, typename ETy>
 struct EdgeItem {
   NTy* N;
-  ETy* E;
+  ETy E;
   
-  inline NTy*&       first()        { return N; }
-  inline NTy* const& first()  const { return N; }
-  inline ETy*&       second()       { return E; }
-  inline ETy* const& second() const { return E; }
-  EdgeItem(NTy* n, ETy* e) : N(n), E(e) {}
+  inline NTy*&       first()       { return N; }
+  inline NTy* const& first() const { return N; }
+  inline ETy*       second()       { return &E; }
+  inline ETy* const second() const { return &E; }
+  EdgeItem(NTy* n) : N(n) {}
 };
 
 template<typename NTy>
@@ -102,7 +102,7 @@ struct EdgeItem<NTy, void> {
   inline NTy*&       first()        { return N; }
   inline NTy* const& first()  const { return N; }
   inline void*       second() const { return static_cast<void*>(NULL); }
-  EdgeItem(NTy* n, void* e) : N(n) {}
+  EdgeItem(NTy* n) : N(n) {}
 };
 
 
@@ -114,7 +114,7 @@ struct EdgeItem<NTy, void> {
  * @param Directional true if graph is directed
  */
 template<typename NodeTy, typename EdgeTy, bool Directional>
-class FirstGraph {
+class FastGraph {
   template<typename T>
   struct first_eq {
     T N2;
@@ -147,8 +147,8 @@ class FirstGraph {
       return std::find_if(begin(), end(), first_eq<gNode*>(N));
     }
 
-    iterator createEdge(gNode* N, EdgeTy* D) {
-      return edges.insert(edges.end(), EITy(N,D));
+    iterator createEdge(gNode* N) {
+      return edges.insert(edges.end(), EITy(N));
     }
   };
 
@@ -164,23 +164,6 @@ class FirstGraph {
   NodeListTy nodes;
 
 public:
-  /**
-   * An opaque handle to a graph node.
-   */
-  // class GraphNode { 
-  //   friend class FirstGraph;
-  //   gNode* ID;
-  //   explicit GraphNode(gNode* id) :ID(id) {}
-  // public:
-  //   GraphNode() :ID(0) {}
-  //   ~GraphNode() { if (ID) __sync_fetch_and_sub(&ID->count, 1); }
-
-  //   bool operator!=(const GraphNode& rhs) const { return ID != rhs; }
-  //   bool operator==(const GraphNode& rhs) const { return ID == rhs; }
-  //   bool operator< (const GraphNode& rhs) const { return ID < rhs;  }
-  //   bool operator> (const GraphNode& rhs) const { return ID > rhs;  }
-  // };
-
   typedef gNode* GraphNode;
 
 private:
@@ -245,7 +228,10 @@ public:
 
   //// Edge Handling ////
 
-  //! Adds an edge to graph, replacing existing value if edge already exists
+  //! Adds an edge to graph, replacing existing value if edge already
+  //! exists Ignore the edge data, let the caller use the returned
+  //! iterator to set the value if desired.  This frees us from
+  //! dealing with the void edge data problem in this API
   edge_iterator addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {
     //FIXME: allocate space for edge data
     assert(src);
@@ -254,11 +240,11 @@ public:
     edge_iterator ii = src->find(dst);
     if (ii == src->end()) {
       if (Directional) {
-	ii = src->createEdge(dst, 0);
+	ii = src->createEdge(dst);
       } else {
 	acquire(dst, mflag);
-	dst->createEdge(src, 0);
-	src->createEdge(dst, 0);
+	dst->createEdge(src);
+	ii = src->createEdge(dst);
       }
     }
     return ii;
@@ -352,7 +338,7 @@ public:
     return std::distance (active_begin (), active_end ());
   }
 
-  FirstGraph() {
+  FastGraph() {
     // std::cerr << "NodeSize " << sizeof(gNode) << "\n";
     // std::cerr << "NodeDataSize " << sizeof(NodeTy) << "\n";
     // std::cerr << "NodeEdgesSize " << sizeof(typename gNode::EdgesTy) << "\n";

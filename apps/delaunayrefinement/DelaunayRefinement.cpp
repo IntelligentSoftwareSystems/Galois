@@ -56,8 +56,8 @@ static const char* url = "delaunay_mesh_refinement";
 
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 
-typedef Galois::Graph::FirstGraph<Element,void,false>            Graph;
-typedef Galois::Graph::FirstGraph<Element,void,false>::GraphNode GNode;
+typedef Galois::Graph::FastGraph<Element,void,false>            Graph;
+typedef Galois::Graph::FastGraph<Element,void,false>::GraphNode GNode;
 
 
 #include "Subgraph.h"
