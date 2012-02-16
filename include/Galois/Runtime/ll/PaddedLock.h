@@ -79,6 +79,7 @@ static inline void UnLockPairOrdered(PaddedLock<true>& L1, PaddedLock<true>& L2)
 static inline void LockPairOrdered(PaddedLock<false>& L1, PaddedLock<false>& L2) {
 }
 static inline bool TryLockPairOrdered(PaddedLock<false>& L1, PaddedLock<false>& L2) {
+  return true;
 }
 static inline void UnLockPairOrdered(PaddedLock<false>& L1, PaddedLock<false>& L2) {
 }
