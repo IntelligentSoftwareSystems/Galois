@@ -34,6 +34,7 @@ class FixedSizeRing :private boost::noncopyable, private LL::PaddedLock<concurre
   using LL::PaddedLock<concurrent>::unlock;
   unsigned start;
   unsigned end;
+  //FIXME: This is the last place requiring default constructors in the worklists
   T data[__chunksize + 1];
 
   inline unsigned chunksize() const { return __chunksize + 1; }
@@ -136,34 +137,34 @@ public:
     return b;
   }
 
-  std::pair<bool, value_type> pop_front() {
+  boost::optional<value_type> pop_front() {
     lock();
     assertSE();
     if (_i_empty()) {
       unlock();
-      return std::make_pair(false, value_type());
+      return boost::optional<value_type>();
     }
     value_type retval = data[start];
     ++start;
     start %= chunksize();
     assertSE();
     unlock();
-    return std::make_pair(true, retval);
+    return boost::optional<value_type>(retval);
   }
 
-  std::pair<bool, value_type> pop_back() {
+  boost::optional<value_type> pop_back() {
     lock();
     assertSE();
     if (_i_empty()) {
       unlock();
-      return std::make_pair(false, value_type());
+      return boost::optional<value_type>();
     }
     end += chunksize() - 1;
     end %= chunksize();
     value_type retval = data[end];
     assertSE();
     unlock();
-    return std::make_pair(true, retval);
+    return boost::optional<value_type>(retval);
   }
 };
 

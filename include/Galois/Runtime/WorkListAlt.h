@@ -2,6 +2,8 @@
 #define WLCOMPILECHECK(name) //
 #endif
 
+#include <boost/optional.hpp>
+
 namespace GaloisRuntime {
 namespace WorkList {
 namespace Alt {
@@ -18,11 +20,11 @@ class Chunk : public ChunkHeader {
   int num;
 public:
   Chunk() :num(0) {}
-  std::pair<bool, T> pop() {
+  boost::optional<T> pop() {
     if (num)
-      return std::make_pair(true, data[--num]);
+      return boost::optional<T>(data[--num]);
     else
-      return std::make_pair(false, T());
+      return boost::optional<T>();
   }
   bool push(T val) {
     if (num < chunksize) {
@@ -139,7 +141,7 @@ public:
     
     //steal
     int id = local.myEffectiveID();
-    for (int i = 0; i < local.size(); ++i) {
+    for (unsigned i = 0; i < local.size(); ++i) {
       ++id;
       id %= local.size();
       ret = me.steal(local.get(id));
@@ -249,11 +251,11 @@ public:
     }
   }
 
-  std::pair<bool, value_type> pop()  {
+  boost::optional<value_type> pop()  {
     ChunkTy*& n = data.get();
-    std::pair<bool, value_type> retval;
+    boost::optional<T> retval;
     //simple case, things in current chunk
-    if (n && (retval = n->pop()).first)
+    if (n && (retval = n->pop()))
       return retval;
     //empty chunk, trash it
     if (n)
@@ -263,7 +265,7 @@ public:
     if (n) {
       return n->pop();
     } else {
-      return std::make_pair(false, value_type());
+      return boost::optional<T>();
     }
   }
 };

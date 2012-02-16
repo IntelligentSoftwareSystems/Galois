@@ -138,11 +138,11 @@ class ForEachWork {
     if (!abort_happened.data) return;
     tld.lterm->workHappened();
     abort_happened.data = 0;
-    std::pair<bool, value_type> p = aborted.pop();
-    while (p.first) {
+    boost::optional<value_type> p = aborted.pop();
+    while (p) {
       if (ForeachTraits<FunctionTy>::NeedsBreak && break_happened.data) 
 	return;
-      doProcess(p.second, tld);
+      doProcess(*p, tld);
       p = aborted.pop();
     }
   }
@@ -173,13 +173,13 @@ public:
     tld.lterm = term.getLocalTokenHolder();
 
     do {
-      std::pair<bool, value_type> p = global_wl.pop();
-      if (p.first)
+      boost::optional<value_type> p = global_wl.pop();
+      if (p)
         tld.lterm->workHappened();
-      while (p.first) {
+      while (p) {
         if (ForeachTraits<FunctionTy>::NeedsBreak && break_happened.data)
 	  goto leaveLoop;
-        doProcess(p.second, tld);
+        doProcess(*p, tld);
 	drainAborted<isLeader>(tld);
 	p = global_wl.pop();
       }
