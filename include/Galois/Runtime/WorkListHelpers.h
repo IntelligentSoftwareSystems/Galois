@@ -35,7 +35,14 @@ class FixedSizeRing :private boost::noncopyable, private LL::PaddedLock<concurre
   unsigned start;
   unsigned end;
   //FIXME: This is the last place requiring default constructors in the worklists
-  T data[__chunksize + 1];
+  //T data[__chunksize + 1];
+
+  char datac[sizeof(T[__chunksize + 1])] __attribute__ ((aligned (__alignof__(T))));
+
+  T* at(int i) {
+    T* s = reinterpret_cast<T*>(&datac[0]);
+    return &s[i];
+  }
 
   inline unsigned chunksize() const { return __chunksize + 1; }
 
@@ -102,7 +109,7 @@ public:
     }
     start += chunksize() - 1;
     start %= chunksize();
-    data[start] = val;
+    new (at(start)) T(val);
     assertSE();
     unlock();
     return true;
@@ -115,7 +122,7 @@ public:
       unlock();
       return false;
     }
-    data[end] = val;
+    new (at(end)) T(val);
     end += 1;
     end %= chunksize();
     assertSE();
@@ -128,7 +135,7 @@ public:
     lock();
     assertSE();
     while (!_i_full() && b != e) {
-      data[end] = *b++;
+      new (at(end)) T(*b++);
       ++end;
       end %= chunksize();
     }
@@ -144,7 +151,8 @@ public:
       unlock();
       return boost::optional<value_type>();
     }
-    value_type retval = data[start];
+    value_type retval = *at(start);
+    at(start)->~T();
     ++start;
     start %= chunksize();
     assertSE();
@@ -161,7 +169,8 @@ public:
     }
     end += chunksize() - 1;
     end %= chunksize();
-    value_type retval = data[end];
+    value_type retval = *at(end);
+    at(end)->~T();
     assertSE();
     unlock();
     return boost::optional<value_type>(retval);

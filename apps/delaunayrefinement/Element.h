@@ -49,9 +49,6 @@ class Element {
 
  public:
 
-  //remove when FixedSizeRing doesn't require constructors
-  Element() :obtuse(100), bBad(true), bDim(true) {}
-
  explicit Element(const Tuple& a, const Tuple& b, const Tuple& c)
    :obtuse(0), bBad(0), bDim(true)
   { //constructor for Triangles
