@@ -43,13 +43,21 @@ struct is_bad {
   }
 };
 
+struct processCreate {
+  Graph* lmesh;
+  processCreate(Graph* _lmesh) :lmesh(_lmesh) {}
+  template<typename Context>
+  void operator()(Element item, Context& lwl) {
+    lmesh->createNode(item);
+  }
+};
+
 /**
  * Helper class used providing methods to read in information and create the graph 
  *
  */
 class Mesh {
-  // used during reading of the data and creation of the graph, to record edges between nodes of the graph 
-  std::map<Edge, GNode> edge_map;
+  std::vector<Element> elements;
 
 private:
   void next_line(std::ifstream& scanner) {
@@ -73,7 +81,7 @@ private:
     }
   }
 
-  void readElements(Graph* mesh, std::string filename, std::vector<Tuple>& tuples) {
+  void readElements(std::string filename, std::vector<Tuple>& tuples) {
     std::ifstream scanner(filename.append(".ele").c_str());
     
     size_t nels;
@@ -88,11 +96,11 @@ private:
       assert(n2 >= 0 && n2 < tuples.size());
       assert(n3 >= 0 && n3 < tuples.size());
       Element e(tuples[n1], tuples[n2], tuples[n3]);
-      addElement(mesh, e);
+      elements.push_back(e);
     }
   }
 
-  void readPoly(Graph* mesh, std::string filename, std::vector<Tuple>& tuples) {
+  void readPoly(std::string filename, std::vector<Tuple>& tuples) {
     std::ifstream scanner(filename.append(".poly").c_str());
     next_line(scanner);
     size_t nsegs;
@@ -107,12 +115,12 @@ private:
       assert(n2 >= 0 && n2 < tuples.size());
       next_line(scanner);
       Element e(tuples[n1], tuples[n2]);
-      addElement(mesh, e);
+      elements.push_back(e);
     }
   }
   
-  GNode addElement(Graph* mesh, Element& element) {
-    GNode node = mesh->createNode(element);
+  void addElement(Graph* mesh, GNode node, std::map<Edge, GNode>& edge_map) {
+    Element& element = mesh->getData(node);
     for (int i = 0; i < element.numEdges(); i++) {
       Edge edge = element.getEdge(i);
       if (edge_map.find(edge) == edge_map.end()) {
@@ -122,15 +130,24 @@ private:
         edge_map.erase(edge);
       }
     }
-    return node;
   }
+
+  void makeGraph(Graph* mesh) {
+    Galois::for_each<>(elements.begin(), elements.end(), processCreate(mesh));
+    std::map<Edge, GNode> edge_map;
+    for (Graph::active_iterator ii = mesh->active_begin(), ee = mesh->active_end();
+	 ii != ee; ++ii)
+      addElement(mesh, *ii, edge_map);
+  }
+
   // .poly contains the perimeter of the mesh; edges basically, which is why it contains pairs of nodes
 public:
   void read(Graph* mesh, std::string basename) {
     std::vector<Tuple> tuples;
     readNodes(basename, tuples);
-    readElements(mesh, basename, tuples);
-    readPoly(mesh, basename, tuples);
+    readElements(basename, tuples);
+    readPoly(basename, tuples);
+    makeGraph(mesh);
   }
 
   bool verify(Graph* mesh) {

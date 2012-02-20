@@ -58,8 +58,8 @@ static const char* url = "delaunay_mesh_refinement";
 
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 
-typedef Galois::Graph::FirstGraph<Element,void,false>            Graph;
-typedef Galois::Graph::FirstGraph<Element,void,false>::GraphNode GNode;
+typedef Galois::Graph::FastGraph<Element,void,false>            Graph;
+typedef Galois::Graph::FastGraph<Element,void,false>::GraphNode GNode;
 
 
 #include "Subgraph.h"
@@ -126,7 +126,7 @@ int main(int argc, char** argv) {
   
   std::cout << "MEMINFO PRE: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
 
-  Galois::preAlloc(10 * numThreads + GaloisRuntime::MM::pageAllocInfo() * 10);
+  Galois::preAlloc(10 * numThreads + GaloisRuntime::MM::pageAllocInfo() * 7);
   std::cout << "MEMINFO MID: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
 
   Galois::StatTimer T;
