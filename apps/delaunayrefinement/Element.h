@@ -165,15 +165,13 @@ class Element {
   //Virtualize the Edges array
   //Used only by Mesh now
   Edge getEdge(int i) const {
+    if (i == 0)
+      return Edge(coords[0], coords[1]);
     if (!bDim) {
-      if (i == 0)
-	return Edge(coords[0], coords[1]);
-      else if (i == 1)
+      if (i == 1)
 	return Edge(coords[1], coords[0]);
     } else {
-      if (i == 0)
-	return Edge(coords[0], coords[1]);
-      else if (i == 1)
+      if (i == 1)
 	return Edge(coords[1], coords[2]);
       else if (i == 2)
 	return Edge(coords[2], coords[0]);
