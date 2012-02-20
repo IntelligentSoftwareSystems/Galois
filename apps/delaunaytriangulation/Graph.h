@@ -28,7 +28,7 @@
 
 #include "Element.h"
 
-#include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/Graph2.h"
 
 #include <vector>
 #include <deque>

@@ -64,7 +64,7 @@ class Cavity: private boost::noncopyable {
             != searcher.matches.end())
           continue;
 
-        int index = graph.getEdgeData(graph.findEdge(n, *ii, Galois::NONE));
+        int index = *graph.getEdgeData(graph.findEdge(n, *ii, Galois::NONE));
         outside.push_back(std::make_pair(n, index));
 
         Element& e = graph.getData(n, Galois::NONE);
@@ -98,8 +98,8 @@ class Cavity: private boost::noncopyable {
       p2->addElement(newNode);
       p3->addElement(newNode);
 
-      graph.addEdge(newNode, n, 1, Galois::NONE);
-      graph.addEdge(n, newNode, index, Galois::NONE);
+      *graph.getEdgeData(graph.addEdge(newNode, n, Galois::NONE)) = 1;
+      *graph.getEdgeData(graph.addEdge(n, newNode, Galois::NONE)) = index;
       
       newNodes.push_back(newNode);
     }
@@ -128,8 +128,8 @@ class Cavity: private boost::noncopyable {
 	  }
 	  
 	  if (found) {
-	    graph.addEdge(n1, n2, indexForNewNode, Galois::NONE);
-	    graph.addEdge(n2, n1, indexForNode, Galois::NONE);
+	    *graph.getEdgeData(graph.addEdge(n1, n2, Galois::NONE)) = indexForNewNode;
+	    *graph.getEdgeData(graph.addEdge(n2, n1, Galois::NONE)) = indexForNode;
 	  }
 	}
       }

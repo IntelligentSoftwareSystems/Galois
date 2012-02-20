@@ -303,13 +303,13 @@ static void addBoundaryNodes(PointList& points) {
   GNode border_node2 = graph->createNode(border_ele2);
   GNode border_node3 = graph->createNode(border_ele3);
 
-  graph->addEdge(large_node, border_node1, 0);
-  graph->addEdge(large_node, border_node2, 1);
-  graph->addEdge(large_node, border_node3, 2);
+  *graph->getEdgeData(graph->addEdge(large_node, border_node1)) = 0;
+  *graph->getEdgeData(graph->addEdge(large_node, border_node2)) = 1;
+  *graph->getEdgeData(graph->addEdge(large_node, border_node3)) = 2;
 
-  graph->addEdge(border_node1, large_node, 0);
-  graph->addEdge(border_node2, large_node, 0);
-  graph->addEdge(border_node3, large_node, 0);
+  *graph->getEdgeData(graph->addEdge(border_node1, large_node)) = 0;
+  *graph->getEdgeData(graph->addEdge(border_node2, large_node)) = 0;
+  *graph->getEdgeData(graph->addEdge(border_node3, large_node)) = 0;
 }
 
 static void makeGraph(const std::string& filename, PointList& points) {
