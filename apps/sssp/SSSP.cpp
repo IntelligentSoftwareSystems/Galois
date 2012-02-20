@@ -29,6 +29,7 @@
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
 #include "Galois/Galois.h"
+#include "Galois/UserContext.h"
 #include "Galois/Graphs/LCGraph.h"
 #include "llvm/Support/CommandLine.h"
 
@@ -108,10 +109,8 @@ void runBody(const GNode src) {
 //static Galois::Statistic<unsigned int>* BadWork;
 //static Galois::Statistic<unsigned int>* WLEmptyWork;
 
-template<bool usebfs>
 struct process {
-  template<typename ContextTy>
-  void __attribute__((noinline)) operator()(UpdateRequest& req, ContextTy& lwl) {
+  void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& lwl) {
     SNode& data = graph.getData(req.n,Galois::NONE);
     // if (req.w >= data.dist)
     //   *WLEmptyWork += 1;
@@ -123,7 +122,7 @@ struct process {
 	for (Graph::edge_iterator ii = graph.edge_begin(req.n, Galois::NONE),
 	       ee = graph.edge_end(req.n, Galois::NONE); ii != ee; ++ii) {
 	  GNode dst = graph.getEdgeDst(ii);
-	  int d = usebfs ? 1 : graph.getEdgeData(ii);
+	  int d = useBfs ? 1 : graph.getEdgeData(ii);
 	  unsigned int newDist = req.w + d;
 	  SNode& rdata = graph.getData(dst,Galois::NONE);
 	  if (newDist < rdata.dist)
@@ -145,13 +144,7 @@ void runBodyParallel(const GNode src) {
 
   UpdateRequest one[1] = { UpdateRequest(src, 0) };
   T.start();
-  if (useBfs) {
-    //Exp::StartWorklistExperiment<OBIM,dChunk,Chunk,UpdateRequestIndexer,std::less<UpdateRequest>, std::greater<UpdateRequest> >()(std::cout, &one[0], &one[1], process<true>());
-    Galois::for_each<OBIM>(&one[0], &one[1], process<true>());
-  } else {
-    //Exp::StartWorklistExperiment<OBIM,dChunk,Chunk,UpdateRequestIndexer,std::less<UpdateRequest>, std::greater<UpdateRequest> >()(std::cout, &one[0], &one[1], process<false>());
-    Galois::for_each<OBIM>(&one[0], &one[1], process<false>());
-  }
+  Galois::for_each<OBIM>(&one[0], &one[1], process());
   T.stop();
 }
 
@@ -202,6 +195,10 @@ int main(int argc, char **argv) {
   std::cout << "Read " << graph.size() << " nodes\n";
   std::cout << "Using delta-step of " << (1 << stepShift) << "\n";
   
+  if (useBfs && stepShift > 1) {
+    std::cout << "WARNING: Using a large delta-step for bfs. Expect long execution times.\n";
+  }
+
   unsigned int id = 0;
   bool foundReport = false;
   bool foundSource = false;
@@ -239,8 +236,7 @@ int main(int argc, char **argv) {
     runBody(source);
   }
 
-  std::cout << report << " " 
-       << graph.getData(report,Galois::NONE).toString() << "\n";
+  std::cout << graph.getData(report,Galois::NONE).toString() << "\n";
   if (!skipVerify && !verify(source)) {
     std::cerr << "Verification failed.\n";
     assert(0 && "Verification failed");
