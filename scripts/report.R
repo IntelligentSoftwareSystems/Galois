@@ -23,12 +23,6 @@ if (interactive()) {
   }
 }
 
-summarizeBy <- function(d, f, fun.aggregate=mean, suffix=".Y", merge.with=d, idvars=Id.Vars) {
-  m <- cast(melt(d, id.vars=idvars), f, fun.aggregate)
-  vars <- all.vars(f)
-  merge(merge.with, m, by=vars[-length(vars)], all.x=T, suffixes=c("", suffix))
-}
-
 ### Replace orig[i] with repl[i] in x
 mreplace <- function(x, orig, repl, defaultIndex=1) {
   stopifnot(length(orig) == length(repl))
@@ -111,7 +105,14 @@ cat(sprintf("Dropped %d partial runs\n", sum(partial)))
 
 # Drop unused columns
 Columns <- sapply(res, is.numeric) | colnames(res) %in% Id.Vars
+Columns <- names(Columns)[Columns]
 res <- res[,Columns]
+
+summarizeBy <- function(d, f, fun.aggregate=mean, suffix=".Y", merge.with=d, idvars=Id.Vars) {
+  m <- cast(melt(d[,Columns], id.vars=idvars), f, fun.aggregate)
+  vars <- all.vars(f)
+  merge(merge.with, m, by=vars[-length(vars)], all.x=T, suffixes=c("", suffix))
+}
 
 # Replace NAs with zeros
 res[is.na(res)] <- 0
