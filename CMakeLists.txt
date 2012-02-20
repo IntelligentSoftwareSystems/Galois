@@ -23,7 +23,7 @@ endif()
 
 #Enable iss specific options; should be OFF in the general release
 #use experimental features
-set(USE_EXP ON) 
+#set(USE_EXP ON) 
 
 ###### Optional programs and default paths ######
 
@@ -220,6 +220,7 @@ add_subdirectory(inputs)
 add_subdirectory(test)
 
 if(USE_EXP)
+  add_definitions("-DGALOIS_EXP")
   add_subdirectory(exp)
 endif()
 
@@ -240,3 +241,4 @@ include(CPack)
 install(DIRECTORY include/ DESTINATION include PATTERN ".svn" EXCLUDE PATTERN ".in" EXCLUDE)
 #install(DIRECTORY scripts/ DESTINATION scripts PATTERN ".svn" EXCLUDE PATTERN ".in" EXCLUDE)
 execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/scripts ${CMAKE_BINARY_DIR}/scripts)
+execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/inputs ${CMAKE_BINARY_DIR}/inputs)
