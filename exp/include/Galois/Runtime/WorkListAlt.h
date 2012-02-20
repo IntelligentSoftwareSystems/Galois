@@ -139,7 +139,7 @@ public:
     
     //steal
     int id = local.myEffectiveID();
-    for (int i = 0; i < local.size(); ++i) {
+    for (int i = 0; i < (int) local.size(); ++i) {
       ++id;
       id %= local.size();
       ret = me.steal(local.get(id));
