@@ -147,7 +147,11 @@ class FirstGraphImpl {
       return boost::make_filter_iterator(is_active_edge(), edges.end(), edges.end());
     }
     void erase(iterator ii) { edges.erase(ii.base()); }
-    void erase(gNode* N) { edges.erase(find(N).base()); }
+    void erase(gNode* N) { 
+      iterator ii = find(N);
+      if (ii != end())
+        edges.erase(ii.base()); 
+    }
 
     iterator find(gNode* N) {
       return std::find_if(begin(), end(), first_eq<gNode*>(N));
@@ -227,9 +231,7 @@ public:
   /**
    * Removes a node from the graph along with all its outgoing/incoming edges
    * for undirected graphs or outgoing edges for directed graphs.
-   * 
    */
-  // FIXME: incoming edges aren't handled here for directed graphs
   void removeNode(GraphNode n, Galois::MethodFlag mflag = ALL) {
     assert(n);
     acquire(n, mflag);
