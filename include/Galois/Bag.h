@@ -91,6 +91,7 @@ protected:
     h->m_begin = h->m_end = begin;
     h->m_last = last;
     h->m_next = h->m_prev = h;
+    return h;
   }
 
   bool isInlined() const {

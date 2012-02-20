@@ -183,7 +183,7 @@ public:
         }
       }
     }
-    int msize = std::distance(mesh->active_begin(), mesh->active_end());
+    size_t msize = std::distance(mesh->active_begin(), mesh->active_end());
 
     if (found.size() != msize) {
       std::cerr << "Not all elements are reachable \n";

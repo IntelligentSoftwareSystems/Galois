@@ -48,7 +48,7 @@ namespace LL {
 
   extern __thread unsigned PACKAGE_ID;
 
-  static unsigned getPackageForThread(int galois_thread_id) {
+  static inline unsigned getPackageForThread(int galois_thread_id) {
     unsigned x = PACKAGE_ID;
     if (x & 1)
       return x >> 1;

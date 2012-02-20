@@ -8,7 +8,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -205,7 +205,7 @@ public:
   }
   void cycleCollapse(unsigned repr) {
 	// assert(repr is present in ancestors).
-	static unsigned ncycles = 0;
+	//static unsigned ncycles = 0;
 	unsigned reprrepr = getFinalRepresentative(repr);
 	for (std::vector<unsigned>::iterator ii = ancestors.begin(); ii != ancestors.end(); ++ii) {
 		if (*ii == repr) {
@@ -408,7 +408,7 @@ void processLoadStore(PointsToConstraints &constraints, WorkList &worklist, Galo
 }
 
 unsigned nfired;
-unsigned niter;
+//unsigned niter;
 struct Process {
   Process() { }
 
@@ -444,8 +444,8 @@ struct Process {
 
 void runSerial(PointsToConstraints &addrcopyconstraints, PointsToConstraints &loadstoreconstraints) {
 	WorkList worklist;
-	unsigned niteration = 0;
-	bool changed = false;
+	//unsigned niteration = 0;
+	//bool changed = false;
 	unsigned nnodesprocessed = 0;
 
 	processAddressOfCopy(addrcopyconstraints, worklist);
@@ -479,7 +479,7 @@ void runSerial(PointsToConstraints &addrcopyconstraints, PointsToConstraints &lo
 
 void runParallel(PointsToConstraints &addrcopyconstraints, PointsToConstraints &loadstoreconstraints) {
 	WorkList worklist;
-	unsigned niteration = 0;
+	//unsigned niteration = 0;
 	
 	processAddressOfCopy(addrcopyconstraints, worklist);
 	processLoadStore(loadstoreconstraints, worklist, Galois::NONE);

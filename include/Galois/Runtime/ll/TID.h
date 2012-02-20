@@ -37,7 +37,7 @@ namespace LL {
   extern unsigned nextID;
 
   //Get this thread's id.
-  static unsigned getTID() {
+  static inline unsigned getTID() {
     unsigned x = TID;
     if (x & 1)
       return x >> 1;
