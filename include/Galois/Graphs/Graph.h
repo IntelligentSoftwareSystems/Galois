@@ -448,19 +448,19 @@ public:
    * for undirected graphs or outgoing edges for directed graphs.
    * 
    */
-  // FIXME: incoming edges aren't handled here for directed graphs
   bool removeNode(GraphNode n, Galois::MethodFlag mflag = ALL) {
     assert(n.ID);
     acquire(n.ID, mflag);
     gNode* N = n.ID;
     bool wasActive = N->active;
     if (wasActive) {
-      //__sync_sub_and_fetch(&numActive, 1);
       N->active = false;
       //erase the in-edges first
-      for (unsigned int i = 0; i < N->edges.size(); ++i) {
-	if (N->edges[i].getNeighbor() != N) // don't handle loops yet
-	  N->edges[i].getNeighbor()->eraseEdge(N);
+      if (!Directional) {
+        for (unsigned int i = 0; i < N->edges.size(); ++i) {
+          if (N->edges[i].getNeighbor() != N) // don't handle loops yet
+            N->edges[i].getNeighbor()->eraseEdge(N);
+        }
       }
       N->edges.clear();
     }
