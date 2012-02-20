@@ -46,7 +46,9 @@
 
 #include "Lonestar/BoilerPlate.h"
 
+#ifdef GALOIS_EXP
 #include "Galois/Runtime/WorkListAlt.h"
+#endif
 
 namespace cll = llvm::cl;
 
@@ -127,18 +129,14 @@ int main(int argc, char** argv) {
   Galois::preAlloc(10 * numThreads + GaloisRuntime::MM::pageAllocInfo() * 10);
   std::cout << "MEMINFO MID: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
 
-
   Galois::StatTimer T;
   T.start();
   using namespace GaloisRuntime::WorkList;
-  //  Galois::for_each<LocalQueues<dChunkedLIFO<256>, LIFO<> > >(wl.begin(),wl.end(), process());
-  //Galois::for_each< Alt::ChunkedAdaptor<Alt::LevelStealingAlt, 256*4> >(wl.begin(),wl.end(), process());
-  Galois::for_each<Alt::ChunkedAdaptor<Alt::InitialQueue<Alt::LevelStealingAlt, Alt::LevelLocalAlt>, 256*4*4> >(wl.begin(),wl.end(), process());
-
-  //Galois::for_each<LocalQueues<dChunkedLIFO<256>, LIFO<> > >(mesh->active_begin(), mesh->active_end(), process(), is_bad(mesh));
-  //Galois::for_each<LocalQueues<InitialIterator<std::vector<GNode>::iterator>, LIFO<> > >(wl.begin(), wl.end(), process());
-  //Galois::for_each<LocalQueues<InitialIterator<GNode*>, LIFO<> > >(&wl[0], &wl[wl.size()], process());
-  //Galois::for_each<dChunkedLIFO<1024> >(wl.begin(), wl.end(), process());
+#ifdef GALOIS_EXP
+  Galois::for_each<Alt::ChunkedAdaptor<Alt::InitialQueue<Alt::LevelStealingAlt, Alt::LevelLocalAlt>, 256*4*4> >(wl.begin(), wl.end(), process());
+#else
+  Galois::for_each<LocalQueues<dChunkedLIFO<256>, LIFO<> > >(wl.begin(), wl.end(), process());
+#endif
   T.stop();
 
   std::cout << "MEMINFO POST: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
