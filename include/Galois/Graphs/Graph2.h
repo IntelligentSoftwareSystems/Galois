@@ -88,8 +88,8 @@ struct EdgeItem {
   ETy* Ea;
   ETy E;
 
-  inline NTy*&       first()       { return N; }
-  inline NTy* const& first() const { return N; }
+  inline NTy*&       first()       { assert(N); return N; }
+  inline NTy* const& first() const { assert(N); return N; }
   inline ETy*       second()       { return Ea ? Ea : &E; }
   inline ETy* const second() const { return Ea ? Ea : &E; }
   inline ETy*       addr()         { return &E; }
@@ -236,15 +236,6 @@ public:
     gNode* N = n;
     if (N->active) {
       N->active = false;
-      //erase the in-edges first
-      if (!Directional) {
-	for (unsigned int i = 0; i < N->edges.size(); ++i) {
-	  gNode* dst = N->edges[i].first();
-	  if (dst != N) { // don't handle loops yet
-	    dst->erase(N);
-	  }
-	}
-      }
       N->edges.clear();
     }
   }
