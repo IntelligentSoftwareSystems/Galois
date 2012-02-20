@@ -3,7 +3,6 @@
 
 library(ggplot2)
 
-Columns <- c("Algo","Kind","Hostname","Threads","CommandLine","Iterations","Time","Timeout")
 Id.Vars <- c("Algo","Kind","Hostname","Threads","CommandLine")
 
 outputfile <- ""
@@ -25,7 +24,7 @@ if (interactive()) {
 }
 
 summarizeBy <- function(d, f, fun.aggregate=mean, suffix=".Y", merge.with=d, idvars=Id.Vars) {
-  m <- cast(melt(d[,Columns], id.vars=idvars), f, fun.aggregate)
+  m <- cast(melt(d, id.vars=idvars), f, fun.aggregate)
   vars <- all.vars(f)
   merge(merge.with, m, by=vars[-length(vars)], all.x=T, suffixes=c("", suffix))
 }
@@ -92,6 +91,7 @@ parseAlgo <- function(res) {
 res.raw <- read.csv(inputfile, stringsAsFactors=F)
 res <- res.raw[res.raw$CommandLine != "",]
 cat(sprintf("Dropped %d empty rows\n", nrow(res.raw) - nrow(res)))
+##res <- subset(res, grepl("r5M.node", res$CommandLine))
 res <- parseAlgo(res)
 
 # Timeouts
@@ -110,13 +110,18 @@ res <- res[!partial,]
 cat(sprintf("Dropped %d partial runs\n", sum(partial)))
 
 # Drop unused columns
+Columns <- sapply(res, is.numeric) | colnames(res) %in% Id.Vars
 res <- res[,Columns]
 
+# Replace NAs with zeros
+res[is.na(res)] <- 0
+
 # Make factors
-res <- data.frame(lapply(res, function(x) if (is.character(x)) { factor(x)} else {x}))
+res <- data.frame(lapply(res, function(x) if (is.character(x)) { factor(x) } else {x}))
 
 # Take mean of multiple runs
 #res <- recast(res, ... ~ variable, mean, id.var=Id.Vars)
+
 
 # Summarize
 res <- summarizeBy(subset(res, Threads==1),
@@ -139,6 +144,13 @@ ggplot(res,
        geom_line() + 
        scale_y_continuous("Time (s)") +
        facet_grid(Hostname ~ Algo, scale="free")
+
+##ggplot(res,
+##       aes(x=Threads, y=(Time.Ref-build.Mean)/(Time.Mean-build.Mean), color=Kind)) +
+##       geom_point() + 
+##       geom_line() + 
+##       scale_y_continuous("Speedup (res. to best at t=1)") +
+##       facet_grid(Hostname ~ Algo, scale="free")
 
 ggplot(res,
        aes(x=Threads, y=Iterations.Mean/Iterations.Ref, color=Kind)) +

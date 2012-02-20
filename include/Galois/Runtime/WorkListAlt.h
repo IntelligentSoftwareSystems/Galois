@@ -128,9 +128,18 @@ public:
     local.get().push(val);
   }
 
-  void pushi(ChunkHeader* val) {
-    push(val);
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    while (b != e)
+      push(*b++);
+    return true;
   }
+
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    push(b,e);
+  }
+
 
   ChunkHeader* pop() {
     LIFO_SB& me = local.get();
@@ -167,9 +176,17 @@ public:
     local.push(val);
   }
 
-  void pushi(ChunkHeader* val) {
-    global.pushi(val);
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    local.push(b,e);
+    return true;
   }
+
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    global.push_initial(b,e);
+  }
+
 
   ChunkHeader* pop() {
     ChunkHeader* ret = local.pop();
@@ -247,7 +264,9 @@ public:
     while (b != e) {
       ChunkTy* n = mkChunk();
       b = n->push(b,e);
-      worklist.pushi(static_cast<ChunkHeader*>(n));
+      ChunkHeader* n2[1];
+      n2[0] = static_cast<ChunkHeader*>(n);
+      worklist.push_initial(&n2[0], &n2[1]);
     }
   }
 

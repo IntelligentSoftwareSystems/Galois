@@ -1,44 +1,60 @@
-/*
- * Verifier.h
+/** Delaunay triangulation verifier -*- C++ -*-
+ * @file
+ * @section License
  *
- *  Created on: May 11, 2011
- *      Author: xinsui
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @section Description
+ *
+ * @author Xin Sui <xinsui@cs.utexas.edu>
  */
 
-#ifndef VERIFIER_H_
-#define VERIFIER_H_
-#include "Element.h"
-#include "Tuple.h"
+#ifndef VERIFIER_H
+#define VERIFIER_H
+
+#include "Graph.h"
+#include "Point.h"
+
 #include <stack>
 #include <set>
+#include <iostream>
 
 class Verifier {
-public:
-  Verifier() { }
-  bool verify(Graph* graph) {
-    return checkConsistency(graph) && checkReachability(graph) && checkDelaunayProperty(graph);
-  }
-
-private:
-  bool checkConsistency(Graph* graph){
+  bool checkConsistency(Graph* graph) {
     bool error = false;
-    for (Graph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
-      GNode node = *ii;
+    for (Graph::active_iterator ii = graph->active_begin(),
+        ei = graph->active_end(); ii != ei; ++ii) {
+      const GNode& node = *ii;
+      Element& e = node.getData(Galois::NONE);
 
-      Element& element = node.getData(Galois::NONE);
-
-      if (element.getDim() == 2) {
+      if (e.dim() == 2) {
         if (graph->neighborsSize(node, Galois::NONE) != 1) {
-          std::cerr << "-> Segment " << element << " has " << graph->neighborsSize(node, Galois::NONE) << " relation(s)\n";
+          std::cerr << "Error: Segment " << e << " has " 
+            << graph->neighborsSize(node, Galois::NONE) << " relation(s)\n";
           error = true;
         }
-      } else if (element.getDim() == 3) {
-        if (graph->neighborsSize(node, Galois::NONE) != 3) {
-          std::cerr << "-> Triangle " << element << " has " << graph->neighborsSize(node, Galois::NONE) << " relation(s)";
+      } else if (e.dim() == 3) {
+        if (graph->neighborsSize(*ii, Galois::NONE) != 3) {
+          std::cerr << "Error: Triangle " << e << " has "
+            << graph->neighborsSize(node, Galois::NONE) << " relation(s)\n";
           error = true;
         }
       } else {
-        std::cerr << "-> Figures with " << element.getDim() << " edges";
+        std::cerr << "Error: Element with " << e.dim() << " edges\n";
         error = true;
       }
     }
@@ -47,7 +63,7 @@ private:
     return true;
   }
 
-  bool checkReachability(Graph* graph){
+  bool checkReachability(Graph* graph) {
     std::stack<GNode> remaining;
     std::set<GNode> found;
     remaining.push(*(graph->active_begin()));
@@ -56,45 +72,48 @@ private:
       GNode node = remaining.top();
       remaining.pop();
       if (!found.count(node)) {
-        assert(graph->containsNode(node) && "Reachable node was removed from graph");
+        if (!graph->containsNode(node)) {
+          std::cerr << "Reachable node was removed from graph\n";
+        }
         found.insert(node);
         int i = 0;
-        for (Graph::neighbor_iterator ii = graph->neighbor_begin(node, Galois::NONE), ee = graph->neighbor_end(node, Galois::NONE); ii != ee; ++ii) {
+        for (Graph::neighbor_iterator ii = graph->neighbor_begin(node, Galois::NONE),
+            ei = graph->neighbor_end(node, Galois::NONE); ii != ei; ++ii) {
           assert(i < 3);
           assert(graph->containsNode(*ii));
           assert(node != *ii);
           ++i;
-          //    if (!found.count(*ii))
           remaining.push(*ii);
         }
       }
     }
 
     if (found.size() != graph->size()) {
-      std::cerr << "Not all elements are reachable. ";
+      std::cerr << "Error: Not all elements are reachable. ";
       std::cerr << "Found: " << found.size() << " needed: " << graph->size() << ".\n";
-      assert(0 && "Not all elements are reachable");
       return false;
     }
     return true;
   }
 
-  bool checkDelaunayProperty(Graph* graph){
-    for (Graph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
-      GNode node = *ii;
-      Element& e = node.getData(Galois::NONE);
-      for (Graph::neighbor_iterator jj = graph->neighbor_begin(node, Galois::NONE), eejj = graph->neighbor_end(node, Galois::NONE); jj != eejj; ++jj) {
-        GNode neighborNode = *jj;
+  bool checkDelaunayProperty(Graph* graph) {
+    for (Graph::active_iterator ii = graph->active_begin(),
+        ei = graph->active_end(); ii != ei; ++ii) {
+      const GNode& node = *ii;
+      Element& e1 = node.getData(Galois::NONE);
+
+      for (Graph::neighbor_iterator jj = graph->neighbor_begin(node, Galois::NONE),
+          ej = graph->neighbor_end(node, Galois::NONE); jj != ej; ++jj) {
+        const GNode& neighborNode = *jj;
         Element& e2 = neighborNode.getData(Galois::NONE);
-        if (e.getDim() == 3 && e2.getDim() == 3) {
-          const Tuple* t2 = getTupleT2OfRelatedEdge(e, e2);
-          if (!t2) {
+        if (e1.dim() == 3 && e2.dim() == 3) {
+          Tuple t2;
+          if (!getTupleT2OfRelatedEdge(e1, e2, t2)) {
             std::cerr << "missing tuple\n";
             return false;
           }
-          if (e.inCircle(*t2)) {
-            std::cerr << "delaunay property violated: " 
-              "point " << *t2 << " in element " << e << "\n";
+          if (e1.inCircle(t2)) {
+            std::cerr << "Delaunay property violated: point " << t2 << " in element " << e1 << "\n";
             return false;
           }
         }
@@ -103,31 +122,38 @@ private:
     return true;
   }
 
-  const Tuple* getTupleT2OfRelatedEdge(Element& e1, Element& e2) {
+  bool getTupleT2OfRelatedEdge(const Element& e1, const Element& e2, Tuple& t) {
     int e2_0 = -1;
     int e2_1 = -1;
     int phase = 0;
 
-    for (int i = 0; i < e1.getDim(); i++) {
-      for (int j = 0; j < e2.getDim(); j++) {
-        if (e1.getPoint(i) == e2.getPoint(j)) {
-          if (phase == 0) {
-            e2_0 = j;
-            phase = 1;
-            break;
-          } else {
-            e2_1 = j;
-            for (int k = 0; k < 3; k++) {
-              if (k != e2_0 && k != e2_1) {
-                 return &(e2.getPoint(k));
-              }
-            }
+    for (int i = 0; i < e1.dim(); i++) {
+      for (int j = 0; j < e2.dim(); j++) {
+        if (e1.getPoint(i) != e2.getPoint(j)) 
+          continue;
+
+        if (phase == 0) {
+          e2_0 = j;
+          phase = 1;
+          break;
+        } 
+
+        e2_1 = j;
+        for (int k = 0; k < 3; k++) {
+          if (k != e2_0 && k != e2_1) {
+            t = e2.getPoint(k)->t();
+            return true;
           }
         }
       }
     }
-    return NULL;
+    return false;
+  }
+
+public:
+  bool verify(Graph* graph) {
+    return checkConsistency(graph) && checkReachability(graph) && checkDelaunayProperty(graph);
   }
 };
 
-#endif /* VERIFIER_H_ */
+#endif

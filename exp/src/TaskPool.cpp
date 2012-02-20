@@ -1,4 +1,4 @@
-/** Check worklist instantiations -*- C++ -*-
+/** Common thread pool implementations -*- C++ -*-
  * @file
  * @section License
  *
@@ -20,35 +20,12 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-template<typename T2>
-struct checker {
-  typedef typename T2::template retype<int>::WL T;
-  T wl;
-  typename T::template rethread<true>::WL wl2;
-  typename T::template rethread<false>::WL wl3;
+#include "Galois/Runtime/SimpleTaskPool.h"
 
-  checker() {
-    int a[3] = {1,2,3};
-    wl.push(0);
-    wl.push_initial(&a[0], &a[4]);
-    wl.push(&a[0], &a[4]);
-    wl.pop();
+using namespace GaloisRuntime;
 
-    wl2.push(0);
-    wl2.push_initial(&a[0], &a[4]);
-    wl2.push(&a[0], &a[4]);
-    wl2.pop();
-
-    wl3.push(0);
-    wl3.push_initial(&a[0], &a[4]);
-    wl3.push(&a[0], &a[4]);
-    wl3.pop();
-  }
-};
-
-#define WLCOMPILECHECK(name) checker<name<> > ck_##name;
-#include "Galois/Runtime/WorkList.h"
-
-int main() {
-  return 0;
+//! Implement the global task pool
+SimpleTaskPool& GaloisRuntime::getSystemTaskPool() {
+  static SimpleTaskPool pool;
+  return pool;
 }

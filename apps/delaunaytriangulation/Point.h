@@ -1,0 +1,103 @@
+/** A coordinate and possibly a link to a containing triangle -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @author Xin Sui <xinsui@cs.utexas.edu>
+ * @author Donald Nguyen <ddn@cs.utexas.edu>
+ */
+#ifndef POINT_H
+#define POINT_H
+
+#include "Tuple.h"
+#include "Graph.h"
+
+#include "Galois/CheckedObject.h"
+
+#include <ostream>
+#include <algorithm>
+
+class Point: public Galois::GChecked {
+  Tuple m_t;
+  GNode m_n;
+  unsigned m_tries;
+  long m_id;
+  
+public:
+  Point(double x, double y, long id): m_tries(0) {
+    m_t.x() = x;
+    m_t.y() = y;
+    m_id = id;
+  }
+
+  const unsigned& numTries() const { return m_tries; }
+  const Tuple& t() const { return m_t; }
+  long id() const { return m_id; }
+
+  Tuple& t() { return m_t; }
+  long& id() { return m_id; }
+
+  void addElement(const GNode& n) {
+    m_n = n;
+  }
+
+  void removeElement(const GNode& n) {
+    if (m_n == n)
+      m_n = GNode();
+  }
+
+  bool inMesh() const {
+    return m_n != GNode();
+  }
+
+  GNode someElement() const {
+    return m_n;
+  }
+
+  bool getNodeForElement(const Tuple& t, GNode& result) const {
+    if (inMesh() && m_n.getData(Galois::NONE).inTriangle(t)) {
+      result = m_n;
+      return true;
+    }
+    return false;
+  }
+
+  void nextTry() {
+    if (++m_tries == 0) {
+      assert(0 && "tries overflow");
+      abort();
+    }
+  }
+
+  void print(std::ostream& os) const {
+    os << "(id: " << m_id << " t: ";
+    m_t.print(os);
+    if (m_n != GNode())
+      m_n.getData().print(os);
+    else
+      os << "NULL";
+    os << ")";
+  }
+};
+
+static inline std::ostream& operator<<(std::ostream& os, const Point& rhs) {
+  rhs.print(os);
+  return os;
+}
+
+#endif

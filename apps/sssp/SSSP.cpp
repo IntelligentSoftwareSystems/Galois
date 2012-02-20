@@ -24,22 +24,16 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
+#include "SSSP.h"
+
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
-//#include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
 #include "Galois/Graphs/LCGraph.h"
-#include "Galois/Runtime/DebugWorkList.h"
 #include "llvm/Support/CommandLine.h"
 
 #include "Lonestar/BoilerPlate.h"
-#include "SSSP.h"
 
-#include "Exp/PriorityScheduling/WorkListTL.h"
-
-#include <string>
-#include <sstream>
-#include <limits>
 #include <iostream>
 #include <set>
 
@@ -152,9 +146,11 @@ void runBodyParallel(const GNode src) {
   UpdateRequest one[1] = { UpdateRequest(src, 0) };
   T.start();
   if (useBfs) {
-    Exp::StartWorklistExperiment<OBIM,dChunk,Chunk,UpdateRequestIndexer,std::less<UpdateRequest>, std::greater<UpdateRequest> >()(std::cout, &one[0], &one[1], process<true>());
+    //Exp::StartWorklistExperiment<OBIM,dChunk,Chunk,UpdateRequestIndexer,std::less<UpdateRequest>, std::greater<UpdateRequest> >()(std::cout, &one[0], &one[1], process<true>());
+    Galois::for_each<OBIM>(&one[0], &one[1], process<true>());
   } else {
-    Exp::StartWorklistExperiment<OBIM,dChunk,Chunk,UpdateRequestIndexer,std::less<UpdateRequest>, std::greater<UpdateRequest> >()(std::cout, &one[0], &one[1], process<false>());
+    //Exp::StartWorklistExperiment<OBIM,dChunk,Chunk,UpdateRequestIndexer,std::less<UpdateRequest>, std::greater<UpdateRequest> >()(std::cout, &one[0], &one[1], process<false>());
+    Galois::for_each<OBIM>(&one[0], &one[1], process<false>());
   }
   T.stop();
 }
@@ -253,4 +249,3 @@ int main(int argc, char **argv) {
 
   return 0;
 }
-// vim sw=2:ts=8:sts=2

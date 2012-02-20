@@ -35,7 +35,7 @@
 
 #include "Lonestar/BoilerPlate.h"
 
-#include "Exp/PriorityScheduling/WorkListTL.h"
+#include "PriorityScheduling/WorkListTL.h"
 
 #include <limits>
 #include <algorithm>
@@ -113,9 +113,9 @@ struct Prims {
       node->id = i++;
     }
 
-    std::pair<bool,HeapItem> retval = heap.pollMin();
-    while (retval.first) {
-      GraphNode src = retval.second.node;
+    boost::optional<HeapItem> retval = heap.pollMin();
+    while (retval) {
+      GraphNode src = retval->node;
       //std::cout << " Got (" << retval.second.weight << "," << src.getData()->id << ")\n";
       for (Graph::neighbor_iterator dst = g.neighbor_begin(src),
           edst = g.neighbor_end(src); dst != edst; ++dst) {
@@ -318,7 +318,7 @@ struct Boruvkas {
 template<typename Graph>
 void makeGraph(const char* in, Graph& g) {
   typedef typename Graph::GraphNode GraphNode;
-  typedef Galois::Graph::LC_CRS_Graph<int, Weight> ReaderGraph;
+  typedef Galois::Graph::LC_CRS_Graph<size_t, Weight> ReaderGraph;
   typedef ReaderGraph::GraphNode ReaderGNode;
 
   ReaderGraph reader;
@@ -358,6 +358,7 @@ void makeGraph(const char* in, Graph& g) {
         Weight& ww = g.getEdgeData(gsrc, gdst);
         if (ww > w) {
           ww = w;
+          g.getEdgeData(gdst, gsrc) = w;
         }
       } else if (gsrc != gdst) {
         g.addMultiEdge(gsrc, gdst, w);

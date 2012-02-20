@@ -13,13 +13,13 @@ void check(const char* func, bool r) {
   }
 }
 
-void check(const char* func, const std::pair<bool,int>& r, int exp) {
-  if (r.first && r.second == exp)
+void check(const char* func, const boost::optional<int>& r, int exp) {
+  if (r && *r == exp)
     return;
-  else if (!r.first)
+  else if (!r)
     std::cerr << func << ": Expected element\n";
   else 
-    std::cerr << func << ": Expected " << exp << " got " << r.second << "\n";
+    std::cerr << func << ": Expected " << exp << " got " << *r << "\n";
   abort();
 }
 

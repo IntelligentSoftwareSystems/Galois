@@ -107,20 +107,30 @@ public:
     return true;
   }
 
-  bool pushi(value_type val)  {
-    return push(val);
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    lock();
+    while (b != e)
+      wl.push_back(*b++);
+    unlock();
+    return true;
+  }
+
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    push(b,e);
   }
 
   boost::optional<value_type> pop()  {
     lock();
     if (wl.empty()) {
       unlock();
-      return std::make_pair(false, value_type());
+      return boost::optional<value_type>();
     } else {
       value_type retval = wl.back();
       wl.pop_back();
       unlock();
-      return std::make_pair(true, retval);
+      return boost::optional<value_type>(retval);
     }
   }
 };
@@ -153,8 +163,18 @@ public:
     return true;
   }
 
-  bool pushi(value_type val)  {
-    return push(val);
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    lock();
+    while (b != e)
+      wl.push_back(*b++);
+    unlock();
+    return true;
+  }
+
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    push(b,e);
   }
 
   boost::optional<value_type> pop() {
@@ -278,8 +298,16 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     return lC->push(val);
   }
 
-  bool pushi(value_type val)  {
-    return push(val);
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    while (b != e)
+      push(*b++);
+    return true;
+  }
+
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    push(b,e);
   }
 
   boost::optional<value_type> pop() {
@@ -287,7 +315,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     perItem& p = current.get();
     CTy*& C = p.current;
     boost::optional<value_type> retval;
-    if (C && (retval = C->pop()).first)
+    if (C && (retval = C->pop()))
       return retval;
     //Failed, find minimum bin
 #if ASDF
@@ -313,7 +341,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
         ee = p.local.end(); ii != ee; ++ii) {
       p.curVersion = ii->first;
       C = ii->second;
-      if ((retval = C->pop()).first) {
+      if ((retval = C->pop())) {
 #if ASDF
         p.cache[ii->first] = true;
 #endif
@@ -324,8 +352,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
 #endif
       }
     }
-    retval.first = false;
-    return retval;
+    return boost::optional<value_type>();
   }
 };
 WLCOMPILECHECK(OrderedByIntegerMetric);
@@ -354,16 +381,23 @@ public:
     return local.get().push(val);
   }
 
-  bool pushi(value_type val) {
-    return global.pushi(val);
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    while (b != e)
+      push(*b++);
+    return true;
+  }
+
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    global.push_initial(b,e);
   }
 
   boost::optional<value_type> pop() {
     boost::optional<value_type> ret = local.get().pop();
-    if (ret.first)
+    if (ret)
       return ret;
-    ret = global.pop();
-    return ret;
+    return global.pop();
   }
 };
 WLCOMPILECHECK(LocalQueues);
@@ -391,13 +425,19 @@ class LocalStealing : private boost::noncopyable {
     return local.get().push(val);
   }
 
-  bool pushi(value_type val)  {
-    return push(val);
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    return local.get().push(b,e);
+  }
+
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    local.get().push_initial(b,e);
   }
 
   boost::optional<value_type> pop() {
     boost::optional<value_type> ret = local.get().pop();
-    if (ret.first)
+    if (ret)
       return ret;
     return local.getNext(ThreadPool::getActiveThreads()).pop();
   }
@@ -427,8 +467,14 @@ class LevelStealing : private boost::noncopyable {
     return local.get().push(val);
   }
 
-  bool pushi(value_type val)  {
-    return push(val);
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    return local.get().push(b,e);
+  }
+
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    local.get().push_initial(b,e);
   }
 
   boost::optional<value_type> pop() {
@@ -526,7 +572,7 @@ class ChunkedMaster : private boost::noncopyable {
     //   }
     // }
 
-    for (int i = id + 1; i < Q.size(); ++i) {
+    for (int i = id + 1; i < (int) Q.size(); ++i) {
       r = popChunkByID(i);
       if (r) 
 	return r;
@@ -582,8 +628,7 @@ public:
 
   template<typename Iter>
   void push_initial(Iter b, Iter e) {
-    while (b != e)
-      push(*b++);
+    push(b,e);
   }
 
   boost::optional<value_type> pop()  {
@@ -696,8 +741,16 @@ public:
     return true;
   }
 
-  bool pushi(value_type val)  {
-    return push(val);
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    while (b != e)
+      push(*b++);
+    return true;
+  }
+
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    push(b,e);
   }
 
   boost::optional<value_type> pop() {
@@ -729,8 +782,16 @@ public:
     return true;
   }
 
-  bool pushi(value_type val)  {
-    return push(val);
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    while (b != e)
+      push(*b++);
+    return true;
+  }
+
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    push(b,e);
   }
 
   boost::optional<value_type> pop() {

@@ -64,7 +64,7 @@ class UserContext: private boost::noncopyable {
   }
 
   //! push stuff
-  typedef std::vector<T> pushBufferTy;
+  typedef std::vector<T,PerIterAllocTy> pushBufferTy;
   pushBufferTy pushBuffer;
 
   pushBufferTy& __getPushBuffer() {
@@ -75,10 +75,9 @@ public:
   UserContext()
     :IterationAllocatorBase(), 
      PerIterationAllocator(&IterationAllocatorBase),
-     breakFlag(0)
-  {
-    pushBuffer.reserve(64);
-  }
+     breakFlag(0),
+     pushBuffer(PerIterationAllocator)
+  {}
 
   //! Signal break in parallel loop
   void breakLoop() {

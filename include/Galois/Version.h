@@ -1,11 +1,11 @@
-/** Check worklist instantiations -*- C++ -*-
+/** Version -*- C++ -*-
  * @file
  * @section License
  *
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -18,37 +18,12 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
- * @author Andrew Lenharth <andrewl@lenharth.org>
+ * @section Description
+ *
+ * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-template<typename T2>
-struct checker {
-  typedef typename T2::template retype<int>::WL T;
-  T wl;
-  typename T::template rethread<true>::WL wl2;
-  typename T::template rethread<false>::WL wl3;
+#ifndef GALOIS_VERSION_H
+#define GALOIS_VERSION_H
 
-  checker() {
-    int a[3] = {1,2,3};
-    wl.push(0);
-    wl.push_initial(&a[0], &a[4]);
-    wl.push(&a[0], &a[4]);
-    wl.pop();
-
-    wl2.push(0);
-    wl2.push_initial(&a[0], &a[4]);
-    wl2.push(&a[0], &a[4]);
-    wl2.pop();
-
-    wl3.push(0);
-    wl3.push_initial(&a[0], &a[4]);
-    wl3.push(&a[0], &a[4]);
-    wl3.pop();
-  }
-};
-
-#define WLCOMPILECHECK(name) checker<name<> > ck_##name;
-#include "Galois/Runtime/WorkList.h"
-
-int main() {
-  return 0;
-}
+#include "config.h"
+#endif

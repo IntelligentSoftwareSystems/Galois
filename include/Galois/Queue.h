@@ -27,6 +27,7 @@
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/mem.h"
 #include <boost/utility.hpp>
+#include <boost/optional.hpp>
 #include <stdlib.h>
 #include <limits>
 #include <vector>
@@ -1357,23 +1358,23 @@ public:
    * @return the removed first entry of this map, or <tt>null</tt> if the map
    *         is empty.
    */
-  std::pair<bool,V*> pollFirstValue() {
+  boost::optional<V*> pollFirstValue() {
     SnapshotEntry retval = doRemoveFirst();
     if (retval.valid)
-      return std::make_pair(true, retval.value);
+      return boost::optional<V*>(retval.value);
     else
-      return std::make_pair(false, static_cast<V*>(NULL));
+      return boost::optional<V*>();
   }
 
   /**
    * Remove first entry; return key or null if empty.
    */
-  std::pair<bool, K> pollFirstKey() {
+  boost::optional<K> pollFirstKey() {
     SnapshotEntry retval = doRemoveFirst();
     if (retval.valid)
-      return std::make_pair(true, retval.key);
+      return boost::optional<K>(retval.key);
     else
-      return std::make_pair(false, K());
+      return boost::optional<K>();
   }
 
   /* ---------------- Finding and removing last element -------------- */
@@ -1606,13 +1607,13 @@ public:
     }
   }
 
-  std::pair<bool,T> pollMin() {
+  boost::optional<T> pollMin() {
     if (empty())
-      return std::make_pair(false, T());
+      return boost::optional<T>();
     T retval = m_root->value;
     m_root = deleteMin(m_root);
 
-    return std::make_pair(true, retval);
+    return boost::optional<T>(retval);
   }
 };
 
@@ -1621,7 +1622,7 @@ template<class T,class Compare=std::less<T>,bool Concurrent=true>
 class FCPairingHeap: private boost::noncopyable {
   struct Op {
     T item;
-    std::pair<bool,T> retval;
+    boost::optional<T> retval;
     Op* response;
     bool req;
   };
@@ -1773,7 +1774,7 @@ public:
     } while(1);
   }
 
-  std::pair<bool,T> pollMin() {
+  boost::optional<T> pollMin() {
     Slot* mySlot = getMySlot();
     //Slot* volatile& myNext = mySlot->next;
     Op* volatile& myReq = mySlot->req;
@@ -1791,7 +1792,7 @@ public:
         flatCombine();
         lock.unlock();
 
-        std::pair<bool,T> retval = myReq->retval;
+	boost::optional<T> retval = myReq->retval;
         recycleOp(req->response);
         recycleOp(req);
         return retval;
@@ -1803,7 +1804,7 @@ public:
 #endif
         }
         _GLIBCXX_READ_MEM_BARRIER;
-        std::pair<bool,T> retval = myReq->retval;
+	boost::optional<T> retval = myReq->retval;
         recycleOp(req->response);
         recycleOp(req);
         return retval;

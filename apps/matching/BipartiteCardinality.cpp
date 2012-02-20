@@ -24,8 +24,7 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-// XXX(ddn): To evaluate:
-//  apps/matching/max-card-bipartite -t 1 -algo 3 -wltype 0 1000000 100000000 10000 12
+
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
 #include "Galois/Graphs/Graph.h"
@@ -33,7 +32,7 @@
 #include "Galois/Graphs/FileGraph.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
-#include "Exp/PriorityScheduling/WorkListTL.h"
+//#include "Exp/PriorityScheduling/WorkListTL.h"
 
 #include <string>
 #include <vector>
@@ -73,15 +72,6 @@ struct BipartiteGraph: public Galois::Graph::FirstGraph<NodeTy,EdgeTy,true> {
   bool addNode(const typename Super::GraphNode& n, Galois::MethodFlag mflag = Galois::ALL) {
     return Super::addNode(n, mflag);
   }
-
-
-  /*
-  bool removeNode(typename Super::GraphNode n, Galois::MethodFlag mflag = Galois::ALL) {
-    assert(0 && "Not supported in Bipartite Graph");
-    abort();
-    return false;
-  }
-  */
 };
 
 //******************************** Common ************************
@@ -456,6 +446,10 @@ struct MatchingABMP {
           g.addEdge(ii->second, ii->first, Galois::NONE);
         }
         //revs.clear();
+        if (revs.size() > 1024) {
+          std::cout << "WARNING: allocating large amounts in parallel: " 
+            << revs.size() << "elements\n";
+        }
         return false;
       } else if (nextEdge(g, cur, next)) {
         // (2) Advance
@@ -524,8 +518,9 @@ struct MatchingABMP {
     typedef dChunkedFIFO<1024> dChunk;
     typedef OrderedByIntegerMetric<Indexer,dChunk> OBIM;
     
-    Exp::StartWorklistExperiment<OBIM,dChunk,Chunk,Indexer,Less,Greater>()(
-        std::cout, initial.begin(), initial.end(), Process(*this, g, maxLayer, size));
+    //Exp::StartWorklistExperiment<OBIM,dChunk,Chunk,Indexer,Less,Greater>()(
+    //    std::cout, initial.begin(), initial.end(), Process(*this, g, maxLayer, size));
+    Galois::for_each<OBIM>(initial.begin(), initial.end(), Process(*this, g, maxLayer, size));
     
     t.start();
     MatchingFF<G,false> algo;

@@ -3,8 +3,8 @@
 #include <iostream>
 #include <vector>
 
-void check(const std::pair<bool,int>& r, int exp) {
-  if (r.first && r.second == exp)
+void check(const boost::optional<int>& r, int exp) {
+  if (r && *r == exp)
     ;
   else {
     std::cerr << "Expected " << exp << "\n";

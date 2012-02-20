@@ -48,10 +48,12 @@ public:
     return push(val);
   }
 
-  std::pair<bool, value_type> pop() {
+  boost::optional<value_type> pop() {
     T V = T();
     bool B = wl.try_pop(V);
-    return std::make_pair(B, V);
+    if (B)
+      return boost::optional<value_type>(V);
+    return boost::optional<value_type>();
   }
 };
 WLCOMPILECHECK(TbbFIFO);
@@ -111,35 +113,41 @@ WLCOMPILECHECK(TbbFIFO);
     return retval;
   }
 
-  bool pushi(value_type val) {
-    return push(val);
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    while (b != e)
+      push(*b++);
+    return true;
   }
-  
-  std::pair<bool, value_type> pop() {
+
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    push(b,e);
+  }
+   
+  boost::optional<value_type> pop() {
     //Fastpath
     CTy* c = current;
-    std::pair<bool, value_type> retval;
-    if (c && (retval = c->pop()).first)
+    boost::optional<value_type> retval;
+    if (c && (retval = c->pop()))
       return retval;
-
+    
     //Failed, find minimum bin
-    retval.first = false;
     //    if (ThreadPool::getMyID() == 1) {
-      lock();
+    lock();
     if (current != c) {
       unlock();
       return pop();
     }
-      for (typename std::map<int, CTy*>::iterator ii = mapping.begin(), ee = mapping.end(); ii != ee; ++ii) {
-	current = ii->second;
-	if ((retval = current->pop()).first) {
-	  cint = ii->first;
-	  goto exit;
-	}
+    for (typename std::map<int, CTy*>::iterator ii = mapping.begin(), ee = mapping.end(); ii != ee; ++ii) {
+      current = ii->second;
+      if ((retval = current->pop())) {
+	cint = ii->first;
+	goto exit;
       }
-      retval.first = false;
-    exit:
-      unlock();
+    }
+  exit:
+    unlock();
     //   }
     return retval;
   }
@@ -207,16 +215,24 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
     return retval;
   }
 
-  bool pushi(value_type val) {
-    return push(val);
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    while (b != e)
+      push(*b++);
+    return true;
   }
 
-  std::pair<bool, value_type> pop() {
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    push(b,e);
+  }
+
+  boost::optional<value_type> pop() {
     //Find a successful pop
     perItem& pI = current.get();
     CTy*& C = pI.current;
-    std::pair<bool, value_type> retval;
-    if (C && (retval = C->pop()).first)
+    boost::optional<value_type> retval;
+    if (C && (retval = C->pop()))
       return retval;
     //Failed, find minimum bin
     for (int i = 0; i <= maxV; ++i) {
@@ -224,11 +240,10 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
       if (wl.find(a, i)) {
 	pI.curVersion = i;
 	C = a->second;
-	if (C && (retval = C->pop()).first)
+	if (C && (retval = C->pop()))
 	  return retval;
       }
     }
-    retval.first = false;
     return retval;
   }
 };
@@ -288,18 +303,26 @@ class BarrierOBIM : private boost::noncopyable {
     return B[index].push(val);
   }
 
-  bool pushi(value_type val) {
-    return push(val);
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    while (b != e)
+      push(*b++);
+    return true;
+  }
+  
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    push(b,e);
   }
 
-  std::pair<bool, value_type> pop() {
+  boost::optional<value_type> pop() {
     do {
       if (current > pushmax)
-	return std::make_pair(false, value_type());
+	return boost::optional<value_type>();
       do {
 	//Find a successful pop
-	std::pair<bool, value_type> retval = B[current].pop();
-	if (retval.first) {
+	boost::optional<value_type> retval = B[current].pop();
+	if (retval) {
 	  term.workHappened();
 	  return retval;
 	}
@@ -354,15 +377,25 @@ public:
     return true;
   }
 
-  bool pushi(value_type val) {
-    return push(val);
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    lock();
+    while (b != e)
+      wl.push_back(*b++);
+    unlock();
+    return true;
   }
 
-  std::pair<bool, value_type> pop() {
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    push(b,e);
+  }
+
+  boost::optional<value_type> pop() {
     lock();
     if (wl.empty()) {
       unlock();
-      return std::make_pair(false, value_type());
+      return boost::optional<value_type>();
     } else {
       size_t size = wl.size();
       unsigned int index = nextRand() % size;
@@ -370,7 +403,7 @@ public:
       std::swap(wl[index], wl[size-1]);
       wl.pop_back();
       unlock();
-      return std::make_pair(true, retval);
+      return boost::optional<value_type>(retval);
     }
   }
 };
@@ -433,11 +466,20 @@ public:
     return true;
   }
 
-  bool pushi(value_type val) {
-    return push(val);
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    while (b != e)
+      push(*b++);
+    return true;
   }
 
-  std::pair<bool, value_type> pop() {
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    while (b != e)
+      push(*b++);
+  }
+
+  boost::optional<value_type> pop() {
     value_type retval;
     PTD& N = tld.get();
     if (N.V) {
@@ -449,11 +491,10 @@ public:
       N.V = false;
       N.L.unlock();
     }
-    if (N.wl.try_pop(retval)) {
-      return std::make_pair(true, retval);
-    } else {
-      return std::make_pair(false, value_type());
-    }
+    boost::optional<value_type> rv;
+    if (N.wl.try_pop(retval))
+      rv = retval;
+    return rv;
   }
 };
 
@@ -478,16 +519,24 @@ public:
     return true;
   }
 
-  bool pushi(value_type val) {
-    return push(val);
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    while (b != e)
+      push(*b++);
+    return true;
   }
 
-  std::pair<bool, value_type> pop() {
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    push(b,e);
+  }
+
+  boost::optional<value_type> pop() {
     value_type retval;
     if (wl.try_pop(retval)) {
-      return std::make_pair(true, retval);
+      return boost::optional<value_type>(retval);
     } else {
-      return std::make_pair(false, value_type());
+      return boost::optional<value_type>();
     }
   }
 };

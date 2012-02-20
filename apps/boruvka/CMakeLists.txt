@@ -1,1 +1,1 @@
-app(boruvka Boruvka.cpp REQUIRES TBB_FOUND)
+app(boruvka Boruvka.cpp)
