@@ -131,7 +131,7 @@ template<typename NTy, typename ETy>
 struct EdgeItem {
   NTy N;
   ETy E;
-  inline NTy getNeighbor() {
+  inline NTy getNeighbor() const {
     return N;
   }
   inline ETy& getData() {
@@ -145,7 +145,7 @@ struct EdgeItem {
 template<typename NTy>
 struct EdgeItem<NTy, void> {
   NTy N;
-  inline NTy getNeighbor() {
+  inline NTy getNeighbor() const {
     return N;
   }
   inline typename VoidWrapper<void>::ref_type getData() {
@@ -180,6 +180,14 @@ public:
   typedef typename VoidWrapper<EdgeTy>::type edge_type;
 
 private:
+  template<typename T>
+  struct first_eq {
+    T N2;
+    first_eq(T& n) :N2(n) {}
+    template <typename T2>
+    bool operator()(const T2& ii) const { return ii.getNeighbor() == N2; }
+  };
+
   struct gNode: public GaloisRuntime::Lockable {
     //! The storage type for an edge
     typedef EdgeItem<gNode*, EdgeTy> EITy;
@@ -390,7 +398,9 @@ public:
    * pass ::GraphUnit instead.
    */
   GraphNode createNode(const_node_reference n) {
-    gNode N(n, false);
+    // TODO(ddn): make semantics the same
+    //gNode N(n, false);
+    gNode N(n, true);
     return GraphNode(this, &(nodes.push(N)));
   }
 
@@ -574,11 +584,47 @@ public:
     return N.ID->edges.size();
   }
 
+  typedef typename gNode::iterator edge_iterator;
+
+  edge_iterator edge_begin(GraphNode N, Galois::MethodFlag mflag = ALL) {
+    assert(N.ID);
+    acquire(N.ID, mflag);
+
+    if (shouldLock(mflag)) {
+      for (typename gNode::neighbor_iterator ii = N.ID->neighbor_begin(), ee =
+             N.ID->neighbor_end(); ii != ee; ++ii) {
+        acquire(*ii, mflag);
+      }
+    }
+    return N.ID->begin();
+  }
+
+  edge_iterator edge_end(GraphNode N, Galois::MethodFlag mflag = ALL) {
+    assert(N.ID);
+    return N.ID->end();
+  }
+
+  edge_iterator findEdge(GraphNode A, GraphNode B, Galois::MethodFlag mflag = ALL) {
+    assert(A.ID);
+    acquire(A.ID, mflag);
+    return std::find_if(A.ID->begin(), A.ID->end(), first_eq<gNode*>(B.ID));
+  }
+
+  edge_reference getEdgeData(const edge_iterator& ii) const {
+    return ii->getData();
+  }
+
+  GraphNode getEdgeDst(const edge_iterator& ii) const {
+    return makeGraphNodePtr(const_cast<FirstGraph*>(this))(ii->getNeighbor());
+  }
+
+  //! Deprecated in favor of edge_iterator
   typedef typename boost::transform_iterator<makeGraphNodePtr,
 					     typename gNode::neighbor_iterator>
                                                neighbor_iterator;
 
   //! Returns an iterator to the neighbors of a node 
+  //! Deprecated in favor of edge_begin
   neighbor_iterator neighbor_begin(GraphNode N, Galois::MethodFlag mflag = ALL) {
     assert(N.ID);
     acquire(N.ID, mflag);
@@ -594,6 +640,7 @@ public:
   }
 
   //! Returns the end of the neighbor iterator 
+  //! Deprecated in favor of edge_end
   neighbor_iterator neighbor_end(GraphNode N, Galois::MethodFlag mflag = ALL) {
     assert(N.ID);
     // Not necessary; no valid use for an end pointer should ever require it
@@ -605,6 +652,7 @@ public:
 
   //! Returns edge data given a neighbor iterator; neighbor iterator should be
   //! from neighbor_begin with the same src.
+  //! Deprecated in favor of getEdgeData(edge_iterator)
   edge_reference getEdgeData(GraphNode src, neighbor_iterator dst,
       Galois::MethodFlag mflag = ALL) {
     assert(src.ID);

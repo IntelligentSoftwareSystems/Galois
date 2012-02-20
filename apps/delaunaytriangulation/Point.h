@@ -69,14 +69,6 @@ public:
     return m_n;
   }
 
-  bool getNodeForElement(const Tuple& t, GNode& result) const {
-    if (inMesh() && m_n.getData(Galois::NONE).inTriangle(t)) {
-      result = m_n;
-      return true;
-    }
-    return false;
-  }
-
   void nextTry() {
     if (++m_tries == 0) {
       assert(0 && "tries overflow");
@@ -88,7 +80,7 @@ public:
     os << "(id: " << m_id << " t: ";
     m_t.print(os);
     if (m_n != GNode())
-      m_n.getData().print(os);
+      os << "SOME";
     else
       os << "NULL";
     os << ")";

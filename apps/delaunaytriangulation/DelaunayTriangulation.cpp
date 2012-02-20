@@ -78,10 +78,11 @@ struct Process {
   QuadTree* tree;
 
   struct ContainsTuple {
+    const Graph& graph;
     Tuple tuple;
-    ContainsTuple(const Tuple& t): tuple(t) { }
+    ContainsTuple(const Graph& g, const Tuple& t): graph(g), tuple(t) { }
     bool operator()(const GNode& n) const {
-      return n.getData(Galois::NONE).inTriangle(tuple);
+      return graph.getData(n, Galois::NONE).inTriangle(tuple);
     }
   };
 
@@ -103,7 +104,7 @@ struct Process {
       return false;
     }
 
-    ContainsTuple contains(p->t());
+    ContainsTuple contains(*graph, p->t());
     Searcher<Alloc> searcher(*graph, alloc);
     searcher.useMark(p, 0, p->numTries());
     searcher.findFirst(someNode, contains);
@@ -130,7 +131,7 @@ struct Process {
       return;
     }
   
-    assert(node.getData().inTriangle(p->t()));
+    assert(graph->getData(node).inTriangle(p->t()));
     assert(graph->containsNode(node));
 
     Cavity<Alloc> cav(*graph, ctx.getPerIterAlloc());
@@ -151,7 +152,7 @@ struct Process {
       abort();
     }
   
-    assert(node.getData().inTriangle(p->t()));
+    assert(graph->getData(node).inTriangle(p->t()));
     assert(graph->containsNode(node));
 
     Cavity<> cav(*graph);
@@ -290,8 +291,6 @@ static void addBoundaryNodes(PointList& points) {
   Element large_triangle(p1, p2, p3);
   GNode large_node = graph->createNode(large_triangle);
   
-  graph->addNode(large_node);
-
   p1->addElement(large_node);
   p2->addElement(large_node);
   p3->addElement(large_node);
@@ -303,10 +302,6 @@ static void addBoundaryNodes(PointList& points) {
   GNode border_node1 = graph->createNode(border_ele1);
   GNode border_node2 = graph->createNode(border_ele2);
   GNode border_node3 = graph->createNode(border_ele3);
-
-  graph->addNode(border_node1);
-  graph->addNode(border_node2);
-  graph->addNode(border_node3);
 
   graph->addEdge(large_node, border_node1, 0);
   graph->addEdge(large_node, border_node2, 1);
@@ -329,7 +324,7 @@ static void writeMesh(const std::string& filename) {
   long numTriangles = 0;
   long numSegments = 0;
   for (Graph::active_iterator ii = graph->active_begin(), ei = graph->active_end(); ii != ei; ++ii) {
-    Element& e = ii->getData();
+    Element& e = graph->getData(*ii);
     if (e.boundary()) {
       numSegments++;
     } else {
@@ -355,7 +350,7 @@ static void writeMesh(const std::string& filename) {
   pout << "0 2 0 0\n";
   pout << numSegments << " 1\n";
   for (Graph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
-    const Element& e = ii->getData();
+    const Element& e = graph->getData(*ii);
     if (e.boundary()) {
       // <segment id> <vertex> <vertex> <is boundary>
       pout << sid << " " << e.getPoint(0)->id() << " " << e.getPoint(1)->id() << " 1\n";

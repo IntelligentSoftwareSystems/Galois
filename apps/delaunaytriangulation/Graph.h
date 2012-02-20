@@ -83,11 +83,11 @@ struct Searcher: private boost::noncopyable {
 
       if (!graph.containsNode(cur, Galois::CHECK_CONFLICT))
         continue;
-      if (cur.getData(Galois::NONE).mark == mark)
+      if (graph.getData(cur, Galois::NONE).mark == mark)
         continue;
 
       if (!all) {
-        cur.getData(Galois::NONE).mark = mark;
+        graph.getData(cur, Galois::NONE).mark = mark;
       }
 
       bool matched = false;
@@ -95,7 +95,7 @@ struct Searcher: private boost::noncopyable {
         matched = true;
         matches.push_back(cur);
         if (all) {
-          cur.getData(Galois::NONE).mark = mark;
+          graph.getData(cur, Galois::NONE).mark = mark;
         }
         else
           break; // Found it
@@ -107,10 +107,10 @@ struct Searcher: private boost::noncopyable {
       // Search neighbors (a) when matched and looking for all or (b) when no match and looking
       // for first
       if (matched == all) {
-        for (Graph::neighbor_iterator ii = graph.neighbor_begin(cur, Galois::CHECK_CONFLICT),
-            ee = graph.neighbor_end(cur, Galois::CHECK_CONFLICT);
+        for (Graph::edge_iterator ii = graph.edge_begin(cur, Galois::CHECK_CONFLICT),
+            ee = graph.edge_end(cur, Galois::CHECK_CONFLICT);
             ii != ee; ++ii) {
-          GNode dst = *ii;
+          GNode dst = graph.getEdgeDst(ii);
           wl.push_back(std::make_pair(dst, cur));
         }
       }

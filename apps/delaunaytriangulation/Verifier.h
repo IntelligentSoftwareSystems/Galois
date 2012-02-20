@@ -39,18 +39,17 @@ class Verifier {
     for (Graph::active_iterator ii = graph->active_begin(),
         ei = graph->active_end(); ii != ei; ++ii) {
       const GNode& node = *ii;
-      Element& e = node.getData(Galois::NONE);
+      Element& e = graph->getData(node);
 
+      size_t s = std::distance(graph->edge_begin(node), graph->edge_end(node));
       if (e.dim() == 2) {
-        if (graph->neighborsSize(node, Galois::NONE) != 1) {
-          std::cerr << "Error: Segment " << e << " has " 
-            << graph->neighborsSize(node, Galois::NONE) << " relation(s)\n";
+        if (s != 1) {
+          std::cerr << "Error: Segment " << e << " has " << s << " relation(s)\n";
           error = true;
         }
       } else if (e.dim() == 3) {
-        if (graph->neighborsSize(*ii, Galois::NONE) != 3) {
-          std::cerr << "Error: Triangle " << e << " has "
-            << graph->neighborsSize(node, Galois::NONE) << " relation(s)\n";
+        if (s != 3) {
+          std::cerr << "Error: Triangle " << e << " has " << s << " relation(s)\n";
           error = true;
         }
       } else {
@@ -77,13 +76,14 @@ class Verifier {
         }
         found.insert(node);
         int i = 0;
-        for (Graph::neighbor_iterator ii = graph->neighbor_begin(node, Galois::NONE),
-            ei = graph->neighbor_end(node, Galois::NONE); ii != ei; ++ii) {
+        for (Graph::edge_iterator ii = graph->edge_begin(node),
+            ei = graph->edge_end(node); ii != ei; ++ii) {
+          GNode n = graph->getEdgeDst(ii);
           assert(i < 3);
-          assert(graph->containsNode(*ii));
-          assert(node != *ii);
+          assert(graph->containsNode(n));
+          assert(node != n);
           ++i;
-          remaining.push(*ii);
+          remaining.push(n);
         }
       }
     }
@@ -100,12 +100,12 @@ class Verifier {
     for (Graph::active_iterator ii = graph->active_begin(),
         ei = graph->active_end(); ii != ei; ++ii) {
       const GNode& node = *ii;
-      Element& e1 = node.getData(Galois::NONE);
+      Element& e1 = graph->getData(node);
 
-      for (Graph::neighbor_iterator jj = graph->neighbor_begin(node, Galois::NONE),
-          ej = graph->neighbor_end(node, Galois::NONE); jj != ej; ++jj) {
-        const GNode& neighborNode = *jj;
-        Element& e2 = neighborNode.getData(Galois::NONE);
+      for (Graph::edge_iterator jj = graph->edge_begin(node),
+          ej = graph->edge_end(node); jj != ej; ++jj) {
+        const GNode& n = graph->getEdgeDst(jj);
+        Element& e2 = graph->getData(n);
         if (e1.dim() == 3 && e2.dim() == 3) {
           Tuple t2;
           if (!getTupleT2OfRelatedEdge(e1, e2, t2)) {
