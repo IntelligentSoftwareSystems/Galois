@@ -30,7 +30,9 @@
 
 #include "Lonestar/BoilerPlate.h"
 
+#ifdef GALOIS_EXP
 #include "Galois/Runtime/WorkListAlt.h"
+#endif
 
 static const char* name = "Schedeler Micro Benchmark";
 static const char* desc = "Measure stuff\n";
@@ -72,6 +74,7 @@ int main(int argc, char** argv) {
   Galois::for_each<dChunkedLIFO<64> >(v.begin(), v.end(), process());
   T2.stop();
 
+#ifdef GALOIS_EXP
   Galois::StatTimer T3("T3");
   T3.start();
   using namespace GaloisRuntime::WorkList;
@@ -79,6 +82,7 @@ int main(int argc, char** argv) {
   Galois::for_each<Alt::ChunkedAdaptor<Alt::InitialQueue<Alt::LevelStealingAlt, Alt::LevelLocalAlt>, 64> >(v.begin(), v.end(), process());
 
   T3.stop();
+#endif
 
   // Galois::StatTimer T4("T4");
   // T4.start();
