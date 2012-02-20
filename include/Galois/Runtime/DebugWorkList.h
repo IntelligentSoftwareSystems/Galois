@@ -109,13 +109,21 @@ public:
     return wl.push(val);
   }
 
-  bool pushi(value_type val) {
-    return wl.pushi(val);
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    while (b != e)
+      push(*b++);
+    return true;
   }
 
-  std::pair<bool, value_type> pop() {
-    std::pair<bool, value_type> ret = wl.pop();
-    if (!ret.first) return ret;
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    push(b,e);
+  }
+
+  boost::optional<value_type> pop() {
+    boost::optional<value_type> ret = wl.pop();
+    if (!ret) return ret;
     p& P = tracking.get();
     unsigned int cclock = clock.data;
     if (P.epoch != cclock) {
@@ -124,7 +132,7 @@ public:
       P.stat.reset();
       P.epoch = clock.data;
     }
-    unsigned int index = I(ret.second);
+    unsigned int index = I(*ret);
     P.stat.insert(index);
     if (tracking.myEffectiveID() == 0) {
       ++thread_clock.data;
@@ -159,11 +167,19 @@ public:
     return wl.push(val);
   }
 
-  bool pushi(value_type val) __attribute__((noinline)) {
-    return wl.pushi(val);
+  //These cannot have noinline in gcc, which makes this semi-useless
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    return wl.push(b,e);
   }
 
-  std::pair<bool, value_type> pop() __attribute__((noinline)) {
+  //These cannot have noinline in gcc, which makes this semi-useless
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    wl.push_initial(b,e);
+  }
+
+  boost::optional<value_type> pop()  {
     return wl.pop();
   }
 };

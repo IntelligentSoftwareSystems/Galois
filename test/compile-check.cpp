@@ -28,16 +28,20 @@ struct checker {
   typename T::template rethread<false>::WL wl3;
 
   checker() {
+    int a[3] = {1,2,3};
     wl.push(0);
-    wl.pushi(3);
+    wl.push_initial(&a[0], &a[4]);
+    wl.push(&a[0], &a[4]);
     wl.pop();
 
     wl2.push(0);
-    wl2.pushi(3);
+    wl2.push_initial(&a[0], &a[4]);
+    wl2.push(&a[0], &a[4]);
     wl2.pop();
 
     wl3.push(0);
-    wl3.pushi(3);
+    wl3.push_initial(&a[0], &a[4]);
+    wl3.push(&a[0], &a[4]);
     wl3.pop();
   }
 };

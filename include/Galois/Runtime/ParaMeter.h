@@ -256,9 +256,7 @@ public:
 
   template <typename Iter>
   bool addInitialWork (Iter b, Iter e) {
-    for (; b != e; ++b)
-      workList.getCurr ().pushi (*b);
-
+    workList.getCurr().push_initial(b,e);
     return true;
   }
 
@@ -301,21 +299,21 @@ public:
 
       size_t numIter = 0;
 
-      for (std::pair<bool, value_type> item = workList.getCurr ().pop ();
-          item.first; item = workList.getCurr ().pop ()) {
+      for (boost::optional<value_type> item = workList.getCurr ().pop ();
+          item; item = workList.getCurr ().pop ()) {
 
         IterationContext& it = newIteration ();
 
         bool doabort = false;
         try {
-          body (item.second, it.facing);
+          body (*item, it.facing);
 
         } catch (int a) {
           doabort = true;
         }
 
         if (doabort) {
-          abortIteration (it, item.second);
+          abortIteration (it, *item);
 
         } else {
 

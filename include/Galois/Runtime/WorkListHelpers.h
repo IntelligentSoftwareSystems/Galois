@@ -34,7 +34,15 @@ class FixedSizeRing :private boost::noncopyable, private LL::PaddedLock<concurre
   using LL::PaddedLock<concurrent>::unlock;
   unsigned start;
   unsigned end;
-  T data[__chunksize + 1];
+  //FIXME: This is the last place requiring default constructors in the worklists
+  //T data[__chunksize + 1];
+
+  char datac[sizeof(T[__chunksize + 1])] __attribute__ ((aligned (__alignof__(T))));
+
+  T* at(int i) {
+    T* s = reinterpret_cast<T*>(&datac[0]);
+    return &s[i];
+  }
 
   inline unsigned chunksize() const { return __chunksize + 1; }
 
@@ -101,7 +109,7 @@ public:
     }
     start += chunksize() - 1;
     start %= chunksize();
-    data[start] = val;
+    new (at(start)) T(val);
     assertSE();
     unlock();
     return true;
@@ -114,7 +122,7 @@ public:
       unlock();
       return false;
     }
-    data[end] = val;
+    new (at(end)) T(val);
     end += 1;
     end %= chunksize();
     assertSE();
@@ -122,34 +130,50 @@ public:
     return true;
   }
 
-  std::pair<bool, value_type> pop_front() {
+  template<typename Iter>
+  Iter push_back(Iter b, Iter e) {
+    lock();
+    assertSE();
+    while (!_i_full() && b != e) {
+      new (at(end)) T(*b++);
+      ++end;
+      end %= chunksize();
+    }
+    assertSE();
+    unlock();
+    return b;
+  }
+
+  boost::optional<value_type> pop_front() {
     lock();
     assertSE();
     if (_i_empty()) {
       unlock();
-      return std::make_pair(false, value_type());
+      return boost::optional<value_type>();
     }
-    value_type retval = data[start];
+    value_type retval = *at(start);
+    at(start)->~T();
     ++start;
     start %= chunksize();
     assertSE();
     unlock();
-    return std::make_pair(true, retval);
+    return boost::optional<value_type>(retval);
   }
 
-  std::pair<bool, value_type> pop_back() {
+  boost::optional<value_type> pop_back() {
     lock();
     assertSE();
     if (_i_empty()) {
       unlock();
-      return std::make_pair(false, value_type());
+      return boost::optional<value_type>();
     }
     end += chunksize() - 1;
     end %= chunksize();
-    value_type retval = data[end];
+    value_type retval = *at(end);
+    at(end)->~T();
     assertSE();
     unlock();
-    return std::make_pair(true, retval);
+    return boost::optional<value_type>(retval);
   }
 };
 

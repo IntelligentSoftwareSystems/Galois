@@ -27,14 +27,13 @@ kind.
 #include <set>
 #include <algorithm>
 #include <boost/utility.hpp>
+#include <boost/optional.hpp>
 
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/Threads.h"
 //#include "Galois/Runtime/QueuingLock.h"
 #include "Galois/Queue.h"
-
-#include <boost/utility.hpp>
 
 #include "mem.h"
 #include "WorkListHelpers.h"
@@ -74,7 +73,7 @@ public:
   bool pushi(value_type val);
 
   //! pop a value from the queue.
-  std::pair<bool, value_type> pop();
+  boost::optional<value_type> pop();
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -108,20 +107,30 @@ public:
     return true;
   }
 
-  bool pushi(value_type val)  {
-    return push(val);
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    lock();
+    while (b != e)
+      wl.push_back(*b++);
+    unlock();
+    return true;
   }
 
-  std::pair<bool, value_type> pop()  {
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    push(b,e);
+  }
+
+  boost::optional<value_type> pop()  {
     lock();
     if (wl.empty()) {
       unlock();
-      return std::make_pair(false, value_type());
+      return boost::optional<value_type>();
     } else {
       value_type retval = wl.back();
       wl.pop_back();
       unlock();
-      return std::make_pair(true, retval);
+      return boost::optional<value_type>(retval);
     }
   }
 };
@@ -154,20 +163,30 @@ public:
     return true;
   }
 
-  bool pushi(value_type val)  {
-    return push(val);
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    lock();
+    while (b != e)
+      wl.push_back(*b++);
+    unlock();
+    return true;
   }
 
-  std::pair<bool, value_type> pop() {
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    push(b,e);
+  }
+
+  boost::optional<value_type> pop() {
     lock();
     if (wl.empty()) {
       unlock();
-      return std::make_pair(false, value_type());
+      return boost::optional<value_type>();
     } else {
       value_type retval = wl.front();
       wl.pop_front();
       unlock();
-      return std::make_pair(true, retval);
+      return boost::optional<value_type>(retval);
     }
   }
 };
@@ -279,16 +298,24 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     return lC->push(val);
   }
 
-  bool pushi(value_type val)  {
-    return push(val);
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    while (b != e)
+      push(*b++);
+    return true;
   }
 
-  std::pair<bool, value_type> pop() {
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    push(b,e);
+  }
+
+  boost::optional<value_type> pop() {
     //Find a successful pop
     perItem& p = current.get();
     CTy*& C = p.current;
-    std::pair<bool, value_type> retval;
-    if (C && (retval = C->pop()).first)
+    boost::optional<value_type> retval;
+    if (C && (retval = C->pop()))
       return retval;
     //Failed, find minimum bin
 #if ASDF
@@ -314,7 +341,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
         ee = p.local.end(); ii != ee; ++ii) {
       p.curVersion = ii->first;
       C = ii->second;
-      if ((retval = C->pop()).first) {
+      if ((retval = C->pop())) {
 #if ASDF
         p.cache[ii->first] = true;
 #endif
@@ -325,8 +352,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
 #endif
       }
     }
-    retval.first = false;
-    return retval;
+    return boost::optional<value_type>();
   }
 };
 WLCOMPILECHECK(OrderedByIntegerMetric);
@@ -355,16 +381,23 @@ public:
     return local.get().push(val);
   }
 
-  bool pushi(value_type val) {
-    return global.pushi(val);
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    while (b != e)
+      push(*b++);
+    return true;
   }
 
-  std::pair<bool, value_type> pop() {
-    std::pair<bool, value_type> ret = local.get().pop();
-    if (ret.first)
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    global.push_initial(b,e);
+  }
+
+  boost::optional<value_type> pop() {
+    boost::optional<value_type> ret = local.get().pop();
+    if (ret)
       return ret;
-    ret = global.pop();
-    return ret;
+    return global.pop();
   }
 };
 WLCOMPILECHECK(LocalQueues);
@@ -392,13 +425,19 @@ class LocalStealing : private boost::noncopyable {
     return local.get().push(val);
   }
 
-  bool pushi(value_type val)  {
-    return push(val);
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    return local.get().push(b,e);
   }
 
-  std::pair<bool, value_type> pop() {
-    std::pair<bool, value_type> ret = local.get().pop();
-    if (ret.first)
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    local.get().push_initial(b,e);
+  }
+
+  boost::optional<value_type> pop() {
+    boost::optional<value_type> ret = local.get().pop();
+    if (ret)
       return ret;
     return local.getNext(ThreadPool::getActiveThreads()).pop();
   }
@@ -428,23 +467,29 @@ class LevelStealing : private boost::noncopyable {
     return local.get().push(val);
   }
 
-  bool pushi(value_type val)  {
-    return push(val);
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    return local.get().push(b,e);
   }
 
-  std::pair<bool, value_type> pop() {
-    std::pair<bool, value_type> ret = local.get().pop();
-    if (ret.first)
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    local.get().push_initial(b,e);
+  }
+
+  boost::optional<value_type> pop() {
+    boost::optional<value_type> ret = local.get().pop();
+    if (ret)
       return ret;
 
     int mp = LL::getMaxPackageForThread(ThreadPool::getActiveThreads() - 1);
     int id = local.myEffectiveID();
-    for (int i = 0; i < (int) local.size(); ++i) {
+    for (unsigned i = 0; i < local.size(); ++i) {
       ++id;
       id %= local.size();
       if (id <= mp) {
 	ret = local.get(id).pop();
-	if (ret.first)
+	if (ret)
 	  return ret;
       }
     }
@@ -574,24 +619,32 @@ public:
     return worked;
   }
 
-  bool pushi(value_type val) {
-    return push(val);
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    while (b != e)
+      push(*b++);
+    return true;
   }
 
-  std::pair<bool, value_type> pop()  {
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    push(b,e);
+  }
+
+  boost::optional<value_type> pop()  {
     p& n = data.get();
-    std::pair<bool, value_type> retval;
+    boost::optional<value_type> retval;
     if (isStack) {
-      if (n.next && (retval = n.next->pop_back()).first)
+      if (n.next && (retval = n.next->pop_back()))
 	return retval;
       if (n.next)
 	delChunk(n.next);
       n.next = popChunk();
       if (n.next)
 	return n.next->pop_back();
-      return std::make_pair(false, value_type());
+      return boost::optional<value_type>();
     } else {
-      if (n.cur && (retval = n.cur->pop_front()).first)
+      if (n.cur && (retval = n.cur->pop_front()))
 	return retval;
       if (n.cur)
 	delChunk(n.cur);
@@ -602,7 +655,7 @@ public:
       }
       if (n.cur)
 	return n.cur->pop_front();
-      return std::make_pair(false, value_type());
+      return boost::optional<value_type>();
     }
   }
 };
@@ -652,15 +705,15 @@ public:
     return push(val);
   }
 
-  std::pair<bool, value_type> pop()  {
-    std::pair<bool, value_type> r = Items.get().pop();
+  boost::optional<value_type> pop()  {
+    boost::optional<value_type> r = Items.get().pop();
     // std::cerr << "{" << Items.myEffectiveID() << "}";
     // if (r.first)
     //   std::cerr << r.first;
     return r;
   }
   
-  std::pair<bool, value_type> try_pop() {
+  boost::optional<value_type> try_pop() {
     return pop();
   }
 };
@@ -688,11 +741,19 @@ public:
     return true;
   }
 
-  bool pushi(value_type val)  {
-    return push(val);
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    while (b != e)
+      push(*b++);
+    return true;
   }
 
-  std::pair<bool, value_type> pop() {
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    push(b,e);
+  }
+
+  boost::optional<value_type> pop() {
     return wl.pollFirstKey();
   }
 };
@@ -721,11 +782,19 @@ public:
     return true;
   }
 
-  bool pushi(value_type val)  {
-    return push(val);
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    while (b != e)
+      push(*b++);
+    return true;
   }
 
-  std::pair<bool, value_type> pop() {
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    push(b,e);
+  }
+
+  boost::optional<value_type> pop() {
     return wl.pollMin();
   }
 };
