@@ -69,12 +69,10 @@
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/InsBag.h"
 
-//#include "Galois/Runtime/MemRegionPool.h"
 #include "llvm/ADT/SmallVector.h"
 
 #include <algorithm>
 #include <deque>
-//#include <iostream>
 
 using namespace GaloisRuntime;
 
@@ -105,7 +103,6 @@ struct EdgeItem<NTy, void> {
   EdgeItem(NTy* n, void* e) : N(n) {}
 };
 
-
 /**
  * A Graph.
  *
@@ -114,7 +111,7 @@ struct EdgeItem<NTy, void> {
  * @param Directional true if graph is directed
  */
 template<typename NodeTy, typename EdgeTy, bool Directional>
-class FirstGraph {
+class FirstGraphImpl {
   template<typename T>
   struct first_eq {
     T N2;
@@ -129,19 +126,28 @@ class FirstGraph {
     
     //! The storage type for edges
     typedef llvm::SmallVector<EITy, 3> EdgesTy;
-    typedef typename EdgesTy::iterator iterator;
+
+    struct is_active_edge : public std::unary_function<EITy&, bool> {
+      bool operator()(const EITy& e) const { return e.first()->active; }
+    };
+
+    typedef boost::filter_iterator<is_active_edge,typename EdgesTy::iterator> iterator;
 
     EdgesTy edges;
     NodeTy data;
     bool active;
 
-    gNode(NodeTy& d) :data(d), active(false) { }
+    gNode(const NodeTy& d) :data(d), active(false) { }
     gNode() :active(false) { }
 
-    iterator begin() { return edges.begin(); }
-    iterator end()   { return edges.end();   }
-    void erase(iterator ii) { edges.erase(ii); }
-    void erase(gNode* N) { edges.erase(find(N)); }
+    iterator begin() {
+      return boost::make_filter_iterator(is_active_edge(), edges.begin(), edges.end());
+    }
+    iterator end()   {
+      return boost::make_filter_iterator(is_active_edge(), edges.end(), edges.end());
+    }
+    void erase(iterator ii) { edges.erase(ii.base()); }
+    void erase(gNode* N) { edges.erase(find(N).base()); }
 
     iterator find(gNode* N) {
       return std::find_if(begin(), end(), first_eq<gNode*>(N));
@@ -197,7 +203,7 @@ public:
   /**
    * Creates a new node holding the indicated data.
    */
-  GraphNode createNode(NodeTy& n, Galois::MethodFlag mflag = ALL) {
+  GraphNode createNode(const NodeTy& n, Galois::MethodFlag mflag = ALL) {
     gNode* N = &(nodes.push(gNode(n)));
     N->active = true;
     acquire(N, mflag);
@@ -244,26 +250,28 @@ public:
   }
 
   //// Edge Handling ////
-
-  //! Adds an edge to graph, replacing existing value if edge already exists
-  edge_iterator addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {
-    //FIXME: allocate space for edge data
+protected:
+  //! Adds an edge to graph
+  edge_iterator addEdgeInternal(GraphNode src, GraphNode dst, EdgeTy* data, bool checkDupes, Galois::MethodFlag mflag = ALL) {
     assert(src);
     assert(dst);
     acquire(src, mflag);
-    edge_iterator ii = src->find(dst);
-    if (ii == src->end()) {
+    edge_iterator ii;
+    if (checkDupes)
+      ii = src->find(dst);
+    if (!checkDupes || ii == src->end()) {
       if (Directional) {
-	ii = src->createEdge(dst, 0);
+	ii = src->createEdge(dst, data);
       } else {
 	acquire(dst, mflag);
-	dst->createEdge(src, 0);
-	src->createEdge(dst, 0);
+	dst->createEdge(src, data);
+	ii = src->createEdge(dst, data);
       }
     }
     return ii;
   }
 
+public:
   //! Removes an edge from the graph
   void removeEdge(GraphNode src, edge_iterator dst, Galois::MethodFlag mflag = ALL) {
     assert(src);
@@ -284,16 +292,7 @@ public:
     return src->find(dst);
   }
 
-  /**
-   * Returns the edge data associated with the edge. It is an error to
-   * get the edge data for a non-existent edge.
-   */
-  template<typename rval> //Don't compile this with void edgedata
-  rval& getEdgeData(edge_iterator dst) const {
-    return rval (*dst->second());
-  }
-
-  GraphNode getEdgeDst(edge_iterator ii) {
+  GraphNode getEdgeDst(edge_iterator ii) const {
     return GraphNode(ii->first());
   }
 
@@ -349,33 +348,107 @@ public:
    * Returns the number of nodes in the graph. Not thread-safe.
    */
   unsigned int size () {
-    return std::distance (active_begin (), active_end ());
+    return std::distance(active_begin(), active_end());
   }
 
-  FirstGraph() {
+  FirstGraphImpl() {
     // std::cerr << "NodeSize " << sizeof(gNode) << "\n";
     // std::cerr << "NodeDataSize " << sizeof(NodeTy) << "\n";
     // std::cerr << "NodeEdgesSize " << sizeof(typename gNode::EdgesTy) << "\n";
   }
 
+protected:
   template<typename GTy>
-  void copyGraph(GTy& graph) {
+  void copyNodes(GTy& graph, std::map<typename GTy::GraphNode, GraphNode>& nodeMap) {
     //mapping between nodes
-    std::map<typename GTy::GraphNode, GraphNode> NodeMap;
     //copy nodes
     for (typename GTy::active_iterator ii = graph.active_begin(), 
 	   ee = graph.active_end(); ii != ee; ++ii) {
       GraphNode N = createNode(graph.getData(*ii));
       addNode(N);
-      NodeMap[*ii] = N;
+      nodeMap[*ii] = N;
     }
+  }
+};
+
+template<typename NodeTy,typename EdgeTy,bool Directional>
+class FirstGraph: public FirstGraphImpl<NodeTy,EdgeTy,Directional> {
+  typedef FirstGraphImpl<NodeTy,EdgeTy,Directional> Super;
+
+  typedef GaloisRuntime::galois_insert_bag<EdgeTy> EdgeListTy;
+  EdgeListTy edges;
+
+public:
+  typedef NodeTy node_type;
+  typedef typename Super::edge_iterator edge_iterator;
+  typedef typename Super::GraphNode GraphNode;
+  typedef typename Super::active_iterator active_iterator;
+
+  /**
+   * Returns the edge data associated with the edge. It is an error to
+   * get the edge data for a non-existent edge.
+   */
+  EdgeTy& getEdgeData(edge_iterator dst) const {
+    return *dst->second();
+  }
+
+  //! Adds an edge to graph
+  edge_iterator addEdge(GraphNode src, GraphNode dst, const EdgeTy& data, Galois::MethodFlag mflag = ALL) {
+    EdgeTy* d = &(edges.push(data));
+    return this->addEdgeInternal(src, dst, d, true, mflag);
+  }
+
+  edge_iterator addMultiEdge(GraphNode src, GraphNode dst, const EdgeTy& data, Galois::MethodFlag mflag = ALL) {
+    EdgeTy* d = &(edges.push(data));
+    return this->addEdgeInternal(src, dst, d, false, mflag);
+  }
+
+  template<typename GTy>
+  void copyGraph(GTy& graph) {
+    //mapping between nodes
+    std::map<typename GTy::GraphNode, GraphNode> nodeMap;
+    copyNodes(graph, nodeMap);
     //copy edges
     for (typename GTy::active_iterator ii = graph.active_begin(), 
 	   ee = graph.active_end(); ii != ee; ++ii)
       for(typename GTy::neighbor_iterator ni = graph.neighbor_begin(*ii), 
 	    ne = graph.neighbor_end(*ii);
 	  ni != ne; ++ni)
-	addEdge(NodeMap[*ii], NodeMap[*ni], graph.getEdgeData(*ii, *ni));
+	addMultiEdge(nodeMap[*ii], nodeMap[*ni], graph.getEdgeData(*ii, *ni));
+  }
+};
+
+template<typename NodeTy,bool Directional>
+class FirstGraph<NodeTy,void,Directional>: public FirstGraphImpl<NodeTy,void,Directional> {
+  typedef FirstGraphImpl<NodeTy,void,Directional> Super;
+
+public:
+  typedef NodeTy node_type;
+  typedef typename Super::edge_iterator edge_iterator;
+  typedef typename Super::GraphNode GraphNode;
+  typedef typename Super::active_iterator active_iterator;
+
+  //! Adds an edge to graph
+  edge_iterator addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {
+    return addEdgeInternal(src, dst, 0, true, mflag);
+  }
+
+  edge_iterator addMultiEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {
+    return addEdgeInternal(src, dst, 0, false, mflag);
+  }
+
+  template<typename GTy>
+  void copyGraph(GTy& graph) {
+    //mapping between nodes
+    std::map<typename GTy::GraphNode, GraphNode> nodeMap;
+    copyNodes(graph, nodeMap);
+    //copy edges
+    for (typename GTy::active_iterator ii = graph.active_begin(), 
+	   ee = graph.active_end(); ii != ee; ++ii)
+      for(typename GTy::neighbor_iterator ni = graph.neighbor_begin(*ii), 
+	    ne = graph.neighbor_end(*ii);
+	  ni != ne; ++ni)
+	addMultiEdge(nodeMap[*ii], nodeMap[*ni]);
   }
 };
 
