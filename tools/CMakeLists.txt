@@ -33,6 +33,16 @@ ExternalProject_Add(triangle
   CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}
 )
 
+ExternalProject_Add(snap
+  PREFIX snap
+  LIST_SEPARATOR |
+  DOWNLOAD_DIR snap/src/snap
+  DOWNLOAD_COMMAND bash -c "if [ ! -e Snap-11-12-31.zip ] | then ${WGET} --quiet http://snap.stanford.edu/snap/Snap-11-12-31.zip | fi"
+  UPDATE_COMMAND bash -c "if [ ! -e README ] | then ${UNZIP} Snap-11-12-31.zip | fi"
+  PATCH_COMMAND bash -c "if [ ! -e CMakeLists.txt ] | then patch -p1 < ${CMAKE_CURRENT_SOURCE_DIR}/snap.patch | fi"
+  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}
+)
+
 find_program(TAR tar)
 ExternalProject_Add(hi_pr
   PREFIX hi_pr
@@ -43,6 +53,15 @@ ExternalProject_Add(hi_pr
   CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}
 )
 
+ExternalProject_Add(GTgraph-rmat
+  PREFIX GTgraph-rmat
+  LIST_SEPARATOR |
+  DOWNLOAD_DIR GTgraph-rmat/src/GTgraph-rmat
+  URL http://www.cse.psu.edu/~madduri/software/GTgraph/GTgraph.tar.gz
+  PATCH_COMMAND bash -c "if [ ! -e CMakeLists.txt ] | then patch -p1 < ${CMAKE_CURRENT_SOURCE_DIR}/GTgraph-rmat.patch | fi"
+  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}
+)
+
 add_custom_target(more-tools)
-set_target_properties(hi_pr triangle cats-gens PROPERTIES EXCLUDE_FROM_ALL true)
-add_dependencies(more-tools hi_pr triangle cats-gens)
+set_target_properties(hi_pr triangle cats-gens snap GTgraph-rmat PROPERTIES EXCLUDE_FROM_ALL true)
+add_dependencies(more-tools hi_pr triangle cats-gens snap GTgraph-rmat)

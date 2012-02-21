@@ -1,5 +1,6 @@
 add_custom_target(more-inputs)
+add_subdirectory(avi)
 add_subdirectory(meshes)
 add_subdirectory(random)
 add_subdirectory(road)
-add_subdirectory(avi)
+add_subdirectory(scalefree)
