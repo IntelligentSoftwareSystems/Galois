@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -20,7 +20,6 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-//#include <algorithm>
 #include <iostream>
 
 #include "Galois/Statistic.h"
@@ -281,9 +280,11 @@ struct FindWork {
 
 template<Galois::MethodFlag flag, typename IncomingWL>
 void globalRelabel(IncomingWL& incoming) {
-  Galois::StatTimer T1("ASDF");
-  T1.start();
   typedef GaloisRuntime::WorkList::dChunkedLIFO<1024> SimpleScheduler;
+  typedef GaloisRuntime::WorkList::dChunkedFIFO<16> BFSScheduler;
+
+  Galois::StatTimer T1("ResetHeights");
+  T1.start();
   Galois::for_each<SimpleScheduler>(app.graph.active_begin(),
       app.graph.active_end(),
       ResetHeights());
@@ -291,10 +292,9 @@ void globalRelabel(IncomingWL& incoming) {
 
   Galois::StatTimer T("BfsTime");
   T.start();
-  typedef GaloisRuntime::WorkList::dChunkedFIFO<16> WL;
   std::vector<GNode> single;
   single.push_back(app.sink);
-  Galois::for_each<WL>(single.begin(), single.end(), UpdateHeights<flag>());
+  Galois::for_each<BFSScheduler>(single.begin(), single.end(), UpdateHeights<flag>());
   T.stop();
 
   Galois::StatTimer T2("FF");
