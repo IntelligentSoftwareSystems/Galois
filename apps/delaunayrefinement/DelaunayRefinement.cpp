@@ -37,7 +37,7 @@
 #include "Element.h"
 
 #include "Galois/Statistic.h"
-#include "Galois/Graphs/Graph2.h"
+#include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
 
 #include "llvm/Support/CommandLine.h"
@@ -81,6 +81,8 @@ struct process {
     cav.build();
     cav.update();
     
+    //FAILSAFE POINT
+
     for (Subgraph::iterator ii = cav.getPre().begin(),
 	   ee = cav.getPre().end(); ii != ee; ++ii) 
       mesh->removeNode(*ii, Galois::NONE);
@@ -89,7 +91,7 @@ struct process {
     for (Subgraph::iterator ii = cav.getPost().begin(),
 	   ee = cav.getPost().end(); ii != ee; ++ii) {
       GNode node = *ii;
-      Element& element = mesh->getData(node,Galois::ALL);
+      Element& element = mesh->getData(node,Galois::NONE);
       if (element.isBad()) {
         lwl.push(node);
       }
@@ -99,7 +101,7 @@ struct process {
 	   ee = cav.getPost().edge_end(); ii != ee; ++ii) {
       Subgraph::tmpEdge edge = *ii;
       //bool ret = 
-      mesh->addEdge(edge.src, edge.dst, Galois::ALL); //, edge.data);
+      mesh->addEdge(edge.src, edge.dst, Galois::NONE); //, edge.data);
       //assert ret;
     }
     if (mesh->containsNode(item)) {
@@ -142,15 +144,14 @@ int main(int argc, char** argv) {
   std::cout << "MEMINFO POST: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
 
   if (!skipVerify) {
-    if (!m.verify(mesh)) {
-      std::cerr << "Refinement failed.\n";
-      assert(0 && "Refinement failed");
-      abort();
-    }
-    
     int size = std::count_if(mesh->active_begin(), mesh->active_end(), is_bad(mesh));
     if (size != 0) {
       std::cerr << size << " bad triangles remaining.\n";
+      assert(0 && "Refinement failed");
+      abort();
+    }
+    if (!m.verify(mesh)) {
+      std::cerr << "Refinement failed.\n";
       assert(0 && "Refinement failed");
       abort();
     }
