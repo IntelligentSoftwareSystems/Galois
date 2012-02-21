@@ -250,27 +250,25 @@ private:
       return ii->getData();
     }
 
-    edge_reference createEdge(gNode* N) {
-      edges.push_back(EITy(N));
-      return edges.back().getData();
+    iterator createEdge(gNode* N) {
+      return edges.insert(edges.end(), EITy(N));
     }
 
-    edge_reference getOrCreateEdge(gNode* N) {
+    iterator getOrCreateEdge(gNode* N) {
       for (iterator ii = begin(), ee = end(); ii != ee; ++ii)
 	if (ii->getNeighbor() == N)
-	  return ii->getData();
+	  return ii;
       return createEdge(N);
     }
 
-    edge_reference createEdge(gNode* N, const_edge_reference data) {
-      edges.push_back(EITy(N, data));
-      return edges.back().getData();
+    iterator createEdge(gNode* N, const_edge_reference data) {
+      return edges.insert(edges.end(), EITy(N, data));
     }
 
-    edge_reference getOrCreateEdge(gNode* N, const_edge_reference data) {
+    iterator getOrCreateEdge(gNode* N, const_edge_reference data) {
       for (iterator ii = begin(), ee = end(); ii != ee; ++ii)
         if (ii->getNeighbor() == N)
-          return ii->getData();
+          return ii;
       return createEdge(N, data);
     }
 
@@ -388,6 +386,8 @@ public:
   typedef EdgeTy EdgeDataTy;
   typedef NodeTy NodeDataTy;
 
+  typedef typename gNode::iterator edge_iterator;
+
   //// Node Handling ////
   
   /**
@@ -466,9 +466,8 @@ public:
   //// Edge Handling ////
 
   //! Adds an edge to graph, replacing existing value if edge already exists
-  edge_reference addEdge(GraphNode src, GraphNode dst,
-	       const_edge_reference data, 
-	       Galois::MethodFlag mflag = ALL) {
+  edge_iterator addEdge(GraphNode src, GraphNode dst, const_edge_reference data, 
+      Galois::MethodFlag mflag = ALL) {
     assert(src.ID);
     assert(dst.ID);
     acquire(src.ID, mflag);
@@ -488,7 +487,7 @@ public:
 
   //! Adds an edge to graph, always adding new value, thus permiting multiple edges to from
   //! one node to another. Not defined for undirected graphs.
-  edge_reference addMultiEdge(GraphNode src, GraphNode dst, const_edge_reference data,
+  edge_iterator addMultiEdge(GraphNode src, GraphNode dst, const_edge_reference data,
       Galois::MethodFlag mflag = ALL) {
     assert(src.ID);
     assert(dst.ID);
@@ -502,7 +501,7 @@ public:
   }
 
   //! Adds an edge to graph, replacing existing value if edge already exists
-  edge_reference addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {
+  edge_iterator addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {
     assert(src.ID);
     assert(dst.ID);
     acquire(src.ID, mflag);
@@ -522,7 +521,7 @@ public:
 
   //! Adds an edge to graph, always adding new value, thus permiting multiple edges to from
   //! one node to another. Not defined for undirected graphs.
-  edge_reference addMultiEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {
+  edge_iterator addMultiEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {
     assert(src.ID);
     assert(dst.ID);
     acquire(src.ID, mflag);
@@ -579,8 +578,6 @@ public:
     acquire(N.ID, mflag);
     return N.ID->edges.size();
   }
-
-  typedef typename gNode::iterator edge_iterator;
 
   edge_iterator edge_begin(GraphNode N, Galois::MethodFlag mflag = ALL) {
     assert(N.ID);
@@ -701,6 +698,7 @@ public:
     //std::cerr << "NodeSize " << sizeof(gNode) << "\n";
   }
 
+#if 0
   template<typename GTy>
   void copyGraph(GTy& graph) {
     //mapping between nodes
@@ -720,6 +718,7 @@ public:
 	  ni != ne; ++ni)
 	addEdge(NodeMap[*ii], NodeMap[*ni], graph.getEdgeData(*ii, *ni));
   }
+#endif
 };
 
 }

@@ -28,8 +28,9 @@
 
 #include "Element.h"
 
-#include "Galois/Graphs/Graph2.h"
+#include "Galois/Graphs/Graph.h"
 
+#include <boost/optional.hpp>
 #include <vector>
 #include <deque>
 
@@ -68,16 +69,15 @@ struct Searcher: private boost::noncopyable {
 
   template<typename Pred>
   void find_(const GNode& start, const Pred& pred, bool all) {
-    typedef std::deque<std::pair<GNode,GNode>, Alloc> WorklistTy;
-
-    GNode empty;
+    typedef boost::optional<GNode> SomeGNode;
+    typedef std::deque<std::pair<GNode,SomeGNode>, Alloc> WorklistTy;
 
     WorklistTy wl(alloc);
-    wl.push_back(std::make_pair(start, empty));
+    wl.push_back(std::make_pair(start, SomeGNode()));
 
     while (!wl.empty()) {
       GNode cur = wl.front().first;
-      GNode prev = wl.front().second;
+      SomeGNode prev = wl.front().second;
 
       wl.pop_front();
 
@@ -100,8 +100,8 @@ struct Searcher: private boost::noncopyable {
         else
           break; // Found it
       } else {
-        if (all && prev != empty)
-          inside.push_back(prev);
+        if (all && prev)
+          inside.push_back(*prev);
       }
 
       // Search neighbors (a) when matched and looking for all or (b) when no match and looking
@@ -111,7 +111,7 @@ struct Searcher: private boost::noncopyable {
             ee = graph.edge_end(cur, Galois::CHECK_CONFLICT);
             ii != ee; ++ii) {
           GNode dst = graph.getEdgeDst(ii);
-          wl.push_back(std::make_pair(dst, cur));
+          wl.push_back(std::make_pair(dst, SomeGNode(cur)));
         }
       }
     }

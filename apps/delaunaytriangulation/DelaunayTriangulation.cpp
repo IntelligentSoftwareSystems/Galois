@@ -303,13 +303,13 @@ static void addBoundaryNodes(PointList& points) {
   GNode border_node2 = graph->createNode(border_ele2);
   GNode border_node3 = graph->createNode(border_ele3);
 
-  *graph->getEdgeData(graph->addEdge(large_node, border_node1)) = 0;
-  *graph->getEdgeData(graph->addEdge(large_node, border_node2)) = 1;
-  *graph->getEdgeData(graph->addEdge(large_node, border_node3)) = 2;
+  graph->getEdgeData(graph->addEdge(large_node, border_node1)) = 0;
+  graph->getEdgeData(graph->addEdge(large_node, border_node2)) = 1;
+  graph->getEdgeData(graph->addEdge(large_node, border_node3)) = 2;
 
-  *graph->getEdgeData(graph->addEdge(border_node1, large_node)) = 0;
-  *graph->getEdgeData(graph->addEdge(border_node2, large_node)) = 0;
-  *graph->getEdgeData(graph->addEdge(border_node3, large_node)) = 0;
+  graph->getEdgeData(graph->addEdge(border_node1, large_node)) = 0;
+  graph->getEdgeData(graph->addEdge(border_node2, large_node)) = 0;
+  graph->getEdgeData(graph->addEdge(border_node3, large_node)) = 0;
 }
 
 static void makeGraph(const std::string& filename, PointList& points) {
@@ -417,7 +417,10 @@ static void generateMesh(PointList& points) {
     nextStep = nextStep*multiplier; //std::min(nextStep*multiplier, 1000000UL);
     T.stop();
 
+    Galois::StatTimer PT("ParallelTime");
+    PT.start();
     Galois::for_each<WL>(&order[top], &order[prevTop], Process(&q));
+    PT.stop();
   } while (top > 0);
 }
 
