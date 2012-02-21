@@ -16,7 +16,7 @@
 #include <dai/properties.h>
 #include "Galois/Galois.h"
 #include "llvm/Support/CommandLine.h"
-#include "PriorityScheduling/WorkListTL.h"
+#include "PriorityScheduling/WorkList.h"
 #include "Galois/Timer.h"
 #include "Galois/Runtime/PerCPU.h"
 
