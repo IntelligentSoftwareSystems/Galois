@@ -201,8 +201,6 @@ private:
     NITy data;
     bool active;
     EdgesTy edges;
-    //NITy data;
-    //bool active;
 
     iterator begin() {
       return edges.begin();
@@ -422,8 +420,8 @@ public:
     acquire(n.ID, mflag);
     bool oldActive = n.ID->active;
     if (!oldActive) {
-            n.ID->active = true;
-            //__sync_add_and_fetch(&numActive, 1);
+      n.ID->active = true;
+      //__sync_add_and_fetch(&numActive, 1);
     }
     n.ID->edges.reserve(maxDegree);
     return !oldActive;
@@ -446,8 +444,8 @@ public:
   /**
    * Removes a node from the graph along with all its outgoing/incoming edges
    * for undirected graphs or outgoing edges for directed graphs.
-   * 
    */
+  // FIXME(ddn): Doesn't handle incoming edges for directed graphs
   bool removeNode(GraphNode n, Galois::MethodFlag mflag = ALL) {
     assert(n.ID);
     acquire(n.ID, mflag);
@@ -456,11 +454,9 @@ public:
     if (wasActive) {
       N->active = false;
       //erase the in-edges first
-      if (!Directional) {
-        for (unsigned int i = 0; i < N->edges.size(); ++i) {
-          if (N->edges[i].getNeighbor() != N) // don't handle loops yet
-            N->edges[i].getNeighbor()->eraseEdge(N);
-        }
+      for (unsigned int i = 0; i < N->edges.size(); ++i) {
+        if (N->edges[i].getNeighbor() != N) // don't handle loops yet
+          N->edges[i].getNeighbor()->eraseEdge(N);
       }
       N->edges.clear();
     }
