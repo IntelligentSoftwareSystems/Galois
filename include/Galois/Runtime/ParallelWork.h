@@ -107,8 +107,6 @@ class ForEachWork {
       tld.facing.__resetPushBuffer();
     }
 
-    assert(tld.facing.__getPushBuffer().capacity() == 0);
-
     // NB: since push buffer uses PIA, reset after getting push buffer
     tld.facing.__resetAlloc();
     if (ForeachTraits<FunctionTy>::NeedsBreak)
