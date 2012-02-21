@@ -7,7 +7,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -26,7 +26,10 @@
 #include "Galois/Threads.h"
 #include "Galois/UserContext.h"
 #include "Galois/Runtime/ParallelWork.h"
+
+#ifdef GALOIS_EXP
 #include "Galois/Runtime/ParaMeter.h"
+#endif
 
 namespace Galois {
 
@@ -37,12 +40,13 @@ namespace Galois {
 //Iterator based versions
 template<typename WLTy, typename IterTy, typename Function>
 static inline void for_each(IterTy b, IterTy e, Function f, const char* loopname = 0) {
-
-  if (GaloisRuntime::usingParaMeter ()) {
-    GaloisRuntime::ParaMeter::for_each_impl <WLTy> (b, e, f, loopname);
-  } else {
-    GaloisRuntime::for_each_impl<WLTy>(b, e, f, loopname);
+#ifdef GALOIS_EXP
+  if (GaloisRuntime::useParaMeter) {
+    GaloisRuntime::ParaMeter::for_each_impl<WLTy>(b, e, f, loopname);
+    return;
   }
+#endif
+  GaloisRuntime::for_each_impl<WLTy>(b, e, f, loopname);
 }
 
 template<typename IterTy, typename Function>

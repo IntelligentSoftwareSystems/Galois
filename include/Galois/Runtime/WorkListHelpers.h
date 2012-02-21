@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -23,7 +23,15 @@
 #ifndef GALOIS_RUNTIME_WORKLISTHELPERS_H
 #define GALOIS_RUNTIME_WORKLISTHELPERS_H
 
+#ifndef WLCOMPILECHECK
+#define WLCOMPILECHECK(name) //
+#endif
+
 #include "ll/PtrLock.h"
+
+#include "Galois/Runtime/ll/PaddedLock.h"
+
+#include <boost/optional.hpp>
 
 namespace GaloisRuntime {
 namespace WorkList {
@@ -40,7 +48,7 @@ class FixedSizeRing :private boost::noncopyable, private LL::PaddedLock<concurre
   char datac[sizeof(T[__chunksize + 1])] __attribute__ ((aligned (__alignof__(T))));
 
   T* at(int i) {
-    assert(i < (__chunksize + 1));
+    assert((unsigned)i < (__chunksize + 1));
     T* s = reinterpret_cast<T*>(&datac[0]);
     return &s[i];
   }

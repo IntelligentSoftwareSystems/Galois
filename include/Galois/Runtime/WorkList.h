@@ -1,45 +1,43 @@
-// Scalable Local worklists -*- C++ -*-
-/*
-Galois, a framework to exploit amorphous data-parallelism in irregular
-programs.
-
-Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
-UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS SOFTWARE
-AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR ANY
-PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF PERFORMANCE, AND ANY
-WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF DEALING OR USAGE OF TRADE.
-NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH RESPECT TO THE USE OF THE
-SOFTWARE OR DOCUMENTATION. Under no circumstances shall University be liable
-for incidental, special, indirect, direct or consequential damages or loss of
-profits, interruption of business, or related expenses which may arise from use
-of Software or Documentation, including but not limited to those resulting from
-defects in Software and/or Documentation, or loss or inaccuracy of data of any
-kind.
-*/
-
-#ifndef __WORKLIST_H_
-#define __WORKLIST_H_
-
-#include <queue>
-#include <stack>
-#include <limits>
-#include <map>
-#include <algorithm>
-#include <boost/utility.hpp>
-#include <boost/optional.hpp>
-
-#include "Galois/Runtime/ll/PaddedLock.h"
-#include "Galois/Runtime/PerCPU.h"
-#include "Galois/Runtime/Threads.h"
-//#include "Galois/Runtime/QueuingLock.h"
-#include "Galois/Queue.h"
+/** Scalable local worklists -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @author Andrew Lenharth <andrewl@lenharth.org>
+ */
+#ifndef GALOIS_RUNTIME_WORKLIST_H
+#define GALOIS_RUNTIME_WORKLIST_H
 
 #include "mem.h"
 #include "WorkListHelpers.h"
 
-#ifndef WLCOMPILECHECK
-#define WLCOMPILECHECK(name) //
-#endif
+#include "Galois/Runtime/ll/PaddedLock.h"
+#include "Galois/Runtime/PerCPU.h"
+#include "Galois/Runtime/Threads.h"
+
+#include <limits>
+#include <map>
+#include <vector>
+#include <deque>
+#include <algorithm>
+
+#include <boost/utility.hpp>
+#include <boost/optional.hpp>
 
 namespace GaloisRuntime {
 namespace WorkList {
@@ -68,11 +66,11 @@ public:
   //! push a value onto the queue
   void push(value_type val);
 
-  //! push many values onto the queue
+  //! push a range onto the queue
   template<typename Iter>
   void push(Iter b, Iter e);
 
-  //! push initial values onto the queue
+  //! push range onto the queue
   template<typename Iter>
   void push_initial(Iter b, Iter e);
 
@@ -304,7 +302,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
 
   template<typename Iter>
   void push_initial(Iter b, Iter e) {
-    push(b,e);
+    push(b, e);
   }
 
   boost::optional<value_type> pop() {
@@ -375,7 +373,7 @@ public:
   LocalQueues() {}
 
   void push(value_type val) {
-    return local.get().push(val);
+    local.get().push(val);
   }
 
   template<typename Iter>
@@ -668,125 +666,6 @@ WLCOMPILECHECK(dChunkedFIFO);
 template<int chunksize=64, typename T = int, bool concurrent=true>
 class dChunkedLIFO : public ChunkedMaster<T, ConExtLinkedStack, true, true, chunksize, concurrent> {};
 WLCOMPILECHECK(dChunkedLIFO);
-
-template<typename Partitioner = DummyPartitioner, typename T = int, typename ChildWLTy = dChunkedFIFO<>, bool concurrent=true>
-class PartitionedWL : private boost::noncopyable {
-
-  Partitioner P;
-  PerCPU<ChildWLTy> Items;
-  int active;
-
-public:
-  template<bool newconcurrent>
-  struct rethread {
-    typedef PartitionedWL<T, Partitioner, ChildWLTy, newconcurrent> WL;
-  };
-
-  typedef T value_type;
-  
-  PartitionedWL(const Partitioner& p = Partitioner()) :P(p), active(ThreadPool::getActiveThreads()) {
-    //std::cerr << active << "\n";
-  }
-
-  void push(value_type val)  {
-    unsigned int index = P(val);
-    //std::cerr << "[" << index << "," << index % active << "]\n";
-    Items.get(index % active).push(val);
-  }
-
-  template<typename Iter>
-  void push(Iter b, Iter e) {
-    while (b != e)
-      push(*b++);
-  }
-
-  template<typename Iter>
-  void push_initial(Iter b, Iter e) {
-    push(b,e);
-  }
-
-  boost::optional<value_type> pop()  {
-    return Items.get().pop();
-  }
-};
-
-template<class Compare = std::less<int>, typename T = int>
-class SkipListQueue : private boost::noncopyable {
-
-  Galois::ConcurrentSkipListMap<T,int,Compare> wl;
-  int magic;
-
-public:
-  template<bool newconcurrent>
-  struct rethread {
-    typedef SkipListQueue<Compare, T> WL;
-  };
-  template<typename Tnew>
-  struct retype {
-    typedef SkipListQueue<Compare, Tnew> WL;
-  };
-
-  typedef T value_type;
-
-  void push(value_type val) {
-    wl.putIfAbsent(val, &magic);
-  }
-
-  template<typename Iter>
-  void push(Iter b, Iter e) {
-    while (b != e)
-      push(*b++);
-  }
-
-  template<typename Iter>
-  void push_initial(Iter b, Iter e) {
-    push(b,e);
-  }
-
-  boost::optional<value_type> pop() {
-    return wl.pollFirstKey();
-  }
-};
-WLCOMPILECHECK(SkipListQueue);
-
-template<class Compare = std::less<int>, typename T = int>
-class FCPairingHeapQueue : private boost::noncopyable {
-
-  Galois::FCPairingHeap<T,Compare> wl;
-
-public:
-
-  template<bool newconcurrent>
-  struct rethread {
-    typedef FCPairingHeapQueue<Compare, T> WL;
-  };
-  template<typename Tnew>
-  struct retype {
-    typedef FCPairingHeapQueue<Compare, Tnew> WL;
-  };
-
-  typedef T value_type;
-
-  void push(value_type val) {
-    wl.add(val);
-  }
-
-  template<typename Iter>
-  void push(Iter b, Iter e) {
-    while (b != e)
-      push(*b++);
-  }
-
-  template<typename Iter>
-  void push_initial(Iter b, Iter e) {
-    push(b,e);
-  }
-
-  boost::optional<value_type> pop() {
-    return wl.pollMin();
-  }
-};
-WLCOMPILECHECK(FCPairingHeapQueue);
 
 //End namespace
 }

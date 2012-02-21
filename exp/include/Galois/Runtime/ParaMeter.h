@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -23,21 +23,10 @@
  * Implementation of ParaMeter runtime
  * Ordered with speculation not supported yet
  *
- * @author ahassaan@ices.utexas.edu
+ * @author Amber Hassaan <ahassaan@ices.utexas.edu>
  */
 #ifndef GALOIS_RUNTIME_PARAMETER_H_
 #define GALOIS_RUNTIME_PARAMETER_H_
-
-#include <iostream>
-#include <fstream>
-#include <string>
-#include <deque>
-#include <vector>
-#include <algorithm>
-
-#include <cstdlib>
-#include <ctime>
-#include <cstdio>
 
 #include "Galois/UserContext.h"
 #include "Galois/TypeTraits.h"
@@ -52,38 +41,39 @@
 #include "Galois/Runtime/Termination.h"
 #include "Galois/Runtime/LoopHooks.h"
 
+#include "llvm/Support/CommandLine.h"
+
+#include <ostream>
+#include <fstream>
+#include <deque>
+#include <vector>
+#include <algorithm>
+
 namespace GaloisRuntime {
 
-
-void enableParaMeter ();
-
-void disableParaMeter ();
-
-bool usingParaMeter ();
+__attribute__((weak)) llvm::cl::opt<bool> useParaMeter("p", llvm::cl::desc("Use ParaMeter to execute for_each loops"), llvm::cl::init(false));
 
 template <typename WorkListTy, typename FunctionTy>
 class ParaMeterExecutor;
 
+// Single ParaMeter stats file per run of an app
+// which includes all instances of for_each loops
+// run with ParaMeter Executor
+//
+// basically, from commandline parser calls enableParaMeter
+// and we
+// - set a flag
+// - open a stats file in overwrite mode
+// - print stats header
+// - close file
 
+// for each for_each loop, we create an instace of ParaMeterExecutor
+// which
+// - opens stats file in append mode
+// - prints stats
+// - closes file when loop finishes
 class ParaMeter: private boost::noncopyable {
-  // Single ParaMeter stats file per run of an app
-  // which includes all instances of for_each loops
-  // run with ParaMeter Executor
-  //
-  // basically, from commandline parser calls enableParaMeter
-  // and we
-  // - set a flag
-  // - open a stats file in overwrite mode
-  // - print stats header
-  // - close file
-
-  // for each for_each loop, we create an instace of ParaMeterExecutor
-  // which
-  // - opens stats file in append mode
-  // - prints stats
-  // - closes file when loop finishes
 private:
-
   template <typename WorkListTy, typename FunctionTy>
   friend class ParaMeterExecutor;
 
@@ -92,88 +82,23 @@ private:
     size_t availParallelism;
     size_t workListSize;
 
-    static std::ostream& printHeader (std::ostream& out) {
-      out << "LOOPNAME, STEP, AVAIL_PARALLELISM, WORKLIST_SIZE" << std::endl;
-      return out;
-    }
-
-    std::ostream& dump (std::ostream& out, const char* loopname) const {
-      out << loopname << ", " << step << ", " << availParallelism << ", " << workListSize << std::endl;
+    std::ostream& dump(std::ostream& out, const char* loopname) const {
+      out << loopname << ", " << step << ", " << availParallelism << ", " << workListSize << "\n";
       return out;
     }
   };
-
-
-  struct Init {
-    std::string statsFname;
-
-    static const std::string genFname () {
-
-      time_t rawtime;
-      struct tm* timeinfo;
-
-      time (&rawtime);
-      timeinfo = localtime (&rawtime);
-
-      const size_t STR_SIZE = 256;
-      char str [STR_SIZE];
-      strftime (str, STR_SIZE, "ParaMeter_Stats_%Y-%m-%d_%H:%M:%S.csv", timeinfo);
-
-      return str;
-    }
-
-    Init () {
-      statsFname = genFname ();
-      std::ofstream statsFile (statsFname.c_str (), std::ios_base::out);
-      StepStats::printHeader (statsFile);
-      statsFile.close ();
-    }
-  };
-
-
-  //////////////////////////////////////////////
-  static Init* init;
-
-
-  static Init& getInit () {
-    if (init == NULL) {
-      init = new Init ();
-    }
-    return *init;
-  }
     
-
-  ParaMeter () {
-  }
-
-  ~ParaMeter () {
-    delete init;
-    init = NULL;
-  }
-
 public:
-
-  static void initialize () {
-    getInit ();
-  }
-
-  static const std::string& statsFileName () {
-    return getInit ().statsFname;
-  }
+  static const char* statsFilename();
 
   template <typename WLTy, typename IterTy, typename Func>
-  static void for_each_impl (IterTy b, IterTy e, Func func, const char* loopname) {
-
+  static void for_each_impl(IterTy b, IterTy e, Func func, const char* loopname) {
     typedef typename WLTy::template retype<typename std::iterator_traits<IterTy>::value_type>::WL ActualWLTy;
 
-    ParaMeterExecutor<ActualWLTy, Func> executor (func, loopname);
-
-    executor.addInitialWork (b, e);
-
-    executor.run ();
-
+    ParaMeterExecutor<ActualWLTy, Func> executor(func, loopname);
+    executor.addInitialWork(b, e);
+    executor.run();
   }
-
 };
 
 
@@ -192,40 +117,37 @@ private:
 
   typedef std::deque<IterationContext*> IterQueue;
 
-
-
   class ParaMeterWorkList: private boost::noncopyable {
     WorkListTy* curr;
     WorkListTy* next;
 
   public:
-    ParaMeterWorkList () {
-      curr = new WorkListTy ();
-      next = new WorkListTy ();
+    ParaMeterWorkList() {
+      curr = new WorkListTy();
+      next = new WorkListTy();
     }
 
-    ~ParaMeterWorkList () {
+    ~ParaMeterWorkList() {
       delete curr;
       curr = NULL;
       delete next;
       next = NULL;
     }
 
-    WorkListTy& getCurr () {
+    WorkListTy& getCurr() {
       return *curr;
     }
 
-    WorkListTy& getNext () {
+    WorkListTy& getNext() {
       return *next;
     }
 
-    void switchWorkLists () {
+    void switchWorkLists() {
       delete curr;
       curr = next;
-      next = new WorkListTy ();
+      next = new WorkListTy();
     }
   };
-
 
   FunctionTy body;
   const char* loopname;
@@ -237,11 +159,10 @@ private:
   // XXX: may turn out to be unnecessary
   std::vector<ParaMeter::StepStats> allSteps;
 
-
 public:
 
-  ParaMeterExecutor (FunctionTy _body, const char* _loopname)
-  : body (_body), loopname (_loopname), pstatsFile (NULL) {
+  ParaMeterExecutor(FunctionTy _body, const char* _loopname):
+    body(_body), loopname(_loopname), pstatsFile(NULL) {
 
     if (this->loopname == NULL) {
       this->loopname = "foreach";
@@ -249,26 +170,23 @@ public:
     
   }
 
-  ~ParaMeterExecutor () {
+  ~ParaMeterExecutor() {
     delete pstatsFile;
     pstatsFile = NULL;
   }
 
   template <typename Iter>
-  bool addInitialWork (Iter b, Iter e) {
+  bool addInitialWork(Iter b, Iter e) {
     workList.getCurr().push_initial(b,e);
     return true;
   }
 
-
-  void run () {
-
-    beginLoop ();
+  void run() {
+    beginLoop();
 
     size_t currStep = 0;
     bool done = false;
     while (!done) {
-
       // do initialization for a new step
       //
       // while currWorkList is not empty {
@@ -296,66 +214,58 @@ public:
       // log current step
       // move to next step
       //
-
       size_t numIter = 0;
 
-      for (boost::optional<value_type> item = workList.getCurr ().pop ();
-          item; item = workList.getCurr ().pop ()) {
+      for (boost::optional<value_type> item = workList.getCurr().pop();
+          item; item = workList.getCurr().pop()) {
 
-        IterationContext& it = newIteration ();
+        IterationContext& it = newIteration();
 
         bool doabort = false;
         try {
-          body (*item, it.facing);
-
+          body(*item, it.facing);
         } catch (int a) {
           doabort = true;
         }
 
         if (doabort) {
           abortIteration (it, *item);
-
         } else {
-
           if (ForeachTraits<FunctionTy>::NeedsBreak) {
-            if (it.facing.__breakHappened ()) {
-              std::cerr << "ParaMeterExecutor: can't handle breaks yet" << std::endl;
-              abort ();
+            if (it.facing.__breakHappened()) {
+              assert(0 && "ParaMeterExecutor: can't handle breaks yet");
+              abort();
             }
           }
 
-          commitQueue.push_back (&it);
+          commitQueue.push_back(&it);
         }
 
         ++numIter;
       }
-
 
       if (numIter == 0) {
         done = true;
         continue;
       }
 
-      size_t numActivities = commitQueue.size ();
+      size_t numActivities = commitQueue.size();
 
       if (numActivities == 0) {
-        std::cerr << "ParaMeterExecutor: no progress made in step=" << currStep << std::endl;
-        abort ();
+        assert(0 && "ParaMeterExecutor: no progress made in step");
+        abort();
       }
 
-
       double avgLocks = 0;
-      for (typename IterQueue::iterator i = commitQueue.begin (), ei = commitQueue.end ();
+      for (typename IterQueue::iterator i = commitQueue.begin(), ei = commitQueue.end();
           i != ei; ++i) {
-
-        unsigned numLocks = commitIteration (*(*i));
-        avgLocks += double (numLocks);
+        unsigned numLocks = commitIteration(*(*i));
+        avgLocks += double(numLocks);
       }
 
       avgLocks /= numActivities;
 
-      commitQueue.clear ();
-
+      commitQueue.clear();
 
       // switch worklists
       // dump stats
@@ -365,93 +275,84 @@ public:
       stat.workListSize = numIter;
 
 
-      finishStep (stat);
+      finishStep(stat);
       ++currStep;
 
     } // end while
 
-
-    finishLoop ();
+    finishLoop();
   }
     
 private:
 
-  void beginLoop () {
+  void beginLoop() {
     // all instances of ParaMeterExecutor (one per for_each), open the stats
     // file in append mode
-    pstatsFile = new std::ofstream (ParaMeter::statsFileName ().c_str (), std::ios_base::app); 
+    pstatsFile = new std::ofstream(ParaMeter::statsFilename(), std::ios_base::app); 
   }
 
   void finishStep (const ParaMeter::StepStats& stat) {
     allSteps.push_back (stat);
-    stat.dump (*pstatsFile, loopname);
+    stat.dump(*pstatsFile, loopname);
     workList.switchWorkLists ();
-    setThreadContext (NULL);
+    setThreadContext(NULL);
   }
 
-  void finishLoop () {
-    setThreadContext (NULL);
-    pstatsFile->close ();
+  void finishLoop() {
+    setThreadContext(NULL);
+    pstatsFile->close();
   }
 
   IterationContext& newIteration () const {
-    IterationContext* it = new IterationContext ();
+    IterationContext* it = new IterationContext();
     
-    setThreadContext (&(it->cnx));
+    setThreadContext(&(it->cnx));
 
     return *it;
   }
 
   unsigned retireIteration (IterationContext& it, const bool abort) const {
-
     if (ForeachTraits<FunctionTy>::NeedsPush) {
-      it.facing.__getPushBuffer ().clear ();
+      it.facing.__getPushBuffer().clear();
     }
 
     if (ForeachTraits<FunctionTy>::NeedsPIA) {
-      it.facing.__resetAlloc ();
+      it.facing.__resetAlloc();
     }
 
     if (ForeachTraits<FunctionTy>::NeedsBreak) {
-      it.facing.__resetBreak ();
+      it.facing.__resetBreak();
     }
 
     unsigned numLocks = 0;
     if (abort) {
-      numLocks = it.cnx.cancel_iteration ();
-
+      numLocks = it.cnx.cancel_iteration();
     } else {
-      numLocks = it.cnx.commit_iteration ();
+      numLocks = it.cnx.commit_iteration();
     }
 
     delete &it;
 
     return numLocks;
-
   }
 
   unsigned abortIteration (IterationContext& it, value_type& item) {
-    clearConflictLock ();
-    workList.getNext ().push (item);
-    return retireIteration (it, true);
+    clearConflictLock();
+    workList.getNext().push(item);
+    return retireIteration(it, true);
   }
 
-  unsigned commitIteration (IterationContext& it) {
+  unsigned commitIteration(IterationContext& it) {
     if (ForeachTraits<FunctionTy>::NeedsPush) {
 
-      for (typename UserContextTy::pushBufferTy::iterator a = it.facing.__getPushBuffer ().begin (),
-          ea = it.facing.__getPushBuffer ().end (); a != ea; ++a) {
-        workList.getNext ().push (*a);
+      for (typename UserContextTy::pushBufferTy::iterator a = it.facing.__getPushBuffer().begin (),
+          ea = it.facing.__getPushBuffer().end(); a != ea; ++a) {
+        workList.getNext().push(*a);
       }
     }
 
-    return retireIteration (it, false);
+    return retireIteration(it, false);
   }
-
-
-
-
-
 };
 
 
