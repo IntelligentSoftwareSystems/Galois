@@ -24,7 +24,6 @@ kind.
 #include <stack>
 #include <limits>
 #include <map>
-#include <set>
 #include <algorithm>
 #include <boost/utility.hpp>
 #include <boost/optional.hpp>
@@ -67,10 +66,15 @@ public:
   };
 
   //! push a value onto the queue
-  bool push(value_type val);
+  void push(value_type val);
 
-  //! push initial value onto the queue
-  bool pushi(value_type val);
+  //! push many values onto the queue
+  template<typename Iter>
+  void push(Iter b, Iter e);
+
+  //! push initial values onto the queue
+  template<typename Iter>
+  void push_initial(Iter b, Iter e);
 
   //! pop a value from the queue.
   boost::optional<value_type> pop();
@@ -100,20 +104,18 @@ public:
 
   typedef T value_type;
 
-  bool push(value_type val) {
+  void push(value_type val) {
     lock();
     wl.push_back(val);
     unlock();
-    return true;
   }
 
   template<typename Iter>
-  bool push(Iter b, Iter e) {
+  void push(Iter b, Iter e) {
     lock();
     while (b != e)
       wl.push_back(*b++);
     unlock();
-    return true;
   }
 
   template<typename Iter>
@@ -122,16 +124,14 @@ public:
   }
 
   boost::optional<value_type> pop()  {
+    boost::optional<value_type> retval;
     lock();
-    if (wl.empty()) {
-      unlock();
-      return boost::optional<value_type>();
-    } else {
-      value_type retval = wl.back();
+    if (!wl.empty()) {
+      retval = wl.back();
       wl.pop_back();
-      unlock();
-      return boost::optional<value_type>(retval);
     }
+    unlock();
+    return retval;
   }
 };
 WLCOMPILECHECK(LIFO);
@@ -156,20 +156,18 @@ public:
 
   typedef T value_type;
 
-  bool push(value_type val) {
+  void push(value_type val) {
     lock();
     wl.push_back(val);
     unlock();
-    return true;
   }
 
   template<typename Iter>
-  bool push(Iter b, Iter e) {
+  void push(Iter b, Iter e) {
     lock();
     while (b != e)
       wl.push_back(*b++);
     unlock();
-    return true;
   }
 
   template<typename Iter>
@@ -178,16 +176,14 @@ public:
   }
 
   boost::optional<value_type> pop() {
+    boost::optional<value_type> retval;
     lock();
-    if (wl.empty()) {
-      unlock();
-      return boost::optional<value_type>();
-    } else {
-      value_type retval = wl.front();
-      wl.pop_front();
-      unlock();
-      return boost::optional<value_type>(retval);
+    if (!wl.empty()) {
+      retval = wl.front();
+      wl.pop_back();
     }
+    unlock();
+    return retval;
   }
 };
 WLCOMPILECHECK(FIFO);
@@ -279,12 +275,14 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     }
   }
 
-  bool push(value_type val) {
+  void push(value_type val) {
     unsigned int index = I(val);
     perItem& p = current.get();
     //fastpath
-    if (index == p.curVersion && p.current)
-      return p.current->push(val);
+    if (index == p.curVersion && p.current) {
+      p.current->push(val);
+      return;
+    }
     //slow path
     CTy* lC = updateLocalOrCreate(p, index);
     //opportunistically move to higher priority work
@@ -295,14 +293,13 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     }
     p.cache[index] = true;
 #endif
-    return lC->push(val);
+    lC->push(val);
   }
 
   template<typename Iter>
-  bool push(Iter b, Iter e) {
+  void push(Iter b, Iter e) {
     while (b != e)
       push(*b++);
-    return true;
   }
 
   template<typename Iter>
@@ -377,15 +374,13 @@ public:
 
   LocalQueues() {}
 
-  bool push(value_type val) {
+  void push(value_type val) {
     return local.get().push(val);
   }
 
   template<typename Iter>
-  bool push(Iter b, Iter e) {
-    while (b != e)
-      push(*b++);
-    return true;
+  void push(Iter b, Iter e) {
+    local.get().push(b,e);
   }
 
   template<typename Iter>
@@ -421,13 +416,13 @@ class LocalStealing : private boost::noncopyable {
   
   LocalStealing() {}
 
-  bool push(value_type val) {
-    return local.get().push(val);
+  void push(value_type val) {
+    local.get().push(val);
   }
 
   template<typename Iter>
-  bool push(Iter b, Iter e) {
-    return local.get().push(b,e);
+  void push(Iter b, Iter e) {
+    local.get().push(b,e);
   }
 
   template<typename Iter>
@@ -463,13 +458,13 @@ class LevelStealing : private boost::noncopyable {
   
   LevelStealing() {}
 
-  bool push(value_type val) {
-    return local.get().push(val);
+  void push(value_type val) {
+    local.get().push(val);
   }
 
   template<typename Iter>
-  bool push(Iter b, Iter e) {
-    return local.get().push(b,e);
+  void push(Iter b, Iter e) {
+    local.get().push(b,e);
   }
 
   template<typename Iter>
@@ -607,23 +602,21 @@ public:
     }
   }
 
-  bool push(value_type val)  {
+  void push(value_type val)  {
     p& n = data.get();
     if (n.next && n.next->push_back(val))
-      return true;
+      return;
     if (n.next)
       pushChunk(n.next);
     n.next = mkChunk();
     bool worked = n.next->push_back(val);
     assert(worked);
-    return worked;
   }
 
   template<typename Iter>
-  bool push(Iter b, Iter e) {
+  void push(Iter b, Iter e) {
     while (b != e)
       push(*b++);
-    return true;
   }
 
   template<typename Iter>
@@ -695,26 +688,25 @@ public:
     //std::cerr << active << "\n";
   }
 
-  bool push(value_type val)  {
+  void push(value_type val)  {
     unsigned int index = P(val);
     //std::cerr << "[" << index << "," << index % active << "]\n";
-    return Items.get(index % active).push(val);
+    Items.get(index % active).push(val);
   }
 
-  bool pushi(value_type val)  {
-    return push(val);
+  template<typename Iter>
+  void push(Iter b, Iter e) {
+    while (b != e)
+      push(*b++);
+  }
+
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    push(b,e);
   }
 
   boost::optional<value_type> pop()  {
-    boost::optional<value_type> r = Items.get().pop();
-    // std::cerr << "{" << Items.myEffectiveID() << "}";
-    // if (r.first)
-    //   std::cerr << r.first;
-    return r;
-  }
-  
-  boost::optional<value_type> try_pop() {
-    return pop();
+    return Items.get().pop();
   }
 };
 
@@ -736,16 +728,14 @@ public:
 
   typedef T value_type;
 
-  bool push(value_type val) {
+  void push(value_type val) {
     wl.putIfAbsent(val, &magic);
-    return true;
   }
 
   template<typename Iter>
-  bool push(Iter b, Iter e) {
+  void push(Iter b, Iter e) {
     while (b != e)
       push(*b++);
-    return true;
   }
 
   template<typename Iter>
@@ -777,16 +767,14 @@ public:
 
   typedef T value_type;
 
-  bool push(value_type val) {
+  void push(value_type val) {
     wl.add(val);
-    return true;
   }
 
   template<typename Iter>
-  bool push(Iter b, Iter e) {
+  void push(Iter b, Iter e) {
     while (b != e)
       push(*b++);
-    return true;
   }
 
   template<typename Iter>
