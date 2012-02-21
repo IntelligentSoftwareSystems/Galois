@@ -40,6 +40,7 @@ class FixedSizeRing :private boost::noncopyable, private LL::PaddedLock<concurre
   char datac[sizeof(T[__chunksize + 1])] __attribute__ ((aligned (__alignof__(T))));
 
   T* at(int i) {
+    assert(i < (__chunksize + 1));
     T* s = reinterpret_cast<T*>(&datac[0]);
     return &s[i];
   }

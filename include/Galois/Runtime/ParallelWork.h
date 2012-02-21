@@ -98,22 +98,19 @@ class ForEachWork {
       //don't listen to breaks from aborted iterations
       tld.facing.__resetBreak();
       //clear push buffer
-      tld.facing.__getPushBuffer().clear();
+      tld.facing.__resetPushBuffer();
     }
 
     if (ForeachTraits<FunctionTy>::NeedsPush) {
       global_wl.push(tld.facing.__getPushBuffer().begin(),
 		     tld.facing.__getPushBuffer().end());
-      // for (typename Galois::UserContext<value_type>::pushBufferTy::iterator
-      // 	     b = tld.facing.__getPushBuffer().begin(),
-      // 	     e = tld.facing.__getPushBuffer().end();
-      // 	   b != e; ++b)
-      // 	global_wl.push(*b);
-      tld.facing.__getPushBuffer().clear();
+      tld.facing.__resetPushBuffer();
     }
+
+    assert(tld.facing.__getPushBuffer().capacity() == 0);
+
     // NB: since push buffer uses PIA, reset after getting push buffer
-    if (ForeachTraits<FunctionTy>::NeedsPIA)
-      tld.facing.__resetAlloc();
+    tld.facing.__resetAlloc();
     if (ForeachTraits<FunctionTy>::NeedsBreak)
       if (tld.facing.__breakHappened())
         break_happened.data = 1;
