@@ -178,7 +178,7 @@ public:
     lock();
     if (!wl.empty()) {
       retval = wl.front();
-      wl.pop_back();
+      wl.pop_front();
     }
     unlock();
     return retval;
