@@ -84,6 +84,8 @@ namespace Graph {
  */
 template<typename NTy, typename ETy>
 struct EdgeItem {
+  typedef ETy& reference;
+  
   NTy* N;
   ETy* Ea;
   ETy E;
@@ -98,6 +100,8 @@ struct EdgeItem {
 
 template<typename NTy>
 struct EdgeItem<NTy, void> {
+  typedef void reference;
+
   NTy* N;
   inline NTy*&       first()        { return N; }
   inline NTy* const& first()  const { return N; }
@@ -147,13 +151,16 @@ class FirstGraph {
     iterator begin() {
       return boost::make_filter_iterator(is_active_edge(), edges.begin(), edges.end());
     }
+    
     iterator end()   {
       return boost::make_filter_iterator(is_active_edge(), edges.end(), edges.end());
     }
+    
     void erase(iterator ii) {
       *ii = edges.back();
       edges.pop_back();
     }
+
     void erase(gNode* N) { 
       iterator ii = find(N);
       if (ii != end())
@@ -166,11 +173,12 @@ class FirstGraph {
 
     iterator createEdge(gNode* N, EdgeTy* v) {
       for (typename EdgesTy::iterator ii = edges.begin(), ee = edges.end();
-	   ii != ee; ++ii)
-	if (!ii->first()->active) {
-	  *ii = EITy(N, v);
-	  return ii;
-	}
+          ii != ee; ++ii) {
+        if (!ii->first()->active) {
+          *ii = EITy(N, v);
+          return ii;
+        }
+      }
       return edges.insert(edges.end(), EITy(N, v));
     }
   };
@@ -197,6 +205,7 @@ private:
 
 public:
   typedef typename gNode::iterator edge_iterator;
+  typedef typename gNode::EITy::reference edge_data_reference;
 
   //// Node Handling ////
   
@@ -227,9 +236,7 @@ public:
   /**
    * Removes a node from the graph along with all its outgoing/incoming edges
    * for undirected graphs or outgoing edges for directed graphs.
-   * 
    */
-  // FIXME: incoming edges aren't handled here for directed graphs
   void removeNode(GraphNode n, Galois::MethodFlag mflag = ALL) {
     assert(n);
     acquire(n, mflag);
@@ -247,7 +254,6 @@ public:
   //! iterator to set the value if desired.  This frees us from
   //! dealing with the void edge data problem in this API
   edge_iterator addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {
-    //FIXME: allocate space for edge data
     assert(src);
     assert(dst);
     acquire(src, mflag);
@@ -288,8 +294,8 @@ public:
    * Returns the edge data associated with the edge. It is an error to
    * get the edge data for a non-existent edge.
    */
-  EdgeTy* getEdgeData(edge_iterator dst) const {
-    return dst->second();
+  edge_data_reference getEdgeData(edge_iterator dst) const {
+    return *dst->second();
   }
 
   GraphNode getEdgeDst(edge_iterator ii) {
@@ -304,8 +310,7 @@ public:
     acquire(N, mflag);
 
     if (shouldLock(mflag)) {
-      for (typename gNode::iterator ii = N->begin(), ee = N->end();
-	   ii != ee; ++ii) {
+      for (typename gNode::iterator ii = N->begin(), ee = N->end(); ii != ee; ++ii) {
         acquire(ii->first(), mflag);
       }
     }
@@ -351,12 +356,9 @@ public:
     return std::distance(active_begin(), active_end());
   }
 
-  FirstGraph() {
-    // std::cerr << "NodeSize " << sizeof(gNode) << "\n";
-    // std::cerr << "NodeDataSize " << sizeof(NodeTy) << "\n";
-    // std::cerr << "NodeEdgesSize " << sizeof(typename gNode::EdgesTy) << "\n";
-  }
+  FirstGraph() { }
 
+#if 0
   template<typename GTy>
   void copyGraph(GTy& graph) {
     //mapping between nodes
@@ -376,6 +378,7 @@ public:
 	  ni != ne; ++ni)
 	addEdge(NodeMap[*ii], NodeMap[*ni], graph.getEdgeData(*ii, *ni));
   }
+#endif
 };
 
 }
