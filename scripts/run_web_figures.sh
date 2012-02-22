@@ -50,6 +50,7 @@ run apps/delaunayrefinement/delaunayrefinement "$BASEINPUT/meshes/r5M"
 run apps/delaunaytriangulation/delaunaytriangulation "$BASEINPUT/meshes/r10M.node"
 run apps/des/DESunordered -noverify "$BASEINPUT/des/koggeStone64bit.net"
 #run apps/gmetis/gmetis -mtxinput "$BASEINPUT/matrix/cage15.mtx" 256
+run apps/matching/max-card-bipartite 1000000 100000000 10000 0
 run apps/preflowpush/preflowpush "$BASEINPUT/random/r4-2e23.gr" 0 100
 run apps/sssp/sssp -delta 14 "$BASEINPUT/random/r4-2e26.gr"
 run apps/surveypropagation/surveypropagation 9 1000000 3000000 3
