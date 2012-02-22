@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -27,7 +27,6 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 #include <iostream>
-#include <stack>
 #include <sys/time.h>
 #include <limits.h>
 #include <math.h>
@@ -41,8 +40,6 @@
 #include "Galois/Galois.h"
 
 #include "llvm/Support/CommandLine.h"
-
-#include "Galois/Runtime/ll/HWTopo.h"
 
 #include "Lonestar/BoilerPlate.h"
 
@@ -61,7 +58,6 @@ static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>")
 typedef Galois::Graph::FirstGraph<Element,void,false>            Graph;
 typedef Galois::Graph::FirstGraph<Element,void,false>::GraphNode GNode;
 
-
 #include "Subgraph.h"
 #include "Mesh.h"
 #include "Cavity.h"
@@ -73,7 +69,7 @@ struct process {
 
   template<typename Context>
   void operator()(GNode item, Context& lwl) {
-    if (!mesh->containsNode(item)) //locks
+    if (!mesh->containsNode(item))
       return;
     
     Cavity cav(mesh, lwl.getPerIterAlloc());
@@ -100,9 +96,7 @@ struct process {
     for (Subgraph::edge_iterator ii = cav.getPost().edge_begin(),
 	   ee = cav.getPost().edge_end(); ii != ee; ++ii) {
       Subgraph::tmpEdge edge = *ii;
-      //bool ret = 
-      mesh->addEdge(edge.src, edge.dst, Galois::NONE); //, edge.data);
-      //assert ret;
+      mesh->addEdge(edge.src, edge.dst, Galois::NONE);
     }
     if (mesh->containsNode(item)) {
       lwl.push(item);
@@ -138,6 +132,7 @@ int main(int argc, char** argv) {
   Galois::for_each<Alt::ChunkedAdaptor<Alt::InitialQueue<Alt::LevelStealingAlt, Alt::LevelLocalAlt>, 256*4*4> >(wl.begin(), wl.end(), process());
 #else
   Galois::for_each<LocalQueues<dChunkedLIFO<256>, LIFO<> > >(wl.begin(), wl.end(), process());
+//  Galois::for_each<LIFO<> >(wl.begin(), wl.end(), process());
 #endif
   T.stop();
 
