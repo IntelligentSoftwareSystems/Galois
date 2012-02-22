@@ -32,7 +32,9 @@
 #include "Galois/Graphs/FileGraph.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
-//#include "Exp/PriorityScheduling/WorkListTL.h"
+#ifdef GALOIS_EXP
+#include "PriorityScheduling/WorkList.h"
+#endif
 
 #include <string>
 #include <vector>
@@ -47,7 +49,7 @@ static const char* desc =
   "maximum cardinality matching is the matching with the most number of edges.";
 static const char* url = 0;
 
-static cll::opt<int> algo("algo", cll::desc("Algorithm"), cll::init(1));
+static cll::opt<int> algo("algo", cll::desc("Algorithm"), cll::init(3));
 static cll::opt<int> N(cll::Positional, cll::desc("<N>"), cll::Required);
 static cll::opt<int> numEdges(cll::Positional, cll::desc("<numEdges>"), cll::Required);
 static cll::opt<int> numGroups(cll::Positional, cll::desc("<numGroups>"), cll::Required);
@@ -518,9 +520,12 @@ struct MatchingABMP {
     typedef dChunkedFIFO<1024> dChunk;
     typedef OrderedByIntegerMetric<Indexer,dChunk> OBIM;
     
-    //Exp::StartWorklistExperiment<OBIM,dChunk,Chunk,Indexer,Less,Greater>()(
-    //    std::cout, initial.begin(), initial.end(), Process(*this, g, maxLayer, size));
+#ifdef GALOIS_EXP
+    Exp::StartWorklistExperiment<OBIM,dChunk,Chunk,Indexer,Less,Greater>()(
+        std::cout, initial.begin(), initial.end(), Process(*this, g, maxLayer, size));
+#else
     Galois::for_each<OBIM>(initial.begin(), initial.end(), Process(*this, g, maxLayer, size));
+#endif
     
     t.start();
     MatchingFF<G,false> algo;

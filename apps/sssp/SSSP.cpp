@@ -34,6 +34,9 @@
 #include "llvm/Support/CommandLine.h"
 
 #include "Lonestar/BoilerPlate.h"
+#ifdef GALOIS_EXP
+#include "PriorityScheduling/WorkList.h"
+#endif
 
 #include <iostream>
 #include <set>
@@ -144,7 +147,13 @@ void runBodyParallel(const GNode src) {
 
   UpdateRequest one[1] = { UpdateRequest(src, 0) };
   T.start();
+#ifdef GALOIS_EXP
+    Exp::StartWorklistExperiment<OBIM,dChunk,Chunk,UpdateRequestIndexer,
+      std::less<UpdateRequest>,std::greater<UpdateRequest> >()(
+        std::cout, &one[0], &one[1], process());
+#else
   Galois::for_each<OBIM>(&one[0], &one[1], process());
+#endif
   T.stop();
 }
 
