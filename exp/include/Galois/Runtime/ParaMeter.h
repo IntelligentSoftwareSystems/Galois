@@ -48,6 +48,10 @@
 #include <deque>
 #include <vector>
 #include <algorithm>
+#include <cstdlib>
+#include <ctime>
+#include <cstdio>
+
 
 namespace GaloisRuntime {
 
@@ -88,6 +92,21 @@ private:
     }
   };
     
+  static std::ostream& printHeader(std::ostream& out) {
+    out << "LOOPNAME, STEP, AVAIL_PARALLELISM, WORKLIST_SIZE\n";
+    return out;
+  }
+
+  static void genName(char* str, size_t size) {
+    time_t rawtime;
+    struct tm* timeinfo;
+
+    time(&rawtime);
+    timeinfo = localtime(&rawtime);
+
+    strftime(str, size, "ParaMeter_Stats_%Y-%m-%d_%H:%M:%S.csv", timeinfo);
+  }
+
 public:
   static const char* statsFilename();
 
@@ -95,7 +114,14 @@ public:
   static void for_each_impl(IterTy b, IterTy e, Func func, const char* loopname) {
     typedef typename WLTy::template retype<typename std::iterator_traits<IterTy>::value_type>::WL ActualWLTy;
 
-    ParaMeterExecutor<ActualWLTy, Func> executor(func, loopname);
+    const size_t NAME_SIZE = 256;
+    char name[NAME_SIZE];
+    genName(name, NAME_SIZE);
+    std::ofstream statsFile(name, std::ios_base::out);
+    printHeader(statsFile);
+    statsFile.close();
+    
+    ParaMeterExecutor<ActualWLTy, Func> executor(func, name, loopname);
     executor.addInitialWork(b, e);
     executor.run();
   }
@@ -151,9 +177,9 @@ private:
 
   FunctionTy body;
   const char* loopname;
-  ParaMeterWorkList workList;
+  std::ofstream pstatsFile;
 
-  std::ofstream* pstatsFile;
+  ParaMeterWorkList workList;
 
   IterQueue commitQueue;
   // XXX: may turn out to be unnecessary
@@ -161,18 +187,16 @@ private:
 
 public:
 
-  ParaMeterExecutor(FunctionTy _body, const char* _loopname):
-    body(_body), loopname(_loopname), pstatsFile(NULL) {
+  ParaMeterExecutor(FunctionTy _body, const char* pstatsName, const char* _loopname):
+    body(_body), loopname(_loopname), pstatsFile(pstatsName, std::ios_base::app) {
 
     if (this->loopname == NULL) {
       this->loopname = "foreach";
     }
-    
   }
 
   ~ParaMeterExecutor() {
-    delete pstatsFile;
-    pstatsFile = NULL;
+    pstatsFile.close();
   }
 
   template <typename Iter>
@@ -286,21 +310,17 @@ public:
 private:
 
   void beginLoop() {
-    // all instances of ParaMeterExecutor (one per for_each), open the stats
-    // file in append mode
-    pstatsFile = new std::ofstream(ParaMeter::statsFilename(), std::ios_base::app); 
   }
 
   void finishStep (const ParaMeter::StepStats& stat) {
     allSteps.push_back (stat);
-    stat.dump(*pstatsFile, loopname);
+    stat.dump(pstatsFile, loopname);
     workList.switchWorkLists ();
     setThreadContext(NULL);
   }
 
   void finishLoop() {
     setThreadContext(NULL);
-    pstatsFile->close();
   }
 
   IterationContext& newIteration () const {
