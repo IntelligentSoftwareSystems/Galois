@@ -58,6 +58,13 @@ void testSerial(int n) {
   checker.checkUnique(n);
   checker.checkRandomAccess();
 
+  int start = n / 2;
+  typename Container::iterator b = c.begin();
+  std::advance(b, start);
+  for (int i = start; i < n; ++i, ++b) {
+    check(__FUNCTION__, i, *b);
+  }
+
   Container c2;
   std::copy(boost::counting_iterator<int>(0),
       boost::counting_iterator<int>(n),
@@ -71,16 +78,28 @@ void testSerial(int n) {
 
   check(__FUNCTION__, n - 1, c.back());
 
+  start = c.size() / 2 - 1;
+  typename Container::iterator e = c.begin();
+  b = e;
+  start = n + 1;
+  std::advance(b, start);
+  std::advance(e, c.size());
+  while (b != e) {
+    check(__FUNCTION__, *b++, start++ - n);
+  }
+
   for (size_t size = c.size(); size > 0; --size) {
     check(__FUNCTION__, size, c.size());
     c.pop_back();
   }
+
+
 }
 
 
 int main() {
-  testSerial<Galois::SmallBag<int, 5> >(NUM_ELEMENTS);
   testSerial<Galois::Bag<int> >(NUM_ELEMENTS);
+  testSerial<Galois::SmallBag<int, 5> >(NUM_ELEMENTS);
   testSerial<Galois::SmallBag<int, 10> >(10);
 }
 

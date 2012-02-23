@@ -49,7 +49,7 @@ class InsertBag: public GaloisRuntime::galois_insert_bag<T> {
 // TODO(ddn): Factor out template dependencies to reduce code bloat
 //#define XXX_BAG_DEBUG_ALLOC
 template<class T>
-class Bag {
+class Bag: private boost::noncopyable {
 protected:  
   struct Header {
     Header* m_next;
@@ -246,7 +246,7 @@ public:
         n -= diff;
         v += diff;
         m_size += diff;
-        if (v == p->m_end && p != p->m_next) {
+        if (v == p->m_end && p->m_next != m_head) {
           p = p->m_next;
           v = p->m_begin;
         }
@@ -489,15 +489,8 @@ public:
  */
 // TODO(ddn): Remove need for explicit merge by adopting same techniques are InsBag
 template<typename T>
-class MergeBag {
+class MergeBag: private boost::noncopyable {
   GaloisRuntime::PerCPU<Bag<T> > bags;
-
-  void merge() const {
-    Bag<T> o = bags.get(0);
-    for (unsigned i = 1; i < bags.size(); ++i) {
-      o.splice(const_cast<Bag<T>&>(bags.get(i)));
-    }
-  }
 
 public:
   typedef typename Bag<T>::value_type value_type;
@@ -506,13 +499,18 @@ public:
   typedef typename Bag<T>::iterator iterator;
   typedef typename Bag<T>::const_iterator const_iterator;
 
+  void merge() {
+    Bag<T>& o = bags.get(0);
+    for (unsigned i = 1; i < bags.size(); ++i) {
+      o.splice(bags.get(i));
+    }
+  }
+
   const_iterator begin() const {
-    merge();
     return bags.get(0).begin();
   }
 
   iterator begin() {
-    merge();
     return bags.get(0).begin();
   }
 
@@ -529,17 +527,14 @@ public:
   }
 
   bool empty() const {
-    merge();
     return bags.get(0).empty();
   }
 
   size_t size() const {
-    merge();
     return bags.get(0).size();
   }
 
   void clear() {
-    merge();
     bags.get(0).clear();
   }
 
