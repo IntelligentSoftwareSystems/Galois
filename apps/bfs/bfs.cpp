@@ -1,4 +1,4 @@
-/** Single source shortest paths -*- C++ -*-
+/** Breadth-first search -*- C++ -*-
  * @file
  * @section License
  *
@@ -172,7 +172,7 @@ static void readGraph(GNode& source, GNode& report) {
 }
 
 
-//! Serial BFS
+//! Serial BFS using Galois graph
 struct SerialAlgo {
   std::string name() const { return "Serial"; }
 
@@ -206,7 +206,7 @@ struct SerialAlgo {
   }
 };
 
-//! Serial BFS using optimized flags
+//! Serial BFS using optimized flags but using Galois graph
 struct SerialFlagOptAlgo {
   std::string name() const { return "Serial (Flag Optimized)"; }
 
@@ -220,6 +220,7 @@ struct SerialFlagOptAlgo {
       UpdateRequest req = wl.front();
       wl.pop_front();
 
+      // Operator begins here
       SNode& data = graph.getData(req.n, Galois::NONE);
 
       if (req.w < data.dist) {
