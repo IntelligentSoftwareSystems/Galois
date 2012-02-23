@@ -15,3 +15,4 @@ rgraph(rmat8-2e14 16384 131072)
 
 add_custom_target(more-scalefree-graphs DEPENDS rmat8-2e12.gr rmat8-2e13.gr rmat8-2e14.gr)
 add_dependencies(more-inputs more-scalefree-graphs)
+add_dependencies(more-scalefree-graphs more-tools)

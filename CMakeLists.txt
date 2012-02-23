@@ -219,7 +219,6 @@ include(llvm-extras)
 
 configure_file("${PROJECT_SOURCE_DIR}/include/config.h.in" "${PROJECT_BINARY_DIR}/include/config.h")
 include_directories("include" "${PROJECT_BINARY_DIR}/include")
-configure_file("${PROJECT_SOURCE_DIR}/scripts/make_dist.sh.in" "${PROJECT_BINARY_DIR}/scripts/make_dist.sh")
 
 add_subdirectory(lib)
 add_subdirectory(src)
@@ -227,6 +226,7 @@ add_subdirectory(apps)
 add_subdirectory(tools)
 add_subdirectory(inputs)
 add_subdirectory(test)
+add_subdirectory(scripts)
 if(USE_EXP)
   add_subdirectory(exp)
 endif()
@@ -246,6 +246,3 @@ include(CPack)
 
 ###### Installation ######
 install(DIRECTORY include/ DESTINATION include PATTERN ".svn" EXCLUDE PATTERN ".in" EXCLUDE)
-#install(DIRECTORY scripts/ DESTINATION scripts PATTERN ".svn" EXCLUDE PATTERN ".in" EXCLUDE)
-execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/scripts ${CMAKE_BINARY_DIR}/scripts)
-execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/inputs ${CMAKE_BINARY_DIR}/inputs)
