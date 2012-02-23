@@ -25,7 +25,7 @@
 #include "Galois/Statistic.h"
 #include "Galois/Galois.h"
 #include "Galois/Bag.h"
-#include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/Graph2.h"
 #include "Galois/Graphs/LCGraph.h"
 #include "llvm/Support/CommandLine.h"
 
@@ -40,7 +40,7 @@ const char* url = "preflow_push";
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<int> sourceId(cll::Positional, cll::desc("sourceID"), cll::Required);
 static cll::opt<int> sinkId(cll::Positional, cll::desc("sinkID"), cll::Required);
-static cll::opt<int> relabelInt("relabel", cll::desc("relabel interval"), cll::init(0));
+static cll::opt<int> relabelInt("relabel", cll::desc("relabel interval: < 0 no relabeling, 0 use default interval, > 0 relabel every X iterations"), cll::init(0));
 
 /**
  * Alpha parameter the original Goldberg algorithm to control when global
@@ -81,6 +81,10 @@ typedef Galois::Graph::FirstGraph<Node, int, true> Graph;
 typedef Graph::GraphNode GNode;
 
 struct Config {
+  typedef std::vector<GNode> NodesTy;
+  typedef typename NodesTy::iterator nodes_iterator;
+
+  NodesTy nodes; // XXX(ddn) remove when we implement do_all loops
   Graph graph;
   GNode sink;
   GNode source;
@@ -95,49 +99,49 @@ Config app;
 
 void checkAugmentingPath() {
   // Use id field as visited flag
-  for (Graph::active_iterator ii = app.graph.active_begin(), 
-      ee = app.graph.active_end(); ii != ee; ++ii) {
+  for (Config::nodes_iterator ii = app.nodes.begin(),
+      ee = app.nodes.end(); ii != ee; ++ii) {
     GNode src = *ii;
-    src.getData().id = 0;
+    app.graph.getData(src).id = 0;
   }
 
   std::deque<GNode> queue;
 
-  app.source.getData().id = 1;
+  app.graph.getData(app.source).id = 1;
   queue.push_back(app.source);
 
   while (!queue.empty()) {
     GNode& src = queue.front();
     queue.pop_front();
-    for (Graph::neighbor_iterator ii = app.graph.neighbor_begin(src),
-        ee = app.graph.neighbor_end(src); ii != ee; ++ii) {
-      GNode dst = *ii;
-      if (dst.getData().id == 0
-          && app.graph.getEdgeData(src, ii) > 0) {
-        dst.getData().id = 1;
+    for (Graph::edge_iterator ii = app.graph.edge_begin(src),
+        ee = app.graph.edge_end(src); ii != ee; ++ii) {
+      GNode dst = app.graph.getEdgeDst(ii);
+      if (app.graph.getData(dst).id == 0
+          && app.graph.getEdgeData(ii) > 0) {
+        app.graph.getData(dst).id = 1;
         queue.push_back(dst);
       }
     }
   }
 
-  if (app.sink.getData().id != 0) {
+  if (app.graph.getData(app.sink).id != 0) {
     assert(false && "Augmenting path exisits");
     abort();
   }
 }
 
 void checkHeights() {
-  for (Graph::active_iterator i = app.graph.active_begin(),
-      iend = app.graph.active_end(); i != iend; ++i) {
-    GNode src = *i;
-    for (Graph::neighbor_iterator j = app.graph.neighbor_begin(src),
-        jend = app.graph.neighbor_end(src); j != jend; ++j) {
-      GNode dst = *j;
-      int sh = src.getData().height;
-      int dh = dst.getData().height;
-      int cap = app.graph.getEdgeData(src, j);
+  for (Config::nodes_iterator ii = app.nodes.begin(),
+      ei = app.nodes.end(); ii != ei; ++ii) {
+    GNode src = *ii;
+    int sh = app.graph.getData(src).height;
+    for (Graph::edge_iterator jj = app.graph.edge_begin(src),
+        ej = app.graph.edge_end(src); jj != ej; ++jj) {
+      GNode dst = app.graph.getEdgeDst(jj);
+      int cap = app.graph.getEdgeData(jj);
+      int dh = app.graph.getData(dst).height;
       if (cap > 0 && sh > dh + 1) {
-        std::cerr << "height violated at " << src.getData() << "\n";
+        std::cerr << "height violated at " << app.graph.getData(src) << "\n";
         abort();
       }
     }
@@ -150,22 +154,22 @@ void checkConservation(Config& orig) {
 
   // Setup ids assuming same iteration order in both graphs
   int id = 0;
-  for (Graph::active_iterator i = app.graph.active_begin(),
-      iend = app.graph.active_end(); i != iend; ++i, ++id) {
-    i->getData().id = id;
+  for (Config::nodes_iterator ii = app.nodes.begin(),
+      ei = app.nodes.end(); ii != ei; ++ii, ++id) {
+    app.graph.getData(*ii).id = id;
   }
   id = 0;
-  for (Graph::active_iterator i = orig.graph.active_begin(),
-      iend = orig.graph.active_end(); i != iend; ++i, ++id) {
-    i->getData().id = id;
-    map[id] = *i;
+  for (Config::nodes_iterator ii = orig.nodes.begin(),
+      ei = orig.nodes.end(); ii != ei; ++ii, ++id) {
+    orig.graph.getData(*ii).id = id;
+    map[id] = *ii;
   }
 
   // Now do some checking
-  for (Graph::active_iterator i = app.graph.active_begin(),
-      iend = app.graph.active_end(); i != iend; ++i) {
-    GNode src = *i;
-    Node node = src.getData();
+  for (Config::nodes_iterator ii = app.nodes.begin(),
+      ei = app.nodes.end(); ii != ei; ++ii) {
+    GNode src = *ii;
+    const Node& node = app.graph.getData(src);
     int srcId = node.id;
 
     if (src == app.source || src == app.sink)
@@ -177,16 +181,16 @@ void checkConservation(Config& orig) {
     }
 
     size_t sum = 0;
-    for (Graph::neighbor_iterator j = app.graph.neighbor_begin(src),
-        jend = app.graph.neighbor_end(src); j != jend; ++j) {
-      GNode dst = *j;
-      int dstId = dst.getData().id;
-      int ocap = orig.graph.getEdgeData(map[srcId], map[dstId]);
+    for (Graph::edge_iterator jj = app.graph.edge_begin(src),
+        ej = app.graph.edge_end(src); jj != ej; ++jj) {
+      GNode dst = app.graph.getEdgeDst(jj);
+      int dstId = app.graph.getData(dst).id;
+      int ocap = orig.graph.getEdgeData(orig.graph.findEdge(map[srcId], map[dstId]));
       int delta = 0;
       if (ocap > 0) 
-        delta -= ocap - app.graph.getEdgeData(src, j);
+        delta -= ocap - app.graph.getEdgeData(jj);
       else
-        delta += app.graph.getEdgeData(src, j);
+        delta += app.graph.getEdgeData(jj);
       sum += delta;
     }
 
@@ -205,9 +209,9 @@ void verify(Config& orig) {
   checkAugmentingPath();
 }
 
-void reduceCapacity(const GNode& src, const GNode& dst, int amount) {
-  int& cap1 = app.graph.getEdgeData(src, dst, Galois::NONE);
-  int& cap2 = app.graph.getEdgeData(dst, src, Galois::NONE);
+void reduceCapacity(const Graph::edge_iterator& ii, const GNode& src, const GNode& dst, int amount) {
+  int& cap1 = app.graph.getEdgeData(ii);
+  int& cap2 = app.graph.getEdgeData(app.graph.findEdge(dst, src, Galois::NONE));
   cap1 -= amount;
   cap2 += amount;
 }
@@ -220,14 +224,15 @@ struct UpdateHeights {
    */
   template<typename Context>
   void operator()(const GNode& src, Context& ctx) {
-    for (Graph::neighbor_iterator
-        ii = app.graph.neighbor_begin(src, useCAS ? Galois::NONE : flag),
-        ee = app.graph.neighbor_end(src, useCAS ? Galois::NONE : flag);
+    for (Graph::edge_iterator
+        ii = app.graph.edge_begin(src, useCAS ? Galois::NONE : flag),
+        ee = app.graph.edge_end(src, useCAS ? Galois::NONE : flag);
         ii != ee; ++ii) {
-      GNode dst = *ii;
-      if (app.graph.getEdgeData(dst, src, Galois::NONE) > 0) {
-        Node& node = dst.getData(Galois::NONE);
-        int newHeight = src.getData(Galois::NONE).height + 1;
+      GNode dst = app.graph.getEdgeDst(ii);
+      int rdata = app.graph.getEdgeData(app.graph.findEdge(dst, src, Galois::NONE));
+      if (rdata > 0) {
+        Node& node = app.graph.getData(dst, Galois::NONE);
+        int newHeight = app.graph.getData(src, Galois::NONE).height + 1;
         if (useCAS) {
           int oldHeight;
           while (newHeight < (oldHeight = node.height)) {
@@ -247,13 +252,20 @@ struct UpdateHeights {
   }
 };
 
+struct BfsIndexer: public std::unary_function<GNode,int> {
+  int operator()(const GNode& n) const {
+    return app.graph.getData(n, Galois::NONE).height;
+  }
+};
+
 struct ResetHeights {
   typedef int tt_does_not_need_context;
   typedef int tt_does_not_need_stats;
+  typedef int tt_does_not_need_parallel_push;
 
   template<typename Context>
   void operator()(const GNode& src, Context&) {
-    Node& node = src.getData(Galois::NONE);
+    Node& node = app.graph.getData(src, Galois::NONE);
     node.height = app.num_nodes;
     node.current = 0;
     if (src == app.sink)
@@ -265,49 +277,45 @@ template<typename WLTy>
 struct FindWork {
   typedef int tt_does_not_need_context;
   typedef int tt_does_not_need_stats;
+  typedef int tt_does_not_need_parallel_push;
+
   WLTy& wl;
   FindWork(WLTy& w) : wl(w) {}
 
   template<typename Context>
   void operator()(const GNode& src, Context&) {
-    Node& node = src.getData(Galois::NONE);
+    Node& node = app.graph.getData(src, Galois::NONE);
     if (src == app.sink || src == app.source || node.height >= app.num_nodes)
       return;
     if (node.excess > 0) 
-      wl.push(src);
+      wl.push_back(src);
   }
 };
 
 template<Galois::MethodFlag flag, typename IncomingWL>
 void globalRelabel(IncomingWL& incoming) {
-  typedef GaloisRuntime::WorkList::dChunkedLIFO<1024> SimpleScheduler;
-  typedef GaloisRuntime::WorkList::dChunkedFIFO<16> BFSScheduler;
+  typedef GaloisRuntime::WorkList::dChunkedLIFO<16> SmallChunk;
+  typedef GaloisRuntime::WorkList::dChunkedLIFO<8*1024> SimpleScheduler;
+  typedef GaloisRuntime::WorkList::OrderedByIntegerMetric<BfsIndexer, SmallChunk> BFSScheduler;
 
-  Galois::StatTimer T1("ResetHeights");
+  Galois::StatTimer T1("ResetHeightsTime");
   T1.start();
-  Galois::for_each<SimpleScheduler>(app.graph.active_begin(),
-      app.graph.active_end(),
+  Galois::for_each<SimpleScheduler>(app.nodes.begin(),
+      app.nodes.end(),
       ResetHeights());
   T1.stop();
 
-  Galois::StatTimer T("BfsTime");
+  Galois::StatTimer T("UpdateHeightsTime");
   T.start();
-  std::vector<GNode> single;
-  single.push_back(app.sink);
-  Galois::for_each<BFSScheduler>(single.begin(), single.end(), UpdateHeights<flag>());
+  GNode single[1] = { app.sink };
+  Galois::for_each<BFSScheduler>(&single[0], &single[1], UpdateHeights<flag>());
   T.stop();
 
-  Galois::StatTimer T2("FF");
+  Galois::StatTimer T2("FindWorkTime");
   T2.start();
-  typedef Galois::InsertBag<GNode> NewWorkTy;
-  NewWorkTy new_work;
-  Galois::for_each<SimpleScheduler>(app.graph.active_begin(),
-      app.graph.active_end(),
-      FindWork<NewWorkTy>(new_work));
-  for (NewWorkTy::iterator it = new_work.begin(), end = new_work.end(); 
-      it != end; ++it) {
-    incoming.push_back(*it);
-  }
+  Galois::for_each<SimpleScheduler>(app.nodes.begin(),
+      app.nodes.end(),
+      FindWork<IncomingWL>(incoming));
   T2.stop();
 }
 
@@ -325,7 +333,7 @@ struct Process {
     }
 
     counter += increment;
-    if (app.global_relabel_interval && counter >= app.global_relabel_interval) {
+    if (app.global_relabel_interval > 0 && counter >= app.global_relabel_interval) {
       app.should_global_relabel = true;
       ctx.breakLoop();
       return;
@@ -334,7 +342,7 @@ struct Process {
 
   template<typename Context>
   bool discharge(const GNode& src, Context& ctx) {
-    Node& node = src.getData(Galois::CHECK_CONFLICT);
+    Node& node = app.graph.getData(src, Galois::CHECK_CONFLICT);
     int prevHeight = node.height;
     bool relabeled = false;
 
@@ -343,26 +351,26 @@ struct Process {
     }
 
     while (true) {
-      Galois::MethodFlag f =
+      Galois::MethodFlag flag =
         relabeled ? Galois::NONE : Galois::CHECK_CONFLICT;
       bool finished = false;
       int current = 0;
 
-      for (Graph::neighbor_iterator ii = app.graph.neighbor_begin(src, f),
-          ee = app.graph.neighbor_end(src, f);
+      for (Graph::edge_iterator ii = app.graph.edge_begin(src, flag),
+          ee = app.graph.edge_end(src, flag);
           ii != ee; ++ii, ++current) {
-        GNode dst = *ii;
-        int cap = app.graph.getEdgeData(src, ii, Galois::NONE);
+        GNode dst = app.graph.getEdgeDst(ii);
+        int cap = app.graph.getEdgeData(ii);
         if (cap == 0 || current < node.current) 
           continue;
 
-        Node& dnode = dst.getData(Galois::NONE);
+        Node& dnode = app.graph.getData(dst, Galois::NONE);
         if (node.height - 1 != dnode.height) 
           continue;
 
         // Push flow
         int amount = std::min(static_cast<int>(node.excess), cap);
-        reduceCapacity(src, dst, amount);
+        reduceCapacity(ii, src, dst, amount);
 
         // Only add once
         if (dst != app.sink && dst != app.source && dnode.excess == 0) 
@@ -398,14 +406,14 @@ struct Process {
     int minEdge;
 
     int current = 0;
-    for (Graph::neighbor_iterator 
-        ii = app.graph.neighbor_begin(src, Galois::NONE),
-        ee = app.graph.neighbor_end(src, Galois::NONE);
+    for (Graph::edge_iterator 
+        ii = app.graph.edge_begin(src, Galois::NONE),
+        ee = app.graph.edge_end(src, Galois::NONE);
         ii != ee; ++ii, ++current) {
-      GNode dst = *ii;
-      int cap = app.graph.getEdgeData(src, ii, Galois::NONE);
+      GNode dst = app.graph.getEdgeDst(ii);
+      int cap = app.graph.getEdgeData(ii);
       if (cap > 0) {
-        Node& dnode = dst.getData(Galois::NONE);
+        const Node& dnode = app.graph.getData(dst, Galois::NONE);
         if (dnode.height < minHeight) {
           minHeight = dnode.height;
           minEdge = current;
@@ -416,7 +424,7 @@ struct Process {
     assert(minHeight != std::numeric_limits<int>::max());
     ++minHeight;
 
-    Node& node = src.getData(Galois::NONE);
+    Node& node = app.graph.getData(src, Galois::NONE);
     if (minHeight < app.num_nodes) {
       node.height = minHeight;
       node.current = minEdge;
@@ -444,8 +452,8 @@ void initializeGraph(const char* inputFile,
   }
 
   // Create dense map between ids and GNodes
-  std::vector<GNode> nodes;
-  nodes.resize(newApp->num_nodes);
+  newApp->nodes.clear();
+  newApp->nodes.resize(newApp->num_nodes);
   for (int i = 0; i < newApp->num_nodes; ++i) {
     Node node;
 
@@ -454,17 +462,19 @@ void initializeGraph(const char* inputFile,
     }
 
     GNode src = newApp->graph.createNode(node);
-    newApp->graph.addNode(src);
+    //newApp->graph.addNode(src);
     if (i == sourceId) {
       newApp->source = src;
     } else if (i == sinkId) {
       newApp->sink = src;
     }
-    nodes[i] = src;
+    newApp->nodes[i] = src;
   }
 
   // Create edges
   newApp->num_edges = 0;
+  Graph& g = newApp->graph;
+  const Config::NodesTy& n = newApp->nodes;
   for (ReaderGraph::active_iterator ii = reader.active_begin(),
       ee = reader.active_end(); ii != ee; ++ii) {
     ReaderGNode rsrc = *ii;
@@ -474,11 +484,11 @@ void initializeGraph(const char* inputFile,
       ReaderGNode rdst = reader.getEdgeDst(jj);
       int rdstId = reader.getData(rdst);
       int cap = reader.getEdgeData(jj);
-      newApp->graph.addEdge(nodes[rsrcId], nodes[rdstId], cap);
+      g.getEdgeData(g.addEdge(n[rsrcId], n[rdstId])) = cap;
       ++newApp->num_edges;
       // Add reverse edge if not already there
       if (!reader.hasNeighbor(rdst, rsrc)) {
-        newApp->graph.addEdge(nodes[rdstId], nodes[rsrcId], 0);
+        g.getEdgeData(g.addEdge(n[rdstId], n[rsrcId])) = 0;
         ++newApp->num_edges;
       }
     }
@@ -487,20 +497,20 @@ void initializeGraph(const char* inputFile,
 
 template<typename C>
 void initializePreflow(C& initial) {
-  for (Graph::neighbor_iterator ii = app.graph.neighbor_begin(app.source),
-      ee = app.graph.neighbor_end(app.source); ii != ee; ++ii) {
-    GNode dst = *ii;
-    int cap = app.graph.getEdgeData(app.source, ii);
-    reduceCapacity(app.source, dst, cap);
-    Node& node = dst.getData();
+  for (Graph::edge_iterator ii = app.graph.edge_begin(app.source),
+      ee = app.graph.edge_end(app.source); ii != ee; ++ii) {
+    GNode dst = app.graph.getEdgeDst(ii);
+    int cap = app.graph.getEdgeData(ii);
+    reduceCapacity(ii, app.source, dst, cap);
+    Node& node = app.graph.getData(dst);
     node.excess += cap;
     if (cap > 0)
       initial.push_back(dst);
   }
 }
 
-struct Indexer :std::binary_function<GNode, int, int> {
-  int operator()(GNode n) const {
+struct Indexer :std::unary_function<GNode, int> {
+  int operator()(const GNode& n) const {
     return (-app.graph.getData(n, Galois::NONE).height) >> 2;
   }
 };
@@ -509,7 +519,7 @@ void run() {
   typedef GaloisRuntime::WorkList::dChunkedFIFO<16> Chunk;
   typedef GaloisRuntime::WorkList::OrderedByIntegerMetric<Indexer,Chunk> OBIM;
 
-  std::vector<GNode> initial;
+  Galois::MergeBag<GNode> initial;
   initializePreflow(initial);
 
   while (!initial.empty()) {
@@ -523,10 +533,11 @@ void run() {
       T_global_relabel.start();
       initial.clear();
       globalRelabel<Galois::CHECK_CONFLICT>(initial);
+      initial.merge();
       app.should_global_relabel = false;
       std::cout 
         << " Flow after global relabel: "
-        << app.sink.getData().excess << "\n";
+        << app.graph.getData(app.sink).excess << "\n";
       T_global_relabel.stop();
     } else {
       break;
@@ -549,12 +560,12 @@ int main(int argc, char** argv) {
     abort();
   }
   
-  if (relabelInt) {
-    app.global_relabel_interval = relabelInt;
-  } else {
+  if (relabelInt == 0) {
     app.global_relabel_interval = app.num_nodes * ALPHA + app.num_edges;
     // TODO fix interval by dividing by numThreads ?
     app.global_relabel_interval /= numThreads;
+  } else {
+    app.global_relabel_interval = relabelInt;
   }
 
   std::cout << "number of nodes: " << app.num_nodes << "\n";
@@ -566,7 +577,7 @@ int main(int argc, char** argv) {
   run();
   T.stop();
 
-  std::cout << "Flow is " << app.sink.getData().excess << "\n";
+  std::cout << "Flow is " << app.graph.getData(app.sink).excess << "\n";
   
   if (!skipVerify) {
     Config orig;
