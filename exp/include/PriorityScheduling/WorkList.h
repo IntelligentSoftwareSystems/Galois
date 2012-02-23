@@ -602,7 +602,8 @@ struct StartWorklistExperiment {
     WLFOO(ii, ei, fn, nactobim, NACTOBIM) else
     WLFOO(ii, ei, fn, slq,      SLQ)      else
     WLFOO(ii, ei, fn, bobim,    BOBIM)    else
-    WLFOO(ii, ei, fn, bag,      dChunk)   else
+    WLFOO(ii, ei, fn, dchunk,   dChunk)   else
+    WLFOO(ii, ei, fn, chunk,    Chunk)    else
     WLFOO(ii, ei, fn, random,   RANDOM)   else
 #ifdef GALOIS_TBB
     WLFOO(ii, ei, fn, tbb,      TBB)      else
