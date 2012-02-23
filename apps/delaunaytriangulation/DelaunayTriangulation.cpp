@@ -88,8 +88,8 @@ struct Process {
 
   Process(QuadTree* t): tree(t) { }
 
-  template<typename Alloc>
-  bool findContainingElement(const Point* p, const Alloc& alloc, GNode& node) {
+  template<typename Alloc2>
+  bool findContainingElement(const Point* p, const Alloc2& alloc, GNode& node) {
     Point* result;
     if (!tree->find(p, result)) {
       return false;
@@ -105,7 +105,7 @@ struct Process {
     }
 
     ContainsTuple contains(*graph, p->t());
-    Searcher<Alloc> searcher(*graph, alloc);
+    Searcher<Alloc2> searcher(*graph, alloc);
     searcher.useMark(p, 0, p->numTries());
     searcher.findFirst(someNode, contains);
 
