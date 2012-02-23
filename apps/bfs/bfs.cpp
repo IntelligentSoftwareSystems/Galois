@@ -282,11 +282,16 @@ struct GaloisNoLockAlgo {
 
   void operator()(const GNode& source) const {
     using namespace GaloisRuntime::WorkList;
-    typedef dChunkedLIFO<16> dChunk;
+    typedef dChunkedFIFO<64> dChunk;
+    typedef ChunkedFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
 
     UpdateRequest one[1] = { UpdateRequest(source, 0) };
+#ifdef GALOIS_EXP
+    Exp::StartWorklistExperiment<OBIM,dChunk,Chunk,UpdateRequestIndexer,std::less<UpdateRequest>,std::greater<UpdateRequest> >()(std::cout, &one[0], &one[1], *this);
+#else
     Galois::for_each<OBIM>(&one[0], &one[1], *this);
+#endif
   }
 
   void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& ctx) const {
