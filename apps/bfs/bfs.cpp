@@ -31,8 +31,10 @@
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
 #include "Galois/Graphs/LCGraph.h"
+#ifdef GALOIS_EXP
+#include "PriorityScheduling/WorkList.h"
+#endif
 #include "llvm/Support/CommandLine.h"
-
 #include "Lonestar/BoilerPlate.h"
 
 #include <string>
@@ -41,7 +43,6 @@
 #include <iostream>
 #include <deque>
 
-namespace cll = llvm::cl;
 
 static const char* name = "Breadth-first Search Example";
 static const char* desc =
@@ -49,23 +50,25 @@ static const char* desc =
   "graph using a modified Bellman-Ford algorithm\n";
 static const char* url = 0;
 
-static cll::opt<unsigned int> startNode("startnode", cll::desc("Node to start search from"), cll::init(1));
-static cll::opt<unsigned int> reportNode("reportnode", cll::desc("Node to report distance to"), cll::init(2));
-static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<int> algo("algo", cll::desc("Algorithm"), cll::init(0));
+//****** Command Line Options ******
+namespace cll = llvm::cl;
+static cll::opt<unsigned int> startNode("startnode",
+    cll::desc("Node to start search from"),
+    cll::init(1));
+static cll::opt<unsigned int> reportNode("reportnode",
+    cll::desc("Node to report distance to"),
+    cll::init(2));
+static cll::opt<int> algo("algo",
+    cll::desc("Algorithm"),
+    cll::init(0));
+static cll::opt<std::string> filename(cll::Positional,
+    cll::desc("<input file>"),
+    cll::Required);
 
 static const unsigned int DIST_INFINITY =
   std::numeric_limits<unsigned int>::max() - 1;
 
-template<typename GrNode>
-struct UpdateRequestCommon {
-  GrNode n;
-  unsigned int w;
-
-  UpdateRequestCommon(const GrNode& N, unsigned int W): n(N), w(W) { }
-  UpdateRequestCommon(): n(), w(0) { }
-};
-
+//****** Work Item and Node Data Defintions ******
 struct SNode {
   unsigned int id;
   unsigned int dist;
@@ -73,14 +76,26 @@ struct SNode {
   SNode(int _id = -1) : id(_id), dist(DIST_INFINITY) {}
 };
 
+typedef Galois::Graph::LC_Linear_Graph<SNode, unsigned int> Graph;
+typedef Graph::GraphNode GNode;
+
+Graph graph;
+
+struct UpdateRequest {
+  GNode n;
+  unsigned int w;
+
+  UpdateRequest(): w(0) { }
+  UpdateRequest(const GNode& N, unsigned int W): n(N), w(W) { }
+  bool operator<(const UpdateRequest& o) const { return w < o.w; }
+  bool operator>(const UpdateRequest& o) const { return w > o.w; }
+  unsigned getID() const { return graph.getData(n).id; }
+};
+
 std::ostream& operator<<(std::ostream& out, const SNode& n) {
   out << "(id: " << n.id << ", dist: " << n.dist << ")";
   return out;
 }
-
-typedef Galois::Graph::LC_Linear_Graph<SNode, unsigned int> Graph;
-typedef Graph::GraphNode GNode;
-typedef UpdateRequestCommon<GNode> UpdateRequest;
 
 struct UpdateRequestIndexer {
   unsigned int operator() (const UpdateRequest& val) const {
@@ -89,8 +104,75 @@ struct UpdateRequestIndexer {
   }
 };
 
-Graph graph;
+//! Simple verifier
+static bool verify(GNode source) {
+  if (graph.getData(source).dist != 0) {
+    std::cerr << "source has non-zero dist value\n";
+    return false;
+  }
+  
+  for (Graph::active_iterator src = graph.active_begin(), ee =
+	 graph.active_end(); src != ee; ++src) {
+    unsigned int dist = graph.getData(*src).dist;
+    if (dist >= DIST_INFINITY) {
+      std::cerr
+        << "found node = " << graph.getData(*src).id
+	<< " with label >= INFINITY = " << dist << "\n";
+      return false;
+    }
+    
+    for (Graph::edge_iterator 
+	   ii = graph.edge_begin(*src),
+	   ee = graph.edge_end(*src); ii != ee; ++ii) {
+      GNode neighbor = graph.getEdgeDst(ii);
+      unsigned int ddist = graph.getData(*src).dist;
+      if (ddist > dist + 1) {
+        std::cerr
+          << "bad level value at " << graph.getData(*src).id
+	  << " which is a neighbor of " << graph.getData(neighbor).id << "\n";
+	return false;
+      }
+    }
+  }
+  return true;
+}
 
+static void readGraph(GNode& source, GNode& report) {
+  graph.structureFromFile(filename);
+  source = *graph.active_begin();
+  report = *graph.active_begin();
+
+  std::cout << "Read " << graph.size() << " nodes\n";
+  
+  unsigned int id = 0;
+  bool foundReport = false;
+  bool foundSource = false;
+  for (Graph::active_iterator src = graph.active_begin(), ee =
+      graph.active_end(); src != ee; ++src) {
+    SNode& node = graph.getData(*src, Galois::NONE);
+    node.id = id++;
+    node.dist = DIST_INFINITY;
+    if (node.id == startNode) {
+      source = *src;
+      foundSource = true;
+    } 
+    if (node.id == reportNode) {
+      foundReport = true;
+      report = *src;
+    }
+  }
+
+  if (!foundReport || !foundSource) {
+    std::cerr 
+      << "failed to set report: " << reportNode 
+      << "or failed to set source: " << startNode << "\n";
+    assert(0);
+    abort();
+  }
+}
+
+
+//! Serial BFS
 struct SerialAlgo {
   std::string name() const { return "Serial"; }
 
@@ -124,6 +206,7 @@ struct SerialAlgo {
   }
 };
 
+//! Serial BFS using optimized flags
 struct SerialFlagOptAlgo {
   std::string name() const { return "Serial (Flag Optimized)"; }
 
@@ -157,16 +240,22 @@ struct SerialFlagOptAlgo {
   }
 };
 
+//! Galois BFS
 struct GaloisAlgo {
   std::string name() const { return "Galois"; }
 
   void operator()(const GNode& source) const {
     using namespace GaloisRuntime::WorkList;
-    typedef dChunkedLIFO<16> dChunk;
+    typedef dChunkedFIFO<64> dChunk;
+    typedef ChunkedFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
 
     UpdateRequest one[1] = { UpdateRequest(source, 0) };
+#ifdef GALOIS_EXP
+    Exp::StartWorklistExperiment<OBIM,dChunk,Chunk,UpdateRequestIndexer,std::less<UpdateRequest>,std::greater<UpdateRequest> >()(std::cout, &one[0], &one[1], *this);
+#else
     Galois::for_each<OBIM>(&one[0], &one[1], *this);
+#endif
   }
 
   void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& ctx) const {
@@ -187,6 +276,7 @@ struct GaloisAlgo {
   }
 };
 
+//! Galois BFS using optimized flags
 struct GaloisNoLockAlgo {
   std::string name() const { return "Galois No Lock"; }
 
@@ -220,39 +310,6 @@ struct GaloisNoLockAlgo {
   }
 };
 
-bool verify(GNode source) {
-  if (graph.getData(source,Galois::NONE).dist != 0) {
-    std::cerr << "source has non-zero dist value\n";
-    return false;
-  }
-  
-  for (Graph::active_iterator src = graph.active_begin(), ee =
-	 graph.active_end(); src != ee; ++src) {
-    unsigned int dist = graph.getData(*src,Galois::NONE).dist;
-    if (dist >= DIST_INFINITY) {
-      std::cerr << "found node = " << graph.getData(*src,Galois::NONE).id
-	   << " with label >= INFINITY = " << dist << "\n";
-      return false;
-    }
-    
-    for (Graph::edge_iterator 
-	   ii = graph.edge_begin(*src, Galois::NONE),
-	   ee = graph.edge_end(*src, Galois::NONE); ii != ee; ++ii) {
-      GNode neighbor = graph.getEdgeDst(ii);
-      unsigned int ddist = graph.getData(*src,Galois::NONE).dist;
-      int d = 1;
-      if (ddist > dist + d) {
-        std::cerr << "bad level value at "
-          << graph.getData(*src,Galois::NONE).id
-	  << " which is a neighbor of " 
-          << graph.getData(neighbor,Galois::NONE).id << "\n";
-	return false;
-      }
-    }
-  }
-  return true;
-}
-
 template<typename AlgoTy>
 void run(const AlgoTy& algo, const GNode& source) {
   Galois::StatTimer T;
@@ -265,36 +322,8 @@ void run(const AlgoTy& algo, const GNode& source) {
 int main(int argc, char **argv) {
   LonestarStart(argc, argv, std::cout, name, desc, url);
 
-  graph.structureFromFile(filename);
-
-  std::cout << "Read " << graph.size() << " nodes\n";
-  
-  unsigned int id = 0;
-  bool foundReport = false;
-  bool foundSource = false;
-  GNode source = *graph.active_begin();
-  GNode report = *graph.active_begin();
-  for (Graph::active_iterator src = graph.active_begin(), ee =
-      graph.active_end(); src != ee; ++src) {
-    SNode& node = graph.getData(*src, Galois::NONE);
-    node.id = id++;
-    node.dist = DIST_INFINITY;
-    if (node.id == startNode) {
-      source = *src;
-      foundSource = true;
-    } 
-    if (node.id == reportNode) {
-      foundReport = true;
-      report = *src;
-    }
-  }
-
-  if (!foundReport || !foundSource) {
-    std::cerr << "failed to set report: " << reportNode 
-      << "or failed to set source: " << startNode << ".\n";
-    assert(0);
-    abort();
-  }
+  GNode source, report;
+  readGraph(source, report);
 
   switch (algo) {
     case 0: run(SerialAlgo(), source); break;
@@ -304,12 +333,16 @@ int main(int argc, char **argv) {
     default: std::cerr << "Unknown algorithm\n"; abort();
   }
 
-  std::cout << "Report node: " << graph.getData(report, Galois::NONE) << "\n";
+  std::cout << "Report node: " << graph.getData(report) << "\n";
 
-  if (!skipVerify && !verify(source)) {
-    std::cerr << "Verification failed.\n";
-    assert(0 && "Verification failed");
-    abort();
+  if (!skipVerify) {
+    if (verify(source)) {
+      std::cout << "Verification successful.\n";
+    } else {
+      std::cerr << "Verification failed.\n";
+      assert(0 && "Verification failed");
+      abort();
+    }
   }
 
   return 0;
