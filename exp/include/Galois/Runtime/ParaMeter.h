@@ -43,8 +43,6 @@
 
 #include "llvm/Support/CommandLine.h"
 
-#include <ostream>
-#include <fstream>
 #include <deque>
 #include <vector>
 #include <algorithm>
@@ -86,15 +84,14 @@ private:
     size_t availParallelism;
     size_t workListSize;
 
-    std::ostream& dump(std::ostream& out, const char* loopname) const {
-      out << loopname << ", " << step << ", " << availParallelism << ", " << workListSize << "\n";
-      return out;
+    void dump(FILE* out, const char* loopname) const {
+      if (out)
+        fprintf(out, "%s,%zu,%zu,%zu\n", loopname, step, availParallelism, workListSize);
     }
   };
     
-  static std::ostream& printHeader(std::ostream& out) {
-    out << "LOOPNAME, STEP, AVAIL_PARALLELISM, WORKLIST_SIZE\n";
-    return out;
+  static void printHeader(FILE* out) {
+    fprintf(out, "LOOPNAME, STEP, AVAIL_PARALLELISM, WORKLIST_SIZE\n");
   }
 
   static void genName(char* str, size_t size) {
@@ -114,12 +111,15 @@ public:
   static void for_each_impl(IterTy b, IterTy e, Func func, const char* loopname) {
     typedef typename WLTy::template retype<typename std::iterator_traits<IterTy>::value_type>::WL ActualWLTy;
 
-    const size_t NAME_SIZE = 256;
-    char name[NAME_SIZE];
-    genName(name, NAME_SIZE);
-    std::ofstream statsFile(name, std::ios_base::out);
-    printHeader(statsFile);
-    statsFile.close();
+    //const size_t NAME_SIZE = 256;
+    //char name[NAME_SIZE];
+    //genName(name, NAME_SIZE);
+    const char* name = "parameter.csv";
+    FILE* out = fopen(name, "w");
+    if (out != NULL) {
+      printHeader(out);
+      fclose(out);
+    }
     
     ParaMeterExecutor<ActualWLTy, Func> executor(func, name, loopname);
     executor.addInitialWork(b, e);
@@ -177,7 +177,7 @@ private:
 
   FunctionTy body;
   const char* loopname;
-  std::ofstream pstatsFile;
+  FILE* pstatsFile;
 
   ParaMeterWorkList workList;
 
@@ -188,7 +188,9 @@ private:
 public:
 
   ParaMeterExecutor(FunctionTy _body, const char* pstatsName, const char* _loopname):
-    body(_body), loopname(_loopname), pstatsFile(pstatsName, std::ios_base::app) {
+    body(_body), loopname(_loopname) {
+
+    pstatsFile = fopen(pstatsName, "a");
 
     if (this->loopname == NULL) {
       this->loopname = "foreach";
@@ -196,7 +198,8 @@ public:
   }
 
   ~ParaMeterExecutor() {
-    pstatsFile.close();
+    if (pstatsFile)
+      fclose(pstatsFile);
   }
 
   template <typename Iter>
