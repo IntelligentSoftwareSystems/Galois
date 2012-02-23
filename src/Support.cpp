@@ -41,7 +41,7 @@ class PrintStats {
 
   void summarizeList(int iternum, const char* first, const char* second,
       const GaloisRuntime::OnlineStatistics& x) {
-    printf("STAT DISTRIBUTION %d %s %s n: %ld ave: %.1f "
+    printf("STAT DISTRIBUTION %d %s %s n: %zu ave: %.1f "
       "min: %.0f max: %.0f stdev: %.1f\n",
       iternum, first, second, x.n(), x.mean(), x.min(), x.max(), sqrt(x.sample_variance()));
   }

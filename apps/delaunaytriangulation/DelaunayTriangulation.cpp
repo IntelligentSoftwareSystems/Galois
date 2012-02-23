@@ -391,7 +391,7 @@ static void generateMesh(PointList& points) {
   std::random_shuffle(&order[0], &order[eend]);
   T.stop();
 
-  size_t prefix = eend - std::min(16UL*numThreads, eend);
+  size_t prefix = eend - std::min(16U*numThreads, eend);
  
   Galois::StatTimer T1("serial");
   T1.start();

@@ -242,7 +242,7 @@ public:
     }
 
     // ------- random access iterator concepts -------
-    typedef long difference_type;
+    typedef ptrdiff_t difference_type;
 
     iterator& operator+=(difference_type n) {
       while (n > 0) {
