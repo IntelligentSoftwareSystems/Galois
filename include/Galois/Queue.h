@@ -358,7 +358,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * it takes special non-V values for marker and header nodes.
    */
   struct Node {
-    K key;
+    boost::optional<K> key;
     bool voidKey;
     /*volatile*/ void* value;
     /*volatile*/ Node* next;
@@ -442,13 +442,13 @@ class ConcurrentSkipListMap : private boost::noncopyable {
       V* v = getValidValue();
       if (v == NULL)
         return SnapshotEntry();
-      return SnapshotEntry(key, v);
+      return SnapshotEntry(*key, v);
     }
   public:
     /**
      * Creates a new regular node.
      */
-    Node(K k, void* v, Node* n): key(k), voidKey(false), value(v), next(n)  { }
+    Node(const K& k, void* v, Node* n): key(k), voidKey(false), value(v), next(n)  { }
 
     /**
      * Creates a new marker node. A marker is distinguished by having its value
@@ -469,7 +469,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * placing field in a shared abstract class.
    */
   struct Index {
-    const K key;
+    const boost::optional<K> key;
     /*final*/Node* node;
     /*final*/ Index* down;
     /*volatile*/ Index* right;
@@ -544,7 +544,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * <tt>Map.Entry.setValue</tt> method.
    */
   struct SnapshotEntry {
-    K key;
+    boost::optional<K> key;
     V* value;
     const bool valid;
 
@@ -556,7 +556,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
      * @param value
      *          the value
      */
-    SnapshotEntry(K k, V* v): key(k), value(v), valid(true) { }
+    SnapshotEntry(const K& k, V* v): key(k), value(v), valid(true) { }
     SnapshotEntry(): valid(false) { }
   };
 
@@ -572,7 +572,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    *          the key
    * @return a predecessor of key
    */
-  Node* findPredecessor(K key) {
+  Node* findPredecessor(const K& key) {
     for (;;) {
       Index* q = head;
       for (;;) {
@@ -584,7 +584,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
             else
               break; // restart
           }
-          if (JComp(comp,key, r->key) > 0) {
+          if (JComp(comp, key, *r->key) > 0) {
             q = r;
             continue;
           }
@@ -635,7 +635,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    *          the key
    * @return node holding key, or null if no such.
    */
-  Node* findNode(K key) {
+  Node* findNode(const K& key) {
     for (;;) {
       Node* b = findPredecessor(key);
       Node* n = b->next;
@@ -652,7 +652,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
         }
         if (v == n || b->value == NULL) // b is deleted
           break;
-	int c = JComp(comp,key,n->key);
+	int c = JComp(comp, key, *n->key);
 	if (c == 0)
           return n;
         else if (c < 0)
@@ -758,14 +758,14 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    *          the key
    * @return the value, or null if absent
    */
-  V* doGet(const K key) {
+  V* doGet(const K& key) {
     //return getUsingFindNode(key);
     Node* bound = NULL;
     Index* q = head;
     for (;;) {
       K rk;
       Index *d, *r;
-      if ((r = q->right) && (rk = r->key) && r->node != bound) {
+      if ((r = q->right) && (rk = *r->key) && r->node != bound) {
         int c = JComp(comp, key, rk);
         if (c > 0) {
           q = r;
@@ -781,9 +781,8 @@ class ConcurrentSkipListMap : private boost::noncopyable {
         q = d;
       else {
         for (Node* n = q->node->next; n; n = n->next) {
-          K nk = n->key;
           if (!n->voidKey) {
-            int c = JComp(comp, key, nk);
+            int c = JComp(comp, key, *n->key);
             if (c == 0) {
               V* v = static_cast<V*>(n->value);
               return v ? v : getUsingFindNode(key);
@@ -805,7 +804,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    *          the key
    * @return the value, or null if absent
    */
-  V* getUsingFindNode(K key) {
+  V* getUsingFindNode(const K& key) {
     /*
      * Loop needed here and elsewhere in case value field goes null just as it
      * is about to be returned, in which case we lost a race with a deletion, so
@@ -835,7 +834,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    *          if should not insert if already present
    * @return the old value, or null if newly inserted
    */
-  V* doPut(K kkey, V* value, bool onlyIfAbsent) {
+  V* doPut(const K& kkey, V* value, bool onlyIfAbsent) {
     for (;;) {
       Node* b = findPredecessor(kkey);
       Node* n = b->next;
@@ -852,7 +851,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
           }
           if (v == n || b->value == NULL) // b is deleted
             break;
-          int c = JComp(comp, kkey, n->key);
+          int c = JComp(comp, kkey, *n->key);
 	  if (c > 0) {
 	    b = n;
 	    n = f;
@@ -981,7 +980,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
         Index* r = q->right;
         if (r != NULL) {
           // compare before deletion check avoids needing recheck
-	  int c = JComp(comp, idx->key, r->key);
+	  int c = JComp(comp, *idx->key, *r->key);
           if (r->indexesDeletedNode()) {
             if (q->unlink(r))
               continue;
@@ -997,7 +996,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
         if (j == insertionLevel) {
           // Don't insert index if node already deleted
           if (t->indexesDeletedNode()) {
-            findNode(idx->key); // cleans up
+            findNode(*idx->key); // cleans up
             return;
           }
           if (!q->link(r, t))
@@ -1005,7 +1004,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
           if (--insertionLevel == 0) {
             // need final deletion check before return
             if (t->indexesDeletedNode())
-              findNode(idx->key);
+              findNode(*idx->key);
             return;
           }
         }
@@ -1095,8 +1094,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
       if (!n->appendMarker(f) || !b->casNext(n, f))
         findFirst(); // retry
       clearIndexToFirst();
-      K key = n->key;
-      return SnapshotEntry(key, static_cast<V*>(v));
+      return SnapshotEntry(*n->key, static_cast<V*>(v));
     }
   }
 
@@ -1219,7 +1217,7 @@ public:
    *                  currently in the map.
    * @throws NullPointerException if the key is <tt>null</tt>.
    */
-  V* get(K key) {
+  V* get(const K& key) {
     return doGet(key);
     //return getUsingFindNode(key);
   }
@@ -1241,7 +1239,7 @@ public:
    * @throws NullPointerException
    *           if the key or value are <tt>null</tt>.
    */
-  V* put(K key, V* value) {
+  V* put(const K& key, V* value) {
     assert(value != NULL);
     return doPut(key, value, false);
   }
@@ -1307,7 +1305,7 @@ public:
    * @throws NullPointerException
    *           if the key or value are <tt>null</tt>.
    */
-  V* putIfAbsent(K key, V* value) {
+  V* putIfAbsent(const K& key, V* value) {
     assert(value != NULL);
     return doPut(key, value, true);
   }
@@ -1372,7 +1370,7 @@ public:
   boost::optional<K> pollFirstKey() {
     SnapshotEntry retval = doRemoveFirst();
     if (retval.valid)
-      return boost::optional<K>(retval.key);
+      return retval.key;
     else
       return boost::optional<K>();
   }
