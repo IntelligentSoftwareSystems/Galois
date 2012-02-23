@@ -24,17 +24,10 @@
 #define GALOIS_BAG_H
 
 #include "Galois/Runtime/InsBag.h"
+#include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/mem.h"
 
-//#define XXX_OLD_BAG
-
-#ifdef XXX_OLD_BAG
-#include <boost/iterator/iterator_facade.hpp>
-#include <list>
-#include <vector>
-#else 
 #include <iterator>
-#endif
 
 namespace Galois {
 
@@ -48,6 +41,9 @@ class InsertBag: public GaloisRuntime::galois_insert_bag<T> {
 
 };
 
+/**
+ * Bag for serial use.
+ */
 // TODO(ddn): Less than page size allocation
 // TODO(ddn): POD specialization
 // TODO(ddn): Factor out template dependencies to reduce code bloat
@@ -456,6 +452,10 @@ public:
   }
 };
 
+/**
+ * Bag that supports a small number of inline elements before defaulting
+ * to Bag<T> implementation.
+ */
 template<typename T, unsigned N>
 class SmallBag: public Bag<T> {
   typedef typename Bag<T>::Header Header;
@@ -484,7 +484,73 @@ public:
   }
 };
 
-}
+/**
+ * Like InsertBag but with random access iterators.
+ */
+// TODO(ddn): Remove need for explicit merge by adopting same techniques are InsBag
+template<typename T>
+class MergeBag {
+  GaloisRuntime::PerCPU<Bag<T> > bags;
+
+  void merge() const {
+    Bag<T> o = bags.get(0);
+    for (unsigned i = 1; i < bags.size(); ++i) {
+      o.splice(const_cast<Bag<T>&>(bags.get(i)));
+    }
+  }
+
+public:
+  typedef typename Bag<T>::value_type value_type;
+  typedef typename Bag<T>::const_reference const_reference;
+  typedef typename Bag<T>::reference reference;
+  typedef typename Bag<T>::iterator iterator;
+  typedef typename Bag<T>::const_iterator const_iterator;
+
+  const_iterator begin() const {
+    merge();
+    return bags.get(0).begin();
+  }
+
+  iterator begin() {
+    merge();
+    return bags.get(0).begin();
+  }
+
+  const_iterator end() const {
+    return bags.get(0).end();
+  }
+
+  iterator end() {
+    return bags.get(0).end();
+  }
+  
+  reference push_back(const T& val) {
+    return bags.get().push_back(val);
+  }
+
+  bool empty() const {
+    merge();
+    return bags.get(0).empty();
+  }
+
+  size_t size() const {
+    merge();
+    return bags.get(0).size();
+  }
+
+  void clear() {
+    merge();
+    bags.get(0).clear();
+  }
+
+  void swap(MergeBag<T>& o) {
+    for (unsigned i = 0; i < bags.size(); ++i) {
+      std::swap(bags.get(i), o.bags.get(i));
+    }
+  }
+};
+
+} // end namespace Galois
 
 namespace std {
   template<typename T>
@@ -497,6 +563,10 @@ namespace std {
     a.swap(b);
   }
 
+  template<typename T>
+  inline void swap(Galois::MergeBag<T>& a, Galois::MergeBag<T>& b) {
+    a.swap(b);
+  }
 }
 
 #endif
