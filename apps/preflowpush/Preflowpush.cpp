@@ -82,7 +82,7 @@ typedef Graph::GraphNode GNode;
 
 struct Config {
   typedef std::vector<GNode> NodesTy;
-  typedef typename NodesTy::iterator nodes_iterator;
+  typedef NodesTy::iterator nodes_iterator;
 
   NodesTy nodes; // XXX(ddn) remove when we implement do_all loops
   Graph graph;
