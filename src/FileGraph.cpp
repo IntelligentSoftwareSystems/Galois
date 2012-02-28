@@ -40,7 +40,6 @@ using namespace Galois::Graph;
 //potential padding (32bit max) to Re-Align to 64bits
 //EdgeType[numEdges] {EdgeType size}
 
-
 FileGraph::FileGraph()
   : masterMapping(0), masterLength(0), masterFD(0),
     outIdx(0), outs(0), edgeData(0),

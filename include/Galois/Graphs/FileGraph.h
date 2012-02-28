@@ -67,6 +67,26 @@
 #include <string.h>
 #include <endian.h>
 
+#include "config.h"
+
+#ifdef HAVE_LE64TOH
+#else
+# if __BYTE_ORDER == __LITTLE_ENDIAN
+#  define le64toh(x) (x)
+# else
+#  error "Need to implement byte reordering for big endian machines"
+# endif
+#endif
+
+#ifdef HAVE_LE32TOH
+#else
+# if __BYTE_ORDER == __LITTLE_ENDIAN
+#  define le32toh(x) (x)
+# else
+#  error "Need to implement byte reordering for big endian machines"
+# endif
+#endif
+
 using namespace GaloisRuntime;
 
 namespace Galois {

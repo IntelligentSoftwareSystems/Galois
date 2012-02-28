@@ -62,16 +62,13 @@ find_package(Threads)
 set(RT_LINK ${CMAKE_THREAD_LIBS_INIT} ${RT_LINK})
 
 #NUMA (linux)
-find_library(LIBNUMA numa)
-set(USE_LIBNUMA TRUE CACHE BOOL "Use libnuma to control memory allocation.")
-if(USE_LIBNUMA)
-  if (LIBNUMA)
-    message(STATUS "NUMA in use")
-    set(RT_LINK numa ${RT_LINK})
-    add_definitions(-DGALOIS_NUMA)
-  else()
-    message(WARNING "NUMA specified but libnuma not found")
-  endif()
+find_package(LIBNUMA)
+if(LIBNUMA_FOUND)
+  message(STATUS "NUMA in use")
+  set(RT_LINK numa ${RT_LINK})
+  add_definitions(-DGALOIS_NUMA)
+else()
+  message(WARNING "NUMA specified but libnuma not found")
 endif()
 
 #LAPACK
@@ -175,8 +172,11 @@ if(CMAKE_BUILD_TYPE MATCHES "Debug")
 endif()
 
 #always import c99 stdint functions into c++
-add_definitions(-D__STDC_LIMIT_MACROS)
-add_definitions(-D__STDC_CONSTANT_MACROS)
+include(UseStdMacro)
+
+include(CheckSymbolExists)
+CHECK_SYMBOL_EXISTS(le64toh "endian.h" HAVE_LE64TOH)
+CHECK_SYMBOL_EXISTS(le32toh "endian.h" HAVE_LE32TOH)
 
 ###### Global Functions ######
 function(linkRuntime name) 
