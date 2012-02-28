@@ -228,7 +228,7 @@ public:
       activeThreads = std::min(num, maxThreads);
     }
     assert(activeThreads <= maxThreads);
-    assert(activeThreads <= threads.size());
+    assert(activeThreads - 1 <= threads.size());
 
     return activeThreads;
   }
