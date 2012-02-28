@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -25,28 +25,26 @@
 #define USE_SUCCS 1
 #define SHARE_SINGLE_BC 0 
 #define SHOULD_PRODUCE_CERTIFICATE 0
-#define SHOULD_TOUCH_GRAPH 0
 
 #include "Galois/Statistic.h"
-#include "Galois/Graphs/FileGraph.h"
 #include "Galois/Galois.h"
-#include "llvm/Support/CommandLine.h"
-
+#include "Galois/UserContext.h"
 #if SHARE_SINGLE_BC
 #include "Galois/Runtime/SimpleLock.h"
 #include "Galois/Runtime/CacheLineStorage.h"
 #endif
+#include "Galois/Graphs/FileGraph.h"
 
+#include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
+#include <boost/iterator/filter_iterator.hpp>
+
+#include <algorithm>
 #include <iostream>
 #include <iomanip>
 #include <fstream>
 #include <sstream>
-#include <map>
-#include <set>
-#include <stack>
-#include <queue>
 #include <vector>
 #include <cstdlib>
 
@@ -101,7 +99,6 @@ std::vector<GNode> & getSuccs(GNode n) {
 }
 
 void initGraphData() {
-  
   // Pre-compute successors sizes in tmp
   std::vector< std::vector<GNode> > tmp(NumNodes);
   for (Graph::active_iterator ii = G->active_begin(), ee = G->active_end();
@@ -140,7 +137,7 @@ void resetData() {
   std::vector< std::vector<GNode> >::iterator it = svec.begin();
   std::vector< std::vector<GNode> >::iterator end = svec.end();
   while (it != end) {
-    (*it).resize(0);
+    it->resize(0);
     ++it;
   }
 }
@@ -154,26 +151,8 @@ void cleanupData() {
   }
 }
 
-int dummyCnt;
-void touchGraph() {
- for (Graph::active_iterator ii = G->active_begin(), ee = G->active_end();
-       ii != ee; ++ii) {
-   GNode v = *ii;
-   for (Graph::neighbor_iterator
-          jj = G->neighbor_begin(v, Galois::NONE),
-          ee = G->neighbor_end(v, Galois::NONE); jj != ee; ++jj) {
-	//GNode w = *jj;
-	dummyCnt++;
-   } 
- }
- std::cerr << "Touching graph... " << dummyCnt << std::endl;
-}
-
 struct process {
-  
-  template<typename Context>
-  void __attribute__((noinline)) operator() (GNode& _req, Context& lwl) {
-    
+  void operator()(GNode& _req, Galois::UserContext<GNode>& lwl) {
     std::vector<GNode> & SQ = *(SQG.get());
     std::vector<double> & sigma = *(sigmaG.get());
     std::vector<int> &d = *(distG.get());
@@ -304,6 +283,14 @@ void printBCcertificate() {
   outf.close();
 }
 
+struct HasOut: public std::unary_function<GNode,bool> {
+  Graph* graph;
+  HasOut(Graph* g): graph(g) { }
+  bool operator()(const GNode& n) const {
+    return graph->neighbor_begin(n) != graph->neighbor_end(n);
+  }
+};
+
 int main(int argc, char** argv) {
   LonestarStart(argc, argv, std::cout, name, desc, url);
 
@@ -328,31 +315,24 @@ int main(int argc, char** argv) {
   if (iterLimit)
     iterations = iterLimit;
 
-  std::cerr << "NumNodes: " << NumNodes 
-    << " Iterations: " << iterations << "\n";
-  std::vector<GNode> tmp;
-  
-#if SHOULD_TOUCH_GRAPH
-  touchGraph(); // pre-faulting graph to memory
-#endif
+  boost::filter_iterator<HasOut,Graph::active_iterator>
+    begin = boost::make_filter_iterator(HasOut(G), g.active_begin(), g.active_end()),
+    end = boost::make_filter_iterator(HasOut(G), g.active_end(), g.active_end());
 
-  int cnt = 0;
-  for (Graph::active_iterator ii = g.active_begin(), ee = g.active_end();
-       ii != ee; ++ii) {
-    if (cnt == iterations)
-      break;
-    // Only process nodes that actually have (out-)neighbors
-    if (std::distance(g.neighbor_begin(*ii, Galois::NONE),
-          g.neighbor_end(*ii, Galois::NONE)) > 0) {
-      cnt++;
-      tmp.push_back(*ii);
-    }
-  }
-  std::cout << "Going parallel" << std::endl;
-  Galois::setMaxThreads(numThreads);
+  iterations = std::min((int) std::distance(begin, end), iterations);
+
+  std::cout 
+    << "NumNodes: " << NumNodes 
+    << " Iterations: " << iterations << "\n";
+  
+  end = begin;
+  std::advance(end, iterations);
+  std::vector<GNode> tmp;
+  std::copy(begin, end, std::back_inserter(tmp));
+
   Galois::StatTimer T;
   T.start();
-  Galois::for_each<GaloisRuntime::WorkList::LIFO<> >(tmp.begin(), tmp.end(), process());
+  Galois::for_each(tmp.begin(), tmp.end(), process());
   T.stop();
 
   if (!skipVerify) {
@@ -369,11 +349,11 @@ int main(int argc, char** argv) {
 #endif
   }
   std::cerr << "Application done...\n";
-  Galois::Timer tt;
+
+  Galois::StatTimer tt("cleanup");
   tt.start();
   cleanupData();
   tt.stop();
-  std::cerr << "Time to cleanup: " << tt.get() << std::endl;
+
   return 0;
 }
-// vim:ts=8:sts=2:sw=2

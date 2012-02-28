@@ -131,7 +131,7 @@ template<typename NTy, typename ETy>
 struct EdgeItem {
   NTy N;
   ETy E;
-  inline NTy getNeighbor() {
+  inline NTy getNeighbor() const {
     return N;
   }
   inline ETy& getData() {
@@ -145,7 +145,7 @@ struct EdgeItem {
 template<typename NTy>
 struct EdgeItem<NTy, void> {
   NTy N;
-  inline NTy getNeighbor() {
+  inline NTy getNeighbor() const {
     return N;
   }
   inline typename VoidWrapper<void>::ref_type getData() {
@@ -180,6 +180,14 @@ public:
   typedef typename VoidWrapper<EdgeTy>::type edge_type;
 
 private:
+  template<typename T>
+  struct first_eq {
+    T N2;
+    first_eq(T& n) :N2(n) {}
+    template <typename T2>
+    bool operator()(const T2& ii) const { return ii.getNeighbor() == N2; }
+  };
+
   struct gNode: public GaloisRuntime::Lockable {
     //! The storage type for an edge
     typedef EdgeItem<gNode*, EdgeTy> EITy;
@@ -193,8 +201,6 @@ private:
     NITy data;
     bool active;
     EdgesTy edges;
-    //NITy data;
-    //bool active;
 
     iterator begin() {
       return edges.begin();
@@ -244,27 +250,25 @@ private:
       return ii->getData();
     }
 
-    edge_reference createEdge(gNode* N) {
-      edges.push_back(EITy(N));
-      return edges.back().getData();
+    iterator createEdge(gNode* N) {
+      return edges.insert(edges.end(), EITy(N));
     }
 
-    edge_reference getOrCreateEdge(gNode* N) {
+    iterator getOrCreateEdge(gNode* N) {
       for (iterator ii = begin(), ee = end(); ii != ee; ++ii)
 	if (ii->getNeighbor() == N)
-	  return ii->getData();
+	  return ii;
       return createEdge(N);
     }
 
-    edge_reference createEdge(gNode* N, const_edge_reference data) {
-      edges.push_back(EITy(N, data));
-      return edges.back().getData();
+    iterator createEdge(gNode* N, const_edge_reference data) {
+      return edges.insert(edges.end(), EITy(N, data));
     }
 
-    edge_reference getOrCreateEdge(gNode* N, const_edge_reference data) {
+    iterator getOrCreateEdge(gNode* N, const_edge_reference data) {
       for (iterator ii = begin(), ee = end(); ii != ee; ++ii)
         if (ii->getNeighbor() == N)
-          return ii->getData();
+          return ii;
       return createEdge(N, data);
     }
 
@@ -382,6 +386,8 @@ public:
   typedef EdgeTy EdgeDataTy;
   typedef NodeTy NodeDataTy;
 
+  typedef typename gNode::iterator edge_iterator;
+
   //// Node Handling ////
   
   /**
@@ -390,7 +396,9 @@ public:
    * pass ::GraphUnit instead.
    */
   GraphNode createNode(const_node_reference n) {
-    gNode N(n, false);
+    // TODO(ddn): make semantics the same
+    //gNode N(n, false);
+    gNode N(n, true);
     return GraphNode(this, &(nodes.push(N)));
   }
 
@@ -412,8 +420,8 @@ public:
     acquire(n.ID, mflag);
     bool oldActive = n.ID->active;
     if (!oldActive) {
-            n.ID->active = true;
-            //__sync_add_and_fetch(&numActive, 1);
+      n.ID->active = true;
+      //__sync_add_and_fetch(&numActive, 1);
     }
     n.ID->edges.reserve(maxDegree);
     return !oldActive;
@@ -436,21 +444,19 @@ public:
   /**
    * Removes a node from the graph along with all its outgoing/incoming edges
    * for undirected graphs or outgoing edges for directed graphs.
-   * 
    */
-  // FIXME: incoming edges aren't handled here for directed graphs
+  // FIXME(ddn): Doesn't handle incoming edges for directed graphs
   bool removeNode(GraphNode n, Galois::MethodFlag mflag = ALL) {
     assert(n.ID);
     acquire(n.ID, mflag);
     gNode* N = n.ID;
     bool wasActive = N->active;
     if (wasActive) {
-      //__sync_sub_and_fetch(&numActive, 1);
       N->active = false;
       //erase the in-edges first
       for (unsigned int i = 0; i < N->edges.size(); ++i) {
-	if (N->edges[i].getNeighbor() != N) // don't handle loops yet
-	  N->edges[i].getNeighbor()->eraseEdge(N);
+        if (N->edges[i].getNeighbor() != N) // don't handle loops yet
+          N->edges[i].getNeighbor()->eraseEdge(N);
       }
       N->edges.clear();
     }
@@ -460,9 +466,8 @@ public:
   //// Edge Handling ////
 
   //! Adds an edge to graph, replacing existing value if edge already exists
-  edge_reference addEdge(GraphNode src, GraphNode dst,
-	       const_edge_reference data, 
-	       Galois::MethodFlag mflag = ALL) {
+  edge_iterator addEdge(GraphNode src, GraphNode dst, const_edge_reference data, 
+      Galois::MethodFlag mflag = ALL) {
     assert(src.ID);
     assert(dst.ID);
     acquire(src.ID, mflag);
@@ -482,7 +487,7 @@ public:
 
   //! Adds an edge to graph, always adding new value, thus permiting multiple edges to from
   //! one node to another. Not defined for undirected graphs.
-  edge_reference addMultiEdge(GraphNode src, GraphNode dst, const_edge_reference data,
+  edge_iterator addMultiEdge(GraphNode src, GraphNode dst, const_edge_reference data,
       Galois::MethodFlag mflag = ALL) {
     assert(src.ID);
     assert(dst.ID);
@@ -496,7 +501,7 @@ public:
   }
 
   //! Adds an edge to graph, replacing existing value if edge already exists
-  edge_reference addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {
+  edge_iterator addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {
     assert(src.ID);
     assert(dst.ID);
     acquire(src.ID, mflag);
@@ -516,7 +521,7 @@ public:
 
   //! Adds an edge to graph, always adding new value, thus permiting multiple edges to from
   //! one node to another. Not defined for undirected graphs.
-  edge_reference addMultiEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {
+  edge_iterator addMultiEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {
     assert(src.ID);
     assert(dst.ID);
     acquire(src.ID, mflag);
@@ -574,11 +579,45 @@ public:
     return N.ID->edges.size();
   }
 
+  edge_iterator edge_begin(GraphNode N, Galois::MethodFlag mflag = ALL) {
+    assert(N.ID);
+    acquire(N.ID, mflag);
+
+    if (shouldLock(mflag)) {
+      for (typename gNode::neighbor_iterator ii = N.ID->neighbor_begin(), ee =
+             N.ID->neighbor_end(); ii != ee; ++ii) {
+        acquire(*ii, mflag);
+      }
+    }
+    return N.ID->begin();
+  }
+
+  edge_iterator edge_end(GraphNode N, Galois::MethodFlag mflag = ALL) {
+    assert(N.ID);
+    return N.ID->end();
+  }
+
+  edge_iterator findEdge(GraphNode A, GraphNode B, Galois::MethodFlag mflag = ALL) {
+    assert(A.ID);
+    acquire(A.ID, mflag);
+    return std::find_if(A.ID->begin(), A.ID->end(), first_eq<gNode*>(B.ID));
+  }
+
+  edge_reference getEdgeData(const edge_iterator& ii) const {
+    return ii->getData();
+  }
+
+  GraphNode getEdgeDst(const edge_iterator& ii) const {
+    return makeGraphNodePtr(const_cast<FirstGraph*>(this))(ii->getNeighbor());
+  }
+
+  //! Deprecated in favor of edge_iterator
   typedef typename boost::transform_iterator<makeGraphNodePtr,
 					     typename gNode::neighbor_iterator>
                                                neighbor_iterator;
 
   //! Returns an iterator to the neighbors of a node 
+  //! Deprecated in favor of edge_begin
   neighbor_iterator neighbor_begin(GraphNode N, Galois::MethodFlag mflag = ALL) {
     assert(N.ID);
     acquire(N.ID, mflag);
@@ -594,6 +633,7 @@ public:
   }
 
   //! Returns the end of the neighbor iterator 
+  //! Deprecated in favor of edge_end
   neighbor_iterator neighbor_end(GraphNode N, Galois::MethodFlag mflag = ALL) {
     assert(N.ID);
     // Not necessary; no valid use for an end pointer should ever require it
@@ -605,6 +645,7 @@ public:
 
   //! Returns edge data given a neighbor iterator; neighbor iterator should be
   //! from neighbor_begin with the same src.
+  //! Deprecated in favor of getEdgeData(edge_iterator)
   edge_reference getEdgeData(GraphNode src, neighbor_iterator dst,
       Galois::MethodFlag mflag = ALL) {
     assert(src.ID);
@@ -657,6 +698,7 @@ public:
     //std::cerr << "NodeSize " << sizeof(gNode) << "\n";
   }
 
+#if 0
   template<typename GTy>
   void copyGraph(GTy& graph) {
     //mapping between nodes
@@ -676,6 +718,7 @@ public:
 	  ni != ne; ++ni)
 	addEdge(NodeMap[*ii], NodeMap[*ni], graph.getEdgeData(*ii, *ni));
   }
+#endif
 };
 
 }

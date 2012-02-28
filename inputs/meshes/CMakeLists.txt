@@ -8,9 +8,10 @@ function(mesh base numpoints)
     DEPENDS delaunaytriangulation ${base}.raw.node)
 endfunction(mesh)
 
-mesh(r500k 500000)
-mesh(r1M  1000000)
-mesh(r5M  5000000)
+mesh(r500k  500000)
+mesh(r1M   1000000)
+mesh(r5M   5000000)
+mesh(r10M 10000000)
 
 add_custom_target(mesh-nodes DEPENDS r500k.node r1M.node r5M.node)
 add_custom_target(mesh-eles DEPENDS r500k.node r500k.ele r500k.poly r1M.node r1M.ele r1M.poly r5M.node r5M.ele r5M.poly)

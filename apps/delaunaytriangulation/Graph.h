@@ -30,6 +30,7 @@
 
 #include "Galois/Graphs/Graph.h"
 
+#include <boost/optional.hpp>
 #include <vector>
 #include <deque>
 
@@ -68,26 +69,25 @@ struct Searcher: private boost::noncopyable {
 
   template<typename Pred>
   void find_(const GNode& start, const Pred& pred, bool all) {
-    typedef std::deque<std::pair<GNode,GNode>, Alloc> WorklistTy;
-
-    GNode empty;
+    typedef boost::optional<GNode> SomeGNode;
+    typedef std::deque<std::pair<GNode,SomeGNode>, Alloc> WorklistTy;
 
     WorklistTy wl(alloc);
-    wl.push_back(std::make_pair(start, empty));
+    wl.push_back(std::make_pair(start, SomeGNode()));
 
     while (!wl.empty()) {
       GNode cur = wl.front().first;
-      GNode prev = wl.front().second;
+      SomeGNode prev = wl.front().second;
 
       wl.pop_front();
 
       if (!graph.containsNode(cur, Galois::CHECK_CONFLICT))
         continue;
-      if (cur.getData(Galois::NONE).mark == mark)
+      if (graph.getData(cur, Galois::NONE).mark == mark)
         continue;
 
       if (!all) {
-        cur.getData(Galois::NONE).mark = mark;
+        graph.getData(cur, Galois::NONE).mark = mark;
       }
 
       bool matched = false;
@@ -95,23 +95,23 @@ struct Searcher: private boost::noncopyable {
         matched = true;
         matches.push_back(cur);
         if (all) {
-          cur.getData(Galois::NONE).mark = mark;
+          graph.getData(cur, Galois::NONE).mark = mark;
         }
         else
           break; // Found it
       } else {
-        if (all && prev != empty)
-          inside.push_back(prev);
+        if (all && prev)
+          inside.push_back(*prev);
       }
 
       // Search neighbors (a) when matched and looking for all or (b) when no match and looking
       // for first
       if (matched == all) {
-        for (Graph::neighbor_iterator ii = graph.neighbor_begin(cur, Galois::CHECK_CONFLICT),
-            ee = graph.neighbor_end(cur, Galois::CHECK_CONFLICT);
+        for (Graph::edge_iterator ii = graph.edge_begin(cur, Galois::CHECK_CONFLICT),
+            ee = graph.edge_end(cur, Galois::CHECK_CONFLICT);
             ii != ee; ++ii) {
-          GNode dst = *ii;
-          wl.push_back(std::make_pair(dst, cur));
+          GNode dst = graph.getEdgeDst(ii);
+          wl.push_back(std::make_pair(dst, SomeGNode(cur)));
         }
       }
     }

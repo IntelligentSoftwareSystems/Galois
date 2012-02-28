@@ -3,7 +3,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 project(Galois)
 set(GALOIS_VERSION_MAJOR "2")
 set(GALOIS_VERSION_MINOR "1")
-set(GALOIS_VERSION_PATCH "3")
+set(GALOIS_VERSION_PATCH "4")
 set(GALOIS_COPYRIGHT_YEAR "2012") # Also in COPYRIGHT
 site_name(SITE_NAME)
 
@@ -23,7 +23,7 @@ endif()
 
 #Enable iss specific options; should be OFF in the general release
 #use experimental features
-set(USE_EXP ON) 
+#set(USE_EXP ON) 
 
 ###### Optional programs and default paths ######
 
@@ -62,16 +62,13 @@ find_package(Threads)
 set(RT_LINK ${CMAKE_THREAD_LIBS_INIT} ${RT_LINK})
 
 #NUMA (linux)
-find_library(LIBNUMA numa)
-set(USE_LIBNUMA TRUE CACHE BOOL "Use libnuma to control memory allocation.")
-if(USE_LIBNUMA)
-  if (LIBNUMA)
-    message(STATUS "NUMA in use")
-    set(RT_LINK numa ${RT_LINK})
-    add_definitions(-DGALOIS_NUMA)
-  else()
-    message(STATUS "NUMA specified but libnuma not found")
-  endif()
+find_package(LIBNUMA)
+if(LIBNUMA_FOUND)
+  message(STATUS "NUMA in use")
+  set(RT_LINK numa ${RT_LINK})
+  add_definitions(-DGALOIS_NUMA)
+else()
+  message(WARNING "NUMA specified but libnuma not found")
 endif()
 
 #LAPACK
@@ -96,17 +93,24 @@ include_directories(${Boost_INCLUDE_DIRS})
 set(RT_LINK ${Boost_LIBRARIES} ${RT_LINK})
 
 if(USE_EXP)
+  add_definitions("-DGALOIS_EXP")
+  include_directories("exp/include")
+
   set(VTUNE_INCLUDE "/opt/intel/vtune_amplifier_xe_2011/include")
   set(VTUNE_LIB "/opt/intel/vtune_amplifier_xe_2011/lib64/libittnotify.a")
   if(EXISTS ${VTUNE_INCLUDE})
     add_definitions(-DGALOIS_VTUNE)
     include_directories(${VTUNE_INCLUDE})
     set(RT_LINK ${VTUNE_LIB} dl ${RT_LINK})
+  else()
+    message(WARNING "VTUNE specified but not found")
   endif()
 
   find_package(OpenMP)
   if(OPENMP_FOUND)
     set(RT_LINK -lgomp ${RT_LINK})
+  else()
+    message(WARNING "OPENMP specified but not found")
   endif()
 
   find_package(TBB)
@@ -116,7 +120,7 @@ if(USE_EXP)
     set(RT_LINK ${TBB_LIBRARIES} ${RT_LINK})
   else()
     # wget http://threadingbuildingblocks.org/uploads/77/173/3.0%20update%208/tbb30_20110704oss_lin.tgz
-    message(STATUS "Could NOT find TBB; have your sourced TBB_INSTALL_DIR/bin/tbbvars.sh?")
+    message(WARNING "TBB specified but not found; have your sourced TBB_INSTALL_DIR/bin/tbbvars.sh?")
   endif()
 
   find_package(MPI)
@@ -124,6 +128,8 @@ if(USE_EXP)
     add_definitions(-DGALOIS_MPI)
     include_directories(${MPI_INCLUDE_PATH})
     set(RT_LINK ${MPI_LIBRARIES} ${RT_LINK})
+  else()
+    message(WARNING "OPENMP specified but not found")
   endif()
 endif()
 
@@ -166,8 +172,11 @@ if(CMAKE_BUILD_TYPE MATCHES "Debug")
 endif()
 
 #always import c99 stdint functions into c++
-add_definitions(-D__STDC_LIMIT_MACROS)
-add_definitions(-D__STDC_CONSTANT_MACROS)
+include(UseStdMacro)
+
+include(CheckSymbolExists)
+CHECK_SYMBOL_EXISTS(le64toh "endian.h" HAVE_LE64TOH)
+CHECK_SYMBOL_EXISTS(le32toh "endian.h" HAVE_LE32TOH)
 
 ###### Global Functions ######
 function(linkRuntime name) 
@@ -210,7 +219,6 @@ include(llvm-extras)
 
 configure_file("${PROJECT_SOURCE_DIR}/include/config.h.in" "${PROJECT_BINARY_DIR}/include/config.h")
 include_directories("include" "${PROJECT_BINARY_DIR}/include")
-configure_file("${PROJECT_SOURCE_DIR}/scripts/make_dist.sh.in" "${PROJECT_BINARY_DIR}/scripts/make_dist.sh")
 
 add_subdirectory(lib)
 add_subdirectory(src)
@@ -218,7 +226,7 @@ add_subdirectory(apps)
 add_subdirectory(tools)
 add_subdirectory(inputs)
 add_subdirectory(test)
-
+add_subdirectory(scripts)
 if(USE_EXP)
   add_subdirectory(exp)
 endif()
@@ -238,5 +246,3 @@ include(CPack)
 
 ###### Installation ######
 install(DIRECTORY include/ DESTINATION include PATTERN ".svn" EXCLUDE PATTERN ".in" EXCLUDE)
-#install(DIRECTORY scripts/ DESTINATION scripts PATTERN ".svn" EXCLUDE PATTERN ".in" EXCLUDE)
-execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/scripts ${CMAKE_BINARY_DIR}/scripts)

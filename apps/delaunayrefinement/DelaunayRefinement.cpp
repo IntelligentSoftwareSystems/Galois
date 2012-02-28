@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -27,7 +27,6 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 #include <iostream>
-#include <stack>
 #include <sys/time.h>
 #include <limits.h>
 #include <math.h>
@@ -37,16 +36,16 @@
 #include "Element.h"
 
 #include "Galois/Statistic.h"
-#include "Galois/Graphs/FastGraph.h"
+#include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
 
 #include "llvm/Support/CommandLine.h"
 
-#include "Galois/Runtime/ll/HWTopo.h"
-
 #include "Lonestar/BoilerPlate.h"
 
+#ifdef GALOIS_EXP
 #include "Galois/Runtime/WorkListAlt.h"
+#endif
 
 namespace cll = llvm::cl;
 
@@ -59,7 +58,6 @@ static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>")
 typedef Galois::Graph::FirstGraph<Element,void,false>            Graph;
 typedef Galois::Graph::FirstGraph<Element,void,false>::GraphNode GNode;
 
-
 #include "Subgraph.h"
 #include "Mesh.h"
 #include "Cavity.h"
@@ -71,7 +69,7 @@ struct process {
 
   template<typename Context>
   void operator()(GNode item, Context& lwl) {
-    if (!mesh->containsNode(item)) //locks
+    if (!mesh->containsNode(item))
       return;
     
     Cavity cav(mesh, lwl.getPerIterAlloc());
@@ -79,6 +77,8 @@ struct process {
     cav.build();
     cav.update();
     
+    //FAILSAFE POINT
+
     for (Subgraph::iterator ii = cav.getPre().begin(),
 	   ee = cav.getPre().end(); ii != ee; ++ii) 
       mesh->removeNode(*ii, Galois::NONE);
@@ -87,7 +87,7 @@ struct process {
     for (Subgraph::iterator ii = cav.getPost().begin(),
 	   ee = cav.getPost().end(); ii != ee; ++ii) {
       GNode node = *ii;
-      Element& element = mesh->getData(node,Galois::ALL);
+      Element& element = mesh->getData(node,Galois::NONE);
       if (element.isBad()) {
         lwl.push(node);
       }
@@ -96,9 +96,7 @@ struct process {
     for (Subgraph::edge_iterator ii = cav.getPost().edge_begin(),
 	   ee = cav.getPost().edge_end(); ii != ee; ++ii) {
       Subgraph::tmpEdge edge = *ii;
-      //bool ret = 
-      mesh->addEdge(edge.src, edge.dst, Galois::ALL); //, edge.data);
-      //assert ret;
+      mesh->addEdge(edge.src, edge.dst, Galois::NONE);
     }
     if (mesh->containsNode(item)) {
       lwl.push(item);
@@ -124,35 +122,31 @@ int main(int argc, char** argv) {
   
   std::cout << "MEMINFO PRE: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
 
-  Galois::preAlloc(10 * numThreads + GaloisRuntime::MM::pageAllocInfo() * 10);
+  Galois::preAlloc(10 * numThreads + GaloisRuntime::MM::pageAllocInfo() * 7);
   std::cout << "MEMINFO MID: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
-
 
   Galois::StatTimer T;
   T.start();
   using namespace GaloisRuntime::WorkList;
-  //  Galois::for_each<LocalQueues<dChunkedLIFO<256>, LIFO<> > >(wl.begin(),wl.end(), process());
-  //Galois::for_each< Alt::ChunkedAdaptor<Alt::LevelStealingAlt, 256*4> >(wl.begin(),wl.end(), process());
-  Galois::for_each<Alt::ChunkedAdaptor<Alt::InitialQueue<Alt::LevelStealingAlt, Alt::LevelLocalAlt>, 256*4*4> >(wl.begin(),wl.end(), process());
-
-  //Galois::for_each<LocalQueues<dChunkedLIFO<256>, LIFO<> > >(mesh->active_begin(), mesh->active_end(), process(), is_bad(mesh));
-  //Galois::for_each<LocalQueues<InitialIterator<std::vector<GNode>::iterator>, LIFO<> > >(wl.begin(), wl.end(), process());
-  //Galois::for_each<LocalQueues<InitialIterator<GNode*>, LIFO<> > >(&wl[0], &wl[wl.size()], process());
-  //Galois::for_each<dChunkedLIFO<1024> >(wl.begin(), wl.end(), process());
+#ifdef GALOIS_EXP
+  Galois::for_each<Alt::ChunkedAdaptor<Alt::InitialQueue<Alt::LevelStealingAlt, Alt::LevelLocalAlt>, 256*4*4> >(wl.begin(), wl.end(), process());
+#else
+  Galois::for_each<LocalQueues<dChunkedLIFO<256>, LIFO<> > >(wl.begin(), wl.end(), process());
+//  Galois::for_each<LIFO<> >(wl.begin(), wl.end(), process());
+#endif
   T.stop();
 
   std::cout << "MEMINFO POST: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
 
   if (!skipVerify) {
-    if (!m.verify(mesh)) {
-      std::cerr << "Refinement failed.\n";
-      assert(0 && "Refinement failed");
-      abort();
-    }
-    
     int size = std::count_if(mesh->active_begin(), mesh->active_end(), is_bad(mesh));
     if (size != 0) {
       std::cerr << size << " bad triangles remaining.\n";
+      assert(0 && "Refinement failed");
+      abort();
+    }
+    if (!m.verify(mesh)) {
+      std::cerr << "Refinement failed.\n";
       assert(0 && "Refinement failed");
       abort();
     }

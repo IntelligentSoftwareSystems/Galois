@@ -27,7 +27,7 @@
  *   ... // Definition of node data
  * };
  *
- * typedef Galois::Graph::FirstGraph<Node,int,true> Graph;
+ * typedef Galois::Graph::FastGraph<Node,int,true> Graph;
  * 
  * // Create graph
  * Graph g;
@@ -69,12 +69,10 @@
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/InsBag.h"
 
-//#include "Galois/Runtime/MemRegionPool.h"
 #include "llvm/ADT/SmallVector.h"
 
 #include <algorithm>
-#include <deque>
-//#include <iostream>
+#include <map>
 
 using namespace GaloisRuntime;
 
@@ -86,23 +84,30 @@ namespace Graph {
  */
 template<typename NTy, typename ETy>
 struct EdgeItem {
-  NTy* N;
-  ETy* E;
+  typedef ETy& reference;
   
-  inline NTy*&       first()        { return N; }
-  inline NTy* const& first()  const { return N; }
-  inline ETy*&       second()       { return E; }
-  inline ETy* const& second() const { return E; }
-  EdgeItem(NTy* n, ETy* e) : N(n), E(e) {}
+  NTy* N;
+  ETy* Ea;
+  ETy E;
+
+  inline NTy*&       first()       { assert(N); return N; }
+  inline NTy* const& first() const { assert(N); return N; }
+  inline ETy*       second()       { return Ea ? Ea : &E; }
+  inline ETy* const second() const { return Ea ? Ea : &E; }
+  inline ETy*       addr()         { return &E; }
+  EdgeItem(NTy* n, ETy* v) : N(n), Ea(v) {}
 };
 
 template<typename NTy>
 struct EdgeItem<NTy, void> {
+  typedef void reference;
+
   NTy* N;
   inline NTy*&       first()        { return N; }
   inline NTy* const& first()  const { return N; }
   inline void*       second() const { return static_cast<void*>(NULL); }
-  EdgeItem(NTy* n, void* e) : N(n) {}
+  inline void*       addr()   const { return second(); }
+  EdgeItem(NTy* n, void* v) : N(n) {}
 };
 
 
@@ -129,26 +134,52 @@ class FirstGraph {
     
     //! The storage type for edges
     typedef llvm::SmallVector<EITy, 3> EdgesTy;
-    typedef typename EdgesTy::iterator iterator;
+
+    struct is_active_edge : public std::unary_function<EITy&, bool> {
+      bool operator()(const EITy& e) const { return e.first()->active; }
+    };
+
+    typedef boost::filter_iterator<is_active_edge,typename EdgesTy::iterator> iterator;
 
     EdgesTy edges;
     NodeTy data;
     bool active;
 
-    gNode(NodeTy& d) :data(d), active(false) { }
+    gNode(const NodeTy& d) :data(d), active(false) { }
     gNode() :active(false) { }
 
-    iterator begin() { return edges.begin(); }
-    iterator end()   { return edges.end();   }
-    void erase(iterator ii) { edges.erase(ii); }
-    void erase(gNode* N) { edges.erase(find(N)); }
+    iterator begin() {
+      return boost::make_filter_iterator(is_active_edge(), edges.begin(), edges.end());
+    }
+    
+    iterator end()   {
+      return boost::make_filter_iterator(is_active_edge(), edges.end(), edges.end());
+    }
+    
+    void erase(iterator ii) {
+      *ii = edges.back();
+      edges.pop_back();
+    }
+
+    void erase(gNode* N) { 
+      iterator ii = find(N);
+      if (ii != end())
+        edges.erase(ii.base()); 
+    }
 
     iterator find(gNode* N) {
       return std::find_if(begin(), end(), first_eq<gNode*>(N));
     }
 
-    iterator createEdge(gNode* N, EdgeTy* D) {
-      return edges.insert(edges.end(), EITy(N,D));
+    iterator createEdge(gNode* N, EdgeTy* v) {
+      for (typename EdgesTy::iterator ii = edges.begin(), ee = edges.end();
+          ii != ee; ++ii) {
+        if (!ii->first()->active) {
+          *ii = EITy(N, v);
+          return ii;
+        }
+      }
+      return edges.insert(edges.end(), EITy(N, v));
     }
   };
 
@@ -164,23 +195,6 @@ class FirstGraph {
   NodeListTy nodes;
 
 public:
-  /**
-   * An opaque handle to a graph node.
-   */
-  // class GraphNode { 
-  //   friend class FirstGraph;
-  //   gNode* ID;
-  //   explicit GraphNode(gNode* id) :ID(id) {}
-  // public:
-  //   GraphNode() :ID(0) {}
-  //   ~GraphNode() { if (ID) __sync_fetch_and_sub(&ID->count, 1); }
-
-  //   bool operator!=(const GraphNode& rhs) const { return ID != rhs; }
-  //   bool operator==(const GraphNode& rhs) const { return ID == rhs; }
-  //   bool operator< (const GraphNode& rhs) const { return ID < rhs;  }
-  //   bool operator> (const GraphNode& rhs) const { return ID > rhs;  }
-  // };
-
   typedef gNode* GraphNode;
 
 private:
@@ -191,13 +205,14 @@ private:
 
 public:
   typedef typename gNode::iterator edge_iterator;
+  typedef typename gNode::EITy::reference edge_data_reference;
 
   //// Node Handling ////
   
   /**
    * Creates a new node holding the indicated data.
    */
-  GraphNode createNode(NodeTy& n, Galois::MethodFlag mflag = ALL) {
+  GraphNode createNode(const NodeTy& n, Galois::MethodFlag mflag = ALL) {
     gNode* N = &(nodes.push(gNode(n)));
     N->active = true;
     acquire(N, mflag);
@@ -221,33 +236,24 @@ public:
   /**
    * Removes a node from the graph along with all its outgoing/incoming edges
    * for undirected graphs or outgoing edges for directed graphs.
-   * 
    */
-  // FIXME: incoming edges aren't handled here for directed graphs
   void removeNode(GraphNode n, Galois::MethodFlag mflag = ALL) {
     assert(n);
     acquire(n, mflag);
     gNode* N = n;
     if (N->active) {
       N->active = false;
-      //erase the in-edges first
-      if (!Directional) {
-	for (unsigned int i = 0; i < N->edges.size(); ++i) {
-	  gNode* dst = N->edges[i].first();
-	  if (dst != N) { // don't handle loops yet
-	    dst->erase(N);
-	  }
-	}
-      }
       N->edges.clear();
     }
   }
 
   //// Edge Handling ////
 
-  //! Adds an edge to graph, replacing existing value if edge already exists
+  //! Adds an edge to graph, replacing existing value if edge already
+  //! exists Ignore the edge data, let the caller use the returned
+  //! iterator to set the value if desired.  This frees us from
+  //! dealing with the void edge data problem in this API
   edge_iterator addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {
-    //FIXME: allocate space for edge data
     assert(src);
     assert(dst);
     acquire(src, mflag);
@@ -257,8 +263,8 @@ public:
 	ii = src->createEdge(dst, 0);
       } else {
 	acquire(dst, mflag);
-	dst->createEdge(src, 0);
-	src->createEdge(dst, 0);
+	ii = dst->createEdge(src, 0);
+	ii = src->createEdge(dst, ii->addr());
       }
     }
     return ii;
@@ -288,9 +294,8 @@ public:
    * Returns the edge data associated with the edge. It is an error to
    * get the edge data for a non-existent edge.
    */
-  template<typename rval> //Don't compile this with void edgedata
-  rval& getEdgeData(edge_iterator dst) const {
-    return rval (*dst->second());
+  edge_data_reference getEdgeData(edge_iterator dst) const {
+    return *dst->second();
   }
 
   GraphNode getEdgeDst(edge_iterator ii) {
@@ -305,8 +310,7 @@ public:
     acquire(N, mflag);
 
     if (shouldLock(mflag)) {
-      for (typename gNode::iterator ii = N->begin(), ee = N->end();
-	   ii != ee; ++ii) {
+      for (typename gNode::iterator ii = N->begin(), ee = N->end(); ii != ee; ++ii) {
         acquire(ii->first(), mflag);
       }
     }
@@ -349,15 +353,12 @@ public:
    * Returns the number of nodes in the graph. Not thread-safe.
    */
   unsigned int size () {
-    return std::distance (active_begin (), active_end ());
+    return std::distance(active_begin(), active_end());
   }
 
-  FirstGraph() {
-    // std::cerr << "NodeSize " << sizeof(gNode) << "\n";
-    // std::cerr << "NodeDataSize " << sizeof(NodeTy) << "\n";
-    // std::cerr << "NodeEdgesSize " << sizeof(typename gNode::EdgesTy) << "\n";
-  }
+  FirstGraph() { }
 
+#if 0
   template<typename GTy>
   void copyGraph(GTy& graph) {
     //mapping between nodes
@@ -377,6 +378,7 @@ public:
 	  ni != ne; ++ni)
 	addEdge(NodeMap[*ii], NodeMap[*ni], graph.getEdgeData(*ii, *ni));
   }
+#endif
 };
 
 }

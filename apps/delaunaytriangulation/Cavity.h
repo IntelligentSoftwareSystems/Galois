@@ -35,10 +35,11 @@ class Cavity: private boost::noncopyable {
   typedef std::vector<std::pair<GNode,int>, Alloc> GNodeIntPairVector;
 
   struct InCircumcenter {
+    const Graph& graph;
     Tuple tuple;
-    InCircumcenter(const Tuple& t): tuple(t) { }
+    InCircumcenter(const Graph& g, const Tuple& t): graph(g), tuple(t) { }
     bool operator()(const GNode& n) const {
-      Element& e = n.getData(Galois::NONE);
+      Element& e = graph.getData(n, Galois::NONE);
       return e.inCircle(tuple);
     }
   };
@@ -55,18 +56,18 @@ class Cavity: private boost::noncopyable {
     for (typename Searcher<Alloc>::GNodeVector::iterator ii = searcher.inside.begin(),
         ei = searcher.inside.end(); ii != ei; ++ii) {
 
-      for (Graph::neighbor_iterator jj = graph.neighbor_begin(*ii, Galois::NONE),
-          ej = graph.neighbor_end(*ii, Galois::NONE); jj != ej; ++jj) {
-
+      for (Graph::edge_iterator jj = graph.edge_begin(*ii, Galois::NONE),
+          ej = graph.edge_end(*ii, Galois::NONE); jj != ej; ++jj) {
+        GNode n = graph.getEdgeDst(jj);
         // i.e., if (!e.boundary() && e.inCircle(point->t())) 
-        if (std::find(searcher.matches.begin(), searcher.matches.end(), *jj)
+        if (std::find(searcher.matches.begin(), searcher.matches.end(), n)
             != searcher.matches.end())
           continue;
 
-        int index = graph.getEdgeData(*jj, *ii, Galois::NONE);
-        outside.push_back(std::make_pair(*jj, index));
+        int index = graph.getEdgeData(graph.findEdge(n, *ii, Galois::NONE));
+        outside.push_back(std::make_pair(n, index));
 
-        Element& e = jj->getData(Galois::NONE);
+        Element& e = graph.getData(n, Galois::NONE);
         Point* p2 = e.getPoint(index);
         Point* p3 = e.getPoint((index + 1) % 3);
 
@@ -85,7 +86,7 @@ class Cavity: private boost::noncopyable {
       const GNode& n = ii->first;
       int& index = ii->second;
 
-      Element& e = n.getData(Galois::NONE);
+      Element& e = graph.getData(n, Galois::NONE);
 
       Point* p2 = e.getPoint(index);
       Point* p3 = e.getPoint((index + 1) % 3);
@@ -97,9 +98,8 @@ class Cavity: private boost::noncopyable {
       p2->addElement(newNode);
       p3->addElement(newNode);
 
-      graph.addNode(newNode, Galois::NONE);
-      graph.addEdge(newNode, n, 1, Galois::NONE);
-      graph.addEdge(n, newNode, index, Galois::NONE);
+      graph.getEdgeData(graph.addEdge(newNode, n, Galois::NONE)) = 1;
+      graph.getEdgeData(graph.addEdge(n, newNode, Galois::NONE)) = index;
       
       newNodes.push_back(newNode);
     }
@@ -107,11 +107,11 @@ class Cavity: private boost::noncopyable {
     // Update new node connectivity
     for (unsigned i = 0; i < newNodes.size(); ++i) {
       const GNode& n1 = newNodes[i];
-      const Element& e1 = n1.getData(Galois::NONE);
+      const Element& e1 = graph.getData(n1, Galois::NONE);
       for (unsigned j = i + 1; j < newNodes.size(); ++j) {
 	if (i != j) {
 	  const GNode& n2 = newNodes[j];
-	  const Element& e2 = n2.getData(Galois::NONE);
+	  const Element& e2 = graph.getData(n2, Galois::NONE);
 	  
 	  bool found = false;
 	  int indexForNewNode;
@@ -128,8 +128,8 @@ class Cavity: private boost::noncopyable {
 	  }
 	  
 	  if (found) {
-	    graph.addEdge(n1, n2, indexForNewNode, Galois::NONE);
-	    graph.addEdge(n2, n1, indexForNode, Galois::NONE);
+	    graph.getEdgeData(graph.addEdge(n1, n2, Galois::NONE)) = indexForNewNode;
+	    graph.getEdgeData(graph.addEdge(n2, n1, Galois::NONE)) = indexForNode;
 	  }
 	}
       }
@@ -158,8 +158,8 @@ public:
   }
 
   void build() {
-    assert(center.getData().inCircle(point->t()));
-    searcher.findAll(center, InCircumcenter(point->t()));
+    assert(graph.getData(center).inCircle(point->t()));
+    searcher.findAll(center, InCircumcenter(graph, point->t()));
     assert(!searcher.inside.empty());
   }
 

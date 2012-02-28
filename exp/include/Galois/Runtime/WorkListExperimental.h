@@ -1,34 +1,38 @@
-// Experimental Shared Memory Worklists -*- C++ -*-
-/*
-Galois, a framework to exploit amorphous data-parallelism in irregular
-programs.
-
-Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
-UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS SOFTWARE
-AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR ANY
-PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF PERFORMANCE, AND ANY
-WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF DEALING OR USAGE OF TRADE.
-NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH RESPECT TO THE USE OF THE
-SOFTWARE OR DOCUMENTATION. Under no circumstances shall University be liable
-for incidental, special, indirect, direct or consequential damages or loss of
-profits, interruption of business, or related expenses which may arise from use
-of Software or Documentation, including but not limited to those resulting from
-defects in Software and/or Documentation, or loss or inaccuracy of data of any
-kind.
-*/
-
+/** Experimental Worklists -*- C++ -*-
+ * @file
+ * This is the only file to include for basic Galois functionality.
+ *
+ * @section License
+ *
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @author Andrew Lenharth <andrewl@lenharth.org>
+ */
 #ifndef GALOIS_RUNTIME_WORKLISTEXPERIMENTAL_H
 #define GALOIS_RUNTIME_WORKLISTEXPERIMENTAL_H
 
-#define OPTNOINLINE
+#include "Galois/Runtime/WorkList.h"
+#include "Galois/Queue.h"
 
 namespace GaloisRuntime {
 namespace WorkList {
-namespace Experimental {
 
 template<class T, class Indexer = DummyIndexer<T>, typename ContainerTy = FIFO<T>, bool concurrent=true >
 class ApproxOrderByIntegerMetric : private boost::noncopyable {
-
   typename ContainerTy::template rethread<concurrent>::WL data[2048];
   
   Indexer I;
@@ -38,8 +42,7 @@ class ApproxOrderByIntegerMetric : private boost::noncopyable {
     return 2048;
   }
 
- public:
-
+public:
   typedef T value_type;
   template<bool newconcurrent>
   struct rethread {
@@ -53,18 +56,29 @@ class ApproxOrderByIntegerMetric : private boost::noncopyable {
       cursor.get(i) = 0;
   }
   
-  bool push(value_type val) OPTNOINLINE {   
+  void push(value_type val) {   
     unsigned int index = I(val);
     index %= num();
     assert(index < num());
     return data[index].push(val);
   }
 
-  std::pair<bool, value_type> pop() OPTNOINLINE {
-    // print();
+  template<typename ItTy>
+  void push(ItTy b, ItTy e) {
+    while (b != e)
+      push(*b++);
+  }
+
+  template<typename ItTy>
+  void push_initial(ItTy b, ItTy e) {
+    while (b != e)
+      push(*b++);
+  }
+
+  boost::optional<value_type> pop() {
     unsigned int& cur = concurrent ? cursor.get() : cursor.get(0);
-    std::pair<bool, value_type> ret = data[cur].pop();
-    if (ret.first)
+    boost::optional<value_type> ret = data[cur].pop();
+    if (ret)
       return ret;
 
     //must move cursor
@@ -74,34 +88,13 @@ class ApproxOrderByIntegerMetric : private boost::noncopyable {
       if (ret.first)
 	return ret;
     }
-    return std::pair<bool, value_type>(false, value_type());
-  }
-
-  bool empty() OPTNOINLINE {
-    for (unsigned int i = 0; i < num(); ++i)
-      if (!data[i].empty())
-	return false;
-    return true;
-  }
-
-  bool aborted(value_type val) {
-    return push(val);
-  }
-
-  //Not Thread Safe
-  //Not ideal
-  template<typename Iter>
-  void fill_initial(Iter ii, Iter ee) {
-    while (ii != ee) {
-      push(*ii++);
-    }
+    return boost::optional<value_type>();
   }
 };
 WLCOMPILECHECK(ApproxOrderByIntegerMetric);
 
 template<class T, class Indexer = DummyIndexer<T>, typename ContainerTy = FIFO<T>, bool concurrent=true >
 class LogOrderByIntegerMetric : private boost::noncopyable {
-
   typename ContainerTy::template rethread<concurrent>::WL data[sizeof(unsigned int)*8 + 1];
   
   Indexer I;
@@ -116,8 +109,7 @@ class LogOrderByIntegerMetric : private boost::noncopyable {
     return sizeof(unsigned int)*8 - __builtin_clz(i);
   }
 
- public:
-
+public:
   typedef T value_type;
   template<bool newconcurrent>
   struct rethread {
@@ -131,17 +123,28 @@ class LogOrderByIntegerMetric : private boost::noncopyable {
       cursor.get(i) = 0;
   }
   
-  bool push(value_type val) {   
+  void push(value_type val) {   
     unsigned int index = I(val);
     index = getBin(index);
     return data[index].push(val);
   }
 
-  std::pair<bool, value_type> pop() {
-    // print();
+  template<typename ItTy>
+  void push(ItTy b, ItTy e) {
+    while (b != e)
+      push(*b++);
+  }
+
+  template<typename ItTy>
+  void push_initial(ItTy b, ItTy e) {
+    while (b != e)
+      push(*b++);
+  }
+
+  boost::optional<value_type> pop() {
     unsigned int& cur = concurrent ? cursor.get() : cursor.get(0);
-    std::pair<bool, value_type> ret = data[cur].pop();
-    if (ret.first)
+    boost::optional<value_type> ret = data[cur].pop();
+    if (ret)
       return ret;
 
     //must move cursor
@@ -151,27 +154,7 @@ class LogOrderByIntegerMetric : private boost::noncopyable {
 	return ret;
     }
     cur = 0;
-    return std::pair<bool, value_type>(false, value_type());
-  }
-
-  bool empty() {
-    for (unsigned int i = 0; i < num(); ++i)
-      if (!data[i].empty())
-	return false;
-    return true;
-  }
-
-  bool aborted(value_type val) {
-    return push(val);
-  }
-
-  //Not Thread Safe
-  //Not ideal
-  template<typename Iter>
-  void fill_initial(Iter ii, Iter ee) {
-    while (ii != ee) {
-      push(*ii++);
-    }
+    return boost::optional<value_type>();
   }
 };
 WLCOMPILECHECK(LogOrderByIntegerMetric);
@@ -195,49 +178,43 @@ public:
       localQs.get(i).current = 0;
   }
 
-    //! change the concurrency flag
+  //! change the concurrency flag
   template<bool newconcurrent>
   struct rethread {
     typedef LocalFilter WL;
   };
 
   //! push a value onto the queue
-  bool push(value_type val) OPTNOINLINE {
+  void push(value_type val) {
     unsigned int index = I(val);
     p& me = localQs.get();
     if (index <= me.current)
-      return me.Q.push(val);
+      me.Q.push(val);
     else
-      return globalQ.push(val);
+      globalQ.push(val);
   }
 
-  //! push an aborted value onto the queue
-  bool aborted(value_type val) {
-    return push(val);
+  template<typename ItTy>
+  void push(ItTy b, ItTy e) {
+    while (b != e)
+      globalQ.push(*b++);
   }
 
-  //! pop a value from the queue.
-  std::pair<bool, value_type> pop() OPTNOINLINE {
-    std::pair<bool, value_type> r = localQs.get().Q.pop();
-    if (r.first)
+  template<typename ItTy>
+  void push_initial(ItTy b, ItTy e) {
+    while (b != e)
+      push(*b++);
+  }
+
+  boost::optional<value_type> pop() {
+    boost::optional<value_type> r = localQs.get().Q.pop();
+    if (r)
       return r;
     
     r = globalQ.pop();
-    if (r.first)
+    if (r)
       localQs.get().current = I(r.second);
     return r;
-  }
-
-  //! return if the queue *may* be empty
-  bool empty() OPTNOINLINE {
-    if (!localQs.get().Q.empty()) return false;
-    return globalQ.empty();
-  }
-  
-  //! called in sequential mode to seed the worklist
-  template<typename iter>
-  void fill_initial(iter begin, iter end) {
-    globalQ.fill_initial(begin,end);
   }
 };
 WLCOMPILECHECK(LocalFilter);
@@ -328,7 +305,7 @@ WLCOMPILECHECK(MP_SC_Bag);
 
 //Per CPU and Per Level Queues, with staving flags
 template<typename T, typename LocalWL, typename GlobalWL>
-class RequestHirarchy {
+class RequestHierarchy {
 public:
   typedef T value_type;
 
@@ -347,34 +324,43 @@ private:
   }
 
 public:
-  bool push(value_type val) {
+  void push(value_type val) {
     if (gStarving)
-      return gwl.push(val);
-    if (starvingFlags.get())
-      return sharedQueues.push(val);
-    return localQueues.push(val);
+      gwl.push(val);
+    else if (starvingFlags.get())
+      sharedQueues.push(val);
+    else
+      localQueues.push(val);
   }
 
-  bool aborted(value_type val) {
-    return push(val);
+  template<typename ItTy>
+  void push(ItTy b, ItTy e) {
+    while (b != e)
+      push(*b++);
   }
 
-  std::pair<bool, value_type> pop() {
+  template<typename ItTy>
+  void push_initial(ItTy b, ItTy e) {
+    while (b != e)
+      push(*b++);
+  }
+
+  boost::optional<value_type> pop() {
     //Try the local queue first
-    std::pair<bool, value_type> ret = localQueues.get().pop();
-    if (ret.first)
+    boost::optional<value_type> ret = localQueues.get().pop();
+    if (ret)
       return ret;
 
     //check parent
     ret = sharedQueues.get().pop();
-    if (ret.first) {
+    if (ret) {
       clearStarving();
       return ret;
     }
 
     //check global
     ret = gwl.pop();
-    if (ret.first) {
+    if (ret) {
       clearStarving();
       return ret;
     }
@@ -386,28 +372,18 @@ public:
 
     return ret;
   }
-
-  //! called in sequential mode to seed the worklist
-  template<typename iter>
-  void fill_initial(iter begin, iter end) {
-    gwl.fill_initial(begin,end);
-  }
 };
-
+WLCOMPILECHECK(RequestHierarchy);
 
 template<typename T, typename LocalWL, typename DistPolicy>
 class ReductionWL {
-
   typedef LL::CacheLineStorage<LocalWL> paddedLocalWL;
 
   paddedLocalWL* WL;
-
   FIFO<T> backup;
-
   int starving;
 
 public:
-
   typedef T value_type;
 
   ReductionWL() :starving(0) {
@@ -419,20 +395,29 @@ public:
     WL = 0;
   }
 
-  bool push(value_type val) {
+  void push(value_type val) {
     if (starving)
-      return backup.push(val);
-    return WL[DistPolicy::getThreadIsland()].data.push(val);
+      backup.push(val);
+    else
+      WL[DistPolicy::getThreadIsland()].data.push(val);
   }
 
-  bool aborted(value_type val) {
-    return WL[DistPolicy::getThreadIsland()].data.aborted(val);
+  template<typename ItTy>
+  void push(ItTy b, ItTy e) {
+    while (b != e)
+      push(*b++);
   }
 
-  std::pair<bool, value_type> pop() {
+  template<typename ItTy>
+  void push_initial(ItTy b, ItTy e) {
+    while (b != e)
+      push(*b++);
+  }
+
+  boost::optional<value_type> pop() {
     int myIsland = DistPolicy::getThreadIsland();
-    std::pair<bool, value_type> val = WL[myIsland].data.pop();
-    if (val.first || !DistPolicy::isThreadMaster())
+    boost::optional<value_type> val = WL[myIsland].data.pop();
+    if (val || !DistPolicy::isThreadMaster())
       return val;
 
     int IFlag = 1 << myIsland;
@@ -447,6 +432,7 @@ public:
     return val;
   }
 };
+WLCOMPILECHECK(ReductionWL);
 
 
 #if 0
@@ -1138,6 +1124,7 @@ class GWL_Idempotent_FIFO: private boost::noncopyable {
   }
    
 public:
+  typedef T value_type;
   typedef GWL_Idempotent_FIFO<T> ConcurrentTy;
   typedef GWL_Idempotent_FIFO<T> SingleTy;
   enum {MAYSTEAL = true};
@@ -1146,15 +1133,28 @@ public:
     tasks = mkArray(size);
   }
 
-  void push(T val) {
+  void push(value_type val) {
     put(val);
   }
 
-  T pop(bool& succeeded) {
+  template<typename ItTy>
+  void push(ItTy b, ItTy e) {
+    while (b != e)
+      push(*b++);
+  }
+
+  template<typename ItTy>
+  void push_initial(ItTy b, ItTy e) {
+    while (b != e)
+      push(*b++);
+  }
+
+  boost::optional<value_type> pop() {
     bool Empty;
     T retval = take(Empty);
-    succeeded = !Empty;
-    return retval;
+    return !Empty ? 
+      boost::optional<value_type>(retval) :
+      boost::optional<value_type>();
   }
     
   //This can be called by any thread
@@ -1164,15 +1164,140 @@ public:
     succeeded = !Empty;
     return retval;
   }
+};
+WLCOMPILECHECK(GWL_Idempotent_FIFO);
 
-  bool empty() {
-    return Empty();
+template<typename Partitioner = DummyPartitioner, typename T = int, typename ChildWLTy = dChunkedFIFO<>, bool concurrent=true>
+class PartitionedWL : private boost::noncopyable {
+
+  Partitioner P;
+  PerCPU<ChildWLTy> Items;
+  int active;
+
+public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef PartitionedWL<T, Partitioner, ChildWLTy, newconcurrent> WL;
+  };
+
+  typedef T value_type;
+  
+  PartitionedWL(const Partitioner& p = Partitioner()) :P(p), active(ThreadPool::getActiveThreads()) {
+    //std::cerr << active << "\n";
   }
 
+  void push(value_type val)  {
+    unsigned int index = P(val);
+    //std::cerr << "[" << index << "," << index % active << "]\n";
+    return Items.get(index % active).push(val);
+  }
+
+  template<typename ItTy>
+  void push(ItTy b, ItTy e) {
+    while (b != e)
+      push(*b++);
+  }
+
+  template<typename ItTy>
+  void push_initial(ItTy b, ItTy e) {
+    while (b != e)
+      push(*b++);
+  }
+
+  boost::optional<value_type> pop() {
+    boost::optional<value_type> r = Items.get().pop();
+    // std::cerr << "{" << Items.myEffectiveID() << "}";
+    // if (r.first)
+    //   std::cerr << r.first;
+    return r;
+  }
+  
+  boost::optional<value_type> try_pop() {
+    return pop();
+  }
 };
+WLCOMPILECHECK(PartitionedWL);
 
+template<class Compare = std::less<int>, typename T = int>
+class SkipListQueue : private boost::noncopyable {
 
-}
+  Galois::ConcurrentSkipListMap<T,int,Compare> wl;
+  int magic;
+
+public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef SkipListQueue<Compare, T> WL;
+  };
+  template<typename Tnew>
+  struct retype {
+    typedef SkipListQueue<Compare, Tnew> WL;
+  };
+
+  typedef T value_type;
+
+  bool push(value_type val) {
+    wl.putIfAbsent(val, &magic);
+    return true;
+  }
+
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    while (b != e)
+      push(*b++);
+    return true;
+  }
+
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    push(b,e);
+  }
+
+  boost::optional<value_type> pop() {
+    return wl.pollFirstKey();
+  }
+};
+WLCOMPILECHECK(SkipListQueue);
+
+template<class Compare = std::less<int>, typename T = int>
+class FCPairingHeapQueue : private boost::noncopyable {
+  Galois::FCPairingHeap<T,Compare> wl;
+
+public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef FCPairingHeapQueue<Compare, T> WL;
+  };
+  template<typename Tnew>
+  struct retype {
+    typedef FCPairingHeapQueue<Compare, Tnew> WL;
+  };
+
+  typedef T value_type;
+
+  bool push(value_type val) {
+    wl.add(val);
+    return true;
+  }
+
+  template<typename Iter>
+  bool push(Iter b, Iter e) {
+    while (b != e)
+      push(*b++);
+    return true;
+  }
+
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    push(b,e);
+  }
+
+  boost::optional<value_type> pop() {
+    return wl.pollMin();
+  }
+};
+WLCOMPILECHECK(FCPairingHeapQueue);
+
 }
 }
 

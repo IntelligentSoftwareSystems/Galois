@@ -155,7 +155,7 @@ class ThreadPool_pthread : public ThreadPool {
     SampleProfiler VT;
     while (workPtr != workEndL) {
       VT.startIf(LocalThreadID, workPtr->profile);
-      if (LocalThreadID < activeThreads) {
+      if (LocalThreadID < (int) activeThreads) {
 	if (workPtr->isParallel)
 	  workPtr->work();
 	else if (LocalThreadID == 0)
@@ -228,7 +228,7 @@ public:
       activeThreads = std::min(num, maxThreads);
     }
     assert(activeThreads <= maxThreads);
-    assert(activeThreads <= threads.size());
+    assert(activeThreads - 1 <= threads.size());
 
     return activeThreads;
   }

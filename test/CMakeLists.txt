@@ -6,7 +6,7 @@ endfunction()
 
 add_definitions(-O0)
 
-#makeTest(bag)
+makeTest(bag)
 makeTest(compile-check)
 makeTest(skiplist)
 makeTest(pairingheap)

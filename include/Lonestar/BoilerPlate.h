@@ -25,7 +25,6 @@
 
 #include "Galois/Version.h"
 #include "Galois/Galois.h"
-#include "Galois/Runtime/ParaMeter.h"
 #include "Galois/Runtime/ll/gio.h"
 #include "llvm/Support/CommandLine.h"
 
@@ -34,7 +33,6 @@
 //! standard global options to the benchmarks
 static llvm::cl::opt<bool> skipVerify("noverify", llvm::cl::desc("Skip verification step"), llvm::cl::init(false));
 static llvm::cl::opt<int> numThreads("t", llvm::cl::desc("Number of threads"), llvm::cl::init(1));
-static llvm::cl::opt<bool> useParaMeter("p", llvm::cl::desc("Use ParaMeter to execute for_each loops"), llvm::cl::init(false));
 
 //! initialize lonestar benchmark
 template<typename OS>
@@ -68,9 +66,6 @@ void LonestarStart(int argc, char** argv, OS& out, const char* app, const char* 
 
   llvm::cl::ParseCommandLineOptions(argc, argv);
   numThreads = Galois::setMaxThreads(numThreads); 
-  if (useParaMeter) {
-    GaloisRuntime::enableParaMeter();
-  }
 }
 
 #endif

@@ -30,6 +30,9 @@
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
+#ifdef GALOIS_EXP
+#include "PriorityScheduling/WorkList.h"
+#endif
 
 #include <string>
 #include <sstream>
@@ -228,8 +231,11 @@ void runBodyParallel() {
 	Galois::StatTimer T;
 
 	T.start();
-	//Exp::StartWorklistExperiment<OBIM, dChunk, Chunk, Indexer, seq_less, seq_gt>()(std::cout, graph.active_begin(), graph.active_end(), process());
+#ifdef GALOIS_EXP
+	Exp::StartWorklistExperiment<OBIM, dChunk, Chunk, Indexer, seq_less, seq_gt>()(std::cout, graph.active_begin(), graph.active_end(), process());
+#else
 	Galois::for_each<dChunk>(graph.active_begin(), graph.active_end(), process());
+#endif
 	T.stop();
 
 	//TODO: use a reduction variable here

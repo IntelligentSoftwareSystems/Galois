@@ -36,6 +36,7 @@
 #include "Galois/Runtime/WorkListExperimental.h"
 
 #include <list>
+#include <boost/optional.hpp>
 
 #define XXX_USE_PERLEVEL
 //#define XXX_USE_PERCPU
@@ -130,9 +131,9 @@ class SimpleTaskPool {
 
     ticks s2 = getticks();
 
-    std::pair<bool,TaskFunction*> r = wl.pop();
-    while (r.first) {
-      r.second->work(true);
+    boost::optional<TaskFunction*> r = wl.pop();
+    while (r) {
+      (*r)->work(true);
       r = wl.pop();
     }
 
@@ -181,9 +182,9 @@ public:
     int iterations = 0;
 #ifdef XXX_USE_PERLEVEL
     Worklist& wl = worklists.get();
-    std::pair<bool,TaskFunction*> r = wl.pop();
-    while (r.first) {
-      iterations += r.second->work();
+    boost::optional<TaskFunction*> r = wl.pop();
+    while (r) {
+      iterations += (*r)->work();
       r = wl.pop();
     }
 #endif
@@ -197,9 +198,9 @@ public:
 
     for (unsigned int i = base; i < numThreads && i < top; ++i) {
       Worklist& wl = worklists.get(i);
-      std::pair<bool,TaskFunction*> r = wl.pop();
-      while (r.first) {
-        iterations += r.second->work();
+      boost::optional<TaskFunction*> r = wl.pop();
+      while (r) {
+        iterations += (*r)->work();
         r = wl.pop();
         didWork = true;
       }
@@ -214,9 +215,9 @@ public:
 
     for (unsigned int i = 0; i < numThreads ; ++i) {
       Worklist& wl = worklists.get(i);
-      std::pair<bool,TaskFunction*> r = wl.pop();
-      while (r.first) {
-        iterations += r.second->work();
+      boost::optional<TaskFunction*> r = wl.pop();
+      while (r) {
+        iterations += (*r)->work();
         r = wl.pop();
         didWork = true;
       }

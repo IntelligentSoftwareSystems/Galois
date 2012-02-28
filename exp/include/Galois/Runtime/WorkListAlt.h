@@ -1,6 +1,7 @@
-#ifndef WLCOMPILECHECK
-#define WLCOMPILECHECK(name) //
-#endif
+#ifndef GALOIS_RUNTIME_WORKLISTALT_H
+#define GALOIS_RUNTIME_WORKLISTALT_H
+
+#include "Galois/Runtime/WorkList.h"
 
 namespace GaloisRuntime {
 namespace WorkList {
@@ -18,11 +19,11 @@ class Chunk : public ChunkHeader {
   int num;
 public:
   Chunk() :num(0) {}
-  std::pair<bool, T> pop() {
+  boost::optional<T> pop() {
     if (num)
-      return std::make_pair(true, data[--num]);
+      return boost::optional<T>(data[--num]);
     else
-      return std::make_pair(false, T());
+      return boost::optional<T>();
   }
   bool push(T val) {
     if (num < chunksize) {
@@ -139,7 +140,7 @@ public:
     
     //steal
     int id = local.myEffectiveID();
-    for (int i = 0; i < local.size(); ++i) {
+    for (int i = 0; i < (int) local.size(); ++i) {
       ++id;
       id %= local.size();
       ret = me.steal(local.get(id));
@@ -210,11 +211,11 @@ public:
       data.get(i) = 0;
   }
 
-  bool push(value_type val) {
+  void push(value_type val) {
     ChunkTy*& n = data.get();
     //Simple case, space in current chunk
     if (n && n->push(val))
-      return true;
+      return;
     //full chunk, push
     if (n)
       worklist.push(static_cast<ChunkHeader*>(n));
@@ -222,15 +223,10 @@ public:
     n = mkChunk();
     //There better be something in the new chunk
     n->push(val);
-    return true;
-  }
-
-  bool pushi(value_type val) {
-    return push(val);
   }
 
   template<typename Iter>
-  bool push(Iter b, Iter e) {
+  void push(Iter b, Iter e) {
     ChunkTy*& n = data.get();
     while (b != e) {
       if (!n)
@@ -241,11 +237,10 @@ public:
 	n = 0;
       }
     }
-    return true;
   }
 
   template<typename Iter>
-  void pushi(Iter b, Iter e)  {
+  void push_initial(Iter b, Iter e)  {
     while (b != e) {
       ChunkTy* n = mkChunk();
       b = n->push(b,e);
@@ -253,11 +248,11 @@ public:
     }
   }
 
-  std::pair<bool, value_type> pop()  {
+  boost::optional<value_type> pop() {
     ChunkTy*& n = data.get();
-    std::pair<bool, value_type> retval;
+    boost::optional<value_type> retval;
     //simple case, things in current chunk
-    if (n && (retval = n->pop()).first)
+    if (n && (retval = n->pop()))
       return retval;
     //empty chunk, trash it
     if (n)
@@ -267,7 +262,7 @@ public:
     if (n) {
       return n->pop();
     } else {
-      return std::make_pair(false, value_type());
+      return boost::optional<value_type>();
     }
   }
 };
@@ -276,3 +271,5 @@ WLCOMPILECHECK(ChunkedAdaptor);
 }
 }
 }
+
+#endif
