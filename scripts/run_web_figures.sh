@@ -44,10 +44,10 @@ mkdir -p "$RESULTDIR"
 run apps/avi/AVIunordered -noverify -d 2 -n 1 -e 0.1 -f "$BASEINPUT/avi/10x10_42k.NEU"
 run apps/clustering/clustering -numPoints 10000
 run apps/barneshut/barneshut -noverify -n 50000 -steps 1 -seed 0
-run apps/betweennesscentrality/betweennesscentrality "$BASEINPUT/scalefree/rmat8-2e14.gr"
+run apps/betweennesscentrality/betweennesscentrality -limit 1024 "$BASEINPUT/scalefree/rmat8-2e14.gr"
 run apps/boruvka/boruvka "$BASEINPUT/road/USA-road-d.USA.gr"
 run apps/delaunayrefinement/delaunayrefinement "$BASEINPUT/meshes/r5M"
-run apps/delaunaytriangulation/delaunaytriangulation "$BASEINPUT/meshes/r10M.node"
+run apps/delaunaytriangulation/delaunaytriangulation "$BASEINPUT/meshes/r5M.node"
 run apps/des/DESunordered -noverify "$BASEINPUT/des/koggeStone64bit.net"
 #run apps/gmetis/gmetis -mtxinput "$BASEINPUT/matrix/cage15.mtx" 256
 run apps/matching/max-card-bipartite 1000000 100000000 10000 0

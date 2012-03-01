@@ -41,8 +41,10 @@ run() {
 shift 3
 
 run echo hi_pr
+HSOURCE=$(($SOURCE + 1))
+HSINK=$(($SINK + 1))
 # Bash tokenizing rules are complicated :(
-perl -p -e "s/p sp (\d+) (\d+)/p max \1 \2\nn $SOURCE s\nn $SINK t/;" $D \
+perl -p -e "s/p sp (\d+) (\d+)/p max \1 \2\nn $HSOURCE s\nn $HSINK t/;" $D \
   | ${BASE}/tools/bin/hi_pr
 
 run ${BASE}/apps/preflowpush/preflowpush $* $G $SOURCE $SINK

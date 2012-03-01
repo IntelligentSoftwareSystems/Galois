@@ -43,25 +43,23 @@ ExternalProject_Add(snap
   CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}
 )
 
-find_program(TAR tar)
-ExternalProject_Add(hi_pr
-  PREFIX hi_pr
-  LIST_SEPARATOR |
-  DOWNLOAD_DIR hi_pr/src/hi_pr
-  URL http://www.avglab.com/andrew/soft/hipr.tar
-  PATCH_COMMAND bash -c "if [ ! -e CMakeLists.txt ] | then patch -p1 < ${CMAKE_CURRENT_SOURCE_DIR}/hi_pr.patch | fi"
-  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}
-)
+# Simple download and patch
+function(dl name url)
+  ExternalProject_Add(${name}
+    PREFIX ${name}
+    LIST_SEPARATOR |
+    DOWNLOAD_DIR ${name}/src/${name}
+    URL ${url}
+    PATCH_COMMAND bash -c "if [ ! -e CMakeLists.txt ] | then patch -p1 < ${CMAKE_CURRENT_SOURCE_DIR}/${name}.patch | fi"
+    CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}
+  )
+endfunction(dl)
 
-ExternalProject_Add(GTgraph-rmat
-  PREFIX GTgraph-rmat
-  LIST_SEPARATOR |
-  DOWNLOAD_DIR GTgraph-rmat/src/GTgraph-rmat
-  URL http://www.cse.psu.edu/~madduri/software/GTgraph/GTgraph.tar.gz
-  PATCH_COMMAND bash -c "if [ ! -e CMakeLists.txt ] | then patch -p1 < ${CMAKE_CURRENT_SOURCE_DIR}/GTgraph-rmat.patch | fi"
-  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}
-)
+dl(hi_pr http://www.avglab.com/andrew/soft/hipr.tar)
+dl(GTgraph-rmat http://www.cse.psu.edu/~madduri/software/GTgraph/GTgraph.tar.gz)
+dl(SSCA2 http://www.graphanalysis.org/benchmark/SSCA2-2.2.tar.gz)
 
+set(more_tools hi_pr triangle cats-gens snap GTgraph-rmat SSCA2)
 add_custom_target(more-tools)
-set_target_properties(hi_pr triangle cats-gens snap GTgraph-rmat PROPERTIES EXCLUDE_FROM_ALL true)
-add_dependencies(more-tools hi_pr triangle cats-gens snap GTgraph-rmat)
+set_target_properties(${more_tools} PROPERTIES EXCLUDE_FROM_ALL true)
+add_dependencies(more-tools ${more_tools})
