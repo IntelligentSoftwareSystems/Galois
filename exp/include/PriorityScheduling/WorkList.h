@@ -14,10 +14,10 @@
 
 #include <boost/utility.hpp>
 #include <boost/optional.hpp>
-#include <tbb/concurrent_hash_map.h>
 
 #ifdef GALOIS_TBB
 #define TBB_PREVIEW_CONCURRENT_PRIORITY_QUEUE 1
+#include <tbb/concurrent_hash_map.h>
 #include <tbb/concurrent_priority_queue.h>
 #include <tbb/concurrent_queue.h>
 #endif
@@ -163,6 +163,7 @@ WLCOMPILECHECK(TbbFIFO);
   }
 };
 
+#ifdef GALOIS_TBB
 template<class Indexer, typename ContainerTy = GaloisRuntime::WorkList::ChunkedLIFO<16>, typename T = int, bool concurrent = true >
 class CTOrderedByIntegerMetric : private boost::noncopyable {
 
@@ -258,6 +259,7 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
   }
 };
 WLCOMPILECHECK(CTOrderedByIntegerMetric);
+#endif
 
 template<class Indexer, typename ContainerTy, bool concurrent = true, int binmax = 1024*1024 >
 class BarrierOBIM : private boost::noncopyable {
@@ -566,14 +568,18 @@ struct StartWorklistExperiment {
     typedef TbbPriQueue<Greater> TBB;
     typedef LocalStealing<TBB> LTBB;
     typedef PTbb<Greater> PTBB;
+    typedef CTOrderedByIntegerMetric<Indexer, dChunk> CTOBIM;
+    typedef CTOrderedByIntegerMetric<Indexer, Chunk> NACTOBIM;
 #endif
+    typedef ChunkedFIFO<256> CF256;
+    typedef ChunkedLIFO<256> CL256;
+    typedef dChunkedFIFO<256> DCF256;
+    typedef dChunkedLIFO<256> DCL256;
     typedef SkipListQueue<Less> SLQ;
     typedef SimpleOrderedByIntegerMetric<Indexer> SOBIM;
     typedef LocalStealing<SOBIM> LSOBIM;
     typedef OrderedByIntegerMetric<Indexer, Chunk> NAOBIM;
     typedef BarrierOBIM<Indexer, dChunk> BOBIM;
-    typedef CTOrderedByIntegerMetric<Indexer, dChunk> CTOBIM;
-    typedef CTOrderedByIntegerMetric<Indexer, Chunk> NACTOBIM;
     typedef LevelStealing<Random<> > RANDOM;
 
     std::string name = WorklistName;
@@ -594,18 +600,24 @@ struct StartWorklistExperiment {
       out << "Using worklist: default\n";
       Galois::for_each<DefaultWorklist>(ii, ei, fn); 
     } else
+    WLFOO(ii, ei, fn, lifo,     LIFO<>)   else
+    WLFOO(ii, ei, fn, fifo,     FIFO<>)   else
     WLFOO(ii, ei, fn, obim,     OBIM)     else
     WLFOO(ii, ei, fn, sobim,    SOBIM)    else
     WLFOO(ii, ei, fn, lsobim,   LSOBIM)   else
     WLFOO(ii, ei, fn, naobim,   NAOBIM)   else
-    WLFOO(ii, ei, fn, ctobim,   CTOBIM)   else
-    WLFOO(ii, ei, fn, nactobim, NACTOBIM) else
     WLFOO(ii, ei, fn, slq,      SLQ)      else
     WLFOO(ii, ei, fn, bobim,    BOBIM)    else
     WLFOO(ii, ei, fn, dchunk,   dChunk)   else
     WLFOO(ii, ei, fn, chunk,    Chunk)    else
+    WLFOO(ii, ei, fn, chunkfifo, CF256)   else
+    WLFOO(ii, ei, fn, chunklifo, CL256)   else
+    WLFOO(ii, ei, fn, dchunkfifo, DCF256) else
+    WLFOO(ii, ei, fn, dchunklifo, DCL256) else
     WLFOO(ii, ei, fn, random,   RANDOM)   else
 #ifdef GALOIS_TBB
+    WLFOO(ii, ei, fn, nactobim, NACTOBIM) else
+    WLFOO(ii, ei, fn, ctobim,   CTOBIM)   else
     WLFOO(ii, ei, fn, tbb,      TBB)      else
     WLFOO(ii, ei, fn, ltbb,     LTBB)     else
     WLFOO(ii, ei, fn, ptbb,     PTBB)     else
