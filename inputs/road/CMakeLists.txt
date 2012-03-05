@@ -8,7 +8,7 @@ function(dlinput base url)
     COMMAND ${GUNZIP} -c ${base}.gz > ${base}.dimacs
     DEPENDS ${base}.gz)
   add_custom_command(OUTPUT ${base}.gr
-    COMMAND ${CMAKE_BINARY_DIR}/tools/graph-convert/graph-convert -dimacs2gr ${base}.dimacs ${base}.gr
+    COMMAND graph-convert -dimacs2gr ${base}.dimacs ${base}.gr
     DEPENDS ${base}.dimacs graph-convert)
 endfunction(dlinput)
 

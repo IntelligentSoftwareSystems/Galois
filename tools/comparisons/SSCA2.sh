@@ -35,4 +35,4 @@ run() {
 }
 
 run ${BASE}/tools/bin/SSCA2 $S
-run ${BASE}/apps/betweennesscentrality/betweennesscentrality $* -limit 1024 $F
+run ${BASE}/apps/betweennesscentrality/betweennesscentrality $* $F
