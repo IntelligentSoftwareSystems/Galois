@@ -34,6 +34,7 @@
 #include "Galois/Runtime/CacheLineStorage.h"
 #endif
 #include "Galois/Graphs/FileGraph.h"
+#include "Galois/Runtime/WorkList.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
@@ -330,9 +331,10 @@ int main(int argc, char** argv) {
   std::vector<GNode> tmp;
   std::copy(begin, end, std::back_inserter(tmp));
 
+  typedef GaloisRuntime::WorkList::dChunkedLIFO<1> WL;
   Galois::StatTimer T;
   T.start();
-  Galois::for_each(tmp.begin(), tmp.end(), process());
+  Galois::for_each<WL>(tmp.begin(), tmp.end(), process());
   T.stop();
 
   if (!skipVerify) {

@@ -45,6 +45,7 @@
 
 #ifdef GALOIS_EXP
 #include "Galois/Runtime/WorkListAlt.h"
+#include "PriorityScheduling/WorkList.h"
 #endif
 
 namespace cll = llvm::cl;
@@ -104,6 +105,22 @@ struct process {
   }
 };
 
+struct Indexer: public std::unary_function<const GNode&,unsigned> {
+  unsigned operator()(const GNode& t) const { return 0; }
+};
+
+struct Less: public std::binary_function<const GNode&,const GNode&,bool>{
+  bool operator()(const GNode& a, const GNode& b) const {
+    return true;
+  }
+};
+
+struct Greater: public std::binary_function<const GNode&,const GNode&,bool> {
+  bool operator()(const GNode& a, const GNode& b) const {
+    return true;
+  }
+};
+
 int main(int argc, char** argv) {
   LonestarStart(argc, argv, std::cout, name, desc, url);
 
@@ -129,10 +146,15 @@ int main(int argc, char** argv) {
   T.start();
   using namespace GaloisRuntime::WorkList;
 #ifdef GALOIS_EXP
-  Galois::for_each<Alt::ChunkedAdaptor<Alt::InitialQueue<Alt::LevelStealingAlt, Alt::LevelLocalAlt>, 256*4*4> >(wl.begin(), wl.end(), process());
+  //Galois::for_each<Alt::ChunkedAdaptor<Alt::InitialQueue<Alt::LevelStealingAlt, Alt::LevelLocalAlt>, 256*4*4> >(wl.begin(), wl.end(), process());
+  typedef dChunkedLIFO<256> dChunk;
+  typedef ChunkedLIFO<256> Chunk;
+  Exp::StartWorklistExperiment<
+    LocalQueues<dChunk, LIFO<> >, 
+    dChunk,Chunk,Indexer,Less,Greater>()(
+      std::cout, wl.begin(), wl.end(), process());
 #else
   Galois::for_each<LocalQueues<dChunkedLIFO<256>, LIFO<> > >(wl.begin(), wl.end(), process());
-//  Galois::for_each<LIFO<> >(wl.begin(), wl.end(), process());
 #endif
   T.stop();
 
