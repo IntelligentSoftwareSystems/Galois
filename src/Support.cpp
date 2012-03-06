@@ -27,7 +27,7 @@
 #include <vector>
 #include <cstdio>
 
-static GaloisRuntime::LL::SimpleLock<int, true> lock;
+static GaloisRuntime::LL::SimpleLock<true> lock;
 
 namespace {
 class PrintStats {

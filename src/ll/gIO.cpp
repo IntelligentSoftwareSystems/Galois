@@ -33,7 +33,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-static GaloisRuntime::LL::SimpleLock<int, true> IOLock;
+static GaloisRuntime::LL::SimpleLock<true> IOLock;
 
 void GaloisRuntime::LL::gPrint(const char* format, ...) {
   IOLock.lock();

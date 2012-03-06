@@ -59,8 +59,8 @@ static std::map<void*, HeadPtr*> ownerMap;
 #else
 #define DoAllocLock false
 #endif
-static GaloisRuntime::LL::SimpleLock<int,DoAllocLock> allocLock;
-static GaloisRuntime::LL::SimpleLock<int,true> dataLock;
+static GaloisRuntime::LL::SimpleLock<DoAllocLock> allocLock;
+static GaloisRuntime::LL::SimpleLock<true> dataLock;
 static __thread HeadPtr* head = 0;
 
 void* allocFromOS() {

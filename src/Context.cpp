@@ -21,7 +21,7 @@ kind.
 //! Global thread context for each active thread
 static __thread GaloisRuntime::SimpleRuntimeContext* thread_cnx = 0;
 
-static GaloisRuntime::LL::SimpleLock<int, true> ConflictLock;
+static GaloisRuntime::LL::SimpleLock<true> ConflictLock;
 
 void GaloisRuntime::clearConflictLock() {
   //ConflictLock.unlock();
