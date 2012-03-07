@@ -66,19 +66,19 @@ private:
     T* a = reinterpret_cast<T*>(m);
     gib_Tile* h = new (m) gib_Tile(&a[offset], &a[(MM::pageSize / sizeof(T))]);
     //Then Insert
-    gib_Tile* H = heads.get();
+    gib_Tile*& H = heads.get();
     if (!H) { //no thread local head, use the new node as one
       //splice new list of one onto the head
       realHead.lock();
       h->next = realHead.getValue();
       realHead.unlock_and_set(h);
-      heads.get() = h;
     } else {
       //existing thread local head, just append
       h->next = H->next;
       asm volatile ("":::"memory");
       H->next = h;
     }
+    H = h;
     return h;
   }
 
