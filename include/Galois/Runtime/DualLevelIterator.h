@@ -31,8 +31,10 @@ public:
   DualLevelIterator(const Iter& b, const Iter& e)
     :I_outer(b), E_outer(e)
   {
-    I_inner = (*I_outer).begin();
-    follow();
+    if (I_outer != E_outer) {
+      I_inner = (*I_outer).begin();
+      follow();
+    }
   }
 
   DualLevelIterator& operator++() {
