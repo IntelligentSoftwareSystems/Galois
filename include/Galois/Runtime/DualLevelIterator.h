@@ -13,7 +13,7 @@ class DualLevelIterator : public std::iterator<std::forward_iterator_tag, typena
   IITy I_inner;
 
   void follow() {
-    while (I_inner == (*I_outer).end() && I_outer != E_outer) {
+    while (I_outer != E_outer && I_inner == (*I_outer).end()) {
       ++I_outer;
       if (I_outer != E_outer)
 	I_inner = (*I_outer).begin();
@@ -50,7 +50,8 @@ public:
   }
 
   bool operator==(const DualLevelIterator& rhs) const {
-    return (I_outer==rhs.I_outer && I_inner == rhs.I_inner);
+    return (I_outer==rhs.I_outer &&
+	    (I_outer == E_outer || I_inner == rhs.I_inner));
   }
 
   bool operator!=(const DualLevelIterator& rhs) const {
