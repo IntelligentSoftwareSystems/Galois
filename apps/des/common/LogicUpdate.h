@@ -85,7 +85,7 @@ struct LogicUpdate {
    *
    * @return the net val
    */
-  const LogicVal getNetVal() const {
+  LogicVal getNetVal() const {
     return netVal;
   }
 

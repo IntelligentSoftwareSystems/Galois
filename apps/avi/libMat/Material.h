@@ -259,7 +259,7 @@ public:
   }
 
 protected:
-  virtual const double getModuli(int i1, int i2, int i3, int i4) const = 0;
+  virtual double getModuli(int i1, int i2, int i3, int i4) const = 0;
 
 };
 
@@ -294,7 +294,7 @@ public:
   ;
 
 protected:
-  const double getModuli(int i1, int i2, int i3, int i4) const {
+  double getModuli(int i1, int i2, int i3, int i4) const {
     return lambda * DELTA_MAT[i1][i2] * DELTA_MAT[i3][i4] + mu * (DELTA_MAT[i1][i3] * DELTA_MAT[i2][i4] + DELTA_MAT[i1][i4] * DELTA_MAT[i2][i3]);
   }
 

@@ -88,13 +88,13 @@ class Triangle: public AbstractGeom<SPD> {
   }
 
 
-  inline const size_t getNumVertices() const { return 3; }
+  inline size_t getNumVertices() const { return 3; }
 
   inline const std::string getPolytopeName() const { return "TRIANGLE"; }
 
-  inline const size_t getParametricDimension() const { return 2; }
+  inline size_t getParametricDimension() const { return 2; }
 
-  inline const size_t getEmbeddingDimension() const { return SPD; }
+  inline size_t getEmbeddingDimension() const { return SPD; }
 
   void map(const double * X, double *Y) const; 
 
@@ -102,9 +102,9 @@ class Triangle: public AbstractGeom<SPD> {
 
   inline size_t getNumFaces() const { return 3; }
 
-  virtual const double getInRadius(void) const;
+  virtual double getInRadius(void) const;
 
-  virtual const double getOutRadius(void) const;
+  virtual double getOutRadius(void) const;
 
   virtual Segment<SPD> * getFaceGeometry(size_t e) const; 
 
@@ -113,9 +113,9 @@ class Triangle: public AbstractGeom<SPD> {
   virtual void computeCenter (std::vector<double>& center) const;
 
 private:
-  static const size_t    SegmentNodes[];
+  static size_t    SegmentNodes[];
 
-  static const double ParamCoord[];
+  static double ParamCoord[];
 
   static double midpoint (double x1, double x2) { return (x1 + x2) / 2; }
 };
@@ -124,10 +124,10 @@ private:
 // Class implementation
 
 template <size_t SPD>
-const size_t    Triangle<SPD>::SegmentNodes[] = {0,1,1,2,2,0};
+size_t    Triangle<SPD>::SegmentNodes[] = {0,1,1,2,2,0};
 
 template <size_t SPD>
-const double Triangle<SPD>::ParamCoord[] = {1,0,0,1,0,0};
+double Triangle<SPD>::ParamCoord[] = {1,0,0,1,0,0};
 
 
 template<size_t SPD> 
@@ -197,7 +197,7 @@ Segment<SPD> * Triangle<SPD>::getFaceGeometry(size_t e) const
 }
 
 template<size_t SPD> 
-const double Triangle<SPD>:: getInRadius(void) const {
+double Triangle<SPD>:: getInRadius(void) const {
   double a,b,c,s;
   a = b = c = s = 0.0;
   for(size_t i=0; i<SPD; i++) {
@@ -217,7 +217,7 @@ const double Triangle<SPD>:: getInRadius(void) const {
 
 
 template<size_t SPD> 
-const double Triangle<SPD>:: getOutRadius(void) const {
+double Triangle<SPD>:: getOutRadius(void) const {
   double a,b,c;
   a = b = c = 0.0;
   for(size_t i=0; i<SPD; i++) {

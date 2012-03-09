@@ -83,17 +83,17 @@ public:
 
 
   //! Returns the number of vertices.
-  inline const size_t getNumVertices() const { return 4; }
+  inline size_t getNumVertices() const { return 4; }
 
 
   //! Returns the name of the geometry. It clarifies the meaning of the connectivity array.
   inline const std::string getPolytopeName() const { return "TETRAHEDRON"; }
 
   //! Returns the number of dimensions in the parametric configuartion.
-  inline const size_t getParametricDimension() const { return 3; }
+  inline size_t getParametricDimension() const { return 3; }
 
   //! Returns the number of dimensions in the real configuration.
-  inline const size_t getEmbeddingDimension() const { return 3; }
+  inline size_t getEmbeddingDimension() const { return 3; }
 
   //! Number of faces the polytope has.
   inline size_t getNumFaces() const { return 4; }
@@ -144,7 +144,7 @@ public:
   //! Prompts an error if an invalid face is requested.
   Triangle<3> * getFaceGeometry(size_t e) const {
 
-    if(e>=0 && e<=3) {
+    if(e<=3) {
       std::vector<GlobalNodalIndex> conn(FaceNodes + 3*e, FaceNodes + 3*e + 2);
 
       return new Triangle<TET_SPD> (AbstractGeom<TET_SPD>::getGlobalCoordVec (), conn);
@@ -160,7 +160,7 @@ public:
   }
 
   //! get the inradius
-  const double getInRadius(void) const {
+  double getInRadius(void) const {
   double a[3],b[3],c[3],o,t[3],d[3],t1[3],t2[3], t3[3];
   for(size_t i=0;i<3;i++) {
     o = AbstractGeom<TET_SPD>::getCoordinate(0,i);
@@ -187,7 +187,7 @@ public:
   }
 
   //! get the outradius -- radius of the circumscribed sphere
-  const double getOutRadius(void) const {
+  double getOutRadius(void) const {
     double x[4],y[4],z[4],r2[4],ones[4]; 
     double M11, M12, M13, M14, M15;
     double **a;
