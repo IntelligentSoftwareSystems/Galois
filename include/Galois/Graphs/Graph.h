@@ -108,7 +108,7 @@ typedef VoidWrapper<void>::unit GraphUnit;
  */
 template<typename NTy>
 struct NodeItem {
-  NTy N;
+  typename VoidWrapper<NTy>::type N;
   NodeItem(typename VoidWrapper<NTy>::const_ref_type n) : N(n) { }
   NodeItem() :N() { }
   inline typename VoidWrapper<NTy>::ref_type getData() {

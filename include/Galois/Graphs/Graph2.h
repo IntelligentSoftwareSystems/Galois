@@ -93,7 +93,7 @@ struct EdgeItem {
   inline NTy*&       first()       { assert(N); return N; }
   inline NTy* const& first() const { assert(N); return N; }
   inline ETy*       second()       { return Ea ? Ea : &E; }
-  inline ETy* const second() const { return Ea ? Ea : &E; }
+  inline ETy* const& second() const { return Ea ? Ea : &E; }
   inline ETy*       addr()         { return &E; }
   EdgeItem(NTy* n, ETy* v) : N(n), Ea(v) {}
 };
