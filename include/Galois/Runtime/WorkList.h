@@ -23,9 +23,8 @@
 #ifndef GALOIS_RUNTIME_WORKLIST_H
 #define GALOIS_RUNTIME_WORKLIST_H
 
-#include "mem.h"
-#include "WorkListHelpers.h"
-
+#include "Galois/Runtime/mem.h"
+#include "Galois/Runtime/WorkListHelpers.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/Threads.h"
