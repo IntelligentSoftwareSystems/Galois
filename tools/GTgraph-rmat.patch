@@ -2,7 +2,7 @@ diff -Naur src/CMakeLists.txt src.patched/CMakeLists.txt
 --- src/CMakeLists.txt  1969-12-31 18:00:00.000000000 -0600
 +++ src.patched/CMakeLists.txt  2011-06-22 11:50:25.697422244 -0500
 @@ -0,0 +1,24 @@
-+cmake_minimum_required(VERSION 2.8)
++cmake_minimum_required(VERSION 2.6)
 +add_definitions(-DAdd_)
 +include_directories(sprng2.0-lite/include sprng2.0-lite/src)
 +set(sprng sprng2.0-lite/src/primes_32.c
