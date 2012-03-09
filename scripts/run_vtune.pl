@@ -10,13 +10,19 @@ chomp($symbol);
 die("Run as: runvtune.pl [-t N] output app args*") unless ($#ARGV > 1);
 
 my $threads = 1;
-if (@ARGV[0] == "-t") {
+my $found_threads = 0;
+if (@ARGV[0] eq "-t") {
   shift @ARGV;
   $threads = shift @ARGV;
+  $found_threads = 1;
 }
 
 my $outfile = shift @ARGV;
-my $cmdline = join(" ", @ARGV) . " -t $threads";
+my $cmdline = join(" ", @ARGV);
+
+if ($found_threads) {
+  $cmdline = $cmdline . " -t $threads";
+}
 
 print "*** Executing: " . $cmdline . "\n";
 
