@@ -25,14 +25,16 @@
 #include "Galois/Runtime/ll/HWTopo.h"
 #include "Galois/Runtime/ll/TID.h"
 
-#include <semaphore.h>
-#include <pthread.h>
 #include <cstdlib>
 #include <cstdio>
 #include <cerrno>
 #include <cassert>
 #include <list>
 #include <limits>
+#include <vector>
+
+#include <semaphore.h>
+#include <pthread.h>
 
 #ifdef GALOIS_VTUNE
 #include "ittnotify.h"
@@ -58,6 +60,7 @@ public:
     int rc = sem_init(&sem, 0, val);
     checkResults(rc);
   }
+
   ~Semaphore() {
     int rc = sem_destroy(&sem);
     checkResults(rc);
@@ -75,7 +78,7 @@ public:
     while (n) {
       --n;
       int rc;
-      while ((rc = sem_wait(&sem)) == EINTR) {}
+      while ((rc = sem_wait(&sem)) == EINTR) { }
       checkResults(rc);
     }
   }
@@ -100,7 +103,6 @@ public:
    checkResults(rc);
    rc = pthread_barrier_init(&bar, 0, val);
    checkResults(rc);
-   
   }
 
   void wait() {
@@ -133,7 +135,7 @@ public:
 #endif
 
 class ThreadPool_pthread : public ThreadPool {
-  Semaphore start; // Signal to release threads to run
+  std::vector<Semaphore> starts; // signal to release threads to run
   Barrier finish; // want on to block on running threads
   std::list<pthread_t> threads; // Set of threads
   unsigned int maxThreads;
@@ -147,22 +149,34 @@ class ThreadPool_pthread : public ThreadPool {
     GaloisRuntime::LL::bindThreadToProcessor(LocalThreadID);
   }
 
+  void continueCascade(int tid) {
+    if (2*tid < activeThreads) {
+      starts[2*tid].release();
+      if (2*tid+1 < activeThreads)
+        starts[2*tid+1].release();
+    }
+  }
+
   void doWork(void) {
-    start.acquire();
+    int LocalThreadID = GaloisRuntime::LL::getTID();
+    
+    starts[LocalThreadID].acquire();
+    assert(LocalThreadID < (int) activeThreads);
+
+    continueCascade(LocalThreadID);
+    
     RunCommand* workPtr = (RunCommand*)workBegin;
     RunCommand* workEndL = (RunCommand*)workEnd;
-    int LocalThreadID = GaloisRuntime::LL::getTID();
     SampleProfiler VT;
     while (workPtr != workEndL) {
       VT.startIf(LocalThreadID, workPtr->profile);
-      if (LocalThreadID < (int) activeThreads) {
-	if (workPtr->isParallel)
-	  workPtr->work();
-	else if (LocalThreadID == 0)
-	  workPtr->work();
-      }
+      if (workPtr->isParallel)
+        workPtr->work();
+      else if (LocalThreadID == 0)
+        workPtr->work();
+
       if (workPtr->barrierAfter)
-	finish.wait();
+        finish.wait();
       ++workPtr;
     }
     VT.startIf(LocalThreadID, false);
@@ -181,13 +195,18 @@ class ThreadPool_pthread : public ThreadPool {
   
 public:
   ThreadPool_pthread()
-    :start(0), maxThreads(0), nextThread(0), shutdown(false), workBegin(0), workEnd(0)
+    :maxThreads(0), nextThread(0), shutdown(false), workBegin(0), workEnd(0)
   {
     initThread();
     ThreadPool::activeThreads = 1;
     unsigned int num = GaloisRuntime::LL::getMaxThreads();
     finish.reinit(num);
     maxThreads = num;
+
+    starts.reserve(num);
+    for (unsigned i = 0; i < num; ++i)
+      starts.push_back(Semaphore(0));
+
     for (unsigned i = 1; i < num; ++i) {
       pthread_t t;
       int rc = pthread_create(&t, 0, &slaunch, this);
@@ -200,8 +219,9 @@ public:
     shutdown = true;
     workBegin = workEnd = 0;
     __sync_synchronize();
-    start.release(threads.size());
-    while(!threads.empty()) {
+    for (unsigned i = 1; i < starts.size(); ++i)
+      starts[i].release();
+    while (!threads.empty()) {
       pthread_t t = threads.front();
       threads.pop_front();
       int rc = pthread_join(t, NULL);
@@ -213,8 +233,9 @@ public:
     workBegin = begin;
     workEnd = end;
     __sync_synchronize();
-    //start all threads
-    start.release(maxThreads);
+    //start thread cascade
+    finish.reinit(activeThreads);
+    starts[0].release();
     //Do master thread work
     doWork();
     //clean up
