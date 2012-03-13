@@ -24,6 +24,7 @@
 #include "Galois/Runtime/Threads.h"
 #include "Galois/Runtime/ll/HWTopo.h"
 #include "Galois/Runtime/ll/TID.h"
+#include "Galois/Runtime/PerCPU.h"
 
 #include <cstdlib>
 #include <cstdio>
@@ -84,16 +85,16 @@ public:
   }
 };
 
-class Barrier {
+class PthreadBarrier {
   pthread_barrier_t bar;
 public:
-  Barrier() {
+  PthreadBarrier() {
     //uninitialized barriers block a lot of threads to help with debugging
     int rc = pthread_barrier_init(&bar, 0, std::numeric_limits<int>::max());
     checkResults(rc);
   }
 
-  ~Barrier() {
+  ~PthreadBarrier() {
     int rc = pthread_barrier_destroy(&bar);
     checkResults(rc);
   }
@@ -111,6 +112,152 @@ public:
       checkResults(rc);
   }
 };
+
+//! Simple busy waiting barrier.
+class SimpleBarrier {
+  struct PLD {
+    int count;
+    int total;
+    PLD(): count(0) { }
+  };
+
+  struct TLD {
+    volatile int flag;
+    TLD(): flag(0) { }
+  };
+
+  volatile int globalTotal;
+  PerCPU<TLD> tlds;
+  PerLevel<PLD> plds;
+  int size;
+
+  void pause() {
+#if defined(__i386__) || defined(__amd64__)
+    asm volatile ( "pause");
+#endif
+  }
+
+  void compilerBarrier() {
+    asm volatile ("":::"memory");
+  }
+
+  void cascade(int tid) {
+    int multiple = 2;
+    for (int i = 0; i < multiple; ++i) {
+      int n = tid * multiple + i;
+      if (n < size && n != 0)
+        tlds.get(n).flag = 1;
+    }
+  }
+
+public:
+  SimpleBarrier(): globalTotal(0), size(-1) { }
+
+  //! Not thread-safe and should only be called when no threads are in wait()/increment()
+  void reinit(int val, int init) {
+    assert(val > 0);
+
+    if (val != size) {
+      for (unsigned i = 0; i < plds.size(); ++i)
+        plds.get(i).total = 0;
+      for (int i = 0; i < val; ++i) {
+        int j = LL::getPackageForThreadInternal(i);
+        ++plds.get(j).total;
+      }
+
+      size = val;
+    }
+
+    globalTotal = init;
+  }
+
+  void increment() {
+    PLD& pld = plds.get();
+    int total = pld.total;
+
+    if (__sync_add_and_fetch(&pld.count, 1) == total) {
+      pld.count = 0;
+      compilerBarrier();
+      __sync_add_and_fetch(&globalTotal, total);
+    }
+  }
+
+  void wait() {
+    int tid = (int) LL::getTID();
+    TLD& tld = tlds.get(tid);
+    if (tid == 0) {
+      while (globalTotal < size) {
+        pause();
+      }
+    } else {
+      while (!tld.flag) {
+        pause();
+      }
+    }
+  }
+
+  void barrier() {
+    assert(size > 0);
+
+    int tid = (int) LL::getTID();
+    TLD& tld = tlds.get(tid);
+
+    if (tid == 0) {
+      while (globalTotal < size) {
+        pause();
+      }
+
+      globalTotal = 0;
+      tld.flag = 0;
+      compilerBarrier();
+      cascade(tid);
+    } else {
+      while (!tld.flag) {
+        pause();
+      }
+
+      tld.flag = 0;
+      compilerBarrier();
+      cascade(tid);
+    }
+  }
+};
+
+//! Busy waiting barrier biased towards getting master thread out as soon
+//! as possible
+class FastBarrier {
+  //PthreadBarrier b;
+  SimpleBarrier in;
+  SimpleBarrier out;
+  int size;
+
+public:
+  FastBarrier(): size(-1) { }
+
+  void reinit(int val) {
+    //b.reinit(val);
+
+    if (val != size) {
+      if (size != -1)
+        out.wait();
+
+      in.reinit(val, 0);
+      out.reinit(val, val);
+      val = size;
+    }
+  }
+
+  void wait() {
+    out.barrier();
+    in.increment();
+    in.barrier();
+    out.increment();
+    //b.wait();
+  }
+};
+
+//typedef PthreadBarrier Barrier;
+typedef FastBarrier Barrier;
 
 #ifdef GALOIS_VTUNE
 class SampleProfiler {
@@ -149,21 +296,25 @@ class ThreadPool_pthread : public ThreadPool {
     GaloisRuntime::LL::bindThreadToProcessor(LocalThreadID);
   }
 
-  void continueCascade(int tid) {
-    if (2*tid < activeThreads) {
-      starts[2*tid].release();
-      if (2*tid+1 < activeThreads)
-        starts[2*tid+1].release();
+  void cascade(int tid) {
+    unsigned multiple = 2;
+    for (unsigned i = 0; i < multiple; ++i) {
+      unsigned n = tid * multiple + i;
+      if (n < activeThreads && n != 0)
+        starts[n].release();
     }
   }
 
   void doWork(void) {
     int LocalThreadID = GaloisRuntime::LL::getTID();
     
-    starts[LocalThreadID].acquire();
-    assert(LocalThreadID < (int) activeThreads);
+    if (LocalThreadID != 0)
+      starts[LocalThreadID].acquire();
 
-    continueCascade(LocalThreadID);
+    if (LocalThreadID >= (int) activeThreads)
+      return;
+
+    cascade(LocalThreadID);
     
     RunCommand* workPtr = (RunCommand*)workBegin;
     RunCommand* workEndL = (RunCommand*)workEnd;
@@ -233,9 +384,7 @@ public:
     workBegin = begin;
     workEnd = end;
     __sync_synchronize();
-    //start thread cascade
     finish.reinit(activeThreads);
-    starts[0].release();
     //Do master thread work
     doWork();
     //clean up
