@@ -96,6 +96,8 @@ static PrintStats& getPS() {
   return P;
 }
 
+bool GaloisRuntime::inGaloisForEach = false;
+
 void GaloisRuntime::reportStatSum(const char* text, unsigned long val, const char* loopname) {
   getPS().reportStatSum(text, val, loopname);
 }

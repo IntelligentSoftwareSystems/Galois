@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -42,17 +42,20 @@
 #include "Galois/Runtime/Termination.h"
 #include "Galois/Runtime/LoopHooks.h"
 
+#ifdef GALOIS_EXP
+#include "Galois/Runtime/SimpleTaskPool.h"
+#endif
+
 namespace GaloisRuntime {
 
 class LoopStatistics {
   unsigned long conflicts;
   unsigned long iterations;
-  OnlineStatistics iterationTimes;
 
 public:
   LoopStatistics() :conflicts(0), iterations(0) { }
-  void inc_iterations() {
-    ++iterations;
+  void inc_iterations(int amount = 1) {
+    iterations += amount;
   }
   void inc_conflicts() {
     ++conflicts;
@@ -62,6 +65,39 @@ public:
     reportStatSum("Iterations", iterations, loopname);
     reportStatAvg("ConflictsThreadDistribution", conflicts, loopname);
     reportStatAvg("IterationsThreadDistribution", iterations, loopname);
+  }
+};
+
+template<class WorkListTy, class FunctionTy>
+class DoAllWork {
+  typedef typename WorkListTy::value_type value_type;
+
+  WorkListTy global_wl;
+  FunctionTy& fn;
+
+  typedef typename WorkListTy::range_type range_type;
+
+public:
+  DoAllWork(FunctionTy& f): fn(f) { }
+
+  template<typename Iter>
+  bool AddInitialWork(Iter b, Iter e) {
+    global_wl.push_initial(b,e);
+    return true;
+  }
+
+  void operator()() {
+    
+    boost::optional<range_type> p = global_wl.pop_range();
+    while (p) {
+      while (p->first != p->second)
+        fn(*p->first++);
+      p = global_wl.pop_range();
+    }
+#ifdef GALOIS_EXP
+    SimpleTaskPool& pool = getSystemTaskPool();
+    pool.work();
+#endif
   }
 };
 
@@ -151,9 +187,11 @@ public:
   }
 
   ~ForEachWork() {
-    for (unsigned int i = 0; i < GaloisRuntime::ThreadPool::getActiveThreads(); ++i)
-      tdata.get(i).stat.report_stat(i, loopname);
-    GaloisRuntime::statDone();
+    if (ForeachTraits<FunctionTy>::CollectStats) {
+      for (unsigned int i = 0; i < GaloisRuntime::ThreadPool::getActiveThreads(); ++i)
+        tdata.get(i).stat.report_stat(i, loopname);
+      GaloisRuntime::statDone();
+    }
   }
 
   template<typename Iter>
@@ -167,6 +205,9 @@ public:
     ThreadLocalData& tld = tdata.get();
     setThreadContext(&tld.cnx);
     tld.lterm = term.getLocalTokenHolder();
+#ifdef GALOIS_EXP
+    SimpleTaskPool& pool = getSystemTaskPool();
+#endif
 
     do {
       boost::optional<value_type> p = global_wl.pop();
@@ -183,6 +224,10 @@ public:
       drainAborted<isLeader>(tld);
       if (ForeachTraits<FunctionTy>::NeedsBreak && break_happened.data)
 	goto leaveLoop;
+
+#ifdef GALOIS_EXP
+      pool.work();
+#endif
 
       term.localTermination();
     } while (!term.globalTermination());
@@ -227,8 +272,12 @@ struct FillWork {
 
 template<typename WLTy, typename IterTy, typename Function>
 void for_each_impl(IterTy b, IterTy e, Function f, const char* loopname) {
+  assert(!inGaloisForEach);
 
-  typedef typename WLTy::template retype<typename std::iterator_traits<IterTy>::value_type>::WL aWLTy;
+  inGaloisForEach = true;
+
+  typedef typename std::iterator_traits<IterTy>::value_type T;
+  typedef typename WLTy::template retype<T>::WL aWLTy;
 
   ForEachWork<aWLTy, Function> GW(f, loopname);
   FillWork<IterTy, ForEachWork<aWLTy, Function> > fw2(b,e,GW);
@@ -247,6 +296,33 @@ void for_each_impl(IterTy b, IterTy e, Function f, const char* loopname) {
   w[2].barrierAfter = true;
   w[2].profile = true;
   getSystemThreadPool().run(&w[0], &w[3]);
+
+  inGaloisForEach = false;
+}
+
+template<typename WLTy, typename T, typename IterTy, typename Function>
+void do_all_impl(IterTy b, IterTy e, Function f, const char* loopname) {
+  assert(!inGaloisForEach);
+
+  inGaloisForEach = true;
+
+  typedef typename WLTy::template retype<T>::WL aWLTy;
+
+  DoAllWork<aWLTy, Function> GW(f);
+  FillWork<IterTy, DoAllWork<aWLTy, Function> > fw2(b,e,GW);
+
+  RunCommand w[2];
+  w[0].work = config::ref(fw2);
+  w[0].isParallel = true;
+  w[0].barrierAfter = false;
+  w[0].profile = true;
+  w[1].work = config::ref(GW);
+  w[1].isParallel = true;
+  w[1].barrierAfter = true;
+  w[1].profile = true;
+  getSystemThreadPool().run(&w[0], &w[2]);
+
+  inGaloisForEach = false;
 }
 
 }

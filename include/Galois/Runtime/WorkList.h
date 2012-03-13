@@ -30,6 +30,7 @@
 #include "Galois/Runtime/Threads.h"
 
 #include <limits>
+#include <iterator>
 #include <map>
 #include <vector>
 #include <deque>
@@ -665,6 +666,197 @@ WLCOMPILECHECK(dChunkedFIFO);
 template<int chunksize=64, typename T = int, bool concurrent=true>
 class dChunkedLIFO : public ChunkedMaster<T, ConExtLinkedStack, true, true, chunksize, concurrent> {};
 WLCOMPILECHECK(dChunkedLIFO);
+
+//! Worklist specialized to random access ranges. Does not support pushes.
+//! Work distribution is the following:
+//!  - Half the work is distributed evenly among all the threads
+//!  - When work runs out, threads check a per package list of work.
+//!    * If there is work, the thread takes 1/#coreperpackage work for itself
+//!    * If there isn't work, one thread per package grabs half of the remaining work
+//!      from the global queue
+template<typename IterTy = int*, int minsize=16, typename T=int, bool concurrent=true>
+class RandomAccessRange {
+
+  //! Type of ranges that we are iterating over
+  typedef IterTy iterator;
+  typedef typename std::iterator_traits<IterTy>::difference_type difference_type;
+
+  //! Thread-local data
+  struct TLD {
+    iterator start; // duplicated so we can start processing without a barrier
+    iterator begin;
+    iterator end;
+    bool failed;
+  };
+
+  //! Package-local data
+  struct PLD {
+    LL::SimpleLock<concurrent> lock;
+    difference_type begin;
+    difference_type end;
+  };
+
+  PerCPU<TLD> tlds;
+  PerLevel<PLD> plds;
+
+  //! global work remaining
+  difference_type total;
+
+  bool tryGlobalSteal(PLD& pld) {
+    difference_type e, b;
+    
+    do {
+      e = total;
+      if (e == 0)
+        return false;
+      b = e / 2;
+      if (e - b < minsize)
+        b = 0;
+    } while (!__sync_bool_compare_and_swap(&total, e, b));
+
+    pld.begin = b;
+    pld.end = e;
+
+    return true;
+  }
+
+  bool tryPackageSteal(TLD& tld) {
+    PLD& pld = plds.get();
+
+    pld.lock.lock();
+
+    while (true) {
+      if (pld.begin == pld.end) {
+        if (tryGlobalSteal(pld))
+          continue;
+
+        pld.lock.unlock();
+        return false;
+      }
+
+      int mp = LL::getMaxPackageForThread(ThreadPool::getActiveThreads()-1) + 1;
+      difference_type e = pld.end;
+      difference_type b = pld.end;
+      difference_type t = e - pld.begin;
+      difference_type block = (t + mp - 1) / mp;
+      if (block < minsize)
+        block = t;
+
+      pld.end -= block;
+
+      pld.lock.unlock();
+
+      b -= block;
+
+      tld.begin = tld.end = tld.start;
+      std::advance(tld.begin, b);
+      std::advance(tld.end, e);
+      return true;
+    }
+  }
+    
+public:
+  RandomAccessRange(): total(0) { }
+
+  //! T is the value type of the WL
+  typedef T value_type;
+
+  template<bool newconcurrent>
+  struct rethread {
+    typedef RandomAccessRange<IterTy, minsize, T, newconcurrent> WL;
+  };
+
+  template<typename Tnew>
+  struct retype {
+    typedef RandomAccessRange<IterTy, minsize, Tnew, concurrent> WL;
+  };
+
+  //! push a value onto the queue
+  void push(value_type val) {
+    abort();
+  }
+
+  //! push a range onto the queue
+  template<typename Iter>
+  void push(Iter b, Iter e) {
+    abort();
+  }
+
+  //! push range onto the queue. NB: unlike other worklists, this
+  //! takes iterators over (begin, end) pairs, where begin and
+  //! end are over the entire range in question.
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    assert(std::distance(b, e) == 1);
+
+    // Divide upper half of range among n threads
+    TLD& tld = tlds.get();
+    difference_type n = std::distance(b->first, b->second);
+    unsigned tid = tlds.myEffectiveID();
+    unsigned int numThreads = GaloisRuntime::ThreadPool::getActiveThreads();
+    difference_type rest = n / 16;
+    difference_type t = n - rest;
+    difference_type block = (t + numThreads - 1) / numThreads;
+
+    if (tid == 0) {
+      // NB: Small race if threads start to steal before this gets written
+      total = rest;
+    }
+
+    tld.begin = tld.end = tld.start = b->first;
+    tld.failed = false;
+    std::advance(tld.begin, rest + std::min(tid * block, t));
+    std::advance(tld.end, rest + std::min((tid + 1) * block, t));
+  }
+
+  //! pop a value from the queue.
+  boost::optional<value_type> pop() {
+    TLD& tld = tlds.get();
+
+    if (!tld.failed) {
+      while (true) {
+        if (tld.begin != tld.end) {
+          return boost::optional<value_type>(*tld.begin++);
+        } 
+
+        // Steal path
+        if (tryPackageSteal(tld))
+          continue;
+
+        tld.failed = true;
+        break;
+      }
+    }
+
+    return boost::optional<value_type>();
+  }
+
+  typedef std::pair<iterator,iterator> range_type;
+  boost::optional<range_type> pop_range() {
+    TLD& tld = tlds.get();
+
+    if (!tld.failed) {
+      while (true) {
+        if (tld.begin != tld.end) {
+          boost::optional<range_type> r(std::make_pair(tld.begin, tld.end));
+          tld.begin = tld.end;
+          return r;
+        } 
+
+        // Steal path
+        if (tryPackageSteal(tld))
+          continue;
+
+        tld.failed = true;
+        break;
+      }
+    }
+
+    return boost::optional<range_type>();
+
+  }
+};
+//WLCOMPILECHECK(RandomAccessRange);
 
 //End namespace
 }
