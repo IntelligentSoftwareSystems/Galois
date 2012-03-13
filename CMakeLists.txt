@@ -15,15 +15,14 @@ endif()
 ###### Options (alternatively pass as options to cmake -DName=Value) ######
 
 #use profiling
-#set(USE_PROFILING ON)
+set(USE_PROFILING OFF CACHE BOOL "Enable GCC profiling")
 
 #use alternate compiler
-#set(USE_ICC ON)
-#set(USE_CLANG ON)
+set(USE_ICC OFF CACHE BOOL "Use intel compiler")
+set(USE_CLANG OFF CACHE BOOL "Use clang compiler")
 
 #Enable iss specific options; should be OFF in the general release
-#use experimental features
-#set(USE_EXP ON) 
+set(USE_EXP OFF CACHE BOOL "Use experimental features") 
 
 ###### Optional programs and default paths ######
 
@@ -46,7 +45,7 @@ endif()
 if(NOT ${ICCXX} STREQUAL "ICCXX-NOTFOUND")
   if(USE_ICC)
     set(CMAKE_CXX_COMPILER ${ICCXX})
-    add_definitions("-wd981 -wd383 -wd869 -wd2196 -wd279 -std=c++0x")
+    add_definitions("-wd68 -wd981 -wd383 -wd869 -wd2196 -wd279 -std=c++0x")
   endif()
 endif()
 
@@ -106,13 +105,6 @@ if(USE_EXP)
     message(WARNING "VTUNE specified but not found")
   endif()
 
-  find_package(OpenMP)
-  if(OPENMP_FOUND)
-    set(RT_LINK -lgomp ${RT_LINK})
-  else()
-    message(WARNING "OPENMP specified but not found")
-  endif()
-
   find_package(TBB)
   if(TBB_FOUND)
     add_definitions(-DGALOIS_TBB -DTBB_USE_THREADING_TOOLS=0)
@@ -129,20 +121,12 @@ if(USE_EXP)
     include_directories(${MPI_INCLUDE_PATH})
     set(RT_LINK ${MPI_LIBRARIES} ${RT_LINK})
   else()
-    message(WARNING "OPENMP specified but not found")
+    message(WARNING "MPI specified but not found")
   endif()
 endif()
 
 # c++0x features
-
-# enable -std=c++0x if possible
-include(CheckCXXCompilerFlag)
-check_cxx_compiler_flag(-std=c++0x HAS_CXX0X)
-if(HAS_CXX0X)
-#  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
-endif()
-
-include(CheckCXX0xFeatures)
+find_package(CXX0x)
 
 if(USE_PROFILING)
   add_definitions(-pg)
@@ -202,7 +186,9 @@ function(app name)
   PARSE_ARGUMENTS(APP "REQUIRES;EXTLIBS" "" ${ARGN})
 
   foreach(required ${APP_REQUIRES})
-    if(NOT ${${required}})
+    if(${${required}})
+
+    else()
       message(WARNING "NOT compiling ${name} (missing: ${required})")
       return()
     endif()
