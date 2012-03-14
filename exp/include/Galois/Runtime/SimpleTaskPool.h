@@ -127,7 +127,7 @@ class TaskContext: public boost::noncopyable {
   void enqueue(const IterTy& begin, const IterTy& end, WorklistTy& wl, FunctionTy fn) {
     int numThreads = getSystemThreadPool().getActiveThreads();
 //    numBlocks = 4 * numThreads;
-    numBlocks = 6;
+    numBlocks = 4 * numThreads;
 
     size_t n = std::distance(begin, end);
     size_t blockSize = n / numBlocks;
