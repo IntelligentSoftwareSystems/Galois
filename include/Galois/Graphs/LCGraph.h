@@ -337,7 +337,7 @@ protected:
 public:
   typedef NodeInfo* GraphNode;
   typedef EdgeInfo* edge_iterator;
-  class active_iterator : std::iterator<std::forward_iterator_tag, GraphNode> {
+  class active_iterator : public std::iterator<std::forward_iterator_tag, GraphNode> {
     NodeInfo* at;
     void incA() {
       at = at->next();
@@ -351,6 +351,7 @@ public:
     bool operator==(const active_iterator& rhs) { return at == rhs.at; }
     bool operator!=(const active_iterator& rhs) { return at != rhs.at; }
     GraphNode operator*() { return at; }
+
   };
 
   LC_Linear_Graph() {}
