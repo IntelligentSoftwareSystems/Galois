@@ -208,6 +208,8 @@ int main(int argc, char **argv) {
     std::cout << "WARNING: Using a large delta-step for bfs. Expect long execution times.\n";
   }
 
+  std::cout << "WARNING: Performance varies considerably due to -delta.  Do not expect the default to be good for your graph\n";
+
   unsigned int id = 0;
   bool foundReport = false;
   bool foundSource = false;
