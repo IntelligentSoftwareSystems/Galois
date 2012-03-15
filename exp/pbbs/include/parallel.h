@@ -33,6 +33,18 @@
   _Pragma("omp parallel for schedule (static,1)") for (type index = begin; index < end; ++index)
 #define parallel_doall_end 
 
+// openmp
+#elif defined(EXP_DOALL_OPENMP_RUNTIME)
+#include <omp.h>
+#define cilk_spawn
+#define cilk_sync
+#define parallel_main main
+#define parallel_doall(type, index, begin, end) \
+  _Pragma("omp parallel for schedule (runtime)") for (type index = begin; index < end; ++index)
+#define parallel_doall_1(type, index, begin, end) \
+  _Pragma("omp parallel for schedule (static,1)") for (type index = begin; index < end; ++index)
+#define parallel_doall_end 
+
 // GALOIS
 #elif defined(EXP_DOALL_GALOIS)
 #include "Galois/Galois.h"

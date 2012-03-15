@@ -118,7 +118,6 @@ class TaskContext: public boost::noncopyable {
   typedef Galois::GFixedAllocator<Node> Allocator;
   typedef std::list<MyTask, Allocator> Tasks;
 
-  Allocator heap;
   Tasks tasks;
   volatile int done;
   size_t numBlocks;
@@ -148,7 +147,7 @@ class TaskContext: public boost::noncopyable {
   }
 
 public:
-  TaskContext(): tasks(heap), done(0) { }
+  TaskContext(): done(0) { }
 
   int run(SimpleTaskPool& pool) {
     int iterations = 0;
