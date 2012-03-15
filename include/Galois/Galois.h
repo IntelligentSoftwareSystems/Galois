@@ -35,6 +35,8 @@
 #include "boost/iterator/transform_iterator.hpp"
 #endif
 
+#include <boost/iterator/transform_iterator.hpp>
+
 namespace Galois {
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -44,13 +46,15 @@ namespace Galois {
 //Iterator based versions
 template<typename WLTy, typename IterTy, typename Function>
 static inline void for_each(IterTy b, IterTy e, Function f, const char* loopname = 0) {
+  typedef typename WLTy::template retype<typename std::iterator_traits<IterTy>::value_type>::WL aWLTy;
+
 #ifdef GALOIS_EXP
   if (GaloisRuntime::useParaMeter) {
-    GaloisRuntime::ParaMeter::for_each_impl<WLTy>(b, e, f, loopname);
+    GaloisRuntime::ParaMeter::for_each_impl<aWLTy>(b, e, f, loopname);
     return;
   }
 #endif
-  GaloisRuntime::for_each_impl<WLTy>(b, e, f, loopname);
+  GaloisRuntime::for_each_impl<aWLTy>(b, e, f, loopname);
 }
 
 template<typename IterTy, typename Function>
@@ -73,10 +77,61 @@ static inline void for_each(InitItemTy i, Function f, const char* loopname = 0) 
   for_each<WLTy, InitItemTy, Function>(i, f, loopname);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// do_all
+// Does not modify container
+// Takes advantage of tiled iterator where applicable
+// Experimental!
+////////////////////////////////////////////////////////////////////////////////
+
 #ifdef GALOIS_EXP
+/*
+template<typename Function>
+struct tile_apply {
+  Function f;
+
+  tile_apply(Function _f2) :f(_f2) {}
+
+  template<typename Tile, typename context>
+  void operator()(Tile& i, context& cnx) {
+    for(typename Tile::iterator ii = i.begin(), ee = i.end();
+	ii != ee; ++ii)
+      f(*ii, cnx);
+  }
+};
+
+template<typename T>
+struct addrof : public std::unary_function<T&, T*>{
+  T* operator()(T& V) const { return &V; }
+};
+template<typename T>
+struct makeRef : public std::unary_function<T&, boost::reference_wrapper<T> >{
+  boost::reference_wrapper<T> operator()(T& V) const { return boost::ref(V); }
+};
+
+template<typename ContainerTy, typename Function>
+static inline void do_all_adl(ContainerTy& c, Function f, const char* loopname = 0) {
+  typedef typename std::iterator_traits<typename ContainerTy::tile_iterator>::value_type TileTy;
+  typedef typename std::iterator_traits<typename TileTy::iterator>::value_type      ValTy;
+  // if (IsChunked(c)) {
+  //   WL<hasOwnerFunction(c)> wl;
+  //   push chunks into wl;
+  // } else {
+  //   foreach(c.begin(), c.end());
+  // }
+  using namespace GaloisRuntime::WorkList;
+  //typedef dChunkedFIFO<16> WLTy;
+  typedef LocalQueues<LocalStealing<TileAdaptor<typename ContainerTy::tile_iterator> >, LIFO<> > WLTy;
+  typedef typename WLTy::template retype<ValTy>::WL aWLTy;
+  GaloisRuntime::for_each_impl<aWLTy>(c.tile_begin(), c.tile_end(), f, loopname);
+  //Fallback:
+  //for_each(c.begin(), c.end(), f, loopname);
+}
+*/
+///DDN:
+
 template<typename IterTy,typename T>
 struct DoAllInitialWork {
-
   template<typename T1, typename T2>
   struct ConstantFunction: public std::unary_function<T1,T2> {
     const T2& item;
@@ -103,8 +158,9 @@ struct DoAllInitialWork {
   }
 };
 
+//Random access iterator do_all
 template<typename IterTy,typename FunctionTy>
-static inline void do_all(const IterTy& begin, const IterTy& end, const FunctionTy& fn) {
+static inline void do_all_dispatch(const IterTy& begin, const IterTy& end, const FunctionTy& fn, std::random_access_iterator_tag) {
   size_t n = std::distance(begin, end);
   if (n < 128) {
     std::for_each(begin, end, fn);
@@ -126,6 +182,13 @@ static inline void do_all(const IterTy& begin, const IterTy& end, const Function
         fn, NULL);
   }
 }
+
+template<typename IterTy,typename FunctionTy>
+static inline void do_all(const IterTy& begin, const IterTy& end, const FunctionTy& fn) {
+  typename std::iterator_traits<IterTy>::iterator_category category;
+  do_all_dispatch(begin,end,fn,category); 
+}
+
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
