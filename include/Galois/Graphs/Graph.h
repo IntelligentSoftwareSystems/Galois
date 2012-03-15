@@ -40,7 +40,7 @@
  * g.addEdge(a, b, 5);
  *
  * // Traverse graph
- * for (Graph::active_iterator i = g.active_begin(), iend = g.active_end();
+ * for (Graph::iterator i = g.begin(), iend = g.end();
  *      i != iend;
  *      ++i) {
  *   Graph::GraphNode src = *i;
@@ -667,12 +667,12 @@ public:
   //These are not thread safe!!
   typedef boost::transform_iterator<makeGraphNode,
             boost::filter_iterator<std::mem_fun_ref_t<bool, gNode>,
-              typename NodeListTy::iterator> > active_iterator;
+              typename NodeListTy::iterator> > iterator;
 
   /**
    * Returns an iterator to all the nodes in the graph. Not thread-safe.
    */
-  active_iterator active_begin() {
+  iterator begin() {
     return boost::make_transform_iterator(
         boost::make_filter_iterator(
           std::mem_fun_ref(&gNode::isActive), nodes.begin(), nodes.end()),
@@ -680,7 +680,7 @@ public:
   }
 
   //! Returns the end of the node iterator. Not thread-safe.
-  active_iterator active_end() {
+  iterator end() {
     return boost::make_transform_iterator(
         boost::make_filter_iterator(
           std::mem_fun_ref(&gNode::isActive), nodes.end(), nodes.end()), 
@@ -691,7 +691,7 @@ public:
    * Returns the number of nodes in the graph. Not thread-safe.
    */
   unsigned int size() {
-    return std::distance(active_begin(), active_end());
+    return std::distance(begin(), end());
   }
 
   FirstGraph() {
@@ -704,15 +704,15 @@ public:
     //mapping between nodes
     std::map<typename GTy::GraphNode, GraphNode> NodeMap;
     //copy nodes
-    for (typename GTy::active_iterator ii = graph.active_begin(), 
-	   ee = graph.active_end(); ii != ee; ++ii) {
+    for (typename GTy::iterator ii = graph.begin(), 
+	   ee = graph.end(); ii != ee; ++ii) {
       GraphNode N = createNode(graph.getData(*ii));
       addNode(N);
       NodeMap[*ii] = N;
     }
     //copy edges
-    for (typename GTy::active_iterator ii = graph.active_begin(), 
-	   ee = graph.active_end(); ii != ee; ++ii)
+    for (typename GTy::iterator ii = graph.begin(), 
+	   ee = graph.end(); ii != ee; ++ii)
       for(typename GTy::neighbor_iterator ni = graph.neighbor_begin(*ii), 
 	    ne = graph.neighbor_end(*ii);
 	  ni != ne; ++ni)

@@ -35,7 +35,7 @@
  * g.structureFromFile(inputfile);
  *
  * // Traverse graph
- * for (Graph::active_iterator i = g.active_begin(), iend = g.active_end();
+ * for (Graph::iterator i = g.begin(), iend = g.end();
  *      i != iend;
  *      ++i) {
  *   Graph::GraphNode src = *i;
@@ -186,12 +186,12 @@ public:
 
   bool hasNeighbor(GraphNode N1, GraphNode N2, MethodFlag mflag = ALL) const;
 
-  typedef boost::counting_iterator<uint64_t> active_iterator;
+  typedef boost::counting_iterator<uint64_t> iterator;
 
   //! Iterate over nodes in graph (not thread safe)
-  active_iterator active_begin() const;
+  iterator begin() const;
 
-  active_iterator active_end() const;
+  iterator end() const;
 
   //! The number of nodes in the graph
   unsigned int size() const;
@@ -220,7 +220,7 @@ public:
 
     typedef typename TyG::GraphNode GNode;
     typedef std::vector<GNode> Nodes;
-    Nodes nodes(G.active_begin(), G.active_end());
+    Nodes nodes(G.begin(), G.end());
 
     //num edges and outidx computation
     uint64_t offset = 0;
@@ -361,8 +361,8 @@ public:
     structureFromGraph(graph);
     emptyNodeData();
     int i = 0;
-    for (typename GTy::active_iterator ii = graph.active_begin(),
-	   ee = graph.active_end(); ii != ee; ++ii, ++i)
+    for (typename GTy::iterator ii = graph.begin(),
+	   ee = graph.end(); ii != ee; ++ii, ++i)
       NodeData[i].data.data = graph.getData(*ii);
   }
 };

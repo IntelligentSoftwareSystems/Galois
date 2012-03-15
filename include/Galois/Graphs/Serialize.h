@@ -81,8 +81,8 @@ bool outputGraph(const char* file, Graph& G) {
   typedef typename Graph::GraphNode GNode;
   typedef std::vector<GNode> Nodes;
   Nodes nodes;
-  for (typename Graph::active_iterator ii = G.active_begin(),
-      ee = G.active_end(); ii != ee; ++ii) {
+  for (typename Graph::iterator ii = G.begin(),
+      ee = G.end(); ii != ee; ++ii) {
     nodes.push_back(*ii);
   }
 
@@ -159,8 +159,8 @@ bool outputGraph(const char* file, Graph& G) {
 template<typename Graph>
 bool outputTextEdgeData(const char* ofile, Graph& G) {
   std::ofstream file(ofile);
-  for (typename Graph::active_iterator ii = G.active_begin(),
-	 ee = G.active_end(); ii != ee; ++ii) {
+  for (typename Graph::iterator ii = G.begin(),
+	 ee = G.end(); ii != ee; ++ii) {
     for (typename Graph::neighbor_iterator ni = G.neighbor_begin(*ii),
 	   ne = G.neighbor_end(*ii); ni != ne; ++ni) {
       file << G.getEdgeData(*ii, *ni) << '\n';

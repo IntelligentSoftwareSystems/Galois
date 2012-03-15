@@ -301,7 +301,7 @@ public:
 
     AVIComparator aviCmp;
 
-    for (Graph::active_iterator i = graph.active_begin (), e = graph.active_end (); i != e; ++i) {
+    for (Graph::iterator i = graph.begin (), e = graph.end (); i != e; ++i) {
       const GNode& src = *i;
       AVI* srcAVI = graph.getData (src, Galois::NONE);
 
@@ -380,7 +380,7 @@ public:
     std::vector<double> center (meshInit.getSpatialDim(), 0.0);
     AVIComparator aviCmp;
 
-    for (Graph::active_iterator i = graph.active_begin (), e = graph.active_end (); i != e; ++i) {
+    for (Graph::iterator i = graph.begin (), e = graph.end (); i != e; ++i) {
       const GNode& src = *i;
       AVI* srcAVI = graph.getData (src, Galois::NONE);
 

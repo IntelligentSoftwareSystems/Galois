@@ -217,7 +217,7 @@ void convert_gr2dimacs(const std::string& infilename, const std::string& outfile
 
   size_t nnodes = 0;
   size_t nedges = 0;
-  for (Graph::active_iterator i = graph.active_begin(), e = graph.active_end();
+  for (Graph::iterator i = graph.begin(), e = graph.end();
       i != e; ++i) {
     GNode src = *i;
     graph.getData(src) = nnodes++;
@@ -226,7 +226,7 @@ void convert_gr2dimacs(const std::string& infilename, const std::string& outfile
 
   std::ofstream file(outfilename.c_str());
   file << "p sp " << nnodes << " " << nedges << "\n";
-  for (Graph::active_iterator i = graph.active_begin(), e = graph.active_end();
+  for (Graph::iterator i = graph.begin(), e = graph.end();
       i != e; ++i) {
     GNode src = *i;
     for (Graph::edge_iterator j = graph.edge_begin(src),

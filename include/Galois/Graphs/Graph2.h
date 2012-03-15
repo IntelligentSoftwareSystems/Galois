@@ -40,7 +40,7 @@
  * g.addEdge(a, b, 5);
  *
  * // Traverse graph
- * for (Graph::active_iterator i = g.active_begin(), iend = g.active_end();
+ * for (Graph::iterator i = g.begin(), iend = g.end();
  *      i != iend;
  *      ++i) {
  *   Graph::GraphNode src = *i;
@@ -239,10 +239,10 @@ class FirstGraph : private boost::noncopyable {
   EdgeFactory<EdgeTy> edges;
 
   //Helpers for iterator classes
-  struct is_active_node : public std::unary_function<gNode&, bool>{
+  struct is_node : public std::unary_function<gNode&, bool>{
     bool operator() (const gNode& g) const { return g.active; }
   };
-  struct is_active_edge : public std::unary_function<typename gNode::EITy&, bool> {
+  struct is_edge : public std::unary_function<typename gNode::EITy&, bool> {
     bool operator()(typename gNode::EITy& e) const { return e.first()->active; }
   };
   struct makeGraphNode: public std::unary_function<gNode&, gNode*> {
@@ -251,11 +251,11 @@ class FirstGraph : private boost::noncopyable {
 
 public:
   typedef gNode* GraphNode;
-  typedef typename boost::filter_iterator<is_active_edge, typename gNode::iterator> edge_iterator;
+  typedef typename boost::filter_iterator<is_edge, typename gNode::iterator> edge_iterator;
   typedef typename gNode::EITy::reference edge_data_reference;
 
   typedef boost::transform_iterator<makeGraphNode,
-          boost::filter_iterator<is_active_node,
+          boost::filter_iterator<is_node,
                    typename NodeListTy::iterator> > iterator;
 
 
@@ -324,7 +324,7 @@ public:
 	ii = src->createEdge(dst, e);
       }
     }
-    return boost::make_filter_iterator(is_active_edge(), ii, src->end());
+    return boost::make_filter_iterator(is_edge(), ii, src->end());
   }
 
   //! Removes an edge from the graph
@@ -346,7 +346,7 @@ public:
     assert(src);
     assert(dst);
     acquire(src, mflag);
-    return boost::make_filter_iterator(is_active_edge(), src->find(dst), src->end());
+    return boost::make_filter_iterator(is_edge(), src->find(dst), src->end());
   }
 
   /**
@@ -377,7 +377,7 @@ public:
 	  acquire(ii->first(), mflag);
       }
     }
-    return boost::make_filter_iterator(is_active_edge(), N->begin(), N->end());
+    return boost::make_filter_iterator(is_edge(), N->begin(), N->end());
   }
 
   //! Returns the end of the neighbor iterator 
@@ -386,7 +386,7 @@ public:
     // Not necessary; no valid use for an end pointer should ever require it
     //if (shouldLock(mflag))
     //  acquire(N);
-    return boost::make_filter_iterator(is_active_edge(), N->end(), N->end());
+    return boost::make_filter_iterator(is_edge(), N->end(), N->end());
   }
 
   //These are not thread safe!!
@@ -395,7 +395,7 @@ public:
    */
   iterator begin() {
     return boost::make_transform_iterator(
-           boost::make_filter_iterator(is_active_node(),
+           boost::make_filter_iterator(is_node(),
 				       nodes.begin(), nodes.end()),
 	   makeGraphNode());
   }
@@ -403,7 +403,7 @@ public:
   //! Returns the end of the node iterator. Not thread-safe.
   iterator end() {
     return boost::make_transform_iterator(
-           boost::make_filter_iterator(is_active_node(),
+           boost::make_filter_iterator(is_node(),
 				       nodes.end(), nodes.end()), 
 	   makeGraphNode());
   }
@@ -421,19 +421,19 @@ public:
     bool empty() { return !T; }
 
     typedef boost::transform_iterator<makeGraphNode,
-            boost::filter_iterator<is_active_node,
+            boost::filter_iterator<is_node,
             typename NodeListTy::gib_Tile::iterator> > iterator;
 
     iterator begin() {
       return boost::make_transform_iterator(
-	     boost::make_filter_iterator(is_active_node(),
+	     boost::make_filter_iterator(is_node(),
 	     T->begin(), T->end()), 
 	   makeGraphNode());
     }
 
     iterator end() {
       return boost::make_transform_iterator(
-	     boost::make_filter_iterator(is_active_node(),
+	     boost::make_filter_iterator(is_node(),
 	     T->end(), T->end()), 
 	   makeGraphNode());
     }
@@ -478,15 +478,15 @@ public:
     //mapping between nodes
     std::map<typename GTy::GraphNode, GraphNode> NodeMap;
     //copy nodes
-    for (typename GTy::active_iterator ii = graph.active_begin(), 
-	   ee = graph.active_end(); ii != ee; ++ii) {
+    for (typename GTy::iterator ii = graph.begin(), 
+	   ee = graph.end(); ii != ee; ++ii) {
       GraphNode N = createNode(graph.getData(*ii));
       addNode(N);
       NodeMap[*ii] = N;
     }
     //copy edges
-    for (typename GTy::active_iterator ii = graph.active_begin(), 
-	   ee = graph.active_end(); ii != ee; ++ii)
+    for (typename GTy::iterator ii = graph.begin(), 
+	   ee = graph.end(); ii != ee; ++ii)
       for(typename GTy::neighbor_iterator ni = graph.neighbor_begin(*ii), 
 	    ne = graph.neighbor_end(*ii);
 	  ni != ne; ++ni)

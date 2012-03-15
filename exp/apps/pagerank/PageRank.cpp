@@ -90,8 +90,8 @@ void runBody() {
     max_delta = std::numeric_limits<double>::min();
     unsigned int small_delta = 0;
     double lost_potential = 0;
-    for (Graph::active_iterator src = graph.active_begin(),
-        esrc = graph.active_end(); src != esrc; ++src) {
+    for (Graph::iterator src = graph.begin(),
+        esrc = graph.end(); src != esrc; ++src) {
       double value = 0;
       for (Graph::neighbor_iterator
           dst = graph.neighbor_begin(*src, Galois::NONE), 
@@ -123,8 +123,8 @@ void runBody() {
 
     // Redistribute lost potential
     if (lost_potential > 0) {
-      for (Graph::active_iterator src = graph.active_begin(),
-          esrc = graph.active_end();
+      for (Graph::iterator src = graph.begin(),
+          esrc = graph.end();
           src != esrc; ++src) {
         Node& sdata = graph.getData(*src, Galois::NONE);
         double value = getPageRank(sdata, iterations);
@@ -187,8 +187,8 @@ static void makeGraph(const char* input) {
   
   Map in_edges(in_graph.size());
   std::vector<bool> has_out_edges(in_graph.size());
-  for (InGraph::active_iterator src = in_graph.active_begin(),
-      esrc = in_graph.active_end();
+  for (InGraph::iterator src = in_graph.begin(),
+      esrc = in_graph.end();
       src != esrc; ++src) {
     int neighbors =
       std::distance(in_graph.edge_begin(*src, Galois::NONE), 
@@ -231,8 +231,8 @@ static void makeGraph(const char* input) {
 }
 
 void printTop(int topn) {
-  for (Graph::active_iterator src = graph.active_begin(),
-      esrc = graph.active_end();
+  for (Graph::iterator src = graph.begin(),
+      esrc = graph.end();
       src != esrc; ++src) {
     // TODO
   }

@@ -56,7 +56,7 @@ public:
 		matchFlag = new bool[numNodes];
 		matches =  new GNode[numNodes];
 		arrayFill(matchFlag, numNodes, false);
-//		for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+//		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 //			GNode node = *ii;
 //			matches[node.getData().getNodeId()] = node;
 //		}
@@ -212,7 +212,7 @@ public:
 			unsetAllBoundaryNodes();
 		}
 		int mincut = 0;
-		for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 			GNode node = *ii;
 			MetisNode& nodeData = node.getData(Galois::NONE);
 			int me = nodeData.getPartition();
@@ -231,7 +231,7 @@ public:
 	 */
 	int getMaxAdjSum() {
 		int maxAdjSum = -1;
-		for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 			GNode node = *ii;
 			int adjwgtsum = node.getData(Galois::NONE).getAdjWgtSum();
 			assert(adjwgtsum>=0||numEdges == 0);
@@ -257,7 +257,7 @@ public:
 			partWeights[i] = 0;
 		}
 		int mincut = 0;
-		for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 			GNode node = *ii;
 			MetisNode& nodeData = node.getData(Galois::NONE);
 			int me = nodeData.getPartition();
@@ -436,7 +436,7 @@ public:
 	 * Compute the sum of the weights of all the outgoing edges for each node in the graph
 	 */
 	void computeAdjWgtSums() {
-		for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 			GNode node = *ii;
 			node.getData(Galois::NONE).setAdjWgtSum(computeAdjWgtSum(node));
 		}
@@ -447,7 +447,7 @@ public:
 	 */
 	int computeCut() {
 		int cut = 0;
-		for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 			GNode node = *ii;
 			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(node, Galois::NONE), eejj = graph->neighbor_end(node, Galois::NONE); jj != eejj; ++jj) {
 				GNode neighbor = *jj;
@@ -467,7 +467,7 @@ public:
 	 */
 	int computeEdges() {
 		int num = 0;
-		for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 			GNode node = *ii;
 			num += graph->neighborsSize(node);
 		}
@@ -521,7 +521,7 @@ public:
 
 	void computeKWayBalanceBoundary() {
 		unsetAllBoundaryNodes();
-		for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 			GNode node = *ii;
 			if (node.getData().getEdegree() > 0) {
 				setBoundaryNode(node);
@@ -532,7 +532,7 @@ public:
 
 	void computeKWayBoundary() {
 		unsetAllBoundaryNodes();
-		for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 			GNode node = *ii;
 			MetisNode& nodeData = node.getData();
 			if (nodeData.getEdegree() - nodeData.getIdegree() >= 0) {
@@ -544,7 +544,7 @@ public:
 	float computePartitionBalance(int nparts){
 	  	vector<int> kpwgts(nparts);
 
-	  	for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+	  	for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 	  		GNode node = *ii;
 	  		kpwgts[node.getData().getPartition()]++;
 	  	}

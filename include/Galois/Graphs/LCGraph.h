@@ -35,7 +35,7 @@
  * g.structureFromFile(inputfile);
  *
  * // Traverse graph
- * for (Graph::active_iterator i = g.active_begin(), iend = g.active_end();
+ * for (Graph::iterator i = g.begin(), iend = g.end();
  *      i != iend;
  *      ++i) {
  *   Graph::GraphNode src = *i;
@@ -98,7 +98,7 @@ protected:
 public:
   typedef uint32_t GraphNode;
   typedef boost::counting_iterator<uint64_t> edge_iterator;
-  typedef boost::counting_iterator<uint32_t> active_iterator;
+  typedef boost::counting_iterator<uint32_t> iterator;
 
   LC_CRS_Graph() {}
   ~LC_CRS_Graph() {}
@@ -130,12 +130,12 @@ public:
     return numNodes;
   }
 
-  active_iterator active_begin() const {
-    return active_iterator(0);
+  iterator begin() const {
+    return iterator(0);
   }
 
-  active_iterator active_end() const {
-    return active_iterator(numNodes);
+  iterator end() const {
+    return iterator(numNodes);
   }
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = ALL) {
@@ -199,18 +199,18 @@ protected:
 public:
   typedef NodeInfo* GraphNode;
   typedef EdgeInfo* edge_iterator;
-  class active_iterator : std::iterator<std::random_access_iterator_tag, GraphNode> {
+  class iterator : std::iterator<std::random_access_iterator_tag, GraphNode> {
     NodeInfo* at;
 
   public:
-    active_iterator(NodeInfo* a) :at(a) {}
-    active_iterator(const active_iterator& m) :at(m.at) {}
-    active_iterator& operator++() { ++at; return *this; }
-    active_iterator operator++(int) { active_iterator tmp(*this); ++at; return tmp; }
-    active_iterator& operator--() { --at; return *this; }
-    active_iterator operator--(int) { active_iterator tmp(*this); --at; return tmp; }
-    bool operator==(const active_iterator& rhs) { return at == rhs.at; }
-    bool operator!=(const active_iterator& rhs) { return at != rhs.at; }
+    iterator(NodeInfo* a) :at(a) {}
+    iterator(const iterator& m) :at(m.at) {}
+    iterator& operator++() { ++at; return *this; }
+    iterator operator++(int) { iterator tmp(*this); ++at; return tmp; }
+    iterator& operator--() { --at; return *this; }
+    iterator operator--(int) { iterator tmp(*this); --at; return tmp; }
+    bool operator==(const iterator& rhs) { return at == rhs.at; }
+    bool operator!=(const iterator& rhs) { return at != rhs.at; }
     GraphNode operator*() { return at; }
   };
 
@@ -239,12 +239,12 @@ public:
     return numNodes;
   }
 
-  active_iterator active_begin() const {
-    return active_iterator(&NodeData[0]);
+  iterator begin() const {
+    return iterator(&NodeData[0]);
   }
 
-  active_iterator active_end() const {
-    return active_iterator(endNode);
+  iterator end() const {
+    return iterator(endNode);
   }
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = ALL) {
@@ -265,8 +265,8 @@ public:
     EdgeData.allocate(graph.sizeEdges());
     std::vector<NodeInfo*> node_ids;
     node_ids.resize(numNodes);
-    for (FileGraph::active_iterator ii = graph.active_begin(),
-	   ee = graph.active_end(); ii != ee; ++ii) {
+    for (FileGraph::iterator ii = graph.begin(),
+	   ee = graph.end(); ii != ee; ++ii) {
       NodeInfo* curNode = &NodeData[*ii];
       new (&curNode->data) NodeTy; //inplace new
       node_ids[*ii] = curNode;
@@ -275,8 +275,8 @@ public:
 
     //layout the edges
     EdgeInfo* curEdge = &EdgeData[0];
-    for (FileGraph::active_iterator ii = graph.active_begin(),
-	   ee = graph.active_end(); ii != ee; ++ii) {
+    for (FileGraph::iterator ii = graph.begin(),
+	   ee = graph.end(); ii != ee; ++ii) {
       node_ids[*ii]->edgebegin = curEdge;
       for (FileGraph::neighbor_iterator ni = graph.neighbor_begin(*ii),
 	     ne = graph.neighbor_end(*ii); ni != ne; ++ni) {
@@ -337,19 +337,19 @@ protected:
 public:
   typedef NodeInfo* GraphNode;
   typedef EdgeInfo* edge_iterator;
-  class active_iterator : public std::iterator<std::forward_iterator_tag, GraphNode> {
+  class iterator : public std::iterator<std::forward_iterator_tag, GraphNode> {
     NodeInfo* at;
     void incA() {
       at = at->next();
     }
 
   public:
-    active_iterator(NodeInfo* a) :at(a) {}
-    active_iterator(const active_iterator& m) :at(m.at) {}
-    active_iterator& operator++() { incA(); return *this; }
-    active_iterator operator++(int) { active_iterator tmp(*this); incA(); return tmp; }
-    bool operator==(const active_iterator& rhs) { return at == rhs.at; }
-    bool operator!=(const active_iterator& rhs) { return at != rhs.at; }
+    iterator(NodeInfo* a) :at(a) {}
+    iterator(const iterator& m) :at(m.at) {}
+    iterator& operator++() { incA(); return *this; }
+    iterator operator++(int) { iterator tmp(*this); incA(); return tmp; }
+    bool operator==(const iterator& rhs) { return at == rhs.at; }
+    bool operator!=(const iterator& rhs) { return at != rhs.at; }
     GraphNode operator*() { return at; }
 
   };
@@ -379,12 +379,12 @@ public:
     return numNodes;
   }
 
-  active_iterator active_begin() const {
-    return active_iterator(reinterpret_cast<NodeInfo*>(Data));
+  iterator begin() const {
+    return iterator(reinterpret_cast<NodeInfo*>(Data));
   }
 
-  active_iterator active_end() const {
-    return active_iterator(endNode);
+  iterator end() const {
+    return iterator(endNode);
   }
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = ALL) {
@@ -410,8 +410,8 @@ public:
     std::vector<NodeInfo*> node_ids;
     node_ids.resize(numNodes);
     NodeInfo* curNode = reinterpret_cast<NodeInfo*>(Data);
-    for (FileGraph::active_iterator ii = graph.active_begin(),
-	   ee = graph.active_end(); ii != ee; ++ii) {
+    for (FileGraph::iterator ii = graph.begin(),
+	   ee = graph.end(); ii != ee; ++ii) {
       new (&curNode->data) NodeTy; //inplace new
       curNode->numEdges = graph.neighborsSize(*ii);
       node_ids[*ii] = curNode;
@@ -420,8 +420,8 @@ public:
     endNode = curNode;
 
     //layout the edges
-    for (FileGraph::active_iterator ii = graph.active_begin(),
-	   ee = graph.active_end(); ii != ee; ++ii) {
+    for (FileGraph::iterator ii = graph.begin(),
+	   ee = graph.end(); ii != ee; ++ii) {
       EdgeInfo* edge = node_ids[*ii]->edgeBegin();
       for (FileGraph::neighbor_iterator ni = graph.neighbor_begin(*ii),
 	     ne = graph.neighbor_end(*ii); ni != ne; ++ni) {

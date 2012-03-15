@@ -102,7 +102,7 @@ std::vector<GNode> & getSuccs(GNode n) {
 void initGraphData() {
   // Pre-compute successors sizes in tmp
   std::vector< std::vector<GNode> > tmp(NumNodes);
-  for (Graph::active_iterator ii = G->active_begin(), ee = G->active_end();
+  for (Graph::iterator ii = G->begin(), ee = G->end();
       ii != ee; ++ii) {
     int nnbrs = std::distance(G->neighbor_begin(*ii, Galois::NONE),
         G->neighbor_end(*ii, Galois::NONE));
@@ -316,9 +316,9 @@ int main(int argc, char** argv) {
   if (iterLimit)
     iterations = iterLimit;
 
-  boost::filter_iterator<HasOut,Graph::active_iterator>
-    begin = boost::make_filter_iterator(HasOut(G), g.active_begin(), g.active_end()),
-    end = boost::make_filter_iterator(HasOut(G), g.active_end(), g.active_end());
+  boost::filter_iterator<HasOut,Graph::iterator>
+    begin = boost::make_filter_iterator(HasOut(G), g.begin(), g.end()),
+    end = boost::make_filter_iterator(HasOut(G), g.end(), g.end());
 
   iterations = std::min((int) std::distance(begin, end), iterations);
 
