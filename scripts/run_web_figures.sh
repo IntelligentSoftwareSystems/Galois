@@ -13,7 +13,7 @@ if [[ -z "$NUMTHREADS" ]]; then
   NUMTHREADS="$(cat /proc/cpuinfo | grep processor | wc -l)"
 fi
 
-RESULTDIR="$(pwd)/logs"
+RESULTDIR="$(pwd)/weblogs"
 
 if [[ ! -e Makefile ]]; then
   echo "Execute this script from the base of your build directory" 1>&2
@@ -46,12 +46,12 @@ run apps/clustering/clustering -numPoints 10000
 run apps/barneshut/barneshut -noverify -n 50000 -steps 1 -seed 0
 run apps/betweennesscentrality/betweennesscentrality "$BASEINPUT/scalefree/rmat8-2e14.gr"
 run apps/boruvka/boruvka "$BASEINPUT/road/USA-road-d.USA.gr"
-run apps/delaunayrefinement/delaunayrefinement "$BASEINPUT/meshes/r5M"
-run apps/delaunaytriangulation/delaunaytriangulation "$BASEINPUT/meshes/r5M.node"
+run apps/delaunayrefinement/delaunayrefinement -noverify "$BASEINPUT/meshes/r5M"
+run apps/delaunaytriangulation/delaunaytriangulation -noverify "$BASEINPUT/meshes/r5M.node"
 run apps/des/DESunordered -noverify "$BASEINPUT/des/koggeStone64bit.net"
 #run apps/gmetis/gmetis -mtxinput "$BASEINPUT/matrix/cage15.mtx" 256
 run apps/matching/max-card-bipartite 1000000 100000000 10000 0
-run apps/preflowpush/preflowpush "$BASEINPUT/random/r4-2e23.gr" 0 100
+run apps/preflowpush/preflowpush -noverify "$BASEINPUT/random/r4-2e23.gr" 0 100
 run apps/sssp/sssp -delta 14 "$BASEINPUT/random/r4-2e26.gr"
 run apps/surveypropagation/surveypropagation 9 1000000 3000000 3
 
