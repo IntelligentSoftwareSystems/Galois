@@ -23,9 +23,10 @@
  * Refinement of an initial, unrefined Delaunay mesh to eliminate triangles
  * with angles < 30 degrees, using a variation of Chew's algorithm.
  *
- * @author Milind Kulkarni <milind@purdue.edu>>
+ * @author Milind Kulkarni <milind@purdue.edu>
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
+
 #include <iostream>
 #include <sys/time.h>
 #include <limits.h>
@@ -36,7 +37,7 @@
 #include "Element.h"
 
 #include "Galois/Statistic.h"
-#include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/Graph2.h"
 #include "Galois/Galois.h"
 
 #include "llvm/Support/CommandLine.h"
@@ -105,6 +106,79 @@ struct process {
   }
 };
 
+bool verify() {
+  // ensure consistency of elements
+  bool error = false;
+  
+  for (Graph::iterator ii = mesh->begin(), ee = mesh->end(); ii != ee; ++ii) {
+    
+    GNode node = *ii;
+    Element& element = mesh->getData(node,Galois::NONE);
+    int nsize = std::distance(mesh->edge_begin(node, Galois::NONE), mesh->edge_end(node, Galois::NONE));
+    if (element.getDim() == 2) {
+      if (nsize != 1) {
+	std::cerr << "-> Segment " << element << " has " << nsize << " relation(s)\n";
+	error = true;
+      }
+    } else if (element.getDim() == 3) {
+      if (nsize != 3) {
+	std::cerr << "-> Triangle " << element << " has " << nsize << " relation(s)";
+	error = true;
+      }
+    } else {
+      std::cerr << "-> Figures with " << element.getDim() << " edges";
+      error = true;
+    }
+  }
+  
+  if (error)
+    return false;
+  
+  // ensure reachability
+  std::stack<GNode> remaining;
+  std::set<GNode> found;
+  remaining.push(*(mesh->begin()));
+  
+  while (!remaining.empty()) {
+    GNode node = remaining.top();
+    remaining.pop();
+    if (!found.count(node)) {
+      assert(mesh->containsNode(node) && "Reachable node was removed from graph");
+      found.insert(node);
+      int i = 0;
+      for (Graph::edge_iterator ii = mesh->edge_begin(node, Galois::NONE), ee = mesh->edge_end(node, Galois::NONE); ii != ee; ++ii) {
+	assert(i < 3);
+	assert(mesh->containsNode(mesh->getEdgeDst(ii)));
+	assert(node != mesh->getEdgeDst(ii));
+	++i;
+	//          if (!found.count(*ii))
+	remaining.push(mesh->getEdgeDst(ii));
+      }
+    }
+  }
+  size_t msize = std::distance(mesh->begin(), mesh->end());
+  
+  if (found.size() != msize) {
+    std::cerr << "Not all elements are reachable \n";
+    std::cerr << "Found: " << found.size() << "\nMesh: " << msize << "\n";
+    assert(0 && "Not all elements are reachable");
+    return false;
+  }
+  return true;
+}
+
+GaloisRuntime::galois_insert_bag<GNode> wl;
+
+struct preprocess {
+  template<typename Context>
+  void operator()(GNode item, Context& lwl) const {
+    if (mesh->getData(item, Galois::NONE).isBad())
+      wl.push(item);
+  }
+};
+
+
+
 struct Indexer: public std::unary_function<const GNode&,unsigned> {
   unsigned operator()(const GNode& t) const { return 0; }
 };
@@ -125,21 +199,29 @@ int main(int argc, char** argv) {
   LonestarStart(argc, argv, std::cout, name, desc, url);
 
   mesh = new Graph();
-  Mesh m;
-  m.read(mesh, filename.c_str());
+  {
+    Mesh m;
+    m.read(mesh, filename.c_str());
+  }
 
-  std::cout << "configuration: " << std::distance(mesh->active_begin(), mesh->active_end())
-	    << " total triangles, " << std::count_if(mesh->active_begin(), mesh->active_end(), is_bad(mesh)) << " bad triangles\n";
+  std::cout << "configuration: " << std::distance(mesh->begin(), mesh->end())
+	    << " total triangles, " << std::count_if(mesh->begin(), mesh->end(), is_bad(mesh)) << " bad triangles\n";
 
-  std::vector<GNode> wl;
-  for (Graph::active_iterator ii = mesh->active_begin(), ee = mesh->active_end();
-       ii != ee; ++ii)
+  Galois::StatTimer Touter("outertime");
+  Touter.start();
+
+  std::cout << "MEMINFO P1: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
+#ifdef GALOIS_EXP
+  //  Galois::do_all(*mesh, preprocess());
+  Galois::for_each(mesh->begin(), mesh->end(), preprocess());
+#else
+  for (Graph::iterator ii = mesh->begin(), ee = mesh->end(); ii != ee; ++ii)
     if (mesh->getData(*ii).isBad())
-      wl.push_back(*ii);
-  
-  std::cout << "MEMINFO PRE: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
+      wl.push(*ii);
+#endif
+  std::cout << "MEMINFO P2: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
 
-  Galois::preAlloc(10 * numThreads + GaloisRuntime::MM::pageAllocInfo() * 7);
+  Galois::preAlloc(10 * numThreads + GaloisRuntime::MM::pageAllocInfo() * 5);
   std::cout << "MEMINFO MID: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
 
   Galois::StatTimer T;
@@ -157,17 +239,18 @@ int main(int argc, char** argv) {
   Galois::for_each<LocalQueues<dChunkedLIFO<256>, LIFO<> > >(wl.begin(), wl.end(), process());
 #endif
   T.stop();
+  Touter.stop();
 
   std::cout << "MEMINFO POST: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
 
   if (!skipVerify) {
-    int size = std::count_if(mesh->active_begin(), mesh->active_end(), is_bad(mesh));
+    int size = std::count_if(mesh->begin(), mesh->end(), is_bad(mesh));
     if (size != 0) {
       std::cerr << size << " bad triangles remaining.\n";
       assert(0 && "Refinement failed");
       abort();
     }
-    if (!m.verify(mesh)) {
+    if (!verify()) {
       std::cerr << "Refinement failed.\n";
       assert(0 && "Refinement failed");
       abort();

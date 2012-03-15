@@ -132,7 +132,7 @@ private:
   void makeGraph(Graph* mesh) {
     Galois::for_each<>(elements.begin(), elements.end(), processCreate(mesh));
     std::map<Edge, GNode> edge_map;
-    for (Graph::active_iterator ii = mesh->active_begin(), ee = mesh->active_end();
+    for (Graph::iterator ii = mesh->begin(), ee = mesh->end();
 	 ii != ee; ++ii)
       addElement(mesh, *ii, edge_map);
   }
@@ -145,67 +145,6 @@ public:
     readElements(basename, tuples);
     readPoly(basename, tuples);
     makeGraph(mesh);
-  }
-
-  bool verify(Graph* mesh) {
-    // ensure consistency of elements
-    bool error = false;
-     
-    for (Graph::active_iterator ii = mesh->active_begin(), ee = mesh->active_end(); ii != ee; ++ii) {
- 
-      GNode node = *ii;
-      Element& element = mesh->getData(node,Galois::NONE);
-      int nsize = std::distance(mesh->edge_begin(node, Galois::NONE), mesh->edge_end(node, Galois::NONE));
-      if (element.getDim() == 2) {
-        if (nsize != 1) {
-          std::cerr << "-> Segment " << element << " has " << nsize << " relation(s)\n";
-          error = true;
-        }
-      } else if (element.getDim() == 3) {
-        if (nsize != 3) {
-          std::cerr << "-> Triangle " << element << " has " << nsize << " relation(s)";
-          error = true;
-        }
-      } else {
-        std::cerr << "-> Figures with " << element.getDim() << " edges";
-        error = true;
-      }
-    }
-    
-    if (error)
-      return false;
-    
-    // ensure reachability
-    std::stack<GNode> remaining;
-    std::set<GNode> found;
-    remaining.push(*(mesh->active_begin()));
-      
-    while (!remaining.empty()) {
-      GNode node = remaining.top();
-      remaining.pop();
-      if (!found.count(node)) {
-        assert(mesh->containsNode(node) && "Reachable node was removed from graph");
-        found.insert(node);
-        int i = 0;
-        for (Graph::edge_iterator ii = mesh->edge_begin(node, Galois::NONE), ee = mesh->edge_end(node, Galois::NONE); ii != ee; ++ii) {
-          assert(i < 3);
-          assert(mesh->containsNode(mesh->getEdgeDst(ii)));
-          assert(node != mesh->getEdgeDst(ii));
-          ++i;
-          //          if (!found.count(*ii))
-	  remaining.push(mesh->getEdgeDst(ii));
-        }
-      }
-    }
-    size_t msize = std::distance(mesh->active_begin(), mesh->active_end());
-
-    if (found.size() != msize) {
-      std::cerr << "Not all elements are reachable \n";
-      std::cerr << "Found: " << found.size() << "\nMesh: " << msize << "\n";
-      assert(0 && "Not all elements are reachable");
-      return false;
-    }
-    return true;
   }
 };
 
