@@ -215,7 +215,7 @@ void runBodyParallel() {
 
    T.start();
 #ifdef GALOIS_EXP
-   Exp::StartWorklistExperiment<OBIM, dChunk, Chunk, Indexer, seq_less, seq_gt>()(std::cout, graph.active_begin(), graph.active_end(), process());
+   Exp::StartWorklistExperiment<OBIM, dChunk, Chunk, Indexer, seq_less, seq_gt>()(std::cout, graph.begin(), graph.end(), process());
 #else
    Galois::for_each<dChunk>(graph.begin(), graph.end(), process());
 #endif
