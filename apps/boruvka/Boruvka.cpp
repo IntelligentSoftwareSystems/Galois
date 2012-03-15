@@ -256,7 +256,7 @@ static void makeGraph(const char* input) {
    Map edges(in_graph.size());
    //
    int numEdges = 0;
-   for (InGraph::active_iterator src = in_graph.active_begin(), esrc = in_graph.active_end(); src != esrc; ++src) {
+   for (InGraph::iterator src = in_graph.begin(), esrc = in_graph.end(); src != esrc; ++src) {
       for (InGraph::edge_iterator dst = in_graph.edge_begin(*src, Galois::NONE), edst = in_graph.edge_end(*src, Galois::NONE); dst != edst; ++dst) {
          if (*src == *dst) {
 #if BORUVKA_DEBUG

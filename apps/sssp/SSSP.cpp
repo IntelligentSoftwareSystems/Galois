@@ -164,8 +164,8 @@ bool verify(GNode source) {
     return false;
   }
   
-  for (Graph::active_iterator src = graph.active_begin(), ee =
-	 graph.active_end(); src != ee; ++src) {
+  for (Graph::iterator src = graph.begin(), ee =
+	 graph.end(); src != ee; ++src) {
     unsigned int dist = graph.getData(*src,Galois::NONE).dist;
     if (dist >= DIST_INFINITY) {
       std::cerr << "found node = " << graph.getData(*src,Galois::NONE).id
@@ -213,10 +213,10 @@ int main(int argc, char **argv) {
   unsigned int id = 0;
   bool foundReport = false;
   bool foundSource = false;
-  GNode source = *graph.active_begin();
-  GNode report = *graph.active_begin();
-  for (Graph::active_iterator src = graph.active_begin(), ee =
-      graph.active_end(); src != ee; ++src) {
+  GNode source = *graph.begin();
+  GNode report = *graph.begin();
+  for (Graph::iterator src = graph.begin(), ee =
+      graph.end(); src != ee; ++src) {
     SNode& node = graph.getData(*src,Galois::NONE);
     node.id = id++;
     node.dist = DIST_INFINITY;

@@ -111,8 +111,8 @@ static bool verify(GNode source) {
     return false;
   }
   
-  for (Graph::active_iterator src = graph.active_begin(), ee =
-	 graph.active_end(); src != ee; ++src) {
+  for (Graph::iterator src = graph.begin(), ee =
+	 graph.end(); src != ee; ++src) {
     unsigned int dist = graph.getData(*src).dist;
     if (dist >= DIST_INFINITY) {
       std::cerr
@@ -139,16 +139,16 @@ static bool verify(GNode source) {
 
 static void readGraph(GNode& source, GNode& report) {
   graph.structureFromFile(filename);
-  source = *graph.active_begin();
-  report = *graph.active_begin();
+  source = *graph.begin();
+  report = *graph.begin();
 
   std::cout << "Read " << graph.size() << " nodes\n";
   
   unsigned int id = 0;
   bool foundReport = false;
   bool foundSource = false;
-  for (Graph::active_iterator src = graph.active_begin(), ee =
-      graph.active_end(); src != ee; ++src) {
+  for (Graph::iterator src = graph.begin(), ee =
+      graph.end(); src != ee; ++src) {
     SNode& node = graph.getData(*src, Galois::NONE);
     node.id = id++;
     node.dist = DIST_INFINITY;

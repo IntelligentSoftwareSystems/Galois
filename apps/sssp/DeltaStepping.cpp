@@ -178,7 +178,7 @@ public:
     vertex_was_deleted.resize(g.size(), false);
 
     // No path from s to any other vertex, yet
-    //for (Graph::active_iterator ii = g.active_begin(), ei = g.active_end();
+    //for (Graph::iterator ii = g.begin(), ei = g.end();
     //    ii != ei; ++ii) {
     //  if (synch.isLocal(*ii))
     //    g.getData(*ii) = inf;

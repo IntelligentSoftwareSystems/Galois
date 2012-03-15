@@ -323,7 +323,7 @@ static void makeGraph(const std::string& filename, PointList& points) {
 static void writeMesh(const std::string& filename) {
   long numTriangles = 0;
   long numSegments = 0;
-  for (Graph::active_iterator ii = graph->active_begin(), ei = graph->active_end(); ii != ei; ++ii) {
+  for (Graph::iterator ii = graph->begin(), ei = graph->end(); ii != ei; ++ii) {
     Element& e = graph->getData(*ii);
     if (e.boundary()) {
       numSegments++;
@@ -349,7 +349,7 @@ static void writeMesh(const std::string& filename) {
   // <num segments> <has boundary markers>
   pout << "0 2 0 0\n";
   pout << numSegments << " 1\n";
-  for (Graph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+  for (Graph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
     const Element& e = graph->getData(*ii);
     if (e.boundary()) {
       // <segment id> <vertex> <vertex> <is boundary>

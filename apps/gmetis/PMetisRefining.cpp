@@ -39,7 +39,7 @@ void projectTwoWayPartition(MetisGraph* metisGraph) {
 
 	GGraph* finerGraph = finer->getGraph();
 
-	for (GGraph::active_iterator ii = finerGraph->active_begin(), ee = finerGraph->active_end(); ii != ee; ++ii) {
+	for (GGraph::iterator ii = finerGraph->begin(), ee = finerGraph->end(); ii != ee; ++ii) {
 		GNode node = *ii;
 		MetisNode& nodeData = node.getData();
 		nodeData.setPartition(finer->getCoarseGraphMap(nodeData.getNodeId()).getData().getPartition());
@@ -49,7 +49,7 @@ void projectTwoWayPartition(MetisGraph* metisGraph) {
 		finer->unsetBoundaryNode(node);
 	}
 
-	for (GGraph::active_iterator ii = finerGraph->active_begin(), ee = finerGraph->active_end(); ii != ee; ++ii) {
+	for (GGraph::iterator ii = finerGraph->begin(), ee = finerGraph->end(); ii != ee; ++ii) {
 		GNode node = *ii;
 
 		MetisNode& nodeData = node.getData();

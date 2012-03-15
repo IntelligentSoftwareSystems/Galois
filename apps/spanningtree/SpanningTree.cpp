@@ -114,8 +114,8 @@ bool verify(Galois::InsertBag<Edge>& result) {
   if (std::distance(result.begin(), result.end()) != graph.size() - 1)
     return false;
 
-  for (Graph::active_iterator src = graph.active_begin(),
-      end = graph.active_end(); src != end; ++src) {
+  for (Graph::iterator src = graph.begin(),
+      end = graph.end(); src != end; ++src) {
     if (!graph.getData(*src).in_mst)
       return false;
   }
@@ -131,8 +131,8 @@ void readGraph(const char* filename, int root_id, GNode* root) {
   reader.structureFromFile(filename);
 
   int num_nodes = 0;
-  for (ReaderGraph::active_iterator ii = reader.active_begin(),
-      ei = reader.active_end(); ii != ei; ++ii, ++num_nodes) {
+  for (ReaderGraph::iterator ii = reader.begin(),
+      ei = reader.end(); ii != ei; ++ii, ++num_nodes) {
     reader.getData(*ii) = num_nodes;
   }
 
@@ -145,8 +145,8 @@ void readGraph(const char* filename, int root_id, GNode* root) {
     nodes[i] = src;
   }
 
-  for (ReaderGraph::active_iterator ii = reader.active_begin(),
-      ei = reader.active_end(); ii != ei; ++ii) {
+  for (ReaderGraph::iterator ii = reader.begin(),
+      ei = reader.end(); ii != ei; ++ii) {
     ReaderGNode src = *ii;
     int src_id = reader.getData(src);
     for (ReaderGraph::edge_iterator jj = reader.edge_begin(src),

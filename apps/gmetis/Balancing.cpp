@@ -52,7 +52,7 @@ void generalTwoWayBalance(MetisGraph* metisGraph, int* tpwgts) {
 	arrayFill(moved, numNodes, -1);
 	int fromConstant=from;
 	/* Insert boundary nodes in the priority queues */
-	for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+	for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 		GNode node = *ii;
 		MetisNode& nodeData = node.getData();
 		int part = nodeData.getPartition();

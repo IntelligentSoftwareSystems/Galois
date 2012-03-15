@@ -156,7 +156,7 @@ void randomBisection(MetisGraph* metisGraph, int* tpwgts, int coarsenTo){
 		indexes[i] = i;
 	}
 	GNode* nodes = new GNode[numNodes];
-	for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+	for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 		GNode node = *ii;
 		nodes[node.getData().getNodeId()] = node;
 	}
@@ -215,7 +215,7 @@ void growBisection(MetisGraph* metisGraph, int* tpwgts, int coarsenTo) {
 	int numNodes = metisGraph->getNumNodes();
 	GNode* nodes = new GNode[numNodes];
 
-	for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+	for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 		GNode node = *ii;
 		nodes[node.getData().getNodeId()] = node;
 	}

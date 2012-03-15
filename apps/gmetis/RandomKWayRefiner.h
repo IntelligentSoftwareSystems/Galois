@@ -75,7 +75,7 @@ public:
 				}
 			}
 //			GGraph* graph = metisGraph->getGraph();
-//			for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+//			for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 //				GNode node = *ii;
 //				if(node.getData().isBoundary()){
 //					metisGraph->getBoundaryNodes()->insert(node);
