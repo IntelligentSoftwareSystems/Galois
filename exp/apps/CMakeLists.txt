@@ -1,7 +1,5 @@
 add_subdirectory(bp)
 #add_subdirectory(buchberger)
-add_subdirectory(delaunaytriangulation2)
-add_subdirectory(delaunaytriangulation.old)
 add_subdirectory(linear)
 add_subdirectory(pagerank)
 add_subdirectory(pmst)
