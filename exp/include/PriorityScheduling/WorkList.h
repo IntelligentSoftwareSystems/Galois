@@ -261,6 +261,127 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
 WLCOMPILECHECK(CTOrderedByIntegerMetric);
 #endif
 
+template<class T=int, bool concurrent = true>
+class StaticAssignment : private boost::noncopyable {
+  typedef Galois::Bag<T> BagTy;
+
+  struct TLD {
+    BagTy bags[2];
+    unsigned round;
+    TLD(): round(0) { }
+  };
+
+  GaloisRuntime::PerCPU<TLD> tlds;
+
+  pthread_barrier_t barrier1;
+  pthread_barrier_t barrier2;
+  unsigned numActive;
+  volatile bool empty;
+
+  //! Redistribute work among threads, returns whether there is any work left
+  bool redistribute() {
+    // TODO(ddn): avoid copying by implementing Bag::splice(iterator b, iterator e)
+    BagTy bag;
+    unsigned round = tlds.get().round;
+    
+    for (unsigned i = 0; i < numActive; ++i) {
+      BagTy& o = tlds.get(i).bags[round];
+      bag.splice(o);
+    }
+
+    size_t total = bag.size();
+    size_t blockSize = (total + numActive - 1) / numActive;
+
+    if (!total)
+      return false;
+
+    typename BagTy::iterator b = bag.begin();
+    typename BagTy::iterator e = b;
+    
+    if (blockSize < total)
+      std::advance(e, blockSize);
+    else
+      e = bag.end();
+
+    for (size_t i = 0, size = blockSize; i < numActive; ++i, size += blockSize) {
+      BagTy& o = tlds.get(i).bags[round];
+      std::copy(b, e, std::back_inserter(o));
+      b = e;
+      if (size + blockSize < total)
+        std::advance(e, blockSize);
+      else
+        e = bag.end();
+    }
+
+    return true;
+  }
+
+ public:
+  typedef T value_type;
+
+  template<bool newconcurrent>
+  struct rethread {
+    typedef StaticAssignment<T,newconcurrent> WL;
+  };
+  template<typename Tnew>
+  struct retype {
+    typedef StaticAssignment<Tnew,concurrent> WL;
+  };
+
+  StaticAssignment(): empty(false) {
+    numActive = GaloisRuntime::getSystemThreadPool().getActiveThreads();
+    pthread_barrier_init(&barrier1, NULL, numActive);
+    pthread_barrier_init(&barrier2, NULL, numActive);
+  }
+
+  ~StaticAssignment() {
+    pthread_barrier_destroy(&barrier1);
+    pthread_barrier_destroy(&barrier2);
+  }
+
+  void push(value_type val) {
+    TLD& tld = tlds.get();
+    tld.bags[(tld.round + 1) & 1].push_back(val);
+  }
+
+  template<typename ItTy>
+  void push(ItTy b, ItTy e) {
+    while (b != e)
+      push(*b++);
+  }
+
+  template<typename ItTy>
+  void push_initial(ItTy b, ItTy e) {
+    while (b != e)
+      push(*b++);
+    TLD& tld = tlds.get();
+    tld.round = (tld.round + 1) & 1;
+  }
+
+  boost::optional<value_type> pop() {
+    TLD& tld = tlds.get();
+    while (true) {
+      if (empty) {
+        return boost::optional<value_type>();
+      }
+
+      if (!tld.bags[tld.round].empty()) {
+        boost::optional<value_type> r(tld.bags[tld.round].back());
+        tld.bags[tld.round].pop_back();
+        return r;
+      }
+
+      pthread_barrier_wait(&barrier1);
+      tld.round = (tld.round + 1) & 1;
+      if (GaloisRuntime::LL::getTID() == 0) {
+        empty = !redistribute();
+      }
+      pthread_barrier_wait(&barrier2);
+    }
+  }
+};
+
+
 template<class Indexer, typename ContainerTy, bool concurrent = true, int binmax = 1024*1024 >
 class BarrierOBIM : private boost::noncopyable {
   typedef typename ContainerTy::template rethread<concurrent>::WL CTy;
@@ -581,6 +702,7 @@ struct StartWorklistExperiment {
     typedef OrderedByIntegerMetric<Indexer, Chunk> NAOBIM;
     typedef BarrierOBIM<Indexer, dChunk> BOBIM;
     typedef LevelStealing<Random<> > RANDOM;
+    typedef StaticAssignment<> STATIC;
 
     std::string name = WorklistName;
 
@@ -615,6 +737,7 @@ struct StartWorklistExperiment {
     WLFOO(ii, ei, fn, dchunkfifo, DCF256) else
     WLFOO(ii, ei, fn, dchunklifo, DCL256) else
     WLFOO(ii, ei, fn, random,   RANDOM)   else
+    WLFOO(ii, ei, fn, sa,       STATIC)   else
 #ifdef GALOIS_TBB
     WLFOO(ii, ei, fn, nactobim, NACTOBIM) else
     WLFOO(ii, ei, fn, ctobim,   CTOBIM)   else
