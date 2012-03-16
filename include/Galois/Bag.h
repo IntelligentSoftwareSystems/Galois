@@ -44,12 +44,14 @@ class InsertBag: public GaloisRuntime::galois_insert_bag<T> {
 /**
  * Bag for serial use.
  */
-// TODO(ddn): Less than page size allocation
 // TODO(ddn): POD specialization
 // TODO(ddn): Factor out template dependencies to reduce code bloat
 //#define XXX_BAG_DEBUG_ALLOC
-template<class T>
+template<class T, int blockSize=1024*16>
 class Bag: private boost::noncopyable {
+  typedef GaloisRuntime::MM::SimpleBumpPtr<GaloisRuntime::MM::FreeListHeap<GaloisRuntime::MM::SystemBaseAlloc> > Allocator;
+  Allocator alloc;
+
 protected:  
   struct Header {
     Header* m_next;
@@ -91,7 +93,7 @@ protected:
   }
 
   bool isInlined() const {
-    return m_head->m_begin == static_cast<const void*>(&m_first);
+    return m_head && m_head->m_begin == static_cast<const void*>(&m_first);
   }
 
   void destroyRange(T* begin, T* end) {
@@ -124,17 +126,17 @@ protected:
     if (h->m_begin == static_cast<void*>(&m_first))
       return;
 
-    GaloisRuntime::MM::pageFree(h);
+    alloc.deallocate(h);
   }
 
   Header* newHeader() {
-    void* m = GaloisRuntime::MM::pageAlloc();
+    void* m = alloc.allocate(blockSize);
     Header* h = new (m) Header();
     int offset = 1;
     if (sizeof(T) < sizeof(Header))
       offset += sizeof(Header)/sizeof(T);
     T* a = reinterpret_cast<T*>(m);
-    return initHeader(h, &a[offset], &a[(GaloisRuntime::MM::pageSize / sizeof(T))]);
+    return initHeader(h, &a[offset], &a[(blockSize / sizeof(T))]);
   }
 #endif
 
@@ -413,8 +415,7 @@ public:
     std::swap(m_size, o.m_size);
   }
 
-  //! Add elements of other bag to this one, leaving other bag in unspecified but valid
-  //! state
+  //! Add elements of other bag to this one, leaving other bag empty
   void splice(Bag<T>& o) {
     if (o.empty()) {
       return;
