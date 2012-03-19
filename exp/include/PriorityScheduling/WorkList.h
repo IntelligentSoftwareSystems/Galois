@@ -4,6 +4,8 @@
 #ifndef PRIORITYSCHEDULING_WORKLIST_H
 #define PRIORITYSCHEDULING_WORKLIST_H
 
+#include "Galois/Bag.h"
+
 #include "Galois/Runtime/WorkList.h"
 #include "Galois/Runtime/WorkListExperimental.h"
 #include "Galois/Runtime/WorkListDebug.h"
