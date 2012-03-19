@@ -97,7 +97,7 @@ struct EdgeItem<NTy, ETy, true> {
   inline NTy*&       first()       { assert(N); return N; }
   inline NTy* const& first() const { assert(N); return N; }
   inline ETy*       second()       { return &Ea; }
-  inline ETy* const second() const { return &Ea; }
+  inline const ETy* second() const { return &Ea; }
   EdgeItem(NTy* n, ETy* v) : N(n) {}
 };
 
@@ -111,7 +111,7 @@ struct EdgeItem<NTy, ETy, false> {
   inline NTy*&       first()       { assert(N); return N; }
   inline NTy* const& first() const { assert(N); return N; }
   inline ETy*       second()       { return Ea; }
-  inline ETy* const second() const { return Ea; }
+  inline const ETy* second() const { return Ea; }
   EdgeItem(NTy* n, ETy* v) : N(n), Ea(v) {}
 };
 
@@ -258,6 +258,11 @@ public:
           boost::filter_iterator<is_node,
                    typename NodeListTy::iterator> > iterator;
 
+  class OwnerFn {
+    unsigned operator() (const GraphNode& g) {
+      return g->node;
+    }
+  };
 
   //// Node Handling ////
   
