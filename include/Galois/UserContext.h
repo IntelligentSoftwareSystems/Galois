@@ -72,8 +72,7 @@ class UserContext: private boost::noncopyable {
   }
 
   void __resetPushBuffer() {
-    pushBufferTy v(PerIterationAllocator);
-    pushBuffer.swap(v);
+    pushBuffer = pushBufferTy(PerIterationAllocator);
     assert(pushBuffer.capacity() == 0);
   }
 
