@@ -80,7 +80,7 @@ struct process {
 	  int d = graph.getEdgeData(ii);
 	  unsigned int newDist = req.w + d;
 	  SNode& rdata = graph.getData(dst,Galois::NONE);
-	  if (newDist < data.dist[req.c])
+	  if (newDist < rdata.dist[req.c])
 	    lwl.push(UpdateRequest(dst, newDist, req.c));
 	}
 	break;
@@ -143,7 +143,7 @@ int main(int argc, char **argv) {
 
   std::cout << "Read " << graph.size() << " nodes\n";
   std::cout << "Using delta-step of " << (1 << stepShift) << "\n";
-  
+  std::cout << "Doing " << NUM << " at a time\n";
   std::cout << "WARNING: Performance varies considerably due to -delta.  Do not expect the default to be good for your graph\n";
 
   unsigned int id = 0;
