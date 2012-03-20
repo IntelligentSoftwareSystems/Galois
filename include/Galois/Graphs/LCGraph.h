@@ -344,6 +344,7 @@ public:
     }
 
   public:
+    iterator() :at(0) {}
     iterator(NodeInfo* a) :at(a) {}
     iterator(const iterator& m) :at(m.at) {}
     iterator& operator++() { incA(); return *this; }
