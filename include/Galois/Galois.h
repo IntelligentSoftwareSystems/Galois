@@ -170,16 +170,21 @@ static inline void do_all_dispatch(const IterTy& begin, const IterTy& end, const
     pool.enqueue(ctx, begin, end, fn);
     ctx.run(pool);
   } else {
-    typedef typename std::iterator_traits<IterTy>::value_type value_type;
-    typedef GaloisRuntime::WorkList::RandomAccessRange<IterTy> WL;
-    typedef DoAllInitialWork<IterTy,unsigned int> DIW;
+    if(true) { //ADL use complex code for now
+      typedef typename std::iterator_traits<IterTy>::value_type value_type;
+      typedef GaloisRuntime::WorkList::RandomAccessRange<IterTy> WL;
+      typedef DoAllInitialWork<IterTy,unsigned int> DIW;
 
-    unsigned int numThreads = GaloisRuntime::ThreadPool::getActiveThreads();
+      unsigned int numThreads = GaloisRuntime::ThreadPool::getActiveThreads();
 
-    DIW it(begin, end, numThreads);
-    GaloisRuntime::do_all_impl<WL,value_type>(
-        it.begin(), it.end(), 
-        fn, NULL);
+      DIW it(begin, end, numThreads);
+      GaloisRuntime::do_all_impl<WL,value_type>(
+						it.begin(), it.end(), 
+						fn, NULL);
+    } else {
+      typedef GaloisRuntime::WorkList::StaticRandomAccessRange<IterTy> WL;
+      GaloisRuntime::do_all_alt_impl<WL>(begin, end, fn, NULL);
+    }
   }
 }
 //Random access iterator do_all

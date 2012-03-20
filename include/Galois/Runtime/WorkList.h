@@ -987,6 +987,66 @@ public:
 };
 //WLCOMPILECHECK(RandomAccessRange);
 
+template<typename IterTy = int*>
+class StaticRandomAccessRange {
+  //! Thread-local data
+  struct TLD {
+    IterTy begin;
+    IterTy end;
+  };
+
+  PerCPU<TLD> tlds;
+
+public:
+
+  //! T is the value type of the WL
+  typedef typename std::iterator_traits<IterTy>::value_type value_type;
+
+  template<bool newconcurrent>
+  struct rethread {
+    typedef StaticRandomAccessRange<IterTy> WL;
+  };
+
+  template<typename Tnew>
+  struct retype {
+    typedef StaticRandomAccessRange<IterTy> WL;
+  };
+
+  //! push a value onto the queue
+  void push(value_type val) {
+    abort();
+  }
+
+  //! push a range onto the queue
+  template<typename Iter>
+  void push(Iter b, Iter e) {
+    abort();
+  }
+
+  //stager each thread's start item
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    unsigned num = ThreadPool::getActiveThreads();
+    unsigned len = std::distance(b,e);
+    unsigned per = (len + num - 1) / num;
+    for (unsigned i = 0; i < num; ++i) {
+      TLD& tld = tlds.get(i);
+      tld.begin = b + per * i;
+      tld.end = b + per * i + std::min(per, (unsigned)std::distance(tld.begin, e));
+    }
+  }
+
+  //! pop a value from the queue.
+  // move through range in num thread strides
+  boost::optional<value_type> pop() {
+    TLD& tld = tlds.get();
+    if (tld.begin != tld.end)
+      return boost::optional<value_type>(*tld.begin++);
+    return boost::optional<value_type>();
+  }
+};
+//WLCOMPILECHECK(RandomAccessRange);
+
 template<typename OwnerFn, template<typename V> class OwnerMap = PerCPU, typename T = int, typename ChildWLTy = LIFO<> >
 class OwnerComputesWL : private boost::noncopyable {
 
