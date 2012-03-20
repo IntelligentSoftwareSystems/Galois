@@ -167,20 +167,43 @@ public:
   }
 };
 
+/**
+ * Wrapper class to have a valid type on void edges
+ */
+template<typename NITy, typename EdgeTy>
+struct EdgeInfoWrapper {
+  typedef EdgeTy& reference;
+
+  EdgeTy data;
+  NITy* dst;
+  void allocateEdgeData(FileGraph& g, FileGraph::neighbor_iterator& ni) {
+    new (&data) EdgeTy(g.getEdgeData<EdgeTy>(ni));
+  }
+
+  reference getData() {
+    return data;
+  }
+};
+
+template<typename NITy>
+struct EdgeInfoWrapper<NITy,void> {
+  typedef void reference;
+  NITy* dst;
+  void allocateEdgeData(FileGraph& g, FileGraph::neighbor_iterator& ni) { }
+  reference getData() { }
+};
 
 //! Local computation graph (i.e., graph structure does not change)
 template<typename NodeTy, typename EdgeTy>
 class LC_CRSInline_Graph {
 protected:
-  struct EdgeInfo;
+  struct NodeInfo;
+  typedef EdgeInfoWrapper<NodeInfo, EdgeTy> EdgeInfo;
+  
   struct NodeInfo : public GaloisRuntime::Lockable {
     NodeTy data;
     EdgeInfo* edgebegin;
     EdgeInfo* edgeend;
-  };
-  struct EdgeInfo {
-    EdgeTy data;
-    NodeInfo* dst;
   };
 
   NodeInfo* NodeData;
@@ -199,6 +222,8 @@ protected:
 public:
   typedef NodeInfo* GraphNode;
   typedef EdgeInfo* edge_iterator;
+  typedef typename EdgeInfo::reference edge_data_reference;
+
   class iterator : std::iterator<std::random_access_iterator_tag, GraphNode> {
     NodeInfo* at;
 
@@ -222,13 +247,13 @@ public:
     return N->data;
   }
   
-  EdgeTy& getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
+  edge_data_reference getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
     GaloisRuntime::acquire(src, mflag);
-    return EdgeData[getEdgeIdx(src,dst)].data;
+    return EdgeData[getEdgeIdx(src,dst)].getData();
   }
 
-  EdgeTy& getEdgeData(edge_iterator ni) const {
-    return ni->data;
+  edge_data_reference getEdgeData(edge_iterator ni) const {
+    return ni->getData();
    }
 
   GraphNode getEdgeDst(edge_iterator ni) const {
@@ -280,7 +305,7 @@ public:
       node_ids[*ii]->edgebegin = curEdge;
       for (FileGraph::neighbor_iterator ni = graph.neighbor_begin(*ii),
 	     ne = graph.neighbor_end(*ii); ni != ne; ++ni) {
-	new (&curEdge->data) EdgeTy(graph.getEdgeData<EdgeTy>(ni)); //inplace new
+        curEdge->allocateEdgeData(graph, ni);
 	curEdge->dst = node_ids[*ni];
 	++curEdge;
       }
@@ -295,10 +320,8 @@ template<typename NodeTy, typename EdgeTy>
 class LC_Linear_Graph {
 protected:
   struct NodeInfo;
-  struct EdgeInfo {
-    EdgeTy data;
-    NodeInfo* dst;
-  };
+  typedef EdgeInfoWrapper<NodeInfo,EdgeTy> EdgeInfo;
+
   struct NodeInfo : public GaloisRuntime::Lockable {
     NodeTy data;
     int numEdges;
@@ -337,6 +360,8 @@ protected:
 public:
   typedef NodeInfo* GraphNode;
   typedef EdgeInfo* edge_iterator;
+  typedef typename EdgeInfo::reference edge_data_reference;
+
   class iterator : public std::iterator<std::forward_iterator_tag, GraphNode> {
     NodeInfo* at;
     void incA() {
@@ -363,13 +388,13 @@ public:
     return N->data;
   }
   
-  EdgeTy& getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
+  edge_data_reference getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
     GaloisRuntime::acquire(src, mflag);
-    return getEdgeIdx(src,dst)->data;
+    return getEdgeIdx(src,dst)->getData();
   }
 
-  EdgeTy& getEdgeData(edge_iterator ni) const {
-    return ni->data;
+  edge_data_reference getEdgeData(edge_iterator ni) const {
+    return ni->getData();
   }
 
   GraphNode getEdgeDst(edge_iterator ni) const {
@@ -426,7 +451,7 @@ public:
       EdgeInfo* edge = node_ids[*ii]->edgeBegin();
       for (FileGraph::neighbor_iterator ni = graph.neighbor_begin(*ii),
 	     ne = graph.neighbor_end(*ii); ni != ne; ++ni) {
-	new (&edge->data) EdgeTy(graph.getEdgeData<EdgeTy>(ni)); //inplace new
+        edge->allocateEdgeData(graph, ni);
 	edge->dst = node_ids[*ni];
 	++edge;
       }
