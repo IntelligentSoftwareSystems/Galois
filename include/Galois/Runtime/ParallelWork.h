@@ -102,6 +102,35 @@ public:
 };
 
 template<class WorkListTy, class FunctionTy>
+class DoAllWorkAlt {
+  typedef typename WorkListTy::value_type value_type;
+
+  WorkListTy global_wl;
+  FunctionTy& fn;
+
+public:
+  DoAllWorkAlt(FunctionTy& f): fn(f) { }
+
+  template<typename Iter>
+  bool AddInitialWork(Iter b, Iter e) {
+    global_wl.push_initial(b,e);
+    return true;
+  }
+
+  void operator()() {
+    boost::optional<value_type> p = global_wl.pop();
+    while (p) {
+      fn(*p);
+      p = global_wl.pop();
+    }
+#ifdef GALOIS_EXP
+    SimpleTaskPool& pool = getSystemTaskPool();
+    pool.work();
+#endif
+  }
+};
+
+template<class WorkListTy, class FunctionTy>
 class ForEachWork {
   typedef typename WorkListTy::value_type value_type;
   typedef WorkList::LevelStealing<WorkList::FIFO<value_type>, value_type> AbortedList;
@@ -321,6 +350,26 @@ void do_all_impl(IterTy b, IterTy e, Function f, const char* loopname) {
   w[1].barrierAfter = true;
   w[1].profile = true;
   getSystemThreadPool().run(&w[0], &w[2]);
+
+  inGaloisForEach = false;
+}
+
+template<typename WLTy, typename IterTy, typename Function>
+void do_all_alt_impl(IterTy b, IterTy e, Function f, const char* loopname) {
+  assert(!inGaloisForEach);
+
+  inGaloisForEach = true;
+
+  DoAllWorkAlt<WLTy, Function> GW(f);
+
+  GW.AddInitialWork(b,e);
+
+  RunCommand w[1];
+  w[0].work = config::ref(GW);
+  w[0].isParallel = true;
+  w[0].barrierAfter = true;
+  w[0].profile = true;
+  getSystemThreadPool().run(&w[0], &w[1]);
 
   inGaloisForEach = false;
 }

@@ -129,6 +129,7 @@ void resetParallel() {
   // 	 graph.end(); src != ee; ++src) 
   //   graph.getData(*src, Galois::NONE).dist = DIST_INFINITY;
   Galois::do_all(allNodes.begin(), allNodes.end(), reset());
+  //Galois::do_all(graph.begin(), graph.end(), reset());
 }
 
 int main(int argc, char **argv) {

@@ -35,9 +35,11 @@
 #include <vector>
 #include <deque>
 #include <algorithm>
+#include <iterator>
 
 #include <boost/utility.hpp>
 #include <boost/optional.hpp>
+#include <boost/ref.hpp>
 
 namespace GaloisRuntime {
 namespace WorkList {
@@ -667,6 +669,67 @@ template<int chunksize=64, typename T = int, bool concurrent=true>
 class dChunkedLIFO : public ChunkedMaster<T, ConExtLinkedStack, true, true, chunksize, concurrent> {};
 WLCOMPILECHECK(dChunkedLIFO);
 
+//Weird WorkList where push and pop are different types
+template<typename IterTy, bool concurrent = true>
+class TileAdaptor {
+  typedef typename std::iterator_traits<IterTy>::value_type T;
+  typedef typename boost::reference_wrapper<T> wlT;
+
+  std::deque<wlT> wl;
+  LL::SimpleLock<concurrent> Lock;
+
+  typename T::iterator ii, ee;
+
+public:
+  typedef typename std::iterator_traits<typename T::iterator>::value_type value_type;
+
+  template<bool newconcurrent>
+  struct rethread {
+    typedef TileAdaptor<IterTy, newconcurrent> WL;
+  };
+
+  template<typename Tnew>
+  struct retype {
+    typedef TileAdaptor<IterTy, concurrent> WL;
+  };
+
+  void push(wlT val) {
+    Lock.lock();
+    wl.push_front(val);
+    Lock.unlock();
+  }
+
+  template<typename Iter>
+  void push(Iter b, Iter e) {
+    while (b != e)
+      push(boost::ref(*b++));
+  }
+
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    push(b,e);
+  }
+
+  boost::optional<value_type> pop() {
+    Lock.lock();
+    while (ii == ee) {
+      if (wl.empty()) {
+	Lock.unlock();
+	return boost::optional<value_type>();
+      } else {
+	T t = wl.back();
+	ii = t.begin();
+	ee = t.end();
+	wl.pop_back();
+      }
+    }
+    boost::optional<value_type> retval = boost::optional<value_type>(*ii++);
+    Lock.unlock();
+    return retval;
+  }
+};
+
+
 //! Worklist specialized to random access ranges. Does not support pushes.
 //! Work distribution is the following:
 //!  - Half the work is distributed evenly among all the threads
@@ -857,6 +920,119 @@ public:
   }
 };
 //WLCOMPILECHECK(RandomAccessRange);
+
+
+template<typename IterTy = int*>
+class ForwardAccessRange {
+  //! Thread-local data
+  struct TLD {
+    IterTy begin;
+    IterTy end;
+  };
+
+  PerCPU<TLD> tlds;
+  unsigned num;
+
+public:
+
+  //! T is the value type of the WL
+  typedef typename std::iterator_traits<IterTy>::value_type value_type;
+
+  template<bool newconcurrent>
+  struct rethread {
+    typedef ForwardAccessRange<IterTy> WL;
+  };
+
+  template<typename Tnew>
+  struct retype {
+    typedef ForwardAccessRange<IterTy> WL;
+  };
+
+  //! push a value onto the queue
+  void push(value_type val) {
+    abort();
+  }
+
+  //! push a range onto the queue
+  template<typename Iter>
+  void push(Iter b, Iter e) {
+    abort();
+  }
+
+  //stager each thread's start item
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    num = ThreadPool::getActiveThreads();
+    for (unsigned i = 0; i < num; ++i) {
+      tlds.get(i).begin = b;
+      tlds.get(i).end = e;
+      if (b != e)
+	++b;
+    }
+  }
+
+  //! pop a value from the queue.
+  // move through range in num thread strides
+  boost::optional<value_type> pop() {
+    TLD& tld = tlds.get();
+
+    if (tld.begin != tld.end) {
+      boost::optional<value_type> retval = *tld.begin;
+      for (int i = 0; i < num && tld.begin != tld.end; ++i)
+	tld.begin++;
+      return retval;
+    }
+    return boost::optional<value_type>();
+  }
+};
+//WLCOMPILECHECK(RandomAccessRange);
+
+template<typename OwnerFn, template<typename V> class OwnerMap = PerCPU, typename T = int, typename ChildWLTy = LIFO<> >
+class OwnerComputesWL : private boost::noncopyable {
+
+  OwnerFn Fn;
+  OwnerMap<typename ChildWLTy::template retype<T>::WL> Items;
+  OwnerMap<LIFO<T> > pushBuffer;
+
+public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef OwnerComputesWL<OwnerFn, OwnerMap, T, ChildWLTy> WL;
+  };
+
+  template<typename nTy>
+  struct retype {
+    typedef OwnerComputesWL<OwnerFn, OwnerMap, nTy, ChildWLTy> WL;
+  };
+
+  typedef T value_type;
+  
+  void push(value_type val)  {
+    unsigned int index = Fn(val);
+    //std::cerr << "[" << index << "," << index % active << "]\n";
+    if (Items.effectiveIDFor(index) == Items.myEffectiveID())
+      Items.get(index).push(val);
+    else
+      pushBuffer.get(index).push(val);
+  }
+
+  template<typename ItTy>
+  void push(ItTy b, ItTy e) {
+    while (b != e)
+      push(*b++);
+  }
+
+  template<typename ItTy>
+  void push_initial(ItTy b, ItTy e) {
+    push(b,e);
+  }
+
+  boost::optional<value_type> pop() {
+    return Items.get().pop();
+  }
+};
+//WLCOMPILECHECK(OwnerComputesWL);
+
 
 //End namespace
 }

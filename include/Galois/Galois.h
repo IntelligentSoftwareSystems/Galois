@@ -182,6 +182,16 @@ static inline void do_all_dispatch(const IterTy& begin, const IterTy& end, const
         fn, NULL);
   }
 }
+//Random access iterator do_all
+template<typename IterTy,typename FunctionTy>
+static inline void do_all_dispatch(const IterTy& begin, const IterTy& end, const FunctionTy& fn, std::forward_iterator_tag) {
+  if (GaloisRuntime::inGaloisForEach) {
+    abort();
+  } else {
+    typedef GaloisRuntime::WorkList::ForwardAccessRange<IterTy> WL;
+    GaloisRuntime::do_all_alt_impl<WL>(begin, end, fn, NULL);
+  }
+}
 
 template<typename IterTy,typename FunctionTy>
 static inline void do_all(const IterTy& begin, const IterTy& end, const FunctionTy& fn) {
