@@ -51,6 +51,15 @@ static const char* desc =
 static const char* url = 0;
 
 //****** Command Line Options ******
+enum BFSAlgo {
+  serial,
+  serialOpt,
+  serialSet,
+  galois,
+  galoisOpt,
+  galoisSet
+};
+
 namespace cll = llvm::cl;
 static cll::opt<unsigned int> startNode("startnode",
     cll::desc("Node to start search from"),
@@ -58,9 +67,15 @@ static cll::opt<unsigned int> startNode("startnode",
 static cll::opt<unsigned int> reportNode("reportnode",
     cll::desc("Node to report distance to"),
     cll::init(2));
-static cll::opt<int> algo("algo",
-    cll::desc("Algorithm"),
-    cll::init(0));
+static cll::opt<BFSAlgo> algo(cll::desc("Choose an algorithm:"),
+    cll::values(
+      clEnumVal(serial, "Serial"),
+      clEnumVal(serialOpt, "Serial optimized "),
+      clEnumVal(serialSet, "Serial optimized with workset semantics"),
+      clEnumVal(galois, "Galois"),
+      clEnumVal(galoisOpt, "Galois optimized"),
+      clEnumVal(galoisSet, "Galois optimized with workset semantics"),
+      clEnumValEnd), cll::init(serial));
 static cll::opt<std::string> filename(cll::Positional,
     cll::desc("<input file>"),
     cll::Required);
@@ -72,11 +87,10 @@ static const unsigned int DIST_INFINITY =
 struct SNode {
   unsigned int id;
   unsigned int dist;
-  
-  SNode(int _id = -1) : id(_id), dist(DIST_INFINITY) {}
+  bool flag;
 };
 
-typedef Galois::Graph::LC_Linear_Graph<SNode, unsigned int> Graph;
+typedef Galois::Graph::LC_Linear_Graph<SNode, void> Graph;
 typedef Graph::GraphNode GNode;
 
 Graph graph;
@@ -98,9 +112,27 @@ std::ostream& operator<<(std::ostream& out, const SNode& n) {
 }
 
 struct UpdateRequestIndexer {
-  unsigned int operator() (const UpdateRequest& val) const {
+  unsigned int operator()(const UpdateRequest& val) const {
     unsigned int t = val.w;
     return t;
+  }
+};
+
+struct GNodeIndexer {
+  unsigned int operator()(const GNode& val) const {
+    return graph.getData(val, Galois::NONE).dist;
+  }
+};
+
+struct GNodeLess {
+  bool operator()(const GNode& a, const GNode& b) const {
+    return graph.getData(a, Galois::NONE).dist < graph.getData(b, Galois::NONE).dist;
+  }
+};
+
+struct GNodeGreater {
+  bool operator()(const GNode& a, const GNode& b) const {
+    return graph.getData(a, Galois::NONE).dist > graph.getData(b, Galois::NONE).dist;
   }
 };
 
@@ -139,6 +171,7 @@ static bool verify(GNode source) {
 
 static void readGraph(GNode& source, GNode& report) {
   graph.structureFromFile(filename);
+
   source = *graph.begin();
   report = *graph.begin();
 
@@ -152,6 +185,7 @@ static void readGraph(GNode& source, GNode& report) {
     SNode& node = graph.getData(*src, Galois::NONE);
     node.id = id++;
     node.dist = DIST_INFINITY;
+    node.flag = false;
     if (node.id == startNode) {
       source = *src;
       foundSource = true;
@@ -241,6 +275,51 @@ struct SerialFlagOptAlgo {
   }
 };
 
+//! Serial BFS using optimized flags and workset semantics
+struct SerialWorkSet {
+  std::string name() const { return "Serial (Workset)"; }
+
+  void operator()(const GNode source) const {
+    Galois::Statistic<unsigned int> counter("Iterations");
+
+    std::deque<GNode> wl;
+    graph.getData(source).dist = 0;
+
+    for (Graph::edge_iterator ii = graph.edge_begin(source), 
+           ei = graph.edge_end(source); ii != ei; ++ii) {
+      GNode dst = graph.getEdgeDst(ii);
+      SNode& ddata = graph.getData(dst);
+      ddata.flag = true;
+      ddata.dist = 1;
+      wl.push_back(dst);
+    }
+
+    while (!wl.empty()) {
+      GNode n = wl.front();
+      wl.pop_front();
+
+      SNode& data = graph.getData(n);
+      data.flag = false;
+
+      unsigned int newDist = data.dist + 1;
+
+      for (Graph::edge_iterator ii = graph.edge_begin(n),
+            ei = graph.edge_end(n); ii != ei; ++ii) {
+        GNode dst = graph.getEdgeDst(ii);
+        SNode& ddata = graph.getData(dst);
+
+        if (newDist < ddata.dist && !ddata.flag) {
+          ddata.flag = true;
+          ddata.dist = newDist;
+          wl.push_back(dst);
+        }
+      }
+
+      counter += 1;
+    }
+  }
+};
+
 //! Galois BFS
 struct GaloisAlgo {
   std::string name() const { return "Galois"; }
@@ -279,7 +358,7 @@ struct GaloisAlgo {
 
 //! Galois BFS using optimized flags
 struct GaloisNoLockAlgo {
-  std::string name() const { return "Galois No Lock"; }
+  std::string name() const { return "Galois (No Lock)"; }
 
   void operator()(const GNode& source) const {
     using namespace GaloisRuntime::WorkList;
@@ -316,6 +395,62 @@ struct GaloisNoLockAlgo {
   }
 };
 
+//! Galois BFS using optimized flags and workset semantics
+struct GaloisWorkSet {
+  std::string name() const { return "Galois (Workset)"; }
+
+  void operator()(const GNode& source) const {
+    using namespace GaloisRuntime::WorkList;
+    typedef dChunkedFIFO<64> dChunk;
+    typedef ChunkedFIFO<64> Chunk;
+    typedef OrderedByIntegerMetric<GNodeIndexer,dChunk> OBIM;
+    
+    std::vector<GNode> initial;
+    graph.getData(source).dist = 0;
+    for (Graph::edge_iterator ii = graph.edge_begin(source),
+          ei = graph.edge_end(source); ii != ei; ++ii) {
+      GNode dst = graph.getEdgeDst(ii);
+      SNode& ddata = graph.getData(dst);
+      ddata.flag = true;
+      ddata.dist = 1;
+      initial.push_back(dst);
+    }
+
+#ifdef GALOIS_EXP
+    Exp::StartWorklistExperiment<OBIM,dChunk,Chunk,GNodeIndexer,GNodeLess,GNodeGreater>()(std::cout, initial.begin(), initial.end(), *this);
+#else
+    Galois::for_each<OBIM>(initial.begin(), initial.end(), *this);
+#endif
+  }
+
+  void operator()(GNode& n, Galois::UserContext<GNode>& ctx) const {
+    SNode& data = graph.getData(n, Galois::NONE);
+    data.flag = false;
+
+    unsigned int newDist = data.dist + 1;
+
+    for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::NONE),
+          ei = graph.edge_end(n, Galois::NONE); ii != ei; ++ii) {
+      GNode dst = graph.getEdgeDst(ii);
+      SNode& ddata = graph.getData(dst, Galois::NONE);
+
+      unsigned int oldDist;
+      while (true) {
+        oldDist = ddata.dist;
+        if (oldDist <= newDist)
+          break;
+        if (__sync_bool_compare_and_swap(&ddata.dist, oldDist, newDist)) {
+          if (!ddata.flag) {
+            ddata.flag = true;
+            ctx.push(dst);
+            break;
+          }
+        }
+      }
+    }
+  }
+};
+
 template<typename AlgoTy>
 void run(const AlgoTy& algo, const GNode& source) {
   Galois::StatTimer T;
@@ -332,10 +467,12 @@ int main(int argc, char **argv) {
   readGraph(source, report);
 
   switch (algo) {
-    case 0: run(SerialAlgo(), source); break;
-    case 1: run(SerialFlagOptAlgo(), source); break;
-    case 2: run(GaloisAlgo(), source); break;
-    case 3: run(GaloisNoLockAlgo(), source); break;
+    case serial: run(SerialAlgo(), source); break;
+    case serialOpt: run(SerialFlagOptAlgo(), source); break;
+    case serialSet: run(SerialWorkSet(), source); break;
+    case galois: run(GaloisAlgo(), source); break;
+    case galoisOpt: run(GaloisNoLockAlgo(), source); break;
+    case galoisSet: run(GaloisWorkSet(), source);  break;
     default: std::cerr << "Unknown algorithm\n"; abort();
   }
 
