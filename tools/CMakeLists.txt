@@ -60,6 +60,12 @@ dl(GTgraph-rmat http://www.cse.psu.edu/~madduri/software/GTgraph/GTgraph.tar.gz)
 dl(SSCA2 http://www.graphanalysis.org/benchmark/SSCA2-2.2.tar.gz)
 
 set(more_tools hi_pr triangle cats-gens snap GTgraph-rmat SSCA2)
+
+if(HAVE_CILK)
+  dl(bfs-schardl http://web.mit.edu/~neboat/www/code/bfs-icc-20120304.tar.gz)
+  set(more_tools ${more_tools} bfs-schardl)
+endif()
+
 add_custom_target(more-tools)
 set_target_properties(${more_tools} PROPERTIES EXCLUDE_FROM_ALL true)
 add_dependencies(more-tools ${more_tools})

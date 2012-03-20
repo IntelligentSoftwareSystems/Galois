@@ -24,6 +24,8 @@ set(USE_CLANG OFF CACHE BOOL "Use clang compiler")
 #Enable iss specific options; should be OFF in the general release
 set(USE_EXP OFF CACHE BOOL "Use experimental features") 
 
+set(USE_VTUNE ON CACHE BOOL "Use vtune (if found)")
+
 ###### Optional programs and default paths ######
 
 #find better c++ compilers
@@ -74,6 +76,9 @@ endif()
 enable_language(Fortran)
 find_package(LAPACK)
 
+#CILK
+include(CheckCilk)
+
 #Boost
 #not needed now but will be needed for newer version of Boost after 1.4X ish
 set(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0" "1.47" "1.47.0")
@@ -95,14 +100,15 @@ if(USE_EXP)
   add_definitions("-DGALOIS_EXP")
   include_directories("exp/include")
 
-  set(VTUNE_INCLUDE "/opt/intel/vtune_amplifier_xe_2011/include")
-  set(VTUNE_LIB "/opt/intel/vtune_amplifier_xe_2011/lib64/libittnotify.a")
-  if(EXISTS ${VTUNE_INCLUDE})
-    add_definitions(-DGALOIS_VTUNE)
-    include_directories(${VTUNE_INCLUDE})
-    set(RT_LINK ${VTUNE_LIB} dl ${RT_LINK})
-  else()
-    message(WARNING "VTUNE specified but not found")
+  if(USE_VTUNE)
+    find_package(VTUNE)
+    if (VTUNE_FOUND)
+      add_definitions(-DGALOIS_VTUNE)
+      include_directories(${VTUNE_INCLUDE_DIRS})
+      set(RT_LINK ${VTUNE_LIBRARIES} ${RT_LINK})
+    else()
+      message(WARNING "VTUNE required but not found")
+    endif()
   endif()
 
   find_package(TBB)
