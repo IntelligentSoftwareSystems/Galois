@@ -119,7 +119,7 @@ void runBodyParallel(const GNode src[NUM], int n) {
   T.stop();
 }
 
-std::vector<GNode> allNodes;
+//std::vector<GNode> allNodes;
 
 void resetParallel() {
   //  using namespace GaloisRuntime::WorkList;
@@ -128,8 +128,8 @@ void resetParallel() {
   // for (Graph::iterator src = graph.begin(), ee =
   // 	 graph.end(); src != ee; ++src) 
   //   graph.getData(*src, Galois::NONE).dist = DIST_INFINITY;
-  Galois::do_all(allNodes.begin(), allNodes.end(), reset());
-  //Galois::do_all(graph.begin(), graph.end(), reset());
+  //Galois::do_all(allNodes.begin(), allNodes.end(), reset());
+  Galois::do_all(graph.begin(), graph.end(), reset());
 }
 
 int main(int argc, char **argv) {
@@ -154,7 +154,7 @@ int main(int argc, char **argv) {
   GNode report = *graph.begin();
   for (Graph::iterator src = graph.begin(), ee =
       graph.end(); src != ee; ++src) {
-    allNodes.push_back(*src);
+    //allNodes.push_back(*src);
     SNode& node = graph.getData(*src,Galois::NONE);
     node.id = id++;
   }
