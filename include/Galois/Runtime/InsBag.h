@@ -82,18 +82,28 @@ private:
     return h;
   }
 
-public:
-  galois_insert_bag() {}
-
-  ~galois_insert_bag() {
+  void destruct() {
     while (realHead.getValue()) {
       gib_Tile* h = realHead.getValue();
       realHead.setValue(h->next);
-      for(T* ii = h->dbegin, *ee = h->dend; ii != ee; ++ii) {
+      for (T* ii = h->dbegin, *ee = h->dend; ii != ee; ++ii) {
 	ii->~T();
       }
       MM::pageFree(h);
     }
+  }
+
+public:
+  galois_insert_bag() {}
+
+  ~galois_insert_bag() {
+    destruct();
+  }
+
+  void clear() {
+    destruct();
+    for (unsigned i = 0; i < heads.size(); ++i)
+      heads.get(i) = 0;
   }
 
   typedef T        value_type;
