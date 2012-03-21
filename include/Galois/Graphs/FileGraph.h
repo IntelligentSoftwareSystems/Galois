@@ -58,36 +58,16 @@
 #include "Galois/ConflictFlags.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/ll/CacheLineStorage.h"
+#include "Galois/util/Endian.h"
+
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/iterator/transform_iterator.hpp>
+
 #include <map>
 #include <vector>
 #include <fstream>
 
 #include <string.h>
-#include <endian.h>
-
-#include "config.h"
-
-#ifdef HAVE_LE64TOH
-#else
-# if __BYTE_ORDER == __LITTLE_ENDIAN
-#  define le64toh(x) (x)
-# else
-#  error "Need to implement byte reordering for big endian machines"
-# endif
-#endif
-
-#ifdef HAVE_LE32TOH
-#else
-# if __BYTE_ORDER == __LITTLE_ENDIAN
-#  define le32toh(x) (x)
-# else
-#  error "Need to implement byte reordering for big endian machines"
-# endif
-#endif
-
-using namespace GaloisRuntime;
 
 namespace Galois {
 namespace Graph {
@@ -304,7 +284,7 @@ class LC_FileGraph : public FileGraph {
   };
 
   //null if type is void
-  LL::CacheLineStorage<gNode>* NodeData;
+  GaloisRuntime::LL::CacheLineStorage<gNode>* NodeData;
 
 public:
   LC_FileGraph() :NodeData(0) {}
@@ -340,7 +320,7 @@ public:
   
   //! Initializes node data for the graph to default values
   void emptyNodeData(NodeTy init = NodeTy()) {
-    NodeData = new LL::CacheLineStorage<gNode>[size()];
+    NodeData = new GaloisRuntime::LL::CacheLineStorage<gNode>[size()];
     //NodeData = (LL::CacheLineStorage<gNode>*)numa_alloc_interleaved(sizeof(LL::CacheLineStorage<gNode>)*size());
     for (uint64_t i = 0; i < size(); ++i)
       NodeData[i].data.data = init;
@@ -376,7 +356,7 @@ class LC_FileGraph<void, EdgeTy> : public FileGraph {
   };
 
   //null if type is void
-  LL::CacheLineStorage<gNode>* NodeData;
+  GaloisRuntime::LL::CacheLineStorage<gNode>* NodeData;
 
 public:
   LC_FileGraph() :NodeData(0) {}
@@ -406,7 +386,7 @@ class LC_FileGraph<NodeTy, void>: public FileGraph {
   };
 
   //null if type is void
-  LL::CacheLineStorage<gNode>* NodeData;
+  GaloisRuntime::LL::CacheLineStorage<gNode>* NodeData;
 
 public:
   LC_FileGraph() :NodeData(0) {}
@@ -428,7 +408,7 @@ public:
   }
   
   void emptyNodeData(NodeTy init = NodeTy()) {
-    NodeData = new LL::CacheLineStorage<gNode>[numNodes];
+    NodeData = new GaloisRuntime::LL::CacheLineStorage<gNode>[numNodes];
     for (uint64_t i = 0; i < numNodes; ++i)
       NodeData[i].data.data = init;
   }

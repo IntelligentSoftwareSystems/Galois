@@ -1,0 +1,7 @@
+include(TestBigEndian)
+TEST_BIG_ENDIAN(HAVE_BIG_ENDIAN)
+include(CheckIncludeFiles)
+CHECK_INCLUDE_FILES(endian.h HAVE_ENDIAN_H)
+include(CheckSymbolExists)
+CHECK_SYMBOL_EXISTS(le64toh "endian.h" HAVE_LE64TOH)
+CHECK_SYMBOL_EXISTS(le32toh "endian.h" HAVE_LE32TOH)

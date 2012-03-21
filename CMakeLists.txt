@@ -80,19 +80,11 @@ find_package(LAPACK)
 include(CheckCilk)
 
 #Boost
-#not needed now but will be needed for newer version of Boost after 1.4X ish
-set(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0" "1.47" "1.47.0")
 set(Boost_USE_MULTITHREADED OFF) # newer boost builds don't use -mt extension
 #Other options that can be used with find_package(Boost)
 # set(BOOST_ROOT /path/)
-# set(Boost_USE_STATIC_LIBS ON)
-# find_package(Boost 1.34.0 REQUIRED COMPONENTS system serialization graph_parallel mpi)
-# set(BOOST_LIBS system)
-if(${SITE_NAME} MATCHES "delaunay.*")
-  find_package(Boost 1.34.0 COMPONENTS ${BOOST_LIBS})
-else()
-  find_package(Boost 1.34.0 COMPONENTS ${BOOST_LIBS} REQUIRED)
-endif()
+# set(Boost_NO_SYSTEM_PATHS TRUE) # useful with BOOST_ROOT
+find_package(Boost 1.36.0 COMPONENTS REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 set(RT_LINK ${Boost_LIBRARIES} ${RT_LINK})
 
@@ -164,9 +156,7 @@ endif()
 #always import c99 stdint functions into c++
 include(UseStdMacro)
 
-include(CheckSymbolExists)
-CHECK_SYMBOL_EXISTS(le64toh "endian.h" HAVE_LE64TOH)
-CHECK_SYMBOL_EXISTS(le32toh "endian.h" HAVE_LE32TOH)
+include(CheckEndian)
 
 ###### Global Functions ######
 function(linkRuntime name) 
