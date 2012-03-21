@@ -27,7 +27,7 @@ namespace Galois {
 //close than the advance amount
 
 template<typename IterTy, class Distance>
-IterTy safe_advance_impl(IterTy b, IterTy e, Distance n, std::random_access_iterator_tag) {
+IterTy safe_advance_dispatch(IterTy b, IterTy e, Distance n, std::random_access_iterator_tag) {
   if (std::distance(b,e) < n)
     return b + n;
   else
@@ -35,7 +35,7 @@ IterTy safe_advance_impl(IterTy b, IterTy e, Distance n, std::random_access_iter
 }
 
 template<typename IterTy, class Distance>
-IterTy safe_advance_impl(IterTy b, IterTy e, Distance n, std::forward_iterator_tag) {
+IterTy safe_advance_dispatch(IterTy b, IterTy e, Distance n, std::input_iterator_tag) {
   while (b != e && n--)
     ++b;
   return b;
@@ -44,7 +44,7 @@ IterTy safe_advance_impl(IterTy b, IterTy e, Distance n, std::forward_iterator_t
 template<typename IterTy, class Distance>
 IterTy safe_advance(IterTy b, IterTy e, Distance n) {
   typename std::iterator_traits<IterTy>::iterator_category category;
-  return safe_advance_impl(b,e,n,category);
+  return safe_advance_dispatch(b,e,n,category);
 }
 
 

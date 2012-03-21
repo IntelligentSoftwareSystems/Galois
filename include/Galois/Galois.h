@@ -128,35 +128,7 @@ static inline void do_all_adl(ContainerTy& c, Function f, const char* loopname =
   //for_each(c.begin(), c.end(), f, loopname);
 }
 */
-///DDN:
-
-template<typename IterTy,typename T>
-struct DoAllInitialWork {
-  template<typename T1, typename T2>
-  struct ConstantFunction: public std::unary_function<T1,T2> {
-    const T2& item;
-    ConstantFunction(const T2& t): item(t) { }
-    const T2& operator()(const T1&) const {
-      return item;
-    }
-  };
-
-  typedef std::pair<IterTy,IterTy> RangeTy;
-  typedef boost::transform_iterator<ConstantFunction<T,RangeTy>, boost::counting_iterator<T> > iterator;
-  RangeTy range;
-  T numThreads;
-
-  DoAllInitialWork(const IterTy& begin, const IterTy& end, T n):
-    range(begin, end), numThreads(n) { }
-
-  iterator begin() {
-    return iterator(boost::counting_iterator<T>(0), ConstantFunction<T,RangeTy>(range));
-  }
-
-  iterator end() {
-    return iterator(boost::counting_iterator<T>(numThreads), ConstantFunction<T,RangeTy>(range));
-  }
-};
+#endif
 
 //Random access iterator do_all
 template<typename IterTy,typename FunctionTy>
@@ -177,7 +149,7 @@ static inline void do_all_dispatch(const IterTy& begin, const IterTy& end, const
 
 //Forward iterator do_all
 template<typename IterTy,typename FunctionTy>
-static inline void do_all_dispatch(const IterTy& begin, const IterTy& end, const FunctionTy& fn, const char* loopname, std::forward_iterator_tag) {
+static inline void do_all_dispatch(const IterTy& begin, const IterTy& end, const FunctionTy& fn, const char* loopname, std::input_iterator_tag) {
   if (GaloisRuntime::inGaloisForEach) {
     GaloisRuntime::TaskContext<IterTy,FunctionTy> ctx;
     GaloisRuntime::SimpleTaskPool& pool = GaloisRuntime::getSystemTaskPool();
@@ -194,8 +166,6 @@ static inline void do_all(const IterTy& begin, const IterTy& end, const Function
   typename std::iterator_traits<IterTy>::iterator_category category;
   do_all_dispatch(begin,end,fn,loopname,category); 
 }
-
-#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // PreAlloc

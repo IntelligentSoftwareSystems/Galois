@@ -170,8 +170,7 @@ bool verify() {
 GaloisRuntime::galois_insert_bag<GNode> wl;
 
 struct preprocess {
-  template<typename Context>
-  void operator()(GNode item, Context& lwl) const {
+  void operator()(GNode item) const {
     if (mesh->getData(item, Galois::NONE).isBad())
       wl.push(item);
   }
@@ -211,14 +210,7 @@ int main(int argc, char** argv) {
   Touter.start();
 
   std::cout << "MEMINFO P1: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
-#ifdef GALOIS_EXP
-  //  Galois::do_all(*mesh, preprocess());
-  Galois::for_each(mesh->begin(), mesh->end(), preprocess());
-#else
-  for (Graph::iterator ii = mesh->begin(), ee = mesh->end(); ii != ee; ++ii)
-    if (mesh->getData(*ii).isBad())
-      wl.push(*ii);
-#endif
+  Galois::do_all(mesh->begin(), mesh->end(), preprocess());
   std::cout << "MEMINFO P2: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
 
   Galois::preAlloc(10 * numThreads + GaloisRuntime::MM::pageAllocInfo() * 5);

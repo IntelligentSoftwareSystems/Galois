@@ -730,7 +730,7 @@ public:
   }
 };
 
-
+//FIXME: make this valid for input iterators (e.g. no default constructor)
 template<typename IterTy = int*>
 class ForwardAccessRange {
   //! Thread-local data
@@ -1015,7 +1015,6 @@ public:
   }
 };
 //WLCOMPILECHECK(OwnerComputesWL);
-
 
 //End namespace
 }

@@ -109,26 +109,13 @@ void runBodyParallel(const GNode src[NUM], int n) {
   for (int i = 0; i < n; ++i)
     one[i] = UpdateRequest(src[i], 0, i);
   T.start();
-// #ifdef GALOIS_EXP
-//     Exp::StartWorklistExperiment<OBIM,dChunk,Chunk,UpdateRequestIndexer,
-//       std::less<UpdateRequest>,std::greater<UpdateRequest> >()(
-//         std::cout, &one[0], &one[1], process());
-// #else
   Galois::for_each<OBIM>(&one[0], &one[n], process());
-  //#endif
   T.stop();
 }
 
 //std::vector<GNode> allNodes;
 
 void resetParallel() {
-  //  using namespace GaloisRuntime::WorkList;
-  //  typedef dChunkedLIFO<16> dChunk;
-  //  Galois::for_each<dChunk>(graph.begin(), graph.end(), reset());
-  // for (Graph::iterator src = graph.begin(), ee =
-  // 	 graph.end(); src != ee; ++src) 
-  //   graph.getData(*src, Galois::NONE).dist = DIST_INFINITY;
-  //Galois::do_all(allNodes.begin(), allNodes.end(), reset());
   Galois::do_all(graph.begin(), graph.end(), reset());
 }
 
