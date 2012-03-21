@@ -28,6 +28,7 @@
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/Threads.h"
+#include "Galois/util/GAlgs.h"
 
 #include <limits>
 #include <iterator>
@@ -928,10 +929,13 @@ class ForwardAccessRange {
   struct TLD {
     IterTy begin;
     IterTy end;
+    bool init;
   };
 
   PerCPU<TLD> tlds;
   unsigned num;
+  IterTy gbegin;
+  IterTy gend;
 
 public:
 
@@ -963,23 +967,25 @@ public:
   template<typename Iter>
   void push_initial(Iter b, Iter e) {
     num = ThreadPool::getActiveThreads();
-    for (unsigned i = 0; i < num; ++i) {
-      tlds.get(i).begin = b;
-      tlds.get(i).end = e;
-      if (b != e)
-	++b;
-    }
+    gbegin = b;
+    gend = e;
+    for (unsigned i = 0; i < tlds.size(); ++i)
+      tlds.get(i).init = false;
   }
 
   //! pop a value from the queue.
   // move through range in num thread strides
   boost::optional<value_type> pop() {
     TLD& tld = tlds.get();
-
+    if (!tld.init) {
+      tld.begin = Galois::safe_advance(gbegin, gend, tlds.myEffectiveID());
+      tld.end = gend;
+      tld.init = true;
+    }
     if (tld.begin != tld.end) {
       boost::optional<value_type> retval = *tld.begin;
-      for (int i = 0; i < num && tld.begin != tld.end; ++i)
-	tld.begin++;
+      tld.begin = Galois::safe_advance(tld.begin, tld.end, num);
+      assert(*retval);
       return retval;
     }
     return boost::optional<value_type>();
@@ -993,9 +999,13 @@ class StaticRandomAccessRange {
   struct TLD {
     IterTy begin;
     IterTy end;
+    bool init;
   };
 
   PerCPU<TLD> tlds;
+
+  IterTy gbegin;
+  IterTy gend;
 
 public:
 
@@ -1026,20 +1036,25 @@ public:
   //stager each thread's start item
   template<typename Iter>
   void push_initial(Iter b, Iter e) {
-    unsigned num = ThreadPool::getActiveThreads();
-    unsigned len = std::distance(b,e);
-    unsigned per = (len + num - 1) / num;
-    for (unsigned i = 0; i < num; ++i) {
-      TLD& tld = tlds.get(i);
-      tld.begin = b + per * i;
-      tld.end = b + per * i + std::min(per, (unsigned)std::distance(tld.begin, e));
-    }
+    gbegin = b;
+    gend = e;
+    for (unsigned i = 0; i < tlds.size(); ++i)
+      tlds.get(i).init = false;
   }
 
   //! pop a value from the queue.
   // move through range in num thread strides
   boost::optional<value_type> pop() {
     TLD& tld = tlds.get();
+    if (!tld.init) {
+      unsigned num = ThreadPool::getActiveThreads();
+      unsigned len = std::distance(gbegin,gend);
+      unsigned per = (len + num - 1) / num;
+      unsigned i = tlds.myEffectiveID();
+      tld.begin = gbegin + per * i;
+      tld.end = tld.begin + std::min(per, (unsigned)std::distance(tld.begin, gend));
+      tld.init = true;
+    }
     if (tld.begin != tld.end)
       return boost::optional<value_type>(*tld.begin++);
     return boost::optional<value_type>();
