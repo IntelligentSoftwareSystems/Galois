@@ -346,7 +346,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * compareAndSet head node
    */
   bool casHead(HeadIndex* cmp, HeadIndex* val) {
-    return __sync_bool_compare_and_swap(&head, cmp, val);
+    return __sync_bool_compare_and_swap(&head, reinterpret_cast<uintptr_t>(cmp), reinterpret_cast<uintptr_t>(val));
   }
 
   /* ---------------- Nodes -------------- */
@@ -367,14 +367,14 @@ class ConcurrentSkipListMap : private boost::noncopyable {
      * compareAndSet value field
      */
     bool casValue(void* cmp, void* val) {
-      return __sync_bool_compare_and_swap(&value, cmp, val);
+      return __sync_bool_compare_and_swap(&value, reinterpret_cast<uintptr_t>(cmp), reinterpret_cast<uintptr_t>(val));
     }
 
     /**
      * compareAndSet next field
      */
     bool casNext(Node* cmp, Node* val) {
-      return __sync_bool_compare_and_swap(&next, cmp, val);
+      return __sync_bool_compare_and_swap(&next, reinterpret_cast<uintptr_t>(cmp), reinterpret_cast<uintptr_t>(val));
     }
 
     /**
@@ -483,7 +483,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
      * compareAndSet right field
      */
     bool casRight(Index* cmp, Index* val) {
-      return __sync_bool_compare_and_swap(&right, cmp, val); 
+      return __sync_bool_compare_and_swap(&right, reinterpret_cast<uintptr_t>(cmp), reinterpret_cast<uintptr_t>(val)); 
     }
 
     /**
