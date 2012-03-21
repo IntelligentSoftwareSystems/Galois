@@ -75,41 +75,8 @@ class DoAllWork {
   WorkListTy global_wl;
   FunctionTy& fn;
 
-  typedef typename WorkListTy::range_type range_type;
-
 public:
   DoAllWork(FunctionTy& f): fn(f) { }
-
-  template<typename Iter>
-  bool AddInitialWork(Iter b, Iter e) {
-    global_wl.push_initial(b,e);
-    return true;
-  }
-
-  void operator()() {
-    
-    boost::optional<range_type> p = global_wl.pop_range();
-    while (p) {
-      while (p->first != p->second)
-        fn(*p->first++);
-      p = global_wl.pop_range();
-    }
-#ifdef GALOIS_EXP
-    SimpleTaskPool& pool = getSystemTaskPool();
-    pool.work();
-#endif
-  }
-};
-
-template<class WorkListTy, class FunctionTy>
-class DoAllWorkAlt {
-  typedef typename WorkListTy::value_type value_type;
-
-  WorkListTy global_wl;
-  FunctionTy& fn;
-
-public:
-  DoAllWorkAlt(FunctionTy& f): fn(f) { }
 
   template<typename Iter>
   bool AddInitialWork(Iter b, Iter e) {
@@ -134,7 +101,7 @@ template<class WorkListTy, class FunctionTy>
 class ForEachWork {
   typedef typename WorkListTy::value_type value_type;
   typedef WorkList::LevelStealing<WorkList::FIFO<value_type>, value_type> AbortedList;
-  
+
   struct ThreadLocalData {
     Galois::UserContext<value_type> facing;
     SimpleRuntimeContext cnx;
@@ -329,38 +296,13 @@ void for_each_impl(IterTy b, IterTy e, Function f, const char* loopname) {
   inGaloisForEach = false;
 }
 
-template<typename WLTy, typename T, typename IterTy, typename Function>
+template<typename WLTy, typename IterTy, typename Function>
 void do_all_impl(IterTy b, IterTy e, Function f, const char* loopname) {
   assert(!inGaloisForEach);
 
   inGaloisForEach = true;
 
-  typedef typename WLTy::template retype<T>::WL aWLTy;
-
-  DoAllWork<aWLTy, Function> GW(f);
-  FillWork<IterTy, DoAllWork<aWLTy, Function> > fw2(b,e,GW);
-
-  RunCommand w[2];
-  w[0].work = config::ref(fw2);
-  w[0].isParallel = true;
-  w[0].barrierAfter = false;
-  w[0].profile = true;
-  w[1].work = config::ref(GW);
-  w[1].isParallel = true;
-  w[1].barrierAfter = true;
-  w[1].profile = true;
-  getSystemThreadPool().run(&w[0], &w[2]);
-
-  inGaloisForEach = false;
-}
-
-template<typename WLTy, typename IterTy, typename Function>
-void do_all_alt_impl(IterTy b, IterTy e, Function f, const char* loopname) {
-  assert(!inGaloisForEach);
-
-  inGaloisForEach = true;
-
-  DoAllWorkAlt<WLTy, Function> GW(f);
+  DoAllWork<WLTy, Function> GW(f);
 
   GW.AddInitialWork(b,e);
 

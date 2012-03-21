@@ -160,7 +160,7 @@ struct DoAllInitialWork {
 
 //Random access iterator do_all
 template<typename IterTy,typename FunctionTy>
-static inline void do_all_dispatch(const IterTy& begin, const IterTy& end, const FunctionTy& fn, std::random_access_iterator_tag) {
+static inline void do_all_dispatch(const IterTy& begin, const IterTy& end, const FunctionTy& fn, const char* loopname, std::random_access_iterator_tag) {
   size_t n = std::distance(begin, end);
   if (n < 128) {
     std::for_each(begin, end, fn);
@@ -170,38 +170,26 @@ static inline void do_all_dispatch(const IterTy& begin, const IterTy& end, const
     pool.enqueue(ctx, begin, end, fn);
     ctx.run(pool);
   } else {
-    if(true) { //ADL use complex code for now
-      typedef typename std::iterator_traits<IterTy>::value_type value_type;
-      typedef GaloisRuntime::WorkList::RandomAccessRange<IterTy> WL;
-      typedef DoAllInitialWork<IterTy,unsigned int> DIW;
-
-      unsigned int numThreads = GaloisRuntime::ThreadPool::getActiveThreads();
-
-      DIW it(begin, end, numThreads);
-      GaloisRuntime::do_all_impl<WL,value_type>(
-						it.begin(), it.end(), 
-						fn, NULL);
-    } else {
-      typedef GaloisRuntime::WorkList::StaticRandomAccessRange<IterTy> WL;
-      GaloisRuntime::do_all_alt_impl<WL>(begin, end, fn, NULL);
-    }
+    typedef GaloisRuntime::WorkList::StealingRandomAccessRange<IterTy> WL;
+    GaloisRuntime::do_all_impl<WL>(begin, end, fn, loopname);
   }
 }
-//Random access iterator do_all
+
+//Forward iterator do_all
 template<typename IterTy,typename FunctionTy>
-static inline void do_all_dispatch(const IterTy& begin, const IterTy& end, const FunctionTy& fn, std::forward_iterator_tag) {
+static inline void do_all_dispatch(const IterTy& begin, const IterTy& end, const FunctionTy& fn, const char* loopname, std::forward_iterator_tag) {
   if (GaloisRuntime::inGaloisForEach) {
     abort();
   } else {
     typedef GaloisRuntime::WorkList::ForwardAccessRange<IterTy> WL;
-    GaloisRuntime::do_all_alt_impl<WL>(begin, end, fn, NULL);
+    GaloisRuntime::do_all_impl<WL>(begin, end, fn, loopname);
   }
 }
 
 template<typename IterTy,typename FunctionTy>
-static inline void do_all(const IterTy& begin, const IterTy& end, const FunctionTy& fn) {
+static inline void do_all(const IterTy& begin, const IterTy& end, const FunctionTy& fn, const char* loopname = 0) {
   typename std::iterator_traits<IterTy>::iterator_category category;
-  do_all_dispatch(begin,end,fn,category); 
+  do_all_dispatch(begin,end,fn,loopname,category); 
 }
 
 #endif

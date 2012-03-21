@@ -731,198 +731,6 @@ public:
 };
 
 
-//! Worklist specialized to random access ranges. Does not support pushes.
-//! Work distribution is the following:
-//!  - Half the work is distributed evenly among all the threads
-//!  - When work runs out, threads check a per package list of work.
-//!    * If there is work, the thread takes 1/#coreperpackage work for itself
-//!    * If there isn't work, one thread per package grabs half of the remaining work
-//!      from the global queue
-template<typename IterTy = int*, int minsize=16, typename T=int, bool concurrent=true>
-class RandomAccessRange {
-
-  //! Type of ranges that we are iterating over
-  typedef IterTy iterator;
-  typedef typename std::iterator_traits<IterTy>::difference_type difference_type;
-
-  //! Thread-local data
-  struct TLD {
-    iterator start; // duplicated so we can start processing without a barrier
-    iterator begin;
-    iterator end;
-    bool failed;
-  };
-
-  //! Package-local data
-  struct PLD {
-    LL::SimpleLock<concurrent> lock;
-    difference_type begin;
-    difference_type end;
-  };
-
-  PerCPU<TLD> tlds;
-  PerLevel<PLD> plds;
-
-  //! global work remaining
-  difference_type total;
-
-  bool tryGlobalSteal(PLD& pld) {
-    difference_type e, b;
-    
-    do {
-      e = total;
-      if (e == 0)
-        return false;
-      b = e / 2;
-      if (e - b < minsize)
-        b = 0;
-    } while (!__sync_bool_compare_and_swap(&total, e, b));
-
-    pld.begin = b;
-    pld.end = e;
-
-    return true;
-  }
-
-  bool tryPackageSteal(TLD& tld) {
-    PLD& pld = plds.get();
-
-    pld.lock.lock();
-
-    while (true) {
-      if (pld.begin == pld.end) {
-        if (tryGlobalSteal(pld))
-          continue;
-
-        pld.lock.unlock();
-        return false;
-      }
-
-      int mp = LL::getMaxPackageForThread(ThreadPool::getActiveThreads()-1) + 1;
-      difference_type e = pld.end;
-      difference_type b = pld.end;
-      difference_type t = e - pld.begin;
-      difference_type block = (t + mp - 1) / mp;
-      if (block < minsize)
-        block = t;
-
-      pld.end -= block;
-
-      pld.lock.unlock();
-
-      b -= block;
-
-      tld.begin = tld.end = tld.start;
-      std::advance(tld.begin, b);
-      std::advance(tld.end, e);
-      return true;
-    }
-  }
-    
-public:
-  RandomAccessRange(): total(0) { }
-
-  //! T is the value type of the WL
-  typedef T value_type;
-
-  template<bool newconcurrent>
-  struct rethread {
-    typedef RandomAccessRange<IterTy, minsize, T, newconcurrent> WL;
-  };
-
-  template<typename Tnew>
-  struct retype {
-    typedef RandomAccessRange<IterTy, minsize, Tnew, concurrent> WL;
-  };
-
-  //! push a value onto the queue
-  void push(value_type val) {
-    abort();
-  }
-
-  //! push a range onto the queue
-  template<typename Iter>
-  void push(Iter b, Iter e) {
-    abort();
-  }
-
-  //! push range onto the queue. NB: unlike other worklists, this
-  //! takes iterators over (begin, end) pairs, where begin and
-  //! end are over the entire range in question.
-  template<typename Iter>
-  void push_initial(Iter b, Iter e) {
-    assert(std::distance(b, e) == 1);
-
-    // Divide upper half of range among n threads
-    TLD& tld = tlds.get();
-    difference_type n = std::distance(b->first, b->second);
-    unsigned tid = tlds.myEffectiveID();
-    unsigned int numThreads = GaloisRuntime::ThreadPool::getActiveThreads();
-    difference_type rest = n / 16;
-    difference_type t = n - rest;
-    difference_type block = (t + numThreads - 1) / numThreads;
-
-    if (tid == 0) {
-      // NB: Small race if threads start to steal before this gets written
-      total = rest;
-    }
-
-    tld.begin = tld.end = tld.start = b->first;
-    tld.failed = false;
-    std::advance(tld.begin, rest + std::min(tid * block, t));
-    std::advance(tld.end, rest + std::min((tid + 1) * block, t));
-  }
-
-  //! pop a value from the queue.
-  boost::optional<value_type> pop() {
-    TLD& tld = tlds.get();
-
-    if (!tld.failed) {
-      while (true) {
-        if (tld.begin != tld.end) {
-          return boost::optional<value_type>(*tld.begin++);
-        } 
-
-        // Steal path
-        if (tryPackageSteal(tld))
-          continue;
-
-        tld.failed = true;
-        break;
-      }
-    }
-
-    return boost::optional<value_type>();
-  }
-
-  typedef std::pair<iterator,iterator> range_type;
-  boost::optional<range_type> pop_range() {
-    TLD& tld = tlds.get();
-
-    if (!tld.failed) {
-      while (true) {
-        if (tld.begin != tld.end) {
-          boost::optional<range_type> r(std::make_pair(tld.begin, tld.end));
-          tld.begin = tld.end;
-          return r;
-        } 
-
-        // Steal path
-        if (tryPackageSteal(tld))
-          continue;
-
-        tld.failed = true;
-        break;
-      }
-    }
-
-    return boost::optional<range_type>();
-
-  }
-};
-//WLCOMPILECHECK(RandomAccessRange);
-
-
 template<typename IterTy = int*>
 class ForwardAccessRange {
   //! Thread-local data
@@ -964,8 +772,7 @@ public:
   }
 
   //stager each thread's start item
-  template<typename Iter>
-  void push_initial(Iter b, Iter e) {
+  void push_initial(IterTy b, IterTy e) {
     num = ThreadPool::getActiveThreads();
     gbegin = b;
     gend = e;
@@ -991,7 +798,7 @@ public:
     return boost::optional<value_type>();
   }
 };
-//WLCOMPILECHECK(RandomAccessRange);
+WLCOMPILECHECK(ForwardAccessRange);
 
 template<typename IterTy = int*>
 class StaticRandomAccessRange {
@@ -1034,8 +841,7 @@ public:
   }
 
   //stager each thread's start item
-  template<typename Iter>
-  void push_initial(Iter b, Iter e) {
+  void push_initial(IterTy b, IterTy e) {
     gbegin = b;
     gend = e;
     for (unsigned i = 0; i < tlds.size(); ++i)
@@ -1060,7 +866,109 @@ public:
     return boost::optional<value_type>();
   }
 };
-//WLCOMPILECHECK(RandomAccessRange);
+WLCOMPILECHECK(StaticRandomAccessRange);
+
+template<typename IterTy = int*>
+class StealingRandomAccessRange {
+  //! Thread-local data
+  struct TLD {
+    IterTy begin;
+    IterTy end;
+    IterTy stealBegin;
+    IterTy stealEnd;
+    bool init;
+    LL::SimpleLock<true> stealLock;
+  };
+
+  PerCPU<TLD> tlds;
+
+  IterTy gbegin;
+  IterTy gend;
+
+  bool do_steal(TLD& stld, TLD& otld) {
+    bool retval = false;
+    otld.stealLock.lock();
+    if (otld.stealBegin != otld.stealEnd) {
+      stld.begin = otld.stealBegin;
+      otld.stealBegin = stld.end = Galois::split_range(otld.stealBegin, otld.stealEnd);
+      retval = true;
+    }
+    otld.stealLock.unlock();
+    return retval;
+  }
+
+  void try_steal(TLD& tld) {
+    //First try stealing from self
+    if (do_steal(tld,tld))
+      return;
+    //Then try stealing from neighbor
+    TLD& otld = tlds.getNext(ThreadPool::getActiveThreads());
+    if (do_steal(tld, tlds.getNext(ThreadPool::getActiveThreads()))) {
+      //redistribute stolen items for neighbor to steal too
+      if (std::distance(tld.begin, tld.end) > 1) {
+	tld.stealLock.lock();
+	tld.stealEnd = tld.end;
+	tld.stealBegin = tld.end = Galois::split_range(tld.begin, tld.end);
+	tld.stealLock.unlock();
+      }
+    }
+  }
+
+public:
+
+  //! T is the value type of the WL
+  typedef typename std::iterator_traits<IterTy>::value_type value_type;
+
+  template<bool newconcurrent>
+  struct rethread {
+    typedef StealingRandomAccessRange<IterTy> WL;
+  };
+
+  template<typename Tnew>
+  struct retype {
+    typedef StealingRandomAccessRange<IterTy> WL;
+  };
+
+  //! push a value onto the queue
+  void push(value_type val) {
+    abort();
+  }
+
+  //! push a range onto the queue
+  template<typename Iter>
+  void push(Iter b, Iter e) {
+    abort();
+  }
+
+  //stager each thread's start item
+  void push_initial(IterTy b, IterTy e) {
+    gbegin = b;
+    gend = e;
+    for (unsigned i = 0; i < tlds.size(); ++i)
+      tlds.get(i).init = false;
+  }
+
+  //! pop a value from the queue.
+  // move through range in num thread strides
+  boost::optional<value_type> pop() {
+    TLD& tld = tlds.get();
+    if (!tld.init) {
+      unsigned num = ThreadPool::getActiveThreads();
+      unsigned len = std::distance(gbegin,gend);
+      unsigned per = (len + num - 1) / num;
+      unsigned i = tlds.myEffectiveID();
+      tld.stealBegin = gbegin + per * i;
+      tld.stealEnd = tld.stealBegin + std::min(per, (unsigned)std::distance(tld.stealBegin, gend));
+      tld.init = true;
+    }
+    if (tld.begin == tld.end)
+      try_steal(tld);
+    if (tld.begin != tld.end)
+      return boost::optional<value_type>(*tld.begin++);
+    return boost::optional<value_type>();
+  }
+};
+WLCOMPILECHECK(StealingRandomAccessRange);
 
 template<typename OwnerFn, template<typename V> class OwnerMap = PerCPU, typename T = int, typename ChildWLTy = LIFO<> >
 class OwnerComputesWL : private boost::noncopyable {
