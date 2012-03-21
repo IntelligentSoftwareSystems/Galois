@@ -23,6 +23,8 @@
 
 namespace Galois {
 
+//safe_advance is like std::advance, but it returns end if end is
+//close than the advance amount
 
 template<typename IterTy, class Distance>
 IterTy safe_advance_impl(IterTy b, IterTy e, Distance n, std::random_access_iterator_tag) {
@@ -43,6 +45,16 @@ template<typename IterTy, class Distance>
 IterTy safe_advance(IterTy b, IterTy e, Distance n) {
   typename std::iterator_traits<IterTy>::iterator_category category;
   return safe_advance_impl(b,e,n,category);
+}
+
+
+//split_range finds the midpoint of a range.  The first half should
+//always be bigger if the range has an odd length
+
+template<typename IterTy>
+IterTy split_range(IterTy b, IterTy e) {
+  std::advance(b, (std::distance(b,e) + 1) / 2);
+  return b;
 }
 
 }
