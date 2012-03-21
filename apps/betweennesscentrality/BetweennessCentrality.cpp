@@ -33,7 +33,7 @@
 #include "Galois/Runtime/SimpleLock.h"
 #include "Galois/Runtime/CacheLineStorage.h"
 #endif
-#include "Galois/Graphs/FileGraph.h"
+#include "Galois/Graphs/LCGraph.h"
 #include "Galois/Runtime/WorkList.h"
 
 #include "llvm/Support/CommandLine.h"
