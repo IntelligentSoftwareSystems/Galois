@@ -179,7 +179,10 @@ static inline void do_all_dispatch(const IterTy& begin, const IterTy& end, const
 template<typename IterTy,typename FunctionTy>
 static inline void do_all_dispatch(const IterTy& begin, const IterTy& end, const FunctionTy& fn, const char* loopname, std::forward_iterator_tag) {
   if (GaloisRuntime::inGaloisForEach) {
-    abort();
+    GaloisRuntime::TaskContext<IterTy,FunctionTy> ctx;
+    GaloisRuntime::SimpleTaskPool& pool = GaloisRuntime::getSystemTaskPool();
+    pool.enqueue(ctx, begin, end, fn);
+    ctx.run(pool);
   } else {
     typedef GaloisRuntime::WorkList::ForwardAccessRange<IterTy> WL;
     GaloisRuntime::do_all_impl<WL>(begin, end, fn, loopname);
