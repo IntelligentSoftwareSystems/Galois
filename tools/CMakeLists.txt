@@ -18,7 +18,12 @@ ExternalProject_Add(cats-gens
   DOWNLOAD_DIR cats-gens/src/cats-gens
   DOWNLOAD_COMMAND bash -c "if [ ! -e makefile ] | then ${WGET} --recursive --no-parent --no-host-directories --cut-dirs=3 --reject \"index.html*\" --quiet http://www.avglab.com/andrew/CATS/gens/ | fi"
   PATCH_COMMAND bash -c "if [ ! -e CMakeLists.txt ] | then patch -p1 < ${CMAKE_CURRENT_SOURCE_DIR}/cats-gens.patch | fi"
-  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}
+  CMAKE_ARGS 
+    -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} 
+    -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS_RELEASE}
+    -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+    -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS_RELEASE}
+    -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}
 )
 
 find_program(UNZIP unzip)
@@ -30,7 +35,12 @@ ExternalProject_Add(triangle
   DOWNLOAD_COMMAND bash -c "if [ ! -e triangle.zip ] | then ${WGET} --quiet http://www.netlib.org/voronoi/triangle.zip | fi"
   UPDATE_COMMAND bash -c "if [ ! -e makefile ] | then ${UNZIP} triangle.zip | fi"
   PATCH_COMMAND bash -c "if [ ! -e CMakeLists.txt ] | then patch -p1 < ${CMAKE_CURRENT_SOURCE_DIR}/triangle.patch | fi"
-  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}
+  CMAKE_ARGS 
+    -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} 
+    -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS_RELEASE}
+    -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+    -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS_RELEASE}
+    -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}
 )
 
 ExternalProject_Add(snap
@@ -40,7 +50,12 @@ ExternalProject_Add(snap
   DOWNLOAD_COMMAND bash -c "if [ ! -e Snap-11-12-31.zip ] | then ${WGET} --quiet http://snap.stanford.edu/snap/Snap-11-12-31.zip | fi"
   UPDATE_COMMAND bash -c "if [ ! -e README ] | then ${UNZIP} Snap-11-12-31.zip | fi"
   PATCH_COMMAND bash -c "if [ ! -e CMakeLists.txt ] | then patch -p1 < ${CMAKE_CURRENT_SOURCE_DIR}/snap.patch | fi"
-  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}
+  CMAKE_ARGS 
+    -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+    -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS_RELEASE}
+    -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+    -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS_RELEASE}
+    -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}
 )
 
 # Simple download and patch
@@ -51,7 +66,12 @@ function(dl name url)
     DOWNLOAD_DIR ${name}/src/${name}
     URL ${url}
     PATCH_COMMAND bash -c "if [ ! -e CMakeLists.txt ] | then patch -p1 < ${CMAKE_CURRENT_SOURCE_DIR}/${name}.patch | fi"
-    CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}
+    CMAKE_ARGS 
+      -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} 
+      -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS_RELEASE}
+      -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+      -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS_RELEASE}
+      -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}
   )
 endfunction(dl)
 
