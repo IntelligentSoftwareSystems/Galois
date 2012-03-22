@@ -92,6 +92,14 @@ public:
   unsigned myEffectiveID() const {
     return BASE::myEID();
   }
+
+  unsigned effectiveIDFor(unsigned i) const {
+    return BASE::otherEID(i);
+  }
+
+  // bool isLeader() const {
+  //   return false;
+  // }
 };
 
 struct H_PERCPU {
@@ -101,6 +109,9 @@ struct H_PERCPU {
   unsigned getMaxSize() const {
     return LL::getMaxThreads();
   }
+  unsigned otherEID(unsigned i) const {
+    return i;
+  }
 };
 
 struct H_PERPACKAGE {
@@ -109,6 +120,9 @@ struct H_PERPACKAGE {
   }
   unsigned getMaxSize() const {
     return LL::getMaxPackages();
+  }
+  unsigned otherEID(unsigned i) const {
+    return LL::getPackageForThread(i);
   }
 };
 
