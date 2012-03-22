@@ -24,10 +24,10 @@
 #define GALOIS_RUNTIME_WORKLIST_H
 
 #include "Galois/Runtime/mem.h"
-#include "Galois/Runtime/WorkListHelpers.h"
-#include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/Threads.h"
+#include "Galois/Runtime/WorkListHelpers.h"
+#include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/util/GAlgs.h"
 
 #include <limits>
@@ -800,7 +800,7 @@ public:
 };
 WLCOMPILECHECK(ForwardAccessRange);
 
-template<bool Stealing, typename IterTy = int*>
+template<bool Stealing=false, typename IterTy = int*>
 class RandomAccessRange {
   //! Thread-local data
   struct TLD {
@@ -963,6 +963,7 @@ public:
 //WLCOMPILECHECK(OwnerComputesWL);
 
 //End namespace
+
 }
 }
 

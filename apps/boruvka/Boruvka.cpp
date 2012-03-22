@@ -31,7 +31,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 #ifdef GALOIS_EXP
-#include "PriorityScheduling/WorkList.h"
+#include "Galois/PriorityScheduling.h"
 #endif
 
 #include <string>
@@ -215,7 +215,7 @@ void runBodyParallel() {
 
    T.start();
 #ifdef GALOIS_EXP
-   Exp::StartWorklistExperiment<OBIM, dChunk, Chunk, Indexer, seq_less, seq_gt>()(std::cout, graph.begin(), graph.end(), process());
+   Exp::WorklistExperiment<OBIM, dChunk, Chunk, Indexer, seq_less, seq_gt>().for_each(std::cout, graph.begin(), graph.end(), process());
 #else
    Galois::for_each<dChunk>(graph.begin(), graph.end(), process());
 #endif

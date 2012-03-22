@@ -33,7 +33,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 #ifdef GALOIS_EXP
-#include "PriorityScheduling/WorkList.h"
+#include "Galois/PriorityScheduling.h"
 #endif
 
 #include <string>
@@ -521,7 +521,7 @@ struct MatchingABMP {
     typedef OrderedByIntegerMetric<Indexer,dChunk> OBIM;
     
 #ifdef GALOIS_EXP
-    Exp::StartWorklistExperiment<OBIM,dChunk,Chunk,Indexer,Less,Greater>()(
+    Exp::WorklistExperiment<OBIM,dChunk,Chunk,Indexer,Less,Greater>().for_each(
         std::cout, initial.begin(), initial.end(), Process(*this, g, maxLayer, size));
 #else
     Galois::for_each<OBIM>(initial.begin(), initial.end(), Process(*this, g, maxLayer, size));

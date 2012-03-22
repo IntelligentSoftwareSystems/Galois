@@ -4,7 +4,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
-#include "PriorityScheduling/WorkList.h"
+#include "Galois/PriorityScheduling.h"
 
 #include <dai/daialg.h>
 #include <dai/alldai.h>
