@@ -26,6 +26,7 @@
 #define GALOIS_RUNTIME_WORKLISTEXPERIMENTAL_H
 
 #include "Galois/Runtime/WorkList.h"
+#include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/WorkListDebug.h"
 #include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/Termination.h"
