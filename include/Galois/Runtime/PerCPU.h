@@ -97,9 +97,9 @@ public:
     return BASE::otherEID(i);
   }
 
-  // bool isLeader() const {
-  //   return false;
-  // }
+  bool isLeader() const {
+    return BASE::LocalLeader(BASE::myEID());
+  }
 };
 
 struct H_PERCPU {
@@ -112,6 +112,9 @@ struct H_PERCPU {
   unsigned otherEID(unsigned i) const {
     return i;
   }
+  bool LocalLeader(unsigned i) const {
+    return true;
+  }
 };
 
 struct H_PERPACKAGE {
@@ -123,6 +126,9 @@ struct H_PERPACKAGE {
   }
   unsigned otherEID(unsigned i) const {
     return LL::getPackageForThread(i);
+  }
+  bool LocalLeader(unsigned i) const {
+    return LL::isLeaderForPackage(i);
   }
 };
 

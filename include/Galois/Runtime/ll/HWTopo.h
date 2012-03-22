@@ -33,29 +33,47 @@
 namespace GaloisRuntime {
 namespace LL {
 
-  //Bind thread specified by id to the correct OS thread
-  bool bindThreadToProcessor(int galois_thread_id);
-  //Get number of threads supported
-  unsigned getMaxThreads();
-  //get number of cores supported
-  unsigned getMaxCores();
-  //get number of packages supported
-  unsigned getMaxPackages();
-  //map thread to package
-  unsigned getPackageForThreadInternal(int galois_thread_id);
-  //find the maximum package number for all threads up to and including id
-  unsigned getMaxPackageForThread(int galois_thread_id);
+//Bind thread specified by id to the correct OS thread
+bool bindThreadToProcessor(int galois_thread_id);
+//Get number of threads supported
+unsigned getMaxThreads();
+//get number of cores supported
+unsigned getMaxCores();
+//get number of packages supported
+unsigned getMaxPackages();
+//map thread to package
+unsigned getPackageForThreadInternal(int galois_thread_id);
+//find the maximum package number for all threads up to and including id
+unsigned getMaxPackageForThread(int galois_thread_id);
+//is This the first thread in a package
+bool isLeaderForPackageInternal(int galois_thread_id);
 
-  extern __thread unsigned PACKAGE_ID;
+extern __thread unsigned PACKAGE_ID;
 
-  static inline unsigned getPackageForThread(int galois_thread_id) {
-    unsigned x = PACKAGE_ID;
-    if (x & 1)
-      return x >> 1;
-    x = getPackageForThreadInternal(galois_thread_id);
-    PACKAGE_ID = (x << 1) | 1;
-    return x;
-  }
+static inline unsigned fillPackageID(int galois_thread_id) {
+  unsigned x = getPackageForThreadInternal(galois_thread_id);
+  bool y = isLeaderForPackageInternal(galois_thread_id);
+  x = (x << 2) | ((y ? 1 : 0) << 1) | 1;
+  PACKAGE_ID = x;
+  return x;
+}
+
+static inline unsigned getPackageForThread(int galois_thread_id) {
+  unsigned x = PACKAGE_ID;
+  if (x & 1)
+    return x >> 2;
+  x = fillPackageID(galois_thread_id);
+  return x >> 2;
+}
+
+static inline bool isLeaderForPackage(int galois_thread_id) {
+  unsigned x = PACKAGE_ID;
+  if (x & 1)
+    return (x >> 1) & 1;
+  x = fillPackageID(galois_thread_id);
+  return (x >> 1) & 1;
+}
+
 }
 }
 
