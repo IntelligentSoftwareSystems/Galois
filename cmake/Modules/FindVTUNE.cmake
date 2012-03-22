@@ -8,4 +8,3 @@ else()
 endif()
 
 find_package_handle_standard_args(VTUNE DEFAULT_MSG VTUNE_FOUND_INTERNAL)
-

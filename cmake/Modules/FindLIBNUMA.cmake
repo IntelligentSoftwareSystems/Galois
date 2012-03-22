@@ -1,2 +1,3 @@
 include(CheckLibraryExists)
-CHECK_LIBRARY_EXISTS(numa numa_available "" LIBNUMA_FOUND)
+CHECK_LIBRARY_EXISTS(numa numa_available "" LIBNUMA_FOUND_INTERNAL)
+find_package_handle_standard_args(LIBNUMA DEFAULT_MSG LIBNUMA_FOUND_INTERNAL)

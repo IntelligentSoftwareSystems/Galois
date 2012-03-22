@@ -65,11 +65,8 @@ set(RT_LINK ${CMAKE_THREAD_LIBS_INIT} ${RT_LINK})
 #NUMA (linux)
 find_package(LIBNUMA)
 if(LIBNUMA_FOUND)
-  message(STATUS "NUMA in use")
   set(RT_LINK numa ${RT_LINK})
   add_definitions(-DGALOIS_NUMA)
-else()
-  message(WARNING "NUMA specified but libnuma not found")
 endif()
 
 #LAPACK

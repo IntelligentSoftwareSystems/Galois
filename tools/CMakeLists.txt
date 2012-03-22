@@ -64,6 +64,8 @@ set(more_tools hi_pr triangle cats-gens snap GTgraph-rmat SSCA2)
 if(HAVE_CILK)
   dl(bfs-schardl http://web.mit.edu/~neboat/www/code/bfs-icc-20120304.tar.gz)
   set(more_tools ${more_tools} bfs-schardl)
+else()
+  message(STATUS "Build of Schardl BFS will be skipped because CILK is not available")
 endif()
 
 add_custom_target(more-tools)
