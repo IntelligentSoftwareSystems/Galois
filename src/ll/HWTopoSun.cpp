@@ -103,4 +103,8 @@ unsigned GaloisRuntime::LL::getPackageForThreadInternal(int id) {
   return 0;
 }
 
+bool GaloisRuntime::LL::isLeaderForPackageInternal(int id) {
+  return id == 0;
+}
+
 #endif //sun
