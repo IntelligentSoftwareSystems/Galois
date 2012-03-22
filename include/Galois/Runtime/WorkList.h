@@ -970,33 +970,36 @@ public:
 };
 WLCOMPILECHECK(StealingRandomAccessRange);
 
-template<typename OwnerFn, template<typename V> class OwnerMap = PerCPU, typename T = int, typename ChildWLTy = LIFO<> >
+template<typename OwnerFn, typename T = int>
 class OwnerComputesWL : private boost::noncopyable {
+  typedef ChunkedLIFO<256, T> cWL;
+  typedef ChunkedLIFO<256, T> pWL;
 
   OwnerFn Fn;
-  OwnerMap<typename ChildWLTy::template retype<T>::WL> Items;
-  OwnerMap<LIFO<T> > pushBuffer;
+  PerLevel<cWL> Items;
+  PerLevel<pWL> pushBuffer;
 
 public:
   template<bool newconcurrent>
   struct rethread {
-    typedef OwnerComputesWL<OwnerFn, OwnerMap, T, ChildWLTy> WL;
+    typedef OwnerComputesWL<OwnerFn, T> WL;
   };
 
   template<typename nTy>
   struct retype {
-    typedef OwnerComputesWL<OwnerFn, OwnerMap, nTy, ChildWLTy> WL;
+    typedef OwnerComputesWL<OwnerFn, nTy> WL;
   };
 
   typedef T value_type;
   
   void push(value_type val)  {
     unsigned int index = Fn(val);
+    unsigned int mindex = Items.effectiveIDFor(index);
     //std::cerr << "[" << index << "," << index % active << "]\n";
-    if (Items.effectiveIDFor(index) == Items.myEffectiveID())
-      Items.get(index).push(val);
+    if (mindex == Items.myEffectiveID())
+      Items.get(mindex).push(val);
     else
-      pushBuffer.get(index).push(val);
+      pushBuffer.get(mindex).push(val);
   }
 
   template<typename ItTy>
@@ -1011,7 +1014,14 @@ public:
   }
 
   boost::optional<value_type> pop() {
-    return Items.get().pop();
+    cWL& wl = Items.get();
+    boost::optional<value_type> retval = wl.pop();
+    if (retval)
+      return retval;
+    pWL& p = pushBuffer.get();
+    while (retval = p.pop())
+      wl.push(*retval);
+    return wl.pop();
   }
 };
 //WLCOMPILECHECK(OwnerComputesWL);
