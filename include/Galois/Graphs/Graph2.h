@@ -258,7 +258,7 @@ public:
           boost::filter_iterator<is_node,
                    typename NodeListTy::iterator> > iterator;
 
-  class OwnerFn {
+  struct OwnerFn {
     unsigned operator() (const GraphNode& g) {
       return g->node;
     }
