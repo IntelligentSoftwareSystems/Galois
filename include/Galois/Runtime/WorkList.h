@@ -800,76 +800,8 @@ public:
 };
 WLCOMPILECHECK(ForwardAccessRange);
 
-template<typename IterTy = int*>
-class StaticRandomAccessRange {
-  //! Thread-local data
-  struct TLD {
-    IterTy begin;
-    IterTy end;
-    bool init;
-  };
-
-  PerCPU<TLD> tlds;
-
-  IterTy gbegin;
-  IterTy gend;
-
-public:
-
-  //! T is the value type of the WL
-  typedef typename std::iterator_traits<IterTy>::value_type value_type;
-
-  template<bool newconcurrent>
-  struct rethread {
-    typedef StaticRandomAccessRange<IterTy> WL;
-  };
-
-  template<typename Tnew>
-  struct retype {
-    typedef StaticRandomAccessRange<IterTy> WL;
-  };
-
-  //! push a value onto the queue
-  void push(value_type val) {
-    abort();
-  }
-
-  //! push a range onto the queue
-  template<typename Iter>
-  void push(Iter b, Iter e) {
-    abort();
-  }
-
-  //stager each thread's start item
-  void push_initial(IterTy b, IterTy e) {
-    gbegin = b;
-    gend = e;
-    for (unsigned i = 0; i < tlds.size(); ++i)
-      tlds.get(i).init = false;
-  }
-
-  //! pop a value from the queue.
-  // move through range in num thread strides
-  boost::optional<value_type> pop() {
-    TLD& tld = tlds.get();
-    if (!tld.init) {
-      unsigned num = ThreadPool::getActiveThreads();
-      unsigned len = std::distance(gbegin,gend);
-      unsigned per = (len + num - 1) / num;
-      unsigned i = tlds.myEffectiveID();
-      tld.begin = gbegin + per * i;
-      tld.end = tld.begin + std::min(per, (unsigned)std::distance(tld.begin, gend));
-      tld.init = true;
-    }
-    if (tld.begin != tld.end)
-      return boost::optional<value_type>(*tld.begin++);
-    return boost::optional<value_type>();
-  }
-};
-WLCOMPILECHECK(StaticRandomAccessRange);
-
-template<typename IterTy = int*>
-class StealingRandomAccessRange {
+template<bool Stealing, typename IterTy = int*>
+class RandomAccessRange {
   //! Thread-local data
   struct TLD {
     IterTy begin;
@@ -921,12 +853,12 @@ public:
 
   template<bool newconcurrent>
   struct rethread {
-    typedef StealingRandomAccessRange<IterTy> WL;
+    typedef RandomAccessRange<Stealing,IterTy> WL;
   };
 
   template<typename Tnew>
   struct retype {
-    typedef StealingRandomAccessRange<IterTy> WL;
+    typedef RandomAccessRange<Stealing,IterTy> WL;
   };
 
   //! push a value onto the queue
@@ -957,18 +889,22 @@ public:
       unsigned len = std::distance(gbegin,gend);
       unsigned per = (len + num - 1) / num;
       unsigned i = tlds.myEffectiveID();
-      tld.stealBegin = gbegin + per * i;
-      tld.stealEnd = tld.stealBegin + std::min(per, (unsigned)std::distance(tld.stealBegin, gend));
+      tld.begin = gbegin + per * i;
+      tld.end = tld.begin + std::min(per, (unsigned)std::distance(tld.begin, gend));
+      if (Stealing) {
+	tld.stealEnd = tld.end;
+	tld.stealBegin = tld.end = Galois::split_range(tld.begin, tld.end);
+      }
       tld.init = true;
     }
-    if (tld.begin == tld.end)
+    if (Stealing && tld.begin == tld.end)
       try_steal(tld);
     if (tld.begin != tld.end)
       return boost::optional<value_type>(*tld.begin++);
     return boost::optional<value_type>();
   }
 };
-WLCOMPILECHECK(StealingRandomAccessRange);
+WLCOMPILECHECK(RandomAccessRange);
 
 template<typename OwnerFn, typename T = int>
 class OwnerComputesWL : private boost::noncopyable {

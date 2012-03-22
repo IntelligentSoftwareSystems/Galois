@@ -145,7 +145,7 @@ static inline void do_all_dispatch(const IterTy& begin, const IterTy& end, const
     std::for_each(begin, end, fn);
 #endif
   } else {
-    typedef GaloisRuntime::WorkList::StealingRandomAccessRange<IterTy> WL;
+    typedef GaloisRuntime::WorkList::RandomAccessRange<false,IterTy> WL;
     GaloisRuntime::do_all_impl<WL>(begin, end, fn, loopname);
   }
 }
