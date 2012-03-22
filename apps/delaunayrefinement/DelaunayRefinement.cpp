@@ -45,8 +45,7 @@
 #include "Lonestar/BoilerPlate.h"
 
 #ifdef GALOIS_EXP
-#include "Galois/Runtime/WorkListAlt.h"
-#include "PriorityScheduling/WorkList.h"
+#include "Galois/PriorityScheduling.h"
 #endif
 
 namespace cll = llvm::cl;
@@ -223,9 +222,9 @@ int main(int argc, char** argv) {
   //Galois::for_each<Alt::ChunkedAdaptor<Alt::InitialQueue<Alt::LevelStealingAlt, Alt::LevelLocalAlt>, 256*4*4> >(wl.begin(), wl.end(), process());
   typedef dChunkedLIFO<256> dChunk;
   typedef ChunkedLIFO<256> Chunk;
-  Exp::StartWorklistExperiment<
+  Exp::WorklistExperiment<
     LocalQueues<dChunk, LIFO<> >, 
-    dChunk,Chunk,Indexer,Less,Greater>()(
+    dChunk,Chunk,Indexer,Less,Greater>().for_each(
       std::cout, wl.begin(), wl.end(), process());
 #else
   Galois::for_each<LocalQueues<dChunkedLIFO<256>, LIFO<> > >(wl.begin(), wl.end(), process());
