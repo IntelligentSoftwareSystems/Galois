@@ -603,6 +603,13 @@ public:
     }
   }
 
+  // void flush() {
+  //   p& n = data.get();
+  //   if (n.next)
+  //     pushChunk(n.next);
+  //   n.next = 0;
+  // }
+
   void push(value_type val)  {
     p& n = data.get();
     if (n.next && n.next->push_back(val))
@@ -669,66 +676,6 @@ WLCOMPILECHECK(dChunkedFIFO);
 template<int chunksize=64, typename T = int, bool concurrent=true>
 class dChunkedLIFO : public ChunkedMaster<T, ConExtLinkedStack, true, true, chunksize, concurrent> {};
 WLCOMPILECHECK(dChunkedLIFO);
-
-//Weird WorkList where push and pop are different types
-template<typename IterTy, bool concurrent = true>
-class TileAdaptor {
-  typedef typename std::iterator_traits<IterTy>::value_type T;
-  typedef typename boost::reference_wrapper<T> wlT;
-
-  std::deque<wlT> wl;
-  LL::SimpleLock<concurrent> Lock;
-
-  typename T::iterator ii, ee;
-
-public:
-  typedef typename std::iterator_traits<typename T::iterator>::value_type value_type;
-
-  template<bool newconcurrent>
-  struct rethread {
-    typedef TileAdaptor<IterTy, newconcurrent> WL;
-  };
-
-  template<typename Tnew>
-  struct retype {
-    typedef TileAdaptor<IterTy, concurrent> WL;
-  };
-
-  void push(wlT val) {
-    Lock.lock();
-    wl.push_front(val);
-    Lock.unlock();
-  }
-
-  template<typename Iter>
-  void push(Iter b, Iter e) {
-    while (b != e)
-      push(boost::ref(*b++));
-  }
-
-  template<typename Iter>
-  void push_initial(Iter b, Iter e) {
-    push(b,e);
-  }
-
-  boost::optional<value_type> pop() {
-    Lock.lock();
-    while (ii == ee) {
-      if (wl.empty()) {
-	Lock.unlock();
-	return boost::optional<value_type>();
-      } else {
-	T t = wl.back();
-	ii = t.begin();
-	ee = t.end();
-	wl.pop_back();
-      }
-    }
-    boost::optional<value_type> retval = boost::optional<value_type>(*ii++);
-    Lock.unlock();
-    return retval;
-  }
-};
 
 //FIXME: make this valid for input iterators (e.g. no default constructor)
 template<typename IterTy = int*>
@@ -889,8 +836,10 @@ public:
       unsigned len = std::distance(gbegin,gend);
       unsigned per = (len + num - 1) / num;
       unsigned i = tlds.myEffectiveID();
-      tld.begin = gbegin + per * i;
-      tld.end = tld.begin + std::min(per, (unsigned)std::distance(tld.begin, gend));
+      tld.begin = gbegin;
+      std::advance(tld.begin, per * i);
+      tld.end = tld.begin;
+      std::advance(tld.end,std::min(per, (unsigned)std::distance(tld.begin, gend)));
       if (Stealing) {
 	tld.stealEnd = tld.end;
 	tld.stealBegin = tld.end = Galois::split_range(tld.begin, tld.end);
@@ -909,6 +858,7 @@ WLCOMPILECHECK(RandomAccessRange);
 template<typename OwnerFn, typename T = int>
 class OwnerComputesWL : private boost::noncopyable {
   typedef ChunkedLIFO<256, T> cWL;
+  //  typedef ChunkedLIFO<256, T> pWL;
   typedef ChunkedLIFO<256, T> pWL;
 
   OwnerFn Fn;
@@ -947,6 +897,8 @@ public:
   template<typename ItTy>
   void push_initial(ItTy b, ItTy e) {
     push(b,e);
+    for (int x = 0; x < pushBuffer.size(); ++x)
+      pushBuffer.get(x).flush();
   }
 
   boost::optional<value_type> pop() {
