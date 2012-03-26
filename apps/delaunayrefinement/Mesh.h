@@ -43,9 +43,14 @@ struct is_bad {
 struct processCreate {
   Graph* lmesh;
   processCreate(Graph* _lmesh) :lmesh(_lmesh) {}
-  template<typename Context>
-  void operator()(Element item, Context& lwl) {
+  void operator()(Element& item) {
     lmesh->createNode(item);
+  }
+};
+
+struct centerCmp {
+  bool operator()(const Element& lhs, const Element& rhs) const {
+    return lhs.getCenter() < rhs.getCenter();
   }
 };
 
@@ -130,7 +135,8 @@ private:
   }
 
   void makeGraph(Graph* mesh) {
-    Galois::for_each<>(elements.begin(), elements.end(), processCreate(mesh));
+    std::sort(elements.begin(), elements.end(), centerCmp());
+    Galois::do_all(elements.begin(), elements.end(), processCreate(mesh));
     std::map<Edge, GNode> edge_map;
     for (Graph::iterator ii = mesh->begin(), ee = mesh->end();
 	 ii != ee; ++ii)

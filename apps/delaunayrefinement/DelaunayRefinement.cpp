@@ -45,7 +45,7 @@
 #include "Lonestar/BoilerPlate.h"
 
 #ifdef GALOIS_EXP
-#include "Galois/PriorityScheduling.h"
+//#include "Galois/PriorityScheduling.h"
 #endif
 
 namespace cll = llvm::cl;
@@ -173,8 +173,13 @@ struct preprocess {
     if (mesh->getData(item, Galois::NONE).isBad())
       wl.push(item);
   }
+  void operator()(Graph::GTile item) const {
+    for (typename Graph::GTile::iterator ii = item.begin(), ee = item.end();
+	 ii != ee; ++ii)
+      if (mesh->getData(*ii, Galois::NONE).isBad())
+	wl.push(*ii);
+  }
 };
-
 
 
 struct Indexer: public std::unary_function<const GNode&,unsigned> {
@@ -205,20 +210,21 @@ int main(int argc, char** argv) {
   std::cout << "configuration: " << std::distance(mesh->begin(), mesh->end())
 	    << " total triangles, " << std::count_if(mesh->begin(), mesh->end(), is_bad(mesh)) << " bad triangles\n";
 
+  std::cout << "MEMINFO P1: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
+  Galois::preAlloc(15 * numThreads + GaloisRuntime::MM::pageAllocInfo() * 8);
+  std::cout << "MEMINFO P2: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
+
   Galois::StatTimer Touter("outertime");
   Touter.start();
 
-  std::cout << "MEMINFO P1: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
-  Galois::do_all(mesh->begin(), mesh->end(), preprocess());
-  std::cout << "MEMINFO P2: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
-
-  Galois::preAlloc(10 * numThreads + GaloisRuntime::MM::pageAllocInfo() * 5);
+  Galois::do_all(mesh->tile_begin(), mesh->tile_end(), preprocess());
   std::cout << "MEMINFO MID: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
 
   Galois::StatTimer T;
   T.start();
   using namespace GaloisRuntime::WorkList;
-#ifdef GALOIS_EXP
+  //#ifdef GALOIS_EXP
+#if 0
   //Galois::for_each<Alt::ChunkedAdaptor<Alt::InitialQueue<Alt::LevelStealingAlt, Alt::LevelLocalAlt>, 256*4*4> >(wl.begin(), wl.end(), process());
   typedef dChunkedLIFO<256> dChunk;
   typedef ChunkedLIFO<256> Chunk;
@@ -227,7 +233,8 @@ int main(int argc, char** argv) {
     dChunk,Chunk,Indexer,Less,Greater>().for_each(
       std::cout, wl.begin(), wl.end(), process());
 #else
-  Galois::for_each<LocalQueues<dChunkedLIFO<256>, LIFO<> > >(wl.begin(), wl.end(), process());
+  Galois::for_each<LocalQueues<dChunkedLIFO<256>, ChunkedLIFO<256> /*LIFO<>*/ > >(wl.begin(), wl.end(), process());
+  //Galois::for_each<OwnerComputesWL<Graph::OwnerFn, int> >(wl.begin(), wl.end(), process());
 #endif
   T.stop();
   Touter.stop();
