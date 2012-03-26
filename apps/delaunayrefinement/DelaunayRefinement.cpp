@@ -174,7 +174,7 @@ struct preprocess {
       wl.push(item);
   }
   void operator()(Graph::GTile item) const {
-    for (typename Graph::GTile::iterator ii = item.begin(), ee = item.end();
+    for (Graph::GTile::iterator ii = item.begin(), ee = item.end();
 	 ii != ee; ++ii)
       if (mesh->getData(*ii, Galois::NONE).isBad())
 	wl.push(*ii);
