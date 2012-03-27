@@ -709,7 +709,7 @@ int main(int argc, char **argv) {
   }
 
   std::cout
-    << "MEMINFO P2: " << GaloisRuntime::MM::pageAllocInfo() << " pages " <<
+    << "MEMINFO P2: " << GaloisRuntime::MM::pageAllocInfo() << " pages "
 //    << "and "
 //    << "(large: " << GaloisRuntime::MM::largeAllocInfo() << " bytes)"
     << "\n";
