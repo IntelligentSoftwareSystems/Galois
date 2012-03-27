@@ -688,8 +688,9 @@ int main(int argc, char **argv) {
   GNode source, report;
   readGraph(source, report);
   std::cout
-    << "MEMINFO P1: " << GaloisRuntime::MM::pageAllocInfo() << " pages and "
-    << "(large: " << GaloisRuntime::MM::largeAllocInfo() << " bytes)"
+    << "MEMINFO P1: " << GaloisRuntime::MM::pageAllocInfo() << " pages "
+//    << "and "
+//    << "(large: " << GaloisRuntime::MM::largeAllocInfo() << " bytes)"
     << "\n";
 
   switch (algo) {
@@ -708,8 +709,9 @@ int main(int argc, char **argv) {
   }
 
   std::cout
-    << "MEMINFO P2: " << GaloisRuntime::MM::pageAllocInfo() << " pages and "
-    << "(large: " << GaloisRuntime::MM::largeAllocInfo() << " bytes)"
+    << "MEMINFO P2: " << GaloisRuntime::MM::pageAllocInfo() << " pages " <<
+//    << "and "
+//    << "(large: " << GaloisRuntime::MM::largeAllocInfo() << " bytes)"
     << "\n";
 
   std::cout << "Report node: " << graph.getData(report) << "\n";
