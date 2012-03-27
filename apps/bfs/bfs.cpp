@@ -26,7 +26,6 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-
 #include "Galois/Galois.h"
 #include "Galois/Bag.h"
 #include "Galois/Timer.h"
@@ -36,6 +35,7 @@
 #include "Galois/PriorityScheduling.h"
 #endif
 #include "llvm/Support/CommandLine.h"
+#include "llvm/ADT/SmallVector.h"
 #include "Lonestar/BoilerPlate.h"
 
 #include <string>
@@ -56,6 +56,8 @@ enum BFSAlgo {
   serial,
   serialOpt,
   serialSet,
+  serialBarrier,
+  serialBare,
   galois,
   galoisOpt,
   galoisSet,
@@ -76,6 +78,8 @@ static cll::opt<BFSAlgo> algo(cll::desc("Choose an algorithm:"),
       clEnumVal(serial, "Serial"),
       clEnumVal(serialOpt, "Serial optimized "),
       clEnumVal(serialSet, "Serial optimized with workset semantics"),
+      clEnumVal(serialBarrier, "Serial optimized with workset and barrier"),
+      clEnumVal(serialBare, "Serial optimized with bare runtime"),
       clEnumVal(galois, "Galois"),
       clEnumVal(galoisOpt, "Galois optimized"),
       clEnumVal(galoisSet, "Galois optimized with workset semantics"),
@@ -92,9 +96,7 @@ static const unsigned int DIST_INFINITY =
 
 //****** Work Item and Node Data Defintions ******
 struct SNode {
-  unsigned int id;
   unsigned int dist;
-  bool flag;
 };
 
 typedef Galois::Graph::LC_Linear_Graph<SNode, void> Graph;
@@ -110,11 +112,11 @@ struct UpdateRequest {
   UpdateRequest(const GNode& N, unsigned int W): n(N), w(W) { }
   bool operator<(const UpdateRequest& o) const { return w < o.w; }
   bool operator>(const UpdateRequest& o) const { return w > o.w; }
-  unsigned getID() const { return graph.getData(n).id; }
+  unsigned getID() const { return /* graph.getData(n).id; */ 0; }
 };
 
 std::ostream& operator<<(std::ostream& out, const SNode& n) {
-  out << "(id: " << n.id << ", dist: " << n.dist << ")";
+  out <<  "(dist: " << n.dist << ")";
   return out;
 }
 
@@ -150,12 +152,14 @@ static bool verify(GNode source) {
     return false;
   }
   
+  size_t id = 0;
+
   for (Graph::iterator src = graph.begin(), ee =
-	 graph.end(); src != ee; ++src) {
+	 graph.end(); src != ee; ++src, ++id) {
     unsigned int dist = graph.getData(*src).dist;
     if (dist >= DIST_INFINITY) {
       std::cerr
-        << "found node = " << graph.getData(*src).id
+        << "found node = " << id
 	<< " with label >= INFINITY = " << dist << "\n";
       return false;
     }
@@ -166,9 +170,7 @@ static bool verify(GNode source) {
       GNode neighbor = graph.getEdgeDst(ii);
       unsigned int ddist = graph.getData(*src).dist;
       if (ddist > dist + 1) {
-        std::cerr
-          << "bad level value at " << graph.getData(*src).id
-	  << " which is a neighbor of " << graph.getData(neighbor).id << "\n";
+        std::cerr << "bad level value at "  << id << "\n";
 	return false;
       }
     }
@@ -184,23 +186,22 @@ static void readGraph(GNode& source, GNode& report) {
 
   std::cout << "Read " << graph.size() << " nodes\n";
   
-  unsigned int id = 0;
+  size_t id = 0;
   bool foundReport = false;
   bool foundSource = false;
   for (Graph::iterator src = graph.begin(), ee =
       graph.end(); src != ee; ++src) {
     SNode& node = graph.getData(*src, Galois::NONE);
-    node.id = id++;
     node.dist = DIST_INFINITY;
-    node.flag = false;
-    if (node.id == startNode) {
+    if (id == startNode) {
       source = *src;
       foundSource = true;
     } 
-    if (node.id == reportNode) {
+    if (id == reportNode) {
       foundReport = true;
       report = *src;
     }
+    ++id;
   }
 
   if (!foundReport || !foundSource) {
@@ -298,7 +299,6 @@ struct SerialWorkSet {
            ei = graph.edge_end(source); ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
       SNode& ddata = graph.getData(dst);
-      ddata.flag = true;
       ddata.dist = 1;
       wl.push_back(dst);
     }
@@ -310,7 +310,6 @@ struct SerialWorkSet {
       counter += 1;
 
       SNode& data = graph.getData(n);
-      data.flag = false;
 
       unsigned int newDist = data.dist + 1;
 
@@ -319,8 +318,7 @@ struct SerialWorkSet {
         GNode dst = graph.getEdgeDst(ii);
         SNode& ddata = graph.getData(dst);
 
-        if (newDist < ddata.dist && !ddata.flag) {
-          ddata.flag = true;
+        if (newDist < ddata.dist) {
           ddata.dist = newDist;
           wl.push_back(dst);
         }
@@ -328,6 +326,114 @@ struct SerialWorkSet {
     }
   }
 };
+
+//! Serial BFS using optimized flags and workset semantics
+struct SerialBarrier {
+  typedef std::vector<GNode> WL;
+
+  std::string name() const { return "Serial (Barrier)"; }
+
+  void operator()(const GNode source) const {
+    Galois::Statistic<unsigned int> counter("Iterations");
+
+    WL wls[2];
+
+    graph.getData(source).dist = 0;
+
+    for (Graph::edge_iterator ii = graph.edge_begin(source), 
+           ei = graph.edge_end(source); ii != ei; ++ii) {
+      GNode dst = graph.getEdgeDst(ii);
+      SNode& ddata = graph.getData(dst);
+      ddata.dist = 1;
+      wls[0].push_back(dst);
+    }
+
+    unsigned newDist = 1;
+    unsigned next = 0;
+    unsigned cur;
+
+    do {
+      cur = next;
+      next = (next + 1) & 1;
+      ++newDist;
+      WL& wl = wls[cur];
+      WL& wlNext = wls[next];
+
+      while (!wl.empty()) {
+        GNode n = wl.back();
+        wl.pop_back();
+
+        counter += 1;
+
+        for (Graph::edge_iterator ii = graph.edge_begin(n),
+              ei = graph.edge_end(n); ii != ei; ++ii) {
+          GNode dst = graph.getEdgeDst(ii);
+          SNode& ddata = graph.getData(dst);
+
+          if (newDist < ddata.dist) {
+            ddata.dist = newDist;
+            wlNext.push_back(dst);
+          }
+        }
+      }
+    } while (!wls[next].empty());
+  }
+};
+
+//! Serial BFS using optimized flags and workset semantics
+struct SerialBare {
+  std::string name() const { return "Serial (Bare)"; }
+
+  void operator()(const GNode source) const {
+    typedef GaloisRuntime::WorkList::FIFO<GNode,false> WL;
+
+    Galois::Statistic<unsigned int> counter("Iterations");
+
+    WL wls[2];
+    graph.getData(source).dist = 0;
+
+    for (Graph::edge_iterator ii = graph.edge_begin(source), 
+           ei = graph.edge_end(source); ii != ei; ++ii) {
+      GNode dst = graph.getEdgeDst(ii);
+      SNode& ddata = graph.getData(dst);
+      ddata.dist = 1;
+      wls[0].push(dst);
+    }
+
+    unsigned newDist = 1;
+    unsigned next = 0;
+    unsigned cur;
+    boost::optional<GNode> r = wls[0].pop();
+
+    do {
+      cur = next;
+      next = (next + 1) & 1;
+      ++newDist;
+      WL& wl = wls[cur];
+      WL& wlNext = wls[next];
+
+      while (r) {
+        GNode n = *r;
+
+        counter += 1;
+
+        for (Graph::edge_iterator ii = graph.edge_begin(n),
+              ei = graph.edge_end(n); ii != ei; ++ii) {
+          GNode dst = graph.getEdgeDst(ii);
+          SNode& ddata = graph.getData(dst);
+
+          if (newDist < ddata.dist) {
+            ddata.dist = newDist;
+            wlNext.push(dst);
+          }
+        }
+        r = wl.pop();
+      }
+      r = wlNext.pop();
+    } while (r);
+  }
+};
+
 
 //! Galois BFS
 struct GaloisAlgo {
@@ -408,6 +514,8 @@ struct GaloisNoLockAlgo {
 
 //! Galois BFS using optimized flags and workset semantics
 struct GaloisWorkSet {
+  typedef int tt_does_not_need_aborts;
+
   std::string name() const { return "Galois (Workset)"; }
 
   void operator()(const GNode& source) const {
@@ -422,7 +530,6 @@ struct GaloisWorkSet {
           ei = graph.edge_end(source); ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
       SNode& ddata = graph.getData(dst);
-      ddata.flag = true;
       ddata.dist = 1;
       initial.push_back(dst);
     }
@@ -436,11 +543,7 @@ struct GaloisWorkSet {
 
   void operator()(GNode& n, Galois::UserContext<GNode>& ctx) const {
     SNode& data = graph.getData(n, Galois::NONE);
-    data.flag = false;
 
-    // TODO(ddn): Check if this is actually correct
-    asm volatile ("":::"memory");
-    
     unsigned int newDist = data.dist + 1;
 
     for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::NONE),
@@ -454,10 +557,7 @@ struct GaloisWorkSet {
         if (oldDist <= newDist)
           break;
         if (__sync_bool_compare_and_swap(&ddata.dist, oldDist, newDist)) {
-          if (!ddata.flag) {
-            ddata.flag = true;
-            ctx.push(dst);
-          }
+          ctx.push(dst);
           break;
         }
       }
@@ -471,15 +571,10 @@ struct GaloisManualBarrier {
 
   struct Fn {
     Galois::InsertBag<GNode>& wl;
-
-    Fn(Galois::InsertBag<GNode>& w): wl(w) { }
+    unsigned int newDist;
+    Fn(Galois::InsertBag<GNode>& w, unsigned int d): wl(w), newDist(d) { }
 
     void operator()(GNode& n) {
-      SNode& data = graph.getData(n, Galois::NONE);
-      data.flag = false;
-
-      unsigned int newDist = data.dist + 1;
-
       for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::NONE),
             ei = graph.edge_end(n, Galois::NONE); ii != ei; ++ii) {
         GNode dst = graph.getEdgeDst(ii);
@@ -488,11 +583,8 @@ struct GaloisManualBarrier {
         if (ddata.dist <= newDist)
           continue;
         
-        if (!ddata.flag) {
-          ddata.dist = newDist;
-          ddata.flag = true;
-          wl.push(dst);
-        }
+        ddata.dist = newDist;
+        wl.push(dst);
       }
     }
   };
@@ -507,16 +599,18 @@ struct GaloisManualBarrier {
       GNode dst = graph.getEdgeDst(ii);
       SNode& ddata = graph.getData(dst);
       ddata.dist = 1;
-      ddata.flag = true;
       wls[round].push(dst);
     }
 
+    unsigned int newDist = 2;
+
     while (true) {
       unsigned next = (round + 1) & 1;
-      Galois::do_all(wls[round].begin(), wls[round].end(), Fn(wls[next]));
+      Galois::do_all(wls[round].begin(), wls[round].end(), Fn(wls[next], newDist));
       wls[round].clear();
       Galois::InsertBag<GNode>& next_wl = wls[next];
       round = next;
+      ++newDist;
       if (next_wl.begin() == next_wl.end())
         break;
     }
@@ -527,9 +621,10 @@ struct GaloisManualBarrier {
 template<bool useCas>
 struct GaloisBarrier {
   std::string name() const { return "Galois (Barrier)"; }
+  typedef std::pair<GNode,int> ItemTy;
 
   void operator()(const GNode& source) const {
-    std::vector<GNode> initial;
+    std::vector<ItemTy> initial;
 
     graph.getData(source).dist = 0;
     for (Graph::edge_iterator ii = graph.edge_begin(source),
@@ -537,24 +632,25 @@ struct GaloisBarrier {
       GNode dst = graph.getEdgeDst(ii);
       SNode& ddata = graph.getData(dst);
       ddata.dist = 1;
-      ddata.flag = true;
-      initial.push_back(dst);
+      initial.push_back(ItemTy(dst, 2));
     }
 
 #ifdef GALOIS_EXP
     using namespace GaloisRuntime::WorkList;
-    Galois::for_each<BulkSynchronous<dChunkedLIFO<512> > >(initial.begin(), initial.end(), *this);
+    //GaloisRuntime::for_each_x(initial.begin(), initial.end(), *this);
+    //else
+    //Galois::for_each<FIFO<int,false> >(initial.begin(), initial.end(), *this);
+    //Galois::for_each<BulkSynchronous<dChunkedLIFO<256> > >(initial.begin(), initial.end(), *this);
 #else
     std::cerr << "Need Galois EXP support\n";
     abort();
 #endif
   }
 
-  void operator()(GNode& n, Galois::UserContext<GNode>& ctx) {
-    SNode& data = graph.getData(n, Galois::NONE);
-    data.flag = false;
+  void operator()(const ItemTy& item, Galois::UserContext<ItemTy>& ctx) const {
+    GNode n = item.first;
 
-    unsigned int newDist = data.dist + 1;
+    unsigned int newDist = item.second;
 
     for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::NONE),
           ei = graph.edge_end(n, Galois::NONE); ii != ei; ++ii) {
@@ -567,12 +663,9 @@ struct GaloisBarrier {
         if (oldDist <= newDist)
           break;
         if (!useCas || __sync_bool_compare_and_swap(&ddata.dist, oldDist, newDist)) {
-          if (!ddata.flag) {
-            if (!useCas)
-              ddata.dist = newDist;
-            ddata.flag = true;
-            ctx.push(dst);
-          }
+          if (!useCas)
+            ddata.dist = newDist;
+          ctx.push(ItemTy(dst, newDist + 1));
           break;
         }
       }
@@ -594,11 +687,17 @@ int main(int argc, char **argv) {
 
   GNode source, report;
   readGraph(source, report);
+  std::cout
+    << "MEMINFO P1: " << GaloisRuntime::MM::pageAllocInfo() << " pages and "
+    << "(large: " << GaloisRuntime::MM::largeAllocInfo() << " bytes)"
+    << "\n";
 
   switch (algo) {
     case serial: run(SerialAlgo(), source); break;
     case serialOpt: run(SerialFlagOptAlgo(), source); break;
     case serialSet: run(SerialWorkSet(), source); break;
+    case serialBarrier: run(SerialBarrier(), source); break;
+    case serialBare: run(SerialBare(), source); break;
     case galois: run(GaloisAlgo(), source); break;
     case galoisOpt: run(GaloisNoLockAlgo(), source); break;
     case galoisSet: run(GaloisWorkSet(), source);  break;
@@ -607,6 +706,11 @@ int main(int argc, char **argv) {
     case galoisBarrier: run(GaloisBarrier<false>(), source); break;
     default: std::cerr << "Unknown algorithm" << algo << "\n"; abort();
   }
+
+  std::cout
+    << "MEMINFO P2: " << GaloisRuntime::MM::pageAllocInfo() << " pages and "
+    << "(large: " << GaloisRuntime::MM::largeAllocInfo() << " bytes)"
+    << "\n";
 
   std::cout << "Report node: " << graph.getData(report) << "\n";
 
