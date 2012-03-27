@@ -211,7 +211,7 @@ int main(int argc, char** argv) {
 	    << " total triangles, " << std::count_if(mesh->begin(), mesh->end(), is_bad(mesh)) << " bad triangles\n";
 
   std::cout << "MEMINFO P1: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
-  Galois::preAlloc(15 * numThreads + GaloisRuntime::MM::pageAllocInfo() * 8);
+  Galois::preAlloc(15 * numThreads + GaloisRuntime::MM::pageAllocInfo() * 10);
   std::cout << "MEMINFO P2: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
 
   Galois::StatTimer Touter("outertime");
