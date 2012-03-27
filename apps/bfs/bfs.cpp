@@ -437,6 +437,9 @@ struct SerialBare {
 
 //! Galois BFS
 struct GaloisAlgo {
+  typedef int tt_does_not_need_aborts;
+  typedef int tt_does_not_need_stats;
+
   std::string name() const { return "Galois"; }
 
   void operator()(const GNode& source) const {
@@ -474,6 +477,9 @@ struct GaloisAlgo {
 
 //! Galois BFS using optimized flags
 struct GaloisNoLockAlgo {
+  typedef int tt_does_not_need_aborts;
+  typedef int tt_does_not_need_stats;
+
   std::string name() const { return "Galois (No Lock)"; }
 
   void operator()(const GNode& source) const {
@@ -515,6 +521,7 @@ struct GaloisNoLockAlgo {
 //! Galois BFS using optimized flags and workset semantics
 struct GaloisWorkSet {
   typedef int tt_does_not_need_aborts;
+  typedef int tt_does_not_need_stats;
 
   std::string name() const { return "Galois (Workset)"; }
 
@@ -620,6 +627,9 @@ struct GaloisManualBarrier {
 //! Galois BFS using optimized flags and barrier scheduling 
 template<bool useCas>
 struct GaloisBarrier {
+  typedef int tt_does_not_need_aborts;
+  typedef int tt_does_not_need_stats;
+
   std::string name() const { return "Galois (Barrier)"; }
   typedef std::pair<GNode,int> ItemTy;
 
@@ -639,7 +649,7 @@ struct GaloisBarrier {
     using namespace GaloisRuntime::WorkList;
     //GaloisRuntime::for_each_x(initial.begin(), initial.end(), *this);
     //else
-    //Galois::for_each<FIFO<int,false> >(initial.begin(), initial.end(), *this);
+    Galois::for_each<FIFO<int,false> >(initial.begin(), initial.end(), *this);
     //Galois::for_each<BulkSynchronous<dChunkedLIFO<256> > >(initial.begin(), initial.end(), *this);
 #else
     std::cerr << "Need Galois EXP support\n";

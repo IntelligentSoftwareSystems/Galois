@@ -35,11 +35,11 @@ namespace GaloisRuntime {
 template<typename FunctionTy>
 struct ForeachTraits {
   enum {
-    CollectStats = !Galois::does_not_need_stats<FunctionTy>::value,
+    NeedsStats = !Galois::does_not_need_stats<FunctionTy>::value,
     NeedsBreak = Galois::needs_parallel_break<FunctionTy>::value,
     NeedsPush = !Galois::does_not_need_parallel_push<FunctionTy>::value,
-    NeedsContext = !Galois::does_not_need_context<FunctionTy>::value,
-    NeedsPIA = Galois::needs_per_iter_alloc<FunctionTy>::value
+    NeedsPIA = Galois::needs_per_iter_alloc<FunctionTy>::value,
+    NeedsAborts = !Galois::does_not_need_aborts<FunctionTy>::value
   };
 };
 

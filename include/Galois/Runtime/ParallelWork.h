@@ -28,9 +28,6 @@
 #ifndef GALOIS_RUNTIME_PARALLELWORK_H
 #define GALOIS_RUNTIME_PARALLELWORK_H
 
-#include <algorithm>
-
-
 #include "Galois/Mem.h"
 #include "Galois/Runtime/ForeachTraits.h"
 #include "Galois/Runtime/Config.h"
@@ -45,6 +42,8 @@
 #ifdef GALOIS_EXP
 #include "Galois/Runtime/SimpleTaskPool.h"
 #endif
+
+#include <algorithm>
 
 namespace GaloisRuntime {
 
@@ -119,49 +118,68 @@ class ForEachWork {
   LL::CacheLineStorage<volatile long> break_happened; //hit flag
   LL::CacheLineStorage<volatile long> abort_happened; //hit flag
 
-  void finishIteration(bool aborting, value_type val, ThreadLocalData& tld) {
-    if (aborting) {
-      clearConflictLock();
-      tld.cnx.cancel_iteration();
-      tld.stat.inc_conflicts();
-      __sync_synchronize();
-      aborted.push(val);
-      abort_happened.data = 1;
-      //don't listen to breaks from aborted iterations
-      tld.facing.__resetBreak();
-      //clear push buffer
-      tld.facing.__resetPushBuffer();
-    }
-
+  void commitIteration(ThreadLocalData& tld) {
     if (ForeachTraits<FunctionTy>::NeedsPush) {
       global_wl.push(tld.facing.__getPushBuffer().begin(),
 		     tld.facing.__getPushBuffer().end());
       tld.facing.__resetPushBuffer();
     }
 
-    // NB: since push buffer uses PIA, reset after getting push buffer
-    tld.facing.__resetAlloc();
-    if (ForeachTraits<FunctionTy>::NeedsBreak)
-      if (tld.facing.__breakHappened())
-        break_happened.data = 1;
-    if (!aborting)
+    if (ForeachTraits<FunctionTy>::NeedsPIA)
+      tld.facing.__resetAlloc();
+    if (ForeachTraits<FunctionTy>::NeedsBreak && tld.facing.__breakHappened())
+      break_happened.data = 1;
+    if (ForeachTraits<FunctionTy>::NeedsAborts)
       tld.cnx.commit_iteration();
   }
 
-  void doProcess(value_type val, ThreadLocalData& tld) {
-    tld.stat.inc_iterations();
-    tld.cnx.start_iteration();
-    bool aborted = false;
+  __attribute__((noinline))
+  void abortIteration(value_type val, ThreadLocalData& tld) {
+    assert(ForeachTraits<FunctionTy>::NeedsAborts);
+
+    clearConflictLock();
+    if (ForeachTraits<FunctionTy>::NeedsAborts)
+      tld.cnx.cancel_iteration();
+    if (ForeachTraits<FunctionTy>::NeedsStats)
+      tld.stat.inc_conflicts();
+    __sync_synchronize();
+    aborted.push(val);
+    abort_happened.data = 1;
+    //don't listen to breaks from aborted iterations
+    tld.facing.__resetBreak();
+    //clear push buffer
+    tld.facing.__resetPushBuffer();
+
+    if (ForeachTraits<FunctionTy>::NeedsPIA)
+      tld.facing.__resetAlloc();
+  }
+
+  // NB(ddn): Be careful about modifying this function. Small functions can be
+  // sensitive to instruction cache behavior which is based on compiler inlining
+  // heuristics and therefore fragile
+  template<bool doOne>
+  void doProcess(boost::optional<value_type> p, ThreadLocalData& tld) {
     try {
-      f(val, tld.facing);
+      do {
+        if (ForeachTraits<FunctionTy>::NeedsStats)
+          tld.stat.inc_iterations();
+        if (ForeachTraits<FunctionTy>::NeedsAborts)
+          tld.cnx.start_iteration();
+        f(*p, tld.facing);
+        commitIteration(tld);
+        if (ForeachTraits<FunctionTy>::NeedsBreak && break_happened.data)
+	  break;
+        if (doOne)
+          break;
+        p = global_wl.pop();
+      } while (p);
     } catch (int a) {
-      aborted = true;
+      abortIteration(*p, tld);
     }
-    finishIteration(aborted, val, tld);
   }
 
   template<bool isLeader>
-  inline void drainAborted(ThreadLocalData& tld) {
+  void drainAborted(ThreadLocalData& tld) {
     if (!isLeader) return;
     if (!abort_happened.data) return;
     tld.lterm->workHappened();
@@ -170,7 +188,7 @@ class ForEachWork {
     while (p) {
       if (ForeachTraits<FunctionTy>::NeedsBreak && break_happened.data) 
 	return;
-      doProcess(*p, tld);
+      doProcess<true>(*p, tld);
       p = aborted.pop();
     }
   }
@@ -183,7 +201,7 @@ public:
   }
 
   ~ForEachWork() {
-    if (ForeachTraits<FunctionTy>::CollectStats) {
+    if (ForeachTraits<FunctionTy>::NeedsStats) {
       for (unsigned int i = 0; i < GaloisRuntime::ThreadPool::getActiveThreads(); ++i)
         tdata.get(i).stat.report_stat(i, loopname);
       GaloisRuntime::statDone();
@@ -212,7 +230,7 @@ public:
       while (p) {
         if (ForeachTraits<FunctionTy>::NeedsBreak && break_happened.data)
 	  goto leaveLoop;
-        doProcess(*p, tld);
+        doProcess<false>(p, tld);
 	drainAborted<isLeader>(tld);
 	p = global_wl.pop();
       }
