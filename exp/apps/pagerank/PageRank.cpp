@@ -168,7 +168,7 @@ bool verify() {
 }
 
 static void makeGraph(const char* input) {
-  typedef Galois::Graph::LC_CRS_Graph<Node, int> InGraph;
+  typedef Galois::Graph::LC_CSR_Graph<Node, int> InGraph;
   typedef InGraph::GraphNode InGNode;
   InGraph in_graph;
   Galois::Timer phase;

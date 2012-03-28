@@ -211,7 +211,7 @@ void convert_dimacs2gr(const std::string& infilename, const std::string& outfile
 }
 
 void convert_gr2dimacs(const std::string& infilename, const std::string& outfilename) {
-  typedef Galois::Graph::LC_CRS_Graph<size_t, int> Graph;
+  typedef Galois::Graph::LC_CSR_Graph<size_t, int> Graph;
   typedef Graph::GraphNode GNode;
 
   Graph graph;
@@ -255,7 +255,7 @@ void convert_gr2dimacs(const std::string& infilename, const std::string& outfile
  * fwrite(f, v, 'double');
  */
 void convert_gr2bsml(const std::string& infilename, const std::string& outfilename) {
-  typedef Galois::Graph::LC_CRS_Graph<uint32_t, int> Graph;
+  typedef Galois::Graph::LC_CSR_Graph<uint32_t, int> Graph;
   typedef Graph::GraphNode GNode;
 
   Graph graph;

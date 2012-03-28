@@ -436,7 +436,7 @@ struct Process {
 
 void initializeGraph(const char* inputFile,
     int sourceId, int sinkId, Config *newApp) {
-  typedef Galois::Graph::LC_CRS_Graph<int, int> ReaderGraph;
+  typedef Galois::Graph::LC_CSR_Graph<int, int> ReaderGraph;
   typedef ReaderGraph::GraphNode ReaderGNode;
 
   ReaderGraph reader;

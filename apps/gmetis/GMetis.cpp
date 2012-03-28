@@ -91,8 +91,8 @@ void verify(MetisGraph* metisGraph) {
 	}
 }
 
-typedef Galois::Graph::LC_CRS_Graph<int, unsigned int> InputGraph;
-typedef Galois::Graph::LC_CRS_Graph<int, unsigned int>::GraphNode InputGNode;
+typedef Galois::Graph::LC_CSR_Graph<int, unsigned int> InputGraph;
+typedef Galois::Graph::LC_CSR_Graph<int, unsigned int>::GraphNode InputGNode;
 
 void readMetisGraph(MetisGraph* metisGraph, const char* filename){
 	std::ifstream file(filename);

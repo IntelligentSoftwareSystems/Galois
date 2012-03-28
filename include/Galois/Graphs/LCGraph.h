@@ -66,7 +66,7 @@ namespace Graph {
 
 //! Local computation graph (i.e., graph structure does not change)
 template<typename NodeTy, typename EdgeTy>
-class LC_CRS_Graph {
+class LC_CSR_Graph {
 protected:
   struct NodeInfo : public GaloisRuntime::Lockable {
     NodeTy data;
@@ -74,8 +74,8 @@ protected:
 
   NodeInfo* NodeData;
   uint64_t* EdgeIndData;
-  EdgeTy* EdgeData;
   uint32_t* EdgeDst;
+  EdgeTy* EdgeData;
 
   uint64_t numNodes;
 
@@ -100,8 +100,8 @@ public:
   typedef boost::counting_iterator<uint64_t> edge_iterator;
   typedef boost::counting_iterator<uint32_t> iterator;
 
-  LC_CRS_Graph() {}
-  ~LC_CRS_Graph() {}
+  LC_CSR_Graph() {}
+  ~LC_CSR_Graph() {}
 
   NodeTy& getData(GraphNode N, MethodFlag mflag = ALL) {
     NodeInfo& NI = NodeData[N];
@@ -160,8 +160,8 @@ public:
     EdgeDst = reinterpret_cast<uint32_t*>(GaloisRuntime::MM::largeAlloc(sizeof(uint32_t) * graph.sizeEdges()));
     std::copy(graph.edgeid_begin(), graph.edgeid_end(), &EdgeIndData[0]);
     std::copy(graph.nodeid_begin(), graph.nodeid_end(), &EdgeDst[0]);
-    std::copy(graph.edgedata_begin<EdgeTy>(), graph.edgedata_end<EdgeTy>(),
-	      &EdgeData[0]);
+    std::copy(graph.edgedata_begin<EdgeTy>(), graph.edgedata_end<EdgeTy>(), &EdgeData[0]);
+
     for (unsigned x = 0; x < numNodes; ++x)
       new (&NodeData[x]) NodeTy; // inplace new
   }
@@ -195,7 +195,7 @@ struct EdgeInfoWrapper<NITy,void> {
 
 //! Local computation graph (i.e., graph structure does not change)
 template<typename NodeTy, typename EdgeTy>
-class LC_CRSInline_Graph {
+class LC_CSRInline_Graph {
 protected:
   struct NodeInfo;
   typedef EdgeInfoWrapper<NodeInfo, EdgeTy> EdgeInfo;
@@ -239,8 +239,8 @@ public:
     GraphNode operator*() { return at; }
   };
 
-  LC_CRSInline_Graph() {}
-  ~LC_CRSInline_Graph() {}
+  LC_CSRInline_Graph() {}
+  ~LC_CSRInline_Graph() {}
 
   NodeTy& getData(GraphNode N, MethodFlag mflag = ALL) {
     GaloisRuntime::acquire(N, mflag);
@@ -286,8 +286,8 @@ public:
     FileGraph graph;
     graph.structureFromFile(fname);
     numNodes = graph.size();
-    NodeData.allocate(numNodes);
-    EdgeData.allocate(graph.sizeEdges());
+    NodeData = reinterpret_cast<NodeInfo*>(GaloisRuntime::MM::largeAlloc(numNodes * sizeof(*NodeData)));
+    EdgeData = reinterpret_cast<EdgeInfo*>(GaloisRuntime::MM::largeAlloc(graph.sizeEdges() * sizeof(*EdgeData)));
     std::vector<NodeInfo*> node_ids;
     node_ids.resize(numNodes);
     for (FileGraph::iterator ii = graph.begin(),
@@ -325,16 +325,19 @@ protected:
   struct NodeInfo : public GaloisRuntime::Lockable {
     NodeTy data;
     int numEdges;
+
     EdgeInfo* edgeBegin() {
       NodeInfo* n = this;
       ++n; //start of edges
       return reinterpret_cast<EdgeInfo*>(n);
     }
+
     EdgeInfo* edgeEnd() {
       EdgeInfo* ei = edgeBegin();
       ei += numEdges;
       return ei;
     }
+
     NodeInfo* next() {
       NodeInfo* ni = this;
       EdgeInfo* ei = edgeEnd();
@@ -377,7 +380,6 @@ public:
     bool operator==(const iterator& rhs) { return at == rhs.at; }
     bool operator!=(const iterator& rhs) { return at != rhs.at; }
     GraphNode operator*() { return at; }
-
   };
 
   LC_Linear_Graph() {}
