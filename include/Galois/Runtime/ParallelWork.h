@@ -133,7 +133,6 @@ class ForEachWork {
       tld.cnx.commit_iteration();
   }
 
-  __attribute__((noinline))
   void abortIteration(value_type val, ThreadLocalData& tld) {
     assert(ForeachTraits<FunctionTy>::NeedsAborts);
 
