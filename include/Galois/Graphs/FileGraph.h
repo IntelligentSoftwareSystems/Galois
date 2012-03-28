@@ -139,12 +139,15 @@ public:
   typedef boost::transform_iterator<Convert32, uint32_t*> neighbor_iterator;
   typedef boost::transform_iterator<Convert32, uint32_t*> nodeid_iterator;
   typedef boost::transform_iterator<Convert64, uint64_t*> edgeid_iterator;
+  
   neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = ALL) const {
     return boost::make_transform_iterator(raw_neighbor_begin(N), Convert32());
   }
+
   neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = ALL) const {
     return boost::make_transform_iterator(raw_neighbor_end(N), Convert32());
   }
+
   nodeid_iterator nodeid_begin() const;
   nodeid_iterator nodeid_end() const;
   edgeid_iterator edgeid_begin() const;
@@ -155,10 +158,13 @@ public:
     return reinterpret_cast<EdgeTy*>(edgeData)[std::distance(outs, it.base())];
   }
 
-  template<typename EdgeTy> EdgeTy* edgedata_begin() const {
+  template<typename EdgeTy>
+  EdgeTy* edgedata_begin() const {
     return reinterpret_cast<EdgeTy*>(edgeData);
   }
-  template<typename EdgeTy> EdgeTy* edgedata_end() const {
+
+  template<typename EdgeTy>
+  EdgeTy* edgedata_end() const {
     assert(sizeof(EdgeTy) == sizeEdgeTy);
     EdgeTy* r = reinterpret_cast<EdgeTy*>(edgeData);
     return &r[numEdges];
@@ -270,7 +276,6 @@ public:
 
   void swap(FileGraph& other);
   void clone(FileGraph& other);
-
 };
 
 //! Local computation graph (i.e., graph structure does not change)
@@ -306,6 +311,7 @@ public:
   EdgeTy& getEdgeData(FileGraph::edge_iterator it, MethodFlag mflag = ALL) {
     return FileGraph::getEdgeData<EdgeTy>(it, mflag);
   }
+
   EdgeTy& getEdgeData(FileGraph::neighbor_iterator it, MethodFlag mflag = ALL) {
     return FileGraph::getEdgeData<EdgeTy>(it, mflag);
   }
