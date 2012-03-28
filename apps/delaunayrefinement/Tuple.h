@@ -124,7 +124,7 @@ public:
       return;
     }
 
-    double c = dp / sqrt(distance_squared(a) * distance_squared(b));
+    double c = dp / sqrt(distance_squared(b) * distance_squared(a));
     if (c > cos(M*M_PI/180)) {
       sm = true;
       return;
@@ -132,6 +132,26 @@ public:
     return;
   }
  
+  bool angleGTCheck(const Tuple& a, const Tuple& b, double M) const { //angle formed by a, current tuple, b
+    Tuple vb = a - *this;
+    Tuple vc = b - *this;
+    double dp = vb*vc;
+
+    if (dp < 0)
+      return false;
+
+    double c = dp / sqrt(distance_squared(b) * distance_squared(a));
+    return c > cos(M*M_PI/180);
+  }
+
+  bool angleOBCheck(const Tuple& a, const Tuple& b) const { //angle formed by a, current tuple, b
+    Tuple vb = a - *this;
+    Tuple vc = b - *this;
+    double dp = vb*vc;
+
+    return dp < 0;
+  }
+
   void print(std::ostream& os) const {
     os << "(" << _t[0] << ", " << _t[1] << ")";
   }
@@ -140,6 +160,8 @@ public:
   static double distance(Tuple a, Tuple b) {return a.distance(b);}
   static double angle(const Tuple& a, const Tuple& b, const Tuple& c) {return b.angle(a, c);}
   static void angleCheck(const Tuple& a, const Tuple& b, const Tuple& c, bool& ob, bool& sm, double M) { b.angleCheck(a, c, ob, sm, M); }
+  static bool angleGTCheck(const Tuple& a, const Tuple& b, const Tuple& c, double M) { return b.angleGTCheck(a, c, M); }
+  static bool angleOBCheck(const Tuple& a, const Tuple& b, const Tuple& c) { return b.angleOBCheck(a, c); }
 };
 
 static inline std::ostream& operator<<(std::ostream& os, const Tuple& rhs) {

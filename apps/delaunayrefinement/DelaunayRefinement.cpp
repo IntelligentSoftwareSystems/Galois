@@ -76,7 +76,7 @@ struct process {
     Cavity cav(mesh, lwl.getPerIterAlloc());
     cav.initialize(item);
     cav.build();
-    cav.update();
+    cav.update(); //VTune: Most work
     
     //FAILSAFE POINT
 

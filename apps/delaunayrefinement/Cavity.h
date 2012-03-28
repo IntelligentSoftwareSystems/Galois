@@ -127,7 +127,7 @@ public:
 	     ee = graph->edge_end(curr,Galois::ALL); 
 	   ii != ee; ++ii) {
 	GNode neighbor = graph->getEdgeDst(ii);
-	expand(curr, neighbor);
+	expand(curr, neighbor); //VTune: Lots of work
       }
     }
   }
