@@ -296,11 +296,11 @@ void for_each_impl(IterTy b, IterTy e, Function f, const char* loopname) {
   FillWork<IterTy, ForEachWork<aWLTy, Function> > fw2(b,e,GW);
 
   RunCommand w[3];
-  w[0].work = config::ref(fw2);
+  w[0].work = Config::ref(fw2);
   w[0].isParallel = true;
   w[0].barrierAfter = true;
   w[0].profile = true;
-  w[1].work = config::ref(GW);
+  w[1].work = Config::ref(GW);
   w[1].isParallel = true;
   w[1].barrierAfter = true;
   w[1].profile = true;
@@ -324,7 +324,7 @@ void do_all_impl(IterTy b, IterTy e, Function f, const char* loopname) {
   GW.AddInitialWork(b,e);
 
   RunCommand w[1];
-  w[0].work = config::ref(GW);
+  w[0].work = Config::ref(GW);
   w[0].isParallel = true;
   w[0].barrierAfter = true;
   w[0].profile = true;

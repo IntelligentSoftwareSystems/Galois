@@ -34,15 +34,26 @@
 #endif
 
 namespace GaloisRuntime {
-  namespace config {
+namespace Config {
 #ifdef __GXX_EXPERIMENTAL_CXX0X__
-    using std::function;
-    using std::ref;
+  using std::function;
+  using std::ref;
 #else
-    using std::tr1::function;
-    using std::tr1::ref;
+  using std::tr1::function;
+  using std::tr1::ref;
 #endif
-  }
+
+inline static void pause() {
+#if defined(__i386__) || defined(__amd64__)
+  asm volatile ( "pause");
+#endif
+}
+
+inline static void compilerBarrier() {
+  asm volatile ("":::"memory");
+}
+
+}
 }
 
 #endif

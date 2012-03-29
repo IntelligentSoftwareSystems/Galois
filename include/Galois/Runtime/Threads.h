@@ -28,7 +28,7 @@
 namespace GaloisRuntime {
 
 struct RunCommand {
-  config::function<void (void)> work;
+  Config::function<void (void)> work;
   bool isParallel;
   bool barrierAfter;
   bool profile;
