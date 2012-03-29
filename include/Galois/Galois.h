@@ -48,10 +48,12 @@ static inline void for_each(IterTy b, IterTy e, Function f, const char* loopname
   typedef typename WLTy::template retype<typename std::iterator_traits<IterTy>::value_type>::WL aWLTy;
 
 #ifdef GALOIS_EXP
+#if 0
   if (GaloisRuntime::useParaMeter) {
     GaloisRuntime::ParaMeter::for_each_impl<aWLTy>(b, e, f, loopname);
     return;
   }
+#endif
 #endif
   GaloisRuntime::for_each_impl<aWLTy>(b, e, f, loopname);
 }
