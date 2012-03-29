@@ -26,11 +26,11 @@
 #include "Galois/Threads.h"
 #include "Galois/UserContext.h"
 #include "Galois/Runtime/ParallelWork.h"
+#include "Galois/Runtime/ParallelWorkInline.h"
 
 #ifdef GALOIS_EXP
-#include "Galois/Runtime/ParaMeter.h"
+//#include "Galois/Runtime/ParaMeter.h"
 #include "Galois/Runtime/SimpleTaskPool.h"
-
 #include "boost/iterator/counting_iterator.hpp"
 #endif
 
@@ -45,8 +45,6 @@ namespace Galois {
 //Iterator based versions
 template<typename WLTy, typename IterTy, typename Function>
 static inline void for_each(IterTy b, IterTy e, Function f, const char* loopname = 0) {
-  typedef typename WLTy::template retype<typename std::iterator_traits<IterTy>::value_type>::WL aWLTy;
-
 #ifdef GALOIS_EXP
 #if 0
   if (GaloisRuntime::useParaMeter) {
@@ -55,7 +53,7 @@ static inline void for_each(IterTy b, IterTy e, Function f, const char* loopname
   }
 #endif
 #endif
-  GaloisRuntime::for_each_impl<aWLTy>(b, e, f, loopname);
+  GaloisRuntime::for_each_impl<WLTy>(b, e, f, loopname);
 }
 
 template<typename IterTy, typename Function>

@@ -44,6 +44,8 @@
 #include <iostream>
 #include <deque>
 
+//#include "X.h" // XXX
+
 static const char* name = "Breadth-first Search Example";
 static const char* desc =
   "Computes the shortest path from a source node to all nodes in a directed "
@@ -58,12 +60,16 @@ enum BFSAlgo {
   serialBarrier,
   serialBare,
   serialSchardl,
-  galois,
-  galoisOpt,
-  galoisSet,
-  galoisManualBarrier,
-  galoisBarrierCas,
-  galoisBarrier
+  serialSchardlLCCSRSize,
+  serialSchardlLCLinearSize,
+  serialMin,
+  parallel,
+  parallelOpt,
+  parallelSet,
+  parallelManualBarrier,
+  parallelBarrierCas,
+  parallelBarrier,
+  parallelBarrierInline,
 };
 
 namespace cll = llvm::cl;
@@ -80,13 +86,17 @@ static cll::opt<BFSAlgo> algo(cll::desc("Choose an algorithm:"),
       clEnumVal(serialSet, "Serial optimized with workset semantics"),
       clEnumVal(serialBarrier, "Serial optimized with workset and barrier"),
       clEnumVal(serialBare, "Serial optimized with bare runtime"),
-      clEnumVal(serialSchardl, ""),
-      clEnumVal(galois, "Galois"),
-      clEnumVal(galoisOpt, "Galois optimized"),
-      clEnumVal(galoisSet, "Galois optimized with workset semantics"),
-      clEnumVal(galoisManualBarrier, "Galois optimized with workset and manual barrier"),
-      clEnumVal(galoisBarrierCas, "Galois optimized with workset and barrier but using CAS"),
-      clEnumVal(galoisBarrier, "Galois optimized with workset and barrier"),
+      clEnumVal(serialMin, "Serial optimized with minimal runtime"),
+      clEnumVal(serialSchardl, "Serial version of Schardl's implementation"),
+      clEnumVal(serialSchardlLCCSRSize, "Serial version of Schardl's implementation using graph representation that is the same size as LC_CSR_Graph"),
+      clEnumVal(serialSchardlLCLinearSize, "Serial version of Schardl's implementation using graph representation that is the same size as LC_Linear_Graph"),
+      clEnumVal(parallel, "Parallel using Galois"),
+      clEnumVal(parallelOpt, "Galois optimized"),
+      clEnumVal(parallelSet, "Galois optimized with workset semantics"),
+      clEnumVal(parallelManualBarrier, "Galois optimized with workset and manual barrier"),
+      clEnumVal(parallelBarrierCas, "Galois optimized with workset and barrier but using CAS"),
+      clEnumVal(parallelBarrier, "Galois optimized with workset and barrier"),
+      clEnumVal(parallelBarrierInline, "Galois optimized with inlined workset and barrier"),
       clEnumValEnd), cll::init(serial));
 static cll::opt<std::string> filename(cll::Positional,
     cll::desc("<input file>"),
@@ -101,7 +111,8 @@ struct SNode {
 };
 
 //typedef Galois::Graph::LC_Linear_Graph<SNode, void> Graph;
-typedef Galois::Graph::LC_CRS_Graph<SNode, char> Graph;
+typedef Galois::Graph::LC_CSR_Graph<SNode, char> Graph;
+//typedef Galois::Graph::LC_CSRInline_Graph<SNode, char> Graph;
 typedef Graph::GraphNode GNode;
 
 Graph graph;
@@ -169,7 +180,6 @@ static bool verify(GNode source) {
     for (Graph::edge_iterator 
 	   ii = graph.edge_begin(*src),
 	   ee = graph.edge_end(*src); ii != ee; ++ii) {
-      GNode neighbor = graph.getEdgeDst(ii);
       unsigned int ddist = graph.getData(*src).dist;
       if (ddist > dist + 1) {
         std::cerr << "bad level value at "  << id << "\n";
@@ -340,9 +350,6 @@ struct SerialBarrier {
 
     WL wls[2];
 
-    wls[0].reserve(graph.size());
-    wls[1].reserve(graph.size());
-
     graph.getData(source, Galois::NONE).dist = 0;
 
     for (Graph::edge_iterator ii = graph.edge_begin(source, Galois::NONE), 
@@ -408,6 +415,7 @@ struct SerialBare {
     unsigned newDist = 1;
     unsigned next = 0;
     unsigned cur;
+
     boost::optional<GNode> r = wls[0].pop();
 
     do {
@@ -630,7 +638,7 @@ struct GaloisManualBarrier {
 };
 
 //! Galois BFS using optimized flags and barrier scheduling 
-template<bool useCas>
+template<typename WL,bool useCas>
 struct GaloisBarrier {
   typedef int tt_does_not_need_aborts;
   typedef int tt_does_not_need_stats;
@@ -650,16 +658,7 @@ struct GaloisBarrier {
       initial.push_back(ItemTy(dst, 2));
     }
 
-#ifdef GALOIS_EXP
-    using namespace GaloisRuntime::WorkList;
-    //GaloisRuntime::for_each_x(initial.begin(), initial.end(), *this);
-    //else
-    Galois::for_each<FIFO<int,false> >(initial.begin(), initial.end(), *this);
-    //Galois::for_each<BulkSynchronous<dChunkedLIFO<256> > >(initial.begin(), initial.end(), *this);
-#else
-    std::cerr << "Need Galois EXP support\n";
-    abort();
-#endif
+    Galois::for_each<WL>(initial.begin(), initial.end(), *this);
   }
 
   void operator()(const ItemTy& item, Galois::UserContext<ItemTy>& ctx) const {
@@ -688,18 +687,21 @@ struct GaloisBarrier {
   }
 };
 
+template<typename NodeIdTy,typename EdgeIdTy>
 struct SerialSchardl {
   std::string name() const { return "Serial (Schardl)"; }
-  typedef long NodeId;
+  typedef NodeIdTy NodeId;
+  typedef EdgeIdTy EdgeId;
+  typedef unsigned int Dist;
 
   unsigned int nNodes;
   unsigned int nEdges;
-  NodeId* nodes;
+  EdgeId* nodes;
   NodeId* edges;
 
   // Convert FileGraph to raw CSR
   void loadGraph(std::string& f) {
-    typedef Galois::Graph::LC_FileGraph<int,void> G;
+    typedef Galois::Graph::LC_FileGraph<NodeId,void> G;
     G g;
     g.structureFromFile(f.c_str());
     g.emptyNodeData();
@@ -712,11 +714,11 @@ struct SerialSchardl {
       g.getData(*ii) = nid++;
     }
 
-    nodes = new NodeId[nNodes + 1];
+    nodes = new EdgeId[nNodes + 1];
     edges = new NodeId[nEdges];
 
     nid = 0;
-    NodeId eid = 0;
+    EdgeId eid = 0;
     for (typename G::iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
       nodes[nid] = eid;
       for (typename G::edge_iterator jj = g.edge_begin(*ii), ej = g.edge_end(*ii); jj != ej; ++jj) {
@@ -730,7 +732,7 @@ struct SerialSchardl {
   void operator()(std::string& f) {
     loadGraph(f);
 
-    unsigned int* distances = new unsigned int[nNodes];
+    Dist* distances = new Dist[nNodes];
 
     Galois::StatTimer T;
     std::cerr << "Running " << name() << " version\n";
@@ -741,18 +743,19 @@ struct SerialSchardl {
     std::cout << "Report node: " << reportNode << " (dist: " << distances[reportNode] << ")\n";
   }
 
-  void bfs(const int s, unsigned int distances[]) {
+  void bfs(const NodeId s, Dist distances[]) {
     Galois::Statistic<unsigned int> counter("Iterations");
 
     NodeId *queue = new NodeId[nNodes];
     long head, tail;
-    unsigned int current, newdist;
+    NodeId current;
+    Dist newdist;
 
-    for (int i = 0; i < nNodes; ++i) {
-      distances[i] = UINT_MAX;
+    for (unsigned i = 0; i < nNodes; ++i) {
+      distances[i] = std::numeric_limits<Dist>::max();
     }
 
-    if (s < 0 || s > nNodes)
+    if (s < 0 || s > (NodeId) nNodes)
       return;
 
     current = s;
@@ -763,11 +766,11 @@ struct SerialSchardl {
       newdist = distances[current]+1;
       counter += 1;
 
-      NodeId edgeZero = nodes[current];
-      NodeId edgeLast = nodes[current+1];
+      EdgeId edgeZero = nodes[current];
+      EdgeId edgeLast = nodes[current+1];
       NodeId edge;
 
-      for (int i = edgeZero; i < edgeLast; i++) {
+      for (EdgeId i = edgeZero; i < edgeLast; i++) {
         edge = edges[i];
         if (newdist < distances[edge]) {
           queue[tail++] = edge;
@@ -781,24 +784,17 @@ struct SerialSchardl {
   }
 };
 
-
-
-
 template<typename AlgoTy>
 void run(const AlgoTy& algo) {
   GNode source, report;
   readGraph(source, report);
-  std::cout << "MEMINFO P1: " << GaloisRuntime::MM::pageAllocInfo() << " pages" << "\n";
 
+  //Galois::preAlloc(graph.size() / GaloisRuntime::MM::pageSize * numThreads);
   Galois::StatTimer T;
   std::cerr << "Running " << algo.name() << " version\n";
   T.start();
-  //Galois::preAlloc(graph.size() / GaloisRuntime::MM::pageSize * 7);
-  std::cout << "MEMINFO P2: " << GaloisRuntime::MM::pageAllocInfo() << " pages " << "\n";
   algo(source);
   T.stop();
-
-  std::cout << "MEMINFO P3: " << GaloisRuntime::MM::pageAllocInfo() << " pages " << "\n";
 
   std::cout << "Report node: " << reportNode << " " << graph.getData(report) << "\n";
 
@@ -816,19 +812,27 @@ void run(const AlgoTy& algo) {
 int main(int argc, char **argv) {
   LonestarStart(argc, argv, std::cout, name, desc, url);
 
+  using namespace GaloisRuntime::WorkList;
+  typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;
+  typedef BulkSynchronous<> BSDefaultWL;
+
   switch (algo) {
     case serial: run(SerialAlgo()); break;
     case serialOpt: run(SerialFlagOptAlgo()); break;
     case serialSet: run(SerialWorkSet()); break;
     case serialBarrier: run(SerialBarrier()); break;
     case serialBare: run(SerialBare()); break;
-    case serialSchardl: SerialSchardl()(filename); break;
-    case galois: run(GaloisAlgo()); break;
-    case galoisOpt: run(GaloisNoLockAlgo()); break;
-    case galoisSet: run(GaloisWorkSet());  break;
-    case galoisManualBarrier: run(GaloisManualBarrier()); break;
-    case galoisBarrierCas: run(GaloisBarrier<true>()); break;
-    case galoisBarrier: run(GaloisBarrier<false>()); break;
+    case serialSchardl: SerialSchardl<int,int>()(filename); break;
+    case serialSchardlLCCSRSize: SerialSchardl<int,long>()(filename); break;
+    case serialSchardlLCLinearSize: SerialSchardl<long,long>()(filename); break;
+    case serialMin: run(GaloisBarrier<FIFO<int,false>,false>()); break;
+    case parallel: run(GaloisAlgo()); break;
+    case parallelOpt: run(GaloisNoLockAlgo()); break;
+    case parallelSet: run(GaloisWorkSet());  break;
+    case parallelManualBarrier: run(GaloisManualBarrier()); break;
+    case parallelBarrierCas: run(GaloisBarrier<BSWL,true>()); break;
+    case parallelBarrier: run(GaloisBarrier<BSWL,false>()); break;
+    case parallelBarrierInline: run(GaloisBarrier<BSDefaultWL,false>()); break;
     default: std::cerr << "Unknown algorithm" << algo << "\n"; abort();
   }
 

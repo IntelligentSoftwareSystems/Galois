@@ -28,10 +28,10 @@
 #include "Galois/Mem.h"
 
 namespace GaloisRuntime {
-template <typename WorkListTy, typename Function>
+template <typename WorkListTy, typename T, typename FunctionTy, bool isSimple>
 class ForEachWork;
 
-template <typename WorkListTy, typename Function> 
+template <typename WorkListTy, typename FunctionTy> 
 class ParaMeterExecutor;
 }
 
@@ -39,10 +39,10 @@ namespace Galois {
 
 template<typename T>
 class UserContext: private boost::noncopyable {
-  template <typename WorkListTy, typename Function>
+  template <typename WorkListTy, typename TT, typename FunctionTy, bool isSimple>
   friend class GaloisRuntime::ForEachWork;
 
-  template <typename WorkListTy, typename Function>
+  template <typename WorkListTy, typename FunctionTy>
   friend class GaloisRuntime::ParaMeterExecutor;
 
   //! Allocator stuff
@@ -70,7 +70,7 @@ class UserContext: private boost::noncopyable {
   pushBufferTy& __getPushBuffer() {
     return pushBuffer;
   }
-
+  
   void __resetPushBuffer() {
     pushBuffer.clear();
   }
@@ -79,7 +79,8 @@ public:
   UserContext()
     :IterationAllocatorBase(), 
      PerIterationAllocator(&IterationAllocatorBase),
-     breakFlag(0)  { }
+     breakFlag(0)
+  { }
 
   //! Signal break in parallel loop
   void breakLoop() {
