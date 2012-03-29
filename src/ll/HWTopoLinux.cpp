@@ -350,7 +350,7 @@ struct AutoLinuxPolicy {
 
     //Compute first thread in package
     leaders.resize(numPackages, -1);
-    for (int i = 0; i < packages.size(); ++i)
+    for (int i = 0; i < (int) packages.size(); ++i)
       if (leaders[packages[i]] == -1)
 	leaders[packages[i]] = i;
 
