@@ -76,8 +76,6 @@
 #include <set>
 #include <vector>
 
-using namespace GaloisRuntime;
-
 namespace Galois {
 namespace Graph {
 
@@ -270,23 +268,23 @@ public:
    * Creates a new node holding the indicated data.
    */
   GraphNode createNode(const NodeTy& n, Galois::MethodFlag mflag = ALL) {
-    gNode* N = &(nodes.push(gNode(n, LL::getTID())));
+    gNode* N = &(nodes.push(gNode(n, GaloisRuntime::LL::getTID())));
     N->active = true;
-    acquire(N, mflag);
+    GaloisRuntime::acquire(N, mflag);
     return GraphNode(N);
   }
 
   //! Gets the node data for a node.
   NodeTy& getData(const GraphNode& n, Galois::MethodFlag mflag = ALL) const {
     assert(n);
-    acquire(n, mflag);
+    GaloisRuntime::acquire(n, mflag);
     return n->data;
   }
 
   //! Checks if a node is in the graph
   bool containsNode(const GraphNode& n, Galois::MethodFlag mflag = ALL) const {
     if (!n || !n->active) return false;
-    acquire(n, mflag);
+    GaloisRuntime::acquire(n, mflag);
     return n->active;
   }
 
@@ -297,7 +295,7 @@ public:
   //FIXME: handle edge memory
   void removeNode(GraphNode n, Galois::MethodFlag mflag = ALL) {
     assert(n);
-    acquire(n, mflag);
+    GaloisRuntime::acquire(n, mflag);
     gNode* N = n;
     if (N->active) {
       N->active = false;
@@ -317,13 +315,13 @@ public:
   edge_iterator addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {
     assert(src);
     assert(dst);
-    acquire(src, mflag);
+    GaloisRuntime::acquire(src, mflag);
     typename gNode::iterator ii = src->find(dst);
     if (ii == src->end()) {
       if (Directional) {
 	ii = src->createEdge(dst, 0);
       } else {
-	acquire(dst, mflag);
+	GaloisRuntime::acquire(dst, mflag);
 	EdgeTy* e = edges.mkEdge();
 	ii = dst->createEdge(src, e);
 	ii = src->createEdge(dst, e);
@@ -335,11 +333,11 @@ public:
   //! Removes an edge from the graph
   void removeEdge(GraphNode src, edge_iterator dst, Galois::MethodFlag mflag = ALL) {
     assert(src);
-    acquire(src, mflag);
+    GaloisRuntime::acquire(src, mflag);
     if (Directional) {
       src->eraseEdge(dst);
     } else {
-      acquire(dst->first(), mflag);
+      GaloisRuntime::acquire(dst->first(), mflag);
       EdgeTy* e = dst->second();
       edges.delEdge(e);
       src->eraseEdge(dst);
@@ -350,7 +348,7 @@ public:
   edge_iterator findEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {
     assert(src);
     assert(dst);
-    acquire(src, mflag);
+    GaloisRuntime::acquire(src, mflag);
     return boost::make_filter_iterator(is_edge(), src->find(dst), src->end());
   }
 
@@ -374,12 +372,12 @@ public:
   //! Returns an iterator to the neighbors of a node 
   edge_iterator edge_begin(GraphNode N, Galois::MethodFlag mflag = ALL) {
     assert(N);
-    acquire(N, mflag);
+    GaloisRuntime::acquire(N, mflag);
 
-    if (shouldLock(mflag)) {
+    if (GaloisRuntime::shouldLock(mflag)) {
       for (typename gNode::iterator ii = N->begin(), ee = N->end(); ii != ee; ++ii) {
 	if (ii->first()->active)
-	  acquire(ii->first(), mflag);
+	  GaloisRuntime::acquire(ii->first(), mflag);
       }
     }
     return boost::make_filter_iterator(is_edge(), N->begin(), N->end());

@@ -59,8 +59,6 @@
 #include <iterator>
 #include <new>
 
-using namespace GaloisRuntime;
-
 namespace Galois {
 namespace Graph {
 
