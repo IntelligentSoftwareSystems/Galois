@@ -92,96 +92,17 @@ class SimpleBarrier {
   PerLevel<PLD> plds;
   int size;
 
-  void pause() {
-#if defined(__i386__) || defined(__amd64__)
-    asm volatile ( "pause");
-#endif
-  }
-
-  void compilerBarrier() {
-    asm volatile ("":::"memory");
-  }
-
-  void cascade(int tid) {
-    int multiple = 2;
-    for (int i = 0; i < multiple; ++i) {
-      int n = tid * multiple + i;
-      if (n < size && n != 0)
-        tlds.get(n).flag = 1;
-    }
-  }
+  void cascade(int tid);
 
 public:
   SimpleBarrier(): globalTotal(0), size(-1) { }
 
   //! Not thread-safe and should only be called when no threads are in wait()/increment()
-  void reinit(int val, int init) {
-    assert(val > 0);
+  void reinit(int val, int init);
 
-    if (val != size) {
-      for (unsigned i = 0; i < plds.size(); ++i)
-        plds.get(i).total = 0;
-      for (int i = 0; i < val; ++i) {
-        int j = LL::getPackageForThreadInternal(i);
-        ++plds.get(j).total;
-      }
-
-      size = val;
-    }
-
-    globalTotal = init;
-  }
-
-  void increment() {
-    PLD& pld = plds.get();
-    int total = pld.total;
-
-    if (__sync_add_and_fetch(&pld.count, 1) == total) {
-      pld.count = 0;
-      compilerBarrier();
-      __sync_add_and_fetch(&globalTotal, total);
-    }
-  }
-
-  void wait() {
-    int tid = (int) LL::getTID();
-    TLD& tld = tlds.get(tid);
-    if (tid == 0) {
-      while (globalTotal < size) {
-        pause();
-      }
-    } else {
-      while (!tld.flag) {
-        pause();
-      }
-    }
-  }
-
-  void barrier() {
-    assert(size > 0);
-
-    int tid = (int) LL::getTID();
-    TLD& tld = tlds.get(tid);
-
-    if (tid == 0) {
-      while (globalTotal < size) {
-        pause();
-      }
-
-      globalTotal = 0;
-      tld.flag = 0;
-      compilerBarrier();
-      cascade(tid);
-    } else {
-      while (!tld.flag) {
-        pause();
-      }
-
-      tld.flag = 0;
-      compilerBarrier();
-      cascade(tid);
-    }
-  }
+  void increment();
+  void wait();
+  void barrier();
 };
 
 //! Busy waiting barrier biased towards getting master thread out as soon
@@ -195,23 +116,8 @@ public:
   FastBarrier(): size(-1) { }
   FastBarrier(unsigned int val): size(-1) { reinit(val); }
 
-  void reinit(int val) {
-    if (val != size) {
-      if (size != -1)
-        out.wait();
-
-      in.reinit(val, 0);
-      out.reinit(val, val);
-      val = size;
-    }
-  }
-
-  void wait() {
-    out.barrier();
-    in.increment();
-    in.barrier();
-    out.increment();
-  }
+  void reinit(int val);
+  void wait(); 
 };
 
 }
