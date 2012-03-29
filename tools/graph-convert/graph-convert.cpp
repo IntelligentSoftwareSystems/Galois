@@ -307,7 +307,7 @@ void convert_gr2bsml(const std::string& infilename, const std::string& outfilena
   for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
     GNode src = *ii;
     for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
-      GNode dst = graph.getEdgeDst(jj);
+      //GNode dst = graph.getEdgeDst(jj);
       double weight = graph.getEdgeData(jj);
       retval = write(fd, &weight, sizeof(weight));
       if (retval == -1) { perror(__FILE__); abort(); }

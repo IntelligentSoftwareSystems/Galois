@@ -25,6 +25,7 @@
 
 #include "Galois/Runtime/mem.h"
 #include "Galois/Runtime/PerCPU.h"
+#include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/Threads.h"
 #include "Galois/Runtime/WorkListHelpers.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
@@ -781,7 +782,7 @@ class RandomAccessRange {
     if (do_steal(tld,tld))
       return;
     //Then try stealing from neighbor
-    TLD& otld = tlds.getNext(ThreadPool::getActiveThreads());
+    //TLD& otld = tlds.getNext(ThreadPool::getActiveThreads());
     if (do_steal(tld, tlds.getNext(ThreadPool::getActiveThreads()))) {
       //redistribute stolen items for neighbor to steal too
       if (std::distance(tld.begin, tld.end) > 1) {
@@ -913,6 +914,91 @@ public:
   }
 };
 //WLCOMPILECHECK(OwnerComputesWL);
+
+template<class ContainerTy=dChunkedFIFO<>, class T=int, bool concurrent = true>
+class BulkSynchronous : private boost::noncopyable {
+
+  typedef typename ContainerTy::template rethread<concurrent>::WL CTy;
+
+  struct TLD {
+    unsigned round;
+    TLD(): round(0) { }
+  };
+
+  CTy wls[2];
+  GaloisRuntime::PerCPU<TLD> tlds;
+  GaloisRuntime::FastBarrier barrier1;
+  GaloisRuntime::FastBarrier barrier2;
+  GaloisRuntime::LL::CacheLineStorage<volatile long> some;
+  volatile bool empty;
+
+ public:
+  typedef T value_type;
+
+  template<bool newconcurrent>
+  struct rethread {
+    typedef BulkSynchronous<ContainerTy,T,newconcurrent> WL;
+  };
+  template<typename Tnew>
+  struct retype {
+    typedef BulkSynchronous<typename ContainerTy::template retype<Tnew>::WL,Tnew,concurrent> WL;
+  };
+
+  BulkSynchronous(): empty(false) {
+    unsigned numActive = GaloisRuntime::getSystemThreadPool().getActiveThreads();
+    barrier1.reinit(numActive);
+    barrier2.reinit(numActive);
+  }
+
+  void push(value_type val) {
+    TLD& tld = tlds.get();
+    wls[(tld.round + 1) & 1].push(val);
+  }
+
+  template<typename ItTy>
+  void push(ItTy b, ItTy e) {
+    while (b != e)
+      push(*b++);
+  }
+
+  template<typename ItTy>
+  void push_initial(ItTy b, ItTy e) {
+    while (b != e)
+      push(*b++);
+    tlds.get().round = 1;
+    some.data = true;
+  }
+
+  boost::optional<value_type> pop() {
+    TLD& tld = tlds.get();
+    boost::optional<value_type> r;
+    
+    while (true) {
+      if (empty)
+        return r; // empty
+
+      r = wls[tld.round].pop();
+      if (r)
+        return r;
+
+      barrier1.wait();
+      if (GaloisRuntime::LL::getTID() == 0) {
+        if (!some.data)
+          empty = true;
+        some.data = false; 
+      }
+      tld.round = (tld.round + 1) & 1;
+      barrier2.wait();
+
+      r = wls[tld.round].pop();
+      if (r) {
+        some.data = true;
+        return r;
+      }
+    }
+  }
+};
+WLCOMPILECHECK(BulkSynchronous);
 
 //End namespace
 
