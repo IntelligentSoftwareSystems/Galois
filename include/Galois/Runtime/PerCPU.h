@@ -85,6 +85,14 @@ public:
     return get((BASE::myEID() + 1) % num);
   }
 
+  T& getPrev(unsigned num) {
+    return get((BASE::myEID() + num - 1) % num);
+  }
+  
+  const T& getPrev(unsigned num) const {
+    return get((BASE::myEID() + num - 1) % num);
+  }
+
   unsigned int size() const {
     return BASE::getMaxSize();
   }
