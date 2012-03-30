@@ -53,6 +53,16 @@ inline static void compilerBarrier() {
   asm volatile ("":::"memory");
 }
 
+#ifdef __INTEL_COMPILER
+#define noinline __attribute__ ((noinline))
+#elifdef __GNUC__
+#define noinline __attribute__ ((noinline))
+#elifdef _MSC_VER
+#define noinline __declspec(noinline)
+#else
+#define noinline
+#endif
+
 }
 }
 
