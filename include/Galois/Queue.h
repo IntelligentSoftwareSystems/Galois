@@ -1761,9 +1761,7 @@ public:
       } else {
         _GLIBCXX_WRITE_MEM_BARRIER;
         while (myReq == req) {
-#if defined(__i386__) || defined(__amd64__)
-          asm volatile ( "pause");
-#endif
+	  GaloisRuntime::LL::mem_pause();
         }
         _GLIBCXX_READ_MEM_BARRIER;
         recycleOp(req);
@@ -1797,9 +1795,7 @@ public:
       } else {
         _GLIBCXX_WRITE_MEM_BARRIER;
         while (myReq == req) {
-#if defined(__i386__) || defined(__amd64__)
-          asm volatile ( "pause");
-#endif
+	  GaloisRuntime::LL::mem_pause();
         }
         _GLIBCXX_READ_MEM_BARRIER;
 	boost::optional<T> retval = myReq->retval;

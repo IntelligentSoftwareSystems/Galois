@@ -20,27 +20,34 @@
  *
  * @section Description
  *
- * Factor out site-specific configuration
+ * Factor out compiler-specific lowlevel stuff
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#ifndef GALOIS_RUNTIME_CONFIG_H
-#define GALOIS_RUNTIME_CONFIG_H
-
-#ifdef __GXX_EXPERIMENTAL_CXX0X__
-#include <functional>
-#else
-#include <tr1/functional>
-#endif
+#ifndef GALOIS_RUNTIME_LL_COMPFLAGS_H
+#define GALOIS_RUNTIME_LL_COMPFLAGS_H
 
 namespace GaloisRuntime {
-namespace Config {
-#ifdef __GXX_EXPERIMENTAL_CXX0X__
-  using std::function;
-  using std::ref;
+namespace LL {
+
+inline static void mem_pause() {
+#if defined(__i386__) || defined(__amd64__)
+  asm volatile ( "pause");
+#endif
+}
+
+inline static void compilerBarrier() {
+  asm volatile ("":::"memory");
+}
+
+#if defined(__INTEL_COMPILER)
+#define GALOIS_ATTRIBUTE_NOINLINE __attribute__ ((noinline))
+#elif defined( __GNUC__)
+#define GALOIS_ATTRIBUTE_NOINLINE __attribute__ ((noinline))
+#elif defined( _MSC_VER)
+#define GALOIS_ATTRIBUTE_NOINLINE __declspec(noinline)
 #else
-  using std::tr1::function;
-  using std::tr1::ref;
+#define GALOIS_ATTRIBUTE_NOINLINE
 #endif
 
 }

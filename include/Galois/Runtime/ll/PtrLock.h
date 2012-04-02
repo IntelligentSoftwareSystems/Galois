@@ -37,6 +37,8 @@
 #include <stdint.h>
 #include <cassert>
 
+#include "CompFlags.h"
+
 namespace GaloisRuntime {
 namespace LL {
 
@@ -56,9 +58,7 @@ public:
   inline void lock() {
     do {
       while ((_lock & 1) != 0) {
-#if defined(__i386__) || defined(__amd64__)
-	asm volatile ( "pause");
-#endif
+	mem_pause();
       }
       if (try_lock())
 	break;

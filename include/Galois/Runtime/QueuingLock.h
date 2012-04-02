@@ -190,9 +190,7 @@ public:
 //       I->locked = true;
 //       pred->next = I;
 //       while (I->locked) { //spin
-// #if defined(__i386__) || defined(__amd64__)
-// 	asm volatile ( "pause");
-// #endif
+//         Config::mem_pause();
 //       };
 //     }
 //   }
@@ -203,9 +201,7 @@ public:
 //       if (__sync_bool_compare_and_swap(&_lock, I, 0))
 // 	return;
 //       while (!I->next) { // spin
-// #if defined(__i386__) || defined(__amd64__)
-// 	asm volatile ( "pause");
-// #endif
+//         Config::mem_pause();
 //       }
 //     }
 //     I->next->locked = false;
