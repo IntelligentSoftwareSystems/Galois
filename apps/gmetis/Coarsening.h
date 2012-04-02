@@ -144,7 +144,7 @@ private:
 			this->maxVertexWeight = maxVertexWeight;
 		}
 		template<typename Context>
-		void __attribute__((noinline)) operator()(GNode item, Context& lwl) {
+		void operator()(GNode item, Context& lwl) {
 			matcher.match(item);
 		}
 	};
@@ -284,7 +284,7 @@ private:
 		////			 delete[] visited;
 		//		 }
 		template<typename Context>
-		void __attribute__((noinline)) operator()(GNode item, Context& lwl) {
+		void operator()(GNode item, Context& lwl) {
 			MetisNode& nodeData = item.getData(Galois::NONE);
 			metisGraph->getCoarseGraphMap(nodeData.getNodeId()).getData(Galois::CHECK_CONFLICT);
 			coarsener->addEdges(nodeData.getNodeId(), item, visited, coarseMetisGraph);

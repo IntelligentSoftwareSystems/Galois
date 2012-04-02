@@ -144,7 +144,7 @@ void runBody() {
 
 struct process {
   template<typename ContextTy>
-  void __attribute__((noinline)) operator()(GNode& node, ContextTy& lwl) {
+  void operator()(GNode& node, ContextTy& lwl) {
   }
 };
 

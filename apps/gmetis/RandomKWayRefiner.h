@@ -258,7 +258,7 @@ private:
 			this->perCPUValues = perCPUValues;
 		}
 		template<typename Context>
-		void __attribute__((noinline)) operator()(GNode item, Context& lwl) {
+		void operator()(GNode item, Context& lwl) {
 //			if(perCPUValues->get().changedBndNodes.size() == 0){
 //				perCPUValues->get().changedBndNodes.reserve(metisGraph->getNumOfBoundaryNodes());
 //				cout<<"resize to "<<metisGraph->getNumOfBoundaryNodes()<<endl;

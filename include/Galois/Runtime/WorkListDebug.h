@@ -23,6 +23,7 @@
 #ifndef GALOIS_RUNTIME_WORKLISTDEBUG_H
 #define GALOIS_RUNTIME_WORKLISTDEBUG_H
 
+#include "Galois/Runtime/Config.h"
 #include "Galois/util/OnlineStats.h"
 
 #include <fstream>
@@ -166,7 +167,8 @@ public:
   };
 
   //! push a value onto the queue
-  void push(value_type val) __attribute__((noinline)) {
+  GALOIS_ATTRIBUTE_NOINLINE
+  void push(value_type val) {
     wl.push(val);
   }
 

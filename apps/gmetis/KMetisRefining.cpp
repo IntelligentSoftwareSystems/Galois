@@ -56,7 +56,7 @@ struct projectInfo {
 		this->graph = finer->getGraph();
 	}
 	template<typename Context>
-	void __attribute__((noinline)) operator()(GNode node, Context& lwl) {
+	void operator()(GNode node, Context& lwl) {
 
 		MetisNode& nodeData = node.getData(Galois::NONE);
 		nodeData.setIdegree(nodeData.getAdjWgtSum());

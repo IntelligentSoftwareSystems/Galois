@@ -101,7 +101,7 @@ GaloisRuntime::PerCPU<long> MSTWeight;
 //GaloisRuntime::PerCPU<long> NumIncrements;
 struct process {
    template<typename ContextTy>
-   void __attribute__((noinline)) operator()(GNode& src, ContextTy& lwl) {
+   void operator()(GNode& src, ContextTy& lwl) {
       if (graph.containsNode(src) == false)
          return;
       graph.getData(src, Galois::ALL);
