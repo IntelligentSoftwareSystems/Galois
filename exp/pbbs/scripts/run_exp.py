@@ -9,7 +9,8 @@ D = [{"prob": "breadthFirstSearch",
       "algos": ["deterministicBFS", "ndBFS", "serialBFS"],
       "inputs": ["randLocalGraph_J_5_10000000", "rMatGraph_J_5_10000000", "3Dgrid_J_10000000"]},
      {"prob": "comparisonSort",
-      "algos": ["quickSort", "sampleSort", "serialSort"],
+      "algos": [#"quickSort",
+        "sampleSort", "serialSort"],
       "inputs": ["randomSeq_100M_double", "exptSeq_100M_double", "almostSortedSeq_100M_double",
                  "trigramSeq_100M", ("-p", "trigramSeq_100M")]},
      {"prob": "convexHull",
@@ -24,21 +25,21 @@ D = [{"prob": "breadthFirstSearch",
      {"prob": "dictionary",
       "algos": ["deterministicHash", "serialHash"],
       "inputs": ["randomSeq_10M_int", "randomSeq_10M_100K_int", "exptSeq_10M_int", "trigramSeq_10M", "trigramSeq_10M_pair_int"]},
-     {"prob": "integerSort",
-      "algos": ["blockRadixSort", "serialRadixSort"],
-      "inputs": ["randomSeq_100M_int", "exptSeq_100M_int", "randomSeq_100M_int_pair_int", "randomSeq_100M_256_int_pair_int"]},
+#     {"prob": "integerSort",
+#      "algos": ["blockRadixSort", "serialRadixSort"],
+#      "inputs": ["randomSeq_100M_int", "exptSeq_100M_int", "randomSeq_100M_int_pair_int", "randomSeq_100M_256_int_pair_int"]},
      {"prob": "maximalIndependentSet",
       "algos": ["incrementalMIS", "ndMIS", "serialMIS"],
       "inputs": ["randLocalGraph_J_5_10000000", "rMatGraph_J_5_10000000", "3Dgrid_J_10000000"]},
      {"prob": "maximalMatching",
       "algos": ["incrementalMatching", "ndMatching", "serialMatching"],
       "inputs": ["randLocalGraph_E_5_10000000", "rMatGraph_E_5_10000000", "3Dgrid_E_10000000"]},
-     {"prob": "minSpanningTree",
-      "algos": ["parallelKruskal", "serialMST"],
-      "inputs": ["randLocalGraph_WE_5_10000000", "rMatGraph_WE_5_10000000", "2Dgrid_WE_10000000"]},
-     {"prob": "nBody",
-      "algos": ["parallelCK"],
-      "inputs": ["3DonSphere_1000000", "3DinCube_1000000", "3Dplummer_1000000"]},
+#     {"prob": "minSpanningTree",
+#      "algos": ["parallelKruskal", "serialMST"],
+#      "inputs": ["randLocalGraph_WE_5_10000000", "rMatGraph_WE_5_10000000", "2Dgrid_WE_10000000"]},
+#     {"prob": "nBody",
+#      "algos": ["parallelCK"],
+#      "inputs": ["3DonSphere_1000000", "3DinCube_1000000", "3Dplummer_1000000"]},
      {"prob": "nearestNeighbors",
       "algos": ["octTree2Neighbors", "octTreeNeighbors"],
       "inputs": [("-d 2 -k 1", "2DinCube_10M"), ("-d 2 -k 1", "2Dkuzmin_10M"), ("-d 3 -k 1", "3DinCube_10M"), ("-d 3 -k 1", "3DonSphere_10M"), ("-d 3 -k 10", "3DinCube_10M"), ("-d 3 -k 10", "3Dplummer_10M")]},
@@ -90,7 +91,7 @@ system("mkdir -p " + RESULTDIR)
 def run(key, cmd):
   global SKIPPED, FAILED
   log = "%s/%s" % (RESULTDIR, key)
-  if os.path.exists(log):
+  if os.path.exists(log) or "serial" in key:
     system("echo -n '\033[1;31m'")
     system("echo -n Skipping " + key)
     system("echo '\033[0m'")
@@ -111,6 +112,7 @@ def run(key, cmd):
       system("echo 'INFO: Hostname %s' | tee -a %s" % (os.uname()[1], log))
       system("echo 'STAT SINGLE Kind (null) %s' | tee -a %s" % (BASENAME, log))
       os.environ["OMP_NUM_THREADS"] = str(t)
+      os.environ["OMP_SCHEDULE"] = "dynamic,16"
       os.environ["TBB_NUM_THREADS"] = str(t)
       os.environ["CILK_NWORKERS"] = str(t)
       os.environ["GALOIS_NUM_THREADS"] = str(t)
