@@ -50,9 +50,9 @@ struct Task: public TaskFunction {
   IterTy end;
   FunctionTy fn;
   int flag;
-  volatile int& done;
+  volatile unsigned& done;
 
-  Task(const IterTy& b, const IterTy& e, FunctionTy f, volatile int& d):
+  Task(const IterTy& b, const IterTy& e, FunctionTy f, volatile unsigned& d):
     begin(b), end(e), fn(f), flag(0), done(d) { }
 
   virtual ~Task() { }
@@ -119,7 +119,7 @@ class TaskContext: public boost::noncopyable {
   typedef std::list<MyTask, Allocator> Tasks;
 
   Tasks tasks;
-  volatile int done;
+  volatile unsigned done;
   size_t numBlocks;
 
   template<typename WorklistTy>
