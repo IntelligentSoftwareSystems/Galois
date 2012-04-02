@@ -84,7 +84,6 @@ struct WID {
 
 template<typename T,int chunksize,bool concurrent=true>
 class dChunkedLIFO : private boost::noncopyable {
-private:
   class Chunk : public FixedSizeLIFO<T, chunksize>, public WorkList::ConExtLinkedStack<Chunk, concurrent>::ListNode {};
 
   MM::FixedSizeAllocator heap;
@@ -95,22 +94,20 @@ private:
 
   typedef WorkList::ConExtLinkedStack<Chunk, concurrent> LevelItem;
 
-  PerCPU<p,concurrent> data;
-  PerLevel<LevelItem,concurrent> Q;
+  PerCPU<p> data;
+  PerLevel<LevelItem> Q;
 
   Chunk* mkChunk() {
     return new (heap.allocate(sizeof(Chunk))) Chunk();
   }
   
-  __attribute__((noinline))
   void delChunk(Chunk* C) {
     C->~Chunk();
     heap.deallocate(C);
   }
 
-  __attribute__((noinline))
-  void pushChunk(Chunk* C)  {
-    LevelItem& I = Q.get();
+  void pushChunk(const WID& id, Chunk* C)  {
+    LevelItem& I = Q.get(id.pid);
     I.push(C);
   }
 
@@ -119,9 +116,8 @@ private:
     return I.pop();
   }
 
-  __attribute__((noinline))
-  Chunk* popChunk()  {
-    int pid = Q.myEffectiveID();
+  Chunk* popChunk(const WID& id)  {
+    int pid = id.pid;
     Chunk* r = popChunkByID(pid);
     if (r)
       return r;
@@ -151,171 +147,7 @@ public:
     }
   }
 
-  __attribute__((noinline))
-  void push_backSP(p& n, value_type val) {
-    if (n.next)
-      pushChunk(n.next);
-    n.next = mkChunk();
-    n.next->push_back(val);
-  }
-
-  void push_back(const WID&, value_type val)  {
-    p& n = data.get();
-    if (n.next && !n.next->full()) {
-      n.next->push_back(val);
-      return;
-    }
-    push_backSP(n, val);
-  }
-
-  template<typename Iter>
-  void push_back(const WID& i, Iter b, Iter e) {
-    while (b != e)
-      push_back(i, *b++);
-  }
-
-  template<typename Iter>
-  void push_initial(Iter b, Iter e) {
-    push_back(b, e);
-  }
-
-  value_type& back(const WID&) {
-    p& n = data.get();
-    return n.next->back();
-  }
-
-  __attribute__((noinline))
-  bool emptySP(p& n) {
-    while (true) {
-      if (n.next && !n.next->empty())
-        return false;
-      if (n.next)
-        delChunk(n.next);
-      n.next = popChunk();
-      if (!n.next)
-        return true;
-    }
-  }
-
-  bool sempty() {
-    WID id;
-    for (unsigned i = 0; i < data.size(); ++i) {
-      id.tid = i;
-      id.pid = LL::getPackageForThreadInternal(i);
-      if (!empty(id))
-        return false;
-    }
-    return true;
-  }
-
-  bool empty(const WID&) {
-    p& n = data.get();
-    if (n.next && !n.next->empty())
-      return false;
-    return
-      emptySP(n);
-  }
-
-  __attribute__((noinline))
-  void pop_backSP(p& n) {
-    while (true) {
-      if (n.next && !n.next->empty()) {
-        n.next->pop_back();
-        return;
-      }
-      if (n.next)
-        delChunk(n.next);
-      n.next = popChunk();
-      if (!n.next)
-        return;
-    }
-  }
-
-  void pop_back(const WID&)  {
-    p& n = data.get();
-    if (n.next && !n.next->empty()) {
-      n.next->pop_back();
-      return;
-    }
-    pop_backSP(n);
-  }
-};
-
-template<typename T,int chunksize,bool concurrent=true>
-class dChunkedLIFOThreaded : private boost::noncopyable {
-  class Chunk : public FixedSizeLIFO<T, chunksize>, public WorkList::ConExtLinkedStack<Chunk, concurrent>::ListNode {};
-
-  MM::FixedSizeAllocator heap;
-
-  struct p {
-    Chunk* next;
-  };
-
-  typedef WorkList::ConExtLinkedStack<Chunk, concurrent> LevelItem;
-
-  PerCPU<p> data;
-  PerLevel<LevelItem> Q;
-
-  Chunk* mkChunk() {
-    return new (heap.allocate(sizeof(Chunk))) Chunk();
-  }
-  
-  __attribute__((noinline))
-  void delChunk(Chunk* C) {
-    C->~Chunk();
-    heap.deallocate(C);
-  }
-
-  __attribute__((noinline))
-  void pushChunk(const WID& id, Chunk* C)  {
-    LevelItem& I = Q.get(id.pid);
-    I.push(C);
-  }
-
-  Chunk* popChunkByID(unsigned int i)  {
-    LevelItem& I = Q.get(i);
-    return I.pop();
-  }
-
-  __attribute__((noinline))
-  Chunk* popChunk(const WID& id)  {
-    int pid = id.pid;
-    Chunk* r = popChunkByID(pid);
-    if (r)
-      return r;
-    
-    for (int i = pid + 1; i < (int) Q.size(); ++i) {
-      r = popChunkByID(i);
-      if (r) 
-	return r;
-    }
-
-    for (int i = 0; i < pid; ++i) {
-      r = popChunkByID(i);
-      if (r)
-	return r;
-    }
-
-    return 0;
-  }
-
-public:
-  typedef T value_type;
-
-  dChunkedLIFOThreaded() : heap(sizeof(Chunk)) {
-    for (unsigned int i = 0; i < data.size(); ++i) {
-      p& r = data.get(i);
-      r.next = 0;
-    }
-  }
-
-  __attribute__((noinline))
-  void push_backSP(const WID& id, p& n, value_type val) {
-    if (n.next)
-      pushChunk(id, n.next);
-    n.next = mkChunk();
-    n.next->push_back(val);
-  }
+  void push_backSP(const WID& id, p& n, value_type val);
 
   void push_back(const WID& id, value_type val)  {
     p& n = data.get(id.tid);
@@ -342,25 +174,13 @@ public:
     return n.next->back();
   }
 
-  __attribute__((noinline))
-  bool emptySP(const WID& id, p& n) {
-    while (true) {
-      if (n.next && !n.next->empty())
-        return false;
-      if (n.next)
-        delChunk(n.next);
-      n.next = popChunk(id);
-      if (!n.next)
-        return true;
-    }
-  }
+  bool emptySP(const WID& id, p& n);
 
   bool empty(const WID& id) {
     p& n = data.get(id.tid);
     if (n.next && !n.next->empty())
       return false;
-    return
-      emptySP(id, n);
+    return emptySP(id, n);
   }
 
   bool sempty() {
@@ -374,20 +194,7 @@ public:
     return true;
   }
 
-  __attribute__((noinline))
-  void pop_backSP(const WID& id, p& n) {
-    while (true) {
-      if (n.next && !n.next->empty()) {
-        n.next->pop_back();
-        return;
-      }
-      if (n.next)
-        delChunk(n.next);
-      n.next = popChunk(id);
-      if (!n.next)
-        return;
-    }
-  }
+  void pop_backSP(const WID& id, p& n);
 
   void pop_back(const WID& id)  {
     p& n = data.get(id.tid);
@@ -398,6 +205,43 @@ public:
     pop_backSP(id, n);
   }
 };
+
+template<typename T,int chunksize,bool concurrent>
+void dChunkedLIFO<T,chunksize,concurrent>::pop_backSP(const WID& id, p& n) {
+  while (true) {
+    if (n.next && !n.next->empty()) {
+      n.next->pop_back();
+      return;
+    }
+    if (n.next)
+      delChunk(n.next);
+    n.next = popChunk(id);
+    if (!n.next)
+      return;
+  }
+}
+
+template<typename T,int chunksize,bool concurrent>
+bool dChunkedLIFO<T,chunksize,concurrent>::emptySP(const WID& id, p& n) {
+  while (true) {
+    if (n.next && !n.next->empty())
+      return false;
+    if (n.next)
+      delChunk(n.next);
+    n.next = popChunk(id);
+    if (!n.next)
+      return true;
+  }
+}
+
+template<typename T,int chunksize,bool concurrent>
+void dChunkedLIFO<T,chunksize,concurrent>::push_backSP(const WID& id, p& n, value_type val) {
+  if (n.next)
+    pushChunk(id, n.next);
+  n.next = mkChunk();
+  n.next->push_back(val);
+}
+
 } // end HIDDEN
 
 template<class T, class FunctionTy>
@@ -405,7 +249,7 @@ class ForEachWork<WorkList::BulkSynchronous<>,T,FunctionTy,true>: public ForEach
   typedef ForEachWorkBase<T, FunctionTy> Super;
   typedef typename Super::value_type value_type;
   typedef typename Super::ThreadLocalData ThreadLocalData;
-  typedef HIDDEN::dChunkedLIFOThreaded<T,256> BagTy;
+  typedef HIDDEN::dChunkedLIFO<T,256> BagTy;
 
   GaloisRuntime::FastBarrier barrier1;
   GaloisRuntime::FastBarrier barrier2;
