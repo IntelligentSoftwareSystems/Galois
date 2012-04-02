@@ -58,7 +58,7 @@ static inline void for_each(IterTy b, IterTy e, Function f, const char* loopname
 
 template<typename IterTy, typename Function>
 static inline void for_each(IterTy b, IterTy e, Function f, const char* loopname = 0) {
-  typedef GaloisRuntime::WorkList::dChunkedFIFO<1024> WLTy;
+  typedef GaloisRuntime::WorkList::dChunkedFIFO<256> WLTy;
   for_each<WLTy, IterTy, Function>(b, e, f, loopname);
 }
 
@@ -83,8 +83,7 @@ static inline void for_each(InitItemTy i, Function f, const char* loopname = 0) 
 // Experimental!
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifdef GALOIS_EXP
-/*
+#if 0
 template<typename Function>
 struct tile_apply {
   Function f;
@@ -126,7 +125,7 @@ static inline void do_all_adl(ContainerTy& c, Function f, const char* loopname =
   //Fallback:
   //for_each(c.begin(), c.end(), f, loopname);
 }
-*/
+
 #endif
 
 //Random access iterator do_all
