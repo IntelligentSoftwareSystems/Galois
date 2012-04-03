@@ -67,24 +67,21 @@ public:
 
   inline void unlock() {
     assert(_lock & 1);
-    asm volatile ("":::"memory");
+    compilerBarrier();
     _lock = _lock & ~1;
-    asm volatile ("":::"memory");
   }
 
   inline void unlock_and_clear() {
     assert(_lock & 1);
-    asm volatile ("":::"memory");
+    compilerBarrier();
     _lock = 0;
-    asm volatile ("":::"memory");
   }
 
   inline void unlock_and_set(T val) {
     assert(_lock & 1);
     assert(!((uintptr_t)val & 1));
-    asm volatile ("":::"memory");
+    compilerBarrier();
     _lock = (uintptr_t)val;
-    asm volatile ("":::"memory");
   }
   
   inline T getValue() const {

@@ -63,9 +63,8 @@ public:
 
   inline void unlock() const {
     assert(_lock);
-    asm volatile ("":::"memory");
+    compilerBarrier();
     _lock = 0;
-    asm volatile ("":::"memory");
   }
 
   inline bool try_lock() const {

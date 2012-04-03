@@ -32,6 +32,7 @@ namespace LL {
 
 inline static void mem_pause() {
 #if defined(__i386__) || defined(__amd64__)
+  //__builtin_ia32_pause();
   asm volatile ( "pause");
 #endif
 }
