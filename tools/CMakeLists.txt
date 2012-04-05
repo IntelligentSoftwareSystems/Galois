@@ -18,7 +18,12 @@ ExternalProject_Add(cats-gens
   DOWNLOAD_DIR cats-gens/src/cats-gens
   DOWNLOAD_COMMAND bash -c "if [ ! -e makefile ] | then ${WGET} --recursive --no-parent --no-host-directories --cut-dirs=3 --reject \"index.html*\" --quiet http://www.avglab.com/andrew/CATS/gens/ | fi"
   PATCH_COMMAND bash -c "if [ ! -e CMakeLists.txt ] | then patch -p1 < ${CMAKE_CURRENT_SOURCE_DIR}/cats-gens.patch | fi"
-  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}
+  CMAKE_ARGS 
+    -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} 
+    -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS_RELEASE}
+    -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+    -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS_RELEASE}
+    -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}
 )
 
 find_program(UNZIP unzip)
@@ -30,7 +35,12 @@ ExternalProject_Add(triangle
   DOWNLOAD_COMMAND bash -c "if [ ! -e triangle.zip ] | then ${WGET} --quiet http://www.netlib.org/voronoi/triangle.zip | fi"
   UPDATE_COMMAND bash -c "if [ ! -e makefile ] | then ${UNZIP} triangle.zip | fi"
   PATCH_COMMAND bash -c "if [ ! -e CMakeLists.txt ] | then patch -p1 < ${CMAKE_CURRENT_SOURCE_DIR}/triangle.patch | fi"
-  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}
+  CMAKE_ARGS 
+    -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} 
+    -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS_RELEASE}
+    -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+    -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS_RELEASE}
+    -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}
 )
 
 ExternalProject_Add(snap
@@ -40,28 +50,44 @@ ExternalProject_Add(snap
   DOWNLOAD_COMMAND bash -c "if [ ! -e Snap-11-12-31.zip ] | then ${WGET} --quiet http://snap.stanford.edu/snap/Snap-11-12-31.zip | fi"
   UPDATE_COMMAND bash -c "if [ ! -e README ] | then ${UNZIP} Snap-11-12-31.zip | fi"
   PATCH_COMMAND bash -c "if [ ! -e CMakeLists.txt ] | then patch -p1 < ${CMAKE_CURRENT_SOURCE_DIR}/snap.patch | fi"
-  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}
+  CMAKE_ARGS 
+    -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+    -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS_RELEASE}
+    -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+    -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS_RELEASE}
+    -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}
 )
 
-find_program(TAR tar)
-ExternalProject_Add(hi_pr
-  PREFIX hi_pr
-  LIST_SEPARATOR |
-  DOWNLOAD_DIR hi_pr/src/hi_pr
-  URL http://www.avglab.com/andrew/soft/hipr.tar
-  PATCH_COMMAND bash -c "if [ ! -e CMakeLists.txt ] | then patch -p1 < ${CMAKE_CURRENT_SOURCE_DIR}/hi_pr.patch | fi"
-  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}
-)
+# Simple download and patch
+function(dl name url)
+  ExternalProject_Add(${name}
+    PREFIX ${name}
+    LIST_SEPARATOR |
+    DOWNLOAD_DIR ${name}/src/${name}
+    URL ${url}
+    PATCH_COMMAND bash -c "if [ ! -e CMakeLists.txt ] | then patch -p1 < ${CMAKE_CURRENT_SOURCE_DIR}/${name}.patch | fi"
+    CMAKE_ARGS 
+      -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} 
+      -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS_RELEASE}
+      -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+      -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS_RELEASE}
+      -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}
+  )
+endfunction(dl)
 
-ExternalProject_Add(GTgraph-rmat
-  PREFIX GTgraph-rmat
-  LIST_SEPARATOR |
-  DOWNLOAD_DIR GTgraph-rmat/src/GTgraph-rmat
-  URL http://www.cse.psu.edu/~madduri/software/GTgraph/GTgraph.tar.gz
-  PATCH_COMMAND bash -c "if [ ! -e CMakeLists.txt ] | then patch -p1 < ${CMAKE_CURRENT_SOURCE_DIR}/GTgraph-rmat.patch | fi"
-  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}
-)
+dl(hi_pr http://www.avglab.com/andrew/soft/hipr.tar)
+dl(GTgraph-rmat http://www.cse.psu.edu/~madduri/software/GTgraph/GTgraph.tar.gz)
+dl(SSCA2 http://www.graphanalysis.org/benchmark/SSCA2-2.2.tar.gz)
+
+set(more_tools hi_pr triangle cats-gens snap GTgraph-rmat SSCA2)
+
+if(HAVE_CILK)
+  dl(bfs-schardl http://web.mit.edu/~neboat/www/code/bfs-icc-20120304.tar.gz)
+  set(more_tools ${more_tools} bfs-schardl)
+else()
+  message(STATUS "Build of Schardl BFS will be skipped because CILK is not available")
+endif()
 
 add_custom_target(more-tools)
-set_target_properties(hi_pr triangle cats-gens snap GTgraph-rmat PROPERTIES EXCLUDE_FROM_ALL true)
-add_dependencies(more-tools hi_pr triangle cats-gens snap GTgraph-rmat)
+set_target_properties(${more_tools} PROPERTIES EXCLUDE_FROM_ALL true)
+add_dependencies(more-tools ${more_tools})

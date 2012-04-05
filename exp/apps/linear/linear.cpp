@@ -33,7 +33,7 @@ struct BaseNode {
 template<typename Graph>
 static double residual(Graph& g) {
   double retval = 0;
-  for (typename Graph::active_iterator ii = g.active_begin(), ei = g.active_end(); ii != ei; ++ii) {
+  for (typename Graph::iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
     double r = ii->getData().x - ii->getData().actual;
     retval += r * r;
   }
@@ -43,7 +43,7 @@ static double residual(Graph& g) {
 template<typename Graph>
 static double relativeResidual(Graph& g) {
   double retval = 0;
-  for (typename Graph::active_iterator ii = g.active_begin(), ei = g.active_end(); ii != ei; ++ii) {
+  for (typename Graph::iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
     double r = ii->getData().x - ii->getData().x_prev;
     retval += r * r;
   }
@@ -82,7 +82,7 @@ struct Jacobi {
 
   void operator()() {
     for (int i = 0; i < MaxIterations; ++i) {
-      std::for_each(graph.active_begin(), graph.active_end(), *this);
+      std::for_each(graph.begin(), graph.end(), *this);
       double r = relativeResidual(graph);
       std::cout << "RE " << r << "\n";
       if (r < TOL)
@@ -132,15 +132,15 @@ struct ConjugateGradient {
   void operator()() {
     // rsold = r'*r
     double rs_old = 0.0;
-    for (Graph::active_iterator ii = graph.active_begin(), ei = graph.active_end(); ii != ei; ++ii) {
+    for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
       double r = ii->getData(Galois::NONE).r;
       rs_old += r * r;
     }
 
     for (int iteration = 0; iteration < MaxIterations; ++iteration) {
       // Ap = A*p
-      for (Graph::active_iterator src = graph.active_begin(), 
-          esrc = graph.active_end(); src != esrc; ++src) {
+      for (Graph::iterator src = graph.begin(), 
+          esrc = graph.end(); src != esrc; ++src) {
         Node& node = src->getData(Galois::NONE);
         node.ap = 0;
         for (Graph::neighbor_iterator dst = graph.neighbor_begin(*src, Galois::ALL),
@@ -153,8 +153,8 @@ struct ConjugateGradient {
 
       // alpha = rs_old/(p'*Ap)
       double sum = 0;
-      for (Graph::active_iterator src = graph.active_begin(), 
-          esrc = graph.active_end(); src != esrc; ++src) {
+      for (Graph::iterator src = graph.begin(), 
+          esrc = graph.end(); src != esrc; ++src) {
         Node& node = src->getData(Galois::NONE);
         sum += node.ap * node.p;
       }
@@ -164,8 +164,8 @@ struct ConjugateGradient {
       // r = r - alpha*Ap
       // rs_new = r'*r
       double rs_new = 0;
-      for (Graph::active_iterator src = graph.active_begin(),
-          esrc = graph.active_end(); src != esrc; ++src) {
+      for (Graph::iterator src = graph.begin(),
+          esrc = graph.end(); src != esrc; ++src) {
         Node& node = src->getData(Galois::NONE);
         node.x += alpha * node.p;
         node.r -= alpha * node.ap;
@@ -180,8 +180,8 @@ struct ConjugateGradient {
       std::cout << "RE " << r << "\n";
 
       // p = r + rs_new/rs_old * p
-      for (Graph::active_iterator src = graph.active_begin(),
-          esrc = graph.active_end(); src != esrc; ++src) {
+      for (Graph::iterator src = graph.begin(),
+          esrc = graph.end(); src != esrc; ++src) {
         Node& node = src->getData(Galois::NONE);
         node.p = node.r + rs_new/rs_old * node.p;
       }
@@ -275,7 +275,7 @@ struct GBP {
 
   void operator()() {
     for (int i = 0; i < MaxIterations; ++i) {
-      std::for_each(graph.active_begin(), graph.active_end(), *this);
+      std::for_each(graph.begin(), graph.end(), *this);
       double r = relativeResidual(graph);
       std::cout << "RE " << r << "\n";
       if (r < TOL)
@@ -363,7 +363,7 @@ struct GBP {
 
   void operator()() {
     std::vector<Graph::GraphNode> elements(graph.size());
-    std::copy(graph.active_begin(), graph.active_end(), elements.begin());
+    std::copy(graph.begin(), graph.end(), elements.begin());
 
     for (int i = 0; i < MaxIterations; ++i) {
       std::random_shuffle(elements.begin(), elements.end());
@@ -393,7 +393,7 @@ struct Cholesky {
 
   void operator()() {
     std::vector<Graph::GraphNode> A(graph.size());
-    std::copy(graph.active_begin(), graph.active_end(), A.begin());
+    std::copy(graph.begin(), graph.end(), A.begin());
 
     //for (int k = 0; k < N; k++) {
     //  A[k][k] = Math.sqrt(A[k][k]);
@@ -516,7 +516,7 @@ struct GenerateInput {
     std::cout << "N: " << N << " nnz: " << nnz << "\n";
 
     // Solve system Ax = b
-    for (typename GenGraph::active_iterator src = g1.active_begin(), esrc = g1.active_end();
+    for (typename GenGraph::iterator src = g1.begin(), esrc = g1.end();
         src != esrc; ++src) {
       Node& node = src->getData();
 
@@ -537,7 +537,7 @@ struct GenerateInput {
     // Create nodes
     std::vector<GraphNode> nodes;
     size_t id = 0;
-    for (typename GenGraph::active_iterator ii = g1.active_begin(), ei = g1.active_end();
+    for (typename GenGraph::iterator ii = g1.begin(), ei = g1.end();
         ii != ei; ++ii) {
       ii->getData().id = id++;
       double w = g1.getEdgeData(*ii, *ii);
@@ -548,7 +548,7 @@ struct GenerateInput {
     }
 
     // Create edges
-    for (typename GenGraph::active_iterator src = g1.active_begin(), esrc = g1.active_end();
+    for (typename GenGraph::iterator src = g1.begin(), esrc = g1.end();
         src != esrc; ++src) {
       GraphNode snode = nodes[src->getData().id];
 

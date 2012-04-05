@@ -89,13 +89,13 @@ class Element
   // Accessors/Mutators:
 
   //! Number of different fields 
-  virtual const size_t getNumFields() const = 0;  
+  virtual size_t getNumFields() const = 0;  
 
   //! Number of degrees of freedom of one of the fields.
-  virtual const size_t getDof(size_t field) const = 0; 
+  virtual size_t getDof(size_t field) const = 0; 
 
   //! Number of derivatives per shape function for one of the fields
-  virtual const size_t getNumDerivatives(size_t field) const = 0;  
+  virtual size_t getNumDerivatives(size_t field) const = 0;  
 
   //!  Shape functions at quadrature points of one of the fields
   virtual const std::vector <double> &getShapes(size_t field) const = 0;  
@@ -111,11 +111,11 @@ class Element
 
   //! Value of shape function "shapenumber" of field "field" 
   //! at quadrature point "quad"
-  virtual const double getShape(size_t field, size_t quad, size_t shapenumber) const = 0;
+  virtual double getShape(size_t field, size_t quad, size_t shapenumber) const = 0;
 
   //! Value of derivative of shape function "shapenumber" of field "field" 
   //! at quadrature point "quad" in direction "dir"
-  virtual const double getDShape(size_t field, size_t quad, size_t shapenumber, size_t dir)
+  virtual double getDShape(size_t field, size_t quad, size_t shapenumber, size_t dir)
     const = 0;
 
   //! Access to Element Geometry
@@ -187,10 +187,10 @@ public:
 
   virtual Element_ * clone () const = 0;
 
-  inline const size_t getDof (size_t field) const {
+  inline size_t getDof (size_t field) const {
     return LocalShapes[getFieldShapes (field)]->getBasisDimension ();
   }
-  inline const size_t getNumDerivatives (size_t field) const {
+  inline size_t getNumDerivatives (size_t field) const {
     return LocalShapes[getFieldShapes (field)]-> getNumberOfDerivativesPerFunction ();
   }
   inline const std::vector<double> &getShapes (size_t field) const {
@@ -206,11 +206,11 @@ public:
     return LocalShapes[getFieldShapes (field)]->getQuadraturePointCoordinates ();
   }
 
-  inline const double getShape (size_t field, size_t quad, size_t shapenumber) const {
+  inline double getShape (size_t field, size_t quad, size_t shapenumber) const {
     return getShapes (field)[quad * getDof (field) + shapenumber];
   }
 
-  inline const double getDShape (size_t field, size_t quad, size_t shapenumber, size_t dir) const {
+  inline double getDShape (size_t field, size_t quad, size_t shapenumber, size_t dir) const {
     return getDShapes (field)[quad * getDof (field) * getNumDerivatives (field) + shapenumber
         * getNumDerivatives (field) + dir];
   }
@@ -298,20 +298,20 @@ public:
   //! map returns the GlobalDofIndex associated to degree of freedom "dof" 
   //! of field "field"
   //! in element MappedElement.
-  virtual const GlobalDofIndex map (size_t field, size_t dof, const GlobalElementIndex & ElementMapped) const = 0;
+  virtual GlobalDofIndex map (size_t field, size_t dof, const GlobalElementIndex & ElementMapped) const = 0;
 
   //! Total number of elements that can be mapped. Usually, total number of
   //! elements in the mesh.
-  virtual const size_t getNumElements () const = 0;
+  virtual size_t getNumElements () const = 0;
 
   //! Number of fields in an element mapped
-  virtual const size_t getNumFields (const GlobalElementIndex & ElementMapped) const = 0;
+  virtual size_t getNumFields (const GlobalElementIndex & ElementMapped) const = 0;
 
   //! Number of dofs in an element mapped in a given field
-  virtual const size_t getNumDof (const GlobalElementIndex & ElementMapped, size_t field) const = 0;
+  virtual size_t getNumDof (const GlobalElementIndex & ElementMapped, size_t field) const = 0;
 
   //! Total number of dof in the entire map
-  virtual const size_t getTotalNumDof () const = 0;
+  virtual size_t getTotalNumDof () const = 0;
 };
 
 #endif

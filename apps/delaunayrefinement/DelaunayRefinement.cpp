@@ -23,9 +23,10 @@
  * Refinement of an initial, unrefined Delaunay mesh to eliminate triangles
  * with angles < 30 degrees, using a variation of Chew's algorithm.
  *
- * @author Milind Kulkarni <milind@purdue.edu>>
+ * @author Milind Kulkarni <milind@purdue.edu>
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
+
 #include <iostream>
 #include <sys/time.h>
 #include <limits.h>
@@ -36,7 +37,7 @@
 #include "Element.h"
 
 #include "Galois/Statistic.h"
-#include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/Graph2.h"
 #include "Galois/Galois.h"
 
 #include "llvm/Support/CommandLine.h"
@@ -44,7 +45,7 @@
 #include "Lonestar/BoilerPlate.h"
 
 #ifdef GALOIS_EXP
-#include "Galois/Runtime/WorkListAlt.h"
+//#include "Galois/PriorityScheduling.h"
 #endif
 
 namespace cll = llvm::cl;
@@ -75,7 +76,7 @@ struct process {
     Cavity cav(mesh, lwl.getPerIterAlloc());
     cav.initialize(item);
     cav.build();
-    cav.update();
+    cav.update(); //VTune: Most work
     
     //FAILSAFE POINT
 
@@ -104,48 +105,150 @@ struct process {
   }
 };
 
+bool verify() {
+  // ensure consistency of elements
+  bool error = false;
+  
+  for (Graph::iterator ii = mesh->begin(), ee = mesh->end(); ii != ee; ++ii) {
+    
+    GNode node = *ii;
+    Element& element = mesh->getData(node,Galois::NONE);
+    int nsize = std::distance(mesh->edge_begin(node, Galois::NONE), mesh->edge_end(node, Galois::NONE));
+    if (element.getDim() == 2) {
+      if (nsize != 1) {
+	std::cerr << "-> Segment " << element << " has " << nsize << " relation(s)\n";
+	error = true;
+      }
+    } else if (element.getDim() == 3) {
+      if (nsize != 3) {
+	std::cerr << "-> Triangle " << element << " has " << nsize << " relation(s)";
+	error = true;
+      }
+    } else {
+      std::cerr << "-> Figures with " << element.getDim() << " edges";
+      error = true;
+    }
+  }
+  
+  if (error)
+    return false;
+  
+  // ensure reachability
+  std::stack<GNode> remaining;
+  std::set<GNode> found;
+  remaining.push(*(mesh->begin()));
+  
+  while (!remaining.empty()) {
+    GNode node = remaining.top();
+    remaining.pop();
+    if (!found.count(node)) {
+      assert(mesh->containsNode(node) && "Reachable node was removed from graph");
+      found.insert(node);
+      int i = 0;
+      for (Graph::edge_iterator ii = mesh->edge_begin(node, Galois::NONE), ee = mesh->edge_end(node, Galois::NONE); ii != ee; ++ii) {
+	assert(i < 3);
+	assert(mesh->containsNode(mesh->getEdgeDst(ii)));
+	assert(node != mesh->getEdgeDst(ii));
+	++i;
+	//          if (!found.count(*ii))
+	remaining.push(mesh->getEdgeDst(ii));
+      }
+    }
+  }
+  size_t msize = std::distance(mesh->begin(), mesh->end());
+  
+  if (found.size() != msize) {
+    std::cerr << "Not all elements are reachable \n";
+    std::cerr << "Found: " << found.size() << "\nMesh: " << msize << "\n";
+    assert(0 && "Not all elements are reachable");
+    return false;
+  }
+  return true;
+}
+
+GaloisRuntime::galois_insert_bag<GNode> wl;
+
+struct preprocess {
+  void operator()(GNode item) const {
+    if (mesh->getData(item, Galois::NONE).isBad())
+      wl.push(item);
+  }
+  void operator()(Graph::GTile item) const {
+    for (Graph::GTile::iterator ii = item.begin(), ee = item.end();
+	 ii != ee; ++ii)
+      if (mesh->getData(*ii, Galois::NONE).isBad())
+	wl.push(*ii);
+  }
+};
+
+
+struct Indexer: public std::unary_function<const GNode&,unsigned> {
+  unsigned operator()(const GNode& t) const { return 0; }
+};
+
+struct Less: public std::binary_function<const GNode&,const GNode&,bool>{
+  bool operator()(const GNode& a, const GNode& b) const {
+    return true;
+  }
+};
+
+struct Greater: public std::binary_function<const GNode&,const GNode&,bool> {
+  bool operator()(const GNode& a, const GNode& b) const {
+    return true;
+  }
+};
+
 int main(int argc, char** argv) {
   LonestarStart(argc, argv, std::cout, name, desc, url);
 
   mesh = new Graph();
-  Mesh m;
-  m.read(mesh, filename.c_str());
+  {
+    Mesh m;
+    m.read(mesh, filename.c_str());
+  }
 
-  std::cout << "configuration: " << std::distance(mesh->active_begin(), mesh->active_end())
-	    << " total triangles, " << std::count_if(mesh->active_begin(), mesh->active_end(), is_bad(mesh)) << " bad triangles\n";
+  std::cout << "configuration: " << std::distance(mesh->begin(), mesh->end())
+	    << " total triangles, " << std::count_if(mesh->begin(), mesh->end(), is_bad(mesh)) << " bad triangles\n";
 
-  std::vector<GNode> wl;
-  for (Graph::active_iterator ii = mesh->active_begin(), ee = mesh->active_end();
-       ii != ee; ++ii)
-    if (mesh->getData(*ii).isBad())
-      wl.push_back(*ii);
-  
-  std::cout << "MEMINFO PRE: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
+  std::cout << "MEMINFO P1: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
+  Galois::preAlloc(15 * numThreads + GaloisRuntime::MM::pageAllocInfo() * 10);
+  std::cout << "MEMINFO P2: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
 
-  Galois::preAlloc(10 * numThreads + GaloisRuntime::MM::pageAllocInfo() * 7);
+  Galois::StatTimer Touter("outertime");
+  Touter.start();
+
+  Galois::do_all(mesh->tile_begin(), mesh->tile_end(), preprocess());
   std::cout << "MEMINFO MID: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
 
   Galois::StatTimer T;
   T.start();
   using namespace GaloisRuntime::WorkList;
-#ifdef GALOIS_EXP
-  Galois::for_each<Alt::ChunkedAdaptor<Alt::InitialQueue<Alt::LevelStealingAlt, Alt::LevelLocalAlt>, 256*4*4> >(wl.begin(), wl.end(), process());
+  //#ifdef GALOIS_EXP
+#if 0
+  //Galois::for_each<Alt::ChunkedAdaptor<Alt::InitialQueue<Alt::LevelStealingAlt, Alt::LevelLocalAlt>, 256*4*4> >(wl.begin(), wl.end(), process());
+  typedef dChunkedLIFO<256> dChunk;
+  typedef ChunkedLIFO<256> Chunk;
+  Exp::WorklistExperiment<
+    LocalQueues<dChunk, LIFO<> >, 
+    dChunk,Chunk,Indexer,Less,Greater>().for_each(
+      std::cout, wl.begin(), wl.end(), process());
 #else
-  Galois::for_each<LocalQueues<dChunkedLIFO<256>, LIFO<> > >(wl.begin(), wl.end(), process());
-//  Galois::for_each<LIFO<> >(wl.begin(), wl.end(), process());
+  Galois::for_each<LocalQueues<dChunkedLIFO<256>, ChunkedLIFO<256> /*LIFO<>*/ > >(wl.begin(), wl.end(), process());
+  //Galois::for_each<OwnerComputesWL<Graph::OwnerFn, int> >(wl.begin(), wl.end(), process());
 #endif
   T.stop();
+  Touter.stop();
 
   std::cout << "MEMINFO POST: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
 
   if (!skipVerify) {
-    int size = std::count_if(mesh->active_begin(), mesh->active_end(), is_bad(mesh));
+    int size = std::count_if(mesh->begin(), mesh->end(), is_bad(mesh));
     if (size != 0) {
       std::cerr << size << " bad triangles remaining.\n";
       assert(0 && "Refinement failed");
       abort();
     }
-    if (!m.verify(mesh)) {
+    if (!verify()) {
       std::cerr << "Refinement failed.\n";
       assert(0 && "Refinement failed");
       abort();

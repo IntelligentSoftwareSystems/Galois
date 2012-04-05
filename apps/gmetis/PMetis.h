@@ -46,7 +46,7 @@ public:
 
 		GGraph* graph = metisGraph->getGraph();
 		int totalVertexWeight = 0;
-		for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 			GNode node = *ii;
 			totalVertexWeight += node.getData().getWeight();
 		}
@@ -64,7 +64,7 @@ public:
 		refineTwoWay(mcg, metisGraph, bisectionWeights);
 
 		if (nparts <= 2) {
-			for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+			for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 				GNode node = *ii;
 				assert(node.getData().getPartition()>=0);
 				node.getData().setPartition(node.getData().getPartition() + partStartIndex);
@@ -85,7 +85,7 @@ public:
 						partStartIndex + nparts / 2);
 				metisGraph->setMinCut(metisGraph->getMinCut() + subGraphs[0].getMinCut() + subGraphs[1].getMinCut());
 			} else if (nparts == 3) {
-				for (GGraph::active_iterator ii = subGraphs[0].getGraph()->active_begin(), ee = subGraphs[0].getGraph()->active_end(); ii != ee; ++ii) {
+				for (GGraph::iterator ii = subGraphs[0].getGraph()->begin(), ee = subGraphs[0].getGraph()->end(); ii != ee; ++ii) {
 					GNode node = *ii;
 					MetisNode& nodeData = node.getData(Galois::NONE);
 					nodeData.setPartition(partStartIndex);
@@ -95,7 +95,7 @@ public:
 						partStartIndex + nparts / 2);
 				metisGraph->setMinCut(metisGraph->getMinCut() + subGraphs[1].getMinCut());
 			}
-			for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+			for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 				GNode node = *ii;
 				MetisNode& nodeData = node.getData();
 				nodeData.setPartition(metisGraph->getSubGraphMapTo(nodeData.getNodeId()).getData().getPartition());
@@ -118,7 +118,7 @@ public:
 		subGraphs[0].setGraph(new GGraph());
 		subGraphs[1].setGraph(new GGraph());
 		metisGraph->initSubGraphMapTo();
-		for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 			GNode node = *ii;
 			MetisNode& nodeData = node.getData();
 			assert(nodeData.getPartition()>=0);
@@ -134,7 +134,7 @@ public:
 		assert(subGraphs[0].getNumNodes() == subGraphNodeNum[0]);
 		assert(subGraphs[1].getNumNodes() == subGraphNodeNum[1]);
 
-		for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 			GNode node = *ii;
 			MetisNode& nodeData = node.getData();
 			int index = nodeData.getPartition();

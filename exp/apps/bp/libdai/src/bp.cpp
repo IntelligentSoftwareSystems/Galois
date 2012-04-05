@@ -16,7 +16,7 @@
 #include <dai/properties.h>
 #include "Galois/Galois.h"
 #include "llvm/Support/CommandLine.h"
-#include "PriorityScheduling/WorkList.h"
+#include "Galois/PriorityScheduling.h"
 #include "Galois/Timer.h"
 #include "Galois/Runtime/PerCPU.h"
 
@@ -701,7 +701,7 @@ Real BP::run() {
 
           Galois::Timer t;
           t.start();
-          Exp::StartWorklistExperiment<OBIM,dChunk,Chunk,Indexer,TaskLess,TaskGreater>()(std::cout, initial.begin(), initial.end(), Process(*this, edgeData, count));
+          Exp::WorklistExperiment<OBIM,dChunk,Chunk,Indexer,TaskLess,TaskGreater>().for_each(std::cout, initial.begin(), initial.end(), Process(*this, edgeData, count));
           t.stop();
           GlobalTime += t.get();
         } else {

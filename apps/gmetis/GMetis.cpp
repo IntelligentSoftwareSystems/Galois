@@ -91,8 +91,8 @@ void verify(MetisGraph* metisGraph) {
 	}
 }
 
-typedef Galois::Graph::LC_CRS_Graph<int, unsigned int> InputGraph;
-typedef Galois::Graph::LC_CRS_Graph<int, unsigned int>::GraphNode InputGNode;
+typedef Galois::Graph::LC_CSR_Graph<int, unsigned int> InputGraph;
+typedef Galois::Graph::LC_CSR_Graph<int, unsigned int>::GraphNode InputGNode;
 
 void readMetisGraph(MetisGraph* metisGraph, const char* filename){
 	std::ifstream file(filename);
@@ -146,7 +146,7 @@ void readGraph(MetisGraph* metisGraph, const char* filename, bool weighted = fal
 	inputGraph.structureFromFile(filename);
 	cout<<"start to transfer data to GGraph"<<endl;
 	int id = 0;
-	for (InputGraph::active_iterator ii = inputGraph.active_begin(), ee = inputGraph.active_end(); ii != ee; ++ii) {
+	for (InputGraph::iterator ii = inputGraph.begin(), ee = inputGraph.end(); ii != ee; ++ii) {
 		InputGNode node = *ii;
 		inputGraph.getData(node)=id++;
 	}
@@ -161,7 +161,7 @@ void readGraph(MetisGraph* metisGraph, const char* filename, bool weighted = fal
 	}
 
 	int numEdges = 0;
-	for (InputGraph::active_iterator ii = inputGraph.active_begin(), ee = inputGraph.active_end(); ii != ee; ++ii) {
+	for (InputGraph::iterator ii = inputGraph.begin(), ee = inputGraph.end(); ii != ee; ++ii) {
 		InputGNode inNode = *ii;
 
 		int nodeId = inputGraph.getData(inNode);
@@ -191,7 +191,7 @@ void readGraph(MetisGraph* metisGraph, const char* filename, bool weighted = fal
 	}
 
 	if(directed){
-		for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 			GNode node = *ii;
 			MetisNode& nodeData = node.getData();
 			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(node), eejj = graph->neighbor_end(node); jj != eejj; ++jj) {

@@ -33,10 +33,12 @@
 Quadrature::Quadrature (const double * const xqdat, const double * const wqdat, const size_t NC,
     const size_t NQ) :
   numMapCoordinates (NC), numShapeCoordinates (NC), numQuadraturePoints (NQ) {
+#if 0
   if (NQ < 0 || NC < 0) {
     std::cerr << "Quadrature::Quadrature: Negative number of quadrature points or coordinates\n";
     exit (1); // Bad..., to be improved in the future with exceptions
   }
+#endif
 
   xqshape = xqmap = new double[NQ * NC];
   wq = new double[NQ];
@@ -52,10 +54,12 @@ Quadrature::Quadrature (const double * const xqdat, const double * const wqdat, 
 Quadrature::Quadrature (const double * const xqdatmap, const double * const xqdatshape,
     const double * const wqdat, const size_t NCmap, const size_t NCshape, const size_t NQ) :
   numMapCoordinates (NCmap), numShapeCoordinates (NCshape), numQuadraturePoints (NQ) {
+#if 0
   if (NQ < 0 || NCmap < 0 || NCshape < 0) {
     std::cerr << "Quadrature::Quadrature: Negative number of quadrature points or coordinates\n";
     exit (1); // Bad..., to be improved in the future with exceptions
   }
+#endif
 
   xqmap = new double[NQ * NCmap];
   xqshape = new double[NQ * NCshape];

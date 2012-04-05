@@ -106,6 +106,7 @@ cat(sprintf("Dropped %d partial runs\n", sum(partial)))
 # Drop unused columns
 Columns <- sapply(res, is.numeric) | colnames(res) %in% Id.Vars
 Columns <- names(Columns)[Columns]
+Columns <- grep("\\.null\\.", Columns, value=T, invert=T)
 res <- res[,Columns]
 
 summarizeBy <- function(d, f, fun.aggregate=mean, suffix=".Y", merge.with=d, idvars=Id.Vars) {
@@ -175,6 +176,8 @@ if (outputfile != "") {
     cmd <- sub(" -t \\d+", "", cmd)
     # Drop columns being selected on because they are redundant
     d <- x[,setdiff(Columns, c("CommandLine", idvars))]
+    # Sort by num threads
+    d <- d[order(d$Threads),]
     list(command=cmd, data=d)
   }))
   cat(json, file=outputfile)

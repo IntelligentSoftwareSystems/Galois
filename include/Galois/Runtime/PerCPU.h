@@ -85,12 +85,28 @@ public:
     return get((BASE::myEID() + 1) % num);
   }
 
+  T& getPrev(unsigned num) {
+    return get((BASE::myEID() + num - 1) % num);
+  }
+  
+  const T& getPrev(unsigned num) const {
+    return get((BASE::myEID() + num - 1) % num);
+  }
+
   unsigned int size() const {
     return BASE::getMaxSize();
   }
 
   unsigned myEffectiveID() const {
     return BASE::myEID();
+  }
+
+  unsigned effectiveIDFor(unsigned i) const {
+    return BASE::otherEID(i);
+  }
+
+  bool isLeader() const {
+    return BASE::LocalLeader(BASE::myEID());
   }
 };
 
@@ -101,6 +117,12 @@ struct H_PERCPU {
   unsigned getMaxSize() const {
     return LL::getMaxThreads();
   }
+  unsigned otherEID(unsigned i) const {
+    return i;
+  }
+  bool LocalLeader(unsigned i) const {
+    return true;
+  }
 };
 
 struct H_PERPACKAGE {
@@ -110,6 +132,27 @@ struct H_PERPACKAGE {
   unsigned getMaxSize() const {
     return LL::getMaxPackages();
   }
+  unsigned otherEID(unsigned i) const {
+    return LL::getPackageForThreadInternal(i);
+  }
+  bool LocalLeader(unsigned i) const {
+    return LL::isLeaderForPackage(i);
+  }
+};
+
+struct H_CONSTANT {
+  unsigned myEID() const {
+    return 0;
+  }
+  unsigned getMaxSize() const {
+    return 1;
+  }
+  unsigned otherEID(unsigned i) const {
+    return i;
+  }
+  bool LocalLeader(unsigned i) const {
+    return true;
+  }
 };
 
 }
@@ -118,20 +161,40 @@ struct H_PERPACKAGE {
 //The master thread is thread 0
 //During Parallel regions the threads index
 //from 0 -> num - 1 (one thread pool thread shares an index with the user thread)
+template<typename T,bool concurrent=true>
+class PerCPU;
+
 template<typename T>
-class PerCPU : public HIDDEN::PERTHING<T, HIDDEN::H_PERCPU> {
+class PerCPU<T,true> : public HIDDEN::PERTHING<T, HIDDEN::H_PERCPU> {
 public:
   PerCPU() :HIDDEN::PERTHING<T, HIDDEN::H_PERCPU>() {}
   explicit PerCPU(const T& v) :HIDDEN::PERTHING<T, HIDDEN::H_PERCPU>(v) {}
-
 };
 
 template<typename T>
-class PerLevel : public HIDDEN::PERTHING<T, HIDDEN::H_PERPACKAGE> {
+class PerCPU<T,false> : public HIDDEN::PERTHING<T, HIDDEN::H_CONSTANT> {
+public:
+  PerCPU() :HIDDEN::PERTHING<T, HIDDEN::H_CONSTANT>() {}
+  explicit PerCPU(const T& v) :HIDDEN::PERTHING<T, HIDDEN::H_CONSTANT>(v) {}
+};
+
+template<typename T,bool concurrent=true>
+class PerLevel;
+
+template<typename T>
+class PerLevel<T,true> : public HIDDEN::PERTHING<T, HIDDEN::H_PERPACKAGE> {
 public:
   PerLevel() :HIDDEN::PERTHING<T, HIDDEN::H_PERPACKAGE>() {}
   explicit PerLevel(const T& v) :HIDDEN::PERTHING<T, HIDDEN::H_PERPACKAGE>(v) {}
 };
+
+template<typename T>
+class PerLevel<T,false> : public HIDDEN::PERTHING<T, HIDDEN::H_CONSTANT> {
+public:
+  PerLevel() :HIDDEN::PERTHING<T, HIDDEN::H_CONSTANT>() {}
+  explicit PerLevel(const T& v) :HIDDEN::PERTHING<T, HIDDEN::H_CONSTANT>(v) {}
+};
+
 
 }
 

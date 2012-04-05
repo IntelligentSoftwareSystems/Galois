@@ -15,15 +15,16 @@ endif()
 ###### Options (alternatively pass as options to cmake -DName=Value) ######
 
 #use profiling
-#set(USE_PROFILING ON)
+set(USE_PROFILING OFF CACHE BOOL "Enable GCC profiling")
 
 #use alternate compiler
-#set(USE_ICC ON)
-#set(USE_CLANG ON)
+set(USE_ICC OFF CACHE BOOL "Use intel compiler")
+set(USE_CLANG OFF CACHE BOOL "Use clang compiler")
 
 #Enable iss specific options; should be OFF in the general release
-#use experimental features
-#set(USE_EXP ON) 
+set(USE_EXP OFF CACHE BOOL "Use experimental features") 
+
+set(USE_VTUNE ON CACHE BOOL "Use vtune (if found)")
 
 ###### Optional programs and default paths ######
 
@@ -46,7 +47,7 @@ endif()
 if(NOT ${ICCXX} STREQUAL "ICCXX-NOTFOUND")
   if(USE_ICC)
     set(CMAKE_CXX_COMPILER ${ICCXX})
-    add_definitions("-wd981 -wd383 -wd869 -wd2196 -wd279 -std=c++0x")
+    add_definitions("-wd68 -wd981 -wd383 -wd869 -wd2196 -wd279 -std=c++0x")
   endif()
 endif()
 
@@ -64,31 +65,23 @@ set(RT_LINK ${CMAKE_THREAD_LIBS_INIT} ${RT_LINK})
 #NUMA (linux)
 find_package(LIBNUMA)
 if(LIBNUMA_FOUND)
-  message(STATUS "NUMA in use")
   set(RT_LINK numa ${RT_LINK})
   add_definitions(-DGALOIS_NUMA)
-else()
-  message(WARNING "NUMA specified but libnuma not found")
 endif()
 
 #LAPACK
 enable_language(Fortran)
 find_package(LAPACK)
 
+#CILK
+include(CheckCilk)
+
 #Boost
-#not needed now but will be needed for newer version of Boost after 1.4X ish
-set(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0" "1.47" "1.47.0")
 set(Boost_USE_MULTITHREADED OFF) # newer boost builds don't use -mt extension
 #Other options that can be used with find_package(Boost)
 # set(BOOST_ROOT /path/)
-# set(Boost_USE_STATIC_LIBS ON)
-# find_package(Boost 1.34.0 REQUIRED COMPONENTS system serialization graph_parallel mpi)
-# set(BOOST_LIBS system)
-if(${SITE_NAME} MATCHES "delaunay.*")
-  find_package(Boost 1.34.0 COMPONENTS ${BOOST_LIBS})
-else()
-  find_package(Boost 1.34.0 COMPONENTS ${BOOST_LIBS} REQUIRED)
-endif()
+# set(Boost_NO_SYSTEM_PATHS TRUE) # useful with BOOST_ROOT
+find_package(Boost 1.36.0 COMPONENTS REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 set(RT_LINK ${Boost_LIBRARIES} ${RT_LINK})
 
@@ -96,21 +89,15 @@ if(USE_EXP)
   add_definitions("-DGALOIS_EXP")
   include_directories("exp/include")
 
-  set(VTUNE_INCLUDE "/opt/intel/vtune_amplifier_xe_2011/include")
-  set(VTUNE_LIB "/opt/intel/vtune_amplifier_xe_2011/lib64/libittnotify.a")
-  if(EXISTS ${VTUNE_INCLUDE})
-    add_definitions(-DGALOIS_VTUNE)
-    include_directories(${VTUNE_INCLUDE})
-    set(RT_LINK ${VTUNE_LIB} dl ${RT_LINK})
-  else()
-    message(WARNING "VTUNE specified but not found")
-  endif()
-
-  find_package(OpenMP)
-  if(OPENMP_FOUND)
-    set(RT_LINK -lgomp ${RT_LINK})
-  else()
-    message(WARNING "OPENMP specified but not found")
+  if(USE_VTUNE)
+    find_package(VTUNE)
+    if (VTUNE_FOUND)
+      add_definitions(-DGALOIS_VTUNE)
+      include_directories(${VTUNE_INCLUDE_DIRS})
+      set(RT_LINK ${VTUNE_LIBRARIES} ${RT_LINK})
+    else()
+      message(WARNING "VTUNE required but not found")
+    endif()
   endif()
 
   find_package(TBB)
@@ -129,20 +116,12 @@ if(USE_EXP)
     include_directories(${MPI_INCLUDE_PATH})
     set(RT_LINK ${MPI_LIBRARIES} ${RT_LINK})
   else()
-    message(WARNING "OPENMP specified but not found")
+    message(WARNING "MPI specified but not found")
   endif()
 endif()
 
 # c++0x features
-
-# enable -std=c++0x if possible
-include(CheckCXXCompilerFlag)
-check_cxx_compiler_flag(-std=c++0x HAS_CXX0X)
-if(HAS_CXX0X)
-#  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
-endif()
-
-include(CheckCXX0xFeatures)
+find_package(CXX0x)
 
 if(USE_PROFILING)
   add_definitions(-pg)
@@ -174,9 +153,7 @@ endif()
 #always import c99 stdint functions into c++
 include(UseStdMacro)
 
-include(CheckSymbolExists)
-CHECK_SYMBOL_EXISTS(le64toh "endian.h" HAVE_LE64TOH)
-CHECK_SYMBOL_EXISTS(le32toh "endian.h" HAVE_LE32TOH)
+include(CheckEndian)
 
 ###### Global Functions ######
 function(linkRuntime name) 
@@ -202,7 +179,9 @@ function(app name)
   PARSE_ARGUMENTS(APP "REQUIRES;EXTLIBS" "" ${ARGN})
 
   foreach(required ${APP_REQUIRES})
-    if(NOT ${${required}})
+    if(${${required}})
+
+    else()
       message(WARNING "NOT compiling ${name} (missing: ${required})")
       return()
     endif()

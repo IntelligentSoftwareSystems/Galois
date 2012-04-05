@@ -23,21 +23,25 @@
 #ifndef GALOIS_RUNTIME_WORKLIST_H
 #define GALOIS_RUNTIME_WORKLIST_H
 
-#include "mem.h"
-#include "WorkListHelpers.h"
-
-#include "Galois/Runtime/ll/PaddedLock.h"
+#include "Galois/Runtime/mem.h"
 #include "Galois/Runtime/PerCPU.h"
+#include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/Threads.h"
+#include "Galois/Runtime/WorkListHelpers.h"
+#include "Galois/Runtime/ll/PaddedLock.h"
+#include "Galois/util/GAlgs.h"
 
 #include <limits>
+#include <iterator>
 #include <map>
 #include <vector>
 #include <deque>
 #include <algorithm>
+#include <iterator>
 
 #include <boost/utility.hpp>
 #include <boost/optional.hpp>
+#include <boost/ref.hpp>
 
 namespace GaloisRuntime {
 namespace WorkList {
@@ -600,6 +604,13 @@ public:
     }
   }
 
+  // void flush() {
+  //   p& n = data.get();
+  //   if (n.next)
+  //     pushChunk(n.next);
+  //   n.next = 0;
+  // }
+
   void push(value_type val)  {
     p& n = data.get();
     if (n.next && n.next->push_back(val))
@@ -667,7 +678,330 @@ template<int chunksize=64, typename T = int, bool concurrent=true>
 class dChunkedLIFO : public ChunkedMaster<T, ConExtLinkedStack, true, true, chunksize, concurrent> {};
 WLCOMPILECHECK(dChunkedLIFO);
 
+//FIXME: make this valid for input iterators (e.g. no default constructor)
+template<typename IterTy = int*>
+class ForwardAccessRange {
+  //! Thread-local data
+  struct TLD {
+    IterTy begin;
+    IterTy end;
+    bool init;
+  };
+
+  PerCPU<TLD> tlds;
+  unsigned num;
+  IterTy gbegin;
+  IterTy gend;
+
+public:
+
+  //! T is the value type of the WL
+  typedef typename std::iterator_traits<IterTy>::value_type value_type;
+
+  template<bool newconcurrent>
+  struct rethread {
+    typedef ForwardAccessRange<IterTy> WL;
+  };
+
+  template<typename Tnew>
+  struct retype {
+    typedef ForwardAccessRange<IterTy> WL;
+  };
+
+  //! push a value onto the queue
+  void push(value_type val) {
+    abort();
+  }
+
+  //! push a range onto the queue
+  template<typename Iter>
+  void push(Iter b, Iter e) {
+    abort();
+  }
+
+  //stager each thread's start item
+  void push_initial(IterTy b, IterTy e) {
+    num = ThreadPool::getActiveThreads();
+    gbegin = b;
+    gend = e;
+    for (unsigned i = 0; i < tlds.size(); ++i)
+      tlds.get(i).init = false;
+  }
+
+  //! pop a value from the queue.
+  // move through range in num thread strides
+  boost::optional<value_type> pop() {
+    TLD& tld = tlds.get();
+    if (!tld.init) {
+      tld.begin = Galois::safe_advance(gbegin, gend, tlds.myEffectiveID());
+      tld.end = gend;
+      tld.init = true;
+    }
+    if (tld.begin != tld.end) {
+      boost::optional<value_type> retval = *tld.begin;
+      tld.begin = Galois::safe_advance(tld.begin, tld.end, num);
+      assert(*retval);
+      return retval;
+    }
+    return boost::optional<value_type>();
+  }
+};
+WLCOMPILECHECK(ForwardAccessRange);
+
+template<bool Stealing=false, typename IterTy = int*>
+class RandomAccessRange {
+  //! Thread-local data
+  struct TLD {
+    IterTy begin;
+    IterTy end;
+    IterTy stealBegin;
+    IterTy stealEnd;
+    bool init;
+    LL::SimpleLock<true> stealLock;
+  };
+
+  PerCPU<TLD> tlds;
+
+  IterTy gbegin;
+  IterTy gend;
+
+  bool do_steal(TLD& stld, TLD& otld) {
+    bool retval = false;
+    otld.stealLock.lock();
+    if (otld.stealBegin != otld.stealEnd) {
+      stld.begin = otld.stealBegin;
+      otld.stealBegin = stld.end = Galois::split_range(otld.stealBegin, otld.stealEnd);
+      retval = true;
+    }
+    otld.stealLock.unlock();
+    return retval;
+  }
+
+  void try_steal(TLD& tld) {
+    //First try stealing from self
+    if (do_steal(tld,tld))
+      return;
+    //Then try stealing from neighbor
+    //TLD& otld = tlds.getNext(ThreadPool::getActiveThreads());
+    if (do_steal(tld, tlds.getNext(ThreadPool::getActiveThreads()))) {
+      //redistribute stolen items for neighbor to steal too
+      if (std::distance(tld.begin, tld.end) > 1) {
+	tld.stealLock.lock();
+	tld.stealEnd = tld.end;
+	tld.stealBegin = tld.end = Galois::split_range(tld.begin, tld.end);
+	tld.stealLock.unlock();
+      }
+    }
+  }
+
+public:
+
+  //! T is the value type of the WL
+  typedef typename std::iterator_traits<IterTy>::value_type value_type;
+
+  template<bool newconcurrent>
+  struct rethread {
+    typedef RandomAccessRange<Stealing,IterTy> WL;
+  };
+
+  template<typename Tnew>
+  struct retype {
+    typedef RandomAccessRange<Stealing,IterTy> WL;
+  };
+
+  //! push a value onto the queue
+  void push(value_type val) {
+    abort();
+  }
+
+  //! push a range onto the queue
+  template<typename Iter>
+  void push(Iter b, Iter e) {
+    abort();
+  }
+
+  //stager each thread's start item
+  void push_initial(IterTy b, IterTy e) {
+    gbegin = b;
+    gend = e;
+    for (unsigned i = 0; i < tlds.size(); ++i)
+      tlds.get(i).init = false;
+  }
+
+  //! pop a value from the queue.
+  // move through range in num thread strides
+  boost::optional<value_type> pop() {
+    TLD& tld = tlds.get();
+    if (!tld.init) {
+      unsigned num = ThreadPool::getActiveThreads();
+      unsigned len = std::distance(gbegin,gend);
+      unsigned per = (len + num - 1) / num;
+      unsigned i = tlds.myEffectiveID();
+      tld.begin = gbegin;
+      std::advance(tld.begin, per * i);
+      tld.end = tld.begin;
+      std::advance(tld.end,std::min(per, (unsigned)std::distance(tld.begin, gend)));
+      if (Stealing) {
+	tld.stealEnd = tld.end;
+	tld.stealBegin = tld.end = Galois::split_range(tld.begin, tld.end);
+      }
+      tld.init = true;
+    }
+    if (Stealing && tld.begin == tld.end)
+      try_steal(tld);
+    if (tld.begin != tld.end)
+      return boost::optional<value_type>(*tld.begin++);
+    return boost::optional<value_type>();
+  }
+};
+WLCOMPILECHECK(RandomAccessRange);
+
+template<typename OwnerFn, typename T = int>
+class OwnerComputesWL : private boost::noncopyable {
+  typedef ChunkedLIFO<256, T> cWL;
+  //  typedef ChunkedLIFO<256, T> pWL;
+  typedef ChunkedLIFO<256, T> pWL;
+
+  OwnerFn Fn;
+  PerLevel<cWL> Items;
+  PerLevel<pWL> pushBuffer;
+
+public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef OwnerComputesWL<OwnerFn, T> WL;
+  };
+
+  template<typename nTy>
+  struct retype {
+    typedef OwnerComputesWL<OwnerFn, nTy> WL;
+  };
+
+  typedef T value_type;
+  
+  void push(value_type val)  {
+    unsigned int index = Fn(val);
+    unsigned int mindex = Items.effectiveIDFor(index);
+    //std::cerr << "[" << index << "," << index % active << "]\n";
+    if (mindex == Items.myEffectiveID())
+      Items.get(mindex).push(val);
+    else
+      pushBuffer.get(mindex).push(val);
+  }
+
+  template<typename ItTy>
+  void push(ItTy b, ItTy e) {
+    while (b != e)
+      push(*b++);
+  }
+
+  template<typename ItTy>
+  void push_initial(ItTy b, ItTy e) {
+    push(b,e);
+    for (int x = 0; x < pushBuffer.size(); ++x)
+      pushBuffer.get(x).flush();
+  }
+
+  boost::optional<value_type> pop() {
+    cWL& wl = Items.get();
+    boost::optional<value_type> retval = wl.pop();
+    if (retval)
+      return retval;
+    pWL& p = pushBuffer.get();
+    while (retval = p.pop())
+      wl.push(*retval);
+    return wl.pop();
+  }
+};
+//WLCOMPILECHECK(OwnerComputesWL);
+
+template<class ContainerTy=dChunkedFIFO<>, class T=int, bool concurrent = true>
+class BulkSynchronous : private boost::noncopyable {
+
+  typedef typename ContainerTy::template rethread<concurrent>::WL CTy;
+
+  struct TLD {
+    unsigned round;
+    TLD(): round(0) { }
+  };
+
+  CTy wls[2];
+  GaloisRuntime::PerCPU<TLD> tlds;
+  GaloisRuntime::FastBarrier barrier1;
+  GaloisRuntime::FastBarrier barrier2;
+  GaloisRuntime::LL::CacheLineStorage<volatile long> some;
+  volatile bool empty;
+
+ public:
+  typedef T value_type;
+
+  template<bool newconcurrent>
+  struct rethread {
+    typedef BulkSynchronous<ContainerTy,T,newconcurrent> WL;
+  };
+  template<typename Tnew>
+  struct retype {
+    typedef BulkSynchronous<typename ContainerTy::template retype<Tnew>::WL,Tnew,concurrent> WL;
+  };
+
+  BulkSynchronous(): empty(false) {
+    unsigned numActive = GaloisRuntime::getSystemThreadPool().getActiveThreads();
+    barrier1.reinit(numActive);
+    barrier2.reinit(numActive);
+  }
+
+  void push(value_type val) {
+    TLD& tld = tlds.get();
+    wls[(tld.round + 1) & 1].push(val);
+  }
+
+  template<typename ItTy>
+  void push(ItTy b, ItTy e) {
+    while (b != e)
+      push(*b++);
+  }
+
+  template<typename ItTy>
+  void push_initial(ItTy b, ItTy e) {
+    while (b != e)
+      push(*b++);
+    tlds.get().round = 1;
+    some.data = true;
+  }
+
+  boost::optional<value_type> pop() {
+    TLD& tld = tlds.get();
+    boost::optional<value_type> r;
+    
+    while (true) {
+      if (empty)
+        return r; // empty
+
+      r = wls[tld.round].pop();
+      if (r)
+        return r;
+
+      barrier1.wait();
+      if (GaloisRuntime::LL::getTID() == 0) {
+        if (!some.data)
+          empty = true;
+        some.data = false; 
+      }
+      tld.round = (tld.round + 1) & 1;
+      barrier2.wait();
+
+      r = wls[tld.round].pop();
+      if (r) {
+        some.data = true;
+        return r;
+      }
+    }
+  }
+};
+WLCOMPILECHECK(BulkSynchronous);
+
 //End namespace
+
 }
 }
 

@@ -3,7 +3,7 @@ function(mesh base numpoints)
     COMMAND ${CMAKE_BINARY_DIR}/tools/generators/random-2d-points.py
       ${numpoints} 1 > ${base}.raw.node)
   add_custom_command(OUTPUT ${base}.node ${base}.ele ${base}.poly
-    COMMAND ${CMAKE_BINARY_DIR}/apps/delaunaytriangulation/delaunaytriangulation
+    COMMAND delaunaytriangulation
       -noverify -writemesh ${base} ${base}.raw.node 
     DEPENDS delaunaytriangulation ${base}.raw.node)
 endfunction(mesh)

@@ -36,6 +36,7 @@ namespace cll = llvm::cl;
 enum ConvertMode {
   dimacs2gr,
   rmat2gr,
+  gr2bsml,
   gr2dimacs
 };
 
@@ -45,6 +46,7 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Choose a conversion mode:"),
     cll::values(
       clEnumVal(dimacs2gr, "Convert dimacs to binary gr (default)"),
       clEnumVal(rmat2gr, "Convert rmat to binary gr"),
+      clEnumVal(gr2bsml, "Convert binary gr to binary sparse MATLAB matrix"),
       clEnumVal(gr2dimacs, "Convert binary gr to dimacs"),
       clEnumValEnd), cll::init(dimacs2gr));
 
@@ -209,7 +211,7 @@ void convert_dimacs2gr(const std::string& infilename, const std::string& outfile
 }
 
 void convert_gr2dimacs(const std::string& infilename, const std::string& outfilename) {
-  typedef Galois::Graph::LC_CRS_Graph<size_t, int> Graph;
+  typedef Galois::Graph::LC_CSR_Graph<size_t, int> Graph;
   typedef Graph::GraphNode GNode;
 
   Graph graph;
@@ -217,22 +219,19 @@ void convert_gr2dimacs(const std::string& infilename, const std::string& outfile
 
   size_t nnodes = 0;
   size_t nedges = 0;
-  for (Graph::active_iterator i = graph.active_begin(), e = graph.active_end();
-      i != e; ++i) {
-    GNode src = *i;
+  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+    GNode src = *ii;
     graph.getData(src) = nnodes++;
-    nedges += std::distance(graph.edge_begin(*i), graph.edge_end(*i));
+    nedges += std::distance(graph.edge_begin(*ii), graph.edge_end(*ii));
   }
 
   std::ofstream file(outfilename.c_str());
   file << "p sp " << nnodes << " " << nedges << "\n";
-  for (Graph::active_iterator i = graph.active_begin(), e = graph.active_end();
-      i != e; ++i) {
-    GNode src = *i;
-    for (Graph::edge_iterator j = graph.edge_begin(src),
-        f = graph.edge_end(src); j != f; ++j) {
-      GNode dst = graph.getEdgeDst(j);
-      int weight = graph.getEdgeData(j);
+  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+    GNode src = *ii;
+    for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
+      GNode dst = graph.getEdgeDst(jj);
+      int weight = graph.getEdgeData(jj);
       file << "a " << graph.getData(src) + 1
         << " " << graph.getData(dst) + 1
         << " " << weight << "\n";
@@ -245,11 +244,89 @@ void convert_gr2dimacs(const std::string& infilename, const std::string& outfile
     << "\n";
 }
 
+/**
+ * GR to Binary Sparse MATLAB matrix.
+ * [i, j, v] = find(A); 
+ * fwrite(f, size(A,1), 'uint32');
+ * fwrite(f, size(A,2), 'uint32');
+ * fwrite(f, nnz(A), 'uint32');
+ * fwrite(f, (i-1), 'uint32');     % zero-indexed
+ * fwrite(f, (j-1), 'uint32'); 
+ * fwrite(f, v, 'double');
+ */
+void convert_gr2bsml(const std::string& infilename, const std::string& outfilename) {
+  typedef Galois::Graph::LC_CSR_Graph<uint32_t, int> Graph;
+  typedef Graph::GraphNode GNode;
+
+  Graph graph;
+  graph.structureFromFile(infilename);
+
+  uint32_t nnodes = 0;
+  uint32_t nedges = 0;
+  for (Graph::iterator i = graph.begin(), e = graph.end();
+      i != e; ++i) {
+    GNode src = *i;
+    graph.getData(src) = nnodes++;
+    nedges += std::distance(graph.edge_begin(*i), graph.edge_end(*i));
+  }
+
+  mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+  int fd = open(outfilename.c_str(), O_WRONLY | O_CREAT |O_TRUNC, mode);
+  int retval;
+
+  // Write header
+  retval = write(fd, &nnodes, sizeof(nnodes));
+  if (retval == -1) { perror(__FILE__); abort(); }
+  retval = write(fd, &nnodes, sizeof(nnodes));
+  if (retval == -1) { perror(__FILE__); abort(); }
+  retval = write(fd, &nedges, sizeof(nedges));
+  if (retval == -1) { perror(__FILE__); abort(); }
+
+  // Write row adjacency
+  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+    GNode src = *ii;
+    uint32_t sid = graph.getData(src);
+    for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
+      retval = write(fd, &sid, sizeof(sid));
+      if (retval == -1) { perror(__FILE__); abort(); }
+    }
+  }
+
+  // Write column adjacency
+  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+    GNode src = *ii;
+    for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
+      GNode dst = graph.getEdgeDst(jj);
+      uint32_t did = graph.getData(dst);
+      retval = write(fd, &did, sizeof(did));
+      if (retval == -1) { perror(__FILE__); abort(); }
+    }
+  }
+
+  // Write data
+  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+    GNode src = *ii;
+    for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
+      //GNode dst = graph.getEdgeDst(jj);
+      double weight = graph.getEdgeData(jj);
+      retval = write(fd, &weight, sizeof(weight));
+      if (retval == -1) { perror(__FILE__); abort(); }
+    }
+  }
+
+  close(fd);
+
+  std::cout << "Finished reading graph. "
+    << "Nodes: " << nnodes << " Edges: " << nedges 
+    << "\n";
+}
+
 int main(int argc, char** argv) {
   llvm::cl::ParseCommandLineOptions(argc, argv);
   switch (convertMode) {
     case rmat2gr: convert_rmat2gr(inputfilename, outputfilename); break;
     case gr2dimacs: convert_gr2dimacs(inputfilename, outputfilename); break;
+    case gr2bsml: convert_gr2bsml(inputfilename, outputfilename); break;
     default:
     case dimacs2gr: convert_dimacs2gr(inputfilename, outputfilename); break;
   }

@@ -76,13 +76,13 @@ class Segment:public AbstractGeom<SPD>
     return new Segment<SPD>(*this);
   }
 
-  inline const size_t getNumVertices() const { return 2; }
+  inline size_t getNumVertices() const { return 2; }
 
   inline const std::string getPolytopeName() const { return "SEGMENT"; }
 
-  inline const size_t getParametricDimension() const { return 1; }
+  inline size_t getParametricDimension() const { return 1; }
 
-  inline const size_t getEmbeddingDimension() const { return SPD; }
+  inline size_t getEmbeddingDimension() const { return SPD; }
 
   //! @param X first parametric coordinate
   //! @param Y Output the result of the map
@@ -98,7 +98,7 @@ class Segment:public AbstractGeom<SPD>
     { std::cerr << "Segment<SPD>::getFaceGeometry. "
 	"Not implemented!\n\n";  return 0; }
 
-  const double getInRadius(void) const{
+  double getInRadius(void) const{
     double l;
     l = 0.0;
     for(size_t i=0; i<SPD; i++) {
@@ -109,7 +109,7 @@ class Segment:public AbstractGeom<SPD>
     return(0.5*sqrt(l));
   };
 
-  const double getOutRadius(void) const{
+  double getOutRadius(void) const{
     return(getInRadius());
   };
 

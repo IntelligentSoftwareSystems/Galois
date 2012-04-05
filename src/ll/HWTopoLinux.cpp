@@ -218,6 +218,7 @@ struct AutoLinuxPolicy {
   std::vector<int> packages;
   std::vector<int> maxPackage;
   std::vector<int> virtmap;
+  std::vector<int> leaders;
 
   //! Sort in package-dense manner
   struct DensePackageLessThan: public std::binary_function<int,int,bool> {
@@ -347,6 +348,12 @@ struct AutoLinuxPolicy {
       maxPackage[i] = p;
     }
 
+    //Compute first thread in package
+    leaders.resize(numPackages, -1);
+    for (int i = 0; i < (int) packages.size(); ++i)
+      if (leaders[packages[i]] == -1)
+	leaders[packages[i]] = i;
+
 #if DEBUG_HWTOPOLINUX
     //DEBUG: PRINT Stuff
     gPrint("Threads: %d, %d (raw)\n", numThreads, numThreadsRaw);
@@ -354,7 +361,7 @@ struct AutoLinuxPolicy {
     gPrint("Packages: %d, %d (raw)\n", numPackages, numPackagesRaw);
 
     for (int i = 0; i < virtmap.size(); ++i) {
-      gPrint("T %3d P %3d Tr %3d", i, packages[i], virtmap[i]);
+      gPrint("T %3d P %3d Tr %3d %d", i, packages[i], virtmap[i], (i == leaders[packages[i]] ? 1 : 0));
       if (i >= numCores)
 	gPrint(" HT");
       gPrint("\n");
@@ -395,6 +402,11 @@ unsigned GaloisRuntime::LL::getPackageForThreadInternal(int id) {
 unsigned GaloisRuntime::LL::getMaxPackageForThread(int id) {
   assert(id < (int)A.maxPackage.size());
   return A.maxPackage[id];
+}
+
+bool GaloisRuntime::LL::isLeaderForPackageInternal(int id) {
+  assert(id < (int)A.leaders.size());
+  return A.leaders[A.packages[id]];
 }
 
 #endif //__linux__

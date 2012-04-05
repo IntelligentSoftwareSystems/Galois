@@ -58,6 +58,9 @@ class CBP : public DAIAlgFG {
 
 
     public:
+#ifdef __INTEL_COMPILER
+        CBP(const CBP& d) = default;
+#endif
         /// Default constructor
         CBP() : DAIAlgFG(), _beliefsV(), _beliefsF(), _logZ(0.0), _iters(0), _maxdiff(0.0), _sum_level(0.0), _num_leaves(0), _clamp_ofstream() {}
 

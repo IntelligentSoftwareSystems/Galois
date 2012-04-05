@@ -38,13 +38,12 @@ class Element {
   // if the triangle has an obtuse angle
   // obtuse - 1 is which one
   signed char obtuse;
-  bool bBad;
   bool bDim; // true == 3, false == 2
 
  public:
 
  explicit Element(const Tuple& a, const Tuple& b, const Tuple& c)
-   :obtuse(0), bBad(0), bDim(true)
+   :obtuse(0), bDim(true)
   { //constructor for Triangles
     coords[0] = a;
     coords[1] = b;
@@ -63,20 +62,14 @@ class Element {
     //    edges[0] = Edge(coords[0], coords[1]);
     //    edges[1] = Edge(coords[1], coords[2]);
     //    edges[2] = Edge(coords[2], coords[0]);
-    for (int i = 0; i < 3; i++) {
-      bool ob = false, sm = false;
-      angleCheck(i, ob, sm, MINANGLE);
-      if (ob) {
+    for (int i = 0; i < 3; i++)
+      if (angleOBCheck(i))
 	obtuse = i + 1;
-      } else if (sm) {
-	bBad = true;
-      }
-    }
     //computeCenter();
   }
   
   explicit Element(const Tuple& a, const Tuple& b)
-    :obtuse(0), bBad(0), bDim(false)
+    :obtuse(0), bDim(false)
   { //constructor for segments
     coords[0] = a;
     coords[1] = b;
@@ -155,6 +148,16 @@ class Element {
     int k = (i + 2) % getDim(); 
     Tuple::angleCheck(coords[j], coords[i], coords[k], ob, sm, M);
   }
+  bool angleGTCheck(int i, double M) const {
+    int j = (i + 1) % getDim();
+    int k = (i + 2) % getDim(); 
+    return Tuple::angleGTCheck(coords[j], coords[i], coords[k], M);
+  }
+  bool angleOBCheck(int i) const {
+    int j = (i + 1) % getDim();
+    int k = (i + 2) % getDim(); 
+    return Tuple::angleOBCheck(coords[j], coords[i], coords[k]);
+  }
 
   //Virtualize the Edges array
   //Used only by Mesh now
@@ -199,7 +202,12 @@ class Element {
 
   // should the node be processed?
   bool isBad() const {
-    return bBad;
+    if (!bDim)
+      return false;
+    for (int i = 0; i < 3; i++)
+      if (angleGTCheck(i, MINANGLE))
+	return true;
+    return false;
   }
 
   int getDim() const {

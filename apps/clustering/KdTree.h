@@ -84,11 +84,11 @@ public:
 			      minLightIntensity = (minLightIntensity >= b3) ? b3 : minLightIntensity;
 			      maxConeCosine = (maxConeCosine >= nw.getConeCosine()) ? maxConeCosine : nw.getConeCosine();
 			      double b2 = nw.getHalfSizeX();
-			      double minHalfSizeX = (minHalfSizeX >= b2) ? b2 : minHalfSizeX;
+			      double minHalfSizeX = (minHalfSize.getX() >= b2) ? b2 : minHalfSize.getX();
 			      double b1 = nw.getHalfSizeY();
-			      double minHalfSizeY = (minHalfSizeY >= b1) ? b1 : minHalfSizeY;
+			      double minHalfSizeY = (minHalfSize.getY() >= b1) ? b1 : minHalfSize.getY();
 			      double b = nw.getHalfSizeZ();
-			      double minHalfSizeZ = (minHalfSizeZ >= b) ? b : minHalfSizeZ;
+			      double minHalfSizeZ = (minHalfSize.getZ() >= b) ? b : minHalfSize.getZ();
 			      minHalfSize.set(minHalfSizeX,minHalfSizeY,minHalfSizeZ);
 
 		}

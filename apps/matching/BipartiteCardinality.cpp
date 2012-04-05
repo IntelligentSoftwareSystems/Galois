@@ -33,7 +33,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 #ifdef GALOIS_EXP
-#include "PriorityScheduling/WorkList.h"
+#include "Galois/PriorityScheduling.h"
 #endif
 
 #include <string>
@@ -521,7 +521,7 @@ struct MatchingABMP {
     typedef OrderedByIntegerMetric<Indexer,dChunk> OBIM;
     
 #ifdef GALOIS_EXP
-    Exp::StartWorklistExperiment<OBIM,dChunk,Chunk,Indexer,Less,Greater>()(
+    Exp::WorklistExperiment<OBIM,dChunk,Chunk,Indexer,Less,Greater>().for_each(
         std::cout, initial.begin(), initial.end(), Process(*this, g, maxLayer, size));
 #else
     Galois::for_each<OBIM>(initial.begin(), initial.end(), Process(*this, g, maxLayer, size));
@@ -557,7 +557,7 @@ struct MatchingMF {
   typedef typename G::NodeList NodeList;
   typedef typename G::GraphNode GraphNode;
   typedef typename G::neighbor_iterator neighbor_iterator;
-  typedef typename G::active_iterator active_iterator;
+  typedef typename G::iterator iterator;
   typedef typename G::node_type node_type;
   typedef typename G::edge_type edge_type;
   static const Galois::MethodFlag flag = Concurrent ? Galois::CHECK_CONFLICT : Galois::NONE;
@@ -740,7 +740,7 @@ struct MatchingMF {
   void globalRelabel(G& g, const GraphNode& source, const GraphNode& sink, unsigned numNodes,
       std::vector<GraphNode>& incoming) {
 
-    for (active_iterator ii = g.active_begin(), ei = g.active_end(); ii != ei; ++ii) {
+    for (iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
       GraphNode src = *ii;
       node_type& node = src.getData(Galois::NONE);
       node.height = numNodes;
@@ -754,7 +754,7 @@ struct MatchingMF {
     Galois::for_each(sink, UpdateHeights<false>(g));
     T.stop();
 
-    for (active_iterator ii = g.active_begin(), ei = g.active_end(); ii != ei; ++ii) {
+    for (iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
       GraphNode src = *ii;
       node_type& node = src.getData(Galois::NONE);
       if (src == sink || src == source)

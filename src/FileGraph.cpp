@@ -208,12 +208,12 @@ bool FileGraph::hasNeighbor(GraphNode N1, GraphNode N2, MethodFlag mflag) const 
   return getEdgeIdx(N1,N2) != ~static_cast<uint64_t>(0);
 }
 
-FileGraph::active_iterator FileGraph::active_begin() const {
-  return active_iterator(0);
+FileGraph::iterator FileGraph::begin() const {
+  return iterator(0);
 }
 
-FileGraph::active_iterator FileGraph::active_end() const {
-  return active_iterator(numNodes);
+FileGraph::iterator FileGraph::end() const {
+  return iterator(numNodes);
 }
 
 unsigned int FileGraph::size() const {

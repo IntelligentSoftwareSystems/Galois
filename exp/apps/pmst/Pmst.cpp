@@ -93,7 +93,7 @@ struct Prim {
     NodeAlloc nodeAlloc(ctx.getPerIterAlloc());
 
     int i = 0;
-    for (Graph::active_iterator ii = g.active_begin(), ei = g.active_end(); ii != ei; ++ii) {
+    for (Graph::iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
       Heap::Handle h;
       if (*ii != root)
         h = heap.add(HeapItem(*ii));
@@ -133,7 +133,7 @@ struct Prim {
       retval = heap.pollMin();
     }
 
-    for (Graph::active_iterator ii = g.active_begin(), ei = g.active_end(); ii != ei; ++ii) {
+    for (Graph::iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
       if (*ii != root)
         mstWeight += g.getEdgeData(g.findEdge(*ii, g.getData(*ii)->parent));
       // Automatically reclaimed, but don't leave dangling pointers around
@@ -152,7 +152,7 @@ struct Prim {
   };
 
   void operator()(Graph& g, MstWeight& w) {
-    GraphNode one[] = { *g.active_begin() };
+    GraphNode one[] = { *g.begin() };
 
     Galois::setMaxThreads(1);
     Galois::for_each(&one[0], &one[1], Process(*this, g, w));
@@ -296,14 +296,14 @@ struct Boruvka {
   };
 
   void operator()(Graph& g, MstWeight& w) {
-    for (Graph::active_iterator ii = g.active_begin(), ei = g.active_end(); ii != ei; ++ii) {
+    for (Graph::iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
       g.getData(*ii) = std::distance(g.edge_begin(*ii), g.edge_end(*ii));
     }
 
     using namespace GaloisRuntime::WorkList;
     typedef dChunkedFIFO<16> IChunk;
 
-    Galois::for_each<IChunk>(g.active_begin(), g.active_end(), Process(*this, g, w));
+    Galois::for_each<IChunk>(g.begin(), g.end(), Process(*this, g, w));
   }
 };
 
@@ -539,7 +539,7 @@ struct BoruvkaUnionFind {
 
   void operator()(Graph& g, MstWeight& w) {
     NodesTy nodes;
-    std::copy(g.active_begin(), g.active_end(), std::back_inserter(nodes));
+    std::copy(g.begin(), g.end(), std::back_inserter(nodes));
     std::random_shuffle(nodes.begin(), nodes.end());
 
     size_t size = nodes.size();
@@ -568,8 +568,8 @@ void makeGraph(const std::string& in, Graph& g) {
 
   // Assign ids to ReaderGNodes
   size_t numNodes = 0;
-  for (ReaderGraph::active_iterator ii = reader.active_begin(),
-      ee = reader.active_end(); ii != ee; ++ii, ++numNodes) {
+  for (ReaderGraph::iterator ii = reader.begin(),
+      ee = reader.end(); ii != ee; ++ii, ++numNodes) {
     ReaderGNode src = *ii;
     reader.getData(src) = numNodes;
   }
@@ -584,8 +584,8 @@ void makeGraph(const std::string& in, Graph& g) {
 
   // Create edges
   size_t numEdges = 0;
-  for (ReaderGraph::active_iterator ii = reader.active_begin(),
-      ei = reader.active_end(); ii != ei; ++ii) {
+  for (ReaderGraph::iterator ii = reader.begin(),
+      ei = reader.end(); ii != ei; ++ii) {
     ReaderGNode rsrc = *ii;
     int rsrcId = reader.getData(rsrc);
     for (ReaderGraph::edge_iterator jj = reader.edge_begin(rsrc),

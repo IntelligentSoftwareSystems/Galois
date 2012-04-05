@@ -28,10 +28,10 @@
 #include "Galois/Mem.h"
 
 namespace GaloisRuntime {
-template <typename WorkListTy, typename Function>
+template <typename WorkListTy, typename T, typename FunctionTy, bool isSimple>
 class ForEachWork;
 
-template <typename WorkListTy, typename Function> 
+template <typename WorkListTy, typename FunctionTy> 
 class ParaMeterExecutor;
 }
 
@@ -39,10 +39,10 @@ namespace Galois {
 
 template<typename T>
 class UserContext: private boost::noncopyable {
-  template <typename WorkListTy, typename Function>
+  template <typename WorkListTy, typename TT, typename FunctionTy, bool isSimple>
   friend class GaloisRuntime::ForEachWork;
 
-  template <typename WorkListTy, typename Function>
+  template <typename WorkListTy, typename FunctionTy>
   friend class GaloisRuntime::ParaMeterExecutor;
 
   //! Allocator stuff
@@ -64,26 +64,23 @@ class UserContext: private boost::noncopyable {
   }
 
   //! push stuff
-  typedef std::vector<T,PerIterAllocTy> pushBufferTy;
+  typedef std::vector<T> pushBufferTy;
   pushBufferTy pushBuffer;
 
   pushBufferTy& __getPushBuffer() {
     return pushBuffer;
   }
-
+  
   void __resetPushBuffer() {
-    pushBufferTy v(PerIterationAllocator);
-    pushBuffer.swap(v);
-    assert(pushBuffer.capacity() == 0);
+    pushBuffer.clear();
   }
 
 public:
   UserContext()
     :IterationAllocatorBase(), 
      PerIterationAllocator(&IterationAllocatorBase),
-     breakFlag(0),
-     pushBuffer(PerIterationAllocator)
-  {}
+     breakFlag(0)
+  { }
 
   //! Signal break in parallel loop
   void breakLoop() {

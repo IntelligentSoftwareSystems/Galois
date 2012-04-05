@@ -37,6 +37,8 @@
 #include <stdint.h>
 #include <cassert>
 
+#include "CompFlags.h"
+
 namespace GaloisRuntime {
 namespace LL {
 
@@ -54,37 +56,32 @@ public:
   explicit PtrLock(T val) : _lock(val) {}
 
   inline void lock() {
+    uintptr_t oldval;
     do {
       while ((_lock & 1) != 0) {
-#if defined(__i386__) || defined(__amd64__)
-	asm volatile ( "pause");
-#endif
+	mem_pause();
       }
-      if (try_lock())
-	break;
-    } while (true);
+      oldval = __sync_fetch_and_or(&_lock, 1);
+    } while (oldval & 1);
   }
 
   inline void unlock() {
     assert(_lock & 1);
-    asm volatile ("":::"memory");
+    compilerBarrier();
     _lock = _lock & ~1;
-    asm volatile ("":::"memory");
   }
 
   inline void unlock_and_clear() {
     assert(_lock & 1);
-    asm volatile ("":::"memory");
+    compilerBarrier();
     _lock = 0;
-    asm volatile ("":::"memory");
   }
 
   inline void unlock_and_set(T val) {
     assert(_lock & 1);
     assert(!((uintptr_t)val & 1));
-    asm volatile ("":::"memory");
+    compilerBarrier();
     _lock = (uintptr_t)val;
-    asm volatile ("":::"memory");
   }
   
   inline T getValue() const {

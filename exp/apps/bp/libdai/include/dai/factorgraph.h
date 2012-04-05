@@ -258,7 +258,7 @@ class FactorGraph {
         /// Restores the \a I 'th factor from the backup (it should be backed up first)
         /** \throw OBJECT_NOT_FOUND if a backup does not exist
          */
-        void restoreFactor( size_t I );
+        virtual void restoreFactor( size_t I );
 
         /// Backup the factors specified by indices in \a facs
         /** \throw MULTIPLE_UNDO if a backup already exists
@@ -271,10 +271,10 @@ class FactorGraph {
         /// Makes a backup of all factors connected to a set of variables
         /** \throw MULTIPLE_UNDO if a backup already exists
          */
-        void backupFactors( const VarSet& ns );
+        virtual void backupFactors( const VarSet& ns );
 
         /// Restores all factors connected to a set of variables from their backups
-        void restoreFactors( const VarSet& ns );
+        virtual void restoreFactors( const VarSet& ns );
     //@}
 
     /// \name Transformations

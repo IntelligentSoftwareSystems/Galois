@@ -34,130 +34,62 @@
 
 #include <cassert>
 
+#include "CompFlags.h"
+
 namespace GaloisRuntime {
 namespace LL {
 
-/// SimpleLock is a spinlock.  If the second template parameter is
+/// SimpleLock is a spinlock.  If the template parameter is
 /// false, the lock is a noop.
-template<typename T, bool isALock>
+template<bool isALock>
 class SimpleLock;
 
-template<typename T>
-class SimpleLock<T, true> {
-  volatile mutable T _lock; //Allow locking a const
+template<>
+class SimpleLock<true> {
+  volatile mutable int _lock; //Allow locking a const
 public:
   SimpleLock() : _lock(0) {
   }
 
-  inline void lock(T val) const {
-    do {
-      while (_lock != 0) {
-#if defined(__i386__) || defined(__amd64__)
-	asm volatile ( "pause");
-#endif
-      }
-      if (try_lock(val))
-	break;
-    } while (true);
-  }
-
   inline void lock() const {
+    int oldval;
     do {
       while (_lock != 0) {
-#if defined(__i386__) || defined(__amd64__)
-	asm volatile ( "pause");
-#endif
+	mem_pause();
       }
-      if (try_lock())
-	break;
-    } while (true);
+      oldval = __sync_fetch_and_or(&_lock, 1);
+    } while (oldval & 1);
   }
 
   inline void unlock() const {
     assert(_lock);
-    asm volatile ("":::"memory");
+    compilerBarrier();
     _lock = 0;
-    asm volatile ("":::"memory");
-  }
-
-  inline bool try_lock(T val) const {
-    if (_lock != 0)
-      return false;
-    return __sync_bool_compare_and_swap(&_lock, 0, val);
   }
 
   inline bool try_lock() const {
     if (_lock != 0)
       return false;
-    T oldval = __sync_fetch_and_or(&_lock, 1);
+    int oldval = __sync_fetch_and_or(&_lock, 1);
     return !(oldval & 1);
   }
-
-  inline T getValue() const {
-    return _lock;
-  }
 };
 
-template<typename T>
-class SimpleLock<T, false> {
+template<>
+class SimpleLock<false> {
 public:
-  inline void lock(T val = 0) const {}
+  inline void lock() const {}
   inline void unlock() const {}
-  inline bool try_lock(T val = 1) const { return true; }
-  inline T getValue() const { return 0; }
+  inline bool try_lock() const { return true; }
 };
 
-template<typename T>
-static inline void LockPairOrdered(SimpleLock<T,true>& L1, SimpleLock<T,true>& L2) {
-  assert(&L1 != &L2);
-  if (&L1 < &L2) {
-    L1.lock();
-    L2.lock();
-  } else {
-    L2.lock();
-    L1.lock();
-  }   
-}
-template<typename T>
-static inline bool TryLockPairOrdered(SimpleLock<T,true>& L1, SimpleLock<T,true>& L2) {
-  assert(&L1 != &L2);
-  bool T1, T2;
-  if (&L1 < &L2) {
-    T1 = L1.try_lock();
-    T2 = L2.try_lock();
-  } else {
-    T2 = L2.try_lock();
-    T1 = L1.try_lock();
-  }
-  if (T1 && T2)
-    return true;
-  if (T1)
-    L1.unlock();
-  if (T2)
-    L2.unlock();
-  return false;
-}
-template<typename T>
-static inline void UnLockPairOrdered(SimpleLock<T,true>& L1, SimpleLock<T,true>& L2) {
-  assert(&L1 != &L2);
-  if (&L1 < &L2) {
-    L1.unlock();
-    L2.unlock();
-  } else {
-    L2.unlock();
-    L1.unlock();
-  }   
-}
-template<typename T>
-static inline void LockPairOrdered(SimpleLock<T,false>& L1, SimpleLock<T,false>& L2) {
-}
-template<typename T>
-static inline bool TryLockPairOrdered(SimpleLock<T,false>& L1, SimpleLock<T,false>& L2) {
-  return true;
-}
-template<typename T>
-static inline void UnLockPairOrdered(SimpleLock<T,false>& L1, SimpleLock<T,false>& L2) {
-}
+
+void LockPairOrdered(SimpleLock<true>& L1, SimpleLock<true>& L2);
+bool TryLockPairOrdered(SimpleLock<true>& L1, SimpleLock<true>& L2);
+void UnLockPairOrdered(SimpleLock<true>& L1, SimpleLock<true>& L2);
+void LockPairOrdered(SimpleLock<false>& L1, SimpleLock<false>& L2);
+bool TryLockPairOrdered(SimpleLock<false>& L1, SimpleLock<false>& L2);
+void UnLockPairOrdered(SimpleLock<false>& L1, SimpleLock<false>& L2);
 
 }
 }

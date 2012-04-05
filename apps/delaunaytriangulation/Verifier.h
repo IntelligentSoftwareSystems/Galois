@@ -36,8 +36,8 @@
 class Verifier {
   bool checkConsistency(Graph* graph) {
     bool error = false;
-    for (Graph::active_iterator ii = graph->active_begin(),
-        ei = graph->active_end(); ii != ei; ++ii) {
+    for (Graph::iterator ii = graph->begin(),
+        ei = graph->end(); ii != ei; ++ii) {
       const GNode& node = *ii;
       Element& e = graph->getData(node);
 
@@ -65,7 +65,7 @@ class Verifier {
   bool checkReachability(Graph* graph) {
     std::stack<GNode> remaining;
     std::set<GNode> found;
-    remaining.push(*(graph->active_begin()));
+    remaining.push(*(graph->begin()));
 
     while (!remaining.empty()) {
       GNode node = remaining.top();
@@ -97,8 +97,8 @@ class Verifier {
   }
 
   bool checkDelaunayProperty(Graph* graph) {
-    for (Graph::active_iterator ii = graph->active_begin(),
-        ei = graph->active_end(); ii != ei; ++ii) {
+    for (Graph::iterator ii = graph->begin(),
+        ei = graph->end(); ii != ei; ++ii) {
       const GNode& node = *ii;
       Element& e1 = graph->getData(node);
 

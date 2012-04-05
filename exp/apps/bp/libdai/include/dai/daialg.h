@@ -234,14 +234,14 @@ class DAIAlg : public InfAlg, public GRM {
     /// \name Backup/restore mechanism for factors
     //@{
         /// Make a backup copy of factor \a I
-        void backupFactor( size_t I ) { GRM::backupFactor( I ); }
+        virtual void backupFactor( size_t I ) { GRM::backupFactor( I ); }
         /// Make backup copies of all factors involving the variables in \a vs
-        void backupFactors( const VarSet &vs ) { GRM::backupFactors( vs ); }
+        virtual void backupFactors( const VarSet &vs ) { GRM::backupFactors( vs ); }
 
         /// Restore factor \a I from its backup copy
-        void restoreFactor( size_t I ) { GRM::restoreFactor( I ); }
+        virtual void restoreFactor( size_t I ) { GRM::restoreFactor( I ); }
         /// Restore the factors involving the variables in \a vs from their backup copies
-        void restoreFactors( const VarSet &vs ) { GRM::restoreFactors( vs ); }
+        virtual void restoreFactors( const VarSet &vs ) { GRM::restoreFactors( vs ); }
     //@}
 };
 

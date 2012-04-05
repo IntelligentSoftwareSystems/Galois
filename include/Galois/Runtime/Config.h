@@ -34,15 +34,16 @@
 #endif
 
 namespace GaloisRuntime {
-  namespace config {
+namespace Config {
 #ifdef __GXX_EXPERIMENTAL_CXX0X__
-    using std::function;
-    using std::ref;
+  using std::function;
+  using std::ref;
 #else
-    using std::tr1::function;
-    using std::tr1::ref;
+  using std::tr1::function;
+  using std::tr1::ref;
 #endif
-  }
+
+}
 }
 
 #endif

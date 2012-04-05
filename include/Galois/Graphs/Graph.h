@@ -40,7 +40,7 @@
  * g.addEdge(a, b, 5);
  *
  * // Traverse graph
- * for (Graph::active_iterator i = g.active_begin(), iend = g.active_end();
+ * for (Graph::iterator i = g.begin(), iend = g.end();
  *      i != iend;
  *      ++i) {
  *   Graph::GraphNode src = *i;
@@ -70,8 +70,6 @@
 #include "Galois/Runtime/InsBag.h"
 //#include "Galois/Runtime/MemRegionPool.h"
 #include "llvm/ADT/SmallVector.h"
-
-using namespace GaloisRuntime;
 
 namespace Galois {
 namespace Graph {
@@ -108,7 +106,7 @@ typedef VoidWrapper<void>::unit GraphUnit;
  */
 template<typename NTy>
 struct NodeItem {
-  NTy N;
+  typename VoidWrapper<NTy>::type N;
   NodeItem(typename VoidWrapper<NTy>::const_ref_type n) : N(n) { }
   NodeItem() :N() { }
   inline typename VoidWrapper<NTy>::ref_type getData() {
@@ -293,7 +291,7 @@ private:
   //deal with the Node redirction
   node_reference getData(gNode* ID, Galois::MethodFlag mflag = ALL) {
     assert(ID);
-    acquire(ID, mflag);
+    GaloisRuntime::acquire(ID, mflag);
     return ID->data.getData();
   }
 
@@ -405,7 +403,7 @@ public:
   //! Adds a node to the graph.
   bool addNode(const GraphNode& n, Galois::MethodFlag mflag = ALL) {
     assert(n.ID);
-    acquire(n.ID, mflag);
+    GaloisRuntime::acquire(n.ID, mflag);
     bool oldActive = n.ID->active;
     if (!oldActive) {
       n.ID->active = true;
@@ -417,7 +415,7 @@ public:
   //add a node and reserve the space for edges
   bool addNode(const GraphNode& n, int maxDegree, MethodFlag mflag = ALL) {
     assert(n.ID);
-    acquire(n.ID, mflag);
+    GaloisRuntime::acquire(n.ID, mflag);
     bool oldActive = n.ID->active;
     if (!oldActive) {
       n.ID->active = true;
@@ -430,14 +428,14 @@ public:
   //! Gets the node data for a node.
   node_reference getData(const GraphNode& n, Galois::MethodFlag mflag = ALL) const {
     assert(n.ID);
-    acquire(n.ID, mflag);
+    GaloisRuntime::acquire(n.ID, mflag);
     return n.ID->data.getData();
   }
 
   //! Checks if a node is in the graph (already added)
   bool containsNode(const GraphNode& n, Galois::MethodFlag mflag = ALL) const {
     assert(n.ID);
-    acquire(n.ID, mflag);
+    GaloisRuntime::acquire(n.ID, mflag);
     return n.ID && (n.Parent == this) && n.ID->active;
   }
 
@@ -448,7 +446,7 @@ public:
   // FIXME(ddn): Doesn't handle incoming edges for directed graphs
   bool removeNode(GraphNode n, Galois::MethodFlag mflag = ALL) {
     assert(n.ID);
-    acquire(n.ID, mflag);
+    GaloisRuntime::acquire(n.ID, mflag);
     gNode* N = n.ID;
     bool wasActive = N->active;
     if (wasActive) {
@@ -470,11 +468,11 @@ public:
       Galois::MethodFlag mflag = ALL) {
     assert(src.ID);
     assert(dst.ID);
-    acquire(src.ID, mflag);
+    GaloisRuntime::acquire(src.ID, mflag);
     if (Directional) {
       return src.ID->getOrCreateEdge(dst.ID, data);
     } else {
-      acquire(dst.ID, mflag);
+      GaloisRuntime::acquire(dst.ID, mflag);
       if (src < dst) {
         dst.ID->getOrCreateEdge(src.ID, data);
         return src.ID->getOrCreateEdge(dst.ID, data);
@@ -491,7 +489,7 @@ public:
       Galois::MethodFlag mflag = ALL) {
     assert(src.ID);
     assert(dst.ID);
-    acquire(src.ID, mflag);
+    GaloisRuntime::acquire(src.ID, mflag);
     if (Directional) {
       return src.ID->createEdge(dst.ID, data);
     } else {
@@ -504,11 +502,11 @@ public:
   edge_iterator addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {
     assert(src.ID);
     assert(dst.ID);
-    acquire(src.ID, mflag);
+    GaloisRuntime::acquire(src.ID, mflag);
     if (Directional) {
       return src.ID->getOrCreateEdge(dst.ID);
     } else {
-      acquire(dst.ID, mflag);
+      GaloisRuntime::acquire(dst.ID, mflag);
       if (src < dst) {
         dst.ID->getOrCreateEdge(src.ID);
         return src.ID->getOrCreateEdge(dst.ID);
@@ -524,7 +522,7 @@ public:
   edge_iterator addMultiEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {
     assert(src.ID);
     assert(dst.ID);
-    acquire(src.ID, mflag);
+    GaloisRuntime::acquire(src.ID, mflag);
     if (Directional) {
       return src.ID->createEdge(dst.ID);
     } else {
@@ -537,11 +535,11 @@ public:
   void removeEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {
     assert(src.ID);
     assert(dst.ID);
-    acquire(src.ID, mflag);
+    GaloisRuntime::acquire(src.ID, mflag);
     if (Directional) {
       src.ID->eraseEdge(dst.ID);
     } else {
-      acquire(dst.ID, mflag);
+      GaloisRuntime::acquire(dst.ID, mflag);
       src.ID->eraseEdge(dst.ID);
       dst.ID->eraseEdge(src.ID);
     }
@@ -557,12 +555,12 @@ public:
     assert(dst.ID);
 
     //yes, fault on null (no edge)
-    acquire(src.ID, mflag);
+    GaloisRuntime::acquire(src.ID, mflag);
 
     if (Directional) {
       return src.ID->getEdgeData(dst.ID);
     } else {
-      acquire(dst.ID, mflag);
+      GaloisRuntime::acquire(dst.ID, mflag);
       if (src < dst)
 	return src.ID->getEdgeData(dst.ID);
       else
@@ -575,18 +573,18 @@ public:
   //! Returns the number of neighbors
   size_t neighborsSize(GraphNode N, Galois::MethodFlag mflag = ALL) const {
     assert(N.ID);
-    acquire(N.ID, mflag);
+    GaloisRuntime::acquire(N.ID, mflag);
     return N.ID->edges.size();
   }
 
   edge_iterator edge_begin(GraphNode N, Galois::MethodFlag mflag = ALL) {
     assert(N.ID);
-    acquire(N.ID, mflag);
+    GaloisRuntime::acquire(N.ID, mflag);
 
-    if (shouldLock(mflag)) {
+    if (GaloisRuntime::shouldLock(mflag)) {
       for (typename gNode::neighbor_iterator ii = N.ID->neighbor_begin(), ee =
              N.ID->neighbor_end(); ii != ee; ++ii) {
-        acquire(*ii, mflag);
+        GaloisRuntime::acquire(*ii, mflag);
       }
     }
     return N.ID->begin();
@@ -599,7 +597,7 @@ public:
 
   edge_iterator findEdge(GraphNode A, GraphNode B, Galois::MethodFlag mflag = ALL) {
     assert(A.ID);
-    acquire(A.ID, mflag);
+    GaloisRuntime::acquire(A.ID, mflag);
     return std::find_if(A.ID->begin(), A.ID->end(), first_eq<gNode*>(B.ID));
   }
 
@@ -620,12 +618,12 @@ public:
   //! Deprecated in favor of edge_begin
   neighbor_iterator neighbor_begin(GraphNode N, Galois::MethodFlag mflag = ALL) {
     assert(N.ID);
-    acquire(N.ID, mflag);
+    GaloisRuntime::acquire(N.ID, mflag);
 
-    if (shouldLock(mflag)) {
+    if (GaloisRuntime::shouldLock(mflag)) {
       for (typename gNode::neighbor_iterator ii = N.ID->neighbor_begin(), ee =
              N.ID->neighbor_end(); ii != ee; ++ii) {
-        acquire(*ii, mflag);
+        GaloisRuntime::acquire(*ii, mflag);
       }
     }
     return boost::make_transform_iterator(N.ID->neighbor_begin(),
@@ -651,7 +649,7 @@ public:
     assert(src.ID);
 
     //yes, fault on null (no edge)
-    acquire(src.ID, mflag);
+    GaloisRuntime::acquire(src.ID, mflag);
 
     //TODO(ddn): check that neighbor iterator is from the same source node as src
     if (Directional) {
@@ -667,12 +665,12 @@ public:
   //These are not thread safe!!
   typedef boost::transform_iterator<makeGraphNode,
             boost::filter_iterator<std::mem_fun_ref_t<bool, gNode>,
-              typename NodeListTy::iterator> > active_iterator;
+              typename NodeListTy::iterator> > iterator;
 
   /**
    * Returns an iterator to all the nodes in the graph. Not thread-safe.
    */
-  active_iterator active_begin() {
+  iterator begin() {
     return boost::make_transform_iterator(
         boost::make_filter_iterator(
           std::mem_fun_ref(&gNode::isActive), nodes.begin(), nodes.end()),
@@ -680,7 +678,7 @@ public:
   }
 
   //! Returns the end of the node iterator. Not thread-safe.
-  active_iterator active_end() {
+  iterator end() {
     return boost::make_transform_iterator(
         boost::make_filter_iterator(
           std::mem_fun_ref(&gNode::isActive), nodes.end(), nodes.end()), 
@@ -691,7 +689,7 @@ public:
    * Returns the number of nodes in the graph. Not thread-safe.
    */
   unsigned int size() {
-    return std::distance(active_begin(), active_end());
+    return std::distance(begin(), end());
   }
 
   FirstGraph() {
@@ -704,15 +702,15 @@ public:
     //mapping between nodes
     std::map<typename GTy::GraphNode, GraphNode> NodeMap;
     //copy nodes
-    for (typename GTy::active_iterator ii = graph.active_begin(), 
-	   ee = graph.active_end(); ii != ee; ++ii) {
+    for (typename GTy::iterator ii = graph.begin(), 
+	   ee = graph.end(); ii != ee; ++ii) {
       GraphNode N = createNode(graph.getData(*ii));
       addNode(N);
       NodeMap[*ii] = N;
     }
     //copy edges
-    for (typename GTy::active_iterator ii = graph.active_begin(), 
-	   ee = graph.active_end(); ii != ee; ++ii)
+    for (typename GTy::iterator ii = graph.begin(), 
+	   ee = graph.end(); ii != ee; ++ii)
       for(typename GTy::neighbor_iterator ni = graph.neighbor_begin(*ii), 
 	    ne = graph.neighbor_end(*ii);
 	  ni != ne; ++ni)

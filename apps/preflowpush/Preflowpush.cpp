@@ -436,7 +436,7 @@ struct Process {
 
 void initializeGraph(const char* inputFile,
     int sourceId, int sinkId, Config *newApp) {
-  typedef Galois::Graph::LC_CRS_Graph<int, int> ReaderGraph;
+  typedef Galois::Graph::LC_CSR_Graph<int, int> ReaderGraph;
   typedef ReaderGraph::GraphNode ReaderGNode;
 
   ReaderGraph reader;
@@ -445,8 +445,8 @@ void initializeGraph(const char* inputFile,
 
   // Assign ids to ReaderGNodes
   newApp->num_nodes = 0;
-  for (ReaderGraph::active_iterator ii = reader.active_begin(),
-      ee = reader.active_end(); ii != ee; ++ii, ++newApp->num_nodes) {
+  for (ReaderGraph::iterator ii = reader.begin(),
+      ee = reader.end(); ii != ee; ++ii, ++newApp->num_nodes) {
     ReaderGNode src = *ii;
     reader.getData(src) = newApp->num_nodes;
   }
@@ -475,8 +475,8 @@ void initializeGraph(const char* inputFile,
   newApp->num_edges = 0;
   Graph& g = newApp->graph;
   const Config::NodesTy& n = newApp->nodes;
-  for (ReaderGraph::active_iterator ii = reader.active_begin(),
-      ee = reader.active_end(); ii != ee; ++ii) {
+  for (ReaderGraph::iterator ii = reader.begin(),
+      ee = reader.end(); ii != ee; ++ii) {
     ReaderGNode rsrc = *ii;
     int rsrcId = reader.getData(rsrc);
     for (ReaderGraph::edge_iterator jj = reader.edge_begin(rsrc),

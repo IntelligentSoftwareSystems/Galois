@@ -56,7 +56,7 @@ struct projectInfo {
 		this->graph = finer->getGraph();
 	}
 	template<typename Context>
-	void __attribute__((noinline)) operator()(GNode node, Context& lwl) {
+	void operator()(GNode node, Context& lwl) {
 
 		MetisNode& nodeData = node.getData(Galois::NONE);
 		nodeData.setIdegree(nodeData.getAdjWgtSum());
@@ -91,7 +91,7 @@ struct projectPartition {
 void computeKWayPartInfo(int nparts, MetisGraph* finer,
 		GGraph* coarseGraph, GGraph* graph){
 	projectInfo pi(nparts, finer);
-	Galois::for_each<GaloisRuntime::WorkList::ChunkedLIFO<32> >(graph->active_begin(), graph->active_end(), pi, "ProjectInfo");
+	Galois::for_each<GaloisRuntime::WorkList::ChunkedLIFO<32> >(graph->begin(), graph->end(), pi, "ProjectInfo");
 }
 
 void projectKWayPartition(MetisGraph* metisGraph, int nparts){
@@ -100,9 +100,9 @@ void projectKWayPartition(MetisGraph* metisGraph, int nparts){
 	GGraph* graph = finer->getGraph();
 	finer->initBoundarySet();
 //	projectPartition pp(finer);
-//	Galois::for_each<GaloisRuntime::WorkList::ChunkedFIFO<128> >(graph->active_begin(), graph->active_end(), pp);
+//	Galois::for_each<GaloisRuntime::WorkList::ChunkedFIFO<128> >(graph->begin(), graph->end(), pp);
 
-	for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+	for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 		GNode node = *ii;
 		MetisNode& nodeData = node.getData();
 		nodeData.setPartition(finer->getCoarseGraphMap(nodeData.getNodeId()).getData(Galois::NONE).getPartition());
@@ -112,7 +112,7 @@ void projectKWayPartition(MetisGraph* metisGraph, int nparts){
 	}
 
 	computeKWayPartInfo(nparts, finer, coarseGraph, graph);
-	for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+	for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 		GNode node = *ii;
 		MetisNode& nodeData = node.getData(Galois::NONE);
 		if (finer->getCoarseGraphMap(nodeData.getNodeId()).getData(Galois::NONE).getEdegree() > 0) {

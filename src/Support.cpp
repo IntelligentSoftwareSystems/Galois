@@ -27,7 +27,7 @@
 #include <vector>
 #include <cstdio>
 
-static GaloisRuntime::LL::SimpleLock<int, true> lock;
+static GaloisRuntime::LL::SimpleLock<true> lock;
 
 namespace {
 class PrintStats {
@@ -95,6 +95,8 @@ static PrintStats& getPS() {
   static PrintStats P;
   return P;
 }
+
+bool GaloisRuntime::inGaloisForEach = false;
 
 void GaloisRuntime::reportStatSum(const char* text, unsigned long val, const char* loopname) {
   getPS().reportStatSum(text, val, loopname);

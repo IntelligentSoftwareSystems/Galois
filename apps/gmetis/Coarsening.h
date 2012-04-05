@@ -54,7 +54,7 @@ public:
 		bool* visited = new bool[metisGraph->getNumNodes()];
 		arrayFill(visited, metisGraph->getNumNodes(), false);
 		int id = 0;
-		for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 			GNode node = *ii;
 			MetisNode nodeData = node.getData(Galois::NONE);
 			if(visited[nodeData.getNodeId()]) continue;
@@ -100,7 +100,7 @@ public:
 				parallelCreateCoarserGraph(coarseMetisGraph, visited, level++);
 			}
 			int numEdges = 0;
-			for (GGraph::active_iterator ii = coarser->active_begin(), ee = coarser->active_end(); ii != ee; ++ii) {
+			for (GGraph::iterator ii = coarser->begin(), ee = coarser->end(); ii != ee; ++ii) {
 				numEdges += graph->neighborsSize(*ii, Galois::NONE);
 			}
 			metisGraph->releaseMatches();
@@ -117,13 +117,13 @@ private:
 		if (notFirstTime) {
 			HEMMatcher matcher(metisGraph, coarser, maxVertexWeight);
 
-			for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+			for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 				GNode node = *ii;
 				matcher.match(node);
 			}
 		} else {
 			RMMatcher matcher(metisGraph, coarser, maxVertexWeight);
-			for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+			for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 				GNode node = *ii;
 				matcher.match(node);
 			}
@@ -144,7 +144,7 @@ private:
 			this->maxVertexWeight = maxVertexWeight;
 		}
 		template<typename Context>
-		void __attribute__((noinline)) operator()(GNode item, Context& lwl) {
+		void operator()(GNode item, Context& lwl) {
 			matcher.match(item);
 		}
 	};
@@ -153,16 +153,16 @@ private:
 
 		if (notFirstTime) {
 			parallelMatchNodes<HEMMatcher> pHEM(metisGraph, coarser, maxVertexWeight);
-			Galois::for_each<GaloisRuntime::WorkList::ChunkedLIFO<64, GNode> >(graph->active_begin(), graph->active_end(), pHEM, "HEM_Match");
-//			vector<GNode> v(graph->active_begin(), graph->active_end());
+			Galois::for_each<GaloisRuntime::WorkList::ChunkedLIFO<64, GNode> >(graph->begin(), graph->end(), pHEM, "HEM_Match");
+//			vector<GNode> v(graph->begin(), graph->end());
 //			std::random_shuffle( v.begin(), v.end() );
 //			Galois::for_each<GaloisRuntime::WorkList::ChunkedFIFO<32, GNode> >(v.begin(), v.end(), pHEM);
 		} else {
 			parallelMatchNodes<RMMatcher> pRM(metisGraph, coarser, maxVertexWeight);
-//			vector<GNode> v(graph->active_begin(), graph->active_end());
+//			vector<GNode> v(graph->begin(), graph->end());
 //			std::random_shuffle( v.begin(), v.end() );
 //			Galois::for_each<GaloisRuntime::WorkList::ChunkedFIFO<32, GNode> >(v.begin(), v.end(), pRM);
-			Galois::for_each<GaloisRuntime::WorkList::ChunkedLIFO<64, GNode> >(graph->active_begin(), graph->active_end(), pRM, "RM_Match");
+			Galois::for_each<GaloisRuntime::WorkList::ChunkedLIFO<64, GNode> >(graph->begin(), graph->end(), pRM, "RM_Match");
 			notFirstTime = true;
 		}
 		return notFirstTime;
@@ -255,7 +255,7 @@ private:
 //			visited[i] = false;
 //		}
 
-		for (GGraph::active_iterator ii = graph->active_begin(), ee = graph->active_end(); ii != ee; ++ii) {
+		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 			GNode node = *ii;
 			addEdges(node.getData(Galois::NONE).getNodeId(), node, visited, coarseMetisGraph);
 		}
@@ -284,7 +284,7 @@ private:
 		////			 delete[] visited;
 		//		 }
 		template<typename Context>
-		void __attribute__((noinline)) operator()(GNode item, Context& lwl) {
+		void operator()(GNode item, Context& lwl) {
 			MetisNode& nodeData = item.getData(Galois::NONE);
 			metisGraph->getCoarseGraphMap(nodeData.getNodeId()).getData(Galois::CHECK_CONFLICT);
 			coarsener->addEdges(nodeData.getNodeId(), item, visited, coarseMetisGraph);
@@ -296,7 +296,7 @@ private:
 //		Galois::Timer t2;
 //		t2.start();
 		parallelAddingEdges pae(metisGraph, coarseMetisGraph, this, visited);
-		Galois::for_each<GaloisRuntime::WorkList::ChunkedLIFO<32, GNode> >(graph->active_begin(), graph->active_end(), pae, "AddNeighbors");
+		Galois::for_each<GaloisRuntime::WorkList::ChunkedLIFO<32, GNode> >(graph->begin(), graph->end(), pae, "AddNeighbors");
 //		t2.stop();
 //		cout<<"createTime::"<<t2.get()<<endl;
 	}

@@ -35,7 +35,7 @@
  * g.structureFromFile(inputfile);
  *
  * // Traverse graph
- * for (Graph::active_iterator i = g.active_begin(), iend = g.active_end();
+ * for (Graph::iterator i = g.begin(), iend = g.end();
  *      i != iend;
  *      ++i) {
  *   Graph::GraphNode src = *i;
@@ -58,36 +58,16 @@
 #include "Galois/ConflictFlags.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/ll/CacheLineStorage.h"
+#include "Galois/util/Endian.h"
+
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/iterator/transform_iterator.hpp>
+
 #include <map>
 #include <vector>
 #include <fstream>
 
 #include <string.h>
-#include <endian.h>
-
-#include "config.h"
-
-#ifdef HAVE_LE64TOH
-#else
-# if __BYTE_ORDER == __LITTLE_ENDIAN
-#  define le64toh(x) (x)
-# else
-#  error "Need to implement byte reordering for big endian machines"
-# endif
-#endif
-
-#ifdef HAVE_LE32TOH
-#else
-# if __BYTE_ORDER == __LITTLE_ENDIAN
-#  define le32toh(x) (x)
-# else
-#  error "Need to implement byte reordering for big endian machines"
-# endif
-#endif
-
-using namespace GaloisRuntime;
 
 namespace Galois {
 namespace Graph {
@@ -159,12 +139,15 @@ public:
   typedef boost::transform_iterator<Convert32, uint32_t*> neighbor_iterator;
   typedef boost::transform_iterator<Convert32, uint32_t*> nodeid_iterator;
   typedef boost::transform_iterator<Convert64, uint64_t*> edgeid_iterator;
+  
   neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = ALL) const {
     return boost::make_transform_iterator(raw_neighbor_begin(N), Convert32());
   }
+
   neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = ALL) const {
     return boost::make_transform_iterator(raw_neighbor_end(N), Convert32());
   }
+
   nodeid_iterator nodeid_begin() const;
   nodeid_iterator nodeid_end() const;
   edgeid_iterator edgeid_begin() const;
@@ -175,10 +158,13 @@ public:
     return reinterpret_cast<EdgeTy*>(edgeData)[std::distance(outs, it.base())];
   }
 
-  template<typename EdgeTy> EdgeTy* edgedata_begin() const {
+  template<typename EdgeTy>
+  EdgeTy* edgedata_begin() const {
     return reinterpret_cast<EdgeTy*>(edgeData);
   }
-  template<typename EdgeTy> EdgeTy* edgedata_end() const {
+
+  template<typename EdgeTy>
+  EdgeTy* edgedata_end() const {
     assert(sizeof(EdgeTy) == sizeEdgeTy);
     EdgeTy* r = reinterpret_cast<EdgeTy*>(edgeData);
     return &r[numEdges];
@@ -186,12 +172,12 @@ public:
 
   bool hasNeighbor(GraphNode N1, GraphNode N2, MethodFlag mflag = ALL) const;
 
-  typedef boost::counting_iterator<uint64_t> active_iterator;
+  typedef boost::counting_iterator<uint64_t> iterator;
 
   //! Iterate over nodes in graph (not thread safe)
-  active_iterator active_begin() const;
+  iterator begin() const;
 
-  active_iterator active_end() const;
+  iterator end() const;
 
   //! The number of nodes in the graph
   unsigned int size() const;
@@ -220,7 +206,7 @@ public:
 
     typedef typename TyG::GraphNode GNode;
     typedef std::vector<GNode> Nodes;
-    Nodes nodes(G.active_begin(), G.active_end());
+    Nodes nodes(G.begin(), G.end());
 
     //num edges and outidx computation
     uint64_t offset = 0;
@@ -290,7 +276,6 @@ public:
 
   void swap(FileGraph& other);
   void clone(FileGraph& other);
-
 };
 
 //! Local computation graph (i.e., graph structure does not change)
@@ -304,7 +289,7 @@ class LC_FileGraph : public FileGraph {
   };
 
   //null if type is void
-  LL::CacheLineStorage<gNode>* NodeData;
+  GaloisRuntime::LL::CacheLineStorage<gNode>* NodeData;
 
 public:
   LC_FileGraph() :NodeData(0) {}
@@ -326,6 +311,7 @@ public:
   EdgeTy& getEdgeData(FileGraph::edge_iterator it, MethodFlag mflag = ALL) {
     return FileGraph::getEdgeData<EdgeTy>(it, mflag);
   }
+
   EdgeTy& getEdgeData(FileGraph::neighbor_iterator it, MethodFlag mflag = ALL) {
     return FileGraph::getEdgeData<EdgeTy>(it, mflag);
   }
@@ -340,7 +326,7 @@ public:
   
   //! Initializes node data for the graph to default values
   void emptyNodeData(NodeTy init = NodeTy()) {
-    NodeData = new LL::CacheLineStorage<gNode>[size()];
+    NodeData = new GaloisRuntime::LL::CacheLineStorage<gNode>[size()];
     //NodeData = (LL::CacheLineStorage<gNode>*)numa_alloc_interleaved(sizeof(LL::CacheLineStorage<gNode>)*size());
     for (uint64_t i = 0; i < size(); ++i)
       NodeData[i].data.data = init;
@@ -361,8 +347,8 @@ public:
     structureFromGraph(graph);
     emptyNodeData();
     int i = 0;
-    for (typename GTy::active_iterator ii = graph.active_begin(),
-	   ee = graph.active_end(); ii != ee; ++ii, ++i)
+    for (typename GTy::iterator ii = graph.begin(),
+	   ee = graph.end(); ii != ee; ++ii, ++i)
       NodeData[i].data.data = graph.getData(*ii);
   }
 };
@@ -376,7 +362,7 @@ class LC_FileGraph<void, EdgeTy> : public FileGraph {
   };
 
   //null if type is void
-  LL::CacheLineStorage<gNode>* NodeData;
+  GaloisRuntime::LL::CacheLineStorage<gNode>* NodeData;
 
 public:
   LC_FileGraph() :NodeData(0) {}
@@ -406,7 +392,7 @@ class LC_FileGraph<NodeTy, void>: public FileGraph {
   };
 
   //null if type is void
-  LL::CacheLineStorage<gNode>* NodeData;
+  GaloisRuntime::LL::CacheLineStorage<gNode>* NodeData;
 
 public:
   LC_FileGraph() :NodeData(0) {}
@@ -428,7 +414,7 @@ public:
   }
   
   void emptyNodeData(NodeTy init = NodeTy()) {
-    NodeData = new LL::CacheLineStorage<gNode>[numNodes];
+    NodeData = new GaloisRuntime::LL::CacheLineStorage<gNode>[numNodes];
     for (uint64_t i = 0; i < numNodes; ++i)
       NodeData[i].data.data = init;
   }

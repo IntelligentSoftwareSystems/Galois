@@ -292,8 +292,7 @@ struct update_eta {
 
 //compute biases on each node
 struct update_biases {
-  template<typename Context>
-  void operator()(GNode i, const Context& ctx) {
+  void operator()(GNode i) {
     SPNode& idata = i.getData(Galois::NONE);
     if (idata.solved) return;
 
@@ -352,7 +351,7 @@ void SP_algorithm() {
   maxBias.reset(0.0);
   averageBias.reset(0.0);
   nontrivial.reset(0);
-  Galois::for_each<WLWL>(literals.begin(), literals.end(), update_biases(), "update_bias");
+  Galois::do_all(literals.begin(), literals.end(), update_biases(), "update_biases");
 }
 
 struct fix_variables {

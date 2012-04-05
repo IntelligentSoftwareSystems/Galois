@@ -69,18 +69,19 @@ template<typename T>
 struct needs_per_iter_alloc : public has_tt_needs_per_iter_alloc<T> {};
 
 /**
- * Indicates the operator doesn't need a per-iteration context
- */
-BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_does_not_need_context)
-template<typename T>
-struct does_not_need_context : public has_tt_does_not_need_context<T> {};
-
-/**
  * Indicates the operator doesn't need its execution stats recorded
  */
 BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_does_not_need_stats)
 template<typename T>
 struct does_not_need_stats : public has_tt_does_not_need_stats<T> {};
+
+/**
+ * Indicates the operator doesn't need abort support
+ */
+BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_does_not_need_aborts)
+template<typename T>
+struct does_not_need_aborts : public has_tt_does_not_need_aborts<T> {};
+
 
 }
 #endif

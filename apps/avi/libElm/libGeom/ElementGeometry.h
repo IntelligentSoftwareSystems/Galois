@@ -65,7 +65,7 @@ class ElementGeometry
   virtual ElementGeometry * clone() const = 0;
   
   //! @return number of vertices 
-  virtual const size_t getNumVertices() const = 0; 
+  virtual size_t getNumVertices() const = 0; 
 
   //!@return  ref to Vertices of the polytope. 
   virtual const std::vector <GlobalNodalIndex> &getConnectivity() const = 0; 
@@ -77,10 +77,10 @@ class ElementGeometry
   virtual size_t getSpatialDimension () const = 0;
 
   //! Number of dimensions in parametric configuration
-  virtual const size_t getParametricDimension() const = 0; 
+  virtual size_t getParametricDimension() const = 0; 
 
   //! Number of dimensions in the real configuration
-  virtual const size_t getEmbeddingDimension() const = 0;
+  virtual size_t getEmbeddingDimension() const = 0;
 
   //! map from parametric to real configuration
   //! @param X parametric coordinates
@@ -117,12 +117,12 @@ class ElementGeometry
   //! Computes the Inner radius of the ElementGeometry object
   //!
   //! This is defined as the radius of the largest sphere that can be fit inside the polytope.
-  virtual const double getInRadius() const = 0;
+  virtual double getInRadius() const = 0;
 
   //! Computes the Outer radius of the ElementGeometry object
   //! 
   //! This is defined as the radius of the smallest sphere that contains the object.
-  virtual const double getOutRadius() const = 0;
+  virtual double getOutRadius() const = 0;
 
   //! Compute external normal for a face
   //!

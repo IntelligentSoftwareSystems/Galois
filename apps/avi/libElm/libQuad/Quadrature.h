@@ -133,7 +133,7 @@ class Quadrature
   inline const double *  getQuadraturePointShape(size_t q) const { return xqshape+q*numShapeCoordinates; } 
 
   //! Returns weight of quadrature point q
-  inline const double getQuadratureWeights(size_t q) const { return wq[q]; } 
+  inline double getQuadratureWeights(size_t q) const { return wq[q]; } 
 
  private:
   double *  xqmap;

@@ -57,7 +57,7 @@ public:
   }
 
   //! @see Element::getNumFields
-  virtual const size_t getNumFields () const {
+  virtual size_t getNumFields () const {
     return NF;
   }
 
@@ -191,7 +191,7 @@ public:
     return new StandardP1nDMap (*this);
   }
 
-  inline const GlobalDofIndex map (size_t field, size_t dof, const GlobalElementIndex& ElementMapped) const {
+  inline GlobalDofIndex map (size_t field, size_t dof, const GlobalElementIndex& ElementMapped) const {
     const Element* elem = elementArray[ElementMapped];
     // we subtract 1 from node ids in 1-based node numbering
     // return elem->getNumFields () * (elem-> getGeometry ().getConnectivity ()[dof] - 1) + field;
@@ -200,18 +200,18 @@ public:
   }
 
 
-  inline const size_t getNumElements () const {
+  inline size_t getNumElements () const {
     return elementArray.size ();
   }
 
-  inline const size_t getNumFields (const GlobalElementIndex & ElementMapped) const {
+  inline size_t getNumFields (const GlobalElementIndex & ElementMapped) const {
     return elementArray[ElementMapped]->getNumFields ();
   }
-  inline const size_t getNumDof (const GlobalElementIndex & ElementMapped, size_t field) const {
+  inline size_t getNumDof (const GlobalElementIndex & ElementMapped, size_t field) const {
     return elementArray[ElementMapped]->getDof (field);
   }
 
-  const size_t getTotalNumDof () const {
+  size_t getTotalNumDof () const {
     GlobalNodalIndex MaxNodeNumber = 0;
 
     for (size_t e = 0; e < elementArray.size (); e++) {

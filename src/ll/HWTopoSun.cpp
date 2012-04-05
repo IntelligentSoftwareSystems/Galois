@@ -28,23 +28,26 @@
 
 #include "Galois/Runtime/ll/HWTopo.h"
 
-#if defined(sun) || defined(__sun)
+#include <vector>
+
+#include <unistd.h>
+#include <stdio.h>
 #include <thread.h>
 #include <sys/types.h>
 #include <sys/processor.h>
 #include <sys/procset.h>
-#endif
 
 using namespace GaloisRuntime;
 
 namespace {
 
-static void sunBindToProcessor(int proc) {
+static bool sunBindToProcessor(int proc) {
   if (processor_bind(P_LWPID,  thr_self(), proc, 0) == -1) {
     perror("Error");
+    return false;
     //reportWarning("Could not set CPU Affinity for thread", (unsigned)proc);
   }
-  return;
+  return true;
 }
 
 //Flat machine with the correct number of threads and binding
@@ -77,23 +80,31 @@ AutoSunPolicy A;
 
 
 bool GaloisRuntime::LL::bindThreadToProcessor(int id) {
-  sunBindToProcessor(A.procmap[id]);
+  return sunBindToProcessor(A.procmap[id]);
 }
 
-unsigned GaloisRuntime::LL::getMaxThreads() const {
+unsigned GaloisRuntime::LL::getMaxThreads() {
   return A.numThreads;
 }
 
-unsigned GaloisRuntime::LL::getMaxCores() const {
+unsigned GaloisRuntime::LL::getMaxCores() {
   return A.numCores;
 }
 
-unsigned GaloisRuntime::LL::getMaxPackages() const {
+unsigned GaloisRuntime::LL::getMaxPackages() {
   return A.numPackages;
 }
 
-unsigned GaloisRuntime::LL::getPackageForThread(int id) const {
+unsigned GaloisRuntime::LL::getMaxPackageForThread(int id) {
+  return A.numPackages - 1;
+}
+
+unsigned GaloisRuntime::LL::getPackageForThreadInternal(int id) {
   return 0;
+}
+
+bool GaloisRuntime::LL::isLeaderForPackageInternal(int id) {
+  return id == 0;
 }
 
 #endif //sun

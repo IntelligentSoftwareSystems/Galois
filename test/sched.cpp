@@ -31,7 +31,7 @@
 #include "Lonestar/BoilerPlate.h"
 
 #ifdef GALOIS_EXP
-#include "Galois/Runtime/WorkListAlt.h"
+#include "Galois/Runtime/WorkListExperimental.h"
 #endif
 
 static const char* name = "Schedeler Micro Benchmark";
@@ -89,5 +89,4 @@ int main(int argc, char** argv) {
   // using namespace GaloisRuntime::WorkList;
   // Galois::for_each<Alt::LevelStealingAlt<Alt::LIFO_SB<> > >(v.begin(), v.end(), process());
   // T4.stop();
-
 }

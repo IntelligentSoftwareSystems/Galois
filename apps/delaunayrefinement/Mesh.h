@@ -29,8 +29,7 @@
 #include <set>
 #include <map>
 #include <stack>
-#include <fstream>
-#include <istream>
+#include <cstdio>
 
 struct is_bad {
   Graph* mesh;
@@ -43,9 +42,14 @@ struct is_bad {
 struct processCreate {
   Graph* lmesh;
   processCreate(Graph* _lmesh) :lmesh(_lmesh) {}
-  template<typename Context>
-  void operator()(Element item, Context& lwl) {
+  void operator()(Element& item) {
     lmesh->createNode(item);
+  }
+};
+
+struct centerCmp {
+  bool operator()(const Element& lhs, const Element& rhs) const {
+    return lhs.getCenter() < rhs.getCenter();
   }
 };
 
@@ -57,63 +61,77 @@ class Mesh {
   std::vector<Element> elements;
 
 private:
-  void next_line(std::ifstream& scanner) {
-    scanner.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-  }
-
-  void readNodes(std::string filename, std::vector<Tuple>& tuples) {
-    std::ifstream scanner(filename.append(".node").c_str());
-    size_t ntups;
-    scanner >> ntups;
-    next_line(scanner);
-
-    tuples.resize(ntups);
-    for (size_t i = 0; i < ntups; i++) {
-      size_t index;
-      double x;
-      double y;
-      scanner >> index >> x >> y;
-      next_line(scanner);
-      tuples[index] = Tuple(x, y);
+  void checkResults(int act, int exp, std::string& str) {
+    if (act != exp) {
+      std::cerr << "Failed read in " << str << "\n";
+      abort();
     }
   }
 
-  void readElements(std::string filename, std::vector<Tuple>& tuples) {
-    std::ifstream scanner(filename.append(".ele").c_str());
-    
-    size_t nels;
-    scanner >> nels;
-    next_line(scanner);
+  void readNodes(std::string filename, std::vector<Tuple>& tuples) {
+    FILE* pFile = fopen(filename.append(".node").c_str(), "r");
+    if (!pFile) {
+      std::cerr << "Failed to load file " << filename << "\n";
+      abort();
+    }
+    unsigned ntups;
+    int r = fscanf(pFile, "%u %*u %*u %*u", &ntups);
+    checkResults(r, 1, filename);
+    tuples.resize(ntups);
+    for (size_t i = 0; i < ntups; i++) {
+      unsigned index;
+      double x, y;
+      r = fscanf(pFile, "%u %lf %lf %*f", &index, &x, &y);
+      checkResults(r, 3, filename);
+      tuples[index] = Tuple(x,y);
+    }
+    fclose(pFile);
+  }
 
+  void readElements(std::string filename, std::vector<Tuple>& tuples) {
+    FILE* pFile = fopen(filename.append(".ele").c_str(), "r");
+    if (!pFile) {
+      std::cerr << "Failed to load file " << filename << "\n";
+      abort();
+    }
+    unsigned nels;
+    int r = fscanf(pFile, "%u %*u %*u", &nels);
+    checkResults(r, 1, filename);
     for (size_t i = 0; i < nels; i++) {
-      size_t index;
-      size_t n1, n2, n3;
-      scanner >> index >> n1 >> n2 >> n3;
+      unsigned index;
+      unsigned n1, n2, n3;
+      r = fscanf(pFile, "%u %u %u %u", &index, &n1, &n2, &n3);
+      checkResults(r, 4, filename);
       assert(n1 >= 0 && n1 < tuples.size());
       assert(n2 >= 0 && n2 < tuples.size());
       assert(n3 >= 0 && n3 < tuples.size());
       Element e(tuples[n1], tuples[n2], tuples[n3]);
       elements.push_back(e);
     }
+    fclose(pFile);
   }
 
   void readPoly(std::string filename, std::vector<Tuple>& tuples) {
-    std::ifstream scanner(filename.append(".poly").c_str());
-    next_line(scanner);
-    size_t nsegs;
-    scanner >> nsegs;
-    next_line(scanner);
+    FILE* pFile = fopen(filename.append(".poly").c_str(), "r");
+    if (!pFile) {
+      std::cerr << "Failed to load file " << filename << "\n";
+      abort();
+    }
+    unsigned nsegs;
+    int r = fscanf(pFile, "%*u %*u %*u %*u");
+    checkResults(r, 0, filename);
+    r = fscanf(pFile, "%u %*u", &nsegs);
+    checkResults(r, 1, filename);
     for (size_t i = 0; i < nsegs; i++) {
-      size_t index;
-      size_t n1;
-      size_t n2;
-      scanner >> index >> n1 >> n2;
+      unsigned index, n1, n2;
+      r = fscanf(pFile, "%u %u %u %*u", &index, &n1, &n2);
+      checkResults(r, 3, filename);
       assert(n1 >= 0 && n1 < tuples.size());
       assert(n2 >= 0 && n2 < tuples.size());
-      next_line(scanner);
       Element e(tuples[n1], tuples[n2]);
       elements.push_back(e);
     }
+    fclose(pFile);
   }
   
   void addElement(Graph* mesh, GNode node, std::map<Edge, GNode>& edge_map) {
@@ -130,9 +148,10 @@ private:
   }
 
   void makeGraph(Graph* mesh) {
-    Galois::for_each<>(elements.begin(), elements.end(), processCreate(mesh));
+    std::sort(elements.begin(), elements.end(), centerCmp());
+    Galois::do_all(elements.begin(), elements.end(), processCreate(mesh));
     std::map<Edge, GNode> edge_map;
-    for (Graph::active_iterator ii = mesh->active_begin(), ee = mesh->active_end();
+    for (Graph::iterator ii = mesh->begin(), ee = mesh->end();
 	 ii != ee; ++ii)
       addElement(mesh, *ii, edge_map);
   }
@@ -145,67 +164,6 @@ public:
     readElements(basename, tuples);
     readPoly(basename, tuples);
     makeGraph(mesh);
-  }
-
-  bool verify(Graph* mesh) {
-    // ensure consistency of elements
-    bool error = false;
-     
-    for (Graph::active_iterator ii = mesh->active_begin(), ee = mesh->active_end(); ii != ee; ++ii) {
- 
-      GNode node = *ii;
-      Element& element = mesh->getData(node,Galois::NONE);
-      int nsize = std::distance(mesh->edge_begin(node, Galois::NONE), mesh->edge_end(node, Galois::NONE));
-      if (element.getDim() == 2) {
-        if (nsize != 1) {
-          std::cerr << "-> Segment " << element << " has " << nsize << " relation(s)\n";
-          error = true;
-        }
-      } else if (element.getDim() == 3) {
-        if (nsize != 3) {
-          std::cerr << "-> Triangle " << element << " has " << nsize << " relation(s)";
-          error = true;
-        }
-      } else {
-        std::cerr << "-> Figures with " << element.getDim() << " edges";
-        error = true;
-      }
-    }
-    
-    if (error)
-      return false;
-    
-    // ensure reachability
-    std::stack<GNode> remaining;
-    std::set<GNode> found;
-    remaining.push(*(mesh->active_begin()));
-      
-    while (!remaining.empty()) {
-      GNode node = remaining.top();
-      remaining.pop();
-      if (!found.count(node)) {
-        assert(mesh->containsNode(node) && "Reachable node was removed from graph");
-        found.insert(node);
-        int i = 0;
-        for (Graph::edge_iterator ii = mesh->edge_begin(node, Galois::NONE), ee = mesh->edge_end(node, Galois::NONE); ii != ee; ++ii) {
-          assert(i < 3);
-          assert(mesh->containsNode(mesh->getEdgeDst(ii)));
-          assert(node != mesh->getEdgeDst(ii));
-          ++i;
-          //          if (!found.count(*ii))
-	  remaining.push(mesh->getEdgeDst(ii));
-        }
-      }
-    }
-    size_t msize = std::distance(mesh->active_begin(), mesh->active_end());
-
-    if (found.size() != msize) {
-      std::cerr << "Not all elements are reachable \n";
-      std::cerr << "Found: " << found.size() << "\nMesh: " << msize << "\n";
-      assert(0 && "Not all elements are reachable");
-      return false;
-    }
-    return true;
   }
 };
 

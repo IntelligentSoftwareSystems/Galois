@@ -26,10 +26,15 @@
 #include "Galois/Threads.h"
 #include "Galois/UserContext.h"
 #include "Galois/Runtime/ParallelWork.h"
+#include "Galois/Runtime/ParallelWorkInline.h"
 
 #ifdef GALOIS_EXP
-#include "Galois/Runtime/ParaMeter.h"
+//#include "Galois/Runtime/ParaMeter.h"
+#include "Galois/Runtime/SimpleTaskPool.h"
+#include "boost/iterator/counting_iterator.hpp"
 #endif
+
+#include "boost/iterator/transform_iterator.hpp"
 
 namespace Galois {
 
@@ -41,17 +46,19 @@ namespace Galois {
 template<typename WLTy, typename IterTy, typename Function>
 static inline void for_each(IterTy b, IterTy e, Function f, const char* loopname = 0) {
 #ifdef GALOIS_EXP
+#if 0
   if (GaloisRuntime::useParaMeter) {
-    GaloisRuntime::ParaMeter::for_each_impl<WLTy>(b, e, f, loopname);
+    GaloisRuntime::ParaMeter::for_each_impl<aWLTy>(b, e, f, loopname);
     return;
   }
+#endif
 #endif
   GaloisRuntime::for_each_impl<WLTy>(b, e, f, loopname);
 }
 
 template<typename IterTy, typename Function>
 static inline void for_each(IterTy b, IterTy e, Function f, const char* loopname = 0) {
-  typedef GaloisRuntime::WorkList::dChunkedFIFO<1024> WLTy;
+  typedef GaloisRuntime::WorkList::dChunkedFIFO<256> WLTy;
   for_each<WLTy, IterTy, Function>(b, e, f, loopname);
 }
 
@@ -69,6 +76,130 @@ static inline void for_each(InitItemTy i, Function f, const char* loopname = 0) 
   for_each<WLTy, InitItemTy, Function>(i, f, loopname);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// do_all
+// Does not modify container
+// Takes advantage of tiled iterator where applicable
+// Experimental!
+////////////////////////////////////////////////////////////////////////////////
+
+#if 0
+template<typename Function>
+struct tile_apply {
+  Function f;
+
+  tile_apply(Function _f2) :f(_f2) {}
+
+  template<typename Tile, typename context>
+  void operator()(Tile& i, context& cnx) {
+    for(typename Tile::iterator ii = i.begin(), ee = i.end();
+	ii != ee; ++ii)
+      f(*ii, cnx);
+  }
+};
+
+template<typename T>
+struct addrof : public std::unary_function<T&, T*>{
+  T* operator()(T& V) const { return &V; }
+};
+template<typename T>
+struct makeRef : public std::unary_function<T&, boost::reference_wrapper<T> >{
+  boost::reference_wrapper<T> operator()(T& V) const { return boost::ref(V); }
+};
+
+template<typename ContainerTy, typename Function>
+static inline void do_all_adl(ContainerTy& c, Function f, const char* loopname = 0) {
+  typedef typename std::iterator_traits<typename ContainerTy::tile_iterator>::value_type TileTy;
+  typedef typename std::iterator_traits<typename TileTy::iterator>::value_type      ValTy;
+  // if (IsChunked(c)) {
+  //   WL<hasOwnerFunction(c)> wl;
+  //   push chunks into wl;
+  // } else {
+  //   foreach(c.begin(), c.end());
+  // }
+  using namespace GaloisRuntime::WorkList;
+  //typedef dChunkedFIFO<16> WLTy;
+  typedef LocalQueues<LocalStealing<TileAdaptor<typename ContainerTy::tile_iterator> >, LIFO<> > WLTy;
+  typedef typename WLTy::template retype<ValTy>::WL aWLTy;
+  GaloisRuntime::for_each_impl<aWLTy>(c.tile_begin(), c.tile_end(), f, loopname);
+  //Fallback:
+  //for_each(c.begin(), c.end(), f, loopname);
+}
+
+#endif
+
+//Random access iterator do_all
+template<typename IterTy,typename FunctionTy>
+static inline void do_all_dispatch(const IterTy& begin, const IterTy& end, const FunctionTy& fn, const char* loopname, std::random_access_iterator_tag) {
+  size_t n = std::distance(begin, end);
+  if (n < 128) {
+    std::for_each(begin, end, fn);
+  } else if (GaloisRuntime::inGaloisForEach) {
+#ifdef GALOIS_EXP
+    GaloisRuntime::TaskContext<IterTy,FunctionTy> ctx;
+    GaloisRuntime::SimpleTaskPool& pool = GaloisRuntime::getSystemTaskPool();
+    pool.enqueue(ctx, begin, end, fn);
+    ctx.run(pool);
+#else
+    std::for_each(begin, end, fn);
+#endif
+  } else {
+    typedef GaloisRuntime::WorkList::RandomAccessRange<false,IterTy> WL;
+    GaloisRuntime::do_all_impl<WL>(begin, end, fn, loopname);
+  }
+}
+
+//Forward iterator do_all
+template<typename IterTy,typename FunctionTy>
+static inline void do_all_dispatch(const IterTy& begin, const IterTy& end, const FunctionTy& fn, const char* loopname, std::input_iterator_tag) {
+  if (GaloisRuntime::inGaloisForEach) {
+#ifdef GALOIS_EXP
+    GaloisRuntime::TaskContext<IterTy,FunctionTy> ctx;
+    GaloisRuntime::SimpleTaskPool& pool = GaloisRuntime::getSystemTaskPool();
+    pool.enqueue(ctx, begin, end, fn);
+    ctx.run(pool);
+#else
+    std::for_each(begin, end, fn);
+#endif
+  } else {
+    typedef GaloisRuntime::WorkList::ForwardAccessRange<IterTy> WL;
+    GaloisRuntime::do_all_impl<WL>(begin, end, fn, loopname);
+  }
+}
+
+template<typename IterTy,typename FunctionTy>
+static inline void do_all(const IterTy& begin, const IterTy& end, const FunctionTy& fn, const char* loopname = 0) {
+  typename std::iterator_traits<IterTy>::iterator_category category;
+  do_all_dispatch(begin,end,fn,loopname,category); 
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// OnEach
+// Low level loop executing work on each processor passing thread id and number
+// of threads to the work
+////////////////////////////////////////////////////////////////////////////////
+
+template<typename FunctionTy>
+struct WOnEach {
+  FunctionTy& fn;
+  WOnEach(FunctionTy& f) :fn(f) {}
+  void operator()(void) const {
+    fn(GaloisRuntime::LL::getTID(), 
+       GaloisRuntime::getSystemThreadPool().getActiveThreads());   
+  }
+};
+
+template<typename FunctionTy>
+static inline void on_each(FunctionTy fn, const char* loopname = 0) {
+  WOnEach<FunctionTy> fw(fn);
+  GaloisRuntime::RunCommand w[1];
+  w[0].work = GaloisRuntime::Config::ref(fw);
+  w[0].isParallel = true;
+  w[0].barrierAfter = true;
+  w[0].profile = false;
+  GaloisRuntime::getSystemThreadPool().run(&w[0], &w[1]);
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // PreAlloc
@@ -76,17 +207,18 @@ static inline void for_each(InitItemTy i, Function f, const char* loopname = 0) 
 
 struct WPreAlloc {
   int n;
-  void operator()(void) {
+  WPreAlloc(int m) :n(m) {}
+  void operator()() {
     GaloisRuntime::MM::pagePreAlloc(n);
   }
 };
 
 static inline void preAlloc(int num) {
-  WPreAlloc fw;
   int a = GaloisRuntime::getSystemThreadPool().getActiveThreads();
-  fw.n = (num + a - 1) / a;
+  a = (num + a - 1) / a;
+  WPreAlloc P(a);
   GaloisRuntime::RunCommand w[1];
-  w[0].work = GaloisRuntime::config::ref(fw);
+  w[0].work = GaloisRuntime::Config::ref(P);
   w[0].isParallel = true;
   w[0].barrierAfter = true;
   w[0].profile = false;

@@ -40,6 +40,12 @@ class Element {
 public:
   MarkTy mark;
 
+  Element(const Element& e): m_boundary(e.m_boundary), mark(e.mark) {
+    points[0] = e.points[0];
+    points[1] = e.points[1];
+    points[2] = e.points[2];
+  }
+
   Element(Point* a, Point* b, Point* c):
     m_boundary(false), mark(0,0)
   {

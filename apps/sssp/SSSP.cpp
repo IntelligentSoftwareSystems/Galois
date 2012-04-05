@@ -35,7 +35,7 @@
 
 #include "Lonestar/BoilerPlate.h"
 #ifdef GALOIS_EXP
-#include "PriorityScheduling/WorkList.h"
+#include "Galois/PriorityScheduling.h"
 #endif
 
 #include <iostream>
@@ -148,8 +148,8 @@ void runBodyParallel(const GNode src) {
   UpdateRequest one[1] = { UpdateRequest(src, 0) };
   T.start();
 #ifdef GALOIS_EXP
-    Exp::StartWorklistExperiment<OBIM,dChunk,Chunk,UpdateRequestIndexer,
-      std::less<UpdateRequest>,std::greater<UpdateRequest> >()(
+    Exp::WorklistExperiment<OBIM,dChunk,Chunk,UpdateRequestIndexer,
+      std::less<UpdateRequest>,std::greater<UpdateRequest> >().for_each(
         std::cout, &one[0], &one[1], process());
 #else
   Galois::for_each<OBIM>(&one[0], &one[1], process());
@@ -164,8 +164,8 @@ bool verify(GNode source) {
     return false;
   }
   
-  for (Graph::active_iterator src = graph.active_begin(), ee =
-	 graph.active_end(); src != ee; ++src) {
+  for (Graph::iterator src = graph.begin(), ee =
+	 graph.end(); src != ee; ++src) {
     unsigned int dist = graph.getData(*src,Galois::NONE).dist;
     if (dist >= DIST_INFINITY) {
       std::cerr << "found node = " << graph.getData(*src,Galois::NONE).id
@@ -208,13 +208,15 @@ int main(int argc, char **argv) {
     std::cout << "WARNING: Using a large delta-step for bfs. Expect long execution times.\n";
   }
 
+  std::cout << "WARNING: Performance varies considerably due to -delta.  Do not expect the default to be good for your graph\n";
+
   unsigned int id = 0;
   bool foundReport = false;
   bool foundSource = false;
-  GNode source = *graph.active_begin();
-  GNode report = *graph.active_begin();
-  for (Graph::active_iterator src = graph.active_begin(), ee =
-      graph.active_end(); src != ee; ++src) {
+  GNode source = *graph.begin();
+  GNode report = *graph.begin();
+  for (Graph::iterator src = graph.begin(), ee =
+      graph.end(); src != ee; ++src) {
     SNode& node = graph.getData(*src,Galois::NONE);
     node.id = id++;
     node.dist = DIST_INFINITY;

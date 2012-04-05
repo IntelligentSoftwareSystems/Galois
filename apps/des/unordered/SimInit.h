@@ -202,7 +202,7 @@ private:
     // read in all nodes first, since iterator may not support concurrent modification
     std::vector<GNode> allNodes;
 
-    for (Graph::active_iterator i = graph.active_begin (), ei = graph.active_end (); i != ei; ++i) {
+    for (Graph::iterator i = graph.begin (), ei = graph.end (); i != ei; ++i) {
       allNodes.push_back (*i);
     }
 
