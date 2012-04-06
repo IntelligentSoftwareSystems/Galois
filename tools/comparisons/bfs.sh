@@ -35,4 +35,4 @@ run() {
 }
 
 run ${BASE}/tools/bin/bfs-schardl $(dirname $F)/$(basename $F .gr).bsml 
-run ${BASE}/apps/bfs/bfs -galoisSet $* $F
+run ${BASE}/apps/bfs/bfs -parallelInline $* $F
