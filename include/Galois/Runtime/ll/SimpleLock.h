@@ -34,7 +34,7 @@
 
 #include <cassert>
 
-#include "CompFlags.h"
+#include "CompilerSpecific.h"
 
 namespace GaloisRuntime {
 namespace LL {
@@ -55,7 +55,7 @@ public:
     int oldval;
     do {
       while (_lock != 0) {
-	mem_pause();
+	asmPause();
       }
       oldval = __sync_fetch_and_or(&_lock, 1);
     } while (oldval & 1);
