@@ -252,19 +252,10 @@ struct UpdateHeights {
   }
 };
 
-struct BfsIndexer: public std::unary_function<GNode,int> {
-  int operator()(const GNode& n) const {
-    return app.graph.getData(n, Galois::NONE).height;
-  }
-};
-
 struct ResetHeights {
-  typedef int tt_does_not_need_context;
   typedef int tt_does_not_need_stats;
-  typedef int tt_does_not_need_parallel_push;
 
-  template<typename Context>
-  void operator()(const GNode& src, Context&) {
+  void operator()(const GNode& src) {
     Node& node = app.graph.getData(src, Galois::NONE);
     node.height = app.num_nodes;
     node.current = 0;
@@ -275,15 +266,12 @@ struct ResetHeights {
 
 template<typename WLTy>
 struct FindWork {
-  typedef int tt_does_not_need_context;
   typedef int tt_does_not_need_stats;
-  typedef int tt_does_not_need_parallel_push;
 
   WLTy& wl;
   FindWork(WLTy& w) : wl(w) {}
 
-  template<typename Context>
-  void operator()(const GNode& src, Context&) {
+  void operator()(const GNode& src) {
     Node& node = app.graph.getData(src, Galois::NONE);
     if (src == app.sink || src == app.source || node.height >= app.num_nodes)
       return;
@@ -294,28 +282,20 @@ struct FindWork {
 
 template<Galois::MethodFlag flag, typename IncomingWL>
 void globalRelabel(IncomingWL& incoming) {
-  typedef GaloisRuntime::WorkList::dChunkedLIFO<16> SmallChunk;
-  typedef GaloisRuntime::WorkList::dChunkedLIFO<8*1024> SimpleScheduler;
-  typedef GaloisRuntime::WorkList::OrderedByIntegerMetric<BfsIndexer, SmallChunk> BFSScheduler;
-
   Galois::StatTimer T1("ResetHeightsTime");
   T1.start();
-  Galois::for_each<SimpleScheduler>(app.nodes.begin(),
-      app.nodes.end(),
-      ResetHeights());
+  Galois::do_all(app.nodes.begin(), app.nodes.end(), ResetHeights());
   T1.stop();
 
   Galois::StatTimer T("UpdateHeightsTime");
   T.start();
   GNode single[1] = { app.sink };
-  Galois::for_each<BFSScheduler>(&single[0], &single[1], UpdateHeights<flag>());
+  Galois::for_each<GaloisRuntime::WorkList::BulkSynchronous<> >(&single[0], &single[1], UpdateHeights<flag>());
   T.stop();
 
   Galois::StatTimer T2("FindWorkTime");
   T2.start();
-  Galois::for_each<SimpleScheduler>(app.nodes.begin(),
-      app.nodes.end(),
-      FindWork<IncomingWL>(incoming));
+  Galois::do_all(app.nodes.begin(), app.nodes.end(), FindWork<IncomingWL>(incoming));
   T2.stop();
 }
 
