@@ -24,13 +24,13 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#ifndef GALOIS_RUNTIME_LL_COMPFLAGS_H
-#define GALOIS_RUNTIME_LL_COMPFLAGS_H
+#ifndef GALOIS_RUNTIME_LL_COMPILERSPECIFIC_H
+#define GALOIS_RUNTIME_LL_COMPILERSPECIFIC_H
 
 namespace GaloisRuntime {
 namespace LL {
 
-inline static void mem_pause() {
+inline static void asmPause() {
 #if defined(__i386__) || defined(__amd64__)
   //__builtin_ia32_pause();
   asm volatile ( "pause");

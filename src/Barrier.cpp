@@ -26,7 +26,7 @@
  */
 
 #include "Galois/Runtime/Barrier.h"
-#include "Galois/Runtime/ll/CompFlags.h"
+#include "Galois/Runtime/ll/CompilerSpecific.h"
 
 void GaloisRuntime::SimpleBarrier::cascade(int tid) {
   int multiple = 2;
