@@ -23,7 +23,7 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/Runtime/Mem.h"
+#include "Galois/Runtime/mm/Mem.h"
 
 #include <map>
 #include <list>
