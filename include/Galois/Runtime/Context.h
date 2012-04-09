@@ -21,7 +21,7 @@ kind.
 #define _GALOIS_RUNTIME_CONTEXT_H
 
 #include "Galois/Runtime/ll/PtrLock.h"
-#include "Galois/ConflictFlags.h"
+#include "Galois/MethodFlags.h"
 #include <cassert>
 #include <cstdlib>
 

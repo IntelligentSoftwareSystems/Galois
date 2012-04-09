@@ -64,11 +64,10 @@
 #include <boost/iterator/filter_iterator.hpp>
 #include <boost/functional.hpp>
 
-#include "Galois/ConflictFlags.h"
+#include "Galois/MethodFlags.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/InsBag.h"
-//#include "Galois/Runtime/MemRegionPool.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace Galois {

@@ -1,4 +1,4 @@
-/** Uniform reporting mechanism -*- C++ -*-
+/** Reporting and utility code -*- C++ -*-
  * @file
  * @section License
  *
