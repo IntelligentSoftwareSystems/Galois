@@ -54,7 +54,7 @@
  */
 
 #include "Galois/Graphs/FileGraph.h"
-#include "Galois/Runtime/mem.h"
+#include "Galois/Runtime/mm/Mem.h"
 
 #include <iterator>
 #include <new>

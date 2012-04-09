@@ -27,8 +27,8 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#ifndef GALOIS_RUNTIME_MM_MEM_H
-#define GALOIS_RUNTIME_MM_MEM_H
+#ifndef GALOIS_RUNTIME_MEM_H
+#define GALOIS_RUNTIME_MEM_H
 
 #include "Galois/Runtime/ll/SimpleLock.h"
 #include "Galois/Runtime/ll/PtrLock.h"

@@ -25,7 +25,7 @@
 
 #include "Galois/Runtime/InsBag.h"
 #include "Galois/Runtime/PerCPU.h"
-#include "Galois/Runtime/mem.h"
+#include "Galois/Runtime/mm/Mem.h"
 
 #include <iterator>
 

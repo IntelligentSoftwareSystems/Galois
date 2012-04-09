@@ -27,7 +27,7 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#include "Galois/Runtime/mem.h"
+#include "Galois/Runtime/mm/Mem.h"
 #include "Galois/Runtime/Threads.h"
 #include "Galois/Runtime/Support.h"
 

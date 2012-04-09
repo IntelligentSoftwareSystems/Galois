@@ -23,12 +23,12 @@
 #ifndef GALOIS_RUNTIME_WORKLIST_H
 #define GALOIS_RUNTIME_WORKLIST_H
 
-#include "Galois/Runtime/mem.h"
 #include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/Threads.h"
 #include "Galois/Runtime/WorkListHelpers.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
+#include "Galois/Runtime/mm/Mem.h"
 #include "Galois/util/GAlgs.h"
 
 #include <limits>

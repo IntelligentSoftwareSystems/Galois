@@ -25,7 +25,7 @@
 
 #include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
-#include "Galois/Runtime/mem.h"
+#include "Galois/Runtime/mm/Mem.h"
 #include <boost/utility.hpp>
 #include <boost/optional.hpp>
 #include <stdlib.h>
