@@ -1761,7 +1761,7 @@ public:
       } else {
         _GLIBCXX_WRITE_MEM_BARRIER;
         while (myReq == req) {
-	  GaloisRuntime::LL::mem_pause();
+	  GaloisRuntime::LL::asmPause();
         }
         _GLIBCXX_READ_MEM_BARRIER;
         recycleOp(req);
@@ -1795,7 +1795,7 @@ public:
       } else {
         _GLIBCXX_WRITE_MEM_BARRIER;
         while (myReq == req) {
-	  GaloisRuntime::LL::mem_pause();
+	  GaloisRuntime::LL::asmPause();
         }
         _GLIBCXX_READ_MEM_BARRIER;
 	boost::optional<T> retval = myReq->retval;
