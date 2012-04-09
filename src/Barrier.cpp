@@ -1,11 +1,11 @@
-/** Galois configuration -*- C++ -*-
+/** Galois barrier -*- C++ -*-
  * @file
  * @section License
  *
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -70,11 +70,11 @@ void GaloisRuntime::SimpleBarrier::wait() {
   TLD& tld = tlds.get(tid);
   if (tid == 0) {
     while (globalTotal < size) {
-      GaloisRuntime::LL::mem_pause();
+      GaloisRuntime::LL::asmPause();
     }
   } else {
     while (!tld.flag) {
-      GaloisRuntime::LL::mem_pause();
+      GaloisRuntime::LL::asmPause();
     }
   }
 }
@@ -87,7 +87,7 @@ void GaloisRuntime::SimpleBarrier::barrier() {
 
   if (tid == 0) {
     while (globalTotal < size) {
-      GaloisRuntime::LL::mem_pause();
+      GaloisRuntime::LL::asmPause();
     }
 
     globalTotal = 0;
@@ -96,7 +96,7 @@ void GaloisRuntime::SimpleBarrier::barrier() {
     cascade(tid);
   } else {
     while (!tld.flag) {
-      GaloisRuntime::LL::mem_pause();
+      GaloisRuntime::LL::asmPause();
     }
 
     tld.flag = 0;
