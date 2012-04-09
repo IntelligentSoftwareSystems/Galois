@@ -92,9 +92,10 @@ struct simplex {
   tri *t;
   int o;
   bool boundary;
-  simplex(tri *tt, int oo) : t(tt), o(oo), boundary(0) {}
-  simplex(tri *tt, int oo, bool _b) : t(tt), o(oo), boundary(_b) {}
-  simplex(vertex *v1, vertex *v2, vertex *v3, tri *tt) {
+  bool failed;
+  simplex(tri *tt, int oo) : t(tt), o(oo), boundary(0), failed(false) {}
+  simplex(tri *tt, int oo, bool _b) : t(tt), o(oo), boundary(_b), failed(false) {}
+  simplex(vertex *v1, vertex *v2, vertex *v3, tri *tt): failed(false) {
     t = tt;
     t->ngh[0] = t->ngh[1] = t->ngh[2] = NULL;
     t->vtx[0] = v1; v1->t = t;
@@ -116,6 +117,54 @@ struct simplex {
 	else cout << "NULL ";
       cout << endl;
     }
+  }
+
+  template<typename QsTy>
+  bool acquire(vertex* v, int id, QsTy* q) {
+    int* p = &v->reserve;
+    int val;
+    do {
+      val = *p;
+      if (val == id)
+        return true;
+      if (val == -1 && __sync_bool_compare_and_swap(p, val, id)) {
+        if (q != NULL)
+          q->acquireQ.push_back(v);
+        asm("":::"memory");
+        return true;
+      }
+    } while (val == -1);
+    return false;
+  }
+
+  template<typename QsTy>
+  bool acquire(int id, QsTy* q) {
+    for (int i = 0; i < 3; ++i) {
+      if (!acquire(t->vtx[i], id, q))
+        return false;
+    }
+    return true;
+  }
+
+  template<typename QsTy>
+  simplex across(int id, QsTy* q) {
+    if (!acquire(t->vtx[o], id, q)) {
+      failed = true;
+      return simplex(t, o, 1);
+    }
+
+    tri *to = t->ngh[o];
+    
+    if (to != NULL) {
+      for (int i = 0; i < 3; ++i) {
+        if (!acquire(to->vtx[i], id, q)) {
+          failed = true;
+          return simplex(t, o, 1);
+        }
+      }
+      return simplex(to, to->locate(t));
+    }
+    else return simplex(t,o,1);
   }
 
   simplex across() {

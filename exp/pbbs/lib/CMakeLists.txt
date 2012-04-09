@@ -1,1 +1,1 @@
-add_library(pbbs graphUtils.C tbb_init.C galois_init.C)
+add_library(pbbs graphUtils.C tbb_init.C galois_init.C exp.C)

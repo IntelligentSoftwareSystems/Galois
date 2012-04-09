@@ -21,63 +21,41 @@
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include <iostream>
-#include "float.h"
 #include <algorithm>
-#include <cstring>
-#include "parallel.h"
+#include "gettime.h"
+#include "utils.h"
 #include "geometry.h"
-#include "sequence.h"
+#include "parallel.h"
+#include "IO.h"
 #include "geometryIO.h"
-#include "topology.h"
 #include "parseCommandLine.h"
+#include "refine.h"
 using namespace std;
 using namespace benchIO;
 
-bool checkDelaunay(tri *triangs, int n, int boundarySize);
-
-#define MIN_ANGLE 30.0
-
-bool skinnyTriangle(tri *t) {
-  if (minAngleCheck(t->vtx[0]->pt, t->vtx[1]->pt, t->vtx[2]->pt, MIN_ANGLE))
-    return 1;
-  return 0;
-}
-
-double angle(tri *t) {
-  return min(angle(t->vtx[0]->pt, t->vtx[1]->pt, t->vtx[2]->pt),
-	     min(angle(t->vtx[1]->pt, t->vtx[0]->pt, t->vtx[2]->pt),
-		 angle(t->vtx[2]->pt, t->vtx[0]->pt, t->vtx[1]->pt)));
-}
-
-bool check(triangles<point2d> Tri) {
-  int m = Tri.numTriangles;
-  vertex* V = NULL;
-  tri* Triangs = NULL;
-  topologyFromTriangles(Tri, &V, &Triangs);
-  if (checkDelaunay(Triangs, m, 10)) return 1;
-  int* bad = newA(int, m);
-//  parallel_for (int i = 0; i < m; i++)
-  parallel_doall(int, i, 0, m) {
-    bad[i] = skinnyTriangle(&Triangs[i]);
-  } parallel_doall_end
-  int nbad = sequence::plusReduce(bad, m);
-  if (nbad > 0) {
-    cout << "Delaunay refine check: " << nbad << " skinny triangles" << endl;
-    return 1;
+void timeRefine(triangles<point2d> Tri, int rounds, char* outFile) {
+  triangles<point2d> R;
+  for (int i=0; i < rounds; i++) {
+    if (i != 0) R.del();
+    startTime();
+    R = refine(Tri);
+    nextTimeN();
   }
-  return 0;
+  cout << endl;
+
+  if (outFile != NULL) writeTrianglesToFile(R, outFile);
+  R.del();
 }
 
 int parallel_main(int argc, char* argv[]) {
-  commandLine P(argc,argv,
-		"[-r <numtests>] <inFile> <outfile>");
-  pair<char*,char*> fnames = P.IOFileNames();
-  char* iFile = fnames.first;
-  char* oFile = fnames.second;
+  commandLine P(argc,argv,"[-o <outFile>] [-r <rounds>] [-e] <inFile>");
+  char* iFile = P.getArgument(0);
+  char* oFile = P.getOptionValue("-o");
+  bool nodeelemfiles = P.getOption("-e");
+  int rounds = P.getOptionIntValue("-r",1);
 
-  // number of random points to test
-  int r = P.getOptionIntValue("-r",10);
-
-  triangles<point2d> T = readTrianglesFromFile<point2d>(oFile,0);
-  return check(T);
+  triangles<point2d>T;
+  if (nodeelemfiles) T = readTrianglesFromFileNodeEle(iFile);
+  else T = readTrianglesFromFile<point2d>(iFile,0);
+  timeRefine(T, rounds, oFile);
 }

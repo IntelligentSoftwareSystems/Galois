@@ -14,5 +14,6 @@ endif()
 include_directories(common)
 add_library(pbbs-${prefix}-common common/topologyFromTri.C)
 
+add_subdirectory(ndIncrementalDelaunay)
 add_subdirectory(incrementalDelaunay)
 add_subdirectory(serialDelaunay)

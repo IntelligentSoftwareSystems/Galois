@@ -20,6 +20,7 @@
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+#include <deque>
 #include <vector>
 #include "sequence.h"
 #include "geometry.h"
@@ -39,28 +40,51 @@ using namespace std;
 //    ROUTINES FOR FINDING AND INSERTING A NEW POINT
 // *************************************************************
 
-// Finds a vertex (p) in a mesh starting at any triangle (start)
-// Requires that the mesh is properly connected and convex
-simplex find(vertex *p, simplex start) {
-  simplex t = start;
-  while (1) {
-    int i;
-    for (i=0; i < 3; i++) {
-      t = t.rotClockwise();
-      if (t.outside(p)) {t = t.across(); break;}
-    }
-    if (i==3) return t;
-    if (!t.valid()) return t;
-  }
-}
-
 // Holds vertex and simplex queues used to store the cavity created 
 // while searching from a vertex between when it is initially searched 
 // and later checked to see if all corners are reserved.
 struct Qs {
   vector<vertex*> vertexQ;
   vector<simplex> simplexQ;
+  vector<vertex*> acquireQ;
+  deque<int> abortedQ;
+  int aborted;
+  Qs(): aborted(0) { }
 };
+
+// Finds a vertex (p) in a mesh starting at any triangle (start)
+// Requires that the mesh is properly connected and convex
+simplex find(vertex *p, simplex& start, int id, Qs* q) {
+  simplex t = start;
+
+  if (!t.acquire(id, q)) {
+    start.failed = true;
+    return t;
+  }
+
+  while (1) {
+    int i;
+    for (i=0; i < 3; i++) {
+      t = t.rotClockwise();
+      if (t.outside(p)) {
+        simplex tt = t.across(id, q);
+        if (t.failed) {
+          start.failed = true;
+          return t;
+        }
+
+        t = tt;
+        if (!t.acquire(id, q)) {
+          start.failed = true;
+          return t;
+        }
+        break;
+      }
+    }
+    if (i==3) return t;
+    if (!t.valid()) return t;
+  }
+}
 
 // Recursive routine for finding a cavity across an edge with
 // respect to a vertex p.
@@ -74,15 +98,32 @@ struct Qs {
 //
 //  If p is in circumcircle of T then 
 //     add T to simplexQ, c to vertexQ, and recurse
-void findCavity(simplex t, vertex *p, Qs *q) {
+bool findCavity(simplex t, vertex *p, Qs *q) {
+  if (!t.acquire(p->id, q))
+    return false;
+
   if (t.inCirc(p)) {
     q->simplexQ.push_back(t);
     t = t.rotClockwise();
-    findCavity(t.across(), p, q);
+
+    simplex tt = t.across(p->id, q);
+    if (t.failed)
+      return false;
+
+    if (!findCavity(tt, p, q))
+      return false;
+
     q->vertexQ.push_back(t.firstVertex());
     t = t.rotClockwise();
-    findCavity(t.across(), p, q);
+
+    tt = t.across(p->id, q);
+    if (t.failed)
+      return false;
+
+    if (!findCavity(tt, p, q))
+      return false;
   }
+  return true;
 }
 
 // Finds the cavity for v and tries to reserve vertices on the 
@@ -90,17 +131,22 @@ void findCavity(simplex t, vertex *p, Qs *q) {
 // The boundary vertices are pushed onto q->vertexQ and
 // simplices to be deleted on q->simplexQ (both initially empty)
 // It makes no side effects to the mesh other than to X->reserve
-void reserveForInsert(vertex *v, simplex t, Qs *q) {
+bool reserveForInsert(vertex *v, simplex t, Qs *q) {
   // each iteration searches out from one edge of the triangle
   for (int i=0; i < 3; i++) {
     q->vertexQ.push_back(t.firstVertex());
-    findCavity(t.across(), v, q);
+    simplex tt = t.across(v->id, q);
+    if (t.failed)
+      return false;
+    if (!findCavity(tt, v, q))
+      return false;
     t = t.rotClockwise();
   }
   // the maximum id new vertex that tries to reserve a boundary vertex 
   // will have its id written.  reserve starts out as -1
   for (int i = 0; i < q->vertexQ.size(); i++)
-    utils::writeMax(&((q->vertexQ)[i]->reserve), v->id);
+    t.acquire(q->vertexQ[i], v->id, q);
+  return true;
 }
 
 // checks if v "won" on all adjacent vertices and inserts point if so
@@ -108,8 +154,7 @@ bool insert(vertex *v, simplex t, Qs *q) {
   bool flag = 0;
   for (int i = 0; i < q->vertexQ.size(); i++) {
     vertex* u = (q->vertexQ)[i];
-    if (u->reserve == v->id) u->reserve = -1; // reset to -1
-    else flag = 1; // someone else with higher priority reserved u
+    if (u->reserve != v->id) flag = 1; // someone else with higher priority reserved u
   }
   if (!flag) {
     tri* t1 = v->t;  // the memory for the two new triangles
@@ -120,9 +165,21 @@ bool insert(vertex *v, simplex t, Qs *q) {
       (q->simplexQ)[i].flip();
     }
   }
+  return flag;
+}
+
+void resetState(int id, Qs* q) {
+  for (int i = 0; i < q->vertexQ.size(); i++) {
+    vertex* u = (q->vertexQ)[i];
+    if (u->reserve == id) u->reserve = -1; // someone else with higher priority reserved u
+  }
+  for (int i = 0; i < q->acquireQ.size(); i++) {
+    vertex *u = q->acquireQ[i];
+    if (u->reserve == id) u->reserve = -1;
+  }
   q->simplexQ.clear();
   q->vertexQ.clear();
-  return flag;
+  q->acquireQ.clear();
 }
 
 // *************************************************************
@@ -192,20 +249,28 @@ simplex generateBoundary(point2d* P, int n, int bCount, vertex* v, tri* t) {
 //    MAIN LOOP
 // *************************************************************
 
+//#define DUMB
+
 void incrementallyAddPoints(vertex** v, int n, vertex* start) {
-  int numRounds = Exp::get_num_rounds();
+  unsigned numThreads = Exp::get_num_threads();
 
   // various structures needed for each parallel insertion
   //int maxR = (int) (n/100) + 1; // maximum number to try in parallel
-  int maxR = (int) (n/numRounds) + 1; // maximum number to try in parallel
+  //int maxR = (int) (n/numRounds) + 1; // maximum number to try in parallel
+  int maxR = (int) numThreads; // maximum number to try in parallel
+#ifdef DUMB
+  maxR = (int) (n/100) + 1;
+#endif
   Qs *qqs = newA(Qs,maxR);
   Qs **qs = newA(Qs*,maxR);
   for (int i=0; i < maxR; i++) {
     qs[i] = new (&qqs[i]) Qs;
   }
+#ifdef DUMB
   simplex *t = newA(simplex,maxR);
-  bool *flags = newA(bool,maxR);
-  vertex** h = newA(vertex*,maxR);
+  bool *flags = newA(bool,n);
+  vertex** h = newA(vertex*,n);
+#endif
 
   // create a point location structure
   typedef kNearestNeighbor<vertex,1> KNN;
@@ -227,35 +292,85 @@ void incrementallyAddPoints(vertex** v, int n, vertex* start) {
     }
 
     // determine how many vertices to try in parallel
-    int cnt = 1 + (n-top)/100;  // 100 is pulled out of a hat
-    cnt = (cnt > maxR) ? maxR : cnt;
+    //int cnt = 1 + (n-top)/100;  // 100 is pulled out of a hat
+    //cnt = (cnt > maxR) ? maxR : cnt;
+    //cnt = (cnt > top) ? top : cnt;
+    int cnt = nextNN;
     cnt = (cnt > top) ? top : cnt;
     vertex **vv = v+top-cnt;
+
+
+#ifdef DUMB
+    for (int i = 0; i < cnt; ++i)
+      flags[i] = false;
+#endif
 
     // for trial vertices find containing triangle, determine cavity 
     // and reserve vertices on boundary of cavity
 //    parallel_for (int j = 0; j < cnt; j++) {
     parallel_doall(int, j, 0, cnt)  {
-      vertex *u = knn.nearest(vv[j]);
-      t[j] = find(vv[j],simplex(u->t,0));
-      reserveForInsert(vv[j],t[j],qs[j]);
+      unsigned tid = Exp::get_tid();
+      int cur = j;
+
+      while (true) {
+        bool success = false;
+        vertex *u = knn.nearest(vv[cur]);
+        simplex tt = simplex(u->t, 0);
+        simplex t = find(vv[cur], tt, vv[cur]->id, qs[tid]);
+        if (!tt.failed && reserveForInsert(vv[cur], t, qs[tid])
+            && !insert(vv[cur], t, qs[tid])) {
+          success = true;
+        } else {
+          qs[tid]->abortedQ.push_back(cur);
+          qs[tid]->aborted++;
+        }
+
+        resetState(vv[cur]->id, qs[tid]);
+        
+//        if (!success)
+        if (cnt < 128 && !success)
+          break;
+        if (qs[tid]->abortedQ.empty()) 
+          break;
+
+        cur = qs[tid]->abortedQ.front();
+        qs[tid]->abortedQ.pop_front();
+      }
     } parallel_doall_end
 
-    // For trial vertices check if they own their boundary and
-    // update mesh if so.  flags[i] is 1 if failed (need to retry)
-//    parallel_for (int j = 0; j < cnt; j++) {
-    parallel_doall(int, j, 0, cnt)  {
-      flags[j] = insert(vv[j],t[j],qs[j]);
-    } parallel_doall_end
+    for (int i=0; i < numThreads; i++) {
+      Qs* q = qs[i];
+      for (int j = 0; j < q->abortedQ.size(); ++j) {
+        int cur = q->abortedQ[j];
 
+        vertex *u = knn.nearest(vv[cur]);
+        simplex tt = simplex(u->t, 0);
+        simplex t = find(vv[cur], tt, vv[cur]->id, q);
+        if (tt.failed)
+          abort();
+        if (!reserveForInsert(vv[cur], t, q))
+          abort();
+        if (insert(vv[cur], t, q))
+          abort();
+        resetState(vv[cur]->id, q);
+      }
+      
+      failed += q->aborted;
+
+      q->abortedQ.clear(); 
+      q->aborted = 0;
+    }
+
+#ifdef DUMB
     // Pack failed vertices back onto Q and successful
     // ones up above (needed for point location structure)
     int k = sequence::pack(vv,h,flags,cnt);
-//    parallel_for (int j = 0; j < cnt; j++) flags[j] = !flags[j];
     parallel_doall(int, j, 0, cnt) { flags[j] = !flags[j]; } parallel_doall_end
     sequence::pack(vv,h+k,flags,cnt);
-//    parallel_for (int j = 0; j < cnt; j++) vv[j] = h[j];
     parallel_doall(int, j, 0, cnt) { vv[j] = h[j]; } parallel_doall_end
+#else
+    int k = 0;
+#endif
 
     failed += k;
     top = top-cnt+k; // adjust top, accounting for failed vertices
@@ -263,7 +378,10 @@ void incrementallyAddPoints(vertex** v, int n, vertex* start) {
   }
 
   knn.del();
-  free(qqs); free(qs); free(t); free(flags); free(h);
+  free(qqs); free(qs);
+#ifdef DUMB
+  free(flags); free(h);
+#endif
 
   cout << "n=" << n << "  Total retries=" << failed
        << "  Total rounds=" << rounds << endl;

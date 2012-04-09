@@ -21,6 +21,7 @@
 
 #include <iostream>
 #include <vector>
+#include <deque>
 #include "sequence.h"
 #include "gettime.h"
 #include "parallel.h"
@@ -62,6 +63,10 @@ TriangleTable makeTriangleTable(int m) {return TriangleTable(m,hashTriangles());
 struct Qs {
   vector<vertex*> vertexQ;
   vector<simplex> simplexQ;
+  vector<vertex*> acquireQ;
+  deque<int> abortedQ;
+  int aborted;
+  Qs(): aborted(0) { }
 };
 
 // Recursive routine for finding a cavity across an edge with
@@ -76,15 +81,32 @@ struct Qs {
 //
 //  If p is in circumcircle of T then 
 //     add T to simplexQ, c to vertexQ, and recurse
-void findCavity(simplex t, vertex *p, Qs *q) {
+bool findCavity(simplex t, vertex *p, int id, Qs *q) {
+  if (!t.acquire(id, q))
+    return false;
+
   if (t.inCirc(p)) {
     q->simplexQ.push_back(t);
     t = t.rotClockwise();
-    findCavity(t.across(), p, q);
+    
+    simplex tt = t.across(id, q);
+    if (t.failed)
+      return false;
+
+    if (!findCavity(tt, p, id, q))
+      return false;
+
     q->vertexQ.push_back(t.firstVertex());
     t = t.rotClockwise();
-    findCavity(t.across(), p, q);
+    
+    tt = t.across(id, q);
+    if (t.failed)
+      return false;
+
+    if (!findCavity(tt, p, id, q))
+      return false;
   }
+  return true;
 }
 
 // Finds the cavity for v and tries to reserve vertices on the 
@@ -92,17 +114,24 @@ void findCavity(simplex t, vertex *p, Qs *q) {
 // The boundary vertices are pushed onto q->vertexQ and
 // simplices to be deleted on q->simplexQ (both initially empty)
 // It makes no side effects to the mesh other than to X->reserve
-void reserveForInsert(vertex *v, simplex t, Qs *q) {
+bool reserveForInsert(vertex *v, simplex t, int id, Qs *q) {
   // each iteration searches out from one edge of the triangle
   for (int i=0; i < 3; i++) {
     q->vertexQ.push_back(t.firstVertex());
-    findCavity(t.across(), v, q);
+
+    simplex tt = t.across(id, q);
+    if (t.failed)
+      return false;
+    if (!findCavity(tt, v, id, q))
+      return false;
+
     t = t.rotClockwise();
   }
-  // the maximum id new vertex that tries to reserve a boundary vertex 
-  // will have its id written.  reserve starts out as -1
-  for (int i = 0; i < q->vertexQ.size(); i++)
-    utils::writeMax(&((q->vertexQ)[i]->reserve), v->id);
+  for (int i = 0; i < q->vertexQ.size(); i++) {
+    t.acquire(q->vertexQ[i], v->id, q);
+  }
+
+  return true;
 }
 
 // *************************************************************
@@ -136,51 +165,81 @@ inline point2d circumcenter(simplex t) {
 
 // this side affects the simplex by moving it into the right orientation
 // and setting the boundary if the circumcenter encroaches on a boundary
-inline bool checkEncroached(simplex& t) {
-  if (t.isBoundary()) return 0;
+inline bool checkEncroached(simplex& t, int id, Qs* q) {
+  if (t.isBoundary()) return true;
   int i;
   for (i=0; i < 3; i++) {
+    simplex tt = t.across(id, q);
+    if (t.failed)
+      return false;
+
     if (t.across().isBoundary() && (t.farAngle() > 45.0)) break;
     t = t.rotClockwise();
   }
-  if (i < 3) return t.boundary = 1;
-  else return 0;
+  if (i < 3)
+    t.boundary = 1;
+  return true;
+  //if (i < 3)
+  //  return t.boundary = 1;
+  //else 
+  //  return 0;
 }
 
-bool findAndReserveCavity(vertex* v, simplex& t, Qs* q) {
-  t = simplex(v->badT,0);
+int findAndReserveCavity(vertex* v, simplex& t, Qs* q) {
+//  t = simplex(v->badT, 0);
+  
   if (t.t == NULL) {cout << "refine: nothing in badT" << endl; abort();}
   if (t.t->bad == 0) return 0;
-  //t.t->bad = 0;
+
+  if (!t.acquire(v->id, q))
+    return 2;
 
   // if there is an obtuse angle then move across to opposite triangle, repeat
-  if (obtuse(t)) t = t.across();
+  if (obtuse(t)) {
+    simplex tt = t.across(v->id, q);
+    if (t.failed)
+      return 2;
+
+    t = tt;
+
+    if (!t.acquire(v->id, q))
+      return 2;
+  }
   while (t.isTriangle()) {
     int i;
     for (i=0; i < 2; i++) {
       t = t.rotClockwise();
-      if (obtuse(t)) { t = t.across(); break; } 
+      if (obtuse(t)) {
+        simplex tt = t.across(v->id, q);
+        if (t.failed)
+          return 2;
+        t = tt;
+        if (!t.acquire(v->id, q))
+          return 2;
+        break;
+      } 
     }
     if (i==2) break;
   }
 
   // if encroaching on boundary, move to boundary
-  checkEncroached(t);
+  if (!checkEncroached(t, v->id, q))
+    return 2;
 
   // use circumcenter to add (if it is a boundary then its middle)
   v->pt = circumcenter(t);
-  reserveForInsert(v, t, q);
+  if (!reserveForInsert(v, t, v->id, q))
+    return 2;
   return 1;
 }
 
 // checks if v "won" on all adjacent vertices and inserts point if so
 // returns true if "won" and cavity was updated
-bool addCavity(vertex *v, simplex t, Qs *q, TriangleTable TT) {
+bool addCavity(vertex *v, simplex t, Qs *q, TriangleTable TT, vertex** vbase) {
   bool flag = 1;
   for (int i = 0; i < q->vertexQ.size(); i++) {
     vertex* u = (q->vertexQ)[i];
-    if (u->reserve == v->id) u->reserve = -1; // reset to -1
-    else flag = 0; // someone else with higher priority reserved u
+    if (u->reserve != v->id) flag = 0; // someone else with higher priority reserved u
   }
   if (flag) {
     tri* t0 = t.t;
@@ -209,55 +268,116 @@ bool addCavity(vertex *v, simplex t, Qs *q, TriangleTable TT) {
     }
     v->badT = NULL;
   } 
+  return flag;
+}
+
+void resetState(int id, Qs* q) {
+  for (int i = 0; i < q->vertexQ.size(); i++) {
+    vertex* u = (q->vertexQ)[i];
+    if (u->reserve == id) u->reserve = -1; // reset to -1
+  }
+  for (int i = 0; i < q->acquireQ.size(); i++) {
+    vertex *u = q->acquireQ[i];
+    if (u->reserve == id) u->reserve = -1;
+  }
+  q->acquireQ.clear();
   q->simplexQ.clear();
   q->vertexQ.clear();
-  return flag;
 }
 
 // *************************************************************
 //    MAIN REFINEMENT LOOP
 // *************************************************************
 
-void addRefiningVertices(vertex** v, int n, int nTotal, TriangleTable TT, int& failed, int& rounds) {
-  int numRounds = Exp::get_num_rounds();
-
-  //int maxR = (int) (nTotal/500) + 1; // maximum number to try in parallel
-  int maxR = (int) (nTotal/numRounds) + 1; // maximum number to try in parallel
+void addRefiningVertices(vertex** v, int n, int nTotal, TriangleTable TT, int vlen, int& numBad, int& failed, int& rounds) {
+  unsigned numThreads = Exp::get_num_threads();
+  
+  int maxR = (int) numThreads;
   Qs *qqs = newA(Qs,maxR);
   Qs **qs = newA(Qs*,maxR);
   for (int i=0; i < maxR; i++) qs[i] = new (&qqs[i]) Qs;
+#ifdef DUMB  
   simplex *t = newA(simplex,maxR);
-  bool *flags = newA(bool,maxR);
-  vertex** h = newA(vertex*,maxR);
- 
+  bool *flags = newA(bool,n);
+  vertex** h = newA(vertex*,n);
+#endif
+
   int top = n;
   int size = maxR;
 
   // process all vertices starting just below the top
-  while(top > 0) {
-    int cnt = min(size,top);
+  while (top > 0) {
+    int cnt = top;
     vertex** vv = v+top-cnt;
 
 //    parallel_for (int j = 0; j < cnt; j++) 
     parallel_doall(int, j, 0, cnt) {
-      flags[j] = findAndReserveCavity(vv[j],t[j],qs[j]);
+      unsigned tid = Exp::get_tid();
+      Qs* q = qs[tid];
+
+      int cur = j;
+
+      while (true) {
+        bool success = true;
+        simplex t = simplex(vv[cur]->badT, 0);
+        int r = findAndReserveCavity(vv[cur], t, q);
+        if (r == 1 && addCavity(vv[cur], t, q, TT, v)) {
+          ;
+        } else if (r == 2) {
+          q->abortedQ.push_back(cur);
+          q->aborted++;
+          success = false;
+        } 
+
+        resetState(vv[cur]->id, q);
+
+        if (!success)
+          break;
+        if (!q->abortedQ.empty()) {
+          cur = q->abortedQ.front();
+          q->abortedQ.pop_front();
+        } else {
+          break;
+        }
+      }
     } parallel_doall_end
 
-//    parallel_for (int j = 0; j < cnt; j++) 
-    parallel_doall(int, j, 0, cnt) {
-      flags[j] = flags[j] && !addCavity(vv[j], t[j], qs[j], TT);
-    } parallel_doall_end
+    for (int i = 0; i < numThreads; i++) {
+      Qs* q = qs[i];
+      for (int j = 0; j < q->abortedQ.size(); ++j) {
+        int cur = q->abortedQ[j];
+        simplex t = simplex(vv[cur]->badT, 0);
+        int r = findAndReserveCavity(vv[cur], t, q);
+        if (r == 1 && addCavity(vv[cur], t, q, TT, v)) {
+          ;
+        } else if (r == 2) {
+          abort();
+        } 
+        resetState(vv[cur]->id, q);
+      }
 
+      failed += q->aborted;
+      q->abortedQ.clear();
+      q->aborted = 0;
+    }
+
+#ifdef DUMB
     // Pack the failed vertices back onto Q
     int k = sequence::pack(vv,h,flags,cnt);
 //    parallel_for (int j = 0; j < k; j++) vv[j] = h[j];
     parallel_doall(int, j, 0, k) { vv[j] = h[j]; } parallel_doall_end
     failed += k;
+#else
+    int k = 0;
+#endif
     top = top-cnt+k; // adjust top, accounting for failed vertices
     ++rounds;
   }
-  free(qqs); free(qs); free(t);
+  free(qqs); free(qs);
+#ifdef DUMB
+  free(t);
   free(flags); free(h); 
+#endif
 }
 
 // *************************************************************
@@ -268,7 +388,8 @@ triangles<point2d> refine(triangles<point2d> Tri) {
   // following line is used to fool icpc into starting the scheduler
   if (Tri.numPoints < 0) cilk_spawn printf("ouch");
   startTime();
-  int expandFactor = 4;
+  //int expandFactor = 4;
+  int expandFactor = 6;
   int n = Tri.numPoints;
   int m = Tri.numTriangles;
   int extraVertices = expandFactor*n;
@@ -349,7 +470,8 @@ triangles<point2d> refine(triangles<point2d> Tri) {
     workQ = makeTriangleTable(numBad);
 
     // This does all the work
-    addRefiningVertices(v + numPoints - n, numBad, numPoints, workQ, failed, rounds);
+    addRefiningVertices(v + numPoints - n, numBad, numPoints, workQ, 
+        extraVertices - numPoints + n, numBad, failed, rounds);
 
     // push any bad triangles that were left untouched onto the Q
 //    parallel_for (int i=0; i < numBad; i++) 
