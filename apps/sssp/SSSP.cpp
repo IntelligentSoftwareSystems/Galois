@@ -53,7 +53,6 @@ static cll::opt<unsigned int> startNode("startnode", cll::desc("Node to start se
 static cll::opt<unsigned int> reportNode("reportnode", cll::desc("Node to report distance to"), cll::init(2));
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<int> stepShift("delta", cll::desc("Shift value for the deltastep"), cll::init(10));
-static cll::opt<bool> useBfs("bfs", cll::desc("Use BFS"), cll::init(false));
 
 typedef Galois::Graph::LC_Linear_Graph<SNode, unsigned int> Graph;
 typedef Graph::GraphNode GNode;
@@ -77,7 +76,7 @@ void runBody(const GNode src) {
 	 ee = graph.edge_end(src, Galois::NONE); 
        ii != ee; ++ii) {
     GNode dst = graph.getEdgeDst(ii);
-    int w = useBfs ? 1 : graph.getEdgeData(ii);
+    int w = graph.getEdgeData(ii);
     UpdateRequest up(dst, w);
     initial.insert(up);
   }
@@ -99,7 +98,7 @@ void runBody(const GNode src) {
 	     ee = graph.edge_end(req.n, Galois::NONE);
 	   ii != ee; ++ii) {
 	GNode dst = graph.getEdgeDst(ii);
-	int d = useBfs ? 1 : graph.getEdgeData(ii);
+	int d = graph.getEdgeData(ii);
 	unsigned int newDist = req.w + d;
 	if (newDist < graph.getData(dst,Galois::NONE).dist)
 	  initial.insert(UpdateRequest(dst, newDist));
@@ -125,7 +124,7 @@ struct process {
 	for (Graph::edge_iterator ii = graph.edge_begin(req.n, Galois::NONE),
 	       ee = graph.edge_end(req.n, Galois::NONE); ii != ee; ++ii) {
 	  GNode dst = graph.getEdgeDst(ii);
-	  int d = useBfs ? 1 : graph.getEdgeData(ii);
+	  int d = graph.getEdgeData(ii);
 	  unsigned int newDist = req.w + d;
 	  SNode& rdata = graph.getData(dst,Galois::NONE);
 	  if (newDist < rdata.dist)
@@ -143,11 +142,12 @@ void runBodyParallel(const GNode src) {
   typedef ChunkedLIFO<16> Chunk;
   typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
 
-  Galois::StatTimer T;
+  Galois::StatTimer T("Time");
 
   UpdateRequest one[1] = { UpdateRequest(src, 0) };
   T.start();
-#ifdef GALOIS_EXP
+  //#ifdef GALOIS_EXP
+#if 0
     Exp::WorklistExperiment<OBIM,dChunk,Chunk,UpdateRequestIndexer,
       std::less<UpdateRequest>,std::greater<UpdateRequest> >().for_each(
         std::cout, &one[0], &one[1], process());
@@ -178,7 +178,7 @@ bool verify(GNode source) {
 	   ee = graph.edge_end(*src, Galois::NONE); ii != ee; ++ii) {
       GNode neighbor = graph.getEdgeDst(ii);
       unsigned int ddist = graph.getData(*src,Galois::NONE).dist;
-      int d = useBfs ? 1 : graph.getEdgeData(ii);
+      int d = graph.getEdgeData(ii);
       if (ddist > dist + d) {
         std::cerr << "bad level value at "
           << graph.getData(*src,Galois::NONE).id
@@ -204,10 +204,6 @@ int main(int argc, char **argv) {
   std::cout << "Read " << graph.size() << " nodes\n";
   std::cout << "Using delta-step of " << (1 << stepShift) << "\n";
   
-  if (useBfs && stepShift > 1) {
-    std::cout << "WARNING: Using a large delta-step for bfs. Expect long execution times.\n";
-  }
-
   std::cout << "WARNING: Performance varies considerably due to -delta.  Do not expect the default to be good for your graph\n";
 
   unsigned int id = 0;
