@@ -16,6 +16,7 @@ defects in Software and/or Documentation, or loss or inaccuracy of data of any
 kind.
 */
 #include "Galois/Runtime/Context.h"
+#include "Galois/Runtime/MethodFlags.h"
 #include "Galois/Runtime/ll/SimpleLock.h"
 
 //! Global thread context for each active thread
@@ -23,9 +24,24 @@ static __thread GaloisRuntime::SimpleRuntimeContext* thread_cnx = 0;
 
 static GaloisRuntime::LL::SimpleLock<true> ConflictLock;
 
-void GaloisRuntime::clearConflictLock() {
-  //ConflictLock.unlock();
+#ifdef GALOIS_DET
+static bool pendingFlag = false;
+
+void GaloisRuntime::setPending(bool value) {
+  pendingFlag = value;
 }
+
+void GaloisRuntime::doCheckWrite() {
+  if (pendingFlag) {
+    throw GaloisRuntime::REACHED_FAILSAFE;
+  }
+}
+
+#endif
+
+//void GaloisRuntime::clearConflictLock() {
+//  ConflictLock.unlock();
+//}
 
 void GaloisRuntime::setThreadContext(GaloisRuntime::SimpleRuntimeContext* n)
 {
@@ -74,16 +90,23 @@ void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
     L->next = locks;
     locks = L;
   } else {
+#ifdef GALOIS_DET
+    SimpleRuntimeContext* other;
+    do {
+      other = L->Owner.getValue();
+      if (other == this)
+        break;
+      if (!pendingFlag)
+        throw GaloisRuntime::CONFLICT;
+      if (other->id < id)
+        throw GaloisRuntime::CONFLICT;
+    } while (!L->Owner.stealing_CAS(other, this));
+#else
     if (L->Owner.getValue() != this) {
       //ConflictLock.lock();
-      // SimpleRuntimeContext* other = L->Owner.getValue();
-      // int rid = -1;
-      // int rb = 0;
-      // if (other) rid = other->ID;
-      // if (other) rb = other->bored;
-      // std::cerr << "C: " << rid << "(" << rb << ") != " << ID << "(" << bored << ") " << L << "\n";
-      throw -1; // Conflict
+      throw GaloisRuntime::CONFLICT; // Conflict
     }
+#endif
   }
 }
 

@@ -248,6 +248,7 @@ struct Boruvka {
     std::sort(edges.begin(), edges.end(), EdgeLess());
 
     GraphNode n = g.createNode(Graph::node_type());
+    g.addNode(n);
     GraphNode last;
     unsigned numNeighbors = 0;
     for (EdgeList::iterator ii = edges.begin(), ei = edges.end(); ii != ei; ++ii) {
@@ -579,6 +580,7 @@ void makeGraph(const std::string& in, Graph& g) {
   nodes.resize(numNodes);
   for (size_t i = 0; i < numNodes; ++i) {
     GraphNode src = g.createNode(typename Graph::node_type());
+    g.addNode(src);
     nodes[i] = src;
   }
 

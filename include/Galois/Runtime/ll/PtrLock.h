@@ -102,11 +102,18 @@ public:
     return !(oldval & 1);
   }
 
-  //CAS only works on unlocked values
-  //the lock bit will prevent a successful cas
+  //! CAS only works on unlocked values
+  //! the lock bit will prevent a successful cas
   inline bool CAS(T oldval, T newval) {
     assert(!((uintptr_t)oldval & 1) && !((uintptr_t)newval & 1));
     return __sync_bool_compare_and_swap(&_lock, (uintptr_t)oldval, (uintptr_t)newval);
+  }
+
+  //! CAS that works on locked values, obviously this can be very dangerous
+  //! when used incorrectly
+  inline bool stealing_CAS(T oldval, T newval) {
+    assert(((uintptr_t)oldval & 1));
+    return __sync_bool_compare_and_swap(&_lock, (uintptr_t)oldval | 1, (uintptr_t)newval | 1);
   }
 };
 
@@ -130,6 +137,9 @@ public:
       return true;
     }
     return false;
+  }
+  inline bool stealing_CAS(T oldval, T newval) {
+    return CAS(oldval, newval);
   }
 };
 

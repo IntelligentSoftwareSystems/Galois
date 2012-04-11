@@ -290,6 +290,7 @@ static void addBoundaryNodes(PointList& points) {
 
   Element large_triangle(p1, p2, p3);
   GNode large_node = graph->createNode(large_triangle);
+  graph->addNode(large_node);
   
   p1->addElement(large_node);
   p2->addElement(large_node);
@@ -302,6 +303,10 @@ static void addBoundaryNodes(PointList& points) {
   GNode border_node1 = graph->createNode(border_ele1);
   GNode border_node2 = graph->createNode(border_ele2);
   GNode border_node3 = graph->createNode(border_ele3);
+
+  graph->addNode(border_node1);
+  graph->addNode(border_node2);
+  graph->addNode(border_node3);
 
   graph->getEdgeData(graph->addEdge(large_node, border_node1)) = 0;
   graph->getEdgeData(graph->addEdge(large_node, border_node2)) = 1;

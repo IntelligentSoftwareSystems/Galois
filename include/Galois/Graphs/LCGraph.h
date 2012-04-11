@@ -54,6 +54,7 @@
  */
 
 #include "Galois/Graphs/FileGraph.h"
+#include "Galois/Runtime/MethodFlags.h"
 #include "Galois/Runtime/mm/Mem.h"
 
 #include <iterator>
@@ -102,6 +103,7 @@ public:
   ~LC_CSR_Graph() {}
 
   NodeTy& getData(GraphNode N, MethodFlag mflag = ALL) {
+    GaloisRuntime::checkWrite(mflag);
     NodeInfo& NI = NodeData[N];
     GaloisRuntime::acquire(&NI, mflag);
     return NI.data;
@@ -112,11 +114,13 @@ public:
   }
 
   EdgeTy& getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
+    GaloisRuntime::checkWrite(mflag);
     GaloisRuntime::acquire(&NodeData[src], mflag);
     return EdgeData[getEdgeIdx(src,dst)];
   }
 
-  EdgeTy& getEdgeData(edge_iterator ni) {
+  EdgeTy& getEdgeData(edge_iterator ni, MethodFlag mflag = NONE) {
+    GaloisRuntime::checkWrite(mflag);
     return EdgeData[*ni];
   }
 
@@ -241,16 +245,19 @@ public:
   ~LC_CSRInline_Graph() {}
 
   NodeTy& getData(GraphNode N, MethodFlag mflag = ALL) {
+    GaloisRuntime::checkWrite(mflag);
     GaloisRuntime::acquire(N, mflag);
     return N->data;
   }
   
   edge_data_reference getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
+    GaloisRuntime::checkWrite(mflag);
     GaloisRuntime::acquire(src, mflag);
     return EdgeData[getEdgeIdx(src,dst)].getData();
   }
 
-  edge_data_reference getEdgeData(edge_iterator ni) const {
+  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = NONE) const {
+    GaloisRuntime::checkWrite(mflag);
     return ni->getData();
    }
 
@@ -384,16 +391,19 @@ public:
   ~LC_Linear_Graph() {}
 
   NodeTy& getData(GraphNode N, MethodFlag mflag = ALL) {
+    GaloisRuntime::checkWrite(mflag);
     GaloisRuntime::acquire(N, mflag);
     return N->data;
   }
   
   edge_data_reference getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
+    GaloisRuntime::checkWrite(mflag);
     GaloisRuntime::acquire(src, mflag);
     return getEdgeIdx(src,dst)->getData();
   }
 
-  edge_data_reference getEdgeData(edge_iterator ni) const {
+  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = NONE) const {
+    GaloisRuntime::checkWrite(mflag);
     return ni->getData();
   }
 

@@ -43,7 +43,8 @@ struct processCreate {
   Graph* lmesh;
   processCreate(Graph* _lmesh) :lmesh(_lmesh) {}
   void operator()(Element& item) {
-    lmesh->createNode(item);
+    GNode n = lmesh->createNode(item);
+    lmesh->addNode(n);
   }
 };
 

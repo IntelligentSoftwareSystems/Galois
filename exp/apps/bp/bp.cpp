@@ -31,25 +31,23 @@ struct BipartiteGraph: public Galois::Graph::FirstGraph<NodeTy,EdgeTy,true> {
   NodeList factors;
   NodeList variables;
 
-  bool addNode(const typename Super::GraphNode& n, bool isFactor, Galois::MethodFlag mflag = Galois::ALL) {
+  void addNode(const typename Super::GraphNode& n, bool isFactor, Galois::MethodFlag mflag = Galois::ALL) {
     if (isFactor) {
       factors.push_back(n);
     } else {
       variables.push_back(n);
     }
-    return Super::addNode(n, mflag);
+    Super::addNode(n, mflag);
   }
 
-  bool addNode(const typename Super::GraphNode& n, Galois::MethodFlag mflag = Galois::ALL) {
+  void addNode(const typename Super::GraphNode& n, Galois::MethodFlag mflag = Galois::ALL) {
     assert(0 && "Not supported in Bipartite Graph");
     abort();
-    return false;
   }
 
-  bool removeNode(typename Super::GraphNode n, Galois::MethodFlag mflag = Galois::ALL) {
+  void removeNode(typename Super::GraphNode n, Galois::MethodFlag mflag = Galois::ALL) {
     assert(0 && "Not supported in Bipartite Graph");
     abort();
-    return false;
   }
 };
 

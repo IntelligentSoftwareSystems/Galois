@@ -442,7 +442,7 @@ void initializeGraph(const char* inputFile,
     }
 
     GNode src = newApp->graph.createNode(node);
-    //newApp->graph.addNode(src);
+    newApp->graph.addNode(src);
     if (i == sourceId) {
       newApp->source = src;
     } else if (i == sinkId) {

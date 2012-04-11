@@ -64,7 +64,7 @@
 #include <boost/iterator/filter_iterator.hpp>
 #include <boost/functional.hpp>
 
-#include "Galois/MethodFlags.h"
+#include "Galois/Runtime/MethodFlags.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/InsBag.h"
@@ -290,6 +290,7 @@ private:
   //deal with the Node redirction
   node_reference getData(gNode* ID, Galois::MethodFlag mflag = ALL) {
     assert(ID);
+    GaloisRuntime::checkWrite(mflag);
     GaloisRuntime::acquire(ID, mflag);
     return ID->data.getData();
   }
@@ -323,6 +324,7 @@ public:
     }
 
     node_reference getData(Galois::MethodFlag mflag = ALL) const {
+      GaloisRuntime::checkWrite(mflag);
       return Parent->getData(ID, mflag);
     }
 
@@ -393,27 +395,26 @@ public:
    * pass ::GraphUnit instead.
    */
   GraphNode createNode(const_node_reference n) {
-    // TODO(ddn): make semantics the same
-    //gNode N(n, false);
-    gNode N(n, true);
+    gNode N(n, false);
     return GraphNode(this, &(nodes.push(N)));
   }
 
   //! Adds a node to the graph.
-  bool addNode(const GraphNode& n, Galois::MethodFlag mflag = ALL) {
+  void addNode(const GraphNode& n, Galois::MethodFlag mflag = ALL) {
     assert(n.ID);
+    GaloisRuntime::checkWrite(mflag | Galois::WRITE);
     GaloisRuntime::acquire(n.ID, mflag);
     bool oldActive = n.ID->active;
     if (!oldActive) {
       n.ID->active = true;
       //__sync_add_and_fetch(&numActive, 1);
     }
-    return !oldActive;
   }
 
   //add a node and reserve the space for edges
   bool addNode(const GraphNode& n, int maxDegree, MethodFlag mflag = ALL) {
     assert(n.ID);
+    GaloisRuntime::checkWrite(mflag | Galois::WRITE);
     GaloisRuntime::acquire(n.ID, mflag);
     bool oldActive = n.ID->active;
     if (!oldActive) {
@@ -427,6 +428,7 @@ public:
   //! Gets the node data for a node.
   node_reference getData(const GraphNode& n, Galois::MethodFlag mflag = ALL) const {
     assert(n.ID);
+    GaloisRuntime::checkWrite(mflag);
     GaloisRuntime::acquire(n.ID, mflag);
     return n.ID->data.getData();
   }
@@ -445,6 +447,7 @@ public:
   // FIXME(ddn): Doesn't handle incoming edges for directed graphs
   bool removeNode(GraphNode n, Galois::MethodFlag mflag = ALL) {
     assert(n.ID);
+    GaloisRuntime::checkWrite(mflag | Galois::WRITE);
     GaloisRuntime::acquire(n.ID, mflag);
     gNode* N = n.ID;
     bool wasActive = N->active;
@@ -467,6 +470,7 @@ public:
       Galois::MethodFlag mflag = ALL) {
     assert(src.ID);
     assert(dst.ID);
+    GaloisRuntime::checkWrite(mflag | Galois::WRITE);
     GaloisRuntime::acquire(src.ID, mflag);
     if (Directional) {
       return src.ID->getOrCreateEdge(dst.ID, data);
@@ -488,6 +492,7 @@ public:
       Galois::MethodFlag mflag = ALL) {
     assert(src.ID);
     assert(dst.ID);
+    GaloisRuntime::checkWrite(mflag | Galois::WRITE);
     GaloisRuntime::acquire(src.ID, mflag);
     if (Directional) {
       return src.ID->createEdge(dst.ID, data);
@@ -501,6 +506,7 @@ public:
   edge_iterator addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {
     assert(src.ID);
     assert(dst.ID);
+    GaloisRuntime::checkWrite(mflag | Galois::WRITE);
     GaloisRuntime::acquire(src.ID, mflag);
     if (Directional) {
       return src.ID->getOrCreateEdge(dst.ID);
@@ -521,6 +527,7 @@ public:
   edge_iterator addMultiEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {
     assert(src.ID);
     assert(dst.ID);
+    GaloisRuntime::checkWrite(mflag | Galois::WRITE);
     GaloisRuntime::acquire(src.ID, mflag);
     if (Directional) {
       return src.ID->createEdge(dst.ID);
@@ -534,6 +541,7 @@ public:
   void removeEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {
     assert(src.ID);
     assert(dst.ID);
+    GaloisRuntime::checkWrite(mflag | Galois::WRITE);
     GaloisRuntime::acquire(src.ID, mflag);
     if (Directional) {
       src.ID->eraseEdge(dst.ID);
@@ -554,6 +562,7 @@ public:
     assert(dst.ID);
 
     //yes, fault on null (no edge)
+    GaloisRuntime::checkWrite(mflag);
     GaloisRuntime::acquire(src.ID, mflag);
 
     if (Directional) {
@@ -600,7 +609,16 @@ public:
     return std::find_if(A.ID->begin(), A.ID->end(), first_eq<gNode*>(B.ID));
   }
 
-  edge_reference getEdgeData(const edge_iterator& ii) const {
+  /**
+   * Returns the edge data associated with the edge. It is an error to
+   * get the edge data for a non-existent edge.  It is an error to get
+   * edge data for inactive edges. By default, the mflag is Galois::NONE
+   * because edge_begin() dominates this call and should perform the
+   * appropriate locking.
+   */
+  edge_reference getEdgeData(const edge_iterator& ii, Galois::MethodFlag mflag = NONE) const {
+    GaloisRuntime::checkWrite(mflag);
+    GaloisRuntime::acquire(ii->getNeighbor(), mflag);
     return ii->getData();
   }
 
@@ -647,6 +665,7 @@ public:
       Galois::MethodFlag mflag = ALL) {
     assert(src.ID);
 
+    GaloisRuntime::checkWrite(mflag | Galois::WRITE);
     //yes, fault on null (no edge)
     GaloisRuntime::acquire(src.ID, mflag);
 

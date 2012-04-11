@@ -93,6 +93,7 @@ class Cavity: private boost::noncopyable {
 
       Element newE(point, p2, p3);
       GNode newNode = graph.createNode(newE);
+      graph.addNode(newNode, Galois::NONE);
 
       point->addElement(newNode);
       p2->addElement(newNode);

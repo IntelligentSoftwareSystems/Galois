@@ -220,7 +220,7 @@ class ForEachWork: public ForEachWorkBase<T, FunctionTy> {
           break;
         p = global_wl.pop();
       } while (p);
-    } catch (int a) {
+    } catch (ConflictFlag a) {
       abortIteration(*p, tld);
     }
   }

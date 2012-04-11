@@ -73,6 +73,7 @@ void convert_rmat2gr(const std::string& infilename, const std::string& outfilena
   nodes.resize(nnodes);
   for (size_t i = 0; i < nnodes; ++i) {
     GNode n = graph.createNode(i);
+    graph.addNode(n);
     nodes[i] = n;
     graph.addNode(n, Galois::NONE);
   }
@@ -155,6 +156,7 @@ void convert_dimacs2gr(const std::string& infilename, const std::string& outfile
   nodes.resize(nnodes);
   for (size_t i = 0; i < nnodes; ++i) {
     GNode n = graph.createNode(i);
+    graph.addNode(n);
     nodes[i] = n;
     graph.addNode(n, Galois::NONE);
   }

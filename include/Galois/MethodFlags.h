@@ -32,10 +32,11 @@ namespace Galois {
  *! and/or (2) saving undo information. By default, both are performed (ALL).
  */
 enum MethodFlag {
-  NONE,
-  CHECK_CONFLICT,
-  SAVE_UNDO,
-  ALL
+  NONE = 0,
+  CHECK_CONFLICT = 1,
+  SAVE_UNDO = 2,
+  ALL = 3,
+  WRITE = 4
 };
 
 }

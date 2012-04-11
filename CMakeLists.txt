@@ -7,6 +7,8 @@ set(GALOIS_VERSION_PATCH "4")
 set(GALOIS_COPYRIGHT_YEAR "2012") # Also in COPYRIGHT
 site_name(SITE_NAME)
 
+#add_definitions(-DGALOIS_DET)
+
 if(NOT CMAKE_BUILD_TYPE)
   message(STATUS "No build type selected, default to Release")
   set(CMAKE_BUILD_TYPE "Release")

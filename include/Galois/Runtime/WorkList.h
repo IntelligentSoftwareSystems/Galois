@@ -777,25 +777,10 @@ class RandomAccessRange {
     return retval;
   }
 
-  void try_steal(TLD& tld) {
-    //First try stealing from self
-    if (do_steal(tld,tld))
-      return;
-    //Then try stealing from neighbor
-    //TLD& otld = tlds.getNext(ThreadPool::getActiveThreads());
-    if (do_steal(tld, tlds.getNext(ThreadPool::getActiveThreads()))) {
-      //redistribute stolen items for neighbor to steal too
-      if (std::distance(tld.begin, tld.end) > 1) {
-	tld.stealLock.lock();
-	tld.stealEnd = tld.end;
-	tld.stealBegin = tld.end = Galois::split_range(tld.begin, tld.end);
-	tld.stealLock.unlock();
-      }
-    }
-  }
+  void try_steal(TLD& tld);
+  void init(TLD& tld);
 
 public:
-
   //! T is the value type of the WL
   typedef typename std::iterator_traits<IterTy>::value_type value_type;
 
@@ -833,19 +818,7 @@ public:
   boost::optional<value_type> pop() {
     TLD& tld = tlds.get();
     if (!tld.init) {
-      unsigned num = ThreadPool::getActiveThreads();
-      unsigned len = std::distance(gbegin,gend);
-      unsigned per = (len + num - 1) / num;
-      unsigned i = tlds.myEffectiveID();
-      tld.begin = gbegin;
-      std::advance(tld.begin, per * i);
-      tld.end = tld.begin;
-      std::advance(tld.end,std::min(per, (unsigned)std::distance(tld.begin, gend)));
-      if (Stealing) {
-	tld.stealEnd = tld.end;
-	tld.stealBegin = tld.end = Galois::split_range(tld.begin, tld.end);
-      }
-      tld.init = true;
+      init(tld);
     }
     if (Stealing && tld.begin == tld.end)
       try_steal(tld);
@@ -854,6 +827,42 @@ public:
     return boost::optional<value_type>();
   }
 };
+
+template<bool Stealing,typename IterTy>
+void RandomAccessRange<Stealing,IterTy>::init(TLD& tld) {
+  unsigned num = ThreadPool::getActiveThreads();
+  unsigned len = std::distance(gbegin,gend);
+  unsigned per = (len + num - 1) / num;
+  unsigned i = tlds.myEffectiveID();
+  tld.begin = gbegin;
+  std::advance(tld.begin, per * i);
+  tld.end = tld.begin;
+  std::advance(tld.end,std::min(per, (unsigned)std::distance(tld.begin, gend)));
+  if (Stealing) {
+    tld.stealEnd = tld.end;
+    tld.stealBegin = tld.end = Galois::split_range(tld.begin, tld.end);
+  }
+  tld.init = true;
+}
+
+template<bool Stealing, typename IterTy>
+void RandomAccessRange<Stealing,IterTy>::try_steal(TLD& tld) {
+  //First try stealing from self
+  if (do_steal(tld,tld))
+    return;
+  //Then try stealing from neighbor
+  //TLD& otld = tlds.getNext(ThreadPool::getActiveThreads());
+  if (do_steal(tld, tlds.getNext(ThreadPool::getActiveThreads()))) {
+    //redistribute stolen items for neighbor to steal too
+    if (std::distance(tld.begin, tld.end) > 1) {
+      tld.stealLock.lock();
+      tld.stealEnd = tld.end;
+      tld.stealBegin = tld.end = Galois::split_range(tld.begin, tld.end);
+      tld.stealLock.unlock();
+    }
+  }
+}
+
 WLCOMPILECHECK(RandomAccessRange);
 
 template<typename OwnerFn, typename T = int>
@@ -999,6 +1008,12 @@ class BulkSynchronous : private boost::noncopyable {
   }
 };
 WLCOMPILECHECK(BulkSynchronous);
+
+#ifdef GALOIS_DET
+template<class T=int>
+class Deterministic : private boost::noncopyable {
+};
+#endif
 
 //End namespace
 

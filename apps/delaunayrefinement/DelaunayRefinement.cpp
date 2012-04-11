@@ -26,7 +26,6 @@
  * @author Milind Kulkarni <milind@purdue.edu>
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-
 #include <iostream>
 #include <sys/time.h>
 #include <limits.h>
@@ -45,7 +44,7 @@
 #include "Lonestar/BoilerPlate.h"
 
 #ifdef GALOIS_EXP
-//#include "Galois/PriorityScheduling.h"
+#include "Galois/PriorityScheduling.h"
 #endif
 
 namespace cll = llvm::cl;
@@ -56,8 +55,8 @@ static const char* url = "delaunay_mesh_refinement";
 
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 
-typedef Galois::Graph::FirstGraph<Element,void,false>            Graph;
-typedef Galois::Graph::FirstGraph<Element,void,false>::GraphNode GNode;
+typedef Galois::Graph::FirstGraph<Element,void,false> Graph;
+typedef Graph::GraphNode GNode;
 
 #include "Subgraph.h"
 #include "Mesh.h"
@@ -80,25 +79,27 @@ struct process {
     
     //FAILSAFE POINT
 
-    for (Subgraph::iterator ii = cav.getPre().begin(),
+    for (PreGraph::iterator ii = cav.getPre().begin(),
 	   ee = cav.getPre().end(); ii != ee; ++ii) 
       mesh->removeNode(*ii, Galois::NONE);
     
     //add new data
-    for (Subgraph::iterator ii = cav.getPost().begin(),
+    for (PostGraph::iterator ii = cav.getPost().begin(),
 	   ee = cav.getPost().end(); ii != ee; ++ii) {
       GNode node = *ii;
-      Element& element = mesh->getData(node,Galois::NONE);
+      mesh->addNode(node, Galois::NONE);
+      Element& element = mesh->getData(node, Galois::NONE);
       if (element.isBad()) {
         lwl.push(node);
       }
     }
     
-    for (Subgraph::edge_iterator ii = cav.getPost().edge_begin(),
+    for (PostGraph::edge_iterator ii = cav.getPost().edge_begin(),
 	   ee = cav.getPost().edge_end(); ii != ee; ++ii) {
-      Subgraph::tmpEdge edge = *ii;
+      EdgeTuple edge = *ii;
       mesh->addEdge(edge.src, edge.dst, Galois::NONE);
     }
+
     if (mesh->containsNode(item)) {
       lwl.push(item);
     }
@@ -110,7 +111,6 @@ bool verify() {
   bool error = false;
   
   for (Graph::iterator ii = mesh->begin(), ee = mesh->end(); ii != ee; ++ii) {
-    
     GNode node = *ii;
     Element& element = mesh->getData(node,Galois::NONE);
     int nsize = std::distance(mesh->edge_begin(node, Galois::NONE), mesh->edge_end(node, Galois::NONE));
@@ -150,7 +150,6 @@ bool verify() {
 	assert(mesh->containsNode(mesh->getEdgeDst(ii)));
 	assert(node != mesh->getEdgeDst(ii));
 	++i;
-	//          if (!found.count(*ii))
 	remaining.push(mesh->getEdgeDst(ii));
       }
     }
@@ -223,18 +222,17 @@ int main(int argc, char** argv) {
   Galois::StatTimer T;
   T.start();
   using namespace GaloisRuntime::WorkList;
-  //#ifdef GALOIS_EXP
-#if 0
-  //Galois::for_each<Alt::ChunkedAdaptor<Alt::InitialQueue<Alt::LevelStealingAlt, Alt::LevelLocalAlt>, 256*4*4> >(wl.begin(), wl.end(), process());
+#ifdef GALOIS_EXP
   typedef dChunkedLIFO<256> dChunk;
   typedef ChunkedLIFO<256> Chunk;
-  Exp::WorklistExperiment<
-    LocalQueues<dChunk, LIFO<> >, 
-    dChunk,Chunk,Indexer,Less,Greater>().for_each(
-      std::cout, wl.begin(), wl.end(), process());
+//  Exp::WorklistExperiment<
+//    LocalQueues<dChunk, LIFO<> >, 
+//    dChunk,Chunk,Indexer,Less,Greater>().for_each(
+//      std::cout, wl.begin(), wl.end(), process());
+  //Galois::for_each<Deterministic<> >(wl.begin(), wl.end(), process());
+  Galois::for_each<LocalQueues<dChunkedLIFO<256>, ChunkedLIFO<256> > >(wl.begin(), wl.end(), process());
 #else
-  Galois::for_each<LocalQueues<dChunkedLIFO<256>, ChunkedLIFO<256> /*LIFO<>*/ > >(wl.begin(), wl.end(), process());
-  //Galois::for_each<OwnerComputesWL<Graph::OwnerFn, int> >(wl.begin(), wl.end(), process());
+  Galois::for_each<LocalQueues<dChunkedLIFO<256>, ChunkedLIFO<256> > >(wl.begin(), wl.end(), process());
 #endif
   T.stop();
   Touter.stop();

@@ -62,17 +62,17 @@ struct BipartiteGraph: public Galois::Graph::FirstGraph<NodeTy,EdgeTy,true> {
   NodeList A;
   NodeList B;
 
-  bool addNode(const typename Super::GraphNode& n, bool isA, Galois::MethodFlag mflag = Galois::ALL) {
+  void addNode(const typename Super::GraphNode& n, bool isA, Galois::MethodFlag mflag = Galois::ALL) {
     if (isA) {
       A.push_back(n);
     } else {
       B.push_back(n);
     }
-    return Super::addNode(n, mflag);
+    Super::addNode(n, mflag);
   }
 
-  bool addNode(const typename Super::GraphNode& n, Galois::MethodFlag mflag = Galois::ALL) {
-    return Super::addNode(n, mflag);
+  void addNode(const typename Super::GraphNode& n, Galois::MethodFlag mflag = Galois::ALL) {
+    Super::addNode(n, mflag);
   }
 };
 

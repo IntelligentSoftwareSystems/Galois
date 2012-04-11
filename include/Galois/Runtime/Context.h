@@ -42,14 +42,18 @@ public:
 class SimpleRuntimeContext {
   //! The locks we hold
   Lockable* locks;
-
+  unsigned long id;
 public:
-  SimpleRuntimeContext() :locks(0) {}
+  SimpleRuntimeContext() :locks(0), id(-1) {}
 
   void start_iteration() {
     assert(!locks);
   }
   
+  void setId(unsigned long i) {
+    id = i;
+  }
+
   unsigned cancel_iteration();
   unsigned commit_iteration();
   void acquire(Lockable* L);
@@ -63,11 +67,14 @@ void setThreadContext(SimpleRuntimeContext* n);
 
 //! used to release the conflict lock
 //! gcc exception handling can deadlock :(
-void clearConflictLock();
+static inline void clearConflictLock() {
+  // looks like this is fixed in current versions of gcc
+}
 
 //! Helper function to decide if the conflict detection lock should be taken
 static inline bool shouldLock(Galois::MethodFlag g) {
-  switch(g) {
+  // Mask out additional "optional" flags
+  switch (g & Galois::ALL) {
   case Galois::NONE:
   case Galois::SAVE_UNDO:
     return false;
@@ -87,6 +94,15 @@ static inline void acquire(Lockable* C, Galois::MethodFlag m) {
   if (shouldLock(m))
     doAcquire(C);
 }
+
+enum ConflictFlag {
+  CONFLICT = -1,
+  REACHED_FAILSAFE,
+};
+
+#ifdef GALOIS_DET
+void setPending(bool value);
+#endif
 
 }
 

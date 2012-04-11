@@ -279,6 +279,7 @@ static void makeGraph(const char* input) {
 //      Node n(nodeID);
       Node n;
       GNode node = graph.createNode(n);
+      graph.addNode(node);
       nodes[nodeID] = node;
       nodeID++;
    }

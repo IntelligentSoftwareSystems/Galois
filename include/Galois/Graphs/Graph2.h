@@ -60,12 +60,12 @@
 #ifndef GALOIS_FASTGRAPHS_GRAPH_H
 #define GALOIS_FASTGRAPHS_GRAPH_H
 
+#include <boost/functional.hpp>
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/iterator/filter_iterator.hpp>
-#include <boost/functional.hpp>
 
-#include "Galois/MethodFlags.h"
 #include "Galois/Runtime/Context.h"
+#include "Galois/Runtime/MethodFlags.h"
 #include "Galois/Runtime/InsBag.h"
 
 #include "llvm/ADT/SmallVector.h"
@@ -266,16 +266,22 @@ public:
   /**
    * Creates a new node holding the indicated data.
    */
-  GraphNode createNode(const NodeTy& n, Galois::MethodFlag mflag = ALL) {
-    gNode* N = &(nodes.push(gNode(n, GaloisRuntime::LL::getTID())));
-    N->active = true;
-    GaloisRuntime::acquire(N, mflag);
+  GraphNode createNode(const NodeTy& nd) {
+    gNode* N = &(nodes.push(gNode(nd, GaloisRuntime::LL::getTID())));
+    N->active = false;
     return GraphNode(N);
+  }
+
+  void addNode(const GraphNode& n, Galois::MethodFlag mflag = ALL) {
+    GaloisRuntime::checkWrite(mflag | Galois::WRITE);
+    GaloisRuntime::acquire(n, mflag);
+    n->active = true;
   }
 
   //! Gets the node data for a node.
   NodeTy& getData(const GraphNode& n, Galois::MethodFlag mflag = ALL) const {
     assert(n);
+    GaloisRuntime::checkWrite(mflag);
     GaloisRuntime::acquire(n, mflag);
     return n->data;
   }
@@ -294,6 +300,7 @@ public:
   //FIXME: handle edge memory
   void removeNode(GraphNode n, Galois::MethodFlag mflag = ALL) {
     assert(n);
+    GaloisRuntime::checkWrite(mflag | Galois::WRITE);
     GaloisRuntime::acquire(n, mflag);
     gNode* N = n;
     if (N->active) {
@@ -314,6 +321,7 @@ public:
   edge_iterator addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {
     assert(src);
     assert(dst);
+    GaloisRuntime::checkWrite(mflag | Galois::WRITE);
     GaloisRuntime::acquire(src, mflag);
     typename gNode::iterator ii = src->find(dst);
     if (ii == src->end()) {
@@ -332,6 +340,7 @@ public:
   //! Removes an edge from the graph
   void removeEdge(GraphNode src, edge_iterator dst, Galois::MethodFlag mflag = ALL) {
     assert(src);
+    GaloisRuntime::checkWrite(mflag | Galois::WRITE);
     GaloisRuntime::acquire(src, mflag);
     if (Directional) {
       src->eraseEdge(dst);
@@ -354,11 +363,15 @@ public:
   /**
    * Returns the edge data associated with the edge. It is an error to
    * get the edge data for a non-existent edge.  It is an error to get
-   * edge data for inactive edges.
+   * edge data for inactive edges. By default, the mflag is Galois::NONE
+   * because edge_begin() dominates this call and should perform the
+   * appropriate locking.
    */
-  edge_data_reference getEdgeData(edge_iterator dst) const {
-    assert(dst->first()->active);
-    return *dst->second();
+  edge_data_reference getEdgeData(edge_iterator ii, Galois::MethodFlag mflag = NONE) const {
+    assert(ii->first()->active);
+    GaloisRuntime::checkWrite(mflag);
+    GaloisRuntime::acquire(ii->first(), mflag);
+    return *ii->second();
   }
 
   GraphNode getEdgeDst(edge_iterator ii) {
