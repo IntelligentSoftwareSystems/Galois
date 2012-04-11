@@ -52,11 +52,11 @@ unsigned GaloisRuntime::SimpleRuntimeContext::commit_iteration() {
   unsigned numLocks = 0;
   while (locks) {
     //ORDER MATTERS!
-    //FIXME: compiler optimization barrier
     Lockable* L = locks;
     locks = L->next;
     L->next = 0;
-    __sync_synchronize();
+    //__sync_synchronize();
+    LL::compilerBarrier();
     L->Owner.unlock_and_clear();
 
     ++numLocks;
