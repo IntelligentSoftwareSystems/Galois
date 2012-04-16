@@ -28,4 +28,9 @@
 #include "Galois/Runtime/ll/TID.h"
 
 __thread unsigned GaloisRuntime::LL::TID = 0;
-unsigned GaloisRuntime::LL::nextID = 0;
+static unsigned nextID = 0;
+
+
+void GaloisRuntime::LL::initTID() {
+  TID = __sync_fetch_and_add(&::nextID, 1);
+}

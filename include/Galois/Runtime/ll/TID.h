@@ -43,9 +43,7 @@ static inline unsigned getTID() {
 
 //uninitialized TIDs are 0, and only thread 0 access TID before
 //initializing it
-static inline void initTID() {
-  TID = __sync_fetch_and_add(&nextID, 1);
-}
+void initTID();
 
 }
 }
