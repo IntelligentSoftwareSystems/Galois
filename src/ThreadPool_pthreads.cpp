@@ -120,8 +120,9 @@ class ThreadPool_pthread : public ThreadPool {
   volatile RunCommand* workEnd; //End iterator for work commands
 
   void initThread() {
-    int LocalThreadID = GaloisRuntime::LL::getTID();
-    GaloisRuntime::LL::bindThreadToProcessor(LocalThreadID);
+    //initialize TID
+    GaloisRuntime::LL::initTID();
+    GaloisRuntime::LL::bindThreadToProcessor(GaloisRuntime::LL::getTID());
   }
 
   void cascade(int tid) {
