@@ -37,6 +37,12 @@
 #include <cstdio>
 #include <cmath>
 
+// #include <boost/iostreams/filtering_streambuf.hpp>
+#include <boost/iostreams/filtering_stream.hpp>
+#include <boost/iostreams/copy.hpp>
+#include <boost/iostreams/filter/gzip.hpp>
+
+
 #include "FemapData.h"  
 
 class Femap {
@@ -110,7 +116,8 @@ class FemapInput : public Femap {
 
 
  private:
-  std::ifstream _ifs;
+  boost::iostreams::filtering_istream _ifs;
+  // std::ifstream _ifs;
 
   void _readHeader();
   void _readProperty();

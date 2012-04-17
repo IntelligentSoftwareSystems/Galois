@@ -295,7 +295,7 @@ public:
     process p( graph, inDegVec, meshInit, g, perIterLocalVec, perIterAddList, aviCmp, createSyncFiles, iter);
 
 
-    Galois::for_each(initWl.begin (), initWl.end (), p);
+    Galois::for_each<AVIWorkList> (initWl.begin (), initWl.end (), p);
 
     printf ("iterations = %d\n", iter.get ());
 

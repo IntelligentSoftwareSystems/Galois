@@ -8,8 +8,14 @@
 //   Searches for "-1" indicator, identifies following record,
 //   and calls appropriate function to deal with the record.
 //
-FemapInput::FemapInput(const char* fileName) : _ifs(fileName) 
-{
+FemapInput::FemapInput(const char* fileName) : _ifs() {
+
+  std::ifstream gzfile (fileName, std::ios_base::in | std::ios_base::binary);
+
+  _ifs.push (boost::iostreams::gzip_decompressor ());
+  _ifs.push (gzfile);
+
+
   if (_ifs) {
     std::cout << std::endl
 	 << "Femap Neutral file " << fileName << " is open for input."

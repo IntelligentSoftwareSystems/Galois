@@ -78,12 +78,23 @@ find_package(LAPACK)
 #CILK
 include(CheckCilk)
 
+# ZLIB
+find_package(ZLIB)
+
+if(ZLIB_FOUND)
+  include_directories(ZLIB_INCLUDE_DIRS)
+else()
+  message(WARNING "gzip libraries not found. Needed by AVI!")
+endif(ZLIB_FOUND)  
 #Boost
+#not needed now but will be needed for newer version of Boost after 1.4X ish
+set(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0" "1.47" "1.47.0")
 set(Boost_USE_MULTITHREADED OFF) # newer boost builds don't use -mt extension
 #Other options that can be used with find_package(Boost)
 # set(BOOST_ROOT /path/)
 # set(Boost_NO_SYSTEM_PATHS TRUE) # useful with BOOST_ROOT
-find_package(Boost 1.36.0 COMPONENTS REQUIRED)
+set(BOOST_LIBS system iostreams filesystem)
+find_package(Boost 1.36.0 COMPONENTS ${BOOST_LIBS} REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 set(RT_LINK ${Boost_LIBRARIES} ${RT_LINK})
 
@@ -140,6 +151,7 @@ if(USE_SOLARIS)
 endif()
 
 #Always include debug symbols
+# add_definitions("-g -fno-inline")
 add_definitions("-g")
 
 #Disable asserts
@@ -227,3 +239,4 @@ include(CPack)
 
 ###### Installation ######
 install(DIRECTORY include/ DESTINATION include PATTERN ".svn" EXCLUDE PATTERN ".in" EXCLUDE)
+

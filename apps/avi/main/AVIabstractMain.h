@@ -55,15 +55,10 @@
 
 namespace cll = llvm::cl;
 
-static const char* fileNameOpt = "-f";
-static const char* spDimOpt = "-d";
-static const char* ndivOpt = "-n";
-static const char* simEndTimeOpt = "-e";
-
-static cll::opt<std::string> _fileName("f", cll::desc("<input file>"), cll::Required);
-static cll::opt<int> _spDim("d", cll::desc("spDim"), cll::init(2));
-static cll::opt<int> _ndiv("n", cll::desc("ndiv"), cll::init(0));
-static cll::opt<double> _simEndTime("e", cll::desc("simEndTime"), cll::init(1.0));
+static cll::opt<std::string> fileNameOpt("f", cll::desc("<input mesh file>"), cll::Required);
+static cll::opt<int> spDimOpt("d", cll::desc("spatial dimensionality of the problem i.e. 2 for 2D, 3 for 3D"), cll::init(2));
+static cll::opt<int> ndivOpt("n", cll::desc("number of times the mesh should be subdivided"), cll::init(0));
+static cll::opt<double> simEndTimeOpt("e", cll::desc("simulation end time"), cll::init(1.0));
 
 
 static const char* name = "Asynchronous Variational Integrators";
@@ -92,8 +87,6 @@ private:
 
 private:
   static const std::string getUsage ();
-
-  static void printUsage ();
 
   static InputConfig readCmdLine ();
 
@@ -174,24 +167,11 @@ public:
   virtual void runLoop (MeshInit& meshInit, GlobalVec& g, bool createSyncFiles);
 };
 
-const std::string AVIabstractMain::getUsage () {
-  std::stringstream ss;
-  ss << fileNameOpt << " fileName.neu " << spDimOpt << " spDim " << ndivOpt << " ndiv " 
-    << simEndTimeOpt << " simEndTime" << std::endl;
-  return ss.str ();
-
-}
-
-void AVIabstractMain::printUsage () {
-  fprintf (stderr, "%s\n", getUsage ().c_str ());
-  abort ();
-}
-
 AVIabstractMain::InputConfig AVIabstractMain::readCmdLine () {
-  const char* fileName = _fileName.c_str();
-  int spDim = _spDim;
-  int ndiv = _ndiv;
-  double simEndTime = _simEndTime;
+  const char* fileName = fileNameOpt.c_str();
+  int spDim = spDimOpt;
+  int ndiv = ndivOpt;
+  double simEndTime = simEndTimeOpt;
   std::string wltype;
 
   return InputConfig (fileName, spDim, ndiv, simEndTime, "", wltype);
@@ -207,7 +187,9 @@ MeshInit* AVIabstractMain::initMesh (const AVIabstractMain::InputConfig& input) 
     meshInit = new TetMeshInit (input.simEndTime);
   }
   else {
-    printUsage ();
+    std::cerr << "ERROR: Wrong spatical dimensionality, run with -help" << std::endl;
+    std::cerr << spDimOpt.HelpStr << std::endl;
+    std::abort ();
   }
 
   // read in the mesh from file and setup the mesh, bc etc
