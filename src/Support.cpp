@@ -69,11 +69,15 @@ public:
   }
 
   void reportStatAvg(const char* text, double val, const char* loopname) {
+    lock.lock();
     distStats[std::make_pair(text,loopname)][gcounter].push(val);
+    lock.unlock();
   }
 
   void reportStatSum(const char* text, unsigned long val, const char* loopname) {
+    lock.lock();
     stats[std::make_pair(text,loopname)] += val;
+    lock.unlock();
   }
 
   void incIteration() {
