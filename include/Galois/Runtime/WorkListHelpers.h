@@ -47,8 +47,8 @@ class FixedSizeRing :private boost::noncopyable, private LL::PaddedLock<concurre
 
   char datac[sizeof(T[__chunksize + 1])] __attribute__ ((aligned (__alignof__(T))));
 
-  T* at(int i) {
-    assert((unsigned)i < (__chunksize + 1));
+  T* at(unsigned i) {
+    assert(i < (__chunksize + 1));
     T* s = reinterpret_cast<T*>(&datac[0]);
     return &s[i];
   }
@@ -304,3 +304,4 @@ struct DummyIndexer: public std::unary_function<const T&,unsigned> {
 
 
 #endif
+

@@ -68,7 +68,7 @@ public:
   };
 
   //! push a value onto the queue
-  void push(value_type val);
+  void push(const value_type& val);
 
   //! push a range onto the queue
   template<typename Iter>
@@ -106,7 +106,7 @@ public:
 
   typedef T value_type;
 
-  void push(value_type val) {
+  void push(const value_type& val) {
     lock();
     wl.push_back(val);
     unlock();
@@ -158,7 +158,7 @@ public:
 
   typedef T value_type;
 
-  void push(value_type val) {
+  void push(const value_type& val) {
     lock();
     wl.push_back(val);
     unlock();
@@ -277,7 +277,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     }
   }
 
-  void push(value_type val) {
+  void push(const value_type& val) {
     unsigned int index = I(val);
     perItem& p = current.get();
     //fastpath
@@ -376,7 +376,7 @@ public:
 
   LocalQueues() {}
 
-  void push(value_type val) {
+  void push(const value_type& val) {
     local.get().push(val);
   }
 
@@ -418,7 +418,7 @@ class LocalStealing : private boost::noncopyable {
   
   LocalStealing() {}
 
-  void push(value_type val) {
+  void push(const value_type& val) {
     local.get().push(val);
   }
 
@@ -460,7 +460,7 @@ class LevelStealing : private boost::noncopyable {
   
   LevelStealing() {}
 
-  void push(value_type val) {
+  void push(const value_type& val) {
     local.get().push(val);
   }
 
@@ -610,8 +610,8 @@ public:
   //     pushChunk(n.next);
   //   n.next = 0;
   // }
-
-  void push(value_type val)  {
+  
+  void push(const value_type& val)  {
     p& n = data.get();
     if (n.next && n.next->push_back(val))
       return;
@@ -709,7 +709,7 @@ public:
   };
 
   //! push a value onto the queue
-  void push(value_type val) {
+  void push(const value_type& val) {
     abort();
   }
 
@@ -795,7 +795,7 @@ public:
   };
 
   //! push a value onto the queue
-  void push(value_type val) {
+  void push(const value_type& val) {
     abort();
   }
 
@@ -888,7 +888,7 @@ public:
 
   typedef T value_type;
   
-  void push(value_type val)  {
+  void push(const value_type& val)  {
     unsigned int index = Fn(val);
     unsigned int mindex = Items.effectiveIDFor(index);
     //std::cerr << "[" << index << "," << index % active << "]\n";
@@ -959,7 +959,7 @@ class BulkSynchronous : private boost::noncopyable {
     barrier2.reinit(numActive);
   }
 
-  void push(value_type val) {
+  void push(const value_type& val) {
     TLD& tld = tlds.get();
     wls[(tld.round + 1) & 1].push(val);
   }
@@ -1021,3 +1021,4 @@ class Deterministic : private boost::noncopyable {
 }
 
 #endif
+
