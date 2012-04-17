@@ -47,6 +47,7 @@
 
 namespace GaloisRuntime {
 
+template <bool Enabled> 
 class LoopStatistics {
   unsigned long conflicts;
   unsigned long iterations;
@@ -66,6 +67,18 @@ public:
     reportStatAvg("IterationsThreadDistribution", iterations, loopname);
   }
 };
+
+
+template <>
+class LoopStatistics<false> {
+public:
+  inline void inc_iterations () const {}
+
+  inline void inc_conflicts () const {}
+
+  inline void report_stat (unsigned int tid, const char* loopname) const {}
+};
+
 
 template<class WorkListTy, class FunctionTy>
 class DoAllWork {
@@ -104,7 +117,7 @@ protected:
   struct ThreadLocalData {
     Galois::UserContext<value_type> facing;
     SimpleRuntimeContext cnx;
-    LoopStatistics stat;
+    LoopStatistics<ForeachTraits<FunctionTy>::NeedsStats> stat;
     TerminationDetection::TokenHolder* lterm;
   };
 
@@ -163,7 +176,7 @@ class ForEachWork: public ForEachWorkBase<T, FunctionTy> {
   typedef typename WorkListTy::template retype<value_type>::WL WLTy;
   typedef WorkList::LevelStealing<WorkList::FIFO<value_type>, value_type> AbortedList;
 
-  WLTy global_wl;
+  WLTy& global_wl;
   AbortedList aborted;
   LL::CacheLineStorage<volatile long> break_happened; //hit flag
   LL::CacheLineStorage<volatile long> abort_happened; //hit flag
@@ -280,6 +293,14 @@ public:
     break_happened.data = 0;
   }
 
+  template <typename WL>
+  ForEachWork (WL& _workList, FunctionTy& _func, const char* _loopname)
+  : Super (_func, _loopname), global_wl (_workList) {
+
+    abort_happened.data = 0;
+    break_happened.data = 0;
+  }
+
   template<typename Iter>
   bool AddInitialWork(Iter b, Iter e) {
     global_wl.push_initial(b,e);
@@ -331,9 +352,14 @@ void for_each_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
   const bool simple = 
     !ForeachTraits<FunctionTy>::NeedsAborts &&
     !ForeachTraits<FunctionTy>::NeedsBreak;
-  typedef ForEachWork<WLTy,T,FunctionTy,simple> WorkTy;
 
-  WorkTy W(f, loopname);
+  typedef typename WLTy::template retype<T>::WL ActWLTy;
+
+  typedef ForEachWork<ActWLTy,T,FunctionTy,simple> WorkTy;
+
+  ActWLTy wl;
+
+  WorkTy W(wl, f, loopname);
   FillWork<IterTy, WorkTy> fw2(b, e, W);
 
   RunCommand w[3];
@@ -374,6 +400,33 @@ void do_all_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
   inGaloisForEach = false;
 }
 
+template <typename WLTy, typename FunctionTy>
+void for_each_impl (WLTy& wl, FunctionTy func, const char* loopname) {
+  inGaloisForEach = true;
+
+  const bool simple = 
+    !ForeachTraits<FunctionTy>::NeedsAborts &&
+    !ForeachTraits<FunctionTy>::NeedsBreak;
+
+  ForEachWork<WLTy, typename WLTy::value_type, FunctionTy, simple> GW(wl, func, loopname);
+
+  RunCommand w[1];
+  w[0].work = Config::ref(GW);
+  w[0].isParallel = true;
+  w[0].barrierAfter = true;
+  w[0].profile = true;
+
+  // w[1].work = &runAllLoopExitHandlers;
+  // w[1].isParallel = false;
+  // w[1].barrierAfter = true;
+  // w[1].profile = true;
+
+  getSystemThreadPool().run(&w[0], &w[1]);
+
+  inGaloisForEach = true;
 }
 
+} // end namespace
+
 #endif
+
