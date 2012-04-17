@@ -29,7 +29,7 @@
 #include "Galois/Runtime/ParallelWorkInline.h"
 
 #ifdef GALOIS_EXP
-//#include "Galois/Runtime/ParaMeter.h"
+#include "Galois/Runtime/ParaMeter.h"
 #include "Galois/Runtime/SimpleTaskPool.h"
 #include "boost/iterator/counting_iterator.hpp"
 #endif
@@ -38,28 +38,70 @@
 
 namespace Galois {
 
+
+struct ForeachOpts {
+
+  //! which executor to use for for_each
+  enum ExecutorMode {
+    GALOIS, PARAMETER
+  };
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 // Foreach
 ////////////////////////////////////////////////////////////////////////////////
 
+
 //Iterator based versions
-template<typename WLTy, typename IterTy, typename Function>
+template<ForeachOpts::ExecutorMode mode_tp, typename WLTy, typename IterTy, typename Function>
 static inline void for_each(IterTy b, IterTy e, Function f, const char* loopname = 0) {
 #ifdef GALOIS_EXP
-#if 0
-  if (GaloisRuntime::useParaMeter) {
-    GaloisRuntime::ParaMeter::for_each_impl<aWLTy>(b, e, f, loopname);
+  if (mode_tp == ForeachOpts::PARAMETER) {
+    GaloisRuntime::ParaMeter::for_each_impl<WLTy>(b, e, f, loopname);
     return;
   }
-#endif
 #endif
   GaloisRuntime::for_each_impl<WLTy>(b, e, f, loopname);
 }
 
+
+#ifdef GALOIS_EXP 
+// some code duplication here. Can be removed if we use a certain C++11 feature, which
+// allows default values for function template parameters.
+
+template<ForeachOpts::ExecutorMode mode_tp, typename IterTy, typename Function>
+static inline void for_each(IterTy b, IterTy e, Function f, const char* loopname = 0) {
+  typedef GaloisRuntime::WorkList::dChunkedFIFO<256> WLTy;
+  for_each<mode_tp, WLTy, IterTy, Function>(b, e, f, loopname);
+}
+
+//Single initial item versions
+template<ForeachOpts::ExecutorMode mode_tp, typename WLTy, typename InitItemTy, typename Function>
+static inline void for_each(InitItemTy i, Function f, const char* loopname = 0) {
+  InitItemTy wl[1];
+  wl[0] = i;
+  for_each<mode_tp, WLTy>(&wl[0], &wl[1], f, loopname);
+}
+
+template<ForeachOpts::ExecutorMode mode_tp, typename InitItemTy, typename Function>
+static inline void for_each(InitItemTy i, Function f, const char* loopname = 0) {
+  typedef GaloisRuntime::WorkList::ChunkedFIFO<256> WLTy;
+  for_each<mode_tp, WLTy, InitItemTy, Function>(i, f, loopname);
+}
+
+#endif
+
+// versions that use GALOIS executor by default
+template<typename WLTy, typename IterTy, typename Function>
+static inline void for_each(IterTy b, IterTy e, Function f, const char* loopname = 0) {
+  for_each<ForeachOpts::GALOIS, WLTy, IterTy, Function>(b, e, f, loopname);
+}
+
+
 template<typename IterTy, typename Function>
 static inline void for_each(IterTy b, IterTy e, Function f, const char* loopname = 0) {
   typedef GaloisRuntime::WorkList::dChunkedFIFO<256> WLTy;
-  for_each<WLTy, IterTy, Function>(b, e, f, loopname);
+  for_each<ForeachOpts::GALOIS, WLTy, IterTy, Function>(b, e, f, loopname);
 }
 
 //Single initial item versions
@@ -67,13 +109,13 @@ template<typename WLTy, typename InitItemTy, typename Function>
 static inline void for_each(InitItemTy i, Function f, const char* loopname = 0) {
   InitItemTy wl[1];
   wl[0] = i;
-  for_each<WLTy>(&wl[0], &wl[1], f, loopname);
+  for_each<ForeachOpts::GALOIS, WLTy>(&wl[0], &wl[1], f, loopname);
 }
 
 template<typename InitItemTy, typename Function>
 static inline void for_each(InitItemTy i, Function f, const char* loopname = 0) {
   typedef GaloisRuntime::WorkList::ChunkedFIFO<256> WLTy;
-  for_each<WLTy, InitItemTy, Function>(i, f, loopname);
+  for_each<ForeachOpts::GALOIS, WLTy, InitItemTy, Function>(i, f, loopname);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -53,7 +53,9 @@
 
 namespace GaloisRuntime {
 
-__attribute__((weak)) llvm::cl::opt<bool> useParaMeter("p", llvm::cl::desc("Use ParaMeter to execute for_each loops"), llvm::cl::init(false));
+
+// __attribute__((weak)) llvm::cl::opt<bool> useParaMeter("p", llvm::cl::desc("Use ParaMeter to execute for_each loops"), llvm::cl::init(false));
+
 
 template <typename WorkListTy, typename FunctionTy>
 class ParaMeterExecutor;
@@ -85,46 +87,53 @@ private:
     size_t workListSize;
 
     void dump(FILE* out, const char* loopname) const {
-      if (out)
-        fprintf(out, "%s,%zu,%zu,%zu\n", loopname, step, availParallelism, workListSize);
+      if (out) {
+        fprintf(out, "%s, %zu, %zu, %zu\n", loopname, step, availParallelism, workListSize);
+      }
     }
   };
     
   static void printHeader(FILE* out) {
-    fprintf(out, "LOOPNAME, STEP, AVAIL_PARALLELISM, WORKLIST_SIZE\n");
+    fprintf(out, "LOOPNAME, STEP, PARALLELISM, WORKLIST_SIZE\n");
   }
 
-  static void genName(char* str, size_t size) {
-    time_t rawtime;
-    struct tm* timeinfo;
+  static const char* getStatsFileName();
 
-    time(&rawtime);
-    timeinfo = localtime(&rawtime);
-
-    strftime(str, size, "ParaMeter_Stats_%Y-%m-%d_%H:%M:%S.csv", timeinfo);
-  }
+  static void init ();
 
 public:
-  static const char* statsFilename();
 
   template <typename WLTy, typename IterTy, typename Func>
   static void for_each_impl(IterTy b, IterTy e, Func func, const char* loopname) {
+
     typedef typename WLTy::template retype<typename std::iterator_traits<IterTy>::value_type>::WL ActualWLTy;
 
-    //const size_t NAME_SIZE = 256;
-    //char name[NAME_SIZE];
-    //genName(name, NAME_SIZE);
-    const char* name = "parameter.csv";
-    FILE* out = fopen(name, "w");
-    if (out != NULL) {
-      printHeader(out);
-      fclose(out);
-    }
+    ParaMeter::init ();
+
+    FILE* statsFH = fopen (ParaMeter::getStatsFileName (), "a"); // open in append mode
     
-    ParaMeterExecutor<ActualWLTy, Func> executor(func, name, loopname);
+    ParaMeterExecutor<ActualWLTy, Func> executor(func, statsFH, loopname);
     executor.addInitialWork(b, e);
     executor.run();
+
+    fclose (statsFH);
+
   }
+
+  // TODO: need to empty the workList passed (i.e. the parameter wl)
+  template <typename WLTy, typename Func> 
+  static void for_each_impl (WLTy& wl, Func func, const char* loopname) {
+
+    ParaMeter::init ();
+
+    FILE* statsFH = fopen (ParaMeter::getStatsFileName (), "a"); // open in append mode
+    ParaMeterExecutor<WLTy, Func> executor (wl, func, statsFH, loopname);
+
+    executor.run ();
+
+    fclose (statsFH);
+  }
+
 };
 
 
@@ -139,6 +148,22 @@ private:
   struct IterationContext {
     UserContextTy facing;
     SimpleRuntimeContext cnx;
+
+    void resetUserCtx () {
+      
+      if (ForeachTraits<FunctionTy>::NeedsPIA) {
+        facing.__resetAlloc ();
+      }
+
+      if (ForeachTraits<FunctionTy>::NeedsPush) {
+        facing.__getPushBuffer ().clear ();
+      }
+
+      if (ForeachTraits<FunctionTy>::NeedsBreak) {
+        facing.__resetBreak ();
+      }
+
+    }
   };
 
   typedef std::deque<IterationContext*> IterQueue;
@@ -148,10 +173,20 @@ private:
     WorkListTy* next;
 
   public:
-    ParaMeterWorkList() {
-      curr = new WorkListTy();
-      next = new WorkListTy();
+
+    explicit ParaMeterWorkList (WorkListTy& wl) {
+      curr = new WorkListTy ();
+      next = new WorkListTy ();
+
+      // XXX: workList must be empty after for_each finishes
+      copyWL (wl);
     }
+
+    ParaMeterWorkList () {
+      curr = new WorkListTy ();
+      next = new WorkListTy ();
+    }
+
 
     ~ParaMeterWorkList() {
       delete curr;
@@ -173,13 +208,21 @@ private:
       curr = next;
       next = new WorkListTy();
     }
+
+  private:
+    void copyWL (WorkListTy& wl) {
+
+      for (boost::optional<value_type> item = wl.pop (); item; item = wl.pop ()) {
+        curr->push (*item);
+      }
+    }
   };
 
-  FunctionTy body;
-  const char* loopname;
-  FILE* pstatsFile;
-
   ParaMeterWorkList workList;
+  FunctionTy body;
+  FILE* pstatsFile;
+  const char* loopname;
+
 
   IterQueue commitQueue;
   // XXX: may turn out to be unnecessary
@@ -187,19 +230,25 @@ private:
 
 public:
 
-  ParaMeterExecutor(FunctionTy _body, const char* pstatsName, const char* _loopname):
-    body(_body), loopname(_loopname) {
-
-    pstatsFile = fopen(pstatsName, "a");
+  ParaMeterExecutor (FunctionTy _body, FILE* statsFH, const char* _loopname)
+  : workList (), body (_body), pstatsFile (statsFH), loopname (_loopname) {
 
     if (this->loopname == NULL) {
       this->loopname = "foreach";
     }
+    
   }
 
+  // TODO: combine with the constructor above, if this constructor persists
+  ParaMeterExecutor (WorkListTy& _wl, FunctionTy _body, FILE* statsFH, const char* _loopname)
+  : workList (_wl), body (_body), pstatsFile (statsFH), loopname (_loopname) {
+
+    if (this->loopname == NULL) {
+      this->loopname = "foreach";
+    }
+    
+  }
   ~ParaMeterExecutor() {
-    if (pstatsFile)
-      fclose(pstatsFile);
   }
 
   template <typename Iter>
@@ -209,6 +258,7 @@ public:
   }
 
   void run() {
+
     beginLoop();
 
     size_t currStep = 0;
@@ -251,13 +301,16 @@ public:
         bool doabort = false;
         try {
           body(*item, it.facing);
+
         } catch (int a) {
           doabort = true;
         }
 
         if (doabort) {
           abortIteration (it, *item);
+
         } else {
+
           if (ForeachTraits<FunctionTy>::NeedsBreak) {
             if (it.facing.__breakHappened()) {
               assert(0 && "ParaMeterExecutor: can't handle breaks yet");
@@ -279,7 +332,7 @@ public:
       size_t numActivities = commitQueue.size();
 
       if (numActivities == 0) {
-        assert(0 && "ParaMeterExecutor: no progress made in step");
+        std::cerr << "ParaMeterExecutor: no progress made in step=" << currStep << std::endl;
         abort();
       }
 
@@ -329,6 +382,7 @@ private:
   IterationContext& newIteration () const {
     IterationContext* it = new IterationContext();
     
+    it->resetUserCtx ();
     setThreadContext(&(it->cnx));
 
     return *it;
@@ -382,3 +436,4 @@ private:
 } // end namespace
 
 #endif // GALOIS_RUNTIME_PARAMETER_H_
+
