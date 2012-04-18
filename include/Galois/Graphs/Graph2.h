@@ -288,7 +288,7 @@ public:
 
   //! Checks if a node is in the graph
   bool containsNode(const GraphNode& n, Galois::MethodFlag mflag = ALL) const {
-    if (!n || !n->active) return false;
+    assert(n);
     GaloisRuntime::acquire(n, mflag);
     return n->active;
   }
