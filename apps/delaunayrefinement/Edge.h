@@ -55,11 +55,11 @@ public:
     return !(*this == rhs);
   }    
   bool operator<(const Edge& rhs) const {
-    return ((p[0] < rhs.p[0]) || ((p[0] == rhs.p[0]) && (p[1] < rhs.p[1])));
+    return (p[0] < rhs.p[0]) || ((p[0] == rhs.p[0]) && (p[1] < rhs.p[1]));
   }    
   
   bool operator>(const Edge& rhs) const {
-    return ((p[0] > rhs.p[0]) || ((p[0] == rhs.p[0]) && (p[1] > rhs.p[1])));
+    return (p[0] > rhs.p[0]) || ((p[0] == rhs.p[0]) && (p[1] > rhs.p[1]));
   }    
 
   Tuple getPoint(int i) const {

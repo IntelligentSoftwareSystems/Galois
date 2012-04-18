@@ -26,7 +26,6 @@
 #define _MESH_H_
 
 #include <vector>
-#include <set>
 #include <map>
 #include <stack>
 #include <cstdio>
@@ -39,9 +38,9 @@ struct is_bad {
   }
 };
 
-struct processCreate {
+struct CreateNodes {
   Graph* lmesh;
-  processCreate(Graph* _lmesh) :lmesh(_lmesh) {}
+  CreateNodes(Graph* _lmesh) :lmesh(_lmesh) {}
   void operator()(Element& item) {
     GNode n = lmesh->createNode(item);
     lmesh->addNode(n);
@@ -60,6 +59,7 @@ struct centerCmp {
  */
 class Mesh {
   std::vector<Element> elements;
+  size_t id;
 
 private:
   void checkResults(int act, int exp, std::string& str) {
@@ -106,7 +106,7 @@ private:
       assert(n1 >= 0 && n1 < tuples.size());
       assert(n2 >= 0 && n2 < tuples.size());
       assert(n3 >= 0 && n3 < tuples.size());
-      Element e(tuples[n1], tuples[n2], tuples[n3]);
+      Element e(tuples[n1], tuples[n2], tuples[n3], ++id);
       elements.push_back(e);
     }
     fclose(pFile);
@@ -129,7 +129,7 @@ private:
       checkResults(r, 3, filename);
       assert(n1 >= 0 && n1 < tuples.size());
       assert(n2 >= 0 && n2 < tuples.size());
-      Element e(tuples[n1], tuples[n2]);
+      Element e(tuples[n1], tuples[n2], ++id);
       elements.push_back(e);
     }
     fclose(pFile);
@@ -142,7 +142,7 @@ private:
       if (edge_map.find(edge) == edge_map.end()) {
         edge_map[edge] = node;
       } else {
-        mesh->addEdge(node, edge_map[edge], Galois::NONE);//, edge);
+        mesh->addEdge(node, edge_map[edge], Galois::NONE);
         edge_map.erase(edge);
       }
     }
@@ -150,7 +150,11 @@ private:
 
   void makeGraph(Graph* mesh) {
     std::sort(elements.begin(), elements.end(), centerCmp());
-    Galois::do_all(elements.begin(), elements.end(), processCreate(mesh));
+#ifdef GALOIS_DET
+    std::for_each(elements.begin(), elements.end(), CreateNodes(mesh));
+#else
+    Galois::do_all(elements.begin(), elements.end(), CreateNodes(mesh));
+#endif
     std::map<Edge, GNode> edge_map;
     for (Graph::iterator ii = mesh->begin(), ee = mesh->end();
 	 ii != ee; ++ii)
@@ -159,6 +163,8 @@ private:
 
   // .poly contains the perimeter of the mesh; edges basically, which is why it contains pairs of nodes
 public:
+  Mesh(): id(0) { }
+
   void read(Graph* mesh, std::string basename) {
     std::vector<Tuple> tuples;
     readNodes(basename, tuples);

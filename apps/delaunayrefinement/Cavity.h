@@ -46,28 +46,23 @@ class Cavity {
    */
   GNode getOpposite(GNode node) {
     assert(std::distance(graph->edge_begin(node), graph->edge_end(node)) == 3);
-    Element& element = graph->getData(node,Galois::ALL);
+    Element& element = graph->getData(node, Galois::ALL);
     Tuple elementTuple = element.getObtuse();
     Edge ObtuseEdge = element.getOppositeObtuse();
-    bool found = false;
-    GNode dst;
     for (Graph::edge_iterator ii = graph->edge_begin(node, Galois::ALL),
-        ee = graph->edge_end(node,Galois::ALL); ii != ee; ++ii) {
+        ee = graph->edge_end(node, Galois::ALL); ii != ee; ++ii) {
       GNode neighbor = graph->getEdgeDst(ii);
       //Edge& edgeData = graph->getEdgeData(node, neighbor);
-      Edge edgeData = element.getRelatedEdge(graph->getData(neighbor,Galois::ALL));
+      Edge edgeData = element.getRelatedEdge(graph->getData(neighbor, Galois::ALL));
       if (elementTuple != edgeData.getPoint(0) && elementTuple != edgeData.getPoint(1)) {
-	assert(!found);
-	dst = neighbor;
-        found = true;
+	return neighbor;
       }
     }
-    assert(found);
-    return dst;
+    abort();
   }
 
   void expand(GNode node, GNode next) {
-    Element& nextElement = graph->getData(next,Galois::ALL);
+    Element& nextElement = graph->getData(next, Galois::ALL);
     if ((!(dim == 2 && nextElement.getDim() == 2 && next != centerNode))
         && nextElement.inCircle(center)) {
       // isMember says next is part of the cavity, and we're not the second
@@ -93,7 +88,6 @@ class Cavity {
     }
   }
 
-
 public:
   Cavity(Graph* g, Galois::PerIterAllocTy& cnx)
     :frontier(cnx),
@@ -109,10 +103,10 @@ public:
     connections.clear();
     frontier.clear();
     centerNode = node;
-    centerElement = &graph->getData(centerNode,Galois::ALL);
-    while (graph->containsNode(centerNode) && centerElement->isObtuse()) {
+    centerElement = &graph->getData(centerNode, Galois::ALL);
+    while (graph->containsNode(centerNode, Galois::ALL) && centerElement->isObtuse()) {
       centerNode = getOpposite(centerNode);
-      centerElement = &graph->getData(centerNode,Galois::ALL);
+      centerElement = &graph->getData(centerNode, Galois::ALL);
     }
     center = centerElement->getCenter();
     dim = centerElement->getDim();

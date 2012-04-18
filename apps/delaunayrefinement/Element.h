@@ -34,16 +34,16 @@
 
 class Element {
   Tuple coords[3]; // The three endpoints of the triangle
-
   // if the triangle has an obtuse angle
   // obtuse - 1 is which one
   signed char obtuse;
   bool bDim; // true == 3, false == 2
 
- public:
+public:
+  int id;
 
- explicit Element(const Tuple& a, const Tuple& b, const Tuple& c)
-   :obtuse(0), bDim(true)
+ Element(const Tuple& a, const Tuple& b, const Tuple& c, int _id = 0)
+   :obtuse(0), bDim(true), id(_id) 
   { //constructor for Triangles
     coords[0] = a;
     coords[1] = b;
@@ -68,8 +68,7 @@ class Element {
     //computeCenter();
   }
   
-  explicit Element(const Tuple& a, const Tuple& b)
-    :obtuse(0), bDim(false)
+  Element(const Tuple& a, const Tuple& b, int _id = 0): obtuse(0), bDim(false),id(_id) 
   { //constructor for segments
     coords[0] = a;
     coords[1] = b;
@@ -79,10 +78,6 @@ class Element {
     }
     //computeCenter();
   }
-
-  // Tuple getCenter() const {
-  //   return coords[3];
-  // }
 
   Tuple getCenter() const {
     if (getDim() == 2) {

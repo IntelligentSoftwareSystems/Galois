@@ -43,9 +43,7 @@
 
 #include "Lonestar/BoilerPlate.h"
 
-#ifdef GALOIS_EXP
-#include "Galois/PriorityScheduling.h"
-#endif
+#include "Galois/Runtime/Deterministic.h"
 
 namespace cll = llvm::cl;
 
@@ -64,12 +62,12 @@ typedef Graph::GraphNode GNode;
 
 Graph* mesh;
 
-struct process {
+struct Process {
   typedef int tt_needs_per_iter_alloc;
 
   template<typename Context>
   void operator()(GNode item, Context& lwl) {
-    if (!mesh->containsNode(item))
+    if (!mesh->containsNode(item, Galois::ALL))
       return;
     
     Cavity cav(mesh, lwl.getPerIterAlloc());
@@ -100,7 +98,7 @@ struct process {
       mesh->addEdge(edge.src, edge.dst, Galois::NONE);
     }
 
-    if (mesh->containsNode(item)) {
+    if (mesh->containsNode(item, Galois::NONE)) {
       lwl.push(item);
     }
   }
@@ -167,7 +165,7 @@ bool verify() {
 
 GaloisRuntime::galois_insert_bag<GNode> wl;
 
-struct preprocess {
+struct Preprocess {
   void operator()(GNode item) const {
     if (mesh->getData(item, Galois::NONE).isBad())
       wl.push(item);
@@ -180,20 +178,13 @@ struct preprocess {
   }
 };
 
-
-struct Indexer: public std::unary_function<const GNode&,unsigned> {
-  unsigned operator()(const GNode& t) const { return 0; }
-};
-
-struct Less: public std::binary_function<const GNode&,const GNode&,bool>{
+struct LessThan {
   bool operator()(const GNode& a, const GNode& b) const {
-    return true;
-  }
-};
-
-struct Greater: public std::binary_function<const GNode&,const GNode&,bool> {
-  bool operator()(const GNode& a, const GNode& b) const {
-    return true;
+    int idA = mesh->getData(a, Galois::NONE).id;
+    int idB = mesh->getData(b, Galois::NONE).id;
+    if (idA == 0 || idB == 0)
+      abort();
+    return idA < idB;
   }
 };
 
@@ -216,23 +207,23 @@ int main(int argc, char** argv) {
   Galois::StatTimer Touter("outertime");
   Touter.start();
 
-  Galois::do_all(mesh->tile_begin(), mesh->tile_end(), preprocess());
+#ifdef GALOIS_DET
+  std::for_each(mesh->begin(), mesh->end(), Preprocess());
+  std::vector<GNode> wlnew;
+  std::copy(wl.begin(), wl.end(), std::back_inserter(wlnew));
+  std::sort(wlnew.begin(), wlnew.end(), LessThan());
+#else
+  Galois::do_all(mesh->tile_begin(), mesh->tile_end(), Preprocess());
+#endif
   std::cout << "MEMINFO MID: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
 
   Galois::StatTimer T;
   T.start();
   using namespace GaloisRuntime::WorkList;
-#ifdef GALOIS_EXP
-  typedef dChunkedLIFO<256> dChunk;
-  typedef ChunkedLIFO<256> Chunk;
-//  Exp::WorklistExperiment<
-//    LocalQueues<dChunk, LIFO<> >, 
-//    dChunk,Chunk,Indexer,Less,Greater>().for_each(
-//      std::cout, wl.begin(), wl.end(), process());
-  //Galois::for_each<Deterministic<> >(wl.begin(), wl.end(), process());
-  Galois::for_each<LocalQueues<dChunkedLIFO<256>, ChunkedLIFO<256> > >(wl.begin(), wl.end(), process());
+#ifdef GALOIS_DET
+  Galois::for_each<Deterministic<> >(wlnew.begin(), wlnew.end(), Process());
 #else
-  Galois::for_each<LocalQueues<dChunkedLIFO<256>, ChunkedLIFO<256> > >(wl.begin(), wl.end(), process());
+  Galois::for_each<LocalQueues<dChunkedLIFO<256>, ChunkedLIFO<256> > >(wl.begin(), wl.end(), Process());
 #endif
   T.stop();
   Touter.stop();
