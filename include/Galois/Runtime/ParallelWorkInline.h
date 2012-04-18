@@ -281,7 +281,7 @@ class ForEachWork<WorkList::BulkSynchronous<>,T,FunctionTy,true>: public ForEach
         value_type& p = cur->back(wid);
         function(p, tld.facing);
         
-        Super::incrementIterations(tld);
+        tld.incrementIterations();
 
         if (ForeachTraits<FunctionTy>::NeedsPush) {
           for (typename std::vector<value_type>::iterator ii = tld.facing.__getPushBuffer().begin(), 

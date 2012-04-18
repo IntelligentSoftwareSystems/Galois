@@ -93,23 +93,24 @@ protected:
     SimpleRuntimeContext cnx;
     LoopStatistics<ForeachTraits<FunctionTy>::NeedsStats> stat;
     TerminationDetection::TokenHolder* lterm;
+
+    void incrementConflicts() {
+      if (ForeachTraits<FunctionTy>::NeedsStats)
+	stat.inc_conflicts();
+    }
+
+    void incrementIterations() {
+      if (ForeachTraits<FunctionTy>::NeedsStats)
+	stat.inc_iterations();
+    }
+   
   };
 
   FunctionTy& function;
   const char* loopname;
-
-  PerCPU<ThreadLocalData> tdata;
   TerminationDetection term;
 
-  void incrementConflicts(ThreadLocalData& tld) {
-    if (ForeachTraits<FunctionTy>::NeedsStats)
-      tld.stat.inc_conflicts();
-  }
-
-  void incrementIterations(ThreadLocalData& tld) {
-    if (ForeachTraits<FunctionTy>::NeedsStats)
-      tld.stat.inc_iterations();
-  }
+  PerCPU<ThreadLocalData> tdata;
 
   ThreadLocalData& initWorker() {
     ThreadLocalData& tld = tdata.get();
@@ -177,7 +178,7 @@ class ForEachWork: public ForEachWorkBase<T, FunctionTy> {
 
     clearConflictLock();
     tld.cnx.cancel_iteration();
-    Super::incrementConflicts(tld);
+    tld.incrementConflicts();
     __sync_synchronize();
     aborted.push(val);
     __sync_synchronize();
@@ -200,7 +201,7 @@ class ForEachWork: public ForEachWorkBase<T, FunctionTy> {
   void doProcess(boost::optional<value_type> p, ThreadLocalData& tld) {
     try {
       do {
-        Super::incrementIterations(tld);
+        tld.incrementIterations();
         if (ForeachTraits<FunctionTy>::NeedsAborts)
           tld.cnx.start_iteration();
         Super::function(*p, tld.facing);
@@ -237,6 +238,7 @@ class ForEachWork: public ForEachWorkBase<T, FunctionTy> {
     ThreadLocalData& tld = Super::initWorker();
 #ifdef GALOIS_EXP
     SimpleTaskPool& pool = getSystemTaskPool();
+    pool.initializeThread();
 #endif
 
     do {
