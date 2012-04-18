@@ -36,6 +36,7 @@
 #include "Lonestar/BoilerPlate.h"
 #ifdef GALOIS_EXP
 #include "Galois/PriorityScheduling.h"
+#include "Galois/Queue.h"
 #endif
 
 #include <iostream>
@@ -49,18 +50,29 @@ static const char* desc =
   "graph using a modified Bellman-Ford algorithm\n";
 static const char* url = "single_source_shortest_path";
 
+enum SSSPAlgo {
+  serialStl,
+  serialPairing,
+  parallel
+};
+
 static cll::opt<unsigned int> startNode("startnode", cll::desc("Node to start search from"), cll::init(1));
 static cll::opt<unsigned int> reportNode("reportnode", cll::desc("Node to report distance to"), cll::init(2));
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<int> stepShift("delta", cll::desc("Shift value for the deltastep"), cll::init(10));
+static cll::opt<SSSPAlgo> algo("algo", cll::desc("Choose an algorithm:"),
+    cll::values(
+      clEnumVal(serialStl, "Serial using STL heap"),
+      clEnumVal(serialPairing, "Serial using pairing heap"),
+      clEnumVal(parallel, "Parallel"),
+      clEnumValEnd), cll::init(parallel));
 
 typedef Galois::Graph::LC_Linear_Graph<SNode, unsigned int> Graph;
 typedef Graph::GraphNode GNode;
 
 typedef UpdateRequestCommon<GNode> UpdateRequest;
 
-struct UpdateRequestIndexer
-  : std::unary_function<UpdateRequest, unsigned int> {
+struct UpdateRequestIndexer: public std::unary_function<UpdateRequest, unsigned int> {
   unsigned int operator() (const UpdateRequest& val) const {
     unsigned int t = val.w >> stepShift;
     return t;
@@ -69,50 +81,112 @@ struct UpdateRequestIndexer
 
 Graph graph;
 
-void runBody(const GNode src) {
-  std::set<UpdateRequest, std::less<UpdateRequest> > initial;
-  for (Graph::edge_iterator
-	 ii = graph.edge_begin(src, Galois::NONE), 
-	 ee = graph.edge_end(src, Galois::NONE); 
-       ii != ee; ++ii) {
-    GNode dst = graph.getEdgeDst(ii);
-    int w = graph.getEdgeData(ii);
-    UpdateRequest up(dst, w);
-    initial.insert(up);
-  }
+struct SerialStlAlgo {
+  std::string name() const { return "serial stl heap"; }
 
-  Galois::Statistic<unsigned int> counter("Iterations");
-  Galois::StatTimer T;
-  T.start();
-  
-  while (!initial.empty()) {
-    counter += 1;
-    UpdateRequest req = *initial.begin();
-    initial.erase(initial.begin());
-    SNode& data = graph.getData(req.n, Galois::NONE);
+  void operator()(const GNode src) const {
+    graph.getData(src, Galois::NONE).dist = 0;
 
-    if (req.w < data.dist) {
-      data.dist = req.w;
-      for (Graph::edge_iterator
-	     ii = graph.edge_begin(req.n, Galois::NONE), 
-	     ee = graph.edge_end(req.n, Galois::NONE);
-	   ii != ee; ++ii) {
-	GNode dst = graph.getEdgeDst(ii);
-	int d = graph.getEdgeData(ii);
-	unsigned int newDist = req.w + d;
-	if (newDist < graph.getData(dst,Galois::NONE).dist)
-	  initial.insert(UpdateRequest(dst, newDist));
+    std::set<UpdateRequest, std::less<UpdateRequest> > initial;
+    for (Graph::edge_iterator
+           ii = graph.edge_begin(src, Galois::NONE), 
+           ee = graph.edge_end(src, Galois::NONE); 
+         ii != ee; ++ii) {
+      GNode dst = graph.getEdgeDst(ii);
+      int w = graph.getEdgeData(ii);
+      UpdateRequest up(dst, w);
+      initial.insert(up);
+    }
+
+    Galois::Statistic<unsigned int> counter("Iterations");
+    
+    while (!initial.empty()) {
+      counter += 1;
+      UpdateRequest req = *initial.begin();
+      initial.erase(initial.begin());
+      SNode& data = graph.getData(req.n, Galois::NONE);
+
+      if (req.w < data.dist) {
+        data.dist = req.w;
+        for (Graph::edge_iterator
+               ii = graph.edge_begin(req.n, Galois::NONE), 
+               ee = graph.edge_end(req.n, Galois::NONE);
+             ii != ee; ++ii) {
+          GNode dst = graph.getEdgeDst(ii);
+          int d = graph.getEdgeData(ii);
+          unsigned int newDist = req.w + d;
+          if (newDist < graph.getData(dst,Galois::NONE).dist)
+            initial.insert(UpdateRequest(dst, newDist));
+        }
       }
     }
   }
-  T.stop();
-}
+};
+
+#ifdef GALOIS_EXP
+struct SerialPairingHeapAlgo {
+  std::string name() const { return "serial pairing heap"; }
+
+  void operator()(const GNode src) const {
+    graph.getData(src, Galois::NONE).dist = 0;
+
+    Galois::PairingHeap<UpdateRequest, std::less<UpdateRequest> > initial;
+    for (Graph::edge_iterator
+           ii = graph.edge_begin(src, Galois::NONE), 
+           ee = graph.edge_end(src, Galois::NONE); 
+         ii != ee; ++ii) {
+      GNode dst = graph.getEdgeDst(ii);
+      int w = graph.getEdgeData(ii);
+      UpdateRequest up(dst, w);
+      initial.add(up);
+    }
+
+    Galois::Statistic<unsigned int> counter("Iterations");
+    
+    boost::optional<UpdateRequest> req;
+
+    while ((req = initial.pollMin())) { 
+      counter += 1;
+      SNode& data = graph.getData(req->n, Galois::NONE);
+
+      if (req->w < data.dist) {
+        data.dist = req->w;
+        for (Graph::edge_iterator
+               ii = graph.edge_begin(req->n, Galois::NONE), 
+               ee = graph.edge_end(req->n, Galois::NONE);
+             ii != ee; ++ii) {
+          GNode dst = graph.getEdgeDst(ii);
+          int d = graph.getEdgeData(ii);
+          unsigned int newDist = req->w + d;
+          if (newDist < graph.getData(dst,Galois::NONE).dist)
+            initial.add(UpdateRequest(dst, newDist));
+        }
+      }
+    }
+  }
+};
+#endif
 
 //static Galois::Statistic<unsigned int>* BadWork;
 //static Galois::Statistic<unsigned int>* WLEmptyWork;
 
-struct process {
-  void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& lwl) {
+struct ParallelAlgo {
+  std::string name() const { return "parallel"; }
+
+  void operator()(const GNode src) const {
+    using namespace GaloisRuntime::WorkList;
+    typedef dChunkedLIFO<16> dChunk;
+    typedef ChunkedLIFO<16> Chunk;
+    typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
+
+    std::cout << "Using delta-step of " << (1 << stepShift) << "\n";
+    std::cout << "WARNING: Performance varies considerably due to -delta.  Do not expect the default to be good for your graph\n";
+
+    UpdateRequest one[1] = { UpdateRequest(src, 0) };
+    Galois::for_each<OBIM>(&one[0], &one[1], *this);
+  }
+
+  void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& lwl) const {
     SNode& data = graph.getData(req.n,Galois::NONE);
     // if (req.w >= data.dist)
     //   *WLEmptyWork += 1;
@@ -135,27 +209,6 @@ struct process {
     }
   }
 };
-
-void runBodyParallel(const GNode src) {
-  using namespace GaloisRuntime::WorkList;
-  typedef dChunkedLIFO<16> dChunk;
-  typedef ChunkedLIFO<16> Chunk;
-  typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
-
-  Galois::StatTimer T("Time");
-
-  UpdateRequest one[1] = { UpdateRequest(src, 0) };
-  T.start();
-  //#ifdef GALOIS_EXP
-#if 0
-    Exp::WorklistExperiment<OBIM,dChunk,Chunk,UpdateRequestIndexer,
-      std::less<UpdateRequest>,std::greater<UpdateRequest> >().for_each(
-        std::cout, &one[0], &one[1], process());
-#else
-  Galois::for_each<OBIM>(&one[0], &one[1], process());
-#endif
-  T.stop();
-}
 
 
 bool verify(GNode source) {
@@ -191,26 +244,14 @@ bool verify(GNode source) {
   return true;
 }
 
-int main(int argc, char **argv) {
-  LonestarStart(argc, argv, std::cout, name, desc, url);
-
-  // Galois::Statistic<unsigned int> sBadWork("BadWork");
-  // Galois::Statistic<unsigned int> sWLEmptyWork("WLEmptyWork");
-  // BadWork = &sBadWork;
-  // WLEmptyWork = &sWLEmptyWork;
-
+void initGraph(GNode& source, GNode& report) {
   graph.structureFromFile(filename);
-
-  std::cout << "Read " << graph.size() << " nodes\n";
-  std::cout << "Using delta-step of " << (1 << stepShift) << "\n";
-  
-  std::cout << "WARNING: Performance varies considerably due to -delta.  Do not expect the default to be good for your graph\n";
 
   unsigned int id = 0;
   bool foundReport = false;
   bool foundSource = false;
-  GNode source = *graph.begin();
-  GNode report = *graph.begin();
+  source = *graph.begin();
+  report = *graph.begin();
   for (Graph::iterator src = graph.begin(), ee =
       graph.end(); src != ee; ++src) {
     SNode& node = graph.getData(*src,Galois::NONE);
@@ -225,22 +266,41 @@ int main(int argc, char **argv) {
       report = *src;
     }
   }
+
   if (!foundReport) {
     std::cerr << "Failed to set report (" << reportNode << ").\n";
-    assert(0);
-    abort();
-  }
-  if (!foundSource) {
-    std::cerr << "Failed to set source (" << startNode << ".\n";
-    assert(0);
     abort();
   }
 
-  if (numThreads) {
-    runBodyParallel(source);
-  } else {
-    std::cout << "Running Sequentially\n";
-    runBody(source);
+  if (!foundSource) {
+    std::cerr << "Failed to set source (" << startNode << ").\n";
+    abort();
+  }
+}
+
+template<typename AlgoTy>
+void run(const AlgoTy& algo, GNode source) {
+  Galois::StatTimer T;
+  std::cout << "Running " << algo.name() << " version\n";
+  T.start();
+  algo(source);
+  T.stop();
+}
+
+int main(int argc, char **argv) {
+  LonestarStart(argc, argv, std::cout, name, desc, url);
+
+  GNode source, report;
+  initGraph(source, report);
+  std::cout << "Read " << graph.size() << " nodes\n";
+
+  switch (algo) {
+    case serialStl: run(SerialStlAlgo(), source); break;
+#ifdef GALOIS_EXP
+    case serialPairing: run(SerialPairingHeapAlgo(), source); break;
+#endif
+    case parallel: run(ParallelAlgo(), source); break;
+    default: std::cerr << "Unknown algorithm" << algo << "\n"; abort();
   }
 
   std::cout << graph.getData(report,Galois::NONE).toString() << "\n";

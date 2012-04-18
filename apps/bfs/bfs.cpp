@@ -44,8 +44,6 @@
 #include <iostream>
 #include <deque>
 
-//#include "X.h" // XXX
-
 static const char* name = "Breadth-first Search Example";
 static const char* desc =
   "Computes the shortest path from a source node to all nodes in a directed "
@@ -97,7 +95,7 @@ static cll::opt<BFSAlgo> algo(cll::desc("Choose an algorithm:"),
       clEnumVal(parallelBarrierCas, "Galois optimized with workset and barrier but using CAS"),
       clEnumVal(parallelBarrier, "Galois optimized with workset and barrier"),
       clEnumVal(parallelBarrierInline, "Galois optimized with inlined workset and barrier"),
-      clEnumValEnd), cll::init(serial));
+      clEnumValEnd), cll::init(parallelBarrierInline));
 static cll::opt<std::string> filename(cll::Positional,
     cll::desc("<input file>"),
     cll::Required);
@@ -735,7 +733,7 @@ struct SerialSchardl {
     Dist* distances = new Dist[nNodes];
 
     Galois::StatTimer T;
-    std::cerr << "Running " << name() << " version\n";
+    std::cout << "Running " << name() << " version\n";
     T.start();
     bfs(startNode, distances);
     T.stop();
@@ -791,7 +789,7 @@ void run(const AlgoTy& algo) {
 
   //Galois::preAlloc(graph.size() / GaloisRuntime::MM::pageSize * numThreads);
   Galois::StatTimer T;
-  std::cerr << "Running " << algo.name() << " version\n";
+  std::cout << "Running " << algo.name() << " version\n";
   T.start();
   algo(source);
   T.stop();
