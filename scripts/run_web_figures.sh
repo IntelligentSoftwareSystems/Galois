@@ -41,7 +41,7 @@ run() {
 
 mkdir -p "$RESULTDIR"
 
-run apps/avi/AVIunordered -noverify -d 2 -n 1 -e 0.1 -f "$BASEINPUT/avi/10x10_42k.NEU"
+run apps/avi/AVIunordered -noverify -d 2 -n 1 -e 0.1 -f "$BASEINPUT/avi/10x10_42k.NEU.gz"
 run apps/clustering/clustering -numPoints 10000
 run apps/barneshut/barneshut -noverify -n 50000 -steps 1 -seed 0
 run apps/betweennesscentrality/betweennesscentrality "$BASEINPUT/scalefree/rmat8-2e14.gr"

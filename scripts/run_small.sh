@@ -28,7 +28,7 @@ run() {
   fi
 }
 
-run apps/avi/AVIunordered -t 2 -n 0 -d 2 -f ${BASE}/inputs/avi/squareCoarse.NEU
+run apps/avi/AVIunordered -t 2 -n 0 -d 2 -f ${BASE}/inputs/avi/squareCoarse.NEU.gz
 run apps/barneshut/barneshut -t 2 -n 1000 -steps 1 -seed 0
 run apps/betweennesscentrality/betweennesscentrality -t 2 ${BASE}/inputs/structured/torus5.gr
 run apps/boruvka/boruvka -t 2 ${BASE}/inputs/structured/rome99.gr
