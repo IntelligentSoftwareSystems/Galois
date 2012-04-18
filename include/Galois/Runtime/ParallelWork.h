@@ -45,6 +45,10 @@
 
 #include <algorithm>
 
+//Import DoAll here.
+//FIXME: revisit include location
+#include "ParallelWork_DoAll.h"
+
 namespace GaloisRuntime {
 
 template <bool Enabled> 
@@ -77,37 +81,6 @@ public:
   inline void inc_conflicts () const {}
 
   inline void report_stat (unsigned int tid, const char* loopname) const {}
-};
-
-
-template<class WorkListTy, class FunctionTy>
-class DoAllWork {
-  typedef typename WorkListTy::value_type value_type;
-
-  WorkListTy global_wl;
-  FunctionTy& fn;
-
-public:
-  DoAllWork(FunctionTy& f): fn(f) { }
-
-  template<typename Iter>
-  void AddInitialWork(Iter b, Iter e) {
-    global_wl.initializeThread();
-    if (b != e)
-      global_wl.push_initial(b,e);
-  }
-
-  void operator()() {
-    boost::optional<value_type> p = global_wl.pop();
-    while (p) {
-      fn(*p);
-      p = global_wl.pop();
-    }
-#ifdef GALOIS_EXP
-    SimpleTaskPool& pool = getSystemTaskPool();
-    pool.work();
-#endif
-  }
 };
 
 template<class T, class FunctionTy>
@@ -198,6 +171,7 @@ class ForEachWork: public ForEachWorkBase<T, FunctionTy> {
       tld.cnx.commit_iteration();
   }
 
+  GALOIS_ATTRIBUTE_NOINLINE
   void abortIteration(value_type val, ThreadLocalData& tld) {
     assert(ForeachTraits<FunctionTy>::NeedsAborts);
 
@@ -375,26 +349,6 @@ void for_each_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
   w[2].barrierAfter = true;
   w[2].profile = true;
   getSystemThreadPool().run(&w[0], &w[3]);
-
-  inGaloisForEach = false;
-}
-
-template<typename WLTy, typename IterTy, typename FunctionTy>
-void do_all_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
-  assert(!inGaloisForEach);
-
-  inGaloisForEach = true;
-
-  DoAllWork<WLTy, FunctionTy> W(f);
-
-  W.AddInitialWork(b, e);
-
-  RunCommand w[1];
-  w[0].work = Config::ref(W);
-  w[0].isParallel = true;
-  w[0].barrierAfter = true;
-  w[0].profile = false;
-  getSystemThreadPool().run(&w[0], &w[1]);
 
   inGaloisForEach = false;
 }
