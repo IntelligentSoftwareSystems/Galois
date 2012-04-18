@@ -23,7 +23,7 @@
 #ifndef GALOIS_RUNTIME_WORKLIST_H
 #define GALOIS_RUNTIME_WORKLIST_H
 
-#include "Galois/Runtime/PerCPU.h"
+#include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/Threads.h"
 #include "Galois/Runtime/WorkListHelpers.h"
@@ -78,6 +78,15 @@ public:
   template<typename Iter>
   void push_initial(Iter b, Iter e);
 
+  //Optional, but this is the likely interface for stealing
+  //! steal from a similar worklist
+  void steal(AbstractWorkList& victim);
+  
+  //! initializes per-thread data structures for the current thread
+  //! this must be called on each active thread before the worklist is
+  //! used
+  void initializeThread();
+
   //! pop a value from the queue.
   boost::optional<value_type> pop();
 };
@@ -104,6 +113,8 @@ public:
     typedef LIFO<Tnew, concurrent> WL;
   };
 
+  void initializeThread() {}
+
   typedef T value_type;
 
   void push(const value_type& val) {
@@ -115,14 +126,23 @@ public:
   template<typename Iter>
   void push(Iter b, Iter e) {
     lock();
-    while (b != e)
-      wl.push_back(*b++);
+    wl.insert(wl.end(),b,e);
     unlock();
   }
 
   template<typename Iter>
   void push_initial(Iter b, Iter e) {
     push(b,e);
+  }
+
+  void steal(LIFO& victim) {
+    if (&victim == this) return;
+    if (!LL::TryLockPairOrdered(*this, victim))
+      return;
+    typename std::deque<T>::iterator split = Galois::split_range(victim.wl.begin(), victim.wl.end());
+    wl.insert(wl.end(), victim.wl.begin(), split);
+    victim.wl.erase(victim.wl.begin(), split);
+    UnLockPairOrdered(*this, victim);
   }
 
   boost::optional<value_type> pop()  {
@@ -156,6 +176,8 @@ public:
     typedef FIFO<Tnew, concurrent> WL;
   };
 
+  void initializeThread() {}
+
   typedef T value_type;
 
   void push(const value_type& val) {
@@ -167,14 +189,22 @@ public:
   template<typename Iter>
   void push(Iter b, Iter e) {
     lock();
-    while (b != e)
-      wl.push_back(*b++);
+    wl.insert(wl.end(),b,e);
     unlock();
   }
 
   template<typename Iter>
   void push_initial(Iter b, Iter e) {
     push(b,e);
+  }
+
+  void steal(FIFO& victim) {
+    if (!LL::TryLockPairOrdered(*this, victim))
+      return;
+    typename std::deque<T>::iterator split = Galois::split_range(victim.wl.begin(), wl.victim.end());
+    wl.insert(wl.end(), victim.wl.begin(), split);
+    victim.wl.erase(victim.wl.begin(), split);
+    UnLockPairOrdered(*this, victim);
   }
 
   boost::optional<value_type> pop() {
@@ -190,7 +220,6 @@ public:
 };
 WLCOMPILECHECK(FIFO);
 
-//#define ASDF 1
 template<class Indexer = DummyIndexer<int>, typename ContainerTy = FIFO<>, typename T = int, bool concurrent = true >
 class OrderedByIntegerMetric : private boost::noncopyable {
 
@@ -200,10 +229,8 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     CTy* current;
     unsigned int curVersion;
     unsigned int lastMasterVersion;
+    unsigned int scanStart;
     std::map<unsigned int, CTy*> local;
-#if ASDF
-    std::map<unsigned int, bool> cache;
-#endif
   };
 
   std::vector<std::pair<unsigned int, CTy*> > masterLog;
@@ -212,17 +239,15 @@ class OrderedByIntegerMetric : private boost::noncopyable {
 
   Indexer I;
 
-  PerCPU<perItem> current;
+  PerThreadStorage<perItem> current;
 
   void updateLocal_i(perItem& p) {
     //ASSERT masterLock
     for (; p.lastMasterVersion < masterVersion; ++p.lastMasterVersion) {
       std::pair<unsigned int, CTy*> logEntry = masterLog[p.lastMasterVersion];
       p.local[logEntry.first] = logEntry.second;
+      logEntry.second->initializeThread();
       assert(logEntry.second);
-#if ASDF
-      p.cache[logEntry.first] = true;
-#endif
     }
   }
 
@@ -243,7 +268,8 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     updateLocal_i(p);
     if (!lC) {
       lC = new CTy();
-      ++masterVersion;
+      lC->initializeThread();
+      p.lastMasterVersion = ++masterVersion;
       masterLog.push_back(std::make_pair(i, lC));
     }
     masterLock.unlock();
@@ -264,12 +290,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
 
   OrderedByIntegerMetric(const Indexer& x = Indexer())
     :masterVersion(0), I(x)
-  {
-    for (unsigned int i = 0; i < current.size(); ++i) {
-      current.get(i).current = NULL;
-      current.get(i).lastMasterVersion = 0;
-    }
-  }
+  { }
 
   ~OrderedByIntegerMetric() {
     for (typename std::vector<std::pair<unsigned int, CTy*> >::iterator ii = masterLog.begin(), ee = masterLog.end(); ii != ee; ++ii) {
@@ -277,24 +298,32 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     }
   }
 
+  void initializeThread() {
+    perItem* p = new perItem();
+    p->current = NULL;
+    p->lastMasterVersion = 0;
+    p->scanStart = 0;
+    current.setLocal(p);
+  }
+
   void push(const value_type& val) {
     unsigned int index = I(val);
-    perItem& p = current.get();
+    perItem& p = *current.getLocal();
     //fastpath
     if (index == p.curVersion && p.current) {
       p.current->push(val);
       return;
     }
+
     //slow path
     CTy* lC = updateLocalOrCreate(p, index);
+    if (index < p.scanStart)
+      p.scanStart = index;
     //opportunistically move to higher priority work
-#if ASDF
     if (index < p.curVersion) {
       p.curVersion = index;
       p.current = lC;
     }
-    p.cache[index] = true;
-#endif
     lC->push(val);
   }
 
@@ -311,44 +340,34 @@ class OrderedByIntegerMetric : private boost::noncopyable {
 
   boost::optional<value_type> pop() {
     //Find a successful pop
-    perItem& p = current.get();
+    perItem& p = *current.getLocal();
     CTy*& C = p.current;
     boost::optional<value_type> retval;
     if (C && (retval = C->pop()))
       return retval;
     //Failed, find minimum bin
-#if ASDF
-    {
-      //ltbb-style
-      typename std::map<unsigned int, bool>::iterator ii = p.cache.begin(), ee = p.cache.end(), old;
-      while (ii != ee) {
-        p.curVersion = ii->first;
-        C = p.local[ii->first];
-        // why can C be null?
-        if (C && (retval = C->pop()).first) {
-          return retval;
-        }
-        old = ii;
-        ++ii;
-        p.cache.erase(old);
-      }
-    }
-#endif
-
     updateLocal(p);
-    for (typename std::map<unsigned int, CTy*>::iterator ii = p.local.begin(),
-        ee = p.local.end(); ii != ee; ++ii) {
-      p.curVersion = ii->first;
-      C = ii->second;
-      if ((retval = C->pop())) {
-#if ASDF
-        p.cache[ii->first] = true;
+    unsigned myID = LL::getTID();
+    bool localLeader = LL::isLeaderForPackage(myID);
+
+#if 1
+    unsigned msS = 0;
+#else
+    unsigned msS = p.scanStart;
+    if (localLeader)
+      for (int i = 0; i < ThreadPool::getActiveThreads(); ++i)
+	msS = std::min(msS, current.getRemote(i)->scanStart);
+    else
+      msS = std::min(msS, current.getRemote(LL::getLeaderForPackage(myID))->scanStart);
 #endif
+    typename std::map<unsigned int, CTy*>::iterator ii = p.local.lower_bound(msS);
+    for (typename std::map<unsigned int, CTy*>::iterator ee = p.local.end();
+	 ii != ee; ++ii) {
+      if ((retval = ii->second->pop())) {
+	C = ii->second;
+	p.curVersion = ii->first;
+	p.scanStart = ii->first;
 	return retval;
-      } else {
-#if ASDF
-        p.cache.erase(ii->first);
-#endif
       }
     }
     return boost::optional<value_type>();
@@ -358,8 +377,8 @@ WLCOMPILECHECK(OrderedByIntegerMetric);
 
 template<typename GlobalQueueTy = FIFO<>, typename LocalQueueTy = FIFO<>, typename T = int >
 class LocalQueues : private boost::noncopyable {
-
-  PerCPU<typename LocalQueueTy::template rethread<false>::WL> local;
+  typedef typename LocalQueueTy::template rethread<false>::WL lWLTy;
+  PerThreadStorage<lWLTy> local;
   GlobalQueueTy global;
 
 public:
@@ -372,17 +391,21 @@ public:
     typedef LocalQueues<typename GlobalQueueTy::template retype<Tnew>::WL, typename LocalQueueTy::template retype<Tnew>::WL, Tnew> WL;
   };
 
+  void initializeThread() {
+    local.setLocal(new lWLTy());
+    local.getLocal()->initializeThread();
+    global.initializeThread();
+  }
+
   typedef T value_type;
 
-  LocalQueues() {}
-
   void push(const value_type& val) {
-    local.get().push(val);
+    local.getLocal()->push(val);
   }
 
   template<typename Iter>
   void push(Iter b, Iter e) {
-    local.get().push(b,e);
+    local.getLocal()->push(b,e);
   }
 
   template<typename Iter>
@@ -391,109 +414,13 @@ public:
   }
 
   boost::optional<value_type> pop() {
-    boost::optional<value_type> ret = local.get().pop();
+    boost::optional<value_type> ret = local.getLocal()->pop();
     if (ret)
       return ret;
     return global.pop();
   }
 };
 WLCOMPILECHECK(LocalQueues);
-
-template<typename ContainerTy = FIFO<>, typename T = int >
-class LocalStealing : private boost::noncopyable {
-
-  PerCPU<typename ContainerTy::template rethread<true>::WL> local;
-
- public:
-  template<bool newconcurrent>
-  struct rethread {
-    typedef LocalStealing<ContainerTy, T> WL;
-  };
-  template<typename Tnew>
-  struct retype {
-    typedef LocalStealing<typename ContainerTy::template retype<Tnew>::WL, Tnew> WL;
-  };
-
-  typedef T value_type;
-  
-  LocalStealing() {}
-
-  void push(const value_type& val) {
-    local.get().push(val);
-  }
-
-  template<typename Iter>
-  void push(Iter b, Iter e) {
-    local.get().push(b,e);
-  }
-
-  template<typename Iter>
-  void push_initial(Iter b, Iter e) {
-    local.get().push_initial(b,e);
-  }
-
-  boost::optional<value_type> pop() {
-    boost::optional<value_type> ret = local.get().pop();
-    if (ret)
-      return ret;
-    return local.getNext(ThreadPool::getActiveThreads()).pop();
-  }
-};
-WLCOMPILECHECK(LocalStealing);
-
-template<typename ContainerTy = FIFO<>, typename T = int >
-class LevelStealing : private boost::noncopyable {
-
-  PerLevel<typename ContainerTy::template rethread<true>::WL> local;
-
- public:
-  template<bool newconcurrent>
-  struct rethread {
-    typedef LevelStealing<ContainerTy, T> WL;
-  };
-  template<typename Tnew>
-  struct retype {
-    typedef LevelStealing<typename ContainerTy::template retype<Tnew>::WL, Tnew> WL;
-  };
-
-  typedef T value_type;
-  
-  LevelStealing() {}
-
-  void push(const value_type& val) {
-    local.get().push(val);
-  }
-
-  template<typename Iter>
-  void push(Iter b, Iter e) {
-    local.get().push(b,e);
-  }
-
-  template<typename Iter>
-  void push_initial(Iter b, Iter e) {
-    local.get().push_initial(b,e);
-  }
-
-  boost::optional<value_type> pop() {
-    boost::optional<value_type> ret = local.get().pop();
-    if (ret)
-      return ret;
-
-    int mp = LL::getMaxPackageForThread(ThreadPool::getActiveThreads() - 1);
-    int id = local.myEffectiveID();
-    for (unsigned i = 0; i < local.size(); ++i) {
-      ++id;
-      id %= local.size();
-      if (id <= mp) {
-	ret = local.get(id).pop();
-	if (ret)
-	  return ret;
-      }
-    }
-    return ret;
-  }
-};
-WLCOMPILECHECK(LevelStealing);
 
 //This overly complex specialization avoids a pointer indirection for non-distributed WL when accessing PerLevel
 template<bool d, typename TQ>
@@ -530,7 +457,7 @@ class ChunkedMaster : private boost::noncopyable {
 
   typedef QT<Chunk, concurrent> LevelItem;
 
-  PerCPU<p> data;
+  PerThreadStorage<p> data;
   squeues<distributed, LevelItem> Q;
 
   Chunk* mkChunk() {
@@ -596,23 +523,22 @@ public:
     typedef ChunkedMaster<Tnew, QT, distributed, isStack, chunksize, concurrent> WL;
   };
 
-  ChunkedMaster() : heap(sizeof(Chunk)) {
-    for (unsigned int i = 0; i < data.size(); ++i) {
-      p& r = data.get(i);
-      r.cur = 0;
-      r.next = 0;
-    }
+  ChunkedMaster() : heap(sizeof(Chunk)) { }
+
+  void initializeThread() {
+    assert(!data.getLocal());
+    data.setLocal(new p());
   }
 
-  // void flush() {
-  //   p& n = data.get();
-  //   if (n.next)
-  //     pushChunk(n.next);
-  //   n.next = 0;
-  // }
+  void flush() {
+    p& n = data.get();
+    if (n.next)
+      pushChunk(n.next);
+    n.next = 0;
+  }
   
   void push(const value_type& val)  {
-    p& n = data.get();
+    p& n = *data.getLocal();
     if (n.next && n.next->push_back(val))
       return;
     if (n.next)
@@ -634,7 +560,7 @@ public:
   }
 
   boost::optional<value_type> pop()  {
-    p& n = data.get();
+    p& n = *data.getLocal();
     boost::optional<value_type> retval;
     if (isStack) {
       if (n.next && (retval = n.next->pop_back()))
@@ -686,9 +612,10 @@ class ForwardAccessRange {
     IterTy begin;
     IterTy end;
     bool init;
+    TLD() :init(false) {}
   };
 
-  PerCPU<TLD> tlds;
+  PerThreadStorage<TLD> tlds;
   unsigned num;
   IterTy gbegin;
   IterTy gend;
@@ -708,6 +635,12 @@ public:
     typedef ForwardAccessRange<IterTy> WL;
   };
 
+  ForwardAccessRange() :num(ThreadPool::getActiveThreads()) {}
+
+  void initializeThread() {
+    tlds.setLocal(new TLD());
+  }
+
   //! push a value onto the queue
   void push(const value_type& val) {
     abort();
@@ -721,19 +654,16 @@ public:
 
   //stager each thread's start item
   void push_initial(IterTy b, IterTy e) {
-    num = ThreadPool::getActiveThreads();
     gbegin = b;
     gend = e;
-    for (unsigned i = 0; i < tlds.size(); ++i)
-      tlds.get(i).init = false;
   }
 
   //! pop a value from the queue.
   // move through range in num thread strides
   boost::optional<value_type> pop() {
-    TLD& tld = tlds.get();
+    TLD& tld = *tlds.getLocal();
     if (!tld.init) {
-      tld.begin = Galois::safe_advance(gbegin, gend, tlds.myEffectiveID());
+      tld.begin = Galois::safe_advance(gbegin, gend, LL::getTID());
       tld.end = gend;
       tld.init = true;
     }
@@ -758,9 +688,10 @@ class RandomAccessRange {
     IterTy stealEnd;
     bool init;
     LL::SimpleLock<true> stealLock;
+    TLD() :init(false) {}
   };
 
-  PerCPU<TLD> tlds;
+  PerThreadStorage<TLD> tlds;
 
   IterTy gbegin;
   IterTy gend;
@@ -794,6 +725,10 @@ public:
     typedef RandomAccessRange<Stealing,IterTy> WL;
   };
 
+  void initializeThread() {
+    tlds.setLocal(new TLD());
+  }
+
   //! push a value onto the queue
   void push(const value_type& val) {
     abort();
@@ -809,14 +744,12 @@ public:
   void push_initial(IterTy b, IterTy e) {
     gbegin = b;
     gend = e;
-    for (unsigned i = 0; i < tlds.size(); ++i)
-      tlds.get(i).init = false;
   }
 
   //! pop a value from the queue.
   // move through range in num thread strides
   boost::optional<value_type> pop() {
-    TLD& tld = tlds.get();
+    TLD& tld = *tlds.getLocal();
     if (!tld.init) {
       init(tld);
     }
@@ -833,7 +766,7 @@ void RandomAccessRange<Stealing,IterTy>::init(TLD& tld) {
   unsigned num = ThreadPool::getActiveThreads();
   unsigned len = std::distance(gbegin,gend);
   unsigned per = (len + num - 1) / num;
-  unsigned i = tlds.myEffectiveID();
+  unsigned i = LL::getTID();
   tld.begin = gbegin;
   std::advance(tld.begin, per * i);
   tld.end = tld.begin;
@@ -852,7 +785,8 @@ void RandomAccessRange<Stealing,IterTy>::try_steal(TLD& tld) {
     return;
   //Then try stealing from neighbor
   //TLD& otld = tlds.getNext(ThreadPool::getActiveThreads());
-  if (do_steal(tld, tlds.getNext(ThreadPool::getActiveThreads()))) {
+  int num = ThreadPool::getActiveThreads();
+  if (do_steal(tld, *tlds.getRemote((LL::getTID() + 1) % num))) {
     //redistribute stolen items for neighbor to steal too
     if (std::distance(tld.begin, tld.end) > 1) {
       tld.stealLock.lock();
@@ -935,7 +869,7 @@ class BulkSynchronous : private boost::noncopyable {
   };
 
   CTy wls[2];
-  GaloisRuntime::PerCPU<TLD> tlds;
+  GaloisRuntime::PerThreadStorage<TLD> tlds;
   GaloisRuntime::FastBarrier barrier1;
   GaloisRuntime::FastBarrier barrier2;
   GaloisRuntime::LL::CacheLineStorage<volatile long> some;
@@ -959,9 +893,14 @@ class BulkSynchronous : private boost::noncopyable {
     barrier2.reinit(numActive);
   }
 
+  void initializeThread() {
+    tlds.setLocal(new TLD());
+    wls[0].initializeThread();
+    wls[1].initializeThread();
+  }
+
   void push(const value_type& val) {
-    TLD& tld = tlds.get();
-    wls[(tld.round + 1) & 1].push(val);
+    wls[(tlds.getLocal()->round + 1) & 1].push(val);
   }
 
   template<typename ItTy>
@@ -974,12 +913,12 @@ class BulkSynchronous : private boost::noncopyable {
   void push_initial(ItTy b, ItTy e) {
     while (b != e)
       push(*b++);
-    tlds.get().round = 1;
+    tlds.getLocal()->round = 1;
     some.data = true;
   }
 
   boost::optional<value_type> pop() {
-    TLD& tld = tlds.get();
+    TLD& tld = *tlds.getLocal();
     boost::optional<value_type> r;
     
     while (true) {

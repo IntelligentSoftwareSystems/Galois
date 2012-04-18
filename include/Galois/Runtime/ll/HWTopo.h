@@ -47,6 +47,7 @@ unsigned getPackageForThreadInternal(int galois_thread_id);
 unsigned getMaxPackageForThread(int galois_thread_id);
 //is This the first thread in a package
 bool isLeaderForPackageInternal(int galois_thread_id);
+unsigned getLeaderForPackage(int galois_thread_id);
 
 extern __thread unsigned PACKAGE_ID;
 

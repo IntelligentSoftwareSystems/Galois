@@ -343,10 +343,6 @@ public:
     return true;
   }
 
-  bool parallelInitialWork() const {
-    return false;
-  }
-
   void operator()() {
     ParaMeter::init();
     pstatsFile = fopen(ParaMeter::getStatsFileName(), "a"); // open in append mode

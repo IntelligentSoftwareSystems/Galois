@@ -35,9 +35,9 @@
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Threads.h"
 #include "Galois/Runtime/PerCPU.h"
-#include "Galois/Runtime/WorkList.h"
 #include "Galois/Runtime/Termination.h"
 #include "Galois/Runtime/LoopHooks.h"
+#include "Galois/Runtime/WorkList.h"
 
 #ifdef GALOIS_EXP
 #include "Galois/Runtime/SimpleTaskPool.h"
@@ -91,9 +91,10 @@ public:
   DoAllWork(FunctionTy& f): fn(f) { }
 
   template<typename Iter>
-  bool AddInitialWork(Iter b, Iter e) {
-    global_wl.push_initial(b,e);
-    return true;
+  void AddInitialWork(Iter b, Iter e) {
+    global_wl.initializeThread();
+    if (b != e)
+      global_wl.push_initial(b,e);
   }
 
   void operator()() {
@@ -174,7 +175,7 @@ class ForEachWork: public ForEachWorkBase<T, FunctionTy> {
   typedef typename Super::ThreadLocalData ThreadLocalData;
 
   typedef typename WorkListTy::template retype<value_type>::WL WLTy;
-  typedef WorkList::LevelStealing<WorkList::FIFO<value_type>, value_type> AbortedList;
+  typedef WorkList::FIFO<value_type, true> AbortedList;
 
   WLTy global_wl;
   AbortedList aborted;
@@ -201,17 +202,19 @@ class ForEachWork: public ForEachWorkBase<T, FunctionTy> {
     assert(ForeachTraits<FunctionTy>::NeedsAborts);
 
     clearConflictLock();
-    if (ForeachTraits<FunctionTy>::NeedsAborts)
-      tld.cnx.cancel_iteration();
+    tld.cnx.cancel_iteration();
     Super::incrementConflicts(tld);
     __sync_synchronize();
     aborted.push(val);
+    __sync_synchronize();
     abort_happened.data = 1;
     //don't listen to breaks from aborted iterations
-    tld.facing.__resetBreak();
+    if (ForeachTraits<FunctionTy>::NeedsBreak)
+      tld.facing.__resetBreak();
     //clear push buffer
-    tld.facing.__resetPushBuffer();
-
+    if (ForeachTraits<FunctionTy>::NeedsPush)
+      tld.facing.__resetPushBuffer();
+    //reset allocator
     if (ForeachTraits<FunctionTy>::NeedsPIA)
       tld.facing.__resetAlloc();
   }
@@ -301,13 +304,10 @@ public:
   }
 
   template<typename Iter>
-  bool AddInitialWork(Iter b, Iter e) {
-    wl.push_initial(b,e);
-    return true;
-  }
-
-  bool parallelInitialWork() const {
-    return true;
+  void AddInitialWork(Iter b, Iter e) {
+    wl.initializeThread();
+    if (b != e)
+      wl.push_initial(b,e);
   }
 
   void operator()() {
@@ -361,19 +361,11 @@ void for_each_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
   WorkTy W(f, loopname);
   RunCommand w[3];
 
-  int start;
-  if (W.parallelInitialWork()) {
-    FillWork<IterTy, WorkTy> fw2(b, e, W);
-    w[0].work = Config::ref(fw2);
-    w[0].isParallel = true;
-    w[0].barrierAfter = true;
-    w[0].profile = false;
-    start = 0;
-  } else {
-    W.AddInitialWork(b, e);
-    start = 1;
-  }
-
+  FillWork<IterTy, WorkTy> fw2(b, e, W);
+  w[0].work = Config::ref(fw2);
+  w[0].isParallel = true;
+  w[0].barrierAfter = true;
+  w[0].profile = false;
   w[1].work = Config::ref(W);
   w[1].isParallel = true;
   w[1].barrierAfter = true;
@@ -382,7 +374,7 @@ void for_each_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
   w[2].isParallel = false;
   w[2].barrierAfter = true;
   w[2].profile = true;
-  getSystemThreadPool().run(&w[start], &w[3]);
+  getSystemThreadPool().run(&w[0], &w[3]);
 
   inGaloisForEach = false;
 }
@@ -401,7 +393,7 @@ void do_all_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
   w[0].work = Config::ref(W);
   w[0].isParallel = true;
   w[0].barrierAfter = true;
-  w[0].profile = true;
+  w[0].profile = false;
   getSystemThreadPool().run(&w[0], &w[1]);
 
   inGaloisForEach = false;
