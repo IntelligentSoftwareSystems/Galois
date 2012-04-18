@@ -7,8 +7,6 @@ set(GALOIS_VERSION_PATCH "4")
 set(GALOIS_COPYRIGHT_YEAR "2012") # Also in COPYRIGHT
 site_name(SITE_NAME)
 
-#add_definitions(-DGALOIS_DET)
-
 if(NOT CMAKE_BUILD_TYPE)
   message(STATUS "No build type selected, default to Release")
   set(CMAKE_BUILD_TYPE "Release")
@@ -25,8 +23,8 @@ set(USE_CLANG OFF CACHE BOOL "Use clang compiler")
 
 #Enable iss specific options; should be OFF in the general release
 set(USE_EXP OFF CACHE BOOL "Use experimental features") 
-
 set(USE_VTUNE ON CACHE BOOL "Use vtune (if found)")
+set(USE_DET OFF CACHE BOOL "Use deterministic execution")
 
 ###### Optional programs and default paths ######
 
@@ -80,12 +78,11 @@ include(CheckCilk)
 
 # ZLIB
 find_package(ZLIB)
-
 if(ZLIB_FOUND)
-  include_directories(ZLIB_INCLUDE_DIRS)
-else()
-  message(WARNING "gzip libraries not found. Needed by AVI!")
-endif(ZLIB_FOUND)  
+  include_directories(${ZLIB_INCLUDE_DIRS})
+  set(RT_LINK ${ZLIB_LIBRARIES} ${RT_LINK})
+endif(ZLIB_FOUND)
+
 #Boost
 #not needed now but will be needed for newer version of Boost after 1.4X ish
 set(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0" "1.47" "1.47.0")
@@ -99,8 +96,12 @@ include_directories(${Boost_INCLUDE_DIRS})
 set(RT_LINK ${Boost_LIBRARIES} ${RT_LINK})
 
 if(USE_EXP)
-  add_definitions("-DGALOIS_EXP")
+  add_definitions(-DGALOIS_EXP)
   include_directories("exp/include")
+
+  if(USE_DET)
+    add_definitions(-DGALOIS_DET)
+  endif()
 
   if(USE_VTUNE)
     find_package(VTUNE)

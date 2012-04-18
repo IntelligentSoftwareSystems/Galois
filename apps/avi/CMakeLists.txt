@@ -17,16 +17,16 @@ file(GLOB Sources
 add_library(AVI ${Sources})
 
 app(AVIorderedSerial main/AVIorderedSerial.cpp
-  REQUIRES LAPACK_FOUND
+  REQUIRES LAPACK_FOUND ZLIB_FOUND
   EXTLIBS AVI ${LAPACK_LIBRARIES})
 app(AVIunordered main/AVIunordered.cpp 
-  REQUIRES LAPACK_FOUND
+  REQUIRES LAPACK_FOUND ZLIB_FOUND
   EXTLIBS AVI ${LAPACK_LIBRARIES})
 
 # the files may be removed from the release without causing error in cmake
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/main/AVIunorderedNoLock.cpp)
   app(AVIunorderedNoLock main/AVIunorderedNoLock.cpp
-    REQUIRES LAPACK_FOUND
+    REQUIRES LAPACK_FOUND ZLIB_FOUND
     EXTLIBS AVI ${LAPACK_LIBRARIES})
 endif()
 
