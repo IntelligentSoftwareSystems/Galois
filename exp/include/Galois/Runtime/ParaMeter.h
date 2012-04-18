@@ -54,7 +54,7 @@
 namespace GaloisRuntime {
 
 namespace WorkList {
-template<class T=int>
+template<class ContainerTy = FIFO<>,class T=int>
 class ParaMeter: private boost::noncopyable {
 };
 }
@@ -80,12 +80,12 @@ namespace ParaMeter {
 // - opens stats file in append mode
 // - prints stats
 // - closes file when loop finishes
-template<class T, class FunctionTy, bool isSimple>
-class ForEachWork<WorkList::ParaMeter<>,T,FunctionTy,isSimple>: public ForEachWorkBase<T,FunctionTy> {
+template<class ContainerTy, class T, class FunctionTy, bool isSimple>
+class ForEachWork<WorkList::ParaMeter<ContainerTy>,T,FunctionTy,isSimple>: public ForEachWorkBase<T,FunctionTy> {
   typedef ForEachWorkBase<T, FunctionTy> Super;
   typedef typename Super::value_type value_type;
   typedef Galois::UserContext<value_type> UserContextTy;
-  typedef WorkList::FIFO<value_type> WorkListTy;
+  typedef typename ContainerTy::template retype<value_type>::WL WorkListTy;
 
   struct StepStats {
     size_t step;
