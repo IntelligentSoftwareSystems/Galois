@@ -23,6 +23,7 @@
 
 #include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/Threads.h"
+#include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/ll/HWTopo.h"
 #include "Galois/Runtime/ll/TID.h"
 
@@ -122,7 +123,9 @@ class ThreadPool_pthread : public ThreadPool {
   void initThread() {
     //initialize TID
     GaloisRuntime::LL::initTID();
-    GaloisRuntime::LL::bindThreadToProcessor(GaloisRuntime::LL::getTID());
+    int id = GaloisRuntime::LL::getTID();
+    GaloisRuntime::initPTS();
+    GaloisRuntime::LL::bindThreadToProcessor(id);
   }
 
   void cascade(int tid) {
