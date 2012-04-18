@@ -82,31 +82,43 @@ unsigned GaloisRuntime::SimpleRuntimeContext::commit_iteration() {
 }
 
 void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
-  bool suc = L->Owner.try_lock();
-  if (suc) {
+#ifdef GALOIS_DET
+  if (L->Owner.try_lock()) {
+    assert(!L->next);
+    L->next = locks;
+    locks = L;
+  }
+
+  SimpleRuntimeContext* other;
+  do {
+    other = L->Owner.getValue();
+    if (other == this)
+      break;
+    if (other && other->id > id) {
+      if (pendingFlag)
+        break;
+      else
+        throw GaloisRuntime::CONFLICT;
+    }
+    // Allow new locks on new nodes only
+    if (!pendingFlag && other) {
+      assert(0 && "Grabbing more locks during commit phase");
+      abort();
+    }
+  } while (!L->Owner.stealing_CAS(other, this));
+#else
+  if (L->Owner.try_lock()) {
     assert(!L->Owner.getValue());
     assert(!L->next);
     L->Owner.setValue(this);
     L->next = locks;
     locks = L;
   } else {
-#ifdef GALOIS_DET
-    SimpleRuntimeContext* other;
-    do {
-      other = L->Owner.getValue();
-      if (other == this)
-        break;
-      if (!pendingFlag)
-        throw GaloisRuntime::CONFLICT;
-      if (other->id < id)
-        throw GaloisRuntime::CONFLICT;
-    } while (!L->Owner.stealing_CAS(other, this));
-#else
     if (L->Owner.getValue() != this) {
       //ConflictLock.lock();
       throw GaloisRuntime::CONFLICT; // Conflict
     }
-#endif
   }
+#endif
 }
 

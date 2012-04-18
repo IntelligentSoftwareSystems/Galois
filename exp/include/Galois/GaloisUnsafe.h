@@ -21,31 +21,40 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#ifndef GALOIS_GALOIS_UNSAFE_H
-#define GALOIS_GALOIS_UNSAFE_H
+#ifndef GALOIS_GALOISUNSAFE_H
+#define GALOIS_GALOISUNSAFE_H
 
 #include "Galois/Galois.h"
 
 namespace Galois {
 
-// WorkList based version
-template <ForeachOpts::ExecutorMode mode_tp, typename WLTy, typename Function>
-static inline void for_each_wl (WLTy& wl, Function f, const char* loopname = 0) {
+template<typename WLTy, typename FunctionTy>
+static inline void for_each_wl(WLTy& wl, FunctionTy f, const char* loopname = 0) {
+  assert(!inGaloisForEach);
 
-  if (mode_tp == ForeachOpts::PARAMETER) {
-    GaloisRuntime::ParaMeter::for_each_impl (wl, f, loopname);
-  } else {
-    GaloisRuntime::for_each_impl (wl, f, loopname);
-  }
+  inGaloisForEach = true;
+
+  typedef typename WLTy::value_type T;
+
+  typedef ForEachWork<WLTy,T,FunctionTy,false> WorkTy;
+
+  WorkTy W(wl, f, loopname);
+  RunCommand w[2];
+
+  w[0].work = Config::ref(W);
+  w[0].isParallel = true;
+  w[0].barrierAfter = true;
+  w[0].profile = true;
+  w[1].work = &runAllLoopExitHandlers;
+  w[1].isParallel = false;
+  w[1].barrierAfter = true;
+  w[1].profile = true;
+  getSystemThreadPool().run(&w[0], &w[2]);
+
+  inGaloisForEach = false;
 }
 
-template <typename WLTy, typename Function>
-static inline void for_each_wl (WLTy& wl, Function f, const char* loopname = 0) {
-
-  Galois::for_each_wl<ForeachOpts::GALOIS> (wl, f, loopname);
-}
-
 
 }
 
-#endif //  GALOIS_GALOIS_UNSAFE_H
+#endif //  GALOIS_GALOISUNSAFE_H

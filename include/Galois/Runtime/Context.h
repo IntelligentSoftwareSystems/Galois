@@ -17,8 +17,8 @@ defects in Software and/or Documentation, or loss or inaccuracy of data of any
 kind.
 */
 
-#ifndef _GALOIS_RUNTIME_CONTEXT_H
-#define _GALOIS_RUNTIME_CONTEXT_H
+#ifndef GALOIS_RUNTIME_CONTEXT_H
+#define GALOIS_RUNTIME_CONTEXT_H
 
 #include "Galois/Runtime/ll/PtrLock.h"
 #include "Galois/MethodFlags.h"
