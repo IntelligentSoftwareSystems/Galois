@@ -1568,7 +1568,7 @@ public:
     return m_root == NULL;
   }
 
-  Handle add(T x) {
+  Handle add(const T& x) {
     typename allocator_type::pointer node = get_alloc().allocate(1);
     get_alloc().construct(node, Node(x));
 
