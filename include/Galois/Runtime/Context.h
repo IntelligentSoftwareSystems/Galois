@@ -101,7 +101,13 @@ enum ConflictFlag {
 };
 
 #ifdef GALOIS_DET
-void setPending(bool value);
+enum PendingFlag {
+  NON_DET,
+  PENDING,
+  COMMITTING
+};
+
+void setPending(PendingFlag value);
 #endif
 
 }

@@ -123,12 +123,12 @@ void ForEachWork<WorkList::Deterministic<>,T,FunctionTy,isSimple>::go() {
   HIDDEN::WID wid;
 
   while (true) {
-    setPending(true);
+    setPending(PENDING);
     pendingLoop(wid, tld);
 
     barrier1.wait();
 
-    setPending(false);
+    setPending(COMMITTING);
     commitLoop(wid, tld);
 
     barrier2.wait();
@@ -145,6 +145,7 @@ void ForEachWork<WorkList::Deterministic<>,T,FunctionTy,isSimple>::go() {
     if (done.data)
       break;
   }
+  setPending(NON_DET);
   Super::deinitWorker();
 }
 

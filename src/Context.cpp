@@ -25,18 +25,17 @@ static __thread GaloisRuntime::SimpleRuntimeContext* thread_cnx = 0;
 static GaloisRuntime::LL::SimpleLock<true> ConflictLock;
 
 #ifdef GALOIS_DET
-static bool pendingFlag = false;
+static GaloisRuntime::PendingFlag pendingFlag = GaloisRuntime::NON_DET;
 
-void GaloisRuntime::setPending(bool value) {
+void GaloisRuntime::setPending(PendingFlag value) {
   pendingFlag = value;
 }
 
 void GaloisRuntime::doCheckWrite() {
-  if (pendingFlag) {
+  if (pendingFlag == PENDING) {
     throw GaloisRuntime::REACHED_FAILSAFE;
   }
 }
-
 #endif
 
 //void GaloisRuntime::clearConflictLock() {
@@ -83,30 +82,32 @@ unsigned GaloisRuntime::SimpleRuntimeContext::commit_iteration() {
 
 void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
 #ifdef GALOIS_DET
-  if (L->Owner.try_lock()) {
-    assert(!L->next);
-    L->next = locks;
-    locks = L;
-  }
+  if (pendingFlag != NON_DET) {
+    if (L->Owner.try_lock()) {
+      assert(!L->next);
+      L->next = locks;
+      locks = L;
+    }
 
-  SimpleRuntimeContext* other;
-  do {
-    other = L->Owner.getValue();
-    if (other == this)
-      break;
-    if (other && other->id > id) {
-      if (pendingFlag)
+    SimpleRuntimeContext* other;
+    do {
+      other = L->Owner.getValue();
+      if (other == this)
         break;
-      else
-        throw GaloisRuntime::CONFLICT;
-    }
-    // Allow new locks on new nodes only
-    if (!pendingFlag && other) {
-      assert(0 && "Grabbing more locks during commit phase");
-      abort();
-    }
-  } while (!L->Owner.stealing_CAS(other, this));
-#else
+      if (other && other->id > id) {
+        if (pendingFlag == PENDING)
+          break;
+        else
+          throw GaloisRuntime::CONFLICT;
+      }
+      // Allow new locks on new nodes only
+      if (pendingFlag == COMMITTING && other) {
+        assert(0 && "Grabbing more locks during commit phase");
+        abort();
+      }
+    } while (!L->Owner.stealing_CAS(other, this));
+  }
+#endif
   if (L->Owner.try_lock()) {
     assert(!L->Owner.getValue());
     assert(!L->next);
@@ -119,6 +120,5 @@ void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
       throw GaloisRuntime::CONFLICT; // Conflict
     }
   }
-#endif
 }
 
