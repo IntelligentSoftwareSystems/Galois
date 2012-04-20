@@ -65,6 +65,8 @@ struct UpdateRequestIndexer
 Graph graph;
 
 struct process {
+  typedef int tt_does_not_need_aborts;
+
   void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& lwl) {
     SNode& data = graph.getData(req.n,Galois::NONE);
     // if (req.w >= data.dist)
@@ -90,11 +92,19 @@ struct process {
 };
 
 struct reset {
+  typedef int tt_does_not_need_stats;
+  typedef int tt_does_not_need_parallel_push;
+  typedef int tt_does_not_need_context;
+  typedef int tt_does_not_need_aborts;
+
   void operator()(GNode n) {//, Galois::UserContext<GNode>& lwl) {
     SNode& S = graph.getData(n, Galois::NONE);
     for (int i = 0; i < NUM; ++i)
       S.dist[i] = DIST_INFINITY;
   }
+  // void operator()(GNode n, Galois::UserContext<GNode>& lwl) {
+  //   operator()(n);
+  // }
 };
 
 void runBodyParallel(const GNode src[NUM], int n) {
@@ -112,8 +122,6 @@ void runBodyParallel(const GNode src[NUM], int n) {
   Galois::for_each<OBIM>(&one[0], &one[n], process());
   T.stop();
 }
-
-//std::vector<GNode> allNodes;
 
 void resetParallel() {
   Galois::do_all(graph.begin(), graph.end(), reset());
@@ -141,7 +149,6 @@ int main(int argc, char **argv) {
   GNode report = *graph.begin();
   for (Graph::iterator src = graph.begin(), ee =
       graph.end(); src != ee; ++src) {
-    //allNodes.push_back(*src);
     SNode& node = graph.getData(*src,Galois::NONE);
     node.id = id++;
   }

@@ -1187,7 +1187,7 @@ public:
 };
 WLCOMPILECHECK(GWL_Idempotent_FIFO);
 
-template<typename Partitioner = DummyPartitioner, typename T = int, typename ChildWLTy = dChunkedFIFO<>, bool concurrent=true>
+template<typename Partitioner = DummyIndexer<int>, typename T = int, typename ChildWLTy = dChunkedFIFO<>, bool concurrent=true>
 class PartitionedWL : private boost::noncopyable {
 
   Partitioner P;

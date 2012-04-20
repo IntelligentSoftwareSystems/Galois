@@ -81,6 +81,7 @@ template<typename IterTy,typename FunctionTy> struct TaskContext;
 class SimpleTaskPool {
   typedef GaloisRuntime::WorkList::dChunkedLIFO<4, TaskFunction*> Worklist;
   Worklist worklist;
+  PerThreadStorage<int> init;
 
 public:
   template<typename IterTy,typename FunctionTy>
@@ -101,6 +102,13 @@ public:
     }
 
     return iterations;
+  }
+
+  void initializeThread() {
+    if (!init.getLocal()) {
+      worklist.initializeThread();
+      init.setLocal(reinterpret_cast<int*>(~0));
+    }
   }
 };
 

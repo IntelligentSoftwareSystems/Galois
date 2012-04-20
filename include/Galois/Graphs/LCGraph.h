@@ -354,7 +354,8 @@ protected:
 
   void* Data;
   NodeInfo* endNode;
-  uint64_t numNodes;
+  unsigned numNodes;
+  NodeInfo** nodes;
 
   EdgeInfo* getEdgeIdx(NodeInfo* src, NodeInfo* dst) {
     EdgeInfo* eb = src->edgeBegin();
@@ -369,23 +370,7 @@ public:
   typedef NodeInfo* GraphNode;
   typedef EdgeInfo* edge_iterator;
   typedef typename EdgeInfo::reference edge_data_reference;
-
-  class iterator : public std::iterator<std::forward_iterator_tag, GraphNode> {
-    NodeInfo* at;
-    void incA() {
-      at = at->next();
-    }
-
-  public:
-    iterator() :at(0) {}
-    iterator(NodeInfo* a) :at(a) {}
-    iterator(const iterator& m) :at(m.at) {}
-    iterator& operator++() { incA(); return *this; }
-    iterator operator++(int) { iterator tmp(*this); incA(); return tmp; }
-    bool operator==(const iterator& rhs) { return at == rhs.at; }
-    bool operator!=(const iterator& rhs) { return at != rhs.at; }
-    GraphNode operator*() { return at; }
-  };
+  typedef NodeInfo** iterator;
 
   LC_Linear_Graph() {}
   ~LC_Linear_Graph() {}
@@ -416,11 +401,11 @@ public:
   }
 
   iterator begin() const {
-    return iterator(reinterpret_cast<NodeInfo*>(Data));
+    return nodes;
   }
 
   iterator end() const {
-    return iterator(endNode);
+    return &nodes[numNodes];
   }
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = ALL) {
@@ -443,14 +428,14 @@ public:
     numNodes = graph.size();
     Data = GaloisRuntime::MM::largeAlloc(numNodes * 2 * sizeof(NodeInfo) +
 					 graph.sizeEdges() * sizeof(EdgeInfo));
-    std::vector<NodeInfo*> node_ids;
-    node_ids.resize(numNodes);
+    nodes = reinterpret_cast<NodeInfo**>(GaloisRuntime::MM::largeAlloc(numNodes * sizeof(NodeInfo*)));
+    int at = 0;
     NodeInfo* curNode = reinterpret_cast<NodeInfo*>(Data);
     for (FileGraph::iterator ii = graph.begin(),
 	   ee = graph.end(); ii != ee; ++ii) {
-      new (&curNode->data) NodeTy; //inplace new
+	new (&curNode->data) NodeTy; //inplace new
       curNode->numEdges = graph.neighborsSize(*ii);
-      node_ids[*ii] = curNode;
+      nodes[*ii] = curNode;
       curNode = curNode->next();
     }
     endNode = curNode;
@@ -458,11 +443,11 @@ public:
     //layout the edges
     for (FileGraph::iterator ii = graph.begin(),
 	   ee = graph.end(); ii != ee; ++ii) {
-      EdgeInfo* edge = node_ids[*ii]->edgeBegin();
+      EdgeInfo* edge = nodes[*ii]->edgeBegin();
       for (FileGraph::neighbor_iterator ni = graph.neighbor_begin(*ii),
 	     ne = graph.neighbor_end(*ii); ni != ne; ++ni) {
         edge->allocateEdgeData(graph, ni);
-	edge->dst = node_ids[*ni];
+	edge->dst = nodes[*ni];
 	++edge;
       }
     }

@@ -45,11 +45,20 @@
 
 #include <algorithm>
 
-//Import DoAll here.
-//FIXME: revisit include location
-#include "ParallelWork_DoAll.h"
-
 namespace GaloisRuntime {
+
+template<typename T1, typename T2>
+struct Initializer {
+  T1 b;
+  T1 e;
+  T2& g;
+  
+  Initializer(const T1& _b, const T1& _e, T2& _g) :b(_b), e(_e), g(_g) {}
+
+  void operator()(void) {
+    g.AddInitialWork(b, e);
+  }
+};
 
 template <bool Enabled> 
 class LoopStatistics {
@@ -142,32 +151,38 @@ protected:
   }
 };
 
-template<class WorkListTy, class T, class FunctionTy, bool isSimple>
-class ForEachWork: public ForEachWorkBase<T, FunctionTy> {
-  typedef ForEachWorkBase<T, FunctionTy> Super;
-  typedef typename Super::value_type value_type;
-  typedef typename Super::ThreadLocalData ThreadLocalData;
-
+template<class WorkListTy, class T, class FunctionTy>
+class ForEachWork {
+protected:
+  typedef T value_type;
   typedef typename WorkListTy::template retype<value_type>::WL WLTy;
   typedef WorkList::FIFO<value_type, true> AbortedList;
 
-  WLTy global_wl;
+  struct ThreadLocalData {
+    Galois::UserContext<value_type> facing;
+    SimpleRuntimeContext cnx;
+    LoopStatistics<ForeachTraits<FunctionTy>::NeedsStats> stat;
+    TerminationDetection::TokenHolder* lterm;
+  };
+
+  FunctionTy& function;
+  const char* loopname;
+
+  TerminationDetection term;
+  WLTy wl;
   AbortedList aborted;
+
   LL::CacheLineStorage<volatile long> break_happened; //hit flag
   LL::CacheLineStorage<volatile long> abort_happened; //hit flag
-  WLTy& wl;
 
-  void commitIteration(ThreadLocalData& tld) {
+  inline void commitIteration(ThreadLocalData& tld) {
     if (ForeachTraits<FunctionTy>::NeedsPush) {
       wl.push(tld.facing.__getPushBuffer().begin(),
-              tld.facing.__getPushBuffer().end());
+		     tld.facing.__getPushBuffer().end());
       tld.facing.__resetPushBuffer();
     }
-
     if (ForeachTraits<FunctionTy>::NeedsPIA)
       tld.facing.__resetAlloc();
-    if (ForeachTraits<FunctionTy>::NeedsBreak && tld.facing.__breakHappened())
-      break_happened.data = 1;
     if (ForeachTraits<FunctionTy>::NeedsAborts)
       tld.cnx.commit_iteration();
   }
@@ -178,14 +193,11 @@ class ForEachWork: public ForEachWorkBase<T, FunctionTy> {
 
     clearConflictLock();
     tld.cnx.cancel_iteration();
-    tld.incrementConflicts();
-    __sync_synchronize();
+    if (ForeachTraits<FunctionTy>::NeedsStats)
+      tld.stat.inc_conflicts();
     aborted.push(val);
     __sync_synchronize();
     abort_happened.data = 1;
-    //don't listen to breaks from aborted iterations
-    if (ForeachTraits<FunctionTy>::NeedsBreak)
-      tld.facing.__resetBreak();
     //clear push buffer
     if (ForeachTraits<FunctionTy>::NeedsPush)
       tld.facing.__resetPushBuffer();
@@ -194,132 +206,147 @@ class ForEachWork: public ForEachWorkBase<T, FunctionTy> {
       tld.facing.__resetAlloc();
   }
 
-  // NB(ddn): Be careful about modifying this function. Small functions can be
-  // sensitive to instruction cache behavior which is based on compiler inlining
-  // heuristics and therefore fragile
-  template<bool doOne>
-  void doProcess(boost::optional<value_type> p, ThreadLocalData& tld) {
-    try {
-      do {
-        tld.incrementIterations();
-        if (ForeachTraits<FunctionTy>::NeedsAborts)
-          tld.cnx.start_iteration();
-        Super::function(*p, tld.facing);
-        commitIteration(tld);
-        if (ForeachTraits<FunctionTy>::NeedsBreak && break_happened.data)
-	  break;
-        if (doOne)
-          break;
-        p = wl.pop();
-      } while (p);
-    } catch (ConflictFlag a) {
-      abortIteration(*p, tld);
-    }
+  inline void doProcess(boost::optional<value_type>& p, ThreadLocalData& tld) {
+    if (ForeachTraits<FunctionTy>::NeedsStats)
+      tld.stat.inc_iterations();
+    if (ForeachTraits<FunctionTy>::NeedsAborts)
+      tld.cnx.start_iteration();
+    function(*p, tld.facing);
+    commitIteration(tld);
   }
 
-  template<bool isLeader>
-  void drainAborted(ThreadLocalData& tld) {
-    if (!ForeachTraits<FunctionTy>::NeedsAborts) return;
-    if (!isLeader) return;
-    if (!abort_happened.data) return;
-    tld.lterm->workHappened();
-    abort_happened.data = 0;
-    boost::optional<value_type> p = aborted.pop();
-    while (p) {
-      if (ForeachTraits<FunctionTy>::NeedsBreak && break_happened.data) 
-	return;
-      doProcess<true>(*p, tld);
+  GALOIS_ATTRIBUTE_NOINLINE
+  void handleBreak() {
+    //set flag and empty worklist
+    break_happened.data = 1;
+    boost::optional<value_type> p;
+    do {
+      p = wl.pop();
+    } while (p);
+    do {
       p = aborted.pop();
-    }
+    } while (p);
+    do {
+      p = wl.pop();
+    } while (p);
   }
 
-  template<bool isLeader>
+  template<unsigned limit, typename WL>
+  bool runQueue(ThreadLocalData& tld, WL& lwl) {
+    boost::optional<value_type> p = lwl.pop();
+    bool workHappened = false;
+    if (p)
+      workHappened = true;
+    try {
+      if (!limit) { //compile time optimization
+	while (p) {
+	  doProcess(p, tld);
+	  p = lwl.pop();
+	};
+       } else {
+       	unsigned num = limit;
+       	while (p && num) {
+       	  doProcess(p, tld);
+       	  if (--num)
+       	    p = lwl.pop();
+       	}
+      }
+    } catch (ConflictFlag i) {
+      switch(i) {
+      case GaloisRuntime::CONFLICT:
+	abortIteration(*p, tld);
+	break;
+      case GaloisRuntime::BREAK:
+	handleBreak();
+	workHappened = false; // short circuit caller
+	break;
+      default:
+	assert(0 && "Unhandled throw");
+	abort();
+	break;
+      }
+    }
+    return workHappened;
+  }
+
+  GALOIS_ATTRIBUTE_NOINLINE
+  void handleAborts(ThreadLocalData& tld) {
+    abort_happened.data = 0;
+    runQueue<0>(tld, aborted);
+  }
+
+  template<bool checkAbort>
   void go() {
-    ThreadLocalData& tld = Super::initWorker();
+    //Thread Local Data goes on the local stack
+    //to be NUMA friendly
+    ThreadLocalData tld;
+    setThreadContext(&tld.cnx);
+    tld.lterm = term.getLocalTokenHolder();
 #ifdef GALOIS_EXP
     SimpleTaskPool& pool = getSystemTaskPool();
     pool.initializeThread();
 #endif
 
     do {
-      boost::optional<value_type> p = wl.pop();
-      if (p)
-        tld.lterm->workHappened();
-      while (p) {
-        if (ForeachTraits<FunctionTy>::NeedsBreak && break_happened.data)
-	  goto leaveLoop;
-        doProcess<false>(p, tld);
-	drainAborted<isLeader>(tld);
-	p = wl.pop();
+      bool didWork = false;
+      do {
+	if (checkAbort)
+	  didWork = runQueue<255>(tld, wl);
+	else 
+	  didWork = runQueue<0>(tld, wl);
+	if (didWork)
+	  tld.lterm->workHappened();
+	if (checkAbort && abort_happened.data && 
+	    (!ForeachTraits<FunctionTy>::NeedsBreak || break_happened.data)) {
+	  tld.lterm->workHappened();
+	  handleAborts(tld);
+	}
+      } while (didWork);
+      if (ForeachTraits<FunctionTy>::NeedsBreak && break_happened.data) {
+	handleBreak();
+	break;
       }
-
-      drainAborted<isLeader>(tld);
-      if (ForeachTraits<FunctionTy>::NeedsBreak && break_happened.data)
-	goto leaveLoop;
-
 #ifdef GALOIS_EXP
       pool.work();
 #endif
+      term.localTermination();
+    } while (!term.globalTermination());
 
-      Super::localTermination();
-    } while (!Super::globalTermination());
-  leaveLoop:
-    Super::deinitWorker();
+    setThreadContext(0);
+    if (ForeachTraits<FunctionTy>::NeedsStats)
+      tld.stat.report_stat(LL::getTID(), loopname);
   }
 
 public:
-  ForEachWork(FunctionTy& _f, const char* _loopname) :Super(_f, _loopname), wl(global_wl) {
+  ForEachWork(FunctionTy& _f, const char* _loopname) 
+    :loopname(_loopname), function(_f)
+  {
     abort_happened.data = 0;
     break_happened.data = 0;
   }
 
-  //! Optional constructor to handle experimental Galois::for_each_wl()
-  ForEachWork(WLTy& w, FunctionTy& _f, const char* _loopname) :Super(_f, _loopname), wl(w) {
-    abort_happened.data = 0;
-    break_happened.data = 0;
+  ~ForEachWork() {
+    if (ForeachTraits<FunctionTy>::NeedsStats)
+      GaloisRuntime::statDone();
   }
 
   template<typename Iter>
   void AddInitialWork(Iter b, Iter e) {
     wl.initializeThread();
-    if (b != e)
-      wl.push_initial(b,e);
+    wl.push_initial(b,e);
   }
 
   void operator()() {
-    if (LL::getTID() == 0)
+    if (LL::getTID() == 0 &&
+	ThreadPool::getActiveThreads() > 1 && 
+	ForeachTraits<FunctionTy>::NeedsAborts)
       go<true>();
     else
       go<false>();
   }
+
 };
 
-template<typename T1, typename T2>
-struct FillWork {
-  T1 b;
-  T1 e;
-  T2& g;
-  unsigned int num;
-  unsigned int dist;
-  
-  FillWork(T1& _b, T1& _e, T2& _g) :b(_b), e(_e), g(_g) {
-    unsigned int a = ThreadPool::getActiveThreads();
-    dist = std::distance(b, e);
-    num = (dist + a - 1) / a; //round up
-  }
-
-  void operator()(void) {
-    unsigned int id = LL::getTID();
-    T1 b2 = b;
-    T1 e2 = b;
-    //stay in bounds
-    unsigned int A = std::min(num * id, dist);
-    unsigned int B = std::min(num * (id + 1), dist);
-    std::advance(b2, A);
-    std::advance(e2, B);
-    g.AddInitialWork(b2,e2);
-  }
-};
 
 template<typename WLTy, typename IterTy, typename FunctionTy>
 void for_each_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
@@ -328,16 +355,12 @@ void for_each_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
   inGaloisForEach = true;
 
   typedef typename std::iterator_traits<IterTy>::value_type T;
-  const bool simple = 
-    !ForeachTraits<FunctionTy>::NeedsAborts &&
-    !ForeachTraits<FunctionTy>::NeedsBreak;
-
-  typedef ForEachWork<WLTy,T,FunctionTy,simple> WorkTy;
+  typedef ForEachWork<WLTy,T,FunctionTy> WorkTy;
 
   WorkTy W(f, loopname);
   RunCommand w[3];
 
-  FillWork<IterTy, WorkTy> fw2(b, e, W);
+  Initializer<IterTy, WorkTy> fw2(b, e, W);
   w[0].work = Config::ref(fw2);
   w[0].isParallel = true;
   w[0].barrierAfter = true;
@@ -354,6 +377,47 @@ void for_each_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
 
   inGaloisForEach = false;
 }
+
+template<class FunPar>
+struct doAllWrapper : public FunPar {
+  typedef int tt_does_not_need_stats;
+  typedef int tt_does_not_need_parallel_push;
+  typedef int tt_does_not_need_aborts;
+  doAllWrapper(const FunPar& f) :FunPar(f) {}
+
+  template<typename T1, typename T2>
+  void operator()(T1& t, T2&) {
+    FunPar::operator()(t);
+  }
+};
+
+template<typename WLTy, typename IterTy, typename FunctionTy>
+void do_all_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
+  assert(!inGaloisForEach);
+
+  inGaloisForEach = true;
+
+  typedef typename std::iterator_traits<IterTy>::value_type T;
+  typedef ForEachWork<WLTy,T,doAllWrapper<FunctionTy>,true> WorkTy;
+
+  doAllWrapper<FunctionTy> F(f);
+  WorkTy W(F, loopname);
+
+  Initializer<IterTy, WorkTy > fw2(b, e, W);
+  RunCommand w[2];
+  w[0].work = Config::ref(fw2);
+  w[0].isParallel = true;
+  w[0].barrierAfter = true;
+  w[0].profile = false;
+  w[1].work = Config::ref(W);
+  w[1].isParallel = true;
+  w[1].barrierAfter = true;
+  w[1].profile = false;
+  getSystemThreadPool().run(&w[0], &w[2]);
+
+  inGaloisForEach = false;
+}
+
 
 } // end namespace
 

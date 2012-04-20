@@ -26,6 +26,7 @@
 #include <vector>
 
 #include "Galois/Mem.h"
+#include "Galois/Runtime/Context.h"
 
 namespace GaloisRuntime {
 template <typename WorkListTy, typename T, typename FunctionTy, bool isSimple>
@@ -53,16 +54,6 @@ class UserContext: private boost::noncopyable {
     IterationAllocatorBase.clear();
   }
 
-  //! break stuff
-  int breakFlag;
-  bool __breakHappened() {
-    return breakFlag;
-  }
-
-  void __resetBreak() {
-    breakFlag = 0;
-  }
-
   //! push stuff
   typedef std::vector<T> pushBufferTy;
   pushBufferTy pushBuffer;
@@ -78,13 +69,12 @@ class UserContext: private boost::noncopyable {
 public:
   UserContext()
     :IterationAllocatorBase(), 
-     PerIterationAllocator(&IterationAllocatorBase),
-     breakFlag(0)
+     PerIterationAllocator(&IterationAllocatorBase)
   { }
 
   //! Signal break in parallel loop
   void breakLoop() {
-    breakFlag = 1;
+    throw GaloisRuntime::BREAK;
   }
 
   PerIterAllocTy& getPerIterAlloc() {

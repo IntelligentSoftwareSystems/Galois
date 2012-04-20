@@ -97,7 +97,8 @@ static inline void acquire(Lockable* C, Galois::MethodFlag m) {
 
 enum ConflictFlag {
   CONFLICT = -1,
-  REACHED_FAILSAFE,
+  REACHED_FAILSAFE = 1,
+  BREAK = 2
 };
 
 #ifdef GALOIS_DET
