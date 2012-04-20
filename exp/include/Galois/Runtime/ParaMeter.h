@@ -80,8 +80,8 @@ namespace ParaMeter {
 // - opens stats file in append mode
 // - prints stats
 // - closes file when loop finishes
-template<class ContainerTy, class T, class FunctionTy, bool isSimple>
-class ForEachWork<WorkList::ParaMeter<ContainerTy>,T,FunctionTy,isSimple>: public ForEachWorkBase<T,FunctionTy> {
+template<class T, class FunctionTy>
+class ForEachWork<WorkList::ParaMeter<>,T,FunctionTy>: public ForEachWorkBase<T,FunctionTy> {
   typedef ForEachWorkBase<T, FunctionTy> Super;
   typedef typename Super::value_type value_type;
   typedef Galois::UserContext<value_type> UserContextTy;

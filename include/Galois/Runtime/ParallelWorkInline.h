@@ -250,7 +250,7 @@ void dChunkedLIFO<T,chunksize,concurrent>::push_backSP(const WID& id, p& n, valu
 } // end HIDDEN
 
 template<class T, class FunctionTy>
-class ForEachWork<WorkList::BulkSynchronous<>,T,FunctionTy,true>: public ForEachWorkBase<T,  FunctionTy> {
+class ForEachWork<WorkList::BulkSynchronous<>,T,FunctionTy>: public ForEachWorkBase<T,  FunctionTy> {
   typedef ForEachWorkBase<T, FunctionTy> Super;
   typedef typename Super::value_type value_type;
   typedef typename Super::ThreadLocalData ThreadLocalData;

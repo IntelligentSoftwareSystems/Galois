@@ -29,7 +29,7 @@
 #include "Galois/Runtime/Context.h"
 
 namespace GaloisRuntime {
-template <typename WorkListTy, typename T, typename FunctionTy, bool isSimple>
+template <typename WorkListTy, typename T, typename FunctionTy>
 class ForEachWork;
 
 template <typename WorkListTy, typename FunctionTy> 
@@ -40,7 +40,7 @@ namespace Galois {
 
 template<typename T>
 class UserContext: private boost::noncopyable {
-  template <typename WorkListTy, typename TT, typename FunctionTy, bool isSimple>
+  template <typename WorkListTy, typename TT, typename FunctionTy>
   friend class GaloisRuntime::ForEachWork;
 
   template <typename WorkListTy, typename FunctionTy>

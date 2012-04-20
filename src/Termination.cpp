@@ -26,24 +26,22 @@ using namespace GaloisRuntime;
 
 TerminationDetection::TerminationDetection()
   :globalTerm(false), lastWasWhite(false)
-{
-  data.get(0).hasToken = true;
-  data.get(0).tokenIsBlack = true;
-}
+{}
 
 void TerminationDetection::reset() {
-  assert(data.get().hasToken);
+  assert(data.getLocal()->hasToken);
   globalTerm = false;
   lastWasWhite = false;
-  data.get(0).hasToken = true;
-  data.get(0).tokenIsBlack = true;
+  data.getLocal()->hasToken = true;
+  data.getLocal()->tokenIsBlack = true;
 }
 
 void TerminationDetection::localTermination() {
-  TokenHolder& th = data.get();
-  TokenHolder& thn = data.getNext(ThreadPool::getActiveThreads());
+  unsigned myID = LL::getTID();
+  TokenHolder& th = *data.getLocal();
   if (th.hasToken) {
-    if (data.myEffectiveID() == 0) {
+    TokenHolder& thn = *data.getRemote((myID + 1) % ThreadPool::getActiveThreads());
+    if (myID == 0) {
       //master
       if (th.tokenIsBlack || th.processIsBlack) {
 	//failed circulation

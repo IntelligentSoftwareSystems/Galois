@@ -310,7 +310,10 @@ protected:
       pool.work();
 #endif
       term.localTermination();
-    } while (!term.globalTermination());
+    } while ((ForeachTraits<FunctionTy>::NeedsPush 
+	     ||ForeachTraits<FunctionTy>::NeedsBreak
+	     ||ForeachTraits<FunctionTy>::NeedsAborts)
+	     && !term.globalTermination());
 
     setThreadContext(0);
     if (ForeachTraits<FunctionTy>::NeedsStats)
@@ -332,6 +335,7 @@ public:
 
   template<typename Iter>
   void AddInitialWork(Iter b, Iter e) {
+    term.initializeThread();
     wl.initializeThread();
     wl.push_initial(b,e);
   }
@@ -398,7 +402,7 @@ void do_all_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
   inGaloisForEach = true;
 
   typedef typename std::iterator_traits<IterTy>::value_type T;
-  typedef ForEachWork<WLTy,T,doAllWrapper<FunctionTy>,true> WorkTy;
+  typedef ForEachWork<WLTy,T,doAllWrapper<FunctionTy> > WorkTy;
 
   doAllWrapper<FunctionTy> F(f);
   WorkTy W(F, loopname);
