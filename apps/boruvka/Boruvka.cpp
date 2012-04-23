@@ -170,7 +170,7 @@ struct process {
       }
       graph.removeNode(*minNeighbor, Galois::NONE);
       for (edsetTy::iterator it = toAdd.begin(), endIt = toAdd.end(); it != endIt; it++) {
-         graph.getEdgeData(graph.pushEdge(src, it->first, Galois::NONE)) = it->second;
+         graph.getEdgeData(graph.addEdge(src, it->first, Galois::NONE)) = it->second;
       }
       lwl.push(src);
 

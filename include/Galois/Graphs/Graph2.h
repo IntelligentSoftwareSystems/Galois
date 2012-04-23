@@ -194,8 +194,9 @@ class FirstGraph : private boost::noncopyable {
     EdgesTy edges;
     NodeTy data;
     bool active;
+    bool hole;
     
-    gNode(const NodeTy& d, unsigned n) :node(n), data(d), active(false) { }
+    gNode(const NodeTy& d, unsigned n) :node(n), data(d), active(false), hole(false) { }
     gNode() :active(false) { }
     
     iterator begin() { return edges.begin(); }
@@ -218,13 +219,16 @@ class FirstGraph : private boost::noncopyable {
 
     iterator createEdge(gNode* N, EdgeTy* v) {
       //First check for holes
-      iterator ii = std::find_if(begin(), end(), first_not_valid());
-      if (ii != end()) {
-	*ii = EITy(N, v);
+      if (hole) {
+	iterator ii = std::find_if(begin(), end(), first_not_valid());
+	if (ii != end()) {
+	  *ii = EITy(N, v);
+	  return ii;
+	}
       } else {
-	ii = edges.insert(edges.end(), EITy(N, v));
+	hole = false; // only reset if it was set and finding failed
       }
-      return ii;
+      return edges.insert(edges.end(), EITy(N, v));
     }
   };
 
@@ -390,6 +394,8 @@ public:
       for (typename gNode::iterator ii = N->begin(), ee = N->end(); ii != ee; ++ii) {
 	if (ii->first()->active)
 	  GaloisRuntime::acquire(ii->first(), mflag);
+	else
+	  N->hole = true;
       }
     }
     return boost::make_filter_iterator(is_edge(), N->begin(), N->end());
