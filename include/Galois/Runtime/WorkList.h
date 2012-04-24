@@ -857,7 +857,7 @@ public:
     if (retval)
       return retval;
     pWL& p = pushBuffer.get();
-    while (retval = p.pop())
+    while ((retval = p.pop()))
       wl.push(*retval);
     return wl.pop();
   }
