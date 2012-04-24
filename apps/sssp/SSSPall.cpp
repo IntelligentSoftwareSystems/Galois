@@ -143,10 +143,6 @@ int main(int argc, char **argv) {
   std::cout << "WARNING: Performance varies considerably due to -delta.  Do not expect the default to be good for your graph\n";
 
   unsigned int id = 0;
-  bool foundReport = false;
-  bool foundSource = false;
-  GNode source = *graph.begin();
-  GNode report = *graph.begin();
   for (Graph::iterator src = graph.begin(), ee =
       graph.end(); src != ee; ++src) {
     SNode& node = graph.getData(*src,Galois::NONE);

@@ -448,7 +448,6 @@ public:
     Data = GaloisRuntime::MM::largeAlloc(numNodes * 2 * sizeof(NodeInfo) +
 					 graph.sizeEdges() * sizeof(EdgeInfo));
     nodes = reinterpret_cast<NodeInfo**>(GaloisRuntime::MM::largeAlloc(numNodes * sizeof(NodeInfo*)));
-    int at = 0;
     NodeInfo* curNode = reinterpret_cast<NodeInfo*>(Data);
     for (FileGraph::iterator ii = graph.begin(),
 	   ee = graph.end(); ii != ee; ++ii) {
