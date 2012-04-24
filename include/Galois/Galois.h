@@ -26,10 +26,10 @@
 #include "Galois/Threads.h"
 #include "Galois/UserContext.h"
 #include "Galois/Runtime/ParallelWork.h"
-#include "Galois/Runtime/ParallelWorkInline.h"
 
 #ifdef GALOIS_EXP
 #include "Galois/Runtime/SimpleTaskPool.h"
+#include "Galois/Runtime/ParallelWorkInline.h"
 #endif
 
 #include "boost/iterator/transform_iterator.hpp"
@@ -211,6 +211,34 @@ static inline void preAlloc(int num) {
   w[0].barrierAfter = true;
   w[0].profile = false;
   GaloisRuntime::getSystemThreadPool().run(&w[0], &w[1]);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// STL compatible-ish operators
+////////////////////////////////////////////////////////////////////////////////
+
+template<typename Predicate, typename T>
+struct count_if_counter {
+  GaloisRuntime::PerCPU<ptrdiff_t>& local;
+  Predicate& f;
+  count_if_counter(Predicate& p, GaloisRuntime::PerCPU<ptrdiff_t>& l) :local(l), f(p) {}
+  void operator()(const T& v) {
+    if (f(v)) 
+      local.get()++;
+  }
+};
+
+template <class InputIterator, class Predicate>
+ptrdiff_t count_if ( InputIterator first, InputIterator last, Predicate pred )
+{
+  typedef typename std::iterator_traits<InputIterator>::value_type T;
+  GaloisRuntime::PerCPU<ptrdiff_t> v;
+  count_if_counter<Predicate, T> c(pred, v);
+  ptrdiff_t ret=0;
+  do_all(first, last, c);
+  for (int i = 0; i < v.size(); ++i)
+    ret += v.get(i);
+  return ret;
 }
 
 }
