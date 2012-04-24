@@ -63,6 +63,25 @@
 namespace Galois {
 namespace Graph {
 
+//! Small wrapper to have value void specialization
+template<typename ETy>
+struct EdgeDataWrapper {
+  typedef ETy& reference;
+  ETy* data;
+  reference get(ptrdiff_t x) const { return data[x]; }
+  void readIn(FileGraph& g) {
+    data = reinterpret_cast<ETy*>(GaloisRuntime::MM::largeAlloc(sizeof(ETy) * g.sizeEdges()));
+    std::copy(g.edgedata_begin<ETy>(), g.edgedata_end<ETy>(), &data[0]);
+  }
+};
+
+template<>
+struct EdgeDataWrapper<void> {
+  typedef bool reference;
+  reference get(ptrdiff_t x) const { return false; }
+  void readIn(FileGraph& g) { }
+};
+
 //! Local computation graph (i.e., graph structure does not change)
 template<typename NodeTy, typename EdgeTy>
 class LC_CSR_Graph {
@@ -74,7 +93,7 @@ protected:
   NodeInfo* NodeData;
   uint64_t* EdgeIndData;
   uint32_t* EdgeDst;
-  EdgeTy* EdgeData;
+  EdgeDataWrapper<EdgeTy> EdgeData;
 
   uint64_t numNodes;
 
@@ -96,6 +115,7 @@ protected:
 
 public:
   typedef uint32_t GraphNode;
+  typedef typename EdgeDataWrapper<EdgeTy>::reference edge_data_reference;
   typedef boost::counting_iterator<uint64_t> edge_iterator;
   typedef boost::counting_iterator<uint32_t> iterator;
 
@@ -113,15 +133,15 @@ public:
     return getEdgeIdx(src,dst) != ~static_cast<uint64_t>(0);
   }
 
-  EdgeTy& getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
+  edge_data_reference getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
     GaloisRuntime::checkWrite(mflag);
     GaloisRuntime::acquire(&NodeData[src], mflag);
-    return EdgeData[getEdgeIdx(src,dst)];
+    return EdgeData.get(getEdgeIdx(src,dst));
   }
 
-  EdgeTy& getEdgeData(edge_iterator ni, MethodFlag mflag = NONE) {
+  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = NONE) {
     GaloisRuntime::checkWrite(mflag);
-    return EdgeData[*ni];
+    return EdgeData.get(*ni);
   }
 
   GraphNode getEdgeDst(edge_iterator ni) {
@@ -158,11 +178,10 @@ public:
     numNodes = graph.size();
     NodeData = reinterpret_cast<NodeInfo*>(GaloisRuntime::MM::largeAlloc(sizeof(NodeInfo) * numNodes));
     EdgeIndData = reinterpret_cast<uint64_t*>(GaloisRuntime::MM::largeAlloc(sizeof(uint64_t) * numNodes));
-    EdgeData = reinterpret_cast<EdgeTy*>(GaloisRuntime::MM::largeAlloc(sizeof(EdgeTy) * graph.sizeEdges()));
     EdgeDst = reinterpret_cast<uint32_t*>(GaloisRuntime::MM::largeAlloc(sizeof(uint32_t) * graph.sizeEdges()));
+    EdgeData.readIn(graph);
     std::copy(graph.edgeid_begin(), graph.edgeid_end(), &EdgeIndData[0]);
     std::copy(graph.nodeid_begin(), graph.nodeid_end(), &EdgeDst[0]);
-    std::copy(graph.edgedata_begin<EdgeTy>(), graph.edgedata_end<EdgeTy>(), &EdgeData[0]);
 
     for (unsigned x = 0; x < numNodes; ++x)
       new (&NodeData[x]) NodeTy; // inplace new
