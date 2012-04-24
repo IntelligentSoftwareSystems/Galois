@@ -43,7 +43,11 @@
 
 #include "Lonestar/BoilerPlate.h"
 
+//#include "Galois/Runtime/WorkListAlt.h"
+
+#ifdef GALOIS_DET
 #include "Galois/Runtime/Deterministic.h"
+#endif
 
 namespace cll = llvm::cl;
 
@@ -231,7 +235,7 @@ int main(int argc, char** argv) {
   std::cout << "MEMINFO POST: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
 
   if (!skipVerify) {
-    int size = std::count_if(mesh->begin(), mesh->end(), is_bad(mesh));
+    int size = Galois::count_if(mesh->begin(), mesh->end(), is_bad(mesh));
     if (size != 0) {
       std::cerr << size << " bad triangles remaining.\n";
       assert(0 && "Refinement failed");
