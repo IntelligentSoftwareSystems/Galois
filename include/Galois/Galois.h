@@ -29,9 +29,7 @@
 #include "Galois/Runtime/ParallelWorkInline.h"
 
 #ifdef GALOIS_EXP
-#include "Galois/Runtime/ParaMeter.h"
 #include "Galois/Runtime/SimpleTaskPool.h"
-#include "boost/iterator/counting_iterator.hpp"
 #endif
 
 #include "boost/iterator/transform_iterator.hpp"

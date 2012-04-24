@@ -75,13 +75,13 @@ int main(int argc, char** argv) {
   T2.stop();
 
 #ifdef GALOIS_EXP
-  Galois::StatTimer T3("T3");
-  T3.start();
-  using namespace GaloisRuntime::WorkList;
-  //  Galois::for_each<Alt::ChunkedAdaptor<Alt::LevelStealingAlt, 64> >(v.begin(), v.end(), process());
-  Galois::for_each<Alt::ChunkedAdaptor<Alt::InitialQueue<Alt::LevelStealingAlt, Alt::LevelLocalAlt>, 64> >(v.begin(), v.end(), process());
+  // Galois::StatTimer T3("T3");
+  // T3.start();
+  // using namespace GaloisRuntime::WorkList;
+  // //  Galois::for_each<Alt::ChunkedAdaptor<Alt::LevelStealingAlt, 64> >(v.begin(), v.end(), process());
+  // Galois::for_each<Alt::ChunkedAdaptor<Alt::InitialQueue<Alt::LevelStealingAlt, Alt::LevelLocalAlt>, 64> >(v.begin(), v.end(), process());
 
-  T3.stop();
+  // T3.stop();
 #endif
 
   // Galois::StatTimer T4("T4");

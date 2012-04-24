@@ -374,7 +374,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
 #else
     unsigned msS = p.scanStart;
     if (localLeader)
-      for (int i = 0; i < ThreadPool::getActiveThreads(); ++i)
+      for (int i = 0; i < (int) ThreadPool::getActiveThreads(); ++i)
 	msS = std::min(msS, current.getRemote(i)->scanStart);
     else
       msS = std::min(msS, current.getRemote(LL::getLeaderForPackage(myID))->scanStart);
@@ -575,7 +575,7 @@ public:
 
   template<typename Iter>
   void push_initial(Iter b, Iter e) {
-    fill_work(*this,b,e);
+    fill_work(*this, b, e);
   }
 
   boost::optional<value_type> pop()  {
@@ -847,7 +847,7 @@ public:
   template<typename ItTy>
   void push_initial(ItTy b, ItTy e) {
     fill_work(*this,b,e);
-    for (int x = 0; x < pushBuffer.size(); ++x)
+    for (unsigned int x = 0; x < pushBuffer.size(); ++x)
       pushBuffer.get(x).flush();
   }
 

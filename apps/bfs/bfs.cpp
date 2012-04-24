@@ -32,7 +32,7 @@
 #include "Galois/Statistic.h"
 #include "Galois/Graphs/LCGraph.h"
 #ifdef GALOIS_EXP
-#include "Galois/PriorityScheduling.h"
+#include "Galois/Runtime/ParallelWorkInline.h"
 #endif
 #include "llvm/Support/CommandLine.h"
 #include "llvm/ADT/SmallVector.h"
@@ -94,8 +94,10 @@ static cll::opt<BFSAlgo> algo(cll::desc("Choose an algorithm:"),
       clEnumVal(parallelManualBarrier, "Galois optimized with workset and manual barrier"),
       clEnumVal(parallelBarrierCas, "Galois optimized with workset and barrier but using CAS"),
       clEnumVal(parallelBarrier, "Galois optimized with workset and barrier"),
+#ifdef GALOIS_EXP
       clEnumVal(parallelBarrierInline, "Galois optimized with inlined workset and barrier"),
-      clEnumValEnd), cll::init(parallelBarrierInline));
+#endif
+      clEnumValEnd), cll::init(parallelBarrier));
 static cll::opt<std::string> filename(cll::Positional,
     cll::desc("<input file>"),
     cll::Required);
@@ -109,7 +111,7 @@ struct SNode {
 };
 
 //typedef Galois::Graph::LC_Linear_Graph<SNode, void> Graph;
-typedef Galois::Graph::LC_CSR_Graph<SNode, char> Graph;
+typedef Galois::Graph::LC_CSR_Graph<SNode, void> Graph;
 //typedef Galois::Graph::LC_CSRInline_Graph<SNode, char> Graph;
 typedef Graph::GraphNode GNode;
 
@@ -460,11 +462,7 @@ struct GaloisAlgo {
     typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
 
     UpdateRequest one[1] = { UpdateRequest(source, 0) };
-#ifdef GALOIS_EXP
-    Exp::WorklistExperiment<OBIM,dChunk,Chunk,UpdateRequestIndexer,std::less<UpdateRequest>,std::greater<UpdateRequest> >().for_each(std::cout, &one[0], &one[1], *this);
-#else
     Galois::for_each<OBIM>(&one[0], &one[1], *this);
-#endif
   }
 
   void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& ctx) const {
@@ -500,11 +498,7 @@ struct GaloisNoLockAlgo {
     typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
 
     UpdateRequest one[1] = { UpdateRequest(source, 0) };
-#ifdef GALOIS_EXP
-    Exp::WorklistExperiment<OBIM,dChunk,Chunk,UpdateRequestIndexer,std::less<UpdateRequest>,std::greater<UpdateRequest> >().for_each(std::cout, &one[0], &one[1], *this);
-#else
     Galois::for_each<OBIM>(&one[0], &one[1], *this);
-#endif
   }
 
   void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& ctx) const {
@@ -552,11 +546,7 @@ struct GaloisWorkSet {
       initial.push_back(dst);
     }
 
-#ifdef GALOIS_EXP
-    Exp::WorklistExperiment<OBIM,dChunk,Chunk,GNodeIndexer,GNodeLess,GNodeGreater>().for_each(std::cout, initial.begin(), initial.end(), *this);
-#else
     Galois::for_each<OBIM>(initial.begin(), initial.end(), *this);
-#endif
   }
 
   void operator()(GNode& n, Galois::UserContext<GNode>& ctx) const {

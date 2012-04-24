@@ -250,15 +250,21 @@ void dChunkedLIFO<T,chunksize,concurrent>::push_backSP(const WID& id, p& n, valu
 } // end HIDDEN
 
 template<class T, class FunctionTy>
-class ForEachWork<WorkList::BulkSynchronous<>,T,FunctionTy>: public ForEachWorkBase<T,  FunctionTy> {
-  typedef ForEachWorkBase<T, FunctionTy> Super;
-  typedef typename Super::value_type value_type;
-  typedef typename Super::ThreadLocalData ThreadLocalData;
-  typedef HIDDEN::dChunkedLIFO<T,256> WLTy;
+class ForEachWork<WorkList::BulkSynchronous<char>,T,FunctionTy> {
+  typedef T value_type;
+  typedef HIDDEN::dChunkedLIFO<value_type,256> WLTy;
+
+  struct ThreadLocalData {
+    GaloisRuntime::UserContextAccess<value_type> facing;
+    SimpleRuntimeContext cnx;
+    LoopStatistics<ForeachTraits<FunctionTy>::NeedsStats> stat;
+  };
 
   GaloisRuntime::FastBarrier barrier1;
   GaloisRuntime::FastBarrier barrier2;
   WLTy wls[2];
+  FunctionTy& function;
+  const char* loopname;
   LL::CacheLineStorage<volatile long> done;
   unsigned numActive;
 
@@ -268,9 +274,9 @@ class ForEachWork<WorkList::BulkSynchronous<>,T,FunctionTy>: public ForEachWorkB
 
   void go() {
     unsigned round = 0;
-    ThreadLocalData& tld = Super::initWorker();
+    ThreadLocalData tld;
+    setThreadContext(&tld.cnx);
     unsigned tid = LL::getTID();
-
     HIDDEN::WID wid;
 
     WLTy* cur = &wls[round];
@@ -279,19 +285,19 @@ class ForEachWork<WorkList::BulkSynchronous<>,T,FunctionTy>: public ForEachWorkB
     while (true) {
       while (!cur->empty(wid)) {
         value_type& p = cur->back(wid);
-        function(p, tld.facing);
+        function(p, tld.facing.data());
         
-        tld.incrementIterations();
+        tld.stat.inc_iterations();
 
         if (ForeachTraits<FunctionTy>::NeedsPush) {
-          for (typename std::vector<value_type>::iterator ii = tld.facing.__getPushBuffer().begin(), 
-              ei = tld.facing.__getPushBuffer().end(); ii != ei; ++ii)
+          for (typename std::vector<value_type>::iterator ii = tld.facing.getPushBuffer().begin(), 
+              ei = tld.facing.getPushBuffer().end(); ii != ei; ++ii)
             next->push_back(wid, *ii);
-          tld.facing.__resetPushBuffer();
+          tld.facing.resetPushBuffer();
         }
 
         if (ForeachTraits<FunctionTy>::NeedsPIA)
-          tld.facing.__resetAlloc();
+          tld.facing.resetAlloc();
 
         cur->pop_back(wid);
       }
@@ -310,23 +316,42 @@ class ForEachWork<WorkList::BulkSynchronous<>,T,FunctionTy>: public ForEachWorkB
       if (done.data)
         break;
     }
-    Super::deinitWorker();
+
+    setThreadContext(0);
+    if (ForeachTraits<FunctionTy>::NeedsStats)
+      tld.stat.report_stat(LL::getTID(), loopname);
   }
 
 public:
-  ForEachWork(FunctionTy& f, const char* loopname): Super(f, loopname) { 
+  ForEachWork(FunctionTy& f, const char* ln): function(f), loopname(ln) { 
+    if (ForeachTraits<FunctionTy>::NeedsAborts || ForeachTraits<FunctionTy>::NeedsBreak)
+      abort();
+
     numActive = GaloisRuntime::getSystemThreadPool().getActiveThreads();
     barrier1.reinit(numActive);
     barrier2.reinit(numActive);
   }
 
-  template<typename IterTy>
-  bool AddInitialWork(IterTy b, IterTy e) {
-    wls[0].push_initial(HIDDEN::WID(), b, e);
-    return true;
+  ~ForEachWork() {
+    if (ForeachTraits<FunctionTy>::NeedsStats)
+      GaloisRuntime::statDone();
   }
 
-  bool parallelInitialWork() const {
+  template<typename IterTy>
+  bool AddInitialWork(IterTy b, IterTy e) {
+    unsigned int a = ThreadPool::getActiveThreads();
+    unsigned int id = LL::getTID();
+    unsigned dist = std::distance(b, e);
+    unsigned num = (dist + a - 1) / a; //round up
+    unsigned int A = std::min(num * id, dist);
+    unsigned int B = std::min(num * (id + 1), dist);
+    IterTy b2 = b;
+    IterTy e2 = b;
+    std::advance(b2, A);
+    std::advance(e2, B);
+    wls[0].initializeThread();
+    wls[1].initializeThread();
+    wls[0].push_initial(HIDDEN::WID(), b2, e2);
     return true;
   }
 

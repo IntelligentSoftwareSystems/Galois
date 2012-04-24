@@ -290,7 +290,7 @@ void globalRelabel(IncomingWL& incoming) {
   Galois::StatTimer T("UpdateHeightsTime");
   T.start();
   GNode single[1] = { app.sink };
-  Galois::for_each<GaloisRuntime::WorkList::BulkSynchronous<> >(&single[0], &single[1], UpdateHeights<flag>());
+  Galois::for_each(&single[0], &single[1], UpdateHeights<flag>());
   T.stop();
 
   Galois::StatTimer T2("FindWorkTime");

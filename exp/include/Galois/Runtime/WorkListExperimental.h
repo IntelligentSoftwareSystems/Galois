@@ -2219,7 +2219,7 @@ public:
     }
   }
 };
-WLCOMPILECHECK(ChunkedAdaptor);
+//WLCOMPILECHECK(ChunkedAdaptor);
 
 }
 

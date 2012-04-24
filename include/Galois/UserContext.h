@@ -29,22 +29,18 @@
 #include "Galois/Runtime/Context.h"
 
 namespace GaloisRuntime {
-template <typename WorkListTy, typename T, typename FunctionTy>
-class ForEachWork;
 
-template <typename WorkListTy, typename FunctionTy> 
-class ParaMeterExecutor;
+template<typename T>
+class UserContextAccess;
+
 }
 
 namespace Galois {
 
 template<typename T>
 class UserContext: private boost::noncopyable {
-  template <typename WorkListTy, typename TT, typename FunctionTy>
-  friend class GaloisRuntime::ForEachWork;
-
-  template <typename WorkListTy, typename FunctionTy>
-  friend class GaloisRuntime::ParaMeterExecutor;
+  template<typename TT>
+  friend class GaloisRuntime::UserContextAccess;
 
   //! Allocator stuff
   IterAllocBaseTy IterationAllocatorBase;
@@ -85,6 +81,25 @@ public:
   void push(T val) {
     pushBuffer.push_back(val);
   }
+};
+
+}
+
+namespace GaloisRuntime {
+
+//! Backdoor to allow runtime methods to access private data in UserContext
+template<typename T>
+class UserContextAccess {
+  Galois::UserContext<T> ctx;
+public:
+  typedef typename Galois::UserContext<T>::pushBufferTy pushBufferTy;
+
+  void resetAlloc() { ctx.__resetAlloc(); }
+  bool breakHappened() { return ctx.__breakHappened(); }
+  void resetBreak() { ctx.__resetBreak(); }
+  pushBufferTy& getPushBuffer() { return ctx.__getPushBuffer(); }
+  void resetPushBuffer() { ctx.__resetPushBuffer(); }
+  Galois::UserContext<T>& data() { return ctx; }
 };
 
 }

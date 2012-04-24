@@ -106,6 +106,8 @@ void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
         abort();
       }
     } while (!L->Owner.stealing_CAS(other, this));
+
+    return;
   }
 #endif
   if (L->Owner.try_lock()) {

@@ -80,10 +80,9 @@ namespace ParaMeter {
 // - opens stats file in append mode
 // - prints stats
 // - closes file when loop finishes
-template<class T, class FunctionTy>
-class ForEachWork<WorkList::ParaMeter<>,T,FunctionTy>: public ForEachWorkBase<T,FunctionTy> {
-  typedef ForEachWorkBase<T, FunctionTy> Super;
-  typedef typename Super::value_type value_type;
+template<class ContainerTy,class T, class FunctionTy>
+class ForEachWork<WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
+  typedef T value_type;
   typedef Galois::UserContext<value_type> UserContextTy;
   typedef typename ContainerTy::template retype<value_type>::WL WorkListTy;
 
@@ -164,7 +163,8 @@ class ForEachWork<WorkList::ParaMeter<>,T,FunctionTy>: public ForEachWorkBase<T,
   };
 
   ParaMeterWorkList workList;
-  FunctionTy body;
+  FunctionTy function;
+  const char* loopname;
   FILE* pstatsFile;
 
   IterQueue commitQueue;
@@ -212,7 +212,7 @@ class ForEachWork<WorkList::ParaMeter<>,T,FunctionTy>: public ForEachWorkBase<T,
 
         bool doabort = false;
         try {
-          body(*item, it.facing);
+          function(*item, it.facing);
         } catch (int a) {
           doabort = true;
         }
@@ -274,7 +274,7 @@ class ForEachWork<WorkList::ParaMeter<>,T,FunctionTy>: public ForEachWorkBase<T,
 
   void finishStep(const StepStats& stat) {
     allSteps.push_back(stat);
-    stat.dump(pstatsFile, Super::loopname);
+    stat.dump(pstatsFile, loopname);
     workList.switchWorkLists();
     setThreadContext(NULL);
   }
@@ -335,7 +335,7 @@ class ForEachWork<WorkList::ParaMeter<>,T,FunctionTy>: public ForEachWorkBase<T,
   }
 
 public:
-  ForEachWork(FunctionTy& f, const char* loopname): Super(f, loopname) { }
+  ForEachWork(FunctionTy& f, const char* ln): function(f), loopname(ln) { }
 
   template<typename IterTy>
   bool AddInitialWork(IterTy b, IterTy e) {
