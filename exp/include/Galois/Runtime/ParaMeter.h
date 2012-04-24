@@ -33,7 +33,7 @@
 #include "Galois/Mem.h"
 #include "Galois/Runtime/Config.h"
 #include "Galois/Runtime/Context.h"
-#include "Galois/Runtime/ForeachTraits.h"
+#include "Galois/Runtime/ForEachTraits.h"
 #include "Galois/Runtime/LoopHooks.h"
 #include "Galois/Runtime/ParallelWork.h"
 #include "Galois/Runtime/PerCPU.h"
@@ -103,15 +103,15 @@ class ForEachWork<WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
     SimpleRuntimeContext cnx;
 
     void resetUserCtx() {
-      if (ForeachTraits<FunctionTy>::NeedsPIA) {
+      if (ForEachTraits<FunctionTy>::NeedsPIA) {
         facing.__resetAlloc();
       }
 
-      if (ForeachTraits<FunctionTy>::NeedsPush) {
+      if (ForEachTraits<FunctionTy>::NeedsPush) {
         facing.__getPushBuffer().clear();
       }
 
-      if (ForeachTraits<FunctionTy>::NeedsBreak) {
+      if (ForEachTraits<FunctionTy>::NeedsBreak) {
         facing.__resetBreak();
       }
     }
@@ -220,7 +220,7 @@ class ForEachWork<WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
         if (doabort) {
           abortIteration(it, *item);
         } else {
-          if (ForeachTraits<FunctionTy>::NeedsBreak) {
+          if (ForEachTraits<FunctionTy>::NeedsBreak) {
             if (it.facing.__breakHappened()) {
               assert(0 && "ParaMeterExecutor: can't handle breaks yet");
               abort();
@@ -293,15 +293,15 @@ class ForEachWork<WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
   }
 
   unsigned retireIteration(IterationContext& it, const bool abort) const {
-    if (ForeachTraits<FunctionTy>::NeedsPush) {
+    if (ForEachTraits<FunctionTy>::NeedsPush) {
       it.facing.__getPushBuffer().clear();
     }
 
-    if (ForeachTraits<FunctionTy>::NeedsPIA) {
+    if (ForEachTraits<FunctionTy>::NeedsPIA) {
       it.facing.__resetAlloc();
     }
 
-    if (ForeachTraits<FunctionTy>::NeedsBreak) {
+    if (ForEachTraits<FunctionTy>::NeedsBreak) {
       it.facing.__resetBreak();
     }
 
@@ -324,7 +324,7 @@ class ForEachWork<WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
   }
 
   unsigned commitIteration(IterationContext& it) {
-    if (ForeachTraits<FunctionTy>::NeedsPush) {
+    if (ForEachTraits<FunctionTy>::NeedsPush) {
       for (typename UserContextTy::pushBufferTy::iterator a = it.facing.__getPushBuffer().begin(),
           ea = it.facing.__getPushBuffer().end(); a != ea; ++a) {
         workList.getNext().push(*a);

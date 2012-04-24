@@ -20,20 +20,20 @@
  *
  * @section Description
  *
- * Traits of the Foreach loop body functor.
+ * Traits of the for_each loop body functor.
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#ifndef GALOIS_RUNTIME_FOREACHTRAITS_H_
-#define GALOIS_RUNTIME_FOREACHTRAITS_H_
+#ifndef GALOIS_RUNTIME_FOREACHTRAITS_H
+#define GALOIS_RUNTIME_FOREACHTRAITS_H
 
 #include "Galois/TypeTraits.h"
 
 namespace GaloisRuntime {
 
 template<typename FunctionTy>
-struct ForeachTraits {
+struct ForEachTraits {
   enum {
     NeedsStats = !Galois::does_not_need_stats<FunctionTy>::value,
     NeedsBreak = Galois::needs_parallel_break<FunctionTy>::value,
@@ -45,4 +45,4 @@ struct ForeachTraits {
 
 }
 
-#endif // GALOIS_RUNTIME_FOREACHTRAITS_H_
+#endif // GALOIS_RUNTIME_FOREACHTRAITS_H

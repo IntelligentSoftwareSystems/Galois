@@ -55,7 +55,7 @@ class DeterministicExecutor {
 
   struct ThreadLocalData {
     GaloisRuntime::UserContextAccess<value_type> facing;
-    LoopStatistics<ForeachTraits<FunctionTy>::NeedsStats> stat;
+    LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
     HIDDEN::WID wid;
     ContextPool pool;
     size_t newSize;
@@ -149,11 +149,11 @@ public:
     numActive = (int) GaloisRuntime::getSystemThreadPool().getActiveThreads();
     for (int i = 0; i < 4; ++i)
       barrier[i].reinit(numActive);
-    if (ForeachTraits<FunctionTy>::NeedsBreak) abort();
+    if (ForEachTraits<FunctionTy>::NeedsBreak) abort();
   }
 
   ~DeterministicExecutor() {
-    if (ForeachTraits<FunctionTy>::NeedsStats)
+    if (ForEachTraits<FunctionTy>::NeedsStats)
       GaloisRuntime::statDone();
   }
 
@@ -379,7 +379,7 @@ void DeterministicExecutor<T,FunctionTy>::pendingLoop(ThreadLocalData& tld)
 
     tld.stat.inc_iterations();
 
-    if (ForeachTraits<FunctionTy>::NeedsPIA)
+    if (ForEachTraits<FunctionTy>::NeedsPIA)
       tld.facing.resetAlloc();
 
     if (commit) {
@@ -413,7 +413,7 @@ void DeterministicExecutor<T,FunctionTy>::commitLoop(ThreadLocalData& tld)
     }
     
     if (commit) {
-      if (ForeachTraits<FunctionTy>::NeedsPush) {
+      if (ForEachTraits<FunctionTy>::NeedsPush) {
         unsigned long parent = p.first.second;
         unsigned count = 0;
         typedef typename GaloisRuntime::UserContextAccess<value_type>::pushBufferTy::iterator iterator;
@@ -433,7 +433,7 @@ void DeterministicExecutor<T,FunctionTy>::commitLoop(ThreadLocalData& tld)
       tld.stat.inc_conflicts();
     }
 
-    if (ForeachTraits<FunctionTy>::NeedsPIA)
+    if (ForEachTraits<FunctionTy>::NeedsPIA)
       tld.facing.resetAlloc();
 
     tld.facing.resetPushBuffer();

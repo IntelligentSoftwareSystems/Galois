@@ -257,7 +257,7 @@ class ForEachWork<WorkList::BulkSynchronous<char>,T,FunctionTy> {
   struct ThreadLocalData {
     GaloisRuntime::UserContextAccess<value_type> facing;
     SimpleRuntimeContext cnx;
-    LoopStatistics<ForeachTraits<FunctionTy>::NeedsStats> stat;
+    LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
   };
 
   GaloisRuntime::FastBarrier barrier1;
@@ -289,14 +289,14 @@ class ForEachWork<WorkList::BulkSynchronous<char>,T,FunctionTy> {
         
         tld.stat.inc_iterations();
 
-        if (ForeachTraits<FunctionTy>::NeedsPush) {
+        if (ForEachTraits<FunctionTy>::NeedsPush) {
           for (typename std::vector<value_type>::iterator ii = tld.facing.getPushBuffer().begin(), 
               ei = tld.facing.getPushBuffer().end(); ii != ei; ++ii)
             next->push_back(wid, *ii);
           tld.facing.resetPushBuffer();
         }
 
-        if (ForeachTraits<FunctionTy>::NeedsPIA)
+        if (ForEachTraits<FunctionTy>::NeedsPIA)
           tld.facing.resetAlloc();
 
         cur->pop_back(wid);
@@ -318,13 +318,13 @@ class ForEachWork<WorkList::BulkSynchronous<char>,T,FunctionTy> {
     }
 
     setThreadContext(0);
-    if (ForeachTraits<FunctionTy>::NeedsStats)
+    if (ForEachTraits<FunctionTy>::NeedsStats)
       tld.stat.report_stat(LL::getTID(), loopname);
   }
 
 public:
   ForEachWork(FunctionTy& f, const char* ln): function(f), loopname(ln) { 
-    if (ForeachTraits<FunctionTy>::NeedsAborts || ForeachTraits<FunctionTy>::NeedsBreak)
+    if (ForEachTraits<FunctionTy>::NeedsAborts || ForEachTraits<FunctionTy>::NeedsBreak)
       abort();
 
     numActive = GaloisRuntime::getSystemThreadPool().getActiveThreads();
@@ -333,7 +333,7 @@ public:
   }
 
   ~ForEachWork() {
-    if (ForeachTraits<FunctionTy>::NeedsStats)
+    if (ForEachTraits<FunctionTy>::NeedsStats)
       GaloisRuntime::statDone();
   }
 

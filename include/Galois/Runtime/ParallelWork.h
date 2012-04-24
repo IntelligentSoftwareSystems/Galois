@@ -29,7 +29,7 @@
 #define GALOIS_RUNTIME_PARALLELWORK_H
 
 #include "Galois/Mem.h"
-#include "Galois/Runtime/ForeachTraits.h"
+#include "Galois/Runtime/ForEachTraits.h"
 #include "Galois/Runtime/Config.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Context.h"
@@ -102,7 +102,7 @@ protected:
   struct ThreadLocalData {
     GaloisRuntime::UserContextAccess<value_type> facing;
     SimpleRuntimeContext cnx;
-    LoopStatistics<ForeachTraits<FunctionTy>::NeedsStats> stat;
+    LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
     TerminationDetection::TokenHolder* lterm;
   };
 
@@ -117,40 +117,40 @@ protected:
   LL::CacheLineStorage<volatile long> abort_happened; //hit flag
 
   inline void commitIteration(ThreadLocalData& tld) {
-    if (ForeachTraits<FunctionTy>::NeedsPush) {
+    if (ForEachTraits<FunctionTy>::NeedsPush) {
       wl.push(tld.facing.getPushBuffer().begin(),
               tld.facing.getPushBuffer().end());
       tld.facing.resetPushBuffer();
     }
-    if (ForeachTraits<FunctionTy>::NeedsPIA)
+    if (ForEachTraits<FunctionTy>::NeedsPIA)
       tld.facing.resetAlloc();
-    if (ForeachTraits<FunctionTy>::NeedsAborts)
+    if (ForEachTraits<FunctionTy>::NeedsAborts)
       tld.cnx.commit_iteration();
   }
 
   GALOIS_ATTRIBUTE_NOINLINE
   void abortIteration(value_type val, ThreadLocalData& tld) {
-    assert(ForeachTraits<FunctionTy>::NeedsAborts);
+    assert(ForEachTraits<FunctionTy>::NeedsAborts);
 
     clearConflictLock();
     tld.cnx.cancel_iteration();
-    if (ForeachTraits<FunctionTy>::NeedsStats)
+    if (ForEachTraits<FunctionTy>::NeedsStats)
       tld.stat.inc_conflicts();
     aborted.push(val);
     __sync_synchronize();
     abort_happened.data = 1;
     //clear push buffer
-    if (ForeachTraits<FunctionTy>::NeedsPush)
+    if (ForEachTraits<FunctionTy>::NeedsPush)
       tld.facing.resetPushBuffer();
     //reset allocator
-    if (ForeachTraits<FunctionTy>::NeedsPIA)
+    if (ForEachTraits<FunctionTy>::NeedsPIA)
       tld.facing.resetAlloc();
   }
 
   inline void doProcess(boost::optional<value_type>& p, ThreadLocalData& tld) {
-    if (ForeachTraits<FunctionTy>::NeedsStats)
+    if (ForEachTraits<FunctionTy>::NeedsStats)
       tld.stat.inc_iterations();
-    if (ForeachTraits<FunctionTy>::NeedsAborts)
+    if (ForEachTraits<FunctionTy>::NeedsAborts)
       tld.cnx.start_iteration();
     function(*p, tld.facing.data());
     commitIteration(tld);
@@ -238,13 +238,13 @@ protected:
 	if (didWork)
 	  tld.lterm->workHappened();
 	if (checkAbort && abort_happened.data && 
-	    (!ForeachTraits<FunctionTy>::NeedsBreak || !break_happened.data)) {
+	    (!ForEachTraits<FunctionTy>::NeedsBreak || !break_happened.data)) {
 	  tld.lterm->workHappened();
 	  handleAborts(tld);
 	}
       } while (didWork);
 
-      if (ForeachTraits<FunctionTy>::NeedsBreak && break_happened.data) {
+      if (ForEachTraits<FunctionTy>::NeedsBreak && break_happened.data) {
 	handleBreak(tld);
 	break;
       }
@@ -252,13 +252,13 @@ protected:
       pool.work();
 #endif
       term.localTermination();
-    } while ((ForeachTraits<FunctionTy>::NeedsPush 
-	     ||ForeachTraits<FunctionTy>::NeedsBreak
-	     ||ForeachTraits<FunctionTy>::NeedsAborts)
+    } while ((ForEachTraits<FunctionTy>::NeedsPush 
+	     ||ForEachTraits<FunctionTy>::NeedsBreak
+	     ||ForEachTraits<FunctionTy>::NeedsAborts)
 	     && !term.globalTermination());
 
     setThreadContext(0);
-    if (ForeachTraits<FunctionTy>::NeedsStats)
+    if (ForEachTraits<FunctionTy>::NeedsStats)
       tld.stat.report_stat(LL::getTID(), loopname);
   }
 
@@ -270,7 +270,7 @@ public:
   }
 
   ~ForEachWork() {
-    if (ForeachTraits<FunctionTy>::NeedsStats)
+    if (ForEachTraits<FunctionTy>::NeedsStats)
       GaloisRuntime::statDone();
   }
 
@@ -284,7 +284,7 @@ public:
   void operator()() {
     if (LL::getTID() == 0 &&
 	ThreadPool::getActiveThreads() > 1 && 
-	ForeachTraits<FunctionTy>::NeedsAborts)
+	ForEachTraits<FunctionTy>::NeedsAborts)
       go<true>();
     else
       go<false>();
