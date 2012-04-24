@@ -221,7 +221,8 @@ protected:
     //Thread Local Data goes on the local stack
     //to be NUMA friendly
     ThreadLocalData tld;
-    setThreadContext(&tld.cnx);
+    if (ForEachTraits<FunctionTy>::NeedsAborts)
+      setThreadContext(&tld.cnx);
     tld.lterm = term.getLocalTokenHolder();
 #ifdef GALOIS_EXP
     SimpleTaskPool& pool = getSystemTaskPool();
