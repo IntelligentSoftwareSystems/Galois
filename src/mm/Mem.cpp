@@ -68,7 +68,13 @@ SizedAllocatorFactory::~SizedAllocatorFactory() {
 
 void* GaloisRuntime::MM::largeAlloc(size_t len) {
   void* data = 0;
-#ifdef GALOIS_NUMA
+#if defined GALOIS_NUMA_OLD
+  nodemask_t nm = numa_no_nodes;
+  unsigned int num = GaloisRuntime::ThreadPool::getActiveThreads();
+  for (unsigned y = 0; y < num; ++y)
+    nodemask_set(&nm, y/4);
+  data = numa_alloc_interleaved_subset(len, nm);
+#elif defined GALOIS_NUMA
   bitmask* nm = numa_allocate_nodemask();
   unsigned int num = GaloisRuntime::ThreadPool::getActiveThreads();
   for (unsigned y = 0; y < num; ++y)
