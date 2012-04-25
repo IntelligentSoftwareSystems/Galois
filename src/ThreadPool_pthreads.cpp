@@ -115,7 +115,7 @@ class ThreadPool_pthread : public ThreadPool {
   Barrier finish; // want on to block on running threads
   std::list<pthread_t> threads; // Set of threads
   unsigned int maxThreads;
-  unsigned int nextThread;
+  volatile unsigned int started;
   volatile bool shutdown; // Set and start threads to have them exit
   volatile RunCommand* workBegin; //Begin iterator for work commands
   volatile RunCommand* workEnd; //End iterator for work commands
@@ -126,6 +126,7 @@ class ThreadPool_pthread : public ThreadPool {
     int id = GaloisRuntime::LL::getTID();
     GaloisRuntime::initPTS();
     GaloisRuntime::LL::bindThreadToProcessor(id);
+    __sync_fetch_and_add(&started, 1);
   }
 
   void cascade(int tid) {
@@ -178,7 +179,7 @@ class ThreadPool_pthread : public ThreadPool {
   
 public:
   ThreadPool_pthread()
-    :maxThreads(0), nextThread(0), shutdown(false), workBegin(0), workEnd(0)
+    :maxThreads(0), started(0), shutdown(false), workBegin(0), workEnd(0)
   {
     initThread();
     ThreadPool::activeThreads = 1;
@@ -196,6 +197,7 @@ public:
       checkResults(rc);
       threads.push_front(t);
     }
+    while (started != maxThreads) {}
   }
 
   ~ThreadPool_pthread() {

@@ -26,20 +26,21 @@
 
 #include <vector>
 
-__thread void** GaloisRuntime::HIDDEN::base;
-static std::vector<void**> heads;
+__thread char* GaloisRuntime::HIDDEN::base;
+static std::vector<char*> heads;
 static unsigned int nextLoc; // intially 0
 
-unsigned GaloisRuntime::HIDDEN::allocOffset() {
-  unsigned retval = __sync_fetch_and_add(&nextLoc, 1);
+unsigned GaloisRuntime::HIDDEN::allocOffset(unsigned size) {
+  size = (size + 15) & ~15;
+  unsigned retval = __sync_fetch_and_add(&nextLoc, size);
+  assert(retval + size < GaloisRuntime::MM::pageSize);
   return retval;
 }
 
 void* GaloisRuntime::HIDDEN::getRemote(unsigned thread, unsigned offset) {
-  void** rbase = heads[thread];
-  if (rbase)
-    return rbase[offset];
-  return 0;
+  char* rbase = heads[thread];
+  assert(rbase);
+  return &rbase[offset];
 }
 
 void GaloisRuntime::initPTS() {
@@ -48,7 +49,7 @@ void GaloisRuntime::initPTS() {
     //before any other threads are generated
     if (heads.empty())
       heads.resize(LL::getMaxThreads());
-    GaloisRuntime::HIDDEN::base = heads[LL::getTID()] = (void**)GaloisRuntime::MM::pageAlloc();
+    GaloisRuntime::HIDDEN::base = heads[LL::getTID()] = (char*)GaloisRuntime::MM::pageAlloc();
     memset(GaloisRuntime::HIDDEN::base, 0, GaloisRuntime::MM::pageSize);
   }
 }

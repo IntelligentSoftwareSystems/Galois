@@ -24,17 +24,21 @@
 #ifndef _GALOIS_RUNTIME_PERTHREADSTORAGE_H
 #define _GALOIS_RUNTIME_PERTHREADSTORAGE_H
 
+#include <cassert>
+#include "Threads.h"
+
 namespace GaloisRuntime {
 
 namespace HIDDEN {
 
-extern __thread void** base;
-unsigned allocOffset();
+extern __thread char* base;
+unsigned allocOffset(unsigned size);
 void* getRemote(unsigned thread, unsigned offset);
 
-static inline void*& getLocal(unsigned offset) {
-  void** B = base;
-  return B[offset];
+static inline void* getLocal(unsigned offset) {
+  char* B = base;
+  assert(B);
+  return &B[offset];
 }
 
 }
@@ -49,20 +53,22 @@ protected:
 public:
   PerThreadStorage() {
     //in case we make one of these before initializing the thread pool
-    initPTS();
+    //This will call initPTS for each thread if it hasn't already
+    GaloisRuntime::getSystemThreadPool();
 
-    offset = HIDDEN::allocOffset();
+    offset = HIDDEN::allocOffset(sizeof(T));
+    for (unsigned n = 0; n < ThreadPool::getActiveThreads(); ++n)
+      new (HIDDEN::getRemote(n, offset)) T();
   }
 
-  //FIXME: Figure out what deallocation means
+  ~PerThreadStorage() {
+    for (unsigned n = 0; n < ThreadPool::getActiveThreads(); ++n)
+      reinterpret_cast<T*>(HIDDEN::getRemote(n, offset))->~T();
+  }
 
   T* getLocal() {
-    void*& ditem = HIDDEN::getLocal(offset);
+    void* ditem = HIDDEN::getLocal(offset);
     return reinterpret_cast<T*>(ditem);
-  }
-
-  void setLocal(T* v) {
-    HIDDEN::getLocal(offset) = reinterpret_cast<void*>(v);
   }
 
   T* getRemote(unsigned int thread) {

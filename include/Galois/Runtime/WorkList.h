@@ -74,11 +74,6 @@ public:
   template<typename Iter>
   void push(Iter b, Iter e);
 
-  //! initialize per-thread data structues for current thread
-  //! this must be called on each active thread before the worklist is
-  //! used
-  void initializeThread();
-
   //! push initial range onto the queue
   //! called with the same b and e on each thread
   template<typename Iter>
@@ -129,8 +124,6 @@ public:
   struct retype {
     typedef LIFO<Tnew, concurrent> WL;
   };
-
-  void initializeThread() {}
 
   typedef T value_type;
 
@@ -194,8 +187,6 @@ public:
     typedef FIFO<Tnew, concurrent> WL;
   };
 
-  void initializeThread() {}
-
   typedef T value_type;
 
   void push(const value_type& val) {
@@ -250,6 +241,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     unsigned int lastMasterVersion;
     unsigned int scanStart;
     std::map<unsigned int, CTy*> local;
+    perItem() :current(NULL), curVersion(0), lastMasterVersion(0), scanStart(0) {}
   };
 
   std::vector<std::pair<unsigned int, CTy*> > masterLog;
@@ -265,7 +257,6 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     for (; p.lastMasterVersion < masterVersion; ++p.lastMasterVersion) {
       std::pair<unsigned int, CTy*> logEntry = masterLog[p.lastMasterVersion];
       p.local[logEntry.first] = logEntry.second;
-      logEntry.second->initializeThread();
       assert(logEntry.second);
     }
   }
@@ -287,7 +278,6 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     updateLocal_i(p);
     if (!lC) {
       lC = new CTy();
-      lC->initializeThread();
       p.lastMasterVersion = ++masterVersion;
       masterLog.push_back(std::make_pair(i, lC));
     }
@@ -315,14 +305,6 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     for (typename std::vector<std::pair<unsigned int, CTy*> >::iterator ii = masterLog.begin(), ee = masterLog.end(); ii != ee; ++ii) {
       delete ii->second;
     }
-  }
-
-  void initializeThread() {
-    perItem* p = new perItem();
-    p->current = NULL;
-    p->lastMasterVersion = 0;
-    p->scanStart = 0;
-    current.setLocal(p);
   }
 
   void push(const value_type& val) {
@@ -409,12 +391,6 @@ public:
   struct retype {
     typedef LocalQueues<typename GlobalQueueTy::template retype<Tnew>::WL, typename LocalQueueTy::template retype<Tnew>::WL, Tnew> WL;
   };
-
-  void initializeThread() {
-    local.setLocal(new lWLTy());
-    local.getLocal()->initializeThread();
-    global.initializeThread();
-  }
 
   typedef T value_type;
 
@@ -544,11 +520,6 @@ public:
 
   ChunkedMaster() : heap(sizeof(Chunk)) { }
 
-  void initializeThread() {
-    assert(!data.getLocal());
-    data.setLocal(new p());
-  }
-
   void flush() {
     p& n = *data.getLocal();
     if (n.next)
@@ -631,6 +602,7 @@ class ForwardAccessRange {
     IterTy begin;
     IterTy end;
     unsigned num;
+    TLD() :num(ThreadPool::getActiveThreads()) {}
   };
 
   PerThreadStorage<TLD> tlds;
@@ -649,11 +621,6 @@ public:
   struct retype {
     typedef ForwardAccessRange<IterTy> WL;
   };
-
-  void initializeThread() {
-    tlds.setLocal(new TLD());
-    tlds.getLocal()->num = ThreadPool::getActiveThreads();
-  }
 
   //! push a value onto the queue
   void push(const value_type& val) {
@@ -758,10 +725,6 @@ public:
     typedef RandomAccessRange<Stealing,IterTy> WL;
   };
 
-  void initializeThread() {
-    tlds.setLocal(new TLD());
-  }
-
   //! push a value onto the queue
   void push(const value_type& val) {
     abort();
@@ -826,8 +789,6 @@ public:
 
   typedef T value_type;
 
-  void initializeThread() {}
-  
   void push(const value_type& val)  {
     unsigned int index = Fn(val);
     unsigned int mindex = Items.effectiveIDFor(index);
@@ -897,12 +858,6 @@ class BulkSynchronous : private boost::noncopyable {
     unsigned numActive = GaloisRuntime::getSystemThreadPool().getActiveThreads();
     barrier1.reinit(numActive);
     barrier2.reinit(numActive);
-  }
-
-  void initializeThread() {
-    tlds.setLocal(new TLD());
-    wls[0].initializeThread();
-    wls[1].initializeThread();
   }
 
   void push(const value_type& val) {

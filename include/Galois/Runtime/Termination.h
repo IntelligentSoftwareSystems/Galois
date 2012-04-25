@@ -55,7 +55,6 @@ public:
   }
 
   void initializeThread() {
-    data.setLocal(new TokenHolder());
     if (LL::getTID() == 0) {
       data.getLocal()->hasToken = true;
       data.getLocal()->tokenIsBlack = true;

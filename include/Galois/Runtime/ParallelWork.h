@@ -226,7 +226,6 @@ protected:
     tld.lterm = term.getLocalTokenHolder();
 #ifdef GALOIS_EXP
     SimpleTaskPool& pool = getSystemTaskPool();
-    pool.initializeThread();
 #endif
 
     do {
@@ -278,7 +277,6 @@ public:
   template<typename Iter>
   void AddInitialWork(Iter b, Iter e) {
     term.initializeThread();
-    wl.initializeThread();
     wl.push_initial(b,e);
   }
 
