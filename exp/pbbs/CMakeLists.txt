@@ -1,5 +1,6 @@
 include_directories("include")
 set(input ${CMAKE_CURRENT_BINARY_DIR}/inputs)
+set(input_src ${CMAKE_CURRENT_SOURCE_DIR}/inputs)
 
 if(EXP_DOALL MATCHES "GALOIS")
   if(CXX0X_FOUND)

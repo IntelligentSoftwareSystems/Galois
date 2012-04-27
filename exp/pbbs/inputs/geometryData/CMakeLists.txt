@@ -44,7 +44,7 @@ find_program(BZCAT bzcat)
 
 function(genRays triangles rays)
   add_custom_command(OUTPUT ${input}/${triangles}
-    COMMAND bzcat ${CMAKE_CURRENT_SOURCE_DIR}/data/${triangles}.bz2 > ${input}/${triangles})
+    COMMAND bzcat ${input_src}/geometryData/data/${triangles}.bz2 > ${input}/${triangles})
   add_custom_command(OUTPUT ${input}/${rays}
     COMMAND addRays ${input}/${triangles} ${input}/${rays}
     DEPENDS addRays ${input}/${triangles})
