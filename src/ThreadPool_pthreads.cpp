@@ -129,9 +129,9 @@ class ThreadPool_pthread : public ThreadPool {
 
   void cascade(int tid) {
     unsigned multiple = 2;
-    for (unsigned i = 0; i < multiple; ++i) {
+    for (unsigned i = 1; i <= multiple; ++i) {
       unsigned n = tid * multiple + i;
-      if (n < activeThreads && n != 0)
+      if (n < activeThreads)
         starts[n].release();
     }
   }
@@ -141,9 +141,6 @@ class ThreadPool_pthread : public ThreadPool {
     
     if (LocalThreadID != 0)
       starts[LocalThreadID].acquire();
-
-    if (LocalThreadID >= (int) activeThreads)
-      return;
 
     cascade(LocalThreadID);
     
@@ -177,18 +174,15 @@ class ThreadPool_pthread : public ThreadPool {
   
 public:
   ThreadPool_pthread()
-    :maxThreads(0), started(0), shutdown(false), workBegin(0), workEnd(0)
+    :maxThreads(GaloisRuntime::LL::getMaxThreads()), started(0), shutdown(false), workBegin(0), workEnd(0)
   {
     initThread();
-    ThreadPool::activeThreads = 1;
-    unsigned int num = GaloisRuntime::LL::getMaxThreads();
-    maxThreads = num;
 
-    starts.reserve(num);
-    for (unsigned i = 0; i < num; ++i)
+    starts.reserve(maxThreads);
+    for (unsigned i = 0; i < maxThreads; ++i)
       starts.push_back(Semaphore(0));
 
-    for (unsigned i = 1; i < num; ++i) {
+    for (unsigned i = 1; i < maxThreads; ++i) {
       pthread_t t;
       int rc = pthread_create(&t, 0, &slaunch, this);
       checkResults(rc);
