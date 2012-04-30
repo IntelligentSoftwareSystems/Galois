@@ -25,6 +25,8 @@
 #define _GALOIS_RUNTIME_PERTHREADSTORAGE_H
 
 #include <cassert>
+#include "ll/TID.h"
+#include "ll/HWTopo.h"
 #include "Threads.h"
 
 namespace GaloisRuntime {
@@ -74,6 +76,10 @@ public:
   T* getRemote(unsigned int thread) {
     void* ditem = HIDDEN::getRemote(thread, offset);
     return reinterpret_cast<T*>(ditem);
+  }
+
+  unsigned size() {
+    return LL::getMaxThreads();
   }
 };
 
