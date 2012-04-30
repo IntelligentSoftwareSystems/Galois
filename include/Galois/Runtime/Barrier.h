@@ -24,11 +24,8 @@
 #define GALOIS_RUNTIME_BARRIER_H
 
 #include "PerCPU.h"
+#include "PerThreadStorage.h"
 
-#include <limits>
-#include <cstdio>
-
-#include <stdlib.h>
 #include <pthread.h>
 
 namespace GaloisRuntime {
@@ -36,42 +33,18 @@ namespace GaloisRuntime {
 class PthreadBarrier {
   pthread_barrier_t bar;
 
-  void checkResults(int val) {
-    if (val) {
-      perror("PTHREADS: ");
-      assert(0 && "PThread check");
-      abort();
-    }
-  }
+  void checkResults(int val);
+
 public:
-  PthreadBarrier() {
-    //uninitialized barriers block a lot of threads to help with debugging
-    int rc = pthread_barrier_init(&bar, 0, std::numeric_limits<int>::max());
-    checkResults(rc);
-  }
+  PthreadBarrier();
 
-  PthreadBarrier(unsigned int val) {
-    int rc = pthread_barrier_init(&bar, 0, val);
-    checkResults(rc);
-  }
+  PthreadBarrier(unsigned int val);
 
-  ~PthreadBarrier() {
-    int rc = pthread_barrier_destroy(&bar);
-    checkResults(rc);
-  }
+  ~PthreadBarrier();
 
-  void reinit(int val) {
-   int rc = pthread_barrier_destroy(&bar);
-   checkResults(rc);
-   rc = pthread_barrier_init(&bar, 0, val);
-   checkResults(rc);
-  }
+  void reinit(int val);
 
-  void wait() {
-    int rc = pthread_barrier_wait(&bar);
-    if (rc && rc != PTHREAD_BARRIER_SERIAL_THREAD)
-      checkResults(rc);
-  }
+  void wait();
 };
 
 //! Simple busy waiting barrier, not cyclic
@@ -98,7 +71,7 @@ public:
   SimpleBarrier(): globalTotal(0), size(-1) { }
 
   //! Not thread-safe and should only be called when no threads are in wait()/increment()
-  void reinit(int val, int init);
+  void reinit(int val, int init = 0);
 
   void increment();
   void wait();
@@ -118,6 +91,47 @@ public:
 
   void reinit(int val);
   void wait(); 
+};
+
+class FasterBarrier {
+  volatile unsigned count;
+  unsigned P;
+  bool sense;
+  PerThreadStorage<volatile bool> local_sense;
+
+public:
+  FasterBarrier() :count(~0), P(~0), sense(true) {}
+
+  void reinit(unsigned num) {
+    P = count = num;
+  }
+
+  void wait();
+};
+
+class MCSBarrier {
+  struct treenode {
+    //vpid is LL::getTID()
+    volatile bool* parentpointer; //null of vpid == 0
+    volatile bool* childpointers[2];
+    bool havechild[4];
+
+    volatile bool childnotready[4];
+    volatile bool parentsense;
+    bool sense;
+  };
+
+  PerThreadStorage<treenode> nodes;
+  
+  void _reinit(unsigned P);
+
+public:
+  MCSBarrier();
+
+  //not safe if any thread is in wait
+  void reinit(unsigned val);
+
+  void wait();
 };
 
 }

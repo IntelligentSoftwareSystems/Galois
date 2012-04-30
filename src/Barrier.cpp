@@ -28,6 +28,47 @@
 #include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 
+#include <cstdlib>
+#include <cstdio>
+#include <iostream>
+
+void GaloisRuntime::PthreadBarrier::checkResults(int val) {
+  if (val) {
+    perror("PTHREADS: ");
+    assert(0 && "PThread check");
+    abort();
+  }
+}
+
+GaloisRuntime::PthreadBarrier::PthreadBarrier() {
+  //uninitialized barriers block a lot of threads to help with debugging
+  int rc = pthread_barrier_init(&bar, 0, ~0);
+  checkResults(rc);
+}
+
+GaloisRuntime::PthreadBarrier::PthreadBarrier(unsigned int val) {
+  int rc = pthread_barrier_init(&bar, 0, val);
+  checkResults(rc);
+}
+
+GaloisRuntime::PthreadBarrier::~PthreadBarrier() {
+  int rc = pthread_barrier_destroy(&bar);
+  checkResults(rc);
+}
+
+void GaloisRuntime::PthreadBarrier::reinit(int val) {
+  int rc = pthread_barrier_destroy(&bar);
+  checkResults(rc);
+  rc = pthread_barrier_init(&bar, 0, val);
+  checkResults(rc);
+}
+
+void GaloisRuntime::PthreadBarrier::wait() {
+  int rc = pthread_barrier_wait(&bar);
+  if (rc && rc != PTHREAD_BARRIER_SERIAL_THREAD)
+    checkResults(rc);
+}
+
 void GaloisRuntime::SimpleBarrier::cascade(int tid) {
   int multiple = 2;
   for (int i = 0; i < multiple; ++i) {
@@ -124,4 +165,67 @@ void GaloisRuntime::FastBarrier::wait() {
   out.increment();
 }
 
+#define fanout 4
+void GaloisRuntime::FasterBarrier::wait() {
+  volatile bool& ls = *local_sense.getLocal();
+  if (0 == __sync_sub_and_fetch(&count, 1)) {
+    count = P;
+    LL::compilerBarrier();
+    *local_sense.getRemote(0) = true;
+  }
+  while (!ls) { LL::asmPause(); }
+  ls = false;
+  unsigned id = LL::getTID();
+  for (unsigned x = 1; x <= fanout; ++x)
+    if (id * fanout + x < P)
+      *local_sense.getRemote(id*fanout+x) = true;
+}
 
+void GaloisRuntime::MCSBarrier::_reinit(unsigned P) {
+  for (unsigned i = 0; i < nodes.size(); ++i) {
+    treenode& n = *nodes.getRemote(i);
+    n.sense = true;
+    n.parentsense = false;
+    for (int j = 0; j < 4; ++j)
+      n.childnotready[j] = n.havechild[j] = ((4*i+j+1) < P);
+    n.parentpointer = (i == 0) ? 0 :
+      &nodes.getRemote((i-1)/4)->childnotready[(i-1)%4];
+    n.childpointers[0] = ((2*i + 1) >= P) ? 0 :
+      &nodes.getRemote(2*i+1)->parentsense;
+    n.childpointers[1] = ((2*i + 2) >= P) ? 0 :
+      &nodes.getRemote(2*i+2)->parentsense;
+  }
+}
+
+GaloisRuntime::MCSBarrier::MCSBarrier() {
+  unsigned P = ThreadPool::getActiveThreads();
+  _reinit(P);
+  //std::cerr << "mcs size " << sizeof(treenode) << "\n";
+}
+
+void GaloisRuntime::MCSBarrier::reinit(unsigned val) {
+  _reinit(val);
+}
+
+void GaloisRuntime::MCSBarrier::wait() {
+  treenode& n = *nodes.getLocal();
+  while (n.childnotready[0] || n.childnotready[1] || 
+   	 n.childnotready[2] || n.childnotready[3]) {
+    GaloisRuntime::LL::asmPause();
+  }
+  for (int i = 0; i < 4; ++i)
+    n.childnotready[i] = n.havechild[i];
+  if (n.parentpointer) {
+    //FIXME: make sure the compiler doesn't do a RMW because of the as-if rule
+    *n.parentpointer = false;
+    while(n.parentsense != n.sense) {
+      GaloisRuntime::LL::asmPause();
+    }
+  }
+  //signal children in wakeup tree
+  if (n.childpointers[0])
+    *n.childpointers[0] = n.sense;
+  if (n.childpointers[1])
+    *n.childpointers[1] = n.sense;
+  n.sense = !n.sense;
+}
