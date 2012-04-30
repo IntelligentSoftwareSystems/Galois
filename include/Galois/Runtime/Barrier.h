@@ -134,6 +134,8 @@ public:
   void wait();
 };
 
+typedef MCSBarrier GBarrier;
+
 }
 
 #endif

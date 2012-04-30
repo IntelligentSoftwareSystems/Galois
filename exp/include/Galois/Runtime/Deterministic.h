@@ -110,7 +110,7 @@ class DeterministicExecutor {
 
   PerCPU<MergeInfo> mergeInfo;
   typename MergeInfo::Data mergeBuf;
-  FastBarrier barrier[4];
+  GBarrier barrier[4];
   WL wl;
   NewWork new_;
   PendingWork pending;

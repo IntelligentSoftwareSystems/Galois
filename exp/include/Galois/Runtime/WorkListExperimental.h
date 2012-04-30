@@ -1854,8 +1854,8 @@ class StaticPartitioning : private boost::noncopyable {
 
   GaloisRuntime::PerCPU<TLD> tlds;
 
-  GaloisRuntime::FastBarrier barrier1;
-  GaloisRuntime::FastBarrier barrier2;
+  GaloisRuntime::GBarrier barrier1;
+  GaloisRuntime::GBarrier barrier2;
   unsigned numActive;
   volatile bool empty;
 

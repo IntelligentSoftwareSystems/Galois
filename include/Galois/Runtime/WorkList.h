@@ -837,8 +837,8 @@ class BulkSynchronous : private boost::noncopyable {
 
   CTy wls[2];
   GaloisRuntime::PerThreadStorage<TLD> tlds;
-  GaloisRuntime::FastBarrier barrier1;
-  GaloisRuntime::FastBarrier barrier2;
+  GaloisRuntime::GBarrier barrier1;
+  GaloisRuntime::GBarrier barrier2;
   GaloisRuntime::LL::CacheLineStorage<volatile long> some;
   volatile bool empty;
 

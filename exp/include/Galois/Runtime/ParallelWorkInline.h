@@ -260,8 +260,8 @@ class ForEachWork<WorkList::BulkSynchronous<char>,T,FunctionTy> {
     LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
   };
 
-  GaloisRuntime::FastBarrier barrier1;
-  GaloisRuntime::FastBarrier barrier2;
+  GaloisRuntime::GBarrier barrier1;
+  GaloisRuntime::GBarrier barrier2;
   WLTy wls[2];
   FunctionTy& function;
   const char* loopname;

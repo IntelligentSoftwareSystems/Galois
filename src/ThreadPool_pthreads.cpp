@@ -86,8 +86,6 @@ public:
   }
 };
 
-typedef GaloisRuntime::FastBarrier Barrier;
-
 #ifdef GALOIS_VTUNE
 class SampleProfiler {
   bool IsOn;
@@ -112,7 +110,7 @@ public:
 
 class ThreadPool_pthread : public ThreadPool {
   std::vector<Semaphore> starts; // signal to release threads to run
-  Barrier finish; // want on to block on running threads
+  GBarrier* finish; // want on to block on running threads
   std::list<pthread_t> threads; // Set of threads
   unsigned int maxThreads;
   volatile unsigned int started;
@@ -160,7 +158,7 @@ class ThreadPool_pthread : public ThreadPool {
         workPtr->work();
 
       if (workPtr->barrierAfter)
-        finish.wait();
+        finish->wait();
       ++workPtr;
     }
     VT.startIf(LocalThreadID, false);
@@ -184,7 +182,6 @@ public:
     initThread();
     ThreadPool::activeThreads = 1;
     unsigned int num = GaloisRuntime::LL::getMaxThreads();
-    finish.reinit(num);
     maxThreads = num;
 
     starts.reserve(num);
@@ -212,13 +209,17 @@ public:
       int rc = pthread_join(t, NULL);
       checkResults(rc);
     }
+    delete finish;
   }
 
   virtual void run(RunCommand* begin, RunCommand* end) {
     workBegin = begin;
     workEnd = end;
+    if (!finish) {
+      finish = new GBarrier();
+      finish->reinit(activeThreads);
+    }
     __sync_synchronize();
-    finish.reinit(activeThreads);
     //Do master thread work
     doWork();
     //clean up
@@ -233,6 +234,10 @@ public:
     }
     assert(activeThreads <= maxThreads);
     assert(activeThreads - 1 <= threads.size());
+
+    if (!finish)
+      finish = new GBarrier();
+    finish->reinit(activeThreads);
 
     return activeThreads;
   }
