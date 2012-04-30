@@ -32,7 +32,7 @@
 namespace GaloisRuntime {
 namespace WorkList {
 
-template<typename Indexer, typename realWL, typename T = int>
+template<typename Indexer, typename realWL, typename T >
 class WorkListTracker {
   struct p {
     OnlineStat stat;
@@ -146,6 +146,114 @@ public:
 	//__sync_fetch_and_add(&clock.data, 1);
       }
     }
+    return ret;
+  }
+};
+
+template<typename realWL, unsigned perEpoch = 1024 >
+class LoadBalanceTracker {
+  struct p {
+    unsigned int epoch;
+    unsigned int newEpoch;
+    std::vector<unsigned> values;
+    p() :epoch(0), newEpoch(0), values(1) {}
+  };
+
+  //online collection of stats
+  PerThreadStorage<p> tracking;
+
+  realWL wl;
+  unsigned Pr;
+
+  void atomic_max(unsigned* loc, unsigned val) {
+    unsigned oe = *loc;
+    while (oe < val) {
+      oe = __sync_val_compare_and_swap(loc, oe, val);
+    }
+  }
+
+  void updateEpoch(p& P) {
+    unsigned multiple = 2;
+    P.epoch = P.newEpoch;
+    P.values.resize(P.epoch+1);
+    unsigned tid = LL::getTID();
+    for (unsigned i = 1; i <= multiple; ++i) {
+      unsigned n = tid * multiple + i;
+      if (n < Pr)
+	atomic_max(&tracking.getRemote(n)->newEpoch, P.epoch);
+    }
+  }
+
+  void proposeEpoch(unsigned e) {
+    atomic_max(&tracking.getRemote(0)->newEpoch, e);
+  }
+
+public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef LoadBalanceTracker<typename realWL::template rethread<newconcurrent>::WL, perEpoch> WL;
+  };
+  template<typename Tnew>
+  struct retype {
+    typedef LoadBalanceTracker<typename realWL::template retype<Tnew>::WL, perEpoch> WL;
+  };
+
+  typedef typename realWL::value_type value_type;
+
+  LoadBalanceTracker() :Pr(ThreadPool::getActiveThreads()) {}
+
+  ~LoadBalanceTracker() {
+    std::ofstream file("tracking.csv", std::ofstream::trunc);
+
+    //print header
+    file << "Epoch";
+    for (unsigned int t = 0; t < Pr; ++t)
+      file << ",Thread " << t;
+    file << "\n";
+
+    unsigned maxEpoch = 0;
+    for (unsigned int t = 0; t < Pr; ++t)
+      maxEpoch = std::max(maxEpoch, (unsigned)tracking.getRemote(t)->values.size());
+
+    //for each epoch
+    for (unsigned int x = 0; x < maxEpoch; ++x) {
+      file << x;
+      //for each thread
+      for (unsigned int t = 0; t < Pr; ++t)
+	if (x < tracking.getRemote(t)->values.size())
+	  file << "," << tracking.getRemote(t)->values[x];
+	else
+	  file << ",0";
+      file << "\n";
+    }
+  }
+    
+  //! push a value onto the queue
+  void push(value_type val) {
+    wl.push(val);
+  }
+
+  template<typename Iter>
+  void push(Iter b, Iter e) {
+    wl.push(b,e);
+  }
+
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    wl.push_initial(b,e);
+  }
+
+  boost::optional<value_type> pop() {
+    p& P = *tracking.getLocal();
+
+    if (P.epoch != P.newEpoch)
+      updateEpoch(P);
+
+    boost::optional<value_type> ret = wl.pop();
+    if (!ret) return ret;
+    unsigned num = ++P.values[P.epoch];
+    if (num >= perEpoch)
+      proposeEpoch(P.epoch + 1);
     return ret;
   }
 };
