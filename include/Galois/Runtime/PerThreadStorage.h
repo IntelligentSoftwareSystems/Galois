@@ -25,25 +25,35 @@
 #define _GALOIS_RUNTIME_PERTHREADSTORAGE_H
 
 #include <cassert>
+#include <vector>
+
 #include "ll/TID.h"
 #include "ll/HWTopo.h"
 #include "Threads.h"
 
 namespace GaloisRuntime {
 
-namespace HIDDEN {
+class PerBackend {
+  unsigned int nextLoc;
+  std::vector<char*> heads;
 
-extern __thread char* base;
-unsigned allocOffset(unsigned size);
-void* getRemote(unsigned thread, unsigned offset);
+  void initCommon();
 
-static inline void* getLocal(unsigned offset) {
-  char* B = base;
-  assert(B);
-  return &B[offset];
-}
+public:
+  char* initPerThread();
+  char* initPerPackage();
+  unsigned allocOffset(unsigned size);
+  void* getRemote(unsigned thread, unsigned offset);
+  void* getLocal(unsigned offset, char* base) {
+    return &base[offset];
+  }
+};
 
-}
+extern __thread char* ptsBase;
+extern PerBackend PTSBackend;
+
+extern __thread char* ppsBase;
+extern PerBackend PPSBackend;
 
 void initPTS();
 
@@ -58,23 +68,59 @@ public:
     //This will call initPTS for each thread if it hasn't already
     GaloisRuntime::getSystemThreadPool();
 
-    offset = HIDDEN::allocOffset(sizeof(T));
-    for (unsigned n = 0; n < ThreadPool::getActiveThreads(); ++n)
-      new (HIDDEN::getRemote(n, offset)) T();
+    offset = PTSBackend.allocOffset(sizeof(T));
+    for (unsigned n = 0; n < LL::getMaxThreads(); ++n)
+      new (PTSBackend.getRemote(n, offset)) T();
   }
 
   ~PerThreadStorage() {
-    for (unsigned n = 0; n < ThreadPool::getActiveThreads(); ++n)
-      reinterpret_cast<T*>(HIDDEN::getRemote(n, offset))->~T();
+    for (unsigned n = 0; n < LL::getMaxThreads(); ++n)
+      reinterpret_cast<T*>(PTSBackend.getRemote(n, offset))->~T();
   }
 
   T* getLocal() {
-    void* ditem = HIDDEN::getLocal(offset);
+    void* ditem = PTSBackend.getLocal(offset, ptsBase);
     return reinterpret_cast<T*>(ditem);
   }
 
   T* getRemote(unsigned int thread) {
-    void* ditem = HIDDEN::getRemote(thread, offset);
+    void* ditem = PTSBackend.getRemote(thread, offset);
+    return reinterpret_cast<T*>(ditem);
+  }
+
+  unsigned size() {
+    return LL::getMaxThreads();
+  }
+};
+
+template<typename T>
+class PerPackageStorage {
+protected:
+  unsigned offset;
+
+public:
+  PerPackageStorage() {
+    //in case we make one of these before initializing the thread pool
+    //This will call initPTS for each thread if it hasn't already
+    GaloisRuntime::getSystemThreadPool();
+
+    offset = PPSBackend.allocOffset(sizeof(T));
+    for (unsigned n = 0; n < LL::getMaxPackages(); ++n)
+      new (PPSBackend.getRemote(LL::getLeaderForPackage(n), offset)) T();
+  }
+
+  ~PerPackageStorage() {
+    for (unsigned n = 0; n < LL::getMaxPackages(); ++n)
+      reinterpret_cast<T*>(PPSBackend.getRemote(LL::getLeaderForPackage(n), offset))->~T();
+  }
+
+  T* getLocal() {
+    void* ditem = PPSBackend.getLocal(offset, ppsBase);
+    return reinterpret_cast<T*>(ditem);
+  }
+
+  T* getRemote(unsigned int thread) {
+    void* ditem = PPSBackend.getRemote(thread, offset);
     return reinterpret_cast<T*>(ditem);
   }
 

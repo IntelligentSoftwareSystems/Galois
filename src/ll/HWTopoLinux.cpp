@@ -207,13 +207,13 @@ std::vector<int> parseCPUSet() {
 
 struct AutoLinuxPolicy {
   //number of hw supported threads
-  int numThreads, numThreadsRaw;
+  unsigned numThreads, numThreadsRaw;
   
   //number of "real" processors
-  int numCores, numCoresRaw;
+  unsigned numCores, numCoresRaw;
 
   //number of packages
-  int numPackages, numPackagesRaw;
+  unsigned numPackages, numPackagesRaw;
 
   std::vector<int> packages;
   std::vector<int> maxPackage;
@@ -264,9 +264,9 @@ struct AutoLinuxPolicy {
 
 #if DEBUG_HWTOPOLINUX
     //DEBUG:
-    for (int i = 0; i < vals.size(); ++i)
+    for (unsigned i = 0; i < vals.size(); ++i)
       printCPUINFO(vals[i]);
-    for (int i = 0; i < virtmap.size(); ++i)
+    for (unsigned i = 0; i < virtmap.size(); ++i)
       gPrint("%d, ", virtmap[i]);
     gPrint("\n");
     //End DEBUG
@@ -360,8 +360,8 @@ struct AutoLinuxPolicy {
     gPrint("Cores: %d, %d (raw)\n", numCores, numCoresRaw);
     gPrint("Packages: %d, %d (raw)\n", numPackages, numPackagesRaw);
 
-    for (int i = 0; i < virtmap.size(); ++i) {
-      gPrint("T %3d P %3d Tr %3d %d", i, packages[i], virtmap[i], (i == leaders[packages[i]] ? 1 : 0));
+    for (unsigned i = 0; i < virtmap.size(); ++i) {
+      gPrint("T %3d P %3d Tr %3d %d", i, packages[i], virtmap[i], ((int)i == leaders[packages[i]] ? 1 : 0));
       if (i >= numCores)
 	gPrint(" HT");
       gPrint("\n");
@@ -409,9 +409,14 @@ bool GaloisRuntime::LL::isLeaderForPackageInternal(int id) {
   return A.leaders[A.packages[id]] == id;
 }
 
-unsigned GaloisRuntime::LL::getLeaderForPackage(int id) {
+unsigned GaloisRuntime::LL::getLeaderForThread(int id) {
   assert(id < (int)A.packages.size());
   return A.leaders[A.packages[id]];
+}
+
+unsigned GaloisRuntime::LL::getLeaderForPackage(int id) {
+  assert(id < (int)A.leaders.size());
+  return A.leaders[id];
 }
 
 

@@ -44,6 +44,7 @@
 #include "Lonestar/BoilerPlate.h"
 
 //#include "Galois/Runtime/WorkListAlt.h"
+#include "Galois/Runtime/WorkListDebug.h"
 
 #ifdef GALOIS_DET
 #include "Galois/Runtime/Deterministic.h"
@@ -227,7 +228,9 @@ int main(int argc, char** argv) {
 #ifdef GALOIS_DET
   Galois::for_each<Deterministic<> >(wlnew.begin(), wlnew.end(), Process());
 #else
-  Galois::for_each<LocalQueues<dChunkedLIFO<256>, ChunkedLIFO<256> > >(wl.begin(), wl.end(), Process());
+  typedef LocalQueues<dChunkedLIFO<256>, ChunkedLIFO<256> > BQ;
+  typedef LoadBalanceTracker<BQ, 2048 > DBQ;
+  Galois::for_each<BQ>(wl.begin(), wl.end(), Process());
 #endif
   T.stop();
   Touter.stop();

@@ -111,10 +111,8 @@ protected:
 
   TerminationDetection term;
   WLTy wl;
-  AbortedList aborted;
-
-  LL::CacheLineStorage<volatile long> break_happened; //hit flag
-  LL::CacheLineStorage<volatile long> abort_happened; //hit flag
+  PerPackageStorage<AbortedList> aborted;
+  PerThreadStorage<bool> broke;
 
   inline void commitIteration(ThreadLocalData& tld) {
     if (ForEachTraits<FunctionTy>::NeedsPush) {
@@ -129,16 +127,17 @@ protected:
   }
 
   GALOIS_ATTRIBUTE_NOINLINE
-  void abortIteration(value_type val, ThreadLocalData& tld) {
+  void abortIteration(value_type val, ThreadLocalData& tld, bool recursiveAbort) {
     assert(ForEachTraits<FunctionTy>::NeedsAborts);
 
     clearConflictLock();
     tld.cnx.cancel_iteration();
     if (ForEachTraits<FunctionTy>::NeedsStats)
       tld.stat.inc_conflicts();
-    aborted.push(val);
-    __sync_synchronize();
-    abort_happened.data = 1;
+    if (recursiveAbort)
+      aborted.getRemote(LL::getLeaderForPackage(LL::getPackageForThread(LL::getTID()) / 2))->push(val);
+    else
+      aborted.getLocal()->push(val);
     //clear push buffer
     if (ForEachTraits<FunctionTy>::NeedsPush)
       tld.facing.resetPushBuffer();
@@ -159,61 +158,57 @@ protected:
   GALOIS_ATTRIBUTE_NOINLINE
   void handleBreak(ThreadLocalData& tld) {
     commitIteration(tld);
-    break_happened.data = 1;
-    boost::optional<value_type> p;
-    do {
-      p = wl.pop();
-    } while (p);
-    do {
-      p = aborted.pop();
-    } while (p);
-    do {
-      p = wl.pop();
-    } while (p);
+    for (unsigned x = 0; x < broke.size(); ++x)
+      *broke.getRemote(x) = true;
   }
 
-  template<unsigned limit, typename WL>
-  bool runQueue(ThreadLocalData& tld, WL& lwl) {
-    boost::optional<value_type> p = lwl.pop();
+  bool runQueueSimple(ThreadLocalData& tld) {
     bool workHappened = false;
+    boost::optional<value_type> p = wl.pop();
     if (p)
       workHappened = true;
-    try {
-      if (!limit) { //compile time optimization
-	while (p) {
-	  doProcess(p, tld);
-	  p = lwl.pop();
+    while (p) {
+      doProcess(p, tld);
+      p = wl.pop();
+    }
+    return workHappened;
+  }
+
+  template<bool limit, typename WL>
+  bool runQueue(ThreadLocalData& tld, WL& lwl, bool recursiveAbort) {
+    bool workHappened = false;
+    boost::optional<value_type> p = lwl.pop();
+    unsigned num = 0;
+    if (p)
+      workHappened = true;
+    while (p) {
+      try {
+	doProcess(p, tld);
+      } catch (ConflictFlag i) {
+	switch(i) {
+	case GaloisRuntime::CONFLICT:
+	  abortIteration(*p, tld, recursiveAbort);
+	  break;
+	case GaloisRuntime::BREAK:
+	  handleBreak(tld);
+	  return false;
+	default:
+	  abort();
 	}
-       } else {
-       	unsigned num = limit;
-       	while (p && num) {
-       	  doProcess(p, tld);
-       	  if (--num)
-       	    p = lwl.pop();
-       	}
       }
-    } catch (ConflictFlag i) {
-      switch(i) {
-      case GaloisRuntime::CONFLICT:
-	abortIteration(*p, tld);
-	break;
-      case GaloisRuntime::BREAK:
-	handleBreak(tld);
-	workHappened = false; // short circuit caller
-	break;
-      default:
-	assert(0 && "Unhandled throw");
-	abort();
-	break;
+      if (limit) {
+	++num;
+	if (num == 255)
+	  break;
       }
+      p = lwl.pop();
     }
     return workHappened;
   }
 
   GALOIS_ATTRIBUTE_NOINLINE
-  void handleAborts(ThreadLocalData& tld) {
-    abort_happened.data = 0;
-    runQueue<0>(tld, aborted);
+  bool handleAborts(ThreadLocalData& tld) {
+    return runQueue<false>(tld, *aborted.getLocal(), true);
   }
 
   template<bool checkAbort>
@@ -227,30 +222,31 @@ protected:
 #ifdef GALOIS_EXP
     SimpleTaskPool& pool = getSystemTaskPool();
 #endif
-
     do {
-      bool didWork = false;
+      bool didWork;
       do {
+	didWork = false;
+	//Run some iterations
+	if (ForEachTraits<FunctionTy>::NeedsBreak || ForEachTraits<FunctionTy>::NeedsAborts)
+	  didWork = runQueue<checkAbort || ForEachTraits<FunctionTy>::NeedsBreak>(tld, wl, false);
+	else //No try/catch
+	  didWork = runQueueSimple(tld);
+	//Check for break
+	if (ForEachTraits<FunctionTy>::NeedsBreak && *broke.getLocal())
+	  break;
+	//Check for abort
 	if (checkAbort)
-	  didWork = runQueue<255>(tld, wl);
-	else 
-	  didWork = runQueue<0>(tld, wl);
+	  didWork |= handleAborts(tld);
+	//Update node color
 	if (didWork)
 	  tld.lterm->workHappened();
-	if (checkAbort && abort_happened.data && 
-	    (!ForEachTraits<FunctionTy>::NeedsBreak || !break_happened.data)) {
-	  tld.lterm->workHappened();
-	  handleAborts(tld);
-	}
       } while (didWork);
-
-      if (ForEachTraits<FunctionTy>::NeedsBreak && break_happened.data) {
-	handleBreak(tld);
+      if (ForEachTraits<FunctionTy>::NeedsBreak && *broke.getLocal())
 	break;
-      }
 #ifdef GALOIS_EXP
       pool.work();
 #endif
+
       term.localTermination();
     } while ((ForEachTraits<FunctionTy>::NeedsPush 
 	     ||ForEachTraits<FunctionTy>::NeedsBreak
@@ -264,10 +260,7 @@ protected:
 
 public:
   ForEachWork(FunctionTy& _f, const char* _loopname): function(_f), loopname(_loopname)
-  {
-    abort_happened.data = 0;
-    break_happened.data = 0;
-  }
+  {}
 
   ~ForEachWork() {
     if (ForEachTraits<FunctionTy>::NeedsStats)
@@ -281,7 +274,7 @@ public:
   }
 
   void operator()() {
-    if (LL::getTID() == 0 &&
+    if (LL::isLeaderForPackage(LL::getTID()) &&
 	ThreadPool::getActiveThreads() > 1 && 
 	ForEachTraits<FunctionTy>::NeedsAborts)
       go<true>();

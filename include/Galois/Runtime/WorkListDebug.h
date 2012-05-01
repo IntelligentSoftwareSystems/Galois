@@ -150,7 +150,7 @@ public:
   }
 };
 
-template<typename realWL, unsigned perEpoch = 1024 >
+template<typename realWL, unsigned perEpoch = 1024>
 class LoadBalanceTracker {
   struct p {
     unsigned int epoch;

@@ -359,7 +359,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
       for (int i = 0; i < (int) ThreadPool::getActiveThreads(); ++i)
 	msS = std::min(msS, current.getRemote(i)->scanStart);
     else
-      msS = std::min(msS, current.getRemote(LL::getLeaderForPackage(myID))->scanStart);
+      msS = std::min(msS, current.getRemote(LL::getLeaderForThread(myID))->scanStart);
 #endif
     typename std::map<unsigned int, CTy*>::iterator ii = p.local.lower_bound(msS);
     for (typename std::map<unsigned int, CTy*>::iterator ee = p.local.end();

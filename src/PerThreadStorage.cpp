@@ -24,33 +24,60 @@
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/mm/Mem.h"
 
-#include <vector>
+__thread char* GaloisRuntime::ptsBase;
+GaloisRuntime::PerBackend GaloisRuntime::PTSBackend;
+__thread char* GaloisRuntime::ppsBase;
+GaloisRuntime::PerBackend GaloisRuntime::PPSBackend;
 
-__thread char* GaloisRuntime::HIDDEN::base;
-static std::vector<char*> heads;
-static unsigned int nextLoc; // intially 0
 
-unsigned GaloisRuntime::HIDDEN::allocOffset(unsigned size) {
+unsigned GaloisRuntime::PerBackend::allocOffset(unsigned size) {
   size = (size + 15) & ~15;
   unsigned retval = __sync_fetch_and_add(&nextLoc, size);
   assert(retval + size < GaloisRuntime::MM::pageSize);
   return retval;
 }
 
-void* GaloisRuntime::HIDDEN::getRemote(unsigned thread, unsigned offset) {
+void* GaloisRuntime::PerBackend::getRemote(unsigned thread, unsigned offset) {
   char* rbase = heads[thread];
   assert(rbase);
   return &rbase[offset];
 }
 
-void GaloisRuntime::initPTS() {
-  if (!GaloisRuntime::HIDDEN::base) {
-    //unguarded initialization as initPTS will run in the master thread
-    //before any other threads are generated
-    if (heads.empty())
-      heads.resize(LL::getMaxThreads());
-    GaloisRuntime::HIDDEN::base = heads[LL::getTID()] = (char*)GaloisRuntime::MM::pageAlloc();
-    memset(GaloisRuntime::HIDDEN::base, 0, GaloisRuntime::MM::pageSize);
+void GaloisRuntime::PerBackend::initCommon() {
+  if (heads.empty())
+    heads.resize(LL::getMaxThreads());
+}
+
+char* GaloisRuntime::PerBackend::initPerThread() {
+  initCommon();
+  char* b = heads[LL::getTID()] = (char*)GaloisRuntime::MM::pageAlloc();
+  memset(b, 0, GaloisRuntime::MM::pageSize);
+  return b;
+}
+
+char* GaloisRuntime::PerBackend::initPerPackage() {
+  initCommon();
+  unsigned id = LL::getTID();
+  unsigned leader = LL::getLeaderForThread(id);
+  if (id == leader) {
+    char* b = heads[id] = (char*)GaloisRuntime::MM::pageAlloc();
+    memset(b, 0, GaloisRuntime::MM::pageSize);
+    return b;
+  } else {
+    //wait for leader to fix up package
+    while (__sync_bool_compare_and_swap(&heads[leader], 0, 0)) { LL::asmPause(); }
+    heads[id] = heads[leader];
+    return heads[id];
   }
 }
 
+void GaloisRuntime::initPTS() {
+  if (!GaloisRuntime::ptsBase) {
+    //unguarded initialization as initPTS will run in the master thread
+    //before any other threads are generated
+    GaloisRuntime::ptsBase = PTSBackend.initPerThread();
+  }
+  if (!GaloisRuntime::ppsBase) {
+    GaloisRuntime::ppsBase = PPSBackend.initPerPackage();
+  }
+}
