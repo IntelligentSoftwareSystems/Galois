@@ -36,10 +36,14 @@ void testf(T& b, const char* str) {
 
 int main() {
 
-  Galois::setMaxThreads(GaloisRuntime::LL::getMaxThreads());
-  std::cout << "Using " << GaloisRuntime::LL::getMaxThreads() << " threads\n";
+  unsigned M = GaloisRuntime::LL::getMaxThreads();
 
-  if (1) {
+  while (M) {
+    
+    Galois::setMaxThreads(M); //GaloisRuntime::LL::getMaxThreads());
+  std::cout << "Using " << M << " threads\n";
+
+  if (0) {
 
   int count = 128 * 1024 * 1024;
 
@@ -81,6 +85,9 @@ int main() {
   testf(fbarrier, "fast");
   testf(mbarrier, "mcs");
   testf(ffbarrier, "faster");
+
+  M /= 2;
+  };
 
   return 0;
 }
