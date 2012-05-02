@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -114,23 +114,15 @@ class Cavity: private boost::noncopyable {
 	  const GNode& n2 = newNodes[j];
 	  const Element& e2 = graph.getData(n2, Galois::NONE);
 	  
-	  bool found = false;
-	  int indexForNewNode;
-	  int indexForNode;
-	  
 	  for (int x = 2; x >= 1; --x) {
 	    for (int y = 2; y >= 1; --y) {
 	      if (e1.getPoint(x) == e2.getPoint(y)) {
-		indexForNewNode = x & 2;
-                indexForNode = y & 2;
-                found = true;
+		int indexForNewNode = x & 2;
+                int indexForNode = y & 2;
+                graph.getEdgeData(graph.addEdge(n1, n2, Galois::NONE)) = indexForNewNode;
+                graph.getEdgeData(graph.addEdge(n2, n1, Galois::NONE)) = indexForNode;
 	      }
 	    }
-	  }
-	  
-	  if (found) {
-	    graph.getEdgeData(graph.addEdge(n1, n2, Galois::NONE)) = indexForNewNode;
-	    graph.getEdgeData(graph.addEdge(n2, n1, Galois::NONE)) = indexForNode;
 	  }
 	}
       }
@@ -153,7 +145,7 @@ public:
     { }
 
   void init(const GNode& c, Point* p) {
-    searcher.useMark(p, 1, p->numTries());
+    searcher.useMark(p->id(), 1, p->numTries());
     center = c;
     point = p;
   }

@@ -50,6 +50,10 @@
 #include <string.h>
 #include <unistd.h>
 
+#ifdef GALOIS_DET
+#include "Galois/Runtime/Deterministic.h"
+#endif
+
 namespace cll = llvm::cl;
 
 static const char* name = "Delaunay Triangulation";
@@ -89,6 +93,100 @@ struct Process {
   Process(QuadTree* t): tree(t) { }
 
   template<typename Alloc2>
+  bool graphSearch(const Point* p, const Alloc2& alloc, GNode start, GNode& node) {
+    ContainsTuple contains(*graph, p->t());
+    Searcher<Alloc2> searcher(*graph, alloc);
+    searcher.useMark(p->id(), 0, p->numTries());
+    searcher.findFirst(start, contains);
+
+    if (searcher.matches.empty()) {
+      return false;
+    }
+
+    node = searcher.matches.front();
+    return true;
+  }
+
+  void computeCenter(const Element& e, Tuple& t) const {
+    for (int i = 0; i < 3; ++i) {
+      const Tuple& o = e.getPoint(i)->t();
+      for (int j = 0; j < 2; ++j) {
+        t[j] += o[j];
+      }
+    }
+    for (int j = 0; j < 2; ++j) {
+      t[j] *= 1/3.0;
+    }
+  }
+
+  void findBestNormal(const Element& element, const Point* p, const Point*& bestP1, const Point*& bestP2) {
+    Tuple center(0);
+    computeCenter(element, center);
+    int scale = element.clockwise() ? 1 : -1;
+
+    Tuple origin = p->t() - center;
+//        double length2 = origin.x() * origin.x() + origin.y() * origin.y();
+    bestP1 = bestP2 = NULL;
+    double bestVal;
+    for (int i = 0; i < 3; ++i) {
+      int next = i + 1;
+      if (next > 2) next -= 3;
+
+      const Point* p1 = element.getPoint(i);
+      const Point* p2 = element.getPoint(next);
+      double dx = p2->t().x() - p1->t().x();
+      double dy = p2->t().y() - p1->t().y();
+      Tuple normal(scale * -dy, scale * dx);
+      double val = normal.dot(origin); // / length2;
+      if (bestP1 == NULL || val > bestVal) {
+        bestVal = val;
+        bestP1 = p1;
+        bestP2 = p2;
+      }
+    }
+    assert(bestP1 != NULL && bestP2 != NULL && bestVal > 0);
+  }
+
+  GNode findCorrespondingNode(GNode start, const Point* p1, const Point* p2) {
+    for (Graph::edge_iterator ii = graph->edge_begin(start, Galois::CHECK_CONFLICT),
+        ei = graph->edge_end(start, Galois::CHECK_CONFLICT); ii != ei; ++ii) {
+      GNode dst = graph->getEdgeDst(ii);
+      Element& e = graph->getData(dst, Galois::NONE);
+      int count = 0;
+      for (int i = 0; i < e.dim(); ++i) {
+        if (e.getPoint(i) == p1 || e.getPoint(i) == p2) {
+          if (++count == 2)
+            return dst;
+        }
+      }
+    }
+    abort();
+  }
+
+  bool planarSearch(const Point* p, GNode start, GNode& node) {
+    // Try simple hill climbing instead
+    ContainsTuple contains(*graph, p->t());
+    while (!contains(start)) {
+      Element& element = graph->getData(start, Galois::CHECK_CONFLICT);
+      if (element.boundary()) {
+        // Should only happen when quad tree returns a boundary point which is rare
+        // There's only one way to go from here
+        assert(std::distance(graph->edge_begin(start), graph->edge_end(start)) == 1);
+        start = graph->getEdgeDst(graph->edge_begin(start, Galois::CHECK_CONFLICT));
+      } else {
+        // Find which neighbor will get us to point fastest by computing normal
+        // vectors
+        const Point *p1, *p2;
+        findBestNormal(element, p, p1, p2);
+        start = findCorrespondingNode(start, p1, p2);
+      }
+    }
+
+    node = start;
+    return true;
+  }
+
+  template<typename Alloc2>
   bool findContainingElement(const Point* p, const Alloc2& alloc, GNode& node) {
     Point* result;
     if (!tree->find(p, result)) {
@@ -99,22 +197,16 @@ struct Process {
 
     GNode someNode = result->someElement();
 
-    if (someNode == GNode()) {
+    if (!someNode) {
       // Not in mesh yet
       return false;
     }
 
-    ContainsTuple contains(*graph, p->t());
-    Searcher<Alloc2> searcher(*graph, alloc);
-    searcher.useMark(p, 0, p->numTries());
-    searcher.findFirst(someNode, contains);
-
-    if (searcher.matches.empty()) {
-      return false;
-    }
-
-    node = searcher.matches.front();
-    return true;
+#if 1
+    return graphSearch(p, alloc, someNode, node);
+#else
+    return planarSearch(p, someNode, node);
+#endif
   }
 
   //! Parallel operator
@@ -127,7 +219,10 @@ struct Process {
     if (!findContainingElement(p, ctx.getPerIterAlloc(), node)) {
       // Someone updated an element while we were searching, producing
       // a semi-consistent state
-      ctx.push(p);
+      //ctx.push(p);
+      // Current version is safe with locking so this shouldn't happen
+      std::cerr << "Should not happen\n";
+      abort();
       return;
     }
   
@@ -150,6 +245,7 @@ struct Process {
     if (!findContainingElement(p, std::allocator<char>(), node)) {
       std::cerr << "Couldn't find triangle containing point\n";
       abort();
+      return;
     }
   
     assert(graph->getData(node).inTriangle(p->t()));
@@ -185,7 +281,6 @@ struct ReadPoints {
       boost::make_transform_iterator(&points[0], GetPointer()),
       boost::make_transform_iterator(&points[points.size()], GetPointer()));
     t.output(std::back_insert_iterator<PointList>(result));
-    //std::copy(points.begin(), points.end(), std::back_insert_iterator<PointList>(result));
 
     addBoundaryPoints();
   }
@@ -378,6 +473,8 @@ static void writeMesh(const std::string& filename) {
   pout.close();
 }
 
+static ptrdiff_t myrandom(ptrdiff_t i) { return rand() % i; }
+
 static void generateMesh(PointList& points) {
   size_t end = points.size();
   size_t eend = end - 3; // end of "real" points
@@ -387,16 +484,21 @@ static void generateMesh(PointList& points) {
   T.start();
   typedef std::vector<Point*> OrderTy;
   OrderTy order;
-  order.reserve(eend);
+  order.reserve(end);
   std::copy(
       boost::make_transform_iterator(&points[0], GetPointer()),
       boost::make_transform_iterator(&points[end], GetPointer()),
       std::back_insert_iterator<OrderTy>(order));
-  // But don't randomize boundary points
-  std::random_shuffle(&order[0], &order[eend]);
+  ptrdiff_t (*myptr)(ptrdiff_t) = myrandom;
+  srand(0xDEADBEEF);
+  std::random_shuffle(&order[0], &order[eend], myptr);
   T.stop();
 
+#ifdef GALOIS_DET
+  size_t prefix = eend - std::min((size_t) 16*16, eend);
+#else
   size_t prefix = eend - std::min((size_t) 16*numThreads, eend);
+#endif
  
   Galois::StatTimer T1("serial");
   T1.start();
@@ -424,7 +526,11 @@ static void generateMesh(PointList& points) {
 
     Galois::StatTimer PT("ParallelTime");
     PT.start();
+#ifdef GALOIS_DET
+    Galois::for_each<Deterministic<> >(&order[top], &order[prevTop], Process(&q));
+#else
     Galois::for_each<WL>(&order[top], &order[prevTop], Process(&q));
+#endif
     PT.stop();
   } while (top > 0);
 }

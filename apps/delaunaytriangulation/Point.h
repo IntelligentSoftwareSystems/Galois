@@ -39,7 +39,7 @@ class Point: public Galois::GChecked {
   long m_id;
   
 public:
-  Point(double x, double y, long id): m_tries(0) {
+  Point(double x, double y, long id): m_n(NULL), m_tries(0) {
     m_t.x() = x;
     m_t.y() = y;
     m_id = id;
@@ -58,11 +58,11 @@ public:
 
   void removeElement(const GNode& n) {
     if (m_n == n)
-      m_n = GNode();
+      m_n = NULL;
   }
 
   bool inMesh() const {
-    return m_n != GNode();
+    return m_n != NULL;
   }
 
   GNode someElement() const {
@@ -79,7 +79,7 @@ public:
   void print(std::ostream& os) const {
     os << "(id: " << m_id << " t: ";
     m_t.print(os);
-    if (m_n != GNode())
+    if (m_n != NULL)
       os << "SOME";
     else
       os << "NULL";
