@@ -27,6 +27,7 @@
 
 #include "Galois/Mem.h"
 #include "Galois/Runtime/Context.h"
+#include "Galois/Runtime/MethodFlags.h"
 
 namespace GaloisRuntime {
 
@@ -79,6 +80,7 @@ public:
 
   //! Push new work 
   void push(T val) {
+    GaloisRuntime::checkWrite(Galois::WRITE);
     pushBuffer.push_back(val);
   }
 };
