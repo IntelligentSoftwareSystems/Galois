@@ -30,13 +30,13 @@ set(USE_DET OFF CACHE BOOL "Use deterministic execution")
 
 #find better c++ compilers
 find_program(CLANGXX clang++)
-find_program(CXX_4.5 g++-4.5)
+#find_program(CXX_4.5 g++-4.5)
 find_program(ICCXX icpc)
 
 #always use newer gcc
-if(NOT ${CXX_4.5} STREQUAL "CXX_4.5-NOTFOUND")
-  set(CMAKE_CXX_COMPILER ${CXX_4.5})
-endif()
+#if(NOT ${CXX_4.5} STREQUAL "CXX_4.5-NOTFOUND")
+#  set(CMAKE_CXX_COMPILER ${CXX_4.5})
+#endif()
 
 if(NOT ${CLANGXX} STREQUAL "CLANGXX-NOTFOUND")
   if(USE_CLANG)
@@ -92,7 +92,6 @@ set(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0" "1.47" "1.47.0")
 set(Boost_USE_MULTITHREADED OFF) # newer boost builds don't use -mt extension
 #Other options that can be used with find_package(Boost)
 # set(BOOST_ROOT /path/)
-# set(Boost_NO_SYSTEM_PATHS TRUE) # useful with BOOST_ROOT
 set(BOOST_LIBS system iostreams filesystem)
 find_package(Boost 1.36.0 COMPONENTS ${BOOST_LIBS} REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
@@ -127,14 +126,14 @@ if(USE_EXP)
     message(WARNING "TBB specified but not found; have your sourced TBB_INSTALL_DIR/bin/tbbvars.sh?")
   endif()
 
-  find_package(MPI)
-  if(MPI_FOUND)
-    add_definitions(-DGALOIS_MPI)
-    include_directories(${MPI_INCLUDE_PATH})
-    set(RT_LINK ${MPI_LIBRARIES} ${RT_LINK})
-  else()
-    message(WARNING "MPI specified but not found")
-  endif()
+  #find_package(MPI)
+  #if(MPI_FOUND)
+  #  add_definitions(-DGALOIS_MPI)
+  #  include_directories(${MPI_INCLUDE_PATH})
+  #  set(RT_LINK ${MPI_LIBRARIES} ${RT_LINK})
+  #else()
+  #  message(WARNING "MPI specified but not found")
+  #endif()
 endif()
 
 # c++0x features
