@@ -35,6 +35,7 @@ class ElementMark {
   std::pair<long,unsigned> val;
 public:
   ElementMark(): val(0, 0) { }
+  ElementMark(const ElementMark& x): val(x.val) { }
   ElementMark(unsigned hi, unsigned lo): val(hi, lo) { }
 
   void update(const ElementMark& m) {
