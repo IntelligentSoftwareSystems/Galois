@@ -198,7 +198,7 @@ protected:
       }
       if (limit) {
 	++num;
-	if (num == 255)
+	if (num == 32)
 	  break;
       }
       p = lwl.pop();
