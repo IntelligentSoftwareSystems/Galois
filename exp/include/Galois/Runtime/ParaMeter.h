@@ -230,8 +230,7 @@ class ForEachWork<WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
       size_t numActivities = commitQueue.size();
 
       if (numActivities == 0) {
-        std::cerr << "ParaMeterExecutor: no progress made in step=" << currStep << std::endl;
-        abort();
+        LL::gError (true, "ParaMeterExecutor: no progress made in step %d\n", currStep);
       }
 
       double avgLocks = 0;
