@@ -97,8 +97,6 @@ public:
   typedef typename Galois::UserContext<T>::pushBufferTy pushBufferTy;
 
   void resetAlloc() { ctx.__resetAlloc(); }
-  bool breakHappened() { return ctx.__breakHappened(); }
-  void resetBreak() { ctx.__resetBreak(); }
   pushBufferTy& getPushBuffer() { return ctx.__getPushBuffer(); }
   void resetPushBuffer() { ctx.__resetPushBuffer(); }
   Galois::UserContext<T>& data() { return ctx; }

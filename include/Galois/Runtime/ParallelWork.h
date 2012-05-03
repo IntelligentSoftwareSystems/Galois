@@ -106,11 +106,12 @@ protected:
     TerminationDetection::TokenHolder* lterm;
   };
 
+  WLTy default_wl;
+  WLTy& wl;
   FunctionTy& function;
   const char* loopname;
 
   TerminationDetection term;
-  WLTy wl;
   PerPackageStorage<AbortedList> aborted;
   PerThreadStorage<bool> broke;
 
@@ -259,8 +260,15 @@ protected:
   }
 
 public:
-  ForEachWork(FunctionTy& _f, const char* _loopname): function(_f), loopname(_loopname)
+  ForEachWork(FunctionTy& _f, const char* _loopname)
+    : wl(default_wl), function(_f), loopname(_loopname)
   {}
+
+  template <typename W>
+  ForEachWork (W& _wl, FunctionTy& _f, const char* _ln):
+    wl (_wl), function (_f), loopname (_ln) 
+  {}
+
 
   ~ForEachWork() {
     if (ForEachTraits<FunctionTy>::NeedsStats)
@@ -269,7 +277,7 @@ public:
 
   template<typename Iter>
   void AddInitialWork(Iter b, Iter e) {
-    term.initializeThread();
+    // term.initializeThread();
     wl.push_initial(b,e);
   }
 
@@ -358,3 +366,4 @@ void do_all_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
 } // end namespace
 
 #endif
+

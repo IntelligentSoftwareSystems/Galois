@@ -30,6 +30,7 @@
 #ifdef GALOIS_EXP
 #include "Galois/Runtime/SimpleTaskPool.h"
 #include "Galois/Runtime/ParallelWorkInline.h"
+#include "Galois/Runtime/ParaMeter.h"
 #endif
 
 #include "boost/iterator/transform_iterator.hpp"
@@ -243,3 +244,4 @@ ptrdiff_t count_if ( InputIterator first, InputIterator last, Predicate pred )
 
 }
 #endif
+

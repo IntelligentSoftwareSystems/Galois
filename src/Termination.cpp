@@ -26,7 +26,9 @@ using namespace GaloisRuntime;
 
 TerminationDetection::TerminationDetection()
   :globalTerm(false), lastWasWhite(false)
-{}
+{
+  initializeThread();
+}
 
 void TerminationDetection::reset() {
   assert(data.getLocal()->hasToken);

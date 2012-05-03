@@ -28,33 +28,67 @@
 
 namespace Galois {
 
-template<typename WLTy, typename FunctionTy>
-static inline void for_each_wl(WLTy& wl, FunctionTy f, const char* loopname = 0) {
-  assert(!inGaloisForEach);
+namespace hidden {
 
-  inGaloisForEach = true;
+  template <typename ExecutorTy>
+  static inline void for_each_wl_impl (ExecutorTy& exec, const bool isParallel) {
+    assert(!GaloisRuntime::inGaloisForEach);
+
+    GaloisRuntime::inGaloisForEach = true;
+
+    GaloisRuntime::RunCommand w[2];
+
+    // disabling profiling because this loop is invoked multiple times typically
+    // and that crashes vtune
+    w[0].work = GaloisRuntime::Config::ref(exec);
+    w[0].isParallel = isParallel;
+    w[0].barrierAfter = true;
+    w[0].profile = false;
+    w[1].work = &GaloisRuntime::runAllLoopExitHandlers;
+    w[1].isParallel = false;
+    w[1].barrierAfter = true;
+    w[1].profile = false;
+    GaloisRuntime::getSystemThreadPool().run(&w[0], &w[2]);
+
+    GaloisRuntime::inGaloisForEach = false;
+  }
+}
+
+// XXX: the basic idea of treating executor type as a WorkList e.g. WorkList::ParaMeter
+// is broken
+// However, following should work:
+// When using ParaMeter say: for_each_wl <ParaMeter<WLTy> > (wl, ...)
+// and when usin galois say: for_each_wl (wl,...)
+template <typename ExecTy, typename WLTy, typename FunctionTy>
+static inline void for_each_wl (WLTy& wl, FunctionTy f, const char* loopname=0) {
 
   typedef typename WLTy::value_type T;
 
-  typedef ForEachWork<WLTy,T,FunctionTy,false> WorkTy;
+  typedef GaloisRuntime::ForEachWork<ExecTy, T, FunctionTy> WorkTy;
 
-  WorkTy W(wl, f, loopname);
-  RunCommand w[2];
+  WorkTy W (wl, f, loopname);
 
-  w[0].work = Config::ref(W);
-  w[0].isParallel = true;
-  w[0].barrierAfter = true;
-  w[0].profile = true;
-  w[1].work = &runAllLoopExitHandlers;
-  w[1].isParallel = false;
-  w[1].barrierAfter = true;
-  w[1].profile = true;
-  getSystemThreadPool().run(&w[0], &w[2]);
-
-  inGaloisForEach = false;
+  hidden::for_each_wl_impl (W, false);
+ 
 }
+
+template <typename WLTy, typename FunctionTy>
+static inline void for_each_wl (WLTy& wl, FunctionTy f, const char* loopname=0) {
+
+  typedef typename WLTy::value_type T;
+
+  typedef GaloisRuntime::ForEachWork<WLTy, T, FunctionTy> WorkTy;
+
+  WorkTy W (wl, f, loopname);
+
+  hidden::for_each_wl_impl (W, true);
+}
+
+
+
 
 
 }
 
 #endif //  GALOIS_GALOISUNSAFE_H
+

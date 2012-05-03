@@ -31,6 +31,7 @@
 #include "Galois/UserContext.h"
 #include "Galois/TypeTraits.h"
 #include "Galois/Mem.h"
+
 #include "Galois/Runtime/Config.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/ForEachTraits.h"
@@ -41,6 +42,7 @@
 #include "Galois/Runtime/Termination.h"
 #include "Galois/Runtime/Threads.h"
 #include "Galois/Runtime/WorkList.h"
+#include "Galois/Runtime/ll/gio.h"
 
 #include "llvm/Support/CommandLine.h"
 
@@ -59,7 +61,7 @@ class ParaMeter: private boost::noncopyable {
 };
 }
 
-namespace ParaMeter {
+namespace ParaMeterInit {
   void init();
   const char* getStatsFileName();
 }
@@ -67,33 +69,20 @@ namespace ParaMeter {
 // Single ParaMeter stats file per run of an app
 // which includes all instances of for_each loops
 // run with ParaMeter Executor
-//
-// basically, from commandline parser calls enableParaMeter
-// and we
-// - set a flag
-// - open a stats file in overwrite mode
-// - print stats header
-// - close file
-
-// for each for_each loop, we create an instace of ParaMeterExecutor
-// which
-// - opens stats file in append mode
-// - prints stats
-// - closes file when loop finishes
 template<class ContainerTy,class T, class FunctionTy>
 class ForEachWork<WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
   typedef T value_type;
-  typedef Galois::UserContext<value_type> UserContextTy;
+  typedef GaloisRuntime::UserContextAccess<value_type> UserContextTy;
   typedef typename ContainerTy::template retype<value_type>::WL WorkListTy;
 
   struct StepStats {
     size_t step;
-    size_t availParallelism;
+    size_t parallelism;
     size_t workListSize;
 
     void dump(FILE* out, const char* loopname) const {
       if (out) {
-        fprintf(out, "%s, %zu, %zu, %zu\n", loopname, step, availParallelism, workListSize);
+        fprintf(out, "%s, %zu, %zu, %zu\n", loopname, step, parallelism, workListSize);
       }
     }
   };
@@ -104,15 +93,16 @@ class ForEachWork<WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
 
     void resetUserCtx() {
       if (ForEachTraits<FunctionTy>::NeedsPIA) {
-        facing.__resetAlloc();
+        facing.resetAlloc();
       }
 
       if (ForEachTraits<FunctionTy>::NeedsPush) {
-        facing.__getPushBuffer().clear();
+        facing.getPushBuffer().clear();
       }
 
       if (ForEachTraits<FunctionTy>::NeedsBreak) {
-        facing.__resetBreak();
+        // TODO: no support for breaks yet
+        // facing.resetBreak();
       }
     }
   };
@@ -162,14 +152,6 @@ class ForEachWork<WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
     }
   };
 
-  ParaMeterWorkList workList;
-  FunctionTy function;
-  const char* loopname;
-  FILE* pstatsFile;
-
-  IterQueue commitQueue;
-  // XXX: may turn out to be unnecessary
-  std::vector<StepStats> allSteps;
 
   void go() {
     beginLoop();
@@ -212,21 +194,28 @@ class ForEachWork<WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
 
         bool doabort = false;
         try {
-          function(*item, it.facing);
-        } catch (int a) {
-          doabort = true;
+          function(*item, it.facing.data ());
+
+        } catch (ConflictFlag flag) {
+
+          switch (flag) {
+            case GaloisRuntime::CONFLICT:
+              doabort = true;
+              break;
+
+            case GaloisRuntime::BREAK:
+              LL::gError (true, "ParaMeterExecutor: can't handle breaks yet");
+              break;
+
+            default:
+              abort ();
+          }
         }
 
         if (doabort) {
           abortIteration(it, *item);
-        } else {
-          if (ForEachTraits<FunctionTy>::NeedsBreak) {
-            if (it.facing.__breakHappened()) {
-              assert(0 && "ParaMeterExecutor: can't handle breaks yet");
-              abort();
-            }
-          }
 
+        } else {
           commitQueue.push_back(&it);
         }
 
@@ -260,7 +249,7 @@ class ForEachWork<WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
       // dump stats
       StepStats stat;
       stat.step = currStep;
-      stat.availParallelism = numActivities;
+      stat.parallelism = numActivities;
       stat.workListSize = numIter;
 
       finishStep(stat);
@@ -293,17 +282,8 @@ class ForEachWork<WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
   }
 
   unsigned retireIteration(IterationContext& it, const bool abort) const {
-    if (ForEachTraits<FunctionTy>::NeedsPush) {
-      it.facing.__getPushBuffer().clear();
-    }
 
-    if (ForEachTraits<FunctionTy>::NeedsPIA) {
-      it.facing.__resetAlloc();
-    }
-
-    if (ForEachTraits<FunctionTy>::NeedsBreak) {
-      it.facing.__resetBreak();
-    }
+    it.resetUserCtx ();
 
     unsigned numLocks = 0;
     if (abort) {
@@ -325,8 +305,8 @@ class ForEachWork<WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
 
   unsigned commitIteration(IterationContext& it) {
     if (ForEachTraits<FunctionTy>::NeedsPush) {
-      for (typename UserContextTy::pushBufferTy::iterator a = it.facing.__getPushBuffer().begin(),
-          ea = it.facing.__getPushBuffer().end(); a != ea; ++a) {
+      for (typename UserContextTy::pushBufferTy::iterator a = it.facing.getPushBuffer().begin(),
+          ea = it.facing.getPushBuffer().end(); a != ea; ++a) {
         workList.getNext().push(*a);
       }
     }
@@ -337,6 +317,10 @@ class ForEachWork<WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
 public:
   ForEachWork(FunctionTy& f, const char* ln): function(f), loopname(ln) { }
 
+  ForEachWork (WorkListTy& wl, FunctionTy& f, const char* ln) 
+    : workList (wl), function (f), loopname (ln) 
+  {}
+
   template<typename IterTy>
   bool AddInitialWork(IterTy b, IterTy e) {
     workList.getCurr().push_initial(b, e);
@@ -344,16 +328,27 @@ public:
   }
 
   void operator()() {
-    ParaMeter::init();
-    pstatsFile = fopen(ParaMeter::getStatsFileName(), "a"); // open in append mode
+    ParaMeterInit::init();
+    pstatsFile = fopen(ParaMeterInit::getStatsFileName(), "a"); // open in append mode
     go();
     fclose(pstatsFile);
     pstatsFile = NULL;
   }
+
+private:
+  ParaMeterWorkList workList;
+  FunctionTy function;
+  const char* loopname;
+  FILE* pstatsFile;
+
+  IterQueue commitQueue;
+  // XXX: may turn out to be unnecessary
+  std::vector<StepStats> allSteps;
 };
 
 
 } // end namespace
 
 #endif // GALOIS_RUNTIME_PARAMETER_H
+
 
