@@ -147,7 +147,7 @@ private:
       r = fscanf(pFile, "%u %lf %lf %lf", &R.index, &R.x, &R.y, &R.z);
       checkResults(r, 4, filename);
       recordOut R2 = {R.index, R.x, R.y, R.z};
-      fwrite(&R, sizeof(recordOut), 1, oFile);
+      fwrite(&R2, sizeof(recordOut), 1, oFile);
     }
     fclose(pFile);
     fclose(oFile);
@@ -243,7 +243,7 @@ private:
     for (size_t i = 0; i < nsegs[0]; i++) {
       uint32_t r[4];
       fread(&r[0], sizeof(uint32_t), 4, pFile);
-      assert(r[1] >= 0 && t[1] < tuples.size());
+      assert(r[1] >= 0 && r[1] < tuples.size());
       assert(r[2] >= 0 && r[2] < tuples.size());
       Element e(tuples[r[1]], tuples[r[2]], ++id);
       elements.push_back(e);
