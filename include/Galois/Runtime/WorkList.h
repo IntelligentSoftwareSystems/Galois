@@ -91,19 +91,25 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
-template<class WL, typename Iter>
-void fill_work(WL& wl, Iter b, Iter e) {
+template<typename Iter>
+void fill_work(Iter& b, Iter& e) {
   unsigned int a = ThreadPool::getActiveThreads();
   unsigned int id = LL::getTID();
   unsigned dist = std::distance(b, e);
   unsigned num = (dist + a - 1) / a; //round up
   unsigned int A = std::min(num * id, dist);
   unsigned int B = std::min(num * (id + 1), dist);
+  e = b;
+  std::advance(b, A);
+  std::advance(e, B);
+}
+
+template<class WL, typename Iter>
+void fill_work(WL& wl, Iter b, Iter e) {
   Iter b2 = b;
-  Iter e2 = b;
-  std::advance(b2, A);
-  std::advance(e2, B);
-  wl.push(b2,e2);
+  Iter e2 = e;
+  fill_work(b2, e2);
+  wl.push(b2, e2);
 }
 
 
@@ -635,7 +641,7 @@ public:
     abort();
   }
 
-  //stager each thread's start item
+  //stagger each thread's start item
   void push_initial(IterTy b, IterTy e) {
     TLD& tld = *tlds.getLocal();
     tld.begin = Galois::safe_advance(b, e, LL::getTID());
@@ -738,17 +744,13 @@ public:
     abort();
   }
 
-  //stager each thread's start item
+  //stagger each thread's start item
   void push_initial(IterTy b, IterTy e) {
     TLD& tld = *tlds.getLocal();
-    unsigned num = ThreadPool::getActiveThreads();
-    unsigned len = std::distance(b,e);
-    unsigned per = (len + num - 1) / num;
-    unsigned i = LL::getTID();
     tld.begin = b;
-    std::advance(tld.begin, per * i);
-    tld.end = tld.begin;
-    std::advance(tld.end,std::min(per, (unsigned)std::distance(tld.begin, e)));
+    tld.end = e;
+    fill_work(tld.begin, tld.end);
+
     if (Stealing) {
       tld.stealEnd = tld.end;
       tld.stealBegin = tld.end = Galois::split_range(tld.begin, tld.end);
