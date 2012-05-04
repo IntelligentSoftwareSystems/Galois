@@ -235,7 +235,7 @@ ptrdiff_t count_if ( InputIterator first, InputIterator last, Predicate pred )
   typedef typename std::iterator_traits<InputIterator>::value_type T;
   GaloisRuntime::PerCPU<ptrdiff_t> v;
   count_if_counter<Predicate, T> c(pred, v);
-  ptrdiff_t ret=0;
+  ptrdiff_t ret = 0;
   do_all(first, last, c);
   for (unsigned i = 0; i < v.size(); ++i)
     ret += v.get(i);

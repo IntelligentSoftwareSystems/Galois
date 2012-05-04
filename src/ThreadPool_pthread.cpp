@@ -42,12 +42,16 @@
 #include "ittnotify.h"
 #endif
 
+#ifdef GALOIS_DMP
+#include "dmp.h"
+#endif
+
 using namespace GaloisRuntime;
 
 //! Generic check for pthread functions
 static void checkResults(int val) {
   if (val) {
-    perror("PTHREADS: ");
+    perror("PTHREAD: ");
     assert(0 && "PThread check");
     abort();
   }
@@ -55,15 +59,15 @@ static void checkResults(int val) {
  
 namespace {
 
-class Semaphore {
+class SemSemaphore {
   sem_t sem;
 public:
-  explicit Semaphore(int val) {
+  explicit SemSemaphore(int val) {
     int rc = sem_init(&sem, 0, val);
     checkResults(rc);
   }
 
-  ~Semaphore() {
+  ~SemSemaphore() {
     int rc = sem_destroy(&sem);
     checkResults(rc);
   }
@@ -86,11 +90,44 @@ public:
   }
 };
 
+class PthreadSemaphore {
+  pthread_mutex_t lock;
+  pthread_cond_t cond;
+  int val;
+public:
+  explicit PthreadSemaphore(int v): val(v) {
+    pthread_mutex_init(&lock, NULL);
+    pthread_cond_init(&cond, NULL);
+  }
+  
+  ~PthreadSemaphore() {
+    pthread_mutex_destroy(&lock);
+    pthread_cond_destroy(&cond);
+  }
+
+  void release(int n = 1) {
+    pthread_mutex_lock(&lock);
+    val += n;
+    if (val > 0)
+      pthread_cond_broadcast(&cond);
+    pthread_mutex_unlock(&lock);
+  }
+
+  void acquire(int n = 1) {
+    pthread_mutex_lock(&lock);
+    while (val < n) {
+      pthread_cond_wait(&cond, &lock);
+    }
+    val -= n;
+    pthread_mutex_unlock(&lock);
+  }
+};
+
 #ifdef GALOIS_VTUNE
-class SampleProfiler {
+class VtuneSampleProfiler {
   bool IsOn;
 public:
-  SampleProfiler() :IsOn(false) {}
+  VtuneSampleProfiler() :IsOn(false) {}
   void startIf(int TID, bool ON) {
     if (IsOn != ON && TID == 0) {
       if (ON)
@@ -101,19 +138,49 @@ public:
     }
   }
 };
-#else
-class SampleProfiler {
+#endif
+
+class DummySampleProfiler {
 public:
   void startIf(int TID, bool ON) {}
 };
-#endif
+
+class AtomicThinBarrier {
+  volatile int started;
+  int val;
+public:
+  AtomicThinBarrier(int v): val(v) { }
+  void release(int n = 1) {
+    __sync_fetch_and_add(&started, 1);
+  }
+  void acquire(int n = 1) {
+    while (started < n) { }
+  }
+};
+
 
 class ThreadPool_pthread : public ThreadPool {
+  // Instantiate pthread;
+#if defined(GALOIS_VTUNE) && !defined(GALOIS_DRF)
+  typedef VtuneSampleProfiler SampleProfiler;
+#else
+  typedef DummySampleProfiler SampleProfiler;
+#endif
+#ifndef GALOIS_DRF
+  typedef SemSemaphore Semaphore;
+  typedef GBarrier Barrier;
+  typedef AtomicThinBarrier ThinBarrier;
+#else
+  typedef PthreadSemaphore Semaphore;
+  typedef PthreadBarrier Barrier;
+  typedef PthreadSemaphore ThinBarrier;
+#endif
+
   std::vector<Semaphore> starts; // signal to release threads to run
-  GBarrier* finish; // want on to block on running threads
+  Barrier* finish; // want on to block on running threads
   std::list<pthread_t> threads; // Set of threads
+  ThinBarrier started;
   unsigned int maxThreads;
-  volatile unsigned int started;
   volatile bool shutdown; // Set and start threads to have them exit
   volatile RunCommand* workBegin; //Begin iterator for work commands
   volatile RunCommand* workEnd; //End iterator for work commands
@@ -124,7 +191,7 @@ class ThreadPool_pthread : public ThreadPool {
     int id = GaloisRuntime::LL::getTID();
     GaloisRuntime::initPTS();
     GaloisRuntime::LL::bindThreadToProcessor(id);
-    __sync_fetch_and_add(&started, 1);
+    started.release();
   }
 
   void cascade(int tid) {
@@ -173,8 +240,9 @@ class ThreadPool_pthread : public ThreadPool {
   }
   
 public:
-  ThreadPool_pthread()
-    :maxThreads(GaloisRuntime::LL::getMaxThreads()), started(0), shutdown(false), workBegin(0), workEnd(0)
+  ThreadPool_pthread():
+    maxThreads(GaloisRuntime::LL::getMaxThreads()), 
+    started(0), shutdown(false), workBegin(0), workEnd(0)
   {
     initThread();
 
@@ -188,7 +256,7 @@ public:
       checkResults(rc);
       threads.push_front(t);
     }
-    while (started != maxThreads) {}
+    started.acquire(maxThreads);
   }
 
   ~ThreadPool_pthread() {
@@ -210,7 +278,7 @@ public:
     workBegin = begin;
     workEnd = end;
     if (!finish) {
-      finish = new GBarrier();
+      finish = new Barrier();
       finish->reinit(activeThreads);
     }
     __sync_synchronize();
@@ -230,13 +298,14 @@ public:
     assert(activeThreads - 1 <= threads.size());
 
     if (!finish)
-      finish = new GBarrier();
+      finish = new Barrier();
     finish->reinit(activeThreads);
 
     return activeThreads;
   }
 };
-}
+
+} // end namespace
 
 //! Implement the global threadpool
 ThreadPool& GaloisRuntime::getSystemThreadPool() {

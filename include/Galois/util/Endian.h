@@ -23,7 +23,7 @@
 #ifndef GALOIS_UTIL_ENDIAN_H
 #define GALOIS_UTIL_ENDIAN_H
 
-#include "config.h"
+#include "Galois/config.h"
 
 #ifdef HAVE_ENDIAN_H
 # include <endian.h>

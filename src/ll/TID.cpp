@@ -27,10 +27,51 @@
 
 #include "Galois/Runtime/ll/TID.h"
 
+#ifdef GALOIS_DRF
+#include <pthread.h>
+#endif
+
+#ifdef GALOIS_DMP
+#include "dmp.h"
+#endif
+
 __thread unsigned GaloisRuntime::LL::TID = 0;
 static unsigned nextID = 0;
 
+namespace {
+struct AtomicNextId {
+  unsigned next() {
+    return __sync_fetch_and_add(&::nextID, 1);
+  }
+};
+#ifdef GALOIS_DRF
+struct PthreadNextId {
+  pthread_mutex_t lock;
+  PthreadNextId() {
+    pthread_mutex_init(&lock, NULL);
+  }
+  ~PthreadNextId() {
+    pthread_mutex_destroy(&lock);
+  }
+  unsigned next() {
+    unsigned val;
+    pthread_mutex_lock(&lock);
+    val = ::nextID;
+    ++::nextID;
+    pthread_mutex_unlock(&lock);
+    return val;
+  }
+};
+
+typedef PthreadNextId NextId;
+#else
+typedef AtomicNextId NextId;
+#endif
+
+}
+
+static NextId next;
 
 void GaloisRuntime::LL::initTID() {
-  TID = __sync_fetch_and_add(&::nextID, 1);
+  TID = next.next();
 }

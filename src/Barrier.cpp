@@ -32,6 +32,10 @@
 #include <cstdio>
 #include <iostream>
 
+#ifdef GALOIS_DMP
+#include "dmp.h"
+#endif
+
 void GaloisRuntime::PthreadBarrier::checkResults(int val) {
   if (val) {
     perror("PTHREADS: ");
