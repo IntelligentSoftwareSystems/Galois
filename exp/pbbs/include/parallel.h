@@ -1,6 +1,22 @@
 #ifndef PARALLEL_H
 #define PARALLEL_H
 
+extern void runtime_init();
+extern void DMP_Galois_init();
+namespace {
+// Dummy code to call static initializer 
+struct Init {
+  Init() {
+#ifdef GALOIS_DMP
+    DMP_Galois_init();
+#endif
+    runtime_init(); 
+  }
+};
+
+static Init iii;
+}
+
 // cilkarts cilk++
 #if defined(EXP_DOALL_CILK)
 #include <cilk.h>
@@ -57,17 +73,6 @@
 #define parallel_doall_1(type, index, begin, end) \
   Galois::do_all(boost::counting_iterator<type>(begin), boost::counting_iterator<type>(end), [&](type index)
 #define parallel_doall_end );
-extern void galois_init();
-namespace {
-// Dummy code to call static initializer 
-struct Init {
-  Init() {
-    galois_init(); 
-  }
-};
-
-static Init iii;
-}
 
 // TBB
 #elif defined(EXP_DOALL_TBB)
@@ -81,17 +86,6 @@ static Init iii;
 #define parallel_doall_1(type, index, begin, end) \
   tbb::parallel_for_each(boost::counting_iterator<type>(begin), boost::counting_iterator<type>(end), [&](type index)
 #define parallel_doall_end );
-extern void tbb_init();
-namespace {
-// Dummy code to call static initializer 
-struct Init {
-  Init() {
-    tbb_init(); 
-  }
-};
-
-static Init iii;
-}
 
 // c++
 #else
@@ -103,7 +97,6 @@ static Init iii;
 #define parallel_doall(type, index, begin, end) \
   for(type index = begin; index < end; ++index)
 #define parallel_doall_end 
-
 
 #endif
 

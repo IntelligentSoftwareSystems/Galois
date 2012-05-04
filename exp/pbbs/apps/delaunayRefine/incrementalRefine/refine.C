@@ -27,7 +27,7 @@
 #include "refine.h"
 #include "topology.h"
 
-#include "exp.h"
+#include "exp/exp.h"
 using namespace std;
 
 // *************************************************************

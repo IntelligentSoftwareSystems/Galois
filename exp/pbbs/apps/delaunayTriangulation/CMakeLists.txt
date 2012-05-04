@@ -1,5 +1,4 @@
 set(prefix delaunayTriangulation)
-set(has_common "YES")
 
 inCube(2DinCube_10M 2 10000000)
 kuzmin(2Dkuzmin_10M 2 10000000)
@@ -11,9 +10,12 @@ if(CMAKE_BUILD_TYPE MATCHES "Release")
   add_definitions(-O2)
 endif()
 
+# NB(ddn): we have common .cpps in common/ too but since we change .h
+# definitions, they cannot be shared as a library, so instead just build
+# and link directly
 include_directories(common)
-add_library(pbbs-${prefix}-common common/topologyFromTri.C)
 
 add_subdirectory(ndIncrementalDelaunay)
+add_subdirectory(pthreadIncrementalDelaunay)
 add_subdirectory(incrementalDelaunay)
 add_subdirectory(serialDelaunay)

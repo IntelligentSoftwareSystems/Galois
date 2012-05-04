@@ -30,7 +30,7 @@
 #include "delaunayDefs.h"
 #include "topology.h"
 
-#include "exp.h"
+#include "exp/exp.h"
 using namespace std;
 
 // if on verifies the Delaunay is correct 
@@ -298,7 +298,6 @@ void incrementallyAddPoints(vertex** v, int n, vertex* start) {
     int cnt = nextNN;
     cnt = (cnt > top) ? top : cnt;
     vertex **vv = v+top-cnt;
-
 
 #ifdef DUMB
     for (int i = 0; i < cnt; ++i)

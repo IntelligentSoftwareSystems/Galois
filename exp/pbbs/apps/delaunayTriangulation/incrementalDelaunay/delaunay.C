@@ -29,7 +29,7 @@
 #include "delaunayDefs.h"
 #include "topology.h"
 
-#include "exp.h"
+#include "exp/exp.h"
 using namespace std;
 
 // if on verifies the Delaunay is correct 

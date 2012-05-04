@@ -1,1 +1,2 @@
-papp(serialDelaunay serialDelaunay.C delaunayTime.C)
+include_directories(.)
+papp(serialDelaunay serialDelaunay.C ../common/delaunayTime.C ../common/topologyFromTri.C)

@@ -1,1 +1,2 @@
-papp(incrementalDelaunay delaunay.C delaunayTime.C)
+include_directories(.)
+papp(incrementalDelaunay delaunay.C ../common/delaunayTime.C ../common/topologyFromTri.C)
