@@ -75,9 +75,12 @@ private:
     if (!pFile) {
       return false;
     }
-    std::cerr << "Using bin for node\n";
+    std::cout << "Using bin for node\n";
     uint32_t ntups[4];
-    fread(&ntups[0], sizeof(uint32_t), 4, pFile);
+    if (fread(&ntups[0], sizeof(uint32_t), 4, pFile) < 4) {
+      std::cerr << "Malformed binary file\n";
+      abort();
+    }
     tuples.resize(ntups[0]);
     for (size_t i = 0; i < ntups[0]; i++) {
       struct record {
@@ -85,7 +88,10 @@ private:
 	double x, y, z;
       };
       record R;
-      fread(&R, sizeof(record), 1, pFile);
+      if (fread(&R, sizeof(record), 1, pFile) < 1) {
+        std::cerr << "Malformed binary file\n";
+        abort();
+      }
       tuples[R.index] = Tuple(R.x,R.y);
     }
     fclose(pFile);
@@ -158,12 +164,18 @@ private:
     if (!pFile) {
       return false;
     }
-    std::cerr << "Using bin for ele\n";
+    std::cout << "Using bin for ele\n";
     uint32_t nels[3];
-    fread(&nels[0], sizeof(uint32_t), 3, pFile);
+    if (fread(&nels[0], sizeof(uint32_t), 3, pFile) < 3) {
+      std::cerr << "Malformed binary file\n";
+      abort();
+    }
     for (size_t i = 0; i < nels[0]; i++) {
       uint32_t r[4];
-      fread(&r[0], sizeof(uint32_t), 4, pFile);
+      if (fread(&r[0], sizeof(uint32_t), 4, pFile) < 4) {
+        std::cerr << "Malformed binary file\n";
+        abort();
+      }
       assert(r[1] >= 0 && r[1] < tuples.size());
       assert(r[2] >= 0 && r[2] < tuples.size());
       assert(r[3] >= 0 && r[3] < tuples.size());
@@ -238,11 +250,20 @@ private:
     }
     std::cerr << "Using bin for poly\n";
     uint32_t nsegs[4];
-    fread(&nsegs[0], sizeof(uint32_t), 4, pFile);
-    fread(&nsegs[0], sizeof(uint32_t), 2, pFile);
+    if (fread(&nsegs[0], sizeof(uint32_t), 4, pFile) < 4) {
+      std::cerr << "Malformed binary file\n";
+      abort();
+    }
+    if (fread(&nsegs[0], sizeof(uint32_t), 2, pFile) < 2) {
+      std::cerr << "Malformed binary file\n";
+      abort();
+    }
     for (size_t i = 0; i < nsegs[0]; i++) {
       uint32_t r[4];
-      fread(&r[0], sizeof(uint32_t), 4, pFile);
+      if (fread(&r[0], sizeof(uint32_t), 4, pFile) < 4) {
+        std::cerr << "Malformed binary file\n";
+        abort();
+      }
       assert(r[1] >= 0 && r[1] < tuples.size());
       assert(r[2] >= 0 && r[2] < tuples.size());
       Element e(tuples[r[1]], tuples[r[2]], ++id);
