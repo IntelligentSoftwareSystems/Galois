@@ -1,1 +1,2 @@
-papp(incrementalRefine refine.C refineTime.C topologyFromTri.C)
+include_directories(.)
+papp(incrementalRefine refine.C ../common/refineTime.C ../common/topologyFromTri.C)

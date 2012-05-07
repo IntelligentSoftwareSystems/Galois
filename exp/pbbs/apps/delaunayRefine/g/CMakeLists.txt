@@ -1,0 +1,5 @@
+add_subdirectory(p)
+add_subdirectory(nd)
+add_subdirectory(nd2)
+add_subdirectory(pnd)
+add_subdirectory(pnd2)

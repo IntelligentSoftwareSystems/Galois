@@ -2,6 +2,7 @@
 
 THREADS=1
 ROUNDS=1
+NPROC=$(cat /proc/cpuinfo | grep processor | wc -l)
 
 while getopts "t:r:" opt; do
   case $opt in
@@ -14,6 +15,8 @@ done
 
 shift $((OPTIND-1))
 
+#export DMP_SCHEDULING_CHUNK_SIZE=1000
+export DMP_NUM_PHYSICAL_PROCESSORS=$NPROC
 export OMP_NUM_THREADS=$THREADS
 export OMP_SCHEDULE="dynamic,16"
 export TBB_NUM_THREADS=$THREADS

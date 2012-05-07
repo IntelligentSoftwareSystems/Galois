@@ -15,7 +15,6 @@ endif()
 # and link directly
 include_directories(common)
 
-add_subdirectory(ndIncrementalDelaunay)
-add_subdirectory(pthreadIncrementalDelaunay)
+add_subdirectory(g)
 add_subdirectory(incrementalDelaunay)
 add_subdirectory(serialDelaunay)
