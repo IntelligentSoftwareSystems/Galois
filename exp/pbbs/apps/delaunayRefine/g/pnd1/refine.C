@@ -435,6 +435,7 @@ triangles<point2d> refine(triangles<point2d> Tri) {
 
   int failed = 0;
   int rounds = 0;
+
   // Each iteration processes all bad triangles from the workQ while
   // adding new bad triangles to a new queue
   while (1) {
