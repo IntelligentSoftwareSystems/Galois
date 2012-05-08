@@ -26,11 +26,12 @@
 #include "Galois/Galois.h"
 #include "Galois/Bag.h"
 #include "Galois/Statistic.h"
-#include "Galois/Graphs/Graph.h"
 #include "Galois/Graphs/LCGraph.h"
 #include "llvm/Support/CommandLine.h"
 
 #include "Lonestar/BoilerPlate.h"
+
+#include "boost/optional.hpp"
 
 #include <utility>
 #include <vector>
@@ -53,7 +54,7 @@ struct Node {
   Node() : in_mst(false) { }
 };
 
-typedef Galois::Graph::FirstGraph<Node,void,false> Graph;
+typedef Galois::Graph::LC_Linear_Graph<Node,void> Graph;
 typedef Graph::GraphNode GNode;
 typedef std::pair<GNode,GNode> Edge;
 
@@ -63,59 +64,52 @@ struct Process {
   Galois::InsertBag<Edge>& result;
   Process(Galois::InsertBag<Edge>& _result) : result(_result) { }
 
-  template<typename Context>
-  void operator()(GNode src, Context& ctx) {
-    for (Graph::neighbor_iterator ii = graph.neighbor_begin(src),
-        ei = graph.neighbor_end(src); ii != ei; ++ii) {
-      GNode dst = *ii;
+  void operator()(GNode src, Galois::UserContext<GNode>& ctx) {
+    for (Graph::edge_iterator ii = graph.edge_begin(src),
+        ei = graph.edge_end(src); ii != ei; ++ii) {
+      GNode dst = graph.getEdgeDst(ii);
       Node& data = graph.getData(dst, Galois::NONE);
       if (data.in_mst)
         continue;
+      ctx.push(dst);
       result.push(Edge(src, dst));
       data.in_mst = true;
-      ctx.push(dst);
     }
   }
 };
 
-void runSerial(const std::vector<GNode>& initial,
-    Galois::InsertBag<Edge>& result) {
+void runSerial(GNode root, Galois::InsertBag<Edge>& result) {
   std::vector<GNode> worklist;
 
-  for (std::vector<GNode>::const_iterator ii = initial.begin(), ei = initial.end();
-      ii != ei; ++ii) {
-    worklist.push_back(*ii);
-  }
+  worklist.push_back(root);
 
   while (!worklist.empty()) {
     GNode src = worklist.back();
     worklist.pop_back();
     
     // Expand tree
-    for (Graph::neighbor_iterator ii = graph.neighbor_begin(src),
-        ei = graph.neighbor_end(src); ii != ei; ++ii) {
-      GNode dst = *ii;
+    for (Graph::edge_iterator ii = graph.edge_begin(src),
+        ei = graph.edge_end(src); ii != ei; ++ii) {
+      GNode dst = graph.getEdgeDst(ii);
       Node& data = graph.getData(dst, Galois::NONE);
       if (data.in_mst)
         continue;
+      worklist.push_back(dst);
       result.push(Edge(src, dst));
       data.in_mst = true;
-      worklist.push_back(dst);
     }
   }
 }
 
-void runParallel(const std::vector<GNode>& initial,
-    Galois::InsertBag<Edge>& result) {
-  Galois::for_each(initial.begin(), initial.end(), Process(result));
+void runParallel(GNode root, Galois::InsertBag<Edge>& result) {
+  Galois::for_each(root, Process(result));
 }
 
 bool verify(Galois::InsertBag<Edge>& result) {
   if (std::distance(result.begin(), result.end()) != graph.size() - 1)
     return false;
 
-  for (Graph::iterator src = graph.begin(),
-      end = graph.end(); src != end; ++src) {
+  for (Graph::iterator src = graph.begin(), end = graph.end(); src != end; ++src) {
     if (!graph.getData(*src).in_mst)
       return false;
   }
@@ -123,68 +117,34 @@ bool verify(Galois::InsertBag<Edge>& result) {
   return true;
 }
 
-void readGraph(const char* filename, int root_id, GNode* root) {
-  typedef Galois::Graph::LC_CSR_Graph<int,int> ReaderGraph;
-  typedef ReaderGraph::GraphNode ReaderGNode;
-
-  ReaderGraph reader;
-  reader.structureFromFile(filename);
-
-  int num_nodes = 0;
-  for (ReaderGraph::iterator ii = reader.begin(),
-      ei = reader.end(); ii != ei; ++ii, ++num_nodes) {
-    reader.getData(*ii) = num_nodes;
-  }
-
-  std::vector<GNode> nodes;
-  nodes.resize(num_nodes);
-  for (int i = 0; i < num_nodes; ++i) {
-    Node node;
-    GNode src = graph.createNode(node);
-    graph.addNode(src);
-    nodes[i] = src;
-  }
-
-  for (ReaderGraph::iterator ii = reader.begin(),
-      ei = reader.end(); ii != ei; ++ii) {
-    ReaderGNode src = *ii;
-    int src_id = reader.getData(src);
-    for (ReaderGraph::edge_iterator jj = reader.edge_begin(src),
-        ej = reader.edge_end(src); jj != ej; ++jj) {
-      int dst_id = reader.getData(reader.getEdgeDst(jj));
-      graph.addEdge(nodes[src_id], nodes[dst_id]);
-    }
-  }
-
-  if (root_id < 0 || root_id >= num_nodes) {
-    assert(0 && "Unknown root id");
-    abort();
-  }
-
-  *root = nodes[root_id];
-}
-
 }
 
 int main(int argc, char** argv) {
   LonestarStart(argc, argv, std::cout, name, desc, url);
 
+  boost::optional<GNode> root;
+  graph.structureFromFile(filename.c_str());
+  int n = 0;
+  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii, n++) {
+    if (n == rootNode) {
+      root = boost::optional<GNode>(*ii);
+      break;
+    }
+  }
+  if (!root) {
+    std::cerr << "Unknown root node\n";
+    abort();
+  }
 
-  GNode root;
-  readGraph(filename.c_str(), rootNode, &root);
-
-  std::vector<GNode> initial;
-  graph.getData(root).in_mst = true;
-  initial.push_back(root);
-
+  graph.getData(*root).in_mst = true;
   Galois::InsertBag<Edge> result;
 
   Galois::StatTimer T;
   T.start();
   if (numThreads) {
-    runParallel(initial, result);
+    runParallel(*root, result);
   } else {
-    runSerial(initial, result);
+    runSerial(*root, result);
   }
   T.stop();
 
