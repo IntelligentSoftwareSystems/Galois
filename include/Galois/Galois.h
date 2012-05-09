@@ -219,27 +219,81 @@ static inline void preAlloc(int num) {
 ////////////////////////////////////////////////////////////////////////////////
 
 template<typename Predicate, typename T>
-struct count_if_counter {
+struct count_if_helper {
   GaloisRuntime::PerCPU<ptrdiff_t>& local;
   Predicate& f;
-  count_if_counter(Predicate& p, GaloisRuntime::PerCPU<ptrdiff_t>& l) :local(l), f(p) {}
+  count_if_helper(Predicate& p, GaloisRuntime::PerCPU<ptrdiff_t>& l):local(l), f(p) { }
   void operator()(const T& v) {
     if (f(v)) 
       local.get()++;
   }
 };
 
-template <class InputIterator, class Predicate>
-ptrdiff_t count_if ( InputIterator first, InputIterator last, Predicate pred )
+template<class InputIterator, class Predicate>
+ptrdiff_t count_if(InputIterator first, InputIterator last, Predicate pred)
 {
   typedef typename std::iterator_traits<InputIterator>::value_type T;
   GaloisRuntime::PerCPU<ptrdiff_t> v;
-  count_if_counter<Predicate, T> c(pred, v);
+  count_if_helper<Predicate, T> c(pred, v);
   ptrdiff_t ret = 0;
   do_all(first, last, c);
   for (unsigned i = 0; i < v.size(); ++i)
     ret += v.get(i);
   return ret;
+}
+
+//! Modify an iterator so that *it == it
+template<typename Iterator>
+struct NoDerefIterator: public boost::iterator_adaptor<
+  NoDerefIterator<Iterator>,
+  Iterator,
+  Iterator,
+  boost::use_default,
+  const Iterator&>
+{
+  NoDerefIterator(): NoDerefIterator::iterator_adaptor_() { }
+  explicit NoDerefIterator(Iterator it): NoDerefIterator::iterator_adaptor_(it) { }
+  const Iterator& dereference() const {
+    return NoDerefIterator::iterator_adaptor_::base_reference();
+  }
+  Iterator& dereference() {
+    return NoDerefIterator::iterator_adaptor_::base_reference();
+  }
+};
+
+template<typename InputIterator, class Predicate>
+struct find_if_helper {
+  typedef int tt_does_not_need_stats;
+  typedef int tt_does_not_need_parallel_push;
+  typedef int tt_does_not_need_aborts;
+  typedef int tt_needs_parallel_break;
+
+  typedef boost::optional<InputIterator> ElementTy;
+  typedef GaloisRuntime::PerCPU<ElementTy> AccumulatorTy;
+  AccumulatorTy& accum;
+  Predicate& f;
+  find_if_helper(AccumulatorTy& a, Predicate& p): accum(a), f(p) { }
+  void operator()(const InputIterator& v, UserContext<InputIterator>& ctx) {
+    if (f(*v)) {
+      accum.get() = v;
+      ctx.breakLoop();
+    }
+  }
+};
+
+template<class InputIterator, class Predicate>
+InputIterator find_if(InputIterator first, InputIterator last, Predicate pred)
+{
+  typedef find_if_helper<InputIterator,Predicate> HelperTy;
+  typedef typename HelperTy::AccumulatorTy AccumulatorTy;
+  AccumulatorTy accum;
+  HelperTy helper(accum, pred);
+  for_each(NoDerefIterator<InputIterator>(first), NoDerefIterator<InputIterator>(last), helper);
+  for (unsigned i = 0; i < accum.size(); ++i) {
+    if (accum.get(i))
+      return *accum.get(i);
+  }
+  return last;
 }
 
 }
