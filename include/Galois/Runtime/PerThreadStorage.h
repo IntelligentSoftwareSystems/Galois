@@ -40,6 +40,8 @@ class PerBackend {
   void initCommon();
 
 public:
+  PerBackend(): nextLoc(0) { }
+
   char* initPerThread();
   char* initPerPackage();
   unsigned allocOffset(unsigned size);

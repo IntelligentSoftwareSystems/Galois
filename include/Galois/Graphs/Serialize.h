@@ -37,8 +37,10 @@ namespace Graph {
 template<typename Graph>
 struct CompareNodeData {
   typedef typename Graph::GraphNode GNode;
+  Graph& g;
+  CompareNodeData(Graph& _g): g(_g) { }
   bool operator()(const GNode& a, const GNode& b) {
-    return a.getData() < b.getData();
+    return g.getData(a) < g.getData(b);
   }
 };
 
@@ -63,7 +65,7 @@ bool outputGraph(const char* file, Graph& G) {
     abort();
   }
 
-  uint64_t sizeof_edge_data = sizeof(typename Graph::EdgeDataTy);
+  uint64_t sizeof_edge_data = G.sizeOfEdgeData();
   retval = write(fd, &sizeof_edge_data, sizeof(uint64_t));
   if (retval == -1) {
     perror(__FILE__);
@@ -88,7 +90,7 @@ bool outputGraph(const char* file, Graph& G) {
 
   // TODO(ddn): for some reason stable_sort crashes with:
   //  free(): invalid pointer
-  std::sort(nodes.begin(), nodes.end(), CompareNodeData<Graph>());
+  std::sort(nodes.begin(), nodes.end(), CompareNodeData<Graph>(G));
 
   //num edges and outidx computation
   uint64_t offset = 0;
@@ -97,7 +99,7 @@ bool outputGraph(const char* file, Graph& G) {
   for (uint32_t id = 0; id < num_nodes; ++id) {
     GNode& node = nodes[id];
     node_ids[node] = id;
-    offset += G.neighborsSize(node);
+    offset += std::distance(G.edge_begin(node), G.edge_end(node));
     out_idx.push_back(offset);
   }
   retval = write(fd, &offset, sizeof(uint64_t));
@@ -117,9 +119,9 @@ bool outputGraph(const char* file, Graph& G) {
   size_t num_edges = 0;
   for (typename Nodes::iterator ii = nodes.begin(), ee = nodes.end();
       ii != ee; ++ii) {
-    for (typename Graph::neighbor_iterator ni = G.neighbor_begin(*ii),
-        ne = G.neighbor_end(*ii); ni != ne; ++ni, ++num_edges) {
-      uint32_t id = node_ids[*ni];
+    for (typename Graph::edge_iterator jj = G.edge_begin(*ii),
+        ej = G.edge_end(*ii); jj != ej; ++jj, ++num_edges) {
+      uint32_t id = node_ids[G.getEdgeDst(jj)];
       retval = write(fd, &id, sizeof(uint32_t));
       if (retval == -1) {
         perror(__FILE__);
@@ -137,15 +139,17 @@ bool outputGraph(const char* file, Graph& G) {
   }
 
   //edgeData
-  for (typename Nodes::iterator ii = nodes.begin(), ee = nodes.end();
-      ii != ee; ++ii) {
-    for (typename Graph::neighbor_iterator ni = G.neighbor_begin(*ii),
-        ne = G.neighbor_end(*ii); ni != ne; ++ni) {
-      retval = write(fd, &G.getEdgeData(*ii, *ni),
-          sizeof(typename Graph::EdgeDataTy));
-      if (retval == -1) {
-        perror(__FILE__);
-        abort();
+  if (sizeof_edge_data) {
+    for (typename Nodes::iterator ii = nodes.begin(), ee = nodes.end();
+        ii != ee; ++ii) {
+      for (typename Graph::edge_iterator jj = G.edge_begin(*ii),
+          ej = G.edge_end(*ii); jj != ej; ++jj) {
+        void *b = &G.getEdgeData(jj);
+        retval = write(fd, b, sizeof_edge_data);
+        if (retval == -1) {
+          perror(__FILE__);
+          abort();
+        }
       }
     }
   }
@@ -161,9 +165,9 @@ bool outputTextEdgeData(const char* ofile, Graph& G) {
   std::ofstream file(ofile);
   for (typename Graph::iterator ii = G.begin(),
 	 ee = G.end(); ii != ee; ++ii) {
-    for (typename Graph::neighbor_iterator ni = G.neighbor_begin(*ii),
-	   ne = G.neighbor_end(*ii); ni != ne; ++ni) {
-      file << G.getEdgeData(*ii, *ni) << '\n';
+    for (typename Graph::edge_iterator jj = G.edge_iterator(*ii),
+	   ej = G.edge_iterator(*ii); jj != ej; ++jj) {
+      file << G.getEdgeData(jj) << '\n';
     }
   }
   return true;

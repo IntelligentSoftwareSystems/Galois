@@ -220,7 +220,7 @@ unsigned int FileGraph::size() const {
   return numNodes;
 }
 
-unsigned int FileGraph::sizeEdges () const {
+unsigned int FileGraph::sizeEdges() const {
   return numEdges;
 }
 

@@ -96,6 +96,7 @@ struct EdgeItem<NTy, ETy, true> {
   inline ETy*       second()       { return &Ea; }
   inline const ETy* second() const { return &Ea; }
   EdgeItem(NTy* n, ETy* v) : N(n) {}
+  static size_t sizeOfSecond()     { return sizeof(ETy); }
 };
 
 template<typename NTy, typename ETy>
@@ -110,30 +111,33 @@ struct EdgeItem<NTy, ETy, false> {
   inline ETy*       second()       { return Ea; }
   inline const ETy* second() const { return Ea; }
   EdgeItem(NTy* n, ETy* v) : N(n), Ea(v) {}
+  static size_t sizeOfSecond()     { return sizeof(ETy); }
 };
 
 template<typename NTy>
 struct EdgeItem<NTy, void, true> {
-  typedef void reference;
+  typedef char& reference;
 
   NTy* N;
   inline NTy*&       first()        { return N; }
   inline NTy* const& first()  const { return N; }
-  inline void*       second() const { return static_cast<void*>(NULL); }
-  inline void*       addr()   const { return second(); }
+  inline char*       second() const { return static_cast<char*>(NULL); }
+  inline char*       addr()   const { return second(); }
   EdgeItem(NTy* n, void* v) : N(n) {}
+  static size_t sizeOfSecond()      { return 0; }
 };
 
 template<typename NTy>
 struct EdgeItem<NTy, void, false> {
-  typedef void reference;
+  typedef char& reference;
 
   NTy* N;
   inline NTy*&       first()        { return N; }
   inline NTy* const& first()  const { return N; }
-  inline void*       second() const { return static_cast<void*>(NULL); }
-  inline void*       addr()   const { return second(); }
+  inline char*       second() const { return static_cast<char*>(NULL); }
+  inline char*       addr()   const { return second(); }
   EdgeItem(NTy* n, void* v) : N(n) {}
+  static size_t sizeOfSecond()      { return 0; }
 };
 
 template<typename ETy>
@@ -226,7 +230,6 @@ class FirstGraph : private boost::noncopyable {
       return edges.insert(edges.end(), EITy(N, v));
     }
   };
-
 
   //The graph manages the lifetimes of the data in the nodes and edges
   typedef GaloisRuntime::galois_insert_bag<gNode> NodeListTy;
@@ -480,8 +483,12 @@ public:
   /**
    * Returns the number of nodes in the graph. Not thread-safe.
    */
-  unsigned int size () {
+  unsigned int size() {
     return std::distance(begin(), end());
+  }
+
+  size_t sizeOfEdgeData() const {
+    return gNode::EITy::sizeOfSecond();
   }
 
   FirstGraph() { }

@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -21,7 +21,7 @@
  * @author Dimitrios Prountzos <dprountz@cs.utexas.edu>
  */
 #include "Galois/Galois.h"
-#include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/Graph2.h"
 #include "Galois/Graphs/LCGraph.h"
 #include "Galois/Graphs/Serialize.h"
 
@@ -36,8 +36,10 @@ namespace cll = llvm::cl;
 enum ConvertMode {
   dimacs2gr,
   rmat2gr,
+  pbbs2gr,
   gr2bsml,
-  gr2dimacs
+  gr2dimacs,
+  gr2pbbs
 };
 
 static cll::opt<std::string> inputfilename(cll::Positional, cll::desc("<input file>"), cll::Required);
@@ -46,8 +48,10 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Choose a conversion mode:"),
     cll::values(
       clEnumVal(dimacs2gr, "Convert dimacs to binary gr (default)"),
       clEnumVal(rmat2gr, "Convert rmat to binary gr"),
+      clEnumVal(pbbs2gr, "Convert pbbs graph to binary gr"),
       clEnumVal(gr2bsml, "Convert binary gr to binary sparse MATLAB matrix"),
       clEnumVal(gr2dimacs, "Convert binary gr to dimacs"),
+      clEnumVal(gr2pbbs, "Convert binary gr to pbbs"),
       clEnumValEnd), cll::init(dimacs2gr));
 
 void convert_rmat2gr(const std::string& infilename, const std::string& outfilename) {
@@ -78,7 +82,6 @@ void convert_rmat2gr(const std::string& infilename, const std::string& outfilena
     graph.addNode(n, Galois::NONE);
   }
 
-  size_t edges_added = 0;
   for (size_t edge_num = 0; edge_num < nnodes; ++edge_num) {
     size_t cur_id, cur_edges;
     infile >> cur_id >> cur_edges;
@@ -100,14 +103,8 @@ void convert_rmat2gr(const std::string& infilename, const std::string& outfilena
       }
       GNode& src = nodes[cur_id];
       GNode& dst = nodes[neighbor_id];
-      if (src.hasNeighbor(dst)) {
-        std::cerr << "Warning: Duplicate edge ("
-          << cur_id << ", " << neighbor_id << ") weight " << weight
-          << " ignored\n";
-      } else {
-        graph.addEdge(src, dst, weight);
-        edges_added++;
-      }
+      // replaces existing edge if it exists
+      graph.getEdgeData(graph.addEdge(src, dst)) = weight;
     }
 
     infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
@@ -117,6 +114,11 @@ void convert_rmat2gr(const std::string& infilename, const std::string& outfilena
   if (!infile.eof()) {
     std::cerr << "additional lines in file\n";
     abort();
+  }
+
+  size_t edges_added = 0;
+  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+    edges_added += std::distance(graph.edge_begin(*ii), graph.edge_end(*ii));
   }
 
   std::cout << "Finished reading graph. "
@@ -161,7 +163,6 @@ void convert_dimacs2gr(const std::string& infilename, const std::string& outfile
     graph.addNode(n, Galois::NONE);
   }
 
-  size_t edges_added = 0;
   for (size_t edge_num = 0; edge_num < nedges; ++edge_num) {
     size_t cur_id, neighbor_id;
     int weight;
@@ -185,14 +186,8 @@ void convert_dimacs2gr(const std::string& infilename, const std::string& outfile
     
     GNode& src = nodes[cur_id - 1]; // 1 indexed
     GNode& dst = nodes[neighbor_id - 1];
-    if (src.hasNeighbor(dst)) {
-      std::cerr << "Warning: Duplicate edge ("
-        << cur_id << ", " << neighbor_id << ") weight " << weight
-        << " ignored\n";
-    } else {
-      graph.addEdge(src, dst, weight);
-      edges_added++;
-    }
+    // replaces existing edge if it exists
+    graph.getEdgeData(graph.addEdge(src, dst)) = weight;
 
     infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
   }
@@ -203,6 +198,11 @@ void convert_dimacs2gr(const std::string& infilename, const std::string& outfile
     abort();
   }
 
+  size_t edges_added = 0;
+  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+    edges_added += std::distance(graph.edge_begin(*ii), graph.edge_end(*ii));
+  }
+
   std::cout << "Finished reading graph. "
     << "Nodes: " << nnodes
     << " Edges read: " << nedges 
@@ -210,6 +210,100 @@ void convert_dimacs2gr(const std::string& infilename, const std::string& outfile
     << "\n";
 
   outputGraph(outfilename.c_str(), graph);
+}
+
+/**
+ * PBBS input is an ASCII file of tokens that serialize a CSR graph. I.e., 
+ * elements in brackets are non-literals:
+ * 
+ * AdjacencyGraph
+ * <num nodes>
+ * <num edges>
+ * <offset node 0>
+ * <offset node 1>
+ * ...
+ * <edge 0>
+ * <edge 1>
+ * ...
+ */
+void convert_pbbs2gr(const std::string& infilename, const std::string& outfilename) {
+  typedef Galois::Graph::FirstGraph<int,void,true> Graph;
+  typedef Graph::GraphNode GNode;
+  Graph graph;
+
+  std::ifstream infile(infilename.c_str());
+  std::string header;
+  size_t nnodes, nedges;
+
+  infile >> header >> nnodes >> nedges;
+  if (header != "AdjacencyGraph") {
+    std::cerr << "Unknown file format\n";
+    abort();
+  }
+
+  size_t* offsets = new size_t[nnodes];
+  for (size_t i = 0; i < nnodes; ++i) {
+    infile >> offsets[i];
+  }
+
+  size_t* edges = new size_t[nedges];
+  for (size_t i = 0; i < nedges; ++i) {
+    infile >> edges[i];
+  }
+
+  std::vector<GNode> nodes;
+  nodes.resize(nnodes);
+  for (size_t i = 0; i < nnodes; ++i) {
+    GNode n = graph.createNode(i);
+    graph.addNode(n);
+    nodes[i] = n;
+    graph.addNode(n, Galois::NONE);
+  }
+
+  for (size_t i = 0; i < nnodes; ++i) {
+    size_t begin = offsets[i];
+    size_t end = (i == nnodes - 1) ? nedges : offsets[i+1];
+    GNode& src = nodes[i];
+    for (size_t j = begin; j < end; ++j) {
+      GNode& dst = nodes[edges[j]];
+      graph.addEdge(src, dst);
+    }
+  }
+
+  std::cout << "Finished reading graph. "
+    << "Nodes: " << nnodes
+    << " Edges read: " << nedges 
+    << "\n";
+
+  outputGraph(outfilename.c_str(), graph);
+}
+
+void convert_gr2pbbs(const std::string& infilename, const std::string& outfilename) {
+  // Use FileGraph because it is basically in CSR format needed for pbbs
+  typedef Galois::Graph::FileGraph Graph;
+
+  Graph graph;
+  graph.structureFromFile(infilename);
+
+  std::ofstream file(outfilename.c_str());
+  file << "AdjacencyGraph\n" << graph.size() << "\n" << graph.sizeEdges() << "\n";
+  // edgeid[i] is the end of i in FileGraph while it is the beginning of i in pbbs graph
+  size_t last = std::distance(graph.edgeid_begin(), graph.edgeid_end());
+  size_t count = 0;
+  file << "0\n";
+  for (Graph::edgeid_iterator ii = graph.edgeid_begin(), ei = graph.edgeid_end();
+      ii != ei; ++ii, ++count) {
+    if (count < last - 1)
+      file << *ii << "\n";
+  }
+  for (Graph::nodeid_iterator ii = graph.nodeid_begin(), ei = graph.nodeid_end(); ii != ei; ++ii) {
+    file << *ii << "\n";
+  }
+  file.close();
+
+  std::cout << "Finished reading graph. "
+    << "Nodes: " << graph.size() << " Edges: " << graph.sizeEdges() 
+    << "\n";
 }
 
 void convert_gr2dimacs(const std::string& infilename, const std::string& outfilename) {
@@ -327,8 +421,10 @@ int main(int argc, char** argv) {
   llvm::cl::ParseCommandLineOptions(argc, argv);
   switch (convertMode) {
     case rmat2gr: convert_rmat2gr(inputfilename, outputfilename); break;
+    case pbbs2gr: convert_pbbs2gr(inputfilename, outputfilename); break;
     case gr2dimacs: convert_gr2dimacs(inputfilename, outputfilename); break;
     case gr2bsml: convert_gr2bsml(inputfilename, outputfilename); break;
+    case gr2pbbs: convert_gr2pbbs(inputfilename, outputfilename); break;
     default:
     case dimacs2gr: convert_dimacs2gr(inputfilename, outputfilename); break;
   }
