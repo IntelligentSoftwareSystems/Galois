@@ -30,8 +30,40 @@
 #include "geometryIO.h"
 #include "parseCommandLine.h"
 #include "refine.h"
+#include "topology.h"
+
+bool checkDelaunay(tri *triangs, int n, int boundarySize);
+
+inline bool skinnyTriangle(tri *t) {
+  double minAngle = 30;
+  if (minAngleCheck(t->vtx[0]->pt, t->vtx[1]->pt, t->vtx[2]->pt, minAngle))
+    return 1;
+  return 0;
+}
+
 using namespace std;
 using namespace benchIO;
+
+static bool CheckResult;
+
+bool check(triangles<point2d> Tri) {                                                                  
+  int m = Tri.numTriangles;                                                                           
+  vertex* V = NULL;                                                                                   
+  tri* Triangs = NULL;                                                                                
+  topologyFromTriangles(Tri, &V, &Triangs);                                                           
+  if (checkDelaunay(Triangs, m, 10)) return 1;                                                        
+  int* bad = newA(int, m);                                                                            
+//  parallel_for (int i = 0; i < m; i++)
+  parallel_doall(int, i, 0, m) {
+    bad[i] = skinnyTriangle(&Triangs[i]);
+  } parallel_doall_end
+  int nbad = sequence::plusReduce(bad, m);                                                            
+  if (nbad > 0) {                                                                                     
+    cout << "Delaunay refine check: " << nbad << " skinny triangles" << endl;                         
+    return 1;                                                                                         
+  }                                                                                                   
+  return 0;                                                                                           
+}
 
 void timeRefine(triangles<point2d> Tri, int rounds, char* outFile) {
   triangles<point2d> R;
@@ -44,6 +76,7 @@ void timeRefine(triangles<point2d> Tri, int rounds, char* outFile) {
   cout << endl;
 
   if (outFile != NULL) writeTrianglesToFile(R, outFile);
+  if (CheckResult) { if (!check(R)) { cout << "result ok\n"; } else { abort(); } }
   R.del();
 }
 
@@ -53,9 +86,11 @@ int parallel_main(int argc, char* argv[]) {
   char* oFile = P.getOptionValue("-o");
   bool nodeelemfiles = P.getOption("-e");
   int rounds = P.getOptionIntValue("-r",1);
+  CheckResult = P.getOption("-c");
 
   triangles<point2d>T;
   if (nodeelemfiles) T = readTrianglesFromFileNodeEle(iFile);
   else T = readTrianglesFromFile<point2d>(iFile,0);
   timeRefine(T, rounds, oFile);
+  return 0;
 }

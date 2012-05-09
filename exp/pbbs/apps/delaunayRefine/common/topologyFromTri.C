@@ -117,14 +117,14 @@ bool checkDelaunay(tri *triangs, int n, int boundarySize) {
 					  v->pt, t.t->vtx[t.o]->pt);
 	    //cout << "i=" << i << " vz=" << vz << endl;
 	    // allow for small error
-	    if (vz < -1e-10)  utils::writeMin(&insideOutError,i);
+	    if (vz < -1e-9)  utils::writeMin(&insideOutError,i);
 	  }
 	  if (t.inCirc(v)) {
 	    double vz = inCircleNormalized(t.t->vtx[0]->pt, t.t->vtx[1]->pt, 
 					  t.t->vtx[2]->pt, v->pt);
 	    //cout << "i=" << i << " vz=" << vz << endl;
 	    // allow for small error
-	    if (vz > 1e-10) utils::writeMin(&inCircleError,i);
+	    if (vz > 1e-9) utils::writeMin(&inCircleError,i);
 	  }
 	} else bcount[i]++;
 	t = t.rotClockwise();

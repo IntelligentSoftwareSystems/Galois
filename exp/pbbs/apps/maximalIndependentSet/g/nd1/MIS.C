@@ -21,16 +21,28 @@
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include <iostream>
+#include <deque>
 #include "sequence.h"
 #include "graph.h"
 #include "parallel.h"
 //#include "speculative_for.h"
 #include "exp/exp.h"
+
+struct TLD {
+  std::deque<int> abortedQ;
+  int aborted;
+};
+
+//#define DUMB
 template <class S>
 void speculative_for(S step, int s, int e, int granularity, 
 		     bool hasState=1, int maxTries=-1) {
+  unsigned numThreads = Exp::get_num_threads();
+  
   if (maxTries < 0) maxTries = 2*granularity;
-  int maxRoundSize = (e-s)/granularity+1;
+  int maxRoundSize = (int) numThreads;
+#ifdef DUMB
+  maxRoundSize = (e-s)/granularity+1;
   vindex *I = newA(vindex,maxRoundSize);
   vindex *Ihold = newA(vindex,maxRoundSize);
   bool *keep = newA(bool,maxRoundSize);
@@ -39,6 +51,8 @@ void speculative_for(S step, int s, int e, int granularity,
     state = newA(S, maxRoundSize);
     for (int i=0; i < maxRoundSize; i++) state[i] = step;
   }
+#endif
+  TLD *tld = new TLD[maxRoundSize];
 
   int round = 0; 
   int numberDone = s; // number of iterations done
@@ -51,41 +65,69 @@ void speculative_for(S step, int s, int e, int granularity,
       cerr << "speculativeLoop: too many iterations, increase maxTries parameter\n";
       abort();
     }
-    int size = min(maxRoundSize, e - numberDone);
+    //int size = min(maxRoundSize, e - numberDone);
+    int size = e - numberDone;
 
     if (hasState) {
 //      parallel_for (int i =0; i < size; i++) {
       parallel_doall(int, i, 0, size)  {
-	if (i >= numberKeep) I[i] = numberDone + i;
-	keep[i] = state[i].reserve(I[i]);
+        unsigned tid = Exp::get_tid();
+        TLD& t = tld[tid];
+        int cur = i;
+        while (true) {
+#ifdef DUMB
+          if (cur >= numberKeep) I[cur] = numberDone + cur;
+#endif
+          bool success = step.commit(cur);
+          //bool success = state[i].commit(I[i]);
+          if (!success) {
+            t.abortedQ.push_back(cur);
+            t.aborted++;
+          }
+#ifdef DUMB
+          keep[cur] = !success;
+#endif
+          if (!success)
+            break;
+          if (!t.abortedQ.empty()) {
+            cur = t.abortedQ.front();
+            t.abortedQ.pop_front();
+          } else {
+            break;
+          }
+        }
       } parallel_doall_end
+
+      for (int i = 0; i < numThreads; ++i) {
+        TLD& t = tld[i];
+        for (int j = 0; j < t.abortedQ.size(); ++j) {
+          int cur = t.abortedQ[j];
+          bool success = step.commit(cur);
+          if (!success)
+            abort();
+        }
+        failed += t.aborted;
+        t.abortedQ.clear();
+        t.aborted = 0;
+      }
     } else {
-//      parallel_for (int i =0; i < size; i++) {
-      parallel_doall(int, i, 0, size)  {
-	if (i >= numberKeep) I[i] = numberDone + i;
-	keep[i] = step.reserve(I[i]);
-      } parallel_doall_end
+      abort();
     }
 
-    if (hasState) {
-//      parallel_for (int i =0; i < size; i++) 
-      parallel_doall(int, i, 0, size) {
-	if (keep[i]) keep[i] = !state[i].commit(I[i]);
-      } parallel_doall_end
-    } else {
-//      parallel_for (int i =0; i < size; i++) 
-      parallel_doall(int, i, 0, size) {
-	if (keep[i]) keep[i] = !step.commit(I[i]);
-      } parallel_doall_end
-    }
-
+#ifdef DUMB
     // keep edges that failed to hook for next round
     numberKeep = sequence::pack(I, Ihold, keep, size);
     failed += numberKeep;
     swap(I, Ihold);
     numberDone += size - numberKeep;
+#endif
+    numberKeep = 0;
+    numberDone += size - numberKeep;
   }
+#ifdef DUMB
   free(I); free(Ihold); free(keep); free(state);
+#endif
+  delete [] tld;
   cout << "rounds = " << round << " failed = " << failed << "\n";
 }
 
@@ -100,32 +142,77 @@ using namespace std;
 //   Flags = 1 indicates chosen
 //   Flags = 2 indicates a neighbor is chosen
 struct MISstep {
-  char flag;
-  char *Flags;  vertex*G;
-  MISstep(char* _F, vertex* _G) : Flags(_F), G(_G) {}
+  char *Flags;  vertex*G; int *Marks;
+  MISstep(char* _F, vertex* _G, int* _M) : Flags(_F), G(_G), Marks(_M) {}
 
-  bool reserve(int i) {
-    int d = G[i].degree;
-    flag = 1;
-    for (int j = 0; j < d; j++) {
-      vindex ngh = G[i].Neighbors[j];
-      if (ngh < i) {
-	if (Flags[ngh] == 1) { flag = 2; return 1;}
-	// need to wait for higher priority neighbor to decide
-	else if (Flags[ngh] == 0) flag = 0; 
+  bool acquire(int id, int i) {
+    int v;
+    do {
+      v = Marks[i];
+      if (v == id)
+        return true;
+      if (v == -1 && __sync_bool_compare_and_swap(&Marks[i], v, id)) {
+        return true;
       }
-    }
-    return 1;
+    } while (v == -1);
+
+    return false;
   }
 
-  bool commit(int i) { return (Flags[i] = flag) > 0;}
+  bool release(int id, int i) {
+    if (Marks[i] != id)
+      return false;
+
+    Marks[i] = -1;
+    return true;
+  }
+
+  bool doit(int i) {
+    int d = G[i].degree;
+    if (!acquire(i, i))
+      return false;
+    if (Flags[i] != 0)
+      return true;
+    for (int j = 0; j < d; j++) {
+      vindex ngh = G[i].Neighbors[j];
+      if (!acquire(i, ngh))
+        return false;
+      if (Flags[ngh] != 0)
+        return true;
+    }
+    Flags[i] = 1;
+    for (int j = 0; j < d; j++) {
+      vindex ngh = G[i].Neighbors[j];
+      Flags[ngh] = 2;
+    }
+    return true;
+  }
+
+  void resetState(int i) {
+    int d = G[i].degree;
+    if (!release(i, i))
+      return;
+    for (int j = 0; j < d; j++) {
+      vindex ngh = G[i].Neighbors[j];
+      if (!release(i, ngh))
+        return;
+    }
+    return;
+  }
+
+  bool commit(int i) { 
+    bool retval = doit(i);
+    resetState(i);
+    return retval;
+  }
 };
 
 char* maximalIndependentSet(graph GS) {
   int n = GS.n;
   vertex* G = GS.V;
-  char* Flags = newArray(n, (char) 0);
-  MISstep mis(Flags, G);
+  int* Marks = newArray(n, -1);
+  char* Flags = newArray(n,  (char) 0);
+  MISstep mis(Flags, G, Marks);
   int numRounds = Exp::get_num_rounds();
   //int numRounds = 25;
   speculative_for(mis, 0, n, numRounds);

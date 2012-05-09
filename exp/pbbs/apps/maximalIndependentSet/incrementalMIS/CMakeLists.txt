@@ -1,1 +1,1 @@
-papp(incrementalMIS MIS.C MISTime.C)
+papp(incrementalMIS MIS.C ../common/MISTime.C)

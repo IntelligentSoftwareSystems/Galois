@@ -40,17 +40,6 @@ struct Init {
 };
 #endif
 
-#ifdef EXP_DOALL_PTHREAD
-#include "exp/pthread_do_all.h"
-#include <cstdlib>
-
-struct Init {
-  Init() {
-    // XXX
-  }
-};
-#endif
-
 #if defined(EXP_DOALL_CILK) || defined(EXP_DOALL_CILKP) || defined(EXP_DOALL_OPENMP) || defined(EXP_DOALL_OPENMP_RUNTIME)
 struct Init { };
 #endif

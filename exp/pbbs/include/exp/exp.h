@@ -9,6 +9,8 @@ namespace Exp {
 extern __thread unsigned TID;
 extern unsigned nextID;
 
+// NB(ddn): Not "DRF" for DMP but this is okay if we don't interpret the value
+// itself, i.e., only use this as a identifier for thread-local data.
 static inline unsigned get_tid() {
   unsigned x = TID;
   if (x & 1)

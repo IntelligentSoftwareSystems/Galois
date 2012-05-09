@@ -36,6 +36,8 @@ using namespace benchIO;
 //  TIMING
 // *************************************************************
 
+bool CheckResult;
+
 void timeDelaunay(point2d* pts, int n, int rounds, char* outFile) {
   triangles<point2d> R;
   for (int i=0; i < rounds; i++) {
@@ -55,6 +57,7 @@ int parallel_main(int argc, char* argv[]) {
   char* iFile = P.getArgument(0);
   char* oFile = P.getOptionValue("-o");
   int rounds = P.getOptionIntValue("-r",1);
+  CheckResult = P.getOption("-c");
 
   _seq<point2d> PIn = readPointsFromFile<point2d>(iFile);
   //std::random_shuffle(PIn.A, PIn.A+PIn.n);

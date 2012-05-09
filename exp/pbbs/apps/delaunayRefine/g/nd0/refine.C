@@ -287,14 +287,15 @@ void resetState(int id, Qs* q) {
 // *************************************************************
 
 void addRefiningVertices(vertex** v, int n, int nTotal, TriangleTable TT, int& failed, int& rounds) {
-  int numRounds = Exp::get_num_rounds();
   unsigned numThreads = Exp::get_num_threads();
+  int numRounds = Exp::get_num_rounds();
 
   //int maxR = (int) (nTotal/500) + 1; // maximum number to try in parallel
   int maxR = (int) (nTotal/numRounds) + 1; // maximum number to try in parallel
-  Qs *qqs = newA(Qs,numThreads);
-  Qs **qs = newA(Qs*,numThreads);
-  for (int i=0; i < numThreads; i++) qs[i] = new (&qqs[i]) Qs; 
+  int maxPerThread = min((int) numThreads, maxR);
+  Qs *qqs = newA(Qs,maxPerThread);
+  Qs **qs = newA(Qs*,maxPerThread);
+  for (int i=0; i < maxPerThread; i++) qs[i] = new (&qqs[i]) Qs;
   simplex *t = newA(simplex,maxR);
   bool *flags = newA(bool,maxR);
   vertex** h = newA(vertex*,maxR);
@@ -314,11 +315,13 @@ void addRefiningVertices(vertex** v, int n, int nTotal, TriangleTable TT, int& f
 
       int cur = j;
 
-      bool success = false;
+      bool success = true;
       simplex t = simplex(vv[cur]->badT, 0);
       int r = findAndReserveCavity(vv[cur], t, q);
       if (r == 1 && addCavity(vv[cur], t, q, TT, v)) {
-        success = true;
+        ;
+      } else if (r == 2) {
+        success = false;
       }
       flags[cur] = !success;
       resetState(vv[cur]->id, q);

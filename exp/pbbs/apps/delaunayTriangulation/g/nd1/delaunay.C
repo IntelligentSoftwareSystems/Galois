@@ -27,6 +27,7 @@
 #include "nearestNeighbors.h"
 #include "gettime.h"
 #include "parallel.h"
+#include "delaunay.h"
 #include "delaunayDefs.h"
 #include "topology.h"
 
@@ -328,8 +329,7 @@ void incrementallyAddPoints(vertex** v, int n, vertex* start) {
 
         resetState(vv[cur]->id, qs[tid]);
         
-//        if (!success)
-        if (cnt < 128 && !success)
+        if (!success)
           break;
         if (qs[tid]->abortedQ.empty()) 
           break;
@@ -429,7 +429,7 @@ triangles<point2d> delaunay(point2d* P, int n) {
   free(v);
   nextTime("add points");
 
-  if (CHECK) checkDelaunay(Triangs, numTriangles, boundarySize);
+  if (CheckResult) { checkDelaunay(Triangs, numTriangles, boundarySize); cout << "result ok\n"; }
 
   triangle* rt = newA(triangle, numTriangles);
 //  parallel_for (int i=0; i < numTriangles; i++) {

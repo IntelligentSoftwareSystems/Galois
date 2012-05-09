@@ -1,4 +1,4 @@
-# Broken for -O3
+# XXX(ddn): Broken for -O3
 if(CMAKE_BUILD_TYPE MATCHES "Release")
   add_definitions(-O2)
 endif()
