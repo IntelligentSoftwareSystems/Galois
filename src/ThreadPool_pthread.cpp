@@ -188,7 +188,7 @@ class ThreadPool_pthread : public ThreadPool {
   void initThread() {
     //initialize TID
     GaloisRuntime::LL::initTID();
-    int id = GaloisRuntime::LL::getTID();
+    unsigned id = GaloisRuntime::LL::getTID();
     GaloisRuntime::initPTS();
     GaloisRuntime::LL::bindThreadToProcessor(id);
     started.release();
@@ -204,7 +204,7 @@ class ThreadPool_pthread : public ThreadPool {
   }
 
   void doWork(void) {
-    int LocalThreadID = GaloisRuntime::LL::getTID();
+    unsigned LocalThreadID = GaloisRuntime::LL::getTID();
     
     if (LocalThreadID != 0)
       starts[LocalThreadID].acquire();
@@ -229,6 +229,18 @@ class ThreadPool_pthread : public ThreadPool {
   }
 
   void launch(void) {
+#ifdef GALOIS_DMP
+    // Hack to improve the performance of DMP version by killing off unnecessary threads
+    {
+      char *t = getenv("GALOIS_NUM_THREADS");
+      if (t) {
+        unsigned m = std::min(maxThreads, (unsigned) atoi(t));
+        unsigned LocalThreadID = GaloisRuntime::LL::getTID();
+        if (LocalThreadID >= m)
+          return;
+      }
+    }
+#endif
     while (!shutdown) doWork();
   }
 
@@ -241,8 +253,9 @@ class ThreadPool_pthread : public ThreadPool {
   
 public:
   ThreadPool_pthread():
-    maxThreads(GaloisRuntime::LL::getMaxThreads()), 
-    started(0), shutdown(false), workBegin(0), workEnd(0)
+    started(0),
+    maxThreads(GaloisRuntime::LL::getMaxThreads()),
+    shutdown(false), workBegin(0), workEnd(0)
   {
     initThread();
 
