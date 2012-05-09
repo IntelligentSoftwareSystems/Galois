@@ -41,8 +41,17 @@
 #include <fstream>
 #include <map>
 #include <set>
+#include <vector>
 
 #define BORUVKA_DEBUG 0
+#define COMPILE_STATISICS 0
+#if BORUVKA_DEBUG
+#include "UnionFind.h"
+#endif
+#if COMPILE_STATISICS
+#include <time.h>
+int BORUVKA_SAMPLE_FREQUENCY= 1000000;
+#endif
 
 using namespace std;
 namespace cll = llvm::cl;
@@ -53,6 +62,7 @@ static const char* url = "boruvkas_algorithm";
 
 static cll::opt<std::string> inputfile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<bool> use_weighted_rmat("wrmat",cll::desc("Weighted RMAT"), cll::Optional,cll::init(false));
+static cll::opt<bool> verify_via_kruskal("verify",cll::desc("Verify MST result via Serial Kruskal"), cll::Optional,cll::init(false));
 static int nodeID = 0;
 ///////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -90,7 +100,59 @@ typedef Graph::GraphNode GNode;
 //The graph.
 Graph graph;
 ///////////////////////////////////////////////////////////////////////////////////////
+
 ///////////////////////////////////////////////////////////////////////////////////////
+#if COMPILE_STATISICS
+struct GraphStats{
+   std::vector<float> average_degrees;
+   std::vector<int> time_vals;
+   std::vector<unsigned long> max_degrees;
+   unsigned long counter;
+   GraphStats(){
+      counter=0;
+   }
+   GraphStats &  tick(){
+      ++counter;
+      return *this;
+   }
+   void snap(){
+      unsigned long num_nodes=0;
+      unsigned long num_edges=0;
+      unsigned long current_degree = 0;
+      unsigned long max_degree=0;
+      for(Graph::iterator it = graph.begin(), end_it = graph.end(); it!=end_it; ++it){
+         ++num_nodes;
+         current_degree=0;
+         for(Graph::edge_iterator e_it = graph.edge_begin(*it, Galois::NONE), e_it_end = graph.edge_end(*it, Galois::NONE); e_it!=e_it_end; ++e_it){
+            ++num_edges;
+            ++current_degree;
+         }
+         if(current_degree > max_degree) max_degree = current_degree;
+      }
+      time_vals.push_back(time(0));
+      average_degrees.push_back((float)(num_edges)/(num_nodes));
+      max_degrees.push_back(max_degree);
+   }
+   void dump(ostream & out){
+      out<<"\nMax degrees,";
+      for(size_t i=0;i<max_degrees.size(); ++i){
+         out << " " << max_degrees[i]<<",";
+      }
+      out<<"\nAverage degrees,";
+      for(size_t i=0;i<average_degrees.size(); ++i){
+         out << " " << average_degrees[i]<<",";
+      }
+      out<<"\nTime, ";
+      for(size_t i=0;i<time_vals.size(); ++i){
+         out << " " << time_vals[i]<<",";
+      }
+      out<<"\n";
+   }
+};
+GraphStats stat_collector;
+#endif
+
+/////////////////////////////////////////////////////////////////////////////////////////
 void printGraph() {
    int numEdges = 0;
       for (Graph::iterator src = graph.begin(), esrc = graph.end(); src != esrc; ++src) {
@@ -109,7 +171,6 @@ void printGraph() {
 ///////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////
 GaloisRuntime::PerCPU<long long> MSTWeight;
-//GaloisRuntime::PerCPU<long> NumIncrements;
 struct process {
    template<typename ContextTy>
    void operator()(GNode& src, ContextTy& lwl) {
@@ -127,7 +188,7 @@ struct process {
       }
       //Find minimum neighbor
       for (Graph::edge_iterator e_it = graph.edge_begin(src, Galois::NONE), edst = graph.edge_end(src, Galois::NONE); e_it != edst; ++e_it) {
-         EdgeDataType w = graph.getEdgeData(e_it);
+         EdgeDataType w = graph.getEdgeData(e_it, Galois::NONE);
          assert(w>=0);
          if (w < minEdgeWeight) {
             minNeighbor = &((*e_it).first());
@@ -140,7 +201,7 @@ struct process {
          return;
       }
 #if BORUVKA_DEBUG
-      		std::cout << " Min edge from "<<graph.getData(src).toString() << " to "<<graph.getData minNeighbor.toString()<<" " <<minEdgeWeight << " "<<std::endl;
+            std::cout << " Min edge from "<<graph.getData(src) << " to "<<graph.getData(*minNeighbor)<<" " <<minEdgeWeight << " "<<std::endl;
 #endif
       //Acquire locks on neighborhood of min neighbor.
       for (Graph::edge_iterator e_it = graph.edge_begin(*minNeighbor, Galois::ALL), edst = graph.edge_end(*minNeighbor, Galois::ALL); e_it != edst; ++e_it) {
@@ -149,18 +210,17 @@ struct process {
       assert(minEdgeWeight>=0);
       //update MST weight.
       MSTWeight.get() += minEdgeWeight;
-//      NumIncrements.get()+=1;
       typedef std::pair<GNode, EdgeDataType> EdgeData;
       typedef std::set<EdgeData, std::less<EdgeData>, Galois::PerIterAllocTy::rebind<EdgeData>::other> edsetTy;
       edsetTy toAdd(std::less<EdgeData>(), Galois::PerIterAllocTy::rebind<EdgeData>::other(lwl.getPerIterAlloc()));
       for (Graph::edge_iterator mdst = graph.edge_begin(*minNeighbor, Galois::NONE), medst = graph.edge_end(*minNeighbor, Galois::NONE); mdst != medst; ++mdst) {
          GNode dstNode = graph.getEdgeDst(mdst);
-         int edgeWeight = graph.getEdgeData(mdst);
+         int edgeWeight = graph.getEdgeData(mdst,Galois::NONE);
          if (dstNode != src) { //Do not add the edge being contracted
             Graph::edge_iterator dup_edge = graph.findEdge(src, dstNode, Galois::NONE);
             if (dup_edge != graph.edge_end(src, Galois::NONE)) {
-               EdgeDataType dup_wt = graph.getEdgeData(dup_edge);
-                  graph.getEdgeData(dup_edge) = std::min<EdgeDataType>(edgeWeight, dup_wt);
+               EdgeDataType dup_wt = graph.getEdgeData(dup_edge,Galois::NONE);
+                  graph.getEdgeData(dup_edge,Galois::NONE) = std::min<EdgeDataType>(edgeWeight, dup_wt);
                   assert(std::min<EdgeDataType>(edgeWeight, dup_wt)>=0);
             } else {
                   toAdd.insert(EdgeData(dstNode, edgeWeight));
@@ -173,7 +233,10 @@ struct process {
          graph.getEdgeData(graph.addEdge(src, it->first, Galois::NONE)) = it->second;
       }
       lwl.push(src);
-
+#if COMPILE_STATISICS
+      if(stat_collector.tick().counter%BORUVKA_SAMPLE_FREQUENCY==0)
+         stat_collector.snap();
+#endif
    }
 };
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -207,7 +270,7 @@ struct seq_gt: public std::binary_function<const GNode&, const GNode&, bool> {
 //End body of for-each.
 ///////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////
-void runBodyParallel() {
+EdgeDataType runBodyParallel() {
    using namespace GaloisRuntime::WorkList;
    typedef dChunkedFIFO<64> dChunk;
    typedef ChunkedFIFO<64> Chunk;
@@ -216,18 +279,20 @@ void runBodyParallel() {
 #if BORUVKA_DEBUG
    std::cout<<"Graph size "<<graph.size()<<std::endl;
 #endif
-
+#if COMPILE_STATISICS
+   BORUVKA_SAMPLE_FREQUENCY = graph.size()/200;//200 samples should be sufficient.
+#endif
    for (size_t i = 0; i < MSTWeight.size(); i++){
       MSTWeight.get(i) = 0;
    }
-
+   cout << "Starting loop body\n";
    Galois::StatTimer T;
-
    T.start();
 #ifdef GALOIS_EXP
    Exp::WorklistExperiment<OBIM, dChunk, Chunk, Indexer, seq_less, seq_gt>().for_each(std::cout, graph.begin(), graph.end(), process());
 #else
-   Galois::for_each<dChunk>(graph.begin(), graph.end(), process());
+//   Galois::for_each<dChunk>(graph.begin(), graph.end(), process());
+   Galois::for_each<OBIM>(graph.begin(), graph.end(), process());
 #endif
    T.stop();
 
@@ -238,10 +303,9 @@ void runBodyParallel() {
 #endif
       res += MSTWeight.get(i);
    }
-   std::cout << "MST Weight is " << res <<std::endl;
+//   std::cout << "MST Weight is " << res <<std::endl;
+   return res;
 }
-/////////////////////////////////////////////////////////////////////////////////////////
-
 /////////////////////////////////////////////////////////////////////////////////////////
 static void makeGraph(const char* input) {
    std::vector<GNode> nodes;
@@ -330,12 +394,19 @@ struct EdgeTuple{
    }
 };
 template<typename NdTy, typename EdTy>
+struct LessThanEdgeTuple{
+bool operator()(const EdgeTuple<NdTy,EdTy> & o1, const EdgeTuple<NdTy,EdTy> &o2){
+   return (o1.wt==o2.wt)? o1.src < o2.src : o1.wt<o2.wt;
+}
+};
+template<typename NdTy, typename EdTy>
 std::ostream & operator << (std::ostream & out , const EdgeTuple<NdTy,EdTy> & e ){
    e.print();
    return out;
 }
 static void readWeightedRMAT(const char* input) {
    std::vector<EdgeTuple<NodeDataType,EdgeDataType> > et;
+   et.reserve(100000000);
    ifstream inFile (input);
    NodeDataType src, dst;
    EdgeDataType wt;
@@ -382,7 +453,45 @@ static void readWeightedRMAT(const char* input) {
          assert(edge_sum < std::numeric_limits<EdgeDataType>::max());
    }
 }
+
 ////////////////////////////End READ WRMAT////////////////////////////////////////////////
+////////////////////////////Kruskal////////////////////////////////////////////////
+#if BORUVKA_DEBUG
+typedef EdgeTuple<NodeDataType, EdgeDataType> KEdgeTuple;
+typedef std::vector<KEdgeTuple> KruskalGraph;
+KruskalGraph read_edges(Graph  &g){
+   KruskalGraph  * ret = new KruskalGraph ();
+for(Graph::iterator it = g.begin(), e = g.end(); it!=e; ++it){
+   for(Graph::edge_iterator e_it = g.edge_begin(*it), e_end = g.edge_end(*it); e_it!=e_end; ++e_it){
+      ret->push_back(KEdgeTuple(g.getData(*it).id,g.getData(g.getEdgeDst(e_it)).id, g.getEdgeData(e_it) ));
+   }
+}
+std::cout<<"Number of edge tuples " << ret->size() << "\n";
+return *ret;
+}
+EdgeDataType kruskal_impl(const size_t num_nodes, KruskalGraph kg){
+   std::sort(kg.begin(), kg.end(), LessThanEdgeTuple<NodeDataType,EdgeDataType>());
+   UnionFind<NodeDataType,-1> uf(num_nodes);
+   size_t mst_size = 0;
+   EdgeDataType mst_sum = 0;
+   for(size_t i = 0; i < kg.size(); ++i){
+      KEdgeTuple e  = kg[i];
+      NodeDataType src = uf.uf_find(e.src);
+      NodeDataType dst = uf.uf_find(e.dst);
+      if(src!=dst){
+         uf.uf_union(src,dst);
+         mst_sum+=e.wt;
+         mst_size++;
+         if(mst_size>=num_nodes-1)
+            return mst_sum;
+      }
+   }
+   return -1;
+}
+EdgeDataType verify(Graph & g){
+   return kruskal_impl(g.size(), read_edges(g));
+}
+#endif
 //////////////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char **argv) {
    LonestarStart(argc, argv, std::cout, name, desc, url);
@@ -391,8 +500,25 @@ int main(int argc, char **argv) {
    else
       makeGraph(inputfile.c_str());
 #if BORUVKA_DEBUG
-   printGraph();
+   EdgeDataType kruskal_wt;
+   if(verify_via_kruskal){
+      kruskal_wt= verify(graph);
+      cout<<"Kruskal MST Result is " << kruskal_wt <<"\n";
+   }
 #endif
-   runBodyParallel();
+   cout << "Starting loop body\n";
+   EdgeDataType mst_wt = runBodyParallel();
+   cout<<"Boruvka MST Result is " << mst_wt <<"\n";
+#if BORUVKA_DEBUG
+   if(verify_via_kruskal){
+      assert(kruskal_wt==mst_wt);
+   }
+#endif
+
+#if COMPILE_STATISICS
+   cout<< " \n==================================================\n";
+   stat_collector.dump(cout);
+   cout<< " \n==================================================\n";
+#endif
    return 0;
 }
