@@ -221,7 +221,7 @@ protected:
       setThreadContext(&tld.cnx);
     tld.lterm = term.getLocalTokenHolder();
 #ifdef GALOIS_EXP
-    SimpleTaskPool& pool = getSystemTaskPool();
+//    SimpleTaskPool& pool = getSystemTaskPool();
 #endif
     do {
       bool didWork;
@@ -245,7 +245,7 @@ protected:
       if (ForEachTraits<FunctionTy>::NeedsBreak && *broke.getLocal())
 	break;
 #ifdef GALOIS_EXP
-      pool.work();
+      //pool.work();
 #endif
 
       term.localTermination();
@@ -264,9 +264,9 @@ public:
     : wl(default_wl), function(_f), loopname(_loopname)
   {}
 
-  template <typename W>
-  ForEachWork (W& _wl, FunctionTy& _f, const char* _ln):
-    wl (_wl), function (_f), loopname (_ln) 
+  template<typename W>
+  ForEachWork(W& _wl, FunctionTy& _f, const char* _ln):
+    wl(_wl), function(_f), loopname(_ln) 
   {}
 
 
