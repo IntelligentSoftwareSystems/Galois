@@ -10,6 +10,7 @@ GaloisRuntime::MCSBarrier mbarrier;
 GaloisRuntime::PthreadBarrier pbarrier;
 GaloisRuntime::FastBarrier fbarrier;
 GaloisRuntime::FasterBarrier ffbarrier;
+GaloisRuntime::TopoBarrier tbarrier;
 
 template<typename BarTy>
 struct test {
@@ -82,9 +83,10 @@ int main() {
 }
 
   //testf(pbarrier, "pthread");
-  testf(fbarrier, "fast");
+  //  testf(fbarrier, "fast");
   testf(mbarrier, "mcs");
-  testf(ffbarrier, "faster");
+  //  testf(ffbarrier, "faster");
+  testf(tbarrier, "topo");
 
   M /= 2;
   };

@@ -126,6 +126,11 @@ public:
     return reinterpret_cast<T*>(ditem);
   }
 
+  T* getRemoteByPkg(unsigned int pkg) {
+    void* ditem = PPSBackend.getRemote(LL::getLeaderForPackage(pkg), offset);
+    return reinterpret_cast<T*>(ditem);
+  }
+
   unsigned size() {
     return LL::getMaxThreads();
   }

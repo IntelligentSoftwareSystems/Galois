@@ -30,7 +30,7 @@
 
 #include <cstdlib>
 #include <cstdio>
-#include <iostream>
+//#include <iostream>
 
 #ifdef GALOIS_DMP
 #include "dmp.h"
@@ -233,3 +233,95 @@ void GaloisRuntime::MCSBarrier::wait() {
     *n.childpointers[1] = n.sense;
   n.sense = !n.sense;
 }
+
+
+
+
+
+
+
+
+
+void GaloisRuntime::TopoBarrier::_reinit(unsigned P) {
+  unsigned pkgs = LL::getMaxPackageForThread(P-1) + 1;
+  for (unsigned i = 0; i < pkgs; ++i) {
+    treenode& n = *nodes.getRemoteByPkg(i);
+    n.childnotready = 0;
+    n.havechild = 0;
+    for (int j = 0; j < 4; ++j) {
+	if ((4*i+j+1) < pkgs) {
+	  ++n.childnotready;
+	  ++n.havechild;
+	}
+    }
+    for (unsigned j = 0; j < P; ++j)
+      if (LL::getPackageForThreadInternal(j) == i && !LL::isLeaderForPackageInternal(j)) {
+	++n.childnotready;
+	++n.havechild;
+      }
+    n.parentpointer = (i == 0) ? 0 : nodes.getRemoteByPkg((i-1)/4);
+    n.childpointers[0] = ((2*i + 1) >= pkgs) ? 0 : nodes.getRemoteByPkg(2*i+1);
+    n.childpointers[1] = ((2*i + 2) >= pkgs) ? 0 : nodes.getRemoteByPkg(2*i+2);
+    n.parentsense = 0;
+  }
+  for (unsigned i = 0; i < P; ++i)
+    *sense.getRemote(i) = 1;
+}
+
+GaloisRuntime::TopoBarrier::TopoBarrier() {
+  unsigned P = ThreadPool::getActiveThreads();
+  _reinit(P);
+  //std::cerr << "mcs size " << sizeof(treenode) << "\n";
+}
+
+void GaloisRuntime::TopoBarrier::reinit(unsigned val) {
+  _reinit(val);
+}
+
+void GaloisRuntime::TopoBarrier::wait() {
+  unsigned id = LL::getTID();
+  treenode& n = *nodes.getLocal();
+  unsigned& s = *sense.getLocal();
+  bool leader = LL::isLeaderForPackage(id);
+  //completion tree
+  if (leader) {
+    while (n.childnotready) { GaloisRuntime::LL::asmPause(); }
+    n.childnotready = n.havechild;
+    if (n.parentpointer) {
+      __sync_fetch_and_sub(&n.parentpointer->childnotready, 1);
+    }
+  } else {
+    __sync_fetch_and_sub(&n.childnotready, 1);
+  }
+
+  //wait for signal
+  if (id != 0) {
+    while(n.parentsense != s) {
+      GaloisRuntime::LL::asmPause();
+    }
+  }
+
+  //signal children in wakeup tree
+  if (leader) {
+    if (n.childpointers[0])
+      n.childpointers[0]->parentsense = s;
+    if (n.childpointers[1])
+      n.childpointers[1]->parentsense = s;
+    if (id == 0)
+      n.parentsense = s;
+  }
+  ++s;
+}
+
+// void GaloisRuntime::TopoBarrier::dump() {
+//   unsigned pkgs = LL::getMaxPackages();
+//   for (unsigned i = 0; i < pkgs; ++i) {
+//     treenode* n = nodes.getRemoteByPkg(i);
+//     std::cerr << n << " " << n->parentpointer << " " << n->childpointers[0] << " " << n->childpointers[1] << " " << n->havechild << " " << n->childnotready << " " << n->parentsense << "\n";
+//   }
+//   for (unsigned i = 0; i < sense.size(); ++i) {
+//     std::cerr << *sense.getRemote(i) << " ";
+//   }
+//   std::cerr << "\n";
+
+// }

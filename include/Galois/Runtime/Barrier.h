@@ -150,7 +150,39 @@ public:
   void wait();
 };
 
-typedef MCSBarrier GBarrier;
+class TopoBarrier {
+  struct treenode {
+    //vpid is LL::getTID()
+
+    //package binary tree
+    treenode* parentpointer; //null of vpid == 0
+    treenode* childpointers[2];
+
+    //waiting values:
+    unsigned havechild;
+    volatile unsigned childnotready;
+
+    //signal values
+    volatile unsigned parentsense;
+  };
+
+  PerPackageStorage<treenode> nodes;
+  PerThreadStorage<unsigned> sense;
+
+  void _reinit(unsigned P);
+
+public:
+  TopoBarrier();
+
+  //not safe if any thread is in wait
+  void reinit(unsigned val);
+
+  void wait();
+
+  //  void dump();
+};
+
+typedef TopoBarrier GBarrier;
 
 }
 
