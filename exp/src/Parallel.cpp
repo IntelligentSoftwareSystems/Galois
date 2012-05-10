@@ -1,9 +1,30 @@
+#include "Exp/Parallel.h"
+#include "Galois/Galois.h"
+
+__thread unsigned Exp::TID = 0;
+unsigned Exp::nextID = 0;
+
+unsigned Exp::getNumThreads() {
+  char *p = getenv("GALOIS_NUM_THREADS");
+  if (p) {
+    int n = atoi(p);
+    if (n > 0)
+      return n;
+  }
+  return 1;
+}
+
+int Exp::getNumRounds() {
+  char *p = getenv("EXP_NUM_ROUNDS");
+  if (p) {
+    int n = atoi(p);
+    if (n > 0)
+      return n;
+  }
+  return -1;
+}
 
 #ifdef EXP_DOALL_GALOIS
-#include "Galois/Galois.h"
-#include "exp/exp.h"
-#include <cstdlib>
-
 struct Init {
   Init() {
     Galois::setMaxThreads(Exp::get_num_threads()); 
@@ -13,8 +34,6 @@ struct Init {
 
 #ifdef EXP_DOALL_TBB
 #include "tbb/task_scheduler_init.h"
-#include <cstdlib>
-
 struct Init {
   tbb::task_scheduler_init* init;
 
@@ -48,8 +67,7 @@ namespace {
 Init iii;
 } // end namespace
 
-void runtime_init() {
+void Exp::initRuntime() {
   // external reference to cause the initialization of static object above
 }
-
 

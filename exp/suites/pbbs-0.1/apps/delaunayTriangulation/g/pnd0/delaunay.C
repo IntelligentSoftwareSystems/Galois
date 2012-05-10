@@ -31,7 +31,6 @@
 #include "delaunayDefs.h"
 #include "topology.h"
 
-#include "exp/exp.h"
 using namespace std;
 
 // if on verifies the Delaunay is correct 
@@ -250,8 +249,9 @@ simplex generateBoundary(point2d* P, int n, int bCount, vertex* v, tri* t) {
 // *************************************************************
 
 void incrementallyAddPoints(vertex** v, int n, vertex* start) {
-  int numRounds = Exp::get_num_rounds();
-  unsigned numThreads = Exp::get_num_threads();
+  int numRounds = Exp::getNumRounds();
+  unsigned numThreads = Exp::getNumThreads();
+  numRounds = numRounds < 0 ? 100 : numRounds;
 
   // various structures needed for each parallel insertion
   //int maxR = (int) (n/100) + 1; // maximum number to try in parallel
@@ -294,7 +294,7 @@ void incrementallyAddPoints(vertex** v, int n, vertex* start) {
     // and reserve vertices on boundary of cavity
 //    parallel_for (int j = 0; j < cnt; j++) {
     parallel_doall(int, j, 0, cnt)  {
-      unsigned tid = Exp::get_tid();
+      unsigned tid = Exp::getTID();
       int cur = j;
 
       bool success = false;

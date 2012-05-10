@@ -28,7 +28,6 @@
 #include "refine.h"
 #include "topology.h"
 
-#include "exp/exp.h"
 using namespace std;
 
 // *************************************************************
@@ -291,7 +290,7 @@ void resetState(int id, Qs* q) {
 // *************************************************************
 
 void addRefiningVertices(vertex** v, int n, int nTotal, TriangleTable TT, int vlen, int& numBad, int& failed, int& rounds) {
-  unsigned numThreads = Exp::get_num_threads();
+  unsigned numThreads = Exp::getNumThreads();
   
   int maxR = (int) numThreads;
   Qs *qqs = newA(Qs,maxR);
@@ -313,7 +312,7 @@ void addRefiningVertices(vertex** v, int n, int nTotal, TriangleTable TT, int vl
 
 //    parallel_for (int j = 0; j < cnt; j++) 
     parallel_doall(int, j, 0, cnt) {
-      unsigned tid = Exp::get_tid();
+      unsigned tid = Exp::getTID();
       Qs* q = qs[tid];
 
       int cur = j;

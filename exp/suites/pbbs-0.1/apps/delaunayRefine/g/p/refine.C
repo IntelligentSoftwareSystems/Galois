@@ -27,7 +27,6 @@
 #include "refine.h"
 #include "topology.h"
 
-#include "exp/exp.h"
 using namespace std;
 
 // *************************************************************
@@ -221,7 +220,8 @@ bool addCavity(vertex *v, simplex t, Qs *q, TriangleTable TT) {
 // *************************************************************
 
 void addRefiningVertices(vertex** v, int n, int nTotal, TriangleTable TT, int& failed, int& rounds) {
-  int numRounds = Exp::get_num_rounds();
+  int numRounds = Exp::getNumRounds();
+  numRounds = numRounds < 0 ? 500 : numRounds;
 
   //int maxR = (int) (nTotal/500) + 1; // maximum number to try in parallel
   int maxR = (int) (nTotal/numRounds) + 1; // maximum number to try in parallel

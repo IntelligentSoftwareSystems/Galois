@@ -3,6 +3,7 @@ add_custom_target(pbbs-inputs)
 function(executable name)
   add_executable(${name} ${ARGN})
   target_link_libraries(${name} pbbs ${extra_libs})
+  addsuite(${name})
 endfunction()
 
 add_subdirectory(geometryData)

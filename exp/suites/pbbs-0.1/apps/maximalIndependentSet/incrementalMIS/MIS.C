@@ -25,7 +25,6 @@
 #include "graph.h"
 #include "parallel.h"
 //#include "speculative_for.h"
-#include "exp/exp.h"
 template <class S>
 void speculative_for(S step, int s, int e, int granularity, 
 		     bool hasState=1, int maxTries=-1) {
@@ -126,8 +125,8 @@ char* maximalIndependentSet(graph GS) {
   vertex* G = GS.V;
   char* Flags = newArray(n, (char) 0);
   MISstep mis(Flags, G);
-  int numRounds = Exp::get_num_rounds();
-  //int numRounds = 25;
+  int numRounds = Exp::getNumRounds();
+  numRounds = numRounds < 0 ? 25 : numRounds;
   speculative_for(mis, 0, n, numRounds);
   return Flags;
 }
