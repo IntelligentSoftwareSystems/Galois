@@ -23,7 +23,7 @@ endforeach()
 find_package_handle_standard_args(CXX0x DEFAULT_MSG CXX0X_FOUND_INTERNAL CXX0X_FLAGS)
 mark_as_advanced(CXX0X_FLAGS)
 
-if(CXX0x_FOUND)
+if(CXX0X_FLAG_DETECTED)
   set(_oldflags ${CMAKE_CXX_FLAGS})
   set(CMAKE_CXX_FLAGS ${_oldflags} ${CXX0X_FLAGS})
   include(CheckCXX0xFeatures)
