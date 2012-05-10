@@ -107,7 +107,7 @@ if(USE_EXP)
   endif()
 
   if(EXP_DOALL MATCHES "DMP")
-    include_directories(exp/pbbs/lib/dmpruntime)
+    include_directories(exp/lib/dmpruntime)
     add_definitions(-DGALOIS_DRF -DGALOIS_DMP)
     set(RT_LINK dmpruntime ${RT_LINK})
   elseif(EXP_DOALL MATCHES "PTHREAD")
