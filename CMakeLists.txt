@@ -25,6 +25,7 @@ set(USE_CLANG OFF CACHE BOOL "Use clang compiler")
 set(USE_EXP OFF CACHE BOOL "Use experimental features") 
 set(USE_VTUNE ON CACHE BOOL "Use vtune (if found)")
 set(USE_DET OFF CACHE BOOL "Use deterministic execution")
+set(EXP_DOALL "GALOIS" CACHE STRING "Which type of implementation of parallel_doall")
 
 ###### Optional programs and default paths ######
 
