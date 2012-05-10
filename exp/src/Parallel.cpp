@@ -27,7 +27,7 @@ int Exp::getNumRounds() {
 #ifdef EXP_DOALL_GALOIS
 struct Init {
   Init() {
-    Galois::setMaxThreads(Exp::get_num_threads()); 
+    Galois::setMaxThreads(Exp::getNumThreads()); 
   }
 };
 #endif
