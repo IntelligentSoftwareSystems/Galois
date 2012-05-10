@@ -25,7 +25,6 @@ mark_as_advanced(CXX0X_FLAGS)
 
 if(CXX0x_FOUND)
   set(_oldflags ${CMAKE_CXX_FLAGS})
-  message(${CMAKE_CXX_FLAGS})
   set(CMAKE_CXX_FLAGS ${_oldflags} ${CXX0X_FLAGS})
   include(CheckCXX0xFeatures)
   set(CMAKE_CXX_FLAGS ${_oldflags})
