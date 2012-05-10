@@ -10,7 +10,7 @@ kuzmin(3Dplummer_10M 3 10000000)
 
 # Broken for -O3
 if(CMAKE_BUILD_TYPE MATCHES "Release")
-  add_definitions(-O2)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
 endif()
 
 include_directories(common)

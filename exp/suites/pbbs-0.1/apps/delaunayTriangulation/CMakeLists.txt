@@ -7,7 +7,7 @@ kuzmin(2Dkuzmin_10M 2 10000000)
 
 # Broken for -O3
 if(CMAKE_BUILD_TYPE MATCHES "Release")
-  add_definitions(-O2)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
 endif()
 
 # NB(ddn): we have common .cpps in common/ too but since we change .h

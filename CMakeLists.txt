@@ -17,10 +17,6 @@ endif()
 #use profiling
 set(USE_PROFILING OFF CACHE BOOL "Enable GCC profiling")
 
-#use alternate compiler
-set(USE_ICC OFF CACHE BOOL "Use intel compiler")
-set(USE_CLANG OFF CACHE BOOL "Use clang compiler")
-
 #Enable iss specific options; should be OFF in the general release
 set(USE_EXP OFF CACHE BOOL "Use experimental features") 
 set(USE_VTUNE ON CACHE BOOL "Use vtune (if found)")
@@ -29,27 +25,9 @@ set(EXP_DOALL "GALOIS" CACHE STRING "Which type of implementation of parallel_do
 
 ###### Optional programs and default paths ######
 
-#find better c++ compilers
-find_program(CLANGXX clang++)
-#find_program(CXX_4.5 g++-4.5)
-find_program(ICCXX icpc)
-
-#always use newer gcc
-#if(NOT ${CXX_4.5} STREQUAL "CXX_4.5-NOTFOUND")
-#  set(CMAKE_CXX_COMPILER ${CXX_4.5})
-#endif()
-
-if(NOT ${CLANGXX} STREQUAL "CLANGXX-NOTFOUND")
-  if(USE_CLANG)
-    set(CMAKE_CXX_COMPILER ${CLANGXX})  
-  endif()
-endif()
-
-if(NOT ${ICCXX} STREQUAL "ICCXX-NOTFOUND")
-  if(USE_ICC)
-    set(CMAKE_CXX_COMPILER ${ICCXX})
-    add_definitions("-wd68 -wd981 -wd383 -wd869 -wd2196 -wd279 -std=c++0x")
-  endif()
+if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
+  set(CMAKE_CXX_COMPILER ${ICCXX})
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd68 -wd981 -wd383 -wd869 -wd2196 -wd279")
 endif()
 
 if(CMAKE_SYSTEM MATCHES "SunOS.*")
@@ -109,7 +87,6 @@ if(USE_EXP)
   if(EXP_DOALL MATCHES "DMP")
     include_directories(exp/lib/dmpruntime)
     add_definitions(-DGALOIS_DRF -DGALOIS_DMP)
-    set(RT_LINK dmpruntime ${RT_LINK})
   elseif(EXP_DOALL MATCHES "PTHREAD")
     add_definitions(-DGALOIS_DRF)
   endif()
@@ -149,22 +126,21 @@ endif()
 find_package(CXX0x)
 
 if(USE_PROFILING)
-  add_definitions(-pg)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pg")
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pg")
 endif(USE_PROFILING)
 
 #solaris
 if(USE_SOLARIS)
   add_definitions(-DSOLARIS)
-  add_definitions("-m64")
-  add_definitions("-mcpu=niagara2")
-  add_definitions("-lposix4")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -m64 -mcpu=niagara2 -lposix4")
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -m64 -lposix4")
 endif()
 
 #Always include debug symbols
-# add_definitions("-g -fno-inline")
-add_definitions("-g")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
 
 #Disable asserts
 if(CMAKE_BUILD_TYPE MATCHES "Release")
@@ -173,7 +149,8 @@ endif()
 
 #more warnings
 if(CMAKE_BUILD_TYPE MATCHES "Debug")
-  add_definitions("-Wall")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
 endif()
 
 #always import c99 stdint functions into c++
