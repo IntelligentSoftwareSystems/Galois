@@ -1,5 +1,7 @@
 #include "Galois/Runtime/LoopHooks.h"
 
+#include "Galois/Runtime/ll/TID.h"
+
 using namespace GaloisRuntime;
 
 static AtLoopExit* head;
@@ -20,9 +22,11 @@ AtLoopExit::~AtLoopExit() {
 }
 
 void GaloisRuntime::runAllLoopExitHandlers() {
-  AtLoopExit* h = head;
-  while (h) {
-    h->LoopExit();
-    h = h->next;
+  if (LL::getTID() == 0) {
+    AtLoopExit* h = head;
+    while (h) {
+      h->LoopExit();
+      h = h->next;
+    }
   }
 }
