@@ -331,12 +331,12 @@ void GaloisRuntime::TopoBarrier::wait() {
 
 // }
 
-GaloisRuntime::GBarrier& GaloisRuntime::getSystemBarrier(unsigned P) {
+GaloisRuntime::GBarrier& GaloisRuntime::getSystemBarrier() {
   static GaloisRuntime::GBarrier b;
   static unsigned num = ~0;
-  if (P != num) {
-    b.reinit(P);
-    num = P;
+  if (ThreadPool::getActiveThreads() != num) {
+    num = ThreadPool::getActiveThreads();
+    b.reinit(num);
   }
   return b;
 }
