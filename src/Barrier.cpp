@@ -30,7 +30,6 @@
 
 #include <cstdlib>
 #include <cstdio>
-//#include <iostream>
 
 #ifdef GALOIS_DMP
 #include "dmp.h"
@@ -204,7 +203,10 @@ void GaloisRuntime::MCSBarrier::_reinit(unsigned P) {
 GaloisRuntime::MCSBarrier::MCSBarrier() {
   unsigned P = ThreadPool::getActiveThreads();
   _reinit(P);
-  //std::cerr << "mcs size " << sizeof(treenode) << "\n";
+}
+
+GaloisRuntime::MCSBarrier::MCSBarrier(unsigned P) {
+  _reinit(P);
 }
 
 void GaloisRuntime::MCSBarrier::reinit(unsigned val) {
@@ -271,7 +273,10 @@ void GaloisRuntime::TopoBarrier::_reinit(unsigned P) {
 GaloisRuntime::TopoBarrier::TopoBarrier() {
   unsigned P = ThreadPool::getActiveThreads();
   _reinit(P);
-  //std::cerr << "mcs size " << sizeof(treenode) << "\n";
+}
+
+GaloisRuntime::TopoBarrier::TopoBarrier(unsigned P) {
+  _reinit(P);
 }
 
 void GaloisRuntime::TopoBarrier::reinit(unsigned val) {

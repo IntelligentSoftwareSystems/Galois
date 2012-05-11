@@ -143,11 +143,14 @@ class MCSBarrier {
 
 public:
   MCSBarrier();
+  explicit MCSBarrier(unsigned val);
 
   //not safe if any thread is in wait
   void reinit(unsigned val);
 
   void wait();
+
+  void operator()(void) { wait(); }
 };
 
 class TopoBarrier {
@@ -173,11 +176,14 @@ class TopoBarrier {
 
 public:
   TopoBarrier();
+  explicit TopoBarrier(unsigned val);
 
   //not safe if any thread is in wait
   void reinit(unsigned val);
 
   void wait();
+
+  void operator()(void) { wait(); }
 
   //  void dump();
 };
