@@ -330,3 +330,13 @@ void GaloisRuntime::TopoBarrier::wait() {
 //   std::cerr << "\n";
 
 // }
+
+GaloisRuntime::GBarrier& GaloisRuntime::getSystemBarrier(unsigned P) {
+  static GaloisRuntime::GBarrier b;
+  static unsigned num = ~0;
+  if (P != num) {
+    b.reinit(P);
+    num = P;
+  }
+  return b;
+}

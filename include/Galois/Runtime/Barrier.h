@@ -190,6 +190,8 @@ public:
 
 typedef TopoBarrier GBarrier;
 
+GBarrier& getSystemBarrier(unsigned P);
+
 }
 
 #endif
