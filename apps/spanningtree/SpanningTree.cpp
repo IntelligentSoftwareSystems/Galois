@@ -40,8 +40,6 @@
 
 namespace cll = llvm::cl;
 
-namespace {
-
 const char* name = "Spanning-tree Algorithm";
 const char* desc = "Compute the spanning tree (not mimimal) of a graph";
 const char* url = NULL;
@@ -62,13 +60,13 @@ Graph graph;
 
 struct Process {
   Galois::InsertBag<Edge>& result;
-  Process(Galois::InsertBag<Edge>& _result) : result(_result) { }
+  Process(Galois::InsertBag<Edge>& _result): result(_result) { }
 
   void operator()(GNode src, Galois::UserContext<GNode>& ctx) {
-    for (Graph::edge_iterator ii = graph.edge_begin(src),
-        ei = graph.edge_end(src); ii != ei; ++ii) {
+    for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::ALL),
+        ei = graph.edge_end(src, Galois::ALL); ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
-      Node& data = graph.getData(dst, Galois::NONE);
+      Node& data = graph.getData(dst, Galois::ALL);
       if (data.in_mst)
         continue;
       ctx.push(dst);
@@ -78,45 +76,17 @@ struct Process {
   }
 };
 
-void runSerial(GNode root, Galois::InsertBag<Edge>& result) {
-  std::vector<GNode> worklist;
-
-  worklist.push_back(root);
-
-  while (!worklist.empty()) {
-    GNode src = worklist.back();
-    worklist.pop_back();
-    
-    // Expand tree
-    for (Graph::edge_iterator ii = graph.edge_begin(src),
-        ei = graph.edge_end(src); ii != ei; ++ii) {
-      GNode dst = graph.getEdgeDst(ii);
-      Node& data = graph.getData(dst, Galois::NONE);
-      if (data.in_mst)
-        continue;
-      worklist.push_back(dst);
-      result.push(Edge(src, dst));
-      data.in_mst = true;
-    }
+struct not_in_mst {
+  bool operator()(const GNode& n) const {
+    return !graph.getData(n).in_mst;
   }
-}
-
-void runParallel(GNode root, Galois::InsertBag<Edge>& result) {
-  Galois::for_each(root, Process(result));
-}
+};
 
 bool verify(Galois::InsertBag<Edge>& result) {
   if (std::distance(result.begin(), result.end()) != graph.size() - 1)
     return false;
 
-  for (Graph::iterator src = graph.begin(), end = graph.end(); src != end; ++src) {
-    if (!graph.getData(*src).in_mst)
-      return false;
-  }
-
-  return true;
-}
-
+  return Galois::find_if(graph.begin(), graph.end(), not_in_mst()) == graph.end();
 }
 
 int main(int argc, char** argv) {
@@ -136,16 +106,12 @@ int main(int argc, char** argv) {
     abort();
   }
 
-  graph.getData(*root).in_mst = true;
   Galois::InsertBag<Edge> result;
 
   Galois::StatTimer T;
   T.start();
-  if (numThreads) {
-    runParallel(*root, result);
-  } else {
-    runSerial(*root, result);
-  }
+  graph.getData(*root).in_mst = true;
+  Galois::for_each(*root, Process(result));
   T.stop();
 
   std::cout << "Edges in spanning tree: " 
