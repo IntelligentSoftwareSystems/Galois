@@ -51,9 +51,16 @@ struct FreeNode {
 typedef GaloisRuntime::LL::PtrLock<FreeNode*, true> HeadPtr;
 
 //Number of pages allocated
-static unsigned num = 0;
-static std::list<HeadPtr*> heads;
-static std::map<void*, HeadPtr*> ownerMap;
+struct PAState {
+  unsigned num;
+  std::map<void*, HeadPtr*> ownerMap;
+};
+
+PAState& getPAState() {
+  static PAState p;
+  return p;
+}
+
 #ifdef __linux__
 #define DoAllocLock true
 #else
@@ -95,10 +102,10 @@ void* allocFromOS() {
   HeadPtr*& h = head;
   if (!h) { //first allocation
     h = new HeadPtr();
-    heads.push_back(h);
   }
-  ownerMap[ptr] = h;
-  ++num;
+  PAState& p = getPAState();
+  p.ownerMap[ptr] = h;
+  ++p.num;
   dataLock.unlock();
   return ptr;
 }
@@ -125,7 +132,7 @@ void* GaloisRuntime::MM::pageAlloc() {
 
 void GaloisRuntime::MM::pageFree(void* m) {
   dataLock.lock();
-  HeadPtr* phead = ownerMap[m];
+  HeadPtr* phead = getPAState().ownerMap[m];
   dataLock.unlock();
   assert(phead);
   phead->lock();
@@ -140,6 +147,6 @@ void GaloisRuntime::MM::pagePreAlloc(int numPages) {
 }
 
 unsigned GaloisRuntime::MM::pageAllocInfo() {
-  return num;
+  return getPAState().num;
 }
 
