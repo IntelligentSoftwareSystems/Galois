@@ -119,16 +119,19 @@ def main(args, options):
       if retcode != 0:
         print("INFO: CommandLine %s\n" % ' '.join(cmd))
         print("RUN: Error command: %s\n" % cmd)
-        #sys.exit(1)
+        if not options.ignoreerrors:
+          sys.exit(1)
 
 
 if __name__ == '__main__':
   signal.signal(signal.SIGQUIT, signal.SIG_IGN)
   parser = optparse.OptionParser(usage='usage: %prog [options] <command line> ...')
+  parser.add_option('--ignore-errors', dest='ignoreerrors', default=False, action='store_true',
+      help='ignore errors in subprocesses')
   parser.add_option('-t', '--threads', dest="threads", default="1",
       help='range of threads to use. A range is R := R,R | N | N:N | N:N:N where N is an integer.')
-  parser.add_option('-r', '--runs', default=1, type="int",
-      help="set number of runs")
+  parser.add_option('-r', '--runs', default=1, type='int',
+      help='set number of runs')
   parser.add_option('-x', '--extra', dest="extra", default=[], action='append',
       help='add another parameter to range over (format: <name>::<arg>::<range>). E.g., delta::-delta::1,5')
   parser.add_option('-o', '--timeout', dest="timeout", default=0, type='int',
