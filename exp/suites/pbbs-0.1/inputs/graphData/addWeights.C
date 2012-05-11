@@ -34,6 +34,7 @@ using namespace dataGen;
 using namespace std;
 
 int parallel_main(int argc, char* argv[]) {
+  Exp::Init iii;
   commandLine P(argc,argv,"<inFile> <outFile>");
   pair<char*,char*> fnames = P.IOFileNames();
   char* iFile = fnames.first;

@@ -81,6 +81,7 @@ void timeRefine(triangles<point2d> Tri, int rounds, char* outFile) {
 }
 
 int parallel_main(int argc, char* argv[]) {
+  Exp::Init iii;
   commandLine P(argc,argv,"[-o <outFile>] [-r <rounds>] [-e] <inFile>");
   char* iFile = P.getArgument(0);
   char* oFile = P.getOptionValue("-o");

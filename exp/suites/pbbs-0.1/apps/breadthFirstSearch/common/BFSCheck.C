@@ -92,6 +92,7 @@ int checkBFS(int start, graph G, graph T) {
 }
 
 int parallel_main(int argc, char* argv[]) {
+  Exp::Init iii;
   commandLine P(argc,argv,"<inFile> <outfile>");
   pair<char*,char*> fnames = P.IOFileNames();
   char* iFile = fnames.first;

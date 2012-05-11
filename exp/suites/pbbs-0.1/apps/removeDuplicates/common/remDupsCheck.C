@@ -71,6 +71,7 @@ void checkRemDups(T* A, int an, T* B, int bn, F less) {
 }
 
 int parallel_main(int argc, char* argv[]) {
+  Exp::Init iii;
   commandLine P(argc,argv,"<inFile> <outFile>");
   pair<char*,char*> fnames = P.IOFileNames();
   seqData In = readSequenceFromFile(fnames.first);

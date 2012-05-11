@@ -38,6 +38,8 @@ pair<int*,int> st(edgeArray EA);
 // This needs to be augmented with a proper check
 
 int parallel_main(int argc, char* argv[]) {
+  Exp::Init iii;
+
   commandLine P(argc,argv,"<inFile> <outfile>");
   pair<char*,char*> fnames = P.IOFileNames();
   char* iFile = fnames.first;

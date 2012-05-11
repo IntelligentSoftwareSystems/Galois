@@ -33,6 +33,7 @@ using namespace dataGen;
 using namespace std;
 
 int parallel_main(int argc, char* argv[]) {
+  Exp::Init iii;
   commandLine P(argc,argv,"n <outFile>");
   pair<int,char*> in = P.sizeAndFileName();
   bool onSphere = P.getOption("-S");

@@ -48,6 +48,7 @@ void timeRayCast(triangles<pointT> T, ray<pointT>* rays, int nRays,
 }
 
 int parallel_main(int argc, char* argv[]) {
+  Exp::Init iii;
   commandLine P(argc,argv,"[-o <outFile>] [-r <rounds>] <triangleFile> <rayFile>");
    pair<char*,char*> fnames = P.IOFileNames();
   char* triFile = fnames.first;

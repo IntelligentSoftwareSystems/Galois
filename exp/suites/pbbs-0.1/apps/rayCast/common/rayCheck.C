@@ -31,6 +31,7 @@ using namespace std;
 using namespace benchIO;
 
 int parallel_main(int argc, char* argv[]) {
+  Exp::Init iii;
   commandLine P(argc,argv,"<triangleFile> <rayFile> <intersectFile>");
   char* triFile = P.getArgument(2);
   char* rayFile = P.getArgument(1);

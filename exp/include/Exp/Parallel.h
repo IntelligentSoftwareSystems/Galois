@@ -2,26 +2,15 @@
 #define EXP_PARALLEL_H
 
 #include <cstdlib>
-
+#ifdef EXP_DOALL_TBB
+#include "tbb/task_scheduler_init.h"
+#endif
+#ifdef EXP_DOALL_GALOIS
+#include "Galois/Galois.h"
+#endif
 extern void DMP_Galois_init();
 
 namespace Exp {
-
-void initRuntime();
-
-namespace {
-// Dummy code to call static initializer 
-struct Init {
-  Init() {
-#ifdef GALOIS_DMP
-    DMP_Galois_init();
-#endif
-    initRuntime(); 
-  }
-};
-
-static Init iii;
-}
 
 extern __thread unsigned TID;
 extern unsigned nextID;
@@ -39,6 +28,48 @@ static inline unsigned getTID() {
 
 unsigned getNumThreads();
 int getNumRounds();
+
+
+#ifdef EXP_DOALL_GALOIS
+struct Init {
+  Init() {
+#ifdef GALOIS_DMP
+    DMP_Galois_init();
+#endif
+    Galois::setMaxThreads(Exp::getNumThreads()); 
+  }
+};
+#endif
+
+#ifdef EXP_DOALL_TBB
+struct Init {
+  tbb::task_scheduler_init* init;
+
+  int get_threads() {
+    char *p = getenv("TBB_NUM_THREADS");
+    if (p) {
+      int n = atoi(p);
+      if (n > 0)
+        return n;
+    }
+    return 1;
+  }
+  
+  Init() {
+    int n = get_threads();
+    init = new tbb::task_scheduler_init(n);  
+  }
+
+  ~Init() {
+    if (init)
+      delete init;
+  }
+};
+#endif
+
+#if defined(EXP_DOALL_CILK) || defined(EXP_DOALL_CILKP) || defined(EXP_DOALL_OPENMP) || defined(EXP_DOALL_OPENMP_RUNTIME)
+struct Init { };
+#endif
 
 }
 

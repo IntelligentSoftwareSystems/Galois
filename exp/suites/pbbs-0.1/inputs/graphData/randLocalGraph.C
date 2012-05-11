@@ -64,6 +64,7 @@ edgeArray edgeRandomWithDimension(int dim, int degree, int numRows) {
 }
 
 int parallel_main(int argc, char* argv[]) {
+  Exp::Init iii;
   commandLine P(argc,argv,"[-m <numedges>] [-d <dims>] [-o] [-j] n <outFile>");
   pair<int,char*> in = P.sizeAndFileName();
   int n = in.first;

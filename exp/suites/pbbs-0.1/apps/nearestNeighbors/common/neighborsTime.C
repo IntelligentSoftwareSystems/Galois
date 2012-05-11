@@ -87,6 +87,7 @@ void timeNeighbors(point* pts, int n, int k, int rounds, char* outFile) {
 }
 
 int parallel_main(int argc, char* argv[]) {
+  Exp::Init iii;
   commandLine P(argc,argv,"[-k {1,...,10}] [-d {2,3}] [-o <outFile>] [-r <rounds>] <inFile>");
   char* iFile = P.getArgument(0);
   char* oFile = P.getOptionValue("-o");

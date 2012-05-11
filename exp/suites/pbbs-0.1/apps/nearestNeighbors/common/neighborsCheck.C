@@ -66,6 +66,7 @@ int checkNeighbors(_seq<int> neighbors, pointT* P, int n, int k, int r) {
 
 
 int parallel_main(int argc, char* argv[]) {
+  Exp::Init iii;
   commandLine P(argc,argv,
 		"[-k {1,...,10}] [-d {2,3}] [-r <numtests>] <inFile> <outfile>");
   pair<char*,char*> fnames = P.IOFileNames();

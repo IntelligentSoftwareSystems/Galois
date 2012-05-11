@@ -27,6 +27,22 @@ kind.
 
 namespace GaloisRuntime {
 
+enum ConflictFlag {
+  CONFLICT = -1,
+  REACHED_FAILSAFE = 1,
+  BREAK = 2
+};
+
+#ifdef GALOIS_DET
+enum PendingFlag {
+  NON_DET,
+  PENDING,
+  COMMITTING
+};
+
+void setPending(PendingFlag value);
+#endif
+
 class SimpleRuntimeContext;
 
 //! All objects that may be locked (nodes primarily) must inherit from Lockable.
@@ -94,22 +110,6 @@ static inline void acquire(Lockable* C, Galois::MethodFlag m) {
   if (shouldLock(m))
     doAcquire(C);
 }
-
-enum ConflictFlag {
-  CONFLICT = -1,
-  REACHED_FAILSAFE = 1,
-  BREAK = 2
-};
-
-#ifdef GALOIS_DET
-enum PendingFlag {
-  NON_DET,
-  PENDING,
-  COMMITTING
-};
-
-void setPending(PendingFlag value);
-#endif
 
 }
 

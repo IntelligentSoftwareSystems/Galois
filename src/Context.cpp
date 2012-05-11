@@ -123,4 +123,3 @@ void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
     }
   }
 }
-

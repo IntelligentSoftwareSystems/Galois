@@ -46,6 +46,7 @@ void checkIntegerSort(void* In, void* Out, int n) {
 }
 
 int parallel_main(int argc, char* argv[]) {
+  Exp::Init iii;
   commandLine P(argc,argv,"<inFile> <outFile>");
   pair<char*,char*> fnames = P.IOFileNames();
   seqData In = readSequenceFromFile(fnames.first);

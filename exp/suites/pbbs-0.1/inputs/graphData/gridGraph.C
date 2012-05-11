@@ -75,6 +75,7 @@ edgeArray edge3DMesh(int n) {
 }
 
 int parallel_main(int argc, char* argv[]) {
+  Exp::Init iii;
   commandLine P(argc,argv,"[-d {2,3}] [-j] [-o] n <outFile>");
   pair<int,char*> in = P.sizeAndFileName();
   int n = in.first;

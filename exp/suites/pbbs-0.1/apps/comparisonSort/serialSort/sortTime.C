@@ -59,6 +59,7 @@ void timeSort(T* A, int n, CMP f, int rounds, bool permute, char* outFile) {
 }
 
 int parallel_main(int argc, char* argv[]) {
+  Exp::Init iii;
   commandLine P(argc,argv,"[-p] [-o <outFile>] [-r <rounds>] <inFile>");
   char* iFile = P.getArgument(0);
   char* oFile = P.getOptionValue("-o");

@@ -37,6 +37,7 @@ pair<T1,int>* addIntData(T1* A, int n, int range) {
 }
 
 int parallel_main(int argc, char* argv[]) {
+  Exp::Init iii;
   commandLine P(argc,argv, "[-r <range>] [-t {int,double}] <inFile> <outFile>");
   pair<char*,char*> fnames = P.IOFileNames();
   char* ifile = fnames.first;

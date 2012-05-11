@@ -57,6 +57,7 @@ double check(point3d* p, vect3d* forces, int n) {
 }
 
 int parallel_main(int argc, char* argv[]) {
+  Exp::Init iii;
   commandLine P(argc,argv, "[-e <errbound>] <inFile> <outfile>");
   pair<char*,char*> fnames = P.IOFileNames();
   double errorBound = P.getOptionDoubleValue("-e", 1e-6);

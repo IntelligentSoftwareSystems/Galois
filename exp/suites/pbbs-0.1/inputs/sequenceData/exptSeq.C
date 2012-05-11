@@ -5,6 +5,7 @@ using namespace dataGen;
 using namespace benchIO;
 
 int parallel_main(int argc, char* argv[]) {
+  Exp::Init iii;
   commandLine P(argc,argv,"[-t {int,double}] <size> <outfile>");
   pair<int,char*> in = P.sizeAndFileName();
   elementType tp = elementTypeFromString(P.getOptionValue("-t","int"));

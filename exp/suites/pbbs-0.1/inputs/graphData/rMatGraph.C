@@ -77,6 +77,7 @@ edgeArray edgeRmat(int n, int m, unsigned int seed,
 }
 
 int parallel_main(int argc, char* argv[]) {
+  Exp::Init iii;
   commandLine P(argc,argv,
 		"[-m <numedges>] [-s <intseed>] [-o] [-j] [-a <a>] [-b <b>] [-c <c>] n <outFile>");
   pair<int,char*> in = P.sizeAndFileName();

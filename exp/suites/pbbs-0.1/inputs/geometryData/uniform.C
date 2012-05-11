@@ -40,6 +40,7 @@ using namespace dataGen;
 using namespace std;
 
 int parallel_main(int argc, char* argv[]) {
+  Exp::Init iii;
   commandLine P(argc,argv,"[-s] [-S] [-d {2,3}] n <outFile>");
   pair<int,char*> in = P.sizeAndFileName();
   int n = in.first;

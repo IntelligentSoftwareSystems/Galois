@@ -54,6 +54,7 @@ ray<point3d>* generateRays(point3d p0, point3d p1, int n) {
 }
 
 int parallel_main(int argc, char* argv[]) {
+  Exp::Init iii;
   commandLine P(argc,argv,"[-n <num>] <triangleInFile> <rayOutFile>");
   pair<char*,char*> fnames = P.IOFileNames();
   char* ifile = fnames.first;

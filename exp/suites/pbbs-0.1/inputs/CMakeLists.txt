@@ -1,4 +1,5 @@
-add_custom_target(pbbs-inputs)
+add_custom_target(more-suites-inputs-pbbs)
+add_dependencies(more-suites-inputs more-suites-inputs-pbbs)
 
 function(executable name)
   add_executable(${name} ${ARGN})
@@ -12,5 +13,5 @@ add_subdirectory(sequenceData)
 
 function(addInput name)
   add_custom_target(data-${prefix}-${name} DEPENDS ${input}/${name})
-  add_dependencies(pbbs-inputs data-${prefix}-${name})
+  add_dependencies(more-suites-inputs-pbbs data-${prefix}-${name})
 endfunction(addInput)

@@ -39,6 +39,7 @@ struct strLess {
 };
 
 int parallel_main(int argc, char* argv[]) {
+  Exp::Init iii;
   commandLine P(argc,argv,"<infile> <outfile>");
   pair<char*,char*> fnames = P.IOFileNames();
   seqData In = readSequenceFromFile(fnames.first);

@@ -70,6 +70,7 @@ bool isSorted(int *SA, uchar *s, int n) {
 }
 
 int parallel_main(int argc, char* argv[]) {
+  Exp::Init iii;
   commandLine P(argc,argv,"<infile> <outfile>");
   pair<char*,char*> fnames = P.IOFileNames();
   _seq<char> In = readStringFromFile(fnames.first);

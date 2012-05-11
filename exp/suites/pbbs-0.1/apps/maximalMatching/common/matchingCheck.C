@@ -76,6 +76,7 @@ int checkMaximalMatching(edgeArray EA, int* EI, int nMatches) {
 }
 
 int parallel_main(int argc, char* argv[]) {
+  Exp::Init iii;
   commandLine P(argc,argv,"<inFile> <outfile>");
   pair<char*,char*> fnames = P.IOFileNames();
   edgeArray E = readEdgeArrayFromFile(fnames.first);
