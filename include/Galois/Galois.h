@@ -169,24 +169,8 @@ static inline void do_all(const IterTy& begin, const IterTy& end, const Function
 ////////////////////////////////////////////////////////////////////////////////
 
 template<typename FunctionTy>
-struct WOnEach {
-  FunctionTy& fn;
-  WOnEach(FunctionTy& f) :fn(f) {}
-  void operator()(void) const {
-    fn(GaloisRuntime::LL::getTID(), 
-       GaloisRuntime::getSystemThreadPool().getActiveThreads());   
-  }
-};
-
-template<typename FunctionTy>
 static inline void on_each(FunctionTy fn, const char* loopname = 0) {
-  WOnEach<FunctionTy> fw(fn);
-  GaloisRuntime::RunCommand w[1];
-  w[0].work = GaloisRuntime::Config::ref(fw);
-  w[0].isParallel = true;
-  w[0].barrierAfter = true;
-  w[0].profile = false;
-  GaloisRuntime::getSystemThreadPool().run(&w[0], &w[1]);
+  GaloisRuntime::on_each_impl(fn, loopname);
 }
 
 
@@ -194,24 +178,8 @@ static inline void on_each(FunctionTy fn, const char* loopname = 0) {
 // PreAlloc
 ////////////////////////////////////////////////////////////////////////////////
 
-struct WPreAlloc {
-  int n;
-  WPreAlloc(int m) :n(m) {}
-  void operator()() {
-    GaloisRuntime::MM::pagePreAlloc(n);
-  }
-};
-
 static inline void preAlloc(int num) {
-  int a = GaloisRuntime::getSystemThreadPool().getActiveThreads();
-  a = (num + a - 1) / a;
-  WPreAlloc P(a);
-  GaloisRuntime::RunCommand w[1];
-  w[0].work = GaloisRuntime::Config::ref(P);
-  w[0].isParallel = true;
-  w[0].barrierAfter = true;
-  w[0].profile = false;
-  GaloisRuntime::getSystemThreadPool().run(&w[0], &w[1]);
+  GaloisRuntime::preAlloc_impl(num);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

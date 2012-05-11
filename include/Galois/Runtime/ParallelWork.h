@@ -38,6 +38,7 @@
 #include "Galois/Runtime/Termination.h"
 #include "Galois/Runtime/LoopHooks.h"
 #include "Galois/Runtime/WorkList.h"
+#include "Galois/Runtime/Sampling.h"
 
 #ifdef GALOIS_EXP
 #include "Galois/Runtime/SimpleTaskPool.h"
@@ -297,28 +298,21 @@ void for_each_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
   assert(!inGaloisForEach);
 
   inGaloisForEach = true;
+  beginSampling();
 
   typedef typename std::iterator_traits<IterTy>::value_type T;
   typedef ForEachWork<WLTy,T,FunctionTy> WorkTy;
 
   WorkTy W(f, loopname);
-  RunCommand w[3];
-
   Initializer<IterTy, WorkTy> init(b, e, W);
-  w[0].work = Config::ref(init);
-  w[0].isParallel = true;
-  w[0].barrierAfter = true;
-  w[0].profile = false;
-  w[1].work = Config::ref(W);
-  w[1].isParallel = true;
-  w[1].barrierAfter = true;
-  w[1].profile = true;
-  w[2].work = &runAllLoopExitHandlers;
-  w[2].isParallel = false;
-  w[2].barrierAfter = true;
-  w[2].profile = true;
-  getSystemThreadPool().run(&w[0], &w[3]);
+  RunCommand w[5] = {Config::ref(init), 
+		     Config::ref(getSystemBarrier()),
+		     Config::ref(W),
+		     Config::ref(getSystemBarrier()),
+		     &runAllLoopExitHandlers};
+  getSystemThreadPool().run(&w[0], &w[5]);
 
+  endSampling();
   inGaloisForEach = false;
 }
 
@@ -340,6 +334,7 @@ void do_all_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
   assert(!inGaloisForEach);
 
   inGaloisForEach = true;
+  beginSampling();
 
   typedef typename std::iterator_traits<IterTy>::value_type T;
   typedef ForEachWork<WLTy,T,DoAllWrapper<FunctionTy> > WorkTy;
@@ -348,19 +343,53 @@ void do_all_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
   WorkTy W(F, loopname);
 
   Initializer<IterTy, WorkTy> init(b, e, W);
-  RunCommand w[2];
-  w[0].work = Config::ref(init);
-  w[0].isParallel = true;
-  w[0].barrierAfter = true;
-  w[0].profile = false;
-  w[1].work = Config::ref(W);
-  w[1].isParallel = true;
-  w[1].barrierAfter = true;
-  w[1].profile = false;
-  getSystemThreadPool().run(&w[0], &w[2]);
+  RunCommand w[4] = {Config::ref(init),
+		     Config::ref(getSystemBarrier()),
+		     Config::ref(W),
+		     Config::ref(getSystemBarrier())};
+  getSystemThreadPool().run(&w[0], &w[4]);
 
+  endSampling();
   inGaloisForEach = false;
 }
+
+template<typename FunctionTy>
+struct WOnEach {
+  FunctionTy& fn;
+  WOnEach(FunctionTy& f) :fn(f) {}
+  void operator()(void) const {
+    fn(GaloisRuntime::LL::getTID(), 
+       ThreadPool::getActiveThreads());   
+  }
+};
+
+template<typename FunctionTy>
+void on_each_impl(FunctionTy fn, const char* loopname = 0) {
+  WOnEach<FunctionTy> fw(fn);
+  GaloisRuntime::RunCommand w[2] = {Config::ref(fw),
+				    Config::ref(getSystemBarrier())};
+  GaloisRuntime::getSystemThreadPool().run(&w[0], &w[2]);
+}
+
+
+struct WPreAlloc {
+  int n;
+  WPreAlloc(int m) :n(m) {}
+  void operator()() {
+    GaloisRuntime::MM::pagePreAlloc(n);
+  }
+};
+
+static inline void preAlloc_impl(int num) {
+  int a = GaloisRuntime::getSystemThreadPool().getActiveThreads();
+  a = (num + a - 1) / a;
+  WPreAlloc P(a);
+  GaloisRuntime::RunCommand w[2] = {Config::ref(P),
+				    Config::ref(getSystemBarrier())};
+  GaloisRuntime::getSystemThreadPool().run(&w[0], &w[2]);
+}
+
+
 
 
 } // end namespace

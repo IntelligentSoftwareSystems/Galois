@@ -27,12 +27,7 @@
 
 namespace GaloisRuntime {
 
-struct RunCommand {
-  Config::function<void (void)> work;
-  bool isParallel;
-  bool barrierAfter;
-  bool profile;
-};
+typedef Config::function<void (void)> RunCommand;
 
 class ThreadPool {
 protected:
