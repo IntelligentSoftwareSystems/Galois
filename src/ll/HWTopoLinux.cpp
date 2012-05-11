@@ -383,7 +383,14 @@ bool GaloisRuntime::LL::bindThreadToProcessor(int id) {
 }
 
 unsigned GaloisRuntime::LL::getMaxThreads() {
-  return A.numThreads;
+  unsigned retval = A.numThreads;
+#ifdef GALOIS_DMP
+  // Hack to improve the performance of DMP version by killing off unnecessary threads
+  char *t = getenv("GALOIS_NUM_THREADS");
+  if (t)
+    retval = std::min(retval, (unsigned) atoi(t));
+#endif
+  return retval;
 }
 
 unsigned GaloisRuntime::LL::getMaxCores() {
