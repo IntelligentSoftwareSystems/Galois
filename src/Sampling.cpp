@@ -2,6 +2,7 @@
 
 #ifdef GALOIS_VTUNE
 #include "ittnotify.h"
+#include "Galois/Runtime/ll/TID.h"
 
 static bool isOn;
 
