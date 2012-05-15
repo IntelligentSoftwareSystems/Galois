@@ -26,20 +26,22 @@ SpecPBBS = [{"prob": "breadthFirstSearch",
       "algos": ["quickHull", "serialHull"],
       "inputs": ["2DinSphere_10M", "2Dkuzmin_10M", "2DonSphere_10M"]},
      {"prob": "delaunayRefine",
-      "algos": ["incrementalRefine", "ndIncrementalRefine", 'g/nd0', 'g/nd1', 'g/nd2', 'g/pnd0', 'g/pnd1', 'g/pnd2'],
-      "inputs": ["2DinCubeDelaunay_275000", "2DinCubeDelaunay_1000000", "2DinCubeDelaunay_2500000"],
+      "algos": ["incrementalRefine", 'g/p', 'g/nd0', 'g/nd1', 'g/nd2', 'g/pnd0', 'g/pnd1', 'g/pnd2'],
+      "inputs": ["2DinCubeDelaunay_275000", "2DinCubeDelaunay_1000000", "2DinCubeDelaunay_2500000", "r5M"],
       "extras": 
         [
-          {'algos': ["incrementalRefine", 'g/nd0', 'g/pnd0'],
+          #{'algos': ["incrementalRefine", 'g/p', 'g/nd0', 'g/pnd0'],
+          {'algos': ["incrementalRefine", "g/p"],
            'arg': "Rounds::-r::1,10,50,100:1000:100" }
         ]
       },
      {"prob": "delaunayTriangulation",
-      "algos": ["ndIncrementalDelaunay", "incrementalDelaunay", "serialDelaunay"],
+      "algos": ["incrementalDelaunay", "serialDelaunay", "g/p", "g/nd0", "g/nd1", "g/pnd0", "g/pnd1"],
       "inputs": ["2DinCube_10M", "2Dkuzmin_10M"],
       "extras":
         [
-          {'algos': ["incrementalDelaunay", 'g/nd0', 'g/pnd0'],
+          #{'algos': ["incrementalDelaunay", 'g/p', 'g/nd0', 'g/pnd0'],
+          {'algos': ["incrementalDelaunay", 'g/p'],
            'arg': "Rounds::-r::1,10,50,100:1000:100" }
         ]
       },
@@ -90,6 +92,7 @@ def flatten(l):
 def genPBBS(options):
   """Generate benches for PBBS suite."""
   def genextras(prob):
+    """Generate table to correlate additional arguments with intended benchmarks"""
     extras = defaultdict(list)
     for entry in getfield(prob, 'extras', []):
       for key in entry['algos']:
@@ -203,16 +206,14 @@ def runall(benches, runoptions, options):
   successes = filtered = skipped = failed = 0
   runpath = os.path.abspath(options.runpath)
   runbenchpath = os.path.abspath(options.runbenchpath)
-  regex = None
-  if options.filterby:
-    regex = re.compile(options.filterby)
+  regexes = [re.compile(x) for x in options.filterby]
   system('mkdir -p %s' % options.outdir)
 
   for bench in benches:
     logpath = '%s/%s' % (options.outdir, bench['key'])
     if os.path.exists(logpath):
       skipped += 1
-    elif not regex or regex.search(bench['key']):
+    elif not regexes or all([x.search(bench['key']) for x in regexes]):
       runcmd = [runpath] + runoptions + getfield(bench, 'runargs', [])
       basecmd = [os.path.abspath(bench['prog'])] + getfield(bench, 'args', [])
       wd = getfield(bench, 'wd', '.')
@@ -245,15 +246,14 @@ if __name__ == '__main__':
   runbenchpath = "%s/run_bench.py" % basepath
 
   signal.signal(signal.SIGQUIT, signal.SIG_IGN)
-  # don't buffer stdout so we get the right interleaving between subprocesses
-  # and this script
+  # don't buffer stdout 
   sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
 
   parser = optparse.OptionParser(usage='usage: %prog [options] -- [run.py options]')
   parser.add_option('--baseinput', dest='baseinput', default='exp/suites',
       help='base directory for inputs')
-  parser.add_option('-f', '--filterby', dest='filterby', default='',
-      help='filter benchmarks run by REGEX on key', metavar='REGEX')
+  parser.add_option('-f', '--filterby', dest='filterby', default=[], action='append',
+      help='filter benchmarks run by REGEX on key, repeated options form a conjunction', metavar='REGEX')
   parser.add_option('--runpath', dest='runpath', default=runpath, help='path to run.py')
   parser.add_option('--runbenchpath', dest='runbenchpath', default=runbenchpath, help='path to run_bench.py')
   parser.add_option('--outdir', dest='outdir', default='plogs', help='directory to store output logs')
