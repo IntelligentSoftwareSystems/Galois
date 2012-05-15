@@ -209,8 +209,8 @@ int main(int argc, char** argv) {
   Galois::preAlloc(15 * numThreads + GaloisRuntime::MM::pageAllocInfo() * 10);
   std::cout << "MEMINFO P2: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
 
-  Galois::StatTimer Touter("outertime");
-  Touter.start();
+  Galois::StatTimer T;
+  T.start();
 
 #ifdef GALOIS_DET
   std::for_each(mesh->begin(), mesh->end(), Preprocess());
@@ -222,8 +222,8 @@ int main(int argc, char** argv) {
 #endif
   std::cout << "MEMINFO MID: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
 
-  Galois::StatTimer T;
-  T.start();
+  Galois::StatTimer Trefine("refine");
+  Trefine.start();
   using namespace GaloisRuntime::WorkList;
 #ifdef GALOIS_DET
   Galois::for_each<Deterministic<> >(wlnew.begin(), wlnew.end(), Process());
@@ -232,8 +232,8 @@ int main(int argc, char** argv) {
   typedef LoadBalanceTracker<BQ, 2048 > DBQ;
   Galois::for_each<BQ>(wl.begin(), wl.end(), Process());
 #endif
+  Trefine.stop();
   T.stop();
-  Touter.stop();
 
   std::cout << "MEMINFO POST: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
 
