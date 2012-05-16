@@ -63,11 +63,11 @@ class Cavity {
 
   void expand(GNode node, GNode next) {
     Element& nextElement = graph->getData(next, Galois::ALL);
-    if ((!(dim == 2 && nextElement.getDim() == 2 && next != centerNode))
+    if ((!(dim == 2 && nextElement.dim() == 2 && next != centerNode))
         && nextElement.inCircle(center)) {
       // isMember says next is part of the cavity, and we're not the second
       // segment encroaching on this cavity
-      if ((nextElement.getDim() == 2) && (dim != 2)) {
+      if ((nextElement.dim() == 2) && (dim != 2)) {
 	// is segment, and we are encroaching
 	initialize(next);
 	build();
@@ -109,7 +109,7 @@ public:
       centerElement = &graph->getData(centerNode, Galois::ALL);
     }
     center = centerElement->getCenter();
-    dim = centerElement->getDim();
+    dim = centerElement->dim();
     pre.addNode(centerNode);
     frontier.push_back(centerNode);
   }
@@ -131,7 +131,7 @@ public:
    * Create the new cavity based on the data of the old one
    */
   void update() {
-    if (centerElement->getDim() == 2) { // we built around a segment
+    if (centerElement->dim() == 2) { // we built around a segment
       GNode n1 = graph->createNode(Element(center, centerElement->getPoint(0)));
       GNode n2 = graph->createNode(Element(center, centerElement->getPoint(1)));
 

@@ -80,7 +80,7 @@ public:
   }
 
   Tuple getCenter() const {
-    if (getDim() == 2) {
+    if (dim() == 2) {
       return (coords[0] + coords[1]) * 0.5;
     } else {
       const Tuple& a = coords[0];
@@ -113,9 +113,9 @@ public:
 
   bool operator<(const Element& rhs) const {
     //apparently a triangle is less than a line
-    if (getDim() < rhs.getDim()) return false;
-    if (getDim() > rhs.getDim()) return true;
-    for (int i = 0; i < getDim(); i++) {
+    if (dim() < rhs.dim()) return false;
+    if (dim() > rhs.dim()) return true;
+    for (int i = 0; i < dim(); i++) {
       if (coords[i] < rhs.coords[i]) return true;
       else if (coords[i] > rhs.coords[i]) return false;
     }
@@ -125,8 +125,8 @@ public:
   /// @return if the current triangle has a common edge with e
   bool isRelated(const Element& rhs) const {
     int num_eq = 0;
-    for(int i = 0; i < getDim(); ++i)
-      for(int j = 0; j < rhs.getDim(); ++j)
+    for(int i = 0; i < dim(); ++i)
+      for(int j = 0; j < rhs.dim(); ++j)
 	if (coords[i] == rhs.coords[j])
 	  ++num_eq;
     return num_eq == 2;
@@ -139,18 +139,18 @@ public:
   }
 
   void angleCheck(int i, bool& ob, bool& sm, double M) const {
-    int j = (i + 1) % getDim();
-    int k = (i + 2) % getDim(); 
+    int j = (i + 1) % dim();
+    int k = (i + 2) % dim(); 
     Tuple::angleCheck(coords[j], coords[i], coords[k], ob, sm, M);
   }
   bool angleGTCheck(int i, double M) const {
-    int j = (i + 1) % getDim();
-    int k = (i + 2) % getDim(); 
+    int j = (i + 1) % dim();
+    int k = (i + 2) % dim(); 
     return Tuple::angleGTCheck(coords[j], coords[i], coords[k], M);
   }
   bool angleOBCheck(int i) const {
-    int j = (i + 1) % getDim();
-    int k = (i + 2) % getDim(); 
+    int j = (i + 1) % dim();
+    int k = (i + 2) % dim(); 
     return Tuple::angleOBCheck(coords[j], coords[i], coords[k]);
   }
 
@@ -205,12 +205,12 @@ public:
     return false;
   }
 
-  int getDim() const {
+  int dim() const {
     return bDim ? 3 : 2;
   }
 
   int numEdges() const {
-    return getDim() + getDim() - 3;
+    return dim() + dim() - 3;
   }
 
   bool isObtuse() const {
@@ -224,8 +224,8 @@ public:
   Edge getRelatedEdge(const Element& e) const {
     int at = 0;
     Tuple d[2];
-    for(int i = 0; i < getDim(); ++i)
-      for(int j = 0; j < e.getDim(); ++j)
+    for(int i = 0; i < dim(); ++i)
+      for(int j = 0; j < e.dim(); ++j)
 	if (coords[i] == e.coords[j])
 	  d[at++] = coords[i];
     assert(at == 2);
@@ -234,8 +234,8 @@ public:
 
   std::ostream& print(std::ostream& s) const {
     s << '[';
-    for (int i = 0; i < getDim(); ++i)
-      s << coords[i] << (i < (getDim() - 1) ? ", " : "");
+    for (int i = 0; i < dim(); ++i)
+      s << coords[i] << (i < (dim() - 1) ? ", " : "");
     s << ']';
     return s;
   }

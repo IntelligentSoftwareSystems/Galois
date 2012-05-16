@@ -43,7 +43,7 @@
 
 #include "Lonestar/BoilerPlate.h"
 
-//#include "Galois/Runtime/WorkListAlt.h"
+#include "Galois/Runtime/WorkListAlt.h"
 #include "Galois/Runtime/WorkListDebug.h"
 
 #ifdef GALOIS_DET
@@ -64,6 +64,7 @@ typedef Graph::GraphNode GNode;
 #include "Subgraph.h"
 #include "Mesh.h"
 #include "Cavity.h"
+#include "Verifier.h"
 
 Graph* mesh;
 
@@ -109,65 +110,6 @@ struct Process {
   }
 };
 
-bool verify() {
-  // ensure consistency of elements
-  bool error = false;
-  
-  for (Graph::iterator ii = mesh->begin(), ee = mesh->end(); ii != ee; ++ii) {
-    GNode node = *ii;
-    Element& element = mesh->getData(node,Galois::NONE);
-    int nsize = std::distance(mesh->edge_begin(node, Galois::NONE), mesh->edge_end(node, Galois::NONE));
-    if (element.getDim() == 2) {
-      if (nsize != 1) {
-	std::cerr << "-> Segment " << element << " has " << nsize << " relation(s)\n";
-	error = true;
-      }
-    } else if (element.getDim() == 3) {
-      if (nsize != 3) {
-	std::cerr << "-> Triangle " << element << " has " << nsize << " relation(s)";
-	error = true;
-      }
-    } else {
-      std::cerr << "-> Figures with " << element.getDim() << " edges";
-      error = true;
-    }
-  }
-  
-  if (error)
-    return false;
-  
-  // ensure reachability
-  std::stack<GNode> remaining;
-  std::set<GNode> found;
-  remaining.push(*(mesh->begin()));
-  
-  while (!remaining.empty()) {
-    GNode node = remaining.top();
-    remaining.pop();
-    if (!found.count(node)) {
-      assert(mesh->containsNode(node) && "Reachable node was removed from graph");
-      found.insert(node);
-      int i = 0;
-      for (Graph::edge_iterator ii = mesh->edge_begin(node, Galois::NONE), ee = mesh->edge_end(node, Galois::NONE); ii != ee; ++ii) {
-	assert(i < 3);
-	assert(mesh->containsNode(mesh->getEdgeDst(ii)));
-	assert(node != mesh->getEdgeDst(ii));
-	++i;
-	remaining.push(mesh->getEdgeDst(ii));
-      }
-    }
-  }
-  size_t msize = std::distance(mesh->begin(), mesh->end());
-  
-  if (found.size() != msize) {
-    std::cerr << "Not all elements are reachable \n";
-    std::cerr << "Found: " << found.size() << "\nMesh: " << msize << "\n";
-    assert(0 && "Not all elements are reachable");
-    return false;
-  }
-  return true;
-}
-
 GaloisRuntime::galois_insert_bag<GNode> wl;
 
 struct Preprocess {
@@ -200,6 +142,12 @@ int main(int argc, char** argv) {
   {
     Mesh m;
     m.read(mesh, filename.c_str());
+    Verifier v;
+    if (!skipVerify && !v.verify(mesh)) {
+      std::cerr << "bad input mesh\n";
+      assert(0 && "Refinement failed");
+      abort();
+    }
   }
 
   std::cout << "configuration: " << std::distance(mesh->begin(), mesh->end())
@@ -229,8 +177,9 @@ int main(int argc, char** argv) {
   Galois::for_each<Deterministic<> >(wlnew.begin(), wlnew.end(), Process());
 #else
   typedef LocalQueues<dChunkedLIFO<256>, ChunkedLIFO<256> > BQ;
-  typedef LoadBalanceTracker<BQ, 2048 > DBQ;
-  Galois::for_each<BQ>(wl.begin(), wl.end(), Process());
+  typedef LoadBalanceTracker<BQ, 2048> DBQ;
+  typedef ChunkedAdaptor<false, 32> CA;
+  Galois::for_each<CA>(wl.begin(), wl.end(), Process());
 #endif
   Trefine.stop();
   T.stop();
@@ -244,7 +193,8 @@ int main(int argc, char** argv) {
       assert(0 && "Refinement failed");
       abort();
     }
-    if (!verify()) {
+    Verifier v;
+    if (!v.verify(mesh)) {
       std::cerr << "Refinement failed.\n";
       assert(0 && "Refinement failed");
       abort();

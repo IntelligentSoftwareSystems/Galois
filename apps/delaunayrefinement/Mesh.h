@@ -346,22 +346,18 @@ private:
   }
 
   void makeGraph(Graph* mesh) {
-    std::cerr << "Sorting\n";
     std::sort(elements.begin(), elements.end(), centerCmp());
-    std::cerr << "Creating\n";
 #ifdef GALOIS_DET
     std::for_each(elements.begin(), elements.end(), CreateNodes(mesh));
 #else
     Galois::do_all(elements.begin(), elements.end(), CreateNodes(mesh));
 #endif
-    std::cerr << "Edges\n";
     std::map<Edge, GNode> edge_map;
     for (Graph::iterator ii = mesh->begin(), ee = mesh->end();
 	 ii != ee; ++ii)
       addElement(mesh, *ii, edge_map);
   }
 
-  // .poly contains the perimeter of the mesh; edges basically, which is why it contains pairs of nodes
 public:
   Mesh(): id(0) { }
 
