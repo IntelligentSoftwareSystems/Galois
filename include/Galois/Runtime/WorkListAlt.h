@@ -28,73 +28,6 @@
 namespace GaloisRuntime {
 namespace WorkList {
 
-template<typename T, unsigned chunksize = 64>
-class FixedSizeRingAlt :private boost::noncopyable {
-  unsigned start;
-  unsigned count;
-  char datac[sizeof(T[chunksize])] __attribute__ ((aligned (__alignof__(T))));
-
-  T* data() {
-    return reinterpret_cast<T*>(&datac[0]);
-  }
-
-public:
-
-  FixedSizeRingAlt() :start(0), count(0) {}
-
-  typedef T value_type;
-
-  unsigned size() const {
-    return count;
-  }
-
-  bool empty() const {
-    return count == 0;
-  }
-
-  bool full() const {
-    return count == chunksize;
-  }
-
-  bool push_back(const value_type& val) {
-    if (full()) return false;
-    int end = (start + count) % chunksize;
-    ++count;
-    new (&data()[end]) T(val);
-    return true;
-  }
-
-  bool push_front(const value_type& val) {
-    if (full()) return false;
-    start = (start + chunksize - 1) % chunksize;
-    ++count;
-    new (&data()[start]) T(val);
-    return true;
-  }
-
-  boost::optional<value_type> pop_front() {
-    boost::optional<value_type> retval;
-    if (!empty()) {
-      retval = data()[start];
-      (&data()[start])->~T();
-      start = (start + 1) % chunksize;
-      --count;
-    }
-    return retval;
-  }
-
-  boost::optional<value_type> pop_back() {
-    boost::optional<value_type> retval;
-    if (!empty()) {
-      int end = (start + count - 1) % chunksize;
-      retval = data()[end];
-      (&data()[end])->~T();
-      --count;
-    }
-    return retval;
-  }
-};
-
 struct ChunkHeader {
   ChunkHeader* next;
   ChunkHeader* prev;
@@ -308,11 +241,11 @@ public:
   }
 };
 
-template< bool separateBuffering = true, typename gWL = StealingQueues, 
-	  int chunksize = 64, typename T = int>
+template< bool separateBuffering = true, int chunksize = 64,
+	  typename gWL = StealingQueues, typename T = int>
 class ChunkedAdaptor : private boost::noncopyable {
 
-  class Chunk :public ChunkHeader, public FixedSizeRingAlt<T, chunksize> {};
+  class Chunk :public ChunkHeader, public FixedSizeRing<T, chunksize> {};
 
   MM::FixedSizeAllocator heap;
 
@@ -372,7 +305,7 @@ class ChunkedAdaptor : private boost::noncopyable {
 public:
   template<typename Tnew>
   struct retype {
-    typedef ChunkedAdaptor<separateBuffering, gWL, chunksize, Tnew> WL;
+    typedef ChunkedAdaptor<separateBuffering, chunksize, gWL, Tnew> WL;
   };
 
   typedef T value_type;
