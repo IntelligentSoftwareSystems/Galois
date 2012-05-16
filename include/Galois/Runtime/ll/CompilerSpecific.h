@@ -43,10 +43,13 @@ inline static void compilerBarrier() {
 
 #if defined(__INTEL_COMPILER)
 #define GALOIS_ATTRIBUTE_NOINLINE __attribute__ ((noinline))
+#define GALOIS_ATTRIBUTE_DEPRECATED __attribute__ ((deprecated))
 #elif defined( __GNUC__)
 #define GALOIS_ATTRIBUTE_NOINLINE __attribute__ ((noinline))
+#define GALOIS_ATTRIBUTE_DEPRECATED __attribute__ ((deprecated))
 #elif defined( _MSC_VER)
 #define GALOIS_ATTRIBUTE_NOINLINE __declspec(noinline)
+#define GALOIS_ATTRIBUTE_DEPRECATED __declspec ((deprecated))
 #else
 #define GALOIS_ATTRIBUTE_NOINLINE
 #endif

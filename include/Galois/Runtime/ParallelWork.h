@@ -41,7 +41,7 @@
 #include "Galois/Runtime/Sampling.h"
 
 #ifdef GALOIS_EXP
-#include "Galois/Runtime/SimpleTaskPool.h"
+//#include "Galois/Runtime/SimpleTaskPool.h"
 #endif
 
 #include <algorithm>
@@ -305,13 +305,12 @@ void for_each_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
 
   WorkTy W(f, loopname);
   Initializer<IterTy, WorkTy> init(b, e, W);
-  RunCommand w[5] = {Config::ref(init), 
+  RunCommand w[4] = {Config::ref(init), 
 		     Config::ref(getSystemBarrier()),
 		     Config::ref(W),
-		     Config::ref(getSystemBarrier()),
-		     &runAllLoopExitHandlers};
-  getSystemThreadPool().run(&w[0], &w[5]);
-
+		     Config::ref(getSystemBarrier())};
+  getSystemThreadPool().run(&w[0], &w[4]);
+  runAllLoopExitHandlers();
   endSampling();
   inGaloisForEach = false;
 }

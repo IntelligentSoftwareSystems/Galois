@@ -24,6 +24,8 @@
 #ifndef GALOIS_RUNTIME_LOOPHOOKS_H
 #define GALOIS_RUNTIME_LOOPHOOKS_H
 
+#include "Galois/Runtime/ll/CompilerSpecific.h"
+
 namespace GaloisRuntime {
 
 void runAllLoopExitHandlers(void);
@@ -36,6 +38,7 @@ class AtLoopExit {
 protected:
   AtLoopExit* next;
 public:
+  GALOIS_ATTRIBUTE_DEPRECATED
   AtLoopExit();
   ~AtLoopExit();
 };

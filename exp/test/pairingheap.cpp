@@ -1,4 +1,3 @@
-#include "Galois/Accumulator.h"
 #include "Galois/Galois.h"
 #include "Galois/Queue.h"
 
