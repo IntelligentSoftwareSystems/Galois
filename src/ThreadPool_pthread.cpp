@@ -26,6 +26,8 @@
 #include "Galois/Runtime/ll/HWTopo.h"
 #include "Galois/Runtime/ll/TID.h"
 
+#include "boost/utility.hpp"
+
 #include <cstdlib>
 #include <cstdio>
 #include <cerrno>
@@ -53,10 +55,10 @@ static void checkResults(int val) {
  
 namespace {
 
-class SemSemaphore {
+class SemSemaphore: private boost::noncopyable {
   sem_t sem;
 public:
-  explicit SemSemaphore(int val) {
+  explicit SemSemaphore(int val = 0) {
     int rc = sem_init(&sem, 0, val);
     checkResults(rc);
   }
@@ -84,12 +86,12 @@ public:
   }
 };
 
-class PthreadSemaphore {
+class PthreadSemaphore: private boost::noncopyable {
   pthread_mutex_t lock;
   pthread_cond_t cond;
   int val;
 public:
-  explicit PthreadSemaphore(int v): val(v) {
+  explicit PthreadSemaphore(int v = 0): val(v) {
     pthread_mutex_init(&lock, NULL);
     pthread_cond_init(&cond, NULL);
   }
@@ -117,7 +119,7 @@ public:
   }
 };
 
-class AtomicThinBarrier {
+class AtomicThinBarrier: private boost::noncopyable {
   volatile int started;
   int val;
 public:
@@ -141,9 +143,10 @@ class ThreadPool_pthread : public ThreadPool {
   typedef PthreadSemaphore ThinBarrier;
 #endif
 
-  std::vector<Semaphore> starts; // signal to release threads to run
-  std::list<pthread_t> threads; // Set of threads
+  pthread_t* threads; // set of threads
+  Semaphore* starts;  // signal to release threads to run
   ThinBarrier started;
+  unsigned maxThreads;
   volatile bool shutdown; // Set and start threads to have them exit
   volatile RunCommand* workBegin; //Begin iterator for work commands
   volatile RunCommand* workEnd; //End iterator for work commands
@@ -153,6 +156,9 @@ class ThreadPool_pthread : public ThreadPool {
     GaloisRuntime::LL::initTID();
     unsigned id = GaloisRuntime::LL::getTID();
     GaloisRuntime::initPTS();
+#ifdef GALOIS_DO_NOT_BIND_MAIN_THREAD
+    if (id != 0)
+#endif
     GaloisRuntime::LL::bindThreadToProcessor(id);
     started.release();
   }
@@ -192,38 +198,33 @@ class ThreadPool_pthread : public ThreadPool {
   }
   
 public:
-  ThreadPool_pthread():
-    started(0),
-    shutdown(false), workBegin(0), workEnd(0)
+  ThreadPool_pthread(): started(0), shutdown(false), workBegin(0), workEnd(0)
   {
-    unsigned maxThreads = GaloisRuntime::LL::getMaxThreads();
+    maxThreads = GaloisRuntime::LL::getMaxThreads();
     initThread();
 
-    starts.reserve(maxThreads);
-    for (unsigned i = 0; i < maxThreads; ++i)
-      starts.push_back(Semaphore(0));
+    starts = new Semaphore[maxThreads];
+    threads = new pthread_t[maxThreads];
 
     for (unsigned i = 1; i < maxThreads; ++i) {
-      pthread_t t;
-      int rc = pthread_create(&t, 0, &slaunch, this);
+      int rc = pthread_create(&threads[i], 0, &slaunch, this);
       checkResults(rc);
-      threads.push_front(t);
     }
     started.acquire(maxThreads);
   }
 
-  ~ThreadPool_pthread() {
+  virtual ~ThreadPool_pthread() {
     shutdown = true;
     workBegin = workEnd = 0;
     __sync_synchronize();
-    for (unsigned i = 1; i < starts.size(); ++i)
+    for (unsigned i = 1; i < maxThreads; ++i)
       starts[i].release();
-    while (!threads.empty()) {
-      pthread_t t = threads.front();
-      threads.pop_front();
-      int rc = pthread_join(t, NULL);
+    for (unsigned i = 1; i < maxThreads; ++i) {
+      int rc = pthread_join(threads[i], NULL);
       checkResults(rc);
     }
+    delete [] starts;
+    delete [] threads;
   }
 
   virtual void run(RunCommand* begin, RunCommand* end) {
