@@ -202,7 +202,7 @@ struct Process {
       return false;
     }
 
-#if 1
+#if 0
     return graphSearch(p, alloc, someNode, node);
 #else
     return planarSearch(p, someNode, node);
@@ -262,7 +262,7 @@ struct ReadPoints {
   PointList& result;
   ReadPoints(PointList& r): result(r) { }
 
-  void from(const std::string& name) {
+  void from(const std::string& name, bool reorder=true) {
     PointList points;
     std::ifstream scanner(name.c_str());
     if (!scanner.good()) {
@@ -277,11 +277,14 @@ struct ReadPoints {
     scanner.close();
     
     // Improve locality
-    QuadTree t(
-      boost::make_transform_iterator(&points[0], GetPointer()),
-      boost::make_transform_iterator(&points[points.size()], GetPointer()));
-    t.output(std::back_insert_iterator<PointList>(result));
-
+    if (reorder) {
+      QuadTree t(
+        boost::make_transform_iterator(&points[0], GetPointer()),
+        boost::make_transform_iterator(&points[points.size()], GetPointer()));
+      t.output(std::back_insert_iterator<PointList>(result));
+    } else {
+      std::copy(points.begin(), points.end(), std::back_insert_iterator<PointList>(result));
+    }
     addBoundaryPoints();
   }
 
@@ -367,6 +370,7 @@ static void writePoints(const std::string& filename, const PointList& points) {
   // <num vertices> <dimension> <num attributes> <has boundary markers>
   out << points.size() << " 2 0 0\n";
   //out.setf(std::ios::fixed, std::ios::floatfield);
+  out.setf(std::ios::scientific, std::ios::floatfield);
   out.precision(10);
   long id = 0;
   for (PointList::const_iterator it = points.begin(), end = points.end(); it != end; ++it) {
@@ -453,17 +457,15 @@ static void writeMesh(const std::string& filename) {
     const Element& e = graph->getData(*ii);
     if (e.boundary()) {
       // <segment id> <vertex> <vertex> <is boundary>
-      pout << sid << " " << e.getPoint(0)->id() << " " << e.getPoint(1)->id() << " 1\n";
-      sid++;
+      pout << sid++ << " " << e.getPoint(0)->id() << " " << e.getPoint(1)->id() << " 1\n";
     } else {
       // <triangle id> <vertex> <vertex> <vertex> [in ccw order]
-      eout << tid << " " << e.getPoint(0)->id() << " ";
+      eout << tid++ << " " << e.getPoint(0)->id() << " ";
       if (e.clockwise()) {
         eout << e.getPoint(2)->id() << " " << e.getPoint(1)->id() << "\n";
       } else {
         eout << e.getPoint(1)->id() << " " << e.getPoint(2)->id() << "\n";
       }
-      tid++;
     }
   }
 
@@ -575,7 +577,8 @@ int main(int argc, char** argv) {
     writeMesh(base.c_str());
 
     PointList points;
-    ReadPoints(points).from(inputname);
+    // Reordering messes up connection between id and place in pointlist
+    ReadPoints(points).from(inputname, false);
     writePoints(base.append(".node"), points);
   }
 
