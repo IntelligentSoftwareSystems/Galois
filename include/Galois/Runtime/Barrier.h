@@ -103,10 +103,11 @@ class FastBarrier {
 
 public:
   FastBarrier(): size(-1) { }
-  FastBarrier(unsigned int val): size(-1) { reinit(val); }
+  explicit FastBarrier(unsigned int val): size(-1) { reinit(val); }
 
   void reinit(int val);
   void wait(); 
+  void operator()(void) { wait(); }
 };
 
 class FasterBarrier {
@@ -117,12 +118,16 @@ class FasterBarrier {
 
 public:
   FasterBarrier() :count(~0), P(~0), sense(true) {}
+  explicit FasterBarrier(unsigned int val): count(~0), P(~0), sense(true) {
+    reinit(val);
+  }
 
   void reinit(unsigned num) {
     P = count = num;
   }
 
   void wait();
+  void operator()(void) { wait(); }
 };
 
 class MCSBarrier {
