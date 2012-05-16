@@ -43,7 +43,7 @@ class FixedSizeRing :private boost::noncopyable {
   char datac[sizeof(T[chunksize])] __attribute__ ((aligned (__alignof__(T))));
 
   T* data() {
-    return reinterpret_cast<T*>(&data()[0]);
+    return reinterpret_cast<T*>(&datac[0]);
   }
 
   T* at(unsigned i) {
