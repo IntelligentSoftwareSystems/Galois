@@ -51,7 +51,7 @@ static inline void for_each(IterTy b, IterTy e, Function f, const char* loopname
 template<typename IterTy, typename Function>
 static inline void for_each(IterTy b, IterTy e, Function f, const char* loopname = 0) {
   typedef GaloisRuntime::WorkList::dChunkedFIFO<256> WLTy;
-  for_each<WLTy, IterTy, Function>(b, e, f, loopname);
+  Galois::for_each<WLTy, IterTy, Function>(b, e, f, loopname);
 }
 
 //Single initial item versions
@@ -59,13 +59,13 @@ template<typename WLTy, typename InitItemTy, typename Function>
 static inline void for_each(InitItemTy i, Function f, const char* loopname = 0) {
   InitItemTy wl[1];
   wl[0] = i;
-  for_each<WLTy>(&wl[0], &wl[1], f, loopname);
+  Galois::for_each<WLTy>(&wl[0], &wl[1], f, loopname);
 }
 
 template<typename InitItemTy, typename Function>
 static inline void for_each(InitItemTy i, Function f, const char* loopname = 0) {
   typedef GaloisRuntime::WorkList::ChunkedFIFO<256> WLTy;
-  for_each<WLTy, InitItemTy, Function>(i, f, loopname);
+  Galois::for_each<WLTy, InitItemTy, Function>(i, f, loopname);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -256,7 +256,7 @@ InputIterator find_if(InputIterator first, InputIterator last, Predicate pred)
   typedef typename HelperTy::AccumulatorTy AccumulatorTy;
   AccumulatorTy accum;
   HelperTy helper(accum, pred);
-  for_each(NoDerefIterator<InputIterator>(first), NoDerefIterator<InputIterator>(last), helper);
+  Galois::for_each(NoDerefIterator<InputIterator>(first), NoDerefIterator<InputIterator>(last), helper);
   for (unsigned i = 0; i < accum.size(); ++i) {
     if (accum.get(i))
       return *accum.get(i);
