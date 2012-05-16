@@ -5,7 +5,6 @@ set(GALOIS_VERSION_MAJOR "2")
 set(GALOIS_VERSION_MINOR "1")
 set(GALOIS_VERSION_PATCH "4")
 set(GALOIS_COPYRIGHT_YEAR "2012") # Also in COPYRIGHT
-site_name(SITE_NAME)
 
 if(NOT CMAKE_BUILD_TYPE)
   message(STATUS "No build type selected, default to Release")
@@ -23,19 +22,14 @@ set(USE_VTUNE ON CACHE BOOL "Use vtune (if found)")
 set(USE_DET OFF CACHE BOOL "Use deterministic execution")
 set(EXP_DOALL "GALOIS" CACHE STRING "Which type of implementation of parallel_doall")
 
-###### Optional programs and default paths ######
+###### Configure (users don't need to go beyond here) ######
+enable_testing()
 
+#ICC
 if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
   set(CMAKE_CXX_COMPILER ${ICCXX})
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd68 -wd981 -wd383 -wd869 -wd2196 -wd279")
 endif()
-
-if(CMAKE_SYSTEM MATCHES "SunOS.*")
-  set(USE_SOLARIS ON)
-endif()
-
-###### Configure (users don't need to go beyond here) ######
-enable_testing()
 
 #PThreads
 find_package(Threads)
@@ -45,6 +39,7 @@ set(RT_LINK ${CMAKE_THREAD_LIBS_INIT} ${RT_LINK})
 find_package(LIBNUMA)
 if(LIBNUMA_FOUND)
   set(RT_LINK numa ${RT_LINK})
+  #XXX(ddn): Hack for lonestar machines
   if(LIBNUMA_OLD)
     add_definitions(-DGALOIS_NUMA_OLD)
   endif()
@@ -134,7 +129,7 @@ if(USE_PROFILING)
 endif(USE_PROFILING)
 
 #solaris
-if(USE_SOLARIS)
+if(CMAKE_SYSTEM MATCHES "SunOS.*")
   add_definitions(-DSOLARIS)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -m64 -mcpu=niagara2 -lposix4")
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -m64 -lposix4")
@@ -159,6 +154,23 @@ endif()
 include(UseStdMacro)
 
 include(CheckEndian)
+
+set(LLVM_ENABLE_ASSERTIONS on) # enable assertions in non-release builds
+include(llvm-extras)
+
+###### Build Hacks ######
+
+#XXX(ddn): Hack for lonestar machines
+if(LIBNUMA_FOUND)
+  if(LIBNUMA_OLD)
+    add_definitions(-DGALOIS_NUMA_OLD)
+  endif()
+endif()
+
+#XXX(ddn): avoid broken includes on volta
+if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX0X_FLAGS}")
+endif()
 
 ###### Global Functions ######
 function(linkRuntime name) 
@@ -195,8 +207,6 @@ function(app name)
 endfunction(app)
 
 ###### Source finding ######
-set(LLVM_ENABLE_ASSERTIONS on) # enable assertions in non-release builds
-include(llvm-extras)
 
 configure_file("${PROJECT_SOURCE_DIR}/include/Galois/config.h.in" "${PROJECT_BINARY_DIR}/include/Galois/config.h")
 include_directories("include" "${PROJECT_BINARY_DIR}/include")
