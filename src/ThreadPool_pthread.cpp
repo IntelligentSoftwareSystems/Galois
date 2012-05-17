@@ -239,14 +239,11 @@ public:
   }
 
   virtual unsigned int setActiveThreads(unsigned int num) {
-    unsigned maxThreads = GaloisRuntime::LL::getMaxThreads();
     if (num == 0) {
       activeThreads = 1;
     } else {
       activeThreads = std::min(num, maxThreads);
     }
-    assert(activeThreads <= maxThreads);
-    assert(activeThreads - 1 <= threads.size());
     return activeThreads;
   }
 };

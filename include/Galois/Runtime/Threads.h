@@ -34,6 +34,7 @@ protected:
   static unsigned int activeThreads;
 
 public:
+  virtual ~ThreadPool() { }
 
   //!execute work on all threads
   //!preWork and postWork are executed only on the master thread

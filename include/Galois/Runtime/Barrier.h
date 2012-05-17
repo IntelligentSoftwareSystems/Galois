@@ -48,19 +48,16 @@ class PthreadBarrier {
 #else
   pthread_barrier_t bar;
 #endif
-
   void checkResults(int val);
 
 public:
   PthreadBarrier();
-
   PthreadBarrier(unsigned int val);
-
   ~PthreadBarrier();
 
   void reinit(int val);
-
   void wait();
+  void operator()(void) { wait(); }
 };
 
 //! Simple busy waiting barrier, not cyclic
@@ -193,7 +190,11 @@ public:
   //  void dump();
 };
 
+#ifdef GALOIS_DRF
+typedef PthreadBarrier GBarrier;
+#else
 typedef TopoBarrier GBarrier;
+#endif
 
 GBarrier& getSystemBarrier();
 
