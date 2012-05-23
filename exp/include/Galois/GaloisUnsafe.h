@@ -36,18 +36,9 @@ namespace hidden {
 
     GaloisRuntime::inGaloisForEach = true;
 
-    GaloisRuntime::RunCommand w[2];
+    GaloisRuntime::RunCommand w[2] = { GaloisRuntime::Config::ref (exec), 
+      GaloisRuntime::Config::ref (GaloisRuntime::getSystemBarrier ())};
 
-    // disabling profiling because this loop is invoked multiple times typically
-    // and that crashes vtune
-    w[0].work = GaloisRuntime::Config::ref(exec);
-    w[0].isParallel = isParallel;
-    w[0].barrierAfter = true;
-    w[0].profile = false;
-    w[1].work = &GaloisRuntime::runAllLoopExitHandlers;
-    w[1].isParallel = false;
-    w[1].barrierAfter = true;
-    w[1].profile = false;
     GaloisRuntime::getSystemThreadPool().run(&w[0], &w[2]);
 
     GaloisRuntime::inGaloisForEach = false;
