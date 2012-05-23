@@ -1,5 +1,8 @@
+add_subdirectory(billiards)
 add_subdirectory(bp)
 #add_subdirectory(buchberger)
+add_subdirectory(kruskal)
 add_subdirectory(linear)
+add_subdirectory (bfs_wf)
 add_subdirectory(pagerank)
 add_subdirectory(pmst)
