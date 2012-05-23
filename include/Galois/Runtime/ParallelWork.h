@@ -38,7 +38,6 @@
 #include "Galois/Runtime/Termination.h"
 #include "Galois/Runtime/LoopHooks.h"
 #include "Galois/Runtime/WorkList.h"
-#include "Galois/Runtime/Sampling.h"
 
 #ifdef GALOIS_EXP
 //#include "Galois/Runtime/SimpleTaskPool.h"
@@ -298,7 +297,6 @@ void for_each_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
   assert(!inGaloisForEach);
 
   inGaloisForEach = true;
-  beginSampling();
 
   typedef typename std::iterator_traits<IterTy>::value_type T;
   typedef ForEachWork<WLTy,T,FunctionTy> WorkTy;
@@ -311,7 +309,6 @@ void for_each_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
 		     Config::ref(getSystemBarrier())};
   getSystemThreadPool().run(&w[0], &w[4]);
   runAllLoopExitHandlers();
-  endSampling();
   inGaloisForEach = false;
 }
 
@@ -333,7 +330,6 @@ void do_all_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
   assert(!inGaloisForEach);
 
   inGaloisForEach = true;
-  beginSampling();
 
   typedef typename std::iterator_traits<IterTy>::value_type T;
   typedef ForEachWork<WLTy,T,DoAllWrapper<FunctionTy> > WorkTy;
@@ -348,7 +344,6 @@ void do_all_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
 		     Config::ref(getSystemBarrier())};
   getSystemThreadPool().run(&w[0], &w[4]);
 
-  endSampling();
   inGaloisForEach = false;
 }
 

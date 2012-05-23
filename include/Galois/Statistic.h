@@ -23,9 +23,10 @@
 #ifndef GALOIS_STATISTIC_H
 #define GALOIS_STATISTIC_H
 
-#include "Accumulator.h"
-#include "Runtime/Support.h"
-#include "Timer.h"
+#include "Galois/Accumulator.h"
+#include "Galois/Timer.h"
+#include "Galois/Runtime/Support.h"
+#include "Galois/Runtime/Sampling.h"
 
 namespace Galois {
 
@@ -42,18 +43,25 @@ public:
 class StatTimer : public Timer {
   const char* name;
   const char* loopname;
+  bool main;
+
 public:
-  StatTimer(const char* n = "Time", const char* l = 0) :name(n), loopname(l) {}
+  StatTimer(): name("Time"), loopname(0), main(true) { }
+  StatTimer(const char* n, const char* l = 0): name(n), loopname(l), main(false) { }
   ~StatTimer() {
     GaloisRuntime::reportStatSum(name, get(), loopname);
   }
 
   void start() {
+    if (main)
+      GaloisRuntime::beginSampling();
     Timer::start();
   }
 
   void stop() {
     Timer::stop();
+    if (main)
+      GaloisRuntime::endSampling();
   }
 };
 
