@@ -101,6 +101,11 @@ public:
   void reset(const T& d) {
     _data.reset(d);
   }
+
+  // TODO: remove later
+  T& get (unsigned i) {
+    return _data.get (i);
+  }
 };
 
 
@@ -186,6 +191,59 @@ public:
     return *this;
   }
 };
+
+
+
+/**
+ * An alternate implementation of GReducible,
+ * where 
+ * - the final reduction does not automatically 
+ * happen and does not over-write the value for thread 0
+ * - copy construction is allowed
+ * - simple std binary functors allowed
+ */
+template <typename T, typename BinFunc>
+class GSimpleReducible: protected GaloisRuntime::PerCPU<T> {
+  typedef GaloisRuntime::PerCPU<T> SuperType;
+  BinFunc func;
+
+public:
+  explicit GSimpleReducible (const T& val = T(), BinFunc func=BinFunc())
+    : GaloisRuntime::PerCPU<T> (val), func(func)  {}
+
+
+  T reduce () const {
+    T val (SuperType::get (0));
+
+    for (unsigned i = 1; i < SuperType::size (); ++i) {
+      val = func (val, SuperType::get (i));
+    }
+
+    return val;
+  }
+
+  const T& update (const T& _newVal) {
+    T& oldVal = SuperType::get ();
+    oldVal = func (oldVal, _newVal);
+    return oldVal;
+  }
+
+  T& get () {
+    return SuperType::get ();
+  }
+
+  const T& get () const {
+    return SuperType::get ();
+  }
+
+  void reset (const T& val) {
+    SuperType::reset (val);
+  }
+
+};
+
+
+
 
 }
 
