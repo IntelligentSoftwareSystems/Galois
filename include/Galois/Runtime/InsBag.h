@@ -62,7 +62,7 @@ class galois_insert_bag : private boost::noncopyable {
   }
 
   void destruct() {
-    for (int x = 0; x < heads.size(); ++x) {
+    for (unsigned x = 0; x < heads.size(); ++x) {
       header* h = heads.get(x);
       if (h) {
 	heads.get(x) = h->next;
