@@ -231,7 +231,7 @@ struct SerialAlgo {
   std::string name() const { return "Serial"; }
 
   void operator()(const GNode source) const {
-    Galois::Statistic<unsigned int> counter("Iterations");
+    Galois::Statistic counter(0,"Iterations");
 
     std::deque<UpdateRequest> wl;
     wl.push_back(UpdateRequest(source, 0));
@@ -266,7 +266,7 @@ struct SerialFlagOptAlgo {
   std::string name() const { return "Serial (Flag Optimized)"; }
 
   void operator()(const GNode source) const {
-    Galois::Statistic<unsigned int> counter("Iterations");
+    Galois::Statistic counter(0,"Iterations");
 
     std::deque<UpdateRequest> wl;
     wl.push_back(UpdateRequest(source, 0));
@@ -302,7 +302,7 @@ struct SerialWorkSet {
   std::string name() const { return "Serial (Workset)"; }
 
   void operator()(const GNode source) const {
-    Galois::Statistic<unsigned int> counter("Iterations");
+    Galois::Statistic counter(0,"Iterations");
 
     std::deque<GNode> wl;
     graph.getData(source, Galois::NONE).dist = 0;
@@ -346,7 +346,7 @@ struct SerialBarrier {
   std::string name() const { return "Serial (Barrier)"; }
 
   void operator()(const GNode source) const {
-    Galois::Statistic<unsigned int> counter("Iterations");
+    Galois::Statistic counter(0,"Iterations");
 
     WL wls[2];
 
@@ -399,7 +399,7 @@ struct SerialBare {
   void operator()(const GNode source) const {
     typedef GaloisRuntime::WorkList::FIFO<GNode,false> WL;
 
-    Galois::Statistic<unsigned int> counter("Iterations");
+    Galois::Statistic counter(0,"Iterations");
 
     WL wls[2];
     graph.getData(source, Galois::NONE).dist = 0;
@@ -732,7 +732,7 @@ struct SerialSchardl {
   }
 
   void bfs(const NodeId s, Dist distances[]) {
-    Galois::Statistic<unsigned int> counter("Iterations");
+    Galois::Statistic counter(0, "Iterations");
 
     NodeId *queue = new NodeId[nNodes];
     long head, tail;

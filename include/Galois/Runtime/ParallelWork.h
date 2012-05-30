@@ -64,20 +64,19 @@ template <bool Enabled>
 class LoopStatistics {
   unsigned long conflicts;
   unsigned long iterations;
+  const char* loopname;
 
 public:
-  LoopStatistics() :conflicts(0), iterations(0) { }
-  void inc_iterations(int amount = 1) {
+  explicit LoopStatistics(const char* ln) :conflicts(0), iterations(0), loopname(ln) { }
+  ~LoopStatistics() {
+    reportStat(loopname, "Conflicts", conflicts);
+    reportStat(loopname, "Iterations", iterations);
+  }
+  inline void inc_iterations(int amount = 1) {
     iterations += amount;
   }
-  void inc_conflicts() {
+  inline void inc_conflicts() {
     ++conflicts;
-  }
-  void report_stat(unsigned int tid, const char* loopname) const {
-    reportStatSum("Conflicts", conflicts, loopname);
-    reportStatSum("Iterations", iterations, loopname);
-    reportStatAvg("ConflictsThreadDistribution", conflicts, loopname);
-    reportStatAvg("IterationsThreadDistribution", iterations, loopname);
   }
 };
 
@@ -85,11 +84,9 @@ public:
 template <>
 class LoopStatistics<false> {
 public:
+  explicit LoopStatistics(const char* ln) {}
   inline void inc_iterations() const { }
-
   inline void inc_conflicts() const { }
-
-  inline void report_stat(unsigned int tid, const char* loopname) const { }
 };
 
 template<class WorkListTy, class T, class FunctionTy>
@@ -104,6 +101,8 @@ protected:
     SimpleRuntimeContext cnx;
     LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
     TerminationDetection::TokenHolder* lterm;
+
+    ThreadLocalData(const char* ln) :stat(ln) {}
   };
 
   WLTy default_wl;
@@ -133,8 +132,7 @@ protected:
 
     clearConflictLock();
     tld.cnx.cancel_iteration();
-    if (ForEachTraits<FunctionTy>::NeedsStats)
-      tld.stat.inc_conflicts();
+    tld.stat.inc_conflicts(); //Class specialization handles opt
     if (recursiveAbort)
       aborted.getRemote(LL::getLeaderForPackage(LL::getPackageForThread(LL::getTID()) / 2))->push(val);
     else
@@ -148,8 +146,7 @@ protected:
   }
 
   inline void doProcess(boost::optional<value_type>& p, ThreadLocalData& tld) {
-    if (ForEachTraits<FunctionTy>::NeedsStats)
-      tld.stat.inc_iterations();
+    tld.stat.inc_iterations(); //Class specialization handles opt
     if (ForEachTraits<FunctionTy>::NeedsAborts)
       tld.cnx.start_iteration();
     function(*p, tld.facing.data());
@@ -182,21 +179,36 @@ protected:
     unsigned num = 0;
     if (p)
       workHappened = true;
-    while (p) {
-      try {
+#if 1
+    try {
+      while (p) {
 	doProcess(p, tld);
-      } catch (ConflictFlag i) {
-	switch(i) {
-	case GaloisRuntime::CONFLICT:
-	  abortIteration(*p, tld, recursiveAbort);
-	  break;
-	case GaloisRuntime::BREAK:
-	  handleBreak(tld);
-	  return false;
-	default:
-	  abort();
+	if (limit) {
+	  ++num;
+	  if (num == 32)
+	    break;
 	}
+	p = lwl.pop();
       }
+    } catch (ConflictFlag const& i) {
+      switch(i) {
+      case GaloisRuntime::CONFLICT:
+	abortIteration(*p, tld, recursiveAbort);
+	break;
+      case GaloisRuntime::BREAK:
+	handleBreak(tld);
+	return false;
+      default:
+	abort();
+      }
+    }
+#else
+    if (setjmp(hackjmp)) {
+      abortIteration(*p, tld, recursiveAbort);
+      return workHappened;
+    }
+    while (p) {
+      doProcess(p, tld);
       if (limit) {
 	++num;
 	if (num == 32)
@@ -204,6 +216,7 @@ protected:
       }
       p = lwl.pop();
     }
+#endif
     return workHappened;
   }
 
@@ -216,7 +229,7 @@ protected:
   void go() {
     //Thread Local Data goes on the local stack
     //to be NUMA friendly
-    ThreadLocalData tld;
+    ThreadLocalData tld(loopname);
     if (ForEachTraits<FunctionTy>::NeedsAborts)
       setThreadContext(&tld.cnx);
     tld.lterm = term.getLocalTokenHolder();
@@ -255,25 +268,17 @@ protected:
 	     && !term.globalTermination());
 
     setThreadContext(0);
-    if (ForEachTraits<FunctionTy>::NeedsStats)
-      tld.stat.report_stat(LL::getTID(), loopname);
   }
 
 public:
-  ForEachWork(FunctionTy& _f, const char* _loopname)
-    : wl(default_wl), function(_f), loopname(_loopname)
+  ForEachWork(FunctionTy& _f, const char* _ln)
+    : wl(default_wl), function(_f), loopname(_ln)
   {}
 
   template<typename W>
   ForEachWork(W& _wl, FunctionTy& _f, const char* _ln):
     wl(_wl), function(_f), loopname(_ln) 
   {}
-
-
-  ~ForEachWork() {
-    if (ForEachTraits<FunctionTy>::NeedsStats)
-      GaloisRuntime::statDone();
-  }
 
   template<typename Iter>
   void AddInitialWork(Iter b, Iter e) {

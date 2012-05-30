@@ -26,6 +26,7 @@
 #define SHARE_SINGLE_BC 0 
 #define SHOULD_PRODUCE_CERTIFICATE 0
 
+#include "Galois/Accumulator.h"
 #include "Galois/Statistic.h"
 #include "Galois/Galois.h"
 #include "Galois/UserContext.h"

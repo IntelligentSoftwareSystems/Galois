@@ -23,21 +23,40 @@
 #ifndef GALOIS_STATISTIC_H
 #define GALOIS_STATISTIC_H
 
-#include "Galois/Accumulator.h"
-#include "Galois/Timer.h"
-#include "Galois/Runtime/Support.h"
+#include "Runtime/Support.h"
+#include "Runtime/PerThreadStorage.h"
+#include "Timer.h"
 #include "Galois/Runtime/Sampling.h"
 
 namespace Galois {
 
-template<typename T>
-class Statistic : public GAccumulator<T> {
-  const char* name;
+class Statistic {
+  std::string loopname;
+  std::string statname;
+  GaloisRuntime::PerThreadStorage<unsigned long> val;
 public:
-  Statistic(const char* _name) :name(_name) {}
+  Statistic(const char* _ln, const char* _sn) :loopname(_ln), statname(_sn) {}
   ~Statistic() {
-    GaloisRuntime::reportStatSum(name, GAccumulator<T>::get());
+    GaloisRuntime::reportStat(this);
   }
+
+  unsigned long getValue(unsigned tid) {
+    return *val.getRemote(tid);
+  }
+
+  const std::string& getLoopname() {
+    return loopname;
+  }
+
+  const std::string& getStatname() {
+    return statname;
+  }
+
+  Statistic& operator+=(unsigned long v) {
+    *val.getLocal() += v;
+    return *this;
+  }
+
 };
 
 class StatTimer : public Timer {
@@ -49,7 +68,7 @@ public:
   StatTimer(): name("Time"), loopname(0), main(true) { }
   StatTimer(const char* n, const char* l = 0): name(n), loopname(l), main(false) { }
   ~StatTimer() {
-    GaloisRuntime::reportStatSum(name, get(), loopname);
+    GaloisRuntime::reportStat(loopname, name, get());
   }
 
   void start() {
