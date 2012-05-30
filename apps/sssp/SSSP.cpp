@@ -98,7 +98,7 @@ struct SerialStlAlgo {
       initial.insert(up);
     }
 
-    Galois::Statistic counter(0, "Iterations");
+    Galois::Statistic counter("Iterations");
     
     while (!initial.empty()) {
       counter += 1;
@@ -141,7 +141,7 @@ struct SerialPairingHeapAlgo {
       initial.add(up);
     }
 
-    Galois::Statistic counter(0, "Iterations");
+    Galois::Statistic counter("Iterations");
     
     boost::optional<UpdateRequest> req;
 

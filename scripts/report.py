@@ -28,39 +28,62 @@ import optparse
 import collections
 
 def main(options):
-  class Mutable:
-    pass
+  class Row:
+    def __init__(self):
+      self.reset()
+    def reset(self):
+      self.r = collections.defaultdict(str)
+      self.header = None
+    def get(self, line, key):
+      return line.split(',')[self.header.index(key)]
+
 
   cols = set()
   rows = []
-  row = Mutable() # Wrap row in object to allow assignment in nested functions
-  row.r = collections.defaultdict(str)
+  row = Row()
 
   def add_stat(key, value):
-    row.r[key] = value
+    # 'Threads' key duplicated so just directly assign instead of accumulate
+    if key != "Threads":
+      try:
+        row.r[key] = int(row.r[key]) + int(value)
+      except ValueError:
+        row.r[key] = value
+      except KeyError:
+        row.r[key] = value
+    else:
+      row.r[key] = value
     cols.add(key)
   def add_stat_l(key, value, loop):
     add_stat(key, value)
-    add_stat("%s-%s" % (key, loop), value)
+    if loop != '(NULL)':
+      add_stat("%s-%s" % (key, loop), value)
   def do_start_line(m):
     if row.r:
       rows.append(row.r)
-      row.r = collections.defaultdict(str)
+      row.reset()
   def do_var_line(m):
     add_stat(m.group('key'), m.group('value'))
+  def do_stat_header(m):
+    row.header = m.group('value').split(',')
   def do_stat_line(m):
+    v = m.group('value')
+    add_stat_l(row.get(v, 'CATEGORY'), row.get(v, 'sum'), row.get(v, 'LOOP'))
+  def do_old_stat_line(m):
     add_stat_l(m.group('key'), m.group('value'), m.group('loop'))
-  def do_dist_line(m):
+  def do_old_dist_line(m):
     add_stat_l(m.group('key'), m.group('value'),
         '%s-%s' % (m.group('loop'), m.group('loopn')))
 
   table = {
       r'^RUN: Start': do_start_line,
       r'^RUN: Variable (?P<key>\S+) = (?P<value>\S+)': do_var_line,
-      r'^STAT SINGLE (?P<key>\S+) (?P<loop>\S+) (?P<value>.*)': do_stat_line,
       r'^INFO: (?P<key>CommandLine) (?P<value>.*)': do_var_line,
       r'^INFO: (?P<key>Hostname) (?P<value>.*)': do_var_line,
-      r'^STAT DISTRIBUTION (?P<loopn>\d+) (?P<key>\S+) (?P<loop>\S+) (?P<value>.*)': do_dist_line
+      r'^STAT SINGLE (?P<key>\S+) (?P<loop>\S+) (?P<value>.*)': do_old_stat_line,
+      r'^STAT DISTRIBUTION (?P<loopn>\d+) (?P<key>\S+) (?P<loop>\S+) (?P<value>.*)': do_old_dist_line,
+      r'^(?P<value>STATTYPE.*)': do_stat_header,
+      r'^(?P<value>STAT,.*)': do_stat_line
       }
   
   matcher = [(re.compile(s), fn) for (s,fn) in table.iteritems()]

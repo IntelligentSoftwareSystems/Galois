@@ -53,6 +53,13 @@ class StatManager {
       v.push_back((*Stats.getRemote(x))[mkKey(s1,s2)]);
   }
 
+  unsigned long getSum(std::vector<unsigned long>& Values, unsigned maxThreadID) {
+    unsigned long R = 0;
+    for (unsigned x = 0; x < maxThreadID; ++x)
+      R += Values[x];
+    return R;
+  }
+
   double getAvg(std::vector<unsigned long>& Values, unsigned maxThreadID) {
     double R = 0.0;
     for (unsigned x = 0; x < maxThreadID; ++x)
@@ -109,7 +116,7 @@ public:
       }
     }
     //print header
-    gPrint("TYPE,LOOP,CATEGORY,n,ave,min,max,stddev");
+    gPrint("STATTYPE,LOOP,CATEGORY,n,sum,ave,min,max,stddev");
     for (unsigned x = 0; x < maxThreadID; ++x)
       gPrint(",%d", x);
     gPrint("\n");
@@ -120,10 +127,11 @@ public:
 	   iiK != eeK; ++iiK) {
 	std::vector<unsigned long> Values;
 	gather(*iiL, *iiK, maxThreadID, Values);
-	gPrint("STAT,%s,%s,%d,%f,%ld,%ld,%f", 
+	gPrint("STAT,%s,%s,%u,%lu,%f,%lu,%lu,%f", 
 	       iiL->c_str(), 
 	       iiK->c_str(),
 	       maxThreadID,
+               getSum(Values, maxThreadID),
 	       getAvg(Values, maxThreadID),
 	       getMin(Values, maxThreadID),
 	       getMax(Values, maxThreadID),

@@ -566,6 +566,7 @@ static void generateMesh(PointList& points) {
 }
 
 int main(int argc, char** argv) {
+  Galois::StatManager statManager;
   LonestarStart(argc, argv, std::cout, name, desc, url);
 
   PointList points;
@@ -573,13 +574,12 @@ int main(int argc, char** argv) {
   
   std::cout << "configuration: " << points.size() << " points\n";
 
-  std::cout << "MEMINFO PRE: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
   Galois::preAlloc(1 * numThreads // some per-thread state
       + 2 * points.size() * sizeof(Element) // mesh is about 2x number of points (for random points)
       * 32 // include graph node size
       / (GaloisRuntime::MM::pageSize) // in pages
       );
-  std::cout << "MEMINFO MID: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
+  Galois::Statistic("MeminfoPre", GaloisRuntime::MM::pageAllocInfo());
 
   Galois::StatTimer T;
   T.start();
@@ -587,7 +587,7 @@ int main(int argc, char** argv) {
   T.stop();
   std::cout << "mesh size: " << graph->size() << "\n";
 
-  std::cout << "MEMINFO POST: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
+  Galois::Statistic("MeminfoPost", GaloisRuntime::MM::pageAllocInfo());
 
   if (!skipVerify) {
     Verifier verifier;

@@ -35,9 +35,9 @@
 
 #include "Element.h"
 
+#include "Galois/Galois.h"
 #include "Galois/Statistic.h"
 #include "Galois/Graphs/Graph2.h"
-#include "Galois/Galois.h"
 
 #include "llvm/Support/CommandLine.h"
 
@@ -138,6 +138,7 @@ struct LessThan {
 static ptrdiff_t myrandom(ptrdiff_t i) { return rand() % i; }
 
 int main(int argc, char** argv) {
+  Galois::StatManager statManager;
   LonestarStart(argc, argv, std::cout, name, desc, url);
 
   mesh = new Graph();
@@ -155,9 +156,9 @@ int main(int argc, char** argv) {
   std::cout << "configuration: " << std::distance(mesh->begin(), mesh->end())
 	    << " total triangles, " << std::count_if(mesh->begin(), mesh->end(), is_bad(mesh)) << " bad triangles\n";
 
-  std::cout << "MEMINFO P1: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
+  Galois::Statistic("MeminfoPre1", GaloisRuntime::MM::pageAllocInfo());
   Galois::preAlloc(15 * numThreads + GaloisRuntime::MM::pageAllocInfo() * 10);
-  std::cout << "MEMINFO P2: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
+  Galois::Statistic("MeminfoPre2", GaloisRuntime::MM::pageAllocInfo());
 
   Galois::StatTimer T;
   T.start();
@@ -174,7 +175,7 @@ int main(int argc, char** argv) {
   Galois::do_all_local(*mesh, Preprocess());
   //Galois::do_all(mesh->tile_begin(), mesh->tile_end(), Preprocess());
 #endif
-  std::cout << "MEMINFO MID: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
+  Galois::Statistic("MeminfoMid", GaloisRuntime::MM::pageAllocInfo());
 
   Galois::StatTimer Trefine("refine");
   Trefine.start();
@@ -193,7 +194,7 @@ int main(int argc, char** argv) {
   Trefine.stop();
   T.stop();
 
-  std::cout << "MEMINFO POST: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
+  Galois::Statistic("MeminfoPost", GaloisRuntime::MM::pageAllocInfo());
 
   if (!skipVerify) {
     int size = Galois::count_if(mesh->begin(), mesh->end(), is_bad(mesh));
@@ -210,7 +211,6 @@ int main(int argc, char** argv) {
     }
     std::cout << "Refinement OK\n";
   }
-  GaloisRuntime::printStats();
   return 0;
 }
 

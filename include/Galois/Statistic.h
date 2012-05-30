@@ -23,19 +23,24 @@
 #ifndef GALOIS_STATISTIC_H
 #define GALOIS_STATISTIC_H
 
-#include "Runtime/Support.h"
-#include "Runtime/PerThreadStorage.h"
-#include "Timer.h"
+#include "Galois/Runtime/Support.h"
+#include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/Sampling.h"
+#include "Galois/Timer.h"
+
+#include "boost/utility.hpp"
 
 namespace Galois {
 
 class Statistic {
-  std::string loopname;
   std::string statname;
+  std::string loopname;
   GaloisRuntime::PerThreadStorage<unsigned long> val;
 public:
-  Statistic(const char* _ln, const char* _sn) :loopname(_ln), statname(_sn) {}
+  Statistic(const std::string& _sn, unsigned long v, const std::string& _ln = "(NULL)"): statname(_sn), loopname(_ln) {
+    *val.getLocal() = v;
+  }
+  Statistic(const std::string& _sn, const std::string& _ln = "(NULL)"): statname(_sn), loopname(_ln) { }
   ~Statistic() {
     GaloisRuntime::reportStat(this);
   }
@@ -44,11 +49,11 @@ public:
     return *val.getRemote(tid);
   }
 
-  const std::string& getLoopname() {
+  std::string& getLoopname() {
     return loopname;
   }
 
-  const std::string& getStatname() {
+  std::string& getStatname() {
     return statname;
   }
 
@@ -56,9 +61,18 @@ public:
     *val.getLocal() += v;
     return *this;
   }
-
 };
 
+//! Controls lifetime of stats. Users usually instantiate an instance in main.
+class StatManager: private boost::noncopyable {
+
+public:
+  ~StatManager() {
+    GaloisRuntime::printStats();
+  }
+};
+
+//! Provides statistic interface around timer
 class StatTimer : public Timer {
   const char* name;
   const char* loopname;
