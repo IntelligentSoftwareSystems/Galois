@@ -311,7 +311,9 @@ public:
   //// Edge Handling ////
 
   //! Adds an edge to graph, replacing existing value if edge already
-  //! exists Ignore the edge data, let the caller use the returned
+  //! exists. 
+  //!
+  //! Ignore the edge data, let the caller use the returned
   //! iterator to set the value if desired.  This frees us from
   //! dealing with the void edge data problem in this API
   edge_iterator addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {

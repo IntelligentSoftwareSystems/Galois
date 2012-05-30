@@ -1,20 +1,27 @@
-/*
-Galois, a framework to exploit amorphous data-parallelism in irregular
-programs.
-
-Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
-UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS SOFTWARE
-AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR ANY
-PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF PERFORMANCE, AND ANY
-WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF DEALING OR USAGE OF TRADE.
-NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH RESPECT TO THE USE OF THE
-SOFTWARE OR DOCUMENTATION. Under no circumstances shall University be liable
-for incidental, special, indirect, direct or consequential damages or loss of
-profits, interruption of business, or related expenses which may arise from use
-of Software or Documentation, including but not limited to those resulting from
-defects in Software and/or Documentation, or loss or inaccuracy of data of any
-kind.
-*/
+/** simple galois context and contention manager -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @section Description
+ *
+ * @author Andrew Lenharth <andrewl@lenharth.org>
+ */
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/MethodFlags.h"
 #include "Galois/Runtime/ll/SimpleLock.h"
@@ -24,7 +31,7 @@ kind.
 //! Global thread context for each active thread
 static __thread GaloisRuntime::SimpleRuntimeContext* thread_cnx = 0;
 
-static GaloisRuntime::LL::SimpleLock<true> ConflictLock;
+static GaloisRuntime::LL::SimpleLock<true> conflictLock;
 
 #ifdef GALOIS_DET
 static GaloisRuntime::PendingFlag pendingFlag = GaloisRuntime::NON_DET;
@@ -33,24 +40,30 @@ void GaloisRuntime::setPending(PendingFlag value) {
   pendingFlag = value;
 }
 
+void GaloisRuntime::clearConflictLock() {
+  conflictLock.unlock();
+}
+
+static inline void lockConflictLock() {
+  conflictLock.lock();
+}
+
 void GaloisRuntime::doCheckWrite() {
   if (pendingFlag == PENDING) {
+    lockConflictLock();
     throw GaloisRuntime::REACHED_FAILSAFE;
   }
 }
+
+#else
+static inline void lockConflictLock() { }
 #endif
 
-//void GaloisRuntime::clearConflictLock() {
-//  ConflictLock.unlock();
-//}
-
-void GaloisRuntime::setThreadContext(GaloisRuntime::SimpleRuntimeContext* n)
-{
+void GaloisRuntime::setThreadContext(GaloisRuntime::SimpleRuntimeContext* n) {
   thread_cnx = n;
 }
 
-GaloisRuntime::SimpleRuntimeContext* GaloisRuntime::getThreadContext() 
-{
+GaloisRuntime::SimpleRuntimeContext* GaloisRuntime::getThreadContext() {
   return thread_cnx;
 }
 
@@ -79,7 +92,14 @@ unsigned GaloisRuntime::SimpleRuntimeContext::commit_iteration() {
     ++numLocks;
   }
 
+  not_ready = false;
+
   return numLocks;
+}
+
+void GaloisRuntime::breakLoop() {
+  lockConflictLock();
+  throw GaloisRuntime::BREAK;
 }
 
 void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
@@ -95,12 +115,16 @@ void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
     do {
       other = L->Owner.getValue();
       if (other == this)
-        break;
-      if (other && other->id > id) {
-        if (pendingFlag == PENDING)
-          break;
-        else
+        return;
+      if (other && other->id < id) {
+        if (pendingFlag == PENDING) {
+          // A lock I should have but can't get
+          not_ready = 1;
+          return; 
+        } else {
+          lockConflictLock();
           throw GaloisRuntime::CONFLICT;
+        }
       }
       // Allow new locks on new nodes only
       if (pendingFlag == COMMITTING && other) {
@@ -108,6 +132,10 @@ void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
         abort();
       }
     } while (!L->Owner.stealing_CAS(other, this));
+
+    // Disable loser
+    if (other)
+      other->not_ready = 1; // only need atomic write
 
     return;
   }
@@ -120,8 +148,8 @@ void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
     locks = L;
   } else {
     if (L->Owner.getValue() != this) {
-      //ConflictLock.lock();
-      throw GaloisRuntime::CONFLICT; // Conflict
+      lockConflictLock();
+      throw GaloisRuntime::CONFLICT;
       //longjmp(hackjmp, 1);
     }
   }

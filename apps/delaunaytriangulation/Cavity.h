@@ -46,13 +46,14 @@ class Cavity: private boost::noncopyable {
 
   Searcher<Alloc> searcher;
   GNodeVector newNodes;
+  GNodeIntPairVector outside;
   GNode center;
   Point* point;
   Graph& graph;
   const Alloc& alloc;
 
   //! Find triangles that border cavity but are not in the cavity
-  void findOutside(GNodeIntPairVector& outside) {
+  void findOutside() {
     for (typename Searcher<Alloc>::GNodeVector::iterator ii = searcher.inside.begin(),
         ei = searcher.inside.end(); ii != ei; ++ii) {
 
@@ -77,7 +78,7 @@ class Cavity: private boost::noncopyable {
     }
   }
 
-  void addElements(GNodeIntPairVector& outside) {
+  void addElements() {
     GNodeVector newNodes(alloc);
 
     // Create new nodes
@@ -140,12 +141,12 @@ public:
   Cavity(Graph& g, const Alloc& a = Alloc()):
     searcher(g, a),
     newNodes(a),
+    outside(a),
     graph(g),
     alloc(a)
     { }
 
   void init(const GNode& c, Point* p) {
-    searcher.useMark(p->id(), 1, p->numTries());
     center = c;
     point = p;
   }
@@ -154,13 +155,12 @@ public:
     assert(graph.getData(center).inCircle(point->t()));
     searcher.findAll(center, InCircumcenter(graph, point->t()));
     assert(!searcher.inside.empty());
+    findOutside();
   }
 
   void update() {
-    GNodeIntPairVector outside(alloc);
-    findOutside(outside);
     removeElements();
-    addElements(outside);
+    addElements();
   }
 };
 

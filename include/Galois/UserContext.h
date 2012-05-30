@@ -63,6 +63,18 @@ class UserContext: private boost::noncopyable {
     pushBuffer.clear();
   }
 
+#ifdef GALOIS_DET
+  void* localState;
+  bool localStateUsed;
+  void __setLocalState(void *p, bool used) {
+    localState = p;
+    localStateUsed = used;
+  }
+public:
+  void* getLocalState(bool& used) { used = localStateUsed; return localState; }
+private:
+#endif
+
 public:
   UserContext()
     :IterationAllocatorBase(), 
@@ -71,7 +83,7 @@ public:
 
   //! Signal break in parallel loop
   void breakLoop() {
-    throw GaloisRuntime::BREAK;
+    GaloisRuntime::breakLoop();
   }
 
   PerIterAllocTy& getPerIterAlloc() {
@@ -100,6 +112,9 @@ public:
   pushBufferTy& getPushBuffer() { return ctx.__getPushBuffer(); }
   void resetPushBuffer() { ctx.__resetPushBuffer(); }
   Galois::UserContext<T>& data() { return ctx; }
+#ifdef GALOIS_DET
+  void setLocalState(void *p, bool used) { ctx.__setLocalState(p, used); }
+#endif
 };
 
 }

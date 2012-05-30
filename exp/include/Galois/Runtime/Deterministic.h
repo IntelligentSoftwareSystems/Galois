@@ -1,68 +1,149 @@
+/** Deterministic execution -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @section Description
+ *
+ * @author Donald Nguyen <ddn@cs.utexas.edu>
+ */
 #ifndef GALOIS_RUNTIME_DETERMINISTIC_H
 #define GALOIS_RUNTIME_DETERMINISTIC_H
 
 #ifdef GALOIS_DET
-
-#include "Galois/Runtime/ParallelWorkInline.h"
 
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/iterator/counting_iterator.hpp>
 
 namespace GaloisRuntime {
+namespace Deterministic {
 
-class ContextPool: private boost::noncopyable {
-  template<typename T> struct LinkedNode { void *x,*y; T z; };
-  typedef Galois::GFixedAllocator<LinkedNode<SimpleRuntimeContext> > Allocator;
-  typedef std::list<SimpleRuntimeContext,Allocator> List;
-  typedef List::iterator iterator;
+//! Wrapper around WorkList::ChunkedFIFO to allow peek() and empty() and still have FIFO order
+template<int chunksize,typename T>
+struct FIFO {
+  WorkList::ChunkedFIFO<chunksize,T,false> m_data;
+  WorkList::ChunkedLIFO<16,T,false> m_buffer;
+  size_t m_size;
 
-  List list;
-  iterator end;
+  FIFO(): m_size(0) { }
 
-public:
-  ContextPool(): end(list.end()) { }
-
-  SimpleRuntimeContext* next() {
-    SimpleRuntimeContext* r;
-    if (end != list.end()) {
-      r = &*end;
-      ++end;
-    } else {
-      list.push_back(SimpleRuntimeContext());
-      r = &list.back();
-      end = list.end();
+  boost::optional<T> pop() {
+    boost::optional<T> p;
+    if ((p = m_buffer.pop()) || (p = m_data.pop())) {
+      --m_size;
     }
-    return r;
+    return p;
   }
 
-  void commit() {
-    for (iterator ii = list.begin(); ii != end; ++ii)
-      ii->commit_iteration();
-    end = list.begin();
+  boost::optional<T> peek() {
+    boost::optional<T> p;
+    if ((p = m_buffer.pop())) {
+      m_buffer.push(*p);
+    } else if ((p = m_data.pop())) {
+      m_buffer.push(*p);
+    }
+    return p;
+  }
+
+  void push(const T& item) {
+    m_data.push(item);
+    ++m_size;
+  }
+
+  bool empty() const {
+    return m_size == 0;
   }
 };
 
-template<class T,class FunctionTy>
-class DeterministicExecutor {
+template<typename T>
+struct WorkItem {
+  T item;
+  unsigned long id;
+  SimpleRuntimeContext* cnx;
+  void* localState;
+
+  WorkItem(const T& _item, unsigned long _id): item(_item), id(_id), cnx(NULL), localState(NULL) { }
+};
+
+template<typename T>
+struct has_local_state {
+  typedef char yes[1];
+  typedef char no[2];
+  template<typename C> static yes& test(typename C::LocalState*);
+  template<typename> static no& test(...);
+  static const bool value = sizeof(test<T>(0)) == sizeof(yes);
+};
+
+template<typename T,typename FunctionTy,bool hasLocalState = false>
+struct StateManager { 
+  void alloc(GaloisRuntime::UserContextAccess<T>&, FunctionTy* self) { }
+  void dealloc(GaloisRuntime::UserContextAccess<T>&) { }
+  void save(GaloisRuntime::UserContextAccess<T>&, void*&) { }
+  void restore(GaloisRuntime::UserContextAccess<T>&, void* ) { } 
+};
+
+template<typename T,typename FunctionTy>
+struct StateManager<T,FunctionTy,true> {
+  typedef typename FunctionTy::LocalState LocalState;
+  void alloc(GaloisRuntime::UserContextAccess<T>& c,FunctionTy* self) {
+    void *p = c.data().getPerIterAlloc().allocate(sizeof(LocalState));
+    new (p) LocalState(self, c.data().getPerIterAlloc());
+    c.setLocalState(p, false);
+  }
+  void dealloc(GaloisRuntime::UserContextAccess<T>& c) {
+    bool dummy;
+    LocalState *p = (LocalState*) c.data().getLocalState(dummy);
+    p->~LocalState();
+  }
+  void save(GaloisRuntime::UserContextAccess<T>& c, void*& localState) { 
+    bool dummy;
+    localState = c.data().getLocalState(dummy);
+  }
+  void restore(GaloisRuntime::UserContextAccess<T>& c, void* localState) { 
+    c.setLocalState(localState, true);
+  }
+};
+
+
+template<typename T,typename Function1Ty,typename Function2Ty,bool useLocalState>
+class Executor {
   typedef T value_type;
-  typedef std::pair<T,unsigned long> WorkItem;
-  typedef std::pair<WorkItem,SimpleRuntimeContext*> PendingItem;
+  typedef WorkItem<T> Item;
   typedef std::pair<T,std::pair<unsigned long,unsigned> > NewItem;
-  typedef HIDDEN::dChunkedLIFO<WorkItem,256> WL;
-  typedef HIDDEN::dChunkedLIFO<PendingItem,256> PendingWork;
-  typedef HIDDEN::dChunkedLIFO<NewItem,256> NewWork;
+  typedef WorkList::dChunkedFIFO<16,Item> WL;
+  typedef WorkList::dChunkedFIFO<16,Item> PendingWork;
+  typedef WorkList::ChunkedFIFO<16,Item,false> LocalPendingWork;
+  typedef WorkList::dChunkedFIFO<16,NewItem> NewWork;
+  typedef WorkList::dChunkedLIFO<16,SimpleRuntimeContext> ContextPool;
+  typedef WorkList::dChunkedLIFO<16,SimpleRuntimeContext*> ContextPtrPool;
 
   // Truly thread-local
   struct ThreadLocalData: private boost::noncopyable {
+    LocalPendingWork localPending;
     GaloisRuntime::UserContextAccess<value_type> facing;
-    LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
-    HIDDEN::WID wid;
-    ContextPool pool;
+    LoopStatistics<ForEachTraits<Function1Ty>::NeedsStats || ForEachTraits<Function2Ty>::NeedsStats> stat;
     size_t newSize;
     WL* wlcur;
     WL* wlnext;
-    ThreadLocalData() { reset(); }
+    size_t rounds;
+    size_t outerRounds;
+    ThreadLocalData(): rounds(0), outerRounds(0) { reset(); }
     void reset() {
       newSize = 0;
     }
@@ -70,24 +151,43 @@ class DeterministicExecutor {
 
   // Mostly local but shared sometimes
   struct MergeInfo {
-    typedef std::vector<NewItem> Data;
-    Data data;
+    typedef std::vector<NewItem> NewItemsTy;
+    typedef FIFO<256,Item> ReserveTy;
+    NewItemsTy newItems;
+    ReserveTy reserve;
+
     size_t begin;
-    size_t newItems;
+    size_t window;
+    size_t delta;
     size_t committed;
-    size_t nextMax;
-    size_t skipped;
-    MergeInfo(): nextMax(-1) { reset(); }
+    size_t iterations;
+
+    MergeInfo() { reset(); }
+    
+    void calculateWindow(PerCPU<MergeInfo>&, unsigned numActive);
+
+    void nextWindow(WL* wl, bool renumbered) {
+      if (renumbered)
+        window = delta;
+      else
+        window += delta;
+      boost::optional<Item> p;
+      while ((p = reserve.peek())) {
+        if (p->id > window)
+          break;
+        wl->push(*p);
+        reserve.pop();
+      }
+    }
+
     void reset() {
-      newItems = 0;
       committed = 0;
-      skipped = 0;
-      data.clear();
+      iterations = 0;
     }
   };
 
-  typedef typename MergeInfo::Data MergeInfoData;
-  typedef typename MergeInfoData::iterator MergeInfoDataIterator;
+  typedef typename MergeInfo::NewItemsTy NewItemsTy;
+  typedef typename NewItemsTy::iterator NewItemsIterator;
 
   //! Flatten multiple MergeInfos into single iteration domain
   struct MergeIterator:
@@ -96,7 +196,7 @@ class DeterministicExecutor {
                                   boost::forward_traversal_tag> {
     PerCPU<MergeInfo>* base;
     int oo, eo;
-    MergeInfoDataIterator ii, ei;
+    NewItemsIterator ii, ei;
 
     void increment() {
       ++ii;
@@ -104,8 +204,8 @@ class DeterministicExecutor {
         if (++oo == eo)
           break;
 
-        ii = base->get(oo).data.begin();
-        ei = base->get(oo).data.end();
+        ii = base->get(oo).newItems.begin();
+        ei = base->get(oo).newItems.end();
       }
     }
 
@@ -127,22 +227,26 @@ class DeterministicExecutor {
   };
 
   PerCPU<MergeInfo> mergeInfo;
-  typename MergeInfo::Data mergeBuf;
-  GBarrier barrier[4];
+  typename MergeInfo::NewItemsTy mergeBuf;
+  GBarrier barrier[7];
   WL wl[2];
   NewWork new_;
   PendingWork pending;
-  FunctionTy& function;
+  ContextPool contextPool;
+  ContextPtrPool contextPtrPool;
+  Function1Ty& function1;
+  Function2Ty& function2;
+  StateManager<T,Function1Ty,useLocalState> stateManager;
   const char* loopname;
-  LL::CacheLineStorage<volatile long> done;
+  LL::CacheLineStorage<volatile long> innerDone;
+  LL::CacheLineStorage<volatile long> outerDone;
   int numActive;
 
   bool merge(int begin, int end);
-  bool checkEmpty(ThreadLocalData& tld);
   bool renumber(ThreadLocalData& tld);
-  bool renumberMaster();
-  void pendingLoop(ThreadLocalData& tld);
-  void commitLoop(ThreadLocalData& tld);
+  bool pendingLoop(ThreadLocalData& tld);
+  bool commitLoop(ThreadLocalData& tld);
+  void go();
 
   struct LessThan {
     bool operator()(const NewItem& a, const NewItem& b) const {
@@ -161,58 +265,141 @@ class DeterministicExecutor {
     }
   };
 
-protected:
-  void go();
-
-public:
-  DeterministicExecutor(FunctionTy& f, const char* ln): function(f), loopname(ln) { 
-    numActive = (int) GaloisRuntime::getSystemThreadPool().getActiveThreads();
-    for (int i = 0; i < 4; ++i)
-      barrier[i].reinit(numActive);
-    if (ForEachTraits<FunctionTy>::NeedsBreak) abort();
+  SimpleRuntimeContext* nextContext() {
+    contextPool.push(SimpleRuntimeContext());
+    SimpleRuntimeContext* retval = contextPool.unsafePeek();
+    if (useLocalState)
+      contextPtrPool.push(retval);
+    return retval;
   }
 
-  ~DeterministicExecutor() {
-    if (ForEachTraits<FunctionTy>::NeedsStats)
+#if 0
+  void checkContexts() {
+    boost::optional<SimpleRuntimeContext*> p;
+    while ((p = contextPtrPool.pop())) {
+      (*p)->check_iteration();
+    }
+  }
+#endif
+
+  void commitContexts() {
+    boost::optional<SimpleRuntimeContext> p;
+    while ((p = contextPool.pop())) {
+      p->commit_iteration();
+    }
+  }
+
+  template<typename InputIterator>
+  void safe_advance(InputIterator& it, size_t d, size_t& cur, size_t dist) {
+    if (d + cur >= dist) {
+      d = dist - cur;
+    }
+    std::advance(it, d);
+    cur += d;
+  }
+
+  template<typename InputIterator>
+  void distribute(InputIterator b, InputIterator e, WL* wl, size_t window, size_t dist) {
+#if 0
+    // Slightly complicated reindexing to separate out continuous elements in InputIterator
+    // (by window) while also evenly distributing priority space among threads
+    size_t cur = 0;
+    size_t block = 0;
+    MergeInfo& minfo = mergeInfo.get();
+    unsigned int tid = LL::getTID();
+    size_t blocksize = (dist + window - 1) / window;
+    
+    printf("blocksize: %zu\n", blocksize);
+    safe_advance(b, tid*blocksize, cur, dist);
+    while (b != e) {
+      for (int i = 0; i < blocksize && b != e; ++i) {
+        unsigned long id = i * window + block * numActive + tid;
+        ++id; // skip zero id
+        printf("cur: %lu id: %zu\n", cur, id);
+        if (id <= window)
+          wl->push(std::make_pair(*b, id));
+        else
+          minfo.reserve.push(std::make_pair(*b, id));
+        safe_advance(b, 1, cur, dist);
+      }
+      ++block;
+      safe_advance(b, blocksize*(numActive - 1), cur, dist);
+    }
+#else
+    MergeInfo& minfo = mergeInfo.get();
+    unsigned int tid = LL::getTID();
+    size_t cur = 0;
+    size_t k = 0;
+    safe_advance(b, tid, cur, dist);
+    while (b != e) {
+      unsigned long id = k * numActive + tid;
+      if (id <= window)
+        wl->push(Item(*b, id));
+      else
+        minfo.reserve.push(Item(*b, id));
+      ++k;
+      safe_advance(b, numActive, cur, dist);
+    }
+#endif
+  }
+
+public:
+  Executor(Function1Ty& f1, Function2Ty& f2, const char* ln): function1(f1), function2(f2), loopname(ln) { 
+    numActive = (int) GaloisRuntime::getSystemThreadPool().getActiveThreads();
+    for (int i = 0; i < sizeof(barrier)/sizeof(*barrier); ++i)
+      barrier[i].reinit(numActive);
+    if (ForEachTraits<Function1Ty>::NeedsBreak || ForEachTraits<Function2Ty>::NeedsBreak) abort();
+  }
+
+  ~Executor() {
+    if (ForEachTraits<Function1Ty>::NeedsStats || ForEachTraits<Function2Ty>::NeedsStats)
       GaloisRuntime::statDone();
   }
 
   template<typename IterTy>
   bool AddInitialWork(IterTy b, IterTy e) {
-    if (LL::getTID() != 0)
-      return true;
+    unsigned int dist = std::distance(b, e);
+    MergeInfo& minfo = mergeInfo.get();
+    minfo.window = minfo.delta = std::max(dist / 100U, 1U);
+    distribute(b, e, &wl[1], minfo.window, dist);
 
-    HIDDEN::WID wid;
-    WorkItem a[1];
-    unsigned long id = 0;
-    while (b != e) {
-      a[0] = std::make_pair(*b, ++id);
-      wl[0].push_initial(wid, &a[0], &a[1]);
-      ++b;
-    }
     return true;
-  }
-};
-
-template<class T, class FunctionTy>
-class ForEachWork<WorkList::Deterministic<>,T,FunctionTy>: public DeterministicExecutor<T,FunctionTy>
-{
-  typedef DeterministicExecutor<T,FunctionTy> Super;
-public:
-  ForEachWork(FunctionTy& f, const char* loopname): Super(f, loopname) { }
-
-  template<typename IterTy>
-  bool AddInitialWork(IterTy b, IterTy e) {
-    return Super::AddInitialWork(b, e);
   }
 
   void operator()() {
-    Super::go();
+    go();
   }
 };
 
-template<class T,class FunctionTy>
-void DeterministicExecutor<T,FunctionTy>::MergeIterator::initRange(PerCPU<MergeInfo>* _base, int b, int e, MergeIterator& end) {
+template<typename T,typename Function1Ty,typename Function2Ty,bool useLocalState>
+void Executor<T,Function1Ty,Function2Ty,useLocalState>::MergeInfo::calculateWindow(PerCPU<MergeInfo>& mergeInfo, unsigned numActive) 
+{
+  // Accumulate all threads' info
+  size_t committed = 0;
+  size_t iterations = 0;
+  for (int i = 0; i < numActive; ++i) {
+    MergeInfo& minfo = mergeInfo.get(i);
+    committed += minfo.committed;
+    iterations += minfo.iterations;
+  }
+
+  const float target = 0.90;
+  float commitRatio = iterations > 0 ? committed / (float) iterations : 0.0;
+  if (commitRatio > target)
+    delta += delta;
+  else
+    delta = commitRatio / target * delta;
+  if (delta < 1024) delta = 1024;
+  // XXX set max when we have local state to bound allocations....?
+  //if (LL::getTID() == 0) {
+  //  printf("%.3f (%zu/%zu) window: %zu delta: %zu\n", 
+  //      commitRatio, committed, iterations, window, delta);
+  //}
+}
+
+
+template<typename T,typename Function1Ty,typename Function2Ty,bool useLocalState>
+void Executor<T,Function1Ty,Function2Ty,useLocalState>::MergeIterator::initRange(PerCPU<MergeInfo>* _base, int b, int e, MergeIterator& end) {
   base = _base;
   oo = b;
   eo = e;
@@ -222,57 +409,102 @@ void DeterministicExecutor<T,FunctionTy>::MergeIterator::initRange(PerCPU<MergeI
   end.eo = e;
 
   if (oo != eo) {
-    ii = base->get(oo).data.begin();
-    ei = base->get(oo).data.end();
+    ii = base->get(oo).newItems.begin();
+    ei = base->get(oo).newItems.end();
     while (ii == ei) {
       if (++oo == eo)
         break;
-      ii = base->get(oo).data.begin();
-      ei = base->get(oo).data.end();
+      ii = base->get(oo).newItems.begin();
+      ei = base->get(oo).newItems.end();
     }
   }
 }
 
-template<class T,class FunctionTy>
-void DeterministicExecutor<T,FunctionTy>::go() {
+template<typename T,typename Function1Ty,typename Function2Ty,bool useLocalState>
+void Executor<T,Function1Ty,Function2Ty,useLocalState>::go() {
   ThreadLocalData tld;
+  MergeInfo& minfo = mergeInfo.get();
   tld.wlcur = &wl[0];
   tld.wlnext = &wl[1];
 
   while (true) {
-    setPending(PENDING);
-    pendingLoop(tld);
+    ++tld.outerRounds;
 
-    barrier[0].wait();
+    while (true) {
+      ++tld.rounds;
+      //barrier[0].wait();
 
-    setPending(COMMITTING);
-    commitLoop(tld);
+      std::swap(tld.wlcur, tld.wlnext);
+      setPending(PENDING);
+      bool nextPending = pendingLoop(tld);
+      innerDone.data = true;
 
-    barrier[1].wait();
+      barrier[1].wait();
 
-    tld.pool.commit();
+#if 0
+      if (useLocalState) {
+        checkContexts();
+        barrier[4].wait();
+      }
+#endif
 
-    if (ForEachTraits<FunctionTy>::NeedsPush) {
+      setPending(COMMITTING);
+      bool nextCommit = commitLoop(tld);
+      outerDone.data = true;
+      if (nextPending || nextCommit)
+        innerDone.data = false;
+
+      barrier[2].wait();
+
+      commitContexts();
+      //tld.pool.commit();
+      if (innerDone.data)
+        break;
+
+      barrier[0].wait();
+    } 
+
+    if (!minfo.reserve.empty()) {
+      outerDone.data = false;
+    }
+
+    minfo.calculateWindow(mergeInfo, numActive);
+
+    barrier[3].wait();
+
+    minfo.reset();
+
+    bool renumbered = false;
+    if (outerDone.data) {
+      if (!ForEachTraits<Function1Ty>::NeedsPush && !ForEachTraits<Function2Ty>::NeedsPush)
+        break;
       if (renumber(tld))
         break;
-    } else {
-      if (checkEmpty(tld))
-        break;
-      std::swap(tld.wlcur, tld.wlnext);
+      renumbered = true;
+    }
+
+    minfo.nextWindow(tld.wlnext, renumbered);
+  }
+
+  setPending(NON_DET);
+
+  if (ForEachTraits<Function1Ty>::NeedsStats || ForEachTraits<Function2Ty>::NeedsStats) {
+    unsigned tid = LL::getTID();
+    tld.stat.report_stat(tid, loopname);
+    if (tid == 0) {
+      reportStatSum("RoundsExecuted", tld.rounds, loopname);
+      reportStatSum("OuterRoundsExecuted", tld.outerRounds, loopname);
     }
   }
-  setPending(NON_DET);
-  if (ForEachTraits<FunctionTy>::NeedsStats)
-    tld.stat.report_stat(LL::getTID(), loopname);
 }
 
-template<class T,class FunctionTy>
-bool DeterministicExecutor<T,FunctionTy>::merge(int begin, int end)
+template<typename T,typename Function1Ty,typename Function2Ty,bool useLocalState>
+bool Executor<T,Function1Ty,Function2Ty,useLocalState>::merge(int begin, int end)
 {
   if (begin == end)
     return false;
   else if (begin + 1 == end)
-    return !mergeInfo.get(begin).data.empty();
+    return !mergeInfo.get(begin).newItems.empty();
   
   bool retval = false;
   unsigned mid = (end - begin) / 2 + begin;
@@ -299,8 +531,9 @@ bool DeterministicExecutor<T,FunctionTy>::merge(int begin, int end)
   for (; bb != eb; ++bb)
     mergeBuf.push_back(*bb);
 
-  for (MergeInfoDataIterator ii = mergeBuf.begin(), ei = mergeBuf.end(); ii != ei; ++ii) 
+  for (NewItemsIterator ii = mergeBuf.begin(), ei = mergeBuf.end(); ii != ei; ++ii) 
     *cur++ = *ii; 
+
   mergeBuf.clear();
 
   assert(cur == ecur);
@@ -308,169 +541,93 @@ bool DeterministicExecutor<T,FunctionTy>::merge(int begin, int end)
   return retval;
 }
 
-template<class T,class FunctionTy>
-bool DeterministicExecutor<T,FunctionTy>::checkEmpty(ThreadLocalData& tld)
-{
-  if (tld.wid.tid == 0) {
-    bool empty = true;
-    for (int i = 0; i < numActive; ++i) {
-      HIDDEN::WID wid(i);
-      if (!tld.wlnext->empty(wid)) {
-        empty = false;
-        break;
-      }
-    }
-
-    done.data = empty;
-  }
-  
-  barrier[2].wait();
-
-  return done.data;
-}
-
-template<class T,class FunctionTy>
-bool DeterministicExecutor<T,FunctionTy>::renumberMaster()
-{
-  // Accumulate all threads' info
-  size_t begin = 0;
-  size_t newItems = 0;
-  size_t committed = 0;
-  size_t skipped = 0;
-  for (int i = 0; i < numActive; ++i) {
-    MergeInfo& minfo = mergeInfo.get(i);
-    minfo.begin = begin;
-
-    size_t newSize = minfo.data.size();
-    newItems += minfo.newItems;
-    committed += minfo.committed;
-    skipped += minfo.skipped;
-    begin += newSize;
-  }
-
-  // Compute new window size
-  const float target = 0.90;
-  size_t total = begin - newItems - skipped + committed;
-  float commitRatio = total > 0 ? committed / (float) total : 0.0;
-
-  size_t prevMax = mergeInfo.get(0).nextMax;
-  size_t nextMax;
-  if (commitRatio < target) {
-    nextMax = commitRatio / target * prevMax; //begin;
-  } else {
-    nextMax = 2*prevMax;
-  }
-  if (nextMax == 0) nextMax = 1;
-  if (nextMax > begin) nextMax = begin;
-
-  printf("R %ld %.3f %zu t:%zu c:%zu %zu %zu\n", 
-      begin, commitRatio, nextMax, total, committed, newItems, skipped);
-
-  // Tell everyone new window size
-  for (int i = 0; i < numActive; ++i) {
-    MergeInfo& minfo = mergeInfo.get(i);
-    //minfo.nextMax = nextMax;
-  }
-
-  // Prepare for merge
-  mergeBuf.reserve(begin);
-
-  return !merge(0, numActive);
-}
-
-template<class T,class FunctionTy>
-bool DeterministicExecutor<T,FunctionTy>::renumber(ThreadLocalData& tld)
+template<typename T,typename Function1Ty,typename Function2Ty,bool useLocalState>
+bool Executor<T,Function1Ty,Function2Ty,useLocalState>::renumber(ThreadLocalData& tld)
 {
 #if 0
   MergeInfo& minfo = mergeInfo.get();
 
-  minfo.data.reserve(tld.newSize * 2);
-  while (!new_.empty(tld.wid)) {
-    NewItem& p = new_.back(tld.wid);
-    minfo.data.push_back(p);
-    new_.pop_back(tld.wid);
+  minfo.newItems.reserve(tld.newSize * 2);
+  boost::optional<NewItem> p;
+  while ((p = new_.pop())) {
+    minfo.newItems.push_back(*p);
   }
 
-  std::sort(minfo.data.begin(), minfo.data.end(), LessThan());
+  std::sort(minfo.newItems.begin(), minfo.newItems.end(), LessThan());
   
-  barrier[2].wait();
+  barrier[5].wait();
 
-  if (tld.wid.tid == 0) {
-    done.data = renumberMaster();
-  }
-
-  barrier[3].wait();
-
-  // TODO: shuffle blocks among threads
-  size_t id = minfo.begin;
-  size_t nextMax = minfo.nextMax;
-  size_t newSize = 0;
-  size_t skipped = 0;
-  for (MergeInfoDataIterator ii = minfo.data.begin(), ei = minfo.data.end(); ii != ei; ++ii) {
-    if (++id <= nextMax) {
-      tld.wlcur->push_back(tld.wid, std::make_pair(ii->first, id));
-    } else {
-      new_.push_back(tld.wid, std::make_pair(ii->first, std::make_pair(id, 0)));
-      ++newSize;
-      ++skipped;
+  unsigned tid = LL::getTID();
+  if (tid == 0) {
+    size_t begin = 0;
+    for (int i = 0; i < numActive; ++i) {
+      MergeInfo& minfo = mergeInfo.get(i);
+      minfo.begin = begin;
+      begin += minfo.newItems.size();
     }
+    mergeBuf.reserve(begin);
+
+    outerDone.data = !merge(0, numActive);
   }
 
-  minfo.reset();
-  minfo.skipped += skipped;
-  tld.reset();
-  tld.newSize += newSize;
+  barrier[6].wait();
 
-  return done.data;
+  size_t id = minfo.begin;
+
+  for (NewItemsIterator ii = minfo.newItems.begin(), ei = minfo.newItems.end(); ii != ei; ++ii) {
+    minfo.reserve.push(std::make_pair(ii->first, ++id));
+  }
+
+  minfo.newItems.clear();
+  tld.reset();
+
+  return outerDone.data;
 #else
   if (LL::getTID() == 0) {
     std::vector<NewItem> buf;
-    for (int i = 0; i < numActive; ++i) {
-      HIDDEN::WID wid(i);
-      while (!new_.empty(wid)) {
-        NewItem& p = new_.back(wid);
-        buf.push_back(p);
-        new_.pop_back(wid);
-      }
+    boost::optional<NewItem> p;
+    while ((p = new_.pop())) {
+      buf.push_back(*p);
     }
 
     std::sort(buf.begin(), buf.end(), LessThan());
-    typename std::vector<NewItem>::iterator uni = std::unique(buf.begin(), buf.end(), EqualTo());
-    assert(uni == buf.end());
 
     unsigned long id = 0;
-    done.data = buf.empty();
+    outerDone.data = buf.empty();
 
     printf("R %ld\n", buf.size());
 
-    HIDDEN::WID wid;
     for (typename std::vector<NewItem>::iterator ii = buf.begin(), ei = buf.end(); ii != ei; ++ii) {
-      tld.wlcur->push_back(wid, std::make_pair(ii->first, id++));
+      tld.wlnext->push(Item(ii->first, ++id));
     }
   }
 
-  barrier[2].wait();
+  barrier[5].wait();
 
-  return done.data;
+  return outerDone.data;
 #endif
 }
 
-template<class T,class FunctionTy>
-void DeterministicExecutor<T,FunctionTy>::pendingLoop(ThreadLocalData& tld)
+template<typename T,typename Function1Ty,typename Function2Ty,bool useLocalState>
+bool Executor<T,Function1Ty,Function2Ty,useLocalState>::pendingLoop(ThreadLocalData& tld)
 {
-  SimpleRuntimeContext* cnx = tld.pool.next();
-  setThreadContext(cnx);
-
-  while (!tld.wlcur->empty(tld.wid)) {
-    WorkItem& p = tld.wlcur->back(tld.wid);
-
+  SimpleRuntimeContext* cnx = nextContext();
+  MergeInfo& minfo = mergeInfo.get();
+  bool retval = false;
+  boost::optional<Item> p;
+  while ((p = tld.wlcur->pop())) {
+    ++minfo.iterations;
     bool commit = true;
-    cnx->setId(p.second);
+    cnx->set_id(p->id);
     cnx->start_iteration();
     tld.stat.inc_iterations();
+    setThreadContext(cnx);
+    stateManager.alloc(tld.facing, &function1);
     try {
-      function(p.first, tld.facing.data());
+      function1(p->item, tld.facing.data());
     } catch (ConflictFlag i) {
+      clearConflictLock();
+      stateManager.dealloc(tld.facing);
       switch (i) {
         case CONFLICT: commit = false; break;
         case REACHED_FAILSAFE: break;
@@ -478,85 +635,135 @@ void DeterministicExecutor<T,FunctionTy>::pendingLoop(ThreadLocalData& tld)
       }
     }
 
-    if (ForEachTraits<FunctionTy>::NeedsPIA)
+    if (ForEachTraits<Function1Ty>::NeedsPIA && !useLocalState)
       tld.facing.resetAlloc();
 
     if (commit) {
-      pending.push_back(tld.wid, std::make_pair(p, cnx));
-    } else if (ForEachTraits<FunctionTy>::NeedsPush) {
-      new_.push_back(tld.wid, std::make_pair(p.first, std::make_pair(p.second, 0)));
-      ++tld.newSize;
-      tld.stat.inc_conflicts();
+      p->cnx = cnx;
+      if (useLocalState) {
+        stateManager.save(tld.facing, p->localState);
+        tld.localPending.push(*p);
+      } else {
+        pending.push(*p);
+      }
     } else {
-      tld.wlnext->push_back(tld.wid, p);
+      tld.wlnext->push(*p);
       tld.stat.inc_conflicts();
+      retval = true;
     }
 
-    cnx = tld.pool.next();
-    setThreadContext(cnx);
-    tld.wlcur->pop_back(tld.wid);
+    cnx = nextContext();
   }
+
+  return retval;
 }
 
-template<class T,class FunctionTy>
-void DeterministicExecutor<T,FunctionTy>::commitLoop(ThreadLocalData& tld) 
+template<typename T,typename Function1Ty,typename Function2Ty,bool useLocalState>
+bool Executor<T,Function1Ty,Function2Ty,useLocalState>::commitLoop(ThreadLocalData& tld) 
 {
+  bool retval = false;
   MergeInfo& minfo = mergeInfo.get();
+  boost::optional<Item> p;
 
-  while (!pending.empty(tld.wid)) {
-    PendingItem& p = pending.back(tld.wid);
+  while ((p = (useLocalState) ? tld.localPending.pop() : pending.pop())) {
     bool commit = true;
-    try {
-      setThreadContext(p.second);
-      function(p.first.first, tld.facing.data());
-    } catch (ConflictFlag i) {
-      switch (i) {
-        case CONFLICT: commit = false; break;
-        default: assert(0 && "Unknown exception"); abort(); break;
+    if (useLocalState && !p->cnx->is_ready())
+      commit = false;
+
+    if (commit) {
+      try {
+        setThreadContext(p->cnx);
+        stateManager.restore(tld.facing, p->localState);
+        function2(p->item, tld.facing.data());
+      } catch (ConflictFlag i) {
+        clearConflictLock();
+        switch (i) {
+          case CONFLICT: commit = false; break;
+          default: assert(0 && "Unknown exception"); abort(); break;
+        }
       }
     }
+
+    stateManager.dealloc(tld.facing);
     
     if (commit) {
       ++minfo.committed;
-      unsigned long parent = p.first.second;
-      typedef typename GaloisRuntime::UserContextAccess<value_type>::pushBufferTy::iterator iterator;
-      if (ForEachTraits<FunctionTy>::NeedsPush) {
+      if (ForEachTraits<Function2Ty>::NeedsPush) {
+        unsigned long parent = p->id;
+        typedef typename UserContextAccess<value_type>::pushBufferTy::iterator iterator;
         unsigned count = 0;
         for (iterator ii = tld.facing.getPushBuffer().begin(), 
             ei = tld.facing.getPushBuffer().end(); ii != ei; ++ii) {
-          new_.push_back(tld.wid, std::make_pair(*ii, std::make_pair(parent, ++count)));
+          new_.push(std::make_pair(*ii, std::make_pair(parent, ++count)));
           ++tld.newSize;
-          ++minfo.newItems;
           if (count == 0) {
             assert(0 && "Counter overflow");
             abort();
           }
         }
       }
-      assert(ForEachTraits<FunctionTy>::NeedsPush
+      assert(ForEachTraits<Function2Ty>::NeedsPush
           || tld.facing.getPushBuffer().begin() == tld.facing.getPushBuffer().end());
-    } else if (ForEachTraits<FunctionTy>::NeedsPush) {
-      new_.push_back(tld.wid, std::make_pair(p.first.first, std::make_pair(p.first.second, 0)));
-      ++tld.newSize;
-      tld.stat.inc_conflicts();
     } else {
-      tld.wlnext->push_back(tld.wid, p.first);
+      p->cnx = NULL;
+      //if (useLocalState) p->localState = NULL;
+      tld.wlnext->push(*p);
       tld.stat.inc_conflicts();
+      retval = true;
     }
 
-    if (ForEachTraits<FunctionTy>::NeedsPIA)
+    if (ForEachTraits<Function2Ty>::NeedsPIA && !useLocalState)
       tld.facing.resetAlloc();
 
     tld.facing.resetPushBuffer();
-
-    pending.pop_back(tld.wid);
   }
 
+  if (ForEachTraits<Function2Ty>::NeedsPIA && useLocalState)
+    tld.facing.resetAlloc();
+
   setThreadContext(0);
+  return retval;
 }
 
 }
+}
 
+namespace Galois {
+template<typename InitTy, typename WorkTy>
+static inline void for_each_det_impl(InitTy& init, WorkTy& W) {
+  using namespace GaloisRuntime;
+
+  assert(!inGaloisForEach);
+
+  inGaloisForEach = true;
+  RunCommand w[4] = {Config::ref(init), 
+		     Config::ref(getSystemBarrier()),
+		     Config::ref(W),
+		     Config::ref(getSystemBarrier())};
+  getSystemThreadPool().run(&w[0], &w[4]);
+  runAllLoopExitHandlers();
+  inGaloisForEach = false;
+}
+
+template<bool useLocalState,typename IterTy, typename Function1Ty, typename Function2Ty>
+static inline void for_each_det(IterTy b, IterTy e, Function1Ty f1, Function2Ty f2, const char* loopname = 0) {
+  using namespace GaloisRuntime;
+
+  const bool S = useLocalState && Deterministic::has_local_state<Function1Ty>::value;
+  typedef typename std::iterator_traits<IterTy>::value_type T;
+  typedef Deterministic::Executor<T,Function1Ty,Function2Ty,S> WorkTy;
+
+  WorkTy W(f1, f2, loopname);
+  Initializer<IterTy, WorkTy> init(b, e, W);
+
+  for_each_det_impl(init, W);
+}
+
+template<bool useLocalState,typename IterTy, typename FunctionTy>
+static inline void for_each_det(IterTy b, IterTy e, FunctionTy f, const char* loopname = 0) {
+  Galois::for_each_det<useLocalState>(b, e, f, f, loopname);
+}
+}
 #endif
 
 #endif

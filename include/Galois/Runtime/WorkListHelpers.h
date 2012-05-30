@@ -104,6 +104,13 @@ public:
     return b;
   }
 
+  value_type* peek_front() {
+    if (!empty()) {
+      return at(start);
+    }
+    return NULL;
+  }
+
   boost::optional<value_type> pop_front() {
     boost::optional<value_type> retval;
     if (!empty()) {
@@ -115,6 +122,14 @@ public:
     return retval;
   }
   
+  value_type* peek_back() {
+    if (!empty()) {
+      int end = (start + count - 1) % chunksize;
+      return at(end);
+    }
+    return NULL;
+  }
+
   boost::optional<value_type> pop_back() {
     boost::optional<value_type> retval;
     if (!empty()) {
@@ -132,7 +147,6 @@ class ConExtLinkedStack {
   LL::PtrLock<T, concurrent> head;
   
 public:
-  
   class ListNode {
     T* NextPtr;
   public:

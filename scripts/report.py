@@ -37,13 +37,7 @@ def main(options):
   row.r = collections.defaultdict(str)
 
   def add_stat(key, value):
-    try:
-      if row.r[key]:
-        row.r[key] = int(row.r[key]) + int(value)
-      else:
-        row.r[key] = value
-    except ValueError:
-      row.r[key] = value
+    row.r[key] = value
     cols.add(key)
   def add_stat_l(key, value, loop):
     add_stat(key, value)

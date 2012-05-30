@@ -31,57 +31,28 @@
 
 class Point;
 
-class ElementMark {
-  std::pair<long,unsigned> val;
-public:
-  ElementMark(): val(0, 0) { }
-  ElementMark(const ElementMark& x): val(x.val) { }
-  ElementMark(unsigned hi, unsigned lo): val(hi, lo) { }
-
-  void update(const ElementMark& m) {
-    val = m.val;
-  }
-
-  bool operator==(const ElementMark& m) const {
-    return val == m.val;
-  }
-
-  bool operator!=(const ElementMark& m) const {
-    return val != m.val;
-  }
-};
-
-
 class Element {
   Point* points[3];
-  ElementMark mark;
   bool m_boundary;
   
 public:
-  Element(const Element& e): mark(e.mark), m_boundary(e.m_boundary) {
+  Element(const Element& e): m_boundary(e.m_boundary) {
     points[0] = e.points[0];
     points[1] = e.points[1];
     points[2] = e.points[2];
   }
 
-  Element(Point* a, Point* b, Point* c):
-    m_boundary(false)
-  {
+  Element(Point* a, Point* b, Point* c): m_boundary(false) {
     points[0] = a;
     points[1] = b;
     points[2] = c;
   }
 
-  Element(Point* a, Point* b):
-    m_boundary(true)
-  {
+  Element(Point* a, Point* b): m_boundary(true) {
     points[0] = a;
     points[1] = b;
   }
   
-  ElementMark& getMark() { return mark; }
-  const ElementMark& getMark() const { return mark; }
-
   Point* getPoint(int i) { return points[i]; }
   const Point* getPoint(int i) const { return points[i]; }
 

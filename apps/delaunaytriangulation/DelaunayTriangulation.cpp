@@ -25,7 +25,6 @@
  * @author Xin Sui <xinsui@cs.utexas.edu>
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-
 #include "Point.h"
 #include "Cavity.h"
 #include "QuadTree.h"
@@ -50,10 +49,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#ifdef GALOIS_DET
-#include "Galois/Runtime/Deterministic.h"
-#endif
-
 namespace cll = llvm::cl;
 
 static const char* name = "Delaunay Triangulation";
@@ -65,6 +60,22 @@ static cll::opt<std::string> doWriteMesh("writemesh",
     cll::value_desc("basename"));
 static cll::opt<std::string> inputname(cll::Positional, cll::desc("<input file>"), cll::Required);
 
+enum DetAlgo {
+  nondet,
+  detBase,
+  detPrefix,
+  detDisjoint
+};
+
+#ifdef GALOIS_DET
+static cll::opt<DetAlgo> detAlgo(cll::desc("Deterministic algorithm:"),
+    cll::values(
+      clEnumVal(nondet, "Non-deterministic"),
+      clEnumVal(detBase, "Base execution"),
+      clEnumVal(detPrefix, "Prefix execution"),
+      clEnumVal(detDisjoint, "Disjoint execution"),
+      clEnumValEnd), cll::init(detBase));
+#endif
 typedef std::vector<Point> PointList;
 
 Graph* graph;
@@ -74,6 +85,7 @@ struct GetPointer: public std::unary_function<Point,Point*> {
 };
 
 //! Our main functor
+template<int Version=detBase>
 struct Process {
   typedef int tt_needs_per_iter_alloc;
   typedef int tt_does_not_need_parallel_push;
@@ -91,21 +103,6 @@ struct Process {
   };
 
   Process(QuadTree* t): tree(t) { }
-
-  template<typename Alloc2>
-  bool graphSearch(const Point* p, const Alloc2& alloc, GNode start, GNode& node) {
-    ContainsTuple contains(*graph, p->t());
-    Searcher<Alloc2> searcher(*graph, alloc);
-    searcher.useMark(p->id(), 0, p->numTries());
-    searcher.findFirst(start, contains);
-
-    if (searcher.matches.empty()) {
-      return false;
-    }
-
-    node = searcher.matches.front();
-    return true;
-  }
 
   void computeCenter(const Element& e, Tuple& t) const {
     for (int i = 0; i < 3; ++i) {
@@ -186,8 +183,7 @@ struct Process {
     return true;
   }
 
-  template<typename Alloc2>
-  bool findContainingElement(const Point* p, const Alloc2& alloc, GNode& node) {
+  bool findContainingElement(const Point* p, GNode& node) {
     Point* result;
     if (!tree->find(p, result)) {
       return false;
@@ -197,26 +193,41 @@ struct Process {
 
     GNode someNode = result->someElement();
 
+    // Not in mesh yet
     if (!someNode) {
-      // Not in mesh yet
       return false;
     }
 
-#if 0
-    return graphSearch(p, alloc, someNode, node);
-#else
     return planarSearch(p, someNode, node);
-#endif
   }
+
+  struct LocalState {
+    Cavity<Alloc> cav;
+    LocalState(Process<Version>* self, Galois::PerIterAllocTy& alloc): cav(*graph, alloc) { }
+  };
 
   //! Parallel operator
   void operator()(Point* p, Galois::UserContext<Point*>& ctx) {
+    Cavity<Alloc>* cavp = NULL;
+
+#ifdef GALOIS_DET
+    if (Version == detDisjoint) {
+      bool used;
+      LocalState* localState = (LocalState*) ctx.getLocalState(used);
+      if (used) {
+        localState->cav.update();
+        return;
+      } else {
+        cavp = &localState->cav;
+      }
+    }
+#endif
+
     p->acquire();
-    p->nextTry();
     assert(!p->inMesh());
 
     GNode node;
-    if (!findContainingElement(p, ctx.getPerIterAlloc(), node)) {
+    if (!findContainingElement(p, node)) {
       // Someone updated an element while we were searching, producing
       // a semi-consistent state
       //ctx.push(p);
@@ -229,20 +240,26 @@ struct Process {
     assert(graph->getData(node).inTriangle(p->t()));
     assert(graph->containsNode(node));
 
-    Cavity<Alloc> cav(*graph, ctx.getPerIterAlloc());
-    cav.init(node, p);
-    cav.build();
-    cav.update();
+    if (Version == detDisjoint) {
+      cavp->init(node, p);
+      cavp->build();
+    } else {
+      Cavity<Alloc> cav(*graph, ctx.getPerIterAlloc());
+      cav.init(node, p);
+      cav.build();
+      if (Version == detPrefix)
+        return;
+      cav.update();
+    }
   }
 
   //! Serial operator
   void operator()(Point* p) {
     p->acquire();
-    p->nextTry();
     assert(!p->inMesh());
 
     GNode node;
-    if (!findContainingElement(p, std::allocator<char>(), node)) {
+    if (!findContainingElement(p, node)) {
       std::cerr << "Couldn't find triangle containing point\n";
       abort();
       return;
@@ -482,8 +499,8 @@ static void generateMesh(PointList& points) {
   size_t eend = end - 3; // end of "real" points
 
   // Random order is the best algorithmically
-  Galois::StatTimer T("build");
-  T.start();
+  Galois::StatTimer BT("build");
+  BT.start();
   typedef std::vector<Point*> OrderTy;
   OrderTy order;
   order.reserve(end);
@@ -494,44 +511,55 @@ static void generateMesh(PointList& points) {
   ptrdiff_t (*myptr)(ptrdiff_t) = myrandom;
   srand(0xDEADBEEF);
   std::random_shuffle(&order[0], &order[eend], myptr);
-  T.stop();
+  BT.stop();
 
 #ifdef GALOIS_DET
-  size_t prefix = eend - std::min((size_t) 16*16, eend);
+  size_t prologue = eend - std::min((size_t) 16*16, eend);
 #else
-  size_t prefix = eend - std::min((size_t) 16*numThreads, eend);
+  size_t prologue = eend - std::min((size_t) 16*numThreads, eend);
 #endif
  
   Galois::StatTimer T1("serial");
   T1.start();
   QuadTree q(&order[eend], &order[end]);
-  std::for_each(&order[prefix], &order[eend], Process(&q));
+  std::for_each(&order[prologue], &order[eend], Process<>(&q));
   T1.stop();
 
   const int multiplier = 8;
   size_t nextStep = multiplier;
-  size_t top = prefix;
+  size_t top = prologue;
   size_t prevTop = end;
 
   using namespace GaloisRuntime::WorkList;
   typedef GaloisRuntime::WorkList::dChunkedLIFO<32> WL;
 
   do {
-    Galois::StatTimer T("build");
-    T.start();
+    Galois::StatTimer BT("build");
+    BT.start();
     //QuadTree q(&order[top], &order[prevTop]);
     QuadTree q(&order[top], &order[end]);
     prevTop = top;
     top = top > nextStep ? top - nextStep : 0;
     nextStep = nextStep*multiplier; //std::min(nextStep*multiplier, 1000000UL);
-    T.stop();
+    BT.stop();
 
     Galois::StatTimer PT("ParallelTime");
     PT.start();
 #ifdef GALOIS_DET
-    Galois::for_each<Deterministic<> >(&order[top], &order[prevTop], Process(&q));
+    switch (detAlgo) {
+      case nondet: 
+        Galois::for_each<WL>(&order[top], &order[prevTop], Process<>(&q)); break;
+      case detBase:
+        Galois::for_each_det<false>(&order[top], &order[prevTop], Process<>(&q)); break;
+      case detPrefix:
+        Galois::for_each_det<false>(&order[top], &order[prevTop], Process<detPrefix>(&q), Process<>(&q));
+        break;
+      case detDisjoint:
+        Galois::for_each_det<true>(&order[top], &order[prevTop], Process<detDisjoint>(&q)); break;
+      default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
+    }
 #else
-    Galois::for_each<WL>(&order[top], &order[prevTop], Process(&q));
+    Galois::for_each<WL>(&order[top], &order[prevTop], Process<>(&q));
 #endif
     PT.stop();
   } while (top > 0);

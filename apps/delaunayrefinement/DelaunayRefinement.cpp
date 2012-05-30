@@ -135,6 +135,8 @@ struct LessThan {
   }
 };
 
+static ptrdiff_t myrandom(ptrdiff_t i) { return rand() % i; }
+
 int main(int argc, char** argv) {
   LonestarStart(argc, argv, std::cout, name, desc, url);
 
@@ -165,6 +167,9 @@ int main(int argc, char** argv) {
   std::vector<GNode> wlnew;
   std::copy(wl.begin(), wl.end(), std::back_inserter(wlnew));
   std::sort(wlnew.begin(), wlnew.end(), LessThan());
+  ptrdiff_t (*myptr)(ptrdiff_t) = myrandom;
+  srand(0xDEADBEEF);
+  std::random_shuffle(wlnew.begin(), wlnew.end(), myptr);
 #else
   Galois::do_all_local(*mesh, Preprocess());
   //Galois::do_all(mesh->tile_begin(), mesh->tile_end(), Preprocess());

@@ -34,10 +34,6 @@
 #include <vector>
 #include <deque>
 
-#ifdef GALOIS_DET
-#include <set>
-#endif
-
 typedef Galois::Graph::FirstGraph<Element,int,true> Graph;
 typedef Graph::GraphNode GNode;
 
@@ -47,18 +43,37 @@ struct Searcher: private boost::noncopyable {
   typedef Alloc allocator_type;
   typedef std::vector<GNode, Alloc> GNodeVector;
 
+#if 1
+  struct Marker {
+    std::vector<GNode,Alloc> seen;
+    Marker(Graph&, const Alloc& a): seen(a) { }
+    void mark(GNode n) { 
+      seen.push_back(n);
+    }
+    bool hasMark(GNode n) { 
+      return std::find(seen.begin(), seen.end(), n) != seen.end();
+    }
+  };
+#else
+  struct Marker {
+    Graph& graph;
+    ElementMark m;
+    Marker(Graph& g, const Alloc&, const ElementMark& _m): graph(g), m(_m) { }
+    void mark(GNode n) { 
+      graph.getData(n, Galois::NONE).getMark().update(m);
+    }
+    bool hasMark(GNode n) { 
+      return graph.getData(n, Galois::NONE).getMark() == m;
+    }
+  };
+#endif
+
   Graph& graph;
   GNodeVector matches, inside;
   const allocator_type& alloc;
-  ElementMark mark;
 
   Searcher(Graph& g, const Alloc& a = allocator_type()): 
     graph(g), matches(a), inside(a), alloc(a) { }
-
-  void useMark(long id, unsigned numSearch, unsigned numTry) {
-    assert(numSearch < 2);
-    mark = ElementMark(id + 1, (numTry << 1) | numSearch);
-  }
 
   struct DetLess: public std::binary_function<GNode,GNode,bool> {
     Graph& g;
@@ -80,11 +95,7 @@ struct Searcher: private boost::noncopyable {
   };
   
   void removeDupes(GNodeVector& v) {
-#ifdef GALOIS_DET
     std::sort(v.begin(), v.end(), DetLess(graph));
-#else
-    std::sort(v.begin(), v.end(), std::less<GNode>());
-#endif
     typename GNodeVector::iterator end = std::unique(v.begin(), v.end());
     v.resize(end - v.begin());
   }
@@ -97,9 +108,7 @@ struct Searcher: private boost::noncopyable {
     WorklistTy wl(alloc);
     wl.push_back(std::make_pair(start, SomeGNode()));
 
-#ifdef GALOIS_DET
-    std::set<GNode> seen;
-#endif
+    Marker marker(graph, alloc);
     while (!wl.empty()) {
       GNode cur = wl.front().first;
       SomeGNode prev = wl.front().second;
@@ -109,34 +118,19 @@ struct Searcher: private boost::noncopyable {
       if (!graph.containsNode(cur, Galois::CHECK_CONFLICT))
         continue;
 
-#ifdef GALOIS_DET
-      if (seen.find(cur) != seen.end())
+      if (marker.hasMark(cur))
         continue;
-#else
-      if (graph.getData(cur, Galois::NONE).getMark() == mark)
-        continue;
-#endif
 
-      if (!all) {
-        // NB(ddn): Technically this makes DelaunayTriangulation.cpp::Process not cautious
-#ifdef GALOIS_DET
-        seen.insert(cur);
-#else
-        graph.getData(cur, Galois::NONE).getMark().update(mark); // XXX
-#endif
-      }
+      // NB(ddn): Technically this makes DelaunayTriangulation.cpp::Process not cautious
+      if (!all)
+        marker.mark(cur);
 
       bool matched = false;
       if (pred(cur)) {
         matched = true;
         matches.push_back(cur);
         if (all) {
-          // NB(ddn): Ditto
-#ifdef GALOIS_DET
-          seen.insert(cur);
-#else
-          graph.getData(cur, Galois::CHECK_CONFLICT).getMark().update(mark);
-#endif
+          marker.mark(cur);
         }
         else
           break; // Found it
@@ -166,14 +160,12 @@ struct Searcher: private boost::noncopyable {
   //! Find the first occurance of element matching pred
   template<typename Pred>
   void findFirst(const GNode& start, const Pred& p) {
-    assert(mark != ElementMark());
     find_(start, p, false);
   }
   
   //! Find all the elements matching pred (assuming monotonic predicate)
   template<typename Pred>
   void findAll(const GNode& start, const Pred& p) {
-    assert(mark != ElementMark());
     find_(start, p, true);
     return;
   }

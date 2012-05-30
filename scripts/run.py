@@ -110,13 +110,16 @@ def main(args, options):
           diff = (now-start).seconds
           if diff > options.timeout:
             os.kill(process.pid, signal.SIGKILL)
-            os.waitpid(-1, os.WNOHANG)
+            #os.waitpid(-1, os.WNOHANG)
+            os.waitpid(-1, 0)
             print("RUN: Variable Timeout = %d\n" % (diff*1000))
             break
         retcode = process.returncode
       else:
         retcode = subprocess.call(cmd)
+      sys.stdout.flush()
       if retcode != 0:
+        # print command line just in case child process should be died before doing it
         print("INFO: CommandLine %s\n" % ' '.join(cmd))
         print("RUN: Error command: %s\n" % cmd)
         if not options.ignoreerrors:
@@ -125,6 +128,7 @@ def main(args, options):
 
 if __name__ == '__main__':
   signal.signal(signal.SIGQUIT, signal.SIG_IGN)
+  sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
   parser = optparse.OptionParser(usage='usage: %prog [options] <command line> ...')
   parser.add_option('--ignore-errors', dest='ignoreerrors', default=False, action='store_true',
       help='ignore errors in subprocesses')

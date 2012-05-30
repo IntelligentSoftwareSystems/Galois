@@ -96,8 +96,8 @@ template<typename Iter>
 void fill_work(Iter& b, Iter& e) {
   unsigned int a = ThreadPool::getActiveThreads();
   unsigned int id = LL::getTID();
-  unsigned dist = std::distance(b, e);
-  unsigned num = (dist + a - 1) / a; //round up
+  unsigned int dist = std::distance(b, e);
+  unsigned int num = (dist + a - 1) / a; //round up
   unsigned int A = std::min(num * id, dist);
   unsigned int B = std::min(num * (id + 1), dist);
   e = b;
@@ -502,17 +502,6 @@ class ChunkedMaster : private boost::noncopyable {
     Chunk* r = popChunkByID(id);
     if (r)
       return r;
-    
-    // int mp = LL::getMaxPackageForThread(ThreadPool::getActiveThreads() - 1);
-    // for (int i = 0; i < Q.size(); ++i) {
-    //   ++id;
-    //   id %= Q.size();
-    //   if (id <= mp) {
-    // 	r = popChunkByID(id);
-    // 	if (r)
-    // 	  return r;
-    //   }
-    // }
 
     for (int i = id + 1; i < (int) Q.size(); ++i) {
       r = popChunkByID(i);
@@ -548,6 +537,35 @@ public:
     if (n.next)
       pushChunk(n.next);
     n.next = 0;
+  }
+
+  //! Method to peek at next element, unsafe in the presence of concurrent pop()
+  value_type* unsafePeek() {
+    p& n = *data.getLocal();
+    value_type* retval;
+    if (isStack) {
+      if (n.next && (retval = n.next->peek_back()))
+	return retval;
+      if (n.next)
+	delChunk(n.next);
+      n.next = popChunk();
+      if (n.next)
+	return n.next->peek_back();
+      return NULL;
+    } else {
+      if (n.cur && (retval = n.cur->peek_front()))
+	return retval;
+      if (n.cur)
+	delChunk(n.cur);
+      n.cur = popChunk();
+      if (!n.cur) {
+	n.cur = n.next;
+	n.next = 0;
+      }
+      if (n.cur)
+	return n.cur->peek_front();
+      return NULL;
+    }
   }
   
   void push(const value_type& val)  {
@@ -932,7 +950,7 @@ public:
 
   template<typename ItTy>
   void push_initial(ItTy b, ItTy e) {
-    fill_work(*this,b,e);
+    fill_work(*this, b, e);
     for (unsigned int x = 0; x < pushBuffer.size(); ++x)
       pushBuffer.get(x).flush();
   }
@@ -1032,12 +1050,6 @@ class BulkSynchronous : private boost::noncopyable {
   }
 };
 WLCOMPILECHECK(BulkSynchronous);
-
-#ifdef GALOIS_DET
-template<class T=int>
-class Deterministic : private boost::noncopyable {
-};
-#endif
 
 //End namespace
 

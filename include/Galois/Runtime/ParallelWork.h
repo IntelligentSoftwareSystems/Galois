@@ -271,14 +271,10 @@ protected:
   }
 
 public:
-  ForEachWork(FunctionTy& _f, const char* _ln)
-    : wl(default_wl), function(_f), loopname(_ln)
-  {}
+  ForEachWork(FunctionTy& f, const char* l): wl(default_wl), function(f), loopname(l) { }
 
   template<typename W>
-  ForEachWork(W& _wl, FunctionTy& _f, const char* _ln):
-    wl(_wl), function(_f), loopname(_ln) 
-  {}
+  ForEachWork(W& w, FunctionTy& f, const char* l): wl(w), function(f), loopname(l) { }
 
   template<typename Iter>
   void AddInitialWork(Iter b, Iter e) {

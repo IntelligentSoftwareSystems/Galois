@@ -29,9 +29,9 @@
 #include "Galois/Runtime/LocalIterator.h"
 
 #ifdef GALOIS_EXP
-#include "Galois/Runtime/SimpleTaskPool.h"
 #include "Galois/Runtime/ParallelWorkInline.h"
 #include "Galois/Runtime/ParaMeter.h"
+#include "Galois/Runtime/Deterministic.h"
 #endif
 
 #include "boost/iterator/transform_iterator.hpp"
@@ -44,29 +44,29 @@ namespace Galois {
 
 
 //Iterator based versions
-template<typename WLTy, typename IterTy, typename Function>
-static inline void for_each(IterTy b, IterTy e, Function f, const char* loopname = 0) {
+template<typename WLTy, typename IterTy, typename FunctionTy>
+static inline void for_each(IterTy b, IterTy e, FunctionTy f, const char* loopname = 0) {
   GaloisRuntime::for_each_impl<WLTy>(b, e, f, loopname);
 }
 
-template<typename IterTy, typename Function>
-static inline void for_each(IterTy b, IterTy e, Function f, const char* loopname = 0) {
+template<typename IterTy, typename FunctionTy>
+static inline void for_each(IterTy b, IterTy e, FunctionTy f, const char* loopname = 0) {
   typedef GaloisRuntime::WorkList::dChunkedFIFO<256> WLTy;
-  Galois::for_each<WLTy, IterTy, Function>(b, e, f, loopname);
+  Galois::for_each<WLTy, IterTy, FunctionTy>(b, e, f, loopname);
 }
 
 //Single initial item versions
-template<typename WLTy, typename InitItemTy, typename Function>
-static inline void for_each(InitItemTy i, Function f, const char* loopname = 0) {
+template<typename WLTy, typename InitItemTy, typename FunctionTy>
+static inline void for_each(InitItemTy i, FunctionTy f, const char* loopname = 0) {
   InitItemTy wl[1];
   wl[0] = i;
   Galois::for_each<WLTy>(&wl[0], &wl[1], f, loopname);
 }
 
-template<typename InitItemTy, typename Function>
-static inline void for_each(InitItemTy i, Function f, const char* loopname = 0) {
+template<typename InitItemTy, typename FunctionTy>
+static inline void for_each(InitItemTy i, FunctionTy f, const char* loopname = 0) {
   typedef GaloisRuntime::WorkList::ChunkedFIFO<256> WLTy;
-  Galois::for_each<WLTy, InitItemTy, Function>(i, f, loopname);
+  Galois::for_each<WLTy, InitItemTy, FunctionTy>(i, f, loopname);
 }
 //Local based versions
 template<typename WLTy, typename ConTy, typename Function>
@@ -107,7 +107,7 @@ static inline void do_all_dispatch(const IterTy& begin, const IterTy& end, const
 template<typename IterTy,typename FunctionTy>
 static inline void do_all(const IterTy& begin, const IterTy& end, const FunctionTy& fn, const char* loopname = 0) {
   if (GaloisRuntime::inGaloisForEach) {
-#ifdef GALOIS_EXP
+#if 0
     GaloisRuntime::TaskContext<IterTy,FunctionTy> ctx;
     GaloisRuntime::SimpleTaskPool& pool = GaloisRuntime::getSystemTaskPool();
     pool.enqueue(ctx, begin, end, fn);
@@ -142,7 +142,6 @@ static inline void on_each(FunctionTy fn, const char* loopname = 0) {
   GaloisRuntime::on_each_impl(fn, loopname);
 }
 
-
 ////////////////////////////////////////////////////////////////////////////////
 // PreAlloc
 ////////////////////////////////////////////////////////////////////////////////
@@ -173,7 +172,7 @@ ptrdiff_t count_if(InputIterator first, InputIterator last, Predicate pred)
   GaloisRuntime::PerCPU<ptrdiff_t> v;
   count_if_helper<Predicate, T> c(pred, v);
   ptrdiff_t ret = 0;
-  do_all(first, last, c);
+  Galois::do_all(first, last, c);
   for (unsigned i = 0; i < v.size(); ++i)
     ret += v.get(i);
   return ret;

@@ -135,12 +135,12 @@ public:
 
 class ThreadPool_pthread : public ThreadPool {
   // Instantiate pthread;
-#ifndef GALOIS_DRF
-  typedef SemSemaphore Semaphore;
-  typedef AtomicThinBarrier ThinBarrier;
-#else
+#ifdef GALOIS_DRF
   typedef PthreadSemaphore Semaphore;
   typedef PthreadSemaphore ThinBarrier;
+#else
+  typedef SemSemaphore Semaphore;
+  typedef AtomicThinBarrier ThinBarrier;
 #endif
 
   pthread_t* threads; // set of threads

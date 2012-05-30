@@ -197,8 +197,8 @@ class ForEachWork<WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
           function(*item, it.facing.data ());
 
         } catch (ConflictFlag flag) {
-
           switch (flag) {
+            clearConflictLock();
             case GaloisRuntime::CONFLICT:
               doabort = true;
               break;
@@ -297,7 +297,6 @@ class ForEachWork<WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
   }
 
   unsigned abortIteration(IterationContext& it, value_type& item) {
-    clearConflictLock();
     workList.getNext().push(item);
     return retireIteration(it, true);
   }
