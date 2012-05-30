@@ -81,7 +81,8 @@ public:
 
   //Optional, but this is the likely interface for stealing
   //! steal from a similar worklist
-  void steal(AbstractWorkList& victim);
+  boost::optional<value_type> steal(AbstractWorkList& victim, bool half, bool pop);
+
 
   //! pop a value from the queue.
   boost::optional<value_type> pop();
@@ -152,14 +153,30 @@ public:
       push(b,e);
   }
 
-  void steal(LIFO& victim) {
-    if (&victim == this) return;
-    if (!LL::TryLockPairOrdered(*this, victim))
-      return;
-    typename std::deque<T>::iterator split = Galois::split_range(victim.wl.begin(), victim.wl.end());
-    wl.insert(wl.end(), victim.wl.begin(), split);
-    victim.wl.erase(victim.wl.begin(), split);
+  boost::optional<value_type> steal(LIFO& victim, bool half, bool pop) {
+    boost::optional<value_type> retval;
+    //guard against self stealing
+    if (&victim == this) return retval;
+    //Ordered lock to preent deadlock
+    if (!LL::TryLockPairOrdered(*this, victim)) return retval;
+    if (half) {
+      typename std::deque<T>::iterator split = Galois::split_range(victim.wl.begin(), victim.wl.end());
+      wl.insert(wl.end(), victim.wl.begin(), split);
+      victim.wl.erase(victim.wl.begin(), split);
+    } else {
+      if (wl.empty()) {
+	wl.swap(victim.wl);
+      } else {
+	wl.insert(wl.end(), victim.wl.begin(), victim.wl.end());
+	victim.wl.clear();
+      }
+    }
+    if (pop && !wl.empty()) {
+      retval = wl.back();
+      wl.pop_back();
+    }
     UnLockPairOrdered(*this, victim);
+    return retval;
   }
 
   boost::optional<value_type> pop()  {
@@ -767,6 +784,112 @@ public:
   }
 };
 WLCOMPILECHECK(RandomAccessRange);
+
+//FIXME: make this more typed
+template<typename IterTy = int*>
+class LocalAccessRange {
+  //! Thread-local data
+  struct TLD {
+    IterTy begin;
+    IterTy end;
+  };
+
+  PerThreadStorage<TLD> tlds;
+  
+public:
+
+  //! T is the value type of the WL
+  typedef typename std::iterator_traits<IterTy>::value_type value_type;
+
+  template<bool newconcurrent>
+  struct rethread {
+    typedef LocalAccessRange<IterTy> WL;
+  };
+
+  template<typename Tnew>
+  struct retype {
+    typedef LocalAccessRange<IterTy> WL;
+  };
+
+  //! push a value onto the queue
+  void push(const value_type& val) {
+    abort();
+  }
+
+  //! push a range onto the queue
+  template<typename Iter>
+  void push(Iter b, Iter e) {
+    if (b == e)
+      return;
+    abort();
+  }
+
+  //stagger each thread's start item
+  template<typename LocalTy>
+  void push_initial(LocalTy b, LocalTy e) {
+    TLD& tld = *tlds.getLocal();
+    tld.begin = b.resolve();
+    tld.end = e.resolve();
+  }
+
+  //! pop a value from the queue.
+  // move through range in num thread strides
+  boost::optional<value_type> pop() {
+    TLD& tld = *tlds.getLocal();
+    if (tld.begin != tld.end) {
+      boost::optional<value_type> retval = *tld.begin++;
+      assert(*retval);
+      return retval;
+    }
+    return boost::optional<value_type>();
+  }
+};
+//WLCOMPILECHECK(LocalAccessRange);
+
+//FIXME: make this more typed
+template<typename IterTy, typename WLTy>
+class LocalAccessDist {
+  WLTy w;
+  
+public:
+
+  //! T is the value type of the WL
+  typedef typename std::iterator_traits<IterTy>::value_type value_type;
+
+  template<bool newconcurrent>
+  struct rethread {
+    typedef LocalAccessDist<IterTy, typename WLTy::template rethread<newconcurrent>::WL > WL;
+  };
+
+  template<typename Tnew>
+  struct retype {
+    typedef LocalAccessDist<IterTy, typename WLTy::template retype<Tnew>::WL > WL;
+  };
+
+  //! push a value onto the queue
+  void push(const value_type& val) {
+    w.push();
+  }
+
+  //! push a range onto the queue
+  template<typename Iter>
+  void push(Iter b, Iter e) {
+    w.push(b,e);
+  }
+
+  //stagger each thread's start item
+  template<typename LocalTy>
+  void push_initial(LocalTy b, LocalTy e) {
+    w.push(b.resolve(), e.resolve());
+  }
+
+  //! pop a value from the queue.
+  // move through range in num thread strides
+  boost::optional<value_type> pop() {
+    return w.pop();
+  }
+};
+//WLCOMPILECHECK(LocalAccessDist);
 
 template<typename OwnerFn=DummyIndexer<int>, typename T = int>
 class OwnerComputesWL : private boost::noncopyable {
