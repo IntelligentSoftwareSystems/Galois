@@ -117,12 +117,12 @@ struct Preprocess {
     if (mesh->getData(item, Galois::NONE).isBad())
       wl.push(item);
   }
-  void operator()(Graph::GTile item) const {
-    for (Graph::GTile::iterator ii = item.begin(), ee = item.end();
-	 ii != ee; ++ii)
-      if (mesh->getData(*ii, Galois::NONE).isBad())
-	wl.push(*ii);
-  }
+  // void operator()(Graph::GTile item) const {
+  //   for (Graph::GTile::iterator ii = item.begin(), ee = item.end();
+  // 	 ii != ee; ++ii)
+  //     if (mesh->getData(*ii, Galois::NONE).isBad())
+  // 	wl.push(*ii);
+  // }
 };
 
 struct LessThan {
@@ -166,7 +166,8 @@ int main(int argc, char** argv) {
   std::copy(wl.begin(), wl.end(), std::back_inserter(wlnew));
   std::sort(wlnew.begin(), wlnew.end(), LessThan());
 #else
-  Galois::do_all(mesh->tile_begin(), mesh->tile_end(), Preprocess());
+  Galois::do_all_local(*mesh, Preprocess());
+  //Galois::do_all(mesh->tile_begin(), mesh->tile_end(), Preprocess());
 #endif
   std::cout << "MEMINFO MID: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
 
@@ -177,9 +178,12 @@ int main(int argc, char** argv) {
   Galois::for_each<Deterministic<> >(wlnew.begin(), wlnew.end(), Process());
 #else
   typedef LocalQueues<dChunkedLIFO<256>, ChunkedLIFO<256> > BQ;
-  typedef LoadBalanceTracker<BQ, 2048> DBQ;
-  typedef ChunkedAdaptor<false, 32> CA;
-  Galois::for_each<CA>(wl.begin(), wl.end(), Process());
+  typedef LoadBalanceTracker<BQ, 2048 > DBQ;
+  typedef ChunkedAdaptor<false,32> CA;
+
+  typedef PerThreadQueues<LIFO<> > SHP;
+  Galois::for_each_local<CA>(wl, Process());
+  //Galois::for_each<SHP>(wl.begin(), wl.end(), Process());
 #endif
   Trefine.stop();
   T.stop();
@@ -201,6 +205,7 @@ int main(int argc, char** argv) {
     }
     std::cout << "Refinement OK\n";
   }
+  GaloisRuntime::printStats();
   return 0;
 }
 

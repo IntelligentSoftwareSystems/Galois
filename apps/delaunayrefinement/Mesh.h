@@ -44,13 +44,27 @@ struct CreateNodes {
   void operator()(Element& item) {
     GNode n = lmesh->createNode(item);
     lmesh->addNode(n);
+    lmesh->getData(n, Galois::NONE).id = GaloisRuntime::LL::getTID();
   }
 };
 
-struct centerCmp {
+struct centerXCmp {
   bool operator()(const Element& lhs, const Element& rhs) const {
     //return lhs.getCenter() < rhs.getCenter();
-    return lhs.getPoint(0) < rhs.getPoint(0);
+    return lhs.getPoint(0)[0] < rhs.getPoint(0)[0];
+  }
+};
+
+struct centerYCmp {
+  bool operator()(const Element& lhs, const Element& rhs) const {
+    //return lhs.getCenter() < rhs.getCenter();
+    return lhs.getPoint(0)[1] < rhs.getPoint(0)[1];
+  }
+};
+struct centerYCmpInv {
+  bool operator()(const Element& lhs, const Element& rhs) const {
+    //return lhs.getCenter() < rhs.getCenter();
+    return rhs.getPoint(0)[1] < lhs.getPoint(0)[1];
   }
 };
 
@@ -345,8 +359,24 @@ private:
     }
   }
 
+  template<typename Iter>
+  void divide(const Iter& b, const Iter& e) {
+    if (std::distance(b,e) > 16) {
+      std::sort(b,e, centerXCmp());
+      Iter m = Galois::split_range(b,e);
+      std::sort(b,m, centerYCmpInv());
+      std::sort(m,e, centerYCmp());
+      divide(b, Galois::split_range(b,m));
+      divide(Galois::split_range(b,m), m);
+      divide(m,Galois::split_range(m,e));
+      divide(Galois::split_range(m,e), e);
+    }
+  }
+
   void makeGraph(Graph* mesh) {
-    std::sort(elements.begin(), elements.end(), centerCmp());
+    //std::sort(elements.begin(), elements.end(), centerXCmp());
+    divide(elements.begin(), elements.end());
+
 #ifdef GALOIS_DET
     std::for_each(elements.begin(), elements.end(), CreateNodes(mesh));
 #else
