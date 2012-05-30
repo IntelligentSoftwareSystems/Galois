@@ -57,4 +57,15 @@ IterTy split_range(IterTy b, IterTy e) {
   return b;
 }
 
+
+//Things in the <memory> spirit
+//Destroy a range
+template<class InputIterator>
+void uninitialized_destroy ( InputIterator first, InputIterator last )
+{
+  typedef typename std::iterator_traits<InputIterator>::value_type T;
+  for (; first!=last; ++first)
+    (&*first)->~T();
+}
+
 }
