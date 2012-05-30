@@ -2121,7 +2121,7 @@ public:
 };
 
 class LIFO_SB : private boost::noncopyable {
-  LL::PtrLock<ChunkHeader*, true> head;
+  LL::PtrLock<ChunkHeader, true> head;
 
 public:
 

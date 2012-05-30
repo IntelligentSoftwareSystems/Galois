@@ -171,16 +171,16 @@ static void makeGraph(const char* input) {
   typedef Galois::Graph::LC_CSR_Graph<Node, int> InGraph;
   typedef InGraph::GraphNode InGNode;
   InGraph in_graph;
-  Galois::Timer phase;
+  Galois::StatTimer R1T("Read1");
 
-  phase.start();
+  R1T.start();
   in_graph.structureFromFile(input);
   std::cout << "Read " << in_graph.size() << " nodes\n";
-  phase.stop();
-  GaloisRuntime::reportStatSum("Read1", phase.get());
+  R1T.stop();
   
   // TODO(ddn): Bag map
-  phase.start();
+  Galois::StatTimer R2T("Read2");
+  R2T.start();
   typedef std::pair<InGNode, double> Element;
   typedef std::vector<Element> Elements;
   typedef std::vector<Elements> Map;
@@ -203,11 +203,11 @@ static void makeGraph(const char* input) {
     }
     has_out_edges[*src] = neighbors != 0;
   }
-  phase.stop();
-  GaloisRuntime::reportStatSum("Read2", phase.get());
+  R2T.stop();
 
   // TODO(ddn): better way of making
-  phase.start();
+  Galois::StatTimer R3T("Read3");
+  R3T.start();
   unsigned int id = 0;
   std::vector<GNode> nodes(in_graph.size());
   for (Map::iterator i = in_edges.begin(), ei = in_edges.end(); i != ei; ++i) {
@@ -226,8 +226,7 @@ static void makeGraph(const char* input) {
     }
     id++;
   }
-  phase.stop();
-  GaloisRuntime::reportStatSum("Read3", phase.get());
+  R3T.stop();
 }
 
 void printTop(int topn) {
@@ -241,11 +240,10 @@ void printTop(int topn) {
 int main(int argc, char **argv) {
   LonestarStart(argc, argv, std::cout, name, desc, url);
  
-  Galois::Timer phase;
-  phase.start();
+  Galois::StatTimer RT("ReadTotal");
+  RT.start();
   makeGraph(filename.c_str());
-  phase.stop();
-  GaloisRuntime::reportStatSum("ReadTotal", phase.get());
+  RT.stop();
 
   Galois::StatTimer T;
   T.start();
