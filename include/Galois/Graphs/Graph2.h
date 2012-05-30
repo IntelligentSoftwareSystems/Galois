@@ -257,12 +257,6 @@ public:
           boost::filter_iterator<is_node,
                    typename NodeListTy::iterator> > iterator;
 
-  struct OwnerFn {
-    unsigned operator() (const GraphNode& g) {
-      return g->node;
-    }
-  };
-
   //// Node Handling ////
   
   /**
@@ -425,59 +419,20 @@ public:
 	   makeGraphNode());
   }
 
+  typedef iterator local_iterator;
 
-  //TILES are horribly unsafe right now
-
-  class GTile {
-    typename NodeListTy::gib_Tile* T;
-  public:
-    GTile(typename NodeListTy::gib_Tile* t) :T(t) {}
-    GTile() :T(0) {}
-
-    void set(typename NodeListTy::gib_Tile* t) { T = t; }
-    bool empty() { return !T; }
-
-    typedef boost::transform_iterator<makeGraphNode,
-            boost::filter_iterator<is_node,
-            typename NodeListTy::gib_Tile::iterator> > iterator;
-
-    iterator begin() {
-      return boost::make_transform_iterator(
-	     boost::make_filter_iterator(is_node(),
-	     T->begin(), T->end()), 
+  local_iterator local_begin() {
+    return boost::make_transform_iterator(
+           boost::make_filter_iterator(is_node(),
+				       nodes.local_begin(), nodes.local_end()),
 	   makeGraphNode());
-    }
-
-    iterator end() {
-      return boost::make_transform_iterator(
-	     boost::make_filter_iterator(is_node(),
-	     T->end(), T->end()), 
-	   makeGraphNode());
-    }
-  };
-
-  std::set<typename NodeListTy::gib_Tile*> m;
-  std::vector<GTile> tiles;
-
-  void makeTiles() {
-    for (typename NodeListTy::tile_iterator ii = nodes.tile_begin(),
-	   ee = nodes.tile_end(); ii != ee; ++ii)
-      if (m.find(&*ii) == m.end()) {
-	m.insert(&*ii);
-	tiles.push_back(GTile(&*ii));
-      }
   }
 
-  typedef typename std::vector<GTile>::iterator tile_iterator;
-
-  tile_iterator tile_begin() {
-    makeTiles();
-    return tiles.begin();
-  }
-
-  tile_iterator tile_end() {
-    makeTiles();
-    return tiles.end();
+  local_iterator local_end() {
+    return boost::make_transform_iterator(
+           boost::make_filter_iterator(is_node(),
+				       nodes.local_end(), nodes.local_end()), 
+	   makeGraphNode());
   }
 
   /**
@@ -518,6 +473,14 @@ public:
 #endif
 };
 
+}
+}
+namespace GaloisRuntime {
+namespace WorkList {
+template<typename T>
+unsigned getID(const T& v) {
+  return v->data.id;
+}
 }
 }
 #endif
