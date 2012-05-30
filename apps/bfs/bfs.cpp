@@ -38,6 +38,13 @@
 #include "llvm/ADT/SmallVector.h"
 #include "Lonestar/BoilerPlate.h"
 
+#ifdef GALOIS_TBB
+#include "tbb/parallel_for_each.h"
+#include "tbb/cache_aligned_allocator.h"
+#include "tbb/concurrent_vector.h"
+#include "tbb/task_scheduler_init.h"
+#endif
+
 #include <string>
 #include <sstream>
 #include <limits>
@@ -68,6 +75,7 @@ enum BFSAlgo {
   parallelBarrierCas,
   parallelBarrier,
   parallelBarrierInline,
+  parallelTBB
 };
 
 namespace cll = llvm::cl;
@@ -96,6 +104,9 @@ static cll::opt<BFSAlgo> algo(cll::desc("Choose an algorithm:"),
       clEnumVal(parallelBarrier, "Galois optimized with workset and barrier"),
 #ifdef GALOIS_EXP
       clEnumVal(parallelBarrierInline, "Galois optimized with inlined workset and barrier"),
+#endif
+#ifdef GALOIS_TBB
+      clEnumVal(parallelTBB, "Use TBB instead of Galois"),
 #endif
       clEnumValEnd), cll::init(parallelBarrier));
 static cll::opt<std::string> filename(cll::Positional,
@@ -231,16 +242,12 @@ struct SerialAlgo {
   std::string name() const { return "Serial"; }
 
   void operator()(const GNode source) const {
-    Galois::Statistic counter(0,"Iterations");
-
     std::deque<UpdateRequest> wl;
     wl.push_back(UpdateRequest(source, 0));
 
     while (!wl.empty()) {
       UpdateRequest req = wl.front();
       wl.pop_front();
-
-      counter += 1;
 
       SNode& data = graph.getData(req.n);
 
@@ -266,16 +273,12 @@ struct SerialFlagOptAlgo {
   std::string name() const { return "Serial (Flag Optimized)"; }
 
   void operator()(const GNode source) const {
-    Galois::Statistic counter(0,"Iterations");
-
     std::deque<UpdateRequest> wl;
     wl.push_back(UpdateRequest(source, 0));
 
     while (!wl.empty()) {
       UpdateRequest req = wl.front();
       wl.pop_front();
-
-      counter += 1;
 
       // Operator begins here
       SNode& data = graph.getData(req.n, Galois::NONE);
@@ -302,8 +305,6 @@ struct SerialWorkSet {
   std::string name() const { return "Serial (Workset)"; }
 
   void operator()(const GNode source) const {
-    Galois::Statistic counter(0,"Iterations");
-
     std::deque<GNode> wl;
     graph.getData(source, Galois::NONE).dist = 0;
 
@@ -318,8 +319,6 @@ struct SerialWorkSet {
     while (!wl.empty()) {
       GNode n = wl.front();
       wl.pop_front();
-
-      counter += 1;
 
       SNode& data = graph.getData(n, Galois::NONE);
 
@@ -346,8 +345,6 @@ struct SerialBarrier {
   std::string name() const { return "Serial (Barrier)"; }
 
   void operator()(const GNode source) const {
-    Galois::Statistic counter(0,"Iterations");
-
     WL wls[2];
 
     graph.getData(source, Galois::NONE).dist = 0;
@@ -375,8 +372,6 @@ struct SerialBarrier {
         GNode n = wl.back();
         wl.pop_back();
 
-        counter += 1;
-
         for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::NONE),
               ei = graph.edge_end(n, Galois::NONE); ii != ei; ++ii) {
           GNode dst = graph.getEdgeDst(ii);
@@ -398,8 +393,6 @@ struct SerialBare {
 
   void operator()(const GNode source) const {
     typedef GaloisRuntime::WorkList::FIFO<GNode,false> WL;
-
-    Galois::Statistic counter(0,"Iterations");
 
     WL wls[2];
     graph.getData(source, Galois::NONE).dist = 0;
@@ -427,8 +420,6 @@ struct SerialBare {
 
       while (r) {
         GNode n = *r;
-
-        counter += 1;
 
         for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::NONE),
               ei = graph.edge_end(n, Galois::NONE); ii != ei; ++ii) {
@@ -625,6 +616,70 @@ struct GaloisManualBarrier {
   }
 };
 
+//! TBB version based off of GaloisManualBarrier
+#ifdef GALOIS_TBB
+struct TBB {
+  std::string name() const { return "TBB (parallel_for_each)"; }
+  typedef tbb::concurrent_vector<GNode,tbb::cache_aligned_allocator<GNode> > ContainerTy;
+
+  struct Fn {
+    ContainerTy& wl;
+    unsigned int newDist;
+    Fn(ContainerTy& w, unsigned int d): wl(w), newDist(d) { }
+
+    void operator()(const GNode& n) const {
+      for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::NONE),
+            ei = graph.edge_end(n, Galois::NONE); ii != ei; ++ii) {
+        GNode dst = graph.getEdgeDst(ii);
+        SNode& ddata = graph.getData(dst, Galois::NONE);
+
+        if (ddata.dist <= newDist)
+          continue;
+        
+        ddata.dist = newDist;
+        wl.push_back(dst);
+      }
+    }
+  };
+
+  void operator()(const GNode& source) const {
+    tbb::task_scheduler_init init(numThreads);
+    
+    ContainerTy wls[2];
+    unsigned round = 0;
+
+    graph.getData(source).dist = 0;
+    for (Graph::edge_iterator ii = graph.edge_begin(source),
+          ei = graph.edge_end(source); ii != ei; ++ii) {
+      GNode dst = graph.getEdgeDst(ii);
+      SNode& ddata = graph.getData(dst);
+      ddata.dist = 1;
+      wls[round].push_back(dst);
+    }
+
+    unsigned int newDist = 2;
+
+    while (true) {
+      unsigned next = (round + 1) & 1;
+      tbb::parallel_for_each(wls[round].begin(), wls[round].end(), Fn(wls[next], newDist));
+      wls[round].clear();
+      ContainerTy& next_wl = wls[next];
+      round = next;
+      ++newDist;
+      if (next_wl.begin() == next_wl.end())
+        break;
+    }
+  }
+
+};
+#else
+struct TBB {
+  std::string name() const { return "TBB (parallel_for_each)"; }
+  void operator()(const GNode& source) const { }
+};
+#endif
+
+
 //! Galois BFS using optimized flags and barrier scheduling 
 template<typename WL,bool useCas>
 struct GaloisBarrier {
@@ -732,8 +787,6 @@ struct SerialSchardl {
   }
 
   void bfs(const NodeId s, Dist distances[]) {
-    Galois::Statistic counter(0, "Iterations");
-
     NodeId *queue = new NodeId[nNodes];
     long head, tail;
     NodeId current;
@@ -752,7 +805,6 @@ struct SerialSchardl {
     tail = 0;
      do {
       newdist = distances[current]+1;
-      counter += 1;
 
       EdgeId edgeZero = nodes[current];
       EdgeId edgeLast = nodes[current+1];
@@ -777,7 +829,6 @@ void run(const AlgoTy& algo) {
   GNode source, report;
   readGraph(source, report);
 
-  //Galois::preAlloc(graph.size() / GaloisRuntime::MM::pageSize * numThreads);
   Galois::StatTimer T;
   std::cout << "Running " << algo.name() << " version\n";
   T.start();
@@ -821,6 +872,7 @@ int main(int argc, char **argv) {
     case parallelBarrierCas: run(GaloisBarrier<BSWL,true>()); break;
     case parallelBarrier: run(GaloisBarrier<BSWL,false>()); break;
     case parallelBarrierInline: run(GaloisBarrier<BSDefaultWL,false>()); break;
+    case parallelTBB: run(TBB()); break;
     default: std::cerr << "Unknown algorithm" << algo << "\n"; abort();
   }
 
