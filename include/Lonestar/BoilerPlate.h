@@ -68,7 +68,7 @@ void LonestarStart(int argc, char** argv, OS& out, const char* app, const char* 
   numThreads = Galois::setMaxThreads(numThreads); 
 
   // gInfo ("Using %d threads\n", numThreads.getValue());
-  GaloisRuntime::reportStatSum ("Threads", numThreads, NULL);
+  GaloisRuntime::reportStat (0, "Threads", numThreads);
 }
 
 #endif
