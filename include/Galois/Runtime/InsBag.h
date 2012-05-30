@@ -25,71 +25,52 @@
 
 #include "Galois/Runtime/mm/Mem.h" 
 #include "Galois/Runtime/ll/PtrLock.h"
-#include "Galois/Runtime/DualLevelIterator.h"
 #include <iterator>
 
 namespace GaloisRuntime {
 
 template<class T>
 class galois_insert_bag : private boost::noncopyable {
-  
-public:
-  class gib_Tile : private boost::noncopyable {
-    gib_Tile* next;
-    T* dbegin;
-    T* dend;
-    T* dlast;
-
-    friend class galois_insert_bag;
-
-    gib_Tile(T* s, T* e)
-      :next(0), dbegin(s), dend(s), dlast(e)
-    {}
-
-  public:
-    typedef T* iterator;
-    iterator begin() { return dbegin; }
-    iterator end()  { return dend;   }
-    bool full() { return dend == dlast; }
+ 
+  struct header {
+    header* next;
+    T* dbegin; //start of interesting data
+    T* dend; //end of valid data
+    T* dlast; //end of storage
   };
 
-private:
-  LL::PtrLock<gib_Tile*, true> realHead;
-  GaloisRuntime::PerCPU<gib_Tile*> heads;
+  GaloisRuntime::PerCPU<header*> heads;
 
-  gib_Tile* newHeader() {
-    //First Create
-    void* m = MM::pageAlloc();
-    int offset = 1;
-    if (sizeof(T) < sizeof(gib_Tile))
-      offset += sizeof(gib_Tile)/sizeof(T);
-    T* a = reinterpret_cast<T*>(m);
-    gib_Tile* h = new (m) gib_Tile(&a[offset], &a[(MM::pageSize / sizeof(T))]);
-    //Then Insert
-    gib_Tile*& H = heads.get();
-    if (!H) { //no thread local head, use the new node as one
-      //splice new list of one onto the head
-      realHead.lock();
-      h->next = realHead.getValue();
-      realHead.unlock_and_set(h);
-    } else {
-      //existing thread local head, just append
-      h->next = H->next;
-      asm volatile ("":::"memory");
-      H->next = h;
-    }
+  void insHeader(header* h) {
+    header*& H = heads.get();
+    h->next = H;
     H = h;
-    return h;
+  }
+
+  header* newHeader() {
+    void* m = MM::pageAlloc();
+    header* H = new (m) header();
+    int offset = 1;
+    if (sizeof(T) < sizeof(header))
+      offset += sizeof(header)/sizeof(T);
+    T* a = reinterpret_cast<T*>(m);
+    H->dbegin = &a[offset];
+    H->dend = H->dbegin;
+    H->dlast = &a[(MM::pageSize / sizeof(T))];
+    H->next = 0;
+    return H;
   }
 
   void destruct() {
-    while (realHead.getValue()) {
-      gib_Tile* h = realHead.getValue();
-      realHead.setValue(h->next);
-      for (T* ii = h->dbegin, *ee = h->dend; ii != ee; ++ii) {
-	ii->~T();
+    for (int x = 0; x < heads.size(); ++x) {
+      header* h = heads.get(x);
+      if (h) {
+	heads.get(x) = h->next;
+	for (T* ii = h->dbegin, *ee = h->dend; ii != ee; ++ii) {
+	  ii->~T();
+	}
+	MM::pageFree(h);
       }
-      MM::pageFree(h);
     }
   }
 
@@ -110,49 +91,107 @@ public:
   typedef const T& const_reference;
   typedef T&       reference;
 
-  class tile_iterator : public std::iterator<std::forward_iterator_tag, gib_Tile> {
-    gib_Tile* p;
-    friend class galois_insert_bag;
-    tile_iterator(gib_Tile* x) :p(x) {}
+  class iterator : public std::iterator<std::forward_iterator_tag, T> {
+    GaloisRuntime::PerCPU<header*>* hd;
+    unsigned int thr;
+    header* p;
+    T* v;
+
+    bool init_thread() {
+      p = thr < hd->size() ? hd->get(thr) : 0;
+      v = p ? p->dbegin : 0;
+      return p;
+    }
+
+    bool advance_local() {
+      if (p) {
+	++v;
+	return v != p->dend;
+      }
+      return false;
+    }
+
+    bool advance_chunk() {
+      if (p) {
+	p = p->next;
+	v = p ? p->dbegin : 0;
+      }
+      return p;
+    }
+
+    void advance_thread() {
+      while (thr < hd->size()) {
+	++thr;
+	if (init_thread())
+	  return;
+      }
+    }
+
+    void advance() {
+      if (advance_local()) return;
+      if (advance_chunk()) return;
+      advance_thread();
+    }
+
   public:
-    tile_iterator() :p(0) {}
-    tile_iterator(const tile_iterator& mit) : p(mit.p) {}
-    tile_iterator& operator++() { p = p->next; return *this; }
-    tile_iterator operator++(int) {tile_iterator tmp(*this); operator++(); return tmp;}
-    bool operator==(const tile_iterator& rhs) const { return p == rhs.p; }
-    bool operator!=(const tile_iterator& rhs) const { return p != rhs.p; }
-    gib_Tile& operator*() { return *p; }
-    gib_Tile& operator*() const { return *p; }
+    iterator() :hd(0), thr(0), p(0), v(0) {}
+    iterator(GaloisRuntime::PerCPU<header*>* _hd, int _thr) 
+      :hd(_hd), thr(_thr), p(0), v(0)
+    {
+      //find first valid item
+      if (!init_thread())
+	advance_thread();
+    }
+
+    iterator(const iterator& mit) :hd(mit.hd), thr(mit.thr), p(mit.p), v(mit.v) {}
+
+    iterator& operator++() {
+      advance();
+      return *this;
+    }
+    iterator operator++(int) {iterator tmp(*this); operator++(); return tmp;}
+    bool operator==(const iterator& rhs) const {
+      return (hd == rhs.hd && thr == rhs.thr && p==rhs.p && v == rhs.v);
+    }
+    bool operator!=(const iterator& rhs) const {
+      return !(hd == rhs.hd && thr == rhs.thr && p==rhs.p && v == rhs.v);
+    }
+    T& operator*() const {return *v;}
   };
-
-  tile_iterator tile_begin() {
-    return tile_iterator(realHead.getValue());
-  }
-  tile_iterator tile_end() {
-    return tile_iterator();
-  }
-
-  typedef GaloisRuntime::DualLevelIterator<tile_iterator> iterator;
   
   iterator begin() {
-    return iterator(tile_begin(), tile_end());
+    return iterator(&heads, 0);
+  }
+  
+  iterator end() {
+    return iterator(&heads, heads.size());
+  }
+  
+  typedef iterator local_iterator;
+
+  local_iterator local_begin() {
+    return iterator(&heads, LL::getTID());
   }
 
-  iterator end() {
-    return iterator(tile_end(), tile_end());
+  local_iterator local_end() {
+    return iterator(&heads, LL::getTID() + 1);
   }
+
 
   //Only this is thread safe
   reference push(const T& val) {
-    gib_Tile* H = heads.get();
+    header* H = heads.get();
     T* rv;
     if (!H || H->dend == H->dlast) {
       H = newHeader();
+      insHeader(H);
     }
     rv = new (H->dend) T(val);
     H->dend++;
     return *rv;
   }
 };
+
+
 }
 #endif
