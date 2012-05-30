@@ -285,7 +285,8 @@ void incrementallyAddPoints(vertex** v, int n, vertex* start) {
     }
 
     // determine how many vertices to try in parallel
-    int cnt = 1 + (n-top)/100;  // 100 is pulled out of a hat
+    //int cnt = 1 + (n-top)/100;  // 100 is pulled out of a hat
+    int cnt = 1 + (n-top)/numRounds;
     cnt = (cnt > maxR) ? maxR : cnt;
     cnt = (cnt > top) ? top : cnt;
     vertex **vv = v+top-cnt;

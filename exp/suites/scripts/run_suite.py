@@ -30,9 +30,8 @@ SpecPBBS = [{"prob": "breadthFirstSearch",
       "inputs": ["2DinCubeDelaunay_275000", "2DinCubeDelaunay_1000000", "2DinCubeDelaunay_2500000", "r5M"],
       "extras": 
         [
-          #{'algos': ["incrementalRefine", 'g/p', 'g/nd0', 'g/pnd0'],
-          {'algos': ["incrementalRefine", "g/p"],
-           'arg': "Rounds::-r::1,10,50,100:1000:100" }
+          {'algos': ["incrementalRefine", 'g/p', 'g/nd0', 'g/pnd0'],
+           'arg': "Rounds::-r::1,10,50,100:600:100" }
         ]
       },
      {"prob": "delaunayTriangulation",
@@ -40,9 +39,8 @@ SpecPBBS = [{"prob": "breadthFirstSearch",
       "inputs": ["2DinCube_10M", "2Dkuzmin_10M"],
       "extras":
         [
-          #{'algos': ["incrementalDelaunay", 'g/p', 'g/nd0', 'g/pnd0'],
-          {'algos': ["incrementalDelaunay", 'g/p'],
-           'arg': "Rounds::-r::1,10,50,100:1000:100" }
+          {'algos': ["incrementalDelaunay", 'g/p', 'g/nd0', 'g/pnd0'],
+           'arg': "Rounds::-r::1,10,50,100:600:100" }
         ]
       },
      {"prob": "dictionary",
@@ -57,7 +55,7 @@ SpecPBBS = [{"prob": "breadthFirstSearch",
       "extras":
         [
           {'algos': ["incrementalMIS"],
-           'arg': "Rounds::-r::1,10,50,100:1000:100" }
+           'arg': "Rounds::-r::1,10,50,100:600:100" }
         ]
       },
      {"prob": "maximalMatching",
@@ -151,6 +149,7 @@ def system(cmd, cwd=None, out=None):
         sys.stdout.write(line)
         sys.stdout.flush()
         f.write(line)
+        f.flush()
   
   from subprocess import PIPE, Popen, STDOUT
   if out:

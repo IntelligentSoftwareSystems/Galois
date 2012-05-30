@@ -7,6 +7,10 @@ import sys
 import os
 import socket
 import subprocess
+import signal
+
+#signal.signal(signal.SIGQUIT, signal.SIG_IGN)
+#sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
 
 def backtick(s):
   proc = subprocess.Popen(s, stdout=subprocess.PIPE, shell=True)
@@ -40,4 +44,5 @@ elif basename == 'parsec-bodytrack':
 
 print("INFO: CommandLine %s %s" % (prog, ' '.join(args)))
 print("INFO: Hostname %s" % socket.gethostname())
-sys.exit(subprocess.call([prog] + args))
+sys.stdout.flush()
+os.execvp(prog, [prog] + args)
