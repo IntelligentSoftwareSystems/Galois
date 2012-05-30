@@ -45,6 +45,7 @@ public:
   char* initPerThread();
   char* initPerPackage();
   unsigned allocOffset(unsigned size);
+  void deallocOffset(unsigned offset, unsigned size);
   void* getRemote(unsigned thread, unsigned offset);
   void* getLocal(unsigned offset, char* base) {
     return &base[offset];
@@ -78,6 +79,7 @@ public:
   ~PerThreadStorage() {
     for (unsigned n = 0; n < LL::getMaxThreads(); ++n)
       reinterpret_cast<T*>(PTSBackend.getRemote(n, offset))->~T();
+    PTSBackend.deallocOffset(offset, sizeof(T));
   }
 
   T* getLocal() {
@@ -114,6 +116,7 @@ public:
   ~PerPackageStorage() {
     for (unsigned n = 0; n < LL::getMaxPackages(); ++n)
       reinterpret_cast<T*>(PPSBackend.getRemote(LL::getLeaderForPackage(n), offset))->~T();
+    PPSBackend.deallocOffset(offset, sizeof(T));
   }
 
   T* getLocal() {

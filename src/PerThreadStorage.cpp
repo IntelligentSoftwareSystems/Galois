@@ -33,8 +33,22 @@ GaloisRuntime::PerBackend GaloisRuntime::PPSBackend;
 unsigned GaloisRuntime::PerBackend::allocOffset(unsigned size) {
   size = (size + 15) & ~15;
   unsigned retval = __sync_fetch_and_add(&nextLoc, size);
-  assert(retval + size < GaloisRuntime::MM::pageSize);
+  if (retval + size > GaloisRuntime::MM::pageSize) {
+    assert(0 && "no more memory");
+    abort();
+  }
+
   return retval;
+}
+
+void GaloisRuntime::PerBackend::deallocOffset(unsigned offset, unsigned size) {
+  // Simplest way to recover memory; relies on mostly stack-like nature of
+  // allocations
+  size = (size + 15) & ~15;
+  // Should only be executed by main thread but make lock-free for fun
+  if (__sync_bool_compare_and_swap(&nextLoc, offset + size, offset)) {
+    ; // Recovered some memory
+  }
 }
 
 void* GaloisRuntime::PerBackend::getRemote(unsigned thread, unsigned offset) {
