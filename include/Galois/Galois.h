@@ -26,6 +26,7 @@
 #include "Galois/Threads.h"
 #include "Galois/UserContext.h"
 #include "Galois/Runtime/ParallelWork.h"
+#include "Galois/Runtime/LocalIterator.h"
 
 #ifdef GALOIS_EXP
 #include "Galois/Runtime/SimpleTaskPool.h"
@@ -67,6 +68,20 @@ static inline void for_each(InitItemTy i, Function f, const char* loopname = 0) 
   typedef GaloisRuntime::WorkList::ChunkedFIFO<256> WLTy;
   Galois::for_each<WLTy, InitItemTy, Function>(i, f, loopname);
 }
+//Local based versions
+template<typename WLTy, typename ConTy, typename Function>
+static inline void for_each_local(ConTy& c, Function f, const char* loopname = 0) {
+  typedef typename ConTy::local_iterator IterTy;
+  typedef GaloisRuntime::WorkList::LocalAccessDist<IterTy, WLTy> WL;
+  GaloisRuntime::for_each_impl<WL>(GaloisRuntime::LocalBounce<ConTy>(&c, true), GaloisRuntime::LocalBounce<ConTy>(&c, false), f, loopname);
+}
+
+template<typename ConTy, typename Function>
+static inline void for_each_local(ConTy& c, Function f, const char* loopname = 0) {
+  typedef GaloisRuntime::WorkList::dChunkedFIFO<256> WLTy;
+  Galois::for_each_local<WLTy, ConTy, Function>(c, f, loopname);
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // do_all
@@ -105,6 +120,16 @@ static inline void do_all(const IterTy& begin, const IterTy& end, const Function
     do_all_dispatch(begin,end,fn,loopname,category); 
   }
 }
+
+//Local iterator do_all
+template<typename ConTy,typename FunctionTy>
+static inline void do_all_local(ConTy& c, const FunctionTy& fn, const char* loopname = 0) {
+  typedef typename ConTy::local_iterator IterTy;
+  typedef GaloisRuntime::WorkList::LocalAccessRange<IterTy> WL;
+  GaloisRuntime::do_all_impl<WL>(GaloisRuntime::LocalBounce<ConTy>(&c, true), GaloisRuntime::LocalBounce<ConTy>(&c, false), fn, loopname);
+}
+
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // OnEach
