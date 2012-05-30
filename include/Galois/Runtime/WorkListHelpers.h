@@ -50,6 +50,14 @@ class FixedSizeRing :private boost::noncopyable {
     return &data()[i];
   }
 
+  void destroy(unsigned i) {
+    (at(i))->~T();
+  }
+
+  void create(unsigned i, const T& val) {
+    new (at(i)) T(val);
+  }
+
 public:
 
   typedef T value_type;
@@ -72,7 +80,7 @@ public:
     if (full()) return false;
     start = (start + chunksize - 1) % chunksize;
     ++count;
-    new(at(start)) T(val);
+    create(start, val);
     return true;
   }
 
@@ -80,7 +88,7 @@ public:
     if (full()) return false;
     int end = (start + count) % chunksize;
     ++count;
-    new (at(end)) T(val);
+    create(end, val);
     return true;
   }
 
@@ -100,7 +108,7 @@ public:
     boost::optional<value_type> retval;
     if (!empty()) {
       retval = *at(start);
-      (at(start))->~T();
+      destroy(start);
       start = (start + 1) % chunksize;
       --count;
     }
@@ -112,7 +120,7 @@ public:
     if (!empty()) {
       int end = (start + count - 1) % chunksize;
       retval = *at(end);
-      (at(end))->~T();
+      destroy(end);
       --count;
     }
     return retval;
@@ -121,7 +129,7 @@ public:
   
 template<typename T, bool concurrent>
 class ConExtLinkedStack {
-  LL::PtrLock<T*, concurrent> head;
+  LL::PtrLock<T, concurrent> head;
   
 public:
   
@@ -165,7 +173,7 @@ public:
 template<typename T, bool concurrent>
 class ConExtLinkedQueue {
   
-  LL::PtrLock<T*,concurrent> head;
+  LL::PtrLock<T,concurrent> head;
   T* tail;
   
 public:

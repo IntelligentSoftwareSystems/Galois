@@ -48,7 +48,7 @@ struct FreeNode {
   FreeNode* next;
 };
  
-typedef GaloisRuntime::LL::PtrLock<FreeNode*, true> HeadPtr;
+typedef GaloisRuntime::LL::PtrLock<FreeNode, true> HeadPtr;
 
 //Number of pages allocated
 struct PAState {

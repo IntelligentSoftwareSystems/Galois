@@ -492,14 +492,15 @@ public:
     if (f) {
       instance.unlock();
     } else {
-      f = new SizedAllocatorFactory;
+      f = new SizedAllocatorFactory();
       instance.unlock_and_set(f);
     }
     return f;
   }
 
 private:
-  static LL::PtrLock<SizedAllocatorFactory*, true> instance;
+  //  SizedAllocatorFactory() :lock() {}
+  static LL::PtrLock<SizedAllocatorFactory, true> instance;
   typedef std::map<size_t, SizedAlloc*> AllocatorsTy;
   AllocatorsTy allocators;
   LL::SimpleLock<true> lock;

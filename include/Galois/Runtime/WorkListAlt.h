@@ -35,7 +35,7 @@ struct ChunkHeader {
 
 class AtomicChunkDequeue {
 
-  LL::PtrLock<ChunkHeader*, true> head;
+  LL::PtrLock<ChunkHeader, true> head;
   ChunkHeader* volatile tail;
 
 public:
@@ -109,7 +109,7 @@ public:
 
 class AtomicChunkLIFO {
 
-  LL::PtrLock<ChunkHeader*, true> head;
+  LL::PtrLock<ChunkHeader, true> head;
 
   void prepend(ChunkHeader* C) {
     //Find tail of stolen stuff
@@ -199,6 +199,10 @@ public:
 
 class StealingQueues : private boost::noncopyable {
   PerThreadStorage<AtomicChunkLIFO> local;
+  PerThreadStorage<bool> LocalStarving;
+  
+  volatile unsigned Starving;
+  AtomicChunkLIFO global;
 
   GALOIS_ATTRIBUTE_NOINLINE
   ChunkHeader* doSteal() {
@@ -207,6 +211,9 @@ class StealingQueues : private boost::noncopyable {
     unsigned id = LL::getTID();
     unsigned pkg = LL::getPackageForThread(id);
     unsigned num = ThreadPool::getActiveThreads();
+
+    ChunkHeader* c = 0;
+
     //First steal from this package
     for (unsigned i = 1; i < num; ++i) {
       unsigned eid = (id + i) % num;
@@ -214,28 +221,65 @@ class StealingQueues : private boost::noncopyable {
 	ChunkHeader* c = me.stealHalfAndPop(*local.getRemote(eid));
 	if (c)
 	  return c;
+	  //	  goto stex;
       }
-    }//Leaders can cross package
+    }
+#if 0
+    //Then try the global queue
+    c = global.pop();
+    if (c) 
+      goto stex;
+
+    //Leaders signal starvation
     if (LL::isLeaderForPackage(id)) {
-      for (unsigned i = 0; i < num; ++i) {
-	unsigned eid = (id + i) % num;
-	if (LL::isLeaderForPackageInternal(eid)) {
-	  ChunkHeader* c = me.stealAllAndPop(*local.getRemote(eid));
-	  if (c)
-	    return c;
-	}
+      bool& sig = *LocalStarving.getLocal();
+      if (!sig) {
+	std::cerr << id << " Starving: " << Starving << "\n";
+	__sync_fetch_and_add(&Starving, 1);
+	sig = true;
+      }
+    }
+
+  stex:
+    if (LL::isLeaderForPackage(id) && c) {
+      bool& sig = *LocalStarving.getLocal();
+      if (sig) {
+	std::cerr << id << " Not starving: " << Starving - 1 << "\n";
+	__sync_fetch_and_sub(&Starving, 1);
+	sig = false;
+      }
+    }
+    return c;
+#endif
+    //Leaders can cross package
+    if (LL::isLeaderForPackage(id)) {
+      for (unsigned i = 1; i < num; ++i) {
+     	unsigned eid = (id + i) % num;
+     	if (LL::isLeaderForPackageInternal(eid)) {
+     	  ChunkHeader* c = me.stealAllAndPop(*local.getRemote(eid));
+     	  if (c)
+     	    return c;
+     	}
       }
     }
     return 0;
   }
 
 public:
+  StealingQueues() {} // :Starving(0) {}
+
   void push(ChunkHeader* c) {
     local.getLocal()->push(c);
   }
   ChunkHeader* pop() {
-    ChunkHeader* c = local.getLocal()->pop();
-    if (c)
+    // ChunkHeader* c = 0;
+    // if (Starving)
+    //   c = global.stealHalfAndPop(*local.getLocal());
+    // if (!c)
+    //   c = local.getLocal()->pop();
+    // if (c)
+    //   return c;
+    if (ChunkHeader* c = local.getLocal()->pop())
       return c;
     return doSteal();
   }
@@ -353,6 +397,155 @@ public:
   }
 };
 //WLCOMPILECHECK(ChunkedAdaptor);
+
+template<typename QueueTy>
+boost::optional<typename QueueTy::value_type>
+stealHalfInPackage(PerThreadStorage<QueueTy>& queues) {
+  unsigned id = LL::getTID();
+  unsigned pkg = LL::getPackageForThread(id);
+  unsigned num = ThreadPool::getActiveThreads();
+  QueueTy* me = queues.getLocal();
+  boost::optional<typename QueueTy::value_type> retval;
+  
+  //steal from this package
+  //Having 2 loops avoids a modulo, though this is a slow path anyway
+  for (unsigned i = id + 1; i < num; ++i)
+    if (LL::getPackageForThreadInternal(i) == pkg)
+      if ((retval = me->steal(*queues.getRemote(i), true, true)))
+	return retval;
+  for (unsigned i = 0; i < id; ++i)
+    if (LL::getPackageForThreadInternal(i) == pkg)
+      if ((retval = me->steal(*queues.getRemote(i), true, true)))
+	return retval;
+  return retval;
+}
+
+template<typename QueueTy>
+boost::optional<typename QueueTy::value_type>
+stealRemote(PerThreadStorage<QueueTy>& queues) {
+  unsigned id = LL::getTID();
+  unsigned pkg = LL::getPackageForThread(id);
+  unsigned num = ThreadPool::getActiveThreads();
+  QueueTy* me = queues.getLocal();
+  boost::optional<typename QueueTy::value_type> retval;
+  
+  //steal from this package
+  //Having 2 loops avoids a modulo, though this is a slow path anyway
+  for (unsigned i = id + 1; i < num; ++i)
+    if ((retval = me->steal(*queues.getRemote(i), true, true)))
+      return retval;
+  for (unsigned i = 0; i < id; ++i)
+    if ((retval = me->steal(*queues.getRemote(i), true, true)))
+      return retval;
+  return retval;
+}
+
+template<typename QueueTy>
+class PerThreadQueues : private boost::noncopyable {
+public:
+  typedef typename QueueTy::value_type value_type;
+  
+private:
+  PerThreadStorage<QueueTy> local;
+
+  boost::optional<value_type> doSteal() {
+    boost::optional<value_type> retval = stealHalfInPackage(local);
+    if (retval)
+      return retval;
+    return stealRemote(local);
+  }
+
+  template<typename Iter>
+  void fill_work_l2(Iter& b, Iter& e) {
+    unsigned int a = ThreadPool::getActiveThreads();
+    unsigned int id = LL::getTID();
+    unsigned dist = std::distance(b, e);
+    unsigned num = (dist + a - 1) / a; //round up
+    unsigned int A = std::min(num * id, dist);
+    unsigned int B = std::min(num * (id + 1), dist);
+    e = b;
+    std::advance(b, A);
+    std::advance(e, B);
+  }
+
+  // LL::SimpleLock<true> L;
+  // std::vector<unsigned> sum;
+
+  template<typename Iter>
+  void fill_work_l1(Iter b, Iter e) {
+    Iter b2 = b;
+    Iter e2 = e;
+    fill_work_l2(b2, e2);
+    unsigned int a = ThreadPool::getActiveThreads();
+    unsigned int id = LL::getTID();
+    std::vector<std::vector<value_type> > ranges;
+    ranges.resize(a);
+    while (b2 != e2) {
+      unsigned i = getID(*b2);
+      ranges[i].push_back(*b2);
+      ++b2;
+      if (ranges[i].size() > 128) {
+	local.getRemote(i)->push(ranges[i].begin(), ranges[i].end());
+	ranges[i].clear();
+      }
+    }
+    // L.lock();
+    // if (sum.empty())
+    //   sum.resize(a + 1);
+    // sum[a]++;
+    // std::cerr << id << ":";
+    // for (unsigned int x = 0; x < a; ++x) {
+    //   std::cerr << " " << ranges[x].size();
+    //   sum[x] += ranges[x].size();
+    // }
+    // std::cerr << "\n";
+    // if (sum[a] == a) {
+    //   std::cerr << "total:";
+    //   for (unsigned int x = 0; x < a; ++x)
+    // 	std::cerr << " " << sum[x];
+    //   std::cerr << "\n";
+    // }
+    // L.unlock();
+    for (unsigned int x = 0; x < a; ++x)
+      if (!ranges[x].empty())
+	local.getRemote(x)->push(ranges[x].begin(), ranges[x].end());
+  }
+
+public:
+  template<typename Tnew>
+  struct retype {
+    typedef PerThreadQueues<typename QueueTy::template retype<Tnew>::WL> WL;
+  };
+
+  template<bool newConcurrent>
+  struct rethread {
+    typedef PerThreadQueues<typename QueueTy::template rethread<newConcurrent>::WL> WL;
+  };
+
+  void push(const value_type& val) {
+    local.getLocal()->push(val);
+  }
+
+  template<typename Iter>
+  void push(Iter b, Iter e) {
+    local.getLocal()->push(b,e);
+  }
+
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    //    fill_work(*this, b, e);
+    fill_work_l1(b,e);
+  }
+
+  boost::optional<value_type> pop() {
+    boost::optional<value_type> retval = local.getLocal()->pop();
+    if (retval)
+      return retval;
+    return doSteal();// stealHalfInPackage(local);
+  }
+};
+//WLCOMPILECHECK(LocalQueues);
+
 
 } }//End namespace
 

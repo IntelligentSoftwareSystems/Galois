@@ -24,6 +24,7 @@ kind.
 #include "Galois/MethodFlags.h"
 #include <cassert>
 #include <cstdlib>
+#include <setjmp.h>
 
 namespace GaloisRuntime {
 
@@ -45,10 +46,12 @@ void setPending(PendingFlag value);
 
 class SimpleRuntimeContext;
 
+//extern __thread jmp_buf hackjmp;
+
 //! All objects that may be locked (nodes primarily) must inherit from Lockable.
 //! Use an intrusive list to track objects in a context without allocation overhead
 class Lockable {
-  LL::PtrLock<SimpleRuntimeContext*, true> Owner;
+  LL::PtrLock<SimpleRuntimeContext, true> Owner;
   Lockable* next;
   friend class SimpleRuntimeContext;
 public:

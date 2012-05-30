@@ -52,8 +52,7 @@ template<typename T>
 class PtrLock<T, true> {
   volatile uintptr_t _lock;
 public:
-  PtrLock() : _lock(0) {}
-  explicit PtrLock(T val) : _lock(val) {}
+  PtrLock() : _lock() {}
 
   inline void lock() {
     uintptr_t oldval;
@@ -77,18 +76,18 @@ public:
     _lock = 0;
   }
 
-  inline void unlock_and_set(T val) {
+  inline void unlock_and_set(T* val) {
     assert(_lock & 1);
     assert(!((uintptr_t)val & 1));
     compilerBarrier();
     _lock = (uintptr_t)val;
   }
   
-  inline T getValue() const {
-    return (T)(_lock & ~1);
+  inline T* getValue() const {
+    return (T*)(_lock & ~1);
   }
 
-  inline void setValue(T val) {
+  inline void setValue(T* val) {
     uintptr_t nval = (uintptr_t)val;
     nval |= (_lock & 1);
     _lock = nval;
@@ -104,40 +103,39 @@ public:
 
   //! CAS only works on unlocked values
   //! the lock bit will prevent a successful cas
-  inline bool CAS(T oldval, T newval) {
+  inline bool CAS(T* oldval, T* newval) {
     assert(!((uintptr_t)oldval & 1) && !((uintptr_t)newval & 1));
     return __sync_bool_compare_and_swap(&_lock, (uintptr_t)oldval, (uintptr_t)newval);
   }
 
   //! CAS that works on locked values; this can be very dangerous
   //! when used incorrectly
-  inline bool stealing_CAS(T oldval, T newval) {
+  inline bool stealing_CAS(T* oldval, T* newval) {
     return __sync_bool_compare_and_swap(&_lock, (uintptr_t)oldval|1, (uintptr_t)newval|1);
   }
 };
 
 template<typename T>
 class PtrLock<T, false> {
-  T _lock;
+  T* _lock;
 public:
-  PtrLock() : _lock(0) {}
-  explicit PtrLock(T val) : _lock(val) {}
-
+  PtrLock() : _lock() {}
+  
   inline void lock() {}
   inline void unlock() {}
   inline void unlock_and_clear() { _lock = 0; }
-  inline void unlock_and_set(T val) { _lock = val; }
-  inline T getValue() const { return _lock; }
-  inline void setValue(T val) { _lock = val; }
+  inline void unlock_and_set(T* val) { _lock = val; }
+  inline T* getValue() const { return _lock; }
+  inline void setValue(T* val) { _lock = val; }
   inline bool try_lock() { return true; }
-  inline bool CAS(T oldval, T newval) {
+  inline bool CAS(T* oldval, T* newval) {
     if (_lock == oldval) {
       _lock = newval;
       return true;
     }
     return false;
   }
-  inline bool stealing_CAS(T oldval, T newval) {
+  inline bool stealing_CAS(T* oldval, T* newval) {
     return CAS(oldval, newval);
   }
 };

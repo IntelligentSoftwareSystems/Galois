@@ -45,7 +45,7 @@ using namespace LL;
 SystemBaseAlloc::SystemBaseAlloc() {}
 SystemBaseAlloc::~SystemBaseAlloc() {}
 
-PtrLock<SizedAllocatorFactory*, true> SizedAllocatorFactory::instance;
+PtrLock<SizedAllocatorFactory, true> SizedAllocatorFactory::instance;
 #ifndef USEMALLOC
 SizedAllocatorFactory::SizedAlloc* 
 SizedAllocatorFactory::getAllocatorForSize(size_t size) {
