@@ -118,7 +118,7 @@ public:
     //print header
     gPrint("STATTYPE,LOOP,CATEGORY,n,sum,ave,min,max,stddev");
     for (unsigned x = 0; x < maxThreadID; ++x)
-      gPrint(",%d", x);
+      gPrint(",T%d", x);
     gPrint("\n");
     //print all values
     for(std::set<std::string>::iterator iiL = Loops.begin(), eeL = Loops.end();
@@ -127,7 +127,7 @@ public:
 	   iiK != eeK; ++iiK) {
 	std::vector<unsigned long> Values;
 	gather(*iiL, *iiK, maxThreadID, Values);
-	gPrint("STAT,%s,%s,%u,%lu,%f,%lu,%lu,%f", 
+	gPrint("STAT,%s,%s,%u,%lu,%.1f,%lu,%lu,%.2f", 
 	       iiL->c_str(), 
 	       iiK->c_str(),
 	       maxThreadID,

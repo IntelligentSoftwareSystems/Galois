@@ -40,6 +40,10 @@ enum ConflictFlag {
 };
 
 #ifdef GALOIS_DET
+#define GALOIS_USE_CONFLICT_LOCK
+#endif
+
+#ifdef GALOIS_DET
 enum PendingFlag {
   NON_DET,
   PENDING,
@@ -47,6 +51,9 @@ enum PendingFlag {
 };
 
 void setPending(PendingFlag value);
+#endif
+
+#ifdef GALOIS_USE_CONFLICT_LOCK
 void clearConflictLock();
 #else
 //! used to release lock over exception path

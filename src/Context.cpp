@@ -31,14 +31,8 @@
 //! Global thread context for each active thread
 static __thread GaloisRuntime::SimpleRuntimeContext* thread_cnx = 0;
 
+#ifdef GALOIS_USE_CONFLICT_LOCK
 static GaloisRuntime::LL::SimpleLock<true> conflictLock;
-
-#ifdef GALOIS_DET
-static GaloisRuntime::PendingFlag pendingFlag = GaloisRuntime::NON_DET;
-
-void GaloisRuntime::setPending(PendingFlag value) {
-  pendingFlag = value;
-}
 
 void GaloisRuntime::clearConflictLock() {
   conflictLock.unlock();
@@ -47,6 +41,16 @@ void GaloisRuntime::clearConflictLock() {
 static inline void lockConflictLock() {
   conflictLock.lock();
 }
+#else
+static inline void lockConflictLock() { }
+#endif
+
+#ifdef GALOIS_DET
+static GaloisRuntime::PendingFlag pendingFlag = GaloisRuntime::NON_DET;
+
+void GaloisRuntime::setPending(PendingFlag value) {
+  pendingFlag = value;
+}
 
 void GaloisRuntime::doCheckWrite() {
   if (pendingFlag == PENDING) {
@@ -54,9 +58,6 @@ void GaloisRuntime::doCheckWrite() {
     throw GaloisRuntime::REACHED_FAILSAFE;
   }
 }
-
-#else
-static inline void lockConflictLock() { }
 #endif
 
 void GaloisRuntime::setThreadContext(GaloisRuntime::SimpleRuntimeContext* n) {
