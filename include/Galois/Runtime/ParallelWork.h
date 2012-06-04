@@ -344,6 +344,7 @@ void do_all_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
 		     Config::ref(W),
 		     Config::ref(getSystemBarrier())};
   getSystemThreadPool().run(&w[0], &w[4]);
+  runAllLoopExitHandlers();
 
   inGaloisForEach = false;
 }
