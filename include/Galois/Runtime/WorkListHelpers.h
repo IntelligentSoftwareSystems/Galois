@@ -63,6 +63,9 @@ public:
   typedef T value_type;
 
   FixedSizeRing() :start(0), count(0) {}
+  ~FixedSizeRing() {
+    clear();
+  }
 
   unsigned size() const {
     return count;
@@ -74,6 +77,17 @@ public:
 
   bool full() const {
     return count == chunksize;
+  }
+
+  T& getAt(unsigned x) {
+    return *at((start + x) % chunksize);
+  }
+
+  void clear() {
+    for (unsigned x = 0; x < count; ++x)
+      destroy((start + count) % chunksize);
+    count = 0;
+    start = 0;
   }
 
   bool push_front(const value_type& val) {
