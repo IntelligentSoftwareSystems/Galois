@@ -116,7 +116,7 @@ public:
       }
     }
     //print header
-    gPrint("STATTYPE,LOOP,CATEGORY,n,sum,ave,min,max,stddev");
+    gPrint("STATTYPE,LOOP,CATEGORY,n,sum");
     for (unsigned x = 0; x < maxThreadID; ++x)
       gPrint(",T%d", x);
     gPrint("\n");
@@ -127,15 +127,11 @@ public:
 	   iiK != eeK; ++iiK) {
 	std::vector<unsigned long> Values;
 	gather(*iiL, *iiK, maxThreadID, Values);
-	gPrint("STAT,%s,%s,%u,%lu,%.1f,%lu,%lu,%.2f", 
+	gPrint("STAT,%s,%s,%u,%lu", 
 	       iiL->c_str(), 
 	       iiK->c_str(),
 	       maxThreadID,
-               getSum(Values, maxThreadID),
-	       getAvg(Values, maxThreadID),
-	       getMin(Values, maxThreadID),
-	       getMax(Values, maxThreadID),
-	       getStddev(Values, maxThreadID)
+               getSum(Values, maxThreadID)
 	       );
 	for (unsigned x = 0; x < maxThreadID; ++x) {
 	  gPrint(",%ld", Values[x]);
