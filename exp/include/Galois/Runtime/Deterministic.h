@@ -143,7 +143,7 @@ class Executor {
     WL* wlnext;
     size_t rounds;
     size_t outerRounds;
-    ThreadLocalData(): rounds(0), outerRounds(0) { reset(); }
+    ThreadLocalData(const char* loopname): stat(loopname), rounds(0), outerRounds(0) { reset(); }
     void reset() {
       newSize = 0;
     }
@@ -156,7 +156,7 @@ class Executor {
     NewItemsTy newItems;
     ReserveTy reserve;
 
-    size_t begin;
+    size_t size;
     size_t window;
     size_t delta;
     size_t committed;
@@ -265,6 +265,12 @@ class Executor {
     }
   };
 
+  struct GetFirst: public std::unary_function<NewItem,const value_type&> {
+    const value_type& operator()(const NewItem& x) const {
+      return x.first;
+    }
+  };
+
   SimpleRuntimeContext* nextContext() {
     contextPool.push(SimpleRuntimeContext());
     SimpleRuntimeContext* retval = contextPool.unsafePeek();
@@ -299,7 +305,7 @@ class Executor {
   }
 
   template<typename InputIterator>
-  void distribute(InputIterator b, InputIterator e, WL* wl, size_t window, size_t dist) {
+  void distribute(InputIterator b, InputIterator e, WL* wl, size_t dist) {
 #if 0
     // Slightly complicated reindexing to separate out continuous elements in InputIterator
     // (by window) while also evenly distributing priority space among threads
@@ -333,7 +339,7 @@ class Executor {
     safe_advance(b, tid, cur, dist);
     while (b != e) {
       unsigned long id = k * numActive + tid;
-      if (id <= window)
+      if (id <= minfo.delta)
         wl->push(Item(*b, id));
       else
         minfo.reserve.push(Item(*b, id));
@@ -351,17 +357,12 @@ public:
     if (ForEachTraits<Function1Ty>::NeedsBreak || ForEachTraits<Function2Ty>::NeedsBreak) abort();
   }
 
-  ~Executor() {
-    if (ForEachTraits<Function1Ty>::NeedsStats || ForEachTraits<Function2Ty>::NeedsStats)
-      GaloisRuntime::statDone();
-  }
-
   template<typename IterTy>
   bool AddInitialWork(IterTy b, IterTy e) {
     unsigned int dist = std::distance(b, e);
     MergeInfo& minfo = mergeInfo.get();
     minfo.window = minfo.delta = std::max(dist / 100U, 1U);
-    distribute(b, e, &wl[1], minfo.window, dist);
+    distribute(b, e, &wl[1], dist);
 
     return true;
   }
@@ -422,7 +423,7 @@ void Executor<T,Function1Ty,Function2Ty,useLocalState>::MergeIterator::initRange
 
 template<typename T,typename Function1Ty,typename Function2Ty,bool useLocalState>
 void Executor<T,Function1Ty,Function2Ty,useLocalState>::go() {
-  ThreadLocalData tld;
+  ThreadLocalData tld(loopname);
   MergeInfo& minfo = mergeInfo.get();
   tld.wlcur = &wl[0];
   tld.wlnext = &wl[1];
@@ -489,12 +490,8 @@ void Executor<T,Function1Ty,Function2Ty,useLocalState>::go() {
   setPending(NON_DET);
 
   if (ForEachTraits<Function1Ty>::NeedsStats || ForEachTraits<Function2Ty>::NeedsStats) {
-    unsigned tid = LL::getTID();
-    tld.stat.report_stat(tid, loopname);
-    if (tid == 0) {
-      reportStatSum("RoundsExecuted", tld.rounds, loopname);
-      reportStatSum("OuterRoundsExecuted", tld.outerRounds, loopname);
-    }
+    reportStat(loopname, "RoundsExecuted", tld.rounds);
+    reportStat(loopname, "OuterRoundsExecuted", tld.outerRounds);
   }
 }
 
@@ -544,9 +541,10 @@ bool Executor<T,Function1Ty,Function2Ty,useLocalState>::merge(int begin, int end
 template<typename T,typename Function1Ty,typename Function2Ty,bool useLocalState>
 bool Executor<T,Function1Ty,Function2Ty,useLocalState>::renumber(ThreadLocalData& tld)
 {
-#if 0
   MergeInfo& minfo = mergeInfo.get();
 
+#if 1
+  minfo.newItems.clear();
   minfo.newItems.reserve(tld.newSize * 2);
   boost::optional<NewItem> p;
   while ((p = new_.pop())) {
@@ -559,53 +557,62 @@ bool Executor<T,Function1Ty,Function2Ty,useLocalState>::renumber(ThreadLocalData
 
   unsigned tid = LL::getTID();
   if (tid == 0) {
-    size_t begin = 0;
-    for (int i = 0; i < numActive; ++i) {
-      MergeInfo& minfo = mergeInfo.get(i);
-      minfo.begin = begin;
-      begin += minfo.newItems.size();
-    }
-    mergeBuf.reserve(begin);
+    size_t size = 0;
+    for (int i = 0; i < numActive; ++i)
+      size += mergeInfo.get(i).newItems.size();
+
+    mergeBuf.reserve(size);
+    
+    for (int i = 0; i < numActive; ++i)
+      mergeInfo.get(i).size = size;
 
     outerDone.data = !merge(0, numActive);
   }
 
   barrier[6].wait();
 
-  size_t id = minfo.begin;
+  MergeIterator ii, ei;
+  ii.initRange(&mergeInfo, 0, numActive, ei);
 
-  for (NewItemsIterator ii = minfo.newItems.begin(), ei = minfo.newItems.end(); ii != ei; ++ii) {
-    minfo.reserve.push(std::make_pair(ii->first, ++id));
-  }
+  distribute(boost::make_transform_iterator(ii, GetFirst()),
+      boost::make_transform_iterator(ei, GetFirst()),
+      tld.wlnext, minfo.size);
 
-  minfo.newItems.clear();
-  tld.reset();
+  //size_t id = minfo.begin;
 
-  return outerDone.data;
+  //for (NewItemsIterator ii = minfo.newItems.begin(), ei = minfo.newItems.end(); ii != ei; ++ii) {
+  //  minfo.reserve.push(std::make_pair(ii->first, ++id));
+  //}
 #else
-  if (LL::getTID() == 0) {
-    std::vector<NewItem> buf;
-    boost::optional<NewItem> p;
-    while ((p = new_.pop())) {
-      buf.push_back(*p);
-    }
-
-    std::sort(buf.begin(), buf.end(), LessThan());
-
-    unsigned long id = 0;
-    outerDone.data = buf.empty();
-
-    printf("R %ld\n", buf.size());
-
-    for (typename std::vector<NewItem>::iterator ii = buf.begin(), ei = buf.end(); ii != ei; ++ii) {
-      tld.wlnext->push(Item(ii->first, ++id));
-    }
-  }
+  new_.flush();
 
   barrier[5].wait();
+  
+  if (LL::getTID() == 0) {
+    mergeBuf.clear();
+    mergeBuf.reserve(tld.newSize * numActive);
+    boost::optional<NewItem> p;
+    while ((p = new_.pop())) {
+      mergeBuf.push_back(*p);
+    }
 
-  return outerDone.data;
+    std::sort(mergeBuf.begin(), mergeBuf.end(), LessThan());
+
+    unsigned long id = 0;
+    outerDone.data = mergeBuf.empty();
+
+    printf("R %ld\n", mergeBuf.size());
+  }
+
+  barrier[6].wait();
+
+  distribute(boost::make_transform_iterator(mergeBuf.begin(), GetFirst()),
+      boost::make_transform_iterator(mergeBuf.end(), GetFirst()),
+      tld.wlnext, mergeBuf.size());
 #endif
+
+  tld.reset();
+  return outerDone.data;
 }
 
 template<typename T,typename Function1Ty,typename Function2Ty,bool useLocalState>
