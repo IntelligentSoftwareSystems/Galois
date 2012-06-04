@@ -130,7 +130,7 @@ public:
   /**
    * Create the new cavity based on the data of the old one
    */
-  void update() {
+  void computePost() {
     if (centerElement->dim() == 2) { // we built around a segment
       GNode n1 = graph->createNode(Element(center, centerElement->getPoint(0)));
       GNode n2 = graph->createNode(Element(center, centerElement->getPoint(1)));
@@ -145,7 +145,7 @@ public:
       GNode other = pre.containsNode(tuple.dst) ?  tuple.src : tuple.dst;
       Element& otherElement = graph->getData(other, Galois::ALL);
 
-      GNode newNode = graph->createNode(newElement);
+      GNode newNode = graph->createNode(newElement); // XXX
       const Edge& otherEdge = newElement.getRelatedEdge(otherElement);
       post.addEdge(newNode, other, otherEdge);
 
@@ -160,10 +160,28 @@ public:
       post.addNode(newNode);
     }
   }
-  
-  PreGraph& getPre() { return pre; };
-  PostGraph& getPost() { return post; };
 
-  bool isMember(Element * n);
+  void update(GNode node, Galois::UserContext<GNode>& ctx) {
+    for (PreGraph::iterator ii = pre.begin(), ee = pre.end(); ii != ee; ++ii) 
+      graph->removeNode(*ii, Galois::NONE);
+    
+    //add new data
+    for (PostGraph::iterator ii = post.begin(), ee = post.end(); ii != ee; ++ii) {
+      GNode n = *ii;
+      graph->addNode(n, Galois::NONE);
+      Element& element = graph->getData(n, Galois::NONE);
+      if (element.isBad()) {
+        ctx.push(n);
+      }
+    }
+    
+    for (PostGraph::edge_iterator ii = post.edge_begin(), ee = post.edge_end(); ii != ee; ++ii) {
+      EdgeTuple edge = *ii;
+      graph->addEdge(edge.src, edge.dst, Galois::NONE);
+    }
+
+    if (graph->containsNode(node, Galois::NONE)) {
+      ctx.push(node);
+    }
+  }
 };
-

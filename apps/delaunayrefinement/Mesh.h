@@ -22,29 +22,30 @@
  *
  * @author Milind Kulkarni <milind@purdue.edu>>
  */
-#ifndef _MESH_H_
-#define _MESH_H_
+#ifndef MESH_H
+#define MESH_H
+
+#include "Subgraph.h"
 
 #include <vector>
+#include <string>
 #include <map>
-#include <stack>
-#include <cstdio>
+#include <iostream>
 
 struct is_bad {
-  Graph* mesh;
-  is_bad(Graph* g) :mesh(g) {}
+  Graph* g;
+  is_bad(Graph* _g): g(_g) {}
   bool operator()(const GNode& n) const {
-    return mesh->getData(n, Galois::NONE).isBad();
+    return g->getData(n, Galois::NONE).isBad();
   }
 };
 
 struct CreateNodes {
-  Graph* lmesh;
-  CreateNodes(Graph* _lmesh) :lmesh(_lmesh) {}
+  Graph* g;
+  CreateNodes(Graph* _g): g(_g) {}
   void operator()(Element& item) {
-    GNode n = lmesh->createNode(item);
-    lmesh->addNode(n);
-    lmesh->getData(n, Galois::NONE).id = GaloisRuntime::LL::getTID();
+    GNode n = g->createNode(item);
+    g->addNode(n);
   }
 };
 
@@ -61,6 +62,7 @@ struct centerYCmp {
     return lhs.getPoint(0)[1] < rhs.getPoint(0)[1];
   }
 };
+
 struct centerYCmpInv {
   bool operator()(const Element& lhs, const Element& rhs) const {
     //return lhs.getCenter() < rhs.getCenter();
@@ -190,9 +192,9 @@ private:
         std::cerr << "Malformed binary file\n";
         abort();
       }
-      assert(r[1] >= 0 && r[1] < tuples.size());
-      assert(r[2] >= 0 && r[2] < tuples.size());
-      assert(r[3] >= 0 && r[3] < tuples.size());
+      assert(r[1] < tuples.size());
+      assert(r[2] < tuples.size());
+      assert(r[3] < tuples.size());
       Element e(tuples[r[1]], tuples[r[2]], tuples[r[3]], ++id);
       elements.push_back(e);
     }
@@ -218,9 +220,9 @@ private:
       unsigned n1, n2, n3;
       r = fscanf(pFile, "%u %u %u %u", &index, &n1, &n2, &n3);
       checkResults(r, 4, filename);
-      assert(n1 >= 0 && n1 < tuples.size());
-      assert(n2 >= 0 && n2 < tuples.size());
-      assert(n3 >= 0 && n3 < tuples.size());
+      assert(n1 < tuples.size());
+      assert(n2 < tuples.size());
+      assert(n3 < tuples.size());
       Element e(tuples[n1], tuples[n2], tuples[n3], ++id);
       elements.push_back(e);
     }
@@ -278,8 +280,8 @@ private:
         std::cerr << "Malformed binary file\n";
         abort();
       }
-      assert(r[1] >= 0 && r[1] < tuples.size());
-      assert(r[2] >= 0 && r[2] < tuples.size());
+      assert(r[1] < tuples.size());
+      assert(r[2] < tuples.size());
       Element e(tuples[r[1]], tuples[r[2]], ++id);
       elements.push_back(e);
     }
@@ -306,8 +308,8 @@ private:
       unsigned index, n1, n2;
       r = fscanf(pFile, "%u %u %u %*u", &index, &n1, &n2);
       checkResults(r, 3, filename);
-      assert(n1 >= 0 && n1 < tuples.size());
-      assert(n2 >= 0 && n2 < tuples.size());
+      assert(n1 < tuples.size());
+      assert(n2 < tuples.size());
       Element e(tuples[n1], tuples[n2], ++id);
       elements.push_back(e);
     }

@@ -26,29 +26,22 @@
  * @author Milind Kulkarni <milind@purdue.edu>
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#include <iostream>
-#include <sys/time.h>
-#include <limits.h>
-#include <math.h>
-#include <string.h>
-#include <cassert>
-
-#include "Element.h"
+#include "Mesh.h"
+#include "Cavity.h"
+#include "Verifier.h"
 
 #include "Galois/Galois.h"
 #include "Galois/Statistic.h"
-#include "Galois/Graphs/Graph2.h"
 
 #include "llvm/Support/CommandLine.h"
-
 #include "Lonestar/BoilerPlate.h"
 
 #include "Galois/Runtime/WorkListAlt.h"
 #include "Galois/Runtime/WorkListDebug.h"
 
-#ifdef GALOIS_DET
-#include "Galois/Runtime/Deterministic.h"
-#endif
+#include <iostream>
+#include <string.h>
+#include <cassert>
 
 namespace cll = llvm::cl;
 
@@ -58,54 +51,65 @@ static const char* url = "delaunay_mesh_refinement";
 
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 
-typedef Galois::Graph::FirstGraph<Element,void,false> Graph;
-typedef Graph::GraphNode GNode;
+Graph* graph;
 
-#include "Subgraph.h"
-#include "Mesh.h"
-#include "Cavity.h"
-#include "Verifier.h"
+enum DetAlgo {
+  nondet,
+  detBase,
+  detPrefix,
+  detDisjoint
+};
 
-Graph* mesh;
+#ifdef GALOIS_DET
+static cll::opt<DetAlgo> detAlgo(cll::desc("Deterministic algorithm:"),
+    cll::values(
+      clEnumVal(nondet, "Non-deterministic"),
+      clEnumVal(detBase, "Base execution"),
+      clEnumVal(detPrefix, "Prefix execution"),
+      clEnumVal(detDisjoint, "Disjoint execution"),
+      clEnumValEnd), cll::init(detBase));
+#endif
 
+template<int Version=detBase>
 struct Process {
   typedef int tt_needs_per_iter_alloc;
 
-  template<typename Context>
-  void operator()(GNode item, Context& lwl) {
-    if (!mesh->containsNode(item, Galois::ALL))
+  struct LocalState {
+    Cavity cav;
+    LocalState(Process<Version>* self, Galois::PerIterAllocTy& alloc): cav(graph, alloc) { }
+  };
+
+  void operator()(GNode item, Galois::UserContext<GNode>& ctx) {
+    if (!graph->containsNode(item, Galois::ALL))
       return;
     
-    Cavity cav(mesh, lwl.getPerIterAlloc());
-    cav.initialize(item);
-    cav.build();
-    cav.update(); //VTune: Most work
-    
-    //FAILSAFE POINT
+    Cavity* cavp = NULL;
 
-    for (PreGraph::iterator ii = cav.getPre().begin(),
-	   ee = cav.getPre().end(); ii != ee; ++ii) 
-      mesh->removeNode(*ii, Galois::NONE);
-    
-    //add new data
-    for (PostGraph::iterator ii = cav.getPost().begin(),
-	   ee = cav.getPost().end(); ii != ee; ++ii) {
-      GNode node = *ii;
-      mesh->addNode(node, Galois::NONE);
-      Element& element = mesh->getData(node, Galois::NONE);
-      if (element.isBad()) {
-        lwl.push(node);
+#ifdef GALOIS_DET
+    if (Version == detDisjoint) {
+      bool used;
+      LocalState* localState = (LocalState*) ctx.getLocalState(used);
+      if (used) {
+        localState->cav.update(item, ctx);
+        return;
+      } else {
+        cavp = &localState->cav;
       }
     }
-    
-    for (PostGraph::edge_iterator ii = cav.getPost().edge_begin(),
-	   ee = cav.getPost().edge_end(); ii != ee; ++ii) {
-      EdgeTuple edge = *ii;
-      mesh->addEdge(edge.src, edge.dst, Galois::NONE);
-    }
+#endif
 
-    if (mesh->containsNode(item, Galois::NONE)) {
-      lwl.push(item);
+    if (Version == detDisjoint) {
+      cavp->initialize(item);
+      cavp->build();
+      cavp->computePost();
+    } else {
+      Cavity cav(graph, ctx.getPerIterAlloc());
+      cav.initialize(item);
+      cav.build();
+      cav.computePost();
+      if (Version == detPrefix)
+        return;
+      cav.update(item, ctx);
     }
   }
 };
@@ -114,7 +118,7 @@ GaloisRuntime::galois_insert_bag<GNode> wl;
 
 struct Preprocess {
   void operator()(GNode item) const {
-    if (mesh->getData(item, Galois::NONE).isBad())
+    if (graph->getData(item, Galois::NONE).isBad())
       wl.push(item);
   }
   // void operator()(Graph::GTile item) const {
@@ -125,12 +129,11 @@ struct Preprocess {
   // }
 };
 
-struct LessThan {
+struct DetLessThan {
   bool operator()(const GNode& a, const GNode& b) const {
-    int idA = mesh->getData(a, Galois::NONE).id;
-    int idB = mesh->getData(b, Galois::NONE).id;
-    if (idA == 0 || idB == 0)
-      abort();
+    int idA = graph->getData(a, Galois::NONE).getId();
+    int idB = graph->getData(b, Galois::NONE).getId();
+    if (idA == 0 || idB == 0) abort();
     return idA < idB;
   }
 };
@@ -141,20 +144,20 @@ int main(int argc, char** argv) {
   Galois::StatManager statManager;
   LonestarStart(argc, argv, std::cout, name, desc, url);
 
-  mesh = new Graph();
+  graph = new Graph();
   {
     Mesh m;
-    m.read(mesh, filename.c_str());
+    m.read(graph, filename.c_str());
     Verifier v;
-    if (!skipVerify && !v.verify(mesh)) {
+    if (!skipVerify && !v.verify(graph)) {
       std::cerr << "bad input mesh\n";
       assert(0 && "Refinement failed");
       abort();
     }
   }
 
-  std::cout << "configuration: " << std::distance(mesh->begin(), mesh->end())
-	    << " total triangles, " << std::count_if(mesh->begin(), mesh->end(), is_bad(mesh)) << " bad triangles\n";
+  std::cout << "configuration: " << std::distance(graph->begin(), graph->end())
+	    << " total triangles, " << std::count_if(graph->begin(), graph->end(), is_bad(graph)) << " bad triangles\n";
 
   Galois::Statistic("MeminfoPre1", GaloisRuntime::MM::pageAllocInfo());
   Galois::preAlloc(15 * numThreads + GaloisRuntime::MM::pageAllocInfo() * 10);
@@ -163,33 +166,39 @@ int main(int argc, char** argv) {
   Galois::StatTimer T;
   T.start();
 
+  Galois::do_all_local(*graph, Preprocess());
 #ifdef GALOIS_DET
-  std::for_each(mesh->begin(), mesh->end(), Preprocess());
-  std::vector<GNode> wlnew;
-  std::copy(wl.begin(), wl.end(), std::back_inserter(wlnew));
-  std::sort(wlnew.begin(), wlnew.end(), LessThan());
   ptrdiff_t (*myptr)(ptrdiff_t) = myrandom;
   srand(0xDEADBEEF);
+  std::vector<GNode> wlnew;
+  std::copy(wl.begin(), wl.end(), std::back_inserter(wlnew));
+  std::sort(wlnew.begin(), wlnew.end(), DetLessThan());
   std::random_shuffle(wlnew.begin(), wlnew.end(), myptr);
-#else
-  Galois::do_all_local(*mesh, Preprocess());
-  //Galois::do_all(mesh->tile_begin(), mesh->tile_end(), Preprocess());
 #endif
   Galois::Statistic("MeminfoMid", GaloisRuntime::MM::pageAllocInfo());
 
   Galois::StatTimer Trefine("refine");
   Trefine.start();
   using namespace GaloisRuntime::WorkList;
-#ifdef GALOIS_DET
-  Galois::for_each<Deterministic<> >(wlnew.begin(), wlnew.end(), Process());
-#else
   typedef LocalQueues<dChunkedLIFO<256>, ChunkedLIFO<256> > BQ;
-  typedef LoadBalanceTracker<BQ, 2048 > DBQ;
   typedef ChunkedAdaptor<false,32> CA;
 
-  typedef PerThreadQueues<LIFO<> > SHP;
-  Galois::for_each_local<CA>(wl, Process());
+#ifdef GALOIS_DET
+  switch (detAlgo) {
+    case nondet: 
+      Galois::for_each<BQ>(wlnew.begin(), wlnew.end(), Process<>()); break;
+    case detBase:
+      Galois::for_each_det<false>(wlnew.begin(), wlnew.end(), Process<>()); break;
+    case detPrefix:
+      Galois::for_each_det<false>(wlnew.begin(), wlnew.end(), Process<detPrefix>(), Process<>());
+      break;
+    case detDisjoint:
+      Galois::for_each_det<true>(wlnew.begin(), wlnew.end(), Process<detDisjoint>()); break;
+    default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
+  }
+#else
   //Galois::for_each<SHP>(wl.begin(), wl.end(), Process());
+  Galois::for_each_local<CA>(wl, Process<>());
 #endif
   Trefine.stop();
   T.stop();
@@ -197,20 +206,20 @@ int main(int argc, char** argv) {
   Galois::Statistic("MeminfoPost", GaloisRuntime::MM::pageAllocInfo());
 
   if (!skipVerify) {
-    int size = Galois::count_if(mesh->begin(), mesh->end(), is_bad(mesh));
+    int size = Galois::count_if(graph->begin(), graph->end(), is_bad(graph));
     if (size != 0) {
       std::cerr << size << " bad triangles remaining.\n";
       assert(0 && "Refinement failed");
       abort();
     }
     Verifier v;
-    if (!v.verify(mesh)) {
+    if (!v.verify(graph)) {
       std::cerr << "Refinement failed.\n";
       assert(0 && "Refinement failed");
       abort();
     }
     std::cout << "Refinement OK\n";
   }
+
   return 0;
 }
-

@@ -38,13 +38,13 @@ class Element {
   // obtuse - 1 is which one
   signed char obtuse;
   bool bDim; // true == 3, false == 2
-
-public:
   int id;
 
- Element(const Tuple& a, const Tuple& b, const Tuple& c, int _id = 0)
+public:
+  //! Constructor for Triangles
+  Element(const Tuple& a, const Tuple& b, const Tuple& c, int _id = 0)
    :obtuse(0), bDim(true), id(_id) 
-  { //constructor for Triangles
+  { 
     coords[0] = a;
     coords[1] = b;
     coords[2] = c;
@@ -67,9 +67,9 @@ public:
 	obtuse = i + 1;
     //computeCenter();
   }
-  
-  Element(const Tuple& a, const Tuple& b, int _id = 0): obtuse(0), bDim(false),id(_id) 
-  { //constructor for segments
+
+  //! Constructor for segments
+  Element(const Tuple& a, const Tuple& b, int _id = 0): obtuse(0), bDim(false), id(_id) {
     coords[0] = a;
     coords[1] = b;
     if (b < a) {
@@ -143,11 +143,13 @@ public:
     int k = (i + 2) % dim(); 
     Tuple::angleCheck(coords[j], coords[i], coords[k], ob, sm, M);
   }
+
   bool angleGTCheck(int i, double M) const {
     int j = (i + 1) % dim();
     int k = (i + 2) % dim(); 
     return Tuple::angleGTCheck(coords[j], coords[i], coords[k], M);
   }
+  
   bool angleOBCheck(int i) const {
     int j = (i + 1) % dim();
     int k = (i + 2) % dim(); 
@@ -172,14 +174,6 @@ public:
     abort();
   }
 
-  const Tuple& getPoint(int i) const {
-    return coords[i];
-  }
-
-  const Tuple& getObtuse() const {
-    return coords[obtuse-1];
-  }
-
   Edge getOppositeObtuse() const {
     //The edge opposite the obtuse angle is the edge formed by
     //the other indexes
@@ -195,7 +189,7 @@ public:
     abort();
   }
 
-  // should the node be processed?
+  //! Should the node be processed?
   bool isBad() const {
     if (!bDim)
       return false;
@@ -205,17 +199,17 @@ public:
     return false;
   }
 
-  int dim() const {
-    return bDim ? 3 : 2;
-  }
+  const Tuple& getPoint(int i) const { return coords[i]; }
 
-  int numEdges() const {
-    return dim() + dim() - 3;
-  }
+  const Tuple& getObtuse() const { return coords[obtuse-1]; }
 
-  bool isObtuse() const {
-    return obtuse != 0;
-  }
+  int dim() const { return bDim ? 3 : 2; }
+
+  int numEdges() const { return dim() + dim() - 3; }
+
+  bool isObtuse() const { return obtuse != 0; }
+
+  int getId() const { return id; }
 
   /**
    * Scans all the edges of the two elements and if it finds one that is

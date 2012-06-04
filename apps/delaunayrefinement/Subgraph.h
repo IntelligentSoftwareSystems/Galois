@@ -25,8 +25,16 @@
 #ifndef SUBGRAPH_H
 #define SUBGRAPH_H
 
+#include "Element.h"
+
+#include "Galois/Galois.h"
+#include "Galois/Graphs/Graph2.h"
+
 #include <vector>
 #include <algorithm>
+
+typedef Galois::Graph::FirstGraph<Element,void,false> Graph;
+typedef Graph::GraphNode GNode;
 
 struct EdgeTuple {
   GNode src;

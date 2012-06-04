@@ -21,10 +21,10 @@
  * @author Milind Kulkarni <milind@purdue.edu>>
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#ifndef _TUPLE_H_
-#define _TUPLE_H_
+#ifndef TUPLE_H
+#define TUPLE_H
 
-#include <cstdio>
+#include <ostream>
 #include <cmath>
 
 class Tuple {
