@@ -31,7 +31,7 @@ SpecPBBS = [{"prob": "breadthFirstSearch",
       "extras": 
         [
           {'algos': ["incrementalRefine", 'g/p', 'g/nd0', 'g/pnd0'],
-           'arg': "Rounds::-r::1,10,50,100:600:100" }
+           'arg': "Rounds::-r::10,50,100:600:100" }
         ]
       },
      {"prob": "delaunayTriangulation",
@@ -40,7 +40,7 @@ SpecPBBS = [{"prob": "breadthFirstSearch",
       "extras":
         [
           {'algos': ["incrementalDelaunay", 'g/p', 'g/nd0', 'g/pnd0'],
-           'arg': "Rounds::-r::1,10,50,100:600:100" }
+           'arg': "Rounds::-r::10,50,100:600:100" }
         ]
       },
      {"prob": "dictionary",
@@ -145,10 +145,13 @@ def system(cmd, cwd=None, out=None):
       self.inp = inp
       self.f = f
     def run(self):
-      for line in self.inp:
-        sys.stdout.write(line)
-        sys.stdout.flush()
-        f.write(line)
+      while True:
+        buf = self.inp.read(1)
+        if not buf:
+          break
+      #for line in self.inp:
+        sys.stdout.write(buf)
+        f.write(buf)
         f.flush()
   
   from subprocess import PIPE, Popen, STDOUT

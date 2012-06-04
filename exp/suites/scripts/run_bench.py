@@ -10,7 +10,6 @@ import subprocess
 import signal
 
 #signal.signal(signal.SIGQUIT, signal.SIG_IGN)
-#sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
 
 def backtick(s):
   proc = subprocess.Popen(s, stdout=subprocess.PIPE, shell=True)
@@ -19,7 +18,7 @@ def backtick(s):
 
 parser = optparse.OptionParser(usage='usage: %prog [options] -- <cmd>')
 parser.add_option('-t', dest='threads', default=1, type='int')
-parser.add_option('-r', dest='rounds', default=1, type='int')
+parser.add_option('-r', dest='rounds', default=0, type='int')
 (options, args) = parser.parse_args()
 
 nprocs = int(backtick("cat /proc/cpuinfo | grep processor | wc -l"))

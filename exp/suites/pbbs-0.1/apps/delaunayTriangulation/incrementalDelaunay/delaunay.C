@@ -194,7 +194,7 @@ simplex generateBoundary(point2d* P, int n, int bCount, vertex* v, tri* t) {
 
 void incrementallyAddPoints(vertex** v, int n, vertex* start) {
   int numRounds = Exp::getNumRounds();
-  numRounds = numRounds < 0 ? 100 : numRounds;
+  numRounds = numRounds =< 0 ? 100 : numRounds;
 
   // various structures needed for each parallel insertion
   //int maxR = (int) (n/100) + 1; // maximum number to try in parallel
