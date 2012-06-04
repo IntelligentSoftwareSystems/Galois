@@ -31,6 +31,8 @@
 #include "Galois/Runtime/mm/Mem.h"
 #include "Galois/util/GAlgs.h"
 
+#include "Galois/gdeque.h"
+
 #include <limits>
 #include <iterator>
 #include <map>
@@ -252,6 +254,59 @@ public:
   }
 };
 WLCOMPILECHECK(FIFO);
+
+template<typename T = int, bool concurrent = true>
+class GFIFO : private boost::noncopyable, private LL::PaddedLock<concurrent>  {
+  Galois::gdeque<T> wl;
+
+  using LL::PaddedLock<concurrent>::lock;
+  using LL::PaddedLock<concurrent>::try_lock;
+  using LL::PaddedLock<concurrent>::unlock;
+
+public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef GFIFO<T, newconcurrent> WL;
+  };
+  template<typename Tnew>
+  struct retype {
+    typedef GFIFO<Tnew, concurrent> WL;
+  };
+
+  typedef T value_type;
+
+  void push(const value_type& val) {
+    lock();
+    wl.push_back(val);
+    unlock();
+  }
+
+  template<typename Iter>
+  void push(Iter b, Iter e) {
+    lock();
+    while (b != e)
+      wl.push_back(*b++);
+    unlock();
+  }
+
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    if (LL::getTID() == 0)
+      push(b,e);
+  }
+
+  boost::optional<value_type> pop() {
+    boost::optional<value_type> retval;
+    lock();
+    if (!wl.empty()) {
+      retval = wl.front();
+      wl.pop_front();
+    }
+    unlock();
+    return retval;
+  }
+};
+WLCOMPILECHECK(GFIFO);
 
 template<class Indexer = DummyIndexer<int>, typename ContainerTy = FIFO<>, typename T = int, bool concurrent = true >
 class OrderedByIntegerMetric : private boost::noncopyable {
