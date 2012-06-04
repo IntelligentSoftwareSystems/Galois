@@ -53,6 +53,8 @@ class GReducible : public GaloisRuntime::AtLoopExit {
   }
 
 public:
+  typedef GReducible<T,BinFunc> SelfTy;
+
   /**
    * @param val initial per thread value
    */
@@ -100,11 +102,6 @@ public:
    */
   void reset(const T& d) {
     _data.reset(d);
-  }
-
-  // TODO: remove later
-  T& get (unsigned i) {
-    return _data.get (i);
   }
 };
 
