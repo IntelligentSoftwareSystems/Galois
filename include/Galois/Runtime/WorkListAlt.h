@@ -198,8 +198,8 @@ public:
 
 
 class StealingQueues : private boost::noncopyable {
-  PerThreadStorage<AtomicChunkLIFO> local;
-  PerThreadStorage<bool> LocalStarving;
+  PerThreadStorage<std::pair<AtomicChunkLIFO, unsigned> > local;
+  //PerThreadStorage<bool> LocalStarving;
   
   volatile unsigned Starving;
   AtomicChunkLIFO global;
@@ -207,7 +207,7 @@ class StealingQueues : private boost::noncopyable {
   GALOIS_ATTRIBUTE_NOINLINE
   ChunkHeader* doSteal() {
     
-    AtomicChunkLIFO& me = *local.getLocal();
+    std::pair<AtomicChunkLIFO, unsigned>& me = *local.getLocal();
     unsigned id = LL::getTID();
     unsigned pkg = LL::getPackageForThread(id);
     unsigned num = ThreadPool::getActiveThreads();
@@ -218,7 +218,7 @@ class StealingQueues : private boost::noncopyable {
     for (unsigned i = 1; i < num; ++i) {
       unsigned eid = (id + i) % num;
       if (LL::getPackageForThreadInternal(eid) == pkg) {
-	ChunkHeader* c = me.stealHalfAndPop(*local.getRemote(eid));
+	ChunkHeader* c = me.first.stealHalfAndPop(local.getRemote(eid)->first);
 	if (c)
 	  return c;
 	  //	  goto stex;
@@ -253,13 +253,12 @@ class StealingQueues : private boost::noncopyable {
 #endif
     //Leaders can cross package
     if (LL::isLeaderForPackage(id)) {
-      for (unsigned i = 1; i < num; ++i) {
-     	unsigned eid = (id + i) % num;
-     	if (LL::isLeaderForPackageInternal(eid)) {
-     	  ChunkHeader* c = me.stealAllAndPop(*local.getRemote(eid));
-     	  if (c)
-     	    return c;
-     	}
+      unsigned eid = (id + me.second) % num;
+      ++me.second;
+      if (id != eid && LL::isLeaderForPackageInternal(eid)) {
+	ChunkHeader* c = me.first.stealAllAndPop(local.getRemote(eid)->first);
+	if (c)
+	  return c;
       }
     }
     return 0;
@@ -269,7 +268,7 @@ public:
   StealingQueues() {} // :Starving(0) {}
 
   void push(ChunkHeader* c) {
-    local.getLocal()->push(c);
+    local.getLocal()->first.push(c);
   }
   ChunkHeader* pop() {
     // ChunkHeader* c = 0;
@@ -279,7 +278,7 @@ public:
     //   c = local.getLocal()->pop();
     // if (c)
     //   return c;
-    if (ChunkHeader* c = local.getLocal()->pop())
+    if (ChunkHeader* c = local.getLocal()->first.pop())
       return c;
     return doSteal();
   }
