@@ -100,7 +100,6 @@ def main(args, options):
         print('RUN: Variable %s = %s' % (name, value))
 
       import subprocess, datetime, os, time, signal
-      sys.stdout.flush()
       if options.timeout:
         start = datetime.datetime.now()
         process = subprocess.Popen(cmd)
@@ -117,7 +116,6 @@ def main(args, options):
         retcode = process.returncode
       else:
         retcode = subprocess.call(cmd)
-      sys.stdout.flush()
       if retcode != 0:
         # print command line just in case child process should be died before doing it
         print("INFO: CommandLine %s\n" % ' '.join(cmd))
