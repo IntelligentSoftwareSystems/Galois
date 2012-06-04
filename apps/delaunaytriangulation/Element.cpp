@@ -29,7 +29,7 @@ std::ostream& operator<<(std::ostream& out, const Element& e) {
 }
 
 bool Element::inTriangle(const Tuple& p) const {
-  if (m_boundary)
+  if (boundary())
     return false;
 
   const Tuple& p1 = points[0]->t();
@@ -108,7 +108,7 @@ bool Element::inTriangle(const Tuple& p) const {
 }
 
 bool Element::clockwise() const {
-  assert(!m_boundary);
+  assert(!boundary());
 
   double t1_x = points[0]->t().x();
   double t1_y = points[0]->t().y();
@@ -125,7 +125,7 @@ bool Element::clockwise() const {
 }
 
 bool Element::inCircle(const Tuple& p) const {
-  if (m_boundary)
+  if (boundary())
     return false;
 
   // This version computes the determinant of a matrix including the

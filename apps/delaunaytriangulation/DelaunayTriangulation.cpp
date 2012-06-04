@@ -80,7 +80,7 @@ typedef std::vector<Point> PointList;
 
 Graph* graph;
 
-struct GetPointer: public std::unary_function<Point,Point*> {
+struct GetPointer: public std::unary_function<Point&,Point*> {
   Point* operator()(Point& p) const { return &p; }
 };
 
@@ -88,6 +88,7 @@ struct GetPointer: public std::unary_function<Point,Point*> {
 template<int Version=detBase>
 struct Process {
   typedef int tt_needs_per_iter_alloc;
+  typedef int tt_needs_parallel_break;
   typedef int tt_does_not_need_parallel_push;
   typedef Galois::PerIterAllocTy Alloc;
 
@@ -298,9 +299,9 @@ struct ReadPoints {
       QuadTree t(
         boost::make_transform_iterator(&points[0], GetPointer()),
         boost::make_transform_iterator(&points[points.size()], GetPointer()));
-      t.output(std::back_insert_iterator<PointList>(result));
+      t.output(std::back_inserter(result));
     } else {
-      std::copy(points.begin(), points.end(), std::back_insert_iterator<PointList>(result));
+      std::copy(points.begin(), points.end(), std::back_inserter(result));
     }
     addBoundaryPoints();
   }
@@ -434,7 +435,7 @@ static void addBoundaryNodes(PointList& points) {
 }
 
 static void makeGraph(const std::string& filename, PointList& points) {
-  ReadPoints(points).from(filename);
+  ReadPoints(points).from(filename, false);
 
   graph = new Graph();
 
@@ -507,16 +508,16 @@ static void generateMesh(PointList& points) {
   std::copy(
       boost::make_transform_iterator(&points[0], GetPointer()),
       boost::make_transform_iterator(&points[end], GetPointer()),
-      std::back_insert_iterator<OrderTy>(order));
+      std::back_inserter(order));
   ptrdiff_t (*myptr)(ptrdiff_t) = myrandom;
   srand(0xDEADBEEF);
-  std::random_shuffle(&order[0], &order[eend], myptr);
+  //std::random_shuffle(&order[0], &order[eend], myptr);
   BT.stop();
 
 #ifdef GALOIS_DET
-  size_t prologue = eend - std::min((size_t) 16*16, eend);
+  size_t prologue = eend - std::min((size_t) 32*16, eend);
 #else
-  size_t prologue = eend - std::min((size_t) 16*numThreads, eend);
+  size_t prologue = eend - std::min((size_t) 32*numThreads, eend);
 #endif
  
   Galois::StatTimer T1("serial");
@@ -525,19 +526,19 @@ static void generateMesh(PointList& points) {
   std::for_each(&order[prologue], &order[eend], Process<>(&q));
   T1.stop();
 
-  const int multiplier = 8;
-  size_t nextStep = multiplier;
+  const int multiplier = 64;
   size_t top = prologue;
   size_t prevTop = end;
+  size_t nextStep = (prevTop - top) * multiplier;
 
   using namespace GaloisRuntime::WorkList;
   typedef GaloisRuntime::WorkList::dChunkedLIFO<32> WL;
 
   do {
-    Galois::StatTimer BT("build");
+    Galois::StatTimer BT("buildtree");
     BT.start();
-    //QuadTree q(&order[top], &order[prevTop]);
-    QuadTree q(&order[top], &order[end]);
+    QuadTree q(&order[top], &order[prevTop]);
+    //printf("size: %zu\n", prevTop - top); 
     prevTop = top;
     top = top > nextStep ? top - nextStep : 0;
     nextStep = nextStep*multiplier; //std::min(nextStep*multiplier, 1000000UL);

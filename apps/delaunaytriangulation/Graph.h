@@ -34,7 +34,7 @@
 #include <vector>
 #include <deque>
 
-typedef Galois::Graph::FirstGraph<Element,int,true> Graph;
+typedef Galois::Graph::FirstGraph<Element,char,true> Graph;
 typedef Graph::GraphNode GNode;
 
 //! Factor out common graph traversals
@@ -43,7 +43,6 @@ struct Searcher: private boost::noncopyable {
   typedef Alloc allocator_type;
   typedef std::vector<GNode, Alloc> GNodeVector;
 
-#if 1
   struct Marker {
     std::vector<GNode,Alloc> seen;
     Marker(Graph&, const Alloc& a): seen(a) { }
@@ -54,19 +53,6 @@ struct Searcher: private boost::noncopyable {
       return std::find(seen.begin(), seen.end(), n) != seen.end();
     }
   };
-#else
-  struct Marker {
-    Graph& graph;
-    ElementMark m;
-    Marker(Graph& g, const Alloc&, const ElementMark& _m): graph(g), m(_m) { }
-    void mark(GNode n) { 
-      graph.getData(n, Galois::NONE).getMark().update(m);
-    }
-    bool hasMark(GNode n) { 
-      return graph.getData(n, Galois::NONE).getMark() == m;
-    }
-  };
-#endif
 
   Graph& graph;
   GNodeVector matches, inside;
