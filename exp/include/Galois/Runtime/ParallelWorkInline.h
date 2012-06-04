@@ -332,11 +332,6 @@ public:
     barrier2.reinit(numActive);
   }
 
-  ~ForEachWork() {
-    if (ForEachTraits<FunctionTy>::NeedsStats)
-      GaloisRuntime::statDone();
-  }
-
   template<typename IterTy>
   bool AddInitialWork(IterTy b, IterTy e) {
     unsigned int a = ThreadPool::getActiveThreads();
