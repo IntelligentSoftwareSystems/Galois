@@ -31,6 +31,7 @@
 #include <string>
 #include <map>
 #include <iostream>
+#include <cstdio>
 
 struct is_bad {
   Graph* g;
