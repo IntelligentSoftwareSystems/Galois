@@ -58,7 +58,7 @@ endif(ZLIB_FOUND)
 
 #Boost
 #not needed now but will be needed for newer version of Boost after 1.4X ish
-set(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0" "1.47" "1.47.0")
+set(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0" "1.47" "1.47.0" "1.49" "1.49.0")
 set(Boost_USE_MULTITHREADED OFF) # newer boost builds don't use -mt extension
 #Other options that can be used with find_package(Boost)
 # set(BOOST_ROOT /path/)
