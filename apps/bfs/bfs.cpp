@@ -849,6 +849,7 @@ void run(const AlgoTy& algo) {
 }
 
 int main(int argc, char **argv) {
+  Galois::StatManager statManager;
   LonestarStart(argc, argv, std::cout, name, desc, url);
 
   using namespace GaloisRuntime::WorkList;
