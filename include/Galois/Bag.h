@@ -85,7 +85,7 @@ protected:
     }
   }
 
-  Header* initHeader(Header* h, T* begin, T* last) {
+  static Header* initHeader(Header* h, T* begin, T* last) {
     h->m_begin = h->m_end = begin;
     h->m_last = last;
     h->m_next = h->m_prev = h;
@@ -481,7 +481,7 @@ class SmallBag: public Bag<T> {
 public:
   SmallBag() {
     T* a = static_cast<T*>(static_cast<void*>(&(this->m_first)));
-    this->m_head = initHeader(&m_h, a, a + MaxTs);
+    this->m_head = Bag<T>::initHeader(&m_h, a, a + MaxTs);
   }
 };
 
