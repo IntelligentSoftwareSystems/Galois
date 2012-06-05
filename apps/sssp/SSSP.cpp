@@ -288,6 +288,7 @@ void run(const AlgoTy& algo, GNode source) {
 }
 
 int main(int argc, char **argv) {
+  Galois::StatManager statManager;
   LonestarStart(argc, argv, std::cout, name, desc, url);
 
   GNode source, report;
