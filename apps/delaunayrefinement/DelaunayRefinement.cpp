@@ -31,6 +31,7 @@
 #include "Verifier.h"
 
 #include "Galois/Galois.h"
+#include "Galois/Bag.h"
 #include "Galois/Statistic.h"
 
 #include "llvm/Support/CommandLine.h"
@@ -114,19 +115,13 @@ struct Process {
   }
 };
 
-GaloisRuntime::galois_insert_bag<GNode> wl;
+Galois::InsertBag<GNode> wl;
 
 struct Preprocess {
   void operator()(GNode item) const {
     if (graph->getData(item, Galois::NONE).isBad())
       wl.push(item);
   }
-  // void operator()(Graph::GTile item) const {
-  //   for (Graph::GTile::iterator ii = item.begin(), ee = item.end();
-  // 	 ii != ee; ++ii)
-  //     if (mesh->getData(*ii, Galois::NONE).isBad())
-  // 	wl.push(*ii);
-  // }
 };
 
 struct DetLessThan {
@@ -137,8 +132,6 @@ struct DetLessThan {
     return idA < idB;
   }
 };
-
-static ptrdiff_t myrandom(ptrdiff_t i) { return rand() % i; }
 
 int main(int argc, char** argv) {
   Galois::StatManager statManager;
@@ -166,14 +159,10 @@ int main(int argc, char** argv) {
   Galois::StatTimer T;
   T.start();
 
-  Galois::do_all_local(*graph, Preprocess());
 #ifdef GALOIS_DET
-  ptrdiff_t (*myptr)(ptrdiff_t) = myrandom;
-  srand(0xDEADBEEF);
-  std::vector<GNode> wlnew;
-  std::copy(wl.begin(), wl.end(), std::back_inserter(wlnew));
-  std::sort(wlnew.begin(), wlnew.end(), DetLessThan());
-  std::random_shuffle(wlnew.begin(), wlnew.end(), myptr);
+  std::for_each(graph->begin(), graph->end(), Preprocess());
+#else
+  Galois::do_all_local(*graph, Preprocess());
 #endif
   Galois::Statistic("MeminfoMid", GaloisRuntime::MM::pageAllocInfo());
 
@@ -186,14 +175,14 @@ int main(int argc, char** argv) {
 #ifdef GALOIS_DET
   switch (detAlgo) {
     case nondet: 
-      Galois::for_each<BQ>(wlnew.begin(), wlnew.end(), Process<>()); break;
+      Galois::for_each<BQ>(wl.begin(), wl.end(), Process<>()); break;
     case detBase:
-      Galois::for_each_det<false>(wlnew.begin(), wlnew.end(), Process<>()); break;
+      Galois::for_each_det<false>(wl.begin(), wl.end(), Process<>()); break;
     case detPrefix:
-      Galois::for_each_det<false>(wlnew.begin(), wlnew.end(), Process<detPrefix>(), Process<>());
+      Galois::for_each_det<false>(wl.begin(), wl.end(), Process<detPrefix>(), Process<>());
       break;
     case detDisjoint:
-      Galois::for_each_det<true>(wlnew.begin(), wlnew.end(), Process<detDisjoint>()); break;
+      Galois::for_each_det<true>(wl.begin(), wl.end(), Process<detDisjoint>()); break;
     default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
   }
 #else
