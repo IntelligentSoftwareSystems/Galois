@@ -22,7 +22,7 @@
  */
 
 #include "Galois/Runtime/Threads.h"
-#include "Galois/Runtime/PerThreadStorage.h"
+#include "Galois/Runtime/EnvCheck.h"
 #include "Galois/Runtime/ll/HWTopo.h"
 #include "Galois/Runtime/ll/TID.h"
 
@@ -32,7 +32,6 @@
 #include <cstdio>
 #include <cerrno>
 #include <cassert>
-#include <list>
 #include <vector>
 
 #include <semaphore.h>
@@ -41,6 +40,12 @@
 #ifdef GALOIS_DMP
 #include "dmp.h"
 #endif
+
+//Forward declare this to avoid including PerThreadStorage
+//We avoid this to stress that the thread Pool MUST NOT depend on PTS
+namespace GaloisRuntime {
+extern void initPTS();
+}
 
 using namespace GaloisRuntime;
 
@@ -148,6 +153,7 @@ class ThreadPool_pthread : public ThreadPool {
   ThinBarrier started;
   unsigned maxThreads;
   volatile bool shutdown; // Set and start threads to have them exit
+  volatile unsigned starting; //Each run call uses this to control #threads
   volatile RunCommand* workBegin; //Begin iterator for work commands
   volatile RunCommand* workEnd; //End iterator for work commands
 
@@ -156,18 +162,18 @@ class ThreadPool_pthread : public ThreadPool {
     GaloisRuntime::LL::initTID();
     unsigned id = GaloisRuntime::LL::getTID();
     GaloisRuntime::initPTS();
-#ifdef GALOIS_DO_NOT_BIND_MAIN_THREAD
-    if (id != 0)
-#endif
-    GaloisRuntime::LL::bindThreadToProcessor(id);
+    if (id != 0 || !EnvCheck("DO_NOT_BIND_MAIN_THREAD"))
+      GaloisRuntime::LL::bindThreadToProcessor(id);
+    //we use a simple pthread or atomic to avoid depending on Galois
+    //stuff too early in the initialization process
     started.release();
   }
 
   void cascade(int tid) {
-    unsigned multiple = 2;
+    const unsigned multiple = 2;
     for (unsigned i = 1; i <= multiple; ++i) {
       unsigned n = tid * multiple + i;
-      if (n < activeThreads)
+      if (n < starting)
         starts[n].release();
     }
   }
@@ -227,24 +233,24 @@ public:
     delete [] threads;
   }
 
-  virtual void run(RunCommand* begin, RunCommand* end) {
+  virtual void run(RunCommand* begin, RunCommand* end, unsigned num) {
+    //sanatize num
+    num = std::min(num, maxThreads);
+    num = std::max(num, 1U);
+    starting = num;
+    //setup work
     workBegin = begin;
     workEnd = end;
+    //ensure stores happen before children are spawned
     __sync_synchronize();
     //Do master thread work
     doWork(0);
     //clean up
-    __sync_synchronize();
     workBegin = workEnd = 0;
   }
 
-  virtual unsigned int setActiveThreads(unsigned int num) {
-    if (num == 0) {
-      activeThreads = 1;
-    } else {
-      activeThreads = std::min(num, maxThreads);
-    }
-    return activeThreads;
+  virtual unsigned getMaxThreads() const {
+    return maxThreads;
   }
 };
 

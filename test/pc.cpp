@@ -27,7 +27,7 @@ struct test {
 template<typename T>
 void testf(T& b, const char* str) {
   std::cout << "\nRunning: " << &b << " " << str << "\n";
-  b.reinit(GaloisRuntime::getSystemThreadPool().getActiveThreads());
+  b.reinit(Galois::getActiveThreads());
   Galois::Timer t;
   t.start();
   Galois::on_each(test<T>(b));
@@ -41,7 +41,7 @@ int main() {
 
   while (M) {
     
-    Galois::setMaxThreads(M); //GaloisRuntime::LL::getMaxThreads());
+    Galois::setActiveThreads(M); //GaloisRuntime::LL::getMaxThreads());
   std::cout << "Using " << M << " threads\n";
 
   if (0) {
@@ -83,7 +83,7 @@ int main() {
 }
 
   //testf(pbarrier, "pthread");
-  //  testf(fbarrier, "fast");
+  testf(fbarrier, "fast");
   testf(mbarrier, "mcs");
   //  testf(ffbarrier, "faster");
   testf(tbarrier, "topo");

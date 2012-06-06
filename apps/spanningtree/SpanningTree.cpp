@@ -90,7 +90,7 @@ bool verify(Galois::InsertBag<Edge>& result) {
 }
 
 int main(int argc, char** argv) {
-  LonestarStart(argc, argv, std::cout, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url);
 
   boost::optional<GNode> root;
   graph.structureFromFile(filename.c_str());

@@ -23,9 +23,9 @@
 #ifndef GALOIS_USERCONTEXT_H
 #define GALOIS_USERCONTEXT_H
 
-#include <vector>
-
 #include "Galois/Mem.h"
+#include "Galois/gdeque.h"
+
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/MethodFlags.h"
 
@@ -52,7 +52,7 @@ class UserContext: private boost::noncopyable {
   }
 
   //! push stuff
-  typedef std::vector<T> pushBufferTy;
+  typedef gdeque<T> pushBufferTy;
   pushBufferTy pushBuffer;
 
   pushBufferTy& __getPushBuffer() {

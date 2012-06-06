@@ -528,7 +528,7 @@ void run() {
 
 int main(int argc, char** argv) {
   bool serial = false;
-  LonestarStart(argc, argv, std::cout, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url);
 
   if (sourceId < 0 || sinkId < 0 || sourceId == sinkId) {
     std::cerr << "invalid source or sink id\n";

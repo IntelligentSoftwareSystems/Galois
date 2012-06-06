@@ -129,7 +129,7 @@ bool verify() {
 }
 
 int main(int argc, char** argv) {
-  LonestarStart(argc, argv, std::cout, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url);
 
   graph.structureFromFile(filename.c_str());
 

@@ -210,7 +210,7 @@ void readGraph(MetisGraph* metisGraph, const char* filename, bool weighted = fal
 }
 
 int main(int argc, char** argv) {
-  LonestarStart(argc, argv, std::cout, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url);
 
 	srand(-1);
 	MetisGraph metisGraph;

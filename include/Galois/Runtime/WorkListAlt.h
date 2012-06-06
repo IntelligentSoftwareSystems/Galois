@@ -210,7 +210,7 @@ class StealingQueues : private boost::noncopyable {
     std::pair<AtomicChunkLIFO, unsigned>& me = *local.getLocal();
     unsigned id = LL::getTID();
     unsigned pkg = LL::getPackageForThread(id);
-    unsigned num = ThreadPool::getActiveThreads();
+    unsigned num = Galois::getActiveThreads();
 
     ChunkHeader* c = 0;
 
@@ -402,7 +402,7 @@ boost::optional<typename QueueTy::value_type>
 stealHalfInPackage(PerThreadStorage<QueueTy>& queues) {
   unsigned id = LL::getTID();
   unsigned pkg = LL::getPackageForThread(id);
-  unsigned num = ThreadPool::getActiveThreads();
+  unsigned num = Galois::getActiveThreads();
   QueueTy* me = queues.getLocal();
   boost::optional<typename QueueTy::value_type> retval;
   
@@ -424,7 +424,7 @@ boost::optional<typename QueueTy::value_type>
 stealRemote(PerThreadStorage<QueueTy>& queues) {
   unsigned id = LL::getTID();
   unsigned pkg = LL::getPackageForThread(id);
-  unsigned num = ThreadPool::getActiveThreads();
+  unsigned num = Galois::getActiveThreads();
   QueueTy* me = queues.getLocal();
   boost::optional<typename QueueTy::value_type> retval;
   
@@ -456,7 +456,7 @@ private:
 
   template<typename Iter>
   void fill_work_l2(Iter& b, Iter& e) {
-    unsigned int a = ThreadPool::getActiveThreads();
+    unsigned int a = Galois::getActiveThreads();
     unsigned int id = LL::getTID();
     unsigned dist = std::distance(b, e);
     unsigned num = (dist + a - 1) / a; //round up
@@ -475,7 +475,7 @@ private:
     Iter b2 = b;
     Iter e2 = e;
     fill_work_l2(b2, e2);
-    unsigned int a = ThreadPool::getActiveThreads();
+    unsigned int a = Galois::getActiveThreads();
     unsigned int id = LL::getTID();
     std::vector<std::vector<value_type> > ranges;
     ranges.resize(a);

@@ -409,7 +409,7 @@ bool survey_inspired_decimation() {
 
 
 int main(int argc, char** argv) {
-  LonestarStart(argc, argv, std::cout, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url);
   srand(seed);
   initialize_random_formula(M,N,K);
   //print_formula();

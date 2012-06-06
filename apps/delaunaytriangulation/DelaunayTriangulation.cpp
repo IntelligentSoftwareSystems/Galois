@@ -568,7 +568,7 @@ static void generateMesh(PointList& points) {
 
 int main(int argc, char** argv) {
   Galois::StatManager statManager;
-  LonestarStart(argc, argv, std::cout, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url);
 
   PointList points;
   makeGraph(inputname, points);

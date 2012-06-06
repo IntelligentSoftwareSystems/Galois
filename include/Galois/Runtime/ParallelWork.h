@@ -94,7 +94,7 @@ class ForEachWork {
 protected:
   typedef T value_type;
   typedef typename WorkListTy::template retype<value_type>::WL WLTy;
-  typedef WorkList::FIFO<value_type, true> AbortedList;
+  typedef WorkList::GFIFO<value_type> AbortedList;
 
   struct ThreadLocalData {
     GaloisRuntime::UserContextAccess<value_type> facing;
@@ -284,7 +284,7 @@ public:
 
   void operator()() {
     if (LL::isLeaderForPackage(LL::getTID()) &&
-	ThreadPool::getActiveThreads() > 1 && 
+	Galois::getActiveThreads() > 1 && 
 	ForEachTraits<FunctionTy>::NeedsAborts)
       go<true>();
     else
@@ -355,7 +355,7 @@ struct WOnEach {
   WOnEach(FunctionTy& f) :fn(f) {}
   void operator()(void) const {
     fn(GaloisRuntime::LL::getTID(), 
-       ThreadPool::getActiveThreads());   
+       Galois::getActiveThreads());   
   }
 };
 
@@ -377,7 +377,7 @@ struct WPreAlloc {
 };
 
 static inline void preAlloc_impl(int num) {
-  int a = GaloisRuntime::getSystemThreadPool().getActiveThreads();
+  int a = Galois::getActiveThreads();
   a = (num + a - 1) / a;
   WPreAlloc P(a);
   GaloisRuntime::RunCommand w[2] = {Config::ref(P),

@@ -24,29 +24,22 @@
 #define GALOIS_RUNTIME_THREADS_H
 
 #include "Galois/Runtime/Config.h"
+#include "Galois/Threads.h"
 
 namespace GaloisRuntime {
 
 typedef Config::function<void (void)> RunCommand;
 
 class ThreadPool {
-protected:
-  static unsigned int activeThreads;
-
 public:
   virtual ~ThreadPool() { }
 
   //!execute work on all threads
   //!preWork and postWork are executed only on the master thread
-  virtual void run(RunCommand* begin, RunCommand* end) = 0;
-  
-  //!change the number of threads to num
-  //!returns the number that the runtime chooses (may not be num)
-  virtual unsigned int setActiveThreads(unsigned int num) = 0;
+  virtual void run(RunCommand* begin, RunCommand* end, unsigned num = Galois::getActiveThreads()) = 0;
 
-  //!How many threads will be used
-  static unsigned int getActiveThreads() { return activeThreads; }
-
+  //!return the number of threads supported by the thread pool on the current machine
+  virtual unsigned getMaxThreads() const = 0;
 };
 
 //!Returns or creates the appropriate thread pool for the system

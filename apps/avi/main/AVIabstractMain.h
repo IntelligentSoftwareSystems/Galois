@@ -209,7 +209,7 @@ void AVIabstractMain::initGlobalVec (const MeshInit& meshInit, GlobalVec& g) {
 }
 
 void AVIabstractMain::run (int argc, char* argv[]) {
-  LonestarStart(argc, argv, std::cout, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url);
 
   // print messages e.g. version, input etc.
   InputConfig input = readCmdLine ();

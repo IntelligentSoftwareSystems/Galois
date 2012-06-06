@@ -128,7 +128,7 @@ void resetParallel() {
 }
 
 int main(int argc, char **argv) {
-  LonestarStart(argc, argv, std::cout, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url);
 
   // Galois::Statistic<unsigned int> sBadWork("BadWork");
   // Galois::Statistic<unsigned int> sWLEmptyWork("WLEmptyWork");

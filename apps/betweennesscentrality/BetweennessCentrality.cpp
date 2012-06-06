@@ -294,7 +294,7 @@ struct HasOut: public std::unary_function<GNode,bool> {
 };
 
 int main(int argc, char** argv) {
-  LonestarStart(argc, argv, std::cout, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url);
 
   Graph g;
   G = &g;

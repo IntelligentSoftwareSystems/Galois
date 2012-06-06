@@ -50,7 +50,7 @@ struct process {
 };
 
 int main(int argc, char** argv) {
-  LonestarStart(argc, argv, std::cout, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url);
 
   std::vector<int> v((int)ival, (int)sval);
 

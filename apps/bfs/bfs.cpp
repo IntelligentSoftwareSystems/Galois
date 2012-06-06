@@ -850,7 +850,7 @@ void run(const AlgoTy& algo) {
 
 int main(int argc, char **argv) {
   Galois::StatManager statManager;
-  LonestarStart(argc, argv, std::cout, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url);
 
   using namespace GaloisRuntime::WorkList;
   typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;

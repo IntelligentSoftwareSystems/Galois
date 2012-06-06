@@ -23,10 +23,14 @@
 #include "Galois/Runtime/Threads.h"
 #include "Galois/Threads.h"
 
+#include <algorithm>
+
 using namespace GaloisRuntime;
 
-unsigned int Galois::setMaxThreads(unsigned int num) {
-  return GaloisRuntime::getSystemThreadPool().setActiveThreads(num);
+unsigned int Galois::setActiveThreads(unsigned int num) {
+  num = std::min(num, GaloisRuntime::getSystemThreadPool().getMaxThreads());
+  num = std::max(num, 1U);
+  GaloisRuntime::galoisActiveThreads = num;
 }
 
-unsigned int GaloisRuntime::ThreadPool::activeThreads = 1;
+unsigned int GaloisRuntime::galoisActiveThreads = 1;

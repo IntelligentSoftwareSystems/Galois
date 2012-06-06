@@ -573,7 +573,7 @@ void run(int nbodies, int ntimesteps, int seed) {
 
   for (int step = 0; step < ntimesteps; step++) {
     // Do tree building sequentially
-    Galois::setMaxThreads(1);
+    Galois::setActiveThreads(1);
 
     BoundingBox box;
     ReduceBoxes reduceBoxes(box);
@@ -589,7 +589,7 @@ void run(int nbodies, int ntimesteps, int seed) {
 
     Galois::StatTimer T_parallel("ParallelTime");
     T_parallel.start();
-    Galois::setMaxThreads(numThreads);
+    Galois::setActiveThreads(numThreads);
 
     Galois::for_each<WL>(wrap(bodies.begin()), wrap(bodies.end()),
         ComputeForces(top, box.diameter()));
@@ -607,7 +607,7 @@ void run(int nbodies, int ntimesteps, int seed) {
 } // end namespace
 
 int main(int argc, char** argv) {
-  LonestarStart(argc, argv, std::cout, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url);
   std::cout.setf(std::ios::right|std::ios::scientific|std::ios::showpoint);
 
   std::cerr << "configuration: "

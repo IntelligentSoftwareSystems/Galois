@@ -24,7 +24,7 @@
 #include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/Support.h"
-#include "Galois/Runtime/Threads.h"
+#include "Galois/Threads.h"
 #include "Galois/Statistic.h"
 
 #include <set>
@@ -97,7 +97,7 @@ public:
   }
 
   void addToStat(Galois::Statistic* value) {
-    for (unsigned x = 0; x < GaloisRuntime::ThreadPool::getActiveThreads(); ++x)
+    for (unsigned x = 0; x < Galois::getActiveThreads(); ++x)
       (*Stats.getRemote(x))[mkKey(value->getLoopname(), value->getStatname())] += value->getValue(x);
   }
 
@@ -105,7 +105,7 @@ public:
   void printStats() {
     std::set<std::string> Loops;
     std::set<std::string> Keys;
-    unsigned maxThreadID = GaloisRuntime::ThreadPool::getActiveThreads();
+    unsigned maxThreadID = Galois::getActiveThreads();
     //Find all loops and keys
     for (unsigned x = 0; x < maxThreadID; ++x) {
       std::map<KeyTy, unsigned long>& M = *Stats.getRemote(x);

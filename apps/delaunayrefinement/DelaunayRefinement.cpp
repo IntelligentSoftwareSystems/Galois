@@ -135,7 +135,7 @@ struct DetLessThan {
 
 int main(int argc, char** argv) {
   Galois::StatManager statManager;
-  LonestarStart(argc, argv, std::cout, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url);
 
   graph = new Graph();
   {
@@ -165,13 +165,16 @@ int main(int argc, char** argv) {
   Galois::do_all_local(*graph, Preprocess());
 #endif
   Galois::Statistic("MeminfoMid", GaloisRuntime::MM::pageAllocInfo());
-
+  
   Galois::StatTimer Trefine("refine");
   Trefine.start();
   using namespace GaloisRuntime::WorkList;
+  
   typedef LocalQueues<dChunkedLIFO<256>, ChunkedLIFO<256> > BQ;
+  typedef LoadBalanceTracker<BQ, 2048 > DBQ;
   typedef ChunkedAdaptor<false,32> CA;
-
+  typedef PerThreadQueues<LIFO<> > SHP;
+  
 #ifdef GALOIS_DET
   switch (detAlgo) {
     case nondet: 
@@ -186,14 +189,13 @@ int main(int argc, char** argv) {
     default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
   }
 #else
-  //Galois::for_each<SHP>(wl.begin(), wl.end(), Process());
   Galois::for_each_local<CA>(wl, Process<>());
 #endif
   Trefine.stop();
   T.stop();
-
+  
   Galois::Statistic("MeminfoPost", GaloisRuntime::MM::pageAllocInfo());
-
+  
   if (!skipVerify) {
     int size = Galois::count_if(graph->begin(), graph->end(), is_bad(graph));
     if (size != 0) {

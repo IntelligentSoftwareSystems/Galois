@@ -361,7 +361,7 @@ struct MatchingFF {
     SerialRevs revs;
     SerialReached reached;
 
-    Galois::setMaxThreads(Concurrent ? numThreads : 1);
+    Galois::setActiveThreads(Concurrent ? numThreads : 1);
     Galois::for_each(g.A.begin(), g.A.end(), Process(*this, g, revs, reached));
   }
 };
@@ -512,7 +512,7 @@ struct MatchingABMP {
 
     unsigned maxLayer = (unsigned) (0.1*sqrt(g.size()));
     size_t size = initial.size();
-    Galois::setMaxThreads(Concurrent ? numThreads : 1);
+    Galois::setActiveThreads(Concurrent ? numThreads : 1);
     
     using namespace GaloisRuntime::WorkList;
 
@@ -841,7 +841,7 @@ struct MatchingMF {
     t.stop();
 
     bool shouldGlobalRelabel = false;
-    Galois::setMaxThreads(Concurrent ? numThreads : 1);
+    Galois::setActiveThreads(Concurrent ? numThreads : 1);
     while (!initial.empty()) {
       Galois::for_each(initial.begin(), initial.end(), 
           Process(*this, g, source, sink, numNodes, interval, shouldGlobalRelabel));
@@ -1035,7 +1035,7 @@ void start(int N, int numEdges, int numGroups) {
 }
 
 int main(int argc, char** argv) {
-  LonestarStart(argc, argv, std::cout, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url);
 
   std::cout << "N: " << N 
     << " numEdges: " << numEdges 

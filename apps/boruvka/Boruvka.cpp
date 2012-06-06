@@ -494,7 +494,7 @@ EdgeDataType verify(Graph & g){
 #endif
 //////////////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char **argv) {
-   LonestarStart(argc, argv, std::cout, name, desc, url);
+   LonestarStart(argc, argv, name, desc, url);
    if(use_weighted_rmat)
       readWeightedRMAT(inputfile.c_str());
    else

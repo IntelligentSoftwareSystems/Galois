@@ -543,7 +543,7 @@ void printConstraints(PointsToConstraints &constraints) {
 }
 
 int main(int argc, char** argv) {
-  LonestarStart(argc, argv, std::cout, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url);
 
   numNodes = readConstraints(input.c_str(), addrcopyconstraints, loadstoreconstraints);
   //printConstraints(addrcopyconstraints);

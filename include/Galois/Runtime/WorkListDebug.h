@@ -200,7 +200,7 @@ public:
 
   typedef typename realWL::value_type value_type;
 
-  LoadBalanceTracker() :Pr(ThreadPool::getActiveThreads()) {}
+  LoadBalanceTracker() :Pr(Galois::getActiveThreads()) {}
 
   ~LoadBalanceTracker() {
     std::ofstream file("tracking.csv", std::ofstream::trunc);

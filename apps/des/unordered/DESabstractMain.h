@@ -97,7 +97,7 @@ public:
    */
   void run(int argc, char* argv[]) {
 
-    LonestarStart(argc, argv, std::cout, name, desc, url);
+    LonestarStart(argc, argv, name, desc, url);
 
     printf ("Processing %zd events per iteration\n", AbstractSimObject::NEVENTS_PER_ITER);
 

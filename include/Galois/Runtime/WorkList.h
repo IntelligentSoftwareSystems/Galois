@@ -25,7 +25,7 @@
 
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/Barrier.h"
-#include "Galois/Runtime/Threads.h"
+#include "Galois/Threads.h"
 #include "Galois/Runtime/WorkListHelpers.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/mm/Mem.h"
@@ -96,7 +96,7 @@ public:
 
 template<typename Iter>
 void fill_work(Iter& b, Iter& e) {
-  unsigned int a = ThreadPool::getActiveThreads();
+  unsigned int a = Galois::getActiveThreads();
   unsigned int id = LL::getTID();
   unsigned int dist = std::distance(b, e);
   unsigned int num = (dist + a - 1) / a; //round up
@@ -434,7 +434,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
 #else
     unsigned msS = p.scanStart;
     if (localLeader)
-      for (int i = 0; i < (int) ThreadPool::getActiveThreads(); ++i)
+      for (int i = 0; i < (int) Galois::getActiveThreads(); ++i)
 	msS = std::min(msS, current.getRemote(i)->scanStart);
     else
       msS = std::min(msS, current.getRemote(LL::getLeaderForThread(myID))->scanStart);
@@ -698,7 +698,7 @@ class ForwardAccessRange {
     IterTy begin;
     IterTy end;
     unsigned num;
-    TLD() :num(ThreadPool::getActiveThreads()) {}
+    TLD() :num(Galois::getActiveThreads()) {}
   };
 
   PerThreadStorage<TLD> tlds;
@@ -789,7 +789,7 @@ private:
       return;
     //Then try stealing from neighbor
     //TLD& otld = tlds.getNext(ThreadPool::getActiveThreads());
-    int num = ThreadPool::getActiveThreads();
+    int num = Galois::getActiveThreads();
     if (do_steal(tld, *tlds.getRemote((LL::getTID() + 1) % num))) {
       //redistribute stolen items for neighbor to steal too
       if (std::distance(tld.begin, tld.end) > 1) {
@@ -1053,7 +1053,7 @@ class BulkSynchronous : private boost::noncopyable {
   };
 
   BulkSynchronous(): empty(false) {
-    unsigned numActive = GaloisRuntime::getSystemThreadPool().getActiveThreads();
+    unsigned numActive = Galois::getActiveThreads();
     barrier1.reinit(numActive);
     barrier2.reinit(numActive);
   }
