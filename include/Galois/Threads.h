@@ -23,6 +23,10 @@
 
 //This is a separate file so that Threads.cpp can include almost nothing
 
+namespace GaloisRuntime {
+extern unsigned galoisActiveThreads;
+}
+
 namespace Galois {
 
 /**
@@ -30,7 +34,8 @@ namespace Galois {
  * the actual value of threads used, which could be less than
  * the requested value.
  */
-unsigned int setMaxThreads(unsigned int num);
+unsigned int setActiveThreads(unsigned int num);
+static inline unsigned int getActiveThreads() { return GaloisRuntime::galoisActiveThreads; }
 
 }
 #endif
