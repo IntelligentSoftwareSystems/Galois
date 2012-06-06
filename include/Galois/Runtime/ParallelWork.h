@@ -177,9 +177,10 @@ protected:
     bool workHappened = false;
     boost::optional<value_type> p = lwl.pop();
     unsigned num = 0;
+    int result = 0;
     if (p)
       workHappened = true;
-#if G_USE_EH
+#if GALOIS_USE_EXCEPTION_HANDLER
     try {
       while (p) {
 	doProcess(p, tld);
@@ -190,33 +191,35 @@ protected:
 	}
 	p = lwl.pop();
       }
-    } catch (ConflictFlag const& i) {
-      switch(i) {
-      case GaloisRuntime::CONFLICT:
-	abortIteration(*p, tld, recursiveAbort);
-	break;
-      case GaloisRuntime::BREAK:
-	handleBreak(tld);
-	return false;
-      default:
-	abort();
-      }
+    } catch (ConflictFlag const& flag) {
+      clearConflictLock();
+      result = flag;
     }
 #else
-    if (setjmp(hackjmp)) {
-      abortIteration(*p, tld, recursiveAbort);
-      return workHappened;
-    }
-    while (p) {
-      doProcess(p, tld);
-      if (limit) {
-	++num;
-	if (num == 32)
-	  break;
+    if ((result = setjmp(hackjmp)) == 0) {
+      while (p) {
+        doProcess(p, tld);
+        if (limit) {
+          ++num;
+          if (num == 32)
+            break;
+        }
+        p = lwl.pop();
       }
-      p = lwl.pop();
     }
 #endif
+    switch (result) {
+    case 0:
+      break;
+    case GaloisRuntime::CONFLICT:
+      abortIteration(*p, tld, recursiveAbort);
+      break;
+    case GaloisRuntime::BREAK:
+      handleBreak(tld);
+      return false;
+    default:
+      abort();
+    }
     return workHappened;
   }
 

@@ -31,7 +31,7 @@
 #include <cstdlib>
 #include <setjmp.h>
 
-#define G_USE_EH 1
+#define GALOIS_USE_EXCEPTION_HANDLER 1
 
 namespace GaloisRuntime {
 
@@ -42,7 +42,7 @@ enum ConflictFlag {
 };
 
 #ifdef GALOIS_DET
-//#define GALOIS_USE_CONFLICT_LOCK
+#define GALOIS_USE_CONFLICT_LOCK
 #endif
 
 #ifdef GALOIS_DET
@@ -64,7 +64,7 @@ static inline void clearConflictLock() { }
 
 class SimpleRuntimeContext;
 
-#if G_USE_EH
+#if GALOIS_USE_EXCEPTION_HANDLER
 #else
 extern __thread jmp_buf hackjmp;
 #endif

@@ -26,7 +26,7 @@
 #include "Galois/Runtime/MethodFlags.h"
 #include "Galois/Runtime/ll/SimpleLock.h"
 
-#if G_USE_EH
+#if GALOIS_USE_EXCEPTION_HANDLER
 #else
 __thread jmp_buf GaloisRuntime::hackjmp;
 #endif
@@ -57,8 +57,12 @@ void GaloisRuntime::setPending(PendingFlag value) {
 
 void GaloisRuntime::doCheckWrite() {
   if (pendingFlag == PENDING) {
+#if GALOIS_USE_EXCEPTION_HANDLER
     lockConflictLock();
     throw GaloisRuntime::REACHED_FAILSAFE;
+#else
+    longjmp(hackjmp, GaloisRuntime::REACHED_FAILSAFE);
+#endif
   }
 }
 #endif
@@ -102,8 +106,12 @@ unsigned GaloisRuntime::SimpleRuntimeContext::commit_iteration() {
 }
 
 void GaloisRuntime::breakLoop() {
+#if GALOIS_USE_EXCEPTION_HANDLER
   lockConflictLock();
   throw GaloisRuntime::BREAK;
+#else
+  longjmp(hackjmp, GaloisRuntime::BREAK);
+#endif
 }
 
 void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
@@ -126,8 +134,12 @@ void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
           not_ready = 1;
           return; 
         } else {
+#if GALOIS_USE_EXCEPTION_HANDLER
           lockConflictLock();
           throw GaloisRuntime::CONFLICT;
+#else
+          longjmp(hackjmp, GaloisRuntime::CONFLICT);
+#endif
         }
       }
       // Allow new locks on new nodes only
@@ -152,11 +164,11 @@ void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
     locks = L;
   } else {
     if (L->Owner.getValue() != this) {
-#if G_USE_EH
-      //ConflictLock.lock();
+#if GALOIS_USE_EXCEPTION_HANDLER
+      lockConflictLock();
       throw GaloisRuntime::CONFLICT; // Conflict
 #else
-      longjmp(hackjmp, 1);
+      longjmp(hackjmp, GaloisRuntime::CONFLICT);
 #endif
     }
   }

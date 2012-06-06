@@ -581,16 +581,24 @@ bool Executor<T,Function1Ty,Function2Ty,useLocalState>::pendingLoop(ThreadLocalD
     tld.stat.inc_iterations();
     setThreadContext(cnx);
     stateManager.alloc(tld.facing, &function1);
+    int result = 0;
+#if GALOIS_USE_EXCEPTION_HANDLER
     try {
       function1(p->item, tld.facing.data());
-    } catch (ConflictFlag i) {
+    } catch (ConflictFlag flag) {
       clearConflictLock();
-      stateManager.dealloc(tld.facing);
-      switch (i) {
-        case CONFLICT: commit = false; break;
-        case REACHED_FAILSAFE: break;
-        default: assert(0 && "Unknown conflict flag"); abort(); break;
-      }
+      result = flag;
+    }
+#else
+    if ((result = setjmp(hackjmp)) == 0) {
+      function1(p->item, tld.facing.data());
+    }
+#endif
+    switch (result) {
+      case 0: break;
+      case CONFLICT: stateManager.dealloc(tld.facing); commit = false; break;
+      case REACHED_FAILSAFE: stateManager.dealloc(tld.facing); break;
+      default: assert(0 && "Unknown conflict flag"); abort(); break;
     }
 
     if (ForEachTraits<Function1Ty>::NeedsPIA && !useLocalState)
@@ -629,16 +637,25 @@ bool Executor<T,Function1Ty,Function2Ty,useLocalState>::commitLoop(ThreadLocalDa
       commit = false;
 
     if (commit) {
+      setThreadContext(p->cnx);
+      stateManager.restore(tld.facing, p->localState);
+      int result = 0;
+#if GALOIS_USE_EXCEPTION_HANDLER
       try {
-        setThreadContext(p->cnx);
-        stateManager.restore(tld.facing, p->localState);
         function2(p->item, tld.facing.data());
-      } catch (ConflictFlag i) {
+      } catch (ConflictFlag flag) {
         clearConflictLock();
-        switch (i) {
-          case CONFLICT: commit = false; break;
-          default: assert(0 && "Unknown exception"); abort(); break;
-        }
+        result = flag;
+      }
+#else
+      if ((result = setjmp(hackjmp)) == 0) {
+        function2(p->item, tld.facing.data());
+      }
+#endif
+      switch (result) {
+        case 0: break;
+        case CONFLICT: commit = false; break;
+        default: assert(0 && "Unknown conflict flag"); abort(); break;
       }
     }
 
