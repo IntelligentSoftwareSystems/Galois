@@ -265,7 +265,7 @@ private:
     if (!pFile) {
       return false;
     }
-    std::cerr << "Using bin for poly\n";
+    std::cout << "Using bin for poly\n";
     uint32_t nsegs[4];
     if (fread(&nsegs[0], sizeof(uint32_t), 4, pFile) < 4) {
       std::cerr << "Malformed binary file\n";
