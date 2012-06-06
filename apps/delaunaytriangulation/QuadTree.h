@@ -26,7 +26,6 @@
 #include "Point.h"
 #include "Galois/Galois.h"
 #include "Galois/Accumulator.h"
-#include "Galois/Runtime/ll/SimpleLock.h"
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/array.hpp>
 
@@ -69,7 +68,6 @@ class PQuadTree {
     typedef boost::array<Point*,maxLeafSize> PointsTy;
     Node* child[4];
     PointsTy* points;
-    GaloisRuntime::LL::SimpleLock<true> lock;
     int size;
 
     //! Make internal node
@@ -191,21 +189,21 @@ class PQuadTree {
   GaloisRuntime::MM::FSBGaloisAllocator<Node::PointsTy> pointsAlloc;
 
   template<typename IterTy>
-  void init(IterTy begin, IterTy end) {
+  void init(IterTy begin, IterTy end, Tuple& center, double& radius) {
     MinBox least;
     MaxBox most;
     Galois::do_all(begin, end, ComputeBox(least, most));
     //std::for_each(begin, end, ComputeBox(least, most));
 
-    m_radius = std::max(most.get().x() - least.get().x(), most.get().y() - least.get().y()) / 2.0;
-    m_center = least.get();
-    m_center.x() += m_radius;
-    m_center.y() += m_radius;
+    radius = std::max(most.get().x() - least.get().x(), most.get().y() - least.get().y()) / 2.0;
+    center = least.get();
+    center.x() += m_radius;
+    center.y() += m_radius;
   }
 
   template<typename IterTy,typename OutIterTy>
   void divideWork(IterTy begin, IterTy end, Node* root, Tuple center, double radius, OutIterTy& out, int depth) {
-    if (depth == 0) {
+    if (depth == 0 || std::distance(begin, end) <= 16) {
       *out++ = WorkItem<IterTy>(this, begin, end, root, center, radius);
       return;
     }
@@ -347,47 +345,47 @@ class PQuadTree {
 
 public:
   template<typename IterTy>
-  PQuadTree(IterTy begin, IterTy end): m_root(NULL) { 
+  PQuadTree(IterTy begin, IterTy end) { 
     m_root = newNode();
 
-    init(begin, end);
+    init(begin, end, m_center, m_radius);
 
-    if (std::distance(begin, end) < 32*4*256) {
-      for (; begin != end; ++begin)
-        add(m_root, *begin, m_center, m_radius);
-    } else {
-      typedef std::vector<Point*> PointsBufTy;
-      typedef std::vector<WorkItem<PointsBufTy::iterator> > WorkTy;
-      typedef GaloisRuntime::WorkList::dChunkedLIFO<1> WL;
-      PointsBufTy points(std::distance(begin, end));
-      std::copy(begin, end, points.begin());
+    typedef std::vector<Point*> PointsBufTy;
+    typedef WorkItem<PointsBufTy::iterator> WIT;
+    typedef std::vector<WIT> WorkTy;
+    typedef GaloisRuntime::WorkList::dChunkedLIFO<1> WL;
+    PointsBufTy points;
+    std::copy(begin, end, std::back_inserter(points));
 
-      WorkTy work;
-      std::back_insert_iterator<WorkTy> it(work);
-      divideWork(points.begin(), points.end(), m_root, m_center, m_radius, it, 4);
-      Galois::for_each<WL>(work.begin(), work.end(), PAdd<PointsBufTy::iterator>());
-    }
+    WorkTy work;
+    std::back_insert_iterator<WorkTy> it(work);
+    divideWork(points.begin(), points.end(), m_root, m_center, m_radius, it, 4);
+    Galois::for_each<WL>(work.begin(), work.end(), PAdd<PointsBufTy::iterator>());
   }
 
   ~PQuadTree() {
     deleteNode(m_root);
   }
 
+  template<typename OutputTy>
+  void output(OutputTy out) {
+    if (m_root != NULL) {
+      output(m_root, out);
+    }
+  }
+
   //! Find point nearby to p
   bool find(const Point* p, Point*& result) {
     FindResult r;
     r.p = NULL;
-    find(m_root, p, m_center, m_radius, r);
-    if (r.p != NULL) {
-      result = r.p;
-      return true;
+    if (m_root) {
+      find(m_root, p, m_center, m_radius, r);
+      if (r.p != NULL) {
+        result = r.p;
+        return true;
+      }
     }
     return false;
-  }
-
-  template<typename OutputTy>
-  void output(OutputTy out) {
-    output(m_root, out);
   }
 };
 
@@ -592,10 +590,12 @@ public:
   bool find(const Point* p, Point*& result) {
     FindResult r;
     r.p = NULL;
-    root->find(p, center, radius, r);
-    if (r.p != NULL) {
-      result = r.p;
-      return true;
+    if (root) {
+      root->find(p, center, radius, r);
+      if (r.p != NULL) {
+        result = r.p;
+        return true;
+      }
     }
     return false;
   }

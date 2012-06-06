@@ -31,8 +31,9 @@
 #include "Verifier.h"
 
 #include "Galois/Galois.h"
+#include "Galois/Bag.h"
 #include "Galois/Statistic.h"
-#include "Galois/UserContext.h"
+#include "Galois/Runtime/WorkListAlt.h"
 
 #include "Lonestar/BoilerPlate.h"
 #include "llvm/Support/CommandLine.h"
@@ -76,9 +77,8 @@ static cll::opt<DetAlgo> detAlgo(cll::desc("Deterministic algorithm:"),
       clEnumVal(detDisjoint, "Disjoint execution"),
       clEnumValEnd), cll::init(detBase));
 #endif
-typedef std::vector<Point> PointList;
 
-Graph* graph;
+static Graph* graph;
 
 struct GetPointer: public std::unary_function<Point&,Point*> {
   Point* operator()(Point& p) const { return &p; }
@@ -88,7 +88,6 @@ struct GetPointer: public std::unary_function<Point&,Point*> {
 template<int Version=detBase>
 struct Process {
   typedef int tt_needs_per_iter_alloc;
-  typedef int tt_needs_parallel_break;
   typedef int tt_does_not_need_parallel_push;
   typedef Galois::PerIterAllocTy Alloc;
 
@@ -99,6 +98,7 @@ struct Process {
     Tuple tuple;
     ContainsTuple(const Graph& g, const Tuple& t): graph(g), tuple(t) { }
     bool operator()(const GNode& n) const {
+      assert(!graph.getData(n, Galois::NONE).boundary());
       return graph.getData(n, Galois::NONE).inTriangle(tuple);
     }
   };
@@ -276,43 +276,16 @@ struct Process {
   }
 };
 
-struct ReadPoints {
-  PointList& result;
-  ReadPoints(PointList& r): result(r) { }
+typedef std::vector<Point> PointList;
 
-  void from(const std::string& name, bool reorder=true) {
-    PointList points;
-    std::ifstream scanner(name.c_str());
-    if (!scanner.good()) {
-      std::cerr << "Couldn't open file: " << name << "\n";
-      abort();
-    }
-    if (name.find(".node") == name.size() - 5) {
-      fromTriangle(scanner, points);
-    } else {
-      fromPointList(scanner, points);
-    }
-    scanner.close();
-    
-    // Improve locality
-    if (reorder) {
-      QuadTree t(
-        boost::make_transform_iterator(&points[0], GetPointer()),
-        boost::make_transform_iterator(&points[points.size()], GetPointer()));
-      t.output(std::back_inserter(result));
-    } else {
-      std::copy(points.begin(), points.end(), std::back_inserter(result));
-    }
-    addBoundaryPoints();
-  }
-
+class ReadPoints {
   void addBoundaryPoints() {
     double minX, maxX, minY, maxY;
 
     minX = minY = std::numeric_limits<double>::max();
     maxX = maxY = std::numeric_limits<double>::min();
 
-    for (PointList::iterator ii = result.begin(), ei = result.end(); ii != ei; ++ii) {
+    for (PointList::iterator ii = points.begin(), ei = points.end(); ii != ei; ++ii) {
       double x = ii->t().x();
       double y = ii->t().y();
       if (x < minX)
@@ -325,7 +298,7 @@ struct ReadPoints {
         maxY = y;
     }
 
-    size_t size = result.size();
+    size_t size = points.size();
     double width = maxX - minX;
     double height = maxY - minY;
     double maxLength = std::max(width, height);
@@ -336,7 +309,7 @@ struct ReadPoints {
     for (int i = 0; i < 3; ++i) {
       double dX = radius * cos(2*M_PI*(i/3.0));
       double dY = radius * sin(2*M_PI*(i/3.0));
-      result.push_back(Point(centerX + dX, centerY + dY, size + i));
+      points.push_back(Point(centerX + dX, centerY + dY, size + i));
     }
   }
 
@@ -344,7 +317,7 @@ struct ReadPoints {
     scanner.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
   }
 
-  void fromTriangle(std::ifstream& scanner, PointList& points) {
+  void fromTriangle(std::ifstream& scanner) {
     double x, y;
     long numPoints;
 
@@ -366,7 +339,7 @@ struct ReadPoints {
     }
   }
 
-  void fromPointList(std::ifstream& scanner, PointList& points) {
+  void fromPointList(std::ifstream& scanner) {
     double x, y;
 
     // comment line
@@ -380,6 +353,27 @@ struct ReadPoints {
       x = y = 0;
       nextLine(scanner);
     }
+  }
+
+  PointList& points;
+
+public:
+  ReadPoints(PointList& p): points(p) { }
+
+  void from(const std::string& name, bool reorder) {
+    std::ifstream scanner(name.c_str());
+    if (!scanner.good()) {
+      std::cerr << "Couldn't open file: " << name << "\n";
+      abort();
+    }
+    if (name.find(".node") == name.size() - 5) {
+      fromTriangle(scanner);
+    } else {
+      fromPointList(scanner);
+    }
+    scanner.close();
+    
+    addBoundaryPoints();
   }
 };
 
@@ -399,12 +393,13 @@ static void writePoints(const std::string& filename, const PointList& points) {
   out.close();
 }
 
-static void addBoundaryNodes(PointList& points) {
-  size_t last = points.size();
-  Point* p1 = &points[last-1];
-  Point* p2 = &points[last-2];
-  Point* p3 = &points[last-3];
+//! All Point* refer to elements in this bag
+Galois::InsertBag<Point> basePoints;
+size_t maxRounds;
+Galois::InsertBag<Point*>* rounds;
+const int roundShift = 4; //! round sizes are portional to (1 << roundsShift)
 
+static void addBoundaryNodes(Point* p1, Point* p2, Point* p3) {
   Element large_triangle(p1, p2, p3);
   GNode large_node = graph->createNode(large_triangle);
   graph->addNode(large_node);
@@ -434,12 +429,114 @@ static void addBoundaryNodes(PointList& points) {
   graph->getEdgeData(graph->addEdge(border_node3, large_node)) = 0;
 }
 
-static void makeGraph(const std::string& filename, PointList& points) {
+//! Streaming point distribution 
+struct GenerateRounds {
+  typedef GaloisRuntime::PerCPU<unsigned> CounterTy;
+
+  CounterTy& counter;
+  size_t log2;
+  
+  GenerateRounds(CounterTy& c, size_t l): counter(c), log2(l) { }
+
+  void operator()(const Point& p) {
+    unsigned& c = counter.get();
+
+    Point* ptr = &basePoints.push(p);
+    int r = 0;
+    for (int i = 0; i < log2; ++i) {
+      unsigned mask = (1 << (i + 1)) - 1;
+      if ((c & mask) == (1 << i)) {
+        r = i;
+        break;
+      }
+    }
+    rounds[r / roundShift].push(ptr);
+
+    ++c;
+  }
+};
+
+//! Blocked point distribution (exponentially increasing block size) with points randomized
+//! within a round
+static void generateRoundsOld(PointList& points) {
+  size_t counter = 0;
+  size_t round = 0;
+  size_t next = 1 << roundShift;
+  std::vector<Point*> buf;
+
+  for (PointList::iterator ii = points.begin(), ei = points.end(); ii != ei; ++ii, ++counter) {
+    Point* ptr = &basePoints.push(*ii);
+    buf.push_back(ptr);
+    if (counter > next) {
+      next *= next;
+      int r = maxRounds - 1 - round;
+      std::random_shuffle(buf.begin(), buf.end());
+      std::copy(buf.begin(), buf.end(), std::back_inserter(rounds[r]));
+      buf.clear();
+      ++round;
+    }
+  }
+}
+
+static void generateRounds(PointList& points) {
+  size_t size = points.size() - 3;
+
+  size_t log2 = std::max((size_t) floor(log(size) / log(2)), (size_t) 1);
+  maxRounds = log2 / roundShift;
+  rounds = new Galois::InsertBag<Point*>[maxRounds+1]; // +1 for boundary points
+
+  // Reorganize spatially and distribute over rounds
+  PointList ordered;
+  ordered.reserve(size);
+  QuadTree q(
+    boost::make_transform_iterator(&points[0], GetPointer()),
+    boost::make_transform_iterator(&points[size], GetPointer()));
+
+  q.output(std::back_inserter(ordered));
+
+  if (true) {
+  GenerateRounds::CounterTy counter;
+#ifdef GALOIS_DET
+    std::for_each(ordered.begin(), ordered.end(), GenerateRounds(counter, log2));
+#else
+    Galois::do_all(ordered.begin(), ordered.end(), GenerateRounds(counter, log2));
+#endif
+  } else {
+    generateRoundsOld(ordered);
+  }
+
+  // Now, handle boundary points
+  size_t last = points.size();
+  Point* p1 = &basePoints.push(points[last-1]);
+  Point* p2 = &basePoints.push(points[last-2]);
+  Point* p3 = &basePoints.push(points[last-3]);
+
+  rounds[maxRounds].push(p1);
+  rounds[maxRounds].push(p2);
+  rounds[maxRounds].push(p3);
+
+  addBoundaryNodes(p1, p2, p3);
+}
+
+static void readInput(const std::string& filename) {
+  PointList points;
   ReadPoints(points).from(filename, false);
+
+  std::cout << "configuration: " << points.size() << " points\n";
 
   graph = new Graph();
 
-  addBoundaryNodes(points);
+  Galois::preAlloc(1 * numThreads // some per-thread state
+      + 2 * points.size() * sizeof(Element) // mesh is about 2x number of points (for random points)
+      * 32 // include graph node size
+      / (GaloisRuntime::MM::pageSize) // in pages
+      );
+  Galois::Statistic("MeminfoPre", GaloisRuntime::MM::pageAllocInfo());
+
+  Galois::StatTimer T("generateRounds");
+  T.start();
+  generateRounds(points);
+  T.stop();
 }
 
 static void writeMesh(const std::string& filename) {
@@ -495,96 +592,50 @@ static void writeMesh(const std::string& filename) {
 
 static ptrdiff_t myrandom(ptrdiff_t i) { return rand() % i; }
 
-static void generateMesh(PointList& points) {
-  size_t end = points.size();
-  size_t eend = end - 3; // end of "real" points
+static void generateMesh() {
+  typedef GaloisRuntime::WorkList::dChunkedLIFO<4*1024> WL;
+  typedef GaloisRuntime::WorkList::ChunkedAdaptor<false,32> CA;
 
-  // Random order is the best algorithmically
-  Galois::StatTimer BT("build");
-  BT.start();
-  typedef std::vector<Point*> OrderTy;
-  OrderTy order;
-  order.reserve(end);
-  std::copy(
-      boost::make_transform_iterator(&points[0], GetPointer()),
-      boost::make_transform_iterator(&points[end], GetPointer()),
-      std::back_inserter(order));
-  ptrdiff_t (*myptr)(ptrdiff_t) = myrandom;
-  srand(0xDEADBEEF);
-  //std::random_shuffle(&order[0], &order[eend], myptr);
-  BT.stop();
-
-#ifdef GALOIS_DET
-  size_t prologue = eend - std::min((size_t) 32*16, eend);
-#else
-  size_t prologue = eend - std::min((size_t) 32*numThreads, eend);
-#endif
- 
-  Galois::StatTimer T1("serial");
-  T1.start();
-  QuadTree q(&order[eend], &order[end]);
-  std::for_each(&order[prologue], &order[eend], Process<>(&q));
-  T1.stop();
-
-  const int multiplier = 64;
-  size_t top = prologue;
-  size_t prevTop = end;
-  size_t nextStep = (prevTop - top) * multiplier;
-
-  using namespace GaloisRuntime::WorkList;
-  typedef GaloisRuntime::WorkList::dChunkedLIFO<32> WL;
-
-  do {
+  for (int i = maxRounds - 1; i >= 0; --i) {
     Galois::StatTimer BT("buildtree");
     BT.start();
-    QuadTree q(&order[top], &order[prevTop]);
-    //printf("size: %zu\n", prevTop - top); 
-    prevTop = top;
-    top = top > nextStep ? top - nextStep : 0;
-    nextStep = nextStep*multiplier; //std::min(nextStep*multiplier, 1000000UL);
+    Galois::InsertBag<Point*>& tptrs = rounds[i+1];
+    QuadTree tree(tptrs.begin(), tptrs.end());
     BT.stop();
 
     Galois::StatTimer PT("ParallelTime");
     PT.start();
+    Galois::InsertBag<Point*>& pptrs = rounds[i];
 #ifdef GALOIS_DET
+    // TODO(ddn): may need to randomize det case to avoid huge number of conflicts
     switch (detAlgo) {
       case nondet: 
-        Galois::for_each<WL>(&order[top], &order[prevTop], Process<>(&q)); break;
+        Galois::for_each<WL>(pptrs.begin(), pptrs.end(), Process<>(&tree)); break;
       case detBase:
-        Galois::for_each_det<false>(&order[top], &order[prevTop], Process<>(&q)); break;
+        Galois::for_each_det<false>(pptrs.begin(), pptrs.end(), Process<>(&tree)); break;
       case detPrefix:
-        Galois::for_each_det<false>(&order[top], &order[prevTop], Process<detPrefix>(&q), Process<>(&q));
+        Galois::for_each_det<false>(pptrs.begin(), pptrs.end(), Process<detPrefix>(&tree), Process<>(&tree));
         break;
       case detDisjoint:
-        Galois::for_each_det<true>(&order[top], &order[prevTop], Process<detDisjoint>(&q)); break;
+        Galois::for_each_det<true>(pptrs.begin(), pptrs.end(), Process<detDisjoint>(&tree)); break;
       default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
     }
 #else
-    Galois::for_each<WL>(&order[top], &order[prevTop], Process<>(&q));
+    Galois::for_each_local<CA>(pptrs, Process<>(&tree));
 #endif
     PT.stop();
-  } while (top > 0);
+  }
 }
 
 int main(int argc, char** argv) {
   Galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
-  PointList points;
-  makeGraph(inputname, points);
+  readInput(inputname);
   
-  std::cout << "configuration: " << points.size() << " points\n";
-
-  Galois::preAlloc(1 * numThreads // some per-thread state
-      + 2 * points.size() * sizeof(Element) // mesh is about 2x number of points (for random points)
-      * 32 // include graph node size
-      / (GaloisRuntime::MM::pageSize) // in pages
-      );
-  Galois::Statistic("MeminfoPre", GaloisRuntime::MM::pageAllocInfo());
-
   Galois::StatTimer T;
   T.start();
-  generateMesh(points);
+  generateMesh();
   T.stop();
   std::cout << "mesh size: " << graph->size() << "\n";
 
@@ -612,6 +663,7 @@ int main(int argc, char** argv) {
   }
 
   delete graph;
+  delete [] rounds;
 
   return 0;
 }
