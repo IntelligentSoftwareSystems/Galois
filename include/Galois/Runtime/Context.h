@@ -40,7 +40,7 @@ enum ConflictFlag {
 };
 
 #ifdef GALOIS_DET
-#define GALOIS_USE_CONFLICT_LOCK
+//#define GALOIS_USE_CONFLICT_LOCK
 #endif
 
 #ifdef GALOIS_DET
@@ -62,7 +62,7 @@ static inline void clearConflictLock() { }
 
 class SimpleRuntimeContext;
 
-//extern __thread jmp_buf hackjmp;
+extern __thread jmp_buf hackjmp;
 
 //! All objects that may be locked (nodes primarily) must inherit from Lockable.
 //! Use an intrusive list to track objects in a context without allocation overhead

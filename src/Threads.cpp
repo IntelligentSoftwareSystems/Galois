@@ -31,6 +31,7 @@ unsigned int Galois::setActiveThreads(unsigned int num) {
   num = std::min(num, GaloisRuntime::getSystemThreadPool().getMaxThreads());
   num = std::max(num, 1U);
   GaloisRuntime::galoisActiveThreads = num;
+  return num;
 }
 
 unsigned int GaloisRuntime::galoisActiveThreads = 1;
