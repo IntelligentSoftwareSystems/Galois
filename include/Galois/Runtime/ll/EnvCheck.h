@@ -22,6 +22,7 @@
  */
 
 namespace GaloisRuntime {
+namespace LL {
 
 //PLEASE document all enviroment variables here;
 //ThreadPool_pthread.cpp: "GALOIS_DO_NOT_BIND_MAIN_THREAD"
@@ -30,5 +31,5 @@ namespace GaloisRuntime {
 bool EnvCheck(const char* parm);
 bool EnvCheck(const char* parm, int& val);
 
-
+}
 }
