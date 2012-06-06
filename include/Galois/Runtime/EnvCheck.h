@@ -24,7 +24,7 @@
 namespace GaloisRuntime {
 
 //PLEASE document all enviroment variables here;
-//ThreadPool_pthread.cpp: "DO_NOT_BIND_MAIN_THREAD"
+//ThreadPool_pthread.cpp: "GALOIS_DO_NOT_BIND_MAIN_THREAD"
 
 //Return true if the Enviroment variable is set
 bool EnvCheck(const char* parm);

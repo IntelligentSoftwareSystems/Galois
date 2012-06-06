@@ -162,7 +162,7 @@ class ThreadPool_pthread : public ThreadPool {
     GaloisRuntime::LL::initTID();
     unsigned id = GaloisRuntime::LL::getTID();
     GaloisRuntime::initPTS();
-    if (id != 0 || !EnvCheck("DO_NOT_BIND_MAIN_THREAD"))
+    if (id != 0 || !EnvCheck("GALOIS_DO_NOT_BIND_MAIN_THREAD"))
       GaloisRuntime::LL::bindThreadToProcessor(id);
     //we use a simple pthread or atomic to avoid depending on Galois
     //stuff too early in the initialization process
