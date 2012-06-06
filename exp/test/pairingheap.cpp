@@ -124,7 +124,7 @@ void testParallel2() {
     range.push_back(i);
   std::random_shuffle(range.begin(), range.end());
 
-  int numThreads = Galois::setMaxThreads(2);
+  int numThreads = Galois::setActiveThreads(2);
   if (numThreads < 2) {
     assert(0 && "Unable to run with multiple threads");
     abort();

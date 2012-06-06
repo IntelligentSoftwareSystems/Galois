@@ -515,7 +515,7 @@ static void start(int N, int hardness, int seed) {
 }
 
 int main(int argc,  char **argv) {
-  LonestarStart(argc, argv, std::cout, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url);
 
   switch (algo) {
     case 3: std::cout << "Using BP-MAX-RES\n"; start<BP<BP_MAX_RES> >(N, hardness, seed); break;

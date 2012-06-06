@@ -36,7 +36,7 @@ struct Init {
 #ifdef GALOIS_DMP
     DMP_Galois_init();
 #endif
-    Galois::setMaxThreads(Exp::getNumThreads()); 
+    Galois::setActiveThreads(Exp::getNumThreads()); 
   }
 };
 #endif

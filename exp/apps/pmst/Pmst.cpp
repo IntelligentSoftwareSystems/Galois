@@ -155,7 +155,7 @@ struct Prim {
   void operator()(Graph& g, MstWeight& w) {
     GraphNode one[] = { *g.begin() };
 
-    Galois::setMaxThreads(1);
+    Galois::setActiveThreads(1);
     Galois::for_each(&one[0], &one[1], Process(*this, g, w));
   }
 };
@@ -633,7 +633,7 @@ void run(const std::string& in) {
 }
 
 int main(int argc, char **argv) {
-  LonestarStart(argc, argv, std::cout, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url);
 
   switch (algo) {
   case 2: run<BoruvkaUnionFind>(filename); break;

@@ -238,7 +238,7 @@ void printTop(int topn) {
 }
 
 int main(int argc, char **argv) {
-  LonestarStart(argc, argv, std::cout, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url);
  
   Galois::StatTimer RT("ReadTotal");
   RT.start();

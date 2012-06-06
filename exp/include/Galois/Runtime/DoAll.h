@@ -239,7 +239,7 @@ private:
   static const unsigned CHUNK_SCALING_FACTOR = 64;
 
   void computeChunkSize (const size_t totalSize) {
-    chunk_size = std::max (size_t (1), totalSize / (CHUNK_SCALING_FACTOR * ThreadPool::getActiveThreads ()));
+    chunk_size = std::max (size_t (1), totalSize / (CHUNK_SCALING_FACTOR * Galois::getActiveThreads ()));
 
     chunk_size = std::min (difference_type (MAX_CHUNK_SIZE), chunk_size); 
 
@@ -322,7 +322,7 @@ private:
     size_t min = std::numeric_limits<size_t>::max ();
     size_t max = 0;
 
-    for (unsigned i = 0; i < ThreadPool::getActiveThreads (); ++i) {
+    for (unsigned i = 0; i < Galois::getActiveThreads (); ++i) {
       total_iter += workers.get (i).num_iter;
 
       min = std::min (min, workers.get (i).num_iter);
@@ -330,10 +330,10 @@ private:
       // printf ("Worker %d did %zd iterations\n", i, workers.get (i).num_iter);
     }
 
-    size_t  ave =  total_iter / ThreadPool::getActiveThreads ();
+    size_t  ave =  total_iter / Galois::getActiveThreads ();
     printf ("Total iterations %s: %zd,   chunk_size=%ld\n", loopname, total_iter, chunk_size);
     printf ("Work distribution: Workers=%d,          min=%zd, max=%zd, average=%zd\n\n"
-        , ThreadPool::getActiveThreads (), min, max, ave);
+        , Galois::getActiveThreads (), min, max, ave);
 
   }
 
@@ -508,7 +508,7 @@ void do_all_coupled (const Iter begin, const Iter end, FuncTp func, const char* 
 
   difference_type total = std::distance (begin, end);
 
-  unsigned numT = ThreadPool::getActiveThreads ();
+  unsigned numT = Galois::getActiveThreads ();
 
   assert (numT >= 1);
   difference_type perThread = (total + (numT -1)) / numT; // rounding the integer division up

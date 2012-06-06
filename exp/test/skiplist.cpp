@@ -64,7 +64,7 @@ void testConcurrent() {
   for (int i = top; i >= 0; --i)
     range.push_back(i);
 
-  int numThreads = Galois::setMaxThreads(2);
+  int numThreads = Galois::setActiveThreads(2);
   if (numThreads < 2) {
     assert(0 && "Unable to run with multiple threads");
     abort();

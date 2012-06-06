@@ -870,7 +870,7 @@ void run(int nbodies, int ntimesteps, int seed, TreeSummMethod summMethod) {
 
   for (int step = 0; step < ntimesteps; step++) {
     // Do tree building sequentially
-    Galois::setMaxThreads(1);
+    Galois::setActiveThreads(1);
 
     BoundingBox box;
     ReduceBoxes reduceBoxes(box);
@@ -892,7 +892,7 @@ void run(int nbodies, int ntimesteps, int seed, TreeSummMethod summMethod) {
     t_tree_build.stop ();
 
     // reset the number of threads
-    Galois::setMaxThreads(numThreads);
+    Galois::setActiveThreads(numThreads);
 
 
     Galois::StatTimer t_tree_summ ("Time taken by Tree Summarization: ");
@@ -943,7 +943,7 @@ void run(int nbodies, int ntimesteps, int seed, TreeSummMethod summMethod) {
 } // end namespace
 
 int main(int argc, char** argv) {
-  LonestarStart(argc, argv, std::cout, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url);
   std::cout.setf(std::ios::right|std::ios::scientific|std::ios::showpoint);
 
   TreeSummMethod summMethod = SERIAL;
