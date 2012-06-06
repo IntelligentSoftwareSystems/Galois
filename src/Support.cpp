@@ -24,6 +24,8 @@
 #include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/Support.h"
+#include "Galois/Runtime/EnvCheck.h"
+
 #include "Galois/Threads.h"
 #include "Galois/Statistic.h"
 
@@ -32,6 +34,7 @@
 #include <vector>
 #include <string>
 #include <cmath>
+#include <cstdlib>
 
 using GaloisRuntime::LL::gPrint;
 
@@ -167,4 +170,16 @@ void GaloisRuntime::printStats() {
   SM.get()->printStats();
 }
 
+bool GaloisRuntime::EnvCheck(const char* parm) {
+  if (getenv(parm))
+    return true;
+  return false;
+}
 
+bool GaloisRuntime::EnvCheck(const char* parm, int& val) {
+  if (getenv(parm)) {
+    val = atoi(getenv(parm));
+    return true;
+  }
+  return false;
+}
