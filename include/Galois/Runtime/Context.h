@@ -31,6 +31,8 @@
 #include <cstdlib>
 #include <setjmp.h>
 
+#define G_USE_EH 1
+
 namespace GaloisRuntime {
 
 enum ConflictFlag {
@@ -62,7 +64,10 @@ static inline void clearConflictLock() { }
 
 class SimpleRuntimeContext;
 
+#if G_USE_EH
+#else
 extern __thread jmp_buf hackjmp;
+#endif
 
 //! All objects that may be locked (nodes primarily) must inherit from Lockable.
 //! Use an intrusive list to track objects in a context without allocation overhead

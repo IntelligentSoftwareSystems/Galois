@@ -26,7 +26,10 @@
 #include "Galois/Runtime/MethodFlags.h"
 #include "Galois/Runtime/ll/SimpleLock.h"
 
+#if G_USE_EH
+#else
 __thread jmp_buf GaloisRuntime::hackjmp;
+#endif
 
 //! Global thread context for each active thread
 static __thread GaloisRuntime::SimpleRuntimeContext* thread_cnx = 0;
@@ -149,7 +152,7 @@ void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
     locks = L;
   } else {
     if (L->Owner.getValue() != this) {
-#if 1
+#if G_USE_EH
       //ConflictLock.lock();
       throw GaloisRuntime::CONFLICT; // Conflict
 #else

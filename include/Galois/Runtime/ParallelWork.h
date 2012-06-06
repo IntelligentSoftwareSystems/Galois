@@ -179,7 +179,7 @@ protected:
     unsigned num = 0;
     if (p)
       workHappened = true;
-#if 1
+#if G_USE_EH
     try {
       while (p) {
 	doProcess(p, tld);
