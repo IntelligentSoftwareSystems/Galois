@@ -37,8 +37,10 @@ namespace Galois {
  * can only be done serially.
  */
 template<typename T>
-class InsertBag: public GaloisRuntime::galois_insert_bag<T> {
-
+struct InsertBag: public GaloisRuntime::galois_insert_bag<T> {
+  void push_back(const T& v) {
+    push(v);
+  }
 };
 
 /**
