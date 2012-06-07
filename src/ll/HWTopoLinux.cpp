@@ -32,6 +32,7 @@
 #ifdef __linux__
 
 #include "Galois/Runtime/ll/HWTopo.h"
+#include "Galois/Runtime/ll/EnvCheck.h"
 #include "Galois/Runtime/ll/gio.h"
 
 #define DEBUG_HWTOPOLINUX 0
@@ -247,9 +248,9 @@ struct AutoLinuxPolicy {
 #ifdef GALOIS_USE_DMP
     {
       // Hack to improve the performance of DMP version by killing off unnecessary threads
-      char *t = getenv("GALOIS_NUM_THREADS");
-      if (t) {
-        size_t top = std::min(vals.size(), (size_t) atoi(t));
+      int x;
+      if (EnvCheck("GALOIS_NUM_THREADS", x)) {
+        size_t top = std::min(vals.size(), (size_t) x);
         vals.resize(top);
       }
     }
