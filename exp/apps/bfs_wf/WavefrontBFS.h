@@ -43,7 +43,7 @@
 #include "bfs.h"
 
 // vtune
-#ifdef GALOIS_VTUNE
+#ifdef GALOIS_USE_VTUNE
 #include "ittnotify.h"
 #endif
 
@@ -278,7 +278,7 @@ public:
 
     size_t numIter = 1;
 
-#ifdef GALOIS_VTUNE
+#ifdef GALOIS_USE_VTUNE
     __itt_resume ();
 #endif
 
@@ -294,7 +294,7 @@ public:
 
     numIter += numAdds.reduce ();
 
-#ifdef GALOIS_VTUNE
+#ifdef GALOIS_USE_VTUNE
   __itt_pause ();
 #endif
 

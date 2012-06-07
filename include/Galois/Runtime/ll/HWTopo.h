@@ -27,8 +27,8 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-#ifndef _HWTOPO_H
-#define _HWTOPO_H
+#ifndef GALOIS_RUNTIME_LL_HWTOPO_H
+#define GALOIS_RUNTIME_LL_HWTOPO_H
 
 namespace GaloisRuntime {
 namespace LL {

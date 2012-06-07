@@ -31,14 +31,14 @@
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
 #include "Galois/Graphs/LCGraph.h"
-#ifdef GALOIS_EXP
+#ifdef GALOIS_USE_EXP
 #include "Galois/Runtime/ParallelWorkInline.h"
 #endif
 #include "llvm/Support/CommandLine.h"
 #include "llvm/ADT/SmallVector.h"
 #include "Lonestar/BoilerPlate.h"
 
-#ifdef GALOIS_TBB
+#ifdef GALOIS_USE_TBB
 #include "tbb/parallel_for_each.h"
 #include "tbb/cache_aligned_allocator.h"
 #include "tbb/concurrent_vector.h"
@@ -102,10 +102,10 @@ static cll::opt<BFSAlgo> algo(cll::desc("Choose an algorithm:"),
       clEnumVal(parallelManualBarrier, "Galois optimized with workset and manual barrier"),
       clEnumVal(parallelBarrierCas, "Galois optimized with workset and barrier but using CAS"),
       clEnumVal(parallelBarrier, "Galois optimized with workset and barrier"),
-#ifdef GALOIS_EXP
+#ifdef GALOIS_USE_EXP
       clEnumVal(parallelBarrierInline, "Galois optimized with inlined workset and barrier"),
 #endif
-#ifdef GALOIS_TBB
+#ifdef GALOIS_USE_TBB
       clEnumVal(parallelTBB, "Use TBB instead of Galois"),
 #endif
       clEnumValEnd), cll::init(parallelBarrier));
@@ -617,7 +617,7 @@ struct GaloisManualBarrier {
 };
 
 //! TBB version based off of GaloisManualBarrier
-#ifdef GALOIS_TBB
+#ifdef GALOIS_USE_TBB
 struct TBB {
   std::string name() const { return "TBB (parallel_for_each)"; }
   typedef tbb::concurrent_vector<GNode,tbb::cache_aligned_allocator<GNode> > ContainerTy;

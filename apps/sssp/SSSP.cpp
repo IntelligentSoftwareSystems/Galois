@@ -34,7 +34,7 @@
 #include "llvm/Support/CommandLine.h"
 
 #include "Lonestar/BoilerPlate.h"
-#ifdef GALOIS_EXP
+#ifdef GALOIS_USE_EXP
 #include "Galois/PriorityScheduling.h"
 #include "Galois/Queue.h"
 #endif
@@ -123,7 +123,7 @@ struct SerialStlAlgo {
   }
 };
 
-#ifdef GALOIS_EXP
+#ifdef GALOIS_USE_EXP
 struct SerialPairingHeapAlgo {
   std::string name() const { return "serial pairing heap"; }
 
@@ -297,7 +297,7 @@ int main(int argc, char **argv) {
 
   switch (algo) {
     case serialStl: run(SerialStlAlgo(), source); break;
-#ifdef GALOIS_EXP
+#ifdef GALOIS_USE_EXP
     case serialPairing: run(SerialPairingHeapAlgo(), source); break;
 #endif
     case parallel: run(ParallelAlgo(), source); break;

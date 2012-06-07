@@ -395,7 +395,7 @@ public:
     return retval;
   }
 };
-//WLCOMPILECHECK(ChunkedAdaptor);
+//GALOIS_WLCOMPILECHECK(ChunkedAdaptor);
 
 template<typename QueueTy>
 boost::optional<typename QueueTy::value_type>
@@ -543,7 +543,7 @@ public:
     return doSteal();// stealHalfInPackage(local);
   }
 };
-//WLCOMPILECHECK(LocalQueues);
+//GALOIS_WLCOMPILECHECK(LocalQueues);
 
 
 } }//End namespace

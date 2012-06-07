@@ -27,11 +27,11 @@
 
 #include "Galois/Runtime/ll/TID.h"
 
-#ifdef GALOIS_DRF
+#ifdef GALOIS_USE_DRF
 #include <pthread.h>
 #endif
 
-#ifdef GALOIS_DMP
+#ifdef GALOIS_USE_DMP
 #include "dmp.h"
 #endif
 
@@ -44,7 +44,7 @@ struct AtomicNextId {
     return __sync_fetch_and_add(&::nextID, 1);
   }
 };
-#ifdef GALOIS_DRF
+#ifdef GALOIS_USE_DRF
 struct PthreadNextId {
   pthread_mutex_t lock;
   PthreadNextId() {

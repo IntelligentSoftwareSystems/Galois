@@ -25,7 +25,7 @@
 #ifndef GALOIS_RUNTIME_DETERMINISTIC_H
 #define GALOIS_RUNTIME_DETERMINISTIC_H
 
-#ifdef GALOIS_DET
+#ifdef GALOIS_USE_DET
 
 #include "Galois/Runtime/DualLevelIterator.h"
 

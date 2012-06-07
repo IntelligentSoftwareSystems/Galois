@@ -30,7 +30,7 @@
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
-#ifdef GALOIS_EXP
+#ifdef GALOIS_USE_EXP
 #include "Galois/PriorityScheduling.h"
 #endif
 
@@ -288,7 +288,7 @@ EdgeDataType runBodyParallel() {
    cout << "Starting loop body\n";
    Galois::StatTimer T;
    T.start();
-#ifdef GALOIS_EXP
+#ifdef GALOIS_USE_EXP
    Exp::WorklistExperiment<OBIM, dChunk, Chunk, Indexer, seq_less, seq_gt>().for_each(std::cout, graph.begin(), graph.end(), process());
 #else
 //   Galois::for_each<dChunk>(graph.begin(), graph.end(), process());

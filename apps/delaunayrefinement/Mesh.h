@@ -380,7 +380,7 @@ private:
     //std::sort(elements.begin(), elements.end(), centerXCmp());
     divide(elements.begin(), elements.end());
 
-#ifdef GALOIS_DET
+#ifdef GALOIS_USE_DET
     std::for_each(elements.begin(), elements.end(), CreateNodes(mesh));
 #else
     Galois::do_all(elements.begin(), elements.end(), CreateNodes(mesh));

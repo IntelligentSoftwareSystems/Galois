@@ -39,7 +39,7 @@
 #include "Galois/Runtime/LoopHooks.h"
 #include "Galois/Runtime/WorkList.h"
 
-#ifdef GALOIS_EXP
+#ifdef GALOIS_USE_EXP
 //#include "Galois/Runtime/SimpleTaskPool.h"
 #endif
 
@@ -236,7 +236,7 @@ protected:
     if (ForEachTraits<FunctionTy>::NeedsAborts)
       setThreadContext(&tld.cnx);
     tld.lterm = term.getLocalTokenHolder();
-#ifdef GALOIS_EXP
+#ifdef GALOIS_USE_EXP
 //    SimpleTaskPool& pool = getSystemTaskPool();
 #endif
     do {
@@ -260,7 +260,7 @@ protected:
       } while (didWork);
       if (ForEachTraits<FunctionTy>::NeedsBreak && *broke.getLocal())
 	break;
-#ifdef GALOIS_EXP
+#ifdef GALOIS_USE_EXP
       //pool.work();
 #endif
 

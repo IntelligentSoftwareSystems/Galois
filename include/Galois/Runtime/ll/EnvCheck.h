@@ -20,6 +20,8 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
+#ifndef GALOIS_RUNTIME_LL_ENVCHECK_H
+#define GALOIS_RUNTIME_LL_ENVCHECK_H
 
 namespace GaloisRuntime {
 namespace LL {
@@ -33,3 +35,5 @@ bool EnvCheck(const char* parm, int& val);
 
 }
 }
+
+#endif

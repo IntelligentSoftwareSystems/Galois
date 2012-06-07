@@ -26,22 +26,21 @@
  *
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
-
-#ifndef _CACHE_LINE_STORAGE_H
-#define _CACHE_LINE_STORAGE_H
+#ifndef GALOIS_RUNTIME_CACHE_LINE_STORAGE_H
+#define GALOIS_RUNTIME_CACHE_LINE_STORAGE_H
 
 namespace GaloisRuntime {
 namespace LL {
 
 //xeons have 64 byte cache lines, but will prefetch 2 at a time
-#define G_CACHE_LINE_SIZE 128
+#define GALOIS_CACHE_LINE_SIZE 128
 
 // Store an item with padding
 template<typename T>
 struct CacheLineStorage {
-  T data __attribute__((aligned(G_CACHE_LINE_SIZE)));
-  char pad[ G_CACHE_LINE_SIZE % sizeof(T) ?
-	    G_CACHE_LINE_SIZE - (sizeof(T) % G_CACHE_LINE_SIZE) :
+  T data __attribute__((aligned(GALOIS_CACHE_LINE_SIZE)));
+  char pad[ GALOIS_CACHE_LINE_SIZE % sizeof(T) ?
+	    GALOIS_CACHE_LINE_SIZE - (sizeof(T) % GALOIS_CACHE_LINE_SIZE) :
 	    0 ];
   CacheLineStorage() :data() {}
   explicit CacheLineStorage(const T& v) :data(v) {}

@@ -41,11 +41,11 @@ enum ConflictFlag {
   BREAK = 2
 };
 
-#ifdef GALOIS_DET
+#ifdef GALOIS_USE_DET
 #define GALOIS_USE_CONFLICT_LOCK
 #endif
 
-#ifdef GALOIS_DET
+#ifdef GALOIS_USE_DET
 enum PendingFlag {
   NON_DET,
   PENDING,
@@ -98,7 +98,7 @@ public:
   unsigned commit_iteration();
   void acquire(Lockable* L);
 
-#ifdef GALOIS_DET
+#ifdef GALOIS_USE_DET
   void set_id(unsigned long i) { id = i; }
   bool is_ready() { return !not_ready; }
 #endif

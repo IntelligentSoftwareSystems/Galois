@@ -48,7 +48,6 @@ struct InsertBag: public GaloisRuntime::galois_insert_bag<T> {
  */
 // TODO(ddn): POD specialization
 // TODO(ddn): Factor out template dependencies to reduce code bloat
-//#define XXX_BAG_DEBUG_ALLOC
 template<class T, int blockSize=1024*16>
 class Bag: private boost::noncopyable {
   typedef GaloisRuntime::MM::SimpleBumpPtr<GaloisRuntime::MM::FreeListHeap<GaloisRuntime::MM::SystemBaseAlloc> > Allocator;
@@ -105,7 +104,7 @@ protected:
     }
   }
 
-#ifdef XXX_BAG_DEBUG_ALLOC
+#if 0
   static const size_t block_size = 128;
   void freeHeader(Header* h) {
     if (h->m_begin == static_cast<void*>(&m_first))

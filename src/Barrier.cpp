@@ -31,7 +31,7 @@
 #include <cstdlib>
 #include <cstdio>
 
-#ifdef GALOIS_DMP
+#ifdef GALOIS_USE_DMP
 #include "dmp.h"
 #endif
 

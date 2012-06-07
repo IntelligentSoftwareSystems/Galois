@@ -244,7 +244,7 @@ struct AutoLinuxPolicy {
 
   AutoLinuxPolicy() {
     std::vector<cpuinfo> vals = parseCPUInfo();
-#ifdef GALOIS_DMP
+#ifdef GALOIS_USE_DMP
     {
       // Hack to improve the performance of DMP version by killing off unnecessary threads
       char *t = getenv("GALOIS_NUM_THREADS");

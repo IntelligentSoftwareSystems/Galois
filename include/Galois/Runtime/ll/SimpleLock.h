@@ -29,8 +29,8 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-#ifndef _SIMPLE_LOCK_H
-#define _SIMPLE_LOCK_H
+#ifndef GALOIS_RUNTIME_LL_SIMPLE_LOCK_H
+#define GALOIS_RUNTIME_LL_SIMPLE_LOCK_H
 
 #include <cassert>
 

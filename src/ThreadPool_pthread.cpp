@@ -37,7 +37,7 @@
 #include <semaphore.h>
 #include <pthread.h>
 
-#ifdef GALOIS_DMP
+#ifdef GALOIS_USE_DMP
 #include "dmp.h"
 #endif
 
@@ -140,7 +140,7 @@ public:
 
 class ThreadPool_pthread : public ThreadPool {
   // Instantiate pthread;
-#ifdef GALOIS_DRF
+#ifdef GALOIS_USE_DRF
   typedef PthreadSemaphore Semaphore;
   typedef PthreadSemaphore ThinBarrier;
 #else

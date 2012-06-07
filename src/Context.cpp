@@ -48,7 +48,7 @@ static inline void lockConflictLock() {
 static inline void lockConflictLock() { }
 #endif
 
-#ifdef GALOIS_DET
+#ifdef GALOIS_USE_DET
 static GaloisRuntime::PendingFlag pendingFlag = GaloisRuntime::NON_DET;
 
 void GaloisRuntime::setPending(PendingFlag value) {
@@ -115,7 +115,7 @@ void GaloisRuntime::breakLoop() {
 }
 
 void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
-#ifdef GALOIS_DET
+#ifdef GALOIS_USE_DET
   if (pendingFlag != NON_DET) {
     if (L->Owner.try_lock()) {
       assert(!L->next);

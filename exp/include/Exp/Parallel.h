@@ -33,7 +33,7 @@ int getNumRounds();
 #ifdef EXP_DOALL_GALOIS
 struct Init {
   Init() {
-#ifdef GALOIS_DMP
+#ifdef GALOIS_USE_DMP
     DMP_Galois_init();
 #endif
     Galois::setActiveThreads(Exp::getNumThreads()); 

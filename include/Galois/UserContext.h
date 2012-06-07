@@ -63,7 +63,7 @@ class UserContext: private boost::noncopyable {
     pushBuffer.clear();
   }
 
-#ifdef GALOIS_DET
+#ifdef GALOIS_USE_DET
   void* localState;
   bool localStateUsed;
   void __setLocalState(void *p, bool used) {
@@ -112,7 +112,7 @@ public:
   pushBufferTy& getPushBuffer() { return ctx.__getPushBuffer(); }
   void resetPushBuffer() { ctx.__resetPushBuffer(); }
   Galois::UserContext<T>& data() { return ctx; }
-#ifdef GALOIS_DET
+#ifdef GALOIS_USE_DET
   void setLocalState(void *p, bool used) { ctx.__setLocalState(p, used); }
 #endif
 };

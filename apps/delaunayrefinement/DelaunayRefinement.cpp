@@ -61,7 +61,7 @@ enum DetAlgo {
   detDisjoint
 };
 
-#ifdef GALOIS_DET
+#ifdef GALOIS_USE_DET
 static cll::opt<DetAlgo> detAlgo(cll::desc("Deterministic algorithm:"),
     cll::values(
       clEnumVal(nondet, "Non-deterministic"),
@@ -86,7 +86,7 @@ struct Process {
     
     Cavity* cavp = NULL;
 
-#ifdef GALOIS_DET
+#ifdef GALOIS_USE_DET
     if (Version == detDisjoint) {
       bool used;
       LocalState* localState = (LocalState*) ctx.getLocalState(used);
@@ -159,7 +159,7 @@ int main(int argc, char** argv) {
   Galois::StatTimer T;
   T.start();
 
-#ifdef GALOIS_DET
+#ifdef GALOIS_USE_DET
   std::for_each(graph->begin(), graph->end(), Preprocess());
 #else
   Galois::do_all_local(*graph, Preprocess());
@@ -175,7 +175,7 @@ int main(int argc, char** argv) {
   typedef ChunkedAdaptor<false,32> CA;
   typedef PerThreadQueues<LIFO<> > SHP;
   
-#ifdef GALOIS_DET
+#ifdef GALOIS_USE_DET
   switch (detAlgo) {
     case nondet: 
       Galois::for_each<BQ>(wl.begin(), wl.end(), Process<>()); break;

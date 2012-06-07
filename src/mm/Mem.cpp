@@ -33,7 +33,7 @@
 
 #include <map>
 
-#ifdef GALOIS_NUMA
+#ifdef GALOIS_USE_NUMA
 #include <numa.h>
 #endif
 
@@ -68,13 +68,13 @@ SizedAllocatorFactory::~SizedAllocatorFactory() {
 
 void* GaloisRuntime::MM::largeAlloc(size_t len) {
   void* data = 0;
-#if defined GALOIS_NUMA_OLD
+#if defined GALOIS_USE_NUMA_OLD
   nodemask_t nm = numa_no_nodes;
   unsigned int num = Galois::getActiveThreads();
   for (unsigned y = 0; y < num; ++y)
     nodemask_set(&nm, y/4);
   data = numa_alloc_interleaved_subset(len, &nm);
-#elif defined GALOIS_NUMA
+#elif defined GALOIS_USE_NUMA
   bitmask* nm = numa_allocate_nodemask();
   unsigned int num = Galois::getActiveThreads();
   for (unsigned y = 0; y < num; ++y)
@@ -90,7 +90,7 @@ void* GaloisRuntime::MM::largeAlloc(size_t len) {
 }
 
 void GaloisRuntime::MM::largeFree(void* m, size_t len) {
-#ifdef GALOIS_NUMA
+#ifdef GALOIS_USE_NUMA
   numa_free(m, len);
 #else
   free(m);

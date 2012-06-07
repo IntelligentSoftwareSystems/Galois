@@ -68,7 +68,7 @@ enum DetAlgo {
   detDisjoint
 };
 
-#ifdef GALOIS_DET
+#ifdef GALOIS_USE_DET
 static cll::opt<DetAlgo> detAlgo(cll::desc("Deterministic algorithm:"),
     cll::values(
       clEnumVal(nondet, "Non-deterministic"),
@@ -211,7 +211,7 @@ struct Process {
   void operator()(Point* p, Galois::UserContext<Point*>& ctx) {
     Cavity<Alloc>* cavp = NULL;
 
-#ifdef GALOIS_DET
+#ifdef GALOIS_USE_DET
     if (Version == detDisjoint) {
       bool used;
       LocalState* localState = (LocalState*) ctx.getLocalState(used);
@@ -496,7 +496,7 @@ static void generateRounds(PointList& points) {
 
   if (true) {
   GenerateRounds::CounterTy counter;
-#ifdef GALOIS_DET
+#ifdef GALOIS_USE_DET
     std::for_each(ordered.begin(), ordered.end(), GenerateRounds(counter, log2));
 #else
     Galois::do_all(ordered.begin(), ordered.end(), GenerateRounds(counter, log2));
@@ -606,7 +606,7 @@ static void generateMesh() {
     Galois::StatTimer PT("ParallelTime");
     PT.start();
     Galois::InsertBag<Point*>& pptrs = rounds[i];
-#ifdef GALOIS_DET
+#ifdef GALOIS_USE_DET
     // TODO(ddn): may need to randomize det case to avoid huge number of conflicts
     switch (detAlgo) {
       case nondet: 

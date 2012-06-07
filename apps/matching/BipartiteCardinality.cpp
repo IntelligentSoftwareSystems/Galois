@@ -32,7 +32,7 @@
 #include "Galois/Graphs/FileGraph.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
-#ifdef GALOIS_EXP
+#ifdef GALOIS_USE_EXP
 #include "Galois/PriorityScheduling.h"
 #endif
 
@@ -520,7 +520,7 @@ struct MatchingABMP {
     typedef dChunkedFIFO<1024> dChunk;
     typedef OrderedByIntegerMetric<Indexer,dChunk> OBIM;
     
-#ifdef GALOIS_EXP
+#ifdef GALOIS_USE_EXP
     Exp::WorklistExperiment<OBIM,dChunk,Chunk,Indexer,Less,Greater>().for_each(
         std::cout, initial.begin(), initial.end(), Process(*this, g, maxLayer, size));
 #else

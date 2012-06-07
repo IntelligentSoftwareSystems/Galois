@@ -37,7 +37,7 @@
 
 #include "llvm/Support/CommandLine.h"
 
-#ifdef GALOIS_TBB
+#ifdef GALOIS_USE_TBB
 #define TBB_PREVIEW_CONCURRENT_PRIORITY_QUEUE 1
 #include <tbb/concurrent_hash_map.h>
 #include <tbb/concurrent_priority_queue.h>
@@ -170,7 +170,7 @@ class StaticAssignment : private boost::noncopyable {
     }
   }
 };
-WLCOMPILECHECK(StaticAssignment);
+GALOIS_WLCOMPILECHECK(StaticAssignment);
 
 template<class T, class Indexer = DummyIndexer<T>, typename ContainerTy = FIFO<T>, bool concurrent=true >
 class ApproxOrderByIntegerMetric : private boost::noncopyable {
@@ -232,7 +232,7 @@ public:
     return boost::optional<value_type>();
   }
 };
-WLCOMPILECHECK(ApproxOrderByIntegerMetric);
+GALOIS_WLCOMPILECHECK(ApproxOrderByIntegerMetric);
 
 template<class T, class Indexer = DummyIndexer<T>, typename ContainerTy = FIFO<T>, bool concurrent=true >
 class LogOrderByIntegerMetric : private boost::noncopyable {
@@ -298,7 +298,7 @@ public:
     return boost::optional<value_type>();
   }
 };
-WLCOMPILECHECK(LogOrderByIntegerMetric);
+GALOIS_WLCOMPILECHECK(LogOrderByIntegerMetric);
 
 template<typename T, typename Indexer = DummyIndexer<T>, typename LocalTy = FIFO<T>, typename GlobalTy = FIFO<T> >
 class LocalFilter {
@@ -358,7 +358,7 @@ public:
     return r;
   }
 };
-WLCOMPILECHECK(LocalFilter);
+GALOIS_WLCOMPILECHECK(LocalFilter);
 
 #if 0
 //Bag per writer, reader steals entire bag
@@ -441,7 +441,7 @@ public:
   }
 
 };
-WLCOMPILECHECK(MP_SC_Bag);
+GALOIS_WLCOMPILECHECK(MP_SC_Bag);
 #endif
 
 //Per CPU and Per Level Queues, with staving flags
@@ -514,7 +514,7 @@ public:
     return ret;
   }
 };
-WLCOMPILECHECK(RequestHierarchy);
+GALOIS_WLCOMPILECHECK(RequestHierarchy);
 
 template<typename T, typename LocalWL, typename DistPolicy>
 class ReductionWL {
@@ -573,7 +573,7 @@ public:
     return val;
   }
 };
-WLCOMPILECHECK(ReductionWL);
+GALOIS_WLCOMPILECHECK(ReductionWL);
 
 
 #if 0
@@ -1306,7 +1306,7 @@ public:
     return retval;
   }
 };
-WLCOMPILECHECK(GWL_Idempotent_FIFO);
+GALOIS_WLCOMPILECHECK(GWL_Idempotent_FIFO);
 
 template<typename Partitioner = DummyIndexer<int>, typename T = int, typename ChildWLTy = dChunkedFIFO<>, bool concurrent=true>
 class PartitionedWL : private boost::noncopyable {
@@ -1357,7 +1357,7 @@ public:
     return pop();
   }
 };
-WLCOMPILECHECK(PartitionedWL);
+GALOIS_WLCOMPILECHECK(PartitionedWL);
 
 template<class Compare = std::less<int>, typename T = int>
 class SkipListQueue : private boost::noncopyable {
@@ -1398,7 +1398,7 @@ public:
     return wl.pollFirstKey();
   }
 };
-WLCOMPILECHECK(SkipListQueue);
+GALOIS_WLCOMPILECHECK(SkipListQueue);
 
 template<class Compare = std::less<int>, typename T = int>
 class FCPairingHeapQueue : private boost::noncopyable {
@@ -1437,9 +1437,9 @@ public:
     return wl.pollMin();
   }
 };
-WLCOMPILECHECK(FCPairingHeapQueue);
+GALOIS_WLCOMPILECHECK(FCPairingHeapQueue);
 
-#ifdef GALOIS_TBB
+#ifdef GALOIS_USE_TBB
 template<typename T = int>
 class TbbFIFO : private boost::noncopyable  {
   tbb::concurrent_bounded_queue<T> wl;
@@ -1479,9 +1479,9 @@ public:
       boost::optional<value_type>();
   }
 };
-WLCOMPILECHECK(TbbFIFO);
+GALOIS_WLCOMPILECHECK(TbbFIFO);
 
-#endif // GALOIS_TBB
+#endif
 
 
  template<class Indexer, typename ContainerTy = GaloisRuntime::WorkList::FIFO<>, typename T = int, bool concurrent = true >
@@ -1575,7 +1575,7 @@ WLCOMPILECHECK(TbbFIFO);
   }
 };
 
-#ifdef GALOIS_TBB
+#ifdef GALOIS_USE_TBB
 template<class Indexer, typename ContainerTy = GaloisRuntime::WorkList::ChunkedLIFO<16>, typename T = int, bool concurrent = true >
 class CTOrderedByIntegerMetric : private boost::noncopyable {
 
@@ -1670,7 +1670,7 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
     return retval;
   }
 };
-WLCOMPILECHECK(CTOrderedByIntegerMetric);
+GALOIS_WLCOMPILECHECK(CTOrderedByIntegerMetric);
 #endif
 
 
@@ -1829,7 +1829,7 @@ public:
     }
   }
 };
-WLCOMPILECHECK(Random);
+GALOIS_WLCOMPILECHECK(Random);
 
 
 template <typename T> struct GETID {
@@ -1844,7 +1844,7 @@ template <typename T> struct GETID<T*> {
   }
 };
 
-#ifdef GALOIS_TBB
+#ifdef GALOIS_USE_TBB
 template<class Compare = std::less<int>, typename T = int>
 class PTbb : private boost::noncopyable {
   typedef tbb::concurrent_priority_queue<T,Compare> TBBTy;
@@ -1960,7 +1960,7 @@ public:
     }
   }
 };
-WLCOMPILECHECK(TbbPriQueue);
+GALOIS_WLCOMPILECHECK(TbbPriQueue);
 #endif //TBB
 
 template<class T=int, bool concurrent = true>
@@ -2077,7 +2077,7 @@ class StaticPartitioning : private boost::noncopyable {
     }
   }
 };
-WLCOMPILECHECK(StaticPartitioning);
+GALOIS_WLCOMPILECHECK(StaticPartitioning);
 
 namespace Alt {
 
@@ -2340,7 +2340,7 @@ public:
     }
   }
 };
-//WLCOMPILECHECK(ChunkedAdaptor);
+//GALOIS_WLCOMPILECHECK(ChunkedAdaptor);
 
 }
 

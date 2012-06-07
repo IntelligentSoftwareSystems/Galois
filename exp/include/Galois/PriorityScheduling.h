@@ -33,7 +33,7 @@ struct WorklistExperiment {
     using namespace GaloisRuntime::WorkList;
 
     typedef OrderedByIntegerMetric<Indexer, dChunk> OBIM;
-#ifdef GALOIS_TBB
+#ifdef GALOIS_USE_TBB
     typedef TbbPriQueue<Greater> TBB;
     typedef LocalStealing<TBB> LTBB;
     typedef PTbb<Greater> PTBB;
@@ -86,7 +86,7 @@ struct WorklistExperiment {
     WLFOO(ii, ei, fn, dchunklifo, DCL256) else
     WLFOO(ii, ei, fn, random,   RANDOM)   else
     WLFOO(ii, ei, fn, sp,       STATIC)   else
-#ifdef GALOIS_TBB
+#ifdef GALOIS_USE_TBB
     WLFOO(ii, ei, fn, nactobim, NACTOBIM) else
     WLFOO(ii, ei, fn, ctobim,   CTOBIM)   else
     WLFOO(ii, ei, fn, tbb,      TBB)      else

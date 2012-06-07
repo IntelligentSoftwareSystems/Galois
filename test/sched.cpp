@@ -30,7 +30,7 @@
 
 #include "Lonestar/BoilerPlate.h"
 
-#ifdef GALOIS_EXP
+#ifdef GALOIS_USE_EXP
 #include "Galois/Runtime/WorkListExperimental.h"
 #endif
 
@@ -74,7 +74,7 @@ int main(int argc, char** argv) {
   Galois::for_each<dChunkedLIFO<64> >(v.begin(), v.end(), process());
   T2.stop();
 
-#ifdef GALOIS_EXP
+#ifdef GALOIS_USE_EXP
   // Galois::StatTimer T3("T3");
   // T3.start();
   // using namespace GaloisRuntime::WorkList;

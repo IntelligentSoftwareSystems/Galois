@@ -20,9 +20,8 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-
-#ifndef _GALOIS_RUNTIME_PERCPU_H
-#define _GALOIS_RUNTIME_PERCPU_H
+#ifndef GALOIS_RUNTIME_PERCPU_H
+#define GALOIS_RUNTIME_PERCPU_H
 
 #include "ll/TID.h"
 #include "ll/HWTopo.h"

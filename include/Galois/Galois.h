@@ -28,7 +28,7 @@
 #include "Galois/Runtime/ParallelWork.h"
 #include "Galois/Runtime/LocalIterator.h"
 
-#ifdef GALOIS_EXP
+#ifdef GALOIS_USE_EXP
 #include "Galois/Runtime/ParallelWorkInline.h"
 #include "Galois/Runtime/ParaMeter.h"
 #include "Galois/Runtime/Deterministic.h"

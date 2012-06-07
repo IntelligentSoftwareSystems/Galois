@@ -35,7 +35,7 @@ static inline bool isWriteMethod(int m) {
 void doCheckWrite();
 
 static inline void checkWrite(int m) {
-#ifdef GALOIS_DET
+#ifdef GALOIS_USE_DET
   if (isWriteMethod(m))
     doCheckWrite();
 #endif

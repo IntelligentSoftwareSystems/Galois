@@ -1,6 +1,6 @@
 #include "Galois/Runtime/Sampling.h"
 
-#ifdef GALOIS_VTUNE
+#ifdef GALOIS_USE_VTUNE
 #include "ittnotify.h"
 #include "Galois/Runtime/ll/TID.h"
 

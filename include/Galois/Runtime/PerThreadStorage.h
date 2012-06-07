@@ -21,8 +21,8 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#ifndef _GALOIS_RUNTIME_PERTHREADSTORAGE_H
-#define _GALOIS_RUNTIME_PERTHREADSTORAGE_H
+#ifndef GALOIS_RUNTIME_PERTHREADSTORAGE_H
+#define GALOIS_RUNTIME_PERTHREADSTORAGE_H
 
 #include <cassert>
 #include <vector>

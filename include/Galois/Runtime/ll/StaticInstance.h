@@ -27,6 +27,9 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
+#ifndef GALOIS_RUNTIME_LL_STATICINSTANCE_H
+#define GALOIS_RUNTIME_LL_STATICINSTANCE_H
+
 #include "CompilerSpecific.h"
 
 namespace GaloisRuntime {
@@ -69,3 +72,5 @@ struct StaticInstance {
 
 }
 }
+
+#endif

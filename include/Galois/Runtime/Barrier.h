@@ -28,7 +28,7 @@
 
 #include <pthread.h>
 
-#ifdef GALOIS_DMP
+#ifdef GALOIS_USE_DMP
   // XXX(ddn): cannot import dmp.h directly because it doesn't play nicely with
   // system header files so grab only what we need here
 #ifdef __cplusplus
@@ -43,7 +43,7 @@ extern "C" {
 namespace GaloisRuntime {
 
 class PthreadBarrier {
-#ifdef GALOIS_DMP
+#ifdef GALOIS_USE_DMP
   DMPbarrier bar;
 #else
   pthread_barrier_t bar;
@@ -190,7 +190,7 @@ public:
   //  void dump();
 };
 
-#ifdef GALOIS_DRF
+#ifdef GALOIS_USE_DRF
 typedef PthreadBarrier GBarrier;
 #else
 typedef TopoBarrier GBarrier;

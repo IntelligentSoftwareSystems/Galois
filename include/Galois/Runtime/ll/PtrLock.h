@@ -31,8 +31,8 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-#ifndef _PTR_LOCK_H
-#define _PTR_LOCK_H
+#ifndef GALOIS_RUNTIME_LL_PTRLOCK_H
+#define GALOIS_RUNTIME_LL_PTRLOCK_H
 
 #include <stdint.h>
 #include <cassert>

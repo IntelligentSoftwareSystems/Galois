@@ -27,8 +27,8 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-#ifndef _TID_H
-#define _TID_H
+#ifndef GALOIS_RUNTIME_LL_TID_H
+#define GALOIS_RUNTIME_LL_TID_H
 
 namespace GaloisRuntime {
 namespace LL {

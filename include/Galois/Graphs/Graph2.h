@@ -57,8 +57,8 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#ifndef GALOIS_FASTGRAPHS_GRAPH_H
-#define GALOIS_FASTGRAPHS_GRAPH_H
+#ifndef GALOIS_GRAPHS_GRAPH2_H
+#define GALOIS_GRAPHS_GRAPH2_H
 
 #include <boost/functional.hpp>
 #include <boost/iterator/transform_iterator.hpp>
