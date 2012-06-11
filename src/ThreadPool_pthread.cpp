@@ -37,10 +37,6 @@
 #include <semaphore.h>
 #include <pthread.h>
 
-#ifdef GALOIS_USE_DMP
-#include "dmp.h"
-#endif
-
 //Forward declare this to avoid including PerThreadStorage
 //We avoid this to stress that the thread Pool MUST NOT depend on PTS
 namespace GaloisRuntime {
@@ -60,15 +56,15 @@ static void checkResults(int val) {
  
 namespace {
 
-class SemSemaphore: private boost::noncopyable {
+class Semaphore: private boost::noncopyable {
   sem_t sem;
 public:
-  explicit SemSemaphore(int val = 0) {
+  explicit Semaphore(int val = 0) {
     int rc = sem_init(&sem, 0, val);
     checkResults(rc);
   }
 
-  ~SemSemaphore() {
+  ~Semaphore() {
     int rc = sem_destroy(&sem);
     checkResults(rc);
   }
@@ -91,44 +87,11 @@ public:
   }
 };
 
-class PthreadSemaphore: private boost::noncopyable {
-  pthread_mutex_t lock;
-  pthread_cond_t cond;
-  int val;
-public:
-  explicit PthreadSemaphore(int v = 0): val(v) {
-    pthread_mutex_init(&lock, NULL);
-    pthread_cond_init(&cond, NULL);
-  }
-  
-  ~PthreadSemaphore() {
-    pthread_mutex_destroy(&lock);
-    pthread_cond_destroy(&cond);
-  }
-
-  void release(int n = 1) {
-    pthread_mutex_lock(&lock);
-    val += n;
-    if (val > 0)
-      pthread_cond_broadcast(&cond);
-    pthread_mutex_unlock(&lock);
-  }
-
-  void acquire(int n = 1) {
-    pthread_mutex_lock(&lock);
-    while (val < n) {
-      pthread_cond_wait(&cond, &lock);
-    }
-    val -= n;
-    pthread_mutex_unlock(&lock);
-  }
-};
-
-class AtomicThinBarrier: private boost::noncopyable {
+class ThinBarrier: private boost::noncopyable {
   volatile int started;
   int val;
 public:
-  AtomicThinBarrier(int v): val(v) { }
+  ThinBarrier(int v): val(v) { }
   void release(int n = 1) {
     __sync_fetch_and_add(&started, 1);
   }
@@ -139,15 +102,6 @@ public:
 
 
 class ThreadPool_pthread : public ThreadPool {
-  // Instantiate pthread;
-#ifdef GALOIS_USE_DRF
-  typedef PthreadSemaphore Semaphore;
-  typedef PthreadSemaphore ThinBarrier;
-#else
-  typedef SemSemaphore Semaphore;
-  typedef AtomicThinBarrier ThinBarrier;
-#endif
-
   pthread_t* threads; // set of threads
   Semaphore* starts;  // signal to release threads to run
   ThinBarrier started;

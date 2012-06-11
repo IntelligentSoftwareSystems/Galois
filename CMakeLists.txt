@@ -27,7 +27,6 @@ enable_testing()
 
 #ICC
 if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
-  set(CMAKE_CXX_COMPILER ${ICCXX})
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd68 -wd981 -wd383 -wd869 -wd2196 -wd279")
 endif()
 
@@ -73,16 +72,6 @@ if(USE_EXP)
 
   if(USE_DET)
     add_definitions(-DGALOIS_USE_DET)
-  endif()
-
-  if(EXP_DOALL MATCHES "DMP")
-    include_directories(exp/lib/dmpruntime)
-    add_definitions(-DGALOIS_USE_DRF -DGALOIS_USE_DMP)
-    set(RT_LINK dmpruntime ${RT_LINK})
-    set(EXP_DOALL "GALOIS")
-  elseif(EXP_DOALL MATCHES "PTHREAD")
-    add_definitions(-DGALOIS_USE_DRF)
-    set(EXP_DOALL "GALOIS")
   endif()
 
   if(USE_VTUNE)
@@ -148,7 +137,7 @@ if(CMAKE_BUILD_TYPE MATCHES "Debug")
 endif()
 
 #always import c99 stdint functions into c++
-include(UseStdMacro)
+#include(UseStdMacro) # HandleLLVMOptions.cmake already does this for us
 
 include(CheckEndian)
 
@@ -173,7 +162,7 @@ endif()
 function(linkRuntime name) 
   target_link_libraries(${name} ${ARGN})
   target_link_libraries(${name} galois ${RT_LINK})
-endfunction (linkRuntime)
+endfunction(linkRuntime)
 
 include(ParseArguments)
 
