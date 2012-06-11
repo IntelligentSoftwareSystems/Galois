@@ -194,9 +194,34 @@ simplex generateBoundary(point2d* P, int n, int bCount, vertex* v, tri* t) {
 //    MAIN LOOP
 // *************************************************************
 
+typedef kNearestNeighbor<vertex,1> KNN;
+struct GReserver {
+  KNN& knn;
+  vertex** vv;
+  simplex* t;
+  Qs** qs;
+  GReserver(KNN& _knn, vertex** _vv, simplex* _t, Qs** _qs): knn(_knn), vv(_vv), t(_t), qs(_qs) { }
+  void operator()(int j) {
+      vertex *u = knn.nearest(vv[j]);
+      t[j] = find(vv[j],simplex(u->t,0));
+      reserveForInsert(vv[j],t[j],qs[j]);
+  }
+};
+
+struct GInserter {
+  bool* flags;
+  vertex** vv;
+  simplex* t;
+  Qs** qs;
+  GInserter(bool* _flags, vertex** _vv, simplex* _t, Qs** _qs): flags(_flags), vv(_vv), t(_t), qs(_qs) { }
+  void operator()(int j) {
+      flags[j] = insert(vv[j],t[j],qs[j]);
+  }
+};
+
 void incrementallyAddPoints(vertex** v, int n, vertex* start) {
   int numRounds = Exp::getNumRounds();
-  numRounds = numRounds =< 0 ? 100 : numRounds;
+  numRounds = numRounds <= 0 ? 100 : numRounds;
 
   // various structures needed for each parallel insertion
   //int maxR = (int) (n/100) + 1; // maximum number to try in parallel
@@ -211,7 +236,6 @@ void incrementallyAddPoints(vertex** v, int n, vertex* start) {
   vertex** h = newA(vertex*,maxR);
 
   // create a point location structure
-  typedef kNearestNeighbor<vertex,1> KNN;
   KNN knn = KNN(&start, 1);
   int multiplier = 8; // when to regenerate
   int nextNN = multiplier;
@@ -239,7 +263,7 @@ void incrementallyAddPoints(vertex** v, int n, vertex* start) {
     // for trial vertices find containing triangle, determine cavity 
     // and reserve vertices on boundary of cavity
 //    parallel_for (int j = 0; j < cnt; j++) {
-    parallel_doall(int, j, 0, cnt)  {
+    parallel_doall_obj(int, j, 0, cnt, GReserver(knn, vv, t, qs))  {
       vertex *u = knn.nearest(vv[j]);
       t[j] = find(vv[j],simplex(u->t,0));
       reserveForInsert(vv[j],t[j],qs[j]);
@@ -248,7 +272,7 @@ void incrementallyAddPoints(vertex** v, int n, vertex* start) {
     // For trial vertices check if they own their boundary and
     // update mesh if so.  flags[i] is 1 if failed (need to retry)
 //    parallel_for (int j = 0; j < cnt; j++) {
-    parallel_doall(int, j, 0, cnt)  {
+    parallel_doall_obj(int, j, 0, cnt, GInserter(flags, vv, t, qs))  {
       flags[j] = insert(vv[j],t[j],qs[j]);
     } parallel_doall_end
 

@@ -252,6 +252,43 @@ simplex generateBoundary(point2d* P, int n, int bCount, vertex* v, tri* t) {
 // *************************************************************
 
 //#define DUMB
+typedef kNearestNeighbor<vertex,1> KNN;
+struct GReserver {
+  KNN& knn;
+  vertex** vv;
+  Qs** qs;
+  int cnt;
+  GReserver(KNN& _knn, vertex** _vv, Qs** _qs, int _cnt): knn(_knn), vv(_vv), qs(_qs), cnt(_cnt) { }
+  void operator()(int j) {
+      unsigned tid = Exp::getTID();
+      int cur = j;
+
+      while (true) {
+        bool success = false;
+        vertex *u = knn.nearest(vv[cur]);
+        simplex tt = simplex(u->t, 0);
+        simplex t = find(vv[cur], tt, vv[cur]->id, qs[tid]);
+        if (!tt.failed && reserveForInsert(vv[cur], t, qs[tid])
+            && !insert(vv[cur], t, qs[tid])) {
+          success = true;
+        } else {
+          qs[tid]->abortedQ.push_back(cur);
+          qs[tid]->aborted++;
+        }
+
+        resetState(vv[cur]->id, qs[tid]);
+        
+//        if (!success)
+        if (cnt < 128 && !success)
+          break;
+        if (qs[tid]->abortedQ.empty()) 
+          break;
+
+        cur = qs[tid]->abortedQ.front();
+        qs[tid]->abortedQ.pop_front();
+      }
+  }
+};
 
 void incrementallyAddPoints(vertex** v, int n, vertex* start) {
   unsigned numThreads = Exp::getNumThreads();
@@ -275,7 +312,6 @@ void incrementallyAddPoints(vertex** v, int n, vertex* start) {
 #endif
 
   // create a point location structure
-  typedef kNearestNeighbor<vertex,1> KNN;
   KNN knn = KNN(&start, 1);
   int multiplier = 8; // when to regenerate
   int nextNN = multiplier;
@@ -309,7 +345,7 @@ void incrementallyAddPoints(vertex** v, int n, vertex* start) {
     // for trial vertices find containing triangle, determine cavity 
     // and reserve vertices on boundary of cavity
 //    parallel_for (int j = 0; j < cnt; j++) {
-    parallel_doall(int, j, 0, cnt)  {
+    parallel_doall_obj(int, j, 0, cnt, GReserver(knn, vv, qs, cnt))  {
       unsigned tid = Exp::getTID();
       int cur = j;
 

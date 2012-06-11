@@ -126,7 +126,7 @@ char* maximalIndependentSet(graph GS) {
   char* Flags = newArray(n, (char) 0);
   MISstep mis(Flags, G);
   int numRounds = Exp::getNumRounds();
-  numRounds = numRounds =< 0 ? 25 : numRounds;
+  numRounds = numRounds <= 0 ? 25 : numRounds;
   speculative_for(mis, 0, n, numRounds);
   return Flags;
 }

@@ -2,9 +2,7 @@ add_custom_target(more-suites-inputs-pbbs)
 add_dependencies(more-suites-inputs more-suites-inputs-pbbs)
 
 function(executable name)
-  add_executable(${name} ${ARGN})
-  target_link_libraries(${name} pbbs ${extra_libs})
-  addsuite(${name})
+  addsuite(${name} ${ARGN} EXTLIBS m)
 endfunction()
 
 add_subdirectory(geometryData)

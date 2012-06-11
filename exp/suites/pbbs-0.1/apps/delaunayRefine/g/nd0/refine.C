@@ -288,7 +288,7 @@ void resetState(int id, Qs* q) {
 void addRefiningVertices(vertex** v, int n, int nTotal, TriangleTable TT, int& failed, int& rounds) {
   unsigned numThreads = Exp::getNumThreads();
   int numRounds = Exp::getNumRounds();
-  numRounds = numRounds =< 0 ? 500 : numRounds;
+  numRounds = numRounds <= 0 ? 500 : numRounds;
 
   //int maxR = (int) (nTotal/500) + 1; // maximum number to try in parallel
   int maxR = (int) (nTotal/numRounds) + 1; // maximum number to try in parallel

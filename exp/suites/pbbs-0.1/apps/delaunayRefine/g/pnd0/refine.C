@@ -285,10 +285,37 @@ void resetState(int id, Qs* q) {
 //    MAIN REFINEMENT LOOP
 // *************************************************************
 
+struct GInserter {
+  bool* flags;
+  vertex** vv;
+  simplex* t;
+  Qs** qs;
+  TriangleTable TT;
+  vertex** v;
+  GInserter(bool* _flags, vertex** _vv, simplex* _t, Qs** _qs, TriangleTable _TT, vertex** _v): flags(_flags), vv(_vv), t(_t), qs(_qs), TT(_TT), v(_v) { }
+  void operator()(int j) {
+      unsigned tid = Exp::getTID();
+      Qs* q = qs[tid];
+
+      int cur = j;
+
+      bool success = true;
+      simplex t = simplex(vv[cur]->badT, 0);
+      int r = findAndReserveCavity(vv[cur], t, q);
+      if (r == 1 && addCavity(vv[cur], t, q, TT, v)) {
+        ;
+      } else if (r == 2) {
+        success = false;
+      }
+      flags[cur] = !success;
+      resetState(vv[cur]->id, q);
+  }
+};
+
 void addRefiningVertices(vertex** v, int n, int nTotal, TriangleTable TT, int& failed, int& rounds) {
   unsigned numThreads = Exp::getNumThreads();
   int numRounds = Exp::getNumRounds();
-  numRounds = numRounds =< 0 ? 500 : numRounds;
+  numRounds = numRounds <= 0 ? 500 : numRounds;
 
   //int maxR = (int) (nTotal/500) + 1; // maximum number to try in parallel
   int maxR = (int) (nTotal/numRounds) + 1; // maximum number to try in parallel
@@ -309,7 +336,7 @@ void addRefiningVertices(vertex** v, int n, int nTotal, TriangleTable TT, int& f
     vertex** vv = v+top-cnt;
 
 //    parallel_for (int j = 0; j < cnt; j++) 
-    parallel_doall(int, j, 0, cnt) {
+    parallel_doall_obj(int, j, 0, cnt, GInserter(flags, vv, t, qs, TT, v)) {
       unsigned tid = Exp::getTID();
       Qs* q = qs[tid];
 

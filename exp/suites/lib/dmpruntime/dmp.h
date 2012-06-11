@@ -14,6 +14,9 @@ extern "C" {
 
 #include "dmp-common.h"
 
+int main(int argc, char *argv[]);
+#define	main DMPmain
+
 #define pthread_create(a,b,c,d) DMPthread_create(a,b,c,d)
 #define pthread_join(a,b) DMPthread_join(a,b)
 #define pthread_cancel(a) DMPthread_cancel(a)

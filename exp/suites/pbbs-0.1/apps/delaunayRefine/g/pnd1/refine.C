@@ -289,6 +289,44 @@ void resetState(int id, Qs* q) {
 //    MAIN REFINEMENT LOOP
 // *************************************************************
 
+struct GInserter {
+  vertex** vv;
+  Qs** qs;
+  TriangleTable TT;
+  vertex** v;
+  GInserter(vertex** _vv, Qs** _qs, TriangleTable _TT, vertex** _v): vv(_vv), qs(_qs), TT(_TT), v(_v) { }
+  void operator()(int j) {
+      unsigned tid = Exp::getTID();
+      Qs* q = qs[tid];
+
+      int cur = j;
+
+      while (true) {
+        bool success = true;
+        simplex t = simplex(vv[cur]->badT, 0);
+        int r = findAndReserveCavity(vv[cur], t, q);
+        if (r == 1 && addCavity(vv[cur], t, q, TT, v)) {
+          ;
+        } else if (r == 2) {
+          q->abortedQ.push_back(cur);
+          q->aborted++;
+          success = false;
+        } 
+
+        resetState(vv[cur]->id, q);
+
+        if (!success)
+          break;
+        if (!q->abortedQ.empty()) {
+          cur = q->abortedQ.front();
+          q->abortedQ.pop_front();
+        } else {
+          break;
+        }
+      }
+  }
+};
+
 void addRefiningVertices(vertex** v, int n, int nTotal, TriangleTable TT, int vlen, int& numBad, int& failed, int& rounds) {
   unsigned numThreads = Exp::getNumThreads();
   
@@ -311,7 +349,7 @@ void addRefiningVertices(vertex** v, int n, int nTotal, TriangleTable TT, int vl
     vertex** vv = v+top-cnt;
 
 //    parallel_for (int j = 0; j < cnt; j++) 
-    parallel_doall(int, j, 0, cnt) {
+    parallel_doall_obj(int, j, 0, cnt, GInserter(vv, qs, TT, v)) {
       unsigned tid = Exp::getTID();
       Qs* q = qs[tid];
 

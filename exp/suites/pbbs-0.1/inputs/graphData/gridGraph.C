@@ -37,7 +37,7 @@ int loc2d(int n, int i1, int i2) {
 }
 
 edgeArray edge2DMesh(int n) {
-  int dn = round(pow((float) n,1.0/2.0));
+  int dn = round(pow((double) n,1.0/2.0));
   int nn = dn*dn;
   int nonZeros = 2*nn;
   edge *E = newA(edge,nonZeros);
@@ -57,7 +57,7 @@ int loc3d(int n, int i1, int i2, int i3) {
 }
 
 edgeArray edge3DMesh(int n) {
-  int dn = round(pow((float) n,1.0/3.0));
+  int dn = round(pow((double) n,1.0/3.0));
   int nn = dn*dn*dn;
   int nonZeros = 3*nn;
   edge *E = newA(edge,nonZeros);

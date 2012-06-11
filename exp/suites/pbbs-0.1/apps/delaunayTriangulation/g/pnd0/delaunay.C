@@ -248,10 +248,35 @@ simplex generateBoundary(point2d* P, int n, int bCount, vertex* v, tri* t) {
 //    MAIN LOOP
 // *************************************************************
 
+typedef kNearestNeighbor<vertex,1> KNN;
+struct GReserver {
+  KNN& knn;
+  vertex** vv;
+  simplex* t;
+  Qs** qs;
+  bool* flags;
+  GReserver(KNN& _knn, vertex** _vv, simplex* _t, Qs** _qs, bool* _flags): knn(_knn), vv(_vv), t(_t), qs(_qs), flags(_flags) { }
+  void operator()(int j) {
+      unsigned tid = Exp::getTID();
+      int cur = j;
+
+      bool success = false;
+      vertex *u = knn.nearest(vv[cur]);
+      simplex tt = simplex(u->t, 0);
+      simplex t = find(vv[cur], tt, vv[cur]->id, qs[tid]);
+      if (!tt.failed && reserveForInsert(vv[cur], t, qs[tid])
+          && !insert(vv[cur], t, qs[tid])) {
+        success = true;
+      }
+      flags[cur] = !success;
+      resetState(vv[cur]->id, qs[tid]);
+  }
+};
+
 void incrementallyAddPoints(vertex** v, int n, vertex* start) {
   int numRounds = Exp::getNumRounds();
   unsigned numThreads = Exp::getNumThreads();
-  numRounds = numRounds =< 0 ? 100 : numRounds;
+  numRounds = numRounds <= 0 ? 100 : numRounds;
 
   // various structures needed for each parallel insertion
   //int maxR = (int) (n/100) + 1; // maximum number to try in parallel
@@ -266,7 +291,6 @@ void incrementallyAddPoints(vertex** v, int n, vertex* start) {
   vertex** h = newA(vertex*,maxR);
 
   // create a point location structure
-  typedef kNearestNeighbor<vertex,1> KNN;
   KNN knn = KNN(&start, 1);
   int multiplier = 8; // when to regenerate
   int nextNN = multiplier;
@@ -294,7 +318,7 @@ void incrementallyAddPoints(vertex** v, int n, vertex* start) {
     // for trial vertices find containing triangle, determine cavity 
     // and reserve vertices on boundary of cavity
 //    parallel_for (int j = 0; j < cnt; j++) {
-    parallel_doall(int, j, 0, cnt)  {
+    parallel_doall_obj(int, j, 0, cnt, GReserver(knn, vv, t, qs, flags))  {
       unsigned tid = Exp::getTID();
       int cur = j;
 

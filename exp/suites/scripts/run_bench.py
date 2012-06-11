@@ -19,12 +19,14 @@ def backtick(s):
 parser = optparse.OptionParser(usage='usage: %prog [options] -- <cmd>')
 parser.add_option('-t', dest='threads', default=1, type='int')
 parser.add_option('-r', dest='rounds', default=0, type='int')
+parser.add_option('--dmp-chunk', dest='dmpchunk', default=1000, type='int')
 (options, args) = parser.parse_args()
 
-nprocs = int(backtick("cat /proc/cpuinfo | grep processor | wc -l"))
+#nprocs = int(backtick("cat /proc/cpuinfo | grep processor | wc -l"))
 
-#export DMP_SCHEDULING_CHUNK_SIZE=1000
-os.environ['DMP_NUM_PHYSICAL_PROCESSORS'] = str(nprocs)
+os.environ['DMP_SCHEDULING_CHUNK_SIZE'] = str(options.dmpchunk)
+#os.environ['DMP_NUM_PHYSICAL_PROCESSORS'] = str(nprocs)
+os.environ['DMP_NUM_PHYSICAL_PROCESSORS'] = str(options.threads)
 os.environ['OMP_NUM_THREADS'] = str(options.threads)
 os.environ['OMP_SCHEDULE'] = "dynamic,16"
 os.environ['TBB_NUM_THREADS'] = str(options.threads)

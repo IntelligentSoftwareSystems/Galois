@@ -12,7 +12,7 @@
 
 // Constants.
 #define DefaultSchedulingChunkSize    1000
-#define DefaultNumPhysicalProcessors  24
+#define DefaultNumPhysicalProcessors  8
 
 int DMP_SCHEDULING_CHUNK_SIZE = DefaultSchedulingChunkSize;
 int DMP_NUM_PHYSICAL_PROCESSORS = DefaultNumPhysicalProcessors;
@@ -262,12 +262,9 @@ void DMP_init(void) {
   DMP_init_called = 1;
 }
 
-#ifdef GALOIS_CHANGE
-int DMPmain(int argc, char *argv[]) {
-#else
 int main(int argc, char *argv[]) {
-#endif
   ASSERT(*((volatile int*)&DMP_init_called));
+  
 
   // Run this at program termination.
   atexit(DMP_terminate);
@@ -285,17 +282,14 @@ int main(int argc, char *argv[]) {
 #endif
   INFO_MSG("[DMP] Calling main()...");
 
-#ifndef GALOIS_CHANGE
   const int main_result = DMPmain(argc, argv);
   INFO_MSG("[DMP] main() completed");
   return main_result;
-#else
-  return 0;
-#endif
 }
 
-namespace {
+#if 0
 #ifdef GALOIS_CHANGE
+namespace {
 // Do initialization in code rather than depend on llvm pass
 struct Init {
   Init() { DMP_init();  DMPmain(0, NULL); }
@@ -307,4 +301,4 @@ void DMP_Galois_init() {
 
 }
 #endif
-
+#endif
