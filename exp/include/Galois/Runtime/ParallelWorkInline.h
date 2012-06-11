@@ -249,8 +249,14 @@ void dChunkedLIFO<T,chunksize,concurrent>::push_backSP(const WID& id, p& n, valu
 
 } // end HIDDEN
 
+
+namespace WorkList {
+  template<class T=int>
+  class BulkSynchronousInline { };
+}
+
 template<class T, class FunctionTy>
-class ForEachWork<WorkList::BulkSynchronous<char>,T,FunctionTy> {
+class ForEachWork<WorkList::BulkSynchronousInline<>,T,FunctionTy> {
   typedef T value_type;
   typedef HIDDEN::dChunkedLIFO<value_type,256> WLTy;
 
@@ -258,6 +264,7 @@ class ForEachWork<WorkList::BulkSynchronous<char>,T,FunctionTy> {
     GaloisRuntime::UserContextAccess<value_type> facing;
     SimpleRuntimeContext cnx;
     LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
+    ThreadLocalData(const char* ln): stat(ln) { }
   };
 
   GaloisRuntime::GBarrier barrier1;
@@ -274,7 +281,7 @@ class ForEachWork<WorkList::BulkSynchronous<char>,T,FunctionTy> {
 
   void go() {
     unsigned round = 0;
-    ThreadLocalData tld;
+    ThreadLocalData tld(loopname);
     setThreadContext(&tld.cnx);
     unsigned tid = LL::getTID();
     HIDDEN::WID wid;
@@ -290,9 +297,9 @@ class ForEachWork<WorkList::BulkSynchronous<char>,T,FunctionTy> {
         tld.stat.inc_iterations();
 
         if (ForEachTraits<FunctionTy>::NeedsPush) {
-          for (typename std::vector<value_type>::iterator ii = tld.facing.getPushBuffer().begin(), 
-              ei = tld.facing.getPushBuffer().end(); ii != ei; ++ii)
-            next->push_back(wid, *ii);
+          next->push_back(wid,
+              tld.facing.getPushBuffer().begin(),
+              tld.facing.getPushBuffer().end());
           tld.facing.resetPushBuffer();
         }
 
@@ -318,14 +325,14 @@ class ForEachWork<WorkList::BulkSynchronous<char>,T,FunctionTy> {
     }
 
     setThreadContext(0);
-    if (ForEachTraits<FunctionTy>::NeedsStats)
-      tld.stat.report_stat(LL::getTID(), loopname);
   }
 
 public:
   ForEachWork(FunctionTy& f, const char* ln): function(f), loopname(ln) { 
-    if (ForEachTraits<FunctionTy>::NeedsAborts || ForEachTraits<FunctionTy>::NeedsBreak)
+    if (ForEachTraits<FunctionTy>::NeedsAborts || ForEachTraits<FunctionTy>::NeedsBreak) {
+      assert(0 && "not supported by this executor");
       abort();
+    }
 
     numActive = Galois::getActiveThreads();
     barrier1.reinit(numActive);
@@ -334,7 +341,7 @@ public:
 
   template<typename IterTy>
   bool AddInitialWork(IterTy b, IterTy e) {
-    unsigned int a = Galois::getActiveThreads();
+    unsigned int a = numActive;
     unsigned int id = LL::getTID();
     unsigned dist = std::distance(b, e);
     unsigned num = (dist + a - 1) / a; //round up
@@ -344,8 +351,6 @@ public:
     IterTy e2 = b;
     std::advance(b2, A);
     std::advance(e2, B);
-    wls[0].initializeThread();
-    wls[1].initializeThread();
     wls[0].push_initial(HIDDEN::WID(), b2, e2);
     return true;
   }

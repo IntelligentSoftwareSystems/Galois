@@ -854,7 +854,12 @@ int main(int argc, char **argv) {
 
   using namespace GaloisRuntime::WorkList;
   typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;
-  typedef BulkSynchronous<> BSDefaultWL;
+
+#ifdef GALOIS_USE_EXP
+  typedef BulkSynchronousInline<> BSInline;
+#else
+  typedef BSWL BSInline;
+#endif
 
   switch (algo) {
     case serial: run(SerialAlgo()); break;
@@ -872,7 +877,7 @@ int main(int argc, char **argv) {
     case parallelManualBarrier: run(GaloisManualBarrier()); break;
     case parallelBarrierCas: run(GaloisBarrier<BSWL,true>()); break;
     case parallelBarrier: run(GaloisBarrier<BSWL,false>()); break;
-    case parallelBarrierInline: run(GaloisBarrier<BSDefaultWL,false>()); break;
+    case parallelBarrierInline: run(GaloisBarrier<BSInline,false>()); break;
     case parallelTBB: run(TBB()); break;
     default: std::cerr << "Unknown algorithm" << algo << "\n"; abort();
   }
