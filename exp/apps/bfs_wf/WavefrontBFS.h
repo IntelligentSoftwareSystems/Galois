@@ -39,13 +39,10 @@
 
 #include "Galois/Runtime/PerThreadWorkList.h"
 #include "Galois/Runtime/DoAll.h"
+#include "Galois/Runtime/Sampling.h"
 
 #include "bfs.h"
 
-// vtune
-#ifdef GALOIS_USE_VTUNE
-#include "ittnotify.h"
-#endif
 
 // TODO: write a LCGraph without edge data
 // TODO: allow passing worklist ref to for_each
@@ -278,9 +275,7 @@ public:
 
     size_t numIter = 1;
 
-#ifdef GALOIS_USE_VTUNE
-    __itt_resume ();
-#endif
+    GaloisRuntime::beginSampling ();
 
     ParCounter numAdds (0);
     while (!currWL->empty_all ()) {
@@ -294,9 +289,7 @@ public:
 
     numIter += numAdds.reduce ();
 
-#ifdef GALOIS_USE_VTUNE
-  __itt_pause ();
-#endif
+    GaloisRuntime::endSampling ();
 
     delete currWL; currWL = NULL;
     delete nextWL; nextWL = NULL;

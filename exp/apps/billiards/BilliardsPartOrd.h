@@ -499,7 +499,7 @@ class BilliardsPOsortedVec;
 
 class BilliardsPOunsorted: public Billiards {
 
-  typedef GaloisRuntime::PerThreadWLfactory<Marked<Event> >::PerThreadVector WLTy;
+  typedef GaloisRuntime::PerThreadWLfactory<Markable<Event> >::PerThreadVector WLTy;
   typedef GaloisRuntime::PerThreadWLfactory<Event>::PerThreadVector ILTy;
 
   typedef GaloisRuntime::PerCPU< std::vector<Event> > AddListTy;
@@ -515,8 +515,7 @@ public:
   virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) {
 
     WLTy workList;
-    initPerThreadMarked (initEvents.begin (), initEvents.end (),
-        workList, &WLTy::ContTy::push_back);
+    workList.fill_init (initEvents.begin (), initEvents.end (), &WLTy::Cont_ty::push_back);
 
     return runSimInternal<FindIndepEvents, SimulateIndepEvents, AddNextEvents, RemoveSimulatedEvents> (
         table, workList, endtime, enablePrints);
@@ -636,7 +635,7 @@ private:
     {}
 
 
-    void operator () (Marked<Event>& e) {
+    void operator () (Markable<Event>& e) {
 
 
       if (!e.marked ()) {
@@ -716,7 +715,7 @@ private:
       for (std::vector<Event>::iterator a = addList.get ().begin (), ea = addList.get ().end ();
           a != ea; ++a ) {
 
-        workList.get ().push_back (*a);
+        workList.get ().push_back (Markable<Event> (*a));
       }
 
     }
@@ -779,8 +778,7 @@ public:
   virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) {
 
     WLTy workList;
-    initPerThreadMarked (initEvents.begin (), initEvents.end (),
-        workList, &WLTy::ContTy::push_back);
+    workList.fill_init (initEvents.begin (), initEvents.end (), &WLTy::Cont_ty::push_back);
 
     // sort events
     for (unsigned r = 0; r < workList.numRows (); ++r) {
@@ -816,7 +814,7 @@ private:
     {} 
 
 
-    void operator () (Marked<Event>& e) {
+    void operator () (Markable<Event>& e) {
 
       if (!e.marked ()) {
 

@@ -65,7 +65,7 @@ public:
 
   virtual void run (int argc, char* argv[]) {
     
-    LonestarStart (argc, argv, std::cout, name, desc, url);
+    LonestarStart (argc, argv, name, desc, url);
 
     Table table (length, width, numballs);
     Table verCopy (table);
