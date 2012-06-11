@@ -327,14 +327,14 @@ public:
     if (ForEachTraits<FunctionTy>::NeedsAborts || ForEachTraits<FunctionTy>::NeedsBreak)
       abort();
 
-    numActive = GaloisRuntime::getSystemThreadPool().getActiveThreads();
+    numActive = Galois::getActiveThreads();
     barrier1.reinit(numActive);
     barrier2.reinit(numActive);
   }
 
   template<typename IterTy>
   bool AddInitialWork(IterTy b, IterTy e) {
-    unsigned int a = ThreadPool::getActiveThreads();
+    unsigned int a = Galois::getActiveThreads();
     unsigned int id = LL::getTID();
     unsigned dist = std::distance(b, e);
     unsigned num = (dist + a - 1) / a; //round up

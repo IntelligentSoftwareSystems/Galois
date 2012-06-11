@@ -34,39 +34,40 @@
 #include <cstdio>
 
 #include "Galois/Runtime/PerCPU.h"
+#include "Galois/Runtime/Threads.h"
 
 namespace GaloisRuntime {
 
-template <typename T, template <typename _u, typename _a> class C, typename AllocTy=std::allocator<T> > 
+template <typename T, typename Cont_tp> 
 struct PerThreadWorkList {
 
-  typedef C<T, AllocTy> ContTy;
-  typedef GaloisRuntime::PerCPU<ContTy> PerThrdContTy;
+  typedef Cont_tp Cont_ty;
+  typedef GaloisRuntime::PerCPU<Cont_ty> PerThrdCont_ty;
 
-  PerThrdContTy perThrdCont;
+  PerThrdCont_ty perThrdCont;
 
 public:
-  typedef typename ContTy::value_type value_type;
-  typedef typename ContTy::iterator iterator;
-  typedef typename ContTy::const_iterator const_iterator;
-  typedef typename ContTy::reference reference;
-  typedef typename ContTy::pointer pointer;
-  typedef typename ContTy::size_type size_type;
+  typedef typename Cont_ty::value_type value_type;
+  typedef typename Cont_ty::iterator iterator;
+  typedef typename Cont_ty::const_iterator const_iterator;
+  typedef typename Cont_ty::reference reference;
+  typedef typename Cont_ty::pointer pointer;
+  typedef typename Cont_ty::size_type size_type;
 
 
   PerThreadWorkList () {}
 
-  PerThreadWorkList (const ContTy& refCont): perThrdCont (refCont) {}
+  PerThreadWorkList (const Cont_ty& refCont): perThrdCont (refCont) {}
 
   unsigned numRows () const { return perThrdCont.size (); }
 
-  ContTy& operator [] (unsigned i) { return perThrdCont.get (i); }
+  Cont_ty& operator [] (unsigned i) { return perThrdCont.get (i); }
 
-  const ContTy& operator [] (unsigned i) const { return perThrdCont.get (i); }
+  const Cont_ty& operator [] (unsigned i) const { return perThrdCont.get (i); }
 
-  ContTy& get () { return perThrdCont.get (); }
+  Cont_ty& get () { return perThrdCont.get (); }
 
-  const ContTy& get () const { return perThrdCont.get (); }
+  const Cont_ty& get () const { return perThrdCont.get (); }
 
   iterator begin (unsigned i) { return perThrdCont.get (i).begin (); }
   const_iterator begin (unsigned i) const { return perThrdCont.get (i).begin (); }
@@ -110,6 +111,43 @@ public:
     return res;
   }
 
+  template <typename Iter, typename R>
+  void fill_init (Iter begin, Iter end,
+      R (Cont_ty::*pushFn) (const value_type&)=&Cont_ty::push_back) {
+
+    const unsigned P = Galois::getActiveThreads ();
+
+    typedef typename std::iterator_traits<Iter>::difference_type Diff_ty;
+
+    // integer division, where we want to round up. So adding P-1
+    Diff_ty block_size = (std::distance (begin, end) + (P-1) ) / P;
+
+    assert (block_size >= 1);
+
+    Iter block_begin = begin;
+
+    for (unsigned i = 0; i < P; ++i) {
+
+      Iter block_end = block_begin;
+
+      if (std::distance (block_end, end) < block_size) {
+        block_end = end;
+
+      } else {
+        std::advance (block_end, block_size);
+      }
+
+      for (; block_begin != block_end; ++block_begin) {
+        // workList[i].push_back (Marked<Value_ty> (*block_begin));
+        ((*this)[i].*pushFn) (value_type (*block_begin));
+      }
+
+      if (block_end == end) {
+        break;
+      }
+    }
+  }
+
 private:
 
 };
@@ -120,7 +158,7 @@ struct PerThreadWLfactory {
   // TODO: change this to a better one
   typedef std::allocator<T> AllocTy;
 
-  typedef PerThreadWorkList<T, std::vector, AllocTy> PerThreadVector;
+  typedef PerThreadWorkList<T, std::vector<T, AllocTy> > PerThreadVector;
 
 
 };

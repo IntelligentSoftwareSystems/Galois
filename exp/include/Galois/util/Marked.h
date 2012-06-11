@@ -1,4 +1,4 @@
-/** Marked object -*- C++ -*-
+/** Markable object -*- C++ -*-
  * @file
  * @section License
  *
@@ -30,17 +30,20 @@
 
 #include <climits>
 
+#include <boost/iterator/counting_iterator.hpp>
+
 #include "Galois/Runtime/PerThreadWorkList.h"
+#include "Galois/Runtime/DoAll.h"
 
 template <typename T>
-struct Marked: public T {
+struct Markable: public T {
   private:
     static const unsigned MAX_VAL = UINT_MAX;
 
   public:
     unsigned ver;
 
-    Marked (T _obj)
+    explicit Markable (T _obj)
       : T (_obj), ver (MAX_VAL) 
     {}
 
@@ -55,42 +58,77 @@ struct Marked: public T {
 
 };
 
-template <typename WLTy, typename IterTy, typename R>
-void initPerThreadMarked (IterTy begin, IterTy end, WLTy& workList, 
-    R (WLTy::ContTy::*pushFn) (const typename WLTy::value_type&)  ) {
-
-  const unsigned P = GaloisRuntime::ThreadPool::getActiveThreads ();
-
-  typedef typename std::iterator_traits<IterTy>::difference_type DiffTy;
-  typedef typename std::iterator_traits<IterTy>::value_type ValueTy;
-
-  // integer division, where we want to round up. So adding P-1
-  DiffTy block_size = (std::distance (begin, end) + (P-1) ) / P;
-
-  assert (block_size >= 1);
-
-  IterTy block_begin = begin;
-
-  for (unsigned i = 0; i < P; ++i) {
-
-    IterTy block_end = block_begin;
-
-    if (std::distance (block_end, end) < block_size) {
-      block_end = end;
-
-    } else {
-      std::advance (block_end, block_size);
-    }
-
-    for (; block_begin != block_end; ++block_begin) {
-      // workList[i].push_back (Marked<ValueTy> (*block_begin));
-      (workList[i].*pushFn) (Marked<ValueTy> (*block_begin));
-    }
-
-    if (block_end == end) {
-      break;
-    }
+template <typename T>
+struct IsNotMarked {
+  bool operator () (const Markable<T>& x) const {
+    return !x.marked ();
   }
+};
+
+
+template <typename T, typename C>
+struct RemoveMarked {
+
+  typedef GaloisRuntime::PerThreadWorkList<Markable<T>, C> WL_ty;
+
+  WL_ty& wl;
+
+  RemoveMarked (WL_ty& _wl)
+    : wl (_wl) {}
+
+  void operator () (unsigned r) {
+    assert (r < wl.numRows ());
+
+    typename WL_ty::iterator new_end =
+      std::partition (wl[r].begin (), wl[r].end (), IsNotMarked<T> ());
+
+    wl[r].erase (new_end, wl[r].end ());
+
+  }
+
+};
+
+template <typename T, typename C>
+void removeMarked (GaloisRuntime::PerThreadWorkList<Markable<T>, C>& wl) {
+
+  GaloisRuntime::do_all_coupled (
+      boost::counting_iterator<unsigned> (0),
+      boost::counting_iterator<unsigned> (wl.numRows ()),
+      RemoveMarked<T, C> (wl),
+      "remove_marked");
+      
 }
 
+template <typename T, typename C>
+struct RemoveMarkedStable: public RemoveMarked<T, C> {
+  typedef RemoveMarked<T, C> Super_ty;
+
+  RemoveMarkedStable (typename Super_ty::WL_ty& _wl): Super_ty (_wl) {}
+
+  void operator () (unsigned r) {
+    assert (r < Super_ty::wl.numRows ());
+
+    typename Super_ty::WL_ty::iterator new_end =
+      std::stable_partition (Super_ty::wl[r].begin (), Super_ty::wl[r].end (), IsNotMarked<T> ());
+
+    Super_ty::wl[r].erase (new_end, Super_ty::wl[r].end ());
+    
+  }
+};
+
+template <typename T, typename C>
+void removeMarkedStable (GaloisRuntime::PerThreadWorkList<Markable<T>, C>& wl) {
+
+  GaloisRuntime::do_all_coupled (
+      boost::counting_iterator<unsigned> (0),
+      boost::counting_iterator<unsigned> (wl.numRows ()),
+      RemoveMarkedStable<T, C> (wl),
+      "remove_marked_stable");
+      
+}
+
+
+
+
 #endif // GALOIS_UTIL_MARKED_H
+
