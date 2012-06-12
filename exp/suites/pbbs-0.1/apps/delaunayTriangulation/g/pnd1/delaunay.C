@@ -278,8 +278,7 @@ struct GReserver {
 
         resetState(vv[cur]->id, qs[tid]);
         
-//        if (!success)
-        if (cnt < 128 && !success)
+        if (!success)
           break;
         if (qs[tid]->abortedQ.empty()) 
           break;
@@ -364,8 +363,7 @@ void incrementallyAddPoints(vertex** v, int n, vertex* start) {
 
         resetState(vv[cur]->id, qs[tid]);
         
-//        if (!success)
-        if (cnt < 128 && !success)
+        if (!success)
           break;
         if (qs[tid]->abortedQ.empty()) 
           break;

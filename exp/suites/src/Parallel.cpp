@@ -60,6 +60,7 @@ class Semaphore: private boost::noncopyable {
   pthread_mutex_t lock;
   pthread_cond_t cond;
   int val;
+
 public:
 // Explicit init/destroy because MakeDeterministic loops infinitely otherwise
 #if 0
@@ -68,8 +69,8 @@ public:
     pthread_cond_init(&cond, NULL);
   }
   ~Semaphore() {
-    pthread_mutex_destroy(&lock);
     pthread_cond_destroy(&cond);
+    pthread_mutex_destroy(&lock);
   }
 #else
   void init(int v = 0) {
@@ -79,8 +80,8 @@ public:
   }
   
   void destroy() {
-    pthread_mutex_destroy(&lock);
     pthread_cond_destroy(&cond);
+    pthread_mutex_destroy(&lock);
   }
 #endif
   void release(int n = 1) {
@@ -105,16 +106,18 @@ class ThreadPool_pthread {
   pthread_t* threads; // set of threads
   Semaphore* starts;  // signal to release threads to run
   Semaphore started;
+  Semaphore idlock;
   unsigned maxThreads;
   volatile bool shutdown; // Set and start threads to have them exit
-  volatile unsigned starting; //Each run call uses this to control #threads
   volatile Exp::RunCommand* workBegin; //Begin iterator for work commands
   volatile Exp::RunCommand* workEnd; //End iterator for work commands
 
   void initThread() {
     //we use a simple pthread or atomic to avoid depending on Galois
     //stuff too early in the initialization process
+    idlock.acquire();
     Exp::getTID();
+    idlock.release();
     started.release();
   }
 
@@ -122,7 +125,7 @@ class ThreadPool_pthread {
     const unsigned multiple = 2;
     for (unsigned i = 1; i <= multiple; ++i) {
       unsigned n = tid * multiple + i;
-      if (n < starting)
+      if (n < maxThreads)
         starts[n].release();
     }
   }
@@ -154,8 +157,9 @@ class ThreadPool_pthread {
   }
   
 public:
-  ThreadPool_pthread(): /*started(0),*/ shutdown(false), workBegin(0), workEnd(0) {
+  ThreadPool_pthread(): shutdown(false), workBegin(0), workEnd(0) {
     started.init(0);
+    idlock.init(1);
     maxThreads = Exp::getNumThreads();
     initThread();
 
@@ -185,12 +189,12 @@ public:
     //delete [] starts;
     for (unsigned i = 0; i < maxThreads; ++i)
       starts[i].destroy();
+    idlock.destroy();
+    started.destroy();
     delete [] threads;
   }
 
   void run(Exp::RunCommand* begin, Exp::RunCommand* end) {
-    //sanatize num
-    starting = maxThreads;
     //setup work
     workBegin = begin;
     workEnd = end;
