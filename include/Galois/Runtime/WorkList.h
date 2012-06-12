@@ -499,12 +499,21 @@ GALOIS_WLCOMPILECHECK(LocalQueues);
 template<bool d, typename TQ>
 struct squeues;
 
+// template<typename TQ>
+// struct squeues<true,TQ> {
+//   PerLevel<TQ> queues;
+//   TQ& get(int i) { return queues.get(i); }
+//   TQ& get() { return queues.get(); }
+//   int myEffectiveID() { return queues.myEffectiveID(); }
+//   int size() { return queues.size(); }
+// };
+
 template<typename TQ>
 struct squeues<true,TQ> {
-  PerLevel<TQ> queues;
-  TQ& get(int i) { return queues.get(i); }
-  TQ& get() { return queues.get(); }
-  int myEffectiveID() { return queues.myEffectiveID(); }
+  PerPackageStorage<TQ> queues;
+  TQ& get(int i) { return *queues.getRemote(i); }
+  TQ& get() { return *queues.getLocal(); }
+  int myEffectiveID() { return LL::getTID(); } //queues.myEffectiveID(); }
   int size() { return queues.size(); }
 };
 
@@ -573,6 +582,16 @@ class ChunkedMaster : private boost::noncopyable {
     return 0;
   }
 
+  void pushi(const T& val, p* n)  {
+    if (n->next && n->next->push_back(val))
+      return;
+    if (n->next)
+      pushChunk(n->next);
+    n->next = mkChunk();
+    bool worked = n->next->push_back(val);
+    assert(worked);
+  }
+
 public:
   typedef T value_type;
 
@@ -624,20 +643,15 @@ public:
   }
   
   void push(const value_type& val)  {
-    p& n = *data.getLocal();
-    if (n.next && n.next->push_back(val))
-      return;
-    if (n.next)
-      pushChunk(n.next);
-    n.next = mkChunk();
-    bool worked = n.next->push_back(val);
-    assert(worked);
+    p* n = data.getLocal();
+    pushi(val,n);
   }
 
   template<typename Iter>
   void push(Iter b, Iter e) {
+    p* n = data.getLocal();
     while (b != e)
-      push(*b++);
+      pushi(*b++, n);
   }
 
   template<typename Iter>
