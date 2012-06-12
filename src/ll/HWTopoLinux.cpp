@@ -35,8 +35,6 @@
 #include "Galois/Runtime/ll/EnvCheck.h"
 #include "Galois/Runtime/ll/gio.h"
 
-#define DEBUG_HWTOPOLINUX 0
-
 #include <stdio.h>
 #include <sched.h>
 #include <errno.h>
@@ -263,9 +261,8 @@ struct AutoLinuxPolicy {
 	virtmap.push_back(i);
     }
 
-#if DEBUG_HWTOPOLINUX
-    printRawConfiguration(vals);
-#endif
+    if (EnvCheck("GALOIS_DEBUG_TOPO"))
+      printRawConfiguration(vals);
 
     //Get thread count
     numThreadsRaw = vals.size();
@@ -299,9 +296,9 @@ struct AutoLinuxPolicy {
       if (leaders[packages[i]] == -1)
 	leaders[packages[i]] = i;
 
-#if DEBUG_HWTOPOLINUX
-    printFinalConfiguration(); 
-#endif
+    
+    if (EnvCheck("GALOIS_DEBUG_TOPO"))
+      printFinalConfiguration(); 
   }
 
   void printRawConfiguration(const std::vector<cpuinfo>& vals) {
