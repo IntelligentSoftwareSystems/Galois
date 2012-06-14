@@ -40,7 +40,7 @@ void LonestarStart(int argc, char** argv, const char* app, const char* desc = 0,
   using namespace GaloisRuntime::LL;
 
   gPrint("Galois Benchmark Suite v" GALOIS_VERSION_STRING);
-  gPrint("(%d)\n", SVNVERSION);
+  gPrint(" (r%d)\n", SVNVERSION);
   gPrint("Copyright (C) " GALOIS_COPYRIGHT_YEAR_STRING " The University of Texas at Austin\n");
   gPrint("http://iss.ices.utexas.edu/galois/\n\n");
   gPrint("application: %s\n", app);
