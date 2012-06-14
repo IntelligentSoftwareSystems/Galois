@@ -23,6 +23,7 @@
 #ifndef LONESTAR_BOILERPLATE_H
 #define LONESTAR_BOILERPLATE_H
 
+#include "Galois/svnversion.h"
 #include "Galois/Version.h"
 #include "Galois/Galois.h"
 #include "Galois/Runtime/ll/gio.h"
@@ -38,18 +39,14 @@ static llvm::cl::opt<int> numThreads("t", llvm::cl::desc("Number of threads"), l
 void LonestarStart(int argc, char** argv, const char* app, const char* desc = 0, const char* url = 0) {
   using namespace GaloisRuntime::LL;
 
-  gPrint("Galois Benchmark Suite v" GALOIS_VERSION_STRING "\n"
-	 "Copyright (C) " GALOIS_COPYRIGHT_YEAR_STRING " The University of Texas at Austin\n"
-	 "http://iss.ices.utexas.edu/galois/\n"
-	 "\n"
-	 "application: %s\n"
-	 "%s"
-	 "%s%s"
-	 "\n",
-	 app,
-	 desc ? desc : "",
-	 url ? "http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/" : "", url ? url : ""
-	 );
+  gPrint("Galois Benchmark Suite v" GALOIS_VERSION_STRING);
+  gPrint("(%d)\n", SVNVERSION);
+  gPrint("Copyright (C) " GALOIS_COPYRIGHT_YEAR_STRING " The University of Texas at Austin\n");
+  gPrint("http://iss.ices.utexas.edu/galois/\n\n");
+  gPrint("application: %s\n", app);
+  gPrint("%s", desc ? desc : "");
+  gPrint("%s", url ? "http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/" : "");
+  gPrint("%s\n", url ? url : "");
 
   std::ostringstream cmdout;
   for (int i = 0; i < argc; ++i) {

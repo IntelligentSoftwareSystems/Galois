@@ -162,6 +162,7 @@ endif()
 function(linkRuntime name) 
   target_link_libraries(${name} ${ARGN})
   target_link_libraries(${name} galois ${RT_LINK})
+  add_dependencies(${name} svnversion)
 endfunction(linkRuntime)
 
 include(ParseArguments)
@@ -196,6 +197,7 @@ endfunction(app)
 
 configure_file("${PROJECT_SOURCE_DIR}/include/Galois/config.h.in" "${PROJECT_BINARY_DIR}/include/Galois/config.h")
 include_directories("include" "${PROJECT_BINARY_DIR}/include")
+include(GetSVNVersion)
 
 add_subdirectory(lib)
 add_subdirectory(src)
