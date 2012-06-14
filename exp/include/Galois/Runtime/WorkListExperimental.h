@@ -119,7 +119,7 @@ class StaticAssignment : private boost::noncopyable {
   };
 
   StaticAssignment(): empty(false) {
-    numActive = GaloisRuntime::getSystemThreadPool().getActiveThreads();
+    numActive = Galois::getActiveThreads();
     pthread_barrier_init(&barrier1, NULL, numActive);
     pthread_barrier_init(&barrier2, NULL, numActive);
   }
@@ -1323,7 +1323,7 @@ public:
 
   typedef T value_type;
   
-  PartitionedWL(const Partitioner& p = Partitioner()) :P(p), active(ThreadPool::getActiveThreads()) {
+  PartitionedWL(const Partitioner& p = Partitioner()) :P(p), active(Galois::getActiveThreads()) {
     //std::cerr << active << "\n";
   }
 
@@ -1706,8 +1706,8 @@ class BarrierOBIM : private boost::noncopyable {
   {
     B = new CTy[binmax];
     //std::cerr << "$"<<getSystemThreadPool().getActiveThreads() <<"$";
-    pthread_barrier_init(&barr1, NULL, GaloisRuntime::getSystemThreadPool().getActiveThreads());
-    pthread_barrier_init(&barr2, NULL, GaloisRuntime::getSystemThreadPool().getActiveThreads());
+    pthread_barrier_init(&barr1, NULL, Galois::getActiveThreads());
+    pthread_barrier_init(&barr2, NULL, Galois::getActiveThreads());
   }
   ~BarrierOBIM() {
     delete[] B;
@@ -2031,7 +2031,7 @@ class StaticPartitioning : private boost::noncopyable {
   };
 
   StaticPartitioning(): empty(false) {
-    numActive = GaloisRuntime::getSystemThreadPool().getActiveThreads();
+    numActive = Galois::getActiveThreads();
     barrier1.reinit(numActive);
     barrier2.reinit(numActive);
   }

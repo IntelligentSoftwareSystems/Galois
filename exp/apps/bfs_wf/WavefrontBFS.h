@@ -257,7 +257,8 @@ class BFSwavefrontCoupled: public BFS<Graph, GNode> {
     {} 
 
     void operator () (GNode src) {
-      numAdds.get () += SuperTy::bfsOperator<false> (graph, src, nextWL.get (), &WL_ty::ContTy::push_back);
+      typedef WL_ty::Cont_ty C;
+      numAdds.get () += SuperTy::bfsOperator<false> (graph, src, nextWL.get (), &C::push_back);
     }
   };
 
