@@ -85,7 +85,7 @@ template <>
 class LoopStatistics<false> {
 public:
   explicit LoopStatistics(const char* ln) {}
-  inline void inc_iterations() const { }
+  inline void inc_iterations(int amount = 1) const { }
   inline void inc_conflicts() const { }
 };
 
@@ -130,7 +130,6 @@ protected:
   void abortIteration(value_type val, ThreadLocalData& tld, bool recursiveAbort) {
     assert(ForEachTraits<FunctionTy>::NeedsAborts);
 
-    clearConflictLock();
     tld.cnx.cancel_iteration();
     tld.stat.inc_conflicts(); //Class specialization handles opt
     if (recursiveAbort)
