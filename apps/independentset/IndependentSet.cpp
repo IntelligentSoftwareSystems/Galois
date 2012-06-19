@@ -218,7 +218,7 @@ int main(int argc, char** argv) {
   }
 #else
   //Galois::for_each<BSInline>(graph.begin(), graph.end(), Process());
-  Galois::for_each(graph.begin(), graph.end(), Process());
+  Galois::for_each(graph.begin(), graph.end(), Process<>());
 #endif
   T.stop();
 

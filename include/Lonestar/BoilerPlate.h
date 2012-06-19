@@ -23,7 +23,7 @@
 #ifndef LONESTAR_BOILERPLATE_H
 #define LONESTAR_BOILERPLATE_H
 
-#ifdef SVNVERSION
+#ifdef GALOIS_USE_SVNVERSION
 #include "Galois/svnversion.h"
 #else
 #define SVNVERSION 0
