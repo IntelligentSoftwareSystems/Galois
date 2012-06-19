@@ -61,37 +61,6 @@ class StatManager {
     return R;
   }
 
-  double getAvg(std::vector<unsigned long>& Values, unsigned maxThreadID) {
-    double R = 0.0;
-    for (unsigned x = 0; x < maxThreadID; ++x)
-      R += (double)Values[x];
-    return R / (double)maxThreadID;
-  }
-
-  unsigned long getMin(std::vector<unsigned long>& Values, unsigned maxThreadID) {
-    unsigned long R = Values[0];
-    for (unsigned x = 1; x < maxThreadID; ++x)
-      R = std::min(R, Values[x]);
-    return R;
-  }
-
-  unsigned long getMax(std::vector<unsigned long>& Values, unsigned maxThreadID) {
-    unsigned long R = Values[0];
-    for (unsigned x = 1; x < maxThreadID; ++x)
-      R = std::max(R, Values[x]);
-    return R;
-  }
-
-  double getStddev(std::vector<unsigned long>& Values, unsigned maxThreadID) {
-    double avg = getAvg(Values, maxThreadID);
-    double Diff = 0.0;
-    for (unsigned x = 0; x < maxThreadID; ++x) {
-      double R = avg - (double)Values[x];
-      Diff += R*R;
-    }
-    return std::sqrt(Diff / (double)maxThreadID);
-  }
-  
 public:
   void addToStat(const std::string& loop, const std::string& category, size_t value) {
     (*Stats.getLocal())[mkKey(loop, category)] += value;
