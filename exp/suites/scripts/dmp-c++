@@ -25,12 +25,13 @@ OPTARGS += ['-basicaa', '-libcall-aa', '-ds-aa', '-std-compile-opts']
 OPTARGS += ['-no-pthreads', '-makedeterministic', '-dmp=true']
 # No memory tracking
 OPTARGS += ['-dmp-do-load-track=false', '-dmp-do-store-track=false']
-OPTARGS += ['-dmp-do-memtrack-parallel-malloc=true']
 #OPTARGS += ['-dmp-memtrack-for-buffering=true']
 #OPTARGS += ['-dmp-memtrack-for-buffering=true', '-dmp-do-memtrack-parallel-malloc=true', '-dmp-do-memtrack-hoard-malloc=true']
 # Optimizations?
 OPTARGS += ['-dmp-do-escapeopt=true']
 OPTARGS += ['-dmp-quantum-balance=heuristic', '-dmp-heuristic-balance-thresh=3']
+#OPTARGS += ['-dmp-quantum-balance=maximal']
+#OPTARGS += ['-dmp-quantum-balance=minimal']
 OPTARGS += ['-dmp-mot-blocksize=64']
 
 args = sys.argv[1:]
@@ -65,22 +66,3 @@ with tempfile.NamedTemporaryFile(delete=True) as ftobjs:
             # Generate obj and link
             call([AS, '-o', fall_opt_obj.name, fall_opt_asm.name])
             call([CXX, fall_opt_obj.name] + rest)
-
-sys.exit(0)
-
-with tempfile.NamedTemporaryFile(delete=True) as fall:
-  # Link non-runtime targets together to run deterministic pass
-  call([LINK, '-f', '-o', fall.name] + objs)
-  with tempfile.NamedTemporaryFile(delete=True) as fall_det:
-    # Make deterministic
-    call([OPT] + OPTARGS + [fall.name, '-o', fall_det.name, '-f'])
-    with tempfile.NamedTemporaryFile(delete=True) as fall_det_opt:
-      # Optimize everything
-      call([OPT, '-std-compile-opts', fall_det.name, '-o', fall_det_opt.name, '-f'])
-      with tempfile.NamedTemporaryFile(delete=True) as fall_det_opt_asm:
-        # Generate asm
-        call([LLC, '-f', '-o', fall_det_opt_asm.name, fall_det_opt.name])
-        with tempfile.NamedTemporaryFile(delete=True) as fall_det_opt_obj:
-          # Generate obj from asm and link
-          call([AS, '-o', fall_det_opt_obj.name, fall_det_opt_asm.name])
-          call([CXX, fall_det_opt_obj.name] + rest)

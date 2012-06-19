@@ -31,7 +31,9 @@ SpecPBBS = [{"prob": "breadthFirstSearch",
       "extras": 
         [
           {'algos': ["incrementalRefine", 'g/p', 'g/nd0', 'g/pnd0'],
-           'arg': "Rounds::-r::10,50,100:600:100" }
+#           'arg': "Rounds::-r::50,100:600:100"
+           'arg': "Rounds::-r::500"
+           }
         ]
       },
      {"prob": "delaunayTriangulation",
@@ -40,7 +42,9 @@ SpecPBBS = [{"prob": "breadthFirstSearch",
       "extras":
         [
           {'algos': ["incrementalDelaunay", 'g/p', 'g/nd0', 'g/pnd0'],
-           'arg': "Rounds::-r::10,50,100:600:100" }
+#           'arg': "Rounds::-r::50,100:600:100" 
+           'arg': "Rounds::-r::100" 
+          }
         ]
       },
      {"prob": "dictionary",
@@ -116,7 +120,7 @@ def genPBBS(options):
 
 
 SpecParsec = [
-    {'name': 'blackscholes', 'inputs': ['in_10M.txt prices.txt']},
+    {'name': 'blackscholes', 'inputs': ['in_10M.txt prices.txt', "in_mid.txt prices.txt"]},
     {'name': 'bodytrack', 'inputs': ['sequenceB_261 4 261 4000 5 0']},
     {'name': 'freqmine', 'inputs': ['webdocs_250k.dat 11000']}
     ]
