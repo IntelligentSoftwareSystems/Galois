@@ -85,19 +85,19 @@ void convert_rmat2gr(const std::string& infilename, const std::string& outfilena
   for (size_t edge_num = 0; edge_num < nnodes; ++edge_num) {
     size_t cur_id, cur_edges;
     infile >> cur_id >> cur_edges;
-    if (cur_id < 0 || cur_id >= nnodes) {
+    if (cur_id >= nnodes) {
       std::cerr << "node id out of range: " << cur_id << "\n";
       abort();
     }
-    if (cur_edges < 0) {
-      std::cerr << "num edges out of range: " << cur_edges << "\n";
-      abort();
-    }
+    // if (cur_edges < 0) {
+    //   std::cerr << "num edges out of range: " << cur_edges << "\n";
+    //   abort();
+    // }
     
     for (size_t j = 0; j < cur_edges; ++j) {
       size_t neighbor_id, weight;
       infile >> neighbor_id >> weight;
-      if (neighbor_id < 0 || neighbor_id >= nnodes) {
+      if (neighbor_id >= nnodes) {
         std::cerr << "neighbor id out of range: " << neighbor_id << "\n";
         abort();
       }
