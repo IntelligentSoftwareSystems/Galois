@@ -67,7 +67,7 @@ public:
   inline void unlock() {
     assert(_lock & 1);
     compilerBarrier();
-    _lock = _lock & ~1;
+    _lock = _lock & ~(uintptr_t)1;
   }
 
   inline void unlock_and_clear() {
@@ -84,7 +84,7 @@ public:
   }
   
   inline T* getValue() const {
-    return (T*)(_lock & ~1);
+    return (T*)(_lock & ~(uintptr_t)1);
   }
 
   inline void setValue(T* val) {
