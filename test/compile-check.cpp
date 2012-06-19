@@ -28,7 +28,7 @@ struct checker {
   typename T::template rethread<false>::WL wl3;
 
   checker() {
-    int a[3] = {1,2,3};
+    int a[4] = {1,2,3,0};
     
     wl.push(0);
     wl.push_initial(&a[0], &a[4]);
