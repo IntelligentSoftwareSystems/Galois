@@ -20,6 +20,15 @@ if (exists $n{1}) {
     $doscale = 0;
 }
 
+if (scalar @ARGV > 1) {
+    print "outputfile (eps) is $ARGV[1]\n";
+    open GP, "|gnuplot" or die "Can't execute gnuplot";
+    print GP "set term post eps\n";
+    print GP "set output '$ARGV[1]'\n";
+} else {
+    open GP, "|gnuplot -persist" or die "Can't execute gnuplot";
+}
+
 print GP "set xlabel \"threads\"\n";
 print GP "set ylabel \"$ARGV[0]\"\n";
 print GP "set y2label \"Scaling\"\n" if $doscale;
