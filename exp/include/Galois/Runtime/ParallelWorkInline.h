@@ -26,53 +26,70 @@
 #define GALOIS_RUNTIME_PARALLELWORKINLINE_H
 
 #include "Galois/Runtime/ParallelWork.h"
+#include <cstdio>
 
 namespace GaloisRuntime {
 namespace HIDDEN {
 
 //! Alternative implementation of FixedSizeRing which is non-concurrent and
 //! supports pushX/empty/popX rather than pushX/popX with boost::optional
-template<typename T, int __chunksize = 64>
-class FixedSizeLIFO : private boost::noncopyable {
-  int end;
 
-  char datac[sizeof(T[__chunksize])] __attribute__ ((aligned (__alignof__(T))));
+template<typename T, unsigned ChunkSize>
+struct FixedSizeBase: private boost::noncopyable {
+  char datac[sizeof(T[ChunkSize])] __attribute__ ((aligned (__alignof__(T))));
 
-  T* at(int i) {
-    T* s = reinterpret_cast<T*>(&datac[0]);
-    return &s[i];
-  }
+  T* data() { return reinterpret_cast<T*>(&datac[0]); }
+  T* at(unsigned i) { return &data()[i]; }
+  void create(int i, const T& val) { new (at(i)) T(val); }
+  void destroy(unsigned i) { (at(i))->~T(); }
+  inline unsigned chunksize() const { return ChunkSize; }
+  typedef T value_type;
+};
 
-  inline int chunksize() const { return __chunksize; }
+template<typename T, bool isLIFO, int ChunkSize>
+class FixedSizeRing: public FixedSizeBase<T,ChunkSize> {
+  unsigned start;
+  unsigned count;
 
 public:
-  typedef T value_type;
+  FixedSizeRing(): start(0), count(0) { }
 
-  FixedSizeLIFO(): end(0) { }
+  unsigned size() const { return count; }
+  bool empty() const { return count == 0; }
+  bool full() const { return count == this->chunksize(); }
 
-  int size() const {
-    return end;
+  void push(const T& val) {
+    start = (start + this->chunksize() - 1) % this->chunksize();
+    ++count;
+    this->create(start, val);
   }
 
-  bool empty() const {
-    return end == 0;
+  void pop() {
+    unsigned end = (start + count - 1) % this->chunksize();
+    this->destroy(end);
+    --count;
   }
 
-  bool full() const {
-    return end >= chunksize();
+  T& cur() { 
+    unsigned end = (start + count - 1) % this->chunksize();
+    return *this->at(end); 
   }
+};
 
-  void push_back(value_type val) {
-    new (at(end++)) T(val);
-  }
 
-  T& back() {
-    return *at(end-1);
-  }
+template<typename T, int ChunkSize>
+class FixedSizeRing<T,true,ChunkSize>: public FixedSizeBase<T,ChunkSize>  {
+  unsigned end;
 
-  void pop_back() {
-    at(--end)->~T();
-  }
+public:
+  FixedSizeRing(): end(0) { }
+
+  unsigned size() const { return end; }
+  bool empty() const { return end == 0; }
+  bool full() const { return end >= this->chunksize(); }
+  void pop() { this->destroy(--end); }
+  T& cur() { return *this->at(end-1); }
+  void push(const T& val) { this->create(end, val); ++end; }
 };
 
 struct WID {
@@ -87,9 +104,9 @@ struct WID {
   }
 };
 
-template<typename T,int chunksize,bool concurrent=true>
-class dChunkedLIFO : private boost::noncopyable {
-  class Chunk : public FixedSizeLIFO<T, chunksize>, public WorkList::ConExtLinkedStack<Chunk, concurrent>::ListNode {};
+template<typename T,template<typename,bool> class OuterTy, bool isLIFO,int ChunkSize>
+class dChunkedMaster : private boost::noncopyable {
+  class Chunk : public FixedSizeRing<T,isLIFO,ChunkSize>, public OuterTy<Chunk,true>::ListNode {};
 
   MM::FixedSizeAllocator heap;
 
@@ -97,7 +114,7 @@ class dChunkedLIFO : private boost::noncopyable {
     Chunk* next;
   };
 
-  typedef WorkList::ConExtLinkedStack<Chunk, concurrent> LevelItem;
+  typedef OuterTy<Chunk, true> LevelItem;
 
   PerCPU<p> data;
   PerLevel<LevelItem> Q;
@@ -142,44 +159,52 @@ class dChunkedLIFO : private boost::noncopyable {
     return 0;
   }
 
+  void pushSP(const WID& id, p& n, const T& val);
+  bool emptySP(const WID& id, p& n);
+  void popSP(const WID& id, p& n);
+
 public:
   typedef T value_type;
 
-  dChunkedLIFO() : heap(sizeof(Chunk)) {
+  dChunkedMaster() : heap(sizeof(Chunk)) {
     for (unsigned int i = 0; i < data.size(); ++i) {
       p& r = data.get(i);
       r.next = 0;
     }
   }
 
-  void push_backSP(const WID& id, p& n, value_type val);
-
-  void push_back(const WID& id, value_type val)  {
+  void push(const WID& id, const value_type& val)  {
     p& n = data.get(id.tid);
     if (n.next && !n.next->full()) {
-      n.next->push_back(val);
+      n.next->push(val);
       return;
     }
-    push_backSP(id, n, val);
+    pushSP(id, n, val);
+  }
+
+  unsigned currentChunkSize(const WID& id) {
+    p& n = data.get(id.tid);
+    if (n.next) {
+      return n.next->size();
+    }
+    return 0;
   }
 
   template<typename Iter>
-  void push_back(const WID& id, Iter b, Iter e) {
+  void push(const WID& id, Iter b, Iter e) {
     while (b != e)
-      push_back(id, *b++);
+      push(id, *b++);
   }
 
   template<typename Iter>
   void push_initial(const WID& id, Iter b, Iter e) {
-    push_back(id, b, e);
+    push(id, b, e);
   }
 
-  value_type& back(const WID& id) {
+  value_type& cur(const WID& id) {
     p& n = data.get(id.tid);
-    return n.next->back();
+    return n.next->cur();
   }
-
-  bool emptySP(const WID& id, p& n);
 
   bool empty(const WID& id) {
     p& n = data.get(id.tid);
@@ -199,23 +224,21 @@ public:
     return true;
   }
 
-  void pop_backSP(const WID& id, p& n);
-
-  void pop_back(const WID& id)  {
+  void pop(const WID& id)  {
     p& n = data.get(id.tid);
     if (n.next && !n.next->empty()) {
-      n.next->pop_back();
+      n.next->pop();
       return;
     }
-    pop_backSP(id, n);
+    popSP(id, n);
   }
 };
 
-template<typename T,int chunksize,bool concurrent>
-void dChunkedLIFO<T,chunksize,concurrent>::pop_backSP(const WID& id, p& n) {
+template<typename T,template<typename,bool> class OuterTy, bool isLIFO,int ChunkSize>
+void dChunkedMaster<T,OuterTy,isLIFO,ChunkSize>::popSP(const WID& id, p& n) {
   while (true) {
     if (n.next && !n.next->empty()) {
-      n.next->pop_back();
+      n.next->pop();
       return;
     }
     if (n.next)
@@ -226,8 +249,8 @@ void dChunkedLIFO<T,chunksize,concurrent>::pop_backSP(const WID& id, p& n) {
   }
 }
 
-template<typename T,int chunksize,bool concurrent>
-bool dChunkedLIFO<T,chunksize,concurrent>::emptySP(const WID& id, p& n) {
+template<typename T,template<typename,bool> class OuterTy, bool isLIFO,int ChunkSize>
+bool dChunkedMaster<T,OuterTy,isLIFO,ChunkSize>::emptySP(const WID& id, p& n) {
   while (true) {
     if (n.next && !n.next->empty())
       return false;
@@ -239,13 +262,20 @@ bool dChunkedLIFO<T,chunksize,concurrent>::emptySP(const WID& id, p& n) {
   }
 }
 
-template<typename T,int chunksize,bool concurrent>
-void dChunkedLIFO<T,chunksize,concurrent>::push_backSP(const WID& id, p& n, value_type val) {
+template<typename T,template<typename,bool> class OuterTy, bool isLIFO,int ChunkSize>
+void dChunkedMaster<T,OuterTy,isLIFO,ChunkSize>::pushSP(const WID& id, p& n, const T& val) {
   if (n.next)
     pushChunk(id, n.next);
   n.next = mkChunk();
-  n.next->push_back(val);
+  n.next->push(val);
 }
+
+template<typename T,int ChunkSize>
+class dChunkedLIFO: public dChunkedMaster<T, WorkList::ConExtLinkedStack, true, ChunkSize> { };
+
+template<typename T,int ChunkSize>
+class dChunkedFIFO: public dChunkedMaster<T, WorkList::ConExtLinkedQueue, false, ChunkSize> { };
+
 
 } // end HIDDEN
 
@@ -258,7 +288,7 @@ namespace WorkList {
 template<class T, class FunctionTy>
 class ForEachWork<WorkList::BulkSynchronousInline<>,T,FunctionTy> {
   typedef T value_type;
-  typedef HIDDEN::dChunkedLIFO<value_type,256> WLTy;
+  typedef HIDDEN::dChunkedFIFO<value_type,256> WLTy;
 
   struct ThreadLocalData {
     GaloisRuntime::UserContextAccess<value_type> facing;
@@ -275,49 +305,94 @@ class ForEachWork<WorkList::BulkSynchronousInline<>,T,FunctionTy> {
   LL::CacheLineStorage<volatile long> done;
   unsigned numActive;
 
-  bool empty(ThreadLocalData& tld, unsigned round) {
-    return wls[round].sempty();
+  bool empty(WLTy* wl) {
+    return wl->sempty();
+  }
+
+  GALOIS_ATTRIBUTE_NOINLINE
+  void abortIteration(ThreadLocalData& tld, const HIDDEN::WID& wid, WLTy* cur, WLTy* next) {
+    tld.cnx.cancel_iteration();
+    tld.stat.inc_conflicts();
+    if (ForEachTraits<FunctionTy>::NeedsPush) {
+      tld.facing.resetPushBuffer();
+    }
+    value_type& val = cur->cur(wid);
+    next->push(wid, val);
+    cur->pop(wid);
+  }
+
+  void processWithAborts(ThreadLocalData& tld, const HIDDEN::WID& wid, WLTy* cur, WLTy* next) {
+    int result = 0;
+#if GALOIS_USE_EXCEPTION_HANDLER
+    try {
+      process(tld, wid, cur, next);
+    } catch (ConflictFlag const& flag) {
+      clearConflictLock();
+      result = flag;
+    }
+#else
+    if ((result = setjmp(hackjmp)) == 0) {
+      process(tld, wid, cur, next);
+    }
+#endif
+    switch (result) {
+    case 0: break;
+    case GaloisRuntime::CONFLICT:
+      abortIteration(tld, wid, cur, next);
+      break;
+    case GaloisRuntime::BREAK:
+    default:
+      abort();
+    }
+  }
+
+  void process(ThreadLocalData& tld, const HIDDEN::WID& wid, WLTy* cur, WLTy* next) {
+    int cs = std::max(cur->currentChunkSize(wid), 1U);
+    for (int i = 0; i < cs; ++i) {
+      value_type& val = cur->cur(wid);
+      tld.stat.inc_iterations();
+      function(val, tld.facing.data());
+      if (ForEachTraits<FunctionTy>::NeedsPush) {
+        next->push(wid,
+            tld.facing.getPushBuffer().begin(),
+            tld.facing.getPushBuffer().end());
+        tld.facing.resetPushBuffer();
+      }
+      if (ForEachTraits<FunctionTy>::NeedsAborts)
+        tld.cnx.commit_iteration();
+      cur->pop(wid);
+    }
   }
 
   void go() {
-    unsigned round = 0;
     ThreadLocalData tld(loopname);
     setThreadContext(&tld.cnx);
     unsigned tid = LL::getTID();
     HIDDEN::WID wid;
 
-    WLTy* cur = &wls[round];
-    WLTy* next = &wls[round+1];
+    WLTy* cur = &wls[0];
+    WLTy* next = &wls[1];
 
     while (true) {
       while (!cur->empty(wid)) {
-        value_type& p = cur->back(wid);
-        function(p, tld.facing.data());
-        
-        tld.stat.inc_iterations();
-
-        if (ForEachTraits<FunctionTy>::NeedsPush) {
-          next->push_back(wid,
-              tld.facing.getPushBuffer().begin(),
-              tld.facing.getPushBuffer().end());
-          tld.facing.resetPushBuffer();
+        if (ForEachTraits<FunctionTy>::NeedsAborts) {
+          processWithAborts(tld, wid, cur, next);
+        } else {
+          process(tld, wid, cur, next);
         }
-
         if (ForEachTraits<FunctionTy>::NeedsPIA)
           tld.facing.resetAlloc();
-
-        cur->pop_back(wid);
       }
 
-      round = (round + 1) & 1;
-      next = cur;
-      cur = &wls[round];
+      std::swap(next, cur);
 
       barrier1.wait();
+
       if (tid == 0) {
-        if (empty(tld, round))
+        if (empty(cur))
           done.data = true;
       }
+      
       barrier2.wait();
 
       if (done.data)
@@ -329,7 +404,7 @@ class ForEachWork<WorkList::BulkSynchronousInline<>,T,FunctionTy> {
 
 public:
   ForEachWork(FunctionTy& f, const char* ln): function(f), loopname(ln) { 
-    if (ForEachTraits<FunctionTy>::NeedsAborts || ForEachTraits<FunctionTy>::NeedsBreak) {
+    if (ForEachTraits<FunctionTy>::NeedsBreak) {
       assert(0 && "not supported by this executor");
       abort();
     }

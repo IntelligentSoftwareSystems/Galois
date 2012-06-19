@@ -1861,7 +1861,7 @@ class PTbb : private boost::noncopyable {
 
 public:
   PTbb() {
-    nactive = GaloisRuntime::getSystemThreadPool().getActiveThreads();
+    nactive = Galois::getActiveThreads();
   }
   template<bool newconcurrent>
   struct rethread {

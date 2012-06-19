@@ -124,15 +124,18 @@ struct StateManager<T,FunctionTy,true> {
 
 template<typename T,typename Function1Ty,typename Function2Ty,bool useLocalState>
 class Executor {
+  static const int ChunkSize = 32;
+  static const int MinDelta = ChunkSize * 32;
+
   typedef T value_type;
   typedef WorkItem<T> Item;
   typedef std::pair<T,std::pair<unsigned long,unsigned> > NewItem;
-  typedef WorkList::dChunkedFIFO<32,Item> WL;
-  typedef WorkList::dChunkedFIFO<32,Item> PendingWork;
-  typedef WorkList::ChunkedFIFO<32,Item,false> LocalPendingWork;
-  typedef WorkList::dChunkedFIFO<32,NewItem> NewWork;
-  typedef WorkList::dChunkedLIFO<32,SimpleRuntimeContext> ContextPool;
-  typedef WorkList::dChunkedLIFO<32,SimpleRuntimeContext*> ContextPtrPool;
+  typedef WorkList::dChunkedFIFO<ChunkSize,Item> WL;
+  typedef WorkList::dChunkedFIFO<ChunkSize,Item> PendingWork;
+  typedef WorkList::ChunkedFIFO<ChunkSize,Item,false> LocalPendingWork;
+  typedef WorkList::dChunkedFIFO<ChunkSize,NewItem> NewWork;
+  typedef WorkList::dChunkedLIFO<ChunkSize,SimpleRuntimeContext> ContextPool;
+  typedef WorkList::dChunkedLIFO<ChunkSize,SimpleRuntimeContext*> ContextPtrPool;
 
   // Truly thread-local
   struct ThreadLocalData: private boost::noncopyable {
@@ -151,39 +154,62 @@ class Executor {
   };
 
   // Mostly local but shared sometimes
-  struct MergeInfo {
-    typedef std::vector<NewItem> NewItemsTy;
-    typedef FIFO<256,Item> ReserveTy;
-    NewItemsTy newItems;
-    ReserveTy reserve;
-
-    size_t size;
+  class MergeInfo {
     size_t window;
     size_t delta;
     size_t committed;
     size_t iterations;
+    size_t aborted;
+  public:
+    typedef std::vector<NewItem> NewItemsTy;
+    typedef FIFO<ChunkSize*8,Item> ReserveTy;
+    NewItemsTy newItems;
+    ReserveTy reserve;
+
+    size_t size;
+    bool firstRound;
 
     MergeInfo() { reset(); }
     
+    void initialWindow(size_t w) {
+      window = delta = w;
+    }
+
+    size_t getDelta() { return delta; }
+
     void calculateWindow(PerCPU<MergeInfo>&, unsigned numActive);
 
-    void nextWindow(WL* wl, bool renumbered) {
+    void incrementIterations() {
+      if (firstRound)
+        ++iterations;
+    }
+
+    void incrementCommitted() {
+      if (firstRound)
+        ++committed;
+    }
+
+    bool nextWindow(WL* wl, bool renumbered) {
       if (renumbered)
         window = delta;
       else
-        window += delta;
+        window += (delta - aborted);
       boost::optional<Item> p;
+      bool retval = false;
       while ((p = reserve.peek())) {
         if (p->id > window)
           break;
+        retval = true;
         wl->push(*p);
         reserve.pop();
       }
+      return retval;
     }
 
     void reset() {
       committed = 0;
       iterations = 0;
+      aborted = 0;
     }
   };
 
@@ -278,8 +304,9 @@ class Executor {
     //const size_t mask = numBlocks - 1;
     //size_t blockSize = dist / numBlocks; // round down
     MergeInfo& minfo = mergeInfo.get();
-    size_t blockSize = minfo.delta;
-    size_t numBlocks = dist / minfo.delta;
+    //size_t blockSize = std::max((size_t) (0.9*minfo.delta), (size_t) 1);
+    size_t blockSize = minfo.getDelta();
+    size_t numBlocks = dist / blockSize;
     
     size_t cur = 0;
     safe_advance(b, tid, cur, dist);
@@ -304,7 +331,7 @@ class Executor {
     safe_advance(b, tid, cur, dist);
     while (b != e) {
       unsigned long id = k * numActive + tid + 1;
-      if (id > minfo.delta)
+      if (id > minfo.getDelta())
         minfo.reserve.push(Item(*b, id));
       else
         wl->push(Item(*b, id));
@@ -342,9 +369,9 @@ public:
 
   template<typename IterTy>
   bool AddInitialWork(IterTy b, IterTy e) {
-    unsigned int dist = std::distance(b, e);
+    size_t dist = std::distance(b, e);
     MergeInfo& minfo = mergeInfo.get();
-    minfo.window = minfo.delta = std::max(dist / 100U, 1U);
+    minfo.initialWindow(std::max(dist / 100, (size_t) MinDelta));
     distribute(b, e, dist, &worklists[1]);
 
     return true;
@@ -359,25 +386,28 @@ template<typename T,typename Function1Ty,typename Function2Ty,bool useLocalState
 void Executor<T,Function1Ty,Function2Ty,useLocalState>::MergeInfo::calculateWindow(PerCPU<MergeInfo>& mergeInfo, unsigned numActive) 
 {
   // Accumulate all threads' info
-  size_t committed = 0;
-  size_t iterations = 0;
+  size_t allcommitted = 0;
+  size_t alliterations = 0;
   for (int i = 0; i < numActive; ++i) {
     MergeInfo& minfo = mergeInfo.get(i);
-    committed += minfo.committed;
-    iterations += minfo.iterations;
+    allcommitted += minfo.committed;
+    alliterations += minfo.iterations;
   }
 
-  const float target = 0.90;
-  float commitRatio = iterations > 0 ? committed / (float) iterations : 0.0;
-  if (commitRatio > target)
+  aborted = alliterations - allcommitted;
+
+  const float target = 0.95;
+  float commitRatio = alliterations > 0 ? allcommitted / (float) alliterations : 0.0;
+
+  if (commitRatio >= target)
     delta += delta;
   else
     delta = commitRatio / target * delta;
-  delta = std::max(delta, (size_t) 1024);
+  delta = std::max(delta, (size_t) MinDelta);
   // XXX set max when we have local state to bound allocations....?
   //if (LL::getTID() == 0) {
   //  printf("%.3f (%zu/%zu) window: %zu delta: %zu\n", 
-  //      commitRatio, committed, iterations, window, delta);
+  //      commitRatio, allcommitted, alliterations, window, delta);
   //}
 }
 
@@ -391,9 +421,10 @@ void Executor<T,Function1Ty,Function2Ty,useLocalState>::go() {
   while (true) {
     ++tld.outerRounds;
 
+    minfo.firstRound = true;
+
     while (true) {
       ++tld.rounds;
-      //barrier[0].wait();
 
       std::swap(tld.wlcur, tld.wlnext);
       setPending(PENDING);
@@ -411,12 +442,17 @@ void Executor<T,Function1Ty,Function2Ty,useLocalState>::go() {
       barrier[2].wait();
 
       commitContexts();
+      minfo.firstRound = false;
 
-      if (innerDone.data)
+      if (innerDone.data) {
         break;
+      }
+
+      //minfo.calculateWindow(mergeInfo, numActive);
+      //minfo.nextWindow(tld.wlnext, false);
 
       barrier[0].wait();
-    } 
+    }
 
     if (!minfo.reserve.empty()) {
       outerDone.data = false;
@@ -574,7 +610,7 @@ bool Executor<T,Function1Ty,Function2Ty,useLocalState>::pendingLoop(ThreadLocalD
   bool retval = false;
   boost::optional<Item> p;
   while ((p = tld.wlcur->pop())) {
-    ++minfo.iterations;
+    minfo.incrementIterations();
     bool commit = true;
     cnx->set_id(p->id);
     cnx->start_iteration();
@@ -662,7 +698,7 @@ bool Executor<T,Function1Ty,Function2Ty,useLocalState>::commitLoop(ThreadLocalDa
     stateManager.dealloc(tld.facing);
     
     if (commit) {
-      ++minfo.committed;
+      minfo.incrementCommitted();
       if (ForEachTraits<Function2Ty>::NeedsPush) {
         unsigned long parent = p->id;
         typedef typename UserContextAccess<value_type>::pushBufferTy::iterator iterator;
@@ -730,7 +766,6 @@ static inline void for_each_det(IterTy b, IterTy e, Function1Ty f1, Function2Ty 
 
   WorkTy W(f1, f2, loopname);
   Initializer<IterTy, WorkTy> init(b, e, W);
-
   for_each_det_impl(init, W);
 }
 
