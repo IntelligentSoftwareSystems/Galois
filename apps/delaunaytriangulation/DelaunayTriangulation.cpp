@@ -373,7 +373,12 @@ public:
     }
     scanner.close();
     
-    addBoundaryPoints();
+    if (points.size())
+      addBoundaryPoints();
+    else {
+      std::cerr << "No points found in file: " << name << "\n";
+      abort();
+    }
   }
 };
 
@@ -464,10 +469,12 @@ static void generateRoundsOld(PointList& points) {
   size_t next = 1 << roundShift;
   std::vector<Point*> buf;
 
-  for (PointList::iterator ii = points.begin(), ei = points.end(); ii != ei; ++ii, ++counter) {
+  PointList::iterator ii = points.begin(), ei = points.end();
+  while (ii != ei) {
     Point* ptr = &basePoints.push(*ii);
     buf.push_back(ptr);
-    if (counter > next) {
+    ++ii;
+    if (ii == ei || counter > next) {
       next *= next;
       int r = maxRounds - 1 - round;
       std::random_shuffle(buf.begin(), buf.end());
@@ -475,6 +482,7 @@ static void generateRoundsOld(PointList& points) {
       buf.clear();
       ++round;
     }
+    ++counter;
   }
 }
 
@@ -488,14 +496,18 @@ static void generateRounds(PointList& points) {
   // Reorganize spatially and distribute over rounds
   PointList ordered;
   ordered.reserve(size);
-  QuadTree q(
-    boost::make_transform_iterator(&points[0], GetPointer()),
-    boost::make_transform_iterator(&points[size], GetPointer()));
+  if (true) {
+    QuadTree q(
+      boost::make_transform_iterator(&points[0], GetPointer()),
+      boost::make_transform_iterator(&points[size], GetPointer()));
 
-  q.output(std::back_inserter(ordered));
+    q.output(std::back_inserter(ordered));
+  } else {
+    std::copy(&points[0], &points[size], std::back_inserter(ordered));
+  }
 
   if (true) {
-  GenerateRounds::CounterTy counter;
+    GenerateRounds::CounterTy counter;
 #ifdef GALOIS_USE_DET
     std::for_each(ordered.begin(), ordered.end(), GenerateRounds(counter, log2));
 #else
@@ -607,7 +619,6 @@ static void generateMesh() {
     PT.start();
     Galois::InsertBag<Point*>& pptrs = rounds[i];
 #ifdef GALOIS_USE_DET
-    // TODO(ddn): may need to randomize det case to avoid huge number of conflicts
     switch (detAlgo) {
       case nondet: 
         Galois::for_each<WL>(pptrs.begin(), pptrs.end(), Process<>(&tree)); break;
