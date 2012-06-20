@@ -288,7 +288,7 @@ namespace WorkList {
 template<class T, class FunctionTy>
 class ForEachWork<WorkList::BulkSynchronousInline<>,T,FunctionTy> {
   typedef T value_type;
-  typedef HIDDEN::dChunkedFIFO<value_type,256> WLTy;
+  typedef HIDDEN::dChunkedLIFO<value_type,256> WLTy;
 
   struct ThreadLocalData {
     GaloisRuntime::UserContextAccess<value_type> facing;
