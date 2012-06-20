@@ -28,6 +28,7 @@
  */
 #include "Galois/Galois.h"
 #include "Galois/Bag.h"
+#include "Galois/Accumulator.h"
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
 #include "Galois/Graphs/LCGraph.h"
@@ -169,6 +170,43 @@ struct GNodeGreater {
   }
 };
 
+struct not_consistent {
+  bool operator()(GNode n) const {
+    unsigned int dist = graph.getData(n).dist;
+    for (Graph::edge_iterator 
+	   ii = graph.edge_begin(n),
+	   ee = graph.edge_end(n); ii != ee; ++ii) {
+      GNode dst = graph.getEdgeDst(ii);
+      unsigned int ddist = graph.getData(dst).dist;
+      if (ddist > dist + 1) {
+        std::cerr << "bad level value: " << ddist << " > " << (dist + 1) << "\n";
+	return true;
+      }
+    }
+    return false;
+  }
+};
+
+struct not_visited {
+  bool operator()(GNode n) const {
+    unsigned int dist = graph.getData(n).dist;
+    if (dist >= DIST_INFINITY) {
+      std::cerr << "unvisted node: " << dist << " >= INFINITY\n";
+      return true;
+    }
+    return false;
+  }
+};
+
+struct max_dist {
+  Galois::GReduceMax<unsigned int>& m;
+  max_dist(Galois::GReduceMax<unsigned int>& _m): m(_m) { }
+
+  void operator()(GNode n) const {
+    m.update(graph.getData(n).dist);
+  }
+};
+
 //! Simple verifier
 static bool verify(GNode source) {
   if (graph.getData(source).dist != 0) {
@@ -177,28 +215,17 @@ static bool verify(GNode source) {
   }
   
   size_t id = 0;
+  
+  bool okay = Galois::find_if(graph.begin(), graph.end(), not_consistent()) == graph.end()
+    && Galois::find_if(graph.begin(), graph.end(), not_visited()) == graph.end();
 
-  for (Graph::iterator src = graph.begin(), ee =
-	 graph.end(); src != ee; ++src, ++id) {
-    unsigned int dist = graph.getData(*src).dist;
-    if (dist >= DIST_INFINITY) {
-      std::cerr
-        << "found node = " << id
-	<< " with label >= INFINITY = " << dist << "\n";
-      return false;
-    }
-    
-    for (Graph::edge_iterator 
-	   ii = graph.edge_begin(*src),
-	   ee = graph.edge_end(*src); ii != ee; ++ii) {
-      unsigned int ddist = graph.getData(*src).dist;
-      if (ddist > dist + 1) {
-        std::cerr << "bad level value at "  << id << "\n";
-	return false;
-      }
-    }
+  if (okay) {
+    Galois::GReduceMax<unsigned int> m;
+    Galois::do_all(graph.begin(), graph.end(), max_dist(m));
+    std::cout << "max dist: " << m.get() << "\n";
   }
-  return true;
+  
+  return okay;
 }
 
 static void readGraph(GNode& source, GNode& report) {
