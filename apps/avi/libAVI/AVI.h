@@ -399,7 +399,7 @@ public:
  * according to their time stamps
  */
 struct AVIComparator {
-  static const double EPS = 1e-12;
+//  static const double EPS = 1e-12;
 
   //! tie break comparison
   //! @param left pointer to first AVI object

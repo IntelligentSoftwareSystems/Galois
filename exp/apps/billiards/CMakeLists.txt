@@ -1,4 +1,4 @@
-set (Sources Vec2.cpp Event.cpp)
+set (Sources dependTest.cpp Table.cpp Cushion.cpp FPutils.cpp Vec2.cpp Event.cpp)
 app (BilliardsSerialPQ BilliardsSerialPQ.cpp ${Sources})
 
 app (BilliardsPOunsortedSerial BilliardsPOunsortedSerial.cpp ${Sources})

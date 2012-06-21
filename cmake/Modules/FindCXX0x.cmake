@@ -1,7 +1,6 @@
 include(CheckCXXCompilerFlag)
 
-set(CXX0X_FLAG_CANDIDATES
-  -std=c++0x)
+set(CXX0X_FLAG_CANDIDATES -std=c++11x -std=c++0x)
 
 # Don't do anything when already set
 if(DEFINED CXX0X_FLAGS)

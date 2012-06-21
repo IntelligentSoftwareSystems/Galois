@@ -39,7 +39,7 @@
 
 class OrderDepTest {
 
-  static const double V_MAX = 30.0;
+  static const double V_MAX;
 
 public:
   static bool dependsOn(const Event& later, const Event& earlier) {

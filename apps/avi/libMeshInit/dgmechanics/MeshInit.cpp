@@ -7,6 +7,15 @@ const double TetMeshInit::PARAM[] =
   0, 0, 0,
   0, 0, 1 };
 
+const double MeshInit::RHO = 1.0;
+const double MeshInit::MU = 0.5;
+const double MeshInit::LAMBDA = 0.0;
+const int MeshInit::PID = 0;
+
+const double MeshInit::DELTA = 0.1;
+const double MeshInit::T_INIT = 0.0;
+
+const size_t MeshInit::MAX_FNAME = 1024;
 
 /**
  *

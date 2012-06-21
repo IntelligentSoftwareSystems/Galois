@@ -113,6 +113,7 @@ endif()
 
 # c++0x features
 find_package(CXX0x)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX0X_FLAGS}")
 
 if(USE_PROFILING)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
@@ -160,9 +161,9 @@ if(LIBNUMA_FOUND)
 endif()
 
 #XXX(ddn): avoid broken includes on volta
-if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX0X_FLAGS}")
-endif()
+#if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
+#  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX0X_FLAGS}")
+#endif()
 
 ###### Global Functions ######
 function(linkRuntime name) 

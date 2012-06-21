@@ -46,8 +46,7 @@
 
 struct FPutils: private boost::noncopyable {
 
-  // (adl) not valid c++
-  static const double EPSILON = 1.0e-15;
+  static const double EPSILON;
 
   // We want to truncate double such that results of simple operations e.g.
   // addition/multiplication does not get affected by rounding.
@@ -67,12 +66,11 @@ struct FPutils: private boost::noncopyable {
   //
   // 32 bits give us a precision of 2^(-32) = 2.0e-10
 private:
-  static const unsigned HALF_FRACTION_BITS = 30;
-  static const uint64_t PRECISION_64 = (uint64_t(1) << HALF_FRACTION_BITS);
+  static const unsigned HALF_FRACTION_BITS;
+  static const uint64_t PRECISION_64;
 
 public:
-  // (adl) not valid c++
-  static const double TRUNCATE_PRECISION = PRECISION_64;
+  static const double TRUNCATE_PRECISION;
 
   static double truncate (const double d) {
     return (double (int64_t (d * TRUNCATE_PRECISION)) / TRUNCATE_PRECISION);

@@ -34,6 +34,12 @@
 
 const double SimpleMaterial::I_MAT[]  = { 1., 0., 0., 0., 1., 0., 0., 0., 1. };
 const int IsotropicLinearElastic::DELTA_MAT[][3] = { { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 } };
+const double SimpleMaterial::EPS = 1.e-6;
+const double SimpleMaterial::PERT = 1.e-1;
+const double SimpleMaterial::DET_MIN = 1.e-10;
+
+const size_t SimpleMaterial::NDF = 3;
+const size_t SimpleMaterial::NDM = 3;
 
 bool SimpleMaterial::consistencyTest(const SimpleMaterial &SMat) {
   std::vector<double> strain(MAT_SIZE);

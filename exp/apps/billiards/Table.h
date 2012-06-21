@@ -44,13 +44,11 @@
 class Table {
 
 public:
-  // (adl) not valid c++ inline const/static initializers of doubles
   struct DefaultValues {
-    static const double BALL_MASS = 1.0;
-    static const double BALL_RADIUS = 0.5;
-
-    static const double MIN_SPEED = 0.1;
-    static const double MAX_SPEED = 10.0;
+    static const double BALL_MASS;
+    static const double BALL_RADIUS;
+    static const double MIN_SPEED;
+    static const double MAX_SPEED;
   };
 
 

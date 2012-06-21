@@ -65,14 +65,13 @@ public:
 
   // (amber) some constants collected here
   //! Some constants collected together here
-  // (adl) This is not valid c++ (the doubles anyway).
-  static const double EPS = 1.e-6;
-  static const double PERT = 1.e-1;
-  static const double DET_MIN = 1.e-10;
+  static const double EPS;
+  static const double PERT;
+  static const double DET_MIN;
 
-  static const size_t MAT_SIZE = 9;
-  static const size_t NDF = 3;
-  static const size_t NDM = 3;
+  static const int MAT_SIZE = 9;
+  static const size_t NDF;
+  static const size_t NDM;
 
   static const double I_MAT[MAT_SIZE];
 
