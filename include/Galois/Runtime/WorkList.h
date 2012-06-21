@@ -192,7 +192,7 @@ public:
     return retval;
   }
 };
-GALOIS_WLCOMPILECHECK(LIFO);
+GALOIS_WLCOMPILECHECK(LIFO)
 
 template<typename T = int, bool concurrent = true>
 class FIFO : private boost::noncopyable, private LL::PaddedLock<concurrent>  {
@@ -253,7 +253,7 @@ public:
     return retval;
   }
 };
-GALOIS_WLCOMPILECHECK(FIFO);
+GALOIS_WLCOMPILECHECK(FIFO)
 
 template<typename T = int, bool concurrent = true>
 class GFIFO : private boost::noncopyable, private LL::PaddedLock<concurrent>  {
@@ -306,7 +306,7 @@ public:
     return retval;
   }
 };
-GALOIS_WLCOMPILECHECK(GFIFO);
+GALOIS_WLCOMPILECHECK(GFIFO)
 
 template<class Indexer = DummyIndexer<int>, typename ContainerTy = FIFO<>, typename T = int, bool concurrent = true >
 class OrderedByIntegerMetric : private boost::noncopyable {
@@ -439,8 +439,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     else
       msS = std::min(msS, current.getRemote(LL::getLeaderForThread(myID))->scanStart);
 #endif
-    typename std::map<unsigned int, CTy*>::iterator ii = p.local.lower_bound(msS);
-    for (typename std::map<unsigned int, CTy*>::iterator ee = p.local.end();
+    for (typename std::map<unsigned int, CTy*>::iterator ii = p.local.lower_bound(msS), ee = p.local.end();
 	 ii != ee; ++ii) {
       if ((retval = ii->second->pop())) {
 	C = ii->second;
@@ -452,7 +451,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     return boost::optional<value_type>();
   }
 };
-GALOIS_WLCOMPILECHECK(OrderedByIntegerMetric);
+GALOIS_WLCOMPILECHECK(OrderedByIntegerMetric)
 
 template<typename GlobalQueueTy = FIFO<>, typename LocalQueueTy = FIFO<>, typename T = int >
 class LocalQueues : private boost::noncopyable {
@@ -493,7 +492,7 @@ public:
     return global.pop();
   }
 };
-GALOIS_WLCOMPILECHECK(LocalQueues);
+GALOIS_WLCOMPILECHECK(LocalQueues)
 
 //This overly complex specialization avoids a pointer indirection for non-distributed WL when accessing PerLevel
 template<bool d, typename TQ>
@@ -511,10 +510,12 @@ struct squeues;
 template<typename TQ>
 struct squeues<true,TQ> {
   PerPackageStorage<TQ> queues;
+  unsigned num;
   TQ& get(int i) { return *queues.getRemote(i); }
   TQ& get() { return *queues.getLocal(); }
   int myEffectiveID() { return LL::getTID(); } //queues.myEffectiveID(); }
-  int size() { return queues.size(); }
+  int size() { return num; }
+  squeues() :num(Galois::getActiveThreads()) {}
 };
 
 template<typename TQ>
@@ -690,19 +691,19 @@ public:
 
 template<int chunksize=64, typename T = int, bool concurrent=true>
 class ChunkedFIFO : public ChunkedMaster<T, ConExtLinkedQueue, false, false, chunksize, concurrent> {};
-GALOIS_WLCOMPILECHECK(ChunkedFIFO);
+GALOIS_WLCOMPILECHECK(ChunkedFIFO)
 
 template<int chunksize=64, typename T = int, bool concurrent=true>
 class ChunkedLIFO : public ChunkedMaster<T, ConExtLinkedStack, false, true, chunksize, concurrent> {};
-GALOIS_WLCOMPILECHECK(ChunkedLIFO);
+GALOIS_WLCOMPILECHECK(ChunkedLIFO)
 
 template<int chunksize=64, typename T = int, bool concurrent=true>
 class dChunkedFIFO : public ChunkedMaster<T, ConExtLinkedQueue, true, false, chunksize, concurrent> {};
-GALOIS_WLCOMPILECHECK(dChunkedFIFO);
+GALOIS_WLCOMPILECHECK(dChunkedFIFO)
 
 template<int chunksize=64, typename T = int, bool concurrent=true>
 class dChunkedLIFO : public ChunkedMaster<T, ConExtLinkedStack, true, true, chunksize, concurrent> {};
-GALOIS_WLCOMPILECHECK(dChunkedLIFO);
+GALOIS_WLCOMPILECHECK(dChunkedLIFO)
 
 //FIXME: make this valid for input iterators (e.g. no default constructor)
 template<typename IterTy = int*>
@@ -765,7 +766,7 @@ public:
     return boost::optional<value_type>();
   }
 };
-GALOIS_WLCOMPILECHECK(ForwardAccessRange);
+GALOIS_WLCOMPILECHECK(ForwardAccessRange)
 
 template<bool Stealing=false, typename IterTy = int*>
 class RandomAccessRange {
@@ -870,7 +871,7 @@ public:
     return pop_slowpath(tld);
   }
 };
-GALOIS_WLCOMPILECHECK(RandomAccessRange);
+GALOIS_WLCOMPILECHECK(RandomAccessRange)
 
 //FIXME: make this more typed
 template<typename IterTy = int*>
@@ -1035,7 +1036,7 @@ public:
     return wl.pop();
   }
 };
-GALOIS_WLCOMPILECHECK(OwnerComputesWL);
+GALOIS_WLCOMPILECHECK(OwnerComputesWL)
 
 template<class ContainerTy=dChunkedFIFO<>, class T=int, bool concurrent = true>
 class BulkSynchronous : private boost::noncopyable {
@@ -1118,7 +1119,7 @@ class BulkSynchronous : private boost::noncopyable {
     }
   }
 };
-GALOIS_WLCOMPILECHECK(BulkSynchronous);
+GALOIS_WLCOMPILECHECK(BulkSynchronous)
 
 //End namespace
 
