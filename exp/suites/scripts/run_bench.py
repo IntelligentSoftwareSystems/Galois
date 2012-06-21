@@ -40,8 +40,6 @@ basename = os.path.basename(prog)
 
 if basename == 'parsec-blackscholes':
   args = [str(options.threads)] + args
-elif basename == 'parsec-bodytrack':
-  args = args + [str(options.threads)]
 
 print("INFO: CommandLine %s %s" % (prog, ' '.join(args)))
 print("INFO: Hostname %s" % socket.gethostname())

@@ -50,6 +50,8 @@ static inline unsigned getTID() {
 
 unsigned getNumThreads();
 int getNumRounds();
+void beginSampling();
+void endSampling();
 
 typedef Config::function<void (void)> RunCommand;
 

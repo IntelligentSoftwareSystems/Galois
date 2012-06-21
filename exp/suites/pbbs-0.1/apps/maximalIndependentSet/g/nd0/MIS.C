@@ -72,7 +72,9 @@ void speculative_for(S step, int s, int e, int granularity,
     swap(I, Ihold);
     numberDone += size - numberKeep;
   }
-  free(I); free(Ihold); free(keep); free(state);
+  free(I); free(Ihold); free(keep); 
+  if (hasState)
+    free(state);
   cout << "rounds = " << round << " failed = " << failed << "\n";
 }
 
@@ -161,5 +163,6 @@ char* maximalIndependentSet(graph GS) {
   int numRounds = Exp::getNumRounds();
   numRounds = numRounds <= 0 ? 25 : numRounds;
   speculative_for(mis, 0, n, numRounds, 0);
+  free(Marks);
   return Flags;
 }

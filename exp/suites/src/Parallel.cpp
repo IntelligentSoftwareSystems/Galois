@@ -229,6 +229,22 @@ int Exp::getNumRounds() {
   return -1;
 }
 
+void Exp::beginSampling() {
+  char *p = getenv("GALOIS_EXIT_BEFORE_SAMPLING");
+  if (p) {
+    int n = atoi(p);
+    exit(n);
+  }
+}
+
+void Exp::endSampling() {
+  char *p = getenv("GALOIS_EXIT_AFTER_SAMPLING");
+  if (p) {
+    int n = atoi(p);
+    exit(n);
+  }
+}
+
 //#define USE_SIMPLE_RUNTIME
 
 #ifdef USE_SIMPLE_RUNTIME

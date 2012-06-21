@@ -21,27 +21,46 @@
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include <iostream>
-#include <deque>
 #include "sequence.h"
 #include "graph.h"
 #include "parallel.h"
 //#include "speculative_for.h"
 
-struct TLD {
-  std::deque<int> abortedQ;
-  int aborted;
+template<class S>
+struct GFn1 {
+  int numberKeep;
+  int numberDone;
+  vindex *I;
+  S* state;
+  S step;
+  bool *keep;
+  GFn1(int _numberKeep, int _numberDone, vindex* _I, S* _state, S _step, bool* _keep): numberKeep(_numberKeep), numberDone(_numberDone), I(_I), state(_state), step(_step), keep(_keep) { }
+  void operator()(int i) {
+	if (i >= numberKeep) I[i] = numberDone + i;
+	keep[i] = !state[i].commit(I[i]);
+  }
 };
 
-//#define DUMB
+template<class S>
+struct GFn2 {
+  int numberKeep;
+  int numberDone;
+  vindex *I;
+  S* state;
+  S step;
+  bool *keep;
+  GFn2(int _numberKeep, int _numberDone, vindex* _I, S* _state, S _step, bool* _keep): numberKeep(_numberKeep), numberDone(_numberDone), I(_I), state(_state), step(_step), keep(_keep) { }
+  void operator()(int i) {
+	if (i >= numberKeep) I[i] = numberDone + i;
+	keep[i] = !step.commit(I[i]);
+  }
+};
+
 template <class S>
 void speculative_for(S step, int s, int e, int granularity, 
-		     bool hasState=0, int maxTries=-1) {
-  unsigned numThreads = Exp::getNumThreads();
-  
+		     bool hasState=1, int maxTries=-1) {
   if (maxTries < 0) maxTries = 2*granularity;
-  int maxRoundSize = (int) numThreads;
-#ifdef DUMB
-  maxRoundSize = (e-s)/granularity+1;
+  int maxRoundSize = (e-s)/granularity+1;
   vindex *I = newA(vindex,maxRoundSize);
   vindex *Ihold = newA(vindex,maxRoundSize);
   bool *keep = newA(bool,maxRoundSize);
@@ -50,8 +69,6 @@ void speculative_for(S step, int s, int e, int granularity,
     state = newA(S, maxRoundSize);
     for (int i=0; i < maxRoundSize; i++) state[i] = step;
   }
-#endif
-  TLD *tld = new TLD[maxRoundSize];
 
   int round = 0; 
   int numberDone = s; // number of iterations done
@@ -64,69 +81,33 @@ void speculative_for(S step, int s, int e, int granularity,
       cerr << "speculativeLoop: too many iterations, increase maxTries parameter\n";
       abort();
     }
-    //int size = min(maxRoundSize, e - numberDone);
-    int size = e - numberDone;
+    int size = min(maxRoundSize, e - numberDone);
 
-    if (!hasState) {
+    if (hasState) {
 //      parallel_for (int i =0; i < size; i++) {
-      parallel_doall(int, i, 0, size)  {
-        unsigned tid = Exp::getTID();
-        TLD& t = tld[tid];
-        int cur = i;
-        while (true) {
-#ifdef DUMB
-          if (cur >= numberKeep) I[cur] = numberDone + cur;
-#endif
-          bool success = step.commit(cur);
-          //bool success = state[i].commit(I[i]);
-          if (!success) {
-            t.abortedQ.push_back(cur);
-            t.aborted++;
-          }
-#ifdef DUMB
-          keep[cur] = !success;
-#endif
-          if (!success)
-            break;
-          if (!t.abortedQ.empty()) {
-            cur = t.abortedQ.front();
-            t.abortedQ.pop_front();
-          } else {
-            break;
-          }
-        }
+      GFn2<S> gfn1(numberKeep, numberDone, I, state, step, keep);
+      parallel_doall_obj(int, i, 0, size, gfn1)  {
+	if (i >= numberKeep) I[i] = numberDone + i;
+	keep[i] = !state[i].commit(I[i]);
       } parallel_doall_end
-
-      for (int i = 0; i < numThreads; ++i) {
-        TLD& t = tld[i];
-        for (int j = 0; j < t.abortedQ.size(); ++j) {
-          int cur = t.abortedQ[j];
-          bool success = step.commit(cur);
-          if (!success)
-            abort();
-        }
-        failed += t.aborted;
-        t.abortedQ.clear();
-        t.aborted = 0;
-      }
     } else {
-      abort();
+//      parallel_for (int i =0; i < size; i++) {
+      GFn2<S> gfn2(numberKeep, numberDone, I, state, step, keep);
+      parallel_doall_obj(int, i, 0, size, gfn2)  {
+	if (i >= numberKeep) I[i] = numberDone + i;
+	keep[i] = !step.commit(I[i]);
+      } parallel_doall_end
     }
 
-#ifdef DUMB
     // keep edges that failed to hook for next round
     numberKeep = sequence::pack(I, Ihold, keep, size);
     failed += numberKeep;
     swap(I, Ihold);
     numberDone += size - numberKeep;
-#endif
-    numberKeep = 0;
-    numberDone += size - numberKeep;
   }
-#ifdef DUMB
-  free(I); free(Ihold); free(keep); free(state);
-#endif
-  delete [] tld;
+  free(I); free(Ihold); free(keep); 
+  if (hasState)
+    free(state);
   cout << "rounds = " << round << " failed = " << failed << "\n";
 }
 
@@ -142,20 +123,23 @@ using namespace std;
 //   Flags = 2 indicates a neighbor is chosen
 struct MISstep {
   char *Flags;  vertex*G; int *Marks;
-  MISstep(char* _F, vertex* _G, int* _M) : Flags(_F), G(_G), Marks(_M) {}
+  pthread_mutex_t* locks;
+  MISstep(char* _F, vertex* _G, int* _M, pthread_mutex_t* _l) : Flags(_F), G(_G), Marks(_M), locks(_l) {}
 
   bool acquire(int id, int i) {
-    int v;
-    do {
-      v = Marks[i];
-      if (v == id)
-        return true;
-      if (v == -1 && __sync_bool_compare_and_swap(&Marks[i], v, id)) {
-        return true;
-      }
-    } while (v == -1);
-
-    return false;
+    bool retval;
+    pthread_mutex_lock(&locks[i]);
+    int v = Marks[i];
+    if (v == id) {
+      retval = true;
+    } else if (v == -1) {
+      Marks[i] = id;
+      retval = true;
+    } else {
+      retval = false;
+    }
+    pthread_mutex_unlock(&locks[i]);
+    return retval;
   }
 
   bool release(int id, int i) {
@@ -211,10 +195,16 @@ char* maximalIndependentSet(graph GS) {
   vertex* G = GS.V;
   int* Marks = newArray(n, -1);
   char* Flags = newArray(n,  (char) 0);
-  MISstep mis(Flags, G, Marks);
+  pthread_mutex_t* locks = new pthread_mutex_t[n];
+  for (int i = 0; i < n; ++i)
+    pthread_mutex_init(&locks[i], NULL);
+  MISstep mis(Flags, G, Marks, locks);
   int numRounds = Exp::getNumRounds();
   numRounds = numRounds <= 0 ? 25 : numRounds;
-  speculative_for(mis, 0, n, numRounds);
+  speculative_for(mis, 0, n, numRounds, 0);
+  for (int i = 0; i < n; ++i)
+    pthread_mutex_destroy(&locks[i]);
+  delete [] locks;
   free(Marks);
   return Flags;
 }

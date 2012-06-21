@@ -2,7 +2,7 @@
 
 #ifndef _BENCH_GETTIME_INCLUDED
 #define _BENCH_GETTIME_INCLUDED
-
+#include "Exp/Parallel.h"
 #include <stdlib.h>
 #include <sys/time.h>
 #include <iomanip>
@@ -25,6 +25,7 @@ struct timer {
     return ((double) now.tv_sec) + ((double) now.tv_usec)/1000000.;
   }
   void start () {
+    Exp::beginSampling();
     on = 1;
     lastTime = getTime();
   } 
@@ -78,7 +79,8 @@ struct timer {
 
   void reportTotal(std::string str) {
     std::cout << str << " : "; 
-    reportTotal();}
+    reportTotal();
+  }
 
   void reportNext() {reportTime(next());}
 
@@ -91,7 +93,7 @@ static timer _tm;
 #define stopTime(_weight,_str) _tm.reportStop(_weight,_str);
 #define reportTime(_str) _tm.reportTotal(_str);
 #define nextTime(_string) _tm.reportNext(_string);
-#define nextTimeN() _tm.reportT(_tm.next());
+#define nextTimeN() { _tm.reportT(_tm.next()); Exp::endSampling(); }
 
 #endif // _BENCH_GETTIME_INCLUDED
 

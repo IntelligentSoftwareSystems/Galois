@@ -17,17 +17,10 @@ from collections import defaultdict
 SpecPBBS = [{"prob": "breadthFirstSearch",
       "algos": ["deterministicBFS", "ndBFS", "serialBFS"],
       "inputs": ["randLocalGraph_J_5_10000000", "rMatGraph_J_5_10000000", "3Dgrid_J_10000000"]},
-     {"prob": "comparisonSort",
-      "algos": [#"quickSort",
-        "sampleSort", "serialSort"],
-      "inputs": ["randomSeq_100M_double", "exptSeq_100M_double", "almostSortedSeq_100M_double",
-                 "trigramSeq_100M", ("-p", "trigramSeq_100M")]},
-     {"prob": "convexHull",
-      "algos": ["quickHull", "serialHull"],
-      "inputs": ["2DinSphere_10M", "2Dkuzmin_10M", "2DonSphere_10M"]},
      {"prob": "delaunayRefine",
       "algos": ["incrementalRefine", 'g/p', 'g/nd0', 'g/nd1', 'g/nd2', 'g/pnd0', 'g/pnd1', 'g/pnd2'],
-      "inputs": ["2DinCubeDelaunay_275000", "2DinCubeDelaunay_1000000", "2DinCubeDelaunay_2500000", "r5M"],
+      "inputs": [#"2DinCubeDelaunay_275000", "2DinCubeDelaunay_1000000", 
+        "2DinCubeDelaunay_2500000", "r5M"],
       "extras": 
         [
           {'algos': ["incrementalRefine", 'g/p', 'g/nd0', 'g/pnd0'],
@@ -43,49 +36,58 @@ SpecPBBS = [{"prob": "breadthFirstSearch",
         [
           {'algos': ["incrementalDelaunay", 'g/p', 'g/nd0', 'g/pnd0'],
 #           'arg': "Rounds::-r::50,100:600:100" 
-           'arg': "Rounds::-r::100" 
+           'arg': "Rounds::-r::500" 
           }
         ]
       },
-     {"prob": "dictionary",
-      "algos": ["deterministicHash", "serialHash"],
-      "inputs": ["randomSeq_10M_int", "randomSeq_10M_100K_int", "exptSeq_10M_int", "trigramSeq_10M", "trigramSeq_10M_pair_int"]},
-     {"prob": "integerSort",
-      "algos": ["blockRadixSort", "serialRadixSort"],
-      "inputs": ["randomSeq_100M_int", "exptSeq_100M_int", "randomSeq_100M_int_pair_int", "randomSeq_100M_256_int_pair_int"]},
      {"prob": "maximalIndependentSet",
-      "algos": ["incrementalMIS", "ndMIS", "serialMIS"],
+      "algos": ["incrementalMIS", "ndMIS", "serialMIS", "g/nd0", "g/nd1", "g/pnd0", "gpnd1"],
       "inputs": ["randLocalGraph_J_5_10000000", "rMatGraph_J_5_10000000", "3Dgrid_J_10000000"],
       "extras":
         [
-          {'algos': ["incrementalMIS"],
-           'arg': "Rounds::-r::1,10,50,100:600:100" }
+          {'algos': ["incrementalMIS", "g/nd0", "g/pnd0"],
+           'arg': "Rounds::-r::25,50,100,200" }
         ]
-      },
-     {"prob": "maximalMatching",
-      "algos": ["incrementalMatching", "ndMatching", "serialMatching"],
-      "inputs": ["randLocalGraph_E_5_10000000", "rMatGraph_E_5_10000000", "3Dgrid_E_10000000"]},
-     {"prob": "minSpanningTree",
-      "algos": ["parallelKruskal", "serialMST"],
-      "inputs": ["randLocalGraph_WE_5_10000000", "rMatGraph_WE_5_10000000", "2Dgrid_WE_10000000"]},
-     {"prob": "nBody",
-      "algos": ["parallelCK"],
-      "inputs": ["3DonSphere_1000000", "3DinCube_1000000", "3Dplummer_1000000"]},
-     {"prob": "nearestNeighbors",
-      "algos": ["octTree2Neighbors", "octTreeNeighbors"],
-      "inputs": [("-d 2 -k 1", "2DinCube_10M"), ("-d 2 -k 1", "2Dkuzmin_10M"), ("-d 3 -k 1", "3DinCube_10M"), ("-d 3 -k 1", "3DonSphere_10M"), ("-d 3 -k 10", "3DinCube_10M"), ("-d 3 -k 10", "3Dplummer_10M")]},
-     {"prob": "rayCast",
-      "algos": ["kdTree"],
-      "inputs": [("happyTriangles", "happyRays"), ("angelTriangles", "angelRays"), ("dragonTriangles", "dragonRays")]},
-     {"prob": "removeDuplicates",
-      "algos": ["deterministicHash", "serialHash"],
-      "inputs": [ "randomSeq_10M_int", "randomSeq_10M_100K_int", "exptSeq_10M_int", "trigramSeq_10M", "trigramSeq_10M_pair_int"]},
-     {"prob": "spanningTree",
-      "algos": ["incrementalST", "ndST", "serialST"],
-      "inputs": ["randLocalGraph_E_5_10000000", "rMatGraph_E_5_10000000", "2Dgrid_E_10000000"]},
-     {"prob": "suffixArray",
-      "algos": "serialKS",
-      "inputs": []}
+      }
+#     ,
+#     {"prob": "comparisonSort",
+#      "algos": [#"quickSort",
+#        "sampleSort", "serialSort"],
+#      "inputs": ["randomSeq_100M_double", "exptSeq_100M_double", "almostSortedSeq_100M_double",
+#                 "trigramSeq_100M", ("-p", "trigramSeq_100M")]},
+#     {"prob": "convexHull",
+#      "algos": ["quickHull", "serialHull"],
+#      "inputs": ["2DinSphere_10M", "2Dkuzmin_10M", "2DonSphere_10M"]},
+#     {"prob": "dictionary",
+#      "algos": ["deterministicHash", "serialHash"],
+#      "inputs": ["randomSeq_10M_int", "randomSeq_10M_100K_int", "exptSeq_10M_int", "trigramSeq_10M", "trigramSeq_10M_pair_int"]},
+#     {"prob": "integerSort",
+#      "algos": ["blockRadixSort", "serialRadixSort"],
+#      "inputs": ["randomSeq_100M_int", "exptSeq_100M_int", "randomSeq_100M_int_pair_int", "randomSeq_100M_256_int_pair_int"]},
+#     {"prob": "maximalMatching",
+#      "algos": ["incrementalMatching", "ndMatching", "serialMatching"],
+#      "inputs": ["randLocalGraph_E_5_10000000", "rMatGraph_E_5_10000000", "3Dgrid_E_10000000"]},
+#     {"prob": "minSpanningTree",
+#      "algos": ["parallelKruskal", "serialMST"],
+#      "inputs": ["randLocalGraph_WE_5_10000000", "rMatGraph_WE_5_10000000", "2Dgrid_WE_10000000"]},
+#     {"prob": "nBody",
+#      "algos": ["parallelCK"],
+#      "inputs": ["3DonSphere_1000000", "3DinCube_1000000", "3Dplummer_1000000"]},
+#     {"prob": "nearestNeighbors",
+#      "algos": ["octTree2Neighbors", "octTreeNeighbors"],
+#      "inputs": [("-d 2 -k 1", "2DinCube_10M"), ("-d 2 -k 1", "2Dkuzmin_10M"), ("-d 3 -k 1", "3DinCube_10M"), ("-d 3 -k 1", "3DonSphere_10M"), ("-d 3 -k 10", "3DinCube_10M"), ("-d 3 -k 10", "3Dplummer_10M")]},
+#     {"prob": "rayCast",
+#      "algos": ["kdTree"],
+#      "inputs": [("happyTriangles", "happyRays"), ("angelTriangles", "angelRays"), ("dragonTriangles", "dragonRays")]},
+#     {"prob": "removeDuplicates",
+#      "algos": ["deterministicHash", "serialHash"],
+#      "inputs": [ "randomSeq_10M_int", "randomSeq_10M_100K_int", "exptSeq_10M_int", "trigramSeq_10M", "trigramSeq_10M_pair_int"]},
+#     {"prob": "spanningTree",
+#      "algos": ["incrementalST", "ndST", "serialST"],
+#      "inputs": ["randLocalGraph_E_5_10000000", "rMatGraph_E_5_10000000", "2Dgrid_E_10000000"]},
+#     {"prob": "suffixArray",
+#      "algos": "serialKS",
+#      "inputs": []}
     ]
 
 def flatten(l):
@@ -120,9 +122,9 @@ def genPBBS(options):
 
 
 SpecParsec = [
-    {'name': 'blackscholes', 'inputs': ['in_10M.txt prices.txt', "in_mid.txt prices.txt"]},
-    {'name': 'bodytrack', 'inputs': ['sequenceB_261 4 261 4000 5 0']},
-    {'name': 'freqmine', 'inputs': ['webdocs_250k.dat 11000']}
+    {'name': 'blackscholes', 'inputs': ['-1 in_10M.txt prices.txt']}, #, "-1 in_mid.txt prices.txt"]},
+    {'name': 'bodytrack', 'inputs': ['sequenceB_261 4 261 4000 5 0 -1']},
+    {'name': 'freqmine', 'inputs': ['webdocs_250k.dat 11000']} #, 'kosarak_250k.dat 220', 'kosarak_990k.dat 790']}
     ]
 
 def genParsec(options):

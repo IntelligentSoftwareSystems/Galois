@@ -32,10 +32,43 @@ struct TLD {
   int aborted;
 };
 
+template<class S>
+struct GFn1 {
+  S step;
+  TLD* tld;
+  GFn1(S _step, TLD* _tld): step(_step), tld(_tld) { }
+  void operator()(int i) {
+        unsigned tid = Exp::getTID();
+        TLD& t = tld[tid];
+        int cur = i;
+        while (true) {
+#ifdef DUMB
+          if (cur >= numberKeep) I[cur] = numberDone + cur;
+#endif
+          bool success = step.commit(cur);
+          //bool success = state[i].commit(I[i]);
+          if (!success) {
+            t.abortedQ.push_back(cur);
+            t.aborted++;
+          }
+#ifdef DUMB
+          keep[cur] = !success;
+#endif
+          if (!success)
+            break;
+          if (!t.abortedQ.empty()) {
+            cur = t.abortedQ.front();
+            t.abortedQ.pop_front();
+          } else {
+            break;
+          }
+        }
+  }
+};
+
 //#define DUMB
 template <class S>
-void speculative_for(S step, int s, int e, int granularity, 
-		     bool hasState=0, int maxTries=-1) {
+void speculative_for(S step, int s, int e, int granularity, bool hasState=0, int maxTries=-1) {
   unsigned numThreads = Exp::getNumThreads();
   
   if (maxTries < 0) maxTries = 2*granularity;
@@ -69,7 +102,8 @@ void speculative_for(S step, int s, int e, int granularity,
 
     if (!hasState) {
 //      parallel_for (int i =0; i < size; i++) {
-      parallel_doall(int, i, 0, size)  {
+      GFn1<S> gfn1(step, tld);
+      parallel_doall_obj(int, i, 0, size, gfn1)  {
         unsigned tid = Exp::getTID();
         TLD& t = tld[tid];
         int cur = i;
@@ -142,20 +176,23 @@ using namespace std;
 //   Flags = 2 indicates a neighbor is chosen
 struct MISstep {
   char *Flags;  vertex*G; int *Marks;
-  MISstep(char* _F, vertex* _G, int* _M) : Flags(_F), G(_G), Marks(_M) {}
+  pthread_mutex_t* locks;
+  MISstep(char* _F, vertex* _G, int* _M, pthread_mutex_t* _l) : Flags(_F), G(_G), Marks(_M), locks(_l) {}
 
   bool acquire(int id, int i) {
-    int v;
-    do {
-      v = Marks[i];
-      if (v == id)
-        return true;
-      if (v == -1 && __sync_bool_compare_and_swap(&Marks[i], v, id)) {
-        return true;
-      }
-    } while (v == -1);
-
-    return false;
+    bool retval;
+    pthread_mutex_lock(&locks[i]);
+    int v = Marks[i];
+    if (v == id) {
+      retval = true;
+    } else if (v == -1) {
+      Marks[i] = id;
+      retval = true;
+    } else {
+      retval = false;
+    }
+    pthread_mutex_unlock(&locks[i]);
+    return retval;
   }
 
   bool release(int id, int i) {
@@ -211,10 +248,16 @@ char* maximalIndependentSet(graph GS) {
   vertex* G = GS.V;
   int* Marks = newArray(n, -1);
   char* Flags = newArray(n,  (char) 0);
-  MISstep mis(Flags, G, Marks);
+  pthread_mutex_t* locks = new pthread_mutex_t[n];
+  for (int i = 0; i < n; ++i)
+    pthread_mutex_init(&locks[i], NULL);
+  MISstep mis(Flags, G, Marks, locks);
   int numRounds = Exp::getNumRounds();
   numRounds = numRounds <= 0 ? 25 : numRounds;
   speculative_for(mis, 0, n, numRounds);
+  for (int i = 0; i < n; ++i)
+    pthread_mutex_destroy(&locks[i]);
+  delete [] locks;
   free(Marks);
   return Flags;
 }

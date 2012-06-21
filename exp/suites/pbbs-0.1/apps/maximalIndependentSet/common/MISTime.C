@@ -58,9 +58,11 @@ int checkMaximalIndependentSet(graph G, char* Flags) {
 }
 
 void timeMIS(graph G, int rounds, char* outFile) {
-  char* flags = maximalIndependentSet(G);
+  char* flags = NULL;
+  //maximalIndependentSet(G);
   for (int i=0; i < rounds; i++) {
-    free(flags);
+    if (flags)
+      free(flags);
     startTime();
     flags = maximalIndependentSet(G);
     nextTimeN();
