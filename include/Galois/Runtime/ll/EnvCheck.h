@@ -28,10 +28,11 @@ namespace LL {
 
 //PLEASE document all enviroment variables here;
 //ThreadPool_pthread.cpp: "GALOIS_DO_NOT_BIND_MAIN_THREAD"
-//HWTopoLinux.cpp: "GALOIS_NUM_THREADS"
 //HWTopoLinux.cpp: "GALOIS_DEBUG_TOPO"
+//Sampling.cpp: "GALOIS_EXIT_BEFORE_SAMPLING"
+//Sampling.cpp: "GALOIS_EXIT_AFTER_SAMPLING"
 
-//Return true if the Enviroment variable is set
+//! Return true if the Enviroment variable is set
 bool EnvCheck(const char* parm);
 bool EnvCheck(const char* parm, int& val);
 
