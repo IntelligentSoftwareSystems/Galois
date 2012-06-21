@@ -65,6 +65,7 @@ public:
 
   // (amber) some constants collected here
   //! Some constants collected together here
+  // (adl) This is not valid c++ (the doubles anyway).
   static const double EPS = 1.e-6;
   static const double PERT = 1.e-1;
   static const double DET_MIN = 1.e-10;

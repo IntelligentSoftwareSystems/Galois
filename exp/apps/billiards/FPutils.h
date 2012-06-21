@@ -46,6 +46,7 @@
 
 struct FPutils: private boost::noncopyable {
 
+  // (adl) not valid c++
   static const double EPSILON = 1.0e-15;
 
   // We want to truncate double such that results of simple operations e.g.
@@ -70,6 +71,7 @@ private:
   static const uint64_t PRECISION_64 = (uint64_t(1) << HALF_FRACTION_BITS);
 
 public:
+  // (adl) not valid c++
   static const double TRUNCATE_PRECISION = PRECISION_64;
 
   static double truncate (const double d) {
