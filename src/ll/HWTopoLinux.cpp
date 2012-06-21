@@ -243,16 +243,6 @@ struct AutoLinuxPolicy {
 
   AutoLinuxPolicy() {
     std::vector<cpuinfo> vals = parseCPUInfo();
-#ifdef GALOIS_USE_DMP
-    {
-      // Hack to improve the performance of DMP version by killing off unnecessary threads
-      int x;
-      if (EnvCheck("GALOIS_NUM_THREADS", x)) {
-        size_t top = std::min(vals.size(), (size_t) x);
-        vals.resize(top);
-      }
-    }
-#endif
     virtmap = parseCPUSet();
 
     if (virtmap.empty()) {
