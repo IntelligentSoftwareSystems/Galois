@@ -29,8 +29,6 @@
 
 namespace Galois {
 
-// TODO(ddn): Rename to Galois/Reducers.h
-
 /**
  * GReducible stores per thread values of a variable of type T
  *

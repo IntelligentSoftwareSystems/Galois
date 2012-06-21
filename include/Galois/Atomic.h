@@ -83,8 +83,8 @@ public:
     return iv;
   }
   //! direct compare and swap
-  bool cas (const T& expected, const T& updated) {
-    return __sync_bool_compare_and_swap (&val, expected, updated);
+  bool cas(const T& expected, const T& updated) {
+    return __sync_bool_compare_and_swap(&val, expected, updated);
   }
 };
 
