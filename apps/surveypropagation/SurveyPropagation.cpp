@@ -331,7 +331,7 @@ struct update_biases {
     idata.Bias = d;
     idata.value = (BiasP > BiasN);
 
-    assert(!isnan(d) && !isnan(-d));
+    assert(!std::isnan(d) && !std::isnan(-d));
     maxBias.update(d);
     averageBias.update(d);
   }

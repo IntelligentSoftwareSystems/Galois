@@ -84,7 +84,11 @@ public:
   }
   //! direct compare and swap
   bool cas(const T& expected, const T& updated) {
+#ifdef __INTEL_COMPILER
+    return __sync_bool_compare_and_swap(&val, reinterpret_cast<uintptr_t>(expected), reinterpret_cast<uintptr_t>(updated));
+#else
     return __sync_bool_compare_and_swap(&val, expected, updated);
+#endif
   }
 };
 
@@ -112,7 +116,7 @@ public:
     return iv;
   }
   //! direct compare and swap
-  bool cas (bool expected, bool updated) {
+  bool cas(bool expected, bool updated) {
     return __sync_bool_compare_and_swap (&val, expected, updated);
   }
 };
