@@ -38,9 +38,6 @@ prog = args[0]
 args = args[1:]
 basename = os.path.basename(prog)
 
-if basename == 'parsec-blackscholes':
-  args = [str(options.threads)] + args
-
 print("INFO: CommandLine %s %s" % (prog, ' '.join(args)))
 print("INFO: Hostname %s" % socket.gethostname())
 sys.stdout.flush()

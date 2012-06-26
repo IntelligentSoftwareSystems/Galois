@@ -15,7 +15,7 @@ from collections import defaultdict
 
 
 SpecPBBS = [{"prob": "breadthFirstSearch",
-      "algos": ["deterministicBFS", "ndBFS", "serialBFS"],
+      "algos": ["deterministicBFS", "ndBFS"], #, "serialBFS"],
       "inputs": ["randLocalGraph_J_5_10000000", "rMatGraph_J_5_10000000", "3Dgrid_J_10000000"]},
      {"prob": "delaunayRefine",
       "algos": ["incrementalRefine", 'g/p', 'g/nd0', 'g/nd1', 'g/nd2', 'g/pnd0', 'g/pnd1', 'g/pnd2'],
@@ -30,18 +30,18 @@ SpecPBBS = [{"prob": "breadthFirstSearch",
         ]
       },
      {"prob": "delaunayTriangulation",
-      "algos": ["incrementalDelaunay", "serialDelaunay", "g/p", "g/nd0", "g/nd1", "g/pnd0", "g/pnd1"],
-      "inputs": ["2DinCube_10M", "2Dkuzmin_10M"],
+      "algos": ["incrementalDelaunay", "g/p", "g/nd0", "g/nd1", "g/pnd0", "g/pnd1"], #, "serialDelaunay"],
+      "inputs": ["2DinCube_10M", "2Dkuzmin_10M", "2DinCube_10M-reordered.points"],
       "extras":
         [
           {'algos': ["incrementalDelaunay", 'g/p', 'g/nd0', 'g/pnd0'],
 #           'arg': "Rounds::-r::50,100:600:100" 
-           'arg': "Rounds::-r::500" 
+           'arg': "Rounds::-r::100" 
           }
         ]
       },
      {"prob": "maximalIndependentSet",
-      "algos": ["incrementalMIS", "ndMIS", "serialMIS", "g/nd0", "g/nd1", "g/pnd0", "gpnd1"],
+      "algos": ["incrementalMIS", "ndMIS", "g/nd0", "g/nd1", "g/pnd0", "g/pnd1"],# "serialMIS"],
       "inputs": ["randLocalGraph_J_5_10000000", "rMatGraph_J_5_10000000", "3Dgrid_J_10000000"],
       "extras":
         [
@@ -124,7 +124,8 @@ def genPBBS(options):
 SpecParsec = [
     {'name': 'blackscholes', 'inputs': ['-1 in_10M.txt prices.txt']}, #, "-1 in_mid.txt prices.txt"]},
     {'name': 'bodytrack', 'inputs': ['sequenceB_261 4 261 4000 5 0 -1']},
-    {'name': 'freqmine', 'inputs': ['webdocs_250k.dat 11000']} #, 'kosarak_250k.dat 220', 'kosarak_990k.dat 790']}
+    {'name': 'freqmine', 'inputs': ['kosarak_990k.dat 790']}
+#      ['webdocs_250k.dat 11000', 'kosarak_250k.dat 220', 'kosarak_990k.dat 790']}
     ]
 
 def genParsec(options):
@@ -214,14 +215,17 @@ def runall(benches, runoptions, options):
   successes = filtered = skipped = failed = 0
   runpath = os.path.abspath(options.runpath)
   runbenchpath = os.path.abspath(options.runbenchpath)
-  regexes = [re.compile(x) for x in options.filterby]
+  include = [re.compile(x) for x in options.include]
+  exclude = [re.compile(x) for x in options.exclude]
   system('mkdir -p %s' % options.outdir)
 
   for bench in benches:
     logpath = '%s/%s' % (options.outdir, bench['key'])
     if os.path.exists(logpath):
       skipped += 1
-    elif not regexes or all([x.search(bench['key']) for x in regexes]):
+    elif exclude and any([x.search(bench['key']) for x in exclude]):
+      filtered += 1
+    elif not include or all([x.search(bench['key']) for x in include]):
       runcmd = [runpath] + runoptions + getfield(bench, 'runargs', [])
       basecmd = [os.path.abspath(bench['prog'])] + getfield(bench, 'args', [])
       wd = getfield(bench, 'wd', '.')
@@ -260,8 +264,10 @@ if __name__ == '__main__':
   parser = optparse.OptionParser(usage='usage: %prog [options] -- [run.py options]')
   parser.add_option('--baseinput', dest='baseinput', default='exp/suites',
       help='base directory for inputs')
-  parser.add_option('-f', '--filterby', dest='filterby', default=[], action='append',
-      help='filter benchmarks run by REGEX on key, repeated options form a conjunction', metavar='REGEX')
+  parser.add_option('-i', '--include', dest='include', default=[], action='append',
+      help='include benchmarks whose keys match REGEX, repeated options form a conjunction', metavar='REGEX')
+  parser.add_option('-e', '--exclude', dest='exclude', default=[], action='append',
+      help='exclude benchmarks whose keys match REGEX, repeated options form a conjunction', metavar='REGEX')
   parser.add_option('--runpath', dest='runpath', default=runpath, help='path to run.py')
   parser.add_option('--runbenchpath', dest='runbenchpath', default=runbenchpath, help='path to run_bench.py')
   parser.add_option('--outdir', dest='outdir', default='plogs', help='directory to store output logs')
