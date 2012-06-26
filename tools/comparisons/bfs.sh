@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Compare performance with SSCA2 program
+# Compare performance with Schardl BFS program
 
 BASE="$(cd $(dirname $0); cd ../..; pwd)"
 
