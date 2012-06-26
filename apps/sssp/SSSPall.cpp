@@ -92,11 +92,6 @@ struct process {
 };
 
 struct reset {
-  typedef int tt_does_not_need_stats;
-  typedef int tt_does_not_need_parallel_push;
-  typedef int tt_does_not_need_context;
-  typedef int tt_does_not_need_aborts;
-
   void operator()(GNode n) {//, Galois::UserContext<GNode>& lwl) {
     SNode& S = graph.getData(n, Galois::NONE);
     for (int i = 0; i < NUM; ++i)
