@@ -294,6 +294,7 @@ struct HasOut: public std::unary_function<GNode,bool> {
 };
 
 int main(int argc, char** argv) {
+  Galois::StatManager M;
   LonestarStart(argc, argv, name, desc, url);
 
   Graph g;

@@ -527,6 +527,7 @@ void run() {
 
 
 int main(int argc, char** argv) {
+  Galois::StatManager M;
   bool serial = false;
   LonestarStart(argc, argv, name, desc, url);
 

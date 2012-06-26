@@ -494,6 +494,7 @@ EdgeDataType verify(Graph & g){
 #endif
 //////////////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char **argv) {
+   Galois::StatManager M;
    LonestarStart(argc, argv, name, desc, url);
    if(use_weighted_rmat)
       readWeightedRMAT(inputfile.c_str());

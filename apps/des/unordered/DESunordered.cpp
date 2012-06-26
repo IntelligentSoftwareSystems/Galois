@@ -25,7 +25,7 @@
 #include "DESunordered.h"
 
 int main (int argc, char* argv[]) {
-
+  Galois::StatManager M;
   DESunordered m;
   m.run (argc, argv);
 

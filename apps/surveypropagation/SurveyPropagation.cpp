@@ -409,6 +409,7 @@ bool survey_inspired_decimation() {
 
 
 int main(int argc, char** argv) {
+  Galois::StatManager MM;
   LonestarStart(argc, argv, name, desc, url);
   srand(seed);
   initialize_random_formula(M,N,K);

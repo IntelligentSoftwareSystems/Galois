@@ -607,6 +607,7 @@ void run(int nbodies, int ntimesteps, int seed) {
 } // end namespace
 
 int main(int argc, char** argv) {
+  Galois::StatManager M;
   LonestarStart(argc, argv, name, desc, url);
   std::cout.setf(std::ios::right|std::ios::scientific|std::ios::showpoint);
 

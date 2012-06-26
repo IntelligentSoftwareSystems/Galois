@@ -1035,6 +1035,7 @@ void start(int N, int numEdges, int numGroups) {
 }
 
 int main(int argc, char** argv) {
+  Galois::StatManager M;
   LonestarStart(argc, argv, name, desc, url);
 
   std::cout << "N: " << N 

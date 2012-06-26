@@ -325,6 +325,7 @@ void clusterSerial(vector<LeafNode*> & lights) {
 }
 ///////////////////////////////////////////
 int main(int argc, char ** argv){
+  Galois::StatManager M;
   LonestarStart(argc, argv, name, desc, url);
 	std::cout<<"Starting Clustering app...["<<numPoints<<"]"<<std::endl;
 	//Initializing...
