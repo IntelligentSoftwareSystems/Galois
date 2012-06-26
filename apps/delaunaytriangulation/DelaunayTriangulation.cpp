@@ -59,6 +59,9 @@ static const char* url = "delaunay_triangulation";
 static cll::opt<std::string> doWriteMesh("writemesh", 
     cll::desc("Write the mesh out to files with basename"),
     cll::value_desc("basename"));
+static cll::opt<std::string> doWritePoints("writepoints",
+    cll::desc("Write the (reordered) points to filename"),
+    cll::value_desc("filename"));
 static cll::opt<std::string> inputname(cll::Positional, cll::desc("<input file>"), cll::Required);
 
 enum DetAlgo {
@@ -404,6 +407,15 @@ size_t maxRounds;
 Galois::InsertBag<Point*>* rounds;
 const int roundShift = 4; //! round sizes are portional to (1 << roundsShift)
 
+static void copyPointsFromRounds(PointList& points) {
+  for (int i = maxRounds - 1; i >= 0; --i) {
+    Galois::InsertBag<Point*>& pptrs = rounds[i];
+    for (Galois::InsertBag<Point*>::iterator ii = pptrs.begin(), ei = pptrs.end(); ii != ei; ++ii) {
+      points.push_back(*(*ii));
+    }
+  }
+}
+
 static void addBoundaryNodes(Point* p1, Point* p2, Point* p3) {
   Element large_triangle(p1, p2, p3);
   GNode large_node = graph->createNode(large_triangle);
@@ -486,7 +498,7 @@ static void generateRoundsOld(PointList& points) {
   }
 }
 
-static void generateRounds(PointList& points) {
+static void generateRounds(PointList& points, bool addBoundary) {
   size_t size = points.size() - 3;
 
   size_t log2 = std::max((size_t) floor(log(size) / log(2)), (size_t) 1);
@@ -517,6 +529,9 @@ static void generateRounds(PointList& points) {
     generateRoundsOld(ordered);
   }
 
+  if (!addBoundary)
+    return;
+
   // Now, handle boundary points
   size_t last = points.size();
   Point* p1 = &basePoints.push(points[last-1]);
@@ -530,7 +545,7 @@ static void generateRounds(PointList& points) {
   addBoundaryNodes(p1, p2, p3);
 }
 
-static void readInput(const std::string& filename) {
+static void readInput(const std::string& filename, bool addBoundary) {
   PointList points;
   ReadPoints(points).from(filename, false);
 
@@ -547,7 +562,7 @@ static void readInput(const std::string& filename) {
 
   Galois::StatTimer T("generateRounds");
   T.start();
-  generateRounds(points);
+  generateRounds(points, addBoundary);
   T.stop();
 }
 
@@ -642,7 +657,17 @@ int main(int argc, char** argv) {
   Galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
-  readInput(inputname);
+  bool writepoints = doWritePoints.size() > 0;
+  readInput(inputname, !writepoints);
+  if (writepoints) {
+    std::cout << "Writing " << doWritePoints << "\n";
+    PointList points;
+    copyPointsFromRounds(points);
+    writePoints(doWritePoints, points);
+    delete graph;
+    delete [] rounds;
+    return 0;
+  }
   
   Galois::StatTimer T;
   T.start();
