@@ -276,19 +276,10 @@ class dChunkedLIFO: public dChunkedMaster<T, WorkList::ConExtLinkedStack, true, 
 template<typename T,int ChunkSize>
 class dChunkedFIFO: public dChunkedMaster<T, WorkList::ConExtLinkedQueue, false, ChunkSize> { };
 
-
-} // end HIDDEN
-
-
-namespace WorkList {
-  template<class T=int>
-  class BulkSynchronousInline { };
-}
-
-template<class T, class FunctionTy>
-class ForEachWork<WorkList::BulkSynchronousInline<>,T,FunctionTy> {
+template<class T, class FunctionTy, template<typename,int> class WorklistTy>
+class BSInlineExecutor {
   typedef T value_type;
-  typedef HIDDEN::dChunkedLIFO<value_type,256> WLTy;
+  typedef WorklistTy<value_type,256> WLTy;
 
   struct ThreadLocalData {
     GaloisRuntime::UserContextAccess<value_type> facing;
@@ -403,7 +394,7 @@ class ForEachWork<WorkList::BulkSynchronousInline<>,T,FunctionTy> {
   }
 
 public:
-  ForEachWork(FunctionTy& f, const char* ln): function(f), loopname(ln) { 
+  BSInlineExecutor(FunctionTy& f, const char* ln): function(f), loopname(ln) { 
     if (ForEachTraits<FunctionTy>::NeedsBreak) {
       assert(0 && "not supported by this executor");
       abort();
@@ -433,6 +424,28 @@ public:
   void operator()() {
     go();
   }
+};
+
+
+} // end HIDDEN
+
+namespace WorkList {
+  template<bool isLIFO=true, class T=int>
+  class BulkSynchronousInline { };
+}
+
+template<class T,class FunctionTy>
+struct ForEachWork<WorkList::BulkSynchronousInline<true>,T,FunctionTy>:
+  public HIDDEN::BSInlineExecutor<T,FunctionTy,HIDDEN::dChunkedLIFO> {
+  typedef HIDDEN::BSInlineExecutor<T,FunctionTy,HIDDEN::dChunkedLIFO> SuperTy;
+  ForEachWork(FunctionTy& f, const char* ln): SuperTy(f, ln) { }
+};
+
+template<class T,class FunctionTy>
+struct ForEachWork<WorkList::BulkSynchronousInline<false>,T,FunctionTy>:
+  public HIDDEN::BSInlineExecutor<T,FunctionTy,HIDDEN::dChunkedFIFO> {
+  typedef HIDDEN::BSInlineExecutor<T,FunctionTy,HIDDEN::dChunkedFIFO> SuperTy;
+  ForEachWork(FunctionTy& f, const char* ln): SuperTy(f, ln) { }
 };
 
 }
