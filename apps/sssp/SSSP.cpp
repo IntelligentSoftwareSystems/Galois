@@ -34,9 +34,9 @@
 #include "llvm/Support/CommandLine.h"
 
 #include "Lonestar/BoilerPlate.h"
+
 #ifdef GALOIS_USE_EXP
 #include "Galois/PriorityScheduling.h"
-#include "Galois/Queue.h"
 #endif
 
 #include <iostream>
@@ -176,14 +176,14 @@ struct ParallelAlgo {
   void operator()(const GNode src) const {
     using namespace GaloisRuntime::WorkList;
     typedef dChunkedLIFO<16> dChunk;
-    typedef ChunkedLIFO<16> Chunk;
-    typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
+    typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk,true> OBIM;
 
     std::cout << "Using delta-step of " << (1 << stepShift) << "\n";
     std::cout << "WARNING: Performance varies considerably due to -delta.  Do not expect the default to be good for your graph\n";
 
     UpdateRequest one[1] = { UpdateRequest(src, 0) };
-    Galois::for_each<OBIM>(&one[0], &one[1], *this);
+    Exp::PriAuto<16, UpdateRequestIndexer, OBIM, std::less<UpdateRequest>, std::greater<UpdateRequest> >::for_each(&one[0], &one[1], *this);
+    //Galois::for_each<OBIM>(&one[0], &one[1], *this);
   }
 
   void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& lwl) const {

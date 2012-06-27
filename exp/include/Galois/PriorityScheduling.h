@@ -6,99 +6,64 @@
 
 #include "Galois/Runtime/WorkList.h"
 #include "Galois/Runtime/WorkListExperimental.h"
-
-// Uncomment to enable bunches of worklist types, disabled to speed up builds
-//#define _RUN_EXP
+#include "Galois/Runtime/ll/gio.h"
 
 namespace Exp {
-__attribute__((weak)) llvm::cl::opt<std::string> WorklistName("wl", llvm::cl::desc("Worklist to use"));
 
-template<
- typename DefaultWorklist,
- typename dChunk,
- typename Chunk,
- typename Indexer,
- typename Less,
- typename Greater
- >
-struct WorklistExperiment {
-#ifndef _RUN_EXP
-  template<typename Iterator,typename Functor>
-  void for_each(std::ostream& out, Iterator ii, Iterator ei, Functor fn) {
-    Galois::for_each<DefaultWorklist>(ii, ei, fn); 
-  }
-#else
-  template<typename Iterator,typename Functor>
-  void for_each(std::ostream& out, Iterator ii, Iterator ei, Functor fn) {
-    using namespace GaloisRuntime::WorkList;
+__attribute__((weak)) llvm::cl::opt<std::string> WorklistName("wl", llvm::cl::desc("Worklist to use"), llvm::cl::init("DEFAULT"));
 
-    typedef OrderedByIntegerMetric<Indexer, dChunk> OBIM;
-#ifdef GALOIS_USE_TBB
-    typedef TbbPriQueue<Greater> TBB;
-    typedef LocalStealing<TBB> LTBB;
-    typedef PTbb<Greater> PTBB;
-    typedef CTOrderedByIntegerMetric<Indexer, dChunk> CTOBIM;
-    typedef CTOrderedByIntegerMetric<Indexer, Chunk> NACTOBIM;
-#endif
-    typedef ChunkedFIFO<256> CF256;
-    typedef ChunkedLIFO<256> CL256;
-    typedef dChunkedFIFO<256> DCF256;
-    typedef dChunkedLIFO<256> DCL256;
-    typedef SkipListQueue<Less> SLQ;
-    typedef SimpleOrderedByIntegerMetric<Indexer> SOBIM;
-    typedef LocalStealing<SOBIM> LSOBIM;
-    typedef OrderedByIntegerMetric<Indexer, Chunk> NAOBIM;
-    typedef BarrierOBIM<Indexer, dChunk> BOBIM;
-    typedef LevelStealing<Random<> > RANDOM;
-    typedef StaticPartitioning<> STATIC;
+using namespace GaloisRuntime::LL;
+using namespace GaloisRuntime::WorkList;
 
-    std::string name = WorklistName;
+template<int ChunkSize, typename Ind, typename DEFAULT, typename Less, typename Greater >
+struct PriAuto {
 
-#define WLFOO(__b, __e, __p, __x, __y)					\
-  if (name == #__x) {							\
-    out << "Using worklist: " << name << "\n";				\
-    Galois::for_each<__y>(__b, __e, __p);				\
-  } else if (name == "tr_" #__x) {					\
-    out << "Using worklist: " << name << "\n";			\
-    Galois::for_each<WorkListTracker<Indexer, __y > >(__b, __e, __p);	\
-  } else if (name == "ni_" #__x) {					\
-    out << "Using worklist: " << name << "\n";			\
-    Galois::for_each<NoInlineFilter< __y > >(__b, __e, __p);		\
-  }
+  typedef dChunkedLIFO<ChunkSize> dChunk;
+  typedef  ChunkedLIFO<ChunkSize>  Chunk;
 
-    if (name == "default" || name == "") {
-      out << "Using worklist: default\n";
-      Galois::for_each<DefaultWorklist>(ii, ei, fn); 
+  //OBIM
+  typedef   OrderedByIntegerMetric<Ind,dChunk, true> OBIM_DMB;
+  typedef CTOrderedByIntegerMetric<Ind,dChunk, true> OBIM_DSB;
+  typedef   OrderedByIntegerMetric<Ind, Chunk, true> OBIM_CMB;
+  typedef CTOrderedByIntegerMetric<Ind, Chunk, true> OBIM_CSB;
+  typedef   OrderedByIntegerMetric<Ind,dChunk,false> OBIM_DMN;
+  typedef CTOrderedByIntegerMetric<Ind,dChunk,false> OBIM_DSN;
+  typedef   OrderedByIntegerMetric<Ind, Chunk,false> OBIM_CMN;
+  typedef CTOrderedByIntegerMetric<Ind, Chunk,false> OBIM_CSN;
+
+  //TBB
+  typedef TbbPriQueue<Greater> TBB;
+  typedef PTbb<Greater> PTBB;
+  typedef STbb<Greater> STBB;
+
+  //MISC
+  typedef SkipListQueue<Less> SLQ;
+  typedef SetQueue<Less> SETQ;
+
+
+
+  template<typename IterTy,typename FunctionTy>
+  static void for_each(IterTy b, IterTy e, FunctionTy f, const char* loopname = 0) {
+
+#define WLFOO2(__x)							\
+    if (WorklistName == #__x) {						\
+      gInfo("WorkList %s\n", #__x);					\
+      Galois::for_each<__x>(b,e,f,loopname);				\
     } else
-    WLFOO(ii, ei, fn, lifo,     LIFO<>)   else
-    WLFOO(ii, ei, fn, fifo,     FIFO<>)   else
-    WLFOO(ii, ei, fn, obim,     OBIM)     else
-    WLFOO(ii, ei, fn, sobim,    SOBIM)    else
-    WLFOO(ii, ei, fn, lsobim,   LSOBIM)   else
-    WLFOO(ii, ei, fn, naobim,   NAOBIM)   else
-    WLFOO(ii, ei, fn, slq,      SLQ)      else
-    WLFOO(ii, ei, fn, bobim,    BOBIM)    else
-    WLFOO(ii, ei, fn, dchunk,   dChunk)   else
-    WLFOO(ii, ei, fn, chunk,    Chunk)    else
-    WLFOO(ii, ei, fn, chunkfifo, CF256)   else
-    WLFOO(ii, ei, fn, chunklifo, CL256)   else
-    WLFOO(ii, ei, fn, dchunkfifo, DCF256) else
-    WLFOO(ii, ei, fn, dchunklifo, DCL256) else
-    WLFOO(ii, ei, fn, random,   RANDOM)   else
-    WLFOO(ii, ei, fn, sp,       STATIC)   else
-#ifdef GALOIS_USE_TBB
-    WLFOO(ii, ei, fn, nactobim, NACTOBIM) else
-    WLFOO(ii, ei, fn, ctobim,   CTOBIM)   else
-    WLFOO(ii, ei, fn, tbb,      TBB)      else
-    WLFOO(ii, ei, fn, ltbb,     LTBB)     else
-    WLFOO(ii, ei, fn, ptbb,     PTBB)     else
-#endif
+#include "PrioritySchedulers.h"
+#undef WLFOO2
+#define WLFOO2(__x)							\
+    if (WorklistName == "NI_" #__x) {					\
+      gInfo("WorkList %s\n", "NI_" #__x);				\
+      Galois::for_each<NoInlineFilter<__x> >(b,e,f,loopname);		\
+    } else
+#include "PrioritySchedulers.h"
+#undef WLFOO2
+
     {
-      out << "Unrecognized worklist " << name << "\n";
+      gError(true, "Unknown Worklist [%s]\n", WorklistName.c_str());
     }
-#undef WLFOO
   }
-#endif
 };
 
 } // end namespace

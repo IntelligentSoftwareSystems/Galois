@@ -521,8 +521,8 @@ struct MatchingABMP {
     typedef OrderedByIntegerMetric<Indexer,dChunk> OBIM;
     
 #ifdef GALOIS_USE_EXP
-    Exp::WorklistExperiment<OBIM,dChunk,Chunk,Indexer,Less,Greater>().for_each(
-        std::cout, initial.begin(), initial.end(), Process(*this, g, maxLayer, size));
+    Exp::PriAuto<1024,Indexer,OBIM,Less,Greater>::for_each(
+	 initial.begin(), initial.end(), Process(*this, g, maxLayer, size));
 #else
     Galois::for_each<OBIM>(initial.begin(), initial.end(), Process(*this, g, maxLayer, size));
 #endif
