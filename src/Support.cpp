@@ -44,6 +44,15 @@ class StatManager {
 
   GaloisRuntime::PerThreadStorage<std::map<KeyTy, unsigned long> > Stats;
 
+  volatile unsigned maxID;
+
+  void updateMax() {
+    unsigned n = Galois::getActiveThreads();
+    unsigned c;
+    while (n > (c = maxID))
+      __sync_bool_compare_and_swap(&maxID, c, n);
+  }
+
   KeyTy mkKey(const std::string& loop, const std::string& category) {
     return std::make_pair(loop,category);
   }
@@ -62,20 +71,25 @@ class StatManager {
   }
 
 public:
+
+  StatManager() :maxID(0) {}
+
   void addToStat(const std::string& loop, const std::string& category, size_t value) {
     (*Stats.getLocal())[mkKey(loop, category)] += value;
+    updateMax();
   }
 
   void addToStat(Galois::Statistic* value) {
     for (unsigned x = 0; x < Galois::getActiveThreads(); ++x)
       (*Stats.getRemote(x))[mkKey(value->getLoopname(), value->getStatname())] += value->getValue(x);
+    updateMax();
   }
 
   //Assume called serially
   void printStats() {
     std::set<std::string> Loops;
     std::set<std::string> Keys;
-    unsigned maxThreadID = Galois::getActiveThreads();
+    unsigned maxThreadID = maxID;
     //Find all loops and keys
     for (unsigned x = 0; x < maxThreadID; ++x) {
       std::map<KeyTy, unsigned long>& M = *Stats.getRemote(x);
