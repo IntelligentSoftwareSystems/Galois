@@ -308,7 +308,7 @@ public:
 };
 GALOIS_WLCOMPILECHECK(GFIFO)
 
-template<class Indexer = DummyIndexer<int>, typename ContainerTy = FIFO<>, typename T = int, bool concurrent = true >
+template<class Indexer = DummyIndexer<int>, typename ContainerTy = FIFO<>, bool BSP=true, typename T = int, bool concurrent = true>
 class OrderedByIntegerMetric : private boost::noncopyable {
 
   typedef typename ContainerTy::template rethread<concurrent>::WL CTy;
@@ -322,16 +322,15 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     perItem() :current(NULL), curVersion(0), lastMasterVersion(0), scanStart(0) {}
   };
 
-  std::vector<std::pair<unsigned int, CTy*> > masterLog;
+  std::deque<std::pair<unsigned int, CTy*> > masterLog;
   LL::PaddedLock<concurrent> masterLock;
-  unsigned int masterVersion;
+  volatile unsigned int masterVersion;
 
   Indexer I;
 
   PerThreadStorage<perItem> current;
 
   void updateLocal_i(perItem& p) {
-    //ASSERT masterLock
     for (; p.lastMasterVersion < masterVersion; ++p.lastMasterVersion) {
       std::pair<unsigned int, CTy*> logEntry = masterLog[p.lastMasterVersion];
       p.local[logEntry.first] = logEntry.second;
@@ -339,12 +338,14 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     }
   }
 
-  void updateLocal(perItem& p) {
+  bool updateLocal(perItem& p) {
     if (p.lastMasterVersion != masterVersion) {
-      masterLock.lock();
+      //masterLock.lock();
       updateLocal_i(p);
-      masterLock.unlock();
+      //masterLock.unlock();
+      return true;
     }
+    return false;
   }
 
   CTy* updateLocalOrCreate(perItem& p, unsigned int i) {
@@ -352,12 +353,20 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     CTy*& lC = p.local[i];
     if (lC)
       return lC;
-    masterLock.lock();
-    updateLocal_i(p);
+    //update local until we find it or we get the write lock
+    do {
+      updateLocal(p);
+      if (lC)
+	return lC;
+    } while (!masterLock.try_lock());
+    //we have the write lock, update again then create
+    updateLocal(p);
     if (!lC) {
       lC = new CTy();
-      p.lastMasterVersion = ++masterVersion;
+      p.lastMasterVersion = masterVersion + 1;
       masterLog.push_back(std::make_pair(i, lC));
+      __sync_fetch_and_add(&masterVersion, 1);
+      p.local[i] = lC;
     }
     masterLock.unlock();
     return lC;
@@ -366,11 +375,11 @@ class OrderedByIntegerMetric : private boost::noncopyable {
  public:
   template<bool newconcurrent>
   struct rethread {
-    typedef OrderedByIntegerMetric<Indexer,ContainerTy,T,newconcurrent> WL;
+    typedef OrderedByIntegerMetric<Indexer,ContainerTy,BSP,T,newconcurrent> WL;
   };
   template<typename Tnew>
   struct retype {
-    typedef OrderedByIntegerMetric<Indexer,typename ContainerTy::template retype<Tnew>::WL,Tnew,concurrent> WL;
+    typedef OrderedByIntegerMetric<Indexer,typename ContainerTy::template retype<Tnew>::WL,BSP,Tnew,concurrent> WL;
   };
 
   typedef T value_type;
@@ -380,7 +389,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
   { }
 
   ~OrderedByIntegerMetric() {
-    for (typename std::vector<std::pair<unsigned int, CTy*> >::iterator ii = masterLog.begin(), ee = masterLog.end(); ii != ee; ++ii) {
+    for (typename std::deque<std::pair<unsigned int, CTy*> >::iterator ii = masterLog.begin(), ee = masterLog.end(); ii != ee; ++ii) {
       delete ii->second;
     }
   }
@@ -396,7 +405,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
 
     //slow path
     CTy* lC = updateLocalOrCreate(p, index);
-    if (index < p.scanStart)
+    if (BSP && index < p.scanStart)
       p.scanStart = index;
     //opportunistically move to higher priority work
     if (index < p.curVersion) {
@@ -429,16 +438,16 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     unsigned myID = LL::getTID();
     bool localLeader = LL::isLeaderForPackage(myID);
 
-#if 0
     unsigned msS = 0;
-#else
-    unsigned msS = p.scanStart;
-    if (localLeader)
-      for (int i = 0; i < (int) Galois::getActiveThreads(); ++i)
-	msS = std::min(msS, current.getRemote(i)->scanStart);
-    else
-      msS = std::min(msS, current.getRemote(LL::getLeaderForThread(myID))->scanStart);
-#endif
+    if (BSP) {
+      msS = p.scanStart;
+      if (localLeader)
+	for (int i = 0; i < (int) Galois::getActiveThreads(); ++i)
+	  msS = std::min(msS, current.getRemote(i)->scanStart);
+      else
+	msS = std::min(msS, current.getRemote(LL::getLeaderForThread(myID))->scanStart);
+    }
+
     for (typename std::map<unsigned int, CTy*>::iterator ii = p.local.lower_bound(msS), ee = p.local.end();
 	 ii != ee; ++ii) {
       if ((retval = ii->second->pop())) {
