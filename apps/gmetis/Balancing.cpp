@@ -117,7 +117,7 @@ void generalTwoWayBalance(MetisGraph* metisGraph, int* tpwgts) {
 	}
 	delete[] moved;
 	metisGraph->setMinCut(mincut);
-};
+}
 
 void boundaryTwoWayBalance(MetisGraph* metisGraph, int* tpwgts) {
 

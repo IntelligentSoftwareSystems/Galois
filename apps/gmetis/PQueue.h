@@ -231,7 +231,7 @@ private:
 	vector<int> locator;
 	int (*mapToInt)(T);
 	int numNodes;
-	int maxNumNodes;;
+	int maxNumNodes;
 };
 
 template <class T>
