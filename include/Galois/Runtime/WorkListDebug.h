@@ -282,16 +282,19 @@ public:
 
   //These cannot have noinline in gcc, which makes this semi-useless
   template<typename Iter>
+  GALOIS_ATTRIBUTE_NOINLINE
   void push(Iter b, Iter e) {
     wl.push(b,e);
   }
 
   //These cannot have noinline in gcc, which makes this semi-useless
   template<typename Iter>
+  GALOIS_ATTRIBUTE_NOINLINE
   void push_initial(Iter b, Iter e) {
     wl.push_initial(b, e);
   }
 
+  GALOIS_ATTRIBUTE_NOINLINE
   boost::optional<value_type> pop()  {
     return wl.pop();
   }
