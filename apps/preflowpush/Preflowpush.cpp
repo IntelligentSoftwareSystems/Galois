@@ -97,6 +97,18 @@ struct Config {
 
 Config app;
 
+struct Indexer :std::unary_function<GNode, int> {
+  int operator()(const GNode& n) const {
+    return (-app.graph.getData(n, Galois::NONE).height) >> 2;
+  }
+};
+
+struct NIndexer :std::unary_function<GNode, int> {
+  int operator()(const GNode& n) const {
+    return (app.graph.getData(n, Galois::NONE).height) >> 2;
+  }
+};
+
 void checkAugmentingPath() {
   // Use id field as visited flag
   for (Config::nodes_iterator ii = app.nodes.begin(),
@@ -282,20 +294,23 @@ struct FindWork {
 
 template<Galois::MethodFlag flag, typename IncomingWL>
 void globalRelabel(IncomingWL& incoming) {
+  typedef GaloisRuntime::WorkList::dChunkedFIFO<16> Chunk;
+  typedef GaloisRuntime::WorkList::OrderedByIntegerMetric<NIndexer,Chunk> OBIM;
+
   Galois::StatTimer T1("ResetHeightsTime");
   T1.start();
-  Galois::do_all(app.nodes.begin(), app.nodes.end(), ResetHeights());
+  Galois::do_all(app.nodes.begin(), app.nodes.end(), ResetHeights(), "ResetHeights");
   T1.stop();
 
   Galois::StatTimer T("UpdateHeightsTime");
   T.start();
   GNode single[1] = { app.sink };
-  Galois::for_each(&single[0], &single[1], UpdateHeights<flag>());
+  Galois::for_each<OBIM>(&single[0], &single[1], UpdateHeights<flag>(), "UpdateHeights");
   T.stop();
 
   Galois::StatTimer T2("FindWorkTime");
   T2.start();
-  Galois::do_all(app.nodes.begin(), app.nodes.end(), FindWork<IncomingWL>(incoming));
+  Galois::do_all(app.nodes.begin(), app.nodes.end(), FindWork<IncomingWL>(incoming), "FindWork");
   T2.stop();
 }
 
@@ -489,12 +504,6 @@ void initializePreflow(C& initial) {
   }
 }
 
-struct Indexer :std::unary_function<GNode, int> {
-  int operator()(const GNode& n) const {
-    return (-app.graph.getData(n, Galois::NONE).height) >> 2;
-  }
-};
-
 void run() {
   typedef GaloisRuntime::WorkList::dChunkedFIFO<16> Chunk;
   typedef GaloisRuntime::WorkList::OrderedByIntegerMetric<Indexer,Chunk> OBIM;
@@ -505,7 +514,7 @@ void run() {
   while (!initial.empty()) {
     Galois::StatTimer T_discharge("DischargeTime");
     T_discharge.start();
-    Galois::for_each(initial.begin(), initial.end(), Process());
+    Galois::for_each<OBIM>(initial.begin(), initial.end(), Process(), "Discharge");
     T_discharge.stop();
 
     if (app.should_global_relabel) {
