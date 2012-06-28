@@ -87,16 +87,14 @@ public:
 
   //Assume called serially
   void printStats() {
-    std::set<std::string> Loops;
-    std::set<std::string> Keys;
+    std::set<KeyTy> LKs;
     unsigned maxThreadID = maxID;
     //Find all loops and keys
     for (unsigned x = 0; x < maxThreadID; ++x) {
       std::map<KeyTy, unsigned long>& M = *Stats.getRemote(x);
       for (std::map<KeyTy, unsigned long>::iterator ii = M.begin(), ee = M.end();
 	   ii != ee; ++ii) {
-	Loops.insert(ii->first.first);
-	Keys.insert(ii->first.second);
+	LKs.insert(ii->first);
       }
     }
     //print header
@@ -105,23 +103,20 @@ public:
       gPrint(",T%d", x);
     gPrint("\n");
     //print all values
-    for(std::set<std::string>::iterator iiL = Loops.begin(), eeL = Loops.end();
-	iiL != eeL; ++iiL) {
-      for (std::set<std::string>::iterator iiK = Keys.begin(), eeK = Keys.end();
-	   iiK != eeK; ++iiK) {
-	std::vector<unsigned long> Values;
-	gather(*iiL, *iiK, maxThreadID, Values);
-	gPrint("STAT,%s,%s,%u,%lu", 
-	       iiL->c_str(), 
-	       iiK->c_str(),
-	       maxThreadID,
-               getSum(Values, maxThreadID)
-	       );
-	for (unsigned x = 0; x < maxThreadID; ++x) {
-	  gPrint(",%ld", Values[x]);
-	}
-	gPrint("\n");
+    for(std::set<KeyTy>::iterator ii = LKs.begin(), ee = LKs.end();
+	ii != ee; ++ii) {
+      std::vector<unsigned long> Values;
+      gather(ii->first, ii->second, maxThreadID, Values);
+      gPrint("STAT,%s,%s,%u,%lu", 
+	     ii->first.c_str(), 
+	     ii->second.c_str(),
+	     maxThreadID,
+	     getSum(Values, maxThreadID)
+	     );
+      for (unsigned x = 0; x < maxThreadID; ++x) {
+	gPrint(",%ld", Values[x]);
       }
+      gPrint("\n");
     }
   }
 };
