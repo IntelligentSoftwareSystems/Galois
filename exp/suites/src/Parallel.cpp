@@ -245,7 +245,6 @@ void Exp::endSampling() {
   }
 }
 
-//#define USE_SIMPLE_RUNTIME
 
 #ifdef USE_SIMPLE_RUNTIME
 static void* slaunch(void* ptr) {
@@ -261,6 +260,20 @@ static void* slaunch(void* ptr) {
   return NULL;
 }
 #endif
+
+static ThreadPool_pthread* pool;
+
+void Exp::do_all_init() {
+#ifndef USE_SIMPLE_RUNTIME
+  pool = new ThreadPool_pthread();
+#endif
+}
+
+void Exp::do_all_finish() {
+#ifndef USE_SIMPLE_RUNTIME
+  delete pool;
+#endif
+}
 
 void Exp::do_all_impl(RunCommand* begin, RunCommand* end) {
 #ifdef USE_SIMPLE_RUNTIME
@@ -279,7 +292,7 @@ void Exp::do_all_impl(RunCommand* begin, RunCommand* end) {
     checkResults(rc);
   }
 #else
-  static ThreadPool_pthread pool;
-  pool.run(begin, end);
+//  static ThreadPool_pthread pool;
+  pool->run(begin, end);
 #endif
 }

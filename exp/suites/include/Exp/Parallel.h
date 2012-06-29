@@ -22,6 +22,8 @@
 #include "dmp.h"
 #endif
 
+//#define USE_SIMPLE_RUNTIME
+
 namespace Exp {
 
 namespace Config {
@@ -55,6 +57,8 @@ void endSampling();
 
 typedef Config::function<void (void)> RunCommand;
 
+void do_all_init();
+void do_all_finish();
 void do_all_impl(RunCommand* begin, RunCommand* end);
 
 class PthreadBarrier {
@@ -98,9 +102,13 @@ void do_all(IterTy begin, IterTy end, FunctionTy fn) {
   Work<IterTy,FunctionTy> W(begin, end, fn);
   PthreadBarrier bar(Exp::getNumThreads());
 
-  RunCommand w[2] = { Config::ref(W), Config::ref(bar) };
+  RunCommand w[2] = { Config::ref(W), Config::ref(bar) }; 
 
+#ifdef USE_SIMPLE_RUNTIME
+  do_all_impl(&w[0], &w[1]);
+#else
   do_all_impl(&w[0], &w[2]);
+#endif
 }
 
 #ifdef EXP_DOALL_GALOIS
@@ -137,7 +145,18 @@ struct Init {
 };
 #endif
 
-#if defined(EXP_DOALL_CILK) || defined(EXP_DOALL_CILKP) || defined(EXP_DOALL_OPENMP) || defined(EXP_DOALL_OPENMP_RUNTIME) || defined(EXP_DOALL_PTHREAD)
+#ifdef EXP_DOALL_PTHREAD
+struct Init {
+  Init() {
+    do_all_init();
+  }
+  ~Init() {
+    do_all_finish();
+  }
+};
+#endif
+
+#if defined(EXP_DOALL_CILK) || defined(EXP_DOALL_CILKP) || defined(EXP_DOALL_OPENMP) || defined(EXP_DOALL_OPENMP_RUNTIME)
 struct Init { };
 #endif
 
