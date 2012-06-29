@@ -48,9 +48,10 @@ void LonestarStart(int argc, char** argv, const char* app, const char* desc = 0,
   gPrint("Copyright (C) " GALOIS_COPYRIGHT_YEAR_STRING " The University of Texas at Austin\n");
   gPrint("http://iss.ices.utexas.edu/galois/\n\n");
   gPrint("application: %s\n", app);
-  gPrint("%s", desc ? desc : "");
-  gPrint("%s", url ? "http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/" : "");
-  gPrint("%s\n", url ? url : "");
+  gPrint("%s\n", desc ? desc : "");
+  if (url) {
+    gPrint("http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/%s\n", url);
+  }
 
   std::ostringstream cmdout;
   for (int i = 0; i < argc; ++i) {
