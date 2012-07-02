@@ -92,20 +92,20 @@ static inline void for_each_local(ConTy& c, Function f, const char* loopname = 0
 
 //Random access iterator do_all
 template<typename IterTy,typename FunctionTy>
-static inline void do_all_dispatch(const IterTy& begin, const IterTy& end, const FunctionTy& fn, const char* loopname, std::random_access_iterator_tag) {
+static inline void do_all_dispatch(const IterTy& begin, const IterTy& end, FunctionTy fn, const char* loopname, std::random_access_iterator_tag) {
   typedef GaloisRuntime::WorkList::RandomAccessRange<false,IterTy> WL;
   GaloisRuntime::do_all_impl<WL>(begin, end, fn, loopname);
 }
 
 //Forward iterator do_all
 template<typename IterTy,typename FunctionTy>
-static inline void do_all_dispatch(const IterTy& begin, const IterTy& end, const FunctionTy& fn, const char* loopname, std::input_iterator_tag) {
+static inline void do_all_dispatch(const IterTy& begin, const IterTy& end, FunctionTy fn, const char* loopname, std::input_iterator_tag) {
   typedef GaloisRuntime::WorkList::ForwardAccessRange<IterTy> WL;
   GaloisRuntime::do_all_impl<WL>(begin, end, fn, loopname);
 }
 
 template<typename IterTy,typename FunctionTy>
-static inline void do_all(const IterTy& begin, const IterTy& end, const FunctionTy& fn, const char* loopname = 0) {
+static inline void do_all(const IterTy& begin, const IterTy& end, FunctionTy fn, const char* loopname = 0) {
   if (GaloisRuntime::inGaloisForEach) {
 #if 0
     GaloisRuntime::TaskContext<IterTy,FunctionTy> ctx;
@@ -123,7 +123,7 @@ static inline void do_all(const IterTy& begin, const IterTy& end, const Function
 
 //Local iterator do_all
 template<typename ConTy,typename FunctionTy>
-static inline void do_all_local(ConTy& c, const FunctionTy& fn, const char* loopname = 0) {
+static inline void do_all_local(ConTy& c, FunctionTy fn, const char* loopname = 0) {
   typedef typename ConTy::local_iterator IterTy;
   typedef GaloisRuntime::WorkList::LocalAccessRange<IterTy> WL;
   GaloisRuntime::do_all_impl<WL>(GaloisRuntime::LocalBounce<ConTy>(&c, true), GaloisRuntime::LocalBounce<ConTy>(&c, false), fn, loopname);
