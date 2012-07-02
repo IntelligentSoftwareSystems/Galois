@@ -190,6 +190,11 @@ public:
     H->dend++;
     return *rv;
   }
+
+  //allow using std::back_inserter
+  reference push_back(const T& val) {
+    return push(val);
+  }
 };
 
 
