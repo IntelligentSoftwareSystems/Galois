@@ -15,11 +15,25 @@ __attribute__((weak)) llvm::cl::opt<std::string> WorklistName("wl", llvm::cl::de
 using namespace GaloisRuntime::LL;
 using namespace GaloisRuntime::WorkList;
 
-template<int ChunkSize, typename Ind, typename DEFAULT, typename Less, typename Greater >
+template<int CS, bool LF>
+struct PickInner;
+
+template<int CS>
+struct PickInner<CS, true> {
+  typedef dChunkedLIFO<CS> dChunk;
+  typedef  ChunkedLIFO<CS> Chunk;
+};
+template<int CS>
+struct PickInner<CS, false> {
+  typedef dChunkedFIFO<CS> dChunk;
+  typedef  ChunkedFIFO<CS> Chunk;
+};
+
+ template<int ChunkSize, typename Ind, typename DEFAULT, typename Less, typename Greater, bool LF = false >
 struct PriAuto {
 
-  typedef dChunkedLIFO<ChunkSize> dChunk;
-  typedef  ChunkedLIFO<ChunkSize>  Chunk;
+   typedef typename PickInner<ChunkSize, LF>::dChunk dChunk;
+   typedef typename PickInner<ChunkSize, LF>::Chunk   Chunk;
 
   //OBIM
   typedef   OrderedByIntegerMetric<Ind,dChunk, true> OBIM_DMB;
