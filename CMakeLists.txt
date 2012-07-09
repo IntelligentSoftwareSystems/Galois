@@ -20,7 +20,7 @@ set(USE_PROFILING OFF CACHE BOOL "Enable GCC profiling")
 set(USE_EXP OFF CACHE BOOL "Use experimental features") 
 set(USE_VTUNE ON CACHE BOOL "Use vtune (if found)")
 set(USE_DET OFF CACHE BOOL "Use deterministic execution")
-set(EXP_DOALL "GALOIS" CACHE STRING "Which type of implementation of parallel_doall")
+set(EXP_DOALL "PTHREAD" CACHE STRING "Which type of implementation of parallel_doall")
 
 ###### Configure (users don't need to go beyond here) ######
 enable_testing()
