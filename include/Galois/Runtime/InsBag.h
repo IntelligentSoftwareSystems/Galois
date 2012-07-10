@@ -177,7 +177,6 @@ public:
     return iterator(&heads, LL::getTID() + 1);
   }
 
-
   //Only this is thread safe
   reference push(const T& val) {
     header* H = heads.get();

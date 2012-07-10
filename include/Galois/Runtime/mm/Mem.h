@@ -48,11 +48,11 @@ void  pageFree(void*);
 unsigned pageAllocInfo();
 void pagePreAlloc(int numpages);
 
-void* largeAlloc(size_t bytes);
-void  largeFree (void* mem, size_t bytes);
+void* largeInterleavedAlloc(size_t bytes);
+void  largeInterleavedFree(void* mem, size_t bytes);
 
-void* galoisMalloc(size_t bytes);
-void  galoisFree(void*);
+void* largeAlloc(size_t bytes);
+void  largeFree(void* mem, size_t bytes);
 
 //! Per-thread heaps using Galois thread aware construct
 template<class LocalHeap>

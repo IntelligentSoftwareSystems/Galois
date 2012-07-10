@@ -79,7 +79,6 @@ void* allocFromOS() {
   //First try huge
   ptr = mmap(0, GaloisRuntime::MM::pageSize, _PROT, _MAP_HUGE, -1, 0);
 #endif
-  
 
   //FIXME: improve failure case to ensure pageSize alignment
 #ifdef MAP_POPULATE
@@ -110,11 +109,7 @@ void* allocFromOS() {
   return ptr;
 }
 
-
-
 } // end anon namespace
-
-
 
 void* GaloisRuntime::MM::pageAlloc() {
   HeadPtr* phead = head;
@@ -149,4 +144,3 @@ void GaloisRuntime::MM::pagePreAlloc(int numPages) {
 unsigned GaloisRuntime::MM::pageAllocInfo() {
   return getPAState().num;
 }
-
