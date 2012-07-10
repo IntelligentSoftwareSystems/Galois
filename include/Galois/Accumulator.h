@@ -42,8 +42,11 @@ class GReducible : public GaloisRuntime::AtLoopExit {
 
   void reduce() {
     T& d0 = _data.get(0);
-    for (unsigned int i = 1; i < _data.size(); ++i)
-      _func(d0, _data.get(i));
+    for (unsigned int i = 1; i < _data.size(); ++i) {
+      T& d = _data.get(i);
+      _func(d0, d);
+      d = T();
+    }
   }
 
   virtual void LoopExit() {
