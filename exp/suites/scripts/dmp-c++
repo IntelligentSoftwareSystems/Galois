@@ -25,6 +25,7 @@ OPTARGS += ['-basicaa', '-libcall-aa', '-ds-aa', '-std-compile-opts']
 OPTARGS += ['-no-pthreads', '-makedeterministic', '-dmp=true']
 # No memory tracking
 OPTARGS += ['-dmp-do-load-track=false', '-dmp-do-store-track=false']
+OPTARGS += ['-dmp-ignore-external-calls=true']
 #OPTARGS += ['-dmp-memtrack-for-buffering=true']
 #OPTARGS += ['-dmp-memtrack-for-buffering=true', '-dmp-do-memtrack-parallel-malloc=true', '-dmp-do-memtrack-hoard-malloc=true']
 # Optimizations?

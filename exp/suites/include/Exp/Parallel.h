@@ -156,7 +156,7 @@ struct Init {
 };
 #endif
 
-#if defined(EXP_DOALL_CILK) || defined(EXP_DOALL_CILKP) || defined(EXP_DOALL_OPENMP) || defined(EXP_DOALL_OPENMP_RUNTIME)
+#if defined(EXP_DOALL_CILK) || defined(EXP_DOALL_CILKP) || defined(EXP_DOALL_OPENMP) || defined(EXP_DOALL_OPENMP_RUNTIME) || defined(EXP_DOALL_PTHREAD_OPENMP)
 struct Init { };
 #endif
 
@@ -164,11 +164,13 @@ struct Init { };
 
 #if defined(EXP_DOALL_CILK)
 #include <cilk/cilk.h>
+#define parallel_doall(type, index, begin, end) \
+  cilk_for (type index = begin; index < end; ++index)
 #define parallel_doall_1(type, index, begin, end) \
   cilk_for (type index = begin; index < end; ++index)
 #define parallel_doall_obj(type, index, begin, end, obj) \
   cilk_for (type index = begin; index < end; ++index)
-#define parallel_doall(type, index, begin, end) \
+#define parallel_doall_obj_1(type, index, begin, end, obj) \
   cilk_for (type index = begin; index < end; ++index)
 #define parallel_doall_end 
 
@@ -177,12 +179,28 @@ struct Init { };
 #include <omp.h>
 #define cilk_spawn
 #define cilk_sync
+#define parallel_doall(type, index, begin, end) \
+  _Pragma("omp parallel for") for (type index = begin; index < end; ++index)
 #define parallel_doall_1(type, index, begin, end) \
   _Pragma("omp parallel for schedule (static,1)") for (type index = begin; index < end; ++index)
 #define parallel_doall_obj(type, index, begin, end, obj) \
   _Pragma("omp parallel for") for (type index = begin; index < end; ++index)
+#define parallel_doall_obj_1(type, index, begin, end, obj) \
+  _Pragma("omp parallel for schedule (static,1)") for (type index = begin; index < end; ++index)
+#define parallel_doall_end 
+
+#elif defined(EXP_DOALL_PTHREAD_OPENMP)
+#include <omp.h>
+#define cilk_spawn
+#define cilk_sync
 #define parallel_doall(type, index, begin, end) \
-  _Pragma("omp parallel for") for (type index = begin; index < end; ++index)
+  for(type index = begin; index < end; ++index)
+#define parallel_doall_1(type, index, begin, end) \
+  for(type index = begin; index < end; ++index)
+#define parallel_doall_obj(type, index, begin, end, obj) \
+  if (true) { _Pragma("omp parallel for") for (type index = begin; index < end; ++index) { obj(index); } } else for(type index = begin; index < end; ++index)
+#define parallel_doall_obj_1(type, index, begin, end, obj) \
+  if (true) { _Pragma("omp parallel for schedule (static,1)") for (type index = begin; index < end; ++index) { obj(index); } } else for(type index = begin; index < end; ++index)
 #define parallel_doall_end 
 
 // openmp
@@ -190,11 +208,13 @@ struct Init { };
 #include <omp.h>
 #define cilk_spawn
 #define cilk_sync
+#define parallel_doall(type, index, begin, end) \
+  _Pragma("omp parallel for schedule (runtime)") for (type index = begin; index < end; ++index)
 #define parallel_doall_1(type, index, begin, end) \
   _Pragma("omp parallel for schedule (static,1)") for (type index = begin; index < end; ++index)
 #define parallel_doall_obj(type, index, begin, end, obj) \
   _Pragma("omp parallel for schedule (runtime)") for (type index = begin; index < end; ++index)
-#define parallel_doall(type, index, begin, end) \
+#define parallel_doall_obj_1(type, index, begin, end, obj) \
   _Pragma("omp parallel for schedule (runtime)") for (type index = begin; index < end; ++index)
 #define parallel_doall_end 
 
@@ -204,11 +224,13 @@ struct Init { };
 #include "boost/iterator/counting_iterator.hpp"
 #define cilk_spawn
 #define cilk_sync
+#define parallel_doall(type, index, begin, end) \
+  Galois::do_all(boost::counting_iterator<type>(begin), boost::counting_iterator<type>(end), [&](type index)
 #define parallel_doall_1(type, index, begin, end) \
   Galois::do_all(boost::counting_iterator<type>(begin), boost::counting_iterator<type>(end), [&](type index)
 #define parallel_doall_obj(type, index, begin, end, obj) \
   Galois::do_all(boost::counting_iterator<type>(begin), boost::counting_iterator<type>(end), [&](type index)
-#define parallel_doall(type, index, begin, end) \
+#define parallel_doall_obj_1(type, index, begin, end, obj) \
   Galois::do_all(boost::counting_iterator<type>(begin), boost::counting_iterator<type>(end), [&](type index)
 #define parallel_doall_end );
 
@@ -218,11 +240,13 @@ struct Init { };
 #include "tbb/parallel_for_each.h"
 #define cilk_spawn
 #define cilk_sync
+#define parallel_doall(type, index, begin, end) \
+  tbb::parallel_for_each(boost::counting_iterator<type>(begin), boost::counting_iterator<type>(end), [&](type index)
 #define parallel_doall_1(type, index, begin, end) \
   tbb::parallel_for_each(boost::counting_iterator<type>(begin), boost::counting_iterator<type>(end), [&](type index)
 #define parallel_doall_obj(type, index, begin, end, obj) \
   tbb::parallel_for_each(boost::counting_iterator<type>(begin), boost::counting_iterator<type>(end), [&](type index)
-#define parallel_doall(type, index, begin, end) \
+#define parallel_doall_obj_1(type, index, begin, end, obj) \
   tbb::parallel_for_each(boost::counting_iterator<type>(begin), boost::counting_iterator<type>(end), [&](type index)
 #define parallel_doall_end );
 
@@ -230,23 +254,27 @@ struct Init { };
 #include "boost/iterator/counting_iterator.hpp"
 #define cilk_spawn
 #define cilk_sync
+#define parallel_doall(type, index, begin, end) \
+  for(type index = begin; index < end; ++index)
 #define parallel_doall_1(type, index, begin, end) \
   for (type index = begin; index < end; ++index)
 #define parallel_doall_obj(type, index, begin, end, obj) \
   if (true) {Exp::do_all(boost::counting_iterator<type>(begin), boost::counting_iterator<type>(end), obj); } else for(type index = begin; index < end; ++index)
-#define parallel_doall(type, index, begin, end) \
-  for(type index = begin; index < end; ++index)
+#define parallel_doall_obj_1(type, index, begin, end, obj) \
+  if (true) {Exp::do_all(boost::counting_iterator<type>(begin), boost::counting_iterator<type>(end), obj); } else for(type index = begin; index < end; ++index)
 #define parallel_doall_end 
 
 // c++
 #else
 #define cilk_spawn
 #define cilk_sync
+#define parallel_doall(type, index, begin, end) \
+  for(type index = begin; index < end; ++index)
 #define parallel_doall_1(type, index, begin, end) \
   for (type index = begin; index < end; ++index)
 #define parallel_doall_obj(type, index, begin, end, obj) \
   for(type index = begin; index < end; ++index)
-#define parallel_doall(type, index, begin, end) \
+#define parallel_doall_obj_1(type, index, begin, end, obj) \
   for(type index = begin; index < end; ++index)
 #define parallel_doall_end 
 

@@ -122,7 +122,8 @@ def genPBBS(options):
 
 
 SpecParsec = [
-    {'name': 'blackscholes', 'inputs': ['-1 in_10M.txt prices.txt']}, #, "-1 in_mid.txt prices.txt"]},
+    {'name': 'blackscholes', 'inputs': ['-1 in_mid.txt prices.txt']},
+#      ['-1 in_10M.txt prices.txt']},
     {'name': 'bodytrack', 'inputs': ['sequenceB_261 4 261 4000 5 0 -1']},
     {'name': 'freqmine', 'inputs': ['kosarak_990k.dat 790']}
 #      ['webdocs_250k.dat 11000', 'kosarak_250k.dat 220', 'kosarak_990k.dat 790']}
