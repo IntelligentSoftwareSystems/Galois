@@ -207,7 +207,7 @@ struct Process {
 
   struct LocalState {
     Cavity<Alloc> cav;
-    LocalState(Process<Version>* self, Galois::PerIterAllocTy& alloc): cav(*graph, alloc) { }
+    LocalState(Process<Version>& self, Galois::PerIterAllocTy& alloc): cav(*graph, alloc) { }
   };
 
   //! Parallel operator
@@ -505,10 +505,10 @@ static void generateRounds(PointList& points, bool addBoundary) {
   maxRounds = log2 / roundShift;
   rounds = new Galois::InsertBag<Point*>[maxRounds+1]; // +1 for boundary points
 
-  // Reorganize spatially and distribute over rounds
   PointList ordered;
   ordered.reserve(size);
   if (true) {
+    // Reorganize spatially
     QuadTree q(
       boost::make_transform_iterator(&points[0], GetPointer()),
       boost::make_transform_iterator(&points[size], GetPointer()));

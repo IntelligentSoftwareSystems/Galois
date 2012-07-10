@@ -79,6 +79,12 @@ enum BFSAlgo {
   parallelTBB
 };
 
+enum DetAlgo {
+  nondet,
+  detBase,
+  detDisjoint
+};
+
 namespace cll = llvm::cl;
 static cll::opt<unsigned int> startNode("startnode",
     cll::desc("Node to start search from"),
@@ -110,6 +116,14 @@ static cll::opt<BFSAlgo> algo(cll::desc("Choose an algorithm:"),
       clEnumVal(parallelTBB, "Use TBB instead of Galois"),
 #endif
       clEnumValEnd), cll::init(parallelBarrier));
+#ifdef GALOIS_USE_DET
+static cll::opt<DetAlgo> detAlgo(cll::desc("Deterministic algorithm:"),
+    cll::values(
+      clEnumVal(nondet, "Non-deterministic"),
+      clEnumVal(detBase, "Base execution"),
+      clEnumVal(detDisjoint, "Disjoint execution"),
+      clEnumValEnd), cll::init(detBase));
+#endif
 static cll::opt<std::string> filename(cll::Positional,
     cll::desc("<input file>"),
     cll::Required);
@@ -120,11 +134,10 @@ static const unsigned int DIST_INFINITY =
 //****** Work Item and Node Data Defintions ******
 struct SNode {
   unsigned int dist;
+  unsigned int id;
 };
 
-//typedef Galois::Graph::LC_Linear_Graph<SNode, void> Graph;
 typedef Galois::Graph::LC_CSR_Graph<SNode, void> Graph;
-//typedef Galois::Graph::LC_CSRInline_Graph<SNode, char> Graph;
 typedef Graph::GraphNode GNode;
 
 Graph graph;
@@ -240,9 +253,10 @@ static void readGraph(GNode& source, GNode& report) {
   bool foundReport = false;
   bool foundSource = false;
   for (Graph::iterator src = graph.begin(), ee =
-      graph.end(); src != ee; ++src) {
+      graph.end(); src != ee; ++src, ++id) {
     SNode& node = graph.getData(*src, Galois::NONE);
     node.dist = DIST_INFINITY;
+    node.id = id;
     if (id == startNode) {
       source = *src;
       foundSource = true;
@@ -251,7 +265,6 @@ static void readGraph(GNode& source, GNode& report) {
       foundReport = true;
       report = *src;
     }
-    ++id;
   }
 
   if (!foundReport || !foundSource) {
@@ -469,7 +482,6 @@ struct SerialBare {
 //! Galois BFS
 struct GaloisAlgo {
   typedef int tt_does_not_need_aborts;
-  typedef int tt_does_not_need_stats;
 
   std::string name() const { return "Galois"; }
 
@@ -505,7 +517,6 @@ struct GaloisAlgo {
 //! Galois BFS using optimized flags
 struct GaloisNoLockAlgo {
   typedef int tt_does_not_need_aborts;
-  typedef int tt_does_not_need_stats;
 
   std::string name() const { return "Galois (No Lock)"; }
 
@@ -544,7 +555,6 @@ struct GaloisNoLockAlgo {
 //! Galois BFS using optimized flags and workset semantics
 struct GaloisWorkSet {
   typedef int tt_does_not_need_aborts;
-  typedef int tt_does_not_need_stats;
 
   std::string name() const { return "Galois (Workset)"; }
 
@@ -706,12 +716,10 @@ struct TBB {
 };
 #endif
 
-
 //! Galois BFS using optimized flags and barrier scheduling 
 template<typename WL,bool useCas>
 struct GaloisBarrier {
   typedef int tt_does_not_need_aborts;
-  typedef int tt_does_not_need_stats;
 
   std::string name() const { return "Galois (Barrier)"; }
   typedef std::pair<GNode,int> ItemTy;
@@ -727,7 +735,6 @@ struct GaloisBarrier {
       ddata.dist = 1;
       initial.push_back(ItemTy(dst, 2));
     }
-
     Galois::for_each<WL>(initial.begin(), initial.end(), *this);
   }
 
@@ -756,6 +763,119 @@ struct GaloisBarrier {
     }
   }
 };
+
+#ifdef GALOIS_USE_DET
+//! Galois BFS using optimized flags and barrier scheduling 
+template<DetAlgo Version>
+struct GaloisDetBarrier {
+  typedef int tt_needs_per_iter_alloc; // For LocalState
+
+  std::string name() const { return "Galois (Deterministic Barrier)"; }
+  typedef std::pair<GNode,int> ItemTy;
+
+  struct LocalState {
+    typedef std::deque<GNode,Galois::PerIterAllocTy> Pending;
+    Pending pending;
+    LocalState(GaloisDetBarrier<Version>& self, Galois::PerIterAllocTy& alloc): pending(alloc) { }
+  };
+
+  struct IdFn {
+    unsigned long operator()(const ItemTy& item) const {
+      return graph.getData(item.first, Galois::NONE).id;
+    }
+  };
+
+  void operator()(const GNode& source) const {
+    typedef GaloisRuntime::WorkList::BulkSynchronousInline<> WL;
+    std::vector<ItemTy> initial;
+
+    graph.getData(source).dist = 0;
+    for (Graph::edge_iterator ii = graph.edge_begin(source),
+          ei = graph.edge_end(source); ii != ei; ++ii) {
+      GNode dst = graph.getEdgeDst(ii);
+      SNode& ddata = graph.getData(dst);
+      ddata.dist = 1;
+      initial.push_back(ItemTy(dst, 2));
+    }
+    switch (Version) {
+      case nondet: 
+        Galois::for_each<WL>(initial.begin(), initial.end(), *this); break;
+      case detBase:
+        Galois::for_each_det<false>(initial.begin(), initial.end(), *this); break;
+      case detDisjoint:
+        Galois::for_each_det<true>(initial.begin(), initial.end(), *this); break;
+      default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
+    }
+  }
+
+  void build(const ItemTy& item, typename LocalState::Pending* pending) const {
+    GNode n = item.first;
+
+    unsigned int newDist = item.second;
+    
+    for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::NONE),
+          ei = graph.edge_end(n, Galois::NONE); ii != ei; ++ii) {
+      GNode dst = graph.getEdgeDst(ii);
+      SNode& ddata = graph.getData(dst, Galois::ALL);
+
+      unsigned int oldDist;
+      while (true) {
+        oldDist = ddata.dist;
+        if (oldDist <= newDist)
+          break;
+        pending->push_back(dst);
+        break;
+      }
+    }
+  }
+
+  void modify(const ItemTy& item, Galois::UserContext<ItemTy>& ctx, typename LocalState::Pending* ppending) const {
+    GNode n = item.first;
+
+    unsigned int newDist = item.second;
+    bool useCas = false;
+
+    for (typename LocalState::Pending::iterator ii = ppending->begin(), ei = ppending->end(); ii != ei; ++ii) {
+      GNode dst = *ii;
+      SNode& ddata = graph.getData(dst, Galois::NONE);
+
+      unsigned int oldDist;
+      while (true) {
+        oldDist = ddata.dist;
+        if (oldDist <= newDist)
+          break;
+        if (!useCas || __sync_bool_compare_and_swap(&ddata.dist, oldDist, newDist)) {
+          if (!useCas)
+            ddata.dist = newDist;
+          ctx.push(ItemTy(dst, newDist + 1));
+          break;
+        }
+      }
+    }
+  }
+
+  void operator()(const ItemTy& item, Galois::UserContext<ItemTy>& ctx) const {
+    typename LocalState::Pending* ppending;
+    if (Version == detDisjoint) {
+      bool used;
+      LocalState* localState = (LocalState*) ctx.getLocalState(used);
+      ppending = &localState->pending;
+      if (used) {
+        modify(item, ctx, ppending);
+        return;
+      }
+    }
+    if (Version == detDisjoint) {
+      build(item, ppending);
+    } else {
+      typename LocalState::Pending pending(ctx.getPerIterAlloc());
+      build(item, &pending);
+      graph.getData(item.first, Galois::WRITE); // Failsafe point
+      modify(item, ctx, &pending);
+    }
+  }
+};
+#endif
 
 template<typename NodeIdTy,typename EdgeIdTy>
 struct SerialSchardl {
@@ -855,12 +975,16 @@ template<typename AlgoTy>
 void run(const AlgoTy& algo) {
   GNode source, report;
   readGraph(source, report);
+  Galois::preAlloc((numThreads + (graph.size() * sizeof(SNode) * 2) / GaloisRuntime::MM::pageSize)*8);
+  Galois::Statistic("MeminfoPre", GaloisRuntime::MM::pageAllocInfo());
 
   Galois::StatTimer T;
   std::cout << "Running " << algo.name() << " version\n";
   T.start();
   algo(source);
   T.stop();
+  
+  Galois::Statistic("MeminfoPost", GaloisRuntime::MM::pageAllocInfo());
 
   std::cout << "Report node: " << reportNode << " " << graph.getData(report) << "\n";
 
@@ -888,6 +1012,14 @@ int main(int argc, char **argv) {
   typedef BSWL BSInline;
 #endif
 
+#ifdef GALOIS_USE_DET
+  switch (detAlgo) {
+    case nondet: run(GaloisDetBarrier<nondet>()); break;
+    case detBase: run(GaloisDetBarrier<detBase>()); break;
+    case detDisjoint: run(GaloisDetBarrier<detDisjoint>()); break;
+    default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
+  }
+#else
   switch (algo) {
     case serial: run(SerialAlgo()); break;
     case serialOpt: run(SerialFlagOptAlgo()); break;
@@ -908,6 +1040,7 @@ int main(int argc, char **argv) {
     case parallelTBB: run(TBB()); break;
     default: std::cerr << "Unknown algorithm" << algo << "\n"; abort();
   }
+#endif
 
   return 0;
 }

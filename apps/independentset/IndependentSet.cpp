@@ -81,12 +81,14 @@ enum MatchFlag {
 };
 
 struct Node {
+  unsigned int id;
   MatchFlag flag; 
   MatchFlag pendingFlag; 
   Node() : flag(UNMATCHED), pendingFlag(UNMATCHED) { }
 };
 
-typedef Galois::Graph::LC_CSR_Graph<Node,void> Graph;
+//typedef Galois::Graph::LC_CSR_Graph<Node,void> Graph;
+typedef Galois::Graph::LC_Linear_Graph<Node,void> Graph;
 typedef Graph::GraphNode GNode;
 
 Graph graph;
@@ -99,7 +101,7 @@ struct Process {
 
   struct LocalState {
     bool mod;
-    LocalState(Process<Version>* self, Galois::PerIterAllocTy& alloc): mod(false) { }
+    LocalState(Process<Version>& self, Galois::PerIterAllocTy& alloc): mod(false) { }
   };
 
   template<Galois::MethodFlag Flag>
@@ -175,7 +177,7 @@ struct GaloisAlgo {
 #ifdef GALOIS_USE_DET
     switch (detAlgo) {
       case nondet: 
-        Galois::for_each<WL>(graph.begin(), graph.end(), Process<>()); break;
+        Galois::for_each_local(graph, Process<>()); break;
       case detBase:
         Galois::for_each_det<false>(graph.begin(), graph.end(), Process<>()); break;
       case detPrefix:
@@ -331,8 +333,13 @@ int main(int argc, char** argv) {
   Galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
-  graph.structureFromFile(filename.c_str());
-  Galois::preAlloc(numThreads + (graph.size() * sizeof(Node) * 2) / GaloisRuntime::MM::pageSize);
+  graph.structureFromFile(filename);
+
+  unsigned int id = 0;
+  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii, ++id)
+    graph.getData(*ii).id = id;
+  
+  Galois::preAlloc(numThreads + (graph.size() * sizeof(Node) * numThreads / 8) / GaloisRuntime::MM::pageSize);
   Galois::Statistic("MeminfoPre", GaloisRuntime::MM::pageAllocInfo());
   Galois::StatTimer T;
   T.start();

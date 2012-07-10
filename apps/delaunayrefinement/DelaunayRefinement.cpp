@@ -77,7 +77,7 @@ struct Process {
 
   struct LocalState {
     Cavity cav;
-    LocalState(Process<Version>* self, Galois::PerIterAllocTy& alloc): cav(graph, alloc) { }
+    LocalState(Process<Version>& self, Galois::PerIterAllocTy& alloc): cav(graph, alloc) { }
   };
 
   void operator()(GNode item, Galois::UserContext<GNode>& ctx) {
@@ -171,14 +171,12 @@ int main(int argc, char** argv) {
   using namespace GaloisRuntime::WorkList;
   
   typedef LocalQueues<dChunkedLIFO<256>, ChunkedLIFO<256> > BQ;
-  typedef LoadBalanceTracker<BQ, 2048 > DBQ;
   typedef ChunkedAdaptor<false,32> CA;
-  typedef PerThreadQueues<LIFO<> > SHP;
   
 #ifdef GALOIS_USE_DET
   switch (detAlgo) {
     case nondet: 
-      Galois::for_each<BQ>(wl.begin(), wl.end(), Process<>()); break;
+      Galois::for_each_local<CA>(wl, Process<>()); break;
     case detBase:
       Galois::for_each_det<false>(wl.begin(), wl.end(), Process<>()); break;
     case detPrefix:

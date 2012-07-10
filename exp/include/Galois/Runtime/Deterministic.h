@@ -29,13 +29,17 @@
 
 #include "Galois/Runtime/DualLevelIterator.h"
 
+#include <boost/static_assert.hpp>
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/iterator/counting_iterator.hpp>
 
+#include <deque>
+
 namespace GaloisRuntime {
 namespace Deterministic {
 
+static const int ChunkSize = 32;
 //! Wrapper around WorkList::ChunkedFIFO to allow peek() and empty() and still have FIFO order
 template<int chunksize,typename T>
 struct FIFO {
@@ -74,15 +78,17 @@ struct FIFO {
 };
 
 template<typename T>
-struct WorkItem {
+struct DItem {
   T item;
   unsigned long id;
   SimpleRuntimeContext* cnx;
   void* localState;
 
-  WorkItem(const T& _item, unsigned long _id): item(_item), id(_id), cnx(NULL), localState(NULL) { }
+  DItem(const T& _item, unsigned long _id): item(_item), id(_id), cnx(NULL), localState(NULL) { }
+  DItem(const DItem<T>& o): item(o.item), id(o.id), cnx(o.cnx), localState(o.localState) { }
 };
 
+//! Some template meta programming
 template<typename T>
 struct has_local_state {
   typedef char yes[1];
@@ -94,16 +100,16 @@ struct has_local_state {
 
 template<typename T,typename FunctionTy,bool hasLocalState = false>
 struct StateManager { 
-  void alloc(GaloisRuntime::UserContextAccess<T>&, FunctionTy* self) { }
+  void alloc(GaloisRuntime::UserContextAccess<T>&, FunctionTy& self) { }
   void dealloc(GaloisRuntime::UserContextAccess<T>&) { }
   void save(GaloisRuntime::UserContextAccess<T>&, void*&) { }
-  void restore(GaloisRuntime::UserContextAccess<T>&, void* ) { } 
+  void restore(GaloisRuntime::UserContextAccess<T>&, void*) { } 
 };
 
 template<typename T,typename FunctionTy>
 struct StateManager<T,FunctionTy,true> {
   typedef typename FunctionTy::LocalState LocalState;
-  void alloc(GaloisRuntime::UserContextAccess<T>& c,FunctionTy* self) {
+  void alloc(GaloisRuntime::UserContextAccess<T>& c,FunctionTy& self) {
     void *p = c.data().getPerIterAlloc().allocate(sizeof(LocalState));
     new (p) LocalState(self, c.data().getPerIterAlloc());
     c.setLocalState(p, false);
@@ -122,170 +128,194 @@ struct StateManager<T,FunctionTy,true> {
   }
 };
 
-template<typename T,typename Function1Ty,typename Function2Ty,bool useLocalState>
-class Executor {
-  static const int ChunkSize = 32;
-  static const int MinDelta = ChunkSize * 32;
+template<typename T>
+struct has_break_fn {
+  typedef char yes[1];
+  typedef char no[2];
+  template<typename C> static yes& test(typename C::BreakFn*);
+  template<typename> static no& test(...);
+  static const bool value = sizeof(test<T>(0)) == sizeof(yes);
+};
 
-  typedef T value_type;
-  typedef WorkItem<T> Item;
-  typedef std::pair<T,std::pair<unsigned long,unsigned> > NewItem;
-  typedef WorkList::dChunkedFIFO<ChunkSize,Item> WL;
-  typedef WorkList::dChunkedFIFO<ChunkSize,Item> PendingWork;
-  typedef WorkList::ChunkedFIFO<ChunkSize,Item,false> LocalPendingWork;
-  typedef WorkList::dChunkedFIFO<ChunkSize,NewItem> NewWork;
-  typedef WorkList::dChunkedLIFO<ChunkSize,SimpleRuntimeContext> ContextPool;
-  typedef WorkList::dChunkedLIFO<ChunkSize,SimpleRuntimeContext*> ContextPtrPool;
+template<typename FunctionTy,bool hasBreak = false>
+struct BreakManager {
+  BreakManager(FunctionTy&) { }
+  bool checkBreak() { return false; }
+};
 
-  // Truly thread-local
-  struct ThreadLocalData: private boost::noncopyable {
-    LocalPendingWork localPending;
-    GaloisRuntime::UserContextAccess<value_type> facing;
-    LoopStatistics<ForEachTraits<Function1Ty>::NeedsStats || ForEachTraits<Function2Ty>::NeedsStats> stat;
-    size_t newSize;
-    WL* wlcur;
-    WL* wlnext;
-    size_t rounds;
-    size_t outerRounds;
-    ThreadLocalData(const char* loopname): stat(loopname), rounds(0), outerRounds(0) { reset(); }
-    void reset() {
-      newSize = 0;
-    }
-  };
+template<typename FunctionTy>
+class BreakManager<FunctionTy,true> {
+  GBarrier barrier[1];
+  LL::CacheLineStorage<volatile long> done;
+  typename FunctionTy::BreakFn breakFn;
 
-  // Mostly local but shared sometimes
-  class MergeInfo {
-    size_t window;
-    size_t delta;
-    size_t committed;
-    size_t iterations;
-    size_t aborted;
-  public:
-    typedef std::vector<NewItem> NewItemsTy;
-    typedef FIFO<ChunkSize*8,Item> ReserveTy;
-    NewItemsTy newItems;
-    ReserveTy reserve;
+public:
+  BreakManager(FunctionTy& fn): breakFn(fn) { 
+    int numActive = (int) Galois::getActiveThreads();
+    for (int i = 0; i < sizeof(barrier)/sizeof(*barrier); ++i)
+      barrier[i].reinit(numActive);
+  }
 
-    size_t size;
-    bool firstRound;
+  bool checkBreak() {
+    runAllLoopExitHandlers();
+    if (LL::getTID() == 0)
+      done.data = breakFn();
+    barrier[0].wait();
+    return done.data;
+  }
+};
 
-    MergeInfo() { reset(); }
-    
-    void initialWindow(size_t w) {
-      window = delta = w;
-    }
-
-    size_t getDelta() { return delta; }
-
-    void calculateWindow(PerCPU<MergeInfo>&, unsigned numActive);
-
-    void incrementIterations() {
-      if (firstRound)
-        ++iterations;
-    }
-
-    void incrementCommitted() {
-      if (firstRound)
-        ++committed;
-    }
-
-    bool nextWindow(WL* wl, bool renumbered) {
-      if (renumbered)
-        window = delta;
-      else
-        window += (delta - aborted);
-      boost::optional<Item> p;
-      bool retval = false;
-      while ((p = reserve.peek())) {
-        if (p->id > window)
-          break;
-        retval = true;
-        wl->push(*p);
-        reserve.pop();
-      }
-      return retval;
-    }
-
-    void reset() {
-      committed = 0;
-      iterations = 0;
-      aborted = 0;
-    }
-  };
-
-  typedef typename MergeInfo::NewItemsTy NewItemsTy;
-  typedef typename NewItemsTy::iterator NewItemsIterator;
-
-  struct GetNewItem: public std::unary_function<int,NewItemsTy&> {
-    PerCPU<MergeInfo>* base;
-    GetNewItem() { }
-    GetNewItem(PerCPU<MergeInfo>* b): base(b) { }
-    NewItemsTy& operator()(int i) const { return base->get(i).newItems; }
-  };
-
-  typedef boost::transform_iterator<GetNewItem, boost::counting_iterator<int> > MergeOuterIt;
-  typedef DualLevelIterator<MergeOuterIt> MergeIt;
-
-  PerCPU<MergeInfo> mergeInfo;
-  typename MergeInfo::NewItemsTy mergeBuf;
-  std::vector<value_type> distributeBuf;
-  GBarrier barrier[8];
-  WL worklists[2];
-  NewWork new_;
-  PendingWork pending;
-  ContextPool contextPool;
-  ContextPtrPool contextPtrPool;
-  Function1Ty& function1;
-  Function2Ty& function2;
-  StateManager<T,Function1Ty,useLocalState> stateManager;
-  const char* loopname;
-  LL::CacheLineStorage<volatile long> innerDone;
-  LL::CacheLineStorage<volatile long> outerDone;
-  int numActive;
-
-  bool merge(int begin, int end);
-  bool renumber(ThreadLocalData& tld);
-  bool pendingLoop(ThreadLocalData& tld);
-  bool commitLoop(ThreadLocalData& tld);
-  void go();
-
-  struct LessThan {
-    bool operator()(const NewItem& a, const NewItem& b) const {
-      if (a.second.first < b.second.first)
-        return true;
-      else if (a.second.first == b.second.first) 
-        return a.second.second < b.second.second;
-      else
-        return false;
-    }
-  };
-
-  struct EqualTo {
-    bool operator()(const NewItem& a, const NewItem& b) const {
-      return a.second.first == b.second.first && a.second.second == b.second.second;
-    }
-  };
-
-  struct GetFirst: public std::unary_function<NewItem,const value_type&> {
-    const value_type& operator()(const NewItem& x) const {
-      return x.first;
-    }
-  };
-
-  SimpleRuntimeContext* nextContext() {
-    contextPool.push(SimpleRuntimeContext());
-    SimpleRuntimeContext* retval = contextPool.unsafePeek();
-    if (useLocalState)
-      contextPtrPool.push(retval);
+class ContextPool {
+  typedef WorkList::dChunkedLIFO<ChunkSize,SimpleRuntimeContext> Pool;
+  Pool pool;
+public:
+  SimpleRuntimeContext* next() {
+    pool.push(SimpleRuntimeContext());
+    SimpleRuntimeContext* retval = pool.unsafePeek();
     return retval;
   }
 
-  void commitContexts() {
+  void commitAll() {
     boost::optional<SimpleRuntimeContext> p;
-    while ((p = contextPool.pop())) {
+    while ((p = pool.pop())) {
       p->commit_iteration();
     }
   }
+};
+
+template<typename T>
+struct DNewItem { 
+  T item;
+  unsigned long parent;
+  unsigned count;
+
+  DNewItem(const T& _item, unsigned long _parent, unsigned _count): item(_item), parent(_parent), count(_count) { }
+  DNewItem(const DNewItem& o): item(o.item), parent(o.parent), count(o.count) { }
+
+  bool operator<(const DNewItem<T>& o) const {
+    if (parent < o.parent)
+      return true;
+    else if (parent == o.parent)
+      return count < o.count;
+    else
+      return false;
+  }
+
+  bool operator==(const DNewItem<T>& o) const {
+    return parent == o.parent && count == o.count;
+  }
+
+  struct GetFirst: public std::unary_function<DNewItem<T>,const T&> {
+    const T& operator()(const DNewItem<T>& x) const {
+      return x.item;
+    }
+  };
+};
+
+template<typename> class DMergeManagerBase;
+template<typename,typename,bool> class DMergeManager;
+
+template<typename T>
+class DMergeLocal {
+  template<typename> friend class DMergeManagerBase;
+  template<typename,typename,bool> friend class DMergeManager;
+
+  typedef DItem<T> Item;
+  typedef DNewItem<T> NewItem;
+  typedef std::vector<NewItem,typename Galois::PerIterAllocTy::rebind<NewItem>::other> NewItemsTy;
+  typedef FIFO<ChunkSize*8,Item> ReserveTy;
+
+  Galois::IterAllocBaseTy heap;
+  Galois::PerIterAllocTy alloc;
+  size_t window;
+  size_t delta;
+  size_t committed;
+  size_t iterations;
+  size_t aborted;
+  size_t size;
+  NewItemsTy newItems;
+  ReserveTy reserve;
+  unsigned long minId;
+  unsigned long maxId;
+  
+  void initialWindow(size_t w) {
+    window = delta = w;
+  }
+
+  //! Update min and max id from sorted iterator
+  template<typename BiIteratorTy>
+  void updateMinMax(BiIteratorTy ii, BiIteratorTy ei) {
+    minId = std::numeric_limits<unsigned long>::max();
+    maxId = 0;
+    if (ii != ei) {
+      if (ii + 1 == ei) {
+        minId = maxId = ii->parent;
+      } else {
+        minId = ii->parent;
+        maxId = (ei-1)->parent;
+      }
+    }
+  }
+
+public:
+  DMergeLocal(): alloc(&heap), newItems(alloc) { reset(); }
+
+  void incrementIterations(bool firstRound) {
+    if (firstRound)
+      ++iterations;
+  }
+
+  void incrementCommitted(bool firstRound) {
+    if (firstRound)
+      ++committed;
+  }
+
+  template<typename WL>
+  void nextWindow(WL* wl, bool newWork) {
+    if (newWork)
+      window = delta;
+    else
+//      window += (delta - aborted);
+      window += delta;
+    boost::optional<Item> p;
+    while ((p = reserve.peek())) {
+      if (p->id > window)
+        break;
+      wl->push(*p);
+      reserve.pop();
+    }
+  }
+
+  void reset() {
+    committed = 0;
+    iterations = 0;
+    aborted = 0;
+  }
+
+  bool empty() {
+    return reserve.empty();
+  }
+};
+
+template<typename T>
+class DMergeManagerBase {
+protected:
+  //static const int MinDelta = ChunkSize;
+  static const int MinDelta = ChunkSize * 40;
+
+  typedef DItem<T> Item;
+  typedef DNewItem<T> NewItem;
+  typedef WorkList::dChunkedFIFO<ChunkSize,NewItem> NewWork;
+  typedef DMergeLocal<T> MergeLocal;
+  typedef typename MergeLocal::NewItemsTy NewItemsTy;
+  typedef typename NewItemsTy::iterator NewItemsIterator;
+
+  Galois::IterAllocBaseTy heap;
+  Galois::PerIterAllocTy alloc;
+  PerCPU<MergeLocal> data;
+
+  NewWork new_;
+  int numActive;
 
   template<typename InputIteratorTy>
   void safe_advance(InputIteratorTy& it, size_t d, size_t& cur, size_t dist) {
@@ -296,6 +326,142 @@ class Executor {
     cur += d;
   }
 
+  template<typename InputIteratorTy,typename WL>
+  void copyIn(InputIteratorTy b, InputIteratorTy e, size_t dist, WL* wl) {
+    unsigned int tid = LL::getTID();
+    MergeLocal& mlocal = this->data.get();
+    size_t cur = 0;
+    size_t k = 0;
+    safe_advance(b, tid, cur, dist);
+    while (b != e) {
+      unsigned long id = k * this->numActive + tid + 1;
+      if (id > mlocal.delta)
+        mlocal.reserve.push(Item(*b, id));
+      else
+        wl->push(Item(*b, id));
+      ++k;
+      safe_advance(b, this->numActive, cur, dist);
+    }
+  }
+
+public:
+  DMergeManagerBase(): alloc(&heap) {
+    numActive = (int) Galois::getActiveThreads();
+  }
+
+  MergeLocal& get() {
+    return data.get();
+  }
+
+  void calculateWindow(bool inner) {
+    MergeLocal& mlocal = data.get();
+
+    // Accumulate all threads' info
+    size_t allcommitted = 0;
+    size_t alliterations = 0;
+    for (int i = 0; i < numActive; ++i) {
+      DMergeLocal<T>& mlocal = data.get(i);
+      allcommitted += mlocal.committed;
+      alliterations += mlocal.iterations;
+    }
+
+//    mlocal.aborted = alliterations - allcommitted;
+
+    const float target = 0.95;
+    float commitRatio = alliterations > 0 ? allcommitted / (float) alliterations : 0.0;
+
+    if (commitRatio >= target)
+      mlocal.delta += mlocal.delta;
+    else if (allcommitted == 0) // special case when we don't execute anything
+      mlocal.delta += mlocal.delta;
+    else
+      mlocal.delta = commitRatio / target * mlocal.delta;
+
+    if (!inner)
+      mlocal.delta = std::max(mlocal.delta, (size_t) MinDelta);
+    else if (mlocal.delta < MinDelta)
+      mlocal.delta = 0; //mlocal.aborted; // XXX;
+//    if (LL::getTID() == 0) {
+//      printf("%.3f (%zu/%zu) window: %zu delta: %zu\n", 
+//          commitRatio, allcommitted, alliterations, mlocal.window, mlocal.delta);
+//    }
+  }
+};
+
+template<typename T>
+struct has_id_fn {
+  typedef char yes[1];
+  typedef char no[2];
+  template<typename C> static yes& test(typename C::IdFn*);
+  template<typename> static no& test(...);
+  static const bool value = sizeof(test<T>(0)) == sizeof(yes);
+};
+
+template<typename T,typename,bool = false>
+class DMergeManager: public DMergeManagerBase<T> {
+  typedef DMergeManagerBase<T> Base;
+  typedef typename Base::Item Item;
+  typedef typename Base::NewItem NewItem;
+  typedef typename Base::MergeLocal MergeLocal;
+  typedef typename Base::NewItemsTy NewItemsTy;
+  typedef typename Base::NewItemsIterator NewItemsIterator;
+
+  struct GetNewItem: public std::unary_function<int,NewItemsTy&> {
+    PerCPU<MergeLocal>* base;
+    GetNewItem() { }
+    GetNewItem(PerCPU<MergeLocal>* b): base(b) { }
+    NewItemsTy& operator()(int i) const { return base->get(i).newItems; }
+  };
+
+  typedef boost::transform_iterator<GetNewItem, boost::counting_iterator<int> > MergeOuterIt;
+  typedef DualLevelIterator<MergeOuterIt> MergeIt;
+
+  std::vector<NewItem,typename Galois::PerIterAllocTy::rebind<NewItem>::other> mergeBuf;
+  std::vector<T,typename Galois::PerIterAllocTy::rebind<T>::other> distributeBuf;
+
+  GBarrier barrier[4];
+
+  bool merge(int begin, int end) {
+    if (begin == end)
+      return false;
+    else if (begin + 1 == end)
+      return !this->data.get(begin).newItems.empty();
+    
+    bool retval = false;
+    int mid = (end - begin) / 2 + begin;
+    retval |= merge(begin, mid);
+    retval |= merge(mid, end);
+
+    MergeOuterIt bbegin(boost::make_counting_iterator(begin), GetNewItem(&this->data));
+    MergeOuterIt mmid(boost::make_counting_iterator(mid), GetNewItem(&this->data));
+    MergeOuterIt eend(boost::make_counting_iterator(end), GetNewItem(&this->data));
+    MergeIt aa(bbegin, mmid), ea(mmid, mmid);
+    MergeIt bb(mmid, eend), eb(eend, eend);
+    MergeIt cc(bbegin, eend), ec(eend, eend);
+
+    while (aa != ea && bb != eb) {
+      if (*aa < *bb)
+        mergeBuf.push_back(*aa++);
+      else
+        mergeBuf.push_back(*bb++);
+    }
+
+    for (; aa != ea; ++aa)
+      mergeBuf.push_back(*aa);
+
+    for (; bb != eb; ++bb)
+      mergeBuf.push_back(*bb);
+
+    for (NewItemsIterator ii = mergeBuf.begin(), ei = mergeBuf.end(); ii != ei; ++ii) 
+      *cc++ = *ii; 
+
+    mergeBuf.clear();
+
+    assert(cc == ec);
+
+    return retval;
+  }
+
   //! Slightly complicated reindexing to separate out continuous elements in InputIterator
   template<typename InputIteratorTy>
   void redistribute(InputIteratorTy b, InputIteratorTy e, size_t dist) {
@@ -303,9 +469,9 @@ class Executor {
     //const size_t numBlocks = 1 << 7;
     //const size_t mask = numBlocks - 1;
     //size_t blockSize = dist / numBlocks; // round down
-    MergeInfo& minfo = mergeInfo.get();
+    MergeLocal& mlocal = this->data.get();
     //size_t blockSize = std::max((size_t) (0.9*minfo.delta), (size_t) 1);
-    size_t blockSize = minfo.getDelta();
+    size_t blockSize = mlocal.delta;
     size_t numBlocks = dist / blockSize;
     
     size_t cur = 0;
@@ -318,38 +484,22 @@ class Executor {
       else
         id = cur;
       distributeBuf[id] = *b;
-      safe_advance(b, numActive, cur, dist);
+      safe_advance(b, this->numActive, cur, dist);
     }
   }
 
-  template<typename InputIteratorTy>
-  void copyIn(InputIteratorTy b, InputIteratorTy e, size_t dist, WL* wl) {
-    unsigned int tid = LL::getTID();
-    MergeInfo& minfo = mergeInfo.get();
-    size_t cur = 0;
-    size_t k = 0;
-    safe_advance(b, tid, cur, dist);
-    while (b != e) {
-      unsigned long id = k * numActive + tid + 1;
-      if (id > minfo.getDelta())
-        minfo.reserve.push(Item(*b, id));
-      else
-        wl->push(Item(*b, id));
-      ++k;
-      safe_advance(b, numActive, cur, dist);
-    }
-  }
-
-  template<typename InputIteratorTy>
+  template<typename InputIteratorTy,typename WL>
   void distribute(InputIteratorTy b, InputIteratorTy e, size_t dist, WL* wl) {
     unsigned int tid = LL::getTID();
+    MergeLocal& mlocal = this->data.get();
+    mlocal.initialWindow(std::max(dist / 100, (size_t) Base::MinDelta));
 #if 1
     if (tid == 0) {
       distributeBuf.resize(dist);
     }
-    barrier[4].wait();
+    barrier[0].wait();
     redistribute(b, e, dist);
-    barrier[5].wait();
+    barrier[1].wait();
     copyIn(distributeBuf.begin(), distributeBuf.end(), dist, wl);
 #else
     copyIn(b, e, dist, wl);
@@ -357,22 +507,254 @@ class Executor {
   }
 
 public:
-  Executor(Function1Ty& f1, Function2Ty& f2, const char* ln): function1(f1), function2(f2), loopname(ln) { 
+  DMergeManager(): mergeBuf(this->alloc), distributeBuf(this->alloc) {
+    for (int i = 0; i < sizeof(barrier)/sizeof(*barrier); ++i)
+      barrier[i].reinit(this->numActive);
+  }
+
+  template<typename InputIteratorTy, typename WL>
+  void addInitialWork(InputIteratorTy b, InputIteratorTy e, WL* wl) {
+    size_t dist = std::distance(b, e);
+    distribute(b, e, dist, wl);
+  }
+
+  void pushNew(const T& item, unsigned long parent, unsigned count) {
+    this->new_.push(NewItem(item, parent, count));
+  }
+
+  template<typename WL>
+  void distributeNewWork(WL* wl) {
+    MergeLocal& mlocal = this->data.get();
+
+    // XXX take ids and dump
+#if 1
+    mlocal.newItems.clear();
+    //minfo.newItems.reserve(tld.newSize * 2);
+    boost::optional<NewItem> p;
+    while ((p = this->new_.pop())) {
+      mlocal.newItems.push_back(*p);
+    }
+
+    std::sort(mlocal.newItems.begin(), mlocal.newItems.end());
+    
+    barrier[2].wait();
+
+    unsigned tid = LL::getTID();
+    if (tid == 0) {
+      size_t size = 0;
+      for (int i = 0; i < this->numActive; ++i)
+        size += this->data.get(i).newItems.size();
+
+      mergeBuf.reserve(size);
+      
+      for (int i = 0; i < this->numActive; ++i)
+        this->data.get(i).size = size;
+
+      //!merge(0, numActive);
+      merge(0, this->numActive);
+    }
+
+    barrier[3].wait();
+
+    MergeOuterIt bbegin(boost::make_counting_iterator(0), GetNewItem(&this->data));
+    MergeOuterIt eend(boost::make_counting_iterator(this->numActive), GetNewItem(&this->data));
+    MergeIt ii(bbegin, eend), ei(eend, eend);
+
+//    mlocal.initialWindow(std::max(mlocal.size / 100, (size_t) Base::MinDelta)); // XXX
+    distribute(boost::make_transform_iterator(ii, typename Base::NewItem::GetFirst()),
+        boost::make_transform_iterator(ei, typename Base::NewItem::GetFirst()),
+        mlocal.size, wl);
+#else
+    this->new_.flush();
+
+    barrier[2].wait();
+    
+    if (LL::getTID() == 0) {
+      mergeBuf.clear();
+      mergeBuf.reserve(tld.newSize * this->numActive);
+      boost::optional<NewItem> p;
+      while ((p = this->new_.pop())) {
+        mergeBuf.push_back(*p);
+      }
+
+      std::sort(mergeBuf.begin(), mergeBuf.end());
+
+      unsigned long id = 0;
+      outerDone.data = mergeBuf.empty();
+
+      printf("R %ld\n", mergeBuf.size());
+    }
+
+    barrier[3].wait();
+
+    distribute(boost::make_transform_iterator(mergeBuf.begin(), typename NewItem::GetFirst()),
+        boost::make_transform_iterator(mergeBuf.end(), typename NewItem::GetFirst()),
+        mergeBuf.size(), tld.wlnext);
+#endif
+  }
+};
+
+// this specialization only selected when FunctionTy::IdFn exists
+template<typename T,typename FunctionTy>
+class DMergeManager<T,FunctionTy,true>: public DMergeManagerBase<T> {
+  typedef DMergeManagerBase<T> Base;
+  typedef typename Base::Item Item;
+  typedef typename Base::NewItem NewItem;
+  typedef typename Base::MergeLocal MergeLocal;
+  typedef typename Base::NewItemsTy NewItemsTy;
+  typedef typename Base::NewItemsIterator NewItemsIterator;
+  typedef typename FunctionTy::IdFn IdFn;
+
+  std::vector<NewItem,typename Galois::PerIterAllocTy::rebind<NewItem>::other> mergeBuf;
+
+  GBarrier barrier[4];
+  IdFn idFunction;
+
+  void broadcastMinMax(MergeLocal& mlocal, unsigned int tid) {
+    for (int i = 0; i < this->numActive; ++i) {
+      if (i == tid) continue;
+      DMergeLocal<T>& mother = this->data.get(i);
+      mother.minId = mlocal.minId;
+      mother.maxId = mlocal.maxId;
+    }
+  }
+
+  template<typename InputIteratorTy,typename WL>
+  void distribute(InputIteratorTy b, InputIteratorTy e, size_t dist, WL* wl) {
+    unsigned int tid = LL::getTID();
+    MergeLocal& mlocal = this->data.get();
+    if (tid == 0) {
+      mergeBuf.clear();
+      mergeBuf.reserve(dist);
+      for (; b != e; ++b) {
+        unsigned long id = idFunction(*b);
+        mergeBuf.push_back(NewItem(*b, id, 1));
+      }
+      std::sort(mergeBuf.begin(), mergeBuf.end());
+      mlocal.updateMinMax(mergeBuf.begin(), mergeBuf.end());
+      broadcastMinMax(mlocal, tid);
+    }
+    mlocal.initialWindow(std::max((mlocal.maxId - mlocal.minId) / 100, (size_t) Base::MinDelta));
+    barrier[0].wait();
+    copyIn(boost::make_transform_iterator(mergeBuf.begin(), typename Base::NewItem::GetFirst()),
+        boost::make_transform_iterator(mergeBuf.end(), typename Base::NewItem::GetFirst()),
+        dist, wl);
+  }
+
+public:
+  DMergeManager(): mergeBuf(this->alloc) {
+    for (int i = 0; i < sizeof(barrier)/sizeof(*barrier); ++i)
+      barrier[i].reinit(this->numActive);
+  }
+
+  template<typename InputIteratorTy, typename WL>
+  void addInitialWork(InputIteratorTy b, InputIteratorTy e, WL* wl) {
+    size_t dist = std::distance(b, e);
+    distribute(b, e, dist, wl);
+  }
+
+  void pushNew(const T& item, unsigned long parent, unsigned count) {
+    this->new_.push(NewItem(item, idFunction(item), 1));
+  }
+
+  template<typename WL>
+  void distributeNewWork(WL* wl) {
+    unsigned int tid = LL::getTID();
+    MergeLocal& mlocal = this->data.get();
+
+    mlocal.newItems.clear();
+    boost::optional<NewItem> p;
+    while ((p = this->new_.pop())) {
+      mlocal.newItems.push_back(*p);
+    }
+
+    std::sort(mlocal.newItems.begin(), mlocal.newItems.end());
+    NewItemsIterator ii = mlocal.newItems.begin(), ei = mlocal.newItems.end();
+    mlocal.updateMinMax(ii, ei);
+
+    barrier[1].wait();
+    
+    if (tid == 0) {
+      for (int i = 0; i < this->numActive; ++i) {
+        DMergeLocal<T>& mother = this->data.get(i);
+        mlocal.minId = std::min(mother.minId, mlocal.minId);
+        mlocal.maxId = std::max(mother.maxId, mlocal.maxId);
+      }
+      broadcastMinMax(mlocal, tid);
+    }
+
+    barrier[2].wait();
+
+    mlocal.initialWindow(std::max((mlocal.maxId - mlocal.minId) / 100, (size_t) Base::MinDelta));
+
+    for (; ii != ei; ++ii) {
+      unsigned long id = ii->parent;
+      if (id > mlocal.delta)
+        mlocal.reserve.push(Item(ii->item, id));
+      else
+        wl->push(Item(ii->item, id));
+    }
+  }
+};
+
+template<typename T,typename Function1Ty,typename Function2Ty,bool useLocalState>
+class Executor {
+  typedef T value_type;
+  typedef DItem<T> Item;
+  typedef DNewItem<T> NewItem;
+  typedef DMergeLocal<T> MergeLocal;
+  typedef WorkList::dChunkedFIFO<ChunkSize,Item> WL;
+  typedef WorkList::dChunkedFIFO<ChunkSize,Item> PendingWork;
+  typedef WorkList::ChunkedFIFO<ChunkSize,Item,false> LocalPendingWork;
+
+  // Truly thread-local
+  struct ThreadLocalData: private boost::noncopyable {
+    LocalPendingWork localPending;
+    GaloisRuntime::UserContextAccess<value_type> facing;
+    LoopStatistics<ForEachTraits<Function1Ty>::NeedsStats || ForEachTraits<Function2Ty>::NeedsStats> stat;
+    WL* wlcur;
+    WL* wlnext;
+    size_t rounds;
+    size_t outerRounds;
+    bool firstRound;
+    bool hasNewWork;
+    ThreadLocalData(const char* loopname): stat(loopname), rounds(0), outerRounds(0) { }
+  };
+
+  GBarrier barrier[4];
+  WL worklists[2];
+  DMergeManager<T,Function1Ty,has_id_fn<Function1Ty>::value> mergeManager;
+  BreakManager<Function1Ty,has_break_fn<Function1Ty>::value> breakManager;
+  PendingWork pending;
+  ContextPool contextPool;
+  Function1Ty& function1;
+  Function2Ty& function2;
+  StateManager<T,Function1Ty,useLocalState> stateManager;
+  const char* loopname;
+  LL::CacheLineStorage<volatile long> innerDone;
+  LL::CacheLineStorage<volatile long> outerDone;
+  LL::CacheLineStorage<volatile long> hasNewWork;
+  int numActive;
+
+  bool pendingLoop(ThreadLocalData& tld);
+  bool commitLoop(ThreadLocalData& tld);
+  void go();
+
+public:
+  Executor(Function1Ty& f1, Function2Ty& f2, const char* ln):
+    breakManager(f1), function1(f1), function2(f2), loopname(ln)
+  { 
     numActive = (int) Galois::getActiveThreads();
     for (int i = 0; i < sizeof(barrier)/sizeof(*barrier); ++i)
       barrier[i].reinit(numActive);
-    if (ForEachTraits<Function1Ty>::NeedsBreak || ForEachTraits<Function2Ty>::NeedsBreak) {
-      assert(0 && "Break not supported");
-      abort();
-    }
+    //BOOST_STATIC_ASSERT(!ForEachTraits<Function1Ty>::NeedsBreak
+    //    && !ForEachTraits<Function2Ty>::NeedsBreak
+    //    || has_break_fn<Function1Ty>::value);
   }
 
   template<typename IterTy>
   bool AddInitialWork(IterTy b, IterTy e) {
-    size_t dist = std::distance(b, e);
-    MergeInfo& minfo = mergeInfo.get();
-    minfo.initialWindow(std::max(dist / 100, (size_t) MinDelta));
-    distribute(b, e, dist, &worklists[1]);
+    mergeManager.addInitialWork(b, e, &worklists[1]);
 
     return true;
   }
@@ -383,45 +765,18 @@ public:
 };
 
 template<typename T,typename Function1Ty,typename Function2Ty,bool useLocalState>
-void Executor<T,Function1Ty,Function2Ty,useLocalState>::MergeInfo::calculateWindow(PerCPU<MergeInfo>& mergeInfo, unsigned numActive) 
-{
-  // Accumulate all threads' info
-  size_t allcommitted = 0;
-  size_t alliterations = 0;
-  for (int i = 0; i < numActive; ++i) {
-    MergeInfo& minfo = mergeInfo.get(i);
-    allcommitted += minfo.committed;
-    alliterations += minfo.iterations;
-  }
-
-  aborted = alliterations - allcommitted;
-
-  const float target = 0.95;
-  float commitRatio = alliterations > 0 ? allcommitted / (float) alliterations : 0.0;
-
-  if (commitRatio >= target)
-    delta += delta;
-  else
-    delta = commitRatio / target * delta;
-  delta = std::max(delta, (size_t) MinDelta);
-  // XXX set max when we have local state to bound allocations....?
-  //if (LL::getTID() == 0) {
-  //  printf("%.3f (%zu/%zu) window: %zu delta: %zu\n", 
-  //      commitRatio, allcommitted, alliterations, window, delta);
-  //}
-}
-
-template<typename T,typename Function1Ty,typename Function2Ty,bool useLocalState>
 void Executor<T,Function1Ty,Function2Ty,useLocalState>::go() {
   ThreadLocalData tld(loopname);
-  MergeInfo& minfo = mergeInfo.get();
+  MergeLocal& mlocal = mergeManager.get();
   tld.wlcur = &worklists[0];
   tld.wlnext = &worklists[1];
+
+  tld.hasNewWork = false;
 
   while (true) {
     ++tld.outerRounds;
 
-    minfo.firstRound = true;
+    tld.firstRound = true;
 
     while (true) {
       ++tld.rounds;
@@ -441,39 +796,50 @@ void Executor<T,Function1Ty,Function2Ty,useLocalState>::go() {
 
       barrier[2].wait();
 
-      commitContexts();
-      minfo.firstRound = false;
+      contextPool.commitAll();
+      tld.firstRound = false;
 
       if (innerDone.data) {
         break;
       }
 
-      //minfo.calculateWindow(mergeInfo, numActive);
-      //minfo.nextWindow(tld.wlnext, false);
+      mergeManager.calculateWindow(true);
 
       barrier[0].wait();
+
+      mlocal.nextWindow(tld.wlnext, false);
+      mlocal.reset();
+      tld.firstRound = true;
     }
 
-    if (!minfo.reserve.empty()) {
+    if (!mlocal.empty())
       outerDone.data = false;
-    }
 
-    minfo.calculateWindow(mergeInfo, numActive);
+    if (tld.hasNewWork)
+      hasNewWork.data = true;
+
+    mergeManager.calculateWindow(false);
+
+    if (breakManager.checkBreak()) {
+      break;
+    }
 
     barrier[3].wait();
 
-    minfo.reset();
-
-    bool renumbered = false;
+    bool newWork = false;
     if (outerDone.data) {
       if (!ForEachTraits<Function1Ty>::NeedsPush && !ForEachTraits<Function2Ty>::NeedsPush)
         break;
-      if (renumber(tld))
+      if (!hasNewWork.data)
         break;
-      renumbered = true;
+      mergeManager.distributeNewWork(tld.wlnext);
+      tld.hasNewWork = false;
+      hasNewWork.data = false;
+      newWork = true;
     }
 
-    minfo.nextWindow(tld.wlnext, renumbered);
+    mlocal.nextWindow(tld.wlnext, newWork);
+    mlocal.reset();
   }
 
   setPending(NON_DET);
@@ -487,136 +853,20 @@ void Executor<T,Function1Ty,Function2Ty,useLocalState>::go() {
 }
 
 template<typename T,typename Function1Ty,typename Function2Ty,bool useLocalState>
-bool Executor<T,Function1Ty,Function2Ty,useLocalState>::merge(int begin, int end)
-{
-  if (begin == end)
-    return false;
-  else if (begin + 1 == end)
-    return !mergeInfo.get(begin).newItems.empty();
-  
-  bool retval = false;
-  int mid = (end - begin) / 2 + begin;
-  retval |= merge(begin, mid);
-  retval |= merge(mid, end);
-
-  LessThan lessThan;
-  MergeOuterIt bbegin(boost::make_counting_iterator(begin), GetNewItem(&mergeInfo));
-  MergeOuterIt mmid(boost::make_counting_iterator(mid), GetNewItem(&mergeInfo));
-  MergeOuterIt eend(boost::make_counting_iterator(end), GetNewItem(&mergeInfo));
-  MergeIt aa(bbegin, mmid), ea(mmid, mmid);
-  MergeIt bb(mmid, eend), eb(eend, eend);
-  MergeIt cc(bbegin, eend), ec(eend, eend);
-
-  while (aa != ea && bb != eb) {
-    if (lessThan(*aa, *bb))
-      mergeBuf.push_back(*aa++);
-    else
-      mergeBuf.push_back(*bb++);
-  }
-
-  for (; aa != ea; ++aa)
-    mergeBuf.push_back(*aa);
-
-  for (; bb != eb; ++bb)
-    mergeBuf.push_back(*bb);
-
-  for (NewItemsIterator ii = mergeBuf.begin(), ei = mergeBuf.end(); ii != ei; ++ii) 
-    *cc++ = *ii; 
-
-  mergeBuf.clear();
-
-  assert(cc == ec);
-
-  return retval;
-}
-
-template<typename T,typename Function1Ty,typename Function2Ty,bool useLocalState>
-bool Executor<T,Function1Ty,Function2Ty,useLocalState>::renumber(ThreadLocalData& tld)
-{
-  MergeInfo& minfo = mergeInfo.get();
-
-#if 1
-  minfo.newItems.clear();
-  minfo.newItems.reserve(tld.newSize * 2);
-  boost::optional<NewItem> p;
-  while ((p = new_.pop())) {
-    minfo.newItems.push_back(*p);
-  }
-
-  std::sort(minfo.newItems.begin(), minfo.newItems.end(), LessThan());
-  
-  barrier[6].wait();
-
-  unsigned tid = LL::getTID();
-  if (tid == 0) {
-    size_t size = 0;
-    for (int i = 0; i < numActive; ++i)
-      size += mergeInfo.get(i).newItems.size();
-
-    mergeBuf.reserve(size);
-    
-    for (int i = 0; i < numActive; ++i)
-      mergeInfo.get(i).size = size;
-
-    outerDone.data = !merge(0, numActive);
-  }
-
-  barrier[7].wait();
-
-  MergeOuterIt bbegin(boost::make_counting_iterator(0), GetNewItem(&mergeInfo));
-  MergeOuterIt eend(boost::make_counting_iterator(numActive), GetNewItem(&mergeInfo));
-  MergeIt ii(bbegin, eend), ei(eend, eend);
-
-  distribute(boost::make_transform_iterator(ii, GetFirst()),
-      boost::make_transform_iterator(ei, GetFirst()),
-      minfo.size, tld.wlnext);
-#else
-  new_.flush();
-
-  barrier[6].wait();
-  
-  if (LL::getTID() == 0) {
-    mergeBuf.clear();
-    mergeBuf.reserve(tld.newSize * numActive);
-    boost::optional<NewItem> p;
-    while ((p = new_.pop())) {
-      mergeBuf.push_back(*p);
-    }
-
-    std::sort(mergeBuf.begin(), mergeBuf.end(), LessThan());
-
-    unsigned long id = 0;
-    outerDone.data = mergeBuf.empty();
-
-    printf("R %ld\n", mergeBuf.size());
-  }
-
-  barrier[7].wait();
-
-  distribute(boost::make_transform_iterator(mergeBuf.begin(), GetFirst()),
-      boost::make_transform_iterator(mergeBuf.end(), GetFirst()),
-      mergeBuf.size(), tld.wlnext);
-#endif
-
-  tld.reset();
-  return outerDone.data;
-}
-
-template<typename T,typename Function1Ty,typename Function2Ty,bool useLocalState>
 bool Executor<T,Function1Ty,Function2Ty,useLocalState>::pendingLoop(ThreadLocalData& tld)
 {
-  SimpleRuntimeContext* cnx = nextContext();
-  MergeInfo& minfo = mergeInfo.get();
+  SimpleRuntimeContext* cnx = contextPool.next();
+  MergeLocal& mlocal = mergeManager.get();
   bool retval = false;
   boost::optional<Item> p;
   while ((p = tld.wlcur->pop())) {
-    minfo.incrementIterations();
+    mlocal.incrementIterations(tld.firstRound);
     bool commit = true;
     cnx->set_id(p->id);
     cnx->start_iteration();
     tld.stat.inc_iterations();
     setThreadContext(cnx);
-    stateManager.alloc(tld.facing, &function1);
+    stateManager.alloc(tld.facing, function1);
     int result = 0;
 #if GALOIS_USE_EXCEPTION_HANDLER
     try {
@@ -654,7 +904,7 @@ bool Executor<T,Function1Ty,Function2Ty,useLocalState>::pendingLoop(ThreadLocalD
       retval = true;
     }
 
-    cnx = nextContext();
+    cnx = contextPool.next();
   }
 
   return retval;
@@ -664,7 +914,7 @@ template<typename T,typename Function1Ty,typename Function2Ty,bool useLocalState
 bool Executor<T,Function1Ty,Function2Ty,useLocalState>::commitLoop(ThreadLocalData& tld) 
 {
   bool retval = false;
-  MergeInfo& minfo = mergeInfo.get();
+  MergeLocal& mlocal = mergeManager.get();
   boost::optional<Item> p;
 
   while ((p = (useLocalState) ? tld.localPending.pop() : pending.pop())) {
@@ -698,15 +948,15 @@ bool Executor<T,Function1Ty,Function2Ty,useLocalState>::commitLoop(ThreadLocalDa
     stateManager.dealloc(tld.facing);
     
     if (commit) {
-      minfo.incrementCommitted();
+      mlocal.incrementCommitted(tld.firstRound);
       if (ForEachTraits<Function2Ty>::NeedsPush) {
         unsigned long parent = p->id;
         typedef typename UserContextAccess<value_type>::pushBufferTy::iterator iterator;
         unsigned count = 0;
         for (iterator ii = tld.facing.getPushBuffer().begin(), 
             ei = tld.facing.getPushBuffer().end(); ii != ei; ++ii) {
-          new_.push(std::make_pair(*ii, std::make_pair(parent, ++count)));
-          ++tld.newSize;
+          mergeManager.pushNew(*ii, parent, ++count);
+          tld.hasNewWork = true;
           if (count == 0) {
             assert(0 && "Counter overflow");
             abort();
