@@ -701,7 +701,7 @@ Real BP::run() {
 
           Galois::Timer t;
           t.start();
-          Exp::WorklistExperiment<OBIM,dChunk,Chunk,Indexer,TaskLess,TaskGreater>().for_each(std::cout, initial.begin(), initial.end(), Process(*this, edgeData, count));
+          Exp::PriAuto<64, Indexer, OBIM, TaskLess,TaskGreater>::for_each(initial.begin(), initial.end(), Process(*this, edgeData, count));
           t.stop();
           GlobalTime += t.get();
         } else {
