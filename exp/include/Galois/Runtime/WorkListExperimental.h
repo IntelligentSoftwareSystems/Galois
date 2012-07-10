@@ -34,7 +34,7 @@
 
 #include "Galois/Bag.h"
 #include "Galois/Queue.h"
-#include "Galois/SkipList.h"
+//#include "Galois/SkipList.h"
 
 #include "llvm/Support/CommandLine.h"
 
