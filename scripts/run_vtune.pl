@@ -26,15 +26,32 @@ if ($found_threads) {
 
 print "*** Executing: " . $cmdline . "\n";
 
-my $rdir = "-result-dir=tmp.vtune.r$threads";
-my $report = "-R hw-events -csv-delimiter tab";
-my $collect = "-analyze-system -collect nehalem_general-exploration -start-paused";
-my $sdir = "-search-dir all=$symbol";
+my $uname = `whoami`;
+chomp($uname);
+my $type = "nehalem_memory-access";
+my $type = "nehalem_memory-access";
 
-system("rm -rf tmp.vtune.r$threads");
-system("mkdir tmp.vtune.r$threads");
+my $sys = `hostname`;
+chomp($sys);
+if ($sys eq "faraday") {
+    $type = "nehalem-memory-access";
+}
+if ($sys eq "oersted") {
+    $type = "nehalem-memory-access";
+}
+
+my $dire = "/tmp/$uname.vtune.r$threads";
+my $rdir = "-result-dir=$dire";
+my $report = "-R hw-events -csv-delimiter tab";
+my $collect = "-analyze-system -collect $type -start-paused";
+my $sdir = "-search-dir all=$symbol";
+my $maxsec = 240;
+
+system("date");
+system("rm -rf $dire");
+system("mkdir $dire");
 system("$vtune $collect $rdir $sdir -- $cmdline");
 system("echo THREADS\t$threads >>$outfile.line.log");
-system("$vtune $report $rdir -group-by source-line >> $outfile.line.log");
+system("ulimit -t $maxsec ; $vtune $report $rdir -group-by source-line >> $outfile.line.log");
 system("echo THREADS\t$threads >>$outfile.function.log");
-system("$vtune $report $rdir -group-by function >> $outfile.function.log");
+system("ulimit -t $maxsec ; $vtune $report $rdir -group-by function >> $outfile.function.log");
