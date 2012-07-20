@@ -14,13 +14,23 @@ import re
 from collections import defaultdict
 
 
-SpecPBBS = [{"prob": "breadthFirstSearch",
-      "algos": ["deterministicBFS", "ndBFS"], #, "serialBFS"],
-      "inputs": ["randLocalGraph_J_5_10000000", "rMatGraph_J_5_10000000", "3Dgrid_J_10000000"]},
+SpecPBBS = [
+     {"prob": "breadthFirstSearch",
+      "algos": ["deterministicBFS", "ndBFS", "g/nd0", "g/nd1", "g/pnd0", "g/pnd1", "g/d", "g/pd"], #, "serialBFS"],
+#      "inputs": ["randLocalGraph_J_5_10000000", "rMatGraph_J_5_10000000", "3Dgrid_J_10000000", "USA-road-d.USA"],
+      "inputs": ["randLocalGraph_J_5_10000000"],
+      "extras":
+        [
+          {'algos': ['g/pnd0', 'g/nd0', 'g/d', 'g/pd'],
+#            'arg': "Rounds::-r::1:10:1" 
+            'arg': "Rounds::-r::1" 
+          }
+        ]
+     },
      {"prob": "delaunayRefine",
       "algos": ["incrementalRefine", 'g/p', 'g/nd0', 'g/nd1', 'g/nd2', 'g/pnd0', 'g/pnd1', 'g/pnd2'],
-      "inputs": [#"2DinCubeDelaunay_275000", "2DinCubeDelaunay_1000000", 
-        "2DinCubeDelaunay_2500000", "r5M"],
+      "inputs": [#"2DinCubeDelaunay_275000", "2DinCubeDelaunay_1000000", "r5M",
+        "2DinCubeDelaunay_2500000"],
       "extras": 
         [
           {'algos': ["incrementalRefine", 'g/p', 'g/nd0', 'g/pnd0'],
@@ -31,7 +41,8 @@ SpecPBBS = [{"prob": "breadthFirstSearch",
       },
      {"prob": "delaunayTriangulation",
       "algos": ["incrementalDelaunay", "g/p", "g/nd0", "g/nd1", "g/pnd0", "g/pnd1"], #, "serialDelaunay"],
-      "inputs": ["2DinCube_10M", "2Dkuzmin_10M", "2DinCube_10M-reordered.points"],
+      "inputs": [#"2Dkuzmin_10M", 
+        "2DinCube_10M", "2DinCube_10M-reordered.points"],
       "extras":
         [
           {'algos': ["incrementalDelaunay", 'g/p', 'g/nd0', 'g/pnd0'],
@@ -41,12 +52,15 @@ SpecPBBS = [{"prob": "breadthFirstSearch",
         ]
       },
      {"prob": "maximalIndependentSet",
-      "algos": ["incrementalMIS", "ndMIS", "g/nd0", "g/nd1", "g/pnd0", "g/pnd1"],# "serialMIS"],
-      "inputs": ["randLocalGraph_J_5_10000000", "rMatGraph_J_5_10000000", "3Dgrid_J_10000000"],
+      "algos": ["incrementalMIS", "ndMIS", "g/nd0", "g/nd1", "g/pnd0", "g/pnd1", "g/d", "g/pd"],# "serialMIS"],
+#      "inputs": ["randLocalGraph_J_5_10000000", "rMatGraph_J_5_10000000", "3Dgrid_J_10000000", "USA-road-d.USA", "2d-2e26", "2d-2e26-ordered"],
+      "inputs": ["randLocalGraph_J_5_10000000", "2d-2e26", "2d-2e26-ordered"],
       "extras":
         [
-          {'algos': ["incrementalMIS", "g/nd0", "g/pnd0"],
-           'arg': "Rounds::-r::25,50,100,200" }
+          {'algos': ["incrementalMIS", "g/nd0", "g/pnd0", "g/d", "g/pd"],
+#           'arg': "Rounds::-r::1,25,50,100,200" 
+           'arg': "Rounds::-r::25" 
+          }
         ]
       }
 #     ,
@@ -122,8 +136,7 @@ def genPBBS(options):
 
 
 SpecParsec = [
-    {'name': 'blackscholes', 'inputs': ['-1 in_mid.txt prices.txt']},
-#      ['-1 in_10M.txt prices.txt']},
+    {'name': 'blackscholes', 'inputs': ["-1 in_64K.txt prices.txt", "-1 in_mid.txt prices.txt", '-1 in_10M.txt prices.txt']},
     {'name': 'bodytrack', 'inputs': ['sequenceB_261 4 261 4000 5 0 -1']},
     {'name': 'freqmine', 'inputs': ['kosarak_990k.dat 790']}
 #      ['webdocs_250k.dat 11000', 'kosarak_250k.dat 220', 'kosarak_990k.dat 790']}
