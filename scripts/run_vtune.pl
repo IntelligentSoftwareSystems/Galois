@@ -28,7 +28,7 @@ print "*** Executing: " . $cmdline . "\n";
 
 my $uname = `whoami`;
 chomp($uname);
-my $type = "nehalem_memory-access";
+# my $type = "nehalem_general-exploration";
 my $type = "nehalem_memory-access";
 
 my $sys = `hostname`;
@@ -42,10 +42,10 @@ if ($sys eq "oersted") {
 
 my $dire = "/tmp/$uname.vtune.r$threads";
 my $rdir = "-result-dir=$dire";
-my $report = "-R hw-events -csv-delimiter tab";
+my $report = "-R hw-events -format csv -csv-delimiter tab";
 my $collect = "-analyze-system -collect $type -start-paused";
 my $sdir = "-search-dir all=$symbol";
-my $maxsec = 240;
+my $maxsec = 1000;
 
 system("date");
 system("rm -rf $dire");
