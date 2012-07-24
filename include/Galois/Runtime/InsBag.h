@@ -63,13 +63,14 @@ class galois_insert_bag : private boost::noncopyable {
 
   void destruct() {
     for (unsigned x = 0; x < heads.size(); ++x) {
-      header* h = heads.get(x);
-      if (h) {
-	heads.get(x) = h->next;
+      header*& h = heads.get(x);
+      while (h) {
 	for (T* ii = h->dbegin, *ee = h->dend; ii != ee; ++ii) {
 	  ii->~T();
 	}
-	MM::pageFree(h);
+	header* h2 = h;
+	h = h->next;
+	MM::pageFree(h2);
       }
     }
   }
@@ -83,8 +84,6 @@ public:
 
   void clear() {
     destruct();
-    for (unsigned i = 0; i < heads.size(); ++i)
-      heads.get(i) = 0;
   }
 
   typedef T        value_type;
