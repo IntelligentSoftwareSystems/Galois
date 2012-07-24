@@ -23,8 +23,8 @@ if (exists $n{1}) {
 if (scalar @ARGV > 1) {
     print "outputfile (eps) is $ARGV[1]\n";
     open GP, "|gnuplot" or die "Can't execute gnuplot";
-    print GP "set term post eps\n";
-    print GP "set output '$ARGV[1]'\n";
+    print GP "set terminal postscript enhanced color\n";
+    print GP "set output '| ps2pdf - $ARGV[1]'\n";
 } else {
     open GP, "|gnuplot -persist" or die "Can't execute gnuplot";
 }
