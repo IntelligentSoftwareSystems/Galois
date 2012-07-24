@@ -48,7 +48,6 @@ const char* url = NULL;
 enum MISAlgo {
   serial,
   parallel,
-  parallelBarrier
 };
 
 enum DetAlgo {
@@ -64,7 +63,6 @@ static cll::opt<MISAlgo> algo(cll::desc("Choose an algorithm:"),
     cll::values(
       clEnumVal(serial, "Serial"),
       clEnumVal(parallel, "Parallel using Galois"),
-      clEnumVal(parallelBarrier, "Parallel semi-ordered"),
       clEnumValEnd), cll::init(parallel));
 #ifdef GALOIS_USE_DET
 static cll::opt<DetAlgo> detAlgo(cll::desc("Deterministic algorithm:"),
@@ -87,8 +85,12 @@ struct Node {
   Node() : flag(UNMATCHED), pendingFlag(UNMATCHED) { }
 };
 
-//typedef Galois::Graph::LC_CSR_Graph<Node,void> Graph;
-typedef Galois::Graph::LC_Linear_Graph<Node,void> Graph;
+#ifdef GALOIS_USE_NUMA
+typedef Galois::Graph::LC_Linear2_Graph<Node,void> Graph;
+#else
+typedef Galois::Graph::LC_CSR_Graph<Node,void> Graph;
+#endif
+
 typedef Graph::GraphNode GNode;
 
 Graph graph;
@@ -177,7 +179,7 @@ struct GaloisAlgo {
 #ifdef GALOIS_USE_DET
     switch (detAlgo) {
       case nondet: 
-        Galois::for_each_local(graph, Process<>()); break;
+        Galois::for_each<WL>(graph.begin(), graph.end(), Process<>()); break;
       case detBase:
         Galois::for_each_det<false>(graph.begin(), graph.end(), Process<>()); break;
       case detPrefix:
@@ -198,92 +200,6 @@ struct SerialAlgo {
     typedef GaloisRuntime::WorkList::BulkSynchronousInline<false> WL;
 
     std::for_each(graph.begin(), graph.end(), Process<>());
-  }
-};
-
-//! Operator for bulk-synchronous scheduling
-struct BarrierProcess1 {
-  typedef int tt_does_not_need_aborts;
-  typedef int tt_does_not_need_parallel_push;
-
-  void operator()(GNode src, Galois::UserContext<GNode>& _) {
-    MatchFlag flag = MATCHED;
-    for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::NONE),
-        ei = graph.edge_end(src, Galois::NONE); ii != ei; ++ii) {
-      GNode dst = graph.getEdgeDst(ii);
-      if (dst < src) {
-        Node& data = graph.getData(dst, Galois::NONE);
-        if (data.flag == MATCHED) {
-          flag = OTHER_MATCHED;
-          break;
-        } else if (data.flag == UNMATCHED) {
-          flag = UNMATCHED;
-        }
-      }
-    }
-    
-    graph.getData(src, Galois::NONE).pendingFlag = flag;
-  }
-};
-
-//! Operator for bulk-synchronous scheduling
-struct BarrierProcess2 {
-  typedef int tt_does_not_need_aborts;
-  typedef int tt_does_not_need_parallel_push;
-
-  Galois::InsertBag<GNode>& bag;
-  BarrierProcess2(Galois::InsertBag<GNode>& b): bag(b) { }
-  void operator()(GNode src, Galois::UserContext<GNode>& _) {
-    Node& data = graph.getData(src, Galois::NONE);
-    if (data.pendingFlag == UNMATCHED)
-      bag.push(src);
-    else
-      data.flag = data.pendingFlag;
-  }
-};
-
-struct GenerateBarrierData {
-  typedef GaloisRuntime::PerCPU<unsigned> CounterTy;
-  CounterTy& counter;
-  Galois::InsertBag<GNode>* wls;
-
-  GenerateBarrierData(Galois::InsertBag<GNode>* w, CounterTy& c): wls(w), counter(c) { }
-
-  void operator()(GNode node) {
-    unsigned& c = counter.get();
-    wls[c].push(node);
-    c = ++c & 31;
-  }
-};
-
-struct GaloisBarrier {
-  void operator()() {
-    Galois::StatTimer T("copy");
-    T.start();
-    std::vector<GNode> order;
-    std::copy(graph.begin(), graph.end(), std::back_inserter(order)); 
-    T.stop();
-
-    Galois::InsertBag<GNode> wls[2];
-    size_t delta = std::max(order.size() / 16, 1UL);
-    int cur = 0;
-    int next = 1;
-    for (size_t begin = 0; begin < order.size(); begin += delta) {
-      size_t end = std::min(begin + delta, order.size());
-      Galois::for_each(&order[begin], &order[end], BarrierProcess1());
-      Galois::for_each(&order[begin], &order[end], BarrierProcess2(wls[cur]));
-      Galois::for_each(wls[cur].begin(), wls[cur].end(), BarrierProcess1());
-      Galois::for_each(wls[cur].begin(), wls[cur].end(), BarrierProcess2(wls[next]));
-      wls[cur].clear();
-      std::swap(cur, next);
-    }
-
-    while (wls[cur].begin() != wls[cur].end()) {
-      Galois::for_each(wls[cur].begin(), wls[cur].end(), BarrierProcess1());
-      Galois::for_each(wls[cur].begin(), wls[cur].end(), BarrierProcess2(wls[next]));
-      wls[cur].clear();
-      std::swap(cur, next);
-    }
   }
 };
 
@@ -346,7 +262,6 @@ int main(int argc, char** argv) {
   switch (algo) {
     case serial: SerialAlgo()(); break;
     case parallel: GaloisAlgo()(); break;
-    case parallelBarrier: GaloisBarrier()(); break;
     default: std::cerr << "Unknown algorithm" << algo << "\n"; abort();
   }
   T.stop();
