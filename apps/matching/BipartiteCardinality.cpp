@@ -395,13 +395,21 @@ struct MatchingABMP {
 
   struct Less: public std::binary_function<const GraphNode&,const GraphNode&,bool> {
     unsigned operator()(const GraphNode& n1, const GraphNode& n2) const {
-      return n1.getData(Galois::NONE).layer < n2.getData(Galois::NONE).layer;
+      unsigned l1 = n1.getData(Galois::NONE).layer;
+      unsigned l2 = n2.getData(Galois::NONE).layer;
+      if (l1 < l2) return true;
+      if (l1 > l2) return false;
+      return n1 < n2;
     }
   };
 
   struct Greater: public std::binary_function<const GraphNode&,const GraphNode&,bool> {
     unsigned operator()(const GraphNode& n1, const GraphNode& n2) const {
-      return n1.getData(Galois::NONE).layer > n2.getData(Galois::NONE).layer;
+      unsigned l1 = n1.getData(Galois::NONE).layer;
+      unsigned l2 = n2.getData(Galois::NONE).layer;
+      if (l1 > l2) return true;
+      if (l1 < l2) return false;
+      return n1 > n2;
     }
   };
 
