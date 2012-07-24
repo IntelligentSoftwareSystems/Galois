@@ -1944,6 +1944,8 @@ public:
       srand48_r(i, &tld.getRemote(i)->r);
   }
 
+
+
   template<bool newconcurrent>
   struct rethread {
     typedef PTbb<Compare, T> WL;
@@ -1991,7 +1993,7 @@ public:
 
   template<typename ItTy>
   void push_initial(ItTy b, ItTy e) {
-    push(b,e);
+    fill_work(*this, b, e);
   }
 
   boost::optional<value_type> pop() {
@@ -2080,8 +2082,7 @@ public:
 
   template<typename ItTy>
   void push_initial(ItTy b, ItTy e) {
-    while (b != e)
-      push(*b++);
+    fill_work(*this,b,e);
   }
 
   boost::optional<value_type> pop() {
