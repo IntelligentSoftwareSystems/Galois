@@ -58,17 +58,23 @@ struct PriAuto {
 
   template<typename IterTy,typename FunctionTy>
   static void for_each(IterTy b, IterTy e, FunctionTy f, const char* loopname = 0) {
-
+    static bool printed = false;
 #define WLFOO2(__x)							\
     if (WorklistName == #__x) {						\
-      gInfo("WorkList %s\n", #__x);					\
+      if (!printed) {							\
+	gInfo("WorkList %s\n", #__x);					\
+	printed = true;							\
+      }									\
       Galois::for_each<__x>(b,e,f,loopname);				\
     } else
 #include "PrioritySchedulers.h"
 #undef WLFOO2
 #define WLFOO2(__x)							\
     if (WorklistName == "NI_" #__x) {					\
-      gInfo("WorkList %s\n", "NI_" #__x);				\
+      if (!printed) {							\
+	gInfo("WorkList %s\n", "NI_" #__x);				\
+	printed = true;							\
+      }									\
       Galois::for_each<NoInlineFilter<__x> >(b,e,f,loopname);		\
     } else
 #include "PrioritySchedulers.h"
