@@ -62,6 +62,9 @@ static cll::opt<std::string> doWriteMesh("writemesh",
 static cll::opt<std::string> doWritePoints("writepoints",
     cll::desc("Write the (reordered) points to filename"),
     cll::value_desc("filename"));
+static cll::opt<bool> noReorderPoints("noreorder",
+    cll::desc("Don't reorder points to improve locality"),
+    cll::init(false));
 static cll::opt<std::string> inputname(cll::Positional, cll::desc("<input file>"), cll::Required);
 
 enum DetAlgo {
@@ -363,7 +366,7 @@ class ReadPoints {
 public:
   ReadPoints(PointList& p): points(p) { }
 
-  void from(const std::string& name, bool reorder) {
+  void from(const std::string& name) {
     std::ifstream scanner(name.c_str());
     if (!scanner.good()) {
       std::cerr << "Couldn't open file: " << name << "\n";
@@ -475,7 +478,7 @@ struct GenerateRounds {
 
 //! Blocked point distribution (exponentially increasing block size) with points randomized
 //! within a round
-static void generateRoundsOld(PointList& points) {
+static void generateRoundsOld(PointList& points, bool randomize) {
   size_t counter = 0;
   size_t round = 0;
   size_t next = 1 << roundShift;
@@ -489,7 +492,8 @@ static void generateRoundsOld(PointList& points) {
     if (ii == ei || counter > next) {
       next *= next;
       int r = maxRounds - 1 - round;
-      std::random_shuffle(buf.begin(), buf.end());
+      if (randomize)
+        std::random_shuffle(buf.begin(), buf.end());
       std::copy(buf.begin(), buf.end(), std::back_inserter(rounds[r]));
       buf.clear();
       ++round;
@@ -507,26 +511,27 @@ static void generateRounds(PointList& points, bool addBoundary) {
 
   PointList ordered;
   ordered.reserve(size);
-  if (true) {
+  if (noReorderPoints) {
+    std::copy(&points[0], &points[size], std::back_inserter(ordered));
+    generateRoundsOld(ordered, false);
+  } else {
     // Reorganize spatially
     QuadTree q(
       boost::make_transform_iterator(&points[0], GetPointer()),
       boost::make_transform_iterator(&points[size], GetPointer()));
 
     q.output(std::back_inserter(ordered));
-  } else {
-    std::copy(&points[0], &points[size], std::back_inserter(ordered));
-  }
 
-  if (true) {
-    GenerateRounds::CounterTy counter;
+    if (true) {
+      GenerateRounds::CounterTy counter;
 #ifdef GALOIS_USE_DET
-    std::for_each(ordered.begin(), ordered.end(), GenerateRounds(counter, log2));
+      std::for_each(ordered.begin(), ordered.end(), GenerateRounds(counter, log2));
 #else
-    Galois::do_all(ordered.begin(), ordered.end(), GenerateRounds(counter, log2));
+      Galois::do_all(ordered.begin(), ordered.end(), GenerateRounds(counter, log2));
 #endif
-  } else {
-    generateRoundsOld(ordered);
+    } else {
+      generateRoundsOld(ordered, true);
+    }
   }
 
   if (!addBoundary)
@@ -547,7 +552,7 @@ static void generateRounds(PointList& points, bool addBoundary) {
 
 static void readInput(const std::string& filename, bool addBoundary) {
   PointList points;
-  ReadPoints(points).from(filename, false);
+  ReadPoints(points).from(filename);
 
   std::cout << "configuration: " << points.size() << " points\n";
 
@@ -694,7 +699,7 @@ int main(int argc, char** argv) {
 
     PointList points;
     // Reordering messes up connection between id and place in pointlist
-    ReadPoints(points).from(inputname, false);
+    ReadPoints(points).from(inputname);
     writePoints(base.append(".node"), points);
   }
 
