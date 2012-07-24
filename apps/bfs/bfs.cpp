@@ -33,6 +33,7 @@
 #include "Galois/Statistic.h"
 #include "Galois/Graphs/LCGraph.h"
 #ifdef GALOIS_USE_EXP
+#include "Galois/PriorityScheduling.h"
 #include "Galois/Runtime/ParallelWorkInline.h"
 #endif
 #include "llvm/Support/CommandLine.h"
@@ -148,8 +149,16 @@ struct UpdateRequest {
 
   UpdateRequest(): w(0) { }
   UpdateRequest(const GNode& N, unsigned int W): n(N), w(W) { }
-  bool operator<(const UpdateRequest& o) const { return w < o.w; }
-  bool operator>(const UpdateRequest& o) const { return w > o.w; }
+  bool operator<(const UpdateRequest& o) const {
+    if (w < o.w) return true;
+    if (w > o.w) return false;
+    return n < o.n;
+  }
+  bool operator>(const UpdateRequest& o) const {
+    if (w > o.w) return true;
+    if (w < o.w) return false;
+    return n > o.n;
+  }
   unsigned getID() const { return /* graph.getData(n).id; */ 0; }
 };
 
@@ -168,18 +177,6 @@ struct UpdateRequestIndexer {
 struct GNodeIndexer {
   unsigned int operator()(const GNode& val) const {
     return graph.getData(val, Galois::NONE).dist;
-  }
-};
-
-struct GNodeLess {
-  bool operator()(const GNode& a, const GNode& b) const {
-    return graph.getData(a, Galois::NONE).dist < graph.getData(b, Galois::NONE).dist;
-  }
-};
-
-struct GNodeGreater {
-  bool operator()(const GNode& a, const GNode& b) const {
-    return graph.getData(a, Galois::NONE).dist > graph.getData(b, Galois::NONE).dist;
   }
 };
 
@@ -524,10 +521,14 @@ struct GaloisNoLockAlgo {
     using namespace GaloisRuntime::WorkList;
     typedef dChunkedFIFO<64> dChunk;
     typedef ChunkedFIFO<64> Chunk;
-    typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
+    typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk,true> OBIM;
 
     UpdateRequest one[1] = { UpdateRequest(source, 0) };
+#ifdef GALOIS_USE_EXP
+    Exp::PriAuto<64, UpdateRequestIndexer, OBIM, std::less<UpdateRequest>, std::greater<UpdateRequest> >::for_each(&one[0], &one[1], *this);
+#else
     Galois::for_each<OBIM>(&one[0], &one[1], *this);
+#endif
   }
 
   void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& ctx) const {
