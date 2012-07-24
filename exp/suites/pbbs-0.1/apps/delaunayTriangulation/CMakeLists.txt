@@ -6,9 +6,9 @@ kuzmin(2Dkuzmin_10M 2 10000000)
 ## 
 
 # Broken for -O3
-if(CMAKE_BUILD_TYPE MATCHES "Release")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
-endif()
+#if(CMAKE_BUILD_TYPE MATCHES "Release")
+#  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
+#endif()
 
 # NB(ddn): we have common .cpps in common/ too but since we change .h
 # definitions, they cannot be shared as a library, so instead just build

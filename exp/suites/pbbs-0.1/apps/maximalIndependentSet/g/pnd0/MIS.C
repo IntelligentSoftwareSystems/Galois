@@ -37,7 +37,7 @@ struct GFn1 {
   GFn1(int _numberKeep, int _numberDone, vindex* _I, S* _state, S _step, bool* _keep): numberKeep(_numberKeep), numberDone(_numberDone), I(_I), state(_state), step(_step), keep(_keep) { }
   void operator()(int i) {
 	if (i >= numberKeep) I[i] = numberDone + i;
-	keep[i] = !state[i].commit(I[i]);
+	keep[i] = step.reserve(I[i]);
   }
 };
 
@@ -51,8 +51,7 @@ struct GFn2 {
   bool *keep;
   GFn2(int _numberKeep, int _numberDone, vindex* _I, S* _state, S _step, bool* _keep): numberKeep(_numberKeep), numberDone(_numberDone), I(_I), state(_state), step(_step), keep(_keep) { }
   void operator()(int i) {
-	if (i >= numberKeep) I[i] = numberDone + i;
-	keep[i] = !step.commit(I[i]);
+        if (keep[i]) keep[i] = !step.commit(I[i]);
   }
 };
 
@@ -78,24 +77,29 @@ void speculative_for(S step, int s, int e, int granularity,
   while (numberDone < e) {
     //cout << "numberDone=" << numberDone << endl;
     if (round++ > maxTries) {
-      cerr << "speculativeLoop: too many iterations, increase maxTries parameter\n";
-      abort();
+//      cerr << "speculativeLoop: too many iterations, increase maxTries parameter\n";
+//      abort();
     }
     int size = min(maxRoundSize, e - numberDone);
 
     if (hasState) {
+      abort();
+    } else {
 //      parallel_for (int i =0; i < size; i++) {
-      GFn2<S> gfn1(numberKeep, numberDone, I, state, step, keep);
+      GFn1<S> gfn1(numberKeep, numberDone, I, state, step, keep);
       parallel_doall_obj(int, i, 0, size, gfn1)  {
 	if (i >= numberKeep) I[i] = numberDone + i;
-	keep[i] = !state[i].commit(I[i]);
+	keep[i] = step.reserve(I[i]);
       } parallel_doall_end
+    }
+
+    if (hasState) {
+      abort();
     } else {
 //      parallel_for (int i =0; i < size; i++) {
       GFn2<S> gfn2(numberKeep, numberDone, I, state, step, keep);
       parallel_doall_obj(int, i, 0, size, gfn2)  {
-	if (i >= numberKeep) I[i] = numberDone + i;
-	keep[i] = !step.commit(I[i]);
+        if (keep[i]) keep[i] = !step.commit(I[i]);
       } parallel_doall_end
     }
 
@@ -127,12 +131,13 @@ struct MISstep {
   MISstep(char* _F, vertex* _G, int* _M, pthread_mutex_t* _l) : Flags(_F), G(_G), Marks(_M), locks(_l) {}
 
   bool acquire(int id, int i) {
+    if (Marks[i] == id)
+      return true;
+
     bool retval;
     pthread_mutex_lock(&locks[i]);
     int v = Marks[i];
-    if (v == id) {
-      retval = true;
-    } else if (v == -1) {
+    if (v == -1) {
       Marks[i] = id;
       retval = true;
     } else {
@@ -150,7 +155,14 @@ struct MISstep {
     return true;
   }
 
-  bool doit(int i) {
+  bool reserve(int i) {
+    if (doit(i, true))
+      return true;
+    resetState(i);
+    return false;
+  }
+
+  bool doit(int i, bool reserve) {
     int d = G[i].degree;
     if (!acquire(i, i))
       return false;
@@ -163,6 +175,8 @@ struct MISstep {
       if (Flags[ngh] != 0)
         return true;
     }
+    if (reserve)
+      return true;
     Flags[i] = 1;
     for (int j = 0; j < d; j++) {
       vindex ngh = G[i].Neighbors[j];
@@ -184,7 +198,7 @@ struct MISstep {
   }
 
   bool commit(int i) { 
-    bool retval = doit(i);
+    bool retval = doit(i, false);
     resetState(i);
     return retval;
   }

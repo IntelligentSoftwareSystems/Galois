@@ -25,6 +25,36 @@
 #include "graph.h"
 #include "parallel.h"
 //#include "speculative_for.h"
+
+template<class S>
+struct GFn1 {
+  int numberKeep;
+  int numberDone;
+  vindex *I;
+  S* state;
+  S step;
+  bool *keep;
+  GFn1(int _numberKeep, int _numberDone, vindex* _I, S* _state, S _step, bool* _keep): numberKeep(_numberKeep), numberDone(_numberDone), I(_I), state(_state), step(_step), keep(_keep) { }
+  void operator()(int i) {
+	if (i >= numberKeep) I[i] = numberDone + i;
+	keep[i] = step.reserve(I[i]);
+  }
+};
+
+template<class S>
+struct GFn2 {
+  int numberKeep;
+  int numberDone;
+  vindex *I;
+  S* state;
+  S step;
+  bool *keep;
+  GFn2(int _numberKeep, int _numberDone, vindex* _I, S* _state, S _step, bool* _keep): numberKeep(_numberKeep), numberDone(_numberDone), I(_I), state(_state), step(_step), keep(_keep) { }
+  void operator()(int i) {
+        if (keep[i]) keep[i] = !step.commit(I[i]);
+  }
+};
+
 template <class S>
 void speculative_for(S step, int s, int e, int granularity, 
 		     bool hasState=1, int maxTries=-1) {
@@ -56,7 +86,8 @@ void speculative_for(S step, int s, int e, int granularity,
       abort();
     } else {
 //      parallel_for (int i =0; i < size; i++) {
-      parallel_doall(int, i, 0, size)  {
+      GFn1<S> gfn1(numberKeep, numberDone, I, state, step, keep);
+      parallel_doall_obj(int, i, 0, size, gfn1)  {
 	if (i >= numberKeep) I[i] = numberDone + i;
 	keep[i] = step.reserve(I[i]);
       } parallel_doall_end
@@ -66,7 +97,8 @@ void speculative_for(S step, int s, int e, int granularity,
       abort();
     } else {
 //      parallel_for (int i =0; i < size; i++) {
-      parallel_doall(int, i, 0, size)  {
+      GFn2<S> gfn2(numberKeep, numberDone, I, state, step, keep);
+      parallel_doall_obj(int, i, 0, size, gfn2)  {
         if (keep[i]) keep[i] = !step.commit(I[i]);
       } parallel_doall_end
     }
@@ -95,46 +127,45 @@ using namespace std;
 //   Flags = 2 indicates a neighbor is chosen
 struct MISstep {
   char *Flags;  vertex*G; int *Marks;
-  MISstep(char* _F, vertex* _G, int* _M) : Flags(_F), G(_G), Marks(_M) {}
+  pthread_mutex_t* locks;
+  MISstep(char* _F, vertex* _G, int* _M, pthread_mutex_t* _l) : Flags(_F), G(_G), Marks(_M), locks(_l) {}
 
-  bool acquire(int id, int i) {
-    int v;
-    do {
-      v = Marks[i];
-      if (v == id)
+  bool acquire(int id, int i, bool reserve) {
+    if (reserve) {
+      if (Marks[i] == id)
         return true;
-      if (v == -1 && __sync_bool_compare_and_swap(&Marks[i], v, id)) {
-        return true;
-      }
-    } while (v == -1);
-
-    return false;
+      pthread_mutex_lock(&locks[i]);
+      if (Marks[i] > id)
+        Marks[i] = id;
+      pthread_mutex_unlock(&locks[i]);
+      return true;
+    } else {
+      return Marks[i] == id;
+    }
   }
 
   bool release(int id, int i) {
     if (Marks[i] != id)
       return false;
 
-    Marks[i] = -1;
+    Marks[i] = INT_MAX;
     return true;
   }
 
   bool reserve(int i) {
-    if (doit(i, true))
-      return true;
-    resetState(i);
-    return false;
+    doit(i, true);
+    return true;
   }
 
   bool doit(int i, bool reserve) {
     int d = G[i].degree;
-    if (!acquire(i, i))
+    if (!acquire(i, i, reserve))
       return false;
     if (Flags[i] != 0)
       return true;
     for (int j = 0; j < d; j++) {
       vindex ngh = G[i].Neighbors[j];
-      if (!acquire(i, ngh))
+      if (!acquire(i, ngh, reserve))
         return false;
       if (Flags[ngh] != 0)
         return true;
@@ -155,10 +186,8 @@ struct MISstep {
       return;
     for (int j = 0; j < d; j++) {
       vindex ngh = G[i].Neighbors[j];
-      if (!release(i, ngh))
-        return;
+      release(i, ngh);
     }
-    return;
   }
 
   bool commit(int i) { 
@@ -171,12 +200,18 @@ struct MISstep {
 char* maximalIndependentSet(graph GS) {
   int n = GS.n;
   vertex* G = GS.V;
-  int* Marks = newArray(n, -1);
+  int* Marks = newArray(n, INT_MAX);
   char* Flags = newArray(n,  (char) 0);
-  MISstep mis(Flags, G, Marks);
+  pthread_mutex_t* locks = new pthread_mutex_t[n];
+  for (int i = 0; i < n; ++i)
+    pthread_mutex_init(&locks[i], NULL);
+  MISstep mis(Flags, G, Marks, locks);
   int numRounds = Exp::getNumRounds();
   numRounds = numRounds <= 0 ? 25 : numRounds;
   speculative_for(mis, 0, n, numRounds, 0);
+  for (int i = 0; i < n; ++i)
+    pthread_mutex_destroy(&locks[i]);
+  delete [] locks;
   free(Marks);
   return Flags;
 }

@@ -47,8 +47,8 @@ void speculative_for(S step, int s, int e, int granularity,
   while (numberDone < e) {
     //cout << "numberDone=" << numberDone << endl;
     if (round++ > maxTries) {
-      cerr << "speculativeLoop: too many iterations, increase maxTries parameter\n";
-      abort();
+//      cerr << "speculativeLoop: too many iterations, increase maxTries parameter\n";
+//      abort();
     }
     int size = min(maxRoundSize, e - numberDone);
 

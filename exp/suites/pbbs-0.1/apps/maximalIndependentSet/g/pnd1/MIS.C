@@ -30,6 +30,7 @@
 struct TLD {
   std::deque<int> abortedQ;
   int aborted;
+  TLD(): aborted(0) { }
 };
 
 template<class S>
@@ -94,8 +95,8 @@ void speculative_for(S step, int s, int e, int granularity, bool hasState=0, int
   while (numberDone < e) {
     //cout << "numberDone=" << numberDone << endl;
     if (round++ > maxTries) {
-      cerr << "speculativeLoop: too many iterations, increase maxTries parameter\n";
-      abort();
+//      cerr << "speculativeLoop: too many iterations, increase maxTries parameter\n";
+//      abort();
     }
     //int size = min(maxRoundSize, e - numberDone);
     int size = e - numberDone;
@@ -180,12 +181,13 @@ struct MISstep {
   MISstep(char* _F, vertex* _G, int* _M, pthread_mutex_t* _l) : Flags(_F), G(_G), Marks(_M), locks(_l) {}
 
   bool acquire(int id, int i) {
+    if (Marks[i] == id)
+      return true;
+
     bool retval;
     pthread_mutex_lock(&locks[i]);
     int v = Marks[i];
-    if (v == id) {
-      retval = true;
-    } else if (v == -1) {
+    if (v == -1) {
       Marks[i] = id;
       retval = true;
     } else {

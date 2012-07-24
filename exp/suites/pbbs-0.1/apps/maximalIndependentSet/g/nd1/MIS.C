@@ -30,12 +30,13 @@
 struct TLD {
   std::deque<int> abortedQ;
   int aborted;
+  TLD(): aborted(0) { }
 };
 
 //#define DUMB
 template <class S>
 void speculative_for(S step, int s, int e, int granularity, 
-		     bool hasState=0, int maxTries=-1) {
+		     bool hasState=1, int maxTries=-1) {
   unsigned numThreads = Exp::getNumThreads();
   
   if (maxTries < 0) maxTries = 2*granularity;
@@ -61,8 +62,8 @@ void speculative_for(S step, int s, int e, int granularity,
   while (numberDone < e) {
     //cout << "numberDone=" << numberDone << endl;
     if (round++ > maxTries) {
-      cerr << "speculativeLoop: too many iterations, increase maxTries parameter\n";
-      abort();
+//      cerr << "speculativeLoop: too many iterations, increase maxTries parameter\n";
+//      abort();
     }
     //int size = min(maxRoundSize, e - numberDone);
     int size = e - numberDone;
@@ -78,7 +79,6 @@ void speculative_for(S step, int s, int e, int granularity,
           if (cur >= numberKeep) I[cur] = numberDone + cur;
 #endif
           bool success = step.commit(cur);
-          //bool success = state[i].commit(I[i]);
           if (!success) {
             t.abortedQ.push_back(cur);
             t.aborted++;
@@ -214,7 +214,7 @@ char* maximalIndependentSet(graph GS) {
   MISstep mis(Flags, G, Marks);
   int numRounds = Exp::getNumRounds();
   numRounds = numRounds <= 0 ? 25 : numRounds;
-  speculative_for(mis, 0, n, numRounds);
+  speculative_for(mis, 0, n, numRounds, 0);
   free(Marks);
   return Flags;
 }

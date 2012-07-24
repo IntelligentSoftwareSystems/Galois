@@ -4,6 +4,10 @@
 #include <cassert>
 #include <cstdio>
 
+#ifdef GALOIS_USE_VTUNE
+#include "ittnotify.h"
+#endif
+
 __thread unsigned Exp::TID = 0;
 unsigned Exp::nextID = 0;
 
@@ -229,7 +233,15 @@ int Exp::getNumRounds() {
   return -1;
 }
 
+static bool started = 0;
+
 void Exp::beginSampling() {
+#ifdef GALOIS_USE_VTUNE
+  if (!started) {
+    __itt_resume();
+    started = true;
+  }
+#endif
   char *p = getenv("GALOIS_EXIT_BEFORE_SAMPLING");
   if (p) {
     int n = atoi(p);
@@ -238,6 +250,10 @@ void Exp::beginSampling() {
 }
 
 void Exp::endSampling() {
+#ifdef GALOIS_USE_VTUNE
+  __itt_pause();
+  started = 0;
+#endif
   char *p = getenv("GALOIS_EXIT_AFTER_SAMPLING");
   if (p) {
     int n = atoi(p);

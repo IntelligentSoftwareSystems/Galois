@@ -32,8 +32,11 @@ using namespace std;
 
 void maxIndSetNonDeterministic(int n, vertex* G, char* Flags){
   int* V = newA(int,n);
+  int* failures = newA(int,n);
+
 //  parallel_for(int i=0;i<n;i++) V[i]=INT_MAX;
   parallel_doall(int, i, 0, n) { V[i]=INT_MAX; } parallel_doall_end
+  parallel_doall(int, i, 0, n) { failures[i] = 0; } parallel_doall_end
   
 //  parallel_for(int i=0;i<n;i++){
   parallel_doall(int, i, 0, n) {
@@ -66,11 +69,17 @@ void maxIndSetNonDeterministic(int n, vertex* G, char* Flags){
 	    vindex ngh = G[v].Neighbors[j];
 	    if(Flags[ngh] != 2) V[ngh] = INT_MAX;
 	  }
+          failures[v]++;
 	}
+      } else {
+        failures[v]++;
       }
     }
   } parallel_doall_end
-  free(V);
+  int nfailures = sequence::plusReduce(failures, n);
+  cout << "failures = " << nfailures << "\n";
+  free(V); free(failures);
+
 }
 
 void brokenCompiler(char* Flags, int n) {

@@ -54,7 +54,9 @@ def parse(line, first):
     values = [' '.join(values[0:d+1])] + values[d+1:]
   if KeepAll:
     for (h,v) in zip(Header, values):
-      print('RUN: Variable PC%s = %s' % (h, v))
+      if h == "Function" or h == "Module":
+        continue
+      print('RUN: Variable PC_%s = %s' % (h, v))
   else:
     (func, module, cycles, insts, llcm) = [values[x] for x in Columns]
     kind = decode(func, module)
@@ -79,10 +81,10 @@ def main():
       indata = True
       first = True
       continue
-    if line.startswith('RUN: CUT STOP') or line.startswith('RUN: Start'): 
+    if line.startswith('RUN: '):
       indata = False
       first = False
-      if not line.startswith('RUN: Start'):
+      if line.startswith('RUN: CUT STOP'):
         continue
 
     if indata:

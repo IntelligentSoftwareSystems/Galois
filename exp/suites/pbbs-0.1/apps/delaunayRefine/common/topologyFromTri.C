@@ -51,6 +51,56 @@ struct hashEdges {
 typedef Table<hashEdges> EdgeTable;
 EdgeTable makeEdgeTable(int m) {return EdgeTable(m,hashEdges());}
 
+namespace {
+struct GFn1 {
+  vertex* v;
+  point2d* P;
+  GFn1(vertex* _v, point2d* _P): v(_v), P(_P) { }
+  void operator()(int i) {
+    v[i] = vertex(P[i],i);
+  }
+};
+
+struct GFn2 {
+  edge* E;
+  triangle* T;
+  tri* Triangs;
+  EdgeTable& ET;
+  vertex* v;
+  GFn2(edge* _E, triangle* _T, tri* _Triangs, EdgeTable& _ET, vertex* _v):
+    E(_E), T(_T), Triangs(_Triangs), ET(_ET), v(_v) { }
+  void operator()(int i) {
+    for (int j=0; j<3; j++) {
+      E[i*3 + j] = edge(pairInt(T[i].C[j], T[i].C[(j+1)%3]), &Triangs[i]);
+      ET.insert(&E[i*3+j]);
+      Triangs[i].vtx[(j+2)%3] = &v[T[i].C[j]];
+    }
+  }
+};
+
+struct GFn3 {
+  tri* Triangs;
+  triangle* T;
+  EdgeTable& ET;
+  GFn3(tri* _Triangs, triangle* _T, EdgeTable& _ET):
+    Triangs(_Triangs), T(_T), ET(_ET) { }
+  void operator()(int i) {
+    Triangs[i].id = i;
+    Triangs[i].initialized = 1;
+    Triangs[i].bad = 0;
+    for (int j=0; j<3; j++) {
+      pairInt key = pairInt(T[i].C[(j+1)%3], T[i].C[j]);
+      edge *Ed = ET.find(key);
+      if (Ed != NULL) Triangs[i].ngh[j] = Ed->second;
+      else { Triangs[i].ngh[j] = NULL;
+	//Triangs[i].vtx[j]->boundary = 1;
+	//Triangs[i].vtx[(j+2)%3]->boundary = 1;
+      }
+    }
+  }
+};
+}
+
 void topologyFromTriangles(triangles<point2d> Tri, vertex** vr, tri** tr) {
   int n = Tri.numPoints;
   point2d* P = Tri.P;
@@ -61,7 +111,7 @@ void topologyFromTriangles(triangles<point2d> Tri, vertex** vr, tri** tr) {
   if (*vr == NULL) *vr = newA(vertex,n);
   vertex* v = *vr;
 //  parallel_for (int i=0; i < n; i++)
-  parallel_doall(int, i, 0, n) {
+  parallel_doall_obj(int, i, 0, n, GFn1(v, P)) {
     v[i] = vertex(P[i],i);
   } parallel_doall_end
 
@@ -70,7 +120,7 @@ void topologyFromTriangles(triangles<point2d> Tri, vertex** vr, tri** tr) {
   edge* E = newA(edge, m*3);
   EdgeTable ET = makeEdgeTable(m*6);
 //  parallel_for (int i=0; i < m; i++)
-  parallel_doall(int, i, 0, m) {
+  parallel_doall_obj(int, i, 0, m, GFn2(E,T,Triangs,ET,v)) {
     for (int j=0; j<3; j++) {
       E[i*3 + j] = edge(pairInt(T[i].C[j], T[i].C[(j+1)%3]), &Triangs[i]);
       ET.insert(&E[i*3+j]);
@@ -79,7 +129,7 @@ void topologyFromTriangles(triangles<point2d> Tri, vertex** vr, tri** tr) {
   } parallel_doall_end
 
 //  parallel_for (int i=0; i < m; i++) {
-  parallel_doall(int, i, 0, m)  {
+  parallel_doall_obj(int, i, 0, m, GFn3(Triangs, T, ET))  {
     Triangs[i].id = i;
     Triangs[i].initialized = 1;
     Triangs[i].bad = 0;

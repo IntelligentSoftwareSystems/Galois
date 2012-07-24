@@ -5,9 +5,8 @@ RDIR=vtune.$$
 ROPT="-result-dir=$RDIR"
 REPORT="-R hw-events -csv-delimiter tab"
 #COLLECT="-analyze-system -collect nehalem_general-exploration -start-paused"
-#COLLECT="-collect nehalem_memory-access -start-paused"
 COLLECT="-collect nehalem-general-exploration -start-paused"
-#COLLECT="-collect hotspots -start-paused"
+#COLLECT="-collect nehalem_general-exploration -start-paused"
 SOPT="-search-dir all=$SYMBOL";
 
 trap '' EXIT 
