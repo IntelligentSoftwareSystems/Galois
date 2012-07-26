@@ -769,7 +769,7 @@ public:
     if (tld.begin != tld.end) {
       boost::optional<value_type> retval = *tld.begin;
       tld.begin = Galois::safe_advance(tld.begin, tld.end, tld.num);
-      assert(*retval);
+      assert(retval);
       return retval;
     }
     return boost::optional<value_type>();
