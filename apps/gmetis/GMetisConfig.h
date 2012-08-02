@@ -30,6 +30,7 @@
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
 #include "Galois/Timer.h"
+#include "Galois/Accumulator.h"
 
 #include <stdlib.h>
 
@@ -63,16 +64,9 @@ void arrayFill(T* array, int length, T value){
 int gNodeToInt(GNode node);
 int getRandom(int num);
 
-struct PerCPUValue{
-	int mincutInc;
-	GNodeSTLSet changedBndNodes;
-	PerCPUValue(){
-		mincutInc = 0;
-	}
-};
-
-struct mergeP {
-  void operator()(PerCPUValue& a, PerCPUValue& b);
+struct PerCPUValue {
+  Galois::GAccumulator<int> mincutInc;
+  Galois::GSetAccumulator<GNodeSTLSet> changedBndNodes;
 };
 
 int intlog2(int a);

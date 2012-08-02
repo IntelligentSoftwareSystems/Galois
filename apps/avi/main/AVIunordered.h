@@ -272,7 +272,7 @@ protected:
         }
 
 
-        ++ (iter.get ());
+        iter += 1;
 
         // if (iter.get () == 5000) {
            // meshInit.writeMesh ();
@@ -349,14 +349,13 @@ public:
 
     GaloisRuntime::PerCPU<LocalVec> perIterLocalVec (l);
 
-    IterCounter iter(0);
+    IterCounter iter;
 
     Process p(graph, inDegVec, meshInit, g, perIterLocalVec, aviCmp, createSyncFiles, iter);
 
     Galois::for_each<AVIWorkList>(initWl.begin (), initWl.end (), p);
 
-    printf ("iterations = %d\n", iter.get ());
-
+    printf ("iterations = %d\n", iter.reduce());
   }
 
 

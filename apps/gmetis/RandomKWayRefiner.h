@@ -61,11 +61,11 @@ public:
 		for (int pass = 0; pass < npasses; pass++) {
 			int oldcut = metisGraph->getMinCut();
 
-			Galois::GReducible<PerCPUValue, mergeP> perCPUValues;
+			PerCPUValue perCPUValues;
 			parallelRefine pr(metisGraph, this, &perCPUValues);
 			Galois::for_each<GaloisRuntime::WorkList::ChunkedLIFO<32, GNode> >(metisGraph->getBoundaryNodes()->begin(), metisGraph->getBoundaryNodes()->end(), pr, "RandomKWAYRefine");
-			metisGraph->incMinCut(perCPUValues.get().mincutInc);
-			GNodeSTLSet& changedNodes = perCPUValues.get().changedBndNodes;
+			metisGraph->incMinCut(perCPUValues.mincutInc.reduce());
+			GNodeSTLSet& changedNodes = perCPUValues.changedBndNodes.reduce();
 			for(GNodeSTLSet::iterator iter=changedNodes.begin();iter!=changedNodes.end();++iter){
 				GNode changed = *iter;
 				if(changed.getData().isBoundary()){
@@ -91,7 +91,7 @@ public:
 
 private:
 
-  void refineOneNode(MetisGraph* metisGraph, GNode n,  Galois::GReducible<PerCPUValue, mergeP>* perCPUValues) {
+  void refineOneNode(MetisGraph* metisGraph, GNode n, PerCPUValue* perCPUValues) {
 		GGraph* graph = metisGraph->getGraph();
 		MetisNode& nodeData = n.getData(Galois::CHECK_CONFLICT);
 		if (nodeData.getEdegree() >= nodeData.getIdegree()) {
@@ -148,7 +148,7 @@ private:
 				neighbor.getData(Galois::NONE);
 			}
 
-			perCPUValues->get().mincutInc+=-(nodeData.getPartEd()[k] - nodeData.getIdegree());
+			perCPUValues->mincutInc += -(nodeData.getPartEd()[k] - nodeData.getIdegree());
 			nodeData.setPartition(to);
 			metisGraph->incPartWeight(to, vwgt);
 			metisGraph->incPartWeight(from, -vwgt);
@@ -170,7 +170,7 @@ private:
 //				metisGraph->unsetBoundaryNode(n);
 				metisGraph->unMarkBoundaryNode(n);
 //				perCPUValues->get().changedBndNodes.push_back(n);
-				perCPUValues->get().changedBndNodes.insert(n);
+				perCPUValues->changedBndNodes.update(n);
 			}
 
 			/*
@@ -195,7 +195,7 @@ private:
 //						metisGraph->setBoundaryNode(neighbor);
 						metisGraph->markBoundaryNode(neighbor);
 //						perCPUValues->get().changedBndNodes.push_back(neighbor);
-						perCPUValues->get().changedBndNodes.insert(neighbor);
+						perCPUValues->changedBndNodes.update(neighbor);
 					}
 				} else if (neighborData.getPartition() == to) {
 					neighborData.setEdegree(neighborData.getEdegree() - edgeWeight);
@@ -205,7 +205,7 @@ private:
 //						metisGraph->unsetBoundaryNode(neighbor);
 						metisGraph->unMarkBoundaryNode(neighbor);
 //						perCPUValues->get().changedBndNodes.push_back(neighbor);
-						perCPUValues->get().changedBndNodes.insert(neighbor);
+						perCPUValues->changedBndNodes.update(neighbor);
 					}
 
 				}
@@ -251,8 +251,8 @@ private:
 	struct parallelRefine {
 		MetisGraph* metisGraph;
 		RandomKwayEdgeRefiner* refiner;
-	  Galois::GReducible<PerCPUValue, mergeP>* perCPUValues;
-	  parallelRefine(MetisGraph* metisGraph, RandomKwayEdgeRefiner* refiner, Galois::GReducible<PerCPUValue, mergeP>* perCPUValues){
+	  PerCPUValue* perCPUValues;
+	  parallelRefine(MetisGraph* metisGraph, RandomKwayEdgeRefiner* refiner, PerCPUValue* perCPUValues){
 			this->metisGraph = metisGraph;
 			this->refiner = refiner;
 			this->perCPUValues = perCPUValues;

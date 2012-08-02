@@ -117,20 +117,28 @@ class PQuadTree {
     return n;
   }
 
+
+  //! Provide appropriate initial values for reduction
   template<bool isMax>
-  struct TupleReducer {
-    void operator()(Tuple& lhs, const Tuple& rhs) const {
+  struct MTuple: public Tuple {
+    MTuple(): Tuple(isMax ? std::numeric_limits<TupleDataTy>::max() : std::numeric_limits<TupleDataTy>::min()) { }
+    MTuple(const Tuple& t): Tuple(t) { }
+  };
+
+  template<bool isMax>
+  struct MTupleReducer {
+    void operator()(MTuple<isMax>& lhs, const MTuple<isMax>& rhs) const {
       for (int i = 0; i < 2; ++i)
         lhs[i] = isMax ? std::max(lhs[i], rhs[i]) : std::min(lhs[i], rhs[i]);
     }
   };
 
-  struct MinBox: public Galois::GReducible<Tuple, TupleReducer<false> > { 
-    MinBox(): SelfTy(Tuple(std::numeric_limits<TupleDataTy>::max())) { }
+  struct MinBox: public Galois::GReducible<MTuple<false>, MTupleReducer<false> > { 
+    MinBox() { }
   };
 
-  struct MaxBox: public Galois::GReducible<Tuple, TupleReducer<true> > { 
-    MaxBox(): SelfTy(Tuple(std::numeric_limits<TupleDataTy>::min())) { }
+  struct MaxBox: public Galois::GReducible<MTuple<true>, MTupleReducer<true> > { 
+    MaxBox() { }
   };
 
   struct ComputeBox {
@@ -195,8 +203,11 @@ class PQuadTree {
     Galois::do_all(begin, end, ComputeBox(least, most));
     //std::for_each(begin, end, ComputeBox(least, most));
 
-    radius = std::max(most.get().x() - least.get().x(), most.get().y() - least.get().y()) / 2.0;
-    center = least.get();
+    MTuple<true> mmost = most.reduce();
+    MTuple<false> lleast = least.reduce();
+    
+    radius = std::max(mmost.x() - lleast.x(), mmost.y() - lleast.y()) / 2.0;
+    center = lleast;
     center.x() += m_radius;
     center.y() += m_radius;
   }

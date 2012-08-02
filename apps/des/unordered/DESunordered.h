@@ -97,7 +97,7 @@ class DESunordered: public DESabstractMain {
         maxPending.update (srcObj->numPendingEvents ());
 
         int proc = srcObj->simulate(graph, activeNode); // number of events processed
-        numEvents.get () += proc;
+        numEvents += proc;
 
         for (Graph::neighbor_iterator i = graph.neighbor_begin (activeNode, Galois::NONE)
             , ei = graph.neighbor_end (activeNode, Galois::NONE); i != ei; ++i) {
@@ -137,8 +137,7 @@ class DESunordered: public DESabstractMain {
           }
         }
 
-        ++(numIter.get ());
-
+        numIter += 1;
     }
   };
 
@@ -182,9 +181,9 @@ class DESunordered: public DESabstractMain {
     // Galois::for_each < GaloisRuntime::WorkList::FIFO<GNode> > (initialActive.begin (), initialActive.end (), p);
     Galois::for_each<WLType>(initialActive.begin (), initialActive.end (), p);
 
-    std::cout << "Number of events processed = " << numEvents.get () << std::endl;
-    std::cout << "Number of iterations performed = " << numIter.get () << std::endl;
-    std::cout << "Maximum size of pending events = " << maxPending.get () << std::endl;
+    std::cout << "Number of events processed = " << numEvents.reduce () << std::endl;
+    std::cout << "Number of iterations performed = " << numIter.reduce () << std::endl;
+    std::cout << "Maximum size of pending events = " << maxPending.reduce() << std::endl;
   }
 
   virtual bool isSerial () const { return false; }

@@ -122,7 +122,8 @@ static std::vector<GNode> clauses;
 static Galois::GAccumulator<unsigned int> nontrivial;
 
 static Galois::GReduceMax<double> maxBias;
-static Galois::GReduceAverage<double> averageBias;
+static Galois::GAccumulator<int> numBias;
+static Galois::GAccumulator<double> sumBias;
 
 //interesting parameters:
 static const double epsilon = 0.000001;
@@ -333,7 +334,8 @@ struct update_biases {
 
     assert(!std::isnan(d) && !std::isnan(-d));
     maxBias.update(d);
-    averageBias.update(d);
+    numBias += 1;
+    sumBias += d;
   }
 };
 
@@ -348,9 +350,10 @@ void SP_algorithm() {
   //  tlimit += tmax;
   Galois::for_each<WLWL>(clauses.begin(), clauses.end(), update_eta(), "update_eta");
 
-  maxBias.reset(0.0);
-  averageBias.reset(0.0);
-  nontrivial.reset(0);
+  maxBias.reset();
+  numBias.reset();
+  sumBias.reset();
+  nontrivial.reset();
   Galois::do_all(literals.begin(), literals.end(), update_biases(), "update_biases");
 }
 
@@ -377,8 +380,12 @@ struct fix_variables {
 };
 
 void decimate() {
-  std::cout << "NonTrivial " << nontrivial.get() << " MaxBias " << maxBias.get() << " Average Bias " << averageBias.get() << "\n";
-  double d = ((maxBias.get() - averageBias.get()) * 0.25) + averageBias.get();
+  double m = maxBias.reduce();
+  double n = nontrivial.reduce();
+  int num = numBias.reduce();
+  double average = num > 0 ? sumBias.reduce() / num : 0.0;
+  std::cout << "NonTrivial " << n << " MaxBias " << m << " Average Bias " << average << "\n";
+  double d = ((m - average) * 0.25) + average;
   Galois::for_each<WLWL>(literals.begin(), literals.end(), fix_variables(d), "fix_variables");
 }
 
@@ -396,7 +403,7 @@ bool survey_inspired_decimation() {
   //4) if solved, output SAT, if no contradiction, continue at 1, if contridiction, stop
   do {
     SP_algorithm();
-    if (nontrivial.get()) {
+    if (nontrivial.reduce()) {
       std::cout << "DECIMATED\n";
       decimate();
     } else {

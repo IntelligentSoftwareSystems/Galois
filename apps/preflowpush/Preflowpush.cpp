@@ -515,7 +515,7 @@ struct Process {
     Galois::GAccumulator<int>& counter;
     BreakFn(Process<version>& self): counter(self.counter) { }
     bool operator()() const {
-      if (app.global_relabel_interval > 0 && counter.get() >= app.global_relabel_interval) {
+      if (app.global_relabel_interval > 0 && counter.reduce() >= app.global_relabel_interval) {
         app.should_global_relabel = true;
         return true;
       }
@@ -564,7 +564,7 @@ struct Process<nondet> {
   Galois::GAccumulator<int>& counter;
   int limit;
   Process(Galois::GAccumulator<int>& c): counter(c) { 
-    limit = app.global_relabel_interval / numThreads;
+    limit = app.global_relabel_interval;
   }
 
   void operator()(GNode& src, Galois::UserContext<GNode>& ctx) {
@@ -575,7 +575,7 @@ struct Process<nondet> {
     }
 
     counter += increment;
-    if (app.global_relabel_interval > 0 && counter.get() >= limit) {
+    if (app.global_relabel_interval > 0 && counter.unsafeRead() >= limit) {
       app.should_global_relabel = true;
       ctx.breakLoop();
       return;

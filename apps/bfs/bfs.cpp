@@ -232,7 +232,7 @@ static bool verify(GNode source) {
   if (okay) {
     Galois::GReduceMax<unsigned int> m;
     Galois::do_all(graph.begin(), graph.end(), max_dist(m));
-    std::cout << "max dist: " << m.get() << "\n";
+    std::cout << "max dist: " << m.reduce() << "\n";
   }
   
   return okay;

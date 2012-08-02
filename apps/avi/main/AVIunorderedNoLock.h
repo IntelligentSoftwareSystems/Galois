@@ -210,7 +210,7 @@ protected:
 
 
         // for debugging, remove later
-        ++(iter.get ());
+        iter += 1;
 
 
       }
@@ -289,7 +289,7 @@ public:
 
 
 
-    IterCounter iter(0);
+    IterCounter iter;
 
 
     process p( graph, inDegVec, meshInit, g, perIterLocalVec, perIterAddList, aviCmp, createSyncFiles, iter);
@@ -297,7 +297,7 @@ public:
 
     Galois::for_each<AVIWorkList> (initWl.begin (), initWl.end (), p);
 
-    printf ("iterations = %d\n", iter.get ());
+    printf ("iterations = %d\n", iter.reduce());
 
   }
 

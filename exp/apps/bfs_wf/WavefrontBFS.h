@@ -52,7 +52,7 @@
 typedef Galois::Graph::LC_CSR_Graph<unsigned, unsigned> Graph;
 typedef Graph::GraphNode GNode;
 
-typedef Galois::GSimpleReducible<unsigned, std::plus<unsigned> > ParCounter;
+typedef Galois::GAccumulator<unsigned> ParCounter;
 
 class AbstractWavefrontBFS: public BFS<Graph, GNode> {
 
@@ -189,7 +189,7 @@ private:
 
     template <typename ContextTy>
     void operator () (GNode src, ContextTy&) {
-      numAdds.get () += BaseBFS::bfsOperator<doLock> (graph, src, nextWL, &GaloisWL::push);
+      numAdds += BaseBFS::bfsOperator<doLock> (graph, src, nextWL, &GaloisWL::push);
     }
   };
 
@@ -198,7 +198,7 @@ private:
   struct ParallelInnerLoop {
     unsigned operator () (Graph& graph, GaloisWL& currWL, GaloisWL& nextWL) const {
 
-      ParCounter numAdds (0);
+      ParCounter numAdds;
 
       LoopBody<doLock> l (graph, nextWL, numAdds);
       Galois::for_each_wl (currWL, l);
@@ -258,7 +258,7 @@ class BFSwavefrontCoupled: public BFS<Graph, GNode> {
 
     void operator () (GNode src) {
       typedef WL_ty::Cont_ty C;
-      numAdds.get () += SuperTy::bfsOperator<false> (graph, src, nextWL.get (), &C::push_back);
+      numAdds += SuperTy::bfsOperator<false> (graph, src, nextWL.get (), &C::push_back);
     }
   };
 
@@ -278,7 +278,7 @@ public:
 
     GaloisRuntime::beginSampling ();
 
-    ParCounter numAdds (0);
+    ParCounter numAdds;
     while (!currWL->empty_all ()) {
 
 

@@ -117,17 +117,17 @@ struct FindMatching {
 								NodeWrapper * newNode = new NodeWrapper(*nodeA, *nodeB, coordinatesArray,clusterArray);
 								newNodes->push(newNode);
 								allocs.push(newNode);
-								addedNodes.get()+=1;
+								addedNodes +=1;
 							}
 						}
 						else{
-							addedNodes.get()+=1;
+							addedNodes +=1;
 							newNodes->push(nodeA);
 						}
 					}
 				}
 				else{
-					addedNodes.get()+=1;
+					addedNodes +=1;
 					newNodes->push(nodeA);
 				}
 		}
@@ -202,14 +202,14 @@ void clusterGalois(vector<LeafNode*> & lights) {
 	while(true){
 		newNodes = new GaloisRuntime::galois_insert_bag<NodeWrapper*>();
 
-		addedNodes.reset(0);
+		addedNodes.reset();
 
 		findMatchingLambda.newNodes=newNodes;
 		findMatchingLambda.tree=tree;
 
 		Galois::for_each(workList.begin(),workList.end(),findMatchingLambda);
 
-		size += addedNodes.get();
+		size += addedNodes.reduce();
 
 		workList.clear();
 		for(GaloisRuntime::galois_insert_bag<NodeWrapper*>::iterator it = newNodes->begin(), itEnd = newNodes->end();it!=itEnd;it++)

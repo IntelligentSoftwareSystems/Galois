@@ -237,10 +237,6 @@ int gNodeToInt(GNode node){
 	return node.getData().getNodeId();
 }
 
-void mergeP::operator()(PerCPUValue& a, PerCPUValue& b){
-	a.mincutInc+=b.mincutInc;
-	a.changedBndNodes.insert(b.changedBndNodes.begin(), b.changedBndNodes.end());
-}
 int intlog2(int a){
 	int i;
 	for (i=1; a > 1; i++, a = a>>1);

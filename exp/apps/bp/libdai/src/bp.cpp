@@ -708,7 +708,7 @@ Real BP::run() {
           abort();
         }
 
-        Galois::GReduceMax<Real> accMaxDiff(-INFINITY);
+        Galois::GReduceMax<Real> accMaxDiff;
         Galois::for_each(integers.begin(), integers.end(), ComputeDiffs(*this, accMaxDiff));
 
         // calculate new beliefs and compare with old ones
@@ -723,7 +723,7 @@ Real BP::run() {
         //    maxDiff = std::max( maxDiff, dist( b, _oldBeliefsF[I], DISTLINF ) );
         //    _oldBeliefsF[I] = b;
         //}
-        maxDiff = accMaxDiff.get();
+        maxDiff = accMaxDiff.reduce();
 
         if( props.verbose >= 3 )
             cerr << name() << "::run:  maxdiff " << maxDiff << " after " << _iters+1 << " passes" << endl;

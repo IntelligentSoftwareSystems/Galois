@@ -81,7 +81,7 @@ struct merge {
   }
 };
 
-Galois::GReducible<std::vector<double>, merge >* CB;
+Galois::GVectorElementAccumulator<std::vector<double> >* CB;
 #endif
 
 GaloisRuntime::PerCPU<std::vector<GNode>*> SQG;
@@ -233,9 +233,10 @@ struct process {
       r.bc += delta_w;
       r.lock.unlock();
 #else 
-      if (CB->get().size() < (unsigned int)w + 1)
-	CB->get().resize(w+1);
-      CB->get()[w] += delta_w;
+      CB->update(w, delta_w);
+//      if (CB->get().size() < (unsigned int)w + 1)
+//	CB->get().resize(w+1);
+//      CB->get()[w] += delta_w;
 #endif
     }
     resetData();
@@ -251,7 +252,7 @@ void verify() {
 #if SHARE_SINGLE_BC
       double bc = (*CB)[i].data.bc;
 #else
-      double bc = CB->get()[i];
+      double bc = CB->reduce()[i];
 #endif
       if (firstTime) {
         sampleBC = bc;
@@ -273,12 +274,16 @@ void printBCcertificate() {
   foutname << "outer_certificate_" << numThreads;
   std::ofstream outf(foutname.str().c_str());
   std::cerr << "Writting certificate..." << std::endl;
-  
+#if SHARE_SINGLE_BC
+#else
+  const std::vector<double>& bcv = CB->reduce();
+#endif
+
   for (int i=0; i<NumNodes; ++i) {
 #if SHARE_SINGLE_BC
       double bc = (*CB)[i].data.bc;
 #else
-      double bc = CB->get()[i];
+      double bc = bcv[i];
 #endif
     outf << i << ": " << setiosflags(std::ios::fixed) << std::setprecision(9) << bc << std::endl;
   }
@@ -308,7 +313,7 @@ int main(int argc, char** argv) {
   std::vector<cache_line_storage<BCrecord> > cb(NumNodes);
   CB = &cb;
 #else
-  Galois::GReducible<std::vector<double>, merge > cb;
+  Galois::GVectorElementAccumulator<std::vector<double> > cb;
   CB = &cb; 
 #endif
   
@@ -342,11 +347,15 @@ int main(int argc, char** argv) {
   if (!skipVerify) {
     verify();
   } else { // print bc value for first 10 nodes
+#if SHARE_SINGLE_BC
+#else
+    const std::vector<double>& bcv = CB->reduce();
+#endif
     for (int i=0; i<10; ++i)
 #if SHARE_SINGLE_BC
     std::cout << i << ": " << setiosflags(std::ios::fixed) << std::setprecision(6) << (*CB)[i].data.bc << "\n";
 #else
-    std::cout << i << ": " << setiosflags(std::ios::fixed) << std::setprecision(6) << CB->get()[i] << "\n";
+    std::cout << i << ": " << setiosflags(std::ios::fixed) << std::setprecision(6) << bcv[i] << "\n";
 #endif
 #if SHOULD_PRODUCE_CERTIFICATE
     printBCcertificate();

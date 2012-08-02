@@ -629,7 +629,7 @@ void run(const std::string& in) {
   T.start();
   algo(g, w);
   T.stop();
-  std::cout << "MST Weight is " << w.get() << "\n";
+  std::cout << "MST Weight is " << w.reduce() << "\n";
 }
 
 int main(int argc, char **argv) {
