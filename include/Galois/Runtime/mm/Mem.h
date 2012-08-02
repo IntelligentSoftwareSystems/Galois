@@ -593,12 +593,17 @@ public:
   }
   
   size_type max_size() const throw() { return 1; }
+
+  template<typename T1>
+  inline bool operator!=(const FSBGaloisAllocator<T1>& rhs) const {
+    return Alloc != rhs.Alloc;
+  }
 };
 
-template<typename T1,typename T2>
-bool operator!=(const FSBGaloisAllocator<T1>& lhs, const FSBGaloisAllocator<T2>& rhs) {
-  return lhs.Alloc != rhs.Alloc;
-}
+//template<typename T1,typename T2>
+//bool operator!=(const FSBGaloisAllocator<T1>& lhs, const FSBGaloisAllocator<T2>& rhs) {
+//  return lhs.Alloc != rhs.Alloc;
+//}
 
 //!Keep a reference to an external allocator
 template<typename Ty, typename AllocTy>
@@ -639,8 +644,9 @@ public:
   };
 
   explicit ExternRefGaloisAllocator(AllocTy* a) throw(): Alloc(a) {}
-  template <class U>
-  ExternRefGaloisAllocator (const ExternRefGaloisAllocator<U,AllocTy>& rhs) throw() {
+
+  template<class T1>
+  ExternRefGaloisAllocator(const ExternRefGaloisAllocator<T1,AllocTy>& rhs) throw() {
     Alloc = rhs.Alloc;
   }
   
@@ -667,12 +673,13 @@ public:
   }
   
   size_type max_size() const throw() { return size_t(-1)/sizeof(Ty); }
-};
 
-template<typename T1,typename T2,typename A1,typename A2>
-bool operator!=(const ExternRefGaloisAllocator<T1,A1>& lhs, const ExternRefGaloisAllocator<T2,A2>& rhs) {
-  return lhs.Alloc != rhs.Alloc;
-}
+  template<typename T1,typename A1>
+  bool operator!=(const ExternRefGaloisAllocator<T1,A1>& rhs) {
+    return Alloc != rhs.Alloc;
+  }
+
+};
 
 }
 }
