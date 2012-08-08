@@ -36,6 +36,7 @@ namespace cll = llvm::cl;
 enum ConvertMode {
   dimacs2gr,
   rmat2gr,
+  stext2vgr,
   pbbs2vgr,
   pbbs2gr,
   gr2bsml,
@@ -51,6 +52,7 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Choose a conversion mode:"),
       clEnumVal(dimacs2gr, "Convert dimacs to binary gr (default)"),
       clEnumVal(rmat2gr, "Convert rmat to binary gr"),
       clEnumVal(pbbs2vgr, "Convert pbbs graph to binary void gr"),
+      clEnumVal(stext2vgr, "Convert simple text graph to binary void gr"),
       clEnumVal(pbbs2gr, "Convert pbbs graph to binary gr"),
       clEnumVal(gr2bsml, "Convert binary gr to binary sparse MATLAB matrix"),
       clEnumVal(vgr2bsml, "Convert binary void gr to binary sparse MATLAB matrix"),
@@ -92,20 +94,16 @@ void convert_rmat2gr(const std::string& infilename, const std::string& outfilena
     size_t cur_edges;
     infile >> cur_id >> cur_edges;
     if (cur_id >= nnodes) {
-      std::cerr << "node id out of range: " << cur_id << "\n";
+      std::cerr << "Error: node id out of range: " << cur_id << "\n";
       abort();
     }
-    // if (cur_edges < 0) {
-    //   std::cerr << "num edges out of range: " << cur_edges << "\n";
-    //   abort();
-    // }
     
     for (size_t j = 0; j < cur_edges; ++j) {
       uint32_t neighbor_id;
       int32_t weight;
       infile >> neighbor_id >> weight;
       if (neighbor_id >= nnodes) {
-        std::cerr << "neighbor id out of range: " << neighbor_id << "\n";
+        std::cerr << "Error: neighbor id out of range: " << neighbor_id << "\n";
         abort();
       }
       GNode& src = nodes[cur_id];
@@ -119,13 +117,81 @@ void convert_rmat2gr(const std::string& infilename, const std::string& outfilena
 
   infile.peek();
   if (!infile.eof()) {
-    std::cerr << "additional lines in file\n";
+    std::cerr << "Error: additional lines in file\n";
     abort();
   }
 
   size_t edges_added = 0;
   for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
     edges_added += std::distance(graph.edge_begin(*ii), graph.edge_end(*ii));
+  }
+
+  std::cout << "Finished reading graph. "
+    << "Nodes: " << nnodes
+    << " Edges read: " << nedges 
+    << " Edges added: " << edges_added
+    << "\n";
+
+  outputGraph(outfilename.c_str(), graph);
+}
+
+/**
+ * Simple undirected graph input.
+ *
+ * <num_nodes> <num_edges>
+ * <neighbor 0 of node 0> <neighbor 1 of node 0> ...
+ * <neighbor 0 of node 1> ...
+ * ...
+ */
+void convert_stext2vgr(const std::string& infilename, const std::string& outfilename) {
+  typedef Galois::Graph::FirstGraph<uint32_t,void,true> Graph;
+  typedef Graph::GraphNode GNode;
+  Graph graph;
+
+  std::ifstream infile(infilename.c_str());
+
+  std::string tmp;
+  uint32_t nnodes;
+  size_t nedges;
+  infile >> nnodes >> nedges;
+  infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+
+  std::vector<GNode> nodes;
+  nodes.resize(nnodes);
+  for (uint32_t i = 0; i < nnodes; ++i) {
+    GNode n = graph.createNode(i);
+    graph.addNode(n);
+    nodes[i] = n;
+    graph.addNode(n, Galois::NONE);
+  }
+
+  size_t edges_added = 0;
+  for (uint32_t node_id = 0; node_id < nnodes; ++node_id) {
+    GNode& src = nodes[node_id];
+    while (true) {
+      if (!infile.good()) {
+        if (node_id != nnodes - 1) {
+          std::cerr << "Error: read data until node " << node_id << " of " << nnodes << "\n";
+          return;
+        }
+        break;
+      }
+
+      char c;
+      infile.get(c);
+      if (c == '\n')
+        break;
+      if (isspace(c))
+        continue;
+      
+      infile.unget();
+      uint32_t neighbor_id;
+      infile >> neighbor_id;
+      assert(neighbor_id < nnodes);
+      GNode& dst = nodes[neighbor_id];
+      graph.addEdge(src, dst);
+      ++edges_added;
+    }
   }
 
   std::cout << "Finished reading graph. "
@@ -152,7 +218,7 @@ void convert_dimacs2gr(const std::string& infilename, const std::string& outfile
   }
 
   if (infile.peek() != 'p') {
-    std::cerr << "Missing problem specification line\n";
+    std::cerr << "Error: missing problem specification line\n";
     abort();
   }
 
@@ -184,11 +250,11 @@ void convert_dimacs2gr(const std::string& infilename, const std::string& outfile
 
     infile >> cur_id >> neighbor_id >> weight;
     if (cur_id == 0 || cur_id > nnodes) {
-      std::cerr << "node id out of range: " << cur_id << "\n";
+      std::cerr << "Error: node id out of range: " << cur_id << "\n";
       abort();
     }
     if (neighbor_id == 0 || neighbor_id > nnodes) {
-      std::cerr << "neighbor id out of range: " << neighbor_id << "\n";
+      std::cerr << "Error: neighbor id out of range: " << neighbor_id << "\n";
       abort();
     }
     
@@ -202,7 +268,7 @@ void convert_dimacs2gr(const std::string& infilename, const std::string& outfile
 
   infile.peek();
   if (!infile.eof()) {
-    std::cerr << "additional lines in file\n";
+    std::cerr << "Error: additional lines in file\n";
     abort();
   }
 
@@ -247,7 +313,7 @@ void convert_pbbs2gr(const std::string& infilename, const std::string& outfilena
 
   infile >> header >> nnodes >> nedges;
   if (header != "AdjacencyGraph") {
-    std::cerr << "Unknown file format\n";
+    std::cerr << "Error: unknown file format\n";
     abort();
   }
 
@@ -378,7 +444,7 @@ void convert_gr2bsml(const std::string& infilename, const std::string& outfilena
   }
 
   mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
-  int fd = open(outfilename.c_str(), O_WRONLY | O_CREAT |O_TRUNC, mode);
+  int fd = open(outfilename.c_str(), O_WRONLY | O_CREAT | O_TRUNC, mode);
   int retval;
 
   // Write header
@@ -432,6 +498,7 @@ int main(int argc, char** argv) {
   llvm::cl::ParseCommandLineOptions(argc, argv);
   switch (convertMode) {
     case rmat2gr: convert_rmat2gr(inputfilename, outputfilename); break;
+    case stext2vgr: convert_stext2vgr(inputfilename, outputfilename); break;
     case pbbs2vgr: convert_pbbs2gr<void>(inputfilename, outputfilename); break;
     case pbbs2gr: convert_pbbs2gr<int32_t>(inputfilename, outputfilename); break;
     case gr2dimacs: convert_gr2dimacs(inputfilename, outputfilename); break;
