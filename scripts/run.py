@@ -76,6 +76,37 @@ def product(args):
   for prod in result:
     yield tuple(prod)
 
+def run(cmd, values, options):
+  for R in range(options.runs):
+    print('RUN: Start')
+    print_bright('RUN: Executing %s' % ' '.join(cmd))
+    for (name, value) in values:
+      print('RUN: Variable %s = %s' % (name, value))
+
+    import subprocess, datetime, os, time, signal
+    if options.timeout:
+      start = datetime.datetime.now()
+      process = subprocess.Popen(cmd)
+      while process.poll() is None:
+        time.sleep(5)
+        now = datetime.datetime.now()
+        diff = (now-start).seconds
+        if diff > options.timeout:
+          os.kill(process.pid, signal.SIGKILL)
+          #os.waitpid(-1, os.WNOHANG)
+          os.waitpid(-1, 0)
+          print("RUN: Variable Timeout = %d\n" % (diff*1000))
+          break
+      retcode = process.returncode
+    else:
+      retcode = subprocess.call(cmd)
+    if retcode != 0:
+      # print command line just in case child process should be died before doing it
+      print("INFO: CommandLine %s\n" % ' '.join(cmd))
+      print("RUN: Error command: %s\n" % cmd)
+      if not options.ignore_errors:
+        sys.exit(1)
+
 
 def main(args, options):
   variables = []
@@ -85,50 +116,25 @@ def main(args, options):
     variables.append((name, arg))
     ranges.append(get_range(r))
 
-  for prod in product(ranges):
-    cmd = [args[0]]
-    values = []
-    for ((name, arg), value) in zip(variables, prod):
-      cmd.extend([arg, str(value)])
-      values.append((name, str(value)))
-    cmd.extend(args[1:])
+  if options.no_parameters:
+    run(args, [], options)
+  else:
+    for prod in product(ranges):
+      cmd = [args[0]]
+      values = []
+      for ((name, arg), value) in zip(variables, prod):
+        cmd.extend([arg, str(value)])
+        values.append((name, str(value)))
+      cmd.extend(args[1:])
 
-    for run in range(options.runs):
-      print('RUN: Start')
-      print_bright('RUN: Executing %s' % ' '.join(cmd))
-      for (name, value) in values:
-        print('RUN: Variable %s = %s' % (name, value))
-
-      import subprocess, datetime, os, time, signal
-      if options.timeout:
-        start = datetime.datetime.now()
-        process = subprocess.Popen(cmd)
-        while process.poll() is None:
-          time.sleep(5)
-          now = datetime.datetime.now()
-          diff = (now-start).seconds
-          if diff > options.timeout:
-            os.kill(process.pid, signal.SIGKILL)
-            #os.waitpid(-1, os.WNOHANG)
-            os.waitpid(-1, 0)
-            print("RUN: Variable Timeout = %d\n" % (diff*1000))
-            break
-        retcode = process.returncode
-      else:
-        retcode = subprocess.call(cmd)
-      if retcode != 0:
-        # print command line just in case child process should be died before doing it
-        print("INFO: CommandLine %s\n" % ' '.join(cmd))
-        print("RUN: Error command: %s\n" % cmd)
-        if not options.ignoreerrors:
-          sys.exit(1)
+      run(cmd, values, options)
 
 
 if __name__ == '__main__':
   signal.signal(signal.SIGQUIT, signal.SIG_IGN)
   sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
   parser = optparse.OptionParser(usage='usage: %prog [options] <command line> ...')
-  parser.add_option('--ignore-errors', dest='ignoreerrors', default=False, action='store_true',
+  parser.add_option('--ignore-errors', dest='ignore_errors', default=False, action='store_true',
       help='ignore errors in subprocesses')
   parser.add_option('-t', '--threads', dest="threads", default="1",
       help='range of threads to use. A range is R := R,R | N | N:N | N:N:N where N is an integer.')
@@ -138,8 +144,11 @@ if __name__ == '__main__':
       help='add another parameter to range over (format: <name>::<arg>::<range>). E.g., delta::-delta::1,5')
   parser.add_option('-o', '--timeout', dest="timeout", default=0, type='int',
       help="timeout a run after SEC seconds", metavar='SEC')
+  parser.add_option('--no-parameters', dest='no_parameters', default=False, action='store_true',
+      help='run command without additional parameters')
   (options, args) = parser.parse_args()
   if not args:
     parser.error('need command to run')
-  options.extra.insert(0, '%s::%s::%s' % ('Threads', '-t', options.threads))
+  if not options.no_parameters:
+    options.extra.insert(0, '%s::%s::%s' % ('Threads', '-t', options.threads))
   main(args, options)
