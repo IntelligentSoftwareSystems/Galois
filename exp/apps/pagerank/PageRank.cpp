@@ -21,11 +21,11 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 #include "Galois/Galois.h"
+#include "Galois/Accumulator.h"
 #include "Galois/Statistic.h"
 #include "Galois/Graphs/Graph2.h"
 #include "Galois/Graphs/LCGraph.h"
 #include "Galois/Graphs/Serialize.h"
-#include "Galois/Galois.h"
 
 #include "Lonestar/BoilerPlate.h"
 
@@ -58,8 +58,10 @@ static cll::opt<Phase> phase(cll::desc("Phase:"),
       clEnumVal(serial, "Compute PageRank in serial"),
       clEnumValEnd), cll::init(parallel));
 
-// d is the damping factor. Alpha is the prob that user will do a random jump, i.e., 1 - d
+//! d is the damping factor. Alpha is the prob that user will do a random jump, i.e., 1 - d
 static const double alpha = 1.0 - 0.85;
+
+//! maximum relative change until we deem convergence
 static const double tolerance = 0.001;
 
 struct Node {
@@ -69,7 +71,7 @@ struct Node {
   bool hasNoOuts;
 };
 
-typedef Galois::Graph::LC_CSR_Graph<Node, double> Graph;
+typedef Galois::Graph::LC_Linear_Graph<Node, double> Graph;
 typedef Graph::GraphNode GNode;
 
 Graph graph;
@@ -91,22 +93,20 @@ static void setPageRank(Node& data, unsigned int it, double value) {
 
 void serialPageRank() {
   iterations = 0;
-  double max_delta;
   unsigned int numNodes = graph.size();
-
   double tol = tolerance / numNodes;
 
   std::cout << "target max delta: " << tol << "\n";
 
   while (true) {
-    max_delta = std::numeric_limits<double>::min();
+    double max_delta = std::numeric_limits<double>::min();
     unsigned int small_delta = 0;
     double lost_potential = 0;
 
-    for (Graph::iterator src = graph.begin(),
-        esrc = graph.end(); src != esrc; ++src) {
+    for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+      GNode src = *ii;
       double value = 0;
-      for (Graph::edge_iterator ii = graph.edge_begin(*src, Galois::NONE), ei = graph.edge_end(*src, Galois::NONE); ii != ei; ++ii) {
+      for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::NONE), ei = graph.edge_end(src, Galois::NONE); ii != ei; ++ii) {
         GNode dst = graph.getEdgeDst(ii);
         double w = graph.getEdgeData(ii);
 
@@ -118,7 +118,7 @@ void serialPageRank() {
       if (alpha > 0)
         value = value * (1 - alpha) + alpha/numNodes;
 
-      Node& sdata = graph.getData(*src, Galois::NONE);
+      Node& sdata = graph.getData(src, Galois::NONE);
       if (sdata.hasNoOuts) {
         lost_potential += getPageRank(sdata, iterations);
       }
@@ -137,8 +137,9 @@ void serialPageRank() {
     // Redistribute lost potential
     if (lost_potential > 0) {
       unsigned int next = iterations + 1;
-      for (Graph::iterator src = graph.begin(), esrc = graph.end(); src != esrc; ++src) {
-        Node& sdata = graph.getData(*src, Galois::NONE);
+      for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+        GNode src = *ii;
+        Node& sdata = graph.getData(src, Galois::NONE);
         double value = getPageRank(sdata, next);
         // assuming uniform prior probability, i.e., 1 / numNodes
         double delta = (1 - alpha) * (lost_potential / numNodes);
@@ -165,27 +166,95 @@ void serialPageRank() {
 }
 
 struct Process {
-  template<typename ContextTy>
-  void operator()(GNode& node, ContextTy& lwl) {
+  struct Accum {
+    Galois::GReduceMax<double> max_delta;
+    Galois::GAccumulator<unsigned int> small_delta;
+    Galois::GAccumulator<double> lost_potential;
+  };
+
+  Accum& accum;
+  double tol;
+  double addend;
+
+  Process(Accum& a, double t, unsigned int numNodes): accum(a), tol(t), addend(alpha/numNodes) { }
+
+  void operator()(const GNode& src) {
+    double value = 0;
+    for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::NONE), ei = graph.edge_end(src, Galois::NONE); ii != ei; ++ii) {
+      GNode dst = graph.getEdgeDst(ii);
+      double w = graph.getEdgeData(ii);
+
+      Node& ddata = graph.getData(dst, Galois::NONE);
+      value += getPageRank(ddata, iterations) * w;
+    }
+     
+    // assuming uniform prior probability, i.e., 1 / numNodes
+    if (alpha > 0)
+      value = value * (1 - alpha) + addend;
+
+    Node& sdata = graph.getData(src, Galois::NONE);
+    if (sdata.hasNoOuts) {
+      accum.lost_potential += getPageRank(sdata, iterations);
+    }
+    
+    double diff = value - getPageRank(sdata, iterations);
+    if (diff < 0)
+      diff = -diff;
+
+    accum.max_delta.update(diff);
+    if (diff <= tol)
+      accum.small_delta += 1;
+    setPageRank(sdata, iterations, value);
+  }
+};
+
+struct RedistributeLost {
+  double delta;
+  unsigned int next;
+
+  RedistributeLost(double p): delta((1 - alpha) * p), next(iterations + 1) { }
+
+  void operator()(const GNode& src) {
+    Node& sdata = graph.getData(src, Galois::NONE);
+    double value = getPageRank(sdata, next);
+    // assuming uniform prior probability, i.e., 1 / numNodes
+    setPageRank(sdata, iterations, value + delta);
   }
 };
 
 void parallelPageRank() {
-  using namespace GaloisRuntime::WorkList;
+  iterations = 0;
+  unsigned int numNodes = graph.size();
+  double tol = tolerance / numNodes;
 
-  double max_delta = 0;
+  std::cout << "target max delta: " << tol << "\n";
+  
   while (true) {
-    //??? wl never had anything in it
-    Galois::for_each<ChunkedFIFO<32> >((GNode*)0,(GNode*)0, Process());
-    iterations++;
+    Process::Accum accum;
+    Galois::do_all(graph.begin(), graph.end(), Process(accum, tol, numNodes));
+    double lost_potential = accum.lost_potential.reduce();
+    if (lost_potential > 0) {
+      Galois::do_all(graph.begin(), graph.end(), RedistributeLost(lost_potential / numNodes));
+    }
 
-    std::cout << "iteration: " << iterations << " max delta: " << max_delta << "\n";
+    unsigned int small_delta = accum.small_delta.reduce();
+    double max_delta = accum.max_delta.reduce();
 
-    if (iterations < max_iterations && max_delta > tolerance) {
-      iterations++;
+    std::cout << "iteration: " << iterations
+              << " max delta: " << max_delta
+              << " small delta: " << small_delta
+              << " (" << small_delta / (float) numNodes << ")"
+              << "\n";
+
+    if (iterations < max_iterations && max_delta > tol) {
+      ++iterations;
       continue;
     } else
       break;
+  }
+
+  if (iterations >= max_iterations) {
+    std::cout << "Failed to converge\n";
   }
 }
 
@@ -214,7 +283,7 @@ static void transposeGraph() {
   bool* has_out_edges = new bool[input.size()];
   node_id = 0;
   for (InputGraph::iterator ii = input.begin(), ei = input.end(); ii != ei; ++ii, ++node_id) {
-    GNode src = *ii;
+    InputNode src = *ii;
     size_t sid = input.getData(src);
     assert(sid < input.size());
 
@@ -223,7 +292,7 @@ static void transposeGraph() {
 
     double w = 1.0/num_neighbors;
     for (InputGraph::edge_iterator jj = input.edge_begin(src), ej = input.edge_end(src); jj != ej; ++jj) {
-      GNode dst = input.getEdgeDst(*jj);
+      InputNode dst = input.getEdgeDst(*jj);
       size_t did = input.getData(dst);
       assert(did < input.size());
 
