@@ -232,6 +232,75 @@ InputIterator find_if(InputIterator first, InputIterator last, Predicate pred)
   return last;
 }
 
+
+template<class T>
+struct parsort_lt {
+  T* v;
+  parsort_lt(T* _v) :v(_v) {}
+  bool operator()(const T& o) const {
+    return o < *v;
+  }
+};
+
+struct parsort {
+
+  template <class RandomAccessIterator>
+  RandomAccessIterator choose(RandomAccessIterator first, 
+			      RandomAccessIterator last) {
+    //We know there are at least 17 items, so we can do math safely
+    size_t d = std::distance(first, last);
+    return first + rand() % d;
+  }
+
+
+  template <class RandomAccessIterator>
+  RandomAccessIterator partition(RandomAccessIterator first, 
+				 RandomAccessIterator last, 
+				 RandomAccessIterator pivot) {
+    std::swap(*(last - 1), *pivot);
+    --last;
+    pivot = last;
+    RandomAccessIterator m = std::partition(first, last, parsort_lt<typename std::iterator_traits<RandomAccessIterator>::value_type>(&*pivot));
+    std::swap(*m, *pivot);
+    return m;
+  }
+
+  template <class RandomAccessIterator, class Context>
+  void operator()(std::pair<RandomAccessIterator,RandomAccessIterator> bounds, 
+		  Context& cnx) {
+    if (std::distance(bounds.first, bounds.second) <= 128) {
+      std::sort(bounds.first, bounds.second);
+    } else {
+      RandomAccessIterator pivot = choose(bounds.first, bounds.second);
+      pivot = partition(bounds.first, bounds.second, pivot);
+      cnx.push(std::make_pair(bounds.first, pivot));
+      cnx.push(std::make_pair(pivot + 1, bounds.second));
+    }
+  }
+
+  template <class RandomAccessIterator>
+    void seq_sort(std::pair<RandomAccessIterator,RandomAccessIterator> bounds) {
+    if (std::distance(bounds.first, bounds.second) <= 128) {
+      std::sort(bounds.first, bounds.second);
+    } else {
+      RandomAccessIterator pivot = choose(bounds.first, bounds.second);
+      pivot = partition(bounds.first, bounds.second, pivot);
+      seq_sort(std::make_pair(bounds.first, pivot));
+      seq_sort(std::make_pair(pivot + 1, bounds.second));
+    }
+  }
+};
+
+template <class RandomAccessIterator>
+void sort ( RandomAccessIterator first, RandomAccessIterator last ) {
+  if (std::distance(first,last) <= 128) {
+    std::sort(first,last);
+  } else {
+    parsort P;
+    P.seq_sort(std::make_pair(first,last));
+  }
+}
+
 }
 #endif
 
