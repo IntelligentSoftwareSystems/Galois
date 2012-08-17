@@ -50,7 +50,7 @@ enum Phase {
 
 static cll::opt<std::string> inputFilename(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<std::string> outputFilename(cll::Positional, cll::desc("[output file]"));
-static cll::opt<unsigned int> max_iterations("max-iterations", cll::desc("Maximum iterations"), cll::init(10));
+static cll::opt<unsigned int> max_iterations("max-iterations", cll::desc("Maximum iterations"), cll::init(100));
 static cll::opt<Phase> phase(cll::desc("Phase:"),
     cll::values(
       clEnumVal(transpose, "Transpose graph"),
@@ -71,7 +71,7 @@ struct Node {
   bool hasNoOuts;
 };
 
-typedef Galois::Graph::LC_Linear_Graph<Node, double> Graph;
+typedef Galois::Graph::LC_CSR_Graph<Node, double> Graph;
 typedef Graph::GraphNode GNode;
 
 Graph graph;
@@ -177,6 +177,10 @@ struct Process {
   double addend;
 
   Process(Accum& a, double t, unsigned int numNodes): accum(a), tol(t), addend(alpha/numNodes) { }
+
+  void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
+    (*this)(src);
+  }
 
   void operator()(const GNode& src) {
     double value = 0;
