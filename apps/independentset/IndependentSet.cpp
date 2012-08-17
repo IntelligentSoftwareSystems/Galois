@@ -174,7 +174,11 @@ struct Process {
 
 struct GaloisAlgo {
   void operator()() {
+#ifdef GALOIS_USE_EXP
     typedef GaloisRuntime::WorkList::BulkSynchronousInline<false> WL;
+#else
+    typedef GaloisRuntime::WorkList::dChunkedFIFO<256> WL;
+#endif
 
 #ifdef GALOIS_USE_DET
     switch (detAlgo) {
@@ -197,8 +201,6 @@ struct GaloisAlgo {
 
 struct SerialAlgo {
   void operator()() {
-    typedef GaloisRuntime::WorkList::BulkSynchronousInline<false> WL;
-
     std::for_each(graph.begin(), graph.end(), Process<>());
   }
 };

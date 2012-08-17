@@ -182,8 +182,11 @@ struct ParallelAlgo {
     std::cout << "WARNING: Performance varies considerably due to -delta.  Do not expect the default to be good for your graph\n";
 
     UpdateRequest one[1] = { UpdateRequest(src, 0) };
+#ifdef GALOIS_USE_EXP
     Exp::PriAuto<16, UpdateRequestIndexer, OBIM, std::less<UpdateRequest>, std::greater<UpdateRequest> >::for_each(&one[0], &one[1], *this);
-    //Galois::for_each<OBIM>(&one[0], &one[1], *this);
+#else
+    Galois::for_each<OBIM>(&one[0], &one[1], *this);
+#endif
   }
 
   void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& lwl) const {
