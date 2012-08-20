@@ -22,12 +22,14 @@
  *
  * a thread local stl container for each thread
  *
- * @author Donald Nguyen <ddn@cs.utexas.edu>
+ * @author <ahassaan@ices.utexas.edu>
  */
 #ifndef GALOIS_RUNTIME_PER_THREAD_WORK_LIST_H_
 #define GALOIS_RUNTIME_PER_THREAD_WORK_LIST_H_
 
 #include <vector>
+#include <deque>
+#include <set>
 #include <limits>
 #include <iostream>
 
@@ -35,61 +37,73 @@
 
 #include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/Threads.h"
+#include "Galois/Runtime/mm/Mem.h"
+#include "Galois/Runtime/TwoLevelIteratorA.h"
 
 namespace GaloisRuntime {
 
 template <typename T, typename Cont_tp> 
-struct PerThreadWorkList {
-
-  typedef Cont_tp Cont_ty;
-  typedef GaloisRuntime::PerCPU<Cont_ty> PerThrdCont_ty;
-
-  PerThrdCont_ty perThrdCont;
+class PerThreadWorkList {
 
 public:
+  typedef Cont_tp Cont_ty;
   typedef typename Cont_ty::value_type value_type;
-  typedef typename Cont_ty::iterator iterator;
-  typedef typename Cont_ty::const_iterator const_iterator;
   typedef typename Cont_ty::reference reference;
   typedef typename Cont_ty::pointer pointer;
   typedef typename Cont_ty::size_type size_type;
 
+  typedef typename Cont_ty::iterator local_iterator;
+  typedef typename Cont_ty::const_iterator local_const_iterator;
+  typedef typename Cont_ty::reverse_iterator local_reverse_iterator;
+  typedef typename Cont_ty::const_reverse_iterator local_const_reverse_iterator;
 
-  PerThreadWorkList () {}
+  typedef PerThreadWorkList<T, Cont_tp> This_ty;
 
-  PerThreadWorkList (const Cont_ty& refCont): perThrdCont (refCont) {}
+  typedef typename intern::ChooseIter<This_ty, typename Cont_tp::iterator>::type global_iterator;
+  typedef typename intern::ChooseIter<This_ty, typename Cont_tp::const_iterator>::type global_const_iterator;
+  typedef typename intern::ChooseIter<This_ty, typename Cont_tp::reverse_iterator>::type global_reverse_iterator;
+  typedef typename intern::ChooseIter<This_ty, typename Cont_tp::const_reverse_iterator>::type global_const_reverse_iterator;
 
+protected:
+  typedef GaloisRuntime::PerCPU<Cont_ty*> PerThrdCont_ty;
+  PerThrdCont_ty perThrdCont;
+
+  PerThreadWorkList (): perThrdCont (NULL) {}
+  ~PerThreadWorkList () {}
+
+
+public:
   unsigned numRows () const { return perThrdCont.size (); }
 
-  Cont_ty& operator [] (unsigned i) { return perThrdCont.get (i); }
+  Cont_ty& get () { return *(perThrdCont.get ()); }
 
-  const Cont_ty& operator [] (unsigned i) const { return perThrdCont.get (i); }
+  const Cont_ty& get () const { return *(perThrdCont.get ()); }
 
-  Cont_ty& get () { return perThrdCont.get (); }
+  Cont_ty& get (unsigned i) { return *(perThrdCont.get (i)); }
 
-  const Cont_ty& get () const { return perThrdCont.get (); }
+  const Cont_ty& get (unsigned i) const { return *(perThrdCont.get (i)); }
 
-  iterator begin (unsigned i) { return perThrdCont.get (i).begin (); }
-  const_iterator begin (unsigned i) const { return perThrdCont.get (i).begin (); }
+  Cont_ty& operator [] (unsigned i) { return get (i); }
 
-  iterator end (unsigned i) { return perThrdCont.get (i).end (); }
-  const_iterator end (unsigned i) const { return perThrdCont.get (i).end (); }
+  const Cont_ty& operator [] (unsigned i) const { return get (i); }
 
+  global_iterator begin_all () { return intern::make_begin (*this, local_iterator ()); }
+  global_iterator end_all () { return intern::make_end (*this, local_iterator ()); }
 
-  size_type size () const { return perThrdCont.get ().size (); }
-  size_type size (unsigned i) const { return perThrdCont.get (i).size (); }
+  global_const_iterator begin_all () const { return intern::make_begin (*this, local_const_iterator ()); }
+  global_const_iterator end_all () const { return intern::make_end (*this, local_const_iterator ()); }
 
-  void clear () { perThrdCont.get ().clear (); }
-  void clear (unsigned i) { perThrdCont.get (i).clear (); }
+  global_reverse_iterator rbegin_all () { return intern::make_begin (*this, local_reverse_iterator ()); }
+  global_reverse_iterator rend_all () { return intern::make_end (*this, local_reverse_iterator ()); }
 
-  bool empty () const { return perThrdCont.get ().empty (); }
-  bool empty (unsigned i) const { return perThrdCont.get (i).empty (); }
+  global_const_reverse_iterator rbegin_all () const { return intern::make_begin (*this, local_const_reverse_iterator ()); }
+  global_const_reverse_iterator rend_all () const { return intern::make_end (*this, local_const_reverse_iterator ()); }
 
   size_type size_all () const {
     size_type sz = 0;
 
     for (unsigned i = 0; i < perThrdCont.size (); ++i) {
-      sz += size (i);
+      sz += get (i).size ();
     }
 
     return sz;
@@ -98,14 +112,14 @@ public:
 
   void clear_all () {
     for (unsigned i = 0; i < perThrdCont.size (); ++i) {
-      clear (i);
+      get (i).clear ();
     }
   }
 
   bool empty_all () const {
     bool res = true;
     for (unsigned i = 0; i < perThrdCont.size (); ++i) {
-      res = res && empty (i);
+      res = res && get (i).empty ();
     }
 
     return res;
@@ -148,18 +162,131 @@ public:
     }
   }
 
-private:
-
 };
 
 template <typename T>
 struct PerThreadWLfactory {
 
-  // TODO: change this to a better one
-  typedef std::allocator<T> AllocTy;
+  typedef std::allocator<T> StlAlloc;
 
-  typedef PerThreadWorkList<T, std::vector<T, AllocTy> > PerThreadVector;
+  typedef PerThreadWorkList<T, std::vector<T, StlAlloc> > PerThreadStlVector;
 
+
+  typedef MM::SimpleBumpPtrWithMallocFallback<MM::FreeListHeap<MM::SystemBaseAlloc> > BasicHeap;
+
+  typedef MM::ThreadAwarePrivateHeap<BasicHeap> PerThreadHeap;
+
+  typedef MM::ExternRefGaloisAllocator<T, PerThreadHeap> PerThreadAllocator;
+
+};
+
+
+template <typename T>
+class PerThreadVector: 
+  public PerThreadWorkList<T, std::vector<T, typename PerThreadWLfactory<T>::PerThreadAllocator> > {
+
+public:
+  typedef typename PerThreadWLfactory<T>::PerThreadHeap Heap_ty;
+  typedef typename PerThreadWLfactory<T>::PerThreadAllocator Alloc_ty;
+  typedef std::vector<T, Alloc_ty> Cont_ty;
+
+protected:
+  typedef PerThreadWorkList<T, Cont_ty> Super_ty;
+
+
+  Heap_ty heap;
+
+
+public:
+  PerThreadVector () {
+    Alloc_ty alloc (&heap);
+
+    for (unsigned i = 0; i < Super_ty::perThrdCont.size (); ++i) {
+      Super_ty::perThrdCont.get (i) = new Cont_ty (alloc);
+    }
+
+  }
+
+  ~PerThreadVector () {
+    for (unsigned i = 0; i < Super_ty::perThrdCont.size (); ++i) {
+      delete Super_ty::perThrdCont.get (i);
+      Super_ty::perThrdCont.get (i) = NULL;
+    }
+  }
+  
+
+};
+
+
+template <typename T>
+class PerThreadDeque: 
+  public PerThreadWorkList<T, std::deque<T, typename PerThreadWLfactory<T>::PerThreadAllocator> > {
+
+public:
+  typedef typename PerThreadWLfactory<T>::PerThreadHeap Heap_ty;
+  typedef typename PerThreadWLfactory<T>::PerThreadAllocator Alloc_ty;
+  typedef std::deque<T, Alloc_ty> Cont_ty;
+
+protected:
+  typedef PerThreadWorkList<T, Cont_ty> Super_ty;
+
+
+  Heap_ty heap;
+
+
+public:
+  PerThreadDeque () {
+    Alloc_ty alloc (&heap);
+
+    for (unsigned i = 0; i < Super_ty::perThrdCont.size (); ++i) {
+      Super_ty::perThrdCont.get (i) = new Cont_ty (alloc);
+    }
+
+  }
+
+  ~PerThreadDeque () {
+    for (unsigned i = 0; i < Super_ty::perThrdCont.size (); ++i) {
+      delete Super_ty::perThrdCont.get (i);
+      Super_ty::perThrdCont.get (i) = NULL;
+    }
+  }
+  
+
+};
+
+template <typename T, typename C=std::less<T> >
+class PerThreadSet: 
+  public PerThreadWorkList<T, std::set<T, C, typename PerThreadWLfactory<T>::PerThreadAllocator> > {
+
+public:
+  typedef typename PerThreadWLfactory<T>::PerThreadHeap Heap_ty;
+  typedef typename PerThreadWLfactory<T>::PerThreadAllocator Alloc_ty;
+  typedef std::set<T, C, Alloc_ty> Cont_ty;
+
+protected:
+  typedef PerThreadWorkList<T, Cont_ty> Super_ty;
+
+
+  Heap_ty heap;
+
+
+public:
+  explicit PerThreadSet (const C& cmp=C ()) {
+    Alloc_ty alloc (&heap);
+
+    for (unsigned i = 0; i < Super_ty::perThrdCont.size (); ++i) {
+      Super_ty::perThrdCont.get (i) = new Cont_ty (cmp, alloc);
+    }
+
+  }
+
+  ~PerThreadSet () {
+    for (unsigned i = 0; i < Super_ty::perThrdCont.size (); ++i) {
+      delete Super_ty::perThrdCont.get (i);
+      Super_ty::perThrdCont.get (i) = NULL;
+    }
+  }
+  
 
 };
 
