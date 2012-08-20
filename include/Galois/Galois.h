@@ -58,8 +58,7 @@ static inline void for_each(IterTy b, IterTy e, FunctionTy f, const char* loopna
 //Single initial item versions
 template<typename WLTy, typename InitItemTy, typename FunctionTy>
 static inline void for_each(InitItemTy i, FunctionTy f, const char* loopname = 0) {
-  InitItemTy wl[1];
-  wl[0] = i;
+  InitItemTy wl[1] = {i};
   Galois::for_each<WLTy>(&wl[0], &wl[1], f, loopname);
 }
 

@@ -29,6 +29,10 @@
 #include "Galois/Graphs/Serialize.h"
 #include "llvm/Support/CommandLine.h"
 
+#ifdef GALOIS_USE_EXP
+#include "Galois/PriorityScheduling.h"
+#endif
+
 #include "Lonestar/BoilerPlate.h"
 
 #include <iostream>
@@ -115,6 +119,36 @@ struct Indexer :std::unary_function<GNode, int> {
 struct NIndexer :std::unary_function<GNode, int> {
   int operator()(const GNode& n) const {
     return (app.graph.getData(n, Galois::NONE).height) >> 2;
+  }
+};
+
+struct GLess :std::binary_function<GNode, GNode, bool> {
+  bool operator()(const GNode& lhs, const GNode& rhs) const {
+    int lv = -app.graph.getData(lhs, Galois::NONE).height;
+    int rv = -app.graph.getData(rhs, Galois::NONE).height;
+    return lv < rv;
+  }
+};
+struct GGreater :std::binary_function<GNode, GNode, bool> {
+  bool operator()(const GNode& lhs, const GNode& rhs) const {
+    int lv = -app.graph.getData(lhs, Galois::NONE).height;
+    int rv = -app.graph.getData(rhs, Galois::NONE).height;
+    return lv > rv;
+  }
+};
+
+struct GNLess :std::binary_function<GNode, GNode, bool> {
+  bool operator()(const GNode& lhs, const GNode& rhs) const {
+    int lv = app.graph.getData(lhs, Galois::NONE).height;
+    int rv = app.graph.getData(rhs, Galois::NONE).height;
+    return lv < rv;
+  }
+};
+struct GNGreater :std::binary_function<GNode, GNode, bool> {
+  int operator()(const GNode& lhs, const GNode& rhs) const {
+    int lv = app.graph.getData(lhs, Galois::NONE).height;
+    int rv = app.graph.getData(rhs, Galois::NONE).height;
+    return lv > rv;
   }
 };
 
@@ -358,7 +392,6 @@ void globalRelabel(IncomingWL& incoming) {
 
   Galois::StatTimer T("UpdateHeightsTime");
   T.start();
-  GNode single[1] = { app.sink };
 
 #ifdef GALOIS_USE_EXP
   typedef GaloisRuntime::WorkList::BulkSynchronousInline<> WL;
@@ -369,18 +402,22 @@ void globalRelabel(IncomingWL& incoming) {
 #ifdef GALOIS_USE_DET
   switch (detAlgo) {
     case nondet: 
-      Galois::for_each<WL>(&single[0], &single[1], UpdateHeights<nondet>(), "UpdateHeights");
+      Galois::for_each<WL>(app.sink, UpdateHeights<nondet>(), "UpdateHeights");
       break;
     case detBase:
-      Galois::for_each_det<false>(&single[0], &single[1], UpdateHeights<detBase>(), "UpdateHeights");
+      Galois::for_each_det<false>(app.sink, UpdateHeights<detBase>(), "UpdateHeights");
       break;
     case detDisjoint:
-      Galois::for_each_det<true>(&single[0], &single[1], UpdateHeights<detDisjoint>(), "UpdateHeights");
+      Galois::for_each_det<true>(app.sink, UpdateHeights<detDisjoint>(), "UpdateHeights");
       break;
     default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
   }
 #else
-  Galois::for_each<OBIM>(&single[0], &single[1], UpdateHeights<nondet>(), "UpdateHeights");
+#ifdef GALOIS_USE_EXP
+  Exp::PriAuto<16, NIndexer, OBIM, GNLess, GNGreater>::for_each(app.sink, UpdateHeights<nondet>(), "UpdateHeights");
+#else
+  Galois::for_each<OBIM>(app.sink, UpdateHeights<nondet>(), "UpdateHeights");
+#endif
 #endif
   T.stop();
 

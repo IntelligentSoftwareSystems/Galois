@@ -183,11 +183,10 @@ struct ParallelAlgo {
     std::cout << "Using delta-step of " << (1 << stepShift) << "\n";
     std::cout << "WARNING: Performance varies considerably due to -delta.  Do not expect the default to be good for your graph\n";
 
-    UpdateRequest one[1] = { UpdateRequest(src, 0) };
 #ifdef GALOIS_USE_EXP
-    Exp::PriAuto<16, UpdateRequestIndexer, OBIM, std::less<UpdateRequest>, std::greater<UpdateRequest> >::for_each(&one[0], &one[1], *this);
+    Exp::PriAuto<16, UpdateRequestIndexer, OBIM, std::less<UpdateRequest>, std::greater<UpdateRequest> >::for_each(UpdateRequest(src, 0), *this);
 #else
-    Galois::for_each<OBIM>(&one[0], &one[1], *this);
+    Galois::for_each<OBIM>(UpdateRequest(src, 0), *this);
 #endif
   }
 

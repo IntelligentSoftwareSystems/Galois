@@ -84,6 +84,11 @@ struct PriAuto {
       gError(true, "Unknown Worklist [%s]\n", WorklistName.c_str());
     }
   }
+  template<typename InitItemTy,typename FunctionTy>
+  static void for_each(InitItemTy i, FunctionTy f, const char* loopname = 0) {
+    InitItemTy wl[1] = {i};
+    for_each(&wl[0], &wl[1], f, loopname);
+  }
 };
 
 } // end namespace

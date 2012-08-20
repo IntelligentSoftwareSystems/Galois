@@ -487,9 +487,7 @@ struct GaloisAlgo {
     typedef dChunkedFIFO<64> dChunk;
     typedef ChunkedFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
-
-    UpdateRequest one[1] = { UpdateRequest(source, 0) };
-    Galois::for_each<OBIM>(&one[0], &one[1], *this);
+    Galois::for_each<OBIM>(UpdateRequest(source, 0), *this);
   }
 
   void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& ctx) const {
@@ -525,9 +523,9 @@ struct GaloisNoLockAlgo {
 
     UpdateRequest one[1] = { UpdateRequest(source, 0) };
 #ifdef GALOIS_USE_EXP
-    Exp::PriAuto<64, UpdateRequestIndexer, OBIM, std::less<UpdateRequest>, std::greater<UpdateRequest> >::for_each(&one[0], &one[1], *this);
+    Exp::PriAuto<64, UpdateRequestIndexer, OBIM, std::less<UpdateRequest>, std::greater<UpdateRequest> >::for_each(UpdateRequest(source, 0), *this);
 #else
-    Galois::for_each<OBIM>(&one[0], &one[1], *this);
+    Galois::for_each<OBIM>(UpdateRequest(source, 0), *this);
 #endif
   }
 
