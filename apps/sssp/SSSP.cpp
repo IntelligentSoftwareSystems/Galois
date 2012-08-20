@@ -44,6 +44,8 @@
 
 namespace cll = llvm::cl;
 
+static const bool trackBadWork = false;
+
 static const char* name = "Single Source Shortest Path";
 static const char* desc =
   "Computes the shortest path from a source node to all nodes in a directed "
@@ -167,8 +169,8 @@ struct SerialPairingHeapAlgo {
 };
 #endif
 
-//static Galois::Statistic<unsigned int>* BadWork;
-//static Galois::Statistic<unsigned int>* WLEmptyWork;
+static Galois::Statistic* BadWork;
+static Galois::Statistic* WLEmptyWork;
 
 struct ParallelAlgo {
   std::string name() const { return "parallel"; }
@@ -191,13 +193,13 @@ struct ParallelAlgo {
 
   void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& lwl) const {
     SNode& data = graph.getData(req.n,Galois::NONE);
-    // if (req.w >= data.dist)
-    //   *WLEmptyWork += 1;
+    if (trackBadWork && req.w >= data.dist)
+      *WLEmptyWork += 1;
     unsigned int v;
     while (req.w < (v = data.dist)) {
       if (__sync_bool_compare_and_swap(&data.dist, v, req.w)) {
-	// if (v != DIST_INFINITY)
-	//   *BadWork += 1;
+	if (trackBadWork && v != DIST_INFINITY)
+	   *BadWork += 1;
 	for (Graph::edge_iterator ii = graph.edge_begin(req.n, Galois::NONE),
 	       ee = graph.edge_end(req.n, Galois::NONE); ii != ee; ++ii) {
 	  GNode dst = graph.getEdgeDst(ii);
@@ -294,6 +296,11 @@ int main(int argc, char **argv) {
   Galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
+  if (trackBadWork) {
+    BadWork = new Galois::Statistic("BadWork");
+    WLEmptyWork = new Galois::Statistic("EmptyWork");
+  }
+
   GNode source, report;
   initGraph(source, report);
   std::cout << "Read " << graph.size() << " nodes\n";
@@ -305,6 +312,11 @@ int main(int argc, char **argv) {
 #endif
     case parallel: run(ParallelAlgo(), source); break;
     default: std::cerr << "Unknown algorithm" << algo << "\n"; abort();
+  }
+
+  if (trackBadWork) {
+    delete BadWork;
+    delete WLEmptyWork;
   }
 
   std::cout << graph.getData(report,Galois::NONE).toString() << "\n";
