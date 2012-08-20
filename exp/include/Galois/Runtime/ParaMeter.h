@@ -297,6 +297,7 @@ class ForEachWork<WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
   }
 
   unsigned abortIteration(IterationContext& it, value_type& item) {
+    clearConflictLock();
     workList.getNext().push(item);
     return retireIteration(it, true);
   }
