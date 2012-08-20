@@ -29,8 +29,7 @@
 #include "Galois/Accumulator.h"
 #include "Galois/Galois.h"
 #include "Galois/Graphs/Graph.h"
-#include "Galois/Graphs/Serialize.h"
-#include "Galois/Graphs/FileGraph.h"
+#include "Galois/Graphs/LCGraph.h"
 #include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/WorkList.h"
 
@@ -72,20 +71,28 @@
  *
  */
 
+#define USE_LC_GRAPH
+
 class AVIunordered: public AVIabstractMain {
 
 protected:
-  typedef Galois::GAccumulator<int> IterCounter;
+  typedef Galois::GSimpleReducible<int, std::plus<int> > IterCounter;
 
   static const bool DEBUG = false;
 
   static const int CHUNK_SIZE = 32;
 
-// TODO: use LCGraph 
+#ifdef USE_LC_GRAPH
+  typedef Galois::Graph::LC_CSR_Graph<AVI*, void> Graph;
+  typedef Graph::GraphNode GNode;
+#else
   typedef Galois::Graph::FirstGraph<AVI*, void, false> Graph;
   typedef Graph::GraphNode GNode;
+#endif
 
+  // TODO: move this decl to AVIabstractMain
   typedef GaloisRuntime::WorkList::dChunkedFIFO<CHUNK_SIZE> AVIWorkList;
+  // typedef GaloisRuntime::WorkList::dChunkedLIFO<CHUNK_SIZE> AVIWorkList;
 
 
   Graph graph;
@@ -103,14 +110,26 @@ protected:
    * @param g
    */
   void genElemAdjGraph (const MeshInit& meshInit, const GlobalVec& g) {
-    std::vector<GNode> aviAdjNodes;
+
+#ifdef USE_LC_GRAPH
+    typedef Galois::Graph::FirstGraph<AVI*, void, false> MGraph;
+    typedef MGraph::GraphNode MNode;
+
+    MGraph mgraph;
+#else 
+    Graph& mgraph = graph;
+    typedef GNode MNode;
+#endif
+
+
+    std::vector<MNode> aviAdjNodes;
 
     const std::vector<AVI*>& aviList = meshInit.getAVIVec ();
 
     for (std::vector<AVI*>::const_iterator i = aviList.begin (), e = aviList.end (); i != e; ++i) {
       AVI* avi = *i;
-      GNode gn = graph.createNode (avi);
-      graph.addNode (gn);
+      MNode gn = mgraph.createNode (avi);
+      mgraph.addNode (gn);
 
       aviAdjNodes.push_back (gn);
     }
@@ -120,15 +139,15 @@ protected:
     // map where
     // key is node id
     // value is a list of avi elements that share this node
-    std::vector< std::vector<GNode> > nodeSharers(meshInit.getNumNodes ());
+    std::vector< std::vector<MNode> > nodeSharers(meshInit.getNumNodes ());
 
     // for (int i = 0; i < nodeSharers.size (); ++i) {
       // nodeSharers[i] = new ArrayList<GNode<AVIAdjNode>> ();
     // }
 
-    for (std::vector<GNode>::const_iterator i = aviAdjNodes.begin (), ei = aviAdjNodes.end (); i != ei; ++i) {
-      GNode aviAdjN = *i;
-      AVI* avi = graph.getData (aviAdjN, Galois::NONE);
+    for (std::vector<MNode>::const_iterator i = aviAdjNodes.begin (), ei = aviAdjNodes.end (); i != ei; ++i) {
+      MNode aviAdjN = *i;
+      AVI* avi = mgraph.getData (aviAdjN, Galois::NONE);
       const std::vector<GlobalNodalIndex>& conn = avi->getGeometry ().getConnectivity ();
 
       for (std::vector<GlobalNodalIndex>::const_iterator j = conn.begin (), ej = conn.end (); j != ej; ++j) {
@@ -140,10 +159,10 @@ protected:
 
     int numEdges = 0;
 
-    for (std::vector< std::vector<GNode> >::const_iterator it = nodeSharers.begin (), ei = nodeSharers.end ();
+    for (std::vector< std::vector<MNode> >::const_iterator it = nodeSharers.begin (), ei = nodeSharers.end ();
         it != ei; ++it) {
 
-      const std::vector<GNode>& adjElms = *it;
+      const std::vector<MNode>& adjElms = *it;
 
       // adjElms is the list of elements who share the node with id == current index pos in the array
       // and therefore form a clique among themselves
@@ -153,18 +172,26 @@ protected:
           if (!adjElms[i].hasNeighbor (adjElms[j])) {
             ++numEdges;
           }
-          graph.addEdge (adjElms[i], adjElms[j]);
+          mgraph.addEdge (adjElms[i], adjElms[j]);
         }
       }
 
     }
 
-    printf ("Graph created with %d nodes and %d edges\n", graph.size (), numEdges);
+#ifdef USE_LC_GRAPH
+    graph.copyFromGraph (mgraph);
+#endif
 
+    printf ("Graph created with %ld nodes and %d edges\n", graph.size (), numEdges);
   }
   
   virtual void initRemaining (const MeshInit& meshInit, const GlobalVec& g) {
+
+    Galois::StatTimer t_graph ("Time spent in creating the graph: ");
+
+    t_graph.start ();
     genElemAdjGraph (meshInit, g);
+    t_graph.stop ();
   }
 
   //! Functor for loop body
@@ -174,7 +201,6 @@ protected:
     MeshInit& meshInit;
     GlobalVec& g;
     GaloisRuntime::PerCPU<LocalVec>& perIterLocalVec;
-    const AVIComparator& aviCmp;
     bool createSyncFiles;
     IterCounter& iter;
 
@@ -184,7 +210,6 @@ protected:
         MeshInit& meshInit,
         GlobalVec& g,
         GaloisRuntime::PerCPU<LocalVec>& perIterLocalVec,
-        const AVIComparator& aviCmp,
         bool createSyncFiles,
         IterCounter& iter):
 
@@ -193,7 +218,6 @@ protected:
         meshInit (meshInit),
         g (g),
         perIterLocalVec (perIterLocalVec),
-        aviCmp (aviCmp),
         createSyncFiles (createSyncFiles),
         iter (iter) {}
     
@@ -216,8 +240,8 @@ protected:
 
         AVI* srcAVI = graph.getData (src, Galois::CHECK_CONFLICT);
 
-        for (Graph::neighbor_iterator j = graph.neighbor_begin (src, Galois::CHECK_CONFLICT)
-            , ej = graph.neighbor_end (src, Galois::CHECK_CONFLICT); j != ej; ++j) {
+        for (Graph::edge_iterator e = graph.edge_begin (src, Galois::CHECK_CONFLICT)
+            , ende = graph.edge_end (src, Galois::CHECK_CONFLICT); e != ende; ++e) {
         }
 
 
@@ -241,13 +265,13 @@ protected:
         // update the inEdges count and determine
         // which neighbor is at local minimum and needs to be added to the worklist
 
-        for (Graph::neighbor_iterator j = graph.neighbor_begin (src, Galois::NONE), ej = graph.neighbor_end (src, Galois::NONE);
-            j != ej; ++j) {
+        for (Graph::edge_iterator e = graph.edge_begin (src, Galois::NONE)
+            , ende = graph.edge_end (src, Galois::NONE); e != ende; ++e) {
 
-          const GNode& dst = *j;
-          AVI* dstAVI = graph.getData (*j, Galois::NONE);
+          const GNode& dst = graph.getEdgeDst (e);
+          AVI* dstAVI = graph.getData (dst, Galois::NONE);
 
-          if (aviCmp.compare (srcAVI, dstAVI) > 0) {
+          if (AVIComparator::compare (srcAVI, dstAVI) > 0) {
             // if srcAVI has a higher time stamp that dstAVI
 
             ++inDegVec[srcAVI->getGlobalIndex ()];
@@ -272,7 +296,7 @@ protected:
         }
 
 
-        iter += 1;
+        ++ (iter.get ());
 
         // if (iter.get () == 5000) {
            // meshInit.writeMesh ();
@@ -282,13 +306,37 @@ protected:
       }
   };
 
-  struct Indexer : std::binary_function<GNode, unsigned, unsigned> {
-    unsigned operator()(const GNode& val) const {
-      double ts = val.getData(Galois::NONE)->getNextTimeStamp();
-      unsigned r = static_cast<unsigned>(ts * 1000000);
-      return r;
+  template <typename T>
+  void initWorkList (std::vector<GNode>& initWL, std::vector<T>& inDegVec) {
+
+    Galois::StatTimer t_wl ("Time to populate the worklist");
+    t_wl.start ();
+
+    for (Graph::iterator i = graph.begin (), e = graph.end (); i != e; ++i) {
+      const GNode& src = *i;
+      AVI* srcAVI = graph.getData (src, Galois::NONE);
+
+      // calculate the in degree of src by comparing it against its neighbors
+      for (Graph::edge_iterator e = graph.edge_begin  (src, Galois::NONE), 
+          ende = graph.edge_end (src, Galois::NONE); e != ende; ++e) {
+        
+        GNode dst = graph.getEdgeDst (e);
+        AVI* dstAVI = graph.getData (dst, Galois::NONE);
+        if (AVIComparator::compare (srcAVI, dstAVI) > 0) {
+          ++inDegVec[srcAVI->getGlobalIndex ()];
+        }
+      }
+
+      // if src is less than all its neighbors then add to initWL
+      if (inDegVec[srcAVI->getGlobalIndex ()] == 0) {
+        initWL.push_back (src);
+      }
     }
-  };
+
+    t_wl.stop ();
+    printf ("Initial worklist contains %zd elements\n", initWL.size ());
+    
+  }
 public:
 
   virtual  void runLoop (MeshInit& meshInit, GlobalVec& g, bool createSyncFiles) {
@@ -297,38 +345,15 @@ public:
     /////////////////////////////////////////////////////////////////
     std::vector<int> inDegVec(meshInit.getNumElements (), 0);
 
-    std::vector<GNode> initWl;
+    std::vector<GNode> initWL;
 
-    AVIComparator aviCmp;
+    initWorkList (initWL, inDegVec);
 
-    for (Graph::iterator i = graph.begin (), e = graph.end (); i != e; ++i) {
-      const GNode& src = *i;
-      AVI* srcAVI = graph.getData (src, Galois::NONE);
-
-      // calculate the in degree of src by comparing it against its neighbors
-      for (Graph::neighbor_iterator n = graph.neighbor_begin (src, Galois::NONE), 
-          en = graph.neighbor_end (src, Galois::NONE); n != en; ++n) {
-        
-        AVI* dstAVI = graph.getData (*n, Galois::NONE);
-        if (aviCmp.compare (srcAVI, dstAVI) > 0) {
-          ++inDegVec[srcAVI->getGlobalIndex ()];
-        }
-      }
-
-      // if src is less than all its neighbors then add to initWl
-      if (inDegVec[srcAVI->getGlobalIndex ()] == 0) {
-        initWl.push_back (src);
-      }
-    }
-
-
- 
-    printf ("Initial worklist contains %zd elements\n", initWl.size ());
 
 //    // TODO: DEBUG
 //    std::cout << "Initial Worklist = " << std::endl;
-//    for (size_t i = 0; i < initWl.size (); ++i) {
-//      std::cout << graph.getData (initWl[i], Galois::NONE)->toString () << ", ";
+//    for (size_t i = 0; i < initWL.size (); ++i) {
+//      std::cout << graph.getData (initWL[i], Galois::NONE)->toString () << ", ";
 //    }
 //    std::cout << std::endl;
 
@@ -349,13 +374,14 @@ public:
 
     GaloisRuntime::PerCPU<LocalVec> perIterLocalVec (l);
 
-    IterCounter iter;
+    IterCounter iter(0);
 
-    Process p(graph, inDegVec, meshInit, g, perIterLocalVec, aviCmp, createSyncFiles, iter);
+    Process p(graph, inDegVec, meshInit, g, perIterLocalVec, createSyncFiles, iter);
 
-    Galois::for_each<AVIWorkList>(initWl.begin (), initWl.end (), p);
+    Galois::for_each<AVIWorkList>(initWL.begin (), initWL.end (), p);
 
-    printf ("iterations = %d\n", iter.reduce());
+    printf ("iterations = %d\n", iter.reduce ());
+
   }
 
 
@@ -377,7 +403,6 @@ public:
     std::vector<std::pair<GNode, GNode> > outEdges;
 
     std::vector<double> center (meshInit.getSpatialDim(), 0.0);
-    AVIComparator aviCmp;
 
     for (Graph::iterator i = graph.begin (), e = graph.end (); i != e; ++i) {
       const GNode& src = *i;
@@ -385,19 +410,22 @@ public:
 
       size_t inDeg = 0;
       // calculate the in degree of src by comparing it against its neighbors
-      for (Graph::neighbor_iterator n = graph.neighbor_begin (src, Galois::NONE), en =
-          graph.neighbor_end (src, Galois::NONE); n != en; ++n) {
+      for (Graph::edge_iterator e = graph.edge_begin (src, Galois::NONE)
+          , ende = graph.edge_end (src, Galois::NONE); e != ende; ++e) {
 
-        AVI* dstAVI = graph.getData (*n, Galois::NONE);
-        if (aviCmp.compare (srcAVI, dstAVI) > 0) {
+
+        GNode dst = graph.getEdgeDst (e);
+        AVI* dstAVI = graph.getData (dst, Galois::NONE);
+        if (AVIComparator::compare (srcAVI, dstAVI) > 0) {
           ++inDeg;
 
         } else { // is an out-going edge
-          outEdges.push_back (std::make_pair(src, *n));
+          outEdges.push_back (std::make_pair(src, dst));
         }
       }
 
-      size_t outDeg = graph.neighborsSize(src, Galois::NONE) - inDeg;
+      // size_t outDeg = graph.neighborsSize(src, Galois::NONE) - inDeg;
+      size_t outDeg = std::distance (graph.edge_begin (src, Galois::NONE), graph.edge_end (src, Galois::NONE));
 
       std::fill (center.begin (), center.end (), 0.0);
       srcAVI->getElement ().getGeometry ().computeCenter (center);

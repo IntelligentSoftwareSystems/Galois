@@ -8,9 +8,8 @@
 #include "AVIunorderedNoLock.h"
 
 int main (int argc, char* argv[]) {
-  AVIunorderedNoLock* um = new AVIunorderedNoLock ();
-  um->run (argc, argv);
-  delete um;
+  AVIunorderedNoLock um;
+  um.run (argc, argv);
   return 0;
 }
 

@@ -69,7 +69,7 @@ public:
   static const double PERT;
   static const double DET_MIN;
 
-  static const int MAT_SIZE = 9;
+  static const size_t MAT_SIZE = 9;
   static const size_t NDF;
   static const size_t NDM;
 

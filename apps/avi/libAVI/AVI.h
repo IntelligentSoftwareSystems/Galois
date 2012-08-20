@@ -404,16 +404,21 @@ struct AVIComparator {
   //! tie break comparison
   //! @param left pointer to first AVI object
   //! @param right pointer to second AVI object
-  int compare (const AVI* left, const AVI* right) const {
+  static inline int compare (const AVI* const left, const AVI* const right) {
     int result = 0;
     double tdiff = left->getNextTimeStamp() - right->getNextTimeStamp();
 
-    if (tdiff < 0) {
-      result = -1;
-    } else if (tdiff > 0) {
-      result = 1;
-    } else {
+    if (fabs (tdiff) < TOLERANCE) {
       result = left->getGlobalIndex() - right->getGlobalIndex();
+
+    } else if (tdiff < 0.0) {
+      result = -1;
+
+    } else if (tdiff > 0.0) {
+      result = 1;
+
+    } else {
+      abort (); // shouldn't reach here
     }
 
     return result;
@@ -422,7 +427,7 @@ struct AVIComparator {
   //! return true if left < right
   //! @param left pointer to first AVI object
   //! @param right pointer to second AVI object
-  bool operator () (const AVI* left, const AVI* right) const {
+  bool operator () (const AVI* const left, const AVI* const right) const {
     return compare (left, right) < 0;
   }
 };
@@ -434,7 +439,7 @@ struct AVIReverseComparator: public AVIComparator {
   //! @returns true if left > right
   //! @param left pointer to first AVI object
   //! @param right pointer to second AVI object
-  bool operator () (const AVI* left, const AVI* right) const {
+  bool operator () (const AVI* const left, const AVI* const right) const {
     return compare (left, right) > 0;
   }
 };

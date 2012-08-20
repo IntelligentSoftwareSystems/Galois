@@ -26,13 +26,16 @@
 
 
 #include "Galois/Graphs/Graph.h"
-#include "Galois/Galois.h"
-
-
-#include "Galois/Graphs/Serialize.h"
 #include "Galois/Graphs/FileGraph.h"
-#include "Galois/Runtime/PerCPU.h"
+
+#include "Galois/Galois.h"
 #include "Galois/Atomic.h"
+
+#include "Galois/Runtime/PerCPU.h"
+
+#ifdef GALOIS_USE_EXP
+#include "Galois/Runtime/cond_inline.h"
+#endif // GALOIS_USE_EXP
 
 #include <string>
 #include <sstream>
@@ -55,7 +58,7 @@
  * and no abstract locks
  */
 class AVIunorderedNoLock: public AVIunordered {
-  typedef Galois::GAtomic<int> AtomicInteger;
+  typedef Galois::GAtomicPadded<int> AtomicInteger;
 
 protected:
 
@@ -66,26 +69,22 @@ protected:
   /**
    * Functor for loop body
    */
-  struct process {
+  struct Process {
 
     Graph& graph;
     std::vector<AtomicInteger>& inDegVec;
     MeshInit& meshInit;
     GlobalVec& g;
     GaloisRuntime::PerCPU<LocalVec>& perIterLocalVec;
-    GaloisRuntime::PerCPU< std::vector<GNode> >& perIterAddList;
-    const AVIComparator& aviCmp;
     bool createSyncFiles;
     IterCounter& iter;
 
-    process (
+    Process (
         Graph& graph,
         std::vector<AtomicInteger>& inDegVec,
         MeshInit& meshInit,
         GlobalVec& g,
         GaloisRuntime::PerCPU<LocalVec>& perIterLocalVec,
-        GaloisRuntime::PerCPU< std::vector<GNode> >& perIterAddList,
-        const AVIComparator& aviCmp,
         bool createSyncFiles,
         IterCounter& iter):
 
@@ -94,31 +93,19 @@ protected:
         meshInit (meshInit),
         g (g),
         perIterLocalVec (perIterLocalVec),
-        perIterAddList (perIterAddList),
-        aviCmp (aviCmp),
         createSyncFiles (createSyncFiles),
         iter (iter) {}
     
-
-    process (const process& that):
-        graph (that.graph),
-        inDegVec (that.inDegVec),
-        meshInit (that.meshInit),
-        g (that.g),
-        perIterLocalVec (that.perIterLocalVec),
-        perIterAddList (that.perIterAddList),
-        aviCmp (that.aviCmp),
-        createSyncFiles (that.createSyncFiles),
-        iter (that.iter) {}
-
-
     /**
      * Loop body
      *
      * The key condition is that a node and its neighbor cannot be active at the same time,
      * and it must be impossible for two of them to be processed in parallel
      * Therefore a node can add its newly active neighbors to the workset as the last step only when
-     * it has finished performing all other updates
+     * it has finished performing all other updates. *(As per current semantics of for_each, adds to worklist
+     * happen on commit. If this is not the case, then each thread should
+     * accumulate adds in a temp vec and add to the worklist all together in the
+     * end)
      * For the same reason, active node src must update its own in degree before updating the
      * indegree of any of the neighbors. Imagine the alternative, where active node updates its in
      * degree and that of it's neighbor in the same loop. For example A is current active node and
@@ -130,144 +117,113 @@ protected:
      * @param src is active elemtn
      * @param lwl is the worklist handle
      */
-    template <typename ContextTy> 
-      void operator () (const GNode& src, ContextTy& lwl) {
-        AVI* srcAVI = graph.getData (src, Galois::NONE);
 
-        int inDeg = (int)inDegVec[srcAVI->getGlobalIndex ()];
-        // assert  inDeg == 0 : String.format ("active node %s with inDeg = %d\n", srcAVI, inDeg);
+    template <typename C>
+    IFPROF_NOINLINE void addToWL (C& lwl, const GNode& gn, AVI* avi) {
+      assert (graph.getData (gn, Galois::NONE) == avi);
+
+      if (avi->getNextTimeStamp () < meshInit.getSimEndTime ()) {
+        lwl.push (gn);
+      }
+    }
+
+    template <typename C>
+    IFPROF_NOINLINE void updateODG (const GNode& src, AVI* srcAVI, C& lwl) {
+      unsigned addAmt = 0;
+
+      for (Graph::edge_iterator e = graph.edge_begin (src, Galois::NONE)
+          , ende = graph.edge_end (src, Galois::NONE); e != ende; ++e) {
+
+        GNode dst = graph.getEdgeDst (e);
+        AVI* dstAVI = graph.getData (dst, Galois::NONE);
+
+        if (AVIComparator::compare (srcAVI, dstAVI) > 0) {
+          ++addAmt;
+        }
+
+      }
+
+
+      // may be the active node is still at the local minimum
+      // and no updates to neighbors are necessary
+      if (addAmt == 0) {
+        addToWL (lwl, src, srcAVI);
+      }
+      else {
+        inDegVec[srcAVI->getGlobalIndex ()] += addAmt;
+
+        for (Graph::edge_iterator e = graph.edge_begin (src, Galois::NONE)
+            , ende = graph.edge_end (src, Galois::NONE); e != ende; ++e) {
+
+          GNode dst = graph.getEdgeDst (e);
+          AVI* dstAVI = graph.getData (dst, Galois::NONE);
+
+          if (AVIComparator::compare (srcAVI, dstAVI) > 0) {
+            int din = --inDegVec[dstAVI->getGlobalIndex ()];
+
+            assert (din >= 0);
+
+            if (din == 0) {
+              addToWL (lwl, dst, dstAVI);
+              // // TODO: DEBUG
+              // std::cout << "Adding: " << dstAVI->toString () << std::endl;
+            }
+          }
+
+        } // end for
+
+      } // end else
+    }
+
+    template <typename ContextTy> 
+    void operator () (const GNode& src, ContextTy& lwl) {
+      AVI* srcAVI = graph.getData (src, Galois::NONE);
+
+      int inDeg = (int)inDegVec[srcAVI->getGlobalIndex ()];
+      // assert  inDeg == 0 : String.format ("active node %s with inDeg = %d\n", srcAVI, inDeg);
 
 //        // TODO: DEBUG
 //        std::cout << "Processing element: " << srcAVI->toString() << std::endl;
 
-        assert (inDeg == 0);
+      assert (inDeg == 0);
 
-        LocalVec& l = perIterLocalVec.get();
+      LocalVec& l = perIterLocalVec.get();
 
-        AVIabstractMain::simulate(srcAVI, meshInit, g, l, createSyncFiles);
-
-
-        // update the inEdges count and determine
-        // which neighbor is at local minimum and needs to be added to the worklist
-        
-        int addAmt = 0;
-
-        for (Graph::neighbor_iterator j = graph.neighbor_begin (src, Galois::NONE), ej = graph.neighbor_end (src, Galois::NONE);
-            j != ej; ++j) {
-
-          AVI* dstAVI = graph.getData (*j, Galois::NONE);
-
-          if (aviCmp.compare (srcAVI, dstAVI) > 0) {
-            ++addAmt;
-          }
-
-        }
+      AVIabstractMain::simulate(srcAVI, meshInit, g, l, createSyncFiles);
 
 
-        // may be the active node is still at the local minimum
-        // and no updates to neighbors are necessary
-        if (addAmt == 0) {
-          if (srcAVI->getNextTimeStamp () < meshInit.getSimEndTime ()) {
-            lwl.push (src);
-          }
-        }
-        else {
-          inDegVec[srcAVI->getGlobalIndex ()] += addAmt;
-
-          std::vector<GNode> toAdd = perIterAddList.get ();
-          toAdd.clear ();
-
-          for (Graph::neighbor_iterator j = graph.neighbor_begin (src, Galois::NONE), ej = graph.neighbor_end(src, Galois::NONE);
-              j != ej; ++j) {
-
-            const GNode& dst = *j;
-            AVI* dstAVI = graph.getData (dst, Galois::NONE);
-
-            if (aviCmp.compare (srcAVI, dstAVI) > 0) {
-              int din = --inDegVec[dstAVI->getGlobalIndex ()];
-
-              assert (din >= 0);
-
-              if (din == 0) {
-                if (dstAVI->getNextTimeStamp () < meshInit.getSimEndTime ()) {
-                  toAdd.push_back (dst);
-
-//                  // TODO: DEBUG
-//                  std::cout << "Adding: " << dstAVI->toString () << std::endl;
-                }
-              }
-            }
-
-          } // end for
+      // update the inEdges count and determine
+      // which neighbor is at local minimum and needs to be added to the worklist
+      updateODG (src, srcAVI, lwl);
 
 
-          for (std::vector<GNode>::const_iterator i = toAdd.begin (), ei = toAdd.end (); i != ei; ++i) {
-            const GNode& gn = (*i);
-            lwl.push (gn);
-          }
-
-        } // end else
+      // for debugging, remove later
+      ++(iter.get ());
 
 
-        // for debugging, remove later
-        iter += 1;
-
-
-      }
-  };
-  
-  struct Indexer : std::binary_function<GNode, unsigned, unsigned> {
-    unsigned operator()(const GNode& val) const {
-      double ts = val.getData(Galois::NONE)->getNextTimeStamp();
-      unsigned r = static_cast<unsigned>(ts * 1000000);
-      return r;
     }
   };
-
+  
 public:
 
   /**
    * For the in degree vector, we use a vector of atomic integers
    * This along with other changes in the loop body allow us to 
-   * no use abstract locks. @see process
+   * no use abstract locks. @see Process
    */
   virtual  void runLoop (MeshInit& meshInit, GlobalVec& g, bool createSyncFiles) {
     /////////////////////////////////////////////////////////////////
     // populate an initial  worklist
     /////////////////////////////////////////////////////////////////
     std::vector<AtomicInteger> inDegVec(meshInit.getNumElements (), AtomicInteger (0));
-    std::vector<GNode> initWl;
+    std::vector<GNode> initWL;
 
-    AVIComparator aviCmp;
-
-    for (Graph::iterator i = graph.begin (), e = graph.end (); i != e; ++i) {
-      const GNode& src = *i;
-      AVI* srcAVI = graph.getData (src, Galois::NONE);
-
-      // calculate the in degree of src by comparing it against its neighbors
-      for (Graph::neighbor_iterator n = graph.neighbor_begin (src, Galois::NONE), 
-          en= graph.neighbor_end (src, Galois::NONE); n != en; ++n) {
-        
-        AVI* dstAVI = graph.getData (*n, Galois::NONE);
-        if (aviCmp.compare (srcAVI, dstAVI) > 0) {
-          ++inDegVec[srcAVI->getGlobalIndex ()];
-        }
-      }
-
-      // if src is less than all its neighbors then add to initWl
-      if ((int)inDegVec[srcAVI->getGlobalIndex ()] == 0) {
-        initWl.push_back (src);
-      }
-    }
-
-
- 
-    printf ("Initial worklist contains %zd elements\n", initWl.size ());
+    initWorkList (initWL, inDegVec);
 
 //    // TODO: DEBUG
 //    std::cout << "Initial Worklist = " << std::endl;
-//    for (size_t i = 0; i < initWl.size (); ++i) {
-//      std::cout << graph.getData (initWl[i], Galois::NONE)->toString () << ", ";
+//    for (size_t i = 0; i < initWL.size (); ++i) {
+//      std::cout << graph.getData (initWL[i], Galois::NONE)->toString () << ", ";
 //    }
 //    std::cout << std::endl;
 
@@ -284,20 +240,13 @@ public:
     GaloisRuntime::PerCPU<LocalVec> perIterLocalVec (l);
 
 
-    GaloisRuntime::PerCPU< std::vector<GNode> > perIterAddList;
+    IterCounter iter(0);
 
+    Process p (graph, inDegVec, meshInit, g, perIterLocalVec, createSyncFiles, iter);
 
+    Galois::for_each<AVIWorkList> (initWL.begin (), initWL.end (), p);
 
-
-    IterCounter iter;
-
-
-    process p( graph, inDegVec, meshInit, g, perIterLocalVec, perIterAddList, aviCmp, createSyncFiles, iter);
-
-
-    Galois::for_each<AVIWorkList> (initWl.begin (), initWl.end (), p);
-
-    printf ("iterations = %d\n", iter.reduce());
+    printf ("iterations = %d\n", iter.reduce ());
 
   }
 

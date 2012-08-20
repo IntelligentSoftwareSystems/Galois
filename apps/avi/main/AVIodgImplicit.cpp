@@ -1,14 +1,15 @@
 /*
- * AVIorderedSerial.cpp
+ * AVIodgImplicit.cpp
  *
  *  Created on: Jun 21, 2011
  *      Author: amber
  */
-#include "AVIabstractMain.h"
+
+#include "AVIodgImplicit.h"
 
 int main (int argc, char* argv[]) {
-  AVIorderedSerial serial;
-  serial.run (argc, argv);
+  AVIodgImplicit um;
+  um.run (argc, argv);
   return 0;
 }
 

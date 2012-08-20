@@ -8,10 +8,8 @@
 #include "AVIunordered.h"
 
 int main (int argc, char* argv[]) {
-  Galois::StatManager M;
-  AVIunordered* um = new AVIunordered ();
-  um->run (argc, argv);
-  delete um;
+  AVIunordered um;
+  um.run (argc, argv);
   return 0;
 }
 

@@ -46,9 +46,13 @@
 
 
 
-#include "Galois/Statistic.h"
-#include "Galois/Graphs/Graph.h"
+#include "Galois/Accumulator.h"
+#include "Galois/Atomic.h"
 #include "Galois/Galois.h"
+#include "Galois/Galois.h"
+#include "Galois/Graphs/Graph.h"
+#include "Galois/Statistic.h"
+#include "Galois/Runtime/Sampling.h"
 #include "llvm/Support/CommandLine.h"
 
 #include "Lonestar/BoilerPlate.h"
@@ -97,6 +101,10 @@ private:
 
 
 protected:
+  static const int CHUNK_SIZE = 1;
+  typedef GaloisRuntime::WorkList::dChunkedFIFO<CHUNK_SIZE> AVIWorkList;
+
+  typedef Galois::GSimpleReducible<int, std::plus<int> > IterCounter;
 
   std::string wltype;
 
@@ -209,6 +217,7 @@ void AVIabstractMain::initGlobalVec (const MeshInit& meshInit, GlobalVec& g) {
 }
 
 void AVIabstractMain::run (int argc, char* argv[]) {
+  Galois::StatManager sm;
   LonestarStart(argc, argv, name, desc, url);
 
   // print messages e.g. version, input etc.
@@ -240,8 +249,10 @@ void AVIabstractMain::run (int argc, char* argv[]) {
   Galois::StatTimer t;
   t.start ();
 
+  GaloisRuntime::beginSampling ();
   // don't write to files when measuring time
   runLoop (*meshInit, g, false);
+  GaloisRuntime::endSampling ();
 
   t.stop ();
 
@@ -360,7 +371,7 @@ void AVIorderedSerial::runLoop (MeshInit& meshInit, GlobalVec& g, bool createSyn
     AVIabstractMain::simulate (avi, meshInit, g, l, createSyncFiles);
 
 
-    if (avi->getNextTimeStamp () <= meshInit.getSimEndTime ()) {
+    if (avi->getNextTimeStamp () < meshInit.getSimEndTime ()) {
       pq.push (avi);
     }
 
