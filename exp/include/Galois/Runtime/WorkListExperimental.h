@@ -29,7 +29,7 @@
 #include "Galois/Runtime/WorkListDebug.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/Termination.h"
-#include "Galois/Threads.h"
+#include "Galois/Runtime/ThreadPool.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
 
 #include "Galois/Bag.h"

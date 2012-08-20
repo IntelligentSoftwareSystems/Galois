@@ -29,20 +29,15 @@
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/MethodFlags.h"
 
-namespace GaloisRuntime {
-
-template<typename T>
-class UserContextAccess;
-
-}
-
 namespace Galois {
 
+/** 
+ * This is the object passed to the user's parallel loop.  This
+ * provides the in-loop api.
+ */
 template<typename T>
 class UserContext: private boost::noncopyable {
-  template<typename TT>
-  friend class GaloisRuntime::UserContextAccess;
-
+protected:
   //! Allocator stuff
   IterAllocBaseTy IterationAllocatorBase;
   PerIterAllocTy PerIterationAllocator;
@@ -72,7 +67,6 @@ class UserContext: private boost::noncopyable {
   }
 public:
   void* getLocalState(bool& used) { used = localStateUsed; return localState; }
-private:
 #endif
 
 public:
@@ -86,6 +80,7 @@ public:
     GaloisRuntime::breakLoop();
   }
 
+  //! Acquire a per-iteration allocator
   PerIterAllocTy& getPerIterAlloc() {
     return PerIterationAllocator;
   }
@@ -99,23 +94,4 @@ public:
 
 }
 
-namespace GaloisRuntime {
-
-//! Backdoor to allow runtime methods to access private data in UserContext
-template<typename T>
-class UserContextAccess {
-  Galois::UserContext<T> ctx;
-public:
-  typedef typename Galois::UserContext<T>::pushBufferTy pushBufferTy;
-
-  void resetAlloc() { ctx.__resetAlloc(); }
-  pushBufferTy& getPushBuffer() { return ctx.__getPushBuffer(); }
-  void resetPushBuffer() { ctx.__resetPushBuffer(); }
-  Galois::UserContext<T>& data() { return ctx; }
-#ifdef GALOIS_USE_DET
-  void setLocalState(void *p, bool used) { ctx.__setLocalState(p, used); }
-#endif
-};
-
-}
 #endif

@@ -29,7 +29,7 @@
 
 #include "ll/TID.h"
 #include "ll/HWTopo.h"
-#include "Threads.h"
+#include "ThreadPool.h"
 
 namespace GaloisRuntime {
 

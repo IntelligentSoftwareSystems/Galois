@@ -33,11 +33,12 @@
 #include "Galois/Runtime/Config.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Context.h"
-#include "Galois/Runtime/Threads.h"
+#include "Galois/Runtime/ThreadPool.h"
 #include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/Termination.h"
 #include "Galois/Runtime/LoopHooks.h"
 #include "Galois/Runtime/WorkList.h"
+#include "Galois/Runtime/UserContextAccess.h"
 
 #ifdef GALOIS_USE_EXP
 //#include "Galois/Runtime/SimpleTaskPool.h"
@@ -286,7 +287,7 @@ public:
 
   void operator()() {
     if (LL::isLeaderForPackage(LL::getTID()) &&
-	Galois::getActiveThreads() > 1 && 
+	galoisActiveThreads > 1 && 
 	ForEachTraits<FunctionTy>::NeedsAborts)
       go<true>();
     else
@@ -356,8 +357,7 @@ struct WOnEach {
   FunctionTy& fn;
   WOnEach(FunctionTy& f) :fn(f) {}
   void operator()(void) const {
-    fn(GaloisRuntime::LL::getTID(), 
-       Galois::getActiveThreads());   
+    fn(GaloisRuntime::LL::getTID(), galoisActiveThreads);   
   }
 };
 
@@ -379,7 +379,7 @@ struct WPreAlloc {
 };
 
 static inline void preAlloc_impl(int num) {
-  int a = Galois::getActiveThreads();
+  int a = galoisActiveThreads;
   a = (num + a - 1) / a;
   WPreAlloc P(a);
   GaloisRuntime::RunCommand w[2] = {Config::ref(P),

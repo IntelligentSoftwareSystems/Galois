@@ -28,7 +28,7 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 #include "Galois/Runtime/mm/Mem.h"
-#include "Galois/Threads.h"
+#include "Galois/Runtime/Threads.h"
 #include "Galois/Runtime/Support.h"
 
 #include <map>
@@ -84,7 +84,7 @@ void* GaloisRuntime::MM::largeInterleavedAlloc(size_t len) {
   data = numa_alloc_interleaved_subset(len, &nm);
 #elif defined GALOIS_USE_NUMA
   bitmask* nm = numa_allocate_nodemask();
-  unsigned int num = Galois::getActiveThreads();
+  unsigned int num = galoisActiveThreads;
   for (unsigned y = 0; y < num; ++y)
     numa_bitmask_setbit(nm, y/4);
   data = numa_alloc_interleaved_subset(len, nm);

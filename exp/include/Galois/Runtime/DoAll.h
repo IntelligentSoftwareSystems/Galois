@@ -41,7 +41,7 @@
 #include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Termination.h"
-#include "Galois/Runtime/Threads.h"
+#include "Galois/Runtime/ThreadPool.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
 
 #include "Galois/Timer.h"

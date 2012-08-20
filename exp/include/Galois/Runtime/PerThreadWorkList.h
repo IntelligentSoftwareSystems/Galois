@@ -36,7 +36,7 @@
 #include <cstdio>
 
 #include "Galois/Runtime/PerCPU.h"
-#include "Galois/Runtime/Threads.h"
+#include "Galois/Runtime/ThreadPool.h"
 #include "Galois/Runtime/mm/Mem.h"
 #include "Galois/Runtime/TwoLevelIteratorA.h"
 

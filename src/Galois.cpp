@@ -1,4 +1,4 @@
-/** Galois user interface -*- C++ -*-
+/** Implement user facing misc api -*- C++ -*-
  * @file
  * @section License
  *
@@ -17,23 +17,26 @@
  * related expenses which may arise from use of Software or Documentation,
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#ifndef GALOIS_THREADS_H
-#define GALOIS_THREADS_H
 
-namespace Galois {
+#include "Galois/Runtime/ThreadPool.h"
+#include "Galois/Threads.h"
 
-/**
- * Sets the number of threads to use in runtime system. Returns
- * the actual value of threads used, which could be less than
- * the requested value.
- */
-unsigned int setActiveThreads(unsigned int num);
+#include <algorithm>
 
-/**
- * Returns the number of threads in use.
- */
-unsigned int getActiveThreads();
-
+unsigned int Galois::setActiveThreads(unsigned int num) {
+  num = std::min(num, GaloisRuntime::getSystemThreadPool().getMaxThreads());
+  num = std::max(num, 1U);
+  GaloisRuntime::galoisActiveThreads = num;
+  return num;
 }
-#endif
+
+unsigned int Galois::getActiveThreads() {
+  return GaloisRuntime::galoisActiveThreads;
+}
+
+unsigned int GaloisRuntime::galoisActiveThreads = 1;
+
+

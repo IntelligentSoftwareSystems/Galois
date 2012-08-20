@@ -124,7 +124,7 @@ class TaskContext: public boost::noncopyable {
 
   template<typename WorklistTy>
   void enqueue(const IterTy& begin, const IterTy& end, WorklistTy& wl, FunctionTy fn) {
-    int numThreads = Galois::getActiveThreads();
+    unsigned numThreads = galoisActiveThreads;
 //    numBlocks = 4 * numThreads;
     numBlocks = 4 * numThreads;
 

@@ -1,4 +1,4 @@
-/** Common thread pool implementations -*- C++ -*-
+/** Simple thread related classes -*- C++ -*-
  * @file
  * @section License
  *
@@ -20,18 +20,34 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#include "Galois/Runtime/Threads.h"
-#include "Galois/Threads.h"
+#ifndef GALOIS_RUNTIME_THREADPOOL_H
+#define GALOIS_RUNTIME_THREADPOOL_H
 
-#include <algorithm>
+#include "Galois/Runtime/Config.h"
 
-using namespace GaloisRuntime;
+namespace GaloisRuntime {
 
-unsigned int Galois::setActiveThreads(unsigned int num) {
-  num = std::min(num, GaloisRuntime::getSystemThreadPool().getMaxThreads());
-  num = std::max(num, 1U);
-  GaloisRuntime::galoisActiveThreads = num;
-  return num;
+//! the number of active threads
+extern unsigned int galoisActiveThreads;
+
+typedef Config::function<void (void)> RunCommand;
+
+class ThreadPool {
+public:
+  virtual ~ThreadPool() { }
+
+  //!execute work on all threads
+  //!preWork and postWork are executed only on the master thread
+  virtual void run(RunCommand* begin, RunCommand* end, unsigned num = galoisActiveThreads) = 0;
+
+  //!return the number of threads supported by the thread pool on the current machine
+  virtual unsigned getMaxThreads() const = 0;
+
+};
+
+//!Returns or creates the appropriate thread pool for the system
+ThreadPool& getSystemThreadPool();
+
 }
 
-unsigned int GaloisRuntime::galoisActiveThreads = 1;
+#endif

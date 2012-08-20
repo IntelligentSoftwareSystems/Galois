@@ -54,6 +54,7 @@ namespace Galois {
     void stop(); 
     unsigned long get() const;
     TimeAccumulator& operator+=(const TimeAccumulator& rhs);
+    TimeAccumulator& operator+=(const Timer& rhs);
   };
 }
 #endif

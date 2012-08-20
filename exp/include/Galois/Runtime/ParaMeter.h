@@ -28,7 +28,6 @@
 #ifndef GALOIS_RUNTIME_PARAMETER_H
 #define GALOIS_RUNTIME_PARAMETER_H
 
-#include "Galois/UserContext.h"
 #include "Galois/TypeTraits.h"
 #include "Galois/Mem.h"
 
@@ -40,7 +39,7 @@
 #include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Termination.h"
-#include "Galois/Runtime/Threads.h"
+#include "Galois/Runtime/ThreadPool.h"
 #include "Galois/Runtime/WorkList.h"
 #include "Galois/Runtime/ll/gio.h"
 
@@ -348,6 +347,8 @@ private:
 
 } // end namespace
 
+#else
+#warning Reincluding ParaMeter
 #endif // GALOIS_RUNTIME_PARAMETER_H
 
 

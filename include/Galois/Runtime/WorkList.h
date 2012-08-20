@@ -25,7 +25,7 @@
 
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/Barrier.h"
-#include "Galois/Threads.h"
+#include "Galois/Runtime/ThreadPool.h"
 #include "Galois/Runtime/WorkListHelpers.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/mm/Mem.h"
@@ -96,7 +96,7 @@ public:
 
 template<typename Iter>
 void fill_work(Iter& b, Iter& e) {
-  unsigned int a = Galois::getActiveThreads();
+  unsigned int a = galoisActiveThreads;
   unsigned int id = LL::getTID();
   unsigned int dist = std::distance(b, e);
   unsigned int num = (dist + a - 1) / a; //round up
@@ -442,7 +442,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     if (BSP) {
       msS = p.scanStart;
       if (localLeader)
-	for (int i = 0; i < (int) Galois::getActiveThreads(); ++i)
+	for (unsigned i = 0; i <  galoisActiveThreads; ++i)
 	  msS = std::min(msS, current.getRemote(i)->scanStart);
       else
 	msS = std::min(msS, current.getRemote(LL::getLeaderForThread(myID))->scanStart);
@@ -519,12 +519,10 @@ struct squeues;
 template<typename TQ>
 struct squeues<true,TQ> {
   PerPackageStorage<TQ> queues;
-  unsigned num;
   TQ& get(int i) { return *queues.getRemote(i); }
   TQ& get() { return *queues.getLocal(); }
   int myEffectiveID() { return LL::getTID(); } //queues.myEffectiveID(); }
-  int size() { return num; }
-  squeues() :num(Galois::getActiveThreads()) {}
+  int size() { return galoisActiveThreads; }
 };
 
 template<typename TQ>
@@ -721,8 +719,6 @@ class ForwardAccessRange {
   struct TLD {
     IterTy begin;
     IterTy end;
-    unsigned num;
-    TLD() :num(Galois::getActiveThreads()) {}
   };
 
   PerThreadStorage<TLD> tlds;
@@ -768,7 +764,7 @@ public:
     TLD& tld = *tlds.getLocal();
     if (tld.begin != tld.end) {
       boost::optional<value_type> retval = *tld.begin;
-      tld.begin = Galois::safe_advance(tld.begin, tld.end, tld.num);
+      tld.begin = Galois::safe_advance(tld.begin, tld.end, galoisActiveThreads);
       assert(retval);
       return retval;
     }
@@ -812,9 +808,7 @@ private:
     if (do_steal(tld,tld))
       return;
     //Then try stealing from neighbor
-    //TLD& otld = tlds.getNext(ThreadPool::getActiveThreads());
-    int num = Galois::getActiveThreads();
-    if (do_steal(tld, *tlds.getRemote((LL::getTID() + 1) % num))) {
+    if (do_steal(tld, *tlds.getRemote((LL::getTID() + 1) % galoisActiveThreads))) {
       //redistribute stolen items for neighbor to steal too
       if (std::distance(tld.begin, tld.end) > 1) {
 	tld.stealLock.lock();
@@ -1077,9 +1071,9 @@ class BulkSynchronous : private boost::noncopyable {
   };
 
   BulkSynchronous(): empty(false) {
-    unsigned numActive = Galois::getActiveThreads();
-    barrier1.reinit(numActive);
-    barrier2.reinit(numActive);
+    unsigned num = galoisActiveThreads;
+    barrier1.reinit(num);
+    barrier2.reinit(num);
   }
 
   void push(const value_type& val) {

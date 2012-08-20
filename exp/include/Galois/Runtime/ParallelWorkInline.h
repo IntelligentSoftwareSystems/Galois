@@ -400,7 +400,7 @@ public:
       abort();
     }
 
-    numActive = Galois::getActiveThreads();
+    numActive = galoisActiveThreads;
     barrier1.reinit(numActive);
     barrier2.reinit(numActive);
   }

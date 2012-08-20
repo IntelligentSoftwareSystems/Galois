@@ -23,8 +23,8 @@
 #ifndef GALOIS_GALOIS_H
 #define GALOIS_GALOIS_H
 
-#include "Galois/Threads.h"
 #include "Galois/UserContext.h"
+#include "Galois/Threads.h"
 #include "Galois/Runtime/ParallelWork.h"
 #include "Galois/Runtime/LocalIterator.h"
 

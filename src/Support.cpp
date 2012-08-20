@@ -25,7 +25,6 @@
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/Support.h"
 
-#include "Galois/Threads.h"
 #include "Galois/Statistic.h"
 
 #include <set>
@@ -47,7 +46,7 @@ class StatManager {
   volatile unsigned maxID;
 
   void updateMax() {
-    unsigned n = Galois::getActiveThreads();
+    unsigned n = GaloisRuntime::galoisActiveThreads;
     unsigned c;
     while (n > (c = maxID))
       __sync_bool_compare_and_swap(&maxID, c, n);
@@ -80,7 +79,7 @@ public:
   }
 
   void addToStat(Galois::Statistic* value) {
-    for (unsigned x = 0; x < Galois::getActiveThreads(); ++x)
+    for (unsigned x = 0; x < GaloisRuntime::galoisActiveThreads; ++x)
       (*Stats.getRemote(x))[mkKey(value->getLoopname(), value->getStatname())] += value->getValue(x);
     updateMax();
   }

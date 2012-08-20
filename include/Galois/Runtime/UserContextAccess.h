@@ -1,4 +1,4 @@
-/** Simple thread related classes -*- C++ -*-
+/** Manipulate the user context -*- C++ -*-
  * @file
  * @section License
  *
@@ -18,33 +18,34 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
- * @author Andrew Lenharth <andrewl@lenharth.org>
+ * @author Andrew Lenharth <andrew@lenharth.org>
  */
-#ifndef GALOIS_RUNTIME_THREADS_H
-#define GALOIS_RUNTIME_THREADS_H
 
-#include "Galois/Runtime/Config.h"
-#include "Galois/Threads.h"
+#ifndef GALOIS_RUNTIME_USERCONTEXTACCESS_H
+#define GALOIS_RUNTIME_USERCONTEXTACCESS_H
+
+#include "Galois/UserContext.h"
 
 namespace GaloisRuntime {
 
-typedef Config::function<void (void)> RunCommand;
-
-class ThreadPool {
+//! Backdoor to allow runtime methods to access private data in UserContext
+template<typename T>
+class UserContextAccess : public Galois::UserContext<T> {
+    typedef Galois::UserContext<T> ChildTy;
 public:
-  virtual ~ThreadPool() { }
+  typedef typename ChildTy::pushBufferTy pushBufferTy;
 
-  //!execute work on all threads
-  //!preWork and postWork are executed only on the master thread
-  virtual void run(RunCommand* begin, RunCommand* end, unsigned num = Galois::getActiveThreads()) = 0;
-
-  //!return the number of threads supported by the thread pool on the current machine
-  virtual unsigned getMaxThreads() const = 0;
+  void resetAlloc() { ChildTy::__resetAlloc(); }
+  pushBufferTy& getPushBuffer() { return ChildTy::__getPushBuffer(); }
+  void resetPushBuffer() { ChildTy::__resetPushBuffer(); }
+  ChildTy& data() { return *static_cast<ChildTy*>(this); }
+#ifdef GALOIS_USE_DET
+  void setLocalState(void *p, bool used) { ChildTy::__setLocalState(p, used); }
+#endif
 };
-
-//!Returns or creates the appropriate thread pool for the system
-ThreadPool& getSystemThreadPool();
 
 }
 
+#else
+#warning Reincluding UserContextAccess
 #endif
