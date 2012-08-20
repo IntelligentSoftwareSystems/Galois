@@ -48,10 +48,10 @@ my $sdir = "-search-dir all=$symbol";
 my $maxsec = 1000;
 
 system("date");
-system("rm -rf $dire");
-system("mkdir $dire");
-system("$vtune $collect $rdir $sdir -- $cmdline");
+system("set -x ; rm -rf $dire");
+system("set -x ; mkdir $dire");
+system("set -x ; $vtune $collect $rdir $sdir -- $cmdline");
 system("echo THREADS\t$threads >>$outfile.line.log");
-system("ulimit -t $maxsec ; $vtune $report $rdir -group-by source-line >> $outfile.line.log");
+system("set -x ; ulimit -t $maxsec ; $vtune $report $rdir -group-by source-line >> $outfile.line.log");
 system("echo THREADS\t$threads >>$outfile.function.log");
-system("ulimit -t $maxsec ; $vtune $report $rdir -group-by function >> $outfile.function.log");
+system("set -x ; ulimit -t $maxsec ; $vtune $report $rdir -group-by function >> $outfile.function.log");
