@@ -34,7 +34,6 @@
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/ThreadPool.h"
-#include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/Termination.h"
 #include "Galois/Runtime/LoopHooks.h"
 #include "Galois/Runtime/WorkList.h"
