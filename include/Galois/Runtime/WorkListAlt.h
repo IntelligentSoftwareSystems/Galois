@@ -212,8 +212,6 @@ class StealingQueues : private boost::noncopyable {
     unsigned pkg = LL::getPackageForThread(id);
     unsigned num = Galois::getActiveThreads();
 
-    ChunkHeader* c = 0;
-
     //First steal from this package
     for (unsigned i = 1; i < num; ++i) {
       unsigned eid = (id + i) % num;
@@ -225,6 +223,8 @@ class StealingQueues : private boost::noncopyable {
       }
     }
 #if 0
+    ChunkHeader* c = 0;
+
     //Then try the global queue
     c = global.pop();
     if (c) 
