@@ -25,7 +25,7 @@
 #define AVI_UNORDERED_NO_LOCK_H_
 
 
-#include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/Graph2.h"
 #include "Galois/Graphs/FileGraph.h"
 
 #include "Galois/Galois.h"
@@ -198,7 +198,7 @@ protected:
 
 
       // for debugging, remove later
-      ++(iter.get ());
+      iter += 1;
 
 
     }
@@ -240,7 +240,7 @@ public:
     GaloisRuntime::PerCPU<LocalVec> perIterLocalVec (l);
 
 
-    IterCounter iter(0);
+    IterCounter iter;
 
     Process p (graph, inDegVec, meshInit, g, perIterLocalVec, createSyncFiles, iter);
 

@@ -28,7 +28,7 @@
 #include "Galois/Atomic.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Galois.h"
-#include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/Graph2.h"
 #include "Galois/Graphs/LCGraph.h"
 #include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/WorkList.h"
@@ -71,13 +71,11 @@
  *
  */
 
-#define USE_LC_GRAPH
+//#define USE_LC_GRAPH
 
 class AVIunordered: public AVIabstractMain {
 
 protected:
-  typedef Galois::GSimpleReducible<int, std::plus<int> > IterCounter;
-
   static const bool DEBUG = false;
 
   static const int CHUNK_SIZE = 32;
@@ -169,7 +167,8 @@ protected:
       for (size_t i = 0; i < adjElms.size (); ++i) {
         // populate the upper triangle of the adj matrix
         for (size_t j = i + 1; j < adjElms.size (); ++j) {
-          if (!adjElms[i].hasNeighbor (adjElms[j])) {
+//          if (!adjElms[i].hasNeighbor (adjElms[j])) {
+          if (mgraph.findEdge(adjElms[i], adjElms[j]) == mgraph.edge_end(adjElms[i])) {
             ++numEdges;
           }
           mgraph.addEdge (adjElms[i], adjElms[j]);
@@ -296,7 +295,7 @@ protected:
         }
 
 
-        ++ (iter.get ());
+        iter += 1;
 
         // if (iter.get () == 5000) {
            // meshInit.writeMesh ();
@@ -374,7 +373,7 @@ public:
 
     GaloisRuntime::PerCPU<LocalVec> perIterLocalVec (l);
 
-    IterCounter iter(0);
+    IterCounter iter;
 
     Process p(graph, inDegVec, meshInit, g, perIterLocalVec, createSyncFiles, iter);
 

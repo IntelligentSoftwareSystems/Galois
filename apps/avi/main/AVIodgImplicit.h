@@ -193,7 +193,7 @@ protected:
 
     IFPROF_NOINLINE void operator () (const GlobalNodalIndex& n) {
       assert (n < vertexSharers.size ());
-      ++(findIter.get ());
+      findIter += 1;
 
       AVI* avi = getMin (vertexSharers[n]);
 
@@ -247,7 +247,7 @@ protected:
 
       AVIabstractMain::simulate(srcAVI, meshInit, g, l, createSyncFiles);
 
-      ++(opIter.get ());
+      opIter += 1;
 
 
     }

@@ -25,7 +25,7 @@
 #define AVI_ODG_READONLY_H
 
 
-#include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/Graph2.h"
 #include "Galois/Graphs/FileGraph.h"
 
 #include "Galois/Galois.h"
@@ -128,7 +128,7 @@ protected:
         }
       }
 
-      ++(findIter.get ());
+      findIter += 1;
     }
   };
 
@@ -168,7 +168,7 @@ protected:
       AVIabstractMain::simulate(srcAVI, meshInit, g, l, createSyncFiles);
 
       // for debugging, remove later
-      ++(opIter.get ());
+      opIter += 1;
     }
   };
 

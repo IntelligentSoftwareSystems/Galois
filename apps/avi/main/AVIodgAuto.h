@@ -149,7 +149,7 @@ protected:
     template <typename C> 
     IFPROF_NOINLINE void operator () (AVI* srcAVI, C& lwl) {
       // for debugging, remove later
-      ++(iter.get ());
+      iter += 1;
 
       LocalVec& l = perIterLocalVec.get();
 
@@ -180,7 +180,7 @@ public:
 
     GaloisRuntime::PerCPU<LocalVec> perIterLocalVec (l);
 
-    IterCounter iter(0);
+    IterCounter iter;
 
     AVIComparator cmp;
 

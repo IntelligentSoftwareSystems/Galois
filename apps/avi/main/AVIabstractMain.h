@@ -102,7 +102,7 @@ protected:
   static const int CHUNK_SIZE = 1;
   typedef GaloisRuntime::WorkList::dChunkedFIFO<CHUNK_SIZE> AVIWorkList;
 
-  typedef Galois::GSimpleReducible<int, std::plus<int> > IterCounter;
+  typedef Galois::GAccumulator<int> IterCounter;
 
   std::string wltype;
 
