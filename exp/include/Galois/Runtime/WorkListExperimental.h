@@ -1940,11 +1940,9 @@ class PTbb : private boost::noncopyable {
 public:
 
   PTbb() {
-    for (int i = 0; i < tld.size(); ++i)
+    for (size_t i = 0; i < tld.size(); ++i)
       srand48_r(i, &tld.getRemote(i)->r);
   }
-
-
 
   template<bool newconcurrent>
   struct rethread {
@@ -2046,7 +2044,7 @@ public:
     value_type retval;
     if (tld.getLocal()->try_pop(retval))
       return retval;
-    for (int i = 0; i < Galois::getActiveThreads(); ++i) {
+    for (unsigned i = 0; i < Galois::getActiveThreads(); ++i) {
       if (tld.getRemote(i)->try_pop(retval))
 	return retval;
     }
