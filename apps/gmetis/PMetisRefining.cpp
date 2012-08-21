@@ -41,8 +41,8 @@ void projectTwoWayPartition(MetisGraph* metisGraph) {
 
 	for (GGraph::iterator ii = finerGraph->begin(), ee = finerGraph->end(); ii != ee; ++ii) {
 		GNode node = *ii;
-		MetisNode& nodeData = node.getData();
-		nodeData.setPartition(finer->getCoarseGraphMap(nodeData.getNodeId()).getData().getPartition());
+		MetisNode& nodeData = finerGraph->getData(node);
+		nodeData.setPartition(metisGraph->getGraph()->getData(finer->getCoarseGraphMap(nodeData.getNodeId())).getPartition());
 		assert(nodeData.getPartition()>=0);
 		nodeData.setEdegree(0);
 		nodeData.setIdegree(0);
@@ -52,21 +52,21 @@ void projectTwoWayPartition(MetisGraph* metisGraph) {
 	for (GGraph::iterator ii = finerGraph->begin(), ee = finerGraph->end(); ii != ee; ++ii) {
 		GNode node = *ii;
 
-		MetisNode& nodeData = node.getData();
+		MetisNode& nodeData = finerGraph->getData(node);
 		nodeData.setIdegree(nodeData.getAdjWgtSum());
-		if (finerGraph->neighborsSize(node)!=0 && finer->getCoarseGraphMap(nodeData.getNodeId()).getData().isBoundary()) {
-			for (GGraph::neighbor_iterator jj = finerGraph->neighbor_begin(node, Galois::NONE), eejj = finerGraph->neighbor_end(node, Galois::NONE); jj != eejj; ++jj) {
-				GNode neighbor = *jj;
-				MetisNode& neighborData = neighbor.getData();
+		if (finerGraph->edge_begin(node) != finerGraph->edge_end(node) && metisGraph->getGraph()->getData(finer->getCoarseGraphMap(nodeData.getNodeId())).isBoundary()) {
+			for (GGraph::edge_iterator jj = finerGraph->edge_begin(node, Galois::NONE), eejj = finerGraph->edge_end(node, Galois::NONE); jj != eejj; ++jj) {
+			  GNode neighbor = finerGraph->getEdgeDst(jj);
+				MetisNode& neighborData = finerGraph->getData(neighbor);
 				if (nodeData.getPartition() != neighborData.getPartition()) {
-					nodeData.setEdegree(nodeData.getEdegree() + (int)finerGraph->getEdgeData(node, jj));
+					nodeData.setEdegree(nodeData.getEdegree() + (int)finerGraph->getEdgeData(jj));
 				}
 			}
 		}
-		if (finerGraph->neighborsSize(node)!=0) {
+		if (finerGraph->edge_begin(node) != finerGraph->edge_end(node)) {
 			nodeData.setIdegree(nodeData.getIdegree() - nodeData.getEdegree());
 		}
-		if (finerGraph->neighborsSize(node)==0 || nodeData.getEdegree() > 0) {
+		if (finerGraph->edge_begin(node) == finerGraph->edge_end(node) || nodeData.getEdegree() > 0) {
 			finer->setBoundaryNode(node);
 		}
 	}

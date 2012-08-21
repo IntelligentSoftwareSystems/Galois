@@ -27,7 +27,7 @@
 #include "MetisNode.h"
 #include "ArraySet.h"
 
-#include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/Graph2.h"
 #include "Galois/Galois.h"
 #include "Galois/Timer.h"
 #include "Galois/Accumulator.h"
@@ -44,29 +44,22 @@ typedef Galois::Graph::FirstGraph<MetisNode,METISINT, true>::GraphNode GNode;
 #include <set>
 using namespace std;
 typedef ArraySet< GNode > GNodeSet;
-struct GNodeSetCompare
-{
-  bool operator()(const GNode s1, const GNode s2) const
-  {
-    return s1.getData(Galois::NONE).getNodeId() < s2.getData(Galois::NONE).getNodeId();
-  }
-};
-typedef set< GNode, GNodeSetCompare, GaloisRuntime::MM::FSBGaloisAllocator<GNode> > GNodeSTLSet;
+typedef set< GNode, std::less<GNode>, GaloisRuntime::MM::FSBGaloisAllocator<GNode> > GNodeSTLSet;
 //typedef vector<GNode> GNodeSTLSet;
 
-template <typename T>
-void arrayFill(T* array, int length, T value){
-	for(int i=0;i<length;++i){
-		array[i] = value;
-	}
-}
-
-int gNodeToInt(GNode node);
 int getRandom(int num);
 
 struct PerCPUValue {
   Galois::GAccumulator<int> mincutInc;
   Galois::GSetAccumulator<GNodeSTLSet> changedBndNodes;
+};
+
+struct gNodeToInt {
+  GGraph* graph;
+  gNodeToInt(GGraph* _g) :graph(_g) {}
+  int operator()(GNode node){
+    return graph->getData(node).getNodeId();
+  }
 };
 
 int intlog2(int a);

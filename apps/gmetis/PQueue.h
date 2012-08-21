@@ -26,6 +26,7 @@
 #include "GMetisConfig.h"
 #include <algorithm>
 #include <vector>
+#include <boost/function.hpp>
 using namespace std;
 
 template<class T>
@@ -66,7 +67,7 @@ public:
 template <class T>
 class HeapQueue: public SuperPQueue<T>{
 public:
-	HeapQueue(int maxNumNodes, int maxPriority, int (*mapToInt)(T)){
+	HeapQueue(int maxNumNodes, int maxPriority, boost::function<int(T)> mapToInt){
 		numNodes = 0;
 		heap.resize(maxNumNodes);
 		locator.resize(maxNumNodes); //= new int[maxNumNodes];
@@ -85,7 +86,7 @@ public:
 			if (heap[j].key < priority) {
 				heap[i].key = heap[j].key;
 				heap[i].value = heap[j].value;
-				locator[(*mapToInt)(heap[i].value)] = i;
+				locator[mapToInt(heap[i].value)] = i;
 				i = j;
 			} else {
 				break;
@@ -94,13 +95,13 @@ public:
 
 		heap[i].key = priority;
 		heap[i].value = value;
-		locator[(*mapToInt)(value)] = i;
+		locator[mapToInt(value)] = i;
 	}
 	void remove(T value, int priority) {
-		int id = (*mapToInt)(value);
+		int id = mapToInt(value);
 		int i = locator[id];
 		locator[id] = -1;
-		if (--numNodes > 0 && (*mapToInt)(heap[numNodes].value) != id) {
+		if (--numNodes > 0 && mapToInt(heap[numNodes].value) != id) {
 			value = heap[numNodes].value;
 			int newPriority = heap[numNodes].key;
 			int oldPriority = heap[i].key;
@@ -111,7 +112,7 @@ public:
 					if (heap[j].key < newPriority) {
 						heap[i].value = heap[j].value;
 						heap[i].key = heap[j].key;
-						locator[(*mapToInt)(heap[i].value)] = i;
+						locator[mapToInt(heap[i].value)] = i;
 						i = j;
 					} else
 						break;
@@ -124,13 +125,13 @@ public:
 							j = j + 1;
 						heap[i].value = heap[j].value;
 						heap[i].key = heap[j].key;
-						locator[(*mapToInt)(heap[i].value)] = i;
+						locator[mapToInt(heap[i].value)] = i;
 						i = j;
 					} else if (j + 1 < numNodes && heap[j + 1].key > newPriority) {
 						j = j + 1;
 						heap[i].value = heap[j].value;
 						heap[i].key = heap[j].key;
-						locator[(*mapToInt)(heap[i].value)] = i;
+						locator[mapToInt(heap[i].value)] = i;
 						i = j;
 					} else
 						break;
@@ -138,18 +139,18 @@ public:
 			}
 			heap[i].key = newPriority;
 			heap[i].value = value;
-			locator[(*mapToInt)(value)] = i;
+			locator[mapToInt(value)] = i;
 		}
 	}
 	void update(T value, int oldPriority, int newPriority) {
-		int i = locator[(*mapToInt)(value)];
+		int i = locator[mapToInt(value)];
 		if (oldPriority < newPriority) {
 			while (i > 0) {
 				int j = (i - 1) >> 1;
 				if (heap[j].key < newPriority) {
 					heap[i].value = heap[j].value;
 					heap[i].key = heap[j].key;
-					locator[(*mapToInt)(heap[i].value)] = i;
+					locator[mapToInt(heap[i].value)] = i;
 					i = j;
 				} else
 					break;
@@ -162,13 +163,13 @@ public:
 						j = j + 1;
 					heap[i].value = heap[j].value;
 					heap[i].key = heap[j].key;
-					locator[(*mapToInt)(heap[i].value)] = i;
+					locator[mapToInt(heap[i].value)] = i;
 					i = j;
 				} else if (j + 1 < numNodes && heap[j + 1].key > newPriority) {
 					j = j + 1;
 					heap[i].value = heap[j].value;
 					heap[i].key = heap[j].key;
-					locator[(*mapToInt)(heap[i].value)] = i;
+					locator[mapToInt(heap[i].value)] = i;
 					i = j;
 				} else
 					break;
@@ -176,7 +177,7 @@ public:
 		}
 		heap[i].key = newPriority;
 		heap[i].value = value;
-		locator[(*mapToInt)(value)] = i;
+		locator[mapToInt(value)] = i;
 	}
 
 	T getMax(){
@@ -186,7 +187,7 @@ public:
 		}
 		numNodes -- ;
 		T vtx = heap[0].value;
-		locator[(*mapToInt)(vtx)] = -1;
+		locator[mapToInt(vtx)] = -1;
 		int i = numNodes;
 		if (i > 0) {
 			int priority = heap[i].key;
@@ -199,20 +200,20 @@ public:
 						j = j + 1;
 					heap[i].value = heap[j].value;
 					heap[i].key = heap[j].key;
-					locator[(*mapToInt)(heap[i].value)] = i;
+					locator[mapToInt(heap[i].value)] = i;
 					i = j;
 				} else if (j + 1 < numNodes && heap[j + 1].key > priority) {
 					j = j + 1;
 					heap[i].value = heap[j].value;
 					heap[i].key = heap[j].key;
-					locator[(*mapToInt)(heap[i].value)] = i;
+					locator[mapToInt(heap[i].value)] = i;
 					i = j;
 				} else
 					break;
 			}
 			heap[i].key = priority;
 			heap[i].value = node;
-			locator[(*mapToInt)(node)] = i;
+			locator[mapToInt(node)] = i;
 		}
 		return vtx;
 	}
@@ -229,7 +230,7 @@ private:
 	typedef KeyValue<T> TKV;
 	vector<TKV> heap;
 	vector<int> locator;
-	int (*mapToInt)(T);
+	boost::function<int(T)> mapToInt;
 	int numNodes;
 	int maxNumNodes;
 };
@@ -237,7 +238,7 @@ private:
 template <class T>
 class LimitedPriorityQueue: public SuperPQueue<T>{
 public:
-	LimitedPriorityQueue(int maxNumNodes, int maxPriority, int (*mapToInt)(T)):PLUS_PRIORITYSPAN(500), NEG_PRIORITYSPAN(500){
+	LimitedPriorityQueue(int maxNumNodes, int maxPriority, boost::function<int(T)> mapToInt):PLUS_PRIORITYSPAN(500), NEG_PRIORITYSPAN(500){
 		pPrioritySpan = min(PLUS_PRIORITYSPAN, maxPriority);
 		nPrioritySpan = min(NEG_PRIORITYSPAN, maxPriority);
 		nodes = new ListNode<T>[maxNumNodes];
@@ -257,7 +258,7 @@ public:
 	}
 	void insert(T value, int priority) {
 		numNodes++;
-		int id = (*_mapToInt)(value);
+		int id = _mapToInt(value);
 
 		nodes[id].value = value;
 		ListNode<T>* newNode = &nodes[id];
@@ -273,7 +274,7 @@ public:
 	}
 	void remove(T value, int priority) {
 		numNodes--;
-		ListNode<T>* node = &nodes[(*_mapToInt)(value)];
+		ListNode<T>* node = &nodes[_mapToInt(value)];
 		if (node->prev != NULL)
 			node->prev->next = node->next;
 		else
@@ -339,21 +340,21 @@ private:
 	int bucketIndex;
 	const int PLUS_PRIORITYSPAN;
 	const int NEG_PRIORITYSPAN;
-	int (*_mapToInt)(T);
+  boost::function<int(T)> _mapToInt;
 };
 
 class PQueue{
 public:
-	PQueue(int maxNumNodes, int maxGain) {
-		if (maxGain > PLUS_GAINSPAN || maxNumNodes < 500) {
-			internalQueue = new HeapQueue<GNode>(maxNumNodes, maxGain, &gNodeToInt);
-		} else {
-			internalQueue = new LimitedPriorityQueue<GNode>(maxNumNodes, maxGain, &gNodeToInt);
-		}
-	}
-	~PQueue(){
-		delete internalQueue;
-	}
+  PQueue(int maxNumNodes, int maxGain, GGraph* g) {
+    if (maxGain > PLUS_GAINSPAN || maxNumNodes < 500) {
+      internalQueue = new HeapQueue<GNode>(maxNumNodes, maxGain, gNodeToInt(g));
+    } else {
+      internalQueue = new LimitedPriorityQueue<GNode>(maxNumNodes, maxGain, gNodeToInt(g));
+    }
+  }
+  ~PQueue(){
+    delete internalQueue;
+  }
 
 	/**
 	 * insert a node with its gain

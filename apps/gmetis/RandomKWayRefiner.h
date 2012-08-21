@@ -68,7 +68,7 @@ public:
 			GNodeSTLSet& changedNodes = perCPUValues.changedBndNodes.reduce();
 			for(GNodeSTLSet::iterator iter=changedNodes.begin();iter!=changedNodes.end();++iter){
 				GNode changed = *iter;
-				if(changed.getData().isBoundary()){
+				if(metisGraph->getGraph()->getData(changed).isBoundary()){
 					metisGraph->getBoundaryNodes()->insert(changed);
 				}else{
 					metisGraph->getBoundaryNodes()->erase(changed);
@@ -93,7 +93,7 @@ private:
 
   void refineOneNode(MetisGraph* metisGraph, GNode n, PerCPUValue* perCPUValues) {
 		GGraph* graph = metisGraph->getGraph();
-		MetisNode& nodeData = n.getData(Galois::CHECK_CONFLICT);
+		MetisNode& nodeData = graph->getData(n,Galois::CHECK_CONFLICT);
 		if (nodeData.getEdegree() >= nodeData.getIdegree()) {
 			int from = nodeData.getPartition();
 			//TODO
@@ -142,11 +142,8 @@ private:
 			 * if we got here, we can now move the vertex from 'from' to 'to'
 			 */
 			//dummy for cautious
-			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(n, Galois::CHECK_CONFLICT), eejj = graph->neighbor_end(n, Galois::CHECK_CONFLICT); jj != eejj; ++jj) {
-				GNode neighbor = *jj;
-
-				neighbor.getData(Galois::NONE);
-			}
+			graph->edge_begin(n, Galois::CHECK_CONFLICT);
+			graph->edge_end(n, Galois::CHECK_CONFLICT);
 
 			perCPUValues->mincutInc += -(nodeData.getPartEd()[k] - nodeData.getIdegree());
 			nodeData.setPartition(to);
@@ -176,9 +173,9 @@ private:
 			/*
 			 * update the degrees of adjacent vertices
 			 */
-			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(n, Galois::NONE), eejj = graph->neighbor_end(n, Galois::NONE); jj != eejj; ++jj) {
-				GNode neighbor = *jj;
-				MetisNode& neighborData = neighbor.getData(Galois::NONE);
+			for (GGraph::edge_iterator jj = graph->edge_begin(n, Galois::NONE), eejj = graph->edge_end(n, Galois::NONE); jj != eejj; ++jj) {
+			  GNode neighbor = graph->getEdgeDst(jj);
+			  MetisNode& neighborData = graph->getData(neighbor,Galois::NONE);
 				if (neighborData.getPartEd().size() == 0) {
 					int numEdges = neighborData.getNumEdges();
 //					neighborData.partIndex = new int[numEdges];
@@ -186,7 +183,7 @@ private:
 //					cout<<"init"<<endl;
 					neighborData.initPartEdAndIndex(numEdges);
 				}
-				int edgeWeight = graph->getEdgeData(n, jj, Galois::NONE);
+				int edgeWeight = graph->getEdgeData(jj, Galois::NONE);
 				if (neighborData.getPartition() == from) {
 					neighborData.setEdegree(neighborData.getEdegree() + edgeWeight);
 					neighborData.setIdegree(neighborData.getIdegree() - edgeWeight);
