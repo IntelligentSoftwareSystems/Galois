@@ -239,7 +239,7 @@ void checkConservation(Config& orig) {
     if (src == app.source || src == app.sink)
       continue;
 
-    if (node.excess != 0 && node.height != app.graph.size()) {
+    if (node.excess != 0 && node.height != (int) app.graph.size()) {
       std::cerr << "Non-zero excess at " << node << "\n";
       abort();
     }
@@ -373,7 +373,7 @@ struct FindWork {
 
   void operator()(const GNode& src) {
     Node& node = app.graph.getData(src, Galois::NONE);
-    if (src == app.sink || src == app.source || node.height >= app.graph.size())
+    if (src == app.sink || src == app.source || node.height >= (int) app.graph.size())
       return;
     if (node.excess > 0) 
       wl.push_back(src);
@@ -462,7 +462,7 @@ void relabel(const GNode& src) {
   ++minHeight;
 
   Node& node = app.graph.getData(src, Galois::NONE);
-  if (minHeight < app.graph.size()) {
+  if (minHeight < (int) app.graph.size()) {
     node.height = minHeight;
     node.current = minEdge;
   } else {
@@ -476,7 +476,7 @@ bool discharge(const GNode& src, Galois::UserContext<GNode>& ctx) {
   int prevHeight = node.height;
   bool relabeled = false;
 
-  if (node.excess == 0 || node.height >= app.graph.size()) {
+  if (node.excess == 0 || node.height >= (int) app.graph.size()) {
     return false;
   }
 
@@ -523,7 +523,7 @@ bool discharge(const GNode& src, Galois::UserContext<GNode>& ctx) {
     relabel(src);
     relabeled = true;
 
-    if (node.height == app.graph.size())
+    if (node.height == (int) app.graph.size())
       break;
 
     prevHeight = node.height;
