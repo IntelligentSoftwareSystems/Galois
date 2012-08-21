@@ -198,7 +198,7 @@ void readGraph(MetisGraph* metisGraph, const char* filename, bool weighted = fal
 			  GNode neighbor = graph->getEdgeDst(jj);
 				nodeData.incNumEdges();
 				nodeData.addEdgeWeight(graph->getEdgeData(jj));
-				assert(graph->getEdgeData(node, neighbor) == graph->getEdgeData(neighbor, node));
+				assert(graph->getEdgeData(jj) == graph->getEdgeData(graph->findEdge(neighbor, node)));
 				numEdges++;
 			}
 		}

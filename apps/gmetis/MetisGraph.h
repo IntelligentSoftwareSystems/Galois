@@ -480,7 +480,7 @@ public:
 	int computeAdjWgtSum(GNode node) {
 		int num = 0;
 		for (GGraph::edge_iterator jj = graph->edge_begin(node, Galois::NONE), eejj = graph->edge_end(node, Galois::NONE); jj != eejj; ++jj) {
-		  GNode neighbor = graph->getEdgeDst(jj);
+		  //GNode neighbor = graph->getEdgeDst(jj);
 			int weight = (int) graph->getEdgeData(jj, Galois::NONE);
 			num = num + weight;
 		}

@@ -66,7 +66,7 @@ public:
 		if (nparts <= 2) {
 			for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 				GNode node = *ii;
-				assert(node.getData().getPartition()>=0);
+				assert(graph->getData(node).getPartition()>=0);
 				graph->getData(node).setPartition(graph->getData(node).getPartition() + partStartIndex);
 			}
 		} else {
