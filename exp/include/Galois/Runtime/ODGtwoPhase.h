@@ -49,7 +49,7 @@ namespace GaloisRuntime {
 template <typename T, typename OperFunc, typename NhoodFunc, typename Cmp, typename Ctxt >
 class TwoPhaseShareListExecutor {
 
-  typedef Galois::GSimpleReducible<size_t, std::plus<size_t> > Accumulator;
+  typedef Galois::GAccumulator<size_t> Accumulator;
 
   typedef GaloisRuntime::MM::FSBGaloisAllocator<Ctxt> CtxtAlloc_ty;
   typedef GaloisRuntime::PerThreadVector<Ctxt*> CtxtWL_ty;
@@ -83,7 +83,7 @@ class TwoPhaseShareListExecutor {
 
     // TODO: change to ref
     void operator () (const T& active) {
-      ++(expIter.get ());
+      expIter += 1;
 
       Ctxt* ctxt = ctxtAlloc.allocate (1);
       new (ctxt) Ctxt (active);
@@ -119,7 +119,7 @@ class TwoPhaseShareListExecutor {
 
     template <typename NItem>
     void operator () (const NItem* ni) {
-      ++(findIter.get ());
+      findIter += 1;
 
       Ctxt* ctxt = ni->getHighestPriority (cmp);
 
@@ -188,7 +188,7 @@ class TwoPhaseShareListExecutor {
 
 
     void operator () (Ctxt*& src) {
-      ++(opIter.get ());
+      opIter += 1;
 
       addList.get ().clear ();
       op (src->active, addList.get ());
