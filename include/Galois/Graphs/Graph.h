@@ -223,8 +223,7 @@ private:
     gNode(const_node_reference d, bool a)
       :data(d), active(a) {
     }
-    gNode() :active(false) {
-    }
+    gNode() :active(false) { }
 
     void eraseEdge(gNode* N) {
       for (iterator ii = begin(), ee = end(); ii != ee; ++ii) {
@@ -233,6 +232,8 @@ private:
 	  return;
 	}
       }
+      assert(0 && "Edge doesn't exist");
+      abort();
     }
 
     edge_reference getEdgeData(gNode* N) {
@@ -549,6 +550,22 @@ public:
       GaloisRuntime::acquire(dst.ID, mflag);
       src.ID->eraseEdge(dst.ID);
       dst.ID->eraseEdge(src.ID);
+    }
+  }
+
+  //! Removes an edge from the graph
+  void removeEdge(GraphNode src, edge_iterator it, Galois::MethodFlag mflag = ALL) {
+    gNode* dstID = it->getNeighbor();
+    assert(src.ID);
+    assert(dstID);
+    GaloisRuntime::checkWrite(mflag | Galois::WRITE);
+    GaloisRuntime::acquire(src.ID, mflag);
+    if (Directional) {
+      src.ID->eraseEdge(dstID);
+    } else {
+      GaloisRuntime::acquire(dstID, mflag);
+      src.ID->eraseEdge(dstID);
+      dstID->eraseEdge(src.ID);
     }
   }
 

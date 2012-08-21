@@ -213,7 +213,7 @@ class FirstGraph : private boost::noncopyable {
     void erase(gNode* N) { 
       iterator ii = find(N);
       if (ii != end())
-        edges.erase(ii.base()); 
+        edges.erase(ii); 
     }
 
     iterator find(gNode* N) {
@@ -335,19 +335,38 @@ public:
     return boost::make_filter_iterator(is_edge(), ii, src->end());
   }
 
+  edge_iterator addMultiEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {
+    assert(src);
+    assert(dst);
+    GaloisRuntime::checkWrite(mflag | Galois::WRITE);
+    GaloisRuntime::acquire(src, mflag);
+    typename gNode::iterator ii = src->end();
+    if (ii == src->end()) {
+      if (Directional) {
+	ii = src->createEdge(dst, 0);
+      } else {
+	GaloisRuntime::acquire(dst, mflag);
+	EdgeTy* e = edges.mkEdge();
+	ii = dst->createEdge(src, e);
+	ii = src->createEdge(dst, e);
+      }
+    }
+    return boost::make_filter_iterator(is_edge(), ii, src->end());
+  }
+
   //! Removes an edge from the graph
   void removeEdge(GraphNode src, edge_iterator dst, Galois::MethodFlag mflag = ALL) {
     assert(src);
     GaloisRuntime::checkWrite(mflag | Galois::WRITE);
     GaloisRuntime::acquire(src, mflag);
     if (Directional) {
-      src->eraseEdge(dst);
+      src->erase(dst.base());
     } else {
       GaloisRuntime::acquire(dst->first(), mflag);
       EdgeTy* e = dst->second();
       edges.delEdge(e);
-      src->eraseEdge(dst);
-      dst->eraseEdge(dst->findEdge(src));
+      src->erase(dst.base());
+      dst->first()->erase(src);
     }
   }
 
