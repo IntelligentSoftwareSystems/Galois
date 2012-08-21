@@ -78,9 +78,9 @@ class DESunorderedSerial: public DESabstractMain {
       numEvents += srcObj->simulate(graph, activeNode);
 
 
-      for (Graph::neighbor_iterator i = graph.neighbor_begin (activeNode, Galois::NONE), ei =
-          graph.neighbor_end (activeNode, Galois::NONE); i != ei; ++i) {
-        const GNode& dst = *i;
+      for (Graph::edge_iterator i = graph.edge_begin (activeNode, Galois::NONE), ei =
+          graph.edge_end (activeNode, Galois::NONE); i != ei; ++i) {
+        const GNode dst = graph.getEdgeDst(i);
 
         SimObject* dstObj = graph.getData (dst, Galois::NONE);
 

@@ -35,7 +35,7 @@
 
 #include <cassert>
 
-#include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/Graph2.h"
 
 #include "comDefs.h"
 #include "logicDefs.h"
@@ -218,7 +218,7 @@ private:
 
         if (dstGate.hasInputName (srcOutName)) {
           assert (&srcGate != &dstGate); // disallowing self loops
-          if (!src.hasNeighbor (dst)) {
+          if (graph.findEdge(src, dst) == graph.edge_end(src)) {
             ++numEdges;
             graph.addEdge (src, dst, Galois::NONE);
           }

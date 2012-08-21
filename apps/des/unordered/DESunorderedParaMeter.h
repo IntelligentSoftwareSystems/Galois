@@ -67,10 +67,10 @@ private:
     bool abort = locks[srcObj->getId ()];
 
     if (!abort) {
-      for (Graph::neighbor_iterator i = graph.neighbor_begin (activeNode, Galois::NONE), ei =
-          graph.neighbor_end (activeNode, Galois::NONE); i != ei; ++i) {
+      for (Graph::edge_iterator i = graph.edge_begin (activeNode, Galois::NONE), ei =
+          graph.edge_end (activeNode, Galois::NONE); i != ei; ++i) {
 
-        SimObject* dstObj = graph.getData (*i, Galois::NONE);
+        SimObject* dstObj = graph.getData (graph.getEdgeDst(i), Galois::NONE);
         abort = abort || locks[dstObj->getId ()];
         if (abort) {
           break;
@@ -83,10 +83,10 @@ private:
     if (!abort) {
       locks[srcObj->getId ()] = true;
 
-      for (Graph::neighbor_iterator i = graph.neighbor_begin (activeNode, Galois::NONE), ei =
-          graph.neighbor_end (activeNode, Galois::NONE); i != ei; ++i) {
+      for (Graph::edge_iterator i = graph.edge_begin (activeNode, Galois::NONE), ei =
+          graph.edge_end (activeNode, Galois::NONE); i != ei; ++i) {
 
-        SimObject* dstObj = graph.getData (*i, Galois::NONE);
+        SimObject* dstObj = graph.getData (graph.getEdgeDst(i), Galois::NONE);
         locks[dstObj->getId ()] = true;
       }
 
@@ -179,9 +179,9 @@ public:
         numEvents += srcObj->simulate(graph, activeNode);
 
 
-        for (Graph::neighbor_iterator i = graph.neighbor_begin (activeNode, Galois::NONE), ei =
-            graph.neighbor_end (activeNode, Galois::NONE); i != ei; ++i) {
-          const GNode& dst = *i;
+        for (Graph::edge_iterator i = graph.edge_begin (activeNode, Galois::NONE), ei =
+            graph.edge_end (activeNode, Galois::NONE); i != ei; ++i) {
+          const GNode dst = graph.getEdgeDst(i);
 
           SimObject* dstObj = graph.getData (dst, Galois::NONE);
 

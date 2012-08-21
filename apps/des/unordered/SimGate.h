@@ -32,7 +32,7 @@
 #include <cstdlib>
 #include <cassert>
 
-#include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/Graph2.h"
 
 
 #include "logicDefs.h"
@@ -134,10 +134,10 @@ protected:
 
     SimTime sendTime = inputEvent.getRecvTime();
 
-    for (Graph::neighbor_iterator i = graph.neighbor_begin (myNode, Galois::NONE), 
-        e = graph.neighbor_end (myNode, Galois::NONE); i != e; ++i) {
+    for (Graph::edge_iterator i = graph.edge_begin (myNode, Galois::NONE), 
+        e = graph.edge_end (myNode, Galois::NONE); i != e; ++i) {
 
-      const GNode& dst = *i;
+      const GNode dst = graph.getEdgeDst(i);
       SimGate* dstGate = dynamic_cast<SimGate*> (graph.getData (dst, Galois::NONE));
 
       assert (dstGate != NULL);

@@ -79,8 +79,8 @@ class DESunordered: public DESabstractMain {
         SimObject* srcObj = graph.getData (activeNode, Galois::CHECK_CONFLICT);
 
         // acquire locks on neighborhood: one shot
-        for (Graph::neighbor_iterator i = graph.neighbor_begin (activeNode, Galois::CHECK_CONFLICT)
-            , ei = graph.neighbor_end (activeNode, Galois::CHECK_CONFLICT); i != ei; ++i) {
+        for (Graph::edge_iterator i = graph.edge_begin (activeNode, Galois::CHECK_CONFLICT)
+            , ei = graph.edge_end (activeNode, Galois::CHECK_CONFLICT); i != ei; ++i) {
           // const GNode& dst = *i;
           // SimObject* dstObj = graph.getData (dst, Galois::CHECK_CONFLICT);
         }
@@ -99,9 +99,9 @@ class DESunordered: public DESabstractMain {
         int proc = srcObj->simulate(graph, activeNode); // number of events processed
         numEvents += proc;
 
-        for (Graph::neighbor_iterator i = graph.neighbor_begin (activeNode, Galois::NONE)
-            , ei = graph.neighbor_end (activeNode, Galois::NONE); i != ei; ++i) {
-          const GNode& dst = *i;
+        for (Graph::edge_iterator i = graph.edge_begin (activeNode, Galois::NONE)
+            , ei = graph.edge_end (activeNode, Galois::NONE); i != ei; ++i) {
+          const GNode dst = graph.getEdgeDst(i);
 
           SimObject* dstObj = graph.getData (dst, Galois::NONE);
 

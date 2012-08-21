@@ -32,7 +32,7 @@
 
 #include <cassert>
 
-#include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/Graph2.h"
 
 #include "comDefs.h"
 #include "Event.h"
