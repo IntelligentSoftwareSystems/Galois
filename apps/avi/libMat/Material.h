@@ -222,7 +222,6 @@ public:
   double getSoundSpeed(void) const {
     return sqrt((Lambda + 2.0 * Mu) / getDensityInReference());
   }
-  ;
 
 private:
   // Lame constants
@@ -291,7 +290,6 @@ public:
   double getSoundSpeed(void) const {
     return sqrt((lambda + 2.0 * mu) / getDensityInReference());
   }
-  ;
 
 protected:
   double getModuli(int i1, int i2, int i3, int i4) const {

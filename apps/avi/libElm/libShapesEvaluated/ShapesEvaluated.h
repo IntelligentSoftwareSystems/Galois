@@ -195,7 +195,7 @@ public:
   }
 
   ShapesEvaluated__(const ShapesEvaluated__ & SE): ShapesEvaluated (SE) {
-  };
+  }
 
   const Shape& accessShape() const { return *ShapeObj;}
   const Quadrature& accessQuadrature() const { return *QuadObj;}

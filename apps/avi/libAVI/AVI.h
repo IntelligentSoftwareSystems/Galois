@@ -114,13 +114,10 @@ class AVI {
 public:
   AVI () {
   }
-  ;
   virtual ~AVI () {
   }
-  ;
   AVI (const AVI& NewAVI) {
   }
-  ;
   virtual AVI * clone () const = 0;
   //  virtual int getElemIndex(void) const = 0;
 

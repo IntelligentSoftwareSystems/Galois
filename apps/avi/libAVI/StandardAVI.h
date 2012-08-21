@@ -204,7 +204,6 @@ public:
     timeStamp = timeval;
     return true;
   }
-  ;
 
 
   //! Returns the next time at which the force field will be updated
@@ -217,37 +216,31 @@ public:
   size_t getFieldDof (size_t fieldnumber) const {
     return operation.getFieldDof (fieldnumber);
   }
-  ;
 
   const std::vector<size_t>& getFields () const {
     return operation.getFields ();
   }
-  ;
 
   //! returns the element geometry
   const ElementGeometry& getGeometry () const {
     return operation.getElement ().getGeometry ();
   }
-  ;
 
   //! returns the element
   const Element& getElement () const {
     return operation.getElement ();
   }
-  ;
 
   //! Updates the force field through the operation Stresswork class
   bool getForceField (const MatDouble& argval, MatDouble& forcefield) const {
     operation.getVal (argval, forcefield);
     return (true);
   }
-  ;
 
 
   size_t getGlobalIndex (void) const {
     return (globalIdx);
   }
-  ;
 
   //! write the updated time vector into the argument provided
   //! value filled in is the one obtained from getNextTimeStamp ()
@@ -310,7 +303,7 @@ protected:
   virtual void setTimeStep (double epsilon = 1.0) {
      timeStep = epsilon * delta * (operation.getElement ().getGeometry ().getInRadius ()) / operation.getMaterial ().getSoundSpeed ();
 
-   };
+   }
 
   virtual void computeDeltaV (const MatDouble& funcval, MatDouble& DeltaV) const;
 
@@ -329,7 +322,6 @@ protected:
     cut_off = cut_off / strtod (val2, NULL);
     timeStep = floor (timeStep / cut_off) * cut_off;
   }
-  ;
 
   
 private:

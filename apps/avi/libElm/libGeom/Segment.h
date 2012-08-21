@@ -107,11 +107,11 @@ class Segment:public AbstractGeom<SPD>
     }
 
     return(0.5*sqrt(l));
-  };
+  }
 
   double getOutRadius(void) const{
     return(getInRadius());
-  };
+  }
 
   virtual void computeNormal (size_t e, std::vector<double>& vNormal) const {
     std::cerr << "Segment::computeNormal not implemented yet" << std::endl;
