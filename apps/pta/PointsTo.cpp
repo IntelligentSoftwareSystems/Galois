@@ -26,7 +26,7 @@
 #include "Galois/Galois.h"
 #include "Galois/Bag.h"
 #include "Galois/Statistic.h"
-#include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/Graph2.h"
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/util/SparseBitVector2.h"
 #include "Galois/Runtime/WorkList.h"
@@ -192,8 +192,8 @@ public:
 	ancestors.push_back(nodeid);
 
 	GNode nn = nodes[nodeid];
-	for (Graph::neighbor_iterator ii = graph.neighbor_begin(nn, Galois::NONE), ei = graph.neighbor_end(nn, Galois::NONE); ii != ei; ++ii) {
-		Node &nn = graph.getData(*ii, Galois::NONE);
+	for (Graph::edge_iterator ii = graph.edge_begin(nn, Galois::NONE), ei = graph.edge_end(nn, Galois::NONE); ii != ei; ++ii) {
+	  Node &nn = graph.getData(graph.getEdgeDst(ii), Galois::NONE);
 		unsigned iiid = nn.id;
 		if (cycleDetect(iiid, cyclenode)) {
 			//return true;	// don't pop from ancestors.
@@ -304,7 +304,7 @@ void processLoadStoreSerial(PointsToConstraints &constraints, WorkList &worklist
 			result[srcrepr].getAllSetBits(ptstoOfSrc);
 			for (std::vector<unsigned>::iterator pointee = ptstoOfSrc.begin(); pointee != ptstoOfSrc.end(); ++pointee) {
 				unsigned pointeerepr = ocd.getFinalRepresentative(*pointee);
-				if (pointeerepr != dstrepr && !nodes[pointeerepr].hasNeighbor(nodes[dstrepr])) {
+				if (pointeerepr != dstrepr && graph.findEdge(nodes[pointeerepr], nodes[dstrepr]) == graph.edge_begin(nodes[pointeerepr])) {
 					GNode &nn = nodes[pointeerepr];
 					graph.addEdge(nn, nndstrepr, flag);
 					//std::cout << "debug: adding edge from " << *pointee << " to " << dst << std::endl;
@@ -318,7 +318,7 @@ void processLoadStoreSerial(PointsToConstraints &constraints, WorkList &worklist
 			result[dstrepr].getAllSetBits(ptstoOfDst);
 			for (std::vector<unsigned>::iterator pointee = ptstoOfDst.begin(); pointee != ptstoOfDst.end(); ++pointee) {
 				unsigned pointeerepr = ocd.getFinalRepresentative(*pointee);
-				if (srcrepr != pointeerepr && !nodes[srcrepr].hasNeighbor(nodes[pointeerepr])) {
+				if (srcrepr != pointeerepr && graph.findEdge(nodes[srcrepr],nodes[pointeerepr]) == graph.edge_end(nodes[srcrepr])) {
 					graph.addEdge(nnsrcrepr, nodes[pointeerepr], flag);
 					//std::cout << "debug: adding edge from " << src << " to " << *pointee << std::endl;
 					newedgeadded = true;
@@ -380,7 +380,7 @@ void processLoadStore(PointsToConstraints &constraints, WorkList &worklist, Galo
 			result[srcrepr].getAllSetBits(ptstoOfSrc);
 			for (std::vector<unsigned>::iterator pointee = ptstoOfSrc.begin(); pointee != ptstoOfSrc.end(); ++pointee) {
 				unsigned pointeerepr = ocd.getFinalRepresentative(*pointee);
-				if (pointeerepr != dstrepr && !nodes[pointeerepr].hasNeighbor(nodes[dstrepr])) {
+				if (pointeerepr != dstrepr && graph.findEdge(nodes[pointeerepr], nodes[dstrepr]) == graph.edge_end(nodes[pointeerepr])) {
 					GNode &nn = nodes[pointeerepr];
 					graph.addEdge(nn, nndstrepr, flag);
 					//std::cout << "debug: adding edge from " << *pointee << " to " << dst << std::endl;
@@ -394,7 +394,7 @@ void processLoadStore(PointsToConstraints &constraints, WorkList &worklist, Galo
 			result[dstrepr].getAllSetBits(ptstoOfDst);
 			for (std::vector<unsigned>::iterator pointee = ptstoOfDst.begin(); pointee != ptstoOfDst.end(); ++pointee) {
 				unsigned pointeerepr = ocd.getFinalRepresentative(*pointee);
-				if (srcrepr != pointeerepr && !nodes[srcrepr].hasNeighbor(nodes[pointeerepr])) {
+				if (srcrepr != pointeerepr && graph.findEdge(nodes[srcrepr],nodes[pointeerepr]) == graph.edge_end(nodes[srcrepr])) {
 					graph.addEdge(nnsrcrepr, nodes[pointeerepr], flag);
 					//std::cout << "debug: adding edge from " << src << " to " << *pointee << std::endl;
 					newedgeadded = true;
@@ -416,9 +416,9 @@ struct Process {
   void operator()(UpdateRequest &req, Context& ctx) {
    if (++nfired < THRESHOLD_LOADSTORE) {
     GNode &src = req.n;
-    for (Graph::neighbor_iterator ii = graph.neighbor_begin(src, Galois::NONE),
-        ei = graph.neighbor_end(src, Galois::NONE); ii != ei; ++ii) {
-      	GNode dst = *ii;
+    for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::NONE),
+        ei = graph.edge_end(src, Galois::NONE); ii != ei; ++ii) {
+      GNode dst = graph.getEdgeDst(ii);
 	unsigned newptsto = propagate(src, dst, Galois::ALL);
 	if (newptsto) {
 		ctx.push(UpdateRequest(dst, newptsto));
@@ -460,8 +460,8 @@ void runSerial(PointsToConstraints &addrcopyconstraints, PointsToConstraints &lo
 		worklist.pop_back();
 
 		//std::cout << "debug: processing worklist element " << graph.getData(src, Galois::NONE).id << std::endl;
-    		for (Graph::neighbor_iterator ii = graph.neighbor_begin(src, Galois::NONE), ei = graph.neighbor_end(src, Galois::NONE); ii != ei; ++ii) {
-      			GNode dst = *ii;
+    		for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::NONE), ei = graph.edge_end(src, Galois::NONE); ii != ei; ++ii) {
+		  GNode dst = graph.getEdgeDst(ii);
 			unsigned newptsto = propagate(src, dst, Galois::NONE);
 			if (newptsto) {
 				worklist.push_back(UpdateRequest(dst, newptsto));
