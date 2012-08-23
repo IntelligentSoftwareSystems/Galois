@@ -73,6 +73,8 @@ public:
 		removeFromTree=false;
 
 	}
+        virtual ~KdCell() { }
+
 	bool equals(KdCell & other){
 		if(splitType!=other.splitType)
 			return false;

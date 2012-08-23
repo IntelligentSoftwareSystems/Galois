@@ -41,7 +41,7 @@ private :
 public:
   ClusterNode():boxRadius(0),coneDirection(0){
   }
-  ~ClusterNode(){
+  virtual ~ClusterNode(){
 //	  cout<<"Clearing reps"<<endl;
 	  reps.clear();
   }

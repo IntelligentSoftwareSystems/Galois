@@ -53,6 +53,8 @@ public:
 		myLoc(0), intensity(0) {
 		startTime = -1;
 	}
+        virtual ~AbstractNode() { }
+
 	double getScalarTotalIntensity() {
 		return (1.0f / 3.0f) * intensity.getSum();
 	}
