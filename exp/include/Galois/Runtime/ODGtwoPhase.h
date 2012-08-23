@@ -47,7 +47,7 @@ namespace GaloisRuntime {
 
 
 template <typename T, typename OperFunc, typename NhoodFunc, typename Cmp, typename Ctxt >
-class TwoPhaseShareListExecutor {
+class TwoPhaseODGexecutor {
 
   typedef Galois::GAccumulator<size_t> Accumulator;
 
@@ -58,44 +58,72 @@ class TwoPhaseShareListExecutor {
 
   typedef GaloisRuntime::PerThreadVector<T> AddList;
 
-  struct ExpandNhood {
-
-    Cmp& cmp;
-    NhoodFunc& nhoodVisitor;
+  struct CreateCtxt {
     CtxtAlloc_ty& ctxtAlloc;
     CtxtWL_ty& contexts;
-    Accumulator& expIter;
 
-    ExpandNhood (
-        Cmp& cmp,
-        NhoodFunc& nhoodVisitor,
+    CreateCtxt (
         CtxtAlloc_ty& ctxtAlloc,
-        CtxtWL_ty& contexts,
-        Accumulator& expIter)
+        CtxtWL_ty& contexts)
       :
-        cmp (cmp),
-        nhoodVisitor (nhoodVisitor),
         ctxtAlloc (ctxtAlloc),
-        contexts (contexts),
-        expIter (expIter)
+        contexts (contexts)
     {}
 
-
-    // TODO: change to ref
-    void operator () (const T& active) {
-      expIter += 1;
-
+    Ctxt* operator () (const T& active) {
       Ctxt* ctxt = ctxtAlloc.allocate (1);
       new (ctxt) Ctxt (active);
       // Ctxt* ctxt = new Ctxt (&active);
 
       contexts.get ().push_back (ctxt);
 
+      return ctxt;
+    };
+  };
+
+  struct ExpandNhood {
+    NhoodFunc& nhoodVisitor;
+    Accumulator& findIter;
+
+    ExpandNhood (
+        NhoodFunc& nhoodVisitor,
+        Accumulator& findIter)
+      :
+        nhoodVisitor (nhoodVisitor),
+        findIter (findIter)
+    {}
+
+    void operator () (Ctxt* ctxt) {
+      findIter += 1;
+
       GaloisRuntime::setThreadContext (ctxt);
-
-      nhoodVisitor (active);
-
+      ctxt->removeFromNhood ();
+      nhoodVisitor (ctxt->active);
       GaloisRuntime::setThreadContext (NULL);
+    }
+  };
+
+
+  struct CreateCtxtExpandNhood: public CreateCtxt, public ExpandNhood {
+
+    CreateCtxtExpandNhood (
+        NhoodFunc& nhoodVisitor,
+        CtxtAlloc_ty& ctxtAlloc,
+        CtxtWL_ty& contexts,
+        Accumulator& expIter)
+      :
+        CreateCtxt (ctxtAlloc, contexts),
+        ExpandNhood (nhoodVisitor, expIter)
+    {}
+
+
+    // TODO: change to ref
+    void operator () (const T& active) {
+
+      Ctxt* ctxt = CreateCtxt::operator () (active);
+
+      ExpandNhood::operator () (ctxt);
+
     }
 
   };
@@ -164,47 +192,97 @@ class TwoPhaseShareListExecutor {
   // };
 
 
-  struct ApplyOperator: public ExpandNhood {
+  struct ApplyOperatorShareList: public CreateCtxtExpandNhood {
 
     OperFunc& op;
     AddList& addList;
     Accumulator& opIter;
 
-    ApplyOperator (
-        Cmp& cmp,
-        OperFunc& op,
-        AddList& addList,
+    ApplyOperatorShareList (
         NhoodFunc& nhoodVisitor,
         CtxtAlloc_ty& ctxtAlloc,
         CtxtWL_ty& contexts,
         Accumulator& expIter,
+        OperFunc& op,
+        AddList& addList,
         Accumulator& opIter)
       :
-        ExpandNhood (cmp, nhoodVisitor, ctxtAlloc, contexts, expIter),
+        CreateCtxtExpandNhood (nhoodVisitor, ctxtAlloc, contexts, expIter),
         op (op),
         addList (addList),
         opIter (opIter)
     {}
 
 
-    void operator () (Ctxt*& src) {
+    void operator () (Ctxt* src) {
       opIter += 1;
 
       addList.get ().clear ();
       op (src->active, addList.get ());
       src->removeFromNhood ();
 
-      ExpandNhood::ctxtAlloc.deallocate (src, 1);
+      CreateCtxtExpandNhood::ctxtAlloc.deallocate (src, 1);
       // delete src; src = NULL;
 
       for (typename AddList::local_iterator i = addList.get ().begin ()
           , endi = addList.get ().end (); i != endi; ++i) {
 
-        ExpandNhood::operator () (*i);
+        CreateCtxtExpandNhood::operator () (*i);
       }
     }
   };
 
+
+  struct ApplyOperatorPriorityLock: public CreateCtxt  {
+
+    Cmp& cmp;
+    OperFunc& op;
+    AddList& addList;
+    Accumulator& opIter;
+
+    ApplyOperatorPriorityLock (
+        CtxtAlloc_ty& ctxtAlloc,
+        SrcWL_ty& nextWL,
+        Cmp& cmp,
+        OperFunc& op,
+        AddList& addList,
+        Accumulator& opIter)
+      :
+        CreateCtxt (ctxtAlloc, nextWL),
+        cmp (cmp),
+        op (op),
+        addList (addList),
+        opIter (opIter)
+    {}
+
+    void operator () (Ctxt* ctxt) {
+
+      if (ctxt->isSrc (cmp)) {
+        opIter += 1;
+
+        // std::cout << "Found source: " << ctxt << ", Active: " << ctxt->active 
+          // << std::endl;
+
+        addList.get ().clear ();
+        op (ctxt->active, addList.get ());
+        ctxt->removeFromNhood ();
+
+        CreateCtxt::ctxtAlloc.deallocate (ctxt, 1);
+
+        for (typename AddList::local_iterator i = addList.get ().begin ()
+            , endi = addList.get ().end (); i != endi; ++i) {
+
+          CreateCtxt::operator () (*i);
+        }
+
+
+      } else {
+        ctxt->removeFromNhood ();
+        CreateCtxt::contexts.get ().push_back (ctxt);
+      }
+    }
+
+  };
 
 
 
@@ -214,7 +292,7 @@ class TwoPhaseShareListExecutor {
 
 public:
 
-  TwoPhaseShareListExecutor (
+  TwoPhaseODGexecutor (
       Cmp& _cmp, 
       OperFunc& _operFunc, 
       NhoodFunc& _nhoodVisitor)
@@ -243,7 +321,7 @@ public:
     // GaloisRuntime::do_all_coupled (
     Galois::do_all (
         abeg, aend, 
-        ExpandNhood (cmp, nhoodVisitor, ctxtAlloc, contexts, expIter),
+        CreateCtxtExpandNhood (nhoodVisitor, ctxtAlloc, contexts, expIter),
         "initial_expand_nhood");
 
     std::cout << "Iterations spent in initial expansion of nhood: " << expIter.reduce () << std::endl;
@@ -276,14 +354,13 @@ public:
       // GaloisRuntime::do_all_coupled (
       Galois::do_all (
           sources.begin_all (), sources.end_all (),
-          ApplyOperator (
-            cmp, 
-            operFunc, 
-            addList, 
+          ApplyOperatorShareList (
             nhoodVisitor, 
             ctxtAlloc, 
             contexts, 
             expIter, 
+            operFunc, 
+            addList, 
             opIter),
           "exec_src");
       opTime.stop ();
@@ -301,6 +378,77 @@ public:
 
   }
 
+  template <typename AI>
+  void execute (AI abeg, AI aend) {
+
+    CtxtAlloc_ty ctxtAlloc;
+    CtxtWL_ty* currWL = new CtxtWL_ty ();
+    CtxtWL_ty* nextWL = new CtxtWL_ty ();
+    AddList addList;
+
+    Accumulator findIter;
+    Accumulator opIter;
+
+    Galois::TimeAccumulator findTime;
+    Galois::TimeAccumulator opTime;
+
+
+    bool first = true;
+    size_t round = 0;
+
+    size_t prev = 0;
+    while (true) {
+
+      ++round;
+      if (first) {
+        first = false;
+
+        findTime.start ();
+        Galois::do_all (abeg, aend,
+            CreateCtxtExpandNhood (nhoodVisitor, ctxtAlloc, *currWL, findIter),
+            "initial_expand_nhood");
+        findTime.stop ();
+
+      } else {
+
+        findTime.start ();
+        Galois::do_all (currWL->begin_all (), currWL->end_all (),
+            ExpandNhood (nhoodVisitor, findIter),
+            "find_sources");
+        findTime.stop ();
+      }
+
+
+
+      opTime.start ();
+      Galois::do_all (currWL->begin_all (), currWL->end_all (),
+          ApplyOperatorPriorityLock (ctxtAlloc, *nextWL, cmp, operFunc, addList, opIter),
+          "apply_operator");
+      opTime.stop ();
+
+      // std::cout << "Number of sources found: " << (opIter.reduce () - prev) << std::endl;
+      prev = opIter.reduce ();
+
+      std::swap (currWL, nextWL);
+      nextWL->clear_all ();
+
+      if (currWL->empty_all ()) {
+        break;
+      }
+    }
+
+    std::cout << "Number of rounds: " << round << std::endl;
+    std::cout << "Iterations spent in finding sources: " << findIter.reduce () << std::endl;
+    std::cout << "Time spent in finding sources: " << findTime.get () << std::endl;
+
+    std::cout << "Iterations spent in processing sources: " << opIter.reduce () << std::endl;
+    std::cout << "Time spent in processing sources: " << opTime.get () << std::endl;
+
+    delete currWL; currWL = NULL;
+    delete nextWL; nextWL = NULL;
+
+  }
+
 };
 
 
@@ -315,11 +463,27 @@ void for_each_ordered (AI abeg, AI aend, NI nbeg, NI nend, OperFunc operFunc, Nh
 
   typedef NhoodListContext<T, NItem> Ctxt; 
 
-  typedef TwoPhaseShareListExecutor<T, OperFunc, NhoodFunc, Cmp, Ctxt> Exec;
+  typedef TwoPhaseODGexecutor<T, OperFunc, NhoodFunc, Cmp, Ctxt> Exec;
 
   Exec exec (cmp, operFunc, nhoodVisitor);
 
   exec.execute (abeg, aend, nbeg, nend); 
+}
+
+template <typename AI, typename OperFunc, typename NhoodFunc, typename Cmp>
+void for_each_ordered (AI abeg, AI aend, OperFunc operFunc, NhoodFunc nhoodVisitor, Cmp cmp) {
+
+  typedef typename std::iterator_traits<AI>::value_type T;
+
+  typedef NhoodItemPriorityLock<T> NItem;
+
+  typedef NhoodListContext<T, NItem> Ctxt;
+
+  typedef TwoPhaseODGexecutor<T, OperFunc, NhoodFunc, Cmp, Ctxt> Exec;
+
+  Exec exec (cmp, operFunc, nhoodVisitor);
+
+  exec.execute (abeg, aend);
 }
 
 

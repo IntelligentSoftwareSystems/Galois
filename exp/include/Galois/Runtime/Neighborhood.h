@@ -68,6 +68,8 @@ struct NhoodListContext: public SimpleRuntimeContext {
 
   template <typename Cmp>
   bool isSrc (Cmp& cmp) const {
+    // TODO: remove later
+    assert (nhood.size () == 3); // for AVI
     bool ret = true;
     for (typename NhoodList::const_iterator n = nhood.begin ()
         , endn = nhood.end (); n != endn; ++n) {
@@ -93,7 +95,7 @@ struct NhoodListContext: public SimpleRuntimeContext {
       (*n)->remove (this);
     }
 
-    //TODO: should clear nhood list as well after this operation
+    nhood.clear ();
     
   }
 
@@ -102,12 +104,7 @@ struct NhoodListContext: public SimpleRuntimeContext {
     for (typename NhoodList::iterator n = nhood.begin ()
         , endn = nhood.end (); n != endn; ++n) {
 
-      std::cout << (*n)->getID () << ": [ ";
-      for (typename NItem::ShareList::iterator c = (*n)->sharers.begin ()
-          , endc = (*n)->sharers.end (); c != endc; ++c) {
-        std::cout << (*c)->active->toString () << ", ";
-      }
-      std::cout << "]" << std::endl;
+      (*n)->print (std::cout);
 
     }
     std::cout << std::endl;
@@ -143,7 +140,7 @@ public:
 
   template <typename C>
   void visit (C& cmp, Galois::MethodFlag flag=Galois::NONE) {
-    GaloisRuntime::SimpleRuntimeContext * c = GaloisRuntime::getThreadContext ();
+    GaloisRuntime::SimpleRuntimeContext* c = GaloisRuntime::getThreadContext ();
     assert (c != NULL);
     Ctxt* ctxt = static_cast<Ctxt*> (c);
     assert (ctxt != NULL);
@@ -217,42 +214,83 @@ public:
     sharersLock.unlock ();
   }
 
+  void print (std::ostream& out=std::cout) {
+    sharersLock.lock ();
+
+    std::cout << getID () << ": [ ";
+    for (typename ShareList::iterator c = sharers.begin ()
+        , endc = sharers.end (); c != endc; ++c) {
+      std::cout << (*c)->active->toString () << ", ";
+    }
+    std::cout << "]" << std::endl;
+
+    sharersLock.unlock ();
+  }
+
 };
 
-// template <typename T>
-// class NhoodItemPriorityLock: public Lockable {
-// 
-  // typedef Galois::GAtomicPadded<T*> AtomicPtr;
-  // AtomicPtr highest;
-// 
-  // NhoodItemPriorityLock (): Lockable (), highest (NULL) {}
-// 
-  // template <typename C>
-  // bool acquire (T* active, const C& cmp) {
-    // assert (active != NULL);
-// 
-    // bool succ = false;
-// 
-    // if (highest == NULL) {
-      // succ = highest.cas (NULL, active);
-    // }
-// 
+template <typename T>
+class NhoodItemPriorityLock: public Lockable {
+
+  typedef NhoodItemPriorityLock<T> MyType;
+  typedef NhoodListContext<T, MyType> Ctxt;
+  typedef Galois::GAtomicPadded<Ctxt*> AtomicPtr;
+
+  size_t id;
+  AtomicPtr highest;
+
+public:
+
+  NhoodItemPriorityLock (size_t _id): Lockable (), id (_id), highest (NULL) {}
+
+  size_t getID () const { return id; }
+
+  template <typename C>
+  void visit (C& cmp, Galois::MethodFlag flat=Galois::NONE) {
+    GaloisRuntime::SimpleRuntimeContext* c = GaloisRuntime::getThreadContext ();
+    assert (c != NULL);
+    Ctxt* ctxt = static_cast<Ctxt*> (c);
+    assert (ctxt != NULL);
+
+    acquire (ctxt, cmp);
+
+    ctxt->addItem (this);
+  }
+
+  template <typename C>
+  bool acquire (Ctxt* ctxt, const C& cmp) {
+    assert (ctxt != NULL);
+
+    bool succ = false;
+
+    if (highest == NULL) {
+      succ = highest.cas (NULL, ctxt);
+    }
+
+    assert (highest != NULL);
+
+    for (Ctxt* curr = highest; cmp (ctxt->active, curr->active); curr = highest) {
+      succ = highest.cas (curr, ctxt);
+    }
+
+    return succ;
+  }
+
+  template <typename C>
+  bool isHighestPriority (const Ctxt* ctxt, const C& cmp) {
+    assert (ctxt != NULL);
     // assert (highest != NULL);
-// 
-    // for (AtomicPtr curr = highest; cmp (active, curr); curr = highest) {
-      // succ = highest.cas (curr, active);
-    // }
-// 
-    // return succ;
-  // }
-// 
-  // template <typename C>
-  // bool isHighestPriority (T* active, const C& cmp) {
-    // return (highest == active);
-  // }
-// 
-// 
-// };
+    return (highest == ctxt);
+  }
+
+  void remove (Ctxt* ctxt) {
+    assert (ctxt != NULL);
+    if (highest == ctxt) {
+      highest = NULL;
+    }
+  }
+
+};
 
 } // end namespace GaloisRuntime
 
