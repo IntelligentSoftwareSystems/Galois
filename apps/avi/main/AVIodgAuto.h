@@ -62,7 +62,11 @@ protected:
   typedef std::vector<AVI*> VecAVI;
   typedef std::vector<VecAVI> VecVertexAdj;
 
+#ifdef USE_SHARE_LIST
   typedef GaloisRuntime::NhoodItemShareList<AVI*> NItem;
+#else 
+  typedef GaloisRuntime::NhoodItemPriorityLock<AVI*> NItem;
+#endif 
 
   typedef std::vector<NItem> VecNItem;
   typedef std::vector<NItem*> VecNItemPtr;
@@ -188,11 +192,17 @@ public:
     OperFunc op (meshInit, g, perIterLocalVec, createSyncFiles, iter);
 
 
+#ifdef USE_SHARE_LIST
     // Galois::for_each<AVIWorkList> (initWL.begin (), initWL.end (), p);
     GaloisRuntime::for_each_ordered (
         elems.begin (), elems.end (),
         vtxPtrs.begin (), vtxPtrs.end (),
         op, nv, cmp);
+#else 
+    GaloisRuntime::for_each_ordered (
+        elems.begin (), elems.end (),
+        op, nv, cmp);
+#endif
 
     printf ("iterations = %d\n", iter.reduce ());
 
