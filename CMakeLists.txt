@@ -66,6 +66,8 @@ find_package(Boost 1.36.0 COMPONENTS ${BOOST_LIBS} REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 set(RT_LINK ${Boost_LIBRARIES} ${RT_LINK})
 
+find_package(GMP)
+
 if(USE_EXP)
   add_definitions(-DGALOIS_USE_EXP)
   include_directories("exp/include")

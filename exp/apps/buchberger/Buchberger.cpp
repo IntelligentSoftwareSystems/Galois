@@ -20,7 +20,9 @@
  *
  * @section Description
  *
- * Buchberger algorithm for computing Groebner basis.
+ * Buchberger algorithm for computing Groebner basis. Based off of sage
+ * implementation in sage.rings.polynomial.toy_buchberger by Martin Albrecht
+ * and Marshall Hampton.
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
@@ -32,6 +34,8 @@
 #include "Lonestar/BoilerPlate.h"
 
 #include <gmpxx.h>
+//#include <givaro/givgfq.h>
+//#include <givaro/StaticElement.h>
 
 #include <boost/spirit/include/phoenix_core.hpp>
 #include <boost/spirit/include/phoenix_operator.hpp>
@@ -67,32 +71,146 @@ static cll::opt<MonomialOrder> monomialOrder(cll::desc("Monomial order:"),
       clEnumVal(grevlex, "graded reverse lexicographic"),
       clEnumValEnd), cll::init(grevlex));
 
-//! Weights to ease vectorization of lexicographic sorting
-static int powersOfTwo[16] __attribute__((__aligned__(16)));
+#if 0
+//! Unfortunate pun
+struct GaloisField {
+  typedef Givaro::GFqDom<long> Field;
+  typedef Field::Element element_type;
+  Field F;
 
-typedef mpq_class number;
+  GaloisField(): F(2, 1) { }
+
+  void init() { }
+
+  void inverse(element_type& a) const {
+    F.invin(a);
+  }
+  
+  void add(element_type& a, const element_type& b) const {
+    F.addin(a, b);
+  }
+
+  void subtract(element_type& a, const element_type& b) const {
+    F.subin(a, b);
+  }
+
+  void negate(element_type& a) const {
+    F.negin(a);
+  }
+
+  void divide(element_type& a, const element_type& b) const {
+    F.divin(a, b);
+  }
+
+  void multiply(element_type& a, const element_type& b) const {
+    F.mulin(a, b);
+  }
+
+  void assign(element_type& a, const element_type& b) const {
+    F.assign(a, b);
+  }
+
+  void assignOne(element_type& a) const {
+    F.assign(a, F.one);
+  }
+
+  int sign(const element_type& a) const {
+    return neq(a, 0) ? 1 : 0;
+  }
+
+  bool neq(const element_type& a, const element_type& b) const {
+    return a != b;
+  }
+
+  void write(std::ostream& out, const element_type& a) const {
+    out << a;
+  }
+};
+#endif
+
+struct RationalField {
+  typedef mpq_class element_type;
+
+  void init() { }
+
+  void inverse(element_type& a) const {
+    a = 1 / a;
+  }
+  
+  void add(element_type& a, const element_type& b) const {
+    a += b;
+  }
+
+  void subtract(element_type& a, const element_type& b) const {
+    a -= b;
+  }
+
+  void negate(element_type& a) const {
+    a = -a;
+  }
+
+  void divide(element_type& a, const element_type& b) const {
+    a /= b;
+  }
+
+  void multiply(element_type& a, const element_type& b) const {
+    a *= b;
+  }
+
+  void assign(element_type& a, const element_type& b) const {
+    a = b;
+  }
+
+  void assignOne(element_type& a) const {
+    a = 1;
+  }
+
+  int sign(const element_type& a) const {
+    return sgn(a);
+  }
+
+  bool neq(const element_type& a, const element_type& b) const {
+    return a != b;
+  }
+
+  void write(std::ostream& out, const element_type& a) const {
+    out << a.get_str();
+  }
+};
+
+typedef RationalField Field;
+//typedef GaloisField Field;
+typedef Field::element_type number;
+
+Field TheField;
 
 template<class Order,class Alloc> class Ring;
 
+//! Weights to ease vectorization of lexicographic sorting
+static int powersOfTwo[16] __attribute__((__aligned__(16)));
+
 struct Term {
-  typedef int exp_type; 
-  typedef int __attribute__((__aligned__(16))) * __restrict__ exp_ptr_type;
+  typedef char exp_type; 
+  typedef char __attribute__((__aligned__(16))) * __restrict__ exp_ptr_type;
 
 private:
   template<class Order,class Alloc> friend class Ring;
 
-  number m_coef;
+  Field::element_type m_coef;
   exp_ptr_type m_exps;
   int m_totalDegree;
 
 public:
   Term(): m_coef(1), m_exps(NULL), m_totalDegree(0) { }
 
-  number& coef() { return m_coef; }
+  Field::element_type& coef() { return m_coef; }
+  const Field::element_type& coef() const { return m_coef; }
+
   exp_type& exp(int i) { return m_exps[i]; }
-  int totalDegree() const { return m_totalDegree; }
   const exp_type& exp(int i) const { return m_exps[i]; }
-  const number& coef() const { return m_coef; }
+  
+  int totalDegree() const { return m_totalDegree; }
+  
   exp_ptr_type const & exps() const { return m_exps; }
   exp_ptr_type& exps() { return m_exps; }
 
@@ -110,6 +228,7 @@ public:
 
   template<class R>
   bool equals(const Term& b, R& ring) {
+    // TODO vectorize
     int N = ring.numVars();
     for (int i = 0; i < N; ++i) {
       if (b.exp(i) != exp(i))
@@ -146,9 +265,15 @@ class Poly {
   // TODO: more bucketed representations!!!
   typedef std::vector<Term*> Terms;
   Terms terms;
+  int m_totalDegree;
+
 public:
   typedef Terms::iterator iterator;
   typedef Terms::const_iterator const_iterator;
+
+  Poly(): m_totalDegree(0) { }
+
+  int totalDegree() const { return m_totalDegree; }
 
   const Term* head() const {
     return terms.front();
@@ -176,23 +301,28 @@ public:
 
   void push(Term* t) {
     terms.push_back(t);
+    m_totalDegree += t->totalDegree();
   }
 
   bool empty() const { return terms.empty(); }
 
   //! f = f * s
   template<class R>
-  void scaleBy(const number& s, R& ring) {
+  void scaleBy(const Field::element_type& s, R& ring) {
     for (iterator ii = begin(), ei = end(); ii != ei; ++ii) {
       Term* t = *ii;
-      t->coef() *= s;
+      TheField.multiply(t->coef(),  s);
     }
   }
 
   //! f = f * a/b
   template<class R>
   void scaleBy(const Term& a, const Term& b, R& ring) {
-    number s = a.coef() / b.coef();
+    Field::element_type s;
+    TheField.assign(s, a.coef());
+    TheField.divide(s, b.coef());
+   
+    m_totalDegree = 0;
 
     for (iterator ii = begin(), ei = end(); ii != ei; ++ii) {
       Term* t = *ii;
@@ -201,11 +331,11 @@ public:
         assert(a.exp(i) >= b.exp(i));
         t->exp(i) += a.exp(i) - b.exp(i);
       }
-      t->coef() *= s;
+      TheField.multiply(t->coef(),  s);
       ring.generateTotalDegree(*t);
+      m_totalDegree += t->totalDegree();
     }
   }
-
 };
 
 class PolySet {
@@ -249,12 +379,14 @@ private:
 
   //! Sizeof Term plus padding and space for exps
   size_t sizeofTerm() const {
-    return sizeof(Term) + 15 + m_numVars * sizeof(int);
+    return sizeof(Term) + 15 + m_numVars * sizeof(Term::exp_type);
   }
 
+  typedef Term::exp_type* exps_ptr_t;
+
   //! Find 16-byte aligned address after ptr
-  int* expsPtr(const Term* ptr) const {
-    return reinterpret_cast<int*>(((uintptr_t)(ptr + 1) + 15) & ~0x0F);
+  exps_ptr_t expsPtr(const Term* ptr) const {
+    return reinterpret_cast<exps_ptr_t>(((uintptr_t)(ptr + 1) + 15) & ~0x0F);
   }
 
 public:
@@ -307,9 +439,9 @@ public:
     ptr->m_exps = expsPtr(ptr);
 
     if (t.exps() != NULL) {
-      memcpy(ptr->m_exps, t.exps(), m_numVars * sizeof(int));
+      memcpy(ptr->m_exps, t.exps(), m_numVars * sizeof(Term::exp_type));
     } else {
-      memset(ptr->m_exps, 0, m_numVars * sizeof(int));
+      memset(ptr->m_exps, 0, m_numVars * sizeof(Term::exp_type));
     }
     terms.push_back(ptr);
     return *ptr;
@@ -327,12 +459,12 @@ public:
   }
 
   void write(std::ostream& out, const Term& t, const std::vector<std::string>* idMap = NULL) const {
-    if (sgn(t.coef()) >= 0)
+    if (TheField.sign(t.coef()) >= 0)
       out << "+";
-    out << t.coef().get_str();
+    TheField.write(out, t.coef());
 
     for (int i = 0; i < numVars(); ++i) {
-      Term::exp_type exp = t.exp(i);
+      int exp = t.exp(i);
       if (exp == 0)
         continue;
       out << " ";
@@ -363,9 +495,8 @@ public:
     }
   }
 
-  //! Producing ranking of pairs for heuristic selection
-  //! Pick pairs in ascending value of LCM(LM(a), LM(b)).total_degree()
-  int rankPair(const Poly& f, const Poly& g) const {
+  //! Rank under Buchberger's normal selection strategy
+  int normalRank(const Poly& f, const Poly& g) const {
     const Term* fh = f.head();
     const Term* gh = g.head();
     int retval = 0;
@@ -374,7 +505,19 @@ public:
     for (int i = 0; i < numVars(); ++i) {
       retval += std::max(fh->exp(i), gh->exp(i));
     }
+
     return retval;
+  }
+
+  //! Rank pairs using sugar strategy
+  int rankPair(const Poly& f, const Poly& g) const {
+    const Term* fh = f.head();
+    const Term* gh = g.head();
+    int retval = std::max(f.totalDegree() - fh->totalDegree(), g.totalDegree() - gh->totalDegree());
+    int n = normalRank(f, g);
+    // prefer pairs with least sugar component, breaking ties with normalRank
+    int sugar = retval + n;
+    return (sugar << 8) | (n & 0xFF);
   }
 };
 
@@ -394,7 +537,7 @@ class LexOrder {
   bool gtVectorized(const Term& a, const Term& b, const R& ring) const {
     Term::exp_ptr_type aa = a.exps();
     Term::exp_ptr_type bb = b.exps();
-    Term::exp_ptr_type pp = powersOfTwo;
+    int* pp = powersOfTwo;
 
     for (int block = 0; block < ring.numVars(); block += R::kBlockSize) { 
       // Sigh. In GCC 4.7 this inner loop (1) is not vectorized because of
@@ -443,7 +586,7 @@ class GrevlexOrder {
 
     Term::exp_ptr_type aa = a.exps();
     Term::exp_ptr_type bb = b.exps();
-    Term::exp_ptr_type pp = powersOfTwo;
+    int* pp = powersOfTwo;
 
     for (int block = ring.numVars() - 1; block >= 0; block -= R::kBlockSize) { 
       // Sigh. In GCC 4.7 this inner loop (1) is not vectorized because of
@@ -488,7 +631,7 @@ Poly* subtract(const Poly& a, const Poly& b, R& ring) {
   Poly::const_iterator aa = a.begin(), ea = a.end();
   Poly::const_iterator bb = b.begin(), eb = b.end();
 
-  while (aa != ea & bb != eb) {
+  while (aa != ea && bb != eb) {
     Term* a = *aa;
     Term* b = *bb;
     Term t;
@@ -497,15 +640,15 @@ Poly* subtract(const Poly& a, const Poly& b, R& ring) {
       ++aa;
     } else if (ring.gt(*b, *a)) { 
       t = Term(*b);
-      t.coef() = -t.coef();
+      TheField.negate(t.coef());
       ++bb;
     } else {
       t = Term(*a);
-      t.coef() -= b->coef();
+      TheField.subtract(t.coef(), b->coef());
       ++aa;
       ++bb;
     }
-    if (t.coef() != 0) {
+    if (TheField.neq(t.coef(), 0)) {
       result->push(&ring.makeTerm(t));
     }
   }
@@ -515,9 +658,9 @@ Poly* subtract(const Poly& a, const Poly& b, R& ring) {
   for (; bb != eb; ++bb) {
     Term* b = *bb;
     Term t(*b);
-    t.coef() = -b->coef();
-    if (t.coef() != 0)
-      result->push(&ring.makeTerm(t));
+    TheField.negate(t.coef());
+    assert(TheField.neq(t.coef(), 0));
+    result->push(&ring.makeTerm(t));
   }
   return result;
 }
@@ -585,6 +728,10 @@ Poly* reduce(const Poly& f, const PolySet& polys, R& ring) {
   return const_cast<Poly*>(cur);
 }
 
+Galois::Statistic bkUpdate("BKUpdate");
+Galois::Statistic mfUpdate("MFUpdate");
+Galois::Statistic bpUpdate("BPUpdate");
+
 //! Updates basis with h, adds new pairs and marks some previous pairs as useless.
 template<class R1,class R2,class Pushable>
 void update(Poly* h, PolySet& basis, Galois::InsertBag<PolyPair>& pairs, R1& localRing, R2& ring, Pushable& out) {
@@ -594,25 +741,28 @@ void update(Poly* h, PolySet& basis, Galois::InsertBag<PolyPair>& pairs, R1& loc
     PolyPair& p = *ii;
     if (p.useless())
       continue;
-    if (h->head()->divides(*p.lcm, localRing))
+    if (!h->head()->divides(*p.lcm, localRing))
       continue;
     lcm_t.makeLcm(*h->head(), *p.a->head(), localRing);
-    if (!lcm_t.equals(*p.lcm, localRing))
+    if (lcm_t.equals(*p.lcm, localRing))
       continue;
     lcm_t.makeLcm(*h->head(), *p.b->head(), localRing);
-    if (!lcm_t.equals(*p.lcm, localRing))
+    if (lcm_t.equals(*p.lcm, localRing))
       continue;
     p.makeUseless();
+    bkUpdate += 1;
   }
   
   // Successive application of various deletion criteria
   Term& lcm_hi = localRing.makeTerm();
   Term& lcm_hj = localRing.makeTerm();
   for (PolySet::const_iterator ii = basis.begin(), ei = basis.end(); ii != ei; ++ii) {
-#if 1
+
     // Buchberger's Product criterion 
-    if (h->head()->relPrime(*(*ii)->head(), localRing))
+    if (h->head()->relPrime(*(*ii)->head(), localRing)) {
+      bpUpdate += 1;
       continue;
+    }
 
     // Gebauer-Moeller criteria M and F
     lcm_hi.makeLcm(*h->head(), *(*ii)->head(), localRing);
@@ -624,21 +774,24 @@ void update(Poly* h, PolySet& basis, Galois::InsertBag<PolyPair>& pairs, R1& loc
         break;
       }
     }
-#endif
-    //bool condM = false;
+
     if (!condM) {
-      Term& lcm = ring.makeTerm();
-      lcm.makeLcm(*h->head(), *(*ii)->head(), ring);
+      Term& lcm = ring.makeTerm(lcm_hi);
       out.push(&pairs.push(PolyPair(h, *ii, &lcm, ring.rankPair(*h, **ii))));
+    } else {
+      mfUpdate += 1;
     }
   }
 
   basis.push(h);
 }
 
+Galois::Statistic zeroUpdate("ZeroUpdate");
+
 template<class R>
 struct Process {
   typedef typename R::template realloc<Galois::PerIterAllocTy::rebind<char>::other>::other LocalRing;
+
   PolySet& basis;
   Galois::InsertBag<PolyPair>& pairs;
   R& ring;
@@ -646,8 +799,9 @@ struct Process {
   Process(PolySet& _basis, Galois::InsertBag<PolyPair>& _pairs, R& r): basis(_basis), pairs(_pairs), ring(r) { }
 
   void operator()(const PolyPair* p, Galois::UserContext<PolyPair*>& ctx) {
-    if (p->useless())
+    if (p->useless()) {
       return;
+    }
 
     LocalRing localRing(ring.numVars(), ctx.getPerIterAlloc());
 
@@ -657,6 +811,8 @@ struct Process {
     if (!h->empty()) {
       Poly* hh = &ring.makePoly(*h);
       update(hh, basis, pairs, localRing, ring, ctx);
+    } else {
+      zeroUpdate += 1;
     }
   }
 };
@@ -709,7 +865,8 @@ void interReduce(PolySet& polys, R& ring) {
     boost::swap(p, reduced);
     if (p->empty())
       continue;
-    number s = 1 / p->head()->coef();
+    Field::element_type s(p->head()->coef());
+    TheField.inverse(s);
     p->scaleBy(s, ring);
   }
 }
@@ -720,6 +877,8 @@ void buchberger(PolySet& ideal, PolySet& basis, R& ring) {
   Galois::InsertBag<PolyPair*> initial;
 
   for (PolySet::iterator ii = ideal.begin(), ei = ideal.end(); ii != ei; ++ii) {
+    if ((*ii)->empty())
+      continue;
     update(*ii, basis, pairs, ring, ring, initial);
   }
   using namespace GaloisRuntime::WorkList;
@@ -909,26 +1068,29 @@ class Parser: private boost::noncopyable {
     }
   }
 
-  struct RationalVisitor: public boost::static_visitor<number> {
-    number operator()(const fusion::vector<int,int>& x) const {
-      return number(fusion::at_c<0>(x), fusion::at_c<1>(x));
+  struct RationalVisitor: public boost::static_visitor<Field::element_type> {
+    Field::element_type operator()(const fusion::vector<int,int>& x) const {
+      Field::element_type a(fusion::at_c<0>(x));
+      Field::element_type b(fusion::at_c<1>(x));
+      TheField.divide(a, b);
+      return a;
     }
-    number operator()(const int& x) const {
-      return x;
+    Field::element_type operator()(const int& x) const {
+      return Field::element_type(x);
     }
   };
 
-  void parseCoef(const Coef& coef, number& c) {
+  void parseCoef(const Coef& coef, Field::element_type& c) {
     const char* sign = boost::get<char>(&coef.sign);
     bool neg = *sign == '-';
 
-    c = 1;
+    TheField.assign(c, 1);
     if (coef.rational) {
       c = boost::apply_visitor(RationalVisitor(), *coef.rational);
     }
-    c.canonicalize();
+    //c.canonicalize();
     if (neg)
-      c = -c;
+      TheField.negate(c);
   }
 
   void parseMono(const Mono& mono, TheTerm& t) {
@@ -1040,7 +1202,11 @@ void run() {
   ParserTy P;
   P.read(scanner);
   scanner.close();
+
+  P.write(std::cout, P.polys()); // REMOVe
   
+  TheField.init();
+
   Galois::StatTimer T;
   T.start();
   interReduce(P.polys(), P.ring());
@@ -1065,9 +1231,14 @@ void run() {
 
 int main(int argc, char** argv) {
   Galois::StatManager statManager;
+  statManager.push(zeroUpdate);
+  statManager.push(bkUpdate);
+  statManager.push(mfUpdate);
+  statManager.push(bpUpdate);
+
   LonestarStart(argc, argv, name, desc, url);
 
-  for (int i = 0; i < sizeof(powersOfTwo)/sizeof(*powersOfTwo); ++i)
+  for (unsigned i = 0; i < sizeof(powersOfTwo)/sizeof(*powersOfTwo); ++i)
     powersOfTwo[i] = 2 << (i - 1);
 
   switch (monomialOrder) {
