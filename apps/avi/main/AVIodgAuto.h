@@ -84,7 +84,7 @@ protected:
     vertices.clear ();
     vtxPtrs.clear ();
 
-    for (size_t i = 0; i < meshInit.getNumNodes (); ++i) {
+    for (int i = 0; i < meshInit.getNumNodes (); ++i) {
       vertices.push_back (NItem (i));
     }
 

@@ -151,7 +151,7 @@ public:
   inline static void simulate (AVI* avi, MeshInit& meshInit,
         GlobalVec& g, LocalVec& l, bool createSyncFiles);
 
-
+  virtual ~AVIabstractMain() { }
 };
 
 /**
@@ -169,7 +169,6 @@ protected:
   }
 
 public:
-
   virtual void runLoop (MeshInit& meshInit, GlobalVec& g, bool createSyncFiles);
 };
 

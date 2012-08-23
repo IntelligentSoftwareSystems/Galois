@@ -181,7 +181,7 @@ protected:
     graph.copyFromGraph (mgraph);
 #endif
 
-    printf ("Graph created with %ld nodes and %d edges\n", graph.size (), numEdges);
+    printf ("Graph created with %u nodes and %d edges\n", graph.size (), numEdges);
   }
   
   virtual void initRemaining (const MeshInit& meshInit, const GlobalVec& g) {
