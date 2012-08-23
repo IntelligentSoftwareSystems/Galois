@@ -31,6 +31,8 @@
 #include "ll/HWTopo.h"
 #include "ThreadPool.h"
 
+#include <boost/utility.hpp>
+
 namespace GaloisRuntime {
 
 class PerBackend {
@@ -61,7 +63,7 @@ extern PerBackend PPSBackend;
 void initPTS();
 
 template<typename T>
-class PerThreadStorage {
+class PerThreadStorage: private boost::noncopyable {
 protected:
   unsigned offset;
 
@@ -98,7 +100,7 @@ public:
 };
 
 template<typename T>
-class PerPackageStorage {
+class PerPackageStorage: private boost::noncopyable {
 protected:
   unsigned offset;
 

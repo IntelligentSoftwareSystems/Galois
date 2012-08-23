@@ -31,6 +31,10 @@
 #include <cstdlib>
 #include <setjmp.h>
 
+//! Throwing exceptions can be a scalability bottleneck.
+//! Set to zero to use longjmp hack, otherwise make sure that
+//! you use a fixed c++ runtime that improves scalability of
+//! exceptions.
 #define GALOIS_USE_EXCEPTION_HANDLER 1
 
 namespace GaloisRuntime {
@@ -42,10 +46,6 @@ enum ConflictFlag {
 };
 
 #ifdef GALOIS_USE_DET
-#define GALOIS_USE_CONFLICT_LOCK
-#endif
-
-#ifdef GALOIS_USE_DET
 enum PendingFlag {
   NON_DET,
   PENDING,
@@ -55,12 +55,8 @@ enum PendingFlag {
 void setPending(PendingFlag value);
 #endif
 
-#ifdef GALOIS_USE_CONFLICT_LOCK
-void clearConflictLock();
-#else
 //! used to release lock over exception path
 static inline void clearConflictLock() { }
-#endif
 
 class SimpleRuntimeContext;
 
@@ -86,9 +82,12 @@ class SimpleRuntimeContext {
   unsigned long id;
   //! Flag to abort other iterations, used in deterministic execution
   long not_ready;
+  //! User-defined comparison between iterations
+  bool (*comp)(void *, void*);
+  void* comp_data;
 
 public:
-  SimpleRuntimeContext() :locks(0), id(0), not_ready(0) {}
+  SimpleRuntimeContext() :locks(0), id(0), not_ready(0), comp(0), comp_data(0) {}
 
   void start_iteration() {
     assert(!locks);
@@ -101,6 +100,7 @@ public:
 #ifdef GALOIS_USE_DET
   void set_id(unsigned long i) { id = i; }
   bool is_ready() { return !not_ready; }
+  void set_comp_data(void* ptr) { comp_data = ptr; }
 #endif
 };
 
@@ -134,8 +134,8 @@ static inline void acquire(Lockable* C, Galois::MethodFlag m) {
     doAcquire(C);
 }
 
+//! Actually break for_each loop
 void breakLoop();
-
 }
 
 #endif

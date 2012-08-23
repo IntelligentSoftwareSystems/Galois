@@ -34,20 +34,6 @@ __thread jmp_buf GaloisRuntime::hackjmp;
 //! Global thread context for each active thread
 static __thread GaloisRuntime::SimpleRuntimeContext* thread_cnx = 0;
 
-#ifdef GALOIS_USE_CONFLICT_LOCK
-static GaloisRuntime::LL::SimpleLock<true> conflictLock;
-
-void GaloisRuntime::clearConflictLock() {
-  conflictLock.unlock();
-}
-
-static inline void lockConflictLock() {
-  conflictLock.lock();
-}
-#else
-static inline void lockConflictLock() { }
-#endif
-
 #ifdef GALOIS_USE_DET
 static GaloisRuntime::PendingFlag pendingFlag = GaloisRuntime::NON_DET;
 
@@ -58,7 +44,6 @@ void GaloisRuntime::setPending(PendingFlag value) {
 void GaloisRuntime::doCheckWrite() {
   if (pendingFlag == PENDING) {
 #if GALOIS_USE_EXCEPTION_HANDLER
-    lockConflictLock();
     throw GaloisRuntime::REACHED_FAILSAFE;
 #else
     longjmp(hackjmp, GaloisRuntime::REACHED_FAILSAFE);
@@ -107,7 +92,6 @@ unsigned GaloisRuntime::SimpleRuntimeContext::commit_iteration() {
 
 void GaloisRuntime::breakLoop() {
 #if GALOIS_USE_EXCEPTION_HANDLER
-  lockConflictLock();
   throw GaloisRuntime::BREAK;
 #else
   longjmp(hackjmp, GaloisRuntime::BREAK);
@@ -128,18 +112,19 @@ void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
       other = L->Owner.getValue();
       if (other == this)
         return;
-      if (other && other->id < id) {
-        if (pendingFlag == PENDING) {
-          // A lock I should have but can't get
-          not_ready = 1;
-          return; 
-        } else {
+      if (other) { 
+        if ((comp && comp(other->comp_data, comp_data)) || other->id < id) {
+          if (pendingFlag == PENDING) {
+            // A lock I should have but can't get
+            not_ready = 1;
+            return; 
+          } else {
 #if GALOIS_USE_EXCEPTION_HANDLER
-          lockConflictLock();
-          throw GaloisRuntime::CONFLICT;
+            throw GaloisRuntime::CONFLICT;
 #else
-          longjmp(hackjmp, GaloisRuntime::CONFLICT);
+            longjmp(hackjmp, GaloisRuntime::CONFLICT);
 #endif
+          }
         }
       }
       // Allow new locks on new nodes only
@@ -165,7 +150,6 @@ void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
   } else {
     if (L->Owner.getValue() != this) {
 #if GALOIS_USE_EXCEPTION_HANDLER
-      lockConflictLock();
       throw GaloisRuntime::CONFLICT; // Conflict
 #else
       longjmp(hackjmp, GaloisRuntime::CONFLICT);

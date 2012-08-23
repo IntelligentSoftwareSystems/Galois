@@ -590,14 +590,17 @@ class ChunkedMaster : private boost::noncopyable {
     return 0;
   }
 
-  void pushi(const T& val, p* n)  {
-    if (n->next && n->next->push_back(val))
-      return;
+  T* pushi(const T& val, p* n)  {
+    T* retval = 0;
+
+    if (n->next && (retval = n->next->push_back(val)))
+      return retval;
     if (n->next)
       pushChunk(n->next);
     n->next = mkChunk();
-    bool worked = n->next->push_back(val);
-    assert(worked);
+    retval = n->next->push_back(val);
+    assert(retval);
+    return retval;
   }
 
 public:
@@ -620,39 +623,13 @@ public:
       pushChunk(n.next);
     n.next = 0;
   }
-
-  //! Method to peek at next element, unsafe in the presence of concurrent pop()
-  value_type* unsafePeek() {
-    p& n = *data.getLocal();
-    value_type* retval;
-    if (isStack) {
-      if (n.next && (retval = n.next->peek_back()))
-	return retval;
-      if (n.next)
-	delChunk(n.next);
-      n.next = popChunk();
-      if (n.next)
-	return n.next->peek_back();
-      return NULL;
-    } else {
-      if (n.cur && (retval = n.cur->peek_front()))
-	return retval;
-      if (n.cur)
-	delChunk(n.cur);
-      n.cur = popChunk();
-      if (!n.cur) {
-	n.cur = n.next;
-	n.next = 0;
-      }
-      if (n.cur)
-	return n.cur->peek_front();
-      return NULL;
-    }
-  }
   
-  void push(const value_type& val)  {
+  //! Most worklists have void return value for push. This push returns address
+  //! of placed item to facilitate some internal runtime uses. The address is
+  //! generally not safe to use in the presence of concurrent pops.
+  value_type* push(const value_type& val)  {
     p* n = data.getLocal();
-    pushi(val,n);
+    return pushi(val,n);
   }
 
   template<typename Iter>

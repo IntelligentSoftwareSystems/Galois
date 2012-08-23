@@ -54,8 +54,8 @@ class FixedSizeRing :private boost::noncopyable {
     (at(i))->~T();
   }
 
-  void create(unsigned i, const T& val) {
-    new (at(i)) T(val);
+  T* create(unsigned i, const T& val) {
+    return new (at(i)) T(val);
   }
 
 public:
@@ -90,20 +90,18 @@ public:
     start = 0;
   }
 
-  bool push_front(const value_type& val) {
-    if (full()) return false;
+  value_type* push_front(const value_type& val) {
+    if (full()) return 0;
     start = (start + chunksize - 1) % chunksize;
     ++count;
-    create(start, val);
-    return true;
+    return create(start, val);
   }
 
-  bool push_back(const value_type& val) {
-    if (full()) return false;
+  value_type* push_back(const value_type& val) {
+    if (full()) return 0;
     int end = (start + count) % chunksize;
     ++count;
-    create(end, val);
-    return true;
+    return create(end, val);
   }
 
   template<typename Iter>
@@ -118,13 +116,6 @@ public:
     return b;
   }
 
-  value_type* peek_front() {
-    if (!empty()) {
-      return at(start);
-    }
-    return NULL;
-  }
-
   boost::optional<value_type> pop_front() {
     boost::optional<value_type> retval;
     if (!empty()) {
@@ -136,14 +127,6 @@ public:
     return retval;
   }
   
-  value_type* peek_back() {
-    if (!empty()) {
-      int end = (start + count - 1) % chunksize;
-      return at(end);
-    }
-    return NULL;
-  }
-
   boost::optional<value_type> pop_back() {
     boost::optional<value_type> retval;
     if (!empty()) {

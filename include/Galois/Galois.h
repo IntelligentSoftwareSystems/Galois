@@ -32,6 +32,7 @@
 #include "Galois/Runtime/ParallelWorkInline.h"
 #include "Galois/Runtime/ParaMeter.h"
 #include "Galois/Runtime/Deterministic.h"
+#include "Galois/Runtime/Ordered.h"
 #endif
 
 #include "boost/iterator/transform_iterator.hpp"
@@ -291,7 +292,7 @@ struct parsort {
 };
 
 template <class RandomAccessIterator>
-void sort ( RandomAccessIterator first, RandomAccessIterator last ) {
+void sort(RandomAccessIterator first, RandomAccessIterator last) {
   if (std::distance(first,last) <= 128) {
     std::sort(first,last);
   } else {
