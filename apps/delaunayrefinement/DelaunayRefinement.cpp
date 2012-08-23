@@ -178,12 +178,12 @@ int main(int argc, char** argv) {
     case nondet: 
       Galois::for_each_local<CA>(wl, Process<>()); break;
     case detBase:
-      Galois::for_each_det<false>(wl.begin(), wl.end(), Process<>()); break;
+      Galois::for_each_det(wl.begin(), wl.end(), Process<>()); break;
     case detPrefix:
-      Galois::for_each_det<false>(wl.begin(), wl.end(), Process<detPrefix>(), Process<>());
+      Galois::for_each_det(wl.begin(), wl.end(), Process<detPrefix>(), Process<>());
       break;
     case detDisjoint:
-      Galois::for_each_det<true>(wl.begin(), wl.end(), Process<detDisjoint>()); break;
+      Galois::for_each_det(wl.begin(), wl.end(), Process<detDisjoint>()); break;
     default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
   }
 #else

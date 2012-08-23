@@ -405,10 +405,10 @@ void globalRelabel(IncomingWL& incoming) {
       Galois::for_each<WL>(app.sink, UpdateHeights<nondet>(), "UpdateHeights");
       break;
     case detBase:
-      Galois::for_each_det<false>(app.sink, UpdateHeights<detBase>(), "UpdateHeights");
+      Galois::for_each_det(app.sink, UpdateHeights<detBase>(), "UpdateHeights");
       break;
     case detDisjoint:
-      Galois::for_each_det<true>(app.sink, UpdateHeights<detDisjoint>(), "UpdateHeights");
+      Galois::for_each_det(app.sink, UpdateHeights<detDisjoint>(), "UpdateHeights");
       break;
     default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
   }
@@ -728,10 +728,10 @@ void run() {
         Galois::for_each(initial.begin(), initial.end(), Process<nondet>(counter), "Discharge");
         break;
       case detBase:
-        Galois::for_each_det<false>(initial.begin(), initial.end(), Process<detBase>(counter), "Discharge");
+        Galois::for_each_det(initial.begin(), initial.end(), Process<detBase>(counter), "Discharge");
         break;
       case detDisjoint:
-        Galois::for_each_det<true>(initial.begin(), initial.end(), Process<detDisjoint>(counter), "Discharge");
+        Galois::for_each_det(initial.begin(), initial.end(), Process<detDisjoint>(counter), "Discharge");
         break;
       default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
     }

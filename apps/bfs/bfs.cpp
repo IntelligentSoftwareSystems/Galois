@@ -224,8 +224,6 @@ static bool verify(GNode source) {
     return false;
   }
   
-  size_t id = 0;
-  
   bool okay = Galois::find_if(graph.begin(), graph.end(), not_consistent()) == graph.end()
     && Galois::find_if(graph.begin(), graph.end(), not_visited()) == graph.end();
 
@@ -521,7 +519,6 @@ struct GaloisNoLockAlgo {
     typedef ChunkedFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk,true> OBIM;
 
-    UpdateRequest one[1] = { UpdateRequest(source, 0) };
 #ifdef GALOIS_USE_EXP
     Exp::PriAuto<64, UpdateRequestIndexer, OBIM, std::less<UpdateRequest>, std::greater<UpdateRequest> >::for_each(UpdateRequest(source, 0), *this);
 #else
@@ -800,9 +797,9 @@ struct GaloisDetBarrier {
       case nondet: 
         Galois::for_each<WL>(initial.begin(), initial.end(), *this); break;
       case detBase:
-        Galois::for_each_det<false>(initial.begin(), initial.end(), *this); break;
+        Galois::for_each_det(initial.begin(), initial.end(), *this); break;
       case detDisjoint:
-        Galois::for_each_det<true>(initial.begin(), initial.end(), *this); break;
+        Galois::for_each_det(initial.begin(), initial.end(), *this); break;
       default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
     }
   }
@@ -829,7 +826,7 @@ struct GaloisDetBarrier {
   }
 
   void modify(const ItemTy& item, Galois::UserContext<ItemTy>& ctx, typename LocalState::Pending* ppending) const {
-    GNode n = item.first;
+    //GNode n = item.first;
 
     unsigned int newDist = item.second;
     bool useCas = false;

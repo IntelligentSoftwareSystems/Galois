@@ -463,9 +463,9 @@ struct GenerateRounds {
 
     Point* ptr = &basePoints.push(p);
     int r = 0;
-    for (int i = 0; i < log2; ++i) {
+    for (size_t i = 0; i < log2; ++i) {
       unsigned mask = (1 << (i + 1)) - 1;
-      if ((c & mask) == (1 << i)) {
+      if ((c & mask) == (1U << i)) {
         r = i;
         break;
       }
@@ -622,8 +622,6 @@ static void writeMesh(const std::string& filename) {
   pout.close();
 }
 
-static ptrdiff_t myrandom(ptrdiff_t i) { return rand() % i; }
-
 static void generateMesh() {
   typedef GaloisRuntime::WorkList::dChunkedLIFO<4*1024> WL;
   typedef GaloisRuntime::WorkList::ChunkedAdaptor<false,32> CA;
@@ -643,12 +641,12 @@ static void generateMesh() {
       case nondet: 
         Galois::for_each<WL>(pptrs.begin(), pptrs.end(), Process<>(&tree)); break;
       case detBase:
-        Galois::for_each_det<false>(pptrs.begin(), pptrs.end(), Process<>(&tree)); break;
+        Galois::for_each_det(pptrs.begin(), pptrs.end(), Process<>(&tree)); break;
       case detPrefix:
-        Galois::for_each_det<false>(pptrs.begin(), pptrs.end(), Process<detPrefix>(&tree), Process<>(&tree));
+        Galois::for_each_det(pptrs.begin(), pptrs.end(), Process<detPrefix>(&tree), Process<>(&tree));
         break;
       case detDisjoint:
-        Galois::for_each_det<true>(pptrs.begin(), pptrs.end(), Process<detDisjoint>(&tree)); break;
+        Galois::for_each_det(pptrs.begin(), pptrs.end(), Process<detDisjoint>(&tree)); break;
       default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
     }
 #else

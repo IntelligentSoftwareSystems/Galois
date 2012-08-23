@@ -185,12 +185,12 @@ struct GaloisAlgo {
       case nondet: 
         Galois::for_each<WL>(graph.begin(), graph.end(), Process<>()); break;
       case detBase:
-        Galois::for_each_det<false>(graph.begin(), graph.end(), Process<>()); break;
+        Galois::for_each_det(graph.begin(), graph.end(), Process<>()); break;
       case detPrefix:
-        Galois::for_each_det<false>(graph.begin(), graph.end(), Process<detPrefix>(), Process<>());
+        Galois::for_each_det(graph.begin(), graph.end(), Process<detPrefix>(), Process<>());
         break;
       case detDisjoint:
-        Galois::for_each_det<true>(graph.begin(), graph.end(), Process<detDisjoint>()); break;
+        Galois::for_each_det(graph.begin(), graph.end(), Process<detDisjoint>()); break;
       default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
     }
 #else
