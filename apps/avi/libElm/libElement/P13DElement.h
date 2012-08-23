@@ -119,10 +119,6 @@ public:
     return new P13DTrace<NF> (*this);
   }
 
-protected:
-  //! canonical numbering of the nodes. Used to construct face edges
-  static const size_t FaceNodes[];
-
 private:
   //! checks if arguments are consistend with 3D element
   //! @param flabel 
@@ -133,8 +129,6 @@ private:
 
 };
 
-template<size_t NF>
-const size_t P13DTrace<NF>::FaceNodes[] = { 2, 1, 0, 2, 0, 3, 2, 3, 1, 0, 1, 3 };
 // Implementation of class P13DTrace:
 
 template<size_t NF>
@@ -145,43 +139,46 @@ P13DTrace<NF>::P13DTrace (const P13DElement<NF> &BaseElement,
   checkArgs (FaceName, Type);
 
   const ElementGeometry& tetGeom = Element::getGeometry ();
+  assert (dynamic_cast<const Tetrahedron*> (&tetGeom) != NULL);
 
-  Triangle<3> FaceGeom (tetGeom.getConnectivity ()[FaceNodes[FaceName * 3 + 0]],
-      tetGeom.getConnectivity ()[FaceNodes[FaceName * 3 + 1]],
-      tetGeom.getConnectivity ()[FaceNodes[FaceName * 3 + 2]]);
+  ElementGeometry* faceGeom = tetGeom.getFaceGeometry(FaceName);
+  assert (dynamic_cast<Triangle<3>* > (faceGeom) != NULL);
+
 
   if (Type == P1nDTrace<NF>::ThreeDofs) {
-    ShapesP13D::Faces ModelShape (&FaceGeom);
+    ShapesP13D::Faces ModelShape (*faceGeom);
     Element_::addBasisFunctions (ModelShape);
   } else {
     //Type == FourDofs
     switch (FaceName) {
       case P1nDTrace<NF>::FaceOne: {
-        ShapesP13D::FaceOne ModelShape(FaceGeom);
+        ShapesP13D::FaceOne ModelShape(*faceGeom);
         Element_::addBasisFunctions(ModelShape);
         break;
       }
 
       case P1nDTrace<NF>::FaceTwo: {
-        ShapesP13D::FaceTwo ModelShape(FaceGeom);
+        ShapesP13D::FaceTwo ModelShape(*faceGeom);
         Element_::addBasisFunctions(ModelShape);
         break;
       }
 
       case P1nDTrace<NF>::FaceThree: {
-        ShapesP13D::FaceThree ModelShape(FaceGeom);
+        ShapesP13D::FaceThree ModelShape(*faceGeom);
         Element_::addBasisFunctions(ModelShape);
         break;
       }
 
       case P1nDTrace<NF>::FaceFour: {
-        ShapesP13D::FaceFour ModelShape(FaceGeom);
+        ShapesP13D::FaceFour ModelShape(*faceGeom);
         Element_::addBasisFunctions(ModelShape);
         break;
       }
 
     }
   }
+
+  delete faceGeom; faceGeom = NULL;
 }
 
 // Class for ElementBoundaryTraces:
@@ -240,8 +237,7 @@ size_t P13DElementBoundaryTraces<NF>::dofMap (size_t FaceIndex, size_t field, si
     val = dof;
   } else { // Three dofs per face.
   
-    // size_t FaceNodes[] = { 2, 1, 0, 2, 0, 3, 2, 3, 1, 0, 1, 3 };
-    const size_t* FaceNodes = P13DTrace<NF>::FaceNodes;
+    const size_t* FaceNodes = Tetrahedron::FaceNodes;
     size_t facenum = ElementBoundaryTraces::getTraceFaceIds ()[FaceIndex];
     val = FaceNodes[3 * facenum + dof];
   }

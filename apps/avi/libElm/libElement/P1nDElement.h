@@ -83,7 +83,7 @@ public:
   //! When providing a FaceLabel as an argument there is automatic
   //! control of its range
   enum FaceLabel {
-    FaceOne, FaceTwo, FaceThree, FaceFour
+    FaceOne=0, FaceTwo=1, FaceThree=2, FaceFour=3
   };
 
   //! TwoDofs indicates Segment<2> boundary elements, with two dofs per field \n

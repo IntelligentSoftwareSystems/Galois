@@ -61,7 +61,7 @@
 
 class Tetrahedron: public AbstractGeom<TET_SPD>
 {
-private:
+public:
   static const double ParamCoord[]; 
   static const size_t FaceNodes[];
 
@@ -229,7 +229,7 @@ public:
   //! @param e: face number for which the normal is desired
   //! @param vNormal: output of the three Cartesian components of the normal vector
   virtual void computeNormal (size_t e, std::vector<double>& vNormal) const {
-    const size_t sd = getSpatialDimension();
+    const size_t sd = AbstractGeom<TET_SPD>::SP_DIM;
 
     size_t n0, n1, n2;   // Local node numbers of face 'e'
 

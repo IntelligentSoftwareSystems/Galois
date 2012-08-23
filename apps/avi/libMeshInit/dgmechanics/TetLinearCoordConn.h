@@ -40,7 +40,7 @@ struct TetLinearTraits {
 class TetLinearCoordConn
 : public AbstractCoordConn <TetLinearTraits::SPD, TetLinearTraits::NODES_PER_ELEM, TetLinearTraits::TOPO> {
   public:
-    static const int NUM_EDGES = TetLinearTraits::NUM_EDGES;
+    static const size_t NUM_EDGES = TetLinearTraits::NUM_EDGES;
 
   protected:
     /**
@@ -67,17 +67,17 @@ class TetLinearCoordConn
      *
      */
 
-    void getEdgeNeighborList (std::vector<std::vector<std::vector<int> > > &neighbors) const {
+    void getEdgeNeighborList (std::vector<std::vector<std::vector<size_t> > > &neighbors) const {
 
-      unsigned int iElements = getNumElements ();
+      size_t iElements = getNumElements ();
 
       neighbors.clear();
       neighbors.resize(iElements);
 
       std::vector<edgestruct> edges;
 
-      int V1[] = { 0, 1, 0, 2, 0, 1 };
-      int V2[] = { 1, 2, 2, 3, 3, 3 };
+      size_t V1[] = { 0, 1, 0, 2, 0, 1 };
+      size_t V2[] = { 1, 2, 2, 3, 3, 3 };
 
       // the 4 nodes of a tet are numbered 0..3
       // edges are 0-1, 0-2, 0-3, 1-2, 1-3, 2-3
@@ -86,12 +86,12 @@ class TetLinearCoordConn
       // sorted.
 
       // Creating a list of all possible edges.
-      for (unsigned int e = 0; e < iElements; e++) {
+      for (size_t e = 0; e < iElements; e++) {
         neighbors[e].resize(NUM_EDGES);
 
-        const long unsigned int econn[] = { connectivity[e * 4 + 0], connectivity[e * 4 + 1], connectivity[e * 4 + 2], connectivity[e * 4 + 3] };
+        const size_t econn[] = { connectivity[e * 4 + 0], connectivity[e * 4 + 1], connectivity[e * 4 + 2], connectivity[e * 4 + 3] };
 
-        for (int edgenum = 0; edgenum < NUM_EDGES; edgenum++) {
+        for (size_t edgenum = 0; edgenum < NUM_EDGES; edgenum++) {
           GlobalNodalIndex node0;
           GlobalNodalIndex node1;
 
@@ -125,8 +125,8 @@ class TetLinearCoordConn
         }
 
         if (repedges.size() > 1) { // Shared edgeId.
-          for (unsigned int p = 0; p < repedges.size(); p++) {
-            for (unsigned int q = 0; q < repedges.size(); q++) {
+          for (size_t p = 0; p < repedges.size(); p++) {
+            for (size_t q = 0; q < repedges.size(); q++) {
               if (p != q) {
                 neighbors[repedges[p].elemId][repedges[p].edgeId]. push_back(repedges[q].elemId);
 
@@ -163,24 +163,30 @@ class TetLinearCoordConn
      */
     virtual void subdivide () {
 
-      int sd = getSpatialDim();
-      int eNodes = getNodesPerElem(); // Number of nodes per element.
+      size_t sd = getSpatialDim();
+      size_t eNodes = getNodesPerElem(); // Number of nodes per element.
 
-      unsigned int iElements = getNumElements(); // Number of elements.
-      unsigned int iNodes = getNumNodes();
+      size_t iElements = getNumElements(); // Number of elements.
+      size_t iNodes = getNumNodes();
 
-      std::vector<std::vector<std::vector<int> > > neighbors;
+      std::vector<std::vector<std::vector<size_t> > > neighbors;
       getEdgeNeighborList(neighbors);
 
       // Connectivity for mid-points of each edgeId for each element.
-      int midconn[iElements][NUM_EDGES];
-      int count = iNodes;
+      // size_t midconn[iElements][NUM_EDGES];
 
-      for (unsigned int e = 0; e < iElements; e++) {
-        for (int f = 0; f < NUM_EDGES; f++) {
+      std::vector<std::vector<size_t> > midconn (iElements);
+      for (size_t i = 0; i < midconn.size (); ++i) {
+        midconn[i].resize (NUM_EDGES);
+      }
+
+      size_t count = iNodes;
+
+      for (size_t e = 0; e < iElements; e++) {
+        for (size_t f = 0; f < NUM_EDGES; f++) {
 
           // Number of elements sharing edgeId 'f' of element 'e'.
-          int nNeighbors = neighbors[e][f].size() / 2;
+          size_t nNeighbors = neighbors[e][f].size() / 2;
 
           if (nNeighbors == 0) { // Free edgeId.
 
@@ -191,21 +197,21 @@ class TetLinearCoordConn
 
           } else { // Shared edgeId
             // Find the least element neighbor number.
-            int minElem = e;
-            for (int p = 0; p < nNeighbors; p++) {
+            size_t minElem = e;
+            for (size_t p = 0; p < nNeighbors; p++) {
               if (minElem > neighbors[e][f][2 * p]) {
                 minElem = neighbors[e][f][2 * p];
               }
             }
 
-            if (int(e) == minElem) { // Allot only once for a shared edgeId.
+            if (e == minElem) { // Allot only once for a shared edgeId.
               // for 0-based node numbering we increment 'count' afterwards
               // count++;
               midconn[e][f] = count;
 
-              for (int p = 0; p < nNeighbors; p++) {
-                int nelem = neighbors[e][f][2 * p];
-                int nedge = neighbors[e][f][2 * p + 1];
+              for (size_t p = 0; p < nNeighbors; p++) {
+                size_t nelem = neighbors[e][f][2 * p];
+                size_t nedge = neighbors[e][f][2 * p + 1];
                 midconn[nelem][nedge] = count;
               }
               // increment 'count' now
@@ -218,86 +224,60 @@ class TetLinearCoordConn
       // Creating new coordinates and connectivity arrays:
       // Each tet is subdivided into 8.
       std::vector<double> newCoord(count * sd);
-      std::vector<int> newConn;
+      std::vector<size_t> newConn;
 
-      for (unsigned int i = 0; i < coordinates.size(); i++) {
+      for (size_t i = 0; i < coordinates.size(); i++) {
         newCoord[i] = coordinates[i];
       }
 
       // Coordinates for midside nodes:
-      int V1[] = { 0, 1, 0, 2, 0, 1 };
-      int V2[] = { 1, 2, 2, 3, 3, 3 };
-      for (unsigned int e = 0; e < iElements; e++)
-        for (int f = 0; f < NUM_EDGES; f++) {
+      size_t V1[] = { 0, 1, 0, 2, 0, 1 };
+      size_t V2[] = { 1, 2, 2, 3, 3, 3 };
+      for (size_t e = 0; e < iElements; e++)
+        for (size_t f = 0; f < NUM_EDGES; f++) {
           // for 0-based node numbering, we don't need to subtract 1 from node ids in connectivity
-          // int v1 = connectivity[e * eNodes + V1[f]] - 1;
-          // int v2 = connectivity[e * eNodes + V2[f]] - 1;
-          // for (int k = 0; k < sd; k++)
+          // size_t v1 = connectivity[e * eNodes + V1[f]] - 1;
+          // size_t v2 = connectivity[e * eNodes + V2[f]] - 1;
+          // for (size_t k = 0; k < sd; k++)
           // newCoord[(midconn[e][f] - 1) * sd + k] = 0.5 * (coordinates[v1 * sd + k] + coordinates[v2 * sd + k]);
-          int v1 = connectivity[e * eNodes + V1[f]];
-          int v2 = connectivity[e * eNodes + V2[f]];
-          for (int k = 0; k < sd; k++) {
+          size_t v1 = connectivity[e * eNodes + V1[f]];
+          size_t v2 = connectivity[e * eNodes + V2[f]];
+          for (size_t k = 0; k < sd; k++) {
             newCoord[midconn[e][f] * sd + k] = 0.5 * (coordinates[v1 * sd + k] + coordinates[v2 * sd + k]);
           }
         }
 
-      for (unsigned int e = 0; e < iElements; e++) {
-        // tet 1
-        int t1conn[] = { (int) connectivity[e * eNodes + 0], (int) midconn[e][0], (int) midconn[e][2], (int) midconn[e][4] };
-        for (int i = 0; i < eNodes; i++) {
-          newConn.push_back(t1conn[i]);
-        }
+      for (size_t e = 0; e < iElements; e++) {
+        // tet 1-8
+        // four at conrners
+        size_t t1conn[] = { connectivity[e * eNodes + 0], midconn[e][0], midconn[e][2], midconn[e][4] };
+        size_t t2conn[] = {  midconn[e][0], connectivity[e * eNodes + 1], midconn[e][1], midconn[e][5] };
+        size_t t3conn[] = { midconn[e][2], midconn[e][1], connectivity[e * eNodes + 2], midconn[e][3] };
+        size_t t4conn[] = { midconn[e][4], midconn[e][5], midconn[e][3], connectivity[e * eNodes + 3] };
 
-        // tet 2
-        int t2conn[] = { (int) midconn[e][0], (int) connectivity[e * eNodes + 1], (int) midconn[e][1], (int) midconn[e][5] };
-        for (int i = 0; i < eNodes; i++) {
-          newConn.push_back(t2conn[i]);
-        }
+        // four in the middle
+        size_t t5conn[] = { midconn[e][0], midconn[e][3], midconn[e][4], midconn[e][5] };
+        size_t t6conn[] = { midconn[e][0], midconn[e][3], midconn[e][5], midconn[e][1] };
+        size_t t7conn[] = { midconn[e][0], midconn[e][3], midconn[e][1], midconn[e][2] };
+        size_t t8conn[] = { midconn[e][0], midconn[e][3], midconn[e][2], midconn[e][4] };
 
-        // tet3
-        int t3conn[] = { (int) midconn[e][2], (int) midconn[e][1], (int) connectivity[e * eNodes + 2], (int) midconn[e][3] };
-        for (int i = 0; i < eNodes; i++) {
-          newConn.push_back(t3conn[i]);
-        }
+        newConn.insert (newConn.end (), &t1conn[0], &t1conn[eNodes]);
+        newConn.insert (newConn.end (), &t2conn[0], &t2conn[eNodes]);
+        newConn.insert (newConn.end (), &t3conn[0], &t3conn[eNodes]);
+        newConn.insert (newConn.end (), &t4conn[0], &t4conn[eNodes]);
+        newConn.insert (newConn.end (), &t5conn[0], &t5conn[eNodes]);
+        newConn.insert (newConn.end (), &t6conn[0], &t6conn[eNodes]);
+        newConn.insert (newConn.end (), &t7conn[0], &t7conn[eNodes]);
+        newConn.insert (newConn.end (), &t8conn[0], &t8conn[eNodes]);
 
-        // tet4
-        int t4conn[] = { (int) midconn[e][4], (int) midconn[e][5], (int) midconn[e][3], (int) connectivity[e * eNodes + 3] };
-
-        for (int i = 0; i < eNodes; i++) {
-          newConn.push_back(t4conn[i]);
-        }
-
-        // tet5
-        int t5conn[] = { midconn[e][0], midconn[e][3], midconn[e][4], midconn[e][5] };
-        for (int i = 0; i < eNodes; i++) {
-          newConn.push_back(t5conn[i]);
-        }
-
-        // tet6
-        int t6conn[] = { midconn[e][0], midconn[e][3], midconn[e][5], midconn[e][1] };
-        for (int i = 0; i < eNodes; i++) {
-          newConn.push_back(t6conn[i]);
-        }
-
-        // tet 7
-        int t7conn[] = { midconn[e][0], midconn[e][3], midconn[e][1], midconn[e][2] };
-        for (int i = 0; i < eNodes; i++) {
-          newConn.push_back(t7conn[i]);
-        }
-
-        // tet 8
-        int t8conn[] = { midconn[e][0], midconn[e][3], midconn[e][2], midconn[e][4] };
-        for (int i = 0; i < eNodes; i++) {
-          newConn.push_back(t8conn[i]);
-        }
       }
       coordinates.clear();
       connectivity.clear();
       coordinates.assign(newCoord.begin(), newCoord.end());
       connectivity.assign(newConn.begin(), newConn.end());
 
-      // nodes = int(coordinates.size() / 3);
-      // elements = int(connectivity.size() / 4);
+      // nodes = size_t(coordinates.size() / 3);
+      // elements = size_t(connectivity.size() / 4);
     }
 };
 

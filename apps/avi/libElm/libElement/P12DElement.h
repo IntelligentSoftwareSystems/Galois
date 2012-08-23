@@ -130,53 +130,39 @@ P12DTrace<NF>::P12DTrace (const P12DElement<NF> & BaseElement,
   checkArgs (FaceName, Type);
 
   const ElementGeometry& TriGeom = Element::getGeometry ();
-  if (Type == P1nDTrace<NF>::TwoDofs)
-    switch (FaceName) {
-      case P1nDTrace<NF>::FaceOne: {
-        Segment<2> FaceGeom (TriGeom.getConnectivity ()[0], TriGeom.getConnectivity ()[1]);
-        ShapesP12D::Faces ModelShape (&FaceGeom);
-        Element_::addBasisFunctions (ModelShape);
-        break;
-      }
+  assert (dynamic_cast<const Triangle<2>* > (&TriGeom) != NULL);
 
-      case P1nDTrace<NF>::FaceTwo: {
-        Segment<2> FaceGeom (TriGeom.getConnectivity ()[1], TriGeom.getConnectivity ()[2]);
-        ShapesP12D::Faces ModelShape (&FaceGeom);
-        Element_::addBasisFunctions (ModelShape);
-        break;
-      }
+  ElementGeometry* faceGeom = TriGeom.getFaceGeometry(FaceName);
+  assert (dynamic_cast<Segment<2>* > (faceGeom) != NULL);
 
-      case P1nDTrace<NF>::FaceThree: {
-        Segment<2> FaceGeom (TriGeom.getConnectivity ()[2], TriGeom.getConnectivity ()[0]);
-        ShapesP12D::Faces ModelShape (&FaceGeom);
-        Element_::addBasisFunctions (ModelShape);
-        break;
-      }
-    }
-  else
+  if (Type == P1nDTrace<NF>::TwoDofs) {
+    ShapesP12D::Faces modelShape (*faceGeom);
+    Element_::addBasisFunctions (modelShape);
+
+  } else {
     // Type==ThreeDofs
     switch (FaceName) {
       case P1nDTrace<NF>::FaceOne: {
-        Segment<2> FaceGeom (TriGeom.getConnectivity ()[0], TriGeom.getConnectivity ()[1]);
-        ShapesP12D::FaceOne ModelShape (&FaceGeom);
+        ShapesP12D::FaceOne ModelShape (*faceGeom);
         Element_::addBasisFunctions (ModelShape);
         break;
       }
 
       case P1nDTrace<NF>::FaceTwo: {
-        Segment<2> FaceGeom (TriGeom.getConnectivity ()[1], TriGeom.getConnectivity ()[2]);
-        ShapesP12D::FaceTwo ModelShape (&FaceGeom);
+        ShapesP12D::FaceTwo ModelShape (*faceGeom);
         Element_::addBasisFunctions (ModelShape);
         break;
       }
 
       case P1nDTrace<NF>::FaceThree: {
-        Segment<2> FaceGeom (TriGeom.getConnectivity ()[2], TriGeom.getConnectivity ()[0]);
-        ShapesP12D::FaceThree ModelShape (&FaceGeom);
+        ShapesP12D::FaceThree ModelShape (*faceGeom);
         Element_::addBasisFunctions (ModelShape);
         break;
       }
     }
+  }
+
+  delete faceGeom; faceGeom = NULL;
 }
 
 /**

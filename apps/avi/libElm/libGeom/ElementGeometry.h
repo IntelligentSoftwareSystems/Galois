@@ -68,7 +68,7 @@ class ElementGeometry
   virtual size_t getNumVertices() const = 0; 
 
   //!@return  ref to Vertices of the polytope. 
-  virtual const std::vector <GlobalNodalIndex> &getConnectivity() const = 0; 
+  virtual const std::vector <GlobalNodalIndex>& getConnectivity() const = 0;
 
   //! @return Name of type of polytope. 
   virtual const std::string getPolytopeName() const = 0; 
@@ -159,6 +159,7 @@ private:
   std::vector<GlobalNodalIndex> connectivity;
 
 protected:
+  static const size_t SP_DIM = SPD;
   /**
    * @return ref to the vector that contains global coordinates for all mesh nodes
    */
@@ -182,7 +183,7 @@ public:
   }
 
   virtual  size_t getSpatialDimension () const {
-    return SPD;
+    return SP_DIM;
   }
 
   virtual const std::vector<GlobalNodalIndex>& getConnectivity () const {
