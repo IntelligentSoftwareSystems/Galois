@@ -343,7 +343,6 @@ static void makeGraph(const char* input) {
 #if BORUVKA_DEBUG
    std::cout<<"Number of edges "<<numEdges<<std::endl;
 #endif
-   int id = 0;
    nodes.resize(in_graph.size());
    for (Map::iterator i = edges.begin(), ei = edges.end(); i != ei; ++i) {
       Node n(nodeID);
@@ -353,7 +352,7 @@ static void makeGraph(const char* input) {
       nodeID++;
    }
 
-   id = 0;
+   int id = 0;
    numEdges = 0;
    EdgeDataType edge_sum = 0;
    int numDups = 0;
@@ -423,7 +422,7 @@ static void readWeightedRMAT(const char* input) {
    }
 
    std::vector<GNode> nodes;
-   int id = 0;
+
    nodes.resize(max_id+1);
    for (NodeDataType l = 0; l < max_id+1 ; ++l) {
       Node n(nodeID);
@@ -431,7 +430,7 @@ static void readWeightedRMAT(const char* input) {
       nodes[nodeID] = node;
       nodeID++;
    }
-   id = 0;
+
    long numEdges = 0;
    EdgeDataType edge_sum = 0;
    int numDups = 0;
