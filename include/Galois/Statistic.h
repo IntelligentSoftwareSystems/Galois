@@ -30,19 +30,32 @@
 
 #include "boost/utility.hpp"
 
+#include <list>
+
 namespace Galois {
 
 class Statistic {
   std::string statname;
   std::string loopname;
   GaloisRuntime::PerThreadStorage<unsigned long> val;
+  bool valid;
+
 public:
-  Statistic(const std::string& _sn, unsigned long v, const std::string& _ln = "(NULL)"): statname(_sn), loopname(_ln) {
+  Statistic(const std::string& _sn, unsigned long v, const std::string& _ln = "(NULL)"): statname(_sn), loopname(_ln), valid(true) {
     *val.getLocal() = v;
   }
-  Statistic(const std::string& _sn, const std::string& _ln = "(NULL)"): statname(_sn), loopname(_ln) { }
+  
+  Statistic(const std::string& _sn, const std::string& _ln = "(NULL)"): statname(_sn), loopname(_ln), valid(true) { }
+
   ~Statistic() {
-    GaloisRuntime::reportStat(this);
+    report();
+  }
+
+  //! Adds stat to stat pool, usually deconsructor or StatManager calls this for you.
+  void report() {
+    if (valid)
+      GaloisRuntime::reportStat(this);
+    valid = false;
   }
 
   unsigned long getValue(unsigned tid) {
@@ -65,10 +78,19 @@ public:
 
 //! Controls lifetime of stats. Users usually instantiate an instance in main.
 class StatManager: private boost::noncopyable {
+  std::list<Statistic*> stats;
 
 public:
   ~StatManager() {
+    for (std::list<Statistic*>::iterator ii = stats.begin(), ei = stats.end(); ii != ei; ++ii) {
+      (*ii)->report();
+    }
     GaloisRuntime::printStats();
+  }
+
+  //! Statistics that are not lexically scoped must be added explicitly
+  void push(Statistic& s) {
+    stats.push_back(&s);
   }
 };
 
