@@ -615,7 +615,7 @@ struct MatchingMF {
   bool discharge(G& g, const GraphNode& src, Galois::UserContext<GraphNode>& ctx,
       const GraphNode& source, const GraphNode& sink, unsigned numNodes) {
     node_type& node = g.getData(src, flag);
-    unsigned prevHeight = node.height;
+    //unsigned prevHeight = node.height;
     bool relabeled = false;
 
     if (node.excess == 0) {
@@ -661,7 +661,7 @@ struct MatchingMF {
       relabel(g, src, numNodes);
       relabeled = true;
 
-      prevHeight = node.height;
+      //prevHeight = node.height;
     }
 
     return relabeled;
