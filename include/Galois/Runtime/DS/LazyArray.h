@@ -83,8 +83,8 @@ public:
   bool empty() const { return _Size == 0; }
 
   //element access:
-  reference operator[](size_type __n) { return get(__n); }
-  const_reference operator[](size_type __n) const { return get(__n); }
+  reference operator[](size_type __n) { return *get(__n); }
+  const_reference operator[](size_type __n) const { return *get(__n); }
   reference at(size_type __n) {
     if (__n >= _Size)
       throw std::out_of_range("lazyArray::at");
