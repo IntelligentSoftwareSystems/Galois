@@ -34,7 +34,6 @@ namespace GaloisRuntime {
 namespace LL {
 
 extern __thread unsigned TID;
-extern unsigned nextID;
 
 //Get this thread's id.
 static inline unsigned getTID() {
