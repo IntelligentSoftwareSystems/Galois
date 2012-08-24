@@ -194,12 +194,11 @@ class FirstGraph : private boost::noncopyable {
     
     typedef typename EdgesTy::iterator iterator;
     
-    unsigned node;
     EdgesTy edges;
     NodeTy data;
     bool active;
     
-    gNode(const NodeTy& d, unsigned n) :node(n), data(d), active(false) { }
+    gNode(const NodeTy& d) :data(d), active(false) { }
     gNode() :active(false) { }
     
     iterator begin() { return edges.begin(); }
@@ -263,7 +262,7 @@ public:
    * Creates a new node holding the indicated data.
    */
   GraphNode createNode(const NodeTy& nd) {
-    gNode* N = &(nodes.push(gNode(nd, GaloisRuntime::LL::getTID())));
+    gNode* N = &(nodes.push(gNode(nd)));
     N->active = false;
     return GraphNode(N);
   }
@@ -494,14 +493,6 @@ public:
 #endif
 };
 
-}
-}
-namespace GaloisRuntime {
-namespace WorkList {
-template<typename T>
-unsigned getID(const T& v) {
-  return v->data.id;
-}
 }
 }
 #endif
