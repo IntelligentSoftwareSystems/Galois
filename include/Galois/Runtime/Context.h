@@ -128,6 +128,7 @@ static inline bool shouldLock(Galois::MethodFlag g) {
   abort();
 }
 
+//! actual locking function.  Will always lock.
 void doAcquire(Lockable* C);
 
 //! Master function which handles conflict detection
@@ -136,6 +137,19 @@ static inline void acquire(Lockable* C, Galois::MethodFlag m) {
   if (shouldLock(m))
     doAcquire(C);
 }
+
+struct AlwaysLockObj {
+  void operator()(Lockable* C) const {
+    GaloisRuntime::doAcquire(C);
+  }
+};
+struct CheckedLockObj {
+  Galois::MethodFlag m;
+  CheckedLockObj(Galois::MethodFlag _m) :m(_m) {}
+  void operator()(Lockable* C) const {
+    GaloisRuntime::acquire(C, m);
+  }
+};
 
 //! Actually break for_each loop
 void breakLoop();
