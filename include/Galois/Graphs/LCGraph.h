@@ -183,8 +183,13 @@ public:
   }
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = ALL) {
-    NodeInfo& NI = NodeData[N];
-    GaloisRuntime::acquire(&NI, mflag);
+    GaloisRuntime::acquire(&NodeData[N], mflag);
+    if (GaloisRuntime::shouldLock(mflag)) {
+      for (uint64_t ii = raw_neighbor_begin(N), ee = raw_neighbor_end(N);
+	   ii != ee; ++ii) {
+	GaloisRuntime::acquire(&NodeData[EdgeDst[ii]], mflag);
+      }
+    }
     return edge_iterator(raw_neighbor_begin(N));
   }
 
@@ -333,6 +338,12 @@ public:
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = ALL) {
     GaloisRuntime::acquire(N, mflag);
+    if (GaloisRuntime::shouldLock(mflag)) {
+      for (edge_iterator ii = N->edgebegin, ee = N->edgeend;
+	   ii != ee; ++ii) {
+	GaloisRuntime::acquire(ii->dst, mflag);
+      }
+    }
     return N->edgebegin;
   }
 
@@ -475,6 +486,12 @@ public:
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = ALL) {
     GaloisRuntime::acquire(N, mflag);
+    if (GaloisRuntime::shouldLock(mflag)) {
+      for (edge_iterator ii = N->edgeBegin(), ee = N->edgeEnd();
+	   ii != ee; ++ii) {
+	GaloisRuntime::acquire(ii->dst, mflag);
+      }
+    }
     return N->edgeBegin();
   }
 
@@ -731,7 +748,7 @@ public:
 	advance_thread();
     }
 
-    local_iterator(const iterator& it): headers(it.headers), tid(it.tid), p(it.p), v(it.v) { }
+    //local_iterator(const iterator& it): headers(it.headers), tid(it.tid), p(it.p), v(it.v) { }
     local_iterator& operator++() { advance(); return *this; }
     local_iterator operator++(int) { local_iterator tmp(*this); operator++(); return tmp; }
     bool operator==(const local_iterator& rhs) const {
@@ -803,6 +820,11 @@ public:
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = ALL) {
     GaloisRuntime::acquire(N, mflag);
+    if (GaloisRuntime::shouldLock(mflag)) {
+      for (edge_iterator ii = N->edgeBegin(), ee = N->edgeEnd(); ii != ee; ++ii) {
+	GaloisRuntime::acquire(ii->dst, mflag);
+      }
+    }
     return N->edgeBegin();
   }
 
