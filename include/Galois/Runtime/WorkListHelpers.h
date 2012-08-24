@@ -28,8 +28,7 @@
 #endif
 
 #include "ll/PtrLock.h"
-
-#include "Galois/Runtime/ll/PaddedLock.h"
+#include "DS/LazyArray.h"
 
 #include <boost/optional.hpp>
 
@@ -40,22 +39,10 @@ template<typename T, unsigned chunksize = 64>
 class FixedSizeRing :private boost::noncopyable {
   unsigned start;
   unsigned count;
-  char datac[sizeof(T[chunksize])] __attribute__ ((aligned (__alignof__(T))));
-
-  T* data() {
-    return reinterpret_cast<T*>(&datac[0]);
-  }
+  lazyArray<T, chunksize> datac;
 
   T* at(unsigned i) {
-    return &data()[i];
-  }
-
-  void destroy(unsigned i) {
-    (at(i))->~T();
-  }
-
-  T* create(unsigned i, const T& val) {
-    return new (at(i)) T(val);
+    return &datac[i];
   }
 
 public:
@@ -85,7 +72,7 @@ public:
 
   void clear() {
     for (unsigned x = 0; x < count; ++x)
-      destroy((start + count) % chunksize);
+      datac.kill((start + count) % chunksize);
     count = 0;
     start = 0;
   }
@@ -94,14 +81,16 @@ public:
     if (full()) return 0;
     start = (start + chunksize - 1) % chunksize;
     ++count;
-    return create(start, val);
+    datac.init(start,val);
+    return &datac[start];
   }
 
   value_type* push_back(const value_type& val) {
     if (full()) return 0;
     int end = (start + count) % chunksize;
     ++count;
-    return create(end, val);
+    datac.init(end,val);
+    return &datac[end];
   }
 
   template<typename Iter>
@@ -120,7 +109,7 @@ public:
     boost::optional<value_type> retval;
     if (!empty()) {
       retval = *at(start);
-      destroy(start);
+      datac.kill(start);
       start = (start + 1) % chunksize;
       --count;
     }
@@ -132,7 +121,7 @@ public:
     if (!empty()) {
       int end = (start + count - 1) % chunksize;
       retval = *at(end);
-      destroy(end);
+      datac.kill(end);
       --count;
     }
     return retval;
