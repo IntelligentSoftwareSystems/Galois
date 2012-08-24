@@ -315,7 +315,6 @@ class DMergeLocal {
   size_t committed;
   size_t iterations;
   size_t aborted;
-  size_t size;
   NewItemsTy newItems;
   ReserveTy reserve;
   Deque newReserve;
@@ -372,12 +371,13 @@ class DMergeLocal {
       if (i++ == count)
         return;
     }
-    while ((p = reserve.peek())) {
+
+    while ((p = reserve.pop())) {
       wl->push(*p);
-      reserve.pop();
       if (i++ == count)
         return;
     }
+
     while (!newReserve.empty()) {
       wl->push(Item(newReserve.front(), 0));
       popNewReserve(options.comp);
@@ -437,7 +437,7 @@ public:
   }
 
   bool empty() {
-    return reserve.empty();
+    return reserve.empty() && newReserve.empty();
   }
 };
 
@@ -472,7 +472,7 @@ protected:
   }
 
   template<typename InputIteratorTy,typename WL>
-  void copyIn(InputIteratorTy b, InputIteratorTy e, size_t dist, WL* wl) {
+  void copyIn(InputIteratorTy b, InputIteratorTy e, size_t dist, WL* wl, bool noReserve) {
     unsigned int tid = LL::getTID();
     MergeLocal& mlocal = *this->data.getLocal();
     size_t cur = 0;
@@ -480,7 +480,8 @@ protected:
     safe_advance(b, tid, cur, dist);
     while (b != e) {
       unsigned long id = k * this->numActive + tid + 1;
-      if (id > mlocal.delta)
+      // XXX
+      if (!noReserve && id > mlocal.delta)
         mlocal.reserve.push(Item(*b, id));
       else
         wl->push(Item(*b, id));
@@ -527,6 +528,7 @@ public:
       mlocal.delta = 0;
     }
 
+    //mlocal.delta = std::numeric_limits<size_t>::max(); // XXX Debug
     // Useful debugging info
     if (false) {
       if (LL::getTID() == 0) {
@@ -652,9 +654,9 @@ class DMergeManager: public DMergeManagerBase<Options> {
       barrier[0].wait();
       redistribute(b, e, dist);
       barrier[1].wait();
-      this->copyIn(distributeBuf.begin(), distributeBuf.end(), dist, wl);
+      this->copyIn(distributeBuf.begin(), distributeBuf.end(), dist, wl, false);
     } else {
-      this->copyIn(b, e, dist, wl);
+      this->copyIn(b, e, dist, wl, false);
     }
   }
 
@@ -794,7 +796,7 @@ class DMergeManager<Options,typename boost::enable_if_c<has_id_fn<typename Optio
     mlocal.initialWindow(std::max((mlocal.maxId - mlocal.minId) / 100, (size_t) Base::MinDelta));
     this->copyIn(boost::make_transform_iterator(mergeBuf.begin(), typename Base::NewItem::GetFirst()),
         boost::make_transform_iterator(mergeBuf.end(), typename Base::NewItem::GetFirst()),
-        dist, wl);
+        dist, wl, false);
   }
 
 public:
@@ -895,7 +897,7 @@ class DMergeManager<Options,typename boost::enable_if_c<Options::useOrdered>::ty
     mlocal.initialWindow(std::max(dist / 100, (size_t) Base::MinDelta));
     this->copyIn(boost::make_transform_iterator(mergeBuf.begin(), typename Base::NewItem::GetFirst()),
         boost::make_transform_iterator(mergeBuf.end(), typename Base::NewItem::GetFirst()),
-        dist, wl);
+        dist, wl, true);
   }
 
 public:
@@ -916,11 +918,16 @@ public:
     boost::optional<Item> head = mlocal.reserve.peek();
     boost::optional<Item> last = mlocal.reserve.last();
 
+    // TODO: bug when all threads don't all agree on head and last and we use reserve
+    // XXX debug
+    //if (true || !head || comp((void*) &item, (void*) &head->item)) {
     if (!head || comp((void*) &item, (void*) &head->item)) {
       wl->push(Item(item, 0));
     } else if (comp((void*) &item, (void*) &last->item)) {
+      abort();
       mlocal.pushNewReserve(item, comp); 
     } else {
+      abort();
       this->new_.push(NewItem(item, 0, 1));
     }
   }
@@ -928,6 +935,8 @@ public:
   template<typename WL>
   void distributeNewWork(WL* wl) {
     MergeLocal& mlocal = *this->data.getLocal();
+
+    assert(mlocal.empty());
 
     mlocal.newItems.clear();
     boost::optional<NewItem> p;
@@ -940,6 +949,8 @@ public:
 
     size_t top = std::max((size_t) 1, mlocal.delta / this->numActive);
     for (size_t count = 0; ii != ei; ++ii, ++count) {
+      // XXX debug
+      //if (false && count > top)
       if (count > top)
         mlocal.reserve.push(Item(ii->item, 0));
       else
@@ -1171,6 +1182,8 @@ bool Executor<Options>::commitLoop(ThreadLocalData& tld)
 
   while ((p = (useLocalState) ? tld.localPending.pop() : pending.pop())) {
     bool commit = true;
+    // Can skip this check in prefix repeating computations but eagerly aborting
+    // seems more efficient
     if (!p->cnx->is_ready())
       commit = false;
 
