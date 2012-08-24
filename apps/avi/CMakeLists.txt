@@ -35,6 +35,10 @@ app(AVIodgAuto main/AVIodgAuto.cpp
   REQUIRES LAPACK_FOUND ZLIB_FOUND
   EXTLIBS AVI ${LAPACK_LIBRARIES})
 
+app(AVIodgAuto2 main/AVIodgAuto2.cpp 
+  REQUIRES LAPACK_FOUND ZLIB_FOUND
+  EXTLIBS AVI ${LAPACK_LIBRARIES})
+
 # the files may be removed from the release without causing error in cmake
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/main/AVIunorderedNoLock.cpp)
   app(AVIunorderedNoLock main/AVIunorderedNoLock.cpp

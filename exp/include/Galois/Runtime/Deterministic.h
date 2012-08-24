@@ -28,6 +28,7 @@
 #ifdef GALOIS_USE_DET
 
 #include "Galois/Runtime/DualLevelIterator.h"
+#include "Galois/Callbacks.h"
 
 #include <boost/utility/enable_if.hpp>
 #include <boost/iterator/iterator_facade.hpp>
@@ -50,6 +51,15 @@ struct FIFO {
   T* m_last;
 
   FIFO(): m_size(0), m_last(0) { }
+
+  ~FIFO() {
+    boost::optional<T> p;
+    while ((p = m_buffer.pop()))
+      ;
+    while ((p = m_data.pop()))
+      ;
+  }
+
 
   boost::optional<T> pop() {
     boost::optional<T> p;
@@ -180,6 +190,12 @@ class ContextPool {
   typedef WorkList::dChunkedLIFO<ChunkSize,SimpleRuntimeContext> Pool;
   Pool pool;
 public:
+  ~ContextPool() {
+    boost::optional<SimpleRuntimeContext> p;
+    while ((p = pool.pop()))
+      ;
+  }
+
   SimpleRuntimeContext* next() {
     SimpleRuntimeContext* retval = pool.push(SimpleRuntimeContext());
     return retval;
@@ -225,9 +241,8 @@ struct DNewItem {
 struct OrderedTag { };
 struct UnorderedTag { };
 
-//! Options for ordered executor
 template<typename _T,typename _Function1Ty,typename _Function2Ty,typename _CompareTy>
-struct ExecutorOptions {
+struct OrderedOptions {
   typedef _Function1Ty Function1Ty;
   typedef _Function2Ty Function2Ty;
   typedef _T T;
@@ -239,30 +254,31 @@ struct ExecutorOptions {
   Function2Ty& fn2;
   CompareTy& comp;
 
-  ExecutorOptions(Function1Ty& fn1, Function2Ty& fn2, CompareTy& comp): fn1(fn1), fn2(fn2), comp(comp) { }
+  OrderedOptions(Function1Ty& fn1, Function2Ty& fn2, CompareTy& comp): fn1(fn1), fn2(fn2), comp(comp) { }
 };
 
-//! Options for unordered executor
 template<typename _T,typename _Function1Ty,typename _Function2Ty>
-struct ExecutorOptions<_T,_Function1Ty,_Function2Ty,void> {
+struct UnorderedOptions {
   typedef _Function1Ty Function1Ty;
   typedef _Function2Ty Function2Ty;
   typedef _T T;
   static const bool useOrdered = false;
   typedef UnorderedTag Tag;
   
-  struct DummyCompareTy {
+  struct DummyCompareTy: public Galois::CompareCallback {
     bool operator()(void*, void*) const {
       return false;
     }
+    virtual bool compare(void*,void*) { return false; }
   };
 
   typedef DummyCompareTy CompareTy;
 
   Function1Ty& fn1;
   Function2Ty& fn2;
+  CompareTy comp;
 
-  ExecutorOptions(Function1Ty& fn1, Function2Ty& fn2): fn1(fn1), fn2(fn2) { }
+  UnorderedOptions(Function1Ty& fn1, Function2Ty& fn2): fn1(fn1), fn2(fn2) { }
 };
 
 template<typename> class DMergeManagerBase;
@@ -281,7 +297,7 @@ class DMergeLocal {
     Compare(CompareTy& c): comp(c) { }
     bool operator()(const T& a, const T& b) const {
       // reverse sense to get least items out of std::priority_queue
-      return !comp((void*) &a, (void*) &b);
+      return comp((void*) &b, (void*) &a);
     }
   };
 
@@ -290,6 +306,7 @@ class DMergeLocal {
   typedef std::vector<NewItem,typename Galois::PerIterAllocTy::rebind<NewItem>::other> NewItemsTy;
   typedef std::deque<T,typename Galois::PerIterAllocTy::rebind<T>::other> Deque;
   typedef FIFO<ChunkSize*8,Item> ReserveTy;
+  typedef WorkList::ChunkedLIFO<ChunkSize*8,T,false> ItemPool;
 
   Galois::IterAllocBaseTy heap;
   Galois::PerIterAllocTy alloc;
@@ -302,6 +319,7 @@ class DMergeLocal {
   NewItemsTy newItems;
   ReserveTy reserve;
   Deque newReserve;
+  ItemPool itemPool;
   unsigned long minId;
   unsigned long maxId;
   
@@ -338,19 +356,57 @@ class DMergeLocal {
   }
 
   template<typename WL>
-  void nextWindowDispatch(WL* wl, Options&, OrderedTag) {
-    size_t count = std::max((size_t) 1, delta / Galois::getActiveThreads());
+  void nextWindowDispatch(WL* wl, Options& options, OrderedTag) {
     boost::optional<Item> p;
-    
-    // TODO deal with new work
-    while (count-- > 0 && (p = reserve.peek())) {
+    size_t count = std::max((size_t) 1, delta / Galois::getActiveThreads());
+    size_t i = 0;
+
+    while ((p = reserve.peek()) && !newReserve.empty()) {
+      if (options.comp((void*) &*p, (void*) &newReserve.front())) {
+        wl->push(*p);
+        reserve.pop();
+      } else {
+        wl->push(Item(newReserve.front(), 0));
+        popNewReserve(options.comp);
+      }
+      if (i++ == count)
+        return;
+    }
+    while ((p = reserve.peek())) {
       wl->push(*p);
       reserve.pop();
+      if (i++ == count)
+        return;
     }
+    while (!newReserve.empty()) {
+      wl->push(Item(newReserve.front(), 0));
+      popNewReserve(options.comp);
+      if (i++ == count)
+        return;
+    }
+  }
+
+  void popNewReserve(CompareTy& comp) {
+    std::pop_heap(newReserve.begin(), newReserve.end(), Compare(comp));
+    newReserve.pop_back();
   }
 
 public:
   DMergeLocal(): alloc(&heap), newItems(alloc), newReserve(alloc) { resetStats(); }
+
+  ~DMergeLocal() {
+    resetItemPool();
+  }
+
+  void resetItemPool() {
+    boost::optional<T> p;
+    while ((p = itemPool.pop()))
+      ;
+  }
+
+  T* pushItemPool(const T& item) {
+    return itemPool.push(item);
+  }
 
   void incrementIterations() {
     ++iterations;
@@ -369,6 +425,11 @@ public:
     committed = 0;
     iterations = 0;
     aborted = 0;
+  }
+
+  void pushNewReserve(const T& item, CompareTy& comp) {
+    newReserve.push_back(item);
+    std::push_heap(newReserve.begin(), newReserve.end(), Compare(comp));
   }
 
   void resetWindow() {
@@ -855,10 +916,10 @@ public:
     boost::optional<Item> head = mlocal.reserve.peek();
     boost::optional<Item> last = mlocal.reserve.last();
 
-    if (!head || comp((void*) item, (void*) &head->item)) {
+    if (!head || comp((void*) &item, (void*) &head->item)) {
       wl->push(Item(item, 0));
-    } else if (comp((void*) item, (void*) &last->item)) {
-      // TODO add to reserve buffer
+    } else if (comp((void*) &item, (void*) &last->item)) {
+      mlocal.pushNewReserve(item, comp); 
     } else {
       this->new_.push(NewItem(item, 0, 1));
     }
@@ -985,6 +1046,7 @@ void Executor<Options>::go() {
       barrier[2].wait();
 
       contextPool.commitAll();
+      mlocal.resetItemPool();
 
       if (innerDone.data) {
         break;
@@ -1048,8 +1110,10 @@ bool Executor<Options>::pendingLoop(ThreadLocalData& tld)
     mlocal.incrementIterations();
     bool commit = true;
     cnx->set_id(p->id);
-    // TODO: set comp too (if necessary)
-    //cnx->set_comp_data(&p->item);
+    if (Options::useOrdered) {
+      cnx->set_comp(&options.comp);
+      cnx->set_comp_data(mlocal.pushItemPool(p->item));
+    }
     cnx->start_iteration();
     tld.stat.inc_iterations();
     setThreadContext(cnx);
@@ -1068,9 +1132,9 @@ bool Executor<Options>::pendingLoop(ThreadLocalData& tld)
     }
 #endif
     switch (result) {
-      case 0: break;
-      case CONFLICT: stateManager.dealloc(tld.facing); commit = false; break;
-      case REACHED_FAILSAFE: stateManager.dealloc(tld.facing); break;
+      case 0: 
+      case REACHED_FAILSAFE: break;
+      case CONFLICT: commit = false; break;
       default: assert(0 && "Unknown conflict flag"); abort(); break;
     }
 
@@ -1086,6 +1150,7 @@ bool Executor<Options>::pendingLoop(ThreadLocalData& tld)
         pending.push(*p);
       }
     } else {
+      stateManager.dealloc(tld.facing); 
       tld.wlnext->push(*p);
       tld.stat.inc_conflicts();
       retval = true;
@@ -1106,7 +1171,7 @@ bool Executor<Options>::commitLoop(ThreadLocalData& tld)
 
   while ((p = (useLocalState) ? tld.localPending.pop() : pending.pop())) {
     bool commit = true;
-    if (useLocalState && !p->cnx->is_ready())
+    if (!p->cnx->is_ready())
       commit = false;
 
     if (commit) {
@@ -1197,7 +1262,7 @@ static inline void for_each_det_impl(InitTy& init, WorkTy& W) {
 template<typename IterTy, typename Function1Ty, typename Function2Ty>
 static inline void for_each_det(IterTy b, IterTy e, Function1Ty f1, Function2Ty f2, const char* loopname = 0) {
   typedef typename std::iterator_traits<IterTy>::value_type T;
-  typedef GaloisRuntime::Deterministic::ExecutorOptions<T,Function1Ty,Function2Ty,void> Options;
+  typedef GaloisRuntime::Deterministic::UnorderedOptions<T,Function1Ty,Function2Ty> Options;
   typedef GaloisRuntime::Deterministic::Executor<Options> WorkTy;
 
   Options options(f1, f2);

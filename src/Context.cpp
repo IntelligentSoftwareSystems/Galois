@@ -26,6 +26,8 @@
 #include "Galois/Runtime/MethodFlags.h"
 #include "Galois/Runtime/ll/SimpleLock.h"
 
+#include <stdio.h>
+
 #if GALOIS_USE_EXCEPTION_HANDLER
 #else
 __thread jmp_buf GaloisRuntime::hackjmp;
@@ -112,10 +114,16 @@ void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
       other = L->Owner.getValue();
       if (other == this)
         return;
-      if (other) { 
-        if ((comp && comp(other->comp_data, comp_data)) || other->id < id) {
+      if (other) {
+        bool conflict;
+        if (comp) {
+          conflict = comp->compare(other->comp_data, comp_data);
+        } else {
+          conflict = other->id < id;
+        }
+        if (conflict) {
           if (pendingFlag == PENDING) {
-            // A lock I should have but can't get
+            // A lock that I want but can't get
             not_ready = 1;
             return; 
           } else {

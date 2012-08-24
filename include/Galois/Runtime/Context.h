@@ -25,8 +25,9 @@
 #ifndef GALOIS_RUNTIME_CONTEXT_H
 #define GALOIS_RUNTIME_CONTEXT_H
 
-#include "Galois/Runtime/ll/PtrLock.h"
+#include "Galois/Callbacks.h"
 #include "Galois/MethodFlags.h"
+#include "Galois/Runtime/ll/PtrLock.h"
 #include <cassert>
 #include <cstdlib>
 #include <setjmp.h>
@@ -76,6 +77,7 @@ public:
 };
 
 class SimpleRuntimeContext {
+private:
   //! The locks we hold
   Lockable* locks;
   //! Iteration id, used to order iterations in deterministic execution
@@ -83,7 +85,7 @@ class SimpleRuntimeContext {
   //! Flag to abort other iterations, used in deterministic execution
   long not_ready;
   //! User-defined comparison between iterations
-  bool (*comp)(void *, void*);
+  Galois::CompareCallback* comp;
   void* comp_data;
 
 public:
@@ -101,6 +103,7 @@ public:
   void set_id(unsigned long i) { id = i; }
   bool is_ready() { return !not_ready; }
   void set_comp_data(void* ptr) { comp_data = ptr; }
+  void set_comp(Galois::CompareCallback* fn) { comp = fn; }
 #endif
 };
 
