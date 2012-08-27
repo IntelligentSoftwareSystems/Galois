@@ -37,6 +37,8 @@
 
 #include "boost/iterator/transform_iterator.hpp"
 
+#include <iostream>
+
 namespace Galois {
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -235,14 +237,16 @@ InputIterator find_if(InputIterator first, InputIterator last, Predicate pred)
 
 template<class T>
 struct parsort_lt {
-  T* v;
+  T v;
   parsort_lt(T* _v) :v(_v) {}
   bool operator()(const T& o) const {
-    return o < *v;
+    return o < v;
   }
 };
 
 struct parsort {
+
+  typedef int tt_does_not_need_aborts;
 
   template <class RandomAccessIterator>
   RandomAccessIterator choose(RandomAccessIterator first, 
@@ -257,12 +261,8 @@ struct parsort {
   RandomAccessIterator partition(RandomAccessIterator first, 
 				 RandomAccessIterator last, 
 				 RandomAccessIterator pivot) {
-    std::swap(*(last - 1), *pivot);
-    --last;
-    pivot = last;
-    RandomAccessIterator m = std::partition(first, last, parsort_lt<typename std::iterator_traits<RandomAccessIterator>::value_type>(&*pivot));
-    std::swap(*m, *pivot);
-    return m;
+    return std::partition(first, last, 
+			  std::bind2nd(std::less<typename std::iterator_traits<RandomAccessIterator>::value_type>(), *pivot));
   }
 
   template <class RandomAccessIterator, class Context>
@@ -273,8 +273,10 @@ struct parsort {
     } else {
       RandomAccessIterator pivot = choose(bounds.first, bounds.second);
       pivot = partition(bounds.first, bounds.second, pivot);
+      //      std::cout << std::distance(bounds.first, pivot) << " " << std::distance(pivot, bounds.second)  << " \n";
       cnx.push(std::make_pair(bounds.first, pivot));
-      cnx.push(std::make_pair(pivot + 1, bounds.second));
+      while (pivot != bounds.second && pivot + 1 != bounds.second && *pivot == *(pivot + 1)) ++pivot;
+      cnx.push(std::make_pair(pivot, bounds.second));
     }
   }
 
@@ -291,13 +293,84 @@ struct parsort {
   }
 };
 
+template<typename RandomAccessIterator, class Predicate>
+std::pair<RandomAccessIterator, RandomAccessIterator>
+dual_partition(RandomAccessIterator first1, RandomAccessIterator last1,
+	       RandomAccessIterator first2, RandomAccessIterator last2,
+	       Predicate pred) {
+  RandomAccessIterator r1 = std::partition(first1, last1);
+  RandomAccessIterator r2 = std::partition(first2, last2);
+  // first1, r1, last1
+  // first2, r2, last2
+  while (r1 != last1 && first2 != r2) std::swap(*(--r2), *r1++);
+  return std::make_pair(r1, r2);
+};
+
+#if 0
+template<typename RandomAccessIterator, class Predicate>
+struct parpart {
+  struct parpart_state {
+    volatile RandomAccessIterator first;
+    volatile RandomAccessIterator last;
+    SimpleLock<true> Lock;
+    Predicate pred;
+    unsigned BlockSize() { return 1024; }
+
+    parpart_state(RandomAccessIterator f, RandomAccessIterator l, Predicate p)
+      :first(f), last(l), pred(p)
+    {}
+    std::pair<RandomAccessIterator, unsigned> takeHigh() {
+      Lock.lock();
+      unsigned BS = std::min(BlockSize(), std::distance(first,last));
+      last -= BS;
+      RandomAccessIterator rv = last;
+      Lock.unlock();
+      return std::make_pair(rv, BS);
+    }
+    std::pair<RandomAccessIterator, unsigned> takeLow() {
+      Lock.lock();
+      unsigned BS = std::min(BlockSize(), std::distance(first,last));
+      RandomAccessIterator rv = first;
+      first += BS;
+      Lock.unlock();
+      return std::make_pair(rv, BS);
+    }
+    void updateBounds(RandomAccessIterator low, RandomAccessIterator high) {
+      Lock.lock();
+      if (low < first)
+	first = low;
+      if (high > last)
+	last = high;
+      Lock.unlock();
+    }
+  };
+
+  parpart_state* state;
+
+  void operator()() {
+    typedef std::pair<RandomAccessIterator, RandomAccessIterator> RP;
+    RP high, low;
+    do {
+      RP pivots = dual_partition(low.first, low.second, high.first, high.second, stat->pred);
+      low.first = pivots.first;
+      high.second = pivots.second;
+      if (low.first == low.second) low = state->takeLow();
+      if (high.first == high.second) high = state->takeHigh();
+    } while (low.first != low.second && high.first != high.second);
+    state->updateBounds(low.first, high.second);
+  }
+};
+
+#endif
+
 template <class RandomAccessIterator>
 void sort(RandomAccessIterator first, RandomAccessIterator last) {
   if (std::distance(first,last) <= 128) {
     std::sort(first,last);
   } else {
     parsort P;
-    P.seq_sort(std::make_pair(first,last));
+    //Galois::for_each<GaloisRuntime::WorkList::ChunkedFIFO<1> >(std::make_pair(first,last), P);
+    Galois::for_each<GaloisRuntime::WorkList::FIFO<> >(std::make_pair(first,last), P);
   }
 }
 
