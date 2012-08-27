@@ -56,9 +56,12 @@ struct PAState {
   std::map<void*, HeadPtr*> ownerMap;
 };
 
+//FIXME: make thread safe
 PAState& getPAState() {
-  static PAState p;
-  return p;
+  static PAState* p;
+  if (!p)
+    p = new PAState();
+  return *p;
 }
 
 #ifdef __linux__
