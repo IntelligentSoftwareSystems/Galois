@@ -26,8 +26,8 @@
  */
 
 
-#ifndef GALOIS_RUNTIME_ODG_TWO_PHASE_H
-#define GALOIS_RUNTIME_ODG_TWO_PHASE_H
+#ifndef GALOIS_RUNTIME_ODGTWOPHASE_H
+#define GALOIS_RUNTIME_ODGTWOPHASE_H
 
 #include <iostream>
 #include <iterator>

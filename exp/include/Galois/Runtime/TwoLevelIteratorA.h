@@ -25,8 +25,8 @@
  * @author <ahassaan@ices.utexas.edu>
  */
 
-#ifndef GALOIS_RUNTIME_TWO_LEVEL_ITER_A_H
-#define GALOIS_RUNTIME_TWO_LEVEL_ITER_A_H
+#ifndef GALOIS_RUNTIME_TWOLEVELITERA_H
+#define GALOIS_RUNTIME_TWOLEVELITERA_H
 
 #include <iterator>
 

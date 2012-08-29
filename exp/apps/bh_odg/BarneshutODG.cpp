@@ -36,7 +36,7 @@
 #include "Galois/GaloisUnsafe.h"
 #include "Galois/Atomic.h"
 #include "Galois/Statistic.h"
-#include "Galois/Runtime/DoAll.h"
+#include "Galois/Runtime/DoAllCoupled.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"

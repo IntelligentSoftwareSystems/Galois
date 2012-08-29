@@ -24,8 +24,8 @@
  *
  * @author <ahassaan@ices.utexas.edu>
  */
-#ifndef GALOIS_RUNTIME_DO_ALL_COUPLED_H_
-#define GALOIS_RUNTIME_DO_ALL_COUPLED_H_
+#ifndef GALOIS_RUNTIME_DOALLCOUPLED_H
+#define GALOIS_RUNTIME_DOALLCOUPLED_H
 
 #include <algorithm>
 #include <vector>
