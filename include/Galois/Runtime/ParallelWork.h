@@ -353,41 +353,22 @@ void do_all_impl_old(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
 
 template<typename FunctionTy>
 struct WOnEach {
-  FunctionTy& fn;
-  WOnEach(FunctionTy& f) :fn(f) {}
-  void operator()(void) const {
+  FunctionTy fn;
+  WOnEach(FunctionTy f) :fn(f) {}
+  void operator()(void) {
     fn(GaloisRuntime::LL::getTID(), galoisActiveThreads);   
   }
 };
 
 template<typename FunctionTy>
 void on_each_impl(FunctionTy fn, const char* loopname = 0) {
-  WOnEach<FunctionTy> fw(fn);
-  GaloisRuntime::RunCommand w[2] = {Config::ref(fw),
+  GaloisRuntime::RunCommand w[2] = {WOnEach<FunctionTy>(fn),
 				    Config::ref(getSystemBarrier())};
   GaloisRuntime::getSystemThreadPool().run(&w[0], &w[2]);
 }
 
 
-struct WPreAlloc {
-  int n;
-  WPreAlloc(int m) :n(m) {}
-  void operator()() {
-    GaloisRuntime::MM::pagePreAlloc(n);
-  }
-};
-
-void preAlloc_impl(int num) {
-  int a = galoisActiveThreads;
-  a = (num + a - 1) / a;
-  WPreAlloc P(a);
-  GaloisRuntime::RunCommand w[2] = {Config::ref(P),
-				    Config::ref(getSystemBarrier())};
-  GaloisRuntime::getSystemThreadPool().run(&w[0], &w[2]);
-}
-
-
-
+void preAlloc_impl(int num);
 
 } // end namespace
 

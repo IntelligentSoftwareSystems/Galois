@@ -1,4 +1,4 @@
-/** Implement user facing misc api -*- C++ -*-
+/** Implement misc runtime functions and features -*- C++ -*-
  * @file
  * @section License
  *
@@ -21,18 +21,14 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/Runtime/ThreadPool.h"
-#include "Galois/Threads.h"
+#include "Galois/Runtime/ParallelWork.h"
 
-#include <algorithm>
+unsigned int GaloisRuntime::galoisActiveThreads = 1;
 
-unsigned int Galois::setActiveThreads(unsigned int num) {
-  num = std::min(num, GaloisRuntime::getSystemThreadPool().getMaxThreads());
-  num = std::max(num, 1U);
-  GaloisRuntime::galoisActiveThreads = num;
-  return num;
-}
-
-unsigned int Galois::getActiveThreads() {
-  return GaloisRuntime::galoisActiveThreads;
+void GaloisRuntime::preAlloc_impl(int num) {
+  int a = galoisActiveThreads;
+  a = (num + a - 1) / a;
+  GaloisRuntime::RunCommand w[2] = {std::bind(GaloisRuntime::MM::pagePreAlloc, a),
+				    Config::ref(getSystemBarrier())};
+  GaloisRuntime::getSystemThreadPool().run(&w[0], &w[2]);
 }
