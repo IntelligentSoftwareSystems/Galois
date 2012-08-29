@@ -73,7 +73,7 @@ struct Jacobi {
     double sum = 0;
     for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::ALL),
         ei = graph.edge_end(src, Galois::ALL); ii != ei; ++ii) {
-      typename Graph::GraphNode dst = graph.getEdgeDst(ii);
+      Graph::GraphNode dst = graph.getEdgeDst(ii);
       assert(src != dst);
       double weight = graph.getEdgeData(ii);
       sum += weight * graph.getData(dst, Galois::NONE).x;
@@ -146,7 +146,7 @@ struct ConjugateGradient {
         node.ap = 0;
         for (Graph::edge_iterator ii = graph.edge_begin(*src, Galois::ALL),
             ei = graph.edge_end(*src, Galois::ALL); ii != ei; ++ii) {
-          typename Graph::GraphNode dst = graph.getEdgeDst(ii);
+          Graph::GraphNode dst = graph.getEdgeDst(ii);
           double weight = graph.getEdgeData(ii); 
           node.ap += weight * graph.getData(dst, Galois::NONE).p;
         }
@@ -327,7 +327,7 @@ struct GBP {
     //  J(i) = A(i,i) + sum(MJ(:,i));
     for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::ALL),
         ei = graph.edge_end(src, Galois::ALL); ii != ei; ++ii) {
-      typename Graph::GraphNode dst = graph.getEdgeDst(ii);
+      Graph::GraphNode dst = graph.getEdgeDst(ii);
       const Edge& edge = graph.getEdgeData(graph.findEdge(dst, src, Galois::NONE));
       node.mean += edge.mean;
       node.prec += edge.prec;
@@ -348,7 +348,7 @@ struct GBP {
     //  end
     for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::NONE),
         ei = graph.edge_end(src, Galois::NONE); ii != ei; ++ii) {
-      typename Graph::GraphNode dst = graph.getEdgeDst(ii);
+      Graph::GraphNode dst = graph.getEdgeDst(ii);
       Edge& inEdge = graph.getEdgeData(graph.findEdge(dst, src, Galois::NONE));
       Edge& outEdge = graph.getEdgeData(ii);
       
@@ -506,7 +506,7 @@ struct GenerateInput {
     // Create edges
     int nnz = 0;
     for (int i = 0; i < N; ++i) {
-      GraphNode n = nodes[i];
+      //GraphNode n = nodes[i];
       for (int j = 0; j < sparsity; ++j) {
         double& entry = LL[i*sparsity+j];
         if (entry) {

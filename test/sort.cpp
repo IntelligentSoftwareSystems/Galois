@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <cstdlib>
+#include <numeric>
 
 int RandomNumber () { return (rand()%1000000); }
 bool IsOdd (int i) { return ((i%2)==1); }
@@ -46,7 +47,7 @@ int do_sort() {
       std::sort(R.begin(), R.end());
       if (!std::equal(C.begin(), C.end(), R.begin()))
 	std::cout << "Cannot be made equal, sort mutated array\n";
-      for (int x = 0; x < V.size() ; ++x) {
+      for (size_t x = 0; x < V.size() ; ++x) {
 	std::cout << x << "\t" << V[x] << "\t" << C[x];
 	if (V[x] != C[x]) std::cout << "\tDiff";
 	if (V[x] < C[x]) std::cout << "\tLT";
