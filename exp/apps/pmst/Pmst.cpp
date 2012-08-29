@@ -502,8 +502,6 @@ struct BoruvkaUnionFind {
     Data& curData = g.getData(cur, Galois::NONE);
     for (Graph::edge_iterator ii = g.edge_begin(cur, Galois::NONE), 
         ei = g.edge_end(cur, Galois::NONE); ii != ei; ++ii) {
-      GraphNode dst = g.getEdgeDst(ii);
-
       const Weight& w = g.getEdgeData(ii);
       // Should only happen first time someone sees this node
       if (w < curData.minWeight)
