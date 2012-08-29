@@ -72,6 +72,10 @@ public:
     return get(BASE::myEID());
   }
 
+  T* getLocal() {
+    return &get();
+  }
+
   const T& get() const {
     return get(BASE::myEID());
   }
