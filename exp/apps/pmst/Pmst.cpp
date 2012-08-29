@@ -27,7 +27,7 @@
 #include "Galois/Timer.h"
 #include "Galois/Queue.h"
 #include "Galois/UserContext.h"
-#include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/Graph2.h"
 #include "Galois/Graphs/LCGraph.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
@@ -256,8 +256,8 @@ struct Boruvka {
       if (ii->first == last)
         continue;
 
-      g.addMultiEdge(n, ii->first, ii->second, flag);
-      g.addMultiEdge(ii->first, n, ii->second, flag);
+      g.getEdgeData(g.addMultiEdge(n, ii->first, flag)) = ii->second;
+      g.getEdgeData(g.addMultiEdge(ii->first, n, flag)) = ii->second;
       --g.getData(ii->first, flag);
       numNeighbors++;
 
@@ -606,8 +606,8 @@ void makeGraph(const std::string& in, Graph& g) {
           g.getEdgeData(g.findEdge(gdst, gsrc)) = w;
         }
       } else if (gsrc != gdst) {
-        g.addMultiEdge(gsrc, gdst, w);
-        g.addMultiEdge(gdst, gsrc, w);
+        g.getEdgeData(g.addMultiEdge(gsrc, gdst)) = w;
+        g.getEdgeData(g.addMultiEdge(gdst, gsrc)) = w;
         numEdges += 2;
       }
     }

@@ -27,6 +27,7 @@
 
 #include "Galois/Runtime/Deterministic.h"
 
+#ifdef GALOIS_USE_DET
 namespace Galois {
 template<typename IterTy, typename Function1Ty, typename Function2Ty, typename Comparator>
 static inline void for_each_ordered(IterTy b, IterTy e, Function1Ty f1, Function2Ty f2, Comparator comp, const char* loopname = 0) {
@@ -40,4 +41,6 @@ static inline void for_each_ordered(IterTy b, IterTy e, Function1Ty f1, Function
   for_each_det_impl(init, W);
 }
 }
+#endif
+
 #endif

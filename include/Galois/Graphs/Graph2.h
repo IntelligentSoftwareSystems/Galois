@@ -249,6 +249,8 @@ class FirstGraph : private boost::noncopyable {
 
 public:
   typedef gNode* GraphNode;
+  typedef EdgeTy edge_type;
+  typedef NodeTy node_type;
   typedef typename boost::filter_iterator<is_edge, typename gNode::iterator> edge_iterator;
   typedef typename gNode::EITy::reference edge_data_reference;
 
