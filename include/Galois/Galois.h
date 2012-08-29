@@ -26,6 +26,7 @@
 #include "Galois/UserContext.h"
 #include "Galois/Threads.h"
 #include "Galois/Runtime/ParallelWork.h"
+#include "Galois/Runtime/DoAll.h"
 #include "Galois/Runtime/LocalIterator.h"
 
 #ifdef GALOIS_USE_EXP
@@ -48,38 +49,38 @@ namespace Galois {
 
 //Iterator based versions
 template<typename WLTy, typename IterTy, typename FunctionTy>
-static inline void for_each(IterTy b, IterTy e, FunctionTy f, const char* loopname = 0) {
+void for_each(IterTy b, IterTy e, FunctionTy f, const char* loopname = 0) {
   GaloisRuntime::for_each_impl<WLTy>(b, e, f, loopname);
 }
 
 template<typename IterTy, typename FunctionTy>
-static inline void for_each(IterTy b, IterTy e, FunctionTy f, const char* loopname = 0) {
+void for_each(IterTy b, IterTy e, FunctionTy f, const char* loopname = 0) {
   typedef GaloisRuntime::WorkList::dChunkedFIFO<256> WLTy;
   Galois::for_each<WLTy, IterTy, FunctionTy>(b, e, f, loopname);
 }
 
 //Single initial item versions
 template<typename WLTy, typename InitItemTy, typename FunctionTy>
-static inline void for_each(InitItemTy i, FunctionTy f, const char* loopname = 0) {
+void for_each(InitItemTy i, FunctionTy f, const char* loopname = 0) {
   InitItemTy wl[1] = {i};
   Galois::for_each<WLTy>(&wl[0], &wl[1], f, loopname);
 }
 
 template<typename InitItemTy, typename FunctionTy>
-static inline void for_each(InitItemTy i, FunctionTy f, const char* loopname = 0) {
+void for_each(InitItemTy i, FunctionTy f, const char* loopname = 0) {
   typedef GaloisRuntime::WorkList::ChunkedFIFO<256> WLTy;
   Galois::for_each<WLTy, InitItemTy, FunctionTy>(i, f, loopname);
 }
 //Local based versions
 template<typename WLTy, typename ConTy, typename Function>
-static inline void for_each_local(ConTy& c, Function f, const char* loopname = 0) {
+void for_each_local(ConTy& c, Function f, const char* loopname = 0) {
   typedef typename ConTy::local_iterator IterTy;
   typedef GaloisRuntime::WorkList::LocalAccessDist<IterTy, WLTy> WL;
   GaloisRuntime::for_each_impl<WL>(GaloisRuntime::LocalBounce<ConTy>(&c, true), GaloisRuntime::LocalBounce<ConTy>(&c, false), f, loopname);
 }
 
 template<typename ConTy, typename Function>
-static inline void for_each_local(ConTy& c, Function f, const char* loopname = 0) {
+void for_each_local(ConTy& c, Function f, const char* loopname = 0) {
   typedef GaloisRuntime::WorkList::dChunkedFIFO<256> WLTy;
   Galois::for_each_local<WLTy, ConTy, Function>(c, f, loopname);
 }
@@ -96,18 +97,18 @@ static inline void for_each_local(ConTy& c, Function f, const char* loopname = 0
 template<typename IterTy,typename FunctionTy>
 static inline void do_all_dispatch(const IterTy& begin, const IterTy& end, FunctionTy fn, const char* loopname, std::random_access_iterator_tag) {
   typedef GaloisRuntime::WorkList::RandomAccessRange<false,IterTy> WL;
-  GaloisRuntime::do_all_impl<WL>(begin, end, fn, loopname);
+  GaloisRuntime::do_all_impl_old<WL>(begin, end, fn, loopname);
 }
 
 //Forward iterator do_all
 template<typename IterTy,typename FunctionTy>
 static inline void do_all_dispatch(const IterTy& begin, const IterTy& end, FunctionTy fn, const char* loopname, std::input_iterator_tag) {
   typedef GaloisRuntime::WorkList::ForwardAccessRange<IterTy> WL;
-  GaloisRuntime::do_all_impl<WL>(begin, end, fn, loopname);
+  GaloisRuntime::do_all_impl_old<WL>(begin, end, fn, loopname);
 }
 
 template<typename IterTy,typename FunctionTy>
-static inline void do_all(const IterTy& begin, const IterTy& end, FunctionTy fn, const char* loopname = 0) {
+FunctionTy do_all(const IterTy& begin, const IterTy& end, FunctionTy fn, const char* loopname = 0) {
   if (GaloisRuntime::inGaloisForEach) {
 #if 0
     GaloisRuntime::TaskContext<IterTy,FunctionTy> ctx;
@@ -115,11 +116,12 @@ static inline void do_all(const IterTy& begin, const IterTy& end, FunctionTy fn,
     pool.enqueue(ctx, begin, end, fn);
     ctx.run(pool);
 #else
-    std::for_each(begin, end, fn);
+    return std::for_each(begin, end, fn);
 #endif
   } else {
-    typename std::iterator_traits<IterTy>::iterator_category category;
-    do_all_dispatch(begin,end,fn,loopname,category); 
+    //typename std::iterator_traits<IterTy>::iterator_category category;
+    //do_all_dispatch(begin,end,fn,loopname,category); 
+    return GaloisRuntime::do_all_impl(begin, end, fn);
   }
 }
 
@@ -128,7 +130,7 @@ template<typename ConTy,typename FunctionTy>
 static inline void do_all_local(ConTy& c, FunctionTy fn, const char* loopname = 0) {
   typedef typename ConTy::local_iterator IterTy;
   typedef GaloisRuntime::WorkList::LocalAccessRange<IterTy> WL;
-  GaloisRuntime::do_all_impl<WL>(GaloisRuntime::LocalBounce<ConTy>(&c, true), GaloisRuntime::LocalBounce<ConTy>(&c, false), fn, loopname);
+  GaloisRuntime::do_all_impl_old<WL>(GaloisRuntime::LocalBounce<ConTy>(&c, true), GaloisRuntime::LocalBounce<ConTy>(&c, false), fn, loopname);
 }
 
 
@@ -156,38 +158,37 @@ static inline void preAlloc(int num) {
 // STL compatible-ish operators
 ////////////////////////////////////////////////////////////////////////////////
 
-template<typename Predicate, typename T>
+template<typename Predicate>
 struct count_if_helper {
-  GaloisRuntime::PerCPU<ptrdiff_t>& local;
-  Predicate& f;
-  count_if_helper(Predicate& p, GaloisRuntime::PerCPU<ptrdiff_t>& l):local(l), f(p) { }
+  Predicate f;
+  ptrdiff_t ret;
+  count_if_helper(Predicate p):f(p) { }
+  template<typename T>
   void operator()(const T& v) {
-    if (f(v)) 
-      local.get()++;
+    if (f(v)) ++ret;
+  }
+};
+
+struct count_if_reducer {
+  template<typename CIH>
+  void operator()(CIH& dest, const CIH& src) {
+    dest.ret += src.ret;
   }
 };
 
 template<class InputIterator, class Predicate>
 ptrdiff_t count_if(InputIterator first, InputIterator last, Predicate pred)
 {
-  typedef typename std::iterator_traits<InputIterator>::value_type T;
-  GaloisRuntime::PerCPU<ptrdiff_t> v;
-  count_if_helper<Predicate, T> c(pred, v);
-  ptrdiff_t ret = 0;
-  Galois::do_all(first, last, c);
-  for (unsigned i = 0; i < v.size(); ++i)
-    ret += v.get(i);
-  return ret;
+  count_if_helper<Predicate> H(pred);
+  H = GaloisRuntime::do_all_impl(first, last, H, count_if_reducer());
+  return H.ret;
 }
 
 //! Modify an iterator so that *it == it
 template<typename Iterator>
-struct NoDerefIterator: public boost::iterator_adaptor<
-  NoDerefIterator<Iterator>,
-  Iterator,
-  Iterator,
-  boost::use_default,
-  const Iterator&>
+struct NoDerefIterator : public boost::iterator_adaptor<
+  NoDerefIterator<Iterator>, Iterator, Iterator, 
+  boost::use_default, const Iterator&>
 {
   NoDerefIterator(): NoDerefIterator::iterator_adaptor_() { }
   explicit NoDerefIterator(Iterator it): NoDerefIterator::iterator_adaptor_(it) { }
@@ -246,13 +247,6 @@ struct parsort {
 
   typedef int tt_does_not_need_aborts;
 
-  template <class RandomAccessIterator, typename T>
-  RandomAccessIterator part(RandomAccessIterator first, 
-				 RandomAccessIterator last, 
-				 T pivot) {
-    return std::partition(first, last, std::bind2nd(std::less<T>(), pivot));
-  }
-
   template <class RandomAccessIterator, class Context>
   void operator()(std::pair<RandomAccessIterator,RandomAccessIterator> bounds, 
 		  Context& cnx) {
@@ -260,9 +254,9 @@ struct parsort {
       std::sort(bounds.first, bounds.second);
     } else {
       typedef typename std::iterator_traits<RandomAccessIterator>::value_type VT;
-      VT pv = *choose_rand(bounds.first, bounds.second);
-      RandomAccessIterator pivot = part(bounds.first, bounds.second, pv);
-      //      std::cout << std::distance(bounds.first, pivot) << " " << std::distance(pivot, bounds.second)  << " \n";
+      RandomAccessIterator pivot = choose_rand(bounds.first, bounds.second);
+      VT pv = *pivot;
+      pivot = std::partition(bounds.first, bounds.second, std::bind2nd(std::less<VT>(), pv));
       //push the lower bit
       if (bounds.first != pivot)
 	cnx.push(std::make_pair(bounds.first, pivot));
@@ -271,18 +265,6 @@ struct parsort {
       //push the upper bit
       if (bounds.second != pivot)
 	cnx.push(std::make_pair(pivot, bounds.second)); 
-    }
-  }
-
-  template <class RandomAccessIterator>
-    void seq_sort(std::pair<RandomAccessIterator,RandomAccessIterator> bounds) {
-    if (std::distance(bounds.first, bounds.second) <= 128) {
-      std::sort(bounds.first, bounds.second);
-    } else {
-      RandomAccessIterator pivot = choose(bounds.first, bounds.second);
-      pivot = partition(bounds.first, bounds.second, pivot);
-      seq_sort(std::make_pair(bounds.first, pivot));
-      seq_sort(std::make_pair(pivot + 1, bounds.second));
     }
   }
 };
@@ -302,7 +284,7 @@ dual_partition(RandomAccessIterator first1, RandomAccessIterator last1,
     std::swap(*first1++, *first3++);
   }
   return std::make_pair(first1, first3.base());
-};
+}
 
 template<typename RandomAccessIterator, class Predicate>
 struct parpart {

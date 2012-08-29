@@ -329,7 +329,7 @@ struct DoAllWrapper: public FunctionTy {
 };
 
 template<typename WLTy, typename IterTy, typename FunctionTy>
-void do_all_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
+void do_all_impl_old(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
   assert(!inGaloisForEach);
 
   inGaloisForEach = true;
@@ -377,7 +377,7 @@ struct WPreAlloc {
   }
 };
 
-static inline void preAlloc_impl(int num) {
+void preAlloc_impl(int num) {
   int a = galoisActiveThreads;
   a = (num + a - 1) / a;
   WPreAlloc P(a);

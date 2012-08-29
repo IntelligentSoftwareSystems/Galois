@@ -57,6 +57,21 @@ IterTy split_range(IterTy b, IterTy e) {
   return b;
 }
 
+//block_range finds a block from the range based on the number of
+//divisions and the id of the block requested
+
+template<typename IterTy>
+std::pair<IterTy, IterTy> block_range(IterTy b, IterTy e, unsigned id, unsigned num) {
+  unsigned int dist = std::distance(b, e);
+  unsigned int numper = (dist + num - 1) / num; //round up
+  unsigned int A = std::min(numper * id, dist);
+  unsigned int B = std::min(numper * (id + 1), dist);
+  e = b;
+  std::advance(b, A);
+  std::advance(e, B);
+  return std::make_pair(b,e);
+}
+
 
 //Things in the <memory> spirit
 //Destroy a range
