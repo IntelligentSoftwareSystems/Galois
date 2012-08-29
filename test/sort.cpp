@@ -5,10 +5,16 @@
 #include <cstdlib>
 
 int RandomNumber () { return (rand()%1000000); }
+bool IsOdd (int i) { return ((i%2)==1); }
 
-int main() {
+struct IsOddS {
+  bool operator() (int i) { return ((i%2)==1); }
+};
+
+int do_sort() {
 
   unsigned M = GaloisRuntime::LL::getMaxThreads();
+  std::cout << "sort:\n";
 
   while (M) {
     
@@ -54,4 +60,46 @@ int main() {
   }
 
   return 0;
+}
+
+int do_count_if() {
+
+  unsigned M = GaloisRuntime::LL::getMaxThreads();
+  std::cout << "count_if:\n";
+
+  while (M) {
+    
+    Galois::setActiveThreads(M); //GaloisRuntime::LL::getMaxThreads());
+    std::cout << "Using " << M << " threads\n";
+    
+    std::vector<unsigned> V(1024*1024*16);
+    std::generate (V.begin(), V.end(), RandomNumber);
+
+    unsigned x1,x2;
+
+    Galois::Timer t;
+    t.start();
+    x1 = Galois::count_if(V.begin(), V.end(), IsOddS());
+    t.stop();
+    
+    Galois::Timer t2;
+    t2.start();
+    x2 = std::count_if(V.begin(), V.end(), IsOddS());
+    t2.stop();
+
+    std::cout << "Galois: " << t.get() 
+	      << " STL: " << t2.get() 
+	      << " Equal: " << (x1 == x2) << "\n";
+    M >>= 1;
+  }
+  
+  return 0;
+}
+
+
+int main() {
+  int ret = 0;
+  ret |= do_sort();
+  ret |= do_count_if();
+  return ret;
 }
