@@ -96,10 +96,54 @@ int do_count_if() {
   return 0;
 }
 
+template<typename T>
+struct mymax : std:: binary_function<T,T,T> {
+  T operator()(const T& x, const T& y) const {
+    return std::max(x,y);
+  }
+};
+
+
+int do_accumulate() {
+
+  unsigned M = GaloisRuntime::LL::getMaxThreads();
+  std::cout << "accumulate:\n";
+
+  while (M) {
+    
+    Galois::setActiveThreads(M); //GaloisRuntime::LL::getMaxThreads());
+    std::cout << "Using " << M << " threads\n";
+    
+    std::vector<unsigned> V(1024*1024*16);
+    std::generate (V.begin(), V.end(), RandomNumber);
+
+    unsigned x1,x2;
+
+    Galois::Timer t;
+    t.start();
+    x1 = Galois::accumulate(V.begin(), V.end(), 0U, mymax<unsigned>());
+    t.stop();
+    
+    Galois::Timer t2;
+    t2.start();
+    x2 = std::accumulate(V.begin(), V.end(), 0U, mymax<unsigned>());
+    t2.stop();
+
+    std::cout << "Galois: " << t.get() 
+	      << " STL: " << t2.get() 
+	      << " Equal: " << (x1 == x2) << "\n";
+    if (x1 != x2)
+      std::cout << x1 << " " << x2 << "\n";
+    M >>= 1;
+  }
+  
+  return 0;
+}
 
 int main() {
   int ret = 0;
-  ret |= do_sort();
-  ret |= do_count_if();
+  //  ret |= do_sort();
+  //  ret |= do_count_if();
+  ret |= do_accumulate();
   return ret;
 }

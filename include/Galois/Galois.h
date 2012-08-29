@@ -179,9 +179,7 @@ struct count_if_reducer {
 template<class InputIterator, class Predicate>
 ptrdiff_t count_if(InputIterator first, InputIterator last, Predicate pred)
 {
-  count_if_helper<Predicate> H(pred);
-  H = GaloisRuntime::do_all_impl(first, last, H, count_if_reducer());
-  return H.ret;
+  return GaloisRuntime::do_all_impl(first, last, count_if_helper<Predicate>(pred), count_if_reducer()).ret;
 }
 
 //! Modify an iterator so that *it == it
@@ -407,6 +405,37 @@ void sort(RandomAccessIterator first, RandomAccessIterator last) {
 #endif
 }
 
+template<typename T, typename BinOp>
+struct accumulate_helper {
+  T init;
+  BinOp op;
+  accumulate_helper(T i, BinOp o) :init(i), op(o) {}
+  void operator()(const T& v) {
+    init = op(init,v);
+  }
+};
+
+template<typename BinOp>
+struct accumulate_helper_reduce {
+  BinOp op;
+  accumulate_helper_reduce(BinOp o) :op(o) {}
+  template<typename T>
+  void operator()(T& dest, const T& src) const {
+    dest.init = op(dest.init, src.init);
+  }
+};
+
+template <class InputIterator, class T, typename BinaryOperation>
+T accumulate ( InputIterator first, InputIterator last, T init,
+	       BinaryOperation binary_op ) {
+  return GaloisRuntime::do_all_impl(first, last, accumulate_helper<T,BinaryOperation>(init, binary_op), accumulate_helper_reduce<BinaryOperation>(binary_op)).init;
 }
+
+template<class InputIterator, class T>
+T accumulate(InputIterator first, InputIterator last, T init) {
+  return accumulate(first, last, init, std::plus<T>());
+}
+
+} //namespace Galois
 #endif
 
