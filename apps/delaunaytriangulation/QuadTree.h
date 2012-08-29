@@ -121,7 +121,7 @@ class PQuadTree {
   //! Provide appropriate initial values for reduction
   template<bool isMax>
   struct MTuple: public Tuple {
-    MTuple(): Tuple(isMax ? std::numeric_limits<TupleDataTy>::max() : std::numeric_limits<TupleDataTy>::min()) { }
+    MTuple(): Tuple(isMax ? std::numeric_limits<TupleDataTy>::min() : std::numeric_limits<TupleDataTy>::max()) { }
     MTuple(const Tuple& t): Tuple(t) { }
   };
 
@@ -197,7 +197,7 @@ class PQuadTree {
   GaloisRuntime::MM::FSBGaloisAllocator<Node::PointsTy> pointsAlloc;
 
   template<typename IterTy>
-  void init(IterTy begin, IterTy end, Tuple& center, double& radius) {
+  void init(IterTy begin, IterTy end) {
     MinBox least;
     MaxBox most;
     Galois::do_all(begin, end, ComputeBox(least, most));
@@ -206,10 +206,11 @@ class PQuadTree {
     MTuple<true> mmost = most.reduce();
     MTuple<false> lleast = least.reduce();
     
-    radius = std::max(mmost.x() - lleast.x(), mmost.y() - lleast.y()) / 2.0;
-    center = lleast;
-    center.x() += m_radius;
-    center.y() += m_radius;
+    m_radius = std::max(mmost.x() - lleast.x(), mmost.y() - lleast.y()) / 2.0;
+    
+    m_center = lleast;
+    m_center.x() += m_radius;
+    m_center.y() += m_radius;
   }
 
   template<typename IterTy,typename OutIterTy>
@@ -359,7 +360,7 @@ public:
   PQuadTree(IterTy begin, IterTy end) { 
     m_root = newNode();
 
-    init(begin, end, m_center, m_radius);
+    init(begin, end);
 
     typedef std::vector<Point*> PointsBufTy;
     typedef WorkItem<PointsBufTy::iterator> WIT;
