@@ -103,6 +103,9 @@ void GaloisRuntime::breakLoop() {
 void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
 #ifdef GALOIS_USE_DET
   if (pendingFlag != NON_DET) {
+    if (pendingFlag == COMMITTING)
+      return;
+
     if (L->Owner.try_lock()) {
       assert(!L->next);
       L->next = locks;
@@ -115,30 +118,12 @@ void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
       if (other == this)
         return;
       if (other) {
-        bool conflict;
-        if (comp) {
-          conflict = comp->compare(other->comp_data, comp_data);
-        } else {
-          conflict = other->id < id;
-        }
+        bool conflict = comp ? comp->compare(other->comp_data, comp_data) :  other->id < id;
         if (conflict) {
-          if (pendingFlag == PENDING) {
-            // A lock that I want but can't get
-            not_ready = 1;
-            return; 
-          } else {
-#if GALOIS_USE_EXCEPTION_HANDLER
-            throw GaloisRuntime::CONFLICT;
-#else
-            longjmp(hackjmp, GaloisRuntime::CONFLICT);
-#endif
-          }
+          // A lock that I want but can't get
+          not_ready = 1;
+          return; 
         }
-      }
-      // Allow new locks on new nodes only
-      if (pendingFlag == COMMITTING && other) {
-        assert(0 && "Grabbing more locks during commit phase");
-        abort();
       }
     } while (!L->Owner.stealing_CAS(other, this));
 

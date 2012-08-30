@@ -42,15 +42,15 @@ namespace GaloisRuntime {
 namespace Deterministic {
 
 static const int ChunkSize = 32;
+
 //! Wrapper around WorkList::ChunkedFIFO to allow peek() and empty() and still have FIFO order
 template<int chunksize,typename T>
 struct FIFO {
   WorkList::ChunkedFIFO<chunksize,T,false> m_data;
   WorkList::ChunkedLIFO<16,T,false> m_buffer;
   size_t m_size;
-  T* m_last;
 
-  FIFO(): m_size(0), m_last(0) { }
+  FIFO(): m_size(0) { }
 
   ~FIFO() {
     boost::optional<T> p;
@@ -60,13 +60,10 @@ struct FIFO {
       ;
   }
 
-
   boost::optional<T> pop() {
     boost::optional<T> p;
     if ((p = m_buffer.pop()) || (p = m_data.pop())) {
       --m_size;
-      if (m_size == 0)
-        m_last = 0;
     }
     return p;
   }
@@ -81,16 +78,13 @@ struct FIFO {
     return p;
   }
 
-  boost::optional<T> last() {
-    if (m_last) {
-      return boost::optional<T>(*m_last);
-    }
-    return boost::optional<T>();
+  void push(const T& item) {
+    m_data.push(item);
+    ++m_size;
   }
 
-  void push(const T& item) {
-    m_last = m_data.push(item);
-    ++m_size;
+  size_t size() const {
+    return m_size;
   }
 
   bool empty() const {
@@ -166,22 +160,21 @@ struct BreakManager {
 
 template<typename FunctionTy>
 class BreakManager<FunctionTy,typename boost::enable_if<has_break_fn<FunctionTy> >::type> {
-  GBarrier barrier[1];
+  GBarrier barrier;
   LL::CacheLineStorage<volatile long> done;
   typename FunctionTy::BreakFn breakFn;
 
 public:
   BreakManager(FunctionTy& fn): breakFn(fn) { 
     int numActive = (int) Galois::getActiveThreads();
-    for (unsigned i = 0; i < sizeof(barrier)/sizeof(*barrier); ++i)
-      barrier[i].reinit(numActive);
+    barrier.reinit(numActive);
   }
 
   bool checkBreak() {
     runAllLoopExitHandlers();
     if (LL::getTID() == 0)
       done.data = breakFn();
-    barrier[0].wait();
+    barrier.wait();
     return done.data;
   }
 };
@@ -239,6 +232,24 @@ struct DNewItem {
   };
 };
 
+template<typename InputIteratorTy>
+void safe_advance(InputIteratorTy& it, size_t d, size_t& cur, size_t dist) {
+  if (d + cur >= dist) {
+    d = dist - cur;
+  }
+  std::advance(it, d);
+  cur += d;
+}
+
+//! Slightly more type-safe
+template<typename T,typename CompTy>
+bool safe_less_than(const T& a, const T& b, const CompTy& comp) {
+  return comp((void*) &a, (void*) &b);
+}
+
+struct OrderedTag { };
+struct UnorderedTag { };
+
 template<typename _T,typename _Function1Ty,typename _Function2Ty,typename _CompareTy>
 struct OrderedOptions {
   typedef _Function1Ty Function1Ty;
@@ -246,6 +257,7 @@ struct OrderedOptions {
   typedef _T T;
   typedef _CompareTy CompareTy;
   static const bool useOrdered = true;
+  typedef OrderedTag Tag;
 
   Function1Ty& fn1;
   Function2Ty& fn2;
@@ -260,6 +272,7 @@ struct UnorderedOptions {
   typedef _Function2Ty Function2Ty;
   typedef _T T;
   static const bool useOrdered = false;
+  typedef UnorderedTag Tag;
   
   struct DummyCompareTy: public Galois::CompareCallback {
     bool operator()(void*, void*) const {
@@ -280,6 +293,8 @@ struct UnorderedOptions {
 template<typename> class DMergeManagerBase;
 template<typename,typename> class DMergeManager;
 
+//! Thread-local data for merging and implementations specialized for 
+//! ordered and unordered implementations.
 template<typename Options>
 class DMergeLocal {
   template<typename> friend class DMergeManagerBase;
@@ -288,18 +303,19 @@ class DMergeLocal {
   typedef typename Options::T T;
   typedef typename Options::CompareTy CompareTy;
 
-  struct Compare {
-    CompareTy& comp;
-    Compare(CompareTy& c): comp(c) { }
+  struct HeapCompare {
+    const CompareTy& comp;
+    HeapCompare(const CompareTy& c): comp(c) { }
     bool operator()(const T& a, const T& b) const {
       // reverse sense to get least items out of std::priority_queue
-      return comp((void*) &b, (void*) &a);
+      return safe_less_than(b, a, comp);
     }
   };
 
   typedef DItem<T> Item;
   typedef DNewItem<T> NewItem;
   typedef std::vector<NewItem,typename Galois::PerIterAllocTy::rebind<NewItem>::other> NewItemsTy;
+  typedef std::deque<T,typename Galois::PerIterAllocTy::rebind<T>::other> Deque;
   typedef FIFO<ChunkSize*8,Item> ReserveTy;
   typedef WorkList::ChunkedLIFO<ChunkSize*8,T,false> ItemPool;
 
@@ -310,35 +326,228 @@ class DMergeLocal {
   size_t committed;
   size_t iterations;
   size_t aborted;
-  size_t size;
   NewItemsTy newItems;
   ReserveTy reserve;
+
+  // For ordered execution
+  Deque newReserve;
   ItemPool itemPool;
+  boost::optional<T> mostElement;
+  boost::optional<T> windowElement;
+
+  // For id based execution
   unsigned long minId;
   unsigned long maxId;
-  
-  void initialWindow(size_t w) {
-    window = delta = w;
-  }
 
+  // For general execution
+  size_t size;
+  
   //! Update min and max from sorted iterator
   template<typename BiIteratorTy>
-  void updateMinMax(BiIteratorTy ii, BiIteratorTy ei) {
+  void initialLimits(BiIteratorTy ii, BiIteratorTy ei) {
     minId = std::numeric_limits<unsigned long>::max();
     maxId = std::numeric_limits<unsigned long>::min();
+    mostElement = windowElement = boost::optional<T>();
 
     if (ii != ei) {
       if (ii + 1 == ei) {
         minId = maxId = ii->parent;
+        mostElement = boost::optional<T>(ii->item);
       } else {
         minId = ii->parent;
         maxId = (ei-1)->parent;
+        mostElement = boost::optional<T>(ei[-1].item);
       }
     }
   }
 
+  template<typename WL>
+  void nextWindowDispatch(WL* wl, Options&, UnorderedTag) {
+    window += delta;
+    boost::optional<Item> p;
+    while ((p = reserve.peek())) {
+      if (p->id >= window)
+        break;
+      wl->push(*p);
+      reserve.pop();
+    }
+  }
+
+  template<typename WL>
+  void nextWindowDispatch(WL* wl, Options& options, OrderedTag) {
+    orderedUpdateDispatch<false>(wl, options.comp, 0);
+  }
+
+  template<typename WL>
+  void updateWindowElement(WL* wl, const CompareTy& comp, size_t count) {
+    orderedUpdateDispatch<true>(wl, comp, count);
+  }
+
+  //! Common functionality for (1) getting the next N-1 elements and setting windowElement
+  //! to the nth element and (2) getting the next elements < windowElement.
+  template<bool updateWE,typename WL>
+  void orderedUpdateDispatch(WL* wl, const CompareTy& comp, size_t count) {
+    boost::optional<Item> p1;
+    boost::optional<T> p2;
+    
+    // count = 0 is a special signal to not do anything
+    if (updateWE && count == 0)
+      return;
+
+    if (updateWE) {
+      count = std::min(count, reserve.size() + newReserve.size());
+      // No more reserve but what should we propose for windowElement? As with
+      // distributeNewWork, this is a little tricky. Proposing nothing does not
+      // work because our proposal must be at least as large as any element we
+      // add to wl. Here, we use the simplest solution which is mostElement. 
+
+      // TODO improve this
+      if (count == 0) {
+        windowElement = mostElement;
+        return;
+      }
+    }
+
+    size_t c = 0;
+    while (true) {
+      boost::optional<Item> p1 = reserve.peek();
+      boost::optional<T> p2 = peekNewReserve();
+
+      bool fromReserve;
+      if (p1 && p2)
+        fromReserve = safe_less_than(p1->item, *p2, comp);
+      else if (!p1 && !p2)
+        break;
+      else
+        fromReserve = p1;
+
+      T* item = (fromReserve) ? &p1->item : &*p2;
+
+      // When there is no mostElement or windowElement, the reserve should be
+      // empty as well.
+      assert(mostElement && windowElement);
+
+      if (!safe_less_than(*item, *mostElement, comp))
+        break;
+      if (!updateWE && !safe_less_than(*item, *windowElement, comp))
+        break;
+      if (updateWE && ++c >= count) {
+        windowElement = boost::optional<T>(*item);
+        break;
+      }
+      
+      wl->push(Item(*item, 0));
+
+      if (fromReserve)
+        reserve.pop();
+      else
+        popNewReserve(comp);
+    }
+  }
+
+  template<typename InputIteratorTy,typename WL,typename NewTy>
+  void copyInDispatch(InputIteratorTy ii, InputIteratorTy ei, size_t dist, WL* wl, NewTy&, int numActive, const CompareTy&, UnorderedTag) {
+    unsigned int tid = LL::getTID();
+    size_t cur = 0;
+    size_t k = 0;
+    safe_advance(ii, tid, cur, dist);
+    while (ii != ei) {
+      unsigned long id = k * numActive + tid;
+      if (id < window)
+        wl->push(Item(*ii, id));
+      else
+        break;
+      ++k;
+      safe_advance(ii, numActive, cur, dist);
+    }
+    
+    while (ii != ei) {
+      unsigned long id = k * numActive + tid;
+      reserve.push(Item(*ii, id));
+      ++k;
+      safe_advance(ii, numActive, cur, dist);
+    }
+  }
+
+  template<typename InputIteratorTy,typename WL,typename NewTy>
+  void copyInDispatch(InputIteratorTy ii, InputIteratorTy ei, size_t dist, WL* wl, NewTy& new_, int numActive, const CompareTy& comp, OrderedTag) {
+    assert(emptyReserve());
+
+    unsigned int tid = LL::getTID();
+    size_t cur = 0;
+    safe_advance(ii, tid, cur, dist);
+    while (ii != ei) {
+      if (windowElement && !safe_less_than(*ii, *windowElement, comp))
+        break;
+      wl->push(Item(*ii, 0));
+      safe_advance(ii, numActive, cur, dist);
+    }
+
+    while (ii != ei) {
+      if (mostElement && !safe_less_than(*ii, *mostElement, comp))
+        break;
+      reserve.push(Item(*ii, 0));
+      safe_advance(ii, numActive, cur, dist);
+    }
+
+    while (ii != ei) {
+      new_.push(NewItem(*ii, 0, 1));
+      safe_advance(ii, numActive, cur, dist);
+    }
+  }
+
+  void initialWindow(size_t w) {
+    window = delta = w;
+  }
+
+  void receiveLimits(DMergeLocal<Options>& other) {
+    minId = other.minId;
+    maxId = other.maxId;
+    mostElement = other.mostElement;
+    windowElement = other.windowElement;
+    size = other.size;
+  }
+
+  void reduceLimits(DMergeLocal<Options>& other, const CompareTy& comp) {
+    minId = std::min(other.minId, minId);
+    maxId = std::max(other.maxId, maxId);
+    size += other.size;
+
+    if (!mostElement)
+      mostElement = other.mostElement;
+    else if (other.mostElement && safe_less_than(*mostElement, *other.mostElement, comp))
+      mostElement = other.mostElement;
+
+    if (!windowElement)
+      windowElement = other.windowElement;
+    else if (other.windowElement && safe_less_than(*windowElement, *other.windowElement, comp))
+      windowElement = other.windowElement;
+  }
+
+  void popNewReserve(const CompareTy& comp) {
+    std::pop_heap(newReserve.begin(), newReserve.end(), HeapCompare(comp));
+    newReserve.pop_back();
+  }
+
+  void pushNewReserve(const T& item, const CompareTy& comp) {
+    newReserve.push_back(item);
+    std::push_heap(newReserve.begin(), newReserve.end(), HeapCompare(comp));
+  }
+
+  boost::optional<T> peekNewReserve() {
+    if (newReserve.empty())
+      return boost::optional<T>();
+    else
+      return boost::optional<T>(newReserve.front());
+  }
+  
+  template<typename InputIteratorTy,typename WL,typename NewTy>
+  void copyIn(InputIteratorTy b, InputIteratorTy e, size_t dist, WL* wl, NewTy& new_, int numActive, const CompareTy& comp) {
+    copyInDispatch(b, e, dist, wl, new_, numActive, comp, typename Options::Tag());
+  }
+
 public:
-  DMergeLocal(): alloc(&heap), newItems(alloc) { resetStats(); }
+  DMergeLocal(): alloc(&heap), newItems(alloc), newReserve(alloc) { resetStats(); }
 
   ~DMergeLocal() {
     resetItemPool();
@@ -362,40 +571,64 @@ public:
     ++committed;
   }
 
+  void assertLimits(const T& item, const CompareTy& comp) {
+    assert(!windowElement || safe_less_than(item, *windowElement, comp));
+    assert(!mostElement || safe_less_than(item, *mostElement, comp));
+  }
+
   template<typename WL>
-  void nextWindow(WL* wl) {
-    window += delta;
-    boost::optional<Item> p;
-    while ((p = reserve.peek())) {
-      if (p->id > window)
-        break;
-      wl->push(*p);
-      reserve.pop();
-    }
+  void nextWindow(WL* wl, Options& options) {
+    nextWindowDispatch(wl, options, typename Options::Tag());
   }
 
   void resetStats() {
-    committed = 0;
-    iterations = 0;
-    aborted = 0;
+    committed = iterations = aborted = 0;
   }
 
-  void resetWindow() {
-    window = 0;
-  }
-
-  bool empty() {
-    return reserve.empty();
+  bool emptyReserve() {
+    return reserve.empty() && newReserve.empty();
   }
 };
+
+template<typename T>
+struct has_id_fn {
+  typedef char yes[1];
+  typedef char no[2];
+  template<typename C> static yes& test(typename C::IdFn*);
+  template<typename> static no& test(...);
+  static const bool value = sizeof(test<T>(0)) == sizeof(yes);
+};
+
+template<typename Options,typename Enable=void>
+struct MergeTraits {
+  static const bool value = false;
+  static const int MinDelta = ChunkSize * 40;
+};
+
+template<typename Options>
+struct MergeTraits<Options,typename boost::enable_if_c<Options::useOrdered>::type> {
+  static const bool value = true;
+  struct DummyIdFn {
+    typedef typename Options::T T;
+    unsigned long operator()(const T& x) const { return 0; }
+  };
+  typedef DummyIdFn IdFn;
+  static const int MinDelta = ChunkSize;
+};
+
+template<typename Options>
+struct MergeTraits<Options,typename boost::enable_if_c<has_id_fn<typename Options::Function1Ty>::value && !Options::useOrdered>::type> {
+  static const bool value = true;
+  typedef typename Options::Function1Ty::IdFn IdFn;
+  static const int MinDelta = ChunkSize * 40;
+};
+
 
 template<typename Options>
 class DMergeManagerBase {
 protected:
-  //static const int MinDelta = ChunkSize;
-  static const int MinDelta = ChunkSize * 40;
-
   typedef typename Options::T T;
+  typedef typename Options::CompareTy CompareTy;
   typedef DItem<T> Item;
   typedef DNewItem<T> NewItem;
   typedef WorkList::dChunkedFIFO<ChunkSize,NewItem> NewWork;
@@ -410,30 +643,19 @@ protected:
   NewWork new_;
   int numActive;
 
-  template<typename InputIteratorTy>
-  void safe_advance(InputIteratorTy& it, size_t d, size_t& cur, size_t dist) {
-    if (d + cur >= dist) {
-      d = dist - cur;
+  void broadcastLimits(MergeLocal& mlocal, unsigned int tid) {
+    for (int i = 0; i < this->numActive; ++i) {
+      if (i == (int) tid) continue;
+      MergeLocal& mother = *this->data.getRemote(i);
+      mother.receiveLimits(mlocal);
     }
-    std::advance(it, d);
-    cur += d;
   }
 
-  template<typename InputIteratorTy,typename WL>
-  void copyIn(InputIteratorTy b, InputIteratorTy e, size_t dist, WL* wl, bool useReserve) {
-    unsigned int tid = LL::getTID();
-    MergeLocal& mlocal = *this->data.getLocal();
-    size_t cur = 0;
-    size_t k = 0;
-    safe_advance(b, tid, cur, dist);
-    while (b != e) {
-      unsigned long id = k * this->numActive + tid + 1;
-      if (!useReserve || id <= mlocal.delta)
-        wl->push(Item(*b, id));
-      else
-        mlocal.reserve.push(Item(*b, id));
-      ++k;
-      safe_advance(b, this->numActive, cur, dist);
+  void reduceLimits(MergeLocal& mlocal, unsigned int tid, const CompareTy& comp) {
+    for (int i = 0; i < this->numActive; ++i) {
+      if (i == (int) tid) continue;
+      MergeLocal& mother = *this->data.getRemote(i);
+      mlocal.reduceLimits(mother, comp);
     }
   }
 
@@ -442,15 +664,16 @@ public:
     numActive = (int) Galois::getActiveThreads();
   }
 
+  ~DMergeManagerBase() {
+    boost::optional<NewItem> p;
+    assert(!(p = new_.pop()));
+  }
+
   MergeLocal& get() {
     return *data.getLocal();
   }
 
   void calculateWindow(bool inner) {
-    // Ordered doesn't use adaptive window
-    if (Options::useOrdered)
-      return;
-
     MergeLocal& mlocal = *data.getLocal();
 
     // Accumulate all threads' info
@@ -473,8 +696,8 @@ public:
       mlocal.delta = commitRatio / target * mlocal.delta;
 
     if (!inner) {
-      mlocal.delta = std::max(mlocal.delta, (size_t) MinDelta);
-    } else if (mlocal.delta < (size_t) MinDelta) {
+      mlocal.delta = std::max(mlocal.delta, (size_t) MergeTraits<Options>::MinDelta);
+    } else if (mlocal.delta < (size_t) MergeTraits<Options>::MinDelta) {
       // Try to get some new work instead of increasing window
       mlocal.delta = 0;
     }
@@ -482,23 +705,14 @@ public:
     // Useful debugging info
     if (false) {
       if (LL::getTID() == 0) {
-        printf("%.3f (%zu/%zu) window: %zu delta: %zu\n", 
-            commitRatio, allcommitted, alliterations, mlocal.window, mlocal.delta);
+        printf("DEBUG %d %.3f (%zu/%zu) window: %zu delta: %zu\n", 
+            inner, commitRatio, allcommitted, alliterations, mlocal.window, mlocal.delta);
       }
     }
   }
 };
 
-template<typename T>
-struct has_id_fn {
-  typedef char yes[1];
-  typedef char no[2];
-  template<typename C> static yes& test(typename C::IdFn*);
-  template<typename> static no& test(...);
-  static const bool value = sizeof(test<T>(0)) == sizeof(yes);
-};
-
-//! Default implementation
+//! Default implementation for merging
 template<typename Options,typename Enable=void>
 class DMergeManager: public DMergeManagerBase<Options> {
   typedef DMergeManagerBase<Options> Base;
@@ -508,6 +722,7 @@ class DMergeManager: public DMergeManagerBase<Options> {
   typedef typename Base::MergeLocal MergeLocal;
   typedef typename Base::NewItemsTy NewItemsTy;
   typedef typename Base::NewItemsIterator NewItemsIterator;
+  typedef typename Base::CompareTy CompareTy;
 
   struct GetNewItem: public std::unary_function<int,NewItemsTy&> {
     PerThreadStorage<MergeLocal>* base;
@@ -567,7 +782,7 @@ class DMergeManager: public DMergeManagerBase<Options> {
 
   //! Slightly complicated reindexing to separate out continuous elements in InputIterator
   template<typename InputIteratorTy>
-  void redistribute(InputIteratorTy b, InputIteratorTy e, size_t dist) {
+  void redistribute(InputIteratorTy ii, InputIteratorTy ei, size_t dist) {
     unsigned int tid = LL::getTID();
     //const size_t numBlocks = 1 << 7;
     //const size_t mask = numBlocks - 1;
@@ -578,35 +793,35 @@ class DMergeManager: public DMergeManagerBase<Options> {
     size_t numBlocks = dist / blockSize;
     
     size_t cur = 0;
-    this->safe_advance(b, tid, cur, dist);
-    while (b != e) {
+    safe_advance(ii, tid, cur, dist);
+    while (ii != ei) {
       unsigned long id;
       if (cur < blockSize * numBlocks)
         //id = (cur & mask) * blockSize + (cur / numBlocks);
         id = (cur % numBlocks) * blockSize + (cur / numBlocks);
       else
         id = cur;
-      distributeBuf[id] = *b;
-      this->safe_advance(b, this->numActive, cur, dist);
+      distributeBuf[id] = *ii;
+      safe_advance(ii, this->numActive, cur, dist);
     }
   }
 
   template<typename InputIteratorTy,typename WL>
-  void distribute(InputIteratorTy b, InputIteratorTy e, size_t dist, WL* wl) {
+  void distribute(InputIteratorTy ii, InputIteratorTy ei, size_t dist, WL* wl) {
     unsigned int tid = LL::getTID();
     MergeLocal& mlocal = *this->data.getLocal();
-    mlocal.initialWindow(std::max(dist / 100, (size_t) Base::MinDelta));
+    mlocal.initialWindow(std::max(dist / 100, (size_t) MergeTraits<Options>::MinDelta));
     if (true) {
       // Renumber to avoid pathological cases
       if (tid == 0) {
         distributeBuf.resize(dist);
       }
       barrier[0].wait();
-      redistribute(b, e, dist);
+      redistribute(ii, ei, dist);
       barrier[1].wait();
-      this->copyIn(distributeBuf.begin(), distributeBuf.end(), dist, wl, true);
+      mlocal.copyIn(distributeBuf.begin(), distributeBuf.end(), dist, wl, this->new_, this->numActive, CompareTy());
     } else {
-      this->copyIn(b, e, dist, wl, true);
+      mlocal.copyIn(ii, ei, dist, wl, this->new_, this->numActive, CompareTy());
     }
   }
 
@@ -621,20 +836,15 @@ class DMergeManager: public DMergeManagerBase<Options> {
     }
 
     std::sort(mlocal.newItems.begin(), mlocal.newItems.end());
+    mlocal.size = mlocal.newItems.size();
     
     barrier[2].wait();
 
     unsigned tid = LL::getTID();
     if (tid == 0) {
-      size_t size = 0;
-      for (int i = 0; i < this->numActive; ++i)
-        size += this->data.getRemote(i)->newItems.size();
-
-      mergeBuf.reserve(size);
-      
-      for (int i = 0; i < this->numActive; ++i)
-        this->data.getRemote(i)->size = size;
-
+      this->reduceLimits(mlocal, tid, CompareTy());
+      mergeBuf.reserve(mlocal.size);
+      this->broadcastLimits(mlocal, tid);
       merge(0, this->numActive);
     }
 
@@ -657,7 +867,6 @@ class DMergeManager: public DMergeManagerBase<Options> {
     
     if (LL::getTID() == 0) {
       mergeBuf.clear();
-      //mergeBuf.reserve(tld.newSize * this->numActive);
       boost::optional<NewItem> p;
       while ((p = this->new_.pop())) {
         mergeBuf.push_back(*p);
@@ -665,7 +874,7 @@ class DMergeManager: public DMergeManagerBase<Options> {
 
       std::sort(mergeBuf.begin(), mergeBuf.end());
 
-      printf("R %ld\n", mergeBuf.size());
+      printf("DEBUG R %ld\n", mergeBuf.size());
     }
 
     barrier[3].wait();
@@ -683,27 +892,31 @@ public:
 
   template<typename InputIteratorTy, typename WL>
   void addInitialWork(InputIteratorTy b, InputIteratorTy e, WL* wl) {
-    size_t dist = std::distance(b, e);
-    distribute(b, e, dist, wl);
+    distribute(b, e, std::distance(b, e), wl);
   }
 
   template<typename WL>
-  void pushNew(const T& item, unsigned long parent, unsigned count, WL* wl) {
+  void pushNew(const T& item, unsigned long parent, unsigned count, WL* wl, bool& hasNewWork, bool& nextCommit) {
     this->new_.push(NewItem(item, parent, count));
+    hasNewWork = true;
   }
 
   template<typename WL>
-  void distributeNewWork(WL* wl) {
+  bool distributeNewWork(WL* wl) {
     if (true)
       parallelSort(wl);
     else
       serialSort(wl);
+    return false;
   }
+
+  template<typename WL>
+  void prepareNextWindow(WL* wl) { }
 };
 
-//! Specialization for unordered algorithms with id function
+//! Implementation of merging specialized for unordered algorithms with an id function and ordered algorithms
 template<typename Options>
-class DMergeManager<Options,typename boost::enable_if_c<has_id_fn<typename Options::Function1Ty>::value && !Options::useOrdered>::type>: public DMergeManagerBase<Options> {
+class DMergeManager<Options,typename boost::enable_if<MergeTraits<Options> >::type>: public DMergeManagerBase<Options> {
   typedef DMergeManagerBase<Options> Base;
   typedef typename Base::T T;
   typedef typename Base::Item Item;
@@ -711,165 +924,205 @@ class DMergeManager<Options,typename boost::enable_if_c<has_id_fn<typename Optio
   typedef typename Base::MergeLocal MergeLocal;
   typedef typename Base::NewItemsTy NewItemsTy;
   typedef typename Base::NewItemsIterator NewItemsIterator;
-  typedef typename Options::Function1Ty::IdFn IdFn;
-
-  std::vector<NewItem,typename Galois::PerIterAllocTy::rebind<NewItem>::other> mergeBuf;
-
-  GBarrier barrier[4];
-  IdFn idFunction;
-
-  void broadcastMinMax(MergeLocal& mlocal, unsigned int tid) {
-    for (int i = 0; i < this->numActive; ++i) {
-      if (i == (int) tid) continue;
-      MergeLocal& mother = *this->data.getRemote(i);
-      mother.minId = mlocal.minId;
-      mother.maxId = mlocal.maxId;
-    }
-  }
-
-  template<typename InputIteratorTy,typename WL>
-  void distribute(InputIteratorTy b, InputIteratorTy e, size_t dist, WL* wl) {
-    unsigned int tid = LL::getTID();
-    MergeLocal& mlocal = *this->data.getLocal();
-    if (tid == 0) {
-      mergeBuf.clear();
-      mergeBuf.reserve(dist);
-      for (; b != e; ++b) {
-        unsigned long id = idFunction(*b);
-        mergeBuf.push_back(NewItem(*b, id, 1));
-      }
-      std::sort(mergeBuf.begin(), mergeBuf.end());
-      mlocal.updateMinMax(mergeBuf.begin(), mergeBuf.end());
-      broadcastMinMax(mlocal, tid);
-    }
-    barrier[0].wait();
-    mlocal.initialWindow(std::max((mlocal.maxId - mlocal.minId) / 100, (size_t) Base::MinDelta));
-    this->copyIn(boost::make_transform_iterator(mergeBuf.begin(), typename Base::NewItem::GetFirst()),
-        boost::make_transform_iterator(mergeBuf.end(), typename Base::NewItem::GetFirst()),
-        dist, wl, true);
-  }
-
-public:
-  DMergeManager(Options& o): mergeBuf(this->alloc) {
-    for (unsigned i = 0; i < sizeof(barrier)/sizeof(*barrier); ++i)
-      barrier[i].reinit(this->numActive);
-  }
-
-  template<typename InputIteratorTy, typename WL>
-  void addInitialWork(InputIteratorTy b, InputIteratorTy e, WL* wl) {
-    size_t dist = std::distance(b, e);
-    distribute(b, e, dist, wl);
-  }
-
-  template<typename WL>
-  void pushNew(const T& item, unsigned long parent, unsigned count, WL* wl) {
-    this->new_.push(NewItem(item, idFunction(item), 1));
-  }
-
-  template<typename WL>
-  void distributeNewWork(WL* wl) {
-    unsigned int tid = LL::getTID();
-    MergeLocal& mlocal = *this->data.getLocal();
-
-    mlocal.newItems.clear();
-    boost::optional<NewItem> p;
-    while ((p = this->new_.pop())) {
-      mlocal.newItems.push_back(*p);
-    }
-
-    std::sort(mlocal.newItems.begin(), mlocal.newItems.end());
-    NewItemsIterator ii = mlocal.newItems.begin(), ei = mlocal.newItems.end();
-    mlocal.updateMinMax(ii, ei);
-
-    barrier[1].wait();
-    
-    if (tid == 0) {
-      for (int i = 0; i < this->numActive; ++i) {
-        MergeLocal& mother = *this->data.getRemote(i);
-        mlocal.minId = std::min(mother.minId, mlocal.minId);
-        mlocal.maxId = std::max(mother.maxId, mlocal.maxId);
-      }
-      broadcastMinMax(mlocal, tid);
-    }
-
-    barrier[2].wait();
-
-    mlocal.initialWindow(std::max((mlocal.maxId - mlocal.minId) / 100, (size_t) Base::MinDelta));
-
-    for (; ii != ei; ++ii) {
-      unsigned long id = ii->parent;
-      if (id <= mlocal.delta)
-        wl->push(Item(ii->item, id));
-      else
-        mlocal.reserve.push(Item(ii->item, id));
-    }
-  }
-};
-
-//! Specialization for ordered algorithms
-template<typename Options>
-class DMergeManager<Options,typename boost::enable_if_c<Options::useOrdered>::type>: public DMergeManagerBase<Options> {
-  typedef DMergeManagerBase<Options> Base;
-  typedef typename Base::T T;
-  typedef typename Base::Item Item;
-  typedef typename Base::NewItem NewItem;
-  typedef typename Base::MergeLocal MergeLocal;
-  typedef typename Base::NewItemsTy NewItemsTy;
-  typedef typename Base::NewItemsIterator NewItemsIterator;
-  typedef typename Options::CompareTy CompareTy;
+  typedef typename MergeTraits<Options>::IdFn IdFn;
+  typedef typename Base::CompareTy CompareTy;
 
   struct CompareNewItems {
     CompareTy& comp;
     CompareNewItems(CompareTy& c): comp(c) { }
     bool operator()(const NewItem& a, const NewItem& b) const {
-      return comp((void*) &a.item, (void*) &b.item);
+      return safe_less_than(a.item, b.item, comp);
     }
   };
 
   std::vector<NewItem,typename Galois::PerIterAllocTy::rebind<NewItem>::other> mergeBuf;
 
-  GBarrier barrier[1];
+  GBarrier barrier;
+  IdFn idFunction;
   CompareTy& comp;
 
   template<typename InputIteratorTy,typename WL>
-  void distribute(InputIteratorTy b, InputIteratorTy e, size_t dist, WL* wl) {
+  void distribute(InputIteratorTy ii, InputIteratorTy ei, size_t dist, WL* wl) {
     unsigned int tid = LL::getTID();
     MergeLocal& mlocal = *this->data.getLocal();
+
+    // Ordered algorithms generally have less available parallelism, so start
+    // window size out small
+    size_t orderedWindow = std::min((size_t) MergeTraits<Options>::MinDelta, dist);
+
     if (tid == 0) {
       mergeBuf.clear();
       mergeBuf.reserve(dist);
-      for (; b != e; ++b) {
-        mergeBuf.push_back(NewItem(*b, 0, 1));
+      for (; ii != ei; ++ii)
+        mergeBuf.push_back(NewItem(*ii, idFunction(*ii), 1));
+      if (Options::useOrdered)
+        std::sort(mergeBuf.begin(), mergeBuf.end(), CompareNewItems(comp));
+      else
+        std::sort(mergeBuf.begin(), mergeBuf.end());
+      mlocal.initialLimits(mergeBuf.begin(), mergeBuf.end());
+      if (Options::useOrdered) {
+        if (orderedWindow)
+          mlocal.windowElement = boost::optional<T>(mergeBuf[orderedWindow-1].item);
       }
-      std::sort(mergeBuf.begin(), mergeBuf.end(), CompareNewItems(comp));
+      this->broadcastLimits(mlocal, tid);
     }
-    barrier[0].wait();
-    mlocal.initialWindow(std::max(dist / 100, (size_t) Base::MinDelta));
-    this->copyIn(boost::make_transform_iterator(mergeBuf.begin(), typename Base::NewItem::GetFirst()),
+
+    barrier.wait();
+    
+    if (Options::useOrdered)
+      mlocal.initialWindow(orderedWindow);
+    else
+      mlocal.initialWindow(std::max((mlocal.maxId - mlocal.minId) / 100, (size_t) MergeTraits<Options>::MinDelta) + mlocal.minId);
+    
+    mlocal.copyIn(boost::make_transform_iterator(mergeBuf.begin(), typename Base::NewItem::GetFirst()),
         boost::make_transform_iterator(mergeBuf.end(), typename Base::NewItem::GetFirst()),
-        dist, wl, false);
+        dist, wl, this->new_, this->numActive, comp);
   }
 
 public:
   DMergeManager(Options& o): mergeBuf(this->alloc), comp(o.comp) {
-    for (unsigned i = 0; i < sizeof(barrier)/sizeof(*barrier); ++i)
-      barrier[i].reinit(this->numActive);
+    barrier.reinit(this->numActive);
   }
 
   template<typename InputIteratorTy, typename WL>
-  void addInitialWork(InputIteratorTy b, InputIteratorTy e, WL* wl) {
-    size_t dist = std::distance(b, e);
-    distribute(b, e, dist, wl);
+  void addInitialWork(InputIteratorTy ii, InputIteratorTy ei, WL* wl) {
+    distribute(ii, ei, std::distance(ii, ei), wl);
   }
 
   template<typename WL>
-  void pushNew(const T& item, unsigned long parent, unsigned count, WL* wl) {
-    wl->push(Item(item, 0));
+  void pushNew(const T& item, unsigned long parent, unsigned count, WL* wl, bool& hasNewWork, bool& nextCommit) {
+    if (!Options::useOrdered) {
+      this->new_.push(NewItem(item, idFunction(item), 1));
+      hasNewWork = true;
+      return;
+    }
+
+    MergeLocal& mlocal = *this->data.getLocal();
+
+    // NB: Tricky conditions. If we can not definitively place an item, it must
+    // go into the current wl.
+    if (mlocal.mostElement && !safe_less_than(item, *mlocal.mostElement, comp)) {
+      this->new_.push(NewItem(item, idFunction(item), 1));
+      hasNewWork = true;
+    } else if (mlocal.mostElement && mlocal.windowElement && !safe_less_than(item, *mlocal.windowElement, comp)) {
+      mlocal.pushNewReserve(item, comp);
+    } else {
+      // TODO: account for this work in calculateWindow
+      wl->push(Item(item, idFunction(item)));
+      nextCommit = true;
+    }
   }
 
   template<typename WL>
-  void distributeNewWork(WL* wl) {
-    barrier[0].wait();
+  bool distributeNewWork(WL* wl) {
+    unsigned int tid = LL::getTID();
+    MergeLocal& mlocal = *this->data.getLocal();
+
+    assert(mlocal.emptyReserve());
+
+    mlocal.newItems.clear();
+    boost::optional<NewItem> p;
+    while ((p = this->new_.pop()))
+      mlocal.newItems.push_back(*p);
+
+    if (Options::useOrdered)
+      std::sort(mlocal.newItems.begin(), mlocal.newItems.end(), CompareNewItems(comp));
+    else
+      std::sort(mlocal.newItems.begin(), mlocal.newItems.end());
+
+    NewItemsIterator ii = mlocal.newItems.begin(), ei = mlocal.newItems.end();
+    mlocal.initialLimits(ii, ei);
+
+    if (Options::useOrdered) {
+      // Smallest useful delta is 2 because windowElement is not included into
+      // current workset
+      size_t w = std::min(std::max((size_t) MergeTraits<Options>::MinDelta / this->numActive, (size_t) 2), mlocal.newItems.size());
+      if (w)
+        mlocal.windowElement = boost::optional<T>(mlocal.newItems[w-1].item);
+    }
+
+    barrier.wait();
+    
+    if (tid == 0) {
+      this->reduceLimits(mlocal, tid, comp);
+      this->broadcastLimits(mlocal, tid);
+    }
+
+    barrier.wait();
+
+    bool retval = false;
+
+    if (Options::useOrdered) {
+      mlocal.initialWindow(MergeTraits<Options>::MinDelta);
+      
+      assert(ii == ei || (mlocal.windowElement && mlocal.mostElement));
+      assert((!mlocal.windowElement && !mlocal.mostElement) || !safe_less_than(*mlocal.mostElement, *mlocal.windowElement, comp));
+
+      // No new items; we just have the most element X from the previous round.
+      // The most and window elements are exclusive of the range that they
+      // define; there is no most or window element that includes X. The
+      // easiest solution is to not use most or window elements for the next
+      // round, but the downside is that we will never return to windowed execution.
+
+      // TODO: improve this
+      if (mlocal.windowElement && mlocal.mostElement && !safe_less_than(*mlocal.windowElement, *mlocal.mostElement, comp)) {
+        mlocal.windowElement = mlocal.mostElement = boost::optional<T>();
+        for (; ii != ei; ++ii) {
+          wl->push(Item(ii->item, 0));
+        }
+      }
+
+      for (; ii != ei; ++ii) {
+        if (!safe_less_than(ii->item, *mlocal.windowElement, comp))
+          break; 
+        wl->push(Item(ii->item, 0));
+      }
+
+      for (; ii != ei; ++ii) {
+        if (!safe_less_than(ii->item, *mlocal.mostElement, comp))
+          break;
+        mlocal.reserve.push(Item(ii->item, 0));
+      }
+
+      for (; ii != ei; ++ii) {
+        retval = true;
+        this->new_.push(NewItem(ii->item, idFunction(ii->item), 1));
+      }
+    } else {
+      mlocal.initialWindow(std::max((mlocal.maxId - mlocal.minId) / 100, (size_t) MergeTraits<Options>::MinDelta) + mlocal.minId);
+
+      for (; ii != ei; ++ii) {
+        unsigned long id = ii->parent;
+        if (id < mlocal.window)
+          wl->push(Item(ii->item, id));
+        else
+          break;
+      }
+
+      for (; ii != ei; ++ii) {
+        unsigned long id = ii->parent;
+        mlocal.reserve.push(Item(ii->item, id));
+      }
+    }
+
+    return retval;
+  }
+
+  template<typename WL>
+  void prepareNextWindow(WL* wl) { 
+    if (!Options::useOrdered)
+      return;
+    
+    unsigned int tid = LL::getTID();
+    MergeLocal& mlocal = *this->data.getLocal();
+    mlocal.updateWindowElement(wl, comp, mlocal.delta / this->numActive);
+
+    barrier.wait();
+
+    if (tid == 0) {
+      this->reduceLimits(mlocal, tid, comp);
+      this->broadcastLimits(mlocal, tid);
+    }
   }
 };
 
@@ -931,7 +1184,6 @@ public:
   template<typename IterTy>
   bool AddInitialWork(IterTy b, IterTy e) {
     mergeManager.addInitialWork(b, e, &worklists[1]);
-
     return true;
   }
 
@@ -947,7 +1199,8 @@ void Executor<Options>::go() {
   tld.wlcur = &worklists[0];
   tld.wlnext = &worklists[1];
 
-  tld.hasNewWork = false;
+  // copyIn for ordered algorithms adds at least one initial new item
+  tld.hasNewWork = Options::useOrdered ? true : false;
 
   while (true) {
     ++tld.outerRounds;
@@ -977,23 +1230,25 @@ void Executor<Options>::go() {
         break;
 
       mergeManager.calculateWindow(true);
+      mergeManager.prepareNextWindow(tld.wlnext);
 
       barrier[0].wait();
 
-      mlocal.nextWindow(tld.wlnext);
+      mlocal.nextWindow(tld.wlnext, options);
       mlocal.resetStats();
     }
 
-    if (!mlocal.empty())
+    if (!mlocal.emptyReserve())
       outerDone.data = false;
 
     if (tld.hasNewWork)
       hasNewWork.data = true;
 
-    mergeManager.calculateWindow(false);
-
     if (breakManager.checkBreak())
       break;
+
+    mergeManager.calculateWindow(false);
+    mergeManager.prepareNextWindow(tld.wlnext);
 
     barrier[3].wait();
 
@@ -1002,13 +1257,11 @@ void Executor<Options>::go() {
         break;
       if (!hasNewWork.data) // (1)
         break;
-      mergeManager.distributeNewWork(tld.wlnext);
-      mlocal.resetWindow();
-      tld.hasNewWork = false;
+      tld.hasNewWork = mergeManager.distributeNewWork(tld.wlnext);
       // NB: assumes that distributeNewWork has a barrier otherwise checking at (1) is erroneous
       hasNewWork.data = false;
     } else {
-      mlocal.nextWindow(tld.wlnext);
+      mlocal.nextWindow(tld.wlnext, options);
     }
 
     mlocal.resetStats();
@@ -1038,6 +1291,7 @@ bool Executor<Options>::pendingLoop(ThreadLocalData& tld)
     if (Options::useOrdered) {
       cnx->set_comp(&options.comp);
       cnx->set_comp_data(mlocal.pushItemPool(p->item));
+      mlocal.assertLimits(p->item, options.comp);
     }
     cnx->start_iteration();
     tld.stat.inc_iterations();
@@ -1134,8 +1388,7 @@ bool Executor<Options>::commitLoop(ThreadLocalData& tld)
         unsigned count = 0;
         for (iterator ii = tld.facing.getPushBuffer().begin(), 
             ei = tld.facing.getPushBuffer().end(); ii != ei; ++ii) {
-          mergeManager.pushNew(*ii, parent, ++count, tld.wlnext);
-          tld.hasNewWork = true;
+          mergeManager.pushNew(*ii, parent, ++count, tld.wlnext, tld.hasNewWork, retval);
           if (count == 0) {
             assert(0 && "Counter overflow");
             abort();

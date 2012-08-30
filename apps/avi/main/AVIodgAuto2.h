@@ -31,6 +31,8 @@
 
 #include "Galois/Runtime/ODGtwoPhase.h"
 
+#include <boost/iterator/transform_iterator.hpp>
+
 #include <string>
 #include <sstream>
 #include <limits>
@@ -68,15 +70,22 @@ protected:
     }
   }
 
+  struct Item {
+    double timestamp;
+    AVI* avi;
+    Item(double t, AVI* a): timestamp(t), avi(a) { }
+  };
+
   struct Prefix {
     Graph& graph;
     Locks& locks;
 
     Prefix(Graph& g, Locks& l): graph(g), locks(l) { }
 
-    void operator()(AVI* avi, Galois::UserContext<AVI*>&) {
+    void operator()(const Item& item, Galois::UserContext<Item>&) {
       typedef std::vector<GlobalNodalIndex> V;
-      const V& conn = avi->getGeometry().getConnectivity();
+
+      const V& conn = item.avi->getGeometry().getConnectivity();
 
       for (V::const_iterator ii = conn.begin(), ei = conn.end(); ii != ei; ++ii) {
         graph.getData(locks[*ii]);
@@ -103,16 +112,16 @@ protected:
       createSyncFiles(createSyncFiles),
       iter(iter) { }
 
-    void operator()(AVI* avi, Galois::UserContext<AVI*>& ctx) {
+    void operator()(const Item& item, Galois::UserContext<Item>& ctx) {
       // for debugging, remove later
       iter += 1;
 
       LocalVec& l = perIterLocalVec.get();
 
-      AVIabstractMain::simulate(avi, meshInit, g, l, createSyncFiles);
+      AVIabstractMain::simulate(item.avi, meshInit, g, l, createSyncFiles);
 
-      if (avi->getNextTimeStamp() < meshInit.getSimEndTime()) {
-        ctx.push(avi);
+      if (item.avi->getNextTimeStamp() < meshInit.getSimEndTime()) {
+        ctx.push(Item(item.avi->getNextTimeStamp(), item.avi));
       }
     }
   };
@@ -120,13 +129,17 @@ protected:
   struct Compare: public Galois::CompareCallback {
     AVIComparator comp;
     bool operator()(void *a, void *b) const {
-      AVI* aa = *static_cast<AVI**>(a);
-      AVI* bb = *static_cast<AVI**>(b);
-      return comp(aa, bb);
+      Item* aa = static_cast<Item*>(a);
+      Item* bb = static_cast<Item*>(b);
+      return comp(aa->avi, bb->avi);
     }
     virtual bool compare(void *a, void *b) {
       return (*this)(a, b);
     }
+  };
+
+  struct MakeItem: public std::unary_function<AVI*,Item> {
+    Item operator()(AVI* avi) const { return Item(avi->getNextTimeStamp(), avi); }
   };
 
 public:
@@ -141,7 +154,10 @@ public:
     Process p(meshInit, g, perIterLocalVec, createSyncFiles, iter);
 
     const std::vector<AVI*>& elems = meshInit.getAVIVec();
-    Galois::for_each_ordered(elems.begin(), elems.end(), prefix, p, Compare());
+    Galois::for_each_ordered(
+        boost::make_transform_iterator(elems.begin(), MakeItem()),
+        boost::make_transform_iterator(elems.end(), MakeItem()),
+        prefix, p, Compare());
 
     printf("iterations = %d\n", iter.reduce());
   }
