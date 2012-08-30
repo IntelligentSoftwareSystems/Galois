@@ -83,7 +83,7 @@ struct not_in_mst {
 };
 
 bool verify(Galois::InsertBag<Edge>& result) {
-  if (std::distance(result.begin(), result.end()) != graph.size() - 1)
+  if (std::distance(result.begin(), result.end()) != ((ptrdiff_t) graph.size()) - 1)
     return false;
 
   return Galois::find_if(graph.begin(), graph.end(), not_in_mst()) == graph.end();
