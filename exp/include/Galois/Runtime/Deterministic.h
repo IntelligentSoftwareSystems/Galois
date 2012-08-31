@@ -399,10 +399,12 @@ class DMergeLocal {
       // No more reserve but what should we propose for windowElement? As with
       // distributeNewWork, this is a little tricky. Proposing nothing does not
       // work because our proposal must be at least as large as any element we
-      // add to wl. Here, we use the simplest solution which is mostElement. 
+      // add to wl, and for progress, the element must be larger than at least
+      // one element in the reserve. Here, we use the simplest solution which
+      // is mostElement. 
 
       // TODO improve this
-      if (count == 0) {
+      if (count <= 1) {
         windowElement = mostElement;
         return;
       }
@@ -1115,7 +1117,10 @@ public:
     
     unsigned int tid = LL::getTID();
     MergeLocal& mlocal = *this->data.getLocal();
-    mlocal.updateWindowElement(wl, comp, mlocal.delta / this->numActive);
+    size_t w = 0;
+    if (mlocal.delta)
+      w = std::max((size_t) 2, mlocal.delta / this->numActive);
+    mlocal.updateWindowElement(wl, comp, w);
 
     barrier.wait();
 
