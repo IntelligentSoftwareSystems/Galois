@@ -36,10 +36,11 @@ namespace GaloisRuntime {
 namespace LL {
 
 //This should be much simpler in c++03 mode, but be general for now
+//This exists because ptrlock is not a pod, but this is.
 template<typename T>
 struct StaticInstance {
   volatile T* V;
-  int _lock;
+  volatile int _lock;
 
   inline void lock() {
     int oldval;
