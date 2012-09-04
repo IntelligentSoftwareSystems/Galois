@@ -101,7 +101,6 @@ protected:
     SimpleRuntimeContext cnx;
     LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
     TerminationDetection::TokenHolder* lterm;
-
     ThreadLocalData(const char* ln) :stat(ln) {}
   };
 
@@ -112,7 +111,7 @@ protected:
 
   TerminationDetection term;
   PerPackageStorage<AbortedList> aborted;
-  PerThreadStorage<bool> broke;
+  LL::CacheLineStorage<bool> broke;
 
   inline void commitIteration(ThreadLocalData& tld) {
     if (ForEachTraits<FunctionTy>::NeedsPush) {
@@ -155,8 +154,7 @@ protected:
   GALOIS_ATTRIBUTE_NOINLINE
   void handleBreak(ThreadLocalData& tld) {
     commitIteration(tld);
-    for (unsigned x = 0; x < broke.size(); ++x)
-      *broke.getRemote(x) = true;
+    broke.data = true;
   }
 
   bool runQueueSimple(ThreadLocalData& tld) {
@@ -248,7 +246,7 @@ protected:
 	else //No try/catch
 	  didWork = runQueueSimple(tld);
 	//Check for break
-	if (ForEachTraits<FunctionTy>::NeedsBreak && *broke.getLocal())
+	if (ForEachTraits<FunctionTy>::NeedsBreak && broke.data)
 	  break;
 	//Check for abort
 	if (checkAbort)
@@ -257,7 +255,7 @@ protected:
 	if (didWork)
 	  tld.lterm->workHappened();
       } while (didWork);
-      if (ForEachTraits<FunctionTy>::NeedsBreak && *broke.getLocal())
+      if (ForEachTraits<FunctionTy>::NeedsBreak && broke.data)
 	break;
 #ifdef GALOIS_USE_EXP
       //pool.work();
@@ -273,10 +271,10 @@ protected:
   }
 
 public:
-  ForEachWork(FunctionTy& f, const char* l): wl(default_wl), function(f), loopname(l) { }
+  ForEachWork(FunctionTy& f, const char* l): wl(default_wl), function(f), loopname(l), broke(false) { }
 
   template<typename W>
-  ForEachWork(W& w, FunctionTy& f, const char* l): wl(w), function(f), loopname(l) { }
+  ForEachWork(W& w, FunctionTy& f, const char* l): wl(w), function(f), loopname(l), broke(false) { }
 
   template<typename Iter>
   void AddInitialWork(Iter b, Iter e) {
