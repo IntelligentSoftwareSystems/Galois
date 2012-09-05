@@ -23,6 +23,7 @@
 #ifndef GALOIS_RUNTIME_INSBAG_H
 #define GALOIS_RUNTIME_INSBAG_H
 
+#include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/mm/Mem.h" 
 #include "Galois/Runtime/ll/PtrLock.h"
 #include <iterator>
