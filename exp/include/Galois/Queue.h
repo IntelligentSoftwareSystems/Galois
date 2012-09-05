@@ -23,9 +23,9 @@
 #ifndef GALOIS_QUEUE_H
 #define GALOIS_QUEUE_H
 
-#include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/mm/Mem.h"
+#include "Galois/Runtime/PerThreadStorage.h"
 #include <boost/utility.hpp>
 #include <boost/optional.hpp>
 #include <stdlib.h>
@@ -313,7 +313,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * Seed for simple random number generator. Not volatile since it doesn't
    * matter too much if different threads don't see updates.
    */
-  GaloisRuntime::PerCPU<int> randomSeed;
+  GaloisRuntime::PerThreadStorage<int> randomSeed;
   Compare comp;
 
   GaloisRuntime::MM::FixedSizeAllocator node_heap;
@@ -333,7 +333,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
       c = 0; // suppress warning
       // Add slight jitter so threads will get different seeds
       // and ensure non-zero
-      randomSeed.get(i) = ((1000000 + i) * time.tv_sec + time.tv_usec) | 0x0100;
+      *randomSeed.getRemote(i) = ((1000000 + i) * time.tv_sec + time.tv_usec) | 0x0100;
     }
 
     Node *node = new (node_heap.allocate(sizeof(Node))) 
@@ -889,7 +889,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    */
   int randomLevel() {
     int level = 0;
-    int& seed = randomSeed.get();
+    int& seed = *randomSeed.getLocal();
     int r = seed;
     seed = r * 134775813 + 1;
     if (r < 0) {
@@ -1632,8 +1632,8 @@ class FCPairingHeap: private boost::noncopyable {
     Slot(): req(NULL), next(NULL), prev(NULL) { }
   };
 
-  GaloisRuntime::PerCPU<Slot*> localSlots;
-  GaloisRuntime::PerCPU<std::vector<Op*> > ops;
+  GaloisRuntime::PerThreadStorage<Slot*> localSlots;
+  GaloisRuntime::PerThreadStorage<std::vector<Op*> > ops;
   GaloisRuntime::LL::PaddedLock<Concurrent> lock;
   PairingHeap<T,Compare> heap;
   Slot* slots;
@@ -1675,7 +1675,7 @@ class FCPairingHeap: private boost::noncopyable {
   }
 
   Slot* getMySlot() {
-    Slot*& mySlot = localSlots.get();
+    Slot*& mySlot = *localSlots.getLocal();
     if (mySlot == NULL) {
       mySlot = new Slot();
       addSlot(mySlot);
@@ -1685,7 +1685,7 @@ class FCPairingHeap: private boost::noncopyable {
   }
 
   Op* getOp() {
-    std::vector<Op*>& myOps = ops.get();
+    std::vector<Op*>& myOps = *ops.getLocal();
     if (myOps.empty()) {
       return new Op;
     }
@@ -1695,7 +1695,7 @@ class FCPairingHeap: private boost::noncopyable {
   }
 
   void recycleOp(Op* op) {
-    ops.get().push_back(op);
+    ops.getLocal()->push_back(op);
   }
 
   Op* makeAddReq(const T& value) {
@@ -1732,7 +1732,7 @@ public:
     }
 
     for (unsigned int i = 0; i < ops.size(); ++i) {
-      std::vector<Op*>& v = ops.get(i);
+      std::vector<Op*>& v = *ops.getRemote(i);
       for (typename std::vector<Op*>::iterator ii = v.begin(), ee = v.end(); ii != ee ; ++ii) {
         delete *ii;
       }

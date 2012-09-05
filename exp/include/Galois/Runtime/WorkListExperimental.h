@@ -448,8 +448,8 @@ public:
 
 private:
   PerThreadStorage<typename LocalWL::template rethread<false>::WL> localQueues;
-  PerLevel<GlobalWL> sharedQueues;
-  PerLevel<unsigned long> starvingFlags;
+  PerPackageStorage<GlobalWL> sharedQueues;
+  PerPackageStorage<unsigned long> starvingFlags;
   GlobalWL gwl;
   unsigned long gStarving;
 
@@ -457,17 +457,17 @@ private:
   //is a master thread of a level below
   void clearStarving() {
     gStarving = 0;
-    starvingFlags.get() = 0;
+    *starvingFlags.getLocal() = 0;
   }
 
 public:
   void push(value_type val) {
     if (gStarving)
       gwl.push(val);
-    else if (starvingFlags.get())
-      sharedQueues.push(val);
+    else if (*starvingFlags.getLocal())
+      sharedQueues.getLocal()->push(val);
     else
-      localQueues.push(val);
+      localQueues.getLocal()->push(val);
   }
 
   template<typename ItTy>
@@ -484,12 +484,12 @@ public:
 
   boost::optional<value_type> pop() {
     //Try the local queue first
-    boost::optional<value_type> ret = localQueues.get().pop();
+    boost::optional<value_type> ret = localQueues.getLocal()->pop();
     if (ret)
       return ret;
 
     //check parent
-    ret = sharedQueues.get().pop();
+    ret = sharedQueues.getLocal()->pop();
     if (ret) {
       clearStarving();
       return ret;
@@ -503,10 +503,10 @@ public:
     }
     
     //Any thread can set the package starving flag
-    starvingFlags.get() = 1;
+    *starvingFlags.getLocal() = 1;
     //if we are master for the package, handle flags
     if (sharedQueues.isFirstInLevel())
-
+      ; // TODO: ???
     return ret;
   }
 };
@@ -1482,53 +1482,9 @@ public:
 };
 GALOIS_WLCOMPILECHECK(FCPairingHeapQueue)
 
-#ifdef GALOIS_USE_TBB
-template<typename T = int>
-class TbbFIFO : private boost::noncopyable  {
-  tbb::concurrent_bounded_queue<T> wl;
 
-public:
-  template<bool newconcurrent>
-  struct rethread {
-    typedef TbbFIFO<T> WL;
-  };
-  template<typename Tnew>
-  struct retype {
-    typedef TbbFIFO<Tnew> WL;
-  };
-
-  typedef T value_type;
-
-  void push(value_type val) {
-    wl.push(val);
-  }
-
-  template<typename ItTy>
-  void push(ItTy b, ItTy e) {
-    while (b != e)
-      wl.push(*b++);
-  }
-
-  template<typename ItTy>
-  void push_initial(ItTy b, ItTy e) {
-    while (b != e)
-      wl.push(*b++);
-  }
-
-  boost::optional<value_type> pop() {
-    T V = T();
-    return wl.try_pop(V) ?
-      boost::optional<value_type>(V) :
-      boost::optional<value_type>();
-  }
-};
-GALOIS_WLCOMPILECHECK(TbbFIFO)
-
-#endif
-
-
- template<class Indexer, typename ContainerTy = GaloisRuntime::WorkList::FIFO<>, typename T = int, bool concurrent = true >
-   class SimpleOrderedByIntegerMetric : private boost::noncopyable, private GaloisRuntime::LL::PaddedLock<concurrent> {
+template<class Indexer, typename ContainerTy = GaloisRuntime::WorkList::FIFO<>, typename T = int, bool concurrent = true >
+class SimpleOrderedByIntegerMetric : private boost::noncopyable, private GaloisRuntime::LL::PaddedLock<concurrent> {
 
    using GaloisRuntime::LL::PaddedLock<concurrent>::lock;
    using GaloisRuntime::LL::PaddedLock<concurrent>::try_lock;
@@ -1918,6 +1874,47 @@ template <typename T> struct GETID<T*> {
 };
 
 #ifdef GALOIS_USE_TBB
+template<typename T = int>
+class TbbFIFO : private boost::noncopyable  {
+  tbb::concurrent_bounded_queue<T> wl;
+
+public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef TbbFIFO<T> WL;
+  };
+  template<typename Tnew>
+  struct retype {
+    typedef TbbFIFO<Tnew> WL;
+  };
+
+  typedef T value_type;
+
+  void push(value_type val) {
+    wl.push(val);
+  }
+
+  template<typename ItTy>
+  void push(ItTy b, ItTy e) {
+    while (b != e)
+      wl.push(*b++);
+  }
+
+  template<typename ItTy>
+  void push_initial(ItTy b, ItTy e) {
+    while (b != e)
+      wl.push(*b++);
+  }
+
+  boost::optional<value_type> pop() {
+    T V = T();
+    return wl.try_pop(V) ?
+      boost::optional<value_type>(V) :
+      boost::optional<value_type>();
+  }
+};
+GALOIS_WLCOMPILECHECK(TbbFIFO)
+
 //partitioned tbb
 template<class Compare = std::less<int>, typename T = int>
 class PTbb : private boost::noncopyable {
@@ -2093,6 +2090,18 @@ public:
   }
 };
 GALOIS_WLCOMPILECHECK(TbbPriQueue)
+#else
+template<typename T = int>
+class TbbFIFO: public AbstractWorkList<T,false> { };
+
+template<class Compare = std::less<int>, typename T = int>
+class PTbb: public AbstractWorkList<T,false> { };
+
+template<class Compare = std::less<int>, typename T = int>
+class STbb: public AbstractWorkList<T,false> { };
+
+template<class Compare = std::less<int>, typename T = int>
+class TbbPriQueue: public AbstractWorkList<T,false> { };
 #endif //TBB
 
 template<class T=int, bool concurrent = true>
@@ -2309,11 +2318,11 @@ public:
 };
 
 class LevelLocalAlt : private boost::noncopyable {
-  PerLevel<LIFO_SB> local;
+  PerPackageStorage<LIFO_SB> local;
   
 public:
   void push(ChunkHeader* val) {
-    local.get().push(val);
+    local.getLocal()->push(val);
   }
 
   void pushi(ChunkHeader* val) {
@@ -2321,16 +2330,16 @@ public:
   }
 
   ChunkHeader* pop() {
-    return local.get().pop();
+    return local.getLocal()->pop();
   }
 };
 
 class LevelStealingAlt : private boost::noncopyable {
-  PerLevel<LIFO_SB> local;
+  PerPackageStorage<LIFO_SB> local;
   
 public:
   void push(ChunkHeader* val) {
-    local.get().push(val);
+    local.getLocal()->push(val);
   }
 
   void pushi(ChunkHeader* val) {
@@ -2338,18 +2347,18 @@ public:
   }
 
   ChunkHeader* pop() {
-    LIFO_SB& me = local.get();
+    LIFO_SB& me = *local.getLocal();
 
     ChunkHeader* ret = me.pop();
     if (ret)
       return ret;
     
     //steal
-    int id = local.myEffectiveID();
+    int id = LL::getPackageForThread(LL::getTID());
     for (int i = 0; i < (int) local.size(); ++i) {
       ++id;
       id %= local.size();
-      ret = me.steal(local.get(id));
+      ret = me.steal(*local.getRemote(id));
       if (ret)
 	break;
     }

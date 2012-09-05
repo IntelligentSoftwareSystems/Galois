@@ -36,7 +36,6 @@
 #include "Galois/Runtime/ForEachTraits.h"
 #include "Galois/Runtime/LoopHooks.h"
 #include "Galois/Runtime/ParallelWork.h"
-#include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Termination.h"
 #include "Galois/Runtime/ThreadPool.h"

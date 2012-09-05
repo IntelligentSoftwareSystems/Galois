@@ -38,7 +38,7 @@
 
 #include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/LoopHooks.h"
-#include "Galois/Runtime/PerCPU.h"
+#include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Termination.h"
 #include "Galois/Runtime/ThreadPool.h"
@@ -338,7 +338,7 @@ private:
     for (unsigned i = 1; i < numT; ++i) { // skip poor_id by starting at 1
 
       unsigned t = (poor_id + i) % numT;
-      if (workers.get (t).hasWorkWeak ()) {
+      if (workers.getRemote (t)->hasWorkWeak ()) {
 
         rich_id = t;
         succ = true;
@@ -363,7 +363,7 @@ private:
       unsigned t = pack_begin + ((poor_id + 1) % per_pack);
       assert ( (t >= pack_begin) && (t < pack_end));
 
-      if (workers.get (t).hasWorkWeak ()) {
+      if (workers.getRemote (t)->hasWorkWeak ()) {
         rich_id = t;
         succ = true;
         break;
@@ -399,7 +399,7 @@ private:
       Iter begin;
       Iter end;
 
-      if (workers.get (rich_id).stealWork (begin, end, (chunks_to_steal*chunk_size))) {
+      if (workers.getRemote (rich_id)->stealWork (begin, end, (chunks_to_steal*chunk_size))) {
         poor.assignWork (begin, end);
         ret = true;
       } else {
@@ -415,7 +415,7 @@ private:
     
     unsigned numT = LL::getMaxThreads ();
     for (unsigned i = 0; i < numT; ++i) {
-      if (workers.get (i).hasWorkWeak ()) {
+      if (workers.getRemote (i)->hasWorkWeak ()) {
         succ = true;
         rich_id = i;
         break;
@@ -436,7 +436,7 @@ private:
 
 
     for (unsigned i = 0; i < Galois::getActiveThreads (); ++i) {
-      ThreadContext& ctx = workers.get (i);
+      ThreadContext& ctx = *workers.getRemote (i);
 
       iter.add (ctx.num_iter);
       time.add (ctx.timer.get_usec ());
@@ -461,7 +461,7 @@ private:
   FuncTp func;
   const char* loopname;
   Diff_ty chunk_size;
-  GaloisRuntime::PerCPU<ThreadContext> workers;
+  GaloisRuntime::PerThreadStorage<ThreadContext> workers;
   TerminationDetection term;
 
   // for stats
@@ -471,16 +471,14 @@ private:
 public:
 
   DoAllCoupledExec (
-      const PerCPU<Range<Iter> >& ranges, 
+      const PerThreadStorage<Range<Iter> >& ranges, 
       FuncTp& _func, 
       const char* _loopname,
       const unsigned maxChunkSize)
     : 
       func (_func), 
       loopname (_loopname),
-      chunk_size (1),
-      // default contruction, will construct again
-      workers (ThreadContext (0, ranges.get (0)))
+      chunk_size (1)
   {
 
     assert (ranges.size () == workers.size ());
@@ -488,7 +486,7 @@ public:
     assert (maxChunkSize > 0);
 
     for (unsigned i = 0; i < ranges.size (); ++i) {
-      workers.get (i) = ThreadContext (i, ranges.get (i));
+      *workers.getRemote (i) = ThreadContext (i, *ranges.getRemote (i));
     }
 
     chunk_size = std::max (Diff_ty (1), Diff_ty (maxChunkSize));
@@ -498,7 +496,7 @@ public:
   ~DoAllCoupledExec () {
     // executed serially
     for (unsigned i = 0; i < workers.size (); ++i) {
-      assert (!workers.get (i).hasWork () &&  "Unprocessed work left");
+      assert (!workers.getRemote (i)->hasWork () &&  "Unprocessed work left");
     }
 
     // printStats ();
@@ -506,7 +504,7 @@ public:
 
   void operator () () {
 
-    ThreadContext& ctx = workers.get ();
+    ThreadContext& ctx = *workers.getLocal ();
     TerminationDetection::TokenHolder* localterm = term.getLocalTokenHolder ();
 
 #ifdef ENABLE_DO_ALL_TIMERS
@@ -619,7 +617,7 @@ public:
 
 
 template <typename Iter, typename FuncTp>
-void do_all_coupled_impl (PerCPU<Range<Iter> >& ranges, FuncTp& func, const char* loopname, const unsigned maxChunkSize) {
+void do_all_coupled_impl (PerThreadStorage<Range<Iter> >& ranges, FuncTp& func, const char* loopname, const unsigned maxChunkSize) {
 
   assert (!inGaloisForEach);
   inGaloisForEach = true;
@@ -648,11 +646,12 @@ void do_all_coupled (WL& workList, FuncTp func, const char* loopname=0, const un
   typedef typename WL::local_iterator Iter;
 
   // default construction
-  PerCPU<Range<Iter> > ranges (Range<Iter> (workList[0].begin (), workList[0].begin ()));
+  //PerThreadStorage<Range<Iter> > ranges (Range<Iter> (workList[0].begin (), workList[0].begin ()));
+  PerThreadStorage<Range<Iter> > ranges;
 
 
   for (unsigned i = 0; i < workList.numRows (); ++i) {
-    ranges.get (i) = Range<Iter> (workList[i].begin (), workList[i].end (), workList[i].size ());
+    *ranges.getRemote (i) = Range<Iter> (workList[i].begin (), workList[i].end (), workList[i].size ());
   }
 
 
@@ -665,11 +664,12 @@ void do_all_coupled_reverse (WL& workList, FuncTp func, const char* loopname=0, 
   typedef typename WL::local_reverse_iterator Iter;
 
   // default construction
-  PerCPU<Range<Iter> > ranges (Range<Iter> (workList[0].rbegin (), workList[0].rbegin ()));
+  //PerThreadStorage<Range<Iter> > ranges (Range<Iter> (workList[0].rbegin (), workList[0].rbegin ()));
+  PerThreadStorage<Range<Iter> > ranges;
 
 
   for (unsigned i = 0; i < workList.numRows (); ++i) {
-    ranges.get (i) = Range<Iter> (workList[i].rbegin (), workList[i].rend (), workList[i].size ());
+    *ranges.getRemote (i) = Range<Iter> (workList[i].rbegin (), workList[i].rend (), workList[i].size ());
   }
 
 
@@ -687,7 +687,8 @@ void do_all_coupled (const Iter begin, const Iter end, FuncTp func, const char* 
     return;
   }
 
-  PerCPU<Range<Iter> > ranges (Range<Iter> (begin, begin)); // default construction
+  //PerThreadStorage<Range<Iter> > ranges (Range<Iter> (begin, begin)); // default construction
+  PerThreadStorage<Range<Iter> > ranges;
 
   Diff_ty total = std::distance (begin, end);
 
@@ -723,13 +724,13 @@ void do_all_coupled (const Iter begin, const Iter end, FuncTp func, const char* 
     Iter e = b;
     std::advance (e, inc_amount); // e = b + perThread;
 
-    ranges.get (i) = Range<Iter> (b, e, inc_amount);
+    *ranges.getRemote (i) = Range<Iter> (b, e, inc_amount);
 
     b = e;
   }
 
   for (unsigned i = last + 1; i < numT; ++i) {
-    ranges.get (i) = Range<Iter> (end, end);
+    *ranges.getRemote (i) = Range<Iter> (end, end);
   }
 
 

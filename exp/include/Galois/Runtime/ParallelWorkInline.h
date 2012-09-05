@@ -116,8 +116,8 @@ class dChunkedMaster : private boost::noncopyable {
 
   typedef OuterTy<Chunk, true> LevelItem;
 
-  PerCPU<p> data;
-  PerLevel<LevelItem> Q;
+  PerThreadStorage<p> data;
+  PerPackageStorage<LevelItem> Q;
 
   Chunk* mkChunk() {
     return new (heap.allocate(sizeof(Chunk))) Chunk();
@@ -129,12 +129,12 @@ class dChunkedMaster : private boost::noncopyable {
   }
 
   void pushChunk(const WID& id, Chunk* C)  {
-    LevelItem& I = Q.get(id.pid);
+    LevelItem& I = *Q.getLocal();
     I.push(C);
   }
 
   Chunk* popChunkByID(unsigned int i)  {
-    LevelItem& I = Q.get(i);
+    LevelItem& I = *Q.getRemote(i);
     return I.pop();
   }
 
@@ -168,13 +168,13 @@ public:
 
   dChunkedMaster() : heap(sizeof(Chunk)) {
     for (unsigned int i = 0; i < data.size(); ++i) {
-      p& r = data.get(i);
+      p& r = *data.getRemote(i);
       r.next = 0;
     }
   }
 
   void push(const WID& id, const value_type& val)  {
-    p& n = data.get(id.tid);
+    p& n = *data.getLocal();
     if (n.next && !n.next->full()) {
       n.next->push(val);
       return;
@@ -183,7 +183,7 @@ public:
   }
 
   unsigned currentChunkSize(const WID& id) {
-    p& n = data.get(id.tid);
+    p& n = *data.getLocal();
     if (n.next) {
       return n.next->size();
     }
@@ -202,12 +202,12 @@ public:
   }
 
   value_type& cur(const WID& id) {
-    p& n = data.get(id.tid);
+    p& n = *data.getLocal();
     return n.next->cur();
   }
 
   bool empty(const WID& id) {
-    p& n = data.get(id.tid);
+    p& n = *data.getRemote(id.tid);
     if (n.next && !n.next->empty())
       return false;
     return emptySP(id, n);
@@ -225,7 +225,7 @@ public:
   }
 
   void pop(const WID& id)  {
-    p& n = data.get(id.tid);
+    p& n = *data.getLocal();
     if (n.next && !n.next->empty()) {
       n.next->pop();
       return;

@@ -35,7 +35,7 @@
 
 #include <cstdio>
 
-#include "Galois/Runtime/PerCPU.h"
+#include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/ThreadPool.h"
 #include "Galois/Runtime/mm/Mem.h"
 #include "Galois/Runtime/TwoLevelIteratorA.h"
@@ -65,23 +65,23 @@ public:
   typedef typename intern::ChooseIter<This_ty, typename Cont_tp::const_reverse_iterator>::type global_const_reverse_iterator;
 
 protected:
-  typedef GaloisRuntime::PerCPU<Cont_ty*> PerThrdCont_ty;
+  typedef GaloisRuntime::PerThreadStorage<Cont_ty*> PerThrdCont_ty;
   PerThrdCont_ty perThrdCont;
 
-  PerThreadWorkList (): perThrdCont (NULL) {}
+  PerThreadWorkList (): perThrdCont () {}
   ~PerThreadWorkList () {}
 
 
 public:
   unsigned numRows () const { return perThrdCont.size (); }
 
-  Cont_ty& get () { return *(perThrdCont.get ()); }
+  Cont_ty& get () { return **(perThrdCont.getLocal ()); }
 
-  const Cont_ty& get () const { return *(perThrdCont.get ()); }
+  const Cont_ty& get () const { return **(perThrdCont.getLocal ()); }
 
-  Cont_ty& get (unsigned i) { return *(perThrdCont.get (i)); }
+  Cont_ty& get (unsigned i) { return **(perThrdCont.getRemote (i)); }
 
-  const Cont_ty& get (unsigned i) const { return *(perThrdCont.get (i)); }
+  const Cont_ty& get (unsigned i) const { return **(perThrdCont.getRemote (i)); }
 
   Cont_ty& operator [] (unsigned i) { return get (i); }
 
@@ -202,15 +202,15 @@ public:
     Alloc_ty alloc (&heap);
 
     for (unsigned i = 0; i < Super_ty::perThrdCont.size (); ++i) {
-      Super_ty::perThrdCont.get (i) = new Cont_ty (alloc);
+      *Super_ty::perThrdCont.getRemote (i) = new Cont_ty (alloc);
     }
 
   }
 
   ~PerThreadVector () {
     for (unsigned i = 0; i < Super_ty::perThrdCont.size (); ++i) {
-      delete Super_ty::perThrdCont.get (i);
-      Super_ty::perThrdCont.get (i) = NULL;
+      delete *Super_ty::perThrdCont.getRemote (i);
+      *Super_ty::perThrdCont.getRemote (i) = NULL;
     }
   }
   
