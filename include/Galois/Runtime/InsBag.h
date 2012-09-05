@@ -39,10 +39,10 @@ class galois_insert_bag : private boost::noncopyable {
     T* dlast; //end of storage
   };
 
-  GaloisRuntime::PerCPU<header*> heads;
+  GaloisRuntime::PerThreadStorage<header*> heads;
 
   void insHeader(header* h) {
-    header*& H = heads.get();
+    header*& H = *heads.getLocal();
     h->next = H;
     H = h;
   }
@@ -63,7 +63,7 @@ class galois_insert_bag : private boost::noncopyable {
 
   void destruct() {
     for (unsigned x = 0; x < heads.size(); ++x) {
-      header*& h = heads.get(x);
+      header*& h = *heads.getRemote(x);
       while (h) {
 	for (T* ii = h->dbegin, *ee = h->dend; ii != ee; ++ii) {
 	  ii->~T();
@@ -91,13 +91,13 @@ public:
   typedef T&       reference;
 
   class iterator : public std::iterator<std::forward_iterator_tag, T> {
-    GaloisRuntime::PerCPU<header*>* hd;
+    GaloisRuntime::PerThreadStorage<header*>* hd;
     unsigned int thr;
     header* p;
     T* v;
 
     bool init_thread() {
-      p = thr < hd->size() ? hd->get(thr) : 0;
+      p = thr < hd->size() ? *hd->getRemote(thr) : 0;
       v = p ? p->dbegin : 0;
       return p;
     }
@@ -134,7 +134,7 @@ public:
 
   public:
     iterator() :hd(0), thr(0), p(0), v(0) {}
-    iterator(GaloisRuntime::PerCPU<header*>* _hd, int _thr) 
+    iterator(GaloisRuntime::PerThreadStorage<header*>* _hd, int _thr) 
       :hd(_hd), thr(_thr), p(0), v(0)
     {
       //find first valid item
@@ -178,7 +178,7 @@ public:
 
   //Only this is thread safe
   reference push(const T& val) {
-    header* H = heads.get();
+    header* H = *heads.getLocal();
     T* rv;
     if (!H || H->dend == H->dlast) {
       H = newHeader();

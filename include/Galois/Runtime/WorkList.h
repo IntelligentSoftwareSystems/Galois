@@ -53,7 +53,12 @@ namespace WorkList {
 // All classes (should) conform to:
 template<typename T, bool concurrent>
 class AbstractWorkList {
+  AbstractWorkList(const AbstractWorkList&);
+  const AbstractWorkList& operator=(const AbstractWorkList&);
+
 public:
+  AbstractWorkList() { }
+
   //! T is the value type of the WL
   typedef T value_type;
 
@@ -70,24 +75,23 @@ public:
   };
 
   //! push a value onto the queue
-  void push(const value_type& val);
+  void push(const value_type& val) { abort(); }
 
   //! push a range onto the queue
   template<typename Iter>
-  void push(Iter b, Iter e);
+  void push(Iter b, Iter e) { abort(); }
 
   //! push initial range onto the queue
   //! called with the same b and e on each thread
   template<typename Iter>
-  void push_initial(Iter b, Iter e);
+  void push_initial(Iter b, Iter e) { abort(); }
 
   //Optional, but this is the likely interface for stealing
   //! steal from a similar worklist
   boost::optional<value_type> steal(AbstractWorkList& victim, bool half, bool pop);
 
-
   //! pop a value from the queue.
-  boost::optional<value_type> pop();
+  boost::optional<value_type> pop() { abort(); }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -966,8 +970,8 @@ class OwnerComputesWL : private boost::noncopyable {
   typedef ChunkedLIFO<256, T> pWL;
 
   OwnerFn Fn;
-  PerLevel<cWL> Items;
-  PerLevel<pWL> pushBuffer;
+  PerPackageStorage<cWL> items;
+  PerPackageStorage<pWL> pushBuffer;
 
 public:
   template<bool newconcurrent>
@@ -984,12 +988,13 @@ public:
 
   void push(const value_type& val)  {
     unsigned int index = Fn(val);
-    unsigned int mindex = Items.effectiveIDFor(index);
+    unsigned int tid = LL::getTID();
+    unsigned int mindex = LL::getPackageForThreadInternal(index);
     //std::cerr << "[" << index << "," << index % active << "]\n";
-    if (mindex == Items.myEffectiveID())
-      Items.get(mindex).push(val);
+    if (mindex == LL::getPackageForThread(tid))
+      items.getLocal()->push(val);
     else
-      pushBuffer.get(mindex).push(val);
+      pushBuffer.getRemote(mindex)->push(val);
   }
 
   template<typename ItTy>
@@ -1002,15 +1007,15 @@ public:
   void push_initial(ItTy b, ItTy e) {
     fill_work(*this, b, e);
     for (unsigned int x = 0; x < pushBuffer.size(); ++x)
-      pushBuffer.get(x).flush();
+      pushBuffer.getRemote(x)->flush();
   }
 
   boost::optional<value_type> pop() {
-    cWL& wl = Items.get();
+    cWL& wl = *items.getLocal();
     boost::optional<value_type> retval = wl.pop();
     if (retval)
       return retval;
-    pWL& p = pushBuffer.get();
+    pWL& p = *pushBuffer.getLocal();
     while ((retval = p.pop()))
       wl.push(*retval);
     return wl.pop();

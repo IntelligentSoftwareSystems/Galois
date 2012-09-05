@@ -24,7 +24,7 @@
 #define GALOIS_BAG_H
 
 #include "Galois/Runtime/InsBag.h"
-#include "Galois/Runtime/PerCPU.h"
+#include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/mm/Mem.h"
 
 #include <iterator>
@@ -492,7 +492,7 @@ public:
 // TODO(ddn): Remove need for explicit merge by adopting same techniques are InsBag
 template<typename T>
 class MergeBag: private boost::noncopyable {
-  GaloisRuntime::PerCPU<Bag<T> > bags;
+  GaloisRuntime::PerThreadStorage<Bag<T> > bags;
 
 public:
   typedef typename Bag<T>::value_type value_type;
@@ -502,47 +502,47 @@ public:
   typedef typename Bag<T>::const_iterator const_iterator;
 
   void merge() {
-    Bag<T>& o = bags.get(0);
+    Bag<T>& o = *bags.getRemote(0);
     for (unsigned i = 1; i < bags.size(); ++i) {
-      o.splice(bags.get(i));
+      o.splice(*bags.getRemote(i));
     }
   }
 
   const_iterator begin() const {
-    return bags.get(0).begin();
+    return bags.getRemote(0)->begin();
   }
 
   iterator begin() {
-    return bags.get(0).begin();
+    return bags.getRemote(0)->begin();
   }
 
   const_iterator end() const {
-    return bags.get(0).end();
+    return bags.getRemote(0)->end();
   }
 
   iterator end() {
-    return bags.get(0).end();
+    return bags.getRemote(0)->end();
   }
   
   reference push_back(const T& val) {
-    return bags.get().push_back(val);
+    return bags.getLocal()->push_back(val);
   }
 
   bool empty() const {
-    return bags.get(0).empty();
+    return bags.getRemote(0)->empty();
   }
 
   size_t size() const {
-    return bags.get(0).size();
+    return bags.getRemote(0)->size();
   }
 
   void clear() {
-    bags.get(0).clear();
+    bags.getRemote(0)->clear();
   }
 
   void swap(MergeBag<T>& o) {
     for (unsigned i = 0; i < bags.size(); ++i) {
-      std::swap(bags.get(i), o.bags.get(i));
+      std::swap(*bags.getRemote(i), *o.bags.getRemote(i));
     }
   }
 };

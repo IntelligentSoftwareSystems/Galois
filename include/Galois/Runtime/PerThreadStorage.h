@@ -84,17 +84,17 @@ public:
     PTSBackend.deallocOffset(offset, sizeof(T));
   }
 
-  T* getLocal() {
+  T* getLocal() const {
     void* ditem = PTSBackend.getLocal(offset, ptsBase);
     return reinterpret_cast<T*>(ditem);
   }
 
-  T* getRemote(unsigned int thread) {
+  T* getRemote(unsigned int thread) const {
     void* ditem = PTSBackend.getRemote(thread, offset);
     return reinterpret_cast<T*>(ditem);
   }
 
-  unsigned size() {
+  unsigned size() const {
     return LL::getMaxThreads();
   }
 };
@@ -121,22 +121,22 @@ public:
     PPSBackend.deallocOffset(offset, sizeof(T));
   }
 
-  T* getLocal() {
+  T* getLocal() const {
     void* ditem = PPSBackend.getLocal(offset, ppsBase);
     return reinterpret_cast<T*>(ditem);
   }
 
-  T* getRemote(unsigned int thread) {
+  T* getRemote(unsigned int thread) const {
     void* ditem = PPSBackend.getRemote(thread, offset);
     return reinterpret_cast<T*>(ditem);
   }
 
-  T* getRemoteByPkg(unsigned int pkg) {
+  T* getRemoteByPkg(unsigned int pkg) const {
     void* ditem = PPSBackend.getRemote(LL::getLeaderForPackage(pkg), offset);
     return reinterpret_cast<T*>(ditem);
   }
 
-  unsigned size() {
+  unsigned size() const {
     return LL::getMaxThreads();
   }
 };

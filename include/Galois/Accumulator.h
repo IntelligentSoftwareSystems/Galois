@@ -24,7 +24,7 @@
 #ifndef GALOIS_ACCUMULATOR_H
 #define GALOIS_ACCUMULATOR_H
 
-#include "Galois/Runtime/PerCPU.h"
+#include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/LoopHooks.h"
 
 #include <limits>
@@ -46,7 +46,7 @@ template<typename T, typename BinFunc>
 class GReducible {
 protected:
   BinFunc m_func;
-  GaloisRuntime::PerCPU<T> m_data;
+  GaloisRuntime::PerThreadStorage<T> m_data;
   const T m_initial;
 
   explicit GReducible(const BinFunc& f, const T& initial): m_func(f), m_initial(initial) { }
@@ -63,7 +63,7 @@ public:
    * current and newly provided value
    */
   void update(const T& rhs) {
-    T& lhs = m_data.get();
+    T& lhs = *m_data.getLocal();
     m_func(lhs, rhs);
   }
 
@@ -71,9 +71,9 @@ public:
    * the final reduction value. Only valid outside the parallel region.
    */
   T& reduce() {
-    T& d0 = m_data.get(0);
+    T& d0 = *m_data.getLocal();
     for (unsigned int i = 1; i < m_data.size(); ++i) {
-      T& d = m_data.get(i);
+      T& d = *m_data.getRemote(i);
       m_func(d0, d);
       d = m_initial;
     }
@@ -84,7 +84,9 @@ public:
    * reset value 
    */
   void reset() {
-    m_data.reset(m_initial);
+    for (unsigned int i = 0; i < m_data.size(); ++i) {
+      *m_data.getRemote(i) = m_initial;
+    }
   }
 };
 
@@ -185,9 +187,9 @@ public:
  }
 
   T unsafeRead() const {
-    T d0 = this->m_data.get(0);
+    T d0 = *this->m_data.getRemote(0);
     for (unsigned int i = 1; i < this->m_data.size(); ++i) {
-      const T& d = this->m_data.get(i);
+      const T& d = *this->m_data.getRemote(i);
       this->m_func(d0, d);
     }
     return d0;
@@ -209,7 +211,7 @@ class GCollectionAccumulator: public GReducible<CollectionTy, ReduceCollectionWr
 
 public:
   void update(const value_type& rhs) {
-    CollectionTy& v = this->m_data.get();
+    CollectionTy& v = *this->m_data.getLocal();
     func(v, rhs);
   }
 };
@@ -232,7 +234,7 @@ class GVectorElementAccumulator: public GReducible<VectorTy, ReduceVectorWrap<Re
 
 public:
   void update(size_t index, const value_type& rhs) {
-    VectorTy& v = this->m_data.get();
+    VectorTy& v = *this->m_data.getLocal();
     if (v.size() <= index)
       v.resize(index + 1);
     func(v[index], rhs);

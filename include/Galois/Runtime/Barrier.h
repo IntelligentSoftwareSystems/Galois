@@ -23,7 +23,6 @@
 #ifndef GALOIS_RUNTIME_BARRIER_H
 #define GALOIS_RUNTIME_BARRIER_H
 
-#include "PerCPU.h"
 #include "PerThreadStorage.h"
 
 #include <pthread.h>
@@ -58,8 +57,8 @@ class SimpleBarrier {
   };
 
   volatile int globalTotal;
-  PerCPU<TLD> tlds;
-  PerLevel<PLD> plds;
+  PerThreadStorage<TLD> tlds;
+  PerPackageStorage<PLD> plds;
   int size;
 
   void cascade(int tid);

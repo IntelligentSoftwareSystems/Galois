@@ -41,7 +41,7 @@ class WorkListTracker {
   };
 
   //online collection of stats
-  PerCPU<p> tracking;
+  PerThreadStorage<p> tracking;
   //global clock
   LL::CacheLineStorage<unsigned int> clock;
   //master thread counting towards a tick
@@ -72,7 +72,7 @@ public:
 
     //First flush the stats
     for (unsigned int t = 0; t < tracking.size(); ++t) {
-      p& P = tracking.get(t);
+      p& P = *tracking.getRemote(t);
       if (P.stat.getCount()) {
 	P.values[P.epoch] = P.stat;
       }
@@ -94,7 +94,7 @@ public:
       file << x;
       //for each thread
       for (unsigned int t = 0; t < tracking.size(); ++t) {
-	p& P = tracking.get(t);
+	p& P = *tracking.getRemote(t);
 	if (P.values.find(x) != P.values.end()) {
 	  OnlineStat& S = P.values[x];
 	  file << "," << S.getCount()
@@ -128,7 +128,7 @@ public:
   boost::optional<value_type> pop() {
     boost::optional<value_type> ret = wl.pop();
     if (!ret) return ret;
-    p& P = tracking.get();
+    p& P = *tracking.getRemote();
     unsigned int cclock = clock.data;
     if (P.epoch != cclock) {
       if (P.stat.getCount())
@@ -138,7 +138,7 @@ public:
     }
     unsigned int index = I(*ret);
     P.stat.insert(index);
-    if (tracking.myEffectiveID() == 0) {
+    if (LL::getTID() == 0) {
       ++thread_clock.data;
       if (thread_clock.data == 1024*10) {
 	thread_clock.data = 0;

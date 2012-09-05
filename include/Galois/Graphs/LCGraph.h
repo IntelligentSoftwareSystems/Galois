@@ -568,7 +568,7 @@ protected:
     size_t size;
   };
 
-  GaloisRuntime::PerCPU<Header*> headers;
+  GaloisRuntime::PerThreadStorage<Header*> headers;
   NodeInfo** nodes;
   uint64_t numNodes;
   uint64_t numEdges;
@@ -590,7 +590,7 @@ protected:
   };
 
   //! Divide graph into equal sized chunks
-  void distribute(FileGraph& graph, GaloisRuntime::PerCPU<DistributeInfo>& dinfo) {
+  void distribute(FileGraph& graph, GaloisRuntime::PerThreadStorage<DistributeInfo>& dinfo) {
     size_t total = sizeof(NodeInfo) * numNodes + sizeof(EdgeInfo) * numEdges;
     unsigned int num = Galois::getActiveThreads();
     size_t blockSize = total / num;
@@ -607,7 +607,7 @@ protected:
     for (tid = 0; tid + 1 < num; ++tid) {
       for (; ii != ei; ++ii) {
         if (curSize >= (tid + 1) * blockSize) {
-          DistributeInfo& d = dinfo.get(tid);
+          DistributeInfo& d = *dinfo.getRemote(tid);
           d.numNodes = nnodes;
           d.numEdges = nedges;
           d.begin = last;
@@ -626,7 +626,7 @@ protected:
       }
     }
 
-    DistributeInfo& d = dinfo.get(tid);
+    DistributeInfo& d = *dinfo.getRemote(tid);
     d.numNodes = numNodes - runningNodes;
     d.numEdges = numEdges - runningEdges;
     d.begin = last;
@@ -634,18 +634,19 @@ protected:
   }
 
   struct AllocateNodes {
-    GaloisRuntime::PerCPU<DistributeInfo>& dinfo;
-    GaloisRuntime::PerCPU<Header*>& headers;
+    GaloisRuntime::PerThreadStorage<DistributeInfo>& dinfo;
+    GaloisRuntime::PerThreadStorage<Header*>& headers;
     NodeInfo** nodes;
     FileGraph& graph;
 
     AllocateNodes(
-        GaloisRuntime::PerCPU<DistributeInfo>& d,
-        GaloisRuntime::PerCPU<Header*>& h, NodeInfo** n, FileGraph& g):
+        GaloisRuntime::PerThreadStorage<DistributeInfo>& d,
+        GaloisRuntime::PerThreadStorage<Header*>& h, NodeInfo** n, FileGraph& g):
       dinfo(d), headers(h), nodes(n), graph(g) { }
 
     void operator()(unsigned int tid, unsigned int num) {
-      DistributeInfo& d = dinfo.get(tid);
+      //DistributeInfo& d = dinfo.get(tid);
+      DistributeInfo& d = *dinfo.getLocal();
 
       // extra 2 factors are for alignment purposes
       size_t size =
@@ -656,7 +657,7 @@ protected:
       void *raw = GaloisRuntime::MM::largeAlloc(size);
       memset(raw, 0, size);
 
-      Header*& h = headers.get();
+      Header*& h = *headers.getLocal();
       h = reinterpret_cast<Header*>(raw);
       h->size = size;
       h->begin = h->end = reinterpret_cast<NodeInfo*>(h + 1);
@@ -674,16 +675,17 @@ protected:
   };
 
   struct AllocateEdges {
-    GaloisRuntime::PerCPU<DistributeInfo>& dinfo;
+    GaloisRuntime::PerThreadStorage<DistributeInfo>& dinfo;
     NodeInfo** nodes;
     FileGraph& graph;
 
-    AllocateEdges(GaloisRuntime::PerCPU<DistributeInfo>& d, NodeInfo** n, FileGraph& g):
+    AllocateEdges(GaloisRuntime::PerThreadStorage<DistributeInfo>& d, NodeInfo** n, FileGraph& g):
       dinfo(d), nodes(n), graph(g) { }
 
     //! layout the edges
     void operator()(unsigned int tid, unsigned int num) {
-      DistributeInfo& d = dinfo.get(tid);
+      //DistributeInfo& d = *dinfo.getRemote(tid);
+      DistributeInfo& d = *dinfo.getLocal();
       if (!d.numNodes)
         return;
 
@@ -706,13 +708,13 @@ public:
   typedef NodeInfo** iterator;
 
   class local_iterator : public std::iterator<std::forward_iterator_tag, GraphNode> {
-    const GaloisRuntime::PerCPU<Header*>* headers;
+    const GaloisRuntime::PerThreadStorage<Header*>* headers;
     unsigned int tid;
     Header* p;
     GraphNode v;
 
     bool init_thread() {
-      p = tid < headers->size() ? headers->get(tid) : 0;
+      p = tid < headers->size() ? *headers->getRemote(tid) : 0;
       v = p ? p->begin : 0;
       return p;
     }
@@ -740,7 +742,7 @@ public:
 
   public:
     local_iterator(): headers(0), tid(0), p(0), v(0) { }
-    local_iterator(const GaloisRuntime::PerCPU<Header*>* _headers, int _tid):
+    local_iterator(const GaloisRuntime::PerThreadStorage<Header*>* _headers, int _tid):
       headers(_headers), tid(_tid), p(0), v(0)
     {
       //find first valid item
@@ -767,7 +769,7 @@ public:
     if (nodes)
       GaloisRuntime::MM::largeInterleavedFree(nodes, sizeof(NodeInfo*) * numNodes);
     for (unsigned i = 0; i < headers.size(); ++i) {
-      Header* h = headers.get(i);
+      Header* h = *headers.getRemote(i);
       if (h)
         GaloisRuntime::MM::largeFree(h, h->size);
     }
@@ -839,7 +841,7 @@ public:
     numNodes = graph.size();
     numEdges = graph.sizeEdges();
 
-    GaloisRuntime::PerCPU<DistributeInfo> dinfo;
+    GaloisRuntime::PerThreadStorage<DistributeInfo> dinfo;
     distribute(graph, dinfo);
 
     size_t size = sizeof(NodeInfo*) * numNodes;

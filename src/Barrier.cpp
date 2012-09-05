@@ -77,7 +77,7 @@ void GaloisRuntime::SimpleBarrier::cascade(int tid) {
   for (int i = 0; i < multiple; ++i) {
     int n = tid * multiple + i;
     if (n < size && n != 0)
-      tlds.get(n).flag = 1;
+      tlds.getRemote(n)->flag = 1;
   }
 }
 
@@ -86,10 +86,10 @@ void GaloisRuntime::SimpleBarrier::reinit(int val, int init) {
 
   if (val != size) {
     for (unsigned i = 0; i < plds.size(); ++i)
-      plds.get(i).total = 0;
+      plds.getRemote(i)->total = 0;
     for (int i = 0; i < val; ++i) {
       int j = LL::getPackageForThreadInternal(i);
-      ++plds.get(j).total;
+      ++plds.getRemote(j)->total;
     }
 
     size = val;
@@ -99,7 +99,7 @@ void GaloisRuntime::SimpleBarrier::reinit(int val, int init) {
 }
 
 void GaloisRuntime::SimpleBarrier::increment() {
-  PLD& pld = plds.get();
+  PLD& pld = *plds.getLocal();
   int total = pld.total;
 
   if (__sync_add_and_fetch(&pld.count, 1) == total) {
@@ -111,7 +111,7 @@ void GaloisRuntime::SimpleBarrier::increment() {
 
 void GaloisRuntime::SimpleBarrier::wait() {
   int tid = (int) LL::getTID();
-  TLD& tld = tlds.get(tid);
+  TLD& tld = *tlds.getLocal();
   if (tid == 0) {
     while (globalTotal < size) {
       GaloisRuntime::LL::asmPause();
@@ -127,7 +127,7 @@ void GaloisRuntime::SimpleBarrier::barrier() {
   assert(size > 0);
 
   int tid = (int) LL::getTID();
-  TLD& tld = tlds.get(tid);
+  TLD& tld = *tlds.getLocal();
 
   if (tid == 0) {
     while (globalTotal < size) {
