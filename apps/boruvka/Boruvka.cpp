@@ -170,7 +170,7 @@ void printGraph() {
 }
 ///////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////
-GaloisRuntime::PerCPU<long long> MSTWeight;
+GaloisRuntime::PerThreadStorage<long long> MSTWeight;
 struct process {
    template<typename ContextTy>
    void operator()(GNode& src, ContextTy& lwl) {
@@ -209,7 +209,7 @@ struct process {
       }
       assert(minEdgeWeight>=0);
       //update MST weight.
-      MSTWeight.get() += minEdgeWeight;
+      *MSTWeight.getLocal() += minEdgeWeight;
       typedef std::pair<GNode, EdgeDataType> EdgeData;
       typedef std::set<EdgeData, std::less<EdgeData>, Galois::PerIterAllocTy::rebind<EdgeData>::other> edsetTy;
       edsetTy toAdd(std::less<EdgeData>(), Galois::PerIterAllocTy::rebind<EdgeData>::other(lwl.getPerIterAlloc()));
@@ -283,7 +283,7 @@ EdgeDataType runBodyParallel() {
    BORUVKA_SAMPLE_FREQUENCY = graph.size()/200;//200 samples should be sufficient.
 #endif
    for (size_t i = 0; i < MSTWeight.size(); i++){
-      MSTWeight.get(i) = 0;
+      *MSTWeight.getRemote(i) = 0;
    }
    cout << "Starting loop body\n";
    Galois::StatTimer T;
@@ -299,9 +299,9 @@ EdgeDataType runBodyParallel() {
    EdgeDataType res = 0;
    for (size_t i = 0; i < MSTWeight.size(); i++) {
 #if BORUVKA_DEBUG
-      std::cout<<"MST +=" << MSTWeight.get(i)<<std::endl;
+      std::cout<<"MST +=" << *MSTWeight.getRemote(i)<<std::endl;
 #endif
-      res += MSTWeight.get(i);
+      res += *MSTWeight.getRemote(i);
    }
 //   std::cout << "MST Weight is " << res <<std::endl;
    return res;
