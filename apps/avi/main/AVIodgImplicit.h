@@ -28,14 +28,13 @@
 #include "Galois/Atomic.h"
 #include "Galois/Timer.h"
 
-#include "Galois/Runtime/PerCPU.h"
+#include "Galois/Runtime/PerThreadStorage.h"
 
 #ifdef GALOIS_USE_EXP
 #include "Galois/Runtime/cond_inline.h"
 #include "Galois/Runtime/PerThreadWorkList.h"
 #endif // GALOIS_USE_EXP
 
-#include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/WorkList.h"
 #include "Galois/Runtime/ll/gio.h"
 
@@ -219,7 +218,7 @@ protected:
     VecVecAVI& vertexSharers;
     MeshInit& meshInit;
     GlobalVec& g;
-    GaloisRuntime::PerCPU<LocalVec>& perIterLocalVec;
+    GaloisRuntime::PerThreadStorage<LocalVec>& perIterLocalVec;
     bool createSyncFiles;
     IterCounter& opIter;
 
@@ -227,7 +226,7 @@ protected:
         VecVecAVI& vertexSharers,
         MeshInit& meshInit,
         GlobalVec& g,
-        GaloisRuntime::PerCPU<LocalVec>& perIterLocalVec,
+        GaloisRuntime::PerThreadStorage<LocalVec>& perIterLocalVec,
         bool createSyncFiles,
         IterCounter& opIter):
 
@@ -243,7 +242,7 @@ protected:
 
       assert (isSrcInODG (vertexSharers, srcAVI));
 
-      LocalVec& l = perIterLocalVec.get();
+      LocalVec& l = *perIterLocalVec.getLocal();
 
       AVIabstractMain::simulate(srcAVI, meshInit, g, l, createSyncFiles);
 
@@ -265,9 +264,9 @@ public:
     const size_t nrows = meshInit.getSpatialDim ();
     const size_t ncols = meshInit.getNodesPerElem();
 
-    LocalVec l(nrows, ncols);
-
-    GaloisRuntime::PerCPU<LocalVec> perIterLocalVec (l);
+    GaloisRuntime::PerThreadStorage<LocalVec> perIterLocalVec;
+    for (unsigned int i = 0; i < perIterLocalVec.size(); ++i)
+      *perIterLocalVec.getRemote(i) = LocalVec(nrows, ncols);
 
     IterCounter findIter;
     IterCounter opIter;

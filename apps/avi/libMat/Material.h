@@ -26,8 +26,10 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef MATERIAL
-#define MATERIAL
+#ifndef MATERIAL_H
+#define MATERIAL_H
+
+#include "Galois/Runtime/PerThreadStorage.h"
 
 #include <vector>
 #include <string>
@@ -37,7 +39,6 @@
 #include <cmath>
 #include <cassert>
 
-#include "Galois/Runtime/PerCPU.h"
 /**
  \brief Base class for all materials.
 
@@ -197,7 +198,7 @@ class NeoHookean: public SimpleMaterial {
   /**
    * Per thread storage for NeoHookenTmpVec 
    */
-  static GaloisRuntime::PerCPU<NeoHookenTmpVec> perCPUtmpVec;
+  static GaloisRuntime::PerThreadStorage<NeoHookenTmpVec> perCPUtmpVec;
 
 public:
   NeoHookean(double LambdaInput, double MuInput, double rhoInput = 0) :

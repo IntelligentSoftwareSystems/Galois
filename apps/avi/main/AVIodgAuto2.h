@@ -26,10 +26,8 @@
 
 #include "Galois/Galois.h"
 #include "Galois/Callbacks.h"
-#include "Galois/Runtime/PerCPU.h"
+#include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/WorkList.h"
-
-#include "Galois/Runtime/ODGtwoPhase.h"
 
 #include <boost/iterator/transform_iterator.hpp>
 
@@ -96,14 +94,14 @@ protected:
   struct Process {
     MeshInit& meshInit;
     GlobalVec& g;
-    GaloisRuntime::PerCPU<LocalVec>& perIterLocalVec;
+    GaloisRuntime::PerThreadStorage<LocalVec>& perIterLocalVec;
     bool createSyncFiles;
     IterCounter& iter;
 
     Process(
         MeshInit& meshInit,
         GlobalVec& g,
-        GaloisRuntime::PerCPU<LocalVec>& perIterLocalVec,
+        GaloisRuntime::PerThreadStorage<LocalVec>& perIterLocalVec,
         bool createSyncFiles,
         IterCounter& iter):
       meshInit(meshInit),
@@ -116,7 +114,7 @@ protected:
       // for debugging, remove later
       iter += 1;
 
-      LocalVec& l = perIterLocalVec.get();
+      LocalVec& l = *perIterLocalVec.getLocal();
 
       AVIabstractMain::simulate(item.avi, meshInit, g, l, createSyncFiles);
 
@@ -147,7 +145,10 @@ public:
     const size_t nrows = meshInit.getSpatialDim();
     const size_t ncols = meshInit.getNodesPerElem();
 
-    GaloisRuntime::PerCPU<LocalVec> perIterLocalVec(LocalVec(nrows, ncols));
+    GaloisRuntime::PerThreadStorage<LocalVec> perIterLocalVec;
+    for (unsigned int i = 0; i < perIterLocalVec.size(); ++i)
+      *perIterLocalVec.getRemote(i) = LocalVec(nrows, ncols);
+
     IterCounter iter;
 
     Prefix prefix(graph, locks);

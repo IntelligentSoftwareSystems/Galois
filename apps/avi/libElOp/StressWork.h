@@ -34,7 +34,7 @@
 
 #include <cassert>
 
-#include "Galois/Runtime/PerCPU.h"
+#include "Galois/Runtime/PerThreadStorage.h"
 
 #include "ElementalOperation.h"
 #include "AuxDefs.h"
@@ -126,7 +126,7 @@ private:
   /**
    * Per thread storage for temporary vectors used in @see getDValIntern
    */
-  typedef GaloisRuntime::PerCPU<StressWorkTmpVec> PerCPUtmpVecTy;
+  typedef GaloisRuntime::PerThreadStorage<StressWorkTmpVec> PerCPUtmpVecTy;
 
   static PerCPUtmpVecTy perCPUtmpVec;
 
