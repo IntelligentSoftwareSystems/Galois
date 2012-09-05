@@ -162,7 +162,7 @@ template<typename Predicate>
 struct count_if_helper {
   Predicate f;
   ptrdiff_t ret;
-  count_if_helper(Predicate p):f(p) { }
+  count_if_helper(Predicate p): f(p), ret(0) { }
   template<typename T>
   void operator()(const T& v) {
     if (f(v)) ++ret;
@@ -206,13 +206,13 @@ struct find_if_helper {
   typedef int tt_needs_parallel_break;
 
   typedef boost::optional<InputIterator> ElementTy;
-  typedef GaloisRuntime::PerCPU<ElementTy> AccumulatorTy;
+  typedef GaloisRuntime::PerThreadStorage<ElementTy> AccumulatorTy;
   AccumulatorTy& accum;
   Predicate& f;
   find_if_helper(AccumulatorTy& a, Predicate& p): accum(a), f(p) { }
   void operator()(const InputIterator& v, UserContext<InputIterator>& ctx) {
     if (f(*v)) {
-      accum.get() = v;
+      *accum.getLocal() = v;
       ctx.breakLoop();
     }
   }
@@ -227,8 +227,8 @@ InputIterator find_if(InputIterator first, InputIterator last, Predicate pred)
   HelperTy helper(accum, pred);
   Galois::for_each(NoDerefIterator<InputIterator>(first), NoDerefIterator<InputIterator>(last), helper);
   for (unsigned i = 0; i < accum.size(); ++i) {
-    if (accum.get(i))
-      return *accum.get(i);
+    if (*accum.getRemote(i))
+      return **accum.getRemote(i);
   }
   return last;
 }
