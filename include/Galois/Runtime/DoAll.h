@@ -35,9 +35,9 @@ struct dummyFN {
   void operator()(T a, T b) {}
 };
 
-template<class FunctionTy, class ReduceFunTy, class IterTy>
+// TODO(ddn): Tune stealing. DMR suffers when stealing is on
+template<class FunctionTy, class ReduceFunTy, class IterTy, bool useStealing=false>
 class DoAllWork {
-
   LL::SimpleLock<true> reduceLock;
   FunctionTy origF;
   ReduceFunTy RF;
@@ -130,11 +130,12 @@ public:
     thisTLD.begin = r.first;
     thisTLD.end = r.second;
 
-    populateSteal(thisTLD, *TLDS.getLocal());
+    if (useStealing)
+      populateSteal(thisTLD, *TLDS.getLocal());
 
     do {
       processRange(thisTLD);
-    } while (trySteal(thisTLD));
+    } while (useStealing && trySteal(thisTLD));
 
     doReduce(thisTLD);
   }

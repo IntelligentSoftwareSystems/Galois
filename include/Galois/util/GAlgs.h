@@ -63,7 +63,7 @@ IterTy split_range(IterTy b, IterTy e) {
 template<typename IterTy>
 std::pair<IterTy, IterTy> block_range(IterTy b, IterTy e, unsigned id, unsigned num) {
   unsigned int dist = std::distance(b, e);
-  unsigned int numper = (dist + num - 1) / num; //round up
+  unsigned int numper = std::max((dist + num - 1) / num, 1U); //round up
   unsigned int A = std::min(numper * id, dist);
   unsigned int B = std::min(numper * (id + 1), dist);
   e = b;
