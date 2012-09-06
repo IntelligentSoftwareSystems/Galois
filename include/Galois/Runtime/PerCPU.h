@@ -40,7 +40,7 @@ protected:
   LL::CacheLineStorage<T>* datum;
 
 public:
-  GALOIS_ATTRIBUTE_DEPRECIATED
+  GALOIS_ATTRIBUTE_DEPRECATED
   PERTHING() {
     datum = new LL::CacheLineStorage<T>[BASE::getMaxSize()];
   }
