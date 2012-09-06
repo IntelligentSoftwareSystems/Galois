@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Compare performance with Schardl BFS program
+# Compare performance with PBBS maximal independent set program
 
 BASE="$(cd $(dirname $0); cd ../..; pwd)"
 
@@ -9,7 +9,7 @@ if [[ ! -e Makefile ]]; then
   exit 1
 fi
 
-if [[ ! -e "${BASE}/tools/bin/bfs-schardl" ]]; then
+if [[ ! -e "${BASE}/tools/bin/independentset-pbbs" ]]; then
   echo "Execute make more-tools before running this script" 1>&2
   exit 1
 fi
@@ -32,21 +32,10 @@ run() {
   $cmd
 }
 
-SF=$(dirname $F)/$(basename $F .gr).bsml
-if [[ ! -e "$SF" ]]; then
-  "${BASE}/tools/graph-convert/graph-convert" -gr2bsml "$F" "$SF"
-fi
-run "${BASE}/tools/bin/bfs-schardl" -f "$SF"
-
-run "${BASE}/apps/bfs/bfs" -parallelBarrierInline $* "$F"
-run "${BASE}/apps/bfs/bfs" $* "$F"
-
-if [[ ! -e "${BASE}/tools/bin/bfs-pbbs" ]]; then
-  exit
-fi
-
 PBBSF=$(dirname $F)/$(basename $F .gr).pbbs
 if [[ ! -e "$PBBSF" ]]; then
   "${BASE}/tools/graph-convert/graph-convert" -gr2pbbs "$F" "$PBBSF"
 fi
-run "${BASE}/tools/bin/bfs-pbbs" "$PBBSF"
+run "${BASE}/tools/bin/independentset-pbbs" "$PBBSF"
+
+run "${BASE}/apps/independentset/independentset" $* "$F"

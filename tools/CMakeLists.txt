@@ -58,6 +58,9 @@ ExternalProject_Add(snap
     -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}
 )
 
+#set(more_tools hi_pr triangle cats-gens snap GTgraph-rmat SSCA2)
+set(more_tools hi_pr triangle snap GTgraph-rmat SSCA2)
+
 # Simple download and patch
 function(dl name url)
   ExternalProject_Add(${name}
@@ -75,19 +78,23 @@ function(dl name url)
   )
 endfunction(dl)
 
+function(cilkdl name url)
+  if(HAVE_CILK)
+    dl(${name} ${url})
+    set(more_tools ${more_tools} ${name} PARENT_SCOPE)
+  else()
+    message(STATUS "Build of ${name} will be skipped because CILK is not available")
+  endif()
+endfunction(cilkdl)
+
 dl(hi_pr http://www.avglab.com/andrew/soft/hipr.tar)
 dl(GTgraph-rmat http://www.cse.psu.edu/~madduri/software/GTgraph/GTgraph.tar.gz)
 dl(SSCA2 http://www.graphanalysis.org/benchmark/SSCA2-2.2.tar.gz)
-
-#set(more_tools hi_pr triangle cats-gens snap GTgraph-rmat SSCA2)
-set(more_tools hi_pr triangle snap GTgraph-rmat SSCA2)
-
-if(HAVE_CILK)
-  dl(bfs-schardl http://web.mit.edu/~neboat/www/code/bfs-icc-20120304.tar.gz)
-  set(more_tools ${more_tools} bfs-schardl)
-else()
-  message(STATUS "Build of Schardl BFS will be skipped because CILK is not available")
-endif()
+cilkdl(bfs-schardl http://web.mit.edu/~neboat/www/code/bfs-icc-20120304.tar.gz)
+cilkdl(bfs-pbbs http://www.cs.cmu.edu/~pbbs/benchmarks/breadthFirstSearch.tar)
+cilkdl(delaunayrefinement-pbbs http://www.cs.cmu.edu/~pbbs/benchmarks/delaunayRefine.tar)
+cilkdl(delaunaytriangulation-pbbs http://www.cs.cmu.edu/~pbbs/benchmarks/delaunayTriangulation.tar)
+cilkdl(independentset-pbbs http://www.cs.cmu.edu/~pbbs/benchmarks/maximalIndependentSet.tar)
 
 add_custom_target(more-tools)
 set_target_properties(${more_tools} PROPERTIES EXCLUDE_FROM_ALL true)
