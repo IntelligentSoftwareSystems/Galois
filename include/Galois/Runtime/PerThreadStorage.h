@@ -52,6 +52,11 @@ public:
   void* getLocal(unsigned offset, char* base) {
     return &base[offset];
   }
+  // faster when (1) you already know the id and (2) shared access to heads is
+  // not to expensive; otherwise use getLocal(unsigned,char*)
+  void* getLocal(unsigned offset, unsigned id) {
+    return &heads[id][offset];
+  }
 };
 
 extern __thread char* ptsBase;
@@ -89,6 +94,12 @@ public:
     return reinterpret_cast<T*>(ditem);
   }
 
+  //! Like getLocal() but optimized for when you already know the thread id
+  T* getLocal(unsigned int thread) const {
+    void* ditem = PTSBackend.getLocal(offset, thread);
+    return reinterpret_cast<T*>(ditem);
+  }
+
   T* getRemote(unsigned int thread) const {
     void* ditem = PTSBackend.getRemote(thread, offset);
     return reinterpret_cast<T*>(ditem);
@@ -123,6 +134,12 @@ public:
 
   T* getLocal() const {
     void* ditem = PPSBackend.getLocal(offset, ppsBase);
+    return reinterpret_cast<T*>(ditem);
+  }
+
+  //! Like getLocal() but optimized for when you already know the thread id
+  T* getLocal(unsigned int thread) const {
+    void* ditem = PPSBackend.getLocal(offset, thread);
     return reinterpret_cast<T*>(ditem);
   }
 

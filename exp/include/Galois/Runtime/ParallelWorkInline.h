@@ -96,11 +96,11 @@ struct WID {
   unsigned tid;
   unsigned pid;
   WID(unsigned t): tid(t) {
-    pid = LL::getPackageForThreadInternal(tid);
+    pid = LL::getLeaderForThread(tid);
   }
   WID() {
     tid = LL::getTID();
-    pid = LL::getPackageForThreadInternal(tid);
+    pid = LL::getLeaderForThread(tid);
   }
 };
 
@@ -129,28 +129,29 @@ class dChunkedMaster : private boost::noncopyable {
   }
 
   void pushChunk(const WID& id, Chunk* C)  {
-    LevelItem& I = *Q.getLocal();
+    LevelItem& I = *Q.getLocal(id.pid);
     I.push(C);
   }
 
   Chunk* popChunkByID(unsigned int i)  {
-    LevelItem& I = *Q.getRemote(i);
-    return I.pop();
+    LevelItem* I = Q.getRemote(i);
+    if (I)
+      return I->pop();
+    return 0;
   }
 
   Chunk* popChunk(const WID& id)  {
-    int pid = id.pid;
-    Chunk* r = popChunkByID(pid);
+    Chunk* r = popChunkByID(id.pid);
     if (r)
       return r;
     
-    for (int i = pid + 1; i < (int) Q.size(); ++i) {
+    for (int i = id.pid + 1; i < (int) Q.size(); ++i) {
       r = popChunkByID(i);
       if (r) 
 	return r;
     }
 
-    for (int i = 0; i < pid; ++i) {
+    for (int i = 0; i < id.pid; ++i) {
       r = popChunkByID(i);
       if (r)
 	return r;
@@ -174,7 +175,7 @@ public:
   }
 
   void push(const WID& id, const value_type& val)  {
-    p& n = *data.getLocal();
+    p& n = *data.getLocal(id.tid);
     if (n.next && !n.next->full()) {
       n.next->push(val);
       return;
@@ -183,7 +184,7 @@ public:
   }
 
   unsigned currentChunkSize(const WID& id) {
-    p& n = *data.getLocal();
+    p& n = *data.getLocal(id.tid);
     if (n.next) {
       return n.next->size();
     }
@@ -202,7 +203,7 @@ public:
   }
 
   value_type& cur(const WID& id) {
-    p& n = *data.getLocal();
+    p& n = *data.getLocal(id.tid);
     return n.next->cur();
   }
 
@@ -217,7 +218,7 @@ public:
     WID id;
     for (unsigned i = 0; i < data.size(); ++i) {
       id.tid = i;
-      id.pid = LL::getPackageForThreadInternal(i);
+      id.pid = LL::getLeaderForThread(i);
       if (!empty(id))
         return false;
     }
@@ -225,7 +226,7 @@ public:
   }
 
   void pop(const WID& id)  {
-    p& n = *data.getLocal();
+    p& n = *data.getLocal(id.tid);
     if (n.next && !n.next->empty()) {
       n.next->pop();
       return;

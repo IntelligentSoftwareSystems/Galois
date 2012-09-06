@@ -30,9 +30,9 @@
 #ifndef GALOIS_RUNTIME_MEM_H
 #define GALOIS_RUNTIME_MEM_H
 
+#include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/ll/SimpleLock.h"
 #include "Galois/Runtime/ll/PtrLock.h"
-#include "Galois/Runtime/PerCPU.h"
 #include <boost/utility.hpp>
 #include <memory.h>
 #include <stdlib.h>
@@ -57,7 +57,7 @@ void  largeFree(void* mem, size_t bytes);
 //! Per-thread heaps using Galois thread aware construct
 template<class LocalHeap>
 class ThreadAwarePrivateHeap {
-  PerCPU<LocalHeap> heaps;
+  PerThreadStorage<LocalHeap> heaps;
 
 public:
   enum { AllocSize = LocalHeap::AllocSize };
@@ -68,16 +68,16 @@ public:
   }
 
   inline void* allocate(size_t size) {
-    return heaps.get().allocate(size);
+    return heaps.getLocal()->allocate(size);
   }
 
   inline void deallocate(void* ptr) {
-    heaps.get().deallocate(ptr);
+    heaps.getLocal()->deallocate(ptr);
   }
 
   void clear() {
     for (unsigned int i = 0; i < heaps.size(); i++)
-      heaps.get(i).clear();
+      heaps.getRemote(i)->clear();
   }
 };
 

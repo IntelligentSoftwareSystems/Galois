@@ -23,9 +23,10 @@
 #ifndef GALOIS_RUNTIME_PERCPU_H
 #define GALOIS_RUNTIME_PERCPU_H
 
-#include "ll/TID.h"
-#include "ll/HWTopo.h"
-#include "ll/CacheLineStorage.h"
+#include "Galois/Runtime/ll/TID.h"
+#include "Galois/Runtime/ll/HWTopo.h"
+#include "Galois/Runtime/ll/CacheLineStorage.h"
+#include "Galois/Runtime/ll/CompilerSpecific.h"
 
 #include <boost/utility.hpp>
 #include <cassert>
@@ -39,6 +40,7 @@ protected:
   LL::CacheLineStorage<T>* datum;
 
 public:
+  GALOIS_ATTRIBUTE_DEPRECIATED
   PERTHING() {
     datum = new LL::CacheLineStorage<T>[BASE::getMaxSize()];
   }
