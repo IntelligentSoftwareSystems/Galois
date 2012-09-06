@@ -19,7 +19,6 @@ set(USE_PROFILING OFF CACHE BOOL "Enable GCC profiling")
 #Enable iss specific options; should be OFF in the general release
 set(USE_EXP OFF CACHE BOOL "Use experimental features") 
 set(USE_VTUNE ON CACHE BOOL "Use vtune (if found)")
-set(USE_DET OFF CACHE BOOL "Use deterministic execution")
 set(EXP_DOALL "PTHREAD" CACHE STRING "Which type of implementation of parallel_doall")
 
 ###### Configure (users don't need to go beyond here) ######
@@ -71,10 +70,6 @@ find_package(GMP)
 if(USE_EXP)
   add_definitions(-DGALOIS_USE_EXP)
   include_directories("exp/include")
-
-  if(USE_DET)
-    add_definitions(-DGALOIS_USE_DET)
-  endif()
 
   if(USE_VTUNE)
     find_package(VTUNE)

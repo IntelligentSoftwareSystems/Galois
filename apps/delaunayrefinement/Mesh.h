@@ -20,7 +20,7 @@
  *
  * @section Description
  *
- * @author Milind Kulkarni <milind@purdue.edu>>
+ * @author Milind Kulkarni <milind@purdue.edu>
  */
 #ifndef MESH_H
 #define MESH_H
@@ -33,6 +33,7 @@
 #include <iostream>
 #include <cstdio>
 
+
 struct is_bad {
   Graph* g;
   is_bad(Graph* _g): g(_g) {}
@@ -41,9 +42,9 @@ struct is_bad {
   }
 };
 
-struct CreateNodes {
+struct create_nodes {
   Graph* g;
-  CreateNodes(Graph* _g): g(_g) {}
+  create_nodes(Graph* _g): g(_g) {}
   void operator()(Element& item) {
     GNode n = g->createNode(item);
     g->addNode(n);
@@ -376,15 +377,15 @@ private:
     }
   }
 
-  void makeGraph(Graph* mesh) {
+  void makeGraph(Graph* mesh, bool parallelAllocate) {
     //std::sort(elements.begin(), elements.end(), centerXCmp());
     divide(elements.begin(), elements.end());
 
-#ifdef GALOIS_USE_DET
-    std::for_each(elements.begin(), elements.end(), CreateNodes(mesh));
-#else
-    Galois::do_all(elements.begin(), elements.end(), CreateNodes(mesh));
-#endif
+    if (parallelAllocate) 
+      Galois::do_all(elements.begin(), elements.end(), create_nodes(mesh));
+    else
+      std::for_each(elements.begin(), elements.end(), create_nodes(mesh));
+
     std::map<Edge, GNode> edge_map;
     for (Graph::iterator ii = mesh->begin(), ee = mesh->end();
 	 ii != ee; ++ii)
@@ -394,12 +395,12 @@ private:
 public:
   Mesh(): id(0) { }
 
-  void read(Graph* mesh, std::string basename) {
+  void read(Graph* mesh, std::string basename, bool parallelAllocate) {
     std::vector<Tuple> tuples;
     readNodes(basename, tuples);
     readElements(basename, tuples);
     readPoly(basename, tuples);
-    makeGraph(mesh);
+    makeGraph(mesh, parallelAllocate);
   }
 };
 

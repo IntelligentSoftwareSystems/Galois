@@ -25,6 +25,7 @@
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/MethodFlags.h"
 #include "Galois/Runtime/ll/SimpleLock.h"
+#include "Galois/Runtime/ll/CacheLineStorage.h"
 
 #include <stdio.h>
 
@@ -36,15 +37,22 @@ __thread jmp_buf GaloisRuntime::hackjmp;
 //! Global thread context for each active thread
 static __thread GaloisRuntime::SimpleRuntimeContext* thread_cnx = 0;
 
-#ifdef GALOIS_USE_DET
-static GaloisRuntime::PendingFlag pendingFlag = GaloisRuntime::NON_DET;
+namespace {
+struct PendingFlag {
+  GaloisRuntime::LL::CacheLineStorage<GaloisRuntime::PendingFlag> flag;
+  PendingFlag(): flag(GaloisRuntime::NON_DET) { }
+};
+
+}
+
+static PendingFlag pendingFlag;
 
 void GaloisRuntime::setPending(PendingFlag value) {
-  pendingFlag = value;
+  pendingFlag.flag.data = value;
 }
 
 void GaloisRuntime::doCheckWrite() {
-  if (pendingFlag == PENDING) {
+  if (pendingFlag.flag.data == PENDING) {
 #if GALOIS_USE_EXCEPTION_HANDLER
     throw GaloisRuntime::REACHED_FAILSAFE;
 #else
@@ -52,7 +60,6 @@ void GaloisRuntime::doCheckWrite() {
 #endif
   }
 }
-#endif
 
 void GaloisRuntime::setThreadContext(GaloisRuntime::SimpleRuntimeContext* n) {
   thread_cnx = n;
@@ -101,52 +108,54 @@ void GaloisRuntime::breakLoop() {
 }
 
 void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
-#ifdef GALOIS_USE_DET
-  if (pendingFlag != NON_DET) {
-    if (pendingFlag == COMMITTING)
-      return;
-
+  // Normal path
+  if (pendingFlag.flag.data == NON_DET) {
     if (L->Owner.try_lock()) {
+      assert(!L->Owner.getValue());
       assert(!L->next);
+      L->Owner.setValue(this);
       L->next = locks;
       locks = L;
-    }
-
-    SimpleRuntimeContext* other;
-    do {
-      other = L->Owner.getValue();
-      if (other == this)
-        return;
-      if (other) {
-        bool conflict = comp ? comp->compare(other->comp_data, comp_data) :  other->id < id;
-        if (conflict) {
-          // A lock that I want but can't get
-          not_ready = 1;
-          return; 
-        }
+    } else {
+      if (L->Owner.getValue() != this) {
+#if GALOIS_USE_EXCEPTION_HANDLER
+        throw GaloisRuntime::CONFLICT; // Conflict
+#else
+        longjmp(hackjmp, GaloisRuntime::CONFLICT);
+#endif
       }
-    } while (!L->Owner.stealing_CAS(other, this));
-
-    // Disable loser
-    if (other)
-      other->not_ready = 1; // only need atomic write
-
+    }
     return;
   }
-#endif
+
+  // Ordered and deterministic path
+  if (pendingFlag.flag.data == COMMITTING)
+    return;
+
   if (L->Owner.try_lock()) {
-    assert(!L->Owner.getValue());
     assert(!L->next);
-    L->Owner.setValue(this);
     L->next = locks;
     locks = L;
-  } else {
-    if (L->Owner.getValue() != this) {
-#if GALOIS_USE_EXCEPTION_HANDLER
-      throw GaloisRuntime::CONFLICT; // Conflict
-#else
-      longjmp(hackjmp, GaloisRuntime::CONFLICT);
-#endif
-    }
   }
+
+  SimpleRuntimeContext* other;
+  do {
+    other = L->Owner.getValue();
+    if (other == this)
+      return;
+    if (other) {
+      bool conflict = comp ? comp->compare(other->comp_data, comp_data) :  other->id < id;
+      if (conflict) {
+        // A lock that I want but can't get
+        not_ready = 1;
+        return; 
+      }
+    }
+  } while (!L->Owner.stealing_CAS(other, this));
+
+  // Disable loser
+  if (other)
+    other->not_ready = 1; // Only need atomic write
+
+  return;
 }

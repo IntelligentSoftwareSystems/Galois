@@ -61,7 +61,6 @@ enum DetAlgo {
   detDisjoint
 };
 
-#ifdef GALOIS_USE_DET
 static cll::opt<DetAlgo> detAlgo(cll::desc("Deterministic algorithm:"),
     cll::values(
       clEnumVal(nondet, "Non-deterministic"),
@@ -69,7 +68,6 @@ static cll::opt<DetAlgo> detAlgo(cll::desc("Deterministic algorithm:"),
       clEnumVal(detPrefix, "Prefix execution"),
       clEnumVal(detDisjoint, "Disjoint execution"),
       clEnumValEnd), cll::init(nondet));
-#endif
 
 template<int Version=detBase>
 struct Process {
@@ -86,7 +84,6 @@ struct Process {
     
     Cavity* cavp = NULL;
 
-#ifdef GALOIS_USE_DET
     if (Version == detDisjoint) {
       bool used;
       LocalState* localState = (LocalState*) ctx.getLocalState(used);
@@ -97,7 +94,6 @@ struct Process {
         cavp = &localState->cav;
       }
     }
-#endif
 
     if (Version == detDisjoint) {
       cavp->initialize(item);
@@ -140,7 +136,7 @@ int main(int argc, char** argv) {
   graph = new Graph();
   {
     Mesh m;
-    m.read(graph, filename.c_str());
+    m.read(graph, filename.c_str(), detAlgo == nondet);
     Verifier v;
     if (!skipVerify && !v.verify(graph)) {
       std::cerr << "bad input mesh\n";
@@ -159,11 +155,11 @@ int main(int argc, char** argv) {
   Galois::StatTimer T;
   T.start();
 
-#ifdef GALOIS_USE_DET
-  std::for_each(graph->begin(), graph->end(), Preprocess());
-#else
-  Galois::do_all_local(*graph, Preprocess());
-#endif
+  if (detAlgo == nondet)
+    Galois::do_all_local(*graph, Preprocess());
+  else
+    std::for_each(graph->begin(), graph->end(), Preprocess());
+
   Galois::Statistic("MeminfoMid", GaloisRuntime::MM::pageAllocInfo());
   
   Galois::StatTimer Trefine("refine");
@@ -173,7 +169,6 @@ int main(int argc, char** argv) {
   typedef LocalQueues<dChunkedLIFO<256>, ChunkedLIFO<256> > BQ;
   typedef ChunkedAdaptor<false,32> CA;
   
-#ifdef GALOIS_USE_DET
   switch (detAlgo) {
     case nondet: 
       Galois::for_each_local<CA>(wl, Process<>()); break;
@@ -186,9 +181,6 @@ int main(int argc, char** argv) {
       Galois::for_each_det(wl.begin(), wl.end(), Process<detDisjoint>()); break;
     default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
   }
-#else
-  Galois::for_each_local<CA>(wl, Process<>());
-#endif
   Trefine.stop();
   T.stop();
   

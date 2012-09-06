@@ -64,7 +64,6 @@ static cll::opt<MISAlgo> algo(cll::desc("Choose an algorithm:"),
       clEnumVal(serial, "Serial"),
       clEnumVal(parallel, "Parallel using Galois"),
       clEnumValEnd), cll::init(parallel));
-#ifdef GALOIS_USE_DET
 static cll::opt<DetAlgo> detAlgo(cll::desc("Deterministic algorithm:"),
     cll::values(
       clEnumVal(nondet, "Non-deterministic"),
@@ -72,7 +71,6 @@ static cll::opt<DetAlgo> detAlgo(cll::desc("Deterministic algorithm:"),
       clEnumVal(detPrefix, "Prefix execution"),
       clEnumVal(detDisjoint, "Disjoint execution"),
       clEnumValEnd), cll::init(nondet));
-#endif
 
 enum MatchFlag {
   UNMATCHED, OTHER_MATCHED, MATCHED
@@ -143,7 +141,6 @@ struct Process {
 
   void operator()(GNode src, Galois::UserContext<GNode>& ctx) {
     bool* modp;
-#ifdef GALOIS_USE_DET
     if (Version == detDisjoint) {
       bool used;
       LocalState* localState = (LocalState*) ctx.getLocalState(used);
@@ -154,12 +151,9 @@ struct Process {
         return;
       }
     }
-#endif
 
     if (Version == detDisjoint) {
-#ifdef GALOIS_USE_DET
       *modp = build<Galois::ALL>(src);
-#endif
     } else {
       bool mod = build<Galois::ALL>(src);
       if (Version == detPrefix)
@@ -180,7 +174,6 @@ struct GaloisAlgo {
     typedef GaloisRuntime::WorkList::dChunkedFIFO<256> WL;
 #endif
 
-#ifdef GALOIS_USE_DET
     switch (detAlgo) {
       case nondet: 
         Galois::for_each<WL>(graph.begin(), graph.end(), Process<>()); break;
@@ -193,9 +186,6 @@ struct GaloisAlgo {
         Galois::for_each_det(graph.begin(), graph.end(), Process<detDisjoint>()); break;
       default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
     }
-#else
-    Galois::for_each<WL>(graph.begin(), graph.end(), Process<>());
-#endif
   }
 };
 
@@ -281,4 +271,3 @@ int main(int argc, char** argv) {
 
   return 0;
 }
-

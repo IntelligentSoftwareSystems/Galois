@@ -31,7 +31,7 @@ namespace GaloisRuntime {
 //! Backdoor to allow runtime methods to access private data in UserContext
 template<typename T>
 class UserContextAccess : public Galois::UserContext<T> {
-    typedef Galois::UserContext<T> ChildTy;
+  typedef Galois::UserContext<T> ChildTy;
 public:
   typedef typename ChildTy::pushBufferTy pushBufferTy;
 
@@ -39,13 +39,9 @@ public:
   pushBufferTy& getPushBuffer() { return ChildTy::__getPushBuffer(); }
   void resetPushBuffer() { ChildTy::__resetPushBuffer(); }
   ChildTy& data() { return *static_cast<ChildTy*>(this); }
-#ifdef GALOIS_USE_DET
   void setLocalState(void *p, bool used) { ChildTy::__setLocalState(p, used); }
-#endif
 };
 
 }
 
-#else
-#warning Reincluding UserContextAccess
 #endif

@@ -46,15 +46,14 @@ enum ConflictFlag {
   BREAK = 2
 };
 
-#ifdef GALOIS_USE_DET
 enum PendingFlag {
   NON_DET,
   PENDING,
   COMMITTING
 };
 
+//! Used by deterministic and ordered executor
 void setPending(PendingFlag value);
-#endif
 
 //! used to release lock over exception path
 static inline void clearConflictLock() { }
@@ -99,12 +98,10 @@ public:
   unsigned commit_iteration();
   void acquire(Lockable* L);
 
-#ifdef GALOIS_USE_DET
   void set_id(unsigned long i) { id = i; }
   bool is_ready() { return !not_ready; }
   void set_comp_data(void* ptr) { comp_data = ptr; }
   void set_comp(Galois::CompareCallback* fn) { comp = fn; }
-#endif
 };
 
 //! get the current conflict detection class, may be null if not in parallel region
@@ -143,6 +140,7 @@ struct AlwaysLockObj {
     GaloisRuntime::doAcquire(C);
   }
 };
+
 struct CheckedLockObj {
   Galois::MethodFlag m;
   CheckedLockObj(Galois::MethodFlag _m) :m(_m) {}

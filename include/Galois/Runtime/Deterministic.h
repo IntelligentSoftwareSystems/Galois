@@ -25,8 +25,6 @@
 #ifndef GALOIS_RUNTIME_DETERMINISTIC_H
 #define GALOIS_RUNTIME_DETERMINISTIC_H
 
-#ifdef GALOIS_USE_DET
-
 #include "Galois/Runtime/DualLevelIterator.h"
 #include "Galois/Callbacks.h"
 
@@ -40,8 +38,6 @@
 
 namespace GaloisRuntime {
 namespace Deterministic {
-
-static const int ChunkSize = 32;
 
 //! Wrapper around WorkList::ChunkedFIFO to allow peek() and empty() and still have FIFO order
 template<int chunksize,typename T>
@@ -181,7 +177,7 @@ public:
 
 //! Simple wrapper around worklist to manage memory for contexts
 class ContextPool {
-  typedef WorkList::dChunkedLIFO<ChunkSize,SimpleRuntimeContext> Pool;
+  typedef WorkList::dChunkedLIFO<1024,SimpleRuntimeContext> Pool;
   Pool pool;
 public:
   ~ContextPool() {
@@ -316,8 +312,8 @@ class DMergeLocal {
   typedef DNewItem<T> NewItem;
   typedef std::vector<NewItem,typename Galois::PerIterAllocTy::rebind<NewItem>::other> NewItemsTy;
   typedef std::deque<T,typename Galois::PerIterAllocTy::rebind<T>::other> Deque;
-  typedef FIFO<ChunkSize*8,Item> ReserveTy;
-  typedef WorkList::ChunkedLIFO<ChunkSize*8,T,false> ItemPool;
+  typedef FIFO<1024,Item> ReserveTy;
+  typedef WorkList::ChunkedLIFO<1024,T,false> ItemPool;
 
   Galois::IterAllocBaseTy heap;
   Galois::PerIterAllocTy alloc;
@@ -604,6 +600,7 @@ struct has_id_fn {
 template<typename Options,typename Enable=void>
 struct MergeTraits {
   static const bool value = false;
+  static const int ChunkSize = 32;
   static const int MinDelta = ChunkSize * 40;
 };
 
@@ -615,13 +612,15 @@ struct MergeTraits<Options,typename boost::enable_if_c<Options::useOrdered>::typ
     unsigned long operator()(const T& x) const { return 0; }
   };
   typedef DummyIdFn IdFn;
-  static const int MinDelta = ChunkSize;
+  static const int ChunkSize = 16;
+  static const int MinDelta = 32;
 };
 
 template<typename Options>
 struct MergeTraits<Options,typename boost::enable_if_c<has_id_fn<typename Options::Function1Ty>::value && !Options::useOrdered>::type> {
   static const bool value = true;
   typedef typename Options::Function1Ty::IdFn IdFn;
+  static const int ChunkSize = 32;
   static const int MinDelta = ChunkSize * 40;
 };
 
@@ -633,7 +632,7 @@ protected:
   typedef typename Options::CompareTy CompareTy;
   typedef DItem<T> Item;
   typedef DNewItem<T> NewItem;
-  typedef WorkList::dChunkedFIFO<ChunkSize,NewItem> NewWork;
+  typedef WorkList::dChunkedFIFO<MergeTraits<Options>::ChunkSize,NewItem> NewWork;
   typedef DMergeLocal<Options> MergeLocal;
   typedef typename MergeLocal::NewItemsTy NewItemsTy;
   typedef typename NewItemsTy::iterator NewItemsIterator;
@@ -1138,9 +1137,9 @@ class Executor {
   typedef DNewItem<value_type> NewItem;
   typedef DMergeManager<Options> MergeManager;
   typedef DMergeLocal<Options> MergeLocal;
-  typedef WorkList::dChunkedFIFO<ChunkSize,Item> WL;
-  typedef WorkList::dChunkedFIFO<ChunkSize,Item> PendingWork;
-  typedef WorkList::ChunkedFIFO<ChunkSize,Item,false> LocalPendingWork;
+  typedef WorkList::dChunkedFIFO<MergeTraits<Options>::ChunkSize,Item> WL;
+  typedef WorkList::dChunkedFIFO<MergeTraits<Options>::ChunkSize,Item> PendingWork;
+  typedef WorkList::ChunkedFIFO<MergeTraits<Options>::ChunkSize,Item,false> LocalPendingWork;
   static const bool useLocalState = has_local_state<typename Options::Function1Ty>::value;
 
   // Truly thread-local
@@ -1475,6 +1474,4 @@ static inline void for_each_det(T e, FunctionTy f, const char* loopname = 0) {
 }
 
 }
-#endif
-
 #endif

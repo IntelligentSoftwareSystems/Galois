@@ -36,7 +36,7 @@ app(AVIodgAuto main/AVIodgAuto.cpp
   EXTLIBS AVI ${LAPACK_LIBRARIES})
 
 app(AVIodgAuto2 main/AVIodgAuto2.cpp 
-  REQUIRES LAPACK_FOUND ZLIB_FOUND USE_DET
+  REQUIRES LAPACK_FOUND ZLIB_FOUND
   EXTLIBS AVI ${LAPACK_LIBRARIES})
 
 # the files may be removed from the release without causing error in cmake

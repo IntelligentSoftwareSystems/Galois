@@ -53,15 +53,14 @@ enum DetAlgo {
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<uint32_t> sourceId(cll::Positional, cll::desc("sourceID"), cll::Required);
 static cll::opt<uint32_t> sinkId(cll::Positional, cll::desc("sinkID"), cll::Required);
+static cll::opt<bool> useHLOrder("useHLOrder", cll::desc("Use HL ordering heuristic"), cll::init(false));
 static cll::opt<int> relabelInt("relabel", cll::desc("relabel interval: < 0 no relabeling, 0 use default interval, > 0 relabel every X iterations"), cll::init(0));
-#ifdef GALOIS_USE_DET
 static cll::opt<DetAlgo> detAlgo(cll::desc("Deterministic algorithm:"),
     cll::values(
       clEnumVal(nondet, "Non-deterministic"),
       clEnumVal(detBase, "Base execution"),
       clEnumVal(detDisjoint, "Disjoint execution"),
       clEnumValEnd), cll::init(nondet));
-#endif
 
 /**
  * Alpha parameter the original Goldberg algorithm to control when global
@@ -112,13 +111,7 @@ Config app;
 
 struct Indexer :std::unary_function<GNode, int> {
   int operator()(const GNode& n) const {
-    return (-app.graph.getData(n, Galois::NONE).height) >> 2;
-  }
-};
-
-struct NIndexer :std::unary_function<GNode, int> {
-  int operator()(const GNode& n) const {
-    return (app.graph.getData(n, Galois::NONE).height) >> 2;
+    return -app.graph.getData(n, Galois::NONE).height;
   }
 };
 
@@ -133,21 +126,6 @@ struct GGreater :std::binary_function<GNode, GNode, bool> {
   bool operator()(const GNode& lhs, const GNode& rhs) const {
     int lv = -app.graph.getData(lhs, Galois::NONE).height;
     int rv = -app.graph.getData(rhs, Galois::NONE).height;
-    return lv > rv;
-  }
-};
-
-struct GNLess :std::binary_function<GNode, GNode, bool> {
-  bool operator()(const GNode& lhs, const GNode& rhs) const {
-    int lv = app.graph.getData(lhs, Galois::NONE).height;
-    int rv = app.graph.getData(rhs, Galois::NONE).height;
-    return lv < rv;
-  }
-};
-struct GNGreater :std::binary_function<GNode, GNode, bool> {
-  int operator()(const GNode& lhs, const GNode& rhs) const {
-    int lv = app.graph.getData(lhs, Galois::NONE).height;
-    int rv = app.graph.getData(rhs, Galois::NONE).height;
     return lv > rv;
   }
 };
@@ -299,7 +277,6 @@ struct UpdateHeights {
    * Do reverse BFS on residual graph.
    */
   void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
-#ifdef GALOIS_USE_DET
     if (version != nondet) {
       bool used = false;
       if (version == detDisjoint) {
@@ -326,7 +303,6 @@ struct UpdateHeights {
         app.graph.getData(src, Galois::WRITE);
       }
     }
-#endif
 
     for (Graph::edge_iterator
         ii = app.graph.edge_begin(src, useCAS ? Galois::NONE : Galois::CHECK_CONFLICT),
@@ -382,9 +358,6 @@ struct FindWork {
 
 template<typename IncomingWL>
 void globalRelabel(IncomingWL& incoming) {
-  typedef GaloisRuntime::WorkList::dChunkedFIFO<16> Chunk;
-  typedef GaloisRuntime::WorkList::OrderedByIntegerMetric<NIndexer,Chunk> OBIM;
-
   Galois::StatTimer T1("ResetHeightsTime");
   T1.start();
   Galois::do_all(app.graph.begin(), app.graph.end(), ResetHeights(), "ResetHeights");
@@ -393,16 +366,13 @@ void globalRelabel(IncomingWL& incoming) {
   Galois::StatTimer T("UpdateHeightsTime");
   T.start();
 
-#ifdef GALOIS_USE_EXP
-  typedef GaloisRuntime::WorkList::BulkSynchronousInline<> WL;
-#else
-  typedef GaloisRuntime::WorkList::dChunkedLIFO<256> WL;
-#endif
-
-#ifdef GALOIS_USE_DET
   switch (detAlgo) {
-    case nondet: 
-      Galois::for_each<WL>(app.sink, UpdateHeights<nondet>(), "UpdateHeights");
+    case nondet:
+#ifdef GALOIS_USE_EXP
+      Galois::for_each<GaloisRuntime::WorkList::BulkSynchronousInline<> >(app.sink, UpdateHeights<nondet>(), "UpdateHeights");
+#else
+      Galois::for_each(app.sink, UpdateHeights<nondet>(), "UpdateHeights");
+#endif
       break;
     case detBase:
       Galois::for_each_det(app.sink, UpdateHeights<detBase>(), "UpdateHeights");
@@ -412,13 +382,6 @@ void globalRelabel(IncomingWL& incoming) {
       break;
     default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
   }
-#else
-#ifdef GALOIS_USE_EXP
-  Exp::PriAuto<16, NIndexer, OBIM, GNLess, GNGreater>::for_each(app.sink, UpdateHeights<nondet>(), "UpdateHeights");
-#else
-  Galois::for_each<OBIM>(app.sink, UpdateHeights<nondet>(), "UpdateHeights");
-#endif
-#endif
   T.stop();
 
   Galois::StatTimer T2("FindWorkTime");
@@ -532,7 +495,11 @@ bool discharge(const GNode& src, Galois::UserContext<GNode>& ctx) {
   return relabeled;
 }
 
-#ifdef GALOIS_USE_DET
+struct Counter {
+  Galois::GAccumulator<int> accum;
+  GaloisRuntime::PerThreadStorage<int> local;
+};
+
 template<DetAlgo version>
 struct Process {
   typedef int tt_needs_parallel_break;
@@ -549,10 +516,10 @@ struct Process {
   };
 
   struct BreakFn {
-    Galois::GAccumulator<int>& counter;
+    Counter& counter;
     BreakFn(Process<version>& self): counter(self.counter) { }
     bool operator()() const {
-      if (app.global_relabel_interval > 0 && counter.reduce() >= app.global_relabel_interval) {
+      if (app.global_relabel_interval > 0 && counter.accum.reduce() >= app.global_relabel_interval) {
         app.should_global_relabel = true;
         return true;
       }
@@ -560,9 +527,9 @@ struct Process {
     }
   };
 
-  Galois::GAccumulator<int>& counter;
+  Counter& counter;
 
-  Process(Galois::GAccumulator<int>& c): counter(c) { }
+  Process(Counter& c): counter(c) { }
 
   void operator()(GNode& src, Galois::UserContext<GNode>& ctx) {
     if (version != nondet) {
@@ -586,22 +553,18 @@ struct Process {
       increment += BETA;
     }
 
-    counter += increment;
+    counter.accum += increment;
   }
 };
-#else
-template<DetAlgo version>
-struct Process { };
-#endif
 
 template<>
 struct Process<nondet> {
   typedef int tt_needs_parallel_break;
 
-  Galois::GAccumulator<int>& counter;
+  Counter& counter;
   int limit;
-  Process(Galois::GAccumulator<int>& c): counter(c) { 
-    limit = app.global_relabel_interval;
+  Process(Counter& c): counter(c) { 
+    limit = app.global_relabel_interval / numThreads;
   }
 
   void operator()(GNode& src, Galois::UserContext<GNode>& ctx) {
@@ -611,8 +574,8 @@ struct Process<nondet> {
       increment += BETA;
     }
 
-    counter += increment;
-    if (app.global_relabel_interval > 0 && counter.unsafeRead() >= limit) {
+    int v = *counter.local.getLocal() += increment;
+    if (app.global_relabel_interval > 0 && v >= limit) {
       app.should_global_relabel = true;
       ctx.breakLoop();
       return;
@@ -721,11 +684,18 @@ void run() {
   while (initial.begin() != initial.end()) {
     Galois::StatTimer T_discharge("DischargeTime");
     T_discharge.start();
-    Galois::GAccumulator<int> counter;
-#ifdef GALOIS_USE_DET
+    Counter counter;
     switch (detAlgo) {
-      case nondet: 
-        Galois::for_each(initial.begin(), initial.end(), Process<nondet>(counter), "Discharge");
+      case nondet:
+        if (useHLOrder) {
+#ifdef GALOIS_USE_EXP
+          Exp::PriAuto<16, Indexer, OBIM, GLess, GGreater>::for_each(initial.begin(), initial.end(), Process<nondet>(counter), "Discharge");
+#else
+          Galois::for_each<OBIM>(initial.begin(), initial.end(), Process<nondet>(counter), "Discharge");
+#endif
+        } else {
+          Galois::for_each(initial.begin(), initial.end(), Process<nondet>(counter), "Discharge");
+        }
         break;
       case detBase:
         Galois::for_each_det(initial.begin(), initial.end(), Process<detBase>(counter), "Discharge");
@@ -735,9 +705,6 @@ void run() {
         break;
       default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
     }
-#else
-    Galois::for_each<OBIM>(initial.begin(), initial.end(), Process<nondet>(counter), "Discharge");
-#endif
     T_discharge.stop();
 
     if (app.should_global_relabel) {

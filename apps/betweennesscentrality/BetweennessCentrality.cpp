@@ -84,20 +84,20 @@ struct merge {
 Galois::GVectorElementAccumulator<std::vector<double> >* CB;
 #endif
 
-GaloisRuntime::PerCPU<std::vector<GNode>*> SQG;
-GaloisRuntime::PerCPU<std::vector<double> *> sigmaG;
-GaloisRuntime::PerCPU<std::vector<double> *> deltaG;
-GaloisRuntime::PerCPU<std::vector<int>*> distG;
+GaloisRuntime::PerThreadStorage<std::vector<GNode>*> SQG;
+GaloisRuntime::PerThreadStorage<std::vector<double> *> sigmaG;
+GaloisRuntime::PerThreadStorage<std::vector<double> *> deltaG;
+GaloisRuntime::PerThreadStorage<std::vector<int>*> distG;
 
 template<typename T>
 struct PerIt {  
   typedef typename Galois::PerIterAllocTy::rebind<T>::other Ty;
 };
 
-GaloisRuntime::PerCPU< std::vector<std::vector<GNode> > > succsGlobal;
+GaloisRuntime::PerThreadStorage< std::vector<std::vector<GNode> > > succsGlobal;
 
 std::vector<GNode> & getSuccs(GNode n) {
-  return (succsGlobal.get())[n];
+  return (*succsGlobal.getLocal())[n];
 }
 
 void initGraphData() {
@@ -114,28 +114,28 @@ void initGraphData() {
   // Init all structures
   std::cerr << "Pre-allocating graph metadata for " << numThreads << " threads." << std::endl;
   for (int i=0; i<numThreads; ++i) {
-    succsGlobal.get(i) = tmp;
-    SQG.get(i) = new std::vector<GNode>(NumNodes); 
-    sigmaG.get(i) = new std::vector<double>(NumNodes);
-    deltaG.get(i) = new std::vector<double>(NumNodes); 
-    distG.get(i) = new std::vector<int>(NumNodes); 
+    *succsGlobal.getRemote(i) = tmp;
+    *SQG.getRemote(i) = new std::vector<GNode>(NumNodes); 
+    *sigmaG.getRemote(i) = new std::vector<double>(NumNodes);
+    *deltaG.getRemote(i) = new std::vector<double>(NumNodes); 
+    *distG.getRemote(i) = new std::vector<int>(NumNodes); 
   }
 }
 
 void resetData() {
-  std::vector<GNode> *sq = SQG.get();
+  std::vector<GNode> *sq = *SQG.getLocal();
   std::fill(sq->begin(), sq->end(), 0);
 
-  std::vector<double> *sigma = sigmaG.get();
+  std::vector<double> *sigma = *sigmaG.getLocal();
   std::fill(sigma->begin(), sigma->end(), 0);
 
-  std::vector<double> *delta = deltaG.get();
+  std::vector<double> *delta = *deltaG.getLocal();
   std::fill(delta->begin(), delta->end(), 0);
 
-  std::vector<int> *dist = distG.get();
+  std::vector<int> *dist = *distG.getLocal();
   std::fill(dist->begin(), dist->end(), 0);
 
-  std::vector< std::vector<GNode> > & svec = succsGlobal.get();
+  std::vector< std::vector<GNode> > & svec = *succsGlobal.getLocal();
   std::vector< std::vector<GNode> >::iterator it = svec.begin();
   std::vector< std::vector<GNode> >::iterator end = svec.end();
   while (it != end) {
@@ -146,18 +146,18 @@ void resetData() {
 
 void cleanupData() {
   for (int i=0; i<numThreads; ++i) {
-    delete SQG.get(i);
-    delete sigmaG.get(i);
-    delete deltaG.get(i);
-    delete distG.get(i);
+    delete *SQG.getRemote(i);
+    delete *sigmaG.getRemote(i);
+    delete *deltaG.getRemote(i);
+    delete *distG.getRemote(i);
   }
 }
 
 struct process {
   void operator()(GNode& _req, Galois::UserContext<GNode>& lwl) {
-    std::vector<GNode> & SQ = *(SQG.get());
-    std::vector<double> & sigma = *(sigmaG.get());
-    std::vector<int> &d = *(distG.get());
+    std::vector<GNode> & SQ = *(*SQG.getLocal());
+    std::vector<double> & sigma = *(*sigmaG.getLocal());
+    std::vector<int> &d = *(*distG.getLocal());
     int QPush = 0;
     int QAt = 0;
     
@@ -196,7 +196,7 @@ struct process {
 	}
       }
     }
-    std::vector<double> & delta = *(deltaG.get());
+    std::vector<double> & delta = *(*deltaG.getLocal());
 #if USE_SUCCS
     --QAt;
 #endif

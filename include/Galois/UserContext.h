@@ -58,17 +58,12 @@ protected:
     pushBuffer.clear();
   }
 
-#ifdef GALOIS_USE_DET
   void* localState;
   bool localStateUsed;
   void __setLocalState(void *p, bool used) {
     localState = p;
     localStateUsed = used;
   }
-public:
-  void* getLocalState(bool& used) { used = localStateUsed; return localState; }
-#endif
-
 public:
   UserContext()
     :IterationAllocatorBase(), 
@@ -90,6 +85,10 @@ public:
     GaloisRuntime::checkWrite(Galois::WRITE);
     pushBuffer.push_back(val);
   }
+
+  //! Store and retrieve local state for deterministic and ordered executor
+  void* getLocalState(bool& used) { used = localStateUsed; return localState; }
+
 };
 
 }

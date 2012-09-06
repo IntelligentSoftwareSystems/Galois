@@ -74,7 +74,6 @@ enum DetAlgo {
   detDisjoint
 };
 
-#ifdef GALOIS_USE_DET
 static cll::opt<DetAlgo> detAlgo(cll::desc("Deterministic algorithm:"),
     cll::values(
       clEnumVal(nondet, "Non-deterministic"),
@@ -82,7 +81,6 @@ static cll::opt<DetAlgo> detAlgo(cll::desc("Deterministic algorithm:"),
       clEnumVal(detPrefix, "Prefix execution"),
       clEnumVal(detDisjoint, "Disjoint execution"),
       clEnumValEnd), cll::init(nondet));
-#endif
 
 static Graph* graph;
 
@@ -217,7 +215,6 @@ struct Process {
   void operator()(Point* p, Galois::UserContext<Point*>& ctx) {
     Cavity<Alloc>* cavp = NULL;
 
-#ifdef GALOIS_USE_DET
     if (Version == detDisjoint) {
       bool used;
       LocalState* localState = (LocalState*) ctx.getLocalState(used);
@@ -228,7 +225,6 @@ struct Process {
         cavp = &localState->cav;
       }
     }
-#endif
 
     p->acquire();
     assert(!p->inMesh());
@@ -451,7 +447,7 @@ static void addBoundaryNodes(Point* p1, Point* p2, Point* p3) {
 
 //! Streaming point distribution 
 struct GenerateRounds {
-  typedef GaloisRuntime::PerCPU<unsigned> CounterTy;
+  typedef GaloisRuntime::PerThreadStorage<unsigned> CounterTy;
 
   CounterTy& counter;
   size_t log2;
@@ -459,7 +455,7 @@ struct GenerateRounds {
   GenerateRounds(CounterTy& c, size_t l): counter(c), log2(l) { }
 
   void operator()(const Point& p) {
-    unsigned& c = counter.get();
+    unsigned& c = *counter.getLocal();
 
     Point* ptr = &basePoints.push(p);
     int r = 0;
@@ -524,11 +520,11 @@ static void generateRounds(PointList& points, bool addBoundary) {
 
     if (true) {
       GenerateRounds::CounterTy counter;
-#ifdef GALOIS_USE_DET
-      std::for_each(ordered.begin(), ordered.end(), GenerateRounds(counter, log2));
-#else
-      Galois::do_all(ordered.begin(), ordered.end(), GenerateRounds(counter, log2));
-#endif
+      if (detAlgo == nondet) {
+        Galois::do_all(ordered.begin(), ordered.end(), GenerateRounds(counter, log2));
+      } else {
+        std::for_each(ordered.begin(), ordered.end(), GenerateRounds(counter, log2));
+      }
     } else {
       generateRoundsOld(ordered, true);
     }
@@ -623,7 +619,6 @@ static void writeMesh(const std::string& filename) {
 }
 
 static void generateMesh() {
-  typedef GaloisRuntime::WorkList::dChunkedLIFO<4*1024> WL;
   typedef GaloisRuntime::WorkList::ChunkedAdaptor<false,32> CA;
 
   for (int i = maxRounds - 1; i >= 0; --i) {
@@ -636,10 +631,9 @@ static void generateMesh() {
     Galois::StatTimer PT("ParallelTime");
     PT.start();
     Galois::InsertBag<Point*>& pptrs = rounds[i];
-#ifdef GALOIS_USE_DET
     switch (detAlgo) {
-      case nondet: 
-        Galois::for_each<WL>(pptrs.begin(), pptrs.end(), Process<>(&tree)); break;
+      case nondet:
+        Galois::for_each_local<CA>(pptrs, Process<>(&tree)); break;
       case detBase:
         Galois::for_each_det(pptrs.begin(), pptrs.end(), Process<>(&tree)); break;
       case detPrefix:
@@ -649,9 +643,6 @@ static void generateMesh() {
         Galois::for_each_det(pptrs.begin(), pptrs.end(), Process<detDisjoint>(&tree)); break;
       default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
     }
-#else
-    Galois::for_each_local<CA>(pptrs, Process<>(&tree));
-#endif
     PT.stop();
   }
 }
