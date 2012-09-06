@@ -30,7 +30,7 @@
 
 namespace GaloisRuntime {
 
-struct dummyFN {
+struct EmptyFn {
   template<typename T>
   void operator()(T a, T b) {}
 };
@@ -115,12 +115,8 @@ class DoAllWork {
 
 public:
 
-  DoAllWork(const FunctionTy& F, const ReduceFunTy R, IterTy begin, IterTy end)
-    : origF(F), RF(R), needsReduce(true), masterBegin(begin), masterEnd(end)
-  {}
-
-  DoAllWork(FunctionTy& F, IterTy begin, IterTy end)
-    : origF(F), RF(dummyFN()), needsReduce(false), masterBegin(begin), masterEnd(end)
+  DoAllWork(const FunctionTy& F, const ReduceFunTy& R, bool needsReduce, IterTy begin, IterTy end)
+    : origF(F), RF(R), needsReduce(needsReduce), masterBegin(begin), masterEnd(end)
   {}
 
   void operator()() {
@@ -144,36 +140,41 @@ public:
 
 };
 
-template<typename IterTy, typename FunctionTy>
-FunctionTy do_all_impl(IterTy b, IterTy e, FunctionTy f) {
-  assert(!inGaloisForEach);
-
-  inGaloisForEach = true;
-
-  DoAllWork<FunctionTy, dummyFN, IterTy> W(f, b, e);
+template<typename IterTy, typename FunctionTy, typename ReducerTy>
+FunctionTy do_all_impl_dispatch(IterTy b, IterTy e, FunctionTy f, ReducerTy r, bool needsReduce, std::random_access_iterator_tag) {
+  //typedef typename FunctionTy::Error Error;
+  // Still have no work stealing because some do_all loops are actually
+  // placing data.
+  // TODO: differentiate calls
+  DoAllWork<FunctionTy, ReducerTy, IterTy, false> W(f, r, needsReduce, b, e);
 
   RunCommand w[2] = {Config::ref(W),
 		     Config::ref(getSystemBarrier())};
   getSystemThreadPool().run(&w[0], &w[2]);
-
-  inGaloisForEach = false;
   return W.getFn();
 }
 
 template<typename IterTy, typename FunctionTy, typename ReducerTy>
-FunctionTy do_all_impl(IterTy b, IterTy e, FunctionTy f, ReducerTy r) {
-  assert(!inGaloisForEach);
-
-  inGaloisForEach = true;
-
-  DoAllWork<FunctionTy, ReducerTy, IterTy> W(f, r, b, e);
+FunctionTy do_all_impl_dispatch(IterTy b, IterTy e, FunctionTy f, ReducerTy r, bool needsReduce, std::input_iterator_tag) {
+  DoAllWork<FunctionTy, ReducerTy, IterTy, false> W(f, r, needsReduce, b, e);
 
   RunCommand w[2] = {Config::ref(W),
 		     Config::ref(getSystemBarrier())};
   getSystemThreadPool().run(&w[0], &w[2]);
+  return W.getFn();
+}
+
+template<typename IterTy, typename FunctionTy, typename ReducerTy>
+FunctionTy do_all_impl(IterTy b, IterTy e, FunctionTy f, ReducerTy r, bool needsReduce) {
+  assert(!inGaloisForEach);
+  inGaloisForEach = true;
+
+  typename std::iterator_traits<IterTy>::iterator_category category;
+  FunctionTy retval(do_all_impl_dispatch(b, e, f, r, needsReduce, category));
 
   inGaloisForEach = false;
-  return W.getFn();
+
+  return retval;
 }
 
 } //namespace GaloisRuntime

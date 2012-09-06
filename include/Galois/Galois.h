@@ -121,7 +121,7 @@ FunctionTy do_all(const IterTy& begin, const IterTy& end, FunctionTy fn, const c
   } else {
     //typename std::iterator_traits<IterTy>::iterator_category category;
     //do_all_dispatch(begin,end,fn,loopname,category); 
-    return GaloisRuntime::do_all_impl(begin, end, fn);
+    return GaloisRuntime::do_all_impl(begin, end, fn, GaloisRuntime::EmptyFn(), false);
   }
 }
 
@@ -179,7 +179,7 @@ struct count_if_reducer {
 template<class InputIterator, class Predicate>
 ptrdiff_t count_if(InputIterator first, InputIterator last, Predicate pred)
 {
-  return GaloisRuntime::do_all_impl(first, last, count_if_helper<Predicate>(pred), count_if_reducer()).ret;
+  return GaloisRuntime::do_all_impl(first, last, count_if_helper<Predicate>(pred), count_if_reducer(), true).ret;
 }
 
 //! Modify an iterator so that *it == it
@@ -426,9 +426,8 @@ struct accumulate_helper_reduce {
 };
 
 template <class InputIterator, class T, typename BinaryOperation>
-T accumulate ( InputIterator first, InputIterator last, T init,
-	       BinaryOperation binary_op ) {
-  return GaloisRuntime::do_all_impl(first, last, accumulate_helper<T,BinaryOperation>(init, binary_op), accumulate_helper_reduce<BinaryOperation>(binary_op)).init;
+T accumulate (InputIterator first, InputIterator last, T init, BinaryOperation binary_op) {
+  return GaloisRuntime::do_all_impl(first, last, accumulate_helper<T,BinaryOperation>(init, binary_op), accumulate_helper_reduce<BinaryOperation>(binary_op), true).init;
 }
 
 template<class InputIterator, class T>
