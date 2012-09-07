@@ -95,7 +95,11 @@ std::ostream& operator<<(std::ostream& os, const Node& n) {
 }
 
 typedef Galois::Graph::FirstGraph<uint32_t, int, true> RawGraph;
+#ifdef GALOIS_USE_NUMA
+typedef Galois::Graph::LC_Linear2_Graph<Node, int> Graph;
+#else
 typedef Galois::Graph::LC_CSR_Graph<Node, int> Graph;
+#endif
 typedef Graph::GraphNode GNode;
 
 struct Config {
