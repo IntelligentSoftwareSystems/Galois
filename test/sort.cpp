@@ -1,5 +1,6 @@
-#include "Galois/Timer.h"
 #include "Galois/Galois.h"
+#include "Galois/ParallelSTL/ParallelSTL.h"
+#include "Galois/Timer.h"
 
 #include <iostream>
 #include <cstdlib>
@@ -28,7 +29,7 @@ int do_sort() {
 
     Galois::Timer t;
     t.start();
-    Galois::sort(V.begin(), V.end());
+    Galois::ParallelSTL::sort(V.begin(), V.end());
     t.stop();
     
     Galois::Timer t2;
@@ -80,7 +81,7 @@ int do_count_if() {
 
     Galois::Timer t;
     t.start();
-    x1 = Galois::count_if(V.begin(), V.end(), IsOddS());
+    x1 = Galois::ParallelSTL::count_if(V.begin(), V.end(), IsOddS());
     t.stop();
     
     Galois::Timer t2;
@@ -122,7 +123,7 @@ int do_accumulate() {
 
     Galois::Timer t;
     t.start();
-    x1 = Galois::accumulate(V.begin(), V.end(), 0U, mymax<unsigned>());
+    x1 = Galois::ParallelSTL::accumulate(V.begin(), V.end(), 0U, mymax<unsigned>());
     t.stop();
     
     Galois::Timer t2;

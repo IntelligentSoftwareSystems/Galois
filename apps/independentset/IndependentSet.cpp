@@ -27,6 +27,7 @@
 #include "Galois/Bag.h"
 #include "Galois/Statistic.h"
 #include "Galois/Graphs/LCGraph.h"
+#include "Galois/ParallelSTL/ParallelSTL.h"
 #ifdef GALOIS_USE_EXP
 #include "Galois/Runtime/ParallelWorkInline.h"
 #endif
@@ -234,7 +235,7 @@ struct is_matched {
 };
 
 bool verify() {
-  return Galois::find_if(graph.begin(), graph.end(), is_bad()) == graph.end();
+  return Galois::ParallelSTL::find_if(graph.begin(), graph.end(), is_bad()) == graph.end();
 }
 
 int main(int argc, char** argv) {
@@ -260,7 +261,7 @@ int main(int argc, char** argv) {
   Galois::Statistic("MeminfoPost", GaloisRuntime::MM::pageAllocInfo());
 
   std::cout << "Cardinality of maximal independent set: " 
-    << Galois::count_if(graph.begin(), graph.end(), is_matched()) 
+    << Galois::ParallelSTL::count_if(graph.begin(), graph.end(), is_matched()) 
     << "\n";
 
   if (!skipVerify && !verify()) {

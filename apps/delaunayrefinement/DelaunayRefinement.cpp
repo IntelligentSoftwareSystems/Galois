@@ -31,6 +31,7 @@
 #include "Verifier.h"
 
 #include "Galois/Galois.h"
+#include "Galois/ParallelSTL/ParallelSTL.h"
 #include "Galois/Bag.h"
 #include "Galois/Statistic.h"
 
@@ -187,7 +188,7 @@ int main(int argc, char** argv) {
   Galois::Statistic("MeminfoPost", GaloisRuntime::MM::pageAllocInfo());
   
   if (!skipVerify) {
-    int size = Galois::count_if(graph->begin(), graph->end(), is_bad(graph));
+    int size = Galois::ParallelSTL::count_if(graph->begin(), graph->end(), is_bad(graph));
     if (size != 0) {
       std::cerr << size << " bad triangles remaining.\n";
       assert(0 && "Refinement failed");

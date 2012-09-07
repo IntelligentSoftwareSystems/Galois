@@ -32,6 +32,7 @@
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
 #include "Galois/Graphs/LCGraph.h"
+#include "Galois/ParallelSTL/ParallelSTL.h"
 #ifdef GALOIS_USE_EXP
 #include "Galois/PriorityScheduling.h"
 #include "Galois/Runtime/ParallelWorkInline.h"
@@ -191,8 +192,8 @@ static bool verify(GNode source) {
     return false;
   }
   
-  bool okay = Galois::find_if(graph.begin(), graph.end(), not_consistent()) == graph.end()
-    && Galois::find_if(graph.begin(), graph.end(), not_visited()) == graph.end();
+  bool okay = Galois::ParallelSTL::find_if(graph.begin(), graph.end(), not_consistent()) == graph.end()
+    && Galois::ParallelSTL::find_if(graph.begin(), graph.end(), not_visited()) == graph.end();
 
   if (okay) {
     Galois::GReduceMax<unsigned int> m;

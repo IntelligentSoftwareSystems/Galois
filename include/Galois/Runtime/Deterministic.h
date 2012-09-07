@@ -25,6 +25,7 @@
 #ifndef GALOIS_RUNTIME_DETERMINISTIC_H
 #define GALOIS_RUNTIME_DETERMINISTIC_H
 
+#include "Galois/ParallelSTL/ParallelSTL.h"
 #include "Galois/Runtime/DualLevelIterator.h"
 #include "Galois/Callbacks.h"
 
@@ -219,6 +220,10 @@ struct DNewItem {
 
   bool operator==(const DNewItem<T>& o) const {
     return parent == o.parent && count == o.count;
+  }
+
+  bool operator!=(const DNewItem<T>& o) const {
+    return !(*this == o);
   }
 
   struct GetFirst: public std::unary_function<DNewItem<T>,const T&> {
@@ -891,6 +896,9 @@ public:
       barrier[i].reinit(this->numActive);
   }
 
+  template<typename InputIteratorTy>
+  void presort(InputIteratorTy ii, InputIteratorTy ei) { }
+
   template<typename InputIteratorTy, typename WL>
   void addInitialWork(InputIteratorTy b, InputIteratorTy e, WL* wl) {
     distribute(b, e, std::distance(b, e), wl);
@@ -942,44 +950,6 @@ class DMergeManager<Options,typename boost::enable_if<MergeTraits<Options> >::ty
   IdFn idFunction;
   CompareTy& comp;
 
-  template<typename InputIteratorTy,typename WL>
-  void distribute(InputIteratorTy ii, InputIteratorTy ei, size_t dist, WL* wl) {
-    unsigned int tid = LL::getTID();
-    MergeLocal& mlocal = *this->data.getLocal();
-
-    // Ordered algorithms generally have less available parallelism, so start
-    // window size out small
-    size_t orderedWindow = std::min((size_t) MergeTraits<Options>::MinDelta, dist);
-
-    if (tid == 0) {
-      mergeBuf.clear();
-      mergeBuf.reserve(dist);
-      for (; ii != ei; ++ii)
-        mergeBuf.push_back(NewItem(*ii, idFunction(*ii), 1));
-      if (Options::useOrdered)
-        std::sort(mergeBuf.begin(), mergeBuf.end(), CompareNewItems(comp));
-      else
-        std::sort(mergeBuf.begin(), mergeBuf.end());
-      mlocal.initialLimits(mergeBuf.begin(), mergeBuf.end());
-      if (Options::useOrdered) {
-        if (orderedWindow)
-          mlocal.windowElement = boost::optional<T>(mergeBuf[orderedWindow-1].item);
-      }
-      this->broadcastLimits(mlocal, tid);
-    }
-
-    barrier.wait();
-    
-    if (Options::useOrdered)
-      mlocal.initialWindow(orderedWindow);
-    else
-      mlocal.initialWindow(std::max((mlocal.maxId - mlocal.minId) / 100, (size_t) MergeTraits<Options>::MinDelta) + mlocal.minId);
-    
-    mlocal.copyIn(boost::make_transform_iterator(mergeBuf.begin(), typename Base::NewItem::GetFirst()),
-        boost::make_transform_iterator(mergeBuf.end(), typename Base::NewItem::GetFirst()),
-        dist, wl, this->new_, this->numActive, comp);
-  }
-
 public:
   DMergeManager(Options& o): mergeBuf(this->alloc), comp(o.comp) {
     barrier.reinit(this->numActive);
@@ -987,7 +957,52 @@ public:
 
   template<typename InputIteratorTy, typename WL>
   void addInitialWork(InputIteratorTy ii, InputIteratorTy ei, WL* wl) {
-    distribute(ii, ei, std::distance(ii, ei), wl);
+    MergeLocal& mlocal = *this->data.getLocal();
+    mlocal.copyIn(boost::make_transform_iterator(mergeBuf.begin(), typename Base::NewItem::GetFirst()),
+        boost::make_transform_iterator(mergeBuf.end(), typename Base::NewItem::GetFirst()),
+        mergeBuf.size(), wl, this->new_, this->numActive, comp);
+  }
+
+  template<typename InputIteratorTy>
+  void presort(InputIteratorTy ii, InputIteratorTy ei) {
+    unsigned int tid = LL::getTID();
+    MergeLocal& mlocal = *this->data.getLocal();
+    size_t dist = std::distance(ii, ei);
+
+    // Ordered algorithms generally have less available parallelism, so start
+    // window size out small
+    size_t window;
+    
+    if (Options::useOrdered)
+      window = std::min((size_t) MergeTraits<Options>::MinDelta, dist);
+
+    assert(mergeBuf.empty());
+
+    mergeBuf.reserve(dist);
+    for (; ii != ei; ++ii)
+      mergeBuf.push_back(NewItem(*ii, idFunction(*ii), 1));
+
+    // TODO: change sort call when Galois sort supports user defined comparator
+    if (Options::useOrdered)
+      std::sort(mergeBuf.begin(), mergeBuf.end(), CompareNewItems(comp));
+    else
+      Galois::ParallelSTL::sort(mergeBuf.begin(), mergeBuf.end());
+
+    mlocal.initialLimits(mergeBuf.begin(), mergeBuf.end());
+    if (Options::useOrdered) {
+      if (window)
+        mlocal.windowElement = boost::optional<T>(mergeBuf[window-1].item);
+    }
+    
+    this->broadcastLimits(mlocal, tid);
+
+    if (!Options::useOrdered)
+      window = std::max((mlocal.maxId - mlocal.minId) / 100, (size_t) MergeTraits<Options>::MinDelta) + mlocal.minId;
+
+    for (int i = 0; i < this->numActive; ++i) {
+      MergeLocal& mother = *this->data.getRemote(i);
+      mlocal.initialWindow(window);
+    }
   }
 
   template<typename WL>
@@ -1186,9 +1201,14 @@ public:
   }
 
   template<typename IterTy>
-  bool AddInitialWork(IterTy b, IterTy e) {
-    mergeManager.addInitialWork(b, e, &worklists[1]);
+  bool AddInitialWork(IterTy ii, IterTy ei) {
+    mergeManager.addInitialWork(ii, ei, &worklists[1]);
     return true;
+  }
+
+  template<typename IterTy>
+  void presort(IterTy ii, IterTy ei) {
+    mergeManager.presort(ii, ei);
   }
 
   void operator()() {
@@ -1452,6 +1472,8 @@ static inline void for_each_det(IterTy b, IterTy e, Function1Ty f1, Function2Ty 
   Options options(f1, f2);
   WorkTy W(options, loopname);
   GaloisRuntime::Initializer<IterTy, WorkTy> init(b, e, W);
+
+  W.presort(b, e);
   for_each_det_impl(init, W);
 }
 

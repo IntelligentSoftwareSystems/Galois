@@ -27,6 +27,7 @@
 #include "Galois/Bag.h"
 #include "Galois/Statistic.h"
 #include "Galois/Graphs/LCGraph.h"
+#include "Galois/ParallelSTL/ParallelSTL.h"
 #include "llvm/Support/CommandLine.h"
 
 #include "Lonestar/BoilerPlate.h"
@@ -86,7 +87,7 @@ bool verify(Galois::InsertBag<Edge>& result) {
   if (std::distance(result.begin(), result.end()) != ((ptrdiff_t) graph.size()) - 1)
     return false;
 
-  return Galois::find_if(graph.begin(), graph.end(), not_in_mst()) == graph.end();
+  return Galois::ParallelSTL::find_if(graph.begin(), graph.end(), not_in_mst()) == graph.end();
 }
 
 int main(int argc, char** argv) {
