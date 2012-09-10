@@ -35,6 +35,7 @@
 
 #include <cstdio>
 
+#include "Galois/Threads.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/ThreadPool.h"
 #include "Galois/Runtime/mm/Mem.h"

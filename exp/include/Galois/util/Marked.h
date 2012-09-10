@@ -33,7 +33,7 @@
 #include <boost/iterator/counting_iterator.hpp>
 
 #include "Galois/Runtime/PerThreadWorkList.h"
-#include "Galois/Runtime/DoAll.h"
+#include "Galois/Runtime/DoAllCoupled.h"
 
 template <typename T>
 struct Markable: public T {
@@ -79,7 +79,7 @@ struct RemoveMarked {
   void operator () (unsigned r) {
     assert (r < wl.numRows ());
 
-    typename WL_ty::iterator new_end =
+    typename WL_ty::Cont_ty::iterator new_end =
       std::partition (wl[r].begin (), wl[r].end (), IsNotMarked<T> ());
 
     wl[r].erase (new_end, wl[r].end ());

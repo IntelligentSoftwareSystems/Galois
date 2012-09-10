@@ -34,11 +34,11 @@
 
 #include "Galois/Atomic.h"
 #include "Galois/Statistic.h"
-#include "Galois/util/Marked.h"
 #include "Galois/Accumulator.h"
+#include "Galois/util/Marked.h"
 
 #include "Galois/Runtime/PerThreadWorkList.h"
-#include "Galois/Runtime/DoAll.h"
+#include "Galois/Runtime/DoAllCoupled.h"
 
 
 #include "kruskalData.h"
@@ -47,17 +47,17 @@
 
 
 
-typedef Galois::GSimpleReducible<size_t, std::plus<size_t> > Accumulator_ty;
+typedef Galois::GAccumulator<size_t> Accumulator_ty;
 
 
 template <typename KNode_tp>
 struct WLfactory {
   typedef KEdge<KNode_tp> KE_ty;
 
-  typedef typename GaloisRuntime::PerThreadWLfactory<KE_ty>::PerThreadVector EdgeList_ty;
-  typedef typename GaloisRuntime::PerThreadWLfactory<KNode_tp*>::PerThreadVector NodeList_ty;
+  typedef typename GaloisRuntime::PerThreadVector<KE_ty> EdgeList_ty;
+  typedef typename GaloisRuntime::PerThreadVector<KNode_tp*> NodeList_ty;
 
-  typedef typename GaloisRuntime::PerThreadWLfactory<Markable<KE_ty> >::PerThreadVector MarkableEdgeList_ty;
+  typedef typename GaloisRuntime::PerThreadVector<Markable<KE_ty> > MarkableEdgeList_ty;
 };
 
 
@@ -113,9 +113,9 @@ void kruskalAdjNoCopy (
   size_t numUnions = 0;
   unsigned round = 0;
 
-  Accumulator_ty matchIter (0);
-  Accumulator_ty mstSum (0);
-  Accumulator_ty mergeIter (0);
+  Accumulator_ty matchIter;
+  Accumulator_ty mstSum;
+  Accumulator_ty mergeIter;
 
   Galois::TimeAccumulator matchTimer;
   Galois::TimeAccumulator mergeTimer;
@@ -228,7 +228,7 @@ private:
         edge.mark (0);
       }
 
-      matchIter.get () += 1;
+      matchIter += 1;
     }
 
 
@@ -270,8 +270,8 @@ public:
       kruskal::merge<sorted_tp> (master, other);
 
       edge.inMST = true;
-      mstSum.get () += edge.weight;
-      mergeIter.get () += 1;
+      mstSum += edge.weight;
+      mergeIter += 1;
 
       return p;
     }
@@ -359,9 +359,9 @@ void kruskalAdjCopyBased (
   unsigned round = 0;
 
 
-  Accumulator_ty matchIter (0);
-  Accumulator_ty mstSum (0);
-  Accumulator_ty mergeIter (0);
+  Accumulator_ty matchIter;
+  Accumulator_ty mstSum;
+  Accumulator_ty mergeIter;
 
 
   Galois::TimeAccumulator matchTimer;
@@ -510,7 +510,7 @@ private:
     //
     void operator () (KNode_tp* node) const {
 
-      matchIter.get () += 1;
+      matchIter += 1;
 
       // if is a representative
       if (kruskal::findPC (node) == node) {
@@ -617,8 +617,8 @@ private:
       std::pair<KNode_tp*, KNode_tp*> p = outer.unionByAge (edge);
 
       edge.inMST = true;
-      mstSum.get () += edge.weight;
-      mergeIter.get () += 1;
+      mstSum += edge.weight;
+      mergeIter += 1;
 
       KNode_tp& master = *(p.first);
 
@@ -713,7 +713,7 @@ private:
     
     void operator () (KNode_tp* node) {
 
-      matchIter.get () += 1;
+      matchIter += 1;
 
       if ((kruskal::findPC (node) != node) ||
           (outer.matchInfo[node->id] != NULL)) {

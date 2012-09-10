@@ -36,26 +36,24 @@
 #include <boost/iterator/counting_iterator.hpp>
 
 #include "Galois/Statistic.h"
-#include "Galois/Runtime/PerThreadWorkList.h"
-#include "Galois/Runtime/DoAll.h"
-
-#include "Galois/util/Marked.h"
 #include "Galois/Accumulator.h"
-
+#include "Galois/util/Marked.h"
+#include "Galois/Runtime/PerThreadWorkList.h"
+#include "Galois/Runtime/DoAllCoupled.h"
 
 #include "kruskalData.h"
 #include "kruskalFunc.h"
 #include "kruskal.h"
 
 
-typedef Galois::GSimpleReducible<size_t, std::plus<size_t> > Accumulator_ty;
+typedef Galois::GAccumulator<size_t> Accumulator_ty;
 
 
 template <typename KNode_tp>
 struct WLfactory {
-  typedef typename GaloisRuntime::PerThreadWLfactory<KEdge<KNode_tp> >::PerThreadVector WL_ty;
+  typedef typename GaloisRuntime::PerThreadVector<KEdge<KNode_tp> > WL_ty;
 
-  typedef typename GaloisRuntime::PerThreadWLfactory<Markable<KEdge<KNode_tp> > >::PerThreadVector WLmarkable_ty;
+  typedef typename GaloisRuntime::PerThreadVector<Markable<KEdge<KNode_tp> > > WLmarkable_ty;
 };
 
 
@@ -71,7 +69,7 @@ struct FindLoop {
   {}
 
   void operator () (KEdge<KNode_tp>& edge) {
-    matchIter.get () += 1;
+    matchIter += 1;
 
     KNode_tp* rep1 = kruskal::findPC (edge.src);
 
@@ -119,7 +117,7 @@ struct LinkUpLoop {
 
     // not  a self-edge
     if (rep1 != rep2) {
-      mergeIter.get () += 1;
+      mergeIter += 1;
 
       bool succ = false;
 
@@ -139,8 +137,8 @@ struct LinkUpLoop {
 
 
       if (succ) {
-        numUnions.get () += 1;
-        mstSum.get () += edge.weight;
+        numUnions += 1;
+        mstSum += edge.weight;
         edge.inMST = true;
       }
 
@@ -186,10 +184,10 @@ void kruskalNoAdjNonSrc (
   size_t totalUnions = 0;
 
 
-  Accumulator_ty matchIter (0);
-  Accumulator_ty mstSum (0);
-  Accumulator_ty mergeIter (0);
-  Accumulator_ty numUnions (0);
+  Accumulator_ty matchIter;
+  Accumulator_ty mstSum;
+  Accumulator_ty mergeIter;
+  Accumulator_ty numUnions;
 
   Galois::TimeAccumulator matchTimer;
   Galois::TimeAccumulator mergeTimer;
@@ -326,7 +324,7 @@ struct UnionLoop {
   void operator () (Markable<KEdge<KNode_tp> >& edge) {
 
     if (!edge.marked ()) {
-      mergeIter.get () += 1;
+      mergeIter += 1;
 
 
       KNode_tp* rep1 = edge.src->getRep ();
@@ -345,8 +343,8 @@ struct UnionLoop {
         kruskal::unionByRank (rep1, rep2);
 
 
-        numUnions.get () += 1;
-        mstSum.get () += edge.weight;
+        numUnions += 1;
+        mstSum += edge.weight;
         edge.inMST = true;
 
         // mark the edge
@@ -384,10 +382,10 @@ void kruskalNoAdjSrc (std::vector<KNode_tp*>& nodes,
   size_t totalUnions = 0;
 
 
-  Accumulator_ty matchIter (0);
-  Accumulator_ty mstSum (0);
-  Accumulator_ty mergeIter (0);
-  Accumulator_ty numUnions (0);
+  Accumulator_ty matchIter;
+  Accumulator_ty mstSum;
+  Accumulator_ty mergeIter;
+  Accumulator_ty numUnions;
 
   Galois::TimeAccumulator matchTimer;
   Galois::TimeAccumulator mergeTimer;
@@ -506,9 +504,8 @@ void kruskalNoAdjSrc (std::vector<KNode_tp*>& nodes,
     totalIter += niter;
 
     // final check. no non-self edges remaining
-    for (typename WL_ty::iterator i = serialWorkList.begin (), ei = serialWorkList.end (); 
+    for (typename SWL_ty::iterator i = serialWorkList.begin (), ei = serialWorkList.end (); 
         i != ei; ++i) {
-
       assert (!kruskal::NotSelfEdge<KNode_tp> () (*i));
     }
   }
