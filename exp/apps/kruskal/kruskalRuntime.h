@@ -49,7 +49,7 @@ struct EdgeComparator: public Galois::CompareCallback {
 
   virtual bool compare (void* a, void* b) const {
     KEdge<KNode_tp>** ea = static_cast<KEdge<KNode_tp>**> (a);
-    KEdge<KNode_tp>** eb = static_cast<KEdge<KNode_tp>**> (a);
+    KEdge<KNode_tp>** eb = static_cast<KEdge<KNode_tp>**> (b);
 
     return (KEdge<KNode_tp>::PtrComparator::compare (*ea, *eb) < 0);
   }
@@ -122,7 +122,7 @@ class KruskalRuntimeSrc: public Kruskal<KNodeLockable> {
       KNodeLockable* rep2 = edge.dst->getRep ();
 
       if (rep1 != rep2) {
-        std::cout << "Contracting: " << edge.str () << std::endl;
+        // std::cout << "Contracting: " << edge.str () << std::endl;
         kruskal::unionByRank (rep1, rep2);
 
         edge.inMST = true;
@@ -247,6 +247,7 @@ class KruskalRuntimeNonSrc : public Kruskal<KNodeMin> {
 
 
         if (succ1 || succ2) {
+          // std::cout << "Contracting: " << edge->str () << std::endl;
           numUnions += 1;
           mstSum += edge->weight;
           edge->inMST = true;
