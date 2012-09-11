@@ -1451,7 +1451,10 @@ template<typename InitTy, typename WorkTy>
 static inline void for_each_det_impl(InitTy& init, WorkTy& W) {
   using namespace GaloisRuntime;
 
+  W.presort(init.b, init.e);
+
   assert(!inGaloisForEach);
+
 
   inGaloisForEach = true;
   RunCommand w[4] = {Config::ref(init), 
@@ -1473,8 +1476,6 @@ static inline void for_each_det(IterTy b, IterTy e, Function1Ty f1, Function2Ty 
   Options options(f1, f2);
   WorkTy W(options, loopname);
   GaloisRuntime::Initializer<IterTy, WorkTy> init(b, e, W);
-
-  W.presort(b, e);
   for_each_det_impl(init, W);
 }
 

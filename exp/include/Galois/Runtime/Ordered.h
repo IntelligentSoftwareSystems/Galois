@@ -36,8 +36,6 @@ static inline void for_each_ordered(IterTy b, IterTy e, Function1Ty f1, Function
 
   Options options(f1, f2, comp);
   WorkTy W(options, loopname);
-  W.presort(b, e);
-
   GaloisRuntime::Initializer<IterTy, WorkTy> init(b, e, W);
   for_each_det_impl(init, W);
 }
