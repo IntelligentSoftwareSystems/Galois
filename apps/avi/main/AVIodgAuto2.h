@@ -131,7 +131,7 @@ protected:
       Item* bb = static_cast<Item*>(b);
       return comp(aa->avi, bb->avi);
     }
-    virtual bool compare(void *a, void *b) {
+    virtual bool compare(void *a, void *b) const {
       return (*this)(a, b);
     }
   };

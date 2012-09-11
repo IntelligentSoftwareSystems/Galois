@@ -31,7 +31,11 @@ app(AVIodgImplicit main/AVIodgImplicit.cpp
   REQUIRES LAPACK_FOUND ZLIB_FOUND
   EXTLIBS AVI ${LAPACK_LIBRARIES})
 
-app(AVIodgAuto main/AVIodgAuto.cpp 
+app(AVIodgAutoPriLock main/AVIodgAutoPriLock.cpp 
+  REQUIRES LAPACK_FOUND ZLIB_FOUND
+  EXTLIBS AVI ${LAPACK_LIBRARIES})
+
+app(AVIodgAutoShare main/AVIodgAutoShare.cpp 
   REQUIRES LAPACK_FOUND ZLIB_FOUND
   EXTLIBS AVI ${LAPACK_LIBRARIES})
 
