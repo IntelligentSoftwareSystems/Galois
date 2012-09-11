@@ -39,6 +39,7 @@
 #include "llvm/Support/CommandLine.h"
 
 #include <boost/iterator/transform_iterator.hpp>
+#include <boost/iterator/counting_iterator.hpp>
 
 #include <algorithm>
 #include <deque>
@@ -449,26 +450,25 @@ static void addBoundaryNodes(Point* p1, Point* p2, Point* p3) {
 struct GenerateRounds {
   typedef GaloisRuntime::PerThreadStorage<unsigned> CounterTy;
 
-  CounterTy& counter;
+  const PointList& points;
   size_t log2;
   
-  GenerateRounds(CounterTy& c, size_t l): counter(c), log2(l) { }
+  GenerateRounds(const PointList& p, size_t l): points(p), log2(l) { }
 
-  void operator()(const Point& p) {
-    unsigned& c = *counter.getLocal();
+  void operator()(size_t index) {
+    const Point& p = points[index];
 
     Point* ptr = &basePoints.push(p);
     int r = 0;
     for (size_t i = 0; i < log2; ++i) {
-      unsigned mask = (1 << (i + 1)) - 1;
-      if ((c & mask) == (1U << i)) {
+      size_t mask = (1UL << (i + 1)) - 1;
+      if ((index & mask) == (1UL << i)) {
         r = i;
         break;
       }
     }
+    
     rounds[r / roundShift].push(ptr);
-
-    ++c;
   }
 };
 
@@ -507,6 +507,7 @@ static void generateRounds(PointList& points, bool addBoundary) {
 
   PointList ordered;
   ordered.reserve(size);
+
   if (noReorderPoints) {
     std::copy(&points[0], &points[size], std::back_inserter(ordered));
     generateRoundsOld(ordered, false);
@@ -519,11 +520,16 @@ static void generateRounds(PointList& points, bool addBoundary) {
     q.output(std::back_inserter(ordered));
 
     if (true) {
-      GenerateRounds::CounterTy counter;
       if (detAlgo == nondet) {
-        Galois::do_all(ordered.begin(), ordered.end(), GenerateRounds(counter, log2));
+        Galois::do_all(
+            boost::counting_iterator<size_t>(0),
+            boost::counting_iterator<size_t>(size),
+            GenerateRounds(ordered, log2));
       } else {
-        std::for_each(ordered.begin(), ordered.end(), GenerateRounds(counter, log2));
+        std::for_each(
+            boost::counting_iterator<size_t>(0),
+            boost::counting_iterator<size_t>(size),
+            GenerateRounds(ordered, log2));
       }
     } else {
       generateRoundsOld(ordered, true);
