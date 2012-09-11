@@ -145,13 +145,13 @@ class dChunkedMaster : private boost::noncopyable {
     if (r)
       return r;
     
-    for (int i = id.pid + 1; i < (int) Q.size(); ++i) {
+    for (unsigned int i = id.pid + 1; i < Q.size(); ++i) {
       r = popChunkByID(i);
       if (r) 
 	return r;
     }
 
-    for (int i = 0; i < id.pid; ++i) {
+    for (unsigned int i = 0; i < id.pid; ++i) {
       r = popChunkByID(i);
       if (r)
 	return r;

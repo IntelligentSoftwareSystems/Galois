@@ -440,7 +440,7 @@ void relabel(const GNode& src) {
 bool discharge(const GNode& src, Galois::UserContext<GNode>& ctx) {
   //Node& node = app.graph.getData(src, Galois::CHECK_CONFLICT);
   Node& node = app.graph.getData(src, Galois::NONE);
-  int prevHeight = node.height;
+  //int prevHeight = node.height;
   bool relabeled = false;
 
   if (node.excess == 0 || node.height >= (int) app.graph.size()) {
@@ -493,7 +493,7 @@ bool discharge(const GNode& src, Galois::UserContext<GNode>& ctx) {
     if (node.height == (int) app.graph.size())
       break;
 
-    prevHeight = node.height;
+    //prevHeight = node.height;
   }
 
   return relabeled;
