@@ -59,7 +59,7 @@ parseAlgo <- function(res) {
 
   # Try various uniquification patterns until one works
   # Case 1: Extract algo and give kinds unique within an algo
-  algos <- sub("^\\S*?(\\w+)\\s.*$", "\\1", cmds.uniq, perl=T)
+  algos <- sub("^\\S*?((?:\\w|-|\\.)+)\\s.*$", "\\1", cmds.uniq, perl=T)
   kinds <- numeric(length(algos))
   dupes <- duplicated(algos)
   version <- 0
@@ -146,12 +146,12 @@ ggplot(res,
        scale_y_continuous("Time (s)") +
        facet_grid(Hostname ~ Algo, scale="free")
 
-ggplot(res,
-       aes(x=Threads, y=Iterations.Mean/Iterations.Ref, color=Kind)) +
-       geom_point() + 
-       geom_line() + 
-       scale_y_continuous("Iterations relative to serial") +
-       facet_grid(Hostname ~ Algo, scale="free")
+#ggplot(res,
+#       aes(x=Threads, y=Iterations.Mean/Iterations.Ref, color=Kind)) +
+#       geom_point() + 
+#       geom_line() + 
+#       scale_y_continuous("Iterations relative to serial") +
+#       facet_grid(Hostname ~ Algo, scale="free")
 
 cat("Results in Rplots.pdf\n")
 

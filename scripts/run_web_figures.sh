@@ -51,6 +51,7 @@ run apps/delaunayrefinement/delaunayrefinement "$BASEINPUT/meshes/r5M"
 run apps/delaunaytriangulation/delaunaytriangulation "$BASEINPUT/meshes/r5M.node"
 run apps/des/DESunordered "$BASEINPUT/des/koggeStone64bit.net"
 #run apps/gmetis/gmetis -mtxinput "$BASEINPUT/matrix/cage15.mtx" 256
+run apps/independentset/independentset "$BASEINPUT/inputs/random/r4-2e26.gr"
 run apps/matching/bipartite-mcm 1000000 100000000 10000 0
 run apps/preflowpush/preflowpush "$BASEINPUT/random/r4-2e23.gr" 0 100
 run apps/sssp/sssp -delta 14 "$BASEINPUT/random/r4-2e26.gr"
