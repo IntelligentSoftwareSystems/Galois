@@ -28,7 +28,7 @@
 namespace Galois {
 
 struct CompareCallback {
-  virtual bool compare(void *, void *) = 0;
+  virtual bool compare(void *, void *) const = 0;
 };
 
 }

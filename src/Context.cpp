@@ -107,6 +107,14 @@ void GaloisRuntime::breakLoop() {
 #endif
 }
 
+void GaloisRuntime::signalConflict() {
+#if GALOIS_USE_EXCEPTION_HANDLER
+        throw GaloisRuntime::CONFLICT; // Conflict
+#else
+        longjmp(hackjmp, GaloisRuntime::CONFLICT);
+#endif
+}
+
 void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
   // Normal path
   if (pendingFlag.flag.data == NON_DET) {
@@ -118,11 +126,7 @@ void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
       locks = L;
     } else {
       if (L->Owner.getValue() != this) {
-#if GALOIS_USE_EXCEPTION_HANDLER
-        throw GaloisRuntime::CONFLICT; // Conflict
-#else
-        longjmp(hackjmp, GaloisRuntime::CONFLICT);
-#endif
+        GaloisRuntime::signalConflict();
       }
     }
     return;

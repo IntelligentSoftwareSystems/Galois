@@ -36,7 +36,7 @@
 //! Set to zero to use longjmp hack, otherwise make sure that
 //! you use a fixed c++ runtime that improves scalability of
 //! exceptions.
-#define GALOIS_USE_EXCEPTION_HANDLER 1
+#define GALOIS_USE_EXCEPTION_HANDLER 0
 
 namespace GaloisRuntime {
 
@@ -151,6 +151,11 @@ struct CheckedLockObj {
 
 //! Actually break for_each loop
 void breakLoop();
+
+void signalConflict();
 }
+
+
+
 
 #endif

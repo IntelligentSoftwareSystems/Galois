@@ -28,6 +28,7 @@
 #include "Galois/ParallelSTL/ParallelSTL.h"
 #include "Galois/Runtime/DualLevelIterator.h"
 #include "Galois/Callbacks.h"
+#include "Galois/Threads.h"
 
 #include <boost/utility/enable_if.hpp>
 #include <boost/iterator/iterator_facade.hpp>
@@ -279,7 +280,7 @@ struct UnorderedOptions {
     bool operator()(void*, void*) const {
       return false;
     }
-    virtual bool compare(void*,void*) { return false; }
+    virtual bool compare(void*,void*) const { return false; }
   };
 
   typedef DummyCompareTy CompareTy;
@@ -1001,7 +1002,7 @@ public:
 
     for (int i = 0; i < this->numActive; ++i) {
       MergeLocal& mother = *this->data.getRemote(i);
-      mlocal.initialWindow(window);
+      mother.initialWindow(window);
     }
   }
 

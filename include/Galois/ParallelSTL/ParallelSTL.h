@@ -25,6 +25,7 @@
 
 #include "Galois/UserContext.h"
 #include "Galois/Runtime/ParallelWork.h"
+#include "Galois/Runtime/DoAll.h"
 
 #include "boost/iterator/iterator_adaptor.hpp"
 
