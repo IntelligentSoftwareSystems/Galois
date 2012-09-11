@@ -1,11 +1,11 @@
-/** Ordered execution -*- C++ -*-
+/** KruskalRuntimeNonSrc.cpp  -*- C++ -*-
  * @file
  * @section License
  *
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -20,27 +20,15 @@
  *
  * @section Description
  *
- * @author Donald Nguyen <ddn@cs.utexas.edu>
+ * KruskalRuntimeNonSrc.cpp;
+ *
+ * @author <ahassaan@ices.utexas.edu>
  */
-#ifndef GALOIS_RUNTIME_ORDERED_H
-#define GALOIS_RUNTIME_ORDERED_H
 
-#include "Galois/Runtime/Deterministic.h"
+#include "kruskalRuntime.h"
 
-namespace Galois {
-template<typename IterTy, typename Function1Ty, typename Function2Ty, typename Comparator>
-static inline void for_each_ordered(IterTy b, IterTy e, Function1Ty f1, Function2Ty f2, Comparator comp, const char* loopname = 0) {
-  typedef typename std::iterator_traits<IterTy>::value_type T;
-  typedef GaloisRuntime::Deterministic::OrderedOptions<T,Function1Ty,Function2Ty,Comparator> Options;
-  typedef GaloisRuntime::Deterministic::Executor<Options> WorkTy;
-
-  Options options(f1, f2, comp);
-  WorkTy W(options, loopname);
-  W.presort(b, e);
-
-  GaloisRuntime::Initializer<IterTy, WorkTy> init(b, e, W);
-  for_each_det_impl(init, W);
+int main (int argc, char* argv[]) {
+  KruskalRuntimeNonSrc k;
+  k.run (argc, argv);
+  return 0;
 }
-}
-
-#endif

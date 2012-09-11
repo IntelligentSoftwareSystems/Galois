@@ -32,29 +32,41 @@
 
 #include <boost/iterator/counting_iterator.hpp>
 
+#include "Galois/Galois.h"
+
 #include "Galois/Runtime/PerThreadWorkList.h"
 #include "Galois/Runtime/DoAllCoupled.h"
 
 template <typename T>
-struct Markable: public T {
+struct Markable {
   private:
     static const unsigned MAX_VAL = UINT_MAX;
 
-  public:
-    unsigned ver;
+    T m_val;
+    unsigned m_ver;
 
-    explicit Markable (T _obj)
-      : T (_obj), ver (MAX_VAL) 
+  public:
+
+    explicit Markable (T val)
+      : m_val (val), m_ver (MAX_VAL) 
     {}
 
     void mark (unsigned v) {
       assert (v < MAX_VAL);
-      ver = v;
+      m_ver = v;
     }
 
-    bool marked () const { return (ver < MAX_VAL); }
+    bool marked () const { return (m_ver < MAX_VAL); }
 
-    unsigned version () const { return ver; }
+    unsigned version () const { return m_ver; }
+
+    T& get () { return m_val; }
+
+    const T& get () const { return m_val; }
+
+    operator T& () { return get (); }
+
+    operator const T& () const { return get (); }
 
 };
 
@@ -79,7 +91,7 @@ struct RemoveMarked {
   void operator () (unsigned r) {
     assert (r < wl.numRows ());
 
-    typename WL_ty::Cont_ty::iterator new_end =
+    typename WL_ty::local_iterator new_end =
       std::partition (wl[r].begin (), wl[r].end (), IsNotMarked<T> ());
 
     wl[r].erase (new_end, wl[r].end ());
@@ -91,7 +103,8 @@ struct RemoveMarked {
 template <typename T, typename C>
 void removeMarked (GaloisRuntime::PerThreadWorkList<Markable<T>, C>& wl) {
 
-  GaloisRuntime::do_all_coupled (
+  Galois::do_all (
+  // GaloisRuntime::do_all_coupled (
       boost::counting_iterator<unsigned> (0),
       boost::counting_iterator<unsigned> (wl.numRows ()),
       RemoveMarked<T, C> (wl),
@@ -119,7 +132,8 @@ struct RemoveMarkedStable: public RemoveMarked<T, C> {
 template <typename T, typename C>
 void removeMarkedStable (GaloisRuntime::PerThreadWorkList<Markable<T>, C>& wl) {
 
-  GaloisRuntime::do_all_coupled (
+  Galois::do_all (
+  // GaloisRuntime::do_all_coupled (
       boost::counting_iterator<unsigned> (0),
       boost::counting_iterator<unsigned> (wl.numRows ()),
       RemoveMarkedStable<T, C> (wl),

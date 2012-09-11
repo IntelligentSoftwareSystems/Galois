@@ -101,7 +101,7 @@ namespace kruskal {
   template <typename KNode_tp>
   void linkUp (KNode_tp* other, KNode_tp* master) {
     checkIsRep (other);
-    checkIsRep (master);
+    // checkIsRep (master);, can't check this in parallel
 
     assert (master != other);
 
@@ -157,8 +157,8 @@ namespace kruskal {
   template <bool relaxed_tp, typename KNode_tp>
   struct _NotSelfEdge {
 
-    bool operator () (const KEdge<KNode_tp>& e) const {
-      return (_findRO<relaxed_tp> (e.src) != _findRO<relaxed_tp> (e.dst));
+    bool operator () (const KEdge<KNode_tp>* e) const {
+      return (_findRO<relaxed_tp> (e->src) != _findRO<relaxed_tp> (e->dst));
     }
   };
 
@@ -174,7 +174,7 @@ namespace kruskal {
   void minToFront (KNode_tp& node) {
 
     typename KNode_tp::EdgeListTy::iterator min = 
-      std::min_element (node.edges.begin (), node.edges.end (), typename KEdge<KNode_tp>::Comparator ());
+      std::min_element (node.edges.begin (), node.edges.end (), typename KEdge<KNode_tp>::PtrComparator ());
 
     assert (min != node.edges.end ());
 
@@ -190,7 +190,7 @@ namespace kruskal {
   template <bool sorted_tp, typename KNode_tp>
   void arrangeAdj (KNode_tp& node) {
     if (sorted_tp) {
-      node.edges.sort (typename KEdge<KNode_tp>::Comparator ());
+      node.edges.sort (typename KEdge<KNode_tp>::PtrComparator ());
 
     } else {
       minToFront<false> (node); // non-relaxed version
@@ -203,10 +203,10 @@ namespace kruskal {
   // and this invariant is ensured by merge
 
   template <bool sorted_tp, typename KNode_tp>
-  KEdge<KNode_tp>& getLightest (KNode_tp& n) {
+  KEdge<KNode_tp>* getLightest (KNode_tp& n) {
     assert (!n.edges.empty () && "calling front () on empty edges list???");
 
-    KEdge<KNode_tp>& ret = n.edges.front ();
+    KEdge<KNode_tp>* ret = n.edges.front ();
     assert (NotSelfEdge<KNode_tp> () (ret));
     return ret;
   }
@@ -242,7 +242,7 @@ namespace kruskal {
     // to non-master node
     if (sorted_tp) {
       // merge performs a sorted merge
-      master.edges.merge (other.edges, typename KEdge<KNode_tp>::Comparator ());
+      master.edges.merge (other.edges, typename KEdge<KNode_tp>::PtrComparator ());
     } else {
       // simply abutt
       master.edges.splice (master.edges.end (), other.edges);

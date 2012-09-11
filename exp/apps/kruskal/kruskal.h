@@ -47,6 +47,7 @@
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Graphs/LCGraph.h"
 #include "Galois/Runtime/WorkList.h"
+#include "Galois/Runtime/Sampling.h"
 #include "llvm/Support/CommandLine.h"
 
 #include "Lonestar/BoilerPlate.h"
@@ -71,7 +72,7 @@ public:
 
   typedef unsigned Weight_ty;
   typedef std::vector<KNode_tp*> VecKNode_ty;
-  typedef std::vector<KEdge<KNode_tp> > VecKEdge_ty;
+  typedef std::vector<KEdge<KNode_tp>* > VecKEdge_ty;
   typedef std::set<KEdge<KNode_tp>, 
           typename KEdge<KNode_tp>::NodeIDcomparator> SetKEdge_ty;
 
@@ -238,6 +239,7 @@ protected:
 public:
 
   virtual void run (int argc, char* argv[]) {
+    Galois::StatManager stat;
     LonestarStart (argc, argv, name, desc, url);
 
     //TODO
@@ -257,16 +259,22 @@ public:
     readGraph (filename, nodes, edges);
     // readPBBSfile (filename, nodes, edges);
     //
-    VecKNode_ty nodesVec (nodes.begin (), nodes.end ());
-    VecKEdge_ty edgesVec (edges.begin (), edges.end ());
+    VecKEdge_ty edgesVec;
+
+    for (typename SetKEdge_ty::const_iterator i = edges.begin (), endi = edges.end ();
+        i != endi; ++i) {
+      edgesVec.push_back (const_cast<KEdge<KNode_tp>* > (&(*i)));
+    }
 
 
-    initRemaining (nodesVec, edgesVec);
+    initRemaining (nodes, edgesVec);
     
     Galois::StatTimer t ("Time taken by runMST: ");
 
     t.start ();
-    runMST (nodesVec, edgesVec, mstWeight, totalIter);
+    GaloisRuntime::beginSampling ();
+    runMST (nodes, edgesVec, mstWeight, totalIter);
+    GaloisRuntime::endSampling ();
     t.stop ();
 
     printResults (mstWeight, totalIter);
@@ -311,7 +319,7 @@ private:
 
     PrimNode (unsigned id): 
       id (id), 
-      weight (std::numeric_limits<size_t>::max ()), 
+      weight (std::numeric_limits<Weight_ty>::max ()), 
       inMST (false) {}
 
     void addEdge (PrimNode* pn, Weight_ty w) {

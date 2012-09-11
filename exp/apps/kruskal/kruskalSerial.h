@@ -37,24 +37,24 @@ protected:
 
   virtual const std::string getVersion () const { return "Serial Ordered Kruskal"; }
 
-  virtual void runMST (Base_ty::VecKNode_ty& nodes, Base_ty::VecKEdge_ty& edges,
+  virtual void runMST (VecKNode_ty& nodes, VecKEdge_ty& edges,
       size_t& mstWeight, size_t& totalIter) {
 
 
-    std::sort (edges.begin (), edges.end (), KEdge<KNode>::Comparator ());
+    std::sort (edges.begin (), edges.end (), KEdge<KNode>::PtrComparator ());
 
     size_t mstSum = 0;
     size_t iter = 0;
     size_t numUnions = 0;
 
-    for (Base_ty::VecKEdge_ty::iterator i = edges.begin (), ei = edges.end ();
+    for (VecKEdge_ty::const_iterator i = edges.begin (), ei = edges.end ();
         i != ei; ++i) {
 
       ++iter;
 
-      if (kruskal::contract (*i)) {
+      if (kruskal::contract (**i)) {
         ++numUnions;
-        mstSum += i->weight;
+        mstSum += (*i)->weight;
       }
       
 

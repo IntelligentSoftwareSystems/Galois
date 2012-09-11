@@ -30,16 +30,34 @@
 
 #include "Galois/Accumulator.h"
 #include "Galois/Statistic.h"
+#include "Galois/Callbacks.h"
 
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/MethodFlags.h"
+#include "Galois/Runtime/Ordered.h"
 #include "Galois/Runtime/Deterministic.h"
 
 #include "kruskalData.h"
 #include "kruskalFunc.h"
 #include "kruskal.h"
 
-typedef Galois::GSimpleReducible<size_t, std::plus<size_t> > Accumulator_ty;
+typedef Galois::GAccumulator<size_t> Accumulator_ty;
+
+
+template <typename KNode_tp>
+struct EdgeComparator: public Galois::CompareCallback {
+
+  virtual bool compare (void* a, void* b) const {
+    KEdge<KNode_tp>** ea = static_cast<KEdge<KNode_tp>**> (a);
+    KEdge<KNode_tp>** eb = static_cast<KEdge<KNode_tp>**> (a);
+
+    return (KEdge<KNode_tp>::PtrComparator::compare (*ea, *eb) < 0);
+  }
+
+  virtual bool operator () (void* a, void* b) const { 
+    return compare (a, b);
+  }
+};
 
 struct KNodeLockable: public GaloisRuntime::Lockable, KNode {
 
@@ -58,28 +76,14 @@ class KruskalRuntimeSrc: public Kruskal<KNodeLockable> {
   typedef Kruskal<KNodeLockable> Super_ty;
 
 
-  struct Operator {
-    Accumulator_ty& mstSum;
+  struct MatchOperator  {
     Accumulator_ty& matchIter;
-    Accumulator_ty& mergeIter;
 
-    Operator (
-        Accumulator_ty& _mstSum,
-        Accumulator_ty& _matchIter,
-        Accumulator_ty& _mergeIter)
-      :
-        mstSum (_mstSum),
-        matchIter (_matchIter),
-        mergeIter (_mergeIter) 
-    {}
-
-    void signalFailSafe () {
-      GaloisRuntime::checkWrite (Galois::WRITE);
-    }
+    MatchOperator (Accumulator_ty& matchIter): matchIter (matchIter) {}
 
     template <typename C>
     void operator () (KEdge<KNodeLockable>* pedge, C&) {
-      ++(matchIter.get ());
+      matchIter += 1;
 
       assert (pedge != NULL);
       KEdge<KNodeLockable>& edge = *pedge;
@@ -89,15 +93,41 @@ class KruskalRuntimeSrc: public Kruskal<KNodeLockable> {
 
       rep1->acquire ();
       rep2->acquire ();
+    }
 
-      signalFailSafe ();
+  };
+
+  struct UnionOperator {
+    Accumulator_ty& mstSum;
+    Accumulator_ty& mergeIter;
+
+    UnionOperator (
+        Accumulator_ty& _mstSum,
+        Accumulator_ty& _mergeIter)
+      :
+        mstSum (_mstSum),
+        mergeIter (_mergeIter) 
+    {}
+
+    // void signalFailSafe () {
+      // GaloisRuntime::checkWrite (Galois::WRITE);
+    // }
+
+    template <typename C>
+    void operator () (KEdge<KNodeLockable>* pedge, C&) {
+      assert (pedge != NULL);
+      KEdge<KNodeLockable>& edge = *pedge;
+
+      KNodeLockable* rep1 = edge.src->getRep ();
+      KNodeLockable* rep2 = edge.dst->getRep ();
 
       if (rep1 != rep2) {
+        std::cout << "Contracting: " << edge.str () << std::endl;
         kruskal::unionByRank (rep1, rep2);
 
         edge.inMST = true;
-        mstSum.get () += edge.weight;
-        ++(mergeIter.get ());
+        mstSum += edge.weight;
+        mergeIter += 1;
       }
     }
 
@@ -113,9 +143,9 @@ protected:
     totalIter = 0;
     totalWeight = 0;
 
-    Accumulator_ty mstSum (0);
-    Accumulator_ty matchIter (0);
-    Accumulator_ty mergeIter (0);
+    Accumulator_ty mstSum;
+    Accumulator_ty matchIter;
+    Accumulator_ty mergeIter;
 
     Galois::StatTimer t_sort ("sorting time: ");
 
@@ -126,8 +156,9 @@ protected:
     Galois::StatTimer t_feach ("for_each loop time: ");
 
     t_feach.start ();
-    Galois::for_each_det<false> (edges.begin (), edges.end (),
-        Operator (mstSum, matchIter, mergeIter));
+    Galois::for_each_ordered (edges.begin (), edges.end (),
+        MatchOperator (matchIter),
+        UnionOperator (mstSum, mergeIter), EdgeComparator<KNodeLockable> ());
     t_feach.stop ();
 
     totalWeight = mstSum.reduce ();
@@ -154,7 +185,7 @@ class KruskalRuntimeNonSrc : public Kruskal<KNodeMin> {
     void operator () (KEdge<KNodeMin>* edge, C&) {
       assert (edge != NULL);
 
-      matchIter.get () += 1;
+      matchIter += 1;
 
       KNodeMin* rep1 = kruskal::findPC (edge->src);
 
@@ -197,7 +228,7 @@ class KruskalRuntimeNonSrc : public Kruskal<KNodeMin> {
 
       // not  a self-edge
       if (rep1 != rep2) {
-        mergeIter.get () += 1;
+        mergeIter += 1;
 
         bool succ1 = (rep1->minEdge == edge);
         bool succ2 = (rep2->minEdge == edge);
@@ -216,8 +247,8 @@ class KruskalRuntimeNonSrc : public Kruskal<KNodeMin> {
 
 
         if (succ1 || succ2) {
-          numUnions.get () += 1;
-          mstSum.get () += edge->weight;
+          numUnions += 1;
+          mstSum += edge->weight;
           edge->inMST = true;
 
           // reset minEdge for next round
@@ -244,10 +275,10 @@ protected:
     totalIter = 0;
     totalWeight = 0;
 
-    Accumulator_ty mstSum (0);
-    Accumulator_ty numUnions (0);
-    Accumulator_ty matchIter (0);
-    Accumulator_ty mergeIter (0);
+    Accumulator_ty mstSum;
+    Accumulator_ty numUnions;
+    Accumulator_ty matchIter;
+    Accumulator_ty mergeIter;
 
     Galois::StatTimer t_sort ("sorting time: ");
 
@@ -258,9 +289,9 @@ protected:
     Galois::StatTimer t_feach ("for_each loop time: ");
 
     t_feach.start ();
-    Galois::for_each_det<false> (edges.begin (), edges.end (),
+    Galois::for_each_ordered (edges.begin (), edges.end (),
         MatchOperator (matchIter),
-        LinkUpOperator (mstSum, numUnions, mergeIter));
+        LinkUpOperator (mstSum, numUnions, mergeIter), EdgeComparator<KNodeMin> ());
     t_feach.stop ();
 
     totalWeight = mstSum.reduce ();

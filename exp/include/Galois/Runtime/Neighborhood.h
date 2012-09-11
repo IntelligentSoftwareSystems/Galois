@@ -60,9 +60,13 @@ struct NhoodListContext: public SimpleRuntimeContext {
 
   explicit NhoodListContext (const T& _active): active (_active), nhood () {}
 
+  template <bool sort_tp>
   void addItem (NItem* item) {
     nhood.push_back (item);
+
+    if (sort_tp) {
     std::inplace_merge (nhood.begin (), nhood.end ()-1, nhood.end (), NhoodIDcmp<NItem> ()); 
+    }
     
   }
 
@@ -145,7 +149,7 @@ public:
     Ctxt* ctxt = static_cast<Ctxt*> (c);
     assert (ctxt != NULL);
     acquire (ctxt, cmp);
-    ctxt->addItem (this);
+    ctxt->template addItem<true> (this);
   }
 
 
@@ -254,7 +258,7 @@ public:
 
     acquire (ctxt, cmp);
 
-    ctxt->addItem (this);
+    ctxt->template addItem<false> (this);
   }
 
   template <typename C>

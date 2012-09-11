@@ -34,8 +34,8 @@
 
 #include "Galois/Atomic.h"
 #include "Galois/Statistic.h"
+#include "Galois/util/Markable.h"
 #include "Galois/Accumulator.h"
-#include "Galois/util/Marked.h"
 
 #include "Galois/Runtime/PerThreadWorkList.h"
 #include "Galois/Runtime/DoAllCoupled.h"
@@ -54,10 +54,10 @@ template <typename KNode_tp>
 struct WLfactory {
   typedef KEdge<KNode_tp> KE_ty;
 
-  typedef typename GaloisRuntime::PerThreadVector<KE_ty> EdgeList_ty;
+  typedef typename GaloisRuntime::PerThreadVector<KE_ty*> EdgeList_ty;
   typedef typename GaloisRuntime::PerThreadVector<KNode_tp*> NodeList_ty;
 
-  typedef typename GaloisRuntime::PerThreadVector<Markable<KE_ty> > MarkableEdgeList_ty;
+  typedef typename GaloisRuntime::PerThreadVector<Markable<KE_ty*> > MarkableEdgeList_ty;
 };
 
 
@@ -72,7 +72,7 @@ void arrangeWrapper (KNodeAdj* node) {
 template <bool sorted_tp, typename Flavor_tp, typename KNode_tp>
 void kruskalAdjNoCopy (
     std::vector<KNode_tp*>& nodes,
-    std::vector<KEdge<KNode_tp> >& edges,
+    std::vector<KEdge<KNode_tp>* >& edges,
     size_t& totalWeight,
     size_t& totalIter) {
 
@@ -207,28 +207,30 @@ private:
     {}
 
 
-    void operator () (Markable<KEdge<KNode_tp> >& edge) const {
+    void operator () (Markable<KEdge<KNode_tp>* >& medge) const {
+      matchIter += 1;
 
-      if (!edge.marked () && kruskal::NotSelfEdge<KNode_tp> () (edge)) {
+      KEdge<KNode_tp>* edge = medge;
 
-        KNode_tp* rep1 = kruskal::findPC (edge.src);
-        KNode_tp* rep2 = kruskal::findPC (edge.dst);
+      if (!medge.marked () && kruskal::NotSelfEdge<KNode_tp> () (edge)) {
+
+        KNode_tp* rep1 = kruskal::findPC (edge->src);
+        KNode_tp* rep2 = kruskal::findPC (edge->dst);
 
         assert (rep1 != rep2);
 
         if (kruskal::getLightest<sorted_tp> (*rep1) == edge &&
             kruskal::getLightest<sorted_tp> (*rep2) == edge) {
 
-          mergeList.get ().push_back (edge);
+          mergeList.get ().push_back (medge);
 
-          edge.mark (0);
+          medge.mark (0);
 
         } 
       } else {
-        edge.mark (0);
+        medge.mark (0);
       }
 
-      matchIter += 1;
     }
 
 
@@ -251,26 +253,26 @@ public:
     {}
 
 
-      void operator () (Markable<KEdge<KNode_tp> >& edge) const {
+      void operator () (Markable<KEdge<KNode_tp>* >& edge) const {
         doUnion (edge);
       }
 
     protected:
-    std::pair<KNode_tp*, KNode_tp*> doUnion (KEdge<KNode_tp>& edge) const {
+    std::pair<KNode_tp*, KNode_tp*> doUnion (KEdge<KNode_tp>* edge) const {
 
       assert (kruskal::NotSelfEdge<KNode_tp> () (edge));
-      assert (!edge.inMST);
+      assert (!edge->inMST);
 
       std::pair<KNode_tp*, KNode_tp*> p = 
-        kruskal::unionByRank (edge.src->getRep (), edge.dst->getRep ());
+        kruskal::unionByRank (edge->src->getRep (), edge->dst->getRep ());
 
       KNode_tp& master = *(p.first);
       KNode_tp& other = *(p.second);
 
       kruskal::merge<sorted_tp> (master, other);
 
-      edge.inMST = true;
-      mstSum += edge.weight;
+      edge->inMST = true;
+      mstSum += edge->weight;
       mergeIter += 1;
 
       return p;
@@ -284,13 +286,13 @@ public:
 
   KruskalAdjEdgeBased (
       const std::vector<KNode_tp*>& nodes,
-      const std::vector<KEdge<KNode_tp> >& edges) {
+      const std::vector<KEdge<KNode_tp>* >& edges) {
   }
       
 
   void fillInitial (
       const std::vector<KNode_tp*>& nodes,
-      const std::vector<KEdge<KNode_tp> >& edges,
+      const std::vector<KEdge<KNode_tp>* >& edges,
       MatchListTy& matchList) const {
 
     matchList.fill_init (edges.begin (), edges.end (), &MatchListTy::Cont_ty::push_back);
@@ -318,7 +320,7 @@ public:
 template <bool sorted_tp, typename Flavor_tp, typename KNode_tp>
 void kruskalAdjCopyBased (
     std::vector<KNode_tp*>& nodes,
-    std::vector<KEdge<KNode_tp> >& edges,
+    std::vector<KEdge<KNode_tp>* >& edges,
     size_t& totalWeight,
     size_t& totalIter) {
 
@@ -515,22 +517,22 @@ private:
       // if is a representative
       if (kruskal::findPC (node) == node) {
 
-        KEdge<KNode_tp>& e = kruskal::getLightest<sorted_tp> (*node);
+        KEdge<KNode_tp>* edge = kruskal::getLightest<sorted_tp> (*node);
 
-        KNode_tp* rep1 = kruskal::findPC (e.src);
-        KNode_tp* rep2 = kruskal::findPC (e.dst);
+        KNode_tp* rep1 = kruskal::findPC (edge->src);
+        KNode_tp* rep2 = kruskal::findPC (edge->dst);
 
         assert ((rep1 == node) || (rep2 == node));
         assert (rep1 != rep2);
 
         KNode_tp* otherRep = (rep1 == node) ? rep2: rep1;
 
-        if (e == kruskal::getLightest<sorted_tp> (*otherRep)) {
+        if (edge == kruskal::getLightest<sorted_tp> (*otherRep)) {
 
           if (outer.compareByAge (node, otherRep) > 0) {
             // node is going to win in union and will be added
             // to nextRoundList
-            mergeList.get ().push_back (e);
+            mergeList.get ().push_back (edge);
           } else {
             // other is going to win and should be on the current worklist
             // or else it's a bug
@@ -562,12 +564,12 @@ private:
 
   }
 
-  std::pair<KNode_tp*, KNode_tp*> unionByAge (KEdge<KNode_tp>& edge) {
+  std::pair<KNode_tp*, KNode_tp*> unionByAge (KEdge<KNode_tp>* edge) {
     assert (kruskal::NotSelfEdge<KNode_tp> () (edge));
-    assert (!edge.inMST);
+    assert (!edge->inMST);
 
-    KNode_tp* rep1 = edge.src->getRep ();
-    KNode_tp* rep2 = edge.dst->getRep ();
+    KNode_tp* rep1 = edge->src->getRep ();
+    KNode_tp* rep2 = edge->dst->getRep ();
 
     KNode_tp* master = NULL;
     KNode_tp* other = NULL;
@@ -610,14 +612,14 @@ private:
         mergeIter (mergeIter)
     {}
 
-    void operator () (KEdge<KNode_tp>& edge) {
+    void operator () (KEdge<KNode_tp>* edge) {
 
 
 
       std::pair<KNode_tp*, KNode_tp*> p = outer.unionByAge (edge);
 
-      edge.inMST = true;
-      mstSum += edge.weight;
+      edge->inMST = true;
+      mstSum += edge->weight;
       mergeIter += 1;
 
       KNode_tp& master = *(p.first);
@@ -646,7 +648,7 @@ public:
 
   KruskalAdjNodeBased (
       const std::vector<KNode_tp*>& nodes,
-      const std::vector<KEdge<KNode_tp> >& edges)
+      const std::vector<KEdge<KNode_tp>* >& edges)
     :
       latestRound (nodes.size (), 0),
       round (0)
@@ -722,11 +724,11 @@ private:
 
       } else {
 
-        KEdge<KNode_tp>& e = kruskal::getLightest<sorted_tp> (*node);
+        KEdge<KNode_tp>* edge = kruskal::getLightest<sorted_tp> (*node);
 
 
-        KNode_tp* rep1 = kruskal::findPC (e.src);
-        KNode_tp* rep2 = kruskal::findPC (e.dst);
+        KNode_tp* rep1 = kruskal::findPC (edge->src);
+        KNode_tp* rep2 = kruskal::findPC (edge->dst);
 
         assert ((rep1 == node) || (rep2 == node));
         assert (rep1 != rep2);
@@ -734,7 +736,7 @@ private:
         KNode_tp* otherRep = (node == rep1)? rep2: rep1;
 
         if (didMatch (node, otherRep)) {
-          mergeList.get ().push_back (e);
+          mergeList.get ().push_back (edge);
 
         } else {
           nextRoundList.get ().push_back (node);
@@ -789,9 +791,8 @@ private:
     {}
 
 
-    void operator () (KEdge<KNode_tp>& edge) const {
+    void operator () (KEdge<KNode_tp>* edge) const {
 
-      // FIXME:
       std::pair<KNode_tp*, KNode_tp*> p = SuperTy::doUnion (edge);
 
       KNode_tp& master = *(p.first);
@@ -824,7 +825,7 @@ public:
 
   BoruvkaAdj (
       const std::vector<KNode_tp*>& nodes,
-      const std::vector<KEdge<KNode_tp> >& edges)
+      const std::vector<KEdge<KNode_tp>* >& edges)
     :
       matchInfo (nodes.size (), MatchFlag (NULL))
   {}
@@ -866,8 +867,8 @@ protected:
     for (typename Super_ty::VecKEdge_ty::const_iterator e = edges.begin ()
         , ende = edges.end (); e != ende; ++e) {
 
-      e->src->addEdge (*e);
-      e->dst->addEdge (*e);
+      (*e)->src->addEdge (*e);
+      (*e)->dst->addEdge (*e);
 
     }
   }
