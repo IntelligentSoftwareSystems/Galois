@@ -135,8 +135,8 @@ struct ReduceVectorWrap {
   void operator()(T& lhs, const T& rhs) const {
     if (lhs.size() < rhs.size())
       lhs.resize(rhs.size());
-    typename T::const_iterator jj = rhs.begin();
-    for (typename T::iterator ii = lhs.begin(), ei = lhs.end(); ii != ei; ++ii, ++jj) {
+    typename T::iterator ii = lhs.begin();
+    for (typename T::const_iterator jj = rhs.begin(), ej = rhs.end(); jj != ej; ++ii, ++jj) {
       fn(*ii, *jj);
     }
   }

@@ -248,11 +248,15 @@ struct process {
 void verify() {
     double sampleBC = 0.0;
     bool firstTime = true;
+#if SHARE_SINGLE_BC
+#else
+    const std::vector<double>& bcv = CB->reduce();
+#endif
     for (int i=0; i<NumNodes; ++i) {
 #if SHARE_SINGLE_BC
       double bc = (*CB)[i].data.bc;
 #else
-      double bc = CB->reduce()[i];
+      double bc = bcv[i];
 #endif
       if (firstTime) {
         sampleBC = bc;
@@ -260,7 +264,7 @@ void verify() {
         firstTime = false;
       } else {
         if (!((bc - sampleBC) <= 0.0001)) {
-          std::cerr << "If torus graph, verification failed " << (bc - sampleBC) << std::endl;
+          std::cerr << "If torus graph, verification failed " << (bc - sampleBC) << "\n";
 	  assert ((bc - sampleBC) <= 0.0001);
 	  return;
 	}
