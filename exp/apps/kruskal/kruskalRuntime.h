@@ -147,11 +147,6 @@ protected:
     Accumulator_ty matchIter;
     Accumulator_ty mergeIter;
 
-    Galois::StatTimer t_sort ("sorting time: ");
-
-    t_sort.start ();
-    std::sort (edges.begin (), edges.end (), KEdge<KNodeLockable>::PtrComparator ());
-    t_sort.stop ();
 
     Galois::StatTimer t_feach ("for_each loop time: ");
 
@@ -281,11 +276,6 @@ protected:
     Accumulator_ty matchIter;
     Accumulator_ty mergeIter;
 
-    Galois::StatTimer t_sort ("sorting time: ");
-
-    t_sort.start ();
-    std::sort (edges.begin (), edges.end (), KEdge<KNodeMin>::PtrComparator ());
-    t_sort.stop ();
 
     Galois::StatTimer t_feach ("for_each loop time: ");
 
