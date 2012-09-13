@@ -298,5 +298,3 @@ protected:
 };
 
 #endif //  KRUSKAL_RUNTIME_H_
-
-

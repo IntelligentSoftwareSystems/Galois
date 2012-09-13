@@ -73,11 +73,12 @@ public:
   typedef unsigned Weight_ty;
   typedef std::vector<KNode_tp*> VecKNode_ty;
   typedef std::vector<KEdge<KNode_tp>* > VecKEdge_ty;
-  typedef std::set<KEdge<KNode_tp>, 
-          typename KEdge<KNode_tp>::NodeIDcomparator> SetKEdge_ty;
-
 
 protected:
+  typedef std::set<KEdge<KNode_tp>, 
+          typename KEdge<KNode_tp>::NodeIDcomparator> SetKEdge_ty;
+  typedef std::vector<KEdge<KNode_tp> > Edges_ty;
+
   virtual const std::string getVersion () const = 0;
 
   //! doesn't do anything by default. Sub-classes may choose to override 
@@ -88,7 +89,7 @@ protected:
       size_t& mstWeight, size_t& totalIter) = 0;
 
 
-  void readGraph (const std::string& filename, VecKNode_ty& nodes, SetKEdge_ty& edges) {
+  void readGraph (const std::string& filename, VecKNode_ty& nodes, Edges_ty& edges) {
 
     typedef Galois::Graph::LC_CSR_Graph<unsigned, unsigned> InGraph;
     typedef InGraph::GraphNode InGNode;
@@ -107,6 +108,7 @@ protected:
 
 
     nodes.resize (ingraph.size (), NULL);
+    edges.reserve (ingraph.sizeEdges ());
 
     size_t numEdges = 0;
 
@@ -132,11 +134,12 @@ protected:
         if (src != dst) {
           KEdge<KNode_tp> ke (nodes[src], nodes[dst], ingraph.getEdgeData (*e));
 
-          std::pair<typename SetKEdge_ty::iterator, bool> res = edges.insert (ke);
+          edges.push_back (ke);
+          //std::pair<typename SetKEdge_ty::iterator, bool> res = edges.insert (ke);
 
-          if (res.second) {
+          //if (res.second) {
             ++numEdges;
-          }
+          //}
 
         } else {
           std::fprintf (stderr, "Warning: Ignoring self edge (%d, %d, %d)\n",
@@ -153,7 +156,7 @@ protected:
   
 
 
-  virtual void readPBBSfile (const std::string& filename, VecKNode_ty& nodes, SetKEdge_ty& edges) {
+  virtual void readPBBSfile (const std::string& filename, VecKNode_ty& nodes, Edges_ty& edges) {
 
     typedef unsigned NodeData;
     typedef float EdgeData;
@@ -215,11 +218,11 @@ protected:
       if (srcIdx != dstIdx) {
 
         KEdge<KNode_tp> ke (nodes[srcIdx], nodes[dstIdx], integ_wt);
-        std::pair<typename SetKEdge_ty::iterator, bool> res = edges.insert (ke);
-
-        if (res.second) {
+        //std::pair<typename SetKEdge_ty::iterator, bool> res = edges.insert (ke);
+        edges.push_back (ke);
+        //if (res.second) {
           ++numEdges;
-        }
+        //}
 
       } else {
           std::fprintf (stderr, "Warning: Ignoring self edge (%d, %d, %d)\n",
@@ -251,7 +254,7 @@ public:
 
 
     VecKNode_ty nodes;
-    SetKEdge_ty edges;
+    Edges_ty edges;
 
     size_t mstWeight = 0;
     size_t totalIter = 0;
@@ -260,10 +263,11 @@ public:
     // readPBBSfile (filename, nodes, edges);
     //
     VecKEdge_ty edgesVec;
+    edgesVec.reserve( edges.size ());
 
-    for (typename SetKEdge_ty::const_iterator i = edges.begin (), endi = edges.end ();
+    for (typename Edges_ty::iterator i = edges.begin (), endi = edges.end ();
         i != endi; ++i) {
-      edgesVec.push_back (const_cast<KEdge<KNode_tp>* > (&(*i)));
+      edgesVec.push_back (&(*i));
     }
 
 
@@ -272,9 +276,7 @@ public:
     Galois::StatTimer t ("Time taken by runMST: ");
 
     t.start ();
-    GaloisRuntime::beginSampling ();
     runMST (nodes, edgesVec, mstWeight, totalIter);
-    GaloisRuntime::endSampling ();
     t.stop ();
 
     printResults (mstWeight, totalIter);
@@ -373,7 +375,7 @@ private:
     return nd->id;
   }
 
-  size_t runPrim (const VecKNode_ty& nodes, const SetKEdge_ty& edges) const {
+  size_t runPrim (const VecKNode_ty& nodes, const Edges_ty& edges) const {
 
     std::vector<PrimNode*> primNodes (nodes.size (), NULL);
 
@@ -383,7 +385,7 @@ private:
       primNodes[index] = new PrimNode (index);
     }
 
-    for (typename SetKEdge_ty::const_iterator e = edges.begin (), ende = edges.end ();
+    for (typename Edges_ty::const_iterator e = edges.begin (), ende = edges.end ();
         e != ende; ++e) {
 
       unsigned srcIdx = getID (e->src);
@@ -445,7 +447,7 @@ private:
 
 
 
-  bool verify (const VecKNode_ty& nodes, const SetKEdge_ty& edges, const size_t kruskalSum) const {
+  bool verify (const VecKNode_ty& nodes, const Edges_ty& edges, const size_t kruskalSum) const {
     Galois::StatTimer pt("Prim's Time:");
     pt.start ();
     size_t primSum = runPrim (nodes, edges);
