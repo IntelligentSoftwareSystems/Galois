@@ -937,7 +937,7 @@ class DMergeManager<Options,typename boost::enable_if<MergeTraits<Options> >::ty
   typedef typename MergeTraits<Options>::IdFn IdFn;
   typedef typename Base::CompareTy CompareTy;
 
-  struct CompareNewItems {
+  struct CompareNewItems: public std::binary_function<NewItem,NewItem,bool> {
     CompareTy& comp;
     CompareNewItems(CompareTy& c): comp(c) { }
     bool operator()(const NewItem& a, const NewItem& b) const {
@@ -983,9 +983,8 @@ public:
     for (; ii != ei; ++ii)
       mergeBuf.push_back(NewItem(*ii, idFunction(*ii), 1));
 
-    // TODO: change sort call when Galois sort supports user defined comparator
     if (Options::useOrdered)
-      std::sort(mergeBuf.begin(), mergeBuf.end(), CompareNewItems(comp));
+      Galois::ParallelSTL::sort(mergeBuf.begin(), mergeBuf.end(), CompareNewItems(comp));
     else
       Galois::ParallelSTL::sort(mergeBuf.begin(), mergeBuf.end());
 

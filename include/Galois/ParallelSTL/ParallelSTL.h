@@ -107,7 +107,7 @@ InputIterator find_if(InputIterator first, InputIterator last, Predicate pred)
   return last;
 }
 
-template <class Iterator>
+template<class Iterator>
 Iterator choose_rand(Iterator first, Iterator last) {
   size_t dist = std::distance(first,last);
   if (dist)
@@ -115,25 +115,38 @@ Iterator choose_rand(Iterator first, Iterator last) {
   return first;
 }
 
-struct parsort {
-
+template<class Compare>
+struct sort_helper {
   typedef int tt_does_not_need_aborts;
+  Compare comp;
+  
+  //! Not equal in terms of less-than
+  template<class value_type>
+  struct neq_to: public std::binary_function<value_type,value_type,bool> {
+    Compare comp;
+    neq_to(Compare c): comp(c) { }
+    bool operator()(const value_type& a, const value_type& b) const {
+      return comp(a, b) || comp(b, a);
+    }
+  };
+
+  sort_helper(Compare c): comp(c) { }
 
   template <class RandomAccessIterator, class Context>
   void operator()(std::pair<RandomAccessIterator,RandomAccessIterator> bounds, 
 		  Context& cnx) {
     if (std::distance(bounds.first, bounds.second) <= 1024) {
-      std::sort(bounds.first, bounds.second);
+      std::sort(bounds.first, bounds.second, comp);
     } else {
       typedef typename std::iterator_traits<RandomAccessIterator>::value_type VT;
       RandomAccessIterator pivot = choose_rand(bounds.first, bounds.second);
       VT pv = *pivot;
-      pivot = std::partition(bounds.first, bounds.second, std::bind2nd(std::less<VT>(), pv));
+      pivot = std::partition(bounds.first, bounds.second, std::bind2nd(comp, pv));
       //push the lower bit
       if (bounds.first != pivot)
 	cnx.push(std::make_pair(bounds.first, pivot));
       //adjust the upper bit
-      pivot = std::find_if(pivot, bounds.second, std::bind2nd(std::not_equal_to<VT>(), pv));
+      pivot = std::find_if(pivot, bounds.second, std::bind2nd(neq_to<VT>(comp), pv));
       //push the upper bit
       if (bounds.second != pivot)
 	cnx.push(std::make_pair(pivot, bounds.second)); 
@@ -159,16 +172,16 @@ dual_partition(RandomAccessIterator first1, RandomAccessIterator last1,
 }
 
 template<typename RandomAccessIterator, class Predicate>
-struct parpart {
+struct partition_helper {
   typedef std::pair<RandomAccessIterator, RandomAccessIterator> RP;
-  struct parpart_state {
+  struct partition_helper_state {
     RandomAccessIterator first, last;
     RandomAccessIterator rfirst, rlast;
     GaloisRuntime::LL::SimpleLock<true> Lock;
     Predicate pred;
     typename std::iterator_traits<RandomAccessIterator>::difference_type BlockSize() { return 1024; }
 
-    parpart_state(RandomAccessIterator f, RandomAccessIterator l, Predicate p)
+    partition_helper_state(RandomAccessIterator f, RandomAccessIterator l, Predicate p)
       :first(f), last(l), rfirst(l), rlast(f), pred(p)
     {}
     RP takeHigh() {
@@ -201,9 +214,9 @@ struct parpart {
      }
   };
 
-  parpart(parpart_state* s) :state(s) {}
+  partition_helper(partition_helper_state* s) :state(s) {}
 
-  parpart_state* state;
+  partition_helper_state* state;
 
   void operator()(unsigned, unsigned) {
     RP high, low;
@@ -222,17 +235,17 @@ template<class RandomAccessIterator, class Predicate>
 RandomAccessIterator partition(RandomAccessIterator first, 
 			       RandomAccessIterator last,
 			       Predicate pred) {
-  if (std::distance(first,last) <= 1024)
-    return std::partition(first,last, pred);
-  typedef parpart<RandomAccessIterator, Predicate> P;
-  typename P::parpart_state s(first, last, pred);
+  if (std::distance(first, last) <= 1024)
+    return std::partition(first, last, pred);
+  typedef partition_helper<RandomAccessIterator, Predicate> P;
+  typename P::partition_helper_state s(first, last, pred);
   GaloisRuntime::on_each_impl(P(&s), 0);
   if (s.rfirst == first && s.rlast == last) { //perfect !
     //abort();
     return s.first;
   }
   //  return std::partition(first,last,pred);
-  return std::partition(s.rfirst,s.rlast,pred);
+  return std::partition(s.rfirst, s.rlast, pred);
 }
 
 struct pair_dist {
@@ -242,10 +255,10 @@ struct pair_dist {
   }
 };
 
-template <class RandomAccessIterator>
-void sort(RandomAccessIterator first, RandomAccessIterator last) {
-  if (std::distance(first,last) <= 1024) {
-    std::sort(first,last);
+template <class RandomAccessIterator,class Compare>
+void sort(RandomAccessIterator first, RandomAccessIterator last, Compare comp) {
+  if (std::distance(first, last) <= 1024) {
+    std::sort(first, last, comp);
     return;
   }
 #if 0
@@ -276,8 +289,13 @@ void sort(RandomAccessIterator first, RandomAccessIterator last) {
   //Galois::for_each<GaloisRuntime::WorkList::FIFO<> >(std::make_pair(first,last), P);
 #else
   std::pair<RandomAccessIterator,RandomAccessIterator> initial[1] = { std::make_pair(first, last) };
-  GaloisRuntime::for_each_impl<GaloisRuntime::WorkList::dChunkedFIFO<1> >(&initial[0], &initial[1], parsort(), 0);
+  GaloisRuntime::for_each_impl<GaloisRuntime::WorkList::dChunkedFIFO<1> >(&initial[0], &initial[1], sort_helper<Compare>(comp), 0);
 #endif
+}
+
+template <class RandomAccessIterator>
+void sort(RandomAccessIterator first, RandomAccessIterator last) {
+  Galois::ParallelSTL::sort(first, last, std::less<typename std::iterator_traits<RandomAccessIterator>::value_type>());
 }
 
 template<typename T, typename BinOp>
