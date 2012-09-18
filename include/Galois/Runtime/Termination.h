@@ -31,7 +31,7 @@ public:
     friend class TerminationDetection;
     volatile long tokenIsBlack;
     volatile long hasToken;
-    volatile long processIsBlack;
+    long processIsBlack;
   public:
     TokenHolder() :tokenIsBlack(false), hasToken(false), processIsBlack(true) {}
     inline void workHappened() {
@@ -42,6 +42,8 @@ private:
   PerThreadStorage<TokenHolder> data;
   volatile bool globalTerm;
   bool lastWasWhite;
+
+  void propToken(TokenHolder& c, TokenHolder& n);
 
 public:
   TerminationDetection();
