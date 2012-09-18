@@ -94,7 +94,7 @@ unsigned GaloisRuntime::SimpleRuntimeContext::commit_iteration() {
     ++numLocks;
   }
 
-  not_ready = false;
+  // XXX not_ready = false;
 
   return numLocks;
 }
@@ -116,19 +116,23 @@ void GaloisRuntime::signalConflict() {
 }
 
 void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
+  if (L->Owner.try_lock()) {
+    assert(!L->Owner.getValue());
+    assert(!L->next);
+    L->Owner.setValue(this);
+    L->next = locks;
+    locks = L;
+  } else {
+    if (L->Owner.getValue() != this) {
+      GaloisRuntime::signalConflict();
+    }
+  }
+}
+
+void GaloisRuntime::DeterministicRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
   // Normal path
   if (pendingFlag.flag.data == NON_DET) {
-    if (L->Owner.try_lock()) {
-      assert(!L->Owner.getValue());
-      assert(!L->next);
-      L->Owner.setValue(this);
-      L->next = locks;
-      locks = L;
-    } else {
-      if (L->Owner.getValue() != this) {
-        GaloisRuntime::signalConflict();
-      }
-    }
+    GaloisRuntime::SimpleRuntimeContext::acquire(L);
     return;
   }
 
@@ -142,13 +146,13 @@ void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
     locks = L;
   }
 
-  SimpleRuntimeContext* other;
+  DeterministicRuntimeContext* other;
   do {
-    other = L->Owner.getValue();
+    other = static_cast<DeterministicRuntimeContext*>(L->Owner.getValue());
     if (other == this)
       return;
     if (other) {
-      bool conflict = comp ? comp->compare(other->comp_data, comp_data) :  other->id < id;
+      bool conflict = comp ? comp->compare(other->data.comp_data, data.comp_data) :  other->data.id < data.id;
       if (conflict) {
         // A lock that I want but can't get
         not_ready = 1;
@@ -163,3 +167,4 @@ void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
 
   return;
 }
+

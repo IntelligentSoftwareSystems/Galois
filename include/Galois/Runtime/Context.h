@@ -59,6 +59,7 @@ void setPending(PendingFlag value);
 static inline void clearConflictLock() { }
 
 class SimpleRuntimeContext;
+class DeterministicRuntimeContext;
 
 #if GALOIS_USE_EXCEPTION_HANDLER
 #else
@@ -71,24 +72,19 @@ class Lockable {
   LL::PtrLock<SimpleRuntimeContext, true> Owner;
   Lockable* next;
   friend class SimpleRuntimeContext;
+  friend class DeterministicRuntimeContext;
 public:
   Lockable() :next(0) {}
 };
 
 class SimpleRuntimeContext {
-private:
+protected:
   //! The locks we hold
   Lockable* locks;
-  //! Iteration id, used to order iterations in deterministic execution
-  unsigned long id;
-  //! Flag to abort other iterations, used in deterministic execution
-  long not_ready;
-  //! User-defined comparison between iterations
-  Galois::CompareCallback* comp;
-  void* comp_data;
 
 public:
-  SimpleRuntimeContext() :locks(0), id(0), not_ready(0), comp(0), comp_data(0) {}
+  SimpleRuntimeContext(): locks(0) { }
+  virtual ~SimpleRuntimeContext() { }
 
   void start_iteration() {
     assert(!locks);
@@ -96,12 +92,7 @@ public:
   
   unsigned cancel_iteration();
   unsigned commit_iteration();
-  void acquire(Lockable* L);
-
-  void set_id(unsigned long i) { id = i; }
-  bool is_ready() { return !not_ready; }
-  void set_comp_data(void* ptr) { comp_data = ptr; }
-  void set_comp(Galois::CompareCallback* fn) { comp = fn; }
+  virtual void acquire(Lockable* L);
 };
 
 //! get the current conflict detection class, may be null if not in parallel region
@@ -109,6 +100,31 @@ SimpleRuntimeContext* getThreadContext();
 
 //! used by the parallel code to set up conflict detection per thread
 void setThreadContext(SimpleRuntimeContext* n);
+
+class DeterministicRuntimeContext: public SimpleRuntimeContext {
+protected:
+  //! Iteration id for deterministic execution
+  union {
+    unsigned long id;
+    void* comp_data;
+  } data;
+  //! Flag to abort other iterations for deterministic and ordered execution
+  unsigned long not_ready;
+
+  //! User-defined comparison between iterations for ordered execution
+  Galois::CompareCallback* comp;
+
+public:
+  DeterministicRuntimeContext(): not_ready(0), comp(0) { data.id = 0; data.comp_data = 0; }
+
+  virtual void acquire(Lockable* L);
+
+  void set_id(unsigned long i) { data.id = i; }
+  bool is_ready() { return !not_ready; }
+
+  void set_comp_data(void* ptr) { data.comp_data = ptr; }
+  void set_comp(Galois::CompareCallback* fn) { comp = fn; }
+};
 
 //! Helper function to decide if the conflict detection lock should be taken
 static inline bool shouldLock(Galois::MethodFlag g) {
