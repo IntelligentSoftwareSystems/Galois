@@ -76,8 +76,8 @@ public:
 
 protected:
   typedef std::set<KEdge<KNode_tp>, 
-          typename KEdge<KNode_tp>::NodeIDcomparator> SetKEdge_ty;
-  typedef std::vector<KEdge<KNode_tp> > Edges_ty;
+          typename KEdge<KNode_tp>::NodeIDcomparator> Edges_ty;
+  //typedef std::vector<KEdge<KNode_tp> > Edges_ty;
 
   virtual const std::string getVersion () const = 0;
 
@@ -108,7 +108,7 @@ protected:
 
 
     nodes.resize (ingraph.size (), NULL);
-    edges.reserve (ingraph.sizeEdges ());
+    //edges.reserve (ingraph.sizeEdges ());
 
     size_t numEdges = 0;
 
@@ -134,12 +134,12 @@ protected:
         if (src != dst) {
           KEdge<KNode_tp> ke (nodes[src], nodes[dst], ingraph.getEdgeData (*e));
 
-          edges.push_back (ke);
-          //std::pair<typename SetKEdge_ty::iterator, bool> res = edges.insert (ke);
+          //edges.push_back (ke);
+          std::pair<typename Edges_ty::iterator, bool> res = edges.insert (ke);
 
-          //if (res.second) {
+          if (res.second) {
             ++numEdges;
-          //}
+          }
 
         } else {
           std::fprintf (stderr, "Warning: Ignoring self edge (%d, %d, %d)\n",
@@ -218,11 +218,11 @@ protected:
       if (srcIdx != dstIdx) {
 
         KEdge<KNode_tp> ke (nodes[srcIdx], nodes[dstIdx], integ_wt);
-        //std::pair<typename SetKEdge_ty::iterator, bool> res = edges.insert (ke);
-        edges.push_back (ke);
-        //if (res.second) {
+        std::pair<typename Edges_ty::iterator, bool> res = edges.insert (ke);
+        //edges.push_back (ke);
+        if (res.second) {
           ++numEdges;
-        //}
+        }
 
       } else {
           std::fprintf (stderr, "Warning: Ignoring self edge (%d, %d, %d)\n",
@@ -267,7 +267,8 @@ public:
 
     for (typename Edges_ty::iterator i = edges.begin (), endi = edges.end ();
         i != endi; ++i) {
-      edgesVec.push_back (&(*i));
+      //edgesVec.push_back (&(*i));
+      edgesVec.push_back (const_cast<KEdge<KNode_tp>* > (&(*i)));
     }
 
 
