@@ -28,11 +28,11 @@
 #include "Galois/Runtime/ParallelWork.h"
 #include "Galois/Runtime/DoAll.h"
 #include "Galois/Runtime/LocalIterator.h"
+#include "Galois/Runtime/Deterministic.h"
 
 #ifdef GALOIS_USE_EXP
 #include "Galois/Runtime/ParallelWorkInline.h"
 #include "Galois/Runtime/ParaMeter.h"
-#include "Galois/Runtime/Deterministic.h"
 #include "Galois/Runtime/Ordered.h"
 #endif
 
