@@ -175,6 +175,7 @@ public:
 
 typedef TopoBarrier GBarrier;
 
+//! Have a pre-instantiated barrier available for use
 GBarrier& getSystemBarrier();
 
 }
