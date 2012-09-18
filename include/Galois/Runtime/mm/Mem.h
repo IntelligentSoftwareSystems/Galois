@@ -663,10 +663,16 @@ public:
     Alloc->deallocate(ptr);
   }
   
-  template<typename TyC>
-  void construct(pointer ptr, const TyC& val) {
+  void construct(pointer ptr, const_reference val) {
     new (ptr) Ty(val);
   }
+
+#if __GNUC_MINOR__ > 5
+  template< class U, class... Args >
+  void construct( U* p, Args&&... args ) {
+    ::new((void*)p) U(std::forward<Args>(args)...);
+  }
+#endif
   
   void destroy(pointer ptr) {
     destruct(ptr);
