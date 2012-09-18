@@ -22,17 +22,17 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#ifndef GALOIS_RUNTIME_ORDERED_H
-#define GALOIS_RUNTIME_ORDERED_H
+#ifndef GALOIS_RUNTIME_ORDEREDWORK_H
+#define GALOIS_RUNTIME_ORDEREDWORK_H
 
-#include "Galois/Runtime/Deterministic.h"
+#include "Galois/Runtime/DeterministicWork.h"
 
 namespace Galois {
 template<typename IterTy, typename Function1Ty, typename Function2Ty, typename ComparatorTy>
 static inline void for_each_ordered(IterTy b, IterTy e, Function1Ty f1, Function2Ty f2, ComparatorTy comp, const char* loopname = 0) {
   typedef typename std::iterator_traits<IterTy>::value_type T;
-  typedef GaloisRuntime::Deterministic::OrderedOptions<T,Function1Ty,Function2Ty,ComparatorTy> OptionsTy;
-  typedef GaloisRuntime::Deterministic::Executor<OptionsTy> WorkTy;
+  typedef GaloisRuntime::DeterministicWork::OrderedOptions<T,Function1Ty,Function2Ty,ComparatorTy> OptionsTy;
+  typedef GaloisRuntime::DeterministicWork::Executor<OptionsTy> WorkTy;
 
   OptionsTy options(f1, f2, comp);
   WorkTy W(options, loopname);

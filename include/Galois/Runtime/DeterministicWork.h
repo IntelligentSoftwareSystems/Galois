@@ -22,8 +22,8 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#ifndef GALOIS_RUNTIME_DETERMINISTIC_H
-#define GALOIS_RUNTIME_DETERMINISTIC_H
+#ifndef GALOIS_RUNTIME_DETERMINISTICWORK_H
+#define GALOIS_RUNTIME_DETERMINISTICWORK_H
 
 #include "Galois/Callbacks.h"
 #include "Galois/Threads.h"
@@ -41,7 +41,7 @@
 #include <queue>
 
 namespace GaloisRuntime {
-namespace Deterministic {
+namespace DeterministicWork {
 
 //! Wrapper around WorkList::ChunkedFIFO to allow peek() and empty() and still have FIFO order
 template<int chunksize,typename T>
@@ -1470,8 +1470,8 @@ static inline void for_each_det_impl(InitTy& init, WorkTy& W) {
 template<typename IterTy, typename Function1Ty, typename Function2Ty>
 static inline void for_each_det(IterTy b, IterTy e, Function1Ty f1, Function2Ty f2, const char* loopname = 0) {
   typedef typename std::iterator_traits<IterTy>::value_type T;
-  typedef GaloisRuntime::Deterministic::UnorderedOptions<T,Function1Ty,Function2Ty> OptionsTy;
-  typedef GaloisRuntime::Deterministic::Executor<OptionsTy> WorkTy;
+  typedef GaloisRuntime::DeterministicWork::UnorderedOptions<T,Function1Ty,Function2Ty> OptionsTy;
+  typedef GaloisRuntime::DeterministicWork::Executor<OptionsTy> WorkTy;
 
   OptionsTy options(f1, f2);
   WorkTy W(options, loopname);
