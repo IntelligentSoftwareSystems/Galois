@@ -19,34 +19,35 @@ add_library(AVI ${Sources})
 app(AVIorderedSerial main/AVIorderedSerial.cpp
   REQUIRES LAPACK_FOUND ZLIB_FOUND
   EXTLIBS AVI ${LAPACK_LIBRARIES})
+
 app(AVIunordered main/AVIunordered.cpp 
   REQUIRES LAPACK_FOUND ZLIB_FOUND
   EXTLIBS AVI ${LAPACK_LIBRARIES})
 
-app(AVIodgReadonly main/AVIodgReadonly.cpp 
-  REQUIRES LAPACK_FOUND ZLIB_FOUND
-  EXTLIBS AVI ${LAPACK_LIBRARIES})
-
-app(AVIodgImplicit main/AVIodgImplicit.cpp 
-  REQUIRES LAPACK_FOUND ZLIB_FOUND
-  EXTLIBS AVI ${LAPACK_LIBRARIES})
-
-app(AVIodgAutoPriLock main/AVIodgAutoPriLock.cpp 
-  REQUIRES LAPACK_FOUND ZLIB_FOUND
-  EXTLIBS AVI ${LAPACK_LIBRARIES})
-
-app(AVIodgAutoShare main/AVIodgAutoShare.cpp 
-  REQUIRES LAPACK_FOUND ZLIB_FOUND
-  EXTLIBS AVI ${LAPACK_LIBRARIES})
-
-app(AVIodgAuto2 main/AVIodgAuto2.cpp 
+app(AVIodgOrdered main/AVIodgOrdered.cpp 
   REQUIRES LAPACK_FOUND ZLIB_FOUND
   EXTLIBS AVI ${LAPACK_LIBRARIES})
 
 # the files may be removed from the release without causing error in cmake
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/main/AVIunorderedNoLock.cpp)
-  app(AVIunorderedNoLock main/AVIunorderedNoLock.cpp
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/exp)
+  app(AVIunorderedNoLock exp/AVIunorderedNoLock.cpp
     REQUIRES LAPACK_FOUND ZLIB_FOUND
+    EXTLIBS AVI ${LAPACK_LIBRARIES})
+
+  app(AVIodgReadonly exp/AVIodgReadonly.cpp 
+    REQUIRES LAPACK_FOUND ZLIB_FOUND USE_EXP
+    EXTLIBS AVI ${LAPACK_LIBRARIES})
+
+  app(AVIodgImplicit exp/AVIodgImplicit.cpp 
+    REQUIRES LAPACK_FOUND ZLIB_FOUND USE_EXP
+    EXTLIBS AVI ${LAPACK_LIBRARIES})
+
+  app(AVIodgAutoPriLock exp/AVIodgAutoPriLock.cpp 
+    REQUIRES LAPACK_FOUND ZLIB_FOUND USE_EXP
+    EXTLIBS AVI ${LAPACK_LIBRARIES})
+
+  app(AVIodgAutoShare exp/AVIodgAutoShare.cpp 
+    REQUIRES LAPACK_FOUND ZLIB_FOUND USE_EXP
     EXTLIBS AVI ${LAPACK_LIBRARIES})
 endif()
 

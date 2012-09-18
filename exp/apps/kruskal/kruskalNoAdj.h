@@ -40,9 +40,6 @@
 #include "Galois/util/Markable.h"
 #include "Galois/Runtime/PerThreadWorkList.h"
 #include "Galois/Runtime/DoAllCoupled.h"
-#include "Galois/Runtime/cond_inline.h"
-
-
 
 #include "kruskalData.h"
 #include "kruskalFunc.h"
@@ -73,14 +70,14 @@ struct FindLoop {
       matchIter (_matchIter)
   {}
 
-  IFPROF_NOINLINE static void updateODG_claim (KEdge<KNode_tp>* edge, KNode_tp* rep1, KNode_tp* rep2) {
+  static void updateODG_claim (KEdge<KNode_tp>* edge, KNode_tp* rep1, KNode_tp* rep2) {
     if (rep1 != rep2) {
       rep1->claimAsMin (edge);
       rep2->claimAsMin (edge);
     }
   }
 
-  IFPROF_NOINLINE void operator () (KEdge<KNode_tp>* edge) {
+  void operator () (KEdge<KNode_tp>* edge) {
     matchIter += 1;
 
     KNode_tp* rep1 = kruskal::findPC (edge->src);
@@ -116,23 +113,23 @@ struct LinkUpLoop {
       mergeIter (_mergeIter)
   {}
 
-  IFPROF_NOINLINE static bool updateODG_test (KEdge<KNode_tp>& edge, KNode_tp* rep) {
+  static bool updateODG_test (KEdge<KNode_tp>& edge, KNode_tp* rep) {
     assert (rep != NULL);
     return (rep->minEdge == &edge);
   }
 
-  IFPROF_NOINLINE static void updateODG_reset (KEdge<KNode_tp>& edge, KNode_tp* rep) {
+  static void updateODG_reset (KEdge<KNode_tp>& edge, KNode_tp* rep) {
     if (updateODG_test (edge, rep)) {
       rep->minEdge = NULL;
     }
   }
 
-  IFPROF_NOINLINE static void addToWL (WL_ty& wl, const KEdge<KNode_tp>& edge) {
+  static void addToWL (WL_ty& wl, const KEdge<KNode_tp>& edge) {
     wl.get ().push_back (const_cast<KEdge<KNode_tp>*> (&edge));
   }
 
 
-  IFPROF_NOINLINE void operator () (KEdge<KNode_tp>* e) {
+  void operator () (KEdge<KNode_tp>* e) {
 
     assert (e != NULL);
     KEdge<KNode_tp>& edge = *e;
@@ -312,7 +309,7 @@ struct FindLoopMarked: public FindLoop<KNode_tp> {
 
   FindLoopMarked (Accumulator_ty& _matchIter): FindLoop<KNode_tp> (_matchIter) {}
   
-  IFPROF_NOINLINE void operator () (Markable<KEdge<KNode_tp> >& edge) {
+  void operator () (Markable<KEdge<KNode_tp> >& edge) {
     if (!edge.marked ()) {
       FindLoop<KNode_tp>::operator () (edge);
     }
@@ -341,7 +338,7 @@ struct UnionLoop {
       mergeIter (_mergeIter)
   {}
 
-  IFPROF_NOINLINE void operator () (Markable<KEdge<KNode_tp>* >& medge) {
+  void operator () (Markable<KEdge<KNode_tp>* >& medge) {
 
     KEdge<KNode_tp>& edge = *medge;
 

@@ -21,21 +21,18 @@
  * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
  */
 
-#ifndef AVI_ODG_IMPLICIT_H
-#define AVI_ODG_IMPLICIT_H
+#ifndef AVI_ODG_AUTO_H
+#define AVI_ODG_AUTO_H
 
 #include "Galois/Galois.h"
 #include "Galois/Atomic.h"
 
-#ifdef GALOIS_USE_EXP
-#include "Galois/Runtime/cond_inline.h"
-#endif // GALOIS_USE_EXP
-
-#include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/WorkList.h"
-#include "Galois/Runtime/ll/gio.h"
+#include "Galois/Runtime/PerThreadStorage.h"
 
+#ifdef GALOIS_USE_EXP
 #include "Galois/Runtime/ODGtwoPhase.h"
+#endif
 
 #include <string>
 #include <sstream>
@@ -47,6 +44,7 @@
 
 #include <cassert>
 
+#include "cond_inline.h"
 #include "AuxDefs.h"
 #include "AVI.h"
 #include "Element.h"

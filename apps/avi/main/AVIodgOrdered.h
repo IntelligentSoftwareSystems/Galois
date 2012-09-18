@@ -21,8 +21,8 @@
  * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
  */
 
-#ifndef AVI_ODG_AUTO2_H
-#define AVI_ODG_AUTO2_H
+#ifndef AVI_ODG_ORDERED_H
+#define AVI_ODG_ORDERED_H
 
 #include "Galois/Galois.h"
 #include "Galois/Callbacks.h"
@@ -47,7 +47,7 @@
 
 #include "AVIabstractMain.h"
 
-class AVIodgAuto2: public AVIabstractMain {
+class AVIodgOrdered: public AVIabstractMain {
 protected:
   typedef Galois::Graph::FirstGraph<void*,void,true> Graph;
   typedef Graph::GraphNode Lockable;

@@ -31,12 +31,10 @@
 #include "Galois/Runtime/PerThreadStorage.h"
 
 #ifdef GALOIS_USE_EXP
-#include "Galois/Runtime/cond_inline.h"
 #include "Galois/Runtime/PerThreadWorkList.h"
-#endif // GALOIS_USE_EXP
+#endif
 
 #include "Galois/Runtime/WorkList.h"
-#include "Galois/Runtime/ll/gio.h"
 
 #include <string>
 #include <sstream>
@@ -50,6 +48,7 @@
 
 #include <boost/iterator/counting_iterator.hpp>
 
+#include "cond_inline.h"
 #include "AuxDefs.h"
 #include "AVI.h"
 #include "Element.h"
