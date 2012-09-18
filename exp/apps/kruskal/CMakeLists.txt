@@ -11,7 +11,7 @@ app (kruskalAdjNodeBasedUnsorted kruskalAdjNodeBasedUnsorted.cpp)
 app (boruvkaAdjSorted   boruvkaAdjSorted.cpp)
 app (boruvkaAdjUnsorted boruvkaAdjUnsorted.cpp)
 
-app (kruskalRuntimeSrc kruskalRuntimeSrc.cpp)
-app (kruskalRuntimeNonSrc kruskalRuntimeNonSrc.cpp)
+app (kruskalOrderedSrc kruskalOrderedSrc.cpp)
+app (kruskalOrderedNonSrc kruskalOrderedNonSrc.cpp)
 # 
 # 

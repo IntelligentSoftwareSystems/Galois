@@ -1,4 +1,4 @@
-/** KruskalRuntimeNonSrc.cpp  -*- C++ -*-
+/** KruskalOrderedSrc  -*- C++ -*-
  * @file
  * @section License
  *
@@ -20,15 +20,15 @@
  *
  * @section Description
  *
- * KruskalRuntimeNonSrc.cpp;
+ * KruskalOrderedSrc;
  *
  * @author <ahassaan@ices.utexas.edu>
  */
 
-#include "kruskalRuntime.h"
+#include "kruskalOrdered.h"
 
 int main (int argc, char* argv[]) {
-  KruskalRuntimeNonSrc k;
+  KruskalOrderedSrc k;
   k.run (argc, argv);
   return 0;
 }

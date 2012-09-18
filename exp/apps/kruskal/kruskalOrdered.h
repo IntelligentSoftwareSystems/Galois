@@ -25,17 +25,13 @@
  * @author <ahassaan@ices.utexas.edu>
  */
 
-#ifndef KRUSKAL_RUNTIME_H_
-#define KRUSKAL_RUNTIME_H_
+#ifndef KRUSKAL_ORDERED_H_
+#define KRUSKAL_ORDERED_H_
 
+#include "Galois/Galois.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Statistic.h"
 #include "Galois/Callbacks.h"
-
-#include "Galois/Runtime/Context.h"
-#include "Galois/Runtime/MethodFlags.h"
-#include "Galois/Runtime/Ordered.h"
-#include "Galois/Runtime/Deterministic.h"
 
 #include "kruskalData.h"
 #include "kruskalFunc.h"
@@ -72,7 +68,7 @@ struct KNodeLockable: public GaloisRuntime::Lockable, KNode {
   }
 };
 
-class KruskalRuntimeSrc: public Kruskal<KNodeLockable> {
+class KruskalOrderedSrc: public Kruskal<KNodeLockable> {
   typedef Kruskal<KNodeLockable> Super_ty;
 
 
@@ -167,7 +163,7 @@ protected:
 };
 
 
-class KruskalRuntimeNonSrc : public Kruskal<KNodeMin> {
+class KruskalOrderedNonSrc : public Kruskal<KNodeMin> {
 
   typedef Kruskal<KNodeMin> Super_ty;
 
