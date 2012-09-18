@@ -27,6 +27,7 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 #include "Galois/Galois.h"
+#include "Galois/Runtime/Deterministic.h"
 #include "Galois/Bag.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Timer.h"
@@ -395,7 +396,11 @@ struct GaloisDetBarrier {
   };
 
   void operator()(const GNode& source) const {
+#ifdef GALOIS_USE_EXP
     typedef GaloisRuntime::WorkList::BulkSynchronousInline<> WL;
+#else
+  typedef GaloisRuntime::WorkList::BulkSynchronous<GaloisRuntime::WorkList::dChunkedLIFO<256> > WL;
+#endif
     std::vector<ItemTy> initial;
 
     graph.getData(source).dist = 0;

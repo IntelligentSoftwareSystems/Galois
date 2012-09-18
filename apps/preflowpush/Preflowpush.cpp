@@ -21,6 +21,7 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 #include "Galois/Galois.h"
+#include "Galois/Runtime/Deterministic.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Statistic.h"
 #include "Galois/Bag.h"

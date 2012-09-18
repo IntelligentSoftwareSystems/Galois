@@ -31,6 +31,7 @@
 #include "Verifier.h"
 
 #include "Galois/Galois.h"
+#include "Galois/Runtime/Deterministic.h"
 #include "Galois/Bag.h"
 #include "Galois/Statistic.h"
 #include "Galois/Runtime/WorkListAlt.h"
