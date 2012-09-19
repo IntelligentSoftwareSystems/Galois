@@ -20,9 +20,6 @@ app(AVIorderedSerial main/AVIorderedSerial.cpp
   REQUIRES LAPACK_FOUND ZLIB_FOUND
   EXTLIBS AVI ${LAPACK_LIBRARIES})
 
-app(AVIunordered main/AVIunordered.cpp 
-  REQUIRES LAPACK_FOUND ZLIB_FOUND
-  EXTLIBS AVI ${LAPACK_LIBRARIES})
 
 app(AVIodgOrdered main/AVIodgOrdered.cpp 
   REQUIRES LAPACK_FOUND ZLIB_FOUND
@@ -30,7 +27,11 @@ app(AVIodgOrdered main/AVIodgOrdered.cpp
 
 # the files may be removed from the release without causing error in cmake
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/exp)
-  app(AVIunorderedNoLock exp/AVIunorderedNoLock.cpp
+  app(AVIodgExplicit exp/AVIodgExplicit.cpp 
+    REQUIRES LAPACK_FOUND ZLIB_FOUND
+    EXTLIBS AVI ${LAPACK_LIBRARIES})
+
+  app(AVIodgExplicitNoLock exp/AVIodgExplicitNoLock.cpp
     REQUIRES LAPACK_FOUND ZLIB_FOUND
     EXTLIBS AVI ${LAPACK_LIBRARIES})
 

@@ -29,10 +29,8 @@
 #include "Galois/Timer.h"
 
 #include "Galois/Runtime/PerThreadStorage.h"
-
-#ifdef GALOIS_USE_EXP
 #include "Galois/Runtime/PerThreadWorkList.h"
-#endif
+#include "Galois/Runtime/cond_inline.h"
 
 #include "Galois/Runtime/WorkList.h"
 
@@ -48,7 +46,6 @@
 
 #include <boost/iterator/counting_iterator.hpp>
 
-#include "cond_inline.h"
 #include "AuxDefs.h"
 #include "AVI.h"
 #include "Element.h"

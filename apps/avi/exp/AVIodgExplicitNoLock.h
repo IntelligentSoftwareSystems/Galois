@@ -32,6 +32,7 @@
 #include "Galois/Atomic.h"
 
 #include "Galois/Runtime/PerThreadStorage.h"
+#include "Galois/Runtime/cond_inline.h"
 
 #include <string>
 #include <sstream>
@@ -42,25 +43,24 @@
 
 #include <cassert>
 
-#include "cond_inline.h"
 #include "AuxDefs.h"
 #include "AVI.h"
 #include "Element.h"
 
 #include "AVIabstractMain.h"
-#include "AVIunordered.h"
+#include "AVIodgExplicit.h"
 
 /**
  * AVI unordered algorithm that uses atomic integers 
  * and no abstract locks
  */
-class AVIunorderedNoLock: public AVIunordered {
+class AVIodgExplicitNoLock: public AVIodgExplicit {
   typedef Galois::GAtomicPadded<int> AtomicInteger;
 
 protected:
 
   virtual const std::string getVersion () const {
-    return "Parallel Unordered, no abstract locks";
+    return "ODG explicit, no abstract locks";
   }
   
   /**

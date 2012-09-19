@@ -21,8 +21,8 @@
  * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
  */
 
-#ifndef AVI_UNORDERED_H_
-#define AVI_UNORDERED_H_
+#ifndef AVI_ODG_EXPLICIT_H
+#define AVI_ODG_EXPLICIT_H
 
 
 #include "Galois/Atomic.h"
@@ -73,7 +73,7 @@
 
 //#define USE_LC_GRAPH
 
-class AVIunordered: public AVIabstractMain {
+class AVIodgExplicit: public AVIabstractMain {
 
 protected:
   static const bool DEBUG = false;
@@ -96,7 +96,7 @@ protected:
   Graph graph;
 
   virtual const std::string getVersion () const {
-    return "Parallel Unordered";
+    return "ODG explicit, abstract locks on ODG nodes";
   }
 
   /**

@@ -29,10 +29,8 @@
 
 #include "Galois/Runtime/WorkList.h"
 #include "Galois/Runtime/PerThreadStorage.h"
-
-#ifdef GALOIS_USE_EXP
 #include "Galois/Runtime/ODGtwoPhase.h"
-#endif
+#include "Galois/Runtime/cond_inline.h"
 
 #include <string>
 #include <sstream>
@@ -44,7 +42,6 @@
 
 #include <cassert>
 
-#include "cond_inline.h"
 #include "AuxDefs.h"
 #include "AVI.h"
 #include "Element.h"

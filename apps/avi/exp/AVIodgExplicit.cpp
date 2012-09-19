@@ -1,14 +1,14 @@
 /*
- * UnorderdMain.cpp
+ * AVIodgExplicit.cpp
  *
  *  Created on: Jun 21, 2011
  *      Author: amber
  */
 
-#include "AVIunorderedNoLock.h"
+#include "AVIodgExplicit.h"
 
 int main (int argc, char* argv[]) {
-  AVIunorderedNoLock um;
+  AVIodgExplicit um;
   um.run (argc, argv);
   return 0;
 }
