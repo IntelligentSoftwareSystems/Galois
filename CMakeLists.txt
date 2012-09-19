@@ -71,6 +71,10 @@ if(USE_EXP)
   add_definitions(-DGALOIS_USE_EXP)
   include_directories("exp/include")
 
+  if(USE_PROF_MODE) 
+    add_definitions(-DGALOIS_USE_PROF_MODE)
+  endif()
+
   if(USE_VTUNE)
     find_package(VTUNE)
     if (VTUNE_FOUND)

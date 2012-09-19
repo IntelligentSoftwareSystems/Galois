@@ -32,13 +32,10 @@
 
 #include "bfs.h"
 
-typedef Galois::Graph::LC_CSR_Graph<unsigned, unsigned> Graph;
-typedef Graph::GraphNode GNode;
+class BFSserialFIFO: public BFS<NodeData> {
 
-class BFSserialFIFO: public BFS<Graph, GNode> {
-
-  typedef std::deque<GNode> WLTy;
-  typedef BFS<Graph, GNode> BaseBFS;
+  typedef std::deque<GNode> WL_ty;
+  typedef BFS<NodeData> Super_ty;
 
 public:
   virtual const std::string getVersion () const { return "Serial FIFO"; }
@@ -46,10 +43,10 @@ public:
   virtual size_t runBFS (Graph& graph, GNode& startNode) {
 
 
-    WLTy worklist;
+    WL_ty worklist;
     size_t niter = 0;
 
-    graph.getData (startNode, Galois::NONE) = 0;
+    graph.getData (startNode, Galois::NONE).level () = 0;
     worklist.push_back (startNode);
 
     while (!worklist.empty ()) {
@@ -57,7 +54,7 @@ public:
       GNode src = worklist.front ();
       worklist.pop_front ();
 
-      BaseBFS::bfsOperator<false> (graph, src, worklist, &WLTy::push_back);
+      Super_ty::bfsOperator<false> (graph, src, worklist, &WL_ty::push_back);
 
       ++niter;
     }

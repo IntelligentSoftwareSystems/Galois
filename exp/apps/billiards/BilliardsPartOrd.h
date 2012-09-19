@@ -45,7 +45,8 @@
 #include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/PerThreadWorkList.h"
 #include "Galois/Runtime/DoAll.h"
-#include "Galois/util/Marked.h"
+#include "Galois/Runtime/ll/CompilerSpecific.h"
+#include "Galois/util/Markable.h"
 
 
 #include "dependTest.h"
@@ -499,8 +500,8 @@ class BilliardsPOsortedVec;
 
 class BilliardsPOunsorted: public Billiards {
 
-  typedef GaloisRuntime::PerThreadWLfactory<Markable<Event> >::PerThreadVector WLTy;
-  typedef GaloisRuntime::PerThreadWLfactory<Event>::PerThreadVector ILTy;
+  typedef GaloisRuntime::PerThreadVector<Markable<Event> > WLTy;
+  typedef GaloisRuntime::PerThreadVector<Event> ILTy;
 
   typedef GaloisRuntime::PerCPU< std::vector<Event> > AddListTy;
 
@@ -508,6 +509,8 @@ class BilliardsPOunsorted: public Billiards {
 
 
 public:
+
+  static const unsigned CHUNK_SIZE = 1;
 
   virtual const std::string version () const { return "Parallel Partially Ordered with Unsorted workList"; }
 
@@ -523,6 +526,15 @@ public:
 
 
 private:
+
+template <typename _CleanupFunc>
+GALOIS_COND_INLINE static void updateODG_clean (WLTy& workList, const unsigned currStep) {
+  GaloisRuntime::do_all_coupled (
+      boost::counting_iterator<unsigned> (0),
+      boost::counting_iterator<unsigned> (workList.numRows ()), 
+      _CleanupFunc (workList, currStep),
+      "remove_simulated_events", 1);
+}
 
 template <typename _FindIndepFunc, typename _SimulateFunc,
           typename _AddNextFunc, typename _CleanupFunc>
@@ -550,10 +562,9 @@ static size_t runSimInternal (Table& table, WLTy& workList, const double endtime
 
       indepList.clear_all ();
 
-
       findTimer.start ();
       GaloisRuntime::do_all_coupled (workList, 
-          _FindIndepFunc (indepList, workList, currStep, findIter), "find_indep_events");
+          _FindIndepFunc (indepList, workList, currStep, findIter), "find_indep_events", CHUNK_SIZE);
       findTimer.stop ();
 
       // printf ("currStep= %d, indepList.size ()= %zd, workList.size ()= %zd\n", 
@@ -565,18 +576,14 @@ static size_t runSimInternal (Table& table, WLTy& workList, const double endtime
 
       addTimer.start ();
       GaloisRuntime::do_all_coupled (indepList, 
-          _AddNextFunc (workList, addList, table, endtime, enablePrints), "add_next_events");
+          _AddNextFunc (workList, addList, table, endtime, enablePrints), "add_next_events", CHUNK_SIZE);
       addTimer.stop ();
 
 
       sweepTimer.start ();
-
-      GaloisRuntime::do_all_coupled (
-          boost::counting_iterator<unsigned> (0),
-          boost::counting_iterator<unsigned> (workList.numRows ()), 
-          _CleanupFunc (workList, currStep),
-          "remove_simulated_events");
+      updateODG_clean<_CleanupFunc> (workList, currStep);
       sweepTimer.stop ();
+
 
       ++currStep;
       iter += indepList.size_all ();
@@ -586,11 +593,7 @@ static size_t runSimInternal (Table& table, WLTy& workList, const double endtime
 
 
     if (true) {
-      GaloisRuntime::do_all_coupled (
-          boost::counting_iterator<unsigned> (0),
-          boost::counting_iterator<unsigned> (workList.numRows ()), 
-          _CleanupFunc (workList, currStep),
-          "remove_simulated_events");
+      updateODG_clean<_CleanupFunc> (workList, currStep);
 
       if (!workList.empty_all ()) {
         std::cerr << "Still valid events that need processing?" << std::endl;
@@ -635,7 +638,7 @@ private:
     {}
 
 
-    void operator () (Markable<Event>& e) {
+    GALOIS_COND_INLINE void updateODG_test (Markable<Event>& e) {
 
 
       if (!e.marked ()) {
@@ -649,7 +652,7 @@ private:
             findIter.get () += 1;
 
             if ((!i->marked () || (i->version () >= currStep))
-                && (e > (*i))) { 
+                && (e.get () > (*i))) { 
               // >= is used to eliminate duplicate events and different events with same
               // time but a common object between them
 
@@ -675,11 +678,15 @@ private:
 
     }
 
+    GALOIS_COND_INLINE void operator () (Markable<Event>& e) {
+      updateODG_test (e);
+    }
+
   };
 
   struct SimulateIndepEvents {
 
-    void operator () (Event& event) {
+    GALOIS_COND_INLINE void operator () (Event& event) {
       event.simulateCollision ();
     }
   };
@@ -707,7 +714,7 @@ private:
     {}
 
 
-    void operator () (Event& event) {
+    GALOIS_COND_INLINE void operator () (Event& event) {
       addList.get ().clear ();
 
       event.addNextEvents (addList.get (), table, endtime);
@@ -736,7 +743,7 @@ private:
         currStep (_currStep)
     {}
 
-    void operator () (unsigned r) {
+    GALOIS_COND_INLINE void updateODG_clean (unsigned r) {
       assert (r < workList.numRows ());
 
       for (WLTy::iterator i = workList.begin (r), ei = workList.end (r); i != ei;) {
@@ -755,6 +762,10 @@ private:
           ++i;
         }
       }
+    }
+
+    GALOIS_COND_INLINE void operator () (unsigned r) {
+      updateODG_clean (r);
     }
   
   };
@@ -813,16 +824,14 @@ private:
         findIter (_findIter)
     {} 
 
-
-    void operator () (Markable<Event>& e) {
-
+    GALOIS_COND_INLINE void updateODG_test (Markable<Event>& e) {
       if (!e.marked ()) {
 
         bool indep = true;
 
         for (unsigned r = 0; r < workList.numRows (); ++r) {
           for (WLTy::iterator i = workList.begin (r), ei = workList.end (r);
-              (i != ei) && ((*i) < e); ++i) {
+              (i != ei) && (i->get () < e.get ()); ++i) {
 
             findIter.get () += 1;
 
@@ -850,6 +859,10 @@ private:
         
       } // end outer if
     }
+
+    GALOIS_COND_INLINE void operator () (Markable<Event>& e) {
+      updateODG_test (e);
+    }
   };
 
 
@@ -863,12 +876,16 @@ private:
         SuperTy (_workList, _currStep)
     {}
 
-    void operator () (unsigned r) {
+    GALOIS_COND_INLINE void updateODG_clean (unsigned r) {
       // first remove simulated events
-      SuperTy::operator () (r);
+      SuperTy::updateODG_clean (r);
 
       // now sort the rest
       std::sort (workList.begin (r), workList.end (r), Event::Comparator ());
+    }
+
+    GALOIS_COND_INLINE void operator () (unsigned r) {
+      updateODG_clean (r);
     }
 
   };

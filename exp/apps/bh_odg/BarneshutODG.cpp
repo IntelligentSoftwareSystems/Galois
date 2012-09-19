@@ -37,6 +37,8 @@
 #include "Galois/Atomic.h"
 #include "Galois/Statistic.h"
 #include "Galois/Runtime/DoAllCoupled.h"
+#include "Galois/Runtime/Sampling.h"
+#include "Galois/Runtime/ll/CompilerSpecific.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
@@ -432,7 +434,7 @@ struct TreeSummarizeODG {
 
   }
 
-  static void treeCompute (OctreeInternal* node) {
+  GALOIS_COND_INLINE static void treeCompute (OctreeInternal* node) {
 
     assert ((node != NULL) && (!node->isLeaf ()));
 
@@ -482,12 +484,13 @@ struct TreeSummarizeODG {
       : odgNodes (_odgNodes)
     {}
 
-    template <typename ContextTy>
-    void operator () (unsigned nid, ContextTy& lwl) {
+    template <typename C>
+    GALOIS_COND_INLINE static void addToWL (C& lwl, unsigned v) {
+      lwl.push (v);
+    }
 
-      assert (odgNodes[nid].numChild == 0);
-
-      treeCompute (odgNodes[nid].node);
+    template <typename C>
+    GALOIS_COND_INLINE void updateODG (unsigned nid, C& lwl) {
 
       unsigned prtidx = odgNodes[nid].prtidx;
 
@@ -498,12 +501,21 @@ struct TreeSummarizeODG {
         assert (x < 8);
 
         if (x == 0) {
-          lwl.push (prtidx);
+          // lwl.push (prtidx);
+          addToWL (lwl, prtidx);
         }
       } else {
         assert (nid == prtidx && nid == 0);
       }
+    }
 
+    template <typename ContextTy>
+    void operator () (unsigned nid, ContextTy& lwl) {
+      assert (odgNodes[nid].numChild == 0);
+
+      treeCompute (odgNodes[nid].node);
+
+      updateODG (nid, lwl);
     }
 
   };
@@ -523,8 +535,10 @@ struct TreeSummarizeODG {
     Galois::StatTimer t_feach ("Time taken by for_each in tree summarization");
 
     t_feach.start ();
+    GaloisRuntime::beginSampling ();
     // Galois::for_each_wl<GaloisRuntime::WorkList::ParaMeter<WLty> > (wl, SummarizeOp (odgNodes), "tree_summ");
     Galois::for_each_wl (wl, SummarizeOp (odgNodes), "tree_summ");
+    GaloisRuntime::endSampling ();
     t_feach.stop ();
 
   }
@@ -570,7 +584,7 @@ struct TreeSummarizeLevelByLevel {
 
   struct SummarizeOp {
 
-    void operator () (OctreeInternal* node) const {
+    GALOIS_COND_INLINE void operator () (OctreeInternal* node) const {
       TreeSummarizeODG::treeCompute (node);
     }
 
@@ -603,6 +617,7 @@ struct TreeSummarizeLevelByLevel {
     Galois::StatTimer t_feach ("Time taken by for_each in tree summarization");
 
     t_feach.start ();
+    GaloisRuntime::beginSampling ();
     for (unsigned i = levelWL.size (); i > 0;) {
       
       --i; // size - 1
@@ -623,6 +638,7 @@ struct TreeSummarizeLevelByLevel {
 
 
     }
+    GaloisRuntime::endSampling ();
     t_feach.stop ();
 
     std::cout << "TreeSummarizeLevelByLevel: iterations = " << iter << std::endl;
@@ -943,7 +959,9 @@ void run(int nbodies, int ntimesteps, int seed, TreeSummMethod summMethod) {
 } // end namespace
 
 int main(int argc, char** argv) {
+  Galois::StatManager sm;
   LonestarStart(argc, argv, name, desc, url);
+
   std::cout.setf(std::ios::right|std::ios::scientific|std::ios::showpoint);
 
   TreeSummMethod summMethod = SERIAL;

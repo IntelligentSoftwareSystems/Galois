@@ -39,6 +39,7 @@
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
 #include "Galois/Galois.h"
+#include "Galois/Runtime/Sampling.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
@@ -65,6 +66,7 @@ public:
 
   virtual void run (int argc, char* argv[]) {
     
+    Galois::StatManager sm;
     LonestarStart (argc, argv, name, desc, url);
 
     Table table (length, width, numballs);
@@ -85,7 +87,9 @@ public:
     Galois::StatTimer timer ("Simulation time: ");
 
     timer.start ();
+    GaloisRuntime::beginSampling ();
     size_t numEvents = runSim (table, initEvents, endtime, enablePrints);
+    GaloisRuntime::endSampling ();
     timer.stop ();
 
     std::cout << "Billiards " << version () << ", number of events processed=" << numEvents << std::endl;

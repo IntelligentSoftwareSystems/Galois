@@ -25,8 +25,6 @@
  * @author <ahassaan@ices.utexas.edu>
  */
 
-// TODO: write a LCGraph without edge data
-
 
 #ifndef _BFS_H_
 #define _BFS_H_
@@ -44,8 +42,11 @@
 #include "Galois/Graphs/FileGraph.h"
 #include "llvm/Support/CommandLine.h"
 
-#include "Lonestar/BoilerPlate.h"
+#include "Galois/Runtime/ll/CacheLineStorage.h"
+#include "Galois/Runtime/Sampling.h"
+#include "Galois/Runtime/ll/CompilerSpecific.h"
 
+#include "Lonestar/BoilerPlate.h"
 
 namespace cll = llvm::cl;
 
@@ -56,19 +57,46 @@ static const char* const url = "bfs";
 static cll::opt<unsigned int> startId("startnode", cll::desc("Node to start search from"), cll::init(0));
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 
+static const unsigned LEVEL_INFINITY = 1 << 20;
 
-template <typename GraphTy, typename GNodeTy>
 
+struct NodeData {
+  unsigned data;
+
+  NodeData (): data (0) {}
+  explicit NodeData (unsigned _data): data (_data) {}
+
+  inline unsigned& level () { return data; }
+  inline const unsigned& level () const { return data; }
+
+};
+
+struct NodeDataCacheLine: public GaloisRuntime::LL::CacheLineStorage<unsigned> {
+  typedef GaloisRuntime::LL::CacheLineStorage<unsigned> Super_ty;
+
+  NodeDataCacheLine (): Super_ty (0) {}
+  explicit NodeDataCacheLine (unsigned _data): Super_ty (_data) {}
+
+  inline unsigned& level () { return Super_ty::data; }
+  inline const unsigned& level () const { return Super_ty::data; }
+
+};
+
+
+template <typename ND>
 class BFS {
+
 public:
-  static const unsigned LEVEL_INFINITY = 1 << 20;
+  typedef typename Galois::Graph::LC_CSR_Graph<ND, void> Graph;
+  typedef typename Graph::GraphNode GNode;
+  typedef ND NodeData_ty;
 
 protected:
-  virtual size_t runBFS (GraphTy& graph, GNodeTy& startNode) = 0;
+  virtual size_t runBFS (Graph& graph, GNode& startNode) = 0;
 
   virtual const std::string getVersion () const = 0;
 
-  virtual void initGraph (const std::string& filename, GraphTy& graph) const {
+  virtual void initGraph (const std::string& filename, Graph& graph) const {
     std::cout << "Reading graph from file: " << filename << std::endl;
 
 
@@ -77,22 +105,22 @@ protected:
     unsigned numNodes = graph.size ();
     unsigned numEdges = 0;
 
-    for (typename GraphTy::iterator i = graph.begin (), ei = graph.end ();
+    for (typename Graph::iterator i = graph.begin (), ei = graph.end ();
         i != ei; ++i) {
 
-      graph.getData (*i, Galois::NONE) = LEVEL_INFINITY;
+      graph.getData (*i, Galois::NONE) = ND (LEVEL_INFINITY);
       numEdges += graph.edge_end (*i, Galois::NONE) - graph.edge_begin (*i, Galois::NONE);
     }
 
     std::cout << "Graph read with nodes=" << numNodes << ", edges=" << numEdges << std::endl;
   }
 
-  virtual GNodeTy getStartNode (const GraphTy& graph, unsigned startId) const {
+  virtual GNode getStartNode (const Graph& graph, unsigned startId) const {
     assert (startId < graph.size ());
 
     unsigned id = 0;
-    GNodeTy startNode;
-    for (typename GraphTy::iterator i = graph.begin (), ei = graph.end ();
+    GNode startNode;
+    for (typename Graph::iterator i = graph.begin (), ei = graph.end ();
         i != ei; ++i) {
 
       if (id == startId) {
@@ -105,24 +133,24 @@ protected:
     return startNode;
   }
 
-  virtual bool verify (GraphTy& graph, GNodeTy& startNode) const {
+  virtual bool verify (Graph& graph, GNode& startNode) const {
     bool result = true;
 
-    for (typename GraphTy::iterator i = graph.begin (), ei = graph.end ();
+    for (typename Graph::iterator i = graph.begin (), ei = graph.end ();
         i != ei; ++i) {
 
-      unsigned srcLevel = graph.getData (*i, Galois::NONE);
+      const unsigned srcLevel = graph.getData (*i, Galois::NONE).level ();
       if (srcLevel >= LEVEL_INFINITY) { 
         std::cerr << "BAD Level value >= INFINITY at node " << (*i) << std::endl;
         result = false;
       }
 
 
-      for (typename GraphTy::edge_iterator ni = graph.edge_begin (*i, Galois::NONE), eni = graph.edge_end (*i, Galois::NONE);
+      for (typename Graph::edge_iterator ni = graph.edge_begin (*i, Galois::NONE), eni = graph.edge_end (*i, Galois::NONE);
           ni != eni; ++ni) {
         
-        GNodeTy dst = graph.getEdgeDst (ni);
-        unsigned dstLevel = graph.getData (dst, Galois::NONE);
+        GNode dst = graph.getEdgeDst (ni);
+        const unsigned dstLevel = graph.getData (dst, Galois::NONE).level ();
         if (dstLevel > (srcLevel + 1)) {
           result = false;
           std::cerr << "BAD Level value=" << dstLevel << " at neighbor " << dst << " of node " 
@@ -139,19 +167,23 @@ public:
   virtual void run (int argc, char* argv[]) {
     LonestarStart (argc, argv, name, desc, url);
 
-    GraphTy graph;
+    Graph graph;
+
+    std::cout << "Size of node data= " << sizeof (ND) << std::endl;
 
     initGraph (filename, graph);
 
-    GNodeTy startNode = getStartNode (graph, startId);
+    GNode startNode = getStartNode (graph, startId);
 
     std::cout << "Running <" << getVersion () << "> BFS" << std::endl;
     std::cout << "start node = " << startNode << std::endl;
 
-    Galois::StatTimer timer;
+    Galois::StatTimer timer ("BFS time: ");
 
     timer.start ();
+    GaloisRuntime::beginSampling ();
     unsigned numIter = runBFS (graph, startNode);
+    GaloisRuntime::endSampling ();
     timer.stop ();
 
     std::cout << "BFS " << getVersion () << " iterations=" << numIter << std::endl;
@@ -168,39 +200,50 @@ public:
 
   }
 
-protected:
+
+  template <typename WL, typename T>
+  GALOIS_COND_INLINE static void addToWL (
+      WL& workList, 
+      void (WL::*pushFn) (const typename WL::value_type&),
+      const T& val) {
+    (workList.*pushFn) (val);
+  }
+
+
   //! @return number of adds
   template <bool doLock, typename WL>
-  inline static unsigned bfsOperator (
-      GraphTy& graph, GNodeTy& src, 
+  GALOIS_COND_INLINE static unsigned bfsOperator (
+      Graph& graph, GNode& src, 
       WL& workList, void (WL::*pushFn) (const typename WL::value_type&)) {
+
 
     unsigned numAdds = 0;
 
-    unsigned srcLevel = graph.getData (src, (doLock ? Galois::CHECK_CONFLICT : Galois::NONE));
+    const unsigned srcLevel = graph.getData (src, (doLock ? Galois::CHECK_CONFLICT : Galois::NONE)).level ();
 
     // putting a loop to acquire locks. For now, edge_begin does not acquire locks on neighbors,
     // which it should
     if (doLock) {
-      for (typename GraphTy::edge_iterator ni = graph.edge_begin (src, Galois::CHECK_CONFLICT)
+      for (typename Graph::edge_iterator ni = graph.edge_begin (src, Galois::CHECK_CONFLICT)
           , eni = graph.edge_end (src, Galois::CHECK_CONFLICT); ni != eni; ++ni) {
 
-        GNodeTy dst = graph.getEdgeDst (ni);
+        GNode dst = graph.getEdgeDst (ni);
         graph.getData (dst, Galois::CHECK_CONFLICT);
       }
     }
 
 
-    for (typename GraphTy::edge_iterator ni = graph.edge_begin (src, Galois::NONE), eni = graph.edge_end (src, Galois::NONE);
+    for (typename Graph::edge_iterator ni = graph.edge_begin (src, Galois::NONE), eni = graph.edge_end (src, Galois::NONE);
         ni != eni; ++ni) {
 
-      GNodeTy dst = graph.getEdgeDst (ni);
+      GNode dst = graph.getEdgeDst (ni);
 
-      unsigned dstLevel = graph.getData (dst, Galois::NONE); // iterator should already have acquired locks on neighbors
-      if (dstLevel == LEVEL_INFINITY) {
-        graph.getData (dst, Galois::NONE) = srcLevel + 1;
+      ND& dstData = graph.getData (dst, Galois::NONE); // iterator should already have acquired locks on neighbors
+      if (dstData.level () == LEVEL_INFINITY) {
+        dstData.level () = srcLevel + 1;
 
-        (workList.*pushFn) (dst);
+        // (workList.*pushFn) (dst);
+        addToWL (workList, pushFn, dst);
         ++numAdds;
       }
 
@@ -208,8 +251,9 @@ protected:
 
     return numAdds;
   }
-};
 
+
+};
 
 
 #endif // _BFS_H_

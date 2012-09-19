@@ -36,39 +36,34 @@
 
 #include "Galois/GaloisUnsafe.h"
 #include "Galois/Accumulator.h"
+#include "Galois/Bag.h"
 
 #include "Galois/Runtime/PerThreadWorkList.h"
 #include "Galois/Runtime/DoAll.h"
-#include "Galois/Runtime/Sampling.h"
 
 #include "bfs.h"
 
-
-// TODO: write a LCGraph without edge data
-// TODO: allow passing worklist ref to for_each
-
-
-// can't use void for edge data type, therefore, using unsigned
-typedef Galois::Graph::LC_CSR_Graph<unsigned, unsigned> Graph;
-typedef Graph::GraphNode GNode;
+static const unsigned CHUNK_SIZE = 1024; 
 
 typedef Galois::GAccumulator<unsigned> ParCounter;
 
-class AbstractWavefrontBFS: public BFS<Graph, GNode> {
+class AbstractWavefrontBFS: public BFS<NodeData> {
 
 protected:
-  typedef BFS<Graph, GNode> SuperTy;
+  typedef BFS<NodeData> Super_ty;
 
   //! @return number of iterations
   template <typename WL, typename WFInnerLoop> 
-  static size_t runWavefrontBFS (Graph& graph, GNode& startNode, 
+  static size_t runWavefrontBFS (
+      Graph& graph, 
+      GNode& startNode, 
       void (WL::*pushFn) (const typename WL::value_type&),
       const WFInnerLoop& innerLoop) {
 
     WL* currWL = new WL ();
     WL* nextWL = new WL ();
 
-    graph.getData (startNode, Galois::NONE) = 0;
+    graph.getData (startNode, Galois::NONE).level () = 0;
     (currWL->*pushFn) (startNode);
     size_t numIter = 1; //  counting the start node
 
@@ -111,19 +106,19 @@ class BFSserialWavefront: public AbstractWavefrontBFS {
 
 protected:
   typedef std::vector<GNode> WL_ty;
-  typedef AbstractWavefrontBFS::SuperTy BaseBFS;
+  typedef AbstractWavefrontBFS::Super_ty Super_ty;
 
 
 private:
   struct SerialInnerLoop {
-    unsigned operator () (Graph& graph, WL_ty& currWL, WL_ty& nextWL) const {
+    GALOIS_COND_INLINE unsigned operator () (Graph& graph, WL_ty& currWL, WL_ty& nextWL) const {
 
       unsigned numAdds = 0;
 
       for (WL_ty::iterator src = currWL.begin (), esrc = currWL.end ();
           src != esrc; ++src) {
 
-        numAdds += BaseBFS::bfsOperator<false> (graph, *src, nextWL, &WL_ty::push_back);
+        numAdds += Super_ty::bfsOperator<false> (graph, *src, nextWL, &WL_ty::push_back);
       }
 
       return numAdds;
@@ -142,6 +137,30 @@ public:
 };
 
 
+template <typename WL, typename ND> 
+struct InnerLoopDoAll {
+  typedef BFS<ND> BaseBFS;
+
+  typename BaseBFS::Graph& graph;
+  WL& nextWL;
+  ParCounter& numAdds;
+
+  InnerLoopDoAll (
+      typename BaseBFS::Graph& _graph,
+      WL& _nextWL,
+      ParCounter& _numAdds)
+    :
+      graph (_graph),
+      nextWL (_nextWL),
+      numAdds (_numAdds)
+  {}
+
+  GALOIS_COND_INLINE void operator () (typename BaseBFS::GNode& src) {
+    numAdds.get () += BFS<ND>::template bfsOperator<false, WL> (graph, src, nextWL, &WL::push);
+  }
+
+};
+
 template <bool doLock> 
 struct LoopFlags {
   typedef int tt_does_not_need_stats; // disable stats in GaloisRuntime
@@ -156,51 +175,48 @@ struct LoopFlags<false> { // more when no locking
 };
 
 
+template <bool doLock, typename WL, typename ND>
+struct InnerLoopForEach: public InnerLoopDoAll<WL, ND>, public LoopFlags<doLock> {
+
+  typedef InnerLoopDoAll<WL, ND> Super_ty;
+  typedef BFS<ND> BaseBFS;
+
+  InnerLoopForEach (
+      typename BaseBFS::Graph& graph,
+      WL& nextWL,
+      ParCounter& numAdds)
+    :
+      Super_ty (graph, nextWL, numAdds) 
+  {} 
+
+  template <typename ContextTy>
+  GALOIS_COND_INLINE void operator () (typename BaseBFS::GNode src, ContextTy&) {
+    Super_ty::operator () (src);
+  }
+};
+
 class BFSwavefrontNolock;
 
 class BFSwavefrontLock: public AbstractWavefrontBFS {
 protected:
-  static const unsigned CHUNK_SIZE = 1024; 
   typedef GaloisRuntime::WorkList::dChunkedFIFO<CHUNK_SIZE, GNode> GaloisWL;
 
-  typedef AbstractWavefrontBFS::SuperTy BaseBFS;
+  typedef AbstractWavefrontBFS::Super_ty BaseBFS;
 
   friend class BFSwavefrontNolock;
 
 private:
 
 
-  template <bool doLock>
-  struct LoopBody: public LoopFlags<doLock> {
-
-    Graph& graph;
-    GaloisWL& nextWL;
-    ParCounter& numAdds;
-
-    LoopBody (
-        Graph& graph,
-        GaloisWL& nextWL,
-        ParCounter& numAdds)
-      :
-        graph (graph),
-        nextWL (nextWL),
-        numAdds (numAdds) 
-    {} 
-
-    template <typename ContextTy>
-    void operator () (GNode src, ContextTy&) {
-      numAdds += BaseBFS::bfsOperator<doLock> (graph, src, nextWL, &GaloisWL::push);
-    }
-  };
 
 
   template <bool doLock>
   struct ParallelInnerLoop {
-    unsigned operator () (Graph& graph, GaloisWL& currWL, GaloisWL& nextWL) const {
+    GALOIS_COND_INLINE unsigned operator () (Graph& graph, GaloisWL& currWL, GaloisWL& nextWL) const {
 
       ParCounter numAdds;
 
-      LoopBody<doLock> l (graph, nextWL, numAdds);
+      InnerLoopForEach<doLock, GaloisWL, Super_ty::NodeData_ty> l (graph, nextWL, numAdds);
       Galois::for_each_wl (currWL, l);
       // Galois::for_each_wl <GaloisRuntime::WorkList::ParaMeter<GaloisWL> > (currWL, l);
 
@@ -233,13 +249,60 @@ class BFSwavefrontNolock: public AbstractWavefrontBFS {
   }
 };
 
+class BFSwavefrontBag: public AbstractWavefrontBFS {
+
+  // template <typename T>
+  // struct BFSbag: public Galois::InsertBag<T> {
+    // void push (const T& val) {
+      // Galois::InsertBag<T>::push (val);
+    // }
+// 
+  // };
+  // typedef BFSbag<GNode> WL_ty;
+
+  template <typename T>
+  struct BFSbag: public Galois::MergeBag<T> {
+    void push (const T& v) {
+      Galois::MergeBag<T>::push_back (v);
+    }
+  };
+  typedef BFSbag<GNode> WL_ty;
+  
+  struct ParallelInnerLoop {
+    GALOIS_COND_INLINE unsigned operator () (Graph& graph, WL_ty& currWL, WL_ty& nextWL) const {
+
+      ParCounter numAdds;
+
+      InnerLoopDoAll<WL_ty, Super_ty::NodeData_ty> l (graph, nextWL, numAdds);
+
+      Galois::do_all (currWL.begin (), currWL.end (), l, "bag-based do-all");
+      // GaloisRuntime::do_all_coupled (currWL.begin (), currWL.end (), l, "bag-based do-all", CHUNK_SIZE);
+
+      nextWL.merge ();
+
+      return numAdds.reduce ();
+    }
+
+  };
+
+
+  virtual const std::string getVersion () const { return "Galois Wavefront bag-based do-all"; }
+
+  virtual size_t runBFS (Graph& graph, GNode& startNode) {
+    
+    return AbstractWavefrontBFS::runWavefrontBFS<WL_ty> (
+        graph, startNode, 
+        &WL_ty::push, 
+        ParallelInnerLoop ()); // false for no locking
+  }
+};
 
 
 
-class BFSwavefrontCoupled: public BFS<Graph, GNode> {
+class BFSwavefrontCoupled: public AbstractWavefrontBFS {
 
-  typedef BFS<Graph, GNode> SuperTy;
-  typedef GaloisRuntime::PerThreadWLfactory<GNode>::PerThreadVector WL_ty;
+  // typedef GaloisRuntime::PerThreadWLfactory<GNode>::PerThreadVector WL_ty;
+  typedef GaloisRuntime::PerThreadVector<GNode> WL_ty;
 
   struct ParallelInnerLoop {
     Graph& graph;
@@ -256,9 +319,9 @@ class BFSwavefrontCoupled: public BFS<Graph, GNode> {
         numAdds (numAdds) 
     {} 
 
-    void operator () (GNode src) {
+    GALOIS_COND_INLINE void operator () (GNode src) {
       typedef WL_ty::Cont_ty C;
-      numAdds += SuperTy::bfsOperator<false> (graph, src, nextWL.get (), &C::push_back);
+      numAdds.get () += Super_ty::bfsOperator<false> (graph, src, nextWL.get (), &C::push_back);
     }
   };
 
@@ -271,26 +334,132 @@ public:
     WL_ty* currWL = new WL_ty ();
     WL_ty* nextWL = new WL_ty ();
 
-    graph.getData (startNode, Galois::NONE) = 0;
+    graph.getData (startNode, Galois::NONE).level () = 0;
     currWL->get ().push_back (startNode);
 
     size_t numIter = 1;
 
-    GaloisRuntime::beginSampling ();
+    unsigned level = 0;
 
     ParCounter numAdds;
-    while (!currWL->empty_all ()) {
+    // while (!currWL->empty_all ()) {
+    for (size_t s = currWL->size_all (); s != 0; s = currWL->size_all ()) {
 
+      // // TODO: remove
+      // if (level == 4) {
+        // GaloisRuntime::beginSampling ();
+      // }
 
-      GaloisRuntime::do_all_coupled (*currWL, ParallelInnerLoop (graph, *nextWL, numAdds), "wavefront_inner_loop");
+      size_t chunk_size = std::max (size_t(1), s/ (16 * Galois::getActiveThreads ()));
+
+      // GaloisRuntime::do_all_coupled (*currWL, ParallelInnerLoop (graph, *nextWL, numAdds), "wavefront_inner_loop", chunk_size);
+      // GaloisRuntime::do_all_coupled (currWL->begin_all (), currWL->end_all (), ParallelInnerLoop (graph, *nextWL, numAdds), "wavefront_inner_loop", chunk_size);
+      Galois::do_all (currWL->begin_all (), currWL->end_all (), ParallelInnerLoop (graph, *nextWL, numAdds), "wavefront_inner_loop");
+
+      // TODO: remove
+      // if (level == 4) {
+        // GaloisRuntime::endSampling ();
+      // }
 
       std::swap (currWL, nextWL);
       nextWL->clear_all ();
+      ++level;
     }
 
     numIter += numAdds.reduce ();
 
-    GaloisRuntime::endSampling ();
+    delete currWL; currWL = NULL;
+    delete nextWL; nextWL = NULL;
+
+    return numIter;
+  }
+
+};
+
+class BFSwavefrontEdge: public AbstractWavefrontBFS {
+
+
+  struct Update {
+    GNode node;
+    unsigned dist;
+
+    Update (GNode _node, unsigned _dist):
+      node (_node), dist (_dist) {}
+  };
+
+  typedef GaloisRuntime::PerThreadDeque<Update> WL_ty;
+
+  struct ParallelInnerLoop {
+    Graph& graph;
+    WL_ty& nextWL;
+    ParCounter& numAdds;
+
+    ParallelInnerLoop (
+        Graph& graph,
+        WL_ty& nextWL,
+        ParCounter& numAdds)
+      :
+        graph (graph),
+        nextWL (nextWL),
+        numAdds (numAdds) 
+    {} 
+
+    GALOIS_COND_INLINE void operator () (Update& up) {
+      GNode src = up.node;
+      const unsigned newLevel = up.dist + 1; // src level + 1
+
+      for (Graph::edge_iterator ni = graph.edge_begin (src, Galois::NONE), eni = graph.edge_end (src, Galois::NONE);
+          ni != eni; ++ni) {
+
+        GNode dst = graph.getEdgeDst (ni);
+
+        Super_ty::NodeData_ty& dstData = graph.getData (dst, Galois::NONE);
+
+        if (dstData.level () > newLevel) {
+          dstData.level () = newLevel;
+          // nextWL.get ().push_back (Update (dst, newLevel));
+          Super_ty::addToWL (
+              nextWL.get (), 
+              &WL_ty::Cont_ty::push_back, 
+              Update (dst, newLevel));
+          ++(numAdds.get ());
+        }
+
+      }
+
+    }
+  };
+
+public:
+
+  virtual const std::string getVersion () const { return "Galois Wavefront DoAll Edge based version"; }
+
+  virtual size_t runBFS (Graph& graph, GNode& startNode) {
+
+    WL_ty* currWL = new WL_ty ();
+    WL_ty* nextWL = new WL_ty ();
+
+
+    graph.getData (startNode, Galois::NONE).level () = 0;
+    currWL->get ().push_back (Update (startNode, 0));
+
+    size_t numIter = 1;
+
+    unsigned level = 0;
+
+    ParCounter numAdds;
+    while (!currWL->empty_all ()) {
+
+      GaloisRuntime::do_all_coupled (*currWL, ParallelInnerLoop (graph, *nextWL, numAdds), "wavefront_inner_loop", CHUNK_SIZE);
+      // GaloisRuntime::do_all_coupled_reverse (*currWL, ParallelInnerLoop (graph, *nextWL, numAdds), "wavefront_inner_loop", CHUNK_SIZE);
+
+
+      std::swap (currWL, nextWL);
+      nextWL->clear_all ();
+      ++level;
+    }
+
+    numIter += numAdds.reduce ();
 
     delete currWL; currWL = NULL;
     delete nextWL; nextWL = NULL;
@@ -302,5 +471,5 @@ public:
 
 
 
-
 #endif // WAVEFRONT_BFS_H_
+
