@@ -56,10 +56,10 @@ inline static void compilerBarrier() {
 
 // used to disable inlining of functions so that they
 // show up in stack samples when profiling
-#ifdef GALOIS_USE_PROF_MODE
-#define GALOIS_COND_INLINE GALOIS_ATTRIBUTE_NOINLINE
+#ifdef GALOIS_USE_PROF
+#define GALOIS_ATTRIBUTE_PROF_NOINLINE GALOIS_ATTRIBUTE_NOINLINE
 #else
-#define GALOIS_COND_INLINE inline
+#define GALOIS_ATTRIBUTE_PROF_NOINLINE inline
 #endif
 
 }
