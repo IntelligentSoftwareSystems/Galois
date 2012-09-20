@@ -96,6 +96,7 @@ class gdeque {
   }
 
 public:
+  typedef T value_type;
 
   gdeque() :first(), last(), num(), heap(sizeof(Block)) { }
 
@@ -150,7 +151,6 @@ public:
     // }
   };
 
-
   iterator begin() const {
     return iterator(first);
   }
@@ -167,15 +167,15 @@ public:
     return num == 0;
   }
 
-  T& front() {
+  value_type& front() {
     return first->getAt(0);
   }
 
-  T& back() {
+  value_type& back() {
     return last->getAt(last->size() - 1);
   }
 
-  void push_back(const T& v) {
+  void push_back(const value_type& v) {
     ++num;
     if (last && last->push_back(v))
       return;
@@ -183,7 +183,7 @@ public:
     last->push_back(v);
   }
 
-  void push_front(const T& v) {
+  void push_front(const value_type& v) {
     ++num;
     if (first && first->push_front(v))
       return;

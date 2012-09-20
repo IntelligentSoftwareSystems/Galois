@@ -72,7 +72,7 @@ public:
 
   void clear() {
     for (unsigned x = 0; x < count; ++x)
-      datac.kill((start + count) % chunksize);
+      datac.kill((start + x) % chunksize);
     count = 0;
     start = 0;
   }
