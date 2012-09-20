@@ -111,7 +111,7 @@ protected:
 
 private:
   struct SerialInnerLoop {
-    GALOIS_COND_INLINE unsigned operator () (Graph& graph, WL_ty& currWL, WL_ty& nextWL) const {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE unsigned operator () (Graph& graph, WL_ty& currWL, WL_ty& nextWL) const {
 
       unsigned numAdds = 0;
 
@@ -155,7 +155,7 @@ struct InnerLoopDoAll {
       numAdds (_numAdds)
   {}
 
-  GALOIS_COND_INLINE void operator () (typename BaseBFS::GNode& src) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (typename BaseBFS::GNode& src) {
     numAdds.get () += BFS<ND>::template bfsOperator<false, WL> (graph, src, nextWL, &WL::push);
   }
 
@@ -190,7 +190,7 @@ struct InnerLoopForEach: public InnerLoopDoAll<WL, ND>, public LoopFlags<doLock>
   {} 
 
   template <typename ContextTy>
-  GALOIS_COND_INLINE void operator () (typename BaseBFS::GNode src, ContextTy&) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (typename BaseBFS::GNode src, ContextTy&) {
     Super_ty::operator () (src);
   }
 };
@@ -212,7 +212,7 @@ private:
 
   template <bool doLock>
   struct ParallelInnerLoop {
-    GALOIS_COND_INLINE unsigned operator () (Graph& graph, GaloisWL& currWL, GaloisWL& nextWL) const {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE unsigned operator () (Graph& graph, GaloisWL& currWL, GaloisWL& nextWL) const {
 
       ParCounter numAdds;
 
@@ -269,7 +269,7 @@ class BFSwavefrontBag: public AbstractWavefrontBFS {
   typedef BFSbag<GNode> WL_ty;
   
   struct ParallelInnerLoop {
-    GALOIS_COND_INLINE unsigned operator () (Graph& graph, WL_ty& currWL, WL_ty& nextWL) const {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE unsigned operator () (Graph& graph, WL_ty& currWL, WL_ty& nextWL) const {
 
       ParCounter numAdds;
 
@@ -319,7 +319,7 @@ class BFSwavefrontCoupled: public AbstractWavefrontBFS {
         numAdds (numAdds) 
     {} 
 
-    GALOIS_COND_INLINE void operator () (GNode src) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (GNode src) {
       typedef WL_ty::Cont_ty C;
       numAdds.get () += Super_ty::bfsOperator<false> (graph, src, nextWL.get (), &C::push_back);
     }
@@ -404,7 +404,7 @@ class BFSwavefrontEdge: public AbstractWavefrontBFS {
         numAdds (numAdds) 
     {} 
 
-    GALOIS_COND_INLINE void operator () (Update& up) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (Update& up) {
       GNode src = up.node;
       const unsigned newLevel = up.dist + 1; // src level + 1
 

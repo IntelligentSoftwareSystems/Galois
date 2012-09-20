@@ -202,7 +202,7 @@ public:
 
 
   template <typename WL, typename T>
-  GALOIS_COND_INLINE static void addToWL (
+  GALOIS_ATTRIBUTE_PROF_NOINLINE static void addToWL (
       WL& workList, 
       void (WL::*pushFn) (const typename WL::value_type&),
       const T& val) {
@@ -212,7 +212,7 @@ public:
 
   //! @return number of adds
   template <bool doLock, typename WL>
-  GALOIS_COND_INLINE static unsigned bfsOperator (
+  GALOIS_ATTRIBUTE_PROF_NOINLINE static unsigned bfsOperator (
       Graph& graph, GNode& src, 
       WL& workList, void (WL::*pushFn) (const typename WL::value_type&)) {
 

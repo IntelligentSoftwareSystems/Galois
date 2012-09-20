@@ -93,7 +93,7 @@ protected:
 
     NhoodVisitor (VecNItem& vertices, AVIComparator& cmp): vertices (vertices), cmp (cmp) {}
 
-    GALOIS_COND_INLINE void operator () (AVI* avi) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (AVI* avi) {
       assert (avi != NULL);
 
       const std::vector<GlobalNodalIndex>& conn = avi->getGeometry ().getConnectivity ();
@@ -133,7 +133,7 @@ protected:
     // TODO: add note on add to WL semantics i.e. adds should happen on commit and
     // not earlier
     template <typename C>
-    GALOIS_COND_INLINE void addToWL (C& lwl, AVI* avi) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void addToWL (C& lwl, AVI* avi) {
 
       if (avi->getNextTimeStamp () < meshInit.getSimEndTime ()) {
         lwl.push_back (avi);
@@ -143,7 +143,7 @@ protected:
 
 
     template <typename C> 
-    GALOIS_COND_INLINE void operator () (AVI* srcAVI, C& lwl) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (AVI* srcAVI, C& lwl) {
       // for debugging, remove later
       iter += 1;
 

@@ -528,7 +528,7 @@ public:
 private:
 
 template <typename _CleanupFunc>
-GALOIS_COND_INLINE static void updateODG_clean (WLTy& workList, const unsigned currStep) {
+GALOIS_ATTRIBUTE_PROF_NOINLINE static void updateODG_clean (WLTy& workList, const unsigned currStep) {
   GaloisRuntime::do_all_coupled (
       boost::counting_iterator<unsigned> (0),
       boost::counting_iterator<unsigned> (workList.numRows ()), 
@@ -638,7 +638,7 @@ private:
     {}
 
 
-    GALOIS_COND_INLINE void updateODG_test (Markable<Event>& e) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void updateODG_test (Markable<Event>& e) {
 
 
       if (!e.marked ()) {
@@ -678,7 +678,7 @@ private:
 
     }
 
-    GALOIS_COND_INLINE void operator () (Markable<Event>& e) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (Markable<Event>& e) {
       updateODG_test (e);
     }
 
@@ -686,7 +686,7 @@ private:
 
   struct SimulateIndepEvents {
 
-    GALOIS_COND_INLINE void operator () (Event& event) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (Event& event) {
       event.simulateCollision ();
     }
   };
@@ -714,7 +714,7 @@ private:
     {}
 
 
-    GALOIS_COND_INLINE void operator () (Event& event) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (Event& event) {
       addList.get ().clear ();
 
       event.addNextEvents (addList.get (), table, endtime);
@@ -743,7 +743,7 @@ private:
         currStep (_currStep)
     {}
 
-    GALOIS_COND_INLINE void updateODG_clean (unsigned r) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void updateODG_clean (unsigned r) {
       assert (r < workList.numRows ());
 
       for (WLTy::iterator i = workList.begin (r), ei = workList.end (r); i != ei;) {
@@ -764,7 +764,7 @@ private:
       }
     }
 
-    GALOIS_COND_INLINE void operator () (unsigned r) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (unsigned r) {
       updateODG_clean (r);
     }
   
@@ -824,7 +824,7 @@ private:
         findIter (_findIter)
     {} 
 
-    GALOIS_COND_INLINE void updateODG_test (Markable<Event>& e) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void updateODG_test (Markable<Event>& e) {
       if (!e.marked ()) {
 
         bool indep = true;
@@ -860,7 +860,7 @@ private:
       } // end outer if
     }
 
-    GALOIS_COND_INLINE void operator () (Markable<Event>& e) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (Markable<Event>& e) {
       updateODG_test (e);
     }
   };
@@ -876,7 +876,7 @@ private:
         SuperTy (_workList, _currStep)
     {}
 
-    GALOIS_COND_INLINE void updateODG_clean (unsigned r) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void updateODG_clean (unsigned r) {
       // first remove simulated events
       SuperTy::updateODG_clean (r);
 
@@ -884,7 +884,7 @@ private:
       std::sort (workList.begin (r), workList.end (r), Event::Comparator ());
     }
 
-    GALOIS_COND_INLINE void operator () (unsigned r) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (unsigned r) {
       updateODG_clean (r);
     }
 

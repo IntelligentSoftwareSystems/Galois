@@ -14,12 +14,13 @@ endif()
 ###### Options (alternatively pass as options to cmake -DName=Value) ######
 
 #use profiling
-set(USE_PROFILING OFF CACHE BOOL "Enable GCC profiling")
+set(USE_GPROF OFF CACHE BOOL "Enable GCC profiling")
 
-#Enable iss specific options; should be OFF in the general release
+#Enable iss specific options; should be OFF in the general release; all guarded by USE_EXP
 set(USE_EXP OFF CACHE BOOL "Use experimental features") 
 set(USE_VTUNE ON CACHE BOOL "Use vtune (if found)")
 set(EXP_DOALL "PTHREAD" CACHE STRING "Which type of implementation of parallel_doall")
+set(USE_PROF OFF CACHE BOOL "Use profiling specific features")
 
 ###### Configure (users don't need to go beyond here) ######
 enable_testing()
@@ -65,14 +66,14 @@ find_package(Boost 1.36.0 COMPONENTS ${BOOST_LIBS} REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 set(RT_LINK ${Boost_LIBRARIES} ${RT_LINK})
 
-find_package(GMP)
-
 if(USE_EXP)
+  find_package(GMP) # for buchberger
+
   add_definitions(-DGALOIS_USE_EXP)
   include_directories("exp/include")
 
-  if(USE_PROF_MODE) 
-    add_definitions(-DGALOIS_USE_PROF_MODE)
+  if(USE_PROF) 
+    add_definitions(-DGALOIS_USE_PROF)
   endif()
 
   if(USE_VTUNE)
@@ -116,11 +117,11 @@ endif()
 find_package(CXX0x)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX0X_FLAGS}")
 
-if(USE_PROFILING)
+if(USE_GPROF)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pg")
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pg")
-endif(USE_PROFILING)
+endif(USE_GPROF)
 
 #solaris
 if(CMAKE_SYSTEM MATCHES "SunOS.*")

@@ -434,7 +434,7 @@ struct TreeSummarizeODG {
 
   }
 
-  GALOIS_COND_INLINE static void treeCompute (OctreeInternal* node) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE static void treeCompute (OctreeInternal* node) {
 
     assert ((node != NULL) && (!node->isLeaf ()));
 
@@ -485,12 +485,12 @@ struct TreeSummarizeODG {
     {}
 
     template <typename C>
-    GALOIS_COND_INLINE static void addToWL (C& lwl, unsigned v) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE static void addToWL (C& lwl, unsigned v) {
       lwl.push (v);
     }
 
     template <typename C>
-    GALOIS_COND_INLINE void updateODG (unsigned nid, C& lwl) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void updateODG (unsigned nid, C& lwl) {
 
       unsigned prtidx = odgNodes[nid].prtidx;
 
@@ -584,7 +584,7 @@ struct TreeSummarizeLevelByLevel {
 
   struct SummarizeOp {
 
-    GALOIS_COND_INLINE void operator () (OctreeInternal* node) const {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (OctreeInternal* node) const {
       TreeSummarizeODG::treeCompute (node);
     }
 

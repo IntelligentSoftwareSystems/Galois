@@ -114,7 +114,7 @@ protected:
         findIter (findIter) 
     {}
 
-    GALOIS_COND_INLINE void operator () (const GNode& src) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const GNode& src) {
       AVI* srcAVI = graph.getData (src, Galois::NONE);
 
       if (srcAVI->getNextTimeStamp () < meshInit.getSimEndTime ()) {
@@ -153,7 +153,7 @@ protected:
         opIter (opIter) 
     {}
 
-    GALOIS_COND_INLINE void operator () (const GNode& src) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const GNode& src) {
 
       AVI* srcAVI = graph.getData (src, Galois::NONE);
       assert (isSrcInODG (graph, src, srcAVI));

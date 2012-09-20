@@ -185,7 +185,7 @@ protected:
     {}
 
 
-    GALOIS_COND_INLINE void operator () (const GlobalNodalIndex& n) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const GlobalNodalIndex& n) {
       assert (n < vertexSharers.size ());
       findIter += 1;
 
