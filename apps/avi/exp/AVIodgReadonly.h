@@ -34,7 +34,6 @@
 
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/PerThreadWorkList.h"
-#include "Galois/Runtime/cond_inline.h"
 
 #include <string>
 #include <sstream>
@@ -50,13 +49,13 @@
 #include "Element.h"
 
 #include "AVIabstractMain.h"
-#include "AVIunordered.h"
+#include "AVIodgExplicit.h"
 
 /**
  * AVI unordered algorithm that uses atomic integers 
  * and no abstract locks
  */
-class AVIodgReadonly: public AVIunordered {
+class AVIodgReadonly: public AVIodgExplicit {
   // typedef Galois::GAtomicPadded<bool> AtomicBool;
   // typedef std::vector<AtomicBool> VecAtomicBool;
   //
@@ -115,7 +114,7 @@ protected:
         findIter (findIter) 
     {}
 
-    IFPROF_NOINLINE void operator () (const GNode& src) {
+    GALOIS_COND_INLINE void operator () (const GNode& src) {
       AVI* srcAVI = graph.getData (src, Galois::NONE);
 
       if (srcAVI->getNextTimeStamp () < meshInit.getSimEndTime ()) {
@@ -154,7 +153,7 @@ protected:
         opIter (opIter) 
     {}
 
-    IFPROF_NOINLINE void operator () (const GNode& src) {
+    GALOIS_COND_INLINE void operator () (const GNode& src) {
 
       AVI* srcAVI = graph.getData (src, Galois::NONE);
       assert (isSrcInODG (graph, src, srcAVI));

@@ -30,7 +30,6 @@
 
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/PerThreadWorkList.h"
-#include "Galois/Runtime/cond_inline.h"
 
 #include "Galois/Runtime/WorkList.h"
 
@@ -186,7 +185,7 @@ protected:
     {}
 
 
-    IFPROF_NOINLINE void operator () (const GlobalNodalIndex& n) {
+    GALOIS_COND_INLINE void operator () (const GlobalNodalIndex& n) {
       assert (n < vertexSharers.size ());
       findIter += 1;
 

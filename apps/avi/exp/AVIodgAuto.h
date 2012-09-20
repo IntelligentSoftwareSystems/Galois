@@ -30,7 +30,6 @@
 #include "Galois/Runtime/WorkList.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/ODGtwoPhase.h"
-#include "Galois/Runtime/cond_inline.h"
 
 #include <string>
 #include <sstream>
@@ -94,7 +93,7 @@ protected:
 
     NhoodVisitor (VecNItem& vertices, AVIComparator& cmp): vertices (vertices), cmp (cmp) {}
 
-    IFPROF_NOINLINE void operator () (AVI* avi) {
+    GALOIS_COND_INLINE void operator () (AVI* avi) {
       assert (avi != NULL);
 
       const std::vector<GlobalNodalIndex>& conn = avi->getGeometry ().getConnectivity ();
@@ -134,7 +133,7 @@ protected:
     // TODO: add note on add to WL semantics i.e. adds should happen on commit and
     // not earlier
     template <typename C>
-    IFPROF_NOINLINE void addToWL (C& lwl, AVI* avi) {
+    GALOIS_COND_INLINE void addToWL (C& lwl, AVI* avi) {
 
       if (avi->getNextTimeStamp () < meshInit.getSimEndTime ()) {
         lwl.push_back (avi);
@@ -144,7 +143,7 @@ protected:
 
 
     template <typename C> 
-    IFPROF_NOINLINE void operator () (AVI* srcAVI, C& lwl) {
+    GALOIS_COND_INLINE void operator () (AVI* srcAVI, C& lwl) {
       // for debugging, remove later
       iter += 1;
 

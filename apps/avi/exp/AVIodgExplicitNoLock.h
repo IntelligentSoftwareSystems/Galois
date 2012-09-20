@@ -32,7 +32,6 @@
 #include "Galois/Atomic.h"
 
 #include "Galois/Runtime/PerThreadStorage.h"
-#include "Galois/Runtime/cond_inline.h"
 
 #include <string>
 #include <sstream>
@@ -116,7 +115,7 @@ protected:
      */
 
     template <typename C>
-    IFPROF_NOINLINE void addToWL (C& lwl, const GNode& gn, AVI* avi) {
+    GALOIS_COND_INLINE void addToWL (C& lwl, const GNode& gn, AVI* avi) {
       assert (graph.getData (gn, Galois::NONE) == avi);
 
       if (avi->getNextTimeStamp () < meshInit.getSimEndTime ()) {
@@ -125,7 +124,7 @@ protected:
     }
 
     template <typename C>
-    IFPROF_NOINLINE void updateODG (const GNode& src, AVI* srcAVI, C& lwl) {
+    GALOIS_COND_INLINE void updateODG (const GNode& src, AVI* srcAVI, C& lwl) {
       unsigned addAmt = 0;
 
       for (Graph::edge_iterator e = graph.edge_begin (src, Galois::NONE)
