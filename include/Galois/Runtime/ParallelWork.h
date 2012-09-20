@@ -39,10 +39,6 @@
 #include "Galois/Runtime/WorkList.h"
 #include "Galois/Runtime/UserContextAccess.h"
 
-#ifdef GALOIS_USE_EXP
-//#include "Galois/Runtime/SimpleTaskPool.h"
-#endif
-
 #include <algorithm>
 
 namespace GaloisRuntime {
@@ -233,9 +229,6 @@ protected:
     if (ForEachTraits<FunctionTy>::NeedsAborts)
       setThreadContext(&tld.cnx);
     tld.lterm = term.getLocalTokenHolder();
-#ifdef GALOIS_USE_EXP
-//    SimpleTaskPool& pool = getSystemTaskPool();
-#endif
     do {
       bool didWork;
       do {

@@ -106,14 +106,7 @@ static inline void do_all_dispatch(const IterTy& begin, const IterTy& end, Funct
 template<typename IterTy,typename FunctionTy>
 FunctionTy do_all(const IterTy& begin, const IterTy& end, FunctionTy fn, const char* loopname = 0) {
   if (GaloisRuntime::inGaloisForEach) {
-#if 0
-    GaloisRuntime::TaskContext<IterTy,FunctionTy> ctx;
-    GaloisRuntime::SimpleTaskPool& pool = GaloisRuntime::getSystemTaskPool();
-    pool.enqueue(ctx, begin, end, fn);
-    ctx.run(pool);
-#else
     return std::for_each(begin, end, fn);
-#endif
   } else {
     //typename std::iterator_traits<IterTy>::iterator_category category;
     //do_all_dispatch(begin,end,fn,loopname,category); 
