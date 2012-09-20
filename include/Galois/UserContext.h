@@ -64,6 +64,7 @@ protected:
     localState = p;
     localStateUsed = used;
   }
+
 public:
   UserContext()
     :IterationAllocatorBase(), 
@@ -88,7 +89,6 @@ public:
 
   //! Store and retrieve local state for deterministic and ordered executor
   void* getLocalState(bool& used) { used = localStateUsed; return localState; }
-
 };
 
 }
