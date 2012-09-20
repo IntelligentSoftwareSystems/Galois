@@ -116,6 +116,10 @@ void GaloisRuntime::signalConflict() {
 }
 
 void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
+  if (customAcquire) {
+    sub_acquire(L);
+    return;
+  }
   if (L->Owner.try_lock()) {
     assert(!L->Owner.getValue());
     assert(!L->next);
@@ -129,7 +133,15 @@ void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
   }
 }
 
-void GaloisRuntime::DeterministicRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
+void GaloisRuntime::SimpleRuntimeContext::sub_acquire(GaloisRuntime::Lockable* L) {
+  assert(0 && "Shouldn't get here");
+  abort();
+}
+
+//anchor vtable
+GaloisRuntime::SimpleRuntimeContext::~SimpleRuntimeContext() {}
+
+void GaloisRuntime::DeterministicRuntimeContext::sub_acquire(GaloisRuntime::Lockable* L) {
   // Normal path
   if (pendingFlag.flag.data == NON_DET) {
     GaloisRuntime::SimpleRuntimeContext::acquire(L);

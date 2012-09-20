@@ -81,10 +81,13 @@ class SimpleRuntimeContext {
 protected:
   //! The locks we hold
   Lockable* locks;
+  bool customAcquire;
+
+  virtual void sub_acquire(Lockable* L);
 
 public:
-  SimpleRuntimeContext(): locks(0) { }
-  virtual ~SimpleRuntimeContext() { }
+  SimpleRuntimeContext(bool child = false): locks(0), customAcquire(child) { }
+  virtual ~SimpleRuntimeContext();
 
   void start_iteration() {
     assert(!locks);
@@ -92,7 +95,7 @@ public:
   
   unsigned cancel_iteration();
   unsigned commit_iteration();
-  virtual void acquire(Lockable* L);
+  void acquire(Lockable* L);
 };
 
 //! get the current conflict detection class, may be null if not in parallel region
@@ -114,10 +117,10 @@ protected:
   //! User-defined comparison between iterations for ordered execution
   Galois::CompareCallback* comp;
 
-public:
-  DeterministicRuntimeContext(): not_ready(0), comp(0) { data.id = 0; data.comp_data = 0; }
+  virtual void sub_acquire(Lockable* L);
 
-  virtual void acquire(Lockable* L);
+public:
+  DeterministicRuntimeContext(): SimpleRuntimeContext(true), not_ready(0), comp(0) { data.id = 0; data.comp_data = 0; }
 
   void set_id(unsigned long i) { data.id = i; }
   bool is_ready() { return !not_ready; }

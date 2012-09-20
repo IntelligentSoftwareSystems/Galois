@@ -12,3 +12,5 @@ makeTest(static)
 makeTest(test_gdeque)
 makeTest(sort)
 makeTest(loopoverhead)
+makeTest(acquire)
+
