@@ -24,17 +24,18 @@
 #ifndef GALOIS_GDEQUE_H
 #define GALOIS_GDEQUE_H
 
-#include <iterator>
-
 #include "Galois/Runtime/mm/Mem.h"
-#include "Galois/Runtime/WorkListHelpers.h"
+
+#include "Galois/FixedSizeRing.h"
+
+#include <iterator>
 
 namespace Galois {
 
 template < class T > 
 class gdeque {
 
-  struct Block : public GaloisRuntime::WorkList::FixedSizeRing<T> {
+  struct Block : public FixedSizeRing<T> {
     Block* next;
     Block* prev;
     Block() :next(), prev() {}

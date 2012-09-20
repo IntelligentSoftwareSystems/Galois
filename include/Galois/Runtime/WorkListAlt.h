@@ -288,7 +288,7 @@ template< bool separateBuffering = true, int chunksize = 64,
 	  typename gWL = StealingQueues, typename T = int>
 class ChunkedAdaptor : private boost::noncopyable {
 
-  class Chunk :public ChunkHeader, public FixedSizeRing<T, chunksize> {};
+  class Chunk :public ChunkHeader, public Galois::FixedSizeRing<T, chunksize> {};
 
   MM::FixedSizeAllocator heap;
 

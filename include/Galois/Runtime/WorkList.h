@@ -29,9 +29,10 @@
 #include "Galois/Runtime/WorkListHelpers.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/mm/Mem.h"
-#include "Galois/util/GAlgs.h"
 
 #include "Galois/gdeque.h"
+#include "Galois/FixedSizeRing.h"
+#include "Galois/util/GAlgs.h"
 
 #include <limits>
 #include <iterator>
@@ -540,7 +541,7 @@ struct squeues<false,TQ> {
 
 template<typename T, template<typename, bool> class QT, bool distributed = false, bool isStack = false, int chunksize=64, bool concurrent=true>
 class ChunkedMaster : private boost::noncopyable {
-  class Chunk : public FixedSizeRing<T, chunksize>, public QT<Chunk, concurrent>::ListNode {};
+  class Chunk : public Galois::FixedSizeRing<T, chunksize>, public QT<Chunk, concurrent>::ListNode {};
 
   MM::FixedSizeAllocator heap;
 

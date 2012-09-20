@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -27,18 +27,18 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#ifndef GALOIS_RUNTIME_DS_LAZYARRAY_H
-#define GALOIS_RUNTIME_DS_LAZYARRAY_H
+#ifndef GALOIS__LAZYARRAY_H
+#define GALOIS__LAZYARRAY_H
 
 #include <iterator>
 #include <stdexcept>
 
-namespace GaloisRuntime {
+namespace Galois {
 
 //! This is a container that encapsulates space for a constant size array
 //! items initialization is explicitly under the control of the user.
 template<typename _Tp, unsigned _Size>
-class lazyArray {
+class LazyArray {
   char __datac[sizeof(_Tp[(_Size > 0 ? _Size : 1)])];
 
   _Tp* get(size_t __n) {
@@ -112,4 +112,4 @@ public:
 };
 
 }
-#endif // GALOIS_RUNTIME_DS_LAZYARRAY_H
+#endif // GALOIS_LAZYARRAY_H

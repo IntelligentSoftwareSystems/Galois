@@ -28,106 +28,12 @@
 #endif
 
 #include "ll/PtrLock.h"
-#include "DS/LazyArray.h"
 
 #include <boost/optional.hpp>
 
 namespace GaloisRuntime {
 namespace WorkList {
 
-template<typename T, unsigned chunksize = 64>
-class FixedSizeRing :private boost::noncopyable {
-  unsigned start;
-  unsigned count;
-  lazyArray<T, chunksize> datac;
-
-  T* at(unsigned i) {
-    return &datac[i];
-  }
-
-public:
-
-  typedef T value_type;
-
-  FixedSizeRing() :start(0), count(0) {}
-  ~FixedSizeRing() {
-    clear();
-  }
-
-  unsigned size() const {
-    return count;
-  }
-
-  bool empty() const {
-    return count == 0;
-  }
-
-  bool full() const {
-    return count == chunksize;
-  }
-
-  T& getAt(unsigned x) {
-    return *at((start + x) % chunksize);
-  }
-
-  void clear() {
-    for (unsigned x = 0; x < count; ++x)
-      datac.kill((start + x) % chunksize);
-    count = 0;
-    start = 0;
-  }
-
-  value_type* push_front(const value_type& val) {
-    if (full()) return 0;
-    start = (start + chunksize - 1) % chunksize;
-    ++count;
-    datac.init(start,val);
-    return &datac[start];
-  }
-
-  value_type* push_back(const value_type& val) {
-    if (full()) return 0;
-    int end = (start + count) % chunksize;
-    ++count;
-    datac.init(end,val);
-    return &datac[end];
-  }
-
-  template<typename Iter>
-  Iter push_back(Iter b, Iter e) {
-    while (push_back(*b)) { ++b; }
-    return b;
-  }
-
-  template<typename Iter>
-  Iter push_front(Iter b, Iter e) {
-    while (push_front(*b)) { ++b; }
-    return b;
-  }
-
-  boost::optional<value_type> pop_front() {
-    boost::optional<value_type> retval;
-    if (!empty()) {
-      retval = *at(start);
-      datac.kill(start);
-      start = (start + 1) % chunksize;
-      --count;
-    }
-    return retval;
-  }
-  
-  boost::optional<value_type> pop_back() {
-    boost::optional<value_type> retval;
-    if (!empty()) {
-      int end = (start + count - 1) % chunksize;
-      retval = *at(end);
-      datac.kill(end);
-      --count;
-    }
-    return retval;
-  }
-};
-  
 template<typename T, bool concurrent>
 class ConExtLinkedStack {
   LL::PtrLock<T, concurrent> head;
@@ -172,7 +78,6 @@ public:
 
 template<typename T, bool concurrent>
 class ConExtLinkedQueue {
-  
   LL::PtrLock<T,concurrent> head;
   T* tail;
   
@@ -235,6 +140,4 @@ struct DummyIndexer: public std::unary_function<const T&,unsigned> {
 }
 }
 
-
 #endif
-
