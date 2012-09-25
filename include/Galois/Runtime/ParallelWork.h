@@ -250,9 +250,6 @@ protected:
       } while (didWork);
       if (ForEachTraits<FunctionTy>::NeedsBreak && broke.data)
 	break;
-#ifdef GALOIS_USE_EXP
-      //pool.work();
-#endif
 
       term.localTermination();
     } while ((ForEachTraits<FunctionTy>::NeedsPush 
