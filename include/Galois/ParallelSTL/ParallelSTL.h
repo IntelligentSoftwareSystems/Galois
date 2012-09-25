@@ -328,6 +328,24 @@ T accumulate(InputIterator first, InputIterator last, T init) {
   return accumulate(first, last, init, std::plus<T>());
 }
 
+template<typename T, typename MapOp>
+struct map_reduce_helper {
+  T init;
+  MapOp op;
+  map_reduce_helper(T i, MapOp o) :init(i), op(o) {}
+  template<typename U>
+  void operator()(U&& v) {
+    init = op(std::forward<U>(v));
+  }
+};
+
+template<class InputIterator, class MapFn, class T, class ReduceFn>
+T map_reduce(InputIterator first, InputIterator last, MapFn fn, T init, ReduceFn reduce) {
+  return GaloisRuntime::do_all_impl(first, last,
+      map_reduce_helper<T,MapFn>(init, fn),
+      accumulate_helper_reduce<ReduceFn>(reduce), true).init;
+}
+
 }
 }
 #endif
