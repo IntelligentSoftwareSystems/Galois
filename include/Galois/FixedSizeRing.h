@@ -39,85 +39,157 @@ class FixedSizeRing :private boost::noncopyable {
     return &datac[i];
   }
 
+  bool precondition() const {
+    return count >= 0 && count <= chunksize && start >= 0 && start <= chunksize;
+  }
+
 public:
   typedef T value_type;
+  typedef T* pointer;
+  typedef T& reference;
+  typedef const T& const_reference;
 
-  FixedSizeRing() :start(0), count(0) {}
+  FixedSizeRing() :start(0), count(0) { }
+
   ~FixedSizeRing() {
     clear();
   }
 
   unsigned size() const {
+    assert(precondition());
     return count;
   }
 
   bool empty() const {
+    assert(precondition());
     return count == 0;
   }
 
   bool full() const {
+    assert(precondition());
     return count == chunksize;
   }
 
-  T& getAt(unsigned x) {
+  reference getAt(unsigned x) {
+    assert(precondition());
+    assert(!empty());
     return *at((start + x) % chunksize);
   }
 
   void clear() {
+    assert(precondition());
     for (unsigned x = 0; x < count; ++x)
       datac.kill((start + x) % chunksize);
     count = 0;
     start = 0;
   }
 
-  value_type* push_front(const value_type& val) {
+#ifdef GALOIS_HAS_RVALUE_REFERENCES
+  template<typename U>
+  pointer push_front(U&& val) {
     if (full()) return 0;
     start = (start + chunksize - 1) % chunksize;
     ++count;
-    datac.init(start,val);
-    return &datac[start];
+    return datac.init(start, std::forward<U>(val));
   }
 
-  value_type* push_back(const value_type& val) {
+  template<typename... Args>
+  pointer emplace_front(Args&&... args) {
     if (full()) return 0;
-    int end = (start + count) % chunksize;
+    start = (start + chunksize - 1) % chunksize;
     ++count;
-    datac.init(end,val);
-    return &datac[end];
+    return datac.emplace(start, std::forward<Args>(args)...);
+  }
+#else
+  pointer push_front(const value_type& val) {
+    if (full()) return 0;
+    start = (start + chunksize - 1) % chunksize;
+    ++count;
+    return datac.init(start,val);
+  }
+#endif
+
+#ifdef GALOIS_HAS_RVALUE_REFERENCES
+  template<typename U>
+  pointer push_back(U&& val) {
+    if (full()) return 0;
+    unsigned end = (start + count) % chunksize;
+    ++count;
+    return datac.init(end, std::forward<U>(val));
   }
 
-  template<typename Iter>
-  Iter push_back(Iter b, Iter e) {
-    while (push_back(*b)) { ++b; }
-    return b;
+  template<typename... Args>
+  pointer emplace_back(Args&&... args) {
+    if (full()) return 0;
+    unsigned end = (start + count) % chunksize;
+    ++count;
+    return datac.emplace(end, std::forward<Args>(args)...);
+  }
+#else
+  pointer push_back(const value_type& val) {
+    if (full()) return 0;
+    unsigned end = (start + count) % chunksize;
+    ++count;
+    return datac.init(end,val);
+  }
+#endif
+
+  reference front() {
+    assert(precondition());
+    assert(!empty());
+    return *at(start);
   }
 
-  template<typename Iter>
-  Iter push_front(Iter b, Iter e) {
-    while (push_front(*b)) { ++b; }
-    return b;
+  const_reference front() const {
+    assert(precondition());
+    assert(!empty());
+    return *at(start);
   }
 
-  boost::optional<value_type> pop_front() {
+  boost::optional<value_type> extract_front() {
     boost::optional<value_type> retval;
     if (!empty()) {
-      retval = *at(start);
-      datac.kill(start);
-      start = (start + 1) % chunksize;
-      --count;
+      retval = front();
+      pop_front();
     }
     return retval;
+  }
+
+  void pop_front() {
+    assert(precondition());
+    assert(!empty());
+    datac.kill(start);
+    start = (start + 1) % chunksize;
+    --count;
   }
   
-  boost::optional<value_type> pop_back() {
+  reference back() {
+    assert(precondition());
+    assert(!empty());
+    return *at((start + count - 1) % chunksize);
+  }
+
+  const_reference back() const {
+    assert(precondition());
+    assert(!empty());
+    return *at((start + count - 1) % chunksize); 
+  }
+
+  boost::optional<value_type> extract_back() {
     boost::optional<value_type> retval;
     if (!empty()) {
-      int end = (start + count - 1) % chunksize;
-      retval = *at(end);
-      datac.kill(end);
-      --count;
+      retval = back();
+      pop_back();
     }
     return retval;
+  }
+
+  void pop_back() {
+    assert(precondition());
+    assert(!empty());
+    unsigned end = (start + count - 1) % chunksize;
+    datac.kill(end);
+    --count;
   }
 };
  

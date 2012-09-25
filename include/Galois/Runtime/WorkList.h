@@ -653,16 +653,16 @@ public:
     p& n = *data.getLocal();
     boost::optional<value_type> retval;
     if (isStack) {
-      if (n.next && (retval = n.next->pop_back()))
+      if (n.next && (retval = n.next->extract_back()))
 	return retval;
       if (n.next)
 	delChunk(n.next);
       n.next = popChunk();
       if (n.next)
-	return n.next->pop_back();
+	return n.next->extract_back();
       return boost::optional<value_type>();
     } else {
-      if (n.cur && (retval = n.cur->pop_front()))
+      if (n.cur && (retval = n.cur->extract_front()))
 	return retval;
       if (n.cur)
 	delChunk(n.cur);
@@ -672,7 +672,7 @@ public:
 	n.next = 0;
       }
       if (n.cur)
-	return n.cur->pop_front();
+	return n.cur->extract_front();
       return boost::optional<value_type>();
     }
   }

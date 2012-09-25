@@ -667,7 +667,8 @@ public:
     new (ptr) Ty(val);
   }
 
-#if __GNUC_MINOR__ > 5
+//#if __GNUC_MINOR__ > 5
+#ifdef GALOIS_HAS_RVALUE_REFERENCES
   template< class U, class... Args >
   void construct( U* p, Args&&... args ) {
     ::new((void*)p) U(std::forward<Args>(args)...);

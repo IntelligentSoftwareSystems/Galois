@@ -547,23 +547,21 @@ public:
   }
 };
 
-} // end namespace Galois
+template<typename T>
+inline void swap(Galois::Bag<T>& a, Galois::Bag<T>& b) {
+  a.swap(b);
+}
 
-namespace std {
-  template<typename T>
-  inline void swap(Galois::Bag<T>& a, Galois::Bag<T>& b) {
-    a.swap(b);
-  }
+template<typename T, unsigned N>
+inline void swap(Galois::SmallBag<T,N>& a, Galois::SmallBag<T,N>& b) {
+  a.swap(b);
+}
 
-  template<typename T, unsigned N>
-  inline void swap(Galois::SmallBag<T,N>& a, Galois::SmallBag<T,N>& b) {
-    a.swap(b);
-  }
+template<typename T>
+inline void swap(Galois::MergeBag<T>& a, Galois::MergeBag<T>& b) {
+  a.swap(b);
+}
 
-  template<typename T>
-  inline void swap(Galois::MergeBag<T>& a, Galois::MergeBag<T>& b) {
-    a.swap(b);
-  }
 }
 
 #endif

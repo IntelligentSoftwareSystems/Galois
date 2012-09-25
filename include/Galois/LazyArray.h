@@ -54,7 +54,7 @@ public:
   typedef ptrdiff_t difference_type;
   typedef value_type& reference;
   typedef const value_type& const_reference;
-  typedef value_type& pointer;
+  typedef value_type* pointer;
   typedef const value_type* const_pointer;
   typedef pointer iterator;
   typedef const_pointer const_iterator;
@@ -101,13 +101,22 @@ public:
   reference back() { return *get(_Size > 0 ? _Size - 1 : 0); }
   const_reference back() const { return *get(_Size > 0 ? _Size - 1 : 0); }
 
-  value_type* data() { return &get(0); }
-  const value_type* data() const { return &get(0); }
+  pointer data() { return &get(0); }
+  const_pointer data() const { return &get(0); }
 
   //missing: fill swap
 
   //Extra functionality
-  void init(size_type __n, const _Tp& val) { new (get(__n)) _Tp(val); }
+#ifdef GALOIS_HAS_RVALUE_REFERENCES
+  template<typename T>
+  pointer init(size_type __n, T&& val) { return new (get(__n)) _Tp(std::forward<T>(val)); }
+
+  template<typename... Args>
+  pointer emplace(size_type __n, Args&&... val) { return new (get(__n)) _Tp(std::forward<Args>(val)...); }
+#else
+  pointer init(size_type __n, const _Tp& val) { return new (get(__n)) _Tp(val); }
+#endif
+
   void kill(size_type __n) { (get(__n))->~_Tp(); }
 };
 
