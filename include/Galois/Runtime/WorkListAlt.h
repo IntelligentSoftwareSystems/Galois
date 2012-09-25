@@ -327,9 +327,9 @@ class ChunkedAdaptor : private boost::noncopyable {
 
   boost::optional<T> doPop(Chunk* c) {
     if (separateBuffering)
-      return c->pop_front();
+      return c->extract_front();
     else
-      return c->pop_back();
+      return c->extract_back();
   }
 
   void push_internal(std::pair<Chunk*, Chunk*>& tld, Chunk*& n, const T& val) {
