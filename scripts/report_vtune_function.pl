@@ -17,8 +17,8 @@ while (<>) {
 	$function = shift @line;
 	$function =~ s/,/_/g;
 	$module = shift @line;
-	$proc = shift @line;
-	$pid = shift @line;
+#	$proc = shift @line;
+#	$pid = shift @line;
 
 #	print "$newSet @H\n";
 

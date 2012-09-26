@@ -15,11 +15,11 @@ while (<>) {
 	$thread_keys{$curThread} += 1;
     } else {
 	$file = shift @line;
-	$path = shift @line;
 	$line = shift @line;
 	$module = shift @line;
-	$proc = shift @line;
-	$pid = shift @line;
+	$path = shift @line;
+#	$proc = shift @line;
+#	$pid = shift @line;
 
 #	print "$newSet @H\n";
 
