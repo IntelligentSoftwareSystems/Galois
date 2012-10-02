@@ -279,7 +279,7 @@ struct Process {
   }
 };
 
-typedef std::vector<Point> PointList;
+typedef std::deque<Point> PointList;
 
 class ReadPoints {
   void addBoundaryPoints() {
@@ -506,16 +506,16 @@ static void generateRounds(PointList& points, bool addBoundary) {
   rounds = new Galois::InsertBag<Point*>[maxRounds+1]; // +1 for boundary points
 
   PointList ordered;
-  ordered.reserve(size);
+  //ordered.reserve(size);
 
   if (noReorderPoints) {
-    std::copy(&points[0], &points[size], std::back_inserter(ordered));
+    std::copy(points.begin(), points.begin() + size, std::back_inserter(ordered));
     generateRoundsOld(ordered, false);
   } else {
     // Reorganize spatially
     QuadTree q(
-      boost::make_transform_iterator(&points[0], GetPointer()),
-      boost::make_transform_iterator(&points[size], GetPointer()));
+	       boost::make_transform_iterator(points.begin(), GetPointer()),
+	       boost::make_transform_iterator(points.begin() + size, GetPointer()));
 
     q.output(std::back_inserter(ordered));
 
