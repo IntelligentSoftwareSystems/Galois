@@ -71,10 +71,9 @@ public:
     os << "(id: " << m_id << " t: ";
     m_t.print(os);
     if (m_n != NULL)
-      os << "SOME";
+      os << " SOME)";
     else
-      os << "NULL";
-    os << ")";
+      os << " NULL)";
   }
 };
 

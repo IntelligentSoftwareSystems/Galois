@@ -668,7 +668,18 @@ int main(int argc, char** argv) {
     delete [] rounds;
     return 0;
   }
+
+  const char* name = 0;
+  switch (detAlgo) {
+  case nondet: name = "nondet"; break;
+  case detBase: name = "detBase"; break;
+  case detPrefix: name = "detPrefix"; break;
+  case detDisjoint: name = "detDisjoint"; break;
+  default: name = "unknown"; break;
+  }
+  GaloisRuntime::LL::gInfo("Algorithm %s", name);
   
+
   Galois::StatTimer T;
   T.start();
   generateMesh();

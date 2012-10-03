@@ -197,7 +197,8 @@ bool Element::inCircle(const Tuple& p) const {
 std::ostream& Element::print(std::ostream& out) const {
   out << '[';
   for (int i = 0; i < dim(); ++i) {
-    out << points[i]->id();
+    out << points[i]->id() << " ";
+    points[i]->print(out);
     out << (i < (dim() - 1) ? ", " : "");
   }
   out << ']';
