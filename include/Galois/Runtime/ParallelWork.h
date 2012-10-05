@@ -175,6 +175,9 @@ protected:
       workHappened = true;
 #if GALOIS_USE_EXCEPTION_HANDLER
     try {
+#else
+    if ((result = setjmp(hackjmp)) == 0) {
+#endif
       while (p) {
 	doProcess(p, tld);
 	if (limit) {
@@ -184,21 +187,12 @@ protected:
 	}
 	p = lwl.pop();
       }
+#if GALOIS_USE_EXCEPTION_HANDLER
     } catch (ConflictFlag const& flag) {
       clearConflictLock();
       result = flag;
     }
 #else
-    if ((result = setjmp(hackjmp)) == 0) {
-      while (p) {
-        doProcess(p, tld);
-        if (limit) {
-          ++num;
-          if (num == 32)
-            break;
-        }
-        p = lwl.pop();
-      }
     }
 #endif
     switch (result) {
