@@ -108,11 +108,11 @@ public:
 
   //Extra functionality
 #ifdef GALOIS_HAS_RVALUE_REFERENCES
-  template<typename T>
-  pointer init(size_type __n, T&& val) { return new (get(__n)) _Tp(std::forward<T>(val)); }
-
   template<typename... Args>
   pointer emplace(size_type __n, Args&&... val) { return new (get(__n)) _Tp(std::forward<Args>(val)...); }
+
+  pointer init(size_type __n, const _Tp& val) { return emplace(__n, val); }
+  pointer init(size_type __n, _Tp&& val) { return emplace(__n, std::move(val)); }
 #else
   pointer init(size_type __n, const _Tp& val) { return new (get(__n)) _Tp(val); }
 #endif
