@@ -78,7 +78,7 @@ def main(options):
   table = {
       r'^RUN: Start': do_start_line,
       r'^RUN: Variable (?P<key>\S+) = (?P<value>\S+)': do_var_line,
-      r'^INFO: (?P<key>CommandLine) (?P<value>.*)': do_var_line,
+      r'^(RUN|INFO): (?P<key>CommandLine) (?P<value>.*)': do_var_line,
       r'^INFO: (?P<key>Hostname) (?P<value>.*)': do_var_line,
       r'^STAT SINGLE (?P<key>\S+) (?P<loop>\S+) (?P<value>.*)': do_old_stat_line,
       r'^STAT DISTRIBUTION (?P<loopn>\d+) (?P<key>\S+) (?P<loop>\S+) (?P<value>.*)': do_old_dist_line,

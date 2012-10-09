@@ -23,52 +23,55 @@ def print_bright(s):
   print(red + s + endc)
 
 
-# Parses thread range from G.options
-# Grammar:
-#  R := R,R
-#     | N
-#     | N:N
-#     | N:N:N
-#  N := an integer
-def get_range(s):
+def parse_range(s):
+  """
+  Parses thread range s
+  Grammar:
+   R := R,R
+      | S
+      | N
+      | N:N
+      | N:N:N
+   N := an integer
+   S := a string
+  """
   # Parsing strategy: greedily parse integers with one character
   # lookahead to figure out exact category
   s = s + ' ' # append special end marker
   retval = []
-  curnum = -1
+  cur = -1
   curseq = []
   for i in range(len(s)):
-    if s[i].isdigit() and curnum < 0:
-      curnum = i
-    elif s[i].isdigit():
-      pass
-    elif s[i] == ',' or s[i] == ' ':
-      if curnum < 0:
+    if s[i] == ',' or s[i] == ' ':
+      if cur < 0:
         break
-      num = int(s[curnum:i])
       if len(curseq) == 0:
-        retval.append(num)
+        retval.append(s[cur:i])
       elif len(curseq) == 1:
-        retval.extend(range(curseq[0], num + 1))
+        retval.extend(range(curseq[0], int(s[cur:i]) + 1))
       elif len(curseq) == 2:
-        retval.extend(range(curseq[0], curseq[1] + 1, num))
+        retval.extend(range(curseq[0], curseq[1] + 1, int(s[cur:i])))
       else:
         break
-      curnum = -1
+      cur = -1
       curseq = []
-    elif s[i] == ':' and curnum >= 0:
-      curseq.append(int(s[curnum:i]))
-      curnum = -1
+    elif s[i] == ':' and cur >= 0:
+      curseq.append(int(s[cur:i]))
+      cur = -1
+    elif cur < 0:
+      cur = i
     else:
-      break
+      pass
   else:
     return sorted(set(retval))
   die('error parsing range: %s\n' % s)
 
 
-# Like itertools.product but for one iterable of iterables
-# rather than an argument list of iterables
 def product(args):
+  """
+  Like itertools.product but for one iterable of iterables
+  rather than an argument list of iterables
+  """
   pools = map(tuple, args)
   result = [[]]
   for pool in pools:
@@ -76,14 +79,20 @@ def product(args):
   for prod in result:
     yield tuple(prod)
 
+
 def run(cmd, values, options):
+  import subprocess, datetime, os, time, signal, socket
+
   for R in range(options.runs):
     print('RUN: Start')
-    print_bright('RUN: Executing %s' % ' '.join(cmd))
+    print_bright('RUN: Start')
+    print("RUN: CommandLine %s" % ' '.join(cmd))
+    print("RUN: Variable Hostname = %s" % socket.gethostname())
+    print("RUN: Variable Timestamp = %f" % time.time())
+
     for (name, value) in values:
       print('RUN: Variable %s = %s' % (name, value))
 
-    import subprocess, datetime, os, time, signal
     if options.timeout:
       start = datetime.datetime.now()
       process = subprocess.Popen(cmd)
@@ -95,35 +104,58 @@ def run(cmd, values, options):
           os.kill(process.pid, signal.SIGKILL)
           #os.waitpid(-1, os.WNOHANG)
           os.waitpid(-1, 0)
-          print("RUN: Variable Timeout = %d\n" % (diff*1000))
+          print("RUN: Variable Timeout = %d" % (diff*1000))
           break
       retcode = process.returncode
     else:
       retcode = subprocess.call(cmd)
     if retcode != 0:
       # print command line just in case child process should be died before doing it
-      print("INFO: CommandLine %s\n" % ' '.join(cmd))
-      print("RUN: Error command: %s\n" % cmd)
+      print("RUN: Error %d" % retcode)
       if not options.ignore_errors:
         sys.exit(1)
+
+def parse_extra(extra):
+  """
+  Parse extra command line option.
+  
+  Three cases:
+   (1) <name>::<arg>::<range>
+   (2) ::<arg>::<range>
+   (3) <name>::<range>
+  """
+  import re
+  if extra.count('::') == 2:
+    (name, arg, r) = extra.split('::')
+    if not name:
+      name = re.sub(r'^-*', '', arg)
+  elif extra.count('::') == 1:
+    (name, r) = extra.split('::')
+    arg = None
+  else:
+    die('error parsing extra argument: %s\n' % extra)
+  return (name, arg, r)
 
 
 def main(args, options):
   variables = []
   ranges = []
   for extra in options.extra:
-    (name, arg, r) = extra.split('::')
+    (name, arg, r) = parse_extra(extra)
     variables.append((name, arg))
-    ranges.append(get_range(r))
+    ranges.append(parse_range(r))
 
-  if options.no_parameters:
+  if not ranges and options.no_default_thread:
     run(args, [], options)
   else:
     for prod in product(ranges):
       cmd = [args[0]]
       values = []
       for ((name, arg), value) in zip(variables, prod):
-        cmd.extend([arg, str(value)])
+        if arg:
+          cmd.extend([arg, str(value)])
+        else:
+          cmd.extend([str(value)])
         values.append((name, str(value)))
       cmd.extend(args[1:])
 
@@ -137,18 +169,18 @@ if __name__ == '__main__':
   parser.add_option('--ignore-errors', dest='ignore_errors', default=False, action='store_true',
       help='ignore errors in subprocesses')
   parser.add_option('-t', '--threads', dest="threads", default="1",
-      help='range of threads to use. A range is R := R,R | N | N:N | N:N:N where N is an integer.')
+      help='range of threads to use. A range is R := R,R | S | N | N:N | N:N:N where N is an integer and S is a string.')
   parser.add_option('-r', '--runs', default=1, type='int',
       help='set number of runs')
   parser.add_option('-x', '--extra', dest="extra", default=[], action='append',
-      help='add another parameter to range over (format: <name>::<arg>::<range>). E.g., delta::-delta::1,5')
+      help='add another parameter to range over (format: <name>::<arg>::<range> or ::<arg>::<range> or <name>::<range>). E.g., delta::-delta::1,5 or ::-delta::1,5 or schedule::-useFIFO,-useLIFO')
   parser.add_option('-o', '--timeout', dest="timeout", default=0, type='int',
       help="timeout a run after SEC seconds", metavar='SEC')
-  parser.add_option('--no-parameters', dest='no_parameters', default=False, action='store_true',
-      help='run command without additional parameters')
+  parser.add_option('--no-default-thread', dest='no_default_thread', default=False, action='store_true',
+      help='run command default thread parameter')
   (options, args) = parser.parse_args()
   if not args:
     parser.error('need command to run')
-  if not options.no_parameters:
+  if not options.no_default_thread:
     options.extra.insert(0, '%s::%s::%s' % ('Threads', '-t', options.threads))
   main(args, options)
