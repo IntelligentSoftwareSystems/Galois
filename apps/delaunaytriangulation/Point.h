@@ -38,11 +38,7 @@ class Point: public Galois::GChecked {
   long m_id;
   
 public:
-  Point(double x, double y, long id): m_n(NULL) {
-    m_t.x() = x;
-    m_t.y() = y;
-    m_id = id;
-  }
+  Point(double x, double y, long id): m_t(x,y), m_n(NULL), m_id(id) {}
 
   const Tuple& t() const { return m_t; }
   long id() const { return m_id; }
