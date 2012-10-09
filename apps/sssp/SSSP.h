@@ -40,10 +40,10 @@ struct UpdateRequestCommon {
   GrNode n;
   unsigned int w;
 
-UpdateRequestCommon(const GrNode& N, unsigned int W)
-  :n(N), w(W)
+  UpdateRequestCommon(const GrNode& N, unsigned int W)
+    :n(N), w(W)
   {}
-
+  
   UpdateRequestCommon()
     :n(), w(0)
   {}

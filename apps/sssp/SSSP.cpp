@@ -87,18 +87,9 @@ struct SerialStlAlgo {
   std::string name() const { return "serial stl heap"; }
 
   void operator()(const GNode src) const {
-    graph.getData(src, Galois::NONE).dist = 0;
-
     std::set<UpdateRequest, std::less<UpdateRequest> > initial;
-    for (Graph::edge_iterator
-           ii = graph.edge_begin(src, Galois::NONE), 
-           ee = graph.edge_end(src, Galois::NONE); 
-         ii != ee; ++ii) {
-      GNode dst = graph.getEdgeDst(ii);
-      int w = graph.getEdgeData(ii);
-      UpdateRequest up(dst, w);
-      initial.insert(up);
-    }
+    UpdateRequest init(src, 0);
+    initial.insert(init);
 
     Galois::Statistic counter("Iterations");
     
@@ -107,18 +98,18 @@ struct SerialStlAlgo {
       UpdateRequest req = *initial.begin();
       initial.erase(initial.begin());
       SNode& data = graph.getData(req.n, Galois::NONE);
-
       if (req.w < data.dist) {
         data.dist = req.w;
-        for (Graph::edge_iterator
-               ii = graph.edge_begin(req.n, Galois::NONE), 
-               ee = graph.edge_end(req.n, Galois::NONE);
-             ii != ee; ++ii) {
+	for(Graph::edge_iterator
+	      ii = graph.edge_begin(req.n, Galois::NONE), 
+	      ee = graph.edge_end(req.n, Galois::NONE);
+	    ii != ee; ++ii) {
           GNode dst = graph.getEdgeDst(ii);
           int d = graph.getEdgeData(ii);
           unsigned int newDist = req.w + d;
-          if (newDist < graph.getData(dst,Galois::NONE).dist)
+          if (newDist < graph.getData(dst,Galois::NONE).dist) {
             initial.insert(UpdateRequest(dst, newDist));
+	  }
         }
       }
     }
@@ -216,36 +207,43 @@ struct ParallelAlgo {
 
 
 bool verify(GNode source) {
+  bool retval = true;
   if (graph.getData(source,Galois::NONE).dist != 0) {
     std::cerr << "source has non-zero dist value\n";
-    return false;
+    retval = false;
   }
   
   for (Graph::iterator src = graph.begin(), ee =
 	 graph.end(); src != ee; ++src) {
     unsigned int dist = graph.getData(*src,Galois::NONE).dist;
-    if (dist >= DIST_INFINITY) {
+    if (dist == DIST_INFINITY) {
       std::cerr << "found node = " << graph.getData(*src,Galois::NONE).id
-	   << " with label >= INFINITY = " << dist << "\n";
-      return false;
+		<< " with label INFINITY\n";
+      retval = false;
+    } else if (dist > DIST_INFINITY) {
+      std::cerr << "found node = " << graph.getData(*src,Galois::NONE).id
+		<< " with label greater than INFINITY ( ? ? )\n";
+      retval = false;
     }
     
-    for (Graph::edge_iterator 
-	   ii = graph.edge_begin(*src, Galois::NONE),
-	   ee = graph.edge_end(*src, Galois::NONE); ii != ee; ++ii) {
-      GNode neighbor = graph.getEdgeDst(ii);
-      unsigned int ddist = graph.getData(*src,Galois::NONE).dist;
-      int d = graph.getEdgeData(ii);
-      if (ddist > dist + d) {
-        std::cerr << "bad level value at "
-          << graph.getData(*src,Galois::NONE).id
-	  << " which is a neighbor of " 
-          << graph.getData(neighbor,Galois::NONE).id << "\n";
-	return false;
+    if (dist != DIST_INFINITY) { //avoid overflow on dist + d
+      for (Graph::edge_iterator 
+	     ii = graph.edge_begin(*src, Galois::NONE),
+	     ee = graph.edge_end(*src, Galois::NONE); ii != ee; ++ii) {
+	GNode neighbor = graph.getEdgeDst(ii);
+	unsigned int ddist = graph.getData(*src,Galois::NONE).dist;
+	int d = graph.getEdgeData(ii);
+	if (ddist > dist + d) {
+	  std::cerr << "bad level value at "
+		    << graph.getData(*src,Galois::NONE).id
+		    << " which is a neighbor of " 
+		    << graph.getData(neighbor,Galois::NONE).id << "\n";
+	  retval = false;
+	}
       }
     }
   }
-  return true;
+  return retval;
 }
 
 void initGraph(GNode& source, GNode& report) {
@@ -264,6 +262,10 @@ void initGraph(GNode& source, GNode& report) {
     if (node.id == startNode) {
       source = *src;
       foundSource = true;
+      if (graph.edge_begin(source) == graph.edge_end(source)) {
+	std::cerr << "Source has no neighbors\n";
+	abort();
+      }
     } 
     if (node.id == reportNode) {
       foundReport = true;
