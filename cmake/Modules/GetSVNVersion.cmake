@@ -1,3 +1,4 @@
+# DUMMY is a non-existent file to force regeneration of svn header every build
 add_custom_target(svnversion ALL DEPENDS DUMMY ${PROJECT_BINARY_DIR}/include/Galois/svnversion.h)
 
 find_file(_MODULE "GetSVNVersion-write.cmake" PATHS ${CMAKE_MODULE_PATH})
