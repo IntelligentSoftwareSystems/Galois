@@ -7,7 +7,7 @@ my $vtune = "/opt/intel/vtune_amplifier_xe_2011/bin64/amplxe-cl";
 my $symbol = "/usr/lib/debug/boot/" . `uname -r`;
 chomp($symbol);
 
-die("Run as: runvtune.pl [-t N] output app args*") unless ($#ARGV > 1);
+die("Run as: runvtune.pl [-t N] output app args*") unless (@ARGV > 1);
 
 my $threads = 1;
 my $found_threads = 0;
@@ -29,15 +29,13 @@ print "*** Executing: " . $cmdline . "\n";
 my $uname = `whoami`;
 chomp($uname);
 # my $type = "nehalem_general-exploration";
-my $type = "nehalem_memory-access";
+# my $type = "nehalem_memory-access";
+my $type = "nehalem-memory-access";
 
 my $sys = `hostname`;
 chomp($sys);
-if ($sys eq "faraday") {
-    $type = "nehalem-memory-access";
-}
-if ($sys eq "oersted") {
-    $type = "nehalem-memory-access";
+if ($sys eq "volta") {
+    $type = "nehalem_general-exploration";
 }
 
 my $dire = "/tmp/$uname.vtune.r$threads";
