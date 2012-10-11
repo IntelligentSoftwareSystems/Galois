@@ -1,6 +1,6 @@
 function(mesh base numpoints)
   add_custom_command(OUTPUT ${base}.raw.node
-    COMMAND ${CMAKE_BINARY_DIR}/tools/generators/random-2d-points.py
+    COMMAND python ${CMAKE_BINARY_DIR}/tools/generators/random-2d-points.py
       ${numpoints} 1 > ${base}.raw.node)
   add_custom_command(OUTPUT ${base}.node ${base}.ele ${base}.poly
     COMMAND delaunaytriangulation

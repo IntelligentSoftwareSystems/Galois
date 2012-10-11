@@ -1,6 +1,6 @@
 function(rgraph base numnodes)
   add_custom_command(OUTPUT ${base}.dimacs
-    COMMAND ${CMAKE_BINARY_DIR}/tools/generators/random-graph.py --density 4
+    COMMAND python ${CMAKE_BINARY_DIR}/tools/generators/random-graph.py --density 4
       ${numnodes} 0 > ${base}.dimacs)
   add_custom_command(OUTPUT ${base}.gr
     COMMAND graph-convert
