@@ -42,6 +42,7 @@
 #include "Lonestar/BoilerPlate.h"
 
 #include <string>
+#include <deque>
 #include <sstream>
 #include <limits>
 #include <iostream>
@@ -289,7 +290,7 @@ struct GaloisWorkSet {
     typedef ChunkedFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<GNodeIndexer,dChunk> OBIM;
     
-    std::vector<GNode> initial;
+    std::deque<GNode> initial;
     graph.getData(source).dist = 0;
     for (Graph::edge_iterator ii = graph.edge_begin(source),
           ei = graph.edge_end(source); ii != ei; ++ii) {
@@ -335,7 +336,7 @@ struct GaloisBarrier {
   typedef std::pair<GNode,int> ItemTy;
 
   void operator()(const GNode& source) const {
-    std::vector<ItemTy> initial;
+    std::deque<ItemTy> initial;
 
     graph.getData(source).dist = 0;
     for (Graph::edge_iterator ii = graph.edge_begin(source),
@@ -400,7 +401,7 @@ struct GaloisDetBarrier {
 #else
   typedef GaloisRuntime::WorkList::BulkSynchronous<GaloisRuntime::WorkList::dChunkedLIFO<256> > WL;
 #endif
-    std::vector<ItemTy> initial;
+    std::deque<ItemTy> initial;
 
     graph.getData(source).dist = 0;
     for (Graph::edge_iterator ii = graph.edge_begin(source),
