@@ -17,7 +17,7 @@ struct emp {
 void t_stl() {
 
   std::vector<unsigned> V(1024);
-  unsigned M = GaloisRuntime::LL::getMaxThreads();
+  //unsigned M = GaloisRuntime::LL::getMaxThreads();
 
   std::cout << "stl:\nIterxSize\n";
 

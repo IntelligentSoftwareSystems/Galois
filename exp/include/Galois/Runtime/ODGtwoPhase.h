@@ -396,7 +396,7 @@ public:
     bool first = true;
     size_t round = 0;
 
-    size_t prev = 0;
+    //size_t prev = 0;
     while (true) {
 
       ++round;
@@ -427,7 +427,8 @@ public:
       opTime.stop ();
 
       // std::cout << "Number of sources found: " << (opIter.reduce () - prev) << std::endl;
-      prev = opIter.reduce ();
+      //prev =
+      opIter.reduce ();
 
       std::swap (currWL, nextWL);
       nextWL->clear_all ();
