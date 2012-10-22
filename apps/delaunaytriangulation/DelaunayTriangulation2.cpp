@@ -32,7 +32,7 @@
 #include "Galois/Galois.h"
 #include "Galois/Bag.h"
 #include "Galois/Statistic.h"
-#include "Galois/Graphs/SpacialTree.h"
+#include "Galois/Graphs/SpatialTree.h"
 #include "Galois/Runtime/WorkListAlt.h"
 #include "Lonestar/BoilerPlate.h"
 #include "llvm/Support/CommandLine.h"
@@ -59,7 +59,7 @@ static const char* url = "delaunay_triangulation";
 static cll::opt<std::string> inputname(cll::Positional, cll::desc("<input file>"), cll::Required);
 
 static Graph graph;
-static Galois::SpacialTree2d<Point*> tree;
+static Galois::SpatialTree2d<Point*> tree;
 
 //! Our main functor
 struct Process {

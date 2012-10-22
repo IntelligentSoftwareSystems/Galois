@@ -21,16 +21,15 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-
-#ifndef SPACIALTREE_H
-#define SPACIALTREE_H
+#ifndef GALOIS_GRAPHS_SPATIALTREE_H
+#define GALOIS_GRAPHS_SPATIALTREE_H
 
 namespace Galois {
 
-//! Store sets of objects at specific spacial coordinates in a quad tree
+//! Store sets of objects at specific spatial coordinates in a quad tree
 //! lookup returns an approximation of the closest item
 template<typename T>
-class SpacialTree2d {
+class SpatialTree2d {
   struct Box2d {
     double xmin;
     double ymin;
@@ -157,12 +156,12 @@ class SpacialTree2d {
   }
 
  public:
-  SpacialTree2d(double xmin = 0.0, double ymin = 0.0, double xmax = 0.0, double ymax = 0.0)
+  SpatialTree2d(double xmin = 0.0, double ymin = 0.0, double xmax = 0.0, double ymax = 0.0)
     :root(0) {
     init(xmin, ymin, xmax, ymax);
   }
 
-  ~SpacialTree2d() {
+  ~SpatialTree2d() {
     freeTree(root);
     root = 0;
   }
