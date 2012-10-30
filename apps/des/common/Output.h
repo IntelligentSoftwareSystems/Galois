@@ -22,8 +22,8 @@
  */
 
 
-#ifndef OUTPUT_H_
-#define OUTPUT_H_
+#ifndef DES_OUTPUT_H_
+#define DES_OUTPUT_H_
 
 
 #include <iostream>
@@ -33,11 +33,15 @@
 
 #include "Input.h"
 
-// may as well be inherited from OneInputGate
+namespace des {
 /**
  * The Class Output.
  */
-class Output: public Input {
+template <typename S>
+class Output: public Input<S> {
+
+  typedef Input<S> Base;
+  typedef typename Base::Event_ty Event_ty;
 
 public: 
   /**
@@ -47,8 +51,8 @@ public:
    * @param outputName the output name
    * @param inputName the Output name
    */
-  Output(size_t id, BasicPort& impl)
-    : Input (id, impl) {}
+  Output(size_t id, des::BasicPort& impl)
+    : Input<S> (id, impl) {}
 
 
 
@@ -59,9 +63,9 @@ public:
   /**
    * A string representation
    */
-  virtual const std::string toString () const {
+  virtual std::string str () const {
     std::ostringstream ss;
-    ss << AbstractSimObject::toString () << ": " << "Output " << getImpl ().toString ();
+    ss << "Output: " << Base::Base::str ();
     return ss.str ();
   }
 
@@ -70,14 +74,24 @@ protected:
   /**
    * Output just receives events and updates its state, does not send out any events
    */
-  virtual void execEvent(Graph& g, GNode& myNode, const EventTy& event) {
+  virtual void execEventIntern (const Event_ty& event, 
+      typename Base::SendWrapper& sendWrap, 
+      typename Base::BaseOutDegIter& b, typename Base::BaseOutDegIter& e) {
 
-     if (event.getType() != EventTy::NULL_EVENT) {
-       const LogicUpdate& lu = event.getAction ();
-       getImpl ().applyUpdate (lu);
-     }
+    if (event.getType () != Event_ty::NULL_EVENT) {
+
+      const des::LogicUpdate& lu = event.getAction ();
+      if (lu.getNetName () == Base::getImpl ().getInputName ()) {
+        Base::getImpl ().applyUpdate (lu);
+      } else {
+        Base::getImpl ().netNameMismatch (lu);
+      }
+    }
+
   }
 
 };
 
-#endif /* OUTPUT_H_ */
+} // end namespace des
+
+#endif /* DES_OUTPUT_H_ */

@@ -21,8 +21,8 @@
  * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
  */
 
-#ifndef _BASE_LOGIC_GATE_H_
-#define _BASE_LOGIC_GATE_H_
+#ifndef DES_BASE_LOGIC_GATE_H_
+#define DES_BASE_LOGIC_GATE_H_
 
 #include <string>
 #include <iostream>
@@ -31,9 +31,10 @@
 #include "logicDefs.h"
 #include "LogicUpdate.h"
 
+
+namespace des {
+
 class LogicGate {
-protected:
-  static const SimTime MIN_DELAY = 1l;
 
 public:
 
@@ -101,7 +102,7 @@ public:
    /**
     * @return string representation
     */
-   virtual const std::string toString () const = 0;
+   virtual std::string str () const = 0;
 
   /**
    * @return delay of the gate
@@ -213,9 +214,12 @@ public:
 
 
   virtual void netNameMismatch (const LogicUpdate& le) const {
-    std::cerr << "Received logic update : " << le.toString () << " with mismatching net name, this = " << toString () << std::endl;
+    std::cerr << "Received logic update : " << le.str () << " with mismatching net name, this = " << str () << std::endl;
     exit (-1);
   }
 };
+
+
+} // namespace des
 
 #endif

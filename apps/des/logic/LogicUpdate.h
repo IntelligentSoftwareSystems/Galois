@@ -23,24 +23,29 @@
  * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
  */
 
-#ifndef LOGICUPDATE_H_
-#define LOGICUPDATE_H_
+#ifndef DES_LOGICUPDATE_H_
+#define DES_LOGICUPDATE_H_
 
 #include <string>
 #include <sstream>
 
 #include "logicDefs.h"
 
+
+namespace des {
+
 /**
  * The Class LogicUpdate is the msg carried by events. represents a change in the value of a net.
  */
-struct LogicUpdate {
+class LogicUpdate {
 
   /** The net name. */
-  std::string netName;
+  const std::string* netName;
 
   /** The net val. */
   LogicVal netVal;
+
+public:
 
   /**
    * Instantiates a new logi update
@@ -48,17 +53,25 @@ struct LogicUpdate {
    * @param netName the net name
    * @param netVal the net val
    */
-  LogicUpdate(std::string netName, LogicVal netVal) 
-    : netName (netName), netVal (netVal) {}
+  LogicUpdate(const std::string& netName, const LogicVal& netVal)
+    : netName (&netName), netVal (netVal) {}
 
-  LogicUpdate (): netName (""), netVal('0') {}
+  LogicUpdate (): netName (NULL), netVal(LOGIC_UNKNOWN) {}
+
+  friend bool operator == (const LogicUpdate& left, const LogicUpdate& right) {
+    return ((*left.netName) == (*right.netName)) && (left.netVal == right.netVal);
+  }
+
+  friend bool operator != (const LogicUpdate& left, const LogicUpdate& right) {
+    return !(left == right);
+  }
 
   /**
    * string representation
    */
-  const std::string toString() const {
+  const std::string str() const {
     std::ostringstream ss;
-    ss << "netName = " << netName << " netVal = " << netVal;
+    ss << "netName = " << *netName << " netVal = " << netVal;
     return ss.str ();
   }
 
@@ -67,18 +80,10 @@ struct LogicUpdate {
    *
    * @return the net name
    */
-  const std::string getNetName() const {
-    return netName;
+  const std::string& getNetName() const {
+    return *netName;
   }
 
-  /**
-   * Sets the net name.
-   *
-   * @param netName the new net name
-   */
-  void setNetName(const std::string& netName) {
-    this->netName = netName;
-  }
 
   /**
    * Gets the net val.
@@ -89,13 +94,8 @@ struct LogicUpdate {
     return netVal;
   }
 
-  /**
-   * Sets the net val.
-   *
-   * @param netVal the new net val
-   */
-  void setNetVal(const LogicVal& netVal) {
-    this->netVal = netVal;
-  }
 };
-#endif /* LOGICUPDATE_H_ */
+
+} // namespace des
+
+#endif /* DES_LOGICUPDATE_H_ */

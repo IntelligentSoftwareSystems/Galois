@@ -21,8 +21,8 @@
  * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
  */
 
-#ifndef INPUT_H_
-#define INPUT_H_
+#ifndef DES_INPUT_H_
+#define DES_INPUT_H_
 
 #include <string>
 #include <cassert>
@@ -30,8 +30,15 @@
 #include "SimGate.h"
 #include "BasicPort.h"
 
-// may as well be inherited from OneInputGate
-class Input: public SimGate {
+
+namespace des {
+
+template <typename S>
+class Input: public SimGate<S> {
+
+protected:
+  typedef SimGate<S> Base;
+  typedef typename Base::Event_ty Event_ty;
 
 public: 
   /**
@@ -41,26 +48,26 @@ public:
    * @param outputName the output name
    * @param inputName the Input name
    */
-  Input(size_t id, BasicPort& impl)
-    : SimGate (id, impl) {}
+  Input(size_t id, des::BasicPort& impl)
+    : Base (id, impl) {}
 
 
   virtual Input* clone () const {
     return new Input (*this);
   }
 
-  virtual BasicPort& getImpl () const {
-    BasicPort* ptr = dynamic_cast<BasicPort*> (&SimGate::getImpl ());
+  virtual des::BasicPort& getImpl () const {
+    des::BasicPort* ptr = dynamic_cast<des::BasicPort*> (&Base::getImpl ());
     assert (ptr != NULL);
     return *ptr;
   }
-  
+
   /**
    * A string representation
    */
-  virtual const std::string toString () const {
+  virtual std::string str () const {
     std::ostringstream ss;
-    ss << AbstractSimObject::toString () << ": " << "Input " << getImpl ().toString ();
+    ss << "Input: " << Base::str ();
     return ss.str ();
   }
 
@@ -70,30 +77,32 @@ protected:
    * @see OneInputGate::execEvent()
    *
    */
-  virtual void execEvent(Graph& graph, GNode& myNode, const EventTy& event) {
+  virtual void execEventIntern (const Event_ty& event, 
+      typename Base::SendWrapper& sendWrap, 
+      typename Base::BaseOutDegIter& b, typename Base::BaseOutDegIter& e) {
 
-    if (event.getType () == EventTy::NULL_EVENT) {
-      // send out null messages
-
-      SimGate::execEvent(graph, myNode, event); // same functionality as OneInputGate
+    if (event.getType () == Event_ty::NULL_EVENT) {
+      Base::execEventIntern (event, sendWrap, b, e);
 
     } else {
 
-     const LogicUpdate& lu = event.getAction ();
-      if (getImpl().getOutputName () == lu.getNetName()) {
+      const des::LogicUpdate& lu = event.getAction ();
+      if (getImpl().getInputName () == lu.getNetName()) {
         getImpl().setInputVal (lu.getNetVal());
         getImpl().setOutputVal (lu.getNetVal());
 
-        LogicUpdate drvFanout (getImpl ().getOutputName (), getImpl ().getOutputVal ());
+        des::LogicUpdate drvFanout (getImpl ().getOutputName (), getImpl ().getOutputVal ());
 
-        sendEventsToFanout (graph, myNode, event, EventTy::REGULAR_EVENT, drvFanout);
+        Base::sendEventsToFanout (event, drvFanout, Event_ty::REGULAR_EVENT, sendWrap, b, e);
       } else {
         getImpl ().netNameMismatch (lu);
       }
-
     }
 
   }
 
+
 };
-#endif /* INPUT_H_ */
+
+} // end namespace des
+#endif /* DES_INPUT_H_ */

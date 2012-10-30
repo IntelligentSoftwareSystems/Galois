@@ -21,8 +21,8 @@
  * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
  */
 
-#ifndef _BASE_TWO_INPUT_GATE_H_
-#define _BASE_TWO_INPUT_GATE_H_
+#ifndef DES_BASE_TWO_INPUT_GATE_H_
+#define DES_BASE_TWO_INPUT_GATE_H_
 
 #include <string>
 #include <sstream>
@@ -31,6 +31,9 @@
 #include "logicDefs.h"
 #include "LogicFunctions.h"
 #include "LogicGate.h"
+
+
+namespace des {
 
 struct TwoInputGateTraits {
   static const size_t  N_OUT = 1;
@@ -72,12 +75,12 @@ public:
    */
   TwoInputGate (const TwoInputFunc& func, const std::string& outputName, const std::string& input1Name, 
       const std::string& input2Name, const SimTime& delay = MIN_DELAY)
-    : SuperTy (outputName, '0', delay)
+    : SuperTy (outputName, LOGIC_ZERO, delay)
       , func (func)
       , input1Name (input1Name)
       , input2Name (input2Name)
-      , input1Val ('0')
-      , input2Val ('0') {}
+      , input1Val (LOGIC_ZERO)
+      , input2Val (LOGIC_ZERO) {}
 
 
   virtual TwoInputGate* makeClone () const {
@@ -144,9 +147,9 @@ public:
   /**
    * @return string representation
    */
-  virtual const std::string toString () const {
+  virtual std::string str () const {
     std::ostringstream ss;
-    ss << func.toString () << " output: " << outputName << " = " << outputVal << " input1: " << input1Name << " = "
+    ss << func.str () << " output: " << outputName << " = " << outputVal << " input1: " << input1Name << " = "
         << input1Val << " input2: " << input2Name << " = " << input2Val;
     return ss.str ();
   }
@@ -224,5 +227,8 @@ public:
   }
 
 };
+
+
+} // namespace des
 
 #endif

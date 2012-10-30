@@ -23,8 +23,8 @@
  * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
  */
 
-#ifndef NETLISTPARSER_H_
-#define NETLISTPARSER_H_
+#ifndef DES_NETLISTPARSER_H_
+#define DES_NETLISTPARSER_H_
 
 #include <vector>
 #include <string>
@@ -47,6 +47,9 @@
 #include "OneInputGate.h"
 #include "TwoInputGate.h"
 #include "BasicPort.h"
+
+
+namespace des {
 
 /**
  * NetlistTokenizer is a simple string tokenizer, which 
@@ -214,7 +217,7 @@ private:
 
 
   /** The netlist file. */
-  const char* netlistFile;
+  const std::string& netlistFile;
 
   /** The input names. */
   std::vector<std::string> inputNames;
@@ -416,44 +419,24 @@ private:
     } // end of while
   }
 
-
-  void destroy () {
-    destroyVec (gates);
-  }
-
-public:
   /**
-   * Instantiates a new netlist parser.
-   *
-   * @param netlistFile the netlist file
-   */
-  NetlistParser(const char* netlistFile): netlistFile(netlistFile) {
-    parse(netlistFile);
-  }
+     * Parses the netlist contained in fileName.
+     *
+     * Parsing steps
+     * parse input signal names
+     * parse output signal names
+     * parse finish time
+     * parse stimulus lists for each input signal
+     * parse the netlist
+     *
+     * @param fileName the file name
+     */
 
-
-  ~NetlistParser () {
-    destroy ();
-  }
-
-  /**
-   * Parses the netlist contained in fileName.
-   *
-   * Parsing steps
-   * parse input signal names
-   * parse output signal names
-   * parse finish time
-   * parse stimulus lists for each input signal
-   * parse the netlist
-   *
-   * @param fileName the file name
-   */
-
-  void parse(const char* fileName) {
+  void parse(const std::string& fileName) {
     std::cout << "input: reading circuit from file: " << fileName << std::endl;
 
 
-    NetlistTokenizer tokenizer (fileName, DELIM, COMMENTS);
+    NetlistTokenizer tokenizer (fileName.c_str (), DELIM, COMMENTS);
 
     std::string token;
 
@@ -463,10 +446,8 @@ public:
 
       if (token == ("inputs")) {
         parsePortList(tokenizer, inputNames);
-        createInputPorts ();
       } else if (token == ("outputs")) {
         parsePortList(tokenizer, outputNames);
-        createOutputPorts ();
       } else if (token == ("outvalues")) {
         parseOutValues(tokenizer, outValues);
       } else if (token == ("finish")) {
@@ -479,7 +460,31 @@ public:
       }
     } // end outer while
 
+    createInputPorts ();
+    createOutputPorts ();
   } // end parse()
+
+
+  void destroy () {
+    destroyVec (gates);
+  }
+
+public:
+  /**
+   * Instantiates a new netlist parser.
+   *
+   * @param netlistFile the netlist file
+   */
+  NetlistParser(const std::string& netlistFile): netlistFile(netlistFile) {
+    parse(netlistFile);
+  }
+
+
+  ~NetlistParser () {
+    destroy ();
+  }
+
+
 
 
   /**
@@ -496,7 +501,7 @@ public:
    *
    * @return the netlist file
    */
-  const char* getNetlistFile() const {
+  const std::string& getNetlistFile() const {
     return netlistFile;
   }
 
@@ -564,4 +569,7 @@ public:
 };
 
 
-#endif /* NETLISTPARSER_H_ */
+} // namespace des
+
+
+#endif /* DES_NETLISTPARSER_H_ */

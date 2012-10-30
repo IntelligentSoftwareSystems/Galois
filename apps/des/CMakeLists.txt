@@ -1,21 +1,21 @@
 file (GLOB Sources 
 ./*.cpp
 ./common/*.cpp
+./logic/*.cpp
 )
 
-function (DEStarget name) 
-  add_executable (${name} unordered/${name}.cpp ${Sources})
-  linkRuntime (${name})
-endfunction (DEStarget)
+app (DESunorderedSerial unordered/DESunorderedSerial.cpp ${Sources})
+app (DESunordered unordered/DESunordered.cpp ${Sources})
 
-DEStarget (DESunorderedSerial)
-
-DEStarget (DESunordered)
-
-DEStarget (DESunorderedParaMeter)
+# app (DESorderedSerial ordered/DESorderedSerial.cpp ${Sources})
+# app (DESorderedHand ordered/DESorderedHand.cpp ${Sources})
+# app (DESorderedHandNB ordered/DESorderedHandNB.cpp ${Sources})
+# app (DESorderedHandSet ordered/DESorderedHandSet.cpp ${Sources})
+# app (DESordered ordered/DESordered.cpp ${Sources})
 
 
 include_directories (.)
 include_directories (./common)
-include_directories (./common/circuitlib)
+include_directories (./logic)
+include_directories (./ordered)
 include_directories (./unordered)

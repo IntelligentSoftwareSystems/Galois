@@ -21,20 +21,23 @@
  * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
  */
 
-#ifndef _LOGIC_FUNCTIONS_H_
-#define _LOGIC_FUNCTIONS_H_
+#ifndef DES_LOGIC_FUNCTIONS_H_
+#define DES_LOGIC_FUNCTIONS_H_
 
 #include <functional>
 #include <string>
 
 #include "logicDefs.h"
 
+
+namespace des {
+
 /**
  * LogicFunc is a functor, serving as a common base type 
  * for one and two input functors.
  */
 struct LogicFunc {
-  virtual const std::string toString () const = 0;
+  virtual const std::string str () const = 0;
 };
 
 /**
@@ -67,7 +70,7 @@ struct BUF : public OneInputFunc, public std::unary_function<LogicVal, LogicVal>
     return _buf_ (in);
   }
 
-  virtual const std::string toString () const { return "BUF"; }
+  virtual const std::string str () const { return "BUF"; }
 };
 
 /**
@@ -75,12 +78,12 @@ struct BUF : public OneInputFunc, public std::unary_function<LogicVal, LogicVal>
  */
 struct INV : public OneInputFunc, public std::unary_function<LogicVal, LogicVal> {
   LogicVal _not_ (const LogicVal& in) const {
-    if (in == '0') {
-      return '1';
-    } else if (in == '1') {
-      return '0';
+    if (in == LOGIC_ZERO) {
+      return LOGIC_ONE;
+    } else if (in == LOGIC_ONE) {
+      return LOGIC_ZERO;
     } else {
-      return UNKNOWN_VALUE;
+      return LOGIC_UNKNOWN;
     }
   }
 
@@ -88,7 +91,7 @@ struct INV : public OneInputFunc, public std::unary_function<LogicVal, LogicVal>
     return _not_ (in);
   }
 
-  virtual const std::string toString () const { return "INV"; }
+  virtual const std::string str () const { return "INV"; }
 };
 
 
@@ -98,17 +101,17 @@ struct INV : public OneInputFunc, public std::unary_function<LogicVal, LogicVal>
 
 struct AND2: public TwoInputFunc, public std::binary_function<LogicVal, LogicVal, LogicVal> {
   LogicVal _and_ (const LogicVal& x, const LogicVal& y) const {
-    if (x == '0' || y == '0') {
-      return '0';
+    if (x == LOGIC_ZERO || y == LOGIC_ZERO) {
+      return LOGIC_ZERO;
 
-    } else if (x == '1' ) {
+    } else if (x == LOGIC_ONE ) {
       return y;
 
-    } else if (y == '1') {
+    } else if (y == LOGIC_ONE) {
       return x;
 
     } else {
-      return UNKNOWN_VALUE;
+      return LOGIC_UNKNOWN;
     }
 
   }
@@ -117,7 +120,7 @@ struct AND2: public TwoInputFunc, public std::binary_function<LogicVal, LogicVal
     return _and_ (x, y);
   }
 
-  virtual const std::string toString () const { return "AND2"; }
+  virtual const std::string str () const { return "AND2"; }
 };
 
 /**
@@ -132,7 +135,7 @@ struct NAND2: public AND2 {
     return _nand_ (x, y);
   }
 
-  virtual const std::string toString () const { return "NAND2"; }
+  virtual const std::string str () const { return "NAND2"; }
 };
 
 /**
@@ -140,14 +143,14 @@ struct NAND2: public AND2 {
  */
 struct OR2: public TwoInputFunc, public std::binary_function<LogicVal, LogicVal, LogicVal> {
   LogicVal _or_ (const LogicVal& x, const LogicVal& y) const {
-    if (x == '1' || y == '1') {
-      return '1';
-    } else if (x == '0') {
+    if (x == LOGIC_ONE || y == LOGIC_ONE) {
+      return LOGIC_ONE;
+    } else if (x == LOGIC_ZERO) {
       return y;
-    } else if (y == '0') {
+    } else if (y == LOGIC_ZERO) {
       return x;
     } else {
-      return UNKNOWN_VALUE;
+      return LOGIC_UNKNOWN;
     }
   }
 
@@ -155,7 +158,7 @@ struct OR2: public TwoInputFunc, public std::binary_function<LogicVal, LogicVal,
     return _or_ (x, y);
   }
 
-  virtual const std::string toString () const { return "OR2"; }
+  virtual const std::string str () const { return "OR2"; }
 };
 
 /**
@@ -170,7 +173,7 @@ struct NOR2: public OR2 {
     return _nor_ (x, y);
   }
 
-  virtual const std::string toString () const { return "NOR2"; }
+  virtual const std::string str () const { return "NOR2"; }
 };
 
 /**
@@ -178,14 +181,14 @@ struct NOR2: public OR2 {
  */
 struct XOR2: public TwoInputFunc, public std::binary_function<LogicVal, LogicVal, LogicVal> {
   LogicVal _xor_ (const LogicVal& x, const LogicVal& y) const {
-    if (x == UNKNOWN_VALUE || y == UNKNOWN_VALUE) {
-      return UNKNOWN_VALUE;
+    if (x == LOGIC_UNKNOWN || y == LOGIC_UNKNOWN) {
+      return LOGIC_UNKNOWN;
     } else if (INV()._not_(x) == y) {
-      return '1';
+      return LOGIC_ONE;
     } else if (x == y) {
-      return '0';
+      return LOGIC_ZERO;
     } else {
-      return 'X';
+      return LOGIC_UNKNOWN;
     }
   }
 
@@ -193,7 +196,7 @@ struct XOR2: public TwoInputFunc, public std::binary_function<LogicVal, LogicVal
     return _xor_ (x, y);
   }
 
-  virtual const std::string toString () const { return "XOR2"; }
+  virtual const std::string str () const { return "XOR2"; }
 };
 
 /**
@@ -208,7 +211,10 @@ struct XNOR2: public XOR2 {
     return _xnor_ (x, y);
   }
 
-  virtual const std::string toString () const { return "XNOR2"; }
+  virtual const std::string str () const { return "XNOR2"; }
 };
+
+
+} // namespace des
 
 #endif

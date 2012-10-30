@@ -1,4 +1,4 @@
-/** main function for DESunorderedParaMeter -*- C++ -*-
+/** LogicGate implements the basic structure of a logic gate -*- C++ -*-
  * @file
  * @section License
  *
@@ -21,13 +21,4 @@
  * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
  */
 
-
-#include "DESunorderedParaMeter.h"
-
-int main (int argc, char* argv[]) {
-
-  DESunorderedParaMeter m;
-  m.run (argc, argv);
-
-  return 0;
-}
+#include "LogicGate.h"

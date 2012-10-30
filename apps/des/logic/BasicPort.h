@@ -1,4 +1,4 @@
-/** LogicGate implements the basic structure of a logic gate -*- C++ -*-
+/** OneInputGate implements the basic structure of a one input logic gate -*- C++ -*-
  * @file
  * @section License
  *
@@ -21,7 +21,31 @@
  * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
  */
 
-#include "LogicGate.h"
+#ifndef DES_BASIC_PORT_H
+#define DES_BASIC_PORT_H
 
-// allocate space of static member
-const SimTime LogicGate::MIN_DELAY;
+#include <string>
+
+#include "LogicFunctions.h"
+#include "OneInputGate.h"
+
+namespace des {
+
+class BasicPort: public OneInputGate {
+private:
+  static const BUF& BUFFER;
+
+public:
+  BasicPort (const std::string&  outputName, const std::string& inputName)
+    : OneInputGate (BUFFER, outputName, inputName)  {}
+
+  BasicPort* makeClone () const { return new BasicPort (*this); }
+
+
+};
+
+
+} // namespace des
+
+
+#endif // DES_BASIC_PORT_H

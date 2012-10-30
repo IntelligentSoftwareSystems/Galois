@@ -21,8 +21,8 @@
  * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
  */
 
-#ifndef _BASE_ONE_INPUT_GATE_H_
-#define _BASE_ONE_INPUT_GATE_H_
+#ifndef DES_BASE_ONE_INPUT_GATE_H_
+#define DES_BASE_ONE_INPUT_GATE_H_
 
 #include <string>
 #include <sstream>
@@ -31,6 +31,9 @@
 #include "logicDefs.h"
 #include "LogicFunctions.h"
 #include "LogicGate.h"
+
+
+namespace des {
 
 struct OneInputGateTraits {
   static const size_t  N_OUT = 1;
@@ -63,8 +66,8 @@ public:
    * @param outputName the output name
    * @param inputName the input name
    */
-  OneInputGate (const OneInputFunc& func, const std::string& outputName, const std::string& inputName, const SimTime& delay = LogicGate::MIN_DELAY)
-    : SuperTy (outputName, '0', delay), func (func), inputName (inputName) , inputVal ('0') {}
+  OneInputGate (const OneInputFunc& func, const std::string& outputName, const std::string& inputName, const SimTime& delay = MIN_DELAY)
+    : SuperTy (outputName, LOGIC_ZERO, delay), func (func), inputName (inputName) , inputVal (LOGIC_ZERO) {}
 
 
   virtual OneInputGate* makeClone () const {
@@ -119,10 +122,10 @@ public:
   /**
    * @return string representation
    */
-  virtual const std::string toString () const {
+  virtual std::string str () const {
     std::ostringstream ss;
 
-    ss << func.toString () <<  " output: " << outputName << " = " << outputVal << ", input: " << inputName << " = " << inputVal;
+    ss << func.str () <<  " output: " << outputName << " = " << outputVal << ", input: " << inputName << " = " << inputVal;
     return ss.str ();
   }
 
@@ -163,5 +166,8 @@ public:
   }
 
 };
+
+
+} // namespace des
 
 #endif

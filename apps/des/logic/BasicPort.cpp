@@ -1,4 +1,4 @@
-/** Some common definitions and helper functions -*- C++ -*-
+/** OneInputGate implements the basic structure of a one input logic gate -*- C++ -*-
  * @file
  * @section License
  *
@@ -21,13 +21,7 @@
  * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
  */
 
-#ifndef _LOGIC_DEFS_H_
-#define _LOGIC_DEFS_H_
 
-/** type used for value of a signal e.g. 0, 1, X , Z */
-typedef char LogicVal;
+#include "BasicPort.h"
 
-/** the unknown logic value */
-const char UNKNOWN_VALUE = 'X';
-
-#endif
+const des::BUF& des::BasicPort::BUFFER = des::BUF();
