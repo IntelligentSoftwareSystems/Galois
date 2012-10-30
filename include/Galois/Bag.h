@@ -186,6 +186,14 @@ public:
     size_t m_size;
 
   public:
+    iterator (): 
+      m_head (NULL),
+      p (NULL),
+      v (NULL),
+      m_size (0)
+    {}
+
+
     iterator(Header* h, Header* x, T* e, size_t s): m_head(h), p(x), v(e), m_size(s) { }
 
     // ------ forward iterator concepts --------
@@ -232,6 +240,7 @@ public:
         --v;
       }
       --m_size;
+      return *this;
     }
 
     iterator operator--(int) {
