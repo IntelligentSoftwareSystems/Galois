@@ -33,6 +33,7 @@ namespace GaloisRuntime {
 namespace LL {
 
 void gPrint(const char* format, ...);
+void gDebug(const char* format, ...);
 void gInfo( const char* format, ...);
 void gWarn( const char* format, ...);
 void gError(bool doabort, const char* format, ...);

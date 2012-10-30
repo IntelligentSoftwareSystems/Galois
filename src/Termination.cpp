@@ -38,8 +38,10 @@ void TerminationDetection::reset() {
 }
 
 void TerminationDetection::propToken(TokenHolder& th, TokenHolder& thn) {
+  assert (!globalTerm && "no token should be in progress after globalTerm");
   bool taint = th.processIsBlack || th.tokenIsBlack;
   th.processIsBlack = th.tokenIsBlack = false;
+  th.hasToken = false;
   thn.tokenIsBlack = taint;
   __sync_synchronize();
   thn.hasToken = true;
@@ -52,7 +54,7 @@ void TerminationDetection::localTermination() {
     TokenHolder& thn = *data.getRemote((myID + 1) % galoisActiveThreads);
     if (myID == 0) {
       //master
-      bool failed = th.tokenIsBlack | th.processIsBlack;
+      bool failed = th.tokenIsBlack || th.processIsBlack;
       th.tokenIsBlack = th.processIsBlack = false;
       if (lastWasWhite && !failed) {
 	//This was the second success

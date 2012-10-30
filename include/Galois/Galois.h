@@ -36,6 +36,8 @@
 #include "Galois/Runtime/ParaMeter.h"
 #endif
 
+#define GALOIS_DEFAULT_CHUNK_SIZE 32
+
 namespace Galois {
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -51,7 +53,7 @@ void for_each(IterTy b, IterTy e, FunctionTy f, const char* loopname = 0) {
 
 template<typename IterTy, typename FunctionTy>
 void for_each(IterTy b, IterTy e, FunctionTy f, const char* loopname = 0) {
-  typedef GaloisRuntime::WorkList::dChunkedFIFO<256> WLTy;
+  typedef GaloisRuntime::WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
   Galois::for_each<WLTy, IterTy, FunctionTy>(b, e, f, loopname);
 }
 
@@ -64,7 +66,7 @@ void for_each(InitItemTy i, FunctionTy f, const char* loopname = 0) {
 
 template<typename InitItemTy, typename FunctionTy>
 void for_each(InitItemTy i, FunctionTy f, const char* loopname = 0) {
-  typedef GaloisRuntime::WorkList::ChunkedFIFO<256> WLTy;
+  typedef GaloisRuntime::WorkList::ChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
   Galois::for_each<WLTy, InitItemTy, FunctionTy>(i, f, loopname);
 }
 //Local based versions
@@ -77,7 +79,7 @@ void for_each_local(ConTy& c, Function f, const char* loopname = 0) {
 
 template<typename ConTy, typename Function>
 void for_each_local(ConTy& c, Function f, const char* loopname = 0) {
-  typedef GaloisRuntime::WorkList::dChunkedFIFO<256> WLTy;
+  typedef GaloisRuntime::WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
   Galois::for_each_local<WLTy, ConTy, Function>(c, f, loopname);
 }
 
