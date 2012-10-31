@@ -78,8 +78,6 @@ class AVIodgExplicit: public AVIabstractMain {
 protected:
   static const bool DEBUG = false;
 
-  static const int CHUNK_SIZE = 32;
-
 #ifdef USE_LC_GRAPH
   typedef Galois::Graph::LC_CSR_Graph<AVI*, void> Graph;
   typedef Graph::GraphNode GNode;
@@ -87,10 +85,6 @@ protected:
   typedef Galois::Graph::FirstGraph<AVI*, void, false> Graph;
   typedef Graph::GraphNode GNode;
 #endif
-
-  // TODO: move this decl to AVIabstractMain
-  typedef GaloisRuntime::WorkList::dChunkedFIFO<CHUNK_SIZE> AVIWorkList;
-  // typedef GaloisRuntime::WorkList::dChunkedLIFO<CHUNK_SIZE> AVIWorkList;
 
 
   Graph graph;
@@ -379,7 +373,7 @@ public:
 
     Galois::for_each<AVIWorkList>(initWL.begin (), initWL.end (), p);
 
-    printf ("iterations = %d\n", iter.reduce ());
+    printf ("iterations = %zd\n", iter.reduce ());
 
   }
 

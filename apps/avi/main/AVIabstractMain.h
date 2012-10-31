@@ -99,10 +99,10 @@ private:
 
 
 protected:
-  static const int CHUNK_SIZE = 1;
+  static const int CHUNK_SIZE = 32;
   typedef GaloisRuntime::WorkList::dChunkedFIFO<CHUNK_SIZE> AVIWorkList;
 
-  typedef Galois::GAccumulator<int> IterCounter;
+  typedef Galois::GAccumulator<size_t> IterCounter;
 
   std::string wltype;
 

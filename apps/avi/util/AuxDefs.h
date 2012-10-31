@@ -30,6 +30,9 @@
 #define _AUXDEFS_H_
 
 #include <cstddef>
+#include <cmath>
+#include <cstdlib>
+
 #include <vector>
 
 //! Nodal indices, starting at 0. : amber
@@ -53,5 +56,27 @@ typedef std::vector< std::vector< bool> > MatBool;
 
 //! constants
 const double TOLERANCE = 1e-20;
+
+struct DoubleComparator {
+  static inline int compare (double left, double right) {
+    double tdiff = left - right;
+
+    if (fabs (tdiff) < TOLERANCE) {
+      return 0;
+
+    } else if (tdiff > 0.0) {
+      return 1;
+
+    } else if (tdiff < 0.0) {
+      return -1;
+
+    } else {
+      abort (); // shouldn't reach here
+      return 0;
+    }
+
+  }
+};
+
 
 #endif

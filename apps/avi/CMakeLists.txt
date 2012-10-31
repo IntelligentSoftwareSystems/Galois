@@ -50,6 +50,10 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/exp)
   app(AVIodgAutoShare exp/AVIodgAutoShare.cpp 
     REQUIRES LAPACK_FOUND ZLIB_FOUND USE_EXP
     EXTLIBS AVI ${LAPACK_LIBRARIES})
+
+  app(AVIodgNB exp/AVIodgNB.cpp 
+    REQUIRES LAPACK_FOUND ZLIB_FOUND USE_EXP
+    EXTLIBS AVI ${LAPACK_LIBRARIES})
 endif()
 
 include_directories(util)

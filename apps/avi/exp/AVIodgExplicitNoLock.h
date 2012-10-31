@@ -242,7 +242,7 @@ public:
 
     Galois::for_each<AVIWorkList> (initWL.begin (), initWL.end (), p);
 
-    printf ("iterations = %d\n", iter.reduce ());
+    printf ("iterations = %zd\n", iter.reduce ());
 
   }
 

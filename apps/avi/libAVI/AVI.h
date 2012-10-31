@@ -402,20 +402,10 @@ struct AVIComparator {
   //! @param left pointer to first AVI object
   //! @param right pointer to second AVI object
   static inline int compare (const AVI* const left, const AVI* const right) {
-    int result = 0;
-    double tdiff = left->getNextTimeStamp() - right->getNextTimeStamp();
+    int result = DoubleComparator::compare (left->getNextTimeStamp (), right->getNextTimeStamp ());
 
-    if (fabs (tdiff) < TOLERANCE) {
+    if (result == 0) {
       result = left->getGlobalIndex() - right->getGlobalIndex();
-
-    } else if (tdiff < 0.0) {
-      result = -1;
-
-    } else if (tdiff > 0.0) {
-      result = 1;
-
-    } else {
-      abort (); // shouldn't reach here
     }
 
     return result;
