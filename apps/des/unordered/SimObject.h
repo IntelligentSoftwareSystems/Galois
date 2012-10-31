@@ -36,7 +36,7 @@
 #include "BaseSimObject.h"
 #include "Event.h"
 
-#include "Galois/Runtime/PriorityQueue.h"
+#include "Galois/PriorityQueue.h"
 #include "Galois/Runtime/ll/gio.h"
 
 //TODO: modeling one output for now. Need to extend for multiple outputs
