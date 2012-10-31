@@ -212,7 +212,7 @@ public:
   TwoLevelFwdIter (): Base () {}
 
   TwoLevelFwdIter (PerThrdWL& wl, const GlobalPos& pos): Base (wl, pos) {
-    Base::curr = Base::localBegin ();
+    // Base::curr = Base::localBegin ();
     seekValidBegin ();
   }
 

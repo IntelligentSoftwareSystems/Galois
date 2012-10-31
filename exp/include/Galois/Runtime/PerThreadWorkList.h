@@ -165,6 +165,7 @@ public:
 
 };
 
+// TODO: rename to per thread heap factory, move outside
 template <typename T>
 struct PerThreadWLfactory {
 
@@ -181,7 +182,7 @@ struct PerThreadWLfactory {
 
 };
 
-
+// TODO: remove code reuse here.
 template <typename T>
 class PerThreadVector: 
   public PerThreadWorkList<T, std::vector<T, typename PerThreadWLfactory<T>::PerThreadAllocator> > {

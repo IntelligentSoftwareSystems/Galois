@@ -46,7 +46,7 @@
 
 #include "Galois/Timer.h"
 
-#define  MAX_CHUNK_SIZE 1024UL
+#define  MAX_CHUNK_SIZE 8UL
 
 #undef ENABLE_DO_ALL_TIMERS
 // TODO: assume bidirectional iterators as the lcd

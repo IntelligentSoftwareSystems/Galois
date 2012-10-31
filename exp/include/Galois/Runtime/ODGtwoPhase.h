@@ -72,7 +72,7 @@ class TwoPhaseODGexecutor {
 
     Ctxt* operator () (const T& active) {
       Ctxt* ctxt = ctxtAlloc.allocate (1);
-      new (ctxt) Ctxt (active);
+      ctxtAlloc.construct (ctxt, Ctxt (active));
       // Ctxt* ctxt = new Ctxt (&active);
 
       contexts.get ().push_back (ctxt);
@@ -221,6 +221,7 @@ class TwoPhaseODGexecutor {
       op (src->active, addList.get ());
       src->removeFromNhood ();
 
+      CreateCtxtExpandNhood::ctxtAlloc.destroy (src);
       CreateCtxtExpandNhood::ctxtAlloc.deallocate (src, 1);
       // delete src; src = NULL;
 
@@ -267,6 +268,7 @@ class TwoPhaseODGexecutor {
         op (ctxt->active, addList.get ());
         ctxt->removeFromNhood ();
 
+        CreateCtxt::ctxtAlloc.destroy (ctxt);
         CreateCtxt::ctxtAlloc.deallocate (ctxt, 1);
 
         for (typename AddList::local_iterator i = addList.get ().begin ()

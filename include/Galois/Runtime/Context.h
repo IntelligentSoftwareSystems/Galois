@@ -74,6 +74,7 @@ class Lockable {
   friend class SimpleRuntimeContext;
   friend class DeterministicRuntimeContext;
 public:
+  LL::PtrLock<void, true> auxPtr;
   Lockable() :next(0) {}
 };
 
