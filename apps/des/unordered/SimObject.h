@@ -65,8 +65,7 @@ protected:
   };
 
   typedef des::EventRecvTimeLocalTieBrkCmp<Event_ty> Cmp;
-  // typedef typename Galois::ThreadSafeOrderedSet<Event_ty, Cmp> PQ;
-  typedef typename Galois::ThreadSafeMinHeap<Event_ty, Cmp> PQ;
+  typedef typename Galois::ThreadSafeOrderedSet<Event_ty, Cmp> PQ;
 
   static size_t NEVENTS_PER_ITER;
 
