@@ -43,6 +43,7 @@
 #include "Galois/Runtime/Termination.h"
 #include "Galois/Runtime/ThreadPool.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
+#include "Galois/Runtime/ll/CompilerSpecific.h"
 
 #include "Galois/Timer.h"
 
@@ -195,7 +196,7 @@ class DoAllCoupledExec {
 
   struct ThreadContext {
 
-    LL::PaddedLock<true> work_lock;
+    GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE LL::SimpleLock<true> work_lock;
 
     unsigned id;
 

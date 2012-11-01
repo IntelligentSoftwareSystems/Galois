@@ -29,6 +29,7 @@
 #define GALOIS_PRIORITY_QUEUE
 
 #include "Galois/Runtime/ll/PaddedLock.h"
+#include "Galois/Runtime/ll/CompilerSpecific.h"
 
 #include <vector>
 #include <algorithm>
@@ -36,151 +37,9 @@
 
 namespace Galois {
 
-
-template <typename T, typename Cmp=std::less<T>, typename Cont=std::vector<T> >
-class ThreadSafeMinHeap {
-
-public:
-  typedef Cont container_type;
-
-  typedef typename container_type::value_type value_type;
-  typedef typename container_type::reference reference;
-  typedef typename container_type::const_reference const_reference;
-  typedef typename container_type::size_type size_type;
-  typedef typename container_type::const_iterator const_iterator;
-
-protected:
-  struct RevCmp {
-    Cmp cmp;
-
-    explicit RevCmp (Cmp cmp): cmp (cmp) {}
-
-    bool operator () (const T& left, const T& right) const {
-      return !cmp (left, right);
-    }
-  };
-
-  typedef GaloisRuntime::LL::PaddedLock<true> Lock_ty;
-
-  RevCmp revCmp;
-  Cont container;
-  Lock_ty mutex;
-
-
-  const_reference top_internal () const {
-    assert (!container.empty ());
-    return container.front ();
-  }
-  
-  value_type pop_internal () {
-    assert (!container.empty ());
-    std::pop_heap (container.begin (), container.end (), revCmp);
-
-    value_type x = container.back ();
-    container.pop_back ();
-
-    return x;
-  }
-
-public:
-
-  explicit ThreadSafeMinHeap (const Cmp& cmp=Cmp (), const Cont& container=Cont ())
-    : revCmp (cmp), container (container), mutex ()
-  {}
-
-  template <typename Iter>
-  ThreadSafeMinHeap (Iter b, Iter e, const Cmp& cmp=Cmp ())
-    : revCmp (cmp), container (b, e), mutex ()
-  {
-    std::make_heap (container.begin (), container.end ());
-  }
-  
-  
-  bool empty () const {
-    mutex.lock ();
-      bool ret = container.empty ();
-    mutex.unlock ();
-
-    return ret;
-  }
-
-  size_type size () const {
-    mutex.lock ();
-      size_type sz =  container.size ();
-    mutex.unlock ();
-
-    return sz;
-  }
-
-  // can't return a reference, because the reference may not be pointing
-  // to a valid location due to vector doubling in size and moving to 
-  // another memory location
-  value_type top () const {
-    mutex.lock ();
-      value_type x = top_internal ();
-    mutex.unlock ();
-
-    return x;
-  }
-
-  void push (const value_type& x) {
-    mutex.lock ();
-      container.push_back (x);
-      std::push_heap (container.begin (), container.end (), revCmp);
-    mutex.unlock ();
-  }
-
-  value_type pop () {
-    mutex.lock ();
-      value_type x = pop_internal ();
-    mutex.unlock ();
-    return x;
-  }
-
-  bool remove (const value_type& x) {
-    bool ret = false;
-
-    // TODO: write a better remove method
-    mutex.lock ();
-      if (x == top_internal ()) {
-        pop_internal ();
-        ret = true;
-
-      } else {
-        typename container_type::iterator nend = 
-            std::remove (container.begin (), container.end (), x);
-
-        ret = nend != container.end ();
-        container.erase (nend, container.end ());
-
-        std::make_heap (container.begin (), container.end (), revCmp);
-
-      }
-    mutex.unlock ();
-
-    return ret;
-  }
-
-  bool find (const value_type& x) const {
-
-    mutex.lock ();
-      bool ret = (std::find (begin (), end (), x) != end ());
-    mutex.unlock ();
-
-    return ret;
-  }
-
-  // TODO: can't use in parallel context
-  const_iterator begin () const { return container.begin (); }
-  const_iterator end () const { return container.end (); }
-
-  // void reserve (size_type s) {
-    // container.reserve (s);
-  // }
-
-
-};
-
+// - Ordered-Set is serially faster than Min-Heap, e.g., 10%-15% faster on serial
+//    ordered DES
+// - Ordered-Set can easily use a scalable allocator i.e. FSBGaloisAllocator. 
 template <typename T, typename Cmp=std::less<T>, typename Alloc=GaloisRuntime::MM::FSBGaloisAllocator<T> >
 class ThreadSafeOrderedSet {
   typedef std::set<T, Cmp, Alloc> Set;
@@ -193,9 +52,9 @@ public:
   typedef typename Set::size_type size_type;
   typedef typename Set::const_iterator const_iterator;
 
-  typedef GaloisRuntime::LL::PaddedLock<true> Lock_ty;
+  typedef GaloisRuntime::LL::SimpleLock<true> Lock_ty;
 
-  Lock_ty mutex;
+  GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Lock_ty mutex;
   Set orderedSet;
 
 public:
@@ -285,6 +144,151 @@ public:
 };
 
 
+
+
+template <typename T, typename Cmp=std::less<T>, typename Cont=std::vector<T> >
+class ThreadSafeMinHeap {
+
+public:
+  typedef Cont container_type;
+
+  typedef typename container_type::value_type value_type;
+  typedef typename container_type::reference reference;
+  typedef typename container_type::const_reference const_reference;
+  typedef typename container_type::size_type size_type;
+  typedef typename container_type::const_iterator const_iterator;
+
+protected:
+  struct RevCmp {
+    Cmp cmp;
+
+    explicit RevCmp (Cmp cmp): cmp (cmp) {}
+
+    bool operator () (const T& left, const T& right) const {
+      return !cmp (left, right);
+    }
+  };
+
+  typedef GaloisRuntime::LL::SimpleLock<true> Lock_ty;
+
+  GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Lock_ty mutex;
+  Cont container;
+  RevCmp revCmp;
+
+
+  const_reference top_internal () const {
+    assert (!container.empty ());
+    return container.front ();
+  }
+  
+  value_type pop_internal () {
+    assert (!container.empty ());
+    std::pop_heap (container.begin (), container.end (), revCmp);
+
+    value_type x = container.back ();
+    container.pop_back ();
+
+    return x;
+  }
+
+public:
+
+  explicit ThreadSafeMinHeap (const Cmp& cmp=Cmp (), const Cont& container=Cont ())
+    : mutex (), container (container), revCmp (cmp)
+  {}
+
+  template <typename Iter>
+  ThreadSafeMinHeap (Iter b, Iter e, const Cmp& cmp=Cmp ())
+    : mutex (), container (b, e), revCmp (cmp)
+  {
+    std::make_heap (container.begin (), container.end ());
+  }
+  
+  
+  bool empty () const {
+    mutex.lock ();
+      bool ret = container.empty ();
+    mutex.unlock ();
+
+    return ret;
+  }
+
+  size_type size () const {
+    mutex.lock ();
+      size_type sz =  container.size ();
+    mutex.unlock ();
+
+    return sz;
+  }
+
+  // can't return a reference, because the reference may not be pointing
+  // to a valid location due to vector doubling in size and moving to 
+  // another memory location
+  value_type top () const {
+    mutex.lock ();
+      value_type x = top_internal ();
+    mutex.unlock ();
+
+    return x;
+  }
+
+  void push (const value_type& x) {
+    mutex.lock ();
+      container.push_back (x);
+      std::push_heap (container.begin (), container.end (), revCmp);
+    mutex.unlock ();
+  }
+
+  value_type pop () {
+    mutex.lock ();
+      value_type x = pop_internal ();
+    mutex.unlock ();
+    return x;
+  }
+
+  bool remove (const value_type& x) {
+    bool ret = false;
+
+    // TODO: write a better remove method
+    mutex.lock ();
+      if (x == top_internal ()) {
+        pop_internal ();
+        ret = true;
+
+      } else {
+        typename container_type::iterator nend = 
+            std::remove (container.begin (), container.end (), x);
+
+        ret = nend != container.end ();
+        container.erase (nend, container.end ());
+
+        std::make_heap (container.begin (), container.end (), revCmp);
+
+      }
+    mutex.unlock ();
+
+    return ret;
+  }
+
+  bool find (const value_type& x) const {
+
+    mutex.lock ();
+      bool ret = (std::find (begin (), end (), x) != end ());
+    mutex.unlock ();
+
+    return ret;
+  }
+
+  // TODO: can't use in parallel context
+  const_iterator begin () const { return container.begin (); }
+  const_iterator end () const { return container.end (); }
+
+  // void reserve (size_type s) {
+    // container.reserve (s);
+  // }
+
+
+};
 
 }
 

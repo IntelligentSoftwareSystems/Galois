@@ -126,15 +126,14 @@ struct NhoodItemShareList: public Lockable {
   typedef NhoodListContext<T, MyType> Ctxt;
 
 
-  // typedef GaloisRuntime::LL::PaddedLock<true> Lock_ty;
   typedef GaloisRuntime::LL::SimpleLock<true> Lock_ty;
 
   typedef std::vector<Ctxt*> ShareList;
 
 
+  GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Lock_ty sharersLock;
   size_t id;
   ShareList sharers; 
-  Lock_ty sharersLock;
   
 public:
   NhoodItemShareList(size_t _id): 
@@ -238,10 +237,10 @@ class NhoodItemPriorityLock: public Lockable {
 
   typedef NhoodItemPriorityLock<T> MyType;
   typedef NhoodListContext<T, MyType> Ctxt;
-  typedef Galois::GAtomicPadded<Ctxt*> AtomicPtr;
+  typedef Galois::GAtomic<Ctxt*> AtomicPtr;
 
+  GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE AtomicPtr highest;
   size_t id;
-  AtomicPtr highest;
 
 public:
 

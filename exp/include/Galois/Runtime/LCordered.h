@@ -112,14 +112,14 @@ public:
   typedef NhoodItem<MyType, typename MyType::Comparator> NItem;
   // typedef Galois::gdeque<NItem*> NhoodList;
   typedef std::vector<NItem*> NhoodList;
-  typedef Galois::GAtomicPadded<bool> AtomicBool;
+  typedef Galois::GAtomic<bool> AtomicBool;
 
   // TODO: fix visibility below
 public:
+  GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE AtomicBool onWL;
   T active;
   NhoodMgr& nhmgr;
   NhoodList nhood;
-  AtomicBool onWL;
 
 
 public:
@@ -300,7 +300,7 @@ public:
       std::equal_to<Lockable*>,
       PerThreadAllocator
     > NhoodMap;
-  // typedef GaloisRuntime::LL::PaddedLock<true> Lock_ty;
+
   typedef GaloisRuntime::ThreadRWlock Lock_ty;
 
 protected:

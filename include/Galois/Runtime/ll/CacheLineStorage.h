@@ -29,15 +29,16 @@
 #ifndef GALOIS_RUNTIME_CACHE_LINE_STORAGE_H
 #define GALOIS_RUNTIME_CACHE_LINE_STORAGE_H
 
+#include "CompilerSpecific.h"
+
 namespace GaloisRuntime {
 namespace LL {
 
-//xeons have 64 byte cache lines, but will prefetch 2 at a time
-#define GALOIS_CACHE_LINE_SIZE 128
+
 
 template<typename T, int REM>
 struct CacheLineImp {
-  T data __attribute__((aligned(GALOIS_CACHE_LINE_SIZE)));
+  GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE T data;
   char pad[REM];
   CacheLineImp() :data() {}
   explicit CacheLineImp(const T& v) :data(v) {}
@@ -45,7 +46,7 @@ struct CacheLineImp {
 
 template<typename T>
 struct CacheLineImp<T, 0> {
-  T data __attribute__((aligned(GALOIS_CACHE_LINE_SIZE)));
+  GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE T data;
   CacheLineImp() :data() {}
   explicit CacheLineImp(const T& v) :data(v) {}
 };
