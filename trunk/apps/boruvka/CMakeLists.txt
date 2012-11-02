@@ -1,0 +1,1 @@
+app(boruvka Boruvka.cpp)

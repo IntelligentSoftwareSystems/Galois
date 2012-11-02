@@ -1,0 +1,47 @@
+
+finish 10000
+
+inputs cin, a, b
+end
+
+outputs cout, s 
+end
+
+initlist a 0,0 59, 0 end 
+
+
+initlist b 0,0 39, 0 end 
+
+
+initlist cin 0,0 16, 1 end 
+
+outvalues cout 0, s 1, end
+
+netlist
+
+inv(an,a)#4
+inv(bn,b)#4
+inv(cinn,cin)#4
+
+and2(anbn,an,bn)#2
+and2(anb,an,b)#2
+and2(abn,a,bn)#2
+and2(ab,a,b)#3
+
+and2(abcin,ab,cin)#2
+and2(anbncin,anbn,cin)#2
+and2(anbcinn,anb,cinn)#2
+and2(abncinn,abn,cinn)#2
+
+and2(bcin,b,cin)#2
+and2(acin,cin,a)#2
+
+or2(sw42,abncinn,anbcinn)#3
+or2(sw71,abcin, anbncin)#3
+or2(s,sw42,sw71)#3
+
+or2(sw35, bcin, acin)#3
+or2(cout,sw35,ab)#5
+
+
+end

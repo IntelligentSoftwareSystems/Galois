@@ -1,0 +1,30 @@
+inputs a,b end
+outputs o end
+
+finish=40
+
+initlist a
+0,0
+5,1
+10,0
+15,1
+
+end
+
+initlist b
+0,0
+10,1
+20,0
+end
+
+outvalues o 1 end
+
+netlist 
+nand2(x,a,b)#4
+nand2(y,a,x)#4
+end
+
+netlist
+nand2(z,b,x)#4
+nand2(o,y,z)#4
+end

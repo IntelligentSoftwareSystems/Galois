@@ -1,0 +1,16 @@
+function(makeTest name)
+  add_executable(${name} ${name}.cpp)
+  linkRuntime(${name})
+  add_test(${name} ${name})
+endfunction()
+
+makeTest(bag)
+makeTest(compile-check)
+makeTest(sched)
+makeTest(pc)
+makeTest(static)
+makeTest(test_gdeque)
+makeTest(sort)
+makeTest(loopoverhead)
+makeTest(acquire)
+

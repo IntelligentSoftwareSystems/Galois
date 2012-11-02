@@ -1,0 +1,74 @@
+Number of traces: 2 should be 2
+Face number : 0
+Normal components
+0.707107 0.707107 
+Face number : 2
+Normal components
+0 -1 
+Face number : 0
+Shape functions values for the first field
+0.788675 0.211325 0.211325 0.788675 
+Integration point coordinates
+0.788675 0.211325 0.211325 0.788675 
+Face number : 2
+Shape functions values for the first field
+0.788675 0.211325 0.211325 0.788675 
+Integration point coordinates
+0.211325 0 0.788675 0 
+
+Test copy constructor
+Number of traces: 2 should be 2
+Face number : 0
+Normal components
+0.707107 0.707107 
+Face number : 2
+Normal components
+0 -1 
+Face number : 0
+Shape functions values for the first field
+0.788675 0.211325 0.211325 0.788675 
+Integration point coordinates
+0.788675 0.211325 0.211325 0.788675 
+Face number : 2
+Shape functions values for the first field
+0.788675 0.211325 0.211325 0.788675 
+Integration point coordinates
+0.211325 0 0.788675 0 
+
+Test Cloning
+Number of traces: 2 should be 2
+Face number : 0
+Normal components
+0.707107 0.707107 
+Face number : 2
+Normal components
+0 -1 
+Face number : 0
+Shape functions values for the first field
+0.788675 0.211325 0.211325 0.788675 
+Integration point coordinates
+0.788675 0.211325 0.211325 0.788675 
+Face number : 2
+Shape functions values for the first field
+0.788675 0.211325 0.211325 0.788675 
+Integration point coordinates
+0.211325 0 0.788675 0 
+
+ Test ThreeDofs traces
+Number of traces: 2 should be 2
+Face number : 0
+Normal components
+0.707107 0.707107 
+Face number : 2
+Normal components
+0 -1 
+Face number : 0
+Shape functions values for the first field
+0.788675 0.211325 0 0.211325 0.788675 0 
+Integration point coordinates
+0.788675 0.211325 0.211325 0.788675 
+Face number : 2
+Shape functions values for the first field
+0.211325 0 0.788675 0.788675 0 0.211325 
+Integration point coordinates
+0.211325 0 0.788675 0 

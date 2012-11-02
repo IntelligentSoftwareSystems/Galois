@@ -1,0 +1,7 @@
+app (BFSserialWavefront BFSserialWavefront.cpp)
+app (BFSserialFIFO BFSserialFIFO.cpp)
+app (BFSwavefrontLock BFSwavefrontLock.cpp)
+app (BFSwavefrontNolock BFSwavefrontNolock.cpp)
+app (BFSwavefrontCoupled BFSwavefrontCoupled.cpp)
+app (BFSwavefrontBag BFSwavefrontBag.cpp)
+app (BFSwavefrontEdge BFSwavefrontEdge.cpp)

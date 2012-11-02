@@ -1,0 +1,49 @@
+Parametric triangle
+Function values
+0.666667 0.166667 0.166667 0.166667 0.666667 0.166667 0.166667 0.166667 0.666667 
+Function derivative values
+1 0 0 1 -1 -1 1 0 0 1 -1 -1 1 0 0 1 -1 -1 
+Integration weights
+0.166667 0.166667 0.166667 
+Quadrature point coordinates
+0.666667 0.166667 0.166667 0.666667 0.166667 0.166667 
+
+Twice Parametric triangle
+Function values
+0.666667 0.166667 0.166667 0.166667 0.666667 0.166667 0.166667 0.166667 0.666667 
+Function derivative values
+0.5 0 0 0.5 -0.5 -0.5 0.5 0 0 0.5 -0.5 -0.5 0.5 0 0 0.5 -0.5 -0.5 
+Integration weights
+0.666667 0.666667 0.666667 
+Quadrature point coordinates
+1.33333 0.333333 0.333333 1.33333 0.333333 0.333333 
+
+Reordered nodes of  twice parametric triangle
+Function values
+0.666667 0.166667 0.166667 0.166667 0.666667 0.166667 0.166667 0.166667 0.666667 
+Function derivative values
+-0.5 -0.5 0.5 0 0 0.5 -0.5 -0.5 0.5 0 0 0.5 -0.5 -0.5 0.5 0 0 0.5 
+Integration weights
+0.666667 0.666667 0.666667 
+Quadrature point coordinates
+0.333333 0.333333 1.33333 0.333333 0.333333 1.33333 
+
+ Equilateral triangle with area sqrt(3)
+Function values
+0.666667 0.166667 0.166667 0.166667 0.666667 0.166667 0.166667 0.166667 0.666667 
+Function derivative values
+-0.5 -0.288675 0.5 -0.288675 0 0.57735 -0.5 -0.288675 0.5 -0.288675 0 0.57735 -0.5 -0.288675 0.5 -0.288675 0 0.57735 
+Integration weights
+0.57735 0.57735 0.57735 
+Quadrature point coordinates
+0.5 0.288675 1.5 0.288675 1 1.1547 
+
+ Irregular triangle with area sqrt(3)
+Function values
+0.666667 0.166667 0.166667 0.166667 0.666667 0.166667 0.166667 0.166667 0.666667 
+Function derivative values
+-0.5 0.144338 0.5 -0.721688 5.55112e-17 0.57735 -0.5 0.144338 0.5 -0.721688 5.55112e-17 0.57735 -0.5 0.144338 0.5 -0.721688 5.55112e-17 0.57735 
+Integration weights
+0.57735 0.57735 0.57735 
+Quadrature point coordinates
+0.75 0.288675 1.75 0.288675 2 1.1547 
