@@ -186,7 +186,7 @@ public:
           && srcTest (highest) 
           && highest->onWL.cas (false, true)) {
 
-        // LL::gDebug ("Adding found source: %s\n", highest->str ().c_str ());
+        // GALOIS_DEBUG_PRINT ("Adding found source: %s\n", highest->str ().c_str ());
         wl.push (highest);
       }
     }
@@ -518,7 +518,7 @@ class LCorderedExec {
       assert (src != NULL);
 
 
-      // LL::gDebug ("Processing source: %s\n", src->str ().c_str ());
+      // GALOIS_DEBUG_PRINT ("Processing source: %s\n", src->str ().c_str ());
       if (sourceTest (src)) {
         niter += 1;
 

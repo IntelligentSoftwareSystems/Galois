@@ -96,12 +96,12 @@ public:
     size_t inIdx = getInputIndex (e);
     assert (inIdx < numInputs);
 
-    // GaloisRuntime::LL::gDebug ("%s, Received : %s\n", this->str ().c_str (), e.str ().c_str ());
+    // GALOIS_DEBUG_PRINT ("%s, Received : %s\n", this->str ().c_str (), e.str ().c_str ());
 
     if (inputTimes[inIdx] > e.getRecvTime () 
         && e.getRecvTime () < des::INFINITY_SIM_TIME ) {
 
-      GaloisRuntime::LL::gDebug ("Non-FIFO order on input[%d], last msg time=%zd, current message =%s\n", 
+      GALOIS_DEBUG_PRINT ("Non-FIFO order on input[%d], last msg time=%zd, current message =%s\n", 
           inIdx, inputTimes[inIdx], e.str ().c_str ());
 
       assert (inputTimes[inIdx] <= e.getRecvTime ());
@@ -139,7 +139,7 @@ public:
 
         Event_ty event = pendingEvents.pop ();
 
-        // GaloisRuntime::LL::gDebug ("%s, Processing: %s\n", this->str ().c_str (), event.str ().c_str ());
+        // GALOIS_DEBUG_PRINT ("%s, Processing: %s\n", this->str ().c_str (), event.str ().c_str ());
 
 
         //DEBUG
