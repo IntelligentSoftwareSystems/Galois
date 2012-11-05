@@ -32,6 +32,7 @@
 #include "Galois/Runtime/PerThreadStorage.h"
 
 namespace GaloisRuntime {
+namespace LL {
 
 
 class ThreadRWlock {
@@ -69,7 +70,8 @@ public:
 };
 
 
-}
+} // end namespace LL
+} // end namespace GaloisRuntime
 
 
 

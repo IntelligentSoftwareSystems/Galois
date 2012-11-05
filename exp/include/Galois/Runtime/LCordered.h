@@ -40,8 +40,10 @@
 #include "Galois/Runtime/DoAllCoupled.h"
 #include "Galois/Runtime/mm/Mem.h"
 #include "Galois/Runtime/Context.h"
-#include "Galois/Runtime/ThreadRWlock.h"
 #include "Galois/Runtime/ll/gio.h"
+#include "Galois/Runtime/ll/ThreadRWlock.h"
+
+#include "llvm/ADT/SmallVector.h"
 
 #include <iostream>
 #include <tr1/unordered_map>
@@ -53,12 +55,12 @@ template <typename Ctxt, typename CtxtCmp>
 class NhoodItem {
 
 public:
-  // typedef Galois::ThreadSafeMinHeap<Ctxt*, CtxtCmp> PQ;
-  typedef Galois::ThreadSafeOrderedSet<Ctxt*, CtxtCmp> PQ;
+  typedef Galois::ThreadSafeMinHeap<Ctxt*, CtxtCmp> PQ;
+  // typedef Galois::ThreadSafeOrderedSet<Ctxt*, CtxtCmp> PQ;
 
 protected:
-  Lockable* lockable;
   PQ sharers;
+  Lockable* lockable;
 
 public:
 
@@ -110,16 +112,17 @@ public:
   typedef NhoodMgr_tp NhoodMgr;
   typedef LCorderedContext MyType;
   typedef NhoodItem<MyType, typename MyType::Comparator> NItem;
-  // typedef Galois::gdeque<NItem*> NhoodList;
-  typedef std::vector<NItem*> NhoodList;
   typedef Galois::GAtomic<bool> AtomicBool;
+  typedef llvm::SmallVector<NItem*, 4> NhoodList;
+  // typedef Galois::gdeque<NItem*, 4> NhoodList;
+  // typedef std::vector<NItem*> NhoodList;
 
   // TODO: fix visibility below
 public:
-  GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE AtomicBool onWL;
   T active;
-  NhoodMgr& nhmgr;
   NhoodList nhood;
+  NhoodMgr& nhmgr;
+  GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE AtomicBool onWL;
 
 
 public:
@@ -183,6 +186,7 @@ public:
 
       LCorderedContext* highest = (*n)->getHighestPriority ();
       if ((highest != NULL) 
+          && !bool (highest->onWL)
           && srcTest (highest) 
           && highest->onWL.cas (false, true)) {
 
@@ -301,7 +305,7 @@ public:
       PerThreadAllocator
     > NhoodMap;
 
-  typedef GaloisRuntime::ThreadRWlock Lock_ty;
+  typedef GaloisRuntime::LL::ThreadRWlock Lock_ty;
 
 protected:
   Cmp cmp;
@@ -485,8 +489,8 @@ class LCorderedExec {
     NhoodMgr& nhmgr;
     SourceTest& sourceTest;
     CtxtAlloc& ctxtAlloc;
-    CtxtWL& delCtxtWL;
     CtxtWL& addCtxtWL;
+    CtxtWL& delCtxtWL;
     AddWL& addWL;
     Accumulator& niter;
 
@@ -496,8 +500,8 @@ class LCorderedExec {
         NhoodMgr& nhmgr,
         SourceTest& sourceTest,
         CtxtAlloc& ctxtAlloc,
-        CtxtWL& delCtxtWL,
         CtxtWL& addCtxtWL,
+        CtxtWL& delCtxtWL,
         AddWL& addWL,
         Accumulator& niter)
       :
@@ -506,8 +510,8 @@ class LCorderedExec {
         nhmgr (nhmgr),
         sourceTest (sourceTest),
         ctxtAlloc (ctxtAlloc),
-        delCtxtWL (delCtxtWL),
         addCtxtWL (addCtxtWL),
+        delCtxtWL (delCtxtWL),
         addWL (addWL),
         niter (niter) 
     {}
@@ -548,10 +552,11 @@ class LCorderedExec {
         src->removeFromNhood ();
         src->findNewSources (sourceTest, wl);
 
-        // ctxtAlloc.destroy (src);
-        // ctxtAlloc.deallocate (src, 1); 
-        // src = NULL;
-        delCtxtWL.get ().push_back (src);
+        //TODO: restore
+        ctxtAlloc.destroy (src);
+        ctxtAlloc.deallocate (src, 1); 
+        src = NULL;
+        // delCtxtWL.get ().push_back (src);
 
       } else {
         std::cout << "Not found to be a source: " << src->str ()
@@ -605,13 +610,22 @@ public:
     Accumulator nInitSrc;
     Accumulator niter;
 
+    Galois::TimeAccumulator t_create;
+    Galois::TimeAccumulator t_find;
+    Galois::TimeAccumulator t_for;
+    Galois::TimeAccumulator t_destroy;
+
+    t_create.start ();
     Galois::do_all (abeg, aend, 
         CreateCtxtExpandNhood (nhoodVisitor, nhmgr, ctxtAlloc, initCtxt),
         "create_initial_contexts");
+    t_create.stop ();
 
+    t_find.start ();
     Galois::do_all (initCtxt.begin_all (), initCtxt.end_all (),
         FindInitSources (sourceTest, initSrc, nInitSrc),
         "find_initial_sources");
+    t_find.stop ();
 
     std::cout << "Number of initial sources found: " << nInitSrc.reduce () 
       << std::endl;
@@ -622,6 +636,8 @@ public:
 
     typedef GaloisRuntime::WorkList::dChunkedFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
     // TODO: code to find global min goes here
+
+    t_for.start ();
     Galois::for_each<SrcWL_ty> (initSrc.begin_all (), initSrc.end_all (),
         ApplyOperator (
           operFunc,
@@ -634,11 +650,19 @@ public:
           addWL,
           niter),
         "apply_operator");
+    t_for.stop ();
 
+    t_destroy.start ();
     Galois::do_all (delCtxtWL.begin_all (), delCtxtWL.end_all (),
         DelCtxt (ctxtAlloc), "delete_all_ctxt");
+    t_destroy.stop ();
 
     std::cout << "Number of iterations: " << niter.reduce () << std::endl;
+
+    std::cout << "Time taken in creating intial contexts: " << t_create.get () << std::endl;
+    std::cout << "Time taken in finding intial sources: " << t_find.get () << std::endl;
+    std::cout << "Time taken in for_each loop: " << t_for.get () << std::endl;
+    std::cout << "Time taken in destroying all the contexts: " << t_destroy.get () << std::endl;
 
   }
 

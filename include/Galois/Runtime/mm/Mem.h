@@ -33,6 +33,7 @@
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/ll/SimpleLock.h"
 #include "Galois/Runtime/ll/PtrLock.h"
+#include "Galois/Runtime/ll/ThreadRWlock.h"
 #include <boost/utility.hpp>
 #include <memory.h>
 #include <stdlib.h>
@@ -480,7 +481,8 @@ class SizedAllocatorFactory: private boost::noncopyable {
 public:
   typedef ThreadAwarePrivateHeap<
     FreeListHeap<SimpleBumpPtr<SystemBaseAlloc> > > SizedAlloc;
-  SizedAlloc* getAllocatorForSize(size_t);
+
+  SizedAlloc* getAllocatorForSize(const size_t);
 
   static SizedAllocatorFactory* getInstance() {
     SizedAllocatorFactory* f = instance.getValue();
@@ -499,11 +501,13 @@ public:
   }
 
 private:
-  //  SizedAllocatorFactory() :lock() {}
   static LL::PtrLock<SizedAllocatorFactory, true> instance;
-  typedef std::map<size_t, SizedAlloc*> AllocatorsTy;
-  AllocatorsTy allocators;
-  LL::SimpleLock<true> lock;
+  typedef std::map<size_t, SizedAlloc*> AllocatorsMap;
+  AllocatorsMap allocators;
+  // LL::SimpleLock<true> lock;
+  LL::ThreadRWlock lock;
+
+  SizedAllocatorFactory() :lock() {}
   ~SizedAllocatorFactory();
 };
 

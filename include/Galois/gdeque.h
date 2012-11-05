@@ -32,10 +32,10 @@
 
 namespace Galois {
 
-template < class T > 
+template <typename T, unsigned CHUNK_SIZE=64> 
 class gdeque {
 
-  struct Block : public FixedSizeRing<T> {
+  struct Block : public FixedSizeRing<T,CHUNK_SIZE> {
     Block* next;
     Block* prev;
     Block() :next(), prev() {}

@@ -48,18 +48,38 @@ SystemBaseAlloc::~SystemBaseAlloc() {}
 PtrLock<SizedAllocatorFactory, true> SizedAllocatorFactory::instance;
 #ifndef USEMALLOC
 SizedAllocatorFactory::SizedAlloc* 
-SizedAllocatorFactory::getAllocatorForSize(size_t size) {
-  lock.lock();
-  SizedAlloc*& retval = allocators[size];
-  if (!retval)
-    retval = new SizedAlloc;
-  lock.unlock();
- 
-  return retval;
+SizedAllocatorFactory::getAllocatorForSize(const size_t size) {
+
+  typedef SizedAllocatorFactory::AllocatorsMap AllocMap;
+
+  lock.readLock ();
+    AllocMap::const_iterator i = allocators.find (size);
+
+    if (i == allocators.end ()) {
+      // entry missing, needs to be created
+      lock.readUnlock ();
+
+      lock.writeLock ();
+        // check again to avoid overwriting existing entry
+        i = allocators.find (size);
+        if (i == allocators.end ()) {
+          allocators.insert (std::make_pair (size, new SizedAlloc ()));
+        }
+      lock.writeUnlock ();
+
+      lock.readLock ();
+        i = allocators.find (size);
+    }
+
+    assert (i != allocators.end ());
+  lock.readUnlock ();
+
+  return i->second;
 }
 
+
 SizedAllocatorFactory::~SizedAllocatorFactory() {
-  for (AllocatorsTy::iterator it = allocators.begin(), end = allocators.end();
+  for (AllocatorsMap::iterator it = allocators.begin(), end = allocators.end();
       it != end; ++it) {
     delete it->second;
   }

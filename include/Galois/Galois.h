@@ -36,9 +36,10 @@
 #include "Galois/Runtime/ParaMeter.h"
 #endif
 
-#define GALOIS_DEFAULT_CHUNK_SIZE 32
 
 namespace Galois {
+
+static const unsigned GALOIS_DEFAULT_CHUNK_SIZE = 32;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Foreach
