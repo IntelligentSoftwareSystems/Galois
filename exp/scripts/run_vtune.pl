@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 
 use strict;
+use warnings;
 
 # TODO: check for other common places
 my $vtune = "/opt/intel/vtune_amplifier_xe_2011/bin64/amplxe-cl";
@@ -49,7 +50,7 @@ system("date");
 system("set -x ; rm -rf $dire");
 system("set -x ; mkdir $dire");
 system("set -x ; $vtune $collect $rdir $sdir -- $cmdline");
-system("echo THREADS\t$threads >>$outfile.line.log");
+system("echo \"THREADS\t$threads\" >>$outfile.line.log");
 system("set -x ; ulimit -t $maxsec ; $vtune $report $rdir -group-by source-line >> $outfile.line.log");
-system("echo THREADS\t$threads >>$outfile.function.log");
+system("echo \"THREADS\t$threads\" >>$outfile.function.log");
 system("set -x ; ulimit -t $maxsec ; $vtune $report $rdir -group-by function >> $outfile.function.log");
