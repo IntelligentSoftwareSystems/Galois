@@ -42,7 +42,7 @@ void gFlush();
 #ifndef NDEBUG
 #define GALOIS_DEBUG_PRINT(...) { GaloisRuntime::LL::gDebug (__VA_ARGS__); }
 #else
-#define GALOIS_DEBUG_PRINT(...) { do {} while (false) }
+#define GALOIS_DEBUG_PRINT(...) { do {} while (false); }
 #endif
 
 }
