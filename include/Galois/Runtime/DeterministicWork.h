@@ -383,7 +383,7 @@ class DMergeLocal {
       return;
 
     if (updateWE) {
-      count = std::min(count, reserve.size() + newReserve.size());
+      size_t available = reserve.size() + newReserve.size();
       // No more reserve but what should we propose for windowElement? As with
       // distributeNewWork, this is a little tricky. Proposing nothing does not
       // work because our proposal must be at least as large as any element we
@@ -392,10 +392,11 @@ class DMergeLocal {
       // is mostElement. 
 
       // TODO improve this
-      if (count == 0) {
+      if (available < count) {
         windowElement = mostElement;
         return;
       }
+      count = std::min(count, available);
     }
 
     size_t c = 0;
