@@ -246,7 +246,7 @@ int main(int argc, char** argv) {
   } else { // print bc value for first 10 nodes
     std::vector<double> bcv(NumNodes);
     for (int i = 0; i < state.size(); ++i)
-      if (state.getRemote(i))
+      if (*state.getRemote(i))
 	std::transform(bcv.begin(), bcv.end(), (*state.getRemote(i))->CB.begin(), bcv.begin(), std::plus<double>());
     for (int i=0; i<10; ++i)
       std::cout << i << ": " << setiosflags(std::ios::fixed) << std::setprecision(6) << bcv[i] << "\n";
