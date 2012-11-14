@@ -40,7 +40,7 @@ class FixedSizeRing :private boost::noncopyable {
   }
 
   bool precondition() const {
-    return count >= 0 && count <= chunksize && start >= 0 && start <= chunksize;
+    return count <= chunksize && start <= chunksize;
   }
 
 public:

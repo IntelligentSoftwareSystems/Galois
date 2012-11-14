@@ -33,7 +33,7 @@
 namespace Galois {
 
 template <typename T, unsigned CHUNK_SIZE=64> 
-class gdeque {
+class gdeque: private boost::noncopyable {
 
   struct Block : public FixedSizeRing<T,CHUNK_SIZE> {
     Block* next;
@@ -110,7 +110,7 @@ public:
   gdeque() :first(), last(), num(), heap(sizeof(Block)) { }
   ~gdeque() { clear(); }
 
-  class iterator : public std::iterator<std::forward_iterator_tag, T> {
+  class iterator: public std::iterator<std::forward_iterator_tag, T> {
     Block* b;
     unsigned offset;
 
@@ -148,17 +148,6 @@ public:
       advance();
       return tmp;
     }
-
-    // iterator& operator--() {
-    //   regress();
-    //   return *this;
-    // }
-
-    // iterator operator--(int) {
-    //   iterator tmp(*this);
-    //   regress();
-    //   return tmp;
-    // }
   };
 
   iterator begin() const {
@@ -238,15 +227,12 @@ public:
     assert(p);
   }
 
-  template<typename U>
-  void push_back(U&& v) {
-    assert(precondition());
-    ++num;
-    if (last && last->push_back(std::forward<U>(v)))
-      return;
-    extend_last();
-    pointer p = last->push_back(std::forward<U>(v));
-    assert(p);
+  void push_back(value_type&& v) {
+    emplace_back(std::move(v));
+  }
+
+  void push_back(const value_type& v) {
+    emplace_back(v);
   }
 #else
   void push_back(const value_type& v) {
@@ -272,15 +258,12 @@ public:
     assert(p);
   }
 
-  template<typename U>
-  void push_front(U&& v) {
-    assert(precondition());
-    ++num;
-    if (first && first->push_front(std::forward<U>(v)))
-      return;
-    extend_first();
-    pointer p = first->push_front(std::forward<U>(v));
-    assert(p);
+  void push_front(value_type&& v) {
+    emplace_front(std::move(v));
+  }
+
+  void push_front(const value_type& v) {
+    emplace_front(v);
   }
 #else
   void push_front(const value_type& v) {

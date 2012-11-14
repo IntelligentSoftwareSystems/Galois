@@ -53,6 +53,7 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
+#include "Galois/Galois.h"
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Runtime/MethodFlags.h"
 #include "Galois/Runtime/mm/Mem.h"
