@@ -68,13 +68,12 @@ public:
         const double delta, 
         const double time) 
 
-      : AVI (),
+      : AVI (time),
         operation (MyRes),
         globalIdx (globalIdx),
         imposedFlags (IFlag),
         imposedValues (IVal), 
-        delta (delta),
-        timeStamp (time) {
+        delta (delta) {
 
         init(L2G, MassVec);
 
@@ -115,12 +114,11 @@ public:
         const double delta, 
         const double time)
 
-    :   AVI (),
+    :   AVI (time),
         operation (MyRes),
         globalIdx (globalIdx),
         imposedTypes (IType),
-        delta (delta),
-        timeStamp (time) {
+        delta (delta) {
 
         init (L2G, MassVec);
 
@@ -179,8 +177,7 @@ public:
     imposedFlags (that.imposedFlags),
     imposedValues (that.imposedValues),
     nfields (that.nfields),
-    delta (that.delta),
-    timeStamp (that.timeStamp) {
+    delta (that.delta) {
 
       setTimeStep ();
     }
@@ -188,28 +185,6 @@ public:
   virtual StandardAVI* clone () const {
     return new StandardAVI (*this);
   }
-
-  //! returns time step for the Element
-  double getTimeStep () const {
-    return timeStep;
-  }
-
-  //! returns the last update time for this element
-  double getTimeStamp () const {
-    return timeStamp;
-  }
-
-  bool setTimeStamp (double timeval) {
-    assert (timeval >= 0.0);
-    timeStamp = timeval;
-    return true;
-  }
-
-
-  //! Returns the next time at which the force field will be updated
-  virtual double getNextTimeStamp () const { return getTimeStamp() + getTimeStep();}
-  //! increment the time stamp
-  virtual void incTimeStamp () { setTimeStamp(getNextTimeStamp()); }
 
   virtual const DResidue& getOperation () const { return operation; }
 
@@ -369,11 +344,6 @@ private:
 
   size_t nfields;
   double delta; // safety factor in time step computation
-  double timeStamp;
-  double timeStep;
-
-
-
 };
 
 #endif // _STANDARD_AVI_H_

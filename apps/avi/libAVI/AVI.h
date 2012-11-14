@@ -111,32 +111,44 @@
  */
 
 class AVI {
+protected:
+  double timeStamp;
+  double timeStep;
+  
 public:
-  AVI () {
-  }
-  virtual ~AVI () {
-  }
-  AVI (const AVI& NewAVI) {
-  }
+  AVI (double timeStamp): timeStamp(timeStamp) { }
+  virtual ~AVI () { }
   virtual AVI * clone () const = 0;
   //  virtual int getElemIndex(void) const = 0;
 
   //! Returns the current value of the time step for the potential
-  virtual double getTimeStep () const = 0;
+  double getTimeStep () const {
+    return timeStep;
+  }
 
   //! Returns the last time at which the force field was updated
-  virtual double getTimeStamp () const = 0;
+  double getTimeStamp () const {
+    return timeStamp;
+  }
 
   //! set the last update time. Returns true upon success. \n	       
   //!
   //! @param timeval  value of the last update time 
-  virtual bool setTimeStamp (double timeval) = 0;
+  bool setTimeStamp (double timeval) {
+    assert (timeval >= 0.0);
+    timeStamp = timeval;
+    return true;
+  }
 
   //! Returns the next time at which the force field will be updated
-  virtual double getNextTimeStamp () const = 0; // { return getTimeStamp() + getTimeStep();}
+  double getNextTimeStamp () const {
+    return getTimeStamp() + getTimeStep();
+  }
 
   //! increment the time stamp
-  virtual void incTimeStamp () = 0;
+  void incTimeStamp () {
+    setTimeStamp(getNextTimeStamp()); 
+  }
 
   //! Returns the field numbers used whose degrees of freedom participate in the force field computation 
   //!
