@@ -55,6 +55,7 @@ class SimObject: public des::BaseSimObject<Event_tp> {
   typedef typename des::BaseSimObject<Event_tp> Base;
   typedef Event_tp Event_ty;
 
+
 protected:
 
   struct SendWrapperImpl: public Base::SendWrapper {
@@ -66,8 +67,8 @@ protected:
 
   typedef des::EventRecvTimeLocalTieBrkCmp<Event_ty> Cmp;
   typedef typename Galois::ThreadSafeOrderedSet<Event_ty, Cmp> PQ;
+  // typedef typename Galois::ThreadSafeMinHeap<Event_ty, Cmp> PQ;
 
-  static size_t NEVENTS_PER_ITER;
 
   static const bool DEBUG = false;
 
@@ -78,6 +79,8 @@ protected:
   PQ pendingEvents;
 
 public:
+  static size_t NEVENTS_PER_ITER;
+
   SimObject (size_t id, unsigned numOutputs, unsigned numInputs)
     :
       Base (id),
@@ -143,7 +146,7 @@ public:
 
 
         //DEBUG
-        if (!pendingEvents.empty ()) {
+        if (DEBUG && !pendingEvents.empty ()) {
           Event_ty curr = event;
           Event_ty next = pendingEvents.top ();
 

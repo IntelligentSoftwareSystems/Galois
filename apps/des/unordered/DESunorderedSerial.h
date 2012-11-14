@@ -40,16 +40,6 @@ class DESunorderedSerial: public des_unord::DESunorderedBase {
 
   virtual std::string getVersion () const { return "Unordered (Chandy-Misra) serial"; }
 
-  virtual void initRemaining (const SimInit_ty& simInit, Graph& graph) {
-    // post the initial events on their stations
-    for (std::vector<Event_ty>::const_iterator i = simInit.getInitEvents ().begin ()
-        , endi = simInit.getInitEvents ().end (); i != endi; ++i) {
-
-      SimObj_ty* so = static_cast<SimObj_ty*> (i->getRecvObj ());
-      so->recv (*i);
-    }
-
-  } 
   /**
    * Run loop.
    * Does not use GaloisRuntime or Galois worklists

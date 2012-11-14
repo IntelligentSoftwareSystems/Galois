@@ -338,6 +338,10 @@ void AVIabstractMain::simulate (AVI* avi, MeshInit& meshInit,
 }
 
 void AVIorderedSerial::runLoop (MeshInit& meshInit, GlobalVec& g, bool createSyncFiles) {
+
+  typedef std::priority_queue<AVI*, std::vector<AVI*>, AVIReverseComparator> PQ;
+  // typedef std::set<AVI*, AVIComparator> PQ;
+
   // temporary matrices
   int nrows = meshInit.getSpatialDim ();
   int ncols = meshInit.getNodesPerElem ();
@@ -351,17 +355,18 @@ void AVIorderedSerial::runLoop (MeshInit& meshInit, GlobalVec& g, bool createSyn
   }
 
 
-  std::priority_queue<AVI*, std::vector<AVI*>, AVIReverseComparator> pq;
+  PQ pq;
   for (std::vector<AVI*>::const_iterator i = aviList.begin (), e = aviList.end (); i != e; ++i) {
     pq.push (*i);
+    // pq.insert (*i);
   }
 
 
   int iter = 0;
   while (!pq.empty ()) {
 
-    AVI* avi = pq.top ();
-    pq.pop ();
+    AVI* avi = pq.top (); pq.pop ();
+    // AVI* avi = *pq.begin (); pq.erase (pq.begin ());
 
     assert (avi != NULL);
 
@@ -370,6 +375,7 @@ void AVIorderedSerial::runLoop (MeshInit& meshInit, GlobalVec& g, bool createSyn
 
     if (avi->getNextTimeStamp () < meshInit.getSimEndTime ()) {
       pq.push (avi);
+      // pq.insert (avi);
     }
 
     ++iter;

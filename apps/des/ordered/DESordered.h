@@ -65,6 +65,7 @@ struct SimObjInfo: public TypeHelper {
   size_t numInputs;
   size_t numOutputs;
   std::vector<Event_ty> lastInputEvents;
+  mutable volatile des::SimTime clock;
 
   SimObjInfo () {}
 
@@ -76,6 +77,8 @@ struct SimObjInfo: public TypeHelper {
     numOutputs = sg->getImpl ().getNumOutputs ();
 
     lastInputEvents.resize (numInputs, sobj->makeZeroEvent ());
+
+    clock = 0;
   }
 
 
@@ -97,14 +100,28 @@ struct SimObjInfo: public TypeHelper {
     // an input with INFINITY_SIM_TIME is dead and will not receive more non-null events
     // in the future
     bool notReady = false;
-    for (std::vector<Event_ty>::const_iterator e = lastInputEvents.begin ()
-        , ende = lastInputEvents.end (); e != ende; ++e) {
 
-      if ((e->getRecvTime () < des::INFINITY_SIM_TIME) && 
-          (Cmp_ty::compare (event, *e) > 0)) {
-        notReady = true;
-        break;
+    if (event.getRecvTime () < clock) {
+      return true;
+
+    } else {
+
+      des::SimTime new_clk = 2 * des::INFINITY_SIM_TIME;
+      for (std::vector<Event_ty>::const_iterator e = lastInputEvents.begin ()
+          , ende = lastInputEvents.end (); e != ende; ++e) {
+
+        if ((e->getRecvTime () < des::INFINITY_SIM_TIME) && 
+            (Cmp_ty::compare (event, *e) > 0)) {
+          notReady = true;
+          // break;
+        }
+
+        if (e->getRecvTime () < des::INFINITY_SIM_TIME) {
+          new_clk = std::min (new_clk, e->getRecvTime ());
+        }
       }
+
+      this->clock = new_clk;
     }
 
     return !notReady;
@@ -221,7 +238,7 @@ protected:
     AddList_ty newEvents;
     Accumulator_ty nevents;
 
-    GaloisRuntime::for_each_ordered_lc <16> (
+    GaloisRuntime::for_each_ordered_lc <CHUNK_SIZE> (
         simInit.getInitEvents ().begin (), simInit.getInitEvents ().end (),
         Cmp_ty (), 
         OpFunc (graph, sobjInfoVec, newEvents, nevents),

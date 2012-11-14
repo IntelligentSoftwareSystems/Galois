@@ -51,12 +51,14 @@
 
 namespace GaloisRuntime {
 
+  static const bool DEBUG = false;
+
 template <typename Ctxt, typename CtxtCmp>
 class NhoodItem {
 
 public:
-  typedef Galois::ThreadSafeMinHeap<Ctxt*, CtxtCmp> PQ;
-  // typedef Galois::ThreadSafeOrderedSet<Ctxt*, CtxtCmp> PQ;
+  // typedef Galois::ThreadSafeMinHeap<Ctxt*, CtxtCmp> PQ;
+  typedef Galois::ThreadSafeOrderedSet<Ctxt*, CtxtCmp> PQ;
 
 protected:
   PQ sharers;
@@ -65,7 +67,7 @@ protected:
 public:
 
   template <typename Cmp>
-  NhoodItem (Lockable* l, const Cmp& cmp): lockable (l), sharers (CtxtCmp (cmp)) {}
+  NhoodItem (Lockable* l, const Cmp& cmp):  sharers (CtxtCmp (cmp)), lockable (l) {}
 
   Lockable* getLockable () const { return lockable; }
 
@@ -131,8 +133,8 @@ public:
     : 
       SimpleRuntimeContext (true), // to make acquire call virtual function sub_acquire
       active (active), 
-      nhmgr (nhmgr), 
       nhood (), 
+      nhmgr (nhmgr), 
       onWL (false) 
   {}
 
@@ -192,6 +194,25 @@ public:
 
         // GALOIS_DEBUG_PRINT ("Adding found source: %s\n", highest->str ().c_str ());
         wl.push (highest);
+      }
+    }
+  }
+
+  // TODO: combine with above method and reuse the code
+  template <typename SourceTest, typename WL>
+  void findSrcInNhood (const SourceTest& srcTest, WL& wl) {
+
+    for (typename NhoodList::iterator n = nhood.begin ()
+        , endn = nhood.end (); n != endn; ++n) {
+
+      LCorderedContext* highest = (*n)->getHighestPriority ();
+      if ((highest != NULL) 
+          && !bool (highest->onWL)
+          && srcTest (highest) 
+          && highest->onWL.cas (false, true)) {
+
+        // GALOIS_DEBUG_PRINT ("Adding found source: %s\n", highest->str ().c_str ());
+        wl.push_back (highest);
       }
     }
   }
@@ -409,6 +430,8 @@ class LCorderedExec {
 
   typedef GaloisRuntime::MM::FSBGaloisAllocator<Ctxt> CtxtAlloc;
   typedef GaloisRuntime::PerThreadVector<Ctxt*> CtxtWL;
+  typedef GaloisRuntime::PerThreadDeque<Ctxt*> CtxtDelQ;
+  typedef GaloisRuntime::PerThreadDeque<Ctxt*> CtxtLocalQ;
   typedef GaloisRuntime::PerThreadVector<T> AddWL;
 
 
@@ -484,13 +507,17 @@ class LCorderedExec {
 
   struct ApplyOperator {
 
+    static const size_t DELETE_CONTEXT_SIZE = 1024;
+    static const size_t UNROLL_FACTOR = 32;
+
     OperFunc& op;
     NhoodFunc& nhoodVisitor;
     NhoodMgr& nhmgr;
     SourceTest& sourceTest;
     CtxtAlloc& ctxtAlloc;
     CtxtWL& addCtxtWL;
-    CtxtWL& delCtxtWL;
+    CtxtLocalQ& ctxtLocalQ;
+    CtxtDelQ& ctxtDelQ;
     AddWL& addWL;
     Accumulator& niter;
 
@@ -501,7 +528,8 @@ class LCorderedExec {
         SourceTest& sourceTest,
         CtxtAlloc& ctxtAlloc,
         CtxtWL& addCtxtWL,
-        CtxtWL& delCtxtWL,
+        CtxtLocalQ& ctxtLocalQ,
+        CtxtDelQ& ctxtDelQ,
         AddWL& addWL,
         Accumulator& niter)
       :
@@ -511,19 +539,36 @@ class LCorderedExec {
         sourceTest (sourceTest),
         ctxtAlloc (ctxtAlloc),
         addCtxtWL (addCtxtWL),
-        delCtxtWL (delCtxtWL),
+        ctxtLocalQ (ctxtLocalQ),
+        ctxtDelQ (ctxtDelQ),
         addWL (addWL),
         niter (niter) 
     {}
 
 
     template <typename WL>
-    void operator () (Ctxt* src, WL& wl) {
-      assert (src != NULL);
+    void operator () (Ctxt* const in_src, WL& wl) {
+      assert (in_src != NULL);
 
+      ctxtLocalQ.get ().clear ();
 
-      // GALOIS_DEBUG_PRINT ("Processing source: %s\n", src->str ().c_str ());
-      if (sourceTest (src)) {
+      ctxtLocalQ.get ().push_back (in_src);
+
+      unsigned local_iter = 0;
+
+      while ((local_iter < UNROLL_FACTOR) && !ctxtLocalQ.get ().empty ()) {
+
+        ++local_iter;
+
+        Ctxt* src = ctxtLocalQ.get ().front (); ctxtLocalQ.get ().pop_front ();
+
+        // GALOIS_DEBUG_PRINT ("Processing source: %s\n", src->str ().c_str ());
+        if (DEBUG && !sourceTest (src)) {
+          std::cout << "Not found to be a source: " << src->str ()
+            << std::endl;
+          // abort ();
+        }
+
         niter += 1;
 
         addWL.get ().clear ();
@@ -544,26 +589,35 @@ class LCorderedExec {
           (*c)->findNewSources (sourceTest, wl);
           // // if is source add to workList;
           // if (sourceTest (*c) && (*c)->onWL.cas (false, true)) {
-            // // std::cout << "Adding new source: " << *c << std::endl;
-            // wl.push (*c);
+          // // std::cout << "Adding new source: " << *c << std::endl;
+          // wl.push (*c);
           // }
         }
 
         src->removeFromNhood ();
-        src->findNewSources (sourceTest, wl);
 
-        //TODO: restore
-        ctxtAlloc.destroy (src);
-        ctxtAlloc.deallocate (src, 1); 
-        src = NULL;
-        // delCtxtWL.get ().push_back (src);
+        src->findSrcInNhood (sourceTest, ctxtLocalQ.get ());
 
-      } else {
-        std::cout << "Not found to be a source: " << src->str ()
-           << std::endl;
-        // abort ();
+        //TODO: use a ref count type wrapper for Ctxt;
+        ctxtDelQ.get ().push_back (src);
+
       }
 
+
+      // add remaining to global wl
+      for (typename CtxtLocalQ::local_iterator c = ctxtLocalQ.get ().begin ()
+          , endc = ctxtLocalQ.get ().end (); c != endc; ++c) {
+
+        wl.push (*c);
+      }
+
+
+      while (ctxtDelQ.get ().size () >= DELETE_CONTEXT_SIZE) {
+
+        Ctxt* c = ctxtDelQ.get ().front (); ctxtDelQ.get ().pop_front ();
+        ctxtAlloc.destroy (c);
+        ctxtAlloc.deallocate (c, 1); 
+      }
     }
 
   };
@@ -632,7 +686,8 @@ public:
 
     AddWL addWL;
     CtxtWL addCtxtWL;
-    CtxtWL delCtxtWL;
+    CtxtDelQ ctxtDelQ;
+    CtxtLocalQ ctxtLocalQ;
 
     typedef GaloisRuntime::WorkList::dChunkedFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
     // TODO: code to find global min goes here
@@ -646,14 +701,15 @@ public:
           sourceTest,
           ctxtAlloc,
           addCtxtWL,
-          delCtxtWL,
+          ctxtLocalQ,
+          ctxtDelQ,
           addWL,
           niter),
         "apply_operator");
     t_for.stop ();
 
     t_destroy.start ();
-    Galois::do_all (delCtxtWL.begin_all (), delCtxtWL.end_all (),
+    Galois::do_all (ctxtDelQ.begin_all (), ctxtDelQ.end_all (),
         DelCtxt (ctxtAlloc), "delete_all_ctxt");
     t_destroy.stop ();
 

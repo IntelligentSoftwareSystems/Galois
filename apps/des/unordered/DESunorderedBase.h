@@ -25,7 +25,12 @@
 #include "abstractMain.h"
 #include "SimObject.h"
 
+
 namespace des_unord {
+
+namespace cll = llvm::cl;
+static cll::opt<unsigned> eventsPerIter("epi", 
+      cll::desc ("number of events processed per iteration (max.)"), cll::init (0));
 
 struct TypeHelper {
   typedef des::Event<des::LogicUpdate> Event_ty;
@@ -47,6 +52,13 @@ class DESunorderedBase:
 protected:
 
   virtual void initRemaining (const SimInit_ty& simInit, Graph& graph) {
+
+    SimObj_ty::NEVENTS_PER_ITER = eventsPerIter;
+    if (SimObj_ty::NEVENTS_PER_ITER == 0) { 
+      SimObj_ty::NEVENTS_PER_ITER = DEFAULT_EPI;
+    }
+
+
     // post the initial events on their stations
     for (std::vector<Event_ty>::const_iterator i = simInit.getInitEvents ().begin ()
         , endi = simInit.getInitEvents ().end (); i != endi; ++i) {

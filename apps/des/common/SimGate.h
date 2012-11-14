@@ -75,12 +75,6 @@ public:
     return impl.getInputIndex (netName);
   }
 
-  // static const des::LogicGate& getImpl (Graph& graph, GNode& src) {
-    // SimGate* sg = dynamic_cast<SimGate*> (graph.getData (src, Galois::NONE));
-    // assert  (sg != NULL);
-    // return sg->getImpl ();
-  // }
-
   /**
    * A string representation
    */
@@ -107,15 +101,15 @@ protected:
       typename Base::SendWrapper& sendWrap, 
       typename Base::BaseOutDegIter& b, typename Base::BaseOutDegIter& e) {
 
-    SimGate* srcGate = dynamic_cast<SimGate*> (this);
-    assert (srcGate != NULL);
+    assert (dynamic_cast<SimGate*> (this) != NULL);
+    SimGate* srcGate = static_cast<SimGate*> (this);
 
     const des::SimTime& sendTime = inputEvent.getRecvTime();
 
     for (; b != e; ++b) {
 
-      SimGate* dstGate = dynamic_cast<SimGate*> (*b);
-      assert (dstGate != NULL);
+      assert (dynamic_cast<SimGate*> (*b) != NULL);
+      SimGate* dstGate = static_cast<SimGate*> (*b);
 
       Event_ty ne = srcGate->makeEvent (dstGate, msg, type, sendTime, impl.getDelay ());
 

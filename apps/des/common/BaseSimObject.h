@@ -148,7 +148,8 @@ protected:
 
     virtual bool is_equal (const BaseOutDegIter& t) const {
 
-      const OutDegIterator<G>& that = dynamic_cast<const OutDegIterator<G>&> (t);
+      assert (dynamic_cast<const OutDegIterator<G>*> (&t) != NULL);
+      const OutDegIterator<G>& that = static_cast<const OutDegIterator<G>&> (t);
 
       assert (&that != NULL);
       assert (&(this->graph) == &(that.graph));

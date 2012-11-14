@@ -241,15 +241,15 @@ public:
     Alloc_ty alloc (&heap);
 
     for (unsigned i = 0; i < Super_ty::perThrdCont.size (); ++i) {
-      Super_ty::perThrdCont.get (i) = new Cont_ty (alloc);
+      *Super_ty::perThrdCont.getRemote (i) = new Cont_ty (alloc);
     }
 
   }
 
   ~PerThreadDeque () {
     for (unsigned i = 0; i < Super_ty::perThrdCont.size (); ++i) {
-      delete Super_ty::perThrdCont.get (i);
-      Super_ty::perThrdCont.get (i) = NULL;
+      delete *Super_ty::perThrdCont.getRemote (i);
+      *Super_ty::perThrdCont.getRemote (i) = NULL;
     }
   }
   
@@ -277,15 +277,15 @@ public:
     Alloc_ty alloc (&heap);
 
     for (unsigned i = 0; i < Super_ty::perThrdCont.size (); ++i) {
-      Super_ty::perThrdCont.get (i) = new Cont_ty (cmp, alloc);
+      *Super_ty::perThrdCont.getRemote (i) = new Cont_ty (cmp, alloc);
     }
 
   }
 
   ~PerThreadSet () {
     for (unsigned i = 0; i < Super_ty::perThrdCont.size (); ++i) {
-      delete Super_ty::perThrdCont.get (i);
-      Super_ty::perThrdCont.get (i) = NULL;
+      delete *Super_ty::perThrdCont.getRemote (i);
+      *Super_ty::perThrdCont.getRemote (i) = NULL;
     }
   }
   

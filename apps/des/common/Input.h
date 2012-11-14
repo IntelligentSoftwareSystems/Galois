@@ -57,7 +57,8 @@ public:
   }
 
   virtual des::BasicPort& getImpl () const {
-    des::BasicPort* ptr = dynamic_cast<des::BasicPort*> (&Base::getImpl ());
+    assert (dynamic_cast<des::BasicPort*> (&Base::getImpl ()) != NULL);
+    des::BasicPort* ptr = static_cast<des::BasicPort*> (&Base::getImpl ());
     assert (ptr != NULL);
     return *ptr;
   }

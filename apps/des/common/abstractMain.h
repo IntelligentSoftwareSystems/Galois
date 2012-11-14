@@ -38,6 +38,7 @@
 #include "Galois/Graphs/Graph2.h"
 #include "Galois/Graphs/LCGraph.h"
 #include "Galois/Galois.h"
+#include "Galois/Runtime/Sampling.h"
 
 #include "llvm/Support/CommandLine.h"
 
@@ -75,6 +76,10 @@ public:
 
 
 protected:
+  static const unsigned CHUNK_SIZE = 8;
+
+  static const unsigned DEFAULT_EPI = 32;
+
   /**
    * Gets the version.
    *
@@ -103,7 +108,6 @@ public:
     Galois::StatManager sm;
     LonestarStart(argc, argv, name, desc, url);
 
-
     SimInit_tp simInit(netlistFile);
     Graph graph;
     simInit.initialize (graph);
@@ -119,9 +123,11 @@ public:
     Galois::StatTimer t;
 
     t.start ();
+    GaloisRuntime::beginSampling ();
 
     runLoop(simInit, graph);
 
+    GaloisRuntime::endSampling ();
     t.stop ();
 
     if (!skipVerify) {

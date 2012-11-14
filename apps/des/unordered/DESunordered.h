@@ -77,11 +77,12 @@ class DESunordered: public DESunorderedBase {
     void lockNeighborhood (GNode& activeNode) {
         // acquire locks on neighborhood: one shot
         graph.getData (activeNode, Galois::CHECK_CONFLICT);
-        for (Graph::edge_iterator i = graph.edge_begin (activeNode, Galois::CHECK_CONFLICT)
-            , ei = graph.edge_end (activeNode, Galois::CHECK_CONFLICT); i != ei; ++i) {
-          GNode dst = graph.getEdgeDst (i);
-          graph.getData (dst, Galois::CHECK_CONFLICT);
-        }
+
+        // for (Graph::edge_iterator i = graph.edge_begin (activeNode, Galois::CHECK_CONFLICT)
+            // , ei = graph.edge_end (activeNode, Galois::CHECK_CONFLICT); i != ei; ++i) {
+          // GNode dst = graph.getEdgeDst (i);
+          // graph.getData (dst, Galois::CHECK_CONFLICT);
+        // }
 
     }
 
@@ -118,7 +119,9 @@ class DESunordered: public DESunorderedBase {
           const GNode dst = graph.getEdgeDst(i);
           SimObj_ty* dstObj = static_cast<SimObj_ty*> (graph.getData (dst, Galois::NONE));
 
-          if (dstObj->isActive () && onWLflags[dstObj->getID ()].cas (false, true)) {
+          if (dstObj->isActive () 
+              && !bool (onWLflags [dstObj->getID ()])
+              && onWLflags[dstObj->getID ()].cas (false, true)) {
             if (DEBUG) {
               GALOIS_DEBUG_PRINT ("Added %d neighbor: %s\n", 
                   bool (onWLflags[dstObj->getID ()]), dstObj->str ().c_str ());
@@ -183,8 +186,8 @@ class DESunordered: public DESunorderedBase {
 
     Process p(graph, onWLflags, numEvents, numIter, maxPending);
 
-    static const size_t CHUNK_SIZE = 16;
     typedef GaloisRuntime::WorkList::dChunkedFIFO<CHUNK_SIZE, GNode> WL_ty;
+    // typedef GaloisRuntime::WorkList::GFIFO<GNode> WL_ty;
 
     Galois::for_each<WL_ty>(initialActive.begin (), initialActive.end (), p);
 

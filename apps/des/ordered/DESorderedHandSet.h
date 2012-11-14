@@ -57,12 +57,15 @@ typedef GaloisRuntime::PerThreadVector<TypeHelper::Event_ty> AddList_ty;
 
 typedef Galois::GAtomicPadded<bool> AtomicBool_ty;
 
+static const bool DEBUG = false;
+
 struct SimObjInfo: public TypeHelper {
   
 
   struct MarkedEvent {
     Event_ty event;
-    mutable AtomicBool_ty flag;
+    // mutable AtomicBool_ty flag;
+    mutable bool flag;
 
     explicit MarkedEvent (const Event_ty& _event)
       : event (_event), flag (false) 
@@ -71,7 +74,14 @@ struct SimObjInfo: public TypeHelper {
     bool isMarked () const { return flag; }
 
     bool mark () const {
-      return flag.cas (false, true);
+      // return flag.cas (false, true);
+      if (flag == false) { 
+        flag = true; 
+        return true;
+
+      } else {
+        return false;
+      }
     }
 
     void unmark () {
@@ -82,7 +92,7 @@ struct SimObjInfo: public TypeHelper {
   };
 
 
-  typedef GaloisRuntime::LL::SimpleLock<true> Lock_ty;
+  typedef GaloisRuntime::LL::PaddedLock<true> Lock_ty;
   typedef des::AbstractMain<SimInit_ty>::GNode GNode;
   typedef std::set<MarkedEvent, Cmp_ty
     , GaloisRuntime::MM::FSBGaloisAllocator<MarkedEvent> > PQ;
@@ -96,6 +106,8 @@ struct SimObjInfo: public TypeHelper {
   size_t numOutputs;
   std::vector<Event_ty> lastInputEvents;
 
+  volatile mutable des::SimTime clock;
+
   SimObjInfo () {}
 
   SimObjInfo (GNode node, SimObj_ty* sobj): node (node) {
@@ -106,6 +118,8 @@ struct SimObjInfo: public TypeHelper {
     numOutputs = sg->getImpl ().getNumOutputs ();
 
     lastInputEvents.resize (numInputs, sobj->makeZeroEvent ());
+
+    clock = 0;
   }
 
   void recv (const Event_ty& event) {
@@ -131,14 +145,28 @@ struct SimObjInfo: public TypeHelper {
     // an input with INFINITY_SIM_TIME is dead and will not receive more non-null events
     // in the future
     bool notReady = false;
-    for (std::vector<Event_ty>::const_iterator e = lastInputEvents.begin ()
-        , ende = lastInputEvents.end (); e != ende; ++e) {
+    if (event.getRecvTime () < clock) { 
+      return true;
 
-      if ((e->getRecvTime () < des::INFINITY_SIM_TIME) && 
-          (Cmp_ty::compare (event, *e) > 0)) {
-        notReady = true;
-        break;
+    } else {
+
+      des::SimTime new_clk = 2 * des::INFINITY_SIM_TIME;
+
+      for (std::vector<Event_ty>::const_iterator e = lastInputEvents.begin ()
+          , ende = lastInputEvents.end (); e != ende; ++e) {
+
+        if ((e->getRecvTime () < des::INFINITY_SIM_TIME) && 
+            (Cmp_ty::compare (event, *e) > 0)) {
+          notReady = true;
+          // break;
+        }
+
+        if (e->getRecvTime () < des::INFINITY_SIM_TIME) {
+          new_clk = std::min (new_clk, e->getRecvTime ());
+        }
       }
+
+      this->clock = new_clk;
     }
 
     return !notReady;
@@ -229,6 +257,8 @@ getGlobalMin (std::vector<SimObjInfo>& sobjInfoVec) {
 class DESorderedHandSet: 
   public des::AbstractMain<TypeHelper::SimInit_ty>, public TypeHelper {
 
+  static const unsigned EPI = 32;
+
   struct OpFuncSet {
     Graph& graph;
     std::vector<SimObjInfo>& sobjInfoVec;
@@ -248,50 +278,69 @@ class DESorderedHandSet:
     {}
 
     template <typename C>
-    void operator () (const Event_ty& event, C& lwl) {
+    void operator () (Event_ty event, C& lwl) {
 
       // std::cout << ">>> Processing: " << event.detailedString () << std::endl;
-      // TODO: needs a PQ with remove operation to work correctly
 
-      SimObj_ty* recvObj = static_cast<SimObj_ty*> (event.getRecvObj ());
-      SimObjInfo& srcInfo = sobjInfoVec[recvObj->getID ()];
+      unsigned epi = 0;
+      while (epi < EPI) {
+        ++epi;
 
-      if (!srcInfo.isSrc (event)) {
-        abort ();
-      }
+        SimObj_ty* recvObj = static_cast<SimObj_ty*> (event.getRecvObj ());
+        SimObjInfo& srcInfo = sobjInfoVec[recvObj->getID ()];
 
-      nevents += 1;
-      newEvents.get ().clear ();
-
-      recvObj->execEvent (event, graph, srcInfo.node, newEvents.get ());
-
-      for (AddList_ty::local_iterator a = newEvents.get ().begin ()
-          , enda = newEvents.get ().end (); a != enda; ++a) {
-
-        SimObjInfo& sinfo = sobjInfoVec[a->getRecvObj ()->getID ()];
-
-        sinfo.recv (*a);
-
-
-        if (sinfo.canAddMin ()) {
-
-          assert (sinfo.getMin ().isMarked ());
-          lwl.push (sinfo.getMin ());
-
-          // std::cout << "### Adding: " << static_cast<const Event_ty&> (sinfo.getMin ()).detailedString () << std::endl;
+        if (DEBUG && !srcInfo.isSrc (event)) {
+          abort ();
         }
 
-      }
+        nevents += 1;
+        newEvents.get ().clear ();
+
+        recvObj->execEvent (event, graph, srcInfo.node, newEvents.get ());
+
+        for (AddList_ty::local_iterator a = newEvents.get ().begin ()
+            , enda = newEvents.get ().end (); a != enda; ++a) {
+
+          SimObjInfo& sinfo = sobjInfoVec[a->getRecvObj ()->getID ()];
+
+          sinfo.recv (*a);
 
 
-      if (!srcInfo.isSrc (event)) { abort (); }
-      srcInfo.removeMin ();
+          if (sinfo.canAddMin ()) {
 
+            assert (sinfo.getMin ().isMarked ());
+            lwl.push (sinfo.getMin ());
+
+            // std::cout << "### Adding: " << static_cast<const Event_ty&> (sinfo.getMin ()).detailedString () << std::endl;
+          }
+
+        }
+
+
+        if (DEBUG && !srcInfo.isSrc (event)) { abort (); }
+        srcInfo.removeMin ();
+
+        if (srcInfo.canAddMin ()) {
+
+          assert (srcInfo.isSrc (srcInfo.getMin ()));
+          assert (srcInfo.getMin ().isMarked ());
+
+          event = srcInfo.getMin ();
+          assert (srcInfo.isSrc (event));
+
+          if (epi == EPI) { lwl.push (event); }
+          // lwl.push (srcInfo.getMin ());
+          // std::cout << "%%% Adding: " << static_cast<const Event_ty&> (srcInfo.getMin ()).detailedString () << std::endl;
+        } else {
+          break;
+        }
+
+      } // end while
+
+      SimObjInfo& srcInfo = sobjInfoVec[event.getRecvObj ()->getID ()];
       if (srcInfo.canAddMin ()) {
-
         assert (srcInfo.getMin ().isMarked ());
         lwl.push (srcInfo.getMin ());
-        // std::cout << "%%% Adding: " << static_cast<const Event_ty&> (srcInfo.getMin ()).detailedString () << std::endl;
       }
 
 
@@ -354,7 +403,7 @@ protected:
     while (true) {
       ++round;
 
-      typedef GaloisRuntime::WorkList::dChunkedFIFO<16> WL_ty;
+      typedef GaloisRuntime::WorkList::dChunkedFIFO<CHUNK_SIZE> WL_ty;
 
       Galois::for_each<WL_ty> (initWL.begin (), initWL.end (), 
           OpFuncSet (graph, sobjInfoVec, newEvents,  nevents));
