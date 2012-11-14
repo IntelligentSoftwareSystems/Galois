@@ -81,7 +81,7 @@ public:
     while (n) {
       --n;
       int rc;
-      while ((rc = sem_wait(&sem)) == EINTR) { }
+      while (((rc = sem_wait(&sem)) < 0) && (errno == EINTR)) { }
       checkResults(rc);
     }
   }
