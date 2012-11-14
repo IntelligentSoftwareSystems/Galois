@@ -67,8 +67,10 @@ endif ()
 
 set(BOOST_LIBS system iostreams filesystem)
 find_package(Boost 1.36.0 COMPONENTS ${BOOST_LIBS} REQUIRED)
-include_directories(${Boost_INCLUDE_DIRS})
-set(RT_LINK ${Boost_LIBRARIES} ${RT_LINK})
+if(Boost_FOUND)
+  include_directories(${Boost_INCLUDE_DIRS})
+  set(RT_LINK ${Boost_LIBRARIES} ${RT_LINK})
+endif()
 
 if(USE_EXP)
   find_package(GMP) # for buchberger
