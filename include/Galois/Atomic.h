@@ -85,6 +85,7 @@ public:
   }
   //! direct compare and swap
   bool cas (const T& expected, const T& updated) {
+    if (val.data != expected) { return false; }
 #if defined(__INTEL_COMPILER)
     return __sync_bool_compare_and_swap(
         &val.data, 
