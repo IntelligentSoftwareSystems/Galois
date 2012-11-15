@@ -87,6 +87,9 @@ public:
     pushBuffer.push_back(val);
   }
 
+  //! force the abort of this iteration
+  void abort() { GaloisRuntime::forceAbort(); }
+
   //! Store and retrieve local state for deterministic and ordered executor
   void* getLocalState(bool& used) { used = localStateUsed; return localState; }
 };

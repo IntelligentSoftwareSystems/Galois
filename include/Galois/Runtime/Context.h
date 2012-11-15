@@ -173,6 +173,8 @@ struct CheckedLockObj {
 void breakLoop();
 
 void signalConflict();
+
+void forceAbort();
 }
 
 
