@@ -61,7 +61,7 @@
 
 class Tetrahedron: public AbstractGeom<TET_SPD>
 {
-private:
+public:
   static const double ParamCoord[]; 
   static const size_t FaceNodes[];
 
@@ -229,7 +229,7 @@ public:
   //! @param e: face number for which the normal is desired
   //! @param vNormal: output of the three Cartesian components of the normal vector
   virtual void computeNormal (size_t e, std::vector<double>& vNormal) const {
-    const size_t sd = getSpatialDimension();
+    const size_t sd = AbstractGeom<TET_SPD>::SP_DIM;
 
     size_t n0, n1, n2;   // Local node numbers of face 'e'
 
@@ -272,14 +272,14 @@ protected:
 static double mag(const double *a) {
   double rv = sqrt(dot(a,a));
   return(rv); 
-};
+}
 
 //! @param a vector size 3
 //! @param b vector size 3
 //! @return dot product of vectors a and b
 static double dot(const double *a,const double *b) {
   return(a[0]*b[0] + a[1]*b[1] + a[2]*b[2]);
-};
+}
 
 //! @param a first input vector size 3
 //! @param b second input vector size 3
@@ -288,7 +288,7 @@ static void cross(const double *a,const double *b, double *rv) {
   rv[0] =  a[1]*b[2] - a[2]*b[1];
   rv[1] =  a[2]*b[0] - a[0]*b[2];
   rv[2] =  a[0]*b[1] - a[1]*b[0];
-};
+}
 
 //! @param a square matrix 
 //! @param n number of rows and cols in matrix

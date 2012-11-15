@@ -35,17 +35,11 @@
 class Point: public Galois::GChecked {
   Tuple m_t;
   GNode m_n;
-  unsigned m_tries;
   long m_id;
   
 public:
-  Point(double x, double y, long id): m_tries(0) {
-    m_t.x() = x;
-    m_t.y() = y;
-    m_id = id;
-  }
+  Point(double x, double y, long id): m_t(x,y), m_n(NULL), m_id(id) {}
 
-  const unsigned& numTries() const { return m_tries; }
   const Tuple& t() const { return m_t; }
   long id() const { return m_id; }
 
@@ -58,32 +52,24 @@ public:
 
   void removeElement(const GNode& n) {
     if (m_n == n)
-      m_n = GNode();
+      m_n = NULL;
   }
 
   bool inMesh() const {
-    return m_n != GNode();
+    return m_n != NULL;
   }
 
   GNode someElement() const {
     return m_n;
   }
 
-  void nextTry() {
-    if (++m_tries == 0) {
-      assert(0 && "tries overflow");
-      abort();
-    }
-  }
-
   void print(std::ostream& os) const {
     os << "(id: " << m_id << " t: ";
     m_t.print(os);
-    if (m_n != GNode())
-      os << "SOME";
+    if (m_n != NULL)
+      os << " SOME)";
     else
-      os << "NULL";
-    os << ")";
+      os << " NULL)";
   }
 };
 

@@ -27,24 +27,23 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-#ifndef _TID_H
-#define _TID_H
+#ifndef GALOIS_RUNTIME_LL_TID_H
+#define GALOIS_RUNTIME_LL_TID_H
 
 namespace GaloisRuntime {
 namespace LL {
 
-  extern __thread unsigned TID;
-  extern unsigned nextID;
+extern __thread unsigned TID;
 
-  //Get this thread's id.
-  static inline unsigned getTID() {
-    unsigned x = TID;
-    if (x & 1)
-      return x >> 1;
-    x = __sync_fetch_and_add(&nextID, 1);
-    TID = (x << 1) | 1;
-    return x;
-  }
+//Get this thread's id.
+static inline unsigned getTID() {
+  return TID;
+}
+
+//uninitialized TIDs are 0, and only thread 0 access TID before
+//initializing it
+void initTID();
+
 }
 }
 

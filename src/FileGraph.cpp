@@ -132,7 +132,7 @@ void FileGraph::structureToFile(char* file) {
   ssize_t retval;
   //ASSUME LE machine
   mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
-  int fd = open(file, O_WRONLY | O_CREAT |O_TRUNC, mode);
+  int fd = open(file, O_WRONLY | O_CREAT | O_TRUNC, mode);
   retval = write(fd, masterMapping, masterLength);
   if (retval == -1) {
     perror(__FILE__);
@@ -220,7 +220,7 @@ unsigned int FileGraph::size() const {
   return numNodes;
 }
 
-unsigned int FileGraph::sizeEdges () const {
+unsigned int FileGraph::sizeEdges() const {
   return numEdges;
 }
 

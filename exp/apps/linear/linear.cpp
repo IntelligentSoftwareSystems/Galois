@@ -1,6 +1,6 @@
 #include "Galois/Galois.h"
 #include "Galois/Statistic.h"
-#include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/Graph2.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
@@ -34,7 +34,7 @@ template<typename Graph>
 static double residual(Graph& g) {
   double retval = 0;
   for (typename Graph::iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
-    double r = ii->getData().x - ii->getData().actual;
+    double r = g.getData(*ii).x - g.getData(*ii).actual;
     retval += r * r;
   }
   return retval;
@@ -44,7 +44,7 @@ template<typename Graph>
 static double relativeResidual(Graph& g) {
   double retval = 0;
   for (typename Graph::iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
-    double r = ii->getData().x - ii->getData().x_prev;
+    double r = g.getData(*ii).x - g.getData(*ii).x_prev;
     retval += r * r;
   }
   return retval;
@@ -67,15 +67,16 @@ struct Jacobi {
   Jacobi(Graph& g): graph(g) { }
 
   void operator()(const Graph::GraphNode& src) {
-    Node& node = src.getData(Galois::ALL);
+    Node& node = graph.getData(src, Galois::ALL);
     node.x_prev = node.x;
 
     double sum = 0;
-    for (Graph::neighbor_iterator dst = graph.neighbor_begin(src, Galois::ALL),
-        edst = graph.neighbor_end(src, Galois::ALL); dst != edst; ++dst) {
-      assert(src != *dst);
-      double weight = graph.getEdgeData(src, dst, Galois::NONE);
-      sum += weight * dst->getData(Galois::NONE).x;
+    for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::ALL),
+        ei = graph.edge_end(src, Galois::ALL); ii != ei; ++ii) {
+      Graph::GraphNode dst = graph.getEdgeDst(ii);
+      assert(src != dst);
+      double weight = graph.getEdgeData(ii);
+      sum += weight * graph.getData(dst, Galois::NONE).x;
     }
     node.x = (node.b - sum) / node.weight;
   }
@@ -133,7 +134,7 @@ struct ConjugateGradient {
     // rsold = r'*r
     double rs_old = 0.0;
     for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
-      double r = ii->getData(Galois::NONE).r;
+      double r = graph.getData(*ii, Galois::NONE).r;
       rs_old += r * r;
     }
 
@@ -141,12 +142,13 @@ struct ConjugateGradient {
       // Ap = A*p
       for (Graph::iterator src = graph.begin(), 
           esrc = graph.end(); src != esrc; ++src) {
-        Node& node = src->getData(Galois::NONE);
+        Node& node = graph.getData(*src, Galois::NONE);
         node.ap = 0;
-        for (Graph::neighbor_iterator dst = graph.neighbor_begin(*src, Galois::ALL),
-            edst = graph.neighbor_end(*src, Galois::ALL); dst != edst; ++dst) {
-          double weight = graph.getEdgeData(*src, dst, Galois::NONE); 
-          node.ap += weight * dst->getData(Galois::NONE).p;
+        for (Graph::edge_iterator ii = graph.edge_begin(*src, Galois::ALL),
+            ei = graph.edge_end(*src, Galois::ALL); ii != ei; ++ii) {
+          Graph::GraphNode dst = graph.getEdgeDst(ii);
+          double weight = graph.getEdgeData(ii); 
+          node.ap += weight * graph.getData(dst, Galois::NONE).p;
         }
         node.ap += node.weight * node.p;
       }
@@ -155,7 +157,7 @@ struct ConjugateGradient {
       double sum = 0;
       for (Graph::iterator src = graph.begin(), 
           esrc = graph.end(); src != esrc; ++src) {
-        Node& node = src->getData(Galois::NONE);
+        Node& node = graph.getData(*src, Galois::NONE);
         sum += node.ap * node.p;
       }
       double alpha = rs_old / sum;
@@ -166,7 +168,7 @@ struct ConjugateGradient {
       double rs_new = 0;
       for (Graph::iterator src = graph.begin(),
           esrc = graph.end(); src != esrc; ++src) {
-        Node& node = src->getData(Galois::NONE);
+        Node& node = graph.getData(*src, Galois::NONE);
         node.x += alpha * node.p;
         node.r -= alpha * node.ap;
         rs_new += node.r * node.r;
@@ -182,7 +184,7 @@ struct ConjugateGradient {
       // p = r + rs_new/rs_old * p
       for (Graph::iterator src = graph.begin(),
           esrc = graph.end(); src != esrc; ++src) {
-        Node& node = src->getData(Galois::NONE);
+        Node& node = graph.getData(*src, Galois::NONE);
         node.p = node.r + rs_new/rs_old * node.p;
       }
 
@@ -311,7 +313,7 @@ struct GBP {
   GBP(Graph& g): graph(g) { }
 
   void operator()(const Graph::GraphNode& src) {
-    Node& node = src.getData(Galois::NONE);
+    Node& node = graph.getData(src, Galois::NONE);
     
     node.x_prev = node.x;
 
@@ -323,9 +325,10 @@ struct GBP {
     // Variance can not be zero (must be a diagonally dominant matrix)!
     //  assert(A(i,i) ~= 0);
     //  J(i) = A(i,i) + sum(MJ(:,i));
-    for (Graph::neighbor_iterator dst = graph.neighbor_begin(src, Galois::ALL),
-        edst = graph.neighbor_end(src, Galois::ALL); dst != edst; ++dst) {
-      const Edge& edge = graph.getEdgeData(*dst, src, Galois::NONE);
+    for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::ALL),
+        ei = graph.edge_end(src, Galois::ALL); ii != ei; ++ii) {
+      Graph::GraphNode dst = graph.getEdgeDst(ii);
+      const Edge& edge = graph.getEdgeData(graph.findEdge(dst, src, Galois::NONE));
       node.mean += edge.mean;
       node.prec += edge.prec;
     }
@@ -343,10 +346,11 @@ struct GBP {
     //      MJ(i,j) = (-A(j,i) / J_j) * A(i,j);
     //    end
     //  end
-    for (Graph::neighbor_iterator dst = graph.neighbor_begin(src, Galois::NONE),
-        edst = graph.neighbor_end(src, Galois::NONE); dst != edst; ++dst) {
-      Edge& inEdge = graph.getEdgeData(*dst, src, Galois::NONE);
-      Edge& outEdge = graph.getEdgeData(src, dst, Galois::NONE);
+    for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::NONE),
+        ei = graph.edge_end(src, Galois::NONE); ii != ei; ++ii) {
+      Graph::GraphNode dst = graph.getEdgeDst(ii);
+      Edge& inEdge = graph.getEdgeData(graph.findEdge(dst, src, Galois::NONE));
+      Edge& outEdge = graph.getEdgeData(ii);
       
       double mean_j = node.mean - inEdge.mean;
       double prec_j = node.prec - inEdge.prec;
@@ -502,12 +506,12 @@ struct GenerateInput {
     // Create edges
     int nnz = 0;
     for (int i = 0; i < N; ++i) {
-      GraphNode n = nodes[i];
+      //GraphNode n = nodes[i];
       for (int j = 0; j < sparsity; ++j) {
         double& entry = LL[i*sparsity+j];
         if (entry) {
-          g1.addEdge(nodes[i], nodes[i-sparsity+j+1], entry);
-          g1.addEdge(nodes[i-sparsity+j+1], nodes[i], entry);
+          g1.getEdgeData(g1.addEdge(nodes[i], nodes[i-sparsity+j+1])) = entry;
+          g1.getEdgeData(g1.addEdge(nodes[i-sparsity+j+1], nodes[i])) = entry;
           nnz += 2;
         }
       }
@@ -518,12 +522,13 @@ struct GenerateInput {
     // Solve system Ax = b
     for (typename GenGraph::iterator src = g1.begin(), esrc = g1.end();
         src != esrc; ++src) {
-      Node& node = src->getData();
+      Node& node = g1.getData(*src);
 
       // node.b = 0;
-      for (typename GenGraph::neighbor_iterator dst = g1.neighbor_begin(*src), 
-          edst = g1.neighbor_end(*src); dst != edst; ++dst) {
-        node.b += g1.getEdgeData(*src, dst) * dst->getData().x;
+      for (typename GenGraph::edge_iterator ii = g1.edge_begin(*src), 
+          ei = g1.edge_end(*src); ii != ei; ++ii) {
+        typename GenGraph::GraphNode dst = g1.getEdgeDst(ii);
+        node.b += g1.getEdgeData(ii) * g1.getData(dst).x;
       }
     }
   }
@@ -539,9 +544,9 @@ struct GenerateInput {
     size_t id = 0;
     for (typename GenGraph::iterator ii = g1.begin(), ei = g1.end();
         ii != ei; ++ii) {
-      ii->getData().id = id++;
-      double w = g1.getEdgeData(*ii, *ii);
-      Node& node = ii->getData();
+      g1.getData(*ii).id = id++;
+      double w = g1.getEdgeData(g1.findEdge(*ii, *ii));
+      Node& node = g1.getData(*ii);
       GraphNode n = g.createNode(node_type(node.b, node.x, w));
       g.addNode(n);
       nodes.push_back(n);
@@ -550,17 +555,18 @@ struct GenerateInput {
     // Create edges
     for (typename GenGraph::iterator src = g1.begin(), esrc = g1.end();
         src != esrc; ++src) {
-      GraphNode snode = nodes[src->getData().id];
+      GraphNode snode = nodes[g1.getData(*src).id];
 
-      for (typename GenGraph::neighbor_iterator dst = g1.neighbor_begin(*src),
-          edst = g1.neighbor_end(*src); dst != edst; ++dst) {
+      for (typename GenGraph::edge_iterator ii = g1.edge_begin(*src),
+          ei = g1.edge_end(*src); ii != ei; ++ii) {
+        typename GenGraph::GraphNode dst = g1.getEdgeDst(ii);
         // A_ii handled as node.weight
-        if (*src == *dst)
+        if (*src == dst)
           continue;
-        GraphNode dnode = nodes[dst->getData().id];
-        edge_type edge(g1.getEdgeData(*src, dst));
+        GraphNode dnode = nodes[g1.getData(dst).id];
+        edge_type edge(g1.getEdgeData(ii));
 
-        g.addEdge(snode, dnode, edge);
+        g.getEdgeData(g.addEdge(snode, dnode)) = edge;
       }
     }
   }
@@ -581,7 +587,7 @@ static void start(int N, int sparsity, int seed) {
 }
 
 int main(int argc, char **argv) {
-  LonestarStart(argc, argv, std::cout, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url);
 
   MaxIterations = N;
 

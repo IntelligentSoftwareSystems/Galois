@@ -23,55 +23,24 @@
 #ifndef GALOIS_RUNTIME_BARRIER_H
 #define GALOIS_RUNTIME_BARRIER_H
 
-#include "PerCPU.h"
+#include "PerThreadStorage.h"
 
-#include <limits>
-#include <cstdio>
-
-#include <stdlib.h>
 #include <pthread.h>
 
 namespace GaloisRuntime {
 
 class PthreadBarrier {
   pthread_barrier_t bar;
+  void checkResults(int val);
 
-  void checkResults(int val) {
-    if (val) {
-      perror("PTHREADS: ");
-      assert(0 && "PThread check");
-      abort();
-    }
-  }
 public:
-  PthreadBarrier() {
-    //uninitialized barriers block a lot of threads to help with debugging
-    int rc = pthread_barrier_init(&bar, 0, std::numeric_limits<int>::max());
-    checkResults(rc);
-  }
+  PthreadBarrier();
+  PthreadBarrier(unsigned int val);
+  ~PthreadBarrier();
 
-  PthreadBarrier(unsigned int val) {
-    int rc = pthread_barrier_init(&bar, 0, val);
-    checkResults(rc);
-  }
-
-  ~PthreadBarrier() {
-    int rc = pthread_barrier_destroy(&bar);
-    checkResults(rc);
-  }
-
-  void reinit(int val) {
-   int rc = pthread_barrier_destroy(&bar);
-   checkResults(rc);
-   rc = pthread_barrier_init(&bar, 0, val);
-   checkResults(rc);
-  }
-
-  void wait() {
-    int rc = pthread_barrier_wait(&bar);
-    if (rc && rc != PTHREAD_BARRIER_SERIAL_THREAD)
-      checkResults(rc);
-  }
+  void reinit(int val);
+  void wait();
+  void operator()(void) { wait(); }
 };
 
 //! Simple busy waiting barrier, not cyclic
@@ -88,8 +57,8 @@ class SimpleBarrier {
   };
 
   volatile int globalTotal;
-  PerCPU<TLD> tlds;
-  PerLevel<PLD> plds;
+  PerThreadStorage<TLD> tlds;
+  PerPackageStorage<PLD> plds;
   int size;
 
   void cascade(int tid);
@@ -98,7 +67,7 @@ public:
   SimpleBarrier(): globalTotal(0), size(-1) { }
 
   //! Not thread-safe and should only be called when no threads are in wait()/increment()
-  void reinit(int val, int init);
+  void reinit(int val, int init = 0);
 
   void increment();
   void wait();
@@ -114,11 +83,100 @@ class FastBarrier {
 
 public:
   FastBarrier(): size(-1) { }
-  FastBarrier(unsigned int val): size(-1) { reinit(val); }
+  explicit FastBarrier(unsigned int val): size(-1) { reinit(val); }
 
   void reinit(int val);
   void wait(); 
+  void operator()(void) { wait(); }
 };
+
+class FasterBarrier {
+  volatile unsigned count;
+  unsigned P;
+  bool sense;
+  PerThreadStorage<volatile bool> local_sense;
+
+public:
+  FasterBarrier() :count(~0), P(~0), sense(true) {}
+  explicit FasterBarrier(unsigned int val): count(~0), P(~0), sense(true) {
+    reinit(val);
+  }
+
+  void reinit(unsigned num) {
+    P = count = num;
+  }
+
+  void wait();
+  void operator()(void) { wait(); }
+};
+
+class MCSBarrier {
+  struct treenode {
+    //vpid is LL::getTID()
+    volatile bool* parentpointer; //null of vpid == 0
+    volatile bool* childpointers[2];
+    bool havechild[4];
+
+    volatile bool childnotready[4];
+    volatile bool parentsense;
+    bool sense;
+  };
+
+  PerThreadStorage<treenode> nodes;
+  
+  void _reinit(unsigned P);
+
+public:
+  MCSBarrier();
+  explicit MCSBarrier(unsigned val);
+
+  //not safe if any thread is in wait
+  void reinit(unsigned val);
+
+  void wait();
+
+  void operator()(void) { wait(); }
+};
+
+class TopoBarrier {
+  struct treenode {
+    //vpid is LL::getTID()
+
+    //package binary tree
+    treenode* parentpointer; //null of vpid == 0
+    treenode* childpointers[2];
+
+    //waiting values:
+    unsigned havechild;
+    volatile unsigned childnotready;
+
+    //signal values
+    volatile unsigned parentsense;
+  };
+
+  PerPackageStorage<treenode> nodes;
+  PerThreadStorage<unsigned> sense;
+
+  void _reinit(unsigned P);
+
+public:
+  TopoBarrier();
+  explicit TopoBarrier(unsigned val);
+
+  //not safe if any thread is in wait
+  void reinit(unsigned val);
+
+  void wait();
+
+  void operator()(void) { wait(); }
+
+  //  void dump();
+};
+
+typedef TopoBarrier GBarrier;
+
+//! Have a pre-instantiated barrier available for use
+GBarrier& getSystemBarrier();
 
 }
 

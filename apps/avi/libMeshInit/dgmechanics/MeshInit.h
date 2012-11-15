@@ -51,18 +51,16 @@ public:
   typedef StandardAVI::BCImposedType BCImposedType;
 
 private:
-  static const double RHO = 1.0;
-  static const double MU = 0.5;
-  static const double LAMBDA = 0.0;
-  static const int PID = 0;
+  static const double RHO;
+  static const double MU;
+  static const double LAMBDA;
+  static const int PID;
 
-  static const double DELTA = 0.1;
-  static const double T_INIT = 0.0;
+  static const double DELTA;
+  static const double T_INIT;
 
   // length of filenames
-  static const size_t MAX_FNAME = 1024;
-
-
+  static const size_t MAX_FNAME;
 
 private:
   double simEndTime;

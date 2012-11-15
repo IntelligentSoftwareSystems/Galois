@@ -21,7 +21,6 @@
  * @author Dimitrios Prountzos <dprountz@cs.utexas.edu>
  */
 #include "Galois/Galois.h"
-#include "Galois/Graphs/Graph.h"
 #include "Galois/Graphs/LCGraph.h"
 
 #include "llvm/Support/CommandLine.h"

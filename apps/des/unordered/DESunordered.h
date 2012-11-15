@@ -26,43 +26,65 @@
 #define _DES_UNORDERED_H_
 
 #include "Galois/Galois.h"
-#include "Galois/Runtime/WorkList.h"
 #include "Galois/Accumulator.h"
+#include "Galois/Atomic.h"
+#include "Galois/Runtime/WorkList.h"
+#include "Galois/Runtime/ll/gio.h"
 
-#include "DESabstractMain.h"
+#include "DESunorderedBase.h"
 
 
+
+namespace des_unord {
 static const bool DEBUG = false;
 
 
-class DESunordered: public DESabstractMain {
-  typedef Galois::GAccumulator<int> PerCPUcounter;
+class DESunordered: public DESunorderedBase {
+  typedef Galois::GAccumulator<size_t> Accumulator;
   typedef Galois::GReduceMax<size_t> ReduceMax;
+  typedef Galois::GAtomicPadded<bool> AtomicBool;
+  typedef std::vector<AtomicBool> VecAtomicBool;
 
 
-  static const size_t CHUNK_SIZE = 16;
-  typedef GaloisRuntime::WorkList::dChunkedFIFO<CHUNK_SIZE> WLType;
 
   /**
    * contains the loop body, called 
    * by @see for_each
    */
-  struct process {
+  struct Process {
     Graph& graph;
-    std::vector<unsigned int>& onWlFlags;
-    PerCPUcounter& numEvents;
-    PerCPUcounter& numIter;
+    VecAtomicBool& onWLflags;
+    Accumulator& numEvents;
+    Accumulator& numIter;
     ReduceMax& maxPending;
 
-    
-    process (
-    Graph& graph,
-    std::vector<unsigned int>& onWlFlags,
-    PerCPUcounter& numEvents,
-    PerCPUcounter& numIter,
-    ReduceMax& maxPending)
-      : graph (graph), onWlFlags (onWlFlags), numEvents (numEvents), numIter (numIter), maxPending (maxPending) {}
 
+    Process (
+        Graph& graph,
+        VecAtomicBool& onWLflags,
+        Accumulator& numEvents,
+        Accumulator& numIter,
+        ReduceMax& maxPending)
+      : 
+        graph (graph), 
+        onWLflags (onWLflags), 
+        numEvents (numEvents), 
+        numIter (numIter), 
+        maxPending (maxPending) 
+    {}
+
+
+    void lockNeighborhood (GNode& activeNode) {
+        // acquire locks on neighborhood: one shot
+        graph.getData (activeNode, Galois::CHECK_CONFLICT);
+
+        // for (Graph::edge_iterator i = graph.edge_begin (activeNode, Galois::CHECK_CONFLICT)
+            // , ei = graph.edge_end (activeNode, Galois::CHECK_CONFLICT); i != ei; ++i) {
+          // GNode dst = graph.getEdgeDst (i);
+          // graph.getData (dst, Galois::CHECK_CONFLICT);
+        // }
+
+    }
 
 
     /**
@@ -74,70 +96,65 @@ class DESunordered: public DESabstractMain {
      * @param lwl: the worklist type
      */
 
-    template <typename ContextTy>
-    void operator () (GNode& activeNode, ContextTy& lwl) {
-        SimObject* srcObj = graph.getData (activeNode, Galois::CHECK_CONFLICT);
+    template <typename WL>
+    void operator () (GNode& activeNode, WL& lwl) {
 
-        // acquire locks on neighborhood: one shot
-        for (Graph::neighbor_iterator i = graph.neighbor_begin (activeNode, Galois::CHECK_CONFLICT)
-            , ei = graph.neighbor_end (activeNode, Galois::CHECK_CONFLICT); i != ei; ++i) {
-          // const GNode& dst = *i;
-          // SimObject* dstObj = graph.getData (dst, Galois::CHECK_CONFLICT);
-        }
+        lockNeighborhood (activeNode);
 
-
-
+        SimObj_ty* srcObj = static_cast<SimObj_ty*> (graph.getData (activeNode, Galois::NONE));
         // should be past the fail-safe point by now
 
         if (DEBUG) {
-          // DEBUG
-          printf ("%d processing : %s\n", GaloisRuntime::LL::getTID (), srcObj->toString ().c_str ());
+          GALOIS_DEBUG_PRINT ("processing : %s\n", srcObj->str ().c_str ());
         }
 
         maxPending.update (srcObj->numPendingEvents ());
 
-        int proc = srcObj->simulate(graph, activeNode); // number of events processed
-        numEvents.get () += proc;
+        size_t proc = srcObj->simulate(graph, activeNode); // number of events processed
+        numEvents += proc;
 
-        for (Graph::neighbor_iterator i = graph.neighbor_begin (activeNode, Galois::NONE)
-            , ei = graph.neighbor_end (activeNode, Galois::NONE); i != ei; ++i) {
-          const GNode& dst = *i;
+        for (Graph::edge_iterator i = graph.edge_begin (activeNode, Galois::NONE)
+            , ei = graph.edge_end (activeNode, Galois::NONE); i != ei; ++i) {
 
-          SimObject* dstObj = graph.getData (dst, Galois::NONE);
+          const GNode dst = graph.getEdgeDst(i);
+          SimObj_ty* dstObj = static_cast<SimObj_ty*> (graph.getData (dst, Galois::NONE));
 
-          if (dstObj->isActive ()) {
-
-            if (onWlFlags[dstObj->getId ()] == 0) {
-              if (DEBUG) {
-                // DEBUG
-                printf ("%d Added %d neighbor: %s\n" , GaloisRuntime::LL::getTID(), onWlFlags[dstObj->getId ()], dstObj->toString ().c_str ());
-              }
-              onWlFlags[dstObj->getId ()] = 1;
-              lwl.push (dst);
-
+          if (dstObj->isActive () 
+              && !bool (onWLflags [dstObj->getID ()])
+              && onWLflags[dstObj->getID ()].cas (false, true)) {
+            if (DEBUG) {
+              GALOIS_DEBUG_PRINT ("Added %d neighbor: %s\n", 
+                  bool (onWLflags[dstObj->getID ()]), dstObj->str ().c_str ());
             }
 
+            lwl.push (dst);
+
           }
+
+
         }
+        
 
         if (srcObj->isActive()) {
           lwl.push (activeNode);
           
           if (DEBUG) {
-            //DEBUG
-            printf ("%d Added %d self: %s\n" , GaloisRuntime::LL::getTID(), onWlFlags[srcObj->getId ()], srcObj->toString ().c_str ());
+            GALOIS_DEBUG_PRINT ("Added %d self: %s\n" 
+                , bool (onWLflags[srcObj->getID ()]), srcObj->str ().c_str ());
           }
 
-        }
-        else {
-          onWlFlags[srcObj->getId ()] = 0;
+        } else {
+          onWLflags[srcObj->getID ()] = false;
+
           if (DEBUG) {
-            //DEBUG
-            printf ("%d not adding %d self: %s\n" , GaloisRuntime::LL::getTID(), onWlFlags[srcObj->getId ()], srcObj->toString ().c_str ());
+            GALOIS_DEBUG_PRINT ("not adding %d self: %s\n", 
+                bool (onWLflags[srcObj->getID ()]), srcObj->str ().c_str ());
           }
         }
+        
 
-        ++(numIter.get ());
+        numIter += 1;
+
 
     }
   };
@@ -152,43 +169,50 @@ class DESunordered: public DESabstractMain {
    * when the node is removed from the worklist. This list of flags provides a cheap way of
    * implementing set semantics.
    *
-   * Normally, one would use a vector<bool>, but std::vector<bool> uses bit vector implementation,
-   * where different indices i!=j share a common memory word. To protect against concurrent
-   * accesses, we would need to acquire abstract locks corresponding to the memory word rather than acquiring locks
-   * on locations iand j. This requires knowledge of std::vector<bool> implementation. Instead, we use a
-   * std::vector<unsigned int> so that each index i!=j is stored in a separate word and we can
-   * acquire lock on i safely.
    */
-  virtual void runLoop (const SimInit& simInit) {
-    const std::vector<GNode>& initialActive = simInit.getInputNodes();
+  virtual void runLoop (const SimInit_ty& simInit, Graph& graph) {
+
+    std::vector<GNode> initialActive;
+    VecAtomicBool onWLflags;
+
+    initWorkList (graph, initialActive, onWLflags);
 
 
-    std::vector<unsigned int> onWlFlags (simInit.getNumNodes (), 0);
-    // set onWlFlags for input objects
-    for (std::vector<GNode>::const_iterator i = simInit.getInputNodes ().begin (), ei = simInit.getInputNodes ().end ();
-        i != ei; ++i) {
-      SimObject* srcObj = graph.getData (*i, Galois::NONE);
-      onWlFlags[srcObj->getId ()] = 1;
-    }
-
-
-
-    PerCPUcounter numEvents;
-    PerCPUcounter numIter;
+    Accumulator numEvents;
+    Accumulator numIter;
     ReduceMax maxPending;
 
-    process p(graph, onWlFlags, numEvents, numIter, maxPending);
 
-    // Galois::for_each < GaloisRuntime::WorkList::FIFO<GNode> > (initialActive.begin (), initialActive.end (), p);
-    Galois::for_each<WLType>(initialActive.begin (), initialActive.end (), p);
 
-    std::cout << "Number of events processed = " << numEvents.get () << std::endl;
-    std::cout << "Number of iterations performed = " << numIter.get () << std::endl;
-    std::cout << "Maximum size of pending events = " << maxPending.get () << std::endl;
+    Process p(graph, onWLflags, numEvents, numIter, maxPending);
+
+    typedef GaloisRuntime::WorkList::dChunkedFIFO<CHUNK_SIZE, GNode> WL_ty;
+    // typedef GaloisRuntime::WorkList::GFIFO<GNode> WL_ty;
+
+    Galois::for_each<WL_ty>(initialActive.begin (), initialActive.end (), p);
+
+    std::cout << "Number of events processed = " << numEvents.reduce () << std::endl;
+    std::cout << "Number of iterations performed = " << numIter.reduce () << std::endl;
+    std::cout << "Maximum size of pending events = " << maxPending.reduce() << std::endl;
   }
 
-  virtual bool isSerial () const { return false; }
+  void checkPostState (Graph& graph, VecAtomicBool& onWLflags) {
+    for (Graph::iterator n = graph.begin (),
+        endn = graph.end (); n != endn; ++n) {
+
+      SimObj_ty* so = static_cast<SimObj_ty*> (graph.getData (*n, Galois::NONE));
+      if (so->isActive ()) {
+        std::cout << "ERROR: Found Active: " << so->str () << std::endl
+          << "onWLflags = " << onWLflags[so->getID ()] << ", numPendingEvents = " << so->numPendingEvents () 
+          << std::endl;
+      }
+    }
+
+  }
+
+  virtual std::string getVersion () const { return "Unordered (Chandy-Misra) parallel"; }
 };
+} // end namespace des_unord
 
 
 #endif // _DES_UNORDERED_H_

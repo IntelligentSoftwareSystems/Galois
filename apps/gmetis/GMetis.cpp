@@ -64,7 +64,7 @@ void partition(MetisGraph* metisGraph, int nparts) {
 	cout<<"coarsening time: " << t.get() << " ms"<<endl;
 
 	float* totalPartitionWeights = new float[nparts];
-	arrayFill(totalPartitionWeights, nparts, 1 / (float) nparts);
+	std::fill_n(totalPartitionWeights, nparts, 1 / (float) nparts);
 	maxVertexWeight = (int) (1.5 * ((mcg->getNumNodes()) / COARSEN_FRACTION));
 	PMetis pmetis(20, maxVertexWeight);
 	Galois::Timer init_part_t;
@@ -74,7 +74,7 @@ void partition(MetisGraph* metisGraph, int nparts) {
 	cout << "initial partition time: "<< init_part_t.get()  << " ms"<<endl;
 	Galois::Timer refine_t;
 
-	arrayFill(totalPartitionWeights, nparts, 1 / (float) nparts);
+	std::fill_n(totalPartitionWeights, nparts, 1 / (float) nparts);
 	refine_t.start();
 	refineKWay(mcg, metisGraph, totalPartitionWeights, (float) 1.03, nparts);
 	refine_t.stop();
@@ -127,9 +127,9 @@ void readMetisGraph(MetisGraph* metisGraph, const char* filename){
 			if(n1==n2){
 				continue;
 			}
-			graph->addEdge(n1, n2, 1);
-			n1.getData().addEdgeWeight(1);
-			n1.getData().incNumEdges();
+			graph->getEdgeData(graph->addEdge(n1, n2)) = 1;
+			graph->getData(n1).addEdgeWeight(1);
+			graph->getData(n1).incNumEdges();
 			countEdges++;
 		}
 	}
@@ -167,7 +167,7 @@ void readGraph(MetisGraph* metisGraph, const char* filename, bool weighted = fal
 		int nodeId = inputGraph.getData(inNode);
 		GNode node = gnodes[nodeId];
 
-		MetisNode& nodeData = node.getData();
+		MetisNode& nodeData = graph->getData(node);
 
 		for (InputGraph::edge_iterator jj = inputGraph.edge_begin(inNode), eejj = inputGraph.edge_end(inNode); jj != eejj; ++jj) {
 		  InputGNode inNeighbor = inputGraph.getEdgeDst(jj);
@@ -178,13 +178,13 @@ void readGraph(MetisGraph* metisGraph, const char* filename, bool weighted = fal
 			  weight = inputGraph.getEdgeData(jj);
 			}
 			if(!directed){
-				graph->addEdge(node, gnodes[neighId], weight);//
+			  graph->getEdgeData(graph->addEdge(node, gnodes[neighId])) = weight;//
 				nodeData.incNumEdges();
 				nodeData.addEdgeWeight(weight);//inputGraph.getEdgeData(inNode, inNeighbor));
 				numEdges++;
 			}else{
-				graph->addEdge(node, gnodes[neighId], weight);//
-				graph->addEdge(gnodes[neighId], node, weight);//
+			  graph->getEdgeData(graph->addEdge(node, gnodes[neighId])) = weight;//
+			  graph->getEdgeData(graph->addEdge(gnodes[neighId], node)) = weight;//
 			}
 		}
 
@@ -193,12 +193,12 @@ void readGraph(MetisGraph* metisGraph, const char* filename, bool weighted = fal
 	if(directed){
 		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 			GNode node = *ii;
-			MetisNode& nodeData = node.getData();
-			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(node), eejj = graph->neighbor_end(node); jj != eejj; ++jj) {
-				GNode neighbor = *jj;
+			MetisNode& nodeData = graph->getData(node);
+			for (GGraph::edge_iterator jj = graph->edge_begin(node), eejj = graph->edge_end(node); jj != eejj; ++jj) {
+			  GNode neighbor = graph->getEdgeDst(jj);
 				nodeData.incNumEdges();
-				nodeData.addEdgeWeight(graph->getEdgeData(node, neighbor));
-				assert(graph->getEdgeData(node, neighbor) == graph->getEdgeData(neighbor, node));
+				nodeData.addEdgeWeight(graph->getEdgeData(jj));
+				assert(graph->getEdgeData(jj) == graph->getEdgeData(graph->findEdge(neighbor, node)));
 				numEdges++;
 			}
 		}
@@ -210,7 +210,7 @@ void readGraph(MetisGraph* metisGraph, const char* filename, bool weighted = fal
 }
 
 int main(int argc, char** argv) {
-  LonestarStart(argc, argv, std::cout, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url);
 
 	srand(-1);
 	MetisGraph metisGraph;
@@ -233,14 +233,10 @@ int getRandom(int num){
 	return ((int)(drand48()*((double)(num))));
 }
 
-int gNodeToInt(GNode node){
-	return node.getData().getNodeId();
-}
+// int gNodeToInt(GNode node){
+// 	return graph->getData(node).getNodeId();
+// }
 
-void mergeP::operator()(PerCPUValue& a, PerCPUValue& b){
-	a.mincutInc+=b.mincutInc;
-	a.changedBndNodes.insert(b.changedBndNodes.begin(), b.changedBndNodes.end());
-}
 int intlog2(int a){
 	int i;
 	for (i=1; a > 1; i++, a = a>>1);

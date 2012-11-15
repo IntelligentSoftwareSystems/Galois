@@ -2,6 +2,7 @@
 #  usage: Rscript report.R <report.csv>
 
 library(ggplot2)
+library(reshape2)
 
 Id.Vars <- c("Algo","Kind","Hostname","Threads","CommandLine")
 
@@ -58,7 +59,7 @@ parseAlgo <- function(res) {
 
   # Try various uniquification patterns until one works
   # Case 1: Extract algo and give kinds unique within an algo
-  algos <- sub("^\\S*?(\\w+)\\s.*$", "\\1", cmds.uniq, perl=T)
+  algos <- sub("^\\S*?((?:\\w|-|\\.)+)\\s.*$", "\\1", cmds.uniq, perl=T)
   kinds <- numeric(length(algos))
   dupes <- duplicated(algos)
   version <- 0
@@ -85,7 +86,6 @@ parseAlgo <- function(res) {
 res.raw <- read.csv(inputfile, stringsAsFactors=F)
 res <- res.raw[res.raw$CommandLine != "",]
 cat(sprintf("Dropped %d empty rows\n", nrow(res.raw) - nrow(res)))
-##res <- subset(res, grepl("r5M.node", res$CommandLine))
 res <- parseAlgo(res)
 
 # Timeouts
@@ -110,7 +110,7 @@ Columns <- grep("\\.null\\.", Columns, value=T, invert=T)
 res <- res[,Columns]
 
 summarizeBy <- function(d, f, fun.aggregate=mean, suffix=".Y", merge.with=d, idvars=Id.Vars) {
-  m <- cast(melt(d[,Columns], id.vars=idvars), f, fun.aggregate)
+  m <- dcast(melt(d[,Columns], id.vars=idvars), f, fun.aggregate)
   vars <- all.vars(f)
   merge(merge.with, m, by=vars[-length(vars)], all.x=T, suffixes=c("", suffix))
 }
@@ -123,7 +123,6 @@ res <- data.frame(lapply(res, function(x) if (is.character(x)) { factor(x) } els
 
 # Take mean of multiple runs
 #res <- recast(res, ... ~ variable, mean, id.var=Id.Vars)
-
 
 # Summarize
 res <- summarizeBy(subset(res, Threads==1),
@@ -147,19 +146,12 @@ ggplot(res,
        scale_y_continuous("Time (s)") +
        facet_grid(Hostname ~ Algo, scale="free")
 
-##ggplot(res,
-##       aes(x=Threads, y=(Time.Ref-build.Mean)/(Time.Mean-build.Mean), color=Kind)) +
-##       geom_point() + 
-##       geom_line() + 
-##       scale_y_continuous("Speedup (res. to best at t=1)") +
-##       facet_grid(Hostname ~ Algo, scale="free")
-
-ggplot(res,
-       aes(x=Threads, y=Iterations.Mean/Iterations.Ref, color=Kind)) +
-       geom_point() + 
-       geom_line() + 
-       scale_y_continuous("Iterations relative to serial") +
-       facet_grid(Hostname ~ Algo, scale="free")
+#ggplot(res,
+#       aes(x=Threads, y=Iterations.Mean/Iterations.Ref, color=Kind)) +
+#       geom_point() + 
+#       geom_line() + 
+#       scale_y_continuous("Iterations relative to serial") +
+#       facet_grid(Hostname ~ Algo, scale="free")
 
 cat("Results in Rplots.pdf\n")
 

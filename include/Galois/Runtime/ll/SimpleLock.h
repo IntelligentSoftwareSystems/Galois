@@ -29,12 +29,12 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-#ifndef _SIMPLE_LOCK_H
-#define _SIMPLE_LOCK_H
+#ifndef GALOIS_RUNTIME_LL_SIMPLE_LOCK_H
+#define GALOIS_RUNTIME_LL_SIMPLE_LOCK_H
 
 #include <cassert>
 
-#include "CompFlags.h"
+#include "CompilerSpecific.h"
 
 namespace GaloisRuntime {
 namespace LL {
@@ -48,14 +48,13 @@ template<>
 class SimpleLock<true> {
   volatile mutable int _lock; //Allow locking a const
 public:
-  SimpleLock() : _lock(0) {
-  }
+  SimpleLock() : _lock() {  }
 
   inline void lock() const {
     int oldval;
     do {
       while (_lock != 0) {
-	mem_pause();
+	asmPause();
       }
       oldval = __sync_fetch_and_or(&_lock, 1);
     } while (oldval & 1);

@@ -4,11 +4,6 @@
 
 BASE="$(cd $(dirname $0); cd ../..; pwd)"
 
-if [[ ! -e Makefile ]]; then
-  echo "Execute this script from the base of your build directory" 1>&2
-  exit 1
-fi
-
 if [[ ! -e ${BASE}/tools/bin/hi_pr ]]; then
   echo "Execute make more-tools before running this script" 1>&2
   exit 1
@@ -47,4 +42,6 @@ HSINK=$(($SINK + 1))
 perl -p -e "s/p sp (\d+) (\d+)/p max \1 \2\nn $HSOURCE s\nn $HSINK t/;" $D \
   | ${BASE}/tools/bin/hi_pr
 
-run ${BASE}/apps/preflowpush/preflowpush $* $G $SOURCE $SINK
+if [[ -e ${BASE}/apps/preflowpush/preflowpush ]]; then
+  run ${BASE}/apps/preflowpush/preflowpush $* $G $SOURCE $SINK
+fi

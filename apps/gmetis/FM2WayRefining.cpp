@@ -30,7 +30,7 @@ using namespace std;
 
 void moveNode(PQueue* parts[],MetisGraph* metisGraph, GNode higain, int to, int* moved, GNode* swaps, int nswaps) {
 	GGraph* graph = metisGraph->getGraph();
-	MetisNode& higainData = higain.getData();
+	MetisNode& higainData = graph->getData(higain);
 	higainData.setPartition(to);
 	moved[higainData.getNodeId()] = nswaps;
 	swaps[nswaps] = higain;
@@ -39,15 +39,15 @@ void moveNode(PQueue* parts[],MetisGraph* metisGraph, GNode higain, int to, int*
 	higainData.swapEDAndID();
 	higainData.updateGain();
 
-	if (higainData.getEdegree() == 0 && graph->neighborsSize(higain) >0) {
+	if (higainData.getEdegree() == 0 && graph->edge_begin(higain) != graph->edge_end(higain)) {
 		metisGraph->unsetBoundaryNode(higain);
 	}
 
-	for (GGraph::neighbor_iterator jj = graph->neighbor_begin(higain, Galois::NONE), eejj = graph->neighbor_end(higain, Galois::NONE); jj != eejj; ++jj) {
-		GNode neighbor = *jj;
-		MetisNode& neighborData = neighbor.getData();
+	for (GGraph::edge_iterator jj = graph->edge_begin(higain, Galois::NONE), eejj = graph->edge_end(higain, Galois::NONE); jj != eejj; ++jj) {
+	  GNode neighbor = graph->getEdgeDst(jj);
+	  MetisNode& neighborData = graph->getData(neighbor);
 		int oldgain = neighborData.getGain();
-		int edgeWeight = (int) graph->getEdgeData(higain, jj);
+		int edgeWeight = (int) graph->getEdgeData(jj);
 		int kwgt = (to == neighborData.getPartition() ? edgeWeight : -edgeWeight);
 		neighborData.setEdegree(neighborData.getEdegree() - kwgt);
 		neighborData.setIdegree(neighborData.getIdegree() + kwgt);
@@ -84,14 +84,14 @@ void moveNode(PQueue* parts[],MetisGraph* metisGraph, GNode higain, int to, int*
 
 void moveBackNode(MetisGraph* metisGraph, GNode higain) {
 	GGraph* graph = metisGraph->getGraph();
-	MetisNode& higainData = higain.getData();
+	MetisNode& higainData = graph->getData(higain);
 
 	int to = (higainData.getPartition() + 1) % 2;
 	higainData.setPartition(to);
 	higainData.swapEDAndID();
 	higainData.updateGain();
 
-	if (higainData.getEdegree() == 0 && higainData.isBoundary() && graph->neighborsSize(higain)>0) {
+	if (higainData.getEdegree() == 0 && higainData.isBoundary() && graph->edge_begin(higain) != graph->edge_end(higain)) {
 		metisGraph->unsetBoundaryNode(higain);
 	} else if (higainData.getEdegree() > 0 && !higainData.isBoundary()) {
 		metisGraph->setBoundaryNode(higain);
@@ -100,10 +100,10 @@ void moveBackNode(MetisGraph* metisGraph, GNode higain) {
 	metisGraph->incPartWeight((to + 1) % 2, -higainData.getWeight());
 	metisGraph->incPartWeight(to, higainData.getWeight());
 
-	for (GGraph::neighbor_iterator jj = graph->neighbor_begin(higain, Galois::NONE), eejj = graph->neighbor_end(higain, Galois::NONE); jj != eejj; ++jj) {
-		GNode neighbor = *jj;
-		MetisNode& neighborData = neighbor.getData();
-		int edgeWeight = (int)metisGraph->getGraph()->getEdgeData(higain, jj);
+	for (GGraph::edge_iterator jj = graph->edge_begin(higain, Galois::NONE), eejj = graph->edge_end(higain, Galois::NONE); jj != eejj; ++jj) {
+	  GNode neighbor = graph->getEdgeDst(jj);
+		MetisNode& neighborData = graph->getData(neighbor);
+		int edgeWeight = (int)metisGraph->getGraph()->getEdgeData(jj);
 		int kwgt = (to == neighborData.getPartition() ? edgeWeight : -edgeWeight);
 		neighborData.setEdegree(neighborData.getEdegree() - kwgt);
 		neighborData.setIdegree(neighborData.getIdegree() + kwgt);
@@ -125,14 +125,14 @@ void fmTwoWayEdgeRefine(MetisGraph* metisGraph, int* tpwgts, int npasses) {
 
 	int* moved = new int[numNodes];
 
-	parts[0] = new PQueue(numNodes, metisGraph->getMaxAdjSum());
-	parts[1] = new PQueue(numNodes, metisGraph->getMaxAdjSum());
+	parts[0] = new PQueue(numNodes, metisGraph->getMaxAdjSum(),metisGraph->getGraph());
+	parts[1] = new PQueue(numNodes, metisGraph->getMaxAdjSum(),metisGraph->getGraph());
 
 	int limit = min(max((int) (0.01 * numNodes), 15), 100);
 	int totalWeight = metisGraph->getPartWeight(0) + metisGraph->getPartWeight(1);
 
 	int avgvwgt = min(totalWeight, 2 * totalWeight / numNodes);
-	arrayFill(moved, numNodes, -1);
+	std::fill_n(moved, numNodes, -1);
 
 	int origdiff = abs(tpwgts[0] - metisGraph->getPartWeight(0));
 	for (int pass = 0; pass < npasses; pass++) {
@@ -146,7 +146,7 @@ void fmTwoWayEdgeRefine(MetisGraph* metisGraph, int* tpwgts, int npasses) {
 		GNodeSet* boundaryNodeSet= metisGraph->getBoundaryNodes();
 		for (GNodeSet::iterator bndIter = boundaryNodeSet->begin(); bndIter != boundaryNodeSet->end(); ++bndIter) {
 			GNode boundaryNode = *bndIter;
-			MetisNode& boundaryNodeData = boundaryNode.getData();
+			MetisNode& boundaryNodeData = metisGraph->getGraph()->getData(boundaryNode);
 			boundaryNodeData.updateGain();
 //			assert(boundaryNodeData.getNodeId()<graph->size());
 			parts[boundaryNodeData.getPartition()]->insert(boundaryNode, boundaryNodeData.getGain());
@@ -169,7 +169,7 @@ void fmTwoWayEdgeRefine(MetisGraph* metisGraph, int* tpwgts, int npasses) {
 
 			GNode higain = parts[from]->getMax();
 
-			MetisNode& higainData = higain.getData();
+			MetisNode& higainData = metisGraph->getGraph()->getData(higain);
 
 			newcut -= higainData.getGain();
 
@@ -193,7 +193,7 @@ void fmTwoWayEdgeRefine(MetisGraph* metisGraph, int* tpwgts, int npasses) {
 
 		/* roll back computations */
 		for (int i = 0; i < nswaps; i++) {
-			moved[swaps[i].getData().getNodeId()] = -1; /* reset moved array */
+		  moved[metisGraph->getGraph()->getData(swaps[i]).getNodeId()] = -1; /* reset moved array */
 		}
 		nswaps--;
 		for (; nswaps > mincutorder; nswaps--) {

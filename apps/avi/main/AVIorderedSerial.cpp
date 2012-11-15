@@ -7,9 +7,8 @@
 #include "AVIabstractMain.h"
 
 int main (int argc, char* argv[]) {
-  AVIorderedSerial* serial = new AVIorderedSerial ();
-  serial->run (argc, argv);
-  delete serial;
+  AVIorderedSerial serial;
+  serial.run (argc, argv);
   return 0;
 }
 

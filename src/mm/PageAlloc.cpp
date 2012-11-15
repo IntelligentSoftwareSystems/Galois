@@ -23,7 +23,7 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/Runtime/mem.h"
+#include "Galois/Runtime/mm/Mem.h"
 
 #include <map>
 #include <list>
@@ -48,12 +48,22 @@ struct FreeNode {
   FreeNode* next;
 };
  
-typedef GaloisRuntime::LL::PtrLock<FreeNode*, true> HeadPtr;
+typedef GaloisRuntime::LL::PtrLock<FreeNode, true> HeadPtr;
 
 //Number of pages allocated
-static unsigned num = 0;
-static std::list<HeadPtr*> heads;
-static std::map<void*, HeadPtr*> ownerMap;
+struct PAState {
+  unsigned num;
+  std::map<void*, HeadPtr*> ownerMap;
+};
+
+//FIXME: make thread safe
+PAState& getPAState() {
+  static PAState* p;
+  if (!p)
+    p = new PAState();
+  return *p;
+}
+
 #ifdef __linux__
 #define DoAllocLock true
 #else
@@ -72,7 +82,6 @@ void* allocFromOS() {
   //First try huge
   ptr = mmap(0, GaloisRuntime::MM::pageSize, _PROT, _MAP_HUGE, -1, 0);
 #endif
-  
 
   //FIXME: improve failure case to ensure pageSize alignment
 #ifdef MAP_POPULATE
@@ -95,19 +104,15 @@ void* allocFromOS() {
   HeadPtr*& h = head;
   if (!h) { //first allocation
     h = new HeadPtr();
-    heads.push_back(h);
   }
-  ownerMap[ptr] = h;
-  ++num;
+  PAState& p = getPAState();
+  p.ownerMap[ptr] = h;
+  ++p.num;
   dataLock.unlock();
   return ptr;
 }
 
-
-
 } // end anon namespace
-
-
 
 void* GaloisRuntime::MM::pageAlloc() {
   HeadPtr* phead = head;
@@ -125,7 +130,7 @@ void* GaloisRuntime::MM::pageAlloc() {
 
 void GaloisRuntime::MM::pageFree(void* m) {
   dataLock.lock();
-  HeadPtr* phead = ownerMap[m];
+  HeadPtr* phead = getPAState().ownerMap[m];
   dataLock.unlock();
   assert(phead);
   phead->lock();
@@ -140,6 +145,5 @@ void GaloisRuntime::MM::pagePreAlloc(int numPages) {
 }
 
 unsigned GaloisRuntime::MM::pageAllocInfo() {
-  return num;
+  return getPAState().num;
 }
-

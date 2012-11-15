@@ -55,7 +55,7 @@
 #ifndef GALOIS_GRAPHS_FILEGRAPH_H
 #define GALOIS_GRAPHS_FILEGRAPH_H
 
-#include "Galois/ConflictFlags.h"
+#include "Galois/MethodFlags.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/ll/CacheLineStorage.h"
 #include "Galois/util/Endian.h"

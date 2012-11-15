@@ -21,8 +21,6 @@
 #ifndef GALOIS_THREADS_H
 #define GALOIS_THREADS_H
 
-//This is a separate file so that Threads.cpp can include almost nothing
-
 namespace Galois {
 
 /**
@@ -30,7 +28,12 @@ namespace Galois {
  * the actual value of threads used, which could be less than
  * the requested value.
  */
-unsigned int setMaxThreads(unsigned int num);
+unsigned int setActiveThreads(unsigned int num);
+
+/**
+ * Returns the number of threads in use.
+ */
+unsigned int getActiveThreads();
 
 }
 #endif

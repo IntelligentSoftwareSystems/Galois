@@ -29,7 +29,7 @@
 #include "Material.h"
 
 // calling default constructor
-GaloisRuntime::PerCPU<NeoHookean::NeoHookenTmpVec> NeoHookean::perCPUtmpVec;
+GaloisRuntime::PerThreadStorage<NeoHookean::NeoHookenTmpVec> NeoHookean::perCPUtmpVec;
 
 static double matlib_determinant(const double *A) {
   double det;
@@ -104,7 +104,7 @@ bool NeoHookean::getConstitutiveResponse(const std::vector<double>& strain, std:
   double p;
   double trace;
 
-  NeoHookenTmpVec& tmpVec = perCPUtmpVec.get ();
+  NeoHookenTmpVec& tmpVec = *perCPUtmpVec.getLocal ();
   double* F = tmpVec.F;
   double* Finv = tmpVec.Finv;
   double* C = tmpVec.C;

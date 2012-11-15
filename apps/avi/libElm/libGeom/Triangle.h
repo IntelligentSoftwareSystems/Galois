@@ -213,7 +213,7 @@ double Triangle<SPD>:: getInRadius(void) const {
   c = sqrt(c);
   s = (a + b + c)/2.0;
   return(2.0*sqrt(s*(s-a)*(s-b)*(s-c))/(a+b+c));
-};
+}
 
 
 template<size_t SPD> 
@@ -232,7 +232,7 @@ double Triangle<SPD>:: getOutRadius(void) const {
   b = sqrt(b);
   c = sqrt(c);
   return(a*b*c/sqrt((a+b+c)*(b+c-a)*(c+a-b)*(a+b-c)));
-};
+}
 
 template <size_t SPD>
 void Triangle<SPD>::computeNormal(size_t e, std::vector<double> &VNormal) const {

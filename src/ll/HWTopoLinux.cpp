@@ -32,9 +32,8 @@
 #ifdef __linux__
 
 #include "Galois/Runtime/ll/HWTopo.h"
+#include "Galois/Runtime/ll/EnvCheck.h"
 #include "Galois/Runtime/ll/gio.h"
-
-#define DEBUG_HWTOPOLINUX 0
 
 #include <stdio.h>
 #include <sched.h>
@@ -60,13 +59,6 @@ struct cpuinfo {
 
 static const char* sProcInfo = "/proc/cpuinfo";
 static const char* sCPUSet   = "/proc/self/cpuset";
-
-#if DEBUG_HWTOPOLINUX
-void printCPUINFO(const cpuinfo& p) {
-  gPrint("(proc %d, physid %d, sib %d, coreid %d, cpucores %d\n",
-	 p.proc, p.physid, p.sib, p.coreid, p.cpucores);
-}
-#endif
 
 static bool linuxBindToProcessor(int proc) {
   cpu_set_t mask;
@@ -207,13 +199,13 @@ std::vector<int> parseCPUSet() {
 
 struct AutoLinuxPolicy {
   //number of hw supported threads
-  int numThreads, numThreadsRaw;
+  unsigned numThreads, numThreadsRaw;
   
   //number of "real" processors
-  int numCores, numCoresRaw;
+  unsigned numCores, numCoresRaw;
 
   //number of packages
-  int numPackages, numPackagesRaw;
+  unsigned numPackages, numPackagesRaw;
 
   std::vector<int> packages;
   std::vector<int> maxPackage;
@@ -249,96 +241,36 @@ struct AutoLinuxPolicy {
     }
   };
 
-
   AutoLinuxPolicy() {
     std::vector<cpuinfo> vals = parseCPUInfo();
     virtmap = parseCPUSet();
 
-    std::vector<int>::iterator tempi;
-
     if (virtmap.empty()) {
       //1-1 mapping for non-cpuset using systems
-      for (int i = 0; i < (int)vals.size(); ++i)
+      for (unsigned i = 0; i < vals.size(); ++i)
 	virtmap.push_back(i);
     }
 
-#if DEBUG_HWTOPOLINUX
-    //DEBUG:
-    for (int i = 0; i < vals.size(); ++i)
-      printCPUINFO(vals[i]);
-    for (int i = 0; i < virtmap.size(); ++i)
-      gPrint("%d, ", virtmap[i]);
-    gPrint("\n");
-    //End DEBUG
-#endif
+    if (EnvCheck("GALOIS_DEBUG_TOPO"))
+      printRawConfiguration(vals);
 
     //Get thread count
     numThreadsRaw = vals.size();
     numThreads = virtmap.size();
 
     //Get package level stuff
-    int maxrawpackage;
-    //First, get raw info
-    for (int i = 0; i < (int)vals.size(); ++i)
-      packages.push_back(vals[i].physid);
-    maxrawpackage = *std::max_element(packages.begin(), packages.end());
-    std::sort(packages.begin(), packages.end());
-    tempi = std::unique(packages.begin(), packages.end());
-    numPackagesRaw = std::distance(packages.begin(), tempi);
-    packages.clear();
+    int maxrawpackage = generateRawPackageData(vals);
+    generatePackageData(vals);
     
-    //Second, get cpuset info
-    for (int i = 0; i < (int)virtmap.size(); ++i)
-      packages.push_back(vals[virtmap[i]].physid);
-    std::sort(packages.begin(), packages.end());
-    tempi = std::unique(packages.begin(), packages.end());
-    numPackages = std::distance(packages.begin(), tempi);
-    packages.clear();
-    
-    //Third, Sort by package to get package-dense mapping
+    //Sort by package to get package-dense mapping
     std::sort(virtmap.begin(), virtmap.end(), DensePackageLessThan(vals));
-    //Find duplicates, which are hyperthreads, and place them at the end
-    {
-      // annoyingly, values after tempi are unspecified for std::unique, so copy in and out instead
-      std::vector<int> dense(numThreads);
-      tempi = std::unique_copy(virtmap.begin(), virtmap.end(), 
-          dense.begin(), DensePackageEqual(vals));
-      std::vector<bool> mask(numThreadsRaw);
-      for (std::vector<int>::iterator ii = dense.begin(); ii < tempi; ++ii)
-        mask[*ii] = true;
-      for (std::vector<int>::iterator ii = virtmap.begin(), ei = virtmap.end(); ii < ei; ++ii) {
-        if (!mask[*ii])
-          *tempi++ = *ii;
-      }
-      virtmap = dense;
-    }
+    generateHyperthreads(vals);
 
     //Finally renumber for virtual processor numbers
-    {
-      std::vector<int> mapping(maxrawpackage+1);
-      int nextval = 1;
-      for (int i = 0; i < (int)virtmap.size(); ++i) {
-	int x = vals[virtmap[i]].physid;
-	if (!mapping[x])
-	  mapping[x] = nextval++;
-	packages.push_back(mapping[x]-1);
-      }
-    }
+    finalizePackageData(vals, maxrawpackage);
 
     //Get core count
-    std::vector<std::pair<int, int> > cores;
-    //but first get the raw numbers
-    for (int i = 0; i < (int)vals.size(); ++i)
-      cores.push_back(std::make_pair(vals[i].physid, vals[i].coreid));
-    std::sort(cores.begin(), cores.end());
-    std::vector<std::pair<int,int> >::iterator core_u = std::unique(cores.begin(), cores.end());
-    numCoresRaw = std::distance(cores.begin(), core_u);
-    cores.clear();
-    for (int i = 0; i < (int)virtmap.size(); ++i)
-      cores.push_back(std::make_pair(vals[virtmap[i]].physid, vals[virtmap[i]].coreid));
-    std::sort(cores.begin(), cores.end());
-    core_u = std::unique(cores.begin(), cores.end());
-    numCores = std::distance(cores.begin(), core_u);
+    numCores = generateCoreData(vals);
  
     //Compute cummulative max package
     int p = 0;
@@ -354,21 +286,100 @@ struct AutoLinuxPolicy {
       if (leaders[packages[i]] == -1)
 	leaders[packages[i]] = i;
 
-#if DEBUG_HWTOPOLINUX
+    
+    if (EnvCheck("GALOIS_DEBUG_TOPO"))
+      printFinalConfiguration(); 
+  }
+
+  void printRawConfiguration(const std::vector<cpuinfo>& vals) {
+    for (unsigned i = 0; i < vals.size(); ++i) {
+      const cpuinfo& p = vals[i];
+      gPrint("(proc %d, physid %d, sib %d, coreid %d, cpucores %d\n",
+             p.proc, p.physid, p.sib, p.coreid, p.cpucores);
+    }
+    for (unsigned i = 0; i < virtmap.size(); ++i)
+      gPrint("%d, ", virtmap[i]);
+    gPrint("\n");
+  }
+
+  void printFinalConfiguration() {
     //DEBUG: PRINT Stuff
     gPrint("Threads: %d, %d (raw)\n", numThreads, numThreadsRaw);
     gPrint("Cores: %d, %d (raw)\n", numCores, numCoresRaw);
     gPrint("Packages: %d, %d (raw)\n", numPackages, numPackagesRaw);
 
-    for (int i = 0; i < virtmap.size(); ++i) {
-      gPrint("T %3d P %3d Tr %3d %d", i, packages[i], virtmap[i], (i == leaders[packages[i]] ? 1 : 0));
+    for (unsigned i = 0; i < virtmap.size(); ++i) {
+      gPrint("T %3d P %3d Tr %3d %d", i, packages[i], virtmap[i], ((int)i == leaders[packages[i]] ? 1 : 0));
       if (i >= numCores)
 	gPrint(" HT");
       gPrint("\n");
     }
-#endif
   }
 
+  void finalizePackageData(const std::vector<cpuinfo>& vals, int maxrawpackage) {
+    std::vector<int> mapping(maxrawpackage+1);
+    int nextval = 1;
+    for (int i = 0; i < (int)virtmap.size(); ++i) {
+      int x = vals[virtmap[i]].physid;
+      if (!mapping[x])
+        mapping[x] = nextval++;
+      packages.push_back(mapping[x]-1);
+    }
+  }
+
+  unsigned generateCoreData(const std::vector<cpuinfo>& vals) {
+    std::vector<std::pair<int, int> > cores;
+    //first get the raw numbers
+    for (unsigned i = 0; i < vals.size(); ++i)
+      cores.push_back(std::make_pair(vals[i].physid, vals[i].coreid));
+    std::sort(cores.begin(), cores.end());
+    std::vector<std::pair<int,int> >::iterator it = std::unique(cores.begin(), cores.end());
+    numCoresRaw = std::distance(cores.begin(), it);
+    cores.clear();
+
+    for (unsigned i = 0; i < virtmap.size(); ++i)
+      cores.push_back(std::make_pair(vals[virtmap[i]].physid, vals[virtmap[i]].coreid));
+    std::sort(cores.begin(), cores.end());
+    it = std::unique(cores.begin(), cores.end());
+    return std::distance(cores.begin(), it);
+  }
+
+  void generateHyperthreads(const std::vector<cpuinfo>& vals) {
+    //Find duplicates, which are hyperthreads, and place them at the end
+    // annoyingly, values after tempi are unspecified for std::unique, so copy in and out instead
+    std::vector<int> dense(numThreads);
+    std::vector<int>::iterator it = std::unique_copy(virtmap.begin(), virtmap.end(), 
+        dense.begin(), DensePackageEqual(vals));
+    std::vector<bool> mask(numThreadsRaw);
+    for (std::vector<int>::iterator ii = dense.begin(); ii < it; ++ii)
+      mask[*ii] = true;
+    for (std::vector<int>::iterator ii = virtmap.begin(), ei = virtmap.end(); ii < ei; ++ii) {
+      if (!mask[*ii])
+        *it++ = *ii;
+    }
+    virtmap = dense;
+  }
+  
+  void generatePackageData(const std::vector<cpuinfo>& vals) {
+    std::vector<int> p;
+    for (unsigned i = 0; i < virtmap.size(); ++i)
+      p.push_back(vals[virtmap[i]].physid);
+    std::sort(p.begin(), p.end());
+    std::vector<int>::iterator it = std::unique(p.begin(), p.end());
+    numPackages = std::distance(p.begin(), it);
+  }
+
+  int generateRawPackageData(const std::vector<cpuinfo>& vals) {
+    std::vector<int> p;
+    for (unsigned i = 0; i < vals.size(); ++i)
+      p.push_back(vals[i].physid);
+
+    int retval = *std::max_element(p.begin(), p.end());
+    std::sort(p.begin(), p.end());
+    std::vector<int>::iterator it = std::unique(p.begin(), p.end());
+    numPackagesRaw = std::distance(p.begin(), it);
+    return retval;
+  }
 };
 
 AutoLinuxPolicy A;
@@ -405,8 +416,19 @@ unsigned GaloisRuntime::LL::getMaxPackageForThread(int id) {
 }
 
 bool GaloisRuntime::LL::isLeaderForPackageInternal(int id) {
-  assert(id < (int)A.leaders.size());
+  assert(id < (int)A.packages.size());
+  return A.leaders[A.packages[id]] == id;
+}
+
+unsigned GaloisRuntime::LL::getLeaderForThread(int id) {
+  assert(id < (int)A.packages.size());
   return A.leaders[A.packages[id]];
 }
+
+unsigned GaloisRuntime::LL::getLeaderForPackage(int id) {
+  assert(id < (int)A.leaders.size());
+  return A.leaders[id];
+}
+
 
 #endif //__linux__

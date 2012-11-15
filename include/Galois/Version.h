@@ -25,5 +25,5 @@
 #ifndef GALOIS_VERSION_H
 #define GALOIS_VERSION_H
 
-#include "config.h"
+#include "Galois/config.h"
 #endif

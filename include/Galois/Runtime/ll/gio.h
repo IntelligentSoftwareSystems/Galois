@@ -26,17 +26,24 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#ifndef _GIO_H
-#define _GIO_H
+#ifndef GALOIS_RUNTIME_LL_GIO_H
+#define GALOIS_RUNTIME_LL_GIO_H
 
 namespace GaloisRuntime {
 namespace LL {
 
 void gPrint(const char* format, ...);
-void gInfo( const char* format, ...);
-void gWarn( const char* format, ...);
+void gDebug(const char* format, ...);
+void gInfo(const char* format, ...);
+void gWarn(const char* format, ...);
 void gError(bool doabort, const char* format, ...);
 void gFlush();
+
+#ifndef NDEBUG
+#define GALOIS_DEBUG_PRINT(...) { GaloisRuntime::LL::gDebug (__VA_ARGS__); }
+#else
+#define GALOIS_DEBUG_PRINT(...) { do {} while (false); }
+#endif
 
 }
 }

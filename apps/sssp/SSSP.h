@@ -40,10 +40,10 @@ struct UpdateRequestCommon {
   GrNode n;
   unsigned int w;
 
-UpdateRequestCommon(const GrNode& N, unsigned int W)
-  :n(N), w(W)
+  UpdateRequestCommon(const GrNode& N, unsigned int W)
+    :n(N), w(W)
   {}
-
+  
   UpdateRequestCommon()
     :n(), w(0)
   {}
@@ -66,7 +66,6 @@ UpdateRequestCommon(const GrNode& N, unsigned int W)
   }
 
   uintptr_t getID() const {
-    //return static_cast<uintptr_t>(n);
     return reinterpret_cast<uintptr_t>(n);
   }
 };

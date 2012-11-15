@@ -48,7 +48,7 @@ public:
 		int totalVertexWeight = 0;
 		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 			GNode node = *ii;
-			totalVertexWeight += node.getData().getWeight();
+			totalVertexWeight += graph->getData(node).getWeight();
 		}
 
 		float vertexWeightRatio = 0;
@@ -66,8 +66,8 @@ public:
 		if (nparts <= 2) {
 			for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 				GNode node = *ii;
-				assert(node.getData().getPartition()>=0);
-				node.getData().setPartition(node.getData().getPartition() + partStartIndex);
+				assert(graph->getData(node).getPartition()>=0);
+				graph->getData(node).setPartition(graph->getData(node).getPartition() + partStartIndex);
 			}
 		} else {
 			for (int i = 0; i < nparts / 2; i++) {
@@ -87,7 +87,7 @@ public:
 			} else if (nparts == 3) {
 				for (GGraph::iterator ii = subGraphs[0].getGraph()->begin(), ee = subGraphs[0].getGraph()->end(); ii != ee; ++ii) {
 					GNode node = *ii;
-					MetisNode& nodeData = node.getData(Galois::NONE);
+					MetisNode& nodeData = subGraphs[0].getGraph()->getData(node,Galois::NONE);
 					nodeData.setPartition(partStartIndex);
 					assert(nodeData.getPartition()>=0);
 				}
@@ -97,8 +97,8 @@ public:
 			}
 			for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 				GNode node = *ii;
-				MetisNode& nodeData = node.getData();
-				nodeData.setPartition(metisGraph->getSubGraphMapTo(nodeData.getNodeId()).getData().getPartition());
+				MetisNode& nodeData = graph->getData(node);
+				nodeData.setPartition(graph->getData(metisGraph->getSubGraphMapTo(nodeData.getNodeId())).getPartition());
 				assert(nodeData.getPartition()>=0);
 			}
 
@@ -120,7 +120,7 @@ public:
 		metisGraph->initSubGraphMapTo();
 		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 			GNode node = *ii;
-			MetisNode& nodeData = node.getData();
+			MetisNode& nodeData = graph->getData(node);
 			assert(nodeData.getPartition()>=0);
 			GNode newNode = subGraphs[nodeData.getPartition()].getGraph()->createNode(
 					MetisNode(subGraphNodeNum[nodeData.getPartition()], nodeData.getWeight()));
@@ -136,21 +136,21 @@ public:
 
 		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 			GNode node = *ii;
-			MetisNode& nodeData = node.getData();
+			MetisNode& nodeData = graph->getData(node);
 			int index = nodeData.getPartition();
 			GGraph* subGraph = subGraphs[index].getGraph();
-			metisGraph->getSubGraphMapTo(nodeData.getNodeId()).getData().setAdjWgtSum(nodeData.getAdjWgtSum());
-			assert(metisGraph->getSubGraphMapTo(nodeData.getNodeId()).getData().getAdjWgtSum()>=0);
-			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(node, Galois::NONE), eejj = graph->neighbor_end(node, Galois::NONE); jj != eejj; ++jj) {
-				GNode neighbor = *jj;
+			subGraph->getData(metisGraph->getSubGraphMapTo(nodeData.getNodeId())).setAdjWgtSum(nodeData.getAdjWgtSum());
+			assert(subGraph->getData(metisGraph->getSubGraphMapTo(nodeData.getNodeId())).getAdjWgtSum()>=0);
+			for (GGraph::edge_iterator jj = graph->edge_begin(node, Galois::NONE), eejj = graph->edge_end(node, Galois::NONE); jj != eejj; ++jj) {
+			  GNode neighbor = graph->getEdgeDst(jj);
 
-				MetisNode& neighborData = neighbor.getData();
-				int edgeWeight = graph->getEdgeData(node, jj);
+			  MetisNode& neighborData = graph->getData(neighbor);
+				int edgeWeight = graph->getEdgeData(jj);
 				if (!nodeData.isBoundary() || nodeData.getPartition() == neighborData.getPartition()) {
-					subGraph->addEdge(metisGraph->getSubGraphMapTo(nodeData.getNodeId()), metisGraph->getSubGraphMapTo(neighborData.getNodeId()), edgeWeight);
+				  subGraph->getEdgeData(subGraph->addEdge(metisGraph->getSubGraphMapTo(nodeData.getNodeId()), metisGraph->getSubGraphMapTo(neighborData.getNodeId()))) = edgeWeight;
 				} else {
-					metisGraph->getSubGraphMapTo(nodeData.getNodeId()).getData().setAdjWgtSum(
-							metisGraph->getSubGraphMapTo(nodeData.getNodeId()).getData().getAdjWgtSum() - edgeWeight);
+				  subGraph->getData(metisGraph->getSubGraphMapTo(nodeData.getNodeId())).setAdjWgtSum(
+														     subGraph->getData(metisGraph->getSubGraphMapTo(nodeData.getNodeId())).getAdjWgtSum() - edgeWeight);
 
 				}
 			}

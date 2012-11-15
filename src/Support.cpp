@@ -20,96 +20,127 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#include "Galois/Runtime/ll/SimpleLock.h"
+#include "Galois/Runtime/ll/StaticInstance.h"
+#include "Galois/Runtime/ll/gio.h"
+#include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/Support.h"
-#include "llvm/ADT/SmallVector.h"
+
+#include "Galois/Statistic.h"
+
+#include <set>
 #include <map>
 #include <vector>
-#include <cstdio>
+#include <string>
+#include <cmath>
 
-static GaloisRuntime::LL::SimpleLock<true> lock;
+using GaloisRuntime::LL::gPrint;
 
 namespace {
-class PrintStats {
-  typedef std::pair<const char*, const char*> strPair;
-  typedef std::map<strPair, unsigned long> StatsMap;
-  typedef std::map<int, GaloisRuntime::OnlineStatistics> DistStatsValue;
-  typedef std::map<strPair, DistStatsValue> DistStatsMap;
-  StatsMap stats;
-  DistStatsMap distStats;
-  int gcounter;
 
-  void summarizeList(int iternum, const char* first, const char* second,
-      const GaloisRuntime::OnlineStatistics& x) {
-    printf("STAT DISTRIBUTION %d %s %s n: %zu ave: %.1f "
-      "min: %.0f max: %.0f stdev: %.1f\n",
-      iternum, first, second, x.n(), x.mean(), x.min(), x.max(), sqrt(x.sample_variance()));
+class StatManager {
+
+  typedef std::pair<std::string, std::string> KeyTy;
+
+  GaloisRuntime::PerThreadStorage<std::map<KeyTy, unsigned long> > Stats;
+
+  volatile unsigned maxID;
+
+  void updateMax() {
+    unsigned n = GaloisRuntime::galoisActiveThreads;
+    unsigned c;
+    while (n > (c = maxID))
+      __sync_bool_compare_and_swap(&maxID, c, n);
+  }
+
+  KeyTy mkKey(const std::string& loop, const std::string& category) {
+    return std::make_pair(loop,category);
+  }
+
+  void gather(const std::string& s1, const std::string& s2, unsigned m, 
+	      std::vector<unsigned long>& v) {
+    for (unsigned x = 0; x < m; ++x)
+      v.push_back((*Stats.getRemote(x))[mkKey(s1,s2)]);
+  }
+
+  unsigned long getSum(std::vector<unsigned long>& Values, unsigned maxThreadID) {
+    unsigned long R = 0;
+    for (unsigned x = 0; x < maxThreadID; ++x)
+      R += Values[x];
+    return R;
   }
 
 public:
-  PrintStats() : gcounter(0) { }
-  ~PrintStats() {
-    for (StatsMap::iterator ii = stats.begin(), ee = stats.end();
-        ii != ee; ++ii) {
-      printf("STAT SINGLE %s %s %ld\n",
-          ii->first.first, 
-          ii->first.second ? ii->first.second : "(null)",
-          ii->second);
+
+  StatManager() :maxID(0) {}
+
+  void addToStat(const std::string& loop, const std::string& category, size_t value) {
+    (*Stats.getLocal())[mkKey(loop, category)] += value;
+    updateMax();
+  }
+
+  void addToStat(Galois::Statistic* value) {
+    for (unsigned x = 0; x < GaloisRuntime::galoisActiveThreads; ++x)
+      (*Stats.getRemote(x))[mkKey(value->getLoopname(), value->getStatname())] += value->getValue(x);
+    updateMax();
+  }
+
+  //Assume called serially
+  void printStats() {
+    std::set<KeyTy> LKs;
+    unsigned maxThreadID = maxID;
+    //Find all loops and keys
+    for (unsigned x = 0; x < maxThreadID; ++x) {
+      std::map<KeyTy, unsigned long>& M = *Stats.getRemote(x);
+      for (std::map<KeyTy, unsigned long>::iterator ii = M.begin(), ee = M.end();
+	   ii != ee; ++ii) {
+	LKs.insert(ii->first);
+      }
     }
-    for (DistStatsMap::iterator ii = distStats.begin(), ee = distStats.end();
-        ii != ee; ++ii) {
-      for (DistStatsValue::iterator i = ii->second.begin(), e = ii->second.end();
-          i != e; ++i) {
-        summarizeList(i->first,
-            ii->first.first ? ii->first.first : "(null)",
-            ii->first.second ? ii->first.second : "(null)",
-            i->second);
-      } 
+    //print header
+    gPrint("STATTYPE,LOOP,CATEGORY,n,sum");
+    for (unsigned x = 0; x < maxThreadID; ++x)
+      gPrint(",T%d", x);
+    gPrint("\n");
+    //print all values
+    for(std::set<KeyTy>::iterator ii = LKs.begin(), ee = LKs.end();
+	ii != ee; ++ii) {
+      std::vector<unsigned long> Values;
+      gather(ii->first, ii->second, maxThreadID, Values);
+      gPrint("STAT,%s,%s,%u,%lu", 
+	     ii->first.c_str(), 
+	     ii->second.c_str(),
+	     maxThreadID,
+	     getSum(Values, maxThreadID)
+	     );
+      for (unsigned x = 0; x < maxThreadID; ++x) {
+	gPrint(",%ld", Values[x]);
+      }
+      gPrint("\n");
     }
-  }
-
-  void reportStatAvg(const char* text, double val, const char* loopname) {
-    distStats[std::make_pair(text,loopname)][gcounter].push(val);
-  }
-
-  void reportStatSum(const char* text, unsigned long val, const char* loopname) {
-    stats[std::make_pair(text,loopname)] += val;
-  }
-
-  void incIteration() {
-    ++gcounter;
   }
 };
+
+static GaloisRuntime::LL::StaticInstance<StatManager> SM;
+
 }
 
-std::ostream& operator<<(std::ostream& os, const GaloisRuntime::OnlineStatistics& x) {
-  os << "n: " << x.n()
-    << " ave: " << x.mean()
-    << " min: " << x.min()
-    << " max: " << x.max()
-    << " stdev: " << x.sample_variance();
-  return os;
-}
-
-static PrintStats& getPS() {
-  static PrintStats P;
-  return P;
-}
 
 bool GaloisRuntime::inGaloisForEach = false;
 
-void GaloisRuntime::reportStatSum(const char* text, unsigned long val, const char* loopname) {
-  getPS().reportStatSum(text, val, loopname);
+void GaloisRuntime::reportStat(const char* loopname, const char* category, size_t value) {
+  SM.get()->addToStat(std::string(loopname ? loopname : "(NULL)"), 
+		      std::string(category ? category : "(NULL)"),
+		      value);
 }
 
-void GaloisRuntime::reportStatAvg(const char* text, unsigned long val, const char* loopname) {
-  getPS().reportStatAvg(text, val, loopname);
+void GaloisRuntime::reportStat(const std::string& loopname, const std::string& category, size_t value) {
+  SM.get()->addToStat(loopname, category, value);
 }
 
-void GaloisRuntime::statDone() {
-  getPS().incIteration();
+void GaloisRuntime::reportStat(Galois::Statistic* value) {
+  SM.get()->addToStat(value);
 }
 
-void GaloisRuntime::reportFlush() {
-  fflush(stdout);
+void GaloisRuntime::printStats() {
+  SM.get()->printStats();
 }

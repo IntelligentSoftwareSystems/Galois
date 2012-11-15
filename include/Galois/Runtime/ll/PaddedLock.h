@@ -28,8 +28,8 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-#ifndef _PADDED_LOCK_H
-#define _PADDED_LOCK_H
+#ifndef GALOIS_RUNTIME_LL_PADDED_LOCK_H
+#define GALOIS_RUNTIME_LL_PADDED_LOCK_H
 
 #include "SimpleLock.h"
 #include "CacheLineStorage.h"

@@ -25,20 +25,21 @@
  * @author Xin Sui <xinsui@cs.utexas.edu>
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-
 #include "Point.h"
 #include "Cavity.h"
 #include "QuadTree.h"
 #include "Verifier.h"
 
 #include "Galois/Galois.h"
+#include "Galois/Bag.h"
 #include "Galois/Statistic.h"
-#include "Galois/UserContext.h"
+#include "Galois/Runtime/WorkListAlt.h"
 
 #include "Lonestar/BoilerPlate.h"
 #include "llvm/Support/CommandLine.h"
 
 #include <boost/iterator/transform_iterator.hpp>
+#include <boost/iterator/counting_iterator.hpp>
 
 #include <algorithm>
 #include <deque>
@@ -59,17 +60,37 @@ static const char* url = "delaunay_triangulation";
 static cll::opt<std::string> doWriteMesh("writemesh", 
     cll::desc("Write the mesh out to files with basename"),
     cll::value_desc("basename"));
+static cll::opt<std::string> doWritePoints("writepoints",
+    cll::desc("Write the (reordered) points to filename"),
+    cll::value_desc("filename"));
+static cll::opt<bool> noReorderPoints("noreorder",
+    cll::desc("Don't reorder points to improve locality"),
+    cll::init(false));
 static cll::opt<std::string> inputname(cll::Positional, cll::desc("<input file>"), cll::Required);
 
-typedef std::vector<Point> PointList;
+enum DetAlgo {
+  nondet,
+  detBase,
+  detPrefix,
+  detDisjoint
+};
 
-Graph* graph;
+static cll::opt<DetAlgo> detAlgo(cll::desc("Deterministic algorithm:"),
+    cll::values(
+      clEnumVal(nondet, "Non-deterministic"),
+      clEnumVal(detBase, "Base execution"),
+      clEnumVal(detPrefix, "Prefix execution"),
+      clEnumVal(detDisjoint, "Disjoint execution"),
+      clEnumValEnd), cll::init(nondet));
 
-struct GetPointer: public std::unary_function<Point,Point*> {
+static Graph* graph;
+
+struct GetPointer: public std::unary_function<Point&,Point*> {
   Point* operator()(Point& p) const { return &p; }
 };
 
 //! Our main functor
+template<int Version=detBase>
 struct Process {
   typedef int tt_needs_per_iter_alloc;
   typedef int tt_does_not_need_parallel_push;
@@ -82,14 +103,93 @@ struct Process {
     Tuple tuple;
     ContainsTuple(const Graph& g, const Tuple& t): graph(g), tuple(t) { }
     bool operator()(const GNode& n) const {
+      assert(!graph.getData(n, Galois::NONE).boundary());
       return graph.getData(n, Galois::NONE).inTriangle(tuple);
     }
   };
 
   Process(QuadTree* t): tree(t) { }
 
-  template<typename Alloc2>
-  bool findContainingElement(const Point* p, const Alloc2& alloc, GNode& node) {
+  void computeCenter(const Element& e, Tuple& t) const {
+    for (int i = 0; i < 3; ++i) {
+      const Tuple& o = e.getPoint(i)->t();
+      for (int j = 0; j < 2; ++j) {
+        t[j] += o[j];
+      }
+    }
+    for (int j = 0; j < 2; ++j) {
+      t[j] *= 1/3.0;
+    }
+  }
+
+  void findBestNormal(const Element& element, const Point* p, const Point*& bestP1, const Point*& bestP2) {
+    Tuple center(0);
+    computeCenter(element, center);
+    int scale = element.clockwise() ? 1 : -1;
+
+    Tuple origin = p->t() - center;
+//        double length2 = origin.x() * origin.x() + origin.y() * origin.y();
+    bestP1 = bestP2 = NULL;
+    double bestVal;
+    for (int i = 0; i < 3; ++i) {
+      int next = i + 1;
+      if (next > 2) next -= 3;
+
+      const Point* p1 = element.getPoint(i);
+      const Point* p2 = element.getPoint(next);
+      double dx = p2->t().x() - p1->t().x();
+      double dy = p2->t().y() - p1->t().y();
+      Tuple normal(scale * -dy, scale * dx);
+      double val = normal.dot(origin); // / length2;
+      if (bestP1 == NULL || val > bestVal) {
+        bestVal = val;
+        bestP1 = p1;
+        bestP2 = p2;
+      }
+    }
+    assert(bestP1 != NULL && bestP2 != NULL && bestVal > 0);
+  }
+
+  GNode findCorrespondingNode(GNode start, const Point* p1, const Point* p2) {
+    for (Graph::edge_iterator ii = graph->edge_begin(start, Galois::CHECK_CONFLICT),
+        ei = graph->edge_end(start, Galois::CHECK_CONFLICT); ii != ei; ++ii) {
+      GNode dst = graph->getEdgeDst(ii);
+      Element& e = graph->getData(dst, Galois::NONE);
+      int count = 0;
+      for (int i = 0; i < e.dim(); ++i) {
+        if (e.getPoint(i) == p1 || e.getPoint(i) == p2) {
+          if (++count == 2)
+            return dst;
+        }
+      }
+    }
+    abort();
+  }
+
+  bool planarSearch(const Point* p, GNode start, GNode& node) {
+    // Try simple hill climbing instead
+    ContainsTuple contains(*graph, p->t());
+    while (!contains(start)) {
+      Element& element = graph->getData(start, Galois::CHECK_CONFLICT);
+      if (element.boundary()) {
+        // Should only happen when quad tree returns a boundary point which is rare
+        // There's only one way to go from here
+        assert(std::distance(graph->edge_begin(start), graph->edge_end(start)) == 1);
+        start = graph->getEdgeDst(graph->edge_begin(start, Galois::CHECK_CONFLICT));
+      } else {
+        // Find which neighbor will get us to point fastest by computing normal
+        // vectors
+        const Point *p1, *p2;
+        findBestNormal(element, p, p1, p2);
+        start = findCorrespondingNode(start, p1, p2);
+      }
+    }
+
+    node = start;
+    return true;
+  }
+
+  bool findContainingElement(const Point* p, GNode& node) {
     Point* result;
     if (!tree->find(p, result)) {
       return false;
@@ -99,57 +199,74 @@ struct Process {
 
     GNode someNode = result->someElement();
 
-    if (someNode == GNode()) {
-      // Not in mesh yet
+    // Not in mesh yet
+    if (!someNode) {
       return false;
     }
 
-    ContainsTuple contains(*graph, p->t());
-    Searcher<Alloc2> searcher(*graph, alloc);
-    searcher.useMark(p, 0, p->numTries());
-    searcher.findFirst(someNode, contains);
-
-    if (searcher.matches.empty()) {
-      return false;
-    }
-
-    node = searcher.matches.front();
-    return true;
+    return planarSearch(p, someNode, node);
   }
+
+  struct LocalState {
+    Cavity<Alloc> cav;
+    LocalState(Process<Version>& self, Galois::PerIterAllocTy& alloc): cav(*graph, alloc) { }
+  };
 
   //! Parallel operator
   void operator()(Point* p, Galois::UserContext<Point*>& ctx) {
+    Cavity<Alloc>* cavp = NULL;
+
+    if (Version == detDisjoint) {
+      bool used;
+      LocalState* localState = (LocalState*) ctx.getLocalState(used);
+      if (used) {
+        localState->cav.update();
+        return;
+      } else {
+        cavp = &localState->cav;
+      }
+    }
+
     p->acquire();
-    p->nextTry();
     assert(!p->inMesh());
 
     GNode node;
-    if (!findContainingElement(p, ctx.getPerIterAlloc(), node)) {
+    if (!findContainingElement(p, node)) {
       // Someone updated an element while we were searching, producing
       // a semi-consistent state
-      ctx.push(p);
+      //ctx.push(p);
+      // Current version is safe with locking so this shouldn't happen
+      std::cerr << "Should not happen\n";
+      abort();
       return;
     }
   
     assert(graph->getData(node).inTriangle(p->t()));
     assert(graph->containsNode(node));
 
-    Cavity<Alloc> cav(*graph, ctx.getPerIterAlloc());
-    cav.init(node, p);
-    cav.build();
-    cav.update();
+    if (Version == detDisjoint) {
+      cavp->init(node, p);
+      cavp->build();
+    } else {
+      Cavity<Alloc> cav(*graph, ctx.getPerIterAlloc());
+      cav.init(node, p);
+      cav.build();
+      if (Version == detPrefix)
+        return;
+      cav.update();
+    }
   }
 
   //! Serial operator
   void operator()(Point* p) {
     p->acquire();
-    p->nextTry();
     assert(!p->inMesh());
 
     GNode node;
-    if (!findContainingElement(p, std::allocator<char>(), node)) {
+    if (!findContainingElement(p, node)) {
       std::cerr << "Couldn't find triangle containing point\n";
       abort();
+      return;
     }
   
     assert(graph->getData(node).inTriangle(p->t()));
@@ -162,41 +279,16 @@ struct Process {
   }
 };
 
-struct ReadPoints {
-  PointList& result;
-  ReadPoints(PointList& r): result(r) { }
+typedef std::deque<Point> PointList;
 
-  void from(const std::string& name) {
-    PointList points;
-    std::ifstream scanner(name.c_str());
-    if (!scanner.good()) {
-      std::cerr << "Couldn't open file: " << name << "\n";
-      abort();
-    }
-    if (name.find(".node") == name.size() - 5) {
-      fromTriangle(scanner, points);
-    } else {
-      fromPointList(scanner, points);
-    }
-    scanner.close();
-    
-    // Improve locality
-    QuadTree t(
-      boost::make_transform_iterator(&points[0], GetPointer()),
-      boost::make_transform_iterator(&points[points.size()], GetPointer()));
-    t.output(std::back_insert_iterator<PointList>(result));
-    //std::copy(points.begin(), points.end(), std::back_insert_iterator<PointList>(result));
-
-    addBoundaryPoints();
-  }
-
+class ReadPoints {
   void addBoundaryPoints() {
     double minX, maxX, minY, maxY;
 
     minX = minY = std::numeric_limits<double>::max();
     maxX = maxY = std::numeric_limits<double>::min();
 
-    for (PointList::iterator ii = result.begin(), ei = result.end(); ii != ei; ++ii) {
+    for (PointList::iterator ii = points.begin(), ei = points.end(); ii != ei; ++ii) {
       double x = ii->t().x();
       double y = ii->t().y();
       if (x < minX)
@@ -209,7 +301,7 @@ struct ReadPoints {
         maxY = y;
     }
 
-    size_t size = result.size();
+    size_t size = points.size();
     double width = maxX - minX;
     double height = maxY - minY;
     double maxLength = std::max(width, height);
@@ -220,7 +312,7 @@ struct ReadPoints {
     for (int i = 0; i < 3; ++i) {
       double dX = radius * cos(2*M_PI*(i/3.0));
       double dY = radius * sin(2*M_PI*(i/3.0));
-      result.push_back(Point(centerX + dX, centerY + dY, size + i));
+      points.push_back(Point(centerX + dX, centerY + dY, size + i));
     }
   }
 
@@ -228,7 +320,7 @@ struct ReadPoints {
     scanner.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
   }
 
-  void fromTriangle(std::ifstream& scanner, PointList& points) {
+  void fromTriangle(std::ifstream& scanner) {
     double x, y;
     long numPoints;
 
@@ -250,7 +342,7 @@ struct ReadPoints {
     }
   }
 
-  void fromPointList(std::ifstream& scanner, PointList& points) {
+  void fromPointList(std::ifstream& scanner) {
     double x, y;
 
     // comment line
@@ -265,6 +357,32 @@ struct ReadPoints {
       nextLine(scanner);
     }
   }
+
+  PointList& points;
+
+public:
+  ReadPoints(PointList& p): points(p) { }
+
+  void from(const std::string& name) {
+    std::ifstream scanner(name.c_str());
+    if (!scanner.good()) {
+      std::cerr << "Couldn't open file: " << name << "\n";
+      abort();
+    }
+    if (name.find(".node") == name.size() - 5) {
+      fromTriangle(scanner);
+    } else {
+      fromPointList(scanner);
+    }
+    scanner.close();
+    
+    if (points.size())
+      addBoundaryPoints();
+    else {
+      std::cerr << "No points found in file: " << name << "\n";
+      abort();
+    }
+  }
 };
 
 static void writePoints(const std::string& filename, const PointList& points) {
@@ -272,6 +390,7 @@ static void writePoints(const std::string& filename, const PointList& points) {
   // <num vertices> <dimension> <num attributes> <has boundary markers>
   out << points.size() << " 2 0 0\n";
   //out.setf(std::ios::fixed, std::ios::floatfield);
+  out.setf(std::ios::scientific, std::ios::floatfield);
   out.precision(10);
   long id = 0;
   for (PointList::const_iterator it = points.begin(), end = points.end(); it != end; ++it) {
@@ -282,14 +401,25 @@ static void writePoints(const std::string& filename, const PointList& points) {
   out.close();
 }
 
-static void addBoundaryNodes(PointList& points) {
-  size_t last = points.size();
-  Point* p1 = &points[last-1];
-  Point* p2 = &points[last-2];
-  Point* p3 = &points[last-3];
+//! All Point* refer to elements in this bag
+Galois::InsertBag<Point> basePoints;
+size_t maxRounds;
+Galois::InsertBag<Point*>* rounds;
+const int roundShift = 4; //! round sizes are portional to (1 << roundsShift)
 
+static void copyPointsFromRounds(PointList& points) {
+  for (int i = maxRounds - 1; i >= 0; --i) {
+    Galois::InsertBag<Point*>& pptrs = rounds[i];
+    for (Galois::InsertBag<Point*>::iterator ii = pptrs.begin(), ei = pptrs.end(); ii != ei; ++ii) {
+      points.push_back(*(*ii));
+    }
+  }
+}
+
+static void addBoundaryNodes(Point* p1, Point* p2, Point* p3) {
   Element large_triangle(p1, p2, p3);
   GNode large_node = graph->createNode(large_triangle);
+  graph->addNode(large_node);
   
   p1->addElement(large_node);
   p2->addElement(large_node);
@@ -303,6 +433,10 @@ static void addBoundaryNodes(PointList& points) {
   GNode border_node2 = graph->createNode(border_ele2);
   GNode border_node3 = graph->createNode(border_ele3);
 
+  graph->addNode(border_node1);
+  graph->addNode(border_node2);
+  graph->addNode(border_node3);
+
   graph->getEdgeData(graph->addEdge(large_node, border_node1)) = 0;
   graph->getEdgeData(graph->addEdge(large_node, border_node2)) = 1;
   graph->getEdgeData(graph->addEdge(large_node, border_node3)) = 2;
@@ -312,12 +446,131 @@ static void addBoundaryNodes(PointList& points) {
   graph->getEdgeData(graph->addEdge(border_node3, large_node)) = 0;
 }
 
-static void makeGraph(const std::string& filename, PointList& points) {
+//! Streaming point distribution 
+struct GenerateRounds {
+  typedef GaloisRuntime::PerThreadStorage<unsigned> CounterTy;
+
+  const PointList& points;
+  size_t log2;
+  
+  GenerateRounds(const PointList& p, size_t l): points(p), log2(l) { }
+
+  void operator()(size_t index) {
+    const Point& p = points[index];
+
+    Point* ptr = &basePoints.push(p);
+    int r = 0;
+    for (size_t i = 0; i < log2; ++i) {
+      size_t mask = (1UL << (i + 1)) - 1;
+      if ((index & mask) == (1UL << i)) {
+        r = i;
+        break;
+      }
+    }
+    
+    rounds[r / roundShift].push(ptr);
+  }
+};
+
+//! Blocked point distribution (exponentially increasing block size) with points randomized
+//! within a round
+static void generateRoundsOld(PointList& points, bool randomize) {
+  size_t counter = 0;
+  size_t round = 0;
+  size_t next = 1 << roundShift;
+  std::vector<Point*> buf;
+
+  PointList::iterator ii = points.begin(), ei = points.end();
+  while (ii != ei) {
+    Point* ptr = &basePoints.push(*ii);
+    buf.push_back(ptr);
+    ++ii;
+    if (ii == ei || counter > next) {
+      next *= next;
+      int r = maxRounds - 1 - round;
+      if (randomize)
+        std::random_shuffle(buf.begin(), buf.end());
+      std::copy(buf.begin(), buf.end(), std::back_inserter(rounds[r]));
+      buf.clear();
+      ++round;
+    }
+    ++counter;
+  }
+}
+
+static void generateRounds(PointList& points, bool addBoundary) {
+  size_t size = points.size() - 3;
+
+  size_t log2 = std::max((size_t) floor(log(size) / log(2)), (size_t) 1);
+  maxRounds = log2 / roundShift;
+  rounds = new Galois::InsertBag<Point*>[maxRounds+1]; // +1 for boundary points
+
+  PointList ordered;
+  //ordered.reserve(size);
+
+  if (noReorderPoints) {
+    std::copy(points.begin(), points.begin() + size, std::back_inserter(ordered));
+    generateRoundsOld(ordered, false);
+  } else {
+    // Reorganize spatially
+    QuadTree q(
+	       boost::make_transform_iterator(points.begin(), GetPointer()),
+	       boost::make_transform_iterator(points.begin() + size, GetPointer()));
+
+    q.output(std::back_inserter(ordered));
+
+    if (true) {
+      if (detAlgo == nondet) {
+        Galois::do_all(
+            boost::counting_iterator<size_t>(0),
+            boost::counting_iterator<size_t>(size),
+            GenerateRounds(ordered, log2));
+      } else {
+        std::for_each(
+            boost::counting_iterator<size_t>(0),
+            boost::counting_iterator<size_t>(size),
+            GenerateRounds(ordered, log2));
+      }
+    } else {
+      generateRoundsOld(ordered, true);
+    }
+  }
+
+  if (!addBoundary)
+    return;
+
+  // Now, handle boundary points
+  size_t last = points.size();
+  Point* p1 = &basePoints.push(points[last-1]);
+  Point* p2 = &basePoints.push(points[last-2]);
+  Point* p3 = &basePoints.push(points[last-3]);
+
+  rounds[maxRounds].push(p1);
+  rounds[maxRounds].push(p2);
+  rounds[maxRounds].push(p3);
+
+  addBoundaryNodes(p1, p2, p3);
+}
+
+static void readInput(const std::string& filename, bool addBoundary) {
+  PointList points;
   ReadPoints(points).from(filename);
+
+  std::cout << "configuration: " << points.size() << " points\n";
 
   graph = new Graph();
 
-  addBoundaryNodes(points);
+  Galois::preAlloc(1 * numThreads // some per-thread state
+      + 2 * points.size() * sizeof(Element) // mesh is about 2x number of points (for random points)
+      * 32 // include graph node size
+      / (GaloisRuntime::MM::pageSize) // in pages
+      );
+  Galois::Statistic("MeminfoPre", GaloisRuntime::MM::pageAllocInfo());
+
+  Galois::StatTimer T("generateRounds");
+  T.start();
+  generateRounds(points, addBoundary);
+  T.stop();
 }
 
 static void writeMesh(const std::string& filename) {
@@ -353,17 +606,15 @@ static void writeMesh(const std::string& filename) {
     const Element& e = graph->getData(*ii);
     if (e.boundary()) {
       // <segment id> <vertex> <vertex> <is boundary>
-      pout << sid << " " << e.getPoint(0)->id() << " " << e.getPoint(1)->id() << " 1\n";
-      sid++;
+      pout << sid++ << " " << e.getPoint(0)->id() << " " << e.getPoint(1)->id() << " 1\n";
     } else {
       // <triangle id> <vertex> <vertex> <vertex> [in ccw order]
-      eout << tid << " " << e.getPoint(0)->id() << " ";
+      eout << tid++ << " " << e.getPoint(0)->id() << " ";
       if (e.clockwise()) {
         eout << e.getPoint(2)->id() << " " << e.getPoint(1)->id() << "\n";
       } else {
         eout << e.getPoint(1)->id() << " " << e.getPoint(2)->id() << "\n";
       }
-      tid++;
     }
   }
 
@@ -373,80 +624,69 @@ static void writeMesh(const std::string& filename) {
   pout.close();
 }
 
-static void generateMesh(PointList& points) {
-  size_t end = points.size();
-  size_t eend = end - 3; // end of "real" points
+static void generateMesh() {
+  typedef GaloisRuntime::WorkList::ChunkedAdaptor<false,32> CA;
 
-  // Random order is the best algorithmically
-  Galois::StatTimer T("build");
-  T.start();
-  typedef std::vector<Point*> OrderTy;
-  OrderTy order;
-  order.reserve(eend);
-  std::copy(
-      boost::make_transform_iterator(&points[0], GetPointer()),
-      boost::make_transform_iterator(&points[end], GetPointer()),
-      std::back_insert_iterator<OrderTy>(order));
-  // But don't randomize boundary points
-  std::random_shuffle(&order[0], &order[eend]);
-  T.stop();
-
-  size_t prefix = eend - std::min((size_t) 16*numThreads, eend);
- 
-  Galois::StatTimer T1("serial");
-  T1.start();
-  QuadTree q(&order[eend], &order[end]);
-  std::for_each(&order[prefix], &order[eend], Process(&q));
-  T1.stop();
-
-  const int multiplier = 8;
-  size_t nextStep = multiplier;
-  size_t top = prefix;
-  size_t prevTop = end;
-
-  using namespace GaloisRuntime::WorkList;
-  typedef GaloisRuntime::WorkList::dChunkedLIFO<32> WL;
-
-  do {
-    Galois::StatTimer T("build");
-    T.start();
-    //QuadTree q(&order[top], &order[prevTop]);
-    QuadTree q(&order[top], &order[end]);
-    prevTop = top;
-    top = top > nextStep ? top - nextStep : 0;
-    nextStep = nextStep*multiplier; //std::min(nextStep*multiplier, 1000000UL);
-    T.stop();
+  for (int i = maxRounds - 1; i >= 0; --i) {
+    Galois::StatTimer BT("buildtree");
+    BT.start();
+    Galois::InsertBag<Point*>& tptrs = rounds[i+1];
+    QuadTree tree(tptrs.begin(), tptrs.end());
+    BT.stop();
 
     Galois::StatTimer PT("ParallelTime");
     PT.start();
-    Galois::for_each<WL>(&order[top], &order[prevTop], Process(&q));
+    Galois::InsertBag<Point*>& pptrs = rounds[i];
+    switch (detAlgo) {
+      case nondet:
+        Galois::for_each_local<CA>(pptrs, Process<>(&tree)); break;
+      case detBase:
+        Galois::for_each_det(pptrs.begin(), pptrs.end(), Process<>(&tree)); break;
+      case detPrefix:
+        Galois::for_each_det(pptrs.begin(), pptrs.end(), Process<detPrefix>(&tree), Process<>(&tree));
+        break;
+      case detDisjoint:
+        Galois::for_each_det(pptrs.begin(), pptrs.end(), Process<detDisjoint>(&tree)); break;
+      default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
+    }
     PT.stop();
-  } while (top > 0);
+  }
 }
 
 int main(int argc, char** argv) {
-  LonestarStart(argc, argv, std::cout, name, desc, url);
+  Galois::StatManager statManager;
+  LonestarStart(argc, argv, name, desc, url);
 
-  PointList points;
-  makeGraph(inputname, points);
+  bool writepoints = doWritePoints.size() > 0;
+  readInput(inputname, !writepoints);
+  if (writepoints) {
+    std::cout << "Writing " << doWritePoints << "\n";
+    PointList points;
+    copyPointsFromRounds(points);
+    writePoints(doWritePoints, points);
+    delete graph;
+    delete [] rounds;
+    return 0;
+  }
+
+  const char* name = 0;
+  switch (detAlgo) {
+  case nondet: name = "nondet"; break;
+  case detBase: name = "detBase"; break;
+  case detPrefix: name = "detPrefix"; break;
+  case detDisjoint: name = "detDisjoint"; break;
+  default: name = "unknown"; break;
+  }
+  GaloisRuntime::LL::gInfo("Algorithm %s", name);
   
-  std::cout << "configuration: " << points.size() << " points\n";
-
-  std::cout << "MEMINFO PRE: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
-  Galois::preAlloc(1 * numThreads // some per-thread state
-      + 2 * points.size() * sizeof(Element) // mesh is about 2x number of points (for random points)
-      * 32 // include graph node size
-      / (GaloisRuntime::MM::pageSize) // in pages
-      );
-  std::cout << "MEMINFO MID: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
 
   Galois::StatTimer T;
   T.start();
-  generateMesh(points);
+  generateMesh();
   T.stop();
   std::cout << "mesh size: " << graph->size() << "\n";
 
-  std::cout << "MEMINFO POST: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
+  Galois::Statistic("MeminfoPost", GaloisRuntime::MM::pageAllocInfo());
 
   if (!skipVerify) {
     Verifier verifier;
@@ -464,11 +704,13 @@ int main(int argc, char** argv) {
     writeMesh(base.c_str());
 
     PointList points;
+    // Reordering messes up connection between id and place in pointlist
     ReadPoints(points).from(inputname);
     writePoints(base.append(".node"), points);
   }
 
   delete graph;
+  delete [] rounds;
 
   return 0;
 }

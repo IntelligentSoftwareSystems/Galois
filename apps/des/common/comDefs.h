@@ -21,13 +21,16 @@
  * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
  */
 
-#ifndef _COM_DEFS_H
-#define _COM_DEFS_H
+#ifndef DES_COM_DEFS_H
+#define DES_COM_DEFS_H
 
 #include <limits>
 #include <string>
 #include <algorithm>
 #include <vector>
+
+
+namespace des {
 
 /**
  * type for time in simulation world
@@ -40,6 +43,8 @@ typedef long long SimTime;
 
 /** The Constant INFINITY_SIM_TIME is used by NULL_EVENT messages to signal the end of simulation. */
 const SimTime INFINITY_SIM_TIME = (1 << 30);
+
+const SimTime MIN_DELAY = 1l;
 
 
 /**
@@ -57,5 +62,9 @@ void destroyVec (std::vector<T*>& vec) {
     delete *i;
     *i = NULL;
   }
+  vec.clear ();
 }
+
+} // namespace des
+
 #endif

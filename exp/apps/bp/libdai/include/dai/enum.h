@@ -94,7 +94,7 @@
 \
     protected:\
         value v;\
-};
+}
 
 
 #endif

@@ -4,10 +4,13 @@ function(makeTest name)
   add_test(${name} ${name})
 endfunction()
 
-add_definitions(-O0)
-
 makeTest(bag)
 makeTest(compile-check)
-makeTest(skiplist)
-makeTest(pairingheap)
 makeTest(sched)
+makeTest(pc)
+makeTest(static)
+makeTest(test_gdeque)
+makeTest(sort)
+makeTest(loopoverhead)
+makeTest(acquire)
+

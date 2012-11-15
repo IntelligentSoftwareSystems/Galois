@@ -34,34 +34,48 @@
 #include "llvm/Support/CommandLine.h"
 
 #include "Lonestar/BoilerPlate.h"
-#ifdef GALOIS_EXP
+
+#ifdef GALOIS_USE_EXP
 #include "Galois/PriorityScheduling.h"
 #endif
 
 #include <iostream>
+#include <deque>
 #include <set>
 
 namespace cll = llvm::cl;
 
+static const bool trackBadWork = false;
+
 static const char* name = "Single Source Shortest Path";
 static const char* desc =
   "Computes the shortest path from a source node to all nodes in a directed "
-  "graph using a modified Bellman-Ford algorithm\n";
+  "graph using a modified chaotic iteration algorithm\n";
 static const char* url = "single_source_shortest_path";
+
+enum SSSPAlgo {
+  serialStl,
+  parallel,
+  parallelLessDups
+};
 
 static cll::opt<unsigned int> startNode("startnode", cll::desc("Node to start search from"), cll::init(1));
 static cll::opt<unsigned int> reportNode("reportnode", cll::desc("Node to report distance to"), cll::init(2));
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<int> stepShift("delta", cll::desc("Shift value for the deltastep"), cll::init(10));
-static cll::opt<bool> useBfs("bfs", cll::desc("Use BFS"), cll::init(false));
+static cll::opt<SSSPAlgo> algo("algo", cll::desc("Choose an algorithm:"),
+    cll::values(
+      clEnumVal(serialStl, "Serial using STL heap"),
+      clEnumVal(parallel, "Parallel"),
+      clEnumVal(parallelLessDups, "Parallel (less duplicates)"),
+      clEnumValEnd), cll::init(parallel));
 
 typedef Galois::Graph::LC_Linear_Graph<SNode, unsigned int> Graph;
 typedef Graph::GraphNode GNode;
 
 typedef UpdateRequestCommon<GNode> UpdateRequest;
 
-struct UpdateRequestIndexer
-  : std::unary_function<UpdateRequest, unsigned int> {
+struct UpdateRequestIndexer: public std::unary_function<UpdateRequest, unsigned int> {
   unsigned int operator() (const UpdateRequest& val) const {
     unsigned int t = val.w >> stepShift;
     return t;
@@ -70,66 +84,77 @@ struct UpdateRequestIndexer
 
 Graph graph;
 
-void runBody(const GNode src) {
-  std::set<UpdateRequest, std::less<UpdateRequest> > initial;
-  for (Graph::edge_iterator
-	 ii = graph.edge_begin(src, Galois::NONE), 
-	 ee = graph.edge_end(src, Galois::NONE); 
-       ii != ee; ++ii) {
-    GNode dst = graph.getEdgeDst(ii);
-    int w = useBfs ? 1 : graph.getEdgeData(ii);
-    UpdateRequest up(dst, w);
-    initial.insert(up);
-  }
+struct SerialStlAlgo {
+  std::string name() const { return "serial stl heap"; }
 
-  Galois::Statistic<unsigned int> counter("Iterations");
-  Galois::StatTimer T;
-  T.start();
-  
-  while (!initial.empty()) {
-    counter += 1;
-    UpdateRequest req = *initial.begin();
-    initial.erase(initial.begin());
-    SNode& data = graph.getData(req.n, Galois::NONE);
+  void operator()(const GNode src) const {
+    std::set<UpdateRequest, std::less<UpdateRequest> > initial;
+    UpdateRequest init(src, 0);
+    initial.insert(init);
 
-    if (req.w < data.dist) {
-      data.dist = req.w;
-      for (Graph::edge_iterator
-	     ii = graph.edge_begin(req.n, Galois::NONE), 
-	     ee = graph.edge_end(req.n, Galois::NONE);
-	   ii != ee; ++ii) {
-	GNode dst = graph.getEdgeDst(ii);
-	int d = useBfs ? 1 : graph.getEdgeData(ii);
-	unsigned int newDist = req.w + d;
-	if (newDist < graph.getData(dst,Galois::NONE).dist)
-	  initial.insert(UpdateRequest(dst, newDist));
+    Galois::Statistic counter("Iterations");
+    
+    while (!initial.empty()) {
+      counter += 1;
+      UpdateRequest req = *initial.begin();
+      initial.erase(initial.begin());
+      SNode& data = graph.getData(req.n, Galois::NONE);
+      if (req.w < data.dist) {
+        data.dist = req.w;
+	for(Graph::edge_iterator
+	      ii = graph.edge_begin(req.n, Galois::NONE), 
+	      ee = graph.edge_end(req.n, Galois::NONE);
+	    ii != ee; ++ii) {
+          GNode dst = graph.getEdgeDst(ii);
+          unsigned int d = graph.getEdgeData(ii);
+          unsigned int newDist = req.w + d;
+          if (newDist < graph.getData(dst,Galois::NONE).dist) {
+            initial.insert(UpdateRequest(dst, newDist));
+	  }
+        }
       }
     }
   }
-  T.stop();
-}
+};
 
-//static Galois::Statistic<unsigned int>* BadWork;
-//static Galois::Statistic<unsigned int>* WLEmptyWork;
+static Galois::Statistic* BadWork;
+static Galois::Statistic* WLEmptyWork;
 
-struct process {
-  void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& lwl) {
-    SNode& data = graph.getData(req.n,Galois::NONE);
-    // if (req.w >= data.dist)
-    //   *WLEmptyWork += 1;
+struct ParallelAlgo {
+  std::string name() const { return "parallel"; }
+
+  void operator()(const GNode src) const {
+    using namespace GaloisRuntime::WorkList;
+    typedef dChunkedLIFO<16> dChunk;
+    typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
+
+    std::cout << "Using delta-step of " << (1 << stepShift) << "\n";
+    std::cout << "Warning: Performance varies considerably due to delta parameter.  Do not expect the default to be good for your graph\n";
+
+#ifdef GALOIS_USE_EXP
+    Exp::PriAuto<16, UpdateRequestIndexer, OBIM, std::less<UpdateRequest>, std::greater<UpdateRequest> >::for_each(UpdateRequest(src, 0), *this);
+#else
+    Galois::for_each<OBIM>(UpdateRequest(src, 0), *this);
+#endif
+  }
+
+  void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& ctx) const {
+    SNode& data = graph.getData(req.n, Galois::NONE);
+    if (trackBadWork && req.w >= data.dist)
+      *WLEmptyWork += 1;
     unsigned int v;
     while (req.w < (v = data.dist)) {
       if (__sync_bool_compare_and_swap(&data.dist, v, req.w)) {
-	// if (v != DIST_INFINITY)
-	//   *BadWork += 1;
+	if (trackBadWork && v != DIST_INFINITY)
+	   *BadWork += 1;
 	for (Graph::edge_iterator ii = graph.edge_begin(req.n, Galois::NONE),
 	       ee = graph.edge_end(req.n, Galois::NONE); ii != ee; ++ii) {
 	  GNode dst = graph.getEdgeDst(ii);
-	  int d = useBfs ? 1 : graph.getEdgeData(ii);
+	  unsigned int d = graph.getEdgeData(ii);
 	  unsigned int newDist = req.w + d;
-	  SNode& rdata = graph.getData(dst,Galois::NONE);
+	  SNode& rdata = graph.getData(dst, Galois::NONE);
 	  if (newDist < rdata.dist)
-	    lwl.push(UpdateRequest(dst, newDist));
+	    ctx.push(UpdateRequest(dst, newDist));
 	}
 	break;
       }
@@ -137,84 +162,116 @@ struct process {
   }
 };
 
-void runBodyParallel(const GNode src) {
-  using namespace GaloisRuntime::WorkList;
-  typedef dChunkedLIFO<16> dChunk;
-  typedef ChunkedLIFO<16> Chunk;
-  typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
+struct ParallelLessDupsAlgo {
+  std::string name() const { return "parallel (less duplicates)"; }
 
-  Galois::StatTimer T;
+  void operator()(const GNode src) const {
+    using namespace GaloisRuntime::WorkList;
+    typedef dChunkedLIFO<16> dChunk;
+    typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
 
-  UpdateRequest one[1] = { UpdateRequest(src, 0) };
-  T.start();
-#ifdef GALOIS_EXP
-    Exp::WorklistExperiment<OBIM,dChunk,Chunk,UpdateRequestIndexer,
-      std::less<UpdateRequest>,std::greater<UpdateRequest> >().for_each(
-        std::cout, &one[0], &one[1], process());
-#else
-  Galois::for_each<OBIM>(&one[0], &one[1], process());
-#endif
-  T.stop();
-}
+    std::cout << "INFO: Using delta-step of " << (1 << stepShift) << "\n";
+    std::cout << "WARNING: Performance varies considerably due to delta parameter.  Do not expect the default to be good for your graph\n";
 
-
-bool verify(GNode source) {
-  if (graph.getData(source,Galois::NONE).dist != 0) {
-    std::cerr << "source has non-zero dist value\n";
-    return false;
-  }
-  
-  for (Graph::iterator src = graph.begin(), ee =
-	 graph.end(); src != ee; ++src) {
-    unsigned int dist = graph.getData(*src,Galois::NONE).dist;
-    if (dist >= DIST_INFINITY) {
-      std::cerr << "found node = " << graph.getData(*src,Galois::NONE).id
-	   << " with label >= INFINITY = " << dist << "\n";
-      return false;
-    }
-    
-    for (Graph::edge_iterator 
-	   ii = graph.edge_begin(*src, Galois::NONE),
-	   ee = graph.edge_end(*src, Galois::NONE); ii != ee; ++ii) {
-      GNode neighbor = graph.getEdgeDst(ii);
-      unsigned int ddist = graph.getData(*src,Galois::NONE).dist;
-      int d = useBfs ? 1 : graph.getEdgeData(ii);
-      if (ddist > dist + d) {
-        std::cerr << "bad level value at "
-          << graph.getData(*src,Galois::NONE).id
-	  << " which is a neighbor of " 
-          << graph.getData(neighbor,Galois::NONE).id << "\n";
-	return false;
+    std::deque<UpdateRequest> initial;
+    graph.getData(src).dist = 0;
+    for (Graph::edge_iterator ii = graph.edge_begin(src), ei = graph.edge_end(src); ii != ei; ++ii) {
+      GNode dst = graph.getEdgeDst(ii);
+      SNode& data = graph.getData(dst);
+      unsigned int d = graph.getEdgeData(ii);
+      if (d < data.dist) {
+        initial.push_back(UpdateRequest(dst, d));
+        data.dist = d;
       }
+    }
+
+#ifdef GALOIS_USE_EXP
+    Exp::PriAuto<16, UpdateRequestIndexer, OBIM, std::less<UpdateRequest>, std::greater<UpdateRequest> >::for_each(initial.begin(), initial.end(), *this);
+#else
+    Galois::for_each<OBIM>(initial.begin(), initial.end(), *this);
+#endif
+  }
+
+  void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& ctx) const {
+    SNode& data = graph.getData(req.n, Galois::NONE);
+
+    if (trackBadWork && req.w >= data.dist)
+      *WLEmptyWork += 1;
+    
+    for (Graph::edge_iterator ii = graph.edge_begin(req.n, Galois::NONE),
+           ee = graph.edge_end(req.n, Galois::NONE); ii != ee; ++ii) {
+      GNode dst = graph.getEdgeDst(ii);
+      unsigned int d = graph.getEdgeData(ii);
+      SNode& rdata = graph.getData(dst, Galois::NONE);
+      unsigned int newDist = data.dist + d;
+      unsigned int v;
+      while (newDist < (v = rdata.dist)) {
+        if (__sync_bool_compare_and_swap(&rdata.dist, v, newDist)) {
+          if (trackBadWork && v != DIST_INFINITY)
+             *BadWork += 1;
+          ctx.push(UpdateRequest(dst, newDist));
+          break;
+        }
+      }
+    }
+  }
+};
+
+bool verifyConnected() {
+  for (Graph::iterator src = graph.begin(), ee = graph.end(); src != ee; ++src) {
+    unsigned int dist = graph.getData(*src,Galois::NONE).dist;
+    if (dist == DIST_INFINITY) {
+      std::cerr << "WARNING: found node = " << graph.getData(*src, Galois::NONE).id
+		<< " with label INFINITY\n";
+      return false;
     }
   }
   return true;
 }
 
-int main(int argc, char **argv) {
-  LonestarStart(argc, argv, std::cout, name, desc, url);
-
-  // Galois::Statistic<unsigned int> sBadWork("BadWork");
-  // Galois::Statistic<unsigned int> sWLEmptyWork("WLEmptyWork");
-  // BadWork = &sBadWork;
-  // WLEmptyWork = &sWLEmptyWork;
-
-  graph.structureFromFile(filename);
-
-  std::cout << "Read " << graph.size() << " nodes\n";
-  std::cout << "Using delta-step of " << (1 << stepShift) << "\n";
-  
-  if (useBfs && stepShift > 1) {
-    std::cout << "WARNING: Using a large delta-step for bfs. Expect long execution times.\n";
+bool verify(GNode source) {
+  bool retval = true;
+  if (graph.getData(source,Galois::NONE).dist != 0) {
+    std::cerr << "ERROR: source has non-zero dist value\n";
+    retval = false;
   }
+  
+  for (Graph::iterator src = graph.begin(), ee = graph.end(); src != ee; ++src) {
+    unsigned int dist = graph.getData(*src, Galois::NONE).dist;
+    if (dist > DIST_INFINITY) {
+      std::cerr << "ERROR: found node = " << graph.getData(*src,Galois::NONE).id
+		<< " with label greater than INFINITY (??)\n";
+      retval = false;
+    }
+    
+    if (dist != DIST_INFINITY) { //avoid overflow on dist + d
+      for (Graph::edge_iterator 
+	     ii = graph.edge_begin(*src, Galois::NONE),
+	     ee = graph.edge_end(*src, Galois::NONE); ii != ee; ++ii) {
+	GNode neighbor = graph.getEdgeDst(ii);
+	unsigned int ddist = graph.getData(*src, Galois::NONE).dist;
+	unsigned int d = graph.getEdgeData(ii);
+	if (ddist > dist + d) {
+	  std::cerr << "ERROR: bad level value at "
+		    << graph.getData(*src, Galois::NONE).id
+		    << " which is a neighbor of " 
+		    << graph.getData(neighbor, Galois::NONE).id << "\n";
+	  retval = false;
+	}
+      }
+    }
+  }
+  return retval;
+}
 
-  std::cout << "WARNING: Performance varies considerably due to -delta.  Do not expect the default to be good for your graph\n";
+void initGraph(GNode& source, GNode& report) {
+  graph.structureFromFile(filename);
 
   unsigned int id = 0;
   bool foundReport = false;
   bool foundSource = false;
-  GNode source = *graph.begin();
-  GNode report = *graph.begin();
+  source = *graph.begin();
+  report = *graph.begin();
   for (Graph::iterator src = graph.begin(), ee =
       graph.end(); src != ee; ++src) {
     SNode& node = graph.getData(*src,Galois::NONE);
@@ -223,35 +280,75 @@ int main(int argc, char **argv) {
     if (node.id == startNode) {
       source = *src;
       foundSource = true;
+      if (graph.edge_begin(source) == graph.edge_end(source)) {
+	std::cerr << "ERROR: source has no neighbors\n";
+        assert(0);
+	abort();
+      }
     } 
     if (node.id == reportNode) {
       foundReport = true;
       report = *src;
     }
   }
+
   if (!foundReport) {
-    std::cerr << "Failed to set report (" << reportNode << ").\n";
-    assert(0);
-    abort();
-  }
-  if (!foundSource) {
-    std::cerr << "Failed to set source (" << startNode << ".\n";
+    std::cerr << "ERROR: failed to set report (" << reportNode << ").\n";
     assert(0);
     abort();
   }
 
-  if (numThreads) {
-    runBodyParallel(source);
-  } else {
-    std::cout << "Running Sequentially\n";
-    runBody(source);
+  if (!foundSource) {
+    std::cerr << "ERROR: failed to set source (" << startNode << ").\n";
+    assert(0);
+    abort();
+  }
+}
+
+template<typename AlgoTy>
+void run(const AlgoTy& algo, GNode source) {
+  Galois::StatTimer T;
+  std::cout << "Running " << algo.name() << " version\n";
+  T.start();
+  algo(source);
+  T.stop();
+}
+
+int main(int argc, char **argv) {
+  Galois::StatManager statManager;
+  LonestarStart(argc, argv, name, desc, url);
+
+  if (trackBadWork) {
+    BadWork = new Galois::Statistic("BadWork");
+    WLEmptyWork = new Galois::Statistic("EmptyWork");
+  }
+
+  GNode source, report;
+  initGraph(source, report);
+  std::cout << "Read " << graph.size() << " nodes\n";
+
+  switch (algo) {
+    case serialStl: run(SerialStlAlgo(), source); break;
+    case parallel: run(ParallelAlgo(), source); break;
+    case parallelLessDups: run(ParallelLessDupsAlgo(), source); break;
+    default: std::cerr << "Unknown algorithm" << algo << "\n"; abort();
+  }
+
+  if (trackBadWork) {
+    delete BadWork;
+    delete WLEmptyWork;
   }
 
   std::cout << graph.getData(report,Galois::NONE).toString() << "\n";
-  if (!skipVerify && !verify(source)) {
-    std::cerr << "Verification failed.\n";
-    assert(0 && "Verification failed");
-    abort();
+  if (!skipVerify) {
+    if (!verifyConnected()) {
+      std::cerr << "WARNING: graph not fully connected.\n";
+    }
+    if (!verify(source)) {
+      std::cerr << "ERROR: Verification failed.\n";
+      assert(0 && "Verification failed");
+      abort();
+    }
   }
 
   return 0;

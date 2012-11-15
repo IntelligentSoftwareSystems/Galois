@@ -1,6 +1,6 @@
 #include "Galois/Galois.h"
 #include "Galois/Statistic.h"
-#include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/Graph2.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
@@ -63,7 +63,7 @@ void generateInput(int N, double hardness, int seed,
 }
 
 int main(int argc, char **argv) {
-  LonestarStart(argc, argv, std::cout, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url);
 
   std::cout << "N: " << N << " hardness: " << hardness << " seed: " << seed
     << " maxiterations: " << MaxIterations << " damping: " << damping << " algo: " << algo << "\n";

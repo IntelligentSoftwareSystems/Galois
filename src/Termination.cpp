@@ -18,8 +18,7 @@ kind.
 
 //Dikstra dual-ring termination algorithm
 
-#include "Galois/Runtime/PerCPU.h"
-#include "Galois/Runtime/Threads.h"
+#include "Galois/Runtime/ThreadPool.h"
 #include "Galois/Runtime/Termination.h"
 
 using namespace GaloisRuntime;
@@ -27,64 +26,45 @@ using namespace GaloisRuntime;
 TerminationDetection::TerminationDetection()
   :globalTerm(false), lastWasWhite(false)
 {
-  data.get(0).hasToken = true;
-  data.get(0).tokenIsBlack = true;
+  initializeThread();
 }
 
 void TerminationDetection::reset() {
-  assert(data.get().hasToken);
+  assert(data.getLocal()->hasToken);
   globalTerm = false;
   lastWasWhite = false;
-  data.get(0).hasToken = true;
-  data.get(0).tokenIsBlack = true;
+  data.getLocal()->hasToken = true;
+  data.getLocal()->tokenIsBlack = true;
+}
+
+void TerminationDetection::propToken(TokenHolder& th, TokenHolder& thn) {
+  assert (!globalTerm && "no token should be in progress after globalTerm");
+  bool taint = th.processIsBlack || th.tokenIsBlack;
+  th.processIsBlack = th.tokenIsBlack = false;
+  th.hasToken = false;
+  thn.tokenIsBlack = taint;
+  __sync_synchronize();
+  thn.hasToken = true;
 }
 
 void TerminationDetection::localTermination() {
-  TokenHolder& th = data.get();
-  TokenHolder& thn = data.getNext(ThreadPool::getActiveThreads());
+  unsigned myID = LL::getTID();
+  TokenHolder& th = *data.getLocal();
   if (th.hasToken) {
-    if (data.myEffectiveID() == 0) {
+    TokenHolder& thn = *data.getRemote((myID + 1) % galoisActiveThreads);
+    if (myID == 0) {
       //master
-      if (th.tokenIsBlack || th.processIsBlack) {
-	//failed circulation
-	lastWasWhite = false;
-	th.processIsBlack = false;
-	th.hasToken = false;
-	thn.tokenIsBlack = false;
-	__sync_synchronize();
-	thn.hasToken = true;
-      } else {
-	if (lastWasWhite) {
-	  //This was the second time around
-	  globalTerm = true;
-	} else {
-	  //Start a second round of voting
-	  lastWasWhite = true;
-	  th.hasToken = false;
-	  thn.tokenIsBlack = false;
-	  __sync_synchronize();
-	  thn.hasToken = true;
-	}
+      bool failed = th.tokenIsBlack || th.processIsBlack;
+      th.tokenIsBlack = th.processIsBlack = false;
+      if (lastWasWhite && !failed) {
+	//This was the second success
+	globalTerm = true;
+	return;
       }
-    } else {
-      //Normal thread
-      if (th.processIsBlack) {
-	//Black process colors the token
-	//color resets to white
-	th.processIsBlack = false;
-	th.tokenIsBlack = false;
-	th.hasToken = false;
-	thn.tokenIsBlack = true;
-	__sync_synchronize();
-	thn.hasToken = true;
-      } else {
-	//white process pass the token
-	thn.tokenIsBlack = th.tokenIsBlack;
-	th.hasToken = false;
-	__sync_synchronize();
-	thn.hasToken = true;
-      }
+      lastWasWhite = !failed;
     }
+    //Normal thread or recirc by master
+    propToken(th,thn);
   }
   //  L.unlock();
 }

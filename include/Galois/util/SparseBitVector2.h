@@ -19,8 +19,8 @@ kind.
 @author rupesh nasre. <rupesh0508@gmail.com>
 */
 
-#ifndef _GALOIS_SPARSEBITVECTOR_H
-#define _GALOIS_SPARSEBITVECTOR_H
+#ifndef GALOIS_UTIL_SPARSEBITVECTOR_H
+#define GALOIS_UTIL_SPARSEBITVECTOR_H
 
 
 #include "Galois/Runtime/ll/SimpleLock.h"

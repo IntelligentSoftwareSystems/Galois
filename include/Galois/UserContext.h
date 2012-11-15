@@ -23,28 +23,21 @@
 #ifndef GALOIS_USERCONTEXT_H
 #define GALOIS_USERCONTEXT_H
 
-#include <vector>
-
 #include "Galois/Mem.h"
+#include "Galois/gdeque.h"
 
-namespace GaloisRuntime {
-template <typename WorkListTy, typename T, typename FunctionTy, bool isSimple>
-class ForEachWork;
-
-template <typename WorkListTy, typename FunctionTy> 
-class ParaMeterExecutor;
-}
+#include "Galois/Runtime/Context.h"
+#include "Galois/Runtime/MethodFlags.h"
 
 namespace Galois {
 
+/** 
+ * This is the object passed to the user's parallel loop.  This
+ * provides the in-loop api.
+ */
 template<typename T>
 class UserContext: private boost::noncopyable {
-  template <typename WorkListTy, typename TT, typename FunctionTy, bool isSimple>
-  friend class GaloisRuntime::ForEachWork;
-
-  template <typename WorkListTy, typename FunctionTy>
-  friend class GaloisRuntime::ParaMeterExecutor;
-
+protected:
   //! Allocator stuff
   IterAllocBaseTy IterationAllocatorBase;
   PerIterAllocTy PerIterationAllocator;
@@ -53,18 +46,8 @@ class UserContext: private boost::noncopyable {
     IterationAllocatorBase.clear();
   }
 
-  //! break stuff
-  int breakFlag;
-  bool __breakHappened() {
-    return breakFlag;
-  }
-
-  void __resetBreak() {
-    breakFlag = 0;
-  }
-
   //! push stuff
-  typedef std::vector<T> pushBufferTy;
+  typedef gdeque<T> pushBufferTy;
   pushBufferTy pushBuffer;
 
   pushBufferTy& __getPushBuffer() {
@@ -75,27 +58,42 @@ class UserContext: private boost::noncopyable {
     pushBuffer.clear();
   }
 
+  void* localState;
+  bool localStateUsed;
+  void __setLocalState(void *p, bool used) {
+    localState = p;
+    localStateUsed = used;
+  }
+
 public:
   UserContext()
     :IterationAllocatorBase(), 
-     PerIterationAllocator(&IterationAllocatorBase),
-     breakFlag(0)
+     PerIterationAllocator(&IterationAllocatorBase)
   { }
 
   //! Signal break in parallel loop
   void breakLoop() {
-    breakFlag = 1;
+    GaloisRuntime::breakLoop();
   }
 
+  //! Acquire a per-iteration allocator
   PerIterAllocTy& getPerIterAlloc() {
     return PerIterationAllocator;
   }
 
   //! Push new work 
   void push(T val) {
+    GaloisRuntime::checkWrite(Galois::WRITE);
     pushBuffer.push_back(val);
   }
+
+  //! force the abort of this iteration
+  void abort() { GaloisRuntime::forceAbort(); }
+
+  //! Store and retrieve local state for deterministic and ordered executor
+  void* getLocalState(bool& used) { used = localStateUsed; return localState; }
 };
 
 }
+
 #endif

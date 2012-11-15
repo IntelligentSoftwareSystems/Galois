@@ -46,24 +46,21 @@
 
 
 
-#include "Galois/Statistic.h"
-#include "Galois/Graphs/Graph.h"
+#include "Galois/Accumulator.h"
 #include "Galois/Galois.h"
+#include "Galois/Graphs/Graph2.h"
+#include "Galois/Statistic.h"
+#include "Galois/Runtime/Sampling.h"
 #include "llvm/Support/CommandLine.h"
 
 #include "Lonestar/BoilerPlate.h"
 
 namespace cll = llvm::cl;
 
-static const char* fileNameOpt = "-f";
-static const char* spDimOpt = "-d";
-static const char* ndivOpt = "-n";
-static const char* simEndTimeOpt = "-e";
-
-static cll::opt<std::string> _fileName("f", cll::desc("<input file>"), cll::Required);
-static cll::opt<int> _spDim("d", cll::desc("spDim"), cll::init(2));
-static cll::opt<int> _ndiv("n", cll::desc("ndiv"), cll::init(0));
-static cll::opt<double> _simEndTime("e", cll::desc("simEndTime"), cll::init(1.0));
+static cll::opt<std::string> fileNameOpt("f", cll::desc("<input mesh file>"), cll::Required);
+static cll::opt<int> spDimOpt("d", cll::desc("spatial dimensionality of the problem i.e. 2 for 2D, 3 for 3D"), cll::init(2));
+static cll::opt<int> ndivOpt("n", cll::desc("number of times the mesh should be subdivided"), cll::init(0));
+static cll::opt<double> simEndTimeOpt("e", cll::desc("simulation end time"), cll::init(1.0));
 
 
 static const char* name = "Asynchronous Variational Integrators";
@@ -93,8 +90,6 @@ private:
 private:
   static const std::string getUsage ();
 
-  static void printUsage ();
-
   static InputConfig readCmdLine ();
 
   static MeshInit* initMesh (const InputConfig& input);
@@ -104,6 +99,10 @@ private:
 
 
 protected:
+  static const int CHUNK_SIZE = 32;
+  typedef GaloisRuntime::WorkList::dChunkedFIFO<CHUNK_SIZE> AVIWorkList;
+
+  typedef Galois::GAccumulator<size_t> IterCounter;
 
   std::string wltype;
 
@@ -152,7 +151,7 @@ public:
   inline static void simulate (AVI* avi, MeshInit& meshInit,
         GlobalVec& g, LocalVec& l, bool createSyncFiles);
 
-
+  virtual ~AVIabstractMain() { }
 };
 
 /**
@@ -170,28 +169,14 @@ protected:
   }
 
 public:
-
   virtual void runLoop (MeshInit& meshInit, GlobalVec& g, bool createSyncFiles);
 };
 
-const std::string AVIabstractMain::getUsage () {
-  std::stringstream ss;
-  ss << fileNameOpt << " fileName.neu " << spDimOpt << " spDim " << ndivOpt << " ndiv " 
-    << simEndTimeOpt << " simEndTime" << std::endl;
-  return ss.str ();
-
-}
-
-void AVIabstractMain::printUsage () {
-  fprintf (stderr, "%s\n", getUsage ().c_str ());
-  abort ();
-}
-
 AVIabstractMain::InputConfig AVIabstractMain::readCmdLine () {
-  const char* fileName = _fileName.c_str();
-  int spDim = _spDim;
-  int ndiv = _ndiv;
-  double simEndTime = _simEndTime;
+  const char* fileName = fileNameOpt.c_str();
+  int spDim = spDimOpt;
+  int ndiv = ndivOpt;
+  double simEndTime = simEndTimeOpt;
   std::string wltype;
 
   return InputConfig (fileName, spDim, ndiv, simEndTime, "", wltype);
@@ -207,7 +192,9 @@ MeshInit* AVIabstractMain::initMesh (const AVIabstractMain::InputConfig& input) 
     meshInit = new TetMeshInit (input.simEndTime);
   }
   else {
-    printUsage ();
+    std::cerr << "ERROR: Wrong spatical dimensionality, run with -help" << std::endl;
+    std::cerr << spDimOpt.HelpStr << std::endl;
+    std::abort ();
   }
 
   // read in the mesh from file and setup the mesh, bc etc
@@ -227,7 +214,8 @@ void AVIabstractMain::initGlobalVec (const MeshInit& meshInit, GlobalVec& g) {
 }
 
 void AVIabstractMain::run (int argc, char* argv[]) {
-  LonestarStart(argc, argv, std::cout, name, desc, url);
+  Galois::StatManager sm;
+  LonestarStart(argc, argv, name, desc, url);
 
   // print messages e.g. version, input etc.
   InputConfig input = readCmdLine ();
@@ -258,8 +246,10 @@ void AVIabstractMain::run (int argc, char* argv[]) {
   Galois::StatTimer t;
   t.start ();
 
+  GaloisRuntime::beginSampling ();
   // don't write to files when measuring time
   runLoop (*meshInit, g, false);
+  GaloisRuntime::endSampling ();
 
   t.stop ();
 
@@ -348,6 +338,10 @@ void AVIabstractMain::simulate (AVI* avi, MeshInit& meshInit,
 }
 
 void AVIorderedSerial::runLoop (MeshInit& meshInit, GlobalVec& g, bool createSyncFiles) {
+
+  typedef std::priority_queue<AVI*, std::vector<AVI*>, AVIReverseComparator> PQ;
+  // typedef std::set<AVI*, AVIComparator> PQ;
+
   // temporary matrices
   int nrows = meshInit.getSpatialDim ();
   int ncols = meshInit.getNodesPerElem ();
@@ -361,25 +355,27 @@ void AVIorderedSerial::runLoop (MeshInit& meshInit, GlobalVec& g, bool createSyn
   }
 
 
-  std::priority_queue<AVI*, std::vector<AVI*>, AVIReverseComparator> pq;
+  PQ pq;
   for (std::vector<AVI*>::const_iterator i = aviList.begin (), e = aviList.end (); i != e; ++i) {
     pq.push (*i);
+    // pq.insert (*i);
   }
 
 
   int iter = 0;
   while (!pq.empty ()) {
 
-    AVI* avi = pq.top ();
-    pq.pop ();
+    AVI* avi = pq.top (); pq.pop ();
+    // AVI* avi = *pq.begin (); pq.erase (pq.begin ());
 
     assert (avi != NULL);
 
     AVIabstractMain::simulate (avi, meshInit, g, l, createSyncFiles);
 
 
-    if (avi->getNextTimeStamp () <= meshInit.getSimEndTime ()) {
+    if (avi->getNextTimeStamp () < meshInit.getSimEndTime ()) {
       pq.push (avi);
+      // pq.insert (avi);
     }
 
     ++iter;

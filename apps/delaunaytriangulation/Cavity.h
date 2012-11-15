@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -46,13 +46,14 @@ class Cavity: private boost::noncopyable {
 
   Searcher<Alloc> searcher;
   GNodeVector newNodes;
+  GNodeIntPairVector outside;
   GNode center;
   Point* point;
   Graph& graph;
   const Alloc& alloc;
 
   //! Find triangles that border cavity but are not in the cavity
-  void findOutside(GNodeIntPairVector& outside) {
+  void findOutside() {
     for (typename Searcher<Alloc>::GNodeVector::iterator ii = searcher.inside.begin(),
         ei = searcher.inside.end(); ii != ei; ++ii) {
 
@@ -77,7 +78,7 @@ class Cavity: private boost::noncopyable {
     }
   }
 
-  void addElements(GNodeIntPairVector& outside) {
+  void addElements() {
     GNodeVector newNodes(alloc);
 
     // Create new nodes
@@ -93,6 +94,7 @@ class Cavity: private boost::noncopyable {
 
       Element newE(point, p2, p3);
       GNode newNode = graph.createNode(newE);
+      graph.addNode(newNode, Galois::NONE);
 
       point->addElement(newNode);
       p2->addElement(newNode);
@@ -113,23 +115,15 @@ class Cavity: private boost::noncopyable {
 	  const GNode& n2 = newNodes[j];
 	  const Element& e2 = graph.getData(n2, Galois::NONE);
 	  
-	  bool found = false;
-	  int indexForNewNode;
-	  int indexForNode;
-	  
 	  for (int x = 2; x >= 1; --x) {
 	    for (int y = 2; y >= 1; --y) {
 	      if (e1.getPoint(x) == e2.getPoint(y)) {
-		indexForNewNode = x & 2;
-                indexForNode = y & 2;
-                found = true;
+		int indexForNewNode = x & 2;
+                int indexForNode = y & 2;
+                graph.getEdgeData(graph.addEdge(n1, n2, Galois::NONE)) = indexForNewNode;
+                graph.getEdgeData(graph.addEdge(n2, n1, Galois::NONE)) = indexForNode;
 	      }
 	    }
-	  }
-	  
-	  if (found) {
-	    graph.getEdgeData(graph.addEdge(n1, n2, Galois::NONE)) = indexForNewNode;
-	    graph.getEdgeData(graph.addEdge(n2, n1, Galois::NONE)) = indexForNode;
 	  }
 	}
       }
@@ -147,12 +141,12 @@ public:
   Cavity(Graph& g, const Alloc& a = Alloc()):
     searcher(g, a),
     newNodes(a),
+    outside(a),
     graph(g),
     alloc(a)
     { }
 
   void init(const GNode& c, Point* p) {
-    searcher.useMark(p, 1, p->numTries());
     center = c;
     point = p;
   }
@@ -161,13 +155,12 @@ public:
     assert(graph.getData(center).inCircle(point->t()));
     searcher.findAll(center, InCircumcenter(graph, point->t()));
     assert(!searcher.inside.empty());
+    findOutside();
   }
 
   void update() {
-    GNodeIntPairVector outside(alloc);
-    findOutside(outside);
     removeElements();
-    addElements(outside);
+    addElements();
   }
 };
 

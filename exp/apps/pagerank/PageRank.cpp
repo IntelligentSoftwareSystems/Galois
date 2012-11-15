@@ -20,11 +20,12 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#include "Galois/Statistic.h"
-#include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
-
+#include "Galois/Accumulator.h"
+#include "Galois/Statistic.h"
+#include "Galois/Graphs/Graph2.h"
 #include "Galois/Graphs/LCGraph.h"
+#include "Galois/Graphs/Serialize.h"
 
 #include "Lonestar/BoilerPlate.h"
 
@@ -33,6 +34,7 @@
 #include <limits>
 #include <iostream>
 #include <fstream>
+#include <sys/mman.h>
 
 namespace cll = llvm::cl;
 
@@ -40,72 +42,83 @@ static const char* name = "Page Rank";
 static const char* desc = "Computes page ranks a la Page and Brin\n";
 static const char* url = NULL;
 
-static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<unsigned int> max_iterations("maxiter", cll::desc("Maximum iterations"), cll::init(10));
+enum Phase {
+  transpose,
+  parallel,
+  serial
+};
 
+static cll::opt<std::string> inputFilename(cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<std::string> outputFilename(cll::Positional, cll::desc("[output file]"));
+static cll::opt<unsigned int> max_iterations("max-iterations", cll::desc("Maximum iterations"), cll::init(100));
+static cll::opt<Phase> phase(cll::desc("Phase:"),
+    cll::values(
+      clEnumVal(transpose, "Transpose graph"),
+      clEnumVal(parallel, "Compute PageRank in parallel"),
+      clEnumVal(serial, "Compute PageRank in serial"),
+      clEnumValEnd), cll::init(parallel));
 
-// damping factor: prob that user will continue to next link
-static const double alpha = 0.85;
-static const double tolerance = 0.00001;
+//! d is the damping factor. Alpha is the prob that user will do a random jump, i.e., 1 - d
+static const double alpha = 1.0 - 0.85;
+
+//! maximum relative change until we deem convergence
+static const double tolerance = 0.001;
 
 struct Node {
   double v0;
   double v1;
   unsigned int id;
   bool hasNoOuts;
-  
-  Node(int _id = -1, double _v0 = 0) : v0(_v0), v1(0), id(_id), hasNoOuts(false) {}
-  std::string toString() {
-    std::ostringstream s;
-    s << '[' << id << "] v0: " << v0 << " v1: " << v1;
-    return s.str();
-  }
 };
 
-typedef Galois::Graph::FirstGraph<Node, double, true> Graph;
+typedef Galois::Graph::LC_CSR_Graph<Node, double> Graph;
 typedef Graph::GraphNode GNode;
 
 Graph graph;
+unsigned int iterations;
 
-static double getPageRank(Node& data, unsigned int iterations) {
-  if ((iterations & 1) == 0)
+static double getPageRank(Node& data, unsigned int it) {
+  if ((it & 1) == 0)
     return data.v0;
   else
     return data.v1;
 }
 
-static void setPageRank(Node& data, unsigned int iterations, double value) {
-  if ((iterations & 1) == 0)
+static void setPageRank(Node& data, unsigned int it, double value) {
+  if ((it & 1) == 0)
     data.v1 = value;
   else
     data.v0 = value;
 }
 
-void runBody() {
-  unsigned int iterations = 0;
-  double max_delta;
+void serialPageRank() {
+  iterations = 0;
   unsigned int numNodes = graph.size();
+  double tol = tolerance / numNodes;
 
-  do {
-    max_delta = std::numeric_limits<double>::min();
+  std::cout << "target max delta: " << tol << "\n";
+
+  while (true) {
+    double max_delta = std::numeric_limits<double>::min();
     unsigned int small_delta = 0;
     double lost_potential = 0;
-    for (Graph::iterator src = graph.begin(),
-        esrc = graph.end(); src != esrc; ++src) {
+
+    for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+      GNode src = *ii;
       double value = 0;
-      for (Graph::neighbor_iterator
-          dst = graph.neighbor_begin(*src, Galois::NONE), 
-          edst = graph.neighbor_end(*src, Galois::NONE);
-          dst != edst; ++dst) {
-        double w = graph.getEdgeData(*src, *dst, Galois::NONE);
-        Node& ddata = graph.getData(*dst, Galois::NONE);
+      for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::NONE), ei = graph.edge_end(src, Galois::NONE); ii != ei; ++ii) {
+        GNode dst = graph.getEdgeDst(ii);
+        double w = graph.getEdgeData(ii);
+
+        Node& ddata = graph.getData(dst, Galois::NONE);
         value += getPageRank(ddata, iterations) * w;
       }
-        
+       
+      // assuming uniform prior probability, i.e., 1 / numNodes
       if (alpha > 0)
-        value = value * (1 - alpha) + 1/numNodes * alpha;
+        value = value * (1 - alpha) + alpha/numNodes;
 
-      Node& sdata = graph.getData(*src, Galois::NONE);
+      Node& sdata = graph.getData(src, Galois::NONE);
       if (sdata.hasNoOuts) {
         lost_potential += getPageRank(sdata, iterations);
       }
@@ -116,19 +129,20 @@ void runBody() {
 
       if (diff > max_delta)
         max_delta = diff;
-      if (diff < tolerance)
-        small_delta++;
+      if (diff <= tol)
+        ++small_delta;
       setPageRank(sdata, iterations, value);
     }
 
     // Redistribute lost potential
     if (lost_potential > 0) {
-      for (Graph::iterator src = graph.begin(),
-          esrc = graph.end();
-          src != esrc; ++src) {
-        Node& sdata = graph.getData(*src, Galois::NONE);
-        double value = getPageRank(sdata, iterations);
-        double delta = (1 - alpha) * (lost_potential * 1/numNodes);
+      unsigned int next = iterations + 1;
+      for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+        GNode src = *ii;
+        Node& sdata = graph.getData(src, Galois::NONE);
+        double value = getPageRank(sdata, next);
+        // assuming uniform prior probability, i.e., 1 / numNodes
+        double delta = (1 - alpha) * (lost_potential / numNodes);
         setPageRank(sdata, iterations, value + delta);
       }
     }
@@ -138,125 +152,264 @@ void runBody() {
               << " small delta: " << small_delta
               << " (" << small_delta / (float) numNodes << ")"
               << "\n";
-    iterations++;
-  } while (iterations < max_iterations && max_delta > tolerance);
+
+    if (iterations < max_iterations && max_delta > tol) {
+      ++iterations;
+      continue;
+    } else
+      break;
+  }
+
+  if (iterations >= max_iterations) {
+    std::cout << "Failed to converge\n";
+  }
 }
 
-struct process {
-  template<typename ContextTy>
-  void operator()(GNode& node, ContextTy& lwl) {
+struct Process {
+  struct Accum {
+    Galois::GReduceMax<double> max_delta;
+    Galois::GAccumulator<unsigned int> small_delta;
+    Galois::GAccumulator<double> lost_potential;
+  };
+
+  Accum& accum;
+  double tol;
+  double addend;
+
+  Process(Accum& a, double t, unsigned int numNodes): accum(a), tol(t), addend(alpha/numNodes) { }
+
+  void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
+    (*this)(src);
+  }
+
+  void operator()(const GNode& src) {
+    double value = 0;
+    for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::NONE), ei = graph.edge_end(src, Galois::NONE); ii != ei; ++ii) {
+      GNode dst = graph.getEdgeDst(ii);
+      double w = graph.getEdgeData(ii);
+
+      Node& ddata = graph.getData(dst, Galois::NONE);
+      value += getPageRank(ddata, iterations) * w;
+    }
+     
+    // assuming uniform prior probability, i.e., 1 / numNodes
+    if (alpha > 0)
+      value = value * (1 - alpha) + addend;
+
+    Node& sdata = graph.getData(src, Galois::NONE);
+    if (sdata.hasNoOuts) {
+      accum.lost_potential += getPageRank(sdata, iterations);
+    }
+    
+    double diff = value - getPageRank(sdata, iterations);
+    if (diff < 0)
+      diff = -diff;
+
+    accum.max_delta.update(diff);
+    if (diff <= tol)
+      accum.small_delta += 1;
+    setPageRank(sdata, iterations, value);
   }
 };
 
-void runBodyParallel(const GNode src) {
-  using namespace GaloisRuntime::WorkList;
+struct RedistributeLost {
+  double delta;
+  unsigned int next;
 
-  unsigned int iterations = 0;
-  double max_delta = 0;
-  do {
-    //??? wl never had anything in it
-    Galois::for_each<ChunkedFIFO<32> >((GNode*)0,(GNode*)0, process());
-    iterations++;
-    std::cout << "iteration: " << iterations 
-      << " max delta: " << max_delta << "\n";
-  } while (iterations < max_iterations && max_delta > tolerance);
-}
+  RedistributeLost(double p): delta((1 - alpha) * p), next(iterations + 1) { }
 
+  void operator()(const GNode& src) {
+    Node& sdata = graph.getData(src, Galois::NONE);
+    double value = getPageRank(sdata, next);
+    // assuming uniform prior probability, i.e., 1 / numNodes
+    setPageRank(sdata, iterations, value + delta);
+  }
+};
 
-bool verify() {
-  return true;
-}
+void parallelPageRank() {
+  iterations = 0;
+  unsigned int numNodes = graph.size();
+  double tol = tolerance / numNodes;
 
-static void makeGraph(const char* input) {
-  typedef Galois::Graph::LC_CSR_Graph<Node, int> InGraph;
-  typedef InGraph::GraphNode InGNode;
-  InGraph in_graph;
-  Galois::Timer phase;
-
-  phase.start();
-  in_graph.structureFromFile(input);
-  std::cout << "Read " << in_graph.size() << " nodes\n";
-  phase.stop();
-  GaloisRuntime::reportStatSum("Read1", phase.get());
+  std::cout << "target max delta: " << tol << "\n";
   
-  // TODO(ddn): Bag map
-  phase.start();
-  typedef std::pair<InGNode, double> Element;
-  typedef std::vector<Element> Elements;
-  typedef std::vector<Elements> Map;
-  
-  Map in_edges(in_graph.size());
-  std::vector<bool> has_out_edges(in_graph.size());
-  for (InGraph::iterator src = in_graph.begin(),
-      esrc = in_graph.end();
-      src != esrc; ++src) {
-    int neighbors =
-      std::distance(in_graph.edge_begin(*src, Galois::NONE), 
-          in_graph.edge_end(*src, Galois::NONE));
-
-    for (InGraph::edge_iterator
-        dst = in_graph.edge_begin(*src, Galois::NONE), 
-        edst = in_graph.edge_end(*src, Galois::NONE);
-        dst != edst; ++dst) {
-      Element e(*src, 1.0/neighbors);
-      in_edges[in_graph.getEdgeDst(dst)].push_back(e);
+  while (true) {
+    Process::Accum accum;
+    Galois::do_all(graph.begin(), graph.end(), Process(accum, tol, numNodes));
+    double lost_potential = accum.lost_potential.reduce();
+    if (lost_potential > 0) {
+      Galois::do_all(graph.begin(), graph.end(), RedistributeLost(lost_potential / numNodes));
     }
-    has_out_edges[*src] = neighbors != 0;
-  }
-  phase.stop();
-  GaloisRuntime::reportStatSum("Read2", phase.get());
 
-  // TODO(ddn): better way of making
-  phase.start();
-  unsigned int id = 0;
-  std::vector<GNode> nodes(in_graph.size());
-  for (Map::iterator i = in_edges.begin(), ei = in_edges.end(); i != ei; ++i) {
-    Node n(id, has_out_edges[id]);
-    GNode node = graph.createNode(n);
-    graph.addNode(node);
-    nodes[id] = node;
-    id++;
+    unsigned int small_delta = accum.small_delta.reduce();
+    double max_delta = accum.max_delta.reduce();
+
+    std::cout << "iteration: " << iterations
+              << " max delta: " << max_delta
+              << " small delta: " << small_delta
+              << " (" << small_delta / (float) numNodes << ")"
+              << "\n";
+
+    if (iterations < max_iterations && max_delta > tol) {
+      ++iterations;
+      continue;
+    } else
+      break;
   }
 
-  id = 0;
-  for (Map::iterator i = in_edges.begin(), ei = in_edges.end(); i != ei; ++i) {
-    GNode src = nodes[id];
-    for (Elements::iterator j = i->begin(), ej = i->end(); j != ej; ++j) {
-      graph.addEdge(src, nodes[j->first], j->second);
-    }
-    id++;
+  if (iterations >= max_iterations) {
+    std::cout << "Failed to converge\n";
   }
-  phase.stop();
-  GaloisRuntime::reportStatSum("Read3", phase.get());
 }
+
+
+//! Transpose in-edges to out-edges
+static void transposeGraph() {
+  typedef Galois::Graph::LC_CSR_Graph<size_t, void> InputGraph;
+  typedef InputGraph::GraphNode InputNode;
+  typedef Galois::Graph::FirstGraph<size_t, double, true> OutputGraph;
+  typedef OutputGraph::GraphNode OutputNode;
+
+  InputGraph input;
+  OutputGraph output;
+  input.structureFromFile(inputFilename);
+
+  std::vector<OutputNode> nodes;
+  nodes.resize(input.size());
+  size_t node_id = 0;
+  for (InputGraph::iterator ii = input.begin(), ei = input.end(); ii != ei; ++ii, ++node_id) {
+    input.getData(*ii) = node_id;
+    OutputNode node = output.createNode(node_id);
+    output.addNode(node);
+    nodes[node_id] = node;
+  }
+
+  bool* has_out_edges = new bool[input.size()];
+  node_id = 0;
+  for (InputGraph::iterator ii = input.begin(), ei = input.end(); ii != ei; ++ii, ++node_id) {
+    InputNode src = *ii;
+    size_t sid = input.getData(src);
+    assert(sid < input.size());
+
+    size_t num_neighbors = std::distance(input.edge_begin(src), input.edge_end(src));
+    has_out_edges[node_id] = num_neighbors != 0;
+
+    double w = 1.0/num_neighbors;
+    for (InputGraph::edge_iterator jj = input.edge_begin(src), ej = input.edge_end(src); jj != ej; ++jj) {
+      InputNode dst = input.getEdgeDst(*jj);
+      size_t did = input.getData(dst);
+      assert(did < input.size());
+
+      output.getEdgeData(output.addEdge(nodes[did], nodes[sid])) += w;
+    }
+  }
+  
+  outputGraph(outputFilename.c_str(), output);
+  std::cout << "Wrote " << outputFilename << "\n";
+
+  std::string nodeFilename = outputFilename + ".node";
+  int fd = open(nodeFilename.c_str(), O_WRONLY | O_CREAT | O_TRUNC,
+      S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+  if (fd == -1) { perror(nodeFilename.c_str()); abort(); }
+  if (write(fd, has_out_edges, sizeof(bool) * input.size()) == -1) {
+    perror(outputFilename.c_str()); abort();
+  }
+  close(fd);
+  delete [] has_out_edges;
+  std::cout << "Wrote " << nodeFilename << "\n";
+}
+
+static void readGraph() {
+  graph.structureFromFile(inputFilename);
+
+  std::string nodeFilename = inputFilename + ".node";
+  int fd = open(nodeFilename.c_str(), O_RDONLY);
+  size_t length = sizeof(bool) * graph.size();
+  if (fd == -1) { perror(nodeFilename.c_str()); abort(); }
+  void *m = mmap(0, length, PROT_READ, MAP_PRIVATE, fd, 0);
+  if (m == MAP_FAILED) { perror(nodeFilename.c_str()); abort(); }
+  bool* has_out_edges = reinterpret_cast<bool*>(m);
+
+  size_t node_id = 0;
+  double initial = 1.0/graph.size();
+  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii, ++node_id) {
+    GNode src = *ii;
+    Node& n = graph.getData(src);
+    n.v0 = initial;
+    n.v1 = 0;
+    n.id = node_id;
+    n.hasNoOuts = !has_out_edges[node_id];
+  }
+
+  munmap(m, length);
+  close(fd);
+}
+
+//! Make values unique
+struct TopPair {
+  double value;
+  unsigned int id;
+
+  TopPair(double v, unsigned int i): value(v), id(i) { }
+
+  bool operator<(const TopPair& b) const {
+    if (value == b.value)
+      return id > b.id;
+    return value < b.value;
+  }
+};
 
 void printTop(int topn) {
-  for (Graph::iterator src = graph.begin(),
-      esrc = graph.end();
-      src != esrc; ++src) {
-    // TODO
+  typedef std::map<TopPair,GNode> Top;
+  Top top;
+
+  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+    GNode src = *ii;
+    Node& n = graph.getData(src);
+    double value = getPageRank(n, iterations);
+    TopPair key(value, n.id);
+
+    if ((int) top.size() < topn) {
+      top.insert(std::make_pair(key, src));
+      continue;
+    }
+
+    if (top.begin()->first < key) {
+      top.erase(top.begin());
+      top.insert(std::make_pair(key, src));
+    }
+  }
+
+  int rank = 1;
+  std::cout << "Rank PageRank Id\n";
+  for (Top::reverse_iterator ii = top.rbegin(), ei = top.rend(); ii != ei; ++ii, ++rank) {
+    std::cout << rank << ": " << ii->first.value << " " << ii->first.id << "\n";
   }
 }
 
 int main(int argc, char **argv) {
-  LonestarStart(argc, argv, std::cout, name, desc, url);
- 
-  Galois::Timer phase;
-  phase.start();
-  makeGraph(filename.c_str());
-  phase.stop();
-  GaloisRuntime::reportStatSum("ReadTotal", phase.get());
+  LonestarStart(argc, argv, name, desc, url);
+  Galois::StatManager statManager;
 
   Galois::StatTimer T;
-  T.start();
-  runBody();
-  T.stop();
-
-  printTop(10);
-  if (!skipVerify && !verify()) {
-    std::cerr << "Verification failed.\n";
-    assert(0 && "Verification failed");
-    abort();
+  Galois::StatTimer RT("ReadTime");
+  switch (phase) {
+    case transpose:
+      RT.start(); transposeGraph(); RT.stop();
+      break;
+    case parallel:
+      RT.start(); readGraph(); RT.stop();
+      T.start(); parallelPageRank(); T.stop();
+      if (!skipVerify) printTop(10);
+      break;
+    case serial:
+      RT.start(); readGraph(); RT.stop();
+      T.start(); serialPageRank(); T.stop();
+      if (!skipVerify) printTop(10);
+      break;
+    default:
+      std::cerr << "Unknown option\n";
+      abort();
   }
 
   return 0;

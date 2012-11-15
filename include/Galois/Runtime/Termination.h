@@ -19,6 +19,9 @@ kind.
 
 #ifndef GALOIS_RUNTIME_TERMINATION_H
 #define GALOIS_RUNTIME_TERMINATION_H
+
+#include "Galois/Runtime/PerThreadStorage.h"
+
 namespace GaloisRuntime {
 
 //Dikstra dual-ring termination algorithm
@@ -28,7 +31,7 @@ public:
     friend class TerminationDetection;
     volatile long tokenIsBlack;
     volatile long hasToken;
-    volatile long processIsBlack;
+    long processIsBlack;
   public:
     TokenHolder() :tokenIsBlack(false), hasToken(false), processIsBlack(true) {}
     inline void workHappened() {
@@ -36,19 +39,28 @@ public:
     }
   };
 private:
-  PerCPU<TokenHolder> data;
+  PerThreadStorage<TokenHolder> data;
   volatile bool globalTerm;
   bool lastWasWhite;
+
+  void propToken(TokenHolder& c, TokenHolder& n);
 
 public:
   TerminationDetection();
 
   inline void workHappened() {
-    data.get().workHappened();
+    data.getLocal()->workHappened();
   }
 
   TokenHolder* getLocalTokenHolder() {
-    return &data.get();
+    return data.getLocal();
+  }
+
+  void initializeThread() {
+    if (LL::getTID() == 0) {
+      data.getLocal()->hasToken = true;
+      data.getLocal()->tokenIsBlack = true;
+    }
   }
 
   void localTermination();

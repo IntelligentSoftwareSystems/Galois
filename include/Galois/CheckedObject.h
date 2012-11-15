@@ -20,8 +20,8 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#ifndef _GALOIS_CHECKEDOBJECT_H
-#define _GALOIS_CHECKEDOBJECT_H
+#ifndef GALOIS_CHECKEDOBJECT_H
+#define GALOIS_CHECKEDOBJECT_H
 
 #include "Galois/Runtime/Context.h"
 

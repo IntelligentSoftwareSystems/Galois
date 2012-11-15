@@ -69,10 +69,10 @@ class TriLinearCoordConn
       // Check for consistency of connectivity and coordinates arrays:
       std::vector<edgestruct> faces;
 
-      unsigned int iElements = getNumElements(); // 3 nodes per element.
-      unsigned int iNodes = getNumNodes(); // Assume 2D triangles.
+      size_t iElements = getNumElements(); // 3 nodes per element.
+      size_t iNodes = getNumNodes(); // Assume 2D triangles.
 
-      for (unsigned int e = 0; e < iElements; e++) {
+      for (size_t e = 0; e < iElements; e++) {
         // std::vector<GlobalNodalIndex> conn;
         GlobalNodalIndex node0;
         GlobalNodalIndex node1;
@@ -130,7 +130,7 @@ class TriLinearCoordConn
       std::vector<GlobalNodalIndex> copyconn (connectivity);
       connectivity.resize (iElements * 3 * 4);
 
-      for (unsigned int e = 0; e < iElements; e++) {
+      for (size_t e = 0; e < iElements; e++) {
         // triangle 1
         connectivity[e * 4 * 3 + 0 * 3 + 0] = copyconn[e * 3];
         connectivity[e * 4 * 3 + 0 * 3 + 1] = NodeInfo[e * 6 + 0 * 2 + 1];

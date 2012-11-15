@@ -24,8 +24,8 @@
 #define GALOIS_BAG_H
 
 #include "Galois/Runtime/InsBag.h"
-#include "Galois/Runtime/PerCPU.h"
-#include "Galois/Runtime/mem.h"
+#include "Galois/Runtime/PerThreadStorage.h"
+#include "Galois/Runtime/mm/Mem.h"
 
 #include <iterator>
 
@@ -37,8 +37,10 @@ namespace Galois {
  * can only be done serially.
  */
 template<typename T>
-class InsertBag: public GaloisRuntime::galois_insert_bag<T> {
-
+struct InsertBag: public GaloisRuntime::galois_insert_bag<T> {
+  T& push_back(const T& v) {
+    return this->push(v);
+  }
 };
 
 /**
@@ -46,7 +48,6 @@ class InsertBag: public GaloisRuntime::galois_insert_bag<T> {
  */
 // TODO(ddn): POD specialization
 // TODO(ddn): Factor out template dependencies to reduce code bloat
-//#define XXX_BAG_DEBUG_ALLOC
 template<class T, int blockSize=1024*16>
 class Bag: private boost::noncopyable {
   typedef GaloisRuntime::MM::SimpleBumpPtr<GaloisRuntime::MM::FreeListHeap<GaloisRuntime::MM::SystemBaseAlloc> > Allocator;
@@ -85,7 +86,7 @@ protected:
     }
   }
 
-  Header* initHeader(Header* h, T* begin, T* last) {
+  static Header* initHeader(Header* h, T* begin, T* last) {
     h->m_begin = h->m_end = begin;
     h->m_last = last;
     h->m_next = h->m_prev = h;
@@ -103,7 +104,7 @@ protected:
     }
   }
 
-#ifdef XXX_BAG_DEBUG_ALLOC
+#if 0
   static const size_t block_size = 128;
   void freeHeader(Header* h) {
     if (h->m_begin == static_cast<void*>(&m_first))
@@ -185,6 +186,14 @@ public:
     size_t m_size;
 
   public:
+    iterator (): 
+      m_head (NULL),
+      p (NULL),
+      v (NULL),
+      m_size (0)
+    {}
+
+
     iterator(Header* h, Header* x, T* e, size_t s): m_head(h), p(x), v(e), m_size(s) { }
 
     // ------ forward iterator concepts --------
@@ -231,6 +240,7 @@ public:
         --v;
       }
       --m_size;
+      return *this;
     }
 
     iterator operator--(int) {
@@ -481,7 +491,7 @@ class SmallBag: public Bag<T> {
 public:
   SmallBag() {
     T* a = static_cast<T*>(static_cast<void*>(&(this->m_first)));
-    this->m_head = initHeader(&m_h, a, a + MaxTs);
+    this->m_head = Bag<T>::initHeader(&m_h, a, a + MaxTs);
   }
 };
 
@@ -491,7 +501,7 @@ public:
 // TODO(ddn): Remove need for explicit merge by adopting same techniques are InsBag
 template<typename T>
 class MergeBag: private boost::noncopyable {
-  GaloisRuntime::PerCPU<Bag<T> > bags;
+  GaloisRuntime::PerThreadStorage<Bag<T> > bags;
 
 public:
   typedef typename Bag<T>::value_type value_type;
@@ -501,68 +511,66 @@ public:
   typedef typename Bag<T>::const_iterator const_iterator;
 
   void merge() {
-    Bag<T>& o = bags.get(0);
+    Bag<T>& o = *bags.getRemote(0);
     for (unsigned i = 1; i < bags.size(); ++i) {
-      o.splice(bags.get(i));
+      o.splice(*bags.getRemote(i));
     }
   }
 
   const_iterator begin() const {
-    return bags.get(0).begin();
+    return bags.getRemote(0)->begin();
   }
 
   iterator begin() {
-    return bags.get(0).begin();
+    return bags.getRemote(0)->begin();
   }
 
   const_iterator end() const {
-    return bags.get(0).end();
+    return bags.getRemote(0)->end();
   }
 
   iterator end() {
-    return bags.get(0).end();
+    return bags.getRemote(0)->end();
   }
   
   reference push_back(const T& val) {
-    return bags.get().push_back(val);
+    return bags.getLocal()->push_back(val);
   }
 
   bool empty() const {
-    return bags.get(0).empty();
+    return bags.getRemote(0)->empty();
   }
 
   size_t size() const {
-    return bags.get(0).size();
+    return bags.getRemote(0)->size();
   }
 
   void clear() {
-    bags.get(0).clear();
+    bags.getRemote(0)->clear();
   }
 
   void swap(MergeBag<T>& o) {
     for (unsigned i = 0; i < bags.size(); ++i) {
-      std::swap(bags.get(i), o.bags.get(i));
+      std::swap(*bags.getRemote(i), *o.bags.getRemote(i));
     }
   }
 };
 
-} // end namespace Galois
+template<typename T>
+inline void swap(Galois::Bag<T>& a, Galois::Bag<T>& b) {
+  a.swap(b);
+}
 
-namespace std {
-  template<typename T>
-  inline void swap(Galois::Bag<T>& a, Galois::Bag<T>& b) {
-    a.swap(b);
-  }
+template<typename T, unsigned N>
+inline void swap(Galois::SmallBag<T,N>& a, Galois::SmallBag<T,N>& b) {
+  a.swap(b);
+}
 
-  template<typename T, unsigned N>
-  inline void swap(Galois::SmallBag<T,N>& a, Galois::SmallBag<T,N>& b) {
-    a.swap(b);
-  }
+template<typename T>
+inline void swap(Galois::MergeBag<T>& a, Galois::MergeBag<T>& b) {
+  a.swap(b);
+}
 
-  template<typename T>
-  inline void swap(Galois::MergeBag<T>& a, Galois::MergeBag<T>& b) {
-    a.swap(b);
-  }
 }
 
 #endif

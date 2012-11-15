@@ -25,6 +25,8 @@
 #define ARRAYSET_H_
 #include <vector>
 #include <algorithm>
+#include <boost/function.hpp>
+
 using namespace std;
 template<typename T>
 class ArraySet{
@@ -32,7 +34,7 @@ public:
 	ArraySet(){
 		setsize= 0;
 	}
-	ArraySet(int maxSize, int (*mapToInt)(T)):indexes(maxSize){
+  ArraySet(int maxSize, boost::function<int(T)> mapToInt):indexes(maxSize){
 		this->mapToInt = mapToInt;
 		fill(indexes.begin(), indexes.end(), -1);
 		setsize = 0;
@@ -45,7 +47,7 @@ public:
 		return setElements.end();
 	}
 	bool insert(T ele){
-		int index = (*mapToInt)(ele);
+		int index = mapToInt(ele);
 		if(indexes[index]==-1){
 			setsize++;
 			indexes[index] = setElements.size();
@@ -55,14 +57,14 @@ public:
 		return false;
 	}
 	bool erase(T ele){
-		int index = (*mapToInt)(ele);
+		int index = mapToInt(ele);
 		if(indexes[index]!=-1){
 			setsize--;
 			int indexEle = indexes[index];
 			//swap(setElements[indexEle], setElements[setElements.size()-1]);
 			setElements[indexEle] = setElements[setElements.size()-1];
 			setElements.pop_back();
-			indexes[(*mapToInt)(setElements[indexEle])] = indexEle;
+			indexes[mapToInt(setElements[indexEle])] = indexEle;
 			indexes[index] = -1;
 			return true;
 		}
@@ -83,7 +85,7 @@ public:
 private:
 	vector<int> indexes;
 	vector<T> setElements;
-	int (*mapToInt)(T);
+  boost::function<int(T)> mapToInt;
 	int setsize;
 };
 

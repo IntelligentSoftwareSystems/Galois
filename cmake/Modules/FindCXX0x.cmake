@@ -1,7 +1,6 @@
 include(CheckCXXCompilerFlag)
 
-set(CXX0X_FLAG_CANDIDATES
-  -std=c++0x)
+set(CXX0X_FLAG_CANDIDATES -std=c++0x -std=c++11x)
 
 # Don't do anything when already set
 if(DEFINED CXX0X_FLAGS)
@@ -23,4 +22,11 @@ endforeach()
 find_package_handle_standard_args(CXX0x DEFAULT_MSG CXX0X_FOUND_INTERNAL CXX0X_FLAGS)
 mark_as_advanced(CXX0X_FLAGS)
 
-include(CheckCXX0xFeatures)
+if(CXX0X_FLAG_DETECTED)
+  set(_oldflags ${CMAKE_CXX_FLAGS})
+  set(CMAKE_CXX_FLAGS "${_oldflags} ${CXX0X_FLAGS}")
+  include(CheckCXX0xFeatures)
+  set(CMAKE_CXX_FLAGS ${_oldflags})
+else()
+  include(CheckCXX0xFeatures)
+endif()

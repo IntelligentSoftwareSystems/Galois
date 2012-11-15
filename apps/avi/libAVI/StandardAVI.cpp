@@ -87,7 +87,6 @@ bool StandardAVI::gather ( const LocalToGlobalMap& L2G, const VecDouble& Qval, c
 
   return (true);
 }
-;
 
 void StandardAVI::computeLocalTvec (MatDouble& tnew) const {
   assert (tnew.size () == nfields);
@@ -146,7 +145,6 @@ bool StandardAVI::assemble (const LocalToGlobalMap& L2G,
 
   return (true);
 }
-;
 
 bool StandardAVI::update (const MatDouble& q,
     const MatDouble& v,
@@ -227,7 +225,6 @@ bool StandardAVI::update (const MatDouble& q,
 
   return (true);
 }
-;
 
 bool StandardAVI::vbInit (
     const MatDouble& q,
@@ -309,9 +306,6 @@ bool StandardAVI::vbInit (
   }
   return (true);
 }
-;
-
-
 
 
 void StandardAVI::computeDeltaV(const MatDouble& funcval,
@@ -331,7 +325,7 @@ void StandardAVI::computeDeltaV(const MatDouble& funcval,
       DeltaV[f][a] = funcval[f][a]/(MMdiag[f][a]);
     }
   }
-};
+}
 
 bool StandardAVI::getImposedValues (const GlobalElementIndex& ElementIndex,
     const LocalToGlobalMap& L2G, size_t field, size_t dof,
@@ -346,7 +340,6 @@ bool StandardAVI::getImposedValues (const GlobalElementIndex& ElementIndex,
     return (false);
   }
 }
-;
 
 void StandardAVI::setBCs (const MatBool& IFlag,
     const MatDouble& IVal) {
@@ -372,7 +365,6 @@ void StandardAVI::setBCs (const MatBool& IFlag,
     }
   }
 }
-;
 
 void StandardAVI::setDiagVals (const VecDouble& MassVec,
     const LocalToGlobalMap& L2G, const GlobalElementIndex& elem_index) {
@@ -407,7 +399,6 @@ void StandardAVI::setDiagVals (const VecDouble& MassVec,
   // VecRestoreArray (MassVec,& MMVec);
 
 }
-;
 
 /*
  void StandardAVI::print(const MatDouble& q) {

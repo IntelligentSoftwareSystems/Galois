@@ -40,34 +40,34 @@ public:
 		this->maxVertexWeight=maxVertexWeight;
 	}
 		void match(GNode node) {
-			MetisNode& nodeData = node.getData(Galois::NONE);
+		  MetisNode& nodeData = graph->getData(node, Galois::NONE);
 			if (metisGraph->isMatched(nodeData.getNodeId())) {
 				return;
 			}
 			GNode matchNode;
 			while(true){
 				matchNode = node;
-				for (GGraph::neighbor_iterator jj = graph->neighbor_begin(node, Galois::NONE), eejj = graph->neighbor_end(node, Galois::NONE); jj != eejj; ++jj) {
-					GNode neighbor = *jj;
-					MetisNode& neighMNode = neighbor.getData(Galois::NONE);
+				for (GGraph::edge_iterator jj = graph->edge_begin(node, Galois::NONE), eejj = graph->edge_end(node, Galois::NONE); jj != eejj; ++jj) {
+				  GNode neighbor = graph->getEdgeDst(jj);
+				  MetisNode& neighMNode = graph->getData(neighbor, Galois::NONE);
 					if (!metisGraph->isMatched(neighMNode.getNodeId()) && nodeData.getWeight() + neighMNode.getWeight() <= maxVertexWeight) {
 						matchNode = neighbor;
 						break;
 					}
 				}
 
-				MetisNode& matchNodeData = matchNode.getData(Galois::CHECK_CONFLICT);
+				MetisNode& matchNodeData = graph->getData(matchNode, Galois::CHECK_CONFLICT);
 				if(node == matchNode || !metisGraph->isMatched(matchNodeData.getNodeId())){
 					break;
 				}
 			}
-			node.getData(Galois::CHECK_CONFLICT);
+			graph->getData(node, Galois::CHECK_CONFLICT);
 			if(metisGraph->isMatched(nodeData.getNodeId())){
 				return;
 			}
 
 			metisGraph->setMatch(nodeData.getNodeId(), matchNode);
-			MetisNode& matchNodeData = matchNode.getData(Galois::NONE);
+			MetisNode& matchNodeData = graph->getData(matchNode,Galois::NONE);
 //			int weight = nodeData.getWeight();
 			if (node != matchNode) {
 				metisGraph->setMatch(matchNodeData.getNodeId(), node);

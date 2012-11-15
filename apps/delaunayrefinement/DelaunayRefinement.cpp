@@ -26,27 +26,24 @@
  * @author Milind Kulkarni <milind@purdue.edu>
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
+#include "Mesh.h"
+#include "Cavity.h"
+#include "Verifier.h"
 
-#include <iostream>
-#include <sys/time.h>
-#include <limits.h>
-#include <math.h>
-#include <string.h>
-#include <cassert>
-
-#include "Element.h"
-
-#include "Galois/Statistic.h"
-#include "Galois/Graphs/Graph2.h"
 #include "Galois/Galois.h"
+#include "Galois/ParallelSTL/ParallelSTL.h"
+#include "Galois/Bag.h"
+#include "Galois/Statistic.h"
 
 #include "llvm/Support/CommandLine.h"
-
 #include "Lonestar/BoilerPlate.h"
 
-#ifdef GALOIS_EXP
-//#include "Galois/PriorityScheduling.h"
-#endif
+#include "Galois/Runtime/WorkListAlt.h"
+#include "Galois/Runtime/WorkListDebug.h"
+
+#include <iostream>
+#include <string.h>
+#include <cassert>
 
 namespace cll = llvm::cl;
 
@@ -56,205 +53,155 @@ static const char* url = "delaunay_mesh_refinement";
 
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 
-typedef Galois::Graph::FirstGraph<Element,void,false>            Graph;
-typedef Galois::Graph::FirstGraph<Element,void,false>::GraphNode GNode;
+Graph* graph;
 
-#include "Subgraph.h"
-#include "Mesh.h"
-#include "Cavity.h"
+enum DetAlgo {
+  nondet,
+  detBase,
+  detPrefix,
+  detDisjoint
+};
 
-Graph* mesh;
+static cll::opt<DetAlgo> detAlgo(cll::desc("Deterministic algorithm:"),
+    cll::values(
+      clEnumVal(nondet, "Non-deterministic"),
+      clEnumVal(detBase, "Base execution"),
+      clEnumVal(detPrefix, "Prefix execution"),
+      clEnumVal(detDisjoint, "Disjoint execution"),
+      clEnumValEnd), cll::init(nondet));
 
-struct process {
+template<int Version=detBase>
+struct Process {
   typedef int tt_needs_per_iter_alloc;
 
-  template<typename Context>
-  void operator()(GNode item, Context& lwl) {
-    if (!mesh->containsNode(item))
+  struct LocalState {
+    Cavity cav;
+    LocalState(Process<Version>& self, Galois::PerIterAllocTy& alloc): cav(graph, alloc) { }
+  };
+
+  void operator()(GNode item, Galois::UserContext<GNode>& ctx) {
+    if (!graph->containsNode(item, Galois::ALL))
       return;
     
-    Cavity cav(mesh, lwl.getPerIterAlloc());
-    cav.initialize(item);
-    cav.build();
-    cav.update(); //VTune: Most work
-    
-    //FAILSAFE POINT
+    Cavity* cavp = NULL;
 
-    for (Subgraph::iterator ii = cav.getPre().begin(),
-	   ee = cav.getPre().end(); ii != ee; ++ii) 
-      mesh->removeNode(*ii, Galois::NONE);
-    
-    //add new data
-    for (Subgraph::iterator ii = cav.getPost().begin(),
-	   ee = cav.getPost().end(); ii != ee; ++ii) {
-      GNode node = *ii;
-      Element& element = mesh->getData(node,Galois::NONE);
-      if (element.isBad()) {
-        lwl.push(node);
+    if (Version == detDisjoint) {
+      bool used;
+      LocalState* localState = (LocalState*) ctx.getLocalState(used);
+      if (used) {
+        localState->cav.update(item, ctx);
+        return;
+      } else {
+        cavp = &localState->cav;
       }
     }
-    
-    for (Subgraph::edge_iterator ii = cav.getPost().edge_begin(),
-	   ee = cav.getPost().edge_end(); ii != ee; ++ii) {
-      Subgraph::tmpEdge edge = *ii;
-      mesh->addEdge(edge.src, edge.dst, Galois::NONE);
-    }
-    if (mesh->containsNode(item)) {
-      lwl.push(item);
+
+    if (Version == detDisjoint) {
+      cavp->initialize(item);
+      cavp->build();
+      cavp->computePost();
+    } else {
+      Cavity cav(graph, ctx.getPerIterAlloc());
+      cav.initialize(item);
+      cav.build();
+      cav.computePost();
+      if (Version == detPrefix)
+        return;
+      cav.update(item, ctx);
     }
   }
 };
 
-bool verify() {
-  // ensure consistency of elements
-  bool error = false;
-  
-  for (Graph::iterator ii = mesh->begin(), ee = mesh->end(); ii != ee; ++ii) {
-    
-    GNode node = *ii;
-    Element& element = mesh->getData(node,Galois::NONE);
-    int nsize = std::distance(mesh->edge_begin(node, Galois::NONE), mesh->edge_end(node, Galois::NONE));
-    if (element.getDim() == 2) {
-      if (nsize != 1) {
-	std::cerr << "-> Segment " << element << " has " << nsize << " relation(s)\n";
-	error = true;
-      }
-    } else if (element.getDim() == 3) {
-      if (nsize != 3) {
-	std::cerr << "-> Triangle " << element << " has " << nsize << " relation(s)";
-	error = true;
-      }
-    } else {
-      std::cerr << "-> Figures with " << element.getDim() << " edges";
-      error = true;
-    }
-  }
-  
-  if (error)
-    return false;
-  
-  // ensure reachability
-  std::stack<GNode> remaining;
-  std::set<GNode> found;
-  remaining.push(*(mesh->begin()));
-  
-  while (!remaining.empty()) {
-    GNode node = remaining.top();
-    remaining.pop();
-    if (!found.count(node)) {
-      assert(mesh->containsNode(node) && "Reachable node was removed from graph");
-      found.insert(node);
-      int i = 0;
-      for (Graph::edge_iterator ii = mesh->edge_begin(node, Galois::NONE), ee = mesh->edge_end(node, Galois::NONE); ii != ee; ++ii) {
-	assert(i < 3);
-	assert(mesh->containsNode(mesh->getEdgeDst(ii)));
-	assert(node != mesh->getEdgeDst(ii));
-	++i;
-	//          if (!found.count(*ii))
-	remaining.push(mesh->getEdgeDst(ii));
-      }
-    }
-  }
-  size_t msize = std::distance(mesh->begin(), mesh->end());
-  
-  if (found.size() != msize) {
-    std::cerr << "Not all elements are reachable \n";
-    std::cerr << "Found: " << found.size() << "\nMesh: " << msize << "\n";
-    assert(0 && "Not all elements are reachable");
-    return false;
-  }
-  return true;
-}
+Galois::InsertBag<GNode> wl;
 
-GaloisRuntime::galois_insert_bag<GNode> wl;
-
-struct preprocess {
+struct Preprocess {
   void operator()(GNode item) const {
-    if (mesh->getData(item, Galois::NONE).isBad())
+    if (graph->getData(item, Galois::NONE).isBad())
       wl.push(item);
   }
-  void operator()(Graph::GTile item) const {
-    for (Graph::GTile::iterator ii = item.begin(), ee = item.end();
-	 ii != ee; ++ii)
-      if (mesh->getData(*ii, Galois::NONE).isBad())
-	wl.push(*ii);
-  }
 };
 
-
-struct Indexer: public std::unary_function<const GNode&,unsigned> {
-  unsigned operator()(const GNode& t) const { return 0; }
-};
-
-struct Less: public std::binary_function<const GNode&,const GNode&,bool>{
+struct DetLessThan {
   bool operator()(const GNode& a, const GNode& b) const {
-    return true;
-  }
-};
-
-struct Greater: public std::binary_function<const GNode&,const GNode&,bool> {
-  bool operator()(const GNode& a, const GNode& b) const {
-    return true;
+    int idA = graph->getData(a, Galois::NONE).getId();
+    int idB = graph->getData(b, Galois::NONE).getId();
+    if (idA == 0 || idB == 0) abort();
+    return idA < idB;
   }
 };
 
 int main(int argc, char** argv) {
-  LonestarStart(argc, argv, std::cout, name, desc, url);
+  Galois::StatManager statManager;
+  LonestarStart(argc, argv, name, desc, url);
 
-  mesh = new Graph();
+  graph = new Graph();
   {
     Mesh m;
-    m.read(mesh, filename.c_str());
+    m.read(graph, filename.c_str(), detAlgo == nondet);
+    Verifier v;
+    if (!skipVerify && !v.verify(graph)) {
+      std::cerr << "bad input mesh\n";
+      assert(0 && "Refinement failed");
+      abort();
+    }
   }
 
-  std::cout << "configuration: " << std::distance(mesh->begin(), mesh->end())
-	    << " total triangles, " << std::count_if(mesh->begin(), mesh->end(), is_bad(mesh)) << " bad triangles\n";
+  std::cout << "configuration: " << std::distance(graph->begin(), graph->end())
+	    << " total triangles, " << std::count_if(graph->begin(), graph->end(), is_bad(graph)) << " bad triangles\n";
 
-  std::cout << "MEMINFO P1: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
+  Galois::Statistic("MeminfoPre1", GaloisRuntime::MM::pageAllocInfo());
   Galois::preAlloc(15 * numThreads + GaloisRuntime::MM::pageAllocInfo() * 10);
-  std::cout << "MEMINFO P2: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
-
-  Galois::StatTimer Touter("outertime");
-  Touter.start();
-
-  Galois::do_all(mesh->tile_begin(), mesh->tile_end(), preprocess());
-  std::cout << "MEMINFO MID: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
+  Galois::Statistic("MeminfoPre2", GaloisRuntime::MM::pageAllocInfo());
 
   Galois::StatTimer T;
   T.start();
+
+  if (detAlgo == nondet)
+    Galois::do_all_local(*graph, Preprocess());
+  else
+    std::for_each(graph->begin(), graph->end(), Preprocess());
+
+  Galois::Statistic("MeminfoMid", GaloisRuntime::MM::pageAllocInfo());
+  
+  Galois::StatTimer Trefine("refine");
+  Trefine.start();
   using namespace GaloisRuntime::WorkList;
-  //#ifdef GALOIS_EXP
-#if 0
-  //Galois::for_each<Alt::ChunkedAdaptor<Alt::InitialQueue<Alt::LevelStealingAlt, Alt::LevelLocalAlt>, 256*4*4> >(wl.begin(), wl.end(), process());
-  typedef dChunkedLIFO<256> dChunk;
-  typedef ChunkedLIFO<256> Chunk;
-  Exp::WorklistExperiment<
-    LocalQueues<dChunk, LIFO<> >, 
-    dChunk,Chunk,Indexer,Less,Greater>().for_each(
-      std::cout, wl.begin(), wl.end(), process());
-#else
-  Galois::for_each<LocalQueues<dChunkedLIFO<256>, ChunkedLIFO<256> /*LIFO<>*/ > >(wl.begin(), wl.end(), process());
-  //Galois::for_each<OwnerComputesWL<Graph::OwnerFn, int> >(wl.begin(), wl.end(), process());
-#endif
+  
+  typedef LocalQueues<dChunkedLIFO<256>, ChunkedLIFO<256> > BQ;
+  typedef ChunkedAdaptor<false,32> CA;
+  
+  switch (detAlgo) {
+    case nondet: 
+      Galois::for_each_local<CA>(wl, Process<>()); break;
+    case detBase:
+      Galois::for_each_det(wl.begin(), wl.end(), Process<>()); break;
+    case detPrefix:
+      Galois::for_each_det(wl.begin(), wl.end(), Process<detPrefix>(), Process<>());
+      break;
+    case detDisjoint:
+      Galois::for_each_det(wl.begin(), wl.end(), Process<detDisjoint>()); break;
+    default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
+  }
+  Trefine.stop();
   T.stop();
-  Touter.stop();
-
-  std::cout << "MEMINFO POST: " << GaloisRuntime::MM::pageAllocInfo() << "\n";
-
+  
+  Galois::Statistic("MeminfoPost", GaloisRuntime::MM::pageAllocInfo());
+  
   if (!skipVerify) {
-    int size = std::count_if(mesh->begin(), mesh->end(), is_bad(mesh));
+    int size = Galois::ParallelSTL::count_if(graph->begin(), graph->end(), is_bad(graph));
     if (size != 0) {
       std::cerr << size << " bad triangles remaining.\n";
       assert(0 && "Refinement failed");
       abort();
     }
-    if (!verify()) {
+    Verifier v;
+    if (!v.verify(graph)) {
       std::cerr << "Refinement failed.\n";
       assert(0 && "Refinement failed");
       abort();
     }
     std::cout << "Refinement OK\n";
   }
+
   return 0;
 }
-

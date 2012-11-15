@@ -18,9 +18,8 @@
 #include "llvm/Support/CommandLine.h"
 #include "Galois/PriorityScheduling.h"
 #include "Galois/Timer.h"
-#include "Galois/Runtime/PerCPU.h"
 
-static GaloisRuntime::PerCPU<int> counters;
+static GaloisRuntime::PerThreadStorage<int> counters;
 extern long GlobalTime;
 
 namespace dai {
@@ -477,8 +476,8 @@ void BP::runProcess(const Task& t, std::vector<std::vector<EdgeData> >& edgeData
       }
 
       // update the message with the largest residual
-      if (counters.get()++ == 1000) {
-        counters.get() = 0;
+      if ((*counters.getLocal())++ == 1000) {
+        *counters.getLocal() = 0;
         //Indexer I;
         //std::cout << "AAAA: " << count << " " << t.dist << " " << t.round << "\n";
         if (__sync_fetch_and_add(&count, 1000) >= _updateSeq.size()) {
@@ -701,14 +700,14 @@ Real BP::run() {
 
           Galois::Timer t;
           t.start();
-          Exp::WorklistExperiment<OBIM,dChunk,Chunk,Indexer,TaskLess,TaskGreater>().for_each(std::cout, initial.begin(), initial.end(), Process(*this, edgeData, count));
+          Exp::PriAuto<64, Indexer, OBIM, TaskLess,TaskGreater>::for_each(initial.begin(), initial.end(), Process(*this, edgeData, count));
           t.stop();
           GlobalTime += t.get();
         } else {
           abort();
         }
 
-        Galois::GReduceMax<Real> accMaxDiff(-INFINITY);
+        Galois::GReduceMax<Real> accMaxDiff;
         Galois::for_each(integers.begin(), integers.end(), ComputeDiffs(*this, accMaxDiff));
 
         // calculate new beliefs and compare with old ones
@@ -723,7 +722,7 @@ Real BP::run() {
         //    maxDiff = std::max( maxDiff, dist( b, _oldBeliefsF[I], DISTLINF ) );
         //    _oldBeliefsF[I] = b;
         //}
-        maxDiff = accMaxDiff.get();
+        maxDiff = accMaxDiff.reduce();
 
         if( props.verbose >= 3 )
             cerr << name() << "::run:  maxdiff " << maxDiff << " after " << _iters+1 << " passes" << endl;

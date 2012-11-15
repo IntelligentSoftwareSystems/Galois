@@ -68,13 +68,12 @@ public:
         const double delta, 
         const double time) 
 
-      : AVI (),
+      : AVI (time),
         operation (MyRes),
         globalIdx (globalIdx),
         imposedFlags (IFlag),
         imposedValues (IVal), 
-        delta (delta),
-        timeStamp (time) {
+        delta (delta) {
 
         init(L2G, MassVec);
 
@@ -115,12 +114,11 @@ public:
         const double delta, 
         const double time)
 
-    :   AVI (),
+    :   AVI (time),
         operation (MyRes),
         globalIdx (globalIdx),
         imposedTypes (IType),
-        delta (delta),
-        timeStamp (time) {
+        delta (delta) {
 
         init (L2G, MassVec);
 
@@ -179,8 +177,7 @@ public:
     imposedFlags (that.imposedFlags),
     imposedValues (that.imposedValues),
     nfields (that.nfields),
-    delta (that.delta),
-    timeStamp (that.timeStamp) {
+    delta (that.delta) {
 
       setTimeStep ();
     }
@@ -189,65 +186,36 @@ public:
     return new StandardAVI (*this);
   }
 
-  //! returns time step for the Element
-  double getTimeStep () const {
-    return timeStep;
-  }
-
-  //! returns the last update time for this element
-  double getTimeStamp () const {
-    return timeStamp;
-  }
-
-  bool setTimeStamp (double timeval) {
-    assert (timeval >= 0.0);
-    timeStamp = timeval;
-    return true;
-  }
-  ;
-
-
-  //! Returns the next time at which the force field will be updated
-  virtual double getNextTimeStamp () const { return getTimeStamp() + getTimeStep();}
-  //! increment the time stamp
-  virtual void incTimeStamp () { setTimeStamp(getNextTimeStamp()); }
-
   virtual const DResidue& getOperation () const { return operation; }
 
   size_t getFieldDof (size_t fieldnumber) const {
     return operation.getFieldDof (fieldnumber);
   }
-  ;
 
   const std::vector<size_t>& getFields () const {
     return operation.getFields ();
   }
-  ;
 
   //! returns the element geometry
   const ElementGeometry& getGeometry () const {
     return operation.getElement ().getGeometry ();
   }
-  ;
 
   //! returns the element
   const Element& getElement () const {
     return operation.getElement ();
   }
-  ;
 
   //! Updates the force field through the operation Stresswork class
   bool getForceField (const MatDouble& argval, MatDouble& forcefield) const {
     operation.getVal (argval, forcefield);
     return (true);
   }
-  ;
 
 
   size_t getGlobalIndex (void) const {
     return (globalIdx);
   }
-  ;
 
   //! write the updated time vector into the argument provided
   //! value filled in is the one obtained from getNextTimeStamp ()
@@ -310,7 +278,7 @@ protected:
   virtual void setTimeStep (double epsilon = 1.0) {
      timeStep = epsilon * delta * (operation.getElement ().getGeometry ().getInRadius ()) / operation.getMaterial ().getSoundSpeed ();
 
-   };
+   }
 
   virtual void computeDeltaV (const MatDouble& funcval, MatDouble& DeltaV) const;
 
@@ -329,7 +297,6 @@ protected:
     cut_off = cut_off / strtod (val2, NULL);
     timeStep = floor (timeStep / cut_off) * cut_off;
   }
-  ;
 
   
 private:
@@ -377,11 +344,6 @@ private:
 
   size_t nfields;
   double delta; // safety factor in time step computation
-  double timeStamp;
-  double timeStep;
-
-
-
 };
 
 #endif // _STANDARD_AVI_H_

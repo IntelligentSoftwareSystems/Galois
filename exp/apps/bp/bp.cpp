@@ -1,6 +1,6 @@
 #include "Galois/Galois.h"
 #include "Galois/Statistic.h"
-#include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/Graph2.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
@@ -31,25 +31,23 @@ struct BipartiteGraph: public Galois::Graph::FirstGraph<NodeTy,EdgeTy,true> {
   NodeList factors;
   NodeList variables;
 
-  bool addNode(const typename Super::GraphNode& n, bool isFactor, Galois::MethodFlag mflag = Galois::ALL) {
+  void addNode(const typename Super::GraphNode& n, bool isFactor, Galois::MethodFlag mflag = Galois::ALL) {
     if (isFactor) {
       factors.push_back(n);
     } else {
       variables.push_back(n);
     }
-    return Super::addNode(n, mflag);
+    Super::addNode(n, mflag);
   }
 
-  bool addNode(const typename Super::GraphNode& n, Galois::MethodFlag mflag = Galois::ALL) {
+  void addNode(const typename Super::GraphNode& n, Galois::MethodFlag mflag = Galois::ALL) {
     assert(0 && "Not supported in Bipartite Graph");
     abort();
-    return false;
   }
 
-  bool removeNode(typename Super::GraphNode n, Galois::MethodFlag mflag = Galois::ALL) {
+  void removeNode(typename Super::GraphNode n, Galois::MethodFlag mflag = Galois::ALL) {
     assert(0 && "Not supported in Bipartite Graph");
     abort();
-    return false;
   }
 };
 
@@ -124,19 +122,22 @@ struct BP {
   // initialize residual to 0
   
   Prob calculateIncomingMessageProduct(const GraphNode& factor, const GraphNode& var_i) {
-    Prob prod(factor.getData().prob);
+    Prob prod(graph.getData(factor).prob);
 
-    for (typename Graph::neighbor_iterator var = graph.neighbor_begin(factor),
-        evar = graph.neighbor_end(factor); var != evar; ++var) {
-      if (*var == var_i)
+    for (typename Graph::edge_iterator ii = graph.edge_begin(factor),
+        ei = graph.edge_end(factor); ii != ei; ++ii) {
+      GraphNode var = graph.getEdgeDst(ii);
+
+      if (var == var_i)
         continue;
       
       Prob prod_j;
-      for (typename Graph::neighbor_iterator factor_j = graph.neighbor_begin(*var),
-          efactor_j = graph.neighbor_end(*var); factor_j != efactor_j; ++factor_j) {
-        if (*factor_j == factor)
+      for (typename Graph::edge_iterator jj = graph.edge_begin(var),
+          ej = graph.edge_end(var); jj != ej; ++jj) {
+        GraphNode factor_j = graph.getEdgeDst(jj);
+        if (factor_j == factor)
           continue;
-        prod_j *= graph.getEdgeData(*var, *factor_j).message;
+        prod_j *= graph.getEdgeData(jj).message;
       }
 
       // XXX
@@ -149,20 +150,20 @@ struct BP {
   void calculateMessage(const GraphNode& var, const GraphNode& factor) {
     Prob marg;
 
-    if (std::distance(graph.neighbor_begin(var), graph.neighbor_end(var)) == 1) {
-      marg = factor.getData().prob;
+    if (std::distance(graph.edge_begin(var), graph.edge_end(var)) == 1) {
+      marg = graph.getData(factor).prob;
     } else {
-      Prob& prob = factor.getData().prob;
+      Prob& prob = graph.getData(factor).prob;
       prob = calculateIncomingMessageProduct(factor, var);
 
       // XXX compute marginal and normalize
     }
 
-    graph.getEdgeData(var, factor).message_new = marg;
+    graph.getEdgeData(graph.findEdge(var, factor)).message_new = marg;
   }
 
   void updateMessage(const GraphNode& var, const GraphNode& factor) {
-    Edge& edge = graph.getEdgeData(var, factor);
+    Edge& edge = graph.getEdgeData(graph.findEdge(var, factor));
     if (DAMPING) {
       Prob m = edge.message_new;
       m.pow(1 - DAMPING);
@@ -180,17 +181,17 @@ struct BP {
   void parallelScheduling() {
     for (typename Graph::NodeList::iterator ii = graph.variables.begin(),
         ei = graph.variables.end(); ii != ei; ++ii) {
-      for (typename Graph::neighbor_iterator jj = graph.neighbor_begin(*ii), 
-          ej = graph.neighbor_end(*ii); jj != ej; ++jj) {
-        calculateMessage(*ii, *jj);
+      for (typename Graph::edge_iterator jj = graph.edge_begin(*ii), 
+          ej = graph.edge_end(*ii); jj != ej; ++jj) {
+        calculateMessage(*ii, graph.getEdgeDst(jj));
       }
     }
 
     for (typename Graph::NodeList::iterator ii = graph.variables.begin(), 
         ei = graph.variables.end(); ii != ei; ++ii) {
-      for (typename Graph::neighbor_iterator jj = graph.neighbor_begin(*ii),
-          ej = graph.neighbor_end(*ii); jj != ej; ++jj) {
-        updateMessage(*ii, *jj);
+      for (typename Graph::edge_iterator jj = graph.edge_begin(*ii),
+          ej = graph.edge_end(*ii); jj != ej; ++jj) {
+        updateMessage(*ii, graph.getEdgeDst(jj));
       }
     }
   }
@@ -200,9 +201,9 @@ struct BP {
 
     for (typename Graph::NodeList::iterator ii = graph.factors.begin(), 
         ei = graph.factors.end(); ii != ei; ++ii) {
-      for (typename Graph::neighbor_iterator jj = graph.neighbor_begin(*ii),
-          ej = graph.neighbor_end(*ii); jj != ej; ++jj) {
-        m_sequential_schedule.push_back(std::make_pair(*jj, *ii));
+      for (typename Graph::edge_iterator jj = graph.edge_begin(*ii),
+          ej = graph.edge_end(*ii); jj != ej; ++jj) {
+        m_sequential_schedule.push_back(std::make_pair(graph.getEdgeDst(jj), *ii));
       }
     }
   }
@@ -466,10 +467,10 @@ struct GenerateInput {
     double p01 = exp(-lambda*hardness);
     GraphNode new_n = graph.createNode(node_type(p00, p01, p01, p00));
     graph.addNode(new_n, true);
-    graph.addEdge(new_n, n1, edge);
-    graph.addEdge(new_n, n2, edge);
-    graph.addEdge(n1, new_n, edge);
-    graph.addEdge(n2, new_n, edge);
+    graph.getEdgeData(graph.addEdge(new_n, n1)) = edge;
+    graph.getEdgeData(graph.addEdge(new_n, n2)) = edge;
+    graph.getEdgeData(graph.addEdge(n1, new_n)) = edge;
+    graph.getEdgeData(graph.addEdge(n2, new_n)) = edge;
   }
 
   //! Create a unary factor
@@ -479,8 +480,8 @@ struct GenerateInput {
     edge_type edge;
     GraphNode new_n = graph.createNode(node_type(exp(-h), exp(h)));
     graph.addNode(new_n, true);
-    graph.addEdge(new_n, n, edge);
-    graph.addEdge(n, new_n, edge);
+    graph.getEdgeData(graph.addEdge(new_n, n)) = edge;
+    graph.getEdgeData(graph.addEdge(n, new_n)) = edge;
   }
 
   GenerateInput(Graph& g, int N, int h, int seed): graph(g), hardness(h) {
@@ -517,7 +518,7 @@ static void start(int N, int hardness, int seed) {
 }
 
 int main(int argc,  char **argv) {
-  LonestarStart(argc, argv, std::cout, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url);
 
   switch (algo) {
     case 3: std::cout << "Using BP-MAX-RES\n"; start<BP<BP_MAX_RES> >(N, hardness, seed); break;

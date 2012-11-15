@@ -34,7 +34,7 @@ static const int LARGE_NUM_ITER_PARTITION = 8;
 
 
 void bisectionArray(GGraph* graph, GNode* nodes, int numNodes, int minWgtPart1, int maxWgtPart1, int* pwgts, int* visited, int* queue) {
-	arrayFill(visited, numNodes, 0);
+  std::fill_n(visited, numNodes, 0);
 	vector<int> indexes(numNodes);
 	for(int i=0;i<numNodes;i++){
 		indexes[i]=i;
@@ -50,14 +50,14 @@ void bisectionArray(GGraph* graph, GNode* nodes, int numNodes, int minWgtPart1, 
 		while(first!=last){
 			node = queue[first++];
 			visited[node] = 1;
-			int nodeWeight = nodes[i].getData().getWeight();
+			int nodeWeight = graph->getData(nodes[i]).getWeight();
 
 			if (pwgts[0] > 0 && (pwgts[1] - nodeWeight) < minWgtPart1) {
 				drain = true;
 				continue;
 			}
 
-			nodes[i].getData().setPartition(0);
+			graph->getData(nodes[i]).setPartition(0);
 			pwgts[0] += nodeWeight;
 			pwgts[1] -= nodeWeight;
 			if (pwgts[1] <= maxWgtPart1) {
@@ -66,9 +66,9 @@ void bisectionArray(GGraph* graph, GNode* nodes, int numNodes, int minWgtPart1, 
 
 			drain = false;
 
-			for (GGraph::neighbor_iterator jj = graph->neighbor_begin(nodes[i], Galois::NONE), eejj = graph->neighbor_end(nodes[i], Galois::NONE); jj != eejj; ++jj) {
-				GNode neighbor = *jj;
-				int k = neighbor.getData().getNodeId();//id is same as the position in nodes array
+			for (GGraph::edge_iterator jj = graph->edge_begin(nodes[i], Galois::NONE), eejj = graph->edge_end(nodes[i], Galois::NONE); jj != eejj; ++jj) {
+			  GNode neighbor = graph->getEdgeDst(jj);
+			  int k = graph->getData(neighbor).getNodeId();//id is same as the position in nodes array
 				if (visited[k] == 0) {
 					queue[last++] = k;
 					visited[k] = 1;
@@ -83,7 +83,7 @@ void bisectionArray(GGraph* graph, GNode* nodes, int numNodes, int minWgtPart1, 
 
 void bisection(GGraph* graph, GNode* nodes, int numNodes, int minWgtPart1, int maxWgtPart1, int* pwgts, int* visited, int* queue) {
 
-	arrayFill(visited, numNodes, 0);
+  std::fill_n(visited, numNodes, 0);
 	queue[0] = getRandom(numNodes);
 	visited[queue[0]] = 1;
 	int first = 0;
@@ -115,14 +115,14 @@ void bisection(GGraph* graph, GNode* nodes, int numNodes, int minWgtPart1, int m
 		}
 
 		int i = queue[first++];
-		int nodeWeight = nodes[i].getData().getWeight();
+		int nodeWeight = graph->getData(nodes[i]).getWeight();
 
 		if (pwgts[0] > 0 && (pwgts[1] - nodeWeight) < minWgtPart1) {
 			drain = true;
 			continue;
 		}
 
-		nodes[i].getData().setPartition(0);
+		graph->getData(nodes[i]).setPartition(0);
 		pwgts[0] += nodeWeight;
 		pwgts[1] -= nodeWeight;
 		if (pwgts[1] <= maxWgtPart1) {
@@ -131,9 +131,9 @@ void bisection(GGraph* graph, GNode* nodes, int numNodes, int minWgtPart1, int m
 
 		drain = false;
 
-		for (GGraph::neighbor_iterator jj = graph->neighbor_begin(nodes[i], Galois::NONE), eejj = graph->neighbor_end(nodes[i], Galois::NONE); jj != eejj; ++jj) {
-			GNode neighbor = *jj;
-			int k = neighbor.getData().getNodeId();//id is same as the position in nodes array
+		for (GGraph::edge_iterator jj = graph->edge_begin(nodes[i], Galois::NONE), eejj = graph->edge_end(nodes[i], Galois::NONE); jj != eejj; ++jj) {
+		  GNode neighbor = graph->getEdgeDst(jj);
+			int k = graph->getData(neighbor).getNodeId();//id is same as the position in nodes array
 			if (visited[k] == 0) {
 				queue[last++] = k;
 				visited[k] = 1;
@@ -158,7 +158,7 @@ void randomBisection(MetisGraph* metisGraph, int* tpwgts, int coarsenTo){
 	GNode* nodes = new GNode[numNodes];
 	for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 		GNode node = *ii;
-		nodes[node.getData().getNodeId()] = node;
+		nodes[graph->getData(node).getNodeId()] = node;
 	}
 
 	int bestMinCut = INT_MAX;
@@ -166,7 +166,7 @@ void randomBisection(MetisGraph* metisGraph, int* tpwgts, int coarsenTo){
 	for (int inbfs=0; inbfs<nbfs; inbfs++) {
 		std::random_shuffle(indexes.begin(), indexes.end());
 		for (int i = 0; i < numNodes; i++) {
-			nodes[i].getData().setPartition(1);
+		  graph->getData(nodes[i]).setPartition(1);
 		}
 		int pwgts[2] ;
 		pwgts[1] = tpwgts[0]+tpwgts[1];
@@ -175,9 +175,9 @@ void randomBisection(MetisGraph* metisGraph, int* tpwgts, int coarsenTo){
 		if (nbfs != 1) {
 			for (int ii=0; ii<numNodes; ii++) {
 				int i = indexes[ii];
-				int vwgt = nodes[i].getData().getWeight();
+				int vwgt = graph->getData(nodes[i]).getWeight();
 				if (pwgts[0]+vwgt < maxWgtPart0) {
-					nodes[i].getData().setPartition(0);
+				  graph->getData(nodes[i]).setPartition(0);
 					pwgts[0] += vwgt;
 					pwgts[1] -= vwgt;
 					if (pwgts[0] > minWgtPart0)
@@ -192,15 +192,15 @@ void randomBisection(MetisGraph* metisGraph, int* tpwgts, int coarsenTo){
 		if (inbfs==0 || bestMinCut > metisGraph->getMinCut()) {
 			bestMinCut = metisGraph->getMinCut();
 			for (int i = 0; i < numNodes; i++) {
-				bestWhere[i] = nodes[i].getData().getPartition();
+			  bestWhere[i] = graph->getData(nodes[i]).getPartition();
 			}
 			if (bestMinCut == 0)
 				break;
 		}
 	}
 	for (int i = 0; i < numNodes; i++) {
-		nodes[i].getData().setPartition(bestWhere[i]);
-		assert(nodes[i].getData().getPartition()>=0);
+	  graph->getData(nodes[i]).setPartition(bestWhere[i]);
+	  assert(graph->getData(nodes[i]).getPartition()>=0);
 	}
 	delete[] bestWhere;
 	metisGraph->setMinCut(bestMinCut);
@@ -217,7 +217,7 @@ void growBisection(MetisGraph* metisGraph, int* tpwgts, int coarsenTo) {
 
 	for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 		GNode node = *ii;
-		nodes[node.getData().getNodeId()] = node;
+		nodes[graph->getData(node).getNodeId()] = node;
 	}
 
 	int nbfs = (numNodes <= coarsenTo ? SMALL_NUM_ITER_PARTITION : LARGE_NUM_ITER_PARTITION);
@@ -237,14 +237,14 @@ void growBisection(MetisGraph* metisGraph, int* tpwgts, int coarsenTo) {
 		pwgts[0] = 0;
 
 		for (int i = 0; i < numNodes; i++) {
-			nodes[i].getData().setPartition(1);
+		  graph->getData(nodes[i]).setPartition(1);
 		}
 
 		bisection(graph, nodes, numNodes, minWgtPart1, maxWgtPart1, pwgts, visited, queue);
 		/* Check to see if we hit any bad limiting cases */
 		if (pwgts[1] == 0) {
 			int i = getRandom(numNodes);
-			MetisNode nodeData = nodes[i].getData();
+			MetisNode nodeData = graph->getData(nodes[i]);
 			nodeData.setPartition(1);
 			pwgts[0] += nodeData.getWeight();
 			pwgts[1] -= nodeData.getWeight();
@@ -257,15 +257,15 @@ void growBisection(MetisGraph* metisGraph, int* tpwgts, int coarsenTo) {
 		if (bestMinCut > metisGraph->getMinCut()) {
 			bestMinCut = metisGraph->getMinCut();
 			for (int i = 0; i < numNodes; i++) {
-				bestWhere[i] = nodes[i].getData().getPartition();
+			  bestWhere[i] = graph->getData(nodes[i]).getPartition();
 			}
 		}
 	}
 	delete[] visited;
 	delete[] queue;
 	for (int i = 0; i < numNodes; i++) {
-		nodes[i].getData(Galois::NONE).setPartition(bestWhere[i]);
-		assert(nodes[i].getData(Galois::NONE).getPartition()>=0);
+	  graph->getData(nodes[i], Galois::NONE).setPartition(bestWhere[i]);
+	  assert(graph->getData(nodes[i],Galois::NONE).getPartition()>=0);
 	}
 	delete[] bestWhere;
 	metisGraph->setMinCut(bestMinCut);

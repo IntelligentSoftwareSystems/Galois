@@ -26,8 +26,10 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef MATERIAL
-#define MATERIAL
+#ifndef MATERIAL_H
+#define MATERIAL_H
+
+#include "Galois/Runtime/PerThreadStorage.h"
 
 #include <vector>
 #include <string>
@@ -37,7 +39,6 @@
 #include <cmath>
 #include <cassert>
 
-#include "Galois/Runtime/PerCPU.h"
 /**
  \brief Base class for all materials.
 
@@ -65,13 +66,13 @@ public:
 
   // (amber) some constants collected here
   //! Some constants collected together here
-  static const double EPS = 1.e-6;
-  static const double PERT = 1.e-1;
-  static const double DET_MIN = 1.e-10;
+  static const double EPS;
+  static const double PERT;
+  static const double DET_MIN;
 
   static const size_t MAT_SIZE = 9;
-  static const size_t NDF = 3;
-  static const size_t NDM = 3;
+  static const size_t NDF;
+  static const size_t NDM;
 
   static const double I_MAT[MAT_SIZE];
 
@@ -197,7 +198,7 @@ class NeoHookean: public SimpleMaterial {
   /**
    * Per thread storage for NeoHookenTmpVec 
    */
-  static GaloisRuntime::PerCPU<NeoHookenTmpVec> perCPUtmpVec;
+  static GaloisRuntime::PerThreadStorage<NeoHookenTmpVec> perCPUtmpVec;
 
 public:
   NeoHookean(double LambdaInput, double MuInput, double rhoInput = 0) :
@@ -222,7 +223,6 @@ public:
   double getSoundSpeed(void) const {
     return sqrt((Lambda + 2.0 * Mu) / getDensityInReference());
   }
-  ;
 
 private:
   // Lame constants
@@ -291,7 +291,6 @@ public:
   double getSoundSpeed(void) const {
     return sqrt((lambda + 2.0 * mu) / getDensityInReference());
   }
-  ;
 
 protected:
   double getModuli(int i1, int i2, int i3, int i4) const {

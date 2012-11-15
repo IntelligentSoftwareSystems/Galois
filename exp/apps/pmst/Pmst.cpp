@@ -22,11 +22,12 @@
  * @author Rashid Kaleem <rashid@cs.utexas.edu>
  */
 #include "Galois/Galois.h"
+#include "Galois/Accumulator.h"
 #include "Galois/Statistic.h"
 #include "Galois/Timer.h"
 #include "Galois/Queue.h"
 #include "Galois/UserContext.h"
-#include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/Graph2.h"
 #include "Galois/Graphs/LCGraph.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
@@ -154,7 +155,7 @@ struct Prim {
   void operator()(Graph& g, MstWeight& w) {
     GraphNode one[] = { *g.begin() };
 
-    Galois::setMaxThreads(1);
+    Galois::setActiveThreads(1);
     Galois::for_each(&one[0], &one[1], Process(*this, g, w));
   }
 };
@@ -248,14 +249,15 @@ struct Boruvka {
     std::sort(edges.begin(), edges.end(), EdgeLess());
 
     GraphNode n = g.createNode(Graph::node_type());
+    g.addNode(n);
     GraphNode last;
     unsigned numNeighbors = 0;
     for (EdgeList::iterator ii = edges.begin(), ei = edges.end(); ii != ei; ++ii) {
       if (ii->first == last)
         continue;
 
-      g.addMultiEdge(n, ii->first, ii->second, flag);
-      g.addMultiEdge(ii->first, n, ii->second, flag);
+      g.getEdgeData(g.addMultiEdge(n, ii->first, flag)) = ii->second;
+      g.getEdgeData(g.addMultiEdge(ii->first, n, flag)) = ii->second;
       --g.getData(ii->first, flag);
       numNeighbors++;
 
@@ -500,8 +502,6 @@ struct BoruvkaUnionFind {
     Data& curData = g.getData(cur, Galois::NONE);
     for (Graph::edge_iterator ii = g.edge_begin(cur, Galois::NONE), 
         ei = g.edge_end(cur, Galois::NONE); ii != ei; ++ii) {
-      GraphNode dst = g.getEdgeDst(ii);
-
       const Weight& w = g.getEdgeData(ii);
       // Should only happen first time someone sees this node
       if (w < curData.minWeight)
@@ -579,6 +579,7 @@ void makeGraph(const std::string& in, Graph& g) {
   nodes.resize(numNodes);
   for (size_t i = 0; i < numNodes; ++i) {
     GraphNode src = g.createNode(typename Graph::node_type());
+    g.addNode(src);
     nodes[i] = src;
   }
 
@@ -603,8 +604,8 @@ void makeGraph(const std::string& in, Graph& g) {
           g.getEdgeData(g.findEdge(gdst, gsrc)) = w;
         }
       } else if (gsrc != gdst) {
-        g.addMultiEdge(gsrc, gdst, w);
-        g.addMultiEdge(gdst, gsrc, w);
+        g.getEdgeData(g.addMultiEdge(gsrc, gdst)) = w;
+        g.getEdgeData(g.addMultiEdge(gdst, gsrc)) = w;
         numEdges += 2;
       }
     }
@@ -626,11 +627,11 @@ void run(const std::string& in) {
   T.start();
   algo(g, w);
   T.stop();
-  std::cout << "MST Weight is " << w.get() << "\n";
+  std::cout << "MST Weight is " << w.reduce() << "\n";
 }
 
 int main(int argc, char **argv) {
-  LonestarStart(argc, argv, std::cout, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url);
 
   switch (algo) {
   case 2: run<BoruvkaUnionFind>(filename); break;

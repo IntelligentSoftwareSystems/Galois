@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Compare performance with SSCA2 program
+# Compare performance with Schardl BFS program
 
 BASE="$(cd $(dirname $0); cd ../..; pwd)"
 
@@ -9,7 +9,7 @@ if [[ ! -e Makefile ]]; then
   exit 1
 fi
 
-if [[ ! -e ${BASE}/tools/bin/bfs-schardl ]]; then
+if [[ ! -e "${BASE}/tools/bin/bfs-schardl" ]]; then
   echo "Execute make more-tools before running this script" 1>&2
   exit 1
 fi
@@ -18,12 +18,10 @@ F=$1
 
 if [[ -z "$F" ]]; then
   echo "usage: $(basename $0) <graph.gr> [args]" 1>&2
-  echo "For a useful comparison, graph file and scale must be the same."
   echo "args are passed to Galois programs. A useful example: -t 2" 1>&2
   exit 1
 fi
 
-shift
 shift
 
 run() {
@@ -34,5 +32,21 @@ run() {
   $cmd
 }
 
-run ${BASE}/tools/bin/bfs-schardl $(dirname $F)/$(basename $F .gr).bsml 
-run ${BASE}/apps/bfs/bfs -galoisSet $* $F
+SF=$(dirname $F)/$(basename $F .gr).bsml
+if [[ ! -e "$SF" ]]; then
+  "${BASE}/tools/graph-convert/graph-convert" -gr2bsml "$F" "$SF"
+fi
+run "${BASE}/tools/bin/bfs-schardl" -f "$SF"
+
+run "${BASE}/apps/bfs/bfs" -parallelBarrierInline $* "$F"
+run "${BASE}/apps/bfs/bfs" $* "$F"
+
+if [[ ! -e "${BASE}/tools/bin/bfs-pbbs" ]]; then
+  exit
+fi
+
+PBBSF=$(dirname $F)/$(basename $F .gr).pbbs
+if [[ ! -e "$PBBSF" ]]; then
+  "${BASE}/tools/graph-convert/graph-convert" -gr2pbbs "$F" "$PBBSF"
+fi
+run "${BASE}/tools/bin/bfs-pbbs" "$PBBSF"

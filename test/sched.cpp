@@ -30,7 +30,7 @@
 
 #include "Lonestar/BoilerPlate.h"
 
-#ifdef GALOIS_EXP
+#ifdef GALOIS_USE_EXP
 #include "Galois/Runtime/WorkListExperimental.h"
 #endif
 
@@ -50,7 +50,7 @@ struct process {
 };
 
 int main(int argc, char** argv) {
-  LonestarStart(argc, argv, std::cout, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url);
 
   std::vector<int> v((int)ival, (int)sval);
 
@@ -74,14 +74,14 @@ int main(int argc, char** argv) {
   Galois::for_each<dChunkedLIFO<64> >(v.begin(), v.end(), process());
   T2.stop();
 
-#ifdef GALOIS_EXP
-  Galois::StatTimer T3("T3");
-  T3.start();
-  using namespace GaloisRuntime::WorkList;
-  //  Galois::for_each<Alt::ChunkedAdaptor<Alt::LevelStealingAlt, 64> >(v.begin(), v.end(), process());
-  Galois::for_each<Alt::ChunkedAdaptor<Alt::InitialQueue<Alt::LevelStealingAlt, Alt::LevelLocalAlt>, 64> >(v.begin(), v.end(), process());
+#ifdef GALOIS_USE_EXP
+  // Galois::StatTimer T3("T3");
+  // T3.start();
+  // using namespace GaloisRuntime::WorkList;
+  // //  Galois::for_each<Alt::ChunkedAdaptor<Alt::LevelStealingAlt, 64> >(v.begin(), v.end(), process());
+  // Galois::for_each<Alt::ChunkedAdaptor<Alt::InitialQueue<Alt::LevelStealingAlt, Alt::LevelLocalAlt>, 64> >(v.begin(), v.end(), process());
 
-  T3.stop();
+  // T3.stop();
 #endif
 
   // Galois::StatTimer T4("T4");

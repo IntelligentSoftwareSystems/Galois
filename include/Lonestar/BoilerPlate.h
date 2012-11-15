@@ -23,6 +23,11 @@
 #ifndef LONESTAR_BOILERPLATE_H
 #define LONESTAR_BOILERPLATE_H
 
+#ifdef GALOIS_USE_SVNVERSION
+#include "Galois/svnversion.h"
+#else
+#define SVNVERSION 0
+#endif
 #include "Galois/Version.h"
 #include "Galois/Galois.h"
 #include "Galois/Runtime/ll/gio.h"
@@ -35,22 +40,18 @@ static llvm::cl::opt<bool> skipVerify("noverify", llvm::cl::desc("Skip verificat
 static llvm::cl::opt<int> numThreads("t", llvm::cl::desc("Number of threads"), llvm::cl::init(1));
 
 //! initialize lonestar benchmark
-template<typename OS>
-void LonestarStart(int argc, char** argv, OS& out, const char* app, const char* desc = 0, const char* url = 0) {
+void LonestarStart(int argc, char** argv, const char* app, const char* desc = 0, const char* url = 0) {
   using namespace GaloisRuntime::LL;
 
-  gPrint("Galois Benchmark Suite v" GALOIS_VERSION_STRING "\n"
-	 "Copyright (C) " GALOIS_COPYRIGHT_YEAR_STRING " The University of Texas at Austin\n"
-	 "http://iss.ices.utexas.edu/galois/\n"
-	 "\n"
-	 "application: %s\n"
-	 "%s"
-	 "%s%s"
-	 "\n",
-	 app,
-	 desc ? desc : "",
-	 url ? "http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/" : "", url ? url : ""
-	 );
+  gPrint("Galois Benchmark Suite v" GALOIS_VERSION_STRING);
+  gPrint(" (r%d)\n", SVNVERSION);
+  gPrint("Copyright (C) " GALOIS_COPYRIGHT_YEAR_STRING " The University of Texas at Austin\n");
+  gPrint("http://iss.ices.utexas.edu/galois/\n\n");
+  gPrint("application: %s\n", app);
+  gPrint("%s\n", desc ? desc : "");
+  if (url) {
+    gPrint("http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/%s\n", url);
+  }
 
   std::ostringstream cmdout;
   for (int i = 0; i < argc; ++i) {
@@ -65,7 +66,10 @@ void LonestarStart(int argc, char** argv, OS& out, const char* app, const char* 
   gFlush();
 
   llvm::cl::ParseCommandLineOptions(argc, argv);
-  numThreads = Galois::setMaxThreads(numThreads); 
+  numThreads = Galois::setActiveThreads(numThreads); 
+
+  // gInfo ("Using %d threads\n", numThreads.getValue());
+  GaloisRuntime::reportStat (0, "Threads", numThreads);
 }
 
 #endif

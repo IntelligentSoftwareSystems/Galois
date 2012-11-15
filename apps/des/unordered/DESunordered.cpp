@@ -25,8 +25,7 @@
 #include "DESunordered.h"
 
 int main (int argc, char* argv[]) {
-
-  DESunordered m;
+  des_unord::DESunordered m;
   m.run (argc, argv);
 
   return 0;

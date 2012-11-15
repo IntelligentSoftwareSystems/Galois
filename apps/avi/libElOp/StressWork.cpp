@@ -47,7 +47,7 @@ bool StressWork::getDValIntern (const MatDouble &argval, MatDouble& funcval, Fou
 
 
 
-  StressWorkTmpVec& tmpVec = StressWork::perCPUtmpVec.get ();
+  StressWorkTmpVec& tmpVec = *StressWork::perCPUtmpVec.getLocal ();
   tmpVec.adjustSizes (Dim);
 
   std::vector<size_t>& nDof = tmpVec.nDof;

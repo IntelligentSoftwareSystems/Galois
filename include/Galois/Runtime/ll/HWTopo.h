@@ -27,8 +27,8 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-#ifndef _HWTOPO_H
-#define _HWTOPO_H
+#ifndef GALOIS_RUNTIME_LL_HWTOPO_H
+#define GALOIS_RUNTIME_LL_HWTOPO_H
 
 namespace GaloisRuntime {
 namespace LL {
@@ -47,6 +47,8 @@ unsigned getPackageForThreadInternal(int galois_thread_id);
 unsigned getMaxPackageForThread(int galois_thread_id);
 //is This the first thread in a package
 bool isLeaderForPackageInternal(int galois_thread_id);
+unsigned getLeaderForThread(int galois_thread_id);
+unsigned getLeaderForPackage(int galois_pkg_id);
 
 extern __thread unsigned PACKAGE_ID;
 
@@ -58,6 +60,7 @@ static inline unsigned fillPackageID(int galois_thread_id) {
   return x;
 }
 
+//! Optimized when galois_thread_id corresponds to the executing thread
 static inline unsigned getPackageForThread(int galois_thread_id) {
   unsigned x = PACKAGE_ID;
   if (x & 1)
@@ -66,6 +69,7 @@ static inline unsigned getPackageForThread(int galois_thread_id) {
   return x >> 2;
 }
 
+//! Optimized when galois_thread_id corresponds to the executing thread
 static inline bool isLeaderForPackage(int galois_thread_id) {
   unsigned x = PACKAGE_ID;
   if (x & 1)

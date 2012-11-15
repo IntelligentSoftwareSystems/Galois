@@ -26,7 +26,7 @@
 
 int main (int argc, char* argv[]) {
 
-  DESunorderedSerial s;
+  des_unord::DESunorderedSerial s;
   s.run (argc, argv);
   return 0;
 }

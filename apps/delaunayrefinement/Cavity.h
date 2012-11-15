@@ -20,57 +20,54 @@
  *
  * @section Description
  *
- * @author Milind Kulkarni <milind@purdue.edu>>
+ * @author Milind Kulkarni <milind@purdue.edu>
  */
 #include <vector>
 #include <algorithm>
 
 class Cavity {
+  typedef std::vector<EdgeTuple,Galois::PerIterAllocTy::rebind<EdgeTuple>::other> ConnTy;
+
   Tuple center;
   GNode centerNode;
-  Element* centerElement;
-  int dim;
   std::vector<GNode,Galois::PerIterAllocTy::rebind<GNode>::other> frontier;
-  // the cavity itself
-  Subgraph pre;
-  // what the new elements should look like
-  Subgraph post;
+  // !the cavity itself
+  PreGraph pre;
+  // !what the new elements should look like
+  PostGraph post;
   // the edge-relations that connect the boundary to the cavity
-  typedef std::vector<Subgraph::tmpEdge,Galois::PerIterAllocTy::rebind<Subgraph::tmpEdge>::other> connTy;
-  connTy connections;
-
+  ConnTy connections;
+  Element* centerElement;
   Graph* graph;
+  int dim;
 
   /**
    * find the node that is opposite the obtuse angle of the element
    */
   GNode getOpposite(GNode node) {
     assert(std::distance(graph->edge_begin(node), graph->edge_end(node)) == 3);
-    Element& element = graph->getData(node,Galois::ALL);
+    Element& element = graph->getData(node, Galois::ALL);
     Tuple elementTuple = element.getObtuse();
     Edge ObtuseEdge = element.getOppositeObtuse();
-    bool found = false;
-    GNode dst;
-    for (Graph::edge_iterator ii = graph->edge_begin(node,Galois::ALL), ee = graph->edge_end(node,Galois::ALL); ii != ee; ++ii) {
+    for (Graph::edge_iterator ii = graph->edge_begin(node, Galois::ALL),
+        ee = graph->edge_end(node, Galois::ALL); ii != ee; ++ii) {
       GNode neighbor = graph->getEdgeDst(ii);
       //Edge& edgeData = graph->getEdgeData(node, neighbor);
-      Edge edgeData = element.getRelatedEdge(graph->getData(neighbor,Galois::ALL));
+      Edge edgeData = element.getRelatedEdge(graph->getData(neighbor, Galois::ALL));
       if (elementTuple != edgeData.getPoint(0) && elementTuple != edgeData.getPoint(1)) {
-	assert(!found);
-	dst = neighbor;
-        found = true;
+	return neighbor;
       }
     }
-    assert(found);
-    return dst;
+    abort();
   }
 
   void expand(GNode node, GNode next) {
-    Element& nextElement = graph->getData(next,Galois::ALL);
-    if ((!(dim == 2 && nextElement.getDim() == 2 && next != centerNode)) && nextElement.inCircle(center)) {
+    Element& nextElement = graph->getData(next, Galois::ALL);
+    if ((!(dim == 2 && nextElement.dim() == 2 && next != centerNode))
+        && nextElement.inCircle(center)) {
       // isMember says next is part of the cavity, and we're not the second
       // segment encroaching on this cavity
-      if ((nextElement.getDim() == 2) && (dim != 2)) {
+      if ((nextElement.dim() == 2) && (dim != 2)) {
 	// is segment, and we are encroaching
 	initialize(next);
 	build();
@@ -83,17 +80,15 @@ class Cavity {
     } else {
       // not a member
       //Edge& edgeData = graph->getEdgeData(node, next);
-      Edge edgeData = nextElement.getRelatedEdge(graph->getData(node,Galois::ALL));
-      Subgraph::tmpEdge edge(node, next, edgeData);
+      Edge edgeData = nextElement.getRelatedEdge(graph->getData(node, Galois::ALL));
+      EdgeTuple edge(node, next, edgeData);
       if (std::find(connections.begin(), connections.end(), edge) == connections.end()) {
 	connections.push_back(edge);
       }
     }
   }
 
-
 public:
-  
   Cavity(Graph* g, Galois::PerIterAllocTy& cnx)
     :frontier(cnx),
      pre(cnx),
@@ -106,15 +101,15 @@ public:
     pre.reset();
     post.reset();
     connections.clear();
-    frontier.clear();// = std::<GNode>();
+    frontier.clear();
     centerNode = node;
-    centerElement = &graph->getData(centerNode,Galois::ALL);
-    while (graph->containsNode(centerNode) && centerElement->isObtuse()) {
+    centerElement = &graph->getData(centerNode, Galois::ALL);
+    while (graph->containsNode(centerNode, Galois::ALL) && centerElement->isObtuse()) {
       centerNode = getOpposite(centerNode);
-      centerElement = &graph->getData(centerNode,Galois::ALL);
+      centerElement = &graph->getData(centerNode, Galois::ALL);
     }
     center = centerElement->getCenter();
-    dim = centerElement->getDim();
+    dim = centerElement->dim();
     pre.addNode(centerNode);
     frontier.push_back(centerNode);
   }
@@ -123,8 +118,8 @@ public:
     while (!frontier.empty()) {
       GNode curr = frontier.back();
       frontier.pop_back();
-      for (Graph::edge_iterator ii = graph->edge_begin(curr,Galois::ALL), 
-	     ee = graph->edge_end(curr,Galois::ALL); 
+      for (Graph::edge_iterator ii = graph->edge_begin(curr, Galois::ALL), 
+	     ee = graph->edge_end(curr, Galois::ALL); 
 	   ii != ee; ++ii) {
 	GNode neighbor = graph->getEdgeDst(ii);
 	expand(curr, neighbor); //VTune: Lots of work
@@ -135,53 +130,58 @@ public:
   /**
    * Create the new cavity based on the data of the old one
    */
-  void update() {
-    if (centerElement->getDim() == 2) { // we built around a segment
-      Element ele1(center, centerElement->getPoint(0));
-      GNode node1 = graph->createNode(ele1);
-      post.addNode(node1);
-      Element ele2(center, centerElement->getPoint(1));
-      GNode node2 = graph->createNode(ele2);
-      post.addNode(node2);
+  void computePost() {
+    if (centerElement->dim() == 2) { // we built around a segment
+      GNode n1 = graph->createNode(Element(center, centerElement->getPoint(0)));
+      GNode n2 = graph->createNode(Element(center, centerElement->getPoint(1)));
+
+      post.addNode(n1);
+      post.addNode(n2);
     }
-    for (connTy::iterator ii = connections.begin(), ee = connections.end(); ii != ee; ++ii) {
-      Subgraph::tmpEdge conn = *ii;
-      Edge& edge = conn.data;
-      Element new_element(center, edge.getPoint(0), edge.getPoint(1));
-      GNode ne_node = graph->createNode(new_element);
-      GNode ne_connection;
-      if (pre.containsNode(conn.dst)) {
-        ne_connection = conn.src;
-      } else {
-        ne_connection = conn.dst;
-      }
-      Element& ne_nodeData = graph->getData(ne_connection, Galois::ALL);
-      const Edge& new_edge = new_element.getRelatedEdge(ne_nodeData);
-      //boolean mod = 
-      post.addEdge(Subgraph::tmpEdge(ne_node, ne_connection, new_edge));
-      //assert mod;
-      for (Subgraph::iterator ii = post.begin(), ee = post.end(); ii != ee; ++ii) {
+
+    for (ConnTy::iterator ii = connections.begin(), ee = connections.end(); ii != ee; ++ii) {
+      EdgeTuple tuple = *ii;
+      Element newElement(center, tuple.data.getPoint(0), tuple.data.getPoint(1));
+      GNode other = pre.containsNode(tuple.dst) ?  tuple.src : tuple.dst;
+      Element& otherElement = graph->getData(other, Galois::ALL);
+
+      GNode newNode = graph->createNode(newElement); // XXX
+      const Edge& otherEdge = newElement.getRelatedEdge(otherElement);
+      post.addEdge(newNode, other, otherEdge);
+
+      for (PostGraph::iterator ii = post.begin(), ee = post.end(); ii != ee; ++ii) {
         GNode node = *ii;
         Element& element = graph->getData(node, Galois::ALL);
-        if (element.isRelated(new_element)) {
-          const Edge& ele_edge = new_element.getRelatedEdge(element);
-          //mod = 
-	  post.addEdge(Subgraph::tmpEdge(ne_node, node, ele_edge));
-          //assert mod;
+        if (element.isRelated(newElement)) {
+          const Edge& edge = newElement.getRelatedEdge(element);
+	  post.addEdge(newNode, node, edge);
         }
       }
-      post.addNode(ne_node);
+      post.addNode(newNode);
     }
   }
-  
-  Subgraph& getPre() {
-    return pre;
-  };
-  Subgraph& getPost() {
-    return post;
-  };
 
-  bool isMember(Element * n);
-  
+  void update(GNode node, Galois::UserContext<GNode>& ctx) {
+    for (PreGraph::iterator ii = pre.begin(), ee = pre.end(); ii != ee; ++ii) 
+      graph->removeNode(*ii, Galois::NONE);
+    
+    //add new data
+    for (PostGraph::iterator ii = post.begin(), ee = post.end(); ii != ee; ++ii) {
+      GNode n = *ii;
+      graph->addNode(n, Galois::NONE);
+      Element& element = graph->getData(n, Galois::NONE);
+      if (element.isBad()) {
+        ctx.push(n);
+      }
+    }
+    
+    for (PostGraph::edge_iterator ii = post.edge_begin(), ee = post.edge_end(); ii != ee; ++ii) {
+      EdgeTuple edge = *ii;
+      graph->addEdge(edge.src, edge.dst, Galois::NONE);
+    }
+
+    if (graph->containsNode(node, Galois::NONE)) {
+      ctx.push(node);
+    }
+  }
 };
-

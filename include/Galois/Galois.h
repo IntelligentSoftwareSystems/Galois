@@ -23,58 +23,67 @@
 #ifndef GALOIS_GALOIS_H
 #define GALOIS_GALOIS_H
 
-#include "Galois/Threads.h"
 #include "Galois/UserContext.h"
+#include "Galois/Threads.h"
 #include "Galois/Runtime/ParallelWork.h"
-#include "Galois/Runtime/ParallelWorkInline.h"
+#include "Galois/Runtime/DoAll.h"
+#include "Galois/Runtime/LocalIterator.h"
+#include "Galois/Runtime/DeterministicWork.h"
+#include "Galois/Runtime/OrderedWork.h"
 
-#ifdef GALOIS_EXP
-//#include "Galois/Runtime/ParaMeter.h"
-#include "Galois/Runtime/SimpleTaskPool.h"
-#include "boost/iterator/counting_iterator.hpp"
+#ifdef GALOIS_USE_EXP
+#include "Galois/Runtime/ParallelWorkInline.h"
+#include "Galois/Runtime/ParaMeter.h"
 #endif
 
-#include "boost/iterator/transform_iterator.hpp"
 
 namespace Galois {
+
+static const unsigned GALOIS_DEFAULT_CHUNK_SIZE = 32;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Foreach
 ////////////////////////////////////////////////////////////////////////////////
 
+
 //Iterator based versions
-template<typename WLTy, typename IterTy, typename Function>
-static inline void for_each(IterTy b, IterTy e, Function f, const char* loopname = 0) {
-#ifdef GALOIS_EXP
-#if 0
-  if (GaloisRuntime::useParaMeter) {
-    GaloisRuntime::ParaMeter::for_each_impl<aWLTy>(b, e, f, loopname);
-    return;
-  }
-#endif
-#endif
+template<typename WLTy, typename IterTy, typename FunctionTy>
+void for_each(IterTy b, IterTy e, FunctionTy f, const char* loopname = 0) {
   GaloisRuntime::for_each_impl<WLTy>(b, e, f, loopname);
 }
 
-template<typename IterTy, typename Function>
-static inline void for_each(IterTy b, IterTy e, Function f, const char* loopname = 0) {
-  typedef GaloisRuntime::WorkList::dChunkedFIFO<256> WLTy;
-  for_each<WLTy, IterTy, Function>(b, e, f, loopname);
+template<typename IterTy, typename FunctionTy>
+void for_each(IterTy b, IterTy e, FunctionTy f, const char* loopname = 0) {
+  typedef GaloisRuntime::WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
+  Galois::for_each<WLTy, IterTy, FunctionTy>(b, e, f, loopname);
 }
 
 //Single initial item versions
-template<typename WLTy, typename InitItemTy, typename Function>
-static inline void for_each(InitItemTy i, Function f, const char* loopname = 0) {
-  InitItemTy wl[1];
-  wl[0] = i;
-  for_each<WLTy>(&wl[0], &wl[1], f, loopname);
+template<typename WLTy, typename InitItemTy, typename FunctionTy>
+void for_each(InitItemTy i, FunctionTy f, const char* loopname = 0) {
+  InitItemTy wl[1] = {i};
+  Galois::for_each<WLTy>(&wl[0], &wl[1], f, loopname);
 }
 
-template<typename InitItemTy, typename Function>
-static inline void for_each(InitItemTy i, Function f, const char* loopname = 0) {
-  typedef GaloisRuntime::WorkList::ChunkedFIFO<256> WLTy;
-  for_each<WLTy, InitItemTy, Function>(i, f, loopname);
+template<typename InitItemTy, typename FunctionTy>
+void for_each(InitItemTy i, FunctionTy f, const char* loopname = 0) {
+  typedef GaloisRuntime::WorkList::ChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
+  Galois::for_each<WLTy, InitItemTy, FunctionTy>(i, f, loopname);
 }
+//Local based versions
+template<typename WLTy, typename ConTy, typename Function>
+void for_each_local(ConTy& c, Function f, const char* loopname = 0) {
+  typedef typename ConTy::local_iterator IterTy;
+  typedef GaloisRuntime::WorkList::LocalAccessDist<IterTy, WLTy> WL;
+  GaloisRuntime::for_each_impl<WL>(GaloisRuntime::LocalBounce<ConTy>(&c, true), GaloisRuntime::LocalBounce<ConTy>(&c, false), f, loopname);
+}
+
+template<typename ConTy, typename Function>
+void for_each_local(ConTy& c, Function f, const char* loopname = 0) {
+  typedef GaloisRuntime::WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
+  Galois::for_each_local<WLTy, ConTy, Function>(c, f, loopname);
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // do_all
@@ -83,95 +92,40 @@ static inline void for_each(InitItemTy i, Function f, const char* loopname = 0) 
 // Experimental!
 ////////////////////////////////////////////////////////////////////////////////
 
-#if 0
-template<typename Function>
-struct tile_apply {
-  Function f;
-
-  tile_apply(Function _f2) :f(_f2) {}
-
-  template<typename Tile, typename context>
-  void operator()(Tile& i, context& cnx) {
-    for(typename Tile::iterator ii = i.begin(), ee = i.end();
-	ii != ee; ++ii)
-      f(*ii, cnx);
-  }
-};
-
-template<typename T>
-struct addrof : public std::unary_function<T&, T*>{
-  T* operator()(T& V) const { return &V; }
-};
-template<typename T>
-struct makeRef : public std::unary_function<T&, boost::reference_wrapper<T> >{
-  boost::reference_wrapper<T> operator()(T& V) const { return boost::ref(V); }
-};
-
-template<typename ContainerTy, typename Function>
-static inline void do_all_adl(ContainerTy& c, Function f, const char* loopname = 0) {
-  typedef typename std::iterator_traits<typename ContainerTy::tile_iterator>::value_type TileTy;
-  typedef typename std::iterator_traits<typename TileTy::iterator>::value_type      ValTy;
-  // if (IsChunked(c)) {
-  //   WL<hasOwnerFunction(c)> wl;
-  //   push chunks into wl;
-  // } else {
-  //   foreach(c.begin(), c.end());
-  // }
-  using namespace GaloisRuntime::WorkList;
-  //typedef dChunkedFIFO<16> WLTy;
-  typedef LocalQueues<LocalStealing<TileAdaptor<typename ContainerTy::tile_iterator> >, LIFO<> > WLTy;
-  typedef typename WLTy::template retype<ValTy>::WL aWLTy;
-  GaloisRuntime::for_each_impl<aWLTy>(c.tile_begin(), c.tile_end(), f, loopname);
-  //Fallback:
-  //for_each(c.begin(), c.end(), f, loopname);
-}
-
-#endif
-
 //Random access iterator do_all
 template<typename IterTy,typename FunctionTy>
-static inline void do_all_dispatch(const IterTy& begin, const IterTy& end, const FunctionTy& fn, const char* loopname, std::random_access_iterator_tag) {
-  size_t n = std::distance(begin, end);
-  if (n < 128) {
-    std::for_each(begin, end, fn);
-  } else if (GaloisRuntime::inGaloisForEach) {
-#ifdef GALOIS_EXP
-    GaloisRuntime::TaskContext<IterTy,FunctionTy> ctx;
-    GaloisRuntime::SimpleTaskPool& pool = GaloisRuntime::getSystemTaskPool();
-    pool.enqueue(ctx, begin, end, fn);
-    ctx.run(pool);
-#else
-    std::for_each(begin, end, fn);
-#endif
-  } else {
-    typedef GaloisRuntime::WorkList::RandomAccessRange<false,IterTy> WL;
-    GaloisRuntime::do_all_impl<WL>(begin, end, fn, loopname);
-  }
+static inline void do_all_dispatch(const IterTy& begin, const IterTy& end, FunctionTy fn, const char* loopname, std::random_access_iterator_tag) {
+  typedef GaloisRuntime::WorkList::RandomAccessRange<false,IterTy> WL;
+  GaloisRuntime::do_all_impl_old<WL>(begin, end, fn, loopname);
 }
 
 //Forward iterator do_all
 template<typename IterTy,typename FunctionTy>
-static inline void do_all_dispatch(const IterTy& begin, const IterTy& end, const FunctionTy& fn, const char* loopname, std::input_iterator_tag) {
-  if (GaloisRuntime::inGaloisForEach) {
-#ifdef GALOIS_EXP
-    GaloisRuntime::TaskContext<IterTy,FunctionTy> ctx;
-    GaloisRuntime::SimpleTaskPool& pool = GaloisRuntime::getSystemTaskPool();
-    pool.enqueue(ctx, begin, end, fn);
-    ctx.run(pool);
-#else
-    std::for_each(begin, end, fn);
-#endif
-  } else {
-    typedef GaloisRuntime::WorkList::ForwardAccessRange<IterTy> WL;
-    GaloisRuntime::do_all_impl<WL>(begin, end, fn, loopname);
-  }
+static inline void do_all_dispatch(const IterTy& begin, const IterTy& end, FunctionTy fn, const char* loopname, std::input_iterator_tag) {
+  typedef GaloisRuntime::WorkList::ForwardAccessRange<IterTy> WL;
+  GaloisRuntime::do_all_impl_old<WL>(begin, end, fn, loopname);
 }
 
 template<typename IterTy,typename FunctionTy>
-static inline void do_all(const IterTy& begin, const IterTy& end, const FunctionTy& fn, const char* loopname = 0) {
-  typename std::iterator_traits<IterTy>::iterator_category category;
-  do_all_dispatch(begin,end,fn,loopname,category); 
+FunctionTy do_all(const IterTy& begin, const IterTy& end, FunctionTy fn, const char* loopname = 0) {
+  if (GaloisRuntime::inGaloisForEach) {
+    return std::for_each(begin, end, fn);
+  } else {
+    //typename std::iterator_traits<IterTy>::iterator_category category;
+    //do_all_dispatch(begin,end,fn,loopname,category); 
+    return GaloisRuntime::do_all_impl(begin, end, fn, GaloisRuntime::EmptyFn(), false);
+  }
 }
+
+//Local iterator do_all
+template<typename ConTy,typename FunctionTy>
+static inline void do_all_local(ConTy& c, FunctionTy fn, const char* loopname = 0) {
+  typedef typename ConTy::local_iterator IterTy;
+  typedef GaloisRuntime::WorkList::LocalAccessRange<IterTy> WL;
+  GaloisRuntime::do_all_impl_old<WL>(GaloisRuntime::LocalBounce<ConTy>(&c, true), GaloisRuntime::LocalBounce<ConTy>(&c, false), fn, loopname);
+}
+
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // OnEach
@@ -180,50 +134,17 @@ static inline void do_all(const IterTy& begin, const IterTy& end, const Function
 ////////////////////////////////////////////////////////////////////////////////
 
 template<typename FunctionTy>
-struct WOnEach {
-  FunctionTy& fn;
-  WOnEach(FunctionTy& f) :fn(f) {}
-  void operator()(void) const {
-    fn(GaloisRuntime::LL::getTID(), 
-       GaloisRuntime::getSystemThreadPool().getActiveThreads());   
-  }
-};
-
-template<typename FunctionTy>
 static inline void on_each(FunctionTy fn, const char* loopname = 0) {
-  WOnEach<FunctionTy> fw(fn);
-  GaloisRuntime::RunCommand w[1];
-  w[0].work = GaloisRuntime::Config::ref(fw);
-  w[0].isParallel = true;
-  w[0].barrierAfter = true;
-  w[0].profile = false;
-  GaloisRuntime::getSystemThreadPool().run(&w[0], &w[1]);
+  GaloisRuntime::on_each_impl(fn, loopname);
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 // PreAlloc
 ////////////////////////////////////////////////////////////////////////////////
 
-struct WPreAlloc {
-  int n;
-  WPreAlloc(int m) :n(m) {}
-  void operator()() {
-    GaloisRuntime::MM::pagePreAlloc(n);
-  }
-};
-
 static inline void preAlloc(int num) {
-  int a = GaloisRuntime::getSystemThreadPool().getActiveThreads();
-  a = (num + a - 1) / a;
-  WPreAlloc P(a);
-  GaloisRuntime::RunCommand w[1];
-  w[0].work = GaloisRuntime::Config::ref(P);
-  w[0].isParallel = true;
-  w[0].barrierAfter = true;
-  w[0].profile = false;
-  GaloisRuntime::getSystemThreadPool().run(&w[0], &w[1]);
+  GaloisRuntime::preAlloc_impl(num);
 }
 
-}
+} //namespace Galois
 #endif

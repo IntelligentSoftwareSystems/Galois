@@ -1,39 +1,71 @@
-/*
-Galois, a framework to exploit amorphous data-parallelism in irregular
-programs.
-
-Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
-UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS SOFTWARE
-AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR ANY
-PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF PERFORMANCE, AND ANY
-WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF DEALING OR USAGE OF TRADE.
-NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH RESPECT TO THE USE OF THE
-SOFTWARE OR DOCUMENTATION. Under no circumstances shall University be liable
-for incidental, special, indirect, direct or consequential damages or loss of
-profits, interruption of business, or related expenses which may arise from use
-of Software or Documentation, including but not limited to those resulting from
-defects in Software and/or Documentation, or loss or inaccuracy of data of any
-kind.
-*/
+/** simple galois context and contention manager -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @section Description
+ *
+ * @author Andrew Lenharth <andrewl@lenharth.org>
+ */
 #include "Galois/Runtime/Context.h"
+#include "Galois/Runtime/MethodFlags.h"
 #include "Galois/Runtime/ll/SimpleLock.h"
+#include "Galois/Runtime/ll/CacheLineStorage.h"
+
+#include <stdio.h>
+
+#if GALOIS_USE_EXCEPTION_HANDLER
+#else
+__thread jmp_buf GaloisRuntime::hackjmp;
+#endif
 
 //! Global thread context for each active thread
 static __thread GaloisRuntime::SimpleRuntimeContext* thread_cnx = 0;
 
-static GaloisRuntime::LL::SimpleLock<true> ConflictLock;
+namespace {
+struct PendingFlag {
+  GaloisRuntime::LL::CacheLineStorage<GaloisRuntime::PendingFlag> flag;
+  PendingFlag(): flag(GaloisRuntime::NON_DET) { }
+};
 
-void GaloisRuntime::clearConflictLock() {
-  //ConflictLock.unlock();
 }
 
-void GaloisRuntime::setThreadContext(GaloisRuntime::SimpleRuntimeContext* n)
-{
+static PendingFlag pendingFlag;
+
+void GaloisRuntime::setPending(PendingFlag value) {
+  pendingFlag.flag.data = value;
+}
+
+void GaloisRuntime::doCheckWrite() {
+  if (pendingFlag.flag.data == PENDING) {
+#if GALOIS_USE_EXCEPTION_HANDLER
+    throw GaloisRuntime::REACHED_FAILSAFE;
+#else
+    longjmp(hackjmp, GaloisRuntime::REACHED_FAILSAFE);
+#endif
+  }
+}
+
+void GaloisRuntime::setThreadContext(GaloisRuntime::SimpleRuntimeContext* n) {
   thread_cnx = n;
 }
 
-GaloisRuntime::SimpleRuntimeContext* GaloisRuntime::getThreadContext() 
-{
+GaloisRuntime::SimpleRuntimeContext* GaloisRuntime::getThreadContext() {
   return thread_cnx;
 }
 
@@ -52,22 +84,43 @@ unsigned GaloisRuntime::SimpleRuntimeContext::commit_iteration() {
   unsigned numLocks = 0;
   while (locks) {
     //ORDER MATTERS!
-    //FIXME: compiler optimization barrier
     Lockable* L = locks;
     locks = L->next;
     L->next = 0;
-    __sync_synchronize();
+    //__sync_synchronize();
+    LL::compilerBarrier();
     L->Owner.unlock_and_clear();
 
     ++numLocks;
   }
 
+  // XXX not_ready = false;
+
   return numLocks;
 }
 
+void GaloisRuntime::breakLoop() {
+#if GALOIS_USE_EXCEPTION_HANDLER
+  throw GaloisRuntime::BREAK;
+#else
+  longjmp(hackjmp, GaloisRuntime::BREAK);
+#endif
+}
+
+void GaloisRuntime::signalConflict() {
+#if GALOIS_USE_EXCEPTION_HANDLER
+        throw GaloisRuntime::CONFLICT; // Conflict
+#else
+        longjmp(hackjmp, GaloisRuntime::CONFLICT);
+#endif
+}
+
 void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
-  bool suc = L->Owner.try_lock();
-  if (suc) {
+  if (customAcquire) {
+    sub_acquire(L);
+    return;
+  }
+  if (L->Owner.try_lock()) {
     assert(!L->Owner.getValue());
     assert(!L->next);
     L->Owner.setValue(this);
@@ -75,15 +128,59 @@ void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
     locks = L;
   } else {
     if (L->Owner.getValue() != this) {
-      //ConflictLock.lock();
-      // SimpleRuntimeContext* other = L->Owner.getValue();
-      // int rid = -1;
-      // int rb = 0;
-      // if (other) rid = other->ID;
-      // if (other) rb = other->bored;
-      // std::cerr << "C: " << rid << "(" << rb << ") != " << ID << "(" << bored << ") " << L << "\n";
-      throw -1; // Conflict
+      GaloisRuntime::signalConflict();
     }
   }
 }
 
+void GaloisRuntime::SimpleRuntimeContext::sub_acquire(GaloisRuntime::Lockable* L) {
+  assert(0 && "Shouldn't get here");
+  abort();
+}
+
+//anchor vtable
+GaloisRuntime::SimpleRuntimeContext::~SimpleRuntimeContext() {}
+
+void GaloisRuntime::DeterministicRuntimeContext::sub_acquire(GaloisRuntime::Lockable* L) {
+  // Normal path
+  if (pendingFlag.flag.data == NON_DET) {
+    GaloisRuntime::SimpleRuntimeContext::acquire(L);
+    return;
+  }
+
+  // Ordered and deterministic path
+  if (pendingFlag.flag.data == COMMITTING)
+    return;
+
+  if (L->Owner.try_lock()) {
+    assert(!L->next);
+    L->next = locks;
+    locks = L;
+  }
+
+  DeterministicRuntimeContext* other;
+  do {
+    other = static_cast<DeterministicRuntimeContext*>(L->Owner.getValue());
+    if (other == this)
+      return;
+    if (other) {
+      bool conflict = comp ? comp->compare(other->data.comp_data, data.comp_data) :  other->data.id < data.id;
+      if (conflict) {
+        // A lock that I want but can't get
+        not_ready = 1;
+        return; 
+      }
+    }
+  } while (!L->Owner.stealing_CAS(other, this));
+
+  // Disable loser
+  if (other)
+    other->not_ready = 1; // Only need atomic write
+
+  return;
+}
+
+
+void GaloisRuntime::forceAbort() {
+  signalConflict();
+}

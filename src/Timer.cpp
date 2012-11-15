@@ -25,7 +25,7 @@
 // This is linux/bsd specific
 #include <sys/time.h>
 
-namespace Galois {
+using namespace Galois;
 
 Timer::Timer()
   :_start_hi(0), _start_low(0), _stop_hi(0), _stop_low(0)
@@ -91,4 +91,8 @@ TimeAccumulator& TimeAccumulator::operator+=(const TimeAccumulator& rhs) {
   return *this;
 }
 
+TimeAccumulator& TimeAccumulator::operator+=(const Timer& rhs) {
+  acc += rhs.get_usec();
+  return *this;
 }
+

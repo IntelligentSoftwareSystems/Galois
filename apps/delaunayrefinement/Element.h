@@ -34,17 +34,17 @@
 
 class Element {
   Tuple coords[3]; // The three endpoints of the triangle
-
   // if the triangle has an obtuse angle
   // obtuse - 1 is which one
   signed char obtuse;
   bool bDim; // true == 3, false == 2
+  int id;
 
- public:
-
- explicit Element(const Tuple& a, const Tuple& b, const Tuple& c)
-   :obtuse(0), bDim(true)
-  { //constructor for Triangles
+public:
+  //! Constructor for Triangles
+  Element(const Tuple& a, const Tuple& b, const Tuple& c, int _id = 0)
+   :obtuse(0), bDim(true), id(_id) 
+  { 
     coords[0] = a;
     coords[1] = b;
     coords[2] = c;
@@ -67,10 +67,9 @@ class Element {
 	obtuse = i + 1;
     //computeCenter();
   }
-  
-  explicit Element(const Tuple& a, const Tuple& b)
-    :obtuse(0), bDim(false)
-  { //constructor for segments
+
+  //! Constructor for segments
+  Element(const Tuple& a, const Tuple& b, int _id = 0): obtuse(0), bDim(false), id(_id) {
     coords[0] = a;
     coords[1] = b;
     if (b < a) {
@@ -80,12 +79,8 @@ class Element {
     //computeCenter();
   }
 
-  // Tuple getCenter() const {
-  //   return coords[3];
-  // }
-
   Tuple getCenter() const {
-    if (getDim() == 2) {
+    if (dim() == 2) {
       return (coords[0] + coords[1]) * 0.5;
     } else {
       const Tuple& a = coords[0];
@@ -118,9 +113,9 @@ class Element {
 
   bool operator<(const Element& rhs) const {
     //apparently a triangle is less than a line
-    if (getDim() < rhs.getDim()) return false;
-    if (getDim() > rhs.getDim()) return true;
-    for (int i = 0; i < getDim(); i++) {
+    if (dim() < rhs.dim()) return false;
+    if (dim() > rhs.dim()) return true;
+    for (int i = 0; i < dim(); i++) {
       if (coords[i] < rhs.coords[i]) return true;
       else if (coords[i] > rhs.coords[i]) return false;
     }
@@ -130,8 +125,8 @@ class Element {
   /// @return if the current triangle has a common edge with e
   bool isRelated(const Element& rhs) const {
     int num_eq = 0;
-    for(int i = 0; i < getDim(); ++i)
-      for(int j = 0; j < rhs.getDim(); ++j)
+    for(int i = 0; i < dim(); ++i)
+      for(int j = 0; j < rhs.dim(); ++j)
 	if (coords[i] == rhs.coords[j])
 	  ++num_eq;
     return num_eq == 2;
@@ -144,18 +139,20 @@ class Element {
   }
 
   void angleCheck(int i, bool& ob, bool& sm, double M) const {
-    int j = (i + 1) % getDim();
-    int k = (i + 2) % getDim(); 
+    int j = (i + 1) % dim();
+    int k = (i + 2) % dim(); 
     Tuple::angleCheck(coords[j], coords[i], coords[k], ob, sm, M);
   }
+
   bool angleGTCheck(int i, double M) const {
-    int j = (i + 1) % getDim();
-    int k = (i + 2) % getDim(); 
+    int j = (i + 1) % dim();
+    int k = (i + 2) % dim(); 
     return Tuple::angleGTCheck(coords[j], coords[i], coords[k], M);
   }
+  
   bool angleOBCheck(int i) const {
-    int j = (i + 1) % getDim();
-    int k = (i + 2) % getDim(); 
+    int j = (i + 1) % dim();
+    int k = (i + 2) % dim(); 
     return Tuple::angleOBCheck(coords[j], coords[i], coords[k]);
   }
 
@@ -177,14 +174,6 @@ class Element {
     abort();
   }
 
-  const Tuple& getPoint(int i) const {
-    return coords[i];
-  }
-
-  const Tuple& getObtuse() const {
-    return coords[obtuse-1];
-  }
-
   Edge getOppositeObtuse() const {
     //The edge opposite the obtuse angle is the edge formed by
     //the other indexes
@@ -200,7 +189,7 @@ class Element {
     abort();
   }
 
-  // should the node be processed?
+  //! Should the node be processed?
   bool isBad() const {
     if (!bDim)
       return false;
@@ -210,17 +199,17 @@ class Element {
     return false;
   }
 
-  int getDim() const {
-    return bDim ? 3 : 2;
-  }
+  const Tuple& getPoint(int i) const { return coords[i]; }
 
-  int numEdges() const {
-    return getDim() + getDim() - 3;
-  }
+  const Tuple& getObtuse() const { return coords[obtuse-1]; }
 
-  bool isObtuse() const {
-    return obtuse != 0;
-  }
+  int dim() const { return bDim ? 3 : 2; }
+
+  int numEdges() const { return dim() + dim() - 3; }
+
+  bool isObtuse() const { return obtuse != 0; }
+
+  int getId() const { return id; }
 
   /**
    * Scans all the edges of the two elements and if it finds one that is
@@ -229,8 +218,8 @@ class Element {
   Edge getRelatedEdge(const Element& e) const {
     int at = 0;
     Tuple d[2];
-    for(int i = 0; i < getDim(); ++i)
-      for(int j = 0; j < e.getDim(); ++j)
+    for(int i = 0; i < dim(); ++i)
+      for(int j = 0; j < e.dim(); ++j)
 	if (coords[i] == e.coords[j])
 	  d[at++] = coords[i];
     assert(at == 2);
@@ -239,12 +228,11 @@ class Element {
 
   std::ostream& print(std::ostream& s) const {
     s << '[';
-    for (int i = 0; i < getDim(); ++i)
-      s << coords[i] << (i < (getDim() - 1) ? ", " : "");
+    for (int i = 0; i < dim(); ++i)
+      s << coords[i] << (i < (dim() - 1) ? ", " : "");
     s << ']';
     return s;
   }
-
 };
 
 static std::ostream& operator<<(std::ostream& s, const Element& E) {

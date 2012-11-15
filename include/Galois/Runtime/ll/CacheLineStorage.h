@@ -26,25 +26,36 @@
  *
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
+#ifndef GALOIS_RUNTIME_CACHE_LINE_STORAGE_H
+#define GALOIS_RUNTIME_CACHE_LINE_STORAGE_H
 
-#ifndef _CACHE_LINE_STORAGE_H
-#define _CACHE_LINE_STORAGE_H
+#include "CompilerSpecific.h"
 
 namespace GaloisRuntime {
 namespace LL {
 
-//xeons have 64 byte cache lines, but will prefetch 2 at a time
-#define G_CACHE_LINE_SIZE 128
+
+
+template<typename T, int REM>
+struct CacheLineImp {
+  GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE T data;
+  char pad[REM];
+  CacheLineImp() :data() {}
+  explicit CacheLineImp(const T& v) :data(v) {}
+};
+
+template<typename T>
+struct CacheLineImp<T, 0> {
+  GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE T data;
+  CacheLineImp() :data() {}
+  explicit CacheLineImp(const T& v) :data(v) {}
+};
 
 // Store an item with padding
 template<typename T>
-struct CacheLineStorage {
-  T data __attribute__((aligned(G_CACHE_LINE_SIZE)));
-  char pad[ G_CACHE_LINE_SIZE % sizeof(T) ?
-	    G_CACHE_LINE_SIZE - (sizeof(T) % G_CACHE_LINE_SIZE) :
-	    0 ];
-  CacheLineStorage() :data() {}
-  explicit CacheLineStorage(const T& v) :data(v) {}
+struct CacheLineStorage : public CacheLineImp<T, GALOIS_CACHE_LINE_SIZE % sizeof(T)> {
+  CacheLineStorage() :CacheLineImp<T, GALOIS_CACHE_LINE_SIZE % sizeof(T)>() {}
+  explicit CacheLineStorage(const T& v) :CacheLineImp<T, GALOIS_CACHE_LINE_SIZE % sizeof(T)>(v) {}
 };
 
 }
