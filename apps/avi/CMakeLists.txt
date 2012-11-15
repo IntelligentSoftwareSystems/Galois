@@ -12,6 +12,7 @@ file(GLOB Sources
   libMeshInit/femap/*.cpp
   libMeshInit/dgmechanics/*.cpp
   libMeshInit/*.cpp
+  dummy.f95
 )
 
 add_library(AVI ${Sources})
@@ -26,7 +27,8 @@ app(AVIodgOrdered main/AVIodgOrdered.cpp
   EXTLIBS AVI ${LAPACK_LIBRARIES})
 
 # the files may be removed from the release without causing error in cmake
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/exp)
+#if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/exp)
+if(0)
   app(AVIodgExplicit exp/AVIodgExplicit.cpp 
     REQUIRES LAPACK_FOUND ZLIB_FOUND
     EXTLIBS AVI ${LAPACK_LIBRARIES})
