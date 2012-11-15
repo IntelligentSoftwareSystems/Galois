@@ -67,11 +67,11 @@ public:
 
     assert (event.getRecvObj () == this);
 
-    typename Base::template OutDegIterator<G> beg = make_begin (graph, mynode);
-    typename Base::template OutDegIterator<G> end = make_end (graph, mynode);
+    typename Base::template OutDegIterator<G> beg = this->make_begin (graph, mynode);
+    typename Base::template OutDegIterator<G> end = this->make_end (graph, mynode);
 
     SendAddList<C> addListWrap (newEvents);
-    execEventIntern (event, addListWrap, beg, end);
+    this->execEventIntern (event, addListWrap, beg, end);
   }
   
 };

@@ -96,7 +96,7 @@ public:
 
 
   void recv (const Event_ty& e) {
-    size_t inIdx = getInputIndex (e);
+    size_t inIdx = this->getInputIndex (e);
     assert (inIdx < numInputs);
 
     // GALOIS_DEBUG_PRINT ("%s, Received : %s\n", this->str ().c_str (), e.str ().c_str ());
@@ -165,7 +165,7 @@ public:
 
         SendWrapperImpl sendWrap;
 
-        execEventIntern(event, sendWrap, beg, end);
+        this->execEventIntern(event, sendWrap, beg, end);
 
         ++nevents;
       }
