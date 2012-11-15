@@ -41,6 +41,8 @@
 #include <sstream>
 #include <vector>
 #include <cstdlib>
+#include <linux/mman.h>
+#include <sys/mman.h>
 
 static const char* name = "Betweenness Centrality";
 static const char* desc =
@@ -57,31 +59,53 @@ Graph* G;
 int NumNodes;
 std::vector<int> sucSize;
 
+#define PAGE_SIZE (4*1024)
+#define PAGE_ROUND_UP(x) ( (((uintptr_t)(x)) + PAGE_SIZE-1)  & (~(PAGE_SIZE-1)) )
+
 struct TempState  {
-  std::vector<GNode> SQG;
-  std::vector<double> sigmaG;
-  std::vector<int> distG;
+  //  std::vector<GNode> SQG;
+  GNode* SQG;
+  //  std::vector<double> sigmaG;
+  double* sigmaG;
+  //  std::vector<int> distG;
+  int* distG;
 
-  std::vector<std::vector<GNode> > succsGlobal;
+  std::vector<GNode>* succsGlobal;
 
-  std::vector<double> CB;
+  //  std::vector<double> CB;
+  double* CB;
 
-  TempState() 
-    :SQG(NumNodes), sigmaG(NumNodes), distG(NumNodes), CB(NumNodes) {
-    succsGlobal.resize(NumNodes);
-    for (int i = 0; i < NumNodes; ++i)
+  TempState() {
+    size_t len = PAGE_ROUND_UP(sizeof(GNode) * NumNodes);
+    SQG = (GNode*)mmap(0, len, PROT_READ | PROT_WRITE, MAP_POPULATE | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    len = PAGE_ROUND_UP(sizeof(double) * NumNodes);
+    sigmaG = (double*)mmap(0, len, PROT_READ | PROT_WRITE, MAP_POPULATE | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    len = PAGE_ROUND_UP(sizeof(int) * NumNodes);
+    distG = (int*)mmap(0, len, PROT_READ | PROT_WRITE, MAP_POPULATE | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    len = PAGE_ROUND_UP(sizeof(std::vector<GNode>) * NumNodes);
+    succsGlobal = (std::vector<GNode>*)mmap(0, len, PROT_READ | PROT_WRITE, MAP_POPULATE | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    len = PAGE_ROUND_UP(sizeof(double) * NumNodes);
+    CB = (double*)mmap(0, len, PROT_READ | PROT_WRITE, MAP_POPULATE | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
+    //:SQG(NumNodes), sigmaG(NumNodes), distG(NumNodes), CB(NumNodes) {
+    //succsGlobal.resize(NumNodes);
+    for (int i = 0; i < NumNodes; ++i) {
+      new (&succsGlobal[i]) std::vector<GNode>();
       succsGlobal[i].reserve(sucSize[i]);
+    }
   }
 
   void reset() {
-    SQG.resize(0);
-    SQG.resize(NumNodes);
-    sigmaG.resize(0);
-    sigmaG.resize(NumNodes);
-    distG.resize(0);
-    distG.resize(NumNodes);
-    for(int i = 0; i < succsGlobal.size(); ++i)
+    // SQG.resize(0);
+    // SQG.resize(NumNodes);
+    // sigmaG.resize(0);
+    // sigmaG.resize(NumNodes);
+    // distG.resize(0);
+    // distG.resize(NumNodes);
+    for(int i = 0; i < NumNodes; ++i) {
       succsGlobal[i].resize(0);
+      distG[i] = 0;
+    }
   }
 };
 
@@ -94,17 +118,22 @@ void computeSucSize() {
 				 G->neighbor_end(*ii, Galois::NONE));
 }
 
+struct popstate {
+  void operator()(int , int) {
+    *state.getLocal() = *state.getLocal() = new TempState();
+  }
+};
+
+
 struct process {
   void operator()(GNode& _req, Galois::UserContext<GNode>& lwl) {
     TempState* tmp = *state.getLocal();
-    if (!tmp)
-      tmp = *state.getLocal() = new TempState();
     tmp->reset();
-    std::vector<GNode>& SQ = tmp->SQG;
-    std::vector<double>& sigma = tmp->sigmaG;
-    std::vector<int>& d = tmp->distG;
-    std::vector<double>& delta = tmp->CB;
-    std::vector<std::vector<GNode> >& suc = tmp->succsGlobal;
+    GNode* SQ = tmp->SQG;
+    double* sigma = tmp->sigmaG;
+    int* d = tmp->distG;
+    double* delta = tmp->CB;
+    std::vector<GNode>* suc = tmp->succsGlobal;
 
     int QPush = 0;
     int QAt = 0;
@@ -156,7 +185,7 @@ void reduce(std::vector<double>& bcv) {
   bcv.resize(NumNodes);
   for (unsigned int i = 0; i < state.size(); ++i)
     if (*state.getRemote(i))
-      std::transform(bcv.begin(), bcv.end(), (*state.getRemote(i))->CB.begin(), bcv.begin(), std::plus<double>());
+      std::transform(bcv.begin(), bcv.end(), (*state.getRemote(i))->CB, bcv.begin(), std::plus<double>());
 }
 
 // Verification for reference torus graph inputs. 
@@ -235,7 +264,10 @@ int main(int argc, char** argv) {
   std::vector<GNode> tmp;
   std::copy(begin, end, std::back_inserter(tmp));
 
-  typedef GaloisRuntime::WorkList::dChunkedLIFO<2> WL;
+  Galois::on_each(popstate());
+
+  typedef GaloisRuntime::WorkList::dChunkedLIFO<8> WL;
+  typedef ChunkedAdaptor<false,32> CA;
   Galois::StatTimer T;
   T.start();
   Galois::for_each<WL>(tmp.begin(), tmp.end(), process());
@@ -247,7 +279,7 @@ int main(int argc, char** argv) {
     std::vector<double> bcv(NumNodes);
     for (int i = 0; i < state.size(); ++i)
       if (*state.getRemote(i))
-	std::transform(bcv.begin(), bcv.end(), (*state.getRemote(i))->CB.begin(), bcv.begin(), std::plus<double>());
+	std::transform(bcv.begin(), bcv.end(), (*state.getRemote(i))->CB, bcv.begin(), std::plus<double>());
     for (int i=0; i<10; ++i)
       std::cout << i << ": " << setiosflags(std::ios::fixed) << std::setprecision(6) << bcv[i] << "\n";
 #if SHOULD_PRODUCE_CERTIFICATE
