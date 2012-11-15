@@ -38,8 +38,8 @@ namespace Galois {
  */
 template<typename T>
 struct InsertBag: public GaloisRuntime::galois_insert_bag<T> {
-  void push_back(const T& v) {
-    this->push(v);
+  T& push_back(const T& v) {
+    return this->push(v);
   }
 };
 
