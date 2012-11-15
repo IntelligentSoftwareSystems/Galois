@@ -12,6 +12,7 @@ file(GLOB Sources
   libMeshInit/femap/*.cpp
   libMeshInit/dgmechanics/*.cpp
   libMeshInit/*.cpp
+  dummy.f95
 )
 
 add_library(AVI ${Sources})
