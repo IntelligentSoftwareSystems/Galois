@@ -27,6 +27,7 @@ namespace GaloisRuntime {
 
 void beginSampling();
 void endSampling();
+void reportSampling(const char* loopname);
 
 }
 
