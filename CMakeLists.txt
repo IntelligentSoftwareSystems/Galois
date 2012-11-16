@@ -102,6 +102,13 @@ endif()
 if(USE_EXP)
   find_package(GMP) # for buchberger
 
+  find_package(MPI REQUIRED) # for distributed
+  set(CMAKE_CXX_COMPILE_FLAGS ${CMAKE_CXX_COMPILE_FLAGS} ${MPI_COMPILE_FLAGS})
+  set(CMAKE_CXX_LINK_FLAGS ${CMAKE_CXX_LINK_FLAGS} ${MPI_LINK_FLAGS})
+  include_directories(${MPI_INCLUDE_PATH})
+  set(RT_LINK ${MPI_LIBRARIES} ${RT_LINK})
+
+
   add_definitions(-DGALOIS_USE_EXP)
   include_directories("exp/include")
 
