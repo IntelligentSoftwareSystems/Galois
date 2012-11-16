@@ -45,7 +45,7 @@
 namespace GaloisRuntime {
 
 // the default value is false
-extern __thread bool distributed_foreach;
+extern bool distributed_foreach;
 
 static inline void set_distributed_foreach(bool val) {
    distributed_foreach = val;
@@ -237,7 +237,7 @@ protected:
       setThreadContext(&tld.cnx);
     tld.lterm = term.getLocalTokenHolder();
     do {
-      if (get_distributed_foreach() && (!LL::getTID())) {
+      if (get_distributed_foreach() && (LL::getTID() == (galoisActiveThreads-1))) {
          DIR::comm();
       }
       else {

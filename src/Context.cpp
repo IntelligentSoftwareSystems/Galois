@@ -117,7 +117,7 @@ unsigned GaloisRuntime::SimpleRuntimeContext::commit_iteration() {
     //__sync_synchronize();
     LL::compilerBarrier();
     L->Owner.unlock_and_clear();
- printf ("Unlock: %lx\n", (size_t)L);
+ //printf ("Unlock: %lx\n", (size_t)L);
 
     ++numLocks;
   }
@@ -152,12 +152,12 @@ void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
     assert(!L->Owner.getValue());
     assert(!L->next);
     L->Owner.setValue(this);
- printf ("Acquire: %lx\n", (size_t)L);
+ //printf ("Acquire: %lx\n", (size_t)L);
     L->next = locks;
     locks = L;
   } else {
     if (L->Owner.getValue() != this) {
- printf ("Acquire Failed: %lx\n", (size_t)L);
+ //printf ("Acquire Failed: %lx\n", (size_t)L);
       GaloisRuntime::signalConflict();
     }
   }

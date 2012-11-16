@@ -26,7 +26,7 @@
 using namespace GaloisRuntime;
 using namespace DIR;
 
-__thread bool GaloisRuntime::distributed_foreach = false;
+bool GaloisRuntime::distributed_foreach = false;
 NodeRequest GaloisRuntime::DIR::nr;
 unordered_map<Pair,void*,HashFunction,SetEqual>    GaloisRuntime::DIR::hash_table;
 unordered_map<Pair,locData*,HashFunction,SetEqual> GaloisRuntime::sent_hash;
