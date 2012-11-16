@@ -29,6 +29,7 @@
 #define GALOIS_RUNTIME_PARALLELWORK_H
 
 #include "Galois/Mem.h"
+#include "Galois/Runtime/Directory.h"
 #include "Galois/Runtime/ForEachTraits.h"
 #include "Galois/Runtime/Config.h"
 #include "Galois/Runtime/Support.h"
@@ -42,6 +43,18 @@
 #include <algorithm>
 
 namespace GaloisRuntime {
+
+// the default value is false
+extern __thread bool distributed_foreach;
+
+static inline void set_distributed_foreach(bool val) {
+   distributed_foreach = val;
+   return;
+}
+
+static inline bool get_distributed_foreach() {
+   return distributed_foreach;
+}
 
 template<typename T1, typename T2>
 struct Initializer {
@@ -224,26 +237,31 @@ protected:
       setThreadContext(&tld.cnx);
     tld.lterm = term.getLocalTokenHolder();
     do {
-      bool didWork;
-      do {
-	didWork = false;
-	//Run some iterations
-	if (ForEachTraits<FunctionTy>::NeedsBreak || ForEachTraits<FunctionTy>::NeedsAborts)
-	  didWork = runQueue<checkAbort || ForEachTraits<FunctionTy>::NeedsBreak>(tld, wl, false);
-	else //No try/catch
-	  didWork = runQueueSimple(tld);
-	//Check for break
-	if (ForEachTraits<FunctionTy>::NeedsBreak && broke.data)
-	  break;
-	//Check for abort
-	if (checkAbort)
-	  didWork |= handleAborts(tld);
-	//Update node color
-	if (didWork)
-	  tld.lterm->workHappened();
-      } while (didWork);
-      if (ForEachTraits<FunctionTy>::NeedsBreak && broke.data)
-	break;
+      if (get_distributed_foreach() && (!LL::getTID())) {
+         DIR::comm();
+      }
+      else {
+         bool didWork;
+         do {
+            didWork = false;
+            //Run some iterations
+            if (ForEachTraits<FunctionTy>::NeedsBreak || ForEachTraits<FunctionTy>::NeedsAborts)
+	            didWork = runQueue<checkAbort || ForEachTraits<FunctionTy>::NeedsBreak>(tld, wl, false);
+         	else //No try/catch
+               didWork = runQueueSimple(tld);
+         	//Check for break
+         	if (ForEachTraits<FunctionTy>::NeedsBreak && broke.data)
+         	  break;
+         	//Check for abort
+         	if (checkAbort)
+         	  didWork |= handleAborts(tld);
+         	//Update node color
+         	if (didWork)
+         	  tld.lterm->workHappened();
+         } while (didWork);
+         if (ForEachTraits<FunctionTy>::NeedsBreak && broke.data)
+         	break;
+      }
 
       term.localTermination();
     } while ((ForEachTraits<FunctionTy>::NeedsPush 

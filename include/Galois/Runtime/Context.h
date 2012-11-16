@@ -97,6 +97,9 @@ public:
   unsigned cancel_iteration();
   unsigned commit_iteration();
   void acquire(Lockable* L);
+  bool do_trylock(GaloisRuntime::Lockable* L);
+  void do_unlock(GaloisRuntime::Lockable* L);
+  void *do_getValue(GaloisRuntime::Lockable* L);
 };
 
 //! get the current conflict detection class, may be null if not in parallel region
@@ -155,6 +158,25 @@ static inline void acquire(Lockable* C, Galois::MethodFlag m) {
     doAcquire(C);
 }
 
+void *do_getValue(Lockable* C);
+
+static inline void *getValue(Lockable* C) {
+   return do_getValue(C);
+}
+
+bool do_trylock(Lockable* C);
+
+static inline bool trylock(Lockable* C) {
+   return do_trylock(C);
+}
+
+void do_unlock(Lockable* C);
+
+static inline void unlock(Lockable* C) {
+   do_unlock(C);
+   return;
+}
+
 struct AlwaysLockObj {
   void operator()(Lockable* C) const {
     GaloisRuntime::doAcquire(C);
@@ -169,12 +191,12 @@ struct CheckedLockObj {
   }
 };
 
+void forceAbort();
+
 //! Actually break for_each loop
 void breakLoop();
 
 void signalConflict();
-
-void forceAbort();
 }
 
 

@@ -23,6 +23,15 @@
 
 #include "Galois/Runtime/ParallelWork.h"
 
+using namespace GaloisRuntime;
+using namespace DIR;
+
+__thread bool GaloisRuntime::distributed_foreach = false;
+NodeRequest GaloisRuntime::DIR::nr;
+unordered_map<Pair,void*,HashFunction,SetEqual>    GaloisRuntime::DIR::hash_table;
+unordered_map<Pair,locData*,HashFunction,SetEqual> GaloisRuntime::sent_hash;
+//unordered_map<Pair,void*,HashFunction,SetEqual>    GaloisRuntime::recv_hash;
+
 unsigned int GaloisRuntime::galoisActiveThreads = 1;
 
 void GaloisRuntime::preAlloc_impl(int num) {

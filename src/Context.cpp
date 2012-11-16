@@ -75,6 +75,33 @@ void GaloisRuntime::doAcquire(GaloisRuntime::Lockable* C) {
     cnx->acquire(C);
 }
 
+void *GaloisRuntime::SimpleRuntimeContext::do_getValue(GaloisRuntime::Lockable* L) {
+  return ((void*)L->Owner.getValue());
+}
+
+void *GaloisRuntime::do_getValue(GaloisRuntime::Lockable* L) {
+  SimpleRuntimeContext cnx;
+  return cnx.do_getValue(L);
+}
+
+bool GaloisRuntime::SimpleRuntimeContext::do_trylock(GaloisRuntime::Lockable* L) {
+  return L->Owner.try_lock();
+}
+
+bool GaloisRuntime::do_trylock(GaloisRuntime::Lockable* L) {
+  SimpleRuntimeContext cnx;
+  return cnx.do_trylock(L);
+}
+
+void GaloisRuntime::SimpleRuntimeContext::do_unlock(GaloisRuntime::Lockable* L) {
+  L->Owner.unlock_and_clear();
+}
+
+void GaloisRuntime::do_unlock(GaloisRuntime::Lockable* C) {
+  SimpleRuntimeContext cnx;
+  cnx.do_unlock(C);
+}
+
 unsigned GaloisRuntime::SimpleRuntimeContext::cancel_iteration() {
   //FIXME: not handled yet
   return commit_iteration();
@@ -90,6 +117,7 @@ unsigned GaloisRuntime::SimpleRuntimeContext::commit_iteration() {
     //__sync_synchronize();
     LL::compilerBarrier();
     L->Owner.unlock_and_clear();
+ printf ("Unlock: %lx\n", (size_t)L);
 
     ++numLocks;
   }
@@ -124,10 +152,12 @@ void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
     assert(!L->Owner.getValue());
     assert(!L->next);
     L->Owner.setValue(this);
+ printf ("Acquire: %lx\n", (size_t)L);
     L->next = locks;
     locks = L;
   } else {
     if (L->Owner.getValue() != this) {
+ printf ("Acquire Failed: %lx\n", (size_t)L);
       GaloisRuntime::signalConflict();
     }
   }

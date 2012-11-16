@@ -8,3 +8,4 @@ add_definitions(-O0)
 
 makeTest(pairingheap)
 makeTest(skiplist)
+makeTest(foreachtask)

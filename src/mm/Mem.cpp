@@ -98,7 +98,7 @@ void* GaloisRuntime::MM::largeInterleavedAlloc(size_t len) {
   void* data = 0;
 #if defined GALOIS_USE_NUMA_OLD
   nodemask_t nm = numa_no_nodes;
-  unsigned int num = Galois::getActiveThreads();
+  unsigned int num = galoisActiveThreads;
   for (unsigned y = 0; y < num; ++y)
     nodemask_set(&nm, y/4);
   data = numa_alloc_interleaved_subset(len, &nm);
