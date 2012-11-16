@@ -94,7 +94,7 @@ LC::LC( const FactorGraph & fg, const PropertySet &opts ) : DAIAlgFG(fg), _panca
     for( size_t i = 0; i < nrVars(); i++ ) {
         _phis.push_back( vector<Factor>() );
         _phis[i].reserve( nbV(i).size() );
-        foreach( const Neighbor &I, nbV(i) )
+        diaforeach( const Neighbor &I, nbV(i) )
             _phis[i].push_back( Factor( factor(I).vars() / var(i) ) );
     }
 
@@ -203,7 +203,7 @@ long LC::SetCavityDists( std::vector<Factor> &Q ) {
 
 void LC::init() {
     for( size_t i = 0; i < nrVars(); ++i )
-        foreach( const Neighbor &I, nbV(i) )
+        diaforeach( const Neighbor &I, nbV(i) )
             if( props.updates == Properties::UpdateType::SEQRND )
                 _phis[i][I.iter].randomize();
             else
@@ -257,7 +257,7 @@ Real LC::run() {
     for( size_t i = 0; i < nrVars(); i++ ) {
         _pancakes[i] = _cavitydists[i];
 
-        foreach( const Neighbor &I, nbV(i) ) {
+        diaforeach( const Neighbor &I, nbV(i) ) {
             _pancakes[i] *= factor(I);
             if( props.updates == Properties::UpdateType::SEQRND )
               _pancakes[i] *= _phis[i][I.iter];
@@ -287,7 +287,7 @@ Real LC::run() {
     vector<Edge> update_seq;
     update_seq.reserve( nredges );
     for( size_t i = 0; i < nrVars(); ++i )
-        foreach( const Neighbor &I, nbV(i) )
+        diaforeach( const Neighbor &I, nbV(i) )
             update_seq.push_back( Edge( i, I.iter ) );
 
     // do several passes over the network until maximum number of iterations has

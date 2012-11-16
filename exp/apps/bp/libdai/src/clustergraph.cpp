@@ -22,7 +22,7 @@ using namespace std;
 ClusterGraph::ClusterGraph( const std::vector<VarSet> & cls ) : _G(), _vars(), _clusters() {
     // construct vars, clusters and edge list
     vector<Edge> edges;
-    foreach( const VarSet &cl, cls ) {
+    diaforeach( const VarSet &cl, cls ) {
         if( find( clusters().begin(), clusters().end(), cl ) == clusters().end() ) {
             // add cluster
             size_t n2 = nrClusters();
@@ -53,7 +53,7 @@ ClusterGraph::ClusterGraph( const FactorGraph& fg, bool onlyMaximal ) : _G( fg.n
             if( fg.isMaximal( I ) ) {
                 _clusters.push_back( fg.factor(I).vars() );
                 size_t clind = _G.addNode2();
-                foreach( const Neighbor &i, fg.nbF(I) )
+                diaforeach( const Neighbor &i, fg.nbF(I) )
                     _G.addEdge( i, clind, true );
             }
     } else {

@@ -266,10 +266,10 @@ class DAG {
             for( size_t n1 = 0; n1 < nrNodes(); n1++ ) {
                 if( pa(n1).size() != x.pa(n1).size() )
                     return false;
-                foreach( const Neighbor &n2, pa(n1) )
+                diaforeach( const Neighbor &n2, pa(n1) )
                     if( !x.hasEdge( n2, n1 ) )
                         return false;
-                foreach( const Neighbor &n2, x.pa(n1) )
+                diaforeach( const Neighbor &n2, x.pa(n1) )
                     if( !hasEdge( n2, n1 ) )
                         return false;
             }

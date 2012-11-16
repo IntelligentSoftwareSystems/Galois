@@ -65,16 +65,16 @@ void BP_dual::calcMessages() {
     // calculate 'n' messages from "factor marginal / factor"
     for( size_t I = 0; I < fg().nrFactors(); I++ ) {
         Factor f = _ia->beliefF(I) / fg().factor(I);
-        foreach( const Neighbor &i, fg().nbF(I) )
+        diaforeach( const Neighbor &i, fg().nbF(I) )
             msgN(i, i.dual) = f.marginal( fg().var(i) ).p();
     }
     // calculate 'm' messages and normalizers from 'n' messages
     for( size_t i = 0; i < fg().nrVars(); i++ )
-        foreach( const Neighbor &I, fg().nbV(i) )
+        diaforeach( const Neighbor &I, fg().nbV(i) )
             calcNewM( i, I.iter );
     // recalculate 'n' messages and normalizers from 'm' messages
     for( size_t i = 0; i < fg().nrVars(); i++ )
-        foreach( const Neighbor &I, fg().nbV(i) )
+        diaforeach( const Neighbor &I, fg().nbV(i) )
             calcNewN(i, I.iter);
 }
 
@@ -83,7 +83,7 @@ void BP_dual::calcNewM( size_t i, size_t _I ) {
     // calculate updated message I->i
     const Neighbor &I = fg().nbV(i)[_I];
     Prob prod( fg().factor(I).p() );
-    foreach( const Neighbor &j, fg().nbF(I) )
+    diaforeach( const Neighbor &j, fg().nbF(I) )
         if( j != i ) { // for all j in I \ i
             Prob &n = msgN(j,j.dual);
             IndexFor ind( fg().var(j), fg().factor(I).vars() );
@@ -106,7 +106,7 @@ void BP_dual::calcNewN( size_t i, size_t _I ) {
     // calculate updated message i->I
     const Neighbor &I = fg().nbV(i)[_I];
     Prob prod( fg().var(i).states(), 1.0 );
-    foreach( const Neighbor &J, fg().nbV(i) )
+    diaforeach( const Neighbor &J, fg().nbV(i) )
         if( J.node != I.node ) // for all J in i \ I
             prod *= msgM(i,J.iter);
     _msgs.Zn[i][_I] = prod.normalize();
@@ -124,7 +124,7 @@ void BP_dual::calcBeliefs() {
 
 void BP_dual::calcBeliefV( size_t i ) {
     Prob prod( fg().var(i).states(), 1.0 );
-    foreach( const Neighbor &I, fg().nbV(i) )
+    diaforeach( const Neighbor &I, fg().nbV(i) )
         prod *= msgM(i,I.iter);
     _beliefs.Zb1[i] = prod.normalize();
     _beliefs.b1[i] = prod;
@@ -133,7 +133,7 @@ void BP_dual::calcBeliefV( size_t i ) {
 
 void BP_dual::calcBeliefF( size_t I ) {
     Prob prod( fg().factor(I).p() );
-    foreach( const Neighbor &j, fg().nbF(I) ) {
+    diaforeach( const Neighbor &j, fg().nbF(I) ) {
         IndexFor ind( fg().var(j), fg().factor(I).vars() );
         Prob n( msgN(j,j.dual) );
         for( size_t x = 0; ind.valid(); x++, ++ind )

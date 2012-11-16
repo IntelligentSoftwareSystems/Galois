@@ -123,7 +123,7 @@ class GraphEL : public std::set<UEdge> {
         /// Construct from GraphAL
         GraphEL( const GraphAL& G ) {
             for( size_t n1 = 0; n1 < G.nrNodes(); n1++ )
-                foreach( const Neighbor n2, G.nb(n1) )
+                diaforeach( const Neighbor n2, G.nb(n1) )
                     if( n1 < n2 )
                         insert( UEdge( n1, n2 ) );
         }

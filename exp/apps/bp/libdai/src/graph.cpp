@@ -21,7 +21,7 @@ GraphAL& GraphAL::addEdge( size_t n1, size_t n2, bool check ) {
     bool exists = false;
     if( check ) {
         // Check whether the edge already exists
-        foreach( const Neighbor &n, nb(n1) )
+        diaforeach( const Neighbor &n, nb(n1) )
             if( n == n2 ) {
                 exists = true;
                 break;
@@ -95,7 +95,7 @@ void GraphAL::eraseEdge( size_t n1, size_t n2 ) {
 
 SmallSet<size_t> GraphAL::nbSet( size_t n ) const {
     SmallSet<size_t> result;
-    foreach( const Neighbor &m, nb(n) )
+    diaforeach( const Neighbor &m, nb(n) )
         result |= m;
     return result;
 }
@@ -115,7 +115,7 @@ bool GraphAL::isConnected() const {
             // For all nodes, check if they are connected with the (growing) component
             for( size_t n1 = 0; n1 < nrNodes(); n1++ )
                 if( !incomponent[n1] ) {
-                    foreach( const Neighbor &n2, nb(n1) ) {
+                    diaforeach( const Neighbor &n2, nb(n1) ) {
                         if( incomponent[n2] ) {
                             found_new_nodes = true;
                             incomponent[n1] = true;
@@ -142,7 +142,7 @@ bool GraphAL::isConnected() const {
         vector<E> edges;
         edges.reserve( nrEdges() );
         for( size_t n1 = 0; n1 < nrNodes(); n1++ )
-            foreach( const Neighbor &n2, nb(n1) )
+            diaforeach( const Neighbor &n2, nb(n1) )
                 if( n1 < n2 )
                     edges.push_back( E( n1, n2 ) );
         boostGraphAL g( edges.begin(), edges.end(), nrNodes() );
@@ -175,7 +175,7 @@ bool GraphAL::isTree() const {
             // (without backtracking), aborting if a cycle is detected
             for( size_t e = 0; e < prevLevel.size(); e++ ) {
                 size_t n2 = prevLevel[e].first; // for all nodes n2 in the previous level
-                foreach( const Neighbor &n1, nb(n2) ) { // for all neighbors n1 of n2
+                diaforeach( const Neighbor &n1, nb(n2) ) { // for all neighbors n1 of n2
                     if( n1 != prevLevel[e].second ) { // no backtracking allowed
                         for( size_t l = 0; l < levels.size() && !foundCycle; l++ )
                             for( size_t f = 0; f < levels[l].size() && !foundCycle; f++ )
@@ -208,7 +208,7 @@ void GraphAL::printDot( std::ostream& os ) const {
     for( size_t n = 0; n < nrNodes(); n++ )
         os << "\tx" << n << ";" << endl;
     for( size_t n1 = 0; n1 < nrNodes(); n1++ )
-        foreach( const Neighbor &n2, nb(n1) )
+        diaforeach( const Neighbor &n2, nb(n1) )
             if( n1 < n2 )
                 os << "\tx" << n1 << " -- x" << n2 << ";" << endl;
     os << "}" << endl;
@@ -219,7 +219,7 @@ void GraphAL::checkConsistency() const {
     size_t N = nrNodes();
     for( size_t n1 = 0; n1 < N; n1++ ) {
         size_t iter = 0;
-        foreach( const Neighbor &n2, nb(n1) ) {
+        diaforeach( const Neighbor &n2, nb(n1) ) {
             DAI_ASSERT( n2.iter == iter );
             DAI_ASSERT( n2.node < N );
             DAI_ASSERT( n2.dual < nb(n2).size() );

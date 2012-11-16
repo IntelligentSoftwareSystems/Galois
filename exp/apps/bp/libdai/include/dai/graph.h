@@ -61,7 +61,7 @@ namespace dai {
  *  \code
  *  for( size_t i = 0; i < nrNodes(); ++i ) {
  *      size_t _j = 0;
- *      foreach( const Neighbor &j, nb(i) ) {
+ *      diaforeach( const Neighbor &j, nb(i) ) {
  *          assert( j == nb(i,j.iter) );
  *          assert( nb(j.node,j.dual).node == i );
  *          assert( _j = j.iter );
@@ -282,10 +282,10 @@ class GraphAL {
             for( size_t n1 = 0; n1 < nrNodes(); n1++ ) {
                 if( nb(n1).size() != x.nb(n1).size() )
                     return false;
-                foreach( const Neighbor &n2, nb(n1) )
+                diaforeach( const Neighbor &n2, nb(n1) )
                     if( !x.hasEdge( n1, n2 ) )
                         return false;
-                foreach( const Neighbor &n2, x.nb(n1) )
+                diaforeach( const Neighbor &n2, x.nb(n1) )
                     if( !hasEdge( n1, n2 ) )
                         return false;
             }

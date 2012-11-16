@@ -21,7 +21,7 @@ BipartiteGraph& BipartiteGraph::addEdge( size_t n1, size_t n2, bool check ) {
     bool exists = false;
     if( check ) {
         // Check whether the edge already exists
-        foreach( const Neighbor &nb2, nb1(n1) )
+        diaforeach( const Neighbor &nb2, nb1(n1) )
             if( nb2 == n2 ) {
                 exists = true;
                 break;
@@ -118,7 +118,7 @@ void BipartiteGraph::eraseEdge( size_t n1, size_t n2 ) {
 
 SmallSet<size_t> BipartiteGraph::nb1Set( size_t n1 ) const {
     SmallSet<size_t> result;
-    foreach( const Neighbor &n2, nb1(n1) )
+    diaforeach( const Neighbor &n2, nb1(n1) )
         result |= n2;
     return result;
 }
@@ -126,7 +126,7 @@ SmallSet<size_t> BipartiteGraph::nb1Set( size_t n1 ) const {
 
 SmallSet<size_t> BipartiteGraph::nb2Set( size_t n2 ) const {
     SmallSet<size_t> result;
-    foreach( const Neighbor &n1, nb2(n2) )
+    diaforeach( const Neighbor &n1, nb2(n2) )
         result |= n1;
     return result;
 }
@@ -135,8 +135,8 @@ SmallSet<size_t> BipartiteGraph::nb2Set( size_t n2 ) const {
 SmallSet<size_t> BipartiteGraph::delta1( size_t n1, bool include ) const {
     // get all second-order neighbors
     SmallSet<size_t> result;
-    foreach( const Neighbor &n2, nb1(n1) )
-        foreach( const Neighbor &m1, nb2(n2) )
+    diaforeach( const Neighbor &n2, nb1(n1) )
+        diaforeach( const Neighbor &m1, nb2(n2) )
             if( include || (m1 != n1) )
                 result |= m1;
     return result;
@@ -146,8 +146,8 @@ SmallSet<size_t> BipartiteGraph::delta1( size_t n1, bool include ) const {
 SmallSet<size_t> BipartiteGraph::delta2( size_t n2, bool include ) const {
     // store all second-order neighbors
     SmallSet<size_t> result;
-    foreach( const Neighbor &n1, nb2(n2) )
-        foreach( const Neighbor &m2, nb1(n1) )
+    diaforeach( const Neighbor &n1, nb2(n2) )
+        diaforeach( const Neighbor &m2, nb1(n1) )
             if( include || (m2 != n2) )
                 result |= m2;
     return result;
@@ -169,7 +169,7 @@ bool BipartiteGraph::isConnected() const {
         vector<E> edges;
         edges.reserve( nrEdges() );
         for( size_t n1 = 0; n1 < nrNodes1(); n1++ )
-            foreach( const Neighbor &n2, nb1(n1) )
+            diaforeach( const Neighbor &n2, nb1(n1) )
                 edges.push_back( E( n1, n2.node + N ) );
         boostGraph g( edges.begin(), edges.end(), nrNodes1() + nrNodes2() );
 
@@ -191,7 +191,7 @@ bool BipartiteGraph::isConnected() const {
             // For all nodes of type 2, check if they are connected with the (growing) component
             for( size_t n2 = 0; n2 < nrNodes2(); n2++ )
                 if( !incomponent2[n2] ) {
-                    foreach( const Neighbor &n1, nb2(n2) ) {
+                    diaforeach( const Neighbor &n1, nb2(n2) ) {
                         if( incomponent1[n1] ) {
                             found_new_nodes = true;
                             incomponent2[n2] = true;
@@ -203,7 +203,7 @@ bool BipartiteGraph::isConnected() const {
             // For all nodes of type 1, check if they are connected with the (growing) component
             for( size_t n1 = 0; n1 < nrNodes1(); n1++ )
                 if( !incomponent1[n1] ) {
-                    foreach( const Neighbor &n2, nb1(n1) ) {
+                    diaforeach( const Neighbor &n2, nb1(n1) ) {
                         if( incomponent2[n2] ) {
                             found_new_nodes = true;
                             incomponent1[n1] = true;
@@ -249,13 +249,13 @@ bool BipartiteGraph::isTree() const {
                 newLevel.ind1 = vector<size_t>( 1, n1 );
                 // add all neighbors of n1 to ind2
                 newLevel.ind2.reserve( nb1(n1).size() );
-                foreach( const Neighbor &n2, nb1(n1) )
+                diaforeach( const Neighbor &n2, nb1(n1) )
                     newLevel.ind2.push_back( n2 );
             } else {
                 const levelType &prevLevel = levels.back();
                 // build newLevel.ind1
-                foreach( size_t n2, prevLevel.ind2 ) { // for all n2 in the previous level
-                    foreach( const Neighbor &n1, nb2(n2) ) { // for all neighbors n1 of n2
+                diaforeach( size_t n2, prevLevel.ind2 ) { // for all n2 in the previous level
+                    diaforeach( const Neighbor &n1, nb2(n2) ) { // for all neighbors n1 of n2
                         if( find( prevLevel.ind1.begin(), prevLevel.ind1.end(), n1 ) == prevLevel.ind1.end() ) { // n1 not in previous level
                             if( find( newLevel.ind1.begin(), newLevel.ind1.end(), n1 ) != newLevel.ind1.end() )
                                 foundCycle = true; // n1 already in new level: we found a cycle
@@ -269,8 +269,8 @@ bool BipartiteGraph::isTree() const {
                         break;
                 }
                 // build newLevel.ind2
-                foreach( size_t n1, newLevel.ind1 ) { // for all n1 in this level
-                    foreach( const Neighbor &n2, nb1(n1) ) { // for all neighbors n2 of n1
+                diaforeach( size_t n1, newLevel.ind1 ) { // for all n1 in this level
+                    diaforeach( const Neighbor &n2, nb1(n1) ) { // for all neighbors n2 of n1
                         if( find( prevLevel.ind2.begin(), prevLevel.ind2.end(), n2 ) == prevLevel.ind2.end() ) { // n2 not in previous level
                             if( find( newLevel.ind2.begin(), newLevel.ind2.end(), n2 ) != newLevel.ind2.end() )
                                 foundCycle = true; // n2 already in new level: we found a cycle
@@ -305,7 +305,7 @@ void BipartiteGraph::printDot( std::ostream& os ) const {
     for( size_t n2 = 0; n2 < nrNodes2(); n2++ )
         os << "\ty" << n2 << ";" << endl;
     for( size_t n1 = 0; n1 < nrNodes1(); n1++ )
-        foreach( const Neighbor &n2, nb1(n1) )
+        diaforeach( const Neighbor &n2, nb1(n1) )
             os << "\tx" << n1 << " -- y" << n2 << ";" << endl;
     os << "}" << endl;
 }
@@ -316,7 +316,7 @@ void BipartiteGraph::checkConsistency() const {
     size_t N2 = nrNodes2();
     for( size_t n1 = 0; n1 < N1; n1++ ) {
         size_t iter = 0;
-        foreach( const Neighbor &n2, nb1(n1) ) {
+        diaforeach( const Neighbor &n2, nb1(n1) ) {
             DAI_ASSERT( n2.iter == iter );
             DAI_ASSERT( n2.node < N2 );
             DAI_ASSERT( n2.dual < nb2(n2).size() );
@@ -326,7 +326,7 @@ void BipartiteGraph::checkConsistency() const {
     }
     for( size_t n2 = 0; n2 < N2; n2++ ) {
         size_t iter = 0;
-        foreach( const Neighbor &n1, nb2(n2) ) {
+        diaforeach( const Neighbor &n1, nb2(n2) ) {
             DAI_ASSERT( n1.iter == iter );
             DAI_ASSERT( n1.node < N1 );
             DAI_ASSERT( n1.dual < nb1(n1).size() );

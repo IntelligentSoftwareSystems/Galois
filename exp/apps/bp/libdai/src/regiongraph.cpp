@@ -30,7 +30,7 @@ void RegionGraph::construct( const FactorGraph &fg, const std::vector<VarSet> &o
     // Construct outer regions (giving them counting number 1.0)
     _ORs.clear();
     _ORs.reserve( ors.size() );
-    foreach( const VarSet &alpha, ors )
+    diaforeach( const VarSet &alpha, ors )
         _ORs.push_back( FRegion(Factor(alpha, 1.0), 1.0) );
 
     // For each factor, find an outer region that subsumes that factor.
@@ -146,7 +146,7 @@ void RegionGraph::calcCVMCountingNumbers() {
                         has_unassigned_ancestor = true;
                 if( !has_unassigned_ancestor ) {
                     Real c = 1.0;
-                    foreach( const Neighbor &alpha, nbIR(beta) )
+                    diaforeach( const Neighbor &alpha, nbIR(beta) )
                         c -= OR(alpha).c();
                     for( vector<size_t>::const_iterator beta2 = ancestors[beta].begin(); beta2 != ancestors[beta].end(); beta2++ )
                         c -= IR(*beta2).c();
@@ -224,7 +224,7 @@ ostream & operator << (ostream & os, const RegionGraph & rg) {
     for( size_t beta = 0; beta < rg.nrIRs(); beta++ )
         os << "\tb" << beta << " [label=\"b" << beta << ": " << (VarSet)rg.IR(beta) << ", c=" << rg.IR(beta).c() << "\"];" << endl;
     for( size_t alpha = 0; alpha < rg.nrORs(); alpha++ )
-        foreach( const Neighbor &beta, rg.nbOR(alpha) )
+        diaforeach( const Neighbor &beta, rg.nbOR(alpha) )
             os << "\ta" << alpha << " -> b" << beta << ";" << endl;
     os << "}" << endl;
     return os;

@@ -98,7 +98,7 @@ class PropertySet : private std::map<PropertyKey, PropertyValue> {
         /// Set properties according to \a newProps, overriding properties that already exist with new values
         PropertySet& set( const PropertySet& newProps ) {
             const std::map<PropertyKey, PropertyValue> *m = &newProps;
-            foreach(value_type i, *m)
+            diaforeach(value_type i, *m)
                 set( i.first, i.second );
             return *this;
         }

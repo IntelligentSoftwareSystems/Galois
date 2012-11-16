@@ -84,13 +84,13 @@ TreeEP::TreeEP( const FactorGraph &fg, const PropertySet &opts ) : JTree(fg, opt
             for( size_t i = 0; i < fg.nrVars(); i++ ) {
                 SmallSet<size_t> delta_i = fg.bipGraph().delta1( i, false );
                 const Var& v_i = fg.var(i);
-                foreach( size_t j, delta_i ) 
+                diaforeach( size_t j, delta_i ) 
                     if( i < j ) {
                         const Var& v_j = fg.var(j);
                         VarSet v_ij( v_i, v_j );
                         SmallSet<size_t> nb_ij = fg.bipGraph().nb1Set( i ) | fg.bipGraph().nb1Set( j );
                         Factor piet;
-                        foreach( size_t I, nb_ij ) {
+                        diaforeach( size_t I, nb_ij ) {
                             const VarSet& Ivars = fg.factor(I).vars();
                             if( props.type == Properties::TypeType::ORG ) {
                                 if( (Ivars == v_i) || (Ivars == v_j) )

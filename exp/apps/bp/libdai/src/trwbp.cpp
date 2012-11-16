@@ -54,7 +54,7 @@ Real TRWBP::logZ() const {
     }
     for( size_t i = 0; i < nrVars(); ++i ) {
         Real c_i = 0.0;
-        foreach( const Neighbor &I, nbV(i) )
+        diaforeach( const Neighbor &I, nbV(i) )
             c_i += Weight(I);
         if( c_i != 1.0 )
             sum += (1.0 - c_i) * beliefV(i).entropy();  // TRWBP/FBP
@@ -76,13 +76,13 @@ Prob TRWBP::calcIncomingMessageProduct( size_t I, bool without_i, size_t i ) con
         prod ^= (1.0 / c_I); // TRWBP
 
     // Calculate product of incoming messages and factor I
-    foreach( const Neighbor &j, nbF(I) )
+    diaforeach( const Neighbor &j, nbF(I) )
         if( !(without_i && (j == i)) ) {
             const Var &v_j = var(j);
             // prod_j will be the product of messages coming into j
             // TRWBP: corresponds to messages n_jI
             Prob prod_j( v_j.states(), props.logdomain ? 0.0 : 1.0 );
-            foreach( const Neighbor &J, nbV(j) ) {
+            diaforeach( const Neighbor &J, nbV(j) ) {
                 Real c_J = Weight(J);  // TRWBP
                 if( J != I ) { // for all J in nb(j) \ I
                     if( props.logdomain )
@@ -125,7 +125,7 @@ Prob TRWBP::calcIncomingMessageProduct( size_t I, bool without_i, size_t i ) con
 // This code has been copied from bp.cpp, except where comments indicate TRWBP-specific behaviour
 void TRWBP::calcBeliefV( size_t i, Prob &p ) const {
     p = Prob( var(i).states(), props.logdomain ? 0.0 : 1.0 );
-    foreach( const Neighbor &I, nbV(i) ) {
+    diaforeach( const Neighbor &I, nbV(i) ) {
         Real c_I = Weight(I);
         if( props.logdomain )
             p += newMessage( i, I.iter ) * c_I;

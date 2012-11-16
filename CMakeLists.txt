@@ -30,6 +30,11 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd68 -wd981 -wd383 -wd869 -wd2196 -wd279")
 endif()
 
+message(STATUS "Using ${CMAKE_CXX_COMPILER_ID}")
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -isystem=/net/faraday/workspace/local/modules/gcc-4.7")
+endif()
+
 #PThreads
 find_package(Threads)
 set(RT_LINK ${CMAKE_THREAD_LIBS_INIT} ${RT_LINK})

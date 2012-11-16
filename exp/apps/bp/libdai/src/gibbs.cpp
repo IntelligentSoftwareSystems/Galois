@@ -141,7 +141,7 @@ Prob Gibbs::getVarDist( size_t i ) {
     Prob i_given_MB( i_states, 1.0 );
 
     // use Markov blanket of var(i) to calculate distribution
-    foreach( const Neighbor &I, nbV(i) ) {
+    diaforeach( const Neighbor &I, nbV(i) ) {
         const Factor &f_I = factor(I);
         size_t I_skip = getFactorEntryDiff( I, i );
         size_t I_entry = getFactorEntry(I) - (_state[i] * I_skip);

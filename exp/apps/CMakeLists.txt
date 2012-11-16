@@ -1,6 +1,6 @@
 add_subdirectory(bh_odg)
 #add_subdirectory(billiards)
-add_subdirectory(bp)
+#add_subdirectory(bp)
 add_subdirectory(buchberger)
 add_subdirectory(kruskal)
 add_subdirectory(linear)

@@ -171,7 +171,7 @@ void MR::propagateCavityFields() {
     size_t maxruns = 1000;
 
     for( size_t i = 0; i < G.nrNodes(); i++ )
-        foreach( const Neighbor &j, G.nb(i) )
+        diaforeach( const Neighbor &j, G.nb(i) )
             M[i][j.iter] = 0.1;
 
     size_t run=0;
@@ -179,7 +179,7 @@ void MR::propagateCavityFields() {
         maxdev=0.0;
         run++;
         for( size_t i = 0; i < G.nrNodes(); i++ ) {
-            foreach( const Neighbor &j, G.nb(i) ) {
+            diaforeach( const Neighbor &j, G.nb(i) ) {
                 size_t _j = j.iter;
                 size_t _i = G.findNb(j,i);
                 DAI_ASSERT( G.nb(j,_i) == i );
@@ -291,7 +291,7 @@ Real MR::calcCavityCorrelations() {
             bpcav.run();
 
             BBP bbp( &bpcav, PropertySet()("verbose",(size_t)0)("tol",(Real)1.0e-9)("maxiter",(size_t)10000)("damping",(Real)0.0)("updates",string("SEQ_MAX")) );
-            foreach( const Neighbor &j, G.nb(i) ) {
+            diaforeach( const Neighbor &j, G.nb(i) ) {
                 // Create weights for magnetization of some spin
                 Prob p( 2, 0.0 );
                 p.set( 0, -1.0 );
@@ -310,7 +310,7 @@ Real MR::calcCavityCorrelations() {
                 // run BBP to estimate adjoints
                 bbp.run();
 
-                foreach( const Neighbor &k, G.nb(i) ) {
+                diaforeach( const Neighbor &k, G.nb(i) ) {
                     if( k != j )
                         cors[i][j.iter][k.iter] = (bbp.adj_psi_V(k)[1] - bbp.adj_psi_V(k)[0]);
                     else
@@ -459,7 +459,7 @@ MR::MR( const FactorGraph &fg, const PropertySet &opts ) : DAIAlgFG(fg), support
         }
     }
     for( size_t i = 0; i < N; i++ )
-        foreach( const Neighbor &j, G.nb(i) )
+        diaforeach( const Neighbor &j, G.nb(i) )
             tJ[i][j.iter] = tanh( tJ[i][j.iter] );
 
     // construct M

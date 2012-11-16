@@ -149,7 +149,7 @@ void BBP::RegenerateInds() {
     for( size_t i = 0; i < _fg->nrVars(); i++ ) {
         _indices[i].clear();
         _indices[i].reserve( _fg->nbV(i).size() );
-        foreach( const Neighbor &I, _fg->nbV(i) ) {
+        diaforeach( const Neighbor &I, _fg->nbV(i) ) {
             _ind_t index;
             index.reserve( _fg->factor(I).nrStates() );
             for( IndexFor k(_fg->var(i), _fg->factor(I).vars()); k.valid(); ++k )
@@ -165,9 +165,9 @@ void BBP::RegenerateT() {
     _Tmsg.resize( _fg->nrVars() );
     for( size_t i = 0; i < _fg->nrVars(); i++ ) {
         _Tmsg[i].resize( _fg->nbV(i).size() );
-        foreach( const Neighbor &I, _fg->nbV(i) ) {
+        diaforeach( const Neighbor &I, _fg->nbV(i) ) {
             Prob prod( _fg->var(i).states(), 1.0 );
-            foreach( const Neighbor &J, _fg->nbV(i) )
+            diaforeach( const Neighbor &J, _fg->nbV(i) )
                 if( J.node != I.node )
                     prod *= _bp_dual.msgM( i, J.iter );
             _Tmsg[i][I.iter] = prod;
@@ -181,9 +181,9 @@ void BBP::RegenerateU() {
     _Umsg.resize( _fg->nrFactors() );
     for( size_t I = 0; I < _fg->nrFactors(); I++ ) {
         _Umsg[I].resize( _fg->nbF(I).size() );
-        foreach( const Neighbor &i, _fg->nbF(I) ) {
+        diaforeach( const Neighbor &i, _fg->nbF(I) ) {
             Prob prod( _fg->factor(I).nrStates(), 1.0 );
-            foreach( const Neighbor &j, _fg->nbF(I) )
+            diaforeach( const Neighbor &j, _fg->nbF(I) )
                 if( i.node != j.node ) {
                     Prob n_jI( _bp_dual.msgN( j, j.dual ) );
                     const _ind_t &ind = _index( j, j.dual );
@@ -202,12 +202,12 @@ void BBP::RegenerateS() {
     _Smsg.resize( _fg->nrVars() );
     for( size_t i = 0; i < _fg->nrVars(); i++ ) {
         _Smsg[i].resize( _fg->nbV(i).size() );
-        foreach( const Neighbor &I, _fg->nbV(i) ) {
+        diaforeach( const Neighbor &I, _fg->nbV(i) ) {
             _Smsg[i][I.iter].resize( _fg->nbF(I).size() );
-            foreach( const Neighbor &j, _fg->nbF(I) )
+            diaforeach( const Neighbor &j, _fg->nbF(I) )
                 if( i != j ) {
                     Factor prod( _fg->factor(I) );
-                    foreach( const Neighbor &k, _fg->nbF(I) ) {
+                    diaforeach( const Neighbor &k, _fg->nbF(I) ) {
                         if( k != i && k.node != j.node ) {
                             const _ind_t &ind = _index( k, k.dual );
                             Prob p( _bp_dual.msgN( k, k.dual ) );
@@ -230,12 +230,12 @@ void BBP::RegenerateR() {
     _Rmsg.resize( _fg->nrFactors() );
     for( size_t I = 0; I < _fg->nrFactors(); I++ ) {
         _Rmsg[I].resize( _fg->nbF(I).size() );
-        foreach( const Neighbor &i, _fg->nbF(I) ) {
+        diaforeach( const Neighbor &i, _fg->nbF(I) ) {
             _Rmsg[I][i.iter].resize( _fg->nbV(i).size() );
-            foreach( const Neighbor &J, _fg->nbV(i) ) {
+            diaforeach( const Neighbor &J, _fg->nbV(i) ) {
                 if( I != J ) {
                     Prob prod( _fg->var(i).states(), 1.0 );
-                    foreach( const Neighbor &K, _fg->nbV(i) )
+                    diaforeach( const Neighbor &K, _fg->nbV(i) )
                         if( K.node != I && K.node != J.node )
                             prod *= _bp_dual.msgM( i, K.iter );
                     _Rmsg[I][i.iter][J.iter] = prod;
@@ -264,7 +264,7 @@ void BBP::RegeneratePsiAdjoints() {
     for( size_t i = 0; i < _fg->nrVars(); i++ ) {
         Prob p( _adj_b_V_unnorm[i] );
         DAI_ASSERT( p.size() == _fg->var(i).states() );
-        foreach( const Neighbor &I, _fg->nbV(i) )
+        diaforeach( const Neighbor &I, _fg->nbV(i) )
             p *= _bp_dual.msgM( i, I.iter );
         p += _init_adj_psi_V[i];
         _adj_psi_V.push_back( p );
@@ -274,7 +274,7 @@ void BBP::RegeneratePsiAdjoints() {
     for( size_t I = 0; I < _fg->nrFactors(); I++ ) {
         Prob p( _adj_b_F_unnorm[I] );
         DAI_ASSERT( p.size() == _fg->factor(I).nrStates() );
-        foreach( const Neighbor &i, _fg->nbF(I) ) {
+        diaforeach( const Neighbor &i, _fg->nbF(I) ) {
             Prob n_iI( _bp_dual.msgN( i, i.dual ) );
             const _ind_t& ind = _index( i, i.dual );
             // multiply prod with n_jI
@@ -303,11 +303,11 @@ void BBP::RegenerateParMessageAdjoints() {
         _adj_m_unnorm[i].resize( n_i );
         _new_adj_n[i].resize( n_i );
         _new_adj_m[i].resize( n_i );
-        foreach( const Neighbor &I, _fg->nbV(i) ) {
+        diaforeach( const Neighbor &I, _fg->nbV(i) ) {
             { // calculate adj_n
                 Prob prod( _fg->factor(I).p() );
                 prod *= _adj_b_F_unnorm[I];
-                foreach( const Neighbor &j, _fg->nbF(I) )
+                diaforeach( const Neighbor &j, _fg->nbF(I) )
                     if( i != j ) {
                         Prob n_jI( _bp_dual.msgN( j, j.dual ) );
                         const _ind_t &ind = _index( j, j.dual );
@@ -326,7 +326,7 @@ void BBP::RegenerateParMessageAdjoints() {
             { // calculate adj_m
                 Prob prod( _adj_b_V_unnorm[i] );
                 DAI_ASSERT( prod.size() == _fg->var(i).states() );
-                foreach( const Neighbor &J, _fg->nbV(i) )
+                diaforeach( const Neighbor &J, _fg->nbV(i) )
                     if( J.node != I.node )
                         prod *= _bp_dual.msgM(i,J.iter);
                 _new_adj_m[i][I.iter] = prod;
@@ -347,11 +347,11 @@ void BBP::RegenerateSeqMessageAdjoints() {
         _adj_m[i].resize( n_i );
         _adj_m_unnorm[i].resize( n_i );
         _new_adj_m[i].resize( n_i );
-        foreach( const Neighbor &I, _fg->nbV(i) ) {
+        diaforeach( const Neighbor &I, _fg->nbV(i) ) {
             // calculate adj_m
             Prob prod( _adj_b_V_unnorm[i] );
             DAI_ASSERT( prod.size() == _fg->var(i).states() );
-            foreach( const Neighbor &J, _fg->nbV(i) )
+            diaforeach( const Neighbor &J, _fg->nbV(i) )
                 if( J.node != I.node )
                     prod *= _bp_dual.msgM( i, J.iter );
             _adj_m[i][I.iter] = prod;
@@ -360,11 +360,11 @@ void BBP::RegenerateSeqMessageAdjoints() {
         }
     }
     for( size_t i = 0; i < _fg->nrVars(); i++ ) {
-        foreach( const Neighbor &I, _fg->nbV(i) ) {
+        diaforeach( const Neighbor &I, _fg->nbV(i) ) {
             // calculate adj_n
             Prob prod( _fg->factor(I).p() );
             prod *= _adj_b_F_unnorm[I];
-            foreach( const Neighbor &j, _fg->nbF(I) )
+            diaforeach( const Neighbor &j, _fg->nbF(I) )
                 if( i != j ) {
                     Prob n_jI( _bp_dual.msgN( j, j.dual) );
                     const _ind_t& ind = _index( j, j.dual );
@@ -403,7 +403,7 @@ void BBP::calcNewN( size_t i, size_t _I ) {
     Prob &new_adj_n_iI = _new_adj_n[i][_I];
     new_adj_n_iI = Prob( _fg->var(i).states(), 0.0 );
     size_t I = _fg->nbV(i)[_I];
-    foreach( const Neighbor &j, _fg->nbF(I) )
+    diaforeach( const Neighbor &j, _fg->nbF(I) )
         if( j != i ) {
             const Prob &p = _Smsg[i][_I][j.iter];
             const Prob &_adj_m_unnorm_jI = _adj_m_unnorm[j][j.dual];
@@ -432,7 +432,7 @@ void BBP::calcNewM( size_t i, size_t _I ) {
     */
 
     _new_adj_m[i][_I] = Prob( _fg->var(i).states(), 0.0 );
-    foreach( const Neighbor &J, _fg->nbV(i) )
+    diaforeach( const Neighbor &J, _fg->nbV(i) )
         if( J != I )
             _new_adj_m[i][_I] += _Rmsg[I][I.dual][J.iter] * _adj_n_unnorm[i][J.iter];
 }
@@ -462,12 +462,12 @@ void BBP::upMsgM( size_t i, size_t _I ) {
 
 void BBP::doParUpdate() {
     for( size_t i = 0; i < _fg->nrVars(); i++ )
-        foreach( const Neighbor &I, _fg->nbV(i) ) {
+        diaforeach( const Neighbor &I, _fg->nbV(i) ) {
             calcNewM( i, I.iter );
             calcNewN( i, I.iter );
         }
     for( size_t i = 0; i < _fg->nrVars(); i++ )
-        foreach( const Neighbor &I, _fg->nbV(i) ) {
+        diaforeach( const Neighbor &I, _fg->nbV(i) ) {
             upMsgM( i, I.iter );
             upMsgN( i, I.iter );
         }
@@ -534,7 +534,7 @@ void BBP::sendSeqMsgN( size_t i, size_t _I, const Prob &f ) {
         DAI_PV(_fg->factor(I).p());
     }
 #endif
-    foreach( const Neighbor &J, _fg->nbV(i) ) {
+    diaforeach( const Neighbor &J, _fg->nbV(i) ) {
         if( J.node != I.node ) {
 #if 0
             if(f_unnorm.sumAbs() > pv_thresh) {
@@ -578,7 +578,7 @@ void BBP::sendSeqMsgM( size_t j, size_t _I ) {
 //     DAI_PV(I);
 //     DAI_PV(_I);
 //     DAI_PV(_fg->nbF(I).size());
-    foreach( const Neighbor &i, _fg->nbF(I) ) {
+    diaforeach( const Neighbor &i, _fg->nbF(I) ) {
         if( i.node != j ) {
             const Prob &S = _Smsg[i][i.dual][_j];
             Prob msg( _fg->var(i).states(), 0.0 );
@@ -633,7 +633,7 @@ Real BBP::getUnMsgMag() {
     Real s = 0.0;
     size_t e = 0;
     for( size_t i = 0; i < _fg->nrVars(); i++ )
-        foreach( const Neighbor &I, _fg->nbV(i) ) {
+        diaforeach( const Neighbor &I, _fg->nbV(i) ) {
             s += _adj_m_unnorm[i][I.iter].sumAbs();
             s += _adj_n_unnorm[i][I.iter].sumAbs();
             e++;
@@ -647,7 +647,7 @@ void BBP::getMsgMags( Real &s, Real &new_s ) {
     new_s = 0.0;
     size_t e = 0;
     for( size_t i = 0; i < _fg->nrVars(); i++ )
-        foreach( const Neighbor &I, _fg->nbV(i) ) {
+        diaforeach( const Neighbor &I, _fg->nbV(i) ) {
             s += _adj_m[i][I.iter].sumAbs();
             s += _adj_n[i][I.iter].sumAbs();
             new_s += _new_adj_m[i][I.iter].sumAbs();
@@ -679,7 +679,7 @@ void BBP::getMsgMags( Real &s, Real &new_s ) {
 void BBP::getArgmaxMsgM( size_t &out_i, size_t &out__I, Real &mag ) {
     bool found = false;
     for( size_t i = 0; i < _fg->nrVars(); i++ )
-        foreach( const Neighbor &I, _fg->nbV(i) ) {
+        diaforeach( const Neighbor &I, _fg->nbV(i) ) {
             Real thisMag = _adj_m[i][I.iter].sumAbs();
             if( !found || mag < thisMag ) {
                 found = true;
@@ -703,7 +703,7 @@ Real BBP::getMaxMsgM() {
 Real BBP::getTotalMsgM() {
     Real mag = 0.0;
     for( size_t i = 0; i < _fg->nrVars(); i++ )
-        foreach( const Neighbor &I, _fg->nbV(i) )
+        diaforeach( const Neighbor &I, _fg->nbV(i) )
             mag += _adj_m[i][I.iter].sumAbs();
     return mag;
 }
@@ -712,7 +712,7 @@ Real BBP::getTotalMsgM() {
 Real BBP::getTotalNewMsgM() {
     Real mag = 0.0;
     for( size_t i = 0; i < _fg->nrVars(); i++ )
-        foreach( const Neighbor &I, _fg->nbV(i) )
+        diaforeach( const Neighbor &I, _fg->nbV(i) )
             mag += _new_adj_m[i][I.iter].sumAbs();
     return mag;
 }
@@ -721,7 +721,7 @@ Real BBP::getTotalNewMsgM() {
 Real BBP::getTotalMsgN() {
     Real mag = 0.0;
     for( size_t i = 0; i < _fg->nrVars(); i++ )
-        foreach( const Neighbor &I, _fg->nbV(i) )
+        diaforeach( const Neighbor &I, _fg->nbV(i) )
             mag += _adj_n[i][I.iter].sumAbs();
     return mag;
 }
@@ -925,10 +925,10 @@ void BBP::run() {
                     break;
 
                 for( size_t i = 0; i < _fg->nrVars(); i++ )
-                    foreach( const Neighbor &I, _fg->nbV(i) )
+                    diaforeach( const Neighbor &I, _fg->nbV(i) )
                         sendSeqMsgM( i, I.iter );
 /*                for( size_t i = 0; i < _fg->nrVars(); i++ )
-                    foreach( const Neighbor &I, _fg->nbV(i) )
+                    diaforeach( const Neighbor &I, _fg->nbV(i) )
                         updateSeqMsgM( i, I.iter );*/
             } while( mag > tol && _iters < props.maxiter );
 
@@ -1047,7 +1047,7 @@ Real numericBBPTest( const InfAlg &bp, const std::vector<size_t> *state, const P
         // for each variable i
         for(size_t i=0; i<bp_dual.nrVars(); i++) {
             // for each factor I ~ i
-            foreach(size_t I, bp_dual.nbV(i)) {
+            diaforeach(size_t I, bp_dual.nbV(i)) {
                 vector<Real> adj_n_est;
                 // for each value xi
                 for(size_t xi=0; xi<bp_dual.var(i).states(); xi++) {
