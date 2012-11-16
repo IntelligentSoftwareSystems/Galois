@@ -133,7 +133,7 @@ void HAK::construct() {
         _muba.push_back( vector<Factor>() );
         _muab[alpha].reserve( nbOR(alpha).size() );
         _muba[alpha].reserve( nbOR(alpha).size() );
-        foreach( const Neighbor &beta, nbOR(alpha) ) {
+        diaforeach( const Neighbor &beta, nbOR(alpha) ) {
             _muab[alpha].push_back( Factor( IR(beta) ) );
             _muba[alpha].push_back( Factor( IR(beta) ) );
         }
@@ -280,7 +280,7 @@ void HAK::init( const VarSet &ns ) {
                 _Qb[beta].fill( 1.0 );
             else
                 _Qb[beta].randomize();
-            foreach( const Neighbor &alpha, nbIR(beta) ) {
+            diaforeach( const Neighbor &alpha, nbIR(beta) ) {
                 size_t _beta = alpha.dual;
                 if( props.init == Properties::InitType::UNIFORM ) {
                     muab( alpha, _beta ).fill( 1.0 );
@@ -311,7 +311,7 @@ void HAK::init() {
             _Qb[beta].randomize();
 
     for( size_t alpha = 0; alpha < nrORs(); alpha++ )
-        foreach( const Neighbor &beta, nbOR(alpha) ) {
+        diaforeach( const Neighbor &beta, nbOR(alpha) ) {
             size_t _beta = beta.iter;
             if( props.init == Properties::InitType::UNIFORM ) {
                 muab( alpha, _beta ).setUniform();
@@ -351,7 +351,7 @@ Real HAK::doGBP() {
     Real maxDiff = INFINITY;
     for( _iters = 0; _iters < props.maxiter && maxDiff > props.tol; _iters++ ) {
         for( size_t beta = 0; beta < nrIRs(); beta++ ) {
-            foreach( const Neighbor &alpha, nbIR(beta) ) {
+            diaforeach( const Neighbor &alpha, nbIR(beta) ) {
                 size_t _beta = alpha.dual;
                 muab( alpha, _beta ) = _Qa[alpha].marginal(IR(beta)) / muba(alpha,_beta);
                 /* TODO: INVESTIGATE THIS PROBLEM
@@ -368,7 +368,7 @@ Real HAK::doGBP() {
             }
 
             Factor Qb_new;
-            foreach( const Neighbor &alpha, nbIR(beta) ) {
+            diaforeach( const Neighbor &alpha, nbIR(beta) ) {
                 size_t _beta = alpha.dual;
                 Qb_new *= muab(alpha,_beta) ^ (1 / (nbIR(beta).size() + IR(beta).c()));
             }
@@ -389,7 +389,7 @@ Real HAK::doGBP() {
             else
                 _Qb[beta] = (Qb_new^(1.0 - props.damping)) * (_Qb[beta]^props.damping);
 
-            foreach( const Neighbor &alpha, nbIR(beta) ) {
+            diaforeach( const Neighbor &alpha, nbIR(beta) ) {
                 size_t _beta = alpha.dual;
                 muba(alpha,_beta) = _Qb[beta] / muab(alpha,_beta);
 
@@ -400,7 +400,7 @@ Real HAK::doGBP() {
                  */
 
                 Factor Qa_new = OR(alpha);
-                foreach( const Neighbor &gamma, nbOR(alpha) )
+                diaforeach( const Neighbor &gamma, nbOR(alpha) )
                     Qa_new *= muba(alpha,gamma.iter);
                 Qa_new ^= (1.0 / OR(alpha).c());
                 Qa_new.normalize();
@@ -502,7 +502,7 @@ Real HAK::doDoubleLoop() {
         // Calculate new outer regions
         for( size_t alpha = 0; alpha < nrORs(); alpha++ ) {
             OR(alpha) = org_ORs[alpha];
-            foreach( const Neighbor &beta, nbOR(alpha) )
+            diaforeach( const Neighbor &beta, nbOR(alpha) )
                 OR(alpha) *= _Qb[beta] ^ ((IR(beta).c() - org_IR_cs[beta]) / nbIR(beta).size());
         }
 

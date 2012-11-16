@@ -308,10 +308,10 @@ class BipartiteGraph {
             for( size_t n1 = 0; n1 < nrNodes1(); n1++ ) {
                 if( nb1(n1).size() != x.nb1(n1).size() )
                     return false;
-                foreach( const Neighbor &n2, nb1(n1) )
+                diaforeach( const Neighbor &n2, nb1(n1) )
                     if( !x.hasEdge( n1, n2 ) )
                         return false;
-                foreach( const Neighbor &n2, x.nb1(n1) )
+                diaforeach( const Neighbor &n2, x.nb1(n1) )
                     if( !hasEdge( n1, n2 ) )
                         return false;
             }

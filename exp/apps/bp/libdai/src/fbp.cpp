@@ -27,7 +27,7 @@ Real FBP::logZ() const {
     }
     for( size_t i = 0; i < nrVars(); ++i ) {
         Real c_i = 0.0;
-        foreach( const Neighbor &I, nbV(i) )
+        diaforeach( const Neighbor &I, nbV(i) )
             c_i += Weight(I);
         if( c_i != 1.0 )
             sum += (1.0 - c_i) * beliefV(i).entropy();  // FBP
@@ -50,12 +50,12 @@ Prob FBP::calcIncomingMessageProduct( size_t I, bool without_i, size_t i ) const
         prod ^= (1.0 / c_I); // FBP
 
     // Calculate product of incoming messages and factor I
-    foreach( const Neighbor &j, nbF(I) )
+    diaforeach( const Neighbor &j, nbF(I) )
         if( !(without_i && (j == i)) ) {
             // prod_j will be the product of messages coming into j
             // FBP: corresponds to messages n_jI
             Prob prod_j( var(j).states(), props.logdomain ? 0.0 : 1.0 );
-            foreach( const Neighbor &J, nbV(j) )
+            diaforeach( const Neighbor &J, nbV(j) )
                 if( J != I ) { // for all J in nb(j) \ I
                     if( props.logdomain )
                         prod_j += message( j, J.iter );

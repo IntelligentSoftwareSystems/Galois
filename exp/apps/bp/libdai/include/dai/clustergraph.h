@@ -100,7 +100,7 @@ namespace dai {
             /// Returns union of clusters that contain the \a i 'th variable
             VarSet Delta( size_t i ) const {
                 VarSet result;
-                foreach( const Neighbor& I, _G.nb1(i) )
+                diaforeach( const Neighbor& I, _G.nb1(i) )
                     result |= _clusters[I];
                 return result;
             }
@@ -115,7 +115,7 @@ namespace dai {
                 if( i1 == i2 )
                     return false;
                 bool result = false;
-                foreach( const Neighbor& I, _G.nb1(i1) )
+                diaforeach( const Neighbor& I, _G.nb1(i1) )
                     if( find( _G.nb2(I).begin(), _G.nb2(I).end(), i2 ) != _G.nb2(I).end() ) {
                         result = true;
                         break;
@@ -129,8 +129,8 @@ namespace dai {
                 const VarSet & clI = _clusters[I];
                 bool maximal = true;
                 // The following may not be optimal, since it may repeatedly test the same cluster *J
-                foreach( const Neighbor& i, _G.nb2(I) ) {
-                    foreach( const Neighbor& J, _G.nb1(i) )
+                diaforeach( const Neighbor& i, _G.nb2(I) ) {
+                    diaforeach( const Neighbor& J, _G.nb1(i) )
                         if( (J != I) && (clI << _clusters[J]) ) {
                             maximal = false;
                             break;

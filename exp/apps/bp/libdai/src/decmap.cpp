@@ -143,7 +143,7 @@ Real DecMAP::run() {
         vector<size_t> Istate(1,0);
         Istate[0] = clamped->beliefF(bestI).p().argmax().first;
         map<Var, size_t> Istatemap = calcState( factor(bestI).vars(), Istate[0] );
-        foreach( size_t i, bipGraph().nb2Set(bestI) & freeVars ) {
+        diaforeach( size_t i, bipGraph().nb2Set(bestI) & freeVars ) {
             varsToInit |= var(i);
             varsToClamp |= i;
             _state[i] = Istatemap[var(i)];
@@ -151,7 +151,7 @@ Real DecMAP::run() {
         }
 
         // clamp all variables scheduled for clamping
-        foreach( size_t i, varsToClamp )
+        diaforeach( size_t i, varsToClamp )
             clamped->clamp( i, _state[i], false );
 
         // initialize clamped for the next run

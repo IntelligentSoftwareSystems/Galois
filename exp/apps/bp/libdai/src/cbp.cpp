@@ -188,10 +188,10 @@ void CBP::runRecurse( InfAlg *bp, Real orig_logZ, vector<size_t> clamped_vars_li
         *_clamp_ofstream << choose_count << "\t" << clamped_vars_list.size() << "\t" << i << "\t" << xis[0] << endl;
 
     if( clampingVar )
-        foreach( size_t xi, xis )
+        diaforeach( size_t xi, xis )
             DAI_ASSERT(/*0<=xi &&*/ xi < var(i).states() );
     else
-        foreach( size_t xI, xis )
+        diaforeach( size_t xI, xis )
             DAI_ASSERT(/*0<=xI &&*/ xI < factor(i).nrStates() );
     // - otherwise, clamp and recurse, saving margin estimates for each
     // clamp setting. afterwards, combine estimates.

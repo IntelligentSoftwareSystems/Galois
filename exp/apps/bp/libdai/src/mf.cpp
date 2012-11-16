@@ -91,9 +91,9 @@ void MF::init() {
 
 Factor MF::calcNewBelief( size_t i ) {
     Factor result;
-    foreach( const Neighbor &I, nbV(i) ) {
+    diaforeach( const Neighbor &I, nbV(i) ) {
         Factor belief_I_minus_i;
-        foreach( const Neighbor &j, nbF(I) ) // for all j in I \ i
+        diaforeach( const Neighbor &j, nbF(I) ) // for all j in I \ i
             if( j != i )
                 belief_I_minus_i *= _beliefs[j];
         Factor f_I = factor(I);
@@ -128,7 +128,7 @@ Real MF::run() {
         random_shuffle( update_seq.begin(), update_seq.end(), rnd );
 
         maxDiff = -INFINITY;
-        foreach( const size_t &i, update_seq ) {
+        diaforeach( const size_t &i, update_seq ) {
             Factor nb = calcNewBelief( i );
 
             if( nb.hasNaNs() ) {
@@ -198,7 +198,7 @@ Real MF::logZ() const {
         s -= beliefV(i).entropy();
     for( size_t I = 0; I < nrFactors(); I++ ) {
         Factor henk;
-        foreach( const Neighbor &j, nbF(I) )  // for all j in I
+        diaforeach( const Neighbor &j, nbF(I) )  // for all j in I
             henk *= _beliefs[j];
         henk.normalize();
         Factor piet;

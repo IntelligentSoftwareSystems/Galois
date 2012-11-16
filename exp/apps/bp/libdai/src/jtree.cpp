@@ -97,7 +97,7 @@ JTree::JTree( const FactorGraph &fg, const PropertySet &opts, bool automatic ) :
 
         // Estimate memory needed (rough upper bound)
         BigInt memneeded = 0;
-        foreach( const VarSet& cl, ElimVec )
+        diaforeach( const VarSet& cl, ElimVec )
             memneeded += cl.nrStates();
         memneeded *= sizeof(Real) * fudge;
         if( props.verbose >= 1 ) {
@@ -211,7 +211,7 @@ void JTree::GenerateJT( const FactorGraph &fg, const std::vector<VarSet> &cl ) {
     for( size_t alpha = 0; alpha < nrORs(); alpha++ ) {
         _mes.push_back( vector<Factor>() );
         _mes[alpha].reserve( nbOR(alpha).size() );
-        foreach( const Neighbor &beta, nbOR(alpha) )
+        diaforeach( const Neighbor &beta, nbOR(alpha) )
             _mes[alpha].push_back( Factor( IR(beta), 1.0 ) );
     }
 
@@ -317,7 +317,7 @@ void JTree::runShaferShenoy() {
         size_t _e = nbIR(e)[0].dual;
 
         Factor msg = OR(i);
-        foreach( const Neighbor &k, nbOR(i) )
+        diaforeach( const Neighbor &k, nbOR(i) )
             if( k != e )
                 msg *= message( i, k.iter );
         if( props.inference == Properties::InfType::SUMPROD )
@@ -334,7 +334,7 @@ void JTree::runShaferShenoy() {
         size_t _e = nbIR(e)[1].dual;
 
         Factor msg = OR(i);
-        foreach( const Neighbor &k, nbOR(i) )
+        diaforeach( const Neighbor &k, nbOR(i) )
             if( k != e )
                 msg *= message( i, k.iter );
         if( props.inference == Properties::InfType::SUMPROD )
@@ -346,7 +346,7 @@ void JTree::runShaferShenoy() {
     // Calculate beliefs
     for( size_t alpha = 0; alpha < nrORs(); alpha++ ) {
         Factor piet = OR(alpha);
-        foreach( const Neighbor &k, nbOR(alpha) )
+        diaforeach( const Neighbor &k, nbOR(alpha) )
             piet *= message( alpha, k.iter );
         if( nrIRs() == 0 ) {
             _logZ += log( piet.normalize() );
@@ -603,7 +603,7 @@ std::vector<size_t> JTree::findMaximum() const {
             // First, calculate whether this state is consistent with variables that
             // have been assigned already
             bool allowedState = true;
-            foreach( const Var& j, OR(alpha).vars() ) {
+            diaforeach( const Var& j, OR(alpha).vars() ) {
                 size_t j_index = findVar(j);
                 if( visitedVars[j_index] && maximum[j_index] != s(j) ) {
                     allowedState = false;
@@ -624,7 +624,7 @@ std::vector<size_t> JTree::findMaximum() const {
         DAI_ASSERT( Qa[alpha][maxState] != 0.0 );
 
         // Decode the argmax
-        foreach( const Var& j, OR(alpha).vars() ) {
+        diaforeach( const Var& j, OR(alpha).vars() ) {
             size_t j_index = findVar(j);
             if( visitedVars[j_index] ) {
                 // We have already visited j earlier - hopefully our state is consistent
@@ -634,8 +634,8 @@ std::vector<size_t> JTree::findMaximum() const {
                 // We found a consistent state for variable j
                 visitedVars[j_index] = true;
                 maximum[j_index] = maxState( j );
-                foreach( const Neighbor &beta, nbOR(alpha) )
-                    foreach( const Neighbor &alpha2, nbIR(beta) )
+                diaforeach( const Neighbor &beta, nbOR(alpha) )
+                    diaforeach( const Neighbor &alpha2, nbIR(beta) )
                         if( !visitedORs[alpha2] )
                             scheduledORs.push(alpha2);
             }

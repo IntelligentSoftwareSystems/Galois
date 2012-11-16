@@ -21,7 +21,7 @@ DAG& DAG::addEdge( size_t n1, size_t n2, bool check ) {
     bool allowed = true;
     if( check ) {
         // Check whether the edge already exists
-        foreach( const Neighbor& n, ch(n1) )
+        diaforeach( const Neighbor& n, ch(n1) )
             if( n == n2 ) {
                 allowed = false;
                 break;
@@ -115,7 +115,7 @@ void DAG::eraseEdge( size_t n1, size_t n2 ) {
 
 SmallSet<size_t> DAG::paSet( size_t n ) const {
     SmallSet<size_t> result;
-    foreach( const Neighbor &p, pa(n) )
+    diaforeach( const Neighbor &p, pa(n) )
         result |= p;
     return result;
 }
@@ -123,7 +123,7 @@ SmallSet<size_t> DAG::paSet( size_t n ) const {
 
 SmallSet<size_t> DAG::chSet( size_t n ) const {
     SmallSet<size_t> result;
-    foreach( const Neighbor &c, ch(n) )
+    diaforeach( const Neighbor &c, ch(n) )
         result |= c;
     return result;
 }
@@ -141,7 +141,7 @@ std::set<size_t> DAG::ancestors( size_t n ) const {
         if( node != n )
             anc.insert( node );
         // Add all parents of node to curParents
-        foreach( const Neighbor& p, pa(node) )
+        diaforeach( const Neighbor& p, pa(node) )
             curParents.insert( p.node );
         // Erase node from curParents
         curParents.erase( node );
@@ -163,7 +163,7 @@ std::set<size_t> DAG::descendants( size_t n ) const {
         if( node != n )
             desc.insert( node );
         // Add all children of node to curChildren
-        foreach( const Neighbor& c, ch(node) )
+        diaforeach( const Neighbor& c, ch(node) )
             curChildren.insert( c.node );
         // Erase node from curChildren
         curChildren.erase( node );
@@ -183,7 +183,7 @@ bool DAG::existsDirectedPath( size_t n1, size_t n2 ) const {
         if( node == n2 )
             return true;
         // Add all children of node to curChildren
-        foreach( const Neighbor& c, ch(node) )
+        diaforeach( const Neighbor& c, ch(node) )
             curChildren.insert( c.node );
         // Erase node from curChildren
         curChildren.erase( node );
@@ -206,7 +206,7 @@ bool DAG::isConnected() const {
             // For all nodes, check if they are connected with the (growing) component
             for( size_t n1 = 0; n1 < nrNodes(); n1++ ) {
                 if( !incomponent[n1] ) {
-                    foreach( const Neighbor &n2, pa(n1) )
+                    diaforeach( const Neighbor &n2, pa(n1) )
                         if( incomponent[n2] ) {
                             found_new_nodes = true;
                             incomponent[n1] = true;
@@ -214,7 +214,7 @@ bool DAG::isConnected() const {
                         }
                 }
                 if( !incomponent[n1] ) {
-                    foreach( const Neighbor &n2, ch(n1) )
+                    diaforeach( const Neighbor &n2, ch(n1) )
                         if( incomponent[n2] ) {
                             found_new_nodes = true;
                             incomponent[n1] = true;
@@ -241,7 +241,7 @@ void DAG::printDot( std::ostream& os ) const {
     for( size_t n = 0; n < nrNodes(); n++ )
         os << "\tx" << n << ";" << endl;
     for( size_t n1 = 0; n1 < nrNodes(); n1++ )
-        foreach( const Neighbor &n2, ch(n1) )
+        diaforeach( const Neighbor &n2, ch(n1) )
             os << "\tx" << n1 << " -> x" << n2 << ";" << endl;
     os << "}" << endl;
 }
@@ -251,7 +251,7 @@ void DAG::checkConsistency() const {
     size_t N = nrNodes();
     for( size_t n1 = 0; n1 < N; n1++ ) {
         size_t iter = 0;
-        foreach( const Neighbor &n2, pa(n1) ) {
+        diaforeach( const Neighbor &n2, pa(n1) ) {
             DAI_ASSERT( n2.iter == iter );
             DAI_ASSERT( n2.node < N );
             DAI_ASSERT( n2.dual < ch(n2).size() );
@@ -259,7 +259,7 @@ void DAG::checkConsistency() const {
             iter++;
         }
         iter = 0;
-        foreach( const Neighbor &n2, ch(n1) ) {
+        diaforeach( const Neighbor &n2, ch(n1) ) {
             DAI_ASSERT( n2.iter == iter );
             DAI_ASSERT( n2.node < N );
             DAI_ASSERT( n2.dual < pa(n2).size() );
@@ -269,7 +269,7 @@ void DAG::checkConsistency() const {
     }
     // Check acyclicity
     for( size_t n1 = 0; n1 < N; n1++ )
-        foreach( const Neighbor& n2, ch(n1) )
+        diaforeach( const Neighbor& n2, ch(n1) )
             DAI_ASSERT( !existsDirectedPath( n2, n1 ) );
 }
 
