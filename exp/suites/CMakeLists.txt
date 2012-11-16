@@ -98,6 +98,7 @@ endfunction()
 add_custom_target(more-suites-inputs)
 
 add_subdirectory(pbbs-0.1)
+add_subdirectory(splash2)
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/parsec-2.1")
   add_subdirectory(parsec-2.1)
 else()
