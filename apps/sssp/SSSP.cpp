@@ -240,7 +240,7 @@ bool verify(GNode source) {
     unsigned int dist = graph.getData(*src, Galois::NONE).dist;
     if (dist > DIST_INFINITY) {
       std::cerr << "ERROR: found node = " << graph.getData(*src,Galois::NONE).id
-		<< " with label greater than INFINITY (??)\n";
+		<< " with label greater than INFINITY ( ? ? )\n";
       retval = false;
     }
     
