@@ -1,1 +1,0 @@
-papp(quickSort sortTime.C)

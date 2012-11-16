@@ -1,1 +1,0 @@
-app(bfs bfs.cpp)

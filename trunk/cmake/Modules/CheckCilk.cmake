@@ -1,7 +1,0 @@
-include(CheckCXXSourceCompiles)
-find_file(_FILE CheckCilk.cpp PATHS ${CMAKE_MODULE_PATH})
-set(_BINDIR "${CMAKE_CURRENT_BINARY_DIR}/CheckCilk")
-try_compile(HAVE_CILK ${_BINDIR} ${_FILE})
-if(HAVE_CILK)
-  message(STATUS "A compiler with CILK support found")
-endif()

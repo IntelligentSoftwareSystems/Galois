@@ -1,5 +1,0 @@
-add_subdirectory(p)
-add_subdirectory(nd0)
-add_subdirectory(nd1)
-add_subdirectory(pnd0)
-add_subdirectory(pnd1)

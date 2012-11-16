@@ -42,7 +42,7 @@ if(LIBNUMA_FOUND)
 endif()
 
 #LAPACK
-enable_language(Fortran OPTIONAL)
+enable_language(Fortran)
 find_package(LAPACK)
 
 #CILK
