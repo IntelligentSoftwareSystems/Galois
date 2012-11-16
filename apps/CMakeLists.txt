@@ -1,6 +1,6 @@
 add_subdirectory(avi)
 add_subdirectory(barneshut)
-#add_subdirectory(betweennesscentrality)
+add_subdirectory(betweennesscentrality)
 add_subdirectory(bfs)
 add_subdirectory(boruvka)
 add_subdirectory(clustering)

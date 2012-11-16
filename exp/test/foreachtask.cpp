@@ -5,6 +5,18 @@
 using namespace std;
 using namespace GaloisRuntime;
 
+struct R : public GaloisRuntime::Lockable {
+   int i;
+
+   R() { i = 0; }
+
+   void add(int v) {
+      i += v;
+      return;
+   }
+};
+
+
 struct f1 {
    dptr<R> r;
 

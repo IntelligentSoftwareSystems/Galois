@@ -191,12 +191,12 @@ struct CheckedLockObj {
   }
 };
 
-void forceAbort();
-
 //! Actually break for_each loop
 void breakLoop();
 
 void signalConflict();
+
+void forceAbort();
 }
 
 
