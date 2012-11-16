@@ -346,7 +346,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * compareAndSet head node
    */
   bool casHead(HeadIndex* cmp, HeadIndex* val) {
-    return __sync_bool_compare_and_swap(&head, reinterpret_cast<uintptr_t>(cmp), reinterpret_cast<uintptr_t>(val));
+    return __sync_bool_compare_and_swap((uintptr_t*)&head, reinterpret_cast<uintptr_t>(cmp), reinterpret_cast<uintptr_t>(val));
   }
 
   /* ---------------- Nodes -------------- */
