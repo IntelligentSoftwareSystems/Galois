@@ -37,8 +37,6 @@ static bool NR_init = false;
       int toTask;
    };
 
-   extern unordered_map<Pair,locData*,HashFunction,SetEqual> sent_hash;
-
 class NodeRequest {
 
 protected:
@@ -75,10 +73,12 @@ protected:
    inreq_que incoming_reqs;
 
    /* set of all initial requests to be serviced after getting remote nodes */
-   unordered_map<Pair,handle_req*,HashFunction,SetEqual>      initial_reqs;
-   unordered_map<Pair,void*,HashFunction,SetEqual>            recv_hash;
-   typedef unordered_map<Pair,void*,HashFunction,SetEqual>    recv_type;
-   typedef unordered_map<Pair,locData*,HashFunction,SetEqual> sent_type;
+   unordered_map<Pair,handle_req*,HashFunction,SetEqual>       initial_reqs;
+   unordered_map<Pair,void*,HashFunction,SetEqual>             recv_hash;
+   unordered_map<Pair,locData*,HashFunction,SetEqual>          sent_hash;
+   unordered_map<Pair,int,HashFunction,SetEqual>               sent_not_recv_hash;
+   typedef unordered_map<Pair,void*,HashFunction,SetEqual>     recv_type;
+   typedef unordered_map<Pair,locData*,HashFunction,SetEqual>  sent_type;
 
    /* These variables store the request handles */
    handle_req  *hreq;
@@ -143,10 +143,18 @@ protected:
       inreq_que::const_iterator pos1;
       req_queue::const_iterator pos2;
 
-      pthread_mutex_lock(&mutex);
+      Pair p(task,addr);
+      if (sent_not_recv_hash[p])
+         return true;
+
       for (pos1 = incoming_reqs.begin(); pos1 != incoming_reqs.end(); ++pos1) {
          Requests *woreq = *pos1;
          if ((task == woreq->hreq->req_to) && (addr == woreq->hreq->addr))
+            return true;
+      }
+      for (pos2 = service_reqs.begin(); pos2 != service_reqs.end(); ++pos2) {
+         handle_req *woreq = *pos2;
+         if ((task == woreq->req_to) && (addr == woreq->addr))
             return true;
       }
       for (pos2 = outgoing_reqs.begin(); pos2 != outgoing_reqs.end(); ++pos2) {
@@ -154,7 +162,6 @@ protected:
          if ((task == woreq->req_to) && (addr == woreq->addr))
             return true;
       }
-      pthread_mutex_unlock(&mutex);
 
       return false;
    }
@@ -166,9 +173,11 @@ public:
 
    void PlaceRequest(int req_to, void *addr, size_t size)
    {
-      if (alreadyRequested(addr,req_to,size))
-        return;
       pthread_mutex_lock(&mutex);
+      if (alreadyRequested(addr,req_to,size)) {
+         pthread_mutex_unlock(&mutex);
+         return;
+      }
       handle_req *req = allocate_req();
       req->mreq = allocate_mpi_req();
       req->req_from = taskRank;
@@ -187,10 +196,27 @@ public:
       return;
    }
 
-   bool checkRequest (void *addr, int task, char *buf, size_t size)
+   void *remoteAccess (void *addr, int task)
+   {
+      void *tmp;
+      Pair p(task,addr);
+      pthread_mutex_lock(&mutex);
+      tmp = recv_hash[p];
+      // check for a local node
+      if(task == taskRank) {
+         // check if the node has been sent to another task
+         if (sent_hash[p])
+           tmp = NULL;
+         else
+           tmp = addr;
+      }
+      pthread_mutex_unlock(&mutex);
+      return tmp;
+   }
+
+   void checkRequest (void *addr, int task, void **buf, size_t size)
    {
       inreq_que::const_iterator pos1;
-      bool flag = false;
 
       pthread_mutex_lock(&mutex);
       for (pos1 = incoming_reqs.begin(); pos1 != incoming_reqs.end(); ++pos1) {
@@ -211,22 +237,26 @@ public:
                cout << "Error in memory size! " << __FILE__ << ":" << __LINE__ << endl;
                exit(1);
             }
-            memcpy(buf,woreq->hreq->buff,size);
             Pair p(task,addr);
-            // free local buffer when passing to external buffer
-            free (recv_hash[p]);
-            recv_hash[p] = buf;
+            *buf = recv_hash[p];
+            // check if local node
+            if (task == taskRank) {
+               // update the value in addr
+               memcpy(addr,*buf,size);
+               free (recv_hash[p]);
+               recv_hash[p] = NULL;
+               *buf = addr;
+            }
             incoming_reqs.erase(woreq);
             free_req(woreq->hreq);
             free_mpi_req(woreq->mreq);
             free_incoming_req(woreq);
-            flag = true;
             break;
          }
       }
       pthread_mutex_unlock(&mutex);
 
-      return flag;
+      return;
    }
 
    void register_initial_req(int req_from, int req_to, void *addr, size_t size)
@@ -276,17 +306,6 @@ public:
       return;
    }
 
-   bool checkSent(int owner,void *addr)
-   {
-      Pair p(owner,addr);
-      bool flag = false;
-      pthread_mutex_lock(&mutex);
-      if (sent_hash[p])
-        flag = true;
-      pthread_mutex_unlock(&mutex);
-      return flag;
-   }
-
    void return_remote()
    {
       pthread_mutex_lock(&mutex);
@@ -306,8 +325,8 @@ public:
       pthread_mutex_unlock(&mutex);
    }
 
-   // temporary service request callback - cache manager should handle this!
-   void temp_service_req(handle_req *req, req_queue *add_req, req_queue *rem_req)
+   // temporary service request callback
+   void temp_service_req(handle_req *req, req_queue *rem_req)
    {
       // only called from comm() so no mutex required around sent_hash
       locData *loc;
@@ -338,6 +357,7 @@ public:
          L = reinterpret_cast<Lockable*>(addr);
          if (!req->ret_req) {
             // this is a local node as not a return request
+            // send only if the is not locked now
             if (!trylock(L))
               return;
          }
@@ -345,6 +365,11 @@ public:
          if(req->ret_req) {
             addr = recv_hash[p];
             recv_hash[p] = NULL;
+         }
+         // check for possible duplicate requests and delete em
+         if (!addr) {
+            rem_req->insert(req);
+            return;
          }
          memcpy(req->buff,addr,req->size);
          if(req->ret_req) {
@@ -360,7 +385,6 @@ public:
          }
          req->done = 1;
          req->sent = 0;
-         add_req->insert (req);
       }
       return;
    }
@@ -464,7 +488,7 @@ public:
 
          /* if not serviced yet call service routine */
          if (!wreq->done) {
-            temp_service_req (wreq,&temp_add_req,&temp_rem_req);
+            temp_service_req (wreq,&temp_rem_req);
          }
 
          /* check if any data request can be satisfied */
@@ -521,6 +545,8 @@ public:
             err = MPI_Isend (wreq, sizeof(handle_req), MPI_BYTE, wreq->req_to,
                              REQ_TAG, MPI_COMM_WORLD, wreq->mreq);
             wreq->sent = 1;
+            Pair p(wreq->req_to,wreq->addr);
+            sent_not_recv_hash[p] = 1;
          }
       }
 
@@ -541,13 +567,22 @@ public:
                inreq->mreq = mreq_ser[task];
                incoming_reqs.insert (inreq);
 
-               /* store the incoming message in the recv_hash if not local */
-               Pair p(inreq->hreq->req_to,inreq->hreq->addr);
-               if (!sent_hash[p]) {
-                  char *tbuf = (char*)malloc(sizeof(char)*BUF_SIZE);
-                  memcpy(tbuf,inreq->hreq->buff,inreq->hreq->size);
-                  recv_hash[p] = tbuf;
-               }
+               /* store the incoming message in the recv_hash */
+               int storeTask = inreq->hreq->req_to;
+               Pair p1(taskRank,inreq->hreq->addr);
+               /* check if it's a returned local node */
+               if (sent_hash[p1])
+                 storeTask = taskRank;
+               void *tbuf = (void*)malloc(sizeof(char)*(inreq->hreq->size+5));
+               memcpy(tbuf,inreq->hreq->buff,inreq->hreq->size);
+
+               /* data is locked by the remote directory before sending */
+               Lockable *L;
+               L = reinterpret_cast<Lockable*>(tbuf);
+               unlock(L);
+               Pair p2(storeTask,inreq->hreq->addr);
+               recv_hash[p2] = tbuf;
+               sent_not_recv_hash[p2] = 0;
 
                /* mark that a request was received */
                recv_flag = true;
