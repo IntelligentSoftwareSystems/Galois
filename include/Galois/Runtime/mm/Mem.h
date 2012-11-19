@@ -540,7 +540,8 @@ template<typename Ty>
 class FSBGaloisAllocator;
 
 template<>
-struct FSBGaloisAllocator<void> {
+class FSBGaloisAllocator<void> {
+public:
   typedef size_t size_type;
   typedef ptrdiff_t difference_type;
   typedef void* pointer;
@@ -614,7 +615,8 @@ template<typename Ty, typename AllocTy>
 class ExternRefGaloisAllocator;
 
 template<typename AllocTy>
-struct ExternRefGaloisAllocator<void,AllocTy> {
+class ExternRefGaloisAllocator<void,AllocTy> {
+public:
   typedef size_t size_type;
   typedef ptrdiff_t difference_type;
   typedef void* pointer;
