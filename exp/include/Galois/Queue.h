@@ -1670,7 +1670,7 @@ class FCPairingHeap: private boost::noncopyable {
     do {
       cur = slots;
       slot->next = cur;
-    } while (!__sync_bool_compare_and_swap(&slots, reinterpret_cast<uintptr_t>(cur), reinterpret_cast<uintptr_t>(slot)));
+    } while (!__sync_bool_compare_and_swap((uintptr_t*)&slots, reinterpret_cast<uintptr_t>(cur), reinterpret_cast<uintptr_t>(slot)));
     cur->prev = slot;
   }
 
