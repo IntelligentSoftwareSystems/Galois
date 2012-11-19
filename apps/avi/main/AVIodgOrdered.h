@@ -160,7 +160,7 @@ public:
         boost::make_transform_iterator(elems.end(), MakeItem()),
         prefix, p, Compare());
 
-    printf("iterations = %d\n", iter.reduce());
+    printf("iterations = %lu\n", iter.reduce());
   }
 };
 
