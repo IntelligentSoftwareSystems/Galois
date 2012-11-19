@@ -423,7 +423,7 @@ template<typename QueueTy>
 boost::optional<typename QueueTy::value_type>
 stealRemote(PerThreadStorage<QueueTy>& queues) {
   unsigned id = LL::getTID();
-  unsigned pkg = LL::getPackageForThread(id);
+  //  unsigned pkg = LL::getPackageForThread(id);
   unsigned num = Galois::getActiveThreads();
   QueueTy* me = queues.getLocal();
   boost::optional<typename QueueTy::value_type> retval;
@@ -476,7 +476,7 @@ private:
     Iter e2 = e;
     fill_work_l2(b2, e2);
     unsigned int a = Galois::getActiveThreads();
-    unsigned int id = LL::getTID();
+    //    unsigned int id = LL::getTID();
     std::vector<std::vector<value_type> > ranges;
     ranges.resize(a);
     while (b2 != e2) {
