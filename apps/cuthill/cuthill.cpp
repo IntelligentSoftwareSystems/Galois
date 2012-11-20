@@ -80,7 +80,8 @@ struct GNodeIndexer {
 unsigned int max_dist;
 std::deque<unsigned int> level_count;
 std::deque<unsigned int> read_offset;
-std::deque<unsigned int> write_offset;
+std::deque<GaloisRuntime::LL::CacheLineStorage<unsigned int> > write_offset;
+//std::deque<unsigned int> write_offset;
 std::vector<GNode> perm;
 
 struct CutHillUnordered {
@@ -167,14 +168,17 @@ struct CutHillUnordered {
     static void reduce(count_levels& dest, count_levels& src) {
       if (dest.counts.size() < src.counts.size())
 	dest.counts.resize(src.counts.size());
-      std::transform(dest.counts.begin(), dest.counts.end(), src.counts.begin(), dest.counts.begin(), std::plus<unsigned>());
+      std::transform(src.counts.begin(), src.counts.end(), dest.counts.begin(), dest.counts.begin(), std::plus<unsigned>());
     }
 
     static void go(GNode source) {
       level_count = GaloisRuntime::do_all_impl(graph.begin(), graph.end(), count_levels(), default_reduce(), true).counts;
       read_offset.push_back(0);
       std::partial_sum(level_count.begin(), level_count.end(), back_inserter(read_offset));
-      write_offset = read_offset;
+      //write_offset = read_offset;
+      write_offset.resize(read_offset.size());
+      for(int x = 0; x < read_offset.size(); ++x)
+	write_offset[x].data = read_offset[x];
     }
   };
 
@@ -190,7 +194,7 @@ struct CutHillUnordered {
       unsigned n = me;
       while (n < max_dist + 1) {
 	unsigned start = read_offset[n];
-	volatile unsigned* endp = (volatile unsigned*)&write_offset[n];
+	volatile unsigned* endp = (volatile unsigned*)&write_offset[n].data;
 	unsigned todo = level_count[n];
 	while (todo) {
 	  //spin
@@ -202,8 +206,8 @@ struct CutHillUnordered {
 	    SNode& ddata = graph.getData(dst, Galois::NONE);
 	    if (!ddata.done && (ddata.dist == n + 1)) {
 	      ddata.done = true;
-	      perm[write_offset[ddata.dist]] = dst;
-	      ++write_offset[ddata.dist];
+	      perm[write_offset[ddata.dist].data] = dst;
+	      ++write_offset[ddata.dist].data;
 	    }
 	  }
 	  //	++read_offset[n];
@@ -215,48 +219,15 @@ struct CutHillUnordered {
       }
     }
 
-    std::vector<Galois::GWrapped<int> > levels;
-
-    void operator()(unsigned n, Galois::UserContext<unsigned>& ctx) {
-      levels[n].get(); //locks level
-      if (!level_count[n]) return;
-      unsigned start = read_offset[n];
-      unsigned end = write_offset[n];
-      assert(start != end);
-      GNode next = perm[start];
-      typedef std::vector<std::pair<unsigned, GNode>, Galois::PerIterAllocTy> GV;
-      GV V(ctx.getPerIterAlloc());
-      for (Graph::edge_iterator ii = graph.edge_begin(next),
-	     ei = graph.edge_end(next); ii != ei; ++ii) {
-	GNode dst = graph.getEdgeDst(ii);
-	SNode& ddata = graph.getData(dst);
-	if (!ddata.done && (ddata.dist == n + 1)) {
-	  ddata.done = true;
-	  V.push_back(std::make_pair(ddata.degree, dst));
-	}
-      }
-      std::sort(V.begin(), V.end(), std::greater<std::pair<unsigned, GNode> >());
-      for (GV::iterator ii = V.begin(), ee = V.end(); ii != ee; ++ii) {
-	perm[write_offset[n + 1]] = ii->second;
-	++write_offset[n + 1];
-      }
-      ++read_offset[n];
-      --level_count[n];
-      //trigger the next level
-      ctx.push(n+1);
-      //trigger rest of current level
-      ctx.push(n);
-    }
-
     static void go(GNode source) {
       using namespace GaloisRuntime::WorkList;
       typedef dChunkedFIFO<8> dChunk;
       typedef ChunkedFIFO<8> Chunk;
       typedef OrderedByIntegerMetric<UnsignedIndexer,FIFO<> > OBIM;
       perm[0] = source;
-      write_offset[0] = 1;
-      //Galois::on_each(placeFn(), "place");
-      Galois::for_each<OBIM >(0U, placeFn(), "place");
+      write_offset[0].data = 1;
+      Galois::on_each(placeFn(), "place");
+      //Galois::for_each<OBIM >(0U, placeFn(), "place");
       //std::cout << "max dist is " << max_dist << "\n";
     }
   };
