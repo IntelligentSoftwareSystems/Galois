@@ -195,8 +195,11 @@ struct ParallelLessDupsAlgo {
   void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& ctx) const {
     SNode& data = graph.getData(req.n, Galois::NONE);
 
-    if (trackBadWork && req.w >= data.dist)
-      *WLEmptyWork += 1;
+    if (req.w > data.dist) {
+      if (trackBadWork)
+	*WLEmptyWork += 1;
+      return;
+    }
     
     for (Graph::edge_iterator ii = graph.edge_begin(req.n, Galois::NONE),
            ee = graph.edge_end(req.n, Galois::NONE); ii != ee; ++ii) {
