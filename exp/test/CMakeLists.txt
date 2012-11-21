@@ -9,5 +9,6 @@ add_definitions(-O0)
 makeTest(pairingheap)
 makeTest(skiplist)
 makeTest(dist)
+makeTest(distnodes)
 makeTest(foreachtask)
 
