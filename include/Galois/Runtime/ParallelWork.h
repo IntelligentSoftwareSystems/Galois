@@ -205,7 +205,7 @@ protected:
       handleBreak(tld);
       return false;
     default:
-      abort();
+      GALOIS_ERROR(true, "unknown conflict type");
     }
     return workHappened;
   }

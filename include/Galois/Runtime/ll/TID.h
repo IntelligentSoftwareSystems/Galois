@@ -40,7 +40,7 @@ static inline unsigned getTID() {
   return TID;
 }
 
-//uninitialized TIDs are 0, and only thread 0 access TID before
+//uninitialized TIDs are 0, and only thread 0 accesses TID before
 //initializing it
 void initTID();
 

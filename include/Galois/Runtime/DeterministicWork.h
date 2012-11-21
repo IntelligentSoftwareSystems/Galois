@@ -704,7 +704,7 @@ public:
     // Useful debugging info
     if (false) {
       if (LL::getTID() == 0) {
-        printf("DEBUG %d %.3f (%zu/%zu) window: %zu delta: %zu\n", 
+        LL::gDebug("DEBUG %d %.3f (%zu/%zu) window: %zu delta: %zu\n", 
             inner, commitRatio, allcommitted, alliterations, mlocal.window, mlocal.delta);
       }
     }
@@ -1194,8 +1194,7 @@ public:
     for (unsigned i = 0; i < sizeof(barrier)/sizeof(*barrier); ++i)
       barrier[i].reinit(numActive);
     if (OptionsTy::needsBreak && !has_break_fn<typename OptionsTy::Function1Ty>::value) {
-      assert(0 && "Need to use break function to break loop");
-      abort();
+      GALOIS_ERROR(true, "need to use break function to break loop");
     }
   }
 

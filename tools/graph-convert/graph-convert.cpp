@@ -19,6 +19,7 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  *
  * @author Dimitrios Prountzos <dprountz@cs.utexas.edu>
+ * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 #include "Galois/Galois.h"
 #include "Galois/Graphs/Graph2.h"
@@ -34,6 +35,7 @@
 namespace cll = llvm::cl;
 
 enum ConvertMode {
+  edgelist2gr,
   dimacs2gr,
   rmat2gr,
   stext2vgr,
@@ -49,7 +51,8 @@ static cll::opt<std::string> inputfilename(cll::Positional, cll::desc("<input fi
 static cll::opt<std::string> outputfilename(cll::Positional, cll::desc("<output file>"), cll::Required);
 static cll::opt<ConvertMode> convertMode(cll::desc("Choose a conversion mode:"),
     cll::values(
-      clEnumVal(dimacs2gr, "Convert dimacs to binary gr (default)"),
+      clEnumVal(edgelist2gr, "Convert edge list to binary gr (default)"),
+      clEnumVal(dimacs2gr, "Convert dimacs to binary gr"),
       clEnumVal(rmat2gr, "Convert rmat to binary gr"),
       clEnumVal(pbbs2vgr, "Convert pbbs graph to binary void gr"),
       clEnumVal(stext2vgr, "Convert simple text graph to binary void gr"),
@@ -58,7 +61,72 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Choose a conversion mode:"),
       clEnumVal(vgr2bsml, "Convert binary void gr to binary sparse MATLAB matrix"),
       clEnumVal(gr2dimacs, "Convert binary gr to dimacs"),
       clEnumVal(gr2pbbs, "Convert binary gr to pbbs"),
-      clEnumValEnd), cll::init(dimacs2gr));
+      clEnumValEnd), cll::init(edgelist2gr));
+
+// TODO(ddn): Switch over to FileGraphParser interface instead of
+// Galois::Graphs::outputGraph()
+
+
+//! Just a bunch of pairs
+void convert_edgelist2gr(const std::string& infilename, const std::string& outfilename) {
+  typedef Galois::Graph::FileGraphParser Parser;
+
+  Parser p;
+  std::ifstream infile(infilename.c_str());
+
+  size_t numNodes = 0;
+  size_t numEdges = 0;
+
+  while (infile.good()) {
+    size_t src;
+    size_t dst;
+    infile >> src >> dst;
+    if (infile.good()) {
+      ++numEdges;
+      if (src > numNodes)
+        numNodes = src;
+      if (dst > numNodes)
+        numNodes = dst;
+    }
+  }
+
+  numNodes++;
+  p.setNumNodes(numNodes);
+  p.setNumEdges(numEdges);
+
+  infile.clear();
+  infile.seekg(0, std::ios::beg);
+  p.phase1();
+  while (infile.good()) {
+    size_t src;
+    size_t dst;
+    infile >> src >> dst;
+    if (infile.good()) {
+      p.incrementDegree(src);
+    }
+  }
+
+  infile.clear();
+  infile.seekg(0, std::ios::beg);
+  p.phase2();
+  while (infile.good()) {
+    size_t src;
+    size_t dst;
+    infile >> src >> dst;
+    if (infile.good()) {
+      p.addNeighbor(src, dst);
+    }
+  }
+
+  p.finish(0);
+
+  std::cout << "Finished reading graph. "
+    << "Nodes: " << numNodes
+    << " Edges: " << numEdges 
+    << "\n";
+
+  p.structureToFile(outfilename.c_str());
+}
 
 void convert_rmat2gr(const std::string& infilename, const std::string& outfilename) {
   typedef Galois::Graph::FirstGraph<uint32_t,int32_t,true> Graph;
@@ -203,6 +271,12 @@ void convert_stext2vgr(const std::string& infilename, const std::string& outfile
   outputGraph(outfilename.c_str(), graph);
 }
 
+// Example:
+//  c Some file
+//  c Comments
+//  p XXX XXX <num nodes> <num edges>
+//  a <src id> <dst id> <weight>
+//  ....
 void convert_dimacs2gr(const std::string& infilename, const std::string& outfilename) {
   typedef Galois::Graph::FirstGraph<uint32_t,int32_t,true> Graph;
   typedef Graph::GraphNode GNode;
@@ -505,8 +579,9 @@ int main(int argc, char** argv) {
     case vgr2bsml: convert_gr2bsml<void>(inputfilename, outputfilename); break;
     case gr2bsml: convert_gr2bsml<int32_t>(inputfilename, outputfilename); break;
     case gr2pbbs: convert_gr2pbbs(inputfilename, outputfilename); break;
-    default:
     case dimacs2gr: convert_dimacs2gr(inputfilename, outputfilename); break;
+    default:
+    case edgelist2gr: convert_edgelist2gr(inputfilename, outputfilename); break;
   }
   return 0;
 }

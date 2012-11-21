@@ -192,91 +192,142 @@ public:
   void structureFromFile(const std::string& filename);
 
   //! Read graph connectivity information from memory
-  void structureFromMem(void* mem, size_t len, bool clone = false);
+  void structureFromMem(void* mem, size_t len, bool clone);
+
+  //! Read graph connectivity information from arrays.
+  //! If sizeof_edge_data != 0, return a pointer to array to
+  //! populate with edge data.
+  char* structureFromArrays(uint64_t* out_idxs, uint64_t num_nodes,
+      uint32_t* outs, uint64_t num_edges, size_t sizeof_edge_data);
 
   //! Read graph connectivity information from graph
   template<typename TyG>
   void structureFromGraph(TyG& G) {
-    //version
-    uint64_t version = 1;
-    uint64_t sizeof_edge_data = sizeof(typename TyG::EdgeDataTy);
     uint64_t num_nodes = G.size();
 
-    uint64_t nBytes = sizeof(uint64_t) * 3;
-
     typedef typename TyG::GraphNode GNode;
+    typedef typename TyG::EdgeDataTy EdgeData;
+
     typedef std::vector<GNode> Nodes;
     Nodes nodes(G.begin(), G.end());
 
     //num edges and outidx computation
-    uint64_t offset = 0;
+    uint64_t num_edges = 0;
     std::vector<uint64_t> out_idx;
     std::map<typename TyG::GraphNode, uint32_t> node_ids;
     for (uint32_t id = 0; id < num_nodes; ++id) {
       GNode& node = nodes[id];
       node_ids[node] = id;
-      offset += G.neighborsSize(node);
-      out_idx.push_back(offset);
+      num_edges += G.neighborsSize(node);
+      out_idx.push_back(num_edges);
     }
-
-    nBytes += sizeof(uint64_t);
-    nBytes += sizeof(uint64_t) * out_idx.size();
 
     //outs
     std::vector<uint32_t> outs;
-    size_t num_edges = 0;
-    for (typename Nodes::iterator ii = nodes.begin(), ee = nodes.end();
-	 ii != ee; ++ii) {
-      for (typename TyG::neighbor_iterator ni = G.neighbor_begin(*ii),
-	     ne = G.neighbor_end(*ii); ni != ne; ++ni, ++num_edges) {
-	uint32_t id = node_ids[*ni];
-	outs.push_back(id);
-      }
-    }
-    if (num_edges % 2) {
-      outs.push_back(0);
-    }
-
-    nBytes += sizeof(uint32_t) * outs.size();
-    
-    //edgeData
-    std::vector<typename TyG::EdgeDataTy> edgeData;
     for (typename Nodes::iterator ii = nodes.begin(), ee = nodes.end();
 	 ii != ee; ++ii) {
       for (typename TyG::neighbor_iterator ni = G.neighbor_begin(*ii),
 	     ne = G.neighbor_end(*ii); ni != ne; ++ni) {
-	edgeData.push_back(G.getEdgeData(*ii, *ni));
+	uint32_t id = node_ids[*ni];
+	outs.push_back(id);
       }
     }
-    
-    nBytes += sizeof(typename TyG::EdgeDataTy) * edgeData.size();
 
-    char* t = (char*)malloc(nBytes);
-    char* base = t;
-    memcpy(t, &version, sizeof(uint64_t));
-    t += sizeof(uint64_t);
-    memcpy(t, &sizeof_edge_data, sizeof(uint64_t));
-    t += sizeof(uint64_t);
-    memcpy(t, &num_nodes, sizeof(uint64_t));
-    t += sizeof(uint64_t);
-    memcpy(t, &offset, sizeof(uint64_t));
-    t += sizeof(uint64_t);
-    memcpy(t, &out_idx[0], sizeof(uint64_t) * out_idx.size());
-    t += sizeof(uint64_t) * out_idx.size();
-    memcpy(t, &outs[0], sizeof(uint32_t) * outs.size());
-    t += sizeof(uint32_t) * outs.size();
-    memcpy(t, &edgeData[0], sizeof(typename TyG::EdgeDataTy) * edgeData.size());
-    
-    structureFromMem(base, nBytes, true);
-    free(t);
+    EdgeData* edgeData = (EdgeData*) structureFromArrays(&out_idx[0], num_nodes,
+        &outs[0], num_edges, sizeof(EdgeData));
+
+    if (sizeof(EdgeData)) {
+      for (typename Nodes::iterator ii = nodes.begin(), ee = nodes.end();
+           ii != ee; ++ii) {
+        for (typename TyG::neighbor_iterator ni = G.neighbor_begin(*ii),
+               ne = G.neighbor_end(*ii); ni != ne; ++ni) {
+          *edgeData++ = G.getEdgeData(*ii, *ni);
+        }
+      }
+    }
   }
 
   //! Write graph connectivity information to file
-  void structureToFile(char* file);
+  void structureToFile(const char* file);
 
   void swap(FileGraph& other);
   void clone(FileGraph& other);
 };
+
+//! Simpifies parsing graphs from files.
+//! Parse your file in rounds:
+//!  (1) setNumNodes(), setNumEdges()
+//!  (2) phase1(), for each node, incrementDegree(Node x)
+//!  (3) phase2(), add neighbors for each node, addNeighbor(Node src, Node dst)
+//!  (4) finish(), use as FileGraph
+class FileGraphParser: public FileGraph {
+  uint64_t *out_idx; // out_idxs
+  uint32_t *starts;
+  uint32_t *outs; // outs
+
+public:
+  FileGraphParser(): out_idx(0), starts(0), outs(0) { }
+
+  ~FileGraphParser() { 
+    if (out_idx)
+      delete [] out_idx;
+    if (starts)
+      delete [] starts;
+    if (outs)
+      delete [] outs;
+  }
+
+  void setNumNodes(uint64_t n) { this->numNodes = n; }
+  void setNumEdges(uint64_t n) { this->numEdges = n; }
+  
+  void phase1() { 
+    assert(!out_idx);
+    out_idx = new uint64_t[this->numNodes];
+    memset(out_idx, 0, sizeof(*out_idx) * this->numNodes);
+  }
+
+  void incrementDegree(size_t id) {
+    assert(id < this->numNodes);
+    out_idx[id]++;
+  }
+
+  void phase2() {
+    if (this->numNodes == 0)
+      return;
+
+    // Turn counts into partial sums
+    uint64_t* prev = out_idx;
+    for (uint64_t *ii = out_idx + 1, *ei = out_idx + this->numNodes; ii != ei; ++ii, ++prev) {
+      *ii += *prev;
+    }
+    assert(out_idx[this->numNodes-1] == this->numEdges);
+
+    starts = new uint32_t[this->numNodes];
+    memset(starts, 0, sizeof(*starts) * this->numNodes);
+
+    outs = new uint32_t[this->numEdges];
+  }
+
+  size_t addNeighbor(size_t src, size_t dst) {
+    size_t base = src ? out_idx[src-1] : 0;
+    size_t idx = base + starts[src]++;
+    assert(idx < out_idx[src]);
+    outs[idx] = dst;
+    return idx;
+  }
+
+  char* finish(size_t sizeof_edge_data) { 
+    structureFromArrays(out_idx, this->numNodes, outs, this->numEdges, sizeof_edge_data);
+    delete [] out_idx;
+    out_idx = 0;
+    delete [] starts;
+    starts = 0;
+    delete [] outs;
+    outs = 0;
+    return this->edgeData;
+  }
+};
+
 
 //! Local computation graph (i.e., graph structure does not change)
 //! THIS GRAPH SHOULD GO AWAY
@@ -292,6 +343,7 @@ class LC_FileGraph : public FileGraph {
   GaloisRuntime::LL::CacheLineStorage<gNode>* NodeData;
 
 public:
+  GALOIS_ATTRIBUTE_DEPRECATED
   LC_FileGraph() :NodeData(0) {}
   ~LC_FileGraph() {
     if (NodeData)
@@ -356,7 +408,6 @@ public:
 //! Local computation graph (i.e., graph structure does not change)
 template<typename EdgeTy>
 class LC_FileGraph<void, EdgeTy> : public FileGraph {
-
   struct gNode : public GaloisRuntime::Lockable {
     gNode() {}
   };
@@ -365,6 +416,7 @@ class LC_FileGraph<void, EdgeTy> : public FileGraph {
   GaloisRuntime::LL::CacheLineStorage<gNode>* NodeData;
 
 public:
+  GALOIS_ATTRIBUTE_DEPRECATED
   LC_FileGraph() :NodeData(0) {}
   ~LC_FileGraph() {
     if (NodeData)
@@ -395,6 +447,7 @@ class LC_FileGraph<NodeTy, void>: public FileGraph {
   GaloisRuntime::LL::CacheLineStorage<gNode>* NodeData;
 
 public:
+  GALOIS_ATTRIBUTE_DEPRECATED
   LC_FileGraph() :NodeData(0) {}
   ~LC_FileGraph() {
     if (NodeData)
@@ -422,6 +475,9 @@ public:
 
 template<>
 class LC_FileGraph<void, void>: public FileGraph { 
+public:
+  GALOIS_ATTRIBUTE_DEPRECATED
+  LC_FileGraph() { }
 };
 
 }

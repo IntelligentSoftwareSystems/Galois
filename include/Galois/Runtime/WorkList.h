@@ -28,6 +28,7 @@
 #include "Galois/Runtime/ThreadPool.h"
 #include "Galois/Runtime/WorkListHelpers.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
+#include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/mm/Mem.h"
 
 #include "Galois/gdeque.h"
@@ -512,21 +513,12 @@ GALOIS_WLCOMPILECHECK(LocalQueues)
 template<bool d, typename TQ>
 struct squeues;
 
-// template<typename TQ>
-// struct squeues<true,TQ> {
-//   PerLevel<TQ> queues;
-//   TQ& get(int i) { return queues.get(i); }
-//   TQ& get() { return queues.get(); }
-//   int myEffectiveID() { return queues.myEffectiveID(); }
-//   int size() { return queues.size(); }
-// };
-
 template<typename TQ>
 struct squeues<true,TQ> {
   PerPackageStorage<TQ> queues;
   TQ& get(int i) { return *queues.getRemote(i); }
   TQ& get() { return *queues.getLocal(); }
-  int myEffectiveID() { return LL::getTID(); } //queues.myEffectiveID(); }
+  int myEffectiveID() { return LL::getTID(); }
   int size() { return galoisActiveThreads; }
 };
 
@@ -634,7 +626,7 @@ public:
   //! generally not safe to use in the presence of concurrent pops.
   value_type* push(const value_type& val)  {
     p* n = data.getLocal();
-    return pushi(val,n);
+    return pushi(val, n);
   }
 
   template<typename Iter>
@@ -722,7 +714,7 @@ public:
 
   //! push a value onto the queue
   void push(const value_type& val) {
-    abort();
+    GALOIS_ERROR(true, "not implemented");
   }
 
   //! push a range onto the queue
@@ -730,7 +722,7 @@ public:
   void push(Iter b, Iter e) {
     if (b == e)
       return;
-    abort();
+    GALOIS_ERROR(true, "not implemented");
   }
 
   //stagger each thread's start item
@@ -823,7 +815,7 @@ public:
 
   //! push a value onto the queue
   void push(const value_type& val) {
-    abort();
+    GALOIS_ERROR(true, "not implemented");
   }
 
   //! push a range onto the queue
@@ -831,7 +823,7 @@ public:
   void push(Iter b, Iter e) {
     if (b == e)
       return;
-    abort();
+    GALOIS_ERROR(true, "not implemented");
   }
 
   //stagger each thread's start item
@@ -886,7 +878,7 @@ public:
 
   //! push a value onto the queue
   void push(const value_type& val) {
-    abort();
+    GALOIS_ERROR(true, "not implemented");
   }
 
   //! push a range onto the queue
@@ -894,7 +886,7 @@ public:
   void push(Iter b, Iter e) {
     if (b == e)
       return;
-    abort();
+    GALOIS_ERROR(true, "not implemented");
   }
 
   //stagger each thread's start item
@@ -964,11 +956,12 @@ public:
 };
 //GALOIS_WLCOMPILECHECK(LocalAccessDist);
 
-template<typename OwnerFn=DummyIndexer<int>, typename T = int>
+template<typename OwnerFn=DummyIndexer<int>, typename WLTy=ChunkedLIFO<256>, typename T = int>
 class OwnerComputesWL : private boost::noncopyable {
-  typedef ChunkedLIFO<256, T> cWL;
-  //  typedef ChunkedLIFO<256, T> pWL;
-  typedef ChunkedLIFO<256, T> pWL;
+  typedef typename WLTy::template retype<T>::WL lWLTy;
+
+  typedef lWLTy cWL;
+  typedef lWLTy pWL;
 
   OwnerFn Fn;
   PerPackageStorage<cWL> items;
@@ -977,12 +970,12 @@ class OwnerComputesWL : private boost::noncopyable {
 public:
   template<bool newconcurrent>
   struct rethread {
-    typedef OwnerComputesWL<OwnerFn, T> WL;
+    typedef OwnerComputesWL<OwnerFn,typename WLTy::template rethread<newconcurrent>::WL, T> WL;
   };
 
-  template<typename nTy>
+  template<typename Tnew>
   struct retype {
-    typedef OwnerComputesWL<OwnerFn, nTy> WL;
+    typedef OwnerComputesWL<OwnerFn,typename WLTy::template retype<Tnew>::WL,Tnew> WL;
   };
 
   typedef T value_type;

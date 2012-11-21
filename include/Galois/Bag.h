@@ -25,6 +25,7 @@
 
 #include "Galois/Runtime/InsBag.h"
 #include "Galois/Runtime/PerThreadStorage.h"
+#include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/mm/Mem.h"
 
 #include <iterator>
@@ -37,11 +38,7 @@ namespace Galois {
  * can only be done serially.
  */
 template<typename T>
-struct InsertBag: public GaloisRuntime::galois_insert_bag<T> {
-  T& push_back(const T& v) {
-    return this->push(v);
-  }
-};
+struct InsertBag: public GaloisRuntime::galois_insert_bag<T> { };
 
 /**
  * Bag for serial use.
@@ -149,8 +146,7 @@ protected:
 
     // TODO(ddn): Probably could fix this...
     if (std::distance(m_head->m_begin, m_head->m_end) > std::distance(h->m_begin, h->m_last)) {
-      assert(0 && "More inline elements than will fit in block");
-      abort();
+      GALOIS_ERROR(true, "more inline elements than will fit in block");
     }
     h->m_end = std::copy(m_head->m_begin, m_head->m_end, h->m_begin);
     destroyRange(m_head->m_begin, m_head->m_end);

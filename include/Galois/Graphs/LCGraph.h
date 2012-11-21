@@ -52,6 +52,8 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
+#ifndef GALOIS_GRAPHS_LCGRAPH_H
+#define GALOIS_GRAPHS_LCGRAPH_H
 
 #include "Galois/Galois.h"
 #include "Galois/Graphs/FileGraph.h"
@@ -532,8 +534,9 @@ public:
 };
 
 //! Local computation graph (i.e., graph structure does not change)
+//! Specialization of LC_Linear_Graph for NUMA architectures
 template<typename NodeTy, typename EdgeTy>
-class LC_Linear2_Graph {
+class LC_Numa_Graph {
 protected:
   struct NodeInfo;
   typedef EdgeInfoWrapper<NodeInfo,EdgeTy> EdgeInfo;
@@ -763,9 +766,9 @@ public:
     GraphNode operator*() const { return v; }
   };
 
-  LC_Linear2_Graph(): nodes(0) { }
+  LC_Numa_Graph(): nodes(0) { }
 
-  ~LC_Linear2_Graph() {
+  ~LC_Numa_Graph() {
     // TODO(ddn): call destructors of user data
     if (nodes)
       GaloisRuntime::MM::largeInterleavedFree(nodes, sizeof(NodeInfo*) * numNodes);
@@ -856,3 +859,4 @@ public:
 
 }
 }
+#endif

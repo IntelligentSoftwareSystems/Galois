@@ -202,7 +202,7 @@ class ForEachWork<WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
               break;
 
             case GaloisRuntime::BREAK:
-              LL::gError (true, "ParaMeterExecutor: can't handle breaks yet");
+              GALOIS_ERROR(true, "can't handle breaks yet");
               break;
 
             default:
@@ -228,7 +228,7 @@ class ForEachWork<WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
       size_t numActivities = commitQueue.size();
 
       if (numActivities == 0) {
-        LL::gError (true, "ParaMeterExecutor: no progress made in step %d\n", currStep);
+        GALOIS_ERROR(true, "no progress made in step %d", currStep);
       }
 
       double avgLocks = 0;

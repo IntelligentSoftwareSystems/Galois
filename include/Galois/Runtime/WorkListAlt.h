@@ -545,6 +545,201 @@ public:
 };
 //GALOIS_WLCOMPILECHECK(LocalQueues);
 
+template<typename WLTy = FIFO<>, typename T = int>
+class LocalWorklist : private boost::noncopyable {
+  typedef typename WLTy::template rethread<false>::WL lWLTy;
+  PerThreadStorage<lWLTy> local;
+
+public:
+  template<bool newconcurrent>
+  struct rethread {
+    typedef LocalWorklist<typename WLTy::template rethread<newconcurrent>::WL, T> WL;
+  };
+  template<typename Tnew>
+  struct retype {
+    typedef LocalWorklist<typename WLTy::template retype<Tnew>::WL, Tnew> WL;
+  };
+
+  typedef T value_type;
+
+  void push(const value_type& val) {
+    local.getLocal()->push(val);
+  }
+
+  template<typename Iter>
+  void push(Iter b, Iter e) {
+    local.getLocal()->push(b, e);
+  }
+
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    fill_work(*local.getLocal(), b, e);
+  }
+
+  boost::optional<value_type> pop() {
+    return local.getLocal()->pop();
+  }
+};
+GALOIS_WLCOMPILECHECK(LocalWorklist)
+
+  // XXX
+template<int chunksize=64, typename T = int, bool concurrent=true>
+class xChunkedLIFO : public ChunkedMaster<T, ConExtLinkedQueue, true, true, chunksize, concurrent> {};
+GALOIS_WLCOMPILECHECK(xChunkedLIFO)
+
+template<typename T, typename OwnerFn, template<typename, bool> class QT, bool distributed = false, bool isStack = false, int chunksize=64, bool concurrent=true>
+class OwnerComputeChunkedMaster : private boost::noncopyable {
+  class Chunk : public Galois::FixedSizeRing<T, chunksize>, public QT<Chunk, concurrent>::ListNode {};
+
+  MM::FixedSizeAllocator heap;
+  OwnerFn Fn;
+
+  struct p {
+    Chunk* cur;
+    Chunk* next;
+  };
+
+  typedef QT<Chunk, concurrent> LevelItem;
+
+  PerThreadStorage<p> data;
+  squeues<distributed, LevelItem> Q;
+
+  Chunk* mkChunk() {
+    return new (heap.allocate(sizeof(Chunk))) Chunk();
+  }
+  
+  void delChunk(Chunk* C) {
+    C->~Chunk();
+    heap.deallocate(C);
+  }
+
+  void pushChunk(Chunk* C)  {
+    unsigned int tid = LL::getTID();
+    unsigned int index = isStack ? Fn(C->back()) : Fn(C->front());
+    if (tid == index) {
+      LevelItem& I = Q.get();
+      I.push(C);
+    } else {
+      unsigned int mindex = LL::getPackageForThreadInternal(index);
+      LevelItem& I = Q.get(mindex);
+      I.push(C);
+    }
+  }
+
+  Chunk* popChunkByID(unsigned int i)  {
+    LevelItem& I = Q.get(i);
+    return I.pop();
+  }
+
+  Chunk* popChunk()  {
+    int id = Q.myEffectiveID();
+    Chunk* r = popChunkByID(id);
+    if (r)
+      return r;
+
+    for (int i = id + 1; i < (int) Q.size(); ++i) {
+      r = popChunkByID(i);
+      if (r) 
+	return r;
+    }
+
+    for (int i = 0; i < id; ++i) {
+      r = popChunkByID(i);
+      if (r)
+	return r;
+    }
+
+    return 0;
+  }
+
+  T* pushi(const T& val, p* n)  {
+    T* retval = 0;
+
+    if (n->next && (retval = n->next->push_back(val)))
+      return retval;
+    if (n->next)
+      pushChunk(n->next);
+    n->next = mkChunk();
+    retval = n->next->push_back(val);
+    assert(retval);
+    return retval;
+  }
+
+public:
+  typedef T value_type;
+
+  template<bool newconcurrent>
+  struct rethread {
+    typedef OwnerComputeChunkedMaster<T, OwnerFn,QT, distributed, isStack, chunksize, newconcurrent> WL;
+  };
+  template<typename Tnew>
+  struct retype {
+    typedef OwnerComputeChunkedMaster<Tnew, OwnerFn, QT, distributed, isStack, chunksize, concurrent> WL;
+  };
+
+  OwnerComputeChunkedMaster() : heap(sizeof(Chunk)) { }
+
+  void flush() {
+    p& n = *data.getLocal();
+    if (n.next)
+      pushChunk(n.next);
+    n.next = 0;
+  }
+  
+  //! Most worklists have void return value for push. This push returns address
+  //! of placed item to facilitate some internal runtime uses. The address is
+  //! generally not safe to use in the presence of concurrent pops.
+  value_type* push(const value_type& val)  {
+    p* n = data.getLocal();
+    return pushi(val, n);
+  }
+
+  template<typename Iter>
+  void push(Iter b, Iter e) {
+    p* n = data.getLocal();
+    while (b != e)
+      pushi(*b++, n);
+  }
+
+  template<typename Iter>
+  void push_initial(Iter b, Iter e) {
+    fill_work(*this, b, e);
+  }
+
+  boost::optional<value_type> pop()  {
+    p& n = *data.getLocal();
+    boost::optional<value_type> retval;
+    if (isStack) {
+      if (n.next && (retval = n.next->extract_back()))
+	return retval;
+      if (n.next)
+	delChunk(n.next);
+      n.next = popChunk();
+      if (n.next)
+	return n.next->extract_back();
+      return boost::optional<value_type>();
+    } else {
+      if (n.cur && (retval = n.cur->extract_front()))
+	return retval;
+      if (n.cur)
+	delChunk(n.cur);
+      n.cur = popChunk();
+      if (!n.cur) {
+	n.cur = n.next;
+	n.next = 0;
+      }
+      if (n.cur)
+	return n.cur->extract_front();
+      return boost::optional<value_type>();
+    }
+  }
+};
+
+  // XXX
+template<typename OwnerFn=DummyIndexer<int> , int chunksize=64, typename T = int, bool concurrent=true>
+class OwnerComputeChunkedLIFO : public OwnerComputeChunkedMaster<T,OwnerFn,ConExtLinkedQueue, true, true, chunksize, concurrent> {};
+GALOIS_WLCOMPILECHECK(OwnerComputeChunkedLIFO)
+
 
 } }//End namespace
 
