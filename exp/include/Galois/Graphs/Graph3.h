@@ -2,6 +2,7 @@
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/MethodFlags.h"
 
+#include <iterator>
 #include <deque>
 
 namespace Galois {
@@ -14,8 +15,12 @@ class ThirdGraph;
 
 template<typename NHTy>
 class GraphNodeBase {
-  NHTy next;
+  NHTy nextNode;
   bool active;
+
+protected:
+  NHTy& getNextNode() { return nextNode; }
+
 public:
   GraphNodeBase() :active(false) {}
 
@@ -115,6 +120,8 @@ class GraphNode
 {
   friend class ThirdGraph<NodeDataTy, EdgeDataTy, EDir>;
 
+  using GraphNodeBase<SHORTHAND >::getNextNode;
+
 public:
   typedef SHORTHAND Handle;
 
@@ -138,23 +145,47 @@ template<typename NodeTy, typename EdgeTy, EdgeDirection EDir>
 class ThirdGraph { //: public Galois::Runtime::Distributed::DistBase<ThirdGraph> {
   typedef GraphNode<NodeTy, EdgeTy, EDir> gNode;
 
+  typename gNode::Handle head;
+
 public:
   typedef typename gNode::Handle NodeHandle;
 
   template<typename... Args>
   NodeHandle createNode(Args&&... args) {
-    return NodeHandle(new gNode(std::forward<Args...>(args...)));
+    NodeHandle N(new gNode(std::forward<Args...>(args...)));
+    N->getNextNode() = head;
+    head = N;
+    return N;
   }
 
   NodeHandle createNode() {
-    return NodeHandle(new gNode());
+    NodeHandle N(new gNode());
+    N->getNextNode() = head;
+    head = N;
+    return N;
   }
 
-  typedef int iterator;
+  class iterator : public std::iterator<std::forward_iterator_tag, NodeHandle> {
+    NodeHandle n;
+    void next() {
+      n = n->getNextNode();
+    }
+  public:
+    explicit iterator(NodeHandle N) :n(N) {}
+    iterator() :n() {}
+    iterator(const iterator& mit) : n(mit.n) {}
+
+    NodeHandle& operator*() { return n; }
+    iterator& operator++() { next(); return *this; }
+    iterator operator++(int) { iterator tmp(*this); operator++(); return tmp; }
+    bool operator==(const iterator& rhs) { return n == rhs.n; }
+    bool operator!=(const iterator& rhs) { return n != rhs.n; }
+  };
+
   typedef iterator local_iterator;
 
-  iterator begin();
-  iterator end();
+  iterator begin() { return iterator(head); }
+  iterator end() { return iterator(); }
 
   local_iterator local_begin();
   local_iterator local_end();
