@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [ "$(basename $0)" == "iss_load_modules.sh" ]; then
+if [ "$(basename -- $0)" == "iss_load_modules.sh" ]; then
   echo "Source this file instead of running directly" >&2
   exit 1
 fi
