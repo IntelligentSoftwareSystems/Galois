@@ -1,3 +1,4 @@
+#include "Galois/Galois.h"
 #include "Galois/Graphs/Graph3.h"
 
 #include <iostream>
@@ -9,7 +10,7 @@ using G = ThirdGraph<nd,ed,dir>;
 
 
 struct op {
-  template<typename T, Typename Context>
+  template<typename T, typename Context>
   void operator()(const T& node, const Context& cnx) {
     node->createEdge(node, node->getData());
   }
@@ -17,15 +18,15 @@ struct op {
 
 int main(int argc, const char** argv) {
 
-  G<int, int , EdgeDirection::Out> G;
+  G<int, int , EdgeDirection::Out> Gr;
 
   for (int x = 0; x < 100; ++x)
-    G.createnode(x);
+    Gr.createNode(x);
 
-  Galois::foreach<>(G.begin(), G.end(), op());
+  Galois::for_each<>(Gr.begin(), Gr.end(), op());
 
-  for (G::iterator ii = G.begin(), ee = G.end(); ii != ee; ++ii)
-    std::cout << ii->getData() << " " << std::distance(ii->begin(), ii->end()) << "\n";
+  for (typename G<int,int,EdgeDirection::Out>::iterator ii = Gr.begin(), ee = Gr.end(); ii != ee; ++ii)
+    std::cout << (*ii)->getData() << " " << std::distance((*ii)->begin(), (*ii)->end()) << "\n";
 
   return 0;
 }
