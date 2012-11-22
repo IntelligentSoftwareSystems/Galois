@@ -1,4 +1,4 @@
-/** galois IO rutines -*- C++ -*-
+/** Galois IO routines -*- C++ -*-
  * @file
  * @section License
  *
@@ -30,10 +30,12 @@
 #include "Galois/Runtime/ll/SimpleLock.h"
 #include "Galois/Runtime/ll/TID.h"
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdarg.h>
+#include <cstdlib>
+#include <cstdio>
 #include <ctime>
+#include <cstring>
+#include <cstdarg>
+#include <cerrno>
 
 static GaloisRuntime::LL::SimpleLock<true> IOLock;
 
@@ -47,7 +49,6 @@ void GaloisRuntime::LL::gPrint(const char* format, ...) {
 }
 
 void GaloisRuntime::LL::gDebug(const char* format, ...) {
-
   static const unsigned TIME_STR_SIZE = 32;
   char time_str[TIME_STR_SIZE];
   time_t rawtime;
@@ -84,24 +85,38 @@ void GaloisRuntime::LL::gInfo(const char* format, ...) {
   IOLock.unlock();
 }
 
-void GaloisRuntime::LL::gWarn( const char* format, ...) {
+void GaloisRuntime::LL::gWarn(const char* format, ...) {
   IOLock.lock();
   va_list ap;
   va_start(ap, format);
-  printf("WARNING: ");
-  vprintf(format, ap);
+  fprintf(stderr, "WARNING: ");
+  vfprintf(stderr, format, ap);
   printf("\n");
   va_end(ap);
   IOLock.unlock();
 }
 
-void GaloisRuntime::LL::gError(bool doabort, const char* format, ...) {
+void GaloisRuntime::LL::gError(bool doabort, const char* filename, int lineno, const char* format, ...) {
   IOLock.lock();
   va_list ap;
   va_start(ap, format);
-  printf("ERROR: ");
-  vprintf(format, ap);
-  printf("\n");
+  fprintf(stderr, "ERROR: %s:%d ", filename, lineno);
+  vfprintf(stderr, format, ap);
+  fprintf(stderr, "\n");
+  va_end(ap);
+  IOLock.unlock();
+  if (doabort)
+    abort();
+}
+
+void GaloisRuntime::LL::gSysError(bool doabort, const char* filename, int lineno, const char* format, ...) {
+  int err_saved = errno;
+  IOLock.lock();
+  va_list ap;
+  va_start(ap, format);
+  fprintf(stderr, "ERROR: %s:%d: %s: ", filename, lineno, strerror(err_saved));
+  vfprintf(stderr, format, ap);
+  fprintf(stderr, "\n");
   va_end(ap);
   IOLock.unlock();
   if (doabort)

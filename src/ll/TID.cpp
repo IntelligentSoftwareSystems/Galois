@@ -23,9 +23,11 @@
  * This contains support for thread id.  See TID.h.
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
-*/
+ */
 
 #include "Galois/Runtime/ll/TID.h"
+#include "Galois/Runtime/ll/HWTopo.h"
+#include <cassert>
 
 #ifdef GALOIS_USE_DRF
 #include <pthread.h>
@@ -67,11 +69,11 @@ typedef PthreadNextId NextId;
 #else
 typedef AtomicNextId NextId;
 #endif
-
 }
 
 static NextId next;
 
 void GaloisRuntime::LL::initTID() {
   TID = next.next();
+  assert(TID < getMaxThreads());
 }

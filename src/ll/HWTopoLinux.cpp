@@ -35,15 +35,14 @@
 #include "Galois/Runtime/ll/EnvCheck.h"
 #include "Galois/Runtime/ll/gio.h"
 
-#include <stdio.h>
-#include <sched.h>
-#include <errno.h>
-#include <string.h>
-#include <assert.h>
-
 #include <vector>
 #include <functional>
 #include <algorithm>
+#include <cassert>
+#include <cstdio>
+#include <cstring>
+
+#include <sched.h>
 
 using namespace GaloisRuntime::LL;
 
@@ -78,7 +77,7 @@ static bool linuxBindToProcessor(int proc) {
 }
 
 static void openFailed(const char* s) {
-  gError(true, "opening %s failed with %s\n", s, strerror(errno));
+  GALOIS_SYS_ERROR(true, "failed opening %s", s);
 }
 
 static std::vector<cpuinfo> parseCPUInfo() {
