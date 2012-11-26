@@ -28,5 +28,11 @@ int main(int argc, const char** argv) {
   for (typename G<int,int,EdgeDirection::Out>::iterator ii = Gr.begin(), ee = Gr.end(); ii != ee; ++ii)
     std::cout << (*ii)->getData() << " " << std::distance((*ii)->begin(), (*ii)->end()) << "\n";
 
+  //serialize the pointer
+  Galois::Runtime::Distributed::serialize(std::cout, *Gr.begin());
+  //serialize the node
+  Galois::Runtime::Distributed::serialize(std::cout, **Gr.begin());
+
+
   return 0;
 }

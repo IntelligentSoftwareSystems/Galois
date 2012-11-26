@@ -131,14 +131,14 @@ public:
   GraphNode() {}
 
   //serialization support
-  typedef int tt_static_serialize;
-  //deserializing constructor
-  GraphNode(Galois::Runtime::Distributed::memBuffer& buf) {
+  typedef int tt_has_serialize;
+  void serialize(std::ostream& os) const {
+    GraphNodeBase<SHORTHAND >::serialize(os);
+    GraphNodeData<NodeDataTy>::serialize(os);
+    GraphNodeEdges<SHORTHAND, EdgeDataTy, EDir>::serialize(os);
   }
-  //Serialize to the buffer
-  void serialize(Galois::Runtime::Distributed::memBuffer& buf) {
-  }
-};
+
+ };
 
 #undef SHORTHAND
 

@@ -1,6 +1,7 @@
 #include "Galois/Runtime/Context.h"
 
 #include <vector>
+#include <ostream>
 
 #include <cstddef>
 #include <cstring>
@@ -44,52 +45,40 @@ public:
     return ptr;
   }
   operator bool() const { return ptr != nullptr; }
-};
 
-/**
- * Indicates the operator may request the parallel loop to be suspended and a
- * given function run in serial
- */
-BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_static_serialize)
-template<typename T>
-struct has_static_serialize : public has_tt_static_serialize<T> {};
-
-
-class memBuffer {
-  std::vector<unsigned char> data;
-  
-public:
-  template<typename T>
-  void memcpy(T* obj) {
-    size_t old = data.size();
-    size_t n = sizeof(T);
-    data.resize(old + n);
-    std::memcpy(&obj[old], obj, n);
+  typedef int tt_has_serialize;
+  void serialize(std::ostream& os) const {
+    os << ptr;
   }
 };
 
+BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_has_serialize)
 template<typename T>
-void Serialize(const T& data, memBuffer& buf) {
-  if (std::is_pod<T>::value) {
-    buf.memcpy(&data);
-  } else if (has_static_serialize<T>::value) {
-    data.serialize(buf);
-  } else {
-    abort();
-  }
+struct has_serialize : public has_tt_has_serialize<T> {};
+
+template<typename T>
+void serialize(std::ostream& os, const T& data, typename std::enable_if<std::is_pod<T>::value>::type* = 0) {
+  os.write(&data, sizeof(T));
 }
 
 template<typename T>
-T* deSerialize(memBuffer& buf) {
-  if (std::is_pod<T>::value) {
-    abort();
-  } else if (has_static_serialize<T>::value) {
-    return new T(buf);
-  } else {
-    abort();
-  }
-  return 0;
+void serialize(std::ostream& os, const T& data, typename std::enable_if<has_serialize<T>::value>::type* = 0) {
+  data.serialize(os);
 }
+
+// template<typename T>
+// T* deSerialize(memBuffer& buf) {
+//   if (std::is_pod<T>::value) {
+//     T* n = new T;
+//     buf.memcpyOut(n);
+//     abort();
+//   } else if (has_static_serialize<T>::value) {
+//     return new T(buf);
+//   } else {
+//     abort();
+//   }
+//   return 0;
+// }
 
 } //namespace Distributed
 } //namespace Runtime
