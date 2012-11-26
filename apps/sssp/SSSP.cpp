@@ -324,6 +324,8 @@ int main(int argc, char **argv) {
   if (trackBadWork) {
     BadWork = new Galois::Statistic("BadWork");
     WLEmptyWork = new Galois::Statistic("EmptyWork");
+    statManager.push(*BadWork);
+    statManager.push(*WLEmptyWork);
   }
 
   GNode source, report;
