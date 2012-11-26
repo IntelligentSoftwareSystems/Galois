@@ -129,6 +129,15 @@ public:
   GraphNode(Args&&... args) :GraphNodeData<NodeDataTy>(std::forward<Args...>(args...)) {}
 
   GraphNode() {}
+
+  //serialization support
+  typedef int tt_static_serialize;
+  //deserializing constructor
+  GraphNode(Galois::Runtime::Distributed::memBuffer& buf) {
+  }
+  //Serialize to the buffer
+  void serialize(Galois::Runtime::Distributed::memBuffer& buf) {
+  }
 };
 
 #undef SHORTHAND
