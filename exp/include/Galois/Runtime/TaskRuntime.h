@@ -7,7 +7,6 @@
 #include "Galois/Galois.h"
 
 /* buffer sizes */
-#define RBUF      512
 #define RSIZ      (512*sizeof(int))
 
 /* types of tags */
@@ -59,7 +58,7 @@ namespace GaloisRuntime {
 
       // check if any new completion message has been received
       do {
-         usleep(1);
+   //    usleep(1);
          DIR::comm();
          MPI_Test (&rreq, &flag, &status);
          if (flag) {
@@ -71,9 +70,6 @@ namespace GaloisRuntime {
          }
       } while(numTasks != tasksCompleted);
 
-   /* return all the remote nodes */
-   DIR::return_comm();
-
       free (complist);
       return;
    }
@@ -81,34 +77,55 @@ namespace GaloisRuntime {
    /* This is the work loop from which tasks never return */
    void task_worker() {
       bool    flag = true;
+      int     received;
       int     data_count = 0;
-      char    buf[RSIZ], data[RSIZ], class_data[RSIZ];
+      char    buf[RSIZ], data[RSIZ], class_data[RSIZ], stbuf[RSIZ];
       size_t *sbuf = (size_t*)buf;
       ftype   addr;
-      MPI_Status creq;
+      int     err;
+
+      MPI_Status  status;
+      MPI_Request creq, creq1;
 
       task_synchronize();
 
+      /* receive the command from the master (rank = 0) */
+      err = MPI_Irecv(buf, RSIZ, MPI_BYTE, 0, COUNT_TAG, MPI_COMM_WORLD, &creq);
+      err = MPI_Irecv(stbuf, RSIZ, MPI_BYTE, 0, STOP_TAG, MPI_COMM_WORLD, &creq1);
+
       do {
-         /* receive the command from the master (rank = 0) */
-         MPI_Recv(buf, RSIZ, MPI_BYTE, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &creq);
-         switch (creq.MPI_TAG) {
-            case STOP_TAG:
-               flag = false;
-               break;
+         /* check if asked to stop */
+         err = MPI_Test(&creq1, &received, &status);
+         if (received) {
+            /* stop message received */
+            break;
+         }
+         err = MPI_Test(&creq, &received, &status);
+         if (!received) {
+            /* No message received */
+            DIR::comm();
+            continue;
+         }
+         switch (status.MPI_TAG) {
             case DATA_TAG:
                memcpy (data, buf, RSIZ);
+               err = MPI_Irecv(buf, RSIZ, MPI_BYTE, 0, CLASS_TAG, MPI_COMM_WORLD, &creq);
                break;
             case FUNC_TAG:
                addr = (ftype)sbuf[0];
                addr(class_data,data_count,data);
                task_terminate();
+               /* barrier to synchronize after command */
+               task_synchronize();
+               err = MPI_Irecv(buf, RSIZ, MPI_BYTE, 0, COUNT_TAG, MPI_COMM_WORLD, &creq);
                break;
             case COUNT_TAG:
                data_count = *((int*)buf);
+               err = MPI_Irecv(buf, RSIZ, MPI_BYTE, 0, DATA_TAG, MPI_COMM_WORLD, &creq);
                break;
             case CLASS_TAG:
                memcpy (class_data, buf, RSIZ);
+               err = MPI_Irecv(buf, RSIZ, MPI_BYTE, 0, FUNC_TAG, MPI_COMM_WORLD, &creq);
                break;
             default:
                cout << rank << " received unrecognized TAG! " << __FILE__;
@@ -116,9 +133,6 @@ namespace GaloisRuntime {
                break;
          }
       } while (flag);
-
-      /* barrier to synchronize after command */
-      task_synchronize();
 
       /* exit as the worker task should not return */
       MPI_Finalize();
@@ -142,7 +156,7 @@ namespace GaloisRuntime {
 
    template<typename IterTy, typename T, typename FunctionTy>
    void master_send_data(IterTy b, IterTy e, FunctionTy f) {
-      T       buf[RBUF];
+      T       buf[RSIZ];
       char   *rbuf = (char*)buf;
       size_t *sbuf = (size_t*)buf;
       MPI_Request sreq;
@@ -192,13 +206,23 @@ namespace GaloisRuntime {
       }
       f.rstart((char*)&f,mcount,(char*)buf);
 
+      return;
+   }
+
+   void master_terminate() {
+      char    buf[RSIZ];
+      char   *rbuf = (char*)buf;
+      MPI_Request sreq;
+
       // Stop after the foreach on each of the tasks
       for (int i = 1; i < numtasks; i++) {
          MPI_Isend (rbuf, RSIZ, MPI_BYTE, i, STOP_TAG, MPI_COMM_WORLD, &sreq);
       }
 
+      MPI_Finalize();
       return;
    }
+
 
    template<typename IterTy, typename FunctionTy>
    void for_each_task_impl(IterTy b, IterTy e, FunctionTy f) {

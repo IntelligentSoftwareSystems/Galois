@@ -22,16 +22,6 @@ static inline int getNoTasks() {
    return nr.numTasks;
 }
 
-/* return all the remote nodes before termination */
-static inline void return_comm() {
-   nr.return_remote();
-   for (int i = 0; i < 100; i++) {
-      usleep(1);
-      nr.Communicate();
-   }
-   return;
-}
-
 static inline void comm() {
    nr.Communicate();
    return;
@@ -51,12 +41,13 @@ static inline void comm() {
          count = 0;
          do {
             if (count++ == PLACEREQ) {
-               // requests may be lost as remote tasks may request
-               // for the same node
+               // reqs may be lost as remote tasks may ask for the same node
                count = 0;
+               // may be the only running thread - req a call to comm
+               nr.Communicate();
                nr.PlaceRequest (owner, ptr, size);
             }
-            usleep(1);
+   //       usleep(1);
             // another thread might have got the same data
             nr.checkRequest(ptr,owner,&tmp,size);
          } while(!tmp);

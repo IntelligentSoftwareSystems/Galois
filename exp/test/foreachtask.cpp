@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
    Galois::for_each_task<IterTy,f1> (myvec.begin(), myvec.end(), f);
    printf ("final output: %d\n", f.r->i);
 
-   MPI_Finalize();
+   master_terminate();
 
    return 0;
 }

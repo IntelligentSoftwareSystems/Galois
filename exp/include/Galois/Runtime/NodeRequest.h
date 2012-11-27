@@ -144,8 +144,16 @@ protected:
       req_queue::const_iterator pos2;
 
       Pair p(task,addr);
-      if (sent_not_recv_hash[p])
-         return true;
+      // check if request has been placed but not received
+      if (task != taskRank) {
+         if (sent_not_recv_hash[p])
+           return true;
+      }
+      else if (sent_hash[p]) {
+         p.first = (sent_hash[p])->toTask;
+         if (sent_not_recv_hash[p])
+           return true;
+      }
 
       for (pos1 = incoming_reqs.begin(); pos1 != incoming_reqs.end(); ++pos1) {
          Requests *woreq = *pos1;
@@ -185,7 +193,6 @@ public:
       req->addr = addr;
       req->size = size;
       req->ret_req = false;
-      // check if ret request
       if (req_to == taskRank) {
          Pair p(taskRank,addr);
          req->req_to = (sent_hash[p])->toTask;
@@ -582,7 +589,12 @@ public:
                unlock(L);
                Pair p2(storeTask,inreq->hreq->addr);
                recv_hash[p2] = tbuf;
-               sent_not_recv_hash[p2] = 0;
+               if (storeTask != taskRank)
+                 sent_not_recv_hash[p2] = 0;
+               else {
+                  p2.first = inreq->hreq->req_to;
+                  sent_not_recv_hash[p2] = 0;
+               }
 
                /* mark that a request was received */
                recv_flag = true;
