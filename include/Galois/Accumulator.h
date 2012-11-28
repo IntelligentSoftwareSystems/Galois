@@ -123,7 +123,7 @@ struct ReduceAssignWrap {
   }
 };
 
-//! Turn binary functions over references into functions over vectors of references
+//! Turn binary functions over item references into functions over vectors of items
 //!
 //! void operator()(T& a, const T& b) =>
 //! void operator()(std::vector<T>& a, const std::vector<T>& b)
@@ -138,6 +138,22 @@ struct ReduceVectorWrap {
     typename T::iterator ii = lhs.begin();
     for (typename T::const_iterator jj = rhs.begin(), ej = rhs.end(); jj != ej; ++ii, ++jj) {
       fn(*ii, *jj);
+    }
+  }
+};
+
+//! Turn binary functions over item (value) references into functions over maps of items
+//!
+//! void operator()(V& a, const V& b) =>
+//! void operator()(std::map<K,V>& a, const std::map<K,V>& b)
+template<typename BinFunc>
+struct ReduceMapWrap {
+  BinFunc fn;
+  ReduceMapWrap(const BinFunc& f = BinFunc()): fn(f) { }
+  template<typename T>
+  void operator()(T& lhs, const T& rhs) const {
+    for (typename T::const_iterator jj = rhs.begin(), ej = rhs.end(); jj != ej; ++jj) {
+      fn(lhs[jj->first], jj->second);
     }
   }
 };
@@ -237,6 +253,24 @@ public:
     VectorTy& v = *this->m_data.getLocal();
     if (v.size() <= index)
       v.resize(index + 1);
+    func(v[index], rhs);
+  }
+};
+
+//! Accumulator for map where accumulate does element-wise addition among
+//! all entries
+template<typename MapTy>
+class GMapElementAccumulator: public GReducible<MapTy, ReduceMapWrap<ReduceAssignWrap<std::plus<typename MapTy::mapped_type> > > > {
+  typedef ReduceAssignWrap<std::plus<typename MapTy::mapped_type> > ElementFunc;
+  typedef GReducible<MapTy, ReduceMapWrap<ElementFunc> > base_type;
+  typedef typename MapTy::mapped_type mapped_type;
+  typedef typename MapTy::key_type key_type;
+
+  ElementFunc func;
+
+public:
+  void update(const key_type& index, const mapped_type& rhs) {
+    MapTy& v = *this->m_data.getLocal();
     func(v[index], rhs);
   }
 };
