@@ -41,6 +41,7 @@
 #include <cassert>
 #include <cstdio>
 #include <cstring>
+#include <cerrno>
 
 #include <sched.h>
 

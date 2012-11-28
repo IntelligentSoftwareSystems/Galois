@@ -903,7 +903,7 @@ public:
     TLD& tld = *tlds.getLocal();
     if (tld.begin != tld.end) {
       boost::optional<value_type> retval = *tld.begin++;
-      assert(*retval);
+      assert(retval);
       return retval;
     }
     return boost::optional<value_type>();
