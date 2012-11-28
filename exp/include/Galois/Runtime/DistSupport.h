@@ -1,13 +1,30 @@
+/** Galois Distributed Pointer and Object Types -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @author Andrew Lenharth <andrewl@lenharth.org>
+ */
+#ifndef GALOIS_RUNTIME_DISTSUPPORT_H
+#define GALOIS_RUNTIME_DISTSUPPORT_H
+
 #include "Galois/Runtime/Context.h"
-
-#include <vector>
-#include <ostream>
-
-#include <cstddef>
-#include <cstring>
-#include <cstdlib>
-
-#include <boost/mpl/has_xxx.hpp>
+#include "Galois/Runtime/Serialize.h"
 
 namespace Galois {
 namespace Runtime {
@@ -46,40 +63,22 @@ public:
   }
   operator bool() const { return ptr != nullptr; }
 
+  //serialize
   typedef int tt_has_serialize;
-  void serialize(std::ostream& os) const {
+  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+    s.serialize(ptr);
+  }
+  void deserialize(Galois::Runtime::Distributed::SerializeBuffer& s) {
+    s.deserialize(ptr);
+  }
+
+  void dump(std::ostream& os) {
     os << ptr;
   }
 };
 
-BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_has_serialize)
-template<typename T>
-struct has_serialize : public has_tt_has_serialize<T> {};
-
-template<typename T>
-void serialize(std::ostream& os, const T& data, typename std::enable_if<std::is_pod<T>::value>::type* = 0) {
-  os.write(&data, sizeof(T));
-}
-
-template<typename T>
-void serialize(std::ostream& os, const T& data, typename std::enable_if<has_serialize<T>::value>::type* = 0) {
-  data.serialize(os);
-}
-
-// template<typename T>
-// T* deSerialize(memBuffer& buf) {
-//   if (std::is_pod<T>::value) {
-//     T* n = new T;
-//     buf.memcpyOut(n);
-//     abort();
-//   } else if (has_static_serialize<T>::value) {
-//     return new T(buf);
-//   } else {
-//     abort();
-//   }
-//   return 0;
-// }
-
 } //namespace Distributed
 } //namespace Runtime
 } //namespace Galois
+
+#endif //DISTSUPPORT

@@ -19,11 +19,25 @@ class GraphNodeBase {
   bool active;
 
 protected:
-  NHTy& getNextNode() { return nextNode; }
-
-public:
   GraphNodeBase() :active(false) {}
 
+  NHTy& getNextNode() { return nextNode; }
+
+  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+    s.serialize(nextNode, active);
+  }
+  void deserialize(Galois::Runtime::Distributed::SerializeBuffer& s) {
+    s.deserialize(nextNode, active);
+  }
+
+  void dump(std::ostream& os) {
+    os << "next: ";
+    nextNode.dump(os);
+    os << " active: ";
+    os << active;
+  }
+
+public:
   void setActive(bool b) {
     active = b;
   }
@@ -33,6 +47,20 @@ public:
 template<typename NodeDataTy>
 class GraphNodeData {
   NodeDataTy data;
+  
+protected:
+
+  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+    s.serialize(data);
+  }
+  void deserialize(Galois::Runtime::Distributed::SerializeBuffer& s) {
+    s.deserialize(data);
+  }
+
+  void dump(std::ostream& os) {
+    os << "data: " << data;
+  }
+
 public:
   template<typename... Args>
   GraphNodeData(Args&&... args) :data(std::forward<Args...>(args...)) {}
@@ -57,8 +85,26 @@ public:
   template<typename... Args>
   Edge(const NHTy& d, Args&&... args) :dst(d), val(std::forward<Args...>(args...)) {}
 
+  Edge() {}
+
   NHTy getDst() { return dst; }
   EdgeDataTy& getValue() { return val; }
+
+  typedef int tt_has_serialize;
+  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+    s.serialize(dst, val);
+  }
+  void deserialize(Galois::Runtime::Distributed::SerializeBuffer& s) {
+    s.deserialize(dst, val);
+  }
+
+  void dump(std::ostream& os) {
+    os << "<{Edge: dst: ";
+    dst.dump(os);
+    os << " val: ";
+    os << val;
+    os << "}>";
+  }
 };
 
 template<typename NHTy>
@@ -66,8 +112,23 @@ class Edge<NHTy, void> {
   NHTy dst;
 public:
   Edge(const NHTy& d) :dst(d) {}
+  Edge() {}
 
   NHTy getDst() { return dst; }
+
+  typedef int tt_has_serialize;
+  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+    s.serialize(dst);
+  }
+  void deserialize(Galois::Runtime::Distributed::SerializeBuffer& s) {
+    s.deserialize(dst);
+  }
+
+  void dump(std::ostream& os) {
+    os << "<{Edge: dst: ";
+    dst.dump();
+    os << "}>";
+  }
 };
 
 template<typename NHTy, typename EdgeDataTy>
@@ -77,6 +138,20 @@ class GraphNodeEdges<NHTy, EdgeDataTy, EdgeDirection::Out> {
 
   EdgeListTy edges;
 
+protected:
+  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+    s.serialize(edges);
+  }
+  void deserialize(Galois::Runtime::Distributed::SerializeBuffer& s) {
+    s.deserialize(edges);
+  }
+  void dump(std::ostream& os) {
+    os << "numedges: " << edges.size();
+    for (auto x = 0; x < edges.size(); ++x) {
+      os << " ";
+      edges[x].dump(os);
+    }
+  }
  public:
   typedef typename EdgeListTy::iterator iterator;
 
@@ -130,15 +205,28 @@ public:
 
   GraphNode() {}
 
-  //serialization support
+  //serialize
   typedef int tt_has_serialize;
-  void serialize(std::ostream& os) const {
-    GraphNodeBase<SHORTHAND >::serialize(os);
-    GraphNodeData<NodeDataTy>::serialize(os);
-    GraphNodeEdges<SHORTHAND, EdgeDataTy, EDir>::serialize(os);
+  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+    GraphNodeBase<SHORTHAND >::serialize(s);
+    GraphNodeData<NodeDataTy>::serialize(s);
+    GraphNodeEdges<SHORTHAND, EdgeDataTy, EDir>::serialize(s);
   }
-
- };
+  void deserialize(Galois::Runtime::Distributed::SerializeBuffer& s) {
+    GraphNodeBase<SHORTHAND >::deserialize(s);
+    GraphNodeData<NodeDataTy>::deserialize(s);
+    GraphNodeEdges<SHORTHAND, EdgeDataTy, EDir>::deserialize(s);
+  }
+  void dump(std::ostream& os) {
+    os << "<{GN: ";
+    GraphNodeBase<SHORTHAND >::dump(os);
+    os << " ";
+    GraphNodeData<NodeDataTy>::dump(os);
+    os << " ";
+    GraphNodeEdges<SHORTHAND, EdgeDataTy, EDir>::dump(os);
+    os << "}>";
+  }
+};
 
 #undef SHORTHAND
 
