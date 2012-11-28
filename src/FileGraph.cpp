@@ -109,10 +109,10 @@ char* FileGraph::structureFromArrays(uint64_t* out_idx, uint64_t num_nodes,
   uint64_t nBytes = sizeof(uint64_t) * 4; // version, sizeof_edge_data, numNodes, numEdges
 
   nBytes += sizeof(uint64_t) * num_nodes;
+  nBytes += sizeof(uint32_t) * num_edges;
   if (num_edges % 2) {
     nBytes += sizeof(uint32_t); // padding
   }
-  nBytes += sizeof(uint32_t) * num_edges;
   nBytes += sizeof_edge_data * num_edges;
  
   int _MAP_BASE = MAP_ANONYMOUS | MAP_PRIVATE;
@@ -136,10 +136,10 @@ char* FileGraph::structureFromArrays(uint64_t* out_idx, uint64_t num_nodes,
   t += sizeof(num_edges);
   memcpy(t, out_idx, sizeof(*out_idx) * num_nodes);
   t += sizeof(*out_idx) * num_nodes;
+  memcpy(t, outs, sizeof(*outs) * num_edges);
   if (num_edges % 2) {
     t += sizeof(uint32_t); // padding
   }
-  memcpy(t, outs, sizeof(*outs) * num_edges);
   
   structureFromMem(base, nBytes, false);
   return edgeData;

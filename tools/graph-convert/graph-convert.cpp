@@ -77,11 +77,11 @@ void convert_edgelist2gr(const std::string& infilename, const std::string& outfi
   size_t numNodes = 0;
   size_t numEdges = 0;
 
-  while (infile.good()) {
+  while (infile) {
     size_t src;
     size_t dst;
     infile >> src >> dst;
-    if (infile.good()) {
+    if (infile) {
       ++numEdges;
       if (src > numNodes)
         numNodes = src;
@@ -97,11 +97,11 @@ void convert_edgelist2gr(const std::string& infilename, const std::string& outfi
   infile.clear();
   infile.seekg(0, std::ios::beg);
   p.phase1();
-  while (infile.good()) {
+  while (infile) {
     size_t src;
     size_t dst;
     infile >> src >> dst;
-    if (infile.good()) {
+    if (infile) {
       p.incrementDegree(src);
     }
   }
@@ -109,11 +109,11 @@ void convert_edgelist2gr(const std::string& infilename, const std::string& outfi
   infile.clear();
   infile.seekg(0, std::ios::beg);
   p.phase2();
-  while (infile.good()) {
+  while (infile) {
     size_t src;
     size_t dst;
     infile >> src >> dst;
-    if (infile.good()) {
+    if (infile) {
       p.addNeighbor(src, dst);
     }
   }
@@ -136,7 +136,7 @@ void convert_rmat2gr(const std::string& infilename, const std::string& outfilena
   std::ifstream infile(infilename.c_str());
 
   // Skip to first non-comment line
-  while (!infile.eof()) {
+  while (infile) {
     if (infile.peek() != '%') {
       break;
     }
@@ -237,7 +237,7 @@ void convert_stext2vgr(const std::string& infilename, const std::string& outfile
   for (uint32_t node_id = 0; node_id < nnodes; ++node_id) {
     GNode& src = nodes[node_id];
     while (true) {
-      if (!infile.good()) {
+      if (infile) {
         if (node_id != nnodes - 1) {
           std::cerr << "Error: read data until node " << node_id << " of " << nnodes << "\n";
           return;
@@ -284,7 +284,7 @@ void convert_dimacs2gr(const std::string& infilename, const std::string& outfile
 
   std::ifstream infile(infilename.c_str());
 
-  while (!infile.eof()) {
+  while (infile) {
     if (infile.peek() != 'c') {
       break;
     }

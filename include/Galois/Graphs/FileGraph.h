@@ -286,9 +286,9 @@ public:
     memset(out_idx, 0, sizeof(*out_idx) * this->numNodes);
   }
 
-  void incrementDegree(size_t id) {
+  void incrementDegree(size_t id, int delta = 1) {
     assert(id < this->numNodes);
-    out_idx[id]++;
+    out_idx[id] += delta;
   }
 
   void phase2() {
