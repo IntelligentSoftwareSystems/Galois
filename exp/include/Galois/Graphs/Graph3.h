@@ -147,7 +147,7 @@ protected:
   }
   void dump(std::ostream& os) {
     os << "numedges: " << edges.size();
-    for (auto x = 0; x < edges.size(); ++x) {
+    for (decltype(edges.size()) x = 0; x < edges.size(); ++x) {
       os << " ";
       edges[x].dump(os);
     }
@@ -242,6 +242,19 @@ template<typename NodeTy, typename EdgeTy, EdgeDirection EDir>
 class ThirdGraph { //: public Galois::Runtime::Distributed::DistBase<ThirdGraph> {
   typedef GraphNode<NodeTy, EdgeTy, EDir> gNode;
 
+  struct SubGraphState {
+    typename gNode::Handle head;
+    Galois::Runtime::Distributed::gptr<SubGraphState> next;
+    Galois::Runtime::Distributed::gptr<ThirdGraph> master;
+    typedef int tt_has_serialize;
+    void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+      s.serialize(head, next, master);
+    }
+    void deserialize(Galois::Runtime::Distributed::SerializeBuffer& s) {
+      s.deserialize(head, next, master);
+    }
+  };
+
   typename gNode::Handle head;
 
 public:
@@ -284,12 +297,11 @@ public:
   iterator begin() { return iterator(head); }
   iterator end() { return iterator(); }
 
-  local_iterator local_begin();
-  local_iterator local_end();
+  local_iterator local_begin() { return iterator(head); }
+  local_iterator local_end() { return iterator(); }
 
-  unsigned int size();
-  
   ThirdGraph() {}
+
 };
 
 
