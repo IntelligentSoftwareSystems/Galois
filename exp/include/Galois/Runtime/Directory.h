@@ -65,13 +65,12 @@ static inline void comm() {
       }
    pthread_mutex_unlock(&mutex);
       // lock the object if locked for use by the directory (setLockValue)
-      Galois::MethodFlag g = Galois::ALL;
       L = reinterpret_cast<Lockable*>(tmp);
  //   if (get_distributed_foreach() && (getNoTasks() != 1))
       if (get_distributed_foreach())
-        lockAcquire(L,g);
+        lockAcquire(L,Galois::MethodFlag::ALL);
       else
-        acquire(L,g);
+        acquire(L,Galois::MethodFlag::ALL);
       return tmp;
    }
 
