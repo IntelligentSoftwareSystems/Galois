@@ -75,12 +75,6 @@ struct Node {
   Node* component;
 };
 
-std::ostream& operator<<(std::ostream& os, const Node& n) {
-  os << "[id: " << n.id << ", c: " << n.component->id << "]";
-  return os;
-}
-
-
 #ifdef GALOIS_USE_NUMA
 typedef Galois::Graph::LC_Numa_Graph<Node,void> Graph;
 #else
@@ -90,6 +84,11 @@ typedef Galois::Graph::LC_CSR_Graph<Node,void> Graph;
 typedef Graph::GraphNode GNode;
 
 Graph graph;
+
+std::ostream& operator<<(std::ostream& os, const Node& n) {
+  os << "[id: " << n.id << ", c: " << n.component->id << "]";
+  return os;
+}
 
 /** 
  * Serial connected component algorithm. Just use union-find.
@@ -549,18 +548,6 @@ void run() {
   T.start();
   algo();
   T.stop();
-
-  if (!skipVerify || writeType == largest) {
-    Node* component = findLargest();
-    if (!verify()) {
-      std::cerr << "verification failed\n";
-      assert(0 && "verification failed");
-      abort();
-    }
-    if (writeType == largest && component) {
-      writeComponent(component);
-    }
-  }
 }
 
 int main(int argc, char** argv) {
@@ -589,6 +576,18 @@ int main(int argc, char** argv) {
     default: std::cerr << "Unknown algo: " << algo << "\n";
   }
   Galois::Statistic("MeminfoPost", GaloisRuntime::MM::pageAllocInfo());
+
+  if (!skipVerify || writeType == largest) {
+    Node* component = findLargest();
+    if (!verify()) {
+      std::cerr << "verification failed\n";
+      assert(0 && "verification failed");
+      abort();
+    }
+    if (writeType == largest && component) {
+      writeComponent(component);
+    }
+  }
 
   return 0;
 }
