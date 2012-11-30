@@ -93,7 +93,7 @@ public:
   template<typename T>
   inline void deserialize(T& data, typename std::enable_if<std::is_pod<T>::value>::type* = 0) {
     unsigned char* pdata = (unsigned char*)&data;
-    for (int i = 0; i < sizeof(data); ++i) {
+    for (size_t i = 0; i < sizeof(data); ++i) {
       pdata[i] = bufdata.front();
       bufdata.pop_front();
     }
@@ -106,10 +106,11 @@ public:
 
   template<typename T, typename Alloc>
   inline void deserialize(std::deque<T, Alloc>& data) {
-    typename std::deque<T, Alloc>::size_type size;
+    typedef typename std::deque<T, Alloc>::size_type lsty;
+    lsty size;
     deserialize(size);
     data.resize(size);
-    for (decltype(size) x = 0; x < size; ++x)
+    for (lsty x = 0; x < size; ++x)
       deserialize(data[x]);
   }
 
