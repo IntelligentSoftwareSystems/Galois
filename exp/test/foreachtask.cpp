@@ -22,7 +22,7 @@ struct f1 {
 
    void operator()(int& data, Galois::UserContext<int>& lwl) {
       r->add(data);
-   //printf ("data: %d\t sum so far: %d\n", data, r->i);
+   printf ("data: %d\t sum so far: %d\n", data, r->i);
       return;
    }
 

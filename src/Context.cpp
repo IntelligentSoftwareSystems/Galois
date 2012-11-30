@@ -27,12 +27,12 @@
 #include "Galois/Runtime/ll/SimpleLock.h"
 #include "Galois/Runtime/ll/CacheLineStorage.h"
 
-#include <stdio.h>
-
 #if GALOIS_USE_EXCEPTION_HANDLER
 #else
 __thread jmp_buf GaloisRuntime::hackjmp;
 #endif
+
+#define USE_LOCK ((GaloisRuntime::SimpleRuntimeContext*)0x423)
 
 //! Global thread context for each active thread
 static __thread GaloisRuntime::SimpleRuntimeContext* thread_cnx = 0;
@@ -69,10 +69,40 @@ GaloisRuntime::SimpleRuntimeContext* GaloisRuntime::getThreadContext() {
   return thread_cnx;
 }
 
+void GaloisRuntime::SimpleRuntimeContext::lockAcquire(GaloisRuntime::Lockable* L) {
+  if (L->Owner.stealing_CAS(USE_LOCK,this)) {
+    assert(!L->next);
+    L->next = locks;
+    locks = L;
+  } else {
+    if (L->Owner.getValue() != this) {
+      GaloisRuntime::signalConflict();
+    }
+  }
+}
+
+void GaloisRuntime::doLockAcquire(GaloisRuntime::Lockable* C) {
+  SimpleRuntimeContext* cnx = getThreadContext();
+  if (cnx)
+    cnx->lockAcquire(C);
+}
+
 void GaloisRuntime::doAcquire(GaloisRuntime::Lockable* C) {
   SimpleRuntimeContext* cnx = getThreadContext();
   if (cnx)
     cnx->acquire(C);
+}
+
+void GaloisRuntime::SimpleRuntimeContext::do_setLockValue(GaloisRuntime::Lockable* L) {
+  // L->Owner.setValue(USE_LOCK);
+  L->Owner.stealing_CAS(NULL,USE_LOCK);
+  return;
+}
+
+void GaloisRuntime::do_setLockValue(GaloisRuntime::Lockable* L) {
+  SimpleRuntimeContext cnx;
+  cnx.do_setLockValue(L);
+  return;
 }
 
 void *GaloisRuntime::SimpleRuntimeContext::do_getValue(GaloisRuntime::Lockable* L) {

@@ -97,9 +97,11 @@ public:
   unsigned cancel_iteration();
   unsigned commit_iteration();
   void acquire(Lockable* L);
+  void lockAcquire(Lockable* L);
   bool do_trylock(GaloisRuntime::Lockable* L);
   void do_unlock(GaloisRuntime::Lockable* L);
   void *do_getValue(GaloisRuntime::Lockable* L);
+  void do_setLockValue(GaloisRuntime::Lockable* L);
 };
 
 //! get the current conflict detection class, may be null if not in parallel region
@@ -156,6 +158,22 @@ void doAcquire(Lockable* C);
 static inline void acquire(Lockable* C, Galois::MethodFlag m) {
   if (shouldLock(m))
     doAcquire(C);
+}
+
+//! actual locking function
+void doLockAcquire(Lockable* C);
+
+// Function to acquire a local node
+static inline void lockAcquire(Lockable* C, Galois::MethodFlag m) {
+  if (shouldLock(m))
+    doLockAcquire(C);
+}
+
+void do_setLockValue(Lockable* C);
+
+static inline void setLockValue(Lockable* C) {
+   do_setLockValue(C);
+   return;
 }
 
 void *do_getValue(Lockable* C);

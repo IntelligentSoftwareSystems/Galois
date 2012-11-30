@@ -49,6 +49,7 @@ protected:
       int     done;
       int     sent;
       int     nodeid;
+      int     version;
       bool    ret_req; // set when request for node to be returned
       char    buff[BUF_SIZE];
    };
@@ -77,6 +78,7 @@ protected:
    unordered_map<Pair,void*,HashFunction,SetEqual>             recv_hash;
    unordered_map<Pair,locData*,HashFunction,SetEqual>          sent_hash;
    unordered_map<Pair,int,HashFunction,SetEqual>               sent_not_recv_hash;
+   unordered_map<Pair,int,HashFunction,SetEqual>               ver_num;
    typedef unordered_map<Pair,void*,HashFunction,SetEqual>     recv_type;
    typedef unordered_map<Pair,locData*,HashFunction,SetEqual>  sent_type;
 
@@ -142,7 +144,10 @@ protected:
    bool alreadyRequested (void *addr, int task, size_t size) {
       inreq_que::const_iterator pos1;
       req_queue::const_iterator pos2;
+      int check;
 
+      // we should let multiple requests for a failsafe system
+ /*
       Pair p(task,addr);
       // check if request has been placed but not received
       if (task != taskRank) {
@@ -154,20 +159,30 @@ protected:
          if (sent_not_recv_hash[p])
            return true;
       }
+  */
 
       for (pos1 = incoming_reqs.begin(); pos1 != incoming_reqs.end(); ++pos1) {
          Requests *woreq = *pos1;
-         if ((task == woreq->hreq->req_to) && (addr == woreq->hreq->addr))
+         check = woreq->hreq->req_to;
+         if (taskRank == check)
+           check = woreq->hreq->req_from;
+         if ((task == check) && (addr == woreq->hreq->addr))
             return true;
       }
       for (pos2 = service_reqs.begin(); pos2 != service_reqs.end(); ++pos2) {
          handle_req *woreq = *pos2;
-         if ((task == woreq->req_to) && (addr == woreq->addr))
+         check = woreq->req_to;
+         if (taskRank == check)
+           check = woreq->req_from;
+         if ((task == check) && (addr == woreq->addr))
             return true;
       }
       for (pos2 = outgoing_reqs.begin(); pos2 != outgoing_reqs.end(); ++pos2) {
          handle_req *woreq = *pos2;
-         if ((task == woreq->req_to) && (addr == woreq->addr))
+         check = woreq->req_to;
+         if (taskRank == check)
+           check = woreq->req_from;
+         if ((task == check) && (addr == woreq->addr))
             return true;
       }
 
@@ -192,6 +207,7 @@ public:
       req->req_to = req_to;
       req->addr = addr;
       req->size = size;
+      req->version = 0;
       req->ret_req = false;
       if (req_to == taskRank) {
          Pair p(taskRank,addr);
@@ -217,6 +233,14 @@ public:
          else
            tmp = addr;
       }
+      // if present lock the node for use
+      // only locks if the node isn't already locked
+      if (tmp) {
+         Lockable *L;
+         L = reinterpret_cast<Lockable*>(tmp);
+         if (trylock(L))
+           setLockValue(L);
+      }
       pthread_mutex_unlock(&mutex);
       return tmp;
    }
@@ -234,9 +258,12 @@ public:
             Pair p(woreq->hreq->req_from,woreq->hreq->addr);
             free(sent_hash[p]);
             sent_hash[p] = NULL;
+ /*
             Lockable *L;
             L = reinterpret_cast<Lockable*>(woreq->hreq->addr);
+ printf ("\ttask: %d checkRequest unlock!\n", taskRank);
             unlock(L);
+  */
             tchk = woreq->hreq->req_from;
          }
          if ((task == tchk) && (addr == woreq->hreq->addr)) {
@@ -266,7 +293,7 @@ public:
       return;
    }
 
-   void register_initial_req(int req_from, int req_to, void *addr, size_t size)
+   void register_initial_req(int req_from, int req_to, void *addr, size_t size, int ver)
    {
       // when the local node with addr is got back from req_from 
       Pair p(taskRank,addr);
@@ -276,6 +303,7 @@ public:
       req->req_to = taskRank;
       req->addr = addr;
       req->size = size;
+      req->version = ver;
       req->ret_req = false;
       initial_reqs[p] = req;
       return;
@@ -292,6 +320,7 @@ public:
          Requests *woreq = *pos;
          Pair p(taskRank,woreq->hreq->addr);
          if ((req = initial_reqs[p])) {
+            /* check if the node is marked for lock use */
             initial_reqs[p] = NULL;
             (sent_hash[p])->toTask = req->req_from;
             memcpy(req->buff,woreq->hreq->buff,req->size);
@@ -345,7 +374,7 @@ public:
          if (initial_reqs[p1])
            return;
          // register the initial request to be handled once the node is returned
-         register_initial_req(loc->toTask,req->req_from,req->addr,req->size);
+         register_initial_req(loc->toTask,req->req_from,req->addr,req->size,req->version);
          // place a request to the node to return this node
          handle_req *nreq = allocate_req();
          nreq->mreq = allocate_mpi_req();
@@ -353,6 +382,7 @@ public:
          nreq->req_to = loc->toTask;
          nreq->addr = req->addr;
          nreq->size = req->size;
+         nreq->version = req->version;
          nreq->ret_req = true;
          outgoing_reqs.insert (nreq);
          // remove this request from the service list
@@ -364,13 +394,16 @@ public:
          L = reinterpret_cast<Lockable*>(addr);
          if (!req->ret_req) {
             // this is a local node as not a return request
-            // send only if the is not locked now
+            // send only if the node is not locked now
             if (!trylock(L))
               return;
          }
          // check if it's a request to return a node
          if(req->ret_req) {
             addr = recv_hash[p];
+            L = reinterpret_cast<Lockable*>(addr);
+            if (L && getValue(L))
+              return;
             recv_hash[p] = NULL;
          }
          // check for possible duplicate requests and delete em
@@ -500,28 +533,17 @@ public:
 
          /* check if any data request can be satisfied */
          if (wreq->done && !wreq->sent) {
- cout << "SERV " << taskRank << " to " << wreq->req_from << " addr " << wreq->addr << endl;
+ //cout << "SERV " << taskRank << " to " << wreq->req_from << " addr " << wreq->addr << endl;
             err = MPI_Isend (wreq, sizeof(handle_req), MPI_BYTE, wreq->req_from,
                              SERV_TAG, MPI_COMM_WORLD, wreq->mreq);
             wreq->sent = 1;
          }
+      }
 
-         /* check for any more INCOMING data requests */
-         do {
-            err = MPI_Test (mreq, &flag, &status);
-            if (flag) {
-               // add a call back to cache manager to service the request
-               hreq->mreq = mreq;
-               /* add to the service_reqs queue */
-               temp_add_req.insert (hreq);
-
-               /* try receiving another request */
-               hreq = allocate_req();
-               mreq = allocate_mpi_req();
-               err = MPI_Irecv (hreq, sizeof(handle_req), MPI_BYTE, MPI_ANY_SOURCE,
-                                REQ_TAG, MPI_COMM_WORLD, mreq);
-            }
-         } while (flag);
+      /* add the new requests to service_reqs */
+      for (pos = temp_add_req.begin(); pos != temp_add_req.end(); ++pos) {
+         wreq = *pos;
+         service_reqs.insert(wreq);
       }
 
       /* remove all the satisfied requests from service_reqs */
@@ -530,12 +552,6 @@ public:
          service_reqs.erase(wreq);
          free_mpi_req(wreq->mreq);
          free_req(wreq);
-      }
-
-      /* add the new requests to service_reqs */
-      for (pos = temp_add_req.begin(); pos != temp_add_req.end(); ++pos) {
-         wreq = *pos;
-         service_reqs.insert(wreq);
       }
 
       /* empty the temp lists */
@@ -548,7 +564,12 @@ public:
 
          /* send the data request if it hasn't been sent yet */
          if (!wreq->sent) {
- cout << "REQ " << taskRank << " to " << wreq->req_to << " addr " << wreq->addr << endl;
+ //cout << "REQ " << taskRank << " to " << wreq->req_to << " addr " << wreq->addr << endl;
+            // assign version number if not owner
+            if (!wreq->ret_req) {
+               Pair p(wreq->req_to,wreq->addr);
+               wreq->version = ver_num[p];
+            }
             err = MPI_Isend (wreq, sizeof(handle_req), MPI_BYTE, wreq->req_to,
                              REQ_TAG, MPI_COMM_WORLD, wreq->mreq);
             wreq->sent = 1;
@@ -583,17 +604,38 @@ public:
                void *tbuf = (void*)malloc(sizeof(char)*(inreq->hreq->size+5));
                memcpy(tbuf,inreq->hreq->buff,inreq->hreq->size);
 
-               /* data is locked by the remote directory before sending */
+               /* lock the data for use by the local task */
                Lockable *L;
                L = reinterpret_cast<Lockable*>(tbuf);
-               unlock(L);
+               trylock(L);
+               setLockValue(L);
                Pair p2(storeTask,inreq->hreq->addr);
                recv_hash[p2] = tbuf;
-               if (storeTask != taskRank)
-                 sent_not_recv_hash[p2] = 0;
+               if (storeTask != taskRank) {
+                  sent_not_recv_hash[p2] = 0;
+                  // unlock if version number doesn't match - node received
+                  if (inreq->hreq->version != ver_num[p2]) {
+                     unlock(L);
+                     // remove from incoming list as it doesn't match to a req
+                     incoming_reqs.erase(inreq);
+                     free_req(inreq->hreq);
+                     free_mpi_req(inreq->mreq);
+                     free_incoming_req(inreq);
+                  }
+                  else
+                    ver_num[p2]++;
+               }
                else {
                   p2.first = inreq->hreq->req_to;
                   sent_not_recv_hash[p2] = 0;
+                  /* lock in directory if sending to remote node */
+                  p2.first = taskRank;
+                  if (initial_reqs[p2]) {
+                     unlock(L);
+                     if (!trylock(L)) {
+                       cout << "ERROR: " << __FILE__ << ":" << __LINE__ << endl;
+                     }
+                  }
                }
 
                /* mark that a request was received */

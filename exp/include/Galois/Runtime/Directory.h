@@ -6,9 +6,21 @@
 #include "Galois/Runtime/ll/TID.h"
 #include "Galois/Runtime/MethodFlags.h"
 
-#define PLACEREQ 100
+#define PLACEREQ 10000
 
 namespace GaloisRuntime {
+
+// the default value is false
+extern bool distributed_foreach;
+
+static inline void set_distributed_foreach(bool val) {
+   distributed_foreach = val;
+   return;
+}
+
+static inline bool get_distributed_foreach() {
+   return distributed_foreach;
+}
 
 namespace DIR {
 
@@ -27,8 +39,6 @@ static inline void comm() {
    return;
 }
 
-// class dir {
-
    static void *resolve (void *ptr, int owner, size_t size) {
       Lockable *L;
       int count;
@@ -45,20 +55,25 @@ static inline void comm() {
                count = 0;
                // may be the only running thread - req a call to comm
                nr.Communicate();
+               // sleep so that the caller is not flooded with requests
+               sleep(1);
+ //printf ("\t task %d placing another req in the dir\n", getTaskRank());
                nr.PlaceRequest (owner, ptr, size);
             }
-   //       usleep(1);
             // another thread might have got the same data
             nr.checkRequest(ptr,owner,&tmp,size);
          } while(!tmp);
       }
    pthread_mutex_unlock(&mutex);
-      // lock the object
+      // lock the object if locked for use by the directory (setLockValue)
       L = reinterpret_cast<Lockable*>(tmp);
-      acquire(L,Galois::MethodFlag::ALL);
+ //   if (get_distributed_foreach() && (getNoTasks() != 1))
+      if (get_distributed_foreach())
+        lockAcquire(L,Galois::MethodFlag::ALL);
+      else
+        acquire(L,Galois::MethodFlag::ALL);
       return tmp;
    }
-// };
 
 } // end of DIR namespace
 

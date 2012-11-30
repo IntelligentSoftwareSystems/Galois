@@ -44,6 +44,7 @@
 
 namespace GaloisRuntime {
 
+/*
 // the default value is false
 extern bool distributed_foreach;
 
@@ -55,6 +56,7 @@ static inline void set_distributed_foreach(bool val) {
 static inline bool get_distributed_foreach() {
    return distributed_foreach;
 }
+*/
 
 template<typename T1, typename T2>
 struct Initializer {
