@@ -56,8 +56,7 @@ static inline void comm() {
                // may be the only running thread - req a call to comm
                nr.Communicate();
                // sleep so that the caller is not flooded with requests
-               sleep(1);
- //printf ("\t task %d placing another req in the dir\n", getTaskRank());
+               usleep(10000);
                nr.PlaceRequest (owner, ptr, size);
             }
             // another thread might have got the same data
@@ -66,12 +65,13 @@ static inline void comm() {
       }
    pthread_mutex_unlock(&mutex);
       // lock the object if locked for use by the directory (setLockValue)
+      Galois::MethodFlag g = Galois::ALL;
       L = reinterpret_cast<Lockable*>(tmp);
  //   if (get_distributed_foreach() && (getNoTasks() != 1))
       if (get_distributed_foreach())
-        lockAcquire(L,Galois::MethodFlag::ALL);
+        lockAcquire(L,g);
       else
-        acquire(L,Galois::MethodFlag::ALL);
+        acquire(L,g);
       return tmp;
    }
 
