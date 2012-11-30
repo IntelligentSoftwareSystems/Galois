@@ -52,7 +52,7 @@ public:
   template<typename T>
   inline void serialize(const T& data, typename std::enable_if<std::is_pod<T>::value>::type* = 0) {
     unsigned char* pdata = (unsigned char*)&data;
-    for (int i = 0; i < sizeof(data); ++i)
+    for (size_t i = 0; i < sizeof(data); ++i)
       bufdata.push_back(pdata[i]);
   }
 
