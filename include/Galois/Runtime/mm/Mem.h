@@ -592,6 +592,13 @@ public:
   void construct(pointer ptr, const TyC& val) {
     new (ptr) Ty(val);
   }
+
+#ifdef GALOIS_HAS_RVALUE_REFERENCES
+  template<class U, class... Args >
+  void construct(U* p, Args&&... args ) {
+    ::new((void*)p) U(std::forward<Args>(args)...);
+  }
+#endif
   
   void destroy(pointer ptr) {
     destruct(ptr);
@@ -675,8 +682,8 @@ public:
 
 //#if __GNUC_MINOR__ > 5
 #ifdef GALOIS_HAS_RVALUE_REFERENCES
-  template< class U, class... Args >
-  void construct( U* p, Args&&... args ) {
+  template<class U, class... Args >
+  void construct(U* p, Args&&... args ) {
     ::new((void*)p) U(std::forward<Args>(args)...);
   }
 #endif

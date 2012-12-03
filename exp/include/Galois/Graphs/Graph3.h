@@ -293,7 +293,7 @@ public:
 	s = s->next;
 	n = s->head;
       }
-    }	
+    }
     iterator() :n(), s() {}
     iterator(const iterator& mit) : n(mit.n), s(mit.s) {}
 

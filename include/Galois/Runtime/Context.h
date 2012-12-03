@@ -28,6 +28,7 @@
 #include "Galois/Callbacks.h"
 #include "Galois/MethodFlags.h"
 #include "Galois/Runtime/ll/PtrLock.h"
+#include "Galois/Runtime/ll/gio.h"
 #include <cassert>
 #include <cstdlib>
 #include <setjmp.h>
@@ -146,8 +147,8 @@ static inline bool shouldLock(Galois::MethodFlag g) {
   case Galois::CHECK_CONFLICT:
     return true;
   }
-  assert(0 && "Shouldn't get here");
-  abort();
+  GALOIS_ERROR(true, "shouldn't get here");
+  return false;
 }
 
 //! actual locking function.  Will always lock.

@@ -52,6 +52,8 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
+#ifndef GALOIS_GRAPHS_LCGRAPH_H
+#define GALOIS_GRAPHS_LCGRAPH_H
 
 #include "Galois/Galois.h"
 #include "Galois/Graphs/FileGraph.h"
@@ -128,6 +130,7 @@ public:
   typedef typename EdgeDataWrapper<EdgeTy>::reference edge_data_reference;
   typedef boost::counting_iterator<uint64_t> edge_iterator;
   typedef boost::counting_iterator<uint32_t> iterator;
+  typedef iterator local_iterator;
 
   LC_CSR_Graph(): NodeData(0), EdgeIndData(0), EdgeDst(0) { }
 
@@ -181,6 +184,21 @@ public:
 
   iterator end() const {
     return iterator(numNodes);
+  }
+
+  local_iterator local_begin() const {
+    unsigned int id = GaloisRuntime::LL::getTID();
+    unsigned int num = Galois::getActiveThreads();
+    uint64_t start = (numNodes + num - 1) / num * id;
+    return iterator(start);
+  }
+
+  local_iterator local_end() const {
+    unsigned int id = GaloisRuntime::LL::getTID();
+    unsigned int num = Galois::getActiveThreads();
+    uint64_t end = (numNodes + num - 1) / num * (id + 1);
+    end = std::min(end, numNodes);
+    return iterator(end);
   }
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = ALL) {
@@ -290,7 +308,10 @@ public:
     GraphNode operator*() { return at; }
   };
 
+  typedef iterator local_iterator;
+
   LC_CSRInline_Graph(): NodeData(0), EdgeData(0) { }
+
 
   ~LC_CSRInline_Graph() {
     // TODO(ddn): call destructors of user data
@@ -335,6 +356,21 @@ public:
 
   iterator end() const {
     return iterator(endNode);
+  }
+
+  local_iterator local_begin() const {
+    unsigned int id = GaloisRuntime::LL::getTID();
+    unsigned int num = Galois::getActiveThreads();
+    uint64_t start = (numNodes + num - 1) / num * id;
+    return iterator(&NodeData[start]);
+  }
+
+  local_iterator local_end() const {
+    unsigned int id = GaloisRuntime::LL::getTID();
+    unsigned int num = Galois::getActiveThreads();
+    uint64_t end = (numNodes + num - 1) / num * (id + 1);
+    end = std::min(end, numNodes);
+    return iterator(&NodeData[end]);
   }
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = ALL) {
@@ -437,6 +473,7 @@ public:
   typedef EdgeInfo* edge_iterator;
   typedef typename EdgeInfo::reference edge_data_reference;
   typedef NodeInfo** iterator;
+  typedef iterator local_iterator;
 
   LC_Linear_Graph(): Data(0), nodes(0) { }
 
@@ -478,11 +515,26 @@ public:
   }
 
   iterator begin() const {
-    return nodes;
+    return &nodes[0];
   }
 
   iterator end() const {
     return &nodes[numNodes];
+  }
+
+  local_iterator local_begin() const {
+    unsigned int id = GaloisRuntime::LL::getTID();
+    unsigned int num = Galois::getActiveThreads();
+    uint64_t start = (numNodes + num - 1) / num * id;
+    return &nodes[start];
+  }
+
+  local_iterator local_end() const {
+    unsigned int id = GaloisRuntime::LL::getTID();
+    unsigned int num = Galois::getActiveThreads();
+    uint64_t end = (numNodes + num - 1) / num * (id + 1);
+    end = std::min(end, numNodes);
+    return &nodes[end];
   }
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = ALL) {
@@ -532,8 +584,9 @@ public:
 };
 
 //! Local computation graph (i.e., graph structure does not change)
+//! Specialization of LC_Linear_Graph for NUMA architectures
 template<typename NodeTy, typename EdgeTy>
-class LC_Linear2_Graph {
+class LC_Numa_Graph {
 protected:
   struct NodeInfo;
   typedef EdgeInfoWrapper<NodeInfo,EdgeTy> EdgeInfo;
@@ -763,9 +816,9 @@ public:
     GraphNode operator*() const { return v; }
   };
 
-  LC_Linear2_Graph(): nodes(0) { }
+  LC_Numa_Graph(): nodes(0) { }
 
-  ~LC_Linear2_Graph() {
+  ~LC_Numa_Graph() {
     // TODO(ddn): call destructors of user data
     if (nodes)
       GaloisRuntime::MM::largeInterleavedFree(nodes, sizeof(NodeInfo*) * numNodes);
@@ -856,3 +909,4 @@ public:
 
 }
 }
+#endif

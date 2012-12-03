@@ -237,7 +237,6 @@ void GaloisRuntime::DeterministicRuntimeContext::sub_acquire(GaloisRuntime::Lock
   return;
 }
 
-
 void GaloisRuntime::forceAbort() {
   signalConflict();
 }

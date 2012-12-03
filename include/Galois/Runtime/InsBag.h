@@ -177,7 +177,16 @@ public:
     return iterator(&heads, LL::getTID() + 1);
   }
 
-  //Only this is thread safe
+  bool empty() const {
+    for (unsigned x = 0; x < heads.size(); ++x) {
+      header* h = *heads.getRemote(x);
+      if (h)
+        return false;
+    }
+    return true;
+  }
+
+  //! Only this is thread safe
   reference push(const T& val) {
     header* H = *heads.getLocal();
     T* rv;
@@ -190,12 +199,11 @@ public:
     return *rv;
   }
 
-  //allow using std::back_inserter
+  //! Allow using std::back_inserter
   reference push_back(const T& val) {
     return push(val);
   }
 };
-
 
 }
 #endif

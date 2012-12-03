@@ -29,8 +29,10 @@
 #include <boost/iterator/transform_iterator.hpp>
 #include "Galois/Galois.h"
 #include "Galois/Statistic.h"
+#include "Galois/Bag.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
+#include "Galois/Runtime/WorkListAlt.h"
 
 namespace {
 const char* name = "Barnshut N-Body Simulator";
@@ -236,7 +238,8 @@ inline void updateCenter(Point& p, int index, double radius) {
   }
 }
 
-typedef std::vector<Body> Bodies;
+typedef Galois::InsertBag<Body> Bodies;
+typedef Galois::InsertBag<Body*> ptrBodies;
 
 struct BuildOctree {
   // NB: only correct when run sequentially
@@ -501,6 +504,7 @@ struct ReduceBoxes {
 
   template<typename Context>
   void operator()(Body* b, Context&) {
+    assert(b);
     initial.merge(b->pos);
   }
 };
@@ -509,11 +513,58 @@ double nextDouble() {
   return rand() / (double) RAND_MAX;
 }
 
+struct insBody {
+  ptrBodies& pBodies;
+  Bodies& bodies;
+  insBody(ptrBodies& pb, Bodies& b) :pBodies(pb),bodies(b) {}
+  void operator()(Body& b) {
+    pBodies.push_back(&(bodies.push_back(b)));
+  }
+};
+
+struct centerXCmp {
+  template<typename T>
+  bool operator()(const T& lhs, const T& rhs) const {
+    return lhs.pos[0] < rhs.pos[0];
+  }
+};
+
+struct centerYCmp {
+  template<typename T>
+  bool operator()(const T& lhs, const T& rhs) const {
+    return lhs.pos[1] < rhs.pos[1];
+  }
+};
+
+struct centerYCmpInv {
+  template<typename T>
+  bool operator()(const T& lhs, const T& rhs) const {
+    return rhs.pos[1] < lhs.pos[1];
+  }
+};
+
+
+template<typename Iter>
+void divide(const Iter& b, const Iter& e) {
+  if (std::distance(b,e) > 32) {
+    std::sort(b,e, centerXCmp());
+    Iter m = Galois::split_range(b,e);
+    std::sort(b,m, centerYCmpInv());
+    std::sort(m,e, centerYCmp());
+    divide(b, Galois::split_range(b,m));
+    divide(Galois::split_range(b,m), m);
+    divide(m,Galois::split_range(m,e));
+    divide(Galois::split_range(m,e), e);
+  } else {
+    std::random_shuffle(b,e);
+  }
+}
+
 /**
  * Generates random input according to the Plummer model, which is more
  * realistic but perhaps not so much so according to astrophysicists
  */
-void generateInput(Bodies& bodies, int nbodies, int seed) {
+void generateInput(Bodies& bodies, ptrBodies& pbodies, int nbodies, int seed) {
   double v, sq, scale;
   Point p;
   double PI = boost::math::constants::pi<double>();
@@ -522,6 +573,8 @@ void generateInput(Bodies& bodies, int nbodies, int seed) {
 
   double rsc = (3 * PI) / 16;
   double vsc = sqrt(1.0 / rsc);
+
+  std::vector<Body> tmp;
 
   for (int body = 0; body < nbodies; body++) {
     double r = 1.0 / sqrt(pow(nextDouble() * 0.999, -2.0 / 3.0) - 1);
@@ -551,25 +604,22 @@ void generateInput(Bodies& bodies, int nbodies, int seed) {
     for (int i = 0; i < 3; i++)
       b.vel[i] = p[i] * scale;
 
-    bodies.push_back(b);
+    tmp.push_back(b);
   }
-}
 
-template<typename T>
-struct Deref : public std::unary_function<T, T*> {
-  T* operator()(T& item) const { return &item; }
-};
-
-boost::transform_iterator<Deref<Body>, Bodies::iterator> 
-wrap(Bodies::iterator it) {
-  return boost::make_transform_iterator(it, Deref<Body>());
+  //sort and copy out
+  divide(tmp.begin(), tmp.end());
+  Galois::do_all(tmp.begin(), tmp.end(), insBody(pbodies, bodies));
 }
 
 void run(int nbodies, int ntimesteps, int seed) {
   Bodies bodies;
-  generateInput(bodies, nbodies, seed);
+  ptrBodies pBodies;
+  generateInput(bodies, pBodies, nbodies, seed);
 
-  typedef GaloisRuntime::WorkList::dChunkedLIFO<256> WL;
+  typedef GaloisRuntime::WorkList::dChunkedLIFO<256> WL_;
+  typedef GaloisRuntime::WorkList::ChunkedAdaptor<false,32> WL;
+
 
   for (int step = 0; step < ntimesteps; step++) {
     // Do tree building sequentially
@@ -577,12 +627,10 @@ void run(int nbodies, int ntimesteps, int seed) {
 
     BoundingBox box;
     ReduceBoxes reduceBoxes(box);
-    Galois::for_each<WL>(wrap(bodies.begin()), wrap(bodies.end()),
-        ReduceBoxes(box));
+    Galois::for_each_local<WL>(pBodies, ReduceBoxes(box));
     OctreeInternal* top = new OctreeInternal(box.center());
 
-    Galois::for_each<WL>(wrap(bodies.begin()), wrap(bodies.end()),
-        BuildOctree(top, box.radius()));
+    Galois::for_each_local<WL>(pBodies, BuildOctree(top, box.radius()));
 
     ComputeCenterOfMass computeCenterOfMass(top);
     computeCenterOfMass();
@@ -591,10 +639,8 @@ void run(int nbodies, int ntimesteps, int seed) {
     T_parallel.start();
     Galois::setActiveThreads(numThreads);
 
-    Galois::for_each<WL>(wrap(bodies.begin()), wrap(bodies.end()),
-        ComputeForces(top, box.diameter()));
-    Galois::for_each<WL>(wrap(bodies.begin()), wrap(bodies.end()),
-        AdvanceBodies());
+    Galois::for_each_local<WL>(pBodies, ComputeForces(top, box.diameter()));
+    Galois::for_each_local<WL>(pBodies, AdvanceBodies());
     T_parallel.stop();
 
     std::cout 

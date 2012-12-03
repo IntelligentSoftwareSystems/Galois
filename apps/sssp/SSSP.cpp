@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -56,7 +56,9 @@ static const char* url = "single_source_shortest_path";
 enum SSSPAlgo {
   serialStl,
   parallel,
-  parallelLessDups
+  parallelCas,
+  parallelLessDups,
+  parallelCasLessDups
 };
 
 static cll::opt<unsigned int> startNode("startnode", cll::desc("Node to start search from"), cll::init(1));
@@ -67,8 +69,10 @@ static cll::opt<SSSPAlgo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
       clEnumVal(serialStl, "Serial using STL heap"),
       clEnumVal(parallel, "Parallel"),
-      clEnumVal(parallelLessDups, "Parallel (less duplicates)"),
-      clEnumValEnd), cll::init(parallel));
+      clEnumVal(parallelCas, "Parallel with CAS"),
+      clEnumVal(parallelLessDups, "Parallel with duplicate prevention"),
+      clEnumVal(parallelCasLessDups, "Parallel with duplicate prevention and CAS"),
+      clEnumValEnd), cll::init(parallelCasLessDups));
 
 typedef Galois::Graph::LC_Linear_Graph<SNode, unsigned int> Graph;
 typedef Graph::GraphNode GNode;
@@ -120,8 +124,9 @@ struct SerialStlAlgo {
 static Galois::Statistic* BadWork;
 static Galois::Statistic* WLEmptyWork;
 
+template<bool useCas>
 struct ParallelAlgo {
-  std::string name() const { return "parallel"; }
+  std::string name() const { return useCas ? "parallel with CAS" : "parallel"; }
 
   void operator()(const GNode src) const {
     using namespace GaloisRuntime::WorkList;
@@ -129,7 +134,7 @@ struct ParallelAlgo {
     typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
 
     std::cout << "Using delta-step of " << (1 << stepShift) << "\n";
-    std::cout << "Warning: Performance varies considerably due to delta parameter.  Do not expect the default to be good for your graph\n";
+    std::cout << "Warning: Performance varies considerably due to delta parameter. Do not expect the default to be good for your graph\n";
 
 #ifdef GALOIS_USE_EXP
     Exp::PriAuto<16, UpdateRequestIndexer, OBIM, std::less<UpdateRequest>, std::greater<UpdateRequest> >::for_each(UpdateRequest(src, 0), *this);
@@ -139,16 +144,17 @@ struct ParallelAlgo {
   }
 
   void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& ctx) const {
-    SNode& data = graph.getData(req.n, Galois::NONE);
+    Galois::MethodFlag flag = useCas ? Galois::NONE : Galois::ALL;
+    SNode& data = graph.getData(req.n, flag);
+
     if (trackBadWork && req.w >= data.dist)
       *WLEmptyWork += 1;
+    
     unsigned int v;
     while (req.w < (v = data.dist)) {
-      if (__sync_bool_compare_and_swap(&data.dist, v, req.w)) {
-	if (trackBadWork && v != DIST_INFINITY)
-	   *BadWork += 1;
-	for (Graph::edge_iterator ii = graph.edge_begin(req.n, Galois::NONE),
-	       ee = graph.edge_end(req.n, Galois::NONE); ii != ee; ++ii) {
+      if (!useCas || __sync_bool_compare_and_swap(&data.dist, v, req.w)) {
+	for (Graph::edge_iterator ii = graph.edge_begin(req.n, flag),
+	       ee = graph.edge_end(req.n, flag); ii != ee; ++ii) {
 	  GNode dst = graph.getEdgeDst(ii);
 	  unsigned int d = graph.getEdgeData(ii);
 	  unsigned int newDist = req.w + d;
@@ -156,14 +162,26 @@ struct ParallelAlgo {
 	  if (newDist < rdata.dist)
 	    ctx.push(UpdateRequest(dst, newDist));
 	}
+        if (!useCas)
+          data.dist = req.w;
+	if (trackBadWork && v != DIST_INFINITY)
+	   *BadWork += 1;
 	break;
       }
     }
   }
 };
 
+namespace Galois {
+template<>
+struct does_not_need_aborts<ParallelAlgo<true> > : public boost::true_type {};
+}
+
+template<bool useCas>
 struct ParallelLessDupsAlgo {
-  std::string name() const { return "parallel (less duplicates)"; }
+  std::string name() const {
+    return useCas ? "parallel with duplicate detection and CAS" : "parallel with duplicate detection"; 
+  }
 
   void operator()(const GNode src) const {
     using namespace GaloisRuntime::WorkList;
@@ -171,7 +189,7 @@ struct ParallelLessDupsAlgo {
     typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
 
     std::cout << "INFO: Using delta-step of " << (1 << stepShift) << "\n";
-    std::cout << "WARNING: Performance varies considerably due to delta parameter.  Do not expect the default to be good for your graph\n";
+    std::cout << "WARNING: Performance varies considerably due to delta parameter. Do not expect the default to be good for your graph\n";
 
     std::deque<UpdateRequest> initial;
     graph.getData(src).dist = 0;
@@ -193,20 +211,25 @@ struct ParallelLessDupsAlgo {
   }
 
   void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& ctx) const {
-    SNode& data = graph.getData(req.n, Galois::NONE);
+    Galois::MethodFlag flag = useCas ? Galois::NONE : Galois::ALL;
+    SNode& data = graph.getData(req.n, flag);
 
-    if (trackBadWork && req.w >= data.dist)
+    if (trackBadWork && req.w > data.dist) {
       *WLEmptyWork += 1;
+      return;
+    }
     
-    for (Graph::edge_iterator ii = graph.edge_begin(req.n, Galois::NONE),
-           ee = graph.edge_end(req.n, Galois::NONE); ii != ee; ++ii) {
+    for (Graph::edge_iterator ii = graph.edge_begin(req.n, flag),
+           ee = graph.edge_end(req.n, flag); ii != ee; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
       unsigned int d = graph.getEdgeData(ii);
       SNode& rdata = graph.getData(dst, Galois::NONE);
       unsigned int newDist = data.dist + d;
       unsigned int v;
       while (newDist < (v = rdata.dist)) {
-        if (__sync_bool_compare_and_swap(&rdata.dist, v, newDist)) {
+        if (!useCas || __sync_bool_compare_and_swap(&rdata.dist, v, newDist)) {
+          if (!useCas)
+            rdata.dist = newDist;
           if (trackBadWork && v != DIST_INFINITY)
              *BadWork += 1;
           ctx.push(UpdateRequest(dst, newDist));
@@ -216,6 +239,11 @@ struct ParallelLessDupsAlgo {
     }
   }
 };
+
+namespace Galois {
+template<>
+struct does_not_need_aborts<ParallelLessDupsAlgo<true> > : public boost::true_type {};
+}
 
 bool verifyConnected() {
   for (Graph::iterator src = graph.begin(), ee = graph.end(); src != ee; ++src) {
@@ -329,8 +357,10 @@ int main(int argc, char **argv) {
 
   switch (algo) {
     case serialStl: run(SerialStlAlgo(), source); break;
-    case parallel: run(ParallelAlgo(), source); break;
-    case parallelLessDups: run(ParallelLessDupsAlgo(), source); break;
+    case parallel: run(ParallelAlgo<false>(), source); break;
+    case parallelCas: run(ParallelAlgo<true>(), source); break;
+    case parallelLessDups: run(ParallelLessDupsAlgo<false>(), source); break;
+    case parallelCasLessDups: run(ParallelLessDupsAlgo<true>(), source); break;
     default: std::cerr << "Unknown algorithm" << algo << "\n"; abort();
   }
 
