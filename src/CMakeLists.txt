@@ -26,4 +26,7 @@ if(TBB_FOUND)
 	target_link_libraries(galois ${TBB_LIBRARIES})
 endif()
 
+if(USE_EXP)
+	target_link_libraries(galois ${MPI_LIBRARIES})
+endif()
 
