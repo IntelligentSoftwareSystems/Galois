@@ -242,10 +242,10 @@ template<typename NodeTy, typename EdgeTy, EdgeDirection EDir>
 class ThirdGraph { //: public Galois::Runtime::Distributed::DistBase<ThirdGraph> {
   typedef GraphNode<NodeTy, EdgeTy, EDir> gNode;
 
-  struct SubGraphState {
+  struct SubGraphState : public GaloisRuntime::Lockable {
     typename gNode::Handle head;
     Galois::Runtime::Distributed::gptr<SubGraphState> next;
-    Galois::Runtime::Distributed::gptr<ThirdGraph> master;
+    Galois::Runtime::Distributed::gptr<SubGraphState> master;
     typedef int tt_has_serialize;
     void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
       s.serialize(head, next, master);
@@ -253,9 +253,10 @@ class ThirdGraph { //: public Galois::Runtime::Distributed::DistBase<ThirdGraph>
     void deserialize(Galois::Runtime::Distributed::SerializeBuffer& s) {
       s.deserialize(head, next, master);
     }
+    SubGraphState() :head(), next(), master(this) {}
   };
 
-  typename gNode::Handle head;
+  SubGraphState localState;
 
 public:
   typedef typename gNode::Handle NodeHandle;
@@ -263,27 +264,38 @@ public:
   template<typename... Args>
   NodeHandle createNode(Args&&... args) {
     NodeHandle N(new gNode(std::forward<Args...>(args...)));
-    N->getNextNode() = head;
-    head = N;
+    N->getNextNode() = localState.head;
+    localState.head = N;
     return N;
   }
 
   NodeHandle createNode() {
     NodeHandle N(new gNode());
-    N->getNextNode() = head;
-    head = N;
+    N->getNextNode() = localState.head;
+    localState.head = N;
     return N;
   }
-
+  
   class iterator : public std::iterator<std::forward_iterator_tag, NodeHandle> {
     NodeHandle n;
+    Galois::Runtime::Distributed::gptr<SubGraphState> s;
     void next() {
       n = n->getNextNode();
+      while (s->next && !n) {
+	s = s->next;
+	n = s->head;
+      }
     }
   public:
-    explicit iterator(NodeHandle N) :n(N) {}
-    iterator() :n() {}
-    iterator(const iterator& mit) : n(mit.n) {}
+    explicit iterator(Galois::Runtime::Distributed::gptr<SubGraphState> ms) :n(), s(ms) {
+      n = s->head;
+      while (s->next && !n) {
+	s = s->next;
+	n = s->head;
+      }
+    }	
+    iterator() :n(), s() {}
+    iterator(const iterator& mit) : n(mit.n), s(mit.s) {}
 
     NodeHandle& operator*() { return n; }
     iterator& operator++() { next(); return *this; }
@@ -292,12 +304,27 @@ public:
     bool operator!=(const iterator& rhs) { return n != rhs.n; }
   };
 
-  typedef iterator local_iterator;
-
-  iterator begin() { return iterator(head); }
+  iterator begin() { return iterator(localState.master); }
   iterator end() { return iterator(); }
 
-  local_iterator local_begin() { return iterator(head); }
+  class local_iterator : public std::iterator<std::forward_iterator_tag, NodeHandle> {
+    NodeHandle n;
+    void next() {
+      n = n->getNextNode();
+    }
+  public:
+    explicit local_iterator(NodeHandle N) :n(N) {}
+    local_iterator() :n() {}
+    local_iterator(const local_iterator& mit) : n(mit.n) {}
+
+    NodeHandle& operator*() { return n; }
+    local_iterator& operator++() { next(); return *this; }
+    local_iterator operator++(int) { local_iterator tmp(*this); operator++(); return tmp; }
+    bool operator==(const local_iterator& rhs) { return n == rhs.n; }
+    bool operator!=(const local_iterator& rhs) { return n != rhs.n; }
+  };
+
+  local_iterator local_begin() { return iterator(localState.head); }
   local_iterator local_end() { return iterator(); }
 
   ThirdGraph() {}
