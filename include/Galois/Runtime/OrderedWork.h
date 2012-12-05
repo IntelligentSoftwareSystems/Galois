@@ -22,23 +22,57 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#ifndef GALOIS_RUNTIME_ORDEREDWORK_H
-#define GALOIS_RUNTIME_ORDEREDWORK_H
+#ifndef GALOIS_RUNTIME_ORDERED_WORK_H
+#define GALOIS_RUNTIME_ORDERED_WORK_H
 
 #include "Galois/Runtime/DeterministicWork.h"
+#include "Galois/Runtime/LCordered.h"
 
-namespace Galois {
-template<typename IterTy, typename Function1Ty, typename Function2Ty, typename ComparatorTy>
-static inline void for_each_ordered(IterTy b, IterTy e, Function1Ty f1, Function2Ty f2, ComparatorTy comp, const char* loopname = 0) {
-  typedef typename std::iterator_traits<IterTy>::value_type T;
-  typedef GaloisRuntime::DeterministicWork::OrderedOptions<T,Function1Ty,Function2Ty,ComparatorTy> OptionsTy;
-  typedef GaloisRuntime::DeterministicWork::Executor<OptionsTy> WorkTy;
+namespace GaloisRuntime {
 
-  OptionsTy options(f1, f2, comp);
-  WorkTy W(options, loopname);
-  GaloisRuntime::Initializer<IterTy, WorkTy> init(b, e, W);
-  for_each_det_impl(init, W);
+
+template <typename NhFunc, typename OpFunc>
+struct OrderedTraits {
+
+  static const bool NeedsPush = !Galois::does_not_need_push<OpFunc>::value;
+
+  static const bool HasFixedNeighborhood = Galois::has_fixed_neighborhood<NhFunc>::value;
+
+};
+
+
+template <typename Iter, typename Cmp, typename NhFunc, typename OpFunc>
+void for_each_ordered_impl (Iter beg, Iter end, Cmp cmp, NhFunc nhFunc, OpFunc opFunc, const char* loopname) {
+  if (!OrderedTraits<NhFunc, OpFunc>::NeedsPush && OrderedTraits<NhFunc, OpFunc>::HasFixedNeighborhood) {
+    // TODO: Remove-only/DAG executor
+    GALOIS_ERROR(true, "Remove-only executor not implemented yet");
+
+  } else if (OrderedTraits<NhFunc, OpFunc>::HasFixedNeighborhood) {
+    for_each_ordered_lc (beg, end, cmp, nhFunc, opFunc, loopname);
+
+  } else {
+    for_each_ordered_2p (beg, end, cmp, nhFunc, opFunc, loopname);
+  }
 }
+
+
+template <typename Iter, typename Cmp, typename NhFunc, typename OpFunc, typename StableTest>
+void for_each_ordered_impl (Iter beg, Iter end, Cmp cmp, NhFunc nhFunc, OpFunc opFunc, StableTest stabilityTest, const char* loopname) {
+
+  if (!OrderedTraits<NhFunc, OpFunc>::NeedsPush && OrderedTraits<NhFunc, OpFunc>::HasFixedNeighborhood) {
+    GALOIS_ERROR(true, "no-adds + fixed-neighborhood == stable-source");
+
+  }
+  else if (OrderedTraits<NhFunc, OpFunc>::HasFixedNeighborhood) {
+    for_each_ordered_lc (beg, end, cmp, nhFunc, opFunc, stabilityTest, loopname);
+
+  } else {
+    GALOIS_ERROR(true, "two-phase executor for unstable-source algorithms not implemented yet");
+    // TODO: implement following
+    // for_each_ordered_2p (beg, end, cmp, nhFunc, opFunc, stabilityTest, loopname); 
+  }
 }
 
-#endif
+} // end namespace GaloisRuntime
+
+#endif // GALOIS_RUNTIME_ORDERED_WORK_H

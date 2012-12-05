@@ -146,5 +146,20 @@ static inline void preAlloc(int num) {
   GaloisRuntime::preAlloc_impl(num);
 }
 
+
+////////////////////////////////////////////////////////////////////////////////
+// Ordered Foreach 
+////////////////////////////////////////////////////////////////////////////////
+
+template <typename Iter, typename Cmp, typename NhFunc, typename OpFunc>
+void for_each_ordered (Iter beg, Iter end, Cmp cmp, NhFunc nhFunc, OpFunc opFunc, const char* loopname=0) {
+  GaloisRuntime::for_each_ordered_impl (beg, end, cmp, nhFunc, opFunc, loopname);
+}
+
+template <typename Iter, typename Cmp, typename NhFunc, typename OpFunc, typename StableTest>
+void for_each_ordered (Iter beg, Iter end, Cmp cmp, NhFunc nhFunc, OpFunc opFunc, StableTest stabilityTest, const char* loopname=0) {
+  GaloisRuntime::for_each_ordered_impl (beg, end, cmp, nhFunc, opFunc, stabilityTest, loopname);
+}
+
 } //namespace Galois
 #endif
