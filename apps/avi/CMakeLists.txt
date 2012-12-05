@@ -26,16 +26,17 @@ app(AVIodgOrdered main/AVIodgOrdered.cpp
   REQUIRES LAPACK_FOUND ZLIB_FOUND
   EXTLIBS AVI ${LAPACK_LIBRARIES})
 
+app(AVIodgExplicit main/AVIodgExplicit.cpp 
+  REQUIRES LAPACK_FOUND ZLIB_FOUND
+  EXTLIBS AVI ${LAPACK_LIBRARIES})
+
+app(AVIodgExplicitNoLock main/AVIodgExplicitNoLock.cpp
+  REQUIRES LAPACK_FOUND ZLIB_FOUND
+  EXTLIBS AVI ${LAPACK_LIBRARIES})
+
 # the files may be removed from the release without causing error in cmake
 #if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/exp)
 if(0)
-  app(AVIodgExplicit exp/AVIodgExplicit.cpp 
-    REQUIRES LAPACK_FOUND ZLIB_FOUND
-    EXTLIBS AVI ${LAPACK_LIBRARIES})
-
-  app(AVIodgExplicitNoLock exp/AVIodgExplicitNoLock.cpp
-    REQUIRES LAPACK_FOUND ZLIB_FOUND
-    EXTLIBS AVI ${LAPACK_LIBRARIES})
 
   app(AVIodgReadonly exp/AVIodgReadonly.cpp 
     REQUIRES LAPACK_FOUND ZLIB_FOUND USE_EXP
