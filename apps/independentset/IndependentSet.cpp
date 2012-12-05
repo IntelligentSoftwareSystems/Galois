@@ -46,31 +46,25 @@ const char* name = "Maximal Independent Set";
 const char* desc = "Compute a maximal independent set (not maximum) of nodes in a graph";
 const char* url = "independent_set";
 
-enum MISAlgo {
+enum Algo {
   serial,
-  parallel,
-};
-
-enum DetAlgo {
   nondet,
   detBase,
   detPrefix,
-  detDisjoint
+  detDisjoint,
+  orderedBase,
 };
 
 namespace cll = llvm::cl;
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<MISAlgo> algo(cll::desc("Choose an algorithm:"),
+static cll::opt<Algo> algo(cll::desc("Choose an algorithm:"),
     cll::values(
       clEnumVal(serial, "Serial"),
-      clEnumVal(parallel, "Parallel using Galois"),
-      clEnumValEnd), cll::init(parallel));
-static cll::opt<DetAlgo> detAlgo(cll::desc("Deterministic algorithm:"),
-    cll::values(
       clEnumVal(nondet, "Non-deterministic"),
-      clEnumVal(detBase, "Base execution"),
-      clEnumVal(detPrefix, "Prefix execution"),
-      clEnumVal(detDisjoint, "Disjoint execution"),
+      clEnumVal(detBase, "Base deterministic execution"),
+      clEnumVal(detPrefix, "Prefix deterministic execution"),
+      clEnumVal(detDisjoint, "Disjoint deterministic execution"),
+      clEnumVal(orderedBase, "Base ordered execution"),
       clEnumValEnd), cll::init(nondet));
 
 enum MatchFlag {
@@ -85,7 +79,7 @@ struct Node {
 };
 
 #ifdef GALOIS_USE_NUMA
-typedef Galois::Graph::LC_Linear2_Graph<Node,void> Graph;
+typedef Galois::Graph::LC_Numa_Graph<Node,void> Graph;
 #else
 typedef Galois::Graph::LC_CSR_Graph<Node,void> Graph;
 #endif
@@ -94,7 +88,7 @@ typedef Graph::GraphNode GNode;
 
 Graph graph;
 
-//! Basic operator for any scheduling
+//! Basic operator for default and deterministic scheduling
 template<int Version=detBase>
 struct Process {
   typedef int tt_does_not_need_parallel_push;
@@ -167,6 +161,33 @@ struct Process {
   }
 };
 
+template<bool prefix>
+struct OrderedProcess {
+  typedef int tt_does_not_need_parallel_push;
+
+  Process<> process;
+
+  template<typename C>
+  void operator()(GNode src, C& ctx) {
+    (*this)(src);
+  }
+
+  void operator()(GNode src) {
+    if (prefix) {
+      graph.edge_begin(src, Galois::ALL);
+    } else {
+      if (process.build<Galois::NONE>(src))
+        process.modify(src);
+    }
+  }
+};
+
+struct Compare {
+  bool operator()(const GNode& a, const GNode& b) const {
+    return graph.getData(a, Galois::NONE).id < graph.getData(b, Galois::NONE).id;
+  }
+};
+
 struct GaloisAlgo {
   void operator()() {
 #ifdef GALOIS_USE_EXP
@@ -175,17 +196,24 @@ struct GaloisAlgo {
     typedef GaloisRuntime::WorkList::dChunkedFIFO<256> WL;
 #endif
 
-    switch (detAlgo) {
+    switch (algo) {
       case nondet: 
-        Galois::for_each<WL>(graph.begin(), graph.end(), Process<>()); break;
+        Galois::for_each<WL>(graph.begin(), graph.end(), Process<>());
+        break;
       case detBase:
-        Galois::for_each_det(graph.begin(), graph.end(), Process<>()); break;
+        Galois::for_each_det(graph.begin(), graph.end(), Process<>());
+        break;
       case detPrefix:
         Galois::for_each_det(graph.begin(), graph.end(), Process<detPrefix>(), Process<>());
         break;
       case detDisjoint:
-        Galois::for_each_det(graph.begin(), graph.end(), Process<detDisjoint>()); break;
-      default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
+        Galois::for_each_det(graph.begin(), graph.end(), Process<detDisjoint>());
+        break;
+      case orderedBase:
+        Galois::for_each_ordered(graph.begin(), graph.end(), Compare(),
+            OrderedProcess<true>(), OrderedProcess<false>());
+        break;
+      default: std::cerr << "Unknown algorithm" << algo << "\n"; abort();
     }
   }
 };
@@ -248,17 +276,17 @@ int main(int argc, char** argv) {
   for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii, ++id)
     graph.getData(*ii).id = id;
   
+  // XXX Test if this matters
   Galois::preAlloc(numThreads + (graph.size() * sizeof(Node) * numThreads / 8) / GaloisRuntime::MM::pageSize);
-  Galois::Statistic("MeminfoPre", GaloisRuntime::MM::pageAllocInfo());
+  //Galois::Statistic("MeminfoPre", GaloisRuntime::MM::pageAllocInfo());
   Galois::StatTimer T;
   T.start();
   switch (algo) {
     case serial: SerialAlgo()(); break;
-    case parallel: GaloisAlgo()(); break;
-    default: std::cerr << "Unknown algorithm" << algo << "\n"; abort();
+    default: GaloisAlgo()(); break;
   }
   T.stop();
-  Galois::Statistic("MeminfoPost", GaloisRuntime::MM::pageAllocInfo());
+  //Galois::Statistic("MeminfoPost", GaloisRuntime::MM::pageAllocInfo());
 
   std::cout << "Cardinality of maximal independent set: " 
     << Galois::ParallelSTL::count_if(graph.begin(), graph.end(), is_matched()) 
