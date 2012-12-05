@@ -25,7 +25,6 @@
 #ifndef GALOIS_RUNTIME_CONTEXT_H
 #define GALOIS_RUNTIME_CONTEXT_H
 
-#include "Galois/Callbacks.h"
 #include "Galois/MethodFlags.h"
 #include "Galois/Runtime/ll/PtrLock.h"
 #include "Galois/Runtime/ll/gio.h"
@@ -55,12 +54,17 @@ enum PendingFlag {
 
 //! Used by deterministic and ordered executor
 void setPending(PendingFlag value);
+PendingFlag getPending ();
 
 //! used to release lock over exception path
 static inline void clearConflictLock() { }
 
 class SimpleRuntimeContext;
-class DeterministicRuntimeContext;
+
+namespace DeterministicWork {
+template <typename, typename>
+class DeterministicContext;
+}
 
 #if GALOIS_USE_EXCEPTION_HANDLER
 #else
@@ -73,7 +77,8 @@ class Lockable {
   LL::PtrLock<SimpleRuntimeContext, true> Owner;
   Lockable* next;
   friend class SimpleRuntimeContext;
-  friend class DeterministicRuntimeContext;
+  template <typename, typename>
+    friend class GaloisRuntime::DeterministicWork::DeterministicContext;
 public:
   LL::PtrLock<void, true> auxPtr;
   Lockable() :next(0) {}
@@ -106,30 +111,6 @@ SimpleRuntimeContext* getThreadContext();
 //! used by the parallel code to set up conflict detection per thread
 void setThreadContext(SimpleRuntimeContext* n);
 
-class DeterministicRuntimeContext: public SimpleRuntimeContext {
-protected:
-  //! Iteration id for deterministic execution
-  union {
-    unsigned long id;
-    void* comp_data;
-  } data;
-  //! Flag to abort other iterations for deterministic and ordered execution
-  unsigned long not_ready;
-
-  //! User-defined comparison between iterations for ordered execution
-  Galois::CompareCallback* comp;
-
-  virtual void sub_acquire(Lockable* L);
-
-public:
-  DeterministicRuntimeContext(): SimpleRuntimeContext(true), not_ready(0), comp(0) { data.id = 0; data.comp_data = 0; }
-
-  void set_id(unsigned long i) { data.id = i; }
-  bool is_ready() { return !not_ready; }
-
-  void set_comp_data(void* ptr) { data.comp_data = ptr; }
-  void set_comp(Galois::CompareCallback* fn) { comp = fn; }
-};
 
 //! Helper function to decide if the conflict detection lock should be taken
 static inline bool shouldLock(Galois::MethodFlag g) {
