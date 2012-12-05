@@ -99,12 +99,12 @@ public:
     size_t inIdx = this->getInputIndex (e);
     assert (inIdx < numInputs);
 
-    // GALOIS_DEBUG_PRINT ("%s, Received : %s\n", this->str ().c_str (), e.str ().c_str ());
+    // GALOIS_DEBUG ("%s, Received : %s\n", this->str ().c_str (), e.str ().c_str ());
 
     if (inputTimes[inIdx] > e.getRecvTime () 
         && e.getRecvTime () < des::INFINITY_SIM_TIME ) {
 
-      GALOIS_DEBUG_PRINT ("Non-FIFO order on input[%d], last msg time=%zd, current message =%s\n", 
+      GALOIS_DEBUG ("Non-FIFO order on input[%d], last msg time=%zd, current message =%s\n", 
           inIdx, inputTimes[inIdx], e.str ().c_str ());
 
       assert (inputTimes[inIdx] <= e.getRecvTime ());
@@ -142,7 +142,7 @@ public:
 
         Event_ty event = pendingEvents.pop ();
 
-        // GALOIS_DEBUG_PRINT ("%s, Processing: %s\n", this->str ().c_str (), event.str ().c_str ());
+        // GALOIS_DEBUG ("%s, Processing: %s\n", this->str ().c_str (), event.str ().c_str ());
 
 
         //DEBUG

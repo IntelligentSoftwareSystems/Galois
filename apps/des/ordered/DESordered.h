@@ -28,10 +28,8 @@
 #include "Galois/Accumulator.h"
 #include "Galois/Timer.h"
 #include "Galois/Atomic.h"
+#include "Galois/Galois.h"
 
-#include "Galois/Runtime/LCordered.h"
-#include "Galois/Runtime/PerThreadWorkList.h"
-#include "Galois/Runtime/DoAllCoupled.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 
@@ -134,6 +132,7 @@ class DESordered:
   public des::AbstractMain<TypeHelper::SimInit_ty>, public TypeHelper {
 
   struct NhoodVisitor {
+    typedef int tt_has_fixed_neighborhood;
 
     Graph& graph;
     VecSobjInfo& sobjInfoVec;
@@ -142,7 +141,8 @@ class DESordered:
       : graph (graph), sobjInfoVec (sobjInfoVec) 
     {}
     
-    void operator () (const Event_ty& event) const {
+    template <typename C>
+    void operator () (const Event_ty& event, C&) const {
       SimObjInfo& recvInfo = sobjInfoVec[event.getRecvObj ()->getID ()];
       graph.getData (recvInfo.node, Galois::CHECK_CONFLICT);
     }
@@ -199,7 +199,7 @@ class DESordered:
 
         SimObjInfo& sinfo = sobjInfoVec[a->getRecvObj()->getID ()];
         sinfo.recv (*a);
-        lwl.push_back (*a);
+        lwl.push (*a);
 
         // std::cout << "### Adding: " << a->detailedString () << std::endl;
       }
@@ -238,11 +238,11 @@ protected:
     AddList_ty newEvents;
     Accumulator_ty nevents;
 
-    GaloisRuntime::for_each_ordered_lc <CHUNK_SIZE> (
+    Galois::for_each_ordered (
         simInit.getInitEvents ().begin (), simInit.getInitEvents ().end (),
         Cmp_ty (), 
-        OpFunc (graph, sobjInfoVec, newEvents, nevents),
         NhoodVisitor (graph, sobjInfoVec),
+        OpFunc (graph, sobjInfoVec, newEvents, nevents),
         ReadyTest (sobjInfoVec));
 
     std::cout << "Number of events processed= " << 
