@@ -40,9 +40,9 @@ void gSysError(bool doabort, const char* filename, int lineno, const char* forma
 void gFlush();
 
 #ifndef NDEBUG
-#define GALOIS_DEBUG_PRINT(...) { GaloisRuntime::LL::gDebug (__VA_ARGS__); }
+#define GALOIS_DEBUG(...) { GaloisRuntime::LL::gDebug (__VA_ARGS__); }
 #else
-#define GALOIS_DEBUG_PRINT(...) { do {} while (false); }
+#define GALOIS_DEBUG(...) { do {} while (false); }
 #endif
 
 #define GALOIS_SYS_ERROR(doabort, ...) { GaloisRuntime::LL::gSysError(doabort, __FILE__, __LINE__, ##__VA_ARGS__); }
