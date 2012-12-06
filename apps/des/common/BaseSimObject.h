@@ -25,7 +25,7 @@
 #ifndef DES_BASE_SIM_OBJECT_H
 #define DES_BASE_SIM_OBJECT_H
 
-#include "Galois/Graphs/Graph2.h"
+#include "Galois/Graphs/Graph.h"
 
 #include <iostream>
 #include <sstream>

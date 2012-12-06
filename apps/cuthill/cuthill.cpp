@@ -29,7 +29,7 @@
 #include "Galois/Statistic.h"
 #include "Galois/CheckedObject.h"
 #include "Galois/Graphs/LCGraph.h"
-#include "Galois/Graphs/Graph2.h"
+#include "Galois/Graphs/Graph.h"
 #ifdef GALOIS_EXP
 #include "Galois/PriorityScheduling.h"
 #endif

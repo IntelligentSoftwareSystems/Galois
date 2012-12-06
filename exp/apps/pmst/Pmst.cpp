@@ -27,7 +27,7 @@
 #include "Galois/Timer.h"
 #include "Galois/Queue.h"
 #include "Galois/UserContext.h"
-#include "Galois/Graphs/Graph2.h"
+#include "Galois/Graphs/Graph.h"
 #include "Galois/Graphs/LCGraph.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"

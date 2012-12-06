@@ -35,7 +35,7 @@
 #include <cstdio>
 
 #include "Galois/Statistic.h"
-#include "Galois/Graphs/Graph2.h"
+#include "Galois/Graphs/Graph.h"
 #include "Galois/Graphs/LCGraph.h"
 #include "Galois/Galois.h"
 #include "Galois/Runtime/Sampling.h"

@@ -24,7 +24,7 @@
 #include "Galois/Accumulator.h"
 #include "Galois/Statistic.h"
 #include "Galois/Bag.h"
-#include "Galois/Graphs/Graph2.h"
+#include "Galois/Graphs/Graph.h"
 #include "Galois/Graphs/LCGraph.h"
 #include "Galois/Graphs/Serialize.h"
 #include "llvm/Support/CommandLine.h"

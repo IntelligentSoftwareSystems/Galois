@@ -25,7 +25,7 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 #include "Galois/Statistic.h"
-#include "Galois/Graphs/Graph2.h"
+#include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
 #include "Galois/Accumulator.h"
 
