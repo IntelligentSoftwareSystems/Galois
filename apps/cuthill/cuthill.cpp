@@ -84,25 +84,33 @@ std::deque<GaloisRuntime::LL::CacheLineStorage<unsigned int> > write_offset;
 //std::deque<unsigned int> write_offset;
 std::vector<GNode> perm;
 
+
+struct sortDegFn {
+  bool operator()(const GNode& lhs, const GNode& rhs) const {
+    return
+      std::distance(graph.edge_begin(lhs, Galois::NONE),
+		    graph.edge_end(lhs, Galois::NONE))
+      <
+      std::distance(graph.edge_begin(rhs, Galois::NONE),
+		    graph.edge_end(rhs, Galois::NONE))
+      ;
+  }
+};
+
 struct CutHillUnordered {
   std::string name() const { return "Cuthill unordered"; }
 
+  //This operator uses an optimized bfs which doesn't lock nodes.
   struct bfsFn {
     typedef int tt_does_not_need_aborts;
 
     void operator()(GNode& n, Galois::UserContext<GNode>& ctx) const {
       SNode& data = graph.getData(n, Galois::NONE);
-      unsigned int old_max;
-      while ((old_max = max_dist) < data.dist)
-	__sync_bool_compare_and_swap(&max_dist, old_max, data.dist);
-
       unsigned int newDist = data.dist + 1;
-      
       for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::NONE),
 	     ei = graph.edge_end(n, Galois::NONE); ii != ei; ++ii) {
 	GNode dst = graph.getEdgeDst(ii);
 	SNode& ddata = graph.getData(dst, Galois::NONE);
-	
 	unsigned int oldDist;
 	while (true) {
 	  oldDist = ddata.dist;
@@ -116,27 +124,6 @@ struct CutHillUnordered {
       }
     }
 
-  struct bfsFnGalois {
-    void operator()(GNode& n, Galois::UserContext<GNode>& ctx) const {
-      SNode& data = graph.getData(n);
-      unsigned int old_max;
-      while ((old_max = max_dist) < data.dist)
-	__sync_bool_compare_and_swap(&max_dist, old_max, data.dist);
-
-      unsigned int newDist = data.dist + 1;
-      
-      for (Graph::edge_iterator ii = graph.edge_begin(n),
-	     ei = graph.edge_end(n); ii != ei; ++ii) {
-	GNode dst = graph.getEdgeDst(ii);
-	SNode& ddata = graph.getData(dst);
-	if (ddata.dist > newDist) {
-	  ddata.dist = newDist;
-	  ctx.push(dst);
-	}
-      }
-    }
-  };
-
     static void go(GNode source) {
       using namespace GaloisRuntime::WorkList;
       typedef dChunkedFIFO<64> dChunk;
@@ -145,7 +132,6 @@ struct CutHillUnordered {
       
       graph.getData(source).dist = 0;
       Galois::for_each<OBIM>(source, bfsFn(), "BFS");
-      std::cout << "max dist is " << max_dist << "\n";
     }
   };
 
@@ -158,27 +144,31 @@ struct CutHillUnordered {
   
   struct count_levels {
     std::deque<unsigned> counts;
+    unsigned int lmaxdist;
+
     void operator()(GNode& n) {
       //Delete the Galois::NONE to use conflict detection
       SNode& data = graph.getData(n, Galois::NONE);
       if (counts.size() <= data.dist)
 	counts.resize(data.dist + 1);
+      if (lmaxdist < data.dist)
+	lmaxdist = data.dist;
       ++counts[data.dist];
     }
     static void reduce(count_levels& dest, count_levels& src) {
       if (dest.counts.size() < src.counts.size())
 	dest.counts.resize(src.counts.size());
       std::transform(src.counts.begin(), src.counts.end(), dest.counts.begin(), dest.counts.begin(), std::plus<unsigned>());
+      src.lmaxdist = dest.lmaxdist = std::max(src.lmaxdist, dest.lmaxdist);
     }
 
     static void go(GNode source) {
-      level_count = GaloisRuntime::do_all_impl(graph.begin(), graph.end(), count_levels(), default_reduce(), true).counts;
+      count_levels cl = GaloisRuntime::do_all_impl(graph.begin(), graph.end(), count_levels(), default_reduce(), true);
+      level_count.swap(cl.counts);
+      max_dist = cl.lmaxdist;
       read_offset.push_back(0);
       std::partial_sum(level_count.begin(), level_count.end(), back_inserter(read_offset));
-      //write_offset = read_offset;
-      write_offset.resize(read_offset.size());
-      for(int x = 0; x < read_offset.size(); ++x)
-	write_offset[x].data = read_offset[x];
+      write_offset.insert(write_offset.end(), read_offset.begin(), read_offset.end());
     }
   };
 
@@ -192,6 +182,7 @@ struct CutHillUnordered {
 
     void operator()(unsigned me, unsigned int tot) const {
       unsigned n = me;
+      std::vector<GNode> tmp;
       while (n < max_dist + 1) {
 	unsigned start = read_offset[n];
 	volatile unsigned* endp = (volatile unsigned*)&write_offset[n].data;
@@ -200,15 +191,25 @@ struct CutHillUnordered {
 	  //spin
 	  while (start == *endp) {}
 	  GNode next = perm[start];
+	  tmp.resize(0);
+	  //find eligable nodes
 	  for (Graph::edge_iterator ii = graph.edge_begin(next, Galois::NONE),
 		 ei = graph.edge_end(next, Galois::NONE); ii != ei; ++ii) {
 	    GNode dst = graph.getEdgeDst(ii);
 	    SNode& ddata = graph.getData(dst, Galois::NONE);
 	    if (!ddata.done && (ddata.dist == n + 1)) {
 	      ddata.done = true;
-	      perm[write_offset[ddata.dist].data] = dst;
-	      ++write_offset[ddata.dist].data;
+	      tmp.push_back(dst);
 	    }
+	  }
+	  //sort to get cuthill ordering
+	  std::sort(tmp.begin(), tmp.end(), sortDegFn());
+	  //output nodes
+	  for (std::vector<GNode>::iterator ii = tmp.begin(), ee = tmp.end();
+	       ii != ee; ++ii) {
+	    SNode& ddata = graph.getData(*ii, Galois::NONE);
+	    perm[write_offset[ddata.dist].data] = *ii;
+	    ++write_offset[ddata.dist].data;
 	  }
 	  //	++read_offset[n];
 	  //	--level_count[n];
@@ -220,51 +221,11 @@ struct CutHillUnordered {
     }
 
     static void go(GNode source) {
-      using namespace GaloisRuntime::WorkList;
-      typedef dChunkedFIFO<8> dChunk;
-      typedef ChunkedFIFO<8> Chunk;
-      typedef OrderedByIntegerMetric<UnsignedIndexer,FIFO<> > OBIM;
       perm[0] = source;
       write_offset[0].data = 1;
       Galois::on_each(placeFn(), "place");
-      //Galois::for_each<OBIM >(0U, placeFn(), "place");
-      //std::cout << "max dist is " << max_dist << "\n";
     }
   };
-
-  /*
-  void operator()(GNode& n, Galois::UserContext<GNode>& lwl) const {
-    SNode& data = graph.getData(n);
-    //std::cout << "visiting " << data.dist << " path " << data.path << "\n";
-
-    for (Graph::edge_iterator ii = graph.edge_begin(n),
-	   ei = graph.edge_end(n); ii != ei; ++ii) {
-      GNode dst = graph.getEdgeDst(ii);
-      SNode& ddata = graph.getData(dst, Galois::NONE);
-      if (ddata.dist > data.dist + 1) {
-	//First time at this level, we are trivially the best parent
-	ddata.dist = data.dist + 1;
-	ddata.parent = &data;
-	lwl.push(dst);
-      } else if (ddata.dist == data.dist + 1 && 
-		 firstIsMin(&data, ddata.parent)) {
-	//someone else already got here, but we are the minpath
-	ddata.parent = &data;
-	lwl.push(dst);
-      }
-    }
-  }
-  static void go(const GNode& source) {
-    using namespace GaloisRuntime::WorkList;
-    typedef dChunkedFIFO<64> dChunk;
-    typedef ChunkedFIFO<64> Chunk;
-    typedef OrderedByIntegerMetric<GNodeIndexer,dChunk> OBIM;
-    
-    SNode& s = graph.getData(source);
-    s.dist = 0;
-    Galois::for_each<OBIM>(source, CutHillUnordered());
-  }
-  */
 
   static void go(GNode source) {
     bfsFn::go(source);
