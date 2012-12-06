@@ -685,7 +685,7 @@ struct Sloan {
 
     static void go(GNode source) {
       using namespace GaloisRuntime::WorkList;
-      typedef dChunkedLIFO<4> dChunk;
+      typedef dChunkedLIFO<64> dChunk;
       typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
 
       graph.getData(source).status = PREACTIVE;
@@ -716,7 +716,10 @@ struct Sloan {
     vTmain[1].stop();
     vTmain[2].start();
 #endif
+    Galois::StatTimer T;
+    T.start();
     sloanFn::go(source);
+    T.stop();
 #ifdef FINE_GRAIN_TIMING
     vTmain[2].stop();
 #endif
