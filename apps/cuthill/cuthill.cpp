@@ -78,7 +78,7 @@ struct GNodeIndexer {
 };
 
 unsigned int max_dist;
-std::deque<unsigned int> level_count;
+std::vector<unsigned int> level_count;
 std::deque<unsigned int> read_offset;
 std::deque<GaloisRuntime::LL::CacheLineStorage<unsigned int> > write_offset;
 //std::deque<unsigned int> write_offset;
@@ -143,7 +143,7 @@ struct CutHillUnordered {
   };
   
   struct count_levels {
-    std::deque<unsigned> counts;
+    std::vector<unsigned> counts;
     unsigned int lmaxdist;
 
     void operator()(GNode& n) {
@@ -159,7 +159,7 @@ struct CutHillUnordered {
       if (dest.counts.size() < src.counts.size())
 	dest.counts.resize(src.counts.size());
       std::transform(src.counts.begin(), src.counts.end(), dest.counts.begin(), dest.counts.begin(), std::plus<unsigned>());
-      src.lmaxdist = dest.lmaxdist = std::max(src.lmaxdist, dest.lmaxdist);
+      dest.lmaxdist = std::max(src.lmaxdist, dest.lmaxdist);
     }
 
     static void go(GNode source) {
@@ -182,39 +182,52 @@ struct CutHillUnordered {
 
     void operator()(unsigned me, unsigned int tot) const {
       unsigned n = me;
-      std::vector<GNode> tmp;
       while (n < max_dist + 1) {
 	unsigned start = read_offset[n];
+	unsigned t_wo = write_offset[n+1].data;
 	volatile unsigned* endp = (volatile unsigned*)&write_offset[n].data;
+	unsigned cend;
 	unsigned todo = level_count[n];
 	while (todo) {
 	  //spin
-	  while (start == *endp) {}
-	  GNode next = perm[start];
-	  tmp.resize(0);
-	  //find eligable nodes
-	  for (Graph::edge_iterator ii = graph.edge_begin(next, Galois::NONE),
-		 ei = graph.edge_end(next, Galois::NONE); ii != ei; ++ii) {
-	    GNode dst = graph.getEdgeDst(ii);
-	    SNode& ddata = graph.getData(dst, Galois::NONE);
-	    if (!ddata.done && (ddata.dist == n + 1)) {
-	      ddata.done = true;
-	      tmp.push_back(dst);
+	  while (start == (cend = *endp)) {GaloisRuntime::LL::asmPause(); }
+	  while (start != cend) {
+	    GNode next = perm[start];
+	    unsigned t_worig = t_wo;
+	    //find eligable nodes
+	    //prefetch?
+	    if (0) {
+	      if (start + 1 < cend) {
+		GNode nnext = perm[start+1];
+		for (Graph::edge_iterator ii = graph.edge_begin(nnext, Galois::NONE),
+		       ei = graph.edge_end(nnext, Galois::NONE); ii != ei; ++ii) {
+		  GNode dst = graph.getEdgeDst(ii);
+		  SNode& ddata = graph.getData(dst, Galois::NONE);
+		  __builtin_prefetch(&ddata.done);
+		  __builtin_prefetch(&ddata.dist);
+		}
+	      }
 	    }
+	    for (Graph::edge_iterator ii = graph.edge_begin(next, Galois::NONE),
+		   ei = graph.edge_end(next, Galois::NONE); ii != ei; ++ii) {
+	      GNode dst = graph.getEdgeDst(ii);
+	      SNode& ddata = graph.getData(dst, Galois::NONE);
+	      if (!ddata.done && (ddata.dist == n + 1)) {
+		ddata.done = true;
+		perm[t_wo] = dst;
+		++t_wo;
+	      }
+	    }
+	    //sort to get cuthill ordering
+	    std::sort(&perm[t_worig], &perm[t_wo], sortDegFn());
+	    //output nodes
+	    GaloisRuntime::LL::compilerBarrier();
+	    write_offset[n+1].data = t_wo;
+	    //	++read_offset[n];
+	    //	--level_count[n];
+	    ++start;
+	    --todo;
 	  }
-	  //sort to get cuthill ordering
-	  std::sort(tmp.begin(), tmp.end(), sortDegFn());
-	  //output nodes
-	  for (std::vector<GNode>::iterator ii = tmp.begin(), ee = tmp.end();
-	       ii != ee; ++ii) {
-	    SNode& ddata = graph.getData(*ii, Galois::NONE);
-	    perm[write_offset[ddata.dist].data] = *ii;
-	    ++write_offset[ddata.dist].data;
-	  }
-	  //	++read_offset[n];
-	  //	--level_count[n];
-	  ++start;
-	  --todo;
 	}
 	n += tot;
       }
