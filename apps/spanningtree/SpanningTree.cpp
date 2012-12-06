@@ -241,7 +241,7 @@ struct CheckAcyclic {
     unsigned numEdges = std::distance(mst.begin(), mst.end());
     if (graph.size() - numRoots != numEdges) {
       std::cerr << "Generated graph is not a forest. "
-        << "Expected " << graph.size() - numRoots << " edges, "
+        << "Expected " << graph.size() - numRoots << " edges but "
         << "found " << numEdges << "\n";
       return false;
     }
