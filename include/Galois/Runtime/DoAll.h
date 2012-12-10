@@ -41,6 +41,7 @@ template<class FunctionTy, class ReduceFunTy, class IterTy, bool useStealing=fal
 class DoAllWork {
   LL::SimpleLock<true> reduceLock;
   FunctionTy origF;
+  FunctionTy outputF;
   ReduceFunTy RF;
   bool needsReduce;
   IterTy masterBegin;
@@ -109,7 +110,7 @@ class DoAllWork {
   void doReduce(PrivateState& mytld) {
     if (needsReduce) {
       reduceLock.lock();
-      RF(origF, mytld.F);
+      RF(outputF, mytld.F);
       reduceLock.unlock();
     }
   }
@@ -117,7 +118,7 @@ class DoAllWork {
 public:
 
   DoAllWork(const FunctionTy& F, const ReduceFunTy& R, bool needsReduce, IterTy begin, IterTy end)
-    : origF(F), RF(R), needsReduce(needsReduce), masterBegin(begin), masterEnd(end)
+    : origF(F), outputF(F), RF(R), needsReduce(needsReduce), masterBegin(begin), masterEnd(end)
   {}
 
   void operator()() {
@@ -137,7 +138,7 @@ public:
     doReduce(thisTLD);
   }
 
-  FunctionTy getFn() const { return origF; }
+  FunctionTy getFn() const { return outputF; }
 
 };
 
