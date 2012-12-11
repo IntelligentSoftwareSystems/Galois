@@ -208,10 +208,14 @@ public:
 
   void clear() {
     assert(precondition());
-    while (first) {
-      first->clear();
-      shrink_first();
+    Block* b = first;
+    while (b) {
+      b->clear();
+      Block* old = b;
+      b = b->next;
+      free_block(old);
     }
+    first = last = NULL;
     num = 0;
   }
 
