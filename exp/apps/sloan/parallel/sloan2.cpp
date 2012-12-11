@@ -740,7 +740,7 @@ void run() {
   GNode source, terminal;
 
   int maxThreads = numThreads; 
-  Galois::TimeAccumulator vT[maxThreads+2]; 
+  std::vector<Galois::TimeAccumulator> vT(maxThreads+2); 
 
   //Measure time to read graph
   vT[INIT] = Galois::TimeAccumulator();

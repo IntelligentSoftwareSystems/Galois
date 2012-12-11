@@ -1167,10 +1167,10 @@ template<typename AlgoTy>
 void run(const AlgoTy& algo) {
 
 	int maxThreads = numThreads; 
-	Galois::TimeAccumulator vT[maxThreads+20]; 
+	std::vector<Galois::TimeAccumulator> vT(maxThreads+20);
 
 	//Measure time to read graph
-	vT[INIT] = Galois::TimeAccumulator();
+	//vT[INIT] = Galois::TimeAccumulator();
 	vT[INIT].start();
 
   readGraph(source, report);
