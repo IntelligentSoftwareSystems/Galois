@@ -4,7 +4,8 @@
 #include "Galois/Runtime/Directory.h"
 #include "Galois/Runtime/MethodFlags.h"
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 template<typename T>
 struct dptr {
@@ -25,5 +26,5 @@ struct dptr {
    }
 };
 
-} // end namespace
+} } // end namespace
 #endif

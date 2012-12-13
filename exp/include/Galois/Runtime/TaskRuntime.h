@@ -22,7 +22,8 @@ using namespace std;
 
 typedef void (*ftype) (char*,int,char*);
 
-namespace Galois::Runtime {
+namespace Galois {
+namespace Runtime {
 
    int rank, numtasks;
 
@@ -234,5 +235,5 @@ namespace Galois::Runtime {
       /* Execute a barrier to sync all the tasks */
       task_synchronize();
    }
-}
+} } //namespaces
 #endif
