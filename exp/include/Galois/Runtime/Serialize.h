@@ -77,6 +77,10 @@ public:
     serialize(an...);
   }
 
+  void* linearData() { abort(); return 0; }
+
+  size_t size() const { return bufdata.size(); }
+
   //Utility
 
   void print(std::ostream& o) {
