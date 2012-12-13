@@ -25,43 +25,47 @@
 
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Serialize.h"
+#include "Galois/Runtime/Directory.h"
 
 namespace Galois {
 namespace Runtime {
 namespace Distributed {
 
 template<typename T>
-class gptr;
-
-template<typename T>
 class gptr {
-  T* ptr;
+  uintptr_t ptr;
+  uint32_t owner;
 
 public:
   typedef T element_type;
   
-  constexpr gptr() :ptr(nullptr) {}
-  constexpr gptr(std::nullptr_t) :ptr(nullptr) {}
+  constexpr gptr() :ptr(0), owner(0) {}
+  constexpr gptr(std::nullptr_t) :ptr(0), owner(0) {}
 
-  gptr( const gptr& r ) :ptr(r.ptr) {}
-  explicit gptr(T* p) :ptr(p) {}
+  gptr( const gptr& r ) :ptr(r.ptr), owner(networkHostID) {}
+  explicit gptr(T* p) :ptr(reinterpret_cast<uintptr_t>(p)), owner(networkHostID) {}
 
-  ~gptr() {}
-
-  gptr& operator=(const gptr& sp) {
-    ptr = sp.ptr;
-    return *this;
-  }
+  ~gptr()=default;
+  gptr& operator=(const gptr& sp) =default;
 
   T& operator*() const {
-    GaloisRuntime::acquire(ptr,Galois::MethodFlag::ALL);
-    return *ptr;
+    T* rptr = resolve();
+    Galois::Runtime::acquire(rptr,Galois::MethodFlag::ALL);
+    return *rptr;
   }
   T *operator->() const {
-    GaloisRuntime::acquire(ptr,Galois::MethodFlag::ALL);
-    return ptr;
+    T* rptr = resolve();
+    Galois::Runtime::acquire(rptr,Galois::MethodFlag::ALL);
+    return rptr;
   }
-  operator bool() const { return ptr != nullptr; }
+  operator bool() const { return ptr != 0; }
+
+  //Resolve
+  T* resolve() const {
+    if (owner == networkHostID)
+      return reinterpret_cast<T*>(ptr);
+    return getSystemRemoteDirectory().resolve<T>(ptr, owner);
+  }
 
   //serialize
   typedef int tt_has_serialize;

@@ -27,7 +27,8 @@
 #ifndef GALOIS_RUNTIME_LL_COMPILERSPECIFIC_H
 #define GALOIS_RUNTIME_LL_COMPILERSPECIFIC_H
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 namespace LL {
 
 inline static void asmPause() {
@@ -72,6 +73,7 @@ inline static void compilerBarrier() {
 #define GALOIS_ATTRIBUTE_PROF_NOINLINE inline
 #endif
 
+}
 }
 }
 

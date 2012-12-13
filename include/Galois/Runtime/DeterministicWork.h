@@ -40,7 +40,8 @@
 #include <deque>
 #include <queue>
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 namespace DeterministicWork {
 
 //! Wrapper around WorkList::ChunkedFIFO to allow peek() and empty() and still have FIFO order
@@ -115,30 +116,30 @@ struct has_local_state {
 
 template<typename T,typename FunctionTy,typename Enable=void>
 struct StateManager { 
-  void alloc(GaloisRuntime::UserContextAccess<T>&, FunctionTy& self) { }
-  void dealloc(GaloisRuntime::UserContextAccess<T>&) { }
-  void save(GaloisRuntime::UserContextAccess<T>&, void*&) { }
-  void restore(GaloisRuntime::UserContextAccess<T>&, void*) { } 
+  void alloc(Galois::Runtime::UserContextAccess<T>&, FunctionTy& self) { }
+  void dealloc(Galois::Runtime::UserContextAccess<T>&) { }
+  void save(Galois::Runtime::UserContextAccess<T>&, void*&) { }
+  void restore(Galois::Runtime::UserContextAccess<T>&, void*) { } 
 };
 
 template<typename T,typename FunctionTy>
 struct StateManager<T,FunctionTy,typename boost::enable_if<has_local_state<FunctionTy> >::type> {
   typedef typename FunctionTy::LocalState LocalState;
-  void alloc(GaloisRuntime::UserContextAccess<T>& c,FunctionTy& self) {
+  void alloc(Galois::Runtime::UserContextAccess<T>& c,FunctionTy& self) {
     void *p = c.data().getPerIterAlloc().allocate(sizeof(LocalState));
     new (p) LocalState(self, c.data().getPerIterAlloc());
     c.setLocalState(p, false);
   }
-  void dealloc(GaloisRuntime::UserContextAccess<T>& c) {
+  void dealloc(Galois::Runtime::UserContextAccess<T>& c) {
     bool dummy;
     LocalState *p = (LocalState*) c.data().getLocalState(dummy);
     p->~LocalState();
   }
-  void save(GaloisRuntime::UserContextAccess<T>& c, void*& localState) { 
+  void save(Galois::Runtime::UserContextAccess<T>& c, void*& localState) { 
     bool dummy;
     localState = c.data().getLocalState(dummy);
   }
-  void restore(GaloisRuntime::UserContextAccess<T>& c, void* localState) { 
+  void restore(Galois::Runtime::UserContextAccess<T>& c, void* localState) { 
     c.setLocalState(localState, true);
   }
 };
@@ -1158,7 +1159,7 @@ class Executor {
   // Truly thread-local
   struct ThreadLocalData: private boost::noncopyable {
     LocalPendingWork localPending;
-    GaloisRuntime::UserContextAccess<value_type> facing;
+    Galois::Runtime::UserContextAccess<value_type> facing;
     LoopStatistics<OptionsTy::needsStats> stat;
     WL* wlcur;
     WL* wlnext;
@@ -1445,11 +1446,12 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
 
 }
 }
+}
 
 namespace Galois {
 template<typename InitTy, typename WorkTy>
 static inline void for_each_det_impl(InitTy& init, WorkTy& W) {
-  using namespace GaloisRuntime;
+  using namespace Galois::Runtime;
 
   W.presort(init.b, init.e);
 
@@ -1457,11 +1459,11 @@ static inline void for_each_det_impl(InitTy& init, WorkTy& W) {
 
 
   inGaloisForEach = true;
-  RunCommand w[4] = {Config::ref(init), 
-		     Config::ref(getSystemBarrier()),
-		     Config::ref(W),
-		     Config::ref(getSystemBarrier())};
-  getSystemThreadPool().run(&w[0], &w[4]);
+  RunCommand w[4] = {std::ref(init), 
+		     std::ref(getSystemBarrier()),
+		     std::ref(W),
+		     std::ref(getSystemBarrier())};
+  getSystemThreadPool().run(&w[0], &w[4], activeThreads);
   runAllLoopExitHandlers();
   inGaloisForEach = false;
 }
@@ -1470,12 +1472,12 @@ static inline void for_each_det_impl(InitTy& init, WorkTy& W) {
 template<typename IterTy, typename Function1Ty, typename Function2Ty>
 static inline void for_each_det(IterTy b, IterTy e, Function1Ty f1, Function2Ty f2, const char* loopname = 0) {
   typedef typename std::iterator_traits<IterTy>::value_type T;
-  typedef GaloisRuntime::DeterministicWork::UnorderedOptions<T,Function1Ty,Function2Ty> OptionsTy;
-  typedef GaloisRuntime::DeterministicWork::Executor<OptionsTy> WorkTy;
+  typedef Galois::Runtime::DeterministicWork::UnorderedOptions<T,Function1Ty,Function2Ty> OptionsTy;
+  typedef Galois::Runtime::DeterministicWork::Executor<OptionsTy> WorkTy;
 
   OptionsTy options(f1, f2);
   WorkTy W(options, loopname);
-  GaloisRuntime::Initializer<IterTy, WorkTy> init(b, e, W);
+  Galois::Runtime::Initializer<IterTy, WorkTy> init(b, e, W);
   for_each_det_impl(init, W);
 }
 

@@ -53,7 +53,7 @@ struct count_if_reducer {
 template<class InputIterator, class Predicate>
 ptrdiff_t count_if(InputIterator first, InputIterator last, Predicate pred)
 {
-  return GaloisRuntime::do_all_impl(first, last, count_if_helper<Predicate>(pred), count_if_reducer(), true).ret;
+  return Galois::Runtime::do_all_impl(first, last, count_if_helper<Predicate>(pred), count_if_reducer(), true).ret;
 }
 
 //! Modify an iterator so that *it == it
@@ -80,7 +80,7 @@ struct find_if_helper {
   typedef int tt_needs_parallel_break;
 
   typedef boost::optional<InputIterator> ElementTy;
-  typedef GaloisRuntime::PerThreadStorage<ElementTy> AccumulatorTy;
+  typedef Galois::Runtime::PerThreadStorage<ElementTy> AccumulatorTy;
   AccumulatorTy& accum;
   Predicate& f;
   find_if_helper(AccumulatorTy& a, Predicate& p): accum(a), f(p) { }
@@ -99,7 +99,7 @@ InputIterator find_if(InputIterator first, InputIterator last, Predicate pred)
   typedef typename HelperTy::AccumulatorTy AccumulatorTy;
   AccumulatorTy accum;
   HelperTy helper(accum, pred);
-  GaloisRuntime::for_each_impl<GaloisRuntime::WorkList::dChunkedFIFO<256> >(NoDerefIterator<InputIterator>(first), NoDerefIterator<InputIterator>(last), helper, 0);
+  Galois::Runtime::for_each_impl<Galois::Runtime::WorkList::dChunkedFIFO<256> >(NoDerefIterator<InputIterator>(first), NoDerefIterator<InputIterator>(last), helper, 0);
   for (unsigned i = 0; i < accum.size(); ++i) {
     if (*accum.getRemote(i))
       return **accum.getRemote(i);
@@ -177,7 +177,7 @@ struct partition_helper {
   struct partition_helper_state {
     RandomAccessIterator first, last;
     RandomAccessIterator rfirst, rlast;
-    GaloisRuntime::LL::SimpleLock<true> Lock;
+    Galois::Runtime::LL::SimpleLock<true> Lock;
     Predicate pred;
     typename std::iterator_traits<RandomAccessIterator>::difference_type BlockSize() { return 1024; }
 
@@ -239,7 +239,7 @@ RandomAccessIterator partition(RandomAccessIterator first,
     return std::partition(first, last, pred);
   typedef partition_helper<RandomAccessIterator, Predicate> P;
   typename P::partition_helper_state s(first, last, pred);
-  GaloisRuntime::on_each_impl(P(&s), 0);
+  Galois::Runtime::on_each_impl(P(&s), 0);
   if (s.rfirst == first && s.rlast == last) { //perfect !
     //abort();
     return s.first;
@@ -266,7 +266,7 @@ void sort(RandomAccessIterator first, RandomAccessIterator last, Compare comp) {
 
   std::priority_queue<RP, std::vector<RP>, pair_dist> q;
   q.push(std::make_pair(first,last));
-  while (!q.empty() && q.size() < GaloisRuntime::galoisActiveThreads) {
+  while (!q.empty() && q.size() < Galois::Runtime::galoisActiveThreads) {
     RP v = q.top();
     q.pop();
     typedef typename std::iterator_traits<RandomAccessIterator>::value_type PV;
@@ -285,11 +285,11 @@ void sort(RandomAccessIterator first, RandomAccessIterator last, Compare comp) {
     work.push_back(v);
   }
 
-  Galois::for_each<GaloisRuntime::WorkList::dChunkedFIFO<1> >(work.begin(), work.end(), parsort());
-  //Galois::for_each<GaloisRuntime::WorkList::FIFO<> >(std::make_pair(first,last), P);
+  Galois::for_each<Galois::Runtime::WorkList::dChunkedFIFO<1> >(work.begin(), work.end(), parsort());
+  //Galois::for_each<Galois::Runtime::WorkList::FIFO<> >(std::make_pair(first,last), P);
 #else
   std::pair<RandomAccessIterator,RandomAccessIterator> initial[1] = { std::make_pair(first, last) };
-  GaloisRuntime::for_each_impl<GaloisRuntime::WorkList::dChunkedFIFO<1> >(&initial[0], &initial[1], sort_helper<Compare>(comp), 0);
+  Galois::Runtime::for_each_impl<Galois::Runtime::WorkList::dChunkedFIFO<1> >(&initial[0], &initial[1], sort_helper<Compare>(comp), 0);
 #endif
 }
 
@@ -320,7 +320,7 @@ struct accumulate_helper_reduce {
 
 template <class InputIterator, class T, typename BinaryOperation>
 T accumulate (InputIterator first, InputIterator last, T init, BinaryOperation binary_op) {
-  return GaloisRuntime::do_all_impl(first, last, accumulate_helper<T,BinaryOperation>(init, binary_op), accumulate_helper_reduce<BinaryOperation>(binary_op), true).init;
+  return Galois::Runtime::do_all_impl(first, last, accumulate_helper<T,BinaryOperation>(init, binary_op), accumulate_helper_reduce<BinaryOperation>(binary_op), true).init;
 }
 
 template<class InputIterator, class T>
@@ -349,7 +349,7 @@ struct map_reduce_helper {
 
 template<class InputIterator, class MapFn, class T, class ReduceFn>
 T map_reduce(InputIterator first, InputIterator last, MapFn fn, T init, ReduceFn reduce) {
-  return GaloisRuntime::do_all_impl(first, last,
+  return Galois::Runtime::do_all_impl(first, last,
       map_reduce_helper<T,MapFn,ReduceFn>(init, fn, reduce),
       accumulate_helper_reduce<ReduceFn>(reduce), true).init;
 }

@@ -1,4 +1,4 @@
-/** Simple thread related classes -*- C++ -*-
+/** Number of Active Threads -*- C++ -*-
  * @file
  * @section License
  *
@@ -20,33 +20,15 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#ifndef GALOIS_RUNTIME_THREADPOOL_H
-#define GALOIS_RUNTIME_THREADPOOL_H
 
-#include <functional>
+#ifndef GALOIS_RUNTIME_ACTIVETHREADS_H
+#define GALOIS_RUNTIME_ACTIVETHREADS_H
 
 namespace Galois {
 namespace Runtime {
-
-typedef std::function<void (void)> RunCommand;
-
-class ThreadPool {
-public:
-  virtual ~ThreadPool() { }
-
-  //!execute work on all threads
-  //!preWork and postWork are executed only on the master thread
-  virtual void run(RunCommand* begin, RunCommand* end, unsigned num) = 0;
-
-  //!return the number of threads supported by the thread pool on the current machine
-  virtual unsigned getMaxThreads() const = 0;
-
-};
-
-//!Returns or creates the appropriate thread pool for the system
-ThreadPool& getSystemThreadPool();
-
-} //Runtime
-} //Galois
+extern unsigned int activeThreads;
+}
+}
 
 #endif
+

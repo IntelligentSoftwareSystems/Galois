@@ -51,7 +51,8 @@
 //#include <ostream>
 #include <set>
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 namespace WorkList {
 
 template<class T=int, bool concurrent = true>
@@ -64,7 +65,7 @@ class StaticAssignment : private boost::noncopyable {
     TLD(): round(0) { }
   };
 
-  GaloisRuntime::PerThreadStorage<TLD> tlds;
+  Galois::Runtime::PerThreadStorage<TLD> tlds;
 
   pthread_barrier_t barrier1;
   pthread_barrier_t barrier2;
@@ -166,7 +167,7 @@ class StaticAssignment : private boost::noncopyable {
 
       pthread_barrier_wait(&barrier1);
       tld.round = (tld.round + 1) & 1;
-      if (GaloisRuntime::LL::getTID() == 0) {
+      if (Galois::Runtime::LL::getTID() == 0) {
         empty = !redistribute();
       }
       pthread_barrier_wait(&barrier2);
@@ -1483,12 +1484,12 @@ public:
 GALOIS_WLCOMPILECHECK(FCPairingHeapQueue)
 
 
-template<class Indexer, typename ContainerTy = GaloisRuntime::WorkList::FIFO<>, typename T = int, bool concurrent = true >
-class SimpleOrderedByIntegerMetric : private boost::noncopyable, private GaloisRuntime::LL::PaddedLock<concurrent> {
+template<class Indexer, typename ContainerTy = Galois::Runtime::WorkList::FIFO<>, typename T = int, bool concurrent = true >
+class SimpleOrderedByIntegerMetric : private boost::noncopyable, private Galois::Runtime::LL::PaddedLock<concurrent> {
 
-   using GaloisRuntime::LL::PaddedLock<concurrent>::lock;
-   using GaloisRuntime::LL::PaddedLock<concurrent>::try_lock;
-   using GaloisRuntime::LL::PaddedLock<concurrent>::unlock;
+   using Galois::Runtime::LL::PaddedLock<concurrent>::lock;
+   using Galois::Runtime::LL::PaddedLock<concurrent>::try_lock;
+   using Galois::Runtime::LL::PaddedLock<concurrent>::unlock;
 
   typedef ContainerTy CTy;
 
@@ -1574,7 +1575,7 @@ class SimpleOrderedByIntegerMetric : private boost::noncopyable, private GaloisR
   }
 };
 
-template<class Indexer, typename ContainerTy = GaloisRuntime::WorkList::ChunkedLIFO<16>, bool BSP = true, typename T = int, bool concurrent = true>
+template<class Indexer, typename ContainerTy = Galois::Runtime::WorkList::ChunkedLIFO<16>, bool BSP = true, typename T = int, bool concurrent = true>
 class CTOrderedByIntegerMetric : private boost::noncopyable {
 
   typedef typename ContainerTy::template rethread<concurrent>::WL CTy;
@@ -1598,7 +1599,7 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
   int maxV;
 
   Indexer I;
-  GaloisRuntime::PerThreadStorage<perItem> current;
+  Galois::Runtime::PerThreadStorage<perItem> current;
 
   CTy* getOrCreate(int index) {
     CTy* r = wl.get(index);
@@ -1714,7 +1715,7 @@ class BarrierOBIM : private boost::noncopyable {
 
   Indexer I;
 
-  GaloisRuntime::TerminationDetection term;
+  Galois::Runtime::TerminationDetection term;
   pthread_barrier_t barr1;
   pthread_barrier_t barr2;
 
@@ -1785,7 +1786,7 @@ class BarrierOBIM : private boost::noncopyable {
       
       pthread_barrier_wait(&barr1);
   
-      if (GaloisRuntime::LL::getTID() == 0) {
+      if (Galois::Runtime::LL::getTID() == 0) {
 	//std::cerr << "inc: " << current << "\n";
 	term.reset();
 	if (current <= pushmax)
@@ -1798,12 +1799,12 @@ class BarrierOBIM : private boost::noncopyable {
 };
 
 template<typename T = int, bool concurrent = true>
-  class Random : private boost::noncopyable, private GaloisRuntime::LL::PaddedLock<concurrent>  {
+  class Random : private boost::noncopyable, private Galois::Runtime::LL::PaddedLock<concurrent>  {
   std::vector<T> wl;
   unsigned int seed;
-  using GaloisRuntime::LL::PaddedLock<concurrent>::lock;
-  using GaloisRuntime::LL::PaddedLock<concurrent>::try_lock;
-  using GaloisRuntime::LL::PaddedLock<concurrent>::unlock;
+  using Galois::Runtime::LL::PaddedLock<concurrent>::lock;
+  using Galois::Runtime::LL::PaddedLock<concurrent>::try_lock;
+  using Galois::Runtime::LL::PaddedLock<concurrent>::unlock;
 
   unsigned int nextRand() {
     seed = 214013*seed + 2531011; 
@@ -1926,7 +1927,7 @@ class PTbb : private boost::noncopyable {
     drand48_data r;
   };
 
-  GaloisRuntime::PerThreadStorage<PTD> tld;
+  Galois::Runtime::PerThreadStorage<PTD> tld;
 
   void pull_in(PTD* N) {
     boost::optional<T> r;
@@ -2008,7 +2009,7 @@ template<class Compare = std::less<int>, typename T = int>
 class STbb : private boost::noncopyable {
   typedef tbb::concurrent_priority_queue<T,Compare> TBBTy;
   
-  GaloisRuntime::PerThreadStorage<TBBTy> tld;
+  Galois::Runtime::PerThreadStorage<TBBTy> tld;
 
 public:
   template<bool newconcurrent>
@@ -2114,10 +2115,10 @@ class StaticPartitioning : private boost::noncopyable {
     TLD(): round(0) { }
   };
 
-  GaloisRuntime::PerThreadStorage<TLD> tlds;
+  Galois::Runtime::PerThreadStorage<TLD> tlds;
 
-  GaloisRuntime::GBarrier barrier1;
-  GaloisRuntime::GBarrier barrier2;
+  Galois::Runtime::GBarrier barrier1;
+  Galois::Runtime::GBarrier barrier2;
   unsigned numActive;
   volatile bool empty;
 
@@ -2211,7 +2212,7 @@ class StaticPartitioning : private boost::noncopyable {
 
       barrier1.wait();
       tld.round = (tld.round + 1) & 1;
-      if (GaloisRuntime::LL::getTID() == 0) {
+      if (Galois::Runtime::LL::getTID() == 0) {
         empty = !redistribute();
       }
       barrier2.wait();
@@ -2485,6 +2486,7 @@ public:
 
 }
 
+}
 }
 }
 

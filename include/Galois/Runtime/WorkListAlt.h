@@ -25,7 +25,8 @@
 
 #include "ll/CompilerSpecific.h"
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 namespace WorkList {
 
 struct ChunkHeader {
@@ -741,6 +742,6 @@ class OwnerComputeChunkedLIFO : public OwnerComputeChunkedMaster<T,OwnerFn,ConEx
 GALOIS_WLCOMPILECHECK(OwnerComputeChunkedLIFO)
 
 
-} }//End namespace
+} } }//End namespace
 
 #endif

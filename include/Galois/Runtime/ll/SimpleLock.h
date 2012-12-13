@@ -36,7 +36,8 @@
 
 #include "CompilerSpecific.h"
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 namespace LL {
 
 /// SimpleLock is a spinlock.  If the template parameter is
@@ -90,6 +91,7 @@ void LockPairOrdered(SimpleLock<false>& L1, SimpleLock<false>& L2);
 bool TryLockPairOrdered(SimpleLock<false>& L1, SimpleLock<false>& L2);
 void UnLockPairOrdered(SimpleLock<false>& L1, SimpleLock<false>& L2);
 
+}
 }
 }
 

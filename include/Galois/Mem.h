@@ -27,12 +27,12 @@
 
 namespace Galois {
 
-typedef GaloisRuntime::MM::SimpleBumpPtrWithMallocFallback<GaloisRuntime::MM::FreeListHeap<GaloisRuntime::MM::SystemBaseAlloc> > IterAllocBaseTy;
+typedef Galois::Runtime::MM::SimpleBumpPtrWithMallocFallback<Galois::Runtime::MM::FreeListHeap<Galois::Runtime::MM::SystemBaseAlloc> > IterAllocBaseTy;
 
-typedef GaloisRuntime::MM::ExternRefGaloisAllocator<char, IterAllocBaseTy> PerIterAllocTy;
+typedef Galois::Runtime::MM::ExternRefGaloisAllocator<char, IterAllocBaseTy> PerIterAllocTy;
 
 template<typename Ty>
-struct GFixedAllocator : public GaloisRuntime::MM::FSBGaloisAllocator<Ty> { };
+struct GFixedAllocator : public Galois::Runtime::MM::FSBGaloisAllocator<Ty> { };
 
 }
 #endif

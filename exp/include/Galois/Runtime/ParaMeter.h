@@ -31,7 +31,6 @@
 #include "Galois/TypeTraits.h"
 #include "Galois/Mem.h"
 
-#include "Galois/Runtime/Config.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/ForEachTraits.h"
 #include "Galois/Runtime/LoopHooks.h"
@@ -51,7 +50,8 @@
 #include <ctime>
 #include <cstdio>
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 namespace WorkList {
 template<class ContainerTy = FIFO<>,class T=int>
@@ -70,7 +70,7 @@ namespace ParaMeterInit {
 template<class ContainerTy,class T, class FunctionTy>
 class ForEachWork<WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
   typedef T value_type;
-  typedef GaloisRuntime::UserContextAccess<value_type> UserContextTy;
+  typedef Galois::Runtime::UserContextAccess<value_type> UserContextTy;
   typedef typename ContainerTy::template retype<value_type>::WL WorkListTy;
 
   struct StepStats {
@@ -197,11 +197,11 @@ class ForEachWork<WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
         } catch (ConflictFlag flag) {
           clearConflictLock();
           switch (flag) {
-            case GaloisRuntime::CONFLICT:
+            case Galois::Runtime::CONFLICT:
               doabort = true;
               break;
 
-            case GaloisRuntime::BREAK:
+            case Galois::Runtime::BREAK:
               GALOIS_ERROR(true, "can't handle breaks yet");
               break;
 
@@ -345,6 +345,7 @@ private:
 
 
 } // end namespace
+}
 
 #else
 #warning Reincluding ParaMeter

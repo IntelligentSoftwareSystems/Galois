@@ -188,7 +188,7 @@ class GraphNodeEdges<NHTy, EdgeDataTy, EdgeDirection::Un> {
 
 template<typename NodeDataTy, typename EdgeDataTy, EdgeDirection EDir>
 class GraphNode
-  : public GaloisRuntime::Lockable,
+  : public Galois::Runtime::Lockable,
     public GraphNodeBase<SHORTHAND >,
     public GraphNodeData<NodeDataTy>,
     public GraphNodeEdges<SHORTHAND, EdgeDataTy, EDir>
@@ -242,7 +242,7 @@ template<typename NodeTy, typename EdgeTy, EdgeDirection EDir>
 class ThirdGraph { //: public Galois::Runtime::Distributed::DistBase<ThirdGraph> {
   typedef GraphNode<NodeTy, EdgeTy, EDir> gNode;
 
-  struct SubGraphState : public GaloisRuntime::Lockable {
+  struct SubGraphState : public Galois::Runtime::Lockable {
     typename gNode::Handle head;
     Galois::Runtime::Distributed::gptr<SubGraphState> next;
     Galois::Runtime::Distributed::gptr<SubGraphState> master;
@@ -328,7 +328,18 @@ public:
   local_iterator local_end() { return iterator(); }
 
   ThirdGraph() {}
-
+  typedef int tt_has_serialize;
+  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+    //This is what is called on the source of a replicating source
+    s.serialize(localState.master);
+  }
+  void deserialize(Galois::Runtime::Distributed::SerializeBuffer& s) {
+    //This constructs the local node of the distributed graph
+    s.deserialize(localState.master);
+    localState.next = localState.master->next;
+    localState.master->next = localState;
+  }
+  
 };
 
 

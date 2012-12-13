@@ -33,7 +33,7 @@
 #include <string>
 #include <cmath>
 
-using GaloisRuntime::LL::gPrint;
+using Galois::Runtime::LL::gPrint;
 
 namespace {
 
@@ -41,12 +41,12 @@ class StatManager {
 
   typedef std::pair<std::string, std::string> KeyTy;
 
-  GaloisRuntime::PerThreadStorage<std::map<KeyTy, unsigned long> > Stats;
+  Galois::Runtime::PerThreadStorage<std::map<KeyTy, unsigned long> > Stats;
 
   volatile unsigned maxID;
 
   void updateMax() {
-    unsigned n = GaloisRuntime::galoisActiveThreads;
+    unsigned n = Galois::Runtime::activeThreads;
     unsigned c;
     while (n > (c = maxID))
       __sync_bool_compare_and_swap(&maxID, c, n);
@@ -79,7 +79,7 @@ public:
   }
 
   void addToStat(Galois::Statistic* value) {
-    for (unsigned x = 0; x < GaloisRuntime::galoisActiveThreads; ++x)
+    for (unsigned x = 0; x < Galois::Runtime::activeThreads; ++x)
       (*Stats.getRemote(x))[mkKey(value->getLoopname(), value->getStatname())] += value->getValue(x);
     updateMax();
   }
@@ -120,27 +120,27 @@ public:
   }
 };
 
-static GaloisRuntime::LL::StaticInstance<StatManager> SM;
+static Galois::Runtime::LL::StaticInstance<StatManager> SM;
 
 }
 
 
-bool GaloisRuntime::inGaloisForEach = false;
+bool Galois::Runtime::inGaloisForEach = false;
 
-void GaloisRuntime::reportStat(const char* loopname, const char* category, size_t value) {
+void Galois::Runtime::reportStat(const char* loopname, const char* category, size_t value) {
   SM.get()->addToStat(std::string(loopname ? loopname : "(NULL)"), 
 		      std::string(category ? category : "(NULL)"),
 		      value);
 }
 
-void GaloisRuntime::reportStat(const std::string& loopname, const std::string& category, size_t value) {
+void Galois::Runtime::reportStat(const std::string& loopname, const std::string& category, size_t value) {
   SM.get()->addToStat(loopname, category, value);
 }
 
-void GaloisRuntime::reportStat(Galois::Statistic* value) {
+void Galois::Runtime::reportStat(Galois::Statistic* value) {
   SM.get()->addToStat(value);
 }
 
-void GaloisRuntime::printStats() {
+void Galois::Runtime::printStats() {
   SM.get()->printStats();
 }

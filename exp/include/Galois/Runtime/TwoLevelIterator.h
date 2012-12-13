@@ -33,7 +33,8 @@
 #include <cstdlib>
 #include <cassert>
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 namespace intern {
 
@@ -676,6 +677,7 @@ public:
 
 
 } // end namespace intern
-} // end namespace GaloisRuntime
+} // end namespace Galois::Runtime
+}
 
 #endif // GALOIS_RUNTIME_TWO_LEVEL_ITER_H

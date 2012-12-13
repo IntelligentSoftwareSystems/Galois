@@ -22,7 +22,8 @@ kind.
 
 #include "Galois/Runtime/PerThreadStorage.h"
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 //Dikstra dual-ring termination algorithm
 class TerminationDetection {
@@ -74,5 +75,6 @@ public:
 
 };
 
+}
 }
 #endif

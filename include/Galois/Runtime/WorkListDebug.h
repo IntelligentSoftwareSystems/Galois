@@ -23,13 +23,13 @@
 #ifndef GALOIS_RUNTIME_WORKLISTDEBUG_H
 #define GALOIS_RUNTIME_WORKLISTDEBUG_H
 
-#include "Galois/Runtime/Config.h"
 #include "Galois/util/OnlineStats.h"
 
 #include <fstream>
 #include <map>
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 namespace WorkList {
 
 template<typename Indexer, typename realWL, typename T >
@@ -301,6 +301,7 @@ public:
 };
 
 
+}
 }
 }
 

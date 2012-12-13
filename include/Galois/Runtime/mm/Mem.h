@@ -40,7 +40,8 @@
 
 #include <map>
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 namespace MM {
 
 const size_t pageSize = 2*1024*1024;
@@ -701,6 +702,7 @@ public:
 
 };
 
+}
 }
 }
 #endif

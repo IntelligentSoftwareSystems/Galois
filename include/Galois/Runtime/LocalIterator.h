@@ -23,7 +23,8 @@
 #ifndef GALOIS_LOCALITERATOR_H
 #define GALOIS_LOCALITERATOR_H
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 //! Iterator over items in containers of containers
 template<typename ContainerTy>
@@ -41,6 +42,7 @@ public:
   }
 };
 
+}
 }
 
 #endif

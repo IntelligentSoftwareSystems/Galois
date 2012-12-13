@@ -26,7 +26,8 @@
 
 #include "Galois/MethodFlags.h"
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 static inline bool isWriteMethod(int m) {
   return (m & Galois::WRITE) != 0;
@@ -40,5 +41,5 @@ static inline void checkWrite(int m) {
 }
 
 }
-
+}
 #endif //GALOIS_RUNTIME_METHODFLAGS_H

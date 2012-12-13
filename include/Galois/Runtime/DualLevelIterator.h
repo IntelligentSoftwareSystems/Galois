@@ -3,7 +3,8 @@
 
 #include <iterator>
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 //! Iterator over items in containers of containers
 template<typename IterTy>
@@ -60,5 +61,6 @@ public:
   }
 };
 
+}
 }
 #endif

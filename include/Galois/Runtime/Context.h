@@ -39,7 +39,8 @@
 //! exceptions.
 #define GALOIS_USE_EXCEPTION_HANDLER 0
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 enum ConflictFlag {
   CONFLICT = -1,
@@ -99,10 +100,10 @@ public:
   unsigned commit_iteration();
   void acquire(Lockable* L);
   void lockAcquire(Lockable* L);
-  bool do_trylock(GaloisRuntime::Lockable* L);
-  void do_unlock(GaloisRuntime::Lockable* L);
-  void *do_getValue(GaloisRuntime::Lockable* L);
-  void do_setLockValue(GaloisRuntime::Lockable* L);
+  bool do_trylock(Lockable* L);
+  void do_unlock(Lockable* L);
+  void *do_getValue(Lockable* L);
+  void do_setLockValue(Lockable* L);
 };
 
 //! get the current conflict detection class, may be null if not in parallel region
@@ -198,7 +199,7 @@ static inline void unlock(Lockable* C) {
 
 struct AlwaysLockObj {
   void operator()(Lockable* C) const {
-    GaloisRuntime::doAcquire(C);
+    doAcquire(C);
   }
 };
 
@@ -206,7 +207,7 @@ struct CheckedLockObj {
   Galois::MethodFlag m;
   CheckedLockObj(Galois::MethodFlag _m) :m(_m) {}
   void operator()(Lockable* C) const {
-    GaloisRuntime::acquire(C, m);
+    acquire(C, m);
   }
 };
 
@@ -216,8 +217,9 @@ void breakLoop();
 void signalConflict();
 
 void forceAbort();
-}
 
+} //Runtime
+} //Galois
 
 
 

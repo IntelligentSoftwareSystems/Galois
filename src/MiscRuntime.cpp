@@ -23,21 +23,21 @@
 
 #include "Galois/Runtime/ParallelWork.h"
 
-using namespace GaloisRuntime;
+using namespace Galois::Runtime;
 using namespace DIR;
 
-bool GaloisRuntime::distributed_foreach = false;
-NodeRequest GaloisRuntime::DIR::nr;
-//unordered_map<Pair,void*,HashFunction,SetEqual>    GaloisRuntime::DIR::hash_table;
-//unordered_map<Pair,locData*,HashFunction,SetEqual> GaloisRuntime::sent_hash;
-//unordered_map<Pair,void*,HashFunction,SetEqual>    GaloisRuntime::recv_hash;
+bool Galois::Runtime::distributed_foreach = false;
+NodeRequest Galois::Runtime::DIR::nr;
+//unordered_map<Pair,void*,HashFunction,SetEqual>    Galois::Runtime::DIR::hash_table;
+//unordered_map<Pair,locData*,HashFunction,SetEqual> Galois::Runtime::sent_hash;
+//unordered_map<Pair,void*,HashFunction,SetEqual>    Galois::Runtime::recv_hash;
 
-unsigned int GaloisRuntime::galoisActiveThreads = 1;
+unsigned int Galois::Runtime::activeThreads = 1;
 
-void GaloisRuntime::preAlloc_impl(int num) {
-  int a = galoisActiveThreads;
+void Galois::Runtime::preAlloc_impl(int num) {
+  int a = activeThreads;
   a = (num + a - 1) / a;
-  GaloisRuntime::RunCommand w[2] = {std::bind(GaloisRuntime::MM::pagePreAlloc, a),
-				    Config::ref(getSystemBarrier())};
-  GaloisRuntime::getSystemThreadPool().run(&w[0], &w[2]);
+  RunCommand w[2] = {std::bind(Galois::Runtime::MM::pagePreAlloc, a),
+				    std::ref(getSystemBarrier())};
+  getSystemThreadPool().run(&w[0], &w[2], activeThreads);
 }

@@ -31,7 +31,8 @@
 
 #include <boost/optional.hpp>
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 namespace WorkList {
 
 template<typename T, bool concurrent>
@@ -137,6 +138,7 @@ struct DummyIndexer: public std::unary_function<const T&,unsigned> {
   unsigned operator()(const T& x) { return 0; }
 };
 
+}
 }
 }
 

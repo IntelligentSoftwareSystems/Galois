@@ -1,14 +1,43 @@
-#ifndef GALOIS_DIRECTORY_H
-#define GALOIS_DIRECTORY_H
+/** Galois Distributed Directory -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @author Manoj Dhanapal <madhanap@cs.utexas.edu>
+ * @author Andrew Lenharth <andrewl@lenharth.org>
+ */
+
+#ifndef GALOIS_RUNTIME_DIRECTORY_H
+#define GALOIS_RUNTIME_DIRECTORY_H
 
 #include "Galois/Runtime/NodeRequest.h"
 #include <unordered_map>
 #include "Galois/Runtime/ll/TID.h"
 #include "Galois/Runtime/MethodFlags.h"
+#include <unistd.h>
+
+#include "Galois/Runtime/ll/SimpleLock.h"
+#include "Galois/Runtime/Network.h"
 
 #define PLACEREQ 10000
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 // the default value is false
 extern bool distributed_foreach;
@@ -75,6 +104,69 @@ static inline void comm() {
    }
 
 } // end of DIR namespace
-
+}
 } // end namespace
+
+
+namespace Galois {
+namespace Runtime {
+namespace Distributed {
+
+//entry point for remote fetch messages
+template<typename T>
+void serializeLandingPad(Galois::Runtime::Distributed::RecvBuffer &) {
+  //  T* ptr = reinterpret_cast<T*>(ptr);
+  //I have ptr;
+  //acquire(ptr);
+}
+
+class RemoteDirectory {
+
+  struct objstate {
+    enum ObjStates { ObjValid, ObjIncoming };
+
+    uintptr_t localobj;
+    enum ObjStates state;
+  };
+
+  struct ohash : public unary_function<std::pair<uintptr_t, uint32_t>, size_t> {
+    size_t operator()(const std::pair<uintptr_t, uint32_t>& v) const {
+      return std::hash<uintptr_t>()(v.first) ^ std::hash<uint32_t>()(v.second);
+    }
+  };
+
+  std::unordered_map<std::pair<uintptr_t, uint32_t>, objstate, ohash> curobj;
+  Galois::Runtime::LL::SimpleLock<true> Lock;
+
+  //returns a valid local pointer to the object if it exists
+  //or returns null
+  uintptr_t haveObject(uintptr_t ptr, uint32_t owner);
+
+  //returns a valid local pointer to the object if it exists
+  //or returns null
+  uintptr_t fetchObject(uintptr_t ptr, uint32_t owner, recvFuncTy pad );
+
+public:
+  //resolve a pointer, owner pair
+  //precondition: owner != networkHostID
+  template<typename T>
+  T* resolve(uintptr_t ptr, uint32_t owner) {
+    assert(owner != networkHostID);
+    uintptr_t p = haveObject(ptr, owner);
+    if (!p)
+      p = fetchObject(ptr, owner, &serializeLandingPad<T>);
+    return reinterpret_cast<T*>(p);
+  }
+};
+
+RemoteDirectory& getSystemRemoteDirectory();
+
+class LocalDirectory {
+};
+
+LocalDirectory& getSystemLocalDirectory();
+
+} //Distributed
+} //Runtime
+} //Galois
 #endif

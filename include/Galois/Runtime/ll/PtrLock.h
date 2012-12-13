@@ -39,7 +39,8 @@
 
 #include "CompilerSpecific.h"
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 namespace LL {
 
 /// PtrLock is a spinlock and a pointer.  If the second template
@@ -140,6 +141,7 @@ public:
   }
 };
 
+}
 }
 }
 

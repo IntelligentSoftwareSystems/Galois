@@ -26,7 +26,8 @@
 
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 void runAllLoopExitHandlers(void);
 
@@ -43,6 +44,7 @@ public:
   ~AtLoopExit();
 };
 
+}
 }
 
 #endif //GALOIS_RUNTIME_LOOPHOOKS_H

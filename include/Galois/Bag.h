@@ -38,7 +38,7 @@ namespace Galois {
  * can only be done serially.
  */
 template<typename T>
-struct InsertBag: public GaloisRuntime::galois_insert_bag<T> { };
+struct InsertBag: public Galois::Runtime::galois_insert_bag<T> { };
 
 /**
  * Bag for serial use.
@@ -47,7 +47,7 @@ struct InsertBag: public GaloisRuntime::galois_insert_bag<T> { };
 // TODO(ddn): Factor out template dependencies to reduce code bloat
 template<class T, int blockSize=1024*16>
 class Bag: private boost::noncopyable {
-  typedef GaloisRuntime::MM::SimpleBumpPtr<GaloisRuntime::MM::FreeListHeap<GaloisRuntime::MM::SystemBaseAlloc> > Allocator;
+  typedef Galois::Runtime::MM::SimpleBumpPtr<Galois::Runtime::MM::FreeListHeap<Galois::Runtime::MM::SystemBaseAlloc> > Allocator;
   Allocator alloc;
 
 protected:  
@@ -497,7 +497,7 @@ public:
 // TODO(ddn): Remove need for explicit merge by adopting same techniques are InsBag
 template<typename T>
 class MergeBag: private boost::noncopyable {
-  GaloisRuntime::PerThreadStorage<Bag<T> > bags;
+  Galois::Runtime::PerThreadStorage<Bag<T> > bags;
 
 public:
   typedef typename Bag<T>::value_type value_type;

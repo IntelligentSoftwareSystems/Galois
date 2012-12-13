@@ -1,11 +1,11 @@
-/** Galois configuration -*- C++ -*-
+/** Galois Network Layer -*- C++ -*-
  * @file
  * @section License
  *
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -18,32 +18,39 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
- * @section Description
- *
- * Factor out site-specific configuration
- *
- * @author Donald Nguyen <ddn@cs.utexas.edu>
+ * @author Manoj Dhanapal <madhanap@cs.utexas.edu>
+ * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#ifndef GALOIS_RUNTIME_CONFIG_H
-#define GALOIS_RUNTIME_CONFIG_H
 
-#ifdef __GXX_EXPERIMENTAL_CXX0X__
-#include <functional>
-#else
-#include <tr1/functional>
-#endif
+#ifndef GALOIS_RUNTIME_NETWORK_H
+#define GALOIS_RUNTIME_NETWORK_H
 
-namespace GaloisRuntime {
-namespace Config {
-#ifdef __GXX_EXPERIMENTAL_CXX0X__
-  using std::function;
-  using std::ref;
-#else
-  using std::tr1::function;
-  using std::tr1::ref;
-#endif
 
-}
-}
+namespace Galois {
 
+namespace Runtime {
+namespace Distributed {
+
+extern uint32_t networkHostID;
+
+class RecvBuffer;
+class SendBuffer;
+
+typedef void (*recvFuncTy)(RecvBuffer&);
+
+class NetworkInterface {
+public:
+  virtual ~NetworkInterface() {}
+
+  //!send a message to a given (dest) thread.  A messafe is simply a
+  //!landing pad (recv) and some data (buf)
+  virtual void sendMessage(uint32_t dest, recvFuncTy recv, SendBuffer& buf) = 0;
+};
+
+NetworkInterface& getSystemNetworkInterface();
+
+
+} //Distributed
+} //Runtime
+} //Galois
 #endif

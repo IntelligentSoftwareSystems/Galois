@@ -41,7 +41,8 @@
 #include "Galois/Runtime/mm/Mem.h"
 #include "Galois/Runtime/TwoLevelIteratorA.h"
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 template <typename T, typename Cont_tp> 
 class PerThreadWorkList {
@@ -66,7 +67,7 @@ public:
   typedef typename intern::ChooseIter<This_ty, typename Cont_tp::const_reverse_iterator>::type global_const_reverse_iterator;
 
 protected:
-  typedef GaloisRuntime::PerThreadStorage<Cont_ty*> PerThrdCont_ty;
+  typedef Galois::Runtime::PerThreadStorage<Cont_ty*> PerThrdCont_ty;
   PerThrdCont_ty perThrdCont;
 
   PerThreadWorkList (): perThrdCont () {}
@@ -292,7 +293,7 @@ public:
 
 };
 
-}
+} }
 
 
 

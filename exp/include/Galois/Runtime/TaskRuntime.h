@@ -22,7 +22,7 @@ using namespace std;
 
 typedef void (*ftype) (char*,int,char*);
 
-namespace GaloisRuntime {
+namespace Galois::Runtime {
 
    int rank, numtasks;
 
@@ -163,9 +163,7 @@ namespace GaloisRuntime {
       int count, task_count;
 
       /* count number of elements */
-      count = 0;
-      for (IterTy it = b; it != e; it++)
-         count++;
+      count = std::distance(b,e);
 
       /* calculate the num of elements to be sent to each task */
       task_count = count/numtasks;

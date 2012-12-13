@@ -28,7 +28,8 @@
 #include "Galois/Runtime/ParallelWork.h"
 #include <cstdio>
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 namespace HIDDEN {
 
 //! Alternative implementation of FixedSizeRing which is non-concurrent and
@@ -283,14 +284,14 @@ class BSInlineExecutor {
   typedef WorklistTy<value_type,256> WLTy;
 
   struct ThreadLocalData {
-    GaloisRuntime::UserContextAccess<value_type> facing;
+    Galois::Runtime::UserContextAccess<value_type> facing;
     SimpleRuntimeContext cnx;
     LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
     ThreadLocalData(const char* ln): stat(ln) { }
   };
 
-  GaloisRuntime::GBarrier barrier1;
-  GaloisRuntime::GBarrier barrier2;
+  Galois::Runtime::GBarrier barrier1;
+  Galois::Runtime::GBarrier barrier2;
   WLTy wls[2];
   FunctionTy& function;
   const char* loopname;
@@ -329,10 +330,10 @@ class BSInlineExecutor {
 #endif
     switch (result) {
     case 0: break;
-    case GaloisRuntime::CONFLICT:
+    case Galois::Runtime::CONFLICT:
       abortIteration(tld, wid, cur, next);
       break;
-    case GaloisRuntime::BREAK:
+    case Galois::Runtime::BREAK:
     default:
       abort();
     }
@@ -401,7 +402,7 @@ public:
       abort();
     }
 
-    numActive = galoisActiveThreads;
+    numActive = activeThreads;
     barrier1.reinit(numActive);
     barrier2.reinit(numActive);
   }
@@ -449,5 +450,6 @@ struct ForEachWork<WorkList::BulkSynchronousInline<false>,T,FunctionTy>:
   ForEachWork(FunctionTy& f, const char* ln): SuperTy(f, ln) { }
 };
 
+}
 }
 #endif

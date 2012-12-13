@@ -30,7 +30,8 @@
 #ifndef GALOIS_RUNTIME_LL_HWTOPO_H
 #define GALOIS_RUNTIME_LL_HWTOPO_H
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 namespace LL {
 
 //Bind thread specified by id to the correct OS thread
@@ -78,6 +79,7 @@ static inline bool isLeaderForPackage(int galois_thread_id) {
   return (x >> 1) & 1;
 }
 
+}
 }
 }
 

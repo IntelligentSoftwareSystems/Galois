@@ -6,6 +6,7 @@
 #include <iostream>
 #include <set>
 #include <unordered_map>
+#include <cstring>
 #include "Galois/Runtime/Context.h"
 
 #define REQ_TAG  423
@@ -14,7 +15,8 @@
 
 using namespace std;
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 static bool NR_init = false;
 
@@ -276,7 +278,7 @@ public:
             // check if local node
             if (task == taskRank) {
                // update the value in addr
-               memcpy(addr,*buf,size);
+	      std::memcpy(addr,*buf,size);
                free (recv_hash[p]);
                recv_hash[p] = NULL;
                *buf = addr;
@@ -659,4 +661,5 @@ public:
 };
 
 } // end namespace
+}
 #endif

@@ -31,15 +31,17 @@
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 namespace LL {
 
+//FIXME: nothing in LL should depend on Runtime
 
 class ThreadRWlock {
 
-  typedef GaloisRuntime::LL::PaddedLock<true> Lock_ty;
-  // typedef GaloisRuntime::LL::SimpleLock<true> Lock_ty;
-  typedef GaloisRuntime::PerThreadStorage<Lock_ty> PerThreadLock;
+  typedef Galois::Runtime::LL::PaddedLock<true> Lock_ty;
+  // typedef Galois::Runtime::LL::SimpleLock<true> Lock_ty;
+  typedef Galois::Runtime::PerThreadStorage<Lock_ty> PerThreadLock;
 
   PerThreadLock locks;
 
@@ -71,8 +73,8 @@ public:
 
 
 } // end namespace LL
-} // end namespace GaloisRuntime
-
+} // end namespace Runtime
+} // end namespace Galois
 
 
 #endif // GALOIS_THREAD_RW_LOCK_H

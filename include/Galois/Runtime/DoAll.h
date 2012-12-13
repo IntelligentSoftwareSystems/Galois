@@ -28,7 +28,8 @@
 #ifndef GALOIS_RUNTIME_DOALL_H
 #define GALOIS_RUNTIME_DOALL_H
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 struct EmptyFn {
   template<typename T>
@@ -95,8 +96,8 @@ class DoAllWork {
       return true;
     //Then try stealing from neighbors
     unsigned myID = LL::getTID();
-    for (unsigned x = 1; x < galoisActiveThreads; x += x) {
-      SharedState& r = *TLDS.getRemote((myID + x) % galoisActiveThreads);
+    for (unsigned x = 1; x < activeThreads; x += x) {
+      SharedState& r = *TLDS.getRemote((myID + x) % activeThreads);
       if (doSteal(r, mytld)) {
 	//populateSteal(mytld);
 	return true;
@@ -122,7 +123,7 @@ public:
   void operator()() {
     //Assume the copy constructor on the functor is readonly
     PrivateState thisTLD(origF);
-    std::pair<IterTy, IterTy> r = Galois::block_range(masterBegin, masterEnd, LL::getTID(), galoisActiveThreads);
+    std::pair<IterTy, IterTy> r = Galois::block_range(masterBegin, masterEnd, LL::getTID(), activeThreads);
     thisTLD.begin = r.first;
     thisTLD.end = r.second;
 
@@ -148,9 +149,9 @@ FunctionTy do_all_impl_dispatch(IterTy b, IterTy e, FunctionTy f, ReducerTy r, b
   // TODO: differentiate calls
   DoAllWork<FunctionTy, ReducerTy, IterTy, false> W(f, r, needsReduce, b, e);
 
-  RunCommand w[2] = {Config::ref(W),
-		     Config::ref(getSystemBarrier())};
-  getSystemThreadPool().run(&w[0], &w[2]);
+  RunCommand w[2] = {std::ref(W),
+		     std::ref(getSystemBarrier())};
+  getSystemThreadPool().run(&w[0], &w[2], activeThreads);
   return W.getFn();
 }
 
@@ -158,9 +159,9 @@ template<typename IterTy, typename FunctionTy, typename ReducerTy>
 FunctionTy do_all_impl_dispatch(IterTy b, IterTy e, FunctionTy f, ReducerTy r, bool needsReduce, std::input_iterator_tag) {
   DoAllWork<FunctionTy, ReducerTy, IterTy, false> W(f, r, needsReduce, b, e);
 
-  RunCommand w[2] = {Config::ref(W),
-		     Config::ref(getSystemBarrier())};
-  getSystemThreadPool().run(&w[0], &w[2]);
+  RunCommand w[2] = {std::ref(W),
+		     std::ref(getSystemBarrier())};
+  getSystemThreadPool().run(&w[0], &w[2],activeThreads);
   return W.getFn();
 }
 
@@ -177,6 +178,7 @@ FunctionTy do_all_impl(IterTy b, IterTy e, FunctionTy f, ReducerTy r, bool needs
   return retval;
 }
 
-} //namespace GaloisRuntime
+} //namespace Galois::Runtime
+}
 
 #endif // GALOIS_RUNTIME_DOALL_H

@@ -32,7 +32,8 @@
 
 #include <cstdlib>
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 namespace intern {
 
@@ -483,7 +484,8 @@ typename ChooseIter<PerThrdWL, Iter>::type make_end (PerThrdWL& wl, Iter dummy) 
 
 
 } // end namespace intern
-} // end namespace GaloisRuntime
+} // end namespace Galois::Runtime
+}
 
 #endif // GALOIS_RUNTIME_TWO_LEVEL_ITER_A_H
 

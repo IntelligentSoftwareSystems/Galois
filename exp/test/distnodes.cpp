@@ -29,6 +29,8 @@ int main(int argc, const char** argv) {
   for (auto ii = Gr.begin(), ee = Gr.end(); ii != ee; ++ii)
     std::cout << (*ii)->getData() << " " << std::distance((*ii)->begin(), (*ii)->end()) << "\n";
 
+  ///debugging stuff below this point
+
   Galois::Runtime::Distributed::SerializeBuffer B;
   //serialize the pointer
   auto oldB = *Gr.begin();

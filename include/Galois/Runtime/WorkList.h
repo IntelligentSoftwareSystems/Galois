@@ -47,7 +47,8 @@
 #include <boost/optional.hpp>
 #include <boost/ref.hpp>
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 namespace WorkList {
 
 // Worklists may not be copied.
@@ -102,7 +103,7 @@ public:
 
 template<typename Iter>
 void fill_work(Iter& b, Iter& e) {
-  unsigned int a = galoisActiveThreads;
+  unsigned int a = activeThreads;
   unsigned int id = LL::getTID();
   unsigned int dist = std::distance(b, e);
   unsigned int num = (dist + a - 1) / a; //round up
@@ -448,7 +449,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     if (BSP) {
       msS = p.scanStart;
       if (localLeader)
-	for (unsigned i = 0; i <  galoisActiveThreads; ++i)
+	for (unsigned i = 0; i <  activeThreads; ++i)
 	  msS = std::min(msS, current.getRemote(i)->scanStart);
       else
 	msS = std::min(msS, current.getRemote(LL::getLeaderForThread(myID))->scanStart);
@@ -519,7 +520,7 @@ struct squeues<true,TQ> {
   TQ& get(int i) { return *queues.getRemote(i); }
   TQ& get() { return *queues.getLocal(); }
   int myEffectiveID() { return LL::getTID(); }
-  int size() { return galoisActiveThreads; }
+  int size() { return activeThreads; }
 };
 
 template<typename TQ>
@@ -738,7 +739,7 @@ public:
     TLD& tld = *tlds.getLocal();
     if (tld.begin != tld.end) {
       boost::optional<value_type> retval = *tld.begin;
-      tld.begin = Galois::safe_advance(tld.begin, tld.end, galoisActiveThreads);
+      tld.begin = Galois::safe_advance(tld.begin, tld.end, activeThreads);
       assert(retval);
       return retval;
     }
@@ -782,7 +783,7 @@ private:
     if (do_steal(tld,tld))
       return;
     //Then try stealing from neighbor
-    if (do_steal(tld, *tlds.getRemote((LL::getTID() + 1) % galoisActiveThreads))) {
+    if (do_steal(tld, *tlds.getRemote((LL::getTID() + 1) % activeThreads))) {
       //redistribute stolen items for neighbor to steal too
       if (std::distance(tld.begin, tld.end) > 1) {
 	tld.stealLock.lock();
@@ -1028,10 +1029,10 @@ class BulkSynchronous : private boost::noncopyable {
   };
 
   CTy wls[2];
-  GaloisRuntime::PerThreadStorage<TLD> tlds;
-  GaloisRuntime::GBarrier barrier1;
-  GaloisRuntime::GBarrier barrier2;
-  GaloisRuntime::LL::CacheLineStorage<volatile long> some;
+  Galois::Runtime::PerThreadStorage<TLD> tlds;
+  Galois::Runtime::GBarrier barrier1;
+  Galois::Runtime::GBarrier barrier2;
+  Galois::Runtime::LL::CacheLineStorage<volatile long> some;
   volatile bool empty;
 
  public:
@@ -1047,7 +1048,7 @@ class BulkSynchronous : private boost::noncopyable {
   };
 
   BulkSynchronous(): empty(false) {
-    unsigned num = galoisActiveThreads;
+    unsigned num = activeThreads;
     barrier1.reinit(num);
     barrier2.reinit(num);
   }
@@ -1082,7 +1083,7 @@ class BulkSynchronous : private boost::noncopyable {
         return r;
 
       barrier1.wait();
-      if (GaloisRuntime::LL::getTID() == 0) {
+      if (Galois::Runtime::LL::getTID() == 0) {
         if (!some.data)
           empty = true;
         some.data = false; 
@@ -1101,7 +1102,7 @@ class BulkSynchronous : private boost::noncopyable {
 GALOIS_WLCOMPILECHECK(BulkSynchronous)
 
 //End namespace
-
+}
 }
 }
 

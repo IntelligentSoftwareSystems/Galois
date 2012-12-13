@@ -1,11 +1,11 @@
-/** Simple thread related classes -*- C++ -*-
+/** Galois Distributed Directory -*- C++ -*-
  * @file
  * @section License
  *
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -18,35 +18,30 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
+ * @author Manoj Dhanapal <madhanap@cs.utexas.edu>
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#ifndef GALOIS_RUNTIME_THREADPOOL_H
-#define GALOIS_RUNTIME_THREADPOOL_H
 
-#include <functional>
+#include "Galois/Runtime/Directory.h"
 
-namespace Galois {
-namespace Runtime {
+using namespace Galois::Runtime::Distributed;
 
-typedef std::function<void (void)> RunCommand;
+uintptr_t RemoteDirectory::haveObject(uintptr_t ptr, uint32_t owner) {
+  Lock.lock();
+  auto iter = curobj.find(std::make_pair(ptr,owner));
+  uintptr_t retval = 0;
+  //  if (iter != curobj.end() && iter->state == ObjValid)
+  //    retval = iter->localobj;
+  Lock.unlock();
+  return retval;
+}
 
-class ThreadPool {
-public:
-  virtual ~ThreadPool() { }
+uintptr_t RemoteDirectory::fetchObject(uintptr_t ptr, uint32_t owner, recvFuncTy pad) {
+  abort();
+}
 
-  //!execute work on all threads
-  //!preWork and postWork are executed only on the master thread
-  virtual void run(RunCommand* begin, RunCommand* end, unsigned num) = 0;
+RemoteDirectory& getSystemRemoteDirectory() {
+  static RemoteDirectory obj;
+  return obj;
+}
 
-  //!return the number of threads supported by the thread pool on the current machine
-  virtual unsigned getMaxThreads() const = 0;
-
-};
-
-//!Returns or creates the appropriate thread pool for the system
-ThreadPool& getSystemThreadPool();
-
-} //Runtime
-} //Galois
-
-#endif

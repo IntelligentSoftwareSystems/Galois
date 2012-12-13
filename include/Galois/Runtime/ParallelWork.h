@@ -31,7 +31,6 @@
 #include "Galois/Mem.h"
 #include "Galois/Runtime/Directory.h"
 #include "Galois/Runtime/ForEachTraits.h"
-#include "Galois/Runtime/Config.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/ThreadPool.h"
@@ -39,10 +38,11 @@
 #include "Galois/Runtime/LoopHooks.h"
 #include "Galois/Runtime/WorkList.h"
 #include "Galois/Runtime/UserContextAccess.h"
-
+#include "Galois/Runtime/ActiveThreads.h"
 #include <algorithm>
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 /*
 // the default value is false
@@ -108,7 +108,7 @@ protected:
   typedef WorkList::GFIFO<value_type> AbortedList;
 
   struct ThreadLocalData {
-    GaloisRuntime::UserContextAccess<value_type> facing;
+    Galois::Runtime::UserContextAccess<value_type> facing;
     SimpleRuntimeContext cnx;
     LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
     TerminationDetection::TokenHolder* lterm;
@@ -213,10 +213,10 @@ protected:
     switch (result) {
     case 0:
       break;
-    case GaloisRuntime::CONFLICT:
+    case Galois::Runtime::CONFLICT:
       abortIteration(*p, tld, recursiveAbort);
       break;
-    case GaloisRuntime::BREAK:
+    case Galois::Runtime::BREAK:
       handleBreak(tld);
       return false;
     default:
@@ -239,7 +239,7 @@ protected:
       setThreadContext(&tld.cnx);
     tld.lterm = term.getLocalTokenHolder();
     do {
-      if (get_distributed_foreach() && (LL::getTID() == (galoisActiveThreads-1))) {
+      if (get_distributed_foreach() && (LL::getTID() == (Galois::Runtime::activeThreads-1))) {
          DIR::comm();
       }
       else {
@@ -288,7 +288,7 @@ public:
 
   void operator()() {
     if (LL::isLeaderForPackage(LL::getTID()) &&
-	galoisActiveThreads > 1 && 
+	Galois::Runtime::activeThreads > 1 && 
 	ForEachTraits<FunctionTy>::NeedsAborts)
       go<true>();
     else
@@ -308,11 +308,11 @@ void for_each_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
 
   WorkTy W(f, loopname);
   Initializer<IterTy, WorkTy> init(b, e, W);
-  RunCommand w[4] = {Config::ref(init), 
-		     Config::ref(getSystemBarrier()),
-		     Config::ref(W),
-		     Config::ref(getSystemBarrier())};
-  getSystemThreadPool().run(&w[0], &w[4]);
+  RunCommand w[4] = {std::ref(init), 
+		     std::ref(getSystemBarrier()),
+		     std::ref(W),
+		     std::ref(getSystemBarrier())};
+  getSystemThreadPool().run(&w[0], &w[4], activeThreads);
   runAllLoopExitHandlers();
   inGaloisForEach = false;
 }
@@ -343,11 +343,11 @@ void do_all_impl_old(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
   WorkTy W(F, loopname);
 
   Initializer<IterTy, WorkTy> init(b, e, W);
-  RunCommand w[4] = {Config::ref(init),
-		     Config::ref(getSystemBarrier()),
-		     Config::ref(W),
-		     Config::ref(getSystemBarrier())};
-  getSystemThreadPool().run(&w[0], &w[4]);
+  RunCommand w[4] = {std::ref(init),
+		     std::ref(getSystemBarrier()),
+		     std::ref(W),
+		     std::ref(getSystemBarrier())};
+  getSystemThreadPool().run(&w[0], &w[4], activeThreads);
   runAllLoopExitHandlers();
 
   inGaloisForEach = false;
@@ -358,21 +358,22 @@ struct WOnEach {
   FunctionTy fn;
   WOnEach(FunctionTy f) :fn(f) {}
   void operator()(void) {
-    fn(GaloisRuntime::LL::getTID(), galoisActiveThreads);   
+    fn(LL::getTID(), activeThreads);   
   }
 };
 
 template<typename FunctionTy>
 void on_each_impl(FunctionTy fn, const char* loopname = 0) {
-  GaloisRuntime::RunCommand w[2] = {WOnEach<FunctionTy>(fn),
-				    Config::ref(getSystemBarrier())};
-  GaloisRuntime::getSystemThreadPool().run(&w[0], &w[2]);
+  RunCommand w[2] = {WOnEach<FunctionTy>(fn),
+				    std::ref(getSystemBarrier())};
+  getSystemThreadPool().run(&w[0], &w[2], activeThreads);
 }
 
 
 void preAlloc_impl(int num);
 
-} // end namespace
+} // Runtime
+} //Galois
 
 #endif
 
