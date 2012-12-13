@@ -40,8 +40,13 @@ uintptr_t RemoteDirectory::fetchObject(uintptr_t ptr, uint32_t owner, recvFuncTy
   abort();
 }
 
-RemoteDirectory& getSystemRemoteDirectory() {
+RemoteDirectory& Galois::Runtime::Distributed::getSystemRemoteDirectory() {
   static RemoteDirectory obj;
+  return obj;
+}
+
+LocalDirectory& Galois::Runtime::Distributed::getSystemLocalDirectory() {
+  static LocalDirectory obj;
   return obj;
 }
 
