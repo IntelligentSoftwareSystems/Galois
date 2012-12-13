@@ -25,16 +25,18 @@
 #ifndef GALOIS_RUNTIME_NETWORK_H
 #define GALOIS_RUNTIME_NETWORK_H
 
+#include "Galois/Runtime/Serialize.h"
+
+#include <cstdint>
 
 namespace Galois {
-
 namespace Runtime {
 namespace Distributed {
 
 extern uint32_t networkHostID;
 
-class RecvBuffer;
-class SendBuffer;
+typedef SerializeBuffer SendBuffer;
+class RecvBuffer {};
 
 typedef void (*recvFuncTy)(RecvBuffer&);
 
@@ -42,9 +44,15 @@ class NetworkInterface {
 public:
   virtual ~NetworkInterface() {}
 
-  //!send a message to a given (dest) thread.  A messafe is simply a
+  //!send a message to a given (dest) host.  A message is simply a
   //!landing pad (recv) and some data (buf)
+  //! buf is invalidated by this operation
   virtual void sendMessage(uint32_t dest, recvFuncTy recv, SendBuffer& buf) = 0;
+
+  //!send a message to all hostss.  A message is simply a
+  //!landing pad (recv) and some data (buf)
+  //! buf is invalidated by this operation
+  virtual void broadcastMessage(recvFuncTy recv, SendBuffer& buf) = 0;
 };
 
 NetworkInterface& getSystemNetworkInterface();
