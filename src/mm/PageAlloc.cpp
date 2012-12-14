@@ -48,7 +48,8 @@ struct FreeNode {
   FreeNode* next;
 };
  
-typedef GaloisRuntime::LL::PtrLock<FreeNode, true> HeadPtr;
+typedef Galois::Runtime::LL::PtrLock<FreeNode, true> HeadPtr;
+typedef Galois::Runtime::LL::CacheLineStorage<HeadPtr> HeadPtrStorage;
 
 //Number of pages allocated
 struct PAState {
@@ -69,8 +70,8 @@ PAState& getPAState() {
 #else
 #define DoAllocLock false
 #endif
-static GaloisRuntime::LL::SimpleLock<DoAllocLock> allocLock;
-static GaloisRuntime::LL::SimpleLock<true> dataLock;
+static Galois::Runtime::LL::SimpleLock<DoAllocLock> allocLock;
+static Galois::Runtime::LL::SimpleLock<true> dataLock;
 static __thread HeadPtr* head = 0;
 
 void* allocFromOS() {
@@ -80,18 +81,18 @@ void* allocFromOS() {
   void* ptr = 0;
 #ifdef MAP_HUGETLB
   //First try huge
-  ptr = mmap(0, GaloisRuntime::MM::pageSize, _PROT, _MAP_HUGE, -1, 0);
+  ptr = mmap(0, Galois::Runtime::MM::pageSize, _PROT, _MAP_HUGE, -1, 0);
 #endif
 
   //FIXME: improve failure case to ensure pageSize alignment
 #ifdef MAP_POPULATE
   //Then try populate
   if (!ptr || ptr == MAP_FAILED)
-    ptr = mmap(0, GaloisRuntime::MM::pageSize, _PROT, _MAP_POP, -1, 0);
+    ptr = mmap(0, Galois::Runtime::MM::pageSize, _PROT, _MAP_POP, -1, 0);
 #endif
   //Then try normal
   if (!ptr || ptr == MAP_FAILED)
-    ptr = mmap(0, GaloisRuntime::MM::pageSize, _PROT, _MAP_BASE, -1, 0);
+    ptr = mmap(0, Galois::Runtime::MM::pageSize, _PROT, _MAP_BASE, -1, 0);
   
   allocLock.unlock();
   if (!ptr || ptr == MAP_FAILED) {
@@ -103,7 +104,7 @@ void* allocFromOS() {
   dataLock.lock();
   HeadPtr*& h = head;
   if (!h) { //first allocation
-    h = new HeadPtr();
+    h = &((new HeadPtrStorage())->data);
   }
   PAState& p = getPAState();
   p.ownerMap[ptr] = h;
@@ -114,7 +115,7 @@ void* allocFromOS() {
 
 } // end anon namespace
 
-void* GaloisRuntime::MM::pageAlloc() {
+void* Galois::Runtime::MM::pageAlloc() {
   HeadPtr* phead = head;
   if (phead) {
     phead->lock();
@@ -128,7 +129,7 @@ void* GaloisRuntime::MM::pageAlloc() {
   return allocFromOS();
 }
 
-void GaloisRuntime::MM::pageFree(void* m) {
+void Galois::Runtime::MM::pageFree(void* m) {
   dataLock.lock();
   HeadPtr* phead = getPAState().ownerMap[m];
   dataLock.unlock();
@@ -139,11 +140,11 @@ void GaloisRuntime::MM::pageFree(void* m) {
   phead->unlock_and_set(nh);
 }
 
-void GaloisRuntime::MM::pagePreAlloc(int numPages) {
+void Galois::Runtime::MM::pagePreAlloc(int numPages) {
   while (numPages--)
-    GaloisRuntime::MM::pageFree(allocFromOS());
+    Galois::Runtime::MM::pageFree(allocFromOS());
 }
 
-unsigned GaloisRuntime::MM::pageAllocInfo() {
+unsigned Galois::Runtime::MM::pageAllocInfo() {
   return getPAState().num;
 }
