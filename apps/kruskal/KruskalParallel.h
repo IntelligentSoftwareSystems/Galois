@@ -53,8 +53,9 @@ typedef GaloisRuntime::PerThreadVector<EdgeCtx> EdgeCtxWL;
 typedef GaloisRuntime::MM::FSBGaloisAllocator<EdgeCtx> EdgeCtxAlloc;
 typedef Edge::Comparator Cmp;
 typedef Galois::GAccumulator<size_t> Accumulator;
+
 typedef Galois::GAtomicPadded<EdgeCtx*> AtomicCtxPtr;
-// typedef Galois::GAtomic<int> AtomicInt;
+// typedef Galois::GAtomic<EdgeCtx*> AtomicCtxPtr;
 typedef std::vector<AtomicCtxPtr> VecAtomicCtxPtr;
 
 static const int NULL_EDGE_ID = -1;
@@ -73,28 +74,47 @@ struct Padded {
 
 
 struct EdgeCtx: public Edge {
-  bool srcPass;
-  bool dstPass;
 
-  explicit EdgeCtx (const Edge& e): Edge (e), srcPass (true), dstPass (true)
-  {}
+  static const unsigned SRC_FAIL = 1;
+  static const unsigned DST_FAIL = 2;
+  static const unsigned SELF_EDGE = 4;
 
-  void updatePass (const int rep, VecRep_ty& repVec) {
+
+  unsigned status;
+
+  explicit EdgeCtx (const Edge& e): Edge (e), status (0) {}
+
+  void setFail (const int rep, VecRep_ty& repVec) {
 
     if (getRep_int (this->src, repVec) == rep) {
-      srcPass = false;
+      status |= SRC_FAIL;
 
     } else if (getRep_int (this->dst, repVec) == rep) {
-      dstPass = false;
+      status |= DST_FAIL;
 
     } else {
       abort ();
     }
   }
 
-  void resetPass () {
-    srcPass = true;
-    dstPass = true;
+  void setSelf () {
+    status |= SELF_EDGE;
+  }
+
+  void resetStatus () {
+    status = 0;
+  }
+
+  bool isSrcFail () const { 
+    return bool (status & SRC_FAIL);
+  }
+
+  bool isDstFail () const {
+    return bool (status & DST_FAIL);
+  }
+
+  bool isSelf () const { 
+    return bool (status & SELF_EDGE);
   }
 
 
@@ -243,12 +263,12 @@ struct FindLoop {
       succ = minEdgeCtxVec[rep].cas (curr, &ctx);
 
       if (succ) {
-        curr->updatePass (rep, repVec);
+        curr->setFail (rep, repVec);
       }
     }
 
     if (!succ) {
-      ctx.updatePass (rep, repVec);
+      ctx.setFail (rep, repVec);
     }
 
 
@@ -266,8 +286,7 @@ struct FindLoop {
 
     } else {
       // self-edge, disable for early cleanup
-      ctx.srcPass = false;
-      ctx.dstPass = false;
+      ctx.setSelf ();
     }
     
   }
@@ -323,17 +342,30 @@ struct LinkUpLoop {
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (EdgeCtx& ctx) {
 
-    // relies on find with path-compression
-    int rep1 = getRep_int (ctx.src, repVec);
-    int rep2 = getRep_int (ctx.dst, repVec);
 
-    if (ctx.srcPass || ctx.dstPass) {
+    if (!ctx.isSelf () ) {
 
-      if (ctx.srcPass) {
+      if (ctx.isSrcFail () && ctx.isDstFail ()) {
+        ctx.resetStatus ();
+
+        if (usingOrderedRuntime) {
+          GaloisRuntime::signalConflict ();
+
+        } else {
+          nextWL.get ().push_back (ctx);
+        }
+
+      } else {
+
+      // relies on find with path-compression
+      int rep1 = getRep_int (ctx.src, repVec);
+      int rep2 = getRep_int (ctx.dst, repVec);
+
+      if (!ctx.isSrcFail ()) {
         assert (updateODG_test (ctx, rep1));
         linkUp_int (rep1, rep2, repVec);
 
-      } else if (ctx.dstPass) {
+      } else if (!ctx.isDstFail ()) {
         assert (updateODG_test (ctx, rep2));
         linkUp_int (rep2, rep1, repVec);
       }
@@ -341,30 +373,16 @@ struct LinkUpLoop {
       linkUpIter += 1;
       mstSum += ctx.weight;
 
-      if (ctx.srcPass) {
+      if (!ctx.isSrcFail ()) {
         updateODG_reset (ctx, rep1);
       }
 
-      if (ctx.dstPass) {
+      if (!ctx.isDstFail ()) {
         updateODG_reset (ctx, rep2);
       }
 
-      // TODO: deallocate
-
-    } else if (rep1 != rep2) {
-
-      ctx.resetPass ();
-
-      if (usingOrderedRuntime) {
-        GaloisRuntime::signalConflict ();
-
-      } else {
-        nextWL.get ().push_back (ctx);
-      }
-
-    }  else {
-      // TODO: deallocate
-    }
+    } // end else
+  }
 
 
     // if (rep1 != rep2) {

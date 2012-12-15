@@ -92,14 +92,14 @@ void runTwoPhaseKruskal (
     nextWL->clear_all ();
 
 
-    // GaloisRuntime::beginSampling ();
+    GaloisRuntime::beginSampling ();
     findTimer.start ();
     Galois::do_all_choice (*currWL,
     // GaloisRuntime::do_all_coupled (*currWL, 
         FindLoop (repVec, minEdgeCtxVec, findIter),
         "find_loop");
     findTimer.stop ();
-    // GaloisRuntime::endSampling ();
+    GaloisRuntime::endSampling ();
 
 
     // GaloisRuntime::beginSampling ();

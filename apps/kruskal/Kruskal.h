@@ -393,9 +393,9 @@ public:
     Galois::StatTimer t ("Time taken by runMST: ");
 
     t.start ();
-    GaloisRuntime::beginSampling ();
+    // GaloisRuntime::beginSampling ();
     runMST (numNodes, edges, mstWeight, totalIter);
-    GaloisRuntime::endSampling ();
+    // GaloisRuntime::endSampling ();
     t.stop ();
 
     printResults (mstWeight, totalIter);
