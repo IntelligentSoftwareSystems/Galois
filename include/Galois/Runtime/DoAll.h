@@ -179,9 +179,14 @@ FunctionTy do_all_impl(IterTy b, IterTy e, FunctionTy f, ReducerTy r, bool needs
   return retval;
 }
 
-template <typename IterTy, typename FunctionTy>
+template <bool steal_tp, typename IterTy, typename FunctionTy>
 void do_all_impl (IterTy b, IterTy e, FunctionTy f, const char* loopname=0) {
-  do_all_impl (b, e, f, EmptyFn (), false);
+
+  DoAllWork<FunctionTy, EmptyFn, IterTy, steal_tp> W(f, EmptyFn (), false, b, e);
+
+    RunCommand w[2] = {Config::ref(W),
+           Config::ref(getSystemBarrier())};
+    getSystemThreadPool().run(&w[0], &w[2]);
 }
 
 } //namespace GaloisRuntime
