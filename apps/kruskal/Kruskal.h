@@ -1,0 +1,582 @@
+/** Kruskal MST -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @section Description
+ *
+ * Kruskal MST.
+ *
+ * @author <ahassaan@ices.utexas.edu>
+ */
+
+#ifndef _KRUSKAL_H_ 
+#define _KRUSKAL_H_ 
+
+#include <vector>
+#include <string>
+#include <sstream>
+#include <limits>
+#include <iostream>
+#include <set>
+#include <tr1/unordered_set>
+
+#include <cstdlib>
+#include <cstdio>
+
+#include <boost/iterator/counting_iterator.hpp>
+
+#include "Galois/Timer.h"
+#include "Galois/Statistic.h"
+#include "Galois/Galois.h"
+#include "Galois/GaloisUnsafe.h"
+#include "Galois/Graphs/FileGraph.h"
+#include "Galois/Graphs/LCGraph.h"
+#include "Galois/Runtime/WorkList.h"
+#include "Galois/Runtime/Sampling.h"
+#include "llvm/Support/CommandLine.h"
+
+#include "Lonestar/BoilerPlate.h"
+
+namespace cll = llvm::cl;
+
+static const char* const name = "Kruskal MST";
+static const char* const desc = "Compute minimum weight spanning tree of an undirected graph";
+static const char* const url = "kruskal";
+
+static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
+
+
+namespace kruskal {
+
+typedef unsigned Weight_ty;
+typedef std::vector<int> VecRep;
+struct Edge;
+typedef std::vector<Edge> VecEdge;
+
+struct InEdge {
+  int src;
+  int dst;
+  Weight_ty weight;
+
+  InEdge (int _src, int _dst, Weight_ty _weight)
+    : src (_src), dst (_dst), weight (_weight) 
+  {
+    if (src == dst) {
+      fprintf (stderr, "Self edges not allowed\n");
+      abort ();
+    }
+
+    // nodes in an edge ordered so that reverse edges can be detected as duplicates
+    if (src > dst) {
+      std::swap (src, dst);
+    }
+
+    assert (src <= dst);
+  }
+
+  // equals function purely based on src and dst to detect duplicates
+  friend bool operator == (const InEdge& left, const InEdge& right) {
+    return (left.src == right.src) && (left.dst == right.dst);
+  }
+
+  struct Hash {
+
+    // hash function purely based on src and dst to find and remove duplicates
+    size_t operator () (const InEdge& edge) const {
+      return (size_t (edge.src) << 32) ^ size_t(edge.dst);
+    }
+  };
+
+};
+
+struct Edge: public InEdge {
+  unsigned id;
+
+  Edge (unsigned _id, int _src, int _dst, Weight_ty _weight)
+    : InEdge (_src, _dst, _weight), id (_id) {}
+
+
+  friend bool operator == (const Edge& left, const Edge& right) {
+    return (left.id == right.id) 
+      && (left.src == right.src) 
+      && (left.dst == right.dst) 
+      && (left.weight == right.weight);
+  }
+
+  struct Comparator {
+    static inline int compare (const Edge& left, const Edge& right) {
+      int d = left.weight - right.weight;
+      return (d != 0) ? d : (left.id - right.id);
+    }
+
+    bool operator () (const Edge& left, const Edge& right) const {
+      return compare (left, right) < 0;
+    }
+  };
+};
+
+template <typename V>
+static void unionByRank_int (int rep1, int rep2, V& repVec) {
+  assert (rep1 >= 0 && size_t (rep1) < repVec.size ());
+  assert (rep2 >= 0 && size_t (rep2) < repVec.size ());
+  assert (repVec[rep1] < 0);
+  assert (repVec[rep2] < 0);
+
+  if (repVec[rep2] < repVec[rep1]) { 
+    std::swap (rep1, rep2);
+  }
+  assert (repVec[rep1] <= repVec[rep2]);
+
+  repVec[rep1] += repVec[rep2];
+  repVec[rep2] = rep1;
+  assert (repVec[rep1] < 0);
+}
+
+template <typename V>
+static void linkUp_int (int other, int master, V& repVec) {
+  assert (other >= 0 && size_t (other) < repVec.size ());
+  assert (master >= 0 && size_t (master) < repVec.size ());
+  assert (repVec[other] < 0);
+  // assert (repVec[master] < 0); // can't check this in parallel
+
+  repVec[other] = master;
+}
+
+template <typename V>
+int findPCiter_int (const int node, V& repVec) {
+  assert (node >= 0 && size_t (node) < repVec.size ());
+
+  if (repVec[node] < 0) { return node; }
+
+  assert (repVec[node] >= 0);
+
+  int rep = repVec[node];
+  while (repVec[rep] >= 0) { 
+    rep = repVec[rep]; 
+  }
+
+  // path compress
+  for (int n = node; n != rep;) {
+    repVec[n] = rep;
+    n = repVec[n];
+  }
+
+  assert (rep >= 0 && size_t (rep) < repVec.size ());
+  return rep;
+}
+
+template <typename V>
+int getRep_int (const int node, const V& repVec) {
+  assert (node >= 0 && size_t (node) < repVec.size ());
+
+  if (repVec[node] < 0) { return node; }
+
+  int rep = repVec[node];
+  while (repVec[rep] >= 0) {
+    rep = repVec[rep];
+  }
+  assert (repVec[rep] < 0);
+  return rep;
+}
+
+
+class Kruskal {
+
+public:
+
+  typedef std::vector<Edge> VecEdge;
+  // typedef std::set<KEdge<KNode_tp>, 
+          // typename KEdge<KNode_tp>::NodeIDcomparator> Edges_ty;
+
+  typedef std::tr1::unordered_set<InEdge, InEdge::Hash> SetInEdge;
+
+  //typedef std::vector<KEdge<KNode_tp> > Edges_ty;
+
+protected:
+
+  virtual const std::string getVersion () const = 0;
+
+  //! doesn't do anything by default. Sub-classes may choose to override 
+  //! in order to to specific initialization
+  virtual void initRemaining (const size_t numNodes, const VecEdge& edges) { };
+
+  virtual void runMST (const size_t numNodes, const VecEdge& edges,
+      size_t& mstWeight, size_t& totalIter) = 0;
+
+
+  void readGraph (const std::string& filename, size_t& numNodes, SetInEdge& edgeSet) {
+
+    typedef Galois::Graph::LC_CSR_Graph<unsigned, unsigned> InGraph;
+    typedef InGraph::GraphNode InGNode;
+
+    InGraph ingraph;
+    ingraph.structureFromFile (filename);
+
+    // numbering nodes 0..N-1, where N is number of nodes
+    // in the graph
+    unsigned idCntr = 0;
+    for (InGraph::iterator n = ingraph.begin (), endn = ingraph.end ();
+        n != endn; ++n) {
+      ingraph.getData (*n, Galois::NONE) = idCntr++;
+    }
+    numNodes = ingraph.size ();
+
+
+    size_t numEdges = 0;
+    edgeSet.clear ();
+
+    for (InGraph::iterator n = ingraph.begin (), endn = ingraph.end ();
+        n != endn; ++n) {
+
+      unsigned src = ingraph.getData (*n, Galois::NONE);
+
+
+      for (InGraph::edge_iterator e = ingraph.edge_begin (src, Galois::NONE),
+          ende = ingraph.edge_end (src, Galois::NONE); e != ende; ++e) {
+
+        unsigned dst = ingraph.getData (ingraph.getEdgeDst (e), Galois::NONE);
+
+        if (src != dst) {
+
+          InEdge ke (src, dst, ingraph.getEdgeData (e));
+
+          std::pair<SetInEdge::iterator, bool> res = edgeSet.insert (ke);
+
+          if (res.second) {
+            ++numEdges;
+          }
+
+        } else {
+          std::fprintf (stderr, "Warning: Ignoring self edge (%d, %d, %d)\n",
+              src, dst, ingraph.getEdgeData (*e));
+        }
+      }
+
+    }
+
+    std::cout << "Graph read with nodes=" << ingraph.size () << ", edges=" << numEdges << std::endl;
+
+
+  }
+  
+
+
+  virtual void readPBBSfile (const std::string& filename, size_t& numNodes, SetInEdge& edgeSet) {
+
+    typedef unsigned NodeData;
+    typedef float EdgeData;
+
+    static const unsigned WEIGHT_SCALE = 1000000;
+
+
+    std::cout << "Reading input from: " << filename << std::endl;
+
+    // std::ifstream inFile (filename.c_str ());
+    FILE* inFile = fopen (filename.c_str (), "r");
+
+    // std::string header;
+    char header[128];
+
+    // inFile >> header;
+    fscanf (inFile, "%s", header);
+
+    // inFile.seekg (0, std::ios::beg);
+
+
+    size_t numEdges = 0;
+    numNodes = 0;
+    edgeSet.clear ();
+
+    // while (!inFile.eof ()) {
+    while (!feof (inFile)) {
+      NodeData srcIdx;
+      NodeData dstIdx;
+      EdgeData w;
+
+      // inFile >> srcIdx;
+      // inFile >> dstIdx;
+      // inFile >> w;
+
+      fscanf (inFile, "%d", &srcIdx);
+      fscanf (inFile, "%d", &dstIdx);
+      fscanf (inFile, "%g", &w);
+
+      Weight_ty integ_wt = (WEIGHT_SCALE * w);
+
+      if (srcIdx != dstIdx) {
+
+        InEdge ke (srcIdx, dstIdx, integ_wt);
+
+        std::pair<SetInEdge::iterator, bool> res = edgeSet.insert (ke);
+        //edges.push_back (ke);
+        if (res.second) {
+          ++numEdges;
+        }
+
+      } else {
+          std::fprintf (stderr, "Warning: Ignoring self edge (%d, %d, %d)\n",
+              srcIdx, dstIdx, integ_wt);
+      }
+
+      // find max node id;
+      numNodes = std::max (numNodes, size_t (std::max (srcIdx, dstIdx)));
+    }
+    // inFile.close ();
+    fclose (inFile);
+
+    ++numNodes; // nodes number from 0 ... N-1
+
+
+    std::cout << "PBBS graph read with nodes = " << numNodes
+      << ", edges = " << numEdges << std::endl;
+
+
+  }
+
+public:
+
+  virtual void run (int argc, char* argv[]) {
+    Galois::StatManager stat;
+    LonestarStart (argc, argv, name, desc, url);
+
+    //TODO
+    // read the graph from file into a FileGraph
+    // create nodes and edges
+    // compute a set of edges
+    // run kruskal, which should return mst weight as int
+    // verify
+
+
+    size_t numNodes;
+    SetInEdge edgeSet;
+
+    size_t mstWeight = 0;
+    size_t totalIter = 0;
+
+    Galois::StatTimer t_read ("time spent in reading input: ");
+
+    t_read.start ();
+    readGraph (filename, numNodes, edgeSet);
+    // readPBBSfile (filename, numNodes, edgeSet);
+
+    VecEdge edges;
+
+    unsigned edgeIDcntr = 0;
+    for (SetInEdge::const_iterator i = edgeSet.begin ()
+        , endi = edgeSet.end (); i != endi; ++i) {
+
+      edges.push_back (Edge (edgeIDcntr++, i->src, i->dst, i->weight));
+    }
+
+    assert (edges.size () == edgeSet.size ());
+    t_read.stop ();
+
+
+    initRemaining (numNodes, edges);
+    
+    Galois::StatTimer t ("Time taken by runMST: ");
+
+    t.start ();
+    GaloisRuntime::beginSampling ();
+    runMST (numNodes, edges, mstWeight, totalIter);
+    GaloisRuntime::endSampling ();
+    t.stop ();
+
+    printResults (mstWeight, totalIter);
+
+    if (!skipVerify) {
+      verify (numNodes, edgeSet, mstWeight);
+    }
+
+  }
+
+private:
+
+  void printResults (const size_t mstSum, const size_t iter) const {
+    std::cout << getVersion () << ", MST sum=" << mstSum << ", iterations=" << iter << std::endl;
+  }
+
+  template <typename T>
+  static void freeVecPtr (std::vector<T*>& vec) {
+    for (typename std::vector<T*>::iterator i = vec.begin (), ei = vec.end ();
+        i != ei; ++i) {
+
+      delete *i;
+      *i = NULL;
+    }
+
+  }
+
+  struct PrimNode {
+    typedef std::vector<PrimNode*> VecPNode_ty;
+    typedef std::vector<Weight_ty> VecWeight_ty;
+    typedef boost::counting_iterator<unsigned> Adj_iterator_ty;
+
+
+    unsigned id;
+    Weight_ty weight;
+    bool inMST;
+    VecPNode_ty adj;
+    VecWeight_ty adjWts;
+    
+
+    PrimNode (unsigned id): 
+      id (id), 
+      weight (std::numeric_limits<Weight_ty>::max ()), 
+      inMST (false) {}
+
+    void addEdge (PrimNode* pn, Weight_ty w) {
+      assert (pn != NULL);
+      assert (std::find (adj.begin (), adj.end (), pn) == adj.end ());
+
+      adj.push_back (pn);
+      adjWts.push_back (w);
+      assert (adj.size () == adjWts.size ());
+    }
+
+    Adj_iterator_ty adj_begin () const { 
+      return Adj_iterator_ty (0);
+    }
+
+    Adj_iterator_ty adj_end () const {
+      return Adj_iterator_ty (adj.size ());
+    }
+
+    PrimNode* getDst (Adj_iterator_ty i) const {
+      return adj[*i];
+    }
+
+    Weight_ty getWeight (Adj_iterator_ty i) const {
+      return adjWts[*i];
+    }
+
+  };
+
+  struct PrimUpdate {
+    PrimNode* dst;
+    Weight_ty weight;
+
+    PrimUpdate (PrimNode* dst, Weight_ty weight)
+      : dst (dst), weight (weight) {
+        assert (dst != NULL);
+      }
+
+
+    bool operator < (const PrimUpdate& that) const {
+      if (this->weight == that.weight) {
+        return (this->dst->id < that.dst->id);
+
+      } else {
+        return (this->weight < that.weight);
+      }
+    }
+  };
+
+  size_t runPrim (const size_t numNodes, const SetInEdge& edgeSet) const {
+
+    std::vector<PrimNode*> primNodes (numNodes, NULL);
+
+    for (size_t i = 0; i < numNodes; ++i) {
+      primNodes[i] = new PrimNode (i);
+    }
+
+    for (SetInEdge::const_iterator e = edgeSet.begin (), ende = edgeSet.end ();
+        e != ende; ++e) {
+
+
+      assert (primNodes[e->src] != NULL);
+      assert (primNodes[e->dst] != NULL);
+
+      // add undirected edge
+      primNodes[e->src]->addEdge (primNodes[e->dst], e->weight);
+      primNodes[e->dst]->addEdge (primNodes[e->src], e->weight);
+
+    }
+
+    std::set<PrimUpdate> workset;
+
+    PrimNode* root = primNodes[0];
+    PrimUpdate upd (root, 0);
+    workset.insert (upd);
+
+
+    size_t iter = 0;
+    size_t mstSum = 0;
+
+    while (!workset.empty ()) {
+      ++iter;
+      PrimUpdate upd = *(workset.begin ());
+      workset.erase (workset.begin ());
+
+      PrimNode& src = *(upd.dst);
+
+      if (!src.inMST) {
+        src.inMST = true;
+        src.weight = upd.weight;
+
+        mstSum += upd.weight;
+
+        for (PrimNode::Adj_iterator_ty i = src.adj_begin (), endi = src.adj_end (); i != endi; ++i) {
+
+          PrimNode& dst = *(src.getDst (i));
+          Weight_ty wt = src.getWeight (i);
+
+          if (!dst.inMST) {
+            PrimUpdate addUpd (&dst, wt);
+            workset.insert (addUpd);
+          }
+
+        }
+      } // end if;
+    }
+
+    std::cout << "Number of iterations taken by Prim = " << iter << std::endl;
+
+    freeVecPtr (primNodes);
+    return mstSum;
+  }
+
+
+
+
+
+  bool verify (const size_t numNodes, const SetInEdge& edgeSet, const size_t kruskalSum) const {
+    Galois::StatTimer pt("Prim's Time:");
+    pt.start ();
+    size_t primSum = runPrim (numNodes, edgeSet);
+    pt.stop ();
+
+    if (primSum != kruskalSum) {
+      std::cerr << "ERROR. Incorrect MST weight=" << kruskalSum 
+        << ", correct weight from Prim is=" << primSum << std::endl;
+      abort ();
+
+    } else {
+      std::cout << "OK. Correct MST weight=" << kruskalSum << std::endl;
+    }
+
+    return false;
+  }
+};
+
+
+} // namespace kruskal
+
+
+#endif // _KRUSKAL_H_ 
