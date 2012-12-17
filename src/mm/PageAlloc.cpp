@@ -49,6 +49,7 @@ struct FreeNode {
 };
  
 typedef GaloisRuntime::LL::PtrLock<FreeNode, true> HeadPtr;
+typedef GaloisRuntime::LL::CacheLineStorage<HeadPtr> HeadPtrStorage;
 
 //Number of pages allocated
 struct PAState {
@@ -103,7 +104,7 @@ void* allocFromOS() {
   dataLock.lock();
   HeadPtr*& h = head;
   if (!h) { //first allocation
-    h = new HeadPtr();
+    h = &((new HeadPtrStorage())->data);
   }
   PAState& p = getPAState();
   p.ownerMap[ptr] = h;
