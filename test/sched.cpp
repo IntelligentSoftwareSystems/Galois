@@ -34,16 +34,15 @@
 #include "Galois/Runtime/WorkListExperimental.h"
 #endif
 
-static const char* name = "Schedeler Micro Benchmark";
+static const char* name = "Scheduler Micro Benchmark";
 static const char* desc = "Measure stuff\n";
 static const char* url = 0;
 
-static llvm::cl::opt<int> sval(llvm::cl::Positional, llvm::cl::desc("<start value>"), llvm::cl::Required);
-static llvm::cl::opt<int> ival(llvm::cl::Positional, llvm::cl::desc("<init num>"), llvm::cl::Required);
+static llvm::cl::opt<int> sval(llvm::cl::Positional, llvm::cl::desc("<start value>"), llvm::cl::init(-1));
+static llvm::cl::opt<int> ival(llvm::cl::Positional, llvm::cl::desc("<init num>"), llvm::cl::init(100));
 
 struct process {
-  template<typename Context>
-  void operator()(int item, Context& lwl) {
+  void operator()(int item, Galois::UserContext<int>& lwl) {
     for (int i = 0; i < item; ++i)
       lwl.push(item - 1);
   }

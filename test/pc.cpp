@@ -36,60 +36,55 @@ void testf(T& b, const char* str) {
 }
 
 int main() {
-
   unsigned M = GaloisRuntime::LL::getMaxThreads();
 
   while (M) {
-    
     Galois::setActiveThreads(M); //GaloisRuntime::LL::getMaxThreads());
-  std::cout << "Using " << M << " threads\n";
+    std::cout << "Using " << M << " threads\n";
 
-  if (0) {
+    if (0) {
+      int count = 128 * 1024 * 1024;
 
-  int count = 128 * 1024 * 1024;
+      Galois::Timer t;
+      t.start();
+      GaloisRuntime::PerCPU<int> v;
+      for (int i = 0; i < count; ++i)
+        v.get()++;
+      t.stop();
 
-  Galois::Timer t;
-  t.start();
-  GaloisRuntime::PerCPU<int> v;
-  for (int i = 0; i < count; ++i)
-    v.get()++;
-  t.stop();
+      Galois::Timer t2;
+      t2.start();
+      GaloisRuntime::PerThreadStorage<int> v2;
+      for (int i = 0; i < count; ++i)
+        (*v2.getLocal())++;
+      t2.stop();
 
-  Galois::Timer t2;
-  t2.start();
-  GaloisRuntime::PerThreadStorage<int> v2;
-  for (int i = 0; i < count; ++i)
-    (*v2.getLocal())++;
-  t2.stop();
+      Galois::Timer t3;
+      t3.start();
+      GaloisRuntime::PerCPU<int> v3;
+      for (int i = 0; i < count; ++i)
+        v3.get(1)++;
+      t3.stop();
 
-  Galois::Timer t3;
-  t3.start();
-  GaloisRuntime::PerCPU<int> v3;
-  for (int i = 0; i < count; ++i)
-    v3.get(1)++;
-  t3.stop();
+      Galois::Timer t4;
+      t4.start();
+      GaloisRuntime::PerThreadStorage<int> v4;
+      for (int i = 0; i < count; ++i)
+        (*v4.getRemote(1))++;
+      t4.stop();
 
-  Galois::Timer t4;
-  t4.start();
-  GaloisRuntime::PerThreadStorage<int> v4;
-  for (int i = 0; i < count; ++i)
-    (*v4.getRemote(1))++;
-  t4.stop();
+      std::cout << t.get() << " " << t2.get() << "\n";
+      std::cout << t3.get() << " " << t4.get() << "\n";
+    }
 
+    // testf(pbarrier, "pthread");
+    // testf(fbarrier, "fast");
+    testf(mbarrier, "mcs");
+    //  testf(ffbarrier, "faster");
+    testf(tbarrier, "topo");
 
-  std::cout << t.get() << " " << t2.get() << "\n";
-  std::cout << t3.get() << " " << t4.get() << "\n";
-
-}
-
-  //testf(pbarrier, "pthread");
-  testf(fbarrier, "fast");
-  testf(mbarrier, "mcs");
-  //  testf(ffbarrier, "faster");
-  testf(tbarrier, "topo");
-
-  M /= 2;
-  };
+    M /= 2;
+  }
 
   return 0;
 }
