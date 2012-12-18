@@ -225,38 +225,34 @@ uint32_t* FileGraph::raw_neighbor_end(GraphNode N) const {
   return &outs[le64toh(outIdx[N])];
 }
 
-size_t FileGraph::neighborsSize(GraphNode N, Galois::MethodFlag mflag) const {
-  return std::distance(raw_neighbor_begin(N), raw_neighbor_end(N));
-}
-
-FileGraph::edge_iterator FileGraph::edge_begin(GraphNode N, MethodFlag mflag) const {
+FileGraph::edge_iterator FileGraph::edge_begin(GraphNode N) const {
   return edge_iterator(N == 0 ? 0 : le64toh(outIdx[N-1]));
 }
-FileGraph::edge_iterator FileGraph::edge_end(GraphNode N, MethodFlag mflag) const {
+FileGraph::edge_iterator FileGraph::edge_end(GraphNode N) const {
   return edge_iterator(le64toh(outIdx[N]));
 }
 
-FileGraph::GraphNode FileGraph::getEdgeDst(edge_iterator it, MethodFlag mflag) const {
+FileGraph::GraphNode FileGraph::getEdgeDst(edge_iterator it) const {
   return le32toh(outs[*it]);
 }
 
-FileGraph::nodeid_iterator FileGraph::nodeid_begin() const {
+FileGraph::node_id_iterator FileGraph::node_id_begin() const {
   return boost::make_transform_iterator(&outs[0], Convert32());
 }
 
-FileGraph::nodeid_iterator FileGraph::nodeid_end() const {
+FileGraph::node_id_iterator FileGraph::node_id_end() const {
   return boost::make_transform_iterator(&outs[numEdges], Convert32());
 }
 
-FileGraph::edgeid_iterator FileGraph::edgeid_begin() const {
+FileGraph::edge_id_iterator FileGraph::edge_id_begin() const {
   return boost::make_transform_iterator(&outIdx[0], Convert64());
 }
 
-FileGraph::edgeid_iterator FileGraph::edgeid_end() const {
+FileGraph::edge_id_iterator FileGraph::edge_id_end() const {
   return boost::make_transform_iterator(&outIdx[numNodes], Convert64());
 }
 
-bool FileGraph::hasNeighbor(GraphNode N1, GraphNode N2, MethodFlag mflag) const {
+bool FileGraph::hasNeighbor(GraphNode N1, GraphNode N2) const {
   return getEdgeIdx(N1,N2) != ~static_cast<uint64_t>(0);
 }
 

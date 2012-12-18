@@ -53,7 +53,7 @@ void do_summary() {
 
 void do_degrees() {
   for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
-    std::cout << graph.neighborsSize(*ii) << "\n";
+    std::cout << std::distance(graph.neighbor_begin(*ii), graph.neighbor_end(*ii)) << "\n";
   }
 }
 

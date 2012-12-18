@@ -452,7 +452,7 @@ void writeComponent(Node* component) {
     }
   }
 
-  p.finish(0);
+  p.finish();
 
   std::cout << "Writing largest component to " << outputFilename
     << " (nodes: " << numNodes << " edges: " << numEdges << ")\n";

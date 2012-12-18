@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -20,35 +20,11 @@
  *
  * @section Description
  *
- * There are two main classes, ::FileGraph and ::LC_FileGraph. The former
- * represents the pure structure of a graph (i.e., whether an edge exists between
- * two nodes) and cannot be modified. The latter allows values to be stored on
- * nodes and edges, but the structure of the graph cannot be modified.
- *
- * An example of use:
- * 
- * \code
- * typedef Galois::Graph::LC_FileGraph<int,int> Graph;
- * 
- * // Create graph
- * Graph g;
- * g.structureFromFile(inputfile);
- *
- * // Traverse graph
- * for (Graph::iterator i = g.begin(), iend = g.end();
- *      i != iend;
- *      ++i) {
- *   Graph::GraphNode src = *i;
- *   for (Graph::neighbor_iterator j = g.neighbor_begin(src),
- *                                 jend = g.neighbor_end(src);
- *        j != jend;
- *        ++j) {
- *     Graph::GraphNode dst = *j;
- *     int edgeData = g.getEdgeData(src, dst);
- *     int nodeData = g.getData(dst);
- *   }
- * }
- * \endcode
+ * This file contains low-level representations of graphs, closely tied with
+ * their serialized form in the Galois system. These graphs are very basic
+ * (e.g., they don't support concurrency) and are intended to be converted
+ * to/from more specialized graph data structures.  More full featured graphs
+ * are available in LCGraph.h. 
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
@@ -62,6 +38,7 @@
 
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/iterator/transform_iterator.hpp>
+#include <boost/utility.hpp>
 
 #include <map>
 #include <vector>
@@ -73,7 +50,7 @@ namespace Galois {
 namespace Graph {
 
 //! Graph serialized to a file
-class FileGraph {
+class FileGraph: boost::noncopyable {
 public:
   typedef uint32_t GraphNode;
 
@@ -118,59 +95,57 @@ public:
 
   // Edge Handling
   template<typename EdgeTy>
-  EdgeTy& getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
+  EdgeTy& getEdgeData(GraphNode src, GraphNode dst) {
     assert(sizeEdgeTy == sizeof(EdgeTy));
     return reinterpret_cast<EdgeTy*>(edgeData)[getEdgeIdx(src, dst)];
   }
 
-  size_t neighborsSize(GraphNode N, Galois::MethodFlag mflag = ALL) const;
-
   // Iterators
   typedef boost::counting_iterator<uint64_t> edge_iterator;
-  edge_iterator edge_begin(GraphNode N, MethodFlag mflag = ALL) const;
-  edge_iterator edge_end(GraphNode N, MethodFlag mflag = ALL) const;
+  edge_iterator edge_begin(GraphNode N) const;
+  edge_iterator edge_end(GraphNode N) const;
 
-  template<typename EdgeTy> EdgeTy& getEdgeData(edge_iterator it, MethodFlag mflag = ALL) const {
+  template<typename EdgeTy> EdgeTy& getEdgeData(edge_iterator it) const {
     return reinterpret_cast<EdgeTy*>(edgeData)[*it];
   }
 
-  GraphNode getEdgeDst(edge_iterator it, MethodFlag mflag = ALL) const;
+  GraphNode getEdgeDst(edge_iterator it) const;
 
   typedef boost::transform_iterator<Convert32, uint32_t*> neighbor_iterator;
-  typedef boost::transform_iterator<Convert32, uint32_t*> nodeid_iterator;
-  typedef boost::transform_iterator<Convert64, uint64_t*> edgeid_iterator;
+  typedef boost::transform_iterator<Convert32, uint32_t*> node_id_iterator;
+  typedef boost::transform_iterator<Convert64, uint64_t*> edge_id_iterator;
   
-  neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = ALL) const {
+  neighbor_iterator neighbor_begin(GraphNode N) const {
     return boost::make_transform_iterator(raw_neighbor_begin(N), Convert32());
   }
 
-  neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = ALL) const {
+  neighbor_iterator neighbor_end(GraphNode N) const {
     return boost::make_transform_iterator(raw_neighbor_end(N), Convert32());
   }
 
-  nodeid_iterator nodeid_begin() const;
-  nodeid_iterator nodeid_end() const;
-  edgeid_iterator edgeid_begin() const;
-  edgeid_iterator edgeid_end() const;
+  node_id_iterator node_id_begin() const;
+  node_id_iterator node_id_end() const;
+  edge_id_iterator edge_id_begin() const;
+  edge_id_iterator edge_id_end() const;
 
   template<typename EdgeTy>
-  EdgeTy& getEdgeData(neighbor_iterator it, MethodFlag mflag = ALL) {
+  EdgeTy& getEdgeData(neighbor_iterator it) {
     return reinterpret_cast<EdgeTy*>(edgeData)[std::distance(outs, it.base())];
   }
 
   template<typename EdgeTy>
-  EdgeTy* edgedata_begin() const {
+  EdgeTy* edge_data_begin() const {
     return reinterpret_cast<EdgeTy*>(edgeData);
   }
 
   template<typename EdgeTy>
-  EdgeTy* edgedata_end() const {
+  EdgeTy* edge_data_end() const {
     assert(sizeof(EdgeTy) == sizeEdgeTy);
     EdgeTy* r = reinterpret_cast<EdgeTy*>(edgeData);
     return &r[numEdges];
   }
 
-  bool hasNeighbor(GraphNode N1, GraphNode N2, MethodFlag mflag = ALL) const;
+  bool hasNeighbor(GraphNode N1, GraphNode N2) const;
 
   typedef boost::counting_iterator<uint64_t> iterator;
 
@@ -200,6 +175,8 @@ public:
   char* structureFromArrays(uint64_t* out_idxs, uint64_t num_nodes,
       uint32_t* outs, uint64_t num_edges, size_t sizeof_edge_data);
 
+  // XXX(ddn): Avoid methods that depend on slow std::map
+#if 0
   //! Read graph connectivity information from graph
   template<typename TyG>
   void structureFromGraph(TyG& G) {
@@ -246,6 +223,7 @@ public:
       }
     }
   }
+#endif
 
   //! Write graph connectivity information to file
   void structureToFile(const char* file);
@@ -254,19 +232,23 @@ public:
   void clone(FileGraph& other);
 };
 
-//! Simpifies parsing graphs from files.
-//! Parse your file in rounds:
-//!  (1) setNumNodes(), setNumEdges()
-//!  (2) phase1(), for each node, incrementDegree(Node x)
-//!  (3) phase2(), add neighbors for each node, addNeighbor(Node src, Node dst)
-//!  (4) finish(), use as FileGraph
+/** 
+ * Simplifies parsing graphs from files.
+ * 
+ * Parse your file in rounds:
+ *  (1) setNumNodes(), setNumEdges(), setSizeofEdgeData()
+ *  (2) phase1(), for each node, incrementDegree(Node x)
+ *  (3) phase2(), add neighbors for each node, addNeighbor(Node src, Node dst)
+ *  (4) finish(), use as FileGraph
+ */
 class FileGraphParser: public FileGraph {
   uint64_t *out_idx; // out_idxs
   uint32_t *starts;
   uint32_t *outs; // outs
+  size_t sizeof_edge_data;
 
 public:
-  FileGraphParser(): out_idx(0), starts(0), outs(0) { }
+  FileGraphParser(): out_idx(0), starts(0), outs(0), sizeof_edge_data(0) { }
 
   ~FileGraphParser() { 
     if (out_idx)
@@ -279,6 +261,7 @@ public:
 
   void setNumNodes(uint64_t n) { this->numNodes = n; }
   void setNumEdges(uint64_t n) { this->numEdges = n; }
+  void setSizeofEdgeData(size_t n) { sizeof_edge_data = n; }
   
   void phase1() { 
     assert(!out_idx);
@@ -316,7 +299,7 @@ public:
     return idx;
   }
 
-  char* finish(size_t sizeof_edge_data) { 
+  char* finish() { 
     structureFromArrays(out_idx, this->numNodes, outs, this->numEdges, sizeof_edge_data);
     delete [] out_idx;
     out_idx = 0;
@@ -328,6 +311,24 @@ public:
   }
 };
 
+/**
+ * Adds reverse edges to a graph. New graph is placed in out parameter
+ * previous graph.
+ */
+template<typename EdgeTy>
+void makeSymmetric(FileGraph& in, FileGraph& out) {
+  FileGraphParser g;
+
+  g.setNumNodes(in.size());
+  g.setNumEdges(in.sizeEdges() * 2);
+  g.setSizeofEdgeData(sizeof(EdgeTy));
+  g.phase1();
+
+//  for (FileGraph::iterator ii = in.begin(), ei = in.end(); ii != ei; ++ii) {
+//    for 
+//
+//  }
+}
 
 //! Local computation graph (i.e., graph structure does not change)
 //! THIS GRAPH SHOULD GO AWAY
@@ -344,11 +345,11 @@ class LC_FileGraph : public FileGraph {
 
 public:
   GALOIS_ATTRIBUTE_DEPRECATED
-  LC_FileGraph() :NodeData(0) {}
+  LC_FileGraph() :NodeData(0) { }
+
   ~LC_FileGraph() {
     if (NodeData)
       delete[] NodeData;
-      //numa_free(NodeData,sizeof(cache_line_storage<gNode>)*size());
   }
   
   NodeTy& getData(GraphNode N, MethodFlag mflag = ALL) {
@@ -368,6 +369,14 @@ public:
     return FileGraph::getEdgeData<EdgeTy>(it, mflag);
   }
 
+  neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = ALL) const {
+    return FileGraph::neighbor_begin(N);
+  }
+
+  neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = ALL) const {
+    return FileGraph::neighbor_end(N);
+  }
+
   //! Loads node data from file
   void nodeDataFromFile(const char* filename) {
     emptyNodeData();
@@ -379,7 +388,6 @@ public:
   //! Initializes node data for the graph to default values
   void emptyNodeData(NodeTy init = NodeTy()) {
     NodeData = new GaloisRuntime::LL::CacheLineStorage<gNode>[size()];
-    //NodeData = (LL::CacheLineStorage<gNode>*)numa_alloc_interleaved(sizeof(LL::CacheLineStorage<gNode>)*size());
     for (uint64_t i = 0; i < size(); ++i)
       NodeData[i].data.data = init;
   }
@@ -399,8 +407,7 @@ public:
     structureFromGraph(graph);
     emptyNodeData();
     int i = 0;
-    for (typename GTy::iterator ii = graph.begin(),
-	   ee = graph.end(); ii != ee; ++ii, ++i)
+    for (typename GTy::iterator ii = graph.begin(), ee = graph.end(); ii != ee; ++ii, ++i)
       NodeData[i].data.data = graph.getData(*ii);
   }
 };
@@ -432,12 +439,16 @@ public:
   EdgeTy& getEdgeData(FileGraph::neighbor_iterator it, MethodFlag mflag = ALL) {
     return FileGraph::getEdgeData<EdgeTy>(it, mflag);
   }
-
+  neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = ALL) const {
+    return FileGraph::neighbor_begin(N);
+  }
+  neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = ALL) const {
+    return FileGraph::neighbor_end(N);
+  }
 };
 
 template<typename NodeTy>
 class LC_FileGraph<NodeTy, void>: public FileGraph { 
-
   struct gNode : public GaloisRuntime::Lockable {
     NodeTy data;
     gNode() {}
@@ -471,6 +482,14 @@ public:
     for (uint64_t i = 0; i < numNodes; ++i)
       NodeData[i].data.data = init;
   }
+
+  neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = ALL) const {
+    return FileGraph::neighbor_begin(N);
+  }
+
+  neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = ALL) const {
+    return FileGraph::neighbor_end(N);
+  }
 };
 
 template<>
@@ -478,6 +497,12 @@ class LC_FileGraph<void, void>: public FileGraph {
 public:
   GALOIS_ATTRIBUTE_DEPRECATED
   LC_FileGraph() { }
+  neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = ALL) const {
+    return FileGraph::neighbor_begin(N);
+  }
+  neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = ALL) const {
+    return FileGraph::neighbor_end(N);
+  }
 };
 
 }

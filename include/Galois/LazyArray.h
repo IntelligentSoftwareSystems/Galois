@@ -27,16 +27,18 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#ifndef GALOIS__LAZYARRAY_H
-#define GALOIS__LAZYARRAY_H
+#ifndef GALOIS_LAZYARRAY_H
+#define GALOIS_LAZYARRAY_H
 
 #include <iterator>
 #include <stdexcept>
 
 namespace Galois {
 
-//! This is a container that encapsulates space for a constant size array
-//! items initialization is explicitly under the control of the user.
+/**
+ * This is a container that encapsulates space for a constant size array.
+ * The initialization of items is explicitly under the control of the user.
+ */
 template<typename _Tp, unsigned _Size>
 class LazyArray {
   char __datac[sizeof(_Tp[(_Size > 0 ? _Size : 1)])];
