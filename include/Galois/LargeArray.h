@@ -25,6 +25,9 @@
 #ifndef GALOIS_LARGEARRAY_H
 #define GALOIS_LARGEARRAY_H
 
+#include <boost/utility.hpp>
+#include "Galois/Runtime/mm/Mem.h"
+
 namespace Galois {
 
 /**

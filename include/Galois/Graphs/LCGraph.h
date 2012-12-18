@@ -896,7 +896,7 @@ public:
 
   edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = NONE) const {
     GaloisRuntime::checkWrite(mflag);
-    return ni->data.get();
+    return ni->get();
   }
 
   GraphNode getEdgeDst(edge_iterator ni) const {

@@ -32,6 +32,7 @@
 #define GALOIS_GRAPHS_FILEGRAPH_H
 
 #include "Galois/MethodFlags.h"
+#include "Galois/LargeArray.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/ll/CacheLineStorage.h"
 #include "Galois/util/Endian.h"
@@ -172,8 +173,8 @@ public:
   //! Read graph connectivity information from arrays.
   //! If sizeof_edge_data != 0, return a pointer to array to
   //! populate with edge data.
-  char* structureFromArrays(uint64_t* out_idxs, uint64_t num_nodes,
-      uint32_t* outs, uint64_t num_edges, size_t sizeof_edge_data);
+  char* structureFromArrays(uint64_t* outIdxs, uint64_t numNodes,
+      uint32_t* outs, uint64_t numEdges, size_t sizeofEdgeData);
 
   // XXX(ddn): Avoid methods that depend on slow std::map
 #if 0
@@ -242,17 +243,17 @@ public:
  *  (4) finish(), use as FileGraph
  */
 class FileGraphParser: public FileGraph {
-  uint64_t *out_idx; // out_idxs
+  uint64_t *outIdx; // outIdxs
   uint32_t *starts;
   uint32_t *outs; // outs
-  size_t sizeof_edge_data;
+  size_t sizeofEdgeData;
 
 public:
-  FileGraphParser(): out_idx(0), starts(0), outs(0), sizeof_edge_data(0) { }
+  FileGraphParser(): outIdx(0), starts(0), outs(0), sizeofEdgeData(0) { }
 
   ~FileGraphParser() { 
-    if (out_idx)
-      delete [] out_idx;
+    if (outIdx)
+      delete [] outIdx;
     if (starts)
       delete [] starts;
     if (outs)
@@ -261,17 +262,17 @@ public:
 
   void setNumNodes(uint64_t n) { this->numNodes = n; }
   void setNumEdges(uint64_t n) { this->numEdges = n; }
-  void setSizeofEdgeData(size_t n) { sizeof_edge_data = n; }
+  void setSizeofEdgeData(size_t n) { sizeofEdgeData = n; }
   
   void phase1() { 
-    assert(!out_idx);
-    out_idx = new uint64_t[this->numNodes];
-    memset(out_idx, 0, sizeof(*out_idx) * this->numNodes);
+    assert(!outIdx);
+    outIdx = new uint64_t[this->numNodes];
+    memset(outIdx, 0, sizeof(*outIdx) * this->numNodes);
   }
 
   void incrementDegree(size_t id, int delta = 1) {
     assert(id < this->numNodes);
-    out_idx[id] += delta;
+    outIdx[id] += delta;
   }
 
   void phase2() {
@@ -279,11 +280,11 @@ public:
       return;
 
     // Turn counts into partial sums
-    uint64_t* prev = out_idx;
-    for (uint64_t *ii = out_idx + 1, *ei = out_idx + this->numNodes; ii != ei; ++ii, ++prev) {
+    uint64_t* prev = outIdx;
+    for (uint64_t *ii = outIdx + 1, *ei = outIdx + this->numNodes; ii != ei; ++ii, ++prev) {
       *ii += *prev;
     }
-    assert(out_idx[this->numNodes-1] == this->numEdges);
+    assert(outIdx[this->numNodes-1] == this->numEdges);
 
     starts = new uint32_t[this->numNodes];
     memset(starts, 0, sizeof(*starts) * this->numNodes);
@@ -292,17 +293,21 @@ public:
   }
 
   size_t addNeighbor(size_t src, size_t dst) {
-    size_t base = src ? out_idx[src-1] : 0;
+    size_t base = src ? outIdx[src-1] : 0;
     size_t idx = base + starts[src]++;
-    assert(idx < out_idx[src]);
+    assert(idx < outIdx[src]);
     outs[idx] = dst;
     return idx;
   }
 
+  /** 
+   * Finish making graph. Returns pointer to block of memory that should be
+   * used to store edge data.
+   */
   char* finish() { 
-    structureFromArrays(out_idx, this->numNodes, outs, this->numEdges, sizeof_edge_data);
-    delete [] out_idx;
-    out_idx = 0;
+    structureFromArrays(outIdx, this->numNodes, outs, this->numEdges, sizeofEdgeData);
+    delete [] outIdx;
+    outIdx = 0;
     delete [] starts;
     starts = 0;
     delete [] outs;
@@ -312,22 +317,57 @@ public:
 };
 
 /**
- * Adds reverse edges to a graph. New graph is placed in out parameter
- * previous graph.
+ * Adds reverse edges to a graph. Reverse edges have edge data copied from the
+ * original edge. New graph is placed in out parameter.  The previous graph in
+ * out is destroyed.
  */
 template<typename EdgeTy>
 void makeSymmetric(FileGraph& in, FileGraph& out) {
+  typedef FileGraph::GraphNode GNode;
+  typedef LargeArray<EdgeTy,true> EdgeData;
+  typedef typename EdgeData::value_type edge_value_type;
+
   FileGraphParser g;
+  EdgeData edgeData;
 
+  size_t numEdges = in.sizeEdges() * 2;
   g.setNumNodes(in.size());
-  g.setNumEdges(in.sizeEdges() * 2);
-  g.setSizeofEdgeData(sizeof(EdgeTy));
-  g.phase1();
+  g.setNumEdges(numEdges);
+  g.setSizeofEdgeData(EdgeData::has_value ? sizeof(edge_value_type) : 0);
 
-//  for (FileGraph::iterator ii = in.begin(), ei = in.end(); ii != ei; ++ii) {
-//    for 
-//
-//  }
+  g.phase1();
+  for (FileGraph::iterator ii = in.begin(), ei = in.end(); ii != ei; ++ii) {
+    GNode src = *ii;
+    for (FileGraph::edge_iterator jj = in.edge_begin(src), ej = in.edge_end(src); jj != ej; ++jj) {
+      GNode dst = in.getEdgeDst(jj);
+      g.incrementDegree(src);
+      g.incrementDegree(dst);
+    }
+  }
+
+  g.phase2();
+  edgeData.allocate(numEdges);
+  for (FileGraph::iterator ii = in.begin(), ei = in.end(); ii != ei; ++ii) {
+    GNode src = *ii;
+    for (FileGraph::edge_iterator jj = in.edge_begin(src), ej = in.edge_end(src); jj != ej; ++jj) {
+      GNode dst = in.getEdgeDst(jj);
+      if (EdgeData::has_value) {
+        edge_value_type& data = in.getEdgeData<edge_value_type>(jj);
+        edgeData.set(g.addNeighbor(src, dst), data);
+        edgeData.set(g.addNeighbor(dst, src), data);
+      } else {
+        g.addNeighbor(src, dst);
+        g.addNeighbor(dst, src);
+      }
+    }
+  }
+
+  char *rawEdgeData = g.finish();
+  if (EdgeData::has_value) {
+    std::copy(edgeData.begin(), edgeData.end(), reinterpret_cast<edge_value_type*>(rawEdgeData));
+  }
+
+  out.swap(g);
 }
 
 //! Local computation graph (i.e., graph structure does not change)
@@ -341,20 +381,20 @@ class LC_FileGraph : public FileGraph {
   };
 
   //null if type is void
-  GaloisRuntime::LL::CacheLineStorage<gNode>* NodeData;
+  GaloisRuntime::LL::CacheLineStorage<gNode>* nodeData;
 
 public:
   GALOIS_ATTRIBUTE_DEPRECATED
-  LC_FileGraph() :NodeData(0) { }
+  LC_FileGraph(): nodeData(0) { }
 
   ~LC_FileGraph() {
-    if (NodeData)
-      delete[] NodeData;
+    if (nodeData)
+      delete[] nodeData;
   }
   
   NodeTy& getData(GraphNode N, MethodFlag mflag = ALL) {
-    GaloisRuntime::acquire(&NodeData[N].data, mflag);
-    return NodeData[N].data.data;
+    GaloisRuntime::acquire(&nodeData[N].data, mflag);
+    return nodeData[N].data.data;
   }
 
   EdgeTy& getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
@@ -382,23 +422,23 @@ public:
     emptyNodeData();
     std::ifstream file(filename);
     for (uint64_t i = 0; i < size(); ++i)
-      file >> NodeData[i];
+      file >> nodeData[i];
   }
   
   //! Initializes node data for the graph to default values
   void emptyNodeData(NodeTy init = NodeTy()) {
-    NodeData = new GaloisRuntime::LL::CacheLineStorage<gNode>[size()];
+    nodeData = new GaloisRuntime::LL::CacheLineStorage<gNode>[size()];
     for (uint64_t i = 0; i < size(); ++i)
-      NodeData[i].data.data = init;
+      nodeData[i].data.data = init;
   }
 
   void swap(LC_FileGraph& other) {
-    std::swap(NodeData, other.NodeData);
+    std::swap(nodeData, other.nodeData);
     FileGraph::swap(other);
   }
 
   void clone(LC_FileGraph& other) {
-    NodeData = other.NodeData;
+    nodeData = other.nodeData;
     FileGraph::clone(other);
   }
 
@@ -408,7 +448,7 @@ public:
     emptyNodeData();
     int i = 0;
     for (typename GTy::iterator ii = graph.begin(), ee = graph.end(); ii != ee; ++ii, ++i)
-      NodeData[i].data.data = graph.getData(*ii);
+      nodeData[i].data.data = graph.getData(*ii);
   }
 };
 
@@ -420,14 +460,14 @@ class LC_FileGraph<void, EdgeTy> : public FileGraph {
   };
 
   //null if type is void
-  GaloisRuntime::LL::CacheLineStorage<gNode>* NodeData;
+  GaloisRuntime::LL::CacheLineStorage<gNode>* nodeData;
 
 public:
   GALOIS_ATTRIBUTE_DEPRECATED
-  LC_FileGraph() :NodeData(0) {}
+  LC_FileGraph(): nodeData(0) {}
   ~LC_FileGraph() {
-    if (NodeData)
-      delete[] NodeData;
+    if (nodeData)
+      delete[] nodeData;
   }
   
   EdgeTy& getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
@@ -455,32 +495,32 @@ class LC_FileGraph<NodeTy, void>: public FileGraph {
   };
 
   //null if type is void
-  GaloisRuntime::LL::CacheLineStorage<gNode>* NodeData;
+  GaloisRuntime::LL::CacheLineStorage<gNode>* nodeData;
 
 public:
   GALOIS_ATTRIBUTE_DEPRECATED
-  LC_FileGraph() :NodeData(0) {}
+  LC_FileGraph(): nodeData(0) {}
   ~LC_FileGraph() {
-    if (NodeData)
-      delete[] NodeData;
+    if (nodeData)
+      delete[] nodeData;
   }
   
   NodeTy& getData(GraphNode N, MethodFlag mflag = ALL) {
-    GaloisRuntime::acquire(&NodeData[N].data, mflag);
-    return NodeData[N].data.data;
+    GaloisRuntime::acquire(&nodeData[N].data, mflag);
+    return nodeData[N].data.data;
   }
 
   void nodeDataFromFile(const char* filename) {
     emptyNodeData();
     std::ifstream file(filename);
     for (uint64_t i = 0; i < numNodes; ++i)
-      file >> NodeData[i];
+      file >> nodeData[i];
   }
   
   void emptyNodeData(NodeTy init = NodeTy()) {
-    NodeData = new GaloisRuntime::LL::CacheLineStorage<gNode>[numNodes];
+    nodeData = new GaloisRuntime::LL::CacheLineStorage<gNode>[numNodes];
     for (uint64_t i = 0; i < numNodes; ++i)
-      NodeData[i].data.data = init;
+      nodeData[i].data.data = init;
   }
 
   neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = ALL) const {
