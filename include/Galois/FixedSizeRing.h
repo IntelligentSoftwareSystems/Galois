@@ -79,7 +79,7 @@ public:
   void clear() {
     assert(precondition());
     for (unsigned x = 0; x < count; ++x)
-      datac.kill((start + x) % chunksize);
+      datac.destroy((start + x) % chunksize);
     count = 0;
     start = 0;
   }
@@ -90,7 +90,7 @@ public:
     if (full()) return 0;
     start = (start + chunksize - 1) % chunksize;
     ++count;
-    return datac.init(start, std::forward<U>(val));
+    return datac.construct(start, std::forward<U>(val));
   }
 
   template<typename... Args>
@@ -105,7 +105,7 @@ public:
     if (full()) return 0;
     start = (start + chunksize - 1) % chunksize;
     ++count;
-    return datac.init(start,val);
+    return datac.construct(start,val);
   }
 #endif
 
@@ -115,7 +115,7 @@ public:
     if (full()) return 0;
     unsigned end = (start + count) % chunksize;
     ++count;
-    return datac.init(end, std::forward<U>(val));
+    return datac.construct(end, std::forward<U>(val));
   }
 
   template<typename... Args>
@@ -130,7 +130,7 @@ public:
     if (full()) return 0;
     unsigned end = (start + count) % chunksize;
     ++count;
-    return datac.init(end,val);
+    return datac.construct(end, val);
   }
 #endif
 
@@ -158,7 +158,7 @@ public:
   void pop_front() {
     assert(precondition());
     assert(!empty());
-    datac.kill(start);
+    datac.destroy(start);
     start = (start + 1) % chunksize;
     --count;
   }
@@ -188,7 +188,7 @@ public:
     assert(precondition());
     assert(!empty());
     unsigned end = (start + count - 1) % chunksize;
-    datac.kill(end);
+    datac.destroy(end);
     --count;
   }
 };
