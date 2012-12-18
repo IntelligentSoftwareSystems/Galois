@@ -52,6 +52,7 @@ static const char* url = "betweenness_centrality";
 
 static llvm::cl::opt<std::string> filename(llvm::cl::Positional, llvm::cl::desc("<input file>"), llvm::cl::Required);
 static llvm::cl::opt<int> iterLimit("limit", llvm::cl::desc("Limit number of iterations to value (0 is all nodes)"), llvm::cl::init(0));
+static llvm::cl::opt<bool> forceVerify("forceVerify", llvm::cl::desc("Abort if not verified, only makes sense for torus graphs"));
 
 typedef Galois::Graph::LC_FileGraph<void, void> Graph;
 typedef Graph::GraphNode GNode;
@@ -205,6 +206,8 @@ void verify() {
       } else {
         if (!((bc - sampleBC) <= 0.0001)) {
           std::cerr << "If torus graph, verification failed " << (bc - sampleBC) << "\n";
+          if (forceVerify)
+            abort();
 	  assert ((bc - sampleBC) <= 0.0001);
 	  return;
 	}
@@ -274,7 +277,7 @@ int main(int argc, char** argv) {
   Galois::for_each<WL>(tmp.begin(), tmp.end(), process());
   T.stop();
 
-  if (!skipVerify) {
+  if (forceVerify || !skipVerify) {
     verify();
   } else { // print bc value for first 10 nodes
     std::vector<double> bcv(NumNodes);
