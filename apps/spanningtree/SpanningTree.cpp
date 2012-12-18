@@ -147,7 +147,7 @@ struct AsynchronousAlgo {
         return false;
       // Avoid cycles by directing edges consistently
       if (a->id > b->id)
-        boost::swap(a, b);
+        std::swap(a, b);
       if (__sync_bool_compare_and_swap(&a->component, a, b))
         return true;
     }
