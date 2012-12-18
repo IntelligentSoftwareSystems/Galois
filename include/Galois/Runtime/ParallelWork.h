@@ -305,12 +305,12 @@ public:
 template<typename WLTy, typename IterTy, typename FunctionTy>
 void for_each_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
   assert(!inGaloisForEach);
-
+  //if (networkHostNum > 0 && networkHostID == 0) {
   //SerializationBuffer Buf;
   //Buf.serialize(part of b..e, f, loopname);
   //getSystemNetwork.broadcast(&for_each_landing_pad<WLTy, IterTy. FunctionTy>,
   // buf);
-
+  // }
   //getSystemBarrier should return MPI aware barriers too
 
   inGaloisForEach = true;
