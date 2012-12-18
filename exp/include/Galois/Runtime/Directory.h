@@ -36,6 +36,7 @@
 
 #define PLACEREQ 10000
 
+#if 0
 namespace Galois {
 namespace Runtime {
 
@@ -106,7 +107,7 @@ static inline void comm() {
 } // end of DIR namespace
 }
 } // end namespace
-
+#endif
 
 namespace Galois {
 namespace Runtime {
@@ -159,10 +160,12 @@ public:
   }
 };
 
-RemoteDirectory& getSystemRemoteDirectory();
-
 class LocalDirectory {
 };
+
+
+
+RemoteDirectory& getSystemRemoteDirectory();
 
 LocalDirectory& getSystemLocalDirectory();
 

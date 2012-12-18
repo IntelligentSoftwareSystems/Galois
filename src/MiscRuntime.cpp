@@ -24,10 +24,10 @@
 #include "Galois/Runtime/ParallelWork.h"
 
 using namespace Galois::Runtime;
-using namespace DIR;
+//using namespace DIR;
 
-bool Galois::Runtime::distributed_foreach = false;
-NodeRequest Galois::Runtime::DIR::nr;
+//bool Galois::Runtime::distributed_foreach = false;
+//NodeRequest Galois::Runtime::DIR::nr;
 //unordered_map<Pair,void*,HashFunction,SetEqual>    Galois::Runtime::DIR::hash_table;
 //unordered_map<Pair,locData*,HashFunction,SetEqual> Galois::Runtime::sent_hash;
 //unordered_map<Pair,void*,HashFunction,SetEqual>    Galois::Runtime::recv_hash;

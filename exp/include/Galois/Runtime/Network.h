@@ -34,9 +34,10 @@ namespace Runtime {
 namespace Distributed {
 
 extern uint32_t networkHostID;
+extern uint32_t networkHostNum;
 
 typedef SerializeBuffer SendBuffer;
-class RecvBuffer {};
+typedef DeSerializeBuffer RecvBuffer;
 
 typedef void (*recvFuncTy)(RecvBuffer&);
 
@@ -53,6 +54,19 @@ public:
   //!landing pad (recv) and some data (buf)
   //! buf is invalidated by this operation
   virtual void broadcastMessage(recvFuncTy recv, SendBuffer& buf) = 0;
+
+  //!recieve and dispatch messages
+  //!returns true if at least one message was recieved
+  //! if the network requires a dedicated thread, then 
+  //!it is only valid for that thread to call this function
+  virtual bool handleRecieves() = 0;
+
+  //! does this network layer need a dedicated thread?
+  //! if false, then any thread can call send or recieve and work will get done.
+  //! if true, then only the master thread can process sends and recieves
+  //! if true, handleRecieves will process pending sends
+  virtual bool needsDedicatedThread() = 0;
+
 };
 
 NetworkInterface& getSystemNetworkInterface();

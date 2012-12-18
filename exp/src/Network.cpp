@@ -27,6 +27,7 @@ namespace Galois {
 namespace Runtime {
 namespace Distributed {
 uint32_t networkHostID;
+uint32_t networkHostNum;
 }
 }
 }

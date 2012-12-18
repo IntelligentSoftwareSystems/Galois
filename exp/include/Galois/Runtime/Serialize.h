@@ -25,6 +25,7 @@
 
 #include <type_traits>
 #include <ostream>
+#include <vector>
 #include <deque>
 
 #include <boost/mpl/has_xxx.hpp>
@@ -43,7 +44,7 @@ template<typename T>
 struct has_serialize : public has_tt_has_serialize<T> {};
 
 class SerializeBuffer {
-  std::deque<unsigned char> bufdata;
+  std::vector<unsigned char> bufdata;
 public:
 
   //Serialize support
@@ -77,7 +78,7 @@ public:
     serialize(an...);
   }
 
-  void* linearData() { abort(); return 0; }
+  void* linearData() { return &bufdata[0]; }
 
   size_t size() const { return bufdata.size(); }
 
@@ -89,6 +90,17 @@ public:
       o << (unsigned int)*ii << " ";
     o << "}>";
   }
+};
+
+class DeSerializeBuffer {
+  std::vector<unsigned char> bufdata;
+  int offset;
+public:
+
+  explicit DeSerializeBuffer(int count) {
+    offset = 0;
+    bufdata.resize(count);
+  }
 
   //Deserialize support
 
@@ -98,8 +110,8 @@ public:
   inline void deserialize(T& data, typename std::enable_if<std::is_pod<T>::value>::type* = 0) {
     unsigned char* pdata = (unsigned char*)&data;
     for (size_t i = 0; i < sizeof(data); ++i) {
-      pdata[i] = bufdata.front();
-      bufdata.pop_front();
+      pdata[i] = bufdata[offset];
+      ++offset;
     }
   }
 
@@ -125,6 +137,27 @@ public:
     deserialize(an...);
   }
 
+  template<typename T>
+  inline void deserialize_end(T& data, typename std::enable_if<std::is_pod<T>::value>::type* = 0) {
+    unsigned char* pdata = (unsigned char*)&data;
+    size_t b = bufdata.size() - sizeof(data);
+    for (size_t i = 0; i < sizeof(data); ++i)
+      pdata[i] = bufdata[b + i];
+    for (size_t i = 0; i < sizeof(data); ++i)
+      bufdata.pop_back();
+  }
+
+  void* linearData() { return &bufdata[0]; }
+  size_t size() const { return bufdata.size() - offset; }
+
+  //Utility
+
+  void print(std::ostream& o) {
+    o << "<{(" << offset << ") ";
+    for (auto ii = bufdata.begin(), ee = bufdata.end(); ii != ee; ++ii)
+      o << (unsigned int)*ii << " ";
+    o << "}>";
+  }
 };
 
 /*

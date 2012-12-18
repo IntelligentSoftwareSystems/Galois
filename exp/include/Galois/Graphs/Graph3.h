@@ -26,7 +26,7 @@ protected:
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
     s.serialize(nextNode, active);
   }
-  void deserialize(Galois::Runtime::Distributed::SerializeBuffer& s) {
+  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
     s.deserialize(nextNode, active);
   }
 
@@ -53,7 +53,7 @@ protected:
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
     s.serialize(data);
   }
-  void deserialize(Galois::Runtime::Distributed::SerializeBuffer& s) {
+  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
     s.deserialize(data);
   }
 
@@ -94,7 +94,7 @@ public:
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
     s.serialize(dst, val);
   }
-  void deserialize(Galois::Runtime::Distributed::SerializeBuffer& s) {
+  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
     s.deserialize(dst, val);
   }
 
@@ -120,7 +120,7 @@ public:
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
     s.serialize(dst);
   }
-  void deserialize(Galois::Runtime::Distributed::SerializeBuffer& s) {
+  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
     s.deserialize(dst);
   }
 
@@ -142,7 +142,7 @@ protected:
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
     s.serialize(edges);
   }
-  void deserialize(Galois::Runtime::Distributed::SerializeBuffer& s) {
+  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
     s.deserialize(edges);
   }
   void dump(std::ostream& os) {
@@ -212,7 +212,7 @@ public:
     GraphNodeData<NodeDataTy>::serialize(s);
     GraphNodeEdges<SHORTHAND, EdgeDataTy, EDir>::serialize(s);
   }
-  void deserialize(Galois::Runtime::Distributed::SerializeBuffer& s) {
+  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
     GraphNodeBase<SHORTHAND >::deserialize(s);
     GraphNodeData<NodeDataTy>::deserialize(s);
     GraphNodeEdges<SHORTHAND, EdgeDataTy, EDir>::deserialize(s);
@@ -250,7 +250,7 @@ class ThirdGraph { //: public Galois::Runtime::Distributed::DistBase<ThirdGraph>
     void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
       s.serialize(head, next, master);
     }
-    void deserialize(Galois::Runtime::Distributed::SerializeBuffer& s) {
+    void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
       s.deserialize(head, next, master);
     }
     SubGraphState() :head(), next(), master(this) {}
@@ -333,7 +333,7 @@ public:
     //This is what is called on the source of a replicating source
     s.serialize(localState.master);
   }
-  void deserialize(Galois::Runtime::Distributed::SerializeBuffer& s) {
+  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
     //This constructs the local node of the distributed graph
     s.deserialize(localState.master);
     localState.next = localState.master->next;

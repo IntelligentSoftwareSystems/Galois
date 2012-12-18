@@ -41,13 +41,21 @@ int main(int argc, const char** argv) {
   B.print(std::cout);
   cout << "\n";
 
+  Galois::Runtime::Distributed::DeSerializeBuffer D(B.size());
+  memcpy(D.linearData(), B.linearData(), B.size());
+
+  D.print(std::cout);
+  cout << "\n";
+
   typename GTy::NodeHandle foo;
-  B.deserialize(foo);
+  D.deserialize(foo);
 
   auto bar = Gr.createNode();
-  B.deserialize(*bar);
+  D.deserialize(*bar);
 
   B.print(std::cout);
+  cout << "\n";
+  D.print(std::cout);
   cout << "\n";
 
   oldB.dump(std::cout);

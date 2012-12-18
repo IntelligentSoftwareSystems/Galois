@@ -10,5 +10,6 @@ makeTest(pairingheap)
 makeTest(skiplist)
 makeTest(dist)
 makeTest(distnodes)
-makeTest(foreachtask)
+#makeTest(foreachtask)
+makeTest(networktest)
 

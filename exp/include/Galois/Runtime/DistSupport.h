@@ -72,7 +72,7 @@ public:
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
     s.serialize(ptr);
   }
-  void deserialize(Galois::Runtime::Distributed::SerializeBuffer& s) {
+  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
     s.deserialize(ptr);
   }
 

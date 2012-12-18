@@ -29,7 +29,7 @@
 #define GALOIS_RUNTIME_PARALLELWORK_H
 
 #include "Galois/Mem.h"
-#include "Galois/Runtime/Directory.h"
+//#include "Galois/Runtime/Directory.h"
 #include "Galois/Runtime/ForEachTraits.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Context.h"
@@ -239,10 +239,10 @@ protected:
       setThreadContext(&tld.cnx);
     tld.lterm = term.getLocalTokenHolder();
     do {
-      if (get_distributed_foreach() && (LL::getTID() == (Galois::Runtime::activeThreads-1))) {
-         DIR::comm();
-      }
-      else {
+      //      if (get_distributed_foreach() && (LL::getTID() == (Galois::Runtime::activeThreads-1))) {
+      //         DIR::comm();
+      //      }
+      //      else {
          bool didWork;
          do {
             didWork = false;
@@ -263,7 +263,7 @@ protected:
          } while (didWork);
          if (ForEachTraits<FunctionTy>::NeedsBreak && broke.data)
          	break;
-      }
+	 //      }
 
       term.localTermination();
     } while ((ForEachTraits<FunctionTy>::NeedsPush 
@@ -297,9 +297,21 @@ public:
 };
 
 
+//template<typename WLTy, typename IterTy, typename FunctionTy>
+//for_each_landing_pad(Galois::Runtime::Distributed::RecvBuffer& buf) {
+//  
+//}
+
 template<typename WLTy, typename IterTy, typename FunctionTy>
 void for_each_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
   assert(!inGaloisForEach);
+
+  //SerializationBuffer Buf;
+  //Buf.serialize(part of b..e, f, loopname);
+  //getSystemNetwork.broadcast(&for_each_landing_pad<WLTy, IterTy. FunctionTy>,
+  // buf);
+
+  //getSystemBarrier should return MPI aware barriers too
 
   inGaloisForEach = true;
 
