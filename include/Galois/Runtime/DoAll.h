@@ -28,6 +28,8 @@
 #ifndef GALOIS_RUNTIME_DOALL_H
 #define GALOIS_RUNTIME_DOALL_H
 
+#include "Galois/Runtime/Barrier.h"
+
 namespace GaloisRuntime {
 
 struct EmptyFn {
@@ -39,6 +41,7 @@ struct EmptyFn {
 // TODO: add loopname + stats
 template<class FunctionTy, class ReduceFunTy, class IterTy, bool useStealing=false>
 class DoAllWork {
+
   LL::SimpleLock<true> reduceLock;
   FunctionTy origF;
   FunctionTy outputF;
@@ -46,6 +49,7 @@ class DoAllWork {
   bool needsReduce;
   IterTy masterBegin;
   IterTy masterEnd;
+  GBarrier barrier;
 
   struct SharedState {
     IterTy stealBegin;
@@ -119,7 +123,9 @@ public:
 
   DoAllWork(const FunctionTy& F, const ReduceFunTy& R, bool needsReduce, IterTy begin, IterTy end)
     : origF(F), outputF(F), RF(R), needsReduce(needsReduce), masterBegin(begin), masterEnd(end)
-  {}
+  {
+    barrier.reinit (galoisActiveThreads);
+  }
 
   void operator()() {
     //Assume the copy constructor on the functor is readonly
@@ -128,8 +134,13 @@ public:
     thisTLD.begin = r.first;
     thisTLD.end = r.second;
 
-    if (useStealing)
+    if (useStealing) {
       populateSteal(thisTLD, *TLDS.getLocal());
+
+      // threads could start stealing from other threads whose
+      // range has not been initialized yet
+      barrier.wait ();
+    }
 
     do {
       processRange(thisTLD);

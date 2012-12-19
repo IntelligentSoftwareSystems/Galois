@@ -55,7 +55,7 @@ enum GlobalPos {
   GLOBAL_BEGIN, GLOBAL_END
 };
 
-// #define ADAPTOR_BASED_OUTER_ITER
+#define ADAPTOR_BASED_OUTER_ITER
 
 // XXX: use a combination of boost::transform_iterator and
 // boost::counting_iterator to implement the following OuterPerThreadWLIter
@@ -231,10 +231,6 @@ public:
 
   friend bool operator == (const OuterPerThreadWLIter& left, const OuterPerThreadWLIter& right) {
 
-    if (left.workList != right.workList) {
-      GALOIS_DEBUG ("left.workList=%p, right.workList=%p", left.workList, right.workList);
-    }
-
     assert (left.workList == right.workList);
     return (left.row == right.row);
   }
@@ -339,7 +335,8 @@ public:
 private:
 
   // XXX: for testing only
-  /*
+
+#if 0
   struct FakePTS {
     std::vector<Cont_ty*> v;
 
@@ -348,7 +345,7 @@ private:
     }
 
     Cont_ty** getLocal () const {
-      return &v[0];
+      return getRemote (GaloisRuntime::LL::getTID ());
     }
 
     Cont_ty** getRemote (size_t i) const {
@@ -356,10 +353,11 @@ private:
       return const_cast<Cont_ty**> (&v[i]);
     }
 
-    size_t size () const { return 1024*1024; }
+    size_t size () const { return GaloisRuntime::LL::getMaxThreads(); }
 
   };
-  */
+#endif
+
 
 
   // typedef FakePTS PerThrdCont_ty;
