@@ -65,11 +65,14 @@ struct StrictObject<void> {
  * otherwise the compiler will insert non-zero padding for fields (even when
  * empty).
  */
+// TODO(ddn): Use T's copy constructor and assignment operator; current assumes
+// memcpy is okay
 template<typename T>
-class LazyObject: boost::noncopyable {
+class LazyObject {
   char data[sizeof(T)];
 
   T* cast() { return reinterpret_cast<T*>(&data[0]); }
+  const T* cast() const { return reinterpret_cast<const T*>(&data[0]); }
 public:
   typedef T value_type;
   typedef T& reference;
@@ -83,7 +86,7 @@ public:
 };
 
 template<>
-struct LazyObject<void>: boost::noncopyable {
+struct LazyObject<void> {
   typedef void* value_type;
   typedef void* reference;
   typedef void* const_reference;

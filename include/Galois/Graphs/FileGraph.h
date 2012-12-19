@@ -39,6 +39,7 @@
 
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/iterator/transform_iterator.hpp>
+#include <boost/type_traits/is_pod.hpp>
 #include <boost/utility.hpp>
 
 #include <map>
@@ -324,7 +325,7 @@ public:
 template<typename EdgeTy>
 void makeSymmetric(FileGraph& in, FileGraph& out) {
   typedef FileGraph::GraphNode GNode;
-  typedef LargeArray<EdgeTy,true> EdgeData;
+  typedef LargeArray<EdgeTy,boost::is_pod<EdgeTy>::value> EdgeData;
   typedef typename EdgeData::value_type edge_value_type;
 
   FileGraphParser g;

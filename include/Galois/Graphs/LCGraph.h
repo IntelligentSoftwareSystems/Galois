@@ -65,6 +65,38 @@
 namespace Galois {
 namespace Graph {
 
+template<typename GraphTy>
+void structureFromFile(GraphTy& g, const std::string& fname) {
+  FileGraph graph;
+  graph.structureFromFile(fname);
+  g.structureFromGraph(graph);
+}
+
+template<typename EdgeContainerTy,typename CompTy>
+struct EdgeSortCompWrapper {
+  const CompTy& comp;
+
+  EdgeSortCompWrapper(const CompTy& c): comp(c) { }
+  bool operator()(const EdgeContainerTy& a, const EdgeContainerTy& b) const {
+    return comp(a.get(), b.get());
+  }
+};
+
+namespace HIDDEN {
+uint64_t static localStart(uint64_t numNodes) {
+  unsigned int id = GaloisRuntime::LL::getTID();
+  unsigned int num = Galois::getActiveThreads();
+  return (numNodes + num - 1) / num * id;
+}
+
+uint64_t static localEnd(uint64_t numNodes) {
+  unsigned int id = GaloisRuntime::LL::getTID();
+  unsigned int num = Galois::getActiveThreads();
+  uint64_t end = (numNodes + num - 1) / num * (id + 1);
+  return std::min(end, numNodes);
+}
+}
+
 //! Local computation graph (i.e., graph structure does not change)
 template<typename NodeTy, typename EdgeTy>
 class LC_CSR_Graph: boost::noncopyable {
@@ -145,16 +177,6 @@ protected:
     void advance(ptrdiff_t n) { at += n; }
   };
 
-  template<typename CompTy>
-  struct EdgeSortCompWrapper {
-    const CompTy& comp;
-
-    EdgeSortCompWrapper(const CompTy& c): comp(c) { }
-    bool operator()(EdgeValue a, EdgeValue b) const {
-      return comp(a.get(), b.get());
-    }
-  };
-
   LargeArray<NodeInfo,false> nodeData;
   LargeArray<uint64_t,true> edgeIndData;
   EdgeDst edgeDst;
@@ -192,7 +214,9 @@ public:
   typedef typename EdgeData::reference edge_data_reference;
   typedef boost::counting_iterator<uint64_t> edge_iterator;
   typedef boost::counting_iterator<uint32_t> iterator;
+  typedef iterator const_iterator;
   typedef iterator local_iterator;
+  typedef iterator const_local_iterator;
 
   ~LC_CSR_Graph() {
     edgeData.destroy();
@@ -224,36 +248,14 @@ public:
     return edgeDst[*ni];
   }
 
-  uint64_t size() const {
-    return numNodes;
-  }
+  uint64_t size() const { return numNodes; }
+  uint64_t sizeEdges() const { return numEdges; }
 
-  uint64_t sizeEdges() const {
-    return numEdges;
-  }
+  iterator begin() const { return iterator(0); }
+  iterator end() const { return iterator(numNodes); }
 
-  iterator begin() const {
-    return iterator(0);
-  }
-
-  iterator end() const {
-    return iterator(numNodes);
-  }
-
-  local_iterator local_begin() const {
-    unsigned int id = GaloisRuntime::LL::getTID();
-    unsigned int num = Galois::getActiveThreads();
-    uint64_t start = (numNodes + num - 1) / num * id;
-    return iterator(start);
-  }
-
-  local_iterator local_end() const {
-    unsigned int id = GaloisRuntime::LL::getTID();
-    unsigned int num = Galois::getActiveThreads();
-    uint64_t end = (numNodes + num - 1) / num * (id + 1);
-    end = std::min(end, numNodes);
-    return iterator(end);
-  }
+  local_iterator local_begin() const { return iterator(HIDDEN::localStart(numNodes)); }
+  local_iterator local_end() const { return iterator(HIDDEN::localEnd(numNodes)); }
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = ALL) {
     GaloisRuntime::acquire(&nodeData[N], mflag);
@@ -274,12 +276,12 @@ public:
   template<typename CompTy>
   void sortEdges(GraphNode N, const CompTy& comp = std::less<EdgeTy>(), MethodFlag mflag = ALL) {
     GaloisRuntime::acquire(&nodeData[N], mflag);
-    std::sort(edge_sort_begin(N), edge_sort_end(N), EdgeSortCompWrapper<CompTy>(comp));
+    std::sort(edge_sort_begin(N), edge_sort_end(N), EdgeSortCompWrapper<EdgeValue,CompTy>(comp));
   }
 
-  void structureFromFile(const std::string& fname) {
-    FileGraph graph;
-    graph.structureFromFile(fname);
+  void structureFromFile(const std::string& fname) { Galois::Graph::structureFromFile(*this, fname); }
+
+  void structureFromGraph(FileGraph& graph) {
     numNodes = graph.size();
     numEdges = graph.sizeEdges();
     nodeData.allocate(numNodes);
@@ -352,7 +354,9 @@ public:
     GraphNode operator*() { return at; }
   };
 
+  typedef iterator const_iterator;
   typedef iterator local_iterator;
+  typedef iterator const_local_iterator;
 
   ~LC_CSRInline_Graph() {
     if (!EdgeInfo::has_value) return;
@@ -384,36 +388,14 @@ public:
     return ni->dst;
   }
 
-  uint64_t size() const {
-    return numNodes;
-  }
+  uint64_t size() const { return numNodes; }
+  uint64_t sizeEdges() const { return numEdges; }
 
-  uint64_t sizeEdges() const {
-    return numEdges;
-  }
+  iterator begin() const { return iterator(nodeData.data()); }
+  iterator end() const { return iterator(endNode); }
 
-  iterator begin() const {
-    return iterator(nodeData.data());
-  }
-
-  iterator end() const {
-    return iterator(endNode);
-  }
-
-  local_iterator local_begin() const {
-    unsigned int id = GaloisRuntime::LL::getTID();
-    unsigned int num = Galois::getActiveThreads();
-    uint64_t start = (numNodes + num - 1) / num * id;
-    return iterator(&nodeData[start]);
-  }
-
-  local_iterator local_end() const {
-    unsigned int id = GaloisRuntime::LL::getTID();
-    unsigned int num = Galois::getActiveThreads();
-    uint64_t end = (numNodes + num - 1) / num * (id + 1);
-    end = std::min(end, numNodes);
-    return iterator(&nodeData[end]);
-  }
+  local_iterator local_begin() const { return iterator(&nodeData[HIDDEN::localStart(numNodes)]); }
+  local_iterator local_end() const { return iterator(&nodeData[HIDDEN::localEnd(numNodes)]); }
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = ALL) {
     GaloisRuntime::acquire(N, mflag);
@@ -430,9 +412,9 @@ public:
     return N->edgeEnd;
   }
 
-  void structureFromFile(const std::string& fname) {
-    FileGraph graph;
-    graph.structureFromFile(fname);
+  void structureFromFile(const std::string& fname) { Galois::Graph::structureFromFile(*this, fname); }
+
+  void structureFromGraph(FileGraph& graph) {
     numNodes = graph.size();
     numEdges = graph.sizeEdges();
     nodeData.allocate(numNodes);
@@ -495,7 +477,7 @@ protected:
       return ni;
     }
   };
-
+ 
   LargeArray<char,true> data;
   uint64_t numNodes;
   uint64_t numEdges;
@@ -517,6 +499,7 @@ public:
   typedef NodeInfo** iterator;
   typedef NodeInfo*const * const_iterator;
   typedef iterator local_iterator;
+  typedef const_iterator const_local_iterator;
 
   LC_Linear_Graph() { }
 
@@ -563,21 +546,10 @@ public:
   iterator end() { return &nodes[numNodes]; }
   const_iterator begin() const { return &nodes[0]; }
   const_iterator end() const { return &nodes[numNodes]; }
-
-  local_iterator local_begin() const {
-    unsigned int id = GaloisRuntime::LL::getTID();
-    unsigned int num = Galois::getActiveThreads();
-    uint64_t start = (numNodes + num - 1) / num * id;
-    return &nodes[start];
-  }
-
-  local_iterator local_end() const {
-    unsigned int id = GaloisRuntime::LL::getTID();
-    unsigned int num = Galois::getActiveThreads();
-    uint64_t end = (numNodes + num - 1) / num * (id + 1);
-    end = std::min(end, numNodes);
-    return &nodes[end];
-  }
+  local_iterator local_begin() { return &nodes[HIDDEN::localStart(numNodes)]; }
+  local_iterator local_end() { return &nodes[HIDDEN::localEnd(numNodes)]; }
+  const_local_iterator local_begin() const { return &nodes[HIDDEN::localStart(numNodes)]; }
+  const_local_iterator local_end() const { return &nodes[HIDDEN::localEnd(numNodes)]; }
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = ALL) {
     GaloisRuntime::acquire(N, mflag);
@@ -594,9 +566,15 @@ public:
     return N->edgeEnd();
   }
 
-  void structureFromFile(const std::string& fname) {
-    FileGraph graph;
-    graph.structureFromFile(fname);
+  template<typename CompTy>
+  void sortEdges(GraphNode N, const CompTy& comp = std::less<EdgeTy>(), MethodFlag mflag = ALL) {
+    GaloisRuntime::acquire(N, mflag);
+    std::sort(N->edgeBegin(), N->edgeEnd(), EdgeSortCompWrapper<EdgeInfo,CompTy>(comp));
+  }
+
+  void structureFromFile(const std::string& fname) { Galois::Graph::structureFromFile(*this, fname); }
+
+  void structureFromGraph(FileGraph& graph) {
     numNodes = graph.size();
     numEdges = graph.sizeEdges();
     data.allocate(sizeof(NodeInfo) * numNodes * 2 + sizeof(EdgeInfo) * numEdges);
@@ -860,6 +838,8 @@ public:
     GraphNode operator*() const { return v; }
   };
 
+  typedef local_iterator const_local_iterator;
+
   ~LC_Numa_Graph() {
     for (typename Nodes::iterator ii = nodes.begin(), ei = nodes.end(); ii != ei; ++ii) {
       NodeInfo* n = *ii;
@@ -933,9 +913,9 @@ public:
     return N->edgeEnd();
   }
 
-  void structureFromFile(const std::string& fname) {
-    FileGraph graph;
-    graph.structureFromFile(fname);
+  void structureFromFile(const std::string& fname) { Galois::Graph::structureFromFile(*this, fname); }
+
+  void structureFromGraph(FileGraph& graph) {
     numNodes = graph.size();
     numEdges = graph.sizeEdges();
 
