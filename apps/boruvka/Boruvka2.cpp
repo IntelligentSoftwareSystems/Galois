@@ -24,9 +24,10 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 #include "Galois/Galois.h"
-#include "Galois/Bag.h"
 #include "Galois/Accumulator.h"
+#include "Galois/Bag.h"
 #include "Galois/Statistic.h"
+#include "Galois/UnionFind.h"
 #include "Galois/Graphs/LCGraph.h"
 #include "Galois/ParallelSTL/ParallelSTL.h"
 #include "llvm/Support/CommandLine.h"
@@ -58,56 +59,14 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
 
 typedef int EdgeData;
 
-struct Node {
-  unsigned int id;
+struct Node: public Galois::UnionFindNode<Node> {
   EdgeData lightest;
-  Node* component;
-
-  Node* find(bool compress) {
-    // Basic outline of race in synchronous path compression is that two path
-    // compressions along two different paths to the root can create a cycle
-    // in the union-find tree. Prevent that from happening by compressing
-    // incrementally.
-    Node* rep = component;
-    Node* prev = 0;
-    int rank = 0;
-    while (rep->component != rep) {
-      Node* next = rep->component;
-
-      if (compress) {
-        if (prev && prev->component == rep)
-          prev->component = next;
-        prev = rep;
-      }
-
-      rep = next;
-      ++rank;
-    }
-    return rep;
-  }
-
-  //! Lock-free merge. Returns if merge was done.
-  Node* merge(Node* b) {
-    Node* a = component;
-    while (true) {
-      a = a->find(true);
-      b = b->find(true);
-      if (a == b)
-        return 0;
-      // Avoid cycles by directing edges consistently
-      if (a->id > b->id)
-        std::swap(a, b);
-      if (__sync_bool_compare_and_swap(&a->component, a, b))
-        return b;
-    }
-  }
 };
 
 #ifdef GALOIS_USE_NUMA
 typedef Galois::Graph::LC_Numa_Graph<Node,EdgeData> Graph;
 #else
 typedef Galois::Graph::LC_CSR_Graph<Node,EdgeData> Graph;
-//typedef Galois::Graph::LC_Linear_Graph<Node,EdgeData> Graph;
 #endif
 
 typedef Graph::GraphNode GNode;
@@ -115,7 +74,7 @@ typedef Graph::GraphNode GNode;
 Graph graph;
 
 std::ostream& operator<<(std::ostream& os, const Node& n) {
-  os << "[id: " << n.id << ", c: " << n.component->id << "]";
+  os << "[id: " << &n << ", c: " << n.find() << "]";
   return os;
 }
 
@@ -165,7 +124,7 @@ struct ParallelAlgo {
       GNode dst = graph.getEdgeDst(ii);
       Node& ddata = graph.getData(dst, Galois::NONE);
       Node* rep;
-      if ((rep = sdata.find(true)) != ddata.find(true)) {
+      if ((rep = sdata.findAndCompress()) != ddata.findAndCompress()) {
         int weight = graph.getEdgeData(ii);
         next.push(WorkItem(src, dst, weight, cur));
         int old;
@@ -220,7 +179,7 @@ struct ParallelAlgo {
     void operator()(const WorkItem& item) const {
       GNode src = item.edge.src;
       Node& sdata = graph.getData(src, Galois::NONE);
-      Node* rep = sdata.find(true);
+      Node* rep = sdata.findAndCompress();
       int cur = item.cur;
 
       if (rep->lightest == item.edge.weight) {
@@ -289,7 +248,7 @@ struct is_bad_graph {
     for (Graph::edge_iterator ii = graph.edge_begin(n), ei = graph.edge_end(n); ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
       Node& data = graph.getData(dst);
-      if (me.component != data.component) {
+      if (me.findAndCompress() != data.findAndCompress()) {
         std::cerr << "not in same component: " << me << " and " << data << "\n";
         return true;
       }
@@ -300,7 +259,7 @@ struct is_bad_graph {
 
 struct is_bad_mst {
   bool operator()(const Edge& e) const {
-    return graph.getData(e.src).component != graph.getData(e.dst).component;
+    return graph.getData(e.src).findAndCompress() != graph.getData(e.dst).findAndCompress();
   }
 };
 
@@ -313,7 +272,7 @@ struct CheckAcyclic {
 
   void operator()(const GNode& n) {
     Node& data = graph.getData(n);
-    if (data.component == &data)
+    if (data.isRep())
       accum->roots += 1;
   }
 
@@ -333,18 +292,6 @@ struct CheckAcyclic {
     std::cout << "Num trees: " << numRoots << "\n";
     std::cout << "Tree edges: " << numEdges << "\n";
     return true;
-  }
-};
-
-//! Normalize component by doing find with path compression
-struct Normalize {
-  void operator()(const GNode& src) const {
-    Node& sdata = graph.getData(src, Galois::NONE);
-    sdata.component = sdata.find(true);
-  }
-
-  void operator()() {
-    Galois::do_all_local(graph, *this);
   }
 };
 
@@ -370,7 +317,6 @@ void run() {
 }
 
 bool verify() {
-  run<Normalize>(); 
   if (Galois::ParallelSTL::find_if(graph.begin(), graph.end(), is_bad_graph()) == graph.end()) {
     if (Galois::ParallelSTL::find_if(mst.begin(), mst.end(), is_bad_mst()) == mst.end()) {
       CheckAcyclic c;
@@ -397,12 +343,6 @@ void initializeGraph() {
   run<SortEdges>();
   Tsort.stop();
 
-  unsigned int id = 0;
-  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii, ++id) {
-    Node& n = graph.getData(*ii);
-    n.id = id;
-    n.component = &n;
-  }
   std::cout << "Nodes: " << graph.size() << ", edges: " << graph.sizeEdges() << "\n";
 }
 
