@@ -450,6 +450,10 @@ public:
          // check if there are any incoming requests
          err = MPI_Irecv (hreq, sizeof(handle_req), MPI_BYTE, MPI_ANY_SOURCE,
                           REQ_TAG, MPI_COMM_WORLD, mreq);
+         if (err != MPI_SUCCESS) {
+            printf ("Error in MPI_Irecv!\n");
+            exit (1);
+         }
       }
 
       MPI_Comm_size(MPI_COMM_WORLD, &notasks);
@@ -467,6 +471,10 @@ public:
             mreq_ser[count] = allocate_mpi_req();
             err = MPI_Irecv (hreq_ser[count], sizeof(handle_req), MPI_BYTE, count,
                              SERV_TAG, MPI_COMM_WORLD, mreq_ser[count]);
+            if (err != MPI_SUCCESS) {
+               printf ("Error in MPI_Irecv!\n");
+               exit (1);
+            }
          }
 
          NR_init = true;
@@ -510,6 +518,10 @@ public:
             mreq = allocate_mpi_req();
             err = MPI_Irecv (hreq, sizeof(handle_req), MPI_BYTE, MPI_ANY_SOURCE,
                              REQ_TAG, MPI_COMM_WORLD, mreq);
+            if (err != MPI_SUCCESS) {
+               printf ("Error in MPI_Irecv!\n");
+               exit (1);
+            }
          }
       } while (flag);
 
@@ -521,6 +533,10 @@ public:
          /* remove from the list, if the data was already sent */
          if (wreq->done && wreq->sent) {
             err = MPI_Test (wreq->mreq, &flag, &status);
+            if (err != MPI_SUCCESS) {
+               printf ("Error in MPI_Test!\n");
+               exit (1);
+            }
             /* if flag is true the data was sent */
             if (flag) {
                /* add to temp remove list so that it can be removed later */
@@ -538,6 +554,10 @@ public:
  //cout << "SERV " << taskRank << " to " << wreq->req_from << " addr " << wreq->addr << endl;
             err = MPI_Isend (wreq, sizeof(handle_req), MPI_BYTE, wreq->req_from,
                              SERV_TAG, MPI_COMM_WORLD, wreq->mreq);
+            if (err != MPI_SUCCESS) {
+               printf ("Error in MPI_Isend!\n");
+               exit (1);
+            }
             wreq->sent = 1;
          }
       }
@@ -574,6 +594,10 @@ public:
             }
             err = MPI_Isend (wreq, sizeof(handle_req), MPI_BYTE, wreq->req_to,
                              REQ_TAG, MPI_COMM_WORLD, wreq->mreq);
+            if (err != MPI_SUCCESS) {
+               printf ("Error in MPI_Isend!\n");
+               exit (1);
+            }
             wreq->sent = 1;
             Pair p(wreq->req_to,wreq->addr);
             sent_not_recv_hash[p] = 1;
@@ -648,6 +672,10 @@ public:
                mreq_ser[task] = allocate_mpi_req();
                err = MPI_Irecv(hreq_ser[task], sizeof(handle_req), MPI_BYTE,
                                task, SERV_TAG, MPI_COMM_WORLD, mreq_ser[task]);
+               if (err != MPI_SUCCESS) {
+                  printf ("Error in MPI_Irecv!\n");
+                  exit (1);
+               }
             }
          }
       } while (recv_flag);
