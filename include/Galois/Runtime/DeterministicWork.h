@@ -52,47 +52,52 @@ struct DItem {
   unsigned long id;
   void *localState;
 
-  DItem(const T& _val, unsigned long _id)
-    : val(_val), id(_id), localState (NULL) 
-  {}
+  DItem(const T& _val, unsigned long _id): val(_val), id(_id), localState(NULL) { }
 };
 
-
-
-template <typename T, typename CompareTy>
+template<typename T, typename CompareTy>
 struct DeterministicContext: public GaloisRuntime::SimpleRuntimeContext {
-
   typedef DItem<T> Item;
 
   Item item;
   const CompareTy& comp;
   bool not_ready;
 
+  DeterministicContext(const Item& _item, const CompareTy& _comp): 
+      SimpleRuntimeContext(true), 
+      item(_item),
+      comp(_comp),
+      not_ready(false)
+  { }
 
-  DeterministicContext (const Item& _item, const CompareTy& _comp)
-    : 
-      SimpleRuntimeContext (true), 
-      item (_item),
-      comp (_comp),
-      not_ready (false)
-  {}
-
-  DeterministicContext& operator = (const DeterministicContext& that) {
-    SimpleRuntimeContext::operator = (that);
-    if (this != &that) {
-      item = that.item;
-      not_ready = that.not_ready;
+  // XXX(ddn): assignment operator needed by boost::optional to return
+  // contexts from Worklists. Synthesized operator would not be able to
+  // deal with comp reference. Provide implementation that ignores that
+  // field as we won't need it by the time the context is returned. And
+  // while we're at it, define move assignment operator too.
+  DeterministicContext& operator=(DeterministicContext&& other) {
+    SimpleRuntimeContext::operator=(std::move(other));
+    if (this != &other) {
+      item = std::move(other.item);
+      not_ready = std::move(other.not_ready);
     }
-
     return *this;
   }
 
-  bool notReady () const { 
+  DeterministicContext& operator=(const DeterministicContext& other) {
+    SimpleRuntimeContext::operator=(other);
+    if (this != &other) {
+      item = other.item;
+      not_ready = other.not_ready;
+    }
+    return *this;
+  }
+
+  bool notReady() const { 
     return not_ready;
   }
 
-  virtual void sub_acquire (GaloisRuntime::Lockable* L) {
-
+  virtual void sub_acquire(GaloisRuntime::Lockable* L) {
     // TODO: should be redundant with new context hierarchy and virtual function call
     // Normal path
     // if (pendingFlag.flag.data == NON_DET) {
@@ -101,7 +106,7 @@ struct DeterministicContext: public GaloisRuntime::SimpleRuntimeContext {
     // }
 
     // Ordered and deterministic path
-    if (getPending () == COMMITTING)
+    if (getPending() == COMMITTING)
       return;
 
     if (L->Owner.try_lock()) {
@@ -117,7 +122,7 @@ struct DeterministicContext: public GaloisRuntime::SimpleRuntimeContext {
         return;
       if (other) {
 
-        bool conflict = comp (*other, *this); // *other < *this
+        bool conflict = comp(*other, *this); // *other < *this
         if (conflict) {
           // A lock that I want but can't get
           not_ready = true;
@@ -131,49 +136,43 @@ struct DeterministicContext: public GaloisRuntime::SimpleRuntimeContext {
       other->not_ready = true; // Only need atomic write
 
     return;
-
   }
-
 };
 
-template <typename T, typename CompTy> 
+template<typename T, typename CompTy> 
 struct OrderedContextComp {
-  const CompTy& comp;
-
   typedef DeterministicContext<T, OrderedContextComp> DetContext;
 
-  explicit OrderedContextComp (const CompTy& c): comp (c) {}
+  const CompTy& comp;
 
-  inline bool operator () (const DetContext& left, const DetContext& right) const {
-    return comp (left.item.val, right.item.val);
+  explicit OrderedContextComp(const CompTy& c): comp(c) {}
+
+  inline bool operator()(const DetContext& left, const DetContext& right) const {
+    return comp(left.item.val, right.item.val);
   }
-
 };
 
-template <typename T>
+template<typename T>
 struct UnorderedContextComp {
-
   typedef DeterministicContext<T, UnorderedContextComp> DetContext;
 
-  inline bool operator () (const DetContext& left, const DetContext& right) const {
-    return (left.item.id < right.item.id);
+  inline bool operator()(const DetContext& left, const DetContext& right) const {
+    return left.item.id < right.item.id;
   }
 };
 
-template <typename T, typename CompTy>
-DeterministicContext<T, OrderedContextComp<T, CompTy> > make_context (
+template<typename T, typename CompTy>
+DeterministicContext<T, OrderedContextComp<T, CompTy> > make_context(
     const DItem<T>& item, const CompTy& comp, OrderedTag) {
-
   typedef OrderedContextComp<T, CompTy> C;
-  return DeterministicContext<T, OrderedContextComp<T, CompTy> > (item, C (comp));
+  return DeterministicContext<T, OrderedContextComp<T, CompTy> >(item, C(comp));
 }
 
-template <typename T, typename CompTy>
-DeterministicContext <T, UnorderedContextComp<T> > make_context (
+template<typename T, typename CompTy>
+DeterministicContext <T, UnorderedContextComp<T> > make_context(
     const DItem<T>& item, const CompTy& comp, UnorderedTag) {
-
   typedef UnorderedContextComp<T> C;
-  return DeterministicContext<T, UnorderedContextComp<T> > (item, C());
+  return DeterministicContext<T, UnorderedContextComp<T> >(item, C());
 }
 
 template<typename Function1Ty,typename Function2Ty>
@@ -252,7 +251,7 @@ struct StateManager<T,FunctionTy,typename boost::enable_if<has_local_state<Funct
   }
   void dealloc(GaloisRuntime::UserContextAccess<T>& c) {
     bool dummy;
-    LocalState *p = (LocalState*) c.data().getLocalState(dummy);
+    LocalState *p = reinterpret_cast<LocalState*>(c.data().getLocalState(dummy));
     p->~LocalState();
   }
   void save(GaloisRuntime::UserContextAccess<T>& c, void*& localState) { 
@@ -343,7 +342,6 @@ void safe_advance(InputIteratorTy& it, size_t d, size_t& cur, size_t dist) {
   cur += d;
 }
 
-
 //! Wrapper around WorkList::ChunkedFIFO to allow peek() and empty() and still have FIFO order
 template<int chunksize,typename T>
 struct FIFO {
@@ -411,7 +409,7 @@ class DMergeLocal: private boost::noncopyable {
     explicit HeapCompare(const CompareTy& c): comp(c) { }
     bool operator()(const T& a, const T& b) const {
       // reverse sense to get least items out of std::priority_queue
-      return comp (b, a);
+      return comp(b, a);
     }
   };
 
@@ -445,8 +443,7 @@ class DMergeLocal: private boost::noncopyable {
   size_t size;
 
 public:
-  DMergeLocal()
-    : alloc(&heap), newItems(alloc), newReserve(alloc) { 
+  DMergeLocal(): alloc(&heap), newItems(alloc), newReserve(alloc) { 
     resetStats(); 
   }
 
@@ -454,9 +451,7 @@ public:
     // itemPoolReset();
   }
 
-
 private:
-  
   //! Update min and max from sorted iterator
   template<typename BiIteratorTy>
   void initialLimits(BiIteratorTy ii, BiIteratorTy ei) {
@@ -502,7 +497,6 @@ private:
   //! to the nth element and (2) getting the next elements < windowElement.
   template<bool updateWE,typename WL>
   void orderedUpdateDispatch(WL* wl, const CompareTy& comp, size_t count) {
-    
     // count = 0 is a special signal to not do anything
     if (updateWE && count == 0)
       return;
@@ -531,7 +525,7 @@ private:
 
       bool fromReserve;
       if (p1 && p2)
-        fromReserve = comp (p1->val, *p2);
+        fromReserve = comp(p1->val, *p2);
       else if (!p1 && !p2)
         break;
       else
@@ -543,16 +537,16 @@ private:
       // empty as well.
       assert(mostElement && windowElement);
 
-      if (!comp (*val, *mostElement))
+      if (!comp(*val, *mostElement))
         break;
-      if (!updateWE && !comp (*val, *windowElement))
+      if (!updateWE && !comp(*val, *windowElement))
         break;
       if (updateWE && ++c >= count) {
         windowElement = boost::optional<T>(*val);
         break;
       }
       
-      wl->push(Item (*val, 0));
+      wl->push(Item(*val, 0));
 
       if (fromReserve)
         reserve.pop();
@@ -570,7 +564,7 @@ private:
     while (ii != ei) {
       unsigned long id = k * numActive + tid;
       if (id < window)
-        wl->push (Item(*ii, id));
+        wl->push(Item(*ii, id));
       else
         break;
       ++k;
@@ -593,14 +587,14 @@ private:
     size_t cur = 0;
     safe_advance(ii, tid, cur, dist);
     while (ii != ei) {
-      if (windowElement && !comp (*ii, *windowElement))
+      if (windowElement && !comp(*ii, *windowElement))
         break;
-      wl->push (Item (*ii, 0));
+      wl->push(Item(*ii, 0));
       safe_advance(ii, numActive, cur, dist);
     }
 
     while (ii != ei) {
-      if (mostElement && !comp (*ii, *mostElement))
+      if (mostElement && !comp(*ii, *mostElement))
         break;
       reserve.push(Item(*ii, 0));
       safe_advance(ii, numActive, cur, dist);
@@ -631,23 +625,23 @@ private:
 
     if (!mostElement) {
       mostElement = other.mostElement;
-    } else if (other.mostElement && comp (*mostElement, *other.mostElement)) {
+    } else if (other.mostElement && comp(*mostElement, *other.mostElement)) {
       mostElement = other.mostElement;
     }
 
     if (!windowElement) {
       windowElement = other.windowElement;
-    } else if (other.windowElement && comp (*windowElement, *other.windowElement)) {
+    } else if (other.windowElement && comp(*windowElement, *other.windowElement)) {
       windowElement = other.windowElement;
     }
   }
 
-  void popNewReserve (const CompareTy& comp) {
+  void popNewReserve(const CompareTy& comp) {
     std::pop_heap(newReserve.begin(), newReserve.end(), HeapCompare(comp));
     newReserve.pop_back();
   }
 
-  void pushNewReserve (const T& val, const CompareTy& comp) {
+  void pushNewReserve(const T& val, const CompareTy& comp) {
     newReserve.push_back(val);
     std::push_heap(newReserve.begin(), newReserve.end(), HeapCompare(comp));
   }
@@ -665,12 +659,10 @@ private:
   }
 
 public:
-
   void clear() {
     // itemPoolReset();
     heap.clear();
   }
-
 
   void incrementIterations() {
     ++iterations;
@@ -681,8 +673,8 @@ public:
   }
 
   void assertLimits(const T& val, const CompareTy& comp) {
-    assert(!windowElement || comp (val, *windowElement));
-    assert(!mostElement || comp (val, *mostElement));
+    assert(!windowElement || comp(val, *windowElement));
+    assert(!mostElement || comp(val, *mostElement));
   }
 
   template<typename WL>
@@ -1046,7 +1038,7 @@ class DMergeManager<OptionsTy,typename boost::enable_if<MergeTraits<OptionsTy> >
     const CompareTy& comp;
     CompareNewItems(const CompareTy& c): comp(c) { }
     bool operator()(const NewItem& a, const NewItem& b) const {
-      return comp (a.val, b.val);
+      return comp(a.val, b.val);
     }
   };
 
@@ -1132,7 +1124,7 @@ public:
       mlocal.pushNewReserve(val, comp);
     } else {
       // TODO: account for this work in calculateWindow
-      wl->push(Item (val, 0));
+      wl->push(Item(val, 0));
       nextCommit = true;
     }
   }
@@ -1180,7 +1172,7 @@ public:
       mlocal.initialWindow(this->numActive);
       
       assert(ii == ei || (mlocal.windowElement && mlocal.mostElement));
-      assert((!mlocal.windowElement && !mlocal.mostElement) || !comp (*mlocal.mostElement, *mlocal.windowElement));
+      assert((!mlocal.windowElement && !mlocal.mostElement) || !comp(*mlocal.mostElement, *mlocal.windowElement));
 
       // No new items; we just have the most element X from the previous round.
       // The most and window elements are exclusive of the range that they
@@ -1189,21 +1181,21 @@ public:
       // round, but the downside is that we will never return to windowed execution.
 
       // TODO: improve this
-      if (mlocal.windowElement && mlocal.mostElement && !comp (*mlocal.windowElement, *mlocal.mostElement)) {
+      if (mlocal.windowElement && mlocal.mostElement && !comp(*mlocal.windowElement, *mlocal.mostElement)) {
         mlocal.windowElement = mlocal.mostElement = boost::optional<T>();
         for (; ii != ei; ++ii) {
-          wl->push(Item (ii->val, 0));
+          wl->push(Item(ii->val, 0));
         }
       }
 
       for (; ii != ei; ++ii) {
-        if (!comp (ii->val, *mlocal.windowElement))
+        if (!comp(ii->val, *mlocal.windowElement))
           break; 
-        wl->push(Item (ii->val, 0));
+        wl->push(Item(ii->val, 0));
       }
 
       for (; ii != ei; ++ii) {
-        if (!comp (ii->val, *mlocal.mostElement))
+        if (!comp(ii->val, *mlocal.mostElement))
           break;
         mlocal.reserve.push(Item(ii->val, 0));
       }
@@ -1218,7 +1210,7 @@ public:
       for (; ii != ei; ++ii) {
         unsigned long id = ii->parent;
         if (id < mlocal.window)
-          wl->push(Item (ii->val, id));
+          wl->push(Item(ii->val, id));
         else
           break;
       }
@@ -1433,12 +1425,12 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
 
     DetContext* ctx = NULL;
     if (useLocalState) {
-      ctx = tld.localPending.push(make_context (*p, options.comp, typename OptionsTy::Tag ()));
+      ctx = tld.localPending.push(make_context(*p, options.comp, typename OptionsTy::Tag()));
     } else {
-      ctx = pending.push(make_context (*p, options.comp, typename OptionsTy::Tag ()));
+      ctx = pending.push(make_context(*p, options.comp, typename OptionsTy::Tag()));
     }
 
-    assert (ctx != NULL);
+    assert(ctx != NULL);
 
     mlocal.incrementIterations();
     bool commit = true;
@@ -1447,10 +1439,10 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
       // cnx->set_comp(&options.comp);
       // cnx->set_comp_data(mlocal.itemPoolPush(p->item));
       // mlocal.assertLimits(p->item, options.comp);
-      mlocal.assertLimits (ctx->item.val, options.comp);
+      mlocal.assertLimits(ctx->item.val, options.comp);
     }
 
-    ctx->start_iteration ();
+    ctx->start_iteration();
     tld.stat.inc_iterations();
     setThreadContext(ctx);
 
@@ -1573,9 +1565,9 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
     }
 
     if (commit) {
-      ctx->commit_iteration ();
+      ctx->commit_iteration();
     } else {
-      ctx->cancel_iteration ();
+      ctx->cancel_iteration();
     }
 
 
@@ -1591,8 +1583,8 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
     tld.facing.resetAlloc();
 
   setThreadContext(0);
-  if (false && LL::getTID () == 0) {
-    GALOIS_DEBUG ("niter = %zd, ncommits = %zd", niter, ncommits);
+  if (false && LL::getTID() == 0) {
+    GALOIS_DEBUG("niter = %zd, ncommits = %zd", niter, ncommits);
   }
   return retval;
 }

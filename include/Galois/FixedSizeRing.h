@@ -147,12 +147,12 @@ public:
   }
 
   boost::optional<value_type> extract_front() {
-    boost::optional<value_type> retval;
     if (!empty()) {
-      retval = front();
+      boost::optional<value_type> retval(front());
       pop_front();
+      return retval;
     }
-    return retval;
+    return boost::optional<value_type>();
   }
 
   void pop_front() {
@@ -176,12 +176,12 @@ public:
   }
 
   boost::optional<value_type> extract_back() {
-    boost::optional<value_type> retval;
     if (!empty()) {
-      retval = back();
+      boost::optional<value_type> retval(back());
       pop_back();
+      return retval;
     }
-    return retval;
+    return boost::optional<value_type>();
   }
 
   void pop_back() {

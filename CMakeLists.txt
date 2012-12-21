@@ -98,9 +98,6 @@ if(USE_EXP)
   if(TBB_FOUND)
     add_definitions(-DGALOIS_USE_TBB -DTBB_USE_THREADING_TOOLS=0)
     include_directories(${TBB_INCLUDE_DIRS})
-  else()
-    # wget http://threadingbuildingblocks.org/uploads/77/173/3.0%20update%208/tbb30_20110704oss_lin.tgz
-    message(WARNING "TBB specified but not found; have your sourced TBB_INSTALL_DIR/bin/tbbvars.sh?")
   endif()
 
   set(USE_SUBVERSION_REVISION on)
