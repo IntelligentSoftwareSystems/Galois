@@ -406,20 +406,9 @@ public:
     barrier2.reinit(numActive);
   }
 
-  template<typename IterTy>
-  bool AddInitialWork(IterTy b, IterTy e) {
-    unsigned int a = numActive;
-    unsigned int id = LL::getTID();
-    unsigned dist = std::distance(b, e);
-    unsigned num = (dist + a - 1) / a; //round up
-    unsigned int A = std::min(num * id, dist);
-    unsigned int B = std::min(num * (id + 1), dist);
-    IterTy b2 = b;
-    IterTy e2 = b;
-    std::advance(b2, A);
-    std::advance(e2, B);
-    wls[0].push_initial(HIDDEN::WID(), b2, e2);
-    return true;
+  template<typename RangeTy>
+  void AddInitialWork(RangeTy range) {
+    wls[0].push_initial(HIDDEN::WID(), range.local_begin(), range.local_end());
   }
 
   void operator()() {

@@ -163,7 +163,7 @@ struct CutHillUnordered {
     }
 
     static void go(GNode source) {
-      count_levels cl = GaloisRuntime::do_all_impl(graph.begin(), graph.end(), count_levels(), default_reduce(), true);
+      count_levels cl = GaloisRuntime::do_all_impl(GaloisRuntime::makeStandardRange(graph.begin(), graph.end()), count_levels(), default_reduce(), true);
       level_count.swap(cl.counts);
       max_dist = cl.lmaxdist;
       read_offset.push_back(0);

@@ -60,38 +60,15 @@ struct DeterministicContext: public GaloisRuntime::SimpleRuntimeContext {
   typedef DItem<T> Item;
 
   Item item;
-  const CompareTy& comp;
+  const CompareTy* comp;
   bool not_ready;
 
   DeterministicContext(const Item& _item, const CompareTy& _comp): 
       SimpleRuntimeContext(true), 
       item(_item),
-      comp(_comp),
+      comp(&_comp),
       not_ready(false)
   { }
-
-  // XXX(ddn): assignment operator needed by boost::optional to return
-  // contexts from Worklists. Synthesized operator would not be able to
-  // deal with comp reference. Provide implementation that ignores that
-  // field as we won't need it by the time the context is returned. And
-  // while we're at it, define move assignment operator too.
-  DeterministicContext& operator=(DeterministicContext&& other) {
-    SimpleRuntimeContext::operator=(std::move(other));
-    if (this != &other) {
-      item = std::move(other.item);
-      not_ready = std::move(other.not_ready);
-    }
-    return *this;
-  }
-
-  DeterministicContext& operator=(const DeterministicContext& other) {
-    SimpleRuntimeContext::operator=(other);
-    if (this != &other) {
-      item = other.item;
-      not_ready = other.not_ready;
-    }
-    return *this;
-  }
 
   bool notReady() const { 
     return not_ready;
@@ -122,7 +99,7 @@ struct DeterministicContext: public GaloisRuntime::SimpleRuntimeContext {
         return;
       if (other) {
 
-        bool conflict = comp(*other, *this); // *other < *this
+        bool conflict = (*comp)(*other, *this); // *other < *this
         if (conflict) {
           // A lock that I want but can't get
           not_ready = true;
@@ -161,20 +138,6 @@ struct UnorderedContextComp {
   }
 };
 
-template<typename T, typename CompTy>
-DeterministicContext<T, OrderedContextComp<T, CompTy> > make_context(
-    const DItem<T>& item, const CompTy& comp, OrderedTag) {
-  typedef OrderedContextComp<T, CompTy> C;
-  return DeterministicContext<T, OrderedContextComp<T, CompTy> >(item, C(comp));
-}
-
-template<typename T, typename CompTy>
-DeterministicContext <T, UnorderedContextComp<T> > make_context(
-    const DItem<T>& item, const CompTy& comp, UnorderedTag) {
-  typedef UnorderedContextComp<T> C;
-  return DeterministicContext<T, UnorderedContextComp<T> >(item, C());
-}
-
 template<typename Function1Ty,typename Function2Ty>
 struct Options {
   static const bool needsStats = ForEachTraits<Function1Ty>::NeedsStats || ForEachTraits<Function2Ty>::NeedsStats;
@@ -188,15 +151,22 @@ struct OrderedOptions: public Options<_Function1Ty,_Function2Ty> {
   typedef _Function2Ty Function2Ty;
   typedef _T T;
   typedef _CompareTy CompareTy;
-  typedef DeterministicContext<T, OrderedContextComp<T, CompareTy> > DetContext;
+  typedef OrderedContextComp<T, CompareTy> ContextComp;
+  typedef DeterministicContext<T, ContextComp> DetContext;
   static const bool useOrdered = true;
   typedef OrderedTag Tag;
 
   Function1Ty& fn1;
   Function2Ty& fn2;
   CompareTy& comp;
+  ContextComp contextComp;
 
-  OrderedOptions(Function1Ty& fn1, Function2Ty& fn2, CompareTy& comp): fn1(fn1), fn2(fn2), comp(comp) { }
+  OrderedOptions(Function1Ty& fn1, Function2Ty& fn2, CompareTy& comp):
+    fn1(fn1), fn2(fn2), comp(comp), contextComp(comp) { }
+
+  DetContext make_context(const DItem<T>& item) const {
+    return DetContext(item, contextComp);
+  }
 };
 
 template<typename _T,typename _Function1Ty,typename _Function2Ty>
@@ -204,7 +174,8 @@ struct UnorderedOptions: public Options<_Function1Ty,_Function2Ty> {
   typedef _Function1Ty Function1Ty;
   typedef _Function2Ty Function2Ty;
   typedef _T T;
-  typedef DeterministicContext<T, UnorderedContextComp<T> > DetContext;
+  typedef UnorderedContextComp<T> ContextComp;
+  typedef DeterministicContext<T, ContextComp> DetContext;
   static const bool useOrdered = false;
   typedef UnorderedTag Tag;
   
@@ -219,8 +190,13 @@ struct UnorderedOptions: public Options<_Function1Ty,_Function2Ty> {
   Function1Ty& fn1;
   Function2Ty& fn2;
   CompareTy comp;
+  ContextComp contextComp;
 
   UnorderedOptions(Function1Ty& fn1, Function2Ty& fn2): fn1(fn1), fn2(fn2) { }
+
+  DetContext make_context(const DItem<T>& item) const {
+    return DetContext(item, contextComp);
+  }
 };
 
 //! Some template meta programming
@@ -1309,10 +1285,9 @@ public:
     }
   }
 
-  template<typename IterTy>
-  bool AddInitialWork(IterTy ii, IterTy ei) {
-    mergeManager.addInitialWork(ii, ei, &worklists[1]);
-    return true;
+  template<typename RangeTy>
+  void AddInitialWork(RangeTy range) {
+    mergeManager.addInitialWork(range.begin(), range.end(), &worklists[1]);
   }
 
   template<typename IterTy>
@@ -1425,9 +1400,9 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
 
     DetContext* ctx = NULL;
     if (useLocalState) {
-      ctx = tld.localPending.push(make_context(*p, options.comp, typename OptionsTy::Tag()));
+      ctx = tld.localPending.push(options.make_context(*p));
     } else {
-      ctx = pending.push(make_context(*p, options.comp, typename OptionsTy::Tag()));
+      ctx = pending.push(options.make_context(*p));
     }
 
     assert(ctx != NULL);
@@ -1596,11 +1571,9 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
 
 template<typename InitTy, typename WorkTy>
 static inline void for_each_det_impl(InitTy& init, WorkTy& W) {
-
-  W.presort(init.b, init.e);
+  W.presort(init.range.begin(), init.range.end());
 
   assert(!inGaloisForEach);
-
 
   inGaloisForEach = true;
   RunCommand w[4] = {Config::ref(init), 
@@ -1615,14 +1588,14 @@ static inline void for_each_det_impl(InitTy& init, WorkTy& W) {
 
 template<typename IterTy, typename ComparatorTy, typename NhFunc, typename OpFunc>
 static inline void for_each_ordered_2p(IterTy b, IterTy e, ComparatorTy comp, NhFunc f1, OpFunc f2, const char* loopname) {
-
-  typedef typename std::iterator_traits<IterTy>::value_type T;
+  typedef GaloisRuntime::StandardRange<IterTy> Range;
+  typedef typename Range::value_type T;
   typedef GaloisRuntime::DeterministicWork::OrderedOptions<T,NhFunc,OpFunc,ComparatorTy> OptionsTy;
   typedef GaloisRuntime::DeterministicWork::Executor<OptionsTy> WorkTy;
 
   OptionsTy options(f1, f2, comp);
   WorkTy W(options, loopname);
-  GaloisRuntime::Initializer<IterTy, WorkTy> init(b, e, W);
+  GaloisRuntime::Initializer<Range, WorkTy> init(Range(b, e), W);
   for_each_det_impl(init, W);
 }
 
@@ -1634,13 +1607,14 @@ namespace Galois {
 //! Deterministic execution with prefix 
 template<typename IterTy, typename Function1Ty, typename Function2Ty>
 static inline void for_each_det(IterTy b, IterTy e, Function1Ty f1, Function2Ty f2, const char* loopname = 0) {
-  typedef typename std::iterator_traits<IterTy>::value_type T;
+  typedef GaloisRuntime::StandardRange<IterTy> Range;
+  typedef typename Range::value_type T;
   typedef GaloisRuntime::DeterministicWork::UnorderedOptions<T,Function1Ty,Function2Ty> OptionsTy;
   typedef GaloisRuntime::DeterministicWork::Executor<OptionsTy> WorkTy;
 
   OptionsTy options(f1, f2);
   WorkTy W(options, loopname);
-  GaloisRuntime::Initializer<IterTy, WorkTy> init(b, e, W);
+  GaloisRuntime::Initializer<Range, WorkTy> init(Range(b, e), W);
   GaloisRuntime::for_each_det_impl(init, W);
 }
 

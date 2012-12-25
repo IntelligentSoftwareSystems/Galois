@@ -120,9 +120,9 @@ public:
       push(*b++);
   }
 
-  template<typename Iter>
-  void push_initial(Iter b, Iter e) {
-    push(b, e);
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    push(range.begin(), range.end());
   }
 
   boost::optional<value_type> pop() {
@@ -238,9 +238,9 @@ public:
     wl.push(b,e);
   }
 
-  template<typename Iter>
-  void push_initial(Iter b, Iter e) {
-    wl.push_initial(b,e);
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    wl.push_initial(range);
   }
 
   boost::optional<value_type> pop() {
@@ -288,10 +288,10 @@ public:
   }
 
   //These cannot have noinline in gcc, which makes this semi-useless
-  template<typename Iter>
+  template<typename RangeTy>
   GALOIS_ATTRIBUTE_NOINLINE
-  void push_initial(Iter b, Iter e) {
-    wl.push_initial(b, e);
+  void push_initial(RangeTy range) {
+    wl.push_initial(range);
   }
 
   GALOIS_ATTRIBUTE_NOINLINE

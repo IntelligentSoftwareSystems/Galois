@@ -86,8 +86,8 @@ public:
 
   //! push initial range onto the queue
   //! called with the same b and e on each thread
-  template<typename Iter>
-  void push_initial(Iter b, Iter e) { abort(); }
+  template<typename RangeTy>
+  void push_initial(RangeTy) { abort(); }
 
   //Optional, but this is the likely interface for stealing
   //! steal from a similar worklist
@@ -101,6 +101,7 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
+#if 0
 template<typename Iter>
 void fill_work(Iter& b, Iter& e) {
   unsigned int a = galoisActiveThreads;
@@ -121,7 +122,7 @@ void fill_work(WL& wl, Iter b, Iter e) {
   fill_work(b2, e2);
   wl.push(b2, e2);
 }
-
+#endif
 
 template<typename T = int, bool concurrent = true>
 class LIFO : private boost::noncopyable, private LL::PaddedLock<concurrent> {
@@ -156,10 +157,10 @@ public:
     unlock();
   }
 
-  template<typename Iter>
-  void push_initial(Iter b, Iter e) {
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
     if (LL::getTID() == 0)
-      push(b,e);
+      push(range.begin(), range.end());
   }
 
   boost::optional<value_type> steal(LIFO& victim, bool half, bool pop) {
@@ -234,10 +235,10 @@ public:
     unlock();
   }
 
-  template<typename Iter>
-  void push_initial(Iter b, Iter e) {
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
     if (LL::getTID() == 0)
-      push(b,e);
+      push(range.begin(), range.end());
   }
 
   void steal(FIFO& victim) {
@@ -296,10 +297,10 @@ public:
     unlock();
   }
 
-  template<typename Iter>
-  void push_initial(Iter b, Iter e) {
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
     if (LL::getTID() == 0)
-      push(b,e);
+      push(range.begin(), range.end());
   }
 
   boost::optional<value_type> pop() {
@@ -447,9 +448,9 @@ class OrderedByIntegerMetric : private boost::noncopyable {
       push(*b++);
   }
 
-  template<typename Iter>
-  void push_initial(Iter b, Iter e) {
-    fill_work(*this, b, e);
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    push(range.local_begin(), range.local_end());
   }
 
   boost::optional<value_type> pop() {
@@ -515,9 +516,9 @@ public:
     local.getLocal()->push(b,e);
   }
 
-  template<typename Iter>
-  void push_initial(Iter b, Iter e) {
-    global.push_initial(b,e);
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    global.push_initial(range);
   }
 
   boost::optional<value_type> pop() {
@@ -656,9 +657,9 @@ public:
       pushi(*b++, n);
   }
 
-  template<typename Iter>
-  void push_initial(Iter b, Iter e) {
-    fill_work(*this, b, e);
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    push(range.local_begin(), range.local_end());
   }
 
   boost::optional<value_type> pop()  {
@@ -706,276 +707,6 @@ template<int chunksize=64, typename T = int, bool concurrent=true>
 class dChunkedLIFO : public ChunkedMaster<T, ConExtLinkedStack, true, true, chunksize, concurrent> {};
 GALOIS_WLCOMPILECHECK(dChunkedLIFO)
 
-//FIXME: make this valid for input iterators (e.g. no default constructor)
-template<typename IterTy = int*>
-class ForwardAccessRange {
-  //! Thread-local data
-  struct TLD {
-    IterTy begin;
-    IterTy end;
-  };
-
-  PerThreadStorage<TLD> tlds;
-  
-public:
-
-  //! T is the value type of the WL
-  typedef typename std::iterator_traits<IterTy>::value_type value_type;
-
-  template<bool newconcurrent>
-  struct rethread {
-    typedef ForwardAccessRange<IterTy> WL;
-  };
-
-  template<typename Tnew>
-  struct retype {
-    typedef ForwardAccessRange<IterTy> WL;
-  };
-
-  //! push a value onto the queue
-  void push(const value_type& val) {
-    GALOIS_ERROR(true, "not implemented");
-  }
-
-  //! push a range onto the queue
-  template<typename Iter>
-  void push(Iter b, Iter e) {
-    if (b == e)
-      return;
-    GALOIS_ERROR(true, "not implemented");
-  }
-
-  //stagger each thread's start item
-  void push_initial(IterTy b, IterTy e) {
-    TLD& tld = *tlds.getLocal();
-    tld.begin = Galois::safe_advance(b, e, LL::getTID());
-    tld.end = e;
-  }
-
-  //! pop a value from the queue.
-  // move through range in num thread strides
-  boost::optional<value_type> pop() {
-    TLD& tld = *tlds.getLocal();
-    if (tld.begin != tld.end) {
-      boost::optional<value_type> retval = *tld.begin;
-      tld.begin = Galois::safe_advance(tld.begin, tld.end, galoisActiveThreads);
-      assert(retval);
-      return retval;
-    }
-    return boost::optional<value_type>();
-  }
-};
-GALOIS_WLCOMPILECHECK(ForwardAccessRange)
-
-template<bool Stealing=false, typename IterTy = int*>
-class RandomAccessRange {
-public:
-  //! T is the value type of the WL
-  typedef typename std::iterator_traits<IterTy>::value_type value_type;
-
-private:
-  //! Thread-local data
-  struct TLD {
-    IterTy begin;
-    IterTy end;
-    IterTy stealBegin;
-    IterTy stealEnd;
-    LL::SimpleLock<true> stealLock;
-  };
-
-  PerThreadStorage<TLD> tlds;
-
-  bool do_steal(TLD& stld, TLD& otld) {
-    bool retval = false;
-    otld.stealLock.lock();
-    if (otld.stealBegin != otld.stealEnd) {
-      stld.begin = otld.stealBegin;
-      otld.stealBegin = stld.end = Galois::split_range(otld.stealBegin, otld.stealEnd);
-      retval = true;
-    }
-    otld.stealLock.unlock();
-    return retval;
-  }
-
-  void try_steal(TLD& tld) {
-    //First try stealing from self
-    if (do_steal(tld,tld))
-      return;
-    //Then try stealing from neighbor
-    if (do_steal(tld, *tlds.getRemote((LL::getTID() + 1) % galoisActiveThreads))) {
-      //redistribute stolen items for neighbor to steal too
-      if (std::distance(tld.begin, tld.end) > 1) {
-	tld.stealLock.lock();
-	tld.stealEnd = tld.end;
-	tld.stealBegin = tld.end = Galois::split_range(tld.begin, tld.end);
-	tld.stealLock.unlock();
-      }
-    }
-  }
-
-  GALOIS_ATTRIBUTE_NOINLINE
-  boost::optional<value_type> pop_slowpath(TLD& tld) {
-    if (Stealing && tld.begin == tld.end)
-      try_steal(tld);
-    if (tld.begin != tld.end)
-      return boost::optional<value_type>(*tld.begin++);
-    return boost::optional<value_type>();
-  }
-
-public:
-  template<bool newconcurrent>
-  struct rethread {
-    typedef RandomAccessRange<Stealing,IterTy> WL;
-  };
-
-  template<typename Tnew>
-  struct retype {
-    typedef RandomAccessRange<Stealing,IterTy> WL;
-  };
-
-  //! push a value onto the queue
-  void push(const value_type& val) {
-    GALOIS_ERROR(true, "not implemented");
-  }
-
-  //! push a range onto the queue
-  template<typename Iter>
-  void push(Iter b, Iter e) {
-    if (b == e)
-      return;
-    GALOIS_ERROR(true, "not implemented");
-  }
-
-  //stagger each thread's start item
-  void push_initial(IterTy b, IterTy e) {
-    TLD& tld = *tlds.getLocal();
-    tld.begin = b;
-    tld.end = e;
-    fill_work(tld.begin, tld.end);
-
-    if (Stealing) {
-      tld.stealEnd = tld.end;
-      tld.stealBegin = tld.end = Galois::split_range(tld.begin, tld.end);
-    }
-  }
-
-  //! pop a value from the queue.
-  // move through range in num thread strides
-  boost::optional<value_type> pop() {
-    TLD& tld = *tlds.getLocal();
-    if (tld.begin != tld.end)
-      return boost::optional<value_type>(*tld.begin++);
-    return pop_slowpath(tld);
-  }
-};
-GALOIS_WLCOMPILECHECK(RandomAccessRange)
-
-//FIXME: make this more typed
-template<typename IterTy = int*>
-class LocalAccessRange {
-  //! Thread-local data
-  struct TLD {
-    IterTy begin;
-    IterTy end;
-  };
-
-  PerThreadStorage<TLD> tlds;
-  
-public:
-
-  //! T is the value type of the WL
-  typedef typename std::iterator_traits<IterTy>::value_type value_type;
-
-  template<bool newconcurrent>
-  struct rethread {
-    typedef LocalAccessRange<IterTy> WL;
-  };
-
-  template<typename Tnew>
-  struct retype {
-    typedef LocalAccessRange<IterTy> WL;
-  };
-
-  //! push a value onto the queue
-  void push(const value_type& val) {
-    GALOIS_ERROR(true, "not implemented");
-  }
-
-  //! push a range onto the queue
-  template<typename Iter>
-  void push(Iter b, Iter e) {
-    if (b == e)
-      return;
-    GALOIS_ERROR(true, "not implemented");
-  }
-
-  //stagger each thread's start item
-  template<typename LocalTy>
-  void push_initial(LocalTy b, LocalTy e) {
-    TLD& tld = *tlds.getLocal();
-    tld.begin = b.resolve();
-    tld.end = e.resolve();
-  }
-
-  //! pop a value from the queue.
-  // move through range in num thread strides
-  boost::optional<value_type> pop() {
-    TLD& tld = *tlds.getLocal();
-    if (tld.begin != tld.end) {
-      boost::optional<value_type> retval = *tld.begin++;
-      assert(retval);
-      return retval;
-    }
-    return boost::optional<value_type>();
-  }
-};
-//GALOIS_WLCOMPILECHECK(LocalAccessRange);
-
-//FIXME: make this more typed
-template<typename IterTy, typename WLTy>
-class LocalAccessDist {
-  WLTy w;
-  
-public:
-
-  //! T is the value type of the WL
-  typedef typename std::iterator_traits<IterTy>::value_type value_type;
-
-  template<bool newconcurrent>
-  struct rethread {
-    typedef LocalAccessDist<IterTy, typename WLTy::template rethread<newconcurrent>::WL > WL;
-  };
-
-  template<typename Tnew>
-  struct retype {
-    typedef LocalAccessDist<IterTy, typename WLTy::template retype<Tnew>::WL > WL;
-  };
-
-  //! push a value onto the queue
-  void push(const value_type& val) {
-    w.push();
-  }
-
-  //! push a range onto the queue
-  template<typename Iter>
-  void push(Iter b, Iter e) {
-    w.push(b,e);
-  }
-
-  //stagger each thread's start item
-  template<typename LocalTy>
-  void push_initial(LocalTy b, LocalTy e) {
-    w.push(b.resolve(), e.resolve());
-  }
-
-  //! pop a value from the queue.
-  // move through range in num thread strides
-  boost::optional<value_type> pop() {
-    return w.pop();
-  }
-};
-//GALOIS_WLCOMPILECHECK(LocalAccessDist);
-
 template<typename OwnerFn=DummyIndexer<int>, typename WLTy=ChunkedLIFO<256>, typename T = int>
 class OwnerComputesWL : private boost::noncopyable {
   typedef typename WLTy::template retype<T>::WL lWLTy;
@@ -1017,9 +748,9 @@ public:
       push(*b++);
   }
 
-  template<typename ItTy>
-  void push_initial(ItTy b, ItTy e) {
-    fill_work(*this, b, e);
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    push(range.local_begin(), range.local_end());
     for (unsigned int x = 0; x < pushBuffer.size(); ++x)
       pushBuffer.getRemote(x)->flush();
   }
@@ -1082,9 +813,9 @@ class BulkSynchronous : private boost::noncopyable {
       push(*b++);
   }
 
-  template<typename ItTy>
-  void push_initial(ItTy b, ItTy e) {
-    fill_work(*this, b, e);
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    push(range.local_begin(), range.local_end());
     tlds.getLocal()->round = 1;
     some.data = true;
   }

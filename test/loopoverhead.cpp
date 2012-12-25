@@ -15,7 +15,6 @@ struct emp {
 };
 
 void t_stl() {
-
   std::vector<unsigned> V(1024);
   //unsigned M = GaloisRuntime::LL::getMaxThreads();
 
@@ -40,7 +39,6 @@ void t_doall() {
   std::cout << "doall:\nIterxSize\n";
 
   while (M) {
-    
     Galois::setActiveThreads(M); //GaloisRuntime::LL::getMaxThreads());
     std::cout << "Using " << M << " threads\n";
    
@@ -71,8 +69,7 @@ void t_foreach() {
     Galois::Timer t;
     t.start();
     for (unsigned x = 0; x < iter; ++x)
-      Galois::for_each<GaloisRuntime::WorkList::RandomAccessRange<false,std::vector<unsigned>::iterator> >(V.begin(), V.end(), emp());
-    //      Galois::for_each<GaloisRuntime::WorkList::dChunkedFIFO<> >(V.begin(), V.end(), emp());
+      Galois::for_each(V.begin(), V.end(), emp());
     t.stop();
 
     std::cout << "Galois(" << iter << "x" << V.size() << "): " << t.get() << "\n";

@@ -369,9 +369,9 @@ public:
       push_internal(tld, n, *b++);
   }
 
-  template<typename Iter>
-  void push_initial(Iter b, Iter e)  {
-    fill_work(*this, b, e);
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    push(range.local_begin(), range.local_end());
   }
 
   boost::optional<value_type> pop() {
@@ -530,10 +530,9 @@ public:
     local.getLocal()->push(b,e);
   }
 
-  template<typename Iter>
-  void push_initial(Iter b, Iter e) {
-    //    fill_work(*this, b, e);
-    fill_work_l1(b,e);
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    fill_work_l1(range.begin(), range.end());
   }
 
   boost::optional<value_type> pop() {
@@ -571,9 +570,9 @@ public:
     local.getLocal()->push(b, e);
   }
 
-  template<typename Iter>
-  void push_initial(Iter b, Iter e) {
-    fill_work(*local.getLocal(), b, e);
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    local.getLocal()->push(range.local_begin(), range.local_end());
   }
 
   boost::optional<value_type> pop() {
@@ -701,9 +700,9 @@ public:
       pushi(*b++, n);
   }
 
-  template<typename Iter>
-  void push_initial(Iter b, Iter e) {
-    fill_work(*this, b, e);
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    push(range.local_begin(), range.local_end());
   }
 
   boost::optional<value_type> pop()  {

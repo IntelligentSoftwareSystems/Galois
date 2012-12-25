@@ -53,7 +53,8 @@ struct count_if_reducer {
 template<class InputIterator, class Predicate>
 ptrdiff_t count_if(InputIterator first, InputIterator last, Predicate pred)
 {
-  return GaloisRuntime::do_all_impl(first, last, count_if_helper<Predicate>(pred), count_if_reducer(), true).ret;
+  return GaloisRuntime::do_all_impl(GaloisRuntime::makeStandardRange(first, last),
+      count_if_helper<Predicate>(pred), count_if_reducer(), true).ret;
 }
 
 //! Modify an iterator so that *it == it
@@ -97,9 +98,12 @@ InputIterator find_if(InputIterator first, InputIterator last, Predicate pred)
 {
   typedef find_if_helper<InputIterator,Predicate> HelperTy;
   typedef typename HelperTy::AccumulatorTy AccumulatorTy;
+  typedef GaloisRuntime::WorkList::dChunkedFIFO<256> WL;
   AccumulatorTy accum;
   HelperTy helper(accum, pred);
-  GaloisRuntime::for_each_impl<GaloisRuntime::WorkList::dChunkedFIFO<256> >(NoDerefIterator<InputIterator>(first), NoDerefIterator<InputIterator>(last), helper, 0);
+  GaloisRuntime::for_each_impl<WL>(GaloisRuntime::makeStandardRange(
+        NoDerefIterator<InputIterator>(first),
+        NoDerefIterator<InputIterator>(last)), helper, 0);
   for (unsigned i = 0; i < accum.size(); ++i) {
     if (*accum.getRemote(i))
       return **accum.getRemote(i);
@@ -288,12 +292,15 @@ void sort(RandomAccessIterator first, RandomAccessIterator last, Compare comp) {
   Galois::for_each<GaloisRuntime::WorkList::dChunkedFIFO<1> >(work.begin(), work.end(), parsort());
   //Galois::for_each<GaloisRuntime::WorkList::FIFO<> >(std::make_pair(first,last), P);
 #else
-  std::pair<RandomAccessIterator,RandomAccessIterator> initial[1] = { std::make_pair(first, last) };
-  GaloisRuntime::for_each_impl<GaloisRuntime::WorkList::dChunkedFIFO<1> >(&initial[0], &initial[1], sort_helper<Compare>(comp), 0);
+  typedef GaloisRuntime::WorkList::dChunkedFIFO<1> WL;
+  typedef std::pair<RandomAccessIterator,RandomAccessIterator> Pair;
+  Pair initial[1] = { std::make_pair(first, last) };
+
+  GaloisRuntime::for_each_impl<WL>(GaloisRuntime::makeStandardRange(&initial[0], &initial[1]), sort_helper<Compare>(comp), 0);
 #endif
 }
 
-template <class RandomAccessIterator>
+template<class RandomAccessIterator>
 void sort(RandomAccessIterator first, RandomAccessIterator last) {
   Galois::ParallelSTL::sort(first, last, std::less<typename std::iterator_traits<RandomAccessIterator>::value_type>());
 }
@@ -320,7 +327,9 @@ struct accumulate_helper_reduce {
 
 template <class InputIterator, class T, typename BinaryOperation>
 T accumulate (InputIterator first, InputIterator last, T init, BinaryOperation binary_op) {
-  return GaloisRuntime::do_all_impl(first, last, accumulate_helper<T,BinaryOperation>(init, binary_op), accumulate_helper_reduce<BinaryOperation>(binary_op), true).init;
+  return GaloisRuntime::do_all_impl(GaloisRuntime::makeStandardRange(first, last),
+      accumulate_helper<T,BinaryOperation>(init, binary_op),
+      accumulate_helper_reduce<BinaryOperation>(binary_op), true).init;
 }
 
 template<class InputIterator, class T>
@@ -349,7 +358,7 @@ struct map_reduce_helper {
 
 template<class InputIterator, class MapFn, class T, class ReduceFn>
 T map_reduce(InputIterator first, InputIterator last, MapFn fn, T init, ReduceFn reduce) {
-  return GaloisRuntime::do_all_impl(first, last,
+  return GaloisRuntime::do_all_impl(GaloisRuntime::makeStandardRange(first, last),
       map_reduce_helper<T,MapFn,ReduceFn>(init, fn, reduce),
       accumulate_helper_reduce<ReduceFn>(reduce), true).init;
 }

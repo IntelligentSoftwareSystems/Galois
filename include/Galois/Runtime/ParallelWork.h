@@ -29,30 +29,30 @@
 #define GALOIS_RUNTIME_PARALLELWORK_H
 
 #include "Galois/Mem.h"
-#include "Galois/Runtime/ForEachTraits.h"
 #include "Galois/Runtime/Config.h"
-#include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Context.h"
-#include "Galois/Runtime/ThreadPool.h"
-#include "Galois/Runtime/Termination.h"
+#include "Galois/Runtime/ForEachTraits.h"
 #include "Galois/Runtime/LoopHooks.h"
-#include "Galois/Runtime/WorkList.h"
+#include "Galois/Runtime/Support.h"
+#include "Galois/Runtime/Range.h"
+#include "Galois/Runtime/Termination.h"
+#include "Galois/Runtime/ThreadPool.h"
 #include "Galois/Runtime/UserContextAccess.h"
+#include "Galois/Runtime/WorkList.h"
 
 #include <algorithm>
 
 namespace GaloisRuntime {
 
-template<typename T1, typename T2>
+template<typename RangeTy, typename WorkTy>
 struct Initializer {
-  T1 b;
-  T1 e;
-  T2& g;
+  RangeTy range;
+  WorkTy& work;
   
-  Initializer(const T1& _b, const T1& _e, T2& _g) :b(_b), e(_e), g(_g) {}
+  Initializer(const RangeTy& r, WorkTy& w): range(r), work(w) { }
 
-  void operator()(void) {
-    g.AddInitialWork(b, e);
+  void operator()() {
+    work.AddInitialWork(range);
   }
 };
 
@@ -260,10 +260,9 @@ public:
   template<typename W>
   ForEachWork(W& w, FunctionTy& f, const char* l): wl(w), function(f), loopname(l), broke(false) { }
 
-  template<typename Iter>
-  void AddInitialWork(Iter b, Iter e) {
-    // term.initializeThread();
-    wl.push_initial(b,e);
+  template<typename RangeTy>
+  void AddInitialWork(RangeTy range) {
+    wl.push_initial(range);
   }
 
   void operator()() {
@@ -277,59 +276,23 @@ public:
 };
 
 
-template<typename WLTy, typename IterTy, typename FunctionTy>
-void for_each_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
+template<typename WLTy, typename RangeTy, typename FunctionTy>
+void for_each_impl(RangeTy range, FunctionTy f, const char* loopname) {
   assert(!inGaloisForEach);
 
   inGaloisForEach = true;
 
-  typedef typename std::iterator_traits<IterTy>::value_type T;
-  typedef ForEachWork<WLTy,T,FunctionTy> WorkTy;
+  typedef typename RangeTy::value_type T;
+  typedef ForEachWork<WLTy, T, FunctionTy> WorkTy;
 
   WorkTy W(f, loopname);
-  Initializer<IterTy, WorkTy> init(b, e, W);
+  Initializer<RangeTy, WorkTy> init(range, W);
   RunCommand w[4] = {Config::ref(init), 
 		     Config::ref(getSystemBarrier()),
 		     Config::ref(W),
 		     Config::ref(getSystemBarrier())};
   getSystemThreadPool().run(&w[0], &w[4]);
   runAllLoopExitHandlers();
-  inGaloisForEach = false;
-}
-
-template<class FunctionTy>
-struct DoAllWrapper: public FunctionTy {
-  typedef int tt_does_not_need_stats;
-  typedef int tt_does_not_need_parallel_push;
-  typedef int tt_does_not_need_aborts;
-  DoAllWrapper(const FunctionTy& f) :FunctionTy(f) {}
-
-  template<typename T1, typename T2>
-  void operator()(T1& t, T2&) {
-    FunctionTy::operator()(t);
-  }
-};
-
-template<typename WLTy, typename IterTy, typename FunctionTy>
-void do_all_impl_old(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
-  assert(!inGaloisForEach);
-
-  inGaloisForEach = true;
-
-  typedef typename std::iterator_traits<IterTy>::value_type T;
-  typedef ForEachWork<WLTy,T,DoAllWrapper<FunctionTy> > WorkTy;
-
-  DoAllWrapper<FunctionTy> F(f);
-  WorkTy W(F, loopname);
-
-  Initializer<IterTy, WorkTy> init(b, e, W);
-  RunCommand w[4] = {Config::ref(init),
-		     Config::ref(getSystemBarrier()),
-		     Config::ref(W),
-		     Config::ref(getSystemBarrier())};
-  getSystemThreadPool().run(&w[0], &w[4]);
-  runAllLoopExitHandlers();
-
   inGaloisForEach = false;
 }
 
