@@ -83,8 +83,13 @@ void runTwoPhaseKruskal (
   EdgeCtxWL* nextWL = &perThrdWL;
   EdgeCtxWL* currWL = tmp;
 
+#ifdef GALOIS_USE_EXP
   Galois::do_all_choice (boost::counting_iterator<unsigned> (0), boost::counting_iterator<unsigned> (perThrdWL.numRows ()), 
       PreSort (perThrdWL), "pre_sort");
+#else
+  Galois::do_all (boost::counting_iterator<unsigned> (0), boost::counting_iterator<unsigned> (perThrdWL.numRows ()), 
+      PreSort (perThrdWL), "pre_sort");
+#endif
 
   while (!nextWL->empty_all ()) {
     ++round;
@@ -94,20 +99,30 @@ void runTwoPhaseKruskal (
 
     GaloisRuntime::beginSampling ();
     findTimer.start ();
+#ifdef GALOIS_USE_EXP
     Galois::do_all_choice (*currWL,
-    // GaloisRuntime::do_all_coupled (*currWL, 
         FindLoop (repVec, minEdgeCtxVec, findIter),
         "find_loop");
+#else
+    Galois::do_all (currWL->begin_all (), currWL->end_all (),
+        FindLoop (repVec, minEdgeCtxVec, findIter),
+        "find_loop");
+#endif
     findTimer.stop ();
     GaloisRuntime::endSampling ();
 
 
     // GaloisRuntime::beginSampling ();
     linkUpTimer.start ();
+#ifdef GALOIS_USE_EXP
     Galois::do_all_choice (*currWL,
-    // GaloisRuntime::do_all_coupled (*currWL, 
         LinkUpLoop<false> (repVec, minEdgeCtxVec, *nextWL, mstSum, linkUpIter),
         "link_up_loop");
+#else
+    Galois::do_all (currWL->begin_all (), currWL->end_all (),
+        LinkUpLoop<false> (repVec, minEdgeCtxVec, *nextWL, mstSum, linkUpIter),
+        "link_up_loop");
+#endif
     linkUpTimer.stop ();
     // GaloisRuntime::endSampling ();
 
@@ -187,8 +202,11 @@ void runMSTnaive (const size_t numNodes, const VecEdge& edges,
 
   EdgeCtxWL initWL;
 
+#ifdef GALOIS_USE_EXP
   Galois::do_all_choice (edges.begin (), edges.end (), FillUp (alloc, initWL), "fill_init");
-
+#else
+  Galois::do_all (edges.begin (), edges.end (), FillUp (alloc, initWL), "fill_init");
+#endif
   runningTime.start ();
 
   runTwoPhaseKruskal (initWL, repVec, minEdgeCtxVec, 

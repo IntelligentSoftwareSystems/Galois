@@ -31,10 +31,11 @@
 #include "Galois/Atomic.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Runtime/PerThreadWorkList.h"
-#include "Galois/Runtime/DoAllCoupled.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 
+#ifdef GALOIS_USE_EXP
 #include "Galois/DoAllWrap.h"
+#endif
 
 #include "Kruskal.h"
 
@@ -218,7 +219,11 @@ void partition_edges (Iter b, Iter e,
 
   Edge pivot = pick_kth (b, e, k);
 
+#ifdef GALOIS_USE_EXP
   Galois::do_all_choice (b, e, Partition (pivot, alloc, lighter, heavier), "partition_loop");
+#else
+  Galois::do_all (b, e, Partition (pivot, alloc, lighter, heavier), "partition_loop");
+#endif
 
   assert ((lighter.size_all () + heavier.size_all ()) == size_t (std::distance (b, e)));
 
@@ -510,10 +515,15 @@ void runMSTparallel (const size_t numNodes, const VecEdge& edges,
   lighter.clear_all ();
 
   filterTimer.start ();
+#ifdef GALOIS_USE_EXP
   Galois::do_all_choice (heavier,
-  // GaloisRuntime::do_all_coupled (heavier, 
       FilterSelfEdges (repVec, alloc, lighter),
       "filter_loop");
+#else
+  Galois::do_all (heavier.begin_all (), heavier.end_all (),
+      FilterSelfEdges (repVec, alloc, lighter),
+      "filter_loop");
+#endif
   filterTimer.stop ();
 
 

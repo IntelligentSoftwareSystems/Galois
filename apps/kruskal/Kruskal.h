@@ -44,7 +44,7 @@
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
 #include "Galois/Galois.h"
-#include "Galois/GaloisUnsafe.h"
+//#include "Galois/GaloisUnsafe.h"
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Graphs/LCGraph.h"
 #include "Galois/Runtime/WorkList.h"
