@@ -132,16 +132,16 @@ struct H_PERCPU {
 
 struct H_PERPACKAGE {
   unsigned myEID() const {
-    return LL::getPackageForThread(LL::getTID());
+    return LL::getPackageForSelf(LL::getTID());
   }
   unsigned getMaxSize() const {
     return LL::getMaxPackages();
   }
   unsigned otherEID(unsigned i) const {
-    return LL::getPackageForThreadInternal(i);
+    return LL::getPackageForThread(i);
   }
   bool LocalLeader(unsigned i) const {
-    return LL::isLeaderForPackage(i);
+    return LL::isPackageLeaderForSelf(i);
   }
 };
 

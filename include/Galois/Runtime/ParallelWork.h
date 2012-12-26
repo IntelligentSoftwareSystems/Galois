@@ -128,7 +128,7 @@ protected:
     tld.cnx.cancel_iteration();
     tld.stat.inc_conflicts(); //Class specialization handles opt
     if (recursiveAbort)
-      aborted.getRemote(LL::getLeaderForPackage(LL::getPackageForThread(LL::getTID()) / 2))->push(val);
+      aborted.getRemote(LL::getLeaderForPackage(LL::getPackageForSelf(LL::getTID()) / 2))->push(val);
     else
       aborted.getLocal()->push(val);
     //clear push buffer
@@ -266,7 +266,7 @@ public:
   }
 
   void operator()() {
-    if (LL::isLeaderForPackage(LL::getTID()) &&
+    if (LL::isPackageLeaderForSelf(LL::getTID()) &&
 	galoisActiveThreads > 1 && 
 	ForEachTraits<FunctionTy>::NeedsAborts)
       go<true>();

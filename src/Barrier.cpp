@@ -88,7 +88,7 @@ void GaloisRuntime::SimpleBarrier::reinit(int val, int init) {
     for (unsigned i = 0; i < plds.size(); ++i)
       plds.getRemote(i)->total = 0;
     for (int i = 0; i < val; ++i) {
-      int j = LL::getPackageForThreadInternal(i);
+      int j = LL::getPackageForThread(i);
       ++plds.getRemote(j)->total;
     }
 
@@ -256,7 +256,7 @@ void GaloisRuntime::TopoBarrier::_reinit(unsigned P) {
 	}
     }
     for (unsigned j = 0; j < P; ++j)
-      if (LL::getPackageForThreadInternal(j) == i && !LL::isLeaderForPackageInternal(j)) {
+      if (LL::getPackageForThread(j) == i && !LL::isPackageLeader(j)) {
 	++n.childnotready;
 	++n.havechild;
       }
@@ -285,7 +285,7 @@ void GaloisRuntime::TopoBarrier::wait() {
   unsigned id = LL::getTID();
   treenode& n = *nodes.getLocal();
   unsigned& s = *sense.getLocal();
-  bool leader = LL::isLeaderForPackage(id);
+  bool leader = LL::isPackageLeaderForSelf(id);
   //completion tree
   if (leader) {
     while (n.childnotready) { GaloisRuntime::LL::asmPause(); }

@@ -353,7 +353,7 @@ private:
   bool findRichInPackage (const unsigned poor_id, unsigned& rich_id) {
     bool succ = false;
 
-    unsigned my_pack = LL::getPackageForThread (poor_id);
+    unsigned my_pack = LL::getPackageForSelf (poor_id);
     unsigned per_pack = LL::getMaxThreads () / LL::getMaxPackages ();
 
     unsigned pack_begin = my_pack * per_pack;

@@ -1544,7 +1544,7 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
 
     //Failed, find minimum bin
     unsigned myID = LL::getTID();
-    bool localLeader = LL::isLeaderForPackage(myID);
+    bool localLeader = LL::isPackageLeaderForSelf(myID);
 
     unsigned msS = 0;
     if (BSP) {
@@ -2106,7 +2106,7 @@ public:
       return ret;
     
     //steal
-    int id = LL::getPackageForThread(LL::getTID());
+    int id = LL::getPackageForSelf(LL::getTID());
     for (int i = 0; i < (int) local.size(); ++i) {
       ++id;
       id %= local.size();

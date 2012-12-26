@@ -405,7 +405,7 @@ unsigned GaloisRuntime::LL::getMaxPackages() {
   return A.numPackages;
 }
 
-unsigned GaloisRuntime::LL::getPackageForThreadInternal(int id) {
+unsigned GaloisRuntime::LL::getPackageForThread(int id) {
   assert(id < (int)A.packages.size());
   return A.packages[id];
 }
@@ -415,7 +415,7 @@ unsigned GaloisRuntime::LL::getMaxPackageForThread(int id) {
   return A.maxPackage[id];
 }
 
-bool GaloisRuntime::LL::isLeaderForPackageInternal(int id) {
+bool GaloisRuntime::LL::isPackageLeader(int id) {
   assert(id < (int)A.packages.size());
   return A.leaders[A.packages[id]] == id;
 }

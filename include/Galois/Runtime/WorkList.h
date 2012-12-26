@@ -463,7 +463,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     //Failed, find minimum bin
     updateLocal(p);
     unsigned myID = LL::getTID();
-    bool localLeader = LL::isLeaderForPackage(myID);
+    bool localLeader = LL::isPackageLeaderForSelf(myID);
 
     IndexerValue msS = std::numeric_limits<IndexerValue>::min();
     if (BSP) {
@@ -734,9 +734,9 @@ public:
   void push(const value_type& val)  {
     unsigned int index = Fn(val);
     unsigned int tid = LL::getTID();
-    unsigned int mindex = LL::getPackageForThreadInternal(index);
+    unsigned int mindex = LL::getPackageForThread(index);
     //std::cerr << "[" << index << "," << index % active << "]\n";
-    if (mindex == LL::getPackageForThread(tid))
+    if (mindex == LL::getPackageForSelf(tid))
       items.getLocal()->push(val);
     else
       pushBuffer.getRemote(mindex)->push(val);
