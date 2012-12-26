@@ -109,13 +109,13 @@ public:
 template<bool isLazy>
 class LargeArray<void,isLazy>: boost::noncopyable {
 public:
-  typedef char* value_type;
+  typedef char value_type;
   typedef size_t size_type;
   typedef ptrdiff_t difference_type;
-  typedef char* reference;
-  typedef char* const_reference;
-  typedef char* pointer;
-  typedef char* const_pointer;
+  typedef value_type& reference;
+  typedef const value_type& const_reference;
+  typedef value_type* pointer;
+  typedef const value_type* const_pointer;
   typedef pointer iterator;
   typedef const_pointer const_iterator;
   const static bool has_value = false;

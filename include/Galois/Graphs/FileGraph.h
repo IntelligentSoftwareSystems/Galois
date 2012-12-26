@@ -364,9 +364,8 @@ void makeSymmetric(FileGraph& in, FileGraph& out) {
   }
 
   char *rawEdgeData = g.finish();
-  if (EdgeData::has_value) {
+  if (EdgeData::has_value)
     std::copy(edgeData.begin(), edgeData.end(), reinterpret_cast<edge_value_type*>(rawEdgeData));
-  }
 
   out.swap(g);
 }

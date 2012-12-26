@@ -22,6 +22,7 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 #include "Galois/Galois.h"
+#include "Galois/LargeArray.h"
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Graphs/LCGraph.h"
 #include "Galois/Graphs/Serialize.h"
@@ -36,6 +37,8 @@ namespace cll = llvm::cl;
 
 enum ConvertMode {
   edgelist2gr,
+  intedgelist2gr,
+  floatedgelist2gr,
   dimacs2gr,
   rmat2gr,
   stext2vgr,
@@ -52,6 +55,8 @@ static cll::opt<std::string> outputfilename(cll::Positional, cll::desc("<output 
 static cll::opt<ConvertMode> convertMode(cll::desc("Choose a conversion mode:"),
     cll::values(
       clEnumVal(edgelist2gr, "Convert edge list to binary gr (default)"),
+      clEnumVal(intedgelist2gr, "Convert weighted (int) edge list to binary gr (default)"),
+      clEnumVal(floatedgelist2gr, "Convert weighted (float) edge list to binary gr (default)"),
       clEnumVal(dimacs2gr, "Convert dimacs to binary gr"),
       clEnumVal(rmat2gr, "Convert rmat to binary gr"),
       clEnumVal(pbbs2vgr, "Convert pbbs graph to binary void gr"),
@@ -63,15 +68,18 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Choose a conversion mode:"),
       clEnumVal(gr2pbbs, "Convert binary gr to pbbs"),
       clEnumValEnd), cll::init(edgelist2gr));
 
-// TODO(ddn): Switch over to FileGraphParser interface instead of
-// Galois::Graphs::outputGraph()
+// TODO(ddn): Switch over to FileGraphParser interface instead of Galois::Graphs::outputGraph()
 
-
-//! Just a bunch of pairs
+//! Just a bunch of pairs or triples:
+//!   src dst weight?
+template<typename EdgeTy>
 void convert_edgelist2gr(const std::string& infilename, const std::string& outfilename) {
   typedef Galois::Graph::FileGraphParser Parser;
+  typedef Galois::LargeArray<EdgeTy,true> EdgeData;
+  typedef typename EdgeData::value_type edge_value_type;
 
   Parser p;
+  EdgeData edgeData;
   std::ifstream infile(infilename.c_str());
 
   size_t numNodes = 0;
@@ -80,7 +88,13 @@ void convert_edgelist2gr(const std::string& infilename, const std::string& outfi
   while (infile) {
     size_t src;
     size_t dst;
+    edge_value_type data;
+
     infile >> src >> dst;
+
+    if (EdgeData::has_value)
+      infile >> data;
+
     if (infile) {
       ++numEdges;
       if (src > numNodes)
@@ -93,6 +107,8 @@ void convert_edgelist2gr(const std::string& infilename, const std::string& outfi
   numNodes++;
   p.setNumNodes(numNodes);
   p.setNumEdges(numEdges);
+  p.setSizeofEdgeData(EdgeData::has_value ? sizeof(edge_value_type) : 0); 
+  edgeData.allocate(numEdges);
 
   infile.clear();
   infile.seekg(0, std::ios::beg);
@@ -100,7 +116,13 @@ void convert_edgelist2gr(const std::string& infilename, const std::string& outfi
   while (infile) {
     size_t src;
     size_t dst;
+    edge_value_type data;
+
     infile >> src >> dst;
+
+    if (EdgeData::has_value)
+      infile >> data;
+
     if (infile) {
       p.incrementDegree(src);
     }
@@ -112,13 +134,21 @@ void convert_edgelist2gr(const std::string& infilename, const std::string& outfi
   while (infile) {
     size_t src;
     size_t dst;
+    edge_value_type data;
+
     infile >> src >> dst;
+
+    if (EdgeData::has_value)
+      infile >> data;
+    
     if (infile) {
-      p.addNeighbor(src, dst);
+      edgeData.set(p.addNeighbor(src, dst), data);
     }
   }
 
-  p.finish();
+  char *rawEdgeData = p.finish();
+  if (EdgeData::has_value)
+    std::copy(edgeData.begin(), edgeData.end(), reinterpret_cast<edge_value_type*>(rawEdgeData));
 
   std::cout << "Finished reading graph. "
     << "Nodes: " << numNodes
@@ -594,8 +624,10 @@ int main(int argc, char** argv) {
     case gr2bsml: convert_gr2bsml<int32_t>(inputfilename, outputfilename); break;
     case gr2pbbs: convert_gr2pbbs(inputfilename, outputfilename); break;
     case dimacs2gr: convert_dimacs2gr(inputfilename, outputfilename); break;
+    case intedgelist2gr: convert_edgelist2gr<int>(inputfilename, outputfilename); break;
+    case floatedgelist2gr: convert_edgelist2gr<float>(inputfilename, outputfilename); break;
     default:
-    case edgelist2gr: convert_edgelist2gr(inputfilename, outputfilename); break;
+    case edgelist2gr: convert_edgelist2gr<void>(inputfilename, outputfilename); break;
   }
   return 0;
 }
