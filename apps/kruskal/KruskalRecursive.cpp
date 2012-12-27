@@ -25,10 +25,10 @@
  * @author <ahassaan@ices.utexas.edu>
  */
 
-#include "KruskalHand.h"
+#include "KruskalRecursive.h"
 
 int main (int argc, char* argv[]) {
-  kruskal::KruskalHand k;
+  kruskal::KruskalRecursive k;
   k.run (argc, argv);
   return 0;
 }

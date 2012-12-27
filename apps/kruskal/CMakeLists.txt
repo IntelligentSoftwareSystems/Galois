@@ -1,4 +1,7 @@
 app (KruskalSerial KruskalSerial.cpp)
 app (KruskalHand KruskalHand.cpp)
 app (KruskalNaive KruskalNaive.cpp)
-#app (KruskalOrdered KruskalOrdered.cpp)
+app (KruskalRecursive KruskalRecursive.cpp)
+app (KruskalWindow KruskalWindow.cpp)
+app (KruskalFilter KruskalFilter.cpp)
+# app (KruskalOrdered KruskalOrdered.cpp)

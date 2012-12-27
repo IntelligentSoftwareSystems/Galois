@@ -44,7 +44,7 @@
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
 #include "Galois/Galois.h"
-//#include "Galois/GaloisUnsafe.h"
+#include "Galois/GaloisUnsafe.h"
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Graphs/LCGraph.h"
 #include "Galois/Runtime/WorkList.h"
@@ -119,6 +119,16 @@ struct Edge: public InEdge {
       && (left.weight == right.weight);
   }
 
+  std::string str () const {
+    char s[256];
+    sprintf (s, "(id=%d,src=%d,dst=%d,weight=%d)", id, src, dst, weight);
+    return std::string (s);
+  }
+
+  friend std::ostream& operator << (std::ostream& out, const Edge& edge) {
+    return (out << edge.str ());
+  }
+
   struct Comparator {
     static inline int compare (const Edge& left, const Edge& right) {
       int d = left.weight - right.weight;
@@ -167,6 +177,9 @@ int findPCiter_int (const int node, V& repVec) {
   assert (repVec[node] >= 0);
 
   int rep = repVec[node];
+
+  if (repVec[rep] < 0) { return rep; }
+
   while (repVec[rep] >= 0) { 
     rep = repVec[rep]; 
   }
@@ -263,7 +276,7 @@ protected:
           }
 
         } else {
-          std::fprintf (stderr, "Warning: Ignoring self edge (%d, %d, %d)\n",
+          GALOIS_DEBUG ("Warning: Ignoring self edge (%d, %d, %d)\n",
               src, dst, ingraph.getEdgeData (*e));
         }
       }
@@ -349,6 +362,24 @@ protected:
 
   }
 
+
+  void writePBBSfile (const std::string& filename, const SetInEdge& edgeSet) {
+
+    FILE* outFile = std::fopen (filename.c_str (), "w");
+    assert (outFile != NULL);
+
+    fprintf (outFile, "WeightedEdgeArray\n");
+
+    for (SetInEdge::const_iterator i = edgeSet.begin ()
+        , endi = edgeSet.end (); i != endi; ++i) {
+
+      fprintf (outFile, "%d %d %e\n", i->src, i->dst, double (i->weight));
+    }
+
+    fclose (outFile);
+  }
+
+
 public:
 
   virtual void run (int argc, char* argv[]) {
@@ -374,6 +405,10 @@ public:
     t_read.start ();
     readGraph (filename, numNodes, edgeSet);
     // readPBBSfile (filename, numNodes, edgeSet);
+
+
+    // writePBBSfile ("edgeList.pbbs", edgeSet);
+    // std::exit (0);
 
     VecEdge edges;
 
