@@ -25,7 +25,7 @@
 #include "defs.h"
 #include "GMetisConfig.h"
 void projectNeighbors(GGraph* graph, int nparts, GNode node, int& ndegrees, int& ed) {
-  MetisNode& nodeData =graph->getData(node,Galois::NONE);
+  MetisNode& nodeData = graph->getData(node, Galois::NONE);
   std::vector<int> map(nparts,-1);
 	for (GGraph::edge_iterator jj = graph->edge_begin(node, Galois::NONE), eejj = graph->edge_end(node, Galois::NONE); jj != eejj; ++jj) {
 	  GNode neighbor = graph->getEdgeDst(jj);

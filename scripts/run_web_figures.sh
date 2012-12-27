@@ -24,8 +24,9 @@ SKIPPED=0
 
 run() {
   cmd="$@ -noverify"
-  shortname=$(echo "$cmd" | sed -e 's/apps\/\([^/]*\)\/.*/\1/')
-  logfile="$RESULTDIR/$shortname.log"
+  #shortname=$(echo "$cmd" | sed -e 's/apps\/\([^/]*\)\/.*/\1/')
+  name=$(echo "$1" | sed -e 's/\//_/g')
+  logfile="$RESULTDIR/$name.log"
   if [[ ! -e "$logfile"  && -x "$1" ]]; then
     echo -en '\033[1;31m'
     echo -n "$cmd"
@@ -41,19 +42,21 @@ run() {
 
 mkdir -p "$RESULTDIR"
 
-run apps/avi/AVIunordered -d 2 -n 1 -e 0.1 -f "$BASEINPUT/avi/10x10_42k.NEU.gz"
+run apps/avi/AVIodgExplicitNoLock -d 2 -n 1 -e 0.1 -f "$BASEINPUT/avi/10x10_42k.NEU.gz"
 run apps/barneshut/barneshut -n 50000 -steps 1 -seed 0
 run apps/betweennesscentrality/betweennesscentrality "$BASEINPUT/scalefree/rmat8-2e14.gr"
 run apps/bfs/bfs "$BASEINPUT/random/r4-2e26.gr"
+run apps/boruvka/boruvka2 "$BASEINPUT/road/USA-road-d.USA.gr"
 run apps/boruvka/boruvka "$BASEINPUT/road/USA-road-d.USA.gr"
 run apps/clustering/clustering -numPoints 10000
 run apps/delaunayrefinement/delaunayrefinement "$BASEINPUT/meshes/r5M"
 run apps/delaunaytriangulation/delaunaytriangulation "$BASEINPUT/meshes/r5M.node"
 run apps/des/DESunordered "$BASEINPUT/des/koggeStone64bit.net"
-#run apps/gmetis/gmetis -mtxinput "$BASEINPUT/matrix/cage15.mtx" 256
+#run apps/gmetis/gmetis -mtxinput "$BASEINPUT/fl/cage15/cage15.mtx" 256
 run apps/independentset/independentset "$BASEINPUT/inputs/random/r4-2e26.gr"
 run apps/matching/bipartite-mcm 1000000 100000000 10000 0
 run apps/preflowpush/preflowpush "$BASEINPUT/random/r4-2e23.gr" 0 100
+run apps/spanningtree/spanningtree "$BASEINPUT/inputs/random/r4-2e26.gr"
 run apps/sssp/sssp -delta 14 "$BASEINPUT/random/r4-2e26.gr"
 run apps/surveypropagation/surveypropagation 9 1000000 3000000 3
 
