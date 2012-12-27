@@ -57,7 +57,7 @@ class KruskalNaive: public Kruskal {
       size_t& mstWeight, size_t& totalIter) {
 
     
-    runMSTnaive (numNodes, edges, mstWeight, totalIter, UnionFindNaive<false> ());
+    runMSTnaive (numNodes, edges, mstWeight, totalIter, UnionFindNaive<true> ());
 
   }
 };
@@ -85,7 +85,7 @@ class KruskalFilter: public Kruskal {
   virtual void runMST (const size_t numNodes, const VecEdge& edges,
       size_t& mstWeight, size_t& totalIter) {
 
-    runMSTfilter (numNodes, edges, mstWeight, totalIter, UnionFindNaive<false> ());
+    runMSTfilter (numNodes, edges, mstWeight, totalIter, UnionFindNaive<true> ());
 
   }
 };

@@ -793,7 +793,7 @@ struct UnionFindWindow {
 };
 
 
-template <bool use_presort_tp=false> 
+template <bool use_presort_tp=true> 
 struct UnionFindNaive {
 
   void operator () (
