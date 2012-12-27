@@ -32,6 +32,10 @@
 #include "Galois/ParallelSTL/ParallelSTL.h"
 #include "llvm/Support/CommandLine.h"
 
+#ifdef GALOIS_USE_EXP
+#include "Galois/Runtime/BulkSynchronousWork.h"
+#endif
+
 #include "Lonestar/BoilerPlate.h"
 
 #include <utility>
@@ -46,7 +50,8 @@ const char* url = NULL;
 
 enum Algo {
   serial,
-  parallel
+  parallel,
+  exp_parallel
 };
 
 static cll::opt<std::string> inputFilename(cll::Positional, cll::desc("<input file>"), cll::Required);
@@ -55,6 +60,7 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
       clEnumVal(serial, "Serial"),
       clEnumVal(parallel, "Parallel"),
+      clEnumVal(exp_parallel, "Parallel (exp)"),
       clEnumValEnd), cll::init(parallel));
 
 typedef int EdgeData;
@@ -160,14 +166,16 @@ struct ParallelAlgo {
         return;
 
       GNode dst = graph.getEdgeDst(ii);
+
+      if (src == dst)
+        return;
+
       int weight = graph.getEdgeData(ii);
       Node& ddata = graph.getData(dst, Galois::NONE);
 
-      if (sdata.merge(&ddata)) {
-        mst.push(Edge(src, dst, weight));
-      }
+      sdata.lightest = weight;
 
-      findLightest(src, cur + 1, *self->next, false);
+      self->next->push(WorkItem(src, dst, weight, cur + 1));
     }
   };
 
@@ -236,9 +244,123 @@ struct ParallelAlgo {
   }
 };
 
+#ifdef GALOIS_USE_EXP
+/**
+ * Boruvka's algorithm. Implemented bulk-synchronously in order to avoid the
+ * need to merge edge lists.
+ */
+struct ExpParallelAlgo {
+  struct WorkItem {
+    Edge edge;
+    int cur;
+    WorkItem(const GNode& s, const GNode& d, const EdgeData& w, int c): edge(s, d, w), cur(c) { }
+  };
+
+  /**
+   * Find lightest edge between components leaving a node and add it to the
+   * worklist.
+   */
+  static bool findLightest(const GNode& src, int cur, Galois::UserContext<WorkItem>& ctx, bool updateLightest) {
+    Node& sdata = graph.getData(src, Galois::NONE);
+    Graph::edge_iterator ii = graph.edge_begin(src, Galois::NONE);
+    Graph::edge_iterator ei = graph.edge_end(src, Galois::NONE);
+
+    std::advance(ii, cur);
+
+    for (; ii != ei; ++ii, ++cur) {
+      GNode dst = graph.getEdgeDst(ii);
+      Node& ddata = graph.getData(dst, Galois::NONE);
+      Node* rep;
+      if ((rep = sdata.findAndCompress()) != ddata.findAndCompress()) {
+        int weight = graph.getEdgeData(ii);
+        ctx.push(WorkItem(src, dst, weight, cur));
+        int old;
+        while (updateLightest && weight < (old = rep->lightest)) {
+          if (__sync_bool_compare_and_swap(&rep->lightest, old, weight)) {
+            break;
+          }
+        }
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Merge step specialized for first round of the algorithm.
+   */
+  struct Initialize {
+    void operator()(const GNode& src, Galois::UserContext<WorkItem>& ctx) const {
+      Node& sdata = graph.getData(src, Galois::NONE);
+      Graph::edge_iterator ii = graph.edge_begin(src, Galois::NONE);
+      Graph::edge_iterator ei = graph.edge_end(src, Galois::NONE);
+
+      sdata.lightest = std::numeric_limits<EdgeData>::max();
+
+      if (ii == ei)
+        return;
+
+      GNode dst = graph.getEdgeDst(ii);
+
+      if (src == dst)
+        return;
+
+      int weight = graph.getEdgeData(ii);
+      Node& ddata = graph.getData(dst, Galois::NONE);
+
+      sdata.lightest = weight;
+
+      ctx.push(WorkItem(src, dst, weight, 1));
+    }
+  };
+
+  struct Merge {
+    void operator()(const WorkItem& item, Galois::UserContext<WorkItem>& ctx) {
+      GNode src = item.edge.src;
+      Node& sdata = graph.getData(src, Galois::NONE);
+      Node* rep = sdata.findAndCompress();
+
+      if (rep->lightest == item.edge.weight) {
+        GNode dst = item.edge.dst;
+        Node& ddata = graph.getData(dst, Galois::NONE);
+        if ((rep = sdata.merge(&ddata))) {
+          rep->lightest = std::numeric_limits<EdgeData>::max();
+          mst.push(Edge(src, dst, item.edge.weight));
+        }
+      }
+      ctx.push(item);
+    }
+  };
+
+  struct Find {
+    void operator()(const WorkItem& item, Galois::UserContext<WorkItem>& ctx) {
+      // Find true lightest out of each component
+      findLightest(item.edge.src, item.cur, ctx, true);
+    }
+  };
+
+  void operator()() {
+    typedef boost::fusion::vector<WorkItem,WorkItem> Items;
+
+    Galois::do_all_bs<Items>(
+        graph.begin(),
+        graph.end(),
+        boost::fusion::make_vector(Merge(), Find()),
+        Initialize());
+  }
+};
+#else
+struct ExpParallelAlgo {
+  void operator()() {
+    abort();
+  }
+};
+#endif
+
 struct SerialAlgo {
   void operator()() {
-    // TODO
+    abort(); // TODO
   }
 };
 
@@ -362,6 +484,7 @@ int main(int argc, char** argv) {
   switch (algo) {
     case serial: run<SerialAlgo>(); break;
     case parallel: run<ParallelAlgo>(); break;
+    case exp_parallel: run<ExpParallelAlgo>(); break;
     default: std::cerr << "Unknown algo: " << algo << "\n";
   }
   T.stop();
