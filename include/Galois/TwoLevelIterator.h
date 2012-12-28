@@ -25,8 +25,8 @@
  * @author <ahassaan@ices.utexas.edu>
  */
 
-#ifndef GALOIS_RUNTIME_TWO_LEVEL_ITER_H
-#define GALOIS_RUNTIME_TWO_LEVEL_ITER_H
+#ifndef GALOIS_TWO_LEVEL_ITER_H
+#define GALOIS_TWO_LEVEL_ITER_H
 
 #include <iterator>
 #include <functional>
@@ -34,7 +34,7 @@
 #include <cstdlib>
 #include <cassert>
 
-namespace GaloisRuntime {
+namespace Galois {
 
 // XXX: Assumptions
 // - Outer and Inner iterators are default- and copy-constructible
@@ -838,6 +838,6 @@ stl_two_level_crend (Outer beg, Outer end) {
 }
 
 
-} // end namespace GaloisRuntime
+} // end namespace Galois
 
-#endif // GALOIS_RUNTIME_TWO_LEVEL_ITER_H
+#endif // GALOIS_TWO_LEVEL_ITER_H

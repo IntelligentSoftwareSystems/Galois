@@ -28,7 +28,7 @@
 #include "Galois/Threads.h"
 
 #include "Galois/ParallelSTL/ParallelSTL.h"
-#include "Galois/Runtime/DualLevelIterator.h"
+#include "Galois/TwoLevelIterator.h"
 #include "Galois/Runtime/ContextPool.h"
 #include "Galois/Runtime/ll/gio.h"
 
@@ -812,7 +812,7 @@ class DMergeManager: public DMergeManagerBase<OptionsTy> {
   };
 
   typedef boost::transform_iterator<GetNewItem, boost::counting_iterator<int> > MergeOuterIt;
-  typedef DualLevelIterator<MergeOuterIt> MergeIt;
+  typedef typename Galois::ChooseStlTwoLevelIterator<MergeOuterIt, typename NewItemsTy::iterator>::type MergeIt;
 
   std::vector<NewItem,typename Galois::PerIterAllocTy::rebind<NewItem>::other> mergeBuf;
   std::vector<T,typename Galois::PerIterAllocTy::rebind<T>::other> distributeBuf;
@@ -833,9 +833,16 @@ class DMergeManager: public DMergeManagerBase<OptionsTy> {
     MergeOuterIt bbegin(boost::make_counting_iterator(begin), GetNewItem(&this->data));
     MergeOuterIt mmid(boost::make_counting_iterator(mid), GetNewItem(&this->data));
     MergeOuterIt eend(boost::make_counting_iterator(end), GetNewItem(&this->data));
-    MergeIt aa(bbegin, mmid), ea(mmid, mmid);
-    MergeIt bb(mmid, eend), eb(eend, eend);
-    MergeIt cc(bbegin, eend), ec(eend, eend);
+    // MergeIt aa(bbegin, mmid), ea(mmid, mmid);
+    // MergeIt bb(mmid, eend), eb(eend, eend);
+    // MergeIt cc(bbegin, eend), ec(eend, eend);
+    MergeIt aa = Galois::stl_two_level_begin (bbegin, mmid);
+    MergeIt ea = Galois::stl_two_level_end (bbegin, mmid);
+    MergeIt bb = Galois::stl_two_level_begin (mmid, eend);
+    MergeIt eb = Galois::stl_two_level_end (mmid, eend);
+    MergeIt cc = Galois::stl_two_level_begin (bbegin, eend);
+    MergeIt ec = Galois::stl_two_level_end (bbegin, eend);
+   
 
     while (aa != ea && bb != eb) {
       if (*aa < *bb)
