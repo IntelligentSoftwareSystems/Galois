@@ -31,61 +31,28 @@
 #include "Kruskal.h"
 #include "KruskalParallel.h"
 
+static cll::opt<unsigned> maxRounds (
+    "maxRounds",
+    cll::desc ("number of rounds for window executor"),
+    cll::init (600));
+
+static cll::opt<unsigned> lowThresh (
+    "lowThresh",
+    cll::desc ("low parallelism factor for workList refill in window executor"),
+    cll::init (16));
+
 namespace kruskal {
 
 
 class KruskalHand: public Kruskal {
   protected:
 
-  virtual const std::string getVersion () const { return "Handwritten partitioning + filtering + window-based ufLoop"; }
+  virtual const std::string getVersion () const { return "Handwritten using window-based two-phase union-find"; }
 
   virtual void runMST (const size_t numNodes, const VecEdge& edges,
       size_t& mstWeight, size_t& totalIter) {
 
-    runMSTfilter (numNodes, edges, mstWeight, totalIter, UnionFindWindow (64, 2));
-
-  }
-};
-
-
-class KruskalNaive: public Kruskal {
-  protected:
-
-  virtual const std::string getVersion () const { return "no partitioning/filtering, no windowing in ufLoop"; }
-
-  virtual void runMST (const size_t numNodes, const VecEdge& edges,
-      size_t& mstWeight, size_t& totalIter) {
-
-    
-    runMSTnaive (numNodes, edges, mstWeight, totalIter, UnionFindNaive<true> ());
-
-  }
-};
-
-
-class KruskalWindow: public Kruskal {
-  protected:
-
-  virtual const std::string getVersion () const { return "no partitioning/filtering, window-based ufLoop"; }
-
-  virtual void runMST (const size_t numNodes, const VecEdge& edges,
-      size_t& mstWeight, size_t& totalIter) {
-
-    runMSTnaive (numNodes, edges, mstWeight, totalIter, UnionFindWindow (128, 4));
-
-  }
-};
-
-
-class KruskalFilter: public Kruskal {
-  protected:
-
-  virtual const std::string getVersion () const { return "partitioning/filtering, but no window-based ufLoop"; }
-
-  virtual void runMST (const size_t numNodes, const VecEdge& edges,
-      size_t& mstWeight, size_t& totalIter) {
-
-    runMSTfilter (numNodes, edges, mstWeight, totalIter, UnionFindNaive<true> ());
+    runMSTsimple (numNodes, edges, mstWeight, totalIter, UnionFindWindow (maxRounds, lowThresh));
 
   }
 };

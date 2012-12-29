@@ -1,4 +1,4 @@
-/** Parallel Kruskal -*- C++ -*-
+/** Parallel Handwritten Kruskal -*- C++ -*-
  * @file
  * @section License
  *
@@ -20,7 +20,7 @@
  *
  * @section Description
  *
- * Parallel version of Kruskal.
+ * Parallel Handwritten version of Kruskal.
  *
  * @author <ahassaan@ices.utexas.edu>
  */

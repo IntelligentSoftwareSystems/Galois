@@ -44,8 +44,6 @@
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
 #include "Galois/Galois.h"
-#include "Galois/GaloisUnsafe.h"
-#include "Galois/Graphs/FileGraph.h"
 #include "Galois/Graphs/LCGraph.h"
 #include "Galois/Runtime/WorkList.h"
 #include "Galois/Runtime/Sampling.h"
@@ -61,6 +59,10 @@ static const char* const url = "kruskal";
 
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 
+static cll::opt<unsigned> numPages (
+    "preAlloc",
+    cll::desc ("number of pages(per thread) to pre-allocate from OS for Galois allocators "),
+    cll::init (32));
 
 namespace kruskal {
 
@@ -214,12 +216,8 @@ class Kruskal {
 public:
 
   typedef std::vector<Edge> VecEdge;
-  // typedef std::set<KEdge<KNode_tp>, 
-          // typename KEdge<KNode_tp>::NodeIDcomparator> Edges_ty;
 
   typedef std::tr1::unordered_set<InEdge, InEdge::Hash> SetInEdge;
-
-  //typedef std::vector<KEdge<KNode_tp> > Edges_ty;
 
 protected:
 
@@ -386,14 +384,6 @@ public:
     Galois::StatManager stat;
     LonestarStart (argc, argv, name, desc, url);
 
-    //TODO
-    // read the graph from file into a FileGraph
-    // create nodes and edges
-    // compute a set of edges
-    // run kruskal, which should return mst weight as int
-    // verify
-
-
     size_t numNodes;
     SetInEdge edgeSet;
 
@@ -424,6 +414,9 @@ public:
 
 
     initRemaining (numNodes, edges);
+
+    // pre allocate memory from OS for parallel runs
+    Galois::preAlloc (numPages*Galois::getActiveThreads ());
     
     Galois::StatTimer t ("Time taken by runMST: ");
 
@@ -599,7 +592,7 @@ private:
 
     if (primSum != kruskalSum) {
       std::cerr << "ERROR. Incorrect MST weight=" << kruskalSum 
-        << ", correct weight from Prim is=" << primSum << std::endl;
+        << ", weight computed by Prim is=" << primSum << std::endl;
       abort ();
 
     } else {
