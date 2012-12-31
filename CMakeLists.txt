@@ -15,10 +15,11 @@ endif()
 
 #use profiling
 set(USE_GPROF OFF CACHE BOOL "Enable GCC profiling")
+set(USE_VTUNE ON CACHE BOOL "Use vtune (if found) for profiling")
+set(USE_PAPI OFF CACHE BOOL "Use PAPI counters for profiling")
 
 #Enable iss specific options; should be OFF in the general release; all guarded by USE_EXP
 set(USE_EXP OFF CACHE BOOL "Use experimental features") 
-set(USE_VTUNE ON CACHE BOOL "Use vtune (if found)")
 set(EXP_DOALL "PTHREAD" CACHE STRING "Which type of implementation of parallel_doall")
 set(USE_PROF OFF CACHE BOOL "Use profiling specific features")
 
@@ -27,7 +28,7 @@ enable_testing()
 
 #ICC
 if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd68 -wd981 -wd383 -wd869 -wd2196 -wd279")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd68 -wd981 -wd383 -wd869 -wd2196 -wd279 -wd2504 -wd2943")
 endif()
 
 #PThreads

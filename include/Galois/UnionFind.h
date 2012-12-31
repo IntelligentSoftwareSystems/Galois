@@ -83,8 +83,12 @@ public:
       // Avoid cycles by directing edges consistently
       if (a > b)
         std::swap(a, b);
-      if (__sync_bool_compare_and_swap(&a->m_component, a, b))
+      if (__sync_bool_compare_and_swap(
+            reinterpret_cast<uintptr_t*>(&a->m_component),
+            reinterpret_cast<uintptr_t>(a),
+            reinterpret_cast<uintptr_t>(b))) {
         return b;
+      }
     }
   }
 };

@@ -140,7 +140,10 @@ struct ParallelAlgo {
         ctx.push(WorkItem(src, dst, &weight, cur));
         const EdgeData* old;
         while (updateLightest && weight < *(old = rep->lightest)) {
-          if (__sync_bool_compare_and_swap(&rep->lightest, old, &weight)) {
+          if (__sync_bool_compare_and_swap(
+                reinterpret_cast<uintptr_t*>(&rep->lightest),
+                reinterpret_cast<uintptr_t>(old),
+                reinterpret_cast<uintptr_t>(&weight))) {
             break;
           }
         }

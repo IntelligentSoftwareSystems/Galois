@@ -5,4 +5,5 @@
 !***************************************************
 
 PROGRAM Minimal95
+  print *, "Hello"
 END PROGRAM Minimal95

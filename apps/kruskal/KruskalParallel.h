@@ -447,7 +447,7 @@ struct UnionFindWindow {
     typedef EdgeCtxWL::local_iterator Iter;
     typedef Range<Iter> Range_ty;
     typedef Range_ty::PTS PerThrdRange;
-    typedef typename Range_ty::difference_type Diff_ty;
+    typedef Range_ty::difference_type Diff_ty;
 
     PerThrdRange ranges;
 

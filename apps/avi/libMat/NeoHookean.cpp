@@ -102,18 +102,18 @@ bool NeoHookean::getConstitutiveResponse(const std::vector<double>& strain, std:
   double defVol;
   double detC;
   double p;
-  double trace;
+  // double trace;
 
   NeoHookenTmpVec& tmpVec = *perCPUtmpVec.getLocal ();
   double* F = tmpVec.F;
-  double* Finv = tmpVec.Finv;
+  // double* Finv = tmpVec.Finv;
   double* C = tmpVec.C;
   double* Cinv = tmpVec.Cinv;
   double* S = tmpVec.S;
   double* M = tmpVec.M;
 
   
-  double detF;
+  // double detF;
 
   size_t J;
 
@@ -131,7 +131,7 @@ bool NeoHookean::getConstitutiveResponse(const std::vector<double>& strain, std:
 
   /* compute PK2 stresses and derivatives wrt C*/
   detC = matlib_inverse(C, Cinv);
-  detF = matlib_inverse(F, Finv);
+  // detF = matlib_inverse(F, Finv);
 
   if (detC < DET_MIN) {
     std::cerr << "NeoHookean::GetConstitutiveResponse:  close to negative jacobian\n";
@@ -141,7 +141,7 @@ bool NeoHookean::getConstitutiveResponse(const std::vector<double>& strain, std:
   defVol = 0.5 * log(detC);
   p = Lambda * defVol;
 
-  trace = C[0] + C[4] + C[8];
+  // trace = C[0] + C[4] + C[8];
 
   coef = p - Mu;
 
