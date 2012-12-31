@@ -836,13 +836,12 @@ class DMergeManager: public DMergeManagerBase<OptionsTy> {
     // MergeIt aa(bbegin, mmid), ea(mmid, mmid);
     // MergeIt bb(mmid, eend), eb(eend, eend);
     // MergeIt cc(bbegin, eend), ec(eend, eend);
-    MergeIt aa = Galois::stl_two_level_begin (bbegin, mmid);
-    MergeIt ea = Galois::stl_two_level_end (bbegin, mmid);
-    MergeIt bb = Galois::stl_two_level_begin (mmid, eend);
-    MergeIt eb = Galois::stl_two_level_end (mmid, eend);
-    MergeIt cc = Galois::stl_two_level_begin (bbegin, eend);
-    MergeIt ec = Galois::stl_two_level_end (bbegin, eend);
-   
+    MergeIt aa = Galois::stl_two_level_begin(bbegin, mmid);
+    MergeIt ea = Galois::stl_two_level_end(bbegin, mmid);
+    MergeIt bb = Galois::stl_two_level_begin(mmid, eend);
+    MergeIt eb = Galois::stl_two_level_end(mmid, eend);
+    MergeIt cc = Galois::stl_two_level_begin(bbegin, eend);
+    MergeIt ec = Galois::stl_two_level_end(bbegin, eend);
 
     while (aa != ea && bb != eb) {
       if (*aa < *bb)
@@ -939,7 +938,8 @@ class DMergeManager: public DMergeManagerBase<OptionsTy> {
 
     MergeOuterIt bbegin(boost::make_counting_iterator(0), GetNewItem(&this->data));
     MergeOuterIt eend(boost::make_counting_iterator((int) this->numActive), GetNewItem(&this->data));
-    MergeIt ii(bbegin, eend), ei(eend, eend);
+    MergeIt ii = Galois::stl_two_level_begin(bbegin, eend);
+    MergeIt ei = Galois::stl_two_level_end(eend, eend);
 
     distribute(boost::make_transform_iterator(ii, typename Base::NewItem::GetFirst()),
         boost::make_transform_iterator(ei, typename Base::NewItem::GetFirst()),
@@ -1524,7 +1524,7 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
       mlocal.incrementCommitted();
       if (ForEachTraits<typename OptionsTy::Function2Ty>::NeedsPush) {
         unsigned long parent = ctx->item.id;
-        typedef typename UserContextAccess<value_type>::pushBufferTy::iterator iterator;
+        typedef typename UserContextAccess<value_type>::PushBufferTy::iterator iterator;
         unsigned count = 0;
         for (iterator ii = tld.facing.getPushBuffer().begin(), 
             ei = tld.facing.getPushBuffer().end(); ii != ei; ++ii) {

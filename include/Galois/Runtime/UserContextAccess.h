@@ -33,10 +33,10 @@ template<typename T>
 class UserContextAccess : public Galois::UserContext<T> {
   typedef Galois::UserContext<T> SuperTy;
 public:
-  typedef typename SuperTy::pushBufferTy pushBufferTy;
+  typedef typename SuperTy::PushBufferTy PushBufferTy;
 
   void resetAlloc() { SuperTy::__resetAlloc(); }
-  pushBufferTy& getPushBuffer() { return SuperTy::__getPushBuffer(); }
+  PushBufferTy& getPushBuffer() { return SuperTy::__getPushBuffer(); }
   void resetPushBuffer() { SuperTy::__resetPushBuffer(); }
   SuperTy& data() { return *static_cast<SuperTy*>(this); }
   void setLocalState(void *p, bool used) { SuperTy::__setLocalState(p, used); }
