@@ -55,16 +55,16 @@ public:
   //! buf is invalidated by this operation
   virtual void broadcastMessage(recvFuncTy recv, SendBuffer& buf) = 0;
 
-  //!recieve and dispatch messages
-  //!returns true if at least one message was recieved
+  //!receive and dispatch messages
+  //!returns true if at least one message was received
   //! if the network requires a dedicated thread, then 
   //!it is only valid for that thread to call this function
-  virtual bool handleRecieves() = 0;
+  virtual bool handleReceives() = 0;
 
   //! does this network layer need a dedicated thread?
-  //! if false, then any thread can call send or recieve and work will get done.
-  //! if true, then only the master thread can process sends and recieves
-  //! if true, handleRecieves will process pending sends
+  //! if false, then any thread can call send or receive and work will get done.
+  //! if true, then only the master thread can process sends and receives
+  //! if true, handleReceives will process pending sends
   virtual bool needsDedicatedThread() = 0;
 
 };

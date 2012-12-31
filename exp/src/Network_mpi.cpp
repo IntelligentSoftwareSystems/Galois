@@ -163,7 +163,7 @@ public:
     asyncOutLock.unlock();
   }
 
-  virtual bool handleRecieves() {
+  virtual bool handleReceives() {
     //assert master thread
     asyncOutLock.lock();
     while (!asyncOutQueue.empty()) {
@@ -199,7 +199,7 @@ public:
     broadcastInternal(recv, buf);
   }
 
-  virtual bool handleRecieves() {
+  virtual bool handleReceives() {
     return recvInternal();;
   }
 

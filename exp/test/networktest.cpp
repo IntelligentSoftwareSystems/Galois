@@ -29,7 +29,7 @@ int main(int argc, char** argv) {
     net.broadcastMessage(&landingPad, buf);
   }
   while (true) {
-    net.handleRecieves();
+    net.handleReceives();
   }
 
   return 0;

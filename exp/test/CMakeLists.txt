@@ -12,4 +12,5 @@ makeTest(dist)
 makeTest(distnodes)
 #makeTest(foreachtask)
 makeTest(networktest)
+makeTest(printhost)
 
