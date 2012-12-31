@@ -269,7 +269,6 @@ void verify() {
 	}
       }
     }
-    std::cerr << "Verification ok!" << std::endl;
 }
 
 void printBCcertificate() {

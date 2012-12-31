@@ -184,7 +184,7 @@ struct ParallelAlgo {
         return;
 
       const EdgeData& weight = graph.getEdgeData(ii);
-      Node& ddata = graph.getData(dst, Galois::NONE);
+      //Node& ddata = graph.getData(dst, Galois::NONE);
 
       sdata.lightest = &weight;
 

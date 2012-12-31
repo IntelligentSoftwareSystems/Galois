@@ -3,13 +3,14 @@ add_subdirectory(comparisons)
 add_subdirectory(graph-convert)
 add_subdirectory(graph-stats)
 
-### External Projects
-
 include(ExternalProject)
 find_program(WGET wget)
+find_program(UNZIP unzip)
 
-# NB(ddn): bash -c "if [ ! -e ... " is a hack to prevent reexecuting
-# commands when not needed
+##########################################
+# Broken external projects
+##########################################
+
 #ExternalProject_Add(cats-gens
 #  PREFIX cats-gens
 #  # LIST_SEPARATOR is replaced with ";" in generated Makefile
@@ -26,7 +27,28 @@ find_program(WGET wget)
 #    -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}
 #)
 
-find_program(UNZIP unzip)
+#ExternalProject_Add(snap
+#  PREFIX snap
+#  LIST_SEPARATOR |
+#  DOWNLOAD_DIR snap/src/snap
+#  DOWNLOAD_COMMAND bash -c "if [ ! -e Snap-11-12-31.zip ] | then ${WGET} --quiet http://snap.stanford.edu/snap/Snap-11-12-31.zip | fi"
+#  UPDATE_COMMAND bash -c "if [ ! -e README ] | then ${UNZIP} Snap-11-12-31.zip | fi"
+#  PATCH_COMMAND bash -c "if [ ! -e CMakeLists.txt ] | then patch -p1 < ${CMAKE_CURRENT_SOURCE_DIR}/snap.patch | fi"
+#  CMAKE_ARGS 
+#    -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+#    -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS_RELEASE}
+#    -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+#    -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS_RELEASE}
+#    -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}
+#)
+
+##########################################
+# Working external projects
+##########################################
+
+# NB(ddn): bash -c "if [ ! -e ... " is a hack to prevent reexecuting
+# commands when not needed
+
 # Manually specify steps because ExternalProject doesn't know about unzip
 ExternalProject_Add(triangle
   PREFIX triangle
@@ -43,23 +65,8 @@ ExternalProject_Add(triangle
     -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}
 )
 
-ExternalProject_Add(snap
-  PREFIX snap
-  LIST_SEPARATOR |
-  DOWNLOAD_DIR snap/src/snap
-  DOWNLOAD_COMMAND bash -c "if [ ! -e Snap-11-12-31.zip ] | then ${WGET} --quiet http://snap.stanford.edu/snap/Snap-11-12-31.zip | fi"
-  UPDATE_COMMAND bash -c "if [ ! -e README ] | then ${UNZIP} Snap-11-12-31.zip | fi"
-  PATCH_COMMAND bash -c "if [ ! -e CMakeLists.txt ] | then patch -p1 < ${CMAKE_CURRENT_SOURCE_DIR}/snap.patch | fi"
-  CMAKE_ARGS 
-    -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
-    -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS_RELEASE}
-    -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
-    -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS_RELEASE}
-    -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}
-)
-
 #set(more_tools hi_pr triangle cats-gens snap GTgraph-rmat SSCA2)
-set(more_tools hi_pr triangle snap GTgraph-rmat SSCA2)
+set(more_tools hi_pr triangle GTgraph-rmat SSCA2)
 
 # Simple download and patch
 function(dl name url)
