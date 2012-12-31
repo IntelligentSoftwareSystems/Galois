@@ -27,83 +27,45 @@
 
 #include "Galois/Runtime/ParallelWork.h"
 
-#include <boost/mpl/range_c.hpp>
 #include <boost/fusion/adapted/mpl.hpp>
-#include <boost/fusion/container/vector.hpp>
+#include <boost/fusion/algorithm/iteration/fold.hpp>
+#include <boost/fusion/algorithm/iteration/for_each.hpp>
+#include <boost/fusion/algorithm/transformation/filter_if.hpp>
 #include <boost/fusion/container/generation/make_vector.hpp>
-#include <boost/fusion/view/transform_view.hpp>
-#include <boost/fusion/sequence/intrinsic/value_at.hpp>
-#include <boost/fusion/view/zip_view.hpp>
+#include <boost/fusion/container/vector.hpp>
+#include <boost/fusion/iterator/advance.hpp>
+#include <boost/fusion/iterator/deref.hpp>
 #include <boost/fusion/sequence/intrinsic/at.hpp>
 #include <boost/fusion/sequence/intrinsic/size.hpp>
-#include <boost/fusion/algorithm/iteration/for_each.hpp>
-#include <boost/fusion/iterator/deref.hpp>
-#include <boost/fusion/iterator/advance.hpp>
+#include <boost/fusion/sequence/intrinsic/value_at.hpp>
+#include <boost/fusion/view/transform_view.hpp>
+#include <boost/fusion/view/zip_view.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/mpl/for_each.hpp>
+#include <boost/mpl/has_xxx.hpp>
+#include <boost/mpl/range_c.hpp>
+#include <boost/mpl/vector_c.hpp>
 
 #include <cstdio>
 
 namespace GaloisRuntime {
 namespace BulkSynchronousWork {
 
-//! Alternative implementation of FixedSizeRing which is non-concurrent and
-//! supports pushX/empty/popX rather than pushX/popX with boost::optional
+template<typename T, bool isLIFO, unsigned ChunkSize>
+struct RingAdaptor: public Galois::FixedSizeRing<T,ChunkSize> {
+  typedef typename RingAdaptor::reference reference;
 
-template<typename T, unsigned ChunkSize>
-struct FixedSizeBase: private boost::noncopyable {
-  char datac[sizeof(T[ChunkSize])] __attribute__ ((aligned (__alignof__(T))));
+  reference cur() { return isLIFO ? this->front() : this->back();  }
 
-  T* data() { return reinterpret_cast<T*>(&datac[0]); }
-  T* at(unsigned i) { return &data()[i]; }
-  void create(int i, const T& val) { new (at(i)) T(val); }
-  void destroy(unsigned i) { (at(i))->~T(); }
-  inline unsigned chunksize() const { return ChunkSize; }
-  typedef T value_type;
-};
-
-template<typename T, bool isLIFO, int ChunkSize>
-class FixedSizeRing: public FixedSizeBase<T,ChunkSize> {
-  unsigned start;
-  unsigned count;
-
-public:
-  FixedSizeRing(): start(0), count(0) { }
-
-  unsigned size() const { return count; }
-  bool empty() const { return count == 0; }
-  bool full() const { return count == this->chunksize(); }
-
-  void push(const T& val) {
-    start = (start + this->chunksize() - 1) % this->chunksize();
-    ++count;
-    this->create(start, val);
+  template<typename U>
+  void push(U&& val) {
+    this->push_front(std::forward<U>(val));
   }
 
-  void pop() {
-    unsigned end = (start + count - 1) % this->chunksize();
-    this->destroy(end);
-    --count;
+  void pop()  {
+    if (isLIFO) this->pop_front();
+    else this->pop_back();
   }
-
-  T& cur() { 
-    unsigned end = (start + count - 1) % this->chunksize();
-    return *this->at(end); 
-  }
-};
-
-
-template<typename T, int ChunkSize>
-class FixedSizeRing<T,true,ChunkSize>: public FixedSizeBase<T,ChunkSize>  {
-  unsigned end;
-
-public:
-  FixedSizeRing(): end(0) { }
-
-  unsigned size() const { return end; }
-  bool empty() const { return end == 0; }
-  bool full() const { return end >= this->chunksize(); }
-  void pop() { this->destroy(--end); }
-  T& cur() { return *this->at(end-1); }
-  void push(const T& val) { this->create(end, val); ++end; }
 };
 
 struct WID {
@@ -114,9 +76,21 @@ struct WID {
   }
 };
 
-template<typename T,template<typename,bool> class OuterTy, bool isLIFO,int ChunkSize>
+template<typename T,template<typename,bool> class OuterTy, bool isLIFO, int ChunkSize>
 class dChunkedMaster : private boost::noncopyable {
-  class Chunk : public FixedSizeRing<T,isLIFO,ChunkSize>, public OuterTy<Chunk,true>::ListNode {};
+  struct Chunk: public RingAdaptor<T,isLIFO,ChunkSize>, public OuterTy<Chunk, true>::ListNode {
+
+    int mark;
+    Chunk(): mark(0) { }
+
+    template<typename FnTy>
+    unsigned map(FnTy& fn) {
+      for (typename Chunk::iterator ii = this->begin(), ei = this->end(); ii != ei; ++ii) {
+        fn(*ii);
+      }
+      return this->size();
+    }
+  };
 
   MM::FixedSizeAllocator heap;
 
@@ -237,6 +211,24 @@ public:
     }
     popSP(id, n);
   }
+
+
+  template<typename FnTy>
+  size_t map(const WID& id, FnTy fn, int mark) {
+    p& n = *data.getLocal(id.tid);
+    size_t iterations = 0;
+    if (n.next) {
+      iterations += n.next->map(fn);
+    }
+    LevelItem& I = *Q.getLocal(id.pid);
+    for (typename LevelItem::iterator ii = I.begin(), ei = I.end(); ii != ei; ++ii) {
+      int m;
+      if ((m = ii->mark) != mark && __sync_bool_compare_and_swap(&ii->mark, m, mark)) {
+        iterations += ii->map(fn);
+      }
+    }
+    return iterations;
+  }
 };
 
 template<typename T,template<typename,bool> class OuterTy, bool isLIFO,int ChunkSize>
@@ -275,11 +267,27 @@ void dChunkedMaster<T,OuterTy,isLIFO,ChunkSize>::pushSP(const WID& id, p& n, con
   n.next->push(val);
 }
 
-template<typename T,int ChunkSize>
-class dChunkedLIFO: public dChunkedMaster<T, WorkList::ConExtLinkedStack, true, ChunkSize> { };
+#define GALOIS_USE_BAG 0
 
+#if GALOIS_USE_BAG
 template<typename T,int ChunkSize>
-class dChunkedFIFO: public dChunkedMaster<T, WorkList::ConExtLinkedQueue, false, ChunkSize> { };
+class Worklist: public galois_insert_bag<T> { };
+#else
+template<typename T,int ChunkSize>
+//class Worklist: public dChunkedMaster<T, WorkList::ConExtLinkedQueue, true, ChunkSize> { };
+class Worklist: public dChunkedMaster<T, WorkList::ConExtLinkedStack, true, ChunkSize> { };
+
+template<typename WorklistTy>
+struct BindPush {
+  typedef typename WorklistTy::value_type value_type;
+  const WID& wid;
+  WorklistTy& wl;
+  BindPush(const WID& wid, WorklistTy& wl): wid(wid), wl(wl) { }
+  void push(const value_type& x) {
+    wl.push(wid, x);
+  }
+};
+#endif
 
 //! Encapsulation of initial work to pass to executor
 template<typename RangeTy, typename InitFnTy>
@@ -311,24 +319,32 @@ public:
   typedef typename boost::fusion::result_of::as_vector<T1>::type type;
 };
 
+// Some type functions
+template<typename ItemTy>
+struct typeof_worklist { typedef Worklist<ItemTy, 256> type; };
+
+template<typename ItemTy>
+struct typeof_usercontext { typedef GaloisRuntime::UserContextAccess<ItemTy> type; };
+
+template<typename FnTy>
+struct needs_push { typedef boost::mpl::bool_<ForEachTraits<FnTy>::NeedsPush> type; };
+
+template<typename VecTy>
+struct project1: boost::fusion::result_of::value_at<VecTy, boost::mpl::int_<1> >  { };
+
 template<typename ItemsTy, typename FnsTy, typename InitialWorkTy>
 class Executor {
-  template<typename ItemTy>
-  struct typeof_worklist { typedef dChunkedLIFO<ItemTy,256> type; };
-
-  template<typename ItemTy>
-  struct typeof_usercontext { typedef GaloisRuntime::UserContextAccess<ItemTy> type; };
-
   typedef typename map_type_fn<ItemsTy, typeof_worklist>::type WLS;
-  typedef typename boost::fusion::result_of::value_at<WLS, boost::mpl::int_<0> >::type FirstWL;
   typedef typename map_type_fn<ItemsTy, typeof_usercontext>::type UserContexts;
+  typedef typename boost::fusion::result_of::value_at<WLS, boost::mpl::int_<0> >::type FirstWL;
 
   struct ThreadLocalData {
     UserContexts facing;
     long iterations;
+    int rounds;
     BulkSynchronousWork::WID wid;
 
-    explicit ThreadLocalData(unsigned tid): iterations(0), wid(tid) { }
+    explicit ThreadLocalData(unsigned tid): iterations(0), rounds(0), wid(tid) { }
   };
 
   FnsTy fns;
@@ -338,7 +354,18 @@ class Executor {
   InitialWorkTy init;
   const char* loopname;
   LL::CacheLineStorage<volatile long> done;
-  LL::SimpleLock<true> lock;
+
+  template<typename FnTy, typename FacingTy>
+  struct FnWrap {
+    FnTy& fn;
+    FacingTy& facing;
+    FnWrap(FnTy& f, FacingTy& n): fn(f), facing(n) { }
+
+    template<typename T>
+    void operator()(T&& x) const {
+      fn(std::forward<T>(x), facing.data());
+    }
+  };
 
   struct ExecuteFn {
     Executor* self;
@@ -349,67 +376,165 @@ class Executor {
     ExecuteFn(Executor* s, ThreadLocalData& t, FirstWL* c, FirstWL* n):
       self(s), tld(t), cur(c), next(n) { }
     
+#if GALOIS_USE_BAG
     template<typename InWL, typename OutWL, typename FacingTy, typename FnTy>
     void process(InWL& in, OutWL& out, FacingTy& facing, FnTy& fn) const {
+      typedef typename InWL::value_type value_type;
+
+      for (typename InWL::local_iterator ii = in.local_begin(), ei = in.local_end(); ii != ei; ++ii) {
+        fn(*ii, out); //facing.data());
+        //tld.iterations += 1;
+        //if (ForEachTraits<FnTy>::NeedsPush) {
+        //  std::copy(facing.getPushBuffer().begin(), facing.getPushBuffer().end(),
+        //      std::back_inserter(out));
+        //  facing.resetPushBuffer();
+        //}
+      }
+    }
+#else
+    template<typename InWL, typename OutWL, typename FacingTy, typename FnTy>
+    void process(InWL& in, OutWL& out, FacingTy& facing, FnTy& fn) const {
+      BindPush<OutWL> binder(tld.wid, out);
       typedef typename InWL::value_type value_type;
       while (!in.empty(tld.wid)) {
         int cs = std::max(in.currentChunkSize(tld.wid), 1U);
         for (int i = 0; i < cs; ++i) {
           value_type& val = in.cur(tld.wid);
-          fn(val, facing.data());
-          tld.iterations += 1;
-          out.push(tld.wid,
-              facing.getPushBuffer().begin(),
-              facing.getPushBuffer().end());
-          facing.resetPushBuffer();
+          fn(val, binder); //facing.data());
+          //tld.iterations += 1;
+          //out.push(tld.wid,
+          //    facing.getPushBuffer().begin(),
+          //    facing.getPushBuffer().end());
+          //facing.resetPushBuffer();
           in.pop(tld.wid);
         }
       }
     }
+#endif
+    template<typename FnIndex, typename InWL, typename OutWL, typename FacingTy, typename FnTy>
+    void processInPlace(InWL& in, OutWL& out, FacingTy& facing, FnTy& fn) const {
+      int mark = boost::fusion::result_of::size<FnsTy>::value * tld.rounds + FnIndex::value + 1;
+      tld.iterations += in.map(tld.wid, FnWrap<FnTy, FacingTy>(fn, facing), mark);
+    }
 
-    template<typename PairTy>
-    void operator()(const PairTy& pair) const {
+    template<typename TupleTy>
+    void operator()(const TupleTy& tuple) const {
       // Bunch of template meta-programming to select appropriate worklists.
       // Effect of the below, simplified:
-      //  WL in = cur, out = next;
-      //  Facing f = facing[0]
+      //  WL in = cur, out = next; Facing f = facing[0]
       //  if (cur != 0) { in = wls[cur] }
       //  if (cur + 1 != size) { out = wls[cur+1]; f = facing[cur+1] }
       //  process(in, out, f, fn)
-      typedef boost::mpl::int_<0> Zero;
-      typedef boost::mpl::int_<1> One;
-      typedef typename boost::fusion::result_of::value_at<PairTy,Zero>::type CurrentIndex;
-      typedef typename boost::mpl::plus<CurrentIndex,One>::type NextIndex;
-      typedef typename boost::fusion::result_of::size<WLS>::type Size;
-      typedef typename boost::mpl::equal_to<NextIndex,Size>::type IsLast;
-      typedef typename boost::mpl::if_<IsLast,Zero,NextIndex>::type SafeNextIndex;
-      typedef typename boost::fusion::result_of::value_at<WLS,CurrentIndex>::type CurrentWL;
-      typedef typename boost::fusion::result_of::value_at<WLS,SafeNextIndex>::type NextWL;
-      typedef boost::fusion::vector<FirstWL*,CurrentWL*> InWL;
-      typedef boost::fusion::vector<FirstWL*,NextWL*> OutWL;
-      typedef typename boost::mpl::if_<boost::mpl::equal_to<CurrentIndex,Zero>,Zero,One>::type InIndex;
-      typedef typename boost::mpl::if_<boost::mpl::equal_to<NextIndex,Size>,Zero,One>::type OutIndex;
+      using namespace boost;
 
-      InWL in(cur, &boost::fusion::at<CurrentIndex>(self->wls)); 
-      OutWL out(next, &boost::fusion::at<SafeNextIndex>(self->wls)); 
+      typedef mpl::int_<0> Zero;
+      typedef mpl::int_<1> One;
+      typedef mpl::int_<2> Two;
 
-      process(*boost::fusion::at<InIndex>(in),
-          *boost::fusion::at<OutIndex>(out),
-          boost::fusion::at<SafeNextIndex>(tld.facing),
-          boost::fusion::at<One>(pair));
+      typedef typename fusion::result_of::size<WLS>::type Size;
+      typedef typename fusion::result_of::value_at<TupleTy, Zero>::type FnRefTy;
+      typedef typename boost::remove_reference<FnRefTy>::type FnTy;
+      typedef typename fusion::result_of::value_at<TupleTy, One>::type FnIndex;
+      typedef typename fusion::result_of::value_at<TupleTy, Two>::type InIndex;
+
+      typedef typename mpl::plus<InIndex, One>::type OutIndex;
+      typedef typename mpl::equal_to<OutIndex, Size>::type IsLast;
+      typedef typename mpl::if_<IsLast, Zero, OutIndex>::type SafeOutIndex;
+      
+      typedef typename fusion::result_of::value_at<WLS, InIndex>::type InWL;
+      typedef typename fusion::result_of::value_at<WLS, SafeOutIndex>::type OutWL;
+      typedef fusion::vector<FirstWL*, InWL*> InWLPtrs;
+      typedef fusion::vector<FirstWL*, OutWL*> OutWLPtrs;
+      
+      typedef typename mpl::if_<mpl::equal_to<InIndex, Zero>, Zero, One>::type InWLIndex;
+      typedef typename mpl::if_<mpl::equal_to<OutIndex, Size>, Zero, One>::type OutWLIndex;
+
+      InWLPtrs inWlPtrs(cur, &fusion::at<InIndex>(self->wls)); 
+      OutWLPtrs outWlPtrs(next, &fusion::at<SafeOutIndex>(self->wls)); 
+
+#if GALOIS_USE_BAG
+      process(*fusion::at<InWLIndex>(inWlPtrs),
+          *fusion::at<OutWLIndex>(outWlPtrs),
+          fusion::at<SafeOutIndex>(tld.facing),
+          fusion::at<Zero>(tuple));
+#else
+      if (ForEachTraits<FnTy>::NeedsPush) {
+        process(*fusion::at<InWLIndex>(inWlPtrs),
+            *fusion::at<OutWLIndex>(outWlPtrs),
+            fusion::at<SafeOutIndex>(tld.facing),
+            fusion::at<Zero>(tuple));
+      } else {
+        processInPlace<FnIndex>(*fusion::at<InWLIndex>(inWlPtrs),
+            *fusion::at<OutWLIndex>(outWlPtrs),
+            fusion::at<SafeOutIndex>(tld.facing),
+            fusion::at<Zero>(tuple));
+      }
+#endif
       self->barrier.wait();
     }
   };
+
+  struct Clear {
+    template<typename WL>
+    void operator()(WL& wl) const {
+      const_cast<typename boost::remove_const<WL>::type &>(wl).clear();
+    }
+  };
+
+  struct value_printer {
+    template<typename T> void operator()(T x) {
+      std::cout << "C: " << x << "\n";
+    }
+  };
+
+  void processFunctions(ThreadLocalData& tld, FirstWL* cur, FirstWL* next) {
+    using namespace boost;
+
+    // N element bool vector, true where FnTy::NeedsPush
+    typedef typename map_type_fn<FnsTy, needs_push>::type NeedsPush;
+    // N + 1 element int vector, [0] + [<prefix sum of NeedsPush>]
+    typedef typename mpl::fold<
+      NeedsPush,
+      mpl::vector_c<int, 0>, 
+      mpl::if_<
+        mpl::_2,
+        mpl::push_back<mpl::_1, mpl::plus<mpl::back<mpl::_1>, mpl::int_<1> > >,
+        mpl::push_back<mpl::_1, mpl::back<mpl::_1> > >
+      >::type PrefixSum;
+    // Indexes of input worklists
+    typedef typename mpl::pop_back<PrefixSum>::type InputIndices;
+
+    typedef mpl::range_c<int, 0, fusion::result_of::size<FnsTy>::type::value> FnIndices;
+    typedef fusion::vector<FnsTy&, FnIndices&, InputIndices&> Tuple;
+ 
+    //std::cout << "begin\n";
+    //mpl::for_each<InputIndices>(value_printer());
+    //std::cout << "end\n";
+
+    FnIndices fnIndices;
+    InputIndices inputIndices;
+
+    fusion::for_each(
+        fusion::zip_view<Tuple>(Tuple(fns, fnIndices, inputIndices)),
+        ExecuteFn(this, tld, cur, next));
+  }
 
   template<typename FacingTy>
   void initialize(ThreadLocalData& tld, FirstWL& out, FacingTy& facing) {
     typedef typename InitialWorkTy::range_type::local_iterator local_iterator;
     for (local_iterator ii = init.range.local_begin(), ei = init.range.local_end(); ii != ei; ++ii) {
-      init.fn(*ii, facing.data());
-      out.push(tld.wid,
-          facing.getPushBuffer().begin(),
-          facing.getPushBuffer().end());
-      facing.resetPushBuffer();
+#if GALOIS_USE_BAG
+      init.fn(*ii, out);
+      //std::copy(facing.getPushBuffer().begin(), facing.getPushBuffer().end(),
+      //    std::back_inserter(out));
+#else
+      BindPush<FirstWL> binder(tld.wid, out);
+      init.fn(*ii, binder);
+      //out.push(tld.wid,
+      //    facing.getPushBuffer().begin(),
+      //    facing.getPushBuffer().end());
+      //facing.resetPushBuffer();
+#endif
     }
   }
 
@@ -423,13 +548,7 @@ public:
   }
 
   void operator()() {
-    int rounds = 0;
     ThreadLocalData tld(LL::getTID());
-
-    typedef boost::mpl::range_c<int, 0, boost::fusion::result_of::size<FnsTy>::type::value> Range;
-    Range range;
-
-    typedef boost::fusion::vector<Range&,FnsTy&> Pair;
 
     FirstWL* cur = &first;
     FirstWL* next = &boost::fusion::at<boost::mpl::int_<0> >(wls);
@@ -437,15 +556,20 @@ public:
     initialize(tld, *cur);
 
     while (true) {
-      boost::fusion::for_each(
-          boost::fusion::zip_view<Pair>(Pair(range, fns)),
-          ExecuteFn(this, tld, cur, next));
-      
+      processFunctions(tld, cur, next);
+
       if (tld.wid.tid == 0) {
-        rounds += 1;
+#if GALOIS_USE_BAG
+        if (next->empty())
+          done.data = true;
+        cur->clear();
+        boost::fusion::for_each(boost::fusion::pop_front(wls), Clear());
+#else
         if (next->sempty())
           done.data = true;
+#endif
       }
+      tld.rounds += 1;
       barrier.wait();
 
       if (done.data)
@@ -455,23 +579,206 @@ public:
     }
 
     if (tld.wid.tid == 0)
-      reportStat(loopname, "Rounds", rounds);
+      reportStat(loopname, "Rounds", tld.rounds);
     reportStat(loopname, "Iterations", tld.iterations);
   }
 };
 
-template<typename T>
-struct CopyIn {
-  void operator()(const T& item, Galois::UserContext<T>& ctx) const {
-    ctx.push(item);
+template<class T, class FunctionTy, typename InitialWorkTy>
+class Executor2 {
+  typedef T value_type;
+  typedef Worklist<value_type,256> WLTy;
+
+  struct ThreadLocalData {
+    GaloisRuntime::UserContextAccess<value_type> facing;
+    SimpleRuntimeContext cnx;
+    LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
+    ThreadLocalData(const char* ln): stat(ln) { }
+  };
+
+  GaloisRuntime::GBarrier barrier1;
+  GaloisRuntime::GBarrier barrier2;
+  WLTy wls[2];
+  FunctionTy function;
+  InitialWorkTy init;
+  const char* loopname;
+  LL::CacheLineStorage<volatile long> done;
+  unsigned numActive;
+
+  bool empty(WLTy* wl) {
+    return wl->sempty();
+  }
+
+  GALOIS_ATTRIBUTE_NOINLINE
+  void abortIteration(ThreadLocalData& tld, const WID& wid, WLTy* cur, WLTy* next) {
+    tld.cnx.cancel_iteration();
+    tld.stat.inc_conflicts();
+    if (ForEachTraits<FunctionTy>::NeedsPush) {
+      tld.facing.resetPushBuffer();
+    }
+    value_type& val = cur->cur(wid);
+    next->push(wid, val);
+    cur->pop(wid);
+  }
+
+  void processWithAborts(ThreadLocalData& tld, const WID& wid, WLTy* cur, WLTy* next) {
+    int result = 0;
+#if GALOIS_USE_EXCEPTION_HANDLER
+    try {
+      process(tld, wid, cur, next);
+    } catch (ConflictFlag const& flag) {
+      clearConflictLock();
+      result = flag;
+    }
+#else
+    if ((result = setjmp(hackjmp)) == 0) {
+      process(tld, wid, cur, next);
+    }
+#endif
+    switch (result) {
+    case 0: break;
+    case GaloisRuntime::CONFLICT:
+      abortIteration(tld, wid, cur, next);
+      break;
+    case GaloisRuntime::BREAK:
+    default:
+      abort();
+    }
+  }
+
+  void process(ThreadLocalData& tld, const WID& wid, WLTy* cur, WLTy* next) {
+    int cs = std::max(cur->currentChunkSize(wid), 1U);
+    for (int i = 0; i < cs; ++i) {
+      value_type& val = cur->cur(wid);
+      tld.stat.inc_iterations();
+      function(val, tld.facing.data());
+      if (ForEachTraits<FunctionTy>::NeedsPush) {
+        next->push(wid,
+            tld.facing.getPushBuffer().begin(),
+            tld.facing.getPushBuffer().end());
+        tld.facing.resetPushBuffer();
+      }
+      if (ForEachTraits<FunctionTy>::NeedsAborts)
+        tld.cnx.commit_iteration();
+      cur->pop(wid);
+    }
+  }
+
+  void initialize(ThreadLocalData& tld, WID& wid) {
+    typedef typename InitialWorkTy::range_type::local_iterator local_iterator;
+    for (local_iterator ii = init.range.local_begin(), ei = init.range.local_end(); ii != ei; ++ii) {
+      init.fn(*ii, tld.facing.data());
+      wls[0].push(wid, 
+          tld.facing.getPushBuffer().begin(),
+          tld.facing.getPushBuffer().end());
+      tld.facing.resetPushBuffer();
+    }
+  }
+
+  void go() {
+    ThreadLocalData tld(loopname);
+    setThreadContext(&tld.cnx);
+    unsigned tid = LL::getTID();
+    WID wid(tid);
+
+    WLTy* cur = &wls[0];
+    WLTy* next = &wls[1];
+
+    initialize(tld, wid);
+
+    while (true) {
+      while (!cur->empty(wid)) {
+        if (ForEachTraits<FunctionTy>::NeedsAborts) {
+          processWithAborts(tld, wid, cur, next);
+        } else {
+          process(tld, wid, cur, next);
+        }
+        if (ForEachTraits<FunctionTy>::NeedsPIA)
+          tld.facing.resetAlloc();
+      }
+
+      std::swap(next, cur);
+
+      barrier1.wait();
+
+      if (tid == 0) {
+        if (empty(cur))
+          done.data = true;
+      }
+      
+      barrier2.wait();
+
+      if (done.data)
+        break;
+    }
+
+    setThreadContext(0);
+  }
+
+public:
+  Executor2(const FunctionTy& f, const InitialWorkTy& i, const char* ln): function(f), init(i), loopname(ln) { 
+    if (ForEachTraits<FunctionTy>::NeedsBreak) {
+      assert(0 && "not supported by this executor");
+      abort();
+    }
+
+    numActive = galoisActiveThreads;
+    barrier1.reinit(numActive);
+    barrier2.reinit(numActive);
+  }
+
+  void operator()() {
+    go();
   }
 };
 
+#if 0
 template<typename ItemsTy, typename IterTy, typename FnsTy, typename InitFnTy>
 static inline void do_all_bs_impl(IterTy b, IterTy e, FnsTy fns, InitFnTy initFn, const char* loopname) {
   typedef StandardRange<IterTy> R;
   typedef InitialWork<R,InitFnTy> InitialWork;
-  typedef Executor<ItemsTy,FnsTy,InitialWork> Work;
+  typedef typename boost::fusion::result_of::value_at<ItemsTy, boost::mpl::int_<0> >::type FirstItem;
+  typedef typename boost::fusion::result_of::value_at<FnsTy, boost::mpl::int_<0> >::type FirstFn;
+  typedef Executor2<FirstItem,FirstFn,InitialWork> Work;
+
+  Work W(boost::fusion::at<boost::mpl::int_<0> >(fns), InitialWork(makeStandardRange(b, e), initFn), loopname);
+
+  assert(!inGaloisForEach);
+
+  inGaloisForEach = true;
+  RunCommand w[2] = {Config::ref(W),
+		     Config::ref(getSystemBarrier())};
+  getSystemThreadPool().run(&w[0], &w[2]);
+  runAllLoopExitHandlers();
+  inGaloisForEach = false;
+}
+#endif
+
+template<typename T>
+struct CopyIn {
+  template<typename Context>
+  void operator()(const T& item, Context& ctx) const {
+    ctx.push(item);
+  }
+};
+
+#if 1
+template<typename ItemsTy, typename IterTy, typename FnsTy, typename InitFnTy>
+static inline void do_all_bs_impl(IterTy b, IterTy e, FnsTy fns, InitFnTy initFn, const char* loopname) {
+  using namespace boost;
+
+  //! Keep only items for functions that need push
+  typedef typename map_type_fn<FnsTy, needs_push>::type NeedsPush;
+  typedef typename fusion::result_of::filter_if<
+    fusion::zip_view<fusion::vector<NeedsPush&, ItemsTy&> >,
+    fusion::result_of::value_at<mpl::_1, mpl::int_<0> >
+    >::type FilteredItemPairs;
+  typedef typename map_type_fn<FilteredItemPairs, project1>::type FilteredItems;
+  typedef typename fusion::result_of::as_vector<FilteredItems>::type FilteredItemsVector;
+
+  typedef StandardRange<IterTy> R;
+  typedef InitialWork<R, InitFnTy> InitialWork;
+  typedef Executor<FilteredItemsVector, FnsTy, InitialWork> Work;
 
   Work W(fns, InitialWork(makeStandardRange(b, e), initFn), loopname);
 
@@ -484,7 +791,7 @@ static inline void do_all_bs_impl(IterTy b, IterTy e, FnsTy fns, InitFnTy initFn
   runAllLoopExitHandlers();
   inGaloisForEach = false;
 }
-
+#endif
 } // end BulkSynchronousWork
 } // end GaloisRuntime
 

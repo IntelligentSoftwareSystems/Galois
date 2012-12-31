@@ -31,65 +31,21 @@
 namespace GaloisRuntime {
 namespace HIDDEN {
 
-//! Alternative implementation of FixedSizeRing which is non-concurrent and
-//! supports pushX/empty/popX rather than pushX/popX with boost::optional
+template<typename T, bool isLIFO, unsigned ChunkSize>
+struct FixedSizeRingAdaptor: public Galois::FixedSizeRing<T,ChunkSize> {
+  typedef typename FixedSizeRingAdaptor::reference reference;
 
-template<typename T, unsigned ChunkSize>
-struct FixedSizeBase: private boost::noncopyable {
-  char datac[sizeof(T[ChunkSize])] __attribute__ ((aligned (__alignof__(T))));
+  reference cur() { return isLIFO ? this->front() : this->back();  }
 
-  T* data() { return reinterpret_cast<T*>(&datac[0]); }
-  T* at(unsigned i) { return &data()[i]; }
-  void create(int i, const T& val) { new (at(i)) T(val); }
-  void destroy(unsigned i) { (at(i))->~T(); }
-  inline unsigned chunksize() const { return ChunkSize; }
-  typedef T value_type;
-};
-
-template<typename T, bool isLIFO, int ChunkSize>
-class FixedSizeRing: public FixedSizeBase<T,ChunkSize> {
-  unsigned start;
-  unsigned count;
-
-public:
-  FixedSizeRing(): start(0), count(0) { }
-
-  unsigned size() const { return count; }
-  bool empty() const { return count == 0; }
-  bool full() const { return count == this->chunksize(); }
-
-  void push(const T& val) {
-    start = (start + this->chunksize() - 1) % this->chunksize();
-    ++count;
-    this->create(start, val);
+  template<typename U>
+  void push(U&& val) {
+    this->push_front(std::forward<U>(val));
   }
 
-  void pop() {
-    unsigned end = (start + count - 1) % this->chunksize();
-    this->destroy(end);
-    --count;
+  void pop()  {
+    if (isLIFO) this->pop_front();
+    else this->pop_back();
   }
-
-  T& cur() { 
-    unsigned end = (start + count - 1) % this->chunksize();
-    return *this->at(end); 
-  }
-};
-
-
-template<typename T, int ChunkSize>
-class FixedSizeRing<T,true,ChunkSize>: public FixedSizeBase<T,ChunkSize>  {
-  unsigned end;
-
-public:
-  FixedSizeRing(): end(0) { }
-
-  unsigned size() const { return end; }
-  bool empty() const { return end == 0; }
-  bool full() const { return end >= this->chunksize(); }
-  void pop() { this->destroy(--end); }
-  T& cur() { return *this->at(end-1); }
-  void push(const T& val) { this->create(end, val); ++end; }
 };
 
 struct WID {
@@ -106,7 +62,7 @@ struct WID {
 
 template<typename T,template<typename,bool> class OuterTy, bool isLIFO,int ChunkSize>
 class dChunkedMaster : private boost::noncopyable {
-  class Chunk : public FixedSizeRing<T,isLIFO,ChunkSize>, public OuterTy<Chunk,true>::ListNode {};
+  class Chunk : public FixedSizeRingAdaptor<T,isLIFO,ChunkSize>, public OuterTy<Chunk,true>::ListNode {};
 
   MM::FixedSizeAllocator heap;
 
@@ -272,15 +228,12 @@ void dChunkedMaster<T,OuterTy,isLIFO,ChunkSize>::pushSP(const WID& id, p& n, con
 }
 
 template<typename T,int ChunkSize>
-class dChunkedLIFO: public dChunkedMaster<T, WorkList::ConExtLinkedStack, true, ChunkSize> { };
+class Worklist: public dChunkedMaster<T, WorkList::ConExtLinkedQueue, true, ChunkSize> { };
 
-template<typename T,int ChunkSize>
-class dChunkedFIFO: public dChunkedMaster<T, WorkList::ConExtLinkedQueue, false, ChunkSize> { };
-
-template<class T, class FunctionTy, template<typename,int> class WorklistTy>
+template<class T, class FunctionTy>
 class BSInlineExecutor {
   typedef T value_type;
-  typedef WorklistTy<value_type,256> WLTy;
+  typedef Worklist<value_type,256> WLTy;
 
   struct ThreadLocalData {
     GaloisRuntime::UserContextAccess<value_type> facing;
@@ -420,21 +373,14 @@ public:
 } // end HIDDEN
 
 namespace WorkList {
-  template<bool isLIFO=true, class T=int>
+  template<class T=int>
   class BulkSynchronousInline { };
 }
 
 template<class T,class FunctionTy>
-struct ForEachWork<WorkList::BulkSynchronousInline<true>,T,FunctionTy>:
-  public HIDDEN::BSInlineExecutor<T,FunctionTy,HIDDEN::dChunkedLIFO> {
-  typedef HIDDEN::BSInlineExecutor<T,FunctionTy,HIDDEN::dChunkedLIFO> SuperTy;
-  ForEachWork(FunctionTy& f, const char* ln): SuperTy(f, ln) { }
-};
-
-template<class T,class FunctionTy>
-struct ForEachWork<WorkList::BulkSynchronousInline<false>,T,FunctionTy>:
-  public HIDDEN::BSInlineExecutor<T,FunctionTy,HIDDEN::dChunkedFIFO> {
-  typedef HIDDEN::BSInlineExecutor<T,FunctionTy,HIDDEN::dChunkedFIFO> SuperTy;
+struct ForEachWork<WorkList::BulkSynchronousInline<>,T,FunctionTy>:
+  public HIDDEN::BSInlineExecutor<T,FunctionTy> {
+  typedef HIDDEN::BSInlineExecutor<T,FunctionTy> SuperTy;
   ForEachWork(FunctionTy& f, const char* ln): SuperTy(f, ln) { }
 };
 

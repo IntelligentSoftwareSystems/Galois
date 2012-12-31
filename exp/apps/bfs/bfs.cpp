@@ -430,7 +430,8 @@ struct BarrierExpAlgo {
   typedef Pair<GNode,int> ItemTy;
 
   struct Initialize {
-    void operator()(const GNode& source, Galois::UserContext<ItemTy>& ctx) const {
+    template<typename Context>
+    void operator()(const GNode& source, Context& ctx) const {
       graph.getData(source).dist = 0;
       for (Graph::edge_iterator ii = graph.edge_begin(source),
             ei = graph.edge_end(source); ii != ei; ++ii) {
@@ -443,7 +444,8 @@ struct BarrierExpAlgo {
   };
 
   struct Process {
-    void operator()(const ItemTy& item, Galois::UserContext<ItemTy>& ctx) const {
+    template<typename Context>
+    void operator()(const ItemTy& item, Context& ctx) const {
       GNode n = item.first;
 
       unsigned int newDist = item.second;

@@ -101,29 +101,6 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
-#if 0
-template<typename Iter>
-void fill_work(Iter& b, Iter& e) {
-  unsigned int a = galoisActiveThreads;
-  unsigned int id = LL::getTID();
-  unsigned int dist = std::distance(b, e);
-  unsigned int num = (dist + a - 1) / a; //round up
-  unsigned int A = std::min(num * id, dist);
-  unsigned int B = std::min(num * (id + 1), dist);
-  e = b;
-  std::advance(b, A);
-  std::advance(e, B);
-}
-
-template<class WL, typename Iter>
-void fill_work(WL& wl, Iter b, Iter e) {
-  Iter b2 = b;
-  Iter e2 = e;
-  fill_work(b2, e2);
-  wl.push(b2, e2);
-}
-#endif
-
 template<typename T = int, bool concurrent = true>
 class LIFO : private boost::noncopyable, private LL::PaddedLock<concurrent> {
   std::deque<T> wl;

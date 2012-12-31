@@ -66,12 +66,12 @@ class galois_insert_bag : private boost::noncopyable {
     for (unsigned x = 0; x < heads.size(); ++x) {
       header*& h = *heads.getRemote(x);
       while (h) {
-	for (T* ii = h->dbegin, *ee = h->dend; ii != ee; ++ii) {
-	  ii->~T();
-	}
-	header* h2 = h;
-	h = h->next;
-	MM::pageFree(h2);
+        for (T* ii = h->dbegin, *ee = h->dend; ii != ee; ++ii) {
+          ii->~T();
+        }
+        header* h2 = h;
+        h = h->next;
+        MM::pageFree(h2);
       }
     }
   }
@@ -105,25 +105,25 @@ public:
 
     bool advance_local() {
       if (p) {
-	++v;
-	return v != p->dend;
+        ++v;
+        return v != p->dend;
       }
       return false;
     }
 
     bool advance_chunk() {
       if (p) {
-	p = p->next;
-	v = p ? p->dbegin : 0;
+        p = p->next;
+        v = p ? p->dbegin : 0;
       }
       return p;
     }
 
     void advance_thread() {
       while (thr < hd->size()) {
-	++thr;
-	if (init_thread())
-	  return;
+        ++thr;
+        if (init_thread())
+          return;
       }
     }
 
@@ -134,29 +134,25 @@ public:
     }
 
   public:
-    iterator() :hd(0), thr(0), p(0), v(0) {}
-    iterator(GaloisRuntime::PerThreadStorage<header*>* _hd, int _thr) 
-      :hd(_hd), thr(_thr), p(0), v(0)
+    iterator(): hd(0), thr(0), p(0), v(0) { }
+    iterator(GaloisRuntime::PerThreadStorage<header*>* _hd, int _thr): hd(_hd), thr(_thr), p(0), v(0)
     {
       //find first valid item
       if (!init_thread())
-	advance_thread();
+        advance_thread();
     }
 
-    iterator(const iterator& mit) :hd(mit.hd), thr(mit.thr), p(mit.p), v(mit.v) {}
+    iterator(const iterator& mit): hd(mit.hd), thr(mit.thr), p(mit.p), v(mit.v) { }
 
-    iterator& operator++() {
-      advance();
-      return *this;
-    }
-    iterator operator++(int) {iterator tmp(*this); operator++(); return tmp;}
+    iterator& operator++() { advance(); return *this; }
+    iterator operator++(int) { iterator tmp(*this); operator++(); return tmp; }
     bool operator==(const iterator& rhs) const {
       return (hd == rhs.hd && thr == rhs.thr && p==rhs.p && v == rhs.v);
     }
     bool operator!=(const iterator& rhs) const {
       return !(hd == rhs.hd && thr == rhs.thr && p==rhs.p && v == rhs.v);
     }
-    T& operator*() const {return *v;}
+    T& operator*() const { return *v; }
   };
   
   iterator begin() {
