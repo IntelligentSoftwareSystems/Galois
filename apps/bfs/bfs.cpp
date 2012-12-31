@@ -285,7 +285,7 @@ struct GaloisWorkSet {
   std::string name() const { return "Galois (Workset)"; }
 
   void operator()(const GNode& source) const {
-    using namespace GaloisRuntime::WorkList;
+    using namespace Galois::Runtime::WorkList;
     typedef dChunkedFIFO<64> dChunk;
     typedef ChunkedFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<GNodeIndexer,dChunk> OBIM;
@@ -397,9 +397,9 @@ struct GaloisDetBarrier {
 
   void operator()(const GNode& source) const {
 #ifdef GALOIS_USE_EXP
-    typedef GaloisRuntime::WorkList::BulkSynchronousInline<> WL;
+    typedef Galois::Runtime::WorkList::BulkSynchronousInline<> WL;
 #else
-  typedef GaloisRuntime::WorkList::BulkSynchronous<GaloisRuntime::WorkList::dChunkedLIFO<256> > WL;
+  typedef Galois::Runtime::WorkList::BulkSynchronous<Galois::Runtime::WorkList::dChunkedLIFO<256> > WL;
 #endif
     std::deque<ItemTy> initial;
 
@@ -492,8 +492,8 @@ template<typename AlgoTy>
 void run(const AlgoTy& algo) {
   GNode source, report;
   readGraph(source, report);
-  Galois::preAlloc((numThreads + (graph.size() * sizeof(SNode) * 2) / GaloisRuntime::MM::pageSize)*8);
-  Galois::Statistic("MeminfoPre", GaloisRuntime::MM::pageAllocInfo());
+  Galois::preAlloc((numThreads + (graph.size() * sizeof(SNode) * 2) / Galois::Runtime::MM::pageSize)*8);
+  Galois::Statistic("MeminfoPre", Galois::Runtime::MM::pageAllocInfo());
 
   Galois::StatTimer T;
   std::cout << "Running " << algo.name() << " version\n";
@@ -501,7 +501,7 @@ void run(const AlgoTy& algo) {
   algo(source);
   T.stop();
   
-  Galois::Statistic("MeminfoPost", GaloisRuntime::MM::pageAllocInfo());
+  Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
 
   std::cout << "Report node: " << reportNode << " " << graph.getData(report) << "\n";
 
@@ -520,7 +520,7 @@ int main(int argc, char **argv) {
   Galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
-  using namespace GaloisRuntime::WorkList;
+  using namespace Galois::Runtime::WorkList;
   typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;
 
 #ifdef GALOIS_USE_EXP

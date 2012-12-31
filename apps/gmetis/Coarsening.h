@@ -153,16 +153,16 @@ private:
 
 		if (notFirstTime) {
 			parallelMatchNodes<HEMMatcher> pHEM(metisGraph, coarser, maxVertexWeight);
-			Galois::for_each<GaloisRuntime::WorkList::ChunkedLIFO<64, GNode> >(graph->begin(), graph->end(), pHEM, "HEM_Match");
+			Galois::for_each<Galois::Runtime::WorkList::ChunkedLIFO<64, GNode> >(graph->begin(), graph->end(), pHEM, "HEM_Match");
 //			vector<GNode> v(graph->begin(), graph->end());
 //			std::random_shuffle( v.begin(), v.end() );
-//			Galois::for_each<GaloisRuntime::WorkList::ChunkedFIFO<32, GNode> >(v.begin(), v.end(), pHEM);
+//			Galois::for_each<Galois::Runtime::WorkList::ChunkedFIFO<32, GNode> >(v.begin(), v.end(), pHEM);
 		} else {
 			parallelMatchNodes<RMMatcher> pRM(metisGraph, coarser, maxVertexWeight);
 //			vector<GNode> v(graph->begin(), graph->end());
 //			std::random_shuffle( v.begin(), v.end() );
-//			Galois::for_each<GaloisRuntime::WorkList::ChunkedFIFO<32, GNode> >(v.begin(), v.end(), pRM);
-			Galois::for_each<GaloisRuntime::WorkList::ChunkedLIFO<64, GNode> >(graph->begin(), graph->end(), pRM, "RM_Match");
+//			Galois::for_each<Galois::Runtime::WorkList::ChunkedFIFO<32, GNode> >(v.begin(), v.end(), pRM);
+			Galois::for_each<Galois::Runtime::WorkList::ChunkedLIFO<64, GNode> >(graph->begin(), graph->end(), pRM, "RM_Match");
 			notFirstTime = true;
 		}
 		return notFirstTime;
@@ -296,7 +296,7 @@ private:
 //		Galois::Timer t2;
 //		t2.start();
 		parallelAddingEdges pae(metisGraph, coarseMetisGraph, this, visited);
-		Galois::for_each<GaloisRuntime::WorkList::ChunkedLIFO<32, GNode> >(graph->begin(), graph->end(), pae, "AddNeighbors");
+		Galois::for_each<Galois::Runtime::WorkList::ChunkedLIFO<32, GNode> >(graph->begin(), graph->end(), pae, "AddNeighbors");
 //		t2.stop();
 //		cout<<"createTime::"<<t2.get()<<endl;
 	}

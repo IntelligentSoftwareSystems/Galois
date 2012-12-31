@@ -46,7 +46,7 @@ template<typename T, typename BinFunc>
 class GReducible {
 protected:
   BinFunc m_func;
-  GaloisRuntime::PerThreadStorage<T> m_data;
+  Galois::Runtime::PerThreadStorage<T> m_data;
   const T m_initial;
 
   explicit GReducible(const BinFunc& f, const T& initial): m_func(f), m_initial(initial) { }

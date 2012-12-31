@@ -37,7 +37,7 @@
 #include <numa.h>
 #endif
 
-using namespace GaloisRuntime;
+using namespace Galois::Runtime;
 using namespace MM;
 using namespace LL;
 
@@ -86,15 +86,15 @@ SizedAllocatorFactory::~SizedAllocatorFactory() {
 }
 #endif
 
-void* GaloisRuntime::MM::largeAlloc(size_t len) {
+void* Galois::Runtime::MM::largeAlloc(size_t len) {
   return malloc(len);
 }
 
-void GaloisRuntime::MM::largeFree(void* m, size_t len) {
+void Galois::Runtime::MM::largeFree(void* m, size_t len) {
   free(m);
 }
 
-void* GaloisRuntime::MM::largeInterleavedAlloc(size_t len) {
+void* Galois::Runtime::MM::largeInterleavedAlloc(size_t len) {
   void* data = 0;
 #if defined GALOIS_USE_NUMA_OLD
   nodemask_t nm = numa_no_nodes;
@@ -117,7 +117,7 @@ void* GaloisRuntime::MM::largeInterleavedAlloc(size_t len) {
   return data;
 }
 
-void GaloisRuntime::MM::largeInterleavedFree(void* m, size_t len) {
+void Galois::Runtime::MM::largeInterleavedFree(void* m, size_t len) {
 #ifdef GALOIS_USE_NUMA
   numa_free(m, len);
 #else

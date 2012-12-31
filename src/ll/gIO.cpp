@@ -37,9 +37,9 @@
 #include <cstdarg>
 #include <cerrno>
 
-static GaloisRuntime::LL::SimpleLock<true> IOLock;
+static Galois::Runtime::LL::SimpleLock<true> IOLock;
 
-void GaloisRuntime::LL::gPrint(const char* format, ...) {
+void Galois::Runtime::LL::gPrint(const char* format, ...) {
   IOLock.lock();
   va_list ap;
   va_start(ap, format);
@@ -48,7 +48,7 @@ void GaloisRuntime::LL::gPrint(const char* format, ...) {
   IOLock.unlock();
 }
 
-void GaloisRuntime::LL::gDebug(const char* format, ...) {
+void Galois::Runtime::LL::gDebug(const char* format, ...) {
   static const unsigned TIME_STR_SIZE = 32;
   char time_str[TIME_STR_SIZE];
   time_t rawtime;
@@ -68,13 +68,13 @@ void GaloisRuntime::LL::gDebug(const char* format, ...) {
   vsprintf (msg, format, ap);
   va_end(ap);
   // vprintf (format, ap);
-  printf ("[%s Thrd:%-3d] %s\n", time_str, GaloisRuntime::LL::getTID (), msg);
+  printf ("[%s Thrd:%-3d] %s\n", time_str, Galois::Runtime::LL::getTID (), msg);
   // fflush (stdout);
 
   // IOLock.unlock();
 }
 
-void GaloisRuntime::LL::gInfo(const char* format, ...) {
+void Galois::Runtime::LL::gInfo(const char* format, ...) {
   IOLock.lock();
   va_list ap;
   va_start(ap, format);
@@ -85,7 +85,7 @@ void GaloisRuntime::LL::gInfo(const char* format, ...) {
   IOLock.unlock();
 }
 
-void GaloisRuntime::LL::gWarn(const char* format, ...) {
+void Galois::Runtime::LL::gWarn(const char* format, ...) {
   IOLock.lock();
   va_list ap;
   va_start(ap, format);
@@ -96,7 +96,7 @@ void GaloisRuntime::LL::gWarn(const char* format, ...) {
   IOLock.unlock();
 }
 
-void GaloisRuntime::LL::gError(bool doabort, const char* filename, int lineno, const char* format, ...) {
+void Galois::Runtime::LL::gError(bool doabort, const char* filename, int lineno, const char* format, ...) {
   IOLock.lock();
   va_list ap;
   va_start(ap, format);
@@ -109,7 +109,7 @@ void GaloisRuntime::LL::gError(bool doabort, const char* filename, int lineno, c
     abort();
 }
 
-void GaloisRuntime::LL::gSysError(bool doabort, const char* filename, int lineno, const char* format, ...) {
+void Galois::Runtime::LL::gSysError(bool doabort, const char* filename, int lineno, const char* format, ...) {
   int err_saved = errno;
   IOLock.lock();
   va_list ap;
@@ -123,6 +123,6 @@ void GaloisRuntime::LL::gSysError(bool doabort, const char* filename, int lineno
     abort();
 }
 
-void GaloisRuntime::LL::gFlush() {
+void Galois::Runtime::LL::gFlush() {
   fflush(stdout);
 }

@@ -52,7 +52,7 @@ typedef Galois::GAccumulator<size_t> Accumulator_ty;
 
 typedef des::EventRecvTimeLocalTieBrkCmp<TypeHelper::Event_ty> Cmp_ty;
 
-typedef GaloisRuntime::PerThreadVector<TypeHelper::Event_ty> AddList_ty;
+typedef Galois::Runtime::PerThreadVector<TypeHelper::Event_ty> AddList_ty;
 
 struct SimObjInfo;
 typedef std::vector<SimObjInfo> VecSobjInfo;
@@ -238,7 +238,7 @@ protected:
     AddList_ty newEvents;
     Accumulator_ty nevents;
 
-    GaloisRuntime::for_each_ordered_lc <CHUNK_SIZE> (
+    Galois::Runtime::for_each_ordered_lc <CHUNK_SIZE> (
         simInit.getInitEvents ().begin (), simInit.getInitEvents ().end (),
         Cmp_ty (), 
         OpFunc (graph, sobjInfoVec, newEvents, nevents),

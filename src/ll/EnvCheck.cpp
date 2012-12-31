@@ -25,13 +25,13 @@
 
 #include <cstdlib>
 
-bool GaloisRuntime::LL::EnvCheck(const char* parm) {
+bool Galois::Runtime::LL::EnvCheck(const char* parm) {
   if (getenv(parm))
     return true;
   return false;
 }
 
-bool GaloisRuntime::LL::EnvCheck(const char* parm, int& val) {
+bool Galois::Runtime::LL::EnvCheck(const char* parm, int& val) {
   char* t = getenv(parm);
   if (t) {
     val = atoi(t);

@@ -123,11 +123,11 @@ public:
     Galois::StatTimer t;
 
     t.start ();
-    GaloisRuntime::beginSampling ();
+    Galois::Runtime::beginSampling ();
 
     runLoop(simInit, graph);
 
-    GaloisRuntime::endSampling ();
+    Galois::Runtime::endSampling ();
     t.stop ();
 
     if (!skipVerify) {

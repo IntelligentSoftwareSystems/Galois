@@ -198,7 +198,7 @@ class NeoHookean: public SimpleMaterial {
   /**
    * Per thread storage for NeoHookenTmpVec 
    */
-  static GaloisRuntime::PerThreadStorage<NeoHookenTmpVec> perCPUtmpVec;
+  static Galois::Runtime::PerThreadStorage<NeoHookenTmpVec> perCPUtmpVec;
 
 public:
   NeoHookean(double LambdaInput, double MuInput, double rhoInput = 0) :

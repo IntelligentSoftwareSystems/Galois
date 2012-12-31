@@ -568,14 +568,14 @@ int main(int argc, char** argv) {
   
   // XXX Test if preallocation matters
   //Galois::preAlloc(numThreads);
-  Galois::Statistic("MeminfoPre", GaloisRuntime::MM::pageAllocInfo());
+  Galois::Statistic("MeminfoPre", Galois::Runtime::MM::pageAllocInfo());
   switch (algo) {
     case serial: run<SerialAlgo>(); break;
     case synchronous: run<SynchronousAlgo>(); break;
     case asynchronous: run<AsynchronousAlgo>(); break;
     default: std::cerr << "Unknown algo: " << algo << "\n";
   }
-  Galois::Statistic("MeminfoPost", GaloisRuntime::MM::pageAllocInfo());
+  Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
 
   if (!skipVerify || writeType == largest) {
     Node* component = findLargest();

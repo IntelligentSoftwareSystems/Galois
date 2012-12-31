@@ -43,7 +43,7 @@
 #include "Galois/Runtime/mm/Mem.h"
 #include "Galois/Runtime/Neighborhood.h"
 
-namespace GaloisRuntime {
+namespace Galois::Runtime {
 
 
 template <typename T, typename OperFunc, typename NhoodFunc, typename Cmp, typename Ctxt >
@@ -51,12 +51,12 @@ class TwoPhaseODGexecutor {
 
   typedef Galois::GAccumulator<size_t> Accumulator;
 
-  typedef GaloisRuntime::MM::FSBGaloisAllocator<Ctxt> CtxtAlloc_ty;
-  typedef GaloisRuntime::PerThreadVector<Ctxt*> CtxtWL_ty;
+  typedef Galois::Runtime::MM::FSBGaloisAllocator<Ctxt> CtxtAlloc_ty;
+  typedef Galois::Runtime::PerThreadVector<Ctxt*> CtxtWL_ty;
 
-  typedef GaloisRuntime::PerThreadVector<Ctxt*> SrcWL_ty;
+  typedef Galois::Runtime::PerThreadVector<Ctxt*> SrcWL_ty;
 
-  typedef GaloisRuntime::PerThreadVector<T> AddList;
+  typedef Galois::Runtime::PerThreadVector<T> AddList;
 
   struct CreateCtxt {
     CtxtAlloc_ty& ctxtAlloc;
@@ -96,10 +96,10 @@ class TwoPhaseODGexecutor {
     void operator () (Ctxt* ctxt) {
       findIter += 1;
 
-      GaloisRuntime::setThreadContext (ctxt);
+      Galois::Runtime::setThreadContext (ctxt);
       ctxt->removeFromNhood ();
       nhoodVisitor (ctxt->active);
-      GaloisRuntime::setThreadContext (NULL);
+      Galois::Runtime::setThreadContext (NULL);
     }
   };
 
@@ -320,7 +320,7 @@ public:
     Galois::TimeAccumulator findTime;
     Galois::TimeAccumulator opTime;
 
-    // GaloisRuntime::do_all_coupled (
+    // Galois::Runtime::do_all_coupled (
     Galois::do_all (
         abeg, aend, 
         CreateCtxtExpandNhood (nhoodVisitor, ctxtAlloc, contexts, expIter),
@@ -336,7 +336,7 @@ public:
       sources.clear_all ();
 
       findTime.start ();
-      // GaloisRuntime::do_all_coupled ( 
+      // Galois::Runtime::do_all_coupled ( 
       Galois::do_all ( 
           nbeg, nend,
           FindSourcesByNeighborhood (cmp, sources, findIter),
@@ -353,7 +353,7 @@ public:
       }
 
       opTime.start ();
-      // GaloisRuntime::do_all_coupled (
+      // Galois::Runtime::do_all_coupled (
       Galois::do_all (
           sources.begin_all (), sources.end_all (),
           ApplyOperatorShareList (
@@ -490,7 +490,7 @@ void for_each_ordered (AI abeg, AI aend, OperFunc operFunc, NhoodFunc nhoodVisit
 }
 
 
-} // end namespace GaloisRuntime
+} // end namespace Galois::Runtime
 
 #endif // GALOIS_RUNTIME_ODG_TWO_PHASE_H
 

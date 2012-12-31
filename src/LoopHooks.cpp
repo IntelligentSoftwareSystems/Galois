@@ -2,7 +2,7 @@
 
 #include "Galois/Runtime/ll/TID.h"
 
-using namespace GaloisRuntime;
+using namespace Galois::Runtime;
 
 static AtLoopExit* head;
 
@@ -21,7 +21,7 @@ AtLoopExit::~AtLoopExit() {
   }
 }
 
-void GaloisRuntime::runAllLoopExitHandlers() {
+void Galois::Runtime::runAllLoopExitHandlers() {
   if (LL::getTID() == 0) {
     AtLoopExit* h = head;
     while (h) {

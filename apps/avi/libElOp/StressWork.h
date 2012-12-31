@@ -126,7 +126,7 @@ private:
   /**
    * Per thread storage for temporary vectors used in @see getDValIntern
    */
-  typedef GaloisRuntime::PerThreadStorage<StressWorkTmpVec> PerCPUtmpVecTy;
+  typedef Galois::Runtime::PerThreadStorage<StressWorkTmpVec> PerCPUtmpVecTy;
 
   static PerCPUtmpVecTy perCPUtmpVec;
 

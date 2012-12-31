@@ -27,7 +27,7 @@ using namespace std;
 
 #include "hwloc.h"
 
-class hwloc_policy : public GaloisRuntime::ThreadPolicy {
+class hwloc_policy : public Galois::Runtime::ThreadPolicy {
   hwloc_topology_t topology;
 
   //thread id -> obj map
@@ -126,17 +126,17 @@ public:
 
   virtual void bindThreadToProcessor() {
     return;
-    int id = GaloisRuntime::getSystemThreadPool().getMyID();
+    int id = Galois::Runtime::getSystemThreadPool().getMyID();
     //cerr << "Binding Thread " << id << "\n";
     if (hwloc_set_cpubind(topology, bindObj[id - 1]->cpuset, 0) < 0) {
-      GaloisRuntime::reportWarning("Binding of CPU to thread failed");
+      Galois::Runtime::reportWarning("Binding of CPU to thread failed");
     }
   }
 
 };
 
 hwloc_policy hwloc_SystemPolicy;
-GaloisRuntime::ThreadPolicy& GaloisRuntime::getSystemThreadPolicy() {
+Galois::Runtime::ThreadPolicy& Galois::Runtime::getSystemThreadPolicy() {
   static hwloc_policy hwloc_SystemPolicy;
   return hwloc_SystemPolicy;
 }

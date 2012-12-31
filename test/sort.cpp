@@ -15,12 +15,12 @@ struct IsOddS {
 
 int do_sort() {
 
-  unsigned M = GaloisRuntime::LL::getMaxThreads();
+  unsigned M = Galois::Runtime::LL::getMaxThreads();
   std::cout << "sort:\n";
 
   while (M) {
     
-    Galois::setActiveThreads(M); //GaloisRuntime::LL::getMaxThreads());
+    Galois::setActiveThreads(M); //Galois::Runtime::LL::getMaxThreads());
     std::cout << "Using " << M << " threads\n";
     
     std::vector<unsigned> V(1024*1024*16);
@@ -66,12 +66,12 @@ int do_sort() {
 
 int do_count_if() {
 
-  unsigned M = GaloisRuntime::LL::getMaxThreads();
+  unsigned M = Galois::Runtime::LL::getMaxThreads();
   std::cout << "count_if:\n";
 
   while (M) {
     
-    Galois::setActiveThreads(M); //GaloisRuntime::LL::getMaxThreads());
+    Galois::setActiveThreads(M); //Galois::Runtime::LL::getMaxThreads());
     std::cout << "Using " << M << " threads\n";
     
     std::vector<unsigned> V(1024*1024*16);
@@ -108,12 +108,12 @@ struct mymax : std:: binary_function<T,T,T> {
 
 int do_accumulate() {
 
-  unsigned M = GaloisRuntime::LL::getMaxThreads();
+  unsigned M = Galois::Runtime::LL::getMaxThreads();
   std::cout << "accumulate:\n";
 
   while (M) {
     
-    Galois::setActiveThreads(M); //GaloisRuntime::LL::getMaxThreads());
+    Galois::setActiveThreads(M); //Galois::Runtime::LL::getMaxThreads());
     std::cout << "Using " << M << " threads\n";
     
     std::vector<unsigned> V(1024*1024*16);

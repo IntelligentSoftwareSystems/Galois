@@ -170,9 +170,9 @@ struct Process {
 struct GaloisAlgo {
   void operator()() {
 #ifdef GALOIS_USE_EXP
-    typedef GaloisRuntime::WorkList::BulkSynchronousInline<false> WL;
+    typedef Galois::Runtime::WorkList::BulkSynchronousInline<false> WL;
 #else
-    typedef GaloisRuntime::WorkList::dChunkedFIFO<256> WL;
+    typedef Galois::Runtime::WorkList::dChunkedFIFO<256> WL;
 #endif
 
     switch (detAlgo) {
@@ -248,8 +248,8 @@ int main(int argc, char** argv) {
   for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii, ++id)
     graph.getData(*ii).id = id;
   
-  Galois::preAlloc(numThreads + (graph.size() * sizeof(Node) * numThreads / 8) / GaloisRuntime::MM::pageSize);
-  Galois::Statistic("MeminfoPre", GaloisRuntime::MM::pageAllocInfo());
+  Galois::preAlloc(numThreads + (graph.size() * sizeof(Node) * numThreads / 8) / Galois::Runtime::MM::pageSize);
+  Galois::Statistic("MeminfoPre", Galois::Runtime::MM::pageAllocInfo());
   Galois::StatTimer T;
   T.start();
   switch (algo) {
@@ -258,7 +258,7 @@ int main(int argc, char** argv) {
     default: std::cerr << "Unknown algorithm" << algo << "\n"; abort();
   }
   T.stop();
-  Galois::Statistic("MeminfoPost", GaloisRuntime::MM::pageAllocInfo());
+  Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
 
   std::cout << "Cardinality of maximal independent set: " 
     << Galois::ParallelSTL::count_if(graph.begin(), graph.end(), is_matched()) 

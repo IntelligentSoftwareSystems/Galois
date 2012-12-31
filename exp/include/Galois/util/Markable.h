@@ -81,7 +81,7 @@ struct IsNotMarked {
 template <typename T, typename C>
 struct RemoveMarked {
 
-  typedef GaloisRuntime::PerThreadWorkList<Markable<T>, C> WL_ty;
+  typedef Galois::Runtime::PerThreadWorkList<Markable<T>, C> WL_ty;
 
   WL_ty& wl;
 
@@ -101,10 +101,10 @@ struct RemoveMarked {
 };
 
 template <typename T, typename C>
-void removeMarked (GaloisRuntime::PerThreadWorkList<Markable<T>, C>& wl) {
+void removeMarked (Galois::Runtime::PerThreadWorkList<Markable<T>, C>& wl) {
 
   Galois::do_all (
-  // GaloisRuntime::do_all_coupled (
+  // Galois::Runtime::do_all_coupled (
       boost::counting_iterator<unsigned> (0),
       boost::counting_iterator<unsigned> (wl.numRows ()),
       RemoveMarked<T, C> (wl),
@@ -130,10 +130,10 @@ struct RemoveMarkedStable: public RemoveMarked<T, C> {
 };
 
 template <typename T, typename C>
-void removeMarkedStable (GaloisRuntime::PerThreadWorkList<Markable<T>, C>& wl) {
+void removeMarkedStable (Galois::Runtime::PerThreadWorkList<Markable<T>, C>& wl) {
 
   Galois::do_all (
-  // GaloisRuntime::do_all_coupled (
+  // Galois::Runtime::do_all_coupled (
       boost::counting_iterator<unsigned> (0),
       boost::counting_iterator<unsigned> (wl.numRows ()),
       RemoveMarkedStable<T, C> (wl),

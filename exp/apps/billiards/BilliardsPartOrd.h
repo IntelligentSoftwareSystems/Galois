@@ -500,10 +500,10 @@ class BilliardsPOsortedVec;
 
 class BilliardsPOunsorted: public Billiards {
 
-  typedef GaloisRuntime::PerThreadVector<Markable<Event> > WLTy;
-  typedef GaloisRuntime::PerThreadVector<Event> ILTy;
+  typedef Galois::Runtime::PerThreadVector<Markable<Event> > WLTy;
+  typedef Galois::Runtime::PerThreadVector<Event> ILTy;
 
-  typedef GaloisRuntime::PerCPU< std::vector<Event> > AddListTy;
+  typedef Galois::Runtime::PerCPU< std::vector<Event> > AddListTy;
 
   friend class BilliardsPOsortedVec;
 
@@ -529,7 +529,7 @@ private:
 
 template <typename _CleanupFunc>
 GALOIS_ATTRIBUTE_PROF_NOINLINE static void updateODG_clean (WLTy& workList, const unsigned currStep) {
-  GaloisRuntime::do_all_coupled (
+  Galois::Runtime::do_all_coupled (
       boost::counting_iterator<unsigned> (0),
       boost::counting_iterator<unsigned> (workList.numRows ()), 
       _CleanupFunc (workList, currStep),
@@ -563,7 +563,7 @@ static size_t runSimInternal (Table& table, WLTy& workList, const double endtime
       indepList.clear_all ();
 
       findTimer.start ();
-      GaloisRuntime::do_all_coupled (workList, 
+      Galois::Runtime::do_all_coupled (workList, 
           _FindIndepFunc (indepList, workList, currStep, findIter), "find_indep_events", CHUNK_SIZE);
       findTimer.stop ();
 
@@ -571,11 +571,11 @@ static size_t runSimInternal (Table& table, WLTy& workList, const double endtime
           // currStep, indepList.size_all (), workList.size_all ());
 
       simTimer.start ();
-      GaloisRuntime::do_all_serial (indepList, _SimulateFunc (), "simulate_indep_events");
+      Galois::Runtime::do_all_serial (indepList, _SimulateFunc (), "simulate_indep_events");
       simTimer.stop ();
 
       addTimer.start ();
-      GaloisRuntime::do_all_coupled (indepList, 
+      Galois::Runtime::do_all_coupled (indepList, 
           _AddNextFunc (workList, addList, table, endtime, enablePrints), "add_next_events", CHUNK_SIZE);
       addTimer.stop ();
 

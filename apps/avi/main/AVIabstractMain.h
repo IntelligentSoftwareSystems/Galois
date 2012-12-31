@@ -100,7 +100,7 @@ private:
 
 protected:
   static const int CHUNK_SIZE = 32;
-  typedef GaloisRuntime::WorkList::dChunkedFIFO<CHUNK_SIZE> AVIWorkList;
+  typedef Galois::Runtime::WorkList::dChunkedFIFO<CHUNK_SIZE> AVIWorkList;
 
   typedef Galois::GAccumulator<size_t> IterCounter;
 
@@ -246,10 +246,10 @@ void AVIabstractMain::run (int argc, char* argv[]) {
   Galois::StatTimer t;
   t.start ();
 
-  GaloisRuntime::beginSampling ();
+  Galois::Runtime::beginSampling ();
   // don't write to files when measuring time
   runLoop (*meshInit, g, false);
-  GaloisRuntime::endSampling ();
+  Galois::Runtime::endSampling ();
 
   t.stop ();
 

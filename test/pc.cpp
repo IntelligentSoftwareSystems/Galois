@@ -6,11 +6,11 @@
 
 #include <iostream>
 
-GaloisRuntime::MCSBarrier mbarrier;
-GaloisRuntime::PthreadBarrier pbarrier;
-GaloisRuntime::FastBarrier fbarrier;
-GaloisRuntime::FasterBarrier ffbarrier;
-GaloisRuntime::TopoBarrier tbarrier;
+Galois::Runtime::MCSBarrier mbarrier;
+Galois::Runtime::PthreadBarrier pbarrier;
+Galois::Runtime::FastBarrier fbarrier;
+Galois::Runtime::FasterBarrier ffbarrier;
+Galois::Runtime::TopoBarrier tbarrier;
 
 template<typename BarTy>
 struct test {
@@ -37,11 +37,11 @@ void testf(T& b, const char* str) {
 
 int main() {
 
-  unsigned M = GaloisRuntime::LL::getMaxThreads();
+  unsigned M = Galois::Runtime::LL::getMaxThreads();
 
   while (M) {
     
-    Galois::setActiveThreads(M); //GaloisRuntime::LL::getMaxThreads());
+    Galois::setActiveThreads(M); //Galois::Runtime::LL::getMaxThreads());
   std::cout << "Using " << M << " threads\n";
 
   if (0) {
@@ -50,28 +50,28 @@ int main() {
 
   Galois::Timer t;
   t.start();
-  GaloisRuntime::PerCPU<int> v;
+  Galois::Runtime::PerCPU<int> v;
   for (int i = 0; i < count; ++i)
     v.get()++;
   t.stop();
 
   Galois::Timer t2;
   t2.start();
-  GaloisRuntime::PerThreadStorage<int> v2;
+  Galois::Runtime::PerThreadStorage<int> v2;
   for (int i = 0; i < count; ++i)
     (*v2.getLocal())++;
   t2.stop();
 
   Galois::Timer t3;
   t3.start();
-  GaloisRuntime::PerCPU<int> v3;
+  Galois::Runtime::PerCPU<int> v3;
   for (int i = 0; i < count; ++i)
     v3.get(1)++;
   t3.stop();
 
   Galois::Timer t4;
   t4.start();
-  GaloisRuntime::PerThreadStorage<int> v4;
+  Galois::Runtime::PerThreadStorage<int> v4;
   for (int i = 0; i < count; ++i)
     (*v4.getRemote(1))++;
   t4.stop();

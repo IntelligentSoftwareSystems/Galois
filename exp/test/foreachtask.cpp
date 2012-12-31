@@ -3,9 +3,9 @@
 #include <vector>
 
 using namespace std;
-using namespace GaloisRuntime;
+using namespace Galois::Runtime;
 
-struct R : public GaloisRuntime::Lockable {
+struct R : public Galois::Runtime::Lockable {
    int i;
 
    R() { i = 0; }
@@ -32,7 +32,7 @@ struct f1 {
    }
 
    static void rstart (char *f, int count, char *data) {
-      using namespace GaloisRuntime::WorkList;
+      using namespace Galois::Runtime::WorkList;
       typedef LIFO<int,true> chunk;
   //  typedef ChunkedFIFO<16> chunk;
       int *beg = (int*)data;

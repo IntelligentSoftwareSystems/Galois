@@ -7,13 +7,13 @@ namespace Galois {
 
    template<typename IterTy, typename FunctionTy>
    void for_each_task(IterTy b, IterTy e, FunctionTy f) {
-      GaloisRuntime::for_each_task_impl<IterTy,FunctionTy>(b, e, f);
-      GaloisRuntime::set_distributed_foreach(false);
+      Galois::Runtime::for_each_task_impl<IterTy,FunctionTy>(b, e, f);
+      Galois::Runtime::set_distributed_foreach(false);
    }
 
    void for_each_begin() {
-      GaloisRuntime::set_distributed_foreach(true);
-      GaloisRuntime::for_each_begin_impl();
+      Galois::Runtime::set_distributed_foreach(true);
+      Galois::Runtime::for_each_begin_impl();
    }
 }
 #endif

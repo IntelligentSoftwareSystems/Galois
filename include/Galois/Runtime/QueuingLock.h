@@ -22,7 +22,7 @@ kind.
 
 #include <cassert>
 
-namespace GaloisRuntime {
+namespace Galois::Runtime {
 
 template<bool isALock>
 class QueuingLock;

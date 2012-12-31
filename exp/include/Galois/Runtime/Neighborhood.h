@@ -40,7 +40,7 @@
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
 
-namespace GaloisRuntime {
+namespace Galois::Runtime {
 
 template <typename NItem>
 struct NhoodIDcmp {
@@ -126,7 +126,7 @@ struct NhoodItemShareList: public Lockable {
   typedef NhoodListContext<T, MyType> Ctxt;
 
 
-  typedef GaloisRuntime::LL::SimpleLock<true> Lock_ty;
+  typedef Galois::Runtime::LL::SimpleLock<true> Lock_ty;
 
   typedef std::vector<Ctxt*> ShareList;
 
@@ -143,7 +143,7 @@ public:
 
   template <typename C>
   void visit (C& cmp, Galois::MethodFlag flag=Galois::NONE) {
-    GaloisRuntime::SimpleRuntimeContext* c = GaloisRuntime::getThreadContext ();
+    Galois::Runtime::SimpleRuntimeContext* c = Galois::Runtime::getThreadContext ();
     assert (c != NULL);
     Ctxt* ctxt = static_cast<Ctxt*> (c);
     assert (ctxt != NULL);
@@ -250,7 +250,7 @@ public:
 
   template <typename C>
   void visit (C& cmp, Galois::MethodFlag flat=Galois::NONE) {
-    GaloisRuntime::SimpleRuntimeContext* c = GaloisRuntime::getThreadContext ();
+    Galois::Runtime::SimpleRuntimeContext* c = Galois::Runtime::getThreadContext ();
     assert (c != NULL);
     Ctxt* ctxt = static_cast<Ctxt*> (c);
     assert (ctxt != NULL);
@@ -295,7 +295,7 @@ public:
 
 };
 
-} // end namespace GaloisRuntime
+} // end namespace Galois::Runtime
 
 
 #endif // GALOIS_RUNTIME_NEIGHBORHOOD_H

@@ -80,7 +80,7 @@ struct GNodeIndexer {
 unsigned int max_dist;
 std::deque<unsigned int> level_count;
 std::deque<unsigned int> read_offset;
-std::deque<GaloisRuntime::LL::CacheLineStorage<unsigned int> > write_offset;
+std::deque<Galois::Runtime::LL::CacheLineStorage<unsigned int> > write_offset;
 //std::deque<unsigned int> write_offset;
 std::vector<GNode> perm;
 
@@ -138,7 +138,7 @@ struct CutHillUnordered {
   };
 
     static void go(GNode source) {
-      using namespace GaloisRuntime::WorkList;
+      using namespace Galois::Runtime::WorkList;
       typedef dChunkedFIFO<64> dChunk;
       typedef ChunkedFIFO<64> Chunk;
       typedef OrderedByIntegerMetric<GNodeIndexer,dChunk> OBIM;
@@ -172,7 +172,7 @@ struct CutHillUnordered {
     }
 
     static void go(GNode source) {
-      level_count = GaloisRuntime::do_all_impl(graph.begin(), graph.end(), count_levels(), default_reduce(), true).counts;
+      level_count = Galois::Runtime::do_all_impl(graph.begin(), graph.end(), count_levels(), default_reduce(), true).counts;
       read_offset.push_back(0);
       std::partial_sum(level_count.begin(), level_count.end(), back_inserter(read_offset));
       //write_offset = read_offset;
@@ -220,7 +220,7 @@ struct CutHillUnordered {
     }
 
     static void go(GNode source) {
-      using namespace GaloisRuntime::WorkList;
+      using namespace Galois::Runtime::WorkList;
       typedef dChunkedFIFO<8> dChunk;
       typedef ChunkedFIFO<8> Chunk;
       typedef OrderedByIntegerMetric<UnsignedIndexer,FIFO<> > OBIM;
@@ -255,7 +255,7 @@ struct CutHillUnordered {
     }
   }
   static void go(const GNode& source) {
-    using namespace GaloisRuntime::WorkList;
+    using namespace Galois::Runtime::WorkList;
     typedef dChunkedFIFO<64> dChunk;
     typedef ChunkedFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<GNodeIndexer,dChunk> OBIM;

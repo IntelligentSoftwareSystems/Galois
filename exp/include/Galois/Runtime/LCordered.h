@@ -49,7 +49,7 @@
 #include <tr1/unordered_map>
 
 
-namespace GaloisRuntime {
+namespace Galois::Runtime {
 
   static const bool DEBUG = false;
 
@@ -239,8 +239,8 @@ public:
   typedef LCorderedContext<T, Cmp, MyType> Ctxt;
   typedef typename Ctxt::NItem NItem;
 
-  typedef GaloisRuntime::MM::FSBGaloisAllocator<NItem> NItemAlloc;
-  typedef GaloisRuntime::PerThreadVector<NItem*> NItemWL;
+  typedef Galois::Runtime::MM::FSBGaloisAllocator<NItem> NItemAlloc;
+  typedef Galois::Runtime::PerThreadVector<NItem*> NItemWL;
 
 
   Cmp cmp;
@@ -326,7 +326,7 @@ public:
       PerThreadAllocator
     > NhoodMap;
 
-  typedef GaloisRuntime::LL::ThreadRWlock Lock_ty;
+  typedef Galois::Runtime::LL::ThreadRWlock Lock_ty;
 
 protected:
   Cmp cmp;
@@ -428,11 +428,11 @@ class LCorderedExec {
   typedef typename Ctxt::value_type T;
   typedef typename Ctxt::NhoodMgr NhoodMgr;
 
-  typedef GaloisRuntime::MM::FSBGaloisAllocator<Ctxt> CtxtAlloc;
-  typedef GaloisRuntime::PerThreadVector<Ctxt*> CtxtWL;
-  typedef GaloisRuntime::PerThreadDeque<Ctxt*> CtxtDelQ;
-  typedef GaloisRuntime::PerThreadDeque<Ctxt*> CtxtLocalQ;
-  typedef GaloisRuntime::PerThreadVector<T> AddWL;
+  typedef Galois::Runtime::MM::FSBGaloisAllocator<Ctxt> CtxtAlloc;
+  typedef Galois::Runtime::PerThreadVector<Ctxt*> CtxtWL;
+  typedef Galois::Runtime::PerThreadDeque<Ctxt*> CtxtDelQ;
+  typedef Galois::Runtime::PerThreadDeque<Ctxt*> CtxtLocalQ;
+  typedef Galois::Runtime::PerThreadVector<T> AddWL;
 
 
   typedef Galois::GAccumulator<size_t> Accumulator;
@@ -464,9 +464,9 @@ class LCorderedExec {
 
       ctxtWL.get ().push_back (ctxt);
 
-      GaloisRuntime::setThreadContext (ctxt);
+      Galois::Runtime::setThreadContext (ctxt);
       nhoodVisitor (ctxt->active);
-      GaloisRuntime::setThreadContext (NULL);
+      Galois::Runtime::setThreadContext (NULL);
     }
 
   };
@@ -689,7 +689,7 @@ public:
     CtxtDelQ ctxtDelQ;
     CtxtLocalQ ctxtLocalQ;
 
-    typedef GaloisRuntime::WorkList::dChunkedFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
+    typedef Galois::Runtime::WorkList::dChunkedFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
     // TODO: code to find global min goes here
 
     t_for.start ();

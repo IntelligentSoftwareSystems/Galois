@@ -37,7 +37,7 @@ namespace Galois {
 class Statistic {
   std::string statname;
   std::string loopname;
-  GaloisRuntime::PerThreadStorage<unsigned long> val;
+  Galois::Runtime::PerThreadStorage<unsigned long> val;
   bool valid;
 
 public:
@@ -54,7 +54,7 @@ public:
   //! Adds stat to stat pool, usually deconsructor or StatManager calls this for you.
   void report() {
     if (valid)
-      GaloisRuntime::reportStat(this);
+      Galois::Runtime::reportStat(this);
     valid = false;
   }
 
@@ -85,7 +85,7 @@ public:
     for (std::list<Statistic*>::iterator ii = stats.begin(), ei = stats.end(); ii != ei; ++ii) {
       (*ii)->report();
     }
-    GaloisRuntime::printStats();
+    Galois::Runtime::printStats();
   }
 
   //! Statistics that are not lexically scoped must be added explicitly
@@ -104,21 +104,21 @@ public:
   StatTimer(): name("Time"), loopname(0), main(true) { }
   StatTimer(const char* n, const char* l = 0): name(n), loopname(l), main(false) { }
   ~StatTimer() {
-    GaloisRuntime::reportStat(loopname, name, get());
+    Galois::Runtime::reportStat(loopname, name, get());
     if (main)
-      GaloisRuntime::reportSampling(loopname);
+      Galois::Runtime::reportSampling(loopname);
   }
 
   void start() {
     if (main)
-      GaloisRuntime::beginSampling();
+      Galois::Runtime::beginSampling();
     Timer::start();
   }
 
   void stop() {
     Timer::stop();
     if (main)
-      GaloisRuntime::endSampling();
+      Galois::Runtime::endSampling();
   }
 };
 

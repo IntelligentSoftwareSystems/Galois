@@ -60,7 +60,7 @@ protected:
   typedef std::vector<AVI*> VecAVI;
   typedef std::vector<VecAVI> VecVecAVI;
 
-  typedef GaloisRuntime::PerThreadVector<AVI*> WL_ty;
+  typedef Galois::Runtime::PerThreadVector<AVI*> WL_ty;
 
   VecVecAVI vertexSharers;
 
@@ -213,7 +213,7 @@ protected:
     VecVecAVI& vertexSharers;
     MeshInit& meshInit;
     GlobalVec& g;
-    GaloisRuntime::PerThreadStorage<LocalVec>& perIterLocalVec;
+    Galois::Runtime::PerThreadStorage<LocalVec>& perIterLocalVec;
     bool createSyncFiles;
     IterCounter& opIter;
 
@@ -221,7 +221,7 @@ protected:
         VecVecAVI& vertexSharers,
         MeshInit& meshInit,
         GlobalVec& g,
-        GaloisRuntime::PerThreadStorage<LocalVec>& perIterLocalVec,
+        Galois::Runtime::PerThreadStorage<LocalVec>& perIterLocalVec,
         bool createSyncFiles,
         IterCounter& opIter):
 
@@ -259,7 +259,7 @@ public:
     const size_t nrows = meshInit.getSpatialDim ();
     const size_t ncols = meshInit.getNodesPerElem();
 
-    GaloisRuntime::PerThreadStorage<LocalVec> perIterLocalVec;
+    Galois::Runtime::PerThreadStorage<LocalVec> perIterLocalVec;
     for (unsigned int i = 0; i < perIterLocalVec.size(); ++i)
       *perIterLocalVec.getRemote(i) = LocalVec(nrows, ncols);
 

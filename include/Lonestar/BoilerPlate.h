@@ -41,7 +41,7 @@ static llvm::cl::opt<int> numThreads("t", llvm::cl::desc("Number of threads"), l
 
 //! initialize lonestar benchmark
 void LonestarStart(int argc, char** argv, const char* app, const char* desc = 0, const char* url = 0) {
-  using namespace GaloisRuntime::LL;
+  using namespace Galois::Runtime::LL;
 
   gPrint("Galois Benchmark Suite v" GALOIS_VERSION_STRING);
   gPrint(" (r%d)\n", SVNVERSION);
@@ -69,7 +69,7 @@ void LonestarStart(int argc, char** argv, const char* app, const char* desc = 0,
   numThreads = Galois::setActiveThreads(numThreads); 
 
   // gInfo ("Using %d threads\n", numThreads.getValue());
-  GaloisRuntime::reportStat (0, "Threads", numThreads);
+  Galois::Runtime::reportStat (0, "Threads", numThreads);
 }
 
 #endif

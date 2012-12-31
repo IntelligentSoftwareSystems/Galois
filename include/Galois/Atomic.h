@@ -38,7 +38,7 @@ namespace HIDDEN {
  */
 template<typename T, template <typename _> class W>
 class GAtomicImpl {
-  // GaloisRuntime::LL::CacheLineStorage<T> val;
+  // Galois::Runtime::LL::CacheLineStorage<T> val;
   W<T> val;
 
 public:
@@ -239,9 +239,9 @@ public:
 
 template <typename T>
 class GAtomicPadded: 
-  public HIDDEN::GAtomicBase<T, GaloisRuntime::LL::CacheLineStorage> {
+  public HIDDEN::GAtomicBase<T, Galois::Runtime::LL::CacheLineStorage> {
 
-  typedef HIDDEN::GAtomicBase<T, GaloisRuntime::LL::CacheLineStorage> Super_ty;
+  typedef HIDDEN::GAtomicBase<T, Galois::Runtime::LL::CacheLineStorage> Super_ty;
 
 public:
   GAtomicPadded(): Super_ty () {}

@@ -9,15 +9,15 @@ const unsigned iter = 16*1024;
 
 struct emp {
   template<typename T>
-  void operator()(const T& t) { GaloisRuntime::LL::compilerBarrier(); }
+  void operator()(const T& t) { Galois::Runtime::LL::compilerBarrier(); }
   template<typename T, typename C>
-  void operator()(const T& t, const C& c) { GaloisRuntime::LL::compilerBarrier(); }
+  void operator()(const T& t, const C& c) { Galois::Runtime::LL::compilerBarrier(); }
 };
 
 void t_stl() {
 
   std::vector<unsigned> V(1024);
-  //unsigned M = GaloisRuntime::LL::getMaxThreads();
+  //unsigned M = Galois::Runtime::LL::getMaxThreads();
 
   std::cout << "stl:\nIterxSize\n";
 
@@ -35,13 +35,13 @@ void t_stl() {
 void t_doall() {
 
   std::vector<unsigned> V(1024);
-  unsigned M = GaloisRuntime::LL::getMaxThreads();
+  unsigned M = Galois::Runtime::LL::getMaxThreads();
 
   std::cout << "doall:\nIterxSize\n";
 
   while (M) {
     
-    Galois::setActiveThreads(M); //GaloisRuntime::LL::getMaxThreads());
+    Galois::setActiveThreads(M); //Galois::Runtime::LL::getMaxThreads());
     std::cout << "Using " << M << " threads\n";
    
     Galois::Timer t;
@@ -59,20 +59,20 @@ void t_doall() {
 void t_foreach() {
 
   std::vector<unsigned> V(1024);
-  unsigned M = GaloisRuntime::LL::getMaxThreads();
+  unsigned M = Galois::Runtime::LL::getMaxThreads();
 
   std::cout << "foreach:\nIterxSize\n";
 
   while (M) {
     
-    Galois::setActiveThreads(M); //GaloisRuntime::LL::getMaxThreads());
+    Galois::setActiveThreads(M); //Galois::Runtime::LL::getMaxThreads());
     std::cout << "Using " << M << " threads\n";
    
     Galois::Timer t;
     t.start();
     for (unsigned x = 0; x < iter; ++x)
-      Galois::for_each<GaloisRuntime::WorkList::RandomAccessRange<false,std::vector<unsigned>::iterator> >(V.begin(), V.end(), emp());
-    //      Galois::for_each<GaloisRuntime::WorkList::dChunkedFIFO<> >(V.begin(), V.end(), emp());
+      Galois::for_each<Galois::Runtime::WorkList::RandomAccessRange<false,std::vector<unsigned>::iterator> >(V.begin(), V.end(), emp());
+    //      Galois::for_each<Galois::Runtime::WorkList::dChunkedFIFO<> >(V.begin(), V.end(), emp());
     t.stop();
 
     std::cout << "Galois(" << iter << "x" << V.size() << "): " << t.get() << "\n";

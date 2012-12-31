@@ -55,9 +55,9 @@ protected:
   typedef std::vector<VecAVI> VecVertexAdj;
 
 #ifdef USE_SHARE_LIST
-  typedef GaloisRuntime::NhoodItemShareList<AVI*> NItem;
+  typedef Galois::Runtime::NhoodItemShareList<AVI*> NItem;
 #else 
-  typedef GaloisRuntime::NhoodItemPriorityLock<AVI*> NItem;
+  typedef Galois::Runtime::NhoodItemPriorityLock<AVI*> NItem;
 #endif 
 
   typedef std::vector<NItem> VecNItem;
@@ -113,14 +113,14 @@ protected:
 
     MeshInit& meshInit;
     GlobalVec& g;
-    GaloisRuntime::PerThreadStorage<LocalVec>& perIterLocalVec;
+    Galois::Runtime::PerThreadStorage<LocalVec>& perIterLocalVec;
     bool createSyncFiles;
     IterCounter& iter;
 
     OperFunc (
         MeshInit& meshInit,
         GlobalVec& g,
-        GaloisRuntime::PerThreadStorage<LocalVec>& perIterLocalVec,
+        Galois::Runtime::PerThreadStorage<LocalVec>& perIterLocalVec,
         bool createSyncFiles,
         IterCounter& iter):
 
@@ -172,7 +172,7 @@ public:
     const size_t nrows = meshInit.getSpatialDim ();
     const size_t ncols = meshInit.getNodesPerElem();
 
-    GaloisRuntime::PerThreadStorage<LocalVec> perIterLocalVec;
+    Galois::Runtime::PerThreadStorage<LocalVec> perIterLocalVec;
     for (unsigned int i = 0; i < perIterLocalVec.size(); ++i)
       *perIterLocalVec.getRemote(i) = LocalVec(nrows, ncols);
 
@@ -186,12 +186,12 @@ public:
 
 #ifdef USE_SHARE_LIST
     // Galois::for_each<AVIWorkList> (initWL.begin (), initWL.end (), p);
-    GaloisRuntime::for_each_ordered (
+    Galois::Runtime::for_each_ordered (
         elems.begin (), elems.end (),
         vtxPtrs.begin (), vtxPtrs.end (),
         op, nv, cmp);
 #else 
-    GaloisRuntime::for_each_ordered (
+    Galois::Runtime::for_each_ordered (
         elems.begin (), elems.end (),
         op, nv, cmp);
 #endif

@@ -71,8 +71,8 @@ struct NodeData {
 
 };
 
-struct NodeDataCacheLine: public GaloisRuntime::LL::CacheLineStorage<unsigned> {
-  typedef GaloisRuntime::LL::CacheLineStorage<unsigned> Super_ty;
+struct NodeDataCacheLine: public Galois::Runtime::LL::CacheLineStorage<unsigned> {
+  typedef Galois::Runtime::LL::CacheLineStorage<unsigned> Super_ty;
 
   NodeDataCacheLine (): Super_ty (0) {}
   explicit NodeDataCacheLine (unsigned _data): Super_ty (_data) {}
@@ -181,9 +181,9 @@ public:
     Galois::StatTimer timer ("BFS time: ");
 
     timer.start ();
-    GaloisRuntime::beginSampling ();
+    Galois::Runtime::beginSampling ();
     unsigned numIter = runBFS (graph, startNode);
-    GaloisRuntime::endSampling ();
+    Galois::Runtime::endSampling ();
     timer.stop ();
 
     std::cout << "BFS " << getVersion () << " iterations=" << numIter << std::endl;

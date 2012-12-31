@@ -45,7 +45,7 @@
 
 #include <sched.h>
 
-using namespace GaloisRuntime::LL;
+using namespace Galois::Runtime::LL;
 
 namespace {
 
@@ -388,44 +388,44 @@ AutoLinuxPolicy A;
 
 
 
-bool GaloisRuntime::LL::bindThreadToProcessor(int id) {
+bool Galois::Runtime::LL::bindThreadToProcessor(int id) {
   assert(id < (int)A.virtmap.size());
   return linuxBindToProcessor(A.virtmap[id]);
 }
 
-unsigned GaloisRuntime::LL::getMaxThreads() {
+unsigned Galois::Runtime::LL::getMaxThreads() {
   return A.numThreads;
 }
 
-unsigned GaloisRuntime::LL::getMaxCores() {
+unsigned Galois::Runtime::LL::getMaxCores() {
   return A.numCores;
 }
 
-unsigned GaloisRuntime::LL::getMaxPackages() {
+unsigned Galois::Runtime::LL::getMaxPackages() {
   return A.numPackages;
 }
 
-unsigned GaloisRuntime::LL::getPackageForThreadInternal(int id) {
+unsigned Galois::Runtime::LL::getPackageForThreadInternal(int id) {
   assert(id < (int)A.packages.size());
   return A.packages[id];
 }
 
-unsigned GaloisRuntime::LL::getMaxPackageForThread(int id) {
+unsigned Galois::Runtime::LL::getMaxPackageForThread(int id) {
   assert(id < (int)A.maxPackage.size());
   return A.maxPackage[id];
 }
 
-bool GaloisRuntime::LL::isLeaderForPackageInternal(int id) {
+bool Galois::Runtime::LL::isLeaderForPackageInternal(int id) {
   assert(id < (int)A.packages.size());
   return A.leaders[A.packages[id]] == id;
 }
 
-unsigned GaloisRuntime::LL::getLeaderForThread(int id) {
+unsigned Galois::Runtime::LL::getLeaderForThread(int id) {
   assert(id < (int)A.packages.size());
   return A.leaders[A.packages[id]];
 }
 
-unsigned GaloisRuntime::LL::getLeaderForPackage(int id) {
+unsigned Galois::Runtime::LL::getLeaderForPackage(int id) {
   assert(id < (int)A.leaders.size());
   return A.leaders[id];
 }

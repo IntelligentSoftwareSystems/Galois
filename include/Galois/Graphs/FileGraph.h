@@ -334,13 +334,13 @@ public:
 template<typename NodeTy, typename EdgeTy>
 class LC_FileGraph : public FileGraph {
 
-  struct gNode : public GaloisRuntime::Lockable {
+  struct gNode : public Galois::Runtime::Lockable {
     NodeTy data;
     gNode() {}
   };
 
   //null if type is void
-  GaloisRuntime::LL::CacheLineStorage<gNode>* NodeData;
+  Galois::Runtime::LL::CacheLineStorage<gNode>* NodeData;
 
 public:
   GALOIS_ATTRIBUTE_DEPRECATED
@@ -352,7 +352,7 @@ public:
   }
   
   NodeTy& getData(GraphNode N, MethodFlag mflag = ALL) {
-    GaloisRuntime::acquire(&NodeData[N].data, mflag);
+    Galois::Runtime::acquire(&NodeData[N].data, mflag);
     return NodeData[N].data.data;
   }
 
@@ -378,7 +378,7 @@ public:
   
   //! Initializes node data for the graph to default values
   void emptyNodeData(NodeTy init = NodeTy()) {
-    NodeData = new GaloisRuntime::LL::CacheLineStorage<gNode>[size()];
+    NodeData = new Galois::Runtime::LL::CacheLineStorage<gNode>[size()];
     //NodeData = (LL::CacheLineStorage<gNode>*)numa_alloc_interleaved(sizeof(LL::CacheLineStorage<gNode>)*size());
     for (uint64_t i = 0; i < size(); ++i)
       NodeData[i].data.data = init;
@@ -408,12 +408,12 @@ public:
 //! Local computation graph (i.e., graph structure does not change)
 template<typename EdgeTy>
 class LC_FileGraph<void, EdgeTy> : public FileGraph {
-  struct gNode : public GaloisRuntime::Lockable {
+  struct gNode : public Galois::Runtime::Lockable {
     gNode() {}
   };
 
   //null if type is void
-  GaloisRuntime::LL::CacheLineStorage<gNode>* NodeData;
+  Galois::Runtime::LL::CacheLineStorage<gNode>* NodeData;
 
 public:
   GALOIS_ATTRIBUTE_DEPRECATED
@@ -438,13 +438,13 @@ public:
 template<typename NodeTy>
 class LC_FileGraph<NodeTy, void>: public FileGraph { 
 
-  struct gNode : public GaloisRuntime::Lockable {
+  struct gNode : public Galois::Runtime::Lockable {
     NodeTy data;
     gNode() {}
   };
 
   //null if type is void
-  GaloisRuntime::LL::CacheLineStorage<gNode>* NodeData;
+  Galois::Runtime::LL::CacheLineStorage<gNode>* NodeData;
 
 public:
   GALOIS_ATTRIBUTE_DEPRECATED
@@ -455,7 +455,7 @@ public:
   }
   
   NodeTy& getData(GraphNode N, MethodFlag mflag = ALL) {
-    GaloisRuntime::acquire(&NodeData[N].data, mflag);
+    Galois::Runtime::acquire(&NodeData[N].data, mflag);
     return NodeData[N].data.data;
   }
 
@@ -467,7 +467,7 @@ public:
   }
   
   void emptyNodeData(NodeTy init = NodeTy()) {
-    NodeData = new GaloisRuntime::LL::CacheLineStorage<gNode>[numNodes];
+    NodeData = new Galois::Runtime::LL::CacheLineStorage<gNode>[numNodes];
     for (uint64_t i = 0; i < numNodes; ++i)
       NodeData[i].data.data = init;
   }

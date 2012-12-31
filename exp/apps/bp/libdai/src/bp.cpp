@@ -19,7 +19,7 @@
 #include "Galois/PriorityScheduling.h"
 #include "Galois/Timer.h"
 
-static GaloisRuntime::PerThreadStorage<int> counters;
+static Galois::Runtime::PerThreadStorage<int> counters;
 extern long GlobalTime;
 
 namespace dai {
@@ -692,7 +692,7 @@ Real BP::run() {
               //}
           }
 
-          using namespace GaloisRuntime::WorkList;
+          using namespace Galois::Runtime::WorkList;
           typedef dChunkedFIFO<64> dChunk;
           typedef ChunkedFIFO<64> Chunk;
           typedef OrderedByIntegerMetric<Indexer,dChunk> OBIM;

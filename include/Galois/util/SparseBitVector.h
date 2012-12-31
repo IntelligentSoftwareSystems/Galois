@@ -39,7 +39,7 @@ namespace Galois {
     Saves space when the data to be stored is sparsely populated. */
 
 typedef unsigned long WORD;
-typedef GaloisRuntime::SimpleLock<int, true> LockType;
+typedef Galois::Runtime::SimpleLock<int, true> LockType;
 
 static const unsigned wordsize = sizeof(WORD)*8;
 

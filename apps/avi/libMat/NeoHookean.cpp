@@ -29,7 +29,7 @@
 #include "Material.h"
 
 // calling default constructor
-GaloisRuntime::PerThreadStorage<NeoHookean::NeoHookenTmpVec> NeoHookean::perCPUtmpVec;
+Galois::Runtime::PerThreadStorage<NeoHookean::NeoHookenTmpVec> NeoHookean::perCPUtmpVec;
 
 static double matlib_determinant(const double *A) {
   double det;

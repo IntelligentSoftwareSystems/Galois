@@ -73,7 +73,7 @@ public:
 
   //! Signal break in parallel loop
   void breakLoop() {
-    GaloisRuntime::breakLoop();
+    Galois::Runtime::breakLoop();
   }
 
   //! Acquire a per-iteration allocator
@@ -83,12 +83,12 @@ public:
 
   //! Push new work 
   void push(T val) {
-    GaloisRuntime::checkWrite(Galois::WRITE);
+    Galois::Runtime::checkWrite(Galois::WRITE);
     pushBuffer.push_back(val);
   }
 
   //! force the abort of this iteration
-  void abort() { GaloisRuntime::forceAbort(); }
+  void abort() { Galois::Runtime::forceAbort(); }
 
   //! Store and retrieve local state for deterministic and ordered executor
   void* getLocalState(bool& used) { used = localStateUsed; return localState; }

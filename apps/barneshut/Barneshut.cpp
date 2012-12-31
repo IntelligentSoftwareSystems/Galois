@@ -617,8 +617,8 @@ void run(int nbodies, int ntimesteps, int seed) {
   ptrBodies pBodies;
   generateInput(bodies, pBodies, nbodies, seed);
 
-  typedef GaloisRuntime::WorkList::dChunkedLIFO<256> WL_;
-  typedef GaloisRuntime::WorkList::ChunkedAdaptor<false,32> WL;
+  typedef Galois::Runtime::WorkList::dChunkedLIFO<256> WL_;
+  typedef Galois::Runtime::WorkList::ChunkedAdaptor<false,32> WL;
 
 
   for (int step = 0; step < ntimesteps; step++) {
