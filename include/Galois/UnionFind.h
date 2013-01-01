@@ -53,6 +53,15 @@ public:
     return rep;
   }
 
+  T* find() {
+    T* rep = m_component;
+    while (rep->m_component != rep) {
+      T* next = rep->m_component;
+      rep = next;
+    }
+    return rep;
+  }
+
   T* findAndCompress() {
     // Basic outline of race in synchronous path compression is that two path
     // compressions along two different paths to the root can create a cycle
@@ -83,10 +92,7 @@ public:
       // Avoid cycles by directing edges consistently
       if (a > b)
         std::swap(a, b);
-      if (__sync_bool_compare_and_swap(
-            reinterpret_cast<uintptr_t*>(&a->m_component),
-            reinterpret_cast<uintptr_t>(a),
-            reinterpret_cast<uintptr_t>(b))) {
+      if (__sync_bool_compare_and_swap(&a->m_component, a, b)) {
         return b;
       }
     }
