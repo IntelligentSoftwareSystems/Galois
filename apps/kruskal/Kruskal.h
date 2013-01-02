@@ -264,15 +264,16 @@ protected:
         unsigned dst = ingraph.getData (ingraph.getEdgeDst (e), Galois::NONE);
 
         if (src != dst) {
-
-          InEdge ke (src, dst, ingraph.getEdgeData (e));
+          const Weight_ty& w = ingraph.getEdgeData (e);
+          InEdge ke (src, dst, w);
 
           std::pair<SetInEdge::iterator, bool> res = edgeSet.insert (ke);
 
           if (res.second) {
             ++numEdges;
+          } else if (w < res.first->weight) {
+            edgeSet.insert (edgeSet.erase (res.first), ke);
           }
-
         } else {
           GALOIS_DEBUG ("Warning: Ignoring self edge (%d, %d, %d)\n",
               src, dst, ingraph.getEdgeData (*e));
@@ -338,6 +339,8 @@ protected:
         //edges.push_back (ke);
         if (res.second) {
           ++numEdges;
+        } else if (integ_wt < res.first->weight) {
+          edgeSet.insert (edgeSet.erase (res.first), ke);
         }
 
       } else {
@@ -390,7 +393,7 @@ public:
     size_t mstWeight = 0;
     size_t totalIter = 0;
 
-    Galois::StatTimer t_read ("time spent in reading input: ");
+    Galois::StatTimer t_read ("InitializeTime");
 
     t_read.start ();
     readGraph (filename, numNodes, edgeSet);
@@ -418,7 +421,7 @@ public:
     // pre allocate memory from OS for parallel runs
     Galois::preAlloc (numPages*Galois::getActiveThreads ());
     
-    Galois::StatTimer t ("Time taken by runMST: ");
+    Galois::StatTimer t;
 
     t.start ();
     // GaloisRuntime::beginSampling ();
@@ -585,7 +588,7 @@ private:
 
 
   bool verify (const size_t numNodes, const SetInEdge& edgeSet, const size_t kruskalSum) const {
-    Galois::StatTimer pt("Prim's Time:");
+    Galois::StatTimer pt("PrimTime");
     pt.start ();
     size_t primSum = runPrim (numNodes, edgeSet);
     pt.stop ();

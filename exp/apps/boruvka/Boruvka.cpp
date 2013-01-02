@@ -49,7 +49,6 @@ const char* desc = "Compute the minimum spanning forest of a graph";
 const char* url = NULL;
 
 enum Algo {
-  serial,
   parallel,
   exp_parallel
 };
@@ -58,7 +57,6 @@ static cll::opt<std::string> inputFilename(cll::Positional, cll::desc("<input fi
 static cll::opt<bool> symmetricGraph("symmetricGraph", cll::desc("Graph already symmetric"), cll::init(false));
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
-      clEnumVal(serial, "Serial"),
       clEnumVal(parallel, "Parallel"),
 #ifdef GALOIS_USE_EXP
       clEnumVal(exp_parallel, "Parallel (exp)"),
@@ -168,27 +166,9 @@ struct ParallelAlgo {
 
     template<typename Context>
     void operator()(const GNode& src, Context& ctx) const {
-      int cur = 0;
       Node& sdata = graph.getData(src, Galois::NONE);
-      Graph::edge_iterator ii = graph.edge_begin(src, Galois::NONE);
-      Graph::edge_iterator ei = graph.edge_end(src, Galois::NONE);
-
       sdata.lightest = &heaviest;
-
-      if (ii == ei)
-        return;
-
-      GNode dst = graph.getEdgeDst(ii);
-
-      if (src == dst)
-        return;
-
-      const EdgeData& weight = graph.getEdgeData(ii);
-      //Node& ddata = graph.getData(dst, Galois::NONE);
-
-      sdata.lightest = &weight;
-
-      ctx.push(WorkItem(src, dst, &weight, cur + 1));
+      findLightest(src, 0, ctx, true);
     }
   };
 
@@ -369,17 +349,16 @@ struct get_weight {
 };
 
 template<typename Algo>
-void run() {
+typename std::result_of<Algo()>::type run() {
   Algo algo;
 
-  algo();
+  return algo();
 }
 
 bool verify() {
   if (Galois::ParallelSTL::find_if(graph.begin(), graph.end(), is_bad_graph()) == graph.end()) {
     if (Galois::ParallelSTL::find_if(mst.begin(), mst.end(), is_bad_mst()) == mst.end()) {
-      CheckAcyclic c;
-      return c();
+      return run<CheckAcyclic>();
     }
   }
   return false;
@@ -415,12 +394,11 @@ int main(int argc, char** argv) {
   initializeGraph();
   Tinitial.stop();
 
-  Galois::preAlloc(GaloisRuntime::MM::pageAllocInfo()* 4);
+  Galois::preAlloc(GaloisRuntime::MM::pageAllocInfo() * 6);
   Galois::Statistic("MeminfoPre", GaloisRuntime::MM::pageAllocInfo());
   Galois::StatTimer T;
   T.start();
   switch (algo) {
-    case serial: run<SerialAlgo>(); break;
     case parallel: run<ParallelAlgo<false> >(); break;
     case exp_parallel: run<ParallelAlgo<true> >(); break;
     default: std::cerr << "Unknown algo: " << algo << "\n";
@@ -428,8 +406,13 @@ int main(int argc, char** argv) {
   T.stop();
   Galois::Statistic("MeminfoPost", GaloisRuntime::MM::pageAllocInfo());
 
-  size_t weight = Galois::ParallelSTL::map_reduce(mst.begin(), mst.end(), get_weight(), 0, std::plus<size_t>());
-  std::cout << "MST weight: " << weight << "\n";
+  std::cout << "MST weight: "
+    << Galois::ParallelSTL::map_reduce(mst.begin(), mst.end(),
+        get_weight(), 0.0, std::plus<double>())
+    << " ("
+    << Galois::ParallelSTL::map_reduce(mst.begin(), mst.end(),
+        get_weight(), 0UL, std::plus<size_t>())
+    << ")\n";
 
   if (!skipVerify && !verify()) {
     std::cerr << "verification failed\n";

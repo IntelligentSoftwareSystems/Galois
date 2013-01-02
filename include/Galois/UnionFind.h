@@ -25,13 +25,23 @@
  */
 #ifndef GALOIS_UNIONFIND_H
 #define GALOIS_UNIONFIND_H
+
 namespace Galois {
 /**
  * Intrusive union-find implementation. Users subclass this to get disjoint
  * functionality for the subclass object.
  */
 template<typename T>
-struct UnionFindNode {
+class UnionFindNode {
+  T* findImpl() const {
+    T* rep = m_component;
+    while (rep->m_component != rep) {
+      T* next = rep->m_component;
+      rep = next;
+    }
+    return rep;
+  }
+
 protected:
   T* m_component;
 
@@ -44,23 +54,9 @@ public:
     return m_component == this;
   }
 
-  const T* find() const {
-    T* rep = m_component;
-    while (rep->m_component != rep) {
-      T* next = rep->m_component;
-      rep = next;
-    }
-    return rep;
-  }
+  const T* find() const { return findImpl(); }
 
-  T* find() {
-    T* rep = m_component;
-    while (rep->m_component != rep) {
-      T* next = rep->m_component;
-      rep = next;
-    }
-    return rep;
-  }
+  T* find() { return findImpl(); }
 
   T* findAndCompress() {
     // Basic outline of race in synchronous path compression is that two path

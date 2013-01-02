@@ -267,7 +267,7 @@ void dChunkedMaster<T,OuterTy,isLIFO,ChunkSize>::pushSP(const WID& id, p& n, con
   n.next->push(val);
 }
 
-#define GALOIS_USE_BAG 0
+#define GALOIS_USE_BAG 1
 
 #if GALOIS_USE_BAG
 template<typename T,int ChunkSize>
