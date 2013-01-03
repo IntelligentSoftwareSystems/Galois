@@ -1584,10 +1584,10 @@ static inline void for_each_det_impl(InitTy& init, WorkTy& W) {
   assert(!inGaloisForEach);
 
   inGaloisForEach = true;
-  RunCommand w[4] = {Config::ref(init), 
-		     Config::ref(getSystemBarrier()),
-		     Config::ref(W),
-		     Config::ref(getSystemBarrier())};
+  RunCommand w[4] = {std::ref(init), 
+		     std::ref(getSystemBarrier()),
+		     std::ref(W),
+		     std::ref(getSystemBarrier())};
   getSystemThreadPool().run(&w[0], &w[4]);
   runAllLoopExitHandlers();
   inGaloisForEach = false;

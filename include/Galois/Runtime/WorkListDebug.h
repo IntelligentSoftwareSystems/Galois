@@ -23,7 +23,6 @@
 #ifndef GALOIS_RUNTIME_WORKLISTDEBUG_H
 #define GALOIS_RUNTIME_WORKLISTDEBUG_H
 
-#include "Galois/Runtime/Config.h"
 #include "Galois/util/OnlineStats.h"
 
 #include <fstream>

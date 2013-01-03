@@ -156,8 +156,8 @@ FunctionTy do_all_impl_dispatch(RangeTy range, FunctionTy f, ReducerTy r, bool n
   // TODO: differentiate calls or alternatively enrich Range objects to do the right thing
   DoAllWork<FunctionTy, ReducerTy, RangeTy, false> W(f, r, needsReduce, range);
 
-  RunCommand w[2] = {Config::ref(W),
-		     Config::ref(getSystemBarrier())};
+  RunCommand w[2] = {std::ref(W),
+		     std::ref(getSystemBarrier())};
   getSystemThreadPool().run(&w[0], &w[2]);
   return W.getFn();
 }
@@ -166,8 +166,8 @@ template<typename RangeTy, typename FunctionTy, typename ReducerTy>
 FunctionTy do_all_impl_dispatch(RangeTy range, FunctionTy f, ReducerTy r, bool needsReduce, std::input_iterator_tag) {
   DoAllWork<FunctionTy, ReducerTy, RangeTy, false> W(f, r, needsReduce, range);
 
-  RunCommand w[2] = {Config::ref(W),
-		     Config::ref(getSystemBarrier())};
+  RunCommand w[2] = {std::ref(W),
+		     std::ref(getSystemBarrier())};
   getSystemThreadPool().run(&w[0], &w[2]);
   return W.getFn();
 }
@@ -198,8 +198,8 @@ void do_all_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname=0) {
 
     typedef StandardRange<IterTy> Range;
     DoAllWork<FunctionTy, EmptyFn, Range, Steal> W(f, EmptyFn(), false, makeStandardRange(b, e));
-    RunCommand w[2] = {Config::ref(W),
-                       Config::ref(getSystemBarrier())};
+    RunCommand w[2] = {std::ref(W),
+                       std::ref(getSystemBarrier())};
     getSystemThreadPool().run(&w[0], &w[2]);
     inGaloisForEach = false;
   }

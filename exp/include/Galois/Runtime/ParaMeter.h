@@ -31,7 +31,6 @@
 #include "Galois/TypeTraits.h"
 #include "Galois/Mem.h"
 
-#include "Galois/Runtime/Config.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/ForEachTraits.h"
 #include "Galois/Runtime/LoopHooks.h"

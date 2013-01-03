@@ -23,7 +23,7 @@
 #ifndef GALOIS_RUNTIME_THREADPOOL_H
 #define GALOIS_RUNTIME_THREADPOOL_H
 
-#include "Galois/Runtime/Config.h"
+#include <functional>
 
 namespace Galois {
 namespace Runtime {
@@ -31,7 +31,7 @@ namespace Runtime {
 //! the number of active threads
 extern unsigned int galoisActiveThreads;
 
-typedef Config::function<void (void)> RunCommand;
+typedef std::function<void (void)> RunCommand;
 
 class ThreadPool {
 public:

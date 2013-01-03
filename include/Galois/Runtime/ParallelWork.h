@@ -29,7 +29,6 @@
 #define GALOIS_RUNTIME_PARALLELWORK_H
 
 #include "Galois/Mem.h"
-#include "Galois/Runtime/Config.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/ForEachTraits.h"
 #include "Galois/Runtime/LoopHooks.h"
@@ -288,10 +287,10 @@ void for_each_impl(RangeTy range, FunctionTy f, const char* loopname) {
 
   WorkTy W(f, loopname);
   Initializer<RangeTy, WorkTy> init(range, W);
-  RunCommand w[4] = {Config::ref(init), 
-		     Config::ref(getSystemBarrier()),
-		     Config::ref(W),
-		     Config::ref(getSystemBarrier())};
+  RunCommand w[4] = {std::ref(init), 
+		     std::ref(getSystemBarrier()),
+		     std::ref(W),
+		     std::ref(getSystemBarrier())};
   getSystemThreadPool().run(&w[0], &w[4]);
   runAllLoopExitHandlers();
   inGaloisForEach = false;
@@ -309,7 +308,7 @@ struct WOnEach {
 template<typename FunctionTy>
 void on_each_impl(FunctionTy fn, const char* loopname = 0) {
   Galois::Runtime::RunCommand w[2] = {WOnEach<FunctionTy>(fn),
-				    Config::ref(getSystemBarrier())};
+				    std::ref(getSystemBarrier())};
   Galois::Runtime::getSystemThreadPool().run(&w[0], &w[2]);
 }
 
