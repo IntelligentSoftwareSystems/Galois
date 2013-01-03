@@ -20,28 +20,56 @@
  *
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
-
 #ifndef GALOIS_GDEQUE_H
 #define GALOIS_GDEQUE_H
 
 #include "Galois/Runtime/mm/Mem.h"
-
 #include "Galois/FixedSizeRing.h"
-
-#include <iterator>
+#include <boost/iterator/iterator_facade.hpp>
+//#include <iterator>
 
 namespace Galois {
 
-template <typename T, unsigned CHUNK_SIZE=64> 
+template<typename T, unsigned ChunkSize=64, typename ContainerTy=FixedSizeRing<T, ChunkSize> > 
 class gdeque: private boost::noncopyable {
-
-  struct Block : public FixedSizeRing<T,CHUNK_SIZE> {
+protected:
+  struct Block: ContainerTy {
     Block* next;
     Block* prev;
-    Block() :next(), prev() {}
+    Block(): next(), prev() {}
+  };
+
+  template<typename U>
+  class Iterator: public boost::iterator_facade<Iterator<U>, U, boost::forward_traversal_tag> {
+    friend class boost::iterator_core_access;
+
+    Block* b;
+    unsigned offset;
+
+    void increment() {
+      if (!b) return;
+      ++offset;
+      if (offset == b->size()) {
+	b = b->next;
+	offset = 0;
+      }
+    }
+
+    template<typename OtherTy>
+    bool equal(const Iterator<OtherTy>& o) const { return b == o.b && offset == o.offset; }
+
+    U& dereference() const { return b->getAt(offset); }
+
+  public:
+    Iterator(Block* _b = 0, unsigned _off = 0) :b(_b), offset(_off) { }
+    
+    template<typename OtherTy>
+    Iterator(const Iterator<OtherTy>& o): b(o.b), offset(o.offset) { }
   };
 
   Block* first;
+
+private:
   Block* last;
   unsigned num;
 
@@ -106,59 +134,17 @@ public:
   typedef T* pointer;
   typedef T& reference;
   typedef const T& const_reference;
+  typedef Iterator<T> iterator;
+  typedef Iterator<const T> const_iterator;
 
-  gdeque() :first(), last(), num(), heap(sizeof(Block)) { }
+  gdeque(): first(), last(), num(), heap(sizeof(Block)) { }
+
   ~gdeque() { clear(); }
 
-  class iterator: public std::iterator<std::forward_iterator_tag, T> {
-    Block* b;
-    unsigned offset;
-
-    void advance() {
-      if (!b) return;
-      ++offset;
-      if (offset == b->size()) {
-	b = b->next;
-	offset = 0;
-      }
-    }
-
-  public:
-    iterator(Block* _b = 0, unsigned _off = 0) :b(_b), offset(_off) {}
-
-    bool operator==(const iterator& rhs) const {
-      return b == rhs.b && offset == rhs.offset;
-    }
-
-    bool operator!=(const iterator& rhs) const {
-      return b != rhs.b || offset != rhs.offset;
-    }
-
-    T& operator*() const {
-      return b->getAt(offset);
-    }
-
-    iterator& operator++() {
-      advance();
-      return *this;
-    }
-
-    iterator operator++(int) {
-      iterator tmp(*this);
-      advance();
-      return tmp;
-    }
-  };
-
-  iterator begin() const {
-    assert(precondition());
-    return iterator(first);
-  }
-
-  iterator end() const {
-    assert(precondition());
-    return iterator();
-  }
+  iterator begin() { assert(precondition()); return iterator(first); }
+  iterator end() { assert(precondition()); return iterator(); }
+  const_iterator begin() const { assert(precondition()); return const_iterator(first); }
+  const_iterator end() const { assert(precondition()); return const_iterator(); }
 
   size_t size() const {
     assert(precondition());

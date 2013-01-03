@@ -27,10 +27,9 @@
 #define GALOIS_WLCOMPILECHECK(name) //
 #endif
 
-#include "ll/PtrLock.h"
+#include "Galois/Runtime/ll/PtrLock.h"
 
 #include <boost/iterator/iterator_facade.hpp>
-#include <boost/optional.hpp>
 
 namespace Galois {
 namespace Runtime {
@@ -38,11 +37,11 @@ namespace WorkList {
 
 template<typename T>
 class ConExtListNode {
-  T* NextPtr;
+  T* next;
 public:
-  ConExtListNode() :NextPtr(0) {}
-  T*& getNextPtr() { return NextPtr; }
-  T*const& getNextPtr() const { return NextPtr; }
+  ConExtListNode(): next(0) {}
+  T*& getNext() { return next; }
+  T*const& getNext() const { return next; }
 };
 
 template<typename T>
@@ -55,7 +54,7 @@ class ConExtIterator: public boost::iterator_facade<
   bool equal(const ConExtIterator<OtherTy>& o) const { return at == o.at; }
 
   T& dereference() const { return *at; }
-  void increment() { at = at->getNextPtr(); }
+  void increment() { at = at->getNext(); }
 
 public:
   ConExtIterator(): at(0) { }
@@ -81,7 +80,7 @@ public:
     T* oldhead(0);
     do {
       oldhead = head.getValue();
-      C->getNextPtr() = oldhead;
+      C->getNext() = oldhead;
     } while (!head.CAS(oldhead, C));
   }
 
@@ -96,8 +95,8 @@ public:
       head.unlock();
       return 0;
     }
-    head.unlock_and_set(C->getNextPtr());
-    C->getNextPtr() = 0;
+    head.unlock_and_set(C->getNext());
+    C->getNext() = 0;
     return C;
   }
 
@@ -114,21 +113,15 @@ public:
   const_iterator end() const { return const_iterator(); }
 };
 
-
 template<typename T, bool concurrent>
 class ConExtLinkedQueue {
   LL::PtrLock<T,concurrent> head;
   T* tail;
   
 public:
-  class ListNode {
-    T* NextPtr;
-  public:
-    ListNode() :NextPtr(0) {}
-    T*& getNextPtr() { return NextPtr; }
-  };
+  typedef ConExtListNode<T> ListNode;
   
-  ConExtLinkedQueue() :tail(0) { }
+  ConExtLinkedQueue(): tail(0) { }
 
   bool empty() const {
     return !tail;
@@ -137,9 +130,9 @@ public:
   void push(T* C) {
     head.lock();
     //std::cerr << "in(" << C << ") ";
-    C->getNextPtr() = 0;
+    C->getNext() = 0;
     if (tail) {
-      tail->getNextPtr() = C;
+      tail->getNext() = C;
       tail = C;
       head.unlock();
     } else {
@@ -161,11 +154,11 @@ public:
     }
     if (tail == C) {
       tail = 0;
-      assert(!C->getNextPtr());
+      assert(!C->getNext());
       head.unlock_and_clear();
     } else {
-      head.unlock_and_set(C->getNextPtr());
-      C->getNextPtr() = 0;
+      head.unlock_and_set(C->getNext());
+      C->getNext() = 0;
     }
     return C;
   }

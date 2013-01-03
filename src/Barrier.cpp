@@ -299,7 +299,7 @@ void Galois::Runtime::TopoBarrier::wait() {
 
   //wait for signal
   if (id != 0) {
-    while(n.parentsense != s) {
+    while (n.parentsense != s) {
       Galois::Runtime::LL::asmPause();
     }
   }

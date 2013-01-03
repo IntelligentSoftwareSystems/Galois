@@ -31,6 +31,133 @@
 namespace Galois {
 
 template<typename T, unsigned chunksize = 64>
+class FixedSizeBag: private boost::noncopyable {
+  LazyArray<T, chunksize> datac;
+  unsigned count;
+
+  T* at(unsigned i) { return &datac[i]; }
+  const T* at(unsigned i) const { return &datac[i]; }
+
+  bool precondition() const {
+    return count <= chunksize;
+  }
+
+public:
+  typedef T value_type;
+  typedef T* pointer;
+  typedef const T* const_pointer;
+  typedef T& reference;
+  typedef const T& const_reference;
+  typedef pointer iterator;
+  typedef const_pointer const_iterator;
+
+  FixedSizeBag(): count(0) { }
+
+  ~FixedSizeBag() {
+    clear();
+  }
+
+  unsigned size() const {
+    assert(precondition());
+    return count;
+  }
+
+  bool empty() const {
+    assert(precondition());
+    return count == 0;
+  }
+
+  bool full() const {
+    assert(precondition());
+    return count == chunksize;
+  }
+
+  void clear() {
+    assert(precondition());
+    for (unsigned x = 0; x < count; ++x)
+      datac.destroy(x);
+    count = 0;
+  }
+
+#ifdef GALOIS_HAS_RVALUE_REFERENCES
+  template<typename U>
+  pointer push_front(U&& val) { return push_back(std::forward<U>(val)); }
+
+  template<typename... Args>
+  pointer emplace_front(Args&&... args) { return emplace_back(std::forward<Args>(args)...); }
+#else
+  pointer push_front(const value_type& val) { return push_back(val); }
+#endif
+
+#ifdef GALOIS_HAS_RVALUE_REFERENCES
+  template<typename U>
+  pointer push_back(U&& val) {
+    if (full()) return 0;
+    unsigned end = count;
+    ++count;
+    return datac.construct(end, std::forward<U>(val));
+  }
+
+  template<typename... Args>
+  pointer emplace_back(Args&&... args) {
+    if (full()) return 0;
+    unsigned end = count;
+    ++count;
+    return datac.emplace(end, std::forward<Args>(args)...);
+  }
+#else
+  pointer push_back(const value_type& val) {
+    if (full()) return 0;
+    unsigned end = count % chunksize;
+    ++count;
+    return datac.construct(end, val);
+  }
+#endif
+
+  reference front() { return back(); }
+  const_reference front() const { return back(); }
+  boost::optional<value_type> extract_front() { return extract_back(); }
+
+  void pop_front() {
+    pop_back();
+  }
+  
+  reference back() {
+    assert(precondition());
+    assert(!empty());
+    return *at(count - 1);
+  }
+
+  const_reference back() const {
+    assert(precondition());
+    assert(!empty());
+    return *at(count - 1);
+  }
+
+  boost::optional<value_type> extract_back() {
+    if (!empty()) {
+      boost::optional<value_type> retval(back());
+      pop_back();
+      return retval;
+    }
+    return boost::optional<value_type>();
+  }
+
+  void pop_back() {
+    assert(precondition());
+    assert(!empty());
+    unsigned end = (count - 1);
+    datac.destroy(end);
+    --count;
+  }
+
+  iterator begin() { return &datac[0]; }
+  iterator end() { return &datac[count]; }
+  const_iterator begin() const { return &datac[0]; }
+  const_iterator end() const { return &datac[count]; }
+};
+ 
+template<typename T, unsigned chunksize = 64>
 class FixedSizeRing: private boost::noncopyable {
   LazyArray<T, chunksize> datac;
   unsigned start;
@@ -55,7 +182,7 @@ class FixedSizeRing: private boost::noncopyable {
       return base + cur == o.base + o.cur && count == o.count;
     }
 
-    T& dereference() const { return base[cur]; }
+    U& dereference() const { return base[cur]; }
 
     void increment() {
       if (--count == 0) {
