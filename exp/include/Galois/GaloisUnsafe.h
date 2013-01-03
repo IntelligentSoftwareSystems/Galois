@@ -36,8 +36,8 @@ namespace hidden {
 
     Galois::Runtime::inGaloisForEach = true;
 
-    Galois::Runtime::RunCommand w[2] = { Galois::Runtime::Config::ref (exec), 
-      Galois::Runtime::Config::ref (Galois::Runtime::getSystemBarrier ())};
+    Galois::Runtime::RunCommand w[2] = { std::ref (exec), 
+					 std::ref (Galois::Runtime::getSystemBarrier ())};
 
     Galois::Runtime::getSystemThreadPool().run(&w[0], &w[2]);
 

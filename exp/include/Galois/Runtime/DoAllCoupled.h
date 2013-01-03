@@ -781,7 +781,7 @@ void do_all_coupled_impl (PerThreadStorage<Range<Iter> >& ranges, FuncTp& func, 
 
   DoAllCoupledExec<Iter, FuncTp> exec (ranges, func, loopname, chunk_size);
 
-  RunCommand w[2] = { Config::ref (exec), Config::ref (getSystemBarrier ()) };
+  RunCommand w[2] = { std::ref (exec), std::ref (getSystemBarrier ()) };
 
   getSystemThreadPool ().run (&w[0], &w[2]);
   
