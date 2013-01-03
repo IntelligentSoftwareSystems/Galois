@@ -32,7 +32,8 @@
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/optional.hpp>
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 namespace WorkList {
 
 template<typename T>
@@ -189,5 +190,6 @@ struct DummyIndexer: public std::unary_function<const T&,unsigned> {
 
 }
 }
+} // end namespace Galois
 
 #endif

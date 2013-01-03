@@ -32,7 +32,8 @@
 
 #include <iterator>
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 // TODO(ddn): update to have better forward iterator behavor for blocked/local iteration
 
@@ -99,4 +100,6 @@ inline StandardRange<IterTy> makeStandardRange(IterTy begin, IterTy end) {
 }
 
 }
+} // end namespace Galois
+
 #endif

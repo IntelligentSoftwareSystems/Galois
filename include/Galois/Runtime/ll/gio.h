@@ -28,7 +28,8 @@
 #ifndef GALOIS_RUNTIME_LL_GIO_H
 #define GALOIS_RUNTIME_LL_GIO_H
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 namespace LL {
 
 void gPrint(const char* format, ...);
@@ -40,14 +41,15 @@ void gSysError(bool doabort, const char* filename, int lineno, const char* forma
 void gFlush();
 
 #ifndef NDEBUG
-#define GALOIS_DEBUG(...) { GaloisRuntime::LL::gDebug (__VA_ARGS__); }
+#define GALOIS_DEBUG(...) { Galois::Runtime::LL::gDebug (__VA_ARGS__); }
 #else
 #define GALOIS_DEBUG(...) { do {} while (false); }
 #endif
 
-#define GALOIS_SYS_ERROR(doabort, ...) { GaloisRuntime::LL::gSysError(doabort, __FILE__, __LINE__, ##__VA_ARGS__); }
-#define GALOIS_ERROR(doabort, ...) { GaloisRuntime::LL::gError(doabort, __FILE__, __LINE__, ##__VA_ARGS__); }
+#define GALOIS_SYS_ERROR(doabort, ...) { Galois::Runtime::LL::gSysError(doabort, __FILE__, __LINE__, ##__VA_ARGS__); }
+#define GALOIS_ERROR(doabort, ...) { Galois::Runtime::LL::gError(doabort, __FILE__, __LINE__, ##__VA_ARGS__); }
 }
 }
+} // end namespace Galois
 
 #endif //_GIO_H

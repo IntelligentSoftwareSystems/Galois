@@ -30,7 +30,8 @@
 
 #include "Galois/Runtime/Barrier.h"
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 struct EmptyFn {
   template<typename T>
@@ -173,7 +174,7 @@ FunctionTy do_all_impl_dispatch(RangeTy range, FunctionTy f, ReducerTy r, bool n
 
 template<typename RangeTy, typename FunctionTy, typename ReducerTy>
 FunctionTy do_all_impl(RangeTy range, FunctionTy f, ReducerTy r, bool needsReduce) {
-  if (GaloisRuntime::inGaloisForEach) {
+  if (Galois::Runtime::inGaloisForEach) {
     return std::for_each(range.begin(), range.end(), f);
   } else {
     inGaloisForEach = true;
@@ -190,7 +191,7 @@ FunctionTy do_all_impl(RangeTy range, FunctionTy f, ReducerTy r, bool needsReduc
 //! Backdoor function to enable stealing in do_all
 template<bool Steal, typename IterTy, typename FunctionTy>
 void do_all_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname=0) {
-  if (GaloisRuntime::inGaloisForEach) {
+  if (Galois::Runtime::inGaloisForEach) {
     std::for_each(b, e, f);
   } else {
     inGaloisForEach = true;
@@ -204,6 +205,7 @@ void do_all_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname=0) {
   }
 }
 
-} //namespace GaloisRuntime
+} // end namespace Runtime
+} // end namespace Galois
 
 #endif // GALOIS_RUNTIME_DOALL_H

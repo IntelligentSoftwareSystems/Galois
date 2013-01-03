@@ -193,8 +193,8 @@ class PQuadTree {
   double m_radius;
   Node* m_root;
 
-  GaloisRuntime::MM::FSBGaloisAllocator<Node> nodeAlloc;
-  GaloisRuntime::MM::FSBGaloisAllocator<Node::PointsTy> pointsAlloc;
+  Galois::Runtime::MM::FSBGaloisAllocator<Node> nodeAlloc;
+  Galois::Runtime::MM::FSBGaloisAllocator<Node::PointsTy> pointsAlloc;
 
   template<typename IterTy>
   void init(IterTy begin, IterTy end) {
@@ -365,7 +365,7 @@ public:
     typedef std::vector<Point*> PointsBufTy;
     typedef WorkItem<PointsBufTy::iterator> WIT;
     typedef std::vector<WIT> WorkTy;
-    typedef GaloisRuntime::WorkList::dChunkedLIFO<1> WL;
+    typedef Galois::Runtime::WorkList::dChunkedLIFO<1> WL;
     PointsBufTy points;
     std::copy(begin, end, std::back_inserter(points));
 

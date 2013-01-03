@@ -448,7 +448,7 @@ static void addBoundaryNodes(Point* p1, Point* p2, Point* p3) {
 
 //! Streaming point distribution 
 struct GenerateRounds {
-  typedef GaloisRuntime::PerThreadStorage<unsigned> CounterTy;
+  typedef Galois::Runtime::PerThreadStorage<unsigned> CounterTy;
 
   const PointList& points;
   size_t log2;
@@ -563,9 +563,9 @@ static void readInput(const std::string& filename, bool addBoundary) {
   Galois::preAlloc(1 * numThreads // some per-thread state
       + 2 * points.size() * sizeof(Element) // mesh is about 2x number of points (for random points)
       * 32 // include graph node size
-      / (GaloisRuntime::MM::pageSize) // in pages
+      / (Galois::Runtime::MM::pageSize) // in pages
       );
-  Galois::Statistic("MeminfoPre", GaloisRuntime::MM::pageAllocInfo());
+  Galois::Statistic("MeminfoPre", Galois::Runtime::MM::pageAllocInfo());
 
   Galois::StatTimer T("generateRounds");
   T.start();
@@ -625,7 +625,7 @@ static void writeMesh(const std::string& filename) {
 }
 
 static void generateMesh() {
-  typedef GaloisRuntime::WorkList::ChunkedAdaptor<false,32> CA;
+  typedef Galois::Runtime::WorkList::ChunkedAdaptor<false,32> CA;
 
   for (int i = maxRounds - 1; i >= 0; --i) {
     Galois::StatTimer BT("buildtree");
@@ -677,7 +677,7 @@ int main(int argc, char** argv) {
   case detDisjoint: name = "detDisjoint"; break;
   default: name = "unknown"; break;
   }
-  GaloisRuntime::LL::gInfo("Algorithm %s", name);
+  Galois::Runtime::LL::gInfo("Algorithm %s", name);
   
 
   Galois::StatTimer T;
@@ -686,7 +686,7 @@ int main(int argc, char** argv) {
   T.stop();
   std::cout << "mesh size: " << graph->size() << "\n";
 
-  Galois::Statistic("MeminfoPost", GaloisRuntime::MM::pageAllocInfo());
+  Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
 
   if (!skipVerify) {
     Verifier verifier;

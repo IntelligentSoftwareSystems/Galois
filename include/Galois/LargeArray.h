@@ -72,7 +72,7 @@ public:
   void allocate(size_type n) {
     assert(!m_data);
     m_size = n;
-    m_data = reinterpret_cast<T*>(GaloisRuntime::MM::largeInterleavedAlloc(sizeof(T) * n));
+    m_data = reinterpret_cast<T*>(Galois::Runtime::MM::largeInterleavedAlloc(sizeof(T) * n));
     if (!isLazy)
       construct();
   }
@@ -84,7 +84,7 @@ public:
 
   void deallocate() {
     if (!m_data) return;
-    GaloisRuntime::MM::largeInterleavedFree(m_data, sizeof(T) * m_size);
+    Galois::Runtime::MM::largeInterleavedFree(m_data, sizeof(T) * m_size);
     m_data = 0;
     m_size = 0;
   }

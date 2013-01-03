@@ -105,7 +105,7 @@ struct UpdateRequestIndexer
 
 //typedef std::pair<GNode,GNode> Edge;
 typedef std::vector<UpdateRequest> WorkList;
-typedef GaloisRuntime::WorkList::OrderedByIntegerMetric<UpdateRequestIndexer, GaloisRuntime::WorkList::dChunkedFIFO<1024> > OBIM;
+typedef Galois::Runtime::WorkList::OrderedByIntegerMetric<UpdateRequestIndexer, Galois::Runtime::WorkList::dChunkedFIFO<1024> > OBIM;
 
 class PtsToCons {
 public:
@@ -484,7 +484,7 @@ void runParallel(PointsToConstraints &addrcopyconstraints, PointsToConstraints &
 	processAddressOfCopy(addrcopyconstraints, worklist);
 	processLoadStore(loadstoreconstraints, worklist, Galois::NONE);
 
-		//using namespace GaloisRuntime::WorkList;
+		//using namespace Galois::Runtime::WorkList;
 	  	//Galois::for_each<LocalQueues<dChunkedFIFO<1024> > >(worklist.begin(), worklist.end(), Process());
 	  	//Galois::for_each<FIFO<> >(worklist.begin(), worklist.end(), Process());
 	  	//Galois::for_each<ChunkedFIFO<1024> >(worklist.begin(), worklist.end(), Process());

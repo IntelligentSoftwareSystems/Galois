@@ -139,7 +139,8 @@ namespace Galois {
 }
 
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 template <typename Iter>
 struct Range {
@@ -614,7 +615,7 @@ private:
   FuncTp func;
   const char* loopname;
   Diff_ty chunk_size;
-  GaloisRuntime::PerThreadStorage<ThreadContext> workers;
+  Galois::Runtime::PerThreadStorage<ThreadContext> workers;
 
   TerminationDetection term;
 
@@ -893,7 +894,7 @@ void do_all_coupled (const Iter beg, const Iter end, FuncTp func, const char* lo
 }
 
 
-
-
 }
+}
+
 #endif //  GALOIS_RUNTIME_DO_ALL_COUPLED_H_

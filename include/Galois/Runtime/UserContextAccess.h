@@ -26,7 +26,8 @@
 
 #include "Galois/UserContext.h"
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 //! Backdoor to allow runtime methods to access private data in UserContext
 template<typename T>
@@ -43,5 +44,6 @@ public:
 };
 
 }
+} // end namespace Galois
 
 #endif

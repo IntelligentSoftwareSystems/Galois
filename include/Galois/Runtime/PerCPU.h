@@ -31,7 +31,8 @@
 #include <boost/utility.hpp>
 #include <cassert>
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 namespace HIDDEN {
 template<typename T, typename BASE>
@@ -202,6 +203,7 @@ public:
 
 
 }
+} // end namespace Galois
 
 #endif
 

@@ -7,8 +7,8 @@
 #include "Galois/Runtime/ll/SimpleLock.h"
 #include "Galois/Runtime/ll/StaticInstance.h"
 
-using namespace GaloisRuntime;
-using namespace GaloisRuntime::LL;
+using namespace Galois::Runtime;
+using namespace Galois::Runtime::LL;
 
 int main() 
 { 

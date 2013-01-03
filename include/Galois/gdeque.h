@@ -45,7 +45,7 @@ class gdeque: private boost::noncopyable {
   Block* last;
   unsigned num;
 
-  GaloisRuntime::MM::FixedSizeAllocator heap;
+  Galois::Runtime::MM::FixedSizeAllocator heap;
   
   Block* alloc_block() {
     return new (heap.allocate(sizeof(Block))) Block();

@@ -370,7 +370,7 @@ struct TreeSummarizeODG {
 
   typedef Galois::GAtomic<unsigned> UnsignedAtomic;
   static const unsigned CHUNK_SIZE = 64;
-  typedef GaloisRuntime::WorkList::dChunkedFIFO<CHUNK_SIZE, unsigned> WLty;
+  typedef Galois::Runtime::WorkList::dChunkedFIFO<CHUNK_SIZE, unsigned> WLty;
 
   struct ODGnode {
     UnsignedAtomic numChild;
@@ -535,10 +535,10 @@ struct TreeSummarizeODG {
     Galois::StatTimer t_feach ("Time taken by for_each in tree summarization");
 
     t_feach.start ();
-    GaloisRuntime::beginSampling ();
-    // Galois::for_each_wl<GaloisRuntime::WorkList::ParaMeter<WLty> > (wl, SummarizeOp (odgNodes), "tree_summ");
+    Galois::Runtime::beginSampling ();
+    // Galois::for_each_wl<Galois::Runtime::WorkList::ParaMeter<WLty> > (wl, SummarizeOp (odgNodes), "tree_summ");
     Galois::for_each_wl (wl, SummarizeOp (odgNodes), "tree_summ");
-    GaloisRuntime::endSampling ();
+    Galois::Runtime::endSampling ();
     t_feach.stop ();
 
   }
@@ -617,13 +617,13 @@ struct TreeSummarizeLevelByLevel {
     Galois::StatTimer t_feach ("Time taken by for_each in tree summarization");
 
     t_feach.start ();
-    GaloisRuntime::beginSampling ();
+    Galois::Runtime::beginSampling ();
     for (unsigned i = levelWL.size (); i > 0;) {
       
       --i; // size - 1
 
       if (!levelWL[i].empty ()) {
-        GaloisRuntime::do_all_coupled (levelWL[i].begin (), levelWL[i].end (),
+        Galois::Runtime::do_all_coupled (levelWL[i].begin (), levelWL[i].end (),
             SummarizeOp ());
 
 
@@ -638,7 +638,7 @@ struct TreeSummarizeLevelByLevel {
 
 
     }
-    GaloisRuntime::endSampling ();
+    Galois::Runtime::endSampling ();
     t_feach.stop ();
 
     std::cout << "TreeSummarizeLevelByLevel: iterations = " << iter << std::endl;
@@ -882,7 +882,7 @@ void run(int nbodies, int ntimesteps, int seed, TreeSummMethod summMethod) {
   generateInput(bodies, nbodies, seed);
   t_input_gen.stop ();
 
-  typedef GaloisRuntime::WorkList::dChunkedLIFO<256> WL;
+  typedef Galois::Runtime::WorkList::dChunkedLIFO<256> WL;
 
   for (int step = 0; step < ntimesteps; step++) {
     // Do tree building sequentially

@@ -31,7 +31,8 @@ namespace Galois {
 class Statistic;
 }
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 extern bool inGaloisForEach;
 
@@ -47,6 +48,7 @@ void reportStat(Galois::Statistic* value);
 void printStats();
 
 }
+} // end namespace Galois
 
 #endif
 

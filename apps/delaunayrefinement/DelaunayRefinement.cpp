@@ -149,9 +149,9 @@ int main(int argc, char** argv) {
   std::cout << "configuration: " << std::distance(graph->begin(), graph->end())
 	    << " total triangles, " << std::count_if(graph->begin(), graph->end(), is_bad(graph)) << " bad triangles\n";
 
-  Galois::Statistic("MeminfoPre1", GaloisRuntime::MM::pageAllocInfo());
-  Galois::preAlloc(15 * numThreads + GaloisRuntime::MM::pageAllocInfo() * 10);
-  Galois::Statistic("MeminfoPre2", GaloisRuntime::MM::pageAllocInfo());
+  Galois::Statistic("MeminfoPre1", Galois::Runtime::MM::pageAllocInfo());
+  Galois::preAlloc(15 * numThreads + Galois::Runtime::MM::pageAllocInfo() * 10);
+  Galois::Statistic("MeminfoPre2", Galois::Runtime::MM::pageAllocInfo());
 
   Galois::StatTimer T;
   T.start();
@@ -161,11 +161,11 @@ int main(int argc, char** argv) {
   else
     std::for_each(graph->begin(), graph->end(), Preprocess());
 
-  Galois::Statistic("MeminfoMid", GaloisRuntime::MM::pageAllocInfo());
+  Galois::Statistic("MeminfoMid", Galois::Runtime::MM::pageAllocInfo());
   
   Galois::StatTimer Trefine("refine");
   Trefine.start();
-  using namespace GaloisRuntime::WorkList;
+  using namespace Galois::Runtime::WorkList;
   
   typedef LocalQueues<dChunkedLIFO<256>, ChunkedLIFO<256> > BQ;
   typedef ChunkedAdaptor<false,32> CA;
@@ -185,7 +185,7 @@ int main(int argc, char** argv) {
   Trefine.stop();
   T.stop();
   
-  Galois::Statistic("MeminfoPost", GaloisRuntime::MM::pageAllocInfo());
+  Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
   
   if (!skipVerify) {
     int size = Galois::ParallelSTL::count_if(graph->begin(), graph->end(), is_bad(graph));

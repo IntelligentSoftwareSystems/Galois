@@ -23,12 +23,14 @@
 #ifndef GALOIS_RUNTIME_SAMPLING_H
 #define GALOIS_RUNTIME_SAMPLING_H
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 void beginSampling();
 void endSampling();
 void reportSampling(const char* loopname);
 
 }
+} // end namespace Galois
 
 #endif

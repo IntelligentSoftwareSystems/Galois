@@ -852,7 +852,7 @@ int main(int argc, char **argv) {
   //Galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
-  using namespace GaloisRuntime::WorkList;
+  using namespace Galois::Runtime::WorkList;
   typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;
 
 #ifdef GALOIS_USE_EXP

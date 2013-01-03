@@ -57,26 +57,26 @@ int main(int argc, char** argv) {
 
   // Galois::StatTimer T0("T0");
   // T0.start();
-  // using namespace GaloisRuntime::WorkList;
+  // using namespace Galois::Runtime::WorkList;
   // Galois::for_each<ChunkedLIFO<64> >(v.begin(), v.end(), process());
   // T0.stop();
 
   // Galois::StatTimer T1("T1");
   // T1.start();
-  // using namespace GaloisRuntime::WorkList;
+  // using namespace Galois::Runtime::WorkList;
   // Galois::for_each<Alt::ChunkedAdaptor<LIFO<>, 64, true > >(v.begin(), v.end(), process());
   // T1.stop();
 
   Galois::StatTimer T2("T2");
   T2.start();
-  using namespace GaloisRuntime::WorkList;
+  using namespace Galois::Runtime::WorkList;
   Galois::for_each<dChunkedLIFO<64> >(v.begin(), v.end(), process());
   T2.stop();
 
 #ifdef GALOIS_USE_EXP
   // Galois::StatTimer T3("T3");
   // T3.start();
-  // using namespace GaloisRuntime::WorkList;
+  // using namespace Galois::Runtime::WorkList;
   // //  Galois::for_each<Alt::ChunkedAdaptor<Alt::LevelStealingAlt, 64> >(v.begin(), v.end(), process());
   // Galois::for_each<Alt::ChunkedAdaptor<Alt::InitialQueue<Alt::LevelStealingAlt, Alt::LevelLocalAlt>, 64> >(v.begin(), v.end(), process());
 
@@ -85,7 +85,7 @@ int main(int argc, char** argv) {
 
   // Galois::StatTimer T4("T4");
   // T4.start();
-  // using namespace GaloisRuntime::WorkList;
+  // using namespace Galois::Runtime::WorkList;
   // Galois::for_each<Alt::LevelStealingAlt<Alt::LIFO_SB<> > >(v.begin(), v.end(), process());
   // T4.stop();
 }

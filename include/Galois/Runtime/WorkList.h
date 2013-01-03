@@ -48,7 +48,8 @@
 #include <boost/optional.hpp>
 #include <boost/ref.hpp>
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 namespace WorkList {
 
 // Worklists may not be copied.
@@ -756,10 +757,10 @@ class BulkSynchronous : private boost::noncopyable {
   };
 
   CTy wls[2];
-  GaloisRuntime::PerThreadStorage<TLD> tlds;
-  GaloisRuntime::GBarrier barrier1;
-  GaloisRuntime::GBarrier barrier2;
-  GaloisRuntime::LL::CacheLineStorage<volatile long> some;
+  Galois::Runtime::PerThreadStorage<TLD> tlds;
+  Galois::Runtime::GBarrier barrier1;
+  Galois::Runtime::GBarrier barrier2;
+  Galois::Runtime::LL::CacheLineStorage<volatile long> some;
   volatile bool empty;
 
  public:
@@ -810,7 +811,7 @@ class BulkSynchronous : private boost::noncopyable {
         return r;
 
       barrier1.wait();
-      if (GaloisRuntime::LL::getTID() == 0) {
+      if (Galois::Runtime::LL::getTID() == 0) {
         if (!some.data)
           empty = true;
         some.data = false; 
@@ -832,6 +833,7 @@ GALOIS_WLCOMPILECHECK(BulkSynchronous)
 
 }
 }
+} // end namespace Galois
 
 #endif
 

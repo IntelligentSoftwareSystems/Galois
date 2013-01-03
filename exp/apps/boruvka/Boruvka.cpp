@@ -336,7 +336,7 @@ struct CheckAcyclic {
 
 struct SortEdges {
   void operator()(const GNode& src) {
-    graph.sortEdges(src, std::less<EdgeData>(), Galois::NONE);
+    //    graph.sortEdges(src, std::less<EdgeData>(), Galois::NONE);
   }
 
   void operator()() {
@@ -394,8 +394,8 @@ int main(int argc, char** argv) {
   initializeGraph();
   Tinitial.stop();
 
-  Galois::preAlloc(GaloisRuntime::MM::pageAllocInfo() * 6);
-  Galois::Statistic("MeminfoPre", GaloisRuntime::MM::pageAllocInfo());
+  Galois::preAlloc(Galois::Runtime::MM::pageAllocInfo() * 6);
+  Galois::Statistic("MeminfoPre", Galois::Runtime::MM::pageAllocInfo());
   Galois::StatTimer T;
   T.start();
   switch (algo) {
@@ -404,7 +404,7 @@ int main(int argc, char** argv) {
     default: std::cerr << "Unknown algo: " << algo << "\n";
   }
   T.stop();
-  Galois::Statistic("MeminfoPost", GaloisRuntime::MM::pageAllocInfo());
+  Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
 
   std::cout << "MST weight: "
     << Galois::ParallelSTL::map_reduce(mst.begin(), mst.end(),

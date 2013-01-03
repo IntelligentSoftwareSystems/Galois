@@ -24,16 +24,16 @@
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/mm/Mem.h"
 
-__thread char* GaloisRuntime::ptsBase;
-GaloisRuntime::PerBackend GaloisRuntime::PTSBackend;
-__thread char* GaloisRuntime::ppsBase;
-GaloisRuntime::PerBackend GaloisRuntime::PPSBackend;
+__thread char* Galois::Runtime::ptsBase;
+Galois::Runtime::PerBackend Galois::Runtime::PTSBackend;
+__thread char* Galois::Runtime::ppsBase;
+Galois::Runtime::PerBackend Galois::Runtime::PPSBackend;
 
 
-unsigned GaloisRuntime::PerBackend::allocOffset(unsigned size) {
+unsigned Galois::Runtime::PerBackend::allocOffset(unsigned size) {
   size = (size + 15) & ~15;
   unsigned retval = __sync_fetch_and_add(&nextLoc, size);
-  if (retval + size > GaloisRuntime::MM::pageSize) {
+  if (retval + size > Galois::Runtime::MM::pageSize) {
     assert(0 && "no more memory");
     abort();
   }
@@ -41,7 +41,7 @@ unsigned GaloisRuntime::PerBackend::allocOffset(unsigned size) {
   return retval;
 }
 
-void GaloisRuntime::PerBackend::deallocOffset(unsigned offset, unsigned size) {
+void Galois::Runtime::PerBackend::deallocOffset(unsigned offset, unsigned size) {
   // Simplest way to recover memory; relies on mostly stack-like nature of
   // allocations
   size = (size + 15) & ~15;
@@ -51,31 +51,31 @@ void GaloisRuntime::PerBackend::deallocOffset(unsigned offset, unsigned size) {
   }
 }
 
-void* GaloisRuntime::PerBackend::getRemote(unsigned thread, unsigned offset) {
+void* Galois::Runtime::PerBackend::getRemote(unsigned thread, unsigned offset) {
   char* rbase = heads[thread];
   assert(rbase);
   return &rbase[offset];
 }
 
-void GaloisRuntime::PerBackend::initCommon() {
+void Galois::Runtime::PerBackend::initCommon() {
   if (heads.empty())
     heads.resize(LL::getMaxThreads());
 }
 
-char* GaloisRuntime::PerBackend::initPerThread() {
+char* Galois::Runtime::PerBackend::initPerThread() {
   initCommon();
-  char* b = heads[LL::getTID()] = (char*)GaloisRuntime::MM::pageAlloc();
-  memset(b, 0, GaloisRuntime::MM::pageSize);
+  char* b = heads[LL::getTID()] = (char*)Galois::Runtime::MM::pageAlloc();
+  memset(b, 0, Galois::Runtime::MM::pageSize);
   return b;
 }
 
-char* GaloisRuntime::PerBackend::initPerPackage() {
+char* Galois::Runtime::PerBackend::initPerPackage() {
   initCommon();
   unsigned id = LL::getTID();
   unsigned leader = LL::getLeaderForThread(id);
   if (id == leader) {
-    char* b = heads[id] = (char*)GaloisRuntime::MM::pageAlloc();
-    memset(b, 0, GaloisRuntime::MM::pageSize);
+    char* b = heads[id] = (char*)Galois::Runtime::MM::pageAlloc();
+    memset(b, 0, Galois::Runtime::MM::pageSize);
     return b;
   } else {
     //wait for leader to fix up package
@@ -85,13 +85,13 @@ char* GaloisRuntime::PerBackend::initPerPackage() {
   }
 }
 
-void GaloisRuntime::initPTS() {
-  if (!GaloisRuntime::ptsBase) {
+void Galois::Runtime::initPTS() {
+  if (!Galois::Runtime::ptsBase) {
     //unguarded initialization as initPTS will run in the master thread
     //before any other threads are generated
-    GaloisRuntime::ptsBase = PTSBackend.initPerThread();
+    Galois::Runtime::ptsBase = PTSBackend.initPerThread();
   }
-  if (!GaloisRuntime::ppsBase) {
-    GaloisRuntime::ppsBase = PPSBackend.initPerPackage();
+  if (!Galois::Runtime::ppsBase) {
+    Galois::Runtime::ppsBase = PPSBackend.initPerPackage();
   }
 }

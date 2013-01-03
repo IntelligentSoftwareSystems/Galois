@@ -30,7 +30,7 @@
 #include "Galois/Runtime/ll/SimpleLock.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
 
-void GaloisRuntime::LL::LockPairOrdered(SimpleLock<true>& L1, SimpleLock<true>& L2) {
+void Galois::Runtime::LL::LockPairOrdered(SimpleLock<true>& L1, SimpleLock<true>& L2) {
   assert(&L1 != &L2);
   if (&L1 < &L2) {
     L1.lock();
@@ -41,7 +41,7 @@ void GaloisRuntime::LL::LockPairOrdered(SimpleLock<true>& L1, SimpleLock<true>& 
   }   
 }
 
-bool GaloisRuntime::LL::TryLockPairOrdered(SimpleLock<true>& L1, SimpleLock<true>& L2) {
+bool Galois::Runtime::LL::TryLockPairOrdered(SimpleLock<true>& L1, SimpleLock<true>& L2) {
   assert(&L1 != &L2);
   bool T1, T2;
   if (&L1 < &L2) {
@@ -60,7 +60,7 @@ bool GaloisRuntime::LL::TryLockPairOrdered(SimpleLock<true>& L1, SimpleLock<true
   return false;
 }
 
-void GaloisRuntime::LL::UnLockPairOrdered(SimpleLock<true>& L1, SimpleLock<true>& L2) {
+void Galois::Runtime::LL::UnLockPairOrdered(SimpleLock<true>& L1, SimpleLock<true>& L2) {
   assert(&L1 != &L2);
   if (&L1 < &L2) {
     L1.unlock();
@@ -71,34 +71,34 @@ void GaloisRuntime::LL::UnLockPairOrdered(SimpleLock<true>& L1, SimpleLock<true>
   }   
 }
 
-void GaloisRuntime::LL::LockPairOrdered(SimpleLock<false>& L1, SimpleLock<false>& L2) {
+void Galois::Runtime::LL::LockPairOrdered(SimpleLock<false>& L1, SimpleLock<false>& L2) {
 }
 
-bool GaloisRuntime::LL::TryLockPairOrdered(SimpleLock<false>& L1, SimpleLock<false>& L2) {
+bool Galois::Runtime::LL::TryLockPairOrdered(SimpleLock<false>& L1, SimpleLock<false>& L2) {
   return true;
 }
 
-void GaloisRuntime::LL::UnLockPairOrdered(SimpleLock<false>& L1, SimpleLock<false>& L2) {
+void Galois::Runtime::LL::UnLockPairOrdered(SimpleLock<false>& L1, SimpleLock<false>& L2) {
 }
 
-void GaloisRuntime::LL::LockPairOrdered(PaddedLock<true>& L1, PaddedLock<true>& L2) {
+void Galois::Runtime::LL::LockPairOrdered(PaddedLock<true>& L1, PaddedLock<true>& L2) {
   LockPairOrdered(L1.Lock.data, L2.Lock.data);
 }
 
-bool GaloisRuntime::LL::TryLockPairOrdered(PaddedLock<true>& L1, PaddedLock<true>& L2) {
+bool Galois::Runtime::LL::TryLockPairOrdered(PaddedLock<true>& L1, PaddedLock<true>& L2) {
   return TryLockPairOrdered(L1.Lock.data, L2.Lock.data);
 }
 
-void GaloisRuntime::LL::UnLockPairOrdered(PaddedLock<true>& L1, PaddedLock<true>& L2) {
+void Galois::Runtime::LL::UnLockPairOrdered(PaddedLock<true>& L1, PaddedLock<true>& L2) {
   UnLockPairOrdered(L1.Lock.data, L2.Lock.data);
 }
 
-void GaloisRuntime::LL::LockPairOrdered(PaddedLock<false>& L1, PaddedLock<false>& L2) {
+void Galois::Runtime::LL::LockPairOrdered(PaddedLock<false>& L1, PaddedLock<false>& L2) {
 }
 
-bool GaloisRuntime::LL::TryLockPairOrdered(PaddedLock<false>& L1, PaddedLock<false>& L2) {
+bool Galois::Runtime::LL::TryLockPairOrdered(PaddedLock<false>& L1, PaddedLock<false>& L2) {
   return true;
 }
 
-void GaloisRuntime::LL::UnLockPairOrdered(PaddedLock<false>& L1, PaddedLock<false>& L2) {
+void Galois::Runtime::LL::UnLockPairOrdered(PaddedLock<false>& L1, PaddedLock<false>& L2) {
 }

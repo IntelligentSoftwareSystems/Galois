@@ -63,7 +63,7 @@ int NumNodes;
 
 #if SHARE_SINGLE_BC
 struct BCrecord {
-  GaloisRuntime::SimpleLock<unsigned char, true> lock;
+  Galois::Runtime::SimpleLock<unsigned char, true> lock;
   double bc; 
   BCrecord(): lock(), bc(0.0) {}
 };
@@ -81,17 +81,17 @@ struct merge {
 Galois::GVectorElementAccumulator<std::vector<double> >* CB;
 #endif
 
-GaloisRuntime::PerThreadStorage<std::vector<GNode>*> SQG;
-GaloisRuntime::PerThreadStorage<std::vector<double> *> sigmaG;
-GaloisRuntime::PerThreadStorage<std::vector<double> *> deltaG;
-GaloisRuntime::PerThreadStorage<std::vector<int>*> distG;
+Galois::Runtime::PerThreadStorage<std::vector<GNode>*> SQG;
+Galois::Runtime::PerThreadStorage<std::vector<double> *> sigmaG;
+Galois::Runtime::PerThreadStorage<std::vector<double> *> deltaG;
+Galois::Runtime::PerThreadStorage<std::vector<int>*> distG;
 
 template<typename T>
 struct PerIt {  
   typedef typename Galois::PerIterAllocTy::rebind<T>::other Ty;
 };
 
-GaloisRuntime::PerThreadStorage< std::vector<std::vector<GNode> > > succsGlobal;
+Galois::Runtime::PerThreadStorage< std::vector<std::vector<GNode> > > succsGlobal;
 
 std::vector<GNode> & getSuccs(GNode n) {
   return (*succsGlobal.getLocal())[n];
@@ -340,7 +340,7 @@ int main(int argc, char** argv) {
   std::vector<GNode> tmp;
   std::copy(begin, end, std::back_inserter(tmp));
 
-  typedef GaloisRuntime::WorkList::dChunkedLIFO<1> WL;
+  typedef Galois::Runtime::WorkList::dChunkedLIFO<1> WL;
   Galois::StatTimer T;
   T.start();
   Galois::for_each<WL>(tmp.begin(), tmp.end(), process());

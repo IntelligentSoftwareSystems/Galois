@@ -28,7 +28,8 @@
 #include "Galois/Runtime/DeterministicWork.h"
 #include "Galois/Runtime/LCordered.h"
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 
 template <typename NhFunc, typename OpFunc>
@@ -73,6 +74,7 @@ void for_each_ordered_impl (Iter beg, Iter end, Cmp cmp, NhFunc nhFunc, OpFunc o
   }
 }
 
-} // end namespace GaloisRuntime
+} // end namespace Runtime
+} // end namespace Galois
 
 #endif // GALOIS_RUNTIME_ORDERED_WORK_H

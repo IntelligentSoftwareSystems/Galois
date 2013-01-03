@@ -31,60 +31,60 @@
 
 #if GALOIS_USE_EXCEPTION_HANDLER
 #else
-__thread jmp_buf GaloisRuntime::hackjmp;
+__thread jmp_buf Galois::Runtime::hackjmp;
 #endif
 
 //! Global thread context for each active thread
-static __thread GaloisRuntime::SimpleRuntimeContext* thread_cnx = 0;
+static __thread Galois::Runtime::SimpleRuntimeContext* thread_cnx = 0;
 
 namespace HIDDEN {
 struct PendingStatus {
-  GaloisRuntime::LL::CacheLineStorage<GaloisRuntime::PendingFlag> flag;
-  PendingStatus(): flag(GaloisRuntime::NON_DET) { }
+  Galois::Runtime::LL::CacheLineStorage<Galois::Runtime::PendingFlag> flag;
+  PendingStatus(): flag(Galois::Runtime::NON_DET) { }
 };
 
 }
 
 static HIDDEN::PendingStatus pendingStatus;
 
-void GaloisRuntime::setPending(GaloisRuntime::PendingFlag value) {
+void Galois::Runtime::setPending(Galois::Runtime::PendingFlag value) {
   pendingStatus.flag.data = value;
 }
 
-GaloisRuntime::PendingFlag GaloisRuntime::getPending () {
+Galois::Runtime::PendingFlag Galois::Runtime::getPending () {
   return pendingStatus.flag.data;
 }
 
-void GaloisRuntime::doCheckWrite() {
-  if (GaloisRuntime::getPending () == GaloisRuntime::PENDING) {
+void Galois::Runtime::doCheckWrite() {
+  if (Galois::Runtime::getPending () == Galois::Runtime::PENDING) {
 #if GALOIS_USE_EXCEPTION_HANDLER
-    throw GaloisRuntime::REACHED_FAILSAFE;
+    throw Galois::Runtime::REACHED_FAILSAFE;
 #else
-    longjmp(hackjmp, GaloisRuntime::REACHED_FAILSAFE);
+    longjmp(hackjmp, Galois::Runtime::REACHED_FAILSAFE);
 #endif
   }
 }
 
-void GaloisRuntime::setThreadContext(GaloisRuntime::SimpleRuntimeContext* n) {
+void Galois::Runtime::setThreadContext(Galois::Runtime::SimpleRuntimeContext* n) {
   thread_cnx = n;
 }
 
-GaloisRuntime::SimpleRuntimeContext* GaloisRuntime::getThreadContext() {
+Galois::Runtime::SimpleRuntimeContext* Galois::Runtime::getThreadContext() {
   return thread_cnx;
 }
 
-void GaloisRuntime::doAcquire(GaloisRuntime::Lockable* C) {
+void Galois::Runtime::doAcquire(Galois::Runtime::Lockable* C) {
   SimpleRuntimeContext* cnx = getThreadContext();
   if (cnx)
     cnx->acquire(C);
 }
 
-unsigned GaloisRuntime::SimpleRuntimeContext::cancel_iteration() {
+unsigned Galois::Runtime::SimpleRuntimeContext::cancel_iteration() {
   //FIXME: not handled yet
   return commit_iteration();
 }
 
-unsigned GaloisRuntime::SimpleRuntimeContext::commit_iteration() {
+unsigned Galois::Runtime::SimpleRuntimeContext::commit_iteration() {
   unsigned numLocks = 0;
   while (locks) {
     //ORDER MATTERS!
@@ -103,23 +103,23 @@ unsigned GaloisRuntime::SimpleRuntimeContext::commit_iteration() {
   return numLocks;
 }
 
-void GaloisRuntime::breakLoop() {
+void Galois::Runtime::breakLoop() {
 #if GALOIS_USE_EXCEPTION_HANDLER
-  throw GaloisRuntime::BREAK;
+  throw Galois::Runtime::BREAK;
 #else
-  longjmp(hackjmp, GaloisRuntime::BREAK);
+  longjmp(hackjmp, Galois::Runtime::BREAK);
 #endif
 }
 
-void GaloisRuntime::signalConflict() {
+void Galois::Runtime::signalConflict() {
 #if GALOIS_USE_EXCEPTION_HANDLER
-        throw GaloisRuntime::CONFLICT; // Conflict
+        throw Galois::Runtime::CONFLICT; // Conflict
 #else
-        longjmp(hackjmp, GaloisRuntime::CONFLICT);
+        longjmp(hackjmp, Galois::Runtime::CONFLICT);
 #endif
 }
 
-void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
+void Galois::Runtime::SimpleRuntimeContext::acquire(Galois::Runtime::Lockable* L) {
   if (customAcquire) {
     sub_acquire(L);
     return;
@@ -132,20 +132,20 @@ void GaloisRuntime::SimpleRuntimeContext::acquire(GaloisRuntime::Lockable* L) {
     locks = L;
   } else {
     if (L->Owner.getValue() != this) {
-      GaloisRuntime::signalConflict();
+      Galois::Runtime::signalConflict();
     }
   }
 }
 
-void GaloisRuntime::SimpleRuntimeContext::sub_acquire(GaloisRuntime::Lockable* L) {
+void Galois::Runtime::SimpleRuntimeContext::sub_acquire(Galois::Runtime::Lockable* L) {
   assert(0 && "Shouldn't get here");
   abort();
 }
 
 //anchor vtable
-GaloisRuntime::SimpleRuntimeContext::~SimpleRuntimeContext() {}
+Galois::Runtime::SimpleRuntimeContext::~SimpleRuntimeContext() {}
 
 
-void GaloisRuntime::forceAbort() {
+void Galois::Runtime::forceAbort() {
   signalConflict();
 }

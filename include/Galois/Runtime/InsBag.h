@@ -28,7 +28,8 @@
 #include "Galois/Runtime/ll/PtrLock.h"
 #include <iterator>
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 template<class T>
 class galois_insert_bag : private boost::noncopyable {
@@ -40,7 +41,7 @@ class galois_insert_bag : private boost::noncopyable {
     T* dlast; //end of storage
   };
 
-  GaloisRuntime::PerThreadStorage<header*> heads;
+  Galois::Runtime::PerThreadStorage<header*> heads;
 
   void insHeader(header* h) {
     header*& H = *heads.getLocal();
@@ -92,7 +93,7 @@ public:
   typedef T&       reference;
 
   class iterator : public std::iterator<std::forward_iterator_tag, T> {
-    GaloisRuntime::PerThreadStorage<header*>* hd;
+    Galois::Runtime::PerThreadStorage<header*>* hd;
     unsigned int thr;
     header* p;
     T* v;
@@ -135,7 +136,7 @@ public:
 
   public:
     iterator(): hd(0), thr(0), p(0), v(0) { }
-    iterator(GaloisRuntime::PerThreadStorage<header*>* _hd, int _thr): hd(_hd), thr(_thr), p(0), v(0)
+    iterator(Galois::Runtime::PerThreadStorage<header*>* _hd, int _thr): hd(_hd), thr(_thr), p(0), v(0)
     {
       //find first valid item
       if (!init_thread())
@@ -202,4 +203,6 @@ public:
 };
 
 }
+} // end namespace Galois
+
 #endif

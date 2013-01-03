@@ -48,7 +48,8 @@
 
 #include <cstdio>
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 namespace BulkSynchronousWork {
 
 template<typename T, bool isLIFO, unsigned ChunkSize>
@@ -324,7 +325,7 @@ template<typename ItemTy>
 struct typeof_worklist { typedef Worklist<ItemTy, 256> type; };
 
 template<typename ItemTy>
-struct typeof_usercontext { typedef GaloisRuntime::UserContextAccess<ItemTy> type; };
+struct typeof_usercontext { typedef Galois::Runtime::UserContextAccess<ItemTy> type; };
 
 template<typename FnTy>
 struct needs_push { typedef boost::mpl::bool_<ForEachTraits<FnTy>::NeedsPush> type; };
@@ -544,7 +545,7 @@ class Executor {
 
 public:
   explicit Executor(const FnsTy& f, const InitialWorkTy& i, const char* l): fns(f), init(i), loopname(l) { 
-    barrier.reinit(GaloisRuntime::galoisActiveThreads);
+    barrier.reinit(Galois::Runtime::galoisActiveThreads);
   }
 
   void operator()() {
@@ -590,14 +591,14 @@ class Executor2 {
   typedef Worklist<value_type,256> WLTy;
 
   struct ThreadLocalData {
-    GaloisRuntime::UserContextAccess<value_type> facing;
+    Galois::Runtime::UserContextAccess<value_type> facing;
     SimpleRuntimeContext cnx;
     LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
     ThreadLocalData(const char* ln): stat(ln) { }
   };
 
-  GaloisRuntime::GBarrier barrier1;
-  GaloisRuntime::GBarrier barrier2;
+  Galois::Runtime::GBarrier barrier1;
+  Galois::Runtime::GBarrier barrier2;
   WLTy wls[2];
   FunctionTy function;
   InitialWorkTy init;
@@ -637,10 +638,10 @@ class Executor2 {
 #endif
     switch (result) {
     case 0: break;
-    case GaloisRuntime::CONFLICT:
+    case Galois::Runtime::CONFLICT:
       abortIteration(tld, wid, cur, next);
       break;
-    case GaloisRuntime::BREAK:
+    case Galois::Runtime::BREAK:
     default:
       abort();
     }
@@ -793,21 +794,22 @@ static inline void do_all_bs_impl(IterTy b, IterTy e, FnsTy fns, InitFnTy initFn
 }
 #endif
 } // end BulkSynchronousWork
-} // end GaloisRuntime
+} // end Runtime
+} // end Galois
 
 namespace Galois {
 template<typename ItemsTy, typename IterTy, typename FnsTy>
 static inline void do_all_bs(IterTy b, IterTy e, FnsTy fns) {
   typedef typename std::iterator_traits<IterTy>::value_type value_type;
-  typedef typename GaloisRuntime::BulkSynchronousWork::CopyIn<value_type> InitFn;
-  GaloisRuntime::BulkSynchronousWork::do_all_bs_impl<ItemsTy>(b, e, fns, InitFn(), 0);
+  typedef typename Galois::Runtime::BulkSynchronousWork::CopyIn<value_type> InitFn;
+  Galois::Runtime::BulkSynchronousWork::do_all_bs_impl<ItemsTy>(b, e, fns, InitFn(), 0);
 }
 
 template<typename ItemsTy, typename IterTy, typename FnsTy, typename InitFnTy>
 static inline void do_all_bs(IterTy b, IterTy e, FnsTy fns, InitFnTy initFn) {
   typedef typename std::iterator_traits<IterTy>::value_type value_type;
-  typedef typename GaloisRuntime::BulkSynchronousWork::CopyIn<value_type> InitFn;
-  GaloisRuntime::BulkSynchronousWork::do_all_bs_impl<ItemsTy>(b, e, fns, initFn, 0);
+  typedef typename Galois::Runtime::BulkSynchronousWork::CopyIn<value_type> InitFn;
+  Galois::Runtime::BulkSynchronousWork::do_all_bs_impl<ItemsTy>(b, e, fns, initFn, 0);
 }
 }
 

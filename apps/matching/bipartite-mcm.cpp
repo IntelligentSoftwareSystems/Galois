@@ -543,7 +543,7 @@ struct MatchingABMP {
     size_t size = initial.size();
     Galois::setActiveThreads(Concurrent ? numThreads : 1);
     
-    using namespace GaloisRuntime::WorkList;
+    using namespace Galois::Runtime::WorkList;
 
     typedef ChunkedFIFO<1024> Chunk;
     typedef dChunkedFIFO<1024> dChunk;

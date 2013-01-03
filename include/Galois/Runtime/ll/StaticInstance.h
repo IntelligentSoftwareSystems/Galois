@@ -32,7 +32,8 @@
 
 #include "CompilerSpecific.h"
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 namespace LL {
 
 //This should be much simpler in c++03 mode, but be general for now
@@ -73,5 +74,6 @@ struct StaticInstance {
 
 }
 }
+} // end namespace Galois
 
 #endif

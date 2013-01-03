@@ -44,7 +44,7 @@ typedef Galois::Graph::FirstGraph<MetisNode,METISINT, true>::GraphNode GNode;
 #include <set>
 using namespace std;
 typedef ArraySet< GNode > GNodeSet;
-typedef set< GNode, std::less<GNode>, GaloisRuntime::MM::FSBGaloisAllocator<GNode> > GNodeSTLSet;
+typedef set< GNode, std::less<GNode>, Galois::Runtime::MM::FSBGaloisAllocator<GNode> > GNodeSTLSet;
 //typedef vector<GNode> GNodeSTLSet;
 
 int getRandom(int num);

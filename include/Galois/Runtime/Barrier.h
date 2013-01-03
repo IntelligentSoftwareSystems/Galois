@@ -27,7 +27,8 @@
 
 #include <pthread.h>
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 class PthreadBarrier {
   pthread_barrier_t bar;
@@ -179,5 +180,6 @@ typedef TopoBarrier GBarrier;
 GBarrier& getSystemBarrier();
 
 }
+} // end namespace Galois
 
 #endif

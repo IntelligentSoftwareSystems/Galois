@@ -40,7 +40,7 @@ namespace Galois {
 // - Ordered-Set is serially faster than Min-Heap, e.g., 10%-15% faster on serial
 //    ordered DES
 // - Ordered-Set can easily use a scalable allocator i.e. FSBGaloisAllocator. 
-template <typename T, typename Cmp=std::less<T>, typename Alloc=GaloisRuntime::MM::FSBGaloisAllocator<T> >
+template <typename T, typename Cmp=std::less<T>, typename Alloc=Galois::Runtime::MM::FSBGaloisAllocator<T> >
 class ThreadSafeOrderedSet {
   typedef std::set<T, Cmp, Alloc> Set;
 
@@ -52,7 +52,7 @@ public:
   typedef typename Set::size_type size_type;
   typedef typename Set::const_iterator const_iterator;
 
-  typedef GaloisRuntime::LL::SimpleLock<true> Lock_ty;
+  typedef Galois::Runtime::LL::SimpleLock<true> Lock_ty;
 
   GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Lock_ty mutex;
   Set orderedSet;
@@ -169,7 +169,7 @@ protected:
     }
   };
 
-  typedef GaloisRuntime::LL::SimpleLock<true> Lock_ty;
+  typedef Galois::Runtime::LL::SimpleLock<true> Lock_ty;
 
   GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Lock_ty mutex;
   Cont container;

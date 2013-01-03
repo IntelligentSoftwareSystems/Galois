@@ -170,7 +170,7 @@ void printGraph() {
 }
 ///////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////
-GaloisRuntime::PerThreadStorage<long long> MSTWeight;
+Galois::Runtime::PerThreadStorage<long long> MSTWeight;
 struct process {
    template<typename ContextTy>
    void operator()(GNode& src, ContextTy& lwl) {
@@ -271,7 +271,7 @@ struct seq_gt: public std::binary_function<const GNode&, const GNode&, bool> {
 ///////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////
 EdgeDataType runBodyParallel() {
-   using namespace GaloisRuntime::WorkList;
+   using namespace Galois::Runtime::WorkList;
    typedef dChunkedFIFO<64> dChunk;
    typedef ChunkedFIFO<64> Chunk;
    typedef OrderedByIntegerMetric<Indexer, dChunk> OBIM;

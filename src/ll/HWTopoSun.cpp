@@ -37,7 +37,7 @@
 #include <sys/processor.h>
 #include <sys/procset.h>
 
-using namespace GaloisRuntime;
+using namespace Galois::Runtime;
 
 namespace {
 
@@ -79,31 +79,31 @@ AutoSunPolicy A;
 
 
 
-bool GaloisRuntime::LL::bindThreadToProcessor(int id) {
+bool Galois::Runtime::LL::bindThreadToProcessor(int id) {
   return sunBindToProcessor(A.procmap[id]);
 }
 
-unsigned GaloisRuntime::LL::getMaxThreads() {
+unsigned Galois::Runtime::LL::getMaxThreads() {
   return A.numThreads;
 }
 
-unsigned GaloisRuntime::LL::getMaxCores() {
+unsigned Galois::Runtime::LL::getMaxCores() {
   return A.numCores;
 }
 
-unsigned GaloisRuntime::LL::getMaxPackages() {
+unsigned Galois::Runtime::LL::getMaxPackages() {
   return A.numPackages;
 }
 
-unsigned GaloisRuntime::LL::getMaxPackageForThread(int id) {
+unsigned Galois::Runtime::LL::getMaxPackageForThread(int id) {
   return A.numPackages - 1;
 }
 
-unsigned GaloisRuntime::LL::getPackageForThread(int id) {
+unsigned Galois::Runtime::LL::getPackageForThread(int id) {
   return 0;
 }
 
-bool GaloisRuntime::LL::isPackageLeader(int id) {
+bool Galois::Runtime::LL::isPackageLeader(int id) {
   return id == 0;
 }
 

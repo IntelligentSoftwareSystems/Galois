@@ -47,7 +47,8 @@
 #include <iostream>
 #include <tr1/unordered_map>
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 static const bool debug = false;
 
@@ -240,8 +241,8 @@ public:
   typedef LCorderedContext<T, Cmp, MyType> Ctxt;
   typedef typename Ctxt::NItem NItem;
 
-  typedef GaloisRuntime::MM::FSBGaloisAllocator<NItem> NItemAlloc;
-  typedef GaloisRuntime::PerThreadVector<NItem*> NItemWL;
+  typedef Galois::Runtime::MM::FSBGaloisAllocator<NItem> NItemAlloc;
+  typedef Galois::Runtime::PerThreadVector<NItem*> NItemWL;
 
 
   Cmp cmp;
@@ -292,7 +293,7 @@ private:
   };
 
   void resetAll () {
-    GaloisRuntime::do_all_impl<false> (allNItems.begin_all (), allNItems.end_all (),
+    Galois::Runtime::do_all_impl<false> (allNItems.begin_all (), allNItems.end_all (),
         Reset (niAlloc), "reset_NItems");
   }
 
@@ -327,7 +328,7 @@ public:
       PerThreadAllocator
     > NhoodMap;
 
-  typedef GaloisRuntime::LL::ThreadRWlock Lock_ty;
+  typedef Galois::Runtime::LL::ThreadRWlock Lock_ty;
 
 protected:
   Cmp cmp;
@@ -436,13 +437,13 @@ class LCorderedExec {
   typedef typename Ctxt::value_type T;
   typedef typename Ctxt::NhoodMgr NhoodMgr;
 
-  typedef GaloisRuntime::MM::FSBGaloisAllocator<Ctxt> CtxtAlloc;
-  typedef GaloisRuntime::PerThreadVector<Ctxt*> CtxtWL;
-  typedef GaloisRuntime::PerThreadDeque<Ctxt*> CtxtDelQ;
-  typedef GaloisRuntime::PerThreadDeque<Ctxt*> CtxtLocalQ;
-  // typedef GaloisRuntime::PerThreadVector<T> AddWL;
-  typedef GaloisRuntime::UserContextAccess<T> UserCtx;
-  typedef GaloisRuntime::PerThreadStorage<UserCtx> PerThreadUserCtx;
+  typedef Galois::Runtime::MM::FSBGaloisAllocator<Ctxt> CtxtAlloc;
+  typedef Galois::Runtime::PerThreadVector<Ctxt*> CtxtWL;
+  typedef Galois::Runtime::PerThreadDeque<Ctxt*> CtxtDelQ;
+  typedef Galois::Runtime::PerThreadDeque<Ctxt*> CtxtLocalQ;
+  // typedef Galois::Runtime::PerThreadVector<T> AddWL;
+  typedef Galois::Runtime::UserContextAccess<T> UserCtx;
+  typedef Galois::Runtime::PerThreadStorage<UserCtx> PerThreadUserCtx;
 
 
   typedef Galois::GAccumulator<size_t> Accumulator;
@@ -474,12 +475,12 @@ class LCorderedExec {
 
       ctxtWL.get ().push_back (ctxt);
 
-      GaloisRuntime::setThreadContext (ctxt);
+      Galois::Runtime::setThreadContext (ctxt);
       int tmp=0;
       // TODO: nhoodVisitor should take only one arg, 
       // 2nd arg being passed due to compatibility with Deterministic executor
       nhoodVisitor (ctxt->active, tmp); 
-      GaloisRuntime::setThreadContext (NULL);
+      Galois::Runtime::setThreadContext (NULL);
     }
 
   };
@@ -687,13 +688,13 @@ public:
     Galois::TimeAccumulator t_destroy;
 
     t_create.start ();
-    GaloisRuntime::do_all_impl<false> (abeg, aend, 
+    Galois::Runtime::do_all_impl<false> (abeg, aend, 
         CreateCtxtExpandNhood (nhoodVisitor, nhmgr, ctxtAlloc, initCtxt),
         "create_initial_contexts");
     t_create.stop ();
 
     t_find.start ();
-    GaloisRuntime::do_all_impl<false> (initCtxt.begin_all (), initCtxt.end_all (),
+    Galois::Runtime::do_all_impl<false> (initCtxt.begin_all (), initCtxt.end_all (),
         FindInitSources (sourceTest, initSrc, nInitSrc),
         "find_initial_sources");
     t_find.stop ();
@@ -707,12 +708,12 @@ public:
     CtxtDelQ ctxtDelQ;
     CtxtLocalQ ctxtLocalQ;
 
-    typedef GaloisRuntime::WorkList::dChunkedFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
+    typedef Galois::Runtime::WorkList::dChunkedFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
     // TODO: code to find global min goes here
 
     t_for.start ();
-    GaloisRuntime::for_each_impl<SrcWL_ty> (
-        GaloisRuntime::makeStandardRange( initSrc.begin_all (), initSrc.end_all ()),
+    Galois::Runtime::for_each_impl<SrcWL_ty> (
+        Galois::Runtime::makeStandardRange( initSrc.begin_all (), initSrc.end_all ()),
         ApplyOperator (
           operFunc,
           nhoodVisitor,
@@ -728,7 +729,7 @@ public:
     t_for.stop ();
 
     t_destroy.start ();
-    GaloisRuntime::do_all_impl<false> (ctxtDelQ.begin_all (), ctxtDelQ.end_all (),
+    Galois::Runtime::do_all_impl<false> (ctxtDelQ.begin_all (), ctxtDelQ.end_all (),
         DelCtxt (ctxtAlloc), "delete_all_ctxt");
     t_destroy.stop ();
 
@@ -789,4 +790,6 @@ void for_each_ordered_lc (AI abeg, AI aend, Cmp cmp, NhoodFunc nhoodVisitor, Ope
 }
 
 }
+} // end namespace Galois
+
 #endif //  GALOIS_RUNTIME_LC_ORDERED_H

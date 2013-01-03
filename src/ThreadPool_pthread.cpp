@@ -39,11 +39,13 @@
 
 //Forward declare this to avoid including PerThreadStorage
 //We avoid this to stress that the thread Pool MUST NOT depend on PTS
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 extern void initPTS();
 }
+}
 
-using namespace GaloisRuntime;
+using namespace Galois::Runtime;
 
 //! Generic check for pthread functions
 static void checkResults(int val) {
@@ -113,11 +115,11 @@ class ThreadPool_pthread : public ThreadPool {
 
   void initThread() {
     //initialize TID
-    GaloisRuntime::LL::initTID();
-    unsigned id = GaloisRuntime::LL::getTID();
-    GaloisRuntime::initPTS();
+    Galois::Runtime::LL::initTID();
+    unsigned id = Galois::Runtime::LL::getTID();
+    Galois::Runtime::initPTS();
     if (id != 0 || !LL::EnvCheck("GALOIS_DO_NOT_BIND_MAIN_THREAD"))
-      GaloisRuntime::LL::bindThreadToProcessor(id);
+      Galois::Runtime::LL::bindThreadToProcessor(id);
     //we use a simple pthread or atomic to avoid depending on Galois
     //stuff too early in the initialization process
     started.release();
@@ -143,7 +145,7 @@ class ThreadPool_pthread : public ThreadPool {
   }
 
   void launch(void) {
-    unsigned LocalThreadID = GaloisRuntime::LL::getTID();
+    unsigned LocalThreadID = Galois::Runtime::LL::getTID();
     while (!shutdown) {
       starts[LocalThreadID].acquire();  
       doWork(LocalThreadID);
@@ -160,7 +162,7 @@ class ThreadPool_pthread : public ThreadPool {
 public:
   ThreadPool_pthread(): started(0), shutdown(false), workBegin(0), workEnd(0)
   {
-    maxThreads = GaloisRuntime::LL::getMaxThreads();
+    maxThreads = Galois::Runtime::LL::getMaxThreads();
     initThread();
 
     starts = new Semaphore[maxThreads];
@@ -211,7 +213,7 @@ public:
 } // end namespace
 
 //! Implement the global threadpool
-ThreadPool& GaloisRuntime::getSystemThreadPool() {
+ThreadPool& Galois::Runtime::getSystemThreadPool() {
   static ThreadPool_pthread pool;
   return pool;
 }

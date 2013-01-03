@@ -33,7 +33,8 @@
 
 #include <boost/utility.hpp>
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 class PerBackend {
   unsigned int nextLoc;
@@ -76,7 +77,7 @@ public:
   PerThreadStorage() {
     //in case we make one of these before initializing the thread pool
     //This will call initPTS for each thread if it hasn't already
-    GaloisRuntime::getSystemThreadPool();
+    Galois::Runtime::getSystemThreadPool();
 
     offset = PTSBackend.allocOffset(sizeof(T));
     for (unsigned n = 0; n < LL::getMaxThreads(); ++n)
@@ -119,7 +120,7 @@ public:
   PerPackageStorage() {
     //in case we make one of these before initializing the thread pool
     //This will call initPTS for each thread if it hasn't already
-    GaloisRuntime::getSystemThreadPool();
+    Galois::Runtime::getSystemThreadPool();
 
     offset = PPSBackend.allocOffset(sizeof(T));
     for (unsigned n = 0; n < LL::getMaxPackages(); ++n)
@@ -159,5 +160,6 @@ public:
 };
 
 }
+} // end namespace Galois
 
 #endif

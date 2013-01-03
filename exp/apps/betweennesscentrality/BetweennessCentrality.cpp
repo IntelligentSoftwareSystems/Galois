@@ -111,7 +111,7 @@ struct TempState  {
   }
 };
 
-GaloisRuntime::PerThreadStorage<TempState*> state;
+Galois::Runtime::PerThreadStorage<TempState*> state;
 
 void computeSucSize() {
   sucSize.resize(NumNodes);
@@ -270,8 +270,8 @@ int main(int argc, char** argv) {
 
   Galois::on_each(popstate());
 
-  typedef GaloisRuntime::WorkList::dChunkedLIFO<8> WL;
-  typedef GaloisRuntime::WorkList::ChunkedAdaptor<false,32> CA;
+  typedef Galois::Runtime::WorkList::dChunkedLIFO<8> WL;
+  typedef Galois::Runtime::WorkList::ChunkedAdaptor<false,32> CA;
   Galois::StatTimer T;
   T.start();
   Galois::for_each<WL>(tmp.begin(), tmp.end(), process());

@@ -30,7 +30,8 @@
 
 #include "Galois/TypeTraits.h"
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 template<typename FunctionTy>
 struct ForEachTraits {
@@ -44,5 +45,6 @@ struct ForEachTraits {
 };
 
 }
+} // end namespace Galois
 
 #endif // GALOIS_RUNTIME_FOREACHTRAITS_H

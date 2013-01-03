@@ -47,7 +47,8 @@
 #include "Galois/Runtime/mm/Mem.h"
 #include "Galois/Runtime/ll/gio.h"
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 namespace HIDDEN {
 
@@ -345,7 +346,7 @@ private:
     }
 
     Cont_ty** getLocal () const {
-      return getRemote (GaloisRuntime::LL::getTID ());
+      return getRemote (Galois::Runtime::LL::getTID ());
     }
 
     Cont_ty** getRemote (size_t i) const {
@@ -353,7 +354,7 @@ private:
       return const_cast<Cont_ty**> (&v[i]);
     }
 
-    size_t size () const { return GaloisRuntime::LL::getMaxThreads(); }
+    size_t size () const { return Galois::Runtime::LL::getMaxThreads(); }
 
   };
 #endif
@@ -361,7 +362,7 @@ private:
 
 
   // typedef FakePTS PerThrdCont_ty;
-  typedef GaloisRuntime::PerThreadStorage<Cont_ty*> PerThrdCont_ty;
+  typedef Galois::Runtime::PerThreadStorage<Cont_ty*> PerThrdCont_ty;
   PerThrdCont_ty perThrdCont;
 
   void destroy () {
@@ -628,8 +629,6 @@ public:
 };
 
 }
-
-
-
+} // end namespace Galois
 
 #endif // GALOIS_RUNTIME_PER_THREAD_WORK_LIST_H_

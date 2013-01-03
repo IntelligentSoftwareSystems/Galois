@@ -47,12 +47,12 @@ static const unsigned GALOIS_DEFAULT_CHUNK_SIZE = 32;
 //Iterator based versions
 template<typename WLTy, typename IterTy, typename FunctionTy>
 void for_each(IterTy b, IterTy e, FunctionTy f, const char* loopname = 0) {
-  GaloisRuntime::for_each_impl<WLTy>(GaloisRuntime::makeStandardRange(b, e), f, loopname);
+  Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeStandardRange(b, e), f, loopname);
 }
 
 template<typename IterTy, typename FunctionTy>
 void for_each(IterTy b, IterTy e, FunctionTy f, const char* loopname = 0) {
-  typedef GaloisRuntime::WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
+  typedef Galois::Runtime::WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
   Galois::for_each<WLTy, IterTy, FunctionTy>(b, e, f, loopname);
 }
 
@@ -65,19 +65,19 @@ void for_each(InitItemTy i, FunctionTy f, const char* loopname = 0) {
 
 template<typename InitItemTy, typename FunctionTy>
 void for_each(InitItemTy i, FunctionTy f, const char* loopname = 0) {
-  typedef GaloisRuntime::WorkList::ChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
+  typedef Galois::Runtime::WorkList::ChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
   Galois::for_each<WLTy, InitItemTy, FunctionTy>(i, f, loopname);
 }
 
 //Local based versions
 template<typename WLTy, typename ConTy, typename FunctionTy>
 void for_each_local(ConTy& c, FunctionTy f, const char* loopname = 0) {
-  GaloisRuntime::for_each_impl<WLTy>(GaloisRuntime::makeLocalRange(c), f, loopname);
+  Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(c), f, loopname);
 }
 
 template<typename ConTy, typename FunctionTy>
 void for_each_local(ConTy& c, FunctionTy f, const char* loopname = 0) {
-  typedef GaloisRuntime::WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
+  typedef Galois::Runtime::WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
   Galois::for_each_local<WLTy, ConTy, FunctionTy>(c, f, loopname);
 }
 
@@ -88,13 +88,13 @@ void for_each_local(ConTy& c, FunctionTy f, const char* loopname = 0) {
 
 template<typename IterTy,typename FunctionTy>
 FunctionTy do_all(const IterTy& begin, const IterTy& end, FunctionTy fn, const char* loopname = 0) {
-  return GaloisRuntime::do_all_impl(GaloisRuntime::makeStandardRange(begin, end), fn, GaloisRuntime::EmptyFn(), false);
+  return Galois::Runtime::do_all_impl(Galois::Runtime::makeStandardRange(begin, end), fn, Galois::Runtime::EmptyFn(), false);
 }
 
 //Local iterator do_all
 template<typename ConTy,typename FunctionTy>
 FunctionTy do_all_local(ConTy& c, FunctionTy fn, const char* loopname = 0) {
-  return GaloisRuntime::do_all_impl(GaloisRuntime::makeLocalRange(c), fn, GaloisRuntime::EmptyFn(), false);
+  return Galois::Runtime::do_all_impl(Galois::Runtime::makeLocalRange(c), fn, Galois::Runtime::EmptyFn(), false);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -105,7 +105,7 @@ FunctionTy do_all_local(ConTy& c, FunctionTy fn, const char* loopname = 0) {
 
 template<typename FunctionTy>
 static inline void on_each(FunctionTy fn, const char* loopname = 0) {
-  GaloisRuntime::on_each_impl(fn, loopname);
+  Galois::Runtime::on_each_impl(fn, loopname);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -113,7 +113,7 @@ static inline void on_each(FunctionTy fn, const char* loopname = 0) {
 ////////////////////////////////////////////////////////////////////////////////
 
 static inline void preAlloc(int num) {
-  GaloisRuntime::preAlloc_impl(num);
+  Galois::Runtime::preAlloc_impl(num);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -122,12 +122,12 @@ static inline void preAlloc(int num) {
 
 template<typename Iter, typename Cmp, typename NhFunc, typename OpFunc>
 void for_each_ordered(Iter beg, Iter end, Cmp cmp, NhFunc nhFunc, OpFunc opFunc, const char* loopname=0) {
-  GaloisRuntime::for_each_ordered_impl(beg, end, cmp, nhFunc, opFunc, loopname);
+  Galois::Runtime::for_each_ordered_impl(beg, end, cmp, nhFunc, opFunc, loopname);
 }
 
 template<typename Iter, typename Cmp, typename NhFunc, typename OpFunc, typename StableTest>
 void for_each_ordered(Iter beg, Iter end, Cmp cmp, NhFunc nhFunc, OpFunc opFunc, StableTest stabilityTest, const char* loopname=0) {
-  GaloisRuntime::for_each_ordered_impl(beg, end, cmp, nhFunc, opFunc, stabilityTest, loopname);
+  Galois::Runtime::for_each_ordered_impl(beg, end, cmp, nhFunc, opFunc, stabilityTest, loopname);
 }
 
 } //namespace Galois

@@ -136,14 +136,14 @@ protected:
   struct Process {
     MeshInit& meshInit;
     GlobalVec& g;
-    GaloisRuntime::PerThreadStorage<LocalVec>& perIterLocalVec;
+    Galois::Runtime::PerThreadStorage<LocalVec>& perIterLocalVec;
     bool createSyncFiles;
     IterCounter& niter;
 
     Process(
         MeshInit& meshInit,
         GlobalVec& g,
-        GaloisRuntime::PerThreadStorage<LocalVec>& perIterLocalVec,
+        Galois::Runtime::PerThreadStorage<LocalVec>& perIterLocalVec,
         bool createSyncFiles,
         IterCounter& niter):
       meshInit(meshInit),
@@ -172,7 +172,7 @@ public:
     const size_t nrows = meshInit.getSpatialDim();
     const size_t ncols = meshInit.getNodesPerElem();
 
-    GaloisRuntime::PerThreadStorage<LocalVec> perIterLocalVec;
+    Galois::Runtime::PerThreadStorage<LocalVec> perIterLocalVec;
     for (unsigned int i = 0; i < perIterLocalVec.size(); ++i)
       *perIterLocalVec.getRemote(i) = LocalVec(nrows, ncols);
 

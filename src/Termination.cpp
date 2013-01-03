@@ -21,7 +21,7 @@ kind.
 #include "Galois/Runtime/ThreadPool.h"
 #include "Galois/Runtime/Termination.h"
 
-using namespace GaloisRuntime;
+using namespace Galois::Runtime;
 
 TerminationDetection::TerminationDetection()
   :globalTerm(false), lastWasWhite(false)

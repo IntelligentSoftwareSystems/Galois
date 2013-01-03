@@ -25,7 +25,8 @@
 
 #include "Galois/Runtime/Config.h"
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 //! the number of active threads
 extern unsigned int galoisActiveThreads;
@@ -49,5 +50,6 @@ public:
 ThreadPool& getSystemThreadPool();
 
 }
+} // end namespace Galois
 
 #endif

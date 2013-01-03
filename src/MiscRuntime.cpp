@@ -23,12 +23,12 @@
 
 #include "Galois/Runtime/ParallelWork.h"
 
-unsigned int GaloisRuntime::galoisActiveThreads = 1;
+unsigned int Galois::Runtime::galoisActiveThreads = 1;
 
-void GaloisRuntime::preAlloc_impl(int num) {
+void Galois::Runtime::preAlloc_impl(int num) {
   int a = galoisActiveThreads;
   a = (num + a - 1) / a;
-  GaloisRuntime::RunCommand w[2] = {std::bind(GaloisRuntime::MM::pagePreAlloc, a),
+  Galois::Runtime::RunCommand w[2] = {std::bind(Galois::Runtime::MM::pagePreAlloc, a),
 				    Config::ref(getSystemBarrier())};
-  GaloisRuntime::getSystemThreadPool().run(&w[0], &w[2]);
+  Galois::Runtime::getSystemThreadPool().run(&w[0], &w[2]);
 }

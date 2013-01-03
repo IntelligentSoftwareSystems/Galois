@@ -27,12 +27,12 @@
 #include <algorithm>
 
 unsigned int Galois::setActiveThreads(unsigned int num) {
-  num = std::min(num, GaloisRuntime::getSystemThreadPool().getMaxThreads());
+  num = std::min(num, Galois::Runtime::getSystemThreadPool().getMaxThreads());
   num = std::max(num, 1U);
-  GaloisRuntime::galoisActiveThreads = num;
+  Galois::Runtime::galoisActiveThreads = num;
   return num;
 }
 
 unsigned int Galois::getActiveThreads() {
-  return GaloisRuntime::galoisActiveThreads;
+  return Galois::Runtime::galoisActiveThreads;
 }

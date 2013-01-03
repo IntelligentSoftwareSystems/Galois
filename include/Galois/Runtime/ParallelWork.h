@@ -42,7 +42,8 @@
 
 #include <algorithm>
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 template<typename RangeTy, typename WorkTy>
 struct Initializer {
@@ -93,7 +94,7 @@ protected:
   typedef WorkList::GFIFO<value_type> AbortedList;
 
   struct ThreadLocalData {
-    GaloisRuntime::UserContextAccess<value_type> facing;
+    Galois::Runtime::UserContextAccess<value_type> facing;
     SimpleRuntimeContext cnx;
     LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
     TerminationDetection::TokenHolder* lterm;
@@ -198,10 +199,10 @@ protected:
     switch (result) {
     case 0:
       break;
-    case GaloisRuntime::CONFLICT:
+    case Galois::Runtime::CONFLICT:
       abortIteration(*p, tld, recursiveAbort);
       break;
-    case GaloisRuntime::BREAK:
+    case Galois::Runtime::BREAK:
       handleBreak(tld);
       return false;
     default:
@@ -301,21 +302,22 @@ struct WOnEach {
   FunctionTy fn;
   WOnEach(FunctionTy f) :fn(f) {}
   void operator()(void) {
-    fn(GaloisRuntime::LL::getTID(), galoisActiveThreads);   
+    fn(Galois::Runtime::LL::getTID(), galoisActiveThreads);   
   }
 };
 
 template<typename FunctionTy>
 void on_each_impl(FunctionTy fn, const char* loopname = 0) {
-  GaloisRuntime::RunCommand w[2] = {WOnEach<FunctionTy>(fn),
+  Galois::Runtime::RunCommand w[2] = {WOnEach<FunctionTy>(fn),
 				    Config::ref(getSystemBarrier())};
-  GaloisRuntime::getSystemThreadPool().run(&w[0], &w[2]);
+  Galois::Runtime::getSystemThreadPool().run(&w[0], &w[2]);
 }
 
 
 void preAlloc_impl(int num);
 
 } // end namespace
+} // end namespace Galois
 
 #endif
 

@@ -23,7 +23,8 @@
 #ifndef GALOIS_RUNTIME_LL_ENVCHECK_H
 #define GALOIS_RUNTIME_LL_ENVCHECK_H
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 namespace LL {
 
 //PLEASE document all enviroment variables here;
@@ -38,5 +39,6 @@ bool EnvCheck(const char* parm, int& val);
 
 }
 }
+} // end namespace Galois
 
 #endif

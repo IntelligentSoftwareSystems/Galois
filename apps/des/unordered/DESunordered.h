@@ -89,7 +89,7 @@ class DESunordered: public DESunorderedBase {
 
     /**
      *
-     * Called by @see GaloisRuntime::for_each during
+     * Called by @see Galois::Runtime::for_each during
      * every iteration
      *
      * @param activeNode: the current active element
@@ -186,8 +186,8 @@ class DESunordered: public DESunorderedBase {
 
     Process p(graph, onWLflags, numEvents, numIter, maxPending);
 
-    typedef GaloisRuntime::WorkList::dChunkedFIFO<CHUNK_SIZE, GNode> WL_ty;
-    // typedef GaloisRuntime::WorkList::GFIFO<GNode> WL_ty;
+    typedef Galois::Runtime::WorkList::dChunkedFIFO<CHUNK_SIZE, GNode> WL_ty;
+    // typedef Galois::Runtime::WorkList::GFIFO<GNode> WL_ty;
 
     Galois::for_each<WL_ty>(initialActive.begin (), initialActive.end (), p);
 

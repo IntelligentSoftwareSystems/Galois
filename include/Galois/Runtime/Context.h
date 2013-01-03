@@ -38,7 +38,8 @@
 //! exceptions.
 #define GALOIS_USE_EXCEPTION_HANDLER 0
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 enum ConflictFlag {
   CONFLICT = -1,
@@ -78,7 +79,7 @@ class Lockable {
   Lockable* next;
   friend class SimpleRuntimeContext;
   template <typename, typename>
-    friend class GaloisRuntime::DeterministicWork::DeterministicContext;
+    friend class Galois::Runtime::DeterministicWork::DeterministicContext;
 public:
   LL::PtrLock<void, true> auxPtr;
   Lockable() :next(0) {}
@@ -139,7 +140,7 @@ static inline void acquire(Lockable* C, Galois::MethodFlag m) {
 
 struct AlwaysLockObj {
   void operator()(Lockable* C) const {
-    GaloisRuntime::doAcquire(C);
+    Galois::Runtime::doAcquire(C);
   }
 };
 
@@ -147,7 +148,7 @@ struct CheckedLockObj {
   Galois::MethodFlag m;
   CheckedLockObj(Galois::MethodFlag _m) :m(_m) {}
   void operator()(Lockable* C) const {
-    GaloisRuntime::acquire(C, m);
+    Galois::Runtime::acquire(C, m);
   }
 };
 
@@ -157,9 +158,8 @@ void breakLoop();
 void signalConflict();
 
 void forceAbort();
+
 }
-
-
-
+} // end namespace Galois
 
 #endif

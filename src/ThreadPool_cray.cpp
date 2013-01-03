@@ -23,7 +23,7 @@ kind.
 
 #include "Galois/Runtime/ThreadPool.h"
 
-using namespace GaloisRuntime;
+using namespace Galois::Runtime;
 
 namespace {
 
@@ -71,7 +71,7 @@ namespace {
 //! Implement the global threadpool
 static ThreadPool_cray pool;
 
-ThreadPool& GaloisRuntime::getSystemThreadPool() {
+ThreadPool& Galois::Runtime::getSystemThreadPool() {
   return pool;
 }
 

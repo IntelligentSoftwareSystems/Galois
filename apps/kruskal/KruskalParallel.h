@@ -41,9 +41,9 @@ struct EdgeCtx;
 
 typedef VecRep VecRep_ty;
 
-typedef GaloisRuntime::PerThreadVector<Edge> EdgeWL;
-typedef GaloisRuntime::PerThreadVector<EdgeCtx> EdgeCtxWL;
-typedef GaloisRuntime::MM::FSBGaloisAllocator<EdgeCtx> EdgeCtxAlloc;
+typedef Galois::Runtime::PerThreadVector<Edge> EdgeWL;
+typedef Galois::Runtime::PerThreadVector<EdgeCtx> EdgeCtxWL;
+typedef Galois::Runtime::MM::FSBGaloisAllocator<EdgeCtx> EdgeCtxAlloc;
 typedef Edge::Comparator Cmp;
 typedef Galois::GAccumulator<size_t> Accumulator;
 
@@ -228,7 +228,7 @@ struct LinkUpLoop {
         ctx.resetStatus ();
 
         if (usingOrderedRuntime) {
-          GaloisRuntime::signalConflict ();
+          Galois::Runtime::signalConflict ();
 
         } else {
           nextWL.get ().push_back (ctx);
@@ -301,7 +301,7 @@ struct Range {
   typedef typename std::iterator_traits<Iter>::difference_type difference_type;
   typedef typename std::iterator_traits<Iter>::value_type value_type;
 
-  typedef GaloisRuntime::PerThreadStorage<Range> PTS;
+  typedef Galois::Runtime::PerThreadStorage<Range> PTS;
 
   Iter m_beg;
   Iter m_end;
@@ -488,22 +488,22 @@ struct UnionFindWindow {
         break;
       }
 
-      // GaloisRuntime::beginSampling ();
+      // Galois::Runtime::beginSampling ();
       findTimer.start ();
       Galois::do_all (currWL->begin_all (), currWL->end_all (),
           FindLoop (repVec, repOwnerCtxVec, findIter),
           "find_loop");
       findTimer.stop ();
-      // GaloisRuntime::endSampling ();
+      // Galois::Runtime::endSampling ();
 
 
-      // GaloisRuntime::beginSampling ();
+      // Galois::Runtime::beginSampling ();
       linkUpTimer.start ();
       Galois::do_all (currWL->begin_all (), currWL->end_all (),
           LinkUpLoop<false> (repVec, repOwnerCtxVec, *nextWL, mstSum, linkUpIter),
           "link_up_loop");
       linkUpTimer.stop ();
-      // GaloisRuntime::endSampling ();
+      // Galois::Runtime::endSampling ();
 
       int u = linkUpIter.reduce () - numUnions;
       numUnions = linkUpIter.reduce ();

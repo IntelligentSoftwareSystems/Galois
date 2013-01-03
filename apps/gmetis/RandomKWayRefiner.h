@@ -63,7 +63,7 @@ public:
 
 			PerCPUValue perCPUValues;
 			parallelRefine pr(metisGraph, this, &perCPUValues);
-			Galois::for_each<GaloisRuntime::WorkList::ChunkedLIFO<32, GNode> >(metisGraph->getBoundaryNodes()->begin(), metisGraph->getBoundaryNodes()->end(), pr, "RandomKWAYRefine");
+			Galois::for_each<Galois::Runtime::WorkList::ChunkedLIFO<32, GNode> >(metisGraph->getBoundaryNodes()->begin(), metisGraph->getBoundaryNodes()->end(), pr, "RandomKWAYRefine");
 			metisGraph->incMinCut(perCPUValues.mincutInc.reduce());
 			GNodeSTLSet& changedNodes = perCPUValues.changedBndNodes.reduce();
 			for(GNodeSTLSet::iterator iter=changedNodes.begin();iter!=changedNodes.end();++iter){

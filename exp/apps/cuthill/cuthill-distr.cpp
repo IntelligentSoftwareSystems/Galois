@@ -135,7 +135,7 @@ struct SNode {
 	Galois::Graph::LC_CSR_Graph<SNode, void>::GraphNode parent;
 	//std::vector<Galois::Graph::LC_CSR_Graph<SNode, void>::GraphNode> bucket;
 	//Galois::gdeque<Galois::Graph::LC_CSR_Graph<SNode, void>::GraphNode>* bucket;
-	//GaloisRuntime::LL::SimpleLock<true> mutex;
+	//Galois::Runtime::LL::SimpleLock<true> mutex;
 };
 
 struct Prefix {
@@ -177,7 +177,7 @@ GNode source, report;
 //std::vector< std::vector<GNode> > bucket;
 //Galois::gdeque<GNode> bucket;
 Galois::InsertBag<GNode> bucket;
-GaloisRuntime::LL::SimpleLock<true> dbglock;
+Galois::Runtime::LL::SimpleLock<true> dbglock;
 
 std::vector< std::map<GNode, unsigned int> > redbuck;
 
@@ -370,9 +370,9 @@ struct TotalPrefix {
 
 	unsigned int round; 
 	unsigned int chunk; 
-	GaloisRuntime::PthreadBarrier barrier;
+	Galois::Runtime::PthreadBarrier barrier;
 
-	TotalPrefix(unsigned int r, unsigned int c, GaloisRuntime::PthreadBarrier b) : round(r), chunk(c), barrier(b) {}
+	TotalPrefix(unsigned int r, unsigned int c, Galois::Runtime::PthreadBarrier b) : round(r), chunk(c), barrier(b) {}
 
 	void operator()(unsigned int me, unsigned int tot) {
 
@@ -765,8 +765,8 @@ struct BarrierNoDup {
 
 		unsigned int depth = 0;
 		unsigned int thr = Galois::getActiveThreads();
-		GaloisRuntime::PthreadBarrier barrier(thr);
-		//GaloisRuntime::GBarrier& barrier = GaloisRuntime::getSystemBarrier();
+		Galois::Runtime::PthreadBarrier barrier(thr);
+		//Galois::Runtime::GBarrier& barrier = Galois::Runtime::getSystemBarrier();
 
 		while (true) {
 			unsigned next = (round + 1) & 1;
@@ -1279,7 +1279,7 @@ int main(int argc, char **argv) {
   Galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
-  using namespace GaloisRuntime::WorkList;
+  using namespace Galois::Runtime::WorkList;
   typedef dChunkedLIFO<8> BSWL_LIFO;
   typedef dChunkedFIFO<8> BSWL_FIFO;
 

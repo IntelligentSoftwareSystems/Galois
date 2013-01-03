@@ -71,7 +71,7 @@ protected:
     std::vector<AtomicInteger>& inDegVec;
     MeshInit& meshInit;
     GlobalVec& g;
-    GaloisRuntime::PerThreadStorage<LocalVec>& perIterLocalVec;
+    Galois::Runtime::PerThreadStorage<LocalVec>& perIterLocalVec;
     bool createSyncFiles;
     IterCounter& iter;
 
@@ -80,7 +80,7 @@ protected:
         std::vector<AtomicInteger>& inDegVec,
         MeshInit& meshInit,
         GlobalVec& g,
-        GaloisRuntime::PerThreadStorage<LocalVec>& perIterLocalVec,
+        Galois::Runtime::PerThreadStorage<LocalVec>& perIterLocalVec,
         bool createSyncFiles,
         IterCounter& iter):
 
@@ -231,7 +231,7 @@ public:
     size_t nrows = meshInit.getSpatialDim ();
     size_t ncols = meshInit.getNodesPerElem();
 
-    GaloisRuntime::PerThreadStorage<LocalVec> perIterLocalVec;
+    Galois::Runtime::PerThreadStorage<LocalVec> perIterLocalVec;
     for (unsigned int i = 0; i < perIterLocalVec.size(); ++i)
       *perIterLocalVec.getRemote(i) = LocalVec(nrows, ncols);
 

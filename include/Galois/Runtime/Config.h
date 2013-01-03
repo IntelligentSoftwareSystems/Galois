@@ -33,7 +33,8 @@
 #include <tr1/functional>
 #endif
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 namespace Config {
 #ifdef __GXX_EXPERIMENTAL_CXX0X__
   using std::function;
@@ -45,5 +46,6 @@ namespace Config {
 
 }
 }
+} // end namespace Galois
 
 #endif

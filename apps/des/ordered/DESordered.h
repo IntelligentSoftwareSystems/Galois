@@ -50,7 +50,7 @@ typedef Galois::GAccumulator<size_t> Accumulator_ty;
 
 typedef des::EventRecvTimeLocalTieBrkCmp<TypeHelper::Event_ty> Cmp_ty;
 
-typedef GaloisRuntime::PerThreadVector<TypeHelper::Event_ty> AddList_ty;
+typedef Galois::Runtime::PerThreadVector<TypeHelper::Event_ty> AddList_ty;
 
 struct SimObjInfo;
 typedef std::vector<SimObjInfo> VecSobjInfo;

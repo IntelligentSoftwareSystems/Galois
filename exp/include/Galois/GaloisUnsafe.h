@@ -32,16 +32,16 @@ namespace hidden {
 
   template <typename ExecutorTy>
   static inline void for_each_wl_impl (ExecutorTy& exec, const bool isParallel) {
-    assert(!GaloisRuntime::inGaloisForEach);
+    assert(!Galois::Runtime::inGaloisForEach);
 
-    GaloisRuntime::inGaloisForEach = true;
+    Galois::Runtime::inGaloisForEach = true;
 
-    GaloisRuntime::RunCommand w[2] = { GaloisRuntime::Config::ref (exec), 
-      GaloisRuntime::Config::ref (GaloisRuntime::getSystemBarrier ())};
+    Galois::Runtime::RunCommand w[2] = { Galois::Runtime::Config::ref (exec), 
+      Galois::Runtime::Config::ref (Galois::Runtime::getSystemBarrier ())};
 
-    GaloisRuntime::getSystemThreadPool().run(&w[0], &w[2]);
+    Galois::Runtime::getSystemThreadPool().run(&w[0], &w[2]);
 
-    GaloisRuntime::inGaloisForEach = false;
+    Galois::Runtime::inGaloisForEach = false;
   }
 }
 
@@ -55,7 +55,7 @@ static inline void for_each_wl (WLTy& wl, FunctionTy f, const char* loopname=0) 
 
   typedef typename WLTy::value_type T;
 
-  typedef GaloisRuntime::ForEachWork<ExecTy, T, FunctionTy> WorkTy;
+  typedef Galois::Runtime::ForEachWork<ExecTy, T, FunctionTy> WorkTy;
 
   WorkTy W (wl, f, loopname);
 
@@ -68,7 +68,7 @@ static inline void for_each_wl (WLTy& wl, FunctionTy f, const char* loopname=0) 
 
   typedef typename WLTy::value_type T;
 
-  typedef GaloisRuntime::ForEachWork<WLTy, T, FunctionTy> WorkTy;
+  typedef Galois::Runtime::ForEachWork<WLTy, T, FunctionTy> WorkTy;
 
   WorkTy W (wl, f, loopname);
 

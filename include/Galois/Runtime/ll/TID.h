@@ -30,7 +30,8 @@
 #ifndef GALOIS_RUNTIME_LL_TID_H
 #define GALOIS_RUNTIME_LL_TID_H
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 namespace LL {
 
 extern __thread unsigned TID;
@@ -44,6 +45,7 @@ static inline unsigned getTID() {
 //initializing it
 void initTID();
 
+}
 }
 }
 

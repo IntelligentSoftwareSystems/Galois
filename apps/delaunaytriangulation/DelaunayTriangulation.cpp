@@ -416,9 +416,9 @@ static void readInput(const std::string& filename) {
   Galois::preAlloc(2 * numThreads // some per-thread state
       + 2 * points.size() * sizeof(Element) // mesh is about 2x number of points (for random points)
       * 32 // include graph node size
-      / (GaloisRuntime::MM::pageSize) // in pages
+      / (Galois::Runtime::MM::pageSize) // in pages
       );
-  Galois::Statistic("MeminfoPre", GaloisRuntime::MM::pageAllocInfo());
+  Galois::Statistic("MeminfoPre", Galois::Runtime::MM::pageAllocInfo());
 
   layoutPoints(points);
 }
@@ -490,7 +490,7 @@ static void writeMesh(const std::string& filename) {
 }
 
 static void generateMesh() {
-  typedef GaloisRuntime::WorkList::ChunkedAdaptor<false,32> CA;
+  typedef Galois::Runtime::WorkList::ChunkedAdaptor<false,32> CA;
   Galois::for_each_local<CA>(ptrPoints, Process());
 }
 
@@ -506,7 +506,7 @@ int main(int argc, char** argv) {
   T.stop();
   std::cout << "mesh size: " << graph.size() << "\n";
 
-  Galois::Statistic("MeminfoPost", GaloisRuntime::MM::pageAllocInfo());
+  Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
 
   if (!skipVerify) {
     Verifier verifier;

@@ -29,7 +29,8 @@
 #include <fstream>
 #include <map>
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 namespace WorkList {
 
 template<typename Indexer, typename realWL, typename T >
@@ -303,5 +304,6 @@ public:
 
 }
 }
+} // end namespace Galois
 
 #endif

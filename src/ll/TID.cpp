@@ -37,7 +37,7 @@
 #include "dmp.h"
 #endif
 
-__thread unsigned GaloisRuntime::LL::TID = 0;
+__thread unsigned Galois::Runtime::LL::TID = 0;
 static unsigned nextID = 0;
 
 namespace {
@@ -73,7 +73,7 @@ typedef AtomicNextId NextId;
 
 static NextId next;
 
-void GaloisRuntime::LL::initTID() {
+void Galois::Runtime::LL::initTID() {
   TID = next.next();
   assert(TID < getMaxThreads());
 }

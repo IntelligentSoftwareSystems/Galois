@@ -27,7 +27,8 @@
 
 #include "Galois/Runtime/WorkList.h"
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 
 template<typename Context>
 class ContextPool {
@@ -54,4 +55,6 @@ public:
 };
 
 }
+} // end namespace Galois
+
 #endif

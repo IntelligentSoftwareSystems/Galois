@@ -5,14 +5,14 @@
 
 static void endPeriod() {
   int val;
-  if (GaloisRuntime::LL::EnvCheck("GALOIS_EXIT_AFTER_SAMPLING", val)) {
+  if (Galois::Runtime::LL::EnvCheck("GALOIS_EXIT_AFTER_SAMPLING", val)) {
     exit(val);
   }
 }
 
 static void beginPeriod() {
   int val;
-  if (GaloisRuntime::LL::EnvCheck("GALOIS_EXIT_BEFORE_SAMPLING", val)) {
+  if (Galois::Runtime::LL::EnvCheck("GALOIS_EXIT_BEFORE_SAMPLING", val)) {
     exit(val);
   }
 }
@@ -24,13 +24,13 @@ static void beginPeriod() {
 static bool isOn;
 
 static void vtuneBegin() {
-  if (!isOn && GaloisRuntime::LL::getTID() == 0)
+  if (!isOn && Galois::Runtime::LL::getTID() == 0)
     __itt_resume();
   isOn = true;
 }
 
 static void vtuneEnd() {
-  if (isOn && GaloisRuntime::LL::getTID() == 0)
+  if (isOn && Galois::Runtime::LL::getTID() == 0)
     __itt_pause();
   isOn = false;
 }
@@ -103,8 +103,8 @@ static void papiEnd() {
 }
 
 static void papiReport(const char* loopname) {
-  GaloisRuntime::reportStat(loopname, papiNames[0], papiResults[0]);
-  GaloisRuntime::reportStat(loopname, papiNames[1], papiResults[1]);
+  Galois::Runtime::reportStat(loopname, papiNames[0], papiResults[0]);
+  Galois::Runtime::reportStat(loopname, papiNames[1], papiResults[1]);
 }
 
 #else
@@ -113,18 +113,18 @@ static void papiEnd() {}
 static void papiReport(const char* loopname) {}
 #endif
 
-void GaloisRuntime::beginSampling() {
+void Galois::Runtime::beginSampling() {
   beginPeriod();
   papiBegin();
   vtuneBegin();
 }
 
-void GaloisRuntime::endSampling() {
+void Galois::Runtime::endSampling() {
   vtuneEnd();
   papiEnd();
   endPeriod();
 }
 
-void GaloisRuntime::reportSampling(const char* loopname) {
+void Galois::Runtime::reportSampling(const char* loopname) {
   papiReport(loopname);
 }

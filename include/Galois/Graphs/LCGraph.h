@@ -84,13 +84,13 @@ struct EdgeSortCompWrapper {
 
 namespace HIDDEN {
 uint64_t static localStart(uint64_t numNodes) {
-  unsigned int id = GaloisRuntime::LL::getTID();
+  unsigned int id = Galois::Runtime::LL::getTID();
   unsigned int num = Galois::getActiveThreads();
   return (numNodes + num - 1) / num * id;
 }
 
 uint64_t static localEnd(uint64_t numNodes) {
-  unsigned int id = GaloisRuntime::LL::getTID();
+  unsigned int id = Galois::Runtime::LL::getTID();
   unsigned int num = Galois::getActiveThreads();
   uint64_t end = (numNodes + num - 1) / num * (id + 1);
   return std::min(end, numNodes);
@@ -105,7 +105,7 @@ protected:
   typedef typename EdgeData::value_type edge_data_type;
   typedef LargeArray<uint32_t,true> EdgeDst;
 
-  struct NodeInfo : public GaloisRuntime::Lockable {
+  struct NodeInfo : public Galois::Runtime::Lockable {
     NodeTy data;
   };
 
@@ -223,9 +223,9 @@ public:
   }
 
   NodeTy& getData(GraphNode N, MethodFlag mflag = ALL) {
-    GaloisRuntime::checkWrite(mflag);
+    Galois::Runtime::checkWrite(mflag);
     NodeInfo& NI = nodeData[N];
-    GaloisRuntime::acquire(&NI, mflag);
+    Galois::Runtime::acquire(&NI, mflag);
     return NI.data;
   }
 
@@ -234,13 +234,13 @@ public:
   }
 
 //  edge_data_reference getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
-//    GaloisRuntime::checkWrite(mflag);
-//    GaloisRuntime::acquire(&nodeData[src], mflag);
+//    Galois::Runtime::checkWrite(mflag);
+//    Galois::Runtime::acquire(&nodeData[src], mflag);
 //    return EdgeData.get(getEdgeIdx(src, dst));
 //  }
 
   edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = NONE) {
-    GaloisRuntime::checkWrite(mflag);
+    Galois::Runtime::checkWrite(mflag);
     return edgeData[*ni];
   }
 
@@ -258,10 +258,10 @@ public:
   local_iterator local_end() const { return iterator(HIDDEN::localEnd(numNodes)); }
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = ALL) {
-    GaloisRuntime::acquire(&nodeData[N], mflag);
-    if (GaloisRuntime::shouldLock(mflag)) {
+    Galois::Runtime::acquire(&nodeData[N], mflag);
+    if (Galois::Runtime::shouldLock(mflag)) {
       for (uint64_t ii = raw_neighbor_begin(N), ee = raw_neighbor_end(N); ii != ee; ++ii) {
-        GaloisRuntime::acquire(&nodeData[edgeDst[ii]], mflag);
+        Galois::Runtime::acquire(&nodeData[edgeDst[ii]], mflag);
       }
     }
     return edge_iterator(raw_neighbor_begin(N));
@@ -269,13 +269,13 @@ public:
 
   edge_iterator edge_end(GraphNode N, MethodFlag mflag = ALL) {
     NodeInfo& NI = nodeData[N];
-    GaloisRuntime::acquire(&NI, mflag);
+    Galois::Runtime::acquire(&NI, mflag);
     return edge_iterator(raw_neighbor_end(N));
   }
 
   template<typename CompTy>
   void sortEdges(GraphNode N, const CompTy& comp = std::less<EdgeTy>(), MethodFlag mflag = ALL) {
-    GaloisRuntime::acquire(&nodeData[N], mflag);
+    Galois::Runtime::acquire(&nodeData[N], mflag);
     std::sort(edge_sort_begin(N), edge_sort_end(N), EdgeSortCompWrapper<EdgeValue,CompTy>(comp));
   }
 
@@ -314,7 +314,7 @@ protected:
   typedef EdgeInfoBase<NodeInfo, EdgeTy> EdgeInfo;
   typedef typename EdgeInfo::value_type edge_data_type;
   
-  struct NodeInfo : public GaloisRuntime::Lockable {
+  struct NodeInfo : public Galois::Runtime::Lockable {
     NodeTy data;
     EdgeInfo* edgeBegin;
     EdgeInfo* edgeEnd;
@@ -368,19 +368,19 @@ public:
   }
 
   NodeTy& getData(GraphNode N, MethodFlag mflag = ALL) {
-    GaloisRuntime::checkWrite(mflag);
-    GaloisRuntime::acquire(N, mflag);
+    Galois::Runtime::checkWrite(mflag);
+    Galois::Runtime::acquire(N, mflag);
     return N->data;
   }
   
 //  edge_data_reference getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
-//    GaloisRuntime::checkWrite(mflag);
-//    GaloisRuntime::acquire(src, mflag);
+//    Galois::Runtime::checkWrite(mflag);
+//    Galois::Runtime::acquire(src, mflag);
 //    return EdgeData[getEdgeIdx(src,dst)].getData();
 //  }
 
   edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = NONE) const {
-    GaloisRuntime::checkWrite(mflag);
+    Galois::Runtime::checkWrite(mflag);
     return ni->get();
    }
 
@@ -398,17 +398,17 @@ public:
   local_iterator local_end() const { return iterator(&nodeData[HIDDEN::localEnd(numNodes)]); }
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = ALL) {
-    GaloisRuntime::acquire(N, mflag);
-    if (GaloisRuntime::shouldLock(mflag)) {
+    Galois::Runtime::acquire(N, mflag);
+    if (Galois::Runtime::shouldLock(mflag)) {
       for (edge_iterator ii = N->edgeBegin, ee = N->edgeEnd; ii != ee; ++ii) {
-        GaloisRuntime::acquire(ii->dst, mflag);
+        Galois::Runtime::acquire(ii->dst, mflag);
       }
     }
     return N->edgeBegin;
   }
 
   edge_iterator edge_end(GraphNode N, MethodFlag mflag = ALL) {
-    GaloisRuntime::acquire(N, mflag);
+    Galois::Runtime::acquire(N, mflag);
     return N->edgeEnd;
   }
 
@@ -453,7 +453,7 @@ protected:
   typedef typename EdgeInfo::value_type edge_data_type;
   typedef LargeArray<NodeInfo*,true> Nodes;
 
-  struct NodeInfo : public GaloisRuntime::Lockable {
+  struct NodeInfo : public Galois::Runtime::Lockable {
     NodeTy data;
     int numEdges;
 
@@ -520,19 +520,19 @@ public:
   }
 
   NodeTy& getData(GraphNode N, MethodFlag mflag = ALL) {
-    GaloisRuntime::checkWrite(mflag);
-    GaloisRuntime::acquire(N, mflag);
+    Galois::Runtime::checkWrite(mflag);
+    Galois::Runtime::acquire(N, mflag);
     return N->data;
   }
   
 //  edge_data_reference getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
-//    GaloisRuntime::checkWrite(mflag);
-//    GaloisRuntime::acquire(src, mflag);
+//    Galois::Runtime::checkWrite(mflag);
+//    Galois::Runtime::acquire(src, mflag);
 //    return getEdgeIdx(src,dst)->getData();
 //  }
 
   edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = NONE) const {
-    GaloisRuntime::checkWrite(mflag);
+    Galois::Runtime::checkWrite(mflag);
     return ni->get();
   }
 
@@ -552,23 +552,23 @@ public:
   const_local_iterator local_end() const { return &nodes[HIDDEN::localEnd(numNodes)]; }
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = ALL) {
-    GaloisRuntime::acquire(N, mflag);
-    if (GaloisRuntime::shouldLock(mflag)) {
+    Galois::Runtime::acquire(N, mflag);
+    if (Galois::Runtime::shouldLock(mflag)) {
       for (edge_iterator ii = N->edgeBegin(), ee = N->edgeEnd(); ii != ee; ++ii) {
-        GaloisRuntime::acquire(ii->dst, mflag);
+        Galois::Runtime::acquire(ii->dst, mflag);
       }
     }
     return N->edgeBegin();
   }
 
   edge_iterator edge_end(GraphNode N, MethodFlag mflag = ALL) {
-    GaloisRuntime::acquire(N, mflag);
+    Galois::Runtime::acquire(N, mflag);
     return N->edgeEnd();
   }
 
   template<typename CompTy>
   void sortEdges(GraphNode N, const CompTy& comp = std::less<EdgeTy>(), MethodFlag mflag = ALL) {
-    GaloisRuntime::acquire(N, mflag);
+    Galois::Runtime::acquire(N, mflag);
     std::sort(N->edgeBegin(), N->edgeEnd(), EdgeSortCompWrapper<EdgeInfo,CompTy>(comp));
   }
 
@@ -611,7 +611,7 @@ protected:
   typedef typename EdgeInfo::value_type edge_data_type;
   typedef LargeArray<NodeInfo*,true> Nodes;
 
-  struct NodeInfo : public GaloisRuntime::Lockable {
+  struct NodeInfo : public Galois::Runtime::Lockable {
     NodeTy data;
     int numEdges;
 
@@ -642,7 +642,7 @@ protected:
     size_t size;
   };
 
-  GaloisRuntime::PerThreadStorage<Header*> headers;
+  Galois::Runtime::PerThreadStorage<Header*> headers;
   Nodes nodes;
   uint64_t numNodes;
   uint64_t numEdges;
@@ -664,7 +664,7 @@ protected:
   };
 
   //! Divide graph into equal sized chunks
-  void distribute(FileGraph& graph, GaloisRuntime::PerThreadStorage<DistributeInfo>& dinfo) {
+  void distribute(FileGraph& graph, Galois::Runtime::PerThreadStorage<DistributeInfo>& dinfo) {
     size_t total = sizeof(NodeInfo) * numNodes + sizeof(EdgeInfo) * numEdges;
     unsigned int num = Galois::getActiveThreads();
     size_t blockSize = total / num;
@@ -708,14 +708,14 @@ protected:
   }
 
   struct AllocateNodes {
-    GaloisRuntime::PerThreadStorage<DistributeInfo>& dinfo;
-    GaloisRuntime::PerThreadStorage<Header*>& headers;
+    Galois::Runtime::PerThreadStorage<DistributeInfo>& dinfo;
+    Galois::Runtime::PerThreadStorage<Header*>& headers;
     NodeInfo** nodes;
     FileGraph& graph;
 
     AllocateNodes(
-        GaloisRuntime::PerThreadStorage<DistributeInfo>& d,
-        GaloisRuntime::PerThreadStorage<Header*>& h, NodeInfo** n, FileGraph& g):
+        Galois::Runtime::PerThreadStorage<DistributeInfo>& d,
+        Galois::Runtime::PerThreadStorage<Header*>& h, NodeInfo** n, FileGraph& g):
       dinfo(d), headers(h), nodes(n), graph(g) { }
 
     void operator()(unsigned int tid, unsigned int num) {
@@ -728,7 +728,7 @@ protected:
           sizeof(NodeInfo) * d.numNodes * 2 +
           sizeof(EdgeInfo) * d.numEdges;
 
-      void *raw = GaloisRuntime::MM::largeAlloc(size);
+      void *raw = Galois::Runtime::MM::largeAlloc(size);
       memset(raw, 0, size);
 
       Header*& h = *headers.getLocal();
@@ -749,11 +749,11 @@ protected:
   };
 
   struct AllocateEdges {
-    GaloisRuntime::PerThreadStorage<DistributeInfo>& dinfo;
+    Galois::Runtime::PerThreadStorage<DistributeInfo>& dinfo;
     NodeInfo** nodes;
     FileGraph& graph;
 
-    AllocateEdges(GaloisRuntime::PerThreadStorage<DistributeInfo>& d, NodeInfo** n, FileGraph& g):
+    AllocateEdges(Galois::Runtime::PerThreadStorage<DistributeInfo>& d, NodeInfo** n, FileGraph& g):
       dinfo(d), nodes(n), graph(g) { }
 
     //! layout the edges
@@ -784,7 +784,7 @@ public:
   typedef NodeInfo*const * const_iterator;
 
   class local_iterator : public std::iterator<std::forward_iterator_tag, GraphNode> {
-    const GaloisRuntime::PerThreadStorage<Header*>* headers;
+    const Galois::Runtime::PerThreadStorage<Header*>* headers;
     unsigned int tid;
     Header* p;
     GraphNode v;
@@ -818,7 +818,7 @@ public:
 
   public:
     local_iterator(): headers(0), tid(0), p(0), v(0) { }
-    local_iterator(const GaloisRuntime::PerThreadStorage<Header*>* _headers, int _tid):
+    local_iterator(const Galois::Runtime::PerThreadStorage<Header*>* _headers, int _tid):
       headers(_headers), tid(_tid), p(0), v(0)
     {
       //find first valid item
@@ -858,24 +858,24 @@ public:
     for (unsigned i = 0; i < headers.size(); ++i) {
       Header* h = *headers.getRemote(i);
       if (h)
-        GaloisRuntime::MM::largeFree(h, h->size);
+        Galois::Runtime::MM::largeFree(h, h->size);
     }
   }
 
   NodeTy& getData(GraphNode N, MethodFlag mflag = ALL) {
-    GaloisRuntime::checkWrite(mflag);
-    GaloisRuntime::acquire(N, mflag);
+    Galois::Runtime::checkWrite(mflag);
+    Galois::Runtime::acquire(N, mflag);
     return N->data;
   }
   
 //  edge_data_reference getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
-//    GaloisRuntime::checkWrite(mflag);
-//    GaloisRuntime::acquire(src, mflag);
+//    Galois::Runtime::checkWrite(mflag);
+//    Galois::Runtime::acquire(src, mflag);
 //    return getEdgeIdx(src,dst)->getData();
 //  }
 
   edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = NONE) const {
-    GaloisRuntime::checkWrite(mflag);
+    Galois::Runtime::checkWrite(mflag);
     return ni->get();
   }
 
@@ -891,25 +891,25 @@ public:
   const_iterator end() const { return &nodes[numNodes]; }
 
   local_iterator local_begin() const {
-    return local_iterator(&headers, GaloisRuntime::LL::getTID());
+    return local_iterator(&headers, Galois::Runtime::LL::getTID());
   }
 
   local_iterator local_end() const {
-    return local_iterator(&headers, GaloisRuntime::LL::getTID() + 1);
+    return local_iterator(&headers, Galois::Runtime::LL::getTID() + 1);
   }
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = ALL) {
-    GaloisRuntime::acquire(N, mflag);
-    if (GaloisRuntime::shouldLock(mflag)) {
+    Galois::Runtime::acquire(N, mflag);
+    if (Galois::Runtime::shouldLock(mflag)) {
       for (edge_iterator ii = N->edgeBegin(), ee = N->edgeEnd(); ii != ee; ++ii) {
-        GaloisRuntime::acquire(ii->dst, mflag);
+        Galois::Runtime::acquire(ii->dst, mflag);
       }
     }
     return N->edgeBegin();
   }
 
   edge_iterator edge_end(GraphNode N, MethodFlag mflag = ALL) {
-    GaloisRuntime::acquire(N, mflag);
+    Galois::Runtime::acquire(N, mflag);
     return N->edgeEnd();
   }
 
@@ -919,7 +919,7 @@ public:
     numNodes = graph.size();
     numEdges = graph.sizeEdges();
 
-    GaloisRuntime::PerThreadStorage<DistributeInfo> dinfo;
+    Galois::Runtime::PerThreadStorage<DistributeInfo> dinfo;
     distribute(graph, dinfo);
 
     nodes.allocate(numNodes);

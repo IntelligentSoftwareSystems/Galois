@@ -5,15 +5,15 @@
 
 int main(int argc, char** argv) {
 
-  GaloisRuntime::SimpleRuntimeContext S;
-  GaloisRuntime::Lockable L;
+  Galois::Runtime::SimpleRuntimeContext S;
+  Galois::Runtime::Lockable L;
 
 
   Galois::Timer t;
   t.start();
   
   for (int x = 0; x < 1024*1024*1024; ++x)
-    GaloisRuntime::doAcquire(&L);
+    Galois::Runtime::doAcquire(&L);
   
   t.stop();
   std::cout << "Locking: " << t.get() << '\n';

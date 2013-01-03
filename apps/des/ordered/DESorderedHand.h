@@ -52,14 +52,14 @@ typedef Galois::GAccumulator<size_t> Accumulator_ty;
 
 typedef des::EventRecvTimeLocalTieBrkCmp<TypeHelper::Event_ty> Cmp_ty;
 
-typedef GaloisRuntime::PerThreadVector<TypeHelper::Event_ty> AddList_ty;
+typedef Galois::Runtime::PerThreadVector<TypeHelper::Event_ty> AddList_ty;
 
 struct SimObjInfo: public TypeHelper {
 
-  typedef GaloisRuntime::LL::SimpleLock<true> Lock_ty;
+  typedef Galois::Runtime::LL::SimpleLock<true> Lock_ty;
   typedef des::AbstractMain<SimInit_ty>::GNode GNode;
   typedef std::set<Event_ty, Cmp_ty
-    , GaloisRuntime::MM::FSBGaloisAllocator<Event_ty> > PQ;
+    , Galois::Runtime::MM::FSBGaloisAllocator<Event_ty> > PQ;
 
   Lock_ty mutex;
   PQ pendingEvents;
@@ -196,7 +196,7 @@ getGlobalMin (std::vector<SimObjInfo>& sobjInfoVec) {
 class DESorderedHand: 
   public des::AbstractMain<TypeHelper::SimInit_ty>, public TypeHelper {
 
-    typedef GaloisRuntime::PerThreadVector<Event_ty> WL_ty;
+    typedef Galois::Runtime::PerThreadVector<Event_ty> WL_ty;
 
 
 
@@ -309,7 +309,7 @@ protected:
 
       t_find.start ();
       Galois::do_all (
-      // GaloisRuntime::do_all_coupled (
+      // Galois::Runtime::do_all_coupled (
           sobjInfoVec.begin (), sobjInfoVec.end (),
           FindReady (readyEvents, findIter), "find_ready_events");
       t_find.stop ();
@@ -335,7 +335,7 @@ protected:
 
       t_simulate.start ();
       Galois::do_all (
-      // GaloisRuntime::do_all_coupled (
+      // Galois::Runtime::do_all_coupled (
           readyEvents.begin_all (), readyEvents.end_all (),
           ProcessEvents (graph, sobjInfoVec, newEvents, nevents), "process_ready_events");
       t_simulate.stop ();
@@ -473,7 +473,7 @@ protected:
     while (true) {
       ++round;
 
-      typedef GaloisRuntime::WorkList::dChunkedFIFO<16> WL_ty;
+      typedef Galois::Runtime::WorkList::dChunkedFIFO<16> WL_ty;
 
       Galois::for_each<WL_ty> (initWL.begin (), initWL.end (), 
           OpFuncEagerAdd (graph, sobjInfoVec, newEvents, niter, nevents));

@@ -31,7 +31,8 @@
 
 #include "CompilerSpecific.h"
 
-namespace GaloisRuntime {
+namespace Galois {
+namespace Runtime {
 namespace LL {
 
 
@@ -63,5 +64,6 @@ struct CacheLineStorage : public CacheLineImp<T, GALOIS_CACHE_LINE_SIZE % sizeof
 
 }
 }
+} // end namespace Galois
 
 #endif //_CACHE_LINE_STORAGE_H

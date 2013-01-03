@@ -12,7 +12,7 @@ static void printHeader(FILE* out) {
    fprintf(out, "LOOPNAME, STEP, PARALLELISM, WORKLIST_SIZE\n");
 }
 
-void GaloisRuntime::ParaMeterInit::init() {
+void Galois::Runtime::ParaMeterInit::init() {
   if (firstRun()) {
     firstRun() = false;
 
@@ -30,6 +30,6 @@ void GaloisRuntime::ParaMeterInit::init() {
   }
 }
 
-const char* GaloisRuntime::ParaMeterInit::getStatsFileName() {
+const char* Galois::Runtime::ParaMeterInit::getStatsFileName() {
   return statsFileName;
 }
