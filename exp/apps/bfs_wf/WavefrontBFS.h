@@ -251,15 +251,15 @@ class BFSwavefrontNolock: public AbstractWavefrontBFS {
 
 class BFSwavefrontBag: public AbstractWavefrontBFS {
 
-  // template <typename T>
-  // struct BFSbag: public Galois::InsertBag<T> {
-    // void push (const T& val) {
-      // Galois::InsertBag<T>::push (val);
-    // }
-// 
-  // };
-  // typedef BFSbag<GNode> WL_ty;
+  template <typename T>
+  struct BFSbag: public Galois::InsertBag<T> {
+    void push (const T& val) {
+      Galois::InsertBag<T>::push (val);
+    }
+  };
+  typedef BFSbag<GNode> WL_ty;
 
+#if 0
   template <typename T>
   struct BFSbag: public Galois::MergeBag<T> {
     void push (const T& v) {
@@ -267,7 +267,8 @@ class BFSwavefrontBag: public AbstractWavefrontBFS {
     }
   };
   typedef BFSbag<GNode> WL_ty;
-  
+#endif
+
   struct ParallelInnerLoop {
     GALOIS_ATTRIBUTE_PROF_NOINLINE unsigned operator () (Graph& graph, WL_ty& currWL, WL_ty& nextWL) const {
 

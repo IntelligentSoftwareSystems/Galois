@@ -57,16 +57,16 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#ifndef GALOIS_GRAPHS_GRAPH2_H
-#define GALOIS_GRAPHS_GRAPH2_H
+#ifndef GALOIS_GRAPHS_GRAPH_H
+#define GALOIS_GRAPHS_GRAPH_H
 
 #include <boost/functional.hpp>
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/iterator/filter_iterator.hpp>
 
+#include "Galois/Bag.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/MethodFlags.h"
-#include "Galois/Runtime/InsBag.h"
 
 #include "llvm/ADT/SmallVector.h"
 
@@ -231,7 +231,7 @@ class FirstGraph : private boost::noncopyable {
   };
 
   //The graph manages the lifetimes of the data in the nodes and edges
-  typedef Galois::Runtime::galois_insert_bag<gNode> NodeListTy;
+  typedef Galois::InsertBag<gNode> NodeListTy;
   NodeListTy nodes;
 
   EdgeFactory<EdgeTy> edges;

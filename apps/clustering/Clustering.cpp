@@ -93,12 +93,12 @@ void getRandomPoints(vector<LeafNode*> & lights, int numPoints){
 Galois::GAccumulator<size_t> addedNodes;
 struct FindMatching {
 	KdTree * tree;
-	Galois::Runtime::galois_insert_bag<NodeWrapper *> *newNodes;
-	Galois::Runtime::galois_insert_bag<NodeWrapper *> &allocs;
+	Galois::InsertBag<NodeWrapper *> *newNodes;
+	Galois::InsertBag<NodeWrapper *> &allocs;
 	vector<double> * coordinatesArray;
 	vector<ClusterNode*> &clusterArray;
 
-	FindMatching(KdTree * pT,Galois::Runtime::galois_insert_bag<NodeWrapper *> *&pNNodes, Galois::Runtime::galois_insert_bag<NodeWrapper *> &pAllocs,
+	FindMatching(KdTree * pT,Galois::InsertBag<NodeWrapper *> *&pNNodes, Galois::InsertBag<NodeWrapper *> &pAllocs,
 			vector<double> * pCoordinatesArray,vector<ClusterNode*> &pClusterArray):
 		tree(pT), newNodes(pNNodes), allocs(pAllocs),coordinatesArray(pCoordinatesArray), clusterArray(pClusterArray)
 	{
@@ -135,7 +135,7 @@ struct FindMatching {
 };
 
 ////////////////////////////////////////////////////////////
-int findMatch(KdTree * tree, NodeWrapper * nodeA,Galois::Runtime::galois_insert_bag<NodeWrapper *> *&newNodes, Galois::Runtime::galois_insert_bag<NodeWrapper *> &allocs,
+int findMatch(KdTree * tree, NodeWrapper * nodeA,Galois::InsertBag<NodeWrapper *> *&newNodes, Galois::InsertBag<NodeWrapper *> &allocs,
 		vector<double> * coordinatesArray,vector<ClusterNode*> &clusterArray ){
 	int addCounter=0;
 	if (tree->contains(*nodeA)) {
@@ -193,14 +193,14 @@ void clusterGalois(vector<LeafNode*> & lights) {
 	for(unsigned int i=0;i<workListOld.size();i++){
 		workList.push_back(workListOld[i]);
 	}
-	Galois::Runtime::galois_insert_bag<NodeWrapper *> *newNodes;
-	Galois::Runtime::galois_insert_bag<NodeWrapper *> allocs;
+	Galois::InsertBag<NodeWrapper *> *newNodes;
+	Galois::InsertBag<NodeWrapper *> allocs;
 	FindMatching findMatchingLambda(tree,newNodes, allocs,coordinatesArray,clusterArray);
 	Galois::StatTimer T;
 	T.start();
 
 	while(true){
-		newNodes = new Galois::Runtime::galois_insert_bag<NodeWrapper*>();
+		newNodes = new Galois::InsertBag<NodeWrapper*>();
 
 		addedNodes.reset();
 
@@ -212,7 +212,7 @@ void clusterGalois(vector<LeafNode*> & lights) {
 		size += addedNodes.reduce();
 
 		workList.clear();
-		for(Galois::Runtime::galois_insert_bag<NodeWrapper*>::iterator it = newNodes->begin(), itEnd = newNodes->end();it!=itEnd;it++)
+		for(Galois::InsertBag<NodeWrapper*>::iterator it = newNodes->begin(), itEnd = newNodes->end();it!=itEnd;it++)
 			workList.push_back(*it);
 		if(size<2)
 			break;
@@ -234,7 +234,7 @@ void clusterGalois(vector<LeafNode*> & lights) {
 		NodeWrapper * nw = initialWorklist[i];
 		delete nw;
 	}
-	for(Galois::Runtime::galois_insert_bag<NodeWrapper*>::iterator it = allocs.begin(), itEnd = allocs.end();it!=itEnd;it++)
+	for(Galois::InsertBag<NodeWrapper*>::iterator it = allocs.begin(), itEnd = allocs.end();it!=itEnd;it++)
 		delete *it;
 	delete coordinatesArray;
 	return;
