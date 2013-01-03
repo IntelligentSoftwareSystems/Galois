@@ -175,13 +175,6 @@ endif()
 #endif()
 
 ###### Global Functions ######
-function(linkRuntime name) 
-  target_link_libraries(${name} ${ARGN})
-  target_link_libraries(${name} galois)
-  if(USE_SUBVERSION_REVISION)
-    add_dependencies(${name} svnversion)
-  endif()
-endfunction(linkRuntime)
 
 include(ParseArguments)
 
@@ -207,7 +200,8 @@ function(app name)
   endforeach()
 
   compileApp(${name} ${APP_DEFAULT_ARGS})
-  linkRuntime(${name} ${APP_EXTLIBS})
+  target_link_libraries(${name} ${APP_EXTLIBS})
+  target_link_libraries(${name} galois)
   install(TARGETS ${name} DESTINATION bin)
 endfunction(app)
 

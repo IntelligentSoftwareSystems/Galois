@@ -26,4 +26,6 @@ if(TBB_FOUND)
 	target_link_libraries(galois ${TBB_LIBRARIES})
 endif()
 
-
+if(USE_SUBVERSION_REVISION)
+  add_dependencies(galois svnversion)
+endif()
