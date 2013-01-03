@@ -118,9 +118,9 @@ if(USE_EXP)
 endif()
 
 # c++0x features
-find_package(CXX0x)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX0X_FLAGS}")
-if (HAS_CXX0X_RVALUE_REFERENCES)
+find_package(CXX11)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX11_FLAGS}")
+if (HAS_CXX11_RVALUE_REFERENCES)
   add_definitions(-DGALOIS_HAS_RVALUE_REFERENCES)
 endif()
 
