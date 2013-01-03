@@ -163,32 +163,6 @@ struct Range {
 
 };
 
-namespace HIDDEN {
-
-template <typename Iter>
-void decrease (Iter& i, typename std::iterator_traits<Iter>::difference_type dist,
-    std::random_access_iterator_tag) {
-  i -= dist;
-}
-
-template <typename Iter>
-void decrease (Iter& i, typename std::iterator_traits<Iter>::difference_type dist,
-    std::bidirectional_iterator_tag) {
-  while (dist > 0) {
-    --i;
-    --dist;
-  }
-}
-
-template <typename Iter>
-void decrease (Iter& i, typename std::iterator_traits<Iter>::difference_type dist) {
-  assert (dist >= 0);
-  decrease (i, dist, typename std::iterator_traits<Iter>::iterator_category ());
-}
-
-
-} // end namespace HIDDEN
-
 template <typename Iter, typename FuncTp>
 class DoAllCoupledExec {
 
@@ -307,7 +281,7 @@ private:
         , std::bidirectional_iterator_tag) {
 
       steal_end = range.m_end;
-      HIDDEN::decrease (range.m_end, sz);
+      std::advance(range.m_end, -sz);
       steal_beg = range.m_end;
     }
 
