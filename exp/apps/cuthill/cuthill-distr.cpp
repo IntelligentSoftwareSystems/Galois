@@ -150,7 +150,7 @@ typedef Graph::GraphNode GNode;
 Graph graph;
 
 static size_t degree(const GNode& node) { 
-  return std::distance(graph.edge_begin(node, Galois::NONE), graph.edge_end(node, Galois::NONE));
+  return std::distance(graph.edge_begin(node, Galois::MethodFlag::NONE), graph.edge_end(node, Galois::MethodFlag::NONE));
 }
 
 std::ostream& operator<<(std::ostream& out, const SNode& n) {
@@ -160,7 +160,7 @@ std::ostream& operator<<(std::ostream& out, const SNode& n) {
 
 struct GNodeIndexer {
   unsigned int operator()(const GNode& val) const {
-    return graph.getData(val, Galois::NONE).dist;
+    return graph.getData(val, Galois::MethodFlag::NONE).dist;
   }
 };
 
@@ -201,13 +201,13 @@ struct PartialSum {
 
 		//dbglock.lock();
 #ifdef SERIAL_SWAP
-		graph.getData(item, Galois::NONE).numChildren += graph.getData(partial, Galois::NONE).numChildren;
+		graph.getData(item, Galois::MethodFlag::NONE).numChildren += graph.getData(partial, Galois::MethodFlag::NONE).numChildren;
 #else
-		SNode& idata = graph.getData(item, Galois::NONE);
+		SNode& idata = graph.getData(item, Galois::MethodFlag::NONE);
 		idata.sum = idata.numChildren;
-		idata.numChildren += graph.getData(partial, Galois::NONE).numChildren;
+		idata.numChildren += graph.getData(partial, Galois::MethodFlag::NONE).numChildren;
 #endif
-		//std::cerr << "[" << graph.getData(item, Galois::NONE).id << "] " << graph.getData(item, Galois::NONE).numChildren << "\n";
+		//std::cerr << "[" << graph.getData(item, Galois::MethodFlag::NONE).id << "] " << graph.getData(item, Galois::MethodFlag::NONE).numChildren << "\n";
 		//dbglock.unlock();
 		return item;
 	}
@@ -219,7 +219,7 @@ struct SegReduce {
 	SegReduce(unsigned int _sum) : sum(_sum) {}
 
 	void operator()(const GNode& item, Galois::UserContext<GNode>& ctx) {
-		graph.getData(item, Galois::NONE).numChildren += sum;
+		graph.getData(item, Galois::MethodFlag::NONE).numChildren += sum;
 	}
 };
 
@@ -229,7 +229,7 @@ struct Swap {
 	  operator()(item);
 	}
   void operator()(const GNode& item) {
-		SNode& idata = graph.getData(item, Galois::NONE);
+		SNode& idata = graph.getData(item, Galois::MethodFlag::NONE);
 		idata.numChildren -= idata.sum; 
 #ifndef NO_SORT
 		idata.startindex = idata.numChildren; 
@@ -249,7 +249,7 @@ struct SortChildren {
 	  operator()(parent);
 	}
   void operator()(GNode& parent) {
-		SNode& pdata = graph.getData(parent, Galois::NONE);
+		SNode& pdata = graph.getData(parent, Galois::MethodFlag::NONE);
 
 		if(pdata.sum > 1){
 
@@ -288,10 +288,10 @@ struct LocalPrefix {
 			//std::cerr << "On_each thread: " << me << " step: " << ceil(len / tot) << " start: " << start << " end " << end+1 << "\n";
 			//std::cerr << "On_each thread tot: " << tot << " len: " << len << " ceil: " << ceil((double) len / tot) << " floor: " << floor((double) len / tot) << "\n";
 
-			//std::cerr << graph.getData(*(initial[round].begin()+start), Galois::NONE).id << " to " << graph.getData(*(initial[round].begin()+(end+1)), Galois::NONE).id << "\n";
+			//std::cerr << graph.getData(*(initial[round].begin()+start), Galois::MethodFlag::NONE).id << " to " << graph.getData(*(initial[round].begin()+(end+1)), Galois::MethodFlag::NONE).id << "\n";
 
 #ifndef SERIAL_SWAP
-			SNode& idata = graph.getData(initial[round][start], Galois::NONE);
+			SNode& idata = graph.getData(initial[round][start], Galois::MethodFlag::NONE);
 			idata.sum = idata.numChildren;
 #endif
 			std::partial_sum(initial[round].begin()+start, initial[round].begin()+end, initial[round].begin()+start, PartialSum());
@@ -301,10 +301,10 @@ struct LocalPrefix {
 			//dbglock.lock();
 			//std::cerr << "On_each thread: " << me << " size: " << len << " start: " << start << " end " << initial[round].size() << "\n";
 			//std::cerr << "On_each thread tot: " << tot << " len: " << len << " ceil: " << ceil((double) len / tot) << " floor: " << floor((double) len / tot) << "\n";
-			//std::cerr << graph.getData(*(initial[round].begin()+start), Galois::NONE).id << " to " << graph.getData(*(initial[round].end()-1), Galois::NONE).id << "\n";
+			//std::cerr << graph.getData(*(initial[round].begin()+start), Galois::MethodFlag::NONE).id << " to " << graph.getData(*(initial[round].end()-1), Galois::MethodFlag::NONE).id << "\n";
 
 #ifndef SERIAL_SWAP
-			SNode& idata = graph.getData(initial[round][start], Galois::NONE);
+			SNode& idata = graph.getData(initial[round][start], Galois::MethodFlag::NONE);
 			idata.sum = idata.numChildren;
 #endif
 			std::partial_sum(initial[round].begin()+start, initial[round].end(), initial[round].begin()+start, PartialSum());
@@ -329,15 +329,15 @@ struct DistrPrefix {
 				unsigned int len = initial[round].size();
 				unsigned int start = me * chunk;
 				unsigned int end = (me+1) * chunk - 1;
-				unsigned int val = graph.getData(initial[round][start-1], Galois::NONE).numChildren;
+				unsigned int val = graph.getData(initial[round][start-1], Galois::MethodFlag::NONE).numChildren;
 
 				//dbglock.lock();
 				//std::cerr << "On_each thread: " << me << " step: " << ceil(len / tot) << " start: " << start << " end " << end+1 << "\n";
 				//std::cerr << "On_each thread tot: " << tot << " len: " << len << " ceil: " << ceil((double) len / tot) << " floor: " << floor((double) len / tot) << "\n";
 
-				//std::cerr << graph.getData(*(initial[round].begin()+start), Galois::NONE).id << " to " << graph.getData(*(initial[round].begin()+(end+1)), Galois::NONE).id << "\n";
+				//std::cerr << graph.getData(*(initial[round].begin()+start), Galois::MethodFlag::NONE).id << " to " << graph.getData(*(initial[round].begin()+(end+1)), Galois::MethodFlag::NONE).id << "\n";
 				for(unsigned int i = start; i < end; ++i){
-					graph.getData(initial[round][i], Galois::NONE).numChildren += val;
+					graph.getData(initial[round][i], Galois::MethodFlag::NONE).numChildren += val;
 					//std::cerr << "Loop: " << i << " size: " << seglen << " start: " << start << " end " << end << "\n";
 				}
 				//dbglock.unlock();
@@ -346,14 +346,14 @@ struct DistrPrefix {
 				//dbglock.lock();
 				//std::cerr << "On_each thread: " << me << " size: " << len << " start: " << start << " end " << initial[round].size() << "\n";
 				//std::cerr << "On_each thread tot: " << tot << " len: " << len << " ceil: " << ceil((double) len / tot) << " floor: " << floor((double) len / tot) << "\n";
-				//std::cerr << graph.getData(*(initial[round].begin()+start), Galois::NONE).id << " to " << graph.getData(*(initial[round].end()-1), Galois::NONE).id << "\n";
+				//std::cerr << graph.getData(*(initial[round].begin()+start), Galois::MethodFlag::NONE).id << " to " << graph.getData(*(initial[round].end()-1), Galois::MethodFlag::NONE).id << "\n";
 
 				unsigned int len = initial[round].size();
 				unsigned int start = me * chunk;
-				unsigned int val = graph.getData(initial[round][start-1], Galois::NONE).numChildren;
+				unsigned int val = graph.getData(initial[round][start-1], Galois::MethodFlag::NONE).numChildren;
 
 				for(unsigned int i = start; i < len; ++i){
-					graph.getData(initial[round][i], Galois::NONE).numChildren += val;
+					graph.getData(initial[round][i], Galois::MethodFlag::NONE).numChildren += val;
 					//std::cerr << "Loop: " << i << " size: " << seglen << " start: " << start << " end " << end << "\n";
 				}
 				//dbglock.unlock();
@@ -382,14 +382,14 @@ struct TotalPrefix {
 
 		if(me != tot-1){
 #ifndef SERIAL_SWAP
-			SNode& idata = graph.getData(initial[round][start], Galois::NONE);
+			SNode& idata = graph.getData(initial[round][start], Galois::MethodFlag::NONE);
 			idata.sum = idata.numChildren;
 #endif
 			std::partial_sum(initial[round].begin()+start, initial[round].begin()+end, initial[round].begin()+start, PartialSum());
 		}
 		else {
 #ifndef SERIAL_SWAP
-			SNode& idata = graph.getData(initial[round][start], Galois::NONE);
+			SNode& idata = graph.getData(initial[round][start], Galois::MethodFlag::NONE);
 			idata.sum = idata.numChildren;
 #endif
 			std::partial_sum(initial[round].begin()+start, initial[round].end(), initial[round].begin()+start, PartialSum());
@@ -401,7 +401,7 @@ struct TotalPrefix {
 			for(unsigned int i = 1; i < tot-1; ++i){
 				start = i * chunk;
 				end = (i+1) * chunk - 1;
-				graph.getData(initial[round][end], Galois::NONE).numChildren += graph.getData(initial[round][start-1], Galois::NONE).numChildren;
+				graph.getData(initial[round][end], Galois::MethodFlag::NONE).numChildren += graph.getData(initial[round][start-1], Galois::MethodFlag::NONE).numChildren;
 			}
 		}
 
@@ -410,15 +410,15 @@ struct TotalPrefix {
 		if(me != 0){
 			if(me != tot-1){
 				--end;
-				unsigned int val = graph.getData(initial[round][start-1], Galois::NONE).numChildren;
+				unsigned int val = graph.getData(initial[round][start-1], Galois::MethodFlag::NONE).numChildren;
 				for(unsigned int i = start; i < end; ++i){
-					graph.getData(initial[round][i], Galois::NONE).numChildren += val;
+					graph.getData(initial[round][i], Galois::MethodFlag::NONE).numChildren += val;
 				}
 			}
 			else {
-				unsigned int val = graph.getData(initial[round][start-1], Galois::NONE).numChildren;
+				unsigned int val = graph.getData(initial[round][start-1], Galois::MethodFlag::NONE).numChildren;
 				for(unsigned int i = start; i < len; ++i){
-					graph.getData(initial[round][i], Galois::NONE).numChildren += val;
+					graph.getData(initial[round][i], Galois::MethodFlag::NONE).numChildren += val;
 				}
 			}
 		}
@@ -596,12 +596,12 @@ struct banddiff {
 
   void operator()(const GNode& source) const {
 
-		SNode& sdata = graph.getData(source, Galois::NONE);
-		for (Graph::edge_iterator ii = graph.edge_begin(source, Galois::NONE), 
-				 ei = graph.edge_end(source, Galois::NONE); ii != ei; ++ii) {
+		SNode& sdata = graph.getData(source, Galois::MethodFlag::NONE);
+		for (Graph::edge_iterator ii = graph.edge_begin(source, Galois::MethodFlag::NONE), 
+				 ei = graph.edge_end(source, Galois::MethodFlag::NONE); ii != ei; ++ii) {
 
       GNode dst = graph.getEdgeDst(ii);
-      SNode& ddata = graph.getData(dst, Galois::NONE);
+      SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
 
 			unsigned int diff = abs(sdata.id - ddata.id);
 			unsigned int max = maxband;
@@ -627,7 +627,7 @@ static void bandwidth(std::string msg) {
 //Clear node data to re-execute on specific graph
 struct resetNode {
 	void operator()(const GNode& n) const {
-    SNode& node = graph.getData(n, Galois::NONE);
+    SNode& node = graph.getData(n, Galois::MethodFlag::NONE);
 		node.dist = DIST_INFINITY;
 		node.numChildren = 0;
 		//node.numChildren = 0;
@@ -668,7 +668,7 @@ static void readGraph(GNode& source, GNode& report) {
   for (Graph::iterator src = graph.begin(), ei =
       graph.end(); src != ei; ++src) {
 
-    SNode& node = graph.getData(*src, Galois::NONE);
+    SNode& node = graph.getData(*src, Galois::MethodFlag::NONE);
     node.dist = DIST_INFINITY;
     node.id = id;
     node.parent = id;
@@ -787,10 +787,10 @@ struct BarrierNoDup {
 			Galois::do_all<>(bucket.begin(), bucket.end(), Children(), "reduction");
 /*
 			for(Galois::InsertBag<GNode>::iterator ii = bucket.begin(), ei = bucket.end(); ii != ei; ++ii){
-				SNode& cdata = graph.getData(*ii, Galois::NONE);
+				SNode& cdata = graph.getData(*ii, Galois::MethodFlag::NONE);
 				if(!cdata.rflag) {
-					graph.getData(cdata.parent, Galois::NONE).numChildren++;
-					graph.getData(cdata.parent, Galois::NONE).have = true;
+					graph.getData(cdata.parent, Galois::MethodFlag::NONE).numChildren++;
+					graph.getData(cdata.parent, Galois::MethodFlag::NONE).have = true;
 					cdata.rflag = true;
 				}
 			}
@@ -807,13 +807,13 @@ struct BarrierNoDup {
 			/*
 			std::cerr << "Size: " << initial[round].size() << "\n";
 			for(std::vector<GNode>::iterator ii = initial[round].begin(), ei = initial[round].end(); ii != ei; ++ii){
-				SNode& data = graph.getData(*ii, Galois::NONE);
+				SNode& data = graph.getData(*ii, Galois::MethodFlag::NONE);
 				std::cerr << data.id << " "; 
 			}
 			std::cerr << "\n"; 
 
 			for(std::vector<GNode>::iterator ii = initial[round].begin(), ei = initial[round].end(); ii != ei; ++ii){
-				SNode& data = graph.getData(*ii, Galois::NONE);
+				SNode& data = graph.getData(*ii, Galois::MethodFlag::NONE);
 				std::cerr << data.numChildren << " "; 
 			}
 			std::cerr << "\n"; 
@@ -838,7 +838,7 @@ struct BarrierNoDup {
 				for(unsigned int i = 1; i < thr-1; ++i){
 					start = i * chunk;
 					end = (i+1) * chunk - 1;
-					graph.getData(initial[round][end], Galois::NONE).numChildren += graph.getData(initial[round][start-1], Galois::NONE).numChildren;
+					graph.getData(initial[round][end], Galois::MethodFlag::NONE).numChildren += graph.getData(initial[round][start-1], Galois::MethodFlag::NONE).numChildren;
 				}
 
 				Galois::on_each(DistrPrefix(round, chunk), "distrprefix");
@@ -846,7 +846,7 @@ struct BarrierNoDup {
 			}
 			else {
 #ifndef SERIAL_SWAP
-				SNode& idata = graph.getData(initial[round][0], Galois::NONE);
+				SNode& idata = graph.getData(initial[round][0], Galois::MethodFlag::NONE);
 				idata.sum = idata.numChildren;
 #endif
 				std::partial_sum(initial[round].begin(), initial[round].end(), initial[round].begin(), PartialSum());
@@ -857,14 +857,14 @@ struct BarrierNoDup {
 			/*
 			std::cerr << "Size for prefix sum: " << initial[round].size() << "\n";
 			for(std::vector<GNode>::iterator ii = initial[round].begin(), ei = initial[round].end(); ii != ei; ++ii){
-				SNode& data = graph.getData(*ii, Galois::NONE);
+				SNode& data = graph.getData(*ii, Galois::MethodFlag::NONE);
 				std::cerr << data.numChildren << " "; 
 			}
 				std::cerr << "\n"; 
 
 			std::cerr << "Size for sum: " << initial[round].size() << "\n";
 			for(std::vector<GNode>::iterator ii = initial[round].begin(), ei = initial[round].end(); ii != ei; ++ii){
-				SNode& data = graph.getData(*ii, Galois::NONE);
+				SNode& data = graph.getData(*ii, Galois::MethodFlag::NONE);
 				std::cerr << data.sum << " "; 
 			}
 				std::cerr << "\n"; 
@@ -879,31 +879,31 @@ struct BarrierNoDup {
 
 #ifdef SERIAL_SWAP
 			for(std::vector<GNode>::iterator ii = initial[round].begin(), ei = initial[round].end(); ii != ei; ++ii){
-				std::swap(graph.getData(*ii, Galois::NONE).numChildren, added);
+				std::swap(graph.getData(*ii, Galois::MethodFlag::NONE).numChildren, added);
 			}
 #else
-			added = graph.getData(initial[round][seglen-1], Galois::NONE).numChildren;
+			added = graph.getData(initial[round][seglen-1], Galois::MethodFlag::NONE).numChildren;
 			Galois::do_all<>(initial[round].begin(), initial[round].end(), Swap(), "swap");
 #endif
 
 /*
 			std::cerr << "After swap Size for prefix sum: " << initial[round].size() << "\n";
 			for(std::vector<GNode>::iterator ii = initial[round].begin(), ei = initial[round].end(); ii != ei; ++ii){
-				SNode& data = graph.getData(*ii, Galois::NONE);
+				SNode& data = graph.getData(*ii, Galois::MethodFlag::NONE);
 				std::cerr << data.numChildren << " "; 
 			}
 				std::cerr << "\n"; 
 
 			std::cerr << "Size for startindex: " << initial[round].size() << "\n";
 			for(std::vector<GNode>::iterator ii = initial[round].begin(), ei = initial[round].end(); ii != ei; ++ii){
-				SNode& data = graph.getData(*ii, Galois::NONE);
+				SNode& data = graph.getData(*ii, Galois::MethodFlag::NONE);
 				std::cerr << data.startindex << " "; 
 			}
 				std::cerr << "\n"; 
 
 			std::cerr << "After swap Size for sum: " << initial[round].size() << "\n";
 			for(std::vector<GNode>::iterator ii = initial[round].begin(), ei = initial[round].end(); ii != ei; ++ii){
-				SNode& data = graph.getData(*ii, Galois::NONE);
+				SNode& data = graph.getData(*ii, Galois::MethodFlag::NONE);
 				std::cerr << data.sum << " "; 
 			}
 				std::cerr << "\n"; 
@@ -913,7 +913,7 @@ struct BarrierNoDup {
 
 			/*
 			for(std::vector<GNode>::iterator ii = initial[round].begin(), ei = initial[round].end(); ii != ei; ++ii){
-				SNode& data = graph.getData(*ii, Galois::NONE);
+				SNode& data = graph.getData(*ii, Galois::MethodFlag::NONE);
 				temp = data.numChildren;
 				data.numChildren = added;
 				added += temp; 
@@ -1006,13 +1006,13 @@ struct BarrierNoDup {
 		  operator()(n);
 		}
 	  void operator()(GNode& n) {
-			SNode& sdata = graph.getData(n, Galois::NONE);
+			SNode& sdata = graph.getData(n, Galois::MethodFlag::NONE);
 			unsigned int newDist = sdata.dist + 1;
 
-			for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::NONE),
-					ei = graph.edge_end(n, Galois::NONE); ii != ei; ++ii) {
+			for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::NONE),
+					ei = graph.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii) {
 				GNode dst = graph.getEdgeDst(ii);
-				SNode& ddata = graph.getData(dst, Galois::NONE);
+				SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
 
 				if(ddata.dist < newDist)
 					continue; 
@@ -1059,7 +1059,7 @@ struct BarrierNoDup {
 				while (true) {
 					parent = ddata.parent;
 					//if(order[parent] > order[n]){
-					if(graph.getData(parent, Galois::NONE).order > sdata.order){
+					if(graph.getData(parent, Galois::MethodFlag::NONE).order > sdata.order){
 					//if(graph.getData(ddata.parent).numChildren > sdata.numChildren){
 						if(__sync_bool_compare_and_swap(&ddata.parent, parent, n)){
 							break;
@@ -1079,7 +1079,7 @@ struct BarrierNoDup {
 		Place(unsigned int r) : round(r) {}
 
 		void operator()(GNode& parent, Galois::UserContext<GNode>& ctx) {
-			SNode& pdata = graph.getData(parent, Galois::NONE);
+			SNode& pdata = graph.getData(parent, Galois::MethodFlag::NONE);
 
 			if(!pdata.have)
 				return;
@@ -1089,7 +1089,7 @@ struct BarrierNoDup {
 			//unsigned int count = 0;
 			//unsigned int actual = 0;
 			for(Galois::InsertBag<GNode>::iterator ii = bucket.begin(), ei = bucket.end(); ii != ei; ++ii){
-				SNode& cdata = graph.getData(*ii, Galois::NONE);
+				SNode& cdata = graph.getData(*ii, Galois::MethodFlag::NONE);
 				//count++;
 				if(!cdata.pflag && cdata.parent == parent){
 					//order[*ii] = index;
@@ -1112,8 +1112,8 @@ struct BarrierNoDup {
 		  operator()(child);
 		}
 	  void operator()(GNode& child) {
-			SNode& cdata = graph.getData(child, Galois::NONE);
-			SNode& pdata = graph.getData(cdata.parent, Galois::NONE);
+			SNode& cdata = graph.getData(child, Galois::MethodFlag::NONE);
+			SNode& pdata = graph.getData(cdata.parent, Galois::MethodFlag::NONE);
 
 			unsigned int index = pdata.numChildren++; 
 			cdata.order = index;
@@ -1138,25 +1138,25 @@ struct BarrierNoDup {
 		  operator()(child);
 		}
 	  void operator()(GNode& child) {
-			SNode& cdata = graph.getData(child, Galois::NONE);
-			//graph.getData(cdata.parent, Galois::NONE).mutex.lock();
-			graph.getData(cdata.parent, Galois::NONE).numChildren++;
-			//graph.getData(cdata.parent, Galois::NONE).have = true;
-			//graph.getData(cdata.parent, Galois::NONE).mutex.unlock();
+			SNode& cdata = graph.getData(child, Galois::MethodFlag::NONE);
+			//graph.getData(cdata.parent, Galois::MethodFlag::NONE).mutex.lock();
+			graph.getData(cdata.parent, Galois::MethodFlag::NONE).numChildren++;
+			//graph.getData(cdata.parent, Galois::MethodFlag::NONE).have = true;
+			//graph.getData(cdata.parent, Galois::MethodFlag::NONE).mutex.unlock();
 		}
 	};
 
 /*
 	struct Children {
 		void operator()(GNode& owner, Galois::UserContext<GNode>& ctx) {
-			SNode& odata = graph.getData(owner, Galois::NONE);
+			SNode& odata = graph.getData(owner, Galois::MethodFlag::NONE);
 			//for(std::vector<GNode>::iterator ii = odata.bucket.begin(), ei = odata.bucket.end(); ii != ei; ++ii){
 			for(Galois::gdeque<GNode>::iterator ii = odata.bucket->begin(), ei = odata.bucket->end(); ii != ei; ++ii){
-				SNode& cdata = graph.getData(*ii, Galois::NONE);
+				SNode& cdata = graph.getData(*ii, Galois::MethodFlag::NONE);
 				//I'll make it GAtomic
-				graph.getData(cdata.parent, Galois::NONE).mutex.lock();
-				graph.getData(cdata.parent, Galois::NONE).numChildren++;
-				graph.getData(cdata.parent, Galois::NONE).mutex.unlock();
+				graph.getData(cdata.parent, Galois::MethodFlag::NONE).mutex.lock();
+				graph.getData(cdata.parent, Galois::MethodFlag::NONE).numChildren++;
+				graph.getData(cdata.parent, Galois::MethodFlag::NONE).mutex.unlock();
 			}
 		}
 	};

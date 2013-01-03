@@ -103,8 +103,8 @@ struct Process {
     Tuple tuple;
     ContainsTuple(const Graph& g, const Tuple& t): graph(g), tuple(t) { }
     bool operator()(const GNode& n) const {
-      assert(!graph.getData(n, Galois::NONE).boundary());
-      return graph.getData(n, Galois::NONE).inTriangle(tuple);
+      assert(!graph.getData(n, Galois::MethodFlag::NONE).boundary());
+      return graph.getData(n, Galois::MethodFlag::NONE).inTriangle(tuple);
     }
   };
 
@@ -151,10 +151,10 @@ struct Process {
   }
 
   GNode findCorrespondingNode(GNode start, const Point* p1, const Point* p2) {
-    for (Graph::edge_iterator ii = graph->edge_begin(start, Galois::CHECK_CONFLICT),
-        ei = graph->edge_end(start, Galois::CHECK_CONFLICT); ii != ei; ++ii) {
+    for (Graph::edge_iterator ii = graph->edge_begin(start, Galois::MethodFlag::CHECK_CONFLICT),
+        ei = graph->edge_end(start, Galois::MethodFlag::CHECK_CONFLICT); ii != ei; ++ii) {
       GNode dst = graph->getEdgeDst(ii);
-      Element& e = graph->getData(dst, Galois::NONE);
+      Element& e = graph->getData(dst, Galois::MethodFlag::NONE);
       int count = 0;
       for (int i = 0; i < e.dim(); ++i) {
         if (e.getPoint(i) == p1 || e.getPoint(i) == p2) {
@@ -170,12 +170,12 @@ struct Process {
     // Try simple hill climbing instead
     ContainsTuple contains(*graph, p->t());
     while (!contains(start)) {
-      Element& element = graph->getData(start, Galois::CHECK_CONFLICT);
+      Element& element = graph->getData(start, Galois::MethodFlag::CHECK_CONFLICT);
       if (element.boundary()) {
         // Should only happen when quad tree returns a boundary point which is rare
         // There's only one way to go from here
         assert(std::distance(graph->edge_begin(start), graph->edge_end(start)) == 1);
-        start = graph->getEdgeDst(graph->edge_begin(start, Galois::CHECK_CONFLICT));
+        start = graph->getEdgeDst(graph->edge_begin(start, Galois::MethodFlag::CHECK_CONFLICT));
       } else {
         // Find which neighbor will get us to point fastest by computing normal
         // vectors
@@ -195,7 +195,7 @@ struct Process {
       return false;
     }
 
-    result->acquire(Galois::CHECK_CONFLICT);
+    result->acquire(Galois::MethodFlag::CHECK_CONFLICT);
 
     GNode someNode = result->someElement();
 

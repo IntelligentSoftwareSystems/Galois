@@ -37,7 +37,7 @@ class GWrapped : public Galois::Runtime::Lockable {
 public:
   GWrapped(const T& v) :val(v) {}
 
-  T& get(Galois::MethodFlag m = ALL) {
+  T& get(Galois::MethodFlag m = MethodFlag::ALL) {
     Galois::Runtime::acquire(this, m);
     return val;
   }
@@ -45,7 +45,7 @@ public:
 
 
 struct GChecked : public Galois::Runtime::Lockable {
-  void acquire(Galois::MethodFlag m = ALL) const {
+  void acquire(Galois::MethodFlag m = MethodFlag::ALL) const {
     // Allow locking of const objects
     Galois::Runtime::acquire(const_cast<GChecked*>(this), m);
   }

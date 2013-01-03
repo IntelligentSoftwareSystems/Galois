@@ -273,7 +273,7 @@ protected:
     for (Graph::iterator n = graph.begin ()
         , endn = graph.end (); n != endn; ++n) {
 
-      SimObj_ty* so = static_cast<SimObj_ty*> (graph.getData (*n, Galois::NONE));
+      SimObj_ty* so = static_cast<SimObj_ty*> (graph.getData (*n, Galois::MethodFlag::NONE));
       sobjInfoVec[so->getID ()] = SimObjInfo (*n, so);
     }
   }
@@ -388,7 +388,7 @@ class DESorderedHandNB:
       SimObj_ty* recvObj = static_cast<SimObj_ty*> (event.getRecvObj ());
       SimObjInfo& recvInfo = sobjInfoVec[recvObj->getID ()];
 
-      graph.getData (recvInfo.node, Galois::CHECK_CONFLICT); 
+      graph.getData (recvInfo.node, Galois::MethodFlag::CHECK_CONFLICT); 
 
       if (recvInfo.isReady (event) 
           && recvInfo.isMin (event)) {
@@ -440,7 +440,7 @@ protected:
     for (Graph::iterator n = graph.begin ()
         , endn = graph.end (); n != endn; ++n) {
 
-      SimObj_ty* so = static_cast<SimObj_ty*> (graph.getData (*n, Galois::NONE));
+      SimObj_ty* so = static_cast<SimObj_ty*> (graph.getData (*n, Galois::MethodFlag::NONE));
       sobjInfoVec[so->getID ()] = SimObjInfo (*n, so);
     }
   }

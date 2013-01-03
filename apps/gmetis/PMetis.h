@@ -87,7 +87,7 @@ public:
 			} else if (nparts == 3) {
 				for (GGraph::iterator ii = subGraphs[0].getGraph()->begin(), ee = subGraphs[0].getGraph()->end(); ii != ee; ++ii) {
 					GNode node = *ii;
-					MetisNode& nodeData = subGraphs[0].getGraph()->getData(node,Galois::NONE);
+					MetisNode& nodeData = subGraphs[0].getGraph()->getData(node,Galois::MethodFlag::NONE);
 					nodeData.setPartition(partStartIndex);
 					assert(nodeData.getPartition()>=0);
 				}
@@ -141,7 +141,7 @@ public:
 			GGraph* subGraph = subGraphs[index].getGraph();
 			subGraph->getData(metisGraph->getSubGraphMapTo(nodeData.getNodeId())).setAdjWgtSum(nodeData.getAdjWgtSum());
 			assert(subGraph->getData(metisGraph->getSubGraphMapTo(nodeData.getNodeId())).getAdjWgtSum()>=0);
-			for (GGraph::edge_iterator jj = graph->edge_begin(node, Galois::NONE), eejj = graph->edge_end(node, Galois::NONE); jj != eejj; ++jj) {
+			for (GGraph::edge_iterator jj = graph->edge_begin(node, Galois::MethodFlag::NONE), eejj = graph->edge_end(node, Galois::MethodFlag::NONE); jj != eejj; ++jj) {
 			  GNode neighbor = graph->getEdgeDst(jj);
 
 			  MetisNode& neighborData = graph->getData(neighbor);

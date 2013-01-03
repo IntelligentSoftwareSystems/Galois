@@ -222,25 +222,25 @@ public:
     edgeData.destroy();
   }
 
-  NodeTy& getData(GraphNode N, MethodFlag mflag = ALL) {
-    Galois::Runtime::checkWrite(mflag);
+  NodeTy& getData(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+    Galois::Runtime::checkWrite(mflag, false);
     NodeInfo& NI = nodeData[N];
     Galois::Runtime::acquire(&NI, mflag);
     return NI.data;
   }
 
-  bool hasNeighbor(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
+  bool hasNeighbor(GraphNode src, GraphNode dst, MethodFlag mflag = MethodFlag::ALL) {
     return getEdgeIdx(src, dst) != ~static_cast<uint64_t>(0);
   }
 
-//  edge_data_reference getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
+//  edge_data_reference getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = MethodFlag::ALL) {
 //    Galois::Runtime::checkWrite(mflag);
 //    Galois::Runtime::acquire(&nodeData[src], mflag);
 //    return EdgeData.get(getEdgeIdx(src, dst));
 //  }
 
-  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = NONE) {
-    Galois::Runtime::checkWrite(mflag);
+  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::NONE) {
+    Galois::Runtime::checkWrite(mflag, false);
     return edgeData[*ni];
   }
 
@@ -257,7 +257,7 @@ public:
   local_iterator local_begin() const { return iterator(HIDDEN::localStart(numNodes)); }
   local_iterator local_end() const { return iterator(HIDDEN::localEnd(numNodes)); }
 
-  edge_iterator edge_begin(GraphNode N, MethodFlag mflag = ALL) {
+  edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::acquire(&nodeData[N], mflag);
     if (Galois::Runtime::shouldLock(mflag)) {
       for (uint64_t ii = raw_neighbor_begin(N), ee = raw_neighbor_end(N); ii != ee; ++ii) {
@@ -267,14 +267,14 @@ public:
     return edge_iterator(raw_neighbor_begin(N));
   }
 
-  edge_iterator edge_end(GraphNode N, MethodFlag mflag = ALL) {
+  edge_iterator edge_end(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
     NodeInfo& NI = nodeData[N];
     Galois::Runtime::acquire(&NI, mflag);
     return edge_iterator(raw_neighbor_end(N));
   }
 
   template<typename CompTy>
-  void sortEdges(GraphNode N, const CompTy& comp = std::less<EdgeTy>(), MethodFlag mflag = ALL) {
+  void sortEdges(GraphNode N, const CompTy& comp = std::less<EdgeTy>(), MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::acquire(&nodeData[N], mflag);
     std::sort(edge_sort_begin(N), edge_sort_end(N), EdgeSortCompWrapper<EdgeValue,CompTy>(comp));
   }
@@ -367,20 +367,20 @@ public:
     }
   }
 
-  NodeTy& getData(GraphNode N, MethodFlag mflag = ALL) {
-    Galois::Runtime::checkWrite(mflag);
+  NodeTy& getData(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+    Galois::Runtime::checkWrite(mflag, false);
     Galois::Runtime::acquire(N, mflag);
     return N->data;
   }
   
-//  edge_data_reference getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
+//  edge_data_reference getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = MethodFlag::ALL) {
 //    Galois::Runtime::checkWrite(mflag);
 //    Galois::Runtime::acquire(src, mflag);
 //    return EdgeData[getEdgeIdx(src,dst)].getData();
 //  }
 
-  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = NONE) const {
-    Galois::Runtime::checkWrite(mflag);
+  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::NONE) const {
+    Galois::Runtime::checkWrite(mflag, false);
     return ni->get();
    }
 
@@ -397,7 +397,7 @@ public:
   local_iterator local_begin() const { return iterator(&nodeData[HIDDEN::localStart(numNodes)]); }
   local_iterator local_end() const { return iterator(&nodeData[HIDDEN::localEnd(numNodes)]); }
 
-  edge_iterator edge_begin(GraphNode N, MethodFlag mflag = ALL) {
+  edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::acquire(N, mflag);
     if (Galois::Runtime::shouldLock(mflag)) {
       for (edge_iterator ii = N->edgeBegin, ee = N->edgeEnd; ii != ee; ++ii) {
@@ -407,7 +407,7 @@ public:
     return N->edgeBegin;
   }
 
-  edge_iterator edge_end(GraphNode N, MethodFlag mflag = ALL) {
+  edge_iterator edge_end(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::acquire(N, mflag);
     return N->edgeEnd;
   }
@@ -519,20 +519,20 @@ public:
     }
   }
 
-  NodeTy& getData(GraphNode N, MethodFlag mflag = ALL) {
-    Galois::Runtime::checkWrite(mflag);
+  NodeTy& getData(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+    Galois::Runtime::checkWrite(mflag, false);
     Galois::Runtime::acquire(N, mflag);
     return N->data;
   }
   
-//  edge_data_reference getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
+//  edge_data_reference getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = MethodFlag::ALL) {
 //    Galois::Runtime::checkWrite(mflag);
 //    Galois::Runtime::acquire(src, mflag);
 //    return getEdgeIdx(src,dst)->getData();
 //  }
 
-  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = NONE) const {
-    Galois::Runtime::checkWrite(mflag);
+  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::NONE) const {
+    Galois::Runtime::checkWrite(mflag, false);
     return ni->get();
   }
 
@@ -551,7 +551,7 @@ public:
   const_local_iterator local_begin() const { return &nodes[HIDDEN::localStart(numNodes)]; }
   const_local_iterator local_end() const { return &nodes[HIDDEN::localEnd(numNodes)]; }
 
-  edge_iterator edge_begin(GraphNode N, MethodFlag mflag = ALL) {
+  edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::acquire(N, mflag);
     if (Galois::Runtime::shouldLock(mflag)) {
       for (edge_iterator ii = N->edgeBegin(), ee = N->edgeEnd(); ii != ee; ++ii) {
@@ -561,13 +561,13 @@ public:
     return N->edgeBegin();
   }
 
-  edge_iterator edge_end(GraphNode N, MethodFlag mflag = ALL) {
+  edge_iterator edge_end(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::acquire(N, mflag);
     return N->edgeEnd();
   }
 
   template<typename CompTy>
-  void sortEdges(GraphNode N, const CompTy& comp = std::less<EdgeTy>(), MethodFlag mflag = ALL) {
+  void sortEdges(GraphNode N, const CompTy& comp = std::less<EdgeTy>(), MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::acquire(N, mflag);
     std::sort(N->edgeBegin(), N->edgeEnd(), EdgeSortCompWrapper<EdgeInfo,CompTy>(comp));
   }
@@ -862,20 +862,20 @@ public:
     }
   }
 
-  NodeTy& getData(GraphNode N, MethodFlag mflag = ALL) {
-    Galois::Runtime::checkWrite(mflag);
+  NodeTy& getData(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+    Galois::Runtime::checkWrite(mflag, false);
     Galois::Runtime::acquire(N, mflag);
     return N->data;
   }
   
-//  edge_data_reference getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
+//  edge_data_reference getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = MethodFlag::ALL) {
 //    Galois::Runtime::checkWrite(mflag);
 //    Galois::Runtime::acquire(src, mflag);
 //    return getEdgeIdx(src,dst)->getData();
 //  }
 
-  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = NONE) const {
-    Galois::Runtime::checkWrite(mflag);
+  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::NONE) const {
+    Galois::Runtime::checkWrite(mflag, false);
     return ni->get();
   }
 
@@ -898,7 +898,7 @@ public:
     return local_iterator(&headers, Galois::Runtime::LL::getTID() + 1);
   }
 
-  edge_iterator edge_begin(GraphNode N, MethodFlag mflag = ALL) {
+  edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::acquire(N, mflag);
     if (Galois::Runtime::shouldLock(mflag)) {
       for (edge_iterator ii = N->edgeBegin(), ee = N->edgeEnd(); ii != ee; ++ii) {
@@ -908,7 +908,7 @@ public:
     return N->edgeBegin();
   }
 
-  edge_iterator edge_end(GraphNode N, MethodFlag mflag = ALL) {
+  edge_iterator edge_end(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::acquire(N, mflag);
     return N->edgeEnd();
   }

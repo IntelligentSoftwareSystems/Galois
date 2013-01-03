@@ -106,11 +106,11 @@ void serialPageRank() {
     for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
       GNode src = *ii;
       double value = 0;
-      for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::NONE), ei = graph.edge_end(src, Galois::NONE); ii != ei; ++ii) {
+      for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::NONE), ei = graph.edge_end(src, Galois::MethodFlag::NONE); ii != ei; ++ii) {
         GNode dst = graph.getEdgeDst(ii);
         double w = graph.getEdgeData(ii);
 
-        Node& ddata = graph.getData(dst, Galois::NONE);
+        Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
         value += getPageRank(ddata, iterations) * w;
       }
        
@@ -118,7 +118,7 @@ void serialPageRank() {
       if (alpha > 0)
         value = value * (1 - alpha) + alpha/numNodes;
 
-      Node& sdata = graph.getData(src, Galois::NONE);
+      Node& sdata = graph.getData(src, Galois::MethodFlag::NONE);
       if (sdata.hasNoOuts) {
         lost_potential += getPageRank(sdata, iterations);
       }
@@ -139,7 +139,7 @@ void serialPageRank() {
       unsigned int next = iterations + 1;
       for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
         GNode src = *ii;
-        Node& sdata = graph.getData(src, Galois::NONE);
+        Node& sdata = graph.getData(src, Galois::MethodFlag::NONE);
         double value = getPageRank(sdata, next);
         // assuming uniform prior probability, i.e., 1 / numNodes
         double delta = (1 - alpha) * (lost_potential / numNodes);
@@ -184,11 +184,11 @@ struct Process {
 
   void operator()(const GNode& src) {
     double value = 0;
-    for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::NONE), ei = graph.edge_end(src, Galois::NONE); ii != ei; ++ii) {
+    for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::NONE), ei = graph.edge_end(src, Galois::MethodFlag::NONE); ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
       double w = graph.getEdgeData(ii);
 
-      Node& ddata = graph.getData(dst, Galois::NONE);
+      Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
       value += getPageRank(ddata, iterations) * w;
     }
      
@@ -196,7 +196,7 @@ struct Process {
     if (alpha > 0)
       value = value * (1 - alpha) + addend;
 
-    Node& sdata = graph.getData(src, Galois::NONE);
+    Node& sdata = graph.getData(src, Galois::MethodFlag::NONE);
     if (sdata.hasNoOuts) {
       accum.lost_potential += getPageRank(sdata, iterations);
     }
@@ -219,7 +219,7 @@ struct RedistributeLost {
   RedistributeLost(double p): delta((1 - alpha) * p), next(iterations + 1) { }
 
   void operator()(const GNode& src) {
-    Node& sdata = graph.getData(src, Galois::NONE);
+    Node& sdata = graph.getData(src, Galois::MethodFlag::NONE);
     double value = getPageRank(sdata, next);
     // assuming uniform prior probability, i.e., 1 / numNodes
     setPageRank(sdata, iterations, value + delta);

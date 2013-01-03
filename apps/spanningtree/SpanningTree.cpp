@@ -90,10 +90,10 @@ struct DemoAlgo {
   Node* root;
 
   void operator()(GNode src, Galois::UserContext<GNode>& ctx) {
-    for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::ALL),
-        ei = graph.edge_end(src, Galois::ALL); ii != ei; ++ii) {
+    for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::ALL),
+	   ei = graph.edge_end(src, Galois::MethodFlag::ALL); ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
-      Node& ddata = graph.getData(dst, Galois::NONE);
+      Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
       if (ddata.component == root)
         continue;
       ddata.component = root;
@@ -129,11 +129,11 @@ struct AsynchronousAlgo {
     }
 
     void operator()(const GNode& src) const {
-      Node& sdata = graph.getData(src, Galois::NONE);
-      for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::NONE),
-          ei = graph.edge_end(src, Galois::NONE); ii != ei; ++ii) {
+      Node& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+      for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::NONE),
+          ei = graph.edge_end(src, Galois::MethodFlag::NONE); ii != ei; ++ii) {
         GNode dst = graph.getEdgeDst(ii);
-        Node& ddata = graph.getData(dst, Galois::NONE);
+        Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
         if (sdata.merge(&ddata)) {
           mst.push(std::make_pair(src, dst));
         } else {
@@ -146,7 +146,7 @@ struct AsynchronousAlgo {
   //! Normalize component by doing find with path compression
   struct Normalize {
     void operator()(const GNode& src) const {
-      Node& sdata = graph.getData(src, Galois::NONE);
+      Node& sdata = graph.getData(src, Galois::MethodFlag::NONE);
       sdata.component = sdata.findAndCompress();
     }
   };

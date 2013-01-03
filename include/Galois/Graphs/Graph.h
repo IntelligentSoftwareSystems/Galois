@@ -269,22 +269,22 @@ public:
     return GraphNode(N);
   }
 
-  void addNode(const GraphNode& n, Galois::MethodFlag mflag = ALL) {
-    Galois::Runtime::checkWrite(mflag | Galois::WRITE);
+  void addNode(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::ALL) {
+    Galois::Runtime::checkWrite(mflag, true);
     Galois::Runtime::acquire(n, mflag);
     n->active = true;
   }
 
   //! Gets the node data for a node.
-  NodeTy& getData(const GraphNode& n, Galois::MethodFlag mflag = ALL) const {
+  NodeTy& getData(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::ALL) const {
     assert(n);
-    Galois::Runtime::checkWrite(mflag);
+    Galois::Runtime::checkWrite(mflag, false);
     Galois::Runtime::acquire(n, mflag);
     return n->data;
   }
 
   //! Checks if a node is in the graph
-  bool containsNode(const GraphNode& n, Galois::MethodFlag mflag = ALL) const {
+  bool containsNode(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::ALL) const {
     assert(n);
     Galois::Runtime::acquire(n, mflag);
     return n->active;
@@ -295,15 +295,15 @@ public:
    * for undirected graphs or outgoing edges for directed graphs.
    */
   //FIXME: handle edge memory
-  void removeNode(GraphNode n, Galois::MethodFlag mflag = ALL) {
+  void removeNode(GraphNode n, Galois::MethodFlag mflag = MethodFlag::ALL) {
     assert(n);
-    Galois::Runtime::checkWrite(mflag | Galois::WRITE);
+    Galois::Runtime::checkWrite(mflag, true);
     Galois::Runtime::acquire(n, mflag);
     gNode* N = n;
     if (N->active) {
       N->active = false;
       if (!Directional && edges.mustDel())
-	for (edge_iterator ii = edge_begin(n, NONE), ee = edge_end(n, NONE); ii != ee; ++ii)
+	for (edge_iterator ii = edge_begin(n, MethodFlag::NONE), ee = edge_end(n, MethodFlag::NONE); ii != ee; ++ii)
 	  edges.delEdge(ii->second());
       N->edges.clear();
     }
@@ -317,10 +317,10 @@ public:
   //! Ignore the edge data, let the caller use the returned
   //! iterator to set the value if desired.  This frees us from
   //! dealing with the void edge data problem in this API
-  edge_iterator addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {
+  edge_iterator addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::ALL) {
     assert(src);
     assert(dst);
-    Galois::Runtime::checkWrite(mflag | Galois::WRITE);
+    Galois::Runtime::checkWrite(mflag, true);
     Galois::Runtime::acquire(src, mflag);
     typename gNode::iterator ii = src->find(dst);
     if (ii == src->end()) {
@@ -336,10 +336,10 @@ public:
     return boost::make_filter_iterator(is_edge(), ii, src->end());
   }
 
-  edge_iterator addMultiEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {
+  edge_iterator addMultiEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::ALL) {
     assert(src);
     assert(dst);
-    Galois::Runtime::checkWrite(mflag | Galois::WRITE);
+    Galois::Runtime::checkWrite(mflag, true);
     Galois::Runtime::acquire(src, mflag);
     typename gNode::iterator ii = src->end();
     if (ii == src->end()) {
@@ -356,9 +356,9 @@ public:
   }
 
   //! Removes an edge from the graph
-  void removeEdge(GraphNode src, edge_iterator dst, Galois::MethodFlag mflag = ALL) {
+  void removeEdge(GraphNode src, edge_iterator dst, Galois::MethodFlag mflag = MethodFlag::ALL) {
     assert(src);
-    Galois::Runtime::checkWrite(mflag | Galois::WRITE);
+    Galois::Runtime::checkWrite(mflag, true);
     Galois::Runtime::acquire(src, mflag);
     if (Directional) {
       src->erase(dst.base());
@@ -371,7 +371,7 @@ public:
     }
   }
 
-  edge_iterator findEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = ALL) {
+  edge_iterator findEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::ALL) {
     assert(src);
     assert(dst);
     Galois::Runtime::acquire(src, mflag);
@@ -385,9 +385,9 @@ public:
    * because edge_begin() dominates this call and should perform the
    * appropriate locking.
    */
-  edge_data_reference getEdgeData(edge_iterator ii, Galois::MethodFlag mflag = NONE) const {
+  edge_data_reference getEdgeData(edge_iterator ii, Galois::MethodFlag mflag = MethodFlag::NONE) const {
     assert(ii->first()->active);
-    Galois::Runtime::checkWrite(mflag);
+    Galois::Runtime::checkWrite(mflag, false);
     Galois::Runtime::acquire(ii->first(), mflag);
     return *ii->second();
   }
@@ -400,7 +400,7 @@ public:
   //// General Things ////
 
   //! Returns an iterator to the neighbors of a node 
-  edge_iterator edge_begin(GraphNode N, Galois::MethodFlag mflag = ALL) {
+  edge_iterator edge_begin(GraphNode N, Galois::MethodFlag mflag = MethodFlag::ALL) {
     assert(N);
     Galois::Runtime::acquire(N, mflag);
 
@@ -414,7 +414,7 @@ public:
   }
 
   //! Returns the end of the neighbor iterator 
-  edge_iterator edge_end(GraphNode N, Galois::MethodFlag mflag = ALL) {
+  edge_iterator edge_end(GraphNode N, Galois::MethodFlag mflag = MethodFlag::ALL) {
     assert(N);
     // Not necessary; no valid use for an end pointer should ever require it
     //if (shouldLock(mflag))

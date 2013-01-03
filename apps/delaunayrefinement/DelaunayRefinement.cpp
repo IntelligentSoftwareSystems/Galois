@@ -80,7 +80,7 @@ struct Process {
   };
 
   void operator()(GNode item, Galois::UserContext<GNode>& ctx) {
-    if (!graph->containsNode(item, Galois::ALL))
+    if (!graph->containsNode(item, Galois::MethodFlag::ALL))
       return;
     
     Cavity* cavp = NULL;
@@ -116,15 +116,15 @@ Galois::InsertBag<GNode> wl;
 
 struct Preprocess {
   void operator()(GNode item) const {
-    if (graph->getData(item, Galois::NONE).isBad())
+    if (graph->getData(item, Galois::MethodFlag::NONE).isBad())
       wl.push(item);
   }
 };
 
 struct DetLessThan {
   bool operator()(const GNode& a, const GNode& b) const {
-    int idA = graph->getData(a, Galois::NONE).getId();
-    int idB = graph->getData(b, Galois::NONE).getId();
+    int idA = graph->getData(a, Galois::MethodFlag::NONE).getId();
+    int idB = graph->getData(b, Galois::MethodFlag::NONE).getId();
     if (idA == 0 || idB == 0) abort();
     return idA < idB;
   }

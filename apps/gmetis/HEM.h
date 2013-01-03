@@ -39,7 +39,7 @@ public:
 	}
 
 	void match(GNode node) {
-	  MetisNode& nodeData = graph->getData(node, Galois::NONE);
+	  MetisNode& nodeData = graph->getData(node, Galois::MethodFlag::NONE);
 				if (metisGraph->isMatched(nodeData.getNodeId())) {
 					return;
 				}
@@ -47,10 +47,10 @@ public:
 				while(true){
 					matchNode = node;
 					int maxwgt = -1;
-					for (GGraph::edge_iterator jj = graph->edge_begin(node, Galois::NONE), eejj = graph->edge_end(node, Galois::NONE); jj != eejj; ++jj) {
+					for (GGraph::edge_iterator jj = graph->edge_begin(node, Galois::MethodFlag::NONE), eejj = graph->edge_end(node, Galois::MethodFlag::NONE); jj != eejj; ++jj) {
 					  GNode neighbor = graph->getEdgeDst(jj);
-					  MetisNode& neighMNode = graph->getData(neighbor,Galois::NONE);
-						int edgeData = graph->getEdgeData(jj, Galois::NONE);
+					  MetisNode& neighMNode = graph->getData(neighbor,Galois::MethodFlag::NONE);
+						int edgeData = graph->getEdgeData(jj, Galois::MethodFlag::NONE);
 						if (!metisGraph->isMatched(neighMNode.getNodeId()) && maxwgt < edgeData
 								&& nodeData.getWeight() + neighMNode.getWeight() <= maxVertexWeight) {
 							maxwgt = edgeData;
@@ -58,26 +58,26 @@ public:
 						}
 					}
 
-					MetisNode& matchNodeData = graph->getData(matchNode, Galois::CHECK_CONFLICT);
+					MetisNode& matchNodeData = graph->getData(matchNode, Galois::MethodFlag::CHECK_CONFLICT);
 					if(node == matchNode || !metisGraph->isMatched(matchNodeData.getNodeId())){
 //						cout<<(node==matchNode)<<endl;
 						break;
 					}
 				}
-				graph->getData(node, Galois::CHECK_CONFLICT);
+				graph->getData(node, Galois::MethodFlag::CHECK_CONFLICT);
 				if(metisGraph->isMatched(nodeData.getNodeId())){
 					return;
 				}
 
 				metisGraph->setMatch(nodeData.getNodeId(), matchNode);
-				MetisNode& matchNodeData = graph->getData(matchNode, Galois::NONE);
+				MetisNode& matchNodeData = graph->getData(matchNode, Galois::MethodFlag::NONE);
 				int weight = nodeData.getWeight();
 				if (node != matchNode) {
 					metisGraph->setMatch(matchNodeData.getNodeId(), node);
 					weight += matchNodeData.getWeight();
 				}
 //				GNode newNode = coarseGraph->createNode(MetisNode(weight));
-//				coarseGraph->addNode(newNode, Galois::Graph::NONE);
+//				coarseGraph->addNode(newNode, Galois::Graph::MethodFlag::NONE);
 //				metisGraph->setCoarseGraphMap(nodeData.getNodeId(), newNode);
 //				if(matchNode!=node){
 //					metisGraph->setCoarseGraphMap(matchNodeData.getNodeId(), newNode);

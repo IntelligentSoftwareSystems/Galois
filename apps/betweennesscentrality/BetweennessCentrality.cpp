@@ -102,8 +102,8 @@ void initGraphData() {
   std::vector< std::vector<GNode> > tmp(NumNodes);
   for (Graph::iterator ii = G->begin(), ee = G->end();
       ii != ee; ++ii) {
-    int nnbrs = std::distance(G->neighbor_begin(*ii, Galois::NONE),
-        G->neighbor_end(*ii, Galois::NONE));
+    int nnbrs = std::distance(G->neighbor_begin(*ii, Galois::MethodFlag::NONE),
+        G->neighbor_end(*ii, Galois::MethodFlag::NONE));
     //std::cerr << "Node : " << *ii << " has " << nnbrs << " neighbors " << std::endl;
     tmp[*ii].reserve(nnbrs); 
   }
@@ -173,8 +173,8 @@ struct process {
       GNode _v = SQ[QAt++];
       int v = _v;
       for (Graph::neighbor_iterator
-          ii = G->neighbor_begin(_v, Galois::NONE),
-          ee = G->neighbor_end(_v, Galois::NONE); ii != ee; ++ii) {
+          ii = G->neighbor_begin(_v, Galois::MethodFlag::NONE),
+          ee = G->neighbor_end(_v, Galois::MethodFlag::NONE); ii != ee; ++ii) {
 	GNode _w = *ii;
 	int w = _w;
 	if (!d[w]) {

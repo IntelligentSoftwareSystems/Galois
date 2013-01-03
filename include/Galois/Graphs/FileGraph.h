@@ -392,28 +392,28 @@ public:
       delete[] nodeData;
   }
   
-  NodeTy& getData(GraphNode N, MethodFlag mflag = ALL) {
+  NodeTy& getData(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::acquire(&nodeData[N].data, mflag);
     return nodeData[N].data.data;
   }
 
-  EdgeTy& getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
+  EdgeTy& getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = MethodFlag::ALL) {
     return FileGraph::getEdgeData<EdgeTy>(src, dst, mflag);
   }
 
-  EdgeTy& getEdgeData(FileGraph::edge_iterator it, MethodFlag mflag = ALL) {
+  EdgeTy& getEdgeData(FileGraph::edge_iterator it, MethodFlag mflag = MethodFlag::ALL) {
     return FileGraph::getEdgeData<EdgeTy>(it, mflag);
   }
 
-  EdgeTy& getEdgeData(FileGraph::neighbor_iterator it, MethodFlag mflag = ALL) {
+  EdgeTy& getEdgeData(FileGraph::neighbor_iterator it, MethodFlag mflag = MethodFlag::ALL) {
     return FileGraph::getEdgeData<EdgeTy>(it, mflag);
   }
 
-  neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = ALL) const {
+  neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) const {
     return FileGraph::neighbor_begin(N);
   }
 
-  neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = ALL) const {
+  neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = MethodFlag::ALL) const {
     return FileGraph::neighbor_end(N);
   }
 
@@ -470,19 +470,19 @@ public:
       delete[] nodeData;
   }
   
-  EdgeTy& getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
+  EdgeTy& getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = MethodFlag::ALL) {
     return FileGraph::getEdgeData<EdgeTy>(src, dst, mflag);
   }
-  EdgeTy& getEdgeData(FileGraph::edge_iterator it, MethodFlag mflag = ALL) {
+  EdgeTy& getEdgeData(FileGraph::edge_iterator it, MethodFlag mflag = MethodFlag::ALL) {
     return FileGraph::getEdgeData<EdgeTy>(it, mflag);
   }
-  EdgeTy& getEdgeData(FileGraph::neighbor_iterator it, MethodFlag mflag = ALL) {
+  EdgeTy& getEdgeData(FileGraph::neighbor_iterator it, MethodFlag mflag = MethodFlag::ALL) {
     return FileGraph::getEdgeData<EdgeTy>(it, mflag);
   }
-  neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = ALL) const {
+  neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) const {
     return FileGraph::neighbor_begin(N);
   }
-  neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = ALL) const {
+  neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = MethodFlag::ALL) const {
     return FileGraph::neighbor_end(N);
   }
 };
@@ -505,7 +505,7 @@ public:
       delete[] nodeData;
   }
   
-  NodeTy& getData(GraphNode N, MethodFlag mflag = ALL) {
+  NodeTy& getData(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::acquire(&nodeData[N].data, mflag);
     return nodeData[N].data.data;
   }
@@ -523,11 +523,11 @@ public:
       nodeData[i].data.data = init;
   }
 
-  neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = ALL) const {
+  neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) const {
     return FileGraph::neighbor_begin(N);
   }
 
-  neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = ALL) const {
+  neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = MethodFlag::ALL) const {
     return FileGraph::neighbor_end(N);
   }
 };
@@ -537,10 +537,10 @@ class LC_FileGraph<void, void>: public FileGraph {
 public:
   GALOIS_ATTRIBUTE_DEPRECATED
   LC_FileGraph() { }
-  neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = ALL) const {
+  neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) const {
     return FileGraph::neighbor_begin(N);
   }
-  neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = ALL) const {
+  neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = MethodFlag::ALL) const {
     return FileGraph::neighbor_end(N);
   }
 };

@@ -83,7 +83,7 @@ public:
 
   //! Push new work 
   void push(T val) {
-    Galois::Runtime::checkWrite(Galois::WRITE);
+    Galois::Runtime::checkWrite(MethodFlag::WRITE, true);
     pushBuffer.push_back(val);
   }
 

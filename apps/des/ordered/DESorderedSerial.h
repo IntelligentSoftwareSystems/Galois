@@ -61,7 +61,7 @@ protected:
     for (Graph::iterator n = graph.begin ()
         , endn = graph.end (); n != endn; ++n) {
 
-      BaseSimObj_ty* so = graph.getData (*n, Galois::NONE);
+      BaseSimObj_ty* so = graph.getData (*n, Galois::MethodFlag::NONE);
       nodes[so->getID ()] = *n;
     }
   }

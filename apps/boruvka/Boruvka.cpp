@@ -123,7 +123,7 @@ struct GraphStats{
       for(Graph::iterator it = graph.begin(), end_it = graph.end(); it!=end_it; ++it){
          ++num_nodes;
          current_degree=0;
-         for(Graph::edge_iterator e_it = graph.edge_begin(*it, Galois::NONE), e_it_end = graph.edge_end(*it, Galois::NONE); e_it!=e_it_end; ++e_it){
+         for(Graph::edge_iterator e_it = graph.edge_begin(*it, Galois::MethodFlag::NONE), e_it_end = graph.edge_end(*it, Galois::MethodFlag::NONE); e_it!=e_it_end; ++e_it){
             ++num_edges;
             ++current_degree;
          }
@@ -156,9 +156,9 @@ GraphStats stat_collector;
 void printGraph() {
    int numEdges = 0;
       for (Graph::iterator src = graph.begin(), esrc = graph.end(); src != esrc; ++src) {
-      Node& sdata = graph.getData(*src, Galois::NONE);
+      Node& sdata = graph.getData(*src, Galois::MethodFlag::NONE);
       if (graph.containsNode(*src))
-         for (Graph::edge_iterator dst = graph.edge_begin(*src, Galois::NONE), edst = graph.edge_end(*src, Galois::NONE); dst != edst; ++dst) {
+         for (Graph::edge_iterator dst = graph.edge_begin(*src, Galois::MethodFlag::NONE), edst = graph.edge_end(*src, Galois::MethodFlag::NONE); dst != edst; ++dst) {
             EdgeDataType w = graph.getEdgeData(dst);
             assert(w>=0);
             Node & ddata = graph.getData(graph.getEdgeDst(dst));
@@ -176,19 +176,19 @@ struct process {
    void operator()(GNode& src, ContextTy& lwl) {
       if (graph.containsNode(src) == false)
          return;
-      graph.getData(src, Galois::ALL);
+      graph.getData(src, Galois::MethodFlag::ALL);
       GNode * minNeighbor = 0;
 #if BORUVKA_DEBUG
       std::cout<<"Processing "<<graph.getData(src).toString()<<std::endl;
 #endif
       EdgeDataType minEdgeWeight = std::numeric_limits<EdgeDataType>::max();
       //Acquire locks on neighborhood.
-      for (Graph::edge_iterator dst = graph.edge_begin(src, Galois::ALL), edst = graph.edge_end(src, Galois::ALL); dst != edst; ++dst) {
+      for (Graph::edge_iterator dst = graph.edge_begin(src, Galois::MethodFlag::ALL), edst = graph.edge_end(src, Galois::MethodFlag::ALL); dst != edst; ++dst) {
          graph.getData(graph.getEdgeDst(dst));
       }
       //Find minimum neighbor
-      for (Graph::edge_iterator e_it = graph.edge_begin(src, Galois::NONE), edst = graph.edge_end(src, Galois::NONE); e_it != edst; ++e_it) {
-         EdgeDataType w = graph.getEdgeData(e_it, Galois::NONE);
+      for (Graph::edge_iterator e_it = graph.edge_begin(src, Galois::MethodFlag::NONE), edst = graph.edge_end(src, Galois::MethodFlag::NONE); e_it != edst; ++e_it) {
+         EdgeDataType w = graph.getEdgeData(e_it, Galois::MethodFlag::NONE);
          assert(w>=0);
          if (w < minEdgeWeight) {
             minNeighbor = &((*e_it).first());
@@ -197,14 +197,14 @@ struct process {
       }
       //If there are no outgoing neighbors.
       if (minEdgeWeight == std::numeric_limits<EdgeDataType>::max()) {
-         graph.removeNode(src, Galois::NONE);
+         graph.removeNode(src, Galois::MethodFlag::NONE);
          return;
       }
 #if BORUVKA_DEBUG
             std::cout << " Min edge from "<<graph.getData(src) << " to "<<graph.getData(*minNeighbor)<<" " <<minEdgeWeight << " "<<std::endl;
 #endif
       //Acquire locks on neighborhood of min neighbor.
-      for (Graph::edge_iterator e_it = graph.edge_begin(*minNeighbor, Galois::ALL), edst = graph.edge_end(*minNeighbor, Galois::ALL); e_it != edst; ++e_it) {
+      for (Graph::edge_iterator e_it = graph.edge_begin(*minNeighbor, Galois::MethodFlag::ALL), edst = graph.edge_end(*minNeighbor, Galois::MethodFlag::ALL); e_it != edst; ++e_it) {
          graph.getData(graph.getEdgeDst(e_it));
       }
       assert(minEdgeWeight>=0);
@@ -213,14 +213,14 @@ struct process {
       typedef std::pair<GNode, EdgeDataType> EdgeData;
       typedef std::set<EdgeData, std::less<EdgeData>, Galois::PerIterAllocTy::rebind<EdgeData>::other> edsetTy;
       edsetTy toAdd(std::less<EdgeData>(), Galois::PerIterAllocTy::rebind<EdgeData>::other(lwl.getPerIterAlloc()));
-      for (Graph::edge_iterator mdst = graph.edge_begin(*minNeighbor, Galois::NONE), medst = graph.edge_end(*minNeighbor, Galois::NONE); mdst != medst; ++mdst) {
+      for (Graph::edge_iterator mdst = graph.edge_begin(*minNeighbor, Galois::MethodFlag::NONE), medst = graph.edge_end(*minNeighbor, Galois::MethodFlag::NONE); mdst != medst; ++mdst) {
          GNode dstNode = graph.getEdgeDst(mdst);
-         int edgeWeight = graph.getEdgeData(mdst,Galois::NONE);
+         int edgeWeight = graph.getEdgeData(mdst,Galois::MethodFlag::NONE);
          if (dstNode != src) { //Do not add the edge being contracted
-            Graph::edge_iterator dup_edge = graph.findEdge(src, dstNode, Galois::NONE);
-            if (dup_edge != graph.edge_end(src, Galois::NONE)) {
-               EdgeDataType dup_wt = graph.getEdgeData(dup_edge,Galois::NONE);
-                  graph.getEdgeData(dup_edge,Galois::NONE) = std::min<EdgeDataType>(edgeWeight, dup_wt);
+            Graph::edge_iterator dup_edge = graph.findEdge(src, dstNode, Galois::MethodFlag::NONE);
+            if (dup_edge != graph.edge_end(src, Galois::MethodFlag::NONE)) {
+               EdgeDataType dup_wt = graph.getEdgeData(dup_edge,Galois::MethodFlag::NONE);
+                  graph.getEdgeData(dup_edge,Galois::MethodFlag::NONE) = std::min<EdgeDataType>(edgeWeight, dup_wt);
                   assert(std::min<EdgeDataType>(edgeWeight, dup_wt)>=0);
             } else {
                   toAdd.insert(EdgeData(dstNode, edgeWeight));
@@ -228,9 +228,9 @@ struct process {
             }
          }
       }
-      graph.removeNode(*minNeighbor, Galois::NONE);
+      graph.removeNode(*minNeighbor, Galois::MethodFlag::NONE);
       for (edsetTy::iterator it = toAdd.begin(), endIt = toAdd.end(); it != endIt; it++) {
-         graph.getEdgeData(graph.addEdge(src, it->first, Galois::NONE)) = it->second;
+         graph.getEdgeData(graph.addEdge(src, it->first, Galois::MethodFlag::NONE)) = it->second;
       }
       lwl.push(src);
 #if COMPILE_STATISICS
@@ -243,10 +243,10 @@ struct process {
 ///////////////////////////////////////////////////////////////////////////////////////
 struct Indexer: public std::unary_function<const GNode&, unsigned> {
    unsigned operator()(const GNode& n) {
-      return std::distance(graph.edge_begin(n, Galois::NONE), graph.edge_end(n, Galois::NONE));
+      return std::distance(graph.edge_begin(n, Galois::MethodFlag::NONE), graph.edge_end(n, Galois::MethodFlag::NONE));
    }
    static unsigned foo(const GNode& n) {
-      return std::distance(graph.edge_begin(n, Galois::NONE), graph.edge_end(n, Galois::NONE));
+      return std::distance(graph.edge_begin(n, Galois::MethodFlag::NONE), graph.edge_end(n, Galois::MethodFlag::NONE));
    }
 };
 struct seq_less: public std::binary_function<const GNode&, const GNode&, bool> {
@@ -327,7 +327,7 @@ static void makeGraph(const char* input) {
    //
    int numEdges = 0;
    for (InGraph::iterator src = in_graph.begin(), esrc = in_graph.end(); src != esrc; ++src) {
-      for (InGraph::edge_iterator dst = in_graph.edge_begin(*src, Galois::NONE), edst = in_graph.edge_end(*src, Galois::NONE); dst != edst; ++dst) {
+      for (InGraph::edge_iterator dst = in_graph.edge_begin(*src, Galois::MethodFlag::NONE), edst = in_graph.edge_end(*src, Galois::MethodFlag::NONE); dst != edst; ++dst) {
          if (*src == *dst) {
 #if BORUVKA_DEBUG
             std::cout<<"ERR:: Self loop at "<<*src<<std::endl;
@@ -359,8 +359,8 @@ static void makeGraph(const char* input) {
    for (Map::iterator i = edges.begin(), ei = edges.end(); i != ei; ++i) {
       GNode src = nodes[id];
       for (Elements::iterator j = i->begin(), ej = i->end(); j != ej; ++j) {
-         Graph::edge_iterator it = graph.findEdge(src, nodes[j->first], Galois::NONE);
-         if (it != graph.edge_end(src, Galois::NONE)) {
+         Graph::edge_iterator it = graph.findEdge(src, nodes[j->first], Galois::MethodFlag::NONE);
+         if (it != graph.edge_end(src, Galois::MethodFlag::NONE)) {
             numDups++;
             EdgeDataType w = (graph.getEdgeData(it));
             if (j->second < w) {
@@ -368,7 +368,7 @@ static void makeGraph(const char* input) {
                edge_sum += (j->second-w);
             }
          } else {
-            graph.getEdgeData(graph.addEdge(src, nodes[j->first], Galois::NONE)) = j->second;
+            graph.getEdgeData(graph.addEdge(src, nodes[j->first], Galois::MethodFlag::NONE)) = j->second;
             edge_sum += j->second;
          }
          numEdges++;
@@ -436,8 +436,8 @@ static void readWeightedRMAT(const char* input) {
    int numDups = 0;
    for (std::vector<EdgeTuple<NodeDataType, EdgeDataType> >::iterator eIt = et.begin(), end = et.end(); eIt!=end; ++eIt) {
       EdgeTuple<NodeDataType,EdgeDataType> e = *eIt;
-      Graph::edge_iterator it = graph.findEdge(nodes[e.src], nodes[e.dst], Galois::NONE);
-         if (it != graph.edge_end(nodes[e.src], Galois::NONE)) {
+      Graph::edge_iterator it = graph.findEdge(nodes[e.src], nodes[e.dst], Galois::MethodFlag::NONE);
+         if (it != graph.edge_end(nodes[e.src], Galois::MethodFlag::NONE)) {
             numDups++;
             EdgeDataType w = (graph.getEdgeData(it));
             if (e.wt < w) {
@@ -445,7 +445,7 @@ static void readWeightedRMAT(const char* input) {
                edge_sum += (e.wt-w);
             }
          } else {
-            graph.getEdgeData(graph.addEdge(nodes[e.src], nodes[e.dst], Galois::NONE)) = e.wt;
+            graph.getEdgeData(graph.addEdge(nodes[e.src], nodes[e.dst], Galois::MethodFlag::NONE)) = e.wt;
             edge_sum += e.wt;
          }
          numEdges++;

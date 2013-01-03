@@ -123,15 +123,15 @@ struct ParallelAlgo {
    */
   template<typename Context>
   static bool findLightest(const GNode& src, int cur, Context& ctx, bool updateLightest) {
-    Node& sdata = graph.getData(src, Galois::NONE);
-    Graph::edge_iterator ii = graph.edge_begin(src, Galois::NONE);
-    Graph::edge_iterator ei = graph.edge_end(src, Galois::NONE);
+    Node& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+    Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::NONE);
+    Graph::edge_iterator ei = graph.edge_end(src, Galois::MethodFlag::NONE);
 
     std::advance(ii, cur);
 
     for (; ii != ei; ++ii, ++cur) {
       GNode dst = graph.getEdgeDst(ii);
-      Node& ddata = graph.getData(dst, Galois::NONE);
+      Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
       Node* rep;
       if ((rep = sdata.findAndCompress()) != ddata.findAndCompress()) {
         const EdgeData& weight = graph.getEdgeData(ii);
@@ -166,7 +166,7 @@ struct ParallelAlgo {
 
     template<typename Context>
     void operator()(const GNode& src, Context& ctx) const {
-      Node& sdata = graph.getData(src, Galois::NONE);
+      Node& sdata = graph.getData(src, Galois::MethodFlag::NONE);
       sdata.lightest = &heaviest;
       findLightest(src, 0, ctx, true);
     }
@@ -188,13 +188,13 @@ struct ParallelAlgo {
     template<typename Context>
     void operator()(const WorkItem& item, Context& ctx) const {
       GNode src = item.edge.src;
-      Node& sdata = graph.getData(src, Galois::NONE);
+      Node& sdata = graph.getData(src, Galois::MethodFlag::NONE);
       Node* rep = sdata.findAndCompress();
       int cur = item.cur;
 
       if (rep->lightest == item.edge.weight) {
         GNode dst = item.edge.dst;
-        Node& ddata = graph.getData(dst, Galois::NONE);
+        Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
         if ((rep = sdata.merge(&ddata))) {
           rep->lightest = &heaviest;
           mst.push(Edge(src, dst, item.edge.weight));
@@ -336,7 +336,7 @@ struct CheckAcyclic {
 
 struct SortEdges {
   void operator()(const GNode& src) {
-    //    graph.sortEdges(src, std::less<EdgeData>(), Galois::NONE);
+    //    graph.sortEdges(src, std::less<EdgeData>(), Galois::MethodFlag::NONE);
   }
 
   void operator()() {

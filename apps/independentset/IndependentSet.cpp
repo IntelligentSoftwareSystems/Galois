@@ -105,8 +105,8 @@ struct Process {
     if (me.flag != UNMATCHED)
       return false;
 
-    for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::NONE),
-        ei = graph.edge_end(src, Galois::NONE); ii != ei; ++ii) {
+    for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::NONE),
+        ei = graph.edge_end(src, Galois::MethodFlag::NONE); ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
       Node& data = graph.getData(dst, Flag);
       if (data.flag == MATCHED)
@@ -117,11 +117,11 @@ struct Process {
   }
 
   void modify(GNode src) {
-    Node& me = graph.getData(src, Galois::NONE);
-    for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::NONE),
-        ei = graph.edge_end(src, Galois::NONE); ii != ei; ++ii) {
+    Node& me = graph.getData(src, Galois::MethodFlag::NONE);
+    for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::NONE),
+        ei = graph.edge_end(src, Galois::MethodFlag::NONE); ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
-      Node& data = graph.getData(dst, Galois::NONE);
+      Node& data = graph.getData(dst, Galois::MethodFlag::NONE);
       data.flag = OTHER_MATCHED;
     }
 
@@ -130,7 +130,7 @@ struct Process {
 
   //! Serial operator
   void operator()(GNode src) {
-    if (build<Galois::NONE>(src))
+    if (build<Galois::MethodFlag::NONE>(src))
       modify(src);
   }
 
@@ -148,13 +148,13 @@ struct Process {
     }
 
     if (Version == detDisjoint) {
-      *modp = build<Galois::ALL>(src);
+      *modp = build<Galois::MethodFlag::ALL>(src);
     } else {
-      bool mod = build<Galois::ALL>(src);
+      bool mod = build<Galois::MethodFlag::ALL>(src);
       if (Version == detPrefix)
         return;
       else
-        graph.getData(src, Galois::WRITE); // Failsafe point
+        graph.getData(src, Galois::MethodFlag::WRITE); // Failsafe point
       if (mod)
         modify(src);
     }
@@ -174,9 +174,9 @@ struct OrderedProcess {
 
   void operator()(GNode src) {
     if (prefix) {
-      graph.edge_begin(src, Galois::ALL);
+      graph.edge_begin(src, Galois::MethodFlag::ALL);
     } else {
-      if (process.build<Galois::NONE>(src))
+      if (process.build<Galois::MethodFlag::NONE>(src))
         process.modify(src);
     }
   }
@@ -184,7 +184,7 @@ struct OrderedProcess {
 
 struct Compare {
   bool operator()(const GNode& a, const GNode& b) const {
-    return graph.getData(a, Galois::NONE).id < graph.getData(b, Galois::NONE).id;
+    return graph.getData(a, Galois::MethodFlag::NONE).id < graph.getData(b, Galois::MethodFlag::NONE).id;
   }
 };
 

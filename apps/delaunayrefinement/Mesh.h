@@ -38,7 +38,7 @@ struct is_bad {
   Graph* g;
   is_bad(Graph* _g): g(_g) {}
   bool operator()(const GNode& n) const {
-    return g->getData(n, Galois::NONE).isBad();
+    return g->getData(n, Galois::MethodFlag::NONE).isBad();
   }
 };
 
@@ -357,7 +357,7 @@ private:
       if (edge_map.find(edge) == edge_map.end()) {
         edge_map[edge] = node;
       } else {
-        mesh->addEdge(node, edge_map[edge], Galois::NONE);
+        mesh->addEdge(node, edge_map[edge], Galois::MethodFlag::NONE);
         edge_map.erase(edge);
       }
     }

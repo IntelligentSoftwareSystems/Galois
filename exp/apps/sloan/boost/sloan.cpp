@@ -202,19 +202,19 @@ struct UpdateRequestIndexer {
 
 struct GNodeIndexer {
   unsigned int operator()(const GNode& val) const {
-    return graph.getData(val, Galois::NONE).dist;
+    return graph.getData(val, Galois::MethodFlag::NONE).dist;
   }
 };
 
 struct GNodeLess {
   bool operator()(const GNode& a, const GNode& b) const {
-    return graph.getData(a, Galois::NONE).dist < graph.getData(b, Galois::NONE).dist;
+    return graph.getData(a, Galois::MethodFlag::NONE).dist < graph.getData(b, Galois::MethodFlag::NONE).dist;
   }
 };
 
 struct GNodeGreater {
   bool operator()(const GNode& a, const GNode& b) const {
-    return graph.getData(a, Galois::NONE).dist > graph.getData(b, Galois::NONE).dist;
+    return graph.getData(a, Galois::MethodFlag::NONE).dist > graph.getData(b, Galois::MethodFlag::NONE).dist;
   }
 };
 
@@ -283,10 +283,10 @@ static void printAccess(std::string msg){
 
 		std::cerr << sdata.id << " connected with (" << degree(*src) << "): ";
 
-		for (Graph::edge_iterator ii = graph.edge_begin(*src, Galois::NONE), 
-				ei = graph.edge_end(*src, Galois::NONE); ii != ei; ++ii) {
+		for (Graph::edge_iterator ii = graph.edge_begin(*src, Galois::MethodFlag::NONE), 
+				ei = graph.edge_end(*src, Galois::MethodFlag::NONE); ii != ei; ++ii) {
 			GNode dst = graph.getEdgeDst(ii);
-			SNode& ddata = graph.getData(dst, Galois::NONE);
+			SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
 
 			unsigned int diff = abs(sdata.id - ddata.id);
 
@@ -490,7 +490,7 @@ static void printDegreeDistribution() {
 
 	for (Graph::iterator n = graph.begin(), ei = graph.end(); n != ei; ++n) {
 			distr[degree(*n)]++;
-			//std::cerr << graph.getData(*n, Galois::NONE).id << "	" << graph.getData(*n, Galois::NONE).dist << "\n";
+			//std::cerr << graph.getData(*n, Galois::MethodFlag::NONE).id << "	" << graph.getData(*n, Galois::MethodFlag::NONE).dist << "\n";
 	}
 
 	std::cerr << "Degree	Count\n";
@@ -513,17 +513,17 @@ static void readGraph(GNode& source, GNode& report) {
 	bgraph = new BGraph(nnodes);
 
   for (Graph::iterator src = graph.begin(), ei = graph.end(); src != ei; ++src) {
-    SNode& node = graph.getData(*src, Galois::NONE);
+    SNode& node = graph.getData(*src, Galois::MethodFlag::NONE);
     node.id = id++;
   }
 
   std::cout << "Read binary graph\n";
 
 	for (Graph::iterator src = graph.begin(), ei = graph.end(); src != ei; ++src) {
-		SNode& dsrc = graph.getData(*src, Galois::NONE);
-		for (Graph::edge_iterator ii = graph.edge_begin(*src, Galois::NONE), ei = graph.edge_end(*src, Galois::NONE); ii != ei; ++ii) {
+		SNode& dsrc = graph.getData(*src, Galois::MethodFlag::NONE);
+		for (Graph::edge_iterator ii = graph.edge_begin(*src, Galois::MethodFlag::NONE), ei = graph.edge_end(*src, Galois::MethodFlag::NONE); ii != ei; ++ii) {
 			GNode dst = graph.getEdgeDst(ii);
-			SNode& ddst = graph.getData(dst, Galois::NONE);
+			SNode& ddst = graph.getData(dst, Galois::MethodFlag::NONE);
 			boost::add_edge(dsrc.id, ddst.id, *bgraph);
 		}
 	}

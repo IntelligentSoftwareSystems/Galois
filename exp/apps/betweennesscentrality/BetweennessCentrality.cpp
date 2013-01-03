@@ -116,8 +116,8 @@ Galois::Runtime::PerThreadStorage<TempState*> state;
 void computeSucSize() {
   sucSize.resize(NumNodes);
   for (Graph::iterator ii = G->begin(), ee = G->end(); ii != ee; ++ii)
-    sucSize[*ii] = std::distance(G->neighbor_begin(*ii, Galois::NONE),
-				 G->neighbor_end(*ii, Galois::NONE));
+    sucSize[*ii] = std::distance(G->neighbor_begin(*ii, Galois::MethodFlag::NONE),
+				 G->neighbor_end(*ii, Galois::MethodFlag::NONE));
 }
 
 struct popstate {
@@ -150,8 +150,8 @@ struct process {
       GNode _v = SQ[QAt++];
       int v = _v;
       for (Graph::neighbor_iterator
-          ii = G->neighbor_begin(_v, Galois::NONE),
-          ee = G->neighbor_end(_v, Galois::NONE); ii != ee; ++ii) {
+          ii = G->neighbor_begin(_v, Galois::MethodFlag::NONE),
+          ee = G->neighbor_end(_v, Galois::MethodFlag::NONE); ii != ee; ++ii) {
 	GNode _w = *ii;
 	int w = _w;
 	if (!d[w]) {
