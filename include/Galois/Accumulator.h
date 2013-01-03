@@ -25,7 +25,6 @@
 #define GALOIS_ACCUMULATOR_H
 
 #include "Galois/Runtime/PerThreadStorage.h"
-#include "Galois/Runtime/LoopHooks.h"
 
 #include <limits>
 

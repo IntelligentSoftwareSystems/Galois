@@ -750,7 +750,6 @@ static inline void do_all_bs_impl(IterTy b, IterTy e, FnsTy fns, InitFnTy initFn
   RunCommand w[2] = {std::ref(W),
 		     std::ref(getSystemBarrier())};
   getSystemThreadPool().run(&w[0], &w[2]);
-  runAllLoopExitHandlers();
   inGaloisForEach = false;
 }
 #endif
@@ -789,7 +788,6 @@ static inline void do_all_bs_impl(IterTy b, IterTy e, FnsTy fns, InitFnTy initFn
   RunCommand w[2] = {std::ref(W),
 		     std::ref(getSystemBarrier())};
   getSystemThreadPool().run(&w[0], &w[2]);
-  runAllLoopExitHandlers();
   inGaloisForEach = false;
 }
 #endif

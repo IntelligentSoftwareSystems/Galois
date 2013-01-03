@@ -37,7 +37,6 @@
 
 
 #include "Galois/Runtime/Barrier.h"
-#include "Galois/Runtime/LoopHooks.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Termination.h"

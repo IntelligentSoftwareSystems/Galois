@@ -33,7 +33,6 @@
 
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/ForEachTraits.h"
-#include "Galois/Runtime/LoopHooks.h"
 #include "Galois/Runtime/ParallelWork.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Termination.h"
