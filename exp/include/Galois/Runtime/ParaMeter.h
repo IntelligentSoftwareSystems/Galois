@@ -64,6 +64,8 @@ namespace ParaMeterInit {
   const char* getStatsFileName();
 }
 
+namespace {
+
 // Single ParaMeter stats file per run of an app
 // which includes all instances of for_each loops
 // run with ParaMeter Executor
@@ -345,6 +347,7 @@ private:
 
 
 } // end namespace
+}
 }
 
 #else

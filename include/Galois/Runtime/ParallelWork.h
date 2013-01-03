@@ -43,6 +43,7 @@
 
 namespace Galois {
 namespace Runtime {
+namespace {
 
 template<typename RangeTy, typename WorkTy>
 struct Initializer {
@@ -312,10 +313,11 @@ void on_each_impl(FunctionTy fn, const char* loopname = 0) {
   Galois::Runtime::getSystemThreadPool().run(&w[0], &w[2]);
 }
 
+} // end namespace anonymous
 
 void preAlloc_impl(int num);
 
-} // end namespace
+} // end namespace Runtime
 } // end namespace Galois
 
 #endif

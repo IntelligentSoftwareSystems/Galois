@@ -117,6 +117,8 @@ struct DeterministicContext: public Galois::Runtime::SimpleRuntimeContext {
   }
 };
 
+namespace {
+
 template<typename T, typename CompTy> 
 struct OrderedContextComp {
   typedef DeterministicContext<T, OrderedContextComp> DetContext;
@@ -1574,7 +1576,7 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
 
 
 
-
+} // end namespace anonymous
 } // end namespace DeterministicWork
 
 template<typename InitTy, typename WorkTy>
