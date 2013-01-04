@@ -370,7 +370,7 @@ struct TreeSummarizeODG {
 
   typedef Galois::GAtomic<unsigned> UnsignedAtomic;
   static const unsigned CHUNK_SIZE = 64;
-  typedef Galois::Runtime::WorkList::dChunkedFIFO<CHUNK_SIZE, unsigned> WLty;
+  typedef Galois::WorkList::dChunkedFIFO<CHUNK_SIZE, unsigned> WLty;
 
   struct ODGnode {
     UnsignedAtomic numChild;
@@ -882,7 +882,7 @@ void run(int nbodies, int ntimesteps, int seed, TreeSummMethod summMethod) {
   generateInput(bodies, nbodies, seed);
   t_input_gen.stop ();
 
-  typedef Galois::Runtime::WorkList::dChunkedLIFO<256> WL;
+  typedef Galois::WorkList::dChunkedLIFO<256> WL;
 
   for (int step = 0; step < ntimesteps; step++) {
     // Do tree building sequentially

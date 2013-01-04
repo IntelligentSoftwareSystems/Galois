@@ -50,13 +50,13 @@
 #include <cstdio>
 
 namespace Galois {
-namespace Runtime {
-
 namespace WorkList {
 template<class ContainerTy = FIFO<>,class T=int>
 class ParaMeter: private boost::noncopyable {
 };
 }
+
+namespace Runtime {
 
 namespace ParaMeterInit {
   void init();
@@ -69,7 +69,7 @@ namespace {
 // which includes all instances of for_each loops
 // run with ParaMeter Executor
 template<class ContainerTy,class T, class FunctionTy>
-class ForEachWork<WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
+class ForEachWork<Galois::WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
   typedef T value_type;
   typedef Galois::Runtime::UserContextAccess<value_type> UserContextTy;
   typedef typename ContainerTy::template retype<value_type>::WL WorkListTy;

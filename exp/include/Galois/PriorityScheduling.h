@@ -13,7 +13,7 @@ namespace Exp {
 __attribute__((weak)) llvm::cl::opt<std::string> WorklistName("wl", llvm::cl::desc("Worklist to use"), llvm::cl::init("DEFAULT"));
 
 using namespace Galois::Runtime::LL;
-using namespace Galois::Runtime::WorkList;
+using namespace Galois::WorkList;
 
 template<int CS, bool LF>
 struct PickInner;

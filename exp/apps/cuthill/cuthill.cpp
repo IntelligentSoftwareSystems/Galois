@@ -125,7 +125,7 @@ struct CutHillUnordered {
     }
 
     static void go(GNode source) {
-      using namespace Galois::Runtime::WorkList;
+      using namespace Galois::WorkList;
       typedef dChunkedFIFO<64> dChunk;
       typedef ChunkedFIFO<64> Chunk;
       typedef OrderedByIntegerMetric<GNodeIndexer,dChunk> OBIM;

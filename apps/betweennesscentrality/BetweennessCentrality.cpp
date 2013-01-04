@@ -340,7 +340,7 @@ int main(int argc, char** argv) {
   std::vector<GNode> tmp;
   std::copy(begin, end, std::back_inserter(tmp));
 
-  typedef Galois::Runtime::WorkList::dChunkedLIFO<1> WL;
+  typedef Galois::WorkList::dChunkedLIFO<1> WL;
   Galois::StatTimer T;
   T.start();
   Galois::for_each<WL>(tmp.begin(), tmp.end(), process());

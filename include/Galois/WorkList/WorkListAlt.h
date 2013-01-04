@@ -26,7 +26,6 @@
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 
 namespace Galois {
-namespace Runtime {
 namespace WorkList {
 
 struct ChunkHeader {
@@ -36,7 +35,7 @@ struct ChunkHeader {
 
 class AtomicChunkDequeue {
 
-  LL::PtrLock<ChunkHeader, true> head;
+  Runtime::LL::PtrLock<ChunkHeader, true> head;
   ChunkHeader* volatile tail;
 
 public:
@@ -110,7 +109,7 @@ public:
 
 class AtomicChunkLIFO {
 
-  LL::PtrLock<ChunkHeader, true> head;
+  Runtime::LL::PtrLock<ChunkHeader, true> head;
 
   void prepend(ChunkHeader* C) {
     //Find tail of stolen stuff
@@ -199,7 +198,7 @@ public:
 
 
 class StealingQueues : private boost::noncopyable {
-  PerThreadStorage<std::pair<AtomicChunkLIFO, unsigned> > local;
+  Runtime::PerThreadStorage<std::pair<AtomicChunkLIFO, unsigned> > local;
   //PerThreadStorage<bool> LocalStarving;
   
   volatile unsigned Starving;
@@ -209,14 +208,14 @@ class StealingQueues : private boost::noncopyable {
   ChunkHeader* doSteal() {
     
     std::pair<AtomicChunkLIFO, unsigned>& me = *local.getLocal();
-    unsigned id = LL::getTID();
-    unsigned pkg = LL::getPackageForSelf(id);
+    unsigned id = Runtime::LL::getTID();
+    unsigned pkg = Runtime::LL::getPackageForSelf(id);
     unsigned num = Galois::getActiveThreads();
 
     //First steal from this package
     for (unsigned i = 1; i < num; ++i) {
       unsigned eid = (id + i) % num;
-      if (LL::getPackageForThread(eid) == pkg) {
+      if (Runtime::LL::getPackageForThread(eid) == pkg) {
 	ChunkHeader* c = me.first.stealHalfAndPop(local.getRemote(eid)->first);
 	if (c)
 	  return c;
@@ -232,7 +231,7 @@ class StealingQueues : private boost::noncopyable {
       goto stex;
 
     //Leaders signal starvation
-    if (LL::isLeaderForPackage(id)) {
+    if (Runtime::LL::isLeaderForPackage(id)) {
       bool& sig = *LocalStarving.getLocal();
       if (!sig) {
 	std::cerr << id << " Starving: " << Starving << "\n";
@@ -242,7 +241,7 @@ class StealingQueues : private boost::noncopyable {
     }
 
   stex:
-    if (LL::isLeaderForPackage(id) && c) {
+    if (Runtime::LL::isLeaderForPackage(id) && c) {
       bool& sig = *LocalStarving.getLocal();
       if (sig) {
 	std::cerr << id << " Not starving: " << Starving - 1 << "\n";
@@ -253,10 +252,10 @@ class StealingQueues : private boost::noncopyable {
     return c;
 #endif
     //Leaders can cross package
-    if (LL::isPackageLeaderForSelf(id)) {
+    if (Runtime::LL::isPackageLeaderForSelf(id)) {
       unsigned eid = (id + me.second) % num;
       ++me.second;
-      if (id != eid && LL::isPackageLeader(eid)) {
+      if (id != eid && Runtime::LL::isPackageLeader(eid)) {
 	ChunkHeader* c = me.first.stealAllAndPop(local.getRemote(eid)->first);
 	if (c)
 	  return c;
@@ -291,9 +290,9 @@ class ChunkedAdaptor : private boost::noncopyable {
 
   class Chunk :public ChunkHeader, public Galois::FixedSizeRing<T, chunksize> {};
 
-  MM::FixedSizeAllocator heap;
+  Runtime::MM::FixedSizeAllocator heap;
 
-  PerThreadStorage<std::pair<Chunk*, Chunk*> > data;
+  Runtime::PerThreadStorage<std::pair<Chunk*, Chunk*> > data;
 
   gWL worklist;
 
@@ -398,9 +397,9 @@ public:
 
 template<typename QueueTy>
 boost::optional<typename QueueTy::value_type>
-stealHalfInPackage(PerThreadStorage<QueueTy>& queues) {
-  unsigned id = LL::getTID();
-  unsigned pkg = LL::getPackageForSelf(id);
+stealHalfInPackage(Runtime::PerThreadStorage<QueueTy>& queues) {
+  unsigned id = Runtime::LL::getTID();
+  unsigned pkg = Runtime::LL::getPackageForSelf(id);
   unsigned num = Galois::getActiveThreads();
   QueueTy* me = queues.getLocal();
   boost::optional<typename QueueTy::value_type> retval;
@@ -408,11 +407,11 @@ stealHalfInPackage(PerThreadStorage<QueueTy>& queues) {
   //steal from this package
   //Having 2 loops avoids a modulo, though this is a slow path anyway
   for (unsigned i = id + 1; i < num; ++i)
-    if (LL::getPackageForThread(i) == pkg)
+    if (Runtime::LL::getPackageForThread(i) == pkg)
       if ((retval = me->steal(*queues.getRemote(i), true, true)))
 	return retval;
   for (unsigned i = 0; i < id; ++i)
-    if (LL::getPackageForThread(i) == pkg)
+    if (Runtime::LL::getPackageForThread(i) == pkg)
       if ((retval = me->steal(*queues.getRemote(i), true, true)))
 	return retval;
   return retval;
@@ -420,9 +419,9 @@ stealHalfInPackage(PerThreadStorage<QueueTy>& queues) {
 
 template<typename QueueTy>
 boost::optional<typename QueueTy::value_type>
-stealRemote(PerThreadStorage<QueueTy>& queues) {
-  unsigned id = LL::getTID();
-  //  unsigned pkg = LL::getPackageForThread(id);
+stealRemote(Runtime::PerThreadStorage<QueueTy>& queues) {
+  unsigned id = Runtime::LL::getTID();
+  //  unsigned pkg = Runtime::LL::getPackageForThread(id);
   unsigned num = Galois::getActiveThreads();
   QueueTy* me = queues.getLocal();
   boost::optional<typename QueueTy::value_type> retval;
@@ -444,7 +443,7 @@ public:
   typedef typename QueueTy::value_type value_type;
   
 private:
-  PerThreadStorage<QueueTy> local;
+  Runtime::PerThreadStorage<QueueTy> local;
 
   boost::optional<value_type> doSteal() {
     boost::optional<value_type> retval = stealHalfInPackage(local);
@@ -456,7 +455,7 @@ private:
   template<typename Iter>
   void fill_work_l2(Iter& b, Iter& e) {
     unsigned int a = Galois::getActiveThreads();
-    unsigned int id = LL::getTID();
+    unsigned int id = Runtime::LL::getTID();
     unsigned dist = std::distance(b, e);
     unsigned num = (dist + a - 1) / a; //round up
     unsigned int A = std::min(num * id, dist);
@@ -466,7 +465,7 @@ private:
     std::advance(e, B);
   }
 
-  // LL::SimpleLock<true> L;
+  // Runtime::LL::SimpleLock<true> L;
   // std::vector<unsigned> sum;
 
   template<typename Iter>
@@ -475,7 +474,7 @@ private:
     Iter e2 = e;
     fill_work_l2(b2, e2);
     unsigned int a = Galois::getActiveThreads();
-    //    unsigned int id = LL::getTID();
+    //    unsigned int id = Runtime::LL::getTID();
     std::vector<std::vector<value_type> > ranges;
     ranges.resize(a);
     while (b2 != e2) {
@@ -541,7 +540,7 @@ public:
 template<typename WLTy = FIFO<>, typename T = int>
 class LocalWorklist : private boost::noncopyable {
   typedef typename WLTy::template rethread<false>::WL lWLTy;
-  PerThreadStorage<lWLTy> local;
+  Runtime::PerThreadStorage<lWLTy> local;
 
 public:
   template<bool newconcurrent>
@@ -580,7 +579,10 @@ template<typename T, typename OwnerFn, template<typename, bool> class QT, bool d
 class OwnerComputeChunkedMaster : private boost::noncopyable {
   class Chunk : public Galois::FixedSizeRing<T, chunksize>, public QT<Chunk, concurrent>::ListNode {};
 
-  MM::FixedSizeAllocator heap;
+
+
+
+  Runtime::MM::FixedSizeAllocator heap;
   OwnerFn Fn;
 
   struct p {
@@ -590,7 +592,7 @@ class OwnerComputeChunkedMaster : private boost::noncopyable {
 
   typedef QT<Chunk, concurrent> LevelItem;
 
-  PerThreadStorage<p> data;
+  Runtime::PerThreadStorage<p> data;
   squeues<distributed, LevelItem> Q;
 
   Chunk* mkChunk() {
@@ -603,13 +605,13 @@ class OwnerComputeChunkedMaster : private boost::noncopyable {
   }
 
   void pushChunk(Chunk* C)  {
-    unsigned int tid = LL::getTID();
+    unsigned int tid = Runtime::LL::getTID();
     unsigned int index = isStack ? Fn(C->back()) : Fn(C->front());
     if (tid == index) {
       LevelItem& I = Q.get();
       I.push(C);
     } else {
-      unsigned int mindex = LL::getPackageForThread(index);
+      unsigned int mindex = Runtime::LL::getPackageForThread(index);
       LevelItem& I = Q.get(mindex);
       I.push(C);
     }
@@ -726,7 +728,7 @@ class OwnerComputeChunkedLIFO : public OwnerComputeChunkedMaster<T,OwnerFn,ConEx
 GALOIS_WLCOMPILECHECK(OwnerComputeChunkedLIFO)
 
 
-} }//End namespace
+}//End namespace
 } // end namespace Galois
 
 #endif

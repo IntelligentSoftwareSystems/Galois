@@ -105,7 +105,7 @@ struct UpdateRequestIndexer
 
 //typedef std::pair<GNode,GNode> Edge;
 typedef std::vector<UpdateRequest> WorkList;
-typedef Galois::Runtime::WorkList::OrderedByIntegerMetric<UpdateRequestIndexer, Galois::Runtime::WorkList::dChunkedFIFO<1024> > OBIM;
+typedef Galois::WorkList::OrderedByIntegerMetric<UpdateRequestIndexer, Galois::WorkList::dChunkedFIFO<1024> > OBIM;
 
 class PtsToCons {
 public:

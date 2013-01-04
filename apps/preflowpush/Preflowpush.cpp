@@ -373,7 +373,7 @@ void globalRelabel(IncomingWL& incoming) {
   switch (detAlgo) {
     case nondet:
 #ifdef GALOIS_USE_EXP
-      Galois::for_each<Galois::Runtime::WorkList::BulkSynchronousInline<> >(app.sink, UpdateHeights<nondet>(), "UpdateHeights");
+      Galois::for_each<Galois::WorkList::BulkSynchronousInline<> >(app.sink, UpdateHeights<nondet>(), "UpdateHeights");
 #else
       Galois::for_each(app.sink, UpdateHeights<nondet>(), "UpdateHeights");
 #endif
@@ -679,8 +679,8 @@ void initializePreflow(C& initial) {
 }
 
 void run() {
-  typedef Galois::Runtime::WorkList::dChunkedFIFO<16> Chunk;
-  typedef Galois::Runtime::WorkList::OrderedByIntegerMetric<Indexer,Chunk> OBIM;
+  typedef Galois::WorkList::dChunkedFIFO<16> Chunk;
+  typedef Galois::WorkList::OrderedByIntegerMetric<Indexer,Chunk> OBIM;
 
   Galois::InsertBag<GNode> initial;
   initializePreflow(initial);

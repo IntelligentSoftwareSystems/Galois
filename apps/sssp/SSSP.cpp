@@ -129,7 +129,7 @@ struct ParallelAlgo {
   std::string name() const { return useCas ? "parallel with CAS" : "parallel"; }
 
   void operator()(const GNode src) const {
-    using namespace Galois::Runtime::WorkList;
+    using namespace Galois::WorkList;
     typedef dChunkedLIFO<16> dChunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
 
@@ -184,7 +184,7 @@ struct ParallelLessDupsAlgo {
   }
 
   void operator()(const GNode src) const {
-    using namespace Galois::Runtime::WorkList;
+    using namespace Galois::WorkList;
     typedef dChunkedLIFO<16> dChunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
 

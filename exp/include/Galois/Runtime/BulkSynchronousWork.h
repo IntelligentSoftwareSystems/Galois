@@ -146,10 +146,10 @@ struct Bag: public Galois::gdeque<T, ChunkSize, RingAdaptor<T, ChunkSize> > {
   }
 };
 
-struct WID {
+struct WIDb {
   unsigned tid;
   unsigned pid;
-  explicit WID(unsigned t): tid(t) {
+  explicit WIDb(unsigned t): tid(t) {
     pid = LL::getLeaderForThread(tid);
   }
 };
@@ -169,7 +169,7 @@ struct BagMaster: boost::noncopyable {
   }
 
   template<typename FnTy>
-  size_t map(const WID& id, FnTy fn, int mark) { 
+  size_t map(const WIDb& id, FnTy fn, int mark) { 
     size_t iterations = bags.getLocal()->map(fn, mark);
 
     return iterations + mapSlow(id, fn, mark);
@@ -177,7 +177,7 @@ struct BagMaster: boost::noncopyable {
 
   template<typename FnTy>
   GALOIS_ATTRIBUTE_NOINLINE
-  size_t mapSlow(const WID& id, FnTy fn, int mark) { 
+  size_t mapSlow(const WIDb& id, FnTy fn, int mark) { 
     size_t iterations = 0;
     while (true) {
       unsigned failures = 0;
@@ -217,7 +217,7 @@ struct BagMaster: boost::noncopyable {
 
 
 template<typename T,int ChunkSize>
-class Worklist: public BagMaster<T,ChunkSize> { };
+class Worklistb: public BagMaster<T,ChunkSize> { };
 
 //! Encapsulation of initial work to pass to executor
 template<typename RangeTy, typename InitFnTy>
@@ -251,7 +251,7 @@ public:
 
 // Some type functions
 template<typename ItemTy>
-struct typeof_worklist { typedef Worklist<ItemTy, 256> type; };
+struct typeof_worklist { typedef Worklistb<ItemTy, 256> type; };
 
 template<typename ItemTy>
 struct typeof_usercontext { typedef Galois::Runtime::UserContextAccess<ItemTy> type; };
@@ -284,7 +284,7 @@ class Executor {
     UserContexts facing;
     size_t iterations;
     int rounds;
-    WID wid;
+    WIDb wid;
 
     explicit ThreadLocalData(unsigned tid): iterations(0), rounds(0), wid(tid) { }
   };

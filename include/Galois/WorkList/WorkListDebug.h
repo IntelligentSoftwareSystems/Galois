@@ -29,7 +29,6 @@
 #include <map>
 
 namespace Galois {
-namespace Runtime {
 namespace WorkList {
 
 template<typename Indexer, typename realWL, typename T >
@@ -41,11 +40,11 @@ class WorkListTracker {
   };
 
   //online collection of stats
-  PerThreadStorage<p> tracking;
+  Runtime::PerThreadStorage<p> tracking;
   //global clock
-  LL::CacheLineStorage<unsigned int> clock;
+  Runtime::LL::CacheLineStorage<unsigned int> clock;
   //master thread counting towards a tick
-  LL::CacheLineStorage<unsigned int> thread_clock;
+  Runtime::LL::CacheLineStorage<unsigned int> thread_clock;
 
   realWL wl;
   Indexer I;
@@ -134,7 +133,7 @@ public:
     }
     unsigned int index = I(*ret);
     P.stat.insert(index);
-    if (LL::getTID() == 0) {
+    if (Runtime::LL::getTID() == 0) {
       ++thread_clock.data;
       if (thread_clock.data == 1024*10) {
 	thread_clock.data = 0;
@@ -156,7 +155,7 @@ class LoadBalanceTracker {
   };
 
   //online collection of stats
-  PerThreadStorage<p> tracking;
+  Runtime::PerThreadStorage<p> tracking;
 
   realWL wl;
   unsigned Pr;
@@ -172,7 +171,7 @@ class LoadBalanceTracker {
     unsigned multiple = 2;
     P.epoch = P.newEpoch;
     P.values.resize(P.epoch+1);
-    unsigned tid = LL::getTID();
+    unsigned tid = Runtime::LL::getTID();
     for (unsigned i = 1; i <= multiple; ++i) {
       unsigned n = tid * multiple + i;
       if (n < Pr)
@@ -289,7 +288,6 @@ public:
 };
 
 
-}
 }
 } // end namespace Galois
 

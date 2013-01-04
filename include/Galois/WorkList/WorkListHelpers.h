@@ -23,16 +23,13 @@
 #ifndef GALOIS_RUNTIME_WORKLISTHELPERS_H
 #define GALOIS_RUNTIME_WORKLISTHELPERS_H
 
-#ifndef GALOIS_WLCOMPILECHECK
-#define GALOIS_WLCOMPILECHECK(name) //
-#endif
+#include "WLCompileCheck.h"
 
 #include "Galois/Runtime/ll/PtrLock.h"
 
 #include <boost/iterator/iterator_facade.hpp>
 
 namespace Galois {
-namespace Runtime {
 namespace WorkList {
 
 template<typename T>
@@ -115,7 +112,7 @@ public:
 
 template<typename T, bool concurrent>
 class ConExtLinkedQueue {
-  LL::PtrLock<T,concurrent> head;
+  Runtime::LL::PtrLock<T,concurrent> head;
   T* tail;
   
 public:
@@ -181,7 +178,6 @@ struct DummyIndexer: public std::unary_function<const T&,unsigned> {
   unsigned operator()(const T& x) { return 0; }
 };
 
-}
 }
 } // end namespace Galois
 

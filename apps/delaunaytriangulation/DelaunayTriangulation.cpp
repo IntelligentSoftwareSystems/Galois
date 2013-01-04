@@ -490,7 +490,7 @@ static void writeMesh(const std::string& filename) {
 }
 
 static void generateMesh() {
-  typedef Galois::Runtime::WorkList::ChunkedAdaptor<false,32> CA;
+  typedef Galois::WorkList::ChunkedAdaptor<false,32> CA;
   Galois::for_each_local<CA>(ptrPoints, Process());
 }
 

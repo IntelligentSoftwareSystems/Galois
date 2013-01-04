@@ -708,7 +708,7 @@ public:
     CtxtDelQ ctxtDelQ;
     CtxtLocalQ ctxtLocalQ;
 
-    typedef Galois::Runtime::WorkList::dChunkedFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
+    typedef Galois::WorkList::dChunkedFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
     // TODO: code to find global min goes here
 
     t_for.start ();

@@ -52,7 +52,6 @@
 #include <set>
 
 namespace Galois {
-namespace Runtime {
 namespace WorkList {
 
 template<class T, class Indexer = DummyIndexer<T>, typename ContainerTy = FIFO<T>, bool concurrent=true >
@@ -60,7 +59,7 @@ class ApproxOrderByIntegerMetric : private boost::noncopyable {
   typename ContainerTy::template rethread<concurrent> data[2048];
   
   Indexer I;
-  PerThreadStorage<unsigned int> cursor;
+  Runtime::PerThreadStorage<unsigned int> cursor;
 
   int num() {
     return 2048;
@@ -121,7 +120,7 @@ class LogOrderByIntegerMetric : private boost::noncopyable {
   typename ContainerTy::template rethread<concurrent> data[sizeof(unsigned int)*8 + 1];
   
   Indexer I;
-  PerThreadStorage<unsigned int> cursor;
+  Runtime::PerThreadStorage<unsigned int> cursor;
 
   int num() {
     return sizeof(unsigned int)*8 + 1;
@@ -189,7 +188,7 @@ class LocalFilter {
     typename LocalTy::template rethread<false> Q;
     unsigned int current;
   };
-  PerThreadStorage<p> localQs;
+  Runtime::PerThreadStorage<p> localQs;
   Indexer I;
 
 public:
@@ -246,9 +245,9 @@ template<typename T, int chunksize = 64>
 class MP_SC_Bag {
   class Chunk : public FixedSizeRing<T, chunksize, false>, public ConExtListNode<Chunk>::ListNode {};
 
-  MM::FixedSizeAllocator heap;
+  Runtime::MM::FixedSizeAllocator heap;
 
-  PerThreadStorage<PtrLock<Chunk*, true> > write_stack;
+  Runtime::PerThreadStorage<PtrLock<Chunk*, true> > write_stack;
 
   ConExtLinkedStack<Chunk, true> read_stack;
   Chunk* current;
@@ -324,9 +323,9 @@ public:
   typedef T value_type;
 
 private:
-  PerThreadStorage<typename LocalWL::template rethread<false>> localQueues;
-  PerPackageStorage<GlobalWL> sharedQueues;
-  PerPackageStorage<unsigned long> starvingFlags;
+  Runtime::PerThreadStorage<typename LocalWL::template rethread<false>> localQueues;
+  Runtime::PerPackageStorage<GlobalWL> sharedQueues;
+  Runtime::PerPackageStorage<unsigned long> starvingFlags;
   GlobalWL gwl;
   unsigned long gStarving;
 
@@ -390,7 +389,7 @@ GALOIS_WLCOMPILECHECK(RequestHierarchy)
 
 template<typename T, typename LocalWL, typename DistPolicy>
 class ReductionWL {
-  typedef LL::CacheLineStorage<LocalWL> paddedLocalWL;
+  typedef Runtime::LL::CacheLineStorage<LocalWL> paddedLocalWL;
 
   paddedLocalWL* WL;
   FIFO<T> backup;
@@ -1174,7 +1173,7 @@ template<typename Partitioner = DummyIndexer<int>, typename T = int, typename Ch
 class PartitionedWL : private boost::noncopyable {
 
   Partitioner P;
-  PerThreadStorage<ChildWLTy> Items;
+  Runtime::PerThreadStorage<ChildWLTy> Items;
   int active;
 
 public:
@@ -1259,12 +1258,12 @@ GALOIS_WLCOMPILECHECK(SkipListQueue)
 
 
 template<class Compare = std::less<int>, typename T = int, bool concurrent = true>
-class SetQueue : private boost::noncopyable, private LL::PaddedLock<concurrent> {
-  std::set<T, Compare, MM::FSBGaloisAllocator<T> > wl;
+class SetQueue : private boost::noncopyable, private Runtime::LL::PaddedLock<concurrent> {
+  std::set<T, Compare, Runtime::MM::FSBGaloisAllocator<T> > wl;
 
-  using LL::PaddedLock<concurrent>::lock;
-  using LL::PaddedLock<concurrent>::try_lock;
-  using LL::PaddedLock<concurrent>::unlock;
+  using Runtime::LL::PaddedLock<concurrent>::lock;
+  using Runtime::LL::PaddedLock<concurrent>::try_lock;
+  using Runtime::LL::PaddedLock<concurrent>::unlock;
 
 public:
   template<bool newconcurrent>
@@ -1290,7 +1289,7 @@ public:
 
   template<typename RangeTy>
   void push_initial(RangeTy range) {
-    if (LL::getTID() == 0)
+    if (Runtime::LL::getTID() == 0)
       push(range.begin(), range.end());
   }
 
@@ -1344,7 +1343,7 @@ public:
 GALOIS_WLCOMPILECHECK(FCPairingHeapQueue)
 
 
-template<class Indexer, typename ContainerTy = Galois::Runtime::WorkList::FIFO<>, typename T = int, bool concurrent = true >
+template<class Indexer, typename ContainerTy = Galois::WorkList::FIFO<>, typename T = int, bool concurrent = true >
 class SimpleOrderedByIntegerMetric : private boost::noncopyable, private Galois::Runtime::LL::PaddedLock<concurrent> {
 
    using Galois::Runtime::LL::PaddedLock<concurrent>::lock;
@@ -1430,7 +1429,7 @@ class SimpleOrderedByIntegerMetric : private boost::noncopyable, private Galois:
   }
 };
 
-template<class Indexer, typename ContainerTy = Galois::Runtime::WorkList::ChunkedLIFO<16>, bool BSP = true, typename T = int, bool concurrent = true>
+template<class Indexer, typename ContainerTy = Galois::WorkList::ChunkedLIFO<16>, bool BSP = true, typename T = int, bool concurrent = true>
 class CTOrderedByIntegerMetric : private boost::noncopyable {
 
   typedef typename ContainerTy::template rethread<concurrent> CTy;
@@ -1454,7 +1453,7 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
   int maxV;
 
   Indexer I;
-  Galois::Runtime::PerThreadStorage<perItem> current;
+  Runtime::PerThreadStorage<perItem> current;
 
   CTy* getOrCreate(int index) {
     CTy* r = wl.get(index);
@@ -1524,8 +1523,8 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
       return retval;
 
     //Failed, find minimum bin
-    unsigned myID = LL::getTID();
-    bool localLeader = LL::isPackageLeaderForSelf(myID);
+    unsigned myID = Runtime::LL::getTID();
+    bool localLeader = Runtime::LL::isPackageLeaderForSelf(myID);
 
     unsigned msS = 0;
     if (BSP) {
@@ -1534,7 +1533,7 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
 	for (int i = 0; i < (int) Galois::getActiveThreads(); ++i)
 	  msS = std::min(msS, current.getRemote(i)->scanStart);
       else
-	msS = std::min(msS, current.getRemote(LL::getLeaderForThread(myID))->scanStart);
+	msS = std::min(msS, current.getRemote(Runtime::LL::getLeaderForThread(myID))->scanStart);
     }
 
     for (int i = msS; i <= maxV; ++i) {
@@ -1790,7 +1789,7 @@ public:
     //index = (index & 0x00FF) ^ ((index >> 8) & 0x00FF);
     //index %= Galois::getActiveThreads();
     // PTD* N = tld.getLocal();
-    // if (index == LL::getTID()) {
+    // if (index == Runtime::LL::getTID()) {
     //   N->wl.push(val);
     // } else {
     //   tld.getRemote(index)->wl.push(val);
@@ -1798,7 +1797,7 @@ public:
     long int index;
     lrand48_r(&tld.getLocal()->r, &index);
     index %= Galois::getActiveThreads();
-    if (index == LL::getTID())
+    if (index == Runtime::LL::getTID())
       tld.getLocal()->wl.push(val);
     else
       tld.getRemote(index)->inq.push(val);
@@ -1808,7 +1807,7 @@ public:
   void push(ItTy b, ItTy e) {
     PTD* N = tld.getLocal();
     long int index;
-    unsigned loc = LL::getTID();
+    unsigned loc = Runtime::LL::getTID();
     while (b != e) {
       lrand48_r(&N->r, &index);
       index %= Galois::getActiveThreads();
@@ -1971,7 +1970,7 @@ public:
 };
 
 class LIFO_SB : private boost::noncopyable {
-  LL::PtrLock<ChunkHeader, true> head;
+  Runtime::LL::PtrLock<ChunkHeader, true> head;
 
 public:
 
@@ -2027,7 +2026,7 @@ public:
 };
 
 class LevelLocalAlt : private boost::noncopyable {
-  PerPackageStorage<LIFO_SB> local;
+  Runtime::PerPackageStorage<LIFO_SB> local;
   
 public:
   void push(ChunkHeader* val) {
@@ -2044,7 +2043,7 @@ public:
 };
 
 class LevelStealingAlt : private boost::noncopyable {
-  PerPackageStorage<LIFO_SB> local;
+  Runtime::PerPackageStorage<LIFO_SB> local;
   
 public:
   void push(ChunkHeader* val) {
@@ -2063,7 +2062,7 @@ public:
       return ret;
     
     //steal
-    int id = LL::getPackageForSelf(LL::getTID());
+    int id = Runtime::LL::getPackageForSelf(Runtime::LL::getTID());
     for (int i = 0; i < (int) local.size(); ++i) {
       ++id;
       id %= local.size();
@@ -2107,9 +2106,9 @@ template<typename gWL = LIFO_SB, int chunksize = 64, typename T = int>
 class ChunkedAdaptor : private boost::noncopyable {
   typedef Chunk<T, chunksize> ChunkTy;
 
-  MM::FixedSizeAllocator heap;
+  Runtime::MM::FixedSizeAllocator heap;
 
-  PerThreadStorage<ChunkTy*> data;
+  Runtime::PerThreadStorage<ChunkTy*> data;
 
   gWL worklist;
 
@@ -2196,7 +2195,6 @@ public:
 
 }
 
-}
 }
 }
 

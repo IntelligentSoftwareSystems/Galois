@@ -271,7 +271,7 @@ struct seq_gt: public std::binary_function<const GNode&, const GNode&, bool> {
 ///////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////
 EdgeDataType runBodyParallel() {
-   using namespace Galois::Runtime::WorkList;
+   using namespace Galois::WorkList;
    typedef dChunkedFIFO<64> dChunk;
    typedef ChunkedFIFO<64> Chunk;
    typedef OrderedByIntegerMetric<Indexer, dChunk> OBIM;

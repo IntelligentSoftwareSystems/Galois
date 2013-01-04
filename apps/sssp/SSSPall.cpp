@@ -103,7 +103,7 @@ struct reset {
 };
 
 void runBodyParallel(const GNode src[NUM], int n) {
-  using namespace Galois::Runtime::WorkList;
+  using namespace Galois::WorkList;
   typedef dChunkedLIFO<16> dChunk;
   typedef ChunkedLIFO<16> Chunk;
   typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;

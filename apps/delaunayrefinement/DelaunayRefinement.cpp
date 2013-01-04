@@ -165,7 +165,7 @@ int main(int argc, char** argv) {
   
   Galois::StatTimer Trefine("refine");
   Trefine.start();
-  using namespace Galois::Runtime::WorkList;
+  using namespace Galois::WorkList;
   
   typedef LocalQueues<dChunkedLIFO<256>, ChunkedLIFO<256> > BQ;
   typedef ChunkedAdaptor<false,32> CA;

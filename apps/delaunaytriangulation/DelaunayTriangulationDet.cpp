@@ -625,7 +625,7 @@ static void writeMesh(const std::string& filename) {
 }
 
 static void generateMesh() {
-  typedef Galois::Runtime::WorkList::ChunkedAdaptor<false,32> CA;
+  typedef Galois::WorkList::ChunkedAdaptor<false,32> CA;
 
   for (int i = maxRounds - 1; i >= 0; --i) {
     Galois::StatTimer BT("buildtree");

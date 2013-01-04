@@ -652,8 +652,8 @@ double checkAllPairs(Bodies& bodies, int N) {
 }
 
 void run(Bodies& bodies, BodyPtrs& pBodies) {
-  typedef Galois::Runtime::WorkList::dChunkedLIFO<256> WL_;
-  typedef Galois::Runtime::WorkList::ChunkedAdaptor<false,32> WL;
+  typedef Galois::WorkList::dChunkedLIFO<256> WL_;
+  typedef Galois::WorkList::ChunkedAdaptor<false,32> WL;
 
   for (int step = 0; step < ntimesteps; step++) {
     // Do tree building sequentially

@@ -270,8 +270,8 @@ int main(int argc, char** argv) {
 
   Galois::on_each(popstate());
 
-  typedef Galois::Runtime::WorkList::dChunkedLIFO<8> WL;
-  typedef Galois::Runtime::WorkList::ChunkedAdaptor<false,32> CA;
+  typedef Galois::WorkList::dChunkedLIFO<8> WL;
+  typedef Galois::WorkList::ChunkedAdaptor<false,32> CA;
   Galois::StatTimer T;
   T.start();
   Galois::for_each<WL>(tmp.begin(), tmp.end(), process());

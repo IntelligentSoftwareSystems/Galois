@@ -1279,7 +1279,7 @@ int main(int argc, char **argv) {
   Galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
-  using namespace Galois::Runtime::WorkList;
+  using namespace Galois::WorkList;
   typedef dChunkedLIFO<8> BSWL_LIFO;
   typedef dChunkedFIFO<8> BSWL_FIFO;
 
