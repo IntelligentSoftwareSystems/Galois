@@ -24,10 +24,10 @@
 
 template<typename T2>
 struct checker {
-  typedef typename T2::template retype<int>::WL T;
+  typedef typename T2::template retype<int> T;
   T wl;
-  typename T::template rethread<true>::WL wl2;
-  typename T::template rethread<false>::WL wl3;
+  typename T::template rethread<true> wl2;
+  typename T::template rethread<false> wl3;
 
   checker() {
     int a[4] = {1,2,3,0};

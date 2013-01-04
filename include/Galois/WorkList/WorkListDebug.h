@@ -52,13 +52,9 @@ class WorkListTracker {
 
 public:
   template<bool newconcurrent>
-  struct rethread {
-    typedef WorkListTracker<Indexer, typename realWL::template rethread<newconcurrent>::WL, T> WL;
-  };
+  using rethread = WorkListTracker<Indexer, typename realWL::template rethread<newconcurrent>, T>;
   template<typename Tnew>
-  struct retype {
-    typedef WorkListTracker<Indexer, typename realWL::template retype<Tnew>::WL, Tnew> WL;
-  };
+  using retype = WorkListTracker<Indexer, typename realWL::template retype<Tnew>, Tnew>;
 
   typedef T value_type;
 
@@ -190,13 +186,9 @@ class LoadBalanceTracker {
 
 public:
   template<bool newconcurrent>
-  struct rethread {
-    typedef LoadBalanceTracker<typename realWL::template rethread<newconcurrent>::WL, perEpoch> WL;
-  };
+  using rethread = LoadBalanceTracker<typename realWL::template rethread<newconcurrent>, perEpoch>;
   template<typename Tnew>
-  struct retype {
-    typedef LoadBalanceTracker<typename realWL::template retype<Tnew>::WL, perEpoch> WL;
-  };
+  using retype = LoadBalanceTracker<typename realWL::template retype<Tnew>, perEpoch>;
 
   typedef typename realWL::value_type value_type;
 
@@ -266,13 +258,9 @@ public:
   typedef typename iWL::value_type value_type;
   
   template<bool concurrent>
-  struct rethread {
-    typedef NoInlineFilter<typename iWL::template rethread<concurrent>::WL> WL;
-  };
+  using rethread = NoInlineFilter<typename iWL::template rethread<concurrent> >;
   template<typename Tnew>
-  struct retype {
-    typedef NoInlineFilter<typename iWL::template retype<Tnew>::WL> WL;
-  };
+  using retype = NoInlineFilter<typename iWL::template retype<Tnew> >;
 
   //! push a value onto the queue
   GALOIS_ATTRIBUTE_NOINLINE

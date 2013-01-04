@@ -348,9 +348,7 @@ class ChunkedAdaptor : private boost::noncopyable {
 
 public:
   template<typename Tnew>
-  struct retype {
-    typedef ChunkedAdaptor<separateBuffering, chunksize, gWL, Tnew> WL;
-  };
+  using retype = ChunkedAdaptor<separateBuffering, chunksize, gWL, Tnew>;
 
   typedef T value_type;
 
@@ -513,14 +511,9 @@ private:
 
 public:
   template<typename Tnew>
-  struct retype {
-    typedef PerThreadQueues<typename QueueTy::template retype<Tnew>::WL> WL;
-  };
-
+  using retype = PerThreadQueues<typename QueueTy::template retype<Tnew>::WL>;
   template<bool newConcurrent>
-  struct rethread {
-    typedef PerThreadQueues<typename QueueTy::template rethread<newConcurrent>::WL> WL;
-  };
+  using rethread = PerThreadQueues<typename QueueTy::template rethread<newConcurrent>::WL>;
 
   void push(const value_type& val) {
     local.getLocal()->push(val);
@@ -552,13 +545,9 @@ class LocalWorklist : private boost::noncopyable {
 
 public:
   template<bool newconcurrent>
-  struct rethread {
-    typedef LocalWorklist<typename WLTy::template rethread<newconcurrent>::WL, T> WL;
-  };
+  using rethread = LocalWorklist<typename WLTy::template rethread<newconcurrent>::WL, T>;
   template<typename Tnew>
-  struct retype {
-    typedef LocalWorklist<typename WLTy::template retype<Tnew>::WL, Tnew> WL;
-  };
+  using retype = LocalWorklist<typename WLTy::template retype<Tnew>::WL, Tnew>;
 
   typedef T value_type;
 
@@ -669,13 +658,9 @@ public:
   typedef T value_type;
 
   template<bool newconcurrent>
-  struct rethread {
-    typedef OwnerComputeChunkedMaster<T, OwnerFn,QT, distributed, isStack, chunksize, newconcurrent> WL;
-  };
+  using rethread = OwnerComputeChunkedMaster<T, OwnerFn,QT, distributed, isStack, chunksize, newconcurrent>;
   template<typename Tnew>
-  struct retype {
-    typedef OwnerComputeChunkedMaster<Tnew, OwnerFn, QT, distributed, isStack, chunksize, concurrent> WL;
-  };
+  using retype = OwnerComputeChunkedMaster<Tnew, OwnerFn, QT, distributed, isStack, chunksize, concurrent>;
 
   OwnerComputeChunkedMaster() : heap(sizeof(Chunk)) { }
 

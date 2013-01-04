@@ -89,7 +89,7 @@ template<class WorkListTy, class T, class FunctionTy>
 class ForEachWork {
 protected:
   typedef T value_type;
-  typedef typename WorkListTy::template retype<value_type>::WL WLTy;
+  typedef typename WorkListTy::template retype<value_type> WLTy;
   typedef WorkList::GFIFO<value_type> AbortedList;
 
   struct ThreadLocalData {

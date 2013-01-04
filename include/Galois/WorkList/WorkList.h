@@ -49,7 +49,7 @@
 #include <boost/ref.hpp>
 
 namespace Galois {
-namespace Runtime {
+  namespace Runtime {
 namespace WorkList {
 
 // Worklists may not be copied.
@@ -68,15 +68,11 @@ public:
 
   //! change the concurrency flag
   template<bool newconcurrent>
-  struct rethread {
-    typedef AbstractWorkList<T, newconcurrent> WL;
-  };
+  using rethread = AbstractWorkList<T, newconcurrent>;
 
   //! change the type the worklist holds
   template<typename Tnew>
-  struct retype {
-    typedef AbstractWorkList<Tnew, concurrent> WL;
-  };
+  using retype = AbstractWorkList<Tnew, concurrent>;
 
   //! push a value onto the queue
   void push(const value_type& val) { abort(); }
@@ -112,13 +108,9 @@ class LIFO : private boost::noncopyable, private LL::PaddedLock<concurrent> {
 
 public:
   template<bool newconcurrent>
-  struct rethread {
-    typedef LIFO<T, newconcurrent> WL;
-  };
+  using rethread = LIFO<T, newconcurrent>;
   template<typename Tnew>
-  struct retype {
-    typedef LIFO<Tnew, concurrent> WL;
-  };
+  using retype = LIFO<Tnew, concurrent>;
 
   typedef T value_type;
 
@@ -190,13 +182,9 @@ class FIFO : private boost::noncopyable, private LL::PaddedLock<concurrent>  {
 
 public:
   template<bool newconcurrent>
-  struct rethread {
-    typedef FIFO<T, newconcurrent> WL;
-  };
+  using rethread = FIFO<T, newconcurrent>;
   template<typename Tnew>
-  struct retype {
-    typedef FIFO<Tnew, concurrent> WL;
-  };
+  using retype = FIFO<Tnew, concurrent>;
 
   typedef T value_type;
 
@@ -251,13 +239,9 @@ class GFIFO : private boost::noncopyable, private LL::PaddedLock<concurrent>  {
 
 public:
   template<bool newconcurrent>
-  struct rethread {
-    typedef GFIFO<T, newconcurrent> WL;
-  };
+  using rethread = GFIFO<T, newconcurrent>;
   template<typename Tnew>
-  struct retype {
-    typedef GFIFO<Tnew, concurrent> WL;
-  };
+  using retype = GFIFO<Tnew, concurrent>;
 
   typedef T value_type;
 
@@ -312,7 +296,7 @@ struct safe_result_of<false, F(ArgTypes...)> {
 template<class Indexer = DummyIndexer<int>, typename ContainerTy = FIFO<>, bool BSP=true, typename T = int, bool concurrent = true, bool retyped=false>
 class OrderedByIntegerMetric : private boost::noncopyable {
   typedef typename safe_result_of<retyped,Indexer(T)>::type IndexerValue;
-  typedef typename ContainerTy::template rethread<concurrent>::WL CTy;
+  typedef typename ContainerTy::template rethread<concurrent> CTy;
 
   struct perItem {
     std::map<IndexerValue, CTy*> local;
@@ -379,13 +363,9 @@ class OrderedByIntegerMetric : private boost::noncopyable {
 
  public:
   template<bool newconcurrent>
-  struct rethread {
-    typedef OrderedByIntegerMetric<Indexer,ContainerTy,BSP,T,newconcurrent,retyped> WL;
-  };
+  using rethread = OrderedByIntegerMetric<Indexer,ContainerTy,BSP,T,newconcurrent,retyped>;
   template<typename Tnew>
-  struct retype {
-    typedef OrderedByIntegerMetric<Indexer,typename ContainerTy::template retype<Tnew>::WL,BSP,Tnew,concurrent,true> WL;
-  };
+  using retype = OrderedByIntegerMetric<Indexer,typename ContainerTy::template retype<Tnew>,BSP,Tnew,concurrent,true>;
 
   typedef T value_type;
 
@@ -469,19 +449,15 @@ GALOIS_WLCOMPILECHECK(OrderedByIntegerMetric)
 
 template<typename GlobalQueueTy = FIFO<>, typename LocalQueueTy = FIFO<>, typename T = int >
 class LocalQueues : private boost::noncopyable {
-  typedef typename LocalQueueTy::template rethread<false>::WL lWLTy;
+  typedef typename LocalQueueTy::template rethread<false> lWLTy;
   PerThreadStorage<lWLTy> local;
   GlobalQueueTy global;
 
 public:
   template<bool newconcurrent>
-  struct rethread {
-    typedef LocalQueues<GlobalQueueTy, LocalQueueTy, T> WL;
-  };
+  using rethread = LocalQueues<GlobalQueueTy, LocalQueueTy, T>;
   template<typename Tnew>
-  struct retype {
-    typedef LocalQueues<typename GlobalQueueTy::template retype<Tnew>::WL, typename LocalQueueTy::template retype<Tnew>::WL, Tnew> WL;
-  };
+  using retype = LocalQueues<typename GlobalQueueTy::template retype<Tnew>, typename LocalQueueTy::template retype<Tnew>, Tnew>;
 
   typedef T value_type;
 
@@ -603,13 +579,9 @@ public:
   typedef T value_type;
 
   template<bool newconcurrent>
-  struct rethread {
-    typedef ChunkedMaster<T, QT, distributed, isStack, chunksize, newconcurrent> WL;
-  };
+  using rethread = ChunkedMaster<T, QT, distributed, isStack, chunksize, newconcurrent>;
   template<typename Tnew>
-  struct retype {
-    typedef ChunkedMaster<Tnew, QT, distributed, isStack, chunksize, concurrent> WL;
-  };
+  using retype = ChunkedMaster<Tnew, QT, distributed, isStack, chunksize, concurrent>;
 
   ChunkedMaster() : heap(sizeof(Chunk)) { }
 
@@ -687,7 +659,7 @@ GALOIS_WLCOMPILECHECK(dChunkedLIFO)
 
 template<typename OwnerFn=DummyIndexer<int>, typename WLTy=ChunkedLIFO<256>, typename T = int>
 class OwnerComputesWL : private boost::noncopyable {
-  typedef typename WLTy::template retype<T>::WL lWLTy;
+  typedef typename WLTy::template retype<T> lWLTy;
 
   typedef lWLTy cWL;
   typedef lWLTy pWL;
@@ -698,14 +670,9 @@ class OwnerComputesWL : private boost::noncopyable {
 
 public:
   template<bool newconcurrent>
-  struct rethread {
-    typedef OwnerComputesWL<OwnerFn,typename WLTy::template rethread<newconcurrent>::WL, T> WL;
-  };
-
+  using rethread = OwnerComputesWL<OwnerFn,typename WLTy::template rethread<newconcurrent>, T>;
   template<typename Tnew>
-  struct retype {
-    typedef OwnerComputesWL<OwnerFn,typename WLTy::template retype<Tnew>::WL,Tnew> WL;
-  };
+  using retype = OwnerComputesWL<OwnerFn,typename WLTy::template retype<Tnew>,Tnew>;
 
   typedef T value_type;
 
@@ -749,7 +716,7 @@ GALOIS_WLCOMPILECHECK(OwnerComputesWL)
 template<class ContainerTy=dChunkedFIFO<>, class T=int, bool concurrent = true>
 class BulkSynchronous : private boost::noncopyable {
 
-  typedef typename ContainerTy::template rethread<concurrent>::WL CTy;
+  typedef typename ContainerTy::template rethread<concurrent> CTy;
 
   struct TLD {
     unsigned round;
@@ -767,13 +734,9 @@ class BulkSynchronous : private boost::noncopyable {
   typedef T value_type;
 
   template<bool newconcurrent>
-  struct rethread {
-    typedef BulkSynchronous<ContainerTy,T,newconcurrent> WL;
-  };
+  using rethread = BulkSynchronous<ContainerTy,T,newconcurrent>;
   template<typename Tnew>
-  struct retype {
-    typedef BulkSynchronous<typename ContainerTy::template retype<Tnew>::WL,Tnew,concurrent> WL;
-  };
+  using retype = BulkSynchronous<typename ContainerTy::template retype<Tnew>,Tnew,concurrent>;
 
   BulkSynchronous(): empty(false) {
     unsigned num = galoisActiveThreads;
@@ -831,8 +794,8 @@ GALOIS_WLCOMPILECHECK(BulkSynchronous)
 
 //End namespace
 
-}
-}
+} // end namespace WorkList
+  }
 } // end namespace Galois
 
 #endif
