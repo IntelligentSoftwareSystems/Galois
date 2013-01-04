@@ -37,7 +37,7 @@
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Termination.h"
 #include "Galois/Runtime/ThreadPool.h"
-#include "Galois/WorkList/WorkList.h"
+#include "Galois/WorkList/Fifo.h"
 #include "Galois/Runtime/ll/gio.h"
 
 #include "llvm/Support/CommandLine.h"
