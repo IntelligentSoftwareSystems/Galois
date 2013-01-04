@@ -26,7 +26,7 @@
 #include "Galois/Bag.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
-#include "Galois/Runtime/WorkListAlt.h"
+#include "Galois/WorkList/WorkListAlt.h"
 
 #include <boost/math/constants/constants.hpp>
 #include <boost/iterator/transform_iterator.hpp>

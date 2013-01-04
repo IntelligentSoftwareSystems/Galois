@@ -50,7 +50,7 @@ struct checker {
 };
 
 #define GALOIS_WLCOMPILECHECK(name) checker<name<> > ck_##name;
-#include "Galois/Runtime/WorkList.h"
+#include "Galois/WorkList/WorkList.h"
 
 int main() {
   return 0;

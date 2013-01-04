@@ -27,8 +27,8 @@
 #include "Galois/Galois.h"
 #include "Galois/UserContext.h"
 #include "Galois/Graphs/LCGraph.h"
-#include "Galois/Runtime/WorkList.h"
-#include "Galois/Runtime/WorkListAlt.h"
+#include "Galois/WorkList/WorkList.h"
+#include "Galois/WorkList/WorkListAlt.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"

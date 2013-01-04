@@ -26,7 +26,7 @@
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/ThreadPool.h"
-#include "Galois/Runtime/WorkListHelpers.h"
+#include "Galois/WorkList/WorkListHelpers.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/mm/Mem.h"

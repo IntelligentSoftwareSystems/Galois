@@ -38,8 +38,8 @@
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
-#include "Galois/Runtime/WorkListAlt.h"
-#include "Galois/Runtime/WorkListDebug.h"
+#include "Galois/WorkList/WorkListAlt.h"
+#include "Galois/WorkList/WorkListDebug.h"
 
 #include <iostream>
 #include <string.h>

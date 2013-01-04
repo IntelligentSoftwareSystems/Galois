@@ -26,7 +26,7 @@
 
 #include "Galois/Galois.h"
 #include "Galois/Runtime/PerThreadStorage.h"
-#include "Galois/Runtime/WorkList.h"
+#include "Galois/WorkList/WorkList.h"
 
 #include <boost/iterator/transform_iterator.hpp>
 

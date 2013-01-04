@@ -4,8 +4,8 @@
 #ifndef PRIORITYSCHEDULING_WORKLIST_H
 #define PRIORITYSCHEDULING_WORKLIST_H
 
-#include "Galois/Runtime/WorkList.h"
-#include "Galois/Runtime/WorkListExperimental.h"
+#include "Galois/WorkList/WorkList.h"
+#include "Galois/WorkList/WorkListExperimental.h"
 #include "Galois/Runtime/ll/gio.h"
 
 namespace Exp {

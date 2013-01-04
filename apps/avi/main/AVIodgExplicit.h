@@ -31,7 +31,7 @@
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Graphs/LCGraph.h"
 #include "Galois/Runtime/PerThreadStorage.h"
-#include "Galois/Runtime/WorkList.h"
+#include "Galois/WorkList/WorkList.h"
 
 #include <string>
 #include <sstream>

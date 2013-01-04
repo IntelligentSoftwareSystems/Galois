@@ -33,7 +33,7 @@
 #include "Galois/Bag.h"
 #include "Galois/Statistic.h"
 #include "Galois/Graphs/SpatialTree.h"
-#include "Galois/Runtime/WorkListAlt.h"
+#include "Galois/WorkList/WorkListAlt.h"
 #include "Lonestar/BoilerPlate.h"
 #include "llvm/Support/CommandLine.h"
 

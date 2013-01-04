@@ -29,7 +29,7 @@
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/util/SparseBitVector2.h"
-#include "Galois/Runtime/WorkList.h"
+#include "Galois/WorkList/WorkList.h"
 #include "llvm/Support/CommandLine.h"
 
 #include "Lonestar/BoilerPlate.h"

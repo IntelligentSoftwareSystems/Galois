@@ -31,7 +31,7 @@
 #include "Lonestar/BoilerPlate.h"
 
 #ifdef GALOIS_USE_EXP
-#include "Galois/Runtime/WorkListExperimental.h"
+#include "Galois/WorkList/WorkListExperimental.h"
 #endif
 
 static const char* name = "Scheduler Micro Benchmark";

@@ -25,8 +25,8 @@
 #ifndef GALOIS_RUNTIME_WORKLISTEXPERIMENTAL_H
 #define GALOIS_RUNTIME_WORKLISTEXPERIMENTAL_H
 
-#include "Galois/Runtime/WorkList.h"
-#include "Galois/Runtime/WorkListDebug.h"
+#include "Galois/WorkList/WorkList.h"
+#include "Galois/WorkList/WorkListDebug.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/Termination.h"
 #include "Galois/Runtime/ThreadPool.h"

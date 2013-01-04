@@ -28,7 +28,7 @@
 #include "Galois/Galois.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Atomic.h"
-#include "Galois/Runtime/WorkList.h"
+#include "Galois/WorkList/WorkList.h"
 #include "Galois/Runtime/ll/gio.h"
 
 #include "DESunorderedBase.h"

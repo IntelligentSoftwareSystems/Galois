@@ -25,7 +25,7 @@
 #ifndef GALOIS_RUNTIME_CONTEXTPOOL_H
 #define GALOIS_RUNTIME_CONTEXTPOOL_H
 
-#include "Galois/Runtime/WorkList.h"
+#include "Galois/WorkList/WorkList.h"
 
 namespace Galois {
 namespace Runtime {

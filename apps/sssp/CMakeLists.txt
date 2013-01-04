@@ -1,5 +1,6 @@
 app(sssp SSSP.cpp)
 app(sssp_all SSSPall.cpp )
+app(sssp_simple SSSPsimple.cpp)
 #app(boost-sssp BoostSSSP.cpp)
 #app(pboost-sssp PBoostSSSP.cpp)
 #app(deltastepping DeltaStepping2.cpp)

@@ -23,7 +23,7 @@
 #ifndef GALOIS_RUNTIME_WORKLISTALT_H
 #define GALOIS_RUNTIME_WORKLISTALT_H
 
-#include "ll/CompilerSpecific.h"
+#include "Galois/Runtime/ll/CompilerSpecific.h"
 
 namespace Galois {
 namespace Runtime {
