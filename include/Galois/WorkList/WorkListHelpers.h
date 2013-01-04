@@ -40,7 +40,7 @@ class ConExtListNode {
   T* next;
 public:
   ConExtListNode() :next(0) {}
-  T*& getNextPtr() { return next; }
+  T*& getNext() { return next; }
   T*const& getNext() const { return next; }
 };
 
@@ -67,7 +67,7 @@ public:
 
 template<typename T, bool concurrent>
 class ConExtLinkedStack {
-  LL::PtrLock<T, concurrent> head;
+  Galois::Runtime::LL::PtrLock<T, concurrent> head;
   
 public:
   typedef ConExtListNode<T> ListNode;
