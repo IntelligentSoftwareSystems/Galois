@@ -39,7 +39,10 @@
 #include "Galois/Runtime/WorkList.h"
 #include "Galois/Runtime/UserContextAccess.h"
 #include "Galois/Runtime/ActiveThreads.h"
+#include "Galois/Runtime/Network.h"
 #include <algorithm>
+
+using namespace Galois::Runtime::Distributed;
 
 namespace Galois {
 namespace Runtime {
@@ -297,21 +300,9 @@ public:
 };
 
 
-//template<typename WLTy, typename IterTy, typename FunctionTy>
-//for_each_landing_pad(Galois::Runtime::Distributed::RecvBuffer& buf) {
-//  
-//}
-
 template<typename WLTy, typename IterTy, typename FunctionTy>
-void for_each_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
+void for_each_impl_old(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
   assert(!inGaloisForEach);
-  //if (networkHostNum > 0 && networkHostID == 0) {
-  //SerializationBuffer Buf;
-  //Buf.serialize(part of b..e, f, loopname);
-  //getSystemNetwork.broadcast(&for_each_landing_pad<WLTy, IterTy. FunctionTy>,
-  // buf);
-  // }
-  //getSystemBarrier should return MPI aware barriers too
 
   inGaloisForEach = true;
 
@@ -327,6 +318,56 @@ void for_each_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
   getSystemThreadPool().run(&w[0], &w[4], activeThreads);
   runAllLoopExitHandlers();
   inGaloisForEach = false;
+}
+
+template<typename WLTy, typename IterTy, typename FunctionTy>
+void for_each_landing_pad(RecvBuffer& buf) {
+  typedef typename std::iterator_traits<IterTy>::value_type T;
+  NetworkInterface& net = getSystemNetworkInterface();
+  FunctionTy f;
+  int i, count;
+  buf.deserialize_end(f);
+  buf.deserialize(count);
+  // printf ("Inside for_each_landing_pad: %d\t count: %d\n", networkHostID, count);
+  T *data;
+  data = (T*)calloc(count,sizeof(T));
+  for (i = 0; i < count; i++) {
+    buf.deserialize(data[i]);
+  }
+  net.systemBarrier();
+  for_each_impl_old<WLTy> (&data[0], &data[count], f, NULL);
+  free(data);
+  return;
+}
+
+template<typename WLTy, typename IterTy, typename FunctionTy>
+void for_each_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
+  IterTy send_it = b;
+  // Get a handle to the network interface
+  NetworkInterface& net = getSystemNetworkInterface();
+  int count = std::distance(b,e);
+  unsigned sendSize = count/networkHostNum;
+  // Execute across the hosts when available (distributed)
+  if (sendSize && networkHostNum > 1 && networkHostID == 0) {
+    for (unsigned i = 1; i < networkHostNum; i++) {
+      SendBuffer buf;
+      // serialize num of elements
+      buf.serialize(sendSize);
+      // serialize the data
+      for (unsigned j = 0; (j < sendSize); j++) {
+        buf.serialize (*send_it);
+        send_it++;
+      }
+      // serialize the function address
+      buf.serialize(f);
+      net.sendMessage (i, &for_each_landing_pad<WLTy,IterTy,FunctionTy>, buf);
+ // THIS SHOULD BE REMOVED IN CASE OF A DEDICATED COMM THREAD
+      net.handleReceives();
+    }
+    // getSystemBarrier should return MPI aware barriers too
+    net.systemBarrier();
+  }
+  for_each_impl_old<WLTy> (send_it, e, f, loopname);
 }
 
 template<class FunctionTy>

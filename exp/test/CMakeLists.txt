@@ -6,11 +6,11 @@ endfunction()
 
 add_definitions(-O0)
 
-makeTest(pairingheap)
-makeTest(skiplist)
-makeTest(dist)
-makeTest(distnodes)
+makeTest(printhost)
+#makeTest(pairingheap)
+#makeTest(skiplist)
+#makeTest(dist)
+#makeTest(distnodes)
 #makeTest(foreachtask)
 makeTest(networktest)
-makeTest(printhost)
 

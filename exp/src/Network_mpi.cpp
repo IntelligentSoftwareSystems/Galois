@@ -61,7 +61,7 @@ public:
     MPI_Comm_size(MPI_COMM_WORLD, &numTasks);
     MPI_Comm_rank(MPI_COMM_WORLD, &taskRank);
 
-    std::cout << "I am " << taskRank << " of " << numTasks << "\n";
+    // std::cout << "I am " << taskRank << " of " << numTasks << "\n";
 
     networkHostID = taskRank;
     networkHostNum = numTasks;
@@ -108,6 +108,13 @@ public:
       MPI_Recv(buf.linearData(), count, MPI_BYTE, MPI_ANY_SOURCE, FuncTag, MPI_COMM_WORLD, &status);
       recvFuncTy f;
       buf.deserialize_end(f);
+      //check for a call to terminate
+      if (!f) {
+        //should call systemBarrier
+        rv = MPI_Barrier(MPI_COMM_WORLD);
+        handleError(rv);
+        exit(0);
+      }
       //Call deserialized function
       f(buf);
       //Check for another
@@ -163,6 +170,13 @@ public:
     asyncOutLock.unlock();
   }
 
+  virtual void systemBarrier() {
+    int rv;
+    rv = MPI_Barrier(MPI_COMM_WORLD);
+    handleError(rv);
+    return;
+  }
+
   virtual bool handleReceives() {
     //assert master thread
     asyncOutLock.lock();
@@ -207,6 +221,10 @@ public:
     return false;
   }
 
+  virtual void systemBarrier() {
+    return;
+  }
+
 };
 
 }
@@ -215,5 +233,29 @@ public:
 NetworkInterface& Galois::Runtime::Distributed::getSystemNetworkInterface() {
   static NetworkInterfaceSyncMPI net;
   return net;
+}
+
+void Galois::Runtime::Distributed::networkStart() {
+  NetworkInterface& net = getSystemNetworkInterface();
+  if (networkHostID != 0) {
+    while (true) {
+      net.handleReceives();
+    }
+  }
+  return;
+}
+
+void Galois::Runtime::Distributed::networkTerminate() {
+  if (networkHostNum > 1 && networkHostID == 0) {
+    NetworkInterface& net = getSystemNetworkInterface();
+    int x = 0;
+    SendBuffer buf;
+    buf.serialize(x);
+    net.broadcastMessage (NULL, buf);
+ // THIS SHOULD BE REMOVED IN CASE OF A DEDICATED COMM THREAD
+    net.handleReceives();
+    net.systemBarrier();
+  }
+  return;
 }
 

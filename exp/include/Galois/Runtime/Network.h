@@ -55,6 +55,9 @@ public:
   //! buf is invalidated by this operation
   virtual void broadcastMessage(recvFuncTy recv, SendBuffer& buf) = 0;
 
+  //!system barrier. all hosts should synchronize at this call
+  virtual void systemBarrier() = 0;
+
   //!receive and dispatch messages
   //!returns true if at least one message was received
   //! if the network requires a dedicated thread, then 
@@ -71,6 +74,12 @@ public:
 
 NetworkInterface& getSystemNetworkInterface();
 
+//!calls handleReceives on the worker threads
+void networkStart();
+
+//!terminate a distributed program
+//! only the master host should call this
+void networkTerminate();
 
 } //Distributed
 } //Runtime
