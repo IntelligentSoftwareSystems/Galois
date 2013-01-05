@@ -340,8 +340,10 @@ void for_each_landing_pad(RecvBuffer& buf) {
   return;
 }
 
+// function when the type is a pod
 template<typename WLTy, typename IterTy, typename FunctionTy>
-void for_each_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
+void for_each_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname,
+                   typename std::enable_if<std::is_pod<typename std::iterator_traits<IterTy>::value_type>::value>::type* = 0) {
   IterTy send_it = b;
   // Get a handle to the network interface
   NetworkInterface& net = getSystemNetworkInterface();
@@ -368,6 +370,13 @@ void for_each_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
     net.systemBarrier();
   }
   for_each_impl_old<WLTy> (send_it, e, f, loopname);
+}
+
+// function when the type is not a pod
+template<typename WLTy, typename IterTy, typename FunctionTy>
+void for_each_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname,
+                   typename std::enable_if<!std::is_pod<typename std::iterator_traits<IterTy>::value_type>::value>::type* = 0) {
+  for_each_impl_old<WLTy> (b, e, f, loopname);
 }
 
 template<class FunctionTy>
