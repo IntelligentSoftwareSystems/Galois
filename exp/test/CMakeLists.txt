@@ -6,6 +6,7 @@ endfunction()
 
 add_definitions(-O0)
 
+makeTest(addhost)
 makeTest(printhost)
 #makeTest(pairingheap)
 #makeTest(skiplist)

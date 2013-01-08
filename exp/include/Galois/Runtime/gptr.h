@@ -1,3 +1,6 @@
+#ifndef GALOIS_GPTR_H
+#define GALOIS_GPTR_H
+
 template <class T>
 class gptr {
   explicit auto_ptr(T* p = 0) throw();
@@ -6,7 +9,8 @@ class gptr {
 
 template<class T>
 class gptr {
-  T* ptr;
+  T*  ptr;
+  int owner;
 public:
   typedef T element_type;
   
@@ -26,3 +30,5 @@ public:
   Ty *operator->() const { return ptr; }
   operator bool() const { return ptr != nullptr; }
 };
+
+#endif
