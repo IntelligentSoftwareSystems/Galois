@@ -1,5 +1,6 @@
-#include "Galois/Galois.h"
 #include <vector>
+#include "Galois/Galois.h"
+#include "Galois/Runtime/gptr.h"
 
 using namespace std;
 using namespace Galois::Runtime;
@@ -38,7 +39,7 @@ int main(int argc, char *argv[])
    for (int i=1; i<=40; i++) myvec.push_back(i);
 
    Galois::for_each<IterTy,f1> (myvec.begin(), myvec.end(), f);
-   printf ("sum is %d\n", r->i);
+   printf ("sum is %d\n", f.r->i);
 
    // master_terminate();
    Galois::Runtime::Distributed::networkTerminate();

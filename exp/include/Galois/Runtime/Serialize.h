@@ -138,7 +138,12 @@ public:
   }
 
   template<typename T>
+#if 0
+  // just the pointer to the structure (type T) is deserialized
+  // so I feel there's no need to check if T is a pod
   inline void deserialize_end(T& data, typename std::enable_if<std::is_pod<T>::value>::type* = 0) {
+#endif
+  inline void deserialize_end(T& data) {
     unsigned char* pdata = (unsigned char*)&data;
     size_t b = bufdata.size() - sizeof(data);
     for (size_t i = 0; i < sizeof(data); ++i)

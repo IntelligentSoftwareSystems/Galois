@@ -361,7 +361,7 @@ void for_each_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname,
         send_it++;
       }
       // serialize the function address
-      buf.serialize(f);
+      buf.serialize(&f);
       net.sendMessage (i, &for_each_landing_pad<WLTy,IterTy,FunctionTy>, buf);
  // THIS SHOULD BE REMOVED IN CASE OF A DEDICATED COMM THREAD
       net.handleReceives();
