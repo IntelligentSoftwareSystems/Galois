@@ -121,7 +121,13 @@ struct default_reduce {
 };
 
 struct BFS {
-  typedef std::deque<size_t> Counts;
+  struct Result {
+    std::deque<size_t> counts;
+    size_t max_width;
+    GNode source;
+
+    size_t ecc() { return counts.size() - 1; }
+  };
 
   //! Compute BFS levels
   struct Process {
@@ -150,7 +156,7 @@ struct BFS {
 
   //! Compute histogram of levels
   struct CountLevels {
-    Counts counts;
+    std::deque<size_t> counts;
     bool reset;
 
     explicit CountLevels(bool r): reset(r) { }
@@ -187,17 +193,22 @@ struct BFS {
     data.done = false;
   }
 
-  static Counts go(GNode source, bool reset) {
+  static Result go(GNode source, bool reset) {
     using namespace Galois::WorkList;
     typedef dChunkedFIFO<64> dChunk;
     typedef ChunkedFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<GNodeIndexer,dChunk> OBIM;
     
+    Result res;
+    res.source = source;
+
     graph.getData(source).dist = 0;
     Galois::for_each<dChunk>(source, Process(), "BFS");
 
-    return Galois::Runtime::do_all_impl(Galois::Runtime::makeLocalRange(graph),
+    res.counts = Galois::Runtime::do_all_impl(Galois::Runtime::makeLocalRange(graph),
         CountLevels(reset), default_reduce(), true).counts;
+    res.max_width = *std::max_element(res.counts.begin(), res.counts.end());
+    return res;
   }
 
   static void init() {
@@ -217,11 +228,11 @@ struct BFS {
  *
  * Simple pseudo-peripheral algorithm:
  *  1. Choose v
- *  2. Among the vertices as far away as possible from v, select u with minimal degree
+ *  2. Among the vertices dist(v, u) = ecc(v), select u with minimal degree
  *  3. If ecc(u) > ecc(v) then
  *       v = u and go to step 2
  *     otherwise
- *       u is the pseudo-peripheral vertex
+ *       u is a pseudo-peripheral vertex
  */
 struct SimplePseudoPeripheral {
   struct min_degree {
@@ -246,37 +257,38 @@ struct SimplePseudoPeripheral {
     }
   };
 
-  static std::pair<size_t, GNode> search(const GNode& start) {
-     size_t ecc = BFS::go(start, false).size() - 1;
-     GNode candidate =
-       *Galois::ParallelSTL::map_reduce(graph.begin(), graph.end(),
-           has_dist(ecc), boost::optional<GNode>(), min_degree());
-     BFS::reset();
-     return std::make_pair(ecc, candidate);
+  static std::pair<BFS::Result, GNode> search(const GNode& start) {
+    BFS::Result res = BFS::go(start, false);
+    GNode candidate =
+      *Galois::ParallelSTL::map_reduce(graph.begin(), graph.end(),
+          has_dist(res.ecc()), boost::optional<GNode>(), min_degree());
+    return std::make_pair(res, candidate);
   }
 
-  static GNode go(GNode source) {
+  static BFS::Result go(GNode source) {
     int searches = 0;
 
     ++searches;
-    std::pair<size_t, GNode> v = search(source);
+    std::pair<BFS::Result, GNode> v = search(source);
     while (true) {
+      // NB: Leaves graph BFS state for last iteration
       ++searches;
-      std::pair<size_t, GNode> u = search(v.second);
+      BFS::reset();
+      std::pair<BFS::Result, GNode> u = search(v.second);
 
-      std::cout << "ecc(v) = " << v.first << " ecc(u) = " << u.first << "\n";
+      std::cout << "ecc(v) = " << v.first.ecc() << " ecc(u) = " << u.first.ecc() << "\n";
       
-      if (u.first <= v.first)
-        break;
-      source = v.second;
+      bool better = u.first.ecc() > v.first.ecc();
       v = u;
+      if (!better)
+        break;
     }
 
-    std::cout << "Selected source: " << graph.getData(v.second)
+    std::cout << "Selected source: " << graph.getData(v.first.source)
       << " ("
       << "searches: " << searches 
       << ")\n";
-    return v.second;
+    return v.first;
   }
 };
 
@@ -366,58 +378,47 @@ struct PseudoPeripheral {
     }
   };
 
-  struct Result {
-    size_t ecc;
-    std::deque<GNode> candidates;
-    size_t max_width;
-  };
-
-  static Result search(const GNode& start) {
-    Result ret;
-
-    BFS::Counts counts = BFS::go(start, false);
-    ret.max_width = *std::max_element(counts.begin(), counts.end());
-    ret.ecc = counts.size() - 1;
-    ret.candidates = select_candidates::go(5, ret.ecc);  
+  static std::pair<BFS::Result,std::deque<GNode> > search(const GNode& start) {
+    BFS::Result res = BFS::go(start, false);
+    std::deque<GNode> candidates = select_candidates::go(5, res.ecc());  
     BFS::reset();
 
-    return ret;
+    return std::make_pair(res, candidates);
   }
 
-  static GNode go(GNode source) {
+  static BFS::Result go(GNode source) {
     int skips = 0;
     int searches = 0;
 
     ++searches;
-    Result v = search(source);
+    std::pair<BFS::Result,std::deque<GNode> > v = search(source);
     while (true) {
       std::cout 
         << "(ecc(v), max_width) =" 
-        << " (" << v.ecc << ", " << v.max_width << ")"
+        << " (" << v.first.ecc() << ", " << v.first.max_width << ")"
         << " (ecc(u), max_width(u)) =";
 
       size_t last = std::numeric_limits<size_t>::max();
-      auto ii = v.candidates.begin();
-      auto ei = v.candidates.end();
+      auto ii = v.second.begin();
+      auto ei = v.second.end();
 
       for (; ii != ei; ++ii) {
         ++searches;
-        Result u = search(*ii);
+        std::pair<BFS::Result,std::deque<GNode> > u = search(*ii);
 
-        std::cout << " (" << u.ecc << ", " << u.max_width << ")";
+        std::cout << " (" << u.first.ecc() << ", " << u.first.max_width << ")";
 
-        if (u.max_width >= last) {
+        if (u.first.max_width >= last) {
           ++skips;
           continue;
         }
 
-        if (u.ecc > v.ecc) {
-          source = *ii;
+        if (u.first.ecc() > v.first.ecc()) {
           v = u;
           break;
-        } else if (u.max_width < last) {
-          last = u.max_width;
-          source = *ii;
+        } else if (u.first.max_width < last) {
+          last = u.first.max_width;
+          v = u;
         }
       }
 
@@ -427,23 +428,23 @@ struct PseudoPeripheral {
         break;
     }
 
-    std::cout << "Selected source: " << graph.getData(source)
+    std::cout << "Selected source: " << graph.getData(v.first.source)
       << " (skips: " << skips
       << ", searches: " << searches 
       << ")\n";
-    return source;
+    return v.first;
   }
 };
 
 
 struct CuthillUnordered {
-  template<typename RO, typename WO>
+  template<typename C,typename RO, typename WO>
   struct PlaceFn {
-    BFS::Counts& counts;
+    C& counts;
     RO& read_offset;
     WO& write_offset;
 
-    PlaceFn(BFS::Counts& c, RO& r, WO& w): counts(c), read_offset(r), write_offset(w) { }
+    PlaceFn(C& c, RO& r, WO& w): counts(c), read_offset(r), write_offset(w) { }
 
     void operator()(unsigned me, unsigned int tot) const {
       DistType n = me;
@@ -499,12 +500,13 @@ struct CuthillUnordered {
     }
   };
 
-  template<typename RO, typename WO>
-  static void place_nodes(BFS::Counts& c, RO& read_offset, WO& write_offset) {
-    Galois::on_each(PlaceFn<RO,WO>(c, read_offset, write_offset), "place");
+  template<typename C, typename RO, typename WO>
+  static void place_nodes(C& c, RO& read_offset, WO& write_offset) {
+    Galois::on_each(PlaceFn<C,RO,WO>(c, read_offset, write_offset), "place");
   }
 
-  static void place_nodes(GNode source, BFS::Counts& counts) {
+  template<typename C>
+  static void place_nodes(GNode source, C& counts) {
     std::deque<unsigned int> read_offset;
     std::deque<Galois::Runtime::LL::CacheLineStorage<unsigned int> > write_offset;
 
@@ -518,9 +520,14 @@ struct CuthillUnordered {
     place_nodes(counts, read_offset, write_offset);
   }
 
-  static void go(GNode source) {
-    BFS::Counts counts = BFS::go(source, false);
+  template<typename C>
+  static void go(GNode source, C& counts) {
     place_nodes(source, counts);
+  }
+
+  static void go(GNode source) {
+    BFS::Result res = BFS::go(source, false);
+    go(source, res.counts);
   }
 };
 
@@ -548,13 +555,16 @@ int main(int argc, char **argv) {
   T.start();
   Galois::StatTimer Tpseudo("PseudoTime");
   Tpseudo.start();
-  GNode source = useSimplePseudo ? 
+  BFS::Result result = useSimplePseudo ? 
       SimplePseudoPeripheral::go(*graph.begin()) : PseudoPeripheral::go(*graph.begin());
   Tpseudo.stop();
 
   Galois::StatTimer Tcuthill("CuthillTime");
   Tcuthill.start();
-  CuthillUnordered::go(source);
+  if (useSimplePseudo)
+    CuthillUnordered::go(result.source, result.counts);
+  else
+    CuthillUnordered::go(result.source);
   Tcuthill.stop();
   T.stop();
 
