@@ -744,7 +744,7 @@ struct SerialBFS {
 
 			order.push_back(source);
 			levelptr.push_back(0);
-			levelptr.push_back(1);
+			// levelptr.push_back(1);
 
 			unsigned int index = 0;
 			unsigned int curdist = 0;
@@ -781,8 +781,7 @@ struct SerialBFS {
 			}
 			levelptr.push_back(index);
 			height = curdist;
-
-			return 0;
+                        return 0;
 		}
 
 		unsigned int getHeight(){ return height; }
@@ -826,10 +825,17 @@ struct SerialBFS {
 
 				rwidth = DIST_INFINITY;
 
+                                std::cout << "snode: " << fwidth << " " << graph.getData(snode, Galois::MethodFlag::NONE).id 
+                                  << " " << chosen.size() << " " << lastset.size() << " "
+                                  << forward.getHeight() 
+                                  << "\n";
 				//std::cerr << "height: " << forward.getHeight() << " width[last]: " << forward.getWidth(forward.getHeight()) << " maxwidth: " << forward.getMaxWidth() << "\n";
 				//std::cerr << "lastset size: " << lastset.size() << "\n";
 
 				for(int i = 0; i < chosen.size(); ++i) {
+                                        std::cout << "rnode: "
+                                          << graph.getData(chosen[i], Galois::MethodFlag::NONE).id << " "
+                                          << graph.getData(chosen[i], Galois::MethodFlag::NONE).dist << "\n";
 					//BfsFn reverse(forward.getMaxWidth());
 					BfsFn reverse(rwidth);
 
@@ -842,6 +848,12 @@ struct SerialBFS {
 
 					if(res)
 						continue;
+
+                                        std::cout << "rnode: "
+                                          << reverse.getHeight() << " "
+                                          << forward.getHeight() << " "
+                                          << reverse.getMaxWidth() << " "
+                                          << rwidth << "\n";
 
 					if(reverse.getHeight() > forward.getHeight() && reverse.getMaxWidth() < rwidth){
 						//std::cerr << "2nd case height: " << reverse.getHeight() << " >? " << forward.getHeight() << " width: " << reverse.getMaxWidth() << " <? " << rwidth << "\n";
@@ -856,6 +868,9 @@ struct SerialBFS {
 				}
 			} while (foundEndNode == false);
 
+                        std::cout << "Selected starting node: " << fwidth << " " 
+                          << graph.getData(snode, Galois::MethodFlag::NONE).id << " and end node: "
+                          << rwidth << " " << graph.getData(enode, Galois::MethodFlag::NONE).id << "\n";
 			if(fwidth > rwidth)
 				std::swap(snode, enode);
 		}
