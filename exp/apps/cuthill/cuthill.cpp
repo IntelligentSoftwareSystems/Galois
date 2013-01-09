@@ -53,6 +53,10 @@ namespace cll = llvm::cl;
 static cll::opt<std::string> filename(cll::Positional,
     cll::desc("<input file>"),
     cll::Required);
+static cll::opt<bool> useSimplePseudo("useSimplePseudo",
+    cll::desc("use simple pseudo-peripheral algorithm"),
+    cll::init(false));
+
 
 typedef unsigned int DistType;
 
@@ -60,7 +64,7 @@ static const DistType DIST_INFINITY = std::numeric_limits<DistType>::max() - 1;
 
 namespace {
 
-//****** Work Item and Node Data Defintions ******
+//****** Work Item and Node Data Definitions ******
 struct SNode {
   DistType dist;
   unsigned int degree;
@@ -205,7 +209,93 @@ struct BFS {
   }
 };
 
-struct PseudoDiameter {
+/**
+ * The eccentricity of vertex v, ecc(v), is the greatest distance from v to any vertex.
+ * A peripheral vertex v is one whose distance from some other vertex u is the
+ * diameter of the graph: \exists u : dist(v, u) = D. A pseudo-peripheral vertex is a 
+ * vertex v that satisfies: \forall u : dist(v, u) = ecc(v) ==> ecc(v) = ecc(u).
+ *
+ * Simple pseudo-peripheral algorithm:
+ *  1. Choose v
+ *  2. Among the vertices as far away as possible from v, select u with minimal degree
+ *  3. If ecc(u) > ecc(v) then
+ *       v = u and go to step 2
+ *     otherwise
+ *       u is the pseudo-peripheral vertex
+ */
+struct SimplePseudoPeripheral {
+  struct min_degree {
+    template<typename T>
+    T operator()(const T& a, const T& b) const {
+      if (!a) return b;
+      if (!b) return a;
+      if (graph.getData(*a).degree < graph.getData(*b).degree)
+        return a;
+      else
+        return b;
+    }
+  };
+
+  struct has_dist {
+    DistType dist;
+    explicit has_dist(DistType d): dist(d) { }
+    boost::optional<GNode> operator()(const GNode& a) const {
+      if (graph.getData(a).dist == dist)
+        return boost::optional<GNode>(a);
+      return boost::optional<GNode>();
+    }
+  };
+
+  static std::pair<size_t, GNode> search(const GNode& start) {
+     size_t ecc = BFS::go(start, false).size() - 1;
+     GNode candidate =
+       *Galois::ParallelSTL::map_reduce(graph.begin(), graph.end(),
+           has_dist(ecc), boost::optional<GNode>(), min_degree());
+     BFS::reset();
+     return std::make_pair(ecc, candidate);
+  }
+
+  static GNode go(GNode source) {
+    int searches = 0;
+
+    ++searches;
+    std::pair<size_t, GNode> v = search(source);
+    while (true) {
+      ++searches;
+      std::pair<size_t, GNode> u = search(v.second);
+
+      std::cout << "ecc(v) = " << v.first << " ecc(u) = " << u.first << "\n";
+      
+      if (u.first <= v.first)
+        break;
+      source = v.second;
+      v = u;
+    }
+
+    std::cout << "Selected source: " << graph.getData(v.second)
+      << " ("
+      << "searches: " << searches 
+      << ")\n";
+    return v.second;
+  }
+};
+
+/**
+ * A more complicated pseudo-peripheral algorithm.
+ *
+ * Let the width of vertex v be the maximum number of nodes with the same
+ * distance from v.
+ *
+ * Unlike the simple one, instead of picking a minimal degree candidate u,
+ * select among some number of candidates U. Here, we select the top n
+ * lowest degree nodes who do not share neighborhoods.
+ *
+ * If there exists a vertex u such that ecc(u) > ecc(v) proceed as in the
+ * simple algorithm. 
+ *
+ * Otherwise, select the u that has least maximum width.
+ */
+struct PseudoPeripheral {
   struct order_by_degree {
     bool operator()(const GNode& a, const GNode& b) const {
       return graph.getData(a).degree < graph.getData(b).degree;
@@ -226,7 +316,7 @@ struct PseudoDiameter {
   };
 
   struct select_candidates {
-    static std::deque<GNode> go(int topn, size_t dist) {
+    static std::deque<GNode> go(unsigned topn, size_t dist) {
       Galois::InsertBag<GNode> bag;
       Galois::do_all_local(graph, collect_nodes(bag, dist));
 
@@ -235,7 +325,7 @@ struct PseudoDiameter {
       std::deque<GNode> nodes;
       std::deque<GNode> result;
       std::copy(bag.begin(), bag.end(), std::back_inserter(nodes));
-      size_t cur = 0;;
+      size_t cur = 0;
       size_t size = nodes.size();
       size_t delta = topn * 5;
 
@@ -276,66 +366,75 @@ struct PseudoDiameter {
     }
   };
 
+  struct Result {
+    size_t ecc;
+    std::deque<GNode> candidates;
+    size_t max_width;
+  };
+
+  static Result search(const GNode& start) {
+    Result ret;
+
+    BFS::Counts counts = BFS::go(start, false);
+    ret.max_width = *std::max_element(counts.begin(), counts.end());
+    ret.ecc = counts.size() - 1;
+    ret.candidates = select_candidates::go(5, ret.ecc);  
+    BFS::reset();
+
+    return ret;
+  }
+
   static GNode go(GNode source) {
-    GNode sink;
-
-    bool found = false;
-    size_t f_width;
-    size_t r_width;
-    size_t maxDepth = std::numeric_limits<size_t>::min();
-
     int skips = 0;
     int searches = 0;
 
-    while (!found) {
-      BFS::Counts counts = BFS::go(source, false);
-      ++searches;
-      f_width = *std::max_element(counts.begin(), counts.end());
-      
-      if (counts.size() > maxDepth)
-        maxDepth = counts.size();
+    ++searches;
+    Result v = search(source);
+    while (true) {
+      std::cout 
+        << "(ecc(v), max_width) =" 
+        << " (" << v.ecc << ", " << v.max_width << ")"
+        << " (ecc(u), max_width(u)) =";
 
-      std::deque<GNode> candidates = select_candidates::go(5, counts.size() - 1);  
-      BFS::reset();
+      size_t last = std::numeric_limits<size_t>::max();
+      auto ii = v.candidates.begin();
+      auto ei = v.candidates.end();
 
-      r_width = std::numeric_limits<size_t>::max();
-
-      for (auto ii = candidates.begin(), ei = candidates.end(); ii != ei; ++ii) {
-        BFS::Counts rcounts = BFS::go(*ii, true);
+      for (; ii != ei; ++ii) {
         ++searches;
-        size_t w = *std::max_element(rcounts.begin(), rcounts.end());
-        
-        if (rcounts.size() > maxDepth)
-          maxDepth = rcounts.size();
+        Result u = search(*ii);
 
-        if (w >= r_width) {
+        std::cout << " (" << u.ecc << ", " << u.max_width << ")";
+
+        if (u.max_width >= last) {
           ++skips;
           continue;
         }
 
-        if (rcounts.size() > counts.size() && w < r_width) {
+        if (u.ecc > v.ecc) {
           source = *ii;
+          v = u;
           break;
-        } else if (w < r_width) {
-          r_width = w;
-          sink = *ii;
-          found = true;
+        } else if (u.max_width < last) {
+          last = u.max_width;
+          source = *ii;
         }
       }
+
+      std::cout << "\n";
+
+      if (ii == ei)
+        break;
     }
 
-    if (f_width > r_width)
-      std::swap(source, sink);
-
     std::cout << "Selected source: " << graph.getData(source)
-      << " and sink: " << graph.getData(sink)
       << " (skips: " << skips
-      << ", maxDepth: " << maxDepth
       << ", searches: " << searches 
       << ")\n";
     return source;
   }
 };
+
 
 struct CuthillUnordered {
   template<typename RO, typename WO>
@@ -360,7 +459,7 @@ struct CuthillUnordered {
 	  while (start != cend) {
 	    GNode next = perm[start];
 	    unsigned t_worig = t_wo;
-	    //find eligable nodes
+	    //find eligible nodes
 	    //prefetch?
 	    if (0) {
 	      if (start + 1 < cend) {
@@ -449,7 +548,8 @@ int main(int argc, char **argv) {
   T.start();
   Galois::StatTimer Tpseudo("PseudoTime");
   Tpseudo.start();
-  GNode source = PseudoDiameter::go(*graph.begin());
+  GNode source = useSimplePseudo ? 
+      SimplePseudoPeripheral::go(*graph.begin()) : PseudoPeripheral::go(*graph.begin());
   Tpseudo.stop();
 
   Galois::StatTimer Tcuthill("CuthillTime");
