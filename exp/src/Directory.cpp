@@ -27,17 +27,65 @@
 using namespace Galois::Runtime::Distributed;
 
 uintptr_t RemoteDirectory::haveObject(uintptr_t ptr, uint32_t owner) {
+#define OBJSTATE (*iter).second
   Lock.lock();
   auto iter = curobj.find(std::make_pair(ptr,owner));
   uintptr_t retval = 0;
-  //  if (iter != curobj.end() && iter->state == ObjValid)
-  //    retval = iter->localobj;
+  // Returning the object even if locked as the call to acquire would fail
+  // May have to account for the Requested state if it is introduced
+  if (iter != curobj.end() && OBJSTATE.state != objstate::Remote)
+    retval = OBJSTATE.localobj;
   Lock.unlock();
+#undef OBJSTATE
   return retval;
 }
 
-uintptr_t RemoteDirectory::fetchObject(uintptr_t ptr, uint32_t owner, recvFuncTy pad) {
-  abort();
+// NOTE: make sure that the handleReceives() is called by another thread
+void RemoteDirectory::fetchRemoteObj(uintptr_t ptr, uint32_t owner, recvFuncTy pad) {
+  SendBuffer buf;
+  NetworkInterface& net = getSystemNetworkInterface();
+  buf.serialize(ptr);
+  buf.serialize(networkHostID);
+  net.sendMessage (owner, pad, buf);
+  return;
+}
+
+template<typename T>
+void ownerLandingPad(RecvBuffer &buf) {
+  // NACK is a noop on the owner
+  // fwd the request if state is remote
+  // send a NACK if locked
+  // send the object if local and mark obj as remote
+}
+
+uintptr_t LocalDirectory::haveObject(uintptr_t ptr, int *remote) {
+#define OBJSTATE (*iter).second
+  Lock.lock();
+  auto iter = curobj.find(ptr);
+  uintptr_t retval = 0;
+  // Returning the object even if locked as the call to acquire would fail
+  // return the object even if it is not 
+  if (iter == curobj.end() || OBJSTATE.state != objstate::Remote)
+    retval = ptr;
+  else if (iter != curobj.end() && OBJSTATE.state == objstate::Remote)
+    *remote = OBJSTATE.sent_to;
+  Lock.unlock();
+#undef OBJSTATE
+  return retval;
+}
+
+// NOTE: make sure that the handleReceives() is called by another thread
+void LocalDirectory::fetchRemoteObj(uintptr_t ptr, uint32_t remote, recvFuncTy pad) {
+  SendBuffer buf;
+  NetworkInterface& net = getSystemNetworkInterface();
+  buf.serialize(ptr);
+  buf.serialize(networkHostID);
+  net.sendMessage (remote, pad, buf);
+  return;
+}
+
+template<typename T>
+void remoteLandingPad(RecvBuffer &buf) {
 }
 
 RemoteDirectory& Galois::Runtime::Distributed::getSystemRemoteDirectory() {

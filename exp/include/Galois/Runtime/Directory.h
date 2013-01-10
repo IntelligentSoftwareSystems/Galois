@@ -115,16 +115,19 @@ namespace Distributed {
 
 //entry point for remote fetch messages
 template<typename T>
-void serializeLandingPad(Galois::Runtime::Distributed::RecvBuffer &) {
-  //  T* ptr = reinterpret_cast<T*>(ptr);
-  //I have ptr;
-  //acquire(ptr);
-}
+void ownerLandingPad(Galois::Runtime::Distributed::RecvBuffer &);
+template<typename T>
+void remoteLandingPad(Galois::Runtime::Distributed::RecvBuffer &);
 
 class RemoteDirectory {
 
   struct objstate {
-    enum ObjStates { ObjValid, ObjIncoming };
+    // Remote - The object has been returned to the owner
+    // Requested - A request for the object has been made (MAY NEED THIS)
+    // Ineligible - Local object but not eligible to be returned to owner
+    // Eligible - Local object but can be returned to the owner
+    // Locked - Local object locked for use
+    enum ObjStates { Remote, Ineligible, Eligible, Locked };
 
     uintptr_t localobj;
     enum ObjStates state;
@@ -143,9 +146,8 @@ class RemoteDirectory {
   //or returns null
   uintptr_t haveObject(uintptr_t ptr, uint32_t owner);
 
-  //returns a valid local pointer to the object if it exists
-  //or returns null
-  uintptr_t fetchObject(uintptr_t ptr, uint32_t owner, recvFuncTy pad );
+  // places a remote request for the node
+  void fetchRemoteObj(uintptr_t ptr, uint32_t owner, recvFuncTy pad);
 
 public:
   //resolve a pointer, owner pair
@@ -155,12 +157,42 @@ public:
     assert(owner != networkHostID);
     uintptr_t p = haveObject(ptr, owner);
     if (!p)
-      p = fetchObject(ptr, owner, &serializeLandingPad<T>);
+      fetchRemoteObj(ptr, owner, &ownerLandingPad<T>);
     return reinterpret_cast<T*>(p);
   }
 };
 
 class LocalDirectory {
+
+  struct objstate {
+    // Remote - Object passed to a remote host
+    // Local - Local object and not locked
+    // Locked - Local object locked for use
+    enum ObjStates { Remote, Local, Locked };
+
+    int sent_to;  // valid only for remote objects
+    enum ObjStates state;
+  };
+
+  std::unordered_map<uintptr_t, objstate> curobj;
+  Galois::Runtime::LL::SimpleLock<true> Lock;
+
+  // returns a valid local pointer to the object if not remote
+  uintptr_t haveObject(uintptr_t ptr, int *remote);
+
+  // places a remote request for the node
+  void fetchRemoteObj(uintptr_t ptr, uint32_t remote, recvFuncTy pad);
+
+public:
+  // resolve a pointer, owner pair
+  template<typename T>
+  T* resolve(uintptr_t ptr) {
+    int sent = 0;
+    uintptr_t p = haveObject(ptr, &sent);
+    if (!p)
+      fetchRemoteObj(ptr, sent, &remoteLandingPad<T>);
+    return reinterpret_cast<T*>(p);
+  }
 };
 
 
