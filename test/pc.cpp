@@ -1,4 +1,3 @@
-#include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/Barrier.h"
 #include "Galois/Timer.h"
@@ -45,26 +44,12 @@ int main() {
     if (0) {
       int count = 128 * 1024 * 1024;
 
-      Galois::Timer t;
-      t.start();
-      Galois::Runtime::PerCPU<int> v;
-      for (int i = 0; i < count; ++i)
-        v.get()++;
-      t.stop();
-
       Galois::Timer t2;
       t2.start();
       Galois::Runtime::PerThreadStorage<int> v2;
       for (int i = 0; i < count; ++i)
         (*v2.getLocal())++;
       t2.stop();
-
-      Galois::Timer t3;
-      t3.start();
-      Galois::Runtime::PerCPU<int> v3;
-      for (int i = 0; i < count; ++i)
-        v3.get(1)++;
-      t3.stop();
 
       Galois::Timer t4;
       t4.start();
@@ -73,8 +58,7 @@ int main() {
         (*v4.getRemote(1))++;
       t4.stop();
 
-      std::cout << t.get() << " " << t2.get() << "\n";
-      std::cout << t3.get() << " " << t4.get() << "\n";
+      std::cout << t2.get() << " " << t4.get() << "\n";
     }
 
     // testf(pbarrier, "pthread");
