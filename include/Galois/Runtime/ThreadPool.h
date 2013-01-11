@@ -23,13 +23,12 @@
 #ifndef GALOIS_RUNTIME_THREADPOOL_H
 #define GALOIS_RUNTIME_THREADPOOL_H
 
+#include "ActiveThreads.h"
+
 #include <functional>
 
 namespace Galois {
 namespace Runtime {
-
-//! the number of active threads
-extern unsigned int galoisActiveThreads;
 
 typedef std::function<void (void)> RunCommand;
 
@@ -39,7 +38,7 @@ public:
 
   //!execute work on all threads
   //!preWork and postWork are executed only on the master thread
-  virtual void run(RunCommand* begin, RunCommand* end, unsigned num = galoisActiveThreads) = 0;
+  virtual void run(RunCommand* begin, RunCommand* end, unsigned num = activeThreads) = 0;
 
   //!return the number of threads supported by the thread pool on the current machine
   virtual unsigned getMaxThreads() const = 0;

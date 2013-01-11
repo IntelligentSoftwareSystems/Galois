@@ -201,7 +201,7 @@ void Galois::Runtime::MCSBarrier::_reinit(unsigned P) {
 }
 
 Galois::Runtime::MCSBarrier::MCSBarrier() {
-  _reinit(galoisActiveThreads);
+  _reinit(activeThreads);
 }
 
 Galois::Runtime::MCSBarrier::MCSBarrier(unsigned P) {
@@ -270,7 +270,7 @@ void Galois::Runtime::TopoBarrier::_reinit(unsigned P) {
 }
 
 Galois::Runtime::TopoBarrier::TopoBarrier() {
-  _reinit(galoisActiveThreads);
+  _reinit(activeThreads);
 }
 
 Galois::Runtime::TopoBarrier::TopoBarrier(unsigned P) {
@@ -332,8 +332,8 @@ void Galois::Runtime::TopoBarrier::wait() {
 Galois::Runtime::GBarrier& Galois::Runtime::getSystemBarrier() {
   static Galois::Runtime::GBarrier b;
   static unsigned num = ~0;
-  if (galoisActiveThreads != num) {
-    num = galoisActiveThreads;
+  if (activeThreads != num) {
+    num = activeThreads;
     b.reinit(num);
   }
   return b;

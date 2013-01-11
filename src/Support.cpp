@@ -46,7 +46,7 @@ class StatManager {
   volatile unsigned maxID;
 
   void updateMax() {
-    unsigned n = Galois::Runtime::galoisActiveThreads;
+    unsigned n = Galois::Runtime::activeThreads;
     unsigned c;
     while (n > (c = maxID))
       __sync_bool_compare_and_swap(&maxID, c, n);
@@ -79,7 +79,7 @@ public:
   }
 
   void addToStat(Galois::Statistic* value) {
-    for (unsigned x = 0; x < Galois::Runtime::galoisActiveThreads; ++x)
+    for (unsigned x = 0; x < Galois::Runtime::activeThreads; ++x)
       (*Stats.getRemote(x))[mkKey(value->getLoopname(), value->getStatname())] += value->getValue(x);
     updateMax();
   }

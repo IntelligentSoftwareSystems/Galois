@@ -25,7 +25,7 @@
 #ifndef GALOIS_RUNTIME_RANGE_H
 #define GALOIS_RUNTIME_RANGE_H
 
-#include "Galois/Runtime/ThreadPool.h"
+#include "Galois/Runtime/ActiveThreads.h"
 #include "Galois/Runtime/ll/TID.h"
 
 #include "Galois/util/GAlgs.h"
@@ -56,11 +56,11 @@ public:
   local_iterator local_end() { return container->local_end(); }
 
   block_iterator block_begin() { 
-    return Galois::block_range(begin(), end(), LL::getTID(), galoisActiveThreads).first; 
+    return Galois::block_range(begin(), end(), LL::getTID(), activeThreads).first; 
   }
 
   block_iterator block_end() { 
-    return Galois::block_range(begin(), end(), LL::getTID(), galoisActiveThreads).second; 
+    return Galois::block_range(begin(), end(), LL::getTID(), activeThreads).second; 
   }
 };
 
@@ -86,11 +86,11 @@ public:
   local_iterator local_end() { return block_end(); }
 
   block_iterator block_begin() { 
-    return Galois::block_range(begin(), end(), LL::getTID(), galoisActiveThreads).first; 
+    return Galois::block_range(begin(), end(), LL::getTID(), activeThreads).first; 
   }
 
   block_iterator block_end() { 
-    return Galois::block_range(begin(), end(), LL::getTID(), galoisActiveThreads).second; 
+    return Galois::block_range(begin(), end(), LL::getTID(), activeThreads).second; 
   }
 };
 

@@ -162,7 +162,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     if (BSP) {
       msS = p.scanStart;
       if (localLeader)
-	for (unsigned i = 0; i <  Runtime::galoisActiveThreads; ++i)
+	for (unsigned i = 0; i <  Runtime::activeThreads; ++i)
 	  msS = std::min(msS, current.getRemote(i)->scanStart);
       else
 	msS = std::min(msS, current.getRemote(Runtime::LL::getLeaderForThread(myID))->scanStart);

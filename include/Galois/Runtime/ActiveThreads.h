@@ -1,4 +1,4 @@
-/** Implement user facing misc api -*- C++ -*-
+/** Number of Active Threads -*- C++ -*-
  * @file
  * @section License
  *
@@ -21,21 +21,14 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/Runtime/ThreadPool.h"
-#include "Galois/Runtime/ActiveThreads.h"
-#include "Galois/Threads.h"
+#ifndef GALOIS_RUNTIME_ACTIVETHREADS_H
+#define GALOIS_RUNTIME_ACTIVETHREADS_H
 
-#include <algorithm>
-
-unsigned int Galois::Runtime::activeThreads = 1;
-
-unsigned int Galois::setActiveThreads(unsigned int num) {
-  num = std::min(num, Galois::Runtime::getSystemThreadPool().getMaxThreads());
-  num = std::max(num, 1U);
-  Galois::Runtime::activeThreads = num;
-  return num;
+namespace Galois {
+namespace Runtime {
+extern unsigned int activeThreads;
+}
 }
 
-unsigned int Galois::getActiveThreads() {
-  return Galois::Runtime::activeThreads;
-}
+#endif
+

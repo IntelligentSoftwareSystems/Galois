@@ -57,7 +57,7 @@ class BulkSynchronous : private boost::noncopyable {
   using retype = BulkSynchronous<typename ContainerTy::template retype<Tnew>,Tnew,concurrent>;
 
   BulkSynchronous(): empty(false) {
-    unsigned num = Runtime::galoisActiveThreads;
+    unsigned num = Runtime::activeThreads;
     barrier1.reinit(num);
     barrier2.reinit(num);
   }

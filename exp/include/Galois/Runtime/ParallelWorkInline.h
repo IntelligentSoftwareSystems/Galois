@@ -355,7 +355,7 @@ public:
       abort();
     }
 
-    numActive = galoisActiveThreads;
+    numActive = activeThreads;
     barrier1.reinit(numActive);
     barrier2.reinit(numActive);
   }

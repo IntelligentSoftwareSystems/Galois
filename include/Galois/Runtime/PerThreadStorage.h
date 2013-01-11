@@ -30,6 +30,9 @@
 #include "ll/TID.h"
 #include "ll/HWTopo.h"
 #include "ThreadPool.h"
+//#include "ActiveThreads.h"
+//FIXME: we need a better way to order startup so that the thread pool 
+//and threads are created before the pts
 
 #include <boost/utility.hpp>
 

@@ -24,7 +24,7 @@
 #define GALOIS_RUNTIME_WORKLIST_H
 
 #include "Galois/Runtime/PerThreadStorage.h"
-#include "Galois/Runtime/ThreadPool.h"
+#include "Galois/Runtime/ActiveThreads.h"
 #include "Galois/WorkList/WorkListHelpers.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/mm/Mem.h"

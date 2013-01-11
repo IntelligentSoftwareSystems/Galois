@@ -268,7 +268,7 @@ public:
 
   void operator()() {
     if (LL::isPackageLeaderForSelf(LL::getTID()) &&
-	galoisActiveThreads > 1 && 
+	activeThreads > 1 && 
 	ForEachTraits<FunctionTy>::NeedsAborts)
       go<true>();
     else
@@ -301,7 +301,7 @@ struct WOnEach {
   FunctionTy fn;
   WOnEach(FunctionTy f) :fn(f) {}
   void operator()(void) {
-    fn(Galois::Runtime::LL::getTID(), galoisActiveThreads);   
+    fn(Galois::Runtime::LL::getTID(), activeThreads);   
   }
 };
 

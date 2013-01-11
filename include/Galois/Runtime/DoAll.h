@@ -101,8 +101,8 @@ class DoAllWork {
       return true;
     //Then try stealing from neighbors
     unsigned myID = LL::getTID();
-    for (unsigned x = 1; x < galoisActiveThreads; x += x) {
-      SharedState& r = *TLDS.getRemote((myID + x) % galoisActiveThreads);
+    for (unsigned x = 1; x < activeThreads; x += x) {
+      SharedState& r = *TLDS.getRemote((myID + x) % activeThreads);
       if (doSteal(r, mytld)) {
 	//populateSteal(mytld);
 	return true;
@@ -123,7 +123,7 @@ public:
   DoAllWork(const FunctionTy& F, const ReduceFunTy& R, bool needsReduce, RangeTy r)
     : origF(F), outputF(F), RF(R), needsReduce(needsReduce), range(r)
   {
-    barrier.reinit(galoisActiveThreads);
+    barrier.reinit(activeThreads);
   }
 
   void operator()() {

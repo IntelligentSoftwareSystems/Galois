@@ -40,7 +40,7 @@ struct squeues<true,TQ> {
   TQ& get(int i) { return *queues.getRemote(i); }
   TQ& get() { return *queues.getLocal(); }
   int myEffectiveID() { return Runtime::LL::getTID(); }
-  int size() { return Runtime::galoisActiveThreads; }
+  int size() { return Runtime::activeThreads; }
 };
 
 template<typename TQ>
