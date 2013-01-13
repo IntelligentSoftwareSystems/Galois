@@ -1,4 +1,3 @@
-#include "Galois/Runtime/PerCPU.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/Barrier.h"
 #include "Galois/Timer.h"
@@ -36,60 +35,40 @@ void testf(T& b, const char* str) {
 }
 
 int main() {
-
   unsigned M = Galois::Runtime::LL::getMaxThreads();
 
   while (M) {
-    
     Galois::setActiveThreads(M); //Galois::Runtime::LL::getMaxThreads());
-  std::cout << "Using " << M << " threads\n";
+    std::cout << "Using " << M << " threads\n";
 
-  if (0) {
+    if (0) {
+      int count = 128 * 1024 * 1024;
 
-  int count = 128 * 1024 * 1024;
+      Galois::Timer t2;
+      t2.start();
+      Galois::Runtime::PerThreadStorage<int> v2;
+      for (int i = 0; i < count; ++i)
+        (*v2.getLocal())++;
+      t2.stop();
 
-  Galois::Timer t;
-  t.start();
-  Galois::Runtime::PerCPU<int> v;
-  for (int i = 0; i < count; ++i)
-    v.get()++;
-  t.stop();
+      Galois::Timer t4;
+      t4.start();
+      Galois::Runtime::PerThreadStorage<int> v4;
+      for (int i = 0; i < count; ++i)
+        (*v4.getRemote(1))++;
+      t4.stop();
 
-  Galois::Timer t2;
-  t2.start();
-  Galois::Runtime::PerThreadStorage<int> v2;
-  for (int i = 0; i < count; ++i)
-    (*v2.getLocal())++;
-  t2.stop();
+      std::cout << t2.get() << " " << t4.get() << "\n";
+    }
 
-  Galois::Timer t3;
-  t3.start();
-  Galois::Runtime::PerCPU<int> v3;
-  for (int i = 0; i < count; ++i)
-    v3.get(1)++;
-  t3.stop();
+    // testf(pbarrier, "pthread");
+    // testf(fbarrier, "fast");
+    testf(mbarrier, "mcs");
+    //  testf(ffbarrier, "faster");
+    testf(tbarrier, "topo");
 
-  Galois::Timer t4;
-  t4.start();
-  Galois::Runtime::PerThreadStorage<int> v4;
-  for (int i = 0; i < count; ++i)
-    (*v4.getRemote(1))++;
-  t4.stop();
-
-
-  std::cout << t.get() << " " << t2.get() << "\n";
-  std::cout << t3.get() << " " << t4.get() << "\n";
-
-}
-
-  //testf(pbarrier, "pthread");
-  testf(fbarrier, "fast");
-  testf(mbarrier, "mcs");
-  //  testf(ffbarrier, "faster");
-  testf(tbarrier, "topo");
-
-  M /= 2;
-  };
+    M /= 2;
+  }
 
   return 0;
 }
