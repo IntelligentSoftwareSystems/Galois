@@ -113,9 +113,20 @@ namespace Galois {
 namespace Runtime {
 namespace Distributed {
 
-//entry point for remote fetch messages
+// ownerLandingPad and remoteLandingPad
+// should receive both data and requests for data
+
+// NACK is a noop on the owner (NOT SENDING NACK)
+// fwd the request if state is remote
+// send a NACK if locked
+// send the object if local and mark obj as remote
 template<typename T>
 void ownerLandingPad(Galois::Runtime::Distributed::RecvBuffer &);
+
+// NACK is a noop here too (NOT SENDING NACK)
+// if Ineligible, transfer to Eligible after INELI2ELI_COUNT requests
+// if Ineligible or Locked send a NACK
+// if Eligible return the object back to owner and mark as Remote
 template<typename T>
 void remoteLandingPad(Galois::Runtime::Distributed::RecvBuffer &);
 

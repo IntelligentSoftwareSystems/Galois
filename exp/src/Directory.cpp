@@ -24,6 +24,9 @@
 
 #include "Galois/Runtime/Directory.h"
 
+#define DATA_MSG 0x123
+#define REQ_MSG  0x456
+
 using namespace Galois::Runtime::Distributed;
 
 uintptr_t RemoteDirectory::haveObject(uintptr_t ptr, uint32_t owner) {
@@ -40,22 +43,29 @@ uintptr_t RemoteDirectory::haveObject(uintptr_t ptr, uint32_t owner) {
   return retval;
 }
 
-// NOTE: make sure that the handleReceives() is called by another thread
+// NOTE: make sure that handleReceives() is called by another thread
 void RemoteDirectory::fetchRemoteObj(uintptr_t ptr, uint32_t owner, recvFuncTy pad) {
   SendBuffer buf;
   NetworkInterface& net = getSystemNetworkInterface();
+  buf.serialize((int)REQ_MSG);
   buf.serialize(ptr);
   buf.serialize(networkHostID);
   net.sendMessage (owner, pad, buf);
   return;
 }
 
+// NACK is a noop on the owner (NOT SENDING NACK)
+// fwd the request if state is remote
+// send a NACK if locked
+// send the object if local and mark obj as remote
 template<typename T>
 void ownerLandingPad(RecvBuffer &buf) {
-  // NACK is a noop on the owner
-  // fwd the request if state is remote
-  // send a NACK if locked
-  // send the object if local and mark obj as remote
+  int msg_type, remote;
+  LocalDirectory& ld = getSystemLocalDirectory();
+  buf.deserialize(msg_type);
+  if (msg_type == REQ_MSG) {
+    // check if the object can be 
+  }
 }
 
 uintptr_t LocalDirectory::haveObject(uintptr_t ptr, int *remote) {
@@ -84,6 +94,10 @@ void LocalDirectory::fetchRemoteObj(uintptr_t ptr, uint32_t remote, recvFuncTy p
   return;
 }
 
+// NACK is a noop here too (NOT SENDING NACK)
+// if Ineligible, transfer to Eligible after INELI2ELI_COUNT requests
+// if Ineligible or Locked send a NACK
+// if Eligible return the object back to owner and mark as Remote
 template<typename T>
 void remoteLandingPad(RecvBuffer &buf) {
 }
