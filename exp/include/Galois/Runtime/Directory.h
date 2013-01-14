@@ -116,20 +116,6 @@ namespace Distributed {
 // ownerLandingPad and remoteLandingPad
 // should receive both data and requests for data
 
-// NACK is a noop on the owner (NOT SENDING NACK)
-// fwd the request if state is remote
-// send a NACK if locked
-// send the object if local and mark obj as remote
-template<typename T>
-void ownerLandingPad(Galois::Runtime::Distributed::RecvBuffer &);
-
-// NACK is a noop here too (NOT SENDING NACK)
-// if Ineligible, transfer to Eligible after INELI2ELI_COUNT requests
-// if Ineligible or Locked send a NACK
-// if Eligible return the object back to owner and mark as Remote
-template<typename T>
-void remoteLandingPad(Galois::Runtime::Distributed::RecvBuffer &);
-
 class RemoteDirectory {
 
   struct objstate {
@@ -142,6 +128,7 @@ class RemoteDirectory {
 
     uintptr_t localobj;
     enum ObjStates state;
+    int count;
   };
 
   struct ohash : public unary_function<std::pair<uintptr_t, uint32_t>, size_t> {
@@ -160,17 +147,18 @@ class RemoteDirectory {
   // places a remote request for the node
   void fetchRemoteObj(uintptr_t ptr, uint32_t owner, recvFuncTy pad);
 
+  // NACK is a noop here too (NOT SENDING NACK)
+  // if Ineligible, transfer to Eligible after INELI2ELI_COUNT requests
+  // if Ineligible or Locked send a NACK
+  // if Eligible return the object back to owner and mark as Remote
+  template<typename T>
+  void remoteLandingPad(Galois::Runtime::Distributed::RecvBuffer &);
+
 public:
   //resolve a pointer, owner pair
   //precondition: owner != networkHostID
   template<typename T>
-  T* resolve(uintptr_t ptr, uint32_t owner) {
-    assert(owner != networkHostID);
-    uintptr_t p = haveObject(ptr, owner);
-    if (!p)
-      fetchRemoteObj(ptr, owner, &ownerLandingPad<T>);
-    return reinterpret_cast<T*>(p);
-  }
+  T* resolve(uintptr_t ptr, uint32_t owner);
 };
 
 class LocalDirectory {
@@ -194,18 +182,18 @@ class LocalDirectory {
   // places a remote request for the node
   void fetchRemoteObj(uintptr_t ptr, uint32_t remote, recvFuncTy pad);
 
-public:
-  // resolve a pointer, owner pair
+  // NACK is a noop on the owner (NOT SENDING NACK)
+  // fwd the request if state is remote
+  // send a NACK if locked
+  // send the object if local and mark obj as remote
   template<typename T>
-  T* resolve(uintptr_t ptr) {
-    int sent = 0;
-    uintptr_t p = haveObject(ptr, &sent);
-    if (!p)
-      fetchRemoteObj(ptr, sent, &remoteLandingPad<T>);
-    return reinterpret_cast<T*>(p);
-  }
-};
+  void ownerLandingPad(Galois::Runtime::Distributed::RecvBuffer &);
 
+public:
+  // resolve a pointer
+  template<typename T>
+  T* resolve(uintptr_t ptr);
+};
 
 
 RemoteDirectory& getSystemRemoteDirectory();

@@ -20,7 +20,7 @@ public:
     owner = networkHostID;
     ptr = new T;
   }
-  constexpr gptr(std::nullptr_t) :ptr(nullptr) {}
+  // constexpr gptr(std::nullptr_t) :ptr(nullptr) {}
 
   gptr( const gptr& r ) :ptr(r.ptr) {}
 
@@ -33,7 +33,7 @@ public:
 
   T& operator*() const { return *ptr; }
   T *operator->() const { return ptr; }
-  operator bool() const { return ptr != nullptr; }
+  // operator bool() const { return ptr != nullptr; }
 };
 
 #endif

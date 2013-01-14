@@ -49,7 +49,8 @@ class MPIBase {
 
   Galois::Runtime::LL::SimpleLock<true> lock;
 
-  const int FuncTag = 1;
+  // const int FuncTag = 1;
+  #define FuncTag 1
 
   
 
