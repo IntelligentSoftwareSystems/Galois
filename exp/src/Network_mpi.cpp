@@ -96,45 +96,35 @@ public:
     }
   }
 
-  bool emptyQueue() {
-    int flag, rv, count;
-    MPI_Status status;
-    bool retval = false;
-    rv = MPI_Iprobe(MPI_ANY_SOURCE, FuncTag, MPI_COMM_WORLD, &flag, &status);
-    handleError(rv);
-    while (flag) {
-      retval = true;
-      MPI_Get_count(&status, MPI_BYTE, &count);
-      RecvBuffer buf(count);
-      MPI_Recv(buf.linearData(), count, MPI_BYTE, MPI_ANY_SOURCE, FuncTag, MPI_COMM_WORLD, &status);
-      recvFuncTy f;
-      buf.deserialize_end(f);
-      //check for a call to terminate
-      if (!f) {
-        //should call systemBarrier
-        rv = MPI_Barrier(MPI_COMM_WORLD);
-        handleError(rv);
-        exit(0);
-      }
-      //Call deserialized function
-      f(buf);
-      //Check for another
-      rv = MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &status);
-      handleError(rv);
-     }
-    return retval;
-  }
-
   bool recvInternal() {
     int flag, rv;
     bool retval = false;
     MPI_Status status;
-    rv = MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &status);
-    handleError(rv);
-    if (flag && lock.try_lock()) {
-      retval = emptyQueue();
-      lock.unlock();
-    }
+    do {
+      //async probe
+      rv = MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &status);
+      handleError(rv);
+      if (!flag)
+	break;
+      //use the lock
+      lock.lock();
+      rv = MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &status);
+      handleError(rv);
+      if (flag) {
+	retval = true;
+	MPI_Get_count(&status, MPI_BYTE, &count);
+	RecvBuffer buf(count);
+	MPI_Recv(buf.linearData(), count, MPI_BYTE, MPI_ANY_SOURCE, FuncTag, MPI_COMM_WORLD, &status);
+	lock.unlock();
+	//Unlocked call so reciever can call handleRecv()
+	recvFuncTy f;
+	buf.deserialize_end(f);
+	//Call deserialized function
+	f(buf);
+      } else {
+	lock.unlock();
+      }
+    } while (true);
     return retval;
   }
 };
