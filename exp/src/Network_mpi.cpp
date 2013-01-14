@@ -81,13 +81,13 @@ public:
   //! sends a message.  assumes it is being called from a thread for which
   //! this is valid
   void sendInternal(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
-    buf.serialize(recv);
+    buf.serialize_header((uintptr_t)recv);
     int rv = MPI_Send(buf.linearData(), buf.size(), MPI_BYTE, dest, FuncTag, MPI_COMM_WORLD);
     handleError(rv);
   }
 
   void broadcastInternal(recvFuncTy recv, SendBuffer& buf) {
-    buf.serialize(recv);
+    buf.serialize_header((uintptr_t)recv);
     for (int i = 0; i < numTasks; ++i) {
       if (i != taskRank) {
 	int rv = MPI_Send(buf.linearData(), buf.size(), MPI_BYTE, i, FuncTag, MPI_COMM_WORLD);
@@ -119,7 +119,9 @@ public:
 	lock.unlock();
 	//Unlocked call so reciever can call handleRecv()
 	recvFuncTy f;
-	buf.deserialize_end(f);
+	uintptr_t fp;
+	buf.deserialize(fp);
+	f = (recvFuncTy)fp;
 	//Call deserialized function
 	f(buf);
       } else {

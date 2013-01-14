@@ -47,6 +47,12 @@ class SerializeBuffer {
   std::vector<unsigned char> bufdata;
 public:
 
+  SerializeBuffer() {
+    //reserve a header
+    for (int i = 0; i < sizeof(uintptr_t); ++i)
+      bufdata.push_back(0);
+  }
+
   //Serialize support
   inline void serialize() {}
 
@@ -82,6 +88,12 @@ public:
     serialize(a1);
     serialize(a2);
     serialize(an...);
+  }
+
+  void serialize_header(uintptr_t data) {
+    unsigned char* pdata = (unsigned char*)&data;
+    for (size_t i = 0; i < sizeof(data); ++i)
+      bufdata[i] = pdata[i];
   }
 
   void* linearData() { return &bufdata[0]; }
@@ -147,21 +159,6 @@ public:
     deserialize(a1);
     deserialize(a2);
     deserialize(an...);
-  }
-
-  template<typename T>
-#if 0
-  // just the pointer to the structure (type T) is deserialized
-  // so I feel there's no need to check if T is a pod
-  inline void deserialize_end(T& data, typename std::enable_if<std::is_pod<T>::value>::type* = 0) {
-#endif
-  inline void deserialize_end(T& data) {
-    unsigned char* pdata = (unsigned char*)&data;
-    size_t b = bufdata.size() - sizeof(data);
-    for (size_t i = 0; i < sizeof(data); ++i)
-      pdata[i] = bufdata[b + i];
-    for (size_t i = 0; i < sizeof(data); ++i)
-      bufdata.pop_back();
   }
 
   void* linearData() { return &bufdata[0]; }
