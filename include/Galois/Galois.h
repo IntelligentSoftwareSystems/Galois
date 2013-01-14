@@ -32,6 +32,7 @@
 #include "Galois/Runtime/OrderedWork.h"
 
 #ifdef GALOIS_USE_EXP
+#include "Galois/Runtime/ParallelWorkDistributed.h"
 #include "Galois/Runtime/ParallelWorkInline.h"
 #include "Galois/Runtime/ParaMeter.h"
 #endif
@@ -49,7 +50,11 @@ static const unsigned GALOIS_DEFAULT_CHUNK_SIZE = 32;
 //Iterator based versions
 template<typename WLTy, typename IterTy, typename FunctionTy>
 void for_each(IterTy b, IterTy e, FunctionTy f, const char* loopname = 0) {
+#if GALOIS_USE_EXP
+  Galois::Runtime::for_each_dist<WLTy>(b, e, f, loopname);
+#else
   Galois::Runtime::for_each_impl<WLTy>(b, e, f, loopname);
+#endif
 }
 
 template<typename IterTy, typename FunctionTy>

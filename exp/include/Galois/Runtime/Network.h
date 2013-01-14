@@ -50,7 +50,7 @@ public:
   //! buf is invalidated by this operation
   virtual void sendMessage(uint32_t dest, recvFuncTy recv, SendBuffer& buf) = 0;
 
-  //!send a message to all hostss.  A message is simply a
+  //!send a message to all hosts.  A message is simply a
   //!landing pad (recv) and some data (buf)
   //! buf is invalidated by this operation
   virtual void broadcastMessage(recvFuncTy recv, SendBuffer& buf) = 0;
