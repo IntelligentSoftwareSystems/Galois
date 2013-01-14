@@ -32,44 +32,45 @@
 
 namespace Galois {
 namespace Runtime {
-namespace {
 
 template<typename WLTy, typename ItemTy, typename FunctionTy>
-void for_each_landing_pad(RecvBuffer& buf) {
+void for_each_landing_pad(Distributed::RecvBuffer& buf) {
   //extract stuff
   FunctionTy f;
   buf.deserialize(f);
   std::deque<ItemTy> data;
   buf.deserialize(data);
   //Start locally
-  Galois::Runtime::for_each_imple<WLTy>(data.begin(), data.end(), f, loopname);
+  Galois::Runtime::for_each_impl<WLTy>(data.begin(), data.end(), f, nullptr);
 }
+
+namespace {
 
 template<typename WLTy, typename IterTy, typename FunctionTy>
 void for_each_dist(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
-  typename std::iterator_traits<IterTy>::value_type ItemTy;
+  typedef typename std::iterator_traits<IterTy>::value_type ItemTy;
 
   //copy out all data
   std::deque<ItemTy> allData(b,e);
 
   // Get a handle to the network interface
-  NetworkInterface& net = getSystemNetworkInterface();
-  for (unsigned i = 1; i < networkHostNum; i++) {
-    auto blk = block_range(allData.begin(), allData.end(), i, networkHostNum);
+  Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
+  for (unsigned i = 1; i < Distributed::networkHostNum; i++) {
+    auto blk = block_range(allData.begin(), allData.end(), i, Distributed::networkHostNum);
     std::deque<ItemTy> data(blk.first, blk.second);
-    SendBuffer buf;
+    Distributed::SendBuffer buf;
     // serialize function
     buf.serialize(f);
     // serialize data
     buf.serialize(data);
     //send data
-    net.sendMessage (i, &for_each_landing_pad<WLTy,FunctionTy>, buf);
+    net.sendMessage (i, &for_each_landing_pad<WLTy,ItemTy,FunctionTy>, buf);
   }
   //now get our data
-  auto myblk = block_range(allData.begin(), allData.end(), 0, networkHostNum);
+  auto myblk = block_range(allData.begin(), allData.end(), 0, Distributed::networkHostNum);
 
   //Start locally
-  Galois::Runtime::for_each_imple<WLTy>(myblk.first, myblk.second, f, loopname);
+  for_each_impl<WLTy>(myblk.first, myblk.second, f, loopname);
 
   //FIXME: wait on a network barrier here unless systemBarrier is network aware
 }

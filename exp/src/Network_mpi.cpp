@@ -112,6 +112,7 @@ public:
       handleError(rv);
       if (flag) {
 	retval = true;
+	int count;
 	MPI_Get_count(&status, MPI_BYTE, &count);
 	RecvBuffer buf(count);
 	MPI_Recv(buf.linearData(), count, MPI_BYTE, MPI_ANY_SOURCE, FuncTag, MPI_COMM_WORLD, &status);
