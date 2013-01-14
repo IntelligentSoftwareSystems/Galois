@@ -71,6 +71,12 @@ public:
       serialize(*ii);
   }
 
+  template<typename T1, typename T2>
+  inline void serialize(const std::pair<T1, T2>& data) {
+    serialize(data.first);
+    serialize(data.second);
+   }
+
   template<typename T1, typename T2, typename... U>
   void serialize(const T1& a1, const T2& a2, U... an) {
     serialize(a1);
@@ -129,6 +135,12 @@ public:
     for (lsty x = 0; x < size; ++x)
       deserialize(data[x]);
   }
+
+  template<typename T1, typename T2>
+  inline void deserialize(std::pair<T1, T2>& data) {
+    deserialize(data.first);
+    deserialize(data.second);
+   }
 
   template<typename T1, typename T2, typename... U>
   void deserialize(T1& a1, T2& a2, U... an) {
