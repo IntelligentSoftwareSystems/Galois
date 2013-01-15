@@ -1,13 +1,14 @@
 #include <vector>
 #include "Galois/Galois.h"
-#include "Galois/Runtime/gptr.h"
+#include "Galois/Runtime/DistSupport.h"
 
 using namespace std;
 using namespace Galois::Runtime;
+using namespace Galois::Runtime::Distributed;
 
 typedef vector<int>::iterator IterTy;
 
-struct R {
+struct R : public Galois::Runtime::Lockable {
    int i;
 
    R() { i = 0; }
@@ -25,6 +26,15 @@ struct f1 {
       r->add(data);
       return;
    }
+
+	// serialization functions
+	typedef int tt_has_serialize;
+  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+    s.serialize(r);
+  }
+  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+    s.deserialize(r);
+  }
 };
 
 int main(int argc, char *argv[])

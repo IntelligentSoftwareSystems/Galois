@@ -113,18 +113,30 @@ namespace Galois {
 namespace Runtime {
 namespace Distributed {
 
-// ownerLandingPad and remoteLandingPad
-// should receive both data and requests for data
+// Handles incoming requests for remote objects
+// if Ineligible, transfer to Eligible after INELI2ELI_COUNT requests
+// if Eligible return the object back to owner and mark as Remote
+template<typename T>
+void remoteReqLandingPad(Galois::Runtime::Distributed::RecvBuffer &);
+// Landing Pad for incoming remote objects
+template<typename T>
+void remoteDataLandingPad(Galois::Runtime::Distributed::RecvBuffer &);
+
+// fwd the request if state is remote
+// send the object if local, not locked and mark obj as remote
+template<typename T>
+static void localReqLandingPad(Galois::Runtime::Distributed::RecvBuffer &);
+// send the object if local, not locked and mark obj as remote
+template<typename T>
+static void localDataLandingPad(Galois::Runtime::Distributed::RecvBuffer &);
 
 class RemoteDirectory {
 
   struct objstate {
     // Remote - The object has been returned to the owner
-    // Requested - A request for the object has been made (MAY NEED THIS)
-    // Ineligible - Local object but not eligible to be returned to owner
-    // Eligible - Local object but can be returned to the owner
-    // Locked - Local object locked for use
-    enum ObjStates { Remote, Ineligible, Eligible, Locked };
+    // Local  - Local object eligible for use as soon as received
+    //          Inelgible for transfer till INELI2ELI_COUNT reqs or local use
+    enum ObjStates { Remote, Local };
 
     uintptr_t localobj;
     enum ObjStates state;
@@ -147,13 +159,6 @@ class RemoteDirectory {
   // places a remote request for the node
   void fetchRemoteObj(uintptr_t ptr, uint32_t owner, recvFuncTy pad);
 
-  // NACK is a noop here too (NOT SENDING NACK)
-  // if Ineligible, transfer to Eligible after INELI2ELI_COUNT requests
-  // if Ineligible or Locked send a NACK
-  // if Eligible return the object back to owner and mark as Remote
-  template<typename T>
-  void remoteLandingPad(Galois::Runtime::Distributed::RecvBuffer &);
-
 public:
   //resolve a pointer, owner pair
   //precondition: owner != networkHostID
@@ -165,9 +170,8 @@ class LocalDirectory {
 
   struct objstate {
     // Remote - Object passed to a remote host
-    // Local - Local object and not locked
-    // Locked - Local object locked for use
-    enum ObjStates { Remote, Local, Locked };
+    // Local - Local object may be locked
+    enum ObjStates { Remote, Local };
 
     int sent_to;  // valid only for remote objects
     enum ObjStates state;
@@ -181,13 +185,6 @@ class LocalDirectory {
 
   // places a remote request for the node
   void fetchRemoteObj(uintptr_t ptr, uint32_t remote, recvFuncTy pad);
-
-  // NACK is a noop on the owner (NOT SENDING NACK)
-  // fwd the request if state is remote
-  // send a NACK if locked
-  // send the object if local and mark obj as remote
-  template<typename T>
-  void ownerLandingPad(Galois::Runtime::Distributed::RecvBuffer &);
 
 public:
   // resolve a pointer
