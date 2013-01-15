@@ -62,7 +62,7 @@ public:
     for (size_t i = 0; i < sizeof(data); ++i)
       bufdata.push_back(pdata[i]);
   }
-
+  
   template<typename T>
   inline void serialize(const T& data, typename std::enable_if<has_serialize<T>::value>::type* = 0) {
     data.serialize(*this);
