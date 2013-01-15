@@ -24,81 +24,8 @@
 
 #include "Galois/Runtime/Directory.h"
 
-#define INELIGIBLE_COUNT 12
-
 using namespace std;
 using namespace Galois::Runtime::Distributed;
-
-template<typename T>
-void remoteReqLandingPad(RecvBuffer &buf) {
-  int owner;
-  T *data;
-  uintptr_t ptr;
-  LocalDirectory& ld = getSystemLocalDirectory();
-  RemoteDirectory& rd = getSystemRemoteDirectory();
-#define OBJSTATE (*iter).second
-  rd.Lock.lock();
-  buf.deserialize(ptr);
-  buf.deserialize(owner);
-  auto iter = rd.curobj.find(make_pair(ptr,owner));
-  // check if the object can be sent
-  if ((iter == rd.curobj.end()) || (OBJSTATE.state == RemoteDirectory::objstate::Remote)) {
-    // object can't be remote if the owner makes a request
-    abort();
-  }
-  else if (OBJSTATE.state == RemoteDirectory::objstate::Local) {
-// modify the check here to use acquire and free instead of Eligible and Ineligible states
-    // check number of requests and make eligible if needed
-    OBJSTATE.count++;
-    if (OBJSTATE.count == INELIGIBLE_COUNT) {
-      // the data should be sent
-//    OBJSTATE.state = RemoteDirectory::objstate::Eligible;
-    }
-//  if (OBJSTATE.state == RemoteDirectory::objstate::Eligible) {
-      // object should be sent to the remote host
-      data = reinterpret_cast<T*>(OBJSTATE.localobj);
-      SendBuffer sbuf;
-      NetworkInterface& net = getSystemNetworkInterface();
-      sbuf.serialize(ptr);
-      sbuf.serialize(sizeof(*data));
-      sbuf.serialize(*data);
-      rd.curobj.erase(make_pair(ptr,owner));
-      net.sendMessage(owner,&localDataLandingPad<T>,sbuf);
-      free(data);
-//  }
-  }
-  else {
-    cout << "Unexpected state in remoteReqLandingPad" << endl;
-  }
-  rd.Lock.unlock();
-#undef OBJSTATE
-  return;
-}
-
-template<typename T>
-void remoteDataLandingPad(RecvBuffer &buf) {
-  uint32_t owner;
-  int size;
-  T *data;
-  uintptr_t ptr;
-  LocalDirectory& ld = getSystemLocalDirectory();
-  RemoteDirectory& rd = getSystemRemoteDirectory();
-#define OBJSTATE (*iter).second
-  rd.Lock.lock();
-  buf.deserialize(ptr);
-  buf.deserialize(owner);
-  auto iter = rd.curobj.find(make_pair(ptr,owner));
-  buf.deserialize(size);
-  data = (T*)calloc(1,size);
-  buf.deserialize((*data));
-  OBJSTATE.state = RemoteDirectory::objstate::Local;
-// lock the object with the special value to mark eligible
-  OBJSTATE.localobj = (uintptr_t)data;
-  OBJSTATE.count = 0;
-  rd.Lock.unlock();
-#undef OBJSTATE
-  return;
-}
 
 uintptr_t RemoteDirectory::haveObject(uintptr_t ptr, uint32_t owner) {
 #define OBJSTATE (*iter).second
@@ -131,26 +58,6 @@ void RemoteDirectory::fetchRemoteObj(uintptr_t ptr, uint32_t owner, recvFuncTy p
   return;
 }
 
-template<typename T>
-void localDataLandingPad(RecvBuffer &buf) {
-  int size;
-  T *data;
-  uintptr_t ptr;
-#define OBJSTATE (*iter).second
-  LocalDirectory& ld = getSystemLocalDirectory();
-  RemoteDirectory& rd = getSystemRemoteDirectory();
-  ld.Lock.lock();
-  buf.deserialize(ptr);
-  data = reinterpret_cast<T*>(ptr);
-  auto iter = ld.curobj.find(ptr);
-  buf.deserialize(size);
-  buf.deserialize((*data));
-  OBJSTATE.state = LocalDirectory::objstate::Local;
-  ld.Lock.unlock();
-#undef OBJSTATE
-  return;
-}
-
 uintptr_t LocalDirectory::haveObject(uintptr_t ptr, int *remote) {
 #define OBJSTATE (*iter).second
   Lock.lock();
@@ -175,16 +82,6 @@ void LocalDirectory::fetchRemoteObj(uintptr_t ptr, uint32_t remote, recvFuncTy p
   buf.serialize(networkHostID);
   net.sendMessage (remote, pad, buf);
   return;
-}
-
-template<typename T>
-T* LocalDirectory::resolve(uintptr_t ptr) {
-  int sent = 0;
-  RemoteDirectory& rd = getSystemRemoteDirectory();
-  uintptr_t p = haveObject(ptr, &sent);
-  if (!p)
-    fetchRemoteObj(ptr, sent, &remoteReqLandingPad<T>);
-  return reinterpret_cast<T*>(p);
 }
 
 RemoteDirectory& Galois::Runtime::Distributed::getSystemRemoteDirectory() {

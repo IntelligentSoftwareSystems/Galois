@@ -11,6 +11,8 @@ typedef vector<int>::iterator IterTy;
 struct R : public Galois::Runtime::Lockable {
    int i;
 
+   R() { i = 0; }
+
    void add(int v) {
       i += v;
       return;
@@ -54,7 +56,7 @@ int main(int argc, char *argv[])
    Galois::Runtime::Distributed::networkStart();
 
    vector<int> myvec;
-   R r; r.i = 0;
+   R r;
    f1 f(&r);
    for (int i=1; i<=40; i++) myvec.push_back(i);
 
