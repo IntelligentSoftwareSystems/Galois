@@ -122,13 +122,9 @@ void remoteReqLandingPad(Galois::Runtime::Distributed::RecvBuffer &);
 template<typename T>
 void remoteDataLandingPad(Galois::Runtime::Distributed::RecvBuffer &);
 
-// fwd the request if state is remote
 // send the object if local, not locked and mark obj as remote
 template<typename T>
-static void localReqLandingPad(Galois::Runtime::Distributed::RecvBuffer &);
-// send the object if local, not locked and mark obj as remote
-template<typename T>
-static void localDataLandingPad(Galois::Runtime::Distributed::RecvBuffer &);
+void localDataLandingPad(Galois::Runtime::Distributed::RecvBuffer &);
 
 class RemoteDirectory {
 
@@ -187,6 +183,10 @@ class LocalDirectory {
   void fetchRemoteObj(uintptr_t ptr, uint32_t remote, recvFuncTy pad);
 
 public:
+
+  template<typename T>
+  static void localReqLandingPad(Galois::Runtime::Distributed::RecvBuffer &);
+
   // resolve a pointer
   template<typename T>
   T* resolve(uintptr_t ptr);
@@ -200,4 +200,62 @@ LocalDirectory& getSystemLocalDirectory();
 } //Distributed
 } //Runtime
 } //Galois
+
+template<typename T>
+T* Galois::Runtime::Distributed::RemoteDirectory::resolve(uintptr_t ptr, uint32_t owner) {
+  assert(owner != networkHostID);
+  uintptr_t p = haveObject(ptr, owner);
+  if (!p) {
+    fetchRemoteObj(ptr, owner, &Galois::Runtime::Distributed::LocalDirectory::localReqLandingPad<T>);
+    throw 1; //FIXME: integrate with acquire's throw type
+  }
+  return reinterpret_cast<T*>(p);
+}
+
+template<typename T>
+void Galois::Runtime::Distributed::LocalDirectory::localReqLandingPad(RecvBuffer &buf) {
+  uint32_t remote_to;
+  T *data;
+  uintptr_t ptr;
+#define OBJSTATE (*iter).second
+  LocalDirectory& ld = getSystemLocalDirectory();
+  ld.Lock.lock();
+  buf.deserialize(ptr);
+  data = reinterpret_cast<T*>(ptr);
+  auto iter = ld.curobj.find(ptr);
+  buf.deserialize(remote_to);
+  // add object to list if it's not already there
+  if (iter == ld.curobj.end()) {
+    LocalDirectory::objstate list_obj;
+    list_obj.sent_to = remote_to;
+    list_obj.state = LocalDirectory::objstate::Local;
+    ld.curobj[ptr] = list_obj;
+  }
+  // check if the object can be sent
+  if (OBJSTATE.state == LocalDirectory::objstate::Remote) {
+    // object is remote so place a return request
+    ld.fetchRemoteObj(ptr, OBJSTATE.sent_to, &remoteReqLandingPad<T>);
+  }
+  else if (OBJSTATE.state == LocalDirectory::objstate::Local) {
+// check if locked using the new acquire calls!
+    // object should be sent to the remote host
+    SendBuffer sbuf;
+    NetworkInterface& net = getSystemNetworkInterface();
+    sbuf.serialize(ptr);
+    sbuf.serialize(networkHostID);
+    sbuf.serialize(sizeof(*data));
+    sbuf.serialize(*data);
+    OBJSTATE.state = LocalDirectory::objstate::Remote;
+    net.sendMessage(remote_to,&remoteDataLandingPad<T>,sbuf);
+  }
+  else {
+    cout << "Unexpected state in localReqLandingPad" << endl;
+  }
+  ld.Lock.unlock();
+#undef OBJSTATE
+  return;
+}
+
+
+
 #endif
