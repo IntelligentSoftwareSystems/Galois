@@ -49,7 +49,7 @@ public:
 
   SerializeBuffer() {
     //reserve a header
-    for (int i = 0; i < sizeof(uintptr_t); ++i)
+    for (size_t i = 0; i < sizeof(uintptr_t); ++i)
       bufdata.push_back(0);
   }
 
