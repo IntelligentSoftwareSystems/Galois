@@ -66,6 +66,8 @@ static cll::opt<PseudoAlgo> pseudoAlgo(cll::desc("Psuedo-Peripheral algorithm:")
       clEnumVal(fullPseudo, "Full algorithm"),
       clEnumValEnd), cll::init(fullPseudo));
 
+static cll::opt<bool> anyBFS("anyBFS", cll::desc("Use Any BFS ordering"), cll::init(false));
+
 typedef unsigned int DistType;
 
 static const DistType DIST_INFINITY = std::numeric_limits<DistType>::max() - 1;
@@ -631,6 +633,49 @@ struct CuthillUnordered {
   }
 };
 
+struct AnyBFSUnordered {
+  template<typename C, typename WO>
+  struct PlaceFn {
+    C& counts;
+    WO& write_offset;
+
+    PlaceFn(C& c, WO& w): counts(c), write_offset(w) { }
+
+    void operator()(const GNode& src) {
+      unsigned d = graph.getData(src).dist;
+      unsigned wloc = __sync_fetch_and_add(&write_offset[d].data, 1);
+      perm[wloc] = src;
+    }
+  };
+
+  template<typename C, typename RO, typename WO>
+  static void place_nodes(C& c, RO& read_offset, WO& write_offset) {
+    Galois::do_all(graph.begin(), graph.end(), PlaceFn<C,WO>(c, write_offset), "place");
+  }
+
+  template<typename C>
+  static void place_nodes(GNode source, C& counts) {
+    std::deque<unsigned int> read_offset;
+    std::deque<Galois::Runtime::LL::CacheLineStorage<unsigned int> > write_offset;
+
+    read_offset.push_back(0);
+    std::partial_sum(counts.begin(), counts.end(), back_inserter(read_offset));
+    write_offset.insert(write_offset.end(), read_offset.begin(), read_offset.end());
+
+    place_nodes(counts, read_offset, write_offset);
+  }
+
+  template<typename C>
+  static void go(GNode source, C& counts) {
+    place_nodes(source, counts);
+  }
+
+  static void go(GNode source) {
+    BFS::Result res = BFS::go(source, false);
+    go(source, res.counts);
+  }
+};
+
 } // end anonymous
 
 int main(int argc, char **argv) {
@@ -661,10 +706,17 @@ int main(int argc, char **argv) {
 
   Galois::StatTimer Tcuthill("CuthillTime");
   Tcuthill.start();
-  if (pseudoAlgo == simplePseudo)
-    CuthillUnordered::go(result.source, result.counts);
-  else
-    CuthillUnordered::go(result.source);
+  if (pseudoAlgo == simplePseudo) {
+    if (anyBFS)
+      AnyBFSUnordered::go(result.source, result.counts);
+    else
+      CuthillUnordered::go(result.source, result.counts);
+  } else {
+    if (anyBFS)
+      AnyBFSUnordered::go(result.source);
+    else
+      CuthillUnordered::go(result.source);
+  }
   Tcuthill.stop();
   T.stop();
 
