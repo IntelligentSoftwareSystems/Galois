@@ -184,6 +184,8 @@ class LocalDirectory {
 
 public:
 
+  // forward the request if the state is remote
+  // send the object if local and not locked, also mark as remote
   template<typename T>
   static void localReqLandingPad(Galois::Runtime::Distributed::RecvBuffer &);
 
