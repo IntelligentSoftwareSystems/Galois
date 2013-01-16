@@ -496,19 +496,19 @@ struct PseudoPeripheral {
     }
   };
 
-
-  static std::pair<BFS::Result,std::deque<GNode> > search(const GNode& start, size_t limit) {
+  static std::pair<BFS::Result,std::deque<GNode> > search(const GNode& start, size_t limit, bool computeCandidates) {
     BFS::Result res;
     std::deque<GNode> candidates;
 
     if (limit == ~0 || pseudoAlgo == fullPseudo) {
       res = BFS::go(start, false);
-      candidates = select_candidates::go(5, res.ecc());
+      if (computeCandidates)
+        candidates = select_candidates::go(5, res.ecc());
       if (res.max_width >= limit)
         res.complete = false;
     } else {
       res = BFS::go(start, false, limit);
-      if (res.complete)
+      if (res.complete && computeCandidates)
         candidates = select_candidates::go(5, res.ecc());  
     }
 
@@ -520,9 +520,11 @@ struct PseudoPeripheral {
   static std::pair<BFS::Result,GNode> go(GNode source) {
     int skips = 0;
     int searches = 0;
+    boost::optional<BFS::Result> terminal;
 
     ++searches;
-    std::pair<BFS::Result, std::deque<GNode> > v = search(source, ~0);
+    std::pair<BFS::Result, std::deque<GNode> > v = search(source, ~0, true);
+
     while (true) {
       std::cout 
         << "(ecc(v), max_width) =" 
@@ -530,44 +532,50 @@ struct PseudoPeripheral {
         << " (ecc(u), max_width(u)) =";
 
       size_t last = ~0;
-      auto ii = v.second.begin();
-      auto ei = v.second.end();
-
-      for (; ii != ei; ++ii) {
+      for (auto ii = v.second.begin(), ei = v.second.end(); ii != ei; ++ii) {
         ++searches;
-        std::pair<BFS::Result,std::deque<GNode> > u = search(*ii, last);
+        std::pair<BFS::Result,std::deque<GNode> > u = search(*ii, last, false);
 
         std::cout << " (" << u.first.ecc() << ", " << u.first.max_width << ")";
 
         if (!u.first.complete) {
           ++skips;
           continue;
-        }
-
-        if (u.first.ecc() > v.first.ecc()) {
-          source = v.first.source;
+        } else if (u.first.ecc() > v.first.ecc()) {
           v = u;
+          terminal = boost::optional<BFS::Result>();
           break;
         } else if (u.first.max_width < last) {
           last = u.first.max_width;
-          source = v.first.source;
-          v = u;
+          terminal = boost::optional<BFS::Result>(u.first);
         }
       }
 
       std::cout << "\n";
 
-      if (ii == ei)
+      if (terminal)
         break;
+      v = search(v.first.source, ~0, true);
     }
 
-    std::cout << "Selected source: " << graph.getData(v.first.source)
+    BFS::Result res;
+    GNode end;
+    if (v.first.max_width > terminal->max_width) {
+      res = *terminal;
+      end = v.first.source;
+    } else {
+      res = v.first;
+      end = terminal->source;
+    }
+
+    std::cout << "Selected source: " << graph.getData(res.source)
       << " (skips: " << skips
       << ", searches: " << searches 
       << ")\n";
-    return std::make_pair(v.first, source);
+    return std::make_pair(res, end);
   }
 };
+
 struct Permutation {
   size_t cur;
   std::vector<GNode> perm;
