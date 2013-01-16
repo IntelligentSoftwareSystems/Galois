@@ -71,9 +71,11 @@ public:
   typedef int tt_has_serialize;
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
     s.serialize(ptr);
+    s.serialize(owner);
   }
   void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
     s.deserialize(ptr);
+    s.deserialize(owner);
   }
 
   void dump(std::ostream& os) {
