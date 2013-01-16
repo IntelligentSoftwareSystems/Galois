@@ -169,7 +169,7 @@ void convert_gr2sgr(const std::string& infilename, const std::string& outfilenam
   ingraph.structureFromFile(infilename);
   Galois::Graph::makeSymmetric<EdgeTy>(ingraph, outgraph);
 
-  outgraph.structureFromFile(outfilename.c_str());
+  outgraph.structureToFile(outfilename.c_str());
 }
 
 void convert_rmat2gr(const std::string& infilename, const std::string& outfilename) {
