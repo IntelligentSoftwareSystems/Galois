@@ -36,36 +36,38 @@
 namespace cll = llvm::cl;
 
 enum ConvertMode {
-  edgelist2gr,
-  intedgelist2gr,
-  floatedgelist2gr,
   dimacs2gr,
+  edgelist2gr,
+  floatedgelist2gr,
+  gr2bsml,
+  gr2dimacs,
+  gr2pbbs,
+  intedgelist2gr,
+  pbbs2gr,
+  pbbs2vgr,
   rmat2gr,
   stext2vgr,
-  pbbs2vgr,
-  pbbs2gr,
-  gr2bsml,
   vgr2bsml,
-  gr2dimacs,
-  gr2pbbs
+  vgr2svgr
 };
 
 static cll::opt<std::string> inputfilename(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<std::string> outputfilename(cll::Positional, cll::desc("<output file>"), cll::Required);
 static cll::opt<ConvertMode> convertMode(cll::desc("Choose a conversion mode:"),
     cll::values(
-      clEnumVal(edgelist2gr, "Convert edge list to binary gr (default)"),
-      clEnumVal(intedgelist2gr, "Convert weighted (int) edge list to binary gr (default)"),
-      clEnumVal(floatedgelist2gr, "Convert weighted (float) edge list to binary gr (default)"),
       clEnumVal(dimacs2gr, "Convert dimacs to binary gr"),
-      clEnumVal(rmat2gr, "Convert rmat to binary gr"),
-      clEnumVal(pbbs2vgr, "Convert pbbs graph to binary void gr"),
-      clEnumVal(stext2vgr, "Convert simple text graph to binary void gr"),
-      clEnumVal(pbbs2gr, "Convert pbbs graph to binary gr"),
+      clEnumVal(edgelist2gr, "Convert edge list to binary gr (default)"),
+      clEnumVal(floatedgelist2gr, "Convert weighted (float) edge list to binary gr (default)"),
       clEnumVal(gr2bsml, "Convert binary gr to binary sparse MATLAB matrix"),
-      clEnumVal(vgr2bsml, "Convert binary void gr to binary sparse MATLAB matrix"),
       clEnumVal(gr2dimacs, "Convert binary gr to dimacs"),
       clEnumVal(gr2pbbs, "Convert binary gr to pbbs"),
+      clEnumVal(intedgelist2gr, "Convert weighted (int) edge list to binary gr (default)"),
+      clEnumVal(pbbs2gr, "Convert pbbs graph to binary gr"),
+      clEnumVal(pbbs2vgr, "Convert pbbs graph to binary void gr"),
+      clEnumVal(rmat2gr, "Convert rmat to binary gr"),
+      clEnumVal(stext2vgr, "Convert simple text graph to binary void gr"),
+      clEnumVal(vgr2bsml, "Convert binary void gr to binary sparse MATLAB matrix"),
+      clEnumVal(vgr2svgr, "Convert binary void gr to symmetric graph by adding reverse edges"),
       clEnumValEnd), cll::init(edgelist2gr));
 
 // TODO(ddn): Switch over to FileGraphParser interface instead of Galois::Graphs::outputGraph()
@@ -156,6 +158,18 @@ void convert_edgelist2gr(const std::string& infilename, const std::string& outfi
     << "\n";
 
   p.structureToFile(outfilename.c_str());
+}
+
+template<typename EdgeTy>
+void convert_gr2sgr(const std::string& infilename, const std::string& outfilename) {
+  typedef Galois::Graph::FileGraph Graph;
+
+  Graph ingraph;
+  Graph outgraph;
+  ingraph.structureFromFile(infilename);
+  Galois::Graph::makeSymmetric<EdgeTy>(ingraph, outgraph);
+
+  outgraph.structureFromFile(outfilename.c_str());
 }
 
 void convert_rmat2gr(const std::string& infilename, const std::string& outfilename) {
@@ -615,19 +629,20 @@ void convert_gr2bsml(const std::string& infilename, const std::string& outfilena
 int main(int argc, char** argv) {
   llvm::cl::ParseCommandLineOptions(argc, argv);
   switch (convertMode) {
+    case dimacs2gr: convert_dimacs2gr(inputfilename, outputfilename); break;
+    case edgelist2gr: convert_edgelist2gr<void>(inputfilename, outputfilename); break;
+    case floatedgelist2gr: convert_edgelist2gr<float>(inputfilename, outputfilename); break;
+    case gr2bsml: convert_gr2bsml<int32_t>(inputfilename, outputfilename); break;
+    case gr2dimacs: convert_gr2dimacs(inputfilename, outputfilename); break;
+    case gr2pbbs: convert_gr2pbbs(inputfilename, outputfilename); break;
+    case intedgelist2gr: convert_edgelist2gr<int>(inputfilename, outputfilename); break;
+    case pbbs2gr: convert_pbbs2gr<int32_t>(inputfilename, outputfilename); break;
+    case pbbs2vgr: convert_pbbs2gr<void>(inputfilename, outputfilename); break;
     case rmat2gr: convert_rmat2gr(inputfilename, outputfilename); break;
     case stext2vgr: convert_stext2vgr(inputfilename, outputfilename); break;
-    case pbbs2vgr: convert_pbbs2gr<void>(inputfilename, outputfilename); break;
-    case pbbs2gr: convert_pbbs2gr<int32_t>(inputfilename, outputfilename); break;
-    case gr2dimacs: convert_gr2dimacs(inputfilename, outputfilename); break;
     case vgr2bsml: convert_gr2bsml<void>(inputfilename, outputfilename); break;
-    case gr2bsml: convert_gr2bsml<int32_t>(inputfilename, outputfilename); break;
-    case gr2pbbs: convert_gr2pbbs(inputfilename, outputfilename); break;
-    case dimacs2gr: convert_dimacs2gr(inputfilename, outputfilename); break;
-    case intedgelist2gr: convert_edgelist2gr<int>(inputfilename, outputfilename); break;
-    case floatedgelist2gr: convert_edgelist2gr<float>(inputfilename, outputfilename); break;
-    default:
-    case edgelist2gr: convert_edgelist2gr<void>(inputfilename, outputfilename); break;
+    case vgr2svgr: convert_gr2sgr<void>(inputfilename, outputfilename); break;
+    default: abort();
   }
   return 0;
 }

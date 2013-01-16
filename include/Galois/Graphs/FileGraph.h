@@ -162,6 +162,9 @@ public:
   //! The number of edges in the graph
   unsigned int sizeEdges() const;
 
+  //! sizeof an edge
+  size_t sizeEdge() const { return sizeEdgeTy; }
+
   FileGraph();
   ~FileGraph();
 
