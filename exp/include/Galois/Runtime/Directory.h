@@ -162,7 +162,7 @@ public:
   T* resolve(uintptr_t ptr, uint32_t owner);
 };
 
-class LocalDirectory {
+class LocalDirectory: public SimpleRuntimeContext {
 
   struct objstate {
     // Remote - Object passed to a remote host
@@ -182,7 +182,12 @@ class LocalDirectory {
   // places a remote request for the node
   void fetchRemoteObj(uintptr_t ptr, uint32_t remote, recvFuncTy pad);
 
+  // virtual function in SimpleRuntimeContext
+  virtual void sub_acquire(Lockable* L);
+
 public:
+
+  LocalDirectory(): SimpleRuntimeContext(true) {}
 
   // forward the request if the state is remote
   // send the object if local and not locked, also mark as remote

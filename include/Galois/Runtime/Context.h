@@ -60,6 +60,7 @@ void setPending(PendingFlag value);
 //! used to release lock over exception path
 static inline void clearConflictLock() { }
 
+class LocalDirectory;
 class SimpleRuntimeContext;
 class DeterministicRuntimeContext;
 
@@ -73,6 +74,7 @@ extern __thread jmp_buf hackjmp;
 class Lockable {
   LL::PtrLock<SimpleRuntimeContext, true> Owner;
   Lockable* next;
+  friend class LocalDirectory;
   friend class SimpleRuntimeContext;
   friend class DeterministicRuntimeContext;
 public:
