@@ -198,6 +198,24 @@ void Galois::Runtime::SimpleRuntimeContext::sub_acquire(Galois::Runtime::Lockabl
 //anchor vtable
 Galois::Runtime::SimpleRuntimeContext::~SimpleRuntimeContext() {}
 
+void Galois::Runtime::DirectoryRuntimeContext::sub_acquire(Galois::Runtime::Lockable* L) {
+  if (L->Owner.try_lock()) {
+    assert(!L->Owner.getValue());
+    assert(!L->next);
+    L->Owner.setValue(this);
+    // do not create a linked list of the locks for the context
+  /*
+    L->next = locks;
+    locks = L;
+   */
+  } else {
+    if (L->Owner.getValue() != this) {
+      Galois::Runtime::signalConflict();
+    }
+  }
+  return;
+}
+
 void Galois::Runtime::DeterministicRuntimeContext::sub_acquire(Galois::Runtime::Lockable* L) {
   // Normal path
   if (pendingFlag.flag.data == NON_DET) {

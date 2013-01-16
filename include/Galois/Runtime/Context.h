@@ -60,8 +60,8 @@ void setPending(PendingFlag value);
 //! used to release lock over exception path
 static inline void clearConflictLock() { }
 
-class LocalDirectory;
 class SimpleRuntimeContext;
+class DirectoryRuntimeContext;
 class DeterministicRuntimeContext;
 
 #if GALOIS_USE_EXCEPTION_HANDLER
@@ -74,8 +74,8 @@ extern __thread jmp_buf hackjmp;
 class Lockable {
   LL::PtrLock<SimpleRuntimeContext, true> Owner;
   Lockable* next;
-  friend class LocalDirectory;
   friend class SimpleRuntimeContext;
+  friend class DirectoryRuntimeContext;
   friend class DeterministicRuntimeContext;
 public:
   LL::PtrLock<void, true> auxPtr;
@@ -113,6 +113,14 @@ SimpleRuntimeContext* getThreadContext();
 
 //! used by the parallel code to set up conflict detection per thread
 void setThreadContext(SimpleRuntimeContext* n);
+
+class DirectoryRuntimeContext: public SimpleRuntimeContext {
+protected:
+  virtual void sub_acquire(Lockable* L);
+
+public:
+  DirectoryRuntimeContext(): SimpleRuntimeContext(true) {}
+};
 
 class DeterministicRuntimeContext: public SimpleRuntimeContext {
 protected:
