@@ -101,11 +101,12 @@ public:
   unsigned cancel_iteration();
   unsigned commit_iteration();
   void acquire(Lockable* L);
-  void lockAcquire(Lockable* L);
   bool do_trylock(Lockable* L);
   void do_unlock(Lockable* L);
   void *do_getValue(Lockable* L);
-  void do_setLockValue(Lockable* L);
+  bool isMagicLock(Lockable* L);
+  void do_setMagicLock(Lockable* L);
+  bool do_diracquire(Lockable* L);
 };
 
 //! get the current conflict detection class, may be null if not in parallel region
@@ -172,19 +173,20 @@ static inline void acquire(Lockable* C, Galois::MethodFlag m) {
     doAcquire(C);
 }
 
-//! actual locking function
-void doLockAcquire(Lockable* C);
+// acquire call by the directory which tries to acquire the lock
+// returns true or false depending on if the lock was acquired
+bool diracquire(Lockable* C);
 
-// Function to acquire a local node
-static inline void lockAcquire(Lockable* C, Galois::MethodFlag m) {
-  if (shouldLock(m))
-    doLockAcquire(C);
+bool do_isMagicLock(Lockable* C);
+
+static inline bool isMagicLock(Lockable* C) {
+   return do_isMagicLock(C);
 }
 
-void do_setLockValue(Lockable* C);
+void do_setMagicLock(Lockable* C);
 
-static inline void setLockValue(Lockable* C) {
-   do_setLockValue(C);
+static inline void setMagicLock(Lockable* C) {
+   do_setMagicLock(C);
    return;
 }
 

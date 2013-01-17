@@ -63,7 +63,7 @@ public:
   //Resolve
   T* resolve() const {
     if (owner == networkHostID)
-      return reinterpret_cast<T*>(ptr);
+      return getSystemLocalDirectory().resolve<T>(ptr);
     return getSystemRemoteDirectory().resolve<T>(ptr, owner);
   }
 

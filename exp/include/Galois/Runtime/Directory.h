@@ -25,91 +25,14 @@
 #ifndef GALOIS_RUNTIME_DIRECTORY_H
 #define GALOIS_RUNTIME_DIRECTORY_H
 
-#include "Galois/Runtime/NodeRequest.h"
+#include <iostream>
 #include <unordered_map>
-#include "Galois/Runtime/ll/TID.h"
-#include "Galois/Runtime/MethodFlags.h"
-#include <unistd.h>
-
-#include "Galois/Runtime/ll/SimpleLock.h"
+#include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Network.h"
-
-#define PLACEREQ 10000
-
-#if 0
-namespace Galois {
-namespace Runtime {
-
-// the default value is false
-extern bool distributed_foreach;
-
-static inline void set_distributed_foreach(bool val) {
-   distributed_foreach = val;
-   return;
-}
-
-static inline bool get_distributed_foreach() {
-   return distributed_foreach;
-}
-
-namespace DIR {
-
-extern NodeRequest nr;
-
-static inline int getTaskRank() {
-   return nr.taskRank;
-}
-
-static inline int getNoTasks() {
-   return nr.numTasks;
-}
-
-static inline void comm() {
-   nr.Communicate();
-   return;
-}
-
-   static void *resolve (void *ptr, int owner, size_t size) {
-      Lockable *L;
-      int count;
-      static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-   pthread_mutex_lock(&mutex);
-      void *tmp = nr.remoteAccess(ptr,owner);
-      if (!tmp) {
-         // go get a copy of the object
-         nr.PlaceRequest (owner, ptr, size);
-         count = 0;
-         do {
-            if (count++ == PLACEREQ) {
-               // reqs may be lost as remote tasks may ask for the same node
-               count = 0;
-               // may be the only running thread - req a call to comm
-               nr.Communicate();
-               // sleep so that the caller is not flooded with requests
-               usleep(10000);
-               nr.PlaceRequest (owner, ptr, size);
-            }
-            // another thread might have got the same data
-            nr.checkRequest(ptr,owner,&tmp,size);
-         } while(!tmp);
-      }
-   pthread_mutex_unlock(&mutex);
-      // lock the object if locked for use by the directory (setLockValue)
-      L = reinterpret_cast<Lockable*>(tmp);
- //   if (get_distributed_foreach() && (getNoTasks() != 1))
-      if (get_distributed_foreach())
-        lockAcquire(L,Galois::MethodFlag::ALL);
-      else
-        acquire(L,Galois::MethodFlag::ALL);
-      return tmp;
-   }
-
-} // end of DIR namespace
-}
-} // end namespace
-#endif
+#include "Galois/Runtime/ll/SimpleLock.h"
 
 #define INELIGIBLE_COUNT 12
+using namespace std;
 
 namespace Galois {
 namespace Runtime {
@@ -235,16 +158,21 @@ void Galois::Runtime::Distributed::RemoteDirectory::remoteReqLandingPad(RecvBuff
     abort();
   }
   else if (OBJSTATE.state == RemoteDirectory::objstate::Local) {
-// modify the check here to use acquire and free instead of Eligible and Ineligible states
-    // check number of requests and make eligible if needed
-    OBJSTATE.count++;
-    if (OBJSTATE.count == INELIGIBLE_COUNT) {
-      // the data should be sent
-//    OBJSTATE.state = RemoteDirectory::objstate::Eligible;
+    bool flag = true;
+    data = reinterpret_cast<T*>(OBJSTATE.localobj);
+    Lockable *L = reinterpret_cast<Lockable*>(data);
+    // check if eligible or ineligible to be sent
+    if (isMagicLock(L)) {
+      // ineligible state - check number of requests
+      OBJSTATE.count++;
+      if (OBJSTATE.count < INELIGIBLE_COUNT) {
+        // the data should not be sent
+        flag = false;
+      }
     }
-//  if (OBJSTATE.state == RemoteDirectory::objstate::Eligible) {
+    // if eligible and lock acquired
+    if (flag && diracquire(L)) {
       // object should be sent to the remote host
-      data = reinterpret_cast<T*>(OBJSTATE.localobj);
       SendBuffer sbuf;
       NetworkInterface& net = getSystemNetworkInterface();
       sbuf.serialize(ptr);
@@ -253,7 +181,7 @@ void Galois::Runtime::Distributed::RemoteDirectory::remoteReqLandingPad(RecvBuff
       rd.curobj.erase(make_pair(ptr,owner));
       net.sendMessage(owner,&Galois::Runtime::Distributed::LocalDirectory::localDataLandingPad<T>,sbuf);
       free(data);
-//  }
+    }
   }
   else {
     cout << "Unexpected state in remoteReqLandingPad" << endl;
@@ -268,6 +196,7 @@ void Galois::Runtime::Distributed::RemoteDirectory::remoteDataLandingPad(RecvBuf
   uint32_t owner;
   int size;
   T *data;
+  Lockable *L;
   uintptr_t ptr;
   RemoteDirectory& rd = getSystemRemoteDirectory();
 #define OBJSTATE (*iter).second
@@ -279,7 +208,9 @@ void Galois::Runtime::Distributed::RemoteDirectory::remoteDataLandingPad(RecvBuf
   data = (T*)calloc(1,size);
   buf.deserialize((*data));
   OBJSTATE.state = RemoteDirectory::objstate::Local;
-// lock the object with the special value to mark eligible
+  L = reinterpret_cast<Lockable*>(data);
+  // lock the object with magic num to mark ineligible
+  setMagicLock(L);
   OBJSTATE.localobj = (uintptr_t)data;
   OBJSTATE.count = 0;
   rd.Lock.unlock();
@@ -290,7 +221,6 @@ void Galois::Runtime::Distributed::RemoteDirectory::remoteDataLandingPad(RecvBuf
 template<typename T>
 T* Galois::Runtime::Distributed::LocalDirectory::resolve(uintptr_t ptr) {
   int sent = 0;
-  RemoteDirectory& rd = getSystemRemoteDirectory();
   uintptr_t p = haveObject(ptr, &sent);
   if (!p) {
     fetchRemoteObj(ptr, sent, &Galois::Runtime::Distributed::RemoteDirectory::remoteReqLandingPad<T>);
@@ -303,12 +233,14 @@ template<typename T>
 void Galois::Runtime::Distributed::LocalDirectory::localReqLandingPad(RecvBuffer &buf) {
   uint32_t remote_to;
   T *data;
+  Lockable *L;
   uintptr_t ptr;
 #define OBJSTATE (*iter).second
   LocalDirectory& ld = getSystemLocalDirectory();
   ld.Lock.lock();
   buf.deserialize(ptr);
   data = reinterpret_cast<T*>(ptr);
+  L = reinterpret_cast<Lockable*>(data);
   auto iter = ld.curobj.find(ptr);
   buf.deserialize(remote_to);
   // add object to list if it's not already there
@@ -323,8 +255,8 @@ void Galois::Runtime::Distributed::LocalDirectory::localReqLandingPad(RecvBuffer
     // object is remote so place a return request
     ld.fetchRemoteObj(ptr, OBJSTATE.sent_to, &Galois::Runtime::Distributed::RemoteDirectory::remoteReqLandingPad<T>);
   }
-  else if (OBJSTATE.state == LocalDirectory::objstate::Local) {
-// check if locked using the new acquire calls!
+  else if ((OBJSTATE.state == LocalDirectory::objstate::Local) && diracquire(L)) {
+//FIXME: Shouldn't it be locked with a special value so that this thread doesn't end up using this object???
     // object should be sent to the remote host
     SendBuffer sbuf;
     NetworkInterface& net = getSystemNetworkInterface();
@@ -347,6 +279,7 @@ template<typename T>
 void Galois::Runtime::Distributed::LocalDirectory::localDataLandingPad(RecvBuffer &buf) {
   int size;
   T *data;
+  Lockable *L;
   uintptr_t ptr;
 #define OBJSTATE (*iter).second
   LocalDirectory& ld = getSystemLocalDirectory();
@@ -355,7 +288,9 @@ void Galois::Runtime::Distributed::LocalDirectory::localDataLandingPad(RecvBuffe
   data = reinterpret_cast<T*>(ptr);
   auto iter = ld.curobj.find(ptr);
   buf.deserialize(size);
-  buf.deserialize((*data));
+  buf.deserialize(*data);
+  L = reinterpret_cast<Lockable*>(data);
+  unlock(L);
   OBJSTATE.state = LocalDirectory::objstate::Local;
   ld.Lock.unlock();
 #undef OBJSTATE
