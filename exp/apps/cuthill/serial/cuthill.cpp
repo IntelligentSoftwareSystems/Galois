@@ -76,7 +76,7 @@ static cll::opt<unsigned int> scalingStep("step",
     cll::init(2));
 static cll::opt<unsigned int> niter("iter",
     cll::desc("Number of benchmarking iterations"),
-    cll::init(5));
+    cll::init(1));
 static cll::opt<Algo> algo(cll::desc("Choose an algorithm:"),
     cll::values(
       clEnumVal(serialCM, "Serial Cuthill-McKee"),
@@ -475,8 +475,8 @@ struct banddiff {
 			GNode dst = graph.getEdgeDst(ii);
 			SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
 
-			//unsigned long int diff = abs(sdata.id - ddata.id);
-			long int diff = (long int) sdata.id - (long int) ddata.id;
+			unsigned long int diff = abs(sdata.id - ddata.id);
+			//long int diff = (long int) sdata.id - (long int) ddata.id;
 			maxdiff = diff > maxdiff ? diff : maxdiff;
 		}
 
@@ -825,17 +825,17 @@ struct SerialBFS {
 
 				rwidth = DIST_INFINITY;
 
-                                std::cout << "snode: " << fwidth << " " << graph.getData(snode, Galois::MethodFlag::NONE).id 
-                                  << " " << chosen.size() << " " << lastset.size() << " "
-                                  << forward.getHeight() 
-                                  << "\n";
+				std::cout << "snode: " << fwidth << " " << graph.getData(snode, Galois::MethodFlag::NONE).id 
+					<< " " << chosen.size() << " " << lastset.size() << " "
+					<< forward.getHeight() 
+					<< "\n";
 				//std::cerr << "height: " << forward.getHeight() << " width[last]: " << forward.getWidth(forward.getHeight()) << " maxwidth: " << forward.getMaxWidth() << "\n";
 				//std::cerr << "lastset size: " << lastset.size() << "\n";
 
 				for(int i = 0; i < chosen.size(); ++i) {
-                                        std::cout << "rnode: "
-                                          << graph.getData(chosen[i], Galois::MethodFlag::NONE).id << " "
-                                          << graph.getData(chosen[i], Galois::MethodFlag::NONE).dist << "\n";
+					std::cout << "rnode: "
+						<< graph.getData(chosen[i], Galois::MethodFlag::NONE).id << " "
+						<< graph.getData(chosen[i], Galois::MethodFlag::NONE).dist << "\n";
 					//BfsFn reverse(forward.getMaxWidth());
 					BfsFn reverse(rwidth);
 
@@ -849,11 +849,11 @@ struct SerialBFS {
 					if(res)
 						continue;
 
-                                        std::cout << "rnode: "
-                                          << reverse.getHeight() << " "
-                                          << forward.getHeight() << " "
-                                          << reverse.getMaxWidth() << " "
-                                          << rwidth << "\n";
+					std::cout << "rnode: "
+						<< reverse.getHeight() << " "
+						<< forward.getHeight() << " "
+						<< reverse.getMaxWidth() << " "
+						<< rwidth << "\n";
 
 					if(reverse.getHeight() > forward.getHeight() && reverse.getMaxWidth() < rwidth){
 						//std::cerr << "2nd case height: " << reverse.getHeight() << " >? " << forward.getHeight() << " width: " << reverse.getMaxWidth() << " <? " << rwidth << "\n";
@@ -868,9 +868,9 @@ struct SerialBFS {
 				}
 			} while (foundEndNode == false);
 
-                        std::cout << "Selected starting node: " << fwidth << " " 
-                          << graph.getData(snode, Galois::MethodFlag::NONE).id << " and end node: "
-                          << rwidth << " " << graph.getData(enode, Galois::MethodFlag::NONE).id << "\n";
+			std::cout << "Selected starting node: " << fwidth << " " 
+				<< graph.getData(snode, Galois::MethodFlag::NONE).id << " and end node: "
+				<< rwidth << " " << graph.getData(enode, Galois::MethodFlag::NONE).id << "\n";
 			if(fwidth > rwidth)
 				std::swap(snode, enode);
 		}
@@ -982,9 +982,11 @@ void run(const AlgoTy& algo) {
 	vT[SELECT] = Galois::TimeAccumulator();
 	vT[SELECT].start();
 
-	SerialBFS::PseudoDiameter selectNodes;
-
-	selectNodes(source, last);
+	last = source;
+	if(startNode == DIST_INFINITY){
+		SerialBFS::PseudoDiameter selectNodes;
+		selectNodes(source, last);
+	}
 
 	std::cout << "Running " << algo.name() << " version with " << numThreads << " threads for " << niter << " iterations\n";
 	std::cout << "Selected starting node:" << graph.getData(source, Galois::MethodFlag::NONE).id << " and end node: " << graph.getData(last, Galois::MethodFlag::NONE).id << "\n";
@@ -1004,7 +1006,7 @@ void run(const AlgoTy& algo) {
 
 	bandwidth("Initial");
 
-	Galois::StatTimer T;
+	Galois::StatTimer T("CuthillTime", "");
 	for(int i = 0; i < niter; i++){
 		vT[RUN].start();
 
