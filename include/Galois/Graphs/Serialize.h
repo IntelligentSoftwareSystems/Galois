@@ -51,6 +51,7 @@ struct CompareNodeData {
  * to appear in certain order set the node data appropriately.
  */
 template<typename Graph>
+GALOIS_ATTRIBUTE_DEPRECATED
 bool outputGraph(const char* file, Graph& G) {
   ssize_t retval;
   //ASSUME LE machine

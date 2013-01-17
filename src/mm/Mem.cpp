@@ -33,10 +33,6 @@
 
 #include <map>
 
-#ifdef GALOIS_USE_NUMA
-#include <numa.h>
-#endif
-
 using namespace Galois::Runtime;
 using namespace MM;
 using namespace LL;
@@ -85,42 +81,3 @@ SizedAllocatorFactory::~SizedAllocatorFactory() {
   }
 }
 #endif
-
-void* Galois::Runtime::MM::largeAlloc(size_t len) {
-  return malloc(len);
-}
-
-void Galois::Runtime::MM::largeFree(void* m, size_t len) {
-  free(m);
-}
-
-void* Galois::Runtime::MM::largeInterleavedAlloc(size_t len) {
-  void* data = 0;
-#if defined GALOIS_USE_NUMA_OLD
-  nodemask_t nm = numa_no_nodes;
-  unsigned int num = activeThreads;
-  for (unsigned y = 0; y < num; ++y)
-    nodemask_set(&nm, y/4);
-  data = numa_alloc_interleaved_subset(len, &nm);
-#elif defined GALOIS_USE_NUMA
-  bitmask* nm = numa_allocate_nodemask();
-  unsigned int num = activeThreads;
-  for (unsigned y = 0; y < num; ++y)
-    numa_bitmask_setbit(nm, y/4);
-  data = numa_alloc_interleaved_subset(len, nm);
-  numa_free_nodemask(nm);
-#else
-  data = malloc(len);
-#endif
-  if (!data)
-    abort();
-  return data;
-}
-
-void Galois::Runtime::MM::largeInterleavedFree(void* m, size_t len) {
-#ifdef GALOIS_USE_NUMA
-  numa_free(m, len);
-#else
-  free(m);
-#endif
-}

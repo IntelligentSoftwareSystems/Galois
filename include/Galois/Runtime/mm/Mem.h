@@ -34,11 +34,12 @@
 #include "Galois/Runtime/ll/SimpleLock.h"
 #include "Galois/Runtime/ll/PtrLock.h"
 #include "Galois/Runtime/ll/ThreadRWlock.h"
-#include <boost/utility.hpp>
-#include <memory.h>
-#include <stdlib.h>
 
+#include <boost/utility.hpp>
+#include <cstdlib>
 #include <map>
+
+#include <memory.h>
 
 namespace Galois {
 namespace Runtime {

@@ -107,7 +107,8 @@ public:
   edge_iterator edge_begin(GraphNode N) const;
   edge_iterator edge_end(GraphNode N) const;
 
-  template<typename EdgeTy> EdgeTy& getEdgeData(edge_iterator it) const {
+  template<typename EdgeTy> 
+  EdgeTy& getEdgeData(edge_iterator it) const {
     return reinterpret_cast<EdgeTy*>(edgeData)[*it];
   }
 
