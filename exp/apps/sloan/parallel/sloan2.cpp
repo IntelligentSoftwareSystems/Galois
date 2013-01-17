@@ -28,12 +28,9 @@
 
 #include <sys/time.h>
 
-#define FINE_GRAIN_TIMING 
+//#define FINE_GRAIN_TIMING 
 //#define GALOIS_JUNE
 //#define PRINT_DEGREE_DISTR
-
-#define W1 1               //default weight for the distance in the Sloan algorithm
-#define W2 2               //default weight for the degree in the Sloan algorithm
 
 static const char* name = "Sloan's reordering algorithm";
 static const char* desc = "Computes a permutation of a matrix according to Sloan's algorithm\n";
@@ -65,18 +62,22 @@ typedef unsigned int DistType;
 static const DistType DIST_INFINITY = std::numeric_limits<DistType>::max() - 1;
 
 namespace cll = llvm::cl;
-static cll::opt<long> startNode("startnode",
+static cll::opt<unsigned int> startNode("startnode",
     cll::desc("Node to start search from"),
-    cll::init(-1));
-static cll::opt<long> terminalNode("terminalnode",
+    cll::init(DIST_INFINITY));
+static cll::opt<unsigned int> terminalNode("terminalnode",
     cll::desc("Terminal Node to find distance to"),
-    cll::init(-1));
+    cll::init(DIST_INFINITY));
 static cll::opt<int> niter("iter",
     cll::desc("Number of benchmarking iterations"),
-    cll::init(5));
+    cll::init(1));
 static cll::opt<std::string> filename(cll::Positional,
     cll::desc("<input file>"),
     cll::Required);
+static cll::opt<unsigned int> W1("w1",
+    cll::desc("First weight"), cll::init(16));
+static cll::opt<unsigned int> W2("w2",
+    cll::desc("Second weight"), cll::init(1));
 static cll::opt<PseudoAlgo> pseudoAlgo(cll::desc("Psuedo-Peripheral algorithm:"),
     cll::values(
       clEnumVal(simplePseudo, "Simple"),
@@ -842,74 +843,111 @@ static bool verify(GNode& source) {
   return okay;
 }
 
-// Compute maximum bandwidth for a given graph
+		// Compute maximum bandwidth for a given graph
 struct banddiff {
 
-  Galois::GAtomic<unsigned int>& maxband;
-  banddiff(Galois::GAtomic<unsigned int>& _mb): maxband(_mb) { }
+	Galois::GAtomic<long int>& maxband;
+	Galois::GAtomic<long int>& profile;
+	std::vector<GNode>& nmap; 
 
-  void operator()(const GNode& source) const {
+	banddiff(Galois::GAtomic<long int>& _mb, Galois::GAtomic<long int>& _pr, std::vector<GNode>& _nm) : maxband(_mb), profile(_pr), nmap(_nm) { }
 
-    SNode& sdata = graph.getData(source, Galois::MethodFlag::NONE);
-    for (Graph::edge_iterator ii = graph.edge_begin(source, Galois::MethodFlag::NONE), 
-         ei = graph.edge_end(source, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+	void operator()(const GNode& source) const {
 
-      GNode dst = graph.getEdgeDst(ii);
-      SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+		long int maxdiff = 0;
+		SNode& sdata = graph.getData(source, Galois::MethodFlag::NONE);
 
-      unsigned int diff = abs(sdata.id - ddata.id);
-      unsigned int max = maxband;
+		for (Graph::edge_iterator ii = graph.edge_begin(source, Galois::MethodFlag::NONE), 
+				ei = graph.edge_end(source, Galois::MethodFlag::NONE); ii != ei; ++ii) {
 
-      if (diff > max){
-        while (!maxband.cas(max, diff)){
-          max = maxband;
-          if (!diff > max)
-            break;
-        }
-      }
-    }
-  }
-};
+			GNode dst = graph.getEdgeDst(ii);
+			SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
 
-// Compute maximum bandwidth for a given graph
-struct profileFn {
+			unsigned long int diff = abs(sdata.id - ddata.id);
+			//long int diff = (long int) sdata.id - (long int) ddata.id;
+			maxdiff = diff > maxdiff ? diff : maxdiff;
+		}
 
-  Galois::GAtomic<unsigned int>& sum;
-  profileFn(Galois::GAtomic<unsigned int>& _s): sum(_s) { }
+		long int globalmax = maxband;
+		profile += maxdiff;
 
-  void operator()(const GNode& source) const {
-
-    unsigned int max = 0;
-    SNode& sdata = graph.getData(source, Galois::MethodFlag::NONE);
-
-    for (Graph::edge_iterator ii = graph.edge_begin(source, Galois::MethodFlag::NONE), 
-        ei = graph.edge_end(source, Galois::MethodFlag::NONE); ii != ei; ++ii) {
-
-      GNode dst = graph.getEdgeDst(ii);
-      SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
-
-      unsigned int diff = abs(sdata.id - ddata.id);
-
-      max = (diff > max) ? diff : max;
-    }
-
-    sum += (max + 1);
-  }
+		if(maxdiff > globalmax){
+			while(!maxband.cas(globalmax, maxdiff)){
+				globalmax = maxband;
+				if(!maxdiff > globalmax)
+					break;
+			}
+		}
+	}
 };
 
 // Parallel loop for maximum bandwidth computation
 static void bandwidth(std::string msg) {
-    Galois::GAtomic<unsigned int> maxband = Galois::GAtomic<unsigned int>(0);
-    Galois::do_all(graph.begin(), graph.end(), banddiff(maxband));
-    std::cout << msg << " Bandwidth: " << maxband << "\n";
+	Galois::GAtomic<long int> bandwidth = Galois::GAtomic<long int>(0);
+	Galois::GAtomic<long int> profile = Galois::GAtomic<long int>(0);
+	std::vector<GNode> nodemap;
+	std::vector<bool> visited;
+	visited.reserve(graph.size());;
+	visited.resize(graph.size(), false);;
+	nodemap.reserve(graph.size());;
+
+	//static int count = 0;
+	//std::cout << graph.size() << "Run: " << count++ << "\n";
+
+	for (Graph::iterator src = graph.begin(), ei =
+			graph.end(); src != ei; ++src) {
+		nodemap[graph.getData(*src, Galois::MethodFlag::NONE).id] = *src;
+	}
+
+	//Computation of bandwidth and profile in parallel
+	Galois::do_all(graph.begin(), graph.end(), banddiff(bandwidth, profile, nodemap));
+
+	unsigned int nactiv = 0;
+	unsigned int maxwf = 0;
+	unsigned int curwf = 0;
+	double mswf = 0.0;
+
+	//Computation of maximum and root-square-mean wavefront. Serial
+	for(unsigned int i = 0; i < graph.size(); ++i){
+
+		for (Graph::edge_iterator ii = graph.edge_begin(nodemap[i], Galois::MethodFlag::NONE), 
+				ei = graph.edge_end(nodemap[i], Galois::MethodFlag::NONE); ii != ei; ++ii) {
+
+			GNode neigh = graph.getEdgeDst(ii);
+			SNode& ndata = graph.getData(neigh, Galois::MethodFlag::NONE);
+
+			//std::cerr << "neigh: " << ndata.id << "\n";
+			if(visited[ndata.id] == false){
+				visited[ndata.id] = true;
+				nactiv++;
+				//	std::cerr << "val: " << nactiv<< "\n";
+			}
+		}
+
+		SNode& idata = graph.getData(nodemap[i], Galois::MethodFlag::NONE);
+
+		if(visited[idata.id] == false){
+			visited[idata.id] = true;
+			curwf = nactiv+1;
+		}
+		else
+			curwf = nactiv--;
+
+		maxwf = curwf > maxwf ? curwf : maxwf;
+		mswf += (double) curwf * curwf;
+	}
+
+	mswf = mswf / graph.size();
+
+	std::cout << msg << " Bandwidth: " << bandwidth << "\n";
+	std::cout << msg << " Profile: " << profile << "\n";
+	std::cout << msg << " Max WF: " << maxwf << "\n";
+	std::cout << msg << " Mean-Square WF: " << mswf << "\n";
+	std::cout << msg << " RMS WF: " << sqrt(mswf) << "\n";
+
+	//nodemap.clear();
 }
 
-// Parallel loop for maximum bandwidth computation
-static void profile(std::string msg) {
-    Galois::GAtomic<unsigned int> prof = Galois::GAtomic<unsigned int>(0);
-    Galois::do_all(graph.begin(), graph.end(), profileFn(prof));
-    std::cout << msg << " Profile: " << prof << "\n";
-}
 //Clear node data to re-execute on specific graph
 struct resetNode {
   void operator()(const GNode& n) const {
@@ -1153,7 +1191,6 @@ void run() {
   readGraph();
 
   bandwidth("Initial");
-  profile("Initial");
 
   vT[INIT].stop();
 
@@ -1163,8 +1200,8 @@ void run() {
   //Measure total computation time to read graph
   vT[TOTAL].start();
 
-  if ((startNode >= 0 && startNode >= graph.size()) 
-      || (terminalNode >= 0 && terminalNode >= graph.size())) {
+  if ((startNode < DIST_INFINITY && startNode >= graph.size()) 
+      || (terminalNode < DIST_INFINITY && terminalNode >= graph.size())) {
     std::cerr 
       << "failed to set terminal: " << terminalNode 
       << " or failed to set source: " << startNode << "\n";
@@ -1172,18 +1209,18 @@ void run() {
     abort();
   }
 
-  if (startNode >= 0) {
+  if (startNode < DIST_INFINITY) {
     source = graph.begin()[startNode];
   } 
 
-  if (terminalNode >= 0) {
+  if (terminalNode < DIST_INFINITY) {
     terminal = graph.begin()[terminalNode];
   }
   
   bool skipFirstBfs = false;
 
-  if (startNode < 0 || terminalNode < 0) {
-    if (startNode < 0)
+  if (startNode == DIST_INFINITY || terminalNode == DIST_INFINITY) {
+    if (startNode == DIST_INFINITY)
       source = *graph.begin();
 
     Galois::StatTimer Tpseudo("PseudoTime");
@@ -1217,7 +1254,6 @@ void run() {
 
     perm.permute();
     bandwidth("Permuted");
-    profile("Permuted");
 
     std::cout << "Iteration " << i
       << " numthreads: " << numThreads
