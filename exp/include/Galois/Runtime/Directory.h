@@ -199,6 +199,8 @@ void Galois::Runtime::Distributed::RemoteDirectory::remoteDataLandingPad(RecvBuf
   Lockable *L;
   uintptr_t ptr;
   RemoteDirectory& rd = getSystemRemoteDirectory();
+volatile int ijk=0;
+while(!ijk);
 #define OBJSTATE (*iter).second
   rd.Lock.lock();
   buf.deserialize(ptr);

@@ -65,6 +65,8 @@ void for_each_dist(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
     buf.serialize(data);
     //send data
     net.sendMessage (i, &for_each_landing_pad<WLTy,ItemTy,FunctionTy>, buf);
+    // send the data
+    net.handleReceives();
   }
   //now get our data
   auto myblk = block_range(allData.begin(), allData.end(), 0, Distributed::networkHostNum);

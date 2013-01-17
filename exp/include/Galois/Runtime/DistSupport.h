@@ -42,7 +42,8 @@ public:
   constexpr gptr() :ptr(0), owner(0) {}
   constexpr gptr(std::nullptr_t) :ptr(0), owner(0) {}
 
-  gptr( const gptr& r ) :ptr(r.ptr), owner(networkHostID) {}
+  //gptr( const gptr& r ) :ptr(r.ptr), owner(networkHostID) {}
+  gptr( const gptr& r ) :ptr(r.ptr), owner(r.owner) {}
   explicit gptr(T* p) :ptr(reinterpret_cast<uintptr_t>(p)), owner(networkHostID) {}
 
   ~gptr()=default;

@@ -36,9 +36,10 @@ uintptr_t RemoteDirectory::haveObject(uintptr_t ptr, uint32_t owner) {
   if (iter == curobj.end()) {
     objstate list_obj;
     list_obj.count = 0;
-    OBJSTATE.localobj = 0;
+    list_obj.localobj = 0;
     list_obj.state = objstate::Remote;
     curobj[make_pair(ptr,owner)] = list_obj;
+    iter = curobj.find(make_pair(ptr,owner));
   }
   // Returning the object even if locked as the call to acquire would fail
   if (OBJSTATE.state != objstate::Remote)
