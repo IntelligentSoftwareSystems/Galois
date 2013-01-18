@@ -64,7 +64,7 @@
 
 #include <sys/time.h>
 
-#define FINE_GRAIN_TIMING
+//#define FINE_GRAIN_TIMING
 //#define GALOIS_JUNE
 //#define NO_SORT
 //#define SERIAL_SWAP
@@ -171,6 +171,7 @@ struct GNodeSort {
 };
 
 std::vector<GNode> initial[2];
+std::vector<GNode> perm;
 GNode source, report;
 
 //std::map<GNode, unsigned int> order;
@@ -241,9 +242,42 @@ struct Swap {
 #ifndef NO_SORT
 struct SortChildren {
 	unsigned int round; 
+  //Galois::GReduceMax<unsigned int>& maxlen;
+
+	//SortChildren(unsigned int r, Galois::GReduceMax<unsigned int>& m) : round(r), maxlen(m) {}
+	SortChildren(unsigned int r, Galois::GReduceMax<unsigned int>& m) : round(r) {}
+
+	void operator()(GNode& parent, Galois::UserContext<GNode>& ctx) {
+	  operator()(parent);
+	}
+  void operator()(GNode& parent) {
+		SNode& pdata = graph.getData(parent, Galois::MethodFlag::NONE);
+
+		if(pdata.sum > 1){
+
+			//maxlen.update(pdata.sum);
+
+			//dbglock.lock();
+			//std::cerr << "[" << pdata.id << "] sorting: " << pdata.sum << "\n";
+			//dbglock.unlock();
+
+			unsigned int limit = pdata.startindex+pdata.sum;
+			//sort(initial[round].begin()+pdata.startindex, initial[round].begin()+(pdata.startindex + pdata.sum), GNodeSort());
+			sort(initial[round].begin()+pdata.startindex, initial[round].begin()+limit, GNodeSort());
+
+			for(unsigned int i = pdata.startindex; i < limit; ++i){
+				SNode& cdata = graph.getData(initial[round][i], Galois::MethodFlag::NONE);
+				cdata.order = i;
+			}
+		}
+	}
+};
+
+struct IndexChildren {
+	unsigned int round; 
   Galois::GReduceMax<unsigned int>& maxlen;
 
-	SortChildren(unsigned int r, Galois::GReduceMax<unsigned int>& m) : round(r), maxlen(m) {}
+	IndexChildren(unsigned int r, Galois::GReduceMax<unsigned int>& m) : round(r), maxlen(m) {}
 
 	void operator()(GNode& parent, Galois::UserContext<GNode>& ctx) {
 	  operator()(parent);
@@ -259,7 +293,10 @@ struct SortChildren {
 			//std::cerr << "[" << pdata.id << "] sorting: " << pdata.sum << "\n";
 			//dbglock.unlock();
 
-			sort(initial[round].begin()+pdata.startindex, initial[round].begin()+(pdata.startindex + pdata.sum), GNodeSort());
+			for(unsigned int i = pdata.startindex; i < pdata.startindex+pdata.sum; ++i){
+				SNode& cdata = graph.getData(initial[round][i], Galois::MethodFlag::NONE);
+				cdata.order = i;
+			}
 		}
 	}
 };
@@ -591,37 +628,129 @@ static bool verify(GNode& source) {
 // Compute maximum bandwidth for a given graph
 struct banddiff {
 
-	Galois::GAtomic<unsigned int>& maxband;
-  banddiff(Galois::GAtomic<unsigned int>& _mb): maxband(_mb) { }
+	Galois::GAtomic<long int>& maxband;
+	Galois::GAtomic<long int>& profile;
+	std::vector<GNode>& nmap; 
 
-  void operator()(const GNode& source) const {
+	banddiff(Galois::GAtomic<long int>& _mb, Galois::GAtomic<long int>& _pr, std::vector<GNode>& _nm) : maxband(_mb), profile(_pr), nmap(_nm) { }
 
+	void operator()(const GNode& source) const {
+
+		long int maxdiff = 0;
 		SNode& sdata = graph.getData(source, Galois::MethodFlag::NONE);
+
 		for (Graph::edge_iterator ii = graph.edge_begin(source, Galois::MethodFlag::NONE), 
-				 ei = graph.edge_end(source, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+				ei = graph.edge_end(source, Galois::MethodFlag::NONE); ii != ei; ++ii) {
 
-      GNode dst = graph.getEdgeDst(ii);
-      SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+			GNode dst = graph.getEdgeDst(ii);
+			SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
 
-			unsigned int diff = abs(sdata.id - ddata.id);
-			unsigned int max = maxband;
+			unsigned long int diff = abs(sdata.id - ddata.id);
+			//long int diff = (long int) sdata.id - (long int) ddata.id;
+			maxdiff = diff > maxdiff ? diff : maxdiff;
+		}
 
-			if(diff > max){
-				while(!maxband.cas(max, diff)){
-					max = maxband;
-					if(!diff > max)
-						break;
-				}
+		long int globalmax = maxband;
+		profile += maxdiff;
+
+		if(maxdiff > globalmax){
+			while(!maxband.cas(globalmax, maxdiff)){
+				globalmax = maxband;
+				if(!maxdiff > globalmax)
+					break;
 			}
-    }
-  }
+		}
+	}
 };
 
-// Parallel loop for maximum bandwidth computation
+	// Parallel loop for maximum bandwidth computation
 static void bandwidth(std::string msg) {
-		Galois::GAtomic<unsigned int> maxband = Galois::GAtomic<unsigned int>(0);
-    Galois::do_all(graph.begin(), graph.end(), banddiff(maxband));
-    std::cout << msg << " Bandwidth: " << maxband << "\n";
+	Galois::GAtomic<long int> bandwidth = Galois::GAtomic<long int>(0);
+	Galois::GAtomic<long int> profile = Galois::GAtomic<long int>(0);
+	std::vector<GNode> nodemap;
+	std::vector<bool> visited;
+	visited.reserve(graph.size());;
+	visited.resize(graph.size(), false);;
+	nodemap.reserve(graph.size());;
+
+	//static int count = 0;
+	//std::cout << graph.size() << "Run: " << count++ << "\n";
+
+	for (Graph::iterator src = graph.begin(), ei =
+			graph.end(); src != ei; ++src) {
+		nodemap[graph.getData(*src, Galois::MethodFlag::NONE).id] = *src;
+	}
+
+	//Computation of bandwidth and profile in parallel
+	Galois::do_all(graph.begin(), graph.end(), banddiff(bandwidth, profile, nodemap));
+
+	unsigned int nactiv = 0;
+	unsigned int maxwf = 0;
+	unsigned int curwf = 0;
+	double mswf = 0.0;
+
+	//Computation of maximum and root-square-mean wavefront. Serial
+	for(unsigned int i = 0; i < graph.size(); ++i){
+
+		for (Graph::edge_iterator ii = graph.edge_begin(nodemap[i], Galois::MethodFlag::NONE), 
+				ei = graph.edge_end(nodemap[i], Galois::MethodFlag::NONE); ii != ei; ++ii) {
+
+			GNode neigh = graph.getEdgeDst(ii);
+			SNode& ndata = graph.getData(neigh, Galois::MethodFlag::NONE);
+
+			//std::cerr << "neigh: " << ndata.id << "\n";
+			if(visited[ndata.id] == false){
+				visited[ndata.id] = true;
+				nactiv++;
+				//	std::cerr << "val: " << nactiv<< "\n";
+			}
+		}
+
+		SNode& idata = graph.getData(nodemap[i], Galois::MethodFlag::NONE);
+
+		if(visited[idata.id] == false){
+			visited[idata.id] = true;
+			curwf = nactiv+1;
+		}
+		else
+			curwf = nactiv--;
+
+		maxwf = curwf > maxwf ? curwf : maxwf;
+		mswf += (double) curwf * curwf;
+	}
+
+	mswf = mswf / graph.size();
+
+	std::cout << msg << " Bandwidth: " << bandwidth << "\n";
+	std::cout << msg << " Profile: " << profile << "\n";
+	std::cout << msg << " Max WF: " << maxwf << "\n";
+	std::cout << msg << " Mean-Square WF: " << mswf << "\n";
+	std::cout << msg << " RMS WF: " << sqrt(mswf) << "\n";
+
+	//nodemap.clear();
+}
+
+static void permute(std::vector<GNode>& ordering) {
+
+	std::vector<GNode> nodemap;
+	nodemap.reserve(graph.size());;
+
+	for (Graph::iterator src = graph.begin(), ei =
+			graph.end(); src != ei; ++src) {
+
+		nodemap[graph.getData(*src, Galois::MethodFlag::NONE).id] = *src;
+	}
+
+	unsigned int N = ordering.size() - 1;
+
+	//std::cout << " ordering size: " << ordering.size() << "\n";
+
+	for(int i = N; i >= 0; --i) {
+		// RCM
+		graph.getData(ordering[i], Galois::MethodFlag::NONE).id = N - i;
+		// CM
+		//graph.getData(ordering[i], Galois::MethodFlag::NONE).id = i;
+	}
 }
 
 //Clear node data to re-execute on specific graph
@@ -729,11 +858,13 @@ struct BarrierNoDup {
 
 		initial[0].reserve(100);
 		initial[1].reserve(100);
+		perm.reserve(graph.size());
 
 		SNode& sdata = graph.getData(source);
 		sdata.dist = 0;
 		//order[source] = 0;
 		sdata.order = 0;
+		perm.push_back(source);
 
 		//round = (round + 1) & 1;
 
@@ -827,7 +958,7 @@ struct BarrierNoDup {
 			//std::cerr << "Segment : " << seglen / thr << "\n";
 
 			//if(seglen / thr > 2) 
-			//if(seglen > qlen) {
+			//if(seglen > qlen) 
 			if(seglen > 1000) {
 #ifdef TOTAL_PREFIX
 				Galois::on_each(TotalPrefix(round, chunk, barrier), "totalprefix");
@@ -938,6 +1069,7 @@ struct BarrierNoDup {
 				std::cerr << "Placement(par): " << vTmain[4].get() << "\n";
 				std::cout << "& " << vTmain[1].get() << " & " << vTmain[2].get() << " & " << vTmain[3].get() << " & " << vTmain[4].get() << " & " << vTmain[1].get() + vTmain[2].get()  + vTmain[3].get() + vTmain[4].get() << "\n";
 				#endif
+				perm.insert(perm.end(), initial[round].begin(), initial[round].end());
 				break;
 			}
 
@@ -949,9 +1081,11 @@ struct BarrierNoDup {
 			#ifndef NO_SORT
 			Galois::GReduceMax<unsigned int> maxlen;
 			Galois::do_all<>(initial[round].begin(), initial[round].end(), SortChildren(next, maxlen), "sort");
+			//Galois::do_all<>(initial[round].begin(), initial[round].end(), IndexChildren(next, maxlen), "index");
 			//std::cout << "max sorting len: " << maxlen.get() << "\n";
 			#endif
 
+			perm.insert(perm.end(), initial[round].begin(), initial[round].end());
 			initial[round].clear();
 			bucket.clear();
 			round = next;
@@ -1171,108 +1305,42 @@ void run(const AlgoTy& algo) {
 
 	//Measure time to read graph
 	//vT[INIT] = Galois::TimeAccumulator();
-	vT[INIT].start();
+  Galois::StatTimer itimer("InitTime");
+  itimer.start();
 
-  readGraph(source, report);
-	bandwidth("Initial Bandwidth");
+	readGraph(source, report);
 
-	std::cout << "Size of: " << sizeof(SNode) << "\n";
+  itimer.stop();
 
-	vT[INIT].stop();
-	std::cout << "Init: " << vT[INIT].get() << " ( " << (double) vT[INIT].get() / 1000 << " seconds )\n";
+	bandwidth("Initial");
 
-	//Measure total computation time to read graph
-	vT[TOTAL].start();
+	// I've observed cold start. First run takes a few millis more. 
+	//algo(source);
+	//resetGraph();
 
-	//Galois::setActiveThreads(1);
+	Galois::StatTimer T;
+	T.start();
+	Galois::StatTimer Tcuthill("CuthillTime");
+	Tcuthill.start();
 
-	if(scaling) {
-		for(int thr = 2; thr <= maxThreads; thr+=scalingStep){
-			numThreads = Galois::setActiveThreads(thr);
+	algo(source);
 
-			vT[TOTAL+thr] = Galois::TimeAccumulator();
-			std::cout << "Running " << algo.name() << " version with " << numThreads << " threads for " << niter << " iterations\n";
+	Tcuthill.stop();
+	T.stop();
 
-			for(int i = 0; i < niter; i++){
-				vT[TOTAL+thr].start();
-				algo(source);
-				vT[TOTAL+thr].stop();
+	permute(perm);
+	bandwidth("Permuted");
+  std::cout << "done!\n";
 
-				//permute();
-				//bandwidth("Permuted");
-
-				std::cout << "Iteration " << i << " numthreads: " << numThreads << " " << vT[TOTAL+thr].get() << "\n";
-				if(i != niter-1)
-					resetGraph();
-			}
-
-			if(thr+scalingStep <= maxThreads){
-				std::cout << "Total time numthreads: " << numThreads << " " << vT[TOTAL+thr].get() << "\n";
-				std::cout << "Avg time numthreads: " << numThreads << " " << vT[TOTAL+thr].get() / niter << "\n";
-				resetGraph();
-			}
-			else {
-				std::cout << "Final time numthreads: " << numThreads << " " << vT[TOTAL+thr].get() << "\n";
-				std::cout << "Avg time numthreads: " << numThreads << " " << vT[TOTAL+thr].get() / niter << "\n";
-			}
+	if (!skipVerify) {
+		if (verify(source)) {
+			std::cout << "Verification successful.\n";
+		} else {
+			std::cerr << "Verification failed.\n";
+			assert(0 && "Verification failed");
+			abort();
 		}
 	}
-	else {
-
-		// Execution with the specified number of threads
-		vT[RUN] = Galois::TimeAccumulator();
-		vT[CLEANUP] = Galois::TimeAccumulator();
-
-		std::cout << "Running " << algo.name() << " version with " << numThreads << " threads for " << niter << " iterations\n";
-
-		// I've observed cold start. First run takes a few millis more. 
-		//algo(source);
-		//resetGraph();
-
-		Galois::StatTimer T;
-		T.start();
-		for(int i = 0; i < niter; i++){
-			vT[RUN].start();
-			
-			algo(source);
-
-			vT[RUN].stop();
-
-			//permute();
-			//bandwidth("Permuted");
-
-			std::cout << "Iteration " << i << " numthreads: " << numThreads << " " << vT[RUN].get() << "\n";
-
-			if(i < niter-1){
-				vT[CLEANUP].start();
-				resetGraph();
-				vT[CLEANUP].stop();
-			}
-		}
-		T.stop();
-
-		std::cout << "Final time numthreads: " << numThreads << " " << vT[RUN].get() << "\n";
-		std::cout << "Avg time numthreads: " << numThreads << " " << vT[RUN].get() / niter << "\n";
-		if(niter > 1)
-			std::cout << "Cleanup time numthreads: " << numThreads << " " << vT[CLEANUP].get() / (niter-1) << "\n";
-		else
-			std::cout << "Cleanup time numthreads: " << numThreads << " " << vT[CLEANUP].get() << "\n";
-	}
-
-	vT[TOTAL].stop();
-
-	std::cout << "Total with threads: " << numThreads << " " << vT[TOTAL].get() << " ( " << (double) vT[TOTAL].get() / 1000 << " seconds )\n";
-  std::cout << "Report node: " << reportNode << " " << graph.getData(report) << "\n";
-
-  if (!skipVerify) {
-    if (verify(source)) {
-      std::cout << "Verification successful.\n";
-    } else {
-      std::cerr << "Verification failed.\n";
-      assert(0 && "Verification failed");
-      abort();
-    }
-  }
 }
 
 int main(int argc, char **argv) {
