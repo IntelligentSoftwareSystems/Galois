@@ -187,11 +187,7 @@ protected:
     int result = 0;
     if (p)
       workHappened = true;
-#if GALOIS_USE_EXCEPTION_HANDLER
     try {
-#else
-    if ((result = setjmp(hackjmp)) == 0) {
-#endif
       while (p) {
 	doProcess(p, tld);
 	if (limit) {
@@ -201,17 +197,14 @@ protected:
 	}
 	p = lwl.pop();
       }
-#if GALOIS_USE_EXCEPTION_HANDLER
     } catch (ConflictFlag const& flag) {
       clearConflictLock();
       result = flag;
     }
-#else
-    }
-#endif
     switch (result) {
     case 0:
       break;
+    case Galois::Runtime::REMOTE:
     case Galois::Runtime::CONFLICT:
       abortIteration(*p, tld, recursiveAbort);
       break;
@@ -238,31 +231,30 @@ protected:
       setThreadContext(&tld.cnx);
     tld.lterm = term.getLocalTokenHolder();
     do {
-      //      if (get_distributed_foreach() && (LL::getTID() == (Galois::Runtime::activeThreads-1))) {
-      //         DIR::comm();
-      //      }
-      //      else {
-         bool didWork;
-         do {
-            didWork = false;
-            //Run some iterations
-            if (ForEachTraits<FunctionTy>::NeedsBreak || ForEachTraits<FunctionTy>::NeedsAborts)
-	            didWork = runQueue<checkAbort || ForEachTraits<FunctionTy>::NeedsBreak>(tld, wl, false);
-         	else //No try/catch
-               didWork = runQueueSimple(tld);
-         	//Check for break
-         	if (ForEachTraits<FunctionTy>::NeedsBreak && broke.data)
-         	  break;
-         	//Check for abort
-         	if (checkAbort)
-         	  didWork |= handleAborts(tld);
-         	//Update node color
-         	if (didWork)
-         	  tld.lterm->workHappened();
-         } while (didWork);
-         if (ForEachTraits<FunctionTy>::NeedsBreak && broke.data)
-         	break;
-	 //      }
+      if (get_distributed_foreach() && (LL::getTID() == 0)) {
+	DIR::comm();
+      }
+      bool didWork;
+      do {
+
+	didWork = false;
+	//Run some iterations
+	if (ForEachTraits<FunctionTy>::NeedsBreak || ForEachTraits<FunctionTy>::NeedsAborts)
+	  didWork = runQueue<checkAbort || ForEachTraits<FunctionTy>::NeedsBreak>(tld, wl, false);
+	else //No try/catch
+	  didWork = runQueueSimple(tld);
+	//Check for break
+	if (ForEachTraits<FunctionTy>::NeedsBreak && broke.data)
+	  break;
+	//Check for abort
+	if (checkAbort)
+	  didWork |= handleAborts(tld);
+	//Update node color
+	if (didWork)
+	  tld.lterm->workHappened();
+      } while (didWork);
+      if (ForEachTraits<FunctionTy>::NeedsBreak && broke.data)
+	break;
 
       term.localTermination();
     } while ((ForEachTraits<FunctionTy>::NeedsPush 

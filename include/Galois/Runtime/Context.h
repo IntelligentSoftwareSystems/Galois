@@ -45,7 +45,8 @@ namespace Runtime {
 enum ConflictFlag {
   CONFLICT = -1,
   REACHED_FAILSAFE = 1,
-  BREAK = 2
+  BREAK = 2,
+  REMOTE = 3
 };
 
 enum PendingFlag {
@@ -61,13 +62,10 @@ void setPending(PendingFlag value);
 static inline void clearConflictLock() { }
 
 class SimpleRuntimeContext;
+namespace Distributed {
 class DirectoryRuntimeContext;
+}
 class DeterministicRuntimeContext;
-
-#if GALOIS_USE_EXCEPTION_HANDLER
-#else
-extern __thread jmp_buf hackjmp;
-#endif
 
 //! All objects that may be locked (nodes primarily) must inherit from Lockable.
 //! Use an intrusive list to track objects in a context without allocation overhead

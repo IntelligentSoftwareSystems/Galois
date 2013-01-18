@@ -27,11 +27,6 @@
 #include "Galois/Runtime/ll/SimpleLock.h"
 #include "Galois/Runtime/ll/CacheLineStorage.h"
 
-#if GALOIS_USE_EXCEPTION_HANDLER
-#else
-__thread jmp_buf Galois::Runtime::hackjmp;
-#endif
-
 #define CHK_LOCK ((Galois::Runtime::SimpleRuntimeContext*)0x422)
 #define USE_LOCK ((Galois::Runtime::SimpleRuntimeContext*)0x423)
 
@@ -54,11 +49,7 @@ void Galois::Runtime::setPending(PendingFlag value) {
 
 void Galois::Runtime::doCheckWrite() {
   if (pendingFlag.flag.data == PENDING) {
-#if GALOIS_USE_EXCEPTION_HANDLER
     throw Galois::Runtime::REACHED_FAILSAFE;
-#else
-    longjmp(hackjmp, Galois::Runtime::REACHED_FAILSAFE);
-#endif
   }
 }
 
@@ -156,19 +147,11 @@ unsigned Galois::Runtime::SimpleRuntimeContext::commit_iteration() {
 }
 
 void Galois::Runtime::breakLoop() {
-#if GALOIS_USE_EXCEPTION_HANDLER
   throw Galois::Runtime::BREAK;
-#else
-  longjmp(hackjmp, Galois::Runtime::BREAK);
-#endif
 }
 
 void Galois::Runtime::signalConflict() {
-#if GALOIS_USE_EXCEPTION_HANDLER
         throw Galois::Runtime::CONFLICT; // Conflict
-#else
-        longjmp(hackjmp, Galois::Runtime::CONFLICT);
-#endif
 }
 
 /*
