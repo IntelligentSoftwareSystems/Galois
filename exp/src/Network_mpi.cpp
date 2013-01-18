@@ -81,12 +81,14 @@ public:
   //! sends a message.  assumes it is being called from a thread for which
   //! this is valid
   void sendInternal(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
+    assert(recv);
     buf.serialize_header((uintptr_t)recv);
     int rv = MPI_Send(buf.linearData(), buf.size(), MPI_BYTE, dest, FuncTag, MPI_COMM_WORLD);
     handleError(rv);
   }
 
   void broadcastInternal(recvFuncTy recv, SendBuffer& buf) {
+    assert(recv);
     buf.serialize_header((uintptr_t)recv);
     for (int i = 0; i < numTasks; ++i) {
       if (i != taskRank) {
@@ -121,6 +123,7 @@ public:
 	recvFuncTy f;
 	uintptr_t fp;
 	buf.deserialize(fp);
+	assert(fp);
 	f = (recvFuncTy)fp;
 	//Call deserialized function
 	f(buf);
@@ -245,7 +248,7 @@ void Galois::Runtime::Distributed::networkTerminate() {
     int x = 0;
     SendBuffer buf;
     buf.serialize(x);
-    net.broadcastMessage (NULL, buf);
+    //    net.broadcastMessage (NULL, buf);
  // THIS SHOULD BE REMOVED IN CASE OF A DEDICATED COMM THREAD
     net.handleReceives();
     net.systemBarrier();
