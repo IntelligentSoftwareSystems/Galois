@@ -136,7 +136,7 @@ T* Galois::Runtime::Distributed::RemoteDirectory::resolve(uintptr_t ptr, uint32_
   uintptr_t p = haveObject(ptr, owner);
   if (!p) {
     fetchRemoteObj(ptr, owner, &Galois::Runtime::Distributed::LocalDirectory::localReqLandingPad<T>);
-    throw 1; //FIXME: integrate with acquire's throw type
+    throw Galois::Runtime::REMOTE;
   }
   return reinterpret_cast<T*>(p);
 }
