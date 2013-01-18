@@ -329,6 +329,10 @@ void convert_dimacs2gr(const std::string& infilename, const std::string& outfile
     }
   }
 
+  char *rawEdgeData = p.finish();
+  if (EdgeData::has_value)
+    std::copy(edgeData.begin(), edgeData.end(), reinterpret_cast<edge_value_type*>(rawEdgeData));
+
   std::cout << "Finished reading graph. "
     << "Nodes: " << nnodes
     << " Edges read: " << nedges 
