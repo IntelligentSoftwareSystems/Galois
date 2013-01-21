@@ -38,6 +38,7 @@
 #include "Galois/Runtime/WorkList.h"
 #include "Galois/Runtime/UserContextAccess.h"
 #include "Galois/Runtime/ActiveThreads.h"
+#include "Galois/Runtime/Network.h"
 #include <algorithm>
 
 namespace Galois {
@@ -154,6 +155,10 @@ protected:
   }
 
   inline void doProcess(boost::optional<value_type>& p, ThreadLocalData& tld) {
+    if ((Distributed::networkHostNum > 1) && (LL::getTID() == 0)) {
+      Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
+      net.handleReceives();
+    }
     tld.stat.inc_iterations(); //Class specialization handles opt
     if (ForEachTraits<FunctionTy>::NeedsAborts)
       tld.cnx.start_iteration();
@@ -231,30 +236,26 @@ protected:
       setThreadContext(&tld.cnx);
     tld.lterm = term.getLocalTokenHolder();
     do {
-      if (get_distributed_foreach() && (LL::getTID() == 0)) {
-	DIR::comm();
-      }
       bool didWork;
       do {
-
-	didWork = false;
-	//Run some iterations
-	if (ForEachTraits<FunctionTy>::NeedsBreak || ForEachTraits<FunctionTy>::NeedsAborts)
-	  didWork = runQueue<checkAbort || ForEachTraits<FunctionTy>::NeedsBreak>(tld, wl, false);
-	else //No try/catch
-	  didWork = runQueueSimple(tld);
-	//Check for break
-	if (ForEachTraits<FunctionTy>::NeedsBreak && broke.data)
-	  break;
-	//Check for abort
-	if (checkAbort)
-	  didWork |= handleAborts(tld);
-	//Update node color
-	if (didWork)
-	  tld.lterm->workHappened();
+        didWork = false;
+        //Run some iterations
+        if (ForEachTraits<FunctionTy>::NeedsBreak || ForEachTraits<FunctionTy>::NeedsAborts)
+          didWork = runQueue<checkAbort || ForEachTraits<FunctionTy>::NeedsBreak>(tld, wl, false);
+        else //No try/catch
+          didWork = runQueueSimple(tld);
+        //Check for break
+        if (ForEachTraits<FunctionTy>::NeedsBreak && broke.data)
+          break;
+        //Check for abort
+        if (checkAbort)
+          didWork |= handleAborts(tld);
+        //Update node color
+        if (didWork)
+          tld.lterm->workHappened();
       } while (didWork);
       if (ForEachTraits<FunctionTy>::NeedsBreak && broke.data)
-	break;
+        break;
 
       term.localTermination();
     } while ((ForEachTraits<FunctionTy>::NeedsPush 

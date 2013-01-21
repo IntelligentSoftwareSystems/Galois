@@ -33,6 +33,14 @@
 namespace Galois {
 namespace Runtime {
 
+uint32_t term_count;
+
+void for_each_term_landing_pad(Distributed::RecvBuffer& buf) {
+  uint32_t node;
+  buf.deserialize(node);
+  term_count--;
+}
+
 template<typename WLTy, typename ItemTy, typename FunctionTy>
 void for_each_landing_pad(Distributed::RecvBuffer& buf) {
   //extract stuff
@@ -42,6 +50,13 @@ void for_each_landing_pad(Distributed::RecvBuffer& buf) {
   buf.deserialize(data);
   //Start locally
   Galois::Runtime::for_each_impl<WLTy>(data.begin(), data.end(), f, nullptr);
+  //notify the master that the host has completed
+  //not required when distributed loop termination has been implemented!
+  uint32_t node = Distributed::networkHostID;
+  Distributed::SendBuffer sbuf;
+  Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
+  sbuf.serialize(node);
+  net.sendMessage (0, &for_each_term_landing_pad, sbuf);
 }
 
 namespace {
@@ -52,6 +67,9 @@ void for_each_dist(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
 
   //copy out all data
   std::deque<ItemTy> allData(b,e);
+
+  // initialize term_count --- Remove after implementing loop termination detection
+  term_count = Distributed::networkHostNum - 1;
 
   // Get a handle to the network interface
   Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
@@ -73,6 +91,12 @@ void for_each_dist(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
 
   //Start locally
   for_each_impl<WLTy>(myblk.first, myblk.second, f, loopname);
+
+  // continue looping over handleReceives till all the hosts complete
+  //      --- Remove after implementing loop termination detection
+  do {
+    net.handleReceives();
+  } while(term_count > 0);
 
   //FIXME: wait on a network barrier here unless systemBarrier is network aware
 }

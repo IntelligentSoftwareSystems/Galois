@@ -107,28 +107,28 @@ public:
       rv = MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &status);
       handleError(rv);
       if (!flag)
-	break;
+        break;
       //use the lock
       lock.lock();
       rv = MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &status);
       handleError(rv);
       if (flag) {
-	retval = true;
-	int count;
-	MPI_Get_count(&status, MPI_BYTE, &count);
-	RecvBuffer buf(count);
-	MPI_Recv(buf.linearData(), count, MPI_BYTE, MPI_ANY_SOURCE, FuncTag, MPI_COMM_WORLD, &status);
-	lock.unlock();
-	//Unlocked call so reciever can call handleRecv()
-	recvFuncTy f;
-	uintptr_t fp;
-	buf.deserialize(fp);
-	assert(fp);
-	f = (recvFuncTy)fp;
-	//Call deserialized function
-	f(buf);
+        retval = true;
+        int count;
+        MPI_Get_count(&status, MPI_BYTE, &count);
+        RecvBuffer buf(count);
+        MPI_Recv(buf.linearData(), count, MPI_BYTE, MPI_ANY_SOURCE, FuncTag, MPI_COMM_WORLD, &status);
+        lock.unlock();
+        //Unlocked call so reciever can call handleRecv()
+        recvFuncTy f;
+        uintptr_t fp;
+        buf.deserialize(fp);
+        assert(fp);
+        f = (recvFuncTy)fp;
+        //Call deserialized function
+        f(buf);
       } else {
-	lock.unlock();
+        lock.unlock();
       }
     } while (true);
     return retval;
@@ -232,6 +232,15 @@ NetworkInterface& Galois::Runtime::Distributed::getSystemNetworkInterface() {
   return net;
 }
 
+void Galois::Runtime::Distributed::networkExit(Distributed::RecvBuffer& buf) {
+  uint32_t node;
+  buf.deserialize(node);
+  // continue if master doesn't send exit message
+  if (node != 0)
+    return;
+  exit(0);
+}
+
 void Galois::Runtime::Distributed::networkStart() {
   NetworkInterface& net = getSystemNetworkInterface();
   if (networkHostID != 0) {
@@ -245,11 +254,10 @@ void Galois::Runtime::Distributed::networkStart() {
 void Galois::Runtime::Distributed::networkTerminate() {
   if (networkHostNum > 1 && networkHostID == 0) {
     NetworkInterface& net = getSystemNetworkInterface();
-    int x = 0;
+    uint32_t x = networkHostID;
     SendBuffer buf;
     buf.serialize(x);
-    //    net.broadcastMessage (NULL, buf);
- // THIS SHOULD BE REMOVED IN CASE OF A DEDICATED COMM THREAD
+    net.broadcastMessage (&networkExit, buf);
     net.handleReceives();
     net.systemBarrier();
   }

@@ -85,6 +85,52 @@ void LocalDirectory::fetchRemoteObj(uintptr_t ptr, uint32_t remote, recvFuncTy p
   return;
 }
 
+void LocalDirectory::sub_acquire(Galois::Runtime::Lockable* L) {
+  if (L->Owner.try_lock()) {
+    assert(!L->Owner.getValue());
+    assert(!L->next);
+    L->Owner.setValue(this);
+    // do not create a linked list of the locks for the context
+  /*
+    L->next = locks;
+    locks = L;
+   */
+  } else {
+    if (L->Owner.getValue() != this) {
+      Galois::Runtime::signalConflict();
+    }
+  }
+  return;
+}
+
+bool LocalDirectory::diracquire(Galois::Runtime::Lockable* L) {
+  if (L->Owner.try_lock()) {
+    assert(!L->Owner.getValue());
+    assert(!L->next);
+    L->Owner.setValue(this);
+    return true;
+  }
+  else if (L->Owner.stealing_CAS(USE_LOCK,this)) {
+    assert(!L->next);
+    return true;
+  }
+  return false;
+}
+
+bool RemoteDirectory::diracquire(Galois::Runtime::Lockable* L) {
+  if (L->Owner.try_lock()) {
+    assert(!L->Owner.getValue());
+    assert(!L->next);
+    L->Owner.setValue(this);
+    return true;
+  }
+  else if (L->Owner.stealing_CAS(USE_LOCK,this)) {
+    assert(!L->next);
+    return true;
+  }
+  return false;
+}
+
 RemoteDirectory& Galois::Runtime::Distributed::getSystemRemoteDirectory() {
   static RemoteDirectory obj;
   return obj;

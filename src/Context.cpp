@@ -27,9 +27,6 @@
 #include "Galois/Runtime/ll/SimpleLock.h"
 #include "Galois/Runtime/ll/CacheLineStorage.h"
 
-#define CHK_LOCK ((Galois::Runtime::SimpleRuntimeContext*)0x422)
-#define USE_LOCK ((Galois::Runtime::SimpleRuntimeContext*)0x423)
-
 //! Global thread context for each active thread
 static __thread Galois::Runtime::SimpleRuntimeContext* thread_cnx = 0;
 
@@ -61,26 +58,19 @@ Galois::Runtime::SimpleRuntimeContext* Galois::Runtime::getThreadContext() {
   return thread_cnx;
 }
 
-bool Galois::Runtime::SimpleRuntimeContext::isMagicLock(Galois::Runtime::Lockable* L) {
+bool Galois::Runtime::SimpleRuntimeContext::do_isMagicLock(Galois::Runtime::Lockable* L) {
   return (L->Owner.getValue() == CHK_LOCK);
 }
 
 bool Galois::Runtime::do_isMagicLock(Galois::Runtime::Lockable* C) {
   SimpleRuntimeContext cnx;
-  return cnx.isMagicLock(C);
+  return cnx.do_isMagicLock(C);
 }
 
 void Galois::Runtime::doAcquire(Galois::Runtime::Lockable* C) {
   SimpleRuntimeContext* cnx = getThreadContext();
   if (cnx)
     cnx->acquire(C);
-}
-
-bool Galois::Runtime::diracquire(Galois::Runtime::Lockable* C) {
-  SimpleRuntimeContext* cnx = getThreadContext();
-  if (cnx)
-    return cnx->do_diracquire(C);
-  return false;
 }
 
 void Galois::Runtime::SimpleRuntimeContext::do_setMagicLock(Galois::Runtime::Lockable* L) {
@@ -206,24 +196,6 @@ void Galois::Runtime::SimpleRuntimeContext::sub_acquire(Galois::Runtime::Lockabl
 //anchor vtable
 Galois::Runtime::SimpleRuntimeContext::~SimpleRuntimeContext() {}
 
-void Galois::Runtime::DirectoryRuntimeContext::sub_acquire(Galois::Runtime::Lockable* L) {
-  if (L->Owner.try_lock()) {
-    assert(!L->Owner.getValue());
-    assert(!L->next);
-    L->Owner.setValue(this);
-    // do not create a linked list of the locks for the context
-  /*
-    L->next = locks;
-    locks = L;
-   */
-  } else {
-    if (L->Owner.getValue() != this) {
-      Galois::Runtime::signalConflict();
-    }
-  }
-  return;
-}
-
 void Galois::Runtime::DeterministicRuntimeContext::sub_acquire(Galois::Runtime::Lockable* L) {
   // Normal path
   if (pendingFlag.flag.data == NON_DET) {
@@ -261,21 +233,6 @@ void Galois::Runtime::DeterministicRuntimeContext::sub_acquire(Galois::Runtime::
     other->not_ready = 1; // Only need atomic write
 
   return;
-}
-
-// do not update the locks linked list as the data is sent if acquired
-bool Galois::Runtime::SimpleRuntimeContext::do_diracquire(Galois::Runtime::Lockable* L) {
-  if (L->Owner.try_lock()) {
-    assert(!L->Owner.getValue());
-    assert(!L->next);
-    L->Owner.setValue(this);
-    return true;
-  }
-  else if (L->Owner.stealing_CAS(USE_LOCK,this)) {
-    assert(!L->next);
-    return true;
-  }
-  return false;
 }
 
 void Galois::Runtime::forceAbort() {

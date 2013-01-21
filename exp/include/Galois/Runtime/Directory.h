@@ -29,6 +29,7 @@
 #include <unordered_map>
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Network.h"
+#include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/ll/SimpleLock.h"
 
 #define INELIGIBLE_COUNT 12
@@ -38,7 +39,7 @@ namespace Galois {
 namespace Runtime {
 namespace Distributed {
 
-class RemoteDirectory {
+class RemoteDirectory: public SimpleRuntimeContext {
 
   struct objstate {
     // Remote - The object has been returned to the owner
@@ -67,17 +68,21 @@ class RemoteDirectory {
   // places a remote request for the node
   void fetchRemoteObj(uintptr_t ptr, uint32_t owner, recvFuncTy pad);
 
+  // tries to acquire a lock and returns true or false if acquired
+  // used before sending an object and freeing it
+  bool diracquire(Lockable* L);
+
 public:
 
   // Handles incoming requests for remote objects
   // if Ineligible, transfer to Eligible after INELI2ELI_COUNT requests
   // if Eligible return the object back to owner and mark as Remote
   template<typename T>
-  static void remoteReqLandingPad(Galois::Runtime::Distributed::RecvBuffer &);
+  static void remoteReqLandingPad(RecvBuffer &);
 
   // Landing Pad for incoming remote objects
   template<typename T>
-  static void remoteDataLandingPad(Galois::Runtime::Distributed::RecvBuffer &);
+  static void remoteDataLandingPad(RecvBuffer &);
 
   //resolve a pointer, owner pair
   //precondition: owner != networkHostID
@@ -85,7 +90,7 @@ public:
   T* resolve(uintptr_t ptr, uint32_t owner);
 };
 
-class LocalDirectory: public DirectoryRuntimeContext {
+class LocalDirectory: public SimpleRuntimeContext {
 
   struct objstate {
     // Remote - Object passed to a remote host
@@ -105,16 +110,25 @@ class LocalDirectory: public DirectoryRuntimeContext {
   // places a remote request for the node
   void fetchRemoteObj(uintptr_t ptr, uint32_t remote, recvFuncTy pad);
 
+  // needed for locking objects inside the LocalDirectory
+  virtual void sub_acquire(Lockable* L);
+
+  // tries to acquire a lock and returns true or false if acquired
+  // used before sending an object and marking it remote
+  bool diracquire(Lockable* L);
+
 public:
+
+  LocalDirectory(): SimpleRuntimeContext(true) {}
 
   // forward the request if the state is remote
   // send the object if local and not locked, also mark as remote
   template<typename T>
-  static void localReqLandingPad(Galois::Runtime::Distributed::RecvBuffer &);
+  static void localReqLandingPad(RecvBuffer &);
 
   // send the object if local, not locked and mark obj as remote
   template<typename T>
-  static void localDataLandingPad(Galois::Runtime::Distributed::RecvBuffer &);
+  static void localDataLandingPad(RecvBuffer &);
 
   // resolve a pointer
   template<typename T>
@@ -130,19 +144,25 @@ LocalDirectory& getSystemLocalDirectory();
 } //Runtime
 } //Galois
 
+using namespace Galois::Runtime::Distributed;
+
+// should be blocking if not in for each
 template<typename T>
-T* Galois::Runtime::Distributed::RemoteDirectory::resolve(uintptr_t ptr, uint32_t owner) {
+T* RemoteDirectory::resolve(uintptr_t ptr, uint32_t owner) {
   assert(owner != networkHostID);
   uintptr_t p = haveObject(ptr, owner);
-  if (!p) {
-    fetchRemoteObj(ptr, owner, &Galois::Runtime::Distributed::LocalDirectory::localReqLandingPad<T>);
-    throw Galois::Runtime::REMOTE;
+  while (!p) {
+    fetchRemoteObj(ptr, owner, &LocalDirectory::localReqLandingPad<T>);
+    // abort the iteration if inside for each
+    if (Galois::Runtime::inGaloisForEach)
+      throw Galois::Runtime::REMOTE;
+    p = haveObject(ptr, owner);
   }
   return reinterpret_cast<T*>(p);
 }
 
 template<typename T>
-void Galois::Runtime::Distributed::RemoteDirectory::remoteReqLandingPad(RecvBuffer &buf) {
+void RemoteDirectory::remoteReqLandingPad(RecvBuffer &buf) {
   int owner;
   T *data;
   uintptr_t ptr;
@@ -170,8 +190,8 @@ void Galois::Runtime::Distributed::RemoteDirectory::remoteReqLandingPad(RecvBuff
         flag = false;
       }
     }
-    // if eligible and lock acquired
-    if (flag && diracquire(L)) {
+    // if eligible and acquire lock so that no iteration begins using the object
+    if (flag && rd.diracquire(L)) {
       // object should be sent to the remote host
       SendBuffer sbuf;
       NetworkInterface& net = getSystemNetworkInterface();
@@ -179,7 +199,7 @@ void Galois::Runtime::Distributed::RemoteDirectory::remoteReqLandingPad(RecvBuff
       sbuf.serialize(sizeof(*data));
       sbuf.serialize(*data);
       rd.curobj.erase(make_pair(ptr,owner));
-      net.sendMessage(owner,&Galois::Runtime::Distributed::LocalDirectory::localDataLandingPad<T>,sbuf);
+      net.sendMessage(owner,&LocalDirectory::localDataLandingPad<T>,sbuf);
       free(data);
     }
   }
@@ -192,7 +212,7 @@ void Galois::Runtime::Distributed::RemoteDirectory::remoteReqLandingPad(RecvBuff
 }
 
 template<typename T>
-void Galois::Runtime::Distributed::RemoteDirectory::remoteDataLandingPad(RecvBuffer &buf) {
+void RemoteDirectory::remoteDataLandingPad(RecvBuffer &buf) {
   uint32_t owner;
   int size;
   T *data;
@@ -220,19 +240,23 @@ while(!ijk);
   return;
 }
 
+// should be blocking outside for each
 template<typename T>
-T* Galois::Runtime::Distributed::LocalDirectory::resolve(uintptr_t ptr) {
+T* LocalDirectory::resolve(uintptr_t ptr) {
   int sent = 0;
   uintptr_t p = haveObject(ptr, &sent);
-  if (!p) {
-    fetchRemoteObj(ptr, sent, &Galois::Runtime::Distributed::RemoteDirectory::remoteReqLandingPad<T>);
-    throw 1; //FIXME: integrate with acquire's throw type
+  while (!p) {
+    fetchRemoteObj(ptr, sent, &RemoteDirectory::remoteReqLandingPad<T>);
+    // abort the iteration inside for each
+    if (Galois::Runtime::inGaloisForEach)
+      throw Galois::Runtime::REMOTE;
+    p = haveObject(ptr, &sent);
   }
   return reinterpret_cast<T*>(p);
 }
 
 template<typename T>
-void Galois::Runtime::Distributed::LocalDirectory::localReqLandingPad(RecvBuffer &buf) {
+void LocalDirectory::localReqLandingPad(RecvBuffer &buf) {
   uint32_t remote_to;
   T *data;
   Lockable *L;
@@ -251,13 +275,14 @@ void Galois::Runtime::Distributed::LocalDirectory::localReqLandingPad(RecvBuffer
     list_obj.sent_to = remote_to;
     list_obj.state = LocalDirectory::objstate::Local;
     ld.curobj[ptr] = list_obj;
+    iter = ld.curobj.find(ptr);
   }
   // check if the object can be sent
   if (OBJSTATE.state == LocalDirectory::objstate::Remote) {
     // object is remote so place a return request
-    ld.fetchRemoteObj(ptr, OBJSTATE.sent_to, &Galois::Runtime::Distributed::RemoteDirectory::remoteReqLandingPad<T>);
+    ld.fetchRemoteObj(ptr, OBJSTATE.sent_to, &RemoteDirectory::remoteReqLandingPad<T>);
   }
-  else if ((OBJSTATE.state == LocalDirectory::objstate::Local) && diracquire(L)) {
+  else if ((OBJSTATE.state == LocalDirectory::objstate::Local) && ld.diracquire(L)) {
 //FIXME: Shouldn't it be locked with a special value so that this thread doesn't end up using this object???
     // object should be sent to the remote host
     SendBuffer sbuf;
@@ -267,7 +292,7 @@ void Galois::Runtime::Distributed::LocalDirectory::localReqLandingPad(RecvBuffer
     sbuf.serialize(sizeof(*data));
     sbuf.serialize(*data);
     OBJSTATE.state = LocalDirectory::objstate::Remote;
-    net.sendMessage(remote_to,&Galois::Runtime::Distributed::RemoteDirectory::remoteDataLandingPad<T>,sbuf);
+    net.sendMessage(remote_to,&RemoteDirectory::remoteDataLandingPad<T>,sbuf);
   }
   else {
     cout << "Unexpected state in localReqLandingPad" << endl;
@@ -278,7 +303,7 @@ void Galois::Runtime::Distributed::LocalDirectory::localReqLandingPad(RecvBuffer
 }
 
 template<typename T>
-void Galois::Runtime::Distributed::LocalDirectory::localDataLandingPad(RecvBuffer &buf) {
+void LocalDirectory::localDataLandingPad(RecvBuffer &buf) {
   int size;
   T *data;
   Lockable *L;

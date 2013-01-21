@@ -37,7 +37,9 @@
 //! Set to zero to use longjmp hack, otherwise make sure that
 //! you use a fixed c++ runtime that improves scalability of
 //! exceptions.
-#define GALOIS_USE_EXCEPTION_HANDLER 0
+//    --- mdhanapal removing all the longjmp hacks for Directory
+//    options
+#define GALOIS_USE_EXCEPTION_HANDLER 1
 
 namespace Galois {
 namespace Runtime {
@@ -61,9 +63,13 @@ void setPending(PendingFlag value);
 //! used to release lock over exception path
 static inline void clearConflictLock() { }
 
+#define CHK_LOCK ((Galois::Runtime::SimpleRuntimeContext*)0x422)
+#define USE_LOCK ((Galois::Runtime::SimpleRuntimeContext*)0x423)
+
 class SimpleRuntimeContext;
 namespace Distributed {
-class DirectoryRuntimeContext;
+class LocalDirectory;
+class RemoteDirectory;
 }
 class DeterministicRuntimeContext;
 
@@ -73,7 +79,8 @@ class Lockable {
   LL::PtrLock<SimpleRuntimeContext, true> Owner;
   Lockable* next;
   friend class SimpleRuntimeContext;
-  friend class DirectoryRuntimeContext;
+  friend class Distributed::LocalDirectory;
+  friend class Distributed::RemoteDirectory;
   friend class DeterministicRuntimeContext;
 public:
   LL::PtrLock<void, true> auxPtr;
@@ -102,9 +109,8 @@ public:
   bool do_trylock(Lockable* L);
   void do_unlock(Lockable* L);
   void *do_getValue(Lockable* L);
-  bool isMagicLock(Lockable* L);
+  bool do_isMagicLock(Lockable* L);
   void do_setMagicLock(Lockable* L);
-  bool do_diracquire(Lockable* L);
 };
 
 //! get the current conflict detection class, may be null if not in parallel region
@@ -112,14 +118,6 @@ SimpleRuntimeContext* getThreadContext();
 
 //! used by the parallel code to set up conflict detection per thread
 void setThreadContext(SimpleRuntimeContext* n);
-
-class DirectoryRuntimeContext: public SimpleRuntimeContext {
-protected:
-  virtual void sub_acquire(Lockable* L);
-
-public:
-  DirectoryRuntimeContext(): SimpleRuntimeContext(true) {}
-};
 
 class DeterministicRuntimeContext: public SimpleRuntimeContext {
 protected:
@@ -170,10 +168,6 @@ static inline void acquire(Lockable* C, Galois::MethodFlag m) {
   if (shouldLock(m))
     doAcquire(C);
 }
-
-// acquire call by the directory which tries to acquire the lock
-// returns true or false depending on if the lock was acquired
-bool diracquire(Lockable* C);
 
 bool do_isMagicLock(Lockable* C);
 
