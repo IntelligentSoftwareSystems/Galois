@@ -29,17 +29,18 @@ using namespace Galois::Runtime::Distributed;
 
 uintptr_t RemoteDirectory::haveObject(uintptr_t ptr, uint32_t owner) {
 #define OBJSTATE (*iter).second
+  RemoteDirectory& rd = getSystemRemoteDirectory();
   Lock.lock();
-  auto iter = curobj.find(make_pair(ptr,owner));
+  auto iter = rd.curobj.find(make_pair(ptr,owner));
   uintptr_t retval = 0;
   // add object to list if it's not already there
-  if (iter == curobj.end()) {
+  if (iter == rd.curobj.end()) {
     objstate list_obj;
     list_obj.count = 0;
     list_obj.localobj = 0;
     list_obj.state = objstate::Remote;
-    curobj[make_pair(ptr,owner)] = list_obj;
-    iter = curobj.find(make_pair(ptr,owner));
+    rd.curobj[make_pair(ptr,owner)] = list_obj;
+    iter = rd.curobj.find(make_pair(ptr,owner));
   }
   // Returning the object even if locked as the call to acquire would fail
   if (OBJSTATE.state != objstate::Remote)
@@ -52,24 +53,28 @@ uintptr_t RemoteDirectory::haveObject(uintptr_t ptr, uint32_t owner) {
 // NOTE: make sure that handleReceives() is called by another thread
 void RemoteDirectory::fetchRemoteObj(uintptr_t ptr, uint32_t owner, recvFuncTy pad) {
   SendBuffer buf;
+  uint32_t host = networkHostID;
   NetworkInterface& net = getSystemNetworkInterface();
   buf.serialize(ptr);
-  buf.serialize(networkHostID);
+  buf.serialize(host);
   net.sendMessage (owner, pad, buf);
   return;
 }
 
 uintptr_t LocalDirectory::haveObject(uintptr_t ptr, int *remote) {
 #define OBJSTATE (*iter).second
+  LocalDirectory& ld = getSystemLocalDirectory();
   Lock.lock();
-  auto iter = curobj.find(ptr);
+  auto iter = ld.curobj.find(ptr);
   uintptr_t retval = 0;
   // Returning the object even if locked as the call to acquire would fail
   // return the object even if it is not in the list
-  if (iter == curobj.end() || OBJSTATE.state != objstate::Remote)
+  if ((iter == ld.curobj.end()) || (OBJSTATE.state == objstate::Local))
     retval = ptr;
-  else if (iter != curobj.end() && OBJSTATE.state == objstate::Remote)
+  else if ((iter != ld.curobj.end()) && (OBJSTATE.state == objstate::Remote))
     *remote = OBJSTATE.sent_to;
+  else
+    printf ("Unrecognized state in LocalDirectory::haveObject\n");
   Lock.unlock();
 #undef OBJSTATE
   return retval;
@@ -78,9 +83,10 @@ uintptr_t LocalDirectory::haveObject(uintptr_t ptr, int *remote) {
 // NOTE: make sure that the handleReceives() is called by another thread
 void LocalDirectory::fetchRemoteObj(uintptr_t ptr, uint32_t remote, recvFuncTy pad) {
   SendBuffer buf;
+  uint32_t host = networkHostID;
   NetworkInterface& net = getSystemNetworkInterface();
   buf.serialize(ptr);
-  buf.serialize(networkHostID);
+  buf.serialize(host);
   net.sendMessage (remote, pad, buf);
   return;
 }

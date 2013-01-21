@@ -163,7 +163,7 @@ T* RemoteDirectory::resolve(uintptr_t ptr, uint32_t owner) {
 
 template<typename T>
 void RemoteDirectory::remoteReqLandingPad(RecvBuffer &buf) {
-  int owner;
+  uint32_t owner;
   T *data;
   uintptr_t ptr;
   RemoteDirectory& rd = getSystemRemoteDirectory();
@@ -175,7 +175,8 @@ void RemoteDirectory::remoteReqLandingPad(RecvBuffer &buf) {
   // check if the object can be sent
   if ((iter == rd.curobj.end()) || (OBJSTATE.state == RemoteDirectory::objstate::Remote)) {
     // object can't be remote if the owner makes a request
-    abort();
+    // abort();
+    // object might have been sent after this request was made by owner
   }
   else if (OBJSTATE.state == RemoteDirectory::objstate::Local) {
     bool flag = true;
@@ -194,9 +195,10 @@ void RemoteDirectory::remoteReqLandingPad(RecvBuffer &buf) {
     if (flag && rd.diracquire(L)) {
       // object should be sent to the remote host
       SendBuffer sbuf;
+      size_t size = sizeof(*data);
       NetworkInterface& net = getSystemNetworkInterface();
       sbuf.serialize(ptr);
-      sbuf.serialize(sizeof(*data));
+      sbuf.serialize(size);
       sbuf.serialize(*data);
       rd.curobj.erase(make_pair(ptr,owner));
       net.sendMessage(owner,&LocalDirectory::localDataLandingPad<T>,sbuf);
@@ -214,13 +216,11 @@ void RemoteDirectory::remoteReqLandingPad(RecvBuffer &buf) {
 template<typename T>
 void RemoteDirectory::remoteDataLandingPad(RecvBuffer &buf) {
   uint32_t owner;
-  int size;
+  size_t size;
   T *data;
   Lockable *L;
   uintptr_t ptr;
   RemoteDirectory& rd = getSystemRemoteDirectory();
-volatile int ijk=0;
-while(!ijk);
 #define OBJSTATE (*iter).second
   rd.Lock.lock();
   buf.deserialize(ptr);
@@ -272,7 +272,6 @@ void LocalDirectory::localReqLandingPad(RecvBuffer &buf) {
   // add object to list if it's not already there
   if (iter == ld.curobj.end()) {
     LocalDirectory::objstate list_obj;
-    list_obj.sent_to = remote_to;
     list_obj.state = LocalDirectory::objstate::Local;
     ld.curobj[ptr] = list_obj;
     iter = ld.curobj.find(ptr);
@@ -283,14 +282,17 @@ void LocalDirectory::localReqLandingPad(RecvBuffer &buf) {
     ld.fetchRemoteObj(ptr, OBJSTATE.sent_to, &RemoteDirectory::remoteReqLandingPad<T>);
   }
   else if ((OBJSTATE.state == LocalDirectory::objstate::Local) && ld.diracquire(L)) {
-//FIXME: Shouldn't it be locked with a special value so that this thread doesn't end up using this object???
     // object should be sent to the remote host
+    // diracquire locks with the LocalDirectory object so that local iterations fail
     SendBuffer sbuf;
+    size_t size = sizeof(*data);
+    uint32_t host = networkHostID;
     NetworkInterface& net = getSystemNetworkInterface();
     sbuf.serialize(ptr);
-    sbuf.serialize(networkHostID);
-    sbuf.serialize(sizeof(*data));
+    sbuf.serialize(host);
+    sbuf.serialize(size);
     sbuf.serialize(*data);
+    OBJSTATE.sent_to = remote_to;
     OBJSTATE.state = LocalDirectory::objstate::Remote;
     net.sendMessage(remote_to,&RemoteDirectory::remoteDataLandingPad<T>,sbuf);
   }
@@ -304,7 +306,7 @@ void LocalDirectory::localReqLandingPad(RecvBuffer &buf) {
 
 template<typename T>
 void LocalDirectory::localDataLandingPad(RecvBuffer &buf) {
-  int size;
+  size_t size;
   T *data;
   Lockable *L;
   uintptr_t ptr;
@@ -317,8 +319,8 @@ void LocalDirectory::localDataLandingPad(RecvBuffer &buf) {
   buf.deserialize(size);
   buf.deserialize(*data);
   L = reinterpret_cast<Lockable*>(data);
-  unlock(L);
   OBJSTATE.state = LocalDirectory::objstate::Local;
+  unlock(L);
   ld.Lock.unlock();
 #undef OBJSTATE
   return;
