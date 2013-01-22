@@ -120,9 +120,9 @@ public:
   typedef const_pointer const_iterator;
   const static bool has_value = false;
 
-  const_reference at(difference_type x) const { return 0; }
-  reference at(difference_type x) { return 0; }
-  const_reference operator[](size_type x) const { return 0; }
+  //const_reference at(difference_type x) const { return 0; }
+  //reference at(difference_type x) { return 0; }
+  //const_reference operator[](size_type x) const { return 0; }
   size_type size() const { return 0; }
   iterator begin() { return 0; }
   const_iterator begin() const { return 0; }
