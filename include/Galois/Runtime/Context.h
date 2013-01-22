@@ -123,9 +123,10 @@ static inline bool shouldLock(Galois::MethodFlag g) {
   case MethodFlag::ALL:
   case MethodFlag::CHECK_CONFLICT:
     return true;
+  default:
+    GALOIS_ERROR(true, "shouldn't get here");
+    return false;
   }
-  GALOIS_ERROR(true, "shouldn't get here");
-  return false;
 }
 
 //! actual locking function.  Will always lock.
