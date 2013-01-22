@@ -14,6 +14,7 @@ struct R : public Galois::Runtime::Lockable {
    R() { i = 0; }
 
    void add(int v) {
+printf ("In Host %u: processing number %d\n", networkHostID, v);
       i += v;
       return;
    }
@@ -56,11 +57,12 @@ int main(int argc, char *argv[])
    Galois::Runtime::Distributed::networkStart();
 
    vector<int> myvec;
+   typedef WorkList::LIFO<int,true> chunk;
    R r;
    f1 f(&r);
    for (int i=1; i<=40; i++) myvec.push_back(i);
 
-   Galois::for_each<IterTy,f1> (myvec.begin(), myvec.end(), f);
+   Galois::for_each<chunk,IterTy,f1> (myvec.begin(), myvec.end(), f);
    printf ("sum is %d\n", f.r->i);
 
    // master_terminate();

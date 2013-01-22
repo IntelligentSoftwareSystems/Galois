@@ -57,6 +57,9 @@ void RemoteDirectory::fetchRemoteObj(uintptr_t ptr, uint32_t owner, recvFuncTy p
   NetworkInterface& net = getSystemNetworkInterface();
   buf.serialize(ptr);
   buf.serialize(host);
+#ifdef PRINT_DIR_DEBUG
+printf ("Remote fetch obj: %lx req from %u to %u\n", ptr, host, owner);
+#endif
   net.sendMessage (owner, pad, buf);
   return;
 }
@@ -87,6 +90,9 @@ void LocalDirectory::fetchRemoteObj(uintptr_t ptr, uint32_t remote, recvFuncTy p
   NetworkInterface& net = getSystemNetworkInterface();
   buf.serialize(ptr);
   buf.serialize(host);
+#ifdef PRINT_DIR_DEBUG
+printf ("Local fetch obj: %lx req from %u to %u\n", ptr, host, remote);
+#endif
   net.sendMessage (remote, pad, buf);
   return;
 }

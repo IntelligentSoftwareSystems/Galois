@@ -38,6 +38,7 @@ uint32_t term_count;
 void for_each_term_landing_pad(Distributed::RecvBuffer& buf) {
   uint32_t node;
   buf.deserialize(node);
+printf ("Host %u, in for_each_term_landing_pad term_count is %d\n", Distributed::networkHostID, term_count);
   term_count--;
 }
 
@@ -48,6 +49,7 @@ void for_each_landing_pad(Distributed::RecvBuffer& buf) {
   buf.deserialize(f);
   std::deque<ItemTy> data;
   buf.deserialize(data);
+printf ("Host %u, number of elements passed %lu\n", Distributed::networkHostID, data.size());
   //Start locally
   Galois::Runtime::for_each_impl<WLTy>(data.begin(), data.end(), f, nullptr);
   //notify the master that the host has completed
@@ -56,6 +58,7 @@ void for_each_landing_pad(Distributed::RecvBuffer& buf) {
   Distributed::SendBuffer sbuf;
   Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
   sbuf.serialize(node);
+printf ("Host %u, in for_each_landing_pad calling the term_landing_pad\n", Distributed::networkHostID);
   net.sendMessage (0, &for_each_term_landing_pad, sbuf);
 }
 
@@ -94,6 +97,7 @@ void for_each_dist(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
 
   // continue looping over handleReceives till all the hosts complete
   //      --- Remove after implementing loop termination detection
+printf ("Host %u, done with for_each term_count is %d\n", Distributed::networkHostID, term_count);
   do {
     net.handleReceives();
   } while(term_count > 0);

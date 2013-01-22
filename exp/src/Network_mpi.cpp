@@ -92,8 +92,8 @@ public:
     buf.serialize_header((uintptr_t)recv);
     for (int i = 0; i < numTasks; ++i) {
       if (i != taskRank) {
-	int rv = MPI_Send(buf.linearData(), buf.size(), MPI_BYTE, i, FuncTag, MPI_COMM_WORLD);
-	handleError(rv);
+        int rv = MPI_Send(buf.linearData(), buf.size(), MPI_BYTE, i, FuncTag, MPI_COMM_WORLD);
+        handleError(rv);
       }
     }
   }
@@ -259,7 +259,7 @@ void Galois::Runtime::Distributed::networkTerminate() {
     buf.serialize(x);
     net.broadcastMessage (&networkExit, buf);
     net.handleReceives();
-    net.systemBarrier();
+    //net.systemBarrier();
   }
   return;
 }
