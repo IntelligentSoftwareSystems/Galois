@@ -535,7 +535,7 @@ struct TBBAsyncAlgo {
     tbb::task_scheduler_init init(numThreads);
     
     graph.getData(source).dist = 0;
-    GNode[] initial = { source };
+    GNode initial[] = { source };
 
     tbb::parallel_do(&initial[0], &initial[1], Fn());
   }
