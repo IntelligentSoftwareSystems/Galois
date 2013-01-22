@@ -117,7 +117,7 @@ if(USE_EXP)
   #endif()
 endif()
 
-# c++0x features
+# c++11 features
 find_package(CXX11)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX11_FLAGS}")
 if (HAS_CXX11_RVALUE_REFERENCES)
