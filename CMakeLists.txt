@@ -61,7 +61,8 @@ if (NOT "$ENV{BOOST_DIR}" STREQUAL "")
   set(BOOST_ROOT $ENV{BOOST_DIR})
 endif ()
 
-set(BOOST_LIBS system iostreams filesystem)
+#set(BOOST_LIBS system iostreams filesystem)
+set(BOOST_LIBS)
 find_package(Boost 1.36.0 COMPONENTS ${BOOST_LIBS} REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 
@@ -168,11 +169,6 @@ if(LIBNUMA_FOUND)
     add_definitions(-DGALOIS_USE_NUMA_OLD)
   endif()
 endif()
-
-#XXX(ddn): avoid broken includes on volta
-#if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
-#  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX0X_FLAGS}")
-#endif()
 
 ###### Global Functions ######
 
