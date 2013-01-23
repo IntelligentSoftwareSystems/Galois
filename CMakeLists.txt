@@ -61,8 +61,8 @@ if (NOT "$ENV{BOOST_DIR}" STREQUAL "")
   set(BOOST_ROOT $ENV{BOOST_DIR})
 endif ()
 
-#set(BOOST_LIBS system iostreams filesystem)
-set(BOOST_LIBS)
+set(BOOST_LIBS system iostreams filesystem)
+#set(BOOST_LIBS)
 find_package(Boost 1.36.0 COMPONENTS ${BOOST_LIBS} REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 

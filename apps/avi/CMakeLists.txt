@@ -16,6 +16,8 @@ file(GLOB Sources
 )
 
 add_library(AVI ${Sources})
+target_link_libraries(AVI ${ZLIB_LIBRARIES})
+target_link_libraries(AVI ${Boost_LIBRARIES})
 
 app(AVIorderedSerial main/AVIorderedSerial.cpp
   REQUIRES LAPACK_FOUND ZLIB_FOUND
