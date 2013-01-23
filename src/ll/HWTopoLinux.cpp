@@ -382,52 +382,55 @@ struct AutoLinuxPolicy {
   }
 };
 
-AutoLinuxPolicy A;
+AutoLinuxPolicy& getPolicy() {
+  static AutoLinuxPolicy A;
+  return A;
+}
 
 } //namespace
 
 
 
 bool Galois::Runtime::LL::bindThreadToProcessor(int id) {
-  assert(id < (int)A.virtmap.size());
-  return linuxBindToProcessor(A.virtmap[id]);
+  assert(id < (int)getPolicy().virtmap.size());
+  return linuxBindToProcessor(getPolicy().virtmap[id]);
 }
 
 unsigned Galois::Runtime::LL::getMaxThreads() {
-  return A.numThreads;
+  return getPolicy().numThreads;
 }
 
 unsigned Galois::Runtime::LL::getMaxCores() {
-  return A.numCores;
+  return getPolicy().numCores;
 }
 
 unsigned Galois::Runtime::LL::getMaxPackages() {
-  return A.numPackages;
+  return getPolicy().numPackages;
 }
 
 unsigned Galois::Runtime::LL::getPackageForThread(int id) {
-  assert(id < (int)A.packages.size());
-  return A.packages[id];
+  assert(id < (int)getPolicy().packages.size());
+  return getPolicy().packages[id];
 }
 
 unsigned Galois::Runtime::LL::getMaxPackageForThread(int id) {
-  assert(id < (int)A.maxPackage.size());
-  return A.maxPackage[id];
+  assert(id < (int)getPolicy().maxPackage.size());
+  return getPolicy().maxPackage[id];
 }
 
 bool Galois::Runtime::LL::isPackageLeader(int id) {
-  assert(id < (int)A.packages.size());
-  return A.leaders[A.packages[id]] == id;
+  assert(id < (int)getPolicy().packages.size());
+  return getPolicy().leaders[getPolicy().packages[id]] == id;
 }
 
 unsigned Galois::Runtime::LL::getLeaderForThread(int id) {
-  assert(id < (int)A.packages.size());
-  return A.leaders[A.packages[id]];
+  assert(id < (int)getPolicy().packages.size());
+  return getPolicy().leaders[getPolicy().packages[id]];
 }
 
 unsigned Galois::Runtime::LL::getLeaderForPackage(int id) {
-  assert(id < (int)A.leaders.size());
-  return A.leaders[id];
+  assert(id < (int)getPolicy().leaders.size());
+  return getPolicy().leaders[id];
 }
 
 
