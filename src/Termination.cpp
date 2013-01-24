@@ -29,51 +29,88 @@
 
 #include "Galois/Runtime/ActiveThreads.h"
 #include "Galois/Runtime/Termination.h"
+#include "Galois/Runtime/ll/CompilerSpecific.h"
 
 using namespace Galois::Runtime;
 
-TerminationDetection::TerminationDetection()
-  :globalTerm(false), lastWasWhite(false)
-{
-  initializeThread();
-}
+namespace {
+//Dijkstra style 2-pass ring termination detection
+class LocalTerminationDetection : public TerminationDetection {
+  struct TokenHolder {
+    friend class TerminationDetection;
+    volatile long tokenIsBlack;
+    volatile long hasToken;
+    long processIsBlack;
+    bool lastWasWhite; // only used by the master
+  };
 
-void TerminationDetection::reset() {
-  assert(data.getLocal()->hasToken);
-  globalTerm = false;
-  lastWasWhite = false;
-  data.getLocal()->hasToken = true;
-  data.getLocal()->tokenIsBlack = true;
-}
-
-void TerminationDetection::propToken(TokenHolder& th, TokenHolder& thn) {
-  assert (!globalTerm && "no token should be in progress after globalTerm");
-  bool taint = th.processIsBlack || th.tokenIsBlack;
-  th.processIsBlack = th.tokenIsBlack = false;
-  th.hasToken = false;
-  thn.tokenIsBlack = taint;
-  __sync_synchronize();
-  thn.hasToken = true;
-}
-
-void TerminationDetection::localTermination() {
-  unsigned myID = LL::getTID();
-  TokenHolder& th = *data.getLocal();
-  if (th.hasToken) {
-    TokenHolder& thn = *data.getRemote((myID + 1) % activeThreads);
-    if (myID == 0) {
-      //master
-      bool failed = th.tokenIsBlack || th.processIsBlack;
-      th.tokenIsBlack = th.processIsBlack = false;
-      if (lastWasWhite && !failed) {
-	//This was the second success
-	globalTerm = true;
-	return;
-      }
-      lastWasWhite = !failed;
-    }
-    //Normal thread or recirc by master
-    propToken(th,thn);
+  PerThreadStorage<TokenHolder> data;
+  
+  //send token onwards
+  void propToken(bool isBlack) {
+    unsigned id = LL::getTID();
+    TokenHolder& th = *data.getRemote((id + 1) % activeThreads);
+    th.tokenIsBlack = isBlack;
+    LL::compilerBarrier();
+    th.hasToken = true;
   }
-  //  L.unlock();
+
+  void propGlobalTerm() {
+    globalTerm = true;
+  }
+
+  bool isSysMaster() const {
+    return LL::getTID() == 0;
+  }
+
+public:
+  LocalTerminationDetection() {}
+
+  virtual void initializeThread() {
+    TokenHolder& th = *data.getLocal();
+    th.hasToken = false;
+    th.tokenIsBlack = false;
+    th.processIsBlack = true;
+    th.lastWasWhite = true;
+    globalTerm = false;
+    if (isSysMaster()) {
+      th.hasToken = true;
+    }
+  }
+
+  virtual void localTermination(bool workHappened) {
+    assert(!(workHappened && globalTerm));
+    TokenHolder& th = *data.getLocal();
+    th.processIsBlack |= workHappened;
+    if (th.hasToken) {
+      if (isSysMaster()) {
+	bool failed = th.tokenIsBlack || th.processIsBlack;
+	th.tokenIsBlack = th.processIsBlack = false;
+	if (th.lastWasWhite && !failed) {
+	  //This was the second success
+	  propGlobalTerm();
+	  return;
+	}
+	th.lastWasWhite = !failed;
+      }
+      //Normal thread or recirc by master
+      assert (!globalTerm && "no token should be in progress after globalTerm");
+      bool taint = th.processIsBlack || th.tokenIsBlack;
+      th.processIsBlack = th.tokenIsBlack = false;
+      th.hasToken = false;
+      propToken(taint);
+    }
+  }
+};
+
+static LocalTerminationDetection& getLocalTermination() {
+  static LocalTerminationDetection term;
+  return term;
 }
+
+} // namespace
+
+Galois::Runtime::TerminationDetection& Galois::Runtime::getSystemTermination() {
+  return getLocalTermination();
+}
+

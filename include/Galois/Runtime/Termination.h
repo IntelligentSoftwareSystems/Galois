@@ -35,57 +35,33 @@
 namespace Galois {
 namespace Runtime {
 
-//Dikstra dual-ring termination algorithm
 class TerminationDetection {
-public:
-  class TokenHolder {
-    friend class TerminationDetection;
-    volatile long tokenIsBlack;
-    volatile long hasToken;
-    long processIsBlack;
-  public:
-    TokenHolder() :tokenIsBlack(false), hasToken(false), processIsBlack(true) {}
-    inline void workHappened() {
-      processIsBlack = true;
-    }
-  };
-private:
-  PerThreadStorage<TokenHolder> data;
+protected:
   volatile bool globalTerm;
-  bool lastWasWhite;
-
-  void propToken(TokenHolder& c, TokenHolder& n);
-
 public:
-  TerminationDetection();
+  //Initializes the per-thread state.  All threads must call this
+  //before any call localTermination
+  virtual void initializeThread() = 0;
 
-  inline void workHappened() {
-    data.getLocal()->workHappened();
-  }
+  //Process termination locally.  May be called as often as needed
+  //workHappened signals that since last time it was called, some
+  //progress was made that should prevent termination. All threads
+  //must call initializeThread() before any thread calls this
+  //function.  This function should not be on the fast path (this is
+  //why it takes a flag, to allow the caller to buffer up work status
+  //changes).
+  virtual void localTermination(bool workHappened) = 0;
 
-  TokenHolder* getLocalTokenHolder() {
-    return data.getLocal();
-  }
-
-  void initializeThread() {
-    if (LL::getTID() == 0) {
-      data.getLocal()->hasToken = true;
-      data.getLocal()->tokenIsBlack = true;
-    }
-  }
-
-  void localTermination();
-
-  // Returns
-  bool globalTermination() {
+  //Returns whether global termination is detected
+  bool globalTermination() const {
     return globalTerm;
   }
-
-  void reset();
-
 };
 
-}
+//returns an object.  The object will be reused.
+TerminationDetection& getSystemTermination();
+
+} // end namespace Runtime
 } // end namespace Galois
 
 #endif

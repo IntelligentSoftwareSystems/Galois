@@ -97,7 +97,6 @@ protected:
     Galois::Runtime::UserContextAccess<value_type> facing;
     SimpleRuntimeContext cnx;
     LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
-    TerminationDetection::TokenHolder* lterm;
     ThreadLocalData(const char* ln) :stat(ln) {}
   };
 
@@ -106,7 +105,7 @@ protected:
   FunctionTy& function;
   const char* loopname;
 
-  TerminationDetection term;
+  TerminationDetection& term;
   PerPackageStorage<AbortedList> aborted;
   LL::CacheLineStorage<bool> broke;
 
@@ -223,8 +222,9 @@ protected:
     ThreadLocalData tld(loopname);
     if (ForEachTraits<FunctionTy>::NeedsAborts)
       setThreadContext(&tld.cnx);
-    tld.lterm = term.getLocalTokenHolder();
+    bool didAnyWork;
     do {
+      didAnyWork = false;
       bool didWork;
       do {
 	didWork = false;
@@ -239,30 +239,30 @@ protected:
 	//Check for abort
 	if (checkAbort)
 	  didWork |= handleAborts(tld);
-	//Update node color
-	if (didWork)
-	  tld.lterm->workHappened();
+	didAnyWork |= didWork;
       } while (didWork);
       if (ForEachTraits<FunctionTy>::NeedsBreak && broke.data)
 	break;
-
-      term.localTermination();
+      //update node color and prop token
+      term.localTermination(didAnyWork);
     } while ((ForEachTraits<FunctionTy>::NeedsPush 
 	     ||ForEachTraits<FunctionTy>::NeedsBreak
 	     ||ForEachTraits<FunctionTy>::NeedsAborts)
 	     && !term.globalTermination());
 
-    setThreadContext(0);
+    if (ForEachTraits<FunctionTy>::NeedsAborts)
+      setThreadContext(0);
   }
 
 public:
-  ForEachWork(FunctionTy& f, const char* l): wl(default_wl), function(f), loopname(l), broke(false) { }
+  ForEachWork(FunctionTy& f, const char* l): wl(default_wl), function(f), loopname(l), term(getSystemTermination()), broke(false) { }
 
   template<typename W>
-  ForEachWork(W& w, FunctionTy& f, const char* l): wl(w), function(f), loopname(l), broke(false) { }
+  ForEachWork(W& w, FunctionTy& f, const char* l): wl(w), function(f), loopname(l), term(getSystemTermination()), broke(false) { }
 
   template<typename RangeTy>
   void AddInitialWork(RangeTy range) {
+    term.initializeThread();
     wl.push_initial(range);
   }
 

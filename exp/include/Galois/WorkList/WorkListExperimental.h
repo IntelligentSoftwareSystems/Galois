@@ -1565,7 +1565,7 @@ class BarrierOBIM : private boost::noncopyable {
 
   Indexer I;
 
-  Galois::Runtime::TerminationDetection term;
+  Galois::Runtime::TerminationDetection& term;
   pthread_barrier_t barr1;
   pthread_barrier_t barr2;
 
@@ -1578,7 +1578,7 @@ class BarrierOBIM : private boost::noncopyable {
   typedef typename CTy::value_type value_type;
 
   BarrierOBIM(const Indexer& x = Indexer())
-    :current(0), pushmax(0), I(x)
+    :current(0), pushmax(0), I(x), term(Runtime::getSystemTermination())
   {
     B = new CTy[binmax];
     //std::cerr << "$"<<getSystemThreadPool().getActiveThreads() <<"$";
@@ -1596,7 +1596,7 @@ class BarrierOBIM : private boost::noncopyable {
       index = current;
     if (index >= binmax)
       index = binmax - 1;
-    term.workHappened();
+    term.localTermination(true);
     unsigned int oldi;
     while (index > (oldi = pushmax)) {
       __sync_bool_compare_and_swap(&pushmax, oldi, index);
@@ -1612,6 +1612,9 @@ class BarrierOBIM : private boost::noncopyable {
 
   template<typename RangeTy>
   void push_initial(RangeTy range) {
+    pthread_barrier_wait(&barr1);
+    term.initializeThread();
+    pthread_barrier_wait(&barr2);
     push(range.local_begin(), range.local_end());
   }
 
@@ -1623,17 +1626,16 @@ class BarrierOBIM : private boost::noncopyable {
 	//Find a successful pop
 	boost::optional<value_type> retval = B[current].pop();
 	if (retval) {
-	  term.workHappened();
+	  term.localTermination(true);
 	  return retval;
 	}
-	term.localTermination();
+	term.localTermination(false);
       } while (!term.globalTermination());
       
       pthread_barrier_wait(&barr1);
-  
+      term.initializeThread();
       if (Galois::Runtime::LL::getTID() == 0) {
 	//std::cerr << "inc: " << current << "\n";
-	term.reset();
 	if (current <= pushmax)
 	  __sync_fetch_and_add(&current, 1);
       }
