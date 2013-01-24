@@ -35,15 +35,12 @@ namespace Runtime {
 
 template<typename WLTy, typename ItemTy, typename FunctionTy>
 void for_each_landing_pad(Distributed::RecvBuffer& buf) {
-  Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
   //extract stuff
   FunctionTy f;
   buf.deserialize(f);
   std::deque<ItemTy> data;
   buf.deserialize(data);
 printf ("Host %u, number of elements passed %lu\n", Distributed::networkHostID, data.size());
-  //use a MPI barrier to synchronize the for_each functions
-//  net.systemBarrier();
   //Start locally
   Galois::Runtime::for_each_impl<WLTy>(data.begin(), data.end(), f, nullptr);
 }
@@ -81,9 +78,6 @@ void for_each_dist(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
   }
   //now get our data
   auto myblk = block_range(allData.begin(), allData.end(), 0, Distributed::networkHostNum);
-
-  //use a MPI barrier to synchronize the for_each functions
-  //net.systemBarrier();
 
   //Start locally
   for_each_impl<WLTy>(myblk.first, myblk.second, f, loopname);
