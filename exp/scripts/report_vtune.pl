@@ -123,7 +123,7 @@ my $maxThread = (sort { $a <=> $b } keys %Thread_keys)[-1];
 foreach my $nk (sort keys %Stats) {
   print "$nk";
   foreach my $tk (sort { $a <=> $b } keys %Thread_keys) {
-    print ",$tk";
+    print "\t$tk";
   }
   print "\n";
 
@@ -157,7 +157,7 @@ foreach my $nk (sort keys %Stats) {
 
     print "$lk";
     foreach my $tk (sort { $a <=> $b } keys %Thread_keys) {
-      print "," . show(\%transpose, $lk, $tk);
+      print "\t" . show(\%transpose, $lk, $tk);
     }
     print "\n";
   }

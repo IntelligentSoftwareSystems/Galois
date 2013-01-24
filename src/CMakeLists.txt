@@ -7,8 +7,8 @@ endif()
 add_library(galois ${Sources})
 
 target_link_libraries(galois ${CMAKE_THREAD_LIBS_INIT})
-target_link_libraries(galois ${ZLIB_LIBRARIES})
-target_link_libraries(galois ${Boost_LIBRARIES})
+#target_link_libraries(galois ${ZLIB_LIBRARIES})
+#target_link_libraries(galois ${Boost_LIBRARIES})
 
 if(LIBNUMA_FOUND)
 	target_link_libraries(galois numa)

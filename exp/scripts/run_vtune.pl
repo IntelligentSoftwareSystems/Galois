@@ -3,8 +3,16 @@
 use strict;
 use warnings;
 
-# TODO: check for other common places
-my $vtune = "/opt/intel/vtune_amplifier_xe_2013/bin64/amplxe-cl";
+my $vtune = `which amplxe-cl`;
+my @vtune_vers = ("2013", "2011");
+foreach my $ver (@vtune_vers) {
+  my $base = "/opt/intel/vtune_amplifier_xe_" . $ver;
+  if (-e $base and not $vtune) {
+    $vtune = $base . "/bin64/amplxe-cl";
+    last;
+  }
+}
+
 # TODO: fix this path when kernel and library debug symbols get installed
 my $symbol = "/usr/lib/debug/boot/" . `uname -r`;
 chomp($symbol);
