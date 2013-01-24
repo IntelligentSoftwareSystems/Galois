@@ -116,7 +116,7 @@ void setThreadContext(SimpleRuntimeContext* n);
 //! Helper function to decide if the conflict detection lock should be taken
 static inline bool shouldLock(Galois::MethodFlag g) {
   // Mask out additional "optional" flags
-  switch (g) {
+  switch ((MethodFlag)((int)g & (int)MethodFlag::WRITE)) {
   case MethodFlag::NONE:
   case MethodFlag::SAVE_UNDO:
     return false;
