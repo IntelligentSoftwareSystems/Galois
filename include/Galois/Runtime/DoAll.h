@@ -37,6 +37,7 @@ struct EmptyFn {
 };
 
 // TODO(ddn): Tune stealing. DMR suffers when stealing is on
+// TODO: add loopname + stats
 template<class FunctionTy, class ReduceFunTy, class IterTy, bool useStealing=false>
 class DoAllWork {
   LL::SimpleLock<true> reduceLock;
@@ -178,7 +179,12 @@ FunctionTy do_all_impl(IterTy b, IterTy e, FunctionTy f, ReducerTy r, bool needs
   return retval;
 }
 
-} //namespace Galois::Runtime
+template <typename IterTy, typename FunctionTy>
+void do_all_impl (IterTy b, IterTy e, FunctionTy f, const char* loopname=0) {
+  do_all_impl (b, e, f, EmptyFn (), false);
 }
+
+} //namespace Runtime
+} //namespace Galois
 
 #endif // GALOIS_RUNTIME_DOALL_H

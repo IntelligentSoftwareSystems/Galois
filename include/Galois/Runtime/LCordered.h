@@ -29,13 +29,14 @@
 #define GALOIS_RUNTIME_LC_ORDERED_H
 
 #include "Galois/Accumulator.h"
-#include "Galois/Galois.h"
 #include "Galois/Timer.h"
 #include "Galois/Atomic.h"
 #include "Galois/gdeque.h"
 #include "Galois/PriorityQueue.h"
 
 
+#include "Galois/Runtime/DoAll.h"
+#include "Galois/Runtime/ParallelWork.h"
 #include "Galois/Runtime/PerThreadWorkList.h"
 #include "Galois/Runtime/DoAllCoupled.h"
 #include "Galois/Runtime/mm/Mem.h"
@@ -49,7 +50,8 @@
 #include <tr1/unordered_map>
 
 
-namespace Galois::Runtime {
+namespace Galois {
+namespace Runtime {
 
   static const bool DEBUG = false;
 
@@ -192,7 +194,7 @@ public:
           && srcTest (highest) 
           && highest->onWL.cas (false, true)) {
 
-        // GALOIS_DEBUG_PRINT ("Adding found source: %s\n", highest->str ().c_str ());
+        // GALOIS_DEBUG ("Adding found source: %s\n", highest->str ().c_str ());
         wl.push (highest);
       }
     }
@@ -211,7 +213,7 @@ public:
           && srcTest (highest) 
           && highest->onWL.cas (false, true)) {
 
-        // GALOIS_DEBUG_PRINT ("Adding found source: %s\n", highest->str ().c_str ());
+        // GALOIS_DEBUG ("Adding found source: %s\n", highest->str ().c_str ());
         wl.push_back (highest);
       }
     }
@@ -291,7 +293,7 @@ private:
   };
 
   void resetAll () {
-    Galois::do_all (allNItems.begin_all (), allNItems.end_all (),
+    Galois::Runtime::do_all_impl (allNItems.begin_all (), allNItems.end_all (),
         Reset (niAlloc), "reset_NItems");
   }
 
@@ -420,6 +422,13 @@ struct StableSourceTest {
 template <typename OperFunc, typename NhoodFunc, typename Ctxt, typename SourceTest>
 class LCorderedExec {
 
+  // important paramters
+  // TODO: add capability to the interface to express these constants
+  static const size_t DELETE_CONTEXT_SIZE = 1024;
+  static const size_t UNROLL_FACTOR = 32;
+  static const unsigned CHUNK_SIZE = 16;
+
+
 
   // typedef MapBasedNhoodMgr<T, Cmp> NhoodMgr;
   // typedef NhoodItem<T, Cmp, NhoodMgr> NItem;
@@ -432,7 +441,9 @@ class LCorderedExec {
   typedef Galois::Runtime::PerThreadVector<Ctxt*> CtxtWL;
   typedef Galois::Runtime::PerThreadDeque<Ctxt*> CtxtDelQ;
   typedef Galois::Runtime::PerThreadDeque<Ctxt*> CtxtLocalQ;
-  typedef Galois::Runtime::PerThreadVector<T> AddWL;
+  // typedef Galois::Runtime::PerThreadVector<T> AddWL;
+  typedef Galois::Runtime::UserContextAccess<T> UserCtx;
+  typedef Galois::Runtime::PerThreadStorage<UserCtx> PerThreadUserCtx;
 
 
   typedef Galois::GAccumulator<size_t> Accumulator;
@@ -465,7 +476,10 @@ class LCorderedExec {
       ctxtWL.get ().push_back (ctxt);
 
       Galois::Runtime::setThreadContext (ctxt);
-      nhoodVisitor (ctxt->active);
+      int tmp=0;
+      // TODO: nhoodVisitor should take only one arg, 
+      // 2nd arg being passed due to compatibility with Deterministic executor
+      nhoodVisitor (ctxt->active, tmp); 
       Galois::Runtime::setThreadContext (NULL);
     }
 
@@ -507,8 +521,6 @@ class LCorderedExec {
 
   struct ApplyOperator {
 
-    static const size_t DELETE_CONTEXT_SIZE = 1024;
-    static const size_t UNROLL_FACTOR = 32;
 
     OperFunc& op;
     NhoodFunc& nhoodVisitor;
@@ -518,7 +530,7 @@ class LCorderedExec {
     CtxtWL& addCtxtWL;
     CtxtLocalQ& ctxtLocalQ;
     CtxtDelQ& ctxtDelQ;
-    AddWL& addWL;
+    PerThreadUserCtx& perThUserCtx;
     Accumulator& niter;
 
     ApplyOperator (
@@ -530,7 +542,7 @@ class LCorderedExec {
         CtxtWL& addCtxtWL,
         CtxtLocalQ& ctxtLocalQ,
         CtxtDelQ& ctxtDelQ,
-        AddWL& addWL,
+        PerThreadUserCtx& perThUserCtx,
         Accumulator& niter)
       :
         op (op),
@@ -541,7 +553,7 @@ class LCorderedExec {
         addCtxtWL (addCtxtWL),
         ctxtLocalQ (ctxtLocalQ),
         ctxtDelQ (ctxtDelQ),
-        addWL (addWL),
+        perThUserCtx (perThUserCtx),
         niter (niter) 
     {}
 
@@ -562,7 +574,7 @@ class LCorderedExec {
 
         Ctxt* src = ctxtLocalQ.get ().front (); ctxtLocalQ.get ().pop_front ();
 
-        // GALOIS_DEBUG_PRINT ("Processing source: %s\n", src->str ().c_str ());
+        // GALOIS_DEBUG ("Processing source: %s\n", src->str ().c_str ());
         if (DEBUG && !sourceTest (src)) {
           std::cout << "Not found to be a source: " << src->str ()
             << std::endl;
@@ -571,14 +583,20 @@ class LCorderedExec {
 
         niter += 1;
 
-        addWL.get ().clear ();
-        op (src->active, addWL.get ()); 
+        // addWL.get ().clear ();
+        UserCtx& userCtx = *(perThUserCtx.getLocal ());
+        userCtx.resetPushBuffer ();
+        userCtx.resetAlloc ();
+        op (src->active, userCtx.data ()); 
 
         addCtxtWL.get ().clear ();
         CreateCtxtExpandNhood addCtxt (nhoodVisitor, nhmgr, ctxtAlloc, addCtxtWL);
 
-        for (typename AddWL::local_iterator a = addWL.get ().begin ()
-            , enda = addWL.get ().end (); a != enda; ++a) {
+        // for (typename AddWL::local_iterator a = addWL.get ().begin ()
+            // , enda = addWL.get ().end (); a != enda; ++a) {
+        for (typename UserCtx::pushBufferTy::iterator a = userCtx.getPushBuffer ().begin ()
+            , enda = userCtx.getPushBuffer ().end (); a != enda; ++a) {
+          
 
           addCtxt (*a);
         }
@@ -635,8 +653,8 @@ class LCorderedExec {
   };
 
 private:
-  OperFunc operFunc;
   NhoodFunc nhoodVisitor;
+  OperFunc operFunc;
   NhoodMgr& nhmgr;
   SourceTest sourceTest;
 
@@ -644,19 +662,19 @@ private:
 public:
 
   LCorderedExec (
-      OperFunc operFunc,
-      NhoodFunc nhoodVisitor,
+      const NhoodFunc& nhoodVisitor,
+      const OperFunc& operFunc,
       NhoodMgr& nhmgr,
       SourceTest sourceTest)
     :
-      operFunc (operFunc),
       nhoodVisitor (nhoodVisitor),
+      operFunc (operFunc),
       nhmgr (nhmgr),
       sourceTest (sourceTest)
   {}
 
-  template <const unsigned CHUNK_SIZE, typename AI>
-  void execute (AI abeg, AI aend) {
+  template <typename AI>
+  void execute (AI abeg, AI aend, const char* loopname) {
     CtxtAlloc ctxtAlloc;
     CtxtWL initCtxt;
     CtxtWL initSrc;
@@ -670,13 +688,13 @@ public:
     Galois::TimeAccumulator t_destroy;
 
     t_create.start ();
-    Galois::do_all (abeg, aend, 
+    Galois::Runtime::do_all_impl (abeg, aend, 
         CreateCtxtExpandNhood (nhoodVisitor, nhmgr, ctxtAlloc, initCtxt),
         "create_initial_contexts");
     t_create.stop ();
 
     t_find.start ();
-    Galois::do_all (initCtxt.begin_all (), initCtxt.end_all (),
+    Galois::Runtime::do_all_impl (initCtxt.begin_all (), initCtxt.end_all (),
         FindInitSources (sourceTest, initSrc, nInitSrc),
         "find_initial_sources");
     t_find.stop ();
@@ -684,7 +702,8 @@ public:
     std::cout << "Number of initial sources found: " << nInitSrc.reduce () 
       << std::endl;
 
-    AddWL addWL;
+    // AddWL addWL;
+    PerThreadUserCtx perThUserCtx;
     CtxtWL addCtxtWL;
     CtxtDelQ ctxtDelQ;
     CtxtLocalQ ctxtLocalQ;
@@ -693,7 +712,7 @@ public:
     // TODO: code to find global min goes here
 
     t_for.start ();
-    Galois::for_each<SrcWL_ty> (initSrc.begin_all (), initSrc.end_all (),
+    Galois::Runtime::for_each_impl<SrcWL_ty> (initSrc.begin_all (), initSrc.end_all (),
         ApplyOperator (
           operFunc,
           nhoodVisitor,
@@ -703,13 +722,13 @@ public:
           addCtxtWL,
           ctxtLocalQ,
           ctxtDelQ,
-          addWL,
+          perThUserCtx,
           niter),
         "apply_operator");
     t_for.stop ();
 
     t_destroy.start ();
-    Galois::do_all (ctxtDelQ.begin_all (), ctxtDelQ.end_all (),
+    Galois::Runtime::do_all_impl (ctxtDelQ.begin_all (), ctxtDelQ.end_all (),
         DelCtxt (ctxtAlloc), "delete_all_ctxt");
     t_destroy.stop ();
 
@@ -727,8 +746,8 @@ public:
 
 };
 
-template <const unsigned CHUNK_SIZE, typename AI, typename Cmp, typename OperFunc, typename NhoodFunc>
-void for_each_ordered_lc (AI abeg, AI aend, Cmp cmp, OperFunc operFunc, NhoodFunc nhoodVisitor) {
+template <typename AI, typename Cmp, typename OperFunc, typename NhoodFunc>
+void for_each_ordered_lc (AI abeg, AI aend, Cmp cmp, NhoodFunc nhoodVisitor, OperFunc operFunc, const char* loopname) {
 
   typedef typename std::iterator_traits<AI>::value_type T;
 
@@ -743,12 +762,13 @@ void for_each_ordered_lc (AI abeg, AI aend, Cmp cmp, OperFunc operFunc, NhoodFun
 
   NhoodMgr nhmgr (cmp);
 
-  Exec e (operFunc, nhoodVisitor, nhmgr, SourceTest ());
-  e.template execute<CHUNK_SIZE> (abeg, aend);
+  Exec e (nhoodVisitor, operFunc, nhmgr, SourceTest ());
+  // e.template execute<CHUNK_SIZE> (abeg, aend);
+  e.execute (abeg, aend, loopname);
 }
 
-template <const unsigned CHUNK_SIZE, typename AI, typename Cmp, typename OperFunc, typename NhoodFunc, typename StableTest>
-void for_each_ordered_lc (AI abeg, AI aend, Cmp cmp, OperFunc operFunc, NhoodFunc nhoodVisitor, StableTest stabilityTest) {
+template <typename AI, typename Cmp, typename OperFunc, typename NhoodFunc, typename StableTest>
+void for_each_ordered_lc (AI abeg, AI aend, Cmp cmp, NhoodFunc nhoodVisitor, OperFunc operFunc, StableTest stabilityTest, const char* loopname) {
 
   typedef typename std::iterator_traits<AI>::value_type T;
 
@@ -763,9 +783,11 @@ void for_each_ordered_lc (AI abeg, AI aend, Cmp cmp, OperFunc operFunc, NhoodFun
 
   NhoodMgr nhmgr (cmp);
 
-  Exec e (operFunc, nhoodVisitor, nhmgr, SourceTest (stabilityTest));
-  e.template execute<CHUNK_SIZE> (abeg, aend);
+  Exec e (nhoodVisitor, operFunc, nhmgr, SourceTest (stabilityTest));
+  // e.template execute<CHUNK_SIZE> (abeg, aend);
+  e.execute (abeg, aend, loopname);
 }
 
+}
 }
 #endif //  GALOIS_RUNTIME_LC_ORDERED_H

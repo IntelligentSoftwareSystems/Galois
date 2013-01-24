@@ -55,8 +55,11 @@ struct CacheLineImp<T, 0> {
 // Store an item with padding
 template<typename T>
 struct CacheLineStorage : public CacheLineImp<T, GALOIS_CACHE_LINE_SIZE % sizeof(T)> {
-  CacheLineStorage() :CacheLineImp<T, GALOIS_CACHE_LINE_SIZE % sizeof(T)>() {}
-  explicit CacheLineStorage(const T& v) :CacheLineImp<T, GALOIS_CACHE_LINE_SIZE % sizeof(T)>(v) {}
+  typedef CacheLineImp<T, GALOIS_CACHE_LINE_SIZE % sizeof(T)> PTy;
+  using PTy::data;
+  CacheLineStorage() :PTy() {}
+  explicit CacheLineStorage(const T& v) :PTy(v) {}
+  CacheLineStorage& operator=(const T& v) { data = v; return *this; }
 };
 
 }

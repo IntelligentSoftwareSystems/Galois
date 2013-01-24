@@ -23,7 +23,7 @@
  */
 
 #include "Galois/Statistic.h"
-#include "Galois/Graphs/Graph2.h"
+#include "Galois/Graphs/Graph.h"
 #include "Galois/Timer.h"
 #include "Galois/Galois.h"
 #include "Galois/Graphs/LCGraph.h"

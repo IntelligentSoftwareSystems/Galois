@@ -25,7 +25,7 @@
 #ifndef DES_BASE_SIM_OBJECT_H
 #define DES_BASE_SIM_OBJECT_H
 
-#include "Galois/Graphs/Graph2.h"
+#include "Galois/Graphs/Graph.h"
 
 #include <iostream>
 #include <sstream>
@@ -103,7 +103,7 @@ protected:
     virtual BaseOutDegIter& operator ++ () = 0;
 
     // since BaseOutDegIter is virtual, can't return copy of BaseOutDegIter here
-    //virtual BaseOutDegIter operator ++ (int) = 0;
+    virtual void operator ++ (int) = 0;
 
     virtual bool is_equal (const BaseOutDegIter& that) const = 0;
 
@@ -140,10 +140,8 @@ protected:
       return *this;
     }
 
-    virtual OutDegIterator<G> operator ++ (int) {
-      OutDegIterator<G> tmp (*this);
+    virtual void operator ++ (int) {
       operator ++ ();
-      return tmp;
     }
 
     virtual bool is_equal (const BaseOutDegIter& t) const {

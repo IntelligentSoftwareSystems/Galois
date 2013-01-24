@@ -105,7 +105,7 @@ class DESunordered: public DESunorderedBase {
         // should be past the fail-safe point by now
 
         if (DEBUG) {
-          GALOIS_DEBUG_PRINT ("processing : %s\n", srcObj->str ().c_str ());
+          GALOIS_DEBUG ("processing : %s\n", srcObj->str ().c_str ());
         }
 
         maxPending.update (srcObj->numPendingEvents ());
@@ -123,7 +123,7 @@ class DESunordered: public DESunorderedBase {
               && !bool (onWLflags [dstObj->getID ()])
               && onWLflags[dstObj->getID ()].cas (false, true)) {
             if (DEBUG) {
-              GALOIS_DEBUG_PRINT ("Added %d neighbor: %s\n", 
+              GALOIS_DEBUG ("Added %d neighbor: %s\n", 
                   bool (onWLflags[dstObj->getID ()]), dstObj->str ().c_str ());
             }
 
@@ -139,7 +139,7 @@ class DESunordered: public DESunorderedBase {
           lwl.push (activeNode);
           
           if (DEBUG) {
-            GALOIS_DEBUG_PRINT ("Added %d self: %s\n" 
+            GALOIS_DEBUG ("Added %d self: %s\n" 
                 , bool (onWLflags[srcObj->getID ()]), srcObj->str ().c_str ());
           }
 
@@ -147,7 +147,7 @@ class DESunordered: public DESunorderedBase {
           onWLflags[srcObj->getID ()] = false;
 
           if (DEBUG) {
-            GALOIS_DEBUG_PRINT ("not adding %d self: %s\n", 
+            GALOIS_DEBUG ("not adding %d self: %s\n", 
                 bool (onWLflags[srcObj->getID ()]), srcObj->str ().c_str ());
           }
         }

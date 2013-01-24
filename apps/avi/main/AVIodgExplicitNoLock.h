@@ -25,7 +25,7 @@
 #define AVI_UNORDERED_NO_LOCK_H_
 
 
-#include "Galois/Graphs/Graph2.h"
+#include "Galois/Graphs/Graph.h"
 #include "Galois/Graphs/FileGraph.h"
 
 #include "Galois/Galois.h"
@@ -71,7 +71,7 @@ protected:
     std::vector<AtomicInteger>& inDegVec;
     MeshInit& meshInit;
     GlobalVec& g;
-    Galois::Runtime::PerThreadStorage<LocalVec>& perIterLocalVec;
+    GaloisRuntime::PerThreadStorage<LocalVec>& perIterLocalVec;
     bool createSyncFiles;
     IterCounter& iter;
 
@@ -80,7 +80,7 @@ protected:
         std::vector<AtomicInteger>& inDegVec,
         MeshInit& meshInit,
         GlobalVec& g,
-        Galois::Runtime::PerThreadStorage<LocalVec>& perIterLocalVec,
+        GaloisRuntime::PerThreadStorage<LocalVec>& perIterLocalVec,
         bool createSyncFiles,
         IterCounter& iter):
 
@@ -231,7 +231,7 @@ public:
     size_t nrows = meshInit.getSpatialDim ();
     size_t ncols = meshInit.getNodesPerElem();
 
-    Galois::Runtime::PerThreadStorage<LocalVec> perIterLocalVec;
+    GaloisRuntime::PerThreadStorage<LocalVec> perIterLocalVec;
     for (unsigned int i = 0; i < perIterLocalVec.size(); ++i)
       *perIterLocalVec.getRemote(i) = LocalVec(nrows, ncols);
 

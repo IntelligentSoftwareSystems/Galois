@@ -93,21 +93,19 @@ public:
 
 //Derived types
 
-namespace HIDDEN {
 template<typename T>
 struct gmax {
-  void operator()(T& lhs, const T& rhs) const {
-    lhs = std::max(lhs, rhs);
+  const T& operator()(const T& lhs, const T& rhs) const {
+    return std::max<T>(lhs, rhs);
   }
 };
 
 template<typename T>
 struct gmin {
-  void operator()(T& lhs, const T& rhs) const {
-    lhs = std::min(lhs, rhs);
+  const T& operator()(const T& lhs, const T& rhs) const {
+    return std::min<T>(lhs, rhs);
   }
 };
-}
 
 //! Turn binary functions over values into functions over references
 //!
@@ -276,17 +274,17 @@ public:
 };
 
 template<typename T>
-class GReduceMax: public GReducible<T, HIDDEN::gmax<T> > {
-  typedef GReducible<T, HIDDEN::gmax<T> > base_type;
+class GReduceMax: public GReducible<T, ReduceAssignWrap<gmax<T> > > {
+  typedef GReducible<T, ReduceAssignWrap<gmax<T> > > base_type;
 public:
-  GReduceMax(): base_type(HIDDEN::gmax<T>(), std::numeric_limits<T>::min()) { }
+  GReduceMax(): base_type(ReduceAssignWrap<gmax<T> >(), std::numeric_limits<T>::min()) { }
 };
 
 template<typename T>
-class GReduceMin: public GReducible<T, HIDDEN::gmin<T> > {
-  typedef GReducible<T, HIDDEN::gmin<T> > base_type;
+class GReduceMin: public GReducible<T, ReduceAssignWrap<gmin<T> > > {
+  typedef GReducible<T, ReduceAssignWrap<gmin<T> > > base_type;
 public:
-  GReduceMin(): base_type(HIDDEN::gmin<T>(), std::numeric_limits<T>::max()) { }
+  GReduceMin(): base_type(ReduceAssignWrap<gmin<T> >(), std::numeric_limits<T>::max()) { }
 };
 
 }

@@ -56,9 +56,9 @@ struct needs_parallel_break : public has_tt_needs_parallel_break<T> {};
 /**
  * Indicates the operator does not generate new work and push it on the worklist
  */
-BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_does_not_need_parallel_push)
+BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_does_not_need_push)
 template<typename T>
-struct does_not_need_parallel_push : public has_tt_does_not_need_parallel_push<T> {};
+struct does_not_need_push : public has_tt_does_not_need_push<T> {};
 
 /**
  * Indicates the operator may request the access to a per-iteration 
@@ -82,6 +82,17 @@ BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_does_not_need_aborts)
 template<typename T>
 struct does_not_need_aborts : public has_tt_does_not_need_aborts<T> {};
 
+
+/**
+ * Indicates that the neighborhood set does not change through out i.e. is not
+ * dependent on computed values. Examples of such fixed neighborhood is e.g. the 
+ * neighborhood being all the neighbors of a node in the input graph, while the
+ * counter example is the neighborhood being some of the neighbors based on
+ * some predicate. 
+ */
+BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_has_fixed_neighborhood)
+template <typename T>
+struct has_fixed_neighborhood: public has_tt_has_fixed_neighborhood<T> {};
 
 }
 #endif

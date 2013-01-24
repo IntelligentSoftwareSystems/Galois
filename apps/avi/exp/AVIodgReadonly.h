@@ -25,7 +25,7 @@
 #define AVI_ODG_READONLY_H
 
 
-#include "Galois/Graphs/Graph2.h"
+#include "Galois/Graphs/Graph.h"
 #include "Galois/Graphs/FileGraph.h"
 
 #include "Galois/Galois.h"

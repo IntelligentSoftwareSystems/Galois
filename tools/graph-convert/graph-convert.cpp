@@ -22,7 +22,7 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 #include "Galois/Galois.h"
-#include "Galois/Graphs/Graph2.h"
+#include "Galois/Graphs/Graph.h"
 #include "Galois/Graphs/LCGraph.h"
 #include "Galois/Graphs/Serialize.h"
 

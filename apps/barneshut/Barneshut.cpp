@@ -218,6 +218,14 @@ struct Config {
     itolsq(1.0 / (tol * tol))  { }
 };
 
+std::ostream& operator<<(std::ostream& os, const Config& c) {
+  os << "Barnes-Hut configuration:"
+    << " dtime: " << c.dtime
+    << " eps: " << c.eps
+    << " tol: " << c.tol;
+  return os;
+}
+
 Config config;
 
 inline int getIndex(const Point& a, const Point& b) {
@@ -242,9 +250,6 @@ typedef Galois::InsertBag<Body> Bodies;
 typedef Galois::InsertBag<Body*> ptrBodies;
 
 struct BuildOctree {
-  // NB: only correct when run sequentially
-  typedef int tt_does_not_need_stats;
-
   OctreeInternal* root;
   double root_radius;
 
@@ -252,8 +257,7 @@ struct BuildOctree {
     root(_root),
     root_radius(radius) { }
 
-  template<typename Context>
-  void operator()(Body* b, Context&) {
+  void operator()(Body* b) {
     insert(b, root, root_radius);
   }
 
@@ -502,8 +506,7 @@ struct ReduceBoxes {
 
   ReduceBoxes(BoundingBox& _initial): initial(_initial) { }
 
-  template<typename Context>
-  void operator()(Body* b, Context&) {
+  void operator()(Body* b) {
     assert(b);
     initial.merge(b->pos);
   }
@@ -513,11 +516,11 @@ double nextDouble() {
   return rand() / (double) RAND_MAX;
 }
 
-struct insBody {
+struct InsertBody {
   ptrBodies& pBodies;
   Bodies& bodies;
-  insBody(ptrBodies& pb, Bodies& b) :pBodies(pb),bodies(b) {}
-  void operator()(Body& b) {
+  InsertBody(BodyPtrs& pb, Bodies& b): pBodies(pb), bodies(b) { }
+  void operator()(const Body& b) {
     pBodies.push_back(&(bodies.push_back(b)));
   }
 };
@@ -564,7 +567,7 @@ void divide(const Iter& b, const Iter& e) {
  * Generates random input according to the Plummer model, which is more
  * realistic but perhaps not so much so according to astrophysicists
  */
-void generateInput(Bodies& bodies, ptrBodies& pbodies, int nbodies, int seed) {
+void generateInput(Bodies& bodies, BodyPtrs& pBodies, int nbodies, int seed) {
   double v, sq, scale;
   Point p;
   double PI = boost::math::constants::pi<double>();
@@ -605,11 +608,12 @@ void generateInput(Bodies& bodies, ptrBodies& pbodies, int nbodies, int seed) {
       b.vel[i] = p[i] * scale;
 
     tmp.push_back(b);
+    //pBodies.push_back(&bodies.push_back(b));
   }
 
   //sort and copy out
   divide(tmp.begin(), tmp.end());
-  Galois::do_all(tmp.begin(), tmp.end(), insBody(pbodies, bodies));
+  Galois::do_all(tmp.begin(), tmp.end(), InsertBody(pBodies, bodies));
 }
 
 void run(int nbodies, int ntimesteps, int seed) {
@@ -623,14 +627,12 @@ void run(int nbodies, int ntimesteps, int seed) {
 
   for (int step = 0; step < ntimesteps; step++) {
     // Do tree building sequentially
-    Galois::setActiveThreads(1);
-
     BoundingBox box;
     ReduceBoxes reduceBoxes(box);
-    Galois::for_each_local<WL>(pBodies, ReduceBoxes(box));
+    std::for_each(pBodies.begin(), pBodies.end(), ReduceBoxes(box));
     OctreeInternal* top = new OctreeInternal(box.center());
 
-    Galois::for_each_local<WL>(pBodies, BuildOctree(top, box.radius()));
+    std::for_each(pBodies.begin(), pBodies.end(), BuildOctree(top, box.radius()));
 
     ComputeCenterOfMass computeCenterOfMass(top);
     computeCenterOfMass();
