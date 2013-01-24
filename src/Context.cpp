@@ -30,22 +30,26 @@
 //! Global thread context for each active thread
 static __thread Galois::Runtime::SimpleRuntimeContext* thread_cnx = 0;
 
-namespace {
-struct PendingFlag {
+namespace HIDDEN {
+struct PendingStatus {
   Galois::Runtime::LL::CacheLineStorage<Galois::Runtime::PendingFlag> flag;
-  PendingFlag(): flag(Galois::Runtime::NON_DET) { }
+  PendingStatus(): flag(Galois::Runtime::NON_DET) { }
 };
 
 }
 
-static PendingFlag pendingFlag;
+static HIDDEN::PendingStatus pendingStatus;
 
 void Galois::Runtime::setPending(PendingFlag value) {
-  pendingFlag.flag.data = value;
+  pendingStatus.flag.data = value;
+}
+
+Galois::Runtime::PendingFlag Galois::Runtime::getPending () {
+  return pendingStatus.flag.data;
 }
 
 void Galois::Runtime::doCheckWrite() {
-  if (pendingFlag.flag.data == PENDING) {
+  if (Galois::Runtime::getPending () == Galois::Runtime::PENDING) {
     throw Galois::Runtime::REACHED_FAILSAFE;
   }
 }
@@ -195,45 +199,6 @@ void Galois::Runtime::SimpleRuntimeContext::sub_acquire(Galois::Runtime::Lockabl
 
 //anchor vtable
 Galois::Runtime::SimpleRuntimeContext::~SimpleRuntimeContext() {}
-
-void Galois::Runtime::DeterministicRuntimeContext::sub_acquire(Galois::Runtime::Lockable* L) {
-  // Normal path
-  if (pendingFlag.flag.data == NON_DET) {
-    Galois::Runtime::SimpleRuntimeContext::acquire(L);
-    return;
-  }
-
-  // Ordered and deterministic path
-  if (pendingFlag.flag.data == COMMITTING)
-    return;
-
-  if (L->Owner.try_lock()) {
-    assert(!L->next);
-    L->next = locks;
-    locks = L;
-  }
-
-  DeterministicRuntimeContext* other;
-  do {
-    other = static_cast<DeterministicRuntimeContext*>(L->Owner.getValue());
-    if (other == this)
-      return;
-    if (other) {
-      bool conflict = comp ? comp->compare(other->data.comp_data, data.comp_data) :  other->data.id < data.id;
-      if (conflict) {
-        // A lock that I want but can't get
-        not_ready = 1;
-        return; 
-      }
-    }
-  } while (!L->Owner.stealing_CAS(other, this));
-
-  // Disable loser
-  if (other)
-    other->not_ready = 1; // Only need atomic write
-
-  return;
-}
 
 void Galois::Runtime::forceAbort() {
   signalConflict();
