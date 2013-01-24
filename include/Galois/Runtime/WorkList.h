@@ -42,6 +42,7 @@
 #include <deque>
 #include <algorithm>
 #include <iterator>
+#include <utility>
 
 #include <boost/utility.hpp>
 #include <boost/optional.hpp>
@@ -315,21 +316,40 @@ public:
 };
 GALOIS_WLCOMPILECHECK(GFIFO)
 
-template<class Indexer = DummyIndexer<int>, typename ContainerTy = FIFO<>, bool BSP=true, typename T = int, bool concurrent = true>
-class OrderedByIntegerMetric : private boost::noncopyable {
+//! Delay evaluation of result_of until we have all our types rather than
+//! dummy values
+template<bool,class>
+struct safe_result_of { };
 
+template<class F, class... ArgTypes>
+struct safe_result_of<true, F(ArgTypes...)> {
+  typedef typename std::result_of<F(ArgTypes...)>::type type;
+};
+
+template<class F, class... ArgTypes>
+struct safe_result_of<false, F(ArgTypes...)> {
+  typedef int type;
+};
+
+template<class Indexer = DummyIndexer<int>, typename ContainerTy = FIFO<>, bool BSP=true, typename T = int, bool concurrent = true, bool retyped=false>
+class OrderedByIntegerMetric : private boost::noncopyable {
+  typedef typename safe_result_of<retyped,Indexer(T)>::type IndexerValue;
   typedef typename ContainerTy::template rethread<concurrent>::WL CTy;
 
   struct perItem {
+    std::map<IndexerValue, CTy*> local;
+    IndexerValue curIndex;
+    IndexerValue scanStart;
     CTy* current;
-    unsigned int curVersion;
     unsigned int lastMasterVersion;
-    unsigned int scanStart;
-    std::map<unsigned int, CTy*> local;
-    perItem() :current(NULL), curVersion(0), lastMasterVersion(0), scanStart(0) {}
+
+    perItem() :
+      curIndex(std::numeric_limits<IndexerValue>::min()), 
+      scanStart(std::numeric_limits<IndexerValue>::min()),
+      current(0), lastMasterVersion(0) { }
   };
 
-  std::deque<std::pair<unsigned int, CTy*> > masterLog;
+  std::deque<std::pair<IndexerValue, CTy*> > masterLog;
   LL::PaddedLock<concurrent> masterLock;
   volatile unsigned int masterVersion;
 
@@ -339,7 +359,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
 
   void updateLocal_i(perItem& p) {
     for (; p.lastMasterVersion < masterVersion; ++p.lastMasterVersion) {
-      std::pair<unsigned int, CTy*> logEntry = masterLog[p.lastMasterVersion];
+      std::pair<IndexerValue, CTy*> logEntry = masterLog[p.lastMasterVersion];
       p.local[logEntry.first] = logEntry.second;
       assert(logEntry.second);
     }
@@ -355,7 +375,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     return false;
   }
 
-  CTy* updateLocalOrCreate(perItem& p, unsigned int i) {
+  CTy* updateLocalOrCreate(perItem& p, IndexerValue i) {
     //Try local then try update then find again or else create and update the master log
     CTy*& lC = p.local[i];
     if (lC)
@@ -382,11 +402,11 @@ class OrderedByIntegerMetric : private boost::noncopyable {
  public:
   template<bool newconcurrent>
   struct rethread {
-    typedef OrderedByIntegerMetric<Indexer,ContainerTy,BSP,T,newconcurrent> WL;
+    typedef OrderedByIntegerMetric<Indexer,ContainerTy,BSP,T,newconcurrent,retyped> WL;
   };
   template<typename Tnew>
   struct retype {
-    typedef OrderedByIntegerMetric<Indexer,typename ContainerTy::template retype<Tnew>::WL,BSP,Tnew,concurrent> WL;
+    typedef OrderedByIntegerMetric<Indexer,typename ContainerTy::template retype<Tnew>::WL,BSP,Tnew,concurrent,true> WL;
   };
 
   typedef T value_type;
@@ -396,16 +416,16 @@ class OrderedByIntegerMetric : private boost::noncopyable {
   { }
 
   ~OrderedByIntegerMetric() {
-    for (typename std::deque<std::pair<unsigned int, CTy*> >::iterator ii = masterLog.begin(), ee = masterLog.end(); ii != ee; ++ii) {
+    for (typename std::deque<std::pair<IndexerValue, CTy*> >::iterator ii = masterLog.begin(), ee = masterLog.end(); ii != ee; ++ii) {
       delete ii->second;
     }
   }
 
   void push(const value_type& val) {
-    unsigned int index = I(val);
+    IndexerValue index = I(val);
     perItem& p = *current.getLocal();
     //fastpath
-    if (index == p.curVersion && p.current) {
+    if (index == p.curIndex && p.current) {
       p.current->push(val);
       return;
     }
@@ -415,8 +435,8 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     if (BSP && index < p.scanStart)
       p.scanStart = index;
     //opportunistically move to higher priority work
-    if (index < p.curVersion) {
-      p.curVersion = index;
+    if (index < p.curIndex) {
+      p.curIndex = index;
       p.current = lC;
     }
     lC->push(val);
@@ -445,7 +465,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     unsigned myID = LL::getTID();
     bool localLeader = LL::isLeaderForPackage(myID);
 
-    unsigned msS = 0;
+    IndexerValue msS = std::numeric_limits<IndexerValue>::min();
     if (BSP) {
       msS = p.scanStart;
       if (localLeader)
@@ -455,11 +475,11 @@ class OrderedByIntegerMetric : private boost::noncopyable {
 	msS = std::min(msS, current.getRemote(LL::getLeaderForThread(myID))->scanStart);
     }
 
-    for (typename std::map<unsigned int, CTy*>::iterator ii = p.local.lower_bound(msS), ee = p.local.end();
-	 ii != ee; ++ii) {
+    for (typename std::map<IndexerValue, CTy*>::iterator ii = p.local.lower_bound(msS),
+        ee = p.local.end(); ii != ee; ++ii) {
       if ((retval = ii->second->pop())) {
 	C = ii->second;
-	p.curVersion = ii->first;
+	p.curIndex = ii->first;
 	p.scanStart = ii->first;
 	return retval;
       }

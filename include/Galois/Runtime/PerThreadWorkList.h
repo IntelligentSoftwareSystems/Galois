@@ -29,17 +29,23 @@
 
 #include <vector>
 #include <deque>
+#include <list>
 #include <set>
 #include <limits>
+#include <iterator>
 #include <iostream>
 
 #include <cstdio>
+
+#include <boost/iterator/counting_iterator.hpp>
+#include <boost/iterator/transform_iterator.hpp>
 
 #include "Galois/Threads.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/ThreadPool.h"
 #include "Galois/Runtime/mm/Mem.h"
 #include "Galois/Runtime/TwoLevelIterator.h"
+#include "Galois/Runtime/ll/gio.h"
 
 namespace Galois {
 namespace Runtime {
@@ -50,13 +56,70 @@ enum GlobalPos {
   GLOBAL_BEGIN, GLOBAL_END
 };
 
-// #define USE_CUSTOM_TWO_LEVEL_ITER
+// #define ADAPTOR_BASED_OUTER_ITER
 
-// TODO: choose one at the end
-#ifndef USE_CUSTOM_TWO_LEVEL_ITER
-
-// TODO: use a combination of boost::transform_iterator and
+// XXX: use a combination of boost::transform_iterator and
 // boost::counting_iterator to implement the following OuterPerThreadWLIter
+#ifdef ADAPTOR_BASED_OUTER_ITER
+
+template <typename PerThrdWL>
+struct WLindexer: 
+  public std::unary_function<unsigned, typename PerThrdWL::Cont_ty&> 
+{
+
+  typedef typename PerThrdWL::Cont_ty Ret_ty;
+
+  PerThrdWL* wl;
+
+  WLindexer (): wl (NULL) {}
+
+  WLindexer (PerThrdWL& _wl): wl(&_wl) {}
+
+  Ret_ty& operator () (unsigned i) const {
+    assert (wl != NULL);
+    assert (i < wl->numRows ());
+    return const_cast<Ret_ty&> (wl->get (i));
+  }
+};
+
+template <typename PerThrdWL>
+struct TypeFactory {
+  typedef boost::transform_iterator<WLindexer<PerThrdWL>, boost::counting_iterator<unsigned> > OuterIter;
+
+  typedef std::reverse_iterator<OuterIter> RvrsOuterIter;
+};
+
+
+template <typename PerThrdWL>
+typename TypeFactory<PerThrdWL>::OuterIter make_outer_begin (PerThrdWL& wl) {
+
+  typename TypeFactory<PerThrdWL>::OuterIter outer = boost::make_transform_iterator (boost::counting_iterator<unsigned> (0), WLindexer<PerThrdWL> (wl));
+
+  outer->begin ();
+  (*outer).begin ();
+
+  return boost::make_transform_iterator (
+      boost::counting_iterator<unsigned> (0), WLindexer<PerThrdWL> (wl));
+}
+
+template <typename PerThrdWL>
+typename TypeFactory<PerThrdWL>::OuterIter make_outer_end (PerThrdWL& wl) {
+  return boost::make_transform_iterator (
+      boost::counting_iterator<unsigned> (wl.numRows ()), WLindexer<PerThrdWL> (wl));
+}
+
+template <typename PerThrdWL>
+typename TypeFactory<PerThrdWL>::RvrsOuterIter make_outer_rbegin (PerThrdWL& wl) {
+  return typename TypeFactory<PerThrdWL>::RvrsOuterIter (make_outer_end (wl));
+}
+
+template <typename PerThrdWL>
+typename TypeFactory<PerThrdWL>::RvrsOuterIter make_outer_rend (PerThrdWL& wl) {
+  return typename TypeFactory<PerThrdWL>::RvrsOuterIter (make_outer_begin (wl));
+}
+
+#else
+
 template <typename PerThrdWL>
 class OuterPerThreadWLIter: public std::iterator<std::random_access_iterator_tag, typename PerThrdWL::Cont_ty> {
 
@@ -169,6 +232,10 @@ public:
 
   friend bool operator == (const OuterPerThreadWLIter& left, const OuterPerThreadWLIter& right) {
 
+    if (left.workList != right.workList) {
+      GALOIS_DEBUG ("left.workList=%p, right.workList=%p", left.workList, right.workList);
+    }
+
     assert (left.workList == right.workList);
     return (left.row == right.row);
   }
@@ -226,449 +293,6 @@ std::reverse_iterator<OuterPerThreadWLIter<PerThrdWL> >
   return Ret_ty (make_outer_begin (wl));
 }
 
-
-#else 
-
-template <typename PerThrdWL, typename Iter, bool is_reverse_tp>
-class TwoLevelIterBase {
-
-protected:
-  PerThrdWL* workList;
-  unsigned row;
-  Iter curr;
-
-  PerThrdWL& getWL () const { 
-    assert (workList != NULL);
-    return *workList; 
-  }
-
-  inline Iter localBegin () const { 
-    return getWL ()[row].begin ();
-  }
-
-  inline Iter localEnd () const {
-    return getWL ()[row].end  ();
-  }
-
-  void nextRow () {
-    ++row;
-    assert (row < getWL ().numRows ());
-    curr = localBegin ();
-  }
-
-  void prevRow () {
-    assert (row > 0);
-    --row;
-    curr = localEnd ();
-  }
-
-  TwoLevelIterBase (): workList (NULL), row (0), curr () {}
-
-  TwoLevelIterBase (PerThrdWL& wl, const GlobalPos& pos)
-    : workList (&wl), row (0), curr () {
-
-    switch (pos) {
-      case GLOBAL_BEGIN: 
-        row = 0;
-        curr = localBegin ();
-        break;
-      case GLOBAL_END:
-        row = wl.numRows () - 1;
-        curr = localEnd ();
-        break;
-      default:
-        std::abort ();
-    }
-  }
-
-};
-
-template <typename PerThrdWL, typename Iter>
-class TwoLevelIterBase<PerThrdWL, Iter, true> {
-
-protected:
-  typedef std::iterator_traits<Iter> Traits;
-
-  PerThrdWL* workList;
-  unsigned row;
-  Iter curr;
-
-  PerThrdWL& getWL () const { 
-    assert (workList != NULL);
-    return *workList; 
-  }
-
-  inline Iter localBegin () const { 
-    return getWL ()[row].rbegin ();
-  }
-
-  inline Iter localEnd () const {
-    return getWL ()[row].rend ();
-  }
-
-  void nextRow () {
-    assert (row > 0);
-    --row;
-    curr = localBegin ();
-  }
-
-  void prevRow () {
-    ++row;
-    assert (row < getWL ().numRows ());
-    curr = localEnd ();
-  }
-
-  TwoLevelIterBase (): workList (NULL), row (0), curr () {}
-
-  TwoLevelIterBase (PerThrdWL& wl, const GlobalPos& pos)
-    : workList (&wl), row (0), curr () {
-
-    switch (pos) {
-      case GLOBAL_BEGIN: 
-        row = wl.numRows () - 1;
-        curr = localBegin (row);
-        break;
-      case GLOBAL_END:
-        row = 0;
-        curr = localEnd (row);
-        break;
-      default:
-        std::abort ();
-    }
-  }
-};
-
-template <typename PerThrdWL, typename Iter>
-struct IsRvrs {
-  static const bool VAL = false;
-};
-
-template <typename PerThrdWL>
-struct IsRvrs<PerThrdWL, typename PerThrdWL::Cont_ty::reverse_iterator> {
-  static const bool VAL = true;
-};
-
-template <typename PerThrdWL>
-struct IsRvrs<PerThrdWL, typename PerThrdWL::Cont_ty::const_reverse_iterator> {
-  static const bool VAL = true;
-};
-
-template <typename PerThrdWL, typename Iter>
-class TwoLevelFwdIter: 
-  public std::iterator_traits<Iter>, 
-  public TwoLevelIterBase<PerThrdWL, Iter, IsRvrs<PerThrdWL, Iter>::VAL> {
-
-protected:
-
-  typedef std::iterator_traits<Iter> Traits;
-  typedef TwoLevelIterBase<PerThrdWL, Iter, IsRvrs<PerThrdWL, Iter>::VAL> Base;
-
-  inline bool atBegin () const {
-    return Base::curr == Base::localBegin ();
-  }
-
-  inline bool atEnd () const {
-    return Base::curr == Base::localEnd ();
-  }
-
-  void seekValidBegin () {
-    while ((Base::row < (Base::workList->numRows () - 1)) &&  atEnd ()) {
-      Base::nextRow ();
-    } 
-  }
-
-  void step_forward () {
-
-    assert (!atEnd ());
-    ++Base::curr;
-    
-    if (atEnd ()) {
-      seekValidBegin ();
-    }
-  }
-
-  bool is_equal (const TwoLevelFwdIter& that) const {
-    assert (this->workList == that.workList);
-
-    return (this->row == that.row) 
-      && (this->curr == that.curr);
-  }
-
-
-public:
-
-  TwoLevelFwdIter (): Base () {}
-
-  TwoLevelFwdIter (PerThrdWL& wl, const GlobalPos& pos): Base (wl, pos) {
-    // Base::curr = Base::localBegin ();
-    seekValidBegin ();
-  }
-
-  typename Traits::reference operator * () { 
-    return *Base::curr;
-  }
-
-  typename Traits::pointer operator -> () {
-    return Base::curr.operator -> ();
-  }
-
-  TwoLevelFwdIter& operator ++ () {
-    step_forward ();
-    return *this;
-  }
-
-  TwoLevelFwdIter operator ++ (int) {
-    TwoLevelFwdIter tmp (*this);
-    step_forward ();
-    return tmp;
-  }
-    
-  friend bool operator == (const TwoLevelFwdIter& left, const TwoLevelFwdIter& right) {
-    return left.is_equal (right);
-  }
-
-  friend bool operator != (const TwoLevelFwdIter& left, const TwoLevelFwdIter& right) {
-    return !left.is_equal (right);
-  }
-
-
-};
-
-template <typename PerThrdWL, typename Iter>
-class TwoLevelBiDirIter: public TwoLevelFwdIter<PerThrdWL, Iter> {
-
-protected:
-  typedef TwoLevelFwdIter<PerThrdWL, Iter> FwdBase;
-
-
-  void step_backward () {
-    while (FwdBase::row > 0 && FwdBase::atBegin ()) {
-      FwdBase::prevRow ();
-    }
-
-    if (!FwdBase::atBegin ()) {
-      --FwdBase::curr;
-    }
-  }
-
-public:
-
-  TwoLevelBiDirIter (): FwdBase () {}
-
-  TwoLevelBiDirIter (PerThrdWL& wl, const GlobalPos& pos): FwdBase (wl, pos) {}
-
-
-  TwoLevelBiDirIter& operator -- () {
-    step_backward ();
-    return *this;
-  }
-
-  TwoLevelBiDirIter operator -- (int) {
-    TwoLevelBiDirIter tmp (*this);
-    step_backward ();
-    return tmp;
-  }
-};
-
-
-template <typename PerThrdWL, typename Iter>
-class TwoLevelRandIter: public TwoLevelBiDirIter<PerThrdWL, Iter> {
-
-protected:
-  typedef TwoLevelBiDirIter<PerThrdWL, Iter> BiDirBase;
-
-  typedef typename BiDirBase::Traits::difference_type Diff_ty;
-
-  void jump_forward (const Diff_ty d) {
-    if (d < 0) {
-      jump_backward (-d);
-      return;
-    }
-
-    assert (d >= 0);
-    Diff_ty rem (d);
-
-
-    while (rem > 0) {
-      Diff_ty avail = std::distance (BiDirBase::curr, BiDirBase::localEnd ());
-      assert (avail >= 0);
-
-      if (rem > avail) {
-        rem -= avail;
-
-        assert (BiDirBase::row < (BiDirBase::workList->numRows () - 1));
-        BiDirBase::nextRow ();
-
-      } else {
-        BiDirBase::curr += rem;
-        rem = 0;
-      }
-
-      BiDirBase::seekValidBegin ();
-    }
-  }
-
-  void jump_backward (const Diff_ty d) {
-    if (d < 0) {
-      jump_forward (-d);
-      return;
-    }
-
-    assert (d >= 0);
-    Diff_ty rem (d);
-
-    while (rem > 0) {
-      Diff_ty avail = std::distance (BiDirBase::localBegin (), BiDirBase::curr);
-      assert (avail >= 0);
-
-      if (rem > avail) {
-        rem -= avail;
-
-        assert (BiDirBase::row > 0);
-        BiDirBase::prevRow ();
-
-      } else {
-        BiDirBase::curr -= rem;
-        rem = 0;
-      }
-    }
-  }
-
-  Diff_ty compute_dist (const TwoLevelRandIter& that) const {
-    assert (this->workList == that.workList);
-
-    if (this->row > that.row) {
-      return -(that.compute_dist (*this));
-
-    } else if (this->row == that.row) {
-      return std::distance (this->curr, that.curr);
-
-    } else {
-      TwoLevelRandIter tmp (*this);
-
-      Diff_ty d = std::distance (tmp.curr, tmp.curr); // 0
-
-      while (tmp.row < that.row) {
-        d += std::distance (tmp.curr, tmp.localEnd ());
-        tmp.nextRow ();
-      }
-
-      assert (tmp.row == that.row);
-
-      if (tmp.row < tmp.workList->numRows ()) {
-        d += std::distance (tmp.curr, that.curr);
-      }
-
-      assert (d >= 0);
-
-      return d;
-    }
-  }
-
-
-public:
-
-  TwoLevelRandIter (): BiDirBase () {}
-
-  TwoLevelRandIter (PerThrdWL& wl, const GlobalPos& pos): BiDirBase (wl, pos) {}
-
-
-  TwoLevelRandIter& operator += (Diff_ty d) {
-    jump_forward (d);
-    return *this;
-  }
-
-  TwoLevelRandIter& operator -= (Diff_ty d) {
-    jump_backward (d);
-    return *this;
-  }
-
-  friend TwoLevelRandIter operator + (const TwoLevelRandIter& it, Diff_ty d) {
-    TwoLevelRandIter tmp (it);
-    tmp += d;
-    return tmp;
-  }
-
-  friend TwoLevelRandIter operator + (Diff_ty d, const TwoLevelRandIter& it) {
-    return (it + d);
-  }
-
-  friend TwoLevelRandIter operator - (const TwoLevelRandIter& it, Diff_ty d) {
-    TwoLevelRandIter tmp (it);
-    tmp -= d;
-    return tmp;
-  }
-
-  friend Diff_ty operator - (const TwoLevelRandIter& left, const TwoLevelRandIter& right) {
-
-    return right.compute_dist (left);
-  }
-
-  typename BiDirBase::Traits::reference operator [] (Diff_ty d) {
-    return *((*this) + d);
-  }
-
-  friend bool operator < (const TwoLevelRandIter& left, const TwoLevelRandIter& right) {
-    assert (left.workList == right.workList);
-
-    return ((left.row == right.row) ? (left.curr < right.curr) : (left.row < right.row));
-  }
-
-  friend bool operator <= (const TwoLevelRandIter& left, const TwoLevelRandIter& right) {
-    return (left < right) || (left == right);
-  }
-
-  friend bool operator > (const TwoLevelRandIter& left, const TwoLevelRandIter& right) {
-    return !(left <= right);
-  }
-
-  friend bool operator >= (const TwoLevelRandIter& left, const TwoLevelRandIter& right) {
-    return !(left < right);
-  }
-
-
-};
-
-template <typename PerThrdWL, typename Iter, typename Cat>
-struct ByCat {};
-
-template <typename PerThrdWL, typename Iter> 
-struct ByCat<PerThrdWL, Iter, std::forward_iterator_tag> {
-  typedef TwoLevelFwdIter<PerThrdWL, Iter> type;
-};
-
-template <typename PerThrdWL, typename Iter> 
-struct ByCat<PerThrdWL, Iter, std::bidirectional_iterator_tag> {
-  typedef TwoLevelBiDirIter<PerThrdWL, Iter> type;
-};
-
-template <typename PerThrdWL, typename Iter> 
-struct ByCat<PerThrdWL, Iter, std::random_access_iterator_tag> {
-  typedef TwoLevelRandIter<PerThrdWL, Iter> type;
-};
-
-template <typename PerThrdWL, typename Iter>
-struct ChooseIter {
-
-  typedef typename ByCat<PerThrdWL, Iter, typename std::iterator_traits<Iter>::iterator_category>::type type;
-
-};
-
-
-template <typename PerThrdWL, typename Iter>
-typename ChooseIter<PerThrdWL, Iter>::type make_begin (PerThrdWL& wl, Iter dummy) {
-
-  typedef typename ChooseIter<PerThrdWL, Iter>::type Ret_ty;
-  return Ret_ty (wl, GLOBAL_BEGIN);
-}
-
-template <typename PerThrdWL, typename Iter>
-typename ChooseIter<PerThrdWL, Iter>::type make_end (PerThrdWL& wl, Iter dummy) {
-
-  typedef typename ChooseIter<PerThrdWL, Iter>::type Ret_ty;
-  return Ret_ty (wl, GLOBAL_END);
-}
-
 #endif
 
 } // end namespace HIDDEN
@@ -691,26 +315,55 @@ public:
 
   typedef PerThreadWorkList This_ty;
 
-  // TODO: choose one at the end
-#ifndef USE_CUSTOM_TWO_LEVEL_ITER
+#ifdef ADAPTOR_BASED_OUTER_ITER
 
-  typedef HIDDEN::OuterPerThreadWLIter<This_ty> OuterIter;
-
-  typedef typename ChooseTwoLevelIterator<OuterIter, typename Cont_ty::iterator>::type global_iterator;
-  typedef typename ChooseTwoLevelIterator<OuterIter, typename Cont_ty::const_iterator>::type global_const_iterator;
-  typedef typename ChooseTwoLevelIterator<OuterIter, typename Cont_ty::reverse_iterator>::type global_reverse_iterator;
-  typedef typename ChooseTwoLevelIterator<OuterIter, typename Cont_ty::const_reverse_iterator>::type global_const_reverse_iterator;
+  typedef typename HIDDEN::TypeFactory<This_ty>::OuterIter OuterIter;
+  typedef typename HIDDEN::TypeFactory<This_ty>::RvrsOuterIter RvrsOuterIter;
 
 #else
 
-  typedef typename HIDDEN::ChooseIter<This_ty, typename Cont_ty::iterator>::type global_iterator;
-  typedef typename HIDDEN::ChooseIter<This_ty, typename Cont_ty::const_iterator>::type global_const_iterator;
-  typedef typename HIDDEN::ChooseIter<This_ty, typename Cont_ty::reverse_iterator>::type global_reverse_iterator;
-  typedef typename HIDDEN::ChooseIter<This_ty, typename Cont_ty::const_reverse_iterator>::type global_const_reverse_iterator;
+  typedef HIDDEN::OuterPerThreadWLIter<This_ty> OuterIter;
+  typedef std::reverse_iterator<OuterIter> RvrsOuterIter;
 
 #endif
 
+  typedef typename ChooseStlTwoLevelIterator<OuterIter, typename Cont_ty::iterator>::type global_iterator;
+
+  typedef typename ChooseStlTwoLevelIterator<OuterIter, typename Cont_ty::const_iterator>::type global_const_iterator;
+
+  typedef typename ChooseStlTwoLevelIterator<RvrsOuterIter, typename Cont_ty::reverse_iterator>::type global_reverse_iterator;
+
+  typedef typename ChooseStlTwoLevelIterator<RvrsOuterIter, typename Cont_ty::const_reverse_iterator>::type global_const_reverse_iterator;
+
+
+
 private:
+
+  // XXX: for testing only
+  /*
+  struct FakePTS {
+    std::vector<Cont_ty*> v;
+
+    FakePTS () { 
+      v.resize (size ());
+    }
+
+    Cont_ty** getLocal () const {
+      return &v[0];
+    }
+
+    Cont_ty** getRemote (size_t i) const {
+      assert (i < v.size ());
+      return const_cast<Cont_ty**> (&v[i]);
+    }
+
+    size_t size () const { return 1024*1024; }
+
+  };
+  */
+
+
+  // typedef FakePTS PerThrdCont_ty;
   typedef Galois::Runtime::PerThreadStorage<Cont_ty*> PerThrdCont_ty;
   PerThrdCont_ty perThrdCont;
 
@@ -756,95 +409,46 @@ public:
   const Cont_ty& operator [] (unsigned i) const { return get (i); }
 
 
-  // TODO: choose one at the end
-#ifndef USE_CUSTOM_TWO_LEVEL_ITER
-
   global_iterator begin_all () { 
-    return make_two_level_begin (
-        HIDDEN::make_outer_begin (*this), HIDDEN::make_outer_end (*this),  
-        local_iterator ()); 
+    return stl_two_level_begin (
+        HIDDEN::make_outer_begin (*this), HIDDEN::make_outer_end (*this)); 
   }
 
   global_iterator end_all () { 
-    return make_two_level_end (
-        HIDDEN::make_outer_begin (*this), HIDDEN::make_outer_end (*this),  
-        local_iterator ()); 
-  }
-
-
-  global_const_iterator begin_all () const { 
-    return make_two_level_begin (
-        HIDDEN::make_outer_begin (*this), HIDDEN::make_outer_end (*this),  
-        local_const_iterator ()); 
-  }
-
-  global_const_iterator end_all () const { 
-    return make_two_level_end (
-        HIDDEN::make_outer_begin (*this), HIDDEN::make_outer_end (*this),  
-        local_const_iterator ()); 
-  }
-
-  global_reverse_iterator rbegin_all () { 
-    return make_two_level_begin (
-        HIDDEN::make_outer_rbegin (*this), HIDDEN::make_outer_rend (*this),  
-        local_reverse_iterator ()); 
-  }
-
-  global_reverse_iterator rend_all () { 
-    return make_two_level_end (
-        HIDDEN::make_outer_rbegin (*this), HIDDEN::make_outer_rend (*this),  
-        local_reverse_iterator ()); 
-  }
-
-
-  global_const_reverse_iterator rbegin_all () const { 
-    return make_two_level_begin (
-        HIDDEN::make_outer_rbegin (*this), HIDDEN::make_outer_rend (*this),  
-        local_const_reverse_iterator ()); 
-  }
-
-  global_const_reverse_iterator rend_all () const { 
-    return make_two_level_end (
-        HIDDEN::make_outer_rbegin (*this), HIDDEN::make_outer_rend (*this),  
-        local_const_reverse_iterator ()); 
-  }
-
-
-#else 
-
-  global_iterator begin_all () { 
-    return HIDDEN::make_begin (*this, local_iterator ()); 
-  }
-
-  global_iterator end_all () { 
-    return HIDDEN::make_end (*this, local_iterator ()); 
+    return stl_two_level_end (
+        HIDDEN::make_outer_end (*this), HIDDEN::make_outer_end (*this)); 
   }
 
   global_const_iterator begin_all () const { 
-    return HIDDEN::make_begin (*this, local_const_iterator ()); 
+    return stl_two_level_cbegin (
+        HIDDEN::make_outer_begin (*this), HIDDEN::make_outer_end (*this));
   }
-  
+
   global_const_iterator end_all () const { 
-    return HIDDEN::make_end (*this, local_const_iterator ()); 
+    return stl_two_level_cend (
+        HIDDEN::make_outer_begin (*this), HIDDEN::make_outer_end (*this));
   }
 
   global_reverse_iterator rbegin_all () { 
-    return HIDDEN::make_begin (*this, local_reverse_iterator ()); 
+    return stl_two_level_rbegin (
+        HIDDEN::make_outer_rbegin (*this), HIDDEN::make_outer_rend (*this)); 
   }
-  
+
   global_reverse_iterator rend_all () { 
-    return HIDDEN::make_end (*this, local_reverse_iterator ()); 
+    return stl_two_level_rend (
+        HIDDEN::make_outer_rbegin (*this), HIDDEN::make_outer_rend (*this)); 
   }
 
   global_const_reverse_iterator rbegin_all () const { 
-    return HIDDEN::make_begin (*this, local_const_reverse_iterator ()); 
+    return stl_two_level_crbegin (
+        HIDDEN::make_outer_rbegin (*this), HIDDEN::make_outer_rend (*this));
   }
 
   global_const_reverse_iterator rend_all () const { 
-    return HIDDEN::make_end (*this, local_const_reverse_iterator ()); 
+    return stl_two_level_crend (
+        HIDDEN::make_outer_rbegin (*this), HIDDEN::make_outer_rend (*this));
   }
 
-#endif
 
   size_type size_all () const {
     size_type sz = 0;
@@ -872,8 +476,11 @@ public:
     return res;
   }
 
+
+  // TODO: fill parallel
+
   template <typename Iter, typename R>
-  void fill_init (Iter begin, Iter end,
+  void fill_serial (Iter begin, Iter end,
       R (Cont_ty::*pushFn) (const value_type&)=&Cont_ty::push_back) {
 
     const unsigned P = Galois::getActiveThreads ();
@@ -911,18 +518,16 @@ public:
 
 };
 
-namespace M = Galois::Runtime::MM;
-
 // TODO: rename to per thread heap factory, move outside
 template <typename T>
 struct PerThreadAllocatorFactory {
 
 
-  typedef M::SimpleBumpPtrWithMallocFallback<M::FreeListHeap<M::SystemBaseAlloc> > BasicHeap;
+  typedef MM::SimpleBumpPtrWithMallocFallback<MM::FreeListHeap<MM::SystemBaseAlloc> > BasicHeap;
 
-  typedef M::ThreadAwarePrivateHeap<BasicHeap> PerThreadHeap;
+  typedef MM::ThreadAwarePrivateHeap<BasicHeap> PerThreadHeap;
 
-  typedef M::ExternRefGaloisAllocator<T, PerThreadHeap> PerThreadAllocator;
+  typedef MM::ExternRefGaloisAllocator<T, PerThreadHeap> PerThreadAllocator;
 
 };
 
@@ -970,6 +575,30 @@ protected:
 
 public:
   PerThreadDeque (): Super_ty (), heap (), alloc (&heap) {
+
+    Super_ty::init (Cont_ty (alloc));
+
+  }
+
+};
+
+template <typename T>
+class PerThreadList:
+  public PerThreadWorkList<std::list<T, typename PerThreadAllocatorFactory<T>::PerThreadAllocator> > {
+
+public:
+  typedef typename PerThreadAllocatorFactory<T>::PerThreadHeap Heap_ty;
+  typedef typename PerThreadAllocatorFactory<T>::PerThreadAllocator Alloc_ty;
+  typedef std::list<T, Alloc_ty> Cont_ty;
+
+protected:
+  typedef PerThreadWorkList<Cont_ty> Super_ty;
+
+  Heap_ty heap;
+  Alloc_ty alloc;
+
+public:
+  PerThreadList (): Super_ty (), heap (), alloc (&heap) {
 
     Super_ty::init (Cont_ty (alloc));
 

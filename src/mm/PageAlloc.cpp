@@ -50,6 +50,7 @@ struct FreeNode {
  
 typedef Galois::Runtime::LL::PtrLock<FreeNode, true> HeadPtr;
 typedef Galois::Runtime::LL::CacheLineStorage<HeadPtr> HeadPtrStorage;
+typedef Galois::Runtime::LL::CacheLineStorage<HeadPtr> HeadPtrStorage;
 
 //Number of pages allocated
 struct PAState {

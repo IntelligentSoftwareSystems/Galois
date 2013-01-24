@@ -241,7 +241,7 @@ struct process {
 };
 ///////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////
-struct Indexer: public std::unary_function<const GNode&, int> {
+struct Indexer: public std::unary_function<const GNode&, unsigned> {
    unsigned operator()(const GNode& n) {
       return std::distance(graph.edge_begin(n, Galois::NONE), graph.edge_end(n, Galois::NONE));
    }

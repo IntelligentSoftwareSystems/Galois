@@ -136,14 +136,14 @@ std::ostream& operator<<(std::ostream& out, const SNode& n) {
   return out;
 }
 
-struct UpdateRequestIndexer {
+struct UpdateRequestIndexer: public std::unary_function<UpdateRequest,unsigned int> {
   unsigned int operator()(const UpdateRequest& val) const {
     unsigned int t = val.w;
     return t;
   }
 };
 
-struct GNodeIndexer {
+struct GNodeIndexer: public std::unary_function<GNode,unsigned int> {
   unsigned int operator()(const GNode& val) const {
     return graph.getData(val, Galois::NONE).dist;
   }

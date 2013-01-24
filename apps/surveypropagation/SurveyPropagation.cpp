@@ -348,7 +348,7 @@ struct update_biases {
   }
 };
 
-struct EIndexer {
+struct EIndexer: public std::unary_function<std::pair<GNode,int>,int> {
   int operator()(const std::pair<GNode,int>& v) {
     return v.second;
   }

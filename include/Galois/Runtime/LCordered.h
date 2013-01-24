@@ -38,7 +38,6 @@
 #include "Galois/Runtime/DoAll.h"
 #include "Galois/Runtime/ParallelWork.h"
 #include "Galois/Runtime/PerThreadWorkList.h"
-#include "Galois/Runtime/DoAllCoupled.h"
 #include "Galois/Runtime/mm/Mem.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/ll/gio.h"
@@ -176,9 +175,12 @@ public:
     }
   }
 
+// for DEBUG
   std::string str () const {
     std::stringstream ss;
+#if 0
     ss << "[" << this << ": " << active << "]";
+#endif 
     return ss.str ();
   }
 
@@ -293,7 +295,7 @@ private:
   };
 
   void resetAll () {
-    Galois::Runtime::do_all_impl (allNItems.begin_all (), allNItems.end_all (),
+    Galois::Runtime::do_all_impl<false> (allNItems.begin_all (), allNItems.end_all (),
         Reset (niAlloc), "reset_NItems");
   }
 
@@ -688,13 +690,13 @@ public:
     Galois::TimeAccumulator t_destroy;
 
     t_create.start ();
-    Galois::Runtime::do_all_impl (abeg, aend, 
+    Galois::Runtime::do_all_impl<false> (abeg, aend, 
         CreateCtxtExpandNhood (nhoodVisitor, nhmgr, ctxtAlloc, initCtxt),
         "create_initial_contexts");
     t_create.stop ();
 
     t_find.start ();
-    Galois::Runtime::do_all_impl (initCtxt.begin_all (), initCtxt.end_all (),
+    Galois::Runtime::do_all_impl<false> (initCtxt.begin_all (), initCtxt.end_all (),
         FindInitSources (sourceTest, initSrc, nInitSrc),
         "find_initial_sources");
     t_find.stop ();
@@ -728,7 +730,7 @@ public:
     t_for.stop ();
 
     t_destroy.start ();
-    Galois::Runtime::do_all_impl (ctxtDelQ.begin_all (), ctxtDelQ.end_all (),
+    Galois::Runtime::do_all_impl<false> (ctxtDelQ.begin_all (), ctxtDelQ.end_all (),
         DelCtxt (ctxtAlloc), "delete_all_ctxt");
     t_destroy.stop ();
 

@@ -189,10 +189,10 @@ struct UpdateRequest {
 	//unsigned getID() const { return /* graph.getData(n).id; */ 0; }
 };
 
-struct UpdateRequestIndexer {
+struct UpdateRequestIndexer: public std::unary_function<UpdateRequest,int> {
 	int operator()(const UpdateRequest& val) const {
 		int p = val.prio;
-		return p;
+		return -p;
 	}
 };
 
@@ -207,7 +207,7 @@ struct UpdateRequestLess {
   }
 };
 
-struct GNodeIndexer {
+struct GNodeIndexer: public std::unary_function<GNode,int> {
   int operator()(const GNode& node) const {
     return graph.getData(node, Galois::NONE).prio;
   }

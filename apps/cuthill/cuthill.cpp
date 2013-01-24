@@ -71,7 +71,7 @@ typedef Graph::GraphNode GNode;
 
 Graph graph;
 
-struct GNodeIndexer {
+struct GNodeIndexer: public std::unary_function<GNode,unsigned int> {
   unsigned int operator()(const GNode& val) const {
     return graph.getData(val, Galois::NONE).dist;// >> 2;
   }
@@ -173,7 +173,7 @@ struct CutHillUnordered {
   };
 
 
-  struct UnsignedIndexer {
+  struct UnsignedIndexer: public std::unary_function<unsigned,unsigned> {
     unsigned operator()(unsigned x) const { return x;}
   };
 

@@ -42,6 +42,7 @@ template<class FunctionTy, class ReduceFunTy, class IterTy, bool useStealing=fal
 class DoAllWork {
   LL::SimpleLock<true> reduceLock;
   FunctionTy origF;
+  FunctionTy outputF;
   ReduceFunTy RF;
   bool needsReduce;
   IterTy masterBegin;
@@ -110,7 +111,7 @@ class DoAllWork {
   void doReduce(PrivateState& mytld) {
     if (needsReduce) {
       reduceLock.lock();
-      RF(origF, mytld.F);
+      RF(outputF, mytld.F);
       reduceLock.unlock();
     }
   }
@@ -118,7 +119,7 @@ class DoAllWork {
 public:
 
   DoAllWork(const FunctionTy& F, const ReduceFunTy& R, bool needsReduce, IterTy begin, IterTy end)
-    : origF(F), RF(R), needsReduce(needsReduce), masterBegin(begin), masterEnd(end)
+    : origF(F), outputF(F), RF(R), needsReduce(needsReduce), masterBegin(begin), masterEnd(end)
   {}
 
   void operator()() {
@@ -138,7 +139,7 @@ public:
     doReduce(thisTLD);
   }
 
-  FunctionTy getFn() const { return origF; }
+  FunctionTy getFn() const { return outputF; }
 
 };
 
@@ -179,9 +180,14 @@ FunctionTy do_all_impl(IterTy b, IterTy e, FunctionTy f, ReducerTy r, bool needs
   return retval;
 }
 
-template <typename IterTy, typename FunctionTy>
+template <bool steal_tp, typename IterTy, typename FunctionTy>
 void do_all_impl (IterTy b, IterTy e, FunctionTy f, const char* loopname=0) {
-  do_all_impl (b, e, f, EmptyFn (), false);
+
+  DoAllWork<FunctionTy, EmptyFn, IterTy, steal_tp> W(f, EmptyFn (), false, b, e);
+
+    RunCommand w[2] = {std::ref(W),
+           std::ref(getSystemBarrier())};
+    getSystemThreadPool().run(&w[0], &w[2], activeThreads);
 }
 
 } //namespace Runtime
