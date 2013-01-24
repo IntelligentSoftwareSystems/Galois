@@ -34,6 +34,7 @@ namespace Galois {
 namespace Runtime {
 
 class vTerminationDetection {
+protected:
   volatile bool globalTerm;
 public:
   //Initializes the per-thread state.  All threads must call this
