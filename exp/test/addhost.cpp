@@ -14,7 +14,7 @@ struct R : public Galois::Runtime::Lockable {
    R() { i = 0; }
 
    void add(int v) {
-// printf ("In Host %u: processing number %d\n", networkHostID, v);
+     //printf ("In Host %u: processing number %d\n", networkHostID, v);
       i += v;
       return;
    }
@@ -51,7 +51,7 @@ struct f1 {
 
 int main(int argc, char *argv[])
 {
-   // Galois::setActiveThreads(4);
+  //Galois::setActiveThreads(4);
 
    // check the host id and initialise the network
    Galois::Runtime::Distributed::networkStart();
