@@ -278,9 +278,10 @@ public:
     wl.push_initial(b,e);
   }
 
+  // in the distributed case even with 1 thread there can be aborts
   void operator()() {
     if (LL::isLeaderForPackage(LL::getTID()) &&
-	Galois::Runtime::activeThreads > 1 && 
+  //Galois::Runtime::activeThreads > 1 && 
 	ForEachTraits<FunctionTy>::NeedsAborts)
       go<true>();
     else

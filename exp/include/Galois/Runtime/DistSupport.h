@@ -50,12 +50,16 @@ public:
 
   T& operator*() const {
     T* rptr = resolve();
-    Galois::Runtime::acquire(rptr,Galois::MethodFlag::ALL);
+    // lock only if inside for_each
+    if (inGaloisForEach)
+      Galois::Runtime::acquire(rptr,Galois::MethodFlag::ALL);
     return *rptr;
   }
   T *operator->() const {
     T* rptr = resolve();
-    Galois::Runtime::acquire(rptr,Galois::MethodFlag::ALL);
+    // lock only if inside for_each
+    if (inGaloisForEach)
+      Galois::Runtime::acquire(rptr,Galois::MethodFlag::ALL);
     return rptr;
   }
   operator bool() const { return ptr != 0; }

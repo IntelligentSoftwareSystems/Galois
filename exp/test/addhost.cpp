@@ -14,7 +14,7 @@ struct R : public Galois::Runtime::Lockable {
    R() { i = 0; }
 
    void add(int v) {
-printf ("In Host %u: processing number %d\n", networkHostID, v);
+// printf ("In Host %u: processing number %d\n", networkHostID, v);
       i += v;
       return;
    }

@@ -64,7 +64,7 @@ printf ("Remote fetch obj: %lx req from %u to %u\n", ptr, host, owner);
   return;
 }
 
-uintptr_t LocalDirectory::haveObject(uintptr_t ptr, int *remote) {
+uintptr_t LocalDirectory::haveObject(uintptr_t ptr, uint32_t &remote) {
 #define OBJSTATE (*iter).second
   LocalDirectory& ld = getSystemLocalDirectory();
   Lock.lock();
@@ -75,7 +75,7 @@ uintptr_t LocalDirectory::haveObject(uintptr_t ptr, int *remote) {
   if ((iter == ld.curobj.end()) || (OBJSTATE.state == objstate::Local))
     retval = ptr;
   else if ((iter != ld.curobj.end()) && (OBJSTATE.state == objstate::Remote))
-    *remote = OBJSTATE.sent_to;
+    remote = OBJSTATE.sent_to;
   else
     printf ("Unrecognized state in LocalDirectory::haveObject\n");
   Lock.unlock();
@@ -136,10 +136,14 @@ bool RemoteDirectory::diracquire(Galois::Runtime::Lockable* L) {
     L->Owner.setValue(this);
     return true;
   }
+/* 
+ * Letting atleast one iteration proceed before sending the data
+ * ENABLE THIS WHEN RUNNING AN ACTUAL TEST CASE
   else if (L->Owner.stealing_CAS(USE_LOCK,this)) {
     assert(!L->next);
     return true;
   }
+ */
   return false;
 }
 

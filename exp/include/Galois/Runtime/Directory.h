@@ -99,7 +99,7 @@ class LocalDirectory: public SimpleRuntimeContext {
     // Local - Local object may be locked
     enum ObjStates { Remote, Local };
 
-    int sent_to;  // valid only for remote objects
+    uint32_t sent_to;  // valid only for remote objects
     enum ObjStates state;
   };
 
@@ -107,7 +107,7 @@ class LocalDirectory: public SimpleRuntimeContext {
   Galois::Runtime::LL::SimpleLock<true> Lock;
 
   // returns a valid local pointer to the object if not remote
-  uintptr_t haveObject(uintptr_t ptr, int *remote);
+  uintptr_t haveObject(uintptr_t ptr, uint32_t &remote);
 
   // places a remote request for the node
   void fetchRemoteObj(uintptr_t ptr, uint32_t remote, recvFuncTy pad);
@@ -158,9 +158,9 @@ T* RemoteDirectory::resolve(uintptr_t ptr, uint32_t owner) {
     fetchRemoteObj(ptr, owner, &LocalDirectory::localReqLandingPad<T>);
     // abort the iteration if inside for each
     if (Galois::Runtime::inGaloisForEach)
-{ printf ("Host %u throwing in RD::resolve\n", networkHostID);
+// { printf ("Host %u throwing in RD::resolve\n", networkHostID);
       throw Galois::Runtime::REMOTE;
-}
+// }
     p = haveObject(ptr, owner);
     // call handleReceives as only thread outside for_each
     net.handleReceives();
@@ -192,6 +192,9 @@ printf ("Remote Req LP: %lx in %u req from %u\n", ptr, networkHostID, owner);
     bool flag = true;
     data = reinterpret_cast<T*>(OBJSTATE.localobj);
     Lockable *L = reinterpret_cast<Lockable*>(data);
+/*
+ * ENABLE THIS FOR GRAPH TEST CASE
+ * Making sure atleast one iteration runs before returning the obj
     // check if eligible or ineligible to be sent
     if (isMagicLock(L)) {
       // ineligible state - check number of requests
@@ -201,12 +204,12 @@ printf ("Remote Req LP: %lx in %u req from %u\n", ptr, networkHostID, owner);
         flag = false;
       }
     }
+ */
     // if eligible and acquire lock so that no iteration begins using the object
     if (flag && rd.diracquire(L)) {
 #ifdef PRINT_DIR_DEBUG
 printf ("   sending Remote Req LP: %lx from %u to %u\n", ptr, networkHostID, owner);
 #endif
-printf ("   sending Remote Req LP: %lx from %u to %u\n", ptr, networkHostID, owner);
       // object should be sent to the remote host
       SendBuffer sbuf;
       size_t size = sizeof(*data);
@@ -247,7 +250,6 @@ void RemoteDirectory::remoteDataLandingPad(RecvBuffer &buf) {
 #ifdef PRINT_DIR_DEBUG
 printf ("Remote Data LP: %lx from %u in %u state is %d\n", ptr, owner, networkHostID, OBJSTATE.state);
 #endif
-printf ("Remote Data LP: %lx from %u in %u state is %d\n", ptr, owner, networkHostID, OBJSTATE.state);
   L = reinterpret_cast<Lockable*>(data);
   // lock the object with magic num to mark ineligible
   setMagicLock(L);
@@ -261,17 +263,17 @@ printf ("Remote Data LP: %lx from %u in %u state is %d\n", ptr, owner, networkHo
 // should be blocking outside for each
 template<typename T>
 T* LocalDirectory::resolve(uintptr_t ptr) {
-  int sent = 0;
-  uintptr_t p = haveObject(ptr, &sent);
+  uint32_t sent = 0;
+  uintptr_t p = haveObject(ptr, sent);
   while (!p) {
     NetworkInterface& net = getSystemNetworkInterface();
     fetchRemoteObj(ptr, sent, &RemoteDirectory::remoteReqLandingPad<T>);
     // abort the iteration inside for each
     if (Galois::Runtime::inGaloisForEach)
-{ printf ("Host %u throwing in LD::resolve\n", networkHostID);
+// { printf ("Host %u throwing in LD::resolve\n", networkHostID);
       throw Galois::Runtime::REMOTE;
-}
-    p = haveObject(ptr, &sent);
+// }
+    p = haveObject(ptr, sent);
     // call handleReceives as only thread outside for_each
     net.handleReceives();
   }
@@ -305,7 +307,9 @@ printf ("Local Req LP: %lx req from %u to %u\n", ptr, remote_to, networkHostID);
   // check if the object can be sent
   if (OBJSTATE.state == LocalDirectory::objstate::Remote) {
     // object is remote so place a return request
-    ld.fetchRemoteObj(ptr, OBJSTATE.sent_to, &RemoteDirectory::remoteReqLandingPad<T>);
+    // place the request only if a different node is asking for the object
+    if (remote_to != OBJSTATE.sent_to)
+      ld.fetchRemoteObj(ptr, OBJSTATE.sent_to, &RemoteDirectory::remoteReqLandingPad<T>);
   }
   else if ((OBJSTATE.state == LocalDirectory::objstate::Local) && ld.diracquire(L)) {
 #ifdef PRINT_DIR_DEBUG
@@ -346,7 +350,6 @@ void LocalDirectory::localDataLandingPad(RecvBuffer &buf) {
 #ifdef PRINT_DIR_DEBUG
 printf ("Local Data LP: %lx received in %u\n", ptr, networkHostID);
 #endif
-printf ("Local Data LP: %lx received in %u\n", ptr, networkHostID);
   data = reinterpret_cast<T*>(ptr);
   auto iter = ld.curobj.find(ptr);
   buf.deserialize(size);

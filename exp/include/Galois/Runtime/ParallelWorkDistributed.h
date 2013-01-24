@@ -33,32 +33,39 @@
 namespace Galois {
 namespace Runtime {
 
-uint32_t term_count;
-
 void for_each_term_landing_pad(Distributed::RecvBuffer& buf) {
-  uint32_t node;
+  uint32_t  node;
+  uint32_t *term_count;
+  uintptr_t term_count_ptr;
   buf.deserialize(node);
-printf ("Host %u, in for_each_term_landing_pad term_count is %d\n", Distributed::networkHostID, term_count);
-  term_count--;
+  buf.deserialize(term_count_ptr);
+  term_count = (uint32_t*)term_count_ptr;
+// printf ("Host %u, in for_each_term_landing_pad term_count is %d\n", Distributed::networkHostID, term_count);
+  (*term_count)--;
 }
 
 template<typename WLTy, typename ItemTy, typename FunctionTy>
 void for_each_landing_pad(Distributed::RecvBuffer& buf) {
+  Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
   //extract stuff
   FunctionTy f;
+  uintptr_t term_count_ptr;
   buf.deserialize(f);
+  buf.deserialize(term_count_ptr);
   std::deque<ItemTy> data;
   buf.deserialize(data);
 printf ("Host %u, number of elements passed %lu\n", Distributed::networkHostID, data.size());
+  //use a MPI barrier to synchronize the for_each functions
+  net.systemBarrier();
   //Start locally
   Galois::Runtime::for_each_impl<WLTy>(data.begin(), data.end(), f, nullptr);
   //notify the master that the host has completed
   //not required when distributed loop termination has been implemented!
   uint32_t node = Distributed::networkHostID;
   Distributed::SendBuffer sbuf;
-  Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
   sbuf.serialize(node);
-printf ("Host %u, in for_each_landing_pad calling the term_landing_pad\n", Distributed::networkHostID);
+  sbuf.serialize(term_count_ptr);
+// printf ("Host %u, in for_each_landing_pad calling the term_landing_pad\n", Distributed::networkHostID);
   net.sendMessage (0, &for_each_term_landing_pad, sbuf);
 }
 
@@ -67,6 +74,7 @@ namespace {
 template<typename WLTy, typename IterTy, typename FunctionTy>
 void for_each_dist(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
   typedef typename std::iterator_traits<IterTy>::value_type ItemTy;
+  uint32_t term_count;
 
   //copy out all data
   std::deque<ItemTy> allData(b,e);
@@ -82,6 +90,8 @@ void for_each_dist(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
     Distributed::SendBuffer buf;
     // serialize function
     buf.serialize(f);
+    // serialize address to termination counter
+    buf.serialize(((uintptr_t)&term_count));
     // serialize data
     buf.serialize(data);
     //send data
@@ -92,12 +102,15 @@ void for_each_dist(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
   //now get our data
   auto myblk = block_range(allData.begin(), allData.end(), 0, Distributed::networkHostNum);
 
+  //use a MPI barrier to synchronize the for_each functions
+  net.systemBarrier();
+
   //Start locally
   for_each_impl<WLTy>(myblk.first, myblk.second, f, loopname);
 
   // continue looping over handleReceives till all the hosts complete
   //      --- Remove after implementing loop termination detection
-printf ("Host %u, done with for_each term_count is %d\n", Distributed::networkHostID, term_count);
+// printf ("Host %u, done with for_each term_count is %d\n", Distributed::networkHostID, term_count);
   do {
     net.handleReceives();
   } while(term_count > 0);

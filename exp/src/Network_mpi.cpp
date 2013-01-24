@@ -102,6 +102,7 @@ public:
     int flag, rv;
     bool retval = false;
     MPI_Status status;
+ //printf ("\t Entering recvInternal\n");
     do {
       //async probe
       rv = MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &status);
@@ -131,6 +132,7 @@ public:
         lock.unlock();
       }
     } while (true);
+ //printf ("\t Exiting recvInternal\n");
     return retval;
   }
 };
@@ -211,7 +213,7 @@ public:
   }
 
   virtual bool handleReceives() {
-    return recvInternal();;
+    return recvInternal();
   }
 
   virtual bool needsDedicatedThread() {
