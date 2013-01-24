@@ -64,10 +64,10 @@ public:
 };
 
 extern __thread char* ptsBase;
-extern PerBackend PTSBackend;
+PerBackend& getPTSBackend();
 
 extern __thread char* ppsBase;
-extern PerBackend PPSBackend;
+PerBackend& getPPSBackend();
 
 void initPTS();
 
@@ -82,30 +82,30 @@ public:
     //This will call initPTS for each thread if it hasn't already
     Galois::Runtime::getSystemThreadPool();
 
-    offset = PTSBackend.allocOffset(sizeof(T));
+    offset = getPTSBackend().allocOffset(sizeof(T));
     for (unsigned n = 0; n < LL::getMaxThreads(); ++n)
-      new (PTSBackend.getRemote(n, offset)) T();
+      new (getPTSBackend().getRemote(n, offset)) T();
   }
 
   ~PerThreadStorage() {
     for (unsigned n = 0; n < LL::getMaxThreads(); ++n)
-      reinterpret_cast<T*>(PTSBackend.getRemote(n, offset))->~T();
-    PTSBackend.deallocOffset(offset, sizeof(T));
+      reinterpret_cast<T*>(getPTSBackend().getRemote(n, offset))->~T();
+    getPTSBackend().deallocOffset(offset, sizeof(T));
   }
 
   T* getLocal() const {
-    void* ditem = PTSBackend.getLocal(offset, ptsBase);
+    void* ditem = getPTSBackend().getLocal(offset, ptsBase);
     return reinterpret_cast<T*>(ditem);
   }
 
   //! Like getLocal() but optimized for when you already know the thread id
   T* getLocal(unsigned int thread) const {
-    void* ditem = PTSBackend.getLocal(offset, thread);
+    void* ditem = getPTSBackend().getLocal(offset, thread);
     return reinterpret_cast<T*>(ditem);
   }
 
   T* getRemote(unsigned int thread) const {
-    void* ditem = PTSBackend.getRemote(thread, offset);
+    void* ditem = getPTSBackend().getRemote(thread, offset);
     return reinterpret_cast<T*>(ditem);
   }
 
@@ -125,35 +125,35 @@ public:
     //This will call initPTS for each thread if it hasn't already
     Galois::Runtime::getSystemThreadPool();
 
-    offset = PPSBackend.allocOffset(sizeof(T));
+    offset = getPPSBackend().allocOffset(sizeof(T));
     for (unsigned n = 0; n < LL::getMaxPackages(); ++n)
-      new (PPSBackend.getRemote(LL::getLeaderForPackage(n), offset)) T();
+      new (getPPSBackend().getRemote(LL::getLeaderForPackage(n), offset)) T();
   }
 
   ~PerPackageStorage() {
     for (unsigned n = 0; n < LL::getMaxPackages(); ++n)
-      reinterpret_cast<T*>(PPSBackend.getRemote(LL::getLeaderForPackage(n), offset))->~T();
-    PPSBackend.deallocOffset(offset, sizeof(T));
+      reinterpret_cast<T*>(getPPSBackend().getRemote(LL::getLeaderForPackage(n), offset))->~T();
+    getPPSBackend().deallocOffset(offset, sizeof(T));
   }
 
   T* getLocal() const {
-    void* ditem = PPSBackend.getLocal(offset, ppsBase);
+    void* ditem = getPPSBackend().getLocal(offset, ppsBase);
     return reinterpret_cast<T*>(ditem);
   }
 
   //! Like getLocal() but optimized for when you already know the thread id
   T* getLocal(unsigned int thread) const {
-    void* ditem = PPSBackend.getLocal(offset, thread);
+    void* ditem = getPPSBackend().getLocal(offset, thread);
     return reinterpret_cast<T*>(ditem);
   }
 
   T* getRemote(unsigned int thread) const {
-    void* ditem = PPSBackend.getRemote(thread, offset);
+    void* ditem = getPPSBackend().getRemote(thread, offset);
     return reinterpret_cast<T*>(ditem);
   }
 
   T* getRemoteByPkg(unsigned int pkg) const {
-    void* ditem = PPSBackend.getRemote(LL::getLeaderForPackage(pkg), offset);
+    void* ditem = getPPSBackend().getRemote(LL::getLeaderForPackage(pkg), offset);
     return reinterpret_cast<T*>(ditem);
   }
 
