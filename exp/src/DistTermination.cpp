@@ -76,8 +76,10 @@ class DistTerminationDetection : public vTerminationDetection {
   }
 
   void propGlobalTerm() {
-    Distributed::SendBuffer b;
-    Distributed::getSystemNetworkInterface().broadcastMessage(globalTermLandingPad, b);
+    if (Distributed::networkHostNum > 1) {
+      Distributed::SendBuffer b;
+      Distributed::getSystemNetworkInterface().broadcastMessage(globalTermLandingPad, b);
+    }
     globalTerm = true;
   }
 
@@ -101,6 +103,7 @@ public:
   }
 
   virtual void localTermination(bool workHappened) {
+    assert(!(workHappened && globalTerm));
     TokenHolder& th = *data.getLocal();
     th.processIsBlack |= workHappened;
     if (th.hasToken) {
