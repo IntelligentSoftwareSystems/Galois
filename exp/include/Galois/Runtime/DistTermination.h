@@ -34,6 +34,7 @@ namespace Galois {
 namespace Runtime {
 
 class vTerminationDetection {
+  volatile bool globalTerm;
 public:
   //Initializes the per-thread state.  All threads must call this
   //before any call localTermination
@@ -49,7 +50,9 @@ public:
   virtual void localTermination(bool workHappened) = 0;
 
   //Returns whether global termination is detected
-  virtual bool globalTermination() const = 0;
+  bool globalTermination() const {
+    return globalTerm;
+  }
 };
 
 vTerminationDetection& getSystemTermination();

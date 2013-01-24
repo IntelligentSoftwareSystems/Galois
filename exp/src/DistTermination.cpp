@@ -45,7 +45,6 @@ class DistTerminationDetection : public vTerminationDetection {
   };
 
   PerThreadStorage<TokenHolder> data;
-  volatile bool globalTerm;
   
   static void globalTermLandingPad(Distributed::RecvBuffer&);
   static void propTokenLandingPad(Distributed::RecvBuffer&);
@@ -95,7 +94,7 @@ public:
     th.tokenIsBlack = false;
     th.processIsBlack = true;
     th.lastWasWhite = true;
-    globalTerm = true;
+    globalTerm = false;
     if (isSysMaster()) {
       th.hasToken = true;
     }
@@ -123,11 +122,6 @@ public:
       propToken(taint);
     }
   }
-
-  virtual bool globalTermination() const {
-    return globalTerm;
-  }
-
 };
 
 static DistTerminationDetection& getDistTermination() {
