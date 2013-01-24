@@ -24,7 +24,7 @@
 #define GALOIS_RUNTIME_BARRIER_H
 
 #include "PerThreadStorage.h"
-
+#include "Galois/Runtime/Network.h"
 #include <pthread.h>
 
 namespace Galois {
@@ -174,7 +174,23 @@ public:
   //  void dump();
 };
 
-typedef TopoBarrier GBarrier;
+class StupidDistBarrier {
+  unsigned gsense;
+  PerThreadStorage<unsigned> sense;
+  unsigned count;
+
+  static void broadcastLandingPad(Distributed::RecvBuffer&);
+
+public:
+  StupidDistBarrier();
+  //not safe if any thread is in wait
+  void reinit(unsigned val);
+  void wait();
+  void operator()(void) { wait(); }
+};
+
+//typedef TopoBarrier GBarrier;
+typedef StupidDistBarrier GBarrier;
 
 //! Have a pre-instantiated barrier available for use
 GBarrier& getSystemBarrier();

@@ -35,7 +35,9 @@
 #include "dmp.h"
 #endif
 
-void Galois::Runtime::PthreadBarrier::checkResults(int val) {
+using namespace Galois::Runtime;
+
+void PthreadBarrier::checkResults(int val) {
   if (val) {
     perror("PTHREADS: ");
     assert(0 && "PThread check");
@@ -43,36 +45,36 @@ void Galois::Runtime::PthreadBarrier::checkResults(int val) {
   }
 }
 
-Galois::Runtime::PthreadBarrier::PthreadBarrier() {
+PthreadBarrier::PthreadBarrier() {
   //uninitialized barriers block a lot of threads to help with debugging
   int rc = pthread_barrier_init(&bar, 0, ~0);
   checkResults(rc);
 }
 
-Galois::Runtime::PthreadBarrier::PthreadBarrier(unsigned int val) {
+PthreadBarrier::PthreadBarrier(unsigned int val) {
   int rc = pthread_barrier_init(&bar, 0, val);
   checkResults(rc);
 }
 
-Galois::Runtime::PthreadBarrier::~PthreadBarrier() {
+PthreadBarrier::~PthreadBarrier() {
   int rc = pthread_barrier_destroy(&bar);
   checkResults(rc);
 }
 
-void Galois::Runtime::PthreadBarrier::reinit(int val) {
+void PthreadBarrier::reinit(int val) {
   int rc = pthread_barrier_destroy(&bar);
   checkResults(rc);
   rc = pthread_barrier_init(&bar, 0, val);
   checkResults(rc);
 }
 
-void Galois::Runtime::PthreadBarrier::wait() {
+void PthreadBarrier::wait() {
   int rc = pthread_barrier_wait(&bar);
   if (rc && rc != PTHREAD_BARRIER_SERIAL_THREAD)
     checkResults(rc);
 }
 
-void Galois::Runtime::SimpleBarrier::cascade(int tid) {
+void SimpleBarrier::cascade(int tid) {
   int multiple = 2;
   for (int i = 0; i < multiple; ++i) {
     int n = tid * multiple + i;
@@ -81,7 +83,7 @@ void Galois::Runtime::SimpleBarrier::cascade(int tid) {
   }
 }
 
-void Galois::Runtime::SimpleBarrier::reinit(int val, int init) {
+void SimpleBarrier::reinit(int val, int init) {
   assert(val > 0);
 
   if (val != size) {
@@ -98,32 +100,32 @@ void Galois::Runtime::SimpleBarrier::reinit(int val, int init) {
   globalTotal = init;
 }
 
-void Galois::Runtime::SimpleBarrier::increment() {
+void SimpleBarrier::increment() {
   PLD& pld = *plds.getLocal();
   int total = pld.total;
 
   if (__sync_add_and_fetch(&pld.count, 1) == total) {
     pld.count = 0;
-    Galois::Runtime::LL::compilerBarrier();
+    LL::compilerBarrier();
     __sync_add_and_fetch(&globalTotal, total);
   }
 }
 
-void Galois::Runtime::SimpleBarrier::wait() {
+void SimpleBarrier::wait() {
   int tid = (int) LL::getTID();
   TLD& tld = *tlds.getLocal();
   if (tid == 0) {
     while (globalTotal < size) {
-      Galois::Runtime::LL::asmPause();
+      LL::asmPause();
     }
   } else {
     while (!tld.flag) {
-      Galois::Runtime::LL::asmPause();
+      LL::asmPause();
     }
   }
 }
 
-void Galois::Runtime::SimpleBarrier::barrier() {
+void SimpleBarrier::barrier() {
   assert(size > 0);
 
   int tid = (int) LL::getTID();
@@ -131,26 +133,26 @@ void Galois::Runtime::SimpleBarrier::barrier() {
 
   if (tid == 0) {
     while (globalTotal < size) {
-      Galois::Runtime::LL::asmPause();
+      LL::asmPause();
     }
 
     globalTotal = 0;
     tld.flag = 0;
-    Galois::Runtime::LL::compilerBarrier();
+    LL::compilerBarrier();
     cascade(tid);
   } else {
     while (!tld.flag) {
-      Galois::Runtime::LL::asmPause();
+      LL::asmPause();
     }
 
     tld.flag = 0;
-    Galois::Runtime::LL::compilerBarrier();
+    LL::compilerBarrier();
     cascade(tid);
   }
 
 }
 
-void Galois::Runtime::FastBarrier::reinit(int val) {
+void FastBarrier::reinit(int val) {
   if (val != size) {
     if (size != -1)
       out.wait();
@@ -161,7 +163,7 @@ void Galois::Runtime::FastBarrier::reinit(int val) {
   }
 }
 
-void Galois::Runtime::FastBarrier::wait() {
+void FastBarrier::wait() {
   out.barrier();
   in.increment();
   in.barrier();
@@ -169,7 +171,7 @@ void Galois::Runtime::FastBarrier::wait() {
 }
 
 #define fanout 4
-void Galois::Runtime::FasterBarrier::wait() {
+void FasterBarrier::wait() {
   volatile bool& ls = *local_sense.getLocal();
   if (0 == __sync_sub_and_fetch(&count, 1)) {
     count = P;
@@ -184,7 +186,7 @@ void Galois::Runtime::FasterBarrier::wait() {
       *local_sense.getRemote(id*fanout+x) = true;
 }
 
-void Galois::Runtime::MCSBarrier::_reinit(unsigned P) {
+void MCSBarrier::_reinit(unsigned P) {
   for (unsigned i = 0; i < nodes.size(); ++i) {
     treenode& n = *nodes.getRemote(i);
     n.sense = true;
@@ -200,23 +202,23 @@ void Galois::Runtime::MCSBarrier::_reinit(unsigned P) {
   }
 }
 
-Galois::Runtime::MCSBarrier::MCSBarrier() {
+MCSBarrier::MCSBarrier() {
   _reinit(activeThreads);
 }
 
-Galois::Runtime::MCSBarrier::MCSBarrier(unsigned P) {
+MCSBarrier::MCSBarrier(unsigned P) {
   _reinit(P);
 }
 
-void Galois::Runtime::MCSBarrier::reinit(unsigned val) {
+void MCSBarrier::reinit(unsigned val) {
   _reinit(val);
 }
 
-void Galois::Runtime::MCSBarrier::wait() {
+void MCSBarrier::wait() {
   treenode& n = *nodes.getLocal();
   while (n.childnotready[0] || n.childnotready[1] || 
    	 n.childnotready[2] || n.childnotready[3]) {
-    Galois::Runtime::LL::asmPause();
+    LL::asmPause();
   }
   for (int i = 0; i < 4; ++i)
     n.childnotready[i] = n.havechild[i];
@@ -224,7 +226,7 @@ void Galois::Runtime::MCSBarrier::wait() {
     //FIXME: make sure the compiler doesn't do a RMW because of the as-if rule
     *n.parentpointer = false;
     while(n.parentsense != n.sense) {
-      Galois::Runtime::LL::asmPause();
+      LL::asmPause();
     }
   }
   //signal children in wakeup tree
@@ -243,7 +245,7 @@ void Galois::Runtime::MCSBarrier::wait() {
 
 
 
-void Galois::Runtime::TopoBarrier::_reinit(unsigned P) {
+void TopoBarrier::_reinit(unsigned P) {
   unsigned pkgs = LL::getMaxPackageForThread(P-1) + 1;
   for (unsigned i = 0; i < pkgs; ++i) {
     treenode& n = *nodes.getRemoteByPkg(i);
@@ -269,26 +271,26 @@ void Galois::Runtime::TopoBarrier::_reinit(unsigned P) {
     *sense.getRemote(i) = 1;
 }
 
-Galois::Runtime::TopoBarrier::TopoBarrier() {
+TopoBarrier::TopoBarrier() {
   _reinit(activeThreads);
 }
 
-Galois::Runtime::TopoBarrier::TopoBarrier(unsigned P) {
+TopoBarrier::TopoBarrier(unsigned P) {
   _reinit(P);
 }
 
-void Galois::Runtime::TopoBarrier::reinit(unsigned val) {
+void TopoBarrier::reinit(unsigned val) {
   _reinit(val);
 }
 
-void Galois::Runtime::TopoBarrier::wait() {
+void TopoBarrier::wait() {
   unsigned id = LL::getTID();
   treenode& n = *nodes.getLocal();
   unsigned& s = *sense.getLocal();
   bool leader = LL::isLeaderForPackage(id);
   //completion tree
   if (leader) {
-    while (n.childnotready) { Galois::Runtime::LL::asmPause(); }
+    while (n.childnotready) { LL::asmPause(); }
     n.childnotready = n.havechild;
     if (n.parentpointer) {
       __sync_fetch_and_sub(&n.parentpointer->childnotready, 1);
@@ -300,7 +302,7 @@ void Galois::Runtime::TopoBarrier::wait() {
   //wait for signal
   if (id != 0) {
     while(n.parentsense != s) {
-      Galois::Runtime::LL::asmPause();
+      LL::asmPause();
     }
   }
 
@@ -316,7 +318,7 @@ void Galois::Runtime::TopoBarrier::wait() {
   ++s;
 }
 
-// void Galois::Runtime::TopoBarrier::dump() {
+// void TopoBarrier::dump() {
 //   unsigned pkgs = LL::getMaxPackages();
 //   for (unsigned i = 0; i < pkgs; ++i) {
 //     treenode* n = nodes.getRemoteByPkg(i);
@@ -329,12 +331,61 @@ void Galois::Runtime::TopoBarrier::wait() {
 
 // }
 
-Galois::Runtime::GBarrier& Galois::Runtime::getSystemBarrier() {
-  static Galois::Runtime::GBarrier b;
+StupidDistBarrier::StupidDistBarrier() {
+  for (unsigned x = 0; x < sense.size(); ++x)
+    *sense.getRemote(x) = 1;
+}
+
+void StupidDistBarrier::reinit(unsigned val) {
+  count = Distributed::networkHostNum * val;
+}
+
+void StupidDistBarrier::wait() {
+  printf("In barrier %d\n", Distributed::networkHostID);
+  if (Distributed::networkHostID == 0) {
+    printf("sense");
+    for (unsigned x = 0; x < sense.size(); ++x)
+      printf(" %d", *sense.getRemote(x));
+    printf("\n");
+    printf("count %d, gsense %d\n", count, gsense);
+  }
+  //notify the world
+  Distributed::SendBuffer b;
+  Distributed::getSystemNetworkInterface().broadcastMessage(broadcastLandingPad, b);
+  //broadcast skips us
+  __sync_fetch_and_sub(&count, 1);
+
+  //wait for barrier
+  if (LL::getTID() == 0) {
+    while (count != 0)
+      Distributed::getSystemNetworkInterface().handleReceives();
+    //passed barrier, notify local
+    count = Distributed::networkHostNum * activeThreads;
+    ++gsense;
+  } else {
+    while (*sense.getLocal() != gsense)
+      LL::asmPause();
+  }
+  //continue
+  ++(*sense.getLocal());
+  printf("Out barrier %d\n", Distributed::networkHostID);
+}
+
+static StupidDistBarrier& getDistBarrier() {
+  static  StupidDistBarrier b;
+  return b;
+}
+
+void StupidDistBarrier::broadcastLandingPad(Distributed::RecvBuffer&) {
+  __sync_fetch_and_sub(&getDistBarrier().count, 1);
+}
+
+GBarrier& Galois::Runtime::getSystemBarrier() {
+  //static GBarrier b;
   static unsigned num = ~0;
   if (activeThreads != num) {
     num = activeThreads;
-    b.reinit(num);
+    getDistBarrier().reinit(num);
   }
-  return b;
+  return getDistBarrier();
 }

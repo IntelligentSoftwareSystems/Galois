@@ -87,8 +87,6 @@ void for_each_dist(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
 
   //Start locally
   for_each_impl<WLTy>(myblk.first, myblk.second, f, loopname);
-
-  //FIXME: wait on a network barrier here unless systemBarrier is network aware
 }
 
 
