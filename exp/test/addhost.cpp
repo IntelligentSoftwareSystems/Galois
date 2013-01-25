@@ -1,5 +1,6 @@
 #include <vector>
 #include "Galois/Galois.h"
+#include "Lonestar/BoilerPlate.h"
 #include "Galois/Runtime/DistSupport.h"
 
 using namespace std;
@@ -14,7 +15,7 @@ struct R : public Galois::Runtime::Lockable {
    R() { i = 0; }
 
    void add(int v) {
-     //printf ("In Host %u: processing number %d\n", networkHostID, v);
+      //printf ("In Host %u and thread %u processing number %d\n", networkHostID, LL::getTID(), v);
       i += v;
       return;
    }
@@ -49,9 +50,13 @@ struct f1 {
   }
 };
 
+static const char *name = "addhost distributed testcase";
+static const char *desc = "sum of 40 numbers using distributed host";
+static const char *url  = "addhost";
+
 int main(int argc, char *argv[])
 {
-  //Galois::setActiveThreads(4);
+   LonestarStart(argc, argv, name, desc, url);
 
    // check the host id and initialise the network
    Galois::Runtime::Distributed::networkStart();
