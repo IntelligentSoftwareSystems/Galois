@@ -33,7 +33,7 @@ void doCheckWrite();
 
 namespace {
 inline bool isWriteMethod(Galois::MethodFlag m, bool write) {
-  return write || ((int)m & (int)MethodFlag::WRITE);
+  return write || (m & MethodFlag::WRITE) != Galois::MethodFlag::NONE;
 }
 
 inline void checkWrite(Galois::MethodFlag m, bool write) {
