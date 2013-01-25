@@ -175,9 +175,9 @@ public:
 };
 
 class StupidDistBarrier {
-  unsigned gsense;
+  volatile unsigned gsense;
   PerThreadStorage<unsigned> sense;
-  unsigned count;
+  volatile unsigned count;
 
   static void broadcastLandingPad(Distributed::RecvBuffer&);
 

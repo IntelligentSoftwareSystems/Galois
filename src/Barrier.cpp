@@ -341,14 +341,6 @@ void StupidDistBarrier::reinit(unsigned val) {
 }
 
 void StupidDistBarrier::wait() {
-  printf("In barrier %d\n", Distributed::networkHostID);
-  if (Distributed::networkHostID == 0) {
-    printf("sense");
-    for (unsigned x = 0; x < sense.size(); ++x)
-      printf(" %d", *sense.getRemote(x));
-    printf("\n");
-    printf("count %d, gsense %d\n", count, gsense);
-  }
   //notify the world
   Distributed::SendBuffer b;
   Distributed::getSystemNetworkInterface().broadcastMessage(broadcastLandingPad, b);
@@ -368,7 +360,6 @@ void StupidDistBarrier::wait() {
   }
   //continue
   ++(*sense.getLocal());
-  printf("Out barrier %d\n", Distributed::networkHostID);
 }
 
 static StupidDistBarrier& getDistBarrier() {
