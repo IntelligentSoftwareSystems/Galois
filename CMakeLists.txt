@@ -2,9 +2,9 @@ cmake_minimum_required(VERSION 2.6)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 project(Galois)
 set(GALOIS_VERSION_MAJOR "2")
-set(GALOIS_VERSION_MINOR "1")
-set(GALOIS_VERSION_PATCH "5")
-set(GALOIS_COPYRIGHT_YEAR "2012") # Also in COPYRIGHT
+set(GALOIS_VERSION_MINOR "2")
+set(GALOIS_VERSION_PATCH "0")
+set(GALOIS_COPYRIGHT_YEAR "2013") # Also in COPYRIGHT
 
 if(NOT CMAKE_BUILD_TYPE)
   message(STATUS "No build type selected, default to Release")
