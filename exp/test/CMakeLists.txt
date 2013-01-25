@@ -11,7 +11,7 @@ makeTest(printhost)
 #makeTest(pairingheap)
 #makeTest(skiplist)
 #makeTest(dist)
-#makeTest(distnodes)
+makeTest(distnodes)
 #makeTest(foreachtask)
 makeTest(networktest)
 

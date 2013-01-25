@@ -23,6 +23,7 @@
  * Fast Barrier
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
+ * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
 #include "Galois/Runtime/Barrier.h"
