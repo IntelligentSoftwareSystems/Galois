@@ -40,7 +40,6 @@ void for_each_landing_pad(Distributed::RecvBuffer& buf) {
   buf.deserialize(f);
   std::deque<ItemTy> data;
   buf.deserialize(data);
-printf ("Host %u, number of elements passed %lu\n", Distributed::networkHostID, data.size());
   //Start locally
   Galois::Runtime::for_each_impl<WLTy>(data.begin(), data.end(), f, nullptr);
 }

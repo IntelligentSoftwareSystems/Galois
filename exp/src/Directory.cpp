@@ -30,7 +30,7 @@ using namespace Galois::Runtime::Distributed;
 uintptr_t RemoteDirectory::haveObject(uintptr_t ptr, uint32_t owner) {
 #define OBJSTATE (*iter).second
   RemoteDirectory& rd = getSystemRemoteDirectory();
-  Lock.lock();
+  rd.Lock.lock();
   auto iter = rd.curobj.find(make_pair(ptr,owner));
   uintptr_t retval = 0;
   // add object to list if it's not already there
@@ -45,7 +45,7 @@ uintptr_t RemoteDirectory::haveObject(uintptr_t ptr, uint32_t owner) {
   // Returning the object even if locked as the call to acquire would fail
   if (OBJSTATE.state != objstate::Remote)
     retval = OBJSTATE.localobj;
-  Lock.unlock();
+  rd.Lock.unlock();
 #undef OBJSTATE
   return retval;
 }
@@ -57,9 +57,6 @@ void RemoteDirectory::fetchRemoteObj(uintptr_t ptr, uint32_t owner, recvFuncTy p
   NetworkInterface& net = getSystemNetworkInterface();
   buf.serialize(ptr);
   buf.serialize(host);
-#ifdef PRINT_DIR_DEBUG
-printf ("Remote fetch obj: %lx req from %u to %u\n", ptr, host, owner);
-#endif
   net.sendMessage (owner, pad, buf);
   return;
 }
@@ -67,7 +64,7 @@ printf ("Remote fetch obj: %lx req from %u to %u\n", ptr, host, owner);
 uintptr_t LocalDirectory::haveObject(uintptr_t ptr, uint32_t &remote) {
 #define OBJSTATE (*iter).second
   LocalDirectory& ld = getSystemLocalDirectory();
-  Lock.lock();
+  ld.Lock.lock();
   auto iter = ld.curobj.find(ptr);
   uintptr_t retval = 0;
   // Returning the object even if locked as the call to acquire would fail
@@ -78,7 +75,7 @@ uintptr_t LocalDirectory::haveObject(uintptr_t ptr, uint32_t &remote) {
     remote = OBJSTATE.sent_to;
   else
     printf ("Unrecognized state in LocalDirectory::haveObject\n");
-  Lock.unlock();
+  ld.Lock.unlock();
 #undef OBJSTATE
   return retval;
 }
@@ -90,9 +87,6 @@ void LocalDirectory::fetchRemoteObj(uintptr_t ptr, uint32_t remote, recvFuncTy p
   NetworkInterface& net = getSystemNetworkInterface();
   buf.serialize(ptr);
   buf.serialize(host);
-#ifdef PRINT_DIR_DEBUG
-printf ("Local fetch obj: %lx req from %u to %u\n", ptr, host, remote);
-#endif
   net.sendMessage (remote, pad, buf);
   return;
 }
