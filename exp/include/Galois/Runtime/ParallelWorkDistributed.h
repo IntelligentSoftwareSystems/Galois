@@ -48,20 +48,21 @@ namespace {
 
 template<typename WLTy, typename IterTy, typename FunctionTy>
 void for_each_dist(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
+  // Get a handle to the network interface
+  //  Don't move as networkHostNum and networkHostID have to be initialized first
+  Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
+
   //fast path for non-distributed
   if (Distributed::networkHostNum == 1) {
     for_each_impl<WLTy>(b,e,f,loopname);
     return;
   }
 
-
   typedef typename std::iterator_traits<IterTy>::value_type ItemTy;
 
   //copy out all data
   std::deque<ItemTy> allData(b,e);
 
-  // Get a handle to the network interface
-  Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
   for (unsigned i = 1; i < Distributed::networkHostNum; i++) {
     auto blk = block_range(allData.begin(), allData.end(), i, Distributed::networkHostNum);
     std::deque<ItemTy> data(blk.first, blk.second);

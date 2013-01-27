@@ -47,6 +47,10 @@ int main(int argc, const char** argv) {
   D.print(std::cout);
   cout << "\n";
 
+  // read the header first
+  uintptr_t tmp;
+  D.deserialize(tmp);
+
   typename GTy::NodeHandle foo;
   D.deserialize(foo);
 
