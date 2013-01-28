@@ -1,5 +1,6 @@
 #include "Galois/Galois.h"
 #include "Galois/Graphs/Graph3.h"
+#include "Lonestar/BoilerPlate.h"
 
 #include <iostream>
 
@@ -16,7 +17,12 @@ struct op {
   }
 };
 
-int main(int argc, const char** argv) {
+int main(int argc, char** argv) {
+
+  LonestarStart(argc, argv, nullptr, nullptr, nullptr);
+
+  // check the host id and initialise the network
+  Galois::Runtime::Distributed::networkStart();
 
   typedef G<int, int , EdgeDirection::Out> GTy;
   GTy Gr;
@@ -27,7 +33,11 @@ int main(int argc, const char** argv) {
   Galois::for_each<>(Gr.begin(), Gr.end(), op());
 
   for (auto ii = Gr.begin(), ee = Gr.end(); ii != ee; ++ii)
-    std::cout << (*ii)->getData() << " " << std::distance((*ii)->begin(), (*ii)->end()) << "\n";
+    std::cout << (*ii)->getData() << " " << std::distance((*ii)->begin(), (*ii)->end()) << " ";
+  std::cout << "\n";
+
+  // master_terminate();
+  Galois::Runtime::Distributed::networkTerminate();
 
   ///debugging stuff below this point
   if (false) {
