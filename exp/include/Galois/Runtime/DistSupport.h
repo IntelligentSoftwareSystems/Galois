@@ -38,10 +38,12 @@ class gptr {
 
   T* resolve() const {
     T* rptr = nullptr;
+    assert(ptr);
     if (owner == networkHostID)
       rptr = getSystemLocalDirectory().resolve<T>(ptr);
     else 
       rptr = getSystemRemoteDirectory().resolve<T>(ptr, owner);
+    assert(rptr);
     if (inGaloisForEach)
       acquire(rptr, MethodFlag::ALL);
     return rptr;
@@ -51,13 +53,8 @@ public:
   typedef T element_type;
   
   constexpr gptr() :ptr(0), owner(0) {}
-  constexpr gptr(std::nullptr_t) :ptr(0), owner(0) {}
 
   explicit gptr(T* p) :ptr(reinterpret_cast<uintptr_t>(p)), owner(networkHostID) {}
-
-  gptr( const gptr& r ) =default;
-  ~gptr()=default;
-  gptr& operator=(const gptr& sp) =default;
 
   T& operator*() const {
     return *resolve();
@@ -79,7 +76,7 @@ public:
   }
 
   void dump(std::ostream& os) {
-    os << ptr;
+    os << "[" << owner << ", " << ptr << "]";
   }
 };
 
