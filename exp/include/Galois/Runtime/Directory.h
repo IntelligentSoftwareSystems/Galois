@@ -148,6 +148,7 @@ using namespace Galois::Runtime::Distributed;
 // should be blocking if not in for each
 template<typename T>
 T* RemoteDirectory::resolve(uintptr_t ptr, uint32_t owner) {
+  assert(ptr);
   assert(owner != networkHostID);
   uintptr_t p = haveObject(ptr, owner);
   while (!p) {
@@ -208,7 +209,7 @@ void RemoteDirectory::remoteReqLandingPad(RecvBuffer &buf) {
       sbuf.serialize(*data);
       rd.curobj.erase(make_pair(ptr,owner));
       net.sendMessage(owner,&LocalDirectory::localDataLandingPad<T>,sbuf);
-      free(data);
+      delete data;
     }
   }
   else {
@@ -234,7 +235,7 @@ void RemoteDirectory::remoteDataLandingPad(RecvBuffer &buf) {
   buf.deserialize(owner);
   auto iter = rd.curobj.find(make_pair(ptr,owner));
   buf.deserialize(size);
-  data = (T*)calloc(1,size);
+  data = new T();
   buf.deserialize((*data));
   OBJSTATE.state = RemoteDirectory::objstate::Local;
   L = reinterpret_cast<Lockable*>(data);
