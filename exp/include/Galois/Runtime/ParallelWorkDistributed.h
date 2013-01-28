@@ -40,6 +40,7 @@ void for_each_landing_pad(Distributed::RecvBuffer& buf) {
   buf.deserialize(f);
   std::deque<ItemTy> data;
   buf.deserialize(data);
+
   //Start locally
   Galois::Runtime::for_each_impl<WLTy>(data.begin(), data.end(), f, nullptr);
 }
@@ -61,7 +62,8 @@ void for_each_dist(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
   typedef typename std::iterator_traits<IterTy>::value_type ItemTy;
 
   //copy out all data
-  std::deque<ItemTy> allData(b,e);
+  std::deque<ItemTy> allData;
+  allData.insert(allData.end(), b,e);
 
   for (unsigned i = 1; i < Distributed::networkHostNum; i++) {
     auto blk = block_range(allData.begin(), allData.end(), i, Distributed::networkHostNum);
@@ -73,8 +75,6 @@ void for_each_dist(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
     buf.serialize(data);
     //send data
     net.sendMessage (i, &for_each_landing_pad<WLTy,ItemTy,FunctionTy>, buf);
-    // send the data
-    net.handleReceives();
   }
   //now get our data
   auto myblk = block_range(allData.begin(), allData.end(), 0, Distributed::networkHostNum);
