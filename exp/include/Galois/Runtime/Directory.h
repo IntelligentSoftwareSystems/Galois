@@ -25,7 +25,6 @@
 #ifndef GALOIS_RUNTIME_DIRECTORY_H
 #define GALOIS_RUNTIME_DIRECTORY_H
 
-#include <iostream>
 #include <boost/unordered_map.hpp>
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Network.h"
@@ -213,7 +212,7 @@ void RemoteDirectory::remoteReqLandingPad(RecvBuffer &buf) {
     }
   }
   else {
-    cout << "Unexpected state " << OBJSTATE.state << " in remoteReqLandingPad" << endl;
+    assert(0 && "Unexpected state in remoteReqLandingPad");
     abort();
   }
   rd.Lock.unlock();
@@ -310,7 +309,7 @@ void LocalDirectory::localReqLandingPad(RecvBuffer &buf) {
     net.sendMessage(remote_to,&RemoteDirectory::remoteDataLandingPad<T>,sbuf);
   }
   else if (OBJSTATE.state != LocalDirectory::objstate::Local) {
-    cout << "Unexpected state " << OBJSTATE.state << " in localReqLandingPad" << endl;
+    assert(0 && "Unexpected state in localReqLandingPad");
     abort();
   }
   ld.Lock.unlock();

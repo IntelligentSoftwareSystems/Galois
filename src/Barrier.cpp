@@ -332,16 +332,16 @@ void TopoBarrier::wait() {
 
 // }
 
-StupidDistBarrier::StupidDistBarrier() {
+StupidDistBarrier::StupidDistBarrier() : gsense(0), count(0) {
   for (unsigned x = 0; x < sense.size(); ++x)
     *sense.getRemote(x) = 1;
 }
 
 void StupidDistBarrier::reinit(unsigned val) {
-  count = Distributed::networkHostNum * val;
 }
 
 void StupidDistBarrier::wait() {
+  assert(*sense.getLocal() + 1 == gsense);
   //notify the world
   Distributed::SendBuffer b;
   Distributed::getSystemNetworkInterface().broadcastMessage(broadcastLandingPad, b);
@@ -350,10 +350,10 @@ void StupidDistBarrier::wait() {
 
   //wait for barrier
   if (LL::getTID() == 0) {
+    __sync_fetch_and_add(&count, Distributed::networkHostNum * activeThreads);
     while (count != 0)
       Distributed::getSystemNetworkInterface().handleReceives();
     //passed barrier, notify local
-    count = Distributed::networkHostNum * activeThreads;
     ++gsense;
   } else {
     while (*sense.getLocal() != gsense)
@@ -370,6 +370,14 @@ static StupidDistBarrier& getDistBarrier() {
 
 void StupidDistBarrier::broadcastLandingPad(Distributed::RecvBuffer&) {
   __sync_fetch_and_sub(&getDistBarrier().count, 1);
+}
+
+void StupidDistBarrier::dump() {
+  printf("sense");
+  for (unsigned x = 0; x < sense.size(); ++x)
+    printf(" %d", *sense.getRemote(x));
+  printf("\n");
+  printf("count %d, gsense %d\n", count, gsense);
 }
 
 GBarrier& Galois::Runtime::getSystemBarrier() {

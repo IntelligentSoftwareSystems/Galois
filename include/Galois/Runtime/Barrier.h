@@ -177,7 +177,7 @@ public:
 class StupidDistBarrier {
   volatile unsigned gsense;
   PerThreadStorage<unsigned> sense;
-  volatile unsigned count;
+  volatile int count;
 
   static void broadcastLandingPad(Distributed::RecvBuffer&);
 
@@ -187,6 +187,7 @@ public:
   void reinit(unsigned val);
   void wait();
   void operator()(void) { wait(); }
+  void dump();
 };
 
 //typedef TopoBarrier GBarrier;
