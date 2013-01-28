@@ -74,7 +74,7 @@ class RemoteDirectory;
 
 namespace DeterministicWork {
 template <typename, typename>
-class DeterministicContext;
+struct DeterministicContext;
 }
 
 //! All objects that may be locked (nodes primarily) must inherit from Lockable.
@@ -86,7 +86,7 @@ class Lockable {
   friend class Distributed::LocalDirectory;
   friend class Distributed::RemoteDirectory;
   template <typename, typename>
-  friend class Galois::Runtime::DeterministicWork::DeterministicContext;
+  friend struct Galois::Runtime::DeterministicWork::DeterministicContext;
 public:
   LL::PtrLock<void, true> auxPtr;
   Lockable() :next(0) {}
