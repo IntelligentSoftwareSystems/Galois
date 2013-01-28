@@ -30,46 +30,46 @@ int main(int argc, const char** argv) {
     std::cout << (*ii)->getData() << " " << std::distance((*ii)->begin(), (*ii)->end()) << "\n";
 
   ///debugging stuff below this point
-
-  Galois::Runtime::Distributed::SerializeBuffer B;
-  //serialize the pointer
-  auto oldB = *Gr.begin();
-  B.serialize(oldB);
-  //serialize the node
-  B.serialize(*oldB);
-
-  B.print(std::cout);
-  cout << "\n";
-
-  Galois::Runtime::Distributed::DeSerializeBuffer D(B.size());
-  memcpy(D.linearData(), B.linearData(), B.size());
-
-  D.print(std::cout);
-  cout << "\n";
-
-  // read the header first
-  uintptr_t tmp;
-  D.deserialize(tmp);
-
-  typename GTy::NodeHandle foo;
-  D.deserialize(foo);
-
-  auto bar = Gr.createNode();
-  D.deserialize(*bar);
-
-  B.print(std::cout);
-  cout << "\n";
-  D.print(std::cout);
-  cout << "\n";
-
-  oldB.dump(std::cout);
-  std::cout << "\n";
-  foo.dump(std::cout);
-  std::cout << "\n";
-  (*oldB).dump(std::cout);
-  std::cout << "\n";
-  (*bar).dump(std::cout);
-  std::cout << "\n";
-
+  if (false) {
+    Galois::Runtime::Distributed::SerializeBuffer B;
+    //serialize the pointer
+    auto oldB = *Gr.begin();
+    B.serialize(oldB);
+    //serialize the node
+    B.serialize(*oldB);
+    
+    B.print(std::cout);
+    cout << "\n";
+    
+    Galois::Runtime::Distributed::DeSerializeBuffer D(B.size());
+    memcpy(D.linearData(), B.linearData(), B.size());
+    
+    D.print(std::cout);
+    cout << "\n";
+    
+    // read the header first
+    uintptr_t tmp;
+    D.deserialize(tmp);
+    
+    typename GTy::NodeHandle foo;
+    D.deserialize(foo);
+    
+    auto bar = Gr.createNode();
+    D.deserialize(*bar);
+    
+    B.print(std::cout);
+    cout << "\n";
+    D.print(std::cout);
+    cout << "\n";
+    
+    oldB.dump(std::cout);
+    std::cout << "\n";
+    foo.dump(std::cout);
+    std::cout << "\n";
+    (*oldB).dump(std::cout);
+    std::cout << "\n";
+    (*bar).dump(std::cout);
+    std::cout << "\n";
+  }
   return 0;
 }
