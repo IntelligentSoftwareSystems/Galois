@@ -77,6 +77,15 @@ public:
       serialize(*ii);
   }
 
+  template<typename T, typename Alloc>
+  inline void serialize(const std::vector<T, Alloc>& data) {
+    typename std::vector<T, Alloc>::size_type size;
+    size = data.size();
+    serialize(size);
+    for (auto ii = data.begin(), ee = data.end(); ii != ee; ++ii)
+      serialize(*ii);
+  }
+
   template<typename T1, typename T2>
   inline void serialize(const std::pair<T1, T2>& data) {
     serialize(data.first);
@@ -141,6 +150,16 @@ public:
   template<typename T, typename Alloc>
   inline void deserialize(std::deque<T, Alloc>& data) {
     typedef typename std::deque<T, Alloc>::size_type lsty;
+    lsty size;
+    deserialize(size);
+    data.resize(size);
+    for (lsty x = 0; x < size; ++x)
+      deserialize(data[x]);
+  }
+
+  template<typename T, typename Alloc>
+  inline void deserialize(std::vector<T, Alloc>& data) {
+    typedef typename std::vector<T, Alloc>::size_type lsty;
     lsty size;
     deserialize(size);
     data.resize(size);
