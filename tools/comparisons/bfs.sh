@@ -38,7 +38,6 @@ if [[ ! -e "$SF" ]]; then
 fi
 run "${BASE}/tools/bin/bfs-schardl" -f "$SF"
 
-run "${BASE}/apps/bfs/bfs" -parallelBarrierInline $* "$F"
 run "${BASE}/apps/bfs/bfs" $* "$F"
 
 if [[ ! -e "${BASE}/tools/bin/bfs-pbbs" ]]; then
