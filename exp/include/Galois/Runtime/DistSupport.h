@@ -36,6 +36,17 @@ class gptr {
   uintptr_t ptr;
   uint32_t owner;
 
+  T* resolve() const {
+    T* rptr = nullptr;
+    if (owner == networkHostID)
+      rptr = getSystemLocalDirectory().resolve<T>(ptr);
+    else 
+      rptr = getSystemRemoteDirectory().resolve<T>(ptr, owner);
+    if (inGaloisForEach)
+      acquire(rptr, MethodFlag::ALL);
+    return rptr;
+  }
+
 public:
   typedef T element_type;
   
@@ -49,27 +60,12 @@ public:
   gptr& operator=(const gptr& sp) =default;
 
   T& operator*() const {
-    T* rptr = resolve();
-    // lock only if inside for_each
-    if (inGaloisForEach)
-      Galois::Runtime::acquire(rptr,Galois::MethodFlag::ALL);
-    return *rptr;
+    return *resolve();
   }
   T *operator->() const {
-    T* rptr = resolve();
-    // lock only if inside for_each
-    if (inGaloisForEach)
-      Galois::Runtime::acquire(rptr,Galois::MethodFlag::ALL);
-    return rptr;
+    return resolve();
   }
   operator bool() const { return ptr != 0; }
-
-  //Resolve
-  T* resolve() const {
-    if (owner == networkHostID)
-      return getSystemLocalDirectory().resolve<T>(ptr);
-    return getSystemRemoteDirectory().resolve<T>(ptr, owner);
-  }
 
   //serialize
   typedef int tt_has_serialize;
