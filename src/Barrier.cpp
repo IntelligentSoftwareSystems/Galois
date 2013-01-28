@@ -338,10 +338,14 @@ StupidDistBarrier::StupidDistBarrier() : gsense(0), count(0) {
 }
 
 void StupidDistBarrier::reinit(unsigned val) {
+  for (unsigned x = 0; x < sense.size(); ++x)
+    *sense.getRemote(x) = 1;
+  count = 0;
+  gsense = 0;
 }
 
 void StupidDistBarrier::wait() {
-  assert(*sense.getLocal() + 1 == gsense);
+  assert(*sense.getLocal() == gsense + 1);
   //notify the world
   Distributed::SendBuffer b;
   Distributed::getSystemNetworkInterface().broadcastMessage(broadcastLandingPad, b);
