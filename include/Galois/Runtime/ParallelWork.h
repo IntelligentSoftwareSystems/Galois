@@ -268,6 +268,7 @@ public:
   template<typename RangeTy>
   void AddInitialWork(RangeTy range) {
     wl.push_initial(range);
+    term.initializeThread();
   }
 
   // in the distributed case even with 1 thread there can be aborts
