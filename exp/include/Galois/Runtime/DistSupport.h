@@ -63,6 +63,16 @@ public:
     return resolve();
   }
   operator bool() const { return ptr != 0; }
+  gptr& operator=(T* p) {
+    ptr = reinterpret_cast<uintptr_t>(p);
+    owner = networkHostID;
+    return *this;
+  }
+  gptr& operator=(const gptr& p) {
+    ptr = p.ptr;
+    owner = p.owner;
+    return *this;
+  }
 
   //serialize
   typedef int tt_has_serialize;

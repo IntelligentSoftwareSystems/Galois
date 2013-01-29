@@ -337,7 +337,7 @@ public:
     //This constructs the local node of the distributed graph
     s.deserialize(localState.master);
     localState.next = localState.master->next;
-    localState.master->next = localState;
+    localState.master->next = &localState;
   }
   
 };

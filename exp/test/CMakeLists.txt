@@ -12,6 +12,7 @@ makeTest(printhost)
 #makeTest(skiplist)
 #makeTest(dist)
 makeTest(distnodes)
+makeTest(distgraph)
 #makeTest(foreachtask)
 makeTest(networktest)
 

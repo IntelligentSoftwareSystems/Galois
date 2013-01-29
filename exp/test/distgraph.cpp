@@ -2,19 +2,35 @@
 #include "Galois/Graphs/Graph3.h"
 #include "Lonestar/BoilerPlate.h"
 
+#include <boost/iterator/counting_iterator.hpp>
+
 #include <iostream>
 
 using namespace Galois::Graph;
 
-template<typename nd, typename ed, EdgeDirection dir>
-using G = ThirdGraph<nd,ed,dir>;
-
+typedef ThirdGraph<int,int,EdgeDirection::Out> G;
 
 struct op {
-  template<typename T, typename Context>
-  void operator()(const T& node, const Context& cnx) {
+  gptr<G> graph;
+
+  op(gptr<G> g) :graph(g) {}
+  op() {}
+
+  template<typename Context>
+  void operator()(const int& nodeval, const Context& cnx) {
+    G::NodeHandle node = graph->createNode(nodeval);
     node->createEdge(node, -node->getData());
   }
+
+  // serialization functions
+  typedef int tt_has_serialize;
+  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+    s.serialize(graph);
+  }
+  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+    s.deserialize(graph);
+  }
+
 };
 
 int main(int argc, char** argv) {
@@ -24,62 +40,16 @@ int main(int argc, char** argv) {
   // check the host id and initialise the network
   Galois::Runtime::Distributed::networkStart();
 
-  typedef G<int, int , EdgeDirection::Out> GTy;
-  GTy Gr;
+  Galois::Runtime::Distributed::gptr<G> Gr(new G());
 
-  for (int x = 0; x < 100; ++x)
-    Gr.createNode(x);
+  Galois::for_each<>(boost::counting_iterator<int>(0), boost::counting_iterator<int>(1000), op(Gr));
 
-  Galois::for_each<>(Gr.begin(), Gr.end(), op());
-
-  for (auto ii = Gr.begin(), ee = Gr.end(); ii != ee; ++ii)
+  for (auto ii = Gr->begin(), ee = Gr->end(); ii != ee; ++ii)
     std::cout << (*ii)->getData() << " " << std::distance((*ii)->begin(), (*ii)->end()) << " ";
   std::cout << "\n";
 
   // master_terminate();
   Galois::Runtime::Distributed::networkTerminate();
 
-  ///debugging stuff below this point
-  if (false) {
-    Galois::Runtime::Distributed::SerializeBuffer B;
-    //serialize the pointer
-    auto oldB = *Gr.begin();
-    B.serialize(oldB);
-    //serialize the node
-    B.serialize(*oldB);
-    
-    B.print(std::cout);
-    cout << "\n";
-    
-    Galois::Runtime::Distributed::DeSerializeBuffer D(B.size());
-    memcpy(D.linearData(), B.linearData(), B.size());
-    
-    D.print(std::cout);
-    cout << "\n";
-    
-    // read the header first
-    uintptr_t tmp;
-    D.deserialize(tmp);
-    
-    typename GTy::NodeHandle foo;
-    D.deserialize(foo);
-    
-    auto bar = Gr.createNode();
-    D.deserialize(*bar);
-    
-    B.print(std::cout);
-    cout << "\n";
-    D.print(std::cout);
-    cout << "\n";
-    
-    oldB.dump(std::cout);
-    std::cout << "\n";
-    foo.dump(std::cout);
-    std::cout << "\n";
-    (*oldB).dump(std::cout);
-    std::cout << "\n";
-    (*bar).dump(std::cout);
-    std::cout << "\n";
-  }
   return 0;
 }
