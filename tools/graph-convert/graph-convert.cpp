@@ -41,6 +41,8 @@ enum ConvertMode {
   gr2bsml,
   gr2dimacs,
   gr2pbbs,
+  gr2floatpbbs,
+  gr2intpbbs,
   intedgelist2gr,
   pbbs2gr,
   pbbs2vgr,
@@ -55,10 +57,12 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Choose a conversion mode:"),
     cll::values(
       clEnumVal(dimacs2gr, "Convert dimacs to binary gr"),
       clEnumVal(edgelist2gr, "Convert edge list to binary gr (default)"),
-      clEnumVal(floatedgelist2gr, "Convert weighted (float) edge list to binary gr (default)"),
+      clEnumVal(floatedgelist2gr, "Convert weighted (float) edge list to binary gr"),
       clEnumVal(gr2bsml, "Convert binary gr to binary sparse MATLAB matrix"),
       clEnumVal(gr2dimacs, "Convert binary gr to dimacs"),
       clEnumVal(gr2pbbs, "Convert binary gr to pbbs"),
+      clEnumVal(gr2floatpbbs, "Convert binary gr to weighted (float) pbbs"),
+      clEnumVal(gr2intpbbs, "Convert binary gr to weighted (int) pbbs"),
       clEnumVal(intedgelist2gr, "Convert weighted (int) edge list to binary gr (default)"),
       clEnumVal(pbbs2gr, "Convert pbbs graph to binary gr"),
       clEnumVal(pbbs2vgr, "Convert pbbs graph to binary void gr"),
@@ -415,6 +419,32 @@ void convert_pbbs2gr(const std::string& infilename, const std::string& outfilena
   p.structureToFile(outfilename.c_str());
 }
 
+template<typename EdgeTy>
+void convert_gr2wpbbs(const std::string& infilename, const std::string& outfilename) {
+  // Use FileGraph because it is basically in CSR format needed for pbbs
+  typedef Galois::Graph::FileGraph Graph;
+  typedef Graph::GraphNode GNode;
+
+  Graph graph;
+  graph.structureFromFile(infilename);
+
+  std::ofstream file(outfilename.c_str());
+  file << "WeightedEdgeArray\n";
+  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+    GNode src = *ii;
+    for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
+      GNode dst = graph.getEdgeDst(jj);
+      EdgeTy& weight = graph.getEdgeData<EdgeTy>(jj);
+      file << src << " " << dst << " " << weight << "\n";
+    }
+  }
+  file.close();
+
+  std::cout << "Finished reading graph. "
+    << "Nodes: " << graph.size() << " Edges: " << graph.sizeEdges() 
+    << "\n";
+}
+
 void convert_gr2pbbs(const std::string& infilename, const std::string& outfilename) {
   // Use FileGraph because it is basically in CSR format needed for pbbs
   typedef Galois::Graph::FileGraph Graph;
@@ -563,6 +593,8 @@ int main(int argc, char** argv) {
     case gr2bsml: convert_gr2bsml<int32_t>(inputfilename, outputfilename); break;
     case gr2dimacs: convert_gr2dimacs<int32_t>(inputfilename, outputfilename); break;
     case gr2pbbs: convert_gr2pbbs(inputfilename, outputfilename); break;
+    case gr2floatpbbs: convert_gr2wpbbs<float>(inputfilename, outputfilename); break;
+    case gr2intpbbs: convert_gr2wpbbs<int32_t>(inputfilename, outputfilename); break;
     case intedgelist2gr: convert_edgelist2gr<int>(inputfilename, outputfilename); break;
     case pbbs2gr: convert_pbbs2gr<int32_t>(inputfilename, outputfilename); break;
     case pbbs2vgr: convert_pbbs2gr<void>(inputfilename, outputfilename); break;
