@@ -55,7 +55,7 @@ int main() {
       t4.start();
       Galois::Runtime::PerThreadStorage<int> v4;
       for (int i = 0; i < count; ++i)
-        (*v4.getRemote(1))++;
+        (*v4.getRemote((i + 1) % M))++;
       t4.stop();
 
       std::cout << t2.get() << " " << t4.get() << "\n";

@@ -1,7 +1,7 @@
 /** Spanning-tree application -*- C++ -*-
  * @file
  *
- * A simple spanning tree algorithm to demostrate the Galois system.
+ * A simple spanning tree algorithm to demonstrate the Galois system.
  *
  * @section License
  *
@@ -33,16 +33,13 @@
 
 #include "Lonestar/BoilerPlate.h"
 
-#include "boost/optional.hpp"
-
 #include <utility>
-#include <vector>
 #include <algorithm>
 #include <iostream>
 
 namespace cll = llvm::cl;
 
-const char* name = "Spanning-tree Algorithm";
+const char* name = "Spanning Tree Algorithm";
 const char* desc = "Compute the spanning forest of a graph";
 const char* url = NULL;
 
@@ -150,7 +147,7 @@ struct AsynchronousAlgo {
         return false;
       // Avoid cycles by directing edges consistently
       if (a->id > b->id)
-        boost::swap(a, b);
+        std::swap(a, b);
       if (__sync_bool_compare_and_swap(&a->component, a, b))
         return true;
     }

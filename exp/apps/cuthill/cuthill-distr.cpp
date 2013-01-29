@@ -1288,8 +1288,8 @@ int main(int argc, char **argv) {
   typedef BulkSynchronousInline<> BSInline;
 #else
 	*/
-  typedef BulkSynchronousInline<> BSInline1;
-  typedef BulkSynchronousInline<> BSInline2;
+  //typedef BulkSynchronousInline<> BSInline1;
+  //typedef BulkSynchronousInline<> BSInline2;
   //typedef BSWL_LIFO BSInline1;
   //typedef BSWL_FIFO BSInline2;
 //#endif

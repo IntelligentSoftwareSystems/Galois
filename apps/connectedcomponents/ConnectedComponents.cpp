@@ -113,7 +113,7 @@ struct SerialAlgo {
     std::pair<int,Node*> bb = find(b);
     if (aa.second != bb.second) {
       if (aa.first > bb.first) {
-        boost::swap(aa, bb);
+        std::swap(aa, bb);
       }
       aa.second->component = bb.second;
     }
@@ -192,7 +192,7 @@ struct SynchronousAlgo {
         return false;
       // Avoid cycles by directing edges consistently
       if (a->id > b->id)
-        boost::swap(a, b);
+        std::swap(a, b);
       if (__sync_bool_compare_and_swap(&a->component, a, b))
         return true;
     }
@@ -280,7 +280,7 @@ struct SynchronousAlgo {
       Galois::do_all_local(*cur, Merge(emptyMerges));
       Galois::for_each_local(*cur, Find(*next));
       cur->clear();
-      boost::swap(cur, next);
+      std::swap(cur, next);
       rounds += 1;
     }
     Galois::do_all_local(graph, Normalize());
@@ -324,7 +324,7 @@ struct AsynchronousAlgo {
         return false;
       // Avoid cycles by directing edges consistently
       if (a->id > b->id)
-        boost::swap(a, b);
+        std::swap(a, b);
       if (__sync_bool_compare_and_swap(&a->component, a, b))
         return true;
     }
@@ -452,7 +452,7 @@ void writeComponent(Node* component) {
     }
   }
 
-  p.finish(0);
+  p.finish();
 
   std::cout << "Writing largest component to " << outputFilename
     << " (nodes: " << numNodes << " edges: " << numEdges << ")\n";

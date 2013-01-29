@@ -13,4 +13,4 @@ makeTest(test_gdeque)
 makeTest(sort)
 makeTest(loopoverhead)
 makeTest(acquire)
-
+makeTest(empty-member-lcgraph)

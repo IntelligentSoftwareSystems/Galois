@@ -118,7 +118,7 @@ void convert_edgelist2gr(const std::string& infilename, const std::string& outfi
     }
   }
 
-  p.finish(0);
+  p.finish();
 
   std::cout << "Finished reading graph. "
     << "Nodes: " << numNodes
@@ -438,15 +438,15 @@ void convert_gr2pbbs(const std::string& infilename, const std::string& outfilena
   std::ofstream file(outfilename.c_str());
   file << "AdjacencyGraph\n" << graph.size() << "\n" << graph.sizeEdges() << "\n";
   // edgeid[i] is the end of i in FileGraph while it is the beginning of i in pbbs graph
-  size_t last = std::distance(graph.edgeid_begin(), graph.edgeid_end());
+  size_t last = std::distance(graph.edge_id_begin(), graph.edge_id_end());
   size_t count = 0;
   file << "0\n";
-  for (Graph::edgeid_iterator ii = graph.edgeid_begin(), ei = graph.edgeid_end();
+  for (Graph::edge_id_iterator ii = graph.edge_id_begin(), ei = graph.edge_id_end();
       ii != ei; ++ii, ++count) {
     if (count < last - 1)
       file << *ii << "\n";
   }
-  for (Graph::nodeid_iterator ii = graph.nodeid_begin(), ei = graph.nodeid_end(); ii != ei; ++ii) {
+  for (Graph::node_id_iterator ii = graph.node_id_begin(), ei = graph.node_id_end(); ii != ei; ++ii) {
     file << *ii << "\n";
   }
   file.close();
@@ -489,6 +489,20 @@ void convert_gr2dimacs(const std::string& infilename, const std::string& outfile
     << "Nodes: " << nnodes << " Edges: " << nedges 
     << "\n";
 }
+
+template<typename GraphTy,typename EdgeTy>
+struct GetEdgeData {
+  double operator()(GraphTy& g, typename GraphTy::edge_iterator ii) const {
+    return g.getEdgeData(ii);
+  }
+};
+
+template<typename GraphTy>
+struct GetEdgeData<GraphTy,void> {
+  double operator()(GraphTy& g, typename GraphTy::edge_iterator ii) const {
+    return 1;
+  }
+};
 
 /**
  * GR to Binary Sparse MATLAB matrix.
@@ -554,8 +568,8 @@ void convert_gr2bsml(const std::string& infilename, const std::string& outfilena
   for (typename Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
     GNode src = *ii;
     for (typename Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
-      //GNode dst = graph.getEdgeDst(jj);
-      double weight = graph.getEdgeData(jj);
+      //double weight = GetEdgeData<Graph,EdgeTy>()(graph, jj);
+      double weight = GetEdgeData<Graph,EdgeTy>()(graph, jj);
       retval = write(fd, &weight, sizeof(weight));
       if (retval == -1) { perror(__FILE__); abort(); }
     }

@@ -63,6 +63,7 @@ enum BFSAlgo {
   parallelBarrier,
   parallelBarrierCas,
   parallelBarrierInline,
+  parallelUndirected,
   detParallelBarrier,
   detDisjointParallelBarrier,
 };
@@ -85,13 +86,14 @@ static cll::opt<BFSAlgo> algo(cll::desc("Choose an algorithm:"),
       clEnumVal(serial, "Serial"),
       clEnumVal(serialSet, "Serial optimized with workset semantics"),
       clEnumVal(serialMin, "Serial optimized with minimal runtime"),
-      clEnumVal(parallelSet, "Galois optimized with workset semantics"),
-      clEnumVal(parallelBarrier, "Galois optimized with workset and barrier"),
-      clEnumVal(parallelBarrierCas, "Galois optimized with workset and barrier but using CAS"),
+      clEnumVal(parallelSet, "Parallel optimized with workset semantics"),
+      clEnumVal(parallelBarrier, "Parallel optimized with workset and barrier"),
+      clEnumVal(parallelBarrierCas, "Parallel optimized with workset and barrier but using CAS"),
+      clEnumVal(parallelUndirected, "Parallel specialization for undirected graphs"),
       clEnumVal(detParallelBarrier, "Deterministic parallelBarrier"),
       clEnumVal(detDisjointParallelBarrier, "Deterministic parallelBarrier with disjoint optimization"),
 #ifdef GALOIS_USE_EXP
-      clEnumVal(parallelBarrierInline, "Galois optimized with inlined workset and barrier"),
+      clEnumVal(parallelBarrierInline, "Parallel optimized with inlined workset and barrier"),
 #endif
       clEnumValEnd), cll::init(parallelBarrier));
 static cll::opt<std::string> filename(cll::Positional,
@@ -241,7 +243,7 @@ static void readGraph(GNode& source, GNode& report) {
 }
 
 //! Serial BFS using optimized flags and workset semantics
-struct SerialWorkSet {
+struct SerialWorkSetAlgo {
   std::string name() const { return "Serial (Workset)"; }
 
   void operator()(const GNode source) const {
@@ -279,7 +281,7 @@ struct SerialWorkSet {
 };
 
 //! Galois BFS using optimized flags and workset semantics
-struct GaloisWorkSet {
+struct WorkSetAlgo {
   typedef int tt_does_not_need_aborts;
 
   std::string name() const { return "Galois (Workset)"; }
@@ -327,9 +329,11 @@ struct GaloisWorkSet {
   }
 };
 
-//! Galois BFS using optimized flags and barrier scheduling 
+//! Algorithm for undirected graphs from SC'12
+// TODO add cite
+// TODO implementation
 template<typename WL,bool useCas>
-struct GaloisBarrier {
+struct UndirectedAlgo {
   typedef int tt_does_not_need_aborts;
 
   std::string name() const { return "Galois (Barrier)"; }
@@ -375,9 +379,57 @@ struct GaloisBarrier {
   }
 };
 
-//! Galois BFS using optimized flags and barrier scheduling 
+//! BFS using optimized flags and barrier scheduling 
+template<typename WL,bool useCas>
+struct BarrierAlgo {
+  typedef int tt_does_not_need_aborts;
+
+  std::string name() const { return "Galois (Barrier)"; }
+  typedef std::pair<GNode,int> ItemTy;
+
+  void operator()(const GNode& source) const {
+    std::deque<ItemTy> initial;
+
+    graph.getData(source).dist = 0;
+    for (Graph::edge_iterator ii = graph.edge_begin(source),
+          ei = graph.edge_end(source); ii != ei; ++ii) {
+      GNode dst = graph.getEdgeDst(ii);
+      SNode& ddata = graph.getData(dst);
+      ddata.dist = 1;
+      initial.push_back(ItemTy(dst, 2));
+    }
+    Galois::for_each<WL>(initial.begin(), initial.end(), *this);
+  }
+
+  void operator()(const ItemTy& item, Galois::UserContext<ItemTy>& ctx) const {
+    GNode n = item.first;
+
+    unsigned int newDist = item.second;
+
+    for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::NONE),
+          ei = graph.edge_end(n, Galois::NONE); ii != ei; ++ii) {
+      GNode dst = graph.getEdgeDst(ii);
+      SNode& ddata = graph.getData(dst, Galois::NONE);
+
+      unsigned int oldDist;
+      while (true) {
+        oldDist = ddata.dist;
+        if (oldDist <= newDist)
+          break;
+        if (!useCas || __sync_bool_compare_and_swap(&ddata.dist, oldDist, newDist)) {
+          if (!useCas)
+            ddata.dist = newDist;
+          ctx.push(ItemTy(dst, newDist + 1));
+          break;
+        }
+      }
+    }
+  }
+};
+
+//! BFS using optimized flags and barrier scheduling 
 template<DetAlgo Version>
-struct GaloisDetBarrier {
+struct DetBarrierAlgo {
   typedef int tt_needs_per_iter_alloc; // For LocalState
 
   std::string name() const { return "Galois (Deterministic Barrier)"; }
@@ -386,7 +438,7 @@ struct GaloisDetBarrier {
   struct LocalState {
     typedef std::deque<GNode,Galois::PerIterAllocTy> Pending;
     Pending pending;
-    LocalState(GaloisDetBarrier<Version>& self, Galois::PerIterAllocTy& alloc): pending(alloc) { }
+    LocalState(DetBarrierAlgo<Version>& self, Galois::PerIterAllocTy& alloc): pending(alloc) { }
   };
 
   struct IdFn {
@@ -489,7 +541,8 @@ struct GaloisDetBarrier {
 };
 
 template<typename AlgoTy>
-void run(const AlgoTy& algo) {
+void run() {
+  AlgoTy algo;
   GNode source, report;
   readGraph(source, report);
   Galois::preAlloc((numThreads + (graph.size() * sizeof(SNode) * 2) / Galois::Runtime::MM::pageSize)*8);
@@ -530,14 +583,15 @@ int main(int argc, char **argv) {
 #endif
 
   switch (algo) {
-    case serialSet: run(SerialWorkSet()); break;
-    case serialMin: run(GaloisBarrier<FIFO<int,false>,false>()); break;
-    case parallelSet: run(GaloisWorkSet());  break;
-    case parallelBarrierCas: run(GaloisBarrier<BSWL,true>()); break;
-    case parallelBarrier: run(GaloisBarrier<BSWL,false>()); break;
-    case parallelBarrierInline: run(GaloisBarrier<BSInline,false>()); break;
-    case detParallelBarrier: run(GaloisDetBarrier<detBase>()); break;
-    case detDisjointParallelBarrier: run(GaloisDetBarrier<detDisjoint>()); break;
+    case serialSet: run<SerialWorkSetAlgo>(); break;
+    case serialMin: run<BarrierAlgo<FIFO<int,false>,false> >(); break;
+    case parallelSet: run<WorkSetAlgo>();  break;
+    case parallelBarrierCas: run<BarrierAlgo<BSWL,true> >(); break;
+    case parallelBarrier: run<BarrierAlgo<BSWL,false> >(); break;
+    case parallelBarrierInline: run<BarrierAlgo<BSInline,false> >(); break;
+    case parallelUndirected: run<UndirectedAlgo<BSInline,true> >(); break;
+    case detParallelBarrier: run<DetBarrierAlgo<detBase> >(); break;
+    case detDisjointParallelBarrier: run<DetBarrierAlgo<detDisjoint> >(); break;
     default: std::cerr << "Unknown algorithm" << algo << "\n"; abort();
   }
 

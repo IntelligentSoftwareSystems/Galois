@@ -285,6 +285,7 @@ public:
 
   // in the distributed case even with 1 thread there can be aborts
   void operator()() {
+    printf("Host %d starting\n", Distributed::networkHostID);
     if (LL::isLeaderForPackage(LL::getTID()) &&
   //Galois::Runtime::activeThreads > 1 && 
 	ForEachTraits<FunctionTy>::NeedsAborts)

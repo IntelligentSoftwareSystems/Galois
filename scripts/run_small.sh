@@ -2,7 +2,8 @@
 #
 # Small test cases for each benchmark
 
-set -e
+# Die on first failed command
+set -e 
 
 BASE="$(cd $(dirname $0); cd ..; pwd)"
 
@@ -28,16 +29,16 @@ run() {
   fi
 }
 
-run apps/avi/AVIunordered -n 0 -d 2 -f "${BASE}/inputs/avi/squareCoarse.NEU.gz"
+run apps/avi/AVIodgOrdered -n 0 -d 2 -f "${BASE}/inputs/avi/squareCoarse.NEU.gz"
 run apps/barneshut/barneshut -n 1000 -steps 1 -seed 0
-run apps/betweennesscentrality/betweennesscentrality "${BASE}/inputs/structured/torus5.gr"
+run apps/betweennesscentrality/betweennesscentrality "${BASE}/inputs/structured/torus5.gr" -forceVerify
 run apps/bfs/bfs "${BASE}/inputs/structured/rome99.gr"
 run apps/boruvka/boruvka "${BASE}/inputs/structured/rome99.gr"
 run apps/clustering/clustering -numPoints 1000
 run apps/delaunayrefinement/delaunayrefinement "${BASE}/inputs/meshes/r10k.1"
 run apps/delaunaytriangulation/delaunaytriangulation "${BASE}/inputs/meshes/r10k.node"
 run apps/des/DESunordered "${BASE}/inputs/des/multTree6bit.net"
-run apps/gmetis/gmetis "${BASE}/inputs/structured/rome99.gr" 4
+#run apps/gmetis/gmetis "${BASE}/inputs/structured/rome99.gr" 4
 run apps/indpendentset/independentset "${BASE}/inputs/structured/rome99.gr"
 run apps/matching/bipartite-mcm 100 1000 10 0
 run apps/preflowpush/preflowpush "${BASE}/inputs/structured/rome99.gr" 0 100

@@ -80,7 +80,7 @@ struct GNodeIndexer: public std::unary_function<GNode,unsigned int> {
 unsigned int max_dist;
 std::vector<unsigned int> level_count;
 std::deque<unsigned int> read_offset;
-std::deque<Galois::Runtime::LL::CacheLineStorage<unsigned int> > write_offset;
+std::deque<GaloisRuntime::LL::CacheLineStorage<unsigned int> > write_offset;
 //std::deque<unsigned int> write_offset;
 std::vector<GNode> perm;
 
@@ -125,7 +125,7 @@ struct CutHillUnordered {
     }
 
     static void go(GNode source) {
-      using namespace Galois::Runtime::WorkList;
+      using namespace GaloisRuntime::WorkList;
       typedef dChunkedFIFO<64> dChunk;
       typedef ChunkedFIFO<64> Chunk;
       typedef OrderedByIntegerMetric<GNodeIndexer,dChunk> OBIM;

@@ -52,7 +52,7 @@
 namespace Galois {
 namespace Runtime {
 
-  static const bool DEBUG = false;
+  static const bool debug = false;
 
 template <typename Ctxt, typename CtxtCmp>
 class NhoodItem {
@@ -577,7 +577,7 @@ class LCorderedExec {
         Ctxt* src = ctxtLocalQ.get ().front (); ctxtLocalQ.get ().pop_front ();
 
         // GALOIS_DEBUG ("Processing source: %s\n", src->str ().c_str ());
-        if (DEBUG && !sourceTest (src)) {
+        if (debug && !sourceTest (src)) {
           std::cout << "Not found to be a source: " << src->str ()
             << std::endl;
           // abort ();
