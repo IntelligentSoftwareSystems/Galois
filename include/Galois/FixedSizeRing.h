@@ -25,31 +25,71 @@
 
 #include "Galois/LazyArray.h"
 
+#include <boost/iterator/iterator_facade.hpp>
 #include <boost/optional.hpp>
 
 namespace Galois {
 
 template<typename T, unsigned chunksize = 64>
-class FixedSizeRing :private boost::noncopyable {
+class FixedSizeRing: private boost::noncopyable {
+  LazyArray<T, chunksize> datac;
   unsigned start;
   unsigned count;
-  LazyArray<T, chunksize> datac;
 
-  T* at(unsigned i) {
-    return &datac[i];
-  }
+  T* at(unsigned i) { return &datac[i]; }
+  const T* at(unsigned i) const { return &datac[i]; }
 
   bool precondition() const {
     return count <= chunksize && start <= chunksize;
   }
+
+  template<typename U, bool isForward>
+  class Iterator: public boost::iterator_facade<Iterator<U,isForward>, U, boost::forward_traversal_tag> {
+    friend class boost::iterator_core_access;
+    U* base;
+    unsigned cur;
+    unsigned count;
+
+    template<typename OtherTy, bool OtherIsForward>
+    bool equal(const Iterator<OtherTy, OtherIsForward>& o) const {
+      return base + cur == o.base + o.cur && count == o.count;
+    }
+
+    T& dereference() const { return base[cur]; }
+
+    void increment() {
+      if (--count == 0) {
+        base = 0; cur = 0;
+      } else {
+        cur = isForward ? (cur + 1) % chunksize : (cur + chunksize - 1) % chunksize;
+      }
+    }
+
+  public:
+    Iterator(): base(0), cur(0), count(0) { }
+    
+    template<typename OtherTy, bool OtherIsForward>
+    Iterator(const Iterator<OtherTy, OtherIsForward>& o): base(o.base), cur(o.cur), count(o.count) { }
+    
+    Iterator(U* b, unsigned c, unsigned co): base(b), cur(c), count(co) { 
+      if (count == 0) {
+        base = 0;
+        cur = 0;
+      }
+    }
+  };
 
 public:
   typedef T value_type;
   typedef T* pointer;
   typedef T& reference;
   typedef const T& const_reference;
+  typedef Iterator<T, true> iterator;
+  typedef Iterator<const T, true> const_iterator;
+  typedef Iterator<T, false> reverse_iterator;
+  typedef Iterator<const T, false> const_reverse_iterator;
 
-  FixedSizeRing() :start(0), count(0) { }
+  FixedSizeRing(): start(0), count(0) { }
 
   ~FixedSizeRing() {
     clear();
@@ -71,6 +111,12 @@ public:
   }
 
   reference getAt(unsigned x) {
+    assert(precondition());
+    assert(!empty());
+    return *at((start + x) % chunksize);
+  }
+
+  const_reference getAt(unsigned x) const {
     assert(precondition());
     assert(!empty());
     return *at((start + x) % chunksize);
@@ -147,12 +193,12 @@ public:
   }
 
   boost::optional<value_type> extract_front() {
-    boost::optional<value_type> retval;
     if (!empty()) {
-      retval = front();
+      boost::optional<value_type> retval(front());
       pop_front();
+      return retval;
     }
-    return retval;
+    return boost::optional<value_type>();
   }
 
   void pop_front() {
@@ -176,12 +222,12 @@ public:
   }
 
   boost::optional<value_type> extract_back() {
-    boost::optional<value_type> retval;
     if (!empty()) {
-      retval = back();
+      boost::optional<value_type> retval(back());
       pop_back();
+      return retval;
     }
-    return retval;
+    return boost::optional<value_type>();
   }
 
   void pop_back() {
@@ -191,6 +237,16 @@ public:
     datac.destroy(end);
     --count;
   }
+
+  iterator begin() { return iterator(&datac[0], start, count); }
+  iterator end() { return iterator(); }
+  const_iterator begin() const { return const_iterator(&datac[0], start, count); }
+  const_iterator end() const { return const_iterator(); }
+
+  reverse_iterator rbegin() { return reverse_iterator(&datac[0], (start + count - 1) % chunksize, count); }
+  reverse_iterator rend() { return reverse_iterator(); }
+  const_iterator rbegin() const { const_reverse_iterator(&datac[0], (start + count - 1) % chunksize, count); }
+  const_iterator rend() const { const_reverse_iterator(); }
 };
  
 }

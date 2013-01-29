@@ -210,13 +210,13 @@ class StealingQueues : private boost::noncopyable {
     
     std::pair<AtomicChunkLIFO, unsigned>& me = *local.getLocal();
     unsigned id = LL::getTID();
-    unsigned pkg = LL::getPackageForThread(id);
+    unsigned pkg = LL::getPackageForSelf(id);
     unsigned num = Galois::getActiveThreads();
 
     //First steal from this package
     for (unsigned i = 1; i < num; ++i) {
       unsigned eid = (id + i) % num;
-      if (LL::getPackageForThreadInternal(eid) == pkg) {
+      if (LL::getPackageForThread(eid) == pkg) {
 	ChunkHeader* c = me.first.stealHalfAndPop(local.getRemote(eid)->first);
 	if (c)
 	  return c;
@@ -253,10 +253,10 @@ class StealingQueues : private boost::noncopyable {
     return c;
 #endif
     //Leaders can cross package
-    if (LL::isLeaderForPackage(id)) {
+    if (LL::isPackageLeaderForSelf(id)) {
       unsigned eid = (id + me.second) % num;
       ++me.second;
-      if (id != eid && LL::isLeaderForPackageInternal(eid)) {
+      if (id != eid && LL::isPackageLeader(eid)) {
 	ChunkHeader* c = me.first.stealAllAndPop(local.getRemote(eid)->first);
 	if (c)
 	  return c;
@@ -370,9 +370,9 @@ public:
       push_internal(tld, n, *b++);
   }
 
-  template<typename Iter>
-  void push_initial(Iter b, Iter e)  {
-    fill_work(*this, b, e);
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    push(range.local_begin(), range.local_end());
   }
 
   boost::optional<value_type> pop() {
@@ -402,7 +402,7 @@ template<typename QueueTy>
 boost::optional<typename QueueTy::value_type>
 stealHalfInPackage(PerThreadStorage<QueueTy>& queues) {
   unsigned id = LL::getTID();
-  unsigned pkg = LL::getPackageForThread(id);
+  unsigned pkg = LL::getPackageForSelf(id);
   unsigned num = Galois::getActiveThreads();
   QueueTy* me = queues.getLocal();
   boost::optional<typename QueueTy::value_type> retval;
@@ -410,11 +410,11 @@ stealHalfInPackage(PerThreadStorage<QueueTy>& queues) {
   //steal from this package
   //Having 2 loops avoids a modulo, though this is a slow path anyway
   for (unsigned i = id + 1; i < num; ++i)
-    if (LL::getPackageForThreadInternal(i) == pkg)
+    if (LL::getPackageForThread(i) == pkg)
       if ((retval = me->steal(*queues.getRemote(i), true, true)))
 	return retval;
   for (unsigned i = 0; i < id; ++i)
-    if (LL::getPackageForThreadInternal(i) == pkg)
+    if (LL::getPackageForThread(i) == pkg)
       if ((retval = me->steal(*queues.getRemote(i), true, true)))
 	return retval;
   return retval;
@@ -531,10 +531,9 @@ public:
     local.getLocal()->push(b,e);
   }
 
-  template<typename Iter>
-  void push_initial(Iter b, Iter e) {
-    //    fill_work(*this, b, e);
-    fill_work_l1(b,e);
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    fill_work_l1(range.begin(), range.end());
   }
 
   boost::optional<value_type> pop() {
@@ -572,9 +571,9 @@ public:
     local.getLocal()->push(b, e);
   }
 
-  template<typename Iter>
-  void push_initial(Iter b, Iter e) {
-    fill_work(*local.getLocal(), b, e);
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    local.getLocal()->push(range.local_begin(), range.local_end());
   }
 
   boost::optional<value_type> pop() {
@@ -621,7 +620,7 @@ class OwnerComputeChunkedMaster : private boost::noncopyable {
       LevelItem& I = Q.get();
       I.push(C);
     } else {
-      unsigned int mindex = LL::getPackageForThreadInternal(index);
+      unsigned int mindex = LL::getPackageForThread(index);
       LevelItem& I = Q.get(mindex);
       I.push(C);
     }
@@ -702,9 +701,9 @@ public:
       pushi(*b++, n);
   }
 
-  template<typename Iter>
-  void push_initial(Iter b, Iter e) {
-    fill_work(*this, b, e);
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    push(range.local_begin(), range.local_end());
   }
 
   boost::optional<value_type> pop()  {
@@ -743,5 +742,6 @@ GALOIS_WLCOMPILECHECK(OwnerComputeChunkedLIFO)
 
 
 } } }//End namespace
+} // end namespace Galois
 
 #endif

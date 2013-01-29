@@ -555,9 +555,9 @@ public:
 
 template<typename Ty>
 class FSBGaloisAllocator {
-  inline void destruct(char*) {}
-  inline void destruct(wchar_t*) { }
-  template<typename T> inline void destruct(T* t) { t->~T(); }
+  inline void destruct(char*) const {}
+  inline void destruct(wchar_t*) const { }
+  template<typename T> inline void destruct(T* t) const { t->~T(); }
 
   FixedSizeAllocator Alloc;
 
@@ -576,8 +576,8 @@ public:
   FSBGaloisAllocator() throw(): Alloc(sizeof(Ty)) {}
   template <class U> FSBGaloisAllocator (const FSBGaloisAllocator<U>&) throw(): Alloc(sizeof(Ty)) {}
 
-  pointer address(reference val) const { return &val; }
-  const_pointer address(const_reference val) const { return &val; }
+  inline pointer address(reference val) const { return &val; }
+  inline const_pointer address(const_reference val) const { return &val; }
 
   pointer allocate(size_type size) {
     if (size > max_size())
@@ -590,18 +590,18 @@ public:
   }
   
   template<typename TyC>
-  void construct(pointer ptr, const TyC& val) {
+  inline void construct(pointer ptr, const TyC& val) const {
     new (ptr) Ty(val);
   }
 
 #ifdef GALOIS_HAS_RVALUE_REFERENCES
   template<class U, class... Args >
-  void construct(U* p, Args&&... args ) {
+  inline void construct(U* p, Args&&... args ) const {
     ::new((void*)p) U(std::forward<Args>(args)...);
   }
 #endif
   
-  void destroy(pointer ptr) {
+  inline void destroy(pointer ptr) const {
     destruct(ptr);
   }
   
@@ -637,9 +637,9 @@ public:
 
 template<typename Ty, typename AllocTy>
 class ExternRefGaloisAllocator {
-  inline void destruct(char*) {}
-  inline void destruct(wchar_t*) { }
-  template<typename T> inline void destruct(T* t) { t->~T(); }
+  inline void destruct(char*) const {}
+  inline void destruct(wchar_t*) const { }
+  template<typename T> inline void destruct(T* t) const { t->~T(); }
 
 public:
   AllocTy* Alloc; // Should be private except that makes copy hard
@@ -664,8 +664,8 @@ public:
     Alloc = rhs.Alloc;
   }
   
-  pointer address(reference val) const { return &val; }
-  const_pointer address(const_reference val) const { return &val; }
+  inline pointer address(reference val) const { return &val; }
+  inline const_pointer address(const_reference val) const { return &val; }
   
   pointer allocate(size_type size) {
     if (size > max_size())
@@ -677,26 +677,26 @@ public:
     Alloc->deallocate(ptr);
   }
   
-  void construct(pointer ptr, const_reference val) {
+  inline void construct(pointer ptr, const_reference val) const {
     new (ptr) Ty(val);
   }
 
 //#if __GNUC_MINOR__ > 5
 #ifdef GALOIS_HAS_RVALUE_REFERENCES
   template<class U, class... Args >
-  void construct(U* p, Args&&... args ) {
+  inline void construct(U* p, Args&&... args ) const {
     ::new((void*)p) U(std::forward<Args>(args)...);
   }
 #endif
   
-  void destroy(pointer ptr) {
+  void destroy(pointer ptr) const {
     destruct(ptr);
   }
   
   size_type max_size() const throw() { return size_t(-1)/sizeof(Ty); }
 
   template<typename T1,typename A1>
-  bool operator!=(const ExternRefGaloisAllocator<T1,A1>& rhs) {
+  bool operator!=(const ExternRefGaloisAllocator<T1,A1>& rhs) const {
     return Alloc != rhs.Alloc;
   }
 
@@ -704,5 +704,6 @@ public:
 
 }
 }
-}
+} // end namespace Galois
+
 #endif

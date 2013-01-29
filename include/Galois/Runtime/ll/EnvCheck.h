@@ -39,6 +39,6 @@ bool EnvCheck(const char* parm, int& val);
 
 }
 }
-}
+} // end namespace Galois
 
 #endif

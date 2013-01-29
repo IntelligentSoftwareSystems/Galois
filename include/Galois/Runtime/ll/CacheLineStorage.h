@@ -64,6 +64,6 @@ struct CacheLineStorage : public CacheLineImp<T, GALOIS_CACHE_LINE_SIZE % sizeof
 
 }
 }
-}
+} // end namespace Galois
 
 #endif //_CACHE_LINE_STORAGE_H

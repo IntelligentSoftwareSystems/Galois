@@ -143,6 +143,6 @@ public:
 
 }
 }
-}
+} // end namespace Galois
 
 #endif

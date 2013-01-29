@@ -30,3 +30,6 @@ if(USE_EXP)
 	target_link_libraries(galois ${MPI_LIBRARIES})
 endif()
 
+if(USE_SUBVERSION_REVISION)
+  add_dependencies(galois svnversion)
+endif()

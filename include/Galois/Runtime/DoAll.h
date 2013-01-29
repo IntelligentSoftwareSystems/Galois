@@ -28,6 +28,8 @@
 #ifndef GALOIS_RUNTIME_DOALL_H
 #define GALOIS_RUNTIME_DOALL_H
 
+#include "Galois/Runtime/Barrier.h"
+
 namespace Galois {
 namespace Runtime {
 
@@ -38,25 +40,26 @@ struct EmptyFn {
 
 // TODO(ddn): Tune stealing. DMR suffers when stealing is on
 // TODO: add loopname + stats
-template<class FunctionTy, class ReduceFunTy, class IterTy, bool useStealing=false>
+template<class FunctionTy, class ReduceFunTy, class RangeTy, bool useStealing=false>
 class DoAllWork {
+  typedef typename RangeTy::local_iterator local_iterator;
   LL::SimpleLock<true> reduceLock;
   FunctionTy origF;
   FunctionTy outputF;
   ReduceFunTy RF;
   bool needsReduce;
-  IterTy masterBegin;
-  IterTy masterEnd;
+  RangeTy range;
+  GBarrier barrier;
 
   struct SharedState {
-    IterTy stealBegin;
-    IterTy stealEnd;
+    local_iterator stealBegin;
+    local_iterator stealEnd;
     LL::SimpleLock<true> stealLock;
   };
 
   struct PrivateState {
-    IterTy begin;
-    IterTy end;
+    local_iterator begin;
+    local_iterator end;
     FunctionTy F;
     PrivateState(FunctionTy& o) :F(o) {}
   };
@@ -65,7 +68,7 @@ class DoAllWork {
 
   //! Master execution function for this loop type
   void processRange(PrivateState& tld) {
-    for ( ; tld.begin != tld.end; ++tld.begin)
+    for (; tld.begin != tld.end; ++tld.begin)
       tld.F(*tld.begin);
   }
 
@@ -117,20 +120,25 @@ class DoAllWork {
   }
 
 public:
-
-  DoAllWork(const FunctionTy& F, const ReduceFunTy& R, bool needsReduce, IterTy begin, IterTy end)
-    : origF(F), outputF(F), RF(R), needsReduce(needsReduce), masterBegin(begin), masterEnd(end)
-  {}
+  DoAllWork(const FunctionTy& F, const ReduceFunTy& R, bool needsReduce, RangeTy r)
+    : origF(F), outputF(F), RF(R), needsReduce(needsReduce), range(r)
+  {
+    barrier.reinit(activeThreads);
+  }
 
   void operator()() {
     //Assume the copy constructor on the functor is readonly
     PrivateState thisTLD(origF);
-    std::pair<IterTy, IterTy> r = Galois::block_range(masterBegin, masterEnd, LL::getTID(), activeThreads);
-    thisTLD.begin = r.first;
-    thisTLD.end = r.second;
+    thisTLD.begin = range.local_begin();
+    thisTLD.end = range.local_end();
 
-    if (useStealing)
+    if (useStealing) {
       populateSteal(thisTLD, *TLDS.getLocal());
+
+      // threads could start stealing from other threads whose
+      // range has not been initialized yet
+      barrier.wait();
+    }
 
     do {
       processRange(thisTLD);
@@ -140,16 +148,13 @@ public:
   }
 
   FunctionTy getFn() const { return outputF; }
-
 };
 
-template<typename IterTy, typename FunctionTy, typename ReducerTy>
-FunctionTy do_all_impl_dispatch(IterTy b, IterTy e, FunctionTy f, ReducerTy r, bool needsReduce, std::random_access_iterator_tag) {
-  //typedef typename FunctionTy::Error Error;
-  // Still have no work stealing because some do_all loops are actually
-  // placing data.
-  // TODO: differentiate calls
-  DoAllWork<FunctionTy, ReducerTy, IterTy, false> W(f, r, needsReduce, b, e);
+template<typename RangeTy, typename FunctionTy, typename ReducerTy>
+FunctionTy do_all_impl_dispatch(RangeTy range, FunctionTy f, ReducerTy r, bool needsReduce, std::random_access_iterator_tag) {
+  // Still have no work stealing because some do_all loops are actually placing data.
+  // TODO: differentiate calls or alternatively enrich Range objects to do the right thing
+  DoAllWork<FunctionTy, ReducerTy, RangeTy, false> W(f, r, needsReduce, range);
 
   RunCommand w[2] = {std::ref(W),
 		     std::ref(getSystemBarrier())};
@@ -157,9 +162,9 @@ FunctionTy do_all_impl_dispatch(IterTy b, IterTy e, FunctionTy f, ReducerTy r, b
   return W.getFn();
 }
 
-template<typename IterTy, typename FunctionTy, typename ReducerTy>
-FunctionTy do_all_impl_dispatch(IterTy b, IterTy e, FunctionTy f, ReducerTy r, bool needsReduce, std::input_iterator_tag) {
-  DoAllWork<FunctionTy, ReducerTy, IterTy, false> W(f, r, needsReduce, b, e);
+template<typename RangeTy, typename FunctionTy, typename ReducerTy>
+FunctionTy do_all_impl_dispatch(RangeTy range, FunctionTy f, ReducerTy r, bool needsReduce, std::input_iterator_tag) {
+  DoAllWork<FunctionTy, ReducerTy, RangeTy, false> W(f, r, needsReduce, range);
 
   RunCommand w[2] = {std::ref(W),
 		     std::ref(getSystemBarrier())};
@@ -167,30 +172,40 @@ FunctionTy do_all_impl_dispatch(IterTy b, IterTy e, FunctionTy f, ReducerTy r, b
   return W.getFn();
 }
 
-template<typename IterTy, typename FunctionTy, typename ReducerTy>
-FunctionTy do_all_impl(IterTy b, IterTy e, FunctionTy f, ReducerTy r, bool needsReduce) {
-  assert(!inGaloisForEach);
-  inGaloisForEach = true;
+template<typename RangeTy, typename FunctionTy, typename ReducerTy>
+FunctionTy do_all_impl(RangeTy range, FunctionTy f, ReducerTy r, bool needsReduce) {
+  if (Galois::Runtime::inGaloisForEach) {
+    return std::for_each(range.begin(), range.end(), f);
+  } else {
+    inGaloisForEach = true;
 
-  typename std::iterator_traits<IterTy>::iterator_category category;
-  FunctionTy retval(do_all_impl_dispatch(b, e, f, r, needsReduce, category));
+    typename std::iterator_traits<typename RangeTy::local_iterator>::iterator_category category;
+    FunctionTy retval(do_all_impl_dispatch(range, f, r, needsReduce, category));
 
-  inGaloisForEach = false;
+    inGaloisForEach = false;
 
-  return retval;
+    return retval;
+  }
 }
 
-template <bool steal_tp, typename IterTy, typename FunctionTy>
-void do_all_impl (IterTy b, IterTy e, FunctionTy f, const char* loopname=0) {
+//! Backdoor function to enable stealing in do_all
+template<bool Steal, typename IterTy, typename FunctionTy>
+void do_all_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname=0) {
+  if (Galois::Runtime::inGaloisForEach) {
+    std::for_each(b, e, f);
+  } else {
+    inGaloisForEach = true;
 
-  DoAllWork<FunctionTy, EmptyFn, IterTy, steal_tp> W(f, EmptyFn (), false, b, e);
-
+    typedef StandardRange<IterTy> Range;
+    DoAllWork<FunctionTy, EmptyFn, Range, Steal> W(f, EmptyFn(), false, makeStandardRange(b, e));
     RunCommand w[2] = {std::ref(W),
-           std::ref(getSystemBarrier())};
+		       std::ref(getSystemBarrier())};
     getSystemThreadPool().run(&w[0], &w[2], activeThreads);
+    inGaloisForEach = false;
+  }
 }
 
-} //namespace Runtime
-} //namespace Galois
+} // end namespace Runtime
+} // end namespace Galois
 
 #endif // GALOIS_RUNTIME_DOALL_H

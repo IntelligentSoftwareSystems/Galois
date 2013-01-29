@@ -55,127 +55,6 @@ namespace Galois {
 namespace Runtime {
 namespace WorkList {
 
-template<class T=int, bool concurrent = true>
-class StaticAssignment : private boost::noncopyable {
-  typedef Galois::Bag<T> BagTy;
-
-  struct TLD {
-    BagTy bags[2];
-    unsigned round;
-    TLD(): round(0) { }
-  };
-
-  Galois::Runtime::PerThreadStorage<TLD> tlds;
-
-  pthread_barrier_t barrier1;
-  pthread_barrier_t barrier2;
-  unsigned numActive;
-  volatile bool empty;
-
-  //! Redistribute work among threads, returns whether there is any work left
-  bool redistribute() {
-    // TODO(ddn): avoid copying by implementing Bag::splice(iterator b, iterator e)
-    BagTy bag;
-    unsigned round = tlds.get().round;
-    
-    for (unsigned i = 0; i < numActive; ++i) {
-      BagTy& o = tlds.get(i).bags[round];
-      bag.splice(o);
-    }
-
-    size_t total = bag.size();
-    size_t blockSize = (total + numActive - 1) / numActive;
-
-    if (!total)
-      return false;
-
-    typename BagTy::iterator b = bag.begin();
-    typename BagTy::iterator e = b;
-    
-    if (blockSize < total)
-      std::advance(e, blockSize);
-    else
-      e = bag.end();
-
-    for (size_t i = 0, size = blockSize; i < numActive; ++i, size += blockSize) {
-      BagTy& o = tlds.get(i).bags[round];
-      std::copy(b, e, std::back_inserter(o));
-      b = e;
-      if (size + blockSize < total)
-        std::advance(e, blockSize);
-      else
-        e = bag.end();
-    }
-
-    return true;
-  }
-
- public:
-  typedef T value_type;
-
-  template<bool newconcurrent>
-  struct rethread {
-    typedef StaticAssignment<T,newconcurrent> WL;
-  };
-  template<typename Tnew>
-  struct retype {
-    typedef StaticAssignment<Tnew,concurrent> WL;
-  };
-
-  StaticAssignment(): empty(false) {
-    numActive = Galois::getActiveThreads();
-    pthread_barrier_init(&barrier1, NULL, numActive);
-    pthread_barrier_init(&barrier2, NULL, numActive);
-  }
-
-  ~StaticAssignment() {
-    pthread_barrier_destroy(&barrier1);
-    pthread_barrier_destroy(&barrier2);
-  }
-
-  void push(value_type val) {
-    TLD& tld = tlds.get();
-    tld.bags[(tld.round + 1) & 1].push_back(val);
-  }
-
-  template<typename ItTy>
-  void push(ItTy b, ItTy e) {
-    while (b != e)
-      push(*b++);
-  }
-
-  template<typename ItTy>
-  void push_initial(ItTy b, ItTy e) {
-    while (b != e)
-      push(*b++);
-    TLD& tld = tlds.get();
-    tld.round = (tld.round + 1) & 1;
-  }
-
-  boost::optional<value_type> pop() {
-    TLD& tld = tlds.get();
-    while (true) {
-      if (empty) {
-        return boost::optional<value_type>();
-      }
-
-      if (!tld.bags[tld.round].empty()) {
-        boost::optional<value_type> r(tld.bags[tld.round].back());
-        tld.bags[tld.round].pop_back();
-        return r;
-      }
-
-      pthread_barrier_wait(&barrier1);
-      tld.round = (tld.round + 1) & 1;
-      if (Galois::Runtime::LL::getTID() == 0) {
-        empty = !redistribute();
-      }
-      pthread_barrier_wait(&barrier2);
-    }
-  }
-};
-GALOIS_WLCOMPILECHECK(StaticAssignment)
-
 template<class T, class Indexer = DummyIndexer<T>, typename ContainerTy = FIFO<T>, bool concurrent=true >
 class ApproxOrderByIntegerMetric : private boost::noncopyable {
   typename ContainerTy::template rethread<concurrent>::WL data[2048];
@@ -214,10 +93,9 @@ public:
       push(*b++);
   }
 
-  template<typename ItTy>
-  void push_initial(ItTy b, ItTy e) {
-    while (b != e)
-      push(*b++);
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    push(range.local_begin(), range.local_end());
   }
 
   boost::optional<value_type> pop() {
@@ -280,10 +158,9 @@ public:
       push(*b++);
   }
 
-  template<typename ItTy>
-  void push_initial(ItTy b, ItTy e) {
-    while (b != e)
-      push(*b++);
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    push(range.local_begin(), range.local_end());
   }
 
   boost::optional<value_type> pop() {
@@ -345,10 +222,9 @@ public:
       globalQ.push(*b++);
   }
 
-  template<typename ItTy>
-  void push_initial(ItTy b, ItTy e) {
-    while (b != e)
-      push(*b++);
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    push(range.local_begin(), range.local_end());
   }
 
   boost::optional<value_type> pop() {
@@ -477,10 +353,9 @@ public:
       push(*b++);
   }
 
-  template<typename ItTy>
-  void push_initial(ItTy b, ItTy e) {
-    while (b != e)
-      push(*b++);
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    push(range.local_begin(), range.local_end());
   }
 
   boost::optional<value_type> pop() {
@@ -546,10 +421,9 @@ public:
       push(*b++);
   }
 
-  template<typename ItTy>
-  void push_initial(ItTy b, ItTy e) {
-    while (b != e)
-      push(*b++);
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    push(range.local_begin(), range.local_end());
   }
 
   boost::optional<value_type> pop() {
@@ -1273,10 +1147,9 @@ public:
       push(*b++);
   }
 
-  template<typename ItTy>
-  void push_initial(ItTy b, ItTy e) {
-    while (b != e)
-      push(*b++);
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    push(range.local_begin(), range.local_end());
   }
 
   boost::optional<value_type> pop() {
@@ -1328,10 +1201,9 @@ public:
       push(*b++);
   }
 
-  template<typename ItTy>
-  void push_initial(ItTy b, ItTy e) {
-    while (b != e)
-      push(*b++);
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    push(range.local_begin(), range.local_end());
   }
 
   boost::optional<value_type> pop() {
@@ -1378,9 +1250,9 @@ public:
     return true;
   }
 
-  template<typename Iter>
-  void push_initial(Iter b, Iter e) {
-    push(b,e);
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    push(range.local_begin(), range.local_end());
   }
 
   boost::optional<value_type> pop() {
@@ -1424,10 +1296,10 @@ public:
     unlock();
   }
 
-  template<typename Iter>
-  void push_initial(Iter b, Iter e) {
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
     if (LL::getTID() == 0)
-      push(b,e);
+      push(range.begin(), range.end());
   }
 
   boost::optional<value_type> pop() {
@@ -1472,9 +1344,9 @@ public:
     return true;
   }
 
-  template<typename Iter>
-  void push_initial(Iter b, Iter e) {
-    push(b,e);
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    push(range.local_begin(), range.local_end());
   }
 
   boost::optional<value_type> pop() {
@@ -1542,10 +1414,9 @@ class SimpleOrderedByIntegerMetric : private boost::noncopyable, private Galois:
     return true;
   }
 
-  template<typename ItTy>
-  void push_initial(ItTy b, ItTy e) {
-    while (b != e)
-      push(*b++);
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    push(range.local_begin(), range.local_end());
   }
 
   boost::optional<value_type> pop() {
@@ -1659,9 +1530,9 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
       push(*b++);
   }
 
-  template<typename ItTy>
-  void push_initial(ItTy b, ItTy e) {
-    fill_work(*this, b, e);
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    push(range.local_begin(), range.local_end());
   }
 
   boost::optional<value_type> pop() {
@@ -1674,7 +1545,7 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
 
     //Failed, find minimum bin
     unsigned myID = LL::getTID();
-    bool localLeader = LL::isLeaderForPackage(myID);
+    bool localLeader = LL::isPackageLeaderForSelf(myID);
 
     unsigned msS = 0;
     if (BSP) {
@@ -1764,10 +1635,9 @@ class BarrierOBIM : private boost::noncopyable {
       push(*b++);
   }
 
-  template<typename ItTy>
-  void push_initial(ItTy b, ItTy e) {
-    while (b != e)
-      push(*b++);
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    push(range.local_begin(), range.local_end());
   }
 
   boost::optional<value_type> pop() {
@@ -1837,10 +1707,9 @@ public:
       push(*b++);
   }
 
-  template<typename ItTy>
-  void push_initial(ItTy b, ItTy e) {
-    while (b != e)
-      push(*b++);
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    push(range.local_begin(), range.local_end());
   }
 
   boost::optional<value_type> pop() {
@@ -1901,10 +1770,9 @@ public:
       wl.push(*b++);
   }
 
-  template<typename ItTy>
-  void push_initial(ItTy b, ItTy e) {
-    while (b != e)
-      wl.push(*b++);
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    wl.push(range.local_begin(), range.local_end());
   }
 
   boost::optional<value_type> pop() {
@@ -1987,9 +1855,9 @@ public:
     }
   }
 
-  template<typename ItTy>
-  void push_initial(ItTy b, ItTy e) {
-    fill_work(*this, b, e);
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    push(range.local_begin(), range.local_end());
   }
 
   boost::optional<value_type> pop() {
@@ -2033,9 +1901,9 @@ public:
       push(*b++);
   }
 
-  template<typename ItTy>
-  void push_initial(ItTy b, ItTy e) {
-    fill_work(*this, b, e);
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    push(range.local_begin(), range.local_end());
   }
 
   boost::optional<value_type> pop() {
@@ -2076,9 +1944,9 @@ public:
       push(*b++);
   }
 
-  template<typename ItTy>
-  void push_initial(ItTy b, ItTy e) {
-    fill_work(*this,b,e);
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    push(range.local_begin(), range.local_end());
   }
 
   boost::optional<value_type> pop() {
@@ -2104,122 +1972,6 @@ class STbb: public AbstractWorkList<T,false> { };
 template<class Compare = std::less<int>, typename T = int>
 class TbbPriQueue: public AbstractWorkList<T,false> { };
 #endif //TBB
-
-template<class T=int, bool concurrent = true>
-class StaticPartitioning : private boost::noncopyable {
-  typedef Galois::Bag<T> BagTy;
-
-  struct TLD {
-    BagTy bags[2];
-    unsigned round;
-    TLD(): round(0) { }
-  };
-
-  Galois::Runtime::PerThreadStorage<TLD> tlds;
-
-  Galois::Runtime::GBarrier barrier1;
-  Galois::Runtime::GBarrier barrier2;
-  unsigned numActive;
-  volatile bool empty;
-
-  //! Redistribute work among threads, returns whether there is any work left
-  bool redistribute() {
-    // TODO(ddn): avoid copying by implementing Bag::splice(iterator b, iterator e)
-    BagTy bag;
-    unsigned round = tlds.get().round;
-    
-    for (unsigned i = 0; i < numActive; ++i) {
-      BagTy& o = tlds.get(i).bags[round];
-      bag.splice(o);
-    }
-
-    size_t total = bag.size();
-    size_t blockSize = (total + numActive - 1) / numActive;
-
-    if (!total)
-      return false;
-
-    typename BagTy::iterator b = bag.begin();
-    typename BagTy::iterator e = b;
-    
-    if (blockSize < total)
-      std::advance(e, blockSize);
-    else
-      e = bag.end();
-
-    for (size_t i = 0, size = blockSize; i < numActive; ++i, size += blockSize) {
-      BagTy& o = tlds.get(i).bags[round];
-      std::copy(b, e, std::back_inserter(o));
-      b = e;
-      if (size + blockSize < total)
-        std::advance(e, blockSize);
-      else
-        e = bag.end();
-    }
-
-    return true;
-  }
-
- public:
-  typedef T value_type;
-
-  template<bool newconcurrent>
-  struct rethread {
-    typedef StaticPartitioning<T,newconcurrent> WL;
-  };
-  template<typename Tnew>
-  struct retype {
-    typedef StaticPartitioning<Tnew,concurrent> WL;
-  };
-
-  StaticPartitioning(): empty(false) {
-    numActive = Galois::getActiveThreads();
-    barrier1.reinit(numActive);
-    barrier2.reinit(numActive);
-  }
-
-  void push(value_type val) {
-    TLD& tld = tlds.get();
-    tld.bags[(tld.round + 1) & 1].push_back(val);
-  }
-
-  template<typename ItTy>
-  void push(ItTy b, ItTy e) {
-    while (b != e)
-      push(*b++);
-  }
-
-  template<typename ItTy>
-  void push_initial(ItTy b, ItTy e) {
-    while (b != e)
-      push(*b++);
-    TLD& tld = tlds.get();
-    tld.round = (tld.round + 1) & 1;
-  }
-
-  boost::optional<value_type> pop() {
-    TLD& tld = tlds.get();
-    while (true) {
-      if (empty) {
-        return boost::optional<value_type>();
-      }
-
-      if (!tld.bags[tld.round].empty()) {
-        boost::optional<value_type> r(tld.bags[tld.round].back());
-        tld.bags[tld.round].pop_back();
-        return r;
-      }
-
-      barrier1.wait();
-      tld.round = (tld.round + 1) & 1;
-      if (Galois::Runtime::LL::getTID() == 0) {
-        empty = !redistribute();
-      }
-      barrier2.wait();
-    }
-  }
-};
-GALOIS_WLCOMPILECHECK(StaticPartitioning)
 
 namespace Alt {
 
@@ -2355,7 +2107,7 @@ public:
       return ret;
     
     //steal
-    int id = LL::getPackageForThread(LL::getTID());
+    int id = LL::getPackageForSelf(LL::getTID());
     for (int i = 0; i < (int) local.size(); ++i) {
       ++id;
       id %= local.size();
@@ -2455,8 +2207,12 @@ public:
     }
   }
 
-  template<typename Iter>
-  void push_initial(Iter b, Iter e)  {
+  template<typename RangeTy>
+  void push_initial(RangeTy range) {
+    typedef typename RangeTy::local_iterator iterator;
+    iterator b = range.local_begin();
+    iterator e = range.local_end();
+
     while (b != e) {
       ChunkTy* n = mkChunk();
       b = n->push(b,e);

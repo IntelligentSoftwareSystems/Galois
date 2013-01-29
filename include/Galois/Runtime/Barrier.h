@@ -94,12 +94,11 @@ public:
 class FasterBarrier {
   volatile unsigned count;
   unsigned P;
-  bool sense;
   PerThreadStorage<volatile bool> local_sense;
 
 public:
-  FasterBarrier() :count(~0), P(~0), sense(true) {}
-  explicit FasterBarrier(unsigned int val): count(~0), P(~0), sense(true) {
+  FasterBarrier() :count(~0), P(~0) {}
+  explicit FasterBarrier(unsigned int val): count(~0), P(~0) {
     reinit(val);
   }
 
@@ -197,6 +196,6 @@ typedef StupidDistBarrier GBarrier;
 GBarrier& getSystemBarrier();
 
 }
-}
+} // end namespace Galois
 
 #endif

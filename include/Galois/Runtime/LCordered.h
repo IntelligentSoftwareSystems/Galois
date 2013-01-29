@@ -29,30 +29,28 @@
 #define GALOIS_RUNTIME_LC_ORDERED_H
 
 #include "Galois/Accumulator.h"
-#include "Galois/Timer.h"
 #include "Galois/Atomic.h"
 #include "Galois/gdeque.h"
 #include "Galois/PriorityQueue.h"
+#include "Galois/Timer.h"
 
-
+#include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/DoAll.h"
 #include "Galois/Runtime/ParallelWork.h"
 #include "Galois/Runtime/PerThreadWorkList.h"
-#include "Galois/Runtime/mm/Mem.h"
-#include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/ll/ThreadRWlock.h"
+#include "Galois/Runtime/mm/Mem.h"
 
 #include "llvm/ADT/SmallVector.h"
 
 #include <iostream>
 #include <tr1/unordered_map>
 
-
 namespace Galois {
 namespace Runtime {
 
-  static const bool debug = false;
+static const bool debug = false;
 
 template <typename Ctxt, typename CtxtCmp>
 class NhoodItem {
@@ -596,7 +594,7 @@ class LCorderedExec {
 
         // for (typename AddWL::local_iterator a = addWL.get ().begin ()
             // , enda = addWL.get ().end (); a != enda; ++a) {
-        for (typename UserCtx::pushBufferTy::iterator a = userCtx.getPushBuffer ().begin ()
+        for (typename UserCtx::PushBufferTy::iterator a = userCtx.getPushBuffer ().begin ()
             , enda = userCtx.getPushBuffer ().end (); a != enda; ++a) {
           
 
@@ -714,7 +712,8 @@ public:
     // TODO: code to find global min goes here
 
     t_for.start ();
-    Galois::Runtime::for_each_impl<SrcWL_ty> (initSrc.begin_all (), initSrc.end_all (),
+    Galois::Runtime::for_each_impl<SrcWL_ty> (
+        Galois::Runtime::makeStandardRange( initSrc.begin_all (), initSrc.end_all ()),
         ApplyOperator (
           operFunc,
           nhoodVisitor,
@@ -791,5 +790,6 @@ void for_each_ordered_lc (AI abeg, AI aend, Cmp cmp, NhoodFunc nhoodVisitor, Ope
 }
 
 }
-}
+} // end namespace Galois
+
 #endif //  GALOIS_RUNTIME_LC_ORDERED_H

@@ -45,7 +45,7 @@ public:
 };
 
 }
-}
+} // end namespace Galois
 
 #endif //GALOIS_RUNTIME_LOOPHOOKS_H
 

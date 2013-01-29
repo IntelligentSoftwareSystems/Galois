@@ -93,6 +93,6 @@ void UnLockPairOrdered(SimpleLock<false>& L1, SimpleLock<false>& L2);
 
 }
 }
-}
+} // end namespace Galois
 
 #endif

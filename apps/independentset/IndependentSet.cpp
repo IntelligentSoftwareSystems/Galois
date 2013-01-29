@@ -191,7 +191,7 @@ struct Compare {
 struct GaloisAlgo {
   void operator()() {
 #ifdef GALOIS_USE_EXP
-    typedef Galois::Runtime::WorkList::BulkSynchronousInline<false> WL;
+    typedef Galois::Runtime::WorkList::BulkSynchronousInline<> WL;
 #else
     typedef Galois::Runtime::WorkList::dChunkedFIFO<256> WL;
 #endif
@@ -277,8 +277,8 @@ int main(int argc, char** argv) {
     graph.getData(*ii).id = id;
   
   // XXX Test if this matters
-  Galois::preAlloc(numThreads + (graph.size() * sizeof(Node) * numThreads / 8) / GaloisRuntime::MM::pageSize);
-  //Galois::Statistic("MeminfoPre", GaloisRuntime::MM::pageAllocInfo());
+  Galois::preAlloc(numThreads + (graph.size() * sizeof(Node) * numThreads / 8) / Galois::Runtime::MM::pageSize);
+  //Galois::Statistic("MeminfoPre", Galois::Runtime::MM::pageAllocInfo());
   Galois::StatTimer T;
   T.start();
   switch (algo) {
@@ -286,7 +286,7 @@ int main(int argc, char** argv) {
     default: GaloisAlgo()(); break;
   }
   T.stop();
-  //Galois::Statistic("MeminfoPost", GaloisRuntime::MM::pageAllocInfo());
+  //Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
 
   std::cout << "Cardinality of maximal independent set: " 
     << Galois::ParallelSTL::count_if(graph.begin(), graph.end(), is_matched()) 

@@ -23,21 +23,12 @@
 
 #include "Galois/Runtime/ParallelWork.h"
 
-using namespace Galois::Runtime;
-//using namespace DIR;
-
-//bool Galois::Runtime::distributed_foreach = false;
-//NodeRequest Galois::Runtime::DIR::nr;
-//unordered_map<Pair,void*,HashFunction,SetEqual>    Galois::Runtime::DIR::hash_table;
-//unordered_map<Pair,locData*,HashFunction,SetEqual> Galois::Runtime::sent_hash;
-//unordered_map<Pair,void*,HashFunction,SetEqual>    Galois::Runtime::recv_hash;
-
 unsigned int Galois::Runtime::activeThreads = 1;
 
 void Galois::Runtime::preAlloc_impl(int num) {
   int a = activeThreads;
   a = (num + a - 1) / a;
   RunCommand w[2] = {std::bind(Galois::Runtime::MM::pagePreAlloc, a),
-				    std::ref(getSystemBarrier())};
+		     std::ref(getSystemBarrier())};
   getSystemThreadPool().run(&w[0], &w[2], activeThreads);
 }

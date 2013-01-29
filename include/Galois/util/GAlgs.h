@@ -20,6 +20,10 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
+#ifndef GALOIS_UTIL_GALGS_H
+#define GALOIS_UTIL_GALGS_H
+
+#include <iterator>
 
 namespace Galois {
 
@@ -84,3 +88,4 @@ void uninitialized_destroy ( InputIterator first, InputIterator last )
 }
 
 }
+#endif

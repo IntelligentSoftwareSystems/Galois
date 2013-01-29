@@ -47,10 +47,10 @@ protected:
   }
 
   //! push stuff
-  typedef gdeque<T> pushBufferTy;
-  pushBufferTy pushBuffer;
+  typedef gdeque<T> PushBufferTy;
+  PushBufferTy pushBuffer;
 
-  pushBufferTy& __getPushBuffer() {
+  PushBufferTy& __getPushBuffer() {
     return pushBuffer;
   }
   

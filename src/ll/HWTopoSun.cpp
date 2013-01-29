@@ -99,11 +99,11 @@ unsigned Galois::Runtime::LL::getMaxPackageForThread(int id) {
   return A.numPackages - 1;
 }
 
-unsigned Galois::Runtime::LL::getPackageForThreadInternal(int id) {
+unsigned Galois::Runtime::LL::getPackageForThread(int id) {
   return 0;
 }
 
-bool Galois::Runtime::LL::isLeaderForPackageInternal(int id) {
+bool Galois::Runtime::LL::isPackageLeader(int id) {
   return id == 0;
 }
 

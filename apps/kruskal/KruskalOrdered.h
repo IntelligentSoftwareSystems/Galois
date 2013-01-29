@@ -28,54 +28,53 @@
 #ifndef KRUSKAL_ORDERED_H
 #define KRUSKAL_ORDERED_H
 
-#include "Galois/Atomic.h"
-#include "Galois/Accumulator.h"
-#include "Galois/Runtime/PerThreadWorkList.h"
-
 #include "Kruskal.h"
 #include "KruskalParallel.h"
 
 namespace kruskal {
 
 
-void runKruskalDet (
-    EdgeWL& perThrdWL, 
-    VecRep& repVec, 
-    VecAtomicInt& minEdgeIDVec, 
-    const VecEdge& edges, 
-    size_t& mstWeight, 
-    size_t& totalIter,
-    Accumulator& findIter,
-    Accumulator& linkUpIter) {
+struct UnionFindUsingRuntime {
+  void operator () (
+      EdgeCtxWL& perThrdWL, 
+      VecRep_ty& repVec, 
+      VecAtomicCtxPtr& repOwnerCtxVec, 
+      size_t& mstWeight, 
+      size_t& totalIter,
+      Galois::TimeAccumulator& sortTimer,
+      Galois::TimeAccumulator& findTimer,
+      Galois::TimeAccumulator& linkUpTimer,
+      Accumulator& findIter,
+      Accumulator& linkUpIter) const {
 
-  EdgeWL* nextWL = NULL;
-  Accumulator mstSum;
-  
 
-  Galois::for_each_ordered (perThrdWL.begin_all (), perThrdWL.end_all (),
+    EdgeCtxWL* nextWL = NULL; // not used actually
+    Accumulator mstSum;
+
+    Galois::for_each_ordered (perThrdWL.begin_all (), perThrdWL.end_all (),
         Edge::Comparator (),
-        FindLoop (repVec, minEdgeIDVec, edges, findIter),
-        LinkUpLoop<true> (repVec, minEdgeIDVec, *nextWL, mstSum, linkUpIter));
+        FindLoop (repVec, repOwnerCtxVec, findIter),
+        LinkUpLoop<true> (repVec, repOwnerCtxVec, *nextWL, mstSum, linkUpIter));
 
 
-  totalIter += findIter.reduce ();
-  mstWeight += mstSum.reduce ();
+    totalIter += findIter.reduce ();
+    mstWeight += mstSum.reduce ();
 
 
-}
+  }
+};
 
 
 
 class KruskalOrdered: public Kruskal {
   protected:
-  // static const double EDGE_FRAC = 4/3;
 
-  virtual const std::string getVersion () const { return "Parallel Ordered Runtime Kruskal"; }
+  virtual const std::string getVersion () const { return "Parallel Kruskal using Ordered Runtime"; }
 
   virtual void runMST (const size_t numNodes, const VecEdge& edges,
       size_t& mstWeight, size_t& totalIter) {
 
-    runMSTparallel (numNodes, edges, mstWeight, totalIter, &runKruskalDet);
+    runMSTsimple (numNodes, edges, mstWeight, totalIter, UnionFindUsingRuntime ());
 
   }
 };

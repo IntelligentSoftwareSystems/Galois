@@ -31,7 +31,6 @@
 #include "Galois/Atomic.h"
 
 #include "Galois/Runtime/PerThreadWorkList.h"
-#include "Galois/Runtime/DoAllCoupled.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 
@@ -40,7 +39,6 @@
 #include <queue>
 
 #include <cassert>
-
 
 #include "abstractMain.h"
 #include "SimInit.h"

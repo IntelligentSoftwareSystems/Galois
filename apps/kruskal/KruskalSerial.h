@@ -37,16 +37,11 @@ protected:
 
   virtual const std::string getVersion () const { return "Serial Ordered Kruskal"; }
 
-  virtual void runMST (const size_t numNodes, const VecEdge& edges,
-      size_t& mstWeight, size_t& totalIter) {
-
-    runMSTsplit (numNodes, edges, mstWeight, totalIter);
-    // runMSTsimple (numNodes, edges, mstWeight, totalIter);
-  }
 
   virtual void runMSTsplit (const size_t numNodes, const VecEdge& in_edges,
       size_t& mstWeight, size_t& totalIter) {
 
+    Galois::TimeAccumulator t_run;
     Galois::TimeAccumulator t_init;
     Galois::TimeAccumulator t_sort;
     Galois::TimeAccumulator t_loop;
@@ -56,6 +51,7 @@ protected:
     VecRep repVec (numNodes, -1);
     t_init.stop ();
 
+    t_run.start ();
 
     // size_t splitSize = EDGE_FRAC * numNodes;
     size_t splitSize = numNodes;
@@ -131,7 +127,10 @@ protected:
     mstWeight = mstSum;
     totalIter = iter;
 
-    std::cout << "Copying/Initialization time: " << t_init.get () << std::endl;
+    t_run.stop ();
+
+    std::cout << "Running time excluding initialization and destruction: " << t_run.get () << std::endl;
+    std::cout << "Initialization time: " << t_init.get () << std::endl;
     std::cout << "Sorting time: " << t_sort.get () << std::endl;
     std::cout << "Loop time: " << t_loop.get () << std::endl;
 
@@ -141,7 +140,8 @@ protected:
       size_t& mstWeight, size_t& totalIter) {
 
 
-    Galois::StatTimer t_init("initialization and copy: ");
+    Galois::StatTimer t_run("Running time excluding initialization & destruction: ");
+    Galois::StatTimer t_init("initialization time: ");
     Galois::StatTimer t_sort("serial sorting time: ");
     Galois::StatTimer t_loop("serial loop time: ");
 
@@ -152,6 +152,7 @@ protected:
 
 
 
+    t_run.start ();
 
     t_sort.start ();
     std::sort (edges.begin (), edges.end (), Edge::Comparator ());
@@ -183,6 +184,13 @@ protected:
 
     t_loop.stop ();
 
+    t_run.stop ();
+  }
+
+  virtual void runMST (const size_t numNodes, const VecEdge& edges,
+      size_t& mstWeight, size_t& totalIter) {
+
+    runMSTsplit (numNodes, edges, mstWeight, totalIter);
   }
 
 };

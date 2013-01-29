@@ -41,5 +41,6 @@ static inline void checkWrite(int m) {
 }
 
 }
-}
+} // end namespace Galois
+
 #endif //GALOIS_RUNTIME_METHODFLAGS_H

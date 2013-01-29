@@ -86,7 +86,7 @@ class Lockable {
   friend class Distributed::LocalDirectory;
   friend class Distributed::RemoteDirectory;
   template <typename, typename>
-  friend struct Galois::Runtime::DeterministicWork::DeterministicContext;
+    friend struct Galois::Runtime::DeterministicWork::DeterministicContext;
 public:
   LL::PtrLock<void, true> auxPtr;
   Lockable() :next(0) {}
@@ -203,9 +203,7 @@ void signalConflict();
 
 void forceAbort();
 
-} //Runtime
-} //Galois
-
-
+}
+} // end namespace Galois
 
 #endif

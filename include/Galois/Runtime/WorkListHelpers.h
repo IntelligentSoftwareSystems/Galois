@@ -29,23 +29,49 @@
 
 #include "ll/PtrLock.h"
 
+#include <boost/iterator/iterator_facade.hpp>
 #include <boost/optional.hpp>
 
 namespace Galois {
 namespace Runtime {
 namespace WorkList {
 
+template<typename T>
+class ConExtListNode {
+  T* NextPtr;
+public:
+  ConExtListNode() :NextPtr(0) {}
+  T*& getNextPtr() { return NextPtr; }
+  T*const& getNextPtr() const { return NextPtr; }
+};
+
+template<typename T>
+class ConExtIterator: public boost::iterator_facade<
+                      ConExtIterator<T>, T, boost::forward_traversal_tag> {
+  friend class boost::iterator_core_access;
+  T* at;
+
+  template<typename OtherTy>
+  bool equal(const ConExtIterator<OtherTy>& o) const { return at == o.at; }
+
+  T& dereference() const { return *at; }
+  void increment() { at = at->getNextPtr(); }
+
+public:
+  ConExtIterator(): at(0) { }
+  
+  template<typename OtherTy>
+  ConExtIterator(const ConExtIterator<OtherTy>& o): at(o.at) { }
+  
+  explicit ConExtIterator(T* x): at(x) { }
+};
+
 template<typename T, bool concurrent>
 class ConExtLinkedStack {
   LL::PtrLock<T, concurrent> head;
   
 public:
-  class ListNode {
-    T* NextPtr;
-  public:
-    ListNode() :NextPtr(0) {}
-    T*& getNextPtr() { return NextPtr; }
-  };
+  typedef ConExtListNode<T> ListNode;
 
   bool empty() const {
     return !head.getValue();
@@ -74,6 +100,18 @@ public:
     C->getNextPtr() = 0;
     return C;
   }
+
+  //! iterators not safe with concurrent modifications
+  typedef T value_type;
+  typedef T& reference;
+  typedef ConExtIterator<T> iterator;
+  typedef ConExtIterator<const T> const_iterator;
+
+  iterator begin() { return iterator(head.getValue()); }
+  iterator end() { return iterator(); }
+
+  const_iterator begin() const { return const_iterator(head.getValue()); }
+  const_iterator end() const { return const_iterator(); }
 };
 
 
@@ -131,6 +169,18 @@ public:
     }
     return C;
   }
+
+  //! iterators not safe with concurrent modifications
+  typedef T value_type;
+  typedef T& reference;
+  typedef ConExtIterator<T> iterator;
+  typedef ConExtIterator<const T> const_iterator;
+
+  iterator begin() { return iterator(head.getValue()); }
+  iterator end() { return iterator(); }
+
+  const_iterator begin() const { return const_iterator(head.getValue()); }
+  const_iterator end() const { return const_iterator(); }
 };
 
 template<typename T>
@@ -140,6 +190,6 @@ struct DummyIndexer: public std::unary_function<const T&,unsigned> {
 
 }
 }
-}
+} // end namespace Galois
 
 #endif

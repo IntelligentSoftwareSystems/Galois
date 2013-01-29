@@ -48,7 +48,7 @@ void reportStat(Galois::Statistic* value);
 void printStats();
 
 }
-}
+} // end namespace Galois
 
 #endif
 

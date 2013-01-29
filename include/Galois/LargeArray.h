@@ -25,6 +25,9 @@
 #ifndef GALOIS_LARGEARRAY_H
 #define GALOIS_LARGEARRAY_H
 
+#include <boost/utility.hpp>
+#include "Galois/Runtime/mm/Mem.h"
+
 namespace Galois {
 
 /**
@@ -106,20 +109,20 @@ public:
 template<bool isLazy>
 class LargeArray<void,isLazy>: boost::noncopyable {
 public:
-  typedef char* value_type;
+  typedef char value_type;
   typedef size_t size_type;
   typedef ptrdiff_t difference_type;
-  typedef char* reference;
-  typedef char* const_reference;
-  typedef char* pointer;
-  typedef char* const_pointer;
+  typedef value_type& reference;
+  typedef const value_type& const_reference;
+  typedef value_type* pointer;
+  typedef const value_type* const_pointer;
   typedef pointer iterator;
   typedef const_pointer const_iterator;
   const static bool has_value = false;
 
-  const_reference at(difference_type x) const { return 0; }
-  reference at(difference_type x) { return 0; }
-  const_reference operator[](size_type x) const { return 0; }
+  //const_reference at(difference_type x) const { return 0; }
+  //reference at(difference_type x) { return 0; }
+  //const_reference operator[](size_type x) const { return 0; }
   size_type size() const { return 0; }
   iterator begin() { return 0; }
   const_iterator begin() const { return 0; }

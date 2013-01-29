@@ -20,13 +20,11 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  */
-
 #ifndef GALOIS_DOALL_WRAPPER_H
 #define GALOIS_DOALL_WRAPPER_H
 
 #include "Galois/Galois.h"
 #include "Galois/Runtime/DoAllCoupled.h"
-
 
 #ifdef GALOIS_USE_TBB
 #include "tbb/parallel_for_each.h"

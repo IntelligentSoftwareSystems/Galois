@@ -27,6 +27,7 @@
 #include "Galois/Accumulator.h"
 #include "Galois/Bag.h"
 #include "Galois/Statistic.h"
+#include "Galois/UnionFind.h"
 #include "Galois/Graphs/LCGraph.h"
 #include "Galois/ParallelSTL/ParallelSTL.h"
 #include "llvm/Support/CommandLine.h"
@@ -58,21 +59,20 @@ enum WriteType {
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputFilename(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<std::string> outputFilename(cll::Positional, cll::desc("[output file]"));
-static cll::opt<WriteType> writeType(cll::desc("Output type:"),
+static cll::opt<WriteType> writeType("output", cll::desc("Output type:"),
     cll::values(
       clEnumVal(none, "None"),
       clEnumVal(largest, "Write largest component"),
       clEnumValEnd), cll::init(none));
-static cll::opt<Algo> algo(cll::desc("Choose an algorithm:"),
+static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
       clEnumVal(serial, "Serial"),
       clEnumVal(asynchronous, "Asynchronous"),
       clEnumVal(synchronous, "Synchronous"),
-      clEnumValEnd), cll::init(synchronous));
+      clEnumValEnd), cll::init(asynchronous));
 
-struct Node {
+struct Node: public Galois::UnionFindNode<Node> {
   unsigned int id;
-  Node* component;
 };
 
 #ifdef GALOIS_USE_NUMA
@@ -86,39 +86,14 @@ typedef Graph::GraphNode GNode;
 Graph graph;
 
 std::ostream& operator<<(std::ostream& os, const Node& n) {
-  os << "[id: " << n.id << ", c: " << n.component->id << "]";
+  os << "[id: " << n.id << ", c: " << n.find()->id << "]";
   return os;
 }
 
 /** 
- * Serial connected component algorithm. Just use union-find.
+ * Serial connected components algorithm. Just use union-find.
  */
 struct SerialAlgo {
-  // Not exactly union-by-rank because this ``rank'' is a lower-bound on rank
-  static std::pair<int,Node*> find(Node* x) {
-    int rank = 0;
-    Node* rep;
-    for (rep = x; rep->component != rep; rep = rep->component, ++rank)
-      ;
-    while (x != rep) {
-      Node* next = x->component;
-      x->component = rep;
-      x = next;
-    }
-    return std::make_pair(rank, rep);
-  }
-
-  static void merge(Node* a, Node* b) {
-    std::pair<int,Node*> aa = find(a);
-    std::pair<int,Node*> bb = find(b);
-    if (aa.second != bb.second) {
-      if (aa.first > bb.first) {
-        std::swap(aa, bb);
-      }
-      aa.second->component = bb.second;
-    }
-  }
-
   struct Merge {
     void operator()(const GNode& src) const {
       Node& sdata = graph.getData(src, Galois::NONE);
@@ -127,16 +102,8 @@ struct SerialAlgo {
           ei = graph.edge_end(src, Galois::NONE); ii != ei; ++ii) {
         GNode dst = graph.getEdgeDst(ii);
         Node& ddata = graph.getData(dst, Galois::NONE);
-        merge(&sdata, &ddata);
+        sdata.merge(&ddata);
       }
-    }
-  };
-
-  //! Normalize component by doing find with path compression
-  struct Normalize {
-    void operator()(const GNode& src) const {
-      Node& sdata = graph.getData(src, Galois::NONE);
-      find(&sdata);
     }
   };
 
@@ -144,12 +111,11 @@ struct SerialAlgo {
 
   void operator()() {
     Galois::do_all_local(graph, Merge());
-    Galois::do_all_local(graph, Normalize());
   }
 };
 
 /**
- * Synchronous connected component algorithm.  Initially all nodes are in
+ * Synchronous connected components algorithm.  Initially all nodes are in
  * their own component. Then, we merge endpoints of edges to form the spanning
  * tree. Merging is done in two phases to simplify concurrent updates: (1)
  * find components and (2) union components.  Since the merge phase does not
@@ -168,35 +134,6 @@ struct SynchronousAlgo {
   Galois::InsertBag<Edge> wls[2];
   Galois::InsertBag<Edge>* next;
   Galois::InsertBag<Edge>* cur;
-
-  static Node* find(Node* x, bool compress) {
-    Node* rep;
-    for (rep = x; rep->component != rep; rep = rep->component)
-      ;
-    if (compress) { 
-      while (x != rep) {
-        Node* next = x->component;
-        x->component = rep;
-        x = next;
-      }
-    }
-    return rep;
-  }
-
-  //! Lock-free merge. Returns if merge was done.
-  static bool merge(Node* a, Node* b) {
-    while (true) {
-      a = find(a, false);
-      b = find(b, false);
-      if (a == b)
-        return false;
-      // Avoid cycles by directing edges consistently
-      if (a->id > b->id)
-        std::swap(a, b);
-      if (__sync_bool_compare_and_swap(&a->component, a, b))
-        return true;
-    }
-  }
 
   struct Initialize {
     Galois::InsertBag<Edge>& next;
@@ -220,7 +157,7 @@ struct SynchronousAlgo {
 
     void operator()(const Edge& edge) const {
       Node& sdata = graph.getData(edge.src, Galois::NONE);
-      if (!merge(&sdata, edge.ddata))
+      if (!sdata.merge(edge.ddata))
         emptyMerges += 1;
     }
   };
@@ -241,7 +178,7 @@ struct SynchronousAlgo {
     void operator()(const Edge& edge) const {
       GNode src = edge.src;
       Node& sdata = graph.getData(src, Galois::NONE);
-      Node* scomponent = find(&sdata, true);
+      Node* scomponent = sdata.findAndCompress();
       Graph::edge_iterator ii = graph.edge_begin(src, Galois::NONE);
       Graph::edge_iterator ei = graph.edge_end(src, Galois::NONE);
       int count = edge.count + 1;
@@ -249,20 +186,12 @@ struct SynchronousAlgo {
       for (; ii != ei; ++ii, ++count) {
         GNode dst = graph.getEdgeDst(ii);
         Node& ddata = graph.getData(dst, Galois::NONE);
-        Node* dcomponent = find(&ddata, true);
+        Node* dcomponent = ddata.findAndCompress();
         if (scomponent != dcomponent) {
           next.push(Edge(src, dcomponent, count));
           break;
         }
       }
-    }
-  };
-
-  //! Normalize component by doing find with path compression
-  struct Normalize {
-    void operator()(const GNode& src) const {
-      Node& sdata = graph.getData(src, Galois::NONE);
-      sdata.component = find(&sdata, true);
     }
   };
 
@@ -283,7 +212,6 @@ struct SynchronousAlgo {
       std::swap(cur, next);
       rounds += 1;
     }
-    Galois::do_all_local(graph, Normalize());
   }
 };
 
@@ -292,44 +220,6 @@ struct SynchronousAlgo {
  * can perform unions and finds concurrently.
  */
 struct AsynchronousAlgo {
-  static Node* find(Node* x, bool compress) {
-    // Basic outline of race in synchronous path compression is that two path
-    // compressions along two different paths to the root can create a cycle
-    // in the union-find tree. Prevent that from happening by compressing
-    // incrementally.
-    Node* rep = x;
-    Node* prev = 0;
-    int rank = 0;
-    while (rep->component != rep) {
-      Node* next = rep->component;
-
-      if (compress) {
-        if (prev && prev->component == rep)
-          prev->component = next;
-        prev = rep;
-      }
-
-      rep = next;
-      ++rank;
-    }
-    return rep;
-  }
-
-  //! Lock-free merge. Returns if merge was done.
-  static bool merge(Node* a, Node* b) {
-    while (true) {
-      a = find(a, true);
-      b = find(b, true);
-      if (a == b)
-        return false;
-      // Avoid cycles by directing edges consistently
-      if (a->id > b->id)
-        std::swap(a, b);
-      if (__sync_bool_compare_and_swap(&a->component, a, b))
-        return true;
-    }
-  }
-
   struct Merge {
     typedef int tt_does_not_need_aborts;
     typedef int tt_does_not_need_parallel_push;
@@ -350,17 +240,9 @@ struct AsynchronousAlgo {
           ei = graph.edge_end(src, Galois::NONE); ii != ei; ++ii) {
         GNode dst = graph.getEdgeDst(ii);
         Node& ddata = graph.getData(dst, Galois::NONE);
-        if (!merge(&sdata, &ddata))
+        if (!sdata.merge(&ddata))
           emptyMerges += 1;
       }
-    }
-  };
-
-  //! Normalize component by doing find with path compression
-  struct Normalize {
-    void operator()(const GNode& src) const {
-      Node& sdata = graph.getData(src, Galois::NONE);
-      sdata.component = find(&sdata, true);
     }
   };
 
@@ -369,7 +251,6 @@ struct AsynchronousAlgo {
   void operator()() {
     Galois::Statistic emptyMerges("EmptyMerges");
     Galois::for_each_local(graph, Merge(emptyMerges));
-    Galois::do_all_local(graph, Normalize());
   }
 };
 
@@ -379,7 +260,7 @@ struct is_bad {
     for (Graph::edge_iterator ii = graph.edge_begin(n), ei = graph.edge_end(n); ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
       Node& data = graph.getData(dst);
-      if (data.component != me.component) {
+      if (data.findAndCompress() != me.findAndCompress()) {
         std::cerr << "not in same component: " << me << " and " << data << "\n";
         return true;
       }
@@ -398,7 +279,7 @@ void writeComponent(Node* component) {
   size_t numNodes = 0;
   for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
     Node& data = graph.getData(*ii);
-    data.id = data.component == component ? 1 : 0;
+    data.id = data.findAndCompress() == component ? 1 : 0;
     if (data.id) {
       size_t degree = 
         std::distance(graph.edge_begin(*ii, Galois::NONE), graph.edge_end(*ii, Galois::NONE));
@@ -419,7 +300,7 @@ void writeComponent(Node* component) {
     Node& data = graph.getData(*ii);
     if (prev)
       data.id = prev->id + data.id;
-    if (data.component == component) {
+    if (data.findAndCompress() == component) {
       size_t degree = 
         std::distance(graph.edge_begin(*ii, Galois::NONE), graph.edge_end(*ii, Galois::NONE));
       size_t sid = data.id - 1;
@@ -435,7 +316,7 @@ void writeComponent(Node* component) {
   p.phase2();
   for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
     Node& data = graph.getData(*ii);
-    if (data.component != component)
+    if (data.findAndCompress() != component)
       continue;
 
     size_t sid = data.id - 1;
@@ -446,7 +327,7 @@ void writeComponent(Node* component) {
       Node& ddata = graph.getData(dst, Galois::NONE);
       size_t did = ddata.id - 1;
 
-      assert(ddata.component == component);
+      //assert(ddata.component == component);
       assert(sid < numNodes && did < numNodes);
       p.addNeighbor(sid, did);
     }
@@ -475,12 +356,12 @@ struct CountLargest {
   void operator()(const GNode& x) {
     Node& n = graph.getData(x, Galois::NONE);
     // Ignore trivial components
-    if (&n == n.component) {
+    if (n.isRep()) {
       accums.trivial += 1;
       return;
     }
 
-    accums.map.update(n.component, 1);
+    accums.map.update(n.findAndCompress(), 1);
   }
 };
 
@@ -523,7 +404,7 @@ Node* findLargest() {
   Galois::do_all(map.begin(), map.end(), ReduceMax(accumMax));
   ComponentSizePair& largest = accumMax.reduce();
 
-  // Componsate for dropping trivial entries of components
+  // Compensate for dropping trivial entries of components
   double ratio = graph.size() - trivialComponents + map.size();
   size_t largestSize = largest.size + 1;
   if (ratio)
@@ -562,7 +443,6 @@ int main(int argc, char** argv) {
   for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii, ++id) {
     Node& n = graph.getData(*ii);
     n.id = id;
-    n.component = &n;
   }
   Tinitial.stop();
   

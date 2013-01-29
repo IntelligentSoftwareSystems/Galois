@@ -45,5 +45,6 @@ struct ForEachTraits {
 };
 
 }
-}
+} // end namespace Galois
+
 #endif // GALOIS_RUNTIME_FOREACHTRAITS_H

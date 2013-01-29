@@ -47,36 +47,11 @@
 
 #include "Galois/Timer.h"
 
-#define  MAX_CHUNK_SIZE 1024
+#define CHUNK_FACTOR 16
 
 #undef ENABLE_DO_ALL_TIMERS
-// TODO: assume bidirectional iterators as the lcd
-// and improve the code below
 
-namespace std {
-
-template <typename Iter>
-void decrease (Iter& i, typename iterator_traits<Iter>::difference_type dist,
-    random_access_iterator_tag) {
-  i -= dist;
-}
-
-template <typename Iter>
-void decrease (Iter& i, typename iterator_traits<Iter>::difference_type dist,
-    bidirectional_iterator_tag) {
-  while (dist > 0) {
-    --i;
-    --dist;
-  }
-}
-
-template <typename Iter>
-void decrease (Iter& i, typename iterator_traits<Iter>::difference_type dist) {
-  decrease (i, dist, typename iterator_traits<Iter>::iterator_category ());
-}
-
-
-} // end namespace std
+#define USE_NEW_DO_ALL_COUPLED
 
 
 namespace Galois {
@@ -148,7 +123,7 @@ namespace Galois {
         << ", max = " << m_max
         << ", min = " << m_min
         << ", sum = " << m_sum
-        << ", ave = " << average ()
+        << ", avg = " << average ()
         << ", range = " << range () 
         << std::endl;
 
@@ -171,23 +146,49 @@ template <typename Iter>
 struct Range {
   typedef typename std::iterator_traits<Iter>::difference_type Diff_ty;
 
-  Iter begin;
-  Iter end;
-  Diff_ty size;
+  Iter m_beg;
+  Iter m_end;
+  Diff_ty m_size;
 
-  Range (): size (0) {}
+  Range (): m_size (0) {}
 
-  Range (Iter _begin, Iter _end, size_t _size)
-    : begin (_begin), end (_end), size (_size)
+  Range (Iter _beg, Iter _end, size_t _size)
+    : m_beg (_beg), m_end (_end), m_size (_size)
   {
-    assert (size >= 0);
+    assert (m_size >= 0);
   }
 
-  Range (Iter _begin, Iter _end)
-    : begin (_begin), end (_end), size (std::distance (_begin, _end))
+  Range (Iter _beg, Iter _end)
+    : m_beg (_beg), m_end (_end), m_size (std::distance (_beg, _end))
   {}
 
 };
+
+namespace HIDDEN {
+
+template <typename Iter>
+void decrease (Iter& i, typename std::iterator_traits<Iter>::difference_type dist,
+    std::random_access_iterator_tag) {
+  i -= dist;
+}
+
+template <typename Iter>
+void decrease (Iter& i, typename std::iterator_traits<Iter>::difference_type dist,
+    std::bidirectional_iterator_tag) {
+  while (dist > 0) {
+    --i;
+    --dist;
+  }
+}
+
+template <typename Iter>
+void decrease (Iter& i, typename std::iterator_traits<Iter>::difference_type dist) {
+  assert (dist >= 0);
+  decrease (i, dist, typename std::iterator_traits<Iter>::iterator_category ());
+}
+
+
+} // end namespace HIDDEN
 
 template <typename Iter, typename FuncTp>
 class DoAllCoupledExec {
@@ -197,16 +198,17 @@ class DoAllCoupledExec {
 
   struct ThreadContext {
 
-    GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE LL::SimpleLock<true> work_lock;
+    typedef Range<Iter> Range_ty;
 
+    GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE LL::SimpleLock<true> range_mutex;
     unsigned id;
 
-    Iter curr_begin;
-    Iter curr_end;
-    Iter work_end;
+    Range_ty range;
+    Iter local_beg;
+    Iter local_end;
+    size_t num_iter;
 
     // Stats
-    size_t num_iter;
 #ifdef ENABLE_DO_ALL_TIMERS
     Galois::Timer timer;
     Galois::ThreadTimer work_timer;
@@ -216,44 +218,47 @@ class DoAllCoupledExec {
 
     ThreadContext () 
       :
-        work_lock (),
-        id (std::numeric_limits<unsigned>::max ()),
-        num_iter (0)
+        range_mutex (),
+        id (std::numeric_limits<unsigned>::max ())
     {}
 
 
     ThreadContext (
         unsigned id, 
-        const Range<Iter>& range) 
+        const Range_ty& range) 
       : 
-        work_lock (),
+        range_mutex (),
         id (id), 
-        curr_begin (range.begin), 
-        curr_end (range.begin), 
-        work_end (range.end),
+        range (range),
+        local_beg (range.m_beg), 
+        local_end (range.m_beg), 
         num_iter (0)
     {}
 
 
     void doWork (FuncTp& func) {
-      for (; curr_begin != curr_end; ++curr_begin) {
-        func (*curr_begin);
+      for (; local_beg != local_end; ++local_beg) {
         ++num_iter;
+        func (*local_beg);
       }
     }
 
     bool hasWorkWeak () const {
-      return (curr_end != work_end);
+      return (range.m_size > 0);
     }
 
     bool hasWork () const {
       bool ret = false;
 
-      work_lock.lock ();
+      range_mutex.lock ();
       {
         ret = hasWorkWeak ();
+
+        if (range.m_size > 0) {
+          assert (range.m_beg != range.m_end);
+        }
       }
-      work_lock.unlock ();
+      range_mutex.unlock ();
 
       return ret;
     }
@@ -261,77 +266,221 @@ class DoAllCoupledExec {
     bool getWork (const unsigned chunk_size) {
       bool succ = false;
 
-      work_lock.lock ();
+      range_mutex.lock ();
       {
         if (hasWorkWeak ()) {
           succ = true;
 
-          Diff_ty d = std::distance (curr_end, work_end); // TODO: check formal param
-          if (d < chunk_size) {
-            curr_end = work_end;
+          Iter nbeg = range.m_beg;
+          if (range.m_size <= chunk_size) {
+            nbeg = range.m_end;
+            range.m_size = 0;
 
           } else {
-            std::advance (curr_end, chunk_size);
+            std::advance (nbeg, chunk_size);
+            range.m_size -= chunk_size;
+            assert (range.m_size > 0);
           }
+
+          local_beg = range.m_beg;
+          local_end = nbeg;
+          range.m_beg = nbeg;
 
         }
       }
-      work_lock.unlock ();
+      range_mutex.unlock ();
 
       return succ;
     }
 
-    bool stealWork (Iter& steal_begin, Iter& steal_end, const unsigned steal_size) {
+private:
+    void steal_from_end_impl (Iter& steal_beg, Iter& steal_end, const Diff_ty sz
+        , std::forward_iterator_tag) {
+
+      // steal from front for forward_iterator_tag
+      steal_beg = range.m_beg;
+      std::advance (range.m_beg, sz);
+      steal_end = range.m_beg;
+
+    }
+
+    void steal_from_end_impl (Iter& steal_beg, Iter& steal_end, const Diff_ty sz
+        , std::bidirectional_iterator_tag) {
+
+      steal_end = range.m_end;
+      HIDDEN::decrease (range.m_end, sz);
+      steal_beg = range.m_end;
+    }
+
+
+    void steal_from_end (Iter& steal_beg, Iter& steal_end, const Diff_ty sz) {
+      assert (sz > 0);
+      steal_from_end_impl (steal_beg, steal_end, sz, typename std::iterator_traits<Iter>::iterator_category ());
+    }
+
+public:
+
+    bool stealWork (Iter& steal_beg, Iter& steal_end, Diff_ty& steal_size) {
       bool succ = false;
 
-      work_lock.lock ();
-      { 
+      if (range_mutex.try_lock ()) {
+
         if (hasWorkWeak ()) {
           succ = true;
-          Diff_ty d = std::distance (curr_end, work_end);
 
-          if (d < steal_size) {
-            steal_begin = curr_end;
-            steal_end = work_end;
+
+          if (range.m_size < steal_size) {
+            steal_beg = range.m_beg;
+            steal_end = range.m_end;
+
+            range.m_beg = range.m_end;
+
+            steal_size = range.m_size;
+            range.m_size = 0;
 
           } else {
-            
-            // steal_begin = curr_end;
-            // std::advance (steal_begin, (d - steal_size));
-// 
-            // steal_end = work_end;
 
-            steal_begin = work_end;
-            steal_end = work_end;
-            std::decrease (steal_begin, steal_size);
+            steal_from_end (steal_beg, steal_end, steal_size);
+            range.m_size -= steal_size;
+
           }
-
-          // don't forget to shrink my range to beginning of steal range
-          work_end = steal_begin;
         }
+
+        range_mutex.unlock ();
       }
-      work_lock.unlock ();
 
       return succ;
     }
 
-    void assignWork (Iter begin, Iter end) {
-      work_lock.lock ();
+
+    void assignWork (const Iter& beg, const Iter& end, const Diff_ty sz) {
+      range_mutex.lock ();
       {
         assert (!hasWorkWeak ());
-        assert (begin != end);
+        assert (beg != end);
 
-        curr_begin = curr_end = begin;
-        work_end = end;
+        range = Range_ty (beg, end, sz);
+        local_beg = range.m_beg;
+        local_end = range.m_beg;
       }
-      work_lock.unlock ();
+      range_mutex.unlock ();
     }
+
 
 
   };
 
 
 private:
+ 
+#ifdef USE_NEW_DO_ALL_COUPLED
+
+  GALOIS_ATTRIBUTE_NOINLINE bool transferWork (ThreadContext& rich, ThreadContext& poor, Diff_ty steal_size) {
+
+    assert (rich.id != poor.id);
+
+    Iter steal_beg;
+    Iter steal_end;
+
+    bool succ = rich.stealWork (steal_beg, steal_end, steal_size);
+
+    if (succ) {
+      assert (steal_beg != steal_end);
+      assert (std::distance (steal_beg, steal_end) == steal_size);
+
+      poor.assignWork (steal_beg, steal_end, steal_size);
+    }
+
+    return succ;
+  }
+
+  GALOIS_ATTRIBUTE_NOINLINE bool stealWithinPackage (ThreadContext& poor) {
+
+    bool sawWork = false;
+    bool stoleWork = false;
+
+    unsigned my_pack = LL::getPackageForSelf (poor.id);
+    unsigned per_pack = LL::getMaxThreads () / LL::getMaxPackages ();
+
+    unsigned pack_beg = my_pack * per_pack;
+    unsigned pack_end = (my_pack + 1) * per_pack;
+
+    for (unsigned i = pack_beg + 1; i < pack_end; ++i) {
+      // go around the package in circle starting from the next thread
+      unsigned t = pack_beg + ((poor.id + 1) % per_pack);
+      assert ( (t >= pack_beg) && (t < pack_end));
+
+      if (workers.getRemote (t)->hasWorkWeak ()) {
+        sawWork = true;
+
+        stoleWork = transferWork (*workers.getRemote (t), poor, chunk_size);
+
+        if (stoleWork) { 
+          break;
+        }
+      }
+    }
+    
+    return sawWork || stoleWork;
+  }
+
+  GALOIS_ATTRIBUTE_NOINLINE bool stealFlat (ThreadContext& poor, const unsigned maxT) {
+
+    // TODO: test performance of sawWork + stoleWork vs stoleWork only
+    bool sawWork = false;
+    bool stoleWork = false;
+
+    assert ((LL::getMaxCores () / LL::getMaxPackages ()) > 1);
+
+    // TODO: check this steal amount. e.g. all hungry threads in one package may
+    // steal too much work from full threads in another package
+    // size_t stealAmt = chunk_size * (LL::getMaxCores () / LL::getMaxPackages ());
+    size_t stealAmt = chunk_size;
+
+    for (unsigned i = 1; i < maxT; ++i) { // skip poor.id by starting at 1
+
+      unsigned t = (poor.id + i) % maxT;
+
+      if (workers.getRemote (t)->hasWorkWeak ()) {
+        sawWork = true;
+
+        stoleWork = transferWork (*workers.getRemote (t), poor, stealAmt);
+
+        if (stoleWork) {
+          break;
+        }
+      }
+    }
+
+    return sawWork || stoleWork;
+  }
+
+  GALOIS_ATTRIBUTE_NOINLINE bool stealWithinActive (ThreadContext& poor) {
+
+    return stealFlat (poor, Galois::getActiveThreads ());
+  }
+
+  GALOIS_ATTRIBUTE_NOINLINE bool stealGlobal (ThreadContext& poor) {
+    return stealFlat (poor, LL::getMaxThreads ());
+  }
+
+
+  GALOIS_ATTRIBUTE_NOINLINE bool trySteal (ThreadContext& poor) {
+
+    if (stealWithinPackage (poor)) {
+      return true;
+    } else if (stealWithinActive (poor)) {
+      return true;
+    } else if (stealGlobal (poor)) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+
+
+#else
 
   bool findRichSeq (const unsigned poor_id, unsigned& rich_id) {
     bool succ = false;
@@ -354,16 +503,16 @@ private:
   bool findRichInPackage (const unsigned poor_id, unsigned& rich_id) {
     bool succ = false;
 
-    unsigned my_pack = LL::getPackageForThread (poor_id);
+    unsigned my_pack = LL::getPackageForSelf (poor_id);
     unsigned per_pack = LL::getMaxThreads () / LL::getMaxPackages ();
 
-    unsigned pack_begin = my_pack * per_pack;
+    unsigned pack_beg = my_pack * per_pack;
     unsigned pack_end = (my_pack + 1) * per_pack;
 
-    for (unsigned i = pack_begin + 1; i < pack_end; ++i) {
+    for (unsigned i = pack_beg + 1; i < pack_end; ++i) {
       // go around the package in circle starting from the next thread
-      unsigned t = pack_begin + ((poor_id + 1) % per_pack);
-      assert ( (t >= pack_begin) && (t < pack_end));
+      unsigned t = pack_beg + ((poor_id + 1) % per_pack);
+      assert ( (t >= pack_beg) && (t < pack_end));
 
       if (workers.getRemote (t)->hasWorkWeak ()) {
         rich_id = t;
@@ -398,11 +547,13 @@ private:
     }
 
     if (ret) { 
-      Iter begin;
+      Iter beg;
       Iter end;
 
-      if (workers.getRemote (rich_id)->stealWork (begin, end, (chunks_to_steal*chunk_size))) {
-        poor.assignWork (begin, end);
+      Diff_ty stealAmt = chunks_to_steal * chunk_size;
+
+      if (workers.getRemote (rich_id)->stealWork (beg, end, stealAmt)) {
+        poor.assignWork (beg, end, stealAmt);
         ret = true;
       } else {
         ret = false;
@@ -426,6 +577,7 @@ private:
 
     return succ;
   }
+#endif
 
   void printStats () {
 
@@ -464,6 +616,7 @@ private:
   const char* loopname;
   Diff_ty chunk_size;
   Galois::Runtime::PerThreadStorage<ThreadContext> workers;
+
   TerminationDetection term;
 
   // for stats
@@ -476,22 +629,22 @@ public:
       const PerThreadStorage<Range<Iter> >& ranges, 
       FuncTp& _func, 
       const char* _loopname,
-      const unsigned maxChunkSize)
+      const size_t _chunk_size)
     : 
       func (_func), 
       loopname (_loopname),
-      chunk_size (1)
+      chunk_size (_chunk_size)
   {
 
     assert (ranges.size () == workers.size ());
 
-    assert (maxChunkSize > 0);
 
     for (unsigned i = 0; i < ranges.size (); ++i) {
       *workers.getRemote (i) = ThreadContext (i, *ranges.getRemote (i));
     }
 
-    chunk_size = std::max (Diff_ty (1), Diff_ty (maxChunkSize));
+    chunk_size = std::max (Diff_ty (1), Diff_ty (chunk_size));
+    assert (chunk_size > 0);
   }
 
 
@@ -503,6 +656,51 @@ public:
 
     // printStats ();
   }
+
+#ifdef USE_NEW_DO_ALL_COUPLED
+
+  void operator () () {
+
+    static const bool USE_TERM = false;
+
+    ThreadContext& ctx = *workers.getLocal ();
+    TerminationDetection::TokenHolder* localterm = term.getLocalTokenHolder ();
+
+    while (true) {
+
+      while (ctx.getWork (chunk_size)) {
+        ctx.doWork (func);
+
+        if (USE_TERM) { localterm->workHappened (); }
+      }
+
+      assert (!ctx.hasWork ());
+
+      if (trySteal (ctx)) {
+        continue;
+
+      } else  { 
+        assert (!ctx.hasWork ());
+
+        if (USE_TERM) { 
+          term.localTermination ();
+
+          if (term.globalTermination ()) {
+            break;
+          }
+        } else { 
+          break; // no work, no steal, so exiting
+        }
+      }
+
+
+    } // end outer while 
+
+    assert (!ctx.hasWork ());
+
+  }
+
+#else 
 
   void operator () () {
 
@@ -559,110 +757,59 @@ public:
 
   }
 
+#endif
 
-  // void operator () () {
-// 
-    // ThreadContext& ctx = workers.get ();
-    // TerminationDetection::TokenHolder* localterm = term.getLocalTokenHolder ();
-// 
-// #ifdef ENABLE_DO_ALL_TIMERS
-    // ctx.timer.start ();
-// #endif
-// 
-    // do {
-// 
-// 
-      // do {
-// 
-// #ifdef ENABLE_DO_ALL_TIMERS
-        // ctx.work_timer.start ();
-// #endif
-        // while (ctx.getWork (chunk_size)) {
-          // localterm->workHappened ();
-          // ctx.doWork (func);
-        // }
-// #ifdef ENABLE_DO_ALL_TIMERS
-        // ctx.work_timer.stop ();
-// #endif
-// 
-        // if (ctx.hasWorkWeak ()) { std::abort (); } // should be empty at this point
-// 
-// #ifdef ENABLE_DO_ALL_TIMERS
-        // ctx.steal_timer.start ();
-// #endif
-        // if (tryStealing (ctx)) {
-          // continue;
-        // }
-// #ifdef ENABLE_DO_ALL_TIMERS
-        // ctx.steal_timer.stop ();
-// #endif
-// 
-      // } while (ctx.hasWorkWeak ()); // can tolerate
-// 
-// 
-// #ifdef ENABLE_DO_ALL_TIMERS
-      // ctx.term_timer.start ();
-// #endif
-      // term.localTermination ();
-// #ifdef ENABLE_DO_ALL_TIMERS
-      // ctx.term_timer.stop ();
-// #endif
-// 
-// 
-    // } while (!term.globalTermination ());
-// 
-// #ifdef ENABLE_DO_ALL_TIMERS
-    // ctx.timer.stop ();
-// #endif
-  // }
+
 };
+
+namespace HIDDEN {
+  size_t calc_chunk_size (size_t totalDist) {
+    size_t numT = Galois::getActiveThreads ();
+
+    size_t num_chunks = std::max (CHUNK_FACTOR * numT, numT * numT);
+    return std::max(size_t (1), totalDist / num_chunks);
+  }
+} // end namespace HIDDEN
 
 
 template <typename Iter, typename FuncTp>
-void do_all_coupled_impl (PerThreadStorage<Range<Iter> >& ranges, FuncTp& func, const char* loopname, const unsigned maxChunkSize) {
+void do_all_coupled_impl (PerThreadStorage<Range<Iter> >& ranges, FuncTp& func, const char* loopname, const size_t chunk_size) {
 
-  assert (!inGaloisForEach);
-  inGaloisForEach = true;
+  // assert (!inGaloisForEach);
+  // inGaloisForEach = true;
 
 
-  DoAllCoupledExec<Iter, FuncTp> exec (ranges, func, loopname, maxChunkSize);
+  DoAllCoupledExec<Iter, FuncTp> exec (ranges, func, loopname, chunk_size);
 
   RunCommand w[2] = { std::ref (exec), std::ref (getSystemBarrier ()) };
 
   getSystemThreadPool ().run (&w[0], &w[2], activeThreads);
   
-  inGaloisForEach = false;
-}
-
-template <typename WL, typename FuncTp>
-void do_all_serial (WL& workList, FuncTp func, const char* loopname=0) {
-
-  for (unsigned i = 0; i < workList.numRows (); ++i) {
-    std::for_each (workList[i].begin (), workList[i].end (), func);
-  }
+  // inGaloisForEach = false;
 }
 
 
 template <typename WL, typename FuncTp>
-void do_all_coupled (WL& workList, FuncTp func, const char* loopname=0, const unsigned maxChunkSize=MAX_CHUNK_SIZE) {
+void do_all_coupled (WL& workList, FuncTp func, const char* loopname=0, size_t chunk_size=0) {
   typedef typename WL::local_iterator Iter;
 
-  // default construction
-  //PerThreadStorage<Range<Iter> > ranges (Range<Iter> (workList[0].begin (), workList[0].begin ()));
   PerThreadStorage<Range<Iter> > ranges;
-
 
   for (unsigned i = 0; i < workList.numRows (); ++i) {
     *ranges.getRemote (i) = Range<Iter> (workList[i].begin (), workList[i].end (), workList[i].size ());
   }
 
+  
+  if (chunk_size == 0) {
+    chunk_size = HIDDEN::calc_chunk_size (workList.size_all ());
+  }
 
-  do_all_coupled_impl (ranges, func, loopname, maxChunkSize);
-
+  do_all_coupled_impl (ranges, func, loopname, chunk_size);
 }
 
 template <typename WL, typename FuncTp>
-void do_all_coupled_reverse (WL& workList, FuncTp func, const char* loopname=0, const unsigned maxChunkSize=MAX_CHUNK_SIZE) {
+void do_all_coupled_reverse (WL& workList, FuncTp func, const char* loopname=0, size_t chunk_size=0) {
+
   typedef typename WL::local_reverse_iterator Iter;
 
   // default construction
@@ -674,25 +821,29 @@ void do_all_coupled_reverse (WL& workList, FuncTp func, const char* loopname=0, 
     *ranges.getRemote (i) = Range<Iter> (workList[i].rbegin (), workList[i].rend (), workList[i].size ());
   }
 
+  if (chunk_size == 0) {
+    chunk_size = HIDDEN::calc_chunk_size (workList.size_all ());
+  }
 
-  do_all_coupled_impl (ranges, func, loopname, maxChunkSize);
+
+  do_all_coupled_impl (ranges, func, loopname, chunk_size);
 
 }
 
 
 template <typename Iter, typename FuncTp>
-void do_all_coupled (const Iter begin, const Iter end, FuncTp func, const char* loopname=0, const unsigned maxChunkSize=MAX_CHUNK_SIZE) {
+void do_all_coupled (const Iter beg, const Iter end, FuncTp func, const char* loopname=0, unsigned chunk_size=0) {
   typedef typename std::iterator_traits<Iter>::difference_type Diff_ty;
 
   // corner case
-  if (begin == end) { 
+  if (beg == end) { 
     return;
   }
 
-  //PerThreadStorage<Range<Iter> > ranges (Range<Iter> (begin, begin)); // default construction
+  //PerThreadStorage<Range<Iter> > ranges (Range<Iter> (beg, beg)); // default construction
   PerThreadStorage<Range<Iter> > ranges;
 
-  Diff_ty total = std::distance (begin, end);
+  Diff_ty total = std::distance (beg, end);
 
   unsigned numT = Galois::getActiveThreads ();
 
@@ -703,10 +854,10 @@ void do_all_coupled (const Iter begin, const Iter end, FuncTp func, const char* 
   
 
   // We want to support forward iterators as efficiently as possible
-  // therefore, we traverse from begin to end once in blocks of numThread
+  // therefore, we traverse from beg to end once in blocks of numThread
   // except, when we get to last block, we need to make sure iterators
   // don't go past end
-  Iter b = begin; // start at beginning
+  Iter b = beg; // start at beginning
   Diff_ty inc_amount = perThread;
 
   // iteration when we are in the last interval [b,e)
@@ -735,13 +886,15 @@ void do_all_coupled (const Iter begin, const Iter end, FuncTp func, const char* 
     *ranges.getRemote (i) = Range<Iter> (end, end);
   }
 
+  if (chunk_size == 0) {
+    chunk_size = HIDDEN::calc_chunk_size (total);
+  }
 
-  do_all_coupled_impl (ranges, func, loopname, maxChunkSize);
+  do_all_coupled_impl (ranges, func, loopname, chunk_size);
 }
 
 
-
-
-} }
+}
+}
 
 #endif //  GALOIS_RUNTIME_DO_ALL_COUPLED_H_

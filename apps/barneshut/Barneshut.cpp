@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -21,12 +21,6 @@
  * @author Martin Burtscher <burtscher@txstate.edu>
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#include <limits>
-#include <iostream>
-#include <vector>
-#include <strings.h>
-#include <boost/math/constants/constants.hpp>
-#include <boost/iterator/transform_iterator.hpp>
 #include "Galois/Galois.h"
 #include "Galois/Statistic.h"
 #include "Galois/Bag.h"
@@ -34,7 +28,14 @@
 #include "Lonestar/BoilerPlate.h"
 #include "Galois/Runtime/WorkListAlt.h"
 
-namespace {
+#include <boost/math/constants/constants.hpp>
+#include <boost/iterator/transform_iterator.hpp>
+
+#include <limits>
+#include <iostream>
+#include <strings.h>
+#include <deque>
+
 const char* name = "Barnshut N-Body Simulator";
 const char* desc =
   "Simulation of the gravitational forces in a galactic cluster using the "
@@ -93,6 +94,10 @@ struct Point {
     y *= value;
     z *= value;
     return *this;
+  }
+
+  double dist2() {
+    return x * x + y * y + z * z;
   }
 };
 
@@ -209,7 +214,7 @@ struct Config {
   const double eps; // potential softening parameter
   const double tol; // tolerance for stopping recursion, <0.57 to bound error
   const double dthf, epssq, itolsq;
-  Config() :
+  Config():
     dtime(0.5),
     eps(0.05),
     tol(0.025),
@@ -226,6 +231,7 @@ std::ostream& operator<<(std::ostream& os, const Config& c) {
   return os;
 }
 
+// XXX
 Config config;
 
 inline int getIndex(const Point& a, const Point& b) {
@@ -247,7 +253,7 @@ inline void updateCenter(Point& p, int index, double radius) {
 }
 
 typedef Galois::InsertBag<Body> Bodies;
-typedef Galois::InsertBag<Body*> ptrBodies;
+typedef Galois::InsertBag<Body*> BodyPtrs;
 
 struct BuildOctree {
   OctreeInternal* root;
@@ -351,6 +357,22 @@ private:
   }
 };
 
+void updateForce(Point& acc, const Point& delta, double psq, double mass) {
+  // Computing force += delta * mass * (|delta|^2 + eps^2)^{-3/2}
+  psq += config.epssq;
+  double idr = 1 / sqrt((float) psq);
+  double scale = mass * idr * idr * idr;
+
+  for (int i = 0; i < 3; i++)
+    acc[i] += delta[i] * scale;
+}
+
+template<typename T>
+void computeDelta(Point& p, const Body* body, T* b) {
+  for (int i = 0; i < 3; i++)
+    p[i] = b->pos[i] - body->pos[i];
+}
+
 struct ComputeForces {
   // Optimize runtime for no conflict case
   typedef int tt_does_not_need_aborts;
@@ -379,17 +401,8 @@ struct ComputeForces {
 
   void recurse(Body& b, Body* node, double dsq) {
     Point p;
-    for (int i = 0; i < 3; i++)
-      p[i] = node->pos[i] - b.pos[i];
-
-    double psq = p.x * p.x + p.y * p.y + p.z * p.z;
-    psq += config.epssq;
-    double idr = 1 / sqrt(psq);
-    // b.mass is fine because every body has the same mass
-    double nphi = b.mass * idr;
-    double scale = nphi * idr * idr;
-    for (int i = 0; i < 3; i++) 
-      b.acc[i] += p[i] * scale;
+    computeDelta(p, &b, node);
+    updateForce(b.acc, p, p.dist2(), b.mass);
   }
 
   struct Frame {
@@ -399,7 +412,7 @@ struct ComputeForces {
   };
 
   void iterate(Body& b, double root_dsq) {
-    std::vector<Frame> stack;
+    std::deque<Frame> stack;
     stack.push_back(Frame(top, root_dsq));
 
     Point p;
@@ -407,18 +420,12 @@ struct ComputeForces {
       Frame f = stack.back();
       stack.pop_back();
 
-      for (int i = 0; i < 3; i++)
-        p[i] = f.node->pos[i] - b.pos[i];
+      computeDelta(p, &b, f.node);
+      double psq = p.dist2();
 
-      double psq = p.x * p.x + p.y * p.y + p.z * p.z;
+      // Node is far enough away, summarize contribution
       if (psq >= f.dsq) {
-        // Node is far enough away, summarize contribution
-        psq += config.epssq;
-        double idr = 1 / sqrt(psq);
-        double nphi = f.node->mass * idr;
-        double scale = nphi * idr * idr;
-        for (int i = 0; i < 3; i++) 
-          b.acc[i] += p[i] * scale;
+        updateForce(b.acc, p, psq, f.node->mass);
         
         continue;
       }
@@ -443,18 +450,11 @@ struct ComputeForces {
 
   void recurse(Body& b, OctreeInternal* node, double dsq) {
     Point p;
-
-    for (int i = 0; i < 3; i++)
-      p[i] = node->pos[i] - b.pos[i];
-    double psq = p.x * p.x + p.y * p.y + p.z * p.z;
+    computeDelta(p, &b, node);
+    double psq = p.dist2();
+    // Node is far enough away, summarize contribution
     if (psq >= dsq) {
-      // Node is far enough away, summarize contribution
-      psq += config.epssq;
-      double idr = 1 / sqrt(psq);
-      double nphi = node->mass * idr;
-      double scale = nphi * idr * idr;
-      for (int i = 0; i < 3; i++) 
-        b.acc[i] += p[i] * scale;
+      updateForce(b.acc, p, psq, node->mass);
       
       return;
     }
@@ -517,10 +517,10 @@ double nextDouble() {
 }
 
 struct InsertBody {
-  ptrBodies& pBodies;
+  BodyPtrs& pBodies;
   Bodies& bodies;
-  InsertBody(BodyPtrs& pb, Bodies& b): pBodies(pb), bodies(b) { }
-  void operator()(const Body& b) {
+  insBody(BodyPtrs& pb, Bodies& b): pBodies(pb),bodies(b) {}
+  void operator()(Body& b) {
     pBodies.push_back(&(bodies.push_back(b)));
   }
 };
@@ -567,7 +567,7 @@ void divide(const Iter& b, const Iter& e) {
  * Generates random input according to the Plummer model, which is more
  * realistic but perhaps not so much so according to astrophysicists
  */
-void generateInput(Bodies& bodies, BodyPtrs& pBodies, int nbodies, int seed) {
+void generateInput(Bodies& bodies, BodyPtrs& pbodies, int nbodies, int seed) {
   double v, sq, scale;
   Point p;
   double PI = boost::math::constants::pi<double>();
@@ -616,14 +616,45 @@ void generateInput(Bodies& bodies, BodyPtrs& pBodies, int nbodies, int seed) {
   Galois::do_all(tmp.begin(), tmp.end(), InsertBody(pBodies, bodies));
 }
 
-void run(int nbodies, int ntimesteps, int seed) {
-  Bodies bodies;
-  ptrBodies pBodies;
-  generateInput(bodies, pBodies, nbodies, seed);
+struct CheckAllPairs {
+  Bodies& bodies;
+  
+  CheckAllPairs(Bodies& b): bodies(b) { }
 
+  double operator()(const Body& body) {
+    const Body* me = &body;
+    Point acc;
+    for (Bodies::iterator ii = bodies.begin(), ei = bodies.end(); ii != ei; ++ii) {
+      Body* b = &*ii;
+      if (me == b)
+        continue;
+      Point delta;
+      computeDelta(delta, me, b);
+      double psq = delta.dist2();
+      updateForce(acc, delta, psq, b->mass);
+    }
+
+    double dist2 = acc.dist2();
+    for (int i = 0; i < 3; ++i)
+      acc[i] -= me->acc[i];
+    double retval = acc.dist2() / dist2;
+    return retval;
+  }
+};
+
+double checkAllPairs(Bodies& bodies, int N) {
+  Bodies::iterator end(bodies.begin());
+  std::advance(end, N);
+  
+  return Galois::ParallelSTL::map_reduce(bodies.begin(), end,
+      CheckAllPairs(bodies),
+      0.0,
+      std::plus<double>()) / N;
+}
+
+void run(Bodies& bodies, BodyPtrs& pBodies) {
   typedef Galois::Runtime::WorkList::dChunkedLIFO<256> WL_;
   typedef Galois::Runtime::WorkList::ChunkedAdaptor<false,32> WL;
-
 
   for (int step = 0; step < ntimesteps; step++) {
     // Do tree building sequentially
@@ -642,30 +673,36 @@ void run(int nbodies, int ntimesteps, int seed) {
     Galois::setActiveThreads(numThreads);
 
     Galois::for_each_local<WL>(pBodies, ComputeForces(top, box.diameter()));
+    if (!skipVerify) {
+      std::cout << "MSE (sampled) " << checkAllPairs(bodies, std::min((int) nbodies, 100)) << "\n";
+    }
     Galois::for_each_local<WL>(pBodies, AdvanceBodies());
     T_parallel.stop();
 
-    std::cout 
-      << "Timestep " << step
-      << " Center of Mass = " << top->pos << "\n";
+    std::cout << "Timestep " << step << " Center of Mass = ";
+    std::ios::fmtflags flags = 
+      std::cout.setf(std::ios::showpos|std::ios::right|std::ios::scientific|std::ios::showpoint);
+    std::cout << top->pos;
+    std::cout.flags(flags);
+    std::cout << "\n";
     delete top;
   }
 }
 
-} // end namespace
-
 int main(int argc, char** argv) {
   Galois::StatManager M;
   LonestarStart(argc, argv, name, desc, url);
-  std::cout.setf(std::ios::right|std::ios::scientific|std::ios::showpoint);
 
-  std::cerr << "configuration: "
-            << nbodies << " bodies, "
-            << ntimesteps << " time steps" << std::endl << std::endl;
-  std::cout << "Num. of threads: " << numThreads << std::endl;
+  std::cout << config << "\n";
+  std::cout << nbodies << " bodies, "
+            << ntimesteps << " time steps\n";
+
+  Bodies bodies;
+  BodyPtrs pBodies;
+  generateInput(bodies, pBodies, nbodies, seed);
 
   Galois::StatTimer T;
   T.start();
-  run(nbodies, ntimesteps, seed);
+  run(bodies, pBodies);
   T.stop();
 }

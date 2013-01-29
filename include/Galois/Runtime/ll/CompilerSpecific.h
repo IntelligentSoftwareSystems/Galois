@@ -75,6 +75,6 @@ inline static void compilerBarrier() {
 
 }
 }
-}
+} // end namespace Galois
 
 #endif

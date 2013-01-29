@@ -80,7 +80,7 @@ struct GNodeIndexer: public std::unary_function<GNode,unsigned int> {
 unsigned int max_dist;
 std::vector<unsigned int> level_count;
 std::deque<unsigned int> read_offset;
-std::deque<GaloisRuntime::LL::CacheLineStorage<unsigned int> > write_offset;
+std::deque<Galois::Runtime::LL::CacheLineStorage<unsigned int> > write_offset;
 //std::deque<unsigned int> write_offset;
 std::vector<GNode> perm;
 
@@ -125,7 +125,7 @@ struct CutHillUnordered {
     }
 
     static void go(GNode source) {
-      using namespace GaloisRuntime::WorkList;
+      using namespace Galois::Runtime::WorkList;
       typedef dChunkedFIFO<64> dChunk;
       typedef ChunkedFIFO<64> Chunk;
       typedef OrderedByIntegerMetric<GNodeIndexer,dChunk> OBIM;
@@ -163,7 +163,7 @@ struct CutHillUnordered {
     }
 
     static void go(GNode source) {
-      count_levels cl = GaloisRuntime::do_all_impl(graph.begin(), graph.end(), count_levels(), default_reduce(), true);
+      count_levels cl = Galois::Runtime::do_all_impl(Galois::Runtime::makeStandardRange(graph.begin(), graph.end()), count_levels(), default_reduce(), true);
       level_count.swap(cl.counts);
       max_dist = cl.lmaxdist;
       read_offset.push_back(0);
@@ -190,7 +190,7 @@ struct CutHillUnordered {
 	unsigned todo = level_count[n];
 	while (todo) {
 	  //spin
-	  while (start == (cend = *endp)) {GaloisRuntime::LL::asmPause(); }
+	  while (start == (cend = *endp)) {Galois::Runtime::LL::asmPause(); }
 	  while (start != cend) {
 	    GNode next = perm[start];
 	    unsigned t_worig = t_wo;
@@ -221,7 +221,7 @@ struct CutHillUnordered {
 	    //sort to get cuthill ordering
 	    std::sort(&perm[t_worig], &perm[t_wo], sortDegFn());
 	    //output nodes
-	    GaloisRuntime::LL::compilerBarrier();
+	    Galois::Runtime::LL::compilerBarrier();
 	    write_offset[n+1].data = t_wo;
 	    //	++read_offset[n];
 	    //	--level_count[n];

@@ -222,14 +222,13 @@ private:
 			}
 			int edgeWeight = graph->getEdgeData(jj, Galois::NONE);
 			GNode neighborMapTo = metisGraph->getCoarseGraphMap(graph->getData(neighbor,Galois::NONE).getNodeId());//neighbor.getData(Galois::NONE).getMapTo();
-			int& weight = coarseGraph->getEdgeData(coarseGraph->addEdge(nodeMapTo, neighborMapTo, Galois::NONE));
-
-			if(weight == 0){
-				weight = edgeWeight;
-				nodeMapToData.incNumEdges();
-			}else{
-				weight += edgeWeight;
-			}
+                        GGraph::edge_iterator ff = coarseGraph->findEdge(nodeMapTo, neighborMapTo, Galois::NONE);
+                        if (ff == coarseGraph->edge_end(nodeMapTo, Galois::NONE)) {
+                          coarseGraph->getEdgeData(coarseGraph->addEdge(nodeMapTo, neighborMapTo, Galois::NONE)) = edgeWeight;
+                          nodeMapToData.incNumEdges();
+                        } else {
+                          coarseGraph->getEdgeData(ff) += edgeWeight;
+                        }
 			nodeMapToData.addEdgeWeight(edgeWeight);
 		}
 	}

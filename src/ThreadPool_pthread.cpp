@@ -91,9 +91,8 @@ public:
 
 class ThinBarrier: private boost::noncopyable {
   volatile int started;
-  int val;
 public:
-  ThinBarrier(int v): val(v) { }
+  ThinBarrier(int v) { }
   void release(int n = 1) {
     __sync_fetch_and_add(&started, 1);
   }

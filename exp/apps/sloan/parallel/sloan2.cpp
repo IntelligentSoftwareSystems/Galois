@@ -585,7 +585,7 @@ struct Sloan {
     }
 
     static void go(GNode source) {
-      using namespace GaloisRuntime::WorkList;
+      using namespace Galois::Runtime::WorkList;
       typedef dChunkedFIFO<64> dChunk;
       typedef ChunkedFIFO<64> Chunk;
       typedef OrderedByIntegerMetric<GNodeIndexer,dChunk> OBIM;
@@ -684,7 +684,7 @@ struct Sloan {
     }
 
     static void go(GNode source) {
-      using namespace GaloisRuntime::WorkList;
+      using namespace Galois::Runtime::WorkList;
       typedef dChunkedLIFO<64> dChunk;
       typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
 

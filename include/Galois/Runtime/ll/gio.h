@@ -50,6 +50,6 @@ void gFlush();
 #define GALOIS_ERROR(doabort, ...) { Galois::Runtime::LL::gError(doabort, __FILE__, __LINE__, ##__VA_ARGS__); }
 }
 }
-}
+} // end namespace Galois
 
 #endif //_GIO_H

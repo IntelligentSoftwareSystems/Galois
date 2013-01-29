@@ -42,7 +42,7 @@ void for_each_landing_pad(Distributed::RecvBuffer& buf) {
   buf.deserialize(data);
 
   //Start locally
-  Galois::Runtime::for_each_impl<WLTy>(data.begin(), data.end(), f, nullptr);
+  Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeStandardRange(data.begin(), data.end()), f, nullptr);
 }
 
 namespace {
@@ -55,7 +55,7 @@ void for_each_dist(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
 
   //fast path for non-distributed
   if (Distributed::networkHostNum == 1) {
-    for_each_impl<WLTy>(b,e,f,loopname);
+    for_each_impl<WLTy>(Galois::Runtime::makeStandardRange(b, e),f,loopname);
     return;
   }
 
@@ -80,7 +80,7 @@ void for_each_dist(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
   auto myblk = block_range(allData.begin(), allData.end(), 0, Distributed::networkHostNum);
 
   //Start locally
-  for_each_impl<WLTy>(myblk.first, myblk.second, f, loopname);
+  for_each_impl<WLTy>(Galois::Runtime::makeStandardRange(myblk.first, myblk.second), f, loopname);
 }
 
 

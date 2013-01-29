@@ -28,7 +28,7 @@
 #include "Galois/Threads.h"
 
 #include "Galois/ParallelSTL/ParallelSTL.h"
-#include "Galois/Runtime/DualLevelIterator.h"
+#include "Galois/TwoLevelIterator.h"
 #include "Galois/Runtime/ContextPool.h"
 #include "Galois/Runtime/ll/gio.h"
 
@@ -53,47 +53,29 @@ struct DItem {
   unsigned long id;
   void *localState;
 
-  DItem(const T& _val, unsigned long _id)
-    : val(_val), id(_id), localState (NULL) 
-  {}
+  DItem(const T& _val, unsigned long _id): val(_val), id(_id), localState(NULL) { }
 };
 
-
-
-template <typename T, typename CompareTy>
+template<typename T, typename CompareTy>
 struct DeterministicContext: public Galois::Runtime::SimpleRuntimeContext {
-
   typedef DItem<T> Item;
 
   Item item;
-  const CompareTy& comp;
+  const CompareTy* comp;
   bool not_ready;
 
+  DeterministicContext(const Item& _item, const CompareTy& _comp): 
+      SimpleRuntimeContext(true), 
+      item(_item),
+      comp(&_comp),
+      not_ready(false)
+  { }
 
-  DeterministicContext (const Item& _item, const CompareTy& _comp)
-    : 
-      SimpleRuntimeContext (true), 
-      item (_item),
-      comp (_comp),
-      not_ready (false)
-  {}
-
-  DeterministicContext& operator = (const DeterministicContext& that) {
-    SimpleRuntimeContext::operator = (that);
-    if (this != &that) {
-      item = that.item;
-      not_ready = that.not_ready;
-    }
-
-    return *this;
-  }
-
-  bool notReady () const { 
+  bool notReady() const { 
     return not_ready;
   }
 
-  virtual void sub_acquire (Galois::Runtime::Lockable* L) {
-
+  virtual void sub_acquire(Galois::Runtime::Lockable* L) {
     // TODO: should be redundant with new context hierarchy and virtual function call
     // Normal path
     // if (pendingFlag.flag.data == NON_DET) {
@@ -102,7 +84,7 @@ struct DeterministicContext: public Galois::Runtime::SimpleRuntimeContext {
     // }
 
     // Ordered and deterministic path
-    if (getPending () == COMMITTING)
+    if (getPending() == COMMITTING)
       return;
 
     if (L->Owner.try_lock()) {
@@ -118,7 +100,7 @@ struct DeterministicContext: public Galois::Runtime::SimpleRuntimeContext {
         return;
       if (other) {
 
-        bool conflict = comp (*other, *this); // *other < *this
+        bool conflict = (*comp)(*other, *this); // *other < *this
         if (conflict) {
           // A lock that I want but can't get
           not_ready = true;
@@ -132,50 +114,30 @@ struct DeterministicContext: public Galois::Runtime::SimpleRuntimeContext {
       other->not_ready = true; // Only need atomic write
 
     return;
-
   }
-
 };
 
-template <typename T, typename CompTy> 
+template<typename T, typename CompTy> 
 struct OrderedContextComp {
-  const CompTy& comp;
-
   typedef DeterministicContext<T, OrderedContextComp> DetContext;
 
-  explicit OrderedContextComp (const CompTy& c): comp (c) {}
+  const CompTy& comp;
 
-  inline bool operator () (const DetContext& left, const DetContext& right) const {
-    return comp (left.item.val, right.item.val);
+  explicit OrderedContextComp(const CompTy& c): comp(c) {}
+
+  inline bool operator()(const DetContext& left, const DetContext& right) const {
+    return comp(left.item.val, right.item.val);
   }
-
 };
 
-template <typename T>
+template<typename T>
 struct UnorderedContextComp {
-
   typedef DeterministicContext<T, UnorderedContextComp> DetContext;
 
-  inline bool operator () (const DetContext& left, const DetContext& right) const {
-    return (left.item.id < right.item.id);
+  inline bool operator()(const DetContext& left, const DetContext& right) const {
+    return left.item.id < right.item.id;
   }
 };
-
-template <typename T, typename CompTy>
-DeterministicContext<T, OrderedContextComp<T, CompTy> > make_context (
-    const DItem<T>& item, const CompTy& comp, OrderedTag) {
-
-  typedef OrderedContextComp<T, CompTy> C;
-  return DeterministicContext<T, OrderedContextComp<T, CompTy> > (item, C (comp));
-}
-
-template <typename T, typename CompTy>
-DeterministicContext <T, UnorderedContextComp<T> > make_context (
-    const DItem<T>& item, const CompTy& comp, UnorderedTag) {
-
-  typedef UnorderedContextComp<T> C;
-  return DeterministicContext<T, UnorderedContextComp<T> > (item, C());
-}
 
 template<typename Function1Ty,typename Function2Ty>
 struct Options {
@@ -190,15 +152,22 @@ struct OrderedOptions: public Options<_Function1Ty,_Function2Ty> {
   typedef _Function2Ty Function2Ty;
   typedef _T T;
   typedef _CompareTy CompareTy;
-  typedef DeterministicContext<T, OrderedContextComp<T, CompareTy> > DetContext;
+  typedef OrderedContextComp<T, CompareTy> ContextComp;
+  typedef DeterministicContext<T, ContextComp> DetContext;
   static const bool useOrdered = true;
   typedef OrderedTag Tag;
 
   Function1Ty& fn1;
   Function2Ty& fn2;
   CompareTy& comp;
+  ContextComp contextComp;
 
-  OrderedOptions(Function1Ty& fn1, Function2Ty& fn2, CompareTy& comp): fn1(fn1), fn2(fn2), comp(comp) { }
+  OrderedOptions(Function1Ty& fn1, Function2Ty& fn2, CompareTy& comp):
+    fn1(fn1), fn2(fn2), comp(comp), contextComp(comp) { }
+
+  DetContext make_context(const DItem<T>& item) const {
+    return DetContext(item, contextComp);
+  }
 };
 
 template<typename _T,typename _Function1Ty,typename _Function2Ty>
@@ -206,7 +175,8 @@ struct UnorderedOptions: public Options<_Function1Ty,_Function2Ty> {
   typedef _Function1Ty Function1Ty;
   typedef _Function2Ty Function2Ty;
   typedef _T T;
-  typedef DeterministicContext<T, UnorderedContextComp<T> > DetContext;
+  typedef UnorderedContextComp<T> ContextComp;
+  typedef DeterministicContext<T, ContextComp> DetContext;
   static const bool useOrdered = false;
   typedef UnorderedTag Tag;
   
@@ -221,8 +191,13 @@ struct UnorderedOptions: public Options<_Function1Ty,_Function2Ty> {
   Function1Ty& fn1;
   Function2Ty& fn2;
   CompareTy comp;
+  ContextComp contextComp;
 
   UnorderedOptions(Function1Ty& fn1, Function2Ty& fn2): fn1(fn1), fn2(fn2) { }
+
+  DetContext make_context(const DItem<T>& item) const {
+    return DetContext(item, contextComp);
+  }
 };
 
 //! Some template meta programming
@@ -253,7 +228,7 @@ struct StateManager<T,FunctionTy,typename boost::enable_if<has_local_state<Funct
   }
   void dealloc(Galois::Runtime::UserContextAccess<T>& c) {
     bool dummy;
-    LocalState *p = (LocalState*) c.data().getLocalState(dummy);
+    LocalState *p = reinterpret_cast<LocalState*>(c.data().getLocalState(dummy));
     p->~LocalState();
   }
   void save(Galois::Runtime::UserContextAccess<T>& c, void*& localState) { 
@@ -344,7 +319,6 @@ void safe_advance(InputIteratorTy& it, size_t d, size_t& cur, size_t dist) {
   cur += d;
 }
 
-
 //! Wrapper around WorkList::ChunkedFIFO to allow peek() and empty() and still have FIFO order
 template<int chunksize,typename T>
 struct FIFO {
@@ -412,7 +386,7 @@ class DMergeLocal: private boost::noncopyable {
     explicit HeapCompare(const CompareTy& c): comp(c) { }
     bool operator()(const T& a, const T& b) const {
       // reverse sense to get least items out of std::priority_queue
-      return comp (b, a);
+      return comp(b, a);
     }
   };
 
@@ -446,8 +420,7 @@ class DMergeLocal: private boost::noncopyable {
   size_t size;
 
 public:
-  DMergeLocal()
-    : alloc(&heap), newItems(alloc), newReserve(alloc) { 
+  DMergeLocal(): alloc(&heap), newItems(alloc), newReserve(alloc) { 
     resetStats(); 
   }
 
@@ -455,9 +428,7 @@ public:
     // itemPoolReset();
   }
 
-
 private:
-  
   //! Update min and max from sorted iterator
   template<typename BiIteratorTy>
   void initialLimits(BiIteratorTy ii, BiIteratorTy ei) {
@@ -503,7 +474,6 @@ private:
   //! to the nth element and (2) getting the next elements < windowElement.
   template<bool updateWE,typename WL>
   void orderedUpdateDispatch(WL* wl, const CompareTy& comp, size_t count) {
-    
     // count = 0 is a special signal to not do anything
     if (updateWE && count == 0)
       return;
@@ -532,7 +502,7 @@ private:
 
       bool fromReserve;
       if (p1 && p2)
-        fromReserve = comp (p1->val, *p2);
+        fromReserve = comp(p1->val, *p2);
       else if (!p1 && !p2)
         break;
       else
@@ -544,16 +514,16 @@ private:
       // empty as well.
       assert(mostElement && windowElement);
 
-      if (!comp (*val, *mostElement))
+      if (!comp(*val, *mostElement))
         break;
-      if (!updateWE && !comp (*val, *windowElement))
+      if (!updateWE && !comp(*val, *windowElement))
         break;
       if (updateWE && ++c >= count) {
         windowElement = boost::optional<T>(*val);
         break;
       }
       
-      wl->push(Item (*val, 0));
+      wl->push(Item(*val, 0));
 
       if (fromReserve)
         reserve.pop();
@@ -571,7 +541,7 @@ private:
     while (ii != ei) {
       unsigned long id = k * numActive + tid;
       if (id < window)
-        wl->push (Item(*ii, id));
+        wl->push(Item(*ii, id));
       else
         break;
       ++k;
@@ -594,14 +564,14 @@ private:
     size_t cur = 0;
     safe_advance(ii, tid, cur, dist);
     while (ii != ei) {
-      if (windowElement && !comp (*ii, *windowElement))
+      if (windowElement && !comp(*ii, *windowElement))
         break;
-      wl->push (Item (*ii, 0));
+      wl->push(Item(*ii, 0));
       safe_advance(ii, numActive, cur, dist);
     }
 
     while (ii != ei) {
-      if (mostElement && !comp (*ii, *mostElement))
+      if (mostElement && !comp(*ii, *mostElement))
         break;
       reserve.push(Item(*ii, 0));
       safe_advance(ii, numActive, cur, dist);
@@ -632,23 +602,23 @@ private:
 
     if (!mostElement) {
       mostElement = other.mostElement;
-    } else if (other.mostElement && comp (*mostElement, *other.mostElement)) {
+    } else if (other.mostElement && comp(*mostElement, *other.mostElement)) {
       mostElement = other.mostElement;
     }
 
     if (!windowElement) {
       windowElement = other.windowElement;
-    } else if (other.windowElement && comp (*windowElement, *other.windowElement)) {
+    } else if (other.windowElement && comp(*windowElement, *other.windowElement)) {
       windowElement = other.windowElement;
     }
   }
 
-  void popNewReserve (const CompareTy& comp) {
+  void popNewReserve(const CompareTy& comp) {
     std::pop_heap(newReserve.begin(), newReserve.end(), HeapCompare(comp));
     newReserve.pop_back();
   }
 
-  void pushNewReserve (const T& val, const CompareTy& comp) {
+  void pushNewReserve(const T& val, const CompareTy& comp) {
     newReserve.push_back(val);
     std::push_heap(newReserve.begin(), newReserve.end(), HeapCompare(comp));
   }
@@ -666,12 +636,10 @@ private:
   }
 
 public:
-
   void clear() {
     // itemPoolReset();
     heap.clear();
   }
-
 
   void incrementIterations() {
     ++iterations;
@@ -682,8 +650,8 @@ public:
   }
 
   void assertLimits(const T& val, const CompareTy& comp) {
-    assert(!windowElement || comp (val, *windowElement));
-    assert(!mostElement || comp (val, *mostElement));
+    assert(!windowElement || comp(val, *windowElement));
+    assert(!mostElement || comp(val, *mostElement));
   }
 
   template<typename WL>
@@ -845,7 +813,7 @@ class DMergeManager: public DMergeManagerBase<OptionsTy> {
   };
 
   typedef boost::transform_iterator<GetNewItem, boost::counting_iterator<int> > MergeOuterIt;
-  typedef DualLevelIterator<MergeOuterIt> MergeIt;
+  typedef typename Galois::ChooseStlTwoLevelIterator<MergeOuterIt, typename NewItemsTy::iterator>::type MergeIt;
 
   std::vector<NewItem,typename Galois::PerIterAllocTy::rebind<NewItem>::other> mergeBuf;
   std::vector<T,typename Galois::PerIterAllocTy::rebind<T>::other> distributeBuf;
@@ -866,9 +834,15 @@ class DMergeManager: public DMergeManagerBase<OptionsTy> {
     MergeOuterIt bbegin(boost::make_counting_iterator(begin), GetNewItem(&this->data));
     MergeOuterIt mmid(boost::make_counting_iterator(mid), GetNewItem(&this->data));
     MergeOuterIt eend(boost::make_counting_iterator(end), GetNewItem(&this->data));
-    MergeIt aa(bbegin, mmid), ea(mmid, mmid);
-    MergeIt bb(mmid, eend), eb(eend, eend);
-    MergeIt cc(bbegin, eend), ec(eend, eend);
+    // MergeIt aa(bbegin, mmid), ea(mmid, mmid);
+    // MergeIt bb(mmid, eend), eb(eend, eend);
+    // MergeIt cc(bbegin, eend), ec(eend, eend);
+    MergeIt aa = Galois::stl_two_level_begin(bbegin, mmid);
+    MergeIt ea = Galois::stl_two_level_end(bbegin, mmid);
+    MergeIt bb = Galois::stl_two_level_begin(mmid, eend);
+    MergeIt eb = Galois::stl_two_level_end(mmid, eend);
+    MergeIt cc = Galois::stl_two_level_begin(bbegin, eend);
+    MergeIt ec = Galois::stl_two_level_end(bbegin, eend);
 
     while (aa != ea && bb != eb) {
       if (*aa < *bb)
@@ -965,7 +939,8 @@ class DMergeManager: public DMergeManagerBase<OptionsTy> {
 
     MergeOuterIt bbegin(boost::make_counting_iterator(0), GetNewItem(&this->data));
     MergeOuterIt eend(boost::make_counting_iterator((int) this->numActive), GetNewItem(&this->data));
-    MergeIt ii(bbegin, eend), ei(eend, eend);
+    MergeIt ii = Galois::stl_two_level_begin(bbegin, eend);
+    MergeIt ei = Galois::stl_two_level_end(eend, eend);
 
     distribute(boost::make_transform_iterator(ii, typename Base::NewItem::GetFirst()),
         boost::make_transform_iterator(ei, typename Base::NewItem::GetFirst()),
@@ -1047,7 +1022,7 @@ class DMergeManager<OptionsTy,typename boost::enable_if<MergeTraits<OptionsTy> >
     const CompareTy& comp;
     CompareNewItems(const CompareTy& c): comp(c) { }
     bool operator()(const NewItem& a, const NewItem& b) const {
-      return comp (a.val, b.val);
+      return comp(a.val, b.val);
     }
   };
 
@@ -1133,7 +1108,7 @@ public:
       mlocal.pushNewReserve(val, comp);
     } else {
       // TODO: account for this work in calculateWindow
-      wl->push(Item (val, 0));
+      wl->push(Item(val, 0));
       nextCommit = true;
     }
   }
@@ -1181,7 +1156,7 @@ public:
       mlocal.initialWindow(this->numActive);
       
       assert(ii == ei || (mlocal.windowElement && mlocal.mostElement));
-      assert((!mlocal.windowElement && !mlocal.mostElement) || !comp (*mlocal.mostElement, *mlocal.windowElement));
+      assert((!mlocal.windowElement && !mlocal.mostElement) || !comp(*mlocal.mostElement, *mlocal.windowElement));
 
       // No new items; we just have the most element X from the previous round.
       // The most and window elements are exclusive of the range that they
@@ -1190,21 +1165,21 @@ public:
       // round, but the downside is that we will never return to windowed execution.
 
       // TODO: improve this
-      if (mlocal.windowElement && mlocal.mostElement && !comp (*mlocal.windowElement, *mlocal.mostElement)) {
+      if (mlocal.windowElement && mlocal.mostElement && !comp(*mlocal.windowElement, *mlocal.mostElement)) {
         mlocal.windowElement = mlocal.mostElement = boost::optional<T>();
         for (; ii != ei; ++ii) {
-          wl->push(Item (ii->val, 0));
+          wl->push(Item(ii->val, 0));
         }
       }
 
       for (; ii != ei; ++ii) {
-        if (!comp (ii->val, *mlocal.windowElement))
+        if (!comp(ii->val, *mlocal.windowElement))
           break; 
-        wl->push(Item (ii->val, 0));
+        wl->push(Item(ii->val, 0));
       }
 
       for (; ii != ei; ++ii) {
-        if (!comp (ii->val, *mlocal.mostElement))
+        if (!comp(ii->val, *mlocal.mostElement))
           break;
         mlocal.reserve.push(Item(ii->val, 0));
       }
@@ -1219,7 +1194,7 @@ public:
       for (; ii != ei; ++ii) {
         unsigned long id = ii->parent;
         if (id < mlocal.window)
-          wl->push(Item (ii->val, id));
+          wl->push(Item(ii->val, id));
         else
           break;
       }
@@ -1318,10 +1293,9 @@ public:
     }
   }
 
-  template<typename IterTy>
-  bool AddInitialWork(IterTy ii, IterTy ei) {
-    mergeManager.addInitialWork(ii, ei, &worklists[1]);
-    return true;
+  template<typename RangeTy>
+  void AddInitialWork(RangeTy range) {
+    mergeManager.addInitialWork(range.begin(), range.end(), &worklists[1]);
   }
 
   template<typename IterTy>
@@ -1434,12 +1408,12 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
 
     DetContext* ctx = NULL;
     if (useLocalState) {
-      ctx = tld.localPending.push(make_context (*p, options.comp, typename OptionsTy::Tag ()));
+      ctx = tld.localPending.push(options.make_context(*p));
     } else {
-      ctx = pending.push(make_context (*p, options.comp, typename OptionsTy::Tag ()));
+      ctx = pending.push(options.make_context(*p));
     }
 
-    assert (ctx != NULL);
+    assert(ctx != NULL);
 
     mlocal.incrementIterations();
     bool commit = true;
@@ -1448,10 +1422,10 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
       // cnx->set_comp(&options.comp);
       // cnx->set_comp_data(mlocal.itemPoolPush(p->item));
       // mlocal.assertLimits(p->item, options.comp);
-      mlocal.assertLimits (ctx->item.val, options.comp);
+      mlocal.assertLimits(ctx->item.val, options.comp);
     }
 
-    ctx->start_iteration ();
+    ctx->start_iteration();
     tld.stat.inc_iterations();
     setThreadContext(ctx);
 
@@ -1551,7 +1525,7 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
       mlocal.incrementCommitted();
       if (ForEachTraits<typename OptionsTy::Function2Ty>::NeedsPush) {
         unsigned long parent = ctx->item.id;
-        typedef typename UserContextAccess<value_type>::pushBufferTy::iterator iterator;
+        typedef typename UserContextAccess<value_type>::PushBufferTy::iterator iterator;
         unsigned count = 0;
         for (iterator ii = tld.facing.getPushBuffer().begin(), 
             ei = tld.facing.getPushBuffer().end(); ii != ei; ++ii) {
@@ -1574,9 +1548,9 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
     }
 
     if (commit) {
-      ctx->commit_iteration ();
+      ctx->commit_iteration();
     } else {
-      ctx->cancel_iteration ();
+      ctx->cancel_iteration();
     }
 
 
@@ -1592,8 +1566,8 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
     tld.facing.resetAlloc();
 
   setThreadContext(0);
-  if (false && LL::getTID () == 0) {
-    GALOIS_DEBUG ("niter = %zd, ncommits = %zd", niter, ncommits);
+  if (false && LL::getTID() == 0) {
+    GALOIS_DEBUG("niter = %zd, ncommits = %zd", niter, ncommits);
   }
   return retval;
 }
@@ -1605,11 +1579,9 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
 
 template<typename InitTy, typename WorkTy>
 static inline void for_each_det_impl(InitTy& init, WorkTy& W) {
-
-  W.presort(init.b, init.e);
+  W.presort(init.range.begin(), init.range.end());
 
   assert(!inGaloisForEach);
-
 
   inGaloisForEach = true;
   RunCommand w[4] = {std::ref(init), 
@@ -1624,14 +1596,14 @@ static inline void for_each_det_impl(InitTy& init, WorkTy& W) {
 
 template<typename IterTy, typename ComparatorTy, typename NhFunc, typename OpFunc>
 static inline void for_each_ordered_2p(IterTy b, IterTy e, ComparatorTy comp, NhFunc f1, OpFunc f2, const char* loopname) {
-
-  typedef typename std::iterator_traits<IterTy>::value_type T;
+  typedef Galois::Runtime::StandardRange<IterTy> Range;
+  typedef typename Range::value_type T;
   typedef Galois::Runtime::DeterministicWork::OrderedOptions<T,NhFunc,OpFunc,ComparatorTy> OptionsTy;
   typedef Galois::Runtime::DeterministicWork::Executor<OptionsTy> WorkTy;
 
   OptionsTy options(f1, f2, comp);
   WorkTy W(options, loopname);
-  Galois::Runtime::Initializer<IterTy, WorkTy> init(b, e, W);
+  Galois::Runtime::Initializer<Range, WorkTy> init(Range(b, e), W);
   for_each_det_impl(init, W);
 }
 
@@ -1644,13 +1616,14 @@ namespace Galois {
 //! Deterministic execution with prefix 
 template<typename IterTy, typename Function1Ty, typename Function2Ty>
 static inline void for_each_det(IterTy b, IterTy e, Function1Ty f1, Function2Ty f2, const char* loopname = 0) {
-  typedef typename std::iterator_traits<IterTy>::value_type T;
+  typedef Galois::Runtime::StandardRange<IterTy> Range;
+  typedef typename Range::value_type T;
   typedef Galois::Runtime::DeterministicWork::UnorderedOptions<T,Function1Ty,Function2Ty> OptionsTy;
   typedef Galois::Runtime::DeterministicWork::Executor<OptionsTy> WorkTy;
 
   OptionsTy options(f1, f2);
   WorkTy W(options, loopname);
-  Galois::Runtime::Initializer<IterTy, WorkTy> init(b, e, W);
+  Galois::Runtime::Initializer<Range, WorkTy> init(Range(b, e), W);
   Galois::Runtime::for_each_det_impl(init, W);
 }
 
@@ -1672,5 +1645,6 @@ static inline void for_each_det(T e, FunctionTy f, const char* loopname = 0) {
   Galois::for_each_det(&wl[0], &wl[1], f, f, loopname);
 }
 
-}
+} // end namespace Galois
+
 #endif

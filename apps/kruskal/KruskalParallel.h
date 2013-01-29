@@ -31,204 +31,74 @@
 #include "Galois/Atomic.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Runtime/PerThreadWorkList.h"
-#include "Galois/Runtime/DoAllCoupled.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
-
-#include "Galois/DoAllWrap.h"
 
 #include "Kruskal.h"
 
 namespace kruskal {
 
-
-
 struct EdgeCtx;
-template <typename T> struct Padded;
 
 typedef VecRep VecRep_ty;
-// typedef std::vector<Padded<int> > VecRep_ty;
 
-typedef GaloisRuntime::PerThreadVector<Edge> EdgeWL;
-typedef GaloisRuntime::PerThreadVector<EdgeCtx> EdgeCtxWL;
-typedef GaloisRuntime::MM::FSBGaloisAllocator<EdgeCtx> EdgeCtxAlloc;
+typedef Galois::Runtime::PerThreadVector<Edge> EdgeWL;
+typedef Galois::Runtime::PerThreadVector<EdgeCtx> EdgeCtxWL;
+typedef Galois::Runtime::MM::FSBGaloisAllocator<EdgeCtx> EdgeCtxAlloc;
 typedef Edge::Comparator Cmp;
 typedef Galois::GAccumulator<size_t> Accumulator;
 
-typedef Galois::GAtomicPadded<EdgeCtx*> AtomicCtxPtr;
-// typedef Galois::GAtomic<EdgeCtx*> AtomicCtxPtr;
+// typedef Galois::GAtomicPadded<EdgeCtx*> AtomicCtxPtr;
+typedef Galois::GAtomic<EdgeCtx*> AtomicCtxPtr;
 typedef std::vector<AtomicCtxPtr> VecAtomicCtxPtr;
 
 static const int NULL_EDGE_ID = -1;
 
-template <typename T>
-struct Padded {
-  GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE T data;
-
-  Padded (const T& x): data (x) {}
-
-  operator T& () { return data; }
-
-  operator T () const { return data; }
-
-};
-
-
 struct EdgeCtx: public Edge {
 
-  static const unsigned SRC_FAIL = 1;
-  static const unsigned DST_FAIL = 2;
-  static const unsigned SELF_EDGE = 4;
+  bool srcFail;
+  bool dstFail;
 
+  EdgeCtx (const Edge& e)
+    : Edge (e)
+      , srcFail (false), dstFail(false)
+  {}
 
-  unsigned status;
+  void setFail (const int rep) {
+    assert (rep != NULL_EDGE_ID);
 
-  explicit EdgeCtx (const Edge& e): Edge (e), status (0) {}
+    if (rep == src) {
+      srcFail = true;
 
-  void setFail (const int rep, VecRep_ty& repVec) {
-
-    if (getRep_int (this->src, repVec) == rep) {
-      status |= SRC_FAIL;
-
-    } else if (getRep_int (this->dst, repVec) == rep) {
-      status |= DST_FAIL;
+    } else if (rep == dst) {
+      dstFail = true;
 
     } else {
       abort ();
     }
   }
 
-  void setSelf () {
-    status |= SELF_EDGE;
-  }
-
   void resetStatus () {
-    status = 0;
+    srcFail = false;
+    dstFail = false;
   }
 
   bool isSrcFail () const { 
-    return bool (status & SRC_FAIL);
+    return srcFail;
   }
 
   bool isDstFail () const {
-    return bool (status & DST_FAIL);
+    return dstFail;
   }
 
   bool isSelf () const { 
-    return bool (status & SELF_EDGE);
+    return src == dst;
   }
 
+  bool statusIsReset () const {
+    return (!srcFail && !dstFail);
+  }
 
 };
-
-
-template <typename Iter>
-Edge pick_kth_internal (Iter b, Iter e, const typename std::iterator_traits<Iter>::difference_type k) {
-  typedef typename std::iterator_traits<Iter>::difference_type Dist_ty;
-  assert (std::distance (b, e) > k);
-
-  std::sort (b, e, Cmp ());
-
-  return *(b + k);
-}
-
-template <typename Iter>
-Edge pick_kth (Iter b, Iter e, const typename std::iterator_traits<Iter>::difference_type k) {
-  typedef typename std::iterator_traits<Iter>::difference_type Dist_ty;
-
-  static const size_t MAX_SAMPLE_SIZE = 1024;
-
-  Dist_ty total = std::distance (b, e);
-  assert (total > 0);
-
-  if (size_t (total) < MAX_SAMPLE_SIZE) {
-
-    std::vector<Edge> sampleSet (b, e);
-    return pick_kth_internal (sampleSet.begin (), sampleSet.end (), k);
-
-  } else {
-
-    size_t step = (total + MAX_SAMPLE_SIZE - 1)  / MAX_SAMPLE_SIZE; // round up;
-
-    std::vector<Edge> sampleSet;
-
-    size_t numSamples = total / step;
-
-    for (Iter i = b; i != e; std::advance (i, step)) {
-
-      if (sampleSet.size () == numSamples) {
-        break;
-      }
-
-      sampleSet.push_back (*i);
-    }
-
-    assert (numSamples == sampleSet.size ());
-    assert (numSamples <= MAX_SAMPLE_SIZE);
-
-    Dist_ty sample_k = k / step;
-
-    return pick_kth_internal (sampleSet.begin (), sampleSet.end (), sample_k);
-  }
-
-}
-
-
-struct Partition {
-  Edge pivot;
-  EdgeCtxAlloc& alloc;
-  EdgeCtxWL& lighter;
-  EdgeWL& heavier;
-
-  Partition (
-      const Edge& pivot,
-      EdgeCtxAlloc& alloc,
-      EdgeCtxWL& lighter,
-      EdgeWL& heavier)
-    :
-      pivot (pivot),
-      alloc (alloc),
-      lighter (lighter),
-      heavier (heavier)
-  {}
-
-
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Edge& edge) const {
-
-    if (Cmp::compare (edge, pivot) < 0) { // edge < pivot
-      // EdgeCtx* ctx = alloc.allocate (1);
-      // assert (ctx != NULL);
-      // alloc.construct (ctx, EdgeCtx(edge));
-      EdgeCtx ctx (edge);
-
-      lighter.get ().push_back (ctx);
-
-    } else {
-      heavier.get ().push_back (edge);
-    }
-  }
-};
-
-
-template <typename Iter> 
-void partition_edges (Iter b, Iter e, 
-    const typename std::iterator_traits<Iter>::difference_type k,
-    EdgeCtxAlloc& alloc, EdgeCtxWL& lighter, EdgeWL& heavier) {
-
-  assert (b != e);
-
-  Edge pivot = pick_kth (b, e, k);
-
-  Galois::do_all_choice (b, e, Partition (pivot, alloc, lighter, heavier), "partition_loop");
-
-  assert ((lighter.size_all () + heavier.size_all ()) == size_t (std::distance (b, e)));
-
-  // TODO: print here
-  std::printf ("total size = %ld, input index = %ld\n", std::distance (b, e), k);
-  std::printf ("lighter size = %zd, heavier size = %zd\n", 
-      lighter.size_all (), heavier.size_all ());
-
-}
-
 
 
 struct FindLoop {
@@ -236,59 +106,61 @@ struct FindLoop {
   // typedef char tt_does_not_need_parallel_push;
 
   VecRep_ty& repVec;
-  VecAtomicCtxPtr& minEdgeCtxVec;
+  VecAtomicCtxPtr& repOwnerCtxVec;
   Accumulator& findIter;
 
   FindLoop (
       VecRep_ty& repVec,
-      VecAtomicCtxPtr& minEdgeCtxVec,
+      VecAtomicCtxPtr& repOwnerCtxVec,
       Accumulator& findIter)
     :
       repVec (repVec),
-      minEdgeCtxVec (minEdgeCtxVec),
+      repOwnerCtxVec (repOwnerCtxVec),
       findIter (findIter)
   {}
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void claimAsMin (EdgeCtx& ctx, const int rep) {
 
-    assert (rep >= 0 && size_t (rep) < minEdgeCtxVec.size ());
 
-    bool succ = minEdgeCtxVec[rep].cas (NULL, &ctx);
+    bool succ = repOwnerCtxVec[rep].cas (NULL, &ctx);
 
-    assert (minEdgeCtxVec[rep] != NULL);
+    assert (repOwnerCtxVec[rep] != NULL);
 
-    for (EdgeCtx* curr = minEdgeCtxVec[rep];
-        !succ && Cmp::compare (*curr, ctx) > 0; curr = minEdgeCtxVec[rep]) {
+    if (!succ) {
+      for (EdgeCtx* curr = repOwnerCtxVec[rep];
+          Cmp::compare (*curr, ctx) > 0; curr = repOwnerCtxVec[rep]) {
 
-      succ = minEdgeCtxVec[rep].cas (curr, &ctx);
+        assert (curr != NULL);
+        succ = repOwnerCtxVec[rep].cas (curr, &ctx);
 
-      if (succ) {
-        curr->setFail (rep, repVec);
+        if (succ) {
+          curr->setFail (rep);
+          assert (Cmp::compare (*repOwnerCtxVec[rep], ctx) <= 0);
+          break;
+        }
       }
     }
 
     if (!succ) {
-      ctx.setFail (rep, repVec);
+      ctx.setFail (rep);
     }
-
-
+    
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (EdgeCtx& ctx) {
     findIter += 1;
 
-    int rep1 = kruskal::findPCiter_int (ctx.src, repVec);
-    int rep2 = kruskal::findPCiter_int (ctx.dst, repVec);
-    
-    if (rep1 != rep2) {
-      claimAsMin (ctx, rep1);
-      claimAsMin (ctx, rep2);
+    assert (ctx.statusIsReset ());
 
-    } else {
-      // self-edge, disable for early cleanup
-      ctx.setSelf ();
-    }
+    ctx.src = kruskal::findPCiter_int (ctx.src, repVec);
+    ctx.dst = kruskal::findPCiter_int (ctx.dst, repVec);
     
+    if (ctx.src != ctx.dst) {
+      claimAsMin (ctx, ctx.src);
+      claimAsMin (ctx, ctx.dst);
+
+    }     
+
   }
 
   template <typename C>
@@ -306,20 +178,20 @@ struct LinkUpLoop {
   // typedef char tt_does_not_need_parallel_push;
 
   VecRep_ty& repVec;
-  VecAtomicCtxPtr& minEdgeCtxVec;
+  VecAtomicCtxPtr& repOwnerCtxVec;
   EdgeCtxWL& nextWL;
   Accumulator& mstSum;
   Accumulator& linkUpIter;
 
   LinkUpLoop (
       VecRep_ty& repVec,
-      VecAtomicCtxPtr& minEdgeCtxVec,
+      VecAtomicCtxPtr& repOwnerCtxVec,
       EdgeCtxWL& nextWL,
       Accumulator& mstSum,
       Accumulator& linkUpIter)
     :
       repVec (repVec),
-      minEdgeCtxVec (minEdgeCtxVec),
+      repOwnerCtxVec (repOwnerCtxVec),
       nextWL (nextWL),
       mstSum (mstSum),
       linkUpIter (linkUpIter)
@@ -327,17 +199,22 @@ struct LinkUpLoop {
 
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE bool updateODG_test (EdgeCtx& ctx, const int rep) {
-    assert (rep >= 0 && size_t (rep) < minEdgeCtxVec.size ());
+    assert (rep >= 0 && size_t (rep) < repOwnerCtxVec.size ());
 
-    return (minEdgeCtxVec[rep] == &ctx);
+    if (usingOrderedRuntime) {
+      return ((EdgeCtx*) repOwnerCtxVec[rep])->id == ctx.id;
+
+    } else {
+      return (repOwnerCtxVec[rep] == &ctx);
+    }
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void updateODG_reset (EdgeCtx& ctx, const int rep) {
 
-    assert (rep >= 0 && size_t (rep) < minEdgeCtxVec.size ());
+    assert (rep >= 0 && size_t (rep) < repOwnerCtxVec.size ());
     assert (updateODG_test (ctx, rep));
 
-    minEdgeCtxVec[rep] = NULL;
+    repOwnerCtxVec[rep] = NULL;
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (EdgeCtx& ctx) {
@@ -345,11 +222,13 @@ struct LinkUpLoop {
 
     if (!ctx.isSelf () ) {
 
+
       if (ctx.isSrcFail () && ctx.isDstFail ()) {
+
         ctx.resetStatus ();
 
         if (usingOrderedRuntime) {
-          GaloisRuntime::signalConflict ();
+          Galois::Runtime::signalConflict ();
 
         } else {
           nextWL.get ().push_back (ctx);
@@ -357,68 +236,31 @@ struct LinkUpLoop {
 
       } else {
 
-      // relies on find with path-compression
-      int rep1 = getRep_int (ctx.src, repVec);
-      int rep2 = getRep_int (ctx.dst, repVec);
 
-      if (!ctx.isSrcFail ()) {
-        assert (updateODG_test (ctx, rep1));
-        linkUp_int (rep1, rep2, repVec);
+        if (!ctx.isSrcFail ()) {
+          assert (updateODG_test (ctx, ctx.src));
+          linkUp_int (ctx.src, ctx.dst, repVec);
 
-      } else if (!ctx.isDstFail ()) {
-        assert (updateODG_test (ctx, rep2));
-        linkUp_int (rep2, rep1, repVec);
-      }
+        } else if (!ctx.isDstFail ()) {
+          assert (updateODG_test (ctx, ctx.dst));
+          linkUp_int (ctx.dst, ctx.src, repVec);
+        }
 
-      linkUpIter += 1;
-      mstSum += ctx.weight;
+        linkUpIter += 1;
+        mstSum += ctx.weight;
 
-      if (!ctx.isSrcFail ()) {
-        updateODG_reset (ctx, rep1);
-      }
+        if (!ctx.isSrcFail ()) {
+          updateODG_reset (ctx, ctx.src);
+        }
 
-      if (!ctx.isDstFail ()) {
-        updateODG_reset (ctx, rep2);
-      }
+        if (!ctx.isDstFail ()) {
+          updateODG_reset (ctx, ctx.dst);
+        }
 
-    } // end else
-  }
+      } // end else
+    }
 
 
-    // if (rep1 != rep2) {
-// 
-      // bool succ1 = updateODG_test (edge, rep1);
-      // bool succ2 = updateODG_test (edge, rep2);
-// 
-      // if (succ1) {
-        // linkUp_int (rep1, rep2, repVec);
-// 
-      // } else if (succ2) {
-        // linkUp_int (rep2, rep1, repVec);
-// 
-      // } else {
-        // if (usingOrderedRuntime) {
-          // GaloisRuntime::signalConflict ();
-        // } else {
-          // nextWL.get ().push_back (edge);
-        // }
-      // }
-// 
-// 
-      // if (succ1 || succ2) {
-        // linkUpIter += 1;
-        // mstSum += edge.weight;
-// 
-      // }
-// 
-      // if (succ1) {
-        // updateODG_reset (edge, rep1);
-      // }
-// 
-      // if (succ2) {
-        // updateODG_reset (edge, rep2);
-      // }
-    // }
     
   }
 
@@ -432,105 +274,323 @@ struct LinkUpLoop {
   }
 };
 
-struct FilterSelfEdges {
-  VecRep_ty& repVec;
-  EdgeCtxAlloc& alloc;
-  EdgeCtxWL& filterWL;
+template <typename WL>
+struct PreSort {
+  WL& wl;
 
-  FilterSelfEdges (
-      VecRep_ty& repVec, 
-      EdgeCtxAlloc& alloc,
-      EdgeCtxWL& filterWL)
-    : 
-      repVec (repVec), 
-      alloc (alloc),
-      filterWL (filterWL) 
-  {}
+  PreSort (WL& wl): wl (wl) {}
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Edge& edge) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (unsigned tid, unsigned numT) {
+    assert (tid < wl.numRows ());
+    for (unsigned i = numT; i < wl.numRows (); ++i) {
+      assert (wl[i].empty ());
+    }
+    std::sort (wl[tid].begin (), wl[tid].end (), Cmp ());
+  }
+};
 
-    int rep1 = findPCiter_int (edge.src, repVec);
-    int rep2 = findPCiter_int (edge.dst, repVec);
+template <typename WL>
+void presort (WL& wl, Galois::TimeAccumulator& sortTimer) {
+  sortTimer.start ();
+  Galois::on_each (PreSort<WL> (wl), "pre_sort");
+  sortTimer.stop ();
+}
 
-    if (rep1 != rep2) {
-      // EdgeCtx* ctx = alloc.allocate (1);
-      // assert (ctx != NULL);
-      // alloc.construct (ctx, EdgeCtx (edge));
-      EdgeCtx ctx (edge);
+template <typename Iter>
+struct Range {
+  typedef typename std::iterator_traits<Iter>::difference_type difference_type;
+  typedef typename std::iterator_traits<Iter>::value_type value_type;
 
-      filterWL.get ().push_back (ctx);
+  typedef Galois::Runtime::PerThreadStorage<Range> PTS;
+
+  Iter m_beg;
+  Iter m_end;
+
+  Range (): m_beg (), m_end () {}
+
+  Range (Iter b, Iter e): m_beg (b), m_end (e) {} 
+
+  // TODO: improve for non-random iterators
+  const value_type* atOffset (difference_type d) {
+    if (m_beg == m_end) {
+      return NULL;
+
+    } else {
+      if (d >= std::distance (m_beg, m_end)) {
+        d = std::distance (m_beg, m_end) - 1;
+      }
+      Iter i (m_beg);
+      std::advance (i, d);
+      return &(*i);
     }
   }
 };
 
 
+
+
+template <typename T, typename I, typename WL>
+struct RefillWorkList {
+
+  const T* windowLimit;
+  typename Range<I>::PTS& ranges;
+  WL& wl;
+
+  RefillWorkList (
+      const T* windowLimit,
+      typename Range<I>::PTS& ranges,
+      WL& wl)
+    :
+      windowLimit (windowLimit),
+      ranges (ranges),
+      wl (wl)
+  {}
+
+  void operator () (unsigned tid, unsigned numT) {
+
+    assert (tid < ranges.size ());
+
+    for (unsigned i = numT; i < ranges.size (); ++i) {
+      Range<I>& r = *ranges.getRemote (i);
+      assert (r.m_beg == r.m_end);
+    }
+
+    Range<I>& r = *ranges.getRemote (tid);
+
+    for (;r.m_beg != r.m_end; ++r.m_beg) {
+      if (Cmp::compare (*r.m_beg, *windowLimit) <= 0) {
+        wl.get ().push_back (*r.m_beg);
+      } else {
+        break;
+      }
+    }
+  } // end method
+};
+
+
+template <typename WL, typename I>
+void refillWorkList (WL& wl, typename Range<I>::PTS& ranges, const size_t windowSize, const size_t numT) {
+
+
+  typedef typename Range<I>::value_type T;
+
+  size_t perThrdSize = windowSize / numT;
+
+  const T* windowLimit = NULL;
+
+  for (unsigned i = 0; i < numT; ++i) {
+    assert (i < ranges.size ());
+    const T* lim = ranges.getRemote (i)->atOffset (perThrdSize);
+
+    if (lim != NULL) {
+      if (windowLimit == NULL || (Cmp::compare (*lim, *windowLimit) > 0)) {
+        windowLimit = lim;
+      }
+    }
+  }
+
+  GALOIS_DEBUG ("size before refill: %zd", wl.size_all ());
+
+  if (windowLimit != NULL) {
+    GALOIS_DEBUG ("new window limit: %s", windowLimit->str ().c_str ());
+
+    Galois::on_each (RefillWorkList<T, I, WL> (windowLimit, ranges, wl), "refill");
+
+    for (unsigned i = 0; i < ranges.size (); ++i) {
+      Range<I>& r = *ranges.getRemote (i);
+
+      if (r.m_beg != r.m_end) {
+        // assuming that ranges are sorted
+        // after refill, the first element in each range should be bigger
+        // than windowLimit
+        assert (Cmp::compare (*r.m_beg, *windowLimit) > 0); 
+      }
+    }
+  } else {
+
+    for (unsigned i = 0; i < ranges.size (); ++i) {
+      Range<I>& r = *ranges.getRemote (i);
+      assert (r.m_beg == r.m_end);
+    }
+
+
+  }
+
+  GALOIS_DEBUG ("size after refill: %zd", wl.size_all ())
+}
+
+
+struct UnionFindWindow {
+
+  size_t maxRounds;
+  size_t lowThresh;
+
+  UnionFindWindow (): maxRounds (64), lowThresh (2) {}
+
+  UnionFindWindow (size_t maxRounds, size_t lowThresh)
+    : maxRounds (maxRounds), lowThresh (lowThresh) 
+  {}
+
+  void operator () (
+      EdgeCtxWL& perThrdWL, 
+      VecRep_ty& repVec, 
+      VecAtomicCtxPtr& repOwnerCtxVec, 
+      size_t& mstWeight, 
+      size_t& totalIter,
+      Galois::TimeAccumulator& sortTimer,
+      Galois::TimeAccumulator& findTimer,
+      Galois::TimeAccumulator& linkUpTimer,
+      Accumulator& findIter,
+      Accumulator& linkUpIter) const {
+
+
+    typedef EdgeCtxWL::local_iterator Iter;
+    typedef Range<Iter> Range_ty;
+    typedef Range_ty::PTS PerThrdRange;
+    typedef Range_ty::difference_type Diff_ty;
+
+    PerThrdRange ranges;
+
+    presort (perThrdWL, sortTimer);
+
+    for (unsigned i = 0; i < ranges.size (); ++i) {
+      *ranges.getRemote (i) = Range_ty (perThrdWL[i].begin (), perThrdWL[i].end ());
+    }
+
+
+    const size_t numT = Galois::getActiveThreads ();
+
+    const size_t totalDist = perThrdWL.size_all ();
+    const size_t windowSize = totalDist / maxRounds;
+
+    const size_t lowThreshSize = windowSize / lowThresh;
+
+    unsigned round = 0;
+    size_t numUnions = 0;
+    Accumulator mstSum;
+
+    EdgeCtxWL* currWL = new EdgeCtxWL ();
+    EdgeCtxWL* nextWL = new EdgeCtxWL ();
+
+    while (true) {
+      ++round;
+      std::swap (nextWL, currWL);
+      nextWL->clear_all ();
+
+      if (currWL->size_all () <= lowThreshSize) {
+        // size_t s = lowThreshSize - currWL->size_all () + 1;
+        sortTimer.start ();
+        refillWorkList<EdgeCtxWL, Iter> (*currWL, ranges, windowSize, numT);
+        sortTimer.stop ();
+      }
+
+      if (currWL->empty_all ()) {
+        break;
+      }
+
+      // Galois::Runtime::beginSampling ();
+      findTimer.start ();
+      Galois::do_all (currWL->begin_all (), currWL->end_all (),
+          FindLoop (repVec, repOwnerCtxVec, findIter),
+          "find_loop");
+      findTimer.stop ();
+      // Galois::Runtime::endSampling ();
+
+
+      // Galois::Runtime::beginSampling ();
+      linkUpTimer.start ();
+      Galois::do_all (currWL->begin_all (), currWL->end_all (),
+          LinkUpLoop<false> (repVec, repOwnerCtxVec, *nextWL, mstSum, linkUpIter),
+          "link_up_loop");
+      linkUpTimer.stop ();
+      // Galois::Runtime::endSampling ();
+
+      int u = linkUpIter.reduce () - numUnions;
+      numUnions = linkUpIter.reduce ();
+
+      if (!nextWL->empty_all ()) {
+        assert (u > 0 && "no unions, no progress?");
+      }
+
+    }
+
+    totalIter += findIter.reduce ();
+    mstWeight += mstSum.reduce ();
+
+    std::cout << "Number of rounds: " << round << std::endl;
+
+    delete currWL;
+    delete nextWL;
+
+  }
+
+};
+
+
+struct FillUp {
+  EdgeCtxWL& wl;
+
+  explicit FillUp (EdgeCtxWL& wl): wl (wl) {}
+
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Edge& edge) {
+    wl.get ().push_back (edge);
+  }
+};
+
+
+
 template <typename UF>
-void runMSTparallel (const size_t numNodes, const VecEdge& edges,
+void runMSTsimple (const size_t numNodes, const VecEdge& edges, 
     size_t& mstWeight, size_t& totalIter, UF ufLoop) {
 
   totalIter = 0;
   mstWeight = 0;
 
   Galois::TimeAccumulator runningTime;
-  Galois::TimeAccumulator partitionTimer;
+  Galois::TimeAccumulator sortTimer;
   Galois::TimeAccumulator findTimer;
   Galois::TimeAccumulator linkUpTimer;
-  Galois::TimeAccumulator filterTimer;
+  Galois::TimeAccumulator fillUpTimer;
 
   Accumulator findIter;
   Accumulator linkUpIter;
 
 
-
   VecRep_ty repVec (numNodes, -1);
-  VecAtomicCtxPtr minEdgeCtxVec (numNodes, AtomicCtxPtr (NULL));
-  EdgeCtxAlloc alloc;
+  VecAtomicCtxPtr repOwnerCtxVec (numNodes, AtomicCtxPtr (NULL));
 
 
+  fillUpTimer.start ();
+  EdgeCtxWL initWL;
+  unsigned numT = Galois::getActiveThreads ();
+  for (unsigned i = 0; i < numT; ++i) {
+    initWL[i].reserve ((edges.size () + numT - 1) / numT);
+  }
 
-  Galois::preAlloc (16*Galois::getActiveThreads ());
+  Galois::do_all (edges.begin (), edges.end (), FillUp (initWL), "fill_init");
+
+  fillUpTimer.stop ();
 
   runningTime.start ();
 
-  partitionTimer.start ();
-  EdgeCtxWL lighter;
-  EdgeWL heavier;
+  ufLoop (initWL, repVec, repOwnerCtxVec, 
+      mstWeight, totalIter, sortTimer, findTimer, linkUpTimer, findIter, linkUpIter);
 
-  typedef std::iterator_traits<VecEdge::iterator>::difference_type Dist_ty;
-  Dist_ty splitPoint = numNodes;
-  partition_edges (edges.begin (), edges.end (), splitPoint, alloc, lighter, heavier);
-
-  partitionTimer.stop ();
-
-  ufLoop (lighter, repVec, minEdgeCtxVec, 
-      mstWeight, totalIter, findTimer, linkUpTimer, findIter, linkUpIter);
-
-
-  // reuse lighter for filterWL
-  lighter.clear_all ();
-
-  filterTimer.start ();
-  Galois::do_all_choice (heavier,
-  // GaloisRuntime::do_all_coupled (heavier, 
-      FilterSelfEdges (repVec, alloc, lighter),
-      "filter_loop");
-  filterTimer.stop ();
-
-
-  ufLoop (lighter, repVec, minEdgeCtxVec, 
-      mstWeight, totalIter, findTimer, linkUpTimer, findIter, linkUpIter);
   runningTime.stop ();
 
   std::cout << "Number of FindLoop iterations = " << findIter.reduce () << std::endl;
   std::cout << "Number of LinkUpLoop iterations = " << linkUpIter.reduce () << std::endl;
 
   std::cout << "MST running time without initialization/destruction: " << runningTime.get () << std::endl;
+  std::cout << "Time taken by sortTimer: " << sortTimer.get () << std::endl;
   std::cout << "Time taken by FindLoop: " << findTimer.get () << std::endl;
   std::cout << "Time taken by LinkUpLoop: " << linkUpTimer.get () << std::endl;
-  std::cout << "Time taken by partitioning Loop: " << partitionTimer.get () << std::endl;
-  std::cout << "Time taken by filter Loop: " << filterTimer.get () << std::endl;
+  std::cout << "Time taken by FillUp: " << fillUpTimer.get () << std::endl;
 
 }
+
+
+
 
 
 }// end namespace kruskal

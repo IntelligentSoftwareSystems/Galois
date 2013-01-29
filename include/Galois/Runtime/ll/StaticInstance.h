@@ -74,6 +74,6 @@ struct StaticInstance {
 
 }
 }
-}
+} // end namespace Galois
 
 #endif

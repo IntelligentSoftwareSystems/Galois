@@ -40,7 +40,7 @@ struct PendingStatus {
 
 static HIDDEN::PendingStatus pendingStatus;
 
-void Galois::Runtime::setPending(PendingFlag value) {
+void Galois::Runtime::setPending(Galois::Runtime::PendingFlag value) {
   pendingStatus.flag.data = value;
 }
 
@@ -145,7 +145,7 @@ void Galois::Runtime::breakLoop() {
 }
 
 void Galois::Runtime::signalConflict() {
-        throw Galois::Runtime::CONFLICT; // Conflict
+  throw Galois::Runtime::CONFLICT; // Conflict
 }
 
 /*

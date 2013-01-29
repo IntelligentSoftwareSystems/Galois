@@ -31,6 +31,6 @@ void endSampling();
 void reportSampling(const char* loopname);
 
 }
-}
+} // end namespace Galois
 
 #endif

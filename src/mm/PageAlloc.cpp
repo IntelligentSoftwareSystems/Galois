@@ -50,7 +50,6 @@ struct FreeNode {
  
 typedef Galois::Runtime::LL::PtrLock<FreeNode, true> HeadPtr;
 typedef Galois::Runtime::LL::CacheLineStorage<HeadPtr> HeadPtrStorage;
-typedef Galois::Runtime::LL::CacheLineStorage<HeadPtr> HeadPtrStorage;
 
 //Number of pages allocated
 struct PAState {
@@ -92,8 +91,9 @@ void* allocFromOS() {
     ptr = mmap(0, Galois::Runtime::MM::pageSize, _PROT, _MAP_POP, -1, 0);
 #endif
   //Then try normal
-  if (!ptr || ptr == MAP_FAILED)
+  if (!ptr || ptr == MAP_FAILED) {
     ptr = mmap(0, Galois::Runtime::MM::pageSize, _PROT, _MAP_BASE, -1, 0);
+  }
   
   allocLock.unlock();
   if (!ptr || ptr == MAP_FAILED) {

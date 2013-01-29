@@ -44,8 +44,6 @@
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
 #include "Galois/Galois.h"
-#include "Galois/GaloisUnsafe.h"
-#include "Galois/Graphs/FileGraph.h"
 #include "Galois/Graphs/LCGraph.h"
 #include "Galois/Runtime/WorkList.h"
 #include "Galois/Runtime/Sampling.h"
@@ -61,6 +59,10 @@ static const char* const url = "kruskal";
 
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 
+static cll::opt<unsigned> numPages (
+    "preAlloc",
+    cll::desc ("number of pages(per thread) to pre-allocate from OS for Galois allocators "),
+    cll::init (32));
 
 namespace kruskal {
 
@@ -119,6 +121,16 @@ struct Edge: public InEdge {
       && (left.weight == right.weight);
   }
 
+  std::string str () const {
+    char s[256];
+    sprintf (s, "(id=%d,src=%d,dst=%d,weight=%d)", id, src, dst, weight);
+    return std::string (s);
+  }
+
+  friend std::ostream& operator << (std::ostream& out, const Edge& edge) {
+    return (out << edge.str ());
+  }
+
   struct Comparator {
     static inline int compare (const Edge& left, const Edge& right) {
       int d = left.weight - right.weight;
@@ -167,6 +179,9 @@ int findPCiter_int (const int node, V& repVec) {
   assert (repVec[node] >= 0);
 
   int rep = repVec[node];
+
+  if (repVec[rep] < 0) { return rep; }
+
   while (repVec[rep] >= 0) { 
     rep = repVec[rep]; 
   }
@@ -201,12 +216,8 @@ class Kruskal {
 public:
 
   typedef std::vector<Edge> VecEdge;
-  // typedef std::set<KEdge<KNode_tp>, 
-          // typename KEdge<KNode_tp>::NodeIDcomparator> Edges_ty;
 
   typedef std::tr1::unordered_set<InEdge, InEdge::Hash> SetInEdge;
-
-  //typedef std::vector<KEdge<KNode_tp> > Edges_ty;
 
 protected:
 
@@ -253,17 +264,18 @@ protected:
         unsigned dst = ingraph.getData (ingraph.getEdgeDst (e), Galois::NONE);
 
         if (src != dst) {
-
-          InEdge ke (src, dst, ingraph.getEdgeData (e));
+          const Weight_ty& w = ingraph.getEdgeData (e);
+          InEdge ke (src, dst, w);
 
           std::pair<SetInEdge::iterator, bool> res = edgeSet.insert (ke);
 
           if (res.second) {
             ++numEdges;
+          } else if (w < res.first->weight) {
+            edgeSet.insert (edgeSet.erase (res.first), ke);
           }
-
         } else {
-          std::fprintf (stderr, "Warning: Ignoring self edge (%d, %d, %d)\n",
+          GALOIS_DEBUG ("Warning: Ignoring self edge (%d, %d, %d)\n",
               src, dst, ingraph.getEdgeData (*e));
         }
       }
@@ -327,6 +339,8 @@ protected:
         //edges.push_back (ke);
         if (res.second) {
           ++numEdges;
+        } else if (integ_wt < res.first->weight) {
+          edgeSet.insert (edgeSet.erase (res.first), ke);
         }
 
       } else {
@@ -349,19 +363,29 @@ protected:
 
   }
 
+
+  void writePBBSfile (const std::string& filename, const SetInEdge& edgeSet) {
+
+    FILE* outFile = std::fopen (filename.c_str (), "w");
+    assert (outFile != NULL);
+
+    fprintf (outFile, "WeightedEdgeArray\n");
+
+    for (SetInEdge::const_iterator i = edgeSet.begin ()
+        , endi = edgeSet.end (); i != endi; ++i) {
+
+      fprintf (outFile, "%d %d %e\n", i->src, i->dst, double (i->weight));
+    }
+
+    fclose (outFile);
+  }
+
+
 public:
 
   virtual void run (int argc, char* argv[]) {
     Galois::StatManager stat;
     LonestarStart (argc, argv, name, desc, url);
-
-    //TODO
-    // read the graph from file into a FileGraph
-    // create nodes and edges
-    // compute a set of edges
-    // run kruskal, which should return mst weight as int
-    // verify
-
 
     size_t numNodes;
     SetInEdge edgeSet;
@@ -369,11 +393,15 @@ public:
     size_t mstWeight = 0;
     size_t totalIter = 0;
 
-    Galois::StatTimer t_read ("time spent in reading input: ");
+    Galois::StatTimer t_read ("InitializeTime");
 
     t_read.start ();
     readGraph (filename, numNodes, edgeSet);
     // readPBBSfile (filename, numNodes, edgeSet);
+
+
+    // writePBBSfile ("edgeList.pbbs", edgeSet);
+    // std::exit (0);
 
     VecEdge edges;
 
@@ -389,8 +417,11 @@ public:
 
 
     initRemaining (numNodes, edges);
+
+    // pre allocate memory from OS for parallel runs
+    Galois::preAlloc (numPages*Galois::getActiveThreads ());
     
-    Galois::StatTimer t ("Time taken by runMST: ");
+    Galois::StatTimer t;
 
     t.start ();
     // GaloisRuntime::beginSampling ();
@@ -557,14 +588,14 @@ private:
 
 
   bool verify (const size_t numNodes, const SetInEdge& edgeSet, const size_t kruskalSum) const {
-    Galois::StatTimer pt("Prim's Time:");
+    Galois::StatTimer pt("PrimTime");
     pt.start ();
     size_t primSum = runPrim (numNodes, edgeSet);
     pt.stop ();
 
     if (primSum != kruskalSum) {
       std::cerr << "ERROR. Incorrect MST weight=" << kruskalSum 
-        << ", correct weight from Prim is=" << primSum << std::endl;
+        << ", weight computed by Prim is=" << primSum << std::endl;
       abort ();
 
     } else {

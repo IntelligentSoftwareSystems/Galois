@@ -24,9 +24,10 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 #include "Galois/Galois.h"
-#include "Galois/Bag.h"
 #include "Galois/Accumulator.h"
+#include "Galois/Bag.h"
 #include "Galois/Statistic.h"
+#include "Galois/UnionFind.h"
 #include "Galois/Graphs/LCGraph.h"
 #include "Galois/ParallelSTL/ParallelSTL.h"
 #include "llvm/Support/CommandLine.h"
@@ -49,14 +50,13 @@ enum Algo {
 };
 
 static cll::opt<std::string> inputFilename(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<Algo> algo(cll::desc("Choose an algorithm:"),
+static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
       clEnumVal(demo, "Demonstration algorithm"),
       clEnumVal(asynchronous, "Asynchronous"),
       clEnumValEnd), cll::init(asynchronous));
 
-struct Node {
-  unsigned int id;
+struct Node: public Galois::UnionFindNode<Node> {
   Node* component;
 };
 
@@ -71,7 +71,7 @@ typedef Graph::GraphNode GNode;
 Graph graph;
 
 std::ostream& operator<<(std::ostream& os, const Node& n) {
-  os << "[id: " << n.id << ", c: " << n.component->id << "]";
+  os << "[id: " << &n << "]";
   return os;
 }
 
@@ -115,44 +115,6 @@ struct DemoAlgo {
  * Like asynchronous connected components algorithm. 
  */
 struct AsynchronousAlgo {
-  static Node* find(Node* x, bool compress) {
-    // Basic outline of race in synchronous path compression is that two path
-    // compressions along two different paths to the root can create a cycle
-    // in the union-find tree. Prevent that from happening by compressing
-    // incrementally.
-    Node* rep = x;
-    Node* prev = 0;
-    int rank = 0;
-    while (rep->component != rep) {
-      Node* next = rep->component;
-
-      if (compress) {
-        if (prev && prev->component == rep)
-          prev->component = next;
-        prev = rep;
-      }
-
-      rep = next;
-      ++rank;
-    }
-    return rep;
-  }
-
-  //! Lock-free merge. Returns if merge was done.
-  static bool merge(Node* a, Node* b) {
-    while (true) {
-      a = find(a, true);
-      b = find(b, true);
-      if (a == b)
-        return false;
-      // Avoid cycles by directing edges consistently
-      if (a->id > b->id)
-        std::swap(a, b);
-      if (__sync_bool_compare_and_swap(&a->component, a, b))
-        return true;
-    }
-  }
-
   struct Merge {
     typedef int tt_does_not_need_aborts;
     typedef int tt_does_not_need_parallel_push;
@@ -172,7 +134,7 @@ struct AsynchronousAlgo {
           ei = graph.edge_end(src, Galois::NONE); ii != ei; ++ii) {
         GNode dst = graph.getEdgeDst(ii);
         Node& ddata = graph.getData(dst, Galois::NONE);
-        if (merge(&sdata, &ddata)) {
+        if (sdata.merge(&ddata)) {
           mst.push(std::make_pair(src, dst));
         } else {
           emptyMerges += 1;
@@ -185,7 +147,7 @@ struct AsynchronousAlgo {
   struct Normalize {
     void operator()(const GNode& src) const {
       Node& sdata = graph.getData(src, Galois::NONE);
-      sdata.component = find(&sdata, true);
+      sdata.component = sdata.findAndCompress();
     }
   };
 
@@ -277,13 +239,6 @@ int main(int argc, char** argv) {
   Tinitial.start();
   graph.structureFromFile(inputFilename.c_str());
   std::cout << "Num nodes: " << graph.size() << "\n";
-
-  unsigned int id = 0;
-  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii, ++id) {
-    Node& n = graph.getData(*ii);
-    n.id = id;
-    n.component = &n;
-  }
   Tinitial.stop();
 
   //Galois::preAlloc(numThreads);
@@ -303,4 +258,3 @@ int main(int argc, char** argv) {
 
   return 0;
 }
-
