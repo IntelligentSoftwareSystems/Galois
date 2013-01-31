@@ -38,6 +38,11 @@ namespace Galois {
 namespace Runtime {
 namespace Distributed {
 
+//Objects with this tag should make blocking calls
+BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_dir_blocking)
+template<typename T>
+struct dir_blocking : public has_tt_dir_blocking<T> {};
+
 class RemoteDirectory: public SimpleRuntimeContext {
 
   struct objstate {
@@ -193,8 +198,8 @@ T* RemoteDirectory::resolve(uintptr_t ptr, uint32_t owner) {
   while (!p) {
     NetworkInterface& net = getSystemNetworkInterface();
     fetchRemoteObj(ptr, owner, &LocalDirectory::localReqLandingPad<T>);
-    // abort the iteration if inside for each
-    if (Galois::Runtime::inGaloisForEach)
+    // abort the iteration if inside for each and dir_blocking not defined
+    if (Galois::Runtime::inGaloisForEach && !dir_blocking<T>::value)
       throw Galois::Runtime::REMOTE;
     p = haveObject(ptr, owner);
     // call handleReceives as only thread outside for_each
@@ -295,8 +300,8 @@ T* LocalDirectory::resolve(uintptr_t ptr) {
   while (!p) {
     NetworkInterface& net = getSystemNetworkInterface();
     fetchRemoteObj(ptr, sent, &RemoteDirectory::remoteReqLandingPad<T>);
-    // abort the iteration inside for each
-    if (Galois::Runtime::inGaloisForEach)
+    // abort the iteration if inside for each and dir_blocking not defined
+    if (Galois::Runtime::inGaloisForEach && !dir_blocking<T>::value)
       throw Galois::Runtime::REMOTE;
     p = haveObject(ptr, sent);
     // call handleReceives as only thread outside for_each
@@ -388,8 +393,8 @@ T* PersistentDirectory::resolve(uintptr_t ptr, uint32_t owner) {
   while (!p) {
     NetworkInterface& net = getSystemNetworkInterface();
     fetchRemoteObj(ptr, owner, &PersistentDirectory::persistentReqLandingPad<T>);
-    // abort the iteration if inside for each
-    if (Galois::Runtime::inGaloisForEach)
+    // abort the iteration if inside for each and dir_blocking not defined
+    if (Galois::Runtime::inGaloisForEach && !dir_blocking<T>::value)
       throw Galois::Runtime::REMOTE;
     p = haveObject(ptr, owner);
     // call handleReceives only for thread outside for_each
@@ -422,7 +427,6 @@ void PersistentDirectory::persistentReqLandingPad(RecvBuffer &buf) {
 template<typename T>
 void PersistentDirectory::persistentDataLandingPad(RecvBuffer &buf) {
   uint32_t owner;
-  size_t size;
   T *data;
   uintptr_t ptr;
   PersistentDirectory& pd = getSystemPersistentDirectory();
