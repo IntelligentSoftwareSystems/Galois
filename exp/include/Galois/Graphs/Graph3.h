@@ -261,6 +261,9 @@ class ThirdGraph { //: public Galois::Runtime::Distributed::DistBase<ThirdGraph>
 public:
   typedef typename gNode::Handle NodeHandle;
 
+  // mark the graph as persistent so that it is distributed
+  typedef int tt_is_presistent;
+
   template<typename... Args>
   NodeHandle createNode(Args&&... args) {
     NodeHandle N(new gNode(std::forward<Args...>(args...)));

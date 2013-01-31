@@ -31,12 +31,18 @@ namespace Galois {
 namespace Runtime {
 namespace Distributed {
 
+//Objects with this tag have to be stored in a persistent cache
+//Objects with this tag use the Persistent Directory
+BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_is_persistent)
+template<typename T>
+struct is_persistent : public has_tt_is_persistent<T> {};
+
 template<typename T>
 class gptr {
   uintptr_t ptr;
   uint32_t owner;
 
-  T* resolve() const {
+  T* resolve(typename std::enable_if<!is_persistent<T>::value>::type* = 0) const {
     T* rptr = nullptr;
     assert(ptr);
     if (owner == networkHostID)
@@ -48,6 +54,20 @@ class gptr {
       acquire(rptr, MethodFlag::ALL);
     return rptr;
   }
+
+  // resolve for persistent objects!
+/*
+  T* resolve(typename std::enable_if<is_persistent<T>::value>::type* = 0) const {
+    T* rptr = nullptr;
+    assert(ptr);
+    if (owner == networkHostID)
+      rptr = reinterpret_cast<T>(ptr);
+    else
+      rptr = getSystemPersistentDirectory().resolve<T>(ptr, owner);
+    assert(rptr);
+    return rptr;
+  }
+*/
 
 public:
   typedef T element_type;

@@ -134,10 +134,49 @@ public:
   T* resolve(uintptr_t ptr);
 };
 
+class PersistentDirectory: public SimpleRuntimeContext {
+
+  struct objstate {
+    uintptr_t localobj;
+    bool requested;
+  };
+
+  struct ohash : public unary_function<std::pair<uintptr_t, uint32_t>, size_t> {
+    size_t operator()(const std::pair<uintptr_t, uint32_t>& v) const {
+      return std::hash<uintptr_t>()(v.first) ^ std::hash<uint32_t>()(v.second);
+    }
+  };
+
+  boost::unordered_map<std::pair<uintptr_t, uint32_t>, objstate, ohash> perobj;
+  Galois::Runtime::LL::SimpleLock<true> Lock;
+
+  // returns a valid local pointer to the object if not remote
+  uintptr_t haveObject(uintptr_t ptr, uint32_t owner);
+
+  // places a remote request for the node
+  void fetchRemoteObj(uintptr_t ptr, uint32_t owner, recvFuncTy pad);
+
+public:
+
+  // forward the request if the state is remote
+  // send the object if local and not locked, also mark as remote
+  template<typename T>
+  static void persistentReqLandingPad(RecvBuffer &);
+
+  // send the object if local, not locked and mark obj as remote
+  template<typename T>
+  static void persistentDataLandingPad(RecvBuffer &);
+
+  // resolve a pointer
+  template<typename T>
+  T* resolve(uintptr_t ptr, uint32_t owner);
+};
 
 RemoteDirectory& getSystemRemoteDirectory();
 
 LocalDirectory& getSystemLocalDirectory();
+
+PersistentDirectory& getSystemPersistentDirectory();
 
 } //Distributed
 } //Runtime
@@ -336,6 +375,66 @@ void LocalDirectory::localDataLandingPad(RecvBuffer &buf) {
   OBJSTATE.state = LocalDirectory::objstate::Local;
   unlock(L);
   ld.Lock.unlock();
+#undef OBJSTATE
+  return;
+}
+
+// should be blocking if not in for each
+template<typename T>
+T* PersistentDirectory::resolve(uintptr_t ptr, uint32_t owner) {
+  assert(ptr);
+  assert(owner != networkHostID);
+  uintptr_t p = haveObject(ptr, owner);
+  while (!p) {
+    NetworkInterface& net = getSystemNetworkInterface();
+    fetchRemoteObj(ptr, owner, &PersistentDirectory::persistentReqLandingPad<T>);
+    // abort the iteration if inside for each
+    if (Galois::Runtime::inGaloisForEach)
+      throw Galois::Runtime::REMOTE;
+    p = haveObject(ptr, owner);
+    // call handleReceives only for thread outside for_each
+    net.handleReceives();
+  }
+  return reinterpret_cast<T*>(p);
+}
+
+// everytime there's a request send the object!
+// always runs on the host owning the object
+template<typename T>
+void PersistentDirectory::persistentReqLandingPad(RecvBuffer &buf) {
+  T *data;
+  uintptr_t ptr;
+  SendBuffer sbuf;
+  uint32_t remote, owner;
+  owner = networkHostID;
+  NetworkInterface& net = getSystemNetworkInterface();
+  buf.deserialize(ptr);
+  buf.deserialize(remote);
+  data = reinterpret_cast<T*>(ptr);
+  // object should be sent to the remote host
+  sbuf.serialize(ptr);
+  sbuf.serialize(owner);
+  sbuf.serialize(*data);
+  net.sendMessage(remote,&PersistentDirectory::persistentDataLandingPad<T>,sbuf);
+  return;
+}
+
+template<typename T>
+void PersistentDirectory::persistentDataLandingPad(RecvBuffer &buf) {
+  uint32_t owner;
+  size_t size;
+  T *data;
+  uintptr_t ptr;
+  PersistentDirectory& pd = getSystemPersistentDirectory();
+#define OBJSTATE (*iter).second
+  pd.Lock.lock();
+  buf.deserialize(ptr);
+  buf.deserialize(owner);
+  auto iter = pd.perobj.find(make_pair(ptr,owner));
+  data = new T();
+  buf.deserialize((*data));
+  OBJSTATE.localobj = (uintptr_t)data;
+  pd.Lock.unlock();
 #undef OBJSTATE
   return;
 }
