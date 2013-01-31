@@ -56,9 +56,9 @@ int BORUVKA_SAMPLE_FREQUENCY= 1000000;
 using namespace std;
 namespace cll = llvm::cl;
 
-static const char* name = "Boruvka MST";
-static const char* desc = "Computes the Minimal Spanning Tree using Boruvka\n";
-static const char* url = "boruvkas_algorithm";
+static const char* name = "Boruvka's Minimum Spanning Tree Algorithm";
+static const char* desc = "Computes a minimum weight spanning tree of a graph";
+static const char* url = "mst";
 
 static cll::opt<std::string> inputfile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<bool> use_weighted_rmat("wrmat",cll::desc("Weighted RMAT"), cll::Optional,cll::init(false));
