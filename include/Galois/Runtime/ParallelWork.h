@@ -40,22 +40,11 @@
 #include "Galois/WorkList/GFifo.h"
 
 #include <algorithm>
+#include <functional>
 
 namespace Galois {
 namespace Runtime {
 namespace {
-
-template<typename RangeTy, typename WorkTy>
-struct Initializer {
-  RangeTy range;
-  WorkTy& work;
-  
-  Initializer(const RangeTy& r, WorkTy& w): range(r), work(w) { }
-
-  void operator()() {
-    work.AddInitialWork(range);
-  }
-};
 
 template <bool Enabled> 
 class LoopStatistics {
@@ -91,10 +80,10 @@ class ForEachWork {
 protected:
   typedef T value_type;
   typedef typename WorkListTy::template retype<value_type> WLTy;
-  typedef Galois::WorkList::GFIFO<value_type> AbortedList;
+  typedef WorkList::GFIFO<value_type> AbortedList;
 
   struct ThreadLocalData {
-    Galois::Runtime::UserContextAccess<value_type> facing;
+    UserContextAccess<value_type> facing;
     SimpleRuntimeContext cnx;
     LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
     ThreadLocalData(const char* ln) :stat(ln) {}
@@ -198,10 +187,10 @@ protected:
     switch (result) {
     case 0:
       break;
-    case Galois::Runtime::CONFLICT:
+    case CONFLICT:
       abortIteration(*p, tld, recursiveAbort);
       break;
-    case Galois::Runtime::BREAK:
+    case BREAK:
       handleBreak(tld);
       return false;
     default:
@@ -261,7 +250,7 @@ public:
   ForEachWork(W& w, FunctionTy& f, const char* l): wl(w), function(f), loopname(l), term(getSystemTermination()), broke(false) { }
 
   template<typename RangeTy>
-  void AddInitialWork(RangeTy range) {
+  void AddInitialWork(const RangeTy& range) {
     term.initializeThread();
     wl.push_initial(range);
   }
@@ -278,7 +267,7 @@ public:
 
 
 template<typename WLTy, typename RangeTy, typename FunctionTy>
-void for_each_impl(RangeTy range, FunctionTy f, const char* loopname) {
+void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
   assert(!inGaloisForEach);
 
   inGaloisForEach = true;
@@ -287,12 +276,12 @@ void for_each_impl(RangeTy range, FunctionTy f, const char* loopname) {
   typedef ForEachWork<WLTy, T, FunctionTy> WorkTy;
 
   WorkTy W(f, loopname);
-  Initializer<RangeTy, WorkTy> init(range, W);
-  RunCommand w[4] = {std::ref(init), 
+  RunCommand init(std::bind(&WorkTy::template AddInitialWork<RangeTy>, std::ref(W), range));
+  RunCommand w[4] = {init, 
 		     std::ref(getSystemBarrier()),
 		     std::ref(W),
 		     std::ref(getSystemBarrier())};
-  getSystemThreadPool().run(&w[0], &w[4]);
+  getSystemThreadPool().run(&w[0], &w[4], activeThreads);
   inGaloisForEach = false;
 }
 
@@ -301,15 +290,15 @@ struct WOnEach {
   FunctionTy fn;
   WOnEach(FunctionTy f) :fn(f) {}
   void operator()(void) {
-    fn(Galois::Runtime::LL::getTID(), activeThreads);   
+    fn(LL::getTID(), activeThreads);   
   }
 };
 
 template<typename FunctionTy>
 void on_each_impl(FunctionTy fn, const char* loopname = 0) {
-  Galois::Runtime::RunCommand w[2] = {WOnEach<FunctionTy>(fn),
-				    std::ref(getSystemBarrier())};
-  Galois::Runtime::getSystemThreadPool().run(&w[0], &w[2]);
+  RunCommand w[2] = {WOnEach<FunctionTy>(fn),
+		     std::ref(getSystemBarrier())};
+  getSystemThreadPool().run(&w[0], &w[2], activeThreads);
 }
 
 } // end namespace anonymous
