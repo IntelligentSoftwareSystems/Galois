@@ -247,6 +247,7 @@ class ThirdGraph { //: public Galois::Runtime::Distributed::DistBase<ThirdGraph>
     Galois::Runtime::Distributed::gptr<SubGraphState> next;
     Galois::Runtime::Distributed::gptr<SubGraphState> master;
     typedef int tt_has_serialize;
+    typedef int tt_dir_blocking;
     void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
       s.serialize(head, next, master);
     }
@@ -260,9 +261,6 @@ class ThirdGraph { //: public Galois::Runtime::Distributed::DistBase<ThirdGraph>
 
 public:
   typedef typename gNode::Handle NodeHandle;
-
-  // mark the graph as persistent so that it is distributed
-  typedef int tt_is_presistent;
 
   template<typename... Args>
   NodeHandle createNode(Args&&... args) {
@@ -332,6 +330,8 @@ public:
 
   ThirdGraph() {}
   typedef int tt_has_serialize;
+  // mark the graph as persistent so that it is distributed
+  typedef int tt_is_persistent;
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
     //This is what is called on the source of a replicating source
     s.serialize(localState.master);

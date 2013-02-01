@@ -37,37 +37,43 @@ BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_is_persistent)
 template<typename T>
 struct is_persistent : public has_tt_is_persistent<T> {};
 
-template<typename T>
-class gptr {
-  uintptr_t ptr;
-  uint32_t owner;
+template<typename T, bool> struct resolve;
 
-  T* resolve(typename std::enable_if<!is_persistent<T>::value>::type* = 0) const {
+template<typename T>
+struct resolve<T, false> {
+    static T* go(uint32_t owner, uintptr_t ptr) {
     T* rptr = nullptr;
     assert(ptr);
     if (owner == networkHostID)
       rptr = getSystemLocalDirectory().resolve<T>(ptr);
-    else 
+    else
       rptr = getSystemRemoteDirectory().resolve<T>(ptr, owner);
     assert(rptr);
     if (inGaloisForEach)
       acquire(rptr, MethodFlag::ALL);
     return rptr;
   }
+};
 
-  // resolve for persistent objects!
-/*
-  T* resolve(typename std::enable_if<is_persistent<T>::value>::type* = 0) const {
+// resolve for persistent objects!
+template<typename T>
+struct resolve<T,true> {
+  static T* go(uint32_t owner, uintptr_t ptr) {
     T* rptr = nullptr;
     assert(ptr);
     if (owner == networkHostID)
-      rptr = reinterpret_cast<T>(ptr);
+      rptr = reinterpret_cast<T*>(ptr);
     else
       rptr = getSystemPersistentDirectory().resolve<T>(ptr, owner);
     assert(rptr);
     return rptr;
   }
-*/
+};
+
+template<typename T>
+class gptr {
+  uintptr_t ptr;
+  uint32_t owner;
 
 public:
   typedef T element_type;
@@ -77,10 +83,10 @@ public:
   explicit gptr(T* p) :ptr(reinterpret_cast<uintptr_t>(p)), owner(networkHostID) {}
 
   T& operator*() const {
-    return *resolve();
+    return *resolve<T,is_persistent<T>::value>::go(owner, ptr);
   }
   T *operator->() const {
-    return resolve();
+    return resolve<T,is_persistent<T>::value>::go(owner, ptr);
   }
   operator bool() const { return ptr != 0; }
   gptr& operator=(T* p) {
