@@ -32,7 +32,7 @@ protected:
 
   void dump(std::ostream& os) {
     os << "next: ";
-    nextNode.dump(os);
+    nextNode.dump();
     os << " active: ";
     os << active;
   }
@@ -100,7 +100,7 @@ public:
 
   void dump(std::ostream& os) {
     os << "<{Edge: dst: ";
-    dst.dump(os);
+    dst.dump();
     os << " val: ";
     os << val;
     os << "}>";
@@ -282,27 +282,32 @@ public:
     Galois::Runtime::Distributed::gptr<SubGraphState> s;
     void next() {
       n = n->getNextNode();
-      while (s->next && !n) {
+      while (!n && s->next) {
 	s = s->next;
 	n = s->head;
       }
+      if (!n) s.initialize(nullptr);
     }
   public:
-    explicit iterator(Galois::Runtime::Distributed::gptr<SubGraphState> ms) :n(), s(ms) {
-      n = s->head;
-      while (s->next && !n) {
+  iterator() :n(), s() {}
+    explicit iterator(Galois::Runtime::Distributed::gptr<SubGraphState> ms) :n(ms->head), s(ms) {
+      while (!n && s->next) {
 	s = s->next;
 	n = s->head;
       }
+      if (!n) s.initialize(nullptr);
     }
-    iterator() :n(), s() {}
-    iterator(const iterator& mit) : n(mit.n), s(mit.s) {}
 
     NodeHandle& operator*() { return n; }
     iterator& operator++() { next(); return *this; }
-    iterator operator++(int) { iterator tmp(*this); operator++(); return tmp; }
+    iterator operator++(int) { iterator tmp(*this); next(); return tmp; }
     bool operator==(const iterator& rhs) { return n == rhs.n; }
     bool operator!=(const iterator& rhs) { return n != rhs.n; }
+
+    void dump() {
+      n.dump();
+      s.dump();
+    }
   };
 
   iterator begin() { return iterator(localState.master); }
@@ -340,7 +345,7 @@ public:
     //This constructs the local node of the distributed graph
     s.deserialize(localState.master);
     localState.next = localState.master->next;
-    localState.master->next = &localState;
+    localState.master->next.initialize(&localState);
   }
   
 };

@@ -43,21 +43,10 @@
 #include "Galois/Runtime/WorkList.h"
 
 #include <algorithm>
+#include <functional>
 
 namespace Galois {
 namespace Runtime {
-
-template<typename RangeTy, typename WorkTy>
-struct Initializer {
-  RangeTy range;
-  WorkTy& work;
-  
-  Initializer(const RangeTy& r, WorkTy& w): range(r), work(w) { }
-
-  void operator()() {
-    work.AddInitialWork(range);
-  }
-};
 
 template <bool Enabled> 
 class LoopStatistics {
@@ -179,7 +168,6 @@ protected:
     bool workHappened = false;
     boost::optional<value_type> p = lwl.pop();
     unsigned num = 0;
-    int result = 0;
     if (p)
       workHappened = true;
     try {
@@ -192,22 +180,11 @@ protected:
 	}
 	p = lwl.pop();
       }
-    } catch (ConflictFlag const& flag) {
-      clearConflictLock();
-      result = flag;
-    }
-    switch (result) {
-    case 0:
-      break;
-    case Galois::Runtime::REMOTE:
-    case Galois::Runtime::CONFLICT:
+    } catch (const conflict_ex& ex) {
       abortIteration(*p, tld, recursiveAbort);
-      break;
-    case Galois::Runtime::BREAK:
+    } catch (const break_ex&) {
       handleBreak(tld);
       return false;
-    default:
-      GALOIS_ERROR(true, "unknown conflict type");
     }
     return workHappened;
   }
@@ -269,7 +246,7 @@ public:
   ForEachWork(W& w, FunctionTy& f, const char* l): wl(w), function(f), loopname(l), term(getSystemTermination()), broke(false) { }
 
   template<typename RangeTy>
-  void AddInitialWork(RangeTy range) {
+  void AddInitialWork(const RangeTy& range) {
     wl.push_initial(range);
     term.initializeThread();
   }
@@ -277,7 +254,7 @@ public:
   // in the distributed case even with 1 thread there can be aborts
   void operator()() {
     if (LL::isPackageLeaderForSelf(LL::getTID()) &&
-  //Galois::Runtime::activeThreads > 1 && 
+	(activeThreads > 1 || Distributed::networkHostNum > 1) && 
 	ForEachTraits<FunctionTy>::NeedsAborts)
       go<true>();
     else
@@ -296,8 +273,8 @@ void for_each_impl(RangeTy range, FunctionTy f, const char* loopname) {
   typedef ForEachWork<WLTy, T, FunctionTy> WorkTy;
 
   WorkTy W(f, loopname);
-  Initializer<RangeTy, WorkTy> init(range, W);
-  RunCommand w[4] = {std::ref(init), 
+  RunCommand init(std::bind(&WorkTy::template AddInitialWork<RangeTy>, std::ref(W), range));
+  RunCommand w[4] = {init, 
 		     std::ref(getSystemBarrier()),
 		     std::ref(W),
 		     std::ref(getSystemBarrier())};

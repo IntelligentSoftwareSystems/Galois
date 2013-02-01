@@ -268,27 +268,10 @@ class BSInlineExecutor {
   }
 
   void processWithAborts(ThreadLocalData& tld, const HIDDEN::WID& wid, WLTy* cur, WLTy* next) {
-    int result = 0;
-#if GALOIS_USE_EXCEPTION_HANDLER
     try {
       process(tld, wid, cur, next);
-    } catch (ConflictFlag const& flag) {
-      clearConflictLock();
-      result = flag;
-    }
-#else
-    if ((result = setjmp(hackjmp)) == 0) {
-      process(tld, wid, cur, next);
-    }
-#endif
-    switch (result) {
-    case 0: break;
-    case Galois::Runtime::CONFLICT:
+    } catch (const conflict_ex& ex) {
       abortIteration(tld, wid, cur, next);
-      break;
-    case Galois::Runtime::BREAK:
-    default:
-      abort();
     }
   }
 

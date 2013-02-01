@@ -13,6 +13,7 @@ makeTest(printhost)
 #makeTest(dist)
 makeTest(distnodes)
 makeTest(distgraph)
+makeTest(dgraph)
 #makeTest(foreachtask)
 makeTest(networktest)
 

@@ -190,32 +190,12 @@ class ForEachWork<WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
       while ((item = workList.getCurr().pop())) {
         IterationContext& it = newIteration();
 
-        bool doabort = false;
         try {
           function(*item, it.facing.data ());
-
-        } catch (ConflictFlag flag) {
-          clearConflictLock();
-          switch (flag) {
-            case Galois::Runtime::CONFLICT:
-              doabort = true;
-              break;
-
-            case Galois::Runtime::BREAK:
-              GALOIS_ERROR(true, "can't handle breaks yet");
-              break;
-
-            default:
-              abort ();
-          }
-        }
-
-        if (doabort) {
-          abortIteration(it, *item);
-
-        } else {
-          commitQueue.push_back(&it);
-        }
+	  commitQueue.push_back(&it);
+        } catch (const conflict_ex& ex) {
+	  abortIteration(it, *item);
+	}
 
         ++numIter;
       }
@@ -295,7 +275,6 @@ class ForEachWork<WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
   }
 
   unsigned abortIteration(IterationContext& it, value_type& item) {
-    clearConflictLock();
     workList.getNext().push(item);
     return retireIteration(it, true);
   }

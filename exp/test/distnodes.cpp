@@ -1,4 +1,5 @@
 #include "Galois/Galois.h"
+#include "Galois/Statistic.h"
 #include "Galois/Graphs/Graph3.h"
 #include "Lonestar/BoilerPlate.h"
 
@@ -18,7 +19,7 @@ struct op {
 };
 
 int main(int argc, char** argv) {
-
+  Galois::StatManager statManager;
   LonestarStart(argc, argv, nullptr, nullptr, nullptr);
 
   // check the host id and initialise the network
@@ -72,9 +73,9 @@ int main(int argc, char** argv) {
     D.print(std::cout);
     cout << "\n";
     
-    oldB.dump(std::cout);
+    oldB.dump();
     std::cout << "\n";
-    foo.dump(std::cout);
+    foo.dump();
     std::cout << "\n";
     (*oldB).dump(std::cout);
     std::cout << "\n";

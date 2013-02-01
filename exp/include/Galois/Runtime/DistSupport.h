@@ -45,12 +45,12 @@ struct resolve<T, false> {
     T* rptr = nullptr;
     assert(ptr);
     if (owner == networkHostID)
-      rptr = getSystemLocalDirectory().resolve<T>(ptr);
+      rptr = reinterpret_cast<T*>(ptr);
     else
       rptr = getSystemRemoteDirectory().resolve<T>(ptr, owner);
     assert(rptr);
-    if (inGaloisForEach)
-      acquire(rptr, MethodFlag::ALL);
+    //if (inGaloisForEach)
+    //acquire(rptr, MethodFlag::ALL);
     return rptr;
   }
 };
@@ -88,16 +88,18 @@ public:
   T *operator->() const {
     return resolve<T,is_persistent<T>::value>::go(owner, ptr);
   }
-  operator bool() const { return ptr != 0; }
-  gptr& operator=(T* p) {
-    ptr = reinterpret_cast<uintptr_t>(p);
-    owner = networkHostID;
-    return *this;
+
+  bool operator==(const gptr& rhs) const {
+    return rhs.ptr == ptr && rhs.owner == owner;
   }
-  gptr& operator=(const gptr& p) {
-    ptr = p.ptr;
-    owner = p.owner;
-    return *this;
+  bool operator!=(const gptr& rhs) const {
+    return rhs.ptr != ptr || rhs.owner != owner;
+  }
+  explicit operator bool() const { return ptr != 0; }
+
+  void initialize(T* p) {
+    ptr = reinterpret_cast<uintptr_t>(p);
+    owner = ptr ? networkHostID : 0;
   }
 
   //serialize
@@ -111,8 +113,8 @@ public:
     s.deserialize(owner);
   }
 
-  void dump(std::ostream& os) {
-    os << "[" << owner << ", " << ptr << "]";
+  void dump() {
+    printf("[%x,%lx]", owner, ptr);
   }
 };
 

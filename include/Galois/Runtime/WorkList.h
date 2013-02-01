@@ -79,23 +79,23 @@ public:
   };
 
   //! push a value onto the queue
-  void push(const value_type& val) { abort(); }
+  void push(const value_type& val);
 
   //! push a range onto the queue
   template<typename Iter>
-  void push(Iter b, Iter e) { abort(); }
+  void push(Iter b, Iter e);
 
   //! push initial range onto the queue
   //! called with the same b and e on each thread
   template<typename RangeTy>
-  void push_initial(RangeTy) { abort(); }
+  void push_initial(const RangeTy&);
 
   //Optional, but this is the likely interface for stealing
   //! steal from a similar worklist
   boost::optional<value_type> steal(AbstractWorkList& victim, bool half, bool pop);
 
   //! pop a value from the queue.
-  boost::optional<value_type> pop() { abort(); }
+  boost::optional<value_type> pop();
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -136,7 +136,7 @@ public:
   }
 
   template<typename RangeTy>
-  void push_initial(RangeTy range) {
+  void push_initial(const RangeTy& range) {
     if (LL::getTID() == 0)
       push(range.begin(), range.end());
   }
@@ -214,7 +214,7 @@ public:
   }
 
   template<typename RangeTy>
-  void push_initial(RangeTy range) {
+  void push_initial(const RangeTy& range) {
     if (LL::getTID() == 0)
       push(range.begin(), range.end());
   }
@@ -276,7 +276,7 @@ public:
   }
 
   template<typename RangeTy>
-  void push_initial(RangeTy range) {
+  void push_initial(const RangeTy& range) {
     if (LL::getTID() == 0)
       push(range.begin(), range.end());
   }
@@ -427,7 +427,7 @@ class OrderedByIntegerMetric : private boost::noncopyable {
   }
 
   template<typename RangeTy>
-  void push_initial(RangeTy range) {
+  void push_initial(const RangeTy& range) {
     push(range.local_begin(), range.local_end());
   }
 
@@ -495,7 +495,7 @@ public:
   }
 
   template<typename RangeTy>
-  void push_initial(RangeTy range) {
+  void push_initial(const RangeTy& range) {
     global.push_initial(range);
   }
 
@@ -636,7 +636,7 @@ public:
   }
 
   template<typename RangeTy>
-  void push_initial(RangeTy range) {
+  void push_initial(const RangeTy& range) {
     push(range.local_begin(), range.local_end());
   }
 
@@ -727,7 +727,7 @@ public:
   }
 
   template<typename RangeTy>
-  void push_initial(RangeTy range) {
+  void push_initial(const RangeTy& range) {
     push(range.local_begin(), range.local_end());
     for (unsigned int x = 0; x < pushBuffer.size(); ++x)
       pushBuffer.getRemote(x)->flush();
@@ -792,7 +792,7 @@ class BulkSynchronous : private boost::noncopyable {
   }
 
   template<typename RangeTy>
-  void push_initial(RangeTy range) {
+  void push_initial(const RangeTy& range) {
     push(range.local_begin(), range.local_end());
     tlds.getLocal()->round = 1;
     some.data = true;

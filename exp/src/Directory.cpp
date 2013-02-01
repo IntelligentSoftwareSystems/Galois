@@ -147,7 +147,7 @@ void LocalDirectory::sub_acquire(Galois::Runtime::Lockable* L) {
    */
   } else {
     if (L->Owner.getValue() != this) {
-      Galois::Runtime::signalConflict();
+      Galois::Runtime::signalConflict(L);
     }
   }
   return;

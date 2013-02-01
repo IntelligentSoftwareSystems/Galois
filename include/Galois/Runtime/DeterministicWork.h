@@ -1430,24 +1430,11 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
     setThreadContext(ctx);
 
     stateManager.alloc(tld.facing, options.fn1);
-    int result = 0;
-#if GALOIS_USE_EXCEPTION_HANDLER
     try {
       options.fn1(ctx->item.val, tld.facing.data());
-    } catch (ConflictFlag flag) {
-      clearConflictLock();
-      result = flag;
-    }
-#else
-    if ((result = setjmp(hackjmp)) == 0) {
-      options.fn1(ctx->item.val, tld.facing.data());
-    }
-#endif
-    switch (result) {
-      case 0: 
-      case REACHED_FAILSAFE: break;
-      case CONFLICT: commit = false; break;
-      default: assert(0 && "Unknown conflict flag"); abort(); break;
+    } catch (const conflict_ex& ex) {
+      commit = false;
+    } catch (const failsafe_ex& ex) {
     }
 
     if (ForEachTraits<typename OptionsTy::Function1Ty>::NeedsPIA && !useLocalState)
@@ -1497,25 +1484,11 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
     if (commit) {
       setThreadContext(ctx);
       stateManager.restore(tld.facing, ctx->item.localState);
-      int result = 0;
-#if GALOIS_USE_EXCEPTION_HANDLER
       try {
         options.fn2(ctx->item.val, tld.facing.data());
-      } catch (ConflictFlag flag) {
-        clearConflictLock();
-        result = flag;
+      } catch (const conflict_ex& ex) {
+	commit = false;
       }
-#else
-      if ((result = setjmp(hackjmp)) == 0) {
-        options.fn2(ctx->item.val, tld.facing.data());
-      }
-#endif
-      switch (result) {
-        case 0: break;
-        case CONFLICT: commit = false; break;
-        default: assert(0 && "Unknown conflict flag"); abort(); break;
-      }
-
     }
 
     stateManager.dealloc(tld.facing);
@@ -1603,7 +1576,9 @@ static inline void for_each_ordered_2p(IterTy b, IterTy e, ComparatorTy comp, Nh
 
   OptionsTy options(f1, f2, comp);
   WorkTy W(options, loopname);
-  Galois::Runtime::Initializer<Range, WorkTy> init(Range(b, e), W);
+  Range range(b,e);
+  RunCommand init(std::bind(&WorkTy::template AddInitialWork<Range>, std::ref(W), std::ref(range)));
+  //  Galois::Runtime::Initializer<Range, WorkTy> init(Range(b, e), W);
   for_each_det_impl(init, W);
 }
 
@@ -1623,7 +1598,9 @@ static inline void for_each_det(IterTy b, IterTy e, Function1Ty f1, Function2Ty 
 
   OptionsTy options(f1, f2);
   WorkTy W(options, loopname);
-  Galois::Runtime::Initializer<Range, WorkTy> init(Range(b, e), W);
+  //Galois::Runtime::Initializer<Range, WorkTy> init(Range(b, e), W);
+  Range range(b,e);
+  Runtime::RunCommand init(std::bind(&WorkTy::template AddInitialWork<Range>, std::ref(W), std::ref(range)));
   Galois::Runtime::for_each_det_impl(init, W);
 }
 

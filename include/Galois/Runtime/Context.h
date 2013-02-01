@@ -32,23 +32,17 @@
 #include <cstdlib>
 #include <setjmp.h>
 
-//! Throwing exceptions can be a scalability bottleneck.
-//! Set to zero to use longjmp hack, otherwise make sure that
-//! you use a fixed c++ runtime that improves scalability of
-//! exceptions.
-//    --- mdhanapal removing all the longjmp hacks for Directory
-//    options
-#define GALOIS_USE_EXCEPTION_HANDLER 1
-
 namespace Galois {
 namespace Runtime {
 
-enum ConflictFlag {
-  CONFLICT = -1,
-  REACHED_FAILSAFE = 1,
-  BREAK = 2,
-  REMOTE = 3
-};
+//forward declaration for throw list
+class Lockable;
+
+//Things we can throw:
+struct conflict_ex { Lockable* obj; };
+struct break_ex {};
+struct failsafe_ex{};
+struct remote_ex{ uintptr_t ptr; uint32_t owner; };
 
 enum PendingFlag {
   NON_DET,
@@ -59,9 +53,6 @@ enum PendingFlag {
 //! Used by deterministic and ordered executor
 void setPending(PendingFlag value);
 PendingFlag getPending ();
-
-//! used to release lock over exception path
-static inline void clearConflictLock() { }
 
 #define CHK_LOCK ((Galois::Runtime::SimpleRuntimeContext*)0x422)
 #define USE_LOCK ((Galois::Runtime::SimpleRuntimeContext*)0x423)
@@ -199,7 +190,7 @@ struct CheckedLockObj {
 //! Actually break for_each loop
 void breakLoop();
 
-void signalConflict();
+void signalConflict(Lockable*);
 
 void forceAbort();
 

@@ -49,8 +49,8 @@ Galois::Runtime::PendingFlag Galois::Runtime::getPending () {
 }
 
 void Galois::Runtime::doCheckWrite() {
-  if (Galois::Runtime::getPending () == Galois::Runtime::PENDING) {
-    throw Galois::Runtime::REACHED_FAILSAFE;
+  if (getPending () == PENDING) {
+    throw failsafe_ex();
   }
 }
 
@@ -141,20 +141,18 @@ unsigned Galois::Runtime::SimpleRuntimeContext::commit_iteration() {
 }
 
 void Galois::Runtime::breakLoop() {
-  throw Galois::Runtime::BREAK;
+  throw break_ex();
 }
 
-void Galois::Runtime::signalConflict() {
-  throw Galois::Runtime::CONFLICT; // Conflict
+void Galois::Runtime::signalConflict(Lockable* L) {
+  throw conflict_ex{L}; // Conflict
 }
 
 /*
 void Galois::Runtime::SimpleRuntimeContext::acquire(Galois::Runtime::Lockable* L) {
   if (customAcquire) {
     sub_acquire(L);
-    return;
-  }
-  if (L->Owner.try_lock()) {
+  } else if (L->Owner.try_lock()) {
     assert(!L->Owner.getValue());
     assert(!L->next);
     L->Owner.setValue(this);
@@ -172,9 +170,7 @@ void Galois::Runtime::SimpleRuntimeContext::acquire(Galois::Runtime::Lockable* L
 void Galois::Runtime::SimpleRuntimeContext::acquire(Galois::Runtime::Lockable* L) {
   if (customAcquire) {
     sub_acquire(L);
-    return;
-  }
-  if (L->Owner.try_lock()) {
+  } else if (L->Owner.try_lock()) {
     assert(!L->Owner.getValue());
     assert(!L->next);
     L->Owner.setValue(this);
@@ -187,7 +183,7 @@ void Galois::Runtime::SimpleRuntimeContext::acquire(Galois::Runtime::Lockable* L
     locks = L;
   } else {
     if (L->Owner.getValue() != this) {
-      Galois::Runtime::signalConflict();
+      Galois::Runtime::signalConflict(L);
     }
   }
 }
@@ -201,5 +197,5 @@ void Galois::Runtime::SimpleRuntimeContext::sub_acquire(Galois::Runtime::Lockabl
 Galois::Runtime::SimpleRuntimeContext::~SimpleRuntimeContext() {}
 
 void Galois::Runtime::forceAbort() {
-  signalConflict();
+  signalConflict(nullptr);
 }

@@ -200,7 +200,7 @@ T* RemoteDirectory::resolve(uintptr_t ptr, uint32_t owner) {
     fetchRemoteObj(ptr, owner, &LocalDirectory::localReqLandingPad<T>);
     // abort the iteration if inside for each and dir_blocking not defined
     if (Galois::Runtime::inGaloisForEach && !dir_blocking<T>::value)
-      throw Galois::Runtime::REMOTE;
+      throw remote_ex{ptr, owner};
     p = haveObject(ptr, owner);
     // call handleReceives as only thread outside for_each
     net.handleReceives();
@@ -302,7 +302,7 @@ T* LocalDirectory::resolve(uintptr_t ptr) {
     fetchRemoteObj(ptr, sent, &RemoteDirectory::remoteReqLandingPad<T>);
     // abort the iteration if inside for each and dir_blocking not defined
     if (Galois::Runtime::inGaloisForEach && !dir_blocking<T>::value)
-      throw Galois::Runtime::REMOTE;
+      throw remote_ex{ptr, networkHostID};
     p = haveObject(ptr, sent);
     // call handleReceives as only thread outside for_each
     net.handleReceives();
@@ -395,7 +395,7 @@ T* PersistentDirectory::resolve(uintptr_t ptr, uint32_t owner) {
     fetchRemoteObj(ptr, owner, &PersistentDirectory::persistentReqLandingPad<T>);
     // abort the iteration if inside for each and dir_blocking not defined
     if (Galois::Runtime::inGaloisForEach && !dir_blocking<T>::value)
-      throw Galois::Runtime::REMOTE;
+      throw remote_ex{ptr, owner};
     p = haveObject(ptr, owner);
     // call handleReceives only for thread outside for_each
     net.handleReceives();
