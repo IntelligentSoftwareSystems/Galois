@@ -49,17 +49,17 @@ public:
   
   LocalRange(T& c): container(&c) { }
 
-  iterator begin() { return container->begin(); }
-  iterator end() { return container->end(); }
+  iterator begin() const { return container->begin(); }
+  iterator end() const { return container->end(); }
 
-  local_iterator local_begin() { return container->local_begin(); }
-  local_iterator local_end() { return container->local_end(); }
+  local_iterator local_begin() const { return container->local_begin(); }
+  local_iterator local_end() const { return container->local_end(); }
 
-  block_iterator block_begin() { 
+  block_iterator block_begin() const { 
     return Galois::block_range(begin(), end(), LL::getTID(), activeThreads).first; 
   }
 
-  block_iterator block_end() { 
+  block_iterator block_end() const { 
     return Galois::block_range(begin(), end(), LL::getTID(), activeThreads).second; 
   }
 };
@@ -79,17 +79,17 @@ public:
 
   StandardRange(IterTy b, IterTy e): ii(b), ei(e) { }
 
-  iterator begin() { return ii; }
-  iterator end() { return ei; }
+  iterator begin() const { return ii; }
+  iterator end() const { return ei; }
 
-  local_iterator local_begin() { return block_begin(); }
-  local_iterator local_end() { return block_end(); }
+  local_iterator local_begin() const { return block_begin(); }
+  local_iterator local_end() const { return block_end(); }
 
-  block_iterator block_begin() { 
+  block_iterator block_begin() const { 
     return Galois::block_range(begin(), end(), LL::getTID(), activeThreads).first; 
   }
 
-  block_iterator block_end() { 
+  block_iterator block_end() const { 
     return Galois::block_range(begin(), end(), LL::getTID(), activeThreads).second; 
   }
 };
