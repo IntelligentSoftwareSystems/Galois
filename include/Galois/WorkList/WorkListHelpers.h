@@ -23,23 +23,20 @@
 #ifndef GALOIS_RUNTIME_WORKLISTHELPERS_H
 #define GALOIS_RUNTIME_WORKLISTHELPERS_H
 
-#ifndef GALOIS_WLCOMPILECHECK
-#define GALOIS_WLCOMPILECHECK(name) //
-#endif
+#include "WLCompileCheck.h"
 
 #include "Galois/Runtime/ll/PtrLock.h"
 
 #include <boost/iterator/iterator_facade.hpp>
 
 namespace Galois {
-namespace Runtime {
 namespace WorkList {
 
 template<typename T>
 class ConExtListNode {
   T* next;
 public:
-  ConExtListNode(): next(0) {}
+  ConExtListNode() :next(0) {}
   T*& getNext() { return next; }
   T*const& getNext() const { return next; }
 };
@@ -67,7 +64,7 @@ public:
 
 template<typename T, bool concurrent>
 class ConExtLinkedStack {
-  LL::PtrLock<T, concurrent> head;
+  Galois::Runtime::LL::PtrLock<T, concurrent> head;
   
 public:
   typedef ConExtListNode<T> ListNode;
@@ -115,13 +112,13 @@ public:
 
 template<typename T, bool concurrent>
 class ConExtLinkedQueue {
-  LL::PtrLock<T,concurrent> head;
+  Runtime::LL::PtrLock<T,concurrent> head;
   T* tail;
   
 public:
   typedef ConExtListNode<T> ListNode;
   
-  ConExtLinkedQueue(): tail(0) { }
+  ConExtLinkedQueue() :tail(0) { }
 
   bool empty() const {
     return !tail;
@@ -181,7 +178,6 @@ struct DummyIndexer: public std::unary_function<const T&,unsigned> {
   unsigned operator()(const T& x) { return 0; }
 };
 
-}
 }
 } // end namespace Galois
 

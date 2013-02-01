@@ -4,8 +4,8 @@
 #ifndef PRIORITYSCHEDULING_WORKLIST_H
 #define PRIORITYSCHEDULING_WORKLIST_H
 
-#include "Galois/Runtime/WorkList.h"
-#include "Galois/Runtime/WorkListExperimental.h"
+#include "Galois/WorkList/WorkList.h"
+#include "Galois/WorkList/WorkListExperimental.h"
 #include "Galois/Runtime/ll/gio.h"
 
 namespace Exp {
@@ -13,7 +13,7 @@ namespace Exp {
 __attribute__((weak)) llvm::cl::opt<std::string> WorklistName("wl", llvm::cl::desc("Worklist to use"), llvm::cl::init("DEFAULT"));
 
 using namespace Galois::Runtime::LL;
-using namespace Galois::Runtime::WorkList;
+using namespace Galois::WorkList;
 
 template<int CS, bool LF>
 struct PickInner;

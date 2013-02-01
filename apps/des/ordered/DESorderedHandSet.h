@@ -401,7 +401,7 @@ protected:
     while (true) {
       ++round;
 
-      typedef Galois::Runtime::WorkList::dChunkedFIFO<CHUNK_SIZE> WL_ty;
+      typedef Galois::WorkList::dChunkedFIFO<CHUNK_SIZE> WL_ty;
 
       Galois::for_each<WL_ty> (initWL.begin (), initWL.end (), 
           OpFuncSet (graph, sobjInfoVec, newEvents,  nevents));

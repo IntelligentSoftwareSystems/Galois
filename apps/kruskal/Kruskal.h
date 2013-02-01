@@ -45,7 +45,7 @@
 #include "Galois/Statistic.h"
 #include "Galois/Galois.h"
 #include "Galois/Graphs/LCGraph.h"
-#include "Galois/Runtime/WorkList.h"
+#include "Galois/WorkList/WorkList.h"
 #include "Galois/Runtime/Sampling.h"
 #include "llvm/Support/CommandLine.h"
 

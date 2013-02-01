@@ -90,7 +90,7 @@ struct projectPartition {
 void computeKWayPartInfo(int nparts, MetisGraph* finer,
 		GGraph* coarseGraph, GGraph* graph){
 	projectInfo pi(nparts, finer);
-	Galois::for_each<Galois::Runtime::WorkList::ChunkedLIFO<32> >(graph->begin(), graph->end(), pi, "ProjectInfo");
+	Galois::for_each<Galois::WorkList::ChunkedLIFO<32> >(graph->begin(), graph->end(), pi, "ProjectInfo");
 }
 
 void projectKWayPartition(MetisGraph* metisGraph, int nparts){

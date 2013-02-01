@@ -39,7 +39,8 @@
 #include "Galois/Runtime/UserContextAccess.h"
 #include "Galois/Runtime/ActiveThreads.h"
 #include "Galois/Runtime/Network.h"
-#include "Galois/Runtime/WorkList.h"
+#include "Galois/Runtime/Barrier.h"
+#include "Galois/WorkList/GFifo.h"
 
 #include <algorithm>
 #include <functional>
@@ -81,8 +82,8 @@ template<class WorkListTy, class T, class FunctionTy>
 class ForEachWork {
 protected:
   typedef T value_type;
-  typedef typename WorkListTy::template retype<value_type>::WL WLTy;
-  typedef WorkList::GFIFO<value_type> AbortedList;
+  typedef typename WorkListTy::template retype<value_type> WLTy;
+  typedef Galois::WorkList::GFIFO<value_type> AbortedList;
 
   struct ThreadLocalData {
     Galois::Runtime::UserContextAccess<value_type> facing;

@@ -1,7 +1,7 @@
 add_subdirectory(betweennesscentrality)
 add_subdirectory(bfs)
 add_subdirectory(bh_odg)
-add_subdirectory(boruvka)
+#add_subdirectory(boruvka)
 #add_subdirectory(billiards)
 #add_subdirectory(bp)
 add_subdirectory(buchberger)

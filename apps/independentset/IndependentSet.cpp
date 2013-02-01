@@ -191,9 +191,9 @@ struct Compare {
 struct GaloisAlgo {
   void operator()() {
 #ifdef GALOIS_USE_EXP
-    typedef Galois::Runtime::WorkList::BulkSynchronousInline<> WL;
+    typedef Galois::WorkList::BulkSynchronousInline<> WL;
 #else
-    typedef Galois::Runtime::WorkList::dChunkedFIFO<256> WL;
+    typedef Galois::WorkList::dChunkedFIFO<256> WL;
 #endif
 
     switch (algo) {

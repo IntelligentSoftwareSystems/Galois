@@ -27,8 +27,8 @@
 #include "Galois/Galois.h"
 #include "Galois/UserContext.h"
 #include "Galois/Graphs/LCGraph.h"
-#include "Galois/Runtime/WorkList.h"
-#include "Galois/Runtime/WorkListAlt.h"
+#include "Galois/WorkList/WorkList.h"
+#include "Galois/WorkList/WorkListAlt.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
@@ -270,8 +270,8 @@ int main(int argc, char** argv) {
 
   Galois::on_each(popstate());
 
-  typedef Galois::Runtime::WorkList::dChunkedLIFO<8> WL;
-  typedef Galois::Runtime::WorkList::ChunkedAdaptor<false,32> CA;
+  typedef Galois::WorkList::dChunkedLIFO<8> WL;
+  typedef Galois::WorkList::ChunkedAdaptor<false,32> CA;
   Galois::StatTimer T;
   T.start();
   Galois::for_each<WL>(tmp.begin(), tmp.end(), process());

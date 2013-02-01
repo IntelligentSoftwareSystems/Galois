@@ -26,7 +26,7 @@
 #include "Galois/Bag.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
-#include "Galois/Runtime/WorkListAlt.h"
+#include "Galois/WorkList/WorkListAlt.h"
 
 #include <boost/math/constants/constants.hpp>
 #include <boost/iterator/transform_iterator.hpp>
@@ -653,8 +653,8 @@ double checkAllPairs(Bodies& bodies, int N) {
 }
 
 void run(Bodies& bodies, BodyPtrs& pBodies) {
-  typedef Galois::Runtime::WorkList::dChunkedLIFO<256> WL_;
-  typedef Galois::Runtime::WorkList::ChunkedAdaptor<false,32> WL;
+  typedef Galois::WorkList::dChunkedLIFO<256> WL_;
+  typedef Galois::WorkList::ChunkedAdaptor<false,32> WL;
 
   for (int step = 0; step < ntimesteps; step++) {
     // Do tree building sequentially

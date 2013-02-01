@@ -100,7 +100,7 @@ private:
 
 protected:
   static const int CHUNK_SIZE = 32;
-  typedef Galois::Runtime::WorkList::dChunkedFIFO<CHUNK_SIZE> AVIWorkList;
+  typedef Galois::WorkList::dChunkedFIFO<CHUNK_SIZE> AVIWorkList;
 
   typedef Galois::GAccumulator<size_t> IterCounter;
 

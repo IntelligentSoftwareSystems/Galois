@@ -24,6 +24,7 @@
 #define GALOIS_PARALLELSTL_PARALLELSTL_H
 
 #include "Galois/UserContext.h"
+#include "Galois/WorkList/WorkList.h"
 #include "Galois/Runtime/ParallelWork.h"
 #include "Galois/Runtime/DoAll.h"
 
@@ -98,7 +99,7 @@ InputIterator find_if(InputIterator first, InputIterator last, Predicate pred)
 {
   typedef find_if_helper<InputIterator,Predicate> HelperTy;
   typedef typename HelperTy::AccumulatorTy AccumulatorTy;
-  typedef Galois::Runtime::WorkList::dChunkedFIFO<256> WL;
+  typedef Galois::WorkList::dChunkedFIFO<256> WL;
   AccumulatorTy accum;
   HelperTy helper(accum, pred);
   Galois::Runtime::for_each_impl<WL>(Galois::Runtime::makeStandardRange(
@@ -289,10 +290,10 @@ void sort(RandomAccessIterator first, RandomAccessIterator last, Compare comp) {
     work.push_back(v);
   }
 
-  Galois::for_each<Galois::Runtime::WorkList::dChunkedFIFO<1> >(work.begin(), work.end(), parsort());
-  //Galois::for_each<Galois::Runtime::WorkList::FIFO<> >(std::make_pair(first,last), P);
+  Galois::for_each<Galois::WorkList::dChunkedFIFO<1> >(work.begin(), work.end(), parsort());
+  //Galois::for_each<Galois::WorkList::FIFO<> >(std::make_pair(first,last), P);
 #else
-  typedef Galois::Runtime::WorkList::dChunkedFIFO<1> WL;
+  typedef Galois::WorkList::dChunkedFIFO<1> WL;
   typedef std::pair<RandomAccessIterator,RandomAccessIterator> Pair;
   Pair initial[1] = { std::make_pair(first, last) };
 

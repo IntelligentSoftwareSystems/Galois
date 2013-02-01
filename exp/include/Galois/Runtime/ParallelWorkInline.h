@@ -30,7 +30,7 @@
 
 namespace Galois {
 namespace Runtime {
-namespace HIDDEN {
+namespace {
 
 template<typename T, bool isLIFO, unsigned ChunkSize>
 struct FixedSizeRingAdaptor: public Galois::FixedSizeRing<T,ChunkSize> {
@@ -256,7 +256,7 @@ class BSInlineExecutor {
   }
 
   GALOIS_ATTRIBUTE_NOINLINE
-  void abortIteration(ThreadLocalData& tld, const HIDDEN::WID& wid, WLTy* cur, WLTy* next) {
+  void abortIteration(ThreadLocalData& tld, const WID& wid, WLTy* cur, WLTy* next) {
     tld.cnx.cancel_iteration();
     tld.stat.inc_conflicts();
     if (ForEachTraits<FunctionTy>::NeedsPush) {
@@ -267,7 +267,7 @@ class BSInlineExecutor {
     cur->pop(wid);
   }
 
-  void processWithAborts(ThreadLocalData& tld, const HIDDEN::WID& wid, WLTy* cur, WLTy* next) {
+  void processWithAborts(ThreadLocalData& tld, const WID& wid, WLTy* cur, WLTy* next) {
     try {
       process(tld, wid, cur, next);
     } catch (const conflict_ex& ex) {
@@ -275,7 +275,7 @@ class BSInlineExecutor {
     }
   }
 
-  void process(ThreadLocalData& tld, const HIDDEN::WID& wid, WLTy* cur, WLTy* next) {
+  void process(ThreadLocalData& tld, const WID& wid, WLTy* cur, WLTy* next) {
     int cs = std::max(cur->currentChunkSize(wid), 1U);
     for (int i = 0; i < cs; ++i) {
       value_type& val = cur->cur(wid);
@@ -297,7 +297,7 @@ class BSInlineExecutor {
     ThreadLocalData tld(loopname);
     setThreadContext(&tld.cnx);
     unsigned tid = LL::getTID();
-    HIDDEN::WID wid;
+    WID wid;
 
     WLTy* cur = &wls[0];
     WLTy* next = &wls[1];
@@ -345,7 +345,7 @@ public:
 
   template<typename RangeTy>
   void AddInitialWork(RangeTy range) {
-    wls[0].push_initial(HIDDEN::WID(), range.local_begin(), range.local_end());
+    wls[0].push_initial(WID(), range.local_begin(), range.local_end());
   }
 
   void operator()() {
@@ -354,25 +354,28 @@ public:
 };
 
 
-} // end HIDDEN
+} // end anonymouse
+} // end runtime
 
 namespace WorkList {
   template<class T=int>
   class BulkSynchronousInline { };
 }
 
+namespace Runtime {
 namespace {
 
 template<class T,class FunctionTy>
 struct ForEachWork<WorkList::BulkSynchronousInline<>,T,FunctionTy>:
-  public HIDDEN::BSInlineExecutor<T,FunctionTy> {
-  typedef HIDDEN::BSInlineExecutor<T,FunctionTy> SuperTy;
+  public BSInlineExecutor<T,FunctionTy> {
+  typedef BSInlineExecutor<T,FunctionTy> SuperTy;
   ForEachWork(FunctionTy& f, const char* ln): SuperTy(f, ln) { }
 };
 
 }
+} // runtime
 
-}
-}
+
+} //galois
 
 #endif

@@ -28,7 +28,7 @@
 #include "Galois/Galois.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Atomic.h"
-#include "Galois/Runtime/WorkList.h"
+#include "Galois/WorkList/WorkList.h"
 #include "Galois/Runtime/ll/gio.h"
 
 #include "DESunorderedBase.h"
@@ -186,7 +186,7 @@ class DESunordered: public DESunorderedBase {
 
     Process p(graph, onWLflags, numEvents, numIter, maxPending);
 
-    typedef Galois::Runtime::WorkList::dChunkedFIFO<CHUNK_SIZE, GNode> WL_ty;
+    typedef Galois::WorkList::dChunkedFIFO<CHUNK_SIZE, GNode> WL_ty;
     // typedef Galois::Runtime::WorkList::GFIFO<GNode> WL_ty;
 
     Galois::for_each<WL_ty>(initialActive.begin (), initialActive.end (), p);
