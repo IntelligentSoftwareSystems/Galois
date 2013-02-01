@@ -184,7 +184,7 @@ void convert_rmat2gr(const std::string& infilename, const std::string& outfilena
     GNode n = graph.createNode(i);
     graph.addNode(n);
     nodes[i] = n;
-    graph.addNode(n, Galois::NONE);
+    graph.addNode(n, Galois::MethodFlag::NONE);
   }
 
   for (size_t edge_num = 0; edge_num < nnodes; ++edge_num) {
@@ -260,7 +260,7 @@ void convert_stext2vgr(const std::string& infilename, const std::string& outfile
     GNode n = graph.createNode(i);
     graph.addNode(n);
     nodes[i] = n;
-    graph.addNode(n, Galois::NONE);
+    graph.addNode(n, Galois::MethodFlag::NONE);
   }
 
   size_t edges_added = 0;
@@ -338,7 +338,7 @@ void convert_dimacs2gr(const std::string& infilename, const std::string& outfile
     GNode n = graph.createNode(i);
     graph.addNode(n);
     nodes[i] = n;
-    graph.addNode(n, Galois::NONE);
+    graph.addNode(n, Galois::MethodFlag::NONE);
   }
 
   for (size_t edge_num = 0; edge_num < nedges; ++edge_num) {
@@ -437,7 +437,7 @@ void convert_pbbs2gr(const std::string& infilename, const std::string& outfilena
     GNode n = graph.createNode(i);
     graph.addNode(n);
     nodes[i] = n;
-    graph.addNode(n, Galois::NONE);
+    graph.addNode(n, Galois::MethodFlag::NONE);
   }
 
   for (uint32_t i = 0; i < nnodes; ++i) {

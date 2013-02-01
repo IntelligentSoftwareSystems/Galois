@@ -117,19 +117,19 @@ struct UpdateRequestLess {
 
 struct GNodeIndexer: public std::unary_function<GNode,int> {
   int operator()(const GNode& node) const {
-    return graph.getData(node, Galois::NONE).prio;
+    return graph.getData(node, Galois::MethodFlag::NONE).prio;
   }
 };
 
 struct GNodeLess {
   bool operator()(const GNode& a, const GNode& b) const {
-    return graph.getData(a, Galois::NONE).prio < graph.getData(b, Galois::NONE).prio;
+    return graph.getData(a, Galois::MethodFlag::NONE).prio < graph.getData(b, Galois::MethodFlag::NONE).prio;
   }
 };
 
 struct GNodeGreater {
   bool operator()(const GNode& a, const GNode& b) const {
-    return graph.getData(a, Galois::NONE).prio > graph.getData(b, Galois::NONE).prio;
+    return graph.getData(a, Galois::MethodFlag::NONE).prio > graph.getData(b, Galois::MethodFlag::NONE).prio;
   }
 };
 
@@ -223,10 +223,10 @@ static void printAccess(std::string msg){
 
     std::cerr << sdata.id << " connected with (" << degree(*src) << "): ";
 
-    for (Graph::edge_iterator ii = graph.edge_begin(*src, Galois::NONE), 
-        ei = graph.edge_end(*src, Galois::NONE); ii != ei; ++ii) {
+    for (Graph::edge_iterator ii = graph.edge_begin(*src, Galois::MethodFlag::NONE), 
+        ei = graph.edge_end(*src, Galois::MethodFlag::NONE); ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
-      SNode& ddata = graph.getData(dst, Galois::NONE);
+      SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
 
       unsigned int diff = abs(sdata.id - ddata.id);
 
@@ -417,12 +417,12 @@ struct banddiff {
 
   void operator()(const GNode& source) const {
 
-    SNode& sdata = graph.getData(source, Galois::NONE);
-    for (Graph::edge_iterator ii = graph.edge_begin(source, Galois::NONE), 
-         ei = graph.edge_end(source, Galois::NONE); ii != ei; ++ii) {
+    SNode& sdata = graph.getData(source, Galois::MethodFlag::NONE);
+    for (Graph::edge_iterator ii = graph.edge_begin(source, Galois::MethodFlag::NONE), 
+         ei = graph.edge_end(source, Galois::MethodFlag::NONE); ii != ei; ++ii) {
 
       GNode dst = graph.getEdgeDst(ii);
-      SNode& ddata = graph.getData(dst, Galois::NONE);
+      SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
 
       unsigned int diff = abs(sdata.id - ddata.id);
       unsigned int max = maxband;
@@ -447,13 +447,13 @@ struct profileFn {
   void operator()(const GNode& source) const {
 
     unsigned int max = 0;
-    SNode& sdata = graph.getData(source, Galois::NONE);
+    SNode& sdata = graph.getData(source, Galois::MethodFlag::NONE);
 
-    for (Graph::edge_iterator ii = graph.edge_begin(source, Galois::NONE), 
-        ei = graph.edge_end(source, Galois::NONE); ii != ei; ++ii) {
+    for (Graph::edge_iterator ii = graph.edge_begin(source, Galois::MethodFlag::NONE), 
+        ei = graph.edge_end(source, Galois::MethodFlag::NONE); ii != ei; ++ii) {
 
       GNode dst = graph.getEdgeDst(ii);
-      SNode& ddata = graph.getData(dst, Galois::NONE);
+      SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
 
       unsigned int diff = abs(sdata.id - ddata.id);
 
@@ -496,7 +496,7 @@ static void printDegreeDistribution() {
 
   for (Graph::iterator n = graph.begin(), ei = graph.end(); n != ei; ++n) {
       distr[degree(*n)]++;
-      //std::cerr << graph.getData(*n, Galois::NONE).id << "  " << graph.getData(*n, Galois::NONE).dist << "\n";
+      //std::cerr << graph.getData(*n, Galois::MethodFlag::NONE).id << "  " << graph.getData(*n, Galois::MethodFlag::NONE).dist << "\n";
   }
 
   std::cerr << "Degree  Count\n";
@@ -524,7 +524,7 @@ static void readGraph(GNode& source, GNode& terminal) {
   for (Graph::iterator src = graph.begin(), ei =
       graph.end(); src != ei; ++src) {
 
-    SNode& node = graph.getData(*src, Galois::NONE);
+    SNode& node = graph.getData(*src, Galois::MethodFlag::NONE);
     node.dist = DIST_INFINITY;
     node.id = id;
 
@@ -562,14 +562,14 @@ struct Sloan {
     typedef int tt_does_not_need_aborts;
 
     void operator()(GNode& n, Galois::UserContext<GNode>& ctx) const {
-      SNode& data = graph.getData(n, Galois::NONE);
+      SNode& data = graph.getData(n, Galois::MethodFlag::NONE);
 
       unsigned int newDist = data.dist + 1;
 
-      for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::NONE),
-          ei = graph.edge_end(n, Galois::NONE); ii != ei; ++ii) {
+      for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::NONE),
+          ei = graph.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii) {
         GNode dst = graph.getEdgeDst(ii);
-        SNode& ddata = graph.getData(dst, Galois::NONE);
+        SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
 
         unsigned int oldDist;
         while (true) {
@@ -597,7 +597,7 @@ struct Sloan {
   
   struct initFn {
     void operator()(const GNode& n) const {
-      SNode& data = graph.getData(n, Galois::NONE);
+      SNode& data = graph.getData(n, Galois::MethodFlag::NONE);
       data.status = INACTIVE;
       data.degree = degree(n);
       data.prio = W1 * data.dist - W2 * (data.degree + 1);
@@ -616,7 +616,7 @@ struct Sloan {
     void operator()(UpdateRequest& next, Galois::UserContext<UpdateRequest>& ctx) const {
       unsigned int prev_status;
       GNode parent = next.node;
-      SNode& pdata = graph.getData(parent, Galois::NONE);
+      SNode& pdata = graph.getData(parent, Galois::MethodFlag::NONE);
 
       while ((prev_status = pdata.status) != NUMBERED) {
         if (__sync_bool_compare_and_swap(&pdata.status, prev_status, NUMBERED)) {
@@ -633,11 +633,11 @@ struct Sloan {
       }
 
       if (prev_status == PREACTIVE) {
-        for (Graph::edge_iterator ii = graph.edge_begin(parent, Galois::NONE),
-            ei = graph.edge_end(parent, Galois::NONE); ii != ei; ++ii) {
+        for (Graph::edge_iterator ii = graph.edge_begin(parent, Galois::MethodFlag::NONE),
+            ei = graph.edge_end(parent, Galois::MethodFlag::NONE); ii != ei; ++ii) {
 
           GNode child = graph.getEdgeDst(ii);
-          SNode& cdata = graph.getData(child, Galois::NONE);
+          SNode& cdata = graph.getData(child, Galois::MethodFlag::NONE);
 
           if (cdata.status == NUMBERED)
             continue;
@@ -650,11 +650,11 @@ struct Sloan {
         }
       }
 
-      for (Graph::edge_iterator ii = graph.edge_begin(parent, Galois::NONE),
-          ei = graph.edge_end(parent, Galois::NONE); ii != ei; ++ii) {
+      for (Graph::edge_iterator ii = graph.edge_begin(parent, Galois::MethodFlag::NONE),
+          ei = graph.edge_end(parent, Galois::MethodFlag::NONE); ii != ei; ++ii) {
 
         GNode child = graph.getEdgeDst(ii);
-        SNode& cdata = graph.getData(child, Galois::NONE);
+        SNode& cdata = graph.getData(child, Galois::MethodFlag::NONE);
 
         if (cdata.status != PREACTIVE)
           continue;
@@ -666,10 +666,10 @@ struct Sloan {
 
         ctx.push(UpdateRequest(child, prio));
 
-        for (Graph::edge_iterator ij = graph.edge_begin(child, Galois::NONE),
-            ej = graph.edge_end(child, Galois::NONE); ij != ej; ++ij) {
+        for (Graph::edge_iterator ij = graph.edge_begin(child, Galois::MethodFlag::NONE),
+            ej = graph.edge_end(child, Galois::MethodFlag::NONE); ij != ej; ++ij) {
           GNode grandchild = graph.getEdgeDst(ij);
-          SNode& gdata = graph.getData(grandchild, Galois::NONE);
+          SNode& gdata = graph.getData(grandchild, Galois::MethodFlag::NONE);
 
           if (gdata.status == NUMBERED)
             continue;

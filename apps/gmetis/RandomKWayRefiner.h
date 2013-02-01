@@ -93,7 +93,7 @@ private:
 
   void refineOneNode(MetisGraph* metisGraph, GNode n, PerCPUValue* perCPUValues) {
 		GGraph* graph = metisGraph->getGraph();
-		MetisNode& nodeData = graph->getData(n,Galois::CHECK_CONFLICT);
+		MetisNode& nodeData = graph->getData(n,Galois::MethodFlag::CHECK_CONFLICT);
 		if (nodeData.getEdegree() >= nodeData.getIdegree()) {
 			int from = nodeData.getPartition();
 			//TODO
@@ -142,8 +142,8 @@ private:
 			 * if we got here, we can now move the vertex from 'from' to 'to'
 			 */
 			//dummy for cautious
-			graph->edge_begin(n, Galois::CHECK_CONFLICT);
-			graph->edge_end(n, Galois::CHECK_CONFLICT);
+			graph->edge_begin(n, Galois::MethodFlag::CHECK_CONFLICT);
+			graph->edge_end(n, Galois::MethodFlag::CHECK_CONFLICT);
 
 			perCPUValues->mincutInc += -(nodeData.getPartEd()[k] - nodeData.getIdegree());
 			nodeData.setPartition(to);
@@ -173,9 +173,9 @@ private:
 			/*
 			 * update the degrees of adjacent vertices
 			 */
-			for (GGraph::edge_iterator jj = graph->edge_begin(n, Galois::NONE), eejj = graph->edge_end(n, Galois::NONE); jj != eejj; ++jj) {
+			for (GGraph::edge_iterator jj = graph->edge_begin(n, Galois::MethodFlag::NONE), eejj = graph->edge_end(n, Galois::MethodFlag::NONE); jj != eejj; ++jj) {
 			  GNode neighbor = graph->getEdgeDst(jj);
-			  MetisNode& neighborData = graph->getData(neighbor,Galois::NONE);
+			  MetisNode& neighborData = graph->getData(neighbor,Galois::MethodFlag::NONE);
 				if (neighborData.getPartEd().size() == 0) {
 					int numEdges = neighborData.getNumEdges();
 //					neighborData.partIndex = new int[numEdges];
@@ -183,7 +183,7 @@ private:
 //					cout<<"init"<<endl;
 					neighborData.initPartEdAndIndex(numEdges);
 				}
-				int edgeWeight = graph->getEdgeData(jj, Galois::NONE);
+				int edgeWeight = graph->getEdgeData(jj, Galois::MethodFlag::NONE);
 				if (neighborData.getPartition() == from) {
 					neighborData.setEdegree(neighborData.getEdegree() + edgeWeight);
 					neighborData.setIdegree(neighborData.getIdegree() - edgeWeight);

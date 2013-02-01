@@ -302,7 +302,7 @@ void TopoBarrier::wait() {
 
   //wait for signal
   if (id != 0) {
-    while(n.parentsense != s) {
+    while (n.parentsense != s) {
       LL::asmPause();
     }
   }

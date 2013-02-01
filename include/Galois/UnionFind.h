@@ -34,6 +34,8 @@ namespace Galois {
 template<typename T>
 class UnionFindNode {
   T* findImpl() const {
+    if (isRep()) return m_component;
+
     T* rep = m_component;
     while (rep->m_component != rep) {
       T* next = rep->m_component;
@@ -63,6 +65,8 @@ public:
     // compressions along two different paths to the root can create a cycle
     // in the union-find tree. Prevent that from happening by compressing
     // incrementally.
+    if (isRep()) return m_component;
+
     T* rep = m_component;
     T* prev = 0;
     while (rep->m_component != rep) {

@@ -21,14 +21,12 @@
  * @author Dimitrios Prountzos <dprountz@cs.utexas.edu>
  */
 
-#define SHOULD_PRODUCE_CERTIFICATE 0
-
+#include "Galois/Accumulator.h"
 #include "Galois/Statistic.h"
 #include "Galois/Galois.h"
 #include "Galois/UserContext.h"
 #include "Galois/Graphs/LCGraph.h"
-#include "Galois/Runtime/WorkList.h"
-#include "Galois/Runtime/WorkListAlt.h"
+#include "Galois/WorkList/WorkList.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
@@ -42,8 +40,11 @@
 #include <sstream>
 #include <vector>
 #include <cstdlib>
-#include <linux/mman.h>
-#include <sys/mman.h>
+
+#define DEBUG 0 
+#define USE_SUCCS 1
+#define SHARE_SINGLE_BC 0 
+#define SHOULD_PRODUCE_CERTIFICATE 0
 
 static const char* name = "Betweenness Centrality";
 static const char* desc =
@@ -59,91 +60,113 @@ typedef Graph::GraphNode GNode;
 
 Graph* G;
 int NumNodes;
-std::vector<int> sucSize;
 
-#define PAGE_SIZE (4*1024)
-#define PAGE_ROUND_UP(x) ( (((uintptr_t)(x)) + PAGE_SIZE-1)  & (~(PAGE_SIZE-1)) )
-
-struct TempState  {
-  //  std::vector<GNode> SQG;
-  GNode* SQG;
-  //  std::vector<double> sigmaG;
-  double* sigmaG;
-  //  std::vector<int> distG;
-  int* distG;
-
-  std::vector<GNode>* succsGlobal;
-
-  //  std::vector<double> CB;
-  double* CB;
-
-  TempState() {
-    size_t len = PAGE_ROUND_UP(sizeof(GNode) * NumNodes);
-    SQG = (GNode*)mmap(0, len, PROT_READ | PROT_WRITE, MAP_POPULATE | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    len = PAGE_ROUND_UP(sizeof(double) * NumNodes);
-    sigmaG = (double*)mmap(0, len, PROT_READ | PROT_WRITE, MAP_POPULATE | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    len = PAGE_ROUND_UP(sizeof(int) * NumNodes);
-    distG = (int*)mmap(0, len, PROT_READ | PROT_WRITE, MAP_POPULATE | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    len = PAGE_ROUND_UP(sizeof(std::vector<GNode>) * NumNodes);
-    succsGlobal = (std::vector<GNode>*)mmap(0, len, PROT_READ | PROT_WRITE, MAP_POPULATE | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    len = PAGE_ROUND_UP(sizeof(double) * NumNodes);
-    CB = (double*)mmap(0, len, PROT_READ | PROT_WRITE, MAP_POPULATE | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-
-    //:SQG(NumNodes), sigmaG(NumNodes), distG(NumNodes), CB(NumNodes) {
-    //succsGlobal.resize(NumNodes);
-    for (int i = 0; i < NumNodes; ++i) {
-      new (&succsGlobal[i]) std::vector<GNode>();
-      succsGlobal[i].reserve(sucSize[i]);
-    }
-  }
-
-  void reset() {
-    // SQG.resize(0);
-    // SQG.resize(NumNodes);
-    // sigmaG.resize(0);
-    // sigmaG.resize(NumNodes);
-    // distG.resize(0);
-    // distG.resize(NumNodes);
-    for(int i = 0; i < NumNodes; ++i) {
-      succsGlobal[i].resize(0);
-      distG[i] = 0;
-    }
+#if SHARE_SINGLE_BC
+struct BCrecord {
+  Galois::Runtime::SimpleLock<unsigned char, true> lock;
+  double bc; 
+  BCrecord(): lock(), bc(0.0) {}
+};
+std::vector<cache_line_storage<BCrecord> > *CB;
+#else
+struct merge {
+  void operator()(std::vector<double>& lhs, std::vector<double>& rhs) {
+    if (lhs.size() < rhs.size())
+      lhs.resize(rhs.size());
+    for (unsigned int i = 0; i < rhs.size(); i++)
+      lhs[i] += rhs[i];
   }
 };
 
-Galois::Runtime::PerThreadStorage<TempState*> state;
+Galois::GVectorElementAccumulator<std::vector<double> >* CB;
+#endif
 
-void computeSucSize() {
-  sucSize.resize(NumNodes);
-  for (Graph::iterator ii = G->begin(), ee = G->end(); ii != ee; ++ii)
-    sucSize[*ii] = std::distance(G->neighbor_begin(*ii, Galois::MethodFlag::NONE),
-				 G->neighbor_end(*ii, Galois::MethodFlag::NONE));
+Galois::Runtime::PerThreadStorage<std::vector<GNode>*> SQG;
+Galois::Runtime::PerThreadStorage<std::vector<double> *> sigmaG;
+Galois::Runtime::PerThreadStorage<std::vector<double> *> deltaG;
+Galois::Runtime::PerThreadStorage<std::vector<int>*> distG;
+
+template<typename T>
+struct PerIt {  
+  typedef typename Galois::PerIterAllocTy::rebind<T>::other Ty;
+};
+
+Galois::Runtime::PerThreadStorage< std::vector<std::vector<GNode> > > succsGlobal;
+
+std::vector<GNode> & getSuccs(GNode n) {
+  return (*succsGlobal.getLocal())[n];
 }
 
-struct popstate {
-  void operator()(int , int) {
-    *state.getLocal() = *state.getLocal() = new TempState();
+void initGraphData() {
+  // Pre-compute successors sizes in tmp
+  std::vector< std::vector<GNode> > tmp(NumNodes);
+  for (Graph::iterator ii = G->begin(), ee = G->end();
+      ii != ee; ++ii) {
+    int nnbrs = std::distance(G->neighbor_begin(*ii, Galois::MethodFlag::NONE),
+        G->neighbor_end(*ii, Galois::MethodFlag::NONE));
+    //std::cerr << "Node : " << *ii << " has " << nnbrs << " neighbors " << std::endl;
+    tmp[*ii].reserve(nnbrs); 
   }
-};
 
+  // Init all structures
+  std::cerr << "Pre-allocating graph metadata for " << numThreads << " threads." << std::endl;
+  for (int i=0; i<numThreads; ++i) {
+    *succsGlobal.getRemote(i) = tmp;
+    *SQG.getRemote(i) = new std::vector<GNode>(NumNodes); 
+    *sigmaG.getRemote(i) = new std::vector<double>(NumNodes);
+    *deltaG.getRemote(i) = new std::vector<double>(NumNodes); 
+    *distG.getRemote(i) = new std::vector<int>(NumNodes); 
+  }
+}
+
+void resetData() {
+  std::vector<GNode> *sq = *SQG.getLocal();
+  std::fill(sq->begin(), sq->end(), 0);
+
+  std::vector<double> *sigma = *sigmaG.getLocal();
+  std::fill(sigma->begin(), sigma->end(), 0);
+
+  std::vector<double> *delta = *deltaG.getLocal();
+  std::fill(delta->begin(), delta->end(), 0);
+
+  std::vector<int> *dist = *distG.getLocal();
+  std::fill(dist->begin(), dist->end(), 0);
+
+  std::vector< std::vector<GNode> > & svec = *succsGlobal.getLocal();
+  std::vector< std::vector<GNode> >::iterator it = svec.begin();
+  std::vector< std::vector<GNode> >::iterator end = svec.end();
+  while (it != end) {
+    it->resize(0);
+    ++it;
+  }
+}
+
+void cleanupData() {
+  for (int i=0; i<numThreads; ++i) {
+    delete *SQG.getRemote(i);
+    delete *sigmaG.getRemote(i);
+    delete *deltaG.getRemote(i);
+    delete *distG.getRemote(i);
+  }
+}
 
 struct process {
   void operator()(GNode& _req, Galois::UserContext<GNode>& lwl) {
-    TempState* tmp = *state.getLocal();
-    tmp->reset();
-    GNode* SQ = tmp->SQG;
-    double* sigma = tmp->sigmaG;
-    int* d = tmp->distG;
-    double* delta = tmp->CB;
-    std::vector<GNode>* suc = tmp->succsGlobal;
-
+    std::vector<GNode> & SQ = *(*SQG.getLocal());
+    std::vector<double> & sigma = *(*sigmaG.getLocal());
+    std::vector<int> &d = *(*distG.getLocal());
     int QPush = 0;
     int QAt = 0;
     
+#if DEBUG
+    std::cerr << ".";
+#endif
+
     int req = _req;
     
     sigma[req] = 1;
     d[req] = 1;
+    
     SQ[QPush++] = _req;
     
     while (QAt != QPush) {
@@ -160,45 +183,78 @@ struct process {
 	}
 	if (d[w] == d[v] + 1) {
 	  sigma[w] = sigma[w] + sigma[v];
-          suc[v].push_back(w);
+#if USE_SUCCS
+	  std::vector<GNode> & slist = getSuccs(v);
+          slist.push_back(w);
+#else
+	  std::vector<GNode> & plist = getSuccs(w);
+          plist.push_back(v);
+#endif
 	}
       }
     }
-
+    std::vector<double> & delta = *(*deltaG.getLocal());
+#if USE_SUCCS
     --QAt;
+#endif
     while (QAt > 1) {
       int w = SQ[--QAt];
 
       double sigma_w = sigma[w];
       double delta_w = delta[w];
-      for(std::vector<GNode>::iterator it = suc[w].begin(), end = suc[w].end();
-	  it != end; ++it) {
+#if USE_SUCCS
+      std::vector<GNode> & slist = getSuccs(w);
+      std::vector<GNode>::iterator it = slist.begin();
+      std::vector<GNode>::iterator end = slist.end();
+      while (it != end) {
 	//std::cerr << "Processing node " << w << std::endl;
 	GNode v = *it;
 	delta_w += (sigma_w/sigma[v])*(1.0 + delta[v]);
+	++it;
       }
       delta[w] = delta_w;
+#else
+      std::vector<GNode> & plist = getSuccs(w);
+      std::vector<GNode>::iterator it = plist.begin();
+      std::vector<GNode>::iterator end = plist.end();
+      while (it != end) {
+	//std::cerr << "Processing node " << w << std::endl;
+	GNode v = *it;
+	delta[v] += (sigma[v]/sigma_w)*(1.0 + delta_w);
+	++it;
+      }
+#endif
+#if SHARE_SINGLE_BC
+      BCrecord & r = (*CB)[w].data;
+      r.lock.lock();
+      r.bc += delta_w;
+      r.lock.unlock();
+#else 
+      CB->update(w, delta_w);
+//      if (CB->get().size() < (unsigned int)w + 1)
+//	CB->get().resize(w+1);
+//      CB->get()[w] += delta_w;
+#endif
     }
+    resetData();
   }
 };
-
-void reduce(std::vector<double>& bcv) {
-  bcv.resize(0);
-  bcv.resize(NumNodes);
-  for (unsigned int i = 0; i < state.size(); ++i)
-    if (*state.getRemote(i))
-      std::transform(bcv.begin(), bcv.end(), (*state.getRemote(i))->CB, bcv.begin(), std::plus<double>());
-}
 
 // Verification for reference torus graph inputs. 
 // All nodes should have the same betweenness value.
 void verify() {
     double sampleBC = 0.0;
     bool firstTime = true;
-    std::vector<double> bcv;
-    reduce(bcv);
+#if SHARE_SINGLE_BC
+#else
+    const std::vector<double>& bcv = CB->reduce();
+#endif
     for (int i=0; i<NumNodes; ++i) {
+#if SHARE_SINGLE_BC
+      double bc = (*CB)[i].data.bc;
+#else
       double bc = bcv[i];
+#endif
       if (firstTime) {
         sampleBC = bc;
         std::cerr << "BC: " << sampleBC << std::endl;
@@ -213,7 +269,6 @@ void verify() {
 	}
       }
     }
-    std::cerr << "Verification ok!" << std::endl;
 }
 
 void printBCcertificate() {
@@ -221,11 +276,17 @@ void printBCcertificate() {
   foutname << "outer_certificate_" << numThreads;
   std::ofstream outf(foutname.str().c_str());
   std::cerr << "Writting certificate..." << std::endl;
-  std::vector<double> bcv;
-  reduce(bcv);
+#if SHARE_SINGLE_BC
+#else
+  const std::vector<double>& bcv = CB->reduce();
+#endif
 
   for (int i=0; i<NumNodes; ++i) {
-    double bc = bcv[i];
+#if SHARE_SINGLE_BC
+      double bc = (*CB)[i].data.bc;
+#else
+      double bc = bcv[i];
+#endif
     outf << i << ": " << setiosflags(std::ios::fixed) << std::setprecision(9) << bc << std::endl;
   }
   outf.close();
@@ -245,9 +306,20 @@ int main(int argc, char** argv) {
 
   Graph g;
   G = &g;
+
   G->structureFromFile(filename.c_str());
+
   NumNodes = G->size();
-  computeSucSize();
+
+#if SHARE_SINGLE_BC
+  std::vector<cache_line_storage<BCrecord> > cb(NumNodes);
+  CB = &cb;
+#else
+  Galois::GVectorElementAccumulator<std::vector<double> > cb;
+  CB = &cb; 
+#endif
+  
+  initGraphData();
 
   int iterations = NumNodes;
   if (iterLimit)
@@ -268,10 +340,7 @@ int main(int argc, char** argv) {
   std::vector<GNode> tmp;
   std::copy(begin, end, std::back_inserter(tmp));
 
-  Galois::on_each(popstate());
-
-  typedef Galois::Runtime::WorkList::dChunkedLIFO<8> WL;
-  typedef Galois::Runtime::WorkList::ChunkedAdaptor<false,32> CA;
+  typedef Galois::WorkList::dChunkedLIFO<1> WL;
   Galois::StatTimer T;
   T.start();
   Galois::for_each<WL>(tmp.begin(), tmp.end(), process());
@@ -280,12 +349,16 @@ int main(int argc, char** argv) {
   if (forceVerify || !skipVerify) {
     verify();
   } else { // print bc value for first 10 nodes
-    std::vector<double> bcv(NumNodes);
-    for (int i = 0; i < state.size(); ++i)
-      if (*state.getRemote(i))
-	std::transform(bcv.begin(), bcv.end(), (*state.getRemote(i))->CB, bcv.begin(), std::plus<double>());
+#if SHARE_SINGLE_BC
+#else
+    const std::vector<double>& bcv = CB->reduce();
+#endif
     for (int i=0; i<10; ++i)
-      std::cout << i << ": " << setiosflags(std::ios::fixed) << std::setprecision(6) << bcv[i] << "\n";
+#if SHARE_SINGLE_BC
+    std::cout << i << ": " << setiosflags(std::ios::fixed) << std::setprecision(6) << (*CB)[i].data.bc << "\n";
+#else
+    std::cout << i << ": " << setiosflags(std::ios::fixed) << std::setprecision(6) << bcv[i] << "\n";
+#endif
 #if SHOULD_PRODUCE_CERTIFICATE
     printBCcertificate();
 #endif
@@ -294,7 +367,7 @@ int main(int argc, char** argv) {
 
   Galois::StatTimer tt("cleanup");
   tt.start();
-  //cleanupData();
+  cleanupData();
   tt.stop();
 
   return 0;

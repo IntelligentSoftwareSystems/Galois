@@ -29,17 +29,19 @@
 namespace Galois {
 namespace Runtime {
 
-static inline bool isWriteMethod(int m) {
-  return (m & Galois::WRITE) != 0;
-}
-
 void doCheckWrite();
 
-static inline void checkWrite(int m) {
-  if (isWriteMethod(m))
+namespace {
+inline bool isWriteMethod(Galois::MethodFlag m, bool write) {
+  return write || ((int)m & (int)MethodFlag::WRITE);
+}
+
+inline void checkWrite(Galois::MethodFlag m, bool write) {
+  if (isWriteMethod(m, write))
     doCheckWrite();
 }
 
+}
 }
 } // end namespace Galois
 

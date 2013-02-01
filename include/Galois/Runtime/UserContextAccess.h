@@ -32,8 +32,8 @@ namespace Runtime {
 //! Backdoor to allow runtime methods to access private data in UserContext
 template<typename T>
 class UserContextAccess : public Galois::UserContext<T> {
-  typedef Galois::UserContext<T> SuperTy;
 public:
+  typedef Galois::UserContext<T> SuperTy;
   typedef typename SuperTy::PushBufferTy PushBufferTy;
 
   void resetAlloc() { SuperTy::__resetAlloc(); }

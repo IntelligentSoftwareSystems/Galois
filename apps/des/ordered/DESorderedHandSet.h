@@ -358,7 +358,7 @@ protected:
     for (Graph::iterator n = graph.begin ()
         , endn = graph.end (); n != endn; ++n) {
 
-      SimObj_ty* so = static_cast<SimObj_ty*> (graph.getData (*n, Galois::NONE));
+      SimObj_ty* so = static_cast<SimObj_ty*> (graph.getData (*n, Galois::MethodFlag::NONE));
       sobjInfoVec[so->getID ()] = SimObjInfo (*n, so);
     }
   }

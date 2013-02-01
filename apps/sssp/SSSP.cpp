@@ -102,17 +102,17 @@ struct SerialStlAlgo {
       counter += 1;
       UpdateRequest req = *initial.begin();
       initial.erase(initial.begin());
-      SNode& data = graph.getData(req.n, Galois::NONE);
+      SNode& data = graph.getData(req.n, Galois::MethodFlag::NONE);
       if (req.w < data.dist) {
         data.dist = req.w;
 	for(Graph::edge_iterator
-	      ii = graph.edge_begin(req.n, Galois::NONE), 
-	      ee = graph.edge_end(req.n, Galois::NONE);
+	      ii = graph.edge_begin(req.n, Galois::MethodFlag::NONE), 
+	      ee = graph.edge_end(req.n, Galois::MethodFlag::NONE);
 	    ii != ee; ++ii) {
           GNode dst = graph.getEdgeDst(ii);
           unsigned int d = graph.getEdgeData(ii);
           unsigned int newDist = req.w + d;
-          if (newDist < graph.getData(dst,Galois::NONE).dist) {
+          if (newDist < graph.getData(dst,Galois::MethodFlag::NONE).dist) {
             initial.insert(UpdateRequest(dst, newDist));
 	  }
         }
@@ -144,7 +144,7 @@ struct ParallelAlgo {
   }
 
   void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& ctx) const {
-    Galois::MethodFlag flag = useCas ? Galois::NONE : Galois::ALL;
+    Galois::MethodFlag flag = useCas ? Galois::MethodFlag::NONE : Galois::MethodFlag::ALL;
     SNode& data = graph.getData(req.n, flag);
 
     if (trackBadWork && req.w >= data.dist)
@@ -158,7 +158,7 @@ struct ParallelAlgo {
 	  GNode dst = graph.getEdgeDst(ii);
 	  unsigned int d = graph.getEdgeData(ii);
 	  unsigned int newDist = req.w + d;
-	  SNode& rdata = graph.getData(dst, Galois::NONE);
+	  SNode& rdata = graph.getData(dst, Galois::MethodFlag::NONE);
 	  if (newDist < rdata.dist)
 	    ctx.push(UpdateRequest(dst, newDist));
 	}
@@ -211,7 +211,7 @@ struct ParallelLessDupsAlgo {
   }
 
   void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& ctx) const {
-    Galois::MethodFlag flag = useCas ? Galois::NONE : Galois::ALL;
+    Galois::MethodFlag flag = useCas ? Galois::MethodFlag::NONE : Galois::MethodFlag::ALL;
     SNode& data = graph.getData(req.n, flag);
 
     if (trackBadWork && req.w > data.dist) {
@@ -223,7 +223,7 @@ struct ParallelLessDupsAlgo {
            ee = graph.edge_end(req.n, flag); ii != ee; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
       unsigned int d = graph.getEdgeData(ii);
-      SNode& rdata = graph.getData(dst, Galois::NONE);
+      SNode& rdata = graph.getData(dst, Galois::MethodFlag::NONE);
       unsigned int newDist = data.dist + d;
       unsigned int v;
       while (newDist < (v = rdata.dist)) {
@@ -247,9 +247,9 @@ struct does_not_need_aborts<ParallelLessDupsAlgo<true> > : public boost::true_ty
 
 bool verifyConnected() {
   for (Graph::iterator src = graph.begin(), ee = graph.end(); src != ee; ++src) {
-    unsigned int dist = graph.getData(*src,Galois::NONE).dist;
+    unsigned int dist = graph.getData(*src,Galois::MethodFlag::NONE).dist;
     if (dist == DIST_INFINITY) {
-      std::cerr << "WARNING: found node = " << graph.getData(*src, Galois::NONE).id
+      std::cerr << "WARNING: found node = " << graph.getData(*src, Galois::MethodFlag::NONE).id
 		<< " with label INFINITY\n";
       return false;
     }
@@ -259,31 +259,31 @@ bool verifyConnected() {
 
 bool verify(GNode source) {
   bool retval = true;
-  if (graph.getData(source,Galois::NONE).dist != 0) {
+  if (graph.getData(source,Galois::MethodFlag::NONE).dist != 0) {
     std::cerr << "ERROR: source has non-zero dist value\n";
     retval = false;
   }
   
   for (Graph::iterator src = graph.begin(), ee = graph.end(); src != ee; ++src) {
-    unsigned int dist = graph.getData(*src, Galois::NONE).dist;
+    unsigned int dist = graph.getData(*src, Galois::MethodFlag::NONE).dist;
     if (dist > DIST_INFINITY) {
-      std::cerr << "ERROR: found node = " << graph.getData(*src,Galois::NONE).id
+      std::cerr << "ERROR: found node = " << graph.getData(*src,Galois::MethodFlag::NONE).id
 		<< " with label greater than INFINITY ( ? ? )\n";
       retval = false;
     }
     
     if (dist != DIST_INFINITY) { //avoid overflow on dist + d
       for (Graph::edge_iterator 
-	     ii = graph.edge_begin(*src, Galois::NONE),
-	     ee = graph.edge_end(*src, Galois::NONE); ii != ee; ++ii) {
+	     ii = graph.edge_begin(*src, Galois::MethodFlag::NONE),
+	     ee = graph.edge_end(*src, Galois::MethodFlag::NONE); ii != ee; ++ii) {
 	GNode neighbor = graph.getEdgeDst(ii);
-	unsigned int ddist = graph.getData(*src, Galois::NONE).dist;
+	unsigned int ddist = graph.getData(*src, Galois::MethodFlag::NONE).dist;
 	unsigned int d = graph.getEdgeData(ii);
 	if (ddist > dist + d) {
 	  std::cerr << "ERROR: bad level value at "
-		    << graph.getData(*src, Galois::NONE).id
+		    << graph.getData(*src, Galois::MethodFlag::NONE).id
 		    << " which is a neighbor of " 
-		    << graph.getData(neighbor, Galois::NONE).id << "\n";
+		    << graph.getData(neighbor, Galois::MethodFlag::NONE).id << "\n";
 	  retval = false;
 	}
       }
@@ -302,7 +302,7 @@ void initGraph(GNode& source, GNode& report) {
   report = *graph.begin();
   for (Graph::iterator src = graph.begin(), ee =
       graph.end(); src != ee; ++src) {
-    SNode& node = graph.getData(*src,Galois::NONE);
+    SNode& node = graph.getData(*src,Galois::MethodFlag::NONE);
     node.id = id++;
     node.dist = DIST_INFINITY;
     if (node.id == startNode) {
@@ -369,7 +369,7 @@ int main(int argc, char **argv) {
     delete WLEmptyWork;
   }
 
-  std::cout << graph.getData(report,Galois::NONE).toString() << "\n";
+  std::cout << graph.getData(report,Galois::MethodFlag::NONE).toString() << "\n";
   if (!skipVerify) {
     if (!verifyConnected()) {
       std::cerr << "WARNING: graph not fully connected.\n";

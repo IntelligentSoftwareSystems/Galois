@@ -361,12 +361,16 @@ namespace WorkList {
   class BulkSynchronousInline { };
 }
 
+namespace {
+
 template<class T,class FunctionTy>
 struct ForEachWork<WorkList::BulkSynchronousInline<>,T,FunctionTy>:
   public HIDDEN::BSInlineExecutor<T,FunctionTy> {
   typedef HIDDEN::BSInlineExecutor<T,FunctionTy> SuperTy;
   ForEachWork(FunctionTy& f, const char* ln): SuperTy(f, ln) { }
 };
+
+}
 
 }
 }

@@ -66,7 +66,7 @@ void bisectionArray(GGraph* graph, GNode* nodes, int numNodes, int minWgtPart1, 
 
 			drain = false;
 
-			for (GGraph::edge_iterator jj = graph->edge_begin(nodes[i], Galois::NONE), eejj = graph->edge_end(nodes[i], Galois::NONE); jj != eejj; ++jj) {
+			for (GGraph::edge_iterator jj = graph->edge_begin(nodes[i], Galois::MethodFlag::NONE), eejj = graph->edge_end(nodes[i], Galois::MethodFlag::NONE); jj != eejj; ++jj) {
 			  GNode neighbor = graph->getEdgeDst(jj);
 			  int k = graph->getData(neighbor).getNodeId();//id is same as the position in nodes array
 				if (visited[k] == 0) {
@@ -131,7 +131,7 @@ void bisection(GGraph* graph, GNode* nodes, int numNodes, int minWgtPart1, int m
 
 		drain = false;
 
-		for (GGraph::edge_iterator jj = graph->edge_begin(nodes[i], Galois::NONE), eejj = graph->edge_end(nodes[i], Galois::NONE); jj != eejj; ++jj) {
+		for (GGraph::edge_iterator jj = graph->edge_begin(nodes[i], Galois::MethodFlag::NONE), eejj = graph->edge_end(nodes[i], Galois::MethodFlag::NONE); jj != eejj; ++jj) {
 		  GNode neighbor = graph->getEdgeDst(jj);
 			int k = graph->getData(neighbor).getNodeId();//id is same as the position in nodes array
 			if (visited[k] == 0) {
@@ -264,8 +264,8 @@ void growBisection(MetisGraph* metisGraph, int* tpwgts, int coarsenTo) {
 	delete[] visited;
 	delete[] queue;
 	for (int i = 0; i < numNodes; i++) {
-	  graph->getData(nodes[i], Galois::NONE).setPartition(bestWhere[i]);
-	  assert(graph->getData(nodes[i],Galois::NONE).getPartition()>=0);
+	  graph->getData(nodes[i], Galois::MethodFlag::NONE).setPartition(bestWhere[i]);
+	  assert(graph->getData(nodes[i],Galois::MethodFlag::NONE).getPartition()>=0);
 	}
 	delete[] bestWhere;
 	metisGraph->setMinCut(bestMinCut);

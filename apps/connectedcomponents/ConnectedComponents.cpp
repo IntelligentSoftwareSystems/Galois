@@ -96,12 +96,12 @@ std::ostream& operator<<(std::ostream& os, const Node& n) {
 struct SerialAlgo {
   struct Merge {
     void operator()(const GNode& src) const {
-      Node& sdata = graph.getData(src, Galois::NONE);
+      Node& sdata = graph.getData(src, Galois::MethodFlag::NONE);
       
-      for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::NONE),
-          ei = graph.edge_end(src, Galois::NONE); ii != ei; ++ii) {
+      for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::NONE),
+          ei = graph.edge_end(src, Galois::MethodFlag::NONE); ii != ei; ++ii) {
         GNode dst = graph.getEdgeDst(ii);
-        Node& ddata = graph.getData(dst, Galois::NONE);
+        Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
         sdata.merge(&ddata);
       }
     }
@@ -141,10 +141,10 @@ struct SynchronousAlgo {
 
     //! Add the first edge between components to the worklist
     void operator()(const GNode& src) const {
-      for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::NONE),
-          ei = graph.edge_end(src, Galois::NONE); ii != ei; ++ii) {
+      for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::NONE),
+          ei = graph.edge_end(src, Galois::MethodFlag::NONE); ii != ei; ++ii) {
         GNode dst = graph.getEdgeDst(ii);
-        Node& ddata = graph.getData(dst, Galois::NONE);
+        Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
         next.push(Edge(src, &ddata, 0));
         break;
       }
@@ -156,7 +156,7 @@ struct SynchronousAlgo {
     Merge(Galois::Statistic& e): emptyMerges(e) { }
 
     void operator()(const Edge& edge) const {
-      Node& sdata = graph.getData(edge.src, Galois::NONE);
+      Node& sdata = graph.getData(edge.src, Galois::MethodFlag::NONE);
       if (!sdata.merge(edge.ddata))
         emptyMerges += 1;
     }
@@ -177,15 +177,15 @@ struct SynchronousAlgo {
 
     void operator()(const Edge& edge) const {
       GNode src = edge.src;
-      Node& sdata = graph.getData(src, Galois::NONE);
+      Node& sdata = graph.getData(src, Galois::MethodFlag::NONE);
       Node* scomponent = sdata.findAndCompress();
-      Graph::edge_iterator ii = graph.edge_begin(src, Galois::NONE);
-      Graph::edge_iterator ei = graph.edge_end(src, Galois::NONE);
+      Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::NONE);
+      Graph::edge_iterator ei = graph.edge_end(src, Galois::MethodFlag::NONE);
       int count = edge.count + 1;
       std::advance(ii, count);
       for (; ii != ei; ++ii, ++count) {
         GNode dst = graph.getEdgeDst(ii);
-        Node& ddata = graph.getData(dst, Galois::NONE);
+        Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
         Node* dcomponent = ddata.findAndCompress();
         if (scomponent != dcomponent) {
           next.push(Edge(src, dcomponent, count));
@@ -234,12 +234,12 @@ struct AsynchronousAlgo {
     }
 
     void operator()(const GNode& src) const {
-      Node& sdata = graph.getData(src, Galois::NONE);
+      Node& sdata = graph.getData(src, Galois::MethodFlag::NONE);
 
-      for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::NONE),
-          ei = graph.edge_end(src, Galois::NONE); ii != ei; ++ii) {
+      for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::NONE),
+          ei = graph.edge_end(src, Galois::MethodFlag::NONE); ii != ei; ++ii) {
         GNode dst = graph.getEdgeDst(ii);
-        Node& ddata = graph.getData(dst, Galois::NONE);
+        Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
         if (!sdata.merge(&ddata))
           emptyMerges += 1;
       }
@@ -282,7 +282,7 @@ void writeComponent(Node* component) {
     data.id = data.findAndCompress() == component ? 1 : 0;
     if (data.id) {
       size_t degree = 
-        std::distance(graph.edge_begin(*ii, Galois::NONE), graph.edge_end(*ii, Galois::NONE));
+        std::distance(graph.edge_begin(*ii, Galois::MethodFlag::NONE), graph.edge_end(*ii, Galois::MethodFlag::NONE));
       numEdges += degree;
       numNodes += 1;
     }
@@ -302,7 +302,7 @@ void writeComponent(Node* component) {
       data.id = prev->id + data.id;
     if (data.findAndCompress() == component) {
       size_t degree = 
-        std::distance(graph.edge_begin(*ii, Galois::NONE), graph.edge_end(*ii, Galois::NONE));
+        std::distance(graph.edge_begin(*ii, Galois::MethodFlag::NONE), graph.edge_end(*ii, Galois::MethodFlag::NONE));
       size_t sid = data.id - 1;
       assert(sid < numNodes);
       p.incrementDegree(sid, degree);
@@ -321,10 +321,10 @@ void writeComponent(Node* component) {
 
     size_t sid = data.id - 1;
 
-    for (Graph::edge_iterator jj = graph.edge_begin(*ii, Galois::NONE),
-        ej = graph.edge_end(*ii, Galois::NONE); jj != ej; ++jj) {
+    for (Graph::edge_iterator jj = graph.edge_begin(*ii, Galois::MethodFlag::NONE),
+        ej = graph.edge_end(*ii, Galois::MethodFlag::NONE); jj != ej; ++jj) {
       GNode dst = graph.getEdgeDst(jj);
-      Node& ddata = graph.getData(dst, Galois::NONE);
+      Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
       size_t did = ddata.id - 1;
 
       //assert(ddata.component == component);
@@ -354,7 +354,7 @@ struct CountLargest {
   CountLargest(Accums& accums): accums(accums) { }
   
   void operator()(const GNode& x) {
-    Node& n = graph.getData(x, Galois::NONE);
+    Node& n = graph.getData(x, Galois::MethodFlag::NONE);
     // Ignore trivial components
     if (n.isRep()) {
       accums.trivial += 1;

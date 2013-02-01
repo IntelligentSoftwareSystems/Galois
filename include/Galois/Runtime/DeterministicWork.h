@@ -117,6 +117,8 @@ struct DeterministicContext: public Galois::Runtime::SimpleRuntimeContext {
   }
 };
 
+namespace {
+
 template<typename T, typename CompTy> 
 struct OrderedContextComp {
   typedef DeterministicContext<T, OrderedContextComp> DetContext;
@@ -268,7 +270,6 @@ public:
   }
 
   bool checkBreak() {
-    runAllLoopExitHandlers();
     if (LL::getTID() == 0)
       done.data = breakFn();
     barrier.wait();
@@ -1547,7 +1548,7 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
 
 
 
-
+} // end namespace anonymous
 } // end namespace DeterministicWork
 
 template<typename InitTy, typename WorkTy>
@@ -1562,7 +1563,6 @@ static inline void for_each_det_impl(InitTy& init, WorkTy& W) {
 		     std::ref(W),
 		     std::ref(getSystemBarrier())};
   getSystemThreadPool().run(&w[0], &w[4], activeThreads);
-  runAllLoopExitHandlers();
   inGaloisForEach = false;
 }
 

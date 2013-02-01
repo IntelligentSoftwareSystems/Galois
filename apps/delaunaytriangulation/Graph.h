@@ -65,8 +65,8 @@ struct Searcher: private boost::noncopyable {
     Graph& g;
     DetLess(Graph& x): g(x) { }
     bool operator()(GNode a, GNode b) const {
-      Element& e1 = g.getData(a, Galois::NONE);
-      Element& e2 = g.getData(b, Galois::NONE);
+      Element& e1 = g.getData(a, Galois::MethodFlag::NONE);
+      Element& e2 = g.getData(b, Galois::MethodFlag::NONE);
       
       for (int i = 0; i < 3; ++i) {
         uintptr_t v1 = (i < 2 || !e1.boundary()) ? reinterpret_cast<uintptr_t>(e1.getPoint(i)) : 0;
@@ -101,7 +101,7 @@ struct Searcher: private boost::noncopyable {
 
       wl.pop_front();
 
-      if (!graph.containsNode(cur, Galois::CHECK_CONFLICT))
+      if (!graph.containsNode(cur, Galois::MethodFlag::CHECK_CONFLICT))
         continue;
 
       if (marker.hasMark(cur))
@@ -128,8 +128,8 @@ struct Searcher: private boost::noncopyable {
       // Search neighbors (a) when matched and looking for all or (b) when no match and looking
       // for first
       if (matched == all) {
-        for (Graph::edge_iterator ii = graph.edge_begin(cur, Galois::CHECK_CONFLICT),
-            ee = graph.edge_end(cur, Galois::CHECK_CONFLICT);
+        for (Graph::edge_iterator ii = graph.edge_begin(cur, Galois::MethodFlag::CHECK_CONFLICT),
+            ee = graph.edge_end(cur, Galois::MethodFlag::CHECK_CONFLICT);
             ii != ee; ++ii) {
           GNode dst = graph.getEdgeDst(ii);
           wl.push_back(std::make_pair(dst, SomeGNode(cur)));

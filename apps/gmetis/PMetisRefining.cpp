@@ -55,7 +55,7 @@ void projectTwoWayPartition(MetisGraph* metisGraph) {
 		MetisNode& nodeData = finerGraph->getData(node);
 		nodeData.setIdegree(nodeData.getAdjWgtSum());
 		if (finerGraph->edge_begin(node) != finerGraph->edge_end(node) && metisGraph->getGraph()->getData(finer->getCoarseGraphMap(nodeData.getNodeId())).isBoundary()) {
-			for (GGraph::edge_iterator jj = finerGraph->edge_begin(node, Galois::NONE), eejj = finerGraph->edge_end(node, Galois::NONE); jj != eejj; ++jj) {
+			for (GGraph::edge_iterator jj = finerGraph->edge_begin(node, Galois::MethodFlag::NONE), eejj = finerGraph->edge_end(node, Galois::MethodFlag::NONE); jj != eejj; ++jj) {
 			  GNode neighbor = finerGraph->getEdgeDst(jj);
 				MetisNode& neighborData = finerGraph->getData(neighbor);
 				if (nodeData.getPartition() != neighborData.getPartition()) {

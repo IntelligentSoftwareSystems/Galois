@@ -68,7 +68,7 @@ struct process {
   typedef int tt_does_not_need_aborts;
 
   void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& lwl) {
-    SNode& data = graph.getData(req.n,Galois::NONE);
+    SNode& data = graph.getData(req.n,Galois::MethodFlag::NONE);
     // if (req.w >= data.dist)
     //   *WLEmptyWork += 1;
     unsigned int v;
@@ -76,12 +76,12 @@ struct process {
       if (__sync_bool_compare_and_swap(&data.dist[req.c], v, req.w)) {
 	// if (v != DIST_INFINITY)
 	//   *BadWork += 1;
-	for (Graph::edge_iterator ii = graph.edge_begin(req.n, Galois::NONE),
-	       ee = graph.edge_end(req.n, Galois::NONE); ii != ee; ++ii) {
+	for (Graph::edge_iterator ii = graph.edge_begin(req.n, Galois::MethodFlag::NONE),
+	       ee = graph.edge_end(req.n, Galois::MethodFlag::NONE); ii != ee; ++ii) {
 	  GNode dst = graph.getEdgeDst(ii);
 	  int d = graph.getEdgeData(ii);
 	  unsigned int newDist = req.w + d;
-	  SNode& rdata = graph.getData(dst,Galois::NONE);
+	  SNode& rdata = graph.getData(dst,Galois::MethodFlag::NONE);
 	  if (newDist < rdata.dist[req.c])
 	    lwl.push(UpdateRequest(dst, newDist, req.c));
 	}
@@ -93,7 +93,7 @@ struct process {
 
 struct reset {
   void operator()(GNode n) {//, Galois::UserContext<GNode>& lwl) {
-    SNode& S = graph.getData(n, Galois::NONE);
+    SNode& S = graph.getData(n, Galois::MethodFlag::NONE);
     for (int i = 0; i < NUM; ++i)
       S.dist[i] = DIST_INFINITY;
   }
@@ -140,7 +140,7 @@ int main(int argc, char **argv) {
   unsigned int id = 0;
   for (Graph::iterator src = graph.begin(), ee =
       graph.end(); src != ee; ++src) {
-    SNode& node = graph.getData(*src,Galois::NONE);
+    SNode& node = graph.getData(*src,Galois::MethodFlag::NONE);
     node.id = id++;
   }
 
