@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
    Galois::Runtime::Distributed::networkStart();
 
    vector<int> myvec;
-   typedef WorkList::LIFO<int,true> chunk;
+   typedef Galois::WorkList::LIFO<int,true> chunk;
    R r;
    f1 f(&r);
    for (int i=1; i<=40; i++) myvec.push_back(i);

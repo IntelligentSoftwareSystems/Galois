@@ -33,7 +33,7 @@
 namespace Galois {
 namespace Runtime {
 
-class vTerminationDetection {
+class TerminationDetection {
 protected:
   volatile bool globalTerm;
 public:
@@ -56,7 +56,7 @@ public:
   }
 };
 
-vTerminationDetection& getSystemTermination();
+TerminationDetection& getSystemTermination();
 
 }
 }

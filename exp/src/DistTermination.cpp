@@ -35,7 +35,7 @@
 using namespace Galois::Runtime;
 
 namespace {
-class DistTerminationDetection : public vTerminationDetection {
+class DistTerminationDetection : public TerminationDetection {
   struct TokenHolder {
     friend class TerminationDetection;
     volatile long tokenIsBlack;
@@ -143,7 +143,7 @@ void DistTerminationDetection::propTokenLandingPad(Distributed::RecvBuffer& b) {
 
 } // namespace
 
-Galois::Runtime::vTerminationDetection& Galois::Runtime::getSystemTermination() {
+Galois::Runtime::TerminationDetection& Galois::Runtime::getSystemTermination() {
   return getDistTermination();
 }
 
