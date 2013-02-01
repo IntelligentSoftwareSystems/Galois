@@ -759,7 +759,7 @@ void do_all_coupled_impl (PerThreadStorage<Range<Iter> >& ranges, FuncTp& func, 
 
   RunCommand w[2] = { std::ref (exec), std::ref (getSystemBarrier ()) };
 
-  getSystemThreadPool ().run (&w[0], &w[2]);
+  getSystemThreadPool ().run (&w[0], &w[2], activeThreads);
   
   // inGaloisForEach = false;
 }

@@ -35,6 +35,7 @@ namespace Galois {
 namespace Runtime {
 namespace LL {
 
+//FIXME: nothing in LL should depend on Runtime
 
 class ThreadRWlock {
 

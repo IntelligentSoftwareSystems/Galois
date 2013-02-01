@@ -141,7 +141,7 @@ static inline void acquire(Lockable* C, Galois::MethodFlag m) {
 
 struct AlwaysLockObj {
   void operator()(Lockable* C) const {
-    Galois::Runtime::doAcquire(C);
+    doAcquire(C);
   }
 };
 
@@ -149,7 +149,7 @@ struct CheckedLockObj {
   Galois::MethodFlag m;
   CheckedLockObj(Galois::MethodFlag _m) :m(_m) {}
   void operator()(Lockable* C) const {
-    Galois::Runtime::acquire(C, m);
+    acquire(C, m);
   }
 };
 

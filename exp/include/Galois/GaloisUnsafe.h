@@ -39,7 +39,7 @@ namespace hidden {
     Galois::Runtime::RunCommand w[2] = { std::ref (exec), 
 					 std::ref (Galois::Runtime::getSystemBarrier ())};
 
-    Galois::Runtime::getSystemThreadPool().run(&w[0], &w[2]);
+    Galois::Runtime::getSystemThreadPool().run(&w[0], &w[2], Galois::Runtime::activeThreads);
 
     Galois::Runtime::inGaloisForEach = false;
   }

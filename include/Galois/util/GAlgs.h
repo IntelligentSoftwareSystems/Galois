@@ -70,9 +70,11 @@ std::pair<IterTy, IterTy> block_range(IterTy b, IterTy e, unsigned id, unsigned 
   unsigned int numper = std::max((dist + num - 1) / num, 1U); //round up
   unsigned int A = std::min(numper * id, dist);
   unsigned int B = std::min(numper * (id + 1), dist);
-  e = b;
   std::advance(b, A);
-  std::advance(e, B);
+  if (dist != B) {
+    e = b;
+    std::advance(e, B - A);
+  }
   return std::make_pair(b,e);
 }
 

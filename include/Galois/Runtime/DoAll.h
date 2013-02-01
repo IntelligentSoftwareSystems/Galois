@@ -158,7 +158,7 @@ FunctionTy do_all_impl_dispatch(RangeTy range, FunctionTy f, ReducerTy r, bool n
 
   RunCommand w[2] = {std::ref(W),
 		     std::ref(getSystemBarrier())};
-  getSystemThreadPool().run(&w[0], &w[2]);
+  getSystemThreadPool().run(&w[0], &w[2], activeThreads);
   return W.getFn();
 }
 
@@ -168,7 +168,7 @@ FunctionTy do_all_impl_dispatch(RangeTy range, FunctionTy f, ReducerTy r, bool n
 
   RunCommand w[2] = {std::ref(W),
 		     std::ref(getSystemBarrier())};
-  getSystemThreadPool().run(&w[0], &w[2]);
+  getSystemThreadPool().run(&w[0], &w[2],activeThreads);
   return W.getFn();
 }
 
@@ -199,8 +199,8 @@ void do_all_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname=0) {
     typedef StandardRange<IterTy> Range;
     DoAllWork<FunctionTy, EmptyFn, Range, Steal> W(f, EmptyFn(), false, makeStandardRange(b, e));
     RunCommand w[2] = {std::ref(W),
-                       std::ref(getSystemBarrier())};
-    getSystemThreadPool().run(&w[0], &w[2]);
+		       std::ref(getSystemBarrier())};
+    getSystemThreadPool().run(&w[0], &w[2], activeThreads);
     inGaloisForEach = false;
   }
 }

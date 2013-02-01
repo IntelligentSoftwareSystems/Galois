@@ -26,7 +26,7 @@
 void Galois::Runtime::preAlloc_impl(int num) {
   int a = activeThreads;
   a = (num + a - 1) / a;
-  Galois::Runtime::RunCommand w[2] = {std::bind(Galois::Runtime::MM::pagePreAlloc, a),
-				    std::ref(getSystemBarrier())};
-  Galois::Runtime::getSystemThreadPool().run(&w[0], &w[2]);
+  RunCommand w[2] = {std::bind(Galois::Runtime::MM::pagePreAlloc, a),
+		     std::ref(getSystemBarrier())};
+  getSystemThreadPool().run(&w[0], &w[2], activeThreads);
 }
