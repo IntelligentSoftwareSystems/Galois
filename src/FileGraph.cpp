@@ -102,7 +102,28 @@ void FileGraph::structureFromMem(void* mem, size_t len, bool clone) {
   }
 }
 
-char* FileGraph::structureFromArrays(uint64_t* out_idx, uint64_t num_nodes,
+void* FileGraph::structureFromGraph(FileGraph& g, size_t sizeof_edge_data) {
+  // Allocate
+  size_t common = g.masterLength - (g.sizeEdgeTy * g.numEdges);
+  size_t len = common + (sizeof_edge_data * g.numEdges);
+  int _MAP_BASE = MAP_ANONYMOUS | MAP_PRIVATE;
+#ifdef MAP_POPULATE
+  _MAP_BASE |= MAP_POPULATE;
+#endif
+  void* m = mmap(0, len, PROT_READ | PROT_WRITE, _MAP_BASE, -1, 0);
+  if (m == MAP_FAILED) {
+    GALOIS_SYS_ERROR(true, "failed copying graph");
+  }
+  memcpy(m, g.masterMapping, common);
+  uint64_t* fptr = (uint64_t*)m;
+  fptr[1] = sizeof_edge_data; // Update sizeof(edgeData)
+  parse(m);
+  structureFromMem(m, len, false);
+
+  return edgeData;
+}
+
+void* FileGraph::structureFromArrays(uint64_t* out_idx, uint64_t num_nodes,
       uint32_t* outs, uint64_t num_edges, size_t sizeof_edge_data) {
   //version
   uint64_t version = 1;

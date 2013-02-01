@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -40,16 +40,24 @@
  * g.addEdge(a, b, 5);
  *
  * // Traverse graph
- * for (Graph::iterator i = g.begin(), iend = g.end();
- *      i != iend;
- *      ++i) {
- *   Graph::GraphNode src = *i;
- *   for (Graph::neighbor_iterator j = g.neighbor_begin(src),
- *                                 jend = g.neighbor_end(src);
- *        j != jend;
- *        ++j) {
- *     Graph::GraphNode dst = *j;
- *     int edgeData = g.getEdgeData(src, dst);
+ * for (Graph::iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
+ *   Graph::GraphNode src = *ii;
+ *   for (Graph::edge_iterator jj = g.edge_begin(src), ej = g.edge_end(src); ++jj) {
+ *     Graph::GraphNode dst = graph.getEdgeDst(jj);
+ *     int edgeData = g.getEdgeData(jj);
+ *     assert(edgeData == 5);
+ *   }
+ * }
+ * \endcode
+ *
+ * And in C++11:
+ *
+ * \code
+ * // Traverse graph
+ * for (Graph::GraphNode src : g) {
+ *   for (Graph::edge_iterator edge : g.out_edges(src)) {
+ *     Graph::GraphNode dst = g.getEdgeDst(edge);
+ *     int edgeData = g.getEdgeData(edge);
  *     assert(edgeData == 5);
  *   }
  * }
@@ -60,15 +68,16 @@
 #ifndef GALOIS_GRAPHS_GRAPH_H
 #define GALOIS_GRAPHS_GRAPH_H
 
-#include <boost/functional.hpp>
-#include <boost/iterator/transform_iterator.hpp>
-#include <boost/iterator/filter_iterator.hpp>
-
 #include "Galois/Bag.h"
+#include "Galois/Graphs/LCGraph.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/MethodFlags.h"
 
 #include "llvm/ADT/SmallVector.h"
+
+#include <boost/functional.hpp>
+#include <boost/iterator/transform_iterator.hpp>
+#include <boost/iterator/filter_iterator.hpp>
 
 #include <algorithm>
 #include <map>
@@ -420,6 +429,10 @@ public:
     //if (shouldLock(mflag))
     //  acquire(N);
     return boost::make_filter_iterator(is_edge(), N->end(), N->end());
+  }
+
+  EdgesIterator<FirstGraph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+    return EdgesIterator<FirstGraph>(*this, N, mflag);
   }
 
   //These are not thread safe!!

@@ -97,7 +97,7 @@ protected:
   FunctionTy& function;
   const char* loopname;
 
-  vTerminationDetection& term;
+  TerminationDetection& term;
   PerPackageStorage<AbortedList> aborted;
   LL::CacheLineStorage<bool> broke;
 
@@ -248,6 +248,7 @@ public:
 
   template<typename RangeTy>
   void AddInitialWork(const RangeTy& range) {
+    term.initializeThread();
     wl.push_initial(range);
     term.initializeThread();
   }

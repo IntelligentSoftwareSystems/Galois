@@ -1,2 +1,1 @@
-app(graph-convert)
-
+app(graph-convert graph-convert.cpp)

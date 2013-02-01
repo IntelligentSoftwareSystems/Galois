@@ -40,7 +40,7 @@ static llvm::cl::opt<bool> skipVerify("noverify", llvm::cl::desc("Skip verificat
 static llvm::cl::opt<int> numThreads("t", llvm::cl::desc("Number of threads"), llvm::cl::init(1));
 
 //! initialize lonestar benchmark
-void LonestarStart(int argc, char** argv, const char* app, const char* desc = 0, const char* url = 0) {
+static void LonestarStart(int argc, char** argv, const char* app, const char* desc = 0, const char* url = 0) {
   using namespace Galois::Runtime::LL;
 
   gPrint("Galois Benchmark Suite v" GALOIS_VERSION_STRING);

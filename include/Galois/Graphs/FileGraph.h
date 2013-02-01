@@ -89,6 +89,14 @@ protected:
   //! Initialize graph from block of memory
   void parse(void* m);
 
+  //! Read graph connectivity information from memory
+  void structureFromMem(void* mem, size_t len, bool clone);
+
+  void* structureFromArrays(uint64_t* outIdxs, uint64_t numNodes,
+      uint32_t* outs, uint64_t numEdges, size_t sizeofEdgeData);
+
+  void* structureFromGraph(FileGraph& g, size_t sizeofEdgeData);
+
 public:
   // Node Handling
 
@@ -107,7 +115,8 @@ public:
   edge_iterator edge_begin(GraphNode N) const;
   edge_iterator edge_end(GraphNode N) const;
 
-  template<typename EdgeTy> EdgeTy& getEdgeData(edge_iterator it) const {
+  template<typename EdgeTy> 
+  EdgeTy& getEdgeData(edge_iterator it) const {
     return reinterpret_cast<EdgeTy*>(edgeData)[*it];
   }
 
@@ -162,20 +171,29 @@ public:
   //! The number of edges in the graph
   unsigned int sizeEdges() const;
 
+  //! sizeof an edge
+  size_t sizeEdge() const { return sizeEdgeTy; }
+
   FileGraph();
   ~FileGraph();
 
   //! Read graph connectivity information from file
   void structureFromFile(const std::string& filename);
 
-  //! Read graph connectivity information from memory
-  void structureFromMem(void* mem, size_t len, bool clone);
+  //! Read graph connectivity information from arrays.
+  //! Return a pointer to array to populate with edge data.
+  template<typename T>
+  T* structureFromArrays(uint64_t* outIdxs, uint64_t numNodes,
+      uint32_t* outs, uint64_t numEdges) {
+    return reinterpret_cast<T*>(structureFromArrays(outIdx, numNodes, outs, numEdges, sizeof(T)));
+  }
 
   //! Read graph connectivity information from arrays.
-  //! If sizeof_edge_data != 0, return a pointer to array to
-  //! populate with edge data.
-  char* structureFromArrays(uint64_t* outIdxs, uint64_t numNodes,
-      uint32_t* outs, uint64_t numEdges, size_t sizeofEdgeData);
+  //! Return a pointer to array to populate with edge data.
+  template<typename T>
+  T* structureFromGraph(FileGraph& g) {
+    return reinterpret_cast<T*>(structureFromGraph(g, sizeof(T)));
+  }
 
   // XXX(ddn): Avoid methods that depend on slow std::map
 #if 0
@@ -305,15 +323,16 @@ public:
    * Finish making graph. Returns pointer to block of memory that should be
    * used to store edge data.
    */
-  char* finish() { 
-    structureFromArrays(outIdx, this->numNodes, outs, this->numEdges, sizeofEdgeData);
+  template<typename T>
+  T* finish() { 
+    void* ret = structureFromArrays(outIdx, this->numNodes, outs, this->numEdges, sizeofEdgeData);
     delete [] outIdx;
     outIdx = 0;
     delete [] starts;
     starts = 0;
     delete [] outs;
     outs = 0;
-    return this->edgeData;
+    return reinterpret_cast<T*>(ret);
   }
 };
 
@@ -363,9 +382,9 @@ void makeSymmetric(FileGraph& in, FileGraph& out) {
     }
   }
 
-  char *rawEdgeData = g.finish();
+  edge_value_type* rawEdgeData = g.finish<edge_value_type>();
   if (EdgeData::has_value)
-    std::copy(edgeData.begin(), edgeData.end(), reinterpret_cast<edge_value_type*>(rawEdgeData));
+    std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
 
   out.swap(g);
 }

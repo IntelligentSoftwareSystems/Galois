@@ -111,7 +111,7 @@ def run(cmd, values, options):
       retcode = subprocess.call(cmd)
     if retcode != 0:
       # print command line just in case child process should be died before doing it
-      print("RUN: Error %d" % retcode)
+      print("RUN: Error %s" % retcode)
       if not options.ignore_errors:
         sys.exit(1)
 

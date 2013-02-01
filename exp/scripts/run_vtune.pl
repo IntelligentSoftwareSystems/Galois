@@ -3,13 +3,16 @@
 use strict;
 use warnings;
 
-my $vtune = `which amplxe-cl`;
-my @vtune_vers = ("2013", "2011");
-foreach my $ver (@vtune_vers) {
-  my $base = "/opt/intel/vtune_amplifier_xe_" . $ver;
-  if (-e $base and not $vtune) {
-    $vtune = $base . "/bin64/amplxe-cl";
-    last;
+my $vtune = `which amplxe-cl 2> /dev/null`;
+chomp($vtune);
+if (not -e $vtune) {
+  my @vtune_vers = ("2013", "2011");
+  foreach my $ver (@vtune_vers) {
+    my $base = "/opt/intel/vtune_amplifier_xe_" . $ver;
+    if (-e $base and not $vtune) {
+      $vtune = $base . "/bin64/amplxe-cl";
+      last;
+    }
   }
 }
 

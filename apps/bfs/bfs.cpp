@@ -282,15 +282,8 @@ struct SerialAsyncAlgo {
 
   void operator()(const GNode source) const {
     std::deque<GNode> wl;
-    graph.getData(source, Galois::MethodFlag::NONE).dist = 0;
-
-    for (Graph::edge_iterator ii = graph.edge_begin(source, Galois::MethodFlag::NONE), 
-           ei = graph.edge_end(source, Galois::MethodFlag::NONE); ii != ei; ++ii) {
-      GNode dst = graph.getEdgeDst(ii);
-      SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
-      ddata.dist = 1;
-      wl.push_back(dst);
-    }
+    graph.getData(source).dist = 0;
+    wl.push_back(source);
 
     while (!wl.empty()) {
       GNode n = wl.front();
@@ -326,17 +319,9 @@ struct AsyncAlgo {
     typedef ChunkedFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<GNodeIndexer,dChunk> OBIM;
     
-    std::deque<GNode> initial;
     graph.getData(source).dist = 0;
-    for (Graph::edge_iterator ii = graph.edge_begin(source),
-          ei = graph.edge_end(source); ii != ei; ++ii) {
-      GNode dst = graph.getEdgeDst(ii);
-      SNode& ddata = graph.getData(dst);
-      ddata.dist = 1;
-      initial.push_back(dst);
-    }
 
-    Galois::for_each<OBIM>(initial.begin(), initial.end(), *this);
+    Galois::for_each<OBIM>(source, *this);
   }
 
   void operator()(GNode& n, Galois::UserContext<GNode>& ctx) const {
@@ -381,17 +366,8 @@ struct BarrierAlgo {
   typedef Pair<GNode,int> ItemTy;
 
   void operator()(const GNode& source) const {
-    std::deque<ItemTy> initial;
-
     graph.getData(source).dist = 0;
-    for (Graph::edge_iterator ii = graph.edge_begin(source),
-          ei = graph.edge_end(source); ii != ei; ++ii) {
-      GNode dst = graph.getEdgeDst(ii);
-      SNode& ddata = graph.getData(dst);
-      ddata.dist = 1;
-      initial.push_back(ItemTy(dst, 2));
-    }
-    Galois::for_each<WL>(initial.begin(), initial.end(), *this);
+    Galois::for_each<WL>(ItemTy(source, 1), *this);
   }
 
   void operator()(const ItemTy& item, Galois::UserContext<ItemTy>& ctx) const {
@@ -444,25 +420,17 @@ struct DetBarrierAlgo {
 #ifdef GALOIS_USE_EXP
     typedef Galois::WorkList::BulkSynchronousInline<> WL;
 #else
-  typedef Galois::WorkList::BulkSynchronous<Galois::WorkList::dChunkedLIFO<256> > WL;
+    typedef Galois::WorkList::BulkSynchronous<Galois::WorkList::dChunkedLIFO<256> > WL;
 #endif
-    std::deque<ItemTy> initial;
-
     graph.getData(source).dist = 0;
-    for (Graph::edge_iterator ii = graph.edge_begin(source),
-          ei = graph.edge_end(source); ii != ei; ++ii) {
-      GNode dst = graph.getEdgeDst(ii);
-      SNode& ddata = graph.getData(dst);
-      ddata.dist = 1;
-      initial.push_back(ItemTy(dst, 2));
-    }
+
     switch (Version) {
       case nondet: 
-        Galois::for_each<WL>(initial.begin(), initial.end(), *this); break;
+        Galois::for_each<WL>(ItemTy(source, 1), *this); break;
       case detBase:
-        Galois::for_each_det(initial.begin(), initial.end(), *this); break;
+        Galois::for_each_det(ItemTy(source, 1), *this); break;
       case detDisjoint:
-        Galois::for_each_det(initial.begin(), initial.end(), *this); break;
+        Galois::for_each_det(ItemTy(source, 1), *this); break;
       default: std::cerr << "Unknown algorithm " << Version << "\n"; abort();
     }
   }
@@ -566,17 +534,10 @@ struct TBBAsyncAlgo {
   void operator()(const GNode& source) const {
     tbb::task_scheduler_init init(numThreads);
     
-    std::vector<GNode> initial;
     graph.getData(source).dist = 0;
-    for (Graph::edge_iterator ii = graph.edge_begin(source),
-          ei = graph.edge_end(source); ii != ei; ++ii) {
-      GNode dst = graph.getEdgeDst(ii);
-      SNode& ddata = graph.getData(dst);
-      ddata.dist = 1;
-      initial.push_back(dst);
-    }
+    GNode initial[] = { source };
 
-    tbb::parallel_do(initial.begin(), initial.end(), Fn());
+    tbb::parallel_do(&initial[0], &initial[1], Fn());
   }
 };
 

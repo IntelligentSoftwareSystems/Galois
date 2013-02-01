@@ -68,7 +68,7 @@ void Galois::Runtime::LL::gDebug(const char* format, ...) {
   vsprintf (msg, format, ap);
   va_end(ap);
   // vprintf (format, ap);
-  printf ("[%s Thrd:%-3d] %s\n", time_str, Galois::Runtime::LL::getTID (), msg);
+  printf("[%s Thrd:%-3d] %s\n", time_str, Galois::Runtime::LL::getTID(), msg);
   // fflush (stdout);
 
   // IOLock.unlock();

@@ -309,7 +309,7 @@ class Executor {
     template<typename InWL, typename WL>
     void rebalance(InWL& in, WL& self) const {
       // XXX
-      if (tld.wid.tid + 10 >= galoisActiveThreads)
+      if (tld.wid.tid + 10 >= activeThreads)
         return;
 
       WL& other = in.get(tld.wid.tid + 10);
@@ -448,7 +448,7 @@ class Executor {
 
 public:
   explicit Executor(const FnsTy& f, const InitialWorkTy& i, const char* l): fns(f), init(i), loopname(l) { 
-    barrier.reinit(galoisActiveThreads);
+    barrier.reinit(activeThreads);
   }
 
   void operator()() {

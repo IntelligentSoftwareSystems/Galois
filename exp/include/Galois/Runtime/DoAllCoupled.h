@@ -590,7 +590,7 @@ private:
   Diff_ty chunk_size;
   Galois::Runtime::PerThreadStorage<ThreadContext> workers;
 
-  TerminationDetection term;
+  TerminationDetection& term;
 
   // for stats
 
@@ -606,7 +606,8 @@ public:
     : 
       func (_func), 
       loopname (_loopname),
-      chunk_size (_chunk_size)
+      chunk_size (_chunk_size),
+      term(getSystemTermination())
   {
 
     assert (ranges.size () == workers.size ());
@@ -637,14 +638,15 @@ public:
     static const bool USE_TERM = false;
 
     ThreadContext& ctx = *workers.getLocal ();
-    TerminationDetection::TokenHolder* localterm = term.getLocalTokenHolder ();
+
+    bool workHappened = false;
 
     while (true) {
 
       while (ctx.getWork (chunk_size)) {
         ctx.doWork (func);
 
-        if (USE_TERM) { localterm->workHappened (); }
+        if (USE_TERM) { workHappened = true; }
       }
 
       assert (!ctx.hasWork ());
@@ -656,8 +658,8 @@ public:
         assert (!ctx.hasWork ());
 
         if (USE_TERM) { 
-          term.localTermination ();
-
+          term.localTermination (workHappened);
+	  workHappened = false;
           if (term.globalTermination ()) {
             break;
           }
@@ -678,7 +680,7 @@ public:
   void operator () () {
 
     ThreadContext& ctx = *workers.getLocal ();
-    TerminationDetection::TokenHolder* localterm = term.getLocalTokenHolder ();
+    bool workHappened = false;
 
 #ifdef ENABLE_DO_ALL_TIMERS
     ctx.timer.start ();
@@ -702,7 +704,7 @@ public:
 #endif
       while (ctx.getWork (chunk_size)) {
 
-        localterm->workHappened ();
+        workHappened = true;
         ctx.doWork (func);
       }
 #ifdef ENABLE_DO_ALL_TIMERS
@@ -714,7 +716,8 @@ public:
       ctx.term_timer.start ();
 #endif
 
-      term.localTermination ();
+      term.localTermination (workHappened);
+      workHappened = true;
 
 #ifdef ENABLE_DO_ALL_TIMERS
       ctx.term_timer.stop ();

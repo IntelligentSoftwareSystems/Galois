@@ -25,7 +25,7 @@
 #ifndef GALOIS_RUNTIME_RANGE_H
 #define GALOIS_RUNTIME_RANGE_H
 
-#include "Galois/Runtime/ThreadPool.h"
+#include "Galois/Runtime/ActiveThreads.h"
 #include "Galois/Runtime/ll/TID.h"
 
 #include "Galois/util/GAlgs.h"

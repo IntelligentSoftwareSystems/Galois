@@ -39,6 +39,7 @@ run apps/delaunayrefinement/delaunayrefinement "${BASE}/inputs/meshes/r10k.1"
 run apps/delaunaytriangulation/delaunaytriangulation "${BASE}/inputs/meshes/r10k.node"
 run apps/des/DESunordered "${BASE}/inputs/des/multTree6bit.net"
 run apps/gmetis/gmetis "${BASE}/inputs/structured/rome99.gr" 4
+run apps/kruskal/KruskalHand "${BASE}/inputs/structured/rome99.gr"
 run apps/independentset/independentset "${BASE}/inputs/structured/rome99.gr"
 run apps/matching/bipartite-mcm 100 1000 10 0
 run apps/preflowpush/preflowpush "${BASE}/inputs/structured/rome99.gr" 0 100

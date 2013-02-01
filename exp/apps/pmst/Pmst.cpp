@@ -177,7 +177,7 @@ struct Boruvka {
     const Graph& g;
     Indexer(const Graph& a): g(a) { }
     unsigned operator()(const GraphNode& n) const {
-      return g.getData(n, Galois::NONE);
+      return g.getData(n, Galois::MethodFlag::NONE);
     }
   };
 
@@ -185,7 +185,7 @@ struct Boruvka {
     const Graph& g;
     Less(const Graph& a): g(a) { }
     bool operator()(const GraphNode& lhs, const GraphNode& rhs) const {
-      return g.getData(lhs, Galois::NONE) < g.getData(rhs, Galois::NONE);
+      return g.getData(lhs, Galois::MethodFlag::NONE) < g.getData(rhs, Galois::MethodFlag::NONE);
     }
   };
 
@@ -193,14 +193,14 @@ struct Boruvka {
     const Graph& g;
     Greater(const Graph& a): g(a) { }
     bool operator()(const GraphNode& lhs, const GraphNode& rhs) const {
-      return g.getData(lhs, Galois::NONE) > g.getData(rhs, Galois::NONE);
+      return g.getData(lhs, Galois::MethodFlag::NONE) > g.getData(rhs, Galois::MethodFlag::NONE);
     }
   };
 
   std::string name() { return std::string("Boruvka"); }
 
   void expandNeighborhood(Graph& g, const GraphNode& src) {
-    g.edge_begin(src, Galois::ALL);
+    g.edge_begin(src, Galois::MethodFlag::ALL);
   }
 
   std::pair<GraphNode, Weight> findMin(Graph& g, const GraphNode& src, Galois::MethodFlag flag) {
@@ -282,16 +282,16 @@ struct Boruvka {
       if (!g.containsNode(src))
         return;
 
-      std::pair<GraphNode,Weight> minp = parent.findMin(g, src, Galois::NONE);
+      std::pair<GraphNode,Weight> minp = parent.findMin(g, src, Galois::MethodFlag::NONE);
 
       if (minp.second == std::numeric_limits<Weight>::max()) {
-        g.removeNode(src, Galois::NONE);
+        g.removeNode(src, Galois::MethodFlag::NONE);
         return;
       }
 
       parent.expandNeighborhood(g, minp.first);
       
-      GraphNode rep = parent.collapseEdge(g, src, minp.first, ctx, Galois::NONE);
+      GraphNode rep = parent.collapseEdge(g, src, minp.first, ctx, Galois::MethodFlag::NONE);
       mstWeight += minp.second;
       ctx.push(rep);
     }
@@ -302,8 +302,7 @@ struct Boruvka {
       g.getData(*ii) = std::distance(g.edge_begin(*ii), g.edge_end(*ii));
     }
 
-    using namespace Galois::Runtime::WorkList;
-    typedef dChunkedFIFO<16> IChunk;
+    typedef Galois::WorkList::dChunkedFIFO<16> IChunk;
 
     Galois::for_each<IChunk>(g.begin(), g.end(), Process(*this, g, w));
   }
@@ -337,23 +336,23 @@ struct BoruvkaUnionFind {
   //! Separate path compression from find so that we can defer writes after the
   //! fail-safe point
   GraphNode compressPath(const Graph& g, GraphNode n, const NodesTy& nodes) const {
-    GraphNode parent = nodes[g.getData(n, Galois::NONE).parent];
+    GraphNode parent = nodes[g.getData(n, Galois::MethodFlag::NONE).parent];
     if (parent == n)
       return n;
     else {
       GraphNode ret = compressPath(g, parent, nodes);
-      g.getData(n, Galois::NONE).parent = g.getData(ret, Galois::NONE).parent;
+      g.getData(n, Galois::MethodFlag::NONE).parent = g.getData(ret, Galois::MethodFlag::NONE).parent;
       return ret;
     }
   }
 
   void mergeLists(const Graph& g, const GraphNode& a, const GraphNode& b, const NodesTy& nodes) const {
     GraphNode last = a;
-    int aId = g.getData(a, Galois::NONE).next;
-    int bId = g.getData(b, Galois::NONE).next;
+    int aId = g.getData(a, Galois::MethodFlag::NONE).next;
+    int bId = g.getData(b, Galois::MethodFlag::NONE).next;
 
-    int bHeadId = g.getData(b, Galois::NONE).parent;
-    Weight wbh = g.getData(b, Galois::NONE).minWeight;
+    int bHeadId = g.getData(b, Galois::MethodFlag::NONE).parent;
+    Weight wbh = g.getData(b, Galois::MethodFlag::NONE).minWeight;
     assert(wbh != std::numeric_limits<Weight>::max());
 
     bool found = false;
@@ -361,8 +360,8 @@ struct BoruvkaUnionFind {
       if (aId == -1 || bId == -1)
         break;
 
-      Weight wa = g.getData(nodes[aId], Galois::NONE).minWeight;
-      Weight wb = g.getData(nodes[bId], Galois::NONE).minWeight;
+      Weight wa = g.getData(nodes[aId], Galois::MethodFlag::NONE).minWeight;
+      Weight wb = g.getData(nodes[bId], Galois::MethodFlag::NONE).minWeight;
 
       assert(wa != std::numeric_limits<Weight>::max());
       assert(wb != std::numeric_limits<Weight>::max());
@@ -372,42 +371,42 @@ struct BoruvkaUnionFind {
       if (wa > wb) {
         less = wb;
         next = bId;
-        bId = g.getData(nodes[bId], Galois::NONE).next;
+        bId = g.getData(nodes[bId], Galois::MethodFlag::NONE).next;
       } else {
         less = wa;
         next = aId;
-        aId = g.getData(nodes[aId], Galois::NONE).next;
+        aId = g.getData(nodes[aId], Galois::MethodFlag::NONE).next;
       }
       
       if (!found && wbh <= less) {
-        g.getData(last, Galois::NONE).next = bHeadId;
+        g.getData(last, Galois::MethodFlag::NONE).next = bHeadId;
         last = nodes[bHeadId];
         found = true;
       }
 
-      g.getData(last, Galois::NONE).next = next;
+      g.getData(last, Galois::MethodFlag::NONE).next = next;
       last = nodes[next];
     }
 
     if (aId == -1)
-      g.getData(last, Galois::NONE).next = bId;
+      g.getData(last, Galois::MethodFlag::NONE).next = bId;
     else 
-      g.getData(last, Galois::NONE).next = aId;
+      g.getData(last, Galois::MethodFlag::NONE).next = aId;
 
     // Check if we still need to find a place for bHead
     if (found)
       return;
 
-    int rid = g.getData(last, Galois::NONE).next;
-    while (rid != -1 && wbh > g.getData(nodes[rid], Galois::NONE).minWeight) {
-      rid = g.getData(nodes[rid], Galois::NONE).next;
+    int rid = g.getData(last, Galois::MethodFlag::NONE).next;
+    while (rid != -1 && wbh > g.getData(nodes[rid], Galois::MethodFlag::NONE).minWeight) {
+      rid = g.getData(nodes[rid], Galois::MethodFlag::NONE).next;
       if (rid == -1)
         break;
       last = nodes[rid];
     }
 
-    g.getData(last, Galois::NONE).next = bHeadId;
-    g.getData(nodes[bHeadId], Galois::NONE).next = rid;
+    g.getData(last, Galois::MethodFlag::NONE).next = bHeadId;
+    g.getData(nodes[bHeadId], Galois::MethodFlag::NONE).next = rid;
   }
 
   GraphNode merge(const Graph& g, GraphNode a, GraphNode b, const NodesTy& nodes) const {
@@ -416,8 +415,8 @@ struct BoruvkaUnionFind {
 
     assert(repA != repB);
 
-    Data& dA = g.getData(repA, Galois::NONE);
-    Data& dB = g.getData(repB, Galois::NONE);
+    Data& dA = g.getData(repA, Galois::MethodFlag::NONE);
+    Data& dB = g.getData(repB, Galois::MethodFlag::NONE);
 
     if (dA.rank < dB.rank) {
       mergeLists(g, repB, repA, nodes);
@@ -439,21 +438,21 @@ struct BoruvkaUnionFind {
   bool findMin(Graph& g, GraphNode node, const NodesTy& nodes, MinPairTy& minp) const {
     minp.second = std::numeric_limits<Weight>::max();
     
-    GraphNode rep = find(g, node, nodes, Galois::CHECK_CONFLICT);
+    GraphNode rep = find(g, node, nodes, Galois::MethodFlag::CHECK_CONFLICT);
     //GraphNode rep = compressPath(node, nodes);
     GraphNode cur = rep;
     GraphNode last = cur;
     bool first = true;
-    int next = g.getData(cur, Galois::NONE).parent;
+    int next = g.getData(cur, Galois::MethodFlag::NONE).parent;
 
     while (true) {
       bool seen = false;
-      Data& curData = g.getData(cur, Galois::NONE);
+      Data& curData = g.getData(cur, Galois::MethodFlag::NONE);
 
-      for (Graph::edge_iterator ii = g.edge_begin(cur, Galois::CHECK_CONFLICT), 
-          ei = g.edge_end(cur, Galois::CHECK_CONFLICT); ii != ei; ++ii) {
+      for (Graph::edge_iterator ii = g.edge_begin(cur, Galois::MethodFlag::CHECK_CONFLICT), 
+	     ei = g.edge_end(cur, Galois::MethodFlag::CHECK_CONFLICT); ii != ei; ++ii) {
         GraphNode dst = g.getEdgeDst(ii);
-        if (rep == find(g, dst, nodes, Galois::CHECK_CONFLICT))
+        if (rep == find(g, dst, nodes, Galois::MethodFlag::CHECK_CONFLICT))
         //if (rep == compressPath(*dst, nodes))
           continue;
 
@@ -475,7 +474,7 @@ struct BoruvkaUnionFind {
       if (seen) {
         // Safe, because !seen is a monotonic property
         if (last != cur)
-          g.getData(last, Galois::NONE).next = next;
+          g.getData(last, Galois::MethodFlag::NONE).next = next;
         last = cur;
       }
 
@@ -487,8 +486,8 @@ struct BoruvkaUnionFind {
       cur = nodes[next];
 
       // Check 2nd element in list as well
-      if (!first && minp.second < g.getData(cur, Galois::CHECK_CONFLICT).minWeight) {
-        assert(g.getData(cur, Galois::NONE).minWeight != std::numeric_limits<Weight>::max());
+      if (!first && minp.second < g.getData(cur, Galois::MethodFlag::CHECK_CONFLICT).minWeight) {
+        assert(g.getData(cur, Galois::MethodFlag::NONE).minWeight != std::numeric_limits<Weight>::max());
         return true;
       }
 
@@ -499,9 +498,9 @@ struct BoruvkaUnionFind {
   }
 
   void updateMinWeight(Graph& g, GraphNode cur) const {
-    Data& curData = g.getData(cur, Galois::NONE);
-    for (Graph::edge_iterator ii = g.edge_begin(cur, Galois::NONE), 
-        ei = g.edge_end(cur, Galois::NONE); ii != ei; ++ii) {
+    Data& curData = g.getData(cur, Galois::MethodFlag::NONE);
+    for (Graph::edge_iterator ii = g.edge_begin(cur, Galois::MethodFlag::NONE), 
+        ei = g.edge_end(cur, Galois::MethodFlag::NONE); ii != ei; ++ii) {
       const Weight& w = g.getEdgeData(ii);
       // Should only happen first time someone sees this node
       if (w < curData.minWeight)
@@ -527,7 +526,7 @@ struct BoruvkaUnionFind {
       if (!self.findMin(g, src, nodes, minp))
         return;
 
-      if (g.getData(minp.first, Galois::NONE).minWeight == std::numeric_limits<Weight>::max())
+      if (g.getData(minp.first, Galois::MethodFlag::NONE).minWeight == std::numeric_limits<Weight>::max())
         self.updateMinWeight(g, minp.first);
 
       GraphNode rep = self.merge(g, src, minp.first, nodes);
@@ -548,8 +547,7 @@ struct BoruvkaUnionFind {
       g.getData(nodes[i]).parent = i;
     }
 
-    using namespace Galois::Runtime::WorkList;
-    typedef dChunkedFIFO<16> IChunk;
+    typedef Galois::WorkList::dChunkedFIFO<16> IChunk;
 
     Galois::for_each<IChunk>(nodes.begin(), nodes.end(), Process(*this, g, w, nodes));
   }

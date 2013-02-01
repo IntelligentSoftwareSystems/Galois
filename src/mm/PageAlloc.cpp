@@ -55,6 +55,7 @@ typedef Galois::Runtime::LL::CacheLineStorage<HeadPtr> HeadPtrStorage;
 struct PAState {
   unsigned num;
   std::map<void*, HeadPtr*> ownerMap;
+  PAState(): num(0) { }
 };
 
 //FIXME: make thread safe

@@ -74,7 +74,8 @@ static cll::opt<SSSPAlgo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumVal(parallelCasLessDups, "Parallel with duplicate prevention and CAS"),
       clEnumValEnd), cll::init(parallelCasLessDups));
 
-typedef Galois::Graph::LC_Linear_Graph<SNode, unsigned int> Graph;
+//typedef Galois::Graph::LC_Linear_Graph<SNode, unsigned int> Graph;
+typedef Galois::Graph::LC_CSR_Graph<SNode, unsigned int> Graph;
 typedef Graph::GraphNode GNode;
 
 typedef UpdateRequestCommon<GNode> UpdateRequest;

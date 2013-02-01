@@ -25,9 +25,15 @@
 #include "Galois/Runtime/mm/Mem.h"
 
 __thread char* Galois::Runtime::ptsBase;
-Galois::Runtime::PerBackend Galois::Runtime::PTSBackend;
+Galois::Runtime::PerBackend& Galois::Runtime::getPTSBackend() {
+  static Galois::Runtime::PerBackend b;
+  return b;
+}
 __thread char* Galois::Runtime::ppsBase;
-Galois::Runtime::PerBackend Galois::Runtime::PPSBackend;
+Galois::Runtime::PerBackend& Galois::Runtime::getPPSBackend() {
+  static Galois::Runtime::PerBackend b;
+  return b;
+}
 
 
 unsigned Galois::Runtime::PerBackend::allocOffset(unsigned size) {
@@ -89,9 +95,9 @@ void Galois::Runtime::initPTS() {
   if (!Galois::Runtime::ptsBase) {
     //unguarded initialization as initPTS will run in the master thread
     //before any other threads are generated
-    Galois::Runtime::ptsBase = PTSBackend.initPerThread();
+    Galois::Runtime::ptsBase = getPTSBackend().initPerThread();
   }
   if (!Galois::Runtime::ppsBase) {
-    Galois::Runtime::ppsBase = PPSBackend.initPerPackage();
+    Galois::Runtime::ppsBase = getPPSBackend().initPerPackage();
   }
 }

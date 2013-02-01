@@ -1,6 +1,7 @@
 add_subdirectory(generators)
 add_subdirectory(comparisons)
 add_subdirectory(graph-convert)
+add_subdirectory(graph-convert-standalone)
 add_subdirectory(graph-stats)
 
 include(ExternalProject)
@@ -102,6 +103,7 @@ cilkdl(bfs-pbbs http://www.cs.cmu.edu/~pbbs/benchmarks/breadthFirstSearch.tar)
 cilkdl(delaunayrefinement-pbbs http://www.cs.cmu.edu/~pbbs/benchmarks/delaunayRefine.tar)
 cilkdl(delaunaytriangulation-pbbs http://www.cs.cmu.edu/~pbbs/benchmarks/delaunayTriangulation.tar)
 cilkdl(independentset-pbbs http://www.cs.cmu.edu/~pbbs/benchmarks/maximalIndependentSet.tar)
+cilkdl(kruskal-pbbs http://www.cs.cmu.edu/~pbbs/benchmarks/minSpanningTree.tar)
 
 add_custom_target(more-tools)
 set_target_properties(${more_tools} PROPERTIES EXCLUDE_FROM_ALL true)

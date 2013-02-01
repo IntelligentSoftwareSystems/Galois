@@ -1,11 +1,11 @@
-/** Galois Conflict flags -*- C++ -*-
+/** Wrapper around an iterator such that *it == it -*- C++ -*-
  * @file
  * @section License
  *
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -18,31 +18,38 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
+ * @section Description
+ *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
+#ifndef GALOIS_NODEREFITERATOR_H
+#define GALOIS_NODEREFITERATOR_H
 
-#ifndef GALOIS_RUNTIME_METHODFLAGS_H
-#define GALOIS_RUNTIME_METHODFLAGS_H
-
-#include "Galois/MethodFlags.h"
+#include "boost/iterator/iterator_adaptor.hpp"
 
 namespace Galois {
-namespace Runtime {
 
-void doCheckWrite();
+//! Modify an iterator so that *it == it
+template<typename Iterator>
+struct NoDerefIterator : public boost::iterator_adaptor<
+  NoDerefIterator<Iterator>, Iterator, Iterator, 
+  boost::use_default, const Iterator&>
+{
+  NoDerefIterator(): NoDerefIterator::iterator_adaptor_() { }
+  explicit NoDerefIterator(Iterator it): NoDerefIterator::iterator_adaptor_(it) { }
+  const Iterator& dereference() const {
+    return NoDerefIterator::iterator_adaptor_::base_reference();
+  }
+  Iterator& dereference() {
+    return NoDerefIterator::iterator_adaptor_::base_reference();
+  }
+};
 
-namespace {
-inline bool isWriteMethod(Galois::MethodFlag m, bool write) {
-  return write || (m & MethodFlag::WRITE) != Galois::MethodFlag::NONE;
+template<typename Iterator>
+NoDerefIterator<Iterator> make_no_deref_iterator(Iterator it) {
+  return NoDerefIterator<Iterator>(it);
 }
 
-inline void checkWrite(Galois::MethodFlag m, bool write) {
-  if (isWriteMethod(m, write))
-    doCheckWrite();
 }
 
-}
-}
-} // end namespace Galois
-
-#endif //GALOIS_RUNTIME_METHODFLAGS_H
+#endif

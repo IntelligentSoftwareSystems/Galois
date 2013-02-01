@@ -27,6 +27,8 @@
 
 #include <algorithm>
 
+unsigned int Galois::Runtime::activeThreads = 1;
+
 unsigned int Galois::setActiveThreads(unsigned int num) {
   num = std::min(num, Galois::Runtime::getSystemThreadPool().getMaxThreads());
   num = std::max(num, 1U);

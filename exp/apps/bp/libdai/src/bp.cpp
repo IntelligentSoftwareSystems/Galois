@@ -463,7 +463,7 @@ void BP::runProcess(const Task& t, std::vector<std::vector<EdgeData> >& edgeData
       size_t i = t.i;
       size_t _I = t._I;
 
-      edgeData[i][_I].lock.get(Galois::ALL);
+      edgeData[i][_I].lock.get(Galois::MethodFlag::ALL);
       // Acquire neighborhood
       //diaforeach(const Neighbor &J, nbV(i)) {
       //  diaforeach(const Neighbor &j, nbF(J)) {
@@ -692,7 +692,7 @@ Real BP::run() {
               //}
           }
 
-          using namespace Galois::Runtime::WorkList;
+          using namespace Galois::WorkList;
           typedef dChunkedFIFO<64> dChunk;
           typedef ChunkedFIFO<64> Chunk;
           typedef OrderedByIntegerMetric<Indexer,dChunk> OBIM;

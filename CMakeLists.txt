@@ -2,9 +2,9 @@ cmake_minimum_required(VERSION 2.6)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 project(Galois)
 set(GALOIS_VERSION_MAJOR "2")
-set(GALOIS_VERSION_MINOR "1")
-set(GALOIS_VERSION_PATCH "5")
-set(GALOIS_COPYRIGHT_YEAR "2012") # Also in COPYRIGHT
+set(GALOIS_VERSION_MINOR "2")
+set(GALOIS_VERSION_PATCH "0")
+set(GALOIS_COPYRIGHT_YEAR "2013") # Also in COPYRIGHT
 
 if(NOT CMAKE_BUILD_TYPE)
   message(STATUS "No build type selected, default to Release")
@@ -17,6 +17,7 @@ endif()
 set(USE_GPROF OFF CACHE BOOL "Enable GCC profiling")
 set(USE_VTUNE ON CACHE BOOL "Use vtune (if found) for profiling")
 set(USE_PAPI OFF CACHE BOOL "Use PAPI counters for profiling")
+set(USE_STRICT_CONFIG OFF CACHE BOOL "Instead of falling back gracefully, fail")
 
 #Enable iss specific options; should be OFF in the general release; all guarded by USE_EXP
 set(USE_EXP OFF CACHE BOOL "Use experimental features") 
@@ -43,6 +44,8 @@ find_package(Threads REQUIRED)
 find_package(LIBNUMA)
 if(LIBNUMA_FOUND)
   add_definitions(-DGALOIS_USE_NUMA)
+elseif(USE_STRICT_CONFIG)
+  message(FATAL_ERROR "Need libnuma")
 endif()
 
 #LAPACK
@@ -52,7 +55,13 @@ find_package(LAPACK)
 #CILK
 include(CheckCilk)
 
-# ZLIB
+#HugePages
+include(CheckHugePages)
+if(NOT HAVE_HUGEPAGES AND USE_STRICT_CONFIG)
+  message(FATAL_ERROR "Need huge pages")
+endif()
+
+#ZLIB
 find_package(ZLIB REQUIRED)
 include_directories(${ZLIB_INCLUDE_DIRS})
 

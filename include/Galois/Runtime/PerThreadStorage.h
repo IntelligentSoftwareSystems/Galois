@@ -62,10 +62,10 @@ public:
 };
 
 extern __thread char* ptsBase;
-extern PerBackend PTSBackend;
+PerBackend& getPTSBackend();
 
 extern __thread char* ppsBase;
-extern PerBackend PPSBackend;
+PerBackend& getPPSBackend();
 
 void initPTS();
 
@@ -73,37 +73,38 @@ template<typename T>
 class PerThreadStorage: private boost::noncopyable {
 protected:
   unsigned offset;
+  PerBackend& b;
 
 public:
-  PerThreadStorage() {
+  PerThreadStorage() :b(getPTSBackend()) {
     //in case we make one of these before initializing the thread pool
     //This will call initPTS for each thread if it hasn't already
     Galois::Runtime::getSystemThreadPool();
 
-    offset = PTSBackend.allocOffset(sizeof(T));
+    offset = b.allocOffset(sizeof(T));
     for (unsigned n = 0; n < LL::getMaxThreads(); ++n)
-      new (PTSBackend.getRemote(n, offset)) T();
+      new (b.getRemote(n, offset)) T();
   }
 
   ~PerThreadStorage() {
     for (unsigned n = 0; n < LL::getMaxThreads(); ++n)
-      reinterpret_cast<T*>(PTSBackend.getRemote(n, offset))->~T();
-    PTSBackend.deallocOffset(offset, sizeof(T));
+      reinterpret_cast<T*>(b.getRemote(n, offset))->~T();
+    b.deallocOffset(offset, sizeof(T));
   }
 
   T* getLocal() const {
-    void* ditem = PTSBackend.getLocal(offset, ptsBase);
+    void* ditem = b.getLocal(offset, ptsBase);
     return reinterpret_cast<T*>(ditem);
   }
 
   //! Like getLocal() but optimized for when you already know the thread id
   T* getLocal(unsigned int thread) const {
-    void* ditem = PTSBackend.getLocal(offset, thread);
+    void* ditem = b.getLocal(offset, thread);
     return reinterpret_cast<T*>(ditem);
   }
 
   T* getRemote(unsigned int thread) const {
-    void* ditem = PTSBackend.getRemote(thread, offset);
+    void* ditem = b.getRemote(thread, offset);
     return reinterpret_cast<T*>(ditem);
   }
 
@@ -116,42 +117,43 @@ template<typename T>
 class PerPackageStorage: private boost::noncopyable {
 protected:
   unsigned offset;
+  PerBackend& b;
 
 public:
-  PerPackageStorage() {
+  PerPackageStorage() :b(getPPSBackend()) {
     //in case we make one of these before initializing the thread pool
     //This will call initPTS for each thread if it hasn't already
     Galois::Runtime::getSystemThreadPool();
 
-    offset = PPSBackend.allocOffset(sizeof(T));
+    offset = b.allocOffset(sizeof(T));
     for (unsigned n = 0; n < LL::getMaxPackages(); ++n)
-      new (PPSBackend.getRemote(LL::getLeaderForPackage(n), offset)) T();
+      new (b.getRemote(LL::getLeaderForPackage(n), offset)) T();
   }
 
   ~PerPackageStorage() {
     for (unsigned n = 0; n < LL::getMaxPackages(); ++n)
-      reinterpret_cast<T*>(PPSBackend.getRemote(LL::getLeaderForPackage(n), offset))->~T();
-    PPSBackend.deallocOffset(offset, sizeof(T));
+      reinterpret_cast<T*>(b.getRemote(LL::getLeaderForPackage(n), offset))->~T();
+    b.deallocOffset(offset, sizeof(T));
   }
 
   T* getLocal() const {
-    void* ditem = PPSBackend.getLocal(offset, ppsBase);
+    void* ditem = b.getLocal(offset, ppsBase);
     return reinterpret_cast<T*>(ditem);
   }
 
   //! Like getLocal() but optimized for when you already know the thread id
   T* getLocal(unsigned int thread) const {
-    void* ditem = PPSBackend.getLocal(offset, thread);
+    void* ditem = b.getLocal(offset, thread);
     return reinterpret_cast<T*>(ditem);
   }
 
   T* getRemote(unsigned int thread) const {
-    void* ditem = PPSBackend.getRemote(thread, offset);
+    void* ditem = b.getRemote(thread, offset);
     return reinterpret_cast<T*>(ditem);
   }
 
   T* getRemoteByPkg(unsigned int pkg) const {
-    void* ditem = PPSBackend.getRemote(LL::getLeaderForPackage(pkg), offset);
+    void* ditem = b.getRemote(LL::getLeaderForPackage(pkg), offset);
     return reinterpret_cast<T*>(ditem);
   }
 

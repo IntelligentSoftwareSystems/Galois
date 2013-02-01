@@ -28,12 +28,9 @@
 
 #include <sys/time.h>
 
-#define FINE_GRAIN_TIMING 
+//#define FINE_GRAIN_TIMING 
 //#define GALOIS_JUNE
 //#define PRINT_DEGREE_DISTR
-
-#define W1 1               //default weight for the distance in the Sloan algorithm
-#define W2 2               //default weight for the degree in the Sloan algorithm
 
 static const char* name = "Sloan's reordering algorithm";
 static const char* desc = "Computes a permutation of a matrix according to Sloan's algorithm\n";
@@ -54,34 +51,51 @@ enum Statuses {
   NUMBERED,
 };
 
-static const unsigned int DIST_INFINITY =
-  std::numeric_limits<unsigned int>::max() - 1;
+enum PseudoAlgo {
+  simplePseudo,
+  eagerPseudo,
+  fullPseudo
+};
+
+typedef unsigned int DistType;
+
+static const DistType DIST_INFINITY = std::numeric_limits<DistType>::max() - 1;
 
 namespace cll = llvm::cl;
 static cll::opt<unsigned int> startNode("startnode",
     cll::desc("Node to start search from"),
-    cll::init(0));
+    cll::init(DIST_INFINITY));
 static cll::opt<unsigned int> terminalNode("terminalnode",
     cll::desc("Terminal Node to find distance to"),
-    cll::init(0));
+    cll::init(DIST_INFINITY));
 static cll::opt<int> niter("iter",
     cll::desc("Number of benchmarking iterations"),
-    cll::init(5));
+    cll::init(1));
 static cll::opt<std::string> filename(cll::Positional,
     cll::desc("<input file>"),
     cll::Required);
+static cll::opt<unsigned int> W1("w1",
+    cll::desc("First weight"), cll::init(16));
+static cll::opt<unsigned int> W2("w2",
+    cll::desc("Second weight"), cll::init(1));
+static cll::opt<PseudoAlgo> pseudoAlgo(cll::desc("Psuedo-Peripheral algorithm:"),
+    cll::values(
+      clEnumVal(simplePseudo, "Simple"),
+      clEnumVal(eagerPseudo, "Eager terminiation of full algorithm"),
+      clEnumVal(fullPseudo, "Full algorithm"),
+      clEnumValEnd), cll::init(fullPseudo));
 
 //****** Work Item and Node Data Defintions ******
 struct SNode {
   unsigned int id;
-  unsigned int dist;
+  DistType dist;
   unsigned int degree;
   unsigned int status;
   int prio;
 };
 
 std::ostream& operator<<(std::ostream& out, const SNode& n) {
-  out <<  "(dist: " << n.dist << ")";
+  out <<  "(id: " << n.id << " dist: " << n.dist << ")";
   return out;
 }
 
@@ -136,6 +150,430 @@ struct GNodeGreater {
 struct GNodeBefore {
   bool operator()(const GNode& a, const GNode& b) const {
     return (degree(a) < degree(b));
+  }
+};
+
+struct default_reduce {
+  template<typename T>
+  void operator()(T& dest, T& src) {
+    T::reduce(dest,src);
+  }
+};
+
+struct BFS {
+  struct Result {
+    std::deque<size_t> counts;
+    size_t max_width;
+    GNode source;
+    bool complete;
+
+    size_t ecc() { return counts.size() - 1; }
+  };
+
+private:
+  struct EmptyFunction {
+    template<typename T>
+    void operator()(T t) { }
+    template<typename T>
+    void push(T t) { }
+  };
+
+  struct BagWorklist {
+    Galois::InsertBag<GNode>* bag;
+    BagWorklist(Galois::InsertBag<GNode>* b): bag(b) { }
+    void push(const GNode& x) {
+      bag->push(x);
+    }
+  };
+
+  struct AccumUpdate {
+    Galois::GAccumulator<size_t>* accum;
+    AccumUpdate(Galois::GAccumulator<size_t>* a): accum(a) { }
+    void operator()(DistType x) {
+      accum += 1;
+    }
+  };
+
+  //! Compute BFS levels
+  template<bool useContext, typename Worklist, typename Updater>
+  struct Process {
+    typedef int tt_does_not_need_aborts;
+
+    Worklist wl;
+    Updater updater;
+
+    Process(const Worklist& w = Worklist(), const Updater& u = Updater()): wl(w), updater(u) { }
+
+    template<typename Context>
+    void operator()(const GNode& n, Context& ctx) {
+      SNode& data = graph.getData(n, Galois::MethodFlag::NONE);
+      DistType newDist = data.dist + 1;
+      for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::NONE),
+             ei = graph.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+        GNode dst = graph.getEdgeDst(ii);
+        SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        DistType oldDist;
+        while (true) {
+          oldDist = ddata.dist;
+          if (oldDist <= newDist)
+            break;
+          if (__sync_bool_compare_and_swap(&ddata.dist, oldDist, newDist)) {
+            updater(newDist);
+            if (useContext)
+              ctx.push(dst);
+            else
+              wl.push(dst);
+            break;
+          }
+        }
+      }
+    }
+  };
+
+  typedef Process<true, EmptyFunction, EmptyFunction> UnorderedProcess;
+  typedef Process<false, BagWorklist, AccumUpdate> OrderedProcess;
+
+  //! Compute histogram of levels
+  struct CountLevels {
+    std::deque<size_t> counts;
+    bool reset;
+
+    explicit CountLevels(bool r): reset(r) { }
+
+    void operator()(const GNode& n) {
+      SNode& data = graph.getData(n, Galois::MethodFlag::NONE);
+      
+      assert(data.dist != DIST_INFINITY);
+
+      if (counts.size() <= data.dist)
+        counts.resize(data.dist + 1);
+      ++counts[data.dist];
+      if (reset)
+        data.dist = DIST_INFINITY;
+    }
+
+    static void reduce(CountLevels& dest, CountLevels& src) {
+      if (dest.counts.size() < src.counts.size())
+        dest.counts.resize(src.counts.size());
+      std::transform(src.counts.begin(), src.counts.end(),
+          dest.counts.begin(), dest.counts.begin(), std::plus<size_t>());
+    }
+  };
+
+  static Result unorderedAlgo(GNode source, bool reset) {
+    using namespace Galois::WorkList;
+    typedef dChunkedFIFO<64> dChunk;
+    typedef ChunkedFIFO<64> Chunk;
+    typedef OrderedByIntegerMetric<GNodeIndexer,dChunk> OBIM;
+    
+    Result res;
+    res.source = source;
+
+    graph.getData(source).dist = 0;
+    Galois::for_each<dChunk>(source, UnorderedProcess());
+
+    res.counts = Galois::Runtime::do_all_impl(Galois::Runtime::makeLocalRange(graph),
+        CountLevels(reset), default_reduce(), true).counts;
+    res.max_width = *std::max_element(res.counts.begin(), res.counts.end());
+    res.complete = true;
+    return res;
+  }
+
+  static Result orderedAlgo(GNode source, bool reset, size_t limit) {
+    Galois::InsertBag<GNode> wls[2];
+    Result res;
+
+    Galois::InsertBag<GNode>* cur = &wls[0];
+    Galois::InsertBag<GNode>* next = &wls[1];
+
+    res.source = source;
+    graph.getData(source).dist = 0;
+    cur->push(source);
+
+    while (!cur->empty()) {
+      Galois::GAccumulator<size_t> count;
+
+      Galois::for_each_local(*cur, OrderedProcess(BagWorklist(next), AccumUpdate(&count)));
+      res.counts.push_back(count.reduce());
+      if (res.counts.back() >= limit) {
+        res.complete = next->empty();
+        break;
+      }
+      cur->clear();
+      std::swap(cur, next);
+    }
+
+    res.max_width = *std::max_element(res.counts.begin(), res.counts.end());
+    return res;
+  }
+
+public:
+  static void initNode(const GNode& n) {
+    SNode& data = graph.getData(n, Galois::MethodFlag::NONE);
+    data.degree = std::distance(graph.edge_begin(n, Galois::MethodFlag::NONE),
+        graph.edge_end(n, Galois::MethodFlag::NONE));
+    resetNode(n);
+  }
+
+  static void resetNode(const GNode& n) {
+    SNode& data = graph.getData(n, Galois::MethodFlag::NONE);
+    data.dist = DIST_INFINITY;
+    data.status = INACTIVE;
+  }
+
+  static void init() {
+    Galois::do_all_local(graph, initNode);
+  }
+
+  static void reset() {
+    Galois::do_all_local(graph, resetNode);
+  }
+
+  static Result go(GNode source, bool reset) {
+    return unorderedAlgo(source, reset);
+  }
+
+  static Result go(GNode source, bool reset, size_t limit) {
+    return orderedAlgo(source, reset, limit);
+  }
+};
+
+/**
+ * The eccentricity of vertex v, ecc(v), is the greatest distance from v to any vertex.
+ * A peripheral vertex v is one whose distance from some other vertex u is the
+ * diameter of the graph: \exists u : dist(v, u) = D. A pseudo-peripheral vertex is a 
+ * vertex v that satisfies: \forall u : dist(v, u) = ecc(v) ==> ecc(v) = ecc(u).
+ *
+ * Simple pseudo-peripheral algorithm:
+ *  1. Choose v
+ *  2. Among the vertices dist(v, u) = ecc(v), select u with minimal degree
+ *  3. If ecc(u) > ecc(v) then
+ *       v = u and go to step 2
+ *     otherwise
+ *       u is a pseudo-peripheral vertex
+ */
+struct SimplePseudoPeripheral {
+  struct min_degree {
+    template<typename T>
+    T operator()(const T& a, const T& b) const {
+      if (!a) return b;
+      if (!b) return a;
+      if (graph.getData(*a).degree < graph.getData(*b).degree)
+        return a;
+      else
+        return b;
+    }
+  };
+
+  struct has_dist {
+    DistType dist;
+    explicit has_dist(DistType d): dist(d) { }
+    boost::optional<GNode> operator()(const GNode& a) const {
+      if (graph.getData(a).dist == dist)
+        return boost::optional<GNode>(a);
+      return boost::optional<GNode>();
+    }
+  };
+
+  static std::pair<BFS::Result, GNode> search(const GNode& start) {
+    BFS::Result res = BFS::go(start, false);
+    GNode candidate =
+      *Galois::ParallelSTL::map_reduce(graph.begin(), graph.end(),
+          has_dist(res.ecc()), boost::optional<GNode>(), min_degree());
+    return std::make_pair(res, candidate);
+  }
+
+  static std::pair<BFS::Result,GNode> go(GNode source) {
+    int searches = 0;
+
+    ++searches;
+    std::pair<BFS::Result, GNode> v = search(source);
+    while (true) {
+      // NB: Leaves graph BFS state for last iteration
+      ++searches;
+      BFS::reset();
+      std::pair<BFS::Result, GNode> u = search(v.second);
+
+      std::cout << "ecc(v) = " << v.first.ecc() << " ecc(u) = " << u.first.ecc() << "\n";
+      
+      bool better = u.first.ecc() > v.first.ecc();
+      source = v.first.source;
+      v = u;
+      if (!better)
+        break;
+    }
+
+    std::cout << "Selected source: " << graph.getData(v.first.source)
+      << " ("
+      << "searches: " << searches 
+      << ")\n";
+    return std::make_pair(v.first, source);
+  }
+};
+
+/**
+ * A more complicated pseudo-peripheral algorithm.
+ *
+ * Let the width of vertex v be the maximum number of nodes with the same
+ * distance from v.
+ *
+ * Unlike the simple one, instead of picking a minimal degree candidate u,
+ * select among some number of candidates U. Here, we select the top n
+ * lowest degree nodes who do not share neighborhoods.
+ *
+ * If there exists a vertex u such that ecc(u) > ecc(v) proceed as in the
+ * simple algorithm. 
+ *
+ * Otherwise, select the u that has least maximum width.
+ */
+struct PseudoPeripheral {
+  struct order_by_degree {
+    bool operator()(const GNode& a, const GNode& b) const {
+      return graph.getData(a).degree < graph.getData(b).degree;
+    }
+  };
+
+  //! Collect nodes with dist == d
+  struct collect_nodes {
+    Galois::InsertBag<GNode>& bag;
+    size_t dist;
+    
+    collect_nodes(Galois::InsertBag<GNode>& b, size_t d): bag(b), dist(d) { }
+
+    void operator()(const GNode& n) {
+      if (graph.getData(n).dist == dist)
+        bag.push(n);
+    }
+  };
+
+  struct select_candidates {
+    static std::deque<GNode> go(unsigned topn, size_t dist) {
+      Galois::InsertBag<GNode> bag;
+      Galois::do_all_local(graph, collect_nodes(bag, dist));
+
+      // Incrementally sort nodes until we find least N who are not neighbors
+      // of each other
+      std::deque<GNode> nodes;
+      std::deque<GNode> result;
+      std::copy(bag.begin(), bag.end(), std::back_inserter(nodes));
+      size_t cur = 0;
+      size_t size = nodes.size();
+      size_t delta = topn * 5;
+
+      for (std::deque<GNode>::iterator ii = nodes.begin(), ei = nodes.end(); ii != ei; ) {
+        std::deque<GNode>::iterator mi = ii;
+        if (cur + delta < size) {
+          std::advance(mi, delta);
+          cur += delta;
+        } else {
+          mi = ei;
+          cur = size;
+        }
+
+        std::partial_sort(ii, mi, ei, order_by_degree());
+
+        for (std::deque<GNode>::iterator jj = ii; jj != mi; ++jj) {
+          GNode n = *jj;
+
+          // Ignore marked neighbors
+          if (graph.getData(n).status != INACTIVE)
+            continue;
+
+          result.push_back(n);
+          
+          if (result.size() == topn) {
+            return result;
+          }
+
+          // Mark neighbors
+          for (Graph::edge_iterator nn = graph.edge_begin(n), en = graph.edge_end(n); nn != en; ++nn)
+            graph.getData(graph.getEdgeDst(nn)).status = INACTIVE;
+        }
+
+        ii = mi;
+      }
+
+      return result;
+    }
+  };
+
+  static std::pair<BFS::Result,std::deque<GNode> > search(const GNode& start, size_t limit, bool computeCandidates) {
+    BFS::Result res;
+    std::deque<GNode> candidates;
+
+    if (limit == ~0 || pseudoAlgo == fullPseudo) {
+      res = BFS::go(start, false);
+      if (computeCandidates)
+        candidates = select_candidates::go(5, res.ecc());
+      if (res.max_width >= limit)
+        res.complete = false;
+    } else {
+      res = BFS::go(start, false, limit);
+      if (res.complete && computeCandidates)
+        candidates = select_candidates::go(5, res.ecc());  
+    }
+
+    BFS::reset();
+
+    return std::make_pair(res, candidates);
+  }
+
+  static std::pair<BFS::Result,GNode> go(GNode source) {
+    int skips = 0;
+    int searches = 0;
+    boost::optional<BFS::Result> terminal;
+
+    ++searches;
+    std::pair<BFS::Result, std::deque<GNode> > v = search(source, ~0, true);
+
+    while (true) {
+      std::cout 
+        << "(ecc(v), max_width) =" 
+        << " (" << v.first.ecc() << ", " << v.first.max_width << ")"
+        << " (ecc(u), max_width(u)) =";
+
+      size_t last = ~0;
+      for (auto ii = v.second.begin(), ei = v.second.end(); ii != ei; ++ii) {
+        ++searches;
+        std::pair<BFS::Result,std::deque<GNode> > u = search(*ii, last, false);
+
+        std::cout << " (" << u.first.ecc() << ", " << u.first.max_width << ")";
+
+        if (!u.first.complete) {
+          ++skips;
+          continue;
+        } else if (u.first.ecc() > v.first.ecc()) {
+          v = u;
+          terminal = boost::optional<BFS::Result>();
+          break;
+        } else if (u.first.max_width < last) {
+          last = u.first.max_width;
+          terminal = boost::optional<BFS::Result>(u.first);
+        }
+      }
+
+      std::cout << "\n";
+
+      if (terminal)
+        break;
+      v = search(v.first.source, ~0, true);
+    }
+
+    BFS::Result res;
+    GNode end;
+    if (v.first.max_width > terminal->max_width) {
+      res = *terminal;
+      end = v.first.source;
+    } else {
+      res = v.first;
+      end = terminal->source;
+    }
+
+    std::cout << "Selected source: " << graph.getData(res.source)
+      << " (skips: " << skips
+      << ", searches: " << searches 
+      << ")\n";
+    return std::make_pair(res, end);
   }
 };
 
@@ -205,10 +643,6 @@ struct Permutation {
 };
 
 Permutation perm;
-std::priority_queue<UpdateRequest, std::vector<UpdateRequest>, UpdateRequestLess> pq;
-//std::set<UpdateRequest, std::greater<UpdateRequest> > pq;
-//std::multiset<UpdateRequest, UpdateRequestGreater> pq;
-
 
 //debugging 
 static void printAccess(std::string msg){
@@ -340,10 +774,10 @@ static void variance(unsigned long int mean) {
 
 struct not_consistent {
   bool operator()(GNode n) const {
-    unsigned int dist = graph.getData(n).dist;
+    DistType dist = graph.getData(n).dist;
     for (Graph::edge_iterator ii = graph.edge_begin(n), ei = graph.edge_end(n); ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
-      unsigned int ddist = graph.getData(dst).dist;
+      DistType ddist = graph.getData(dst).dist;
       if (ddist > dist + 1) {
         std::cerr << "bad level value for " << graph.getData(dst).id << ": " << ddist << " > " << (dist + 1) << "\n";
   return true;
@@ -355,7 +789,7 @@ struct not_consistent {
 
 struct not_visited {
   bool operator()(GNode n) const {
-    unsigned int dist = graph.getData(n).dist;
+    DistType dist = graph.getData(n).dist;
     if (dist >= DIST_INFINITY) {
       std::cerr << "unvisited node " << graph.getData(n).id << ": " << dist << " >= INFINITY\n";
       return true;
@@ -378,7 +812,7 @@ struct max_dist {
 //! Simple verifier
 static bool verify(GNode& source) {
   if (graph.getData(source).dist != 0) {
-    std::cerr << "source has non-zero dist value\n";
+    std::cerr << "source: " << graph.getData(source) << " has non-zero dist value\n";
     return false;
   }
   
@@ -409,74 +843,111 @@ static bool verify(GNode& source) {
   return okay;
 }
 
-// Compute maximum bandwidth for a given graph
+		// Compute maximum bandwidth for a given graph
 struct banddiff {
 
-  Galois::GAtomic<unsigned int>& maxband;
-  banddiff(Galois::GAtomic<unsigned int>& _mb): maxband(_mb) { }
+	Galois::GAtomic<long int>& maxband;
+	Galois::GAtomic<long int>& profile;
+	std::vector<GNode>& nmap; 
 
-  void operator()(const GNode& source) const {
+	banddiff(Galois::GAtomic<long int>& _mb, Galois::GAtomic<long int>& _pr, std::vector<GNode>& _nm) : maxband(_mb), profile(_pr), nmap(_nm) { }
 
-    SNode& sdata = graph.getData(source, Galois::MethodFlag::NONE);
-    for (Graph::edge_iterator ii = graph.edge_begin(source, Galois::MethodFlag::NONE), 
-         ei = graph.edge_end(source, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+	void operator()(const GNode& source) const {
 
-      GNode dst = graph.getEdgeDst(ii);
-      SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+		long int maxdiff = 0;
+		SNode& sdata = graph.getData(source, Galois::MethodFlag::NONE);
 
-      unsigned int diff = abs(sdata.id - ddata.id);
-      unsigned int max = maxband;
+		for (Graph::edge_iterator ii = graph.edge_begin(source, Galois::MethodFlag::NONE), 
+				ei = graph.edge_end(source, Galois::MethodFlag::NONE); ii != ei; ++ii) {
 
-      if(diff > max){
-        while(!maxband.cas(max, diff)){
-          max = maxband;
-          if(!diff > max)
-            break;
-        }
-      }
-    }
-  }
-};
+			GNode dst = graph.getEdgeDst(ii);
+			SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
 
-// Compute maximum bandwidth for a given graph
-struct profileFn {
+			unsigned long int diff = abs(sdata.id - ddata.id);
+			//long int diff = (long int) sdata.id - (long int) ddata.id;
+			maxdiff = diff > maxdiff ? diff : maxdiff;
+		}
 
-  Galois::GAtomic<unsigned int>& sum;
-  profileFn(Galois::GAtomic<unsigned int>& _s): sum(_s) { }
+		long int globalmax = maxband;
+		profile += maxdiff;
 
-  void operator()(const GNode& source) const {
-
-    unsigned int max = 0;
-    SNode& sdata = graph.getData(source, Galois::MethodFlag::NONE);
-
-    for (Graph::edge_iterator ii = graph.edge_begin(source, Galois::MethodFlag::NONE), 
-        ei = graph.edge_end(source, Galois::MethodFlag::NONE); ii != ei; ++ii) {
-
-      GNode dst = graph.getEdgeDst(ii);
-      SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
-
-      unsigned int diff = abs(sdata.id - ddata.id);
-
-      max = (diff > max) ? diff : max;
-    }
-
-    sum += (max + 1);
-  }
+		if(maxdiff > globalmax){
+			while(!maxband.cas(globalmax, maxdiff)){
+				globalmax = maxband;
+				if(!maxdiff > globalmax)
+					break;
+			}
+		}
+	}
 };
 
 // Parallel loop for maximum bandwidth computation
 static void bandwidth(std::string msg) {
-    Galois::GAtomic<unsigned int> maxband = Galois::GAtomic<unsigned int>(0);
-    Galois::do_all(graph.begin(), graph.end(), banddiff(maxband));
-    std::cout << msg << " Bandwidth: " << maxband << "\n";
+	Galois::GAtomic<long int> bandwidth = Galois::GAtomic<long int>(0);
+	Galois::GAtomic<long int> profile = Galois::GAtomic<long int>(0);
+	std::vector<GNode> nodemap;
+	std::vector<bool> visited;
+	visited.reserve(graph.size());;
+	visited.resize(graph.size(), false);;
+	nodemap.reserve(graph.size());;
+
+	//static int count = 0;
+	//std::cout << graph.size() << "Run: " << count++ << "\n";
+
+	for (Graph::iterator src = graph.begin(), ei =
+			graph.end(); src != ei; ++src) {
+		nodemap[graph.getData(*src, Galois::MethodFlag::NONE).id] = *src;
+	}
+
+	//Computation of bandwidth and profile in parallel
+	Galois::do_all(graph.begin(), graph.end(), banddiff(bandwidth, profile, nodemap));
+
+	unsigned int nactiv = 0;
+	unsigned int maxwf = 0;
+	unsigned int curwf = 0;
+	double mswf = 0.0;
+
+	//Computation of maximum and root-square-mean wavefront. Serial
+	for(unsigned int i = 0; i < graph.size(); ++i){
+
+		for (Graph::edge_iterator ii = graph.edge_begin(nodemap[i], Galois::MethodFlag::NONE), 
+				ei = graph.edge_end(nodemap[i], Galois::MethodFlag::NONE); ii != ei; ++ii) {
+
+			GNode neigh = graph.getEdgeDst(ii);
+			SNode& ndata = graph.getData(neigh, Galois::MethodFlag::NONE);
+
+			//std::cerr << "neigh: " << ndata.id << "\n";
+			if(visited[ndata.id] == false){
+				visited[ndata.id] = true;
+				nactiv++;
+				//	std::cerr << "val: " << nactiv<< "\n";
+			}
+		}
+
+		SNode& idata = graph.getData(nodemap[i], Galois::MethodFlag::NONE);
+
+		if(visited[idata.id] == false){
+			visited[idata.id] = true;
+			curwf = nactiv+1;
+		}
+		else
+			curwf = nactiv--;
+
+		maxwf = curwf > maxwf ? curwf : maxwf;
+		mswf += (double) curwf * curwf;
+	}
+
+	mswf = mswf / graph.size();
+
+	std::cout << msg << " Bandwidth: " << bandwidth << "\n";
+	std::cout << msg << " Profile: " << profile << "\n";
+	std::cout << msg << " Max WF: " << maxwf << "\n";
+	std::cout << msg << " Mean-Square WF: " << mswf << "\n";
+	std::cout << msg << " RMS WF: " << sqrt(mswf) << "\n";
+
+	//nodemap.clear();
 }
 
-// Parallel loop for maximum bandwidth computation
-static void profile(std::string msg) {
-    Galois::GAtomic<unsigned int> prof = Galois::GAtomic<unsigned int>(0);
-    Galois::do_all(graph.begin(), graph.end(), profileFn(prof));
-    std::cout << msg << " Profile: " << prof << "\n";
-}
 //Clear node data to re-execute on specific graph
 struct resetNode {
   void operator()(const GNode& n) const {
@@ -506,11 +977,8 @@ static void printDegreeDistribution() {
 }
 
 // Read graph from a binary .gr as dirived from a Matrix Market .mtx using graph-convert
-static void readGraph(GNode& source, GNode& terminal) {
+static void readGraph() {
   graph.structureFromFile(filename);
-
-  source = *graph.begin();
-  terminal = *graph.begin();
 
   size_t nnodes = graph.size();
   std::cout << "Read " << nnodes << " nodes\n";
@@ -521,37 +989,11 @@ static void readGraph(GNode& source, GNode& terminal) {
 
   perm.init(nnodes);
 
-  for (Graph::iterator src = graph.begin(), ei =
-      graph.end(); src != ei; ++src) {
-
+  for (Graph::iterator src = graph.begin(), ei = graph.end(); src != ei; ++src, ++id) {
     SNode& node = graph.getData(*src, Galois::MethodFlag::NONE);
     node.dist = DIST_INFINITY;
+    node.status = INACTIVE;
     node.id = id;
-
-    if (id == startNode) {
-      source = *src;
-      foundSource = true;
-    } 
-    if (id == terminalNode) {
-      foundTerminal = true;
-      terminal = *src;
-    }
-    ++id;
-  }
-
-/*
-  if(startNode == DIST_INFINITY){
-    findStartingNode(source);
-    foundSource = true;
-  }
-  */
-
-  if (!foundTerminal || !foundSource) {
-    std::cerr 
-      << "failed to set terminal: " << terminalNode 
-      << " or failed to set source: " << startNode << "\n";
-    assert(0);
-    abort();
   }
 }
 
@@ -564,14 +1006,14 @@ struct Sloan {
     void operator()(GNode& n, Galois::UserContext<GNode>& ctx) const {
       SNode& data = graph.getData(n, Galois::MethodFlag::NONE);
 
-      unsigned int newDist = data.dist + 1;
+      DistType newDist = data.dist + 1;
 
       for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::NONE),
           ei = graph.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii) {
         GNode dst = graph.getEdgeDst(ii);
         SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
 
-        unsigned int oldDist;
+        DistType oldDist;
         while (true) {
           oldDist = ddata.dist;
           if (oldDist <= newDist)
@@ -607,7 +1049,6 @@ struct Sloan {
       Galois::do_all(graph.begin(), graph.end(), initFn());
     }
   };
-
 
   struct sloanFn {
     typedef int tt_does_not_need_aborts;
@@ -694,7 +1135,7 @@ struct Sloan {
     }
   };
 
-  static void go(GNode source, GNode terminal) {
+  static void go(GNode source, GNode terminal, bool skipBfs) {
 #ifdef FINE_GRAIN_TIMING
     Galois::TimeAccumulator vTmain[6]; 
     vTmain[0] = Galois::TimeAccumulator();
@@ -705,7 +1146,8 @@ struct Sloan {
     vTmain[0].start();
 #endif
 
-    bfsFn::go(terminal);
+    if (!skipBfs)
+      bfsFn::go(terminal);
     //verify(terminal);
 #ifdef FINE_GRAIN_TIMING
     vTmain[0].stop();
@@ -746,16 +1188,9 @@ void run() {
   vT[INIT] = Galois::TimeAccumulator();
   vT[INIT].start();
 
-  readGraph(source, terminal);
+  readGraph();
 
   bandwidth("Initial");
-  profile("Initial");
-
-  //std::cout << "original bandwidth: " << boost::bandwidth(*bgraph) << std::endl;
-  //std::cout << "original profile: " << boost::profile(*bgraph) << std::endl;
-  //std::cout << "original max_wavefront: " << boost::max_wavefront(*bgraph) << std::endl;
-  //std::cout << "original aver_wavefront: " << boost::aver_wavefront(*bgraph) << std::endl;
-  //std::cout << "original rms_wavefront: " << boost::rms_wavefront(*bgraph) << std::endl;
 
   vT[INIT].stop();
 
@@ -765,6 +1200,45 @@ void run() {
   //Measure total computation time to read graph
   vT[TOTAL].start();
 
+  if ((startNode < DIST_INFINITY && startNode >= graph.size()) 
+      || (terminalNode < DIST_INFINITY && terminalNode >= graph.size())) {
+    std::cerr 
+      << "failed to set terminal: " << terminalNode 
+      << " or failed to set source: " << startNode << "\n";
+    assert(0);
+    abort();
+  }
+
+  if (startNode < DIST_INFINITY) {
+    source = graph.begin()[startNode];
+  } 
+
+  if (terminalNode < DIST_INFINITY) {
+    terminal = graph.begin()[terminalNode];
+  }
+  
+  bool skipFirstBfs = false;
+
+  if (startNode == DIST_INFINITY || terminalNode == DIST_INFINITY) {
+    if (startNode == DIST_INFINITY)
+      source = *graph.begin();
+
+    Galois::StatTimer Tpseudo("PseudoTime");
+    Tpseudo.start();
+    std::pair<BFS::Result, GNode> result;
+    if (pseudoAlgo == simplePseudo) { 
+      result = SimplePseudoPeripheral::go(source);
+      skipFirstBfs = true;
+      source = result.second;
+      terminal = result.first.source;
+    } else {
+      result = PseudoPeripheral::go(source);
+      source = result.first.source;
+      terminal = result.second;
+    }
+    Tpseudo.stop();
+  }
+  
   // Execution with the specified number of threads
   vT[RUN] = Galois::TimeAccumulator();
 
@@ -774,13 +1248,12 @@ void run() {
   for(int i = 0; i < niter; i++){
     vT[RUN].start();
 
-    algo.go(source, terminal);
+    algo.go(source, terminal, i == 0 && skipFirstBfs);
 
     vT[RUN].stop();
 
     perm.permute();
     bandwidth("Permuted");
-    profile("Permuted");
 
     std::cout << "Iteration " << i
       << " numthreads: " << numThreads
