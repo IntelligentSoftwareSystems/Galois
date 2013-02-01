@@ -147,9 +147,9 @@ void convert_edgelist2gr(const std::string& infilename, const std::string& outfi
     }
   }
 
-  char *rawEdgeData = p.finish();
+  edge_value_type* rawEdgeData = p.finish<edge_value_type>();
   if (EdgeData::has_value)
-    std::copy(edgeData.begin(), edgeData.end(), reinterpret_cast<edge_value_type*>(rawEdgeData));
+    std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
 
   std::cout << "Finished reading graph. "
     << "Nodes: " << numNodes
@@ -333,9 +333,9 @@ void convert_dimacs2gr(const std::string& infilename, const std::string& outfile
     }
   }
 
-  char *rawEdgeData = p.finish();
+  edge_value_type* rawEdgeData = p.finish<edge_value_type>();
   if (EdgeData::has_value)
-    std::copy(edgeData.begin(), edgeData.end(), reinterpret_cast<edge_value_type*>(rawEdgeData));
+    std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
 
   std::cout << "Finished reading graph. "
     << "Nodes: " << nnodes
@@ -409,7 +409,7 @@ void convert_pbbs2gr(const std::string& infilename, const std::string& outfilena
     }
   }
 
-  p.finish();
+  p.finish<void>();
 
   std::cout << "Finished reading graph. "
     << "Nodes: " << nnodes

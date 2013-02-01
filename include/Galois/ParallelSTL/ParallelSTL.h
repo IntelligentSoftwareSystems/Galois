@@ -24,11 +24,10 @@
 #define GALOIS_PARALLELSTL_PARALLELSTL_H
 
 #include "Galois/UserContext.h"
+#include "Galois/NoDerefIterator.h"
 #include "Galois/WorkList/WorkList.h"
 #include "Galois/Runtime/ParallelWork.h"
 #include "Galois/Runtime/DoAll.h"
-
-#include "boost/iterator/iterator_adaptor.hpp"
 
 namespace Galois {
 namespace ParallelSTL {
@@ -57,22 +56,6 @@ ptrdiff_t count_if(InputIterator first, InputIterator last, Predicate pred)
   return Galois::Runtime::do_all_impl(Galois::Runtime::makeStandardRange(first, last),
       count_if_helper<Predicate>(pred), count_if_reducer(), true).ret;
 }
-
-//! Modify an iterator so that *it == it
-template<typename Iterator>
-struct NoDerefIterator : public boost::iterator_adaptor<
-  NoDerefIterator<Iterator>, Iterator, Iterator, 
-  boost::use_default, const Iterator&>
-{
-  NoDerefIterator(): NoDerefIterator::iterator_adaptor_() { }
-  explicit NoDerefIterator(Iterator it): NoDerefIterator::iterator_adaptor_(it) { }
-  const Iterator& dereference() const {
-    return NoDerefIterator::iterator_adaptor_::base_reference();
-  }
-  Iterator& dereference() {
-    return NoDerefIterator::iterator_adaptor_::base_reference();
-  }
-};
 
 template<typename InputIterator, class Predicate>
 struct find_if_helper {
@@ -103,8 +86,8 @@ InputIterator find_if(InputIterator first, InputIterator last, Predicate pred)
   AccumulatorTy accum;
   HelperTy helper(accum, pred);
   Galois::Runtime::for_each_impl<WL>(Galois::Runtime::makeStandardRange(
-        NoDerefIterator<InputIterator>(first),
-        NoDerefIterator<InputIterator>(last)), helper, 0);
+        make_no_deref_iterator(first),
+        make_no_deref_iterator(last)), helper, 0);
   for (unsigned i = 0; i < accum.size(); ++i) {
     if (*accum.getRemote(i))
       return **accum.getRemote(i);

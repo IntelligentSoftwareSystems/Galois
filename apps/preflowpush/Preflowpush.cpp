@@ -24,9 +24,7 @@
 #include "Galois/Accumulator.h"
 #include "Galois/Statistic.h"
 #include "Galois/Bag.h"
-#include "Galois/Graphs/Graph.h"
 #include "Galois/Graphs/LCGraph.h"
-#include "Galois/Graphs/Serialize.h"
 #include "llvm/Support/CommandLine.h"
 
 #ifdef GALOIS_USE_EXP
@@ -54,6 +52,8 @@ static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>")
 static cll::opt<uint32_t> sourceId(cll::Positional, cll::desc("sourceID"), cll::Required);
 static cll::opt<uint32_t> sinkId(cll::Positional, cll::desc("sinkID"), cll::Required);
 static cll::opt<bool> useHLOrder("useHLOrder", cll::desc("Use HL ordering heuristic"), cll::init(false));
+static cll::opt<bool> useUnitCapacity("useUnitCapacity", cll::desc("Assume all capacities are unit"), cll::init(false));
+static cll::opt<bool> useSymmetricDirectly("useSymmetricDirectly", cll::desc("Assume input graph is symmetric and has unit capacities"), cll::init(false));
 static cll::opt<int> relabelInt("relabel", cll::desc("relabel interval: < 0 no relabeling, 0 use default interval, > 0 relabel every X iterations"), cll::init(0));
 static cll::opt<DetAlgo> detAlgo(cll::desc("Deterministic algorithm:"),
     cll::values(
@@ -94,7 +94,6 @@ std::ostream& operator<<(std::ostream& os, const Node& n) {
   return os;
 }
 
-typedef Galois::Graph::FirstGraph<uint32_t, int, true> RawGraph;
 #ifdef GALOIS_USE_NUMA
 typedef Galois::Graph::LC_Numa_Graph<Node, int> Graph;
 #else
@@ -587,64 +586,95 @@ struct Process<nondet> {
   }
 };
 
-void initializeRawGraph(const std::string& inputFile, RawGraph& raw) {
-  typedef Galois::Graph::LC_CSR_Graph<uint32_t, int> ReaderGraph;
+template<typename EdgeTy>
+void writePfpGraph(const std::string& inputFile, const std::string& outputFile) {
+  typedef Galois::Graph::FileGraph ReaderGraph;
   typedef ReaderGraph::GraphNode ReaderGNode;
 
   ReaderGraph reader;
   reader.structureFromFile(inputFile);
 
-  typedef RawGraph::GraphNode RawGNode;
-  typedef std::vector<RawGNode> NodesTy;
+  typedef Galois::Graph::FileGraphParser Parser;
+  typedef Galois::LargeArray<EdgeTy,true> EdgeData;
+  typedef typename EdgeData::value_type edge_value_type;
 
-  NodesTy rawNodes(reader.size());
+  Parser p;
+  EdgeData edgeData;
 
-  // Assign ids to ReaderGNodes and
-  // create dense map between ids and GNodes
-  uint32_t id = 0;
-  for (ReaderGraph::iterator ii = reader.begin(),
-      ee = reader.end(); ii != ee; ++ii, ++id) {
-    reader.getData(*ii) = id;
-    RawGNode node = raw.createNode(id);
-    rawNodes[id] = node;
-    raw.addNode(node);
-  }
-
-  // Create edges
-  for (ReaderGraph::iterator ii = reader.begin(),
-      ei = reader.end(); ii != ei; ++ii) {
+  // Count edges
+  size_t numEdges = 0;
+  for (ReaderGraph::iterator ii = reader.begin(), ei = reader.end(); ii != ei; ++ii) {
     ReaderGNode rsrc = *ii;
-    uint32_t rsrcId = reader.getData(rsrc);
     for (ReaderGraph::edge_iterator jj = reader.edge_begin(rsrc),
         ej = reader.edge_end(rsrc); jj != ej; ++jj) {
       ReaderGNode rdst = reader.getEdgeDst(jj);
-      uint32_t rdstId = reader.getData(rdst);
-      int cap = reader.getEdgeData(jj);
-      raw.getEdgeData(raw.addEdge(rawNodes[rsrcId], rawNodes[rdstId])) = cap;
-      // Add reverse edge if not already there
-      if (!reader.hasNeighbor(rdst, rsrc)) {
-        raw.getEdgeData(raw.addEdge(rawNodes[rdstId], rawNodes[rsrcId])) = 0;
-      }
+      if (rsrc == rdst) continue;
+      if (!reader.hasNeighbor(rdst, rsrc)) 
+        ++numEdges;
+      ++numEdges;
     }
   }
+
+  p.setNumNodes(reader.size());
+  p.setNumEdges(numEdges);
+  p.setSizeofEdgeData(sizeof(edge_value_type));
+
+  p.phase1();
+  for (ReaderGraph::iterator ii = reader.begin(), ei = reader.end(); ii != ei; ++ii) {
+    ReaderGNode rsrc = *ii;
+    for (ReaderGraph::edge_iterator jj = reader.edge_begin(rsrc),
+        ej = reader.edge_end(rsrc); jj != ej; ++jj) {
+      ReaderGNode rdst = reader.getEdgeDst(jj);
+      if (rsrc == rdst) continue;
+      if (!reader.hasNeighbor(rdst, rsrc)) 
+        p.incrementDegree(rdst);
+      p.incrementDegree(rsrc);
+    }
+  }
+
+  p.phase2();
+  edgeData.allocate(numEdges);
+  for (ReaderGraph::iterator ii = reader.begin(), ei = reader.end(); ii != ei; ++ii) {
+    ReaderGNode rsrc = *ii;
+    for (ReaderGraph::edge_iterator jj = reader.edge_begin(rsrc),
+        ej = reader.edge_end(rsrc); jj != ej; ++jj) {
+      ReaderGNode rdst = reader.getEdgeDst(jj);
+      if (rsrc == rdst) continue;
+      if (!reader.hasNeighbor(rdst, rsrc)) 
+        edgeData.set(p.addNeighbor(rdst, rsrc), 0);
+      EdgeTy cap = useUnitCapacity ? 1 : reader.getEdgeData<EdgeTy>(jj);
+      edgeData.set(p.addNeighbor(rsrc, rdst), cap);
+    }
+  }
+
+  edge_value_type* rawEdgeData = p.finish<edge_value_type>();
+  std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+
+  p.structureToFile(outputFile.c_str());
 }
 
 void initializeGraph(std::string inputFile,
     uint32_t sourceId, uint32_t sinkId, Config *newApp) {
-  if (inputFile.find(".gr.pfp") != inputFile.size() - strlen(".gr.pfp")) {
-    std::string pfpName = inputFile + ".pfp";
-    std::ifstream pfpFile(pfpName.c_str());
-    if (!pfpFile.good()) {
-      RawGraph raw;
-      initializeRawGraph(inputFile, raw);
-      std::cout << "Writing new output file: " << pfpName << "\n";
-
-      Galois::Graph::outputGraph(pfpName.c_str(), raw);
+  if (useSymmetricDirectly) {
+    Galois::Graph::FileGraph orig, mod;
+    orig.structureFromFile(inputFile.c_str());
+    int* edgeData = mod.structureFromGraph<int>(orig);
+    for (int *pp = edgeData, *ep = edgeData + mod.sizeEdges(); pp != ep; ++pp)
+      *pp = 1;
+    newApp->graph.structureFromGraph(mod);
+  } else {
+    if (inputFile.find(".gr.pfp") != inputFile.size() - strlen(".gr.pfp")) {
+      std::string pfpName = inputFile + ".pfp";
+      std::ifstream pfpFile(pfpName.c_str());
+      if (!pfpFile.good()) {
+        std::cout << "Writing new output file: " << pfpName << "\n";
+        writePfpGraph<int>(inputFile, pfpName);
+      }
+      inputFile = pfpName;
     }
-    inputFile = pfpName;
+    newApp->graph.structureFromFile(inputFile.c_str());
   }
-  newApp->graph.structureFromFile(inputFile.c_str());
-
+  
   Graph& g = newApp->graph;
 
   if (sourceId == sinkId || sourceId >= g.size() || sinkId >= g.size()) {

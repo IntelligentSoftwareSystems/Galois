@@ -52,6 +52,9 @@ public:
   const static bool has_value = true;
 
   LargeArray(): m_data(0), m_size(0) { }
+  explicit LargeArray(size_t n): m_data(0), m_size(0) {
+    allocate(n);
+  }
 
   ~LargeArray() {
     if (isLazy)

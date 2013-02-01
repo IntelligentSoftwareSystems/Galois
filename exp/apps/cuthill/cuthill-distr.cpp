@@ -118,6 +118,12 @@ static cll::opt<std::string> filename(cll::Positional,
     cll::desc("<input file>"),
     cll::Required);
 
+struct SNode;
+typedef Galois::Graph::LC_CSR_Graph<SNode, void> Graph;
+// Hack: Resolve circular definition of Graph and SNode.parent with fact that
+// all LC_CSR_Graph::GraphNodes have the same type.
+typedef Galois::Graph::LC_CSR_Graph<void, void>::GraphNode GNode;
+
 //****** Work Item and Node Data Defintions ******
 struct SNode {
   unsigned int dist;
@@ -132,7 +138,7 @@ struct SNode {
 	//bool rflag;
 	//bool pflag;
 	//bool have;
-	Galois::Graph::LC_CSR_Graph<SNode, void>::GraphNode parent;
+	GNode parent;
 	//std::vector<Galois::Graph::LC_CSR_Graph<SNode, void>::GraphNode> bucket;
 	//Galois::gdeque<Galois::Graph::LC_CSR_Graph<SNode, void>::GraphNode>* bucket;
 	//Galois::Runtime::LL::SimpleLock<true> mutex;
@@ -143,9 +149,6 @@ struct Prefix {
 	unsigned int val;
 	Prefix(unsigned int _id, unsigned _val) : id(_id), val(_val) {}
 };
-
-typedef Galois::Graph::LC_CSR_Graph<SNode, void> Graph;
-typedef Graph::GraphNode GNode;
 
 Graph graph;
 
