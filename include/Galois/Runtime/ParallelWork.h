@@ -142,13 +142,16 @@ protected:
   }
 
   inline void doProcess(boost::optional<value_type>& p, ThreadLocalData& tld) {
+    tld.stat.inc_iterations(); //Class specialization handles opt
+    if (ForEachTraits<FunctionTy>::NeedsAborts)
+      tld.cnx.start_iteration();
+    // network receive should be done only after start_iteration
+    // some objects may be locked in network receive
+    // if order is changed then start_iteration will assert due to the locked objs
     if ((Distributed::networkHostNum > 1) && (LL::getTID() == 0)) {
       Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
       net.handleReceives();
     }
-    tld.stat.inc_iterations(); //Class specialization handles opt
-    if (ForEachTraits<FunctionTy>::NeedsAborts)
-      tld.cnx.start_iteration();
     function(*p, tld.facing.data());
     commitIteration(tld);
   }

@@ -18,10 +18,8 @@ struct op {
 
   template<typename Context>
   void operator()(const int& nodeval, const Context& cnx) {
- //printf ("STARTING:: Host %u value: %d\n", networkHostID, nodeval);
     G::NodeHandle node = graph->createNode(nodeval);
     node->createEdge(node, -node->getData());
- //printf ("\t DONE:: Host %u value: %d\n", networkHostID, nodeval);
   }
 
   // serialization functions
@@ -44,7 +42,7 @@ int main(int argc, char** argv) {
 
   Galois::Runtime::Distributed::gptr<G> Gr(new G());
 
-  Galois::for_each<>(boost::counting_iterator<int>(0), boost::counting_iterator<int>(10), op(Gr));
+  Galois::for_each<>(boost::counting_iterator<int>(0), boost::counting_iterator<int>(100), op(Gr));
 
   for (auto ii = Gr->begin(), ee = Gr->end(); ii != ee; ++ii)
     std::cout << (*ii)->getData() << " " << std::distance((*ii)->begin(), (*ii)->end()) << " ";

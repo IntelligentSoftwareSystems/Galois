@@ -329,9 +329,9 @@ public:
   local_iterator local_end() { return iterator(); }
 
   ThirdGraph() {}
-  typedef int tt_has_serialize;
   // mark the graph as persistent so that it is distributed
   typedef int tt_is_persistent;
+  typedef int tt_has_serialize;
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
     //This is what is called on the source of a replicating source
     s.serialize(localState.master);
