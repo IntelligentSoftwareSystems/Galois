@@ -181,6 +181,8 @@ protected:
 	}
 	p = lwl.pop();
       }
+    } catch (const remote_ex& ex) {
+      abortIteration(*p, tld, recursiveAbort);
     } catch (const conflict_ex& ex) {
       abortIteration(*p, tld, recursiveAbort);
     } catch (const break_ex&) {
