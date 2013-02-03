@@ -80,16 +80,16 @@ public:
   using retype = AbstractWorkList<Tnew, concurrent>;
 
   //! push a value onto the queue
-  void push(const value_type& val) { abort(); }
+  void push(const value_type& val);
 
   //! push a range onto the queue
   template<typename Iter>
-  void push(Iter b, Iter e) { abort(); }
+  void push(Iter b, Iter e);
 
   //! push initial range onto the queue
   //! called with the same b and e on each thread
   template<typename RangeTy>
-  void push_initial(RangeTy) { abort(); }
+  void push_initial(const RangeTy&);
 
   //Optional, but this is the likely interface for stealing
   //! steal from a similar worklist

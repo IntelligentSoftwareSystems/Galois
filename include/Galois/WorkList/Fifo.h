@@ -61,7 +61,7 @@ public:
   }
 
   template<typename RangeTy>
-  void push_initial(RangeTy range) {
+  void push_initial(const RangeTy& range) {
     if (Runtime::LL::getTID() == 0)
       push(range.begin(), range.end());
   }
