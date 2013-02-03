@@ -45,12 +45,12 @@ struct resolve<T, false> {
     T* rptr = nullptr;
     assert(ptr);
     if (owner == networkHostID)
-      rptr = reinterpret_cast<T*>(ptr);
+      rptr = getSystemLocalDirectory().resolve<T>(ptr);
     else
       rptr = getSystemRemoteDirectory().resolve<T>(ptr, owner);
     assert(rptr);
-    //if (inGaloisForEach)
-    //acquire(rptr, MethodFlag::ALL);
+    if (inGaloisForEach)
+      acquire(rptr, MethodFlag::ALL);
     return rptr;
   }
 };
