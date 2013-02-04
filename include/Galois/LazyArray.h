@@ -109,16 +109,11 @@ public:
 
   //missing: fill swap
 
-  //Extra functionality
-#ifdef GALOIS_HAS_RVALUE_REFERENCES
   template<typename... Args>
-  pointer emplace(size_type __n, Args&&... val) { return new (get(__n)) _Tp(std::forward<Args>(val)...); }
+  pointer emplace(size_type __n, Args&&... args) { return new (get(__n)) _Tp(std::forward<Args>(args)...); }
 
   pointer construct(size_type __n, const _Tp& val) { return emplace(__n, val); }
   pointer construct(size_type __n, _Tp&& val) { return emplace(__n, std::move(val)); }
-#else
-  pointer construct(size_type __n, const _Tp& val) { return new (get(__n)) _Tp(val); }
-#endif
 
   void destroy(size_type __n) { (get(__n))->~_Tp(); }
 };

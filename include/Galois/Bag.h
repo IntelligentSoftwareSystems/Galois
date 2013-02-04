@@ -186,22 +186,25 @@ public:
   }
 
   //! Only this is thread safe
-  reference push(const T& val) {
+  template<typename... Args>
+  reference emplace(Args&&... args) {
     header* H = *heads.getLocal();
     T* rv;
     if (!H || H->dend == H->dlast) {
       H = newHeader();
       insHeader(H);
     }
-    rv = new (H->dend) T(val);
+    rv = new (H->dend) T(std::forward<Args>(args)...);
     H->dend++;
     return *rv;
   }
 
+  reference push(const T& val) { return emplace(val); }
+  reference push(T&& val) { return emplace(std::move(val)); }
+
   //! Allow using std::back_inserter
-  reference push_back(const T& val) {
-    return push(val);
-  }
+  reference push_back(const T& val) { return emplace(val); }
+  reference push_back(T&& val) { return emplace(val); }
 };
 
 }

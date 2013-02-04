@@ -37,7 +37,7 @@
  * g.addNode(a);
  * b = g.createNode(n2);
  * g.addNode(b);
- * g.addEdge(a, b, 5);
+ * g.getEdgeData(g.addEdge(a, b)) = 5;
  *
  * // Traverse graph
  * for (Graph::iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
@@ -104,7 +104,8 @@ struct EdgeItem<NTy, ETy, true> {
   inline NTy* const& first() const { assert(N); return N; }
   inline ETy*       second()       { return &Ea; }
   inline const ETy* second() const { return &Ea; }
-  EdgeItem(NTy* n, ETy* v) : N(n) {}
+  template<typename... Args>
+  EdgeItem(NTy* n, ETy* v, Args&&... args) : N(n), Ea(std::forward<Args>(args)...) {}
   static size_t sizeOfSecond()     { return sizeof(ETy); }
 };
 
@@ -119,7 +120,8 @@ struct EdgeItem<NTy, ETy, false> {
   inline NTy* const& first() const { assert(N); return N; }
   inline ETy*       second()       { return Ea; }
   inline const ETy* second() const { return Ea; }
-  EdgeItem(NTy* n, ETy* v) : N(n), Ea(v) {}
+  template<typename... Args>
+  EdgeItem(NTy* n, ETy* v, Args&&... args) : N(n), Ea(v) {}
   static size_t sizeOfSecond()     { return sizeof(ETy); }
 };
 
@@ -132,7 +134,8 @@ struct EdgeItem<NTy, void, true> {
   inline NTy* const& first()  const { return N; }
   inline char*       second() const { return static_cast<char*>(NULL); }
   inline char*       addr()   const { return second(); }
-  EdgeItem(NTy* n, void* v) : N(n) {}
+  template<typename... Args>
+  EdgeItem(NTy* n, void* v, Args&&... args) : N(n) {}
   static size_t sizeOfSecond()      { return 0; }
 };
 
@@ -145,16 +148,18 @@ struct EdgeItem<NTy, void, false> {
   inline NTy* const& first()  const { return N; }
   inline char*       second() const { return static_cast<char*>(NULL); }
   inline char*       addr()   const { return second(); }
-  EdgeItem(NTy* n, void* v) : N(n) {}
+  template<typename... Args>
+  EdgeItem(NTy* n, void* v, Args&&... args) : N(n) {}
   static size_t sizeOfSecond()      { return 0; }
 };
 
 template<typename ETy>
 struct EdgeFactory {
   Galois::Runtime::MM::FSBGaloisAllocator<ETy> mem;
-  ETy* mkEdge() {
+  template<typename... Args>
+  ETy* mkEdge(Args&&... args) {
     ETy* e = mem.allocate(1);
-    mem.construct(e, ETy());
+    mem.construct(e, std::forward<Args>(args)...);
     return e;
   }
   void delEdge(ETy* e) {
@@ -207,8 +212,8 @@ class FirstGraph : private boost::noncopyable {
     NodeTy data;
     bool active;
     
-    gNode(const NodeTy& d) :data(d), active(false) { }
-    gNode() :active(false) { }
+    template<typename... Args>
+    gNode(Args&&... args): data(std::forward<Args>(args)...), active(false) { }
     
     iterator begin() { return edges.begin(); }
     iterator end()   { return edges.end();  }
@@ -228,14 +233,20 @@ class FirstGraph : private boost::noncopyable {
       return std::find_if(begin(), end(), first_eq_and_valid<gNode*>(N));
     }
 
-    iterator createEdge(gNode* N, EdgeTy* v) {
+    template<typename... Args>
+    iterator createEdge(gNode* N, EdgeTy* v, Args&&... args) {
+      return edges.insert(edges.end(), EITy(N, v, std::forward<Args>(args)...));
+    }
+
+    template<typename... Args>
+    iterator createEdgeWithReuse(gNode* N, EdgeTy* v, Args&&... args) {
       //First check for holes
       iterator ii = std::find_if(begin(), end(), first_not_valid());
       if (ii != end()) {
-	*ii = EITy(N, v);
+	*ii = EITy(N, v, std::forward<Args>(args)...);
 	return ii;
       }
-      return edges.insert(edges.end(), EITy(N, v));
+      return edges.insert(edges.end(), EITy(N, v, std::forward<Args>(args)...));
     }
   };
 
@@ -267,13 +278,56 @@ public:
           boost::filter_iterator<is_node,
                    typename NodeListTy::iterator> > iterator;
 
+private:
+  template<typename... Args>
+  edge_iterator createEdgeWithReuse(GraphNode src, GraphNode dst, Galois::MethodFlag mflag, Args&&... args) {
+    assert(src);
+    assert(dst);
+    Galois::Runtime::checkWrite(mflag, true);
+    Galois::Runtime::acquire(src, mflag);
+    typename gNode::iterator ii = src->find(dst);
+    if (ii == src->end()) {
+      if (Directional) {
+	ii = src->createEdgeWithReuse(dst, 0, std::forward<Args>(args)...);
+      } else {
+	Galois::Runtime::acquire(dst, mflag);
+	EdgeTy* e = edges.mkEdge(std::forward<Args>(args)...);
+	ii = dst->createEdgeWithReuse(src, e, std::forward<Args>(args)...);
+	ii = src->createEdgeWithReuse(dst, e, std::forward<Args>(args)...);
+      }
+    }
+    return boost::make_filter_iterator(is_edge(), ii, src->end());
+  }
+
+  template<typename... Args>
+  edge_iterator createEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag, Args&&... args) {
+    assert(src);
+    assert(dst);
+    Galois::Runtime::checkWrite(mflag, true);
+    Galois::Runtime::acquire(src, mflag);
+    typename gNode::iterator ii = src->end();
+    if (ii == src->end()) {
+      if (Directional) {
+	ii = src->createEdge(dst, 0, std::forward<Args>(args)...);
+      } else {
+	Galois::Runtime::acquire(dst, mflag);
+	EdgeTy* e = edges.mkEdge(std::forward<Args>(args)...);
+	ii = dst->createEdge(src, e, std::forward<Args>(args)...);
+	ii = src->createEdge(dst, e, std::forward<Args>(args)...);
+      }
+    }
+    return boost::make_filter_iterator(is_edge(), ii, src->end());
+  }
+
+public:
   //// Node Handling ////
   
   /**
    * Creates a new node holding the indicated data.
    */
-  GraphNode createNode(const NodeTy& nd) {
-    gNode* N = &(nodes.push(gNode(nd)));
+  template<typename... Args>
+  GraphNode createNode(Args&&... args) {
+    gNode* N = &(nodes.emplace(std::forward<Args>(args)...));
     N->active = false;
     return GraphNode(N);
   }
@@ -327,41 +381,13 @@ public:
   //! iterator to set the value if desired.  This frees us from
   //! dealing with the void edge data problem in this API
   edge_iterator addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::ALL) {
-    assert(src);
-    assert(dst);
-    Galois::Runtime::checkWrite(mflag, true);
-    Galois::Runtime::acquire(src, mflag);
-    typename gNode::iterator ii = src->find(dst);
-    if (ii == src->end()) {
-      if (Directional) {
-	ii = src->createEdge(dst, 0);
-      } else {
-	Galois::Runtime::acquire(dst, mflag);
-	EdgeTy* e = edges.mkEdge();
-	ii = dst->createEdge(src, e);
-	ii = src->createEdge(dst, e);
-      }
-    }
-    return boost::make_filter_iterator(is_edge(), ii, src->end());
+    return createEdgeWithReuse(src, dst, mflag);
   }
 
-  edge_iterator addMultiEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::ALL) {
-    assert(src);
-    assert(dst);
-    Galois::Runtime::checkWrite(mflag, true);
-    Galois::Runtime::acquire(src, mflag);
-    typename gNode::iterator ii = src->end();
-    if (ii == src->end()) {
-      if (Directional) {
-	ii = src->createEdge(dst, 0);
-      } else {
-	Galois::Runtime::acquire(dst, mflag);
-	EdgeTy* e = edges.mkEdge();
-	ii = dst->createEdge(src, e);
-	ii = src->createEdge(dst, e);
-      }
-    }
-    return boost::make_filter_iterator(is_edge(), ii, src->end());
+  //! Adds and initializes an edge to graph but does not check for duplicate edges
+  template<typename... Args>
+  edge_iterator addMultiEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag, Args&&... args) {
+    return createEdge(src, dst, mflag, std::forward<Args>(args)...);
   }
 
   //! Removes an edge from the graph

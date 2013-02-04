@@ -590,17 +590,10 @@ public:
     Alloc.deallocate(ptr);
   }
   
-  template<typename TyC>
-  inline void construct(pointer ptr, const TyC& val) const {
-    new (ptr) Ty(val);
-  }
-
-#ifdef GALOIS_HAS_RVALUE_REFERENCES
   template<class U, class... Args >
   inline void construct(U* p, Args&&... args ) const {
     ::new((void*)p) U(std::forward<Args>(args)...);
   }
-#endif
   
   inline void destroy(pointer ptr) const {
     destruct(ptr);

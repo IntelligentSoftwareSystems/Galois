@@ -79,17 +79,12 @@ public:
     count = 0;
   }
 
-#ifdef GALOIS_HAS_RVALUE_REFERENCES
   template<typename U>
   pointer push_front(U&& val) { return push_back(std::forward<U>(val)); }
 
   template<typename... Args>
   pointer emplace_front(Args&&... args) { return emplace_back(std::forward<Args>(args)...); }
-#else
-  pointer push_front(const value_type& val) { return push_back(val); }
-#endif
 
-#ifdef GALOIS_HAS_RVALUE_REFERENCES
   template<typename U>
   pointer push_back(U&& val) {
     if (full()) return 0;
@@ -105,14 +100,6 @@ public:
     ++count;
     return datac.emplace(end, std::forward<Args>(args)...);
   }
-#else
-  pointer push_back(const value_type& val) {
-    if (full()) return 0;
-    unsigned end = count % chunksize;
-    ++count;
-    return datac.construct(end, val);
-  }
-#endif
 
   reference front() { return back(); }
   const_reference front() const { return back(); }
@@ -257,7 +244,6 @@ public:
     start = 0;
   }
 
-#ifdef GALOIS_HAS_RVALUE_REFERENCES
   template<typename U>
   pointer push_front(U&& val) {
     if (full()) return 0;
@@ -273,16 +259,7 @@ public:
     ++count;
     return datac.emplace(start, std::forward<Args>(args)...);
   }
-#else
-  pointer push_front(const value_type& val) {
-    if (full()) return 0;
-    start = (start + chunksize - 1) % chunksize;
-    ++count;
-    return datac.construct(start,val);
-  }
-#endif
 
-#ifdef GALOIS_HAS_RVALUE_REFERENCES
   template<typename U>
   pointer push_back(U&& val) {
     if (full()) return 0;
@@ -298,14 +275,6 @@ public:
     ++count;
     return datac.emplace(end, std::forward<Args>(args)...);
   }
-#else
-  pointer push_back(const value_type& val) {
-    if (full()) return 0;
-    unsigned end = (start + count) % chunksize;
-    ++count;
-    return datac.construct(end, val);
-  }
-#endif
 
   reference front() {
     assert(precondition());
