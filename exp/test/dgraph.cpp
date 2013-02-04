@@ -9,17 +9,31 @@
 using namespace Galois::Graph;
 
 typedef ThirdGraph<int,int,EdgeDirection::Out> G;
-Galois::Runtime::Distributed::gptr<G> Gr;
+typedef Galois::Runtime::Distributed::gptr<G> Gptr;
 
 struct op {
-  void operator()(unsigned, unsigned) const {
-    for (int x = 0; x < 100; ++x) {
-      auto b = Gr->begin();
-      std::advance(b, x);
-      if (std::distance(b, Gr->end()) != 100 - x)
-	std::cerr << "Mismatch\n";
-    }
+  Gptr Gr;
+
+  op(const Gptr& p) : Gr(p) {}
+  op() {}
+
+  template<typename Context>
+  void operator()(unsigned x, Context& cnx) const {
+    auto b = Gr->begin();
+    std::advance(b, x);
+    if (std::distance(b, Gr->end()) != 100 - x)
+      std::cerr << "Mismatch\n";
   }
+
+  // serialization functions
+  typedef int tt_has_serialize;
+  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+    s.serialize(Gr);
+  }
+  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+    s.deserialize(Gr);
+  }
+
 };
 
 int main(int argc, char** argv) {
@@ -29,7 +43,7 @@ int main(int argc, char** argv) {
   // check the host id and initialise the network
   Galois::Runtime::Distributed::networkStart();
 
-  Gr.initialize(new G());
+  Gptr Gr(new G());
   
   for (int x = 0; x < 100; ++x) {
     if (std::distance(Gr->begin(), Gr->end()) != x)
@@ -37,7 +51,7 @@ int main(int argc, char** argv) {
     Gr->createNode(x);
   }
 
-  Galois::on_each(op());
+  Galois::for_each<>(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(100), op(Gr));
 
   for (int x = 0; x < 100; ++x) {
     auto b = Gr->begin();
