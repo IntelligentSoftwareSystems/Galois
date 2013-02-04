@@ -23,12 +23,14 @@
 
 #include "Galois/Runtime/Network.h"
 
+#include <cassert>
+
 namespace Galois {
 namespace Runtime {
 namespace Distributed {
 
-uint32_t networkHostID;
-uint32_t networkHostNum;
+uint32_t networkHostID = 0;
+uint32_t networkHostNum = 1;
 }
 }
 }
@@ -37,11 +39,8 @@ static bool ourexit = false;
 
 //!landing pad for worker hosts
 static void networkExit(Galois::Runtime::Distributed::RecvBuffer& buf) {
-  uint32_t node;
-  buf.deserialize(node);
-  // continue if master doesn't send exit message
-  if (node != 0)
-    return;
+  assert(Galois::Runtime::Distributed::networkHostNum > 1);
+  assert(Galois::Runtime::Distributed::networkHostID > 0);
   ourexit = true;
 }
 
@@ -53,18 +52,13 @@ void Galois::Runtime::Distributed::networkStart() {
     }
     exit(0);
   }
-  //return;
 }
 
 void Galois::Runtime::Distributed::networkTerminate() {
-  if (networkHostNum > 1 && networkHostID == 0) {
-    NetworkInterface& net = getSystemNetworkInterface();
-    uint32_t x = networkHostID;
-    SendBuffer buf;
-    buf.serialize(x);
-    net.broadcastMessage (&networkExit, buf);
-    net.handleReceives();
-    //net.systemBarrier();
-  }
+  assert(networkHostNum > 1);
+  assert(networkHostID == 0);
+  NetworkInterface& net = getSystemNetworkInterface();
+  SendBuffer buf;
+  net.broadcastMessage (&networkExit, buf);
   return;
 }
