@@ -30,7 +30,6 @@
 
 #include "Galois/Mem.h"
 #include "Galois/Runtime/Context.h"
-#include "Galois/Runtime/DistTermination.h"
 #include "Galois/Runtime/ForEachTraits.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Range.h"

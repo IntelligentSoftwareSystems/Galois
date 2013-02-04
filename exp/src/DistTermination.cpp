@@ -28,7 +28,7 @@
  */
 
 #include "Galois/Runtime/PerThreadStorage.h"
-#include "Galois/Runtime/DistTermination.h"
+#include "Galois/Runtime/Termination.h"
 #include "Galois/Runtime/Network.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 
@@ -146,4 +146,3 @@ void DistTerminationDetection::propTokenLandingPad(Distributed::RecvBuffer& b) {
 Galois::Runtime::TerminationDetection& Galois::Runtime::getSystemTermination() {
   return getDistTermination();
 }
-

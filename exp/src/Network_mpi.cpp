@@ -234,35 +234,3 @@ NetworkInterface& Galois::Runtime::Distributed::getSystemNetworkInterface() {
   return net;
 }
 
-void Galois::Runtime::Distributed::networkExit(Distributed::RecvBuffer& buf) {
-  uint32_t node;
-  buf.deserialize(node);
-  // continue if master doesn't send exit message
-  if (node != 0)
-    return;
-  exit(0);
-}
-
-void Galois::Runtime::Distributed::networkStart() {
-  NetworkInterface& net = getSystemNetworkInterface();
-  if (networkHostID != 0) {
-    while (true) {
-      net.handleReceives();
-    }
-  }
-  return;
-}
-
-void Galois::Runtime::Distributed::networkTerminate() {
-  if (networkHostNum > 1 && networkHostID == 0) {
-    NetworkInterface& net = getSystemNetworkInterface();
-    uint32_t x = networkHostID;
-    SendBuffer buf;
-    buf.serialize(x);
-    net.broadcastMessage (&networkExit, buf);
-    net.handleReceives();
-    //net.systemBarrier();
-  }
-  return;
-}
-

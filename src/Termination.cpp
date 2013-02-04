@@ -110,7 +110,8 @@ static LocalTerminationDetection& getLocalTermination() {
 
 } // namespace
 
-Galois::Runtime::TerminationDetection& Galois::Runtime::getSystemTermination() {
-  return getLocalTermination();
-}
+//Galois::Runtime::TerminationDetection& __attribute__ ((weak)) 
+//Galois::Runtime::getSystemTermination() {
+//  return getLocalTermination();
+//}
 

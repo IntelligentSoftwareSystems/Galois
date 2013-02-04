@@ -81,9 +81,6 @@ void networkStart();
 //! only the master host should call this
 void networkTerminate();
 
-//!network exit landing pad for worker hosts
-void networkExit(RecvBuffer& buf);
-
 } //Distributed
 } //Runtime
 } //Galois

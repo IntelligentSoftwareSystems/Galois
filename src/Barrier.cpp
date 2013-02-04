@@ -355,7 +355,7 @@ void StupidDistBarrier::wait() {
   //wait for barrier
   if (LL::getTID() == 0) {
     __sync_fetch_and_add(&count, Distributed::networkHostNum * activeThreads);
-    while (count != 0)
+    while (count > 0)
       Distributed::getSystemNetworkInterface().handleReceives();
     //passed barrier, notify local
     ++gsense;
