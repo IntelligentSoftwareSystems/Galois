@@ -36,6 +36,28 @@ struct op {
 
 };
 
+struct cop {
+  Gptr Gr;
+
+  cop(const Gptr& p) : Gr(p) {}
+  cop() {}
+
+  template<typename Context>
+  void operator()(unsigned x, Context& cnx) const {
+    Gr->createNode(x);
+  }
+
+  // serialization functions
+  typedef int tt_has_serialize;
+  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+    s.serialize(Gr);
+  }
+  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+    s.deserialize(Gr);
+  }
+
+};
+
 int main(int argc, char** argv) {
 
   LonestarStart(argc, argv, nullptr, nullptr, nullptr);
@@ -45,11 +67,7 @@ int main(int argc, char** argv) {
 
   Gptr Gr(new G());
   
-  for (int x = 0; x < 100; ++x) {
-    if (std::distance(Gr->begin(), Gr->end()) != x)
-      std::cerr << "Mismatch\n";
-    Gr->createNode(x);
-  }
+  Galois::for_each<>(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(100), cop(Gr));
 
   Galois::for_each<>(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(100), op(Gr));
 
