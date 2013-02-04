@@ -103,10 +103,12 @@ public:
   }
 };
 
+/*
 static LocalTerminationDetection& getLocalTermination() {
   static LocalTerminationDetection term;
   return term;
 }
+*/
 
 } // namespace
 

@@ -60,5 +60,6 @@ void Galois::Runtime::Distributed::networkTerminate() {
   NetworkInterface& net = getSystemNetworkInterface();
   SendBuffer buf;
   net.broadcastMessage (&networkExit, buf);
+  net.handleReceives();
   return;
 }
