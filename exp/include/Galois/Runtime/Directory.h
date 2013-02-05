@@ -26,6 +26,7 @@
 #define GALOIS_RUNTIME_DIRECTORY_H
 
 #include <boost/unordered_map.hpp>
+#include "Galois/Runtime/ll/TID.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Network.h"
 #include "Galois/Runtime/Support.h"
@@ -202,8 +203,10 @@ T* RemoteDirectory::resolve(uintptr_t ptr, uint32_t owner) {
     if (Galois::Runtime::inGaloisForEach && !dir_blocking<T>::value)
       throw remote_ex{ptr, owner};
     p = haveObject(ptr, owner);
-    // call handleReceives as only thread outside for_each
-    net.handleReceives();
+    // call handleReceives if only thread outside for_each
+    // or is the first thread
+    if (!Galois::Runtime::inGaloisForEach || !LL::getTID())
+      net.handleReceives();
   }
   return reinterpret_cast<T*>(p);
 }
@@ -304,8 +307,10 @@ T* LocalDirectory::resolve(uintptr_t ptr) {
     if (Galois::Runtime::inGaloisForEach && !dir_blocking<T>::value)
       throw remote_ex{ptr, networkHostID};
     p = haveObject(ptr, sent);
-    // call handleReceives as only thread outside for_each
-    net.handleReceives();
+    // call handleReceives if only thread outside for_each
+    // or is the first thread
+    if (!Galois::Runtime::inGaloisForEach || !LL::getTID())
+      net.handleReceives();
   }
   return reinterpret_cast<T*>(p);
 }
@@ -397,8 +402,10 @@ T* PersistentDirectory::resolve(uintptr_t ptr, uint32_t owner) {
     if (Galois::Runtime::inGaloisForEach && !dir_blocking<T>::value)
       throw remote_ex{ptr, owner};
     p = haveObject(ptr, owner);
-    // call handleReceives only for thread outside for_each
-    net.handleReceives();
+    // call handleReceives if only thread outside for_each
+    // or is the first thread
+    if (!Galois::Runtime::inGaloisForEach || !LL::getTID())
+      net.handleReceives();
   }
   return reinterpret_cast<T*>(p);
 }
