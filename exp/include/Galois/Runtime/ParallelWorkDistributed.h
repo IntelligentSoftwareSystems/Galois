@@ -41,8 +41,13 @@ void for_each_landing_pad(Distributed::RecvBuffer& buf) {
   std::deque<ItemTy> data;
   buf.deserialize(data);
 
+  Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
+
   //Start locally
   Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeStandardRange(data.begin(), data.end()), f, nullptr);
+
+  // place a MPI barrier here for all the hosts to synchronize
+  net.systemBarrier();
 }
 
 namespace {
@@ -81,6 +86,9 @@ void for_each_dist(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
 
   //Start locally
   for_each_impl<WLTy>(Galois::Runtime::makeStandardRange(myblk.first, myblk.second), f, loopname);
+
+  // place a MPI barrier here for all the hosts to synchronize
+  net.systemBarrier();
 }
 
 

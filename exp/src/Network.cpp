@@ -55,7 +55,9 @@ void Galois::Runtime::Distributed::networkStart() {
 }
 
 void Galois::Runtime::Distributed::networkTerminate() {
-  assert(networkHostNum > 1);
+  //return if just one host is running
+  if (networkHostNum == 1)
+    return;
   assert(networkHostID == 0);
   NetworkInterface& net = getSystemNetworkInterface();
   SendBuffer buf;

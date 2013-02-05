@@ -365,6 +365,10 @@ void StupidDistBarrier::wait() {
   }
   //continue
   ++(*sense.getLocal());
+  // there's a possibility that one of the thread's broadcast
+  // message wasn't communicated
+  if (LL::getTID() == 0)
+    Distributed::getSystemNetworkInterface().handleReceives();
 }
 
 static StupidDistBarrier& getDistBarrier() {
