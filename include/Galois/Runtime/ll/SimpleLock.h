@@ -59,6 +59,7 @@ public:
       }
       oldval = __sync_fetch_and_or(&_lock, 1);
     } while (oldval & 1);
+    assert(_lock);
   }
 
   inline void unlock() const {
