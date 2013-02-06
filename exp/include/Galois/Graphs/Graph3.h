@@ -330,8 +330,8 @@ public:
     bool operator!=(const local_iterator& rhs) { return n != rhs.n; }
   };
 
-  local_iterator local_begin() { return iterator(localState.head); }
-  local_iterator local_end() { return iterator(); }
+  local_iterator local_begin() { return local_iterator(localState.head); }
+  local_iterator local_end() { return local_iterator(); }
 
   ThirdGraph() {}
   // mark the graph as persistent so that it is distributed
