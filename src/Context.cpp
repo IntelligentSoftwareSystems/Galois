@@ -113,9 +113,9 @@ void Galois::Runtime::breakLoop() {
 
 void Galois::Runtime::signalConflict() {
 #if GALOIS_USE_EXCEPTION_HANDLER
-        throw Galois::Runtime::CONFLICT; // Conflict
+  throw Galois::Runtime::CONFLICT; // Conflict
 #else
-        longjmp(hackjmp, Galois::Runtime::CONFLICT);
+  longjmp(hackjmp, Galois::Runtime::CONFLICT);
 #endif
 }
 

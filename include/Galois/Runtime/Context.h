@@ -35,8 +35,11 @@
 //! Throwing exceptions can be a scalability bottleneck.
 //! Set to zero to use longjmp hack, otherwise make sure that
 //! you use a fixed c++ runtime that improves scalability of
-//! exceptions.
-#define GALOIS_USE_EXCEPTION_HANDLER 0
+//! exceptions. 
+//!
+//! Update: longjmp hack is broken on newer g++ (e.g. 4.7.1)
+//#define GALOIS_USE_EXCEPTION_HANDLER 0
+#define GALOIS_USE_EXCEPTION_HANDLER 1
 
 namespace Galois {
 namespace Runtime {
