@@ -66,9 +66,9 @@ class RemoteDirectory: public SimpleRuntimeContext {
   boost::unordered_map<std::pair<uintptr_t, uint32_t>, objstate, ohash> curobj;
   Galois::Runtime::LL::SimpleLock<true> Lock;
 
-  //returns a valid local pointer to the object if it exists
+  //returns a valid locked local pointer to the object if it exists
   //or returns null
-  uintptr_t haveObject(uintptr_t ptr, uint32_t owner);
+  uintptr_t haveObject(uintptr_t ptr, uint32_t owner, SimpleRuntimeContext *cnx);
 
   // places a remote request for the node
   void fetchRemoteObj(uintptr_t ptr, uint32_t owner, recvFuncTy pad);
@@ -92,7 +92,7 @@ public:
   //resolve a pointer, owner pair
   //precondition: owner != networkHostID
   template<typename T>
-  T* resolve(uintptr_t ptr, uint32_t owner);
+  T* resolve(uintptr_t ptr, uint32_t owner, SimpleRuntimeContext *cnx);
 };
 
 class LocalDirectory: public SimpleRuntimeContext {
@@ -109,8 +109,8 @@ class LocalDirectory: public SimpleRuntimeContext {
   boost::unordered_map<uintptr_t, objstate> curobj;
   Galois::Runtime::LL::SimpleLock<true> Lock;
 
-  // returns a valid local pointer to the object if not remote
-  uintptr_t haveObject(uintptr_t ptr, uint32_t &remote);
+  // returns a valid locked local pointer to the object if not remote
+  uintptr_t haveObject(uintptr_t ptr, uint32_t &remote, SimpleRuntimeContext *cnx);
 
   // places a remote request for the node
   void fetchRemoteObj(uintptr_t ptr, uint32_t remote, recvFuncTy pad);
@@ -137,7 +137,7 @@ public:
 
   // resolve a pointer
   template<typename T>
-  T* resolve(uintptr_t ptr);
+  T* resolve(uintptr_t ptr, SimpleRuntimeContext *cnx);
 };
 
 class PersistentDirectory: public SimpleRuntimeContext {
@@ -192,21 +192,21 @@ using namespace Galois::Runtime::Distributed;
 
 // should be blocking if not in for each
 template<typename T>
-T* RemoteDirectory::resolve(uintptr_t ptr, uint32_t owner) {
+T* RemoteDirectory::resolve(uintptr_t ptr, uint32_t owner, SimpleRuntimeContext *cnx) {
   assert(ptr);
   assert(owner != networkHostID);
-  uintptr_t p = haveObject(ptr, owner);
+  uintptr_t p = haveObject(ptr, owner, cnx);
   while (!p) {
     NetworkInterface& net = getSystemNetworkInterface();
     fetchRemoteObj(ptr, owner, &LocalDirectory::localReqLandingPad<T>);
     // abort the iteration if inside for each and dir_blocking not defined
     if (Galois::Runtime::inGaloisForEach && !dir_blocking<T>::value)
       throw remote_ex{ptr, owner};
-    p = haveObject(ptr, owner);
     // call handleReceives if only thread outside for_each
     // or is the first thread
     if (!Galois::Runtime::inGaloisForEach || !LL::getTID())
       net.handleReceives();
+    p = haveObject(ptr, owner, cnx);
   }
   return reinterpret_cast<T*>(p);
 }
@@ -297,20 +297,20 @@ void RemoteDirectory::remoteDataLandingPad(RecvBuffer &buf) {
 
 // should be blocking outside for each
 template<typename T>
-T* LocalDirectory::resolve(uintptr_t ptr) {
+T* LocalDirectory::resolve(uintptr_t ptr, SimpleRuntimeContext *cnx) {
   uint32_t sent = 0;
-  uintptr_t p = haveObject(ptr, sent);
+  uintptr_t p = haveObject(ptr, sent, cnx);
   while (!p) {
     NetworkInterface& net = getSystemNetworkInterface();
     fetchRemoteObj(ptr, sent, &RemoteDirectory::remoteReqLandingPad<T>);
     // abort the iteration if inside for each and dir_blocking not defined
     if (Galois::Runtime::inGaloisForEach && !dir_blocking<T>::value)
       throw remote_ex{ptr, networkHostID};
-    p = haveObject(ptr, sent);
     // call handleReceives if only thread outside for_each
     // or is the first thread
     if (!Galois::Runtime::inGaloisForEach || !LL::getTID())
       net.handleReceives();
+    p = haveObject(ptr, sent, cnx);
   }
   return reinterpret_cast<T*>(p);
 }
@@ -401,11 +401,11 @@ T* PersistentDirectory::resolve(uintptr_t ptr, uint32_t owner) {
     // abort the iteration if inside for each and dir_blocking not defined
     if (Galois::Runtime::inGaloisForEach && !dir_blocking<T>::value)
       throw remote_ex{ptr, owner};
-    p = haveObject(ptr, owner);
     // call handleReceives if only thread outside for_each
     // or is the first thread
     if (!Galois::Runtime::inGaloisForEach || !LL::getTID())
       net.handleReceives();
+    p = haveObject(ptr, owner);
   }
   return reinterpret_cast<T*>(p);
 }

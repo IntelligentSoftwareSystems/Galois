@@ -27,7 +27,7 @@
 using namespace std;
 using namespace Galois::Runtime::Distributed;
 
-uintptr_t RemoteDirectory::haveObject(uintptr_t ptr, uint32_t owner) {
+uintptr_t RemoteDirectory::haveObject(uintptr_t ptr, uint32_t owner, SimpleRuntimeContext *cnx) {
 #define OBJSTATE (*iter).second
   RemoteDirectory& rd = getSystemRemoteDirectory();
   rd.Lock.lock();
@@ -45,6 +45,11 @@ uintptr_t RemoteDirectory::haveObject(uintptr_t ptr, uint32_t owner) {
   // Returning the object even if locked as the call to acquire would fail
   if (OBJSTATE.state != objstate::Remote)
     retval = OBJSTATE.localobj;
+  // acquire the lock if inside for_each
+  if (retval && inGaloisForEach) {
+    Lockable *L = reinterpret_cast<Lockable*>(retval);
+    cnx->acquire(L);
+  }
   rd.Lock.unlock();
 #undef OBJSTATE
   return retval;
@@ -61,7 +66,7 @@ void RemoteDirectory::fetchRemoteObj(uintptr_t ptr, uint32_t owner, recvFuncTy p
   return;
 }
 
-uintptr_t LocalDirectory::haveObject(uintptr_t ptr, uint32_t &remote) {
+uintptr_t LocalDirectory::haveObject(uintptr_t ptr, uint32_t &remote, SimpleRuntimeContext *cnx) {
 #define OBJSTATE (*iter).second
   LocalDirectory& ld = getSystemLocalDirectory();
   ld.Lock.lock();
@@ -75,6 +80,10 @@ uintptr_t LocalDirectory::haveObject(uintptr_t ptr, uint32_t &remote) {
     remote = OBJSTATE.sent_to;
   else
     printf ("Unrecognized state in LocalDirectory::haveObject\n");
+  if (retval && inGaloisForEach) {
+    Lockable *L = reinterpret_cast<Lockable*>(retval);
+    cnx->acquire(L);
+  }
   ld.Lock.unlock();
 #undef OBJSTATE
   return retval;
