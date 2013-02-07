@@ -37,9 +37,8 @@ template<typename WLTy, typename ItemTy, typename FunctionTy>
 void for_each_landing_pad(Distributed::RecvBuffer& buf) {
   //extract stuff
   FunctionTy f;
-  buf.deserialize(f);
   std::deque<ItemTy> data;
-  buf.deserialize(data);
+  gDeserialize(buf,f,data);
 
   Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
 
@@ -74,10 +73,8 @@ void for_each_dist(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
     auto blk = block_range(allData.begin(), allData.end(), i, Distributed::networkHostNum);
     std::deque<ItemTy> data(blk.first, blk.second);
     Distributed::SendBuffer buf;
-    // serialize function
-    buf.serialize(f);
-    // serialize data
-    buf.serialize(data);
+    // serialize function and data
+    gSerialize(buf,f,data);
     //send data
     net.sendMessage (i, &for_each_landing_pad<WLTy,ItemTy,FunctionTy>, buf);
   }

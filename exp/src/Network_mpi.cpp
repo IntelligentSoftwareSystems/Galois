@@ -123,7 +123,7 @@ public:
         //Unlocked call so reciever can call handleRecv()
         recvFuncTy f;
         uintptr_t fp;
-        buf.deserialize(fp);
+        gDeserialize(buf,fp);
         assert(fp);
         f = (recvFuncTy)fp;
         //Call deserialized function

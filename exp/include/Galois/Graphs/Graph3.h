@@ -24,10 +24,10 @@ protected:
   NHTy& getNextNode() { return nextNode; }
 
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-    s.serialize(nextNode, active);
+    gSerialize(s, nextNode, active);
   }
   void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-    s.deserialize(nextNode, active);
+    gDeserialize(s,nextNode, active);
   }
 
   void dump(std::ostream& os) {
@@ -51,10 +51,10 @@ class GraphNodeData {
 protected:
 
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-    s.serialize(data);
+    gSerialize(s,data);
   }
   void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-    s.deserialize(data);
+    gDeserialize(s,data);
   }
 
   void dump(std::ostream& os) {
@@ -92,10 +92,10 @@ public:
 
   typedef int tt_has_serialize;
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-    s.serialize(dst, val);
+    gSerialize(s, dst, val);
   }
   void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-    s.deserialize(dst, val);
+    gDeserialize(s,dst, val);
   }
 
   void dump(std::ostream& os) {
@@ -118,10 +118,10 @@ public:
 
   typedef int tt_has_serialize;
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-    s.serialize(dst);
+    gSerialize(s,dst);
   }
   void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-    s.deserialize(dst);
+    gDeserialize(s,dst);
   }
 
   void dump(std::ostream& os) {
@@ -140,10 +140,10 @@ class GraphNodeEdges<NHTy, EdgeDataTy, EdgeDirection::Out> {
 
 protected:
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-    s.serialize(edges);
+    gSerialize(s,edges);
   }
   void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-    s.deserialize(edges);
+    gDeserialize(s,edges);
   }
   void dump(std::ostream& os) {
     os << "numedges: " << edges.size();
@@ -249,10 +249,10 @@ class ThirdGraph { //: public Galois::Runtime::Distributed::DistBase<ThirdGraph>
     typedef int tt_has_serialize;
     typedef int tt_dir_blocking;
     void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-      s.serialize(head, next, master);
+      gSerialize(s, head, next, master);
     }
     void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-      s.deserialize(head, next, master);
+      gDeserialize(s,head, next, master);
     }
     SubGraphState() :head(), next(), master(this) {}
   };
@@ -339,11 +339,11 @@ public:
   typedef int tt_has_serialize;
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
     //This is what is called on the source of a replicating source
-    s.serialize(localState.master);
+    gSerialize(s,localState.master);
   }
   void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
     //This constructs the local node of the distributed graph
-    s.deserialize(localState.master);
+    gDeserialize(s,localState.master);
     localState.next = localState.master->next;
     localState.master->next.initialize(&localState);
   }

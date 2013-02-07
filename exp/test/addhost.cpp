@@ -23,10 +23,10 @@ struct R : public Galois::Runtime::Lockable {
   // serialization functions
   typedef int tt_has_serialize;
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-    s.serialize(i);
+    gSerialize(s,i);
   }
   void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-    s.deserialize(i);
+    gDeserialize(s,i);
   }
 };
 
@@ -43,10 +43,10 @@ struct f1 {
 	// serialization functions
 	typedef int tt_has_serialize;
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-    s.serialize(r);
+    gSerialize(s,r);
   }
   void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-    s.deserialize(r);
+    gDeserialize(s,r);
   }
 };
 

@@ -25,10 +25,10 @@ struct op {
   // serialization functions
   typedef int tt_has_serialize;
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-    s.serialize(graph);
+    gSerialize(s,graph);
   }
   void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-    s.deserialize(graph);
+    gDeserialize(s,graph);
   }
 
 };

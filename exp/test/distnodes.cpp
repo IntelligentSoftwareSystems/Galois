@@ -45,9 +45,9 @@ int main(int argc, char** argv) {
     Galois::Runtime::Distributed::SerializeBuffer B;
     //serialize the pointer
     auto oldB = *Gr.begin();
-    B.serialize(oldB);
+    gSerialize(B,oldB);
     //serialize the node
-    B.serialize(*oldB);
+    gSerialize(B,*oldB);
     
     B.print(std::cout);
     cout << "\n";
@@ -60,13 +60,13 @@ int main(int argc, char** argv) {
     
     // read the header first
     uintptr_t tmp;
-    D.deserialize(tmp);
+    gDeserialize(D,tmp);
     
     typename GTy::NodeHandle foo;
-    D.deserialize(foo);
+    gDeserialize(D,foo);
     
     auto bar = Gr.createNode();
-    D.deserialize(*bar);
+    gDeserialize(D,*bar);
     
     B.print(std::cout);
     cout << "\n";

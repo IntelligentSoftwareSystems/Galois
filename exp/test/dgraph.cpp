@@ -28,10 +28,10 @@ struct op {
   // serialization functions
   typedef int tt_has_serialize;
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-    s.serialize(Gr);
+    gSerialize(s,Gr);
   }
   void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-    s.deserialize(Gr);
+    gDeserialize(s,Gr);
   }
 
 };
@@ -50,10 +50,10 @@ struct cop {
   // serialization functions
   typedef int tt_has_serialize;
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-    s.serialize(Gr);
+    gSerialize(s,Gr);
   }
   void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-    s.deserialize(Gr);
+    gDeserialize(s,Gr);
   }
 
 };

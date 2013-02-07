@@ -42,7 +42,7 @@ class Lockable;
 struct conflict_ex { Lockable* obj; };
 struct break_ex {};
 struct failsafe_ex{};
-struct remote_ex{ uintptr_t ptr; uint32_t owner; };
+struct remote_ex; //tried to access a remote object
 
 enum PendingFlag {
   NON_DET,

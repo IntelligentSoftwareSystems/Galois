@@ -53,50 +53,8 @@ public:
       bufdata.push_back(0);
   }
 
-  //Serialize support
-  inline void serialize() {}
-
-  template<typename T>
-  inline void serialize(const T& data, typename std::enable_if<std::is_pod<T>::value>::type* = 0) {
-    unsigned char* pdata = (unsigned char*)&data;
-    for (size_t i = 0; i < sizeof(data); ++i)
-      bufdata.push_back(pdata[i]);
-  }
-  
-  template<typename T>
-  inline void serialize(const T& data, typename std::enable_if<has_serialize<T>::value>::type* = 0) {
-    data.serialize(*this);
-  }
-
-  template<typename T, typename Alloc>
-  inline void serialize(const std::deque<T, Alloc>& data) {
-    typename std::deque<T, Alloc>::size_type size;
-    size = data.size();
-    serialize(size);
-    for (auto ii = data.begin(), ee = data.end(); ii != ee; ++ii)
-      serialize(*ii);
-  }
-
-  template<typename T, typename Alloc>
-  inline void serialize(const std::vector<T, Alloc>& data) {
-    typename std::vector<T, Alloc>::size_type size;
-    size = data.size();
-    serialize(size);
-    for (auto ii = data.begin(), ee = data.end(); ii != ee; ++ii)
-      serialize(*ii);
-  }
-
-  template<typename T1, typename T2>
-  inline void serialize(const std::pair<T1, T2>& data) {
-    serialize(data.first);
-    serialize(data.second);
-   }
-
-  template<typename T1, typename T2, typename... U>
-  void serialize(const T1& a1, const T2& a2, U... an) {
-    serialize(a1);
-    serialize(a2);
-    serialize(an...);
+  inline void push(const char c) {
+    bufdata.push_back(c);
   }
 
   void serialize_header(uintptr_t data) {
@@ -119,6 +77,50 @@ public:
   }
 };
 
+inline void gSerialize(const SerializeBuffer&) {}
+
+template<typename T1, typename T2>
+void gSerialize(SerializeBuffer& buf, const std::pair<T1, T2>& data) {
+  gSerialize(buf, data.first, data.second);
+}
+
+template<typename T1, typename T2, typename... U>
+void gSerialize(SerializeBuffer& buf, const T1& a1, const T2& a2, const U&... an) {
+  gSerialize(buf,a1);
+  gSerialize(buf,a2);
+  gSerialize(buf, an...);
+}
+
+template<typename T, typename Alloc>
+void gSerialize(SerializeBuffer& buf, const std::vector<T, Alloc>& data) {
+  typename std::vector<T, Alloc>::size_type size;
+  size = data.size();
+  gSerialize(buf, size);
+  for (auto ii = data.begin(), ee = data.end(); ii != ee; ++ii)
+    gSerialize(buf,*ii);
+}
+
+template<typename T, typename Alloc>
+void gSerialize(SerializeBuffer& buf, const std::deque<T, Alloc>& data) {
+  typename std::deque<T, Alloc>::size_type size;
+  size = data.size();
+  gSerialize(buf,size);
+  for (auto ii = data.begin(), ee = data.end(); ii != ee; ++ii)
+    gSerialize(buf,*ii);
+}
+
+template<typename T>
+void gSerialize(SerializeBuffer& buf, const T& data, typename std::enable_if<std::is_pod<T>::value>::type* = 0) {
+  unsigned char* pdata = (unsigned char*)&data;
+  for (size_t i = 0; i < sizeof(data); ++i)
+    buf.push(pdata[i]);
+}
+
+template<typename T>
+void gSerialize(SerializeBuffer& buf, const T& data, typename std::enable_if<has_serialize<T>::value>::type* = 0) {
+  data.serialize(buf);
+}
+
 class DeSerializeBuffer {
   std::vector<unsigned char> bufdata;
   int offset;
@@ -129,58 +131,12 @@ public:
     bufdata.resize(count);
   }
 
-  //Deserialize support
-
-  inline void deserialize() {}
-
-  template<typename T>
-  inline void deserialize(T& data, typename std::enable_if<std::is_pod<T>::value>::type* = 0) {
-    unsigned char* pdata = (unsigned char*)&data;
-    for (size_t i = 0; i < sizeof(data); ++i) {
-      pdata[i] = bufdata[offset];
-      ++offset;
-    }
-  }
-
-  template<typename T>
-  inline void deserialize(T& data, typename std::enable_if<has_serialize<T>::value>::type* = 0) {
-    data.deserialize(*this);
-  }
-
-  template<typename T, typename Alloc>
-  inline void deserialize(std::deque<T, Alloc>& data) {
-    typedef typename std::deque<T, Alloc>::size_type lsty;
-    lsty size;
-    deserialize(size);
-    data.resize(size);
-    for (lsty x = 0; x < size; ++x)
-      deserialize(data[x]);
-  }
-
-  template<typename T, typename Alloc>
-  inline void deserialize(std::vector<T, Alloc>& data) {
-    typedef typename std::vector<T, Alloc>::size_type lsty;
-    lsty size;
-    deserialize(size);
-    data.resize(size);
-    for (lsty x = 0; x < size; ++x)
-      deserialize(data[x]);
-  }
-
-  template<typename T1, typename T2>
-  inline void deserialize(std::pair<T1, T2>& data) {
-    deserialize(data.first);
-    deserialize(data.second);
-   }
-
-  template<typename T1, typename T2, typename... U>
-  void deserialize(T1& a1, T2& a2, U... an) {
-    deserialize(a1);
-    deserialize(a2);
-    deserialize(an...);
+  unsigned char pop() {
+    return bufdata[offset++];
   }
 
   void* linearData() { return &bufdata[0]; }
+
   size_t size() const { return bufdata.size() - offset; }
 
   //Utility
@@ -193,31 +149,55 @@ public:
   }
 };
 
-/*
+
+  //Deserialize support
+
+inline void gDeserialize(const DeSerializeBuffer&) {}
+
 template<typename T>
-void serialize(std::ostream& os, const T& data, typename std::enable_if<std::is_pod<T>::value>::type* = 0) {
-  os.write((char*)&data, sizeof(T));
+void gDeserialize(DeSerializeBuffer& buf, T& data, typename std::enable_if<std::is_pod<T>::value>::type* = 0) {
+  unsigned char* pdata = (unsigned char*)&data;
+  for (size_t i = 0; i < sizeof(data); ++i)
+    pdata[i] = buf.pop();
 }
 
 template<typename T>
-void serialize(std::ostream& os, const T& data, typename std::enable_if<has_serialize<T>::value>::type* = 0) {
-  data.serialize(os);
+void gDeserialize(DeSerializeBuffer& buf, T& data, typename std::enable_if<has_serialize<T>::value>::type* = 0) {
+  data.deserialize(buf);
 }
 
-template<typename T>
-T* deserialize(std::istream& is, typename std::enable_if<std::is_pod<T>::value>::type* = 0) {
-  T* retval = new T();
-  is.read((char*)retval, sizeof(T));
-  return retval;
+template<typename T, typename Alloc>
+void gDeserialize(DeSerializeBuffer& buf, std::deque<T, Alloc>& data) {
+  typedef typename std::deque<T, Alloc>::size_type lsty;
+  lsty size;
+  gDeserialize(buf,size);
+  data.resize(size);
+  for (lsty x = 0; x < size; ++x)
+    gDeserialize(buf,data[x]);
 }
 
-template<typename T>
-T* deserialize(std::istream& is, typename std::enable_if<has_deserialize<T>::value>::type* = 0) {
-  T* retval = new T();
-  retval->deserialize(is);
-  return retval;
+template<typename T, typename Alloc>
+void gDeserialize(DeSerializeBuffer& buf, std::vector<T, Alloc>& data) {
+  typedef typename std::vector<T, Alloc>::size_type lsty;
+  lsty size;
+  gDeserialize(buf,size);
+  data.resize(size);
+  for (lsty x = 0; x < size; ++x)
+    gDeserialize(buf,data[x]);
 }
-*/
+
+template<typename T1, typename T2>
+void gDeserialize(DeSerializeBuffer& buf, std::pair<T1, T2>& data) {
+  gDeserialize(buf,data.first,data.second);
+}
+
+template<typename T1, typename T2, typename... U>
+void gDeserialize(DeSerializeBuffer& buf, T1& a1, T2& a2, U&... an) {
+  gDeserialize(buf,a1);
+  gDeserialize(buf,a2);
+  gDeserialize(buf,an...);
+}
+
 
 } //Distributed
 } //Runtime

@@ -37,16 +37,21 @@ BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_is_persistent)
 template<typename T>
 struct is_persistent : public has_tt_is_persistent<T> {};
 
-template<typename T, bool> struct resolve;
+namespace {
+
+template<typename T, bool> struct resolve_dispatch;
 
 template<typename T>
-struct resolve<T, false> {
+struct resolve_dispatch<T, false> {
     static T* go(uint32_t owner, uintptr_t ptr) {
     T* rptr = nullptr;
     assert(ptr);
-    if (owner == networkHostID)
-      rptr = getSystemLocalDirectory().resolve<T>(ptr, getThreadContext());
-    else
+    if (owner == networkHostID) {
+      // if (inGaloisForEach)
+      // 	rptr = reinterpret_cast<T*>(ptr);
+      // else
+	rptr = getSystemLocalDirectory().resolve<T>(ptr, getThreadContext());
+    } else
       rptr = getSystemRemoteDirectory().resolve<T>(ptr, owner, getThreadContext());
     assert(rptr);
     return rptr;
@@ -55,7 +60,7 @@ struct resolve<T, false> {
 
 // resolve for persistent objects!
 template<typename T>
-struct resolve<T,true> {
+struct resolve_dispatch<T,true> {
   static T* go(uint32_t owner, uintptr_t ptr) {
     T* rptr = nullptr;
     assert(ptr);
@@ -67,11 +72,19 @@ struct resolve<T,true> {
     return rptr;
   }
 };
+}
+
+template<typename T>
+T* resolve(const gptr<T>& p) {
+  return resolve_dispatch<T,is_persistent<T>::value>::go(p.owner, p.ptr);
+}
 
 template<typename T>
 class gptr {
   uintptr_t ptr;
   uint32_t owner;
+
+  friend T* resolve<>(const gptr<T>&);
 
 public:
   typedef T element_type;
@@ -81,10 +94,10 @@ public:
   explicit gptr(T* p) :ptr(reinterpret_cast<uintptr_t>(p)), owner(networkHostID) {}
 
   T& operator*() const {
-    return *resolve<T,is_persistent<T>::value>::go(owner, ptr);
+    return *resolve(*this);
   }
   T *operator->() const {
-    return resolve<T,is_persistent<T>::value>::go(owner, ptr);
+    return resolve(*this);
   }
 
   bool operator==(const gptr& rhs) const {
@@ -103,18 +116,25 @@ public:
   //serialize
   typedef int tt_has_serialize;
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-    s.serialize(ptr);
-    s.serialize(owner);
+    gSerialize(s,ptr, owner);
   }
   void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-    s.deserialize(ptr);
-    s.deserialize(owner);
+    gDeserialize(s,ptr, owner);
   }
 
   void dump() {
     printf("[%x,%lx]", owner, ptr);
   }
 };
+
+template<typename T>
+remote_ex make_remote_ex(const Distributed::gptr<T>& p) {
+  return remote_ex{&Distributed::LocalDirectory::localReqLandingPad<T>, p.ptr, p.owner};
+}
+template<typename T>
+remote_ex make_remote_ex(uintptr_t ptr, uint32_t owner) {
+  return remote_ex{&Distributed::LocalDirectory::localReqLandingPad<T>, ptr, owner};
+}
 
 } //namespace Distributed
 } //namespace Runtime

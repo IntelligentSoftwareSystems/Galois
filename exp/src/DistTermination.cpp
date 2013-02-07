@@ -57,7 +57,7 @@ class DistTerminationDetection : public TerminationDetection {
       //remote
       //send message to networkHost + 1
      Distributed::SendBuffer b;
-     b.serialize(isBlack);
+     gSerialize(b,isBlack);
      Distributed::getSystemNetworkInterface().sendMessage((Distributed::networkHostID + 1) % Distributed::networkHostNum, propTokenLandingPad, b);
     } else {
       TokenHolder& th = *data.getRemote((id + 1) % activeThreads);
@@ -137,7 +137,7 @@ void DistTerminationDetection::globalTermLandingPad(Distributed::RecvBuffer&) {
 }
 void DistTerminationDetection::propTokenLandingPad(Distributed::RecvBuffer& b) {
   bool isBlack;
-  b.deserialize(isBlack);
+  gDeserialize(b,isBlack);
   getDistTermination().recvToken(isBlack);
 }
 

@@ -60,8 +60,7 @@ void RemoteDirectory::fetchRemoteObj(uintptr_t ptr, uint32_t owner, recvFuncTy p
   SendBuffer buf;
   uint32_t host = networkHostID;
   NetworkInterface& net = getSystemNetworkInterface();
-  buf.serialize(ptr);
-  buf.serialize(host);
+  gSerialize(buf,ptr,host);
   net.sendMessage (owner, pad, buf);
   return;
 }
@@ -94,8 +93,7 @@ void LocalDirectory::fetchRemoteObj(uintptr_t ptr, uint32_t remote, recvFuncTy p
   SendBuffer buf;
   uint32_t host = networkHostID;
   NetworkInterface& net = getSystemNetworkInterface();
-  buf.serialize(ptr);
-  buf.serialize(host);
+  gSerialize(buf,ptr,host);
   net.sendMessage (remote, pad, buf);
   return;
 }
@@ -138,8 +136,7 @@ void PersistentDirectory::fetchRemoteObj(uintptr_t ptr, uint32_t owner, recvFunc
 #undef OBJSTATE
   // store that the object has been requested
   NetworkInterface& net = getSystemNetworkInterface();
-  buf.serialize(ptr);
-  buf.serialize(host);
+  gSerialize(buf,ptr,host);
   net.sendMessage (owner, pad, buf);
   return;
 }

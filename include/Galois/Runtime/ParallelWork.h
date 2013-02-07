@@ -40,6 +40,7 @@
 #include "Galois/Runtime/Network.h"
 #include "Galois/Runtime/Barrier.h"
 #include "Galois/WorkList/GFifo.h"
+#include "Galois/Runtime/DistSupport.h"
 
 #include <algorithm>
 #include <functional>
@@ -180,8 +181,9 @@ protected:
 	}
 	p = lwl.pop();
       }
-    } catch (const remote_ex& ex) {
+    } catch (const Distributed::remote_ex& ex) {
       abortIteration(*p, tld, recursiveAbort);
+      //Distributed::getSystemRemoteDirectory().fetchRemoteObj(ex.ptr,ex.owner, ex.pad);
     } catch (const conflict_ex& ex) {
       abortIteration(*p, tld, recursiveAbort);
     } catch (const break_ex&) {
