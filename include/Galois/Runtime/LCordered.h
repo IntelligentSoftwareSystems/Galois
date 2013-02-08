@@ -448,15 +448,14 @@ class LCorderedExec {
 
   typedef Galois::GAccumulator<size_t> Accumulator;
 
-
   struct CreateCtxtExpandNhood {
-    NhoodFunc& nhoodVisitor;
+    NhoodFunc nhoodVisitor;
     NhoodMgr& nhmgr;
     CtxtAlloc& ctxtAlloc;
     CtxtWL& ctxtWL;
 
     CreateCtxtExpandNhood (
-        NhoodFunc& nhoodVisitor,
+        const NhoodFunc& nhoodVisitor,
         NhoodMgr& nhmgr,
         CtxtAlloc& ctxtAlloc,
         CtxtWL& ctxtWL)
@@ -486,13 +485,12 @@ class LCorderedExec {
   };
 
   struct FindInitSources {
-
-    SourceTest& sourceTest;
+    SourceTest sourceTest;
     CtxtWL& initSrc;
     Accumulator& nsrc;
 
     FindInitSources (
-        SourceTest& sourceTest, 
+        const SourceTest& sourceTest, 
         CtxtWL& initSrc,
         Accumulator& nsrc)
       : 
@@ -520,12 +518,10 @@ class LCorderedExec {
 
 
   struct ApplyOperator {
-
-
-    OperFunc& op;
-    NhoodFunc& nhoodVisitor;
+    OperFunc op;
+    NhoodFunc nhoodVisitor;
     NhoodMgr& nhmgr;
-    SourceTest& sourceTest;
+    SourceTest sourceTest;
     CtxtAlloc& ctxtAlloc;
     CtxtWL& addCtxtWL;
     CtxtLocalQ& ctxtLocalQ;
@@ -534,10 +530,10 @@ class LCorderedExec {
     Accumulator& niter;
 
     ApplyOperator (
-        OperFunc& op,
-        NhoodFunc& nhoodVisitor,
+        const OperFunc& op,
+        const NhoodFunc& nhoodVisitor,
         NhoodMgr& nhmgr,
-        SourceTest& sourceTest,
+        const SourceTest& sourceTest,
         CtxtAlloc& ctxtAlloc,
         CtxtWL& addCtxtWL,
         CtxtLocalQ& ctxtLocalQ,
@@ -653,10 +649,11 @@ class LCorderedExec {
   };
 
 private:
-  NhoodFunc nhoodVisitor;
-  OperFunc operFunc;
+  const NhoodFunc& nhoodVisitor;
+  const OperFunc& operFunc;
+  // TODO: make cmp function of nhmgr thread local as well.
   NhoodMgr& nhmgr;
-  SourceTest sourceTest;
+  const SourceTest& sourceTest;
 
 
 public:
@@ -665,7 +662,7 @@ public:
       const NhoodFunc& nhoodVisitor,
       const OperFunc& operFunc,
       NhoodMgr& nhmgr,
-      SourceTest sourceTest)
+      const SourceTest& sourceTest)
     :
       nhoodVisitor (nhoodVisitor),
       operFunc (operFunc),
@@ -739,12 +736,7 @@ public:
     std::cout << "Time taken in finding intial sources: " << t_find.get () << std::endl;
     std::cout << "Time taken in for_each loop: " << t_for.get () << std::endl;
     std::cout << "Time taken in destroying all the contexts: " << t_destroy.get () << std::endl;
-
   }
-
-
-  
-
 };
 
 template <typename AI, typename Cmp, typename OperFunc, typename NhoodFunc>

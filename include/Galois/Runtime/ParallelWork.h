@@ -84,15 +84,16 @@ protected:
   typedef WorkList::GFIFO<value_type> AbortedList;
 
   struct ThreadLocalData {
+    FunctionTy function;
     UserContextAccess<value_type> facing;
     SimpleRuntimeContext cnx;
     LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
-    ThreadLocalData(const char* ln) :stat(ln) {}
+    ThreadLocalData(const FunctionTy& fn, const char* ln): function(fn), stat(ln) {}
   };
 
-  WLTy default_wl;
   WLTy& wl;
-  FunctionTy& function;
+  FunctionTy& origFunction;
+  WLTy default_wl;
   const char* loopname;
 
   TerminationDetection& term;
@@ -133,7 +134,7 @@ protected:
     tld.stat.inc_iterations(); //Class specialization handles opt
     if (ForEachTraits<FunctionTy>::NeedsAborts)
       tld.cnx.start_iteration();
-    function(*p, tld.facing.data());
+    tld.function(*p, tld.facing.data());
     commitIteration(tld);
   }
 
@@ -214,7 +215,7 @@ protected:
   void go() {
     //Thread Local Data goes on the local stack
     //to be NUMA friendly
-    ThreadLocalData tld(loopname);
+    ThreadLocalData tld(origFunction, loopname);
     if (ForEachTraits<FunctionTy>::NeedsAborts)
       setThreadContext(&tld.cnx);
     if (false && ForEachTraits<FunctionTy>::NeedsPush && !ForEachTraits<FunctionTy>::NeedsAborts) {
@@ -253,10 +254,10 @@ protected:
   }
 
 public:
-  ForEachWork(FunctionTy& f, const char* l): wl(default_wl), function(f), loopname(l), term(getSystemTermination()), broke(false) { }
+  ForEachWork(FunctionTy& f, const char* l): wl(default_wl), origFunction(f), loopname(l), term(getSystemTermination()), broke(false) { }
 
   template<typename W>
-  ForEachWork(W& w, FunctionTy& f, const char* l): wl(w), function(f), loopname(l), term(getSystemTermination()), broke(false) { }
+  ForEachWork(W& w, FunctionTy& f, const char* l): wl(w), origFunction(f), loopname(l), term(getSystemTermination()), broke(false) { }
 
   template<typename RangeTy>
   void AddInitialWork(const RangeTy& range) {
@@ -296,9 +297,10 @@ void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
 
 template<typename FunctionTy>
 struct WOnEach {
-  FunctionTy fn;
-  WOnEach(FunctionTy f) :fn(f) {}
+  FunctionTy& origFunction;
+  WOnEach(FunctionTy& f): origFunction(f) { }
   void operator()(void) {
+    FunctionTy fn(origFunction);
     fn(LL::getTID(), activeThreads);   
   }
 };

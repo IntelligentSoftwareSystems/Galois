@@ -520,7 +520,7 @@ struct Process {
 
   struct BreakFn {
     Counter& counter;
-    BreakFn(Process<version>& self): counter(self.counter) { }
+    BreakFn(const Process<version>& self): counter(self.counter) { }
     bool operator()() const {
       if (app.global_relabel_interval > 0 && counter.accum.reduce() >= app.global_relabel_interval) {
         app.should_global_relabel = true;

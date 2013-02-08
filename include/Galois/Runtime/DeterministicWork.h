@@ -159,12 +159,12 @@ struct OrderedOptions: public Options<_Function1Ty,_Function2Ty> {
   static const bool useOrdered = true;
   typedef OrderedTag Tag;
 
-  Function1Ty& fn1;
-  Function2Ty& fn2;
-  CompareTy& comp;
+  Function1Ty fn1;
+  Function2Ty fn2;
+  CompareTy comp;
   ContextComp contextComp;
 
-  OrderedOptions(Function1Ty& fn1, Function2Ty& fn2, CompareTy& comp):
+  OrderedOptions(const Function1Ty& fn1, const Function2Ty& fn2, const CompareTy& comp):
     fn1(fn1), fn2(fn2), comp(comp), contextComp(comp) { }
 
   DetContext make_context(const DItem<T>& item) const {
@@ -190,12 +190,12 @@ struct UnorderedOptions: public Options<_Function1Ty,_Function2Ty> {
 
   typedef DummyCompareTy  CompareTy;
 
-  Function1Ty& fn1;
-  Function2Ty& fn2;
+  Function1Ty fn1;
+  Function2Ty fn2;
   CompareTy comp;
   ContextComp contextComp;
 
-  UnorderedOptions(Function1Ty& fn1, Function2Ty& fn2): fn1(fn1), fn2(fn2) { }
+  UnorderedOptions(const Function1Ty& fn1, const Function2Ty& fn2): fn1(fn1), fn2(fn2) { }
 
   DetContext make_context(const DItem<T>& item) const {
     return DetContext(item, contextComp);
@@ -253,7 +253,7 @@ struct has_break_fn {
 
 template<typename FunctionTy,typename Enable=void>
 struct BreakManager {
-  BreakManager(FunctionTy&) { }
+  BreakManager(const FunctionTy&) { }
   bool checkBreak() { return false; }
 };
 
@@ -264,7 +264,7 @@ class BreakManager<FunctionTy,typename boost::enable_if<has_break_fn<FunctionTy>
   typename FunctionTy::BreakFn breakFn;
 
 public:
-  BreakManager(FunctionTy& fn): breakFn(fn) { 
+  BreakManager(const FunctionTy& fn): breakFn(fn) { 
     int numActive = (int) getActiveThreads();
     barrier.reinit(numActive);
   }
@@ -276,8 +276,6 @@ public:
     return done.data;
   }
 };
-
-
 
 template<typename T>
 struct DNewItem { 
@@ -1007,6 +1005,8 @@ public:
 };
 
 //! Implementation of merging specialized for unordered algorithms with an id function and ordered algorithms
+// TODO: For consistency should also have thread-local copies of comp and
+// idFunction
 template<typename OptionsTy>
 class DMergeManager<OptionsTy,typename boost::enable_if<MergeTraits<OptionsTy> >::type>: public DMergeManagerBase<OptionsTy> {
   typedef DMergeManagerBase<OptionsTy> Base;
@@ -1031,7 +1031,7 @@ class DMergeManager<OptionsTy,typename boost::enable_if<MergeTraits<OptionsTy> >
 
   GBarrier barrier;
   IdFn idFunction;
-  const CompareTy& comp;
+  CompareTy comp;
 
 public:
   DMergeManager(const OptionsTy& o): mergeBuf(this->alloc), comp(o.comp) {
@@ -1253,6 +1253,7 @@ class Executor {
 
   // Truly thread-local
   struct ThreadLocalData: private boost::noncopyable {
+    OptionsTy options;
     LocalPendingWork localPending;
     UserContextAccess<value_type> facing;
     LoopStatistics<OptionsTy::needsStats> stat;
@@ -1261,10 +1262,10 @@ class Executor {
     size_t rounds;
     size_t outerRounds;
     bool hasNewWork;
-    ThreadLocalData(const char* loopname): stat(loopname), rounds(0), outerRounds(0) { }
+    ThreadLocalData(const OptionsTy& o, const char* loopname): options(o), stat(loopname), rounds(0), outerRounds(0) { }
   };
 
-  const OptionsTy& options;
+  const OptionsTy& origOptions;
   MergeManager mergeManager;
   const char* loopname;
   BreakManager<typename OptionsTy::Function1Ty> breakManager;
@@ -1284,7 +1285,7 @@ class Executor {
 
 public:
   Executor(const OptionsTy& o, const char* ln):
-    options(o), mergeManager(o), loopname(ln), breakManager(o.fn1)
+    origOptions(o), mergeManager(o), loopname(ln), breakManager(o.fn1)
   { 
     numActive = (int) getActiveThreads();
     for (unsigned i = 0; i < sizeof(barrier)/sizeof(*barrier); ++i)
@@ -1311,7 +1312,7 @@ public:
 
 template<typename OptionsTy>
 void Executor<OptionsTy>::go() {
-  ThreadLocalData tld(loopname);
+  ThreadLocalData tld(origOptions, loopname);
   MergeLocal& mlocal = mergeManager.get();
   tld.wlcur = &worklists[0];
   tld.wlnext = &worklists[1];
@@ -1351,7 +1352,7 @@ void Executor<OptionsTy>::go() {
 
       barrier[0].wait();
 
-      mlocal.nextWindow(tld.wlnext, options);
+      mlocal.nextWindow(tld.wlnext, tld.options);
       mlocal.resetStats();
     }
 
@@ -1378,7 +1379,7 @@ void Executor<OptionsTy>::go() {
       // NB: assumes that distributeNewWork has a barrier otherwise checking at (1) is erroneous
       hasNewWork.data = false;
     } else {
-      mlocal.nextWindow(tld.wlnext, options);
+      mlocal.nextWindow(tld.wlnext, tld.options);
     }
 
     mlocal.resetStats();
@@ -1409,9 +1410,9 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
 
     DetContext* ctx = NULL;
     if (useLocalState) {
-      ctx = tld.localPending.push(options.make_context(*p));
+      ctx = tld.localPending.push(tld.options.make_context(*p));
     } else {
-      ctx = pending.push(options.make_context(*p));
+      ctx = pending.push(tld.options.make_context(*p));
     }
 
     assert(ctx != NULL);
@@ -1423,25 +1424,25 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
       // cnx->set_comp(&options.comp);
       // cnx->set_comp_data(mlocal.itemPoolPush(p->item));
       // mlocal.assertLimits(p->item, options.comp);
-      mlocal.assertLimits(ctx->item.val, options.comp);
+      mlocal.assertLimits(ctx->item.val, tld.options.comp);
     }
 
     ctx->start_iteration();
     tld.stat.inc_iterations();
     setThreadContext(ctx);
 
-    stateManager.alloc(tld.facing, options.fn1);
+    stateManager.alloc(tld.facing, tld.options.fn1);
     int result = 0;
 #if GALOIS_USE_EXCEPTION_HANDLER
     try {
-      options.fn1(ctx->item.val, tld.facing.data());
+      tld.options.fn1(ctx->item.val, tld.facing.data());
     } catch (ConflictFlag flag) {
       clearConflictLock();
       result = flag;
     }
 #else
     if ((result = setjmp(hackjmp)) == 0) {
-      options.fn1(ctx->item.val, tld.facing.data());
+      tld.options.fn1(ctx->item.val, tld.facing.data());
     }
 #endif
     switch (result) {
@@ -1453,7 +1454,6 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
 
     if (ForEachTraits<typename OptionsTy::Function1Ty>::NeedsPIA && !useLocalState)
       tld.facing.resetAlloc();
-
 
     // if (!commit) {
       // stateManager.dealloc(tld.facing); 
@@ -1501,14 +1501,14 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
       int result = 0;
 #if GALOIS_USE_EXCEPTION_HANDLER
       try {
-        options.fn2(ctx->item.val, tld.facing.data());
+        tld.options.fn2(ctx->item.val, tld.facing.data());
       } catch (ConflictFlag flag) {
         clearConflictLock();
         result = flag;
       }
 #else
       if ((result = setjmp(hackjmp)) == 0) {
-        options.fn2(ctx->item.val, tld.facing.data());
+        tld.options.fn2(ctx->item.val, tld.facing.data());
       }
 #endif
       switch (result) {
