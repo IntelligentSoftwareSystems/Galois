@@ -20,7 +20,63 @@
  *
  * @section Description
  *
- * Two Level Iterator for Per-thread workList
+ * Two Level Iterator for per-thread workList.
+ *
+ * Assumptions
+ * <ul>
+ *  <li>Outer and Inner iterators are default- and copy-constructible</li>
+ *  <li>Inner and Outer must be at least forward_iterator_tag</li>
+ *  <li>InnerBegFn and InnerEndFn take an argument of type *Outer and return an Inner
+ *    pointing to begin or end of inner range.</li>
+ *  <li>InnerBegFn and InnerEndFn must inherit from std::unary_function so that
+ *    argument_type and result_type are available.</li>
+ * </ul>
+ *
+ * Important pitfalls to handle
+ * <ol>
+ *  <li>If Outer and Inner have different categories, which category to choose?. The
+ *  category of Inner can be chosen after (expensively) supporting moving backwards for 
+ *  outer iterators of forward category. Note: Lowest category currently supported
+ *  is forward iterators.</li>
+ *
+ *  <li>Prevent Outer from falling outside the [begin,end) range, because calling
+ *  container functions e.g. outer->begin () and outer->end () is not valid and may
+ *  cause a segfault.</li>
+ *
+ *  <li>The initial position of Outer and Inner iterators must be such that calling
+ *  operator * or operator -> on at two level iterator yields a valid result (if
+ *  possible). This means advancing the inner iterator to begin of first non-empty
+ *  container (else to the end of outer). If the outer iterator is initialized to
+ *  end of the outer range i.e. [end, end), then inner iterator cannot be
+ *  initialized.</li>
+ *
+ *  <li>When incrementing (++), the inner iterator should initially be at a valid
+ *  begin position, but after incrementing may end up at end of an Inner range.
+ *  So the next valid local begin must be found, else the end of 
+ *  outer should be reached</li>
+ *
+ *  <ol>
+ *    <li> When jumping forward, outer should not go beyond end. After jump is
+ *    completed, inner may be at local end, so a valid next begin must be found
+ *    or else end of outer must be reached</li>
+ *  </ol>
+ *
+ *  <li>When decrementing (--), the inner iterator may initially be uninitialized
+ *  due to outer being at end (See 3 above).
+ *  Inner iterator must be brought to a valid location after decrementing, or, else
+ *  the begin of outer must be reached (and not exceeded).</li>
+ *  
+ *  <ol>
+ *    <li>When jumping backward, inner iterator may be uninitialized due to
+ *    outer being at end.</li>
+ *  </ol>
+ *
+ *  <li>When jumping forward or backward, check for jump amount being negative.</li>
+ *  <ol>
+ *    <li>Jumping outside the range of outer cannot be supported.</li>
+ *  </ol>
+ *
+ * </ol>
  *
  * @author <ahassaan@ices.utexas.edu>
  */
@@ -36,53 +92,7 @@
 
 namespace Galois {
 
-// XXX: Assumptions
-// - Outer and Inner iterators are default- and copy-constructible
-// - Inner and Outer must be at least forward_iterator_tag
-// - InnerBegFn and InnerEndFn take an argument of type *Outer and return an Inner
-//  pointing to begin or end of inner range. 
-// - InnerBegFn and InnerEndFn must inherit from std::unary_function so that
-// argument_type and result_type are available.
-
-//XXX: Important pitfalls to handle
-// 1 - If Outer and Inner have different categories, which category to choose?. The
-// category of Inner can be chosen after (expensively) supporting moving backwards for 
-// outer iterators of forward category. Note: Lowest category currently supported
-// is forward iterators.
-//
-// 2 - Prevent Outer from falling outside the [begin,end) range, because calling
-// container functions e.g. outer->begin () and outer->end () is not valid and may
-// cause a segfault
-//
-// 3 - The initial position of Outer and Inner iterators must be such that calling
-// operator * or operator -> on at two level iterator yields a valid result (if
-// possible). This means advancing the inner iterator to begin of first non-empty
-// container (else to the end of outer). If the outer iterator is initialized to
-// end of the outer range i.e. [end, end), then inner iterator cannot be
-// initialized
-//
-// 4 - When incrementing (++), the inner iterator should initially be at a valid
-// begin position, but after incrementing may end up at end of an Inner range.
-// So the next valid local begin must be found, else the end of 
-// outer should be reached
-//
-// 4.1 - When jumping forward, outer should not go beyond end. After jump is
-// completed, inner may be at local end, so a valid next begin must be found or
-// else end of outer must be reached
-//
-// 5 - When decrementing (--), the inner iterator may initially be uninitialized
-// due to outer being at end (See 3 above)
-// Inner iterator must be brought to a valid location after decrementing, or, else
-// the begin of outer must be reached (and not exceeded). 
-//
-// 5.1- When jumping backward, inner iterator may be uninitialized due to outer
-// being at end.  
-//
-// 6 - When jumping forward or backward, check for jump amount being negavite.  
-// 6.1 - Jumping outside the range of outer cannot be supported. 
-
-namespace HIDDEN {
-
+namespace TwoLevelIteratorImpl {
   template <typename Iter>
   void safe_decrement (Iter& it, const Iter& beg, const Iter& end
       , std::forward_iterator_tag) {
@@ -116,6 +126,7 @@ namespace HIDDEN {
   }
 }
 
+//! Common functionality of TwoLevelIterators
 template <typename Outer, typename Inner, typename InnerBegFn, typename InnerEndFn>
 class TwoLevelIterBase {
 
@@ -190,6 +201,7 @@ protected:
 };
 
 
+//! Two-Level forward iterator
 template <typename Outer, typename Inner, typename InnerBegFn, typename InnerEndFn>
 class TwoLevelFwdIter: 
   public std::iterator_traits<Inner>,
@@ -287,6 +299,7 @@ public:
 
 };
 
+//! Two-Level bidirectional iterator
 template <typename Outer, typename Inner, typename InnerBegFn, typename InnerEndFn>
 class TwoLevelBiDirIter: public TwoLevelFwdIter<Outer, Inner, InnerBegFn, InnerEndFn> {
 
@@ -298,7 +311,7 @@ protected:
     assert (!FwdBase::outerAtBegin ());
     assert (!FwdBase::outerEmpty ());
 
-    HIDDEN::safe_decrement (FwdBase::m_outer, FwdBase::m_beg_outer, FwdBase::m_end_outer);
+    TwoLevelIteratorImpl::safe_decrement (FwdBase::m_outer, FwdBase::m_beg_outer, FwdBase::m_end_outer);
 
     FwdBase::m_inner = FwdBase::innerEnd ();
   }
@@ -352,6 +365,7 @@ public:
 };
 
 
+//! Two-Level random access iterator
 template <typename Outer, typename Inner, typename InnerBegFn, typename InnerEndFn>
 class TwoLevelRandIter: public TwoLevelBiDirIter<Outer, Inner, InnerBegFn, InnerEndFn> {
 
@@ -521,30 +535,25 @@ public:
   friend bool operator >= (const TwoLevelRandIter& left, const TwoLevelRandIter& right) {
     return !(left < right);
   }
-
-
 };
 
-namespace HIDDEN {
+namespace TwoLevelIteratorImpl {
 
 template <typename Outer, typename Inner, typename InnerBegFn, typename InnerEndFn, typename Cat>
 struct ByCategory {};
 
 template <typename Outer, typename Inner, typename InnerBegFn, typename InnerEndFn> 
 struct ByCategory<Outer, Inner, InnerBegFn, InnerEndFn, std::forward_iterator_tag> {
-
   typedef TwoLevelFwdIter<Outer, Inner, InnerBegFn, InnerEndFn> type;
 };
 
 template <typename Outer, typename Inner, typename InnerBegFn, typename InnerEndFn> 
 struct ByCategory<Outer, Inner, InnerBegFn, InnerEndFn, std::bidirectional_iterator_tag> {
-
   typedef TwoLevelBiDirIter<Outer, Inner, InnerBegFn, InnerEndFn> type;
 };
 
 template <typename Outer, typename Inner, typename InnerBegFn, typename InnerEndFn> 
 struct ByCategory<Outer, Inner, InnerBegFn, InnerEndFn, std::random_access_iterator_tag> {
-
   typedef TwoLevelRandIter<Outer, Inner, InnerBegFn, InnerEndFn> type;
 };
 
@@ -576,18 +585,9 @@ struct ByCategory<Outer, Inner, InnerBegFn, InnerEndFn, std::random_access_itera
     // IsRev<Outer, Inner>::VAL || IsConstRev<Outer, Inner>::VAL;
 // };
 
-template <typename T1, typename T2>
-struct AreSameTypes {
-  static const bool VAL = false;
-};
+} // end namespace impl
 
-template <typename T>
-struct AreSameTypes<T,T> {
-  static const bool VAL = true;
-};
-
-} // end namespace HIDDEN
-
+//! Type function to select appropriate two-level iterator
 template <typename Outer, typename Inner, typename InnerBegFn, typename InnerEndFn>
 struct ChooseTwoLevelIterator {
 private:
@@ -595,16 +595,14 @@ private:
   typedef typename std::iterator_traits<Inner>::iterator_category CatInner;
 
 public:
-  typedef typename HIDDEN::ByCategory<Outer, Inner, InnerBegFn, InnerEndFn, CatInner>::type type;
-
+  typedef typename TwoLevelIteratorImpl::ByCategory<Outer, Inner, InnerBegFn, InnerEndFn, CatInner>::type type;
 };
 
+//! Creates two level iterator
 template <typename Outer, typename InnerBegFn, typename InnerEndFn>
 typename ChooseTwoLevelIterator<Outer, typename InnerBegFn::result_type, InnerBegFn, InnerEndFn>::type
 make_two_level_begin (Outer beg, Outer end, InnerBegFn innerBegFn, InnerEndFn innerEndFn) {
-
-
-  const bool V = HIDDEN::AreSameTypes<typename InnerBegFn::result_type, typename InnerEndFn::result_type>::VAL;
+  const bool V = std::is_same<typename InnerBegFn::result_type, typename InnerEndFn::result_type>::value;
   assert (V);
 
   typedef typename InnerBegFn::result_type Inner;
@@ -613,11 +611,11 @@ make_two_level_begin (Outer beg, Outer end, InnerBegFn innerBegFn, InnerEndFn in
   return Ret_ty (beg, end, innerBegFn, innerEndFn);
 }
 
+//! Creates two level iterator
 template <typename Outer, typename InnerBegFn, typename InnerEndFn>
 typename ChooseTwoLevelIterator<Outer, typename InnerBegFn::result_type, InnerBegFn, InnerEndFn>::type
 make_two_level_end (Outer beg, Outer end, InnerBegFn innerBegFn, InnerEndFn innerEndFn) {
-
-  const bool V = HIDDEN::AreSameTypes<typename InnerBegFn::result_type, typename InnerEndFn::result_type>::VAL;
+  const bool V = std::is_same<typename InnerBegFn::result_type, typename InnerEndFn::result_type>::value;
   assert (V);
 
   typedef typename InnerBegFn::result_type Inner;
@@ -626,8 +624,7 @@ make_two_level_end (Outer beg, Outer end, InnerBegFn innerBegFn, InnerEndFn inne
   return Ret_ty (end, end, innerBegFn, innerEndFn);
 }
 
-namespace HIDDEN {
-
+namespace TwoLevelIteratorImpl {
   template <typename C>
   struct GetBegin: public std::unary_function<C&, typename C::iterator> {
     inline typename C::iterator operator () (C& c) const {
@@ -689,29 +686,29 @@ namespace HIDDEN {
   enum StlIterKind { NORMAL, CONST, REVERSE, CONST_REVERSE };
 
   template <typename C, typename I> struct IsConstIter 
-  { static const bool VAL = false; };
+  { static const bool value = false; };
 
   template <typename C> struct IsConstIter<C, typename C::const_iterator> 
-  { static const bool VAL = true; };
+  { static const bool value = true; };
 
   template <typename C, typename I> struct IsRvrsIter 
-  { static const bool VAL = false; };
+  { static const bool value = false; };
 
   template <typename C> struct IsRvrsIter<C, typename C::reverse_iterator> 
-  { static const bool VAL = true; };
+  { static const bool value = true; };
 
   template <typename C, typename I> struct IsRvrsConstIter 
-  { static const bool VAL = false; };
+  { static const bool value = false; };
 
   template <typename C> struct IsRvrsConstIter<C, typename C::const_reverse_iterator> 
-  { static const bool VAL = true; };
+  { static const bool value = true; };
 
   template <typename C, typename I>
   struct GetStlIterKind {
-    static const bool isRvrs = IsRvrsIter<C, I>::VAL || IsRvrsConstIter<C, I>::VAL;
-    static const bool isConst = IsConstIter<C, I>::VAL || IsRvrsConstIter<C, I>::VAL;
+    static const bool isRvrs = IsRvrsIter<C, I>::value || IsRvrsConstIter<C, I>::value;
+    static const bool isConst = IsConstIter<C, I>::value || IsRvrsConstIter<C, I>::value;
 
-    static const StlIterKind VAL = 
+    static const StlIterKind value = 
       isRvrs ? (isConst ? CONST_REVERSE: REVERSE)
         : (isConst ? CONST : NORMAL);
   };
@@ -758,8 +755,8 @@ namespace HIDDEN {
   struct ChooseStlTwoLevelIterImpl {
 
     typedef typename std::iterator_traits<Outer>::value_type C;
-    static const HIDDEN::StlIterKind KIND = HIDDEN::GetStlIterKind<C, Inner>::VAL;
-    typedef HIDDEN::ChooseStlIter<C, Inner, KIND> CStl;
+    static const TwoLevelIteratorImpl::StlIterKind KIND = TwoLevelIteratorImpl::GetStlIterKind<C, Inner>::value;
+    typedef TwoLevelIteratorImpl::ChooseStlIter<C, Inner, KIND> CStl;
     typedef typename CStl::InnerBegFn InnerBegFn;
     typedef typename CStl::InnerEndFn InnerEndFn;
     typedef typename ChooseTwoLevelIterator<Outer, Inner, InnerBegFn, InnerEndFn>::type type;
@@ -767,7 +764,6 @@ namespace HIDDEN {
     static type make (Outer beg, Outer end) {
       return type (beg, end, InnerBegFn (), InnerEndFn ());
     }
-
   };
 
   template <typename Outer> struct StlInnerIsIterator
@@ -782,59 +778,60 @@ namespace HIDDEN {
   template <typename Outer> struct StlInnerIsConstRvrsIterator
   : public ChooseStlTwoLevelIterImpl<Outer, typename std::iterator_traits<Outer>::value_type::const_reverse_iterator> {};
 
-} // end namespace HIDDEN
+} // end namespace impl
 
+//! Type function to select appropriate two-level iterator
 template <typename Outer, typename Inner>
 struct ChooseStlTwoLevelIterator {
-  typedef typename HIDDEN::ChooseStlTwoLevelIterImpl<Outer, Inner>::type type;
+  typedef typename TwoLevelIteratorImpl::ChooseStlTwoLevelIterImpl<Outer, Inner>::type type;
 };
 
 template <typename Outer>
-typename HIDDEN::StlInnerIsIterator<Outer>::type 
+typename TwoLevelIteratorImpl::StlInnerIsIterator<Outer>::type 
 stl_two_level_begin (Outer beg, Outer end) {
-  return HIDDEN::StlInnerIsIterator<Outer>::make (beg, end);
+  return TwoLevelIteratorImpl::StlInnerIsIterator<Outer>::make (beg, end);
 }
 
 template <typename Outer>
-typename HIDDEN::StlInnerIsIterator<Outer>::type
+typename TwoLevelIteratorImpl::StlInnerIsIterator<Outer>::type
 stl_two_level_end (Outer beg, Outer end) {
-  return HIDDEN::StlInnerIsIterator<Outer>::make (end, end);
+  return TwoLevelIteratorImpl::StlInnerIsIterator<Outer>::make (end, end);
 }
 
 template <typename Outer>
-typename HIDDEN::StlInnerIsConstIterator<Outer>::type
+typename TwoLevelIteratorImpl::StlInnerIsConstIterator<Outer>::type
 stl_two_level_cbegin (Outer beg, Outer end) {
-  return HIDDEN::StlInnerIsConstIterator<Outer>::make (beg, end);
+  return TwoLevelIteratorImpl::StlInnerIsConstIterator<Outer>::make (beg, end);
 }
 
 template <typename Outer>
-typename HIDDEN::StlInnerIsConstIterator<Outer>::type 
+typename TwoLevelIteratorImpl::StlInnerIsConstIterator<Outer>::type 
 stl_two_level_cend (Outer beg, Outer end) {
-  return HIDDEN::StlInnerIsConstIterator<Outer>::make (end, end);
+  return TwoLevelIteratorImpl::StlInnerIsConstIterator<Outer>::make (end, end);
 }
 
 template <typename Outer>
-typename HIDDEN::StlInnerIsRvrsIterator<Outer>::type
+typename TwoLevelIteratorImpl::StlInnerIsRvrsIterator<Outer>::type
 stl_two_level_rbegin (Outer beg, Outer end) {
-  return HIDDEN::StlInnerIsRvrsIterator<Outer>::make (beg, end);
+  return TwoLevelIteratorImpl::StlInnerIsRvrsIterator<Outer>::make (beg, end);
 }
 
 template <typename Outer>
-typename HIDDEN::StlInnerIsRvrsIterator<Outer>::type
+typename TwoLevelIteratorImpl::StlInnerIsRvrsIterator<Outer>::type
 stl_two_level_rend (Outer beg, Outer end) {
-  return HIDDEN::StlInnerIsRvrsIterator<Outer>::make (end, end);
+  return TwoLevelIteratorImpl::StlInnerIsRvrsIterator<Outer>::make (end, end);
 }
 
 template <typename Outer>
-typename HIDDEN::StlInnerIsConstRvrsIterator<Outer>::type
+typename TwoLevelIteratorImpl::StlInnerIsConstRvrsIterator<Outer>::type
 stl_two_level_crbegin (Outer beg, Outer end) {
-  return HIDDEN::StlInnerIsConstRvrsIterator<Outer>::make (beg, end);
+  return TwoLevelIteratorImpl::StlInnerIsConstRvrsIterator<Outer>::make (beg, end);
 }
 
 template <typename Outer>
-typename HIDDEN::StlInnerIsConstRvrsIterator<Outer>::type
+typename TwoLevelIteratorImpl::StlInnerIsConstRvrsIterator<Outer>::type
 stl_two_level_crend (Outer beg, Outer end) {
-  return HIDDEN::StlInnerIsConstRvrsIterator<Outer>::make (end, end);
+  return TwoLevelIteratorImpl::StlInnerIsConstRvrsIterator<Outer>::make (end, end);
 }
 
 

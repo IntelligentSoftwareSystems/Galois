@@ -31,6 +31,11 @@
 namespace Galois {
 namespace WorkList {
 
+/**
+ * Bulk-synchronous scheduling. Work is processed in rounds, and all newly
+ * created work is processed after all the current work in a round is
+ * completed.
+ */
 template<class ContainerTy=dChunkedFIFO<>, class T=int, bool concurrent = true>
 class BulkSynchronous : private boost::noncopyable {
 

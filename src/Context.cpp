@@ -31,21 +31,20 @@
 
 #if GALOIS_USE_EXCEPTION_HANDLER
 #else
-__thread jmp_buf Galois::Runtime::hackjmp;
+static __thread jmp_buf Galois::Runtime::hackjmp;
 #endif
 
 //! Global thread context for each active thread
 static __thread Galois::Runtime::SimpleRuntimeContext* thread_cnx = 0;
 
-namespace HIDDEN {
+namespace {
 struct PendingStatus {
   Galois::Runtime::LL::CacheLineStorage<Galois::Runtime::PendingFlag> flag;
   PendingStatus(): flag(Galois::Runtime::NON_DET) { }
 };
 
+PendingStatus pendingStatus;
 }
-
-static HIDDEN::PendingStatus pendingStatus;
 
 void Galois::Runtime::setPending(Galois::Runtime::PendingFlag value) {
   pendingStatus.flag.data = value;

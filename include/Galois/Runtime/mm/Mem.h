@@ -43,6 +43,7 @@
 
 namespace Galois {
 namespace Runtime {
+//! Memory management functionality.
 namespace MM {
 
 const size_t pageSize = 2*1024*1024;

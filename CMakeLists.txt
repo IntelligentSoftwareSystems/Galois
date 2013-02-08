@@ -227,6 +227,7 @@ if(USE_EXP)
 endif()
 
 ###### Documentation ######
+set(DOXYFILE_SOURCE_DIR "src\" \"include")
 include(UseDoxygen OPTIONAL)
 
 ###### Distribution ######

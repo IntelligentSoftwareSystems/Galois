@@ -37,6 +37,9 @@
 #endif
 
 
+/**
+ * Main Galois namespace. All the core Galois functionality will be found in here.
+ */
 namespace Galois {
 
 static const unsigned GALOIS_DEFAULT_CHUNK_SIZE = 32;
@@ -45,90 +48,191 @@ static const unsigned GALOIS_DEFAULT_CHUNK_SIZE = 32;
 // Foreach
 ////////////////////////////////////////////////////////////////////////////////
 
-//Iterator based versions
+/**
+ * Galois unordered set iterator.
+ * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is a value from the iteration
+ * range and T is the type of item.
+ *
+ * @tparam WLTy Worklist policy {@see Galois::WorkList}
+ * @param b begining of range of initial items
+ * @param e end of range of initial items
+ * @param fn operator
+ * @param loopname string to identity loop in statistics output
+ */
 template<typename WLTy, typename IterTy, typename FunctionTy>
-void for_each(IterTy b, IterTy e, FunctionTy f, const char* loopname = 0) {
-  Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeStandardRange(b, e), f, loopname);
+void for_each(IterTy b, IterTy e, FunctionTy fn, const char* loopname = 0) {
+  Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeStandardRange(b, e), fn, loopname);
 }
 
+/**
+ * Galois unordered set iterator with default worklist policy.
+ * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is a value from the iteration
+ * range and T is the type of item.
+ *
+ * @param b begining of range of initial items
+ * @param e end of range of initial items
+ * @param fn operator
+ * @param loopname string to identity loop in statistics output
+ */
 template<typename IterTy, typename FunctionTy>
-void for_each(IterTy b, IterTy e, FunctionTy f, const char* loopname = 0) {
+void for_each(IterTy b, IterTy e, FunctionTy fn, const char* loopname = 0) {
   typedef Galois::WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
-  Galois::for_each<WLTy, IterTy, FunctionTy>(b, e, f, loopname);
+  Galois::for_each<WLTy, IterTy, FunctionTy>(b, e, fn, loopname);
 }
 
-//Single initial item versions
+/**
+ * Galois unordered set iterator.
+ * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is i and T 
+ * is the type of item.
+ *
+ * @tparam WLTy Worklist policy {@link Galois::WorkList}
+ * @param i initial item
+ * @param fn operator
+ * @param loopname string to identity loop in statistics output
+ */
 template<typename WLTy, typename InitItemTy, typename FunctionTy>
-void for_each(InitItemTy i, FunctionTy f, const char* loopname = 0) {
+void for_each(InitItemTy i, FunctionTy fn, const char* loopname = 0) {
   InitItemTy wl[1] = {i};
-  Galois::for_each<WLTy>(&wl[0], &wl[1], f, loopname);
+  Galois::for_each<WLTy>(&wl[0], &wl[1], fn, loopname);
 }
 
+/**
+ * Galois unordered set iterator with default worklist policy.
+ * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is i and T 
+ * is the type of item.
+ *
+ * @param i initial item
+ * @param fn operator
+ * @param loopname string to identity loop in statistics output
+ */
 template<typename InitItemTy, typename FunctionTy>
-void for_each(InitItemTy i, FunctionTy f, const char* loopname = 0) {
+void for_each(InitItemTy i, FunctionTy fn, const char* loopname = 0) {
   typedef Galois::WorkList::ChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
-  Galois::for_each<WLTy, InitItemTy, FunctionTy>(i, f, loopname);
+  Galois::for_each<WLTy, InitItemTy, FunctionTy>(i, fn, loopname);
 }
 
-//Local based versions
+/**
+ * Galois unordered set iterator with locality-aware container.
+ * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is an element of c and T 
+ * is the type of item.
+ *
+ * @tparam WLTy Worklist policy {@link Galois::WorkList}
+ * @param c locality-aware container
+ * @param fn operator
+ * @param loopname string to identity loop in statistics output
+ */
 template<typename WLTy, typename ConTy, typename FunctionTy>
-void for_each_local(ConTy& c, FunctionTy f, const char* loopname = 0) {
-  Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(c), f, loopname);
+void for_each_local(ConTy& c, FunctionTy fn, const char* loopname = 0) {
+  Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(c), fn, loopname);
 }
 
+/**
+ * Galois unordered set iterator with locality-aware container and default worklist policy.
+ * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is an element of c and T 
+ * is the type of item.
+ *
+ * @param c locality-aware container
+ * @param fn operator
+ * @param loopname string to identity loop in statistics output
+ */
 template<typename ConTy, typename FunctionTy>
-void for_each_local(ConTy& c, FunctionTy f, const char* loopname = 0) {
+void for_each_local(ConTy& c, FunctionTy fn, const char* loopname = 0) {
   typedef Galois::WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
-  Galois::for_each_local<WLTy, ConTy, FunctionTy>(c, f, loopname);
+  Galois::for_each_local<WLTy, ConTy, FunctionTy>(c, fn, loopname);
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// do_all
-// Does not modify container
-////////////////////////////////////////////////////////////////////////////////
-
+/**
+ * Standard do-all loop. All iterations should be independent.
+ * Operator should conform to <code>fn(item)</code> where item is a value from the iteration range.
+ *
+ * @param b beginning of range of items
+ * @param e end of range of items
+ * @param fn operator
+ * @param loopname string to identify loop in statistics output
+ * @returns fn
+ */
 template<typename IterTy,typename FunctionTy>
-FunctionTy do_all(const IterTy& begin, const IterTy& end, FunctionTy fn, const char* loopname = 0) {
-  return Galois::Runtime::do_all_impl(Galois::Runtime::makeStandardRange(begin, end), fn, Galois::Runtime::EmptyFn(), false);
+FunctionTy do_all(const IterTy& b, const IterTy& e, FunctionTy fn, const char* loopname = 0) {
+  return Galois::Runtime::do_all_impl(Galois::Runtime::makeStandardRange(b, e), fn, Galois::Runtime::EmptyFn(), false);
 }
 
-//Local iterator do_all
+/**
+ * Standard do-all loop with locality-aware container. All iterations should be independent.
+ * Operator should conform to <code>fn(item)</code> where item is an element of c.
+ *
+ * @param c locality-aware container
+ * @param fn operator
+ * @param loopname string to identify loop in statistics output
+ * @returns fn
+ */
 template<typename ConTy,typename FunctionTy>
 FunctionTy do_all_local(ConTy& c, FunctionTy fn, const char* loopname = 0) {
   return Galois::Runtime::do_all_impl(Galois::Runtime::makeLocalRange(c), fn, Galois::Runtime::EmptyFn(), false);
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// OnEach
-// Low level loop executing work on each processor passing thread id and number
-// of threads to the work
-////////////////////////////////////////////////////////////////////////////////
-
+/**
+ * Low-level parallel loop. Operator is applied for each running thread. Operator
+ * should confirm to <code>fn(tid, numThreads)</code> where tid is the id of the current thread and
+ * numThreads is the total number of running threads.
+ *
+ * @param fn operator
+ * @param loopname string to identify loop in statistics output
+ */
 template<typename FunctionTy>
 static inline void on_each(FunctionTy fn, const char* loopname = 0) {
   Galois::Runtime::on_each_impl(fn, loopname);
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// PreAlloc
-////////////////////////////////////////////////////////////////////////////////
-
+/**
+ * Preallocate pages on each thread.
+ *
+ * @param num number of pages to allocate of size {@link Galois::Runtime::pageAllocInfo()}
+ */
 static inline void preAlloc(int num) {
   Galois::Runtime::preAlloc_impl(num);
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Ordered Foreach 
-////////////////////////////////////////////////////////////////////////////////
-
+/**
+ * Galois ordered set iterator for stable source algorithms.
+ *
+ * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is a value from the iteration
+ * range and T is the type of item. Comparison function should conform to <code>bool r = cmp(item1, item2)</code>
+ * where r is true if item1 is less than or equal to item2. Neighborhood function should conform to
+ * <code>nhFunc(item)</code> and should visit every element in the neighborhood of active element item.
+ *
+ * @param b begining of range of initial items
+ * @param e end of range of initial items
+ * @param cmp comparison function
+ * @param nhFunc neighborhood function
+ * @param fn operator
+ * @param loopname string to identity loop in statistics output
+ */
 template<typename Iter, typename Cmp, typename NhFunc, typename OpFunc>
-void for_each_ordered(Iter beg, Iter end, Cmp cmp, NhFunc nhFunc, OpFunc opFunc, const char* loopname=0) {
-  Galois::Runtime::for_each_ordered_impl(beg, end, cmp, nhFunc, opFunc, loopname);
+void for_each_ordered(Iter b, Iter e, Cmp cmp, NhFunc nhFunc, OpFunc fn, const char* loopname=0) {
+  Galois::Runtime::for_each_ordered_impl(b, e, cmp, nhFunc, fn, loopname);
 }
 
+/**
+ * Galois ordered set iterator for unstable source algorithms.
+ *
+ * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is a value from the iteration
+ * range and T is the type of item. Comparison function should conform to <code>bool r = cmp(item1, item2)</code>
+ * where r is true if item1 is less than or equal to item2. Neighborhood function should conform to
+ * <code>nhFunc(item)</code> and should visit every element in the neighborhood of active element item.
+ * The stability test should conform to <code>bool r = stabilityTest(item)</code> where r is true if
+ * item is a stable source.
+ *
+ * @param b begining of range of initial items
+ * @param e end of range of initial items
+ * @param cmp comparison function
+ * @param nhFunc neighborhood function
+ * @param fn operator
+ * @param stabilityTest stability test
+ * @param loopname string to identity loop in statistics output
+ */
 template<typename Iter, typename Cmp, typename NhFunc, typename OpFunc, typename StableTest>
-void for_each_ordered(Iter beg, Iter end, Cmp cmp, NhFunc nhFunc, OpFunc opFunc, StableTest stabilityTest, const char* loopname=0) {
-  Galois::Runtime::for_each_ordered_impl(beg, end, cmp, nhFunc, opFunc, stabilityTest, loopname);
+void for_each_ordered(Iter b, Iter e, Cmp cmp, NhFunc nhFunc, OpFunc fn, StableTest stabilityTest, const char* loopname=0) {
+  Galois::Runtime::for_each_ordered_impl(b, e, cmp, nhFunc, fn, stabilityTest, loopname);
 }
 
 } //namespace Galois

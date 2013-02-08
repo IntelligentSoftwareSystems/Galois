@@ -30,11 +30,9 @@
 
 namespace Galois {
 
-namespace HIDDEN {
-/***
- * An atomic wrapper that provides sensible atomic behavior for most
- * primative data types.  Operators return the value of type T so as to
- * retain atomic RMW semantics.
+namespace AtomicImpl {
+/**
+ * Common implementation.
  */
 template<typename T, template <typename _> class W>
 class GAtomicImpl {
@@ -97,9 +95,7 @@ public:
   }
 };
 
-
-
-// basic type
+//! Basic atomic
 template <typename T, template <typename _> class W>
 class GAtomicBase: public GAtomicImpl<T, W> {
   typedef GAtomicImpl<T, W> Super_ty;
@@ -120,7 +116,7 @@ public:
   }
 };
 
-// specialized for pointers
+//! Specialization for pointers
 template <typename T, template <typename _> class W>
 class GAtomicBase<T*, W>: public GAtomicImpl<T*, W>  {
   typedef GAtomicImpl<T*, W> Super_ty;
@@ -147,9 +143,9 @@ public:
   T* operator-=(const difference_type& rhs) {
     return __sync_sub_and_fetch(&Super_ty::val.data, rhs);
   }
-
 };
 
+//! Specialization for const pointers
 template <typename T, template <typename _> class W>
 class GAtomicBase<const T*, W>: public GAtomicImpl<const T*, W>  {
   typedef GAtomicImpl<const T*, W> Super_ty;
@@ -178,7 +174,7 @@ public:
   }
 };
 
-// specialized for bools
+//! Specialization for bools
 template<template <typename _> class W>
 class GAtomicBase<bool, W>: private GAtomicImpl<bool, W> {
   typedef GAtomicImpl<bool, W> Super_ty;
@@ -218,11 +214,16 @@ struct DummyWrapper {
   DummyWrapper() {}
 };
 
-}
+} // end namespace impl
 
+/**
+ * An atomic wrapper that provides sensible atomic behavior for most
+ * primative data types.  Operators return the value of type T so as to
+ * retain atomic RMW semantics.
+ */
 template <typename T>
-class GAtomic: public HIDDEN::GAtomicBase <T, HIDDEN::DummyWrapper> {
-  typedef HIDDEN::GAtomicBase<T, HIDDEN::DummyWrapper> Super_ty;
+class GAtomic: public AtomicImpl::GAtomicBase <T, AtomicImpl::DummyWrapper> {
+  typedef AtomicImpl::GAtomicBase<T, AtomicImpl::DummyWrapper> Super_ty;
 
 public:
   GAtomic(): Super_ty() {}
@@ -237,11 +238,14 @@ public:
   }
 };
 
+/**
+ * Cache-line padded version of {@link GAtomic}.
+ */
 template <typename T>
 class GAtomicPadded: 
-  public HIDDEN::GAtomicBase<T, Galois::Runtime::LL::CacheLineStorage> {
+  public AtomicImpl::GAtomicBase<T, Galois::Runtime::LL::CacheLineStorage> {
 
-  typedef HIDDEN::GAtomicBase<T, Galois::Runtime::LL::CacheLineStorage> Super_ty;
+  typedef AtomicImpl::GAtomicBase<T, Galois::Runtime::LL::CacheLineStorage> Super_ty;
 
 public:
   GAtomicPadded(): Super_ty () {}

@@ -29,6 +29,26 @@
 namespace Galois {
 namespace WorkList {
 
+/**
+ * Approximate priority scheduling. Indexer is a default-constructable class
+ * whose instances conform to <code>R r = indexer(item)</code> where R is
+ * some type with a total order defined by <code>operator&lt;</code> and <code>operator==</code>
+ * and item is an element from the Galois set iterator.
+ *
+ * An example:
+ * \code
+ * struct Item { int index; };
+ *
+ * struct Indexer {
+ *   int operator()(Item i) const { return i.index; }
+ * };
+ *
+ * typedef Galois::WorkList::OrderedByIntegerMetric<Indexer> WL;
+ * Galois::for_each<WL>(items.begin(), items.end(), Fn);
+ * \endcode
+ *
+ * @tparam Indexer Indexer class
+ */
 template<class Indexer = DummyIndexer<int>, typename ContainerTy = FIFO<>, bool BSP=true, typename T = int, typename IndexTy = int, bool concurrent = true>
 class OrderedByIntegerMetric : private boost::noncopyable {
   typedef typename ContainerTy::template rethread<concurrent> CTy;

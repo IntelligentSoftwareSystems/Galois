@@ -54,17 +54,12 @@ protected:
   /** The input name. */
   std::string inputName;
 
-
   /** The input val. */
   LogicVal inputVal;
-
 
 public:
   /**
    * Instantiates a new one input gate.
-   *
-   * @param outputName the output name
-   * @param inputName the input name
    */
   OneInputGate (const OneInputFunc& func, const std::string& outputName, const std::string& inputName, const SimTime& delay = MIN_DELAY)
     : SuperTy (outputName, LOGIC_ZERO, delay), func (func), inputName (inputName) , inputVal (LOGIC_ZERO) {}
@@ -76,10 +71,8 @@ public:
 
 
   /**
-   * @param update
-   *
-   * applies the update to internal state e.g. change to some input. Must update the output
-   * if the inputs have changed
+   * Applies the update to internal state e.g. change to some input. Must update the output
+   * if the inputs have changed.
    */
   virtual void applyUpdate (const LogicUpdate& lu) {
     if (hasInputName (lu.getNetName ())) {

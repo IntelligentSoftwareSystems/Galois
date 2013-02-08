@@ -20,15 +20,12 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#ifndef GALOIS_UTIL_GALGS_H
-#define GALOIS_UTIL_GALGS_H
+#ifndef GALOIS_GSTL_H
+#define GALOIS_GSTL_H
 
 #include <iterator>
 
 namespace Galois {
-
-//safe_advance is like std::advance, but it returns end if end is
-//close than the advance amount
 
 template<typename IterTy, class Distance>
 IterTy safe_advance_dispatch(IterTy b, IterTy e, Distance n, std::random_access_iterator_tag) {
@@ -45,6 +42,9 @@ IterTy safe_advance_dispatch(IterTy b, IterTy e, Distance n, std::input_iterator
   return b;
 }
 
+/**
+ * Like std::advance but returns end if end is closer than the advance amount.
+ */
 template<typename IterTy, class Distance>
 IterTy safe_advance(IterTy b, IterTy e, Distance n) {
   typename std::iterator_traits<IterTy>::iterator_category category;
@@ -52,18 +52,20 @@ IterTy safe_advance(IterTy b, IterTy e, Distance n) {
 }
 
 
-//split_range finds the midpoint of a range.  The first half should
-//always be bigger if the range has an odd length
-
+/**
+ * Finds the midpoint of a range.  The first half is always be bigger than
+ * the second half if the range has an odd length.
+ */
 template<typename IterTy>
 IterTy split_range(IterTy b, IterTy e) {
   std::advance(b, (std::distance(b,e) + 1) / 2);
   return b;
 }
 
-//block_range finds a block from the range based on the number of
-//divisions and the id of the block requested
-
+/**
+ * Returns a continuous block from the range based on the number of
+ * divisions and the id of the block requested
+ */
 template<typename IterTy>
 std::pair<IterTy, IterTy> block_range(IterTy b, IterTy e, unsigned id, unsigned num) {
   unsigned int dist = std::distance(b, e);
@@ -79,8 +81,7 @@ std::pair<IterTy, IterTy> block_range(IterTy b, IterTy e, unsigned id, unsigned 
 }
 
 
-//Things in the <memory> spirit
-//Destroy a range
+//! Destroy a range
 template<class InputIterator>
 void uninitialized_destroy ( InputIterator first, InputIterator last )
 {

@@ -37,10 +37,11 @@
 
 namespace Galois {
 
-// - Ordered-Set is serially faster than Min-Heap, e.g., 10%-15% faster on serial
-//    ordered DES
-// - Ordered-Set can easily use a scalable allocator i.e. FSBGaloisAllocator. 
-template <typename T, typename Cmp=std::less<T>, typename Alloc=Galois::Runtime::MM::FSBGaloisAllocator<T> >
+/**
+ * Thread-safe ordered set. Faster than STL heap operations (about 10%-15% faster on serially) and
+ * can use scalable allocation, e.g., {@link GFixedAllocator}.
+ */
+template <typename T, typename Cmp=std::less<T>, typename Alloc=Galois::GFixedAllocator<T> >
 class ThreadSafeOrderedSet {
   typedef std::set<T, Cmp, Alloc> Set;
 
@@ -51,14 +52,13 @@ public:
   typedef typename Set::const_reference const_reference;
   typedef typename Set::size_type size_type;
   typedef typename Set::const_iterator const_iterator;
-
   typedef Galois::Runtime::LL::SimpleLock<true> Lock_ty;
 
+private:
   GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Lock_ty mutex;
   Set orderedSet;
 
 public:
-
   explicit ThreadSafeOrderedSet (const Cmp& cmp=Cmp (), const Alloc& alloc=Alloc ())
     :
       mutex (),
@@ -144,8 +144,9 @@ public:
 };
 
 
-
-
+/**
+ * Thread-safe min heap.
+ */
 template <typename T, typename Cmp=std::less<T>, typename Cont=std::vector<T> >
 class ThreadSafeMinHeap {
 
@@ -174,7 +175,6 @@ protected:
   GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Lock_ty mutex;
   Cont container;
   RevCmp revCmp;
-
 
   const_reference top_internal () const {
     assert (!container.empty ());
@@ -271,7 +271,6 @@ public:
   }
 
   bool find (const value_type& x) const {
-
     mutex.lock ();
       bool ret = (std::find (begin (), end (), x) != end ());
     mutex.unlock ();
@@ -286,13 +285,9 @@ public:
   // void reserve (size_type s) {
     // container.reserve (s);
   // }
-
-
 };
 
 }
-
-
 
 #endif // GALOIS_PRIORITY_QUEUE
 

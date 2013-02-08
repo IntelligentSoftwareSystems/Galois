@@ -1,4 +1,4 @@
-/** Basic v2 graphs -*- C++ -*-
+/** Basic morph graphs -*- C++ -*-
  * @file
  * @section License
  *
@@ -19,49 +19,6 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  *
  * @section Description
- *
- * An example of use:
- * 
- * \code
- * struct Node {
- *   ... // Definition of node data
- * };
- *
- * typedef Galois::Graph::FastGraph<Node,int,true> Graph;
- * 
- * // Create graph
- * Graph g;
- * Node n1, n2;
- * Graph::GraphNode a, b;
- * a = g.createNode(n1);
- * g.addNode(a);
- * b = g.createNode(n2);
- * g.addNode(b);
- * g.getEdgeData(g.addEdge(a, b)) = 5;
- *
- * // Traverse graph
- * for (Graph::iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
- *   Graph::GraphNode src = *ii;
- *   for (Graph::edge_iterator jj = g.edge_begin(src), ej = g.edge_end(src); ++jj) {
- *     Graph::GraphNode dst = graph.getEdgeDst(jj);
- *     int edgeData = g.getEdgeData(jj);
- *     assert(edgeData == 5);
- *   }
- * }
- * \endcode
- *
- * And in C++11:
- *
- * \code
- * // Traverse graph
- * for (Graph::GraphNode src : g) {
- *   for (Graph::edge_iterator edge : g.out_edges(src)) {
- *     Graph::GraphNode dst = g.getEdgeDst(edge);
- *     int edgeData = g.getEdgeData(edge);
- *     assert(edgeData == 5);
- *   }
- * }
- * \endcode
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
@@ -85,8 +42,10 @@
 #include <vector>
 
 namespace Galois {
+//! Parallel graph data structures.
 namespace Graph {
 
+namespace GraphImpl {
 /**
  * Wrapper class to have a valid type on void edges
  */
@@ -176,12 +135,57 @@ struct EdgeFactory<void> {
   bool mustDel() const { return false; }
 };
 
+} // end namespace impl
+
 /**
  * A Graph.
  *
- * @param NodeTy Type of node data
- * @param EdgeTy Type of edge data
- * @param Directional true if graph is directed
+ * An example of use:
+ * 
+ * \code
+ * struct Node {
+ *   ... // Definition of node data
+ * };
+ *
+ * typedef Galois::Graph::FastGraph<Node,int,true> Graph;
+ * 
+ * // Create graph
+ * Graph g;
+ * Node n1, n2;
+ * Graph::GraphNode a, b;
+ * a = g.createNode(n1);
+ * g.addNode(a);
+ * b = g.createNode(n2);
+ * g.addNode(b);
+ * g.getEdgeData(g.addEdge(a, b)) = 5;
+ *
+ * // Traverse graph
+ * for (Graph::iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
+ *   Graph::GraphNode src = *ii;
+ *   for (Graph::edge_iterator jj = g.edge_begin(src), ej = g.edge_end(src); ++jj) {
+ *     Graph::GraphNode dst = graph.getEdgeDst(jj);
+ *     int edgeData = g.getEdgeData(jj);
+ *     assert(edgeData == 5);
+ *   }
+ * }
+ * \endcode
+ *
+ * And in C++11:
+ *
+ * \code
+ * // Traverse graph
+ * for (Graph::GraphNode src : g) {
+ *   for (Graph::edge_iterator edge : g.out_edges(src)) {
+ *     Graph::GraphNode dst = g.getEdgeDst(edge);
+ *     int edgeData = g.getEdgeData(edge);
+ *     assert(edgeData == 5);
+ *   }
+ * }
+ * \endcode
+ *
+ * @tparam NodeTy Type of node data
+ * @tparam EdgeTy Type of edge data
+ * @tparam Directional true if graph is directed
  */
 template<typename NodeTy, typename EdgeTy, bool Directional>
 class FirstGraph : private boost::noncopyable {
@@ -201,7 +205,7 @@ class FirstGraph : private boost::noncopyable {
   
   struct gNode: public Galois::Runtime::Lockable {
     //! The storage type for an edge
-    typedef EdgeItem<gNode, EdgeTy, Directional> EITy;
+    typedef GraphImpl::EdgeItem<gNode, EdgeTy, Directional> EITy;
     
     //! The storage type for edges
     typedef llvm::SmallVector<EITy, 3> EdgesTy;
@@ -254,7 +258,7 @@ class FirstGraph : private boost::noncopyable {
   typedef Galois::InsertBag<gNode> NodeListTy;
   NodeListTy nodes;
 
-  EdgeFactory<EdgeTy> edges;
+  GraphImpl::EdgeFactory<EdgeTy> edges;
 
   //Helpers for iterator classes
   struct is_node : public std::unary_function<gNode&, bool>{
@@ -268,12 +272,17 @@ class FirstGraph : private boost::noncopyable {
   };
 
 public:
+  //! Graph node handle
   typedef gNode* GraphNode;
+  //! Edge data type
   typedef EdgeTy edge_type;
+  //! Node data type
   typedef NodeTy node_type;
+  //! Edge iterator
   typedef typename boost::filter_iterator<is_edge, typename gNode::iterator> edge_iterator;
+  //! Reference to edge data
   typedef typename gNode::EITy::reference edge_data_reference;
-
+  //! Node iterator
   typedef boost::transform_iterator<makeGraphNode,
           boost::filter_iterator<is_node,
                    typename NodeListTy::iterator> > iterator;
@@ -320,10 +329,9 @@ private:
   }
 
 public:
-  //// Node Handling ////
-  
   /**
-   * Creates a new node holding the indicated data.
+   * Creates a new node holding the indicated data. Usually you should call
+   * {@link addNode()} afterwards.
    */
   template<typename... Args>
   GraphNode createNode(Args&&... args) {
@@ -332,6 +340,9 @@ public:
     return GraphNode(N);
   }
 
+  /**
+   * Adds a node to the graph.
+   */
   void addNode(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::checkWrite(mflag, true);
     Galois::Runtime::acquire(n, mflag);
@@ -372,14 +383,13 @@ public:
     }
   }
 
-  //// Edge Handling ////
-
-  //! Adds an edge to graph, replacing existing value if edge already
-  //! exists. 
-  //!
-  //! Ignore the edge data, let the caller use the returned
-  //! iterator to set the value if desired.  This frees us from
-  //! dealing with the void edge data problem in this API
+  /** 
+   * Adds an edge to graph, replacing existing value if edge already exists. 
+   *
+   * Ignore the edge data, let the caller use the returned iterator to set the
+   * value if desired.  This frees us from dealing with the void edge data
+   * problem in this API
+   */
   edge_iterator addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::ALL) {
     return createEdgeWithReuse(src, dst, mflag);
   }
@@ -406,6 +416,7 @@ public:
     }
   }
 
+  //! Finds if an edge between src and dst exists
   edge_iterator findEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::ALL) {
     assert(src);
     assert(dst);
@@ -427,6 +438,7 @@ public:
     return *ii->second();
   }
 
+  //! Returns the destination of an edge
   GraphNode getEdgeDst(edge_iterator ii) {
     assert(ii->first()->active);
     return GraphNode(ii->first());
@@ -457,12 +469,15 @@ public:
     return boost::make_filter_iterator(is_edge(), N->end(), N->end());
   }
 
-  EdgesIterator<FirstGraph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
-    return EdgesIterator<FirstGraph>(*this, N, mflag);
+  /**
+   * An object with begin() and end() methods to iterate over the outgoing
+   * edges of N.
+   */
+  LCGraphImpl::EdgesIterator<FirstGraph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+    return LCGraphImpl::EdgesIterator<FirstGraph>(*this, N, mflag);
   }
 
-  //These are not thread safe!!
-  /*
+  /**
    * Returns an iterator to all the nodes in the graph. Not thread-safe.
    */
   iterator begin() {
@@ -503,6 +518,7 @@ public:
     return std::distance(begin(), end());
   }
 
+  //! Returns the size of edge data.
   size_t sizeOfEdgeData() const {
     return gNode::EITy::sizeOfSecond();
   }

@@ -46,15 +46,9 @@ class Output: public Input<S> {
 public: 
   /**
    * Instantiates a new Output.
-   *
-   * @param id
-   * @param outputName the output name
-   * @param inputName the Output name
    */
   Output(size_t id, des::BasicPort& impl)
     : Input<S> (id, impl) {}
-
-
 
   virtual Output* clone () const {
     return new Output (*this);

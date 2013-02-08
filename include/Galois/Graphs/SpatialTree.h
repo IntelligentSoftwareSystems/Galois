@@ -25,9 +25,10 @@
 #define GALOIS_GRAPHS_SPATIALTREE_H
 
 namespace Galois {
+namespace Graph {
 
-//! Store sets of objects at specific spatial coordinates in a quad tree
-//! lookup returns an approximation of the closest item
+//! Stores sets of objects at specific spatial coordinates in a quad tree.
+//! Lookup returns an approximation of the closest item
 template<typename T>
 class SpatialTree2d {
   struct Box2d {
@@ -173,20 +174,21 @@ class SpatialTree2d {
     bounds.ymax = ymax;
   }
 
-  //! returns null if tree is empty
+  //! Returns null if tree is empty
   T* find(double x, double y) {
     assert(root);
     return recfind(root, x, y);
   }
 
-  //! will always insert and never roll back
-  //! must be used after failsafe point
+  //! Insert an element. Will always insert and never roll back and thus must
+  //! be used after failsafe point.
   void insert(double x, double y, const T& v) {
     recinsert(&root, bounds, mkNode(v,x,y));
   }
 
 };
 
+}
 }
 
 #endif

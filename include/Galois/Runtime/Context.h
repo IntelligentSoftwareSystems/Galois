@@ -65,7 +65,7 @@ static inline void clearConflictLock() { }
 
 class SimpleRuntimeContext;
 
-namespace DeterministicWork {
+namespace DeterministicImpl {
 template <typename, typename>
 class DeterministicContext;
 }
@@ -82,7 +82,7 @@ class Lockable {
   Lockable* next;
   friend class SimpleRuntimeContext;
   template <typename, typename>
-    friend class Galois::Runtime::DeterministicWork::DeterministicContext;
+    friend class Galois::Runtime::DeterministicImpl::DeterministicContext;
 public:
   LL::PtrLock<void, true> auxPtr;
   Lockable() :next(0) {}

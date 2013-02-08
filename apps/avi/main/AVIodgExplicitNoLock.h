@@ -110,10 +110,10 @@ protected:
      * and adds B to the workset while A is not finished yet. This violates our key condition
      * mentioned above
      *
-     * @param src is active elemtn
+     * @param gn is active elemtn
      * @param lwl is the worklist handle
+     * @param avi is the avi object
      */
-
     template <typename C>
     GALOIS_ATTRIBUTE_PROF_NOINLINE void addToWL (C& lwl, const GNode& gn, AVI* avi) {
       assert (graph.getData (gn, Galois::MethodFlag::NONE) == avi);

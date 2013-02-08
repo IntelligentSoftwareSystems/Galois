@@ -31,6 +31,7 @@
 namespace Galois {
 namespace WorkList {
 
+//! Simple LIFO worklist (not scalable).
 template<typename T = int, bool concurrent = true>
   class LIFO : private boost::noncopyable, private Runtime::LL::PaddedLock<concurrent> {
   std::deque<T> wl;

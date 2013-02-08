@@ -32,7 +32,7 @@
 #include <ostream>
 #include <algorithm>
 
-class Point: public Galois::GChecked {
+class Point: public Galois::GChecked<void> {
   Tuple m_t;
   GNode m_n;
   long m_id;

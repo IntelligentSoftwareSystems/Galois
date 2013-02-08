@@ -42,7 +42,8 @@
 
 namespace Galois {
 namespace Runtime {
-namespace DeterministicWork {
+//! Implementation of deterministic execution
+namespace DeterministicImpl {
 
 struct OrderedTag { };
 struct UnorderedTag { };
@@ -118,7 +119,6 @@ struct DeterministicContext: public SimpleRuntimeContext {
 };
 
 namespace {
-
 template<typename T, typename CompTy> 
 struct OrderedContextComp {
   typedef DeterministicContext<T, OrderedContextComp> DetContext;
@@ -1573,10 +1573,8 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
   return retval;
 }
 
-
-
 } // end namespace anonymous
-} // end namespace DeterministicWork
+} // end namespace DeterministicImpl
 
 template<typename RangeTy, typename WorkTy>
 static inline void for_each_det_impl(const RangeTy& range, WorkTy& W) {
@@ -1595,12 +1593,13 @@ static inline void for_each_det_impl(const RangeTy& range, WorkTy& W) {
 }
 
 
+//! Ordered set iteration using deterministic executor
 template<typename IterTy, typename ComparatorTy, typename NhFunc, typename OpFunc>
 static inline void for_each_ordered_2p(IterTy b, IterTy e, ComparatorTy comp, NhFunc f1, OpFunc f2, const char* loopname) {
   typedef Runtime::StandardRange<IterTy> Range;
   typedef typename Range::value_type T;
-  typedef Runtime::DeterministicWork::OrderedOptions<T,NhFunc,OpFunc,ComparatorTy> OptionsTy;
-  typedef Runtime::DeterministicWork::Executor<OptionsTy> WorkTy;
+  typedef Runtime::DeterministicImpl::OrderedOptions<T,NhFunc,OpFunc,ComparatorTy> OptionsTy;
+  typedef Runtime::DeterministicImpl::Executor<OptionsTy> WorkTy;
 
   OptionsTy options(f1, f2, comp);
   WorkTy W(options, loopname);
@@ -1613,35 +1612,79 @@ static inline void for_each_ordered_2p(IterTy b, IterTy e, ComparatorTy comp, Nh
 
 namespace Galois {
 
-//! Deterministic execution with prefix 
+/**
+ * Deterministic execution with prefix operator.
+ * The prefix of the operator should be exactly the same as the operator
+ * but with execution returning at the failsafe point. The operator
+ * should conform to a standard Galois unordered set operator {@link for_each()}.
+ *
+ * @param b begining of range of initial items
+ * @param e end of range of initial items
+ * @param prefix prefix of operator
+ * @param fn operator
+ * @param loopname string to identity loop in statistics output
+ */
 template<typename IterTy, typename Function1Ty, typename Function2Ty>
-static inline void for_each_det(IterTy b, IterTy e, Function1Ty f1, Function2Ty f2, const char* loopname = 0) {
+static inline void for_each_det(IterTy b, IterTy e, Function1Ty prefix, Function2Ty fn, const char* loopname = 0) {
   typedef Runtime::StandardRange<IterTy> Range;
   typedef typename Range::value_type T;
-  typedef Runtime::DeterministicWork::UnorderedOptions<T,Function1Ty,Function2Ty> OptionsTy;
-  typedef Runtime::DeterministicWork::Executor<OptionsTy> WorkTy;
+  typedef Runtime::DeterministicImpl::UnorderedOptions<T,Function1Ty,Function2Ty> OptionsTy;
+  typedef Runtime::DeterministicImpl::Executor<OptionsTy> WorkTy;
 
-  OptionsTy options(f1, f2);
+  OptionsTy options(prefix, fn);
   WorkTy W(options, loopname);
-  Runtime::for_each_det_impl(Runtime::makeStandardRange(b,e), W);
+  Runtime::for_each_det_impl(Runtime::makeStandardRange(b, e), W);
 }
 
+/**
+ * Deterministic execution with prefix operator.
+ * The prefix of the operator should be exactly the same as the operator
+ * but with execution returning at the failsafe point. The operator
+ * should conform to a standard Galois unordered set operator {@link for_each()}.
+ *
+ * @param i initial item
+ * @param prefix prefix of operator
+ * @param fn operator
+ * @param loopname string to identity loop in statistics output
+ */
 template<typename T, typename Function1Ty, typename Function2Ty>
-static inline void for_each_det(T e, Function1Ty f1, Function2Ty f2, const char* loopname = 0) {
-  T wl[1] = { e };
-  for_each_det(&wl[0], &wl[1], f1, f2, loopname);
+static inline void for_each_det(T i, Function1Ty prefix, Function2Ty fn, const char* loopname = 0) {
+  T wl[1] = { i };
+  for_each_det(&wl[0], &wl[1], prefix, fn, loopname);
 }
 
-//! Deterministic execution
+/**
+ * Deterministic execution with single operator.
+ * The operator fn is used both for the prefix computation and for the
+ * continuation of computation, c.f., the prefix operator version which
+ * uses two different functions. The operator can distinguish between
+ * the two uses by querying {@link UserContext.getLocalState()}.
+ *
+ * @param b begining of range of initial items
+ * @param e end of range of initial items
+ * @param fn operator
+ * @param loopname string to identity loop in statistics output
+ */
 template<typename IterTy, typename FunctionTy>
-static inline void for_each_det(IterTy b, IterTy e, FunctionTy f, const char* loopname = 0) {
-  for_each_det(b, e, f, f, loopname);
+static inline void for_each_det(IterTy b, IterTy e, FunctionTy fn, const char* loopname = 0) {
+  for_each_det(b, e, fn, fn, loopname);
 }
 
+/**
+ * Deterministic execution with single operator.
+ * The operator fn is used both for the prefix computation and for the
+ * continuation of computation, c.f., the prefix operator version which
+ * uses two different functions. The operator can distinguish between
+ * the two uses by querying {@link UserContext.getLocalState()}.
+ *
+ * @param i initial item
+ * @param fn operator
+ * @param loopname string to identity loop in statistics output
+ */
 template<typename T, typename FunctionTy>
-static inline void for_each_det(T e, FunctionTy f, const char* loopname = 0) {
-  T wl[1] = { e };
-  for_each_det(&wl[0], &wl[1], f, f, loopname);
+static inline void for_each_det(T i, FunctionTy fn, const char* loopname = 0) {
+  T wl[1] = { i };
+  for_each_det(&wl[0], &wl[1], fn, fn, loopname);
 }
 
 } // end namespace Galois

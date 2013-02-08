@@ -26,6 +26,7 @@
 #ifndef GALOIS_BAG_H
 #define GALOIS_BAG_H
 
+#include "Galois/gstl.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/mm/Mem.h"
@@ -142,9 +143,7 @@ struct InsertBag: boost::noncopyable {
     for (unsigned x = 0; x < heads.size(); ++x) {
       header*& h = *heads.getRemote(x);
       while (h) {
-        for (T* ii = h->dbegin, *ee = h->dend; ii != ee; ++ii) {
-          ii->~T();
-        }
+        uninitialized_destroy(h->dbegin, h->dend);
         header* h2 = h;
         h = h->next;
         Galois::Runtime::MM::pageFree(h2);
@@ -185,7 +184,7 @@ public:
     return true;
   }
 
-  //! Only this is thread safe
+  //! Thread safe bag insertion
   template<typename... Args>
   reference emplace(Args&&... args) {
     header* H = *heads.getLocal();
@@ -199,11 +198,14 @@ public:
     return *rv;
   }
 
+  //! Thread safe bag insertion
   reference push(const T& val) { return emplace(val); }
+  //! Thread safe bag insertion
   reference push(T&& val) { return emplace(std::move(val)); }
 
-  //! Allow using std::back_inserter
+  //! Thread safe bag insertion
   reference push_back(const T& val) { return emplace(val); }
+  //! Thread safe bag insertion
   reference push_back(T&& val) { return emplace(val); }
 };
 

@@ -20,8 +20,9 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#ifndef GALOIS_UTIL_ONLINESTATS_H
-#define GALOIS_UTIL_ONLINESTATS_H
+#ifndef GALOIS_ONLINESTATS_H
+#define GALOIS_ONLINESTATS_H
+
 class OnlineStat {
   unsigned int n;
   double mean;

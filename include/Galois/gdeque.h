@@ -26,10 +26,10 @@
 #include "Galois/Runtime/mm/Mem.h"
 #include "Galois/FixedSizeRing.h"
 #include <boost/iterator/iterator_facade.hpp>
-//#include <iterator>
 
 namespace Galois {
 
+//! Like std::deque but use Galois memory management functionality
 template<typename T, unsigned ChunkSize=64, typename ContainerTy=FixedSizeRing<T, ChunkSize> > 
 class gdeque: private boost::noncopyable {
 protected:

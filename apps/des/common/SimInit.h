@@ -250,7 +250,6 @@ public:
   /**
    * Instantiates a new simulation initializer.
    *
-   * @param graph the graph
    * @param netlistFile the netlist file
    */
   SimInit(const std::string& netlistFile) 

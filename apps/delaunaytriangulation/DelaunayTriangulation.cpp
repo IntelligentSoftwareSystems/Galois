@@ -164,7 +164,7 @@ struct Process {
     if (!rp)
       return false;
     
-    (*rp)->acquire(Galois::MethodFlag::CHECK_CONFLICT);
+    (*rp)->get(Galois::MethodFlag::CHECK_CONFLICT);
 
     GNode someNode = (*rp)->someElement();
 
@@ -185,7 +185,7 @@ struct Process {
   //! Parallel operator
   GALOIS_ATTRIBUTE_NOINLINE
   void operator()(Point* p, Galois::UserContext<Point*>& ctx) {
-    p->acquire();
+    p->get(Galois::MethodFlag::CHECK_CONFLICT);
     assert(!p->inMesh());
 
     GNode node;

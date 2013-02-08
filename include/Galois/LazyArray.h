@@ -18,7 +18,7 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
- * @description
+ * @section Description
  * 
  * Implements something close to std::array, but which does not initialize its
  * elements.  It is the user's responsibility to make sure memory is properly
@@ -26,7 +26,6 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-
 #ifndef GALOIS_LAZYARRAY_H
 #define GALOIS_LAZYARRAY_H
 

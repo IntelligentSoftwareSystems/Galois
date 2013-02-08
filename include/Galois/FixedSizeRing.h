@@ -30,6 +30,7 @@
 
 namespace Galois {
 
+//! Unordered collection of bounded size
 template<typename T, unsigned chunksize = 64>
 class FixedSizeBag: private boost::noncopyable {
   LazyArray<T, chunksize> datac;
@@ -144,6 +145,7 @@ public:
   const_iterator end() const { return &datac[count]; }
 };
  
+//! Ordered collection of bounded size
 template<typename T, unsigned chunksize = 64>
 class FixedSizeRing: private boost::noncopyable {
   LazyArray<T, chunksize> datac;

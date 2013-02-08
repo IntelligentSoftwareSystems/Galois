@@ -89,12 +89,6 @@ protected:
 
   /**
    * Send events to fanout, which are the out going neighbors in the circuit graph.
-   *
-   * @param graph: the circuit graph
-   * @param myNode: the my node
-   * @param inputEvent: the input event
-   * @param type: the type
-   * @param msg: the logic update
    */
   void sendEventsToFanout (const Event_ty& inputEvent, 
       const des::LogicUpdate& msg, const Event_ty::Type& type,

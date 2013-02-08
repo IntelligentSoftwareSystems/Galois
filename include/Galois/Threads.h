@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -24,9 +24,9 @@
 namespace Galois {
 
 /**
- * Sets the number of threads to use in runtime system. Returns
- * the actual value of threads used, which could be less than
- * the requested value.
+ * Sets the number of threads to use when running any Galois iterator. Returns
+ * the actual value of threads used, which could be less than the requested
+ * value.
  */
 unsigned int setActiveThreads(unsigned int num);
 

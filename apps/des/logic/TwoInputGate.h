@@ -68,10 +68,6 @@ protected:
 public:
   /**
    * Instantiates a new two input gate.
-   *
-   * @param outputName the output name
-   * @param input1Name the input1 name
-   * @param input2Name the input2 name
    */
   TwoInputGate (const TwoInputFunc& func, const std::string& outputName, const std::string& input1Name, 
       const std::string& input2Name, const SimTime& delay = MIN_DELAY)
@@ -88,10 +84,10 @@ public:
   }
 
   /**
-   * @param update
-   *
-   * applies the update to internal state e.g. change to some input. Must update the output
+   * Applies the update to internal state e.g. change to some input. Must update the output
    * if the inputs have changed
+   *
+   * @param lu the update
    */
   virtual void applyUpdate (const LogicUpdate& lu) {
 

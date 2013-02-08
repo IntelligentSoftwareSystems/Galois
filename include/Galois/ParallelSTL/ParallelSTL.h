@@ -30,6 +30,7 @@
 #include "Galois/Runtime/DoAll.h"
 
 namespace Galois {
+//! Parallel versions of STL library algorithms.
 namespace ParallelSTL {
 
 template<typename Predicate>
@@ -129,12 +130,16 @@ struct sort_helper {
       typedef typename std::iterator_traits<RandomAccessIterator>::value_type VT;
       RandomAccessIterator pivot = choose_rand(bounds.first, bounds.second);
       VT pv = *pivot;
-      pivot = std::partition(bounds.first, bounds.second, std::bind2nd(comp, pv));
+      pivot = std::partition(bounds.first, bounds.second,
+          std::bind(comp, std::placeholders::_1, pv));
+ //         std::bind2nd(comp, pv));
       //push the lower bit
       if (bounds.first != pivot)
 	cnx.push(std::make_pair(bounds.first, pivot));
       //adjust the upper bit
-      pivot = std::find_if(pivot, bounds.second, std::bind2nd(neq_to<VT>(comp), pv));
+      pivot = std::find_if(pivot, bounds.second, 
+          std::bind(neq_to<VT>(comp), std::placeholders::_1, pv));
+//          std::bind2nd(neq_to<VT>(comp), pv));
       //push the upper bit
       if (bounds.second != pivot)
 	cnx.push(std::make_pair(pivot, bounds.second)); 

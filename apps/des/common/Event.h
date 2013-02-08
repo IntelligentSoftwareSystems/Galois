@@ -79,10 +79,11 @@ protected:
   /**
    * Instantiates a new base event.
    *
-   * @param id: not guaranteed to be unique
+   * @param id not guaranteed to be unique
    * @param sendObj the sending simulation obj
    * @param recvObj the receiving simulatio obj
    * @param action the action
+   * @param type the type
    * @param sendTime the send time
    * @param recvTime the recv time
    */

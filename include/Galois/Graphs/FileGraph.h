@@ -31,11 +31,11 @@
 #ifndef GALOIS_GRAPHS_FILEGRAPH_H
 #define GALOIS_GRAPHS_FILEGRAPH_H
 
+#include "Galois/Endian.h"
 #include "Galois/MethodFlags.h"
 #include "Galois/LargeArray.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/ll/CacheLineStorage.h"
-#include "Galois/util/Endian.h"
 
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/iterator/transform_iterator.hpp>
@@ -256,10 +256,13 @@ public:
  * Simplifies parsing graphs from files.
  * 
  * Parse your file in rounds:
- *  (1) setNumNodes(), setNumEdges(), setSizeofEdgeData()
- *  (2) phase1(), for each node, incrementDegree(Node x)
- *  (3) phase2(), add neighbors for each node, addNeighbor(Node src, Node dst)
- *  (4) finish(), use as FileGraph
+ * <ol>
+ *  <li>setNumNodes(), setNumEdges(), setSizeofEdgeData()</li>
+ *  <li>phase1(), for each node, incrementDegree(Node x)</li>
+ *  <li>phase2(), add neighbors for each node, addNeighbor(Node src, Node
+ *    dst)</li>
+ *  <li>finish(), use as FileGraph</li>
+ * </ol>
  */
 class FileGraphParser: public FileGraph {
   uint64_t *outIdx; // outIdxs
@@ -283,17 +286,21 @@ public:
   void setNumEdges(uint64_t n) { this->numEdges = n; }
   void setSizeofEdgeData(size_t n) { sizeofEdgeData = n; }
   
+  //! Marks the transition to next phase of parsing, counting the degree of
+  //! nodes
   void phase1() { 
     assert(!outIdx);
     outIdx = new uint64_t[this->numNodes];
     memset(outIdx, 0, sizeof(*outIdx) * this->numNodes);
   }
 
+  //! Increments degree of id by delta
   void incrementDegree(size_t id, int delta = 1) {
     assert(id < this->numNodes);
     outIdx[id] += delta;
   }
 
+  //! Marks the transition to next phase of parsing, adding edges
   void phase2() {
     if (this->numNodes == 0)
       return;
@@ -311,6 +318,7 @@ public:
     outs = new uint32_t[this->numEdges];
   }
 
+  //! Adds a neighbor between src and dst
   size_t addNeighbor(size_t src, size_t dst) {
     size_t base = src ? outIdx[src-1] : 0;
     size_t idx = base + starts[src]++;
