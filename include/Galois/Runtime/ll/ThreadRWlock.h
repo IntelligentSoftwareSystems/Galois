@@ -39,9 +39,9 @@ namespace LL {
 
 class ThreadRWlock {
 
-  typedef Galois::Runtime::LL::PaddedLock<true> Lock_ty;
+  typedef PaddedLock<true> Lock_ty;
   // typedef Galois::Runtime::LL::SimpleLock<true> Lock_ty;
-  typedef Galois::Runtime::PerThreadStorage<Lock_ty> PerThreadLock;
+  typedef PerThreadStorage<Lock_ty> PerThreadLock;
 
   PerThreadLock locks;
 

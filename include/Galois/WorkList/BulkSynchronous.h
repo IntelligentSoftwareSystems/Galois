@@ -47,10 +47,10 @@ class BulkSynchronous : private boost::noncopyable {
   };
 
   CTy wls[2];
-  Galois::Runtime::PerThreadStorage<TLD> tlds;
-  Galois::Runtime::GBarrier barrier1;
-  Galois::Runtime::GBarrier barrier2;
-  Galois::Runtime::LL::CacheLineStorage<volatile long> some;
+  Runtime::PerThreadStorage<TLD> tlds;
+  Runtime::GBarrier barrier1;
+  Runtime::GBarrier barrier2;
+  Runtime::LL::CacheLineStorage<volatile long> some;
   volatile bool empty;
 
  public:
@@ -98,7 +98,7 @@ class BulkSynchronous : private boost::noncopyable {
         return r;
 
       barrier1.wait();
-      if (Galois::Runtime::LL::getTID() == 0) {
+      if (Runtime::LL::getTID() == 0) {
         if (!some.data)
           empty = true;
         some.data = false; 

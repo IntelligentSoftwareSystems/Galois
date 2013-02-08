@@ -61,7 +61,7 @@ static const unsigned GALOIS_DEFAULT_CHUNK_SIZE = 32;
  */
 template<typename WLTy, typename IterTy, typename FunctionTy>
 void for_each(IterTy b, IterTy e, FunctionTy fn, const char* loopname = 0) {
-  Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeStandardRange(b, e), fn, loopname);
+  Runtime::for_each_impl<WLTy>(Runtime::makeStandardRange(b, e), fn, loopname);
 }
 
 /**
@@ -76,8 +76,8 @@ void for_each(IterTy b, IterTy e, FunctionTy fn, const char* loopname = 0) {
  */
 template<typename IterTy, typename FunctionTy>
 void for_each(IterTy b, IterTy e, FunctionTy fn, const char* loopname = 0) {
-  typedef Galois::WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
-  Galois::for_each<WLTy, IterTy, FunctionTy>(b, e, fn, loopname);
+  typedef WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
+  for_each<WLTy, IterTy, FunctionTy>(b, e, fn, loopname);
 }
 
 /**
@@ -93,7 +93,7 @@ void for_each(IterTy b, IterTy e, FunctionTy fn, const char* loopname = 0) {
 template<typename WLTy, typename InitItemTy, typename FunctionTy>
 void for_each(InitItemTy i, FunctionTy fn, const char* loopname = 0) {
   InitItemTy wl[1] = {i};
-  Galois::for_each<WLTy>(&wl[0], &wl[1], fn, loopname);
+  for_each<WLTy>(&wl[0], &wl[1], fn, loopname);
 }
 
 /**
@@ -107,8 +107,8 @@ void for_each(InitItemTy i, FunctionTy fn, const char* loopname = 0) {
  */
 template<typename InitItemTy, typename FunctionTy>
 void for_each(InitItemTy i, FunctionTy fn, const char* loopname = 0) {
-  typedef Galois::WorkList::ChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
-  Galois::for_each<WLTy, InitItemTy, FunctionTy>(i, fn, loopname);
+  typedef WorkList::ChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
+  for_each<WLTy, InitItemTy, FunctionTy>(i, fn, loopname);
 }
 
 /**
@@ -123,7 +123,7 @@ void for_each(InitItemTy i, FunctionTy fn, const char* loopname = 0) {
  */
 template<typename WLTy, typename ConTy, typename FunctionTy>
 void for_each_local(ConTy& c, FunctionTy fn, const char* loopname = 0) {
-  Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(c), fn, loopname);
+  Runtime::for_each_impl<WLTy>(Runtime::makeLocalRange(c), fn, loopname);
 }
 
 /**
@@ -137,8 +137,8 @@ void for_each_local(ConTy& c, FunctionTy fn, const char* loopname = 0) {
  */
 template<typename ConTy, typename FunctionTy>
 void for_each_local(ConTy& c, FunctionTy fn, const char* loopname = 0) {
-  typedef Galois::WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
-  Galois::for_each_local<WLTy, ConTy, FunctionTy>(c, fn, loopname);
+  typedef WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
+  for_each_local<WLTy, ConTy, FunctionTy>(c, fn, loopname);
 }
 
 /**
@@ -153,7 +153,7 @@ void for_each_local(ConTy& c, FunctionTy fn, const char* loopname = 0) {
  */
 template<typename IterTy,typename FunctionTy>
 FunctionTy do_all(const IterTy& b, const IterTy& e, FunctionTy fn, const char* loopname = 0) {
-  return Galois::Runtime::do_all_impl(Galois::Runtime::makeStandardRange(b, e), fn, Galois::Runtime::EmptyFn(), false);
+  return Runtime::do_all_impl(Runtime::makeStandardRange(b, e), fn, Runtime::EmptyFn(), false);
 }
 
 /**
@@ -167,7 +167,7 @@ FunctionTy do_all(const IterTy& b, const IterTy& e, FunctionTy fn, const char* l
  */
 template<typename ConTy,typename FunctionTy>
 FunctionTy do_all_local(ConTy& c, FunctionTy fn, const char* loopname = 0) {
-  return Galois::Runtime::do_all_impl(Galois::Runtime::makeLocalRange(c), fn, Galois::Runtime::EmptyFn(), false);
+  return Runtime::do_all_impl(Runtime::makeLocalRange(c), fn, Runtime::EmptyFn(), false);
 }
 
 /**
@@ -180,7 +180,7 @@ FunctionTy do_all_local(ConTy& c, FunctionTy fn, const char* loopname = 0) {
  */
 template<typename FunctionTy>
 static inline void on_each(FunctionTy fn, const char* loopname = 0) {
-  Galois::Runtime::on_each_impl(fn, loopname);
+  Runtime::on_each_impl(fn, loopname);
 }
 
 /**
@@ -189,7 +189,7 @@ static inline void on_each(FunctionTy fn, const char* loopname = 0) {
  * @param num number of pages to allocate of size {@link Galois::Runtime::pageAllocInfo()}
  */
 static inline void preAlloc(int num) {
-  Galois::Runtime::preAlloc_impl(num);
+  Runtime::preAlloc_impl(num);
 }
 
 /**
@@ -209,7 +209,7 @@ static inline void preAlloc(int num) {
  */
 template<typename Iter, typename Cmp, typename NhFunc, typename OpFunc>
 void for_each_ordered(Iter b, Iter e, Cmp cmp, NhFunc nhFunc, OpFunc fn, const char* loopname=0) {
-  Galois::Runtime::for_each_ordered_impl(b, e, cmp, nhFunc, fn, loopname);
+  Runtime::for_each_ordered_impl(b, e, cmp, nhFunc, fn, loopname);
 }
 
 /**
@@ -232,7 +232,7 @@ void for_each_ordered(Iter b, Iter e, Cmp cmp, NhFunc nhFunc, OpFunc fn, const c
  */
 template<typename Iter, typename Cmp, typename NhFunc, typename OpFunc, typename StableTest>
 void for_each_ordered(Iter b, Iter e, Cmp cmp, NhFunc nhFunc, OpFunc fn, StableTest stabilityTest, const char* loopname=0) {
-  Galois::Runtime::for_each_ordered_impl(b, e, cmp, nhFunc, fn, stabilityTest, loopname);
+  Runtime::for_each_ordered_impl(b, e, cmp, nhFunc, fn, stabilityTest, loopname);
 }
 
 } //namespace Galois

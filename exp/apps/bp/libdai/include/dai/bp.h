@@ -90,7 +90,7 @@ class BP : public DAIAlgFG {
 
         struct EdgeData {
           int round;
-          Galois::GWrapped<char> lock;
+          Galois::GChecked<char> lock;
           EdgeData(): round(0), lock(0) { }
         };
 

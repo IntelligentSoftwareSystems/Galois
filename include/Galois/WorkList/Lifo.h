@@ -74,7 +74,7 @@ public:
     //Ordered lock to preent deadlock
     if (!Runtime::LL::TryLockPairOrdered(*this, victim)) return retval;
     if (half) {
-      typename std::deque<T>::iterator split = Galois::split_range(victim.wl.begin(), victim.wl.end());
+      typename std::deque<T>::iterator split = split_range(victim.wl.begin(), victim.wl.end());
       wl.insert(wl.end(), victim.wl.begin(), split);
       victim.wl.erase(victim.wl.begin(), split);
     } else {

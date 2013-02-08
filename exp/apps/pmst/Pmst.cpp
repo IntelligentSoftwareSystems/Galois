@@ -602,8 +602,8 @@ void makeGraph(const std::string& in, Graph& g) {
           g.getEdgeData(g.findEdge(gdst, gsrc)) = w;
         }
       } else if (gsrc != gdst) {
-        g.getEdgeData(g.addMultiEdge(gsrc, gdst)) = w;
-        g.getEdgeData(g.addMultiEdge(gdst, gsrc)) = w;
+        g.addMultiEdge(gsrc, gdst, Galois::MethodFlag::ALL, w);
+        g.addMultiEdge(gdst, gsrc, Galois::MethodFlag::ALL, w);
         numEdges += 2;
       }
     }
