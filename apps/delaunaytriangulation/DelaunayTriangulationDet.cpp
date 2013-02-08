@@ -195,7 +195,7 @@ struct Process {
       return false;
     }
 
-    result->acquire(Galois::MethodFlag::CHECK_CONFLICT);
+    result->get(Galois::MethodFlag::CHECK_CONFLICT);
 
     GNode someNode = result->someElement();
 
@@ -227,7 +227,7 @@ struct Process {
       }
     }
 
-    p->acquire();
+    p->get(Galois::MethodFlag::CHECK_CONFLICT);
     assert(!p->inMesh());
 
     GNode node;
@@ -259,7 +259,7 @@ struct Process {
 
   //! Serial operator
   void operator()(Point* p) {
-    p->acquire();
+    p->get(Galois::MethodFlag::CHECK_CONFLICT);
     assert(!p->inMesh());
 
     GNode node;

@@ -63,7 +63,7 @@ static const char* url = "discrete_event_simulation";
 static cll::opt<std::string> netlistFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 
 /**
- * The Class AbstractMain holds common functionality for {@link DESunorderedSerial} and {@link DESunordered}.
+ * The Class AbstractMain holds common functionality for {@link des_unord::DESunorderedSerial} and {@link des_unord::DESunordered}.
  */
 // TODO: graph type can also be exposed to sub-classes as a template parameter
 template <typename SimInit_tp>

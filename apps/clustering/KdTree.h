@@ -186,7 +186,6 @@ public:
    * the metrics defined in inBuilder.
    *
    * @param outCluster the cluster to test
-   * @param inBuilder  the builder defining closeness
    * @return true if an element could be closer, false otherwise
    */
   bool couldBeCloser(PotentialCluster &outCluster) {

@@ -31,6 +31,7 @@
 namespace Galois {
 namespace WorkList {
 
+//! Simple FIFO worklist (not scalable).
 template<typename T = int, bool concurrent = true>
 class FIFO : private boost::noncopyable, private Runtime::LL::PaddedLock<concurrent>  {
   std::deque<T> wl;
@@ -61,7 +62,7 @@ public:
   }
 
   template<typename RangeTy>
-  void push_initial(RangeTy range) {
+  void push_initial(const RangeTy& range) {
     if (Runtime::LL::getTID() == 0)
       push(range.begin(), range.end());
   }

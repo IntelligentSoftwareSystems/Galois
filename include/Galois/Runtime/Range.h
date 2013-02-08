@@ -25,10 +25,10 @@
 #ifndef GALOIS_RUNTIME_RANGE_H
 #define GALOIS_RUNTIME_RANGE_H
 
+#include "Galois/gstl.h"
+
 #include "Galois/Runtime/ActiveThreads.h"
 #include "Galois/Runtime/ll/TID.h"
-
-#include "Galois/util/GAlgs.h"
 
 #include <iterator>
 
@@ -52,16 +52,19 @@ public:
   iterator begin() const { return container->begin(); }
   iterator end() const { return container->end(); }
 
+  std::pair<block_iterator, block_iterator> block_pair() const {
+    return Galois::block_range(begin(), end(), LL::getTID(), activeThreads);
+  }
+
+  std::pair<local_iterator, local_iterator> local_pair() const {
+    return std::make_pair(container->local_begin(), container->local_end());
+  }
+
   local_iterator local_begin() const { return container->local_begin(); }
   local_iterator local_end() const { return container->local_end(); }
 
-  block_iterator block_begin() const { 
-    return Galois::block_range(begin(), end(), LL::getTID(), activeThreads).first; 
-  }
-
-  block_iterator block_end() const { 
-    return Galois::block_range(begin(), end(), LL::getTID(), activeThreads).second; 
-  }
+  block_iterator block_begin() const { return block_pair().first; }
+  block_iterator block_end() const { return block_pair().second; }
 };
 
 template<typename T>
@@ -82,16 +85,20 @@ public:
   iterator begin() const { return ii; }
   iterator end() const { return ei; }
 
+  std::pair<block_iterator, block_iterator> block_pair() const {
+    return Galois::block_range(ii, ei, LL::getTID(), activeThreads);
+  }
+
+  std::pair<local_iterator, local_iterator> local_pair() const {
+    return block_pair();
+  }
+
   local_iterator local_begin() const { return block_begin(); }
   local_iterator local_end() const { return block_end(); }
 
-  block_iterator block_begin() const { 
-    return Galois::block_range(begin(), end(), LL::getTID(), activeThreads).first; 
-  }
+  block_iterator block_begin() const { return block_pair().first; }
 
-  block_iterator block_end() const { 
-    return Galois::block_range(begin(), end(), LL::getTID(), activeThreads).second; 
-  }
+  block_iterator block_end() const { return block_pair().second; }
 };
 
 template<typename IterTy>

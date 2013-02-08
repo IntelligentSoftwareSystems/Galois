@@ -27,12 +27,16 @@
 
 namespace Galois {
 
-typedef Galois::Runtime::MM::SimpleBumpPtrWithMallocFallback<Galois::Runtime::MM::FreeListHeap<Galois::Runtime::MM::SystemBaseAlloc> > IterAllocBaseTy;
+//! Base allocator for per-iteration allocator
+typedef Runtime::MM::SimpleBumpPtrWithMallocFallback<Runtime::MM::FreeListHeap<Runtime::MM::SystemBaseAlloc> > IterAllocBaseTy;
 
-typedef Galois::Runtime::MM::ExternRefGaloisAllocator<char, IterAllocBaseTy> PerIterAllocTy;
+//! Per-iteration allocator that conforms to STL allocator interface
+typedef Runtime::MM::ExternRefGaloisAllocator<char, IterAllocBaseTy> PerIterAllocTy;
 
+//! Scalable fixed-sized allocator for T that conforms to STL allocator interface but
+//! does not support variable sized allocations
 template<typename Ty>
-struct GFixedAllocator : public Galois::Runtime::MM::FSBGaloisAllocator<Ty> { };
+struct GFixedAllocator : public Runtime::MM::FSBGaloisAllocator<Ty> { };
 
 }
 #endif

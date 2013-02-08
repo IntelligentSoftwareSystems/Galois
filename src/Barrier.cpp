@@ -27,6 +27,7 @@
  */
 
 #include "Galois/Runtime/Barrier.h"
+#include "Galois/Runtime/ActiveThreads.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 
 #include <cstdlib>

@@ -36,6 +36,8 @@
 
 namespace Galois {
 
+//! Singly linked list. To conserve space, allocator is maintained
+//! external to the list. 
 template<typename T, int ChunkSize=16> 
 class gslist {
 

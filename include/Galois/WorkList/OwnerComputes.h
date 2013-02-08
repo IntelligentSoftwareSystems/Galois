@@ -66,8 +66,9 @@ public:
   }
 
   template<typename RangeTy>
-  void push_initial(RangeTy range) {
-    push(range.local_begin(), range.local_end());
+  void push_initial(const RangeTy& range) {
+    auto rp = range.local_pair();
+    push(rp.first, rp.second);
     for (unsigned int x = 0; x < pushBuffer.size(); ++x)
       pushBuffer.getRemote(x)->flush();
   }

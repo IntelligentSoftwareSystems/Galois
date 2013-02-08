@@ -1918,16 +1918,16 @@ public:
 GALOIS_WLCOMPILECHECK(TbbPriQueue)
 #else
 template<typename T = int>
-class TbbFIFO: public AbstractWorkList<T,false> { };
+class TbbFIFO;//: public AbstractWorkList<T,false> { };
 
 template<class Compare = std::less<int>, typename T = int>
-class PTbb: public AbstractWorkList<T,false> { };
+class PTbb;//: public AbstractWorkList<T,false> { };
 
 template<class Compare = std::less<int>, typename T = int>
-class STbb: public AbstractWorkList<T,false> { };
+class STbb;//: public AbstractWorkList<T,false> { };
 
 template<class Compare = std::less<int>, typename T = int>
-class TbbPriQueue: public AbstractWorkList<T,false> { };
+class TbbPriQueue;//: public AbstractWorkList<T,false> { };
 #endif //TBB
 
 namespace Alt {

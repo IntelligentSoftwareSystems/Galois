@@ -27,26 +27,34 @@
 
 namespace Galois {
 
-//! Conflict-checking wapper for any type
-/*! A wrapper which performs global conflict detection on the enclosed object.
-  This enables arbitrary types to be managed by the Galois runtime. */
+/**
+ * Conflict-checking wrapper for any type.  Performs global conflict detection
+ * on the enclosed object.  This enables arbitrary types to be managed by the
+ * Galois runtime.
+ */
 template<typename T>
-class GWrapped : public Galois::Runtime::Lockable {
+class GChecked : public Galois::Runtime::Lockable {
   T val;
 
 public:
-  GWrapped(const T& v) :val(v) {}
+  template<typename... Args>
+  GChecked(Args&&... args): val(std::forward<Args>(args)...) { }
 
   T& get(Galois::MethodFlag m = MethodFlag::ALL) {
     Galois::Runtime::acquire(this, m);
     return val;
   }
+
+  const T& get(Galois::MethodFlag m = MethodFlag::ALL) const {
+    Galois::Runtime::acquire(const_cast<GChecked*>(this), m);
+    return val;
+  }
 };
 
-
-struct GChecked : public Galois::Runtime::Lockable {
-  void acquire(Galois::MethodFlag m = MethodFlag::ALL) const {
-    // Allow locking of const objects
+template<>
+class GChecked<void>: public Galois::Runtime::Lockable {
+public:
+  void get(Galois::MethodFlag m = MethodFlag::ALL) const {
     Galois::Runtime::acquire(const_cast<GChecked*>(this), m);
   }
 };

@@ -1,9 +1,8 @@
 #include "Galois/Graphs/LCGraph.h"
 
 int main() {
-  size_t intvoid = sizeof(Galois::Graph::EdgeInfoBase<int,void>);
-  size_t intint = sizeof(Galois::Graph::EdgeInfoBase<int,int>);
-  std::cout << "sizeof<int,void> = " << intvoid << "\n"
-    << "sizeof<int,int> = " << intint << "\n";
+  constexpr size_t intvoid = sizeof(Galois::Graph::LCGraphImpl::EdgeInfoBase<int,void>);
+  constexpr size_t intint = sizeof(Galois::Graph::LCGraphImpl::EdgeInfoBase<int,int>);
+  static_assert(intvoid < intint, "Failed to do empty member optimization");
   return intvoid < intint ? 0 : 1;
 }

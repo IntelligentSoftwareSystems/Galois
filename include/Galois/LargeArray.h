@@ -25,8 +25,10 @@
 #ifndef GALOIS_LARGEARRAY_H
 #define GALOIS_LARGEARRAY_H
 
-#include <boost/utility.hpp>
+#include "Galois/gstl.h"
 #include "Galois/Runtime/mm/Mem.h"
+
+#include <boost/utility.hpp>
 
 namespace Galois {
 
@@ -94,8 +96,7 @@ public:
 
   void destroy() {
     if (!m_data) return;
-    for (T* ii = m_data, *ei = m_data + m_size; ii != ei; ++ii)
-      ii->~T();
+    uninitialized_destroy(m_data, m_data + m_size);
   }
 
   template<typename It>
@@ -109,6 +110,7 @@ public:
   pointer data() { return m_data; }
 };
 
+//! Void specialization
 template<bool isLazy>
 class LargeArray<void,isLazy>: boost::noncopyable {
 public:

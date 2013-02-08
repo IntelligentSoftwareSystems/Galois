@@ -517,7 +517,7 @@ static inline void do_all_bs_impl(RangeTy range, FnsTy fns, InitFnTy initFn, con
   inGaloisForEach = true;
   RunCommand w[2] = {std::ref(W),
 		     std::ref(getSystemBarrier())};
-  getSystemThreadPool().run(&w[0], &w[2]);
+  getSystemThreadPool().run(&w[0], &w[2], activeThreads);
   inGaloisForEach = false;
 }
 

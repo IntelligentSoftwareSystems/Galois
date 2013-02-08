@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -26,10 +26,10 @@
 #include "Galois/Runtime/mm/Mem.h"
 #include "Galois/FixedSizeRing.h"
 #include <boost/iterator/iterator_facade.hpp>
-//#include <iterator>
 
 namespace Galois {
 
+//! Like std::deque but use Galois memory management functionality
 template<typename T, unsigned ChunkSize=64, typename ContainerTy=FixedSizeRing<T, ChunkSize> > 
 class gdeque: private boost::noncopyable {
 protected:
@@ -205,7 +205,6 @@ public:
     num = 0;
   }
 
-#ifdef GALOIS_HAS_RVALUE_REFERENCES
   template<typename... Args>
   void emplace_back(Args&&... args) {
     assert(precondition());
@@ -224,19 +223,7 @@ public:
   void push_back(const value_type& v) {
     emplace_back(v);
   }
-#else
-  void push_back(const value_type& v) {
-    assert(precondition());
-    ++num;
-    if (last && last->push_back(v))
-      return;
-    extend_last();
-    pointer p = last->push_back(v);
-    assert(p);
-  }
-#endif
 
-#ifdef GALOIS_HAS_RVALUE_REFERENCES
   template<typename... Args>
   void emplace_front(Args&&... args) {
     assert(precondition());
@@ -255,17 +242,6 @@ public:
   void push_front(const value_type& v) {
     emplace_front(v);
   }
-#else
-  void push_front(const value_type& v) {
-    assert(precondition());
-    ++num;
-    if (first && first->push_front(v))
-      return;
-    extend_first();
-    pointer p = first->push_front(v);
-    assert(p);
-  }
-#endif
 };
 
 }

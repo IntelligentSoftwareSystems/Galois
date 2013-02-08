@@ -25,15 +25,14 @@
  */
 #include "Galois/Galois.h"
 #include "Galois/Bag.h"
+#include "Galois/SparseBitVector.h"
 #include "Galois/Statistic.h"
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Graphs/FileGraph.h"
-#include "Galois/util/SparseBitVector2.h"
 #include "Galois/WorkList/WorkList.h"
 #include "llvm/Support/CommandLine.h"
 
 #include "Lonestar/BoilerPlate.h"
-
 
 #include <vector>
 #include <iostream>

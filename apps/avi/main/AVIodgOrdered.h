@@ -77,7 +77,7 @@ protected:
     assert(locks.empty());
     locks.reserve(meshInit.getNumNodes());
     for (int i = 0; i < meshInit.getNumNodes(); ++i) {
-      locks.push_back(graph.createNode(0));
+      locks.push_back(graph.createNode(nullptr));
     }
   }
 

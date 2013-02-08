@@ -43,10 +43,6 @@ protected:
 public: 
   /**
    * Instantiates a new Input.
-   *
-   * @param id
-   * @param outputName the output name
-   * @param inputName the Input name
    */
   Input(size_t id, des::BasicPort& impl)
     : Base (id, impl) {}
@@ -75,8 +71,12 @@ public:
 protected:
   /**
    * Sends a copy of event at the input to all the outputs in the circuit
-   * @see OneInputGate::execEvent()
+   * @see OneInputGate::execEvent().
    *
+   * @param event the event
+   * @param sendWrap
+   * @param b begining of range
+   * @param e end of range
    */
   virtual void execEventIntern (const Event_ty& event, 
       typename Base::SendWrapper& sendWrap, 

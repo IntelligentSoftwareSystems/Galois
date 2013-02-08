@@ -820,22 +820,22 @@ struct MatchingMF {
       for (edge_iterator ii = g.edge_begin(*src), ei = g.edge_end(*src);
           ii != ei; ++ii) {
         GraphNode dst = g.getEdgeDst(ii);
-        g.getEdgeData(g.addMultiEdge(dst, *src)) = edge_type(0);
+        g.getEdgeData(g.addMultiEdge(dst, *src, Galois::MethodFlag::ALL)) = edge_type(0);
         ++numEdges;
       }
     }
 
     // Add edge from source to each node in A
     for (typename NodeList::iterator src = g.A.begin(), esrc = g.A.end(); src != esrc; ++src) {
-      g.getEdgeData(g.addMultiEdge(source, *src)) = edge_type();
-      g.getEdgeData(g.addMultiEdge(*src, source)) = edge_type(0);
+      g.getEdgeData(g.addMultiEdge(source, *src, Galois::MethodFlag::ALL)) = edge_type();
+      g.getEdgeData(g.addMultiEdge(*src, source, Galois::MethodFlag::ALL)) = edge_type(0);
       ++numEdges;
     }
 
     // Add edge to sink from each node in B
     for (typename NodeList::iterator src = g.B.begin(), esrc = g.B.end(); src != esrc; ++src) {
-      g.getEdgeData(g.addMultiEdge(*src, sink)) = edge_type();
-      g.getEdgeData(g.addMultiEdge(sink, *src)) = edge_type(0);
+      g.getEdgeData(g.addMultiEdge(*src, sink, Galois::MethodFlag::ALL)) = edge_type();
+      g.getEdgeData(g.addMultiEdge(sink, *src, Galois::MethodFlag::ALL)) = edge_type(0);
       ++numEdges;
     }
 

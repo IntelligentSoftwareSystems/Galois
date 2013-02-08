@@ -45,6 +45,7 @@ struct NoDerefIterator : public boost::iterator_adaptor<
   }
 };
 
+//! Convenience function to create {@link NoDerefIterator}.
 template<typename Iterator>
 NoDerefIterator<Iterator> make_no_deref_iterator(Iterator it) {
   return NoDerefIterator<Iterator>(it);

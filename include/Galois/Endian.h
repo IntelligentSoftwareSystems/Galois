@@ -20,8 +20,8 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#ifndef GALOIS_UTIL_ENDIAN_H
-#define GALOIS_UTIL_ENDIAN_H
+#ifndef GALOIS_ENDIAN_H
+#define GALOIS_ENDIAN_H
 
 #include "Galois/config.h"
 

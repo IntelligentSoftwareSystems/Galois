@@ -32,6 +32,7 @@
 
 namespace Galois {
 namespace Runtime {
+//! Low-level, Galois-agnostic functionality.
 namespace LL {
 
 extern __thread unsigned TID;

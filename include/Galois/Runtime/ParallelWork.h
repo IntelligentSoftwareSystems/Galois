@@ -46,6 +46,7 @@
 #include <functional>
 
 namespace Galois {
+//! Internal Galois functionality - Use at your own risk.
 namespace Runtime {
 namespace {
 
@@ -83,10 +84,10 @@ class ForEachWork {
 protected:
   typedef T value_type;
   typedef typename WorkListTy::template retype<value_type> WLTy;
-  typedef Galois::WorkList::GFIFO<value_type> AbortedList;
+  typedef WorkList::GFIFO<value_type> AbortedList;
 
   struct ThreadLocalData {
-    Galois::Runtime::UserContextAccess<value_type> facing;
+    UserContextAccess<value_type> facing;
     SimpleRuntimeContext cnx;
     LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
     ThreadLocalData(const char* ln) :stat(ln) {}
@@ -198,6 +199,11 @@ protected:
     return runQueue<false>(tld, *aborted.getLocal(), true);
   }
 
+  void fastPushBack(typename UserContextAccess<value_type>::PushBufferTy& x) {
+    wl.push(x.begin(), x.end());
+    x.clear();
+  }
+
   template<bool checkAbort>
   void go() {
     //Thread Local Data goes on the local stack
@@ -205,6 +211,9 @@ protected:
     ThreadLocalData tld(loopname);
     if (ForEachTraits<FunctionTy>::NeedsAborts)
       setThreadContext(&tld.cnx);
+    if (false && ForEachTraits<FunctionTy>::NeedsPush && !ForEachTraits<FunctionTy>::NeedsAborts) {
+      tld.facing.setFastPushBack(std::bind(&ForEachWork::fastPushBack, std::ref(*this), std::placeholders::_1));
+    }
     bool didAnyWork;
     do {
       didAnyWork = false;
@@ -269,7 +278,7 @@ public:
 
 
 template<typename WLTy, typename RangeTy, typename FunctionTy>
-void for_each_impl(RangeTy range, FunctionTy f, const char* loopname) {
+void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
   assert(!inGaloisForEach);
 
   inGaloisForEach = true;

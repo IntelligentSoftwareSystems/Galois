@@ -127,13 +127,13 @@ static Galois::Runtime::LL::StaticInstance<StatManager> SM;
 
 bool Galois::Runtime::inGaloisForEach = false;
 
-void Galois::Runtime::reportStat(const char* loopname, const char* category, size_t value) {
+void Galois::Runtime::reportStat(const char* loopname, const char* category, unsigned long value) {
   SM.get()->addToStat(std::string(loopname ? loopname : "(NULL)"), 
 		      std::string(category ? category : "(NULL)"),
 		      value);
 }
 
-void Galois::Runtime::reportStat(const std::string& loopname, const std::string& category, size_t value) {
+void Galois::Runtime::reportStat(const std::string& loopname, const std::string& category, unsigned long value) {
   SM.get()->addToStat(loopname, category, value);
 }
 

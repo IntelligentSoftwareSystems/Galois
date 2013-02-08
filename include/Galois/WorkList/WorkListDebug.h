@@ -23,7 +23,7 @@
 #ifndef GALOIS_RUNTIME_WORKLISTDEBUG_H
 #define GALOIS_RUNTIME_WORKLISTDEBUG_H
 
-#include "Galois/util/OnlineStats.h"
+#include "Galois/OnlineStats.h"
 
 #include <fstream>
 #include <map>
@@ -111,13 +111,12 @@ public:
 
   template<typename Iter>
   void push(Iter b, Iter e) {
-    while (b != e)
-      push(*b++);
+    wl.push(b,e);
   }
 
   template<typename RangeTy>
-  void push_initial(RangeTy range) {
-    push(range.begin(), range.end());
+  void push_initial(const RangeTy& range) {
+    wl.push_initial(range);
   }
 
   boost::optional<value_type> pop() {
@@ -277,7 +276,7 @@ public:
   //These cannot have noinline in gcc, which makes this semi-useless
   template<typename RangeTy>
   GALOIS_ATTRIBUTE_NOINLINE
-  void push_initial(RangeTy range) {
+  void push_initial(const RangeTy& range) {
     wl.push_initial(range);
   }
 

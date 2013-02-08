@@ -51,7 +51,7 @@ public:
   }
 
   template<typename RangeTy>
-  void push_initial(RangeTy range) {
+  void push_initial(const RangeTy& range) {
     global.push_initial(range);
   }
 

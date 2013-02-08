@@ -52,6 +52,7 @@ struct squeues<false,TQ> {
   int size() { return 0; }
 };
 
+//! Common functionality to all chunked worklists
 template<typename T, template<typename, bool> class QT, bool distributed = false, bool isStack = false, int chunksize=64, bool concurrent=true>
 class ChunkedMaster : private boost::noncopyable {
   class Chunk : public Galois::FixedSizeRing<T, chunksize>, public QT<Chunk, concurrent>::ListNode {};
@@ -154,8 +155,9 @@ public:
   }
 
   template<typename RangeTy>
-  void push_initial(RangeTy range) {
-    push(range.local_begin(), range.local_end());
+  void push_initial(const RangeTy& range) {
+    auto rp = range.local_pair();
+    push(rp.first, rp.second);
   }
 
   boost::optional<value_type> pop()  {
@@ -187,18 +189,38 @@ public:
   }
 };
 
+/**
+ * Chunked FIFO. A FIFO of chunks of some fixed size.
+ *
+ * @tparam chunksize chunk size
+ */
 template<int chunksize=64, typename T = int, bool concurrent=true>
 class ChunkedFIFO : public ChunkedMaster<T, ConExtLinkedQueue, false, false, chunksize, concurrent> {};
 GALOIS_WLCOMPILECHECK(ChunkedFIFO)
 
+/**
+ * Chunked LIFO. A LIFO of chunks of some fixed size.
+ *
+ * @tparam chunksize chunk size
+ */
 template<int chunksize=64, typename T = int, bool concurrent=true>
 class ChunkedLIFO : public ChunkedMaster<T, ConExtLinkedStack, false, true, chunksize, concurrent> {};
 GALOIS_WLCOMPILECHECK(ChunkedLIFO)
 
+/**
+ * Distributed chunked FIFO. A more scalable version of {@link ChunkedFIFO}.
+ *
+ * @tparam chunksize chunk size
+ */
 template<int chunksize=64, typename T = int, bool concurrent=true>
 class dChunkedFIFO : public ChunkedMaster<T, ConExtLinkedQueue, true, false, chunksize, concurrent> {};
 GALOIS_WLCOMPILECHECK(dChunkedFIFO)
 
+/**
+ * Distributed chunked LIFO. A more scalable version of {@link ChunkedLIFO}.
+ *
+ * @tparam chunksize chunk size
+ */
 template<int chunksize=64, typename T = int, bool concurrent=true>
 class dChunkedLIFO : public ChunkedMaster<T, ConExtLinkedStack, true, true, chunksize, concurrent> {};
 GALOIS_WLCOMPILECHECK(dChunkedLIFO)

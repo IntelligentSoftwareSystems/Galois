@@ -30,7 +30,7 @@
 #include "Galois/Runtime/mm/Mem.h"
 
 #include "Galois/FixedSizeRing.h"
-#include "Galois/util/GAlgs.h"
+#include "Galois/gstl.h"
 
 #include <iterator>
 #include <vector>
@@ -43,7 +43,6 @@
 #include <boost/optional.hpp>
 #include <boost/ref.hpp>
 
-
 #include "Lifo.h"
 #include "Fifo.h"
 #include "GFifo.h"
@@ -54,8 +53,22 @@
 #include "BulkSynchronous.h"
 
 namespace Galois {
+/**
+ * Scheduling policies for Galois iterators. Unless you have very specific
+ * scheduling requirement, {@link dChunkedLIFO} or {@link dChunkedFIFO} is a
+ * reasonable scheduling policy. If you need approximate priority scheduling,
+ * use {@link OrderedByIntegerMetric}. For debugging, you may be interested
+ * in {@link FIFO} or {@link LIFO}, which try to follow serial order exactly.
+ *
+ * The way to use a worklist is to pass it as a template parameter to
+ * {@link for_each()}. For example,
+ *
+ * \code
+ * Galois::for_each<Galois::WorkList::dChunkedFIFO<32> >(begin, end, fn);
+ * \endcode
+ */
 namespace WorkList {
-namespace { // don't polute the symbol table with the example
+namespace { // don't pollute the symbol table with the example
 
 // Worklists may not be copied.
 // Worklists should be default instantiatable
@@ -80,16 +93,16 @@ public:
   using retype = AbstractWorkList<Tnew, concurrent>;
 
   //! push a value onto the queue
-  void push(const value_type& val) { abort(); }
+  void push(const value_type& val);
 
   //! push a range onto the queue
   template<typename Iter>
-  void push(Iter b, Iter e) { abort(); }
+  void push(Iter b, Iter e);
 
   //! push initial range onto the queue
   //! called with the same b and e on each thread
   template<typename RangeTy>
-  void push_initial(RangeTy) { abort(); }
+  void push_initial(const RangeTy&);
 
   //Optional, but this is the likely interface for stealing
   //! steal from a similar worklist

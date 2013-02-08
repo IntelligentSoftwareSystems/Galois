@@ -42,7 +42,8 @@
 
 namespace Galois {
 namespace Runtime {
-namespace DeterministicWork {
+//! Implementation of deterministic execution
+namespace DeterministicImpl {
 
 struct OrderedTag { };
 struct UnorderedTag { };
@@ -57,7 +58,7 @@ struct DItem {
 };
 
 template<typename T, typename CompareTy>
-struct DeterministicContext: public Galois::Runtime::SimpleRuntimeContext {
+struct DeterministicContext: public SimpleRuntimeContext {
   typedef DItem<T> Item;
 
   Item item;
@@ -75,7 +76,7 @@ struct DeterministicContext: public Galois::Runtime::SimpleRuntimeContext {
     return not_ready;
   }
 
-  virtual void sub_acquire(Galois::Runtime::Lockable* L) {
+  virtual void sub_acquire(Lockable* L) {
     // TODO: should be redundant with new context hierarchy and virtual function call
     // Normal path
     // if (pendingFlag.flag.data == NON_DET) {
@@ -118,7 +119,6 @@ struct DeterministicContext: public Galois::Runtime::SimpleRuntimeContext {
 };
 
 namespace {
-
 template<typename T, typename CompTy> 
 struct OrderedContextComp {
   typedef DeterministicContext<T, OrderedContextComp> DetContext;
@@ -214,30 +214,30 @@ struct has_local_state {
 
 template<typename T,typename FunctionTy,typename Enable=void>
 struct StateManager { 
-  void alloc(Galois::Runtime::UserContextAccess<T>&, FunctionTy& self) { }
-  void dealloc(Galois::Runtime::UserContextAccess<T>&) { }
-  void save(Galois::Runtime::UserContextAccess<T>&, void*&) { }
-  void restore(Galois::Runtime::UserContextAccess<T>&, void*) { } 
+  void alloc(UserContextAccess<T>&, FunctionTy& self) { }
+  void dealloc(UserContextAccess<T>&) { }
+  void save(UserContextAccess<T>&, void*&) { }
+  void restore(UserContextAccess<T>&, void*) { } 
 };
 
 template<typename T,typename FunctionTy>
 struct StateManager<T,FunctionTy,typename boost::enable_if<has_local_state<FunctionTy> >::type> {
   typedef typename FunctionTy::LocalState LocalState;
-  void alloc(Galois::Runtime::UserContextAccess<T>& c,FunctionTy& self) {
+  void alloc(UserContextAccess<T>& c,FunctionTy& self) {
     void *p = c.data().getPerIterAlloc().allocate(sizeof(LocalState));
     new (p) LocalState(self, c.data().getPerIterAlloc());
     c.setLocalState(p, false);
   }
-  void dealloc(Galois::Runtime::UserContextAccess<T>& c) {
+  void dealloc(UserContextAccess<T>& c) {
     bool dummy;
     LocalState *p = reinterpret_cast<LocalState*>(c.data().getLocalState(dummy));
     p->~LocalState();
   }
-  void save(Galois::Runtime::UserContextAccess<T>& c, void*& localState) { 
+  void save(UserContextAccess<T>& c, void*& localState) { 
     bool dummy;
     localState = c.data().getLocalState(dummy);
   }
-  void restore(Galois::Runtime::UserContextAccess<T>& c, void* localState) { 
+  void restore(UserContextAccess<T>& c, void* localState) { 
     c.setLocalState(localState, true);
   }
 };
@@ -265,7 +265,7 @@ class BreakManager<FunctionTy,typename boost::enable_if<has_break_fn<FunctionTy>
 
 public:
   BreakManager(FunctionTy& fn): breakFn(fn) { 
-    int numActive = (int) Galois::getActiveThreads();
+    int numActive = (int) getActiveThreads();
     barrier.reinit(numActive);
   }
 
@@ -393,13 +393,13 @@ class DMergeLocal: private boost::noncopyable {
 
   typedef DItem<T> Item;
   typedef DNewItem<T> NewItem;
-  typedef std::vector<NewItem,typename Galois::PerIterAllocTy::rebind<NewItem>::other> NewItemsTy;
+  typedef std::vector<NewItem,typename PerIterAllocTy::rebind<NewItem>::other> NewItemsTy;
   typedef FIFO<1024,Item> ReserveTy;
 
-  typedef std::vector<T,typename Galois::PerIterAllocTy::rebind<T>::other> PQ;
+  typedef std::vector<T,typename PerIterAllocTy::rebind<T>::other> PQ;
 
-  Galois::IterAllocBaseTy heap;
-  Galois::PerIterAllocTy alloc;
+  IterAllocBaseTy heap;
+  PerIterAllocTy alloc;
   size_t window;
   size_t delta;
   size_t committed;
@@ -718,8 +718,8 @@ protected:
   typedef typename MergeLocal::NewItemsTy NewItemsTy;
   typedef typename NewItemsTy::iterator NewItemsIterator;
 
-  Galois::IterAllocBaseTy heap;
-  Galois::PerIterAllocTy alloc;
+  IterAllocBaseTy heap;
+  PerIterAllocTy alloc;
   PerThreadStorage<MergeLocal> data;
 
   NewWork new_;
@@ -743,7 +743,7 @@ protected:
 
 public:
   DMergeManagerBase(): alloc(&heap) {
-    numActive = Galois::getActiveThreads();
+    numActive = getActiveThreads();
   }
 
   ~DMergeManagerBase() {
@@ -814,10 +814,10 @@ class DMergeManager: public DMergeManagerBase<OptionsTy> {
   };
 
   typedef boost::transform_iterator<GetNewItem, boost::counting_iterator<int> > MergeOuterIt;
-  typedef typename Galois::ChooseStlTwoLevelIterator<MergeOuterIt, typename NewItemsTy::iterator>::type MergeIt;
+  typedef typename ChooseStlTwoLevelIterator<MergeOuterIt, typename NewItemsTy::iterator>::type MergeIt;
 
-  std::vector<NewItem,typename Galois::PerIterAllocTy::rebind<NewItem>::other> mergeBuf;
-  std::vector<T,typename Galois::PerIterAllocTy::rebind<T>::other> distributeBuf;
+  std::vector<NewItem,typename PerIterAllocTy::rebind<NewItem>::other> mergeBuf;
+  std::vector<T,typename PerIterAllocTy::rebind<T>::other> distributeBuf;
 
   GBarrier barrier[4];
 
@@ -838,12 +838,12 @@ class DMergeManager: public DMergeManagerBase<OptionsTy> {
     // MergeIt aa(bbegin, mmid), ea(mmid, mmid);
     // MergeIt bb(mmid, eend), eb(eend, eend);
     // MergeIt cc(bbegin, eend), ec(eend, eend);
-    MergeIt aa = Galois::stl_two_level_begin(bbegin, mmid);
-    MergeIt ea = Galois::stl_two_level_end(bbegin, mmid);
-    MergeIt bb = Galois::stl_two_level_begin(mmid, eend);
-    MergeIt eb = Galois::stl_two_level_end(mmid, eend);
-    MergeIt cc = Galois::stl_two_level_begin(bbegin, eend);
-    MergeIt ec = Galois::stl_two_level_end(bbegin, eend);
+    MergeIt aa = stl_two_level_begin(bbegin, mmid);
+    MergeIt ea = stl_two_level_end(bbegin, mmid);
+    MergeIt bb = stl_two_level_begin(mmid, eend);
+    MergeIt eb = stl_two_level_end(mmid, eend);
+    MergeIt cc = stl_two_level_begin(bbegin, eend);
+    MergeIt ec = stl_two_level_end(bbegin, eend);
 
     while (aa != ea && bb != eb) {
       if (*aa < *bb)
@@ -940,8 +940,8 @@ class DMergeManager: public DMergeManagerBase<OptionsTy> {
 
     MergeOuterIt bbegin(boost::make_counting_iterator(0), GetNewItem(&this->data));
     MergeOuterIt eend(boost::make_counting_iterator((int) this->numActive), GetNewItem(&this->data));
-    MergeIt ii = Galois::stl_two_level_begin(bbegin, eend);
-    MergeIt ei = Galois::stl_two_level_end(eend, eend);
+    MergeIt ii = stl_two_level_begin(bbegin, eend);
+    MergeIt ei = stl_two_level_end(eend, eend);
 
     distribute(boost::make_transform_iterator(ii, typename Base::NewItem::GetFirst()),
         boost::make_transform_iterator(ei, typename Base::NewItem::GetFirst()),
@@ -1027,7 +1027,7 @@ class DMergeManager<OptionsTy,typename boost::enable_if<MergeTraits<OptionsTy> >
     }
   };
 
-  std::vector<NewItem,typename Galois::PerIterAllocTy::rebind<NewItem>::other> mergeBuf;
+  std::vector<NewItem,typename PerIterAllocTy::rebind<NewItem>::other> mergeBuf;
 
   GBarrier barrier;
   IdFn idFunction;
@@ -1067,9 +1067,9 @@ public:
       mergeBuf.push_back(NewItem(*ii, idFunction(*ii), 1));
 
     if (OptionsTy::useOrdered)
-      Galois::ParallelSTL::sort(mergeBuf.begin(), mergeBuf.end(), CompareNewItems(comp));
+      ParallelSTL::sort(mergeBuf.begin(), mergeBuf.end(), CompareNewItems(comp));
     else
-      Galois::ParallelSTL::sort(mergeBuf.begin(), mergeBuf.end());
+      ParallelSTL::sort(mergeBuf.begin(), mergeBuf.end());
 
     mlocal.initialLimits(mergeBuf.begin(), mergeBuf.end());
     if (OptionsTy::useOrdered) {
@@ -1254,7 +1254,7 @@ class Executor {
   // Truly thread-local
   struct ThreadLocalData: private boost::noncopyable {
     LocalPendingWork localPending;
-    Galois::Runtime::UserContextAccess<value_type> facing;
+    UserContextAccess<value_type> facing;
     LoopStatistics<OptionsTy::needsStats> stat;
     WL* wlcur;
     WL* wlnext;
@@ -1286,7 +1286,7 @@ public:
   Executor(const OptionsTy& o, const char* ln):
     options(o), mergeManager(o), loopname(ln), breakManager(o.fn1)
   { 
-    numActive = (int) Galois::getActiveThreads();
+    numActive = (int) getActiveThreads();
     for (unsigned i = 0; i < sizeof(barrier)/sizeof(*barrier); ++i)
       barrier[i].reinit(numActive);
     if (OptionsTy::needsBreak && !has_break_fn<typename OptionsTy::Function1Ty>::value) {
@@ -1546,18 +1546,17 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
   return retval;
 }
 
-
-
 } // end namespace anonymous
-} // end namespace DeterministicWork
+} // end namespace DeterministicImpl
 
-template<typename InitTy, typename WorkTy>
-static inline void for_each_det_impl(InitTy& init, WorkTy& W) {
-  W.presort(init.range.begin(), init.range.end());
+template<typename RangeTy, typename WorkTy>
+static inline void for_each_det_impl(const RangeTy& range, WorkTy& W) {
+  W.presort(range.begin(), range.end());
 
   assert(!inGaloisForEach);
 
   inGaloisForEach = true;
+  RunCommand init(std::bind(&WorkTy::template AddInitialWork<RangeTy>, std::ref(W), std::ref(range)));
   RunCommand w[4] = {std::ref(init), 
 		     std::ref(getSystemBarrier()),
 		     std::ref(W),
@@ -1567,12 +1566,13 @@ static inline void for_each_det_impl(InitTy& init, WorkTy& W) {
 }
 
 
+//! Ordered set iteration using deterministic executor
 template<typename IterTy, typename ComparatorTy, typename NhFunc, typename OpFunc>
 static inline void for_each_ordered_2p(IterTy b, IterTy e, ComparatorTy comp, NhFunc f1, OpFunc f2, const char* loopname) {
-  typedef Galois::Runtime::StandardRange<IterTy> Range;
+  typedef Runtime::StandardRange<IterTy> Range;
   typedef typename Range::value_type T;
-  typedef Galois::Runtime::DeterministicWork::OrderedOptions<T,NhFunc,OpFunc,ComparatorTy> OptionsTy;
-  typedef Galois::Runtime::DeterministicWork::Executor<OptionsTy> WorkTy;
+  typedef Runtime::DeterministicImpl::OrderedOptions<T,NhFunc,OpFunc,ComparatorTy> OptionsTy;
+  typedef Runtime::DeterministicImpl::Executor<OptionsTy> WorkTy;
 
   OptionsTy options(f1, f2, comp);
   WorkTy W(options, loopname);
@@ -1588,15 +1588,26 @@ static inline void for_each_ordered_2p(IterTy b, IterTy e, ComparatorTy comp, Nh
 
 namespace Galois {
 
-//! Deterministic execution with prefix 
+/**
+ * Deterministic execution with prefix operator.
+ * The prefix of the operator should be exactly the same as the operator
+ * but with execution returning at the failsafe point. The operator
+ * should conform to a standard Galois unordered set operator {@link for_each()}.
+ *
+ * @param b begining of range of initial items
+ * @param e end of range of initial items
+ * @param prefix prefix of operator
+ * @param fn operator
+ * @param loopname string to identity loop in statistics output
+ */
 template<typename IterTy, typename Function1Ty, typename Function2Ty>
-static inline void for_each_det(IterTy b, IterTy e, Function1Ty f1, Function2Ty f2, const char* loopname = 0) {
-  typedef Galois::Runtime::StandardRange<IterTy> Range;
+static inline void for_each_det(IterTy b, IterTy e, Function1Ty prefix, Function2Ty fn, const char* loopname = 0) {
+  typedef Runtime::StandardRange<IterTy> Range;
   typedef typename Range::value_type T;
-  typedef Galois::Runtime::DeterministicWork::UnorderedOptions<T,Function1Ty,Function2Ty> OptionsTy;
-  typedef Galois::Runtime::DeterministicWork::Executor<OptionsTy> WorkTy;
+  typedef Runtime::DeterministicImpl::UnorderedOptions<T,Function1Ty,Function2Ty> OptionsTy;
+  typedef Runtime::DeterministicImpl::Executor<OptionsTy> WorkTy;
 
-  OptionsTy options(f1, f2);
+  OptionsTy options(prefix, fn);
   WorkTy W(options, loopname);
   //Galois::Runtime::Initializer<Range, WorkTy> init(Range(b, e), W);
   Range range(b,e);
@@ -1604,22 +1615,55 @@ static inline void for_each_det(IterTy b, IterTy e, Function1Ty f1, Function2Ty 
   Galois::Runtime::for_each_det_impl(init, W);
 }
 
+/**
+ * Deterministic execution with prefix operator.
+ * The prefix of the operator should be exactly the same as the operator
+ * but with execution returning at the failsafe point. The operator
+ * should conform to a standard Galois unordered set operator {@link for_each()}.
+ *
+ * @param i initial item
+ * @param prefix prefix of operator
+ * @param fn operator
+ * @param loopname string to identity loop in statistics output
+ */
 template<typename T, typename Function1Ty, typename Function2Ty>
-static inline void for_each_det(T e, Function1Ty f1, Function2Ty f2, const char* loopname = 0) {
-  T wl[1] = { e };
-  Galois::for_each_det(&wl[0], &wl[1], f1, f2, loopname);
+static inline void for_each_det(T i, Function1Ty prefix, Function2Ty fn, const char* loopname = 0) {
+  T wl[1] = { i };
+  for_each_det(&wl[0], &wl[1], prefix, fn, loopname);
 }
 
-//! Deterministic execution
+/**
+ * Deterministic execution with single operator.
+ * The operator fn is used both for the prefix computation and for the
+ * continuation of computation, c.f., the prefix operator version which
+ * uses two different functions. The operator can distinguish between
+ * the two uses by querying {@link UserContext.getLocalState()}.
+ *
+ * @param b begining of range of initial items
+ * @param e end of range of initial items
+ * @param fn operator
+ * @param loopname string to identity loop in statistics output
+ */
 template<typename IterTy, typename FunctionTy>
-static inline void for_each_det(IterTy b, IterTy e, FunctionTy f, const char* loopname = 0) {
-  Galois::for_each_det(b, e, f, f, loopname);
+static inline void for_each_det(IterTy b, IterTy e, FunctionTy fn, const char* loopname = 0) {
+  for_each_det(b, e, fn, fn, loopname);
 }
 
+/**
+ * Deterministic execution with single operator.
+ * The operator fn is used both for the prefix computation and for the
+ * continuation of computation, c.f., the prefix operator version which
+ * uses two different functions. The operator can distinguish between
+ * the two uses by querying {@link UserContext.getLocalState()}.
+ *
+ * @param i initial item
+ * @param fn operator
+ * @param loopname string to identity loop in statistics output
+ */
 template<typename T, typename FunctionTy>
-static inline void for_each_det(T e, FunctionTy f, const char* loopname = 0) {
-  T wl[1] = { e };
-  Galois::for_each_det(&wl[0], &wl[1], f, f, loopname);
+static inline void for_each_det(T i, FunctionTy fn, const char* loopname = 0) {
+  T wl[1] = { i };
+  for_each_det(&wl[0], &wl[1], fn, fn, loopname);
 }
 
 } // end namespace Galois

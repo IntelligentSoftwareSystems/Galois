@@ -20,49 +20,10 @@
  *
  * @section Description
  *
- * There are two main classes, ::FileGraph and ::LC_FileGraph. The former
+ * There are two main classes, ::FileGraph and ::LC_XXX_Graph. The former
  * represents the pure structure of a graph (i.e., whether an edge exists between
  * two nodes) and cannot be modified. The latter allows values to be stored on
  * nodes and edges, but the structure of the graph cannot be modified.
- *
- * An example of use:
- * 
- * \code
- * typedef Galois::Graph::LC_CSR_Graph<int,int> Graph;
- * 
- * // Create graph
- * Graph g;
- * g.structureFromFile(inputfile);
- *
- * // Traverse graph
- * for (Graph::iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
- *   Graph::GraphNode src = *ii;
- *   for (Graph::edge_iterator jj = g.edge_begin(src), ej = g.edge_end(src); jj != ej; ++jj) {
- *     Graph::GraphNode dst = g.getEdgeDst(jj);
- *     int edgeData = g.getEdgeData(jj);
- *     int nodeData = g.getData(dst);
- *   }
- * }
- * \endcode
- *
- * And in C++11:
- *
- * \code
- * typedef Galois::Graph::LC_CSR_Graph<int,int> Graph;
- * 
- * // Create graph
- * Graph g;
- * g.structureFromFile(inputfile);
- *
- * // Traverse graph
- * for (Graph::GraphNode src : g) {
- *   for (Graph::edge_iterator edge : g.out_edges(src)) {
- *     Graph::GraphNode dst = g.getEdgeDst(edge);
- *     int edgeData = g.getEdgeData(edge);
- *     int nodeData = g.getData(dst);
- *   }
- * }
- * \endcode
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  * @author Donald Nguyen <ddn@cs.utexas.edu>
@@ -86,6 +47,8 @@
 namespace Galois {
 namespace Graph {
 
+namespace LCGraphImpl {
+
 template<typename GraphTy>
 void structureFromFile(GraphTy& g, const std::string& fname) {
   FileGraph graph;
@@ -103,7 +66,6 @@ struct EdgeSortCompWrapper {
   }
 };
 
-namespace {
 uint64_t inline localStart(uint64_t numNodes) {
   unsigned int id = Galois::Runtime::LL::getTID();
   unsigned int num = Galois::getActiveThreads();
@@ -115,7 +77,6 @@ uint64_t inline localEnd(uint64_t numNodes) {
   unsigned int num = Galois::getActiveThreads();
   uint64_t end = (numNodes + num - 1) / num * (id + 1);
   return std::min(end, numNodes);
-}
 }
 
 //! Partial specializations for void node data
@@ -157,14 +118,67 @@ public:
   iterator end() { return make_no_deref_iterator(g.edge_end(n, flag)); }
 };
 
-//! Local computation graph (i.e., graph structure does not change)
+template<typename NodeInfoTy,typename EdgeTy>
+struct EdgeInfoBase: public LazyObject<EdgeTy> {
+  typedef LazyObject<EdgeTy> Super;
+  typedef typename Super::reference reference;
+  typedef typename Super::value_type value_type;
+  const static bool has_value = Super::has_value;
+
+  NodeInfoTy* dst;
+};
+
+} // end namespace impl
+
+/**
+ * Local computation graph (i.e., graph structure does not change).
+ *
+ * An example of use:
+ * 
+ * \code
+ * typedef Galois::Graph::LC_CSR_Graph<int,int> Graph;
+ * 
+ * // Create graph
+ * Graph g;
+ * g.structureFromFile(inputfile);
+ *
+ * // Traverse graph
+ * for (Graph::iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
+ *   Graph::GraphNode src = *ii;
+ *   for (Graph::edge_iterator jj = g.edge_begin(src), ej = g.edge_end(src); jj != ej; ++jj) {
+ *     Graph::GraphNode dst = g.getEdgeDst(jj);
+ *     int edgeData = g.getEdgeData(jj);
+ *     int nodeData = g.getData(dst);
+ *   }
+ * }
+ * \endcode
+ *
+ * And in C++11:
+ *
+ * \code
+ * typedef Galois::Graph::LC_CSR_Graph<int,int> Graph;
+ * 
+ * // Create graph
+ * Graph g;
+ * g.structureFromFile(inputfile);
+ *
+ * // Traverse graph
+ * for (Graph::GraphNode src : g) {
+ *   for (Graph::edge_iterator edge : g.out_edges(src)) {
+ *     Graph::GraphNode dst = g.getEdgeDst(edge);
+ *     int edgeData = g.getEdgeData(edge);
+ *     int nodeData = g.getData(dst);
+ *   }
+ * }
+ * \endcode
+ */
 template<typename NodeTy, typename EdgeTy>
 class LC_CSR_Graph: boost::noncopyable {
 protected:
   typedef LargeArray<EdgeTy,true> EdgeData;
   typedef typename EdgeData::value_type edge_data_type;
   typedef LargeArray<uint32_t,true> EdgeDst;
-  typedef NodeInfoBase<NodeTy> NodeInfo;
+  typedef LCGraphImpl::NodeInfoBase<NodeTy> NodeInfo;
 
   struct EdgeValue: public StrictObject<EdgeTy> {
     typedef StrictObject<EdgeTy> Super;
@@ -311,8 +325,8 @@ public:
   iterator begin() const { return iterator(0); }
   iterator end() const { return iterator(numNodes); }
 
-  local_iterator local_begin() const { return iterator(localStart(numNodes)); }
-  local_iterator local_end() const { return iterator(localEnd(numNodes)); }
+  local_iterator local_begin() const { return iterator(LCGraphImpl::localStart(numNodes)); }
+  local_iterator local_end() const { return iterator(LCGraphImpl::localEnd(numNodes)); }
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::acquire(&nodeData[N], mflag);
@@ -330,17 +344,17 @@ public:
     return edge_iterator(raw_neighbor_end(N));
   }
 
-  EdgesIterator<LC_CSR_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
-    return EdgesIterator<LC_CSR_Graph>(*this, N, mflag);
+  LCGraphImpl::EdgesIterator<LC_CSR_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+    return LCGraphImpl::EdgesIterator<LC_CSR_Graph>(*this, N, mflag);
   }
 
   template<typename CompTy>
   void sortEdges(GraphNode N, const CompTy& comp = std::less<EdgeTy>(), MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::acquire(&nodeData[N], mflag);
-    std::sort(edge_sort_begin(N), edge_sort_end(N), EdgeSortCompWrapper<EdgeValue,CompTy>(comp));
+    std::sort(edge_sort_begin(N), edge_sort_end(N), LCGraphImpl::EdgeSortCompWrapper<EdgeValue,CompTy>(comp));
   }
 
-  void structureFromFile(const std::string& fname) { Galois::Graph::structureFromFile(*this, fname); }
+  void structureFromFile(const std::string& fname) { LCGraphImpl::structureFromFile(*this, fname); }
 
   void structureFromGraph(FileGraph& graph) {
     numNodes = graph.size();
@@ -357,25 +371,15 @@ public:
   }
 };
 
-template<typename NodeInfoTy,typename EdgeTy>
-struct EdgeInfoBase: public LazyObject<EdgeTy> {
-  typedef LazyObject<EdgeTy> Super;
-  typedef typename Super::reference reference;
-  typedef typename Super::value_type value_type;
-  const static bool has_value = Super::has_value;
-
-  NodeInfoTy* dst;
-};
-
 //! Local computation graph (i.e., graph structure does not change)
 template<typename NodeTy, typename EdgeTy>
 class LC_CSRInline_Graph: boost::noncopyable {
 protected:
   struct NodeInfo;
-  typedef EdgeInfoBase<NodeInfo, EdgeTy> EdgeInfo;
+  typedef LCGraphImpl::EdgeInfoBase<NodeInfo, EdgeTy> EdgeInfo;
   typedef typename EdgeInfo::value_type edge_data_type;
   
-  struct NodeInfo: public NodeInfoBase<NodeTy> {
+  struct NodeInfo: public LCGraphImpl::NodeInfoBase<NodeTy> {
     EdgeInfo* edgeBegin;
     EdgeInfo* edgeEnd;
   };
@@ -454,8 +458,8 @@ public:
   iterator begin() const { return iterator(nodeData.data()); }
   iterator end() const { return iterator(endNode); }
 
-  local_iterator local_begin() const { return iterator(&nodeData[localStart(numNodes)]); }
-  local_iterator local_end() const { return iterator(&nodeData[localEnd(numNodes)]); }
+  local_iterator local_begin() const { return iterator(&nodeData[LCGraphImpl::localStart(numNodes)]); }
+  local_iterator local_end() const { return iterator(&nodeData[LCGraphImpl::localEnd(numNodes)]); }
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::acquire(N, mflag);
@@ -472,11 +476,11 @@ public:
     return N->edgeEnd;
   }
 
-  EdgesIterator<LC_CSRInline_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
-    return EdgesIterator<LC_CSRInline_Graph>(*this, N, mflag);
+  LCGraphImpl::EdgesIterator<LC_CSRInline_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+    return LCGraphImpl::EdgesIterator<LC_CSRInline_Graph>(*this, N, mflag);
   }
 
-  void structureFromFile(const std::string& fname) { Galois::Graph::structureFromFile(*this, fname); }
+  void structureFromFile(const std::string& fname) { LCGraphImpl::structureFromFile(*this, fname); }
 
   void structureFromGraph(FileGraph& graph) {
     numNodes = graph.size();
@@ -513,11 +517,11 @@ template<typename NodeTy, typename EdgeTy>
 class LC_Linear_Graph: boost::noncopyable {
 protected:
   struct NodeInfo;
-  typedef EdgeInfoBase<NodeInfo,EdgeTy> EdgeInfo;
+  typedef LCGraphImpl::EdgeInfoBase<NodeInfo,EdgeTy> EdgeInfo;
   typedef typename EdgeInfo::value_type edge_data_type;
   typedef LargeArray<NodeInfo*,true> Nodes;
 
-  struct NodeInfo : public NodeInfoBase<NodeTy> {
+  struct NodeInfo : public LCGraphImpl::NodeInfoBase<NodeTy> {
     int numEdges;
 
     EdgeInfo* edgeBegin() {
@@ -609,10 +613,10 @@ public:
   iterator end() { return &nodes[numNodes]; }
   const_iterator begin() const { return &nodes[0]; }
   const_iterator end() const { return &nodes[numNodes]; }
-  local_iterator local_begin() { return &nodes[localStart(numNodes)]; }
-  local_iterator local_end() { return &nodes[localEnd(numNodes)]; }
-  const_local_iterator local_begin() const { return &nodes[localStart(numNodes)]; }
-  const_local_iterator local_end() const { return &nodes[localEnd(numNodes)]; }
+  local_iterator local_begin() { return &nodes[LCGraphImpl::localStart(numNodes)]; }
+  local_iterator local_end() { return &nodes[LCGraphImpl::localEnd(numNodes)]; }
+  const_local_iterator local_begin() const { return &nodes[LCGraphImpl::localStart(numNodes)]; }
+  const_local_iterator local_end() const { return &nodes[LCGraphImpl::localEnd(numNodes)]; }
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::acquire(N, mflag);
@@ -629,17 +633,17 @@ public:
     return N->edgeEnd();
   }
 
-  EdgesIterator<LC_Linear_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
-    return EdgesIterator<LC_Linear_Graph>(*this, N, mflag);
+  LCGraphImpl::EdgesIterator<LC_Linear_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+    return LCGraphImpl::EdgesIterator<LC_Linear_Graph>(*this, N, mflag);
   }
 
   template<typename CompTy>
   void sortEdges(GraphNode N, const CompTy& comp = std::less<EdgeTy>(), MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::acquire(N, mflag);
-    std::sort(N->edgeBegin(), N->edgeEnd(), EdgeSortCompWrapper<EdgeInfo,CompTy>(comp));
+    std::sort(N->edgeBegin(), N->edgeEnd(), LCGraphImpl::EdgeSortCompWrapper<EdgeInfo,CompTy>(comp));
   }
 
-  void structureFromFile(const std::string& fname) { Galois::Graph::structureFromFile(*this, fname); }
+  void structureFromFile(const std::string& fname) { LCGraphImpl::structureFromFile(*this, fname); }
 
   void structureFromGraph(FileGraph& graph) {
     numNodes = graph.size();
@@ -674,11 +678,11 @@ template<typename NodeTy, typename EdgeTy>
 class LC_Numa_Graph: boost::noncopyable {
 protected:
   struct NodeInfo;
-  typedef EdgeInfoBase<NodeInfo,EdgeTy> EdgeInfo;
+  typedef LCGraphImpl::EdgeInfoBase<NodeInfo,EdgeTy> EdgeInfo;
   typedef typename EdgeInfo::value_type edge_data_type;
   typedef LargeArray<NodeInfo*,true> Nodes;
 
-  struct NodeInfo : public NodeInfoBase<NodeTy> {
+  struct NodeInfo : public LCGraphImpl::NodeInfoBase<NodeTy> {
     int numEdges;
 
     EdgeInfo* edgeBegin() {
@@ -979,11 +983,11 @@ public:
     return N->edgeEnd();
   }
 
-  EdgesIterator<LC_Numa_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
-    return EdgesIterator<LC_Numa_Graph>(*this, N, mflag);
+  LCGraphImpl::EdgesIterator<LC_Numa_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+    return LCGraphImpl::EdgesIterator<LC_Numa_Graph>(*this, N, mflag);
   }
 
-  void structureFromFile(const std::string& fname) { Galois::Graph::structureFromFile(*this, fname); }
+  void structureFromFile(const std::string& fname) { LCGraphImpl::structureFromFile(*this, fname); }
 
   void structureFromGraph(FileGraph& graph) {
     numNodes = graph.size();

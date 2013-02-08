@@ -144,6 +144,15 @@ struct SNode {
 	//Galois::Runtime::LL::SimpleLock<true> mutex;
 };
 
+// Check hack above
+struct CheckAssertion {
+  CheckAssertion() {
+    static_assert(std::is_same<GNode, Graph::GraphNode>::value, "GNode != Graph::GraphNode");
+  }
+};
+
+static CheckAssertion init;
+
 struct Prefix {
   unsigned int id;
 	unsigned int val;

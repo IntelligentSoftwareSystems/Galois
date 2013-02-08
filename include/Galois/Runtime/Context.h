@@ -32,6 +32,8 @@
 #include <cstdlib>
 #include <setjmp.h>
 
+//! Throwing exceptions can be a scalability bottleneck.
+
 namespace Galois {
 namespace Runtime {
 
@@ -63,7 +65,7 @@ class LocalDirectory;
 class RemoteDirectory;
 }
 
-namespace DeterministicWork {
+namespace DeterministicImpl {
 template <typename, typename>
 struct DeterministicContext;
 }
@@ -77,7 +79,7 @@ class Lockable {
   friend class Distributed::LocalDirectory;
   friend class Distributed::RemoteDirectory;
   template <typename, typename>
-    friend struct Galois::Runtime::DeterministicWork::DeterministicContext;
+  friend struct Galois::Runtime::DeterministicImpl::DeterministicContext;
 public:
   LL::PtrLock<void, true> auxPtr;
   Lockable() :next(0) {}

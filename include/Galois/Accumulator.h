@@ -52,13 +52,12 @@ protected:
 
 public:
   /**
-   * @param F the binary functor acting as the reduction operator
+   * @param f the binary functor acting as the reduction operator
    */
   explicit GReducible(const BinFunc& f = BinFunc()): m_func(f), m_initial(T()) { }
 
   /**
-   * updates the thread local value
-   * by applying the reduction operator to 
+   * Updates the thread local value by applying the reduction operator to
    * current and newly provided value
    */
   void update(const T& rhs) {
@@ -67,7 +66,7 @@ public:
   }
 
   /**
-   * the final reduction value. Only valid outside the parallel region.
+   * Returns the final reduction value. Only valid outside the parallel region.
    */
   T& reduce() {
     T& d0 = *m_data.getLocal();
@@ -90,8 +89,7 @@ public:
 };
 
 
-//Derived types
-
+//! Operator form of max
 template<typename T>
 struct gmax {
   const T& operator()(const T& lhs, const T& rhs) const {
@@ -99,6 +97,7 @@ struct gmax {
   }
 };
 
+//! Operator form of min
 template<typename T>
 struct gmin {
   const T& operator()(const T& lhs, const T& rhs) const {
@@ -106,7 +105,7 @@ struct gmin {
   }
 };
 
-//! Turn binary functions over values into functions over references
+//! Turns binary functions over values into functions over references
 //!
 //! T operator()(const T& a, const T& b) =>
 //! void operator()(T& a, const T& b)
@@ -120,7 +119,7 @@ struct ReduceAssignWrap {
   }
 };
 
-//! Turn binary functions over item references into functions over vectors of items
+//! Turns binary functions over item references into functions over vectors of items
 //!
 //! void operator()(T& a, const T& b) =>
 //! void operator()(std::vector<T>& a, const std::vector<T>& b)
@@ -139,7 +138,7 @@ struct ReduceVectorWrap {
   }
 };
 
-//! Turn binary functions over item (value) references into functions over maps of items
+//! Turns binary functions over item (value) references into functions over maps of items
 //!
 //! void operator()(V& a, const V& b) =>
 //! void operator()(std::map<K,V>& a, const std::map<K,V>& b)
@@ -155,6 +154,10 @@ struct ReduceMapWrap {
   }
 };
 
+//! Turns functions over elements of a range into functions over collections
+//!
+//! void operator()(T a) =>
+//! void operator()(Collection<T>& a, const Collection<T>& b)
 template<typename CollectionTy,template<class> class AdaptorTy>
 struct ReduceCollectionWrap {
   typedef typename CollectionTy::value_type value_type;
@@ -183,7 +186,7 @@ public:
   explicit GSimpleReducible(const BinFunc& func = BinFunc()): base_type(func) { }
 };
 
-
+//! Accumulator for T where accumulation is sum
 template<typename T>
 class GAccumulator: public GReducible<T, ReduceAssignWrap<std::plus<T> > > {
   typedef GReducible<T, ReduceAssignWrap<std::plus<T> > > base_type;
@@ -229,13 +232,15 @@ public:
   }
 };
 
+//! Accumulator for set where accumulation is union
 template<typename SetTy>
 class GSetAccumulator: public GCollectionAccumulator<SetTy, std::insert_iterator> { };
 
+//! Accumulator for vector where accumulation is concatenation
 template<typename VectorTy>
 class GVectorAccumulator: public GCollectionAccumulator<VectorTy, std::back_insert_iterator> { };
 
-//! Accumulator for vector where vector is treated as a map and accumulate
+//! Accumulator for vector where a vector is treated as a map and accumulate
 //! does element-wise addition among all entries
 template<typename VectorTy>
 class GVectorElementAccumulator: public GReducible<VectorTy, ReduceVectorWrap<ReduceAssignWrap<std::plus<typename VectorTy::value_type> > > > {
@@ -272,6 +277,7 @@ public:
   }
 };
 
+//! Accumulator for T where accumulation is max
 template<typename T>
 class GReduceMax: public GReducible<T, ReduceAssignWrap<gmax<T> > > {
   typedef GReducible<T, ReduceAssignWrap<gmax<T> > > base_type;
@@ -279,6 +285,7 @@ public:
   GReduceMax(): base_type(ReduceAssignWrap<gmax<T> >(), std::numeric_limits<T>::min()) { }
 };
 
+//! Accumulator for T where accumulation is min
 template<typename T>
 class GReduceMin: public GReducible<T, ReduceAssignWrap<gmin<T> > > {
   typedef GReducible<T, ReduceAssignWrap<gmin<T> > > base_type;

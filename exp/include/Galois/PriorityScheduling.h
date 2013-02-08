@@ -46,10 +46,11 @@ struct PriAuto {
   typedef CTOrderedByIntegerMetric<Ind, Chunk,false> OBIM_CSN;
 
   //TBB
+#ifdef GALOIS_USE_TBB
   typedef TbbPriQueue<Greater> TBB;
   typedef PTbb<Greater> PTBB;
   typedef STbb<Greater> STBB;
-
+#endif
   //MISC
   typedef SkipListQueue<Less> SLQ;
   typedef SetQueue<Less> SETQ;

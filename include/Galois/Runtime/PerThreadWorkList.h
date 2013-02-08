@@ -50,7 +50,7 @@
 namespace Galois {
 namespace Runtime {
 
-namespace HIDDEN {
+namespace {
 
 enum GlobalPos {
   GLOBAL_BEGIN, GLOBAL_END
@@ -291,7 +291,7 @@ std::reverse_iterator<OuterPerThreadWLIter<PerThrdWL> >
 
 #endif
 
-} // end namespace HIDDEN
+} // end namespace 
 
 
 template <typename Cont_tp> 
@@ -313,12 +313,12 @@ public:
 
 #ifdef ADAPTOR_BASED_OUTER_ITER
 
-  typedef typename HIDDEN::TypeFactory<This_ty>::OuterIter OuterIter;
-  typedef typename HIDDEN::TypeFactory<This_ty>::RvrsOuterIter RvrsOuterIter;
+  typedef typename TypeFactory<This_ty>::OuterIter OuterIter;
+  typedef typename TypeFactory<This_ty>::RvrsOuterIter RvrsOuterIter;
 
 #else
 
-  typedef HIDDEN::OuterPerThreadWLIter<This_ty> OuterIter;
+  typedef OuterPerThreadWLIter<This_ty> OuterIter;
   typedef std::reverse_iterator<OuterIter> RvrsOuterIter;
 
 #endif
@@ -409,42 +409,42 @@ public:
 
   global_iterator begin_all () { 
     return Galois::stl_two_level_begin (
-        HIDDEN::make_outer_begin (*this), HIDDEN::make_outer_end (*this)); 
+        make_outer_begin (*this), make_outer_end (*this)); 
   }
 
   global_iterator end_all () { 
     return Galois::stl_two_level_end (
-        HIDDEN::make_outer_end (*this), HIDDEN::make_outer_end (*this)); 
+        make_outer_end (*this), make_outer_end (*this)); 
   }
 
   global_const_iterator begin_all () const { 
     return Galois::stl_two_level_cbegin (
-        HIDDEN::make_outer_begin (*this), HIDDEN::make_outer_end (*this));
+        make_outer_begin (*this), make_outer_end (*this));
   }
 
   global_const_iterator end_all () const { 
     return Galois::stl_two_level_cend (
-        HIDDEN::make_outer_begin (*this), HIDDEN::make_outer_end (*this));
+        make_outer_begin (*this), make_outer_end (*this));
   }
 
   global_reverse_iterator rbegin_all () { 
     return Galois::stl_two_level_rbegin (
-        HIDDEN::make_outer_rbegin (*this), HIDDEN::make_outer_rend (*this)); 
+        make_outer_rbegin (*this), make_outer_rend (*this)); 
   }
 
   global_reverse_iterator rend_all () { 
     return Galois::stl_two_level_rend (
-        HIDDEN::make_outer_rbegin (*this), HIDDEN::make_outer_rend (*this)); 
+        make_outer_rbegin (*this), make_outer_rend (*this)); 
   }
 
   global_const_reverse_iterator rbegin_all () const { 
     return Galois::stl_two_level_crbegin (
-        HIDDEN::make_outer_rbegin (*this), HIDDEN::make_outer_rend (*this));
+        make_outer_rbegin (*this), make_outer_rend (*this));
   }
 
   global_const_reverse_iterator rend_all () const { 
     return Galois::stl_two_level_crend (
-        HIDDEN::make_outer_rbegin (*this), HIDDEN::make_outer_rend (*this));
+        make_outer_rbegin (*this), make_outer_rend (*this));
   }
 
 
