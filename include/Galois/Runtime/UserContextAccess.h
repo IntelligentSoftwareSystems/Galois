@@ -35,12 +35,14 @@ class UserContextAccess : public Galois::UserContext<T> {
 public:
   typedef Galois::UserContext<T> SuperTy;
   typedef typename SuperTy::PushBufferTy PushBufferTy;
+  typedef typename SuperTy::FastPushBack FastPushBack;
 
   void resetAlloc() { SuperTy::__resetAlloc(); }
   PushBufferTy& getPushBuffer() { return SuperTy::__getPushBuffer(); }
   void resetPushBuffer() { SuperTy::__resetPushBuffer(); }
   SuperTy& data() { return *static_cast<SuperTy*>(this); }
   void setLocalState(void *p, bool used) { SuperTy::__setLocalState(p, used); }
+  void setFastPushBack(FastPushBack f) { SuperTy::__setFastPushBack(f); }
 };
 
 }

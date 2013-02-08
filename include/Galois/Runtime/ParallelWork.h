@@ -43,6 +43,7 @@
 #include <functional>
 
 namespace Galois {
+//! Internal Galois functionality - Use at your own risk.
 namespace Runtime {
 namespace {
 
@@ -204,6 +205,11 @@ protected:
     return runQueue<false>(tld, *aborted.getLocal(), true);
   }
 
+  void fastPushBack(typename UserContextAccess<value_type>::PushBufferTy& x) {
+    wl.push(x.begin(), x.end());
+    x.clear();
+  }
+
   template<bool checkAbort>
   void go() {
     //Thread Local Data goes on the local stack
@@ -211,6 +217,9 @@ protected:
     ThreadLocalData tld(loopname);
     if (ForEachTraits<FunctionTy>::NeedsAborts)
       setThreadContext(&tld.cnx);
+    if (false && ForEachTraits<FunctionTy>::NeedsPush && !ForEachTraits<FunctionTy>::NeedsAborts) {
+      tld.facing.setFastPushBack(std::bind(&ForEachWork::fastPushBack, std::ref(*this), std::placeholders::_1));
+    }
     bool didAnyWork;
     do {
       didAnyWork = false;

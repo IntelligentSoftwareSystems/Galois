@@ -65,6 +65,13 @@ protected:
     localStateUsed = used;
   }
 
+  static const int FAST_PUSHBACK_LIMIT = 32;
+  typedef std::function<void(PushBufferTy&)> FastPushBack; 
+  FastPushBack fastPushBack;
+  void __setFastPushBack(FastPushBack f) {
+    fastPushBack = f;
+  }
+
 public:
   UserContext()
     :IterationAllocatorBase(), 
@@ -82,12 +89,15 @@ public:
   }
 
   //! Push new work 
-  void push(T val) {
+  template<typename... Args>
+  void push(Args&&... args) {
     Galois::Runtime::checkWrite(MethodFlag::WRITE, true);
-    pushBuffer.push_back(val);
+    pushBuffer.emplace_back(std::forward<Args>(args)...);
+    if (fastPushBack && pushBuffer.size() > FAST_PUSHBACK_LIMIT)
+      fastPushBack(pushBuffer);
   }
 
-  //! force the abort of this iteration
+  //! Force the abort of this iteration
   void abort() { Galois::Runtime::forceAbort(); }
 
   //! Store and retrieve local state for deterministic and ordered executor
