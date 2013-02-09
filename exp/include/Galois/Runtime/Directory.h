@@ -104,6 +104,11 @@ public:
   template<typename T>
   static void remoteDataLandingPad(RecvBuffer &);
 
+  // clear lock, required when acquire inside haveObject throws
+  // the exception is thrown without releasing the lock
+  // called only from the exception handler in ParallelWork.h
+  void release_lock();
+
   //resolve a pointer, owner pair
   //precondition: owner != networkHostID
   template<typename T>
@@ -149,6 +154,11 @@ public:
   // send the object if local, not locked and mark obj as remote
   template<typename T>
   static void localDataLandingPad(RecvBuffer &);
+
+  // clear lock, required when acquire inside haveObject throws
+  // the exception is thrown without releasing the lock
+  // called only from the exception handler in ParallelWork.h
+  void release_lock();
 
   // resolve a pointer
   template<typename T>

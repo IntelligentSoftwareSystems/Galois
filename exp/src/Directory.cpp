@@ -141,6 +141,16 @@ void PersistentDirectory::fetchRemoteObj(uintptr_t ptr, uint32_t owner, recvFunc
   return;
 }
 
+void RemoteDirectory::release_lock() {
+  Lock.try_lock();
+  Lock.unlock();
+}
+
+void LocalDirectory::release_lock() {
+  Lock.try_lock();
+  Lock.unlock();
+}
+
 void LocalDirectory::sub_acquire(Galois::Runtime::Lockable* L) {
   if (L->Owner.try_lock()) {
     assert(!L->Owner.getValue());

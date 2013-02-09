@@ -186,6 +186,9 @@ protected:
       abortIteration(*p, tld, recursiveAbort);
       //Distributed::getSystemRemoteDirectory().fetchRemoteObj(ex.ptr,ex.owner, ex.pad);
     } catch (const conflict_ex& ex) {
+      // release lock if acquire inside the Directory throws the exception
+      Distributed::getSystemLocalDirectory().release_lock();
+      Distributed::getSystemRemoteDirectory().release_lock();
       abortIteration(*p, tld, recursiveAbort);
     } catch (const break_ex&) {
       handleBreak(tld);
