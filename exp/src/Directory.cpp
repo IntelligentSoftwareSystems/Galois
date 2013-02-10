@@ -46,7 +46,7 @@ uintptr_t RemoteDirectory::haveObject(uintptr_t ptr, uint32_t owner, SimpleRunti
   if (OBJSTATE.state != objstate::Remote)
     retval = OBJSTATE.localobj;
   // acquire the lock if inside for_each
-  if (retval && inGaloisForEach) {
+  if (retval && cnx && inGaloisForEach) {
     Lockable *L = reinterpret_cast<Lockable*>(retval);
     cnx->acquire(L);
   }
@@ -79,7 +79,8 @@ uintptr_t LocalDirectory::haveObject(uintptr_t ptr, uint32_t &remote, SimpleRunt
     remote = OBJSTATE.sent_to;
   else
     printf ("Unrecognized state in LocalDirectory::haveObject\n");
-  if (retval && inGaloisForEach) {
+  // acquire the lock if inside for_each
+  if (retval && cnx && inGaloisForEach) {
     Lockable *L = reinterpret_cast<Lockable*>(retval);
     cnx->acquire(L);
   }
