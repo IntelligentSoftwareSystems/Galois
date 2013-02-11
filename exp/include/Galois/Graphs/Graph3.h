@@ -178,6 +178,61 @@ class GraphNodeEdges<NHTy, EdgeDataTy, EdgeDirection::InOut> {
   //FIXME
 };
 
+template<typename NodeDataTy, typename EdgeDataTy, EdgeDirection EDir>
+class GraphNode;
+
+template<typename NHTy>
+class GraphNodeEdges<NHTy, void, EdgeDirection::Un> {
+  typedef Edge<NHTy, void> EdgeTy;
+  typedef std::deque<EdgeTy> EdgeListTy;
+
+  EdgeListTy edges;
+
+protected:
+  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+    gSerialize(s,edges);
+  }
+  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+    gDeserialize(s,edges);
+  }
+  void dump(std::ostream& os) {
+    os << "numedges: " << edges.size();
+    for (decltype(edges.size()) x = 0; x < edges.size(); ++x) {
+      os << " ";
+      edges[x].dump(os);
+    }
+  }
+ public:
+  typedef typename EdgeListTy::iterator iterator;
+
+ /*
+  iterator createEdge(NHTy& node1, NHTy& node2) {
+    GraphNodeEdges<NHTy, void, EdgeDirection::Un> *N1Edges, *N2Edges;
+    N1Edges = static_cast<GraphNodeEdges<NHTy, void, EdgeDirection::Un>*>(&(*node1));
+    N2Edges = static_cast<GraphNodeEdges<NHTy, void, EdgeDirection::Un>*>(&(*node2));
+    N2Edges->edges.emplace(N2Edges->edges.end(), node1);
+    return N1Edges->edges.emplace(N1Edges->edges.end(), node2);
+  }
+  */
+
+  iterator createEdge(NHTy& node) {
+    NHTy* NNode;
+    GraphNodeEdges<NHTy, void, EdgeDirection::Un> *NEdges;
+    NEdges = static_cast<GraphNodeEdges<NHTy, void, EdgeDirection::Un>*>(&(*node));
+    NNode  = reinterpret_cast<NHTy*>(this);
+    NEdges->edges.emplace(NEdges->edges.end(), *NNode);
+    return edges.emplace(edges.end(), node);
+  }
+
+  iterator begin() {
+    return edges.begin();
+  }
+
+  iterator end() {
+    return edges.end();
+  }
+};
+
 template<typename NHTy, typename EdgeDataTy>
 class GraphNodeEdges<NHTy, EdgeDataTy, EdgeDirection::Un> {
   //FIXME
@@ -218,6 +273,7 @@ public:
     GraphNodeEdges<SHORTHAND, EdgeDataTy, EDir>::deserialize(s);
   }
   void dump(std::ostream& os) {
+    os << this << " ";
     os << "<{GN: ";
     GraphNodeBase<SHORTHAND >::dump(os);
     os << " ";
