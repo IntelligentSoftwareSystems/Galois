@@ -30,7 +30,7 @@ using namespace Galois::Runtime::Distributed;
 uintptr_t RemoteDirectory::haveObject(uintptr_t ptr, uint32_t owner, SimpleRuntimeContext *cnx) {
 #define OBJSTATE (*iter).second
   RemoteDirectory& rd = getSystemRemoteDirectory();
-  rd.Lock.lock();
+  lock_guard<mutex> lock(rd.mlock);
   auto iter = rd.curobj.find(make_pair(ptr,owner));
   uintptr_t retval = 0;
   // add object to list if it's not already there
@@ -50,7 +50,6 @@ uintptr_t RemoteDirectory::haveObject(uintptr_t ptr, uint32_t owner, SimpleRunti
     Lockable *L = reinterpret_cast<Lockable*>(retval);
     cnx->acquire(L);
   }
-  rd.Lock.unlock();
 #undef OBJSTATE
   return retval;
 }
@@ -68,7 +67,7 @@ void RemoteDirectory::fetchRemoteObj(uintptr_t ptr, uint32_t owner, recvFuncTy p
 uintptr_t LocalDirectory::haveObject(uintptr_t ptr, uint32_t &remote, SimpleRuntimeContext *cnx) {
 #define OBJSTATE (*iter).second
   LocalDirectory& ld = getSystemLocalDirectory();
-  ld.Lock.lock();
+  lock_guard<mutex> lock(ld.mlock);
   auto iter = ld.curobj.find(ptr);
   uintptr_t retval = 0;
   // Returning the object even if locked as the call to acquire would fail
@@ -84,7 +83,6 @@ uintptr_t LocalDirectory::haveObject(uintptr_t ptr, uint32_t &remote, SimpleRunt
     Lockable *L = reinterpret_cast<Lockable*>(retval);
     cnx->acquire(L);
   }
-  ld.Lock.unlock();
 #undef OBJSTATE
   return retval;
 }
@@ -102,7 +100,7 @@ void LocalDirectory::fetchRemoteObj(uintptr_t ptr, uint32_t remote, recvFuncTy p
 uintptr_t PersistentDirectory::haveObject(uintptr_t ptr, uint32_t owner) {
 #define OBJSTATE (*iter).second
   PersistentDirectory& pd = getSystemPersistentDirectory();
-  pd.Lock.lock();
+  lock_guard<mutex> lock(pd.mlock);
   auto iter = pd.perobj.find(make_pair(ptr,owner));
   uintptr_t retval = 0;
   // add object to list if it's not already there
@@ -114,7 +112,6 @@ uintptr_t PersistentDirectory::haveObject(uintptr_t ptr, uint32_t owner) {
     iter = pd.perobj.find(make_pair(ptr,owner));
   }
   retval = OBJSTATE.localobj;
-  pd.Lock.unlock();
 #undef OBJSTATE
   return retval;
 }
@@ -125,31 +122,19 @@ void PersistentDirectory::fetchRemoteObj(uintptr_t ptr, uint32_t owner, recvFunc
   uint32_t host = networkHostID;
 #define OBJSTATE (*iter).second
   PersistentDirectory& pd = getSystemPersistentDirectory();
-  pd.Lock.lock();
+  lock_guard<mutex> lock(pd.mlock);
   auto iter = pd.perobj.find(make_pair(ptr,owner));
   // return if already requested
   if (OBJSTATE.requested) {
-    pd.Lock.unlock();
     return;
   }
   OBJSTATE.requested = true;
-  pd.Lock.unlock();
 #undef OBJSTATE
   // store that the object has been requested
   NetworkInterface& net = getSystemNetworkInterface();
   gSerialize(buf,ptr,host);
   net.sendMessage (owner, pad, buf);
   return;
-}
-
-void RemoteDirectory::release_lock() {
-  Lock.try_lock();
-  Lock.unlock();
-}
-
-void LocalDirectory::release_lock() {
-  Lock.try_lock();
-  Lock.unlock();
 }
 
 void LocalDirectory::sub_acquire(Galois::Runtime::Lockable* L) {
