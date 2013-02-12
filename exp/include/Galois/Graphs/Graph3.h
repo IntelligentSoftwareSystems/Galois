@@ -215,13 +215,10 @@ protected:
   }
   */
 
-  iterator createEdge(NHTy& node) {
-    NHTy* NNode;
-    GraphNodeEdges<NHTy, void, EdgeDirection::Un> *NEdges;
-    NEdges = static_cast<GraphNodeEdges<NHTy, void, EdgeDirection::Un>*>(&(*node));
-    NNode  = reinterpret_cast<NHTy*>(this);
-    NEdges->edges.emplace(NEdges->edges.end(), *NNode);
-    return edges.emplace(edges.end(), node);
+  iterator createEdge(NHTy& src, NHTy& dest) {
+    assert(*src == this);
+    dest->edges.emplace(dest->edges.end(), src);
+    return edges.emplace(edges.end(), dest);
   }
 
   iterator begin() {
