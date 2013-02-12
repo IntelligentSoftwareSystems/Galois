@@ -107,7 +107,7 @@ void for_each(InitItemTy i, FunctionTy fn, const char* loopname = 0) {
  */
 template<typename InitItemTy, typename FunctionTy>
 void for_each(InitItemTy i, FunctionTy fn, const char* loopname = 0) {
-  typedef WorkList::ChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
+  typedef WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
   for_each<WLTy, InitItemTy, FunctionTy>(i, fn, loopname);
 }
 
