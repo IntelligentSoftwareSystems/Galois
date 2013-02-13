@@ -206,7 +206,7 @@ protected:
   typedef typename EdgeListTy::iterator iterator;
 
   iterator createEdge(NHTy& src, NHTy& dest) {
-    assert(*src == this);
+    //assert(*src == this);
     dest->edges.emplace(dest->edges.end(), src);
     return edges.emplace(edges.end(), dest);
   }
