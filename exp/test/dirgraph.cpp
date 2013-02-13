@@ -21,6 +21,8 @@ struct op {
     G::NodeHandle node1 = graph->createNode(nodeval*2);
     G::NodeHandle node2 = graph->createNode((nodeval*2)+1);
     node1->createEdge(node1, node2);
+    if (nodeval == 3)
+     graph->removeNode(node1);
   }
 
   // serialization functions
