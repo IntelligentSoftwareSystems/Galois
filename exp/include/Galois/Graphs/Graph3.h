@@ -205,16 +205,6 @@ protected:
  public:
   typedef typename EdgeListTy::iterator iterator;
 
- /*
-  iterator createEdge(NHTy& node1, NHTy& node2) {
-    GraphNodeEdges<NHTy, void, EdgeDirection::Un> *N1Edges, *N2Edges;
-    N1Edges = static_cast<GraphNodeEdges<NHTy, void, EdgeDirection::Un>*>(&(*node1));
-    N2Edges = static_cast<GraphNodeEdges<NHTy, void, EdgeDirection::Un>*>(&(*node2));
-    N2Edges->edges.emplace(N2Edges->edges.end(), node1);
-    return N1Edges->edges.emplace(N1Edges->edges.end(), node2);
-  }
-  */
-
   iterator createEdge(NHTy& src, NHTy& dest) {
     assert(*src == this);
     dest->edges.emplace(dest->edges.end(), src);
