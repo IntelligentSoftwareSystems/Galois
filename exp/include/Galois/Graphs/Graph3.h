@@ -19,7 +19,7 @@ class GraphNodeBase {
   bool active;
 
 protected:
-  GraphNodeBase() :active(false) {}
+  GraphNodeBase() :active(true) {}
 
   NHTy& getNextNode() { return nextNode; }
 
@@ -38,6 +38,10 @@ protected:
   }
 
 public:
+  bool getActive() {
+    return active;
+  }
+
   void setActive(bool b) {
     active = b;
   }
@@ -164,6 +168,10 @@ protected:
     return edges.emplace(edges.end(), dst);
   }
 
+  void clearEdges() {
+    edges.clear();
+  }
+
   iterator begin() {
     return edges.begin();
   }
@@ -209,6 +217,10 @@ protected:
     //assert(*src == this);
     dest->edges.emplace(dest->edges.end(), src);
     return edges.emplace(edges.end(), dest);
+  }
+
+  void clearEdges() {
+    edges.clear();
   }
 
   iterator begin() {
@@ -318,6 +330,14 @@ public:
     N->getNextNode() = localState.head;
     localState.head = N;
     return N;
+  }
+  
+  void removeNode(NodeHandle& N) {
+    if (N->getActive()) {
+      N->setActive(false);
+      // delete all the edges (in the deque)
+      N->clearEdges();
+    }
   }
   
   class iterator : public std::iterator<std::forward_iterator_tag, NodeHandle> {
