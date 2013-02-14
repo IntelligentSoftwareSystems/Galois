@@ -65,7 +65,7 @@ protected:
     localStateUsed = used;
   }
 
-  static const int FAST_PUSHBACK_LIMIT = 32;
+  static const unsigned FAST_PUSHBACK_LIMIT = 32;
   typedef std::function<void(PushBufferTy&)> FastPushBack; 
   FastPushBack fastPushBack;
   void __setFastPushBack(FastPushBack f) {
