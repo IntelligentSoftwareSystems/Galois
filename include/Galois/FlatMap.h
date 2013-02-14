@@ -209,7 +209,7 @@ public:
   
   std::pair<iterator, bool> insert(const value_type& __x) {
     auto i = lower_bound(__x.first);
-    if (i != end())
+    if (i != end() && key_eq(i->first, __x.first))
       return std::make_pair(i, false);
     return std::make_pair(_data.insert(i, __x), true);
   }
@@ -217,7 +217,7 @@ public:
   template<typename _Pair, typename = typename std::enable_if<std::is_constructible<value_type, _Pair&&>::value>::type>
   std::pair<iterator, bool> insert(_Pair&& __x) {
     auto i = lower_bound(__x.first);
-    if (i != end())
+    if (i != end() && key_eq(i->first, __x.first))
       return std::make_pair(i, false);
     return std::make_pair(_data.insert(i, std::forward<_Pair>(__x)), true);
   }
