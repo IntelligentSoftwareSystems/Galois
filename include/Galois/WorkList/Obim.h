@@ -24,7 +24,8 @@
 #ifndef GALOIS_WORKLIST_OBIM_H
 #define GALOIS_WORKLIST_OBIM_H
 
-#include <map>
+//#include <map>
+#include "Galois/FlatMap.h"
 
 namespace Galois {
 namespace WorkList {
@@ -53,8 +54,11 @@ template<class Indexer = DummyIndexer<int>, typename ContainerTy = FIFO<>, bool 
 class OrderedByIntegerMetric : private boost::noncopyable {
   typedef typename ContainerTy::template rethread<concurrent> CTy;
 
+  typedef Galois::flat_map<IndexTy, CTy*> LMapTy;
+  //typedef std::map<IndexTy, CTy*> LMapTy;
+
   struct perItem {
-    std::map<IndexTy, CTy*> local;
+    LMapTy local;
     IndexTy curIndex;
     IndexTy scanStart;
     CTy* current;
@@ -75,11 +79,8 @@ class OrderedByIntegerMetric : private boost::noncopyable {
   Runtime::PerThreadStorage<perItem> current;
 
   void updateLocal_i(perItem& p) {
-    for (; p.lastMasterVersion < masterVersion; ++p.lastMasterVersion) {
-      std::pair<IndexTy, CTy*> logEntry = masterLog[p.lastMasterVersion];
-      p.local[logEntry.first] = logEntry.second;
-      assert(logEntry.second);
-    }
+    for (; p.lastMasterVersion < masterVersion; ++p.lastMasterVersion)
+      p.local.insert(masterLog[p.lastMasterVersion]);
   }
 
   bool updateLocal(perItem& p) {
@@ -92,28 +93,63 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     return false;
   }
 
-  CTy* updateLocalOrCreate(perItem& p, IndexTy i) {
-    //Try local then try update then find again or else create and update the master log
-    CTy*& lC = p.local[i];
-    if (lC)
-      return lC;
+  GALOIS_ATTRIBUTE_NOINLINE boost::optional<T> _slow_pop(perItem& p) {
+    //Failed, find minimum bin
+    updateLocal(p);
+    unsigned myID = Runtime::LL::getTID();
+    bool localLeader = Runtime::LL::isPackageLeaderForSelf(myID);
+
+    IndexTy msS = std::numeric_limits<IndexTy>::min();
+    if (BSP) {
+      msS = p.scanStart;
+      if (localLeader)
+	for (unsigned i = 0; i <  Runtime::activeThreads; ++i)
+	  msS = std::min(msS, current.getRemote(i)->scanStart);
+      else
+	msS = std::min(msS, current.getRemote(Runtime::LL::getLeaderForThread(myID))->scanStart);
+    }
+
+    for (auto ii = p.local.lower_bound(msS),
+	   ee = p.local.end(); ii != ee; ++ii) {
+      boost::optional<T> retval;
+      if ((retval = ii->second->pop())) {
+	p.current = ii->second;
+	p.curIndex = ii->first;
+	p.scanStart = ii->first;
+	return retval;
+      }
+    }
+    return boost::optional<value_type>();
+  }
+
+  GALOIS_ATTRIBUTE_NOINLINE CTy* _slow_updateLocalOrCreate(perItem& p, IndexTy i) {
     //update local until we find it or we get the write lock
     do {
+      CTy* lC;
       updateLocal(p);
-      if (lC)
+      if ((lC = p.local[i]))
 	return lC;
     } while (!masterLock.try_lock());
     //we have the write lock, update again then create
     updateLocal(p);
-    if (!lC) {
-      lC = new CTy();
+    CTy*& lC2 = p.local[i];
+    if (!lC2) {
+      lC2 = new CTy();
       p.lastMasterVersion = masterVersion + 1;
-      masterLog.push_back(std::make_pair(i, lC));
+      masterLog.push_back(std::make_pair(i, lC2));
       __sync_fetch_and_add(&masterVersion, 1);
-      p.local[i] = lC;
     }
     masterLock.unlock();
-    return lC;
+    return lC2;
+  }
+
+  inline CTy* updateLocalOrCreate(perItem& p, IndexTy i) {
+    //Try local then try update then find again or else create and update the master log
+    CTy* lC;
+    if ((lC = p.local[i]))
+      return lC;
+    //slowpath
+    return _slow_updateLocalOrCreate(p, i);
   }
 
  public:
@@ -170,35 +206,13 @@ class OrderedByIntegerMetric : private boost::noncopyable {
   boost::optional<value_type> pop() {
     //Find a successful pop
     perItem& p = *current.getLocal();
-    CTy*& C = p.current;
+    CTy* C = p.current;
     boost::optional<value_type> retval;
     if (C && (retval = C->pop()))
       return retval;
-    //Failed, find minimum bin
-    updateLocal(p);
-    unsigned myID = Runtime::LL::getTID();
-    bool localLeader = Runtime::LL::isPackageLeaderForSelf(myID);
 
-    IndexTy msS = std::numeric_limits<IndexTy>::min();
-    if (BSP) {
-      msS = p.scanStart;
-      if (localLeader)
-	for (unsigned i = 0; i <  Runtime::activeThreads; ++i)
-	  msS = std::min(msS, current.getRemote(i)->scanStart);
-      else
-	msS = std::min(msS, current.getRemote(Runtime::LL::getLeaderForThread(myID))->scanStart);
-    }
-
-    for (typename std::map<IndexTy, CTy*>::iterator ii = p.local.lower_bound(msS),
-        ee = p.local.end(); ii != ee; ++ii) {
-      if ((retval = ii->second->pop())) {
-	C = ii->second;
-	p.curIndex = ii->first;
-	p.scanStart = ii->first;
-	return retval;
-      }
-    }
-    return boost::optional<value_type>();
+    //failed: slow path
+    return _slow_pop(p);
   }
 };
 GALOIS_WLCOMPILECHECK(OrderedByIntegerMetric)
