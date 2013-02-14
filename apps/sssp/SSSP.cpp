@@ -131,7 +131,7 @@ struct ParallelAlgo {
 
   void operator()(const GNode src) const {
     using namespace Galois::WorkList;
-    typedef dChunkedLIFO<16> dChunk;
+    typedef dChunkedLIFO<32> dChunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
 
     std::cout << "Using delta-step of " << (1 << stepShift) << "\n";
@@ -186,7 +186,7 @@ struct ParallelLessDupsAlgo {
 
   void operator()(const GNode src) const {
     using namespace Galois::WorkList;
-    typedef dChunkedLIFO<16> dChunk;
+    typedef dChunkedLIFO<32> dChunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
 
     std::cout << "INFO: Using delta-step of " << (1 << stepShift) << "\n";
@@ -212,11 +212,12 @@ struct ParallelLessDupsAlgo {
   }
 
   void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& ctx) const {
-    Galois::MethodFlag flag = useCas ? Galois::MethodFlag::NONE : Galois::MethodFlag::ALL;
+    const Galois::MethodFlag flag = useCas ? Galois::MethodFlag::NONE : Galois::MethodFlag::ALL;
     SNode& data = graph.getData(req.n, flag);
 
-    if (trackBadWork && req.w > data.dist) {
-      *WLEmptyWork += 1;
+    if (req.w > data.dist) {
+      if (trackBadWork)
+	*WLEmptyWork += 1;
       return;
     }
     
@@ -231,8 +232,8 @@ struct ParallelLessDupsAlgo {
         if (!useCas || __sync_bool_compare_and_swap(&rdata.dist, v, newDist)) {
           if (!useCas)
             rdata.dist = newDist;
-          if (trackBadWork && v != DIST_INFINITY)
-             *BadWork += 1;
+	  if (trackBadWork && v != DIST_INFINITY)
+	    *BadWork += 1;
           ctx.push(UpdateRequest(dst, newDist));
           break;
         }
