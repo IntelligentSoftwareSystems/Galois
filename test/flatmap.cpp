@@ -1,6 +1,25 @@
 #include "Galois/FlatMap.h"
+#include "Galois/Timer.h"
 
 #include <iostream>
+#include <map>
+
+template<typename T, unsigned X>
+void maptime(const char* c) {
+  T m;
+  Galois::Timer t1, t2;
+  t1.start();
+  for (unsigned x = 0; x < X; ++x) {
+    m[x] = (double)x;
+  }
+  t1.stop();
+  t2.start();
+  for (unsigned x = 0; x < X; ++x) {
+    m[x];
+  }
+  t2.stop();
+  std::cout << c << " " << t1.get() << " " << t2.get() << "\n";
+}
 
 int main() {
 
@@ -51,6 +70,14 @@ int main() {
   for (auto ii = m.crbegin(), ee = m.crend(); ii != ee; ++ii)
     std::cout << ii->first << " " << ii->second << " ";
   std::cout << "\n";
+
+  const unsigned X = 1000000;
+  maptime<Galois::flat_map<int, double>,X>("fm");
+  maptime<Galois::flat_map<int, double>,X>("fm");
+  maptime<Galois::flat_map<int, double>,X>("fm");
+  maptime<std::map<int, double>,X>("std");
+  maptime<std::map<int, double>,X>("std");
+  maptime<std::map<int, double>,X>("std");
 
   return 0;
 }
