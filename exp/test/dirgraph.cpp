@@ -63,8 +63,8 @@ int main(int argc, char** argv) {
     cout << "Node: " << N->getData() << " Num Edges: ";
     cout << std::distance(Gr->edge_begin(N), Gr->edge_end(N)) << " edges ";
     for (auto jj = Gr->edge_begin(N), ff = Gr->edge_end(N); jj != ff; ++jj) {
- //   G::NodeHandle& N = *jj;
-      jj->getDst().dump();
+      G::NodeHandle N = jj->getDst();
+      N.dump();
     }
     cout << endl;
   }
