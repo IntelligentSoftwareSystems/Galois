@@ -1,9 +1,10 @@
+#include <iterator>
+#include <deque>
+
 #include "Galois/Runtime/DistSupport.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/MethodFlags.h"
-
-#include <iterator>
-#include <deque>
+#include <boost/iterator/filter_iterator.hpp>
 
 namespace Galois {
 namespace Graph {
@@ -105,6 +106,8 @@ public:
   void dump(std::ostream& os) {
     os << "<{Edge: dst: ";
     dst.dump();
+    os << " dst active: ";
+    os << dst->getActive();
     os << " val: ";
     os << val;
     os << "}>";
@@ -131,6 +134,8 @@ public:
   void dump(std::ostream& os) {
     os << "<{Edge: dst: ";
     dst.dump();
+    os << " dst active: ";
+    os << dst->getActive();
     os << "}>";
   }
 };
@@ -185,9 +190,6 @@ template<typename NHTy, typename EdgeDataTy>
 class GraphNodeEdges<NHTy, EdgeDataTy, EdgeDirection::InOut> {
   //FIXME
 };
-
-template<typename NodeDataTy, typename EdgeDataTy, EdgeDirection EDir>
-class GraphNode;
 
 template<typename NHTy>
 class GraphNodeEdges<NHTy, void, EdgeDirection::Un> {
@@ -253,6 +255,8 @@ class GraphNode
 
 public:
   typedef SHORTHAND Handle;
+  typedef typename Galois::Graph::Edge<SHORTHAND,EdgeDataTy> EdgeType;
+  typedef typename GraphNodeEdges<SHORTHAND,EdgeDataTy,EDir>::iterator edge_iterator;
 
   template<typename... Args>
   GraphNode(Args&&... args) :GraphNodeData<NodeDataTy>(std::forward<Args...>(args...)) {}
@@ -314,8 +318,14 @@ class ThirdGraph { //: public Galois::Runtime::Distributed::DistBase<ThirdGraph>
 
   SubGraphState localState;
 
+  struct is_edge : public std::unary_function<typename gNode::EdgeType&, bool> {
+    bool operator()(typename gNode::EdgeType& n) const { return n.getDst()->getActive(); }
+  };
+
 public:
   typedef typename gNode::Handle NodeHandle;
+  //! Edge iterator
+  typedef typename boost::filter_iterator<is_edge,typename gNode::edge_iterator> edge_iterator;
 
   template<typename... Args>
   NodeHandle createNode(Args&&... args) {
@@ -346,18 +356,24 @@ public:
     void next() {
       n = n->getNextNode();
       while (!n && s->next) {
-	s = s->next;
-	n = s->head;
+        s = s->next;
+        n = s->head;
       }
+      // skip node if not active!
+      if (n && !n->getActive())
+        next();
       if (!n) s.initialize(nullptr);
     }
   public:
   iterator() :n(), s() {}
     explicit iterator(Galois::Runtime::Distributed::gptr<SubGraphState> ms) :n(ms->head), s(ms) {
       while (!n && s->next) {
-	s = s->next;
-	n = s->head;
+        s = s->next;
+        n = s->head;
       }
+      // skip node if not active!
+      if (n && !n->getActive())
+        next();
       if (!n) s.initialize(nullptr);
     }
 
@@ -380,11 +396,18 @@ public:
     NodeHandle n;
     void next() {
       n = n->getNextNode();
+      // skip node if not active!
+      if (n && !n->getActive())
+        next();
     }
   public:
     explicit local_iterator(NodeHandle N) :n(N) {}
     local_iterator() :n() {}
-    local_iterator(const local_iterator& mit) : n(mit.n) {}
+    local_iterator(const local_iterator& mit) : n(mit.n) {
+      // skip node if not active!
+      if (n && !n->getActive())
+        next();
+    }
 
     NodeHandle& operator*() { return n; }
     local_iterator& operator++() { next(); return *this; }
@@ -395,6 +418,32 @@ public:
 
   local_iterator local_begin() { return local_iterator(localState.head); }
   local_iterator local_end() { return local_iterator(); }
+
+  //! Returns an iterator to the neighbors of a node 
+  edge_iterator edge_begin(NodeHandle N) {
+    assert(N);
+    N.acquire();
+    // prefetch all the nodes
+    for (auto ii = N->begin(), ee = N->end(); ii != ee; ++ii) {
+      ii->getDst().prefetch();
+    }
+    // lock all the nodes
+    for (auto ii = N->begin(), ee = N->end(); ii != ee; ++ii) {
+      // NOTE: Andrew thinks acquire may be needed for inactive nodes too
+      //       not sure why though. he had to do this in the prev graph
+      if (ii->getDst()->getActive()) {
+        // modify the call when local nodes aren't looked up in directory
+        ii->getDst().acquire();
+      }
+    }
+    return boost::make_filter_iterator(is_edge(), N->begin(), N->end());
+  }
+
+  //! Returns the end of the neighbor iterator 
+  edge_iterator edge_end(NodeHandle N) {
+    assert(N);
+    return boost::make_filter_iterator(is_edge(), N->end(), N->end());
+  }
 
   ThirdGraph() {}
   // mark the graph as persistent so that it is distributed

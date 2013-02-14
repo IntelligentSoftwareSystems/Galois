@@ -107,6 +107,12 @@ public:
   template<typename T>
   static void remoteDataLandingPad(RecvBuffer &);
 
+  //prefetch a pointer, owner pair
+  //precondition: owner != networkHostID
+  //don't lock obj, just return if found and place a request if not found
+  template<typename T>
+  void prefetch(uintptr_t ptr, uint32_t owner);
+
   //resolve a pointer, owner pair
   //precondition: owner != networkHostID
   template<typename T>
@@ -153,6 +159,11 @@ public:
   // send the object if local, not locked and mark obj as remote
   template<typename T>
   static void localDataLandingPad(RecvBuffer &);
+
+  //prefetch a pointer
+  //don't lock obj, just return if found and place a request if not found
+  template<typename T>
+  void prefetch(uintptr_t ptr);
 
   // resolve a pointer
   template<typename T>
@@ -209,6 +220,24 @@ PersistentDirectory& getSystemPersistentDirectory();
 } //Galois
 
 using namespace Galois::Runtime::Distributed;
+
+// should never block, just place a request if not found
+template<typename T>
+void RemoteDirectory::prefetch(uintptr_t ptr, uint32_t owner) {
+  assert(ptr);
+  assert(owner != networkHostID);
+  // don't lock the object if not found
+  uintptr_t p = haveObject(ptr, owner, NULL);
+  // don't block just place a request if not local
+  if (!p) {
+    NetworkInterface& net = getSystemNetworkInterface();
+    fetchRemoteObj(ptr, owner, &LocalDirectory::localReqLandingPad<T>);
+    // call handleReceives if only thread outside for_each
+    // or is the first thread
+    if (!Galois::Runtime::inGaloisForEach || !LL::getTID())
+      net.handleReceives();
+  }
+}
 
 // should be blocking if not in for each
 template<typename T>
@@ -302,6 +331,24 @@ void RemoteDirectory::remoteDataLandingPad(RecvBuffer &buf) {
   iter->second.localobj = (uintptr_t)data;
   iter->second.count = 0;
   return;
+}
+
+// should never block, just place a request if not found
+template<typename T>
+void LocalDirectory::prefetch(uintptr_t ptr) {
+  uint32_t sent = 0;
+  assert(ptr);
+  // don't lock the object if not found
+  uintptr_t p = haveObject(ptr, sent, NULL);
+  // don't block just place a request if not local
+  if (!p) {
+    NetworkInterface& net = getSystemNetworkInterface();
+    fetchRemoteObj(ptr, sent, &RemoteDirectory::remoteReqLandingPad<T>);
+    // call handleReceives if only thread outside for_each
+    // or is the first thread
+    if (!Galois::Runtime::inGaloisForEach || !LL::getTID())
+      net.handleReceives();
+  }
 }
 
 // should be blocking outside for each

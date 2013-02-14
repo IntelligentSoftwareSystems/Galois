@@ -50,7 +50,7 @@ struct resolve_dispatch<T, false> {
       // if (inGaloisForEach)
       // 	rptr = reinterpret_cast<T*>(ptr);
       // else
-	rptr = getSystemLocalDirectory().resolve<T>(ptr, getThreadContext());
+      rptr = getSystemLocalDirectory().resolve<T>(ptr, getThreadContext());
     } else
       rptr = getSystemRemoteDirectory().resolve<T>(ptr, owner, getThreadContext());
     assert(rptr);
@@ -92,6 +92,20 @@ public:
   constexpr gptr() :ptr(0), owner(0) {}
 
   explicit gptr(T* p) :ptr(reinterpret_cast<uintptr_t>(p)), owner(networkHostID) {}
+
+  // calling resolve acquires the lock, used after a prefetch
+  // IMP: have to be changed when local objects aren't passed to the directory
+  void acquire() const {
+    (void) *resolve(*this);
+  }
+
+  // check if the object is available, else just make a call to fetch
+  void prefetch() {
+    if (owner == networkHostID)
+     getSystemLocalDirectory().prefetch<T>(ptr);
+    else
+     getSystemRemoteDirectory().prefetch<T>(ptr, owner);
+  }
 
   T& operator*() const {
     return *resolve(*this);
