@@ -178,7 +178,7 @@ public:
     // __i->first is greater than or equivalent to __k.
     if (__i == end() || key_comp()(__k, (*__i).first))
       __i = _data.emplace(__i, std::piecewise_construct,
-			  std::tuple<key_type&>(__k),
+			  std::tuple<const key_type&>(__k),
 			  std::tuple<>());
     return (*__i).second;
   }
