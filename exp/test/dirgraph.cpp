@@ -20,9 +20,14 @@ struct op {
   void operator()(const int& nodeval, const Context& cnx) {
     G::NodeHandle node1 = graph->createNode(nodeval*2);
     G::NodeHandle node2 = graph->createNode((nodeval*2)+1);
-    node1->createEdge(node1, node2);
-    if (nodeval == 3)
-     graph->removeNode(node1);
+    graph->addNode(node1);
+    graph->addNode(node2);
+    graph->addEdge(node1, node2);
+    if (nodeval == 3) {
+      graph->removeNode(node1);
+      if (!graph->containsNode(node1))
+        cout << "Node: " << graph->getData(node1) << " not found as expected" << endl;
+    }
   }
 
   // serialization functions
@@ -51,7 +56,7 @@ int main(int argc, char** argv) {
     std::cout << (*ii)->getData() << " " << std::distance((*ii)->begin(), (*ii)->end()) << " ";
   std::cout << "\n";
 
-  std::cout << "\n" << "Dumping the graph:\n";
+  std::cout << "\n" << "Dumping the graph of size " << Gr->size() << endl;
   for (auto ii = Gr->begin(), ee = Gr->end(); ii != ee; ++ii) {
     (*ii)->dump(std::cout);
     std::cout << "\n";

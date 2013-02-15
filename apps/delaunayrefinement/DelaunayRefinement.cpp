@@ -53,13 +53,15 @@ static const char* url = "delaunay_mesh_refinement";
 
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 
-Graph* graph;
-
 struct Process {
+  Graphp graph;
+
   typedef int tt_needs_per_iter_alloc;
 
+  Process(Graphp g) :graph(g) {}
+
   void operator()(GNode item, Galois::UserContext<GNode>& ctx) {
-    if (!graph->containsNode(item, Galois::MethodFlag::ALL))
+    if (!graph->containsNode(item))
       return;
     
     Cavity cav(graph, ctx.getPerIterAlloc());
@@ -73,16 +75,24 @@ struct Process {
 Galois::InsertBag<GNode> wl;
 
 struct Preprocess {
+  Graphp graph;
+
+  Preprocess(Graphp g) :graph(g) {}
+
   void operator()(GNode item) const {
-    if (graph->getData(item, Galois::MethodFlag::NONE).isBad())
+    if (graph->getData(item).isBad())
       wl.push(item);
   }
 };
 
 struct DetLessThan {
+  Graphp graph;
+
+  DetLessThan(Graphp g) :graph(g) {}
+
   bool operator()(const GNode& a, const GNode& b) const {
-    int idA = graph->getData(a, Galois::MethodFlag::NONE).getId();
-    int idB = graph->getData(b, Galois::MethodFlag::NONE).getId();
+    int idA = graph->getData(a).getId();
+    int idB = graph->getData(b).getId();
     if (idA == 0 || idB == 0) abort();
     return idA < idB;
   }
@@ -92,7 +102,7 @@ int main(int argc, char** argv) {
   Galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
-  graph = new Graph();
+  Graphp graph(new Graph());
   {
     Mesh m;
     m.read(graph, filename.c_str());
@@ -114,7 +124,7 @@ int main(int argc, char** argv) {
   Galois::StatTimer T;
   T.start();
 
-  Galois::do_all_local(*graph, Preprocess());
+  Galois::do_all_local(*graph, Preprocess(graph));
 
   Galois::Statistic("MeminfoMid", Galois::Runtime::MM::pageAllocInfo());
   
@@ -125,7 +135,7 @@ int main(int argc, char** argv) {
   typedef LocalQueues<dChunkedLIFO<256>, ChunkedLIFO<256> > BQ;
   typedef ChunkedAdaptor<false,32> CA;
   
-  Galois::for_each_local<CA>(wl, Process());
+  Galois::for_each_local<CA>(wl, Process(graph));
   Trefine.stop();
   T.stop();
   

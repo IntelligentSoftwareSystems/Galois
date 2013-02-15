@@ -20,7 +20,7 @@ class GraphNodeBase {
   bool active;
 
 protected:
-  GraphNodeBase() :active(true) {}
+  GraphNodeBase() :active(false) {}
 
   NHTy& getNextNode() { return nextNode; }
 
@@ -165,11 +165,13 @@ protected:
   typedef typename EdgeListTy::iterator iterator;
 
   template<typename... Args>
-  iterator createEdge(const NHTy& dst, Args&&... args) {
+  iterator createEdge(const NHTy& src, const NHTy& dst, Args&&... args) {
+    *src;
     return edges.emplace(edges.end(), dst, std::forward<Args...>(args...));
   }
 
-  iterator createEdge(const NHTy& dst) {
+  iterator createEdge(const NHTy& src, const NHTy& dst) {
+    *src;
     return edges.emplace(edges.end(), dst);
   }
 
@@ -342,6 +344,10 @@ public:
     return N;
   }
   
+  void addNode(NodeHandle& N) {
+    N->setActive(true);
+  }
+  
   void removeNode(NodeHandle& N) {
     if (N->getActive()) {
       N->setActive(false);
@@ -443,6 +449,31 @@ public:
   edge_iterator edge_end(NodeHandle N) {
     assert(N);
     return boost::make_filter_iterator(is_edge(), N->end(), N->end());
+  }
+
+  void addEdge(NodeHandle src, NodeHandle dst) {
+    assert(src);
+    assert(dst);
+    src->createEdge(src, dst);
+  }
+
+  NodeHandle getEdgeDst(edge_iterator ii) {
+    assert(ii->getDst()->getActive());
+    return ii->getDst();
+  }
+
+  NodeTy& getData(const NodeHandle& N) {
+    assert(N);
+    return N->getData();
+  }
+
+  bool containsNode(const NodeHandle& N) {
+    assert(N);
+    return N->getActive();
+  }
+
+  unsigned int size() {
+    return std::distance(begin(), end());
   }
 
   ThirdGraph() {}

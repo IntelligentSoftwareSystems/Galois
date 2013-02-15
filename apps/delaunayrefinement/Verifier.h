@@ -35,8 +35,8 @@
 
 class Verifier {
   struct inconsistent: public std::unary_function<GNode,bool> {
-    Graph* graph;
-    inconsistent(Graph* g): graph(g) { }
+    Graphp graph;
+    inconsistent(Graphp g): graph(g) { }
 
     bool operator()(const GNode& node) const {
       Element& e = graph->getData(node);
@@ -61,8 +61,8 @@ class Verifier {
   };
 
   struct not_delaunay: public std::unary_function<GNode,bool> {
-    Graph* graph;
-    not_delaunay(Graph* g): graph(g) { }
+    Graphp graph;
+    not_delaunay(Graphp g): graph(g) { }
 
     bool operator()(const GNode& node) {
       Element& e1 = graph->getData(node);
@@ -115,7 +115,7 @@ class Verifier {
     }
   };
 
-  bool checkReachability(Graph* graph) {
+  bool checkReachability(Graphp graph) {
     std::stack<GNode> remaining;
     std::set<GNode> found;
     remaining.push(*(graph->begin()));
@@ -150,7 +150,7 @@ class Verifier {
   }
 
 public:
-  bool verify(Graph* g) {
+  bool verify(Graphp g) {
     return Galois::ParallelSTL::find_if(g->begin(), g->end(), inconsistent(g)) == g->end()
       && Galois::ParallelSTL::find_if(g->begin(), g->end(), not_delaunay(g)) == g->end()
       && checkReachability(g);

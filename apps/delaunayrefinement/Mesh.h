@@ -35,16 +35,16 @@
 
 
 struct is_bad {
-  Graph* g;
-  is_bad(Graph* _g): g(_g) {}
+  Graphp g;
+  is_bad(Graphp _g): g(_g) {}
   bool operator()(const GNode& n) const {
-    return g->getData(n, Galois::MethodFlag::NONE).isBad();
+    return g->getData(n).isBad();
   }
 };
 
 struct create_nodes {
-  Graph* g;
-  create_nodes(Graph* _g): g(_g) {}
+  Graphp g;
+  create_nodes(Graphp _g): g(_g) {}
   void operator()(Element& item) {
     GNode n = g->createNode(item);
     g->addNode(n);
@@ -350,14 +350,14 @@ private:
     fclose(oFile);
   }
   
-  void addElement(Graph* mesh, GNode node, std::map<Edge, GNode>& edge_map) {
+  void addElement(Graphp mesh, GNode node, std::map<Edge, GNode>& edge_map) {
     Element& element = mesh->getData(node);
     for (int i = 0; i < element.numEdges(); i++) {
       Edge edge = element.getEdge(i);
       if (edge_map.find(edge) == edge_map.end()) {
         edge_map[edge] = node;
       } else {
-        mesh->addEdge(node, edge_map[edge], Galois::MethodFlag::NONE);
+        mesh->addEdge(node, edge_map[edge]);
         edge_map.erase(edge);
       }
     }
@@ -377,7 +377,7 @@ private:
     }
   }
 
-  void makeGraph(Graph* mesh) {
+  void makeGraph(Graphp mesh) {
     //std::sort(elements.begin(), elements.end(), centerXCmp());
     divide(elements.begin(), elements.end());
 
@@ -392,7 +392,7 @@ private:
 public:
   Mesh(): id(0) { }
 
-  void read(Graph* mesh, std::string basename) {
+  void read(Graphp mesh, std::string basename) {
     std::vector<Tuple> tuples;
     readNodes(basename, tuples);
     readElements(basename, tuples);

@@ -28,13 +28,15 @@
 #include "Element.h"
 
 #include "Galois/Galois.h"
-#include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/Graph3.h"
+#include "Galois/Runtime/DistSupport.h"
 
 #include <vector>
 #include <algorithm>
 
-typedef Galois::Graph::FirstGraph<Element,void,false> Graph;
-typedef Graph::GraphNode GNode;
+typedef Galois::Graph::ThirdGraph<Element,void,Galois::Graph::EdgeDirection::Un> Graph;
+typedef Graph::NodeHandle GNode;
+typedef Galois::Runtime::Distributed::gptr<Graph> Graphp;
 
 struct EdgeTuple {
   GNode src;

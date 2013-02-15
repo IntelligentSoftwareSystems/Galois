@@ -29,6 +29,7 @@
 #include <stdlib.h>
 
 #include "Edge.h"
+#include "Galois/Runtime/Serialize.h"
 
 #define MINANGLE 30.0
 
@@ -41,6 +42,18 @@ class Element {
   int id;
 
 public:
+
+//NOTE!!! serialize and deserialize the data
+  // serialization functions
+  typedef int tt_has_serialize;
+  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+  }
+  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+  }
+
+  // required by the new in DataLandingPad in Directory.h
+  Element():obtuse(0), bDim(true), id(0) {}
+
   //! Constructor for Triangles
   Element(const Tuple& a, const Tuple& b, const Tuple& c, int _id = 0)
    :obtuse(0), bDim(true), id(_id) 
