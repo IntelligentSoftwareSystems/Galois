@@ -377,14 +377,11 @@ private:
     }
   }
 
-  void makeGraph(Graph* mesh, bool parallelAllocate) {
+  void makeGraph(Graph* mesh) {
     //std::sort(elements.begin(), elements.end(), centerXCmp());
     divide(elements.begin(), elements.end());
 
-    if (parallelAllocate) 
-      Galois::do_all(elements.begin(), elements.end(), create_nodes(mesh));
-    else
-      std::for_each(elements.begin(), elements.end(), create_nodes(mesh));
+    Galois::do_all(elements.begin(), elements.end(), create_nodes(mesh));
 
     std::map<Edge, GNode> edge_map;
     for (Graph::iterator ii = mesh->begin(), ee = mesh->end();
@@ -395,12 +392,12 @@ private:
 public:
   Mesh(): id(0) { }
 
-  void read(Graph* mesh, std::string basename, bool parallelAllocate) {
+  void read(Graph* mesh, std::string basename) {
     std::vector<Tuple> tuples;
     readNodes(basename, tuples);
     readElements(basename, tuples);
     readPoly(basename, tuples);
-    makeGraph(mesh, parallelAllocate);
+    makeGraph(mesh);
   }
 };
 

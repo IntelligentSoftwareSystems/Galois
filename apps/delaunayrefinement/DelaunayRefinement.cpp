@@ -55,60 +55,18 @@ static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>")
 
 Graph* graph;
 
-enum DetAlgo {
-  nondet,
-  detBase,
-  detPrefix,
-  detDisjoint
-};
-
-static cll::opt<DetAlgo> detAlgo(cll::desc("Deterministic algorithm:"),
-    cll::values(
-      clEnumVal(nondet, "Non-deterministic"),
-      clEnumVal(detBase, "Base execution"),
-      clEnumVal(detPrefix, "Prefix execution"),
-      clEnumVal(detDisjoint, "Disjoint execution"),
-      clEnumValEnd), cll::init(nondet));
-
-template<int Version=detBase>
 struct Process {
   typedef int tt_needs_per_iter_alloc;
-
-  struct LocalState {
-    Cavity cav;
-    LocalState(Process<Version>& self, Galois::PerIterAllocTy& alloc): cav(graph, alloc) { }
-  };
 
   void operator()(GNode item, Galois::UserContext<GNode>& ctx) {
     if (!graph->containsNode(item, Galois::MethodFlag::ALL))
       return;
     
-    Cavity* cavp = NULL;
-
-    if (Version == detDisjoint) {
-      bool used;
-      LocalState* localState = (LocalState*) ctx.getLocalState(used);
-      if (used) {
-        localState->cav.update(item, ctx);
-        return;
-      } else {
-        cavp = &localState->cav;
-      }
-    }
-
-    if (Version == detDisjoint) {
-      cavp->initialize(item);
-      cavp->build();
-      cavp->computePost();
-    } else {
-      Cavity cav(graph, ctx.getPerIterAlloc());
-      cav.initialize(item);
-      cav.build();
-      cav.computePost();
-      if (Version == detPrefix)
-        return;
-      cav.update(item, ctx);
-    }
+    Cavity cav(graph, ctx.getPerIterAlloc());
+    cav.initialize(item);
+    cav.build();
+    cav.computePost();
+    cav.update(item, ctx);
   }
 };
 
@@ -137,7 +95,7 @@ int main(int argc, char** argv) {
   graph = new Graph();
   {
     Mesh m;
-    m.read(graph, filename.c_str(), detAlgo == nondet);
+    m.read(graph, filename.c_str());
     Verifier v;
     if (!skipVerify && !v.verify(graph)) {
       std::cerr << "bad input mesh\n";
@@ -156,10 +114,7 @@ int main(int argc, char** argv) {
   Galois::StatTimer T;
   T.start();
 
-  if (detAlgo == nondet)
-    Galois::do_all_local(*graph, Preprocess());
-  else
-    std::for_each(graph->begin(), graph->end(), Preprocess());
+  Galois::do_all_local(*graph, Preprocess());
 
   Galois::Statistic("MeminfoMid", Galois::Runtime::MM::pageAllocInfo());
   
@@ -170,18 +125,7 @@ int main(int argc, char** argv) {
   typedef LocalQueues<dChunkedLIFO<256>, ChunkedLIFO<256> > BQ;
   typedef ChunkedAdaptor<false,32> CA;
   
-  switch (detAlgo) {
-    case nondet: 
-      Galois::for_each_local<CA>(wl, Process<>()); break;
-    case detBase:
-      Galois::for_each_det(wl.begin(), wl.end(), Process<>()); break;
-    case detPrefix:
-      Galois::for_each_det(wl.begin(), wl.end(), Process<detPrefix>(), Process<>());
-      break;
-    case detDisjoint:
-      Galois::for_each_det(wl.begin(), wl.end(), Process<detDisjoint>()); break;
-    default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
-  }
+  Galois::for_each_local<CA>(wl, Process());
   Trefine.stop();
   T.stop();
   
