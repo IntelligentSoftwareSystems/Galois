@@ -85,19 +85,6 @@ struct Preprocess {
   }
 };
 
-struct DetLessThan {
-  Graphp graph;
-
-  DetLessThan(Graphp g) :graph(g) {}
-
-  bool operator()(const GNode& a, const GNode& b) const {
-    int idA = graph->getData(a).getId();
-    int idB = graph->getData(b).getId();
-    if (idA == 0 || idB == 0) abort();
-    return idA < idB;
-  }
-};
-
 int main(int argc, char** argv) {
   Galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);

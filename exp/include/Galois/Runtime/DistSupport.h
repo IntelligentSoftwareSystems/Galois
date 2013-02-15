@@ -114,6 +114,16 @@ public:
     return resolve(*this);
   }
 
+  bool operator<(const gptr& rhs) const {
+    if (owner == rhs.owner)
+      return ptr <= rhs.ptr;
+    return owner < rhs.owner;
+  }
+  bool operator>(const gptr& rhs) const {
+    if (owner == rhs.owner)
+      return ptr > rhs.ptr;
+    return owner > rhs.owner;
+  }
   bool operator==(const gptr& rhs) const {
     return rhs.ptr == ptr && rhs.owner == owner;
   }
