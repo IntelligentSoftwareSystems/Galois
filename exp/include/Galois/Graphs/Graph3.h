@@ -356,7 +356,7 @@ public:
     }
   }
   
-  class iterator : public std::iterator<std::forward_iterator_tag, NodeHandle> {
+  class iterator : public std::iterator<std::forward_iterator_tag, const NodeHandle> {
     NodeHandle n;
     Galois::Runtime::Distributed::gptr<SubGraphState> s;
     void next() {
@@ -370,9 +370,13 @@ public:
         next();
       if (!n) s.initialize(nullptr);
     }
+
   public:
+    using typename std::iterator<std::forward_iterator_tag, const NodeHandle>::pointer;
+    using typename std::iterator<std::forward_iterator_tag, const NodeHandle>::reference;
+
   iterator() :n(), s() {}
-    explicit iterator(Galois::Runtime::Distributed::gptr<SubGraphState> ms) :n(ms->head), s(ms) {
+    explicit iterator(const Galois::Runtime::Distributed::gptr<SubGraphState> ms) :n(ms->head), s(ms) {
       while (!n && s->next) {
         s = s->next;
         n = s->head;
@@ -383,11 +387,12 @@ public:
       if (!n) s.initialize(nullptr);
     }
 
-    NodeHandle& operator*() { return n; }
+    reference operator*() const { return n; }
+    pointer operator->() const { return &n; }
     iterator& operator++() { next(); return *this; }
     iterator operator++(int) { iterator tmp(*this); next(); return tmp; }
-    bool operator==(const iterator& rhs) { return n == rhs.n; }
-    bool operator!=(const iterator& rhs) { return n != rhs.n; }
+    bool operator==(const iterator& rhs) const { return n == rhs.n; }
+    bool operator!=(const iterator& rhs) const { return n != rhs.n; }
 
     void dump() {
       n.dump();
@@ -439,7 +444,7 @@ public:
       //       not sure why though. he had to do this in the prev graph
       if (ii->getDst()->getActive()) {
         // modify the call when local nodes aren't looked up in directory
-        ii->getDst().acquire();
+	//        ii->getDst().acquire();
       }
     }
     return boost::make_filter_iterator(is_edge(), N->begin(), N->end());

@@ -43,16 +43,16 @@ template<typename T, bool> struct resolve_dispatch;
 
 template<typename T>
 struct resolve_dispatch<T, false> {
-    static T* go(uint32_t owner, uintptr_t ptr) {
+    static T* go(uint32_t owner, T* ptr) {
     T* rptr = nullptr;
     assert(ptr);
     if (owner == networkHostID) {
       // if (inGaloisForEach)
       // 	rptr = reinterpret_cast<T*>(ptr);
       // else
-      rptr = getSystemLocalDirectory().resolve<T>(ptr, getThreadContext());
+      rptr = getSystemLocalDirectory().resolve<T>((uintptr_t)ptr, getThreadContext());
     } else
-      rptr = getSystemRemoteDirectory().resolve<T>(ptr, owner, getThreadContext());
+      rptr = getSystemRemoteDirectory().resolve<T>((uintptr_t)ptr, owner, getThreadContext());
     assert(rptr);
     return rptr;
   }
@@ -61,13 +61,13 @@ struct resolve_dispatch<T, false> {
 // resolve for persistent objects!
 template<typename T>
 struct resolve_dispatch<T,true> {
-  static T* go(uint32_t owner, uintptr_t ptr) {
+  static T* go(uint32_t owner, T*  ptr) {
     T* rptr = nullptr;
     assert(ptr);
     if (owner == networkHostID)
-      rptr = reinterpret_cast<T*>(ptr);
+      rptr = ptr;
     else
-      rptr = getSystemPersistentDirectory().resolve<T>(ptr, owner);
+      rptr = getSystemPersistentDirectory().resolve<T>((uintptr_t)ptr, owner);
     assert(rptr);
     return rptr;
   }
@@ -81,7 +81,7 @@ T* resolve(const gptr<T>& p) {
 
 template<typename T>
 class gptr {
-  uintptr_t ptr;
+  T* ptr;
   uint32_t owner;
 
   friend T* resolve<>(const gptr<T>&);
@@ -91,7 +91,7 @@ public:
   
   constexpr gptr() :ptr(0), owner(0) {}
 
-  explicit gptr(T* p) :ptr(reinterpret_cast<uintptr_t>(p)), owner(networkHostID) {}
+  explicit gptr(T* p) :ptr(p), owner(networkHostID) {}
 
   // calling resolve acquires the lock, used after a prefetch
   // IMP: have to be changed when local objects aren't passed to the directory
@@ -102,21 +102,21 @@ public:
   // check if the object is available, else just make a call to fetch
   void prefetch() {
     if (owner == networkHostID)
-     getSystemLocalDirectory().prefetch<T>(ptr);
+      getSystemLocalDirectory().prefetch<T>(reinterpret_cast<uintptr_t>(ptr));
     else
-     getSystemRemoteDirectory().prefetch<T>(ptr, owner);
+      getSystemRemoteDirectory().prefetch<T>(reinterpret_cast<uintptr_t>(ptr), owner);
   }
 
   T& operator*() const {
     return *resolve(*this);
   }
-  T *operator->() const {
+  T* operator->() const {
     return resolve(*this);
   }
 
   bool operator<(const gptr& rhs) const {
     if (owner == rhs.owner)
-      return ptr <= rhs.ptr;
+      return ptr < rhs.ptr;
     return owner < rhs.owner;
   }
   bool operator>(const gptr& rhs) const {
@@ -133,7 +133,7 @@ public:
   explicit operator bool() const { return ptr != 0; }
 
   void initialize(T* p) {
-    ptr = reinterpret_cast<uintptr_t>(p);
+    ptr = p;
     owner = ptr ? networkHostID : 0;
   }
 
