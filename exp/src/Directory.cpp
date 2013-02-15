@@ -30,7 +30,7 @@ using namespace Galois::Runtime::Distributed;
 uintptr_t RemoteDirectory::haveObject(uintptr_t ptr, uint32_t owner, SimpleRuntimeContext *cnx) {
 #define OBJSTATE (*iter).second
   RemoteDirectory& rd = getSystemRemoteDirectory();
-  lock_guard<mutex> lock(rd.mlock);
+  lock_guard<glock> lock(rd.Lock);
   auto iter = rd.curobj.find(make_pair(ptr,owner));
   uintptr_t retval = 0;
   // add object to list if it's not already there
@@ -67,7 +67,7 @@ void RemoteDirectory::fetchRemoteObj(uintptr_t ptr, uint32_t owner, recvFuncTy p
 uintptr_t LocalDirectory::haveObject(uintptr_t ptr, uint32_t &remote, SimpleRuntimeContext *cnx) {
 #define OBJSTATE (*iter).second
   LocalDirectory& ld = getSystemLocalDirectory();
-  lock_guard<mutex> lock(ld.mlock);
+  lock_guard<glock> lock(ld.Lock);
   auto iter = ld.curobj.find(ptr);
   uintptr_t retval = 0;
   // Returning the object even if locked as the call to acquire would fail
@@ -100,7 +100,7 @@ void LocalDirectory::fetchRemoteObj(uintptr_t ptr, uint32_t remote, recvFuncTy p
 uintptr_t PersistentDirectory::haveObject(uintptr_t ptr, uint32_t owner) {
 #define OBJSTATE (*iter).second
   PersistentDirectory& pd = getSystemPersistentDirectory();
-  lock_guard<mutex> lock(pd.mlock);
+  lock_guard<glock> lock(pd.Lock);
   auto iter = pd.perobj.find(make_pair(ptr,owner));
   uintptr_t retval = 0;
   // add object to list if it's not already there
@@ -122,7 +122,7 @@ void PersistentDirectory::fetchRemoteObj(uintptr_t ptr, uint32_t owner, recvFunc
   uint32_t host = networkHostID;
 #define OBJSTATE (*iter).second
   PersistentDirectory& pd = getSystemPersistentDirectory();
-  lock_guard<mutex> lock(pd.mlock);
+  lock_guard<glock> lock(pd.Lock);
   auto iter = pd.perobj.find(make_pair(ptr,owner));
   // return if already requested
   if (OBJSTATE.requested) {

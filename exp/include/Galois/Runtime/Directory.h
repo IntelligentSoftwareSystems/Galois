@@ -81,7 +81,8 @@ class RemoteDirectory: public SimpleRuntimeContext {
   };
 
   // using RCII for locking, done to handle lock release on exceptions
-  mutex mlock;
+  typedef Galois::Runtime::LL::SimpleLock<true> glock;
+  Galois::Runtime::LL::SimpleLock<true> Lock;
   boost::unordered_map<std::pair<uintptr_t, uint32_t>, objstate, ohash> curobj;
 
   //returns a valid locked local pointer to the object if it exists
@@ -131,7 +132,8 @@ class LocalDirectory: public SimpleRuntimeContext {
   };
 
   // using RCII for locking, done to handle lock release on exceptions
-  mutex mlock;
+  typedef Galois::Runtime::LL::SimpleLock<true> glock;
+  Galois::Runtime::LL::SimpleLock<true> Lock;
   boost::unordered_map<uintptr_t, objstate> curobj;
 
   // returns a valid locked local pointer to the object if not remote
@@ -184,7 +186,8 @@ class PersistentDirectory: public SimpleRuntimeContext {
   };
 
   // using RCII for locking, done to handle lock release on exceptions
-  mutex mlock;
+  typedef Galois::Runtime::LL::SimpleLock<true> glock;
+  Galois::Runtime::LL::SimpleLock<true> Lock;
   boost::unordered_map<std::pair<uintptr_t, uint32_t>, objstate, ohash> perobj;
 
   // returns a valid local pointer to the object if not remote
@@ -266,7 +269,7 @@ void RemoteDirectory::remoteReqLandingPad(RecvBuffer &buf) {
   T *data;
   uintptr_t ptr;
   RemoteDirectory& rd = getSystemRemoteDirectory();
-  lock_guard<mutex> lock(rd.mlock);
+  lock_guard<glock> lock(rd.Lock);
   gDeserialize(buf,ptr, owner);
   auto iter = rd.curobj.find(make_pair(ptr,owner));
   // check if the object can be sent
@@ -319,7 +322,7 @@ void RemoteDirectory::remoteDataLandingPad(RecvBuffer &buf) {
   Lockable *L;
   uintptr_t ptr;
   RemoteDirectory& rd = getSystemRemoteDirectory();
-  lock_guard<mutex> lock(rd.mlock);
+  lock_guard<glock> lock(rd.Lock);
   gDeserialize(buf,ptr,owner,size);
   auto iter = rd.curobj.find(make_pair(ptr,owner));
   data = new T();
@@ -378,7 +381,7 @@ void LocalDirectory::localReqLandingPad(RecvBuffer &buf) {
   Lockable *L;
   uintptr_t ptr;
   LocalDirectory& ld = getSystemLocalDirectory();
-  lock_guard<mutex> lock(ld.mlock);
+  lock_guard<glock> lock(ld.Lock);
   gDeserialize(buf,ptr,remote_to);
   data = reinterpret_cast<T*>(ptr);
   L = reinterpret_cast<Lockable*>(data);
@@ -423,7 +426,7 @@ void LocalDirectory::localDataLandingPad(RecvBuffer &buf) {
   Lockable *L;
   uintptr_t ptr;
   LocalDirectory& ld = getSystemLocalDirectory();
-  lock_guard<mutex> lock(ld.mlock);
+  lock_guard<glock> lock(ld.Lock);
   gDeserialize(buf,ptr,size);
   data = reinterpret_cast<T*>(ptr);
   auto iter = ld.curobj.find(ptr);
@@ -479,7 +482,7 @@ void PersistentDirectory::persistentDataLandingPad(RecvBuffer &buf) {
   T *data;
   uintptr_t ptr;
   PersistentDirectory& pd = getSystemPersistentDirectory();
-  lock_guard<mutex> lock(pd.mlock);
+  lock_guard<glock> lock(pd.Lock);
   data = new T();
   gDeserialize(buf, ptr, owner,*data);
   auto iter = pd.perobj.find(make_pair(ptr,owner));
