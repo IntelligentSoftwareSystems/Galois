@@ -28,7 +28,12 @@
 #ifndef GALOIS_RUNTIME_DOALL_H
 #define GALOIS_RUNTIME_DOALL_H
 
+#include "Galois/gstl.h"
 #include "Galois/Runtime/Barrier.h"
+#include "Galois/Runtime/Support.h"
+#include "Galois/Runtime/Range.h"
+
+#include <algorithm>
 
 namespace Galois {
 namespace Runtime {

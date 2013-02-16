@@ -552,6 +552,14 @@ public:
     Super_ty::init (Cont_ty (alloc));
   }
 
+  void reserve_all (size_t sz) {
+    size_t numT = Galois::getActiveThreads ();
+    size_t perT = (sz + numT - 1) / numT; // round up
+
+    for (unsigned i = 0; i < numT; ++i) {
+      Super_ty::get (i).reserve (perT);
+    }
+  }
   
 
 };
