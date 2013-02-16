@@ -87,9 +87,7 @@ public:
     Galois::StatTimer timer ("Simulation time: ");
 
     timer.start ();
-    GaloisRuntime::beginSampling ();
     size_t numEvents = runSim (table, initEvents, endtime, enablePrints);
-    GaloisRuntime::endSampling ();
     timer.stop ();
 
     std::cout << "Billiards " << version () << ", number of events processed=" << numEvents << std::endl;
