@@ -14,7 +14,7 @@ using G = ThirdGraph<nd,ed,dir>;
 struct op {
   template<typename T, typename Context>
   void operator()(const T& node, const Context& cnx) {
-    node->createEdge(node, -node->getData());
+    node->createEdge(node, node, -node->getData());
   }
 };
 

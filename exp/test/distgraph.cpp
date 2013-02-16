@@ -19,7 +19,7 @@ struct op {
   template<typename Context>
   void operator()(const int& nodeval, const Context& cnx) {
     G::NodeHandle node = graph->createNode(nodeval);
-    node->createEdge(node, -node->getData());
+    node->createEdge(node, node, -node->getData());
   }
 
   // serialization functions

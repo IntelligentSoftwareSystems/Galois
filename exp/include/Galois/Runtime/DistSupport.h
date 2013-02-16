@@ -147,7 +147,7 @@ public:
   }
 
   void dump() {
-    printf("[%x,%lx]", owner, ptr);
+    printf("[%x,%lx]", owner, (size_t)ptr);
   }
 };
 

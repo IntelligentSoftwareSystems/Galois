@@ -64,7 +64,7 @@ int main(int argc, char** argv) {
 
   std::cout << "\n" << "Using edge_iterator:\n";
   for (auto ii = Gr->begin(), ee = Gr->end(); ii != ee; ++ii) {
-    G::NodeHandle& N = *ii;
+    G::NodeHandle N = *ii;
     cout << "Node: " << N->getData() << " Num Edges: ";
     cout << std::distance(Gr->edge_begin(N), Gr->edge_end(N)) << " edges ";
     for (auto jj = Gr->edge_begin(N), ff = Gr->edge_end(N); jj != ff; ++jj) {
