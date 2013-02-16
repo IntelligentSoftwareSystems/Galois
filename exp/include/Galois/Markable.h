@@ -37,6 +37,8 @@
 #include "Galois/Runtime/PerThreadWorkList.h"
 #include "Galois/Runtime/DoAllCoupled.h"
 
+namespace Galois {
+
 template <typename T>
 struct Markable {
   private:
@@ -78,20 +80,21 @@ struct IsNotMarked {
 };
 
 
-template <typename T, typename C>
+template <typename WL>
 struct RemoveMarked {
 
-  typedef GaloisRuntime::PerThreadWorkList<Markable<T>, C> WL_ty;
 
-  WL_ty& wl;
+  WL& wl;
 
-  RemoveMarked (WL_ty& _wl)
+  RemoveMarked (WL& _wl)
     : wl (_wl) {}
 
   void operator () (unsigned r) {
     assert (r < wl.numRows ());
 
-    typename WL_ty::local_iterator new_end =
+    using T = typename WL::value_type;
+
+    typename WL::local_iterator new_end =
       std::partition (wl[r].begin (), wl[r].end (), IsNotMarked<T> ());
 
     wl[r].erase (new_end, wl[r].end ());
@@ -100,28 +103,31 @@ struct RemoveMarked {
 
 };
 
-template <typename T, typename C>
-void removeMarked (GaloisRuntime::PerThreadWorkList<Markable<T>, C>& wl) {
+template <typename WL>
+void removeMarked (WL& wl) {
 
   Galois::do_all (
-  // GaloisRuntime::do_all_coupled (
+  // Galois::Runtime::do_all_coupled (
       boost::counting_iterator<unsigned> (0),
       boost::counting_iterator<unsigned> (wl.numRows ()),
-      RemoveMarked<T, C> (wl),
+      RemoveMarked<WL> (wl),
       "remove_marked");
       
 }
 
-template <typename T, typename C>
-struct RemoveMarkedStable: public RemoveMarked<T, C> {
-  typedef RemoveMarked<T, C> Super_ty;
+template <typename WL>
+struct RemoveMarkedStable: public RemoveMarked<WL> {
 
-  RemoveMarkedStable (typename Super_ty::WL_ty& _wl): Super_ty (_wl) {}
+  using Super_ty = RemoveMarked<WL>;
+
+  RemoveMarkedStable (WL& _wl): Super_ty (_wl) {}
 
   void operator () (unsigned r) {
     assert (r < Super_ty::wl.numRows ());
 
-    typename Super_ty::WL_ty::iterator new_end =
+    using T = typename WL::value_type;
+    
+    typename WL::local_iterator new_end =
       std::stable_partition (Super_ty::wl[r].begin (), Super_ty::wl[r].end (), IsNotMarked<T> ());
 
     Super_ty::wl[r].erase (new_end, Super_ty::wl[r].end ());
@@ -129,18 +135,20 @@ struct RemoveMarkedStable: public RemoveMarked<T, C> {
   }
 };
 
-template <typename T, typename C>
-void removeMarkedStable (GaloisRuntime::PerThreadWorkList<Markable<T>, C>& wl) {
+template <typename WL>
+void removeMarkedStable (WL& wl) {
 
   Galois::do_all (
-  // GaloisRuntime::do_all_coupled (
+  // Galois::Runtime::do_all_coupled (
       boost::counting_iterator<unsigned> (0),
       boost::counting_iterator<unsigned> (wl.numRows ()),
-      RemoveMarkedStable<T, C> (wl),
+      RemoveMarkedStable<WL> (wl),
       "remove_marked_stable");
       
 }
 
+
+} // end namespace Galois
 
 
 
