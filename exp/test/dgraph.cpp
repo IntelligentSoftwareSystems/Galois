@@ -44,7 +44,8 @@ struct cop {
 
   template<typename Context>
   void operator()(unsigned x, Context& cnx) const {
-    Gr->createNode(x);
+    G::NodeHandle node = Gr->createNode(x);
+    Gr->addNode(node);
   }
 
   // serialization functions
