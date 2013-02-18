@@ -31,7 +31,7 @@ protected:
     gDeserialize(s,nextNode, active);
   }
 
-  void dump(std::ostream& os) {
+  void dump(std::ostream& os) const {
     os << "next: ";
     nextNode.dump();
     os << " active: ";
@@ -62,7 +62,7 @@ protected:
     gDeserialize(s,data);
   }
 
-  void dump(std::ostream& os) {
+  void dump(std::ostream& os) const {
     os << "data: " << data;
   }
 
@@ -103,7 +103,7 @@ public:
     gDeserialize(s,dst, val);
   }
 
-  void dump(std::ostream& os) {
+  void dump(std::ostream& os) const {
     os << "<{Edge: dst: ";
     dst.dump();
     os << " dst active: ";
@@ -131,7 +131,7 @@ public:
     gDeserialize(s,dst);
   }
 
-  void dump(std::ostream& os) {
+  void dump(std::ostream& os) const {
     os << "<{Edge: dst: ";
     dst.dump();
     os << " dst active: ";
@@ -154,7 +154,7 @@ protected:
   void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
     gDeserialize(s,edges);
   }
-  void dump(std::ostream& os) {
+  void dump(std::ostream& os) const {
     os << "numedges: " << edges.size();
     for (decltype(edges.size()) x = 0; x < edges.size(); ++x) {
       os << " ";
@@ -207,7 +207,7 @@ protected:
   void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
     gDeserialize(s,edges);
   }
-  void dump(std::ostream& os) {
+  void dump(std::ostream& os) const {
     os << "numedges: " << edges.size();
     for (decltype(edges.size()) x = 0; x < edges.size(); ++x) {
       os << " ";
@@ -277,7 +277,7 @@ public:
     GraphNodeData<NodeDataTy>::deserialize(s);
     GraphNodeEdges<SHORTHAND, EdgeDataTy, EDir>::deserialize(s);
   }
-  void dump(std::ostream& os) {
+  void dump(std::ostream& os) const {
     os << this << " ";
     os << "<{GN: ";
     GraphNodeBase<SHORTHAND >::dump(os);
@@ -332,6 +332,8 @@ public:
   template<typename... Args>
   NodeHandle createNode(Args&&... args) {
     NodeHandle N(new gNode(std::forward<Args...>(args...)));
+    // lock the localState before adding the node
+    acquire(&localState,Galois::MethodFlag::ALL);
     N->getNextNode() = localState.head;
     localState.head = N;
     return N;
@@ -339,6 +341,8 @@ public:
 
   NodeHandle createNode() {
     NodeHandle N(new gNode());
+    // lock the localState before adding the node
+    acquire(&localState,Galois::MethodFlag::ALL);
     N->getNextNode() = localState.head;
     localState.head = N;
     return N;
@@ -394,7 +398,7 @@ public:
     bool operator==(const iterator& rhs) const { return n == rhs.n; }
     bool operator!=(const iterator& rhs) const { return n != rhs.n; }
 
-    void dump() {
+    void dump() const {
       n.dump();
       s.dump();
     }
