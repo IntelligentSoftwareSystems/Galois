@@ -146,7 +146,7 @@ public:
     gDeserialize(s,ptr, owner);
   }
 
-  void dump() {
+  void dump() const {
     printf("[%x,%lx]", owner, (size_t)ptr);
   }
 };
