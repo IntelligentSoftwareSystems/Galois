@@ -44,10 +44,22 @@ struct is_bad {
 
 struct create_nodes {
   Graphp g;
+  create_nodes() {}
   create_nodes(Graphp _g): g(_g) {}
-  void operator()(Element& item) {
+
+  template<typename Context>
+  void operator()(Element& item, const Context& cnx) {
     GNode n = g->createNode(item);
     g->addNode(n);
+  }
+
+  // serialization functions
+  typedef int tt_has_serialize;
+  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+    gSerialize(s,g);
+  }
+  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+    gDeserialize(s,g);
   }
 };
 
@@ -381,7 +393,7 @@ private:
     //std::sort(elements.begin(), elements.end(), centerXCmp());
     divide(elements.begin(), elements.end());
 
-    Galois::do_all(elements.begin(), elements.end(), create_nodes(mesh));
+    Galois::for_each<>(elements.begin(), elements.end(), create_nodes(mesh));
 
     std::map<Edge, GNode> edge_map;
     for (Graph::iterator ii = mesh->begin(), ee = mesh->end();
