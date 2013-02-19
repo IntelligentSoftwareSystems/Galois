@@ -338,21 +338,23 @@ public:
   template<typename... Args>
   NodeHandle createNode(Args&&... args) {
     NodeHandle N(new gNode(std::forward<Args...>(args...)));
-    SubGraphState* lState = localState.getLocal();
     // lock the localState before adding the node
-    acquire(lState,Galois::MethodFlag::ALL);
+    gptr<SubGraphState> lStatePtr(localState.getLocal());
+    SubGraphState* lState = lStatePtr.transientAcquire();
     N->getNextNode() = lState->head;
     lState->head = N;
+    lStatePtr.transientRelease();
     return N;
   }
 
   NodeHandle createNode() {
     NodeHandle N(new gNode());
-    SubGraphState* lState = localState.getLocal();
     // lock the localState before adding the node
-    acquire(lState,Galois::MethodFlag::ALL);
+    gptr<SubGraphState> lStatePtr(localState.getLocal());
+    SubGraphState* lState = lStatePtr.transientAcquire();
     N->getNextNode() = lState->head;
     lState->head = N;
+    lStatePtr.transientRelease();
     return N;
   }
   
@@ -514,14 +516,19 @@ public:
   typedef int tt_has_serialize;
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
     //This is what is called on the source of a replicating source
-    gSerialize(s,localState.getLocal()->master);
+    gptr<SubGraphState> lStatePtr(localState.getLocal());
+    SubGraphState* lState = lStatePtr.transientAcquire();
+    gSerialize(s,lState->master);
+    lStatePtr.transientRelease();
   }
   void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
     //This constructs the local node of the distributed graph
-    SubGraphState* lState = localState.getLocal();
+    gptr<SubGraphState> lStatePtr(localState.getLocal());
+    SubGraphState* lState = lStatePtr.transientAcquire();
     gDeserialize(s,lState->master);
     lState->llast->next = lState->master->llast->next;
     lState->master->llast->next.initialize(lState);
+    lStatePtr.transientRelease();
   }
   
 };
