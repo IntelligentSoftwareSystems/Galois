@@ -293,8 +293,8 @@ private:
   };
 
   void resetAll () {
-    Galois::Runtime::do_all_impl<false> (allNItems.begin_all (), allNItems.end_all (),
-        Reset (niAlloc), "reset_NItems");
+    do_all_impl(makeStandardRange(allNItems.begin_all (), allNItems.end_all ()),
+        Reset (niAlloc));
   }
 
 public:
@@ -685,15 +685,15 @@ public:
     Galois::TimeAccumulator t_destroy;
 
     t_create.start ();
-    Galois::Runtime::do_all_impl<false> (abeg, aend, 
-        CreateCtxtExpandNhood (nhoodVisitor, nhmgr, ctxtAlloc, initCtxt),
-        "create_initial_contexts");
+    Galois::Runtime::do_all_impl(makeStandardRange(abeg, aend), 
+				 CreateCtxtExpandNhood (nhoodVisitor, nhmgr, ctxtAlloc, initCtxt));
+    //        "create_initial_contexts");
     t_create.stop ();
 
     t_find.start ();
-    Galois::Runtime::do_all_impl<false> (initCtxt.begin_all (), initCtxt.end_all (),
-        FindInitSources (sourceTest, initSrc, nInitSrc),
-        "find_initial_sources");
+    Galois::Runtime::do_all_impl(makeStandardRange(initCtxt.begin_all (), initCtxt.end_all ()),
+				 FindInitSources (sourceTest, initSrc, nInitSrc));
+    //       "find_initial_sources");
     t_find.stop ();
 
     std::cout << "Number of initial sources found: " << nInitSrc.reduce () 
@@ -726,8 +726,8 @@ public:
     t_for.stop ();
 
     t_destroy.start ();
-    Galois::Runtime::do_all_impl<false> (ctxtDelQ.begin_all (), ctxtDelQ.end_all (),
-        DelCtxt (ctxtAlloc), "delete_all_ctxt");
+    Galois::Runtime::do_all_impl(makeStandardRange(ctxtDelQ.begin_all (), ctxtDelQ.end_all ()),
+				 DelCtxt (ctxtAlloc)); //, "delete_all_ctxt");
     t_destroy.stop ();
 
     std::cout << "Number of iterations: " << niter.reduce () << std::endl;

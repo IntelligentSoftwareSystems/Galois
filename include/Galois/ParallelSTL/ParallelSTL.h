@@ -55,7 +55,7 @@ template<class InputIterator, class Predicate>
 ptrdiff_t count_if(InputIterator first, InputIterator last, Predicate pred)
 {
   return Galois::Runtime::do_all_impl(Galois::Runtime::makeStandardRange(first, last),
-      count_if_helper<Predicate>(pred), count_if_reducer(), true).ret;
+				      count_if_helper<Predicate>(pred), count_if_reducer()).ret;
 }
 
 template<typename InputIterator, class Predicate>
@@ -318,7 +318,7 @@ template <class InputIterator, class T, typename BinaryOperation>
 T accumulate (InputIterator first, InputIterator last, T init, BinaryOperation binary_op) {
   return Galois::Runtime::do_all_impl(Galois::Runtime::makeStandardRange(first, last),
       accumulate_helper<T,BinaryOperation>(init, binary_op),
-      accumulate_helper_reduce<BinaryOperation>(binary_op), true).init;
+      accumulate_helper_reduce<BinaryOperation>(binary_op)).init;
 }
 
 template<class InputIterator, class T>
@@ -349,7 +349,7 @@ template<class InputIterator, class MapFn, class T, class ReduceFn>
 T map_reduce(InputIterator first, InputIterator last, MapFn fn, T init, ReduceFn reduce) {
   return Galois::Runtime::do_all_impl(Galois::Runtime::makeStandardRange(first, last),
       map_reduce_helper<T,MapFn,ReduceFn>(init, fn, reduce),
-      accumulate_helper_reduce<ReduceFn>(reduce), true).init;
+      accumulate_helper_reduce<ReduceFn>(reduce)).init;
 }
 
 }

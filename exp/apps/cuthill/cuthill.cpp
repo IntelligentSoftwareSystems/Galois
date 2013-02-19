@@ -246,7 +246,7 @@ private:
     Galois::for_each<dChunk>(source, UnorderedProcess());
 
     res.counts = Galois::Runtime::do_all_impl(Galois::Runtime::makeLocalRange(graph),
-        CountLevels(reset), default_reduce(), true).counts;
+        CountLevels(reset), default_reduce()).counts;
     res.max_width = *std::max_element(res.counts.begin(), res.counts.end());
     res.complete = true;
     return res;

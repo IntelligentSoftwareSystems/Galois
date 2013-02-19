@@ -153,7 +153,7 @@ void for_each_local(ConTy& c, FunctionTy fn, const char* loopname = 0) {
  */
 template<typename IterTy,typename FunctionTy>
 FunctionTy do_all(const IterTy& b, const IterTy& e, FunctionTy fn, const char* loopname = 0) {
-  return Runtime::do_all_impl(Runtime::makeStandardRange(b, e), fn, Runtime::EmptyFn(), false);
+  return Runtime::do_all_impl(Runtime::makeStandardRange(b, e), fn);
 }
 
 /**
@@ -167,7 +167,7 @@ FunctionTy do_all(const IterTy& b, const IterTy& e, FunctionTy fn, const char* l
  */
 template<typename ConTy,typename FunctionTy>
 FunctionTy do_all_local(ConTy& c, FunctionTy fn, const char* loopname = 0) {
-  return Runtime::do_all_impl(Runtime::makeLocalRange(c), fn, Runtime::EmptyFn(), false);
+  return Runtime::do_all_impl(Runtime::makeLocalRange(c), fn);
 }
 
 /**
