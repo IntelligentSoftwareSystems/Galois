@@ -217,7 +217,7 @@ void LocalDirectory::dirRelease(uintptr_t ptr) {
   // assert if the object is Remote
   assert((iter == ld.curobj.end()) || ((*iter).second.state == objstate::Local));
   Lockable *L = reinterpret_cast<Lockable*>(ptr);
-  L->Owner.unlock();
+  L->Owner.unlock_and_clear();
 }
 
 //release the lock got using transientAcquire
@@ -251,7 +251,7 @@ void RemoteDirectory::dirRelease(uintptr_t ptr, uint32_t owner) {
   assert((*iter).second.state == objstate::Local);
   uintptr_t retval = (*iter).second.localobj;
   Lockable *L = reinterpret_cast<Lockable*>(retval);
-  L->Owner.unlock();
+  L->Owner.unlock_and_clear();
 }
 
 //release the lock got using transientAcquire

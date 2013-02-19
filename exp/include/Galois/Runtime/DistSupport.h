@@ -100,7 +100,7 @@ public:
   }
 
   // check if the object is available, else just make a call to fetch
-  T* transientAquire() {
+  T* transientAcquire() {
     if (owner == networkHostID)
       return getSystemLocalDirectory().transientAcquire<T>(reinterpret_cast<uintptr_t>(ptr));
     else
