@@ -1,0 +1,14 @@
+
+
+set(QT_USE_QTOPENGL TRUE)
+set(QT_USE_QTXML TRUE)
+find_package(Qt4 REQUIRED)
+
+#QT4_WRAP_CPP(viewer_HEADERS_MOC ...)
+set(viewer_HEADERS_MOC)
+
+include(${QT_USE_FILE})
+add_definitions(${QT_DEFINITIONS})
+
+add_executable(billiards-viewer main.cpp Viewer.cpp Scene.cpp ${viewer_HEADERS_MOC})
+target_link_libraries(billiards-viewer ${QT_LIBRARIES} ${QGLVIEWER_LIBRARIES})
