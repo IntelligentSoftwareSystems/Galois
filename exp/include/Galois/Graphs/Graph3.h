@@ -526,6 +526,11 @@ public:
     gptr<SubGraphState> lStatePtr(localState.getLocal());
     SubGraphState* lState = lStatePtr.transientAcquire();
     gDeserialize(s,lState->master);
+    for (unsigned int i = 0; i < getActiveThreads(); i++) {
+      if (i == Runtime::LL::getTID())
+        continue;
+      localState.getLocal(i)->master = lState->master;
+    }
     lState->llast->next = lState->master->llast->next;
     lState->master->llast->next.initialize(lState);
     lStatePtr.transientRelease();
