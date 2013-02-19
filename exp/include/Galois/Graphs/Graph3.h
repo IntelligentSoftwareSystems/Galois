@@ -1,9 +1,11 @@
 #include <iterator>
 #include <deque>
 
+#include "Galois/Threads.h"
 #include "Galois/Runtime/DistSupport.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/MethodFlags.h"
+#include "Galois/Runtime/PerThreadStorage.h"
 #include <boost/iterator/filter_iterator.hpp>
 
 namespace Galois {
@@ -306,19 +308,23 @@ class ThirdGraph { //: public Galois::Runtime::Distributed::DistBase<ThirdGraph>
   struct SubGraphState : public Galois::Runtime::Lockable {
     typename gNode::Handle head;
     Galois::Runtime::Distributed::gptr<SubGraphState> next;
+    //lfirst is the first sub-graph local to the host
+    Galois::Runtime::Distributed::gptr<SubGraphState> lfirst;
+    //llast is the last sub-graph local to the host
+    Galois::Runtime::Distributed::gptr<SubGraphState> llast;
     Galois::Runtime::Distributed::gptr<SubGraphState> master;
     typedef int tt_has_serialize;
     typedef int tt_dir_blocking;
     void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-      gSerialize(s, head, next, master);
+      gSerialize(s, head, next, lfirst, llast, master);
     }
     void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-      gDeserialize(s,head, next, master);
+      gDeserialize(s, head, next, lfirst, llast, master);
     }
-    SubGraphState() :head(), next(), master(this) {}
+    SubGraphState() :head(), next(), lfirst(), llast(), master(this) {}
   };
 
-  SubGraphState localState;
+  Galois::Runtime::PerThreadStorage<SubGraphState> localState;
 
   struct is_edge : public std::unary_function<typename gNode::EdgeType&, bool> {
     bool operator()(typename gNode::EdgeType& n) const { return n.getDst()->getActive(); }
@@ -332,19 +338,21 @@ public:
   template<typename... Args>
   NodeHandle createNode(Args&&... args) {
     NodeHandle N(new gNode(std::forward<Args...>(args...)));
+    SubGraphState* lState = localState.getLocal();
     // lock the localState before adding the node
-    acquire(&localState,Galois::MethodFlag::ALL);
-    N->getNextNode() = localState.head;
-    localState.head = N;
+    acquire(lState,Galois::MethodFlag::ALL);
+    N->getNextNode() = lState->head;
+    lState->head = N;
     return N;
   }
 
   NodeHandle createNode() {
     NodeHandle N(new gNode());
+    SubGraphState* lState = localState.getLocal();
     // lock the localState before adding the node
-    acquire(&localState,Galois::MethodFlag::ALL);
-    N->getNextNode() = localState.head;
-    localState.head = N;
+    acquire(lState,Galois::MethodFlag::ALL);
+    N->getNextNode() = lState->head;
+    lState->head = N;
     return N;
   }
   
@@ -404,7 +412,7 @@ public:
     }
   };
 
-  iterator begin() { return iterator(localState.master); }
+  iterator begin() { return iterator(localState.getLocal()->master); }
   iterator end() { return iterator(); }
 
   class local_iterator : public std::iterator<std::forward_iterator_tag, NodeHandle> {
@@ -431,7 +439,7 @@ public:
     bool operator!=(const local_iterator& rhs) { return n != rhs.n; }
   };
 
-  local_iterator local_begin() { return local_iterator(localState.head); }
+  local_iterator local_begin() { return local_iterator(localState.getLocal()->head); }
   local_iterator local_end() { return local_iterator(); }
 
   //! Returns an iterator to the neighbors of a node 
@@ -485,19 +493,35 @@ public:
     return std::distance(begin(), end());
   }
 
-  ThirdGraph() {}
+  // assuming the constructor runs only on the main thread
+  ThirdGraph() {
+    unsigned int numThreads = getActiveThreads();
+    SubGraphState* first = localState.getLocal(0);
+    SubGraphState* last  = localState.getLocal(numThreads-1);
+    // initialize the linked list of the local nodes
+    for (unsigned int i = 0; i < numThreads; i++) {
+      SubGraphState* lState = localState.getLocal(i);
+      lState->lfirst.initialize(first);
+      lState->master.initialize(first);
+      lState->llast.initialize(last);
+      if (i != (numThreads-1))
+        lState->next.initialize(localState.getLocal(i+1));
+    }
+  }
+
   // mark the graph as persistent so that it is distributed
   typedef int tt_is_persistent;
   typedef int tt_has_serialize;
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
     //This is what is called on the source of a replicating source
-    gSerialize(s,localState.master);
+    gSerialize(s,localState.getLocal()->master);
   }
   void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
     //This constructs the local node of the distributed graph
-    gDeserialize(s,localState.master);
-    localState.next = localState.master->next;
-    localState.master->next.initialize(&localState);
+    SubGraphState* lState = localState.getLocal();
+    gDeserialize(s,lState->master);
+    lState->llast->next = lState->master->llast->next;
+    lState->master->llast->next.initialize(lState);
   }
   
 };

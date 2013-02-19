@@ -54,6 +54,37 @@ uintptr_t RemoteDirectory::haveObject(uintptr_t ptr, uint32_t owner, SimpleRunti
   return retval;
 }
 
+uintptr_t RemoteDirectory::transientHaveObj(uintptr_t ptr, uint32_t owner, bool& isavail) {
+#define OBJSTATE (*iter).second
+  RemoteDirectory& rd = getSystemRemoteDirectory();
+  lock_guard<glock> lock(rd.Lock);
+  auto iter = rd.curobj.find(make_pair(ptr,owner));
+  uintptr_t retval = 0;
+  isavail = false;
+  // add object to list if it's not already there
+  if (iter == rd.curobj.end()) {
+    objstate list_obj;
+    list_obj.count = 0;
+    list_obj.localobj = 0;
+    list_obj.state = objstate::Remote;
+    rd.curobj[make_pair(ptr,owner)] = list_obj;
+    iter = rd.curobj.find(make_pair(ptr,owner));
+  }
+  // Returning the object even if locked as the call to acquire would fail
+  if (OBJSTATE.state != objstate::Remote) {
+    retval = OBJSTATE.localobj;
+    isavail = true;
+  }
+  // acquire the lock if inside for_each
+  if (retval) {
+    Lockable *L = reinterpret_cast<Lockable*>(retval);
+    if (!rd.dirAcquire(L))
+      retval = 0;
+  }
+#undef OBJSTATE
+  return retval;
+}
+
 // NOTE: make sure that handleReceives() is called by another thread
 void RemoteDirectory::fetchRemoteObj(uintptr_t ptr, uint32_t owner, recvFuncTy pad) {
   SendBuffer buf;
@@ -82,6 +113,34 @@ uintptr_t LocalDirectory::haveObject(uintptr_t ptr, uint32_t &remote, SimpleRunt
   if (retval && cnx && inGaloisForEach) {
     Lockable *L = reinterpret_cast<Lockable*>(retval);
     cnx->acquire(L);
+  }
+#undef OBJSTATE
+  return retval;
+}
+
+uintptr_t LocalDirectory::transientHaveObj(uintptr_t ptr, uint32_t &remote, bool& isavail) {
+#define OBJSTATE (*iter).second
+  LocalDirectory& ld = getSystemLocalDirectory();
+  lock_guard<glock> lock(ld.Lock);
+  auto iter = ld.curobj.find(ptr);
+  uintptr_t retval = 0;
+  isavail = false;
+  // Returning the object even if locked as the call to acquire would fail
+  // return the object even if it is not in the list
+  if ((iter == ld.curobj.end()) || (OBJSTATE.state == objstate::Local)) {
+    retval = ptr;
+    isavail = true;
+  }
+  else if ((iter != ld.curobj.end()) && (OBJSTATE.state == objstate::Remote))
+    remote = OBJSTATE.sent_to;
+  else
+    printf ("Unrecognized state in LocalDirectory::haveObject\n");
+  // acquire the lock if inside for_each
+  if (retval) {
+    Lockable *L = reinterpret_cast<Lockable*>(retval);
+    // fails if local but locked another thread
+    if(!ld.dirAcquire(L))
+      retval = 0;
   }
 #undef OBJSTATE
   return retval;
@@ -137,25 +196,7 @@ void PersistentDirectory::fetchRemoteObj(uintptr_t ptr, uint32_t owner, recvFunc
   return;
 }
 
-void LocalDirectory::sub_acquire(Galois::Runtime::Lockable* L) {
-  if (L->Owner.try_lock()) {
-    assert(!L->Owner.getValue());
-    assert(!L->next);
-    L->Owner.setValue(this);
-    // do not create a linked list of the locks for the context
-  /*
-    L->next = locks;
-    locks = L;
-   */
-  } else {
-    if (L->Owner.getValue() != this) {
-      Galois::Runtime::signalConflict(L);
-    }
-  }
-  return;
-}
-
-bool LocalDirectory::diracquire(Galois::Runtime::Lockable* L) {
+bool LocalDirectory::dirAcquire(Galois::Runtime::Lockable* L) {
   if (L->Owner.try_lock()) {
     assert(!L->Owner.getValue());
     assert(!L->next);
@@ -169,22 +210,53 @@ bool LocalDirectory::diracquire(Galois::Runtime::Lockable* L) {
   return false;
 }
 
-bool RemoteDirectory::diracquire(Galois::Runtime::Lockable* L) {
+void LocalDirectory::dirRelease(uintptr_t ptr) {
+  LocalDirectory& ld = getSystemLocalDirectory();
+  lock_guard<glock> lock(ld.Lock);
+  auto iter = ld.curobj.find(ptr);
+  // assert if the object is Remote
+  assert((iter == ld.curobj.end()) || ((*iter).second.state == objstate::Local));
+  Lockable *L = reinterpret_cast<Lockable*>(ptr);
+  L->Owner.unlock();
+}
+
+//release the lock got using transientAcquire
+void LocalDirectory::transientRelease(uintptr_t ptr) {
+  dirRelease(ptr);
+}
+
+bool RemoteDirectory::dirAcquire(Galois::Runtime::Lockable* L) {
   if (L->Owner.try_lock()) {
     assert(!L->Owner.getValue());
     assert(!L->next);
     L->Owner.setValue(this);
     return true;
   }
-/* 
- * Letting atleast one iteration proceed before sending the data
- * ENABLE THIS WHEN RUNNING AN ACTUAL TEST CASE
+ /* 
+  * Letting atleast one iteration proceed before sending the data
+  * ENABLE THIS WHEN RUNNING AN ACTUAL TEST CASE
   else if (L->Owner.stealing_CAS(USE_LOCK,this)) {
     assert(!L->next);
     return true;
   }
- */
+  */
   return false;
+}
+
+void RemoteDirectory::dirRelease(uintptr_t ptr, uint32_t owner) {
+  RemoteDirectory& rd = getSystemRemoteDirectory();
+  lock_guard<glock> lock(rd.Lock);
+  auto iter = rd.curobj.find(make_pair(ptr,owner));
+  assert(iter != rd.curobj.end());
+  assert((*iter).second.state == objstate::Local);
+  uintptr_t retval = (*iter).second.localobj;
+  Lockable *L = reinterpret_cast<Lockable*>(retval);
+  L->Owner.unlock();
+}
+
+//release the lock got using transientAcquire
+void RemoteDirectory::transientRelease(uintptr_t ptr, uint32_t owner) {
+  dirRelease(ptr, owner);
 }
 
 RemoteDirectory& Galois::Runtime::Distributed::getSystemRemoteDirectory() {

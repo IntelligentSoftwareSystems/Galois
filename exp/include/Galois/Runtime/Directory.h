@@ -89,9 +89,15 @@ class RemoteDirectory: public SimpleRuntimeContext {
   //or returns null
   uintptr_t haveObject(uintptr_t ptr, uint32_t owner, SimpleRuntimeContext *cnx);
 
+  // isavail returns if the object is available in this host
+  uintptr_t transientHaveObj(uintptr_t ptr, uint32_t owner, bool& isavail);
+
   // tries to acquire a lock and returns true or false if acquired
   // used before sending an object and freeing it
-  bool diracquire(Lockable* L);
+  bool dirAcquire(Lockable* L);
+
+  // releases an object acquired with dirAcquire
+  void dirRelease(uintptr_t ptr, uint32_t owner);
 
 public:
 
@@ -118,6 +124,15 @@ public:
   //precondition: owner != networkHostID
   template<typename T>
   T* resolve(uintptr_t ptr, uint32_t owner, SimpleRuntimeContext *cnx);
+
+  //resolve a pointer, owner pair
+  //blocking acquire to lock object with the directory object
+  //precondition: owner != networkHostID
+  template<typename T>
+  T* transientAcquire(uintptr_t ptr, uint32_t owner);
+
+  //release the lock got using transientAcquire
+  void transientRelease(uintptr_t ptr, uint32_t owner);
 };
 
 class LocalDirectory: public SimpleRuntimeContext {
@@ -142,12 +157,16 @@ class LocalDirectory: public SimpleRuntimeContext {
   // places a remote request for the node
   void fetchRemoteObj(uintptr_t ptr, uint32_t remote, recvFuncTy pad);
 
-  // needed for locking objects inside the LocalDirectory
-  virtual void sub_acquire(Lockable* L);
+  // blocking acquire to lock object with the directory object
+  // isavail returns if the object is available on this host
+  uintptr_t transientHaveObj(uintptr_t ptr, uint32_t& remote, bool& isavail);
 
   // tries to acquire a lock and returns true or false if acquired
   // used before sending an object and marking it remote
-  bool diracquire(Lockable* L);
+  bool dirAcquire(Lockable* L);
+
+  // releases an object acquired with dirAcquire
+  void dirRelease(uintptr_t ptr);
 
 public:
 
@@ -170,6 +189,14 @@ public:
   // resolve a pointer
   template<typename T>
   T* resolve(uintptr_t ptr, SimpleRuntimeContext *cnx);
+
+  //resolve a pointer
+  //blocking acquire to lock object with the directory object
+  template<typename T>
+  T* transientAcquire(uintptr_t ptr);
+
+  //release the lock got using transientAcquire
+  void transientRelease(uintptr_t ptr);
 };
 
 class PersistentDirectory: public SimpleRuntimeContext {
@@ -242,6 +269,27 @@ void RemoteDirectory::prefetch(uintptr_t ptr, uint32_t owner) {
   }
 }
 
+// should always be a blocking call
+template<typename T>
+T* RemoteDirectory::transientAcquire(uintptr_t ptr, uint32_t owner) {
+  assert(ptr);
+  assert(owner != networkHostID);
+  bool isLocallyAvail;
+  uintptr_t p = transientHaveObj(ptr, owner, isLocallyAvail);
+  while (!p) {
+    NetworkInterface& net = getSystemNetworkInterface();
+    // make fetch object request only if remote
+    if (!isLocallyAvail)
+      fetchRemoteObj(ptr, owner, &LocalDirectory::localReqLandingPad<T>);
+    // call handleReceives if only thread outside for_each
+    // or is the first thread
+    if (!Galois::Runtime::inGaloisForEach || !LL::getTID())
+      net.handleReceives();
+    p = transientHaveObj(ptr, owner, isLocallyAvail);
+  }
+  return reinterpret_cast<T*>(p);
+}
+
 // should be blocking if not in for each
 template<typename T>
 T* RemoteDirectory::resolve(uintptr_t ptr, uint32_t owner, SimpleRuntimeContext *cnx) {
@@ -296,7 +344,7 @@ void RemoteDirectory::remoteReqLandingPad(RecvBuffer &buf) {
     }
  */
     // if eligible and acquire lock so that no iteration begins using the object
-    if (flag && rd.diracquire(L)) {
+    if (flag && rd.dirAcquire(L)) {
       // object should be sent to the remote host
       SendBuffer sbuf;
       size_t size = sizeof(*data);
@@ -354,6 +402,26 @@ void LocalDirectory::prefetch(uintptr_t ptr) {
   }
 }
 
+// should always be blocking
+template<typename T>
+T* LocalDirectory::transientAcquire(uintptr_t ptr) {
+  uint32_t sent = 0;
+  bool isLocallyAvail;
+  uintptr_t p = transientHaveObj(ptr, sent, isLocallyAvail);
+  while (!p) {
+    NetworkInterface& net = getSystemNetworkInterface();
+    // fetch only if remote
+    if (!isLocallyAvail)
+      fetchRemoteObj(ptr, sent, &RemoteDirectory::remoteReqLandingPad<T>);
+    // call handleReceives if only thread outside for_each
+    // or is the first thread
+    if (!Galois::Runtime::inGaloisForEach || !LL::getTID())
+      net.handleReceives();
+    p = transientHaveObj(ptr, sent, isLocallyAvail);
+  }
+  return reinterpret_cast<T*>(p);
+}
+
 // should be blocking outside for each
 template<typename T>
 T* LocalDirectory::resolve(uintptr_t ptr, SimpleRuntimeContext *cnx) {
@@ -400,9 +468,9 @@ void LocalDirectory::localReqLandingPad(RecvBuffer &buf) {
     if (remote_to != iter->second.sent_to)
       ld.fetchRemoteObj(ptr, iter->second.sent_to, &RemoteDirectory::remoteReqLandingPad<T>);
   }
-  else if ((iter->second.state == LocalDirectory::objstate::Local) && ld.diracquire(L)) {
+  else if ((iter->second.state == LocalDirectory::objstate::Local) && ld.dirAcquire(L)) {
     // object should be sent to the remote host
-    // diracquire locks with the LocalDirectory object so that local iterations fail
+    // dirAcquire locks with the LocalDirectory object so that local iterations fail
     SendBuffer sbuf;
     size_t size = sizeof(*data);
     uint32_t host = networkHostID;

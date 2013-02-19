@@ -100,6 +100,22 @@ public:
   }
 
   // check if the object is available, else just make a call to fetch
+  T* transientAquire() {
+    if (owner == networkHostID)
+      return getSystemLocalDirectory().transientAcquire<T>(reinterpret_cast<uintptr_t>(ptr));
+    else
+      return getSystemRemoteDirectory().transientAcquire<T>(reinterpret_cast<uintptr_t>(ptr), owner);
+  }
+
+  // check if the object is available, else just make a call to fetch
+  void transientRelease() {
+    if (owner == networkHostID)
+      getSystemLocalDirectory().transientRelease(reinterpret_cast<uintptr_t>(ptr));
+    else
+      getSystemRemoteDirectory().transientRelease(reinterpret_cast<uintptr_t>(ptr), owner);
+  }
+
+  // check if the object is available, else just make a call to fetch
   void prefetch() {
     if (owner == networkHostID)
       getSystemLocalDirectory().prefetch<T>(reinterpret_cast<uintptr_t>(ptr));
