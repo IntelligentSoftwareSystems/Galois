@@ -47,10 +47,22 @@ struct resolve_dispatch<T, false> {
     T* rptr = nullptr;
     assert(ptr);
     if (owner == networkHostID) {
-      // if (inGaloisForEach)
-      // 	rptr = reinterpret_cast<T*>(ptr);
-      // else
-      rptr = getSystemLocalDirectory().resolve<T>((uintptr_t)ptr, getThreadContext());
+      // have to enter the directory when outside the for each to
+      // check for remote objects! can't be found otherwise as
+      // acquire isn't called outside the for each.
+      if (inGaloisForEach) {
+        rptr = ptr;
+        try {
+          // acquire the lock if inside the for each
+          acquire (rptr, Galois::MethodFlag::ALL);
+        }
+        catch (const conflict_ex& ex) {
+          rptr = getSystemLocalDirectory().resolve<T>((uintptr_t)ptr, getThreadContext());
+        }
+      }
+      else {
+        rptr = getSystemLocalDirectory().resolve<T>((uintptr_t)ptr, getThreadContext());
+      }
     } else
       rptr = getSystemRemoteDirectory().resolve<T>((uintptr_t)ptr, owner, getThreadContext());
     assert(rptr);
@@ -163,7 +175,7 @@ public:
   }
 
   void dump() const {
-    printf("[%x,%lx]", owner, (size_t)ptr);
+    printf("[%u,%lx]", owner, (size_t)ptr);
   }
 };
 
