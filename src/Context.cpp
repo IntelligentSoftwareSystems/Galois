@@ -147,24 +147,6 @@ void Galois::Runtime::signalConflict(Lockable* L) {
   throw conflict_ex{L}; // Conflict
 }
 
-/*
-void Galois::Runtime::SimpleRuntimeContext::acquire(Galois::Runtime::Lockable* L) {
-  if (customAcquire) {
-    sub_acquire(L);
-  } else if (L->Owner.try_lock()) {
-    assert(!L->Owner.getValue());
-    assert(!L->next);
-    L->Owner.setValue(this);
-    L->next = locks;
-    locks = L;
-  } else {
-    if (L->Owner.getValue() != this) {
-      Galois::Runtime::signalConflict();
-    }
-  }
-}
-*/
-
 // Should allow the lock to be taken even if lock has magic value
 void Galois::Runtime::SimpleRuntimeContext::acquire(Galois::Runtime::Lockable* L) {
   if (customAcquire) {
