@@ -29,7 +29,7 @@ struct op {
       if (!graph->containsNode(node1))
         cout << "Node: " << graph->getData(node1) << " not found as expected" << endl;
     }
-    printf("%d iteration in host %u n thread %u\n", nodeval, Distributed::networkHostID, LL::getTID());
+    //printf("%d iteration in host %u and thread %u\n", nodeval, Distributed::networkHostID, LL::getTID());
   }
 
   // serialization functions
@@ -77,11 +77,7 @@ int main(int argc, char** argv) {
   }
 
   if (Gr->size() != 29) {
-    volatile int ijk = 0;
-    while(!ijk);
-    for (auto ii = Gr->begin(), ee = Gr->end(); ii != ee; ++ii) {
-      printf ("Node: %d\n", (*ii)->getData());
-    }
+    printf ("ERROR in the no of nodes!\n");
   }
 
   // master_terminate();

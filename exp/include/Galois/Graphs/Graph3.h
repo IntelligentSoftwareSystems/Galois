@@ -376,7 +376,7 @@ public:
         n = s->head;
       }
       // skip node if not active!
-      if (n && !n->getActive())
+      if (n && !(n->getActive()))
         next();
       if (!n) s.initialize(nullptr);
     }
@@ -392,7 +392,7 @@ public:
         n = s->head;
       }
       // skip node if not active!
-      if (n && !n->getActive())
+      if (n && !(n->getActive()))
         next();
       if (!n) s.initialize(nullptr);
     }
@@ -525,8 +525,13 @@ public:
       localState.getLocal(i)->master = lState->master;
     }
     SubGraphState* mState = lState->master.transientAcquire();
-    lState->next = mState->next;
+    gptr<SubGraphState> lastPtr(localState.getLocal(getActiveThreads()-1));
+    SubGraphState* lastState = lastPtr.transientAcquire();
+    // last thread's localState points to head of the master
+    lastState->next = mState->next;
+    // master's next points to first thread's localState
     mState->next.initialize(lState);
+    lastPtr.transientRelease();
     lState->master.transientRelease();
     lStatePtr.transientRelease();
   }
