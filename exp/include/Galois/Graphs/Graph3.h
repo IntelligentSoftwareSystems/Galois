@@ -493,7 +493,7 @@ public:
 
   // assuming the constructor runs only on the main thread
   ThirdGraph() {
-    unsigned int numThreads = getActiveThreads();
+    unsigned int numThreads = Runtime::LL::getMaxThreads();
     SubGraphState* first = localState.getLocal(0);
     // initialize the linked list of the local nodes
     for (unsigned int i = 0; i < numThreads; i++) {
@@ -515,17 +515,18 @@ public:
     lStatePtr.transientRelease();
   }
   void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+    unsigned int numThreads = Runtime::LL::getMaxThreads();
     //This constructs the local node of the distributed graph
     gptr<SubGraphState> lStatePtr(localState.getLocal());
     SubGraphState* lState = lStatePtr.transientAcquire();
     gDeserialize(s,lState->master);
-    for (unsigned int i = 0; i < getActiveThreads(); i++) {
+    for (unsigned int i = 0; i < numThreads; i++) {
       if (i == Runtime::LL::getTID())
         continue;
       localState.getLocal(i)->master = lState->master;
     }
     SubGraphState* mState = lState->master.transientAcquire();
-    gptr<SubGraphState> lastPtr(localState.getLocal(getActiveThreads()-1));
+    gptr<SubGraphState> lastPtr(localState.getLocal(numThreads-1));
     SubGraphState* lastState = lastPtr.transientAcquire();
     // last thread's localState points to head of the master
     lastState->next = mState->next;
