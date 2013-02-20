@@ -308,20 +308,16 @@ class ThirdGraph { //: public Galois::Runtime::Distributed::DistBase<ThirdGraph>
   struct SubGraphState : public Galois::Runtime::Lockable {
     typename gNode::Handle head;
     Galois::Runtime::Distributed::gptr<SubGraphState> next;
-    //lfirst is the first sub-graph local to the host
-    Galois::Runtime::Distributed::gptr<SubGraphState> lfirst;
-    //llast is the last sub-graph local to the host
-    Galois::Runtime::Distributed::gptr<SubGraphState> llast;
     Galois::Runtime::Distributed::gptr<SubGraphState> master;
     typedef int tt_has_serialize;
     typedef int tt_dir_blocking;
     void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-      gSerialize(s, head, next, lfirst, llast, master);
+      gSerialize(s, head, next, master);
     }
     void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-      gDeserialize(s, head, next, lfirst, llast, master);
+      gDeserialize(s, head, next, master);
     }
-    SubGraphState() :head(), next(), lfirst(), llast(), master(this) {}
+    SubGraphState() :head(), next(), master(this) {}
   };
 
   Galois::Runtime::PerThreadStorage<SubGraphState> localState;
@@ -499,13 +495,10 @@ public:
   ThirdGraph() {
     unsigned int numThreads = getActiveThreads();
     SubGraphState* first = localState.getLocal(0);
-    SubGraphState* last  = localState.getLocal(numThreads-1);
     // initialize the linked list of the local nodes
     for (unsigned int i = 0; i < numThreads; i++) {
       SubGraphState* lState = localState.getLocal(i);
-      lState->lfirst.initialize(first);
       lState->master.initialize(first);
-      lState->llast.initialize(last);
       if (i != (numThreads-1))
         lState->next.initialize(localState.getLocal(i+1));
     }
@@ -531,8 +524,10 @@ public:
         continue;
       localState.getLocal(i)->master = lState->master;
     }
-    lState->llast->next = lState->master->llast->next;
-    lState->master->llast->next.initialize(lState);
+    SubGraphState* mState = lState->master.transientAcquire();
+    lState->next = mState->next;
+    mState->next.initialize(lState);
+    lState->master.transientRelease();
     lStatePtr.transientRelease();
   }
   

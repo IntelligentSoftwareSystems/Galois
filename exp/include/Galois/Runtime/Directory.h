@@ -94,7 +94,8 @@ class RemoteDirectory: public SimpleRuntimeContext {
 
   // tries to acquire a lock and returns true or false if acquired
   // used before sending an object and freeing it
-  bool dirAcquire(Lockable* L);
+  // use steal to specify if the lock can be acquired as soon as received
+  bool dirAcquire(Lockable* L, bool steal);
 
   // releases an object acquired with dirAcquire
   void dirRelease(uintptr_t ptr, uint32_t owner);
@@ -344,7 +345,8 @@ void RemoteDirectory::remoteReqLandingPad(RecvBuffer &buf) {
     }
  */
     // if eligible and acquire lock so that no iteration begins using the object
-    if (flag && rd.dirAcquire(L)) {
+    // disable stealing so that atleast one iteration succeeds
+    if (flag && rd.dirAcquire(L,false)) {
       // object should be sent to the remote host
       SendBuffer sbuf;
       size_t size = sizeof(*data);

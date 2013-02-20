@@ -125,6 +125,8 @@ int main(int argc, char** argv) {
   Galois::for_each_local<CA>(wl, Process(graph));
   Trefine.stop();
   T.stop();
+
+  cout << "Size after refinement: " << graph->size() << endl;
   
   Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
   

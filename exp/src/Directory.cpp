@@ -78,7 +78,7 @@ uintptr_t RemoteDirectory::transientHaveObj(uintptr_t ptr, uint32_t owner, bool&
   // acquire the lock if inside for_each
   if (retval) {
     Lockable *L = reinterpret_cast<Lockable*>(retval);
-    if (!rd.dirAcquire(L))
+    if (!rd.dirAcquire(L, true))
       retval = 0;
   }
 #undef OBJSTATE
@@ -225,7 +225,7 @@ void LocalDirectory::transientRelease(uintptr_t ptr) {
   dirRelease(ptr);
 }
 
-bool RemoteDirectory::dirAcquire(Galois::Runtime::Lockable* L) {
+bool RemoteDirectory::dirAcquire(Galois::Runtime::Lockable* L, bool steal) {
   if (L->Owner.try_lock()) {
     assert(!L->Owner.getValue());
     assert(!L->next);
@@ -235,11 +235,12 @@ bool RemoteDirectory::dirAcquire(Galois::Runtime::Lockable* L) {
  /* 
   * Letting atleast one iteration proceed before sending the data
   * ENABLE THIS WHEN RUNNING AN ACTUAL TEST CASE
-  else if (L->Owner.stealing_CAS(USE_LOCK,this)) {
+  * NOTE: steal should be enabled for transientAcquire() calls!
+  */
+  else if (steal && L->Owner.stealing_CAS(USE_LOCK,this)) {
     assert(!L->next);
     return true;
   }
-  */
   return false;
 }
 

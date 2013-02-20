@@ -7,6 +7,7 @@
 #include <iostream>
 
 using namespace Galois::Graph;
+using namespace Galois::Runtime;
 
 typedef ThirdGraph<int,void,EdgeDirection::Un> G;
 
@@ -28,6 +29,7 @@ struct op {
       if (!graph->containsNode(node1))
         cout << "Node: " << graph->getData(node1) << " not found as expected" << endl;
     }
+    printf("%d iteration in host %u n thread %u\n", nodeval, Distributed::networkHostID, LL::getTID());
   }
 
   // serialization functions
@@ -50,7 +52,7 @@ int main(int argc, char** argv) {
 
   Galois::Runtime::Distributed::gptr<G> Gr(new G());
 
-  Galois::for_each<>(boost::counting_iterator<int>(0), boost::counting_iterator<int>(5), op(Gr));
+  Galois::for_each<>(boost::counting_iterator<int>(0), boost::counting_iterator<int>(15), op(Gr));
 
   for (auto ii = Gr->begin(), ee = Gr->end(); ii != ee; ++ii)
     std::cout << (*ii)->getData() << " " << std::distance((*ii)->begin(), (*ii)->end()) << " ";
@@ -72,6 +74,14 @@ int main(int argc, char** argv) {
       N.dump();
     }
     cout << endl;
+  }
+
+  if (Gr->size() != 29) {
+    volatile int ijk = 0;
+    while(!ijk);
+    for (auto ii = Gr->begin(), ee = Gr->end(); ii != ee; ++ii) {
+      printf ("Node: %d\n", (*ii)->getData());
+    }
   }
 
   // master_terminate();
