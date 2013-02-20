@@ -85,6 +85,10 @@ public:
     return (fabs (d1 - d2) < EPSILON);
   }
 
+  static bool almostEqual (const Vec2& v1, const Vec2& v2) {
+    return almostEqual (v1.getX (), v2.getX ()) && almostEqual (v1.getY (), v2.getY ());
+  }
+
 
   // It can be shown for basic operations that after truncation, the 
   // relative error remains within a small constant factor of TRUNCATE_PRECISION

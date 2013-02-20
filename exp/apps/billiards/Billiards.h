@@ -54,7 +54,7 @@ static const char* const url = "billiards";
 static cll::opt<double>   length("length", cll::desc("length of the billiards table"), cll::init(400.0));
 static cll::opt<double>   width("width", cll::desc("width of the billiards table"), cll::init(200.0));
 static cll::opt<unsigned> numballs("balls", cll::desc("number of balls on the table"), cll::init(100.0));
-static cll::opt<double>   endtime("end", cll::desc("width of the billiards table"), cll::init(200.0));
+static cll::opt<double>   endtime("end", cll::desc("simulation end time"), cll::init(200.0));
 
 
 class Billiards {

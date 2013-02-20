@@ -85,6 +85,18 @@ public:
 
   unsigned getNumBalls () const { return numBalls; }
 
+  double getLength () const { return length; }
+
+  double getWidth () const { return width; }
+
+  const Ball& getBallByID (unsigned id) {
+    assert (id < balls.size ());
+
+    // XXX: assumes ball ids and indices are same
+    assert (balls[id] != NULL);
+    return *balls[id]; 
+  }
+
   void genInitialEvents (std::vector<Event>& initEvents, const double endtime) {
 
     initEvents.clear ();

@@ -41,33 +41,38 @@
 
 class Ball: public CollidingObject {
 
-  unsigned id;
+  unsigned m_id;
 
-  Vec2 position;
-  Vec2 velocity;
+  Vec2 m_pos;
+  Vec2 m_vel;
 
   double m_mass;
   double m_radius;
-  double timestamp;
+  double m_timestamp;
 
-  unsigned collisionCounter;
+  unsigned m_collCntr;
 
 
 public:
   Ball (
-      const unsigned id, 
-      const Vec2& position, 
-      const Vec2& velocity, 
+      const unsigned id,
+      const Vec2& pos,
+      const Vec2& vel,
       double mass, 
-      double radius):
+      double radius,
+      double time=0.0):
 
-    id (id), 
-    position (position), 
-    velocity (velocity), 
+    m_id (id),
+    m_pos (pos),
+    m_vel (vel),
     m_mass (mass), 
     m_radius (radius), 
-    timestamp (0.0),
-    collisionCounter (0) {
+    m_timestamp (time),
+    m_collCntr (0) {
+
+      assert (mass > 0.0);
+      assert (radius > 0.0);
+      assert (time >= 0.0);
       
       truncateAll ();
     }
@@ -76,11 +81,11 @@ public:
 private:
 
   void truncateAll () {
-    position = FPutils::truncate (position);
-    velocity = FPutils::truncate (velocity);
+    m_pos = FPutils::truncate (m_pos);
+    m_vel = FPutils::truncate (m_vel);
     m_mass = FPutils::truncate (m_mass);
     m_radius = FPutils::truncate (m_radius);
-    timestamp = FPutils::truncate (timestamp);
+    m_timestamp = FPutils::truncate (m_timestamp);
   }
 
 public:
@@ -88,19 +93,19 @@ public:
   virtual bool isStationary () const { return false; }
 
   virtual unsigned collCounter () const { 
-    return collisionCounter;
+    return m_collCntr;
   }
 
-  virtual unsigned getID () const { return id; }
+  virtual unsigned getID () const { return m_id; }
 
   virtual void incrCollCounter () {
-    ++collisionCounter;
+    ++m_collCntr;
   }
 
   virtual std::string str () const {
     char s [1024];
     sprintf (s, "[Ball-%d,ts=%10.10f,pos=%s,vel=%s,cc=%d]"
-        , id, timestamp, position.str ().c_str (), velocity.str ().c_str (), collisionCounter);
+        , m_id, m_timestamp, m_pos.str ().c_str (), m_vel.str ().c_str (), m_collCntr);
 
     return s;
   }
@@ -108,9 +113,9 @@ public:
 
   void update (const Vec2& newVel, const double time) {
 
-    assert (time > timestamp && "Time update in the past?");
+    assert (time > m_timestamp && "Time update in the past?");
 
-    if (time < timestamp) {
+    if (time < m_timestamp) {
       std::cerr << "Time update in the past" << std::endl;
       abort ();
     }
@@ -118,26 +123,26 @@ public:
     Vec2 newPos = this->pos (time); 
 
 
-    position = FPutils::truncate (newPos);
-    velocity = FPutils::truncate (newVel);
+    m_pos = FPutils::truncate (newPos);
+    m_vel = FPutils::truncate (newVel);
 
-    timestamp = FPutils::truncate (time);
+    m_timestamp = FPutils::truncate (time);
   }
 
-  const Vec2& pos () const { return position; }
+  const Vec2& pos () const { return m_pos; }
 
   Vec2 pos (const double t) const {
 
-    assert (t >= timestamp);
-    return (position + velocity * (t - timestamp)); 
+    assert (t >= m_timestamp);
+    return (m_pos + m_vel * (t - m_timestamp)); 
   }
 
 
-  const Vec2& vel () const { return velocity; }
+  const Vec2& vel () const { return m_vel; }
 
   double mass () const { return m_mass; }
 
-  double time () const { return timestamp; }
+  double time () const { return m_timestamp; }
 
   double radius () const { return m_radius; }
 
