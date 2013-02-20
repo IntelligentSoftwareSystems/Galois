@@ -20,58 +20,89 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
+#include "Scene.h"
+#include "Viewer.h"
+
 #include <GL/gl.h>
 #include <cmath>
+#include <fstream>
+#include <limits>
+#include <algorithm>
 
-#include "Scene.h"
-
-namespace {
-class Sphere {
-protected:
-  std::vector<GLfloat> vertices;
-  std::vector<GLfloat> normals;
-  std::vector<GLushort> indices;
+//! Project world coordinates to screen based on current GL 
+class WorldScreenProjector {
+  GLint viewport[4];
+  GLdouble mvp[16];
 
 public:
-  Sphere(const float radius, const unsigned int rings, const unsigned int sectors) {
-    float R = 1.0/(rings-1);
-    float S = 1.0/(sectors-1);
+  WorldScreenProjector(qglviewer::Camera* c) {
+    glGetIntegerv(GL_VIEWPORT, viewport);
+    c->getModelViewProjectionMatrix(mvp);
+  }
 
-    vertices.resize(rings * sectors * 3);
-    normals.resize(rings * sectors * 3);
+  qglviewer::Vec project(const qglviewer::Vec& p) {
+    GLdouble v[4], vs[4];
+    // vs = MVP * V
+    v[0] = p[0]; v[1] = p[1]; v[2] = p[2]; v[3] = 1.0;
+    vs[0] = mvp[0]*v[0] + mvp[4]*v[1] + mvp[ 8]*v[2] + mvp[12]*v[3];
+    vs[1] = mvp[1]*v[0] + mvp[5]*v[1] + mvp[ 9]*v[2] + mvp[13]*v[3];
+    vs[2] = mvp[2]*v[0] + mvp[6]*v[1] + mvp[10]*v[2] + mvp[14]*v[3];
+    vs[3] = mvp[3]*v[0] + mvp[7]*v[1] + mvp[11]*v[2] + mvp[15]*v[3];
 
-    auto v = vertices.begin();
-    auto n = normals.begin();
-    for (unsigned int r = 0; r < rings; ++r) {
-      for (unsigned int s = 0; s < sectors; ++s) {
-        float y = sin(-M_PI_2 + M_PI * r * R);
-        float x = cos(2*M_PI* s * S) * sin(M_PI * r * R);
-        float z = sin(2*M_PI* s * S) * sin(M_PI * r * R);
+    // Projection to window 
+    // see http://www.opengl.org/sdk/docs/man2/xhtml/gluProject.xml
+    vs[0] /= vs[3];
+    vs[1] /= vs[3];
+    vs[2] /= vs[3];
+    vs[0] = vs[0] * 0.5 + 0.5;
+    vs[1] = vs[1] * 0.5 + 0.5;
+    vs[2] = vs[2] * 0.5 + 0.5;
+    vs[0] = vs[0] * viewport[2] + viewport[0];
+    vs[1] = vs[1] * viewport[3] + viewport[1];
 
-        *v++ = x * radius;
-        *v++ = y * radius;
-        *v++ = z * radius;
-        *n++ = x;
-        *n++ = y;
-        *n++ = z;
-      }
-    }
+    return qglviewer::Vec(vs[0], viewport[3] - vs[1], vs[2]);
+  }
+};
 
-    indices.resize(rings * sectors * 4);
-    auto i = indices.begin();
-    for (unsigned int r = 0; r < rings - 1; ++r) {
-      for (unsigned int s = 0; s < sectors - 1; ++s) {
-        *i++ = r * sectors + s;
-        *i++ = r * sectors + (s+1);
-        *i++ = (r+1) * sectors + (s+1);
-        *i++ = (r+1) * sectors + s;
-      }
+// -----------------------------------------------
+// Sphere
+// -----------------------------------------------
+
+void Sphere::init(float radius, float rings, float sectors) {
+  float R = 1.0/(rings-1);
+  float S = 1.0/(sectors-1);
+
+  vertices.resize(rings * sectors * 3);
+  normals.resize(rings * sectors * 3);
+
+  auto v = vertices.begin();
+  auto n = normals.begin();
+  for (unsigned int r = 0; r < rings; ++r) {
+    for (unsigned int s = 0; s < sectors; ++s) {
+      float y = sin(-M_PI_2 + M_PI * r * R);
+      float x = cos(2*M_PI* s * S) * sin(M_PI * r * R);
+      float z = sin(2*M_PI* s * S) * sin(M_PI * r * R);
+
+      *v++ = x * radius;
+      *v++ = y * radius;
+      *v++ = z * radius;
+      *n++ = x;
+      *n++ = y;
+      *n++ = z;
     }
   }
 
-  void draw();
-};
-
+  indices.resize(rings * sectors * 4);
+  auto i = indices.begin();
+  for (unsigned int r = 0; r < rings - 1; ++r) {
+    for (unsigned int s = 0; s < sectors - 1; ++s) {
+      *i++ = r * sectors + s;
+      *i++ = r * sectors + (s+1);
+      *i++ = (r+1) * sectors + (s+1);
+      *i++ = (r+1) * sectors + s;
+    }
+  }
+}
   
 void Sphere::draw() {
   // TODO: Switch over to using shader programs
@@ -83,18 +114,81 @@ void Sphere::draw() {
   glDisableClientState(GL_VERTEX_ARRAY);
   glDisableClientState(GL_NORMAL_ARRAY);
 }
+
+// -----------------------------------------------
+// Balls
+// -----------------------------------------------
+
+void Balls::init(size_t numBalls, float ballRadius) {
+  sphere.init(ballRadius, 24, 48);
+
+  balls.resize(numBalls);
+  colors.resize(numBalls * 3);
+  auto c = colors.begin();
+  for (int i = 0; i < numBalls; ++i) {
+    for (int k = 0; k < 3; ++k)
+      *c++ = rand() / static_cast<float>(RAND_MAX);
+  }
 }
 
-void Ball::draw() {
-  static Sphere sphere(0.24, 24, 48);
-  glColor3f(0.5f, 0.5f, 0.0f);
-  glPushMatrix();
-  glTranslatef(pos[0], pos[1], pos[2]);
-  sphere.draw();
-  glPopMatrix();
+void Balls::draw(Viewer* v) {
+  auto c = colors.begin();
+  for (Ball& b : balls) {
+    glColor3f(*c++, *c++, *c++);
+    glPushMatrix();
+    glTranslatef(b.pos[0], b.pos[1], b.pos[2]);
+    sphere.draw();
+    glPopMatrix();
+  }
+
+  lines.draw();
+  
+  WorldScreenProjector proj(v->camera());
+
+  glDisable(GL_LIGHTING);
+  int index = 0;
+  for (Ball& b : balls) {
+    qglviewer::Vec screen = proj.project(b.pos);
+    //qglviewer::Vec screen = v->camera()->projectedCoordinatesOf(b.pos);
+    v->drawText(screen.x, screen.y, QString::number(index++));
+  }
+  glEnable(GL_LIGHTING);
 }
 
-void Lines::init(const std::vector<Ball>& balls) {
+void Balls::animate(float endTime) {
+  while (!events.empty()) {
+    Event& e = events.front();
+    if (e.ball.time > endTime)
+      break;
+    balls[e.index] = e.ball;
+    events.pop_front();
+  }
+
+  for (Ball& b : balls) {
+    b.pos += b.vel * (endTime - b.time);
+    b.time = endTime;
+  }
+
+  lines.update(balls);
+}
+
+void Balls::initBall(int index, float time, float px, float py, float vx, float vy) {
+  if (time == 0.0) {
+    balls[index].pos[0] = px;
+    balls[index].pos[1] = py;
+    balls[index].vel[0] = vx;
+    balls[index].vel[1] = vy;
+  } else {
+    events.emplace_back(index, Ball(qglviewer::Vec(px, py, 0.0), qglviewer::Vec(vx, vy, 0.0), time));
+  }
+}
+
+void Balls::update() {
+  std::sort(events.begin(), events.end(), EventLess());
+  lines.update(balls);
+}
+
+void Balls::Lines::update(std::vector<Ball> balls) {
   vertices.resize(balls.size() * 3 * 2);
   indices.resize(balls.size() * 2);
   
@@ -113,7 +207,7 @@ void Lines::init(const std::vector<Ball>& balls) {
   }
 }
 
-void Lines::draw() {
+void Balls::Lines::draw() {
   glDisable(GL_LIGHTING);
   glColor3f(1.0f, 1.0f, 1.0f);
   glEnableClientState(GL_VERTEX_ARRAY);
@@ -123,46 +217,65 @@ void Lines::draw() {
   glEnable(GL_LIGHTING);
 }
 
-void Scene::init(int numBalls, float r, float dt) {
-  deltaT = dt;
-  radius = r;
+// -----------------------------------------------
+// Scene
+// -----------------------------------------------
 
-  int maxX = radius;
-  int maxY = radius;
+void Scene::readConfig() {
+  std::ifstream infile(configFilename.c_str());
+  std::string comma;
+  
+  float width, length, mass, ballRadius;
+  size_t numBalls;
 
-  for (int x = 0; x <= maxX; ++x) {
-    for (int y = 0; y <= maxY; ++y) {
-      float v = (x+y)/((float) maxX+maxY);
-      float vx = cos(2*M_PI*v);
-      float vy = sin(2*M_PI*v);
-      float px = x - maxX/2;
-      float py = y - maxY/2;
-      balls.emplace_back(qglviewer::Vec(px, py, 0.0f), qglviewer::Vec(vx, vy, 0.0f));
-    }
-  }
+  infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+  infile >> length >> comma;
+  infile >> width >> comma;
+  infile >> numBalls >> comma;
+  infile >> mass >> comma;
+  infile >> ballRadius;
 
-  lines.init(balls);
+  sceneDim[0] = length;
+  sceneDim[1] = width;
+  balls.init(numBalls, ballRadius);
 }
 
-void Scene::draw() {
-  for (Ball& b : balls) {
-    b.draw();
-  }
+void Scene::readLog() {
+  std::ifstream infile(eventLogFilename.c_str());
+  std::string comma;
 
-  lines.draw();
+  int index;
+  float time, px, py, vx, vy;
+  
+  infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+  while (infile) {
+    infile >> index >> comma;
+    infile >> time >> comma;
+    infile >> px >> comma;
+    infile >> py >> comma;
+    infile >> vx >> comma;
+    infile >> vy;
+    if (infile) {
+      balls.initBall(index, time, px, py, vx, vy);
+    }
+  }
+  balls.update();
+}
+
+qglviewer::Vec Scene::init(float dt) {
+  deltaTime = dt;
+
+  readConfig();
+  readLog();
+  
+  return sceneDim;
+}
+
+void Scene::draw(Viewer* v) {
+  balls.draw(v);
 }
 
 void Scene::animate() {
-  for (Ball& b : balls) {
-    b.pos += b.vel * deltaT;
-    qglviewer::Vec n;
-
-    if (!inScene(b.pos, n)) {
-      b.pos -= b.vel * deltaT;
-      b.vel = -2 * (b.vel * n) * n + b.vel;
-      b.pos += b.vel * deltaT;
-    }
-  }
-
-  lines.init(balls);
+  currentTime += deltaTime;
+  balls.animate(currentTime);
 }

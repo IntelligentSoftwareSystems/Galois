@@ -22,8 +22,22 @@
  */
 #include "Viewer.h"
 
+void Viewer::drawTime() {
+  char buf[1024];
+  snprintf(buf, 1024, "SimTime: %.2f", scene.time());
+
+  QFont font;
+
+  font.setPointSize(25);
+  glDisable(GL_LIGHTING);
+  glColor3f(0.0, 1.0, 1.0);
+  drawText(width() - 300, height() - 20, buf, font);
+  glEnable(GL_LIGHTING);
+}
+
 void Viewer::draw() {
-  scene.draw();
+  drawTime();
+  scene.draw(this);
 }
 
 void Viewer::initLights() {
@@ -68,19 +82,20 @@ void Viewer::animate() {
 }
 
 void Viewer::init() {
-  float sceneSize = 10.0f;
-
   initLights();
 
-  scene.init(100, sceneSize);
+  qglviewer::Vec sceneDim = scene.init();
 
   restoreStateFromFile();
 
-  setSceneRadius(sceneSize);
+  float largest = std::max(std::max(sceneDim[0], sceneDim[1]), sceneDim[2]); 
+  setSceneRadius(largest / 2);
+  setSceneCenter(sceneDim / 2);
   camera()->showEntireScene();
   
+  setAnimationPeriod(100);
   //help();
-  startAnimation();
+  //startAnimation();
 }
 
 QString Viewer::helpString() const {

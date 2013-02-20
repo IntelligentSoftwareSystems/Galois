@@ -27,16 +27,20 @@
 #include "Scene.h"
 
 class Viewer: public QGLViewer {
-  Scene scene;
+  Scene& scene;
 
   void initLights();
+
+  void drawTime();
 
 protected:
   virtual void draw() override;
   virtual void init() override;
   virtual void animate() override;
   virtual QString helpString() const override;
+
 public:
+  Viewer(Scene& s): scene(s) { }
 };
 
 #endif

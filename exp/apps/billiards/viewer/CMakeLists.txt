@@ -10,5 +10,5 @@ set(viewer_HEADERS_MOC)
 include(${QT_USE_FILE})
 add_definitions(${QT_DEFINITIONS})
 
-add_executable(billiards-viewer main.cpp Viewer.cpp Scene.cpp ${viewer_HEADERS_MOC})
+app(billiards-viewer main.cpp Viewer.cpp Scene.cpp ${viewer_HEADERS_MOC})
 target_link_libraries(billiards-viewer ${QT_LIBRARIES} ${QGLVIEWER_LIBRARIES})
