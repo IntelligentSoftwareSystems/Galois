@@ -22,7 +22,7 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#include "Galois/Graphs/FileGraph.h"
+#include "Galois/Graph/FileGraph.h"
 #include "Galois/Runtime/ll/gio.h"
 
 #include <sys/mman.h>

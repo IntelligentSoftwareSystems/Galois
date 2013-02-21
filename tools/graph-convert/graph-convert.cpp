@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -22,7 +22,7 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 #include "Galois/LargeArray.h"
-#include "Galois/Graphs/FileGraph.h"
+#include "Galois/Graph/FileGraph.h"
 
 #include "llvm/Support/CommandLine.h"
 
@@ -48,6 +48,8 @@ enum ConvertMode {
   pbbs2vgr,
   rmat2gr,
   vgr2bsml,
+  vgr2cvgr,
+  vgr2edgelist,
   vgr2svgr
 };
 
@@ -68,11 +70,15 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Choose a conversion mode:"),
       clEnumVal(pbbs2vgr, "Convert pbbs graph to binary void gr"),
       clEnumVal(rmat2gr, "Convert rmat to binary gr"),
       clEnumVal(vgr2bsml, "Convert binary void gr to binary sparse MATLAB matrix"),
+      clEnumVal(vgr2cvgr, "Clean up binary void gr: remove self edges and multi-edges"),
+      clEnumVal(vgr2edgelist, "Convert binary void gr to edgelist"),
       clEnumVal(vgr2svgr, "Convert binary void gr to symmetric graph by adding reverse edges"),
       clEnumValEnd), cll::init(edgelist2gr));
 
-//! Just a bunch of pairs or triples:
-//!   src dst weight?
+/**
+ * Just a bunch of pairs or triples:
+ * src dst weight?
+ */
 template<typename EdgeTy>
 void convert_edgelist2gr(const std::string& infilename, const std::string& outfilename) {
   typedef Galois::Graph::FileGraphParser Parser;
@@ -160,6 +166,35 @@ void convert_edgelist2gr(const std::string& infilename, const std::string& outfi
 }
 
 template<typename EdgeTy>
+void convert_gr2edgelist(const std::string& infilename, const std::string& outfilename) {
+  typedef Galois::Graph::FileGraph Graph;
+  typedef Graph::GraphNode GNode;
+  typedef Galois::LargeArray<EdgeTy,true> EdgeData;
+  typedef typename EdgeData::value_type edge_value_type;
+
+  Graph graph;
+  graph.structureFromFile(infilename);
+
+  std::ofstream file(outfilename.c_str());
+  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+    GNode src = *ii;
+    for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
+      GNode dst = graph.getEdgeDst(jj);
+      if (EdgeData::has_value) {
+        file << src << " " << dst << " " << graph.getEdgeData<edge_value_type>(jj) << "\n";
+      } else {
+        file << src << " " << dst << "\n";
+      }
+    }
+  }
+  file.close();
+
+  std::cout << "Finished reading graph. "
+    << "Nodes: " << graph.size() << " Edges: " << graph.sizeEdges() 
+    << "\n";
+}
+
+template<typename EdgeTy>
 void convert_gr2sgr(const std::string& infilename, const std::string& outfilename) {
   typedef Galois::Graph::FileGraph Graph;
 
@@ -169,6 +204,14 @@ void convert_gr2sgr(const std::string& infilename, const std::string& outfilenam
   Galois::Graph::makeSymmetric<EdgeTy>(ingraph, outgraph);
 
   outgraph.structureToFile(outfilename.c_str());
+}
+
+/**
+ * Removes self and multi-edges from a graph.
+ */
+template<typename EdgeTy>
+void convert_gr2cgr(const std::string& infilename, const std::string& outfilename) {
+  abort(); // TODO
 }
 
 #if 1
@@ -600,7 +643,9 @@ int main(int argc, char** argv) {
     case pbbs2vgr: convert_pbbs2gr<void>(inputfilename, outputfilename); break;
     case rmat2gr: convert_rmat2gr(inputfilename, outputfilename); break;
     case vgr2bsml: convert_gr2bsml<void>(inputfilename, outputfilename); break;
+    case vgr2edgelist: convert_gr2edgelist<void>(inputfilename, outputfilename); break;
     case vgr2svgr: convert_gr2sgr<void>(inputfilename, outputfilename); break;
+    case vgr2cvgr: convert_gr2cgr<void>(inputfilename, outputfilename); break;
     default: abort();
   }
   return 0;

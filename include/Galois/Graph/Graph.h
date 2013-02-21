@@ -22,11 +22,11 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#ifndef GALOIS_GRAPHS_GRAPH_H
-#define GALOIS_GRAPHS_GRAPH_H
+#ifndef GALOIS_GRAPH_GRAPH_H
+#define GALOIS_GRAPH_GRAPH_H
 
 #include "Galois/Bag.h"
-#include "Galois/Graphs/LCGraph.h"
+#include "Galois/Graph/Util.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/MethodFlags.h"
 
@@ -473,8 +473,8 @@ public:
    * An object with begin() and end() methods to iterate over the outgoing
    * edges of N.
    */
-  LCGraphImpl::EdgesIterator<FirstGraph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
-    return LCGraphImpl::EdgesIterator<FirstGraph>(*this, N, mflag);
+  EdgesIterator<FirstGraph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+    return EdgesIterator<FirstGraph>(*this, N, mflag);
   }
 
   /**

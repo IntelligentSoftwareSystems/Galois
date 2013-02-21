@@ -3,8 +3,8 @@
 #include "Galois/Accumulator.h"
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
-#include "Galois/Graphs/LCGraph.h"
-#include "Galois/Graphs/Graph.h"
+#include "Galois/Graph/LCGraph.h"
+#include "Galois/Graph/Graph.h"
 #ifdef GALOIS_USE_EXP
 #include "Galois/Runtime/ParallelWorkInline.h"
 #endif

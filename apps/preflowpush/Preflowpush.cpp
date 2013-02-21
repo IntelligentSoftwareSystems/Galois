@@ -24,7 +24,7 @@
 #include "Galois/Accumulator.h"
 #include "Galois/Statistic.h"
 #include "Galois/Bag.h"
-#include "Galois/Graphs/LCGraph.h"
+#include "Galois/Graph/LCGraph.h"
 #include "llvm/Support/CommandLine.h"
 
 #ifdef GALOIS_USE_EXP
@@ -667,7 +667,7 @@ void initializeGraph(std::string inputFile,
       std::string pfpName = inputFile + ".pfp";
       std::ifstream pfpFile(pfpName.c_str());
       if (!pfpFile.good()) {
-        std::cout << "Writing new output file: " << pfpName << "\n";
+        std::cout << "Writing new input file: " << pfpName << "\n";
         writePfpGraph<int>(inputFile, pfpName);
       }
       inputFile = pfpName;

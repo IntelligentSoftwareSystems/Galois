@@ -32,7 +32,7 @@
 #include "MetisGraph.h"
 #include "PMetis.h"
 
-#include "Galois/Graphs/LCGraph.h"
+#include "Galois/Graph/LCGraph.h"
 #include "Galois/Statistic.h"
 
 #include "Lonestar/BoilerPlate.h"

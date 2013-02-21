@@ -28,8 +28,8 @@
 #include "Galois/Atomic.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Galois.h"
-#include "Galois/Graphs/Graph.h"
-#include "Galois/Graphs/LCGraph.h"
+#include "Galois/Graph/Graph.h"
+#include "Galois/Graph/LCGraph.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/WorkList/WorkList.h"
 

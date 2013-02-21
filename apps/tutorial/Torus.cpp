@@ -26,7 +26,7 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 #include "Galois/Galois.h"
-#include "Galois/Graphs/Graph.h"
+#include "Galois/Graph/Graph.h"
 #include <iostream>
 
 //! Graph has int node data, void edge data and is directed

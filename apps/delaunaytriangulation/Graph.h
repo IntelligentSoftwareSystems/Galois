@@ -28,7 +28,7 @@
 
 #include "Element.h"
 
-#include "Galois/Graphs/Graph.h"
+#include "Galois/Graph/Graph.h"
 
 #include <boost/optional.hpp>
 #include <vector>

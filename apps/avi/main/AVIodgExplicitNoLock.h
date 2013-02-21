@@ -25,8 +25,8 @@
 #define AVI_UNORDERED_NO_LOCK_H_
 
 
-#include "Galois/Graphs/Graph.h"
-#include "Galois/Graphs/FileGraph.h"
+#include "Galois/Graph/Graph.h"
+#include "Galois/Graph/FileGraph.h"
 
 #include "Galois/Galois.h"
 #include "Galois/Atomic.h"

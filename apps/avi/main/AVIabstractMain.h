@@ -48,7 +48,7 @@
 
 #include "Galois/Accumulator.h"
 #include "Galois/Galois.h"
-#include "Galois/Graphs/Graph.h"
+#include "Galois/Graph/Graph.h"
 #include "Galois/Statistic.h"
 #include "Galois/Runtime/Sampling.h"
 #include "llvm/Support/CommandLine.h"

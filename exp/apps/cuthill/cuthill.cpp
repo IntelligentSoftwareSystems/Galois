@@ -27,8 +27,8 @@
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
 #include "Galois/CheckedObject.h"
-#include "Galois/Graphs/LCGraph.h"
-#include "Galois/Graphs/Graph.h"
+#include "Galois/Graph/LCGraph.h"
+#include "Galois/Graph/Graph.h"
 #ifdef GALOIS_EXP
 #include "Galois/PriorityScheduling.h"
 #endif

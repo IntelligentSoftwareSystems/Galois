@@ -28,8 +28,8 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#ifndef GALOIS_GRAPHS_FILEGRAPH_H
-#define GALOIS_GRAPHS_FILEGRAPH_H
+#ifndef GALOIS_GRAPH_FILEGRAPH_H
+#define GALOIS_GRAPH_FILEGRAPH_H
 
 #include "Galois/Endian.h"
 #include "Galois/MethodFlags.h"
@@ -386,6 +386,61 @@ void makeSymmetric(FileGraph& in, FileGraph& out) {
       } else {
         g.addNeighbor(src, dst);
         g.addNeighbor(dst, src);
+      }
+    }
+  }
+
+  edge_value_type* rawEdgeData = g.finish<edge_value_type>();
+  if (EdgeData::has_value)
+    std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+
+  out.swap(g);
+}
+
+/**
+ * Permutes a graph.
+ *
+ * Permutation array, P, conforms to: P[i] = j where i is a node index from the
+ * original graph and j is a node index in the permuted graph. New, permuted
+ * graph is placed in the out parameter. The previous graph in out is destroyed.
+ *
+ * @param in original graph
+ * @param p permutation array
+ * @param out permuted graph
+ */
+template<typename EdgeTy,typename PTy>
+void permute(FileGraph& in, const PTy& p, FileGraph& out) {
+  typedef FileGraph::GraphNode GNode;
+  typedef LargeArray<EdgeTy,boost::is_pod<EdgeTy>::value> EdgeData;
+  typedef typename EdgeData::value_type edge_value_type;
+
+  FileGraphParser g;
+  EdgeData edgeData;
+
+  size_t numEdges = in.sizeEdges();
+  g.setNumNodes(in.size());
+  g.setNumEdges(numEdges);
+  g.setSizeofEdgeData(EdgeData::has_value ? sizeof(edge_value_type) : 0);
+
+  g.phase1();
+  for (FileGraph::iterator ii = in.begin(), ei = in.end(); ii != ei; ++ii) {
+    GNode src = *ii;
+    for (FileGraph::edge_iterator jj = in.edge_begin(src), ej = in.edge_end(src); jj != ej; ++jj) {
+      g.incrementDegree(p[src]);
+    }
+  }
+
+  g.phase2();
+  edgeData.allocate(numEdges);
+  for (FileGraph::iterator ii = in.begin(), ei = in.end(); ii != ei; ++ii) {
+    GNode src = p[*ii];
+    for (FileGraph::edge_iterator jj = in.edge_begin(src), ej = in.edge_end(src); jj != ej; ++jj) {
+      GNode dst = p[in.getEdgeDst(jj)];
+      if (EdgeData::has_value) {
+        edge_value_type& data = in.getEdgeData<edge_value_type>(jj);
+        edgeData.set(g.addNeighbor(src, dst), data);
+      } else {
+        g.addNeighbor(src, dst);
       }
     }
   }

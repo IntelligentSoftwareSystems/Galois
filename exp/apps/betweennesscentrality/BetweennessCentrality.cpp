@@ -26,7 +26,7 @@
 #include "Galois/Statistic.h"
 #include "Galois/Galois.h"
 #include "Galois/UserContext.h"
-#include "Galois/Graphs/LCGraph.h"
+#include "Galois/Graph/LCGraph.h"
 #include "Galois/WorkList/WorkList.h"
 #include "Galois/WorkList/WorkListAlt.h"
 
