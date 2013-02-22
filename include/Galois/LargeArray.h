@@ -36,12 +36,21 @@ namespace Galois {
  * Large array of objects with proper specialization for void type. Lazy
  * template parameter indicates whether allocate() also constructs objects
  * and whether the destructor for this collection also calls destroy().
+ *
+ * @tparam T value type of container
+ * @tparam isLazy if false, construct and destroy values as well
+ * @tparam isWrapper if true, do not manage buffer at all
  */
-template<typename T, bool isLazy>
+template<typename T, bool isLazy, bool isWrapper = false>
 class LargeArray: boost::noncopyable {
   T* m_data;
   size_t m_size;
+
+protected:
+  LargeArray(T* d, size_t s): m_data(d), m_size(s) { }
+
 public:
+  typedef T raw_value_type;
   typedef T value_type;
   typedef size_t size_type;
   typedef ptrdiff_t difference_type;
@@ -67,6 +76,7 @@ public:
   const_reference at(difference_type x) const { return m_data[x]; }
   reference at(difference_type x) { return m_data[x]; }
   const_reference operator[](size_type x) const { return m_data[x]; }
+  reference operator[](size_type x) { return m_data[x]; }
   void set(difference_type x, const_reference v) { m_data[x] = v; }
   size_type size() const { return m_size; }
   iterator begin() { return m_data; }
@@ -75,6 +85,7 @@ public:
   const_iterator end() const { return m_data + m_size; }
 
   void allocate(size_type n) {
+    if (isWrapper) return;
     assert(!m_data);
     m_size = n;
     m_data = reinterpret_cast<T*>(Galois::Runtime::MM::largeInterleavedAlloc(sizeof(T) * n));
@@ -83,11 +94,13 @@ public:
   }
   
   void construct() {
+    if (isWrapper) return;
     for (T* ii = m_data, *ei = m_data + m_size; ii != ei; ++ii)
       new (ii) T;
   }
 
   void deallocate() {
+    if (isWrapper) return;
     if (!m_data) return;
     Galois::Runtime::MM::largeInterleavedFree(m_data, sizeof(T) * m_size);
     m_data = 0;
@@ -95,6 +108,7 @@ public:
   }
 
   void destroy() {
+    if (isWrapper) return;
     if (!m_data) return;
     uninitialized_destroy(m_data, m_data + m_size);
   }
@@ -105,29 +119,35 @@ public:
   }
 
   // The following methods are not shared with void specialization
-  reference operator[](size_type x) { return m_data[x]; }
   const_pointer data() const { return m_data; }
   pointer data() { return m_data; }
 };
 
 //! Void specialization
-template<bool isLazy>
-class LargeArray<void,isLazy>: boost::noncopyable {
+template<bool isLazy, bool isWrapper>
+class LargeArray<void, isLazy, isWrapper>: boost::noncopyable {
+protected:
+  template<typename T>
+  LargeArray(T* d, size_t s) { }
+
 public:
-  typedef char value_type;
+  LargeArray() { }
+
+  typedef void raw_value_type;
+  typedef char* value_type;
   typedef size_t size_type;
   typedef ptrdiff_t difference_type;
-  typedef value_type& reference;
-  typedef const value_type& const_reference;
+  typedef value_type reference;
+  typedef const value_type const_reference;
   typedef value_type* pointer;
   typedef const value_type* const_pointer;
   typedef pointer iterator;
   typedef const_pointer const_iterator;
   const static bool has_value = false;
 
-  //const_reference at(difference_type x) const { return 0; }
-  //reference at(difference_type x) { return 0; }
-  //const_reference operator[](size_type x) const { return 0; }
+  const_reference at(difference_type x) const { return 0; }
+  reference at(difference_type x) { return 0; }
+  const_reference operator[](size_type x) const { return 0; }
   size_type size() const { return 0; }
   iterator begin() { return 0; }
   const_iterator begin() const { return 0; }
@@ -143,6 +163,21 @@ public:
 
   template<typename It>
   void copyIn(It begin, It end) { }
+};
+
+/**
+ * Provide {@link LargeArray} semantics over a user-managed memory block.
+ */
+template<typename T>
+class LargeArrayWrapper: public LargeArray<T,false,true> {
+  typedef LargeArray<T,false,true> Super;
+public:
+  LargeArrayWrapper(T* data, size_t size): Super(data, size) { }
+
+  void allocate(typename Super::size_type n) { }
+  void construct() { }
+  void deallocate() { }
+  void destroy() { }
 };
 
 }

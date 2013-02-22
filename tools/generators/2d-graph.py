@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Generates random graphs
+Generates 2D graphs 
 
 @section License
 

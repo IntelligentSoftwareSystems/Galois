@@ -338,7 +338,7 @@ void writeComponent(Node* component) {
   std::cout << "Writing largest component to " << outputFilename
     << " (nodes: " << numNodes << " edges: " << numEdges << ")\n";
 
-  p.structureToFile(outputFilename.c_str());
+  p.structureToFile(outputFilename);
 }
 
 struct CountLargest {

@@ -34,7 +34,7 @@
 #include "Galois/LazyObject.h"
 #include "Galois/NoDerefIterator.h"
 #include "Galois/Threads.h"
-#include "Galois/Graph/FileGraph.h"
+#include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/MethodFlags.h"
 #include "Galois/Runtime/mm/Mem.h"
 
@@ -42,23 +42,6 @@
 
 namespace Galois {
 namespace Graph {
-
-template<typename GraphTy>
-void structureFromFile(GraphTy& g, const std::string& fname) {
-  FileGraph graph;
-  graph.structureFromFile(fname);
-  g.structureFromGraph(graph);
-}
-
-template<typename EdgeContainerTy,typename CompTy>
-struct EdgeSortCompWrapper {
-  const CompTy& comp;
-
-  EdgeSortCompWrapper(const CompTy& c): comp(c) { }
-  bool operator()(const EdgeContainerTy& a, const EdgeContainerTy& b) const {
-    return comp(a.get(), b.get());
-  }
-};
 
 uint64_t inline localStart(uint64_t numNodes) {
   unsigned int id = Galois::Runtime::LL::getTID();
@@ -73,7 +56,100 @@ uint64_t inline localEnd(uint64_t numNodes) {
   return std::min(end, numNodes);
 }
 
-//! Partial specializations for void node data
+//! Proxy object for {@link EdgeSortIterator}
+template<typename EdgeTy>
+struct EdgeSortValue: public StrictObject<EdgeTy> {
+  typedef StrictObject<EdgeTy> Super;
+  typedef typename Super::value_type value_type;
+
+  uint32_t dst;
+  
+  EdgeSortValue(uint32_t d, const value_type& v): Super(v), dst(d) { }
+
+  template<typename ER>
+  EdgeSortValue(const ER& ref) {
+    ref.initialize(*this);
+  }
+};
+
+//! Proxy object for {@link EdgeSortIterator}
+template<typename EdgeDst, typename EdgeData>
+struct EdgeSortReference {
+  typedef typename EdgeData::raw_value_type EdgeTy;
+  uint64_t at;
+  EdgeDst* edgeDst;
+  EdgeData* edgeData;
+
+  EdgeSortReference(uint64_t x, EdgeDst* dsts, EdgeData* data): at(x), edgeDst(dsts), edgeData(data) { }
+
+  EdgeSortReference operator=(const EdgeSortValue<EdgeTy>& x) {
+    edgeDst->at(at) = x.dst;
+    edgeData->set(at, x.get());
+    return *this;
+  }
+
+  EdgeSortReference operator=(const EdgeSortReference<EdgeDst,EdgeData>& x) {
+    edgeDst->at(at) = edgeDst->at(x.at);
+    edgeData->set(at, edgeData->at(x.at));
+    return *this;
+  }
+
+  EdgeSortValue<EdgeTy> operator*() const {
+    return EdgeSortValue<EdgeTy>(edgeDst->at(at), edgeData->at(at));
+  }
+
+  void initialize(EdgeSortValue<EdgeTy>& value) const {
+    value = *(*this);
+  }
+};
+
+/**
+ * Converts comparison functions over EdgeTy to be over {@link EdgeSortValue}.
+ */
+template<typename EdgeSortValueTy,typename CompTy>
+struct EdgeSortCompWrapper {
+  const CompTy& comp;
+
+  EdgeSortCompWrapper(const CompTy& c): comp(c) { }
+  bool operator()(const EdgeSortValueTy& a, const EdgeSortValueTy& b) const {
+    return comp(a.get(), b.get());
+  }
+};
+
+/**
+ * Iterator to facilitate sorting of CSR-like graphs. Converts random access operations
+ * on iterator to appropriate computations on edge destinations and edge data.
+ *
+ * @tparam EdgeDst {@link LargeArray}-like container of edge destinations
+ * @tparam EdgeData {@link LargeArray}-like container of edge data
+ */
+template<typename EdgeDst, typename EdgeData>
+class EdgeSortIterator: public boost::iterator_facade<
+                        EdgeSortIterator<EdgeDst,EdgeData>,
+                        EdgeSortValue<typename EdgeData::raw_value_type>,
+                        boost::random_access_traversal_tag,
+                        EdgeSortReference<EdgeDst, EdgeData>
+                        > {
+  uint64_t at;
+  EdgeDst* edgeDst;
+  EdgeData* edgeData;
+public:
+  EdgeSortIterator(): at(~0) { }
+  EdgeSortIterator(uint64_t x, EdgeDst* dsts, EdgeData* data):
+    at(x), edgeDst(dsts), edgeData(data) { }
+private:
+  friend class boost::iterator_core_access;
+  
+  bool equal(const EdgeSortIterator<EdgeDst,EdgeData>& other) const { return at == other.at; }
+  EdgeSortReference<EdgeDst,EdgeData>
+    dereference() const { return EdgeSortReference<EdgeDst, EdgeData>(at, edgeDst, edgeData); }
+  ptrdiff_t distance_to(const EdgeSortIterator<EdgeDst,EdgeData>& other) const { return other.at - (ptrdiff_t) at; }
+  void increment() { ++at; }
+  void decrement() { --at; }
+  void advance(ptrdiff_t n) { at += n; }
+};
+
+//! Specializations for void node data
 template<typename NodeTy>
 class NodeInfoBase: public Galois::Runtime::Lockable {
   NodeTy data;
@@ -96,8 +172,21 @@ struct NodeInfoBase<void>: public Galois::Runtime::Lockable {
   void construct() { }
 };
 
-//! Convenience wrapper around Graph.edge_begin and Graph.edge_end to allow
-//! C++11 foreach iteration of edges
+//! Edge specialization for void edge data
+template<typename NodeInfoTy,typename EdgeTy>
+struct EdgeInfoBase: public LazyObject<EdgeTy> {
+  typedef LazyObject<EdgeTy> Super;
+  typedef typename Super::reference reference;
+  typedef typename Super::value_type value_type;
+  const static bool has_value = Super::has_value;
+
+  NodeInfoTy* dst;
+};
+
+/**
+ * Convenience wrapper around Graph.edge_begin and Graph.edge_end to allow
+ * C++11 foreach iteration of edges.
+ */
 template<typename GraphTy>
 class EdgesIterator {
   GraphTy& g;
@@ -112,14 +201,17 @@ public:
   iterator end() { return make_no_deref_iterator(g.edge_end(n, flag)); }
 };
 
-template<typename NodeInfoTy,typename EdgeTy>
-struct EdgeInfoBase: public LazyObject<EdgeTy> {
-  typedef LazyObject<EdgeTy> Super;
-  typedef typename Super::reference reference;
-  typedef typename Super::value_type value_type;
-  const static bool has_value = Super::has_value;
+template<typename GraphTy>
+class EdgesWithNoFlagIterator {
+  GraphTy& g;
+  typename GraphTy::GraphNode n;
+public:
+  typedef NoDerefIterator<typename GraphTy::edge_iterator> iterator;
 
-  NodeInfoTy* dst;
+  EdgesWithNoFlagIterator(GraphTy& g, typename GraphTy::GraphNode n): g(g), n(n) { }
+
+  iterator begin() { return make_no_deref_iterator(g.edge_begin(n)); }
+  iterator end() { return make_no_deref_iterator(g.edge_end(n)); }
 };
 
 } // end namespace

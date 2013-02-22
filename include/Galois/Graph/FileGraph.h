@@ -34,6 +34,7 @@
 #include "Galois/Endian.h"
 #include "Galois/MethodFlags.h"
 #include "Galois/LargeArray.h"
+#include "Galois/Graph/Util.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/ll/CacheLineStorage.h"
 
@@ -115,6 +116,44 @@ public:
   edge_iterator edge_begin(GraphNode N) const;
   edge_iterator edge_end(GraphNode N) const;
 
+  EdgesWithNoFlagIterator<FileGraph> out_edges(GraphNode N) {
+    return EdgesWithNoFlagIterator<FileGraph>(*this, N);
+  }
+
+  /**
+   * Sorts outgoing edges of a node. Comparison function is over EdgeTy.
+   */
+  template<typename EdgeTy, typename CompTy>
+  void sortEdgesByEdgeData(GraphNode N, const CompTy& comp = std::less<EdgeTy>()) {
+    typedef LargeArrayWrapper<GraphNode> EdgeDst;
+    typedef LargeArrayWrapper<EdgeTy> EdgeData;
+
+    EdgeDst edgeDst(outs, numEdges);
+    EdgeData ed(edgeData, numEdges);
+
+    EdgeSortIterator<EdgeDst,EdgeData> begin(std::distance(outs, raw_neighbor_begin(N)), &edgeDst, &ed);
+    EdgeSortIterator<EdgeDst,EdgeData> end(std::distance(outs, raw_neighbor_end(N)), &edgeDst, &ed);
+
+    std::sort(begin, end, EdgeSortCompWrapper<EdgeSortValue<EdgeTy>,CompTy>(comp));
+  }
+
+  /**
+   * Sorts outgoing edges of a node. Comparison function is over <code>EdgeSortValue<EdgeTy></code>.
+   */
+  template<typename EdgeTy, typename CompTy>
+  void sortEdges(GraphNode N, const CompTy& comp) {
+    typedef LargeArrayWrapper<GraphNode> EdgeDst;
+    typedef LargeArrayWrapper<EdgeTy> EdgeData;
+
+    EdgeDst edgeDst(outs, numEdges);
+    EdgeData ed(edgeData, numEdges);
+
+    EdgeSortIterator<EdgeDst,EdgeData> begin(std::distance(outs, raw_neighbor_begin(N)), &edgeDst, &ed);
+    EdgeSortIterator<EdgeDst,EdgeData> end(std::distance(outs, raw_neighbor_end(N)), &edgeDst, &ed);
+
+    std::sort(begin, end, comp);
+  }
+
   template<typename EdgeTy> 
   EdgeTy& getEdgeData(edge_iterator it) const {
     return reinterpret_cast<EdgeTy*>(edgeData)[*it];
@@ -195,61 +234,11 @@ public:
     return reinterpret_cast<T*>(structureFromGraph(g, sizeof(T)));
   }
 
-  // XXX(ddn): Avoid methods that depend on slow std::map
-#if 0
-  //! Read graph connectivity information from graph
-  template<typename TyG>
-  void structureFromGraph(TyG& G) {
-    uint64_t num_nodes = G.size();
-
-    typedef typename TyG::GraphNode GNode;
-    typedef typename TyG::EdgeDataTy EdgeData;
-
-    typedef std::vector<GNode> Nodes;
-    Nodes nodes(G.begin(), G.end());
-
-    //num edges and outidx computation
-    uint64_t num_edges = 0;
-    std::vector<uint64_t> out_idx;
-    std::map<typename TyG::GraphNode, uint32_t> node_ids;
-    for (uint32_t id = 0; id < num_nodes; ++id) {
-      GNode& node = nodes[id];
-      node_ids[node] = id;
-      num_edges += G.neighborsSize(node);
-      out_idx.push_back(num_edges);
-    }
-
-    //outs
-    std::vector<uint32_t> outs;
-    for (typename Nodes::iterator ii = nodes.begin(), ee = nodes.end();
-	 ii != ee; ++ii) {
-      for (typename TyG::neighbor_iterator ni = G.neighbor_begin(*ii),
-	     ne = G.neighbor_end(*ii); ni != ne; ++ni) {
-	uint32_t id = node_ids[*ni];
-	outs.push_back(id);
-      }
-    }
-
-    EdgeData* edgeData = (EdgeData*) structureFromArrays(&out_idx[0], num_nodes,
-        &outs[0], num_edges, sizeof(EdgeData));
-
-    if (sizeof(EdgeData)) {
-      for (typename Nodes::iterator ii = nodes.begin(), ee = nodes.end();
-           ii != ee; ++ii) {
-        for (typename TyG::neighbor_iterator ni = G.neighbor_begin(*ii),
-               ne = G.neighbor_end(*ii); ni != ne; ++ni) {
-          *edgeData++ = G.getEdgeData(*ii, *ni);
-        }
-      }
-    }
-  }
-#endif
-
   //! Write graph connectivity information to file
-  void structureToFile(const char* file);
+  void structureToFile(const std::string& file);
 
   void swap(FileGraph& other);
-  void clone(FileGraph& other);
+  void cloneFrom(FileGraph& other);
 };
 
 /** 
@@ -433,14 +422,14 @@ void permute(FileGraph& in, const PTy& p, FileGraph& out) {
   g.phase2();
   edgeData.allocate(numEdges);
   for (FileGraph::iterator ii = in.begin(), ei = in.end(); ii != ei; ++ii) {
-    GNode src = p[*ii];
+    GNode src = *ii;
     for (FileGraph::edge_iterator jj = in.edge_begin(src), ej = in.edge_end(src); jj != ej; ++jj) {
-      GNode dst = p[in.getEdgeDst(jj)];
+      GNode dst = in.getEdgeDst(jj);
       if (EdgeData::has_value) {
         edge_value_type& data = in.getEdgeData<edge_value_type>(jj);
-        edgeData.set(g.addNeighbor(src, dst), data);
+        edgeData.set(g.addNeighbor(p[src], p[dst]), data);
       } else {
-        g.addNeighbor(src, dst);
+        g.addNeighbor(p[src], p[dst]);
       }
     }
   }
@@ -450,6 +439,13 @@ void permute(FileGraph& in, const PTy& p, FileGraph& out) {
     std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
 
   out.swap(g);
+}
+
+template<typename GraphTy>
+void structureFromFile(GraphTy& g, const std::string& fname) {
+  FileGraph graph;
+  graph.structureFromFile(fname);
+  g.structureFromGraph(graph);
 }
 
 //! Local computation graph (i.e., graph structure does not change)
@@ -519,9 +515,9 @@ public:
     FileGraph::swap(other);
   }
 
-  void clone(LC_FileGraph& other) {
+  void cloneFrom(LC_FileGraph& other) {
     nodeData = other.nodeData;
-    FileGraph::clone(other);
+    FileGraph::cloneFrom(other);
   }
 
   template<typename GTy>

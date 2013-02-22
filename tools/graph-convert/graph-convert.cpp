@@ -75,6 +75,15 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Choose a conversion mode:"),
       clEnumVal(vgr2svgr, "Convert binary void gr to symmetric graph by adding reverse edges"),
       clEnumValEnd), cll::init(edgelist2gr));
 
+static void printStatus(size_t in_nodes, size_t in_edges, size_t out_nodes, size_t out_edges) {
+  std::cout << "InGraph : |V| = " << in_nodes << ", |E| = " << in_edges << "\n";
+  std::cout << "OutGraph: |V| = " << out_nodes << ", |E| = " << out_edges << "\n";
+}
+
+static void printStatus(size_t in_nodes, size_t in_edges) {
+  printStatus(in_nodes, in_edges, in_nodes, in_edges);
+}
+
 /**
  * Just a bunch of pairs or triples:
  * src dst weight?
@@ -157,12 +166,8 @@ void convert_edgelist2gr(const std::string& infilename, const std::string& outfi
   if (EdgeData::has_value)
     std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
 
-  std::cout << "Finished reading graph. "
-    << "Nodes: " << numNodes
-    << " Edges: " << numEdges 
-    << "\n";
-
-  p.structureToFile(outfilename.c_str());
+  p.structureToFile(outfilename);
+  printStatus(numNodes, numEdges);
 }
 
 template<typename EdgeTy>
@@ -189,9 +194,7 @@ void convert_gr2edgelist(const std::string& infilename, const std::string& outfi
   }
   file.close();
 
-  std::cout << "Finished reading graph. "
-    << "Nodes: " << graph.size() << " Edges: " << graph.sizeEdges() 
-    << "\n";
+  printStatus(graph.size(), graph.sizeEdges());
 }
 
 template<typename EdgeTy>
@@ -203,15 +206,110 @@ void convert_gr2sgr(const std::string& infilename, const std::string& outfilenam
   ingraph.structureFromFile(infilename);
   Galois::Graph::makeSymmetric<EdgeTy>(ingraph, outgraph);
 
-  outgraph.structureToFile(outfilename.c_str());
+  outgraph.structureToFile(outfilename);
+  printStatus(ingraph.size(), ingraph.sizeEdges(), outgraph.size(), outgraph.sizeEdges());
 }
+
+template<typename EdgeTy>
+struct IdLess {
+  bool operator()(const Galois::Graph::EdgeSortValue<EdgeTy>& e1, const Galois::Graph::EdgeSortValue<EdgeTy>& e2) const {
+    return e1.dst < e2.dst;
+  }
+};
 
 /**
  * Removes self and multi-edges from a graph.
  */
 template<typename EdgeTy>
 void convert_gr2cgr(const std::string& infilename, const std::string& outfilename) {
-  abort(); // TODO
+  typedef Galois::Graph::FileGraph Graph;
+  typedef Graph::GraphNode GNode;
+  
+  Graph orig, graph;
+  {
+    // Original FileGraph is immutable because it is backed by a file
+    orig.structureFromFile(infilename);
+    graph.cloneFrom(orig);
+  }
+
+  size_t numEdges = 0;
+
+  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+    GNode src = *ii;
+
+    graph.sortEdges<EdgeTy>(src, IdLess<EdgeTy>());
+
+    Graph::edge_iterator prev = graph.edge_end(src);
+    for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
+      GNode dst = graph.getEdgeDst(jj);
+      if (src == dst) {
+      } else if (prev != ej && graph.getEdgeDst(prev) == dst) {
+      } else {
+        numEdges += 1;
+      }
+      prev = jj;
+    }
+  }
+
+  if (numEdges == graph.sizeEdges()) {
+    std::cout << "Graph already simplified; copy input to output\n";
+    printStatus(graph.size(), graph.sizeEdges());
+    graph.structureToFile(outfilename);
+    return;
+  }
+
+  typedef Galois::Graph::FileGraphParser Parser;
+  typedef Galois::LargeArray<EdgeTy,true> EdgeData;
+  typedef typename EdgeData::value_type edge_value_type;
+  
+  Parser p;
+  EdgeData edgeData;
+
+  p.setNumNodes(graph.size());
+  p.setNumEdges(numEdges);
+  p.setSizeofEdgeData(EdgeData::has_value ? sizeof(edge_value_type) : 0);
+  edgeData.allocate(numEdges);
+
+  p.phase1();
+  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+    GNode src = *ii;
+
+    Graph::edge_iterator prev = graph.edge_end(src);
+    for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
+      GNode dst = graph.getEdgeDst(jj);
+      if (src == dst) {
+      } else if (prev != ej && graph.getEdgeDst(prev) == dst) {
+      } else {
+        p.incrementDegree(src);
+      }
+      prev = jj;
+    }
+  }
+
+  p.phase2();
+  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+    GNode src = *ii;
+
+    Graph::edge_iterator prev = graph.edge_end(src);
+    for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
+      GNode dst = graph.getEdgeDst(jj);
+      if (src == dst) {
+      } else if (prev != ej && graph.getEdgeDst(prev) == dst) {
+      } else if (EdgeData::has_value) {
+        edgeData.set(p.addNeighbor(src, dst), graph.getEdgeData<edge_value_type>(jj));
+      } else {
+        p.addNeighbor(src, dst);
+      }
+      prev = jj;
+    }
+  }
+
+  edge_value_type* rawEdgeData = p.finish<edge_value_type>();
+  if (EdgeData::has_value)
+    std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+  
+  p.structureToFile(outfilename);
+  printStatus(graph.size(), graph.sizeEdges(), p.size(), p.sizeEdges());
 }
 
 #if 1
@@ -289,7 +387,8 @@ void convert_rmat2gr(const std::string& infilename, const std::string& outfilena
     << " Edges added: " << edges_added
     << "\n";
 
-  outputGraph(outfilename.c_str(), graph);
+  outputGraph(outfilename, graph);
+  printStatus(nnodes, edges_added, graph.size(), graph.sizeEdges());
 }
 #endif
 
@@ -380,12 +479,8 @@ void convert_dimacs2gr(const std::string& infilename, const std::string& outfile
   if (EdgeData::has_value)
     std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
 
-  std::cout << "Finished reading graph. "
-    << "Nodes: " << nnodes
-    << " Edges read: " << nedges 
-    << "\n";
-
-  p.structureToFile(outfilename.c_str());
+  p.structureToFile(outfilename);
+  printStatus(p.size(), p.sizeEdges());
 }
 
 /**
@@ -454,12 +549,8 @@ void convert_pbbs2gr(const std::string& infilename, const std::string& outfilena
 
   p.finish<void>();
 
-  std::cout << "Finished reading graph. "
-    << "Nodes: " << nnodes
-    << " Edges read: " << nedges 
-    << "\n";
-
-  p.structureToFile(outfilename.c_str());
+  p.structureToFile(outfilename);
+  printStatus(p.size(), p.sizeEdges());
 }
 
 template<typename EdgeTy>
@@ -483,9 +574,7 @@ void convert_gr2wpbbs(const std::string& infilename, const std::string& outfilen
   }
   file.close();
 
-  std::cout << "Finished reading graph. "
-    << "Nodes: " << graph.size() << " Edges: " << graph.sizeEdges() 
-    << "\n";
+  printStatus(graph.size(), graph.sizeEdges());
 }
 
 void convert_gr2pbbs(const std::string& infilename, const std::string& outfilename) {
@@ -511,9 +600,7 @@ void convert_gr2pbbs(const std::string& infilename, const std::string& outfilena
   }
   file.close();
 
-  std::cout << "Finished reading graph. "
-    << "Nodes: " << graph.size() << " Edges: " << graph.sizeEdges() 
-    << "\n";
+  printStatus(graph.size(), graph.sizeEdges());
 }
 
 template<typename EdgeTy>
@@ -536,9 +623,7 @@ void convert_gr2dimacs(const std::string& infilename, const std::string& outfile
   }
   file.close();
 
-  std::cout << "Finished reading graph. "
-    << "Nodes: " << graph.size() << " Edges: " << graph.sizeEdges() 
-    << "\n";
+  printStatus(graph.size(), graph.sizeEdges());
 }
 
 template<typename EdgeTy>
@@ -621,10 +706,7 @@ void convert_gr2bsml(const std::string& infilename, const std::string& outfilena
   }
 
   close(fd);
-
-  std::cout << "Finished reading graph. "
-    << "Nodes: " << nnodes << " Edges: " << nedges 
-    << "\n";
+  printStatus(nnodes, nedges);
 }
 
 int main(int argc, char** argv) {

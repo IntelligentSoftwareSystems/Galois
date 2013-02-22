@@ -49,9 +49,9 @@ public:
 
 template<>
 struct StrictObject<void> {
-  typedef void* value_type;
-  typedef void* reference;
-  typedef void* const_reference;
+  typedef char* value_type;
+  typedef char* reference;
+  typedef char* const_reference;
   const static bool has_value = false;
 
   StrictObject() { }

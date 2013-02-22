@@ -96,74 +96,6 @@ protected:
   typedef LargeArray<uint32_t,true> EdgeDst;
   typedef NodeInfoBase<NodeTy> NodeInfo;
 
-  struct EdgeValue: public StrictObject<EdgeTy> {
-    typedef StrictObject<EdgeTy> Super;
-    typedef typename Super::value_type value_type;
-
-    uint32_t dst;
-    
-    EdgeValue(uint32_t d, const value_type& v): Super(v), dst(d) { }
-
-    template<typename ER>
-    EdgeValue(const ER& ref) {
-      ref.initialize(*this);
-    }
-  };
-
-  //! Proxy object to facilitate sorting
-  struct EdgeReference {
-    uint64_t at;
-    EdgeDst* edgeDst;
-    EdgeData* edgeData;
-
-    EdgeReference(uint64_t x, EdgeDst* dsts, EdgeData* data): at(x), edgeDst(dsts), edgeData(data) { }
-
-    EdgeReference operator=(const EdgeValue& x) {
-      edgeDst->at(at) = x.dst;
-      edgeData->set(at, x.get());
-      return *this;
-    }
-
-    EdgeReference operator=(const EdgeReference& x) {
-      edgeDst->at(at) = edgeDst->at(x.at);
-      edgeData->set(at, edgeData->at(x.at));
-      return *this;
-    }
-
-    EdgeValue operator*() const {
-      return EdgeValue(edgeDst->at(at), edgeData->at(at));
-    }
-
-    void initialize(EdgeValue& value) const {
-      value = *(*this);
-    }
-  };
-
-  //! Iterator to facilitate sorting
-  class EdgeSortIterator: public boost::iterator_facade<
-                          EdgeSortIterator,
-                          EdgeValue,
-                          boost::random_access_traversal_tag,
-                          EdgeReference
-                          > {
-    uint64_t at;
-    EdgeDst* edgeDst;
-    EdgeData* edgeData;
-  public:
-    EdgeSortIterator(): at(~0) { }
-    EdgeSortIterator(uint64_t x, EdgeDst* dsts, EdgeData* data):
-      at(x), edgeDst(dsts), edgeData(data) { }
-  private:
-    friend class boost::iterator_core_access;
-    
-    bool equal(const EdgeSortIterator& other) const { return at == other.at; }
-    EdgeReference dereference() const { return EdgeReference(at, edgeDst, edgeData); }
-    ptrdiff_t distance_to(const EdgeSortIterator& other) const { return other.at - (ptrdiff_t) at; }
-    void increment() { ++at; }
-    void decrement() { --at; }
-    void advance(ptrdiff_t n) { at += n; }
-  };
-
   LargeArray<NodeInfo,false> nodeData;
   LargeArray<uint64_t,true> edgeIndData;
   EdgeDst edgeDst;
@@ -188,12 +120,12 @@ protected:
     return ~static_cast<uint64_t>(0);
   }
 
-  EdgeSortIterator edge_sort_begin(uint32_t src) {
-    return EdgeSortIterator(raw_neighbor_begin(src), &edgeDst, &edgeData);
+  EdgeSortIterator<EdgeDst,EdgeData> edge_sort_begin(uint32_t src) {
+    return EdgeSortIterator<EdgeDst,EdgeData>(raw_neighbor_begin(src), &edgeDst, &edgeData);
   }
 
-  EdgeSortIterator edge_sort_end(uint32_t src) {
-    return EdgeSortIterator(raw_neighbor_end(src), &edgeDst, &edgeData);
+  EdgeSortIterator<EdgeDst,EdgeData> edge_sort_end(uint32_t src) {
+    return EdgeSortIterator<EdgeDst,EdgeData>(raw_neighbor_end(src), &edgeDst, &edgeData);
   }
   
 public:
@@ -270,14 +202,11 @@ public:
   template<typename CompTy>
   void sortEdgesByEdgeData(GraphNode N, const CompTy& comp = std::less<EdgeTy>(), MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::acquire(&nodeData[N], mflag);
-    std::sort(edge_sort_begin(N), edge_sort_end(N), EdgeSortCompWrapper<EdgeValue,CompTy>(comp));
+    std::sort(edge_sort_begin(N), edge_sort_end(N), EdgeSortCompWrapper<EdgeSortValue<EdgeTy>,CompTy>(comp));
   }
 
   /**
-   * Sorts outgoing edges of a node. Comparison function is conforms to
-   * <code>bool r = fn(x, y)</code> where
-   * x and y are objects conforming to the following
-   * <code>GraphNode n = x.dst</code> and <code>EdgeDataTy e = x.get()</code>.
+   * Sorts outgoing edges of a node. Comparison function is over <code>EdgeSortValue<EdgeTy></code>.
    */
   template<typename CompTy>
   void sortEdges(GraphNode N, const CompTy& comp, MethodFlag mflag = MethodFlag::ALL) {
@@ -578,10 +507,7 @@ public:
   }
 
   /**
-   * Sorts outgoing edges of a node. Comparison function is conforms to
-   * <code>bool r = fn(x, y)</code> where x and y are objects conforming to the
-   * following <code>GraphNode n = x.dst</code> and <code>EdgeDataTy e =
-   * x.get()</code>.
+   * Sorts outgoing edges of a node. Comparison function is over <code>EdgeSortValue<EdgeTy></code>.
    */
   template<typename CompTy>
   void sortEdges(GraphNode N, const CompTy& comp, MethodFlag mflag = MethodFlag::ALL) {

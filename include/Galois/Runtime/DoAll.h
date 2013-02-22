@@ -52,10 +52,10 @@ class DoAllWork {
   FunctionTy origF;
   FunctionTy outputF;
   ReduceFunTy RF;
-  bool needsReduce;
-  bool useStealing;
   RangeTy range;
   GBarrier barrier;
+  bool needsReduce;
+  bool useStealing;
 
   struct SharedState {
     local_iterator stealBegin;
@@ -127,7 +127,7 @@ class DoAllWork {
 
 public:
   DoAllWork(const FunctionTy& F, const ReduceFunTy& R, bool needsReduce, RangeTy r, bool steal)
-    : origF(F), outputF(F), RF(R), needsReduce(needsReduce), range(r), useStealing(steal)
+    : origF(F), outputF(F), RF(R), range(r), needsReduce(needsReduce), useStealing(steal)
   {
     barrier.reinit(activeThreads);
   }

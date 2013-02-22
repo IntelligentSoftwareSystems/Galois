@@ -194,19 +194,19 @@ void FileGraph::structureFromFile(const std::string& filename) {
 }
 
 //FIXME: perform host -> le on data
-void FileGraph::structureToFile(const char* file) {
+void FileGraph::structureToFile(const std::string& file) {
   ssize_t retval;
   //ASSUME LE machine
   mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
-  int fd = open(file, O_WRONLY | O_CREAT | O_TRUNC, mode);
+  int fd = open(file.c_str(), O_WRONLY | O_CREAT | O_TRUNC, mode);
   size_t total = masterLength;
   char* ptr = (char*) masterMapping;
   while (total) {
     retval = write(fd, ptr, total);
     if (retval == -1) {
-      GALOIS_SYS_ERROR(true, "failed writing to %s", file);
+      GALOIS_SYS_ERROR(true, "failed writing to %s", file.c_str());
     } else if (retval == 0) {
-      GALOIS_ERROR(true, "ran out of space writing to %s", file);
+      GALOIS_ERROR(true, "ran out of space writing to %s", file.c_str());
     }
     total -= retval;
     ptr += retval;
@@ -226,7 +226,7 @@ void FileGraph::swap(FileGraph& other) {
   std::swap(numNodes, other.numNodes);
 }
 
-void FileGraph::clone(FileGraph& other) {
+void FileGraph::cloneFrom(FileGraph& other) {
   structureFromMem(other.masterMapping, other.masterLength, true);
 }
 
