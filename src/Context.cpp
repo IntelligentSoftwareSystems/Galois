@@ -139,10 +139,6 @@ unsigned Galois::Runtime::SimpleRuntimeContext::commit_iteration() {
   return numLocks;
 }
 
-void Galois::Runtime::breakLoop() {
-  throw break_ex();
-}
-
 void Galois::Runtime::signalConflict(Lockable* L) {
   throw conflict_ex{L}; // Conflict
 }
@@ -176,7 +172,3 @@ void Galois::Runtime::SimpleRuntimeContext::sub_acquire(Galois::Runtime::Lockabl
 
 //anchor vtable
 Galois::Runtime::SimpleRuntimeContext::~SimpleRuntimeContext() {}
-
-void Galois::Runtime::forceAbort() {
-  signalConflict(nullptr);
-}

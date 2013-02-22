@@ -26,10 +26,14 @@
 #include "Galois/Mem.h"
 #include "Galois/gdeque.h"
 
-#include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/MethodFlags.h"
+#include "Galois/Runtime/Context.h" //for signal conflict
 
 namespace Galois {
+
+namespace Runtime {
+struct break_ex {};
+}
 
 /** 
  * This is the object passed to the user's parallel loop.  This
@@ -80,7 +84,7 @@ public:
 
   //! Signal break in parallel loop
   void breakLoop() {
-    Galois::Runtime::breakLoop();
+    throw Runtime::break_ex {};
   }
 
   //! Acquire a per-iteration allocator
@@ -98,7 +102,7 @@ public:
   }
 
   //! Force the abort of this iteration
-  void abort() { Galois::Runtime::forceAbort(); }
+  void abort() { Runtime::signalConflict(nullptr); }
 
   //! Store and retrieve local state for deterministic and ordered executor
   void* getLocalState(bool& used) { used = localStateUsed; return localState; }

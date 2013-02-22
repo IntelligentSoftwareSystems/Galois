@@ -30,7 +30,6 @@
 #include "Galois/Runtime/ll/gio.h"
 #include <cassert>
 #include <cstdlib>
-#include <setjmp.h>
 
 //! Throwing exceptions can be a scalability bottleneck.
 
@@ -42,7 +41,6 @@ class Lockable;
 
 //Things we can throw:
 struct conflict_ex { Lockable* obj; };
-struct break_ex {};
 struct failsafe_ex{};
 struct remote_ex; //tried to access a remote object
 
@@ -80,6 +78,8 @@ class Lockable {
   friend class Distributed::RemoteDirectory;
   template <typename, typename>
   friend struct Galois::Runtime::DeterministicImpl::DeterministicContext;
+  friend bool isAcquired(Lockable*);
+
 public:
   LL::PtrLock<void, true> auxPtr;
   Lockable() :next(0) {}
@@ -119,7 +119,7 @@ void setThreadContext(SimpleRuntimeContext* n);
 
 
 //! Helper function to decide if the conflict detection lock should be taken
-static inline bool shouldLock(Galois::MethodFlag g) {
+inline bool shouldLock(Galois::MethodFlag g) {
   // Mask out additional "optional" flags
   switch (g & MethodFlag::ALL) {
   case MethodFlag::NONE:
@@ -139,39 +139,49 @@ void doAcquire(Lockable* C);
 
 //! Master function which handles conflict detection
 //! used to acquire a lockable thing
-static inline void acquire(Lockable* C, Galois::MethodFlag m) {
+inline void acquire(Lockable* C, Galois::MethodFlag m) {
   if (shouldLock(m))
     doAcquire(C);
 }
 
+template<typename ContextTy>
+void acquire(Lockable* C, ContextTy* cnx, Galois::MethodFlag m) {
+  if (shouldLock(m) && cnx)
+    cnx->acquire(C);
+}
+
+inline bool isAcquired(Lockable* C) {
+  return C->Owner.is_locked();
+}
+
 bool do_isMagicLock(Lockable* C);
 
-static inline bool isMagicLock(Lockable* C) {
+inline bool isMagicLock(Lockable* C) {
    return do_isMagicLock(C);
 }
 
 void do_setMagicLock(Lockable* C);
 
-static inline void setMagicLock(Lockable* C) {
+inline void setMagicLock(Lockable* C) {
    do_setMagicLock(C);
    return;
 }
 
 void *do_getValue(Lockable* C);
 
-static inline void *getValue(Lockable* C) {
+inline void *getValue(Lockable* C) {
    return do_getValue(C);
 }
 
 bool do_trylock(Lockable* C);
 
-static inline bool trylock(Lockable* C) {
+inline bool trylock(Lockable* C) {
    return do_trylock(C);
 }
 
 void do_unlock(Lockable* C);
 
-static inline void unlock(Lockable* C) {
+inline void unlock(Lockable* C) {
    do_unlock(C);
    return;
 }
@@ -190,12 +200,7 @@ struct CheckedLockObj {
   }
 };
 
-//! Actually break for_each loop
-void breakLoop();
-
 void signalConflict(Lockable*);
-
-void forceAbort();
 
 }
 } // end namespace Galois
