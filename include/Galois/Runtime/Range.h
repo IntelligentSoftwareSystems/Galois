@@ -45,7 +45,7 @@ public:
   typedef typename T::iterator iterator;
   typedef typename T::local_iterator local_iterator;
   typedef iterator block_iterator;
-  typedef typename std::iterator_traits<iterator>::value_type value_type;
+  typedef typename std::iterator_traits<local_iterator>::value_type value_type;
   
   LocalRange(T& c): container(&c) { }
 
