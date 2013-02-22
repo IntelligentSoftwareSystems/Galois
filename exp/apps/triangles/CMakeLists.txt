@@ -1,0 +1,1 @@
+app(triangles Triangles.cpp)
