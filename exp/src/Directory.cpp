@@ -29,18 +29,17 @@ using namespace Galois::Runtime::Distributed;
 
 uintptr_t RemoteDirectory::haveObject(uintptr_t ptr, uint32_t owner, SimpleRuntimeContext *cnx) {
 #define OBJSTATE (*iter).second
-  RemoteDirectory& rd = getSystemRemoteDirectory();
-  lock_guard<glock> lock(rd.Lock);
-  auto iter = rd.curobj.find(make_pair(ptr,owner));
+  lock_guard<glock> lock(Lock);
+  auto iter = curobj.find(make_pair(ptr,owner));
   uintptr_t retval = 0;
   // add object to list if it's not already there
-  if (iter == rd.curobj.end()) {
+  if (iter == curobj.end()) {
     objstate list_obj;
     list_obj.count = 0;
     list_obj.localobj = 0;
     list_obj.state = objstate::Remote;
-    rd.curobj[make_pair(ptr,owner)] = list_obj;
-    iter = rd.curobj.find(make_pair(ptr,owner));
+    curobj[make_pair(ptr,owner)] = list_obj;
+    iter = curobj.find(make_pair(ptr,owner));
   }
   // Returning the object even if locked as the call to acquire would fail
   if (OBJSTATE.state != objstate::Remote)
@@ -56,19 +55,18 @@ uintptr_t RemoteDirectory::haveObject(uintptr_t ptr, uint32_t owner, SimpleRunti
 
 uintptr_t RemoteDirectory::transientHaveObj(uintptr_t ptr, uint32_t owner, bool& isavail) {
 #define OBJSTATE (*iter).second
-  RemoteDirectory& rd = getSystemRemoteDirectory();
-  lock_guard<glock> lock(rd.Lock);
-  auto iter = rd.curobj.find(make_pair(ptr,owner));
+  lock_guard<glock> lock(Lock);
+  auto iter = curobj.find(make_pair(ptr,owner));
   uintptr_t retval = 0;
   isavail = false;
   // add object to list if it's not already there
-  if (iter == rd.curobj.end()) {
+  if (iter == curobj.end()) {
     objstate list_obj;
     list_obj.count = 0;
     list_obj.localobj = 0;
     list_obj.state = objstate::Remote;
-    rd.curobj[make_pair(ptr,owner)] = list_obj;
-    iter = rd.curobj.find(make_pair(ptr,owner));
+    curobj[make_pair(ptr,owner)] = list_obj;
+    iter = curobj.find(make_pair(ptr,owner));
   }
   // Returning the object even if locked as the call to acquire would fail
   if (OBJSTATE.state != objstate::Remote) {
@@ -78,7 +76,7 @@ uintptr_t RemoteDirectory::transientHaveObj(uintptr_t ptr, uint32_t owner, bool&
   // acquire the lock if inside for_each
   if (retval) {
     Lockable *L = reinterpret_cast<Lockable*>(retval);
-    if (!rd.dirAcquire(L, true))
+    if (!dirAcquire(L, true))
       retval = 0;
   }
 #undef OBJSTATE
@@ -97,15 +95,14 @@ void RemoteDirectory::fetchRemoteObj(uintptr_t ptr, uint32_t owner, recvFuncTy p
 
 uintptr_t LocalDirectory::haveObject(uintptr_t ptr, uint32_t &remote, SimpleRuntimeContext *cnx) {
 #define OBJSTATE (*iter).second
-  LocalDirectory& ld = getSystemLocalDirectory();
-  lock_guard<glock> lock(ld.Lock);
-  auto iter = ld.curobj.find(ptr);
+  lock_guard<glock> lock(Lock);
+  auto iter = curobj.find(ptr);
   uintptr_t retval = 0;
   // Returning the object even if locked as the call to acquire would fail
   // return the object even if it is not in the list
-  if ((iter == ld.curobj.end()) || (OBJSTATE.state == objstate::Local))
+  if ((iter == curobj.end()) || (OBJSTATE.state == objstate::Local))
     retval = ptr;
-  else if ((iter != ld.curobj.end()) && (OBJSTATE.state == objstate::Remote))
+  else if ((iter != curobj.end()) && (OBJSTATE.state == objstate::Remote))
     remote = OBJSTATE.sent_to;
   else
     printf ("Unrecognized state in LocalDirectory::haveObject\n");
@@ -120,18 +117,17 @@ uintptr_t LocalDirectory::haveObject(uintptr_t ptr, uint32_t &remote, SimpleRunt
 
 uintptr_t LocalDirectory::transientHaveObj(uintptr_t ptr, uint32_t &remote, bool& isavail) {
 #define OBJSTATE (*iter).second
-  LocalDirectory& ld = getSystemLocalDirectory();
-  lock_guard<glock> lock(ld.Lock);
-  auto iter = ld.curobj.find(ptr);
+  lock_guard<glock> lock(Lock);
+  auto iter = curobj.find(ptr);
   uintptr_t retval = 0;
   isavail = false;
   // Returning the object even if locked as the call to acquire would fail
   // return the object even if it is not in the list
-  if ((iter == ld.curobj.end()) || (OBJSTATE.state == objstate::Local)) {
+  if ((iter == curobj.end()) || (OBJSTATE.state == objstate::Local)) {
     retval = ptr;
     isavail = true;
   }
-  else if ((iter != ld.curobj.end()) && (OBJSTATE.state == objstate::Remote))
+  else if ((iter != curobj.end()) && (OBJSTATE.state == objstate::Remote))
     remote = OBJSTATE.sent_to;
   else
     printf ("Unrecognized state in LocalDirectory::haveObject\n");
@@ -139,7 +135,7 @@ uintptr_t LocalDirectory::transientHaveObj(uintptr_t ptr, uint32_t &remote, bool
   if (retval) {
     Lockable *L = reinterpret_cast<Lockable*>(retval);
     // fails if local but locked another thread
-    if(!ld.dirAcquire(L))
+    if(!dirAcquire(L))
       retval = 0;
   }
 #undef OBJSTATE
@@ -158,17 +154,16 @@ void LocalDirectory::fetchRemoteObj(uintptr_t ptr, uint32_t remote, recvFuncTy p
 
 uintptr_t PersistentDirectory::haveObject(uintptr_t ptr, uint32_t owner) {
 #define OBJSTATE (*iter).second
-  PersistentDirectory& pd = getSystemPersistentDirectory();
-  lock_guard<glock> lock(pd.Lock);
-  auto iter = pd.perobj.find(make_pair(ptr,owner));
+  lock_guard<glock> lock(Lock);
+  auto iter = perobj.find(make_pair(ptr,owner));
   uintptr_t retval = 0;
   // add object to list if it's not already there
-  if (iter == pd.perobj.end()) {
+  if (iter == perobj.end()) {
     objstate list_obj;
     list_obj.localobj = 0;
     list_obj.requested = false;
-    pd.perobj[make_pair(ptr,owner)] = list_obj;
-    iter = pd.perobj.find(make_pair(ptr,owner));
+    perobj[make_pair(ptr,owner)] = list_obj;
+    iter = perobj.find(make_pair(ptr,owner));
   }
   retval = OBJSTATE.localobj;
 #undef OBJSTATE
@@ -180,9 +175,8 @@ void PersistentDirectory::fetchRemoteObj(uintptr_t ptr, uint32_t owner, recvFunc
   SendBuffer buf;
   uint32_t host = networkHostID;
 #define OBJSTATE (*iter).second
-  PersistentDirectory& pd = getSystemPersistentDirectory();
-  lock_guard<glock> lock(pd.Lock);
-  auto iter = pd.perobj.find(make_pair(ptr,owner));
+  lock_guard<glock> lock(Lock);
+  auto iter = perobj.find(make_pair(ptr,owner));
   // return if already requested
   if (OBJSTATE.requested) {
     return;
@@ -211,11 +205,10 @@ bool LocalDirectory::dirAcquire(Galois::Runtime::Lockable* L) {
 }
 
 void LocalDirectory::dirRelease(uintptr_t ptr) {
-  LocalDirectory& ld = getSystemLocalDirectory();
-  lock_guard<glock> lock(ld.Lock);
-  auto iter = ld.curobj.find(ptr);
+  lock_guard<glock> lock(Lock);
+  auto iter = curobj.find(ptr);
   // assert if the object is Remote
-  assert((iter == ld.curobj.end()) || ((*iter).second.state == objstate::Local));
+  assert((iter == curobj.end()) || ((*iter).second.state == objstate::Local));
   Lockable *L = reinterpret_cast<Lockable*>(ptr);
   L->Owner.unlock_and_clear();
 }
@@ -245,10 +238,9 @@ bool RemoteDirectory::dirAcquire(Galois::Runtime::Lockable* L, bool steal) {
 }
 
 void RemoteDirectory::dirRelease(uintptr_t ptr, uint32_t owner) {
-  RemoteDirectory& rd = getSystemRemoteDirectory();
-  lock_guard<glock> lock(rd.Lock);
-  auto iter = rd.curobj.find(make_pair(ptr,owner));
-  assert(iter != rd.curobj.end());
+  lock_guard<glock> lock(Lock);
+  auto iter = curobj.find(make_pair(ptr,owner));
+  assert(iter != curobj.end());
   assert((*iter).second.state == objstate::Local);
   uintptr_t retval = (*iter).second.localobj;
   Lockable *L = reinterpret_cast<Lockable*>(retval);
