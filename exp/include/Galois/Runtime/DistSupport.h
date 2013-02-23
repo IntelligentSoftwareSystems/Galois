@@ -160,6 +160,10 @@ public:
   }
   explicit operator bool() const { return ptr != 0; }
 
+  bool sameHost(const gptr& rhs) const {
+    return owner == rhs.owner;
+  }
+
   void initialize(T* p) {
     ptr = p;
     owner = ptr ? networkHostID : 0;
