@@ -80,7 +80,7 @@ class RemoteDirectory: public SimpleRuntimeContext {
     }
   };
 
-  // using RCII for locking, done to handle lock release on exceptions
+  // using RAII for locking, done to handle lock release on exceptions
   typedef Galois::Runtime::LL::SimpleLock<true> glock;
   Galois::Runtime::LL::SimpleLock<true> Lock;
   boost::unordered_map<std::pair<uintptr_t, uint32_t>, objstate, ohash> curobj;
@@ -147,7 +147,7 @@ class LocalDirectory: public SimpleRuntimeContext {
     enum ObjStates state;
   };
 
-  // using RCII for locking, done to handle lock release on exceptions
+  // using RAII for locking, done to handle lock release on exceptions
   typedef Galois::Runtime::LL::SimpleLock<true> glock;
   Galois::Runtime::LL::SimpleLock<true> Lock;
   boost::unordered_map<uintptr_t, objstate> curobj;
@@ -213,7 +213,7 @@ class PersistentDirectory: public SimpleRuntimeContext {
     }
   };
 
-  // using RCII for locking, done to handle lock release on exceptions
+  // using RAII for locking, done to handle lock release on exceptions
   typedef Galois::Runtime::LL::SimpleLock<true> glock;
   Galois::Runtime::LL::SimpleLock<true> Lock;
   boost::unordered_map<std::pair<uintptr_t, uint32_t>, objstate, ohash> perobj;

@@ -32,7 +32,7 @@
 #include <map>
 #include <iostream>
 #include <cstdio>
-
+#include <mutex>
 
 struct is_bad {
   Graphp g;
@@ -64,17 +64,22 @@ struct create_nodes {
 };
 
 // NOTE: this is required so that the find(edge) call doesn't take too long
-// HOWEVER! this solution DOESN'T WORK when multiple threads are used
-// This also CRASHES when a remote node has to be fetched
+// This CRASHES when a remote node has to be fetched
 std::map<Edge, GNode> edge_map;
 
 struct addElement {
   Graphp mesh;
+  // using RAII for locking, done to handle lock release on exceptions
+  typedef Galois::Runtime::LL::SimpleLock<true> glock;
+  Galois::Runtime::LL::SimpleLock<true> Lock;
+
   addElement() {}
   addElement(Graphp in_mesh): mesh(in_mesh) {}
 
   void operator()(GNode node, Galois::UserContext<GNode>& ctx) {
     Element& element = mesh->getData(node);
+    // need this lock to guard against multithreaded map access
+    lock_guard<glock> lock(Lock);
     for (int i = 0; i < element.numEdges(); i++) {
       Edge edge = element.getEdge(i);
       if (edge_map.find(edge) == edge_map.end()) {
