@@ -47,8 +47,20 @@ public:
   // serialization functions
   typedef int tt_has_serialize;
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+    gSerialize(s,coords[0]);
+    gSerialize(s,coords[1]);
+    gSerialize(s,coords[2]);
+    gSerialize(s,obtuse);
+    gSerialize(s,bDim);
+    gSerialize(s,id);
   }
   void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+    gDeserialize(s,coords[0]);
+    gDeserialize(s,coords[1]);
+    gDeserialize(s,coords[2]);
+    gDeserialize(s,obtuse);
+    gDeserialize(s,bDim);
+    gDeserialize(s,id);
   }
 
   // required by the new in DataLandingPad in Directory.h

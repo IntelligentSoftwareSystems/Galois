@@ -49,6 +49,22 @@ void for_each_landing_pad(Distributed::RecvBuffer& buf) {
   net.systemBarrier();
 }
 
+template<typename WLTy, typename T, typename FunctionTy>
+void for_each_local_landing_pad(Distributed::RecvBuffer& buf) {
+  //extract stuff
+  FunctionTy f;
+  gptr<T> data;
+  gDeserialize(buf,f,data);
+
+  Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
+
+  //Start locally
+  Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(*data), f, nullptr);
+
+  // place a MPI barrier here for all the hosts to synchronize
+  net.systemBarrier();
+}
+
 namespace {
 
 template<typename WLTy, typename IterTy, typename FunctionTy>
@@ -88,6 +104,31 @@ void for_each_dist(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
   net.systemBarrier();
 }
 
+template<typename WLTy, typename T, typename FunctionTy>
+void for_each_local_dist(Runtime::Distributed::gptr<T>& c, FunctionTy f, const char* loopname) {
+  // Get a handle to the network interface
+  //  Don't move as networkHostNum and networkHostID have to be initialized first
+  Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
+
+  //fast path for non-distributed
+  if (Distributed::networkHostNum == 1) {
+    for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(*c),f,loopname);
+    return;
+  }
+
+  for (unsigned i = 1; i < Distributed::networkHostNum; i++) {
+    Distributed::SendBuffer buf;
+    // serialize function and data
+    gSerialize(buf,f,c);
+    //send data
+    net.sendMessage (i, &for_each_local_landing_pad<WLTy,T,FunctionTy>, buf);
+  }
+  //Start locally
+  for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(*c), f, loopname);
+
+  // place a MPI barrier here for all the hosts to synchronize
+  net.systemBarrier();
+}
 
 } // anon
 } // Runtime

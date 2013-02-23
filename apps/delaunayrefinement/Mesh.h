@@ -396,8 +396,7 @@ private:
     Galois::for_each<>(elements.begin(), elements.end(), create_nodes(mesh));
 
     std::map<Edge, GNode> edge_map;
-    for (Graph::iterator ii = mesh->begin(), ee = mesh->end();
-	 ii != ee; ++ii)
+    for (Graph::iterator ii = mesh->begin(), ee = mesh->end(); ii != ee; ++ii)
       addElement(mesh, *ii, edge_map);
   }
 

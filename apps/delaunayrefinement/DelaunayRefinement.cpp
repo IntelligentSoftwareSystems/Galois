@@ -54,11 +54,12 @@ static const char* url = "delaunay_mesh_refinement";
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 
 struct Process {
-  Graphp graph;
+  Graphp   graph;
 
   typedef int tt_needs_per_iter_alloc;
 
   Process(Graphp g) :graph(g) {}
+  Process() {}
 
   void operator()(GNode item, Galois::UserContext<GNode>& ctx) {
     if (!graph->containsNode(item))
@@ -70,24 +71,46 @@ struct Process {
     cav.computePost();
     cav.update(item, ctx);
   }
+
+  // serialization functions
+  typedef int tt_has_serialize;
+  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+    gSerialize(s,graph);
+  }
+  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+    gDeserialize(s,graph);
+  }
 };
 
 Galois::InsertBag<GNode> wl;
 
 struct Preprocess {
-  Graphp graph;
+  Graphp   graph;
 
   Preprocess(Graphp g) :graph(g) {}
+  Preprocess() {}
 
-  void operator()(GNode item) const {
+  void operator()(GNode item, Galois::UserContext<GNode>& ctx) const {
     if (graph->getData(item).isBad())
       wl.push(item);
+  }
+
+  // serialization functions
+  typedef int tt_has_serialize;
+  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+    gSerialize(s,graph);
+  }
+  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+    gDeserialize(s,graph);
   }
 };
 
 int main(int argc, char** argv) {
   Galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
+
+  // check the host id and initialise the network
+  Galois::Runtime::Distributed::networkStart();
 
   Graphp graph(new Graph());
   {
@@ -111,7 +134,7 @@ int main(int argc, char** argv) {
   Galois::StatTimer T;
   T.start();
 
-  Galois::do_all_local(*graph, Preprocess(graph));
+  Galois::for_each_local(graph, Preprocess(graph));
 
   Galois::Statistic("MeminfoMid", Galois::Runtime::MM::pageAllocInfo());
   
@@ -122,7 +145,7 @@ int main(int argc, char** argv) {
   typedef LocalQueues<dChunkedLIFO<256>, ChunkedLIFO<256> > BQ;
   typedef ChunkedAdaptor<false,32> CA;
   
-  Galois::for_each_local<CA>(wl, Process(graph));
+  Galois::for_each_local_nodist<CA>(wl, Process(graph));
   Trefine.stop();
   T.stop();
 
@@ -145,6 +168,9 @@ int main(int argc, char** argv) {
     }
     std::cout << "Refinement OK\n";
   }
+
+  // master_terminate();
+  Galois::Runtime::Distributed::networkTerminate();
 
   return 0;
 }

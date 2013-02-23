@@ -26,6 +26,7 @@
 
 #include <ostream>
 #include <cmath>
+#include "Galois/Runtime/Serialize.h"
 
 class Tuple {
   double _t[2];
@@ -38,6 +39,17 @@ public:
   Tuple() {};
   ~Tuple() {};
   
+  // serialization functions
+  typedef int tt_has_serialize;
+  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+    gSerialize(s,_t[0]);
+    gSerialize(s,_t[1]);
+  }
+  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+    gDeserialize(s,_t[0]);
+    gDeserialize(s,_t[1]);
+  }
+
   bool operator==(const Tuple& rhs) const {
     for (int x = 0; x < 2; ++x) {
       if (_t[x] != rhs._t[x]) return false;

@@ -128,6 +128,15 @@ void for_each(InitItemTy i, FunctionTy fn, const char* loopname = 0) {
  */
 template<typename WLTy, typename ConTy, typename FunctionTy>
 void for_each_local(ConTy& c, FunctionTy fn, const char* loopname = 0) {
+#if GALOIS_USE_EXP
+  Galois::Runtime::for_each_local_dist<WLTy>(c, fn, loopname);
+#else
+  Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(c), fn, loopname);
+#endif
+}
+
+template<typename WLTy, typename ConTy, typename FunctionTy>
+void for_each_local_nodist(ConTy& c, FunctionTy fn, const char* loopname = 0) {
   Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(c), fn, loopname);
 }
 

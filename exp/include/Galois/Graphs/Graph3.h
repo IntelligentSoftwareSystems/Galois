@@ -366,7 +366,7 @@ public:
     }
   }
   
-  class iterator : public std::iterator<std::forward_iterator_tag, NodeHandle> {
+  class iterator : public std::iterator<std::forward_iterator_tag, const NodeHandle> {
     NodeHandle n;
     Galois::Runtime::Distributed::gptr<SubGraphState> s;
     void next() {
@@ -382,8 +382,8 @@ public:
     }
 
   public:
-    using typename std::iterator<std::forward_iterator_tag, NodeHandle>::pointer;
-    using typename std::iterator<std::forward_iterator_tag, NodeHandle>::reference;
+    using typename std::iterator<std::forward_iterator_tag, const NodeHandle>::pointer;
+    using typename std::iterator<std::forward_iterator_tag, const NodeHandle>::reference;
 
   iterator() :n(), s() {}
     explicit iterator(const Galois::Runtime::Distributed::gptr<SubGraphState> ms) :n(ms->head), s(ms) {
@@ -397,7 +397,7 @@ public:
       if (!n) s.initialize(nullptr);
     }
 
-    reference operator*() { return n; }
+    reference operator*() const { return n; }
     pointer operator->() const { return &n; }
     iterator& operator++() { next(); return *this; }
     iterator operator++(int) { iterator tmp(*this); next(); return tmp; }
