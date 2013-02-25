@@ -63,44 +63,6 @@ struct create_nodes {
   }
 };
 
-// NOTE: this is required so that the find(edge) call doesn't take too long
-// This CRASHES when a remote node has to be fetched
-std::map<Edge, GNode> edge_map;
-
-struct addElement {
-  Graphp mesh;
-  // using RAII for locking, done to handle lock release on exceptions
-  typedef Galois::Runtime::LL::SimpleLock<true> glock;
-  Galois::Runtime::LL::SimpleLock<true> Lock;
-
-  addElement() {}
-  addElement(Graphp in_mesh): mesh(in_mesh) {}
-
-  void operator()(GNode node, Galois::UserContext<GNode>& ctx) {
-    Element& element = mesh->getData(node);
-    // need this lock to guard against multithreaded map access
-    lock_guard<glock> lock(Lock);
-    for (int i = 0; i < element.numEdges(); i++) {
-      Edge edge = element.getEdge(i);
-      if (edge_map.find(edge) == edge_map.end()) {
-        edge_map[edge] = node;
-      } else {
-        mesh->addEdge(node, edge_map[edge]);
-        edge_map.erase(edge);
-      }
-    }
-  }
-
-  // serialization functions
-  typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-    gSerialize(s,mesh);
-  }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-    gDeserialize(s,mesh);
-  }
-};
-
 struct centerXCmp {
   bool operator()(const Element& lhs, const Element& rhs) const {
     //return lhs.getCenter() < rhs.getCenter();
@@ -399,7 +361,20 @@ private:
     fclose(pFile);
     fclose(oFile);
   }
-  
+
+  void addElement(Graphp mesh, GNode node, std::map<Edge, GNode>& edge_map) {
+    Element& element = mesh->getData(node);
+    for (int i = 0; i < element.numEdges(); i++) {
+      Edge edge = element.getEdge(i);
+      if (edge_map.find(edge) == edge_map.end()) {
+        edge_map[edge] = node;
+      } else {
+        mesh->addEdge(node, edge_map[edge]);
+        edge_map.erase(edge);
+      }
+    }
+  }
+
   template<typename Iter>
   void divide(const Iter& b, const Iter& e) {
     if (std::distance(b,e) > 16) {
@@ -420,10 +395,9 @@ private:
 
     Galois::for_each<>(elements.begin(), elements.end(), create_nodes(mesh));
 
-    // parallelize the addition of edges, this really slow otherwise as all the
-    // remote nodes have to be bought to the master.
-    // NOTE: check comments in the operator for issues due to using a map
-    Galois::for_each_local<>(mesh, addElement(mesh));
+    std::map<Edge, GNode> edge_map;
+    for (Graph::iterator ii = mesh->begin(), ee = mesh->end(); ii != ee; ++ii)
+      addElement(mesh, *ii, edge_map);
   }
 
 public:
