@@ -160,6 +160,10 @@ public:
   }
   explicit operator bool() const { return ptr != 0; }
 
+  bool isLocal() const {
+    return owner == Galois::Runtime::Distributed::networkHostID;
+  }
+
   bool sameHost(const gptr& rhs) const {
     return owner == rhs.owner;
   }
