@@ -33,6 +33,10 @@
 #include "Galois/Runtime/ll/gio.h"
 #include "llvm/Support/CommandLine.h"
 
+#ifdef GALOIS_USE_EXP
+#include "Galois/Runtime/Network.h"
+#endif
+
 #include <sstream>
 
 //! standard global options to the benchmarks
@@ -42,24 +46,32 @@ static llvm::cl::opt<int> numThreads("t", llvm::cl::desc("Number of threads"), l
 //! initialize lonestar benchmark
 static void LonestarStart(int argc, char** argv, const char* app, const char* desc = 0, const char* url = 0) {
   using namespace Galois::Runtime::LL;
+  using namespace Galois::Runtime::Distributed;
+  // initialize the network layer
+  NetworkInterface& net = getSystemNetworkInterface();
+  net.handleReceives();
 
-  gPrint("Galois Benchmark Suite v" GALOIS_VERSION_STRING);
-  gPrint(" (r%d)\n", SVNVERSION);
-  gPrint("Copyright (C) " GALOIS_COPYRIGHT_YEAR_STRING " The University of Texas at Austin\n");
-  gPrint("http://iss.ices.utexas.edu/galois/\n\n");
-  gPrint("application: %s\n", app);
-  gPrint("%s\n", desc ? desc : "");
-  if (url) {
-    gPrint("http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/%s\n", url);
+  // display the name only if master host
+  if (networkHostID == 0) {
+    gPrint("Galois Benchmark Suite v" GALOIS_VERSION_STRING);
+    gPrint(" (r%d)\n", SVNVERSION);
+    gPrint("Copyright (C) " GALOIS_COPYRIGHT_YEAR_STRING " The University of Texas at Austin\n");
+    gPrint("http://iss.ices.utexas.edu/galois/\n\n");
+    gPrint("application: %s\n", app);
+    gPrint("%s\n", desc ? desc : "");
+    if (url) {
+      gPrint("http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/%s\n", url);
+    }
+
+    std::ostringstream cmdout;
+    for (int i = 0; i < argc; ++i) {
+      cmdout << argv[i];
+      if (i != argc - 1)
+        cmdout << " ";
+    }
+    gInfo("CommandLine %s", cmdout.str().c_str());
   }
 
-  std::ostringstream cmdout;
-  for (int i = 0; i < argc; ++i) {
-    cmdout << argv[i];
-    if (i != argc - 1)
-      cmdout << " ";
-  }
-  gInfo("CommandLine %s", cmdout.str().c_str());
   char name[256];
   gethostname(name, 256);
   gInfo("Hostname %s", name);
