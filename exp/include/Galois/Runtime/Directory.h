@@ -346,7 +346,7 @@ void RemoteDirectory::remoteReqLandingPad(RecvBuffer &buf) {
  */
     // if eligible and acquire lock so that no iteration begins using the object
     // disable stealing so that atleast one iteration succeeds
-    if (flag && rd.dirAcquire(L,false)) {
+    if (flag && rd.dirAcquire(L,true)) {
       // object should be sent to the remote host
       SendBuffer sbuf;
       size_t size = sizeof(*data);

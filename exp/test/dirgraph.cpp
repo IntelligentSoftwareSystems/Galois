@@ -43,6 +43,28 @@ struct op {
 
 };
 
+struct checking {
+  gptr<G> graph;
+
+  checking(gptr<G> g) :graph(g) {}
+  checking() {}
+
+  template<typename Context>
+  void operator()(G::NodeHandle n, const Context& cnx) {
+    printf("value: %d\n", graph->getData(n));
+  }
+
+  // serialization functions
+  typedef int tt_has_serialize;
+  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+    gSerialize(s,graph);
+  }
+  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+    gDeserialize(s,graph);
+  }
+
+};
+
 int main(int argc, char** argv) {
 
   LonestarStart(argc, argv, nullptr, nullptr, nullptr);
@@ -79,6 +101,8 @@ int main(int argc, char** argv) {
   if (Gr->size() != 29) {
     printf ("ERROR in the no of nodes!\n");
   }
+
+  Galois::for_each_local(Gr,checking(Gr));
 
   // master_terminate();
   Galois::Runtime::Distributed::networkTerminate();
