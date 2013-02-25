@@ -29,6 +29,7 @@ namespace LL {
 
 //PLEASE document all enviroment variables here;
 //ThreadPool_pthread.cpp: "GALOIS_DO_NOT_BIND_MAIN_THREAD"
+//ThreadPool_pthread.cpp: "GALOIS_DO_NOT_BIND_THREADS"
 //HWTopoLinux.cpp: "GALOIS_DEBUG_TOPO"
 //Sampling.cpp: "GALOIS_EXIT_BEFORE_SAMPLING"
 //Sampling.cpp: "GALOIS_EXIT_AFTER_SAMPLING"
