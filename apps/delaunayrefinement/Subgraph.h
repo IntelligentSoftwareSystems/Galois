@@ -39,6 +39,11 @@ typedef Galois::Graph::ThirdGraph<Element,void,Galois::Graph::EdgeDirection::Un>
 typedef Graph::NodeHandle GNode;
 typedef Galois::Runtime::Distributed::gptr<Graph> Graphp;
 
+// Worklist Graph nodes
+typedef Galois::Graph::ThirdGraph<GNode,void,Galois::Graph::EdgeDirection::Un> WLGraph;
+typedef WLGraph::NodeHandle WLGNode;
+typedef Galois::Runtime::Distributed::gptr<WLGraph> WLGraphp;
+
 struct EdgeTuple {
   GNode src;
   GNode dst;

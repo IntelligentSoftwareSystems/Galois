@@ -160,7 +160,7 @@ public:
     }
   }
 
-  void update(GNode node, Galois::UserContext<GNode>& ctx) {
+  void update(GNode node, WLGraphp wlgraph, Galois::UserContext<WLGNode>& ctx) {
     for (PreGraph::iterator ii = pre.begin(), ee = pre.end(); ii != ee; ++ii) 
       graph->removeNode(*ii);
     
@@ -170,7 +170,9 @@ public:
       graph->addNode(n);
       Element& element = graph->getData(n);
       if (element.isBad()) {
-        ctx.push(n);
+        WLGNode elem = wlgraph->createNode(n);
+        wlgraph->addNode(elem);
+        ctx.push(elem);
       }
     }
     
@@ -180,7 +182,10 @@ public:
     }
 
     if (graph->containsNode(node)) {
-      ctx.push(node);
+      //ctx.push(node);
+      WLGNode n = wlgraph->createNode(node);
+      wlgraph->addNode(n);
+      ctx.push(n);
     }
   }
 };

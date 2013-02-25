@@ -135,11 +135,6 @@ void for_each_local(ConTy& c, FunctionTy fn, const char* loopname = 0) {
 #endif
 }
 
-template<typename WLTy, typename ConTy, typename FunctionTy>
-void for_each_local_nodist(ConTy& c, FunctionTy fn, const char* loopname = 0) {
-  Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(c), fn, loopname);
-}
-
 /**
  * Galois unordered set iterator with locality-aware container and default worklist policy.
  * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is an element of c and T 
