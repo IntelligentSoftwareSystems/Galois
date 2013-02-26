@@ -59,7 +59,7 @@ struct Process {
 
   typedef int tt_needs_per_iter_alloc;
 
-  Process(Graphp g,WLGraphp wlg) :graph(g),wlgraph(wlg) {}
+  Process(Graphp g, WLGraphp wlg): graph(g), wlgraph(wlg) {}
   Process() {}
 
   void operator()(WLGNode item, Galois::UserContext<WLGNode>& ctx) {
@@ -90,7 +90,7 @@ struct Preprocess {
   Graphp   graph;
   WLGraphp wlgraph;
 
-  Preprocess(Graphp g,WLGraphp wlg) :graph(g), wlgraph(wlg) {}
+  Preprocess(Graphp g, WLGraphp wlg): graph(g), wlgraph(wlg) {}
   Preprocess() {}
 
   void operator()(GNode item, Galois::UserContext<GNode>& ctx) const {
@@ -109,26 +109,6 @@ struct Preprocess {
   void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
     gDeserialize(s,graph);
     gDeserialize(s,wlgraph);
-  }
-};
-
-struct Prefetch {
-  Graphp   graph;
-
-  Prefetch(Graphp g) :graph(g) {}
-  Prefetch() {}
-
-  void operator()(GNode item, Galois::UserContext<GNode>& ctx) const {
-    graph->getData(item).isBad();
-  }
-
-  // serialization functions
-  typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-    gSerialize(s,graph);
-  }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-    gDeserialize(s,graph);
   }
 };
 
@@ -151,15 +131,15 @@ int main(int argc, char** argv) {
     }
   }
 
-  std::cout << "configuration: " << std::distance(graph->begin(), graph->end())
-	    << " total triangles, " << std::count_if(graph->begin(), graph->end(), is_bad(graph)) << " bad triangles\n";
+  //std::cout << "configuration: " << std::distance(graph->begin(), graph->end())
+	   // << " total triangles, " << std::count_if(graph->begin(), graph->end(), is_bad(graph)) << " bad triangles\n";
+
+  std::cout << "configuration: " << ThirdGraphSize(graph) << " total triangles" << std::endl;
+  //std::cout << "configuration: " << graph->size() << " total triangles" << std::endl;
 
   Galois::Statistic("MeminfoPre1", Galois::Runtime::MM::pageAllocInfo());
   //Galois::preAlloc(15 * numThreads + Galois::Runtime::MM::pageAllocInfo() * 10);
   Galois::Statistic("MeminfoPre2", Galois::Runtime::MM::pageAllocInfo());
-
-  // prefetch the nodes to the respective hosts
-  Galois::for_each_local(graph, Prefetch(graph));
 
   WLGraphp gwl(new WLGraph());
 
@@ -181,7 +161,7 @@ int main(int argc, char** argv) {
   Trefine.stop();
   T.stop();
 
-  //cout << "Size after refinement: " << graph->size() << endl;
+  std::cout << "Size after refinement: " << ThirdGraphSize(graph) << std::endl;
   
   Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
   

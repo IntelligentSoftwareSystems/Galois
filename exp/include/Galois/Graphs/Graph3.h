@@ -487,16 +487,16 @@ public:
     return N->getActive();
   }
 
-  unsigned int size() {
+  unsigned size() {
     return std::distance(begin(), end());
   }
 
   // assuming the constructor runs only on the main thread
   ThirdGraph() {
-    unsigned int numThreads = Runtime::LL::getMaxThreads();
+    unsigned numThreads = Runtime::LL::getMaxThreads();
     SubGraphState* first = localState.getLocal(0);
     // initialize the linked list of the local nodes
-    for (unsigned int i = 0; i < numThreads; i++) {
+    for (unsigned i = 0; i < numThreads; i++) {
       SubGraphState* lState = localState.getLocal(i);
       lState->master.initialize(first);
       if (i != (numThreads-1))
@@ -515,12 +515,12 @@ public:
     lStatePtr.transientRelease();
   }
   void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-    unsigned int numThreads = Runtime::LL::getMaxThreads();
+    unsigned numThreads = Runtime::LL::getMaxThreads();
     //This constructs the local node of the distributed graph
     gptr<SubGraphState> lStatePtr(localState.getLocal());
     SubGraphState* lState = lStatePtr.transientAcquire();
     gDeserialize(s,lState->master);
-    for (unsigned int i = 0; i < numThreads; i++) {
+    for (unsigned i = 0; i < numThreads; i++) {
       if (i == Runtime::LL::getTID())
         continue;
       localState.getLocal(i)->master = lState->master;
@@ -539,6 +539,64 @@ public:
   
 };
 
+// used to find the size of the graph
+struct R : public Galois::Runtime::Lockable {
+  unsigned i;
+
+  R(): i(0) {}
+
+  void add(unsigned v) {
+    i += v;
+    return;
+  }
+
+  typedef int tt_dir_blocking;
+
+  // serialization functions
+  typedef int tt_has_serialize;
+  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+    gSerialize(s,i);
+  }
+  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+    gDeserialize(s,i);
+  }
+};
+
+template <typename GTy>
+struct f {
+  GTy graph;
+  gptr<R> r;
+
+  f(const gptr<R>& p, GTy g): graph(g), r(p) {}
+  f() {}
+
+  template<typename Context>
+  void operator()(unsigned x, Context& cnx) const {
+    unsigned size = std::distance(graph->local_begin(),graph->local_end());
+    r->add(size);
+  }
+
+  // serialization functions
+  typedef int tt_has_serialize;
+  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+    gSerialize(s,r);
+    gSerialize(s,graph);
+  }
+  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+    gDeserialize(s,r);
+    gDeserialize(s,graph);
+  }
+};
+
+template <typename GraphTy>
+unsigned ThirdGraphSize(GraphTy g) {
+  // should only be called from outside the for_each
+  assert(!Galois::Runtime::inGaloisForEach);
+  R tmp;
+  gptr<R> r(&tmp);
+  Galois::on_each(f<GraphTy>(r,g));
+  return r->i;
+}
 
 } //namespace Graph
 } //namespace Galois
