@@ -189,7 +189,11 @@ FunctionTy do_all_local(ConTy& c, FunctionTy fn, const char* loopname = 0) {
  */
 template<typename FunctionTy>
 static inline void on_each(FunctionTy fn, const char* loopname = 0) {
+#if GALOIS_USE_EXP
+  Galois::Runtime::on_each_impl_dist(fn, loopname);
+#else
   Galois::Runtime::on_each_impl(fn, loopname);
+#endif
 }
 
 /**
