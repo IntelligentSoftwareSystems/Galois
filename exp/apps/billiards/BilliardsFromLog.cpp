@@ -179,7 +179,7 @@ int main (int argc, char* argv[]) {
   // dummy simulation loop;
 
   double total_time = 0.0;
-  double delta = 0.5;
+  double delta = 0.1;
 
   while (!updates.empty ()) {
 
@@ -206,10 +206,38 @@ int main (int argc, char* argv[]) {
     } 
 
 
-    std::cout << "advancing all balls to: " << total_time << std::endl;
+    std::cout << "--- advancing all balls to: " << total_time << std::endl;
     for (Ball& b: balls) {
       b.update (b.vel (), total_time);
     }
+
+    // check the state of the balls
+    for (size_t i = 0; i < balls.size (); ++i) {
+      const Ball& b = balls[i];
+      const Vec2& p = b.pos ();
+
+      // TODO: include radius for more precise check
+      if (p.getX() < 0.0 || p.getX () > conf.length) {
+        std::cerr << "!!!  ERROR: Ball out of X lim: " << b.str () << std::endl;
+      }
+
+      // TODO: include radius for more precise check
+      if (p.getY () < 0.0 || p.getY () > conf.width) {
+        std::cerr << "!!!  ERROR: Ball out of Y lim: " << b.str () << std::endl;
+      }
+
+      for (size_t j = i + 1; j < balls.size (); ++i) {
+        const Ball& othB = balls[j];
+
+        double d = p.dist (othB.pos ());
+        if (d < (2 * conf.ball_radius)) {
+          std::cerr << "!!!  ERROR: Balls overlap: ";
+          std::cerr << b.str () << "    ";
+          std::cerr << othB.str () << std::endl;
+        }
+      }
+
+    } // end outer for
 
 
   }

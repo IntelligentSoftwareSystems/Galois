@@ -99,10 +99,14 @@ public:
 class Scene {
   Balls balls;
   qglviewer::Vec sceneDim;
+  std::vector<GLdouble> cushions;
   std::string configFilename;
   std::string eventLogFilename;
   float currentTime;
   float deltaTime;
+
+  void initCushions(double length, double width);
+  void drawCushions (void);
 
   void readConfig();
   void readLog();
@@ -111,7 +115,7 @@ public:
   Scene(const std::string& c, const std::string& e): configFilename(c), eventLogFilename(e), currentTime(0.0) { }
 
   //! Initializes scene; returns dimensions of scene
-  qglviewer::Vec init(float dt = 0.01);
+  qglviewer::Vec init(float dt = 0.1);
   void animate();
   void draw(Viewer* v);
   float time() { return currentTime; }

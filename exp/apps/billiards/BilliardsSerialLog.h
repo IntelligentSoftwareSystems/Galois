@@ -23,7 +23,7 @@ public:
     fprintf (simLog, "ball.id, time, ball.pos.x, ball.pos.y, ball.vel.x, ball.vel.y\n");
   }
 
-  void updateBall (FILE* simLog, const Ball& b, double time) {
+  void updateLog (FILE* simLog, const Ball& b, double time) {
     assert (FPutils::almostEqual (b.time (), time) && "time stamp mismatch");
     fprintf (simLog, "%d, %e, %e, %e, %e, %e\n", 
         b.getID (), time, b.pos ().getX (), b.pos ().getY (), b.vel ().getX (), b.vel ().getY ());
@@ -40,7 +40,7 @@ public:
     printLogHeader (simLog);
     
     for (unsigned i = 0; i < table.getNumBalls (); ++i) {
-      updateBall (simLog, table.getBallByID (i), 0.0);
+      updateLog (simLog, table.getBallByID (i), 0.0);
     }
 
 
@@ -55,6 +55,7 @@ public:
 
     size_t iter = 0;
     std::vector<Event> addList;
+    // double simTime = 0.0;
 
     while (!pq.empty ()) {
 
@@ -65,8 +66,29 @@ public:
         std::cout << "Processing event=" << e.str () << std::endl;
       }
 
+      // // TODO: remove
+      // if (e.getKind () == Event::CUSHION_COLLISION) {
+        // std::cout << "Before cushion collision: " << e.getBall ().str () << std::endl;
+      // }
+      // if (e.getKind () == Event::BALL_COLLISION) {
+        // std::cout << "Before ball collision: " << e.getBall ().str ()
+          // << "     " << e.getOtherBall ().str () << std::endl;
+      // }
+
+      // check staleness before simulating
+      const bool notStale = e.notStale ();
+
       addList.clear ();
       e.simulate (addList, table, endtime);
+
+      // // TODO: remove
+      // if (e.getKind () == Event::CUSHION_COLLISION) {
+        // std::cout << "After cushion collision: " << e.getBall ().str () << std::endl;
+      // }
+      // if (e.getKind () == Event::BALL_COLLISION) {
+        // std::cout << "After ball collision: " << e.getBall ().str ()
+          // << "     " << e.getOtherBall ().str () << std::endl;
+      // }
 
       // may need to add new events for balls in stale events
       for (std::vector<Event>::iterator i = addList.begin (), ei = addList.end ();
@@ -79,27 +101,35 @@ public:
         }
       }
 
+      if (notStale) {
+        // update after simulate
+        assert ((e.getKind () == Event::BALL_COLLISION || e.getKind () == Event::CUSHION_COLLISION)
+            && "unsupported event kind");
+
+        assert (&(e.getBall ()) != NULL);
+        updateLog (simLog, e.getBall (), e.getTime ());
+
+        if (e.getKind () == Event::BALL_COLLISION) {
+
+          assert (&(e.getOtherBall ()) != NULL);
+          updateLog (simLog, e.getOtherBall (), e.getTime ());
+        } 
+
+      } // end if notStale
+
       if (enablePrints) {
         table.printState (std::cout);
       }
 
-      if (e.notStale ()) {
-        // update after simulate
-        if (e.getKind () == Event::CUSHION_COLLISION) {
-          assert (&(e.getBall ()) != NULL);
-          updateBall (simLog, e.getBall (), e.getTime ());
+      // // update all the balls to latest simulation time
+      // if (e.getTime () > simTime) {
+        // simTime = e.getTime ();
+        // 
+        // table.advance (simTime);
+// 
+        // table.check ();
+      // }
 
-        } else if (e.getKind () == Event::BALL_COLLISION) {
-
-          assert (&(e.getOtherBall ()) != NULL);
-          updateBall (simLog, e.getOtherBall (), e.getTime ());
-
-        } else {
-          assert (false && "unsupported event");
-          abort ();
-        }
-
-      } // end if notStale
 
       ++iter;
     }

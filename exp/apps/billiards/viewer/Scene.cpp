@@ -125,8 +125,8 @@ void Balls::init(size_t numBalls, float ballRadius) {
   balls.resize(numBalls);
   colors.resize(numBalls * 3);
   auto c = colors.begin();
-  for (int i = 0; i < numBalls; ++i) {
-    for (int k = 0; k < 3; ++k)
+  for (size_t i = 0; i < numBalls; ++i) {
+    for (size_t k = 0; k < 3; ++k)
       *c++ = rand() / static_cast<float>(RAND_MAX);
   }
 }
@@ -150,7 +150,7 @@ void Balls::draw(Viewer* v) {
   for (Ball& b : balls) {
     qglviewer::Vec screen = proj.project(b.pos);
     //qglviewer::Vec screen = v->camera()->projectedCoordinatesOf(b.pos);
-    v->drawText(screen.x, screen.y, QString::number(index++));
+    // v->drawText(screen.x, screen.y, QString::number(index++));
   }
   glEnable(GL_LIGHTING);
 }
@@ -217,6 +217,29 @@ void Balls::Lines::draw() {
   glEnable(GL_LIGHTING);
 }
 
+void Scene::initCushions (double length, double width) {
+  cushions = {
+      0.0, 0.0,
+      0.0, width,
+      length, width,
+      length, 0.0,
+      0.0, 0.0
+
+  };
+}
+
+// TODO: anti-aliasing for lines
+void Scene::drawCushions (void) {
+  glDisable(GL_LIGHTING);
+  glColor3f(1.0f, 1.0f, 1.0f);
+  glEnableClientState(GL_VERTEX_ARRAY);
+  glVertexPointer(2, GL_DOUBLE, 0, &cushions[0]);
+  glDrawArrays(GL_LINE_STRIP, 0, cushions.size ()/2);
+  glDisableClientState(GL_VERTEX_ARRAY);
+  glEnable(GL_LIGHTING);
+
+}
+
 // -----------------------------------------------
 // Scene
 // -----------------------------------------------
@@ -237,6 +260,7 @@ void Scene::readConfig() {
 
   sceneDim[0] = length;
   sceneDim[1] = width;
+  initCushions(length, width);
   balls.init(numBalls, ballRadius);
 }
 
@@ -272,6 +296,7 @@ qglviewer::Vec Scene::init(float dt) {
 }
 
 void Scene::draw(Viewer* v) {
+  drawCushions ();
   balls.draw(v);
 }
 
