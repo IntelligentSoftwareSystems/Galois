@@ -370,14 +370,14 @@ public:
     NodeHandle n;
     Galois::Runtime::Distributed::gptr<SubGraphState> s;
     void next() {
-      n = n->getNextNode();
-      while (!n && s->next) {
-        s = s->next;
-        n = s->head;
-      }
       // skip node if not active!
-      if (n && !(n->getActive()))
-        next();
+      do {
+        n = n->getNextNode();
+        while (!n && s->next) {
+          s = s->next;
+          n = s->head;
+        }
+      } while (n && !(n->getActive()));
       if (!n) s.initialize(nullptr);
     }
 
@@ -418,8 +418,8 @@ public:
     void next() {
       n = n->getNextNode();
       // skip node if not active!
-      if (n && !n->getActive())
-        next();
+      while (n && !n->getActive())
+        n = n->getNextNode();
     }
   public:
     explicit local_iterator(NodeHandle N) :n(N) {}
