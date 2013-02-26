@@ -112,6 +112,26 @@ struct Preprocess {
   }
 };
 
+struct Prefetch {
+  Graphp   graph;
+
+  Prefetch(Graphp g) :graph(g) {}
+  Prefetch() {}
+
+  void operator()(GNode item, Galois::UserContext<GNode>& ctx) const {
+    graph->getData(item).isBad();
+  }
+
+  // serialization functions
+  typedef int tt_has_serialize;
+  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+    gSerialize(s,graph);
+  }
+  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+    gDeserialize(s,graph);
+  }
+};
+
 int main(int argc, char** argv) {
   Galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
@@ -135,8 +155,11 @@ int main(int argc, char** argv) {
 	    << " total triangles, " << std::count_if(graph->begin(), graph->end(), is_bad(graph)) << " bad triangles\n";
 
   Galois::Statistic("MeminfoPre1", Galois::Runtime::MM::pageAllocInfo());
-  Galois::preAlloc(15 * numThreads + Galois::Runtime::MM::pageAllocInfo() * 10);
+  //Galois::preAlloc(15 * numThreads + Galois::Runtime::MM::pageAllocInfo() * 10);
   Galois::Statistic("MeminfoPre2", Galois::Runtime::MM::pageAllocInfo());
+
+  // prefetch the nodes to the respective hosts
+  Galois::for_each_local(graph, Prefetch(graph));
 
   WLGraphp gwl(new WLGraph());
 
@@ -158,7 +181,7 @@ int main(int argc, char** argv) {
   Trefine.stop();
   T.stop();
 
-  cout << "Size after refinement: " << graph->size() << endl;
+  //cout << "Size after refinement: " << graph->size() << endl;
   
   Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
   
