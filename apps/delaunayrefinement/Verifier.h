@@ -151,9 +151,8 @@ class Verifier {
 
 public:
   bool verify(Graphp g) {
-    return Galois::ParallelSTL::find_if(g->begin(), g->end(), inconsistent(g)) == g->end()
-      && Galois::ParallelSTL::find_if(g->begin(), g->end(), not_delaunay(g)) == g->end()
-      && checkReachability(g);
+    return checkReachability(g) && !Galois::ParallelSTL::count_if(g->begin(), g->end(), inconsistent(g))
+      && !Galois::ParallelSTL::count_if(g->begin(), g->end(), not_delaunay(g));
   }
 };
 
