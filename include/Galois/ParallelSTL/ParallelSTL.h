@@ -29,6 +29,10 @@
 #include "Galois/Runtime/ParallelWork.h"
 #include "Galois/Runtime/DoAll.h"
 
+#ifdef GALOIS_USE_EXP
+#include "Galois/Runtime/ParallelWorkDistributed.h"
+#endif
+
 namespace Galois {
 //! Parallel versions of STL library algorithms.
 namespace ParallelSTL {
@@ -56,6 +60,20 @@ ptrdiff_t count_if(InputIterator first, InputIterator last, Predicate pred)
 {
   return Galois::Runtime::do_all_impl(Galois::Runtime::makeStandardRange(first, last),
       count_if_helper<Predicate>(pred), count_if_reducer(), true).ret;
+}
+
+template<typename ConTy, class Predicate>
+ptrdiff_t count_if_local(ConTy& c, Predicate pred)
+{
+#if GALOIS_USE_EXP
+  count_if_R r;
+  Galois::Runtime::do_all_impl_dist(c, count_if_helper_dist<Predicate>(pred),
+                                              count_if_reducer_dist(&r), true);
+  return r.i;
+#else
+  return Galois::Runtime::do_all_impl(Galois::Runtime::makeLocalRange(c),
+               count_if_helper<Predicate>(pred), count_if_reducer(), true).ret;
+#endif
 }
 
 template<typename InputIterator, class Predicate>

@@ -598,5 +598,26 @@ unsigned ThirdGraphSize(GraphTy g) {
   return r->i;
 }
 
+template <typename GraphTy>
+struct ThirdGraph_for_size {
+  ThirdGraph_for_size() {}
+  bool operator()(typename GraphTy::element_type::NodeHandle n) const {
+    return true;
+  }
+  // serialization functions
+  typedef int tt_has_serialize;
+  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+  }
+  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+  }
+};
+
+template <typename GraphTy>
+ptrdiff_t NThirdGraphSize(GraphTy g) {
+  // should only be called from outside the for_each
+  assert(!Galois::Runtime::inGaloisForEach);
+  return Galois::ParallelSTL::count_if_local(g,ThirdGraph_for_size<GraphTy>());
+}
+
 } //namespace Graph
 } //namespace Galois
