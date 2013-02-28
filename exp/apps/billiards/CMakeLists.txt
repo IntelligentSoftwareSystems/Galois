@@ -8,8 +8,4 @@ app (BilliardsPOsortedSerial BilliardsPOsortedSerial.cpp ${Sources})
 
 app (BilliardsPOunsorted BilliardsPOunsorted.cpp ${Sources})
 app (BilliardsPOsortedVec BilliardsPOsortedVec.cpp ${Sources})
-
-find_package(QGLViewer)
-if (QGLVIEWER_FOUND)
-  add_subdirectory(viewer)
-endif()
+add_subdirectory(viewer)
