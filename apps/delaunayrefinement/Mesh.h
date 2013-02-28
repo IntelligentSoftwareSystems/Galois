@@ -36,9 +36,18 @@
 
 struct is_bad {
   Graphp g;
+  is_bad() {}
   is_bad(Graphp _g): g(_g) {}
   bool operator()(const GNode& n) const {
     return g->getData(n).isBad();
+  }
+  // serialization functions
+  typedef int tt_has_serialize;
+  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+    gSerialize(s,g);
+  }
+  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+    gDeserialize(s,g);
   }
 };
 

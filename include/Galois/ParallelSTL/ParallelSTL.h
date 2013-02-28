@@ -66,10 +66,17 @@ template<typename ConTy, class Predicate>
 ptrdiff_t count_if_local(ConTy& c, Predicate pred)
 {
 #if GALOIS_USE_EXP
-  count_if_R r;
+  count_if_R  r;
+  count_if_R* ptr_r;
+  ptrdiff_t   retval;
+  gptr<count_if_R> loc_r(&r);
   Galois::Runtime::do_all_impl_dist(c, count_if_helper_dist<Predicate>(pred),
                                               count_if_reducer_dist(&r), true);
-  return r.i;
+  // get the modified count back
+  ptr_r  = loc_r.transientAcquire();
+  retval = ptr_r->i;
+  loc_r.transientRelease();
+  return retval;
 #else
   return Galois::Runtime::do_all_impl(Galois::Runtime::makeLocalRange(c),
                count_if_helper<Predicate>(pred), count_if_reducer(), true).ret;

@@ -36,6 +36,7 @@
 class Verifier {
   struct inconsistent: public std::unary_function<GNode,bool> {
     Graphp graph;
+    inconsistent() { }
     inconsistent(Graphp g): graph(g) { }
 
     bool operator()(const GNode& node) const {
@@ -58,10 +59,19 @@ class Verifier {
       }
       return false;
     }
+    // serialization functions
+    typedef int tt_has_serialize;
+    void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+      gSerialize(s,graph);
+    }
+    void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+      gDeserialize(s,graph);
+    }
   };
 
   struct not_delaunay: public std::unary_function<GNode,bool> {
     Graphp graph;
+    not_delaunay() { }
     not_delaunay(Graphp g): graph(g) { }
 
     bool operator()(const GNode& node) {
@@ -113,6 +123,14 @@ class Verifier {
       }
       return false;
     }
+    // serialization functions
+    typedef int tt_has_serialize;
+    void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+      gSerialize(s,graph);
+    }
+    void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+      gDeserialize(s,graph);
+    }
   };
 
   bool checkReachability(Graphp graph) {
@@ -151,8 +169,8 @@ class Verifier {
 
 public:
   bool verify(Graphp g) {
-    return checkReachability(g) && !Galois::ParallelSTL::count_if(g->begin(), g->end(), inconsistent(g))
-      && !Galois::ParallelSTL::count_if(g->begin(), g->end(), not_delaunay(g));
+    return checkReachability(g) && !Galois::ParallelSTL::count_if_local(g, inconsistent(g))
+      && !Galois::ParallelSTL::count_if_local(g, not_delaunay(g));
   }
 };
 

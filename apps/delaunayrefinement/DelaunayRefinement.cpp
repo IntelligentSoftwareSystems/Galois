@@ -131,11 +131,8 @@ int main(int argc, char** argv) {
     }
   }
 
-  //std::cout << "configuration: " << std::distance(graph->begin(), graph->end())
-	   // << " total triangles, " << std::count_if(graph->begin(), graph->end(), is_bad(graph)) << " bad triangles\n";
-
-  std::cout << "configuration: " << ThirdGraphSize(graph) << " total triangles" << std::endl;
-  //std::cout << "configuration: " << graph->size() << " total triangles" << std::endl;
+  std::cout << "configuration: " << NThirdGraphSize(graph) << " total triangles, ";
+	std::cout << Galois::ParallelSTL::count_if_local(graph, is_bad(graph)) << " bad triangles\n";
 
   Galois::Statistic("MeminfoPre1", Galois::Runtime::MM::pageAllocInfo());
   //Galois::preAlloc(15 * numThreads + Galois::Runtime::MM::pageAllocInfo() * 10);
@@ -161,12 +158,12 @@ int main(int argc, char** argv) {
   Trefine.stop();
   T.stop();
 
-  std::cout << "Size after refinement: " << ThirdGraphSize(graph) << std::endl;
+  std::cout << "Size after refinement: " << NThirdGraphSize(graph) << std::endl;
   
   Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
   
   if (!skipVerify) {
-    int size = Galois::ParallelSTL::count_if(graph->begin(), graph->end(), is_bad(graph));
+    int size = Galois::ParallelSTL::count_if_local(graph, is_bad(graph));
     if (size != 0) {
       std::cerr << size << " bad triangles remaining.\n";
       assert(0 && "Refinement failed");
