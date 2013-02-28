@@ -63,7 +63,7 @@ void partition(MetisGraph* metisGraph, int nparts) {
 	t.stop();
 	cout<<"coarsening time: " << t.get() << " ms"<<endl;
 
-	float* totalPartitionWeights = new float[nparts];
+	/*float* totalPartitionWeights = new float[nparts];
 	std::fill_n(totalPartitionWeights, nparts, 1 / (float) nparts);
 	maxVertexWeight = (int) (1.5 * ((mcg->getNumNodes()) / COARSEN_FRACTION));
 	PMetis pmetis(20, maxVertexWeight);
@@ -79,7 +79,7 @@ void partition(MetisGraph* metisGraph, int nparts) {
 	refineKWay(mcg, metisGraph, totalPartitionWeights, (float) 1.03, nparts);
 	refine_t.stop();
 	cout << "refine time: " << refine_t.get() << " ms"<<endl;
-	delete[] totalPartitionWeights;
+	delete[] totalPartitionWeights;*/
 	T.stop();
 }
 
@@ -210,7 +210,8 @@ void readGraph(MetisGraph* metisGraph, const char* filename, bool weighted = fal
 }
 
 int main(int argc, char** argv) {
-  LonestarStart(argc, argv, name, desc, url);
+  Galois::StatManager statManager; 
+	LonestarStart(argc, argv, name, desc, url);
 
 	srand(-1);
 	MetisGraph metisGraph;
@@ -222,7 +223,11 @@ int main(int argc, char** argv) {
 	}else{
 	  readGraph(&metisGraph, filename.c_str(), weighted, directed);
 	}
+  	/*Galois::Statistic("MeminfoPre1", Galois::Runtime::MM::pageAllocInfo());
+  	Galois::preAlloc(5000);
+  	Galois::Statistic("MeminfoPre2", Galois::Runtime::MM::pageAllocInfo());*/
 	partition(&metisGraph, numPartitions);
+  	//Galois::Statistic("MeminfoPre3", Galois::Runtime::MM::pageAllocInfo());
 	verify(&metisGraph);
 }
 

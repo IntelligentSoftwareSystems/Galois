@@ -49,6 +49,21 @@ public:
 		return coarsenTo;
 	}
 
+	void resizeEdges(MetisGraph* coarseMetisGraph) {
+
+			GGraph *coarseGraph = coarseMetisGraph->getGraph();
+			int id = 0;
+			for (GGraph::iterator ii = coarseGraph->begin(), ee = coarseGraph->end(); ii != ee; ++ii) {
+				GNode node = *ii;
+				MetisNode nodeData = coarseGraph->getData(node,Galois::MethodFlag::NONE);
+				coarseGraph->resizeEdges(node,coarseMetisGraph->numberEdges[nodeData.getNodeId()]);
+
+
+			}
+
+		}
+
+
 	void createNodes(MetisGraph* coarseMetisGraph){
 		GGraph* coarseGraph = coarseMetisGraph->getGraph();
 		bool* visited = new bool[metisGraph->getNumNodes()];
@@ -68,6 +83,7 @@ public:
 			GNode newNode = coarseGraph->createNode(MetisNode(id++, weight));
 			coarseGraph->addNode(newNode, Galois::MethodFlag::NONE);
 			metisGraph->setCoarseGraphMap(nodeData.getNodeId(), newNode);
+			metisGraph->getInverseGraphMap()[newNode]=node;
 			if(match!=node){
 				metisGraph->setCoarseGraphMap(matchNodeData.getNodeId(), newNode);
 			}
@@ -95,10 +111,44 @@ public:
 				createNodes(coarseMetisGraph);
 				serialCreateCoarserGraph(coarseMetisGraph, visited);
 			} else {
+  			//	Galois::Statistic("MeminfoPre"+level, Galois::Runtime::MM::pageAllocInfo());
+				Galois::Timer t;
+				t.start();
 				notFirstTime = parallelMatch(notFirstTime, coarser, level);
+				t.stop();
+				cout<<"parallel match: " << t.get() << " ms"<<endl;	
+				t.start();
+				//createNodes(coarseMetisGraph);
+				//parallelCreate(metisGraph,coarseMetisGraph);
+				coarseMetisGraph->initNumberEdges();
 				createNodes(coarseMetisGraph);
-				parallelCreateCoarserGraph(coarseMetisGraph, visited, level++);
+				parallelAddEdgeSet(metisGraph,coarseMetisGraph,false);
+				resizeEdges(coarseMetisGraph);
+
+				t.stop();
+				cout<<"serial create nodes: " << t.get() << " ms"<<endl;
+				t.start();
+				//parallelCreateCoarserGraph(coarseMetisGraph, visited, level++);
+				parallelAddEdgeSet(metisGraph,coarseMetisGraph,true);
+				level++;
+				t.stop();
+				cout<<"parallel create coarse graph " << t.get() << " ms"<<endl;
+				
 			}
+			
+			/*cout<<"Insepcting the edges";
+			long long sum=0;
+			long long maxE=0;
+			int numNodes = coarseMetisGraph->getNumNodes();
+			for(int i=0;i<numNodes;i++) { 
+				if(coarseMetisGraph->numberEdges[i]>maxE) 
+					maxE = coarseMetisGraph->numberEdges[i];
+				sum+=coarseMetisGraph->numberEdges[i];
+			}
+			cout<<"Max "<<maxE; 
+			cout<<"Average "<<(double)sum/(double)numNodes;
+			*/
+
 			int numEdges = 0;
 			for (GGraph::iterator ii = coarser->begin(), ee = coarser->end(); ii != ee; ++ii) {
 			  numEdges += std::distance(graph->edge_begin(*ii, Galois::MethodFlag::NONE), graph->edge_end(*ii, Galois::MethodFlag::NONE));
@@ -153,7 +203,8 @@ private:
 
 		if (notFirstTime) {
 			parallelMatchNodes<HEMMatcher> pHEM(metisGraph, coarser, maxVertexWeight);
-			Galois::for_each<Galois::WorkList::ChunkedLIFO<64, GNode> >(graph->begin(), graph->end(), pHEM, "HEM_Match");
+			//Galois::for_each<Galois::WorkList::ChunkedLIFO<64, GNode> >(graph->begin(), graph->end(), pHEM, "HEM_Match");
+			Galois::for_each_local<Galois::WorkList::ChunkedLIFO<64, GNode> >(*graph, pHEM, "HEM_Match");
 //			vector<GNode> v(graph->begin(), graph->end());
 //			std::random_shuffle( v.begin(), v.end() );
 //			Galois::for_each<Galois::Runtime::WorkList::ChunkedFIFO<32, GNode> >(v.begin(), v.end(), pHEM);
@@ -162,11 +213,149 @@ private:
 //			vector<GNode> v(graph->begin(), graph->end());
 //			std::random_shuffle( v.begin(), v.end() );
 //			Galois::for_each<Galois::Runtime::WorkList::ChunkedFIFO<32, GNode> >(v.begin(), v.end(), pRM);
-			Galois::for_each<Galois::WorkList::ChunkedLIFO<64, GNode> >(graph->begin(), graph->end(), pRM, "RM_Match");
+			//Galois::for_each<Galois::WorkList::ChunkedLIFO<64, GNode> >(graph->begin(), graph->end(), pRM, "RM_Match");
+			Galois::for_each_local<Galois::WorkList::ChunkedLIFO<64, GNode> >(*graph, pRM, "RM_Match");
 			notFirstTime = true;
 		}
 		return notFirstTime;
 	}
+
+	void createNodesParallel(GNode item,MetisGraph *metisGraph,GGraph *coarseGraph) { 
+		MetisNode& node = graph->getData(item,Galois::MethodFlag::NONE); 
+		GNode match = metisGraph->getMatch(node.getNodeId());
+		MetisNode& matchData = graph->getData(metisGraph->getMatch(node.getNodeId()),Galois::MethodFlag::NONE);
+		if(node.getNodeId()<matchData.getNodeId()) 
+			return;
+		int weight = node.getWeight();
+		if(match!=item){
+			weight+=matchData.getWeight();
+		}
+		GNode newNode = coarseGraph->createNode(MetisNode(min(node.getNodeId(),matchData.getNodeId()), weight));//ToDo fix the id
+		coarseGraph->addNode(newNode, Galois::MethodFlag::NONE);
+		metisGraph->setCoarseGraphMap(node.getNodeId(), newNode);
+		if(match!=item){
+		 metisGraph->setCoarseGraphMap(matchData.getNodeId(),newNode);
+		}
+	}
+ 
+       struct parallelCreateNodes {
+                Coarsener* coarsener;
+                MetisGraph* metisGraph;
+		MetisGraph* coarseMetisGraph;
+		GGraph *coarseGraph;
+                parallelCreateNodes(MetisGraph* metisGraph,MetisGraph *coarseMetisGraph,Coarsener* coarsener){
+                        this->metisGraph = metisGraph;                                                 
+                        this->coarsener = coarsener;                                                       
+			this->coarseMetisGraph = coarseMetisGraph;
+                	this->coarseGraph = coarseMetisGraph->getGraph();
+		}                                                                                      
+                template<typename Context>                                                             
+                void operator()(GNode item, Context& lwl) {                                            
+                       coarsener->createNodesParallel(item,metisGraph,coarseGraph);                                                           
+                }                                                                                      
+        };  
+
+    bool parallelCreate(MetisGraph *metisGraph,MetisGraph *coarseMetisGraph){                             
+		parallelCreateNodes pCN(metisGraph,coarseMetisGraph, this);     
+                Galois::for_each_local<Galois::WorkList::ChunkedLIFO<64, GNode> >(*graph, pCN, "Parallel Create Nodes");
+        }
+
+
+	/**
+	 * Code changes try Nikunj
+	 */
+
+	struct parallelAddSet {
+		MetisGraph* coarseMetisGraph;
+		Coarsener* coarsener;
+		MetisGraph* metisGraph;
+		bool addEdges;
+		parallelAddSet(MetisGraph *metisGraph, MetisGraph* coarseMetisGraph, Coarsener* coarsener,bool addEdges){
+			this->metisGraph = metisGraph;
+			this->coarseMetisGraph = coarseMetisGraph;
+			this->coarsener = coarsener;
+			this->addEdges = addEdges;
+		}
+
+		template<typename Context>
+		void operator()(GNode item, Context& lwl) {
+		  coarsener->addEdgeSet(item,metisGraph,coarseMetisGraph,addEdges);
+		}
+	};
+
+	void parallelAddEdgeSet(MetisGraph *metisGraph,MetisGraph* coarseMetisGraph,bool addEdges=true){
+		parallelAddSet pae(metisGraph,coarseMetisGraph, this,addEdges);
+		GGraph *coarseGraph = coarseMetisGraph->getGraph();
+
+		//Galois::for_each_local<GaloisRuntime::WorkList::ChunkedLIFO<64, GNode> >(*coarseGraph,pae,"AddEdgeSet");
+		//Galois::for_each<Galois::WorkList::ChunkedFIFO<64,GNode> >(coarseGraph->begin(),coarseGraph->end(),pae,"AddEdgeSet");
+		Galois::for_each_local<Galois::WorkList::ChunkedFIFO<64,GNode> >(*coarseGraph,pae,"AddEdgeSet");
+	}
+
+
+	void addEdgeSet(GNode node,MetisGraph *metisGraph,MetisGraph *coarseMetisGraph,bool addEdges) {
+
+		GGraph* coarseGraph = coarseMetisGraph->getGraph();
+		MetisNode& nodeData = coarseGraph->getData(node,Galois::MethodFlag::NONE);
+		GNode invMapNode = metisGraph->getInverseCoarseGraphMap(node);
+		MetisNode& fineGraphNodeData = graph->getData(invMapNode,Galois::MethodFlag::NONE);
+		GNode matchNode = metisGraph->getMatch(fineGraphNodeData.getNodeId());
+
+
+		std::map <GNode,int> tempEdges;
+		for (GGraph::edge_iterator jj = graph->edge_begin(invMapNode, Galois::MethodFlag::NONE), eejj = graph->edge_end(invMapNode, Galois::MethodFlag::NONE); jj != eejj; ++jj) {
+			GNode neighbor = graph->getEdgeDst(jj);
+			MetisNode &neighborData = graph->getData(neighbor,Galois::MethodFlag::NONE);
+			GNode neighborMap = metisGraph->getCoarseGraphMap(neighborData.getNodeId());
+			if(neighbor == matchNode)
+				continue;
+
+			int weight = graph->getEdgeData(jj, Galois::MethodFlag::NONE);
+			int existWeight = (tempEdges.find(neighborMap)==tempEdges.end())?0:tempEdges[neighborMap];
+			tempEdges[neighborMap]=existWeight+weight;
+		}
+
+
+		if(matchNode!=invMapNode) {
+			MetisNode &mapNodeData = graph->getData(matchNode,Galois::MethodFlag::NONE);
+			for (GGraph::edge_iterator jj = graph->edge_begin(matchNode, Galois::MethodFlag::NONE), eejj = graph->edge_end(matchNode, Galois::MethodFlag::NONE); jj != eejj; ++jj) {
+				GNode neighbor = graph->getEdgeDst(jj);
+				if(neighbor == invMapNode)
+					continue;
+				MetisNode &neighborData = graph->getData(neighbor,Galois::MethodFlag::NONE);
+				GNode neighborMap = metisGraph->getCoarseGraphMap(neighborData.getNodeId());
+
+
+				int weight = graph->getEdgeData(jj, Galois::MethodFlag::NONE);
+				int existWeight = (tempEdges.find(neighborMap)==tempEdges.end())?0:tempEdges[neighborMap];
+				tempEdges[neighborMap]=existWeight+weight;
+			}
+		}
+
+		if(addEdges) {
+		std::map <GNode,int>::iterator it;
+
+		for(it=tempEdges.begin();it!=tempEdges.end();it++) {
+			GNode edgeDst = (it->first);
+			coarseGraph->getEdgeData(coarseGraph->addEdge(node,edgeDst, Galois::MethodFlag::ALL),Galois::MethodFlag::NONE) = it->second;
+			//coarseGraph->addEdge(node,edgeDst, Galois::ALL);
+			nodeData.addEdgeWeight(it->second);
+			nodeData.incNumEdges();
+		}
+		}
+		else {
+			coarseMetisGraph->numberEdges[nodeData.getNodeId()]=tempEdges.size();
+		}
+
+
+
+
+	}
+
+	/*
+	 * Code Changes End
+	 */
+
 
 	/**
 	 * determine if the graph is coarse enough
@@ -238,6 +427,8 @@ private:
 		if (visited[nodeId])
 			return;
 		GNode matched = metisGraph->getMatch(nodeId);
+		//if(matched!=node && graph->getData(matched).getNodeId()<nodeId)
+	//		return;
 		addNeighbors(nodeId, node, graph, coarseMetisGraph);
 		if (matched != node) {
 			//matched.map(new buildNeighborClosure(graph, coarseMetisGraph, matched, node, lmap), matched);
@@ -285,7 +476,8 @@ private:
 		template<typename Context>
 		void operator()(GNode item, Context& lwl) {
 		  MetisNode& nodeData = graph->getData(item,Galois::MethodFlag::NONE);
-		  graph->getData(metisGraph->getCoarseGraphMap(nodeData.getNodeId()),Galois::MethodFlag::CHECK_CONFLICT);
+	 
+		 //graph->getData(metisGraph->getCoarseGraphMap(nodeData.getNodeId()),Galois::MethodFlag::CHECK_CONFLICT);
 		  coarsener->addEdges(nodeData.getNodeId(), item, visited, coarseMetisGraph);
 		}
 	};
@@ -295,7 +487,8 @@ private:
 //		Galois::Timer t2;
 //		t2.start();
 		parallelAddingEdges pae(metisGraph, coarseMetisGraph, this, visited);
-		Galois::for_each<Galois::WorkList::ChunkedLIFO<32, GNode> >(graph->begin(), graph->end(), pae, "AddNeighbors");
+//		Galois::for_each<Galois::WorkList::ChunkedLIFO<32, GNode> >(graph->begin(), graph->end(), pae, "AddNeighbors");
+		Galois::for_each_local<Galois::WorkList::ChunkedLIFO<32, GNode> >(*graph, pae, "AddNeighbors");
 //		t2.stop();
 //		cout<<"createTime::"<<t2.get()<<endl;
 	}

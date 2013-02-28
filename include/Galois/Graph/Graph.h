@@ -237,6 +237,10 @@ class FirstGraph : private boost::noncopyable {
       return std::find_if(begin(), end(), first_eq_and_valid<gNode*>(N));
     }
 
+    void resizeEdges(int size) {
+      	edges.resize((unsigned int)size,EITy(new gNode(),NULL));
+    }
+
     template<typename... Args>
     iterator createEdge(gNode* N, EdgeTy* v, Args&&... args) {
       return edges.insert(edges.end(), EITy(N, v, std::forward<Args>(args)...));
@@ -382,6 +386,14 @@ public:
       N->edges.clear();
     }
   }
+
+  /*
+   * Resize the edges of the node. Would be executed serially to overcome the problems in scaling llvm::smallvector allocation.
+   */
+  void resizeEdges(GraphNode src,int size) {
+ 	  assert(src);
+ 	  src->resizeEdges(size);
+   }
 
   /** 
    * Adds an edge to graph, replacing existing value if edge already exists. 
