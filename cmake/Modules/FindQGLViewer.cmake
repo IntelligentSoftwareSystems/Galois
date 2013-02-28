@@ -1,5 +1,3 @@
-set(QGLVIEWER_DIR)
-
 # - Try to find QGLViewer
 # Once done this will define
 #  QGLVIEWER_FOUND - System has QGLViewer
