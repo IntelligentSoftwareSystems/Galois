@@ -56,7 +56,7 @@ public:
 		for (GGraph::iterator ii = coarseGraph->begin(), ee = coarseGraph->end(); ii != ee; ++ii) {
 			GNode node = *ii;
 			MetisNode nodeData = coarseGraph->getData(node,Galois::MethodFlag::NONE);
-			coarseGraph->resizeEdges(node,coarseMetisGraph->numberEdges[nodeData.getNodeId()]);
+			coarseGraph->resizeEdges(node,coarseMetisGraph->numberEdges[nodeData.getNodeId()], Galois::MethodFlag::NONE);
 
 		}
 

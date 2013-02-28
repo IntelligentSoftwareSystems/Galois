@@ -237,8 +237,8 @@ class FirstGraph : private boost::noncopyable {
       return std::find_if(begin(), end(), first_eq_and_valid<gNode*>(N));
     }
 
-    void resizeEdges(int size) {
-      	edges.resize((unsigned int)size,EITy(new gNode(),NULL));
+    void resizeEdges(size_t size) {
+      	edges.resize(size, EITy(new gNode(), 0));
     }
 
     template<typename... Args>
@@ -387,12 +387,14 @@ public:
     }
   }
 
-  /*
-   * Resize the edges of the node. Would be executed serially to overcome the problems in scaling llvm::smallvector allocation.
+  /**
+   * Resize the edges of the node. For best performance, should be done serially.
    */
-  void resizeEdges(GraphNode src,int size) {
- 	  assert(src);
- 	  src->resizeEdges(size);
+  void resizeEdges(GraphNode src, size_t size, Galois::MethodFlag mflag = MethodFlag::ALL) {
+    assert(src);
+    Galois::Runtime::checkWrite(mflag, false);
+    Galois::Runtime::acquire(src, mflag);
+    src->resizeEdges(size);
    }
 
   /** 
