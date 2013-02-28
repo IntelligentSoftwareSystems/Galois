@@ -62,8 +62,8 @@ void partition(MetisGraph* metisGraph, int nparts) {
 	MetisGraph* mcg = coarsener.coarsen(metisGraph);
 	t.stop();
 	cout<<"coarsening time: " << t.get() << " ms"<<endl;
-
-	/*float* totalPartitionWeights = new float[nparts];
+	T.stop();
+	float* totalPartitionWeights = new float[nparts];
 	std::fill_n(totalPartitionWeights, nparts, 1 / (float) nparts);
 	maxVertexWeight = (int) (1.5 * ((mcg->getNumNodes()) / COARSEN_FRACTION));
 	PMetis pmetis(20, maxVertexWeight);
@@ -79,7 +79,7 @@ void partition(MetisGraph* metisGraph, int nparts) {
 	refineKWay(mcg, metisGraph, totalPartitionWeights, (float) 1.03, nparts);
 	refine_t.stop();
 	cout << "refine time: " << refine_t.get() << " ms"<<endl;
-	delete[] totalPartitionWeights;*/
+	delete[] totalPartitionWeights;
 	T.stop();
 }
 
