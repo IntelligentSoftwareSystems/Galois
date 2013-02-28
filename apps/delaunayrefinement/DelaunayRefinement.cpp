@@ -131,8 +131,9 @@ int main(int argc, char** argv) {
     }
   }
 
-  std::cout << "configuration: " << NThirdGraphSize(graph) << " total triangles, ";
-	std::cout << Galois::ParallelSTL::count_if_local(graph, is_bad(graph)) << " bad triangles\n";
+  std::cout << "start configuration: " << NThirdGraphSize(graph) << " total triangles, ";
+  std::cout << Galois::ParallelSTL::count_if_local(graph, is_bad(graph)) << " bad triangles\n";
+  //ThirdGraphSize(graph);
 
   Galois::Statistic("MeminfoPre1", Galois::Runtime::MM::pageAllocInfo());
   //Galois::preAlloc(15 * numThreads + Galois::Runtime::MM::pageAllocInfo() * 10);
@@ -158,8 +159,9 @@ int main(int argc, char** argv) {
   Trefine.stop();
   T.stop();
 
-  std::cout << "Size after refinement: " << NThirdGraphSize(graph) << std::endl;
-  
+  std::cout << "final configuration: " << NThirdGraphSize(graph) << " total triangles, ";
+  std::cout << Galois::ParallelSTL::count_if_local(graph, is_bad(graph)) << " bad triangles\n";
+
   Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
   
   if (!skipVerify) {
