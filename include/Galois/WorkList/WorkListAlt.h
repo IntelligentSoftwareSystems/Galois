@@ -201,7 +201,7 @@ class StealingQueues : private boost::noncopyable {
   Runtime::PerThreadStorage<std::pair<AtomicChunkLIFO, unsigned> > local;
   //PerThreadStorage<bool> LocalStarving;
   
-  volatile unsigned Starving;
+  //volatile unsigned Starving;
   AtomicChunkLIFO global;
 
   GALOIS_ATTRIBUTE_NOINLINE
