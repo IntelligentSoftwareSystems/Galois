@@ -112,6 +112,26 @@ struct Preprocess {
   }
 };
 
+struct Prefetch {
+  Graphp   graph;
+
+  Prefetch(Graphp g): graph(g) {}
+  Prefetch() {}
+
+  void operator()(GNode item, Galois::UserContext<GNode>& ctx) const {
+    (void)graph->getData(item).isBad();
+  }
+
+  // serialization functions
+  typedef int tt_has_serialize;
+  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+    gSerialize(s,graph);
+  }
+  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+    gDeserialize(s,graph);
+  }
+};
+
 int main(int argc, char** argv) {
   Galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
@@ -134,6 +154,9 @@ int main(int argc, char** argv) {
   std::cout << "start configuration: " << NThirdGraphSize(graph) << " total triangles, ";
   std::cout << Galois::ParallelSTL::count_if_local(graph, is_bad(graph)) << " bad triangles\n";
   //ThirdGraphSize(graph);
+
+  // call prefetch to get the nodes to the owner
+  Galois::for_each_local(graph, Prefetch(graph));
 
   Galois::Statistic("MeminfoPre1", Galois::Runtime::MM::pageAllocInfo());
   //Galois::preAlloc(15 * numThreads + Galois::Runtime::MM::pageAllocInfo() * 10);
