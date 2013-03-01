@@ -90,10 +90,8 @@ unsigned Galois::Runtime::SimpleRuntimeContext::commit_iteration() {
     Lockable* L = locks;
     locks = L->next;
     L->next = 0;
-    //__sync_synchronize();
     LL::compilerBarrier();
-    L->Owner.unlock_and_clear();
-
+    release(L);
     ++numLocks;
   }
 
@@ -110,7 +108,7 @@ void Galois::Runtime::breakLoop() {
 #endif
 }
 
-void Galois::Runtime::signalConflict() {
+void Galois::Runtime::signalConflict(Lockable* L) {
 #if GALOIS_USE_EXCEPTION_HANDLER
   throw Galois::Runtime::CONFLICT; // Conflict
 #else
@@ -118,21 +116,40 @@ void Galois::Runtime::signalConflict() {
 #endif
 }
 
-void Galois::Runtime::SimpleRuntimeContext::acquire(Galois::Runtime::Lockable* L) {
-  if (customAcquire) {
-    sub_acquire(L);
-    return;
-  }
+////////////////////////////////////////////////////////////////////////////////
+// Simple Runtime Context
+////////////////////////////////////////////////////////////////////////////////
+
+int Galois::Runtime::SimpleRuntimeContext::try_acquire(Galois::Runtime::Lockable* L) {
+  assert(L);
   if (L->Owner.try_lock()) {
     assert(!L->Owner.getValue());
-    assert(!L->next);
     L->Owner.setValue(this);
-    L->next = locks;
-    locks = L;
-  } else {
-    if (L->Owner.getValue() != this) {
-      Galois::Runtime::signalConflict();
+    return 1;
+  } else if (L->Owner.getValue() == this) {
+    return 2;
+  }
+  return 0;
+}
+
+void Galois::Runtime::SimpleRuntimeContext::release(Galois::Runtime::Lockable* L) {
+  assert(L);
+  assert(L->Owner.getValue() == this);
+  assert(!L->next);
+  L->Owner.unlock_and_clear();
+}
+
+void Galois::Runtime::SimpleRuntimeContext::acquire(Galois::Runtime::Lockable* L) {
+  int i;
+  if (customAcquire) {
+    sub_acquire(L);
+  } else if ((i = try_acquire(L))) {
+    if (i == 1) {
+      L->next = locks;
+      locks = L;
     }
+  } else {
+    Galois::Runtime::signalConflict(L);
   }
 }
 
@@ -146,5 +163,5 @@ Galois::Runtime::SimpleRuntimeContext::~SimpleRuntimeContext() {}
 
 
 void Galois::Runtime::forceAbort() {
-  signalConflict();
+  signalConflict(nullptr);
 }

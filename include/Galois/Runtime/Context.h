@@ -83,6 +83,8 @@ class Lockable {
   friend class SimpleRuntimeContext;
   template <typename, typename>
     friend class Galois::Runtime::DeterministicImpl::DeterministicContext;
+  friend bool isAcquired(Lockable*);
+  friend bool isAcquiredBy(Lockable*, SimpleRuntimeContext*);
 public:
   LL::PtrLock<void, true> auxPtr;
   Lockable() :next(0) {}
@@ -96,7 +98,11 @@ protected:
 
   virtual void sub_acquire(Lockable* L);
 
-public:
+  //0: fail, 1: new owner, 2: already owner
+  int try_acquire(Lockable* L);
+  void release(Lockable* L);
+  
+  public:
   SimpleRuntimeContext(bool child = false): locks(0), customAcquire(child) { }
   virtual ~SimpleRuntimeContext();
 
@@ -117,7 +123,7 @@ void setThreadContext(SimpleRuntimeContext* n);
 
 
 //! Helper function to decide if the conflict detection lock should be taken
-static inline bool shouldLock(Galois::MethodFlag g) {
+inline bool shouldLock(const Galois::MethodFlag g) {
   // Mask out additional "optional" flags
   switch (g & MethodFlag::ALL) {
   case MethodFlag::NONE:
@@ -135,11 +141,26 @@ static inline bool shouldLock(Galois::MethodFlag g) {
 //! actual locking function.  Will always lock.
 void doAcquire(Lockable* C);
 
+inline void acquire(Lockable* C, SimpleRuntimeContext* cnx, const Galois::MethodFlag m) {
+  if (shouldLock(m) && cnx)
+    cnx->acquire(C);
+}
+
 //! Master function which handles conflict detection
 //! used to acquire a lockable thing
-static inline void acquire(Lockable* C, Galois::MethodFlag m) {
-  if (shouldLock(m))
-    doAcquire(C);
+inline void acquire(Lockable* C, Galois::MethodFlag m) {
+  if (shouldLock(m)) {
+    SimpleRuntimeContext* cnx = getThreadContext();
+    acquire(C, cnx, m);
+  }
+}
+
+inline bool isAcquired(Lockable* C) {
+  return C->Owner.is_locked();
+}
+
+inline bool isAcquiredBy(Lockable* C, SimpleRuntimeContext* cnx) {
+  return C->Owner.getValue() == cnx;
 }
 
 struct AlwaysLockObj {
@@ -159,7 +180,7 @@ struct CheckedLockObj {
 //! Actually break for_each loop
 void breakLoop();
 
-void signalConflict();
+void signalConflict(Lockable*);
 
 void forceAbort();
 
