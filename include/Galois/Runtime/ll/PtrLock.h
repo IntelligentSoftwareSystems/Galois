@@ -102,6 +102,10 @@ public:
     return !(oldval & 1);
   }
 
+  inline bool is_locked() const {
+    return _lock & 1;
+  }
+
   //! CAS only works on unlocked values
   //! the lock bit will prevent a successful cas
   inline bool CAS(T* oldval, T* newval) {
@@ -128,7 +132,8 @@ public:
   inline void unlock_and_set(T* val) { _lock = val; }
   inline T* getValue() const { return _lock; }
   inline void setValue(T* val) { _lock = val; }
-  inline bool try_lock() { return true; }
+  inline bool try_lock() const { return true; }
+  inline bool is_locked() const { return false; }
   inline bool CAS(T* oldval, T* newval) {
     if (_lock == oldval) {
       _lock = newval;

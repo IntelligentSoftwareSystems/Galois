@@ -59,6 +59,7 @@ public:
       }
       oldval = __sync_fetch_and_or(&_lock, 1);
     } while (oldval & 1);
+    assert(_lock);
   }
 
   inline void unlock() const {
@@ -73,6 +74,10 @@ public:
     int oldval = __sync_fetch_and_or(&_lock, 1);
     return !(oldval & 1);
   }
+
+  inline bool is_locked() const {
+    return _lock & 1;
+  }
 };
 
 template<>
@@ -81,6 +86,7 @@ public:
   inline void lock() const {}
   inline void unlock() const {}
   inline bool try_lock() const { return true; }
+  inline bool is_locked() const { return false; }
 };
 
 
