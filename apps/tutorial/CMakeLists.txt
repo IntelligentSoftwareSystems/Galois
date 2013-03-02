@@ -1,4 +1,4 @@
-app(HelloWorld HelloWorld.cpp)
-app(Torus Torus.cpp)
-app(TorusImproved TorusImproved.cpp)
-app(SSSPsimple SSSPsimple.cpp)
+app(hello-world HelloWorld.cpp)
+app(torus Torus.cpp)
+app(torus-improved TorusImproved.cpp)
+app(sssp-simple SSSPsimple.cpp)
