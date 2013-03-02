@@ -31,6 +31,7 @@
 
 namespace Galois {
 namespace Runtime {
+extern bool inDoAllDistributed;
 namespace Distributed {
 
 extern uint32_t networkHostID;

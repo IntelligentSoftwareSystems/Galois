@@ -137,8 +137,10 @@ void do_all_impl_landing_pad(Distributed::RecvBuffer& buf) {
 
   Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
 
+  inDoAllDistributed = true;
   //Start locally
   do_all_impl(Galois::Runtime::makeLocalRange(*data),f,r,needsReduce);
+  inDoAllDistributed = false;
 
   // place a MPI barrier here for all the hosts to synchronize
   net.systemBarrier();
@@ -248,8 +250,10 @@ void do_all_impl_dist(Runtime::Distributed::gptr<T>& c, FunctionTy f, ReducerTy 
     net.sendMessage (i, &do_all_impl_landing_pad<T,FunctionTy,ReducerTy>, buf);
   }
   net.handleReceives();
+  inDoAllDistributed = true;
   //Start locally
   do_all_impl(Galois::Runtime::makeLocalRange(*c),f,r,needsReduce);
+  inDoAllDistributed = false;
 
   // place a MPI barrier here for all the hosts to synchronize
   net.systemBarrier();

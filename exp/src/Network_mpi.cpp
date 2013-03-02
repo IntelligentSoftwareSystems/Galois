@@ -34,6 +34,8 @@
 
 using namespace Galois::Runtime::Distributed;
 
+bool Galois::Runtime::inDoAllDistributed = false;
+
 namespace {
 
 static void handleError(int rc) {
