@@ -489,6 +489,7 @@ struct BarrierExpAlgo {
 template<DetAlgo Version>
 struct DetBarrierAlgo {
   typedef int tt_needs_per_iter_alloc; // For LocalState
+  static_assert(Galois::needs_per_iter_alloc<DetBarrierAlgo>::value, "Oops");
 
   std::string name() const { return "Parallel (Deterministic Barrier)"; }
   typedef Pair<GNode,int> ItemTy;
@@ -498,12 +499,15 @@ struct DetBarrierAlgo {
     Pending pending;
     LocalState(DetBarrierAlgo<Version>& self, Galois::PerIterAllocTy& alloc): pending(alloc) { }
   };
+  typedef LocalState GaloisDeterministicLocalState;
+  static_assert(Galois::has_deterministic_local_state<DetBarrierAlgo>::value, "Oops");
 
-  struct IdFn {
+  struct GaloisDeterministicId {
     unsigned long operator()(const ItemTy& item) const {
       return graph.getData(item.first, Galois::MethodFlag::NONE).id;
     }
   };
+  static_assert(Galois::has_deterministic_id<DetBarrierAlgo>::value, "Oops");
 
   void operator()(const GNode& source) const {
 #ifdef GALOIS_USE_EXP

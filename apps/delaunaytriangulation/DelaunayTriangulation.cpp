@@ -177,11 +177,6 @@ struct Process {
     return planarSearch(p, someNode, node);
   }
 
-  struct LocalState {
-    Cavity<Alloc> cav;
-    LocalState(Process& self, Galois::PerIterAllocTy& alloc): cav(graph, alloc) { }
-  };
-
   //! Parallel operator
   GALOIS_ATTRIBUTE_NOINLINE
   void operator()(Point* p, Galois::UserContext<Point*>& ctx) {

@@ -202,16 +202,6 @@ struct UnorderedOptions: public Options<_Function1Ty,_Function2Ty> {
   }
 };
 
-//! Some template meta programming
-template<typename T>
-struct has_local_state {
-  typedef char yes[1];
-  typedef char no[2];
-  template<typename C> static yes& test(typename C::LocalState*);
-  template<typename> static no& test(...);
-  static const bool value = sizeof(test<T>(0)) == sizeof(yes);
-};
-
 template<typename T,typename FunctionTy,typename Enable=void>
 struct StateManager { 
   void alloc(UserContextAccess<T>&, FunctionTy& self) { }
@@ -221,7 +211,7 @@ struct StateManager {
 };
 
 template<typename T,typename FunctionTy>
-struct StateManager<T,FunctionTy,typename boost::enable_if<has_local_state<FunctionTy> >::type> {
+struct StateManager<T,FunctionTy,typename boost::enable_if<has_deterministic_local_state<FunctionTy> >::type> {
   typedef typename FunctionTy::LocalState LocalState;
   void alloc(UserContextAccess<T>& c,FunctionTy& self) {
     void *p = c.data().getPerIterAlloc().allocate(sizeof(LocalState));
@@ -242,36 +232,26 @@ struct StateManager<T,FunctionTy,typename boost::enable_if<has_local_state<Funct
   }
 };
 
-template<typename T>
-struct has_break_fn {
-  typedef char yes[1];
-  typedef char no[2];
-  template<typename C> static yes& test(typename C::BreakFn*);
-  template<typename> static no& test(...);
-  static const bool value = sizeof(test<T>(0)) == sizeof(yes);
-};
-
 template<typename FunctionTy,typename Enable=void>
 struct BreakManager {
-  BreakManager(const FunctionTy&) { }
-  bool checkBreak() { return false; }
+  BreakManager() { }
+  bool checkBreak(FunctionTy&) { return false; }
 };
 
 template<typename FunctionTy>
-class BreakManager<FunctionTy,typename boost::enable_if<has_break_fn<FunctionTy> >::type> {
+class BreakManager<FunctionTy,typename boost::enable_if<has_deterministic_break<FunctionTy> >::type> {
   GBarrier barrier;
   LL::CacheLineStorage<volatile long> done;
-  typename FunctionTy::BreakFn breakFn;
 
 public:
-  BreakManager(const FunctionTy& fn): breakFn(fn) { 
+  BreakManager() { 
     int numActive = (int) getActiveThreads();
     barrier.reinit(numActive);
   }
 
-  bool checkBreak() {
+  bool checkBreak(FunctionTy& fn) {
     if (LL::getTID() == 0)
-      done.data = breakFn();
+      done.data = fn.galoisDeterministicBreak();
     barrier.wait();
     return done.data;
   }
@@ -667,15 +647,6 @@ public:
   }
 };
 
-template<typename T>
-struct has_id_fn {
-  typedef char yes[1];
-  typedef char no[2];
-  template<typename C> static yes& test(typename C::IdFn*);
-  template<typename> static no& test(...);
-  static const bool value = sizeof(test<T>(0)) == sizeof(yes);
-};
-
 template<typename OptionsTy,typename Enable=void>
 struct MergeTraits {
   static const bool value = false;
@@ -696,9 +667,9 @@ struct MergeTraits<OptionsTy,typename boost::enable_if_c<OptionsTy::useOrdered>:
 };
 
 template<typename OptionsTy>
-struct MergeTraits<OptionsTy,typename boost::enable_if_c<has_id_fn<typename OptionsTy::Function1Ty>::value && !OptionsTy::useOrdered>::type> {
+struct MergeTraits<OptionsTy,typename boost::enable_if_c<has_deterministic_id<typename OptionsTy::Function1Ty>::value && !OptionsTy::useOrdered>::type> {
   static const bool value = true;
-  typedef typename OptionsTy::Function1Ty::IdFn IdFn;
+  typedef typename OptionsTy::Function1Ty::GaloisDeterministicId IdFn;
   static const int ChunkSize = 32;
   static const int MinDelta = ChunkSize * 40;
 };
@@ -1249,7 +1220,7 @@ class Executor {
   typedef WorkList::dChunkedFIFO<MergeTraits<OptionsTy>::ChunkSize,Item> WL;
   typedef WorkList::dChunkedFIFO<MergeTraits<OptionsTy>::ChunkSize,DetContext> PendingWork;
   typedef WorkList::ChunkedFIFO<MergeTraits<OptionsTy>::ChunkSize,DetContext,false> LocalPendingWork;
-  static const bool useLocalState = has_local_state<typename OptionsTy::Function1Ty>::value;
+  static const bool useLocalState = has_deterministic_local_state<typename OptionsTy::Function1Ty>::value;
 
   // Truly thread-local
   struct ThreadLocalData: private boost::noncopyable {
@@ -1285,12 +1256,12 @@ class Executor {
 
 public:
   Executor(const OptionsTy& o, const char* ln):
-    origOptions(o), mergeManager(o), loopname(ln), breakManager(o.fn1)
+    origOptions(o), mergeManager(o), loopname(ln)
   { 
     numActive = (int) getActiveThreads();
     for (unsigned i = 0; i < sizeof(barrier)/sizeof(*barrier); ++i)
       barrier[i].reinit(numActive);
-    if (OptionsTy::needsBreak && !has_break_fn<typename OptionsTy::Function1Ty>::value) {
+    if (OptionsTy::needsBreak && !has_deterministic_break<typename OptionsTy::Function1Ty>::value) {
       GALOIS_ERROR(true, "need to use break function to break loop");
     }
   }
@@ -1362,7 +1333,7 @@ void Executor<OptionsTy>::go() {
     if (tld.hasNewWork)
       hasNewWork.data = true;
 
-    if (breakManager.checkBreak())
+    if (breakManager.checkBreak(tld.options.fn1))
       break;
 
     mergeManager.calculateWindow(false);

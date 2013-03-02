@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -269,6 +269,8 @@ struct UpdateHeights {
   struct LocalState {
     LocalState(UpdateHeights<version,useCAS>& self, Galois::PerIterAllocTy& alloc) { }
   };
+  typedef LocalState GaloisDeterministicLocalState;
+  static_assert(Galois::has_deterministic_local_state<UpdateHeights>::value, "Oops");
 
   //struct IdFn {
   //  unsigned long operator()(const GNode& item) const {
@@ -511,24 +513,24 @@ struct Process {
   struct LocalState {
     LocalState(Process<version>& self, Galois::PerIterAllocTy& alloc) { }
   };
+  typedef LocalState GaloisDeterministicLocalState;
+  static_assert(Galois::has_deterministic_local_state<Process>::value, "Oops");
 
-  struct IdFn {
+  struct GaloisDeterministicId {
     unsigned long operator()(const GNode& item) const {
       return app.graph.getData(item, Galois::MethodFlag::NONE).id;
     }
   };
+  static_assert(Galois::has_deterministic_id<Process>::value, "Oops");
 
-  struct BreakFn {
-    Counter& counter;
-    BreakFn(const Process<version>& self): counter(self.counter) { }
-    bool operator()() const {
-      if (app.global_relabel_interval > 0 && counter.accum.reduce() >= app.global_relabel_interval) {
-        app.should_global_relabel = true;
-        return true;
-      }
-      return false;
+  bool galoisDeterministicBreak() {
+    if (app.global_relabel_interval > 0 && counter.accum.reduce() >= app.global_relabel_interval) {
+      app.should_global_relabel = true;
+      return true;
     }
-  };
+    return false;
+  }
+  static_assert(Galois::has_deterministic_break<Process>::value, "Oops");
 
   Counter& counter;
 
