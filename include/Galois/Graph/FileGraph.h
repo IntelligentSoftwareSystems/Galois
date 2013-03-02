@@ -441,11 +441,11 @@ void permute(FileGraph& in, const PTy& p, FileGraph& out) {
   out.swap(g);
 }
 
-template<typename GraphTy>
-void structureFromFile(GraphTy& g, const std::string& fname) {
+template<typename GraphTy,typename... Args>
+void structureFromFile(GraphTy& g, const std::string& fname, Args&&... args) {
   FileGraph graph;
   graph.structureFromFile(fname);
-  g.structureFromGraph(graph);
+  g.structureFromGraph(graph, std::forward<Args>(args)...);
 }
 
 //! Local computation graph (i.e., graph structure does not change)

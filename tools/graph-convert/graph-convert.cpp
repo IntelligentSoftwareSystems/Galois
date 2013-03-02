@@ -53,6 +53,7 @@ enum ConvertMode {
   vgr2edgelist,
   vgr2pbbs,
   vgr2svgr,
+  vgr2tvgr,
   vgr2vbinpbbs32,
   vgr2vbinpbbs64
 };
@@ -62,7 +63,7 @@ static cll::opt<std::string> outputfilename(cll::Positional, cll::desc("<output 
 static cll::opt<ConvertMode> convertMode(cll::desc("Choose a conversion mode:"),
     cll::values(
       clEnumVal(dimacs2gr, "Convert dimacs to binary gr"),
-      clEnumVal(edgelist2vgr, "Convert edge list to binary void gr (default)"),
+      clEnumVal(edgelist2vgr, "Convert edge list to binary void gr"),
       clEnumVal(floatedgelist2gr, "Convert weighted (float) edge list to binary gr"),
       clEnumVal(gr2bsml, "Convert binary gr to binary sparse MATLAB matrix"),
       clEnumVal(gr2dimacs, "Convert binary gr to dimacs"),
@@ -79,9 +80,10 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Choose a conversion mode:"),
       clEnumVal(vgr2edgelist, "Convert binary void gr to edgelist"),
       clEnumVal(vgr2pbbs, "Convert binary gr to pbbs"),
       clEnumVal(vgr2svgr, "Convert binary void gr to symmetric graph by adding reverse edges"),
+      clEnumVal(vgr2tvgr, "Convert binary gr to transposed binary gr"),
       clEnumVal(vgr2vbinpbbs32, "Convert binary gr to unweighted binary pbbs"),
       clEnumVal(vgr2vbinpbbs64, "Convert binary gr to unweighted binary pbbs"),
-      clEnumValEnd), cll::init(edgelist2vgr));
+      clEnumValEnd), cll::Required);
 
 static void printStatus(size_t in_nodes, size_t in_edges, size_t out_nodes, size_t out_edges) {
   std::cout << "InGraph : |V| = " << in_nodes << ", |E| = " << in_edges << "\n";
@@ -279,6 +281,7 @@ void convert_gr2edgelist(const std::string& infilename, const std::string& outfi
   printStatus(graph.size(), graph.sizeEdges());
 }
 
+//! Make graph symmetric by blindly adding reverse entries
 template<typename EdgeTy>
 void convert_gr2sgr(const std::string& infilename, const std::string& outfilename) {
   typedef Galois::Graph::FileGraph Graph;
@@ -290,6 +293,58 @@ void convert_gr2sgr(const std::string& infilename, const std::string& outfilenam
 
   outgraph.structureToFile(outfilename);
   printStatus(ingraph.size(), ingraph.sizeEdges(), outgraph.size(), outgraph.sizeEdges());
+}
+
+//! Transpose graph
+template<typename EdgeTy>
+void convert_gr2tgr(const std::string& infilename, const std::string& outfilename) {
+  typedef Galois::Graph::FileGraph Graph;
+  typedef Graph::GraphNode GNode;
+  typedef Galois::Graph::FileGraphParser Parser;
+  typedef Galois::LargeArray<EdgeTy,true> EdgeData;
+  typedef typename EdgeData::value_type edge_value_type;
+  
+  Graph graph;
+  graph.structureFromFile(infilename);
+
+  Parser p;
+  EdgeData edgeData;
+
+  p.setNumNodes(graph.size());
+  p.setNumEdges(graph.sizeEdges());
+  p.setSizeofEdgeData(EdgeData::has_value ? sizeof(edge_value_type) : 0);
+  edgeData.allocate(graph.sizeEdges());
+
+  p.phase1();
+  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+    GNode src = *ii;
+
+    for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
+      GNode dst = graph.getEdgeDst(jj);
+      p.incrementDegree(dst);
+    }
+  }
+
+  p.phase2();
+  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+    GNode src = *ii;
+
+    for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
+      GNode dst = graph.getEdgeDst(jj);
+      if (EdgeData::has_value) {
+        edgeData.set(p.addNeighbor(dst, src), graph.getEdgeData<edge_value_type>(jj));
+      } else {
+        p.addNeighbor(dst, src);
+      }
+    }
+  }
+
+  edge_value_type* rawEdgeData = p.finish<edge_value_type>();
+  if (EdgeData::has_value)
+    std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+  
+  p.structureToFile(outfilename);
+  printStatus(graph.size(), graph.sizeEdges(), p.size(), p.sizeEdges());
 }
 
 template<typename EdgeTy>
@@ -948,6 +1003,7 @@ int main(int argc, char** argv) {
     case vgr2edgelist: convert_gr2edgelist<void>(inputfilename, outputfilename); break;
     case vgr2pbbs: convert_vgr2pbbs(inputfilename, outputfilename); break;
     case vgr2svgr: convert_gr2sgr<void>(inputfilename, outputfilename); break;
+    case vgr2tvgr: convert_gr2tgr<void>(inputfilename, outputfilename); break;
     case vgr2vbinpbbs32: convert_gr2vbinpbbs<uint32_t,uint32_t>(inputfilename, outputfilename); break;
     case vgr2vbinpbbs64: convert_gr2vbinpbbs<uint32_t,uint64_t>(inputfilename, outputfilename); break;
     default: abort();

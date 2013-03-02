@@ -201,6 +201,24 @@ public:
   iterator end() { return make_no_deref_iterator(g.edge_end(n, flag)); }
 };
 
+/**
+ * Convenience wrapper around Graph.in_edge_begin and Graph.in_edge_end to allow
+ * C++11 foreach iteration of in edges.
+ */
+template<typename GraphTy>
+class InEdgesIterator {
+  GraphTy& g;
+  typename GraphTy::GraphNode n;
+  MethodFlag flag;
+public:
+  typedef NoDerefIterator<typename GraphTy::in_edge_iterator> iterator;
+
+  InEdgesIterator(GraphTy& g, typename GraphTy::GraphNode n, MethodFlag f): g(g), n(n), flag(f) { }
+
+  iterator begin() { return make_no_deref_iterator(g.in_edge_begin(n, flag)); }
+  iterator end() { return make_no_deref_iterator(g.in_edge_end(n, flag)); }
+};
+
 template<typename GraphTy>
 class EdgesWithNoFlagIterator {
   GraphTy& g;

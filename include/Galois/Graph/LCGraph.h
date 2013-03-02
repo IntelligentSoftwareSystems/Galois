@@ -38,6 +38,7 @@
 #include "Galois/Runtime/MethodFlags.h"
 #include "Galois/Runtime/mm/Mem.h"
 
+#include <boost/utility/enable_if.hpp>
 #include <boost/iterator/iterator_facade.hpp>
 
 #include <iterator>
@@ -87,17 +88,21 @@ namespace Graph {
  *   }
  * }
  * \endcode
+ *
+ * @tparam NodeTy data on nodes
+ * @tparam EdgeTy data on out edges
  */
 template<typename NodeTy, typename EdgeTy>
 class LC_CSR_Graph: boost::noncopyable {
 protected:
-  typedef LargeArray<EdgeTy,true> EdgeData;
-  typedef typename EdgeData::value_type edge_data_type;
+  typedef LargeArray<EdgeTy,false> EdgeData;
   typedef LargeArray<uint32_t,true> EdgeDst;
   typedef NodeInfoBase<NodeTy> NodeInfo;
+  typedef LargeArray<uint64_t,true> EdgeIndData;
+  typedef LargeArray<NodeInfo,false> NodeData;
 
-  LargeArray<NodeInfo,false> nodeData;
-  LargeArray<uint64_t,true> edgeIndData;
+  NodeData nodeData;
+  EdgeIndData edgeIndData;
   EdgeDst edgeDst;
   EdgeData edgeData;
 
@@ -130,18 +135,17 @@ protected:
   
 public:
   typedef uint32_t GraphNode;
+  typedef EdgeTy edge_data_type;
+  typedef NodeTy node_data_type;
   typedef typename EdgeData::reference edge_data_reference;
+  typedef typename NodeInfo::reference node_data_reference;
   typedef boost::counting_iterator<uint64_t> edge_iterator;
   typedef boost::counting_iterator<uint32_t> iterator;
   typedef iterator const_iterator;
   typedef iterator local_iterator;
   typedef iterator const_local_iterator;
 
-  ~LC_CSR_Graph() {
-    edgeData.destroy();
-  }
-
-  typename NodeInfo::reference getData(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::checkWrite(mflag, false);
     NodeInfo& NI = nodeData[N];
     Galois::Runtime::acquire(&NI, mflag);
@@ -151,12 +155,6 @@ public:
   bool hasNeighbor(GraphNode src, GraphNode dst, MethodFlag mflag = MethodFlag::ALL) {
     return getEdgeIdx(src, dst) != ~static_cast<uint64_t>(0);
   }
-
-//  edge_data_reference getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = MethodFlag::ALL) {
-//    Galois::Runtime::checkWrite(mflag);
-//    Galois::Runtime::acquire(&nodeData[src], mflag);
-//    return EdgeData.get(getEdgeIdx(src, dst));
-//  }
 
   edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::NONE) {
     Galois::Runtime::checkWrite(mflag, false);
@@ -224,10 +222,205 @@ public:
     edgeDst.allocate(numEdges);
     edgeData.allocate(numEdges);
 
+    typedef typename EdgeData::value_type EDV;
+
     if (EdgeData::has_value)
-      edgeData.copyIn(graph.edge_data_begin<edge_data_type>(), graph.edge_data_end<edge_data_type>());
+      edgeData.copyIn(graph.edge_data_begin<EDV>(), graph.edge_data_end<EDV>());
     std::copy(graph.edge_id_begin(), graph.edge_id_end(), edgeIndData.data());
     std::copy(graph.node_id_begin(), graph.node_id_end(), edgeDst.data());
+  }
+};
+
+namespace InOutGraphImpl {
+
+template<typename EdgeDst, typename EdgeIndData>
+struct InEdgesBase {
+  typedef typename EdgeDst::value_type NodeIdx;
+  typedef typename EdgeIndData::value_type EdgeIdx;
+  
+  EdgeIndData edgeIndDataStore;
+  EdgeDst edgeDstStore;
+  EdgeIndData* edgeIndData;
+  EdgeDst* edgeDst;
+
+  EdgeIdx raw_begin(NodeIdx n) const {
+    return (n == 0) ? 0 : (*edgeIndData)[n-1];
+  }
+
+  EdgeIdx raw_end(NodeIdx n) const {
+    return (*edgeIndData)[n];
+  }
+
+  NodeIdx getEdgeDst(EdgeIdx e) {
+    return (*edgeDst)[e];
+  }
+};
+
+//! Dispatch type to handle implementation of in edges
+template<typename EdgeTy, typename EdgeDst, typename EdgeIndData, bool HasPointerData>
+class InEdges;
+
+template<typename EdgeTy, typename EdgeDst, typename EdgeIndData>
+class InEdges<EdgeTy,EdgeDst,EdgeIndData,false>: public InEdgesBase<EdgeDst,EdgeIndData> {
+  typedef InEdgesBase<EdgeDst,EdgeIndData> Super;
+
+  typedef Galois::LargeArray<EdgeTy,false> EdgeData;
+
+  EdgeData edgeDataStore;
+  EdgeData* edgeData;
+
+  typedef typename Super::NodeIdx NodeIdx;
+  typedef typename Super::NodeIdx EdgeIdx;
+
+public:
+  EdgeSortIterator<EdgeDst,EdgeData> edge_sort_begin(NodeIdx n) {
+    return EdgeSortIterator<EdgeDst,EdgeData>(this->raw_begin(n), this->edgeDst, this->edgeData);
+  }
+
+  EdgeSortIterator<EdgeDst,EdgeData> edge_sort_end(NodeIdx n) {
+    return EdgeSortIterator<EdgeDst,EdgeData>(this->raw_end(n), this->edgeDst, this->edgeData);
+  }
+
+  typename EdgeData::reference getEdgeData(EdgeIdx e) {
+    return (*edgeData)[e];
+  }
+
+  void initialize(EdgeIndData* edgeIndDataPtr, EdgeDst* edgeDstPtr, EdgeData* edgeDataPtr, bool symmetric) {
+    if (symmetric) {
+      this->edgeIndData = edgeIndDataPtr;
+      this->edgeDst = edgeDstPtr;
+      this->edgeData = edgeDataPtr;
+      return;
+    }
+
+    // TODO: Transpose graph
+    abort();
+  }
+
+  void initialize(FileGraph& transpose) {
+    typedef typename EdgeData::value_type EDV;
+
+    this->edgeIndData = &this->edgeIndDataStore;
+    this->edgeDst = &this->edgeDstStore;
+    edgeData = &edgeDataStore;
+
+    size_t numNodes = transpose.size();
+    size_t numEdges = transpose.sizeEdges();
+
+    this->edgeIndDataStore.allocate(numNodes);
+    this->edgeDstStore.allocate(numEdges);
+    edgeDataStore.allocate(numEdges);
+
+    if (EdgeData::has_value)
+      edgeData->copyIn(transpose.edge_data_begin<EDV>(), transpose.edge_data_end<EDV>());
+    std::copy(transpose.edge_id_begin(), transpose.edge_id_end(), this->edgeIndData->data());
+    std::copy(transpose.node_id_begin(), transpose.node_id_end(), this->edgeDst->data());
+  }
+};
+
+template<typename EdgeTy, typename EdgeDst, typename EdgeIndData>
+class InEdges<EdgeTy,EdgeDst,EdgeIndData,true>: public InEdgesBase<EdgeDst,EdgeIndData> {
+  // TODO: implement for when we don't store copies of edges
+};
+
+} // end namespace
+
+/**
+ * Local computation graph (i.e., graph structure does not change) that
+ * supports in and out edges.
+ *
+ * An additional template parameter specifies whether the in edge stores a
+ * reference to the corresponding out edge data (the default) or a copy of the
+ * corresponding out edge data. If you want to populate this graph from a
+ * FileGraph that is already symmetric (i.e., (u,v) \in E ==> (v,u) \in E),
+ * this parameter should be true.
+ *
+ * @tparam NodeTy data on nodes
+ * @tparam EdgeTy data on out edges
+ * @tparam CopyInEdgeData in edges hold a copy of out edge data
+ */
+template<typename NodeTy, typename EdgeTy, bool CopyInEdgeData = false>
+class LC_CSR_InOutGraph: public LC_CSR_Graph<NodeTy,EdgeTy> {
+  typedef LC_CSR_Graph<NodeTy,EdgeTy> Super;
+
+protected:
+  InOutGraphImpl::InEdges<EdgeTy,typename Super::EdgeDst,typename Super::EdgeIndData, !CopyInEdgeData> inEdges;
+
+public:
+  typedef typename Super::GraphNode GraphNode;
+  typedef typename Super::edge_data_type edge_data_type;
+  typedef typename Super::node_data_type node_data_type;
+  typedef typename Super::edge_data_reference edge_data_reference;
+  typedef typename Super::node_data_reference node_data_reference;
+  typedef typename Super::edge_iterator edge_iterator;
+  typedef edge_iterator in_edge_iterator;
+  typedef typename Super::iterator iterator;
+  typedef typename Super::const_iterator const_iterator;
+  typedef typename Super::local_iterator local_iterator;
+  typedef typename Super::const_local_iterator const_local_iterator;
+
+  edge_data_reference getInEdgeData(in_edge_iterator ni, MethodFlag mflag = MethodFlag::NONE) { 
+    Galois::Runtime::checkWrite(mflag, false);
+    return inEdges.getEdgeData(*ni);
+  }
+
+  GraphNode getInEdgeDst(in_edge_iterator ni) {
+    return inEdges.getEdgeDst(*ni);
+  }
+
+  in_edge_iterator in_edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+    Galois::Runtime::acquire(&this->nodeData[N], mflag);
+    if (Galois::Runtime::shouldLock(mflag)) {
+      for (uint64_t ii = inEdges.raw_begin(N), ee = inEdges.raw_end(N); ii != ee; ++ii) {
+        Galois::Runtime::acquire(&this->nodeData[inEdges.getEdgeDst(ii)], mflag);
+      }
+    }
+    return in_edge_iterator(inEdges.raw_begin(N));
+  }
+
+  in_edge_iterator in_edge_end(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+    Galois::Runtime::acquire(&this->nodeData[N], mflag);
+    return in_edge_iterator(inEdges.raw_end(N));
+  }
+
+  InEdgesIterator<LC_CSR_InOutGraph> in_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+    return InEdgesIterator<LC_CSR_InOutGraph>(*this, N, mflag);
+  }
+
+  /**
+   * Sorts incoming edges of a node. Comparison function is over EdgeTy.
+   */
+  template<typename CompTy>
+  void sortInEdgesByEdgeData(GraphNode N, const CompTy& comp = std::less<EdgeTy>(), MethodFlag mflag = MethodFlag::ALL) {
+    Galois::Runtime::acquire(&this->nodeData[N], mflag);
+    std::sort(inEdges.edge_sort_begin(N), inEdges.edge_sort_end(N), EdgeSortCompWrapper<EdgeSortValue<EdgeTy>,CompTy>(comp));
+  }
+
+  /**
+   * Sorts incoming edges of a node. Comparison function is over <code>EdgeSortValue<EdgeTy></code>.
+   */
+  template<typename CompTy>
+  void sortInEdges(GraphNode N, const CompTy& comp, MethodFlag mflag = MethodFlag::ALL) {
+    Galois::Runtime::acquire(&this->nodeData[N], mflag);
+    std::sort(inEdges.edge_sort_begin(N), inEdges.edge_sort_end(N), comp);
+  }
+
+  void structureFromFile(const std::string& fname, bool symmetric) { Graph::structureFromFile(*this, fname, symmetric); }
+
+  void structureFromGraph(FileGraph& graph, FileGraph& transpose, typename boost::enable_if_c<CopyInEdgeData>::type* dummy = 0) {
+    if (graph.size() != transpose.size()) {
+      GALOIS_ERROR(true, "number of nodes in graph and its transpose do not match");
+    } else if (graph.sizeEdges() != transpose.sizeEdges()) {
+      GALOIS_ERROR(true, "number of edges in graph and its transpose do not match");
+    }
+
+    Super::structureFromGraph(graph);
+    inEdges.initialize(transpose);
+  }
+
+  void structureFromGraph(FileGraph& graph, bool symmetric) {
+    Super::structureFromGraph(graph);
+    inEdges.initialize(&this->edgeIndData, &this->edgeDst, &this->edgeData, symmetric);
   }
 };
 
@@ -237,7 +430,6 @@ class LC_CSRInline_Graph: boost::noncopyable {
 protected:
   struct NodeInfo;
   typedef EdgeInfoBase<NodeInfo, EdgeTy> EdgeInfo;
-  typedef typename EdgeInfo::value_type edge_data_type;
   
   struct NodeInfo: public NodeInfoBase<NodeTy> {
     EdgeInfo* edgeBegin;
@@ -260,8 +452,11 @@ protected:
 
 public:
   typedef NodeInfo* GraphNode;
-  typedef EdgeInfo* edge_iterator;
+  typedef EdgeTy edge_data_type;
+  typedef NodeTy node_data_type;
   typedef typename EdgeInfo::reference edge_data_reference;
+  typedef typename NodeInfo::reference node_data_reference;
+  typedef EdgeInfo* edge_iterator;
 
   class iterator : std::iterator<std::random_access_iterator_tag, GraphNode> {
     NodeInfo* at;
@@ -291,17 +486,11 @@ public:
     }
   }
 
-  typename NodeInfo::reference getData(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::checkWrite(mflag, false);
     Galois::Runtime::acquire(N, mflag);
     return N->getData();
   }
-  
-//  edge_data_reference getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = MethodFlag::ALL) {
-//    Galois::Runtime::checkWrite(mflag);
-//    Galois::Runtime::acquire(src, mflag);
-//    return EdgeData[getEdgeIdx(src,dst)].getData();
-//  }
 
   edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::NONE) const {
     Galois::Runtime::checkWrite(mflag, false);
@@ -343,6 +532,8 @@ public:
   void structureFromFile(const std::string& fname) { Graph::structureFromFile(*this, fname); }
 
   void structureFromGraph(FileGraph& graph) {
+    typedef typename EdgeInfo::value_type EDV;
+
     numNodes = graph.size();
     numEdges = graph.sizeEdges();
     nodeData.allocate(numNodes);
@@ -363,7 +554,7 @@ public:
       for (FileGraph::neighbor_iterator ni = graph.neighbor_begin(*ii), 
           ne = graph.neighbor_end(*ii); ni != ne; ++ni) {
         if (EdgeInfo::has_value)
-          curEdge->construct(graph.getEdgeData<edge_data_type>(ni));
+          curEdge->construct(graph.getEdgeData<EDV>(ni));
         curEdge->dst = node_ids[*ni];
         ++curEdge;
       }
@@ -378,7 +569,6 @@ class LC_Linear_Graph: boost::noncopyable {
 protected:
   struct NodeInfo;
   typedef EdgeInfoBase<NodeInfo,EdgeTy> EdgeInfo;
-  typedef typename EdgeInfo::value_type edge_data_type;
   typedef LargeArray<NodeInfo*,true> Nodes;
 
   struct NodeInfo : public NodeInfoBase<NodeTy> {
@@ -421,8 +611,11 @@ protected:
 
 public:
   typedef NodeInfo* GraphNode;
-  typedef EdgeInfo* edge_iterator;
+  typedef EdgeTy edge_data_type;
+  typedef NodeTy node_data_type;
+  typedef typename NodeInfo::reference node_data_reference;
   typedef typename EdgeInfo::reference edge_data_reference;
+  typedef EdgeInfo* edge_iterator;
   typedef NodeInfo** iterator;
   typedef NodeInfo*const * const_iterator;
   typedef iterator local_iterator;
@@ -446,18 +639,12 @@ public:
     }
   }
 
-  typename NodeInfo::reference getData(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::checkWrite(mflag, false);
     Galois::Runtime::acquire(N, mflag);
     return N->getData();
   }
   
-//  edge_data_reference getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = MethodFlag::ALL) {
-//    Galois::Runtime::checkWrite(mflag);
-//    Galois::Runtime::acquire(src, mflag);
-//    return getEdgeIdx(src,dst)->getData();
-//  }
-
   edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::NONE) const {
     Galois::Runtime::checkWrite(mflag, false);
     return ni->get();
@@ -518,6 +705,8 @@ public:
   void structureFromFile(const std::string& fname) { Graph::structureFromFile(*this, fname); }
 
   void structureFromGraph(FileGraph& graph) {
+    typedef typename EdgeInfo::value_type EDV;
+
     numNodes = graph.size();
     numEdges = graph.sizeEdges();
     data.allocate(sizeof(NodeInfo) * numNodes * 2 + sizeof(EdgeInfo) * numEdges);
@@ -536,9 +725,9 @@ public:
       for (FileGraph::neighbor_iterator ni = graph.neighbor_begin(*ii),
           ne = graph.neighbor_end(*ii); ni != ne; ++ni) {
         if (EdgeInfo::has_value)
-          edge->construct(graph.getEdgeData<edge_data_type>(ni));
+          edge->construct(graph.getEdgeData<EDV>(ni));
         edge->dst = nodes[*ni];
-	      ++edge;
+        ++edge;
       }
     }
   }
@@ -551,7 +740,6 @@ class LC_Numa_Graph: boost::noncopyable {
 protected:
   struct NodeInfo;
   typedef EdgeInfoBase<NodeInfo,EdgeTy> EdgeInfo;
-  typedef typename EdgeInfo::value_type edge_data_type;
   typedef LargeArray<NodeInfo*,true> Nodes;
 
   struct NodeInfo : public NodeInfoBase<NodeTy> {
@@ -700,6 +888,7 @@ protected:
 
     //! layout the edges
     void operator()(unsigned int tid, unsigned int num) {
+      typedef typename EdgeInfo::value_type EDV;
       //DistributeInfo& d = *dinfo.getRemote(tid);
       DistributeInfo& d = *dinfo.getLocal();
       if (!d.numNodes)
@@ -710,7 +899,7 @@ protected:
         for (FileGraph::neighbor_iterator ni = graph.neighbor_begin(*ii),
                ne = graph.neighbor_end(*ii); ni != ne; ++ni) {
           if (EdgeInfo::has_value)
-            edge->construct(graph.getEdgeData<edge_data_type>(ni));
+            edge->construct(graph.getEdgeData<EDV>(ni));
           edge->dst = nodes[*ni];
           ++edge;
         }
@@ -720,8 +909,11 @@ protected:
 
 public:
   typedef NodeInfo* GraphNode;
-  typedef EdgeInfo* edge_iterator;
+  typedef EdgeTy edge_data_type;
+  typedef NodeTy node_data_type;
   typedef typename EdgeInfo::reference edge_data_reference;
+  typedef typename NodeInfo::reference node_data_reference;
+  typedef EdgeInfo* edge_iterator;
   typedef NodeInfo** iterator;
   typedef NodeInfo*const * const_iterator;
 
@@ -804,7 +996,7 @@ public:
     }
   }
 
-  typename NodeInfo::reference getData(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::checkWrite(mflag, false);
     Galois::Runtime::acquire(N, mflag);
     return N->getData();
