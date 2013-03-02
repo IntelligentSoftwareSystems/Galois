@@ -34,7 +34,7 @@
 #include <cstdio>
 #include <mutex>
 
-struct is_bad {
+struct is_bad : public Galois::Runtime::Lockable {
   Graphp g;
   is_bad() {}
   is_bad(Graphp _g): g(_g) {}
@@ -51,7 +51,7 @@ struct is_bad {
   }
 };
 
-struct create_nodes {
+struct create_nodes : public Galois::Runtime::Lockable {
   Graphp g;
   create_nodes() {}
   create_nodes(Graphp _g): g(_g) {}

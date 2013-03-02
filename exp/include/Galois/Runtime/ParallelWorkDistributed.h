@@ -51,7 +51,7 @@ struct count_if_R : public Galois::Runtime::Lockable {
 };
 
 template<typename Predicate>
-struct count_if_helper_dist {
+struct count_if_helper_dist : public Galois::Runtime::Lockable {
   Predicate f;
   ptrdiff_t ret;
   count_if_helper_dist(): ret(0) { }
@@ -70,7 +70,7 @@ struct count_if_helper_dist {
   }
 };
 
-struct count_if_reducer_dist {
+struct count_if_reducer_dist : public Galois::Runtime::Lockable {
   gptr<count_if_R> r;
   count_if_reducer_dist(count_if_R* _r = nullptr) :r(_r) {}
   template<typename CIH>

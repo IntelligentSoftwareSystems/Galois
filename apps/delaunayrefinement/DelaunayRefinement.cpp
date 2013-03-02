@@ -53,7 +53,7 @@ static const char* url = "delaunay_mesh_refinement";
 
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 
-struct Process {
+struct Process : public Galois::Runtime::Lockable {
   Graphp   graph;
   WLGraphp wlgraph;
 
@@ -86,7 +86,7 @@ struct Process {
   }
 };
 
-struct Preprocess {
+struct Preprocess : public Galois::Runtime::Lockable {
   Graphp   graph;
   WLGraphp wlgraph;
 
@@ -112,7 +112,7 @@ struct Preprocess {
   }
 };
 
-struct Prefetch {
+struct Prefetch : public Galois::Runtime::Lockable {
   Graphp   graph;
 
   Prefetch(Graphp g): graph(g) {}

@@ -33,7 +33,7 @@
 #include <set>
 #include <iostream>
 
-class Verifier {
+class Verifier : public Galois::Runtime::Lockable {
   struct inconsistent: public std::unary_function<GNode,bool> {
     Graphp graph;
     inconsistent() { }
@@ -69,7 +69,7 @@ class Verifier {
     }
   };
 
-  struct not_delaunay: public std::unary_function<GNode,bool> {
+  struct not_delaunay: public std::unary_function<GNode,bool>, public Galois::Runtime::Lockable {
     Graphp graph;
     not_delaunay() { }
     not_delaunay(Graphp g): graph(g) { }

@@ -33,7 +33,7 @@
 
 #define MINANGLE 30.0
 
-class Element {
+class Element : public Galois::Runtime::Lockable {
   Tuple coords[3]; // The three endpoints of the triangle
   // if the triangle has an obtuse angle
   // obtuse - 1 is which one
