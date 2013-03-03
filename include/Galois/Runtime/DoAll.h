@@ -60,6 +60,7 @@ class DoAllWork {
   struct PrivateState {
     local_iterator begin;
     local_iterator end;
+    SimpleRuntimeContext cnx;
     FunctionTy F;
     PrivateState(FunctionTy& o) :F(o) {}
   };
@@ -68,8 +69,35 @@ class DoAllWork {
 
   //! Master execution function for this loop type
   void processRange(PrivateState& tld) {
-    for (; tld.begin != tld.end; ++tld.begin)
-      tld.F(*tld.begin);
+    Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
+    while(tld.begin != tld.end) {
+      try {
+        tld.cnx.start_iteration();
+        if ((Distributed::networkHostNum > 1) && (!LL::getTID()))
+          net.handleReceives();
+        tld.F(*tld.begin);
+      } catch (const Distributed::remote_ex& ex) {
+        tld.cnx.cancel_iteration();
+        continue;
+      } catch (const conflict_ex& ex) {
+        tld.cnx.cancel_iteration();
+        continue;
+      }
+      // make sure the increment occurs before proceeding
+      do {
+        try {
+          if ((Distributed::networkHostNum > 1) && (!LL::getTID()))
+            net.handleReceives();
+          ++tld.begin;
+        } catch (const Distributed::remote_ex& ex) {
+          continue;
+        } catch (const conflict_ex& ex) {
+          continue;
+        }
+        break;
+      } while(true);
+      tld.cnx.commit_iteration();
+    }
   }
 
   bool doSteal(SharedState& source, PrivateState& dest) {
@@ -77,8 +105,8 @@ class DoAllWork {
     if (source.stealBegin != source.stealEnd) {
       source.stealLock.lock();
       if (source.stealBegin != source.stealEnd) {
-	dest.begin = source.stealBegin;
-	source.stealBegin = dest.end = Galois::split_range(source.stealBegin, source.stealEnd);
+        dest.begin = source.stealBegin;
+        source.stealBegin = dest.end = Galois::split_range(source.stealBegin, source.stealEnd);
       }
       source.stealLock.unlock();
     }
@@ -104,8 +132,8 @@ class DoAllWork {
     for (unsigned x = 1; x < activeThreads; x += x) {
       SharedState& r = *TLDS.getRemote((myID + x) % activeThreads);
       if (doSteal(r, mytld)) {
-	//populateSteal(mytld);
-	return true;
+        //populateSteal(mytld);
+        return true;
       }
     }
     return false;
@@ -140,9 +168,13 @@ public:
       barrier.wait();
     }
 
+    setThreadContext(&thisTLD.cnx);
+
     do {
       processRange(thisTLD);
     } while (useStealing && trySteal(thisTLD));
+
+    setThreadContext(NULL);
 
     doReduce(thisTLD);
   }

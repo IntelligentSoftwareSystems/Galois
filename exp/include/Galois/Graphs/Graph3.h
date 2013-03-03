@@ -416,10 +416,14 @@ public:
   class local_iterator : public std::iterator<std::forward_iterator_tag, NodeHandle> {
     NodeHandle n;
     void next() {
-      n = n->getNextNode();
+      NodeHandle tn = n;
       // skip node if not active!
-      while (n && !n->getActive())
-        n = n->getNextNode();
+      do {
+        tn = tn->getNextNode();
+      } while (tn && !tn->getActive());
+      // require a temp so that iterator doesn't get incremented and still end
+      // up throwing an exception when dereferencing for the getActive() call
+      n = tn;
     }
   public:
     explicit local_iterator(NodeHandle N) :n(N) {}
