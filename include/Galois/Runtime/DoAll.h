@@ -83,19 +83,15 @@ class DoAllWork {
         tld.cnx.cancel_iteration();
         continue;
       }
-      local_iterator temp;
       // make sure the increment occurs before proceeding
       do {
         try {
           if ((Distributed::networkHostNum > 1) && (!LL::getTID()))
             net.handleReceives();
-          temp = tld.begin;
           ++tld.begin;
         } catch (const Distributed::remote_ex& ex) {
-          tld.begin = temp;
           continue;
         } catch (const conflict_ex& ex) {
-          tld.begin = temp;
           continue;
         }
         break;
