@@ -34,6 +34,8 @@
 
 #include <mutex>
 
+// #define PRINT_DEBUG 1
+
 #define INELIGIBLE_COUNT 12
 using namespace std;
 
@@ -87,7 +89,7 @@ class RemoteDirectory: public SimpleRuntimeContext {
 
   //returns a valid locked local pointer to the object if it exists
   //or returns null
-  uintptr_t haveObject(uintptr_t ptr, uint32_t owner, SimpleRuntimeContext *cnx);
+  uintptr_t haveObject(uintptr_t ptr, uint32_t owner, SimpleRuntimeContext *cnx, bool& isavail);
 
   // isavail returns if the object is available in this host
   uintptr_t transientHaveObj(uintptr_t ptr, uint32_t owner, bool& isavail);
@@ -153,7 +155,7 @@ class LocalDirectory: public SimpleRuntimeContext {
   boost::unordered_map<uintptr_t, objstate> curobj;
 
   // returns a valid locked local pointer to the object if not remote
-  uintptr_t haveObject(uintptr_t ptr, uint32_t &remote, SimpleRuntimeContext *cnx);
+  uintptr_t haveObject(uintptr_t ptr, uint32_t &remote, SimpleRuntimeContext *cnx, bool& isavail);
 
   // places a remote request for the node
   void fetchRemoteObj(uintptr_t ptr, uint32_t remote, recvFuncTy pad);
@@ -257,8 +259,9 @@ template<typename T>
 void RemoteDirectory::prefetch(uintptr_t ptr, uint32_t owner) {
   assert(ptr);
   assert(owner != networkHostID);
+  bool isavail;
   // don't lock the object if not found
-  uintptr_t p = haveObject(ptr, owner, NULL);
+  uintptr_t p = haveObject(ptr, owner, NULL, isavail);
   // don't block just place a request if not local
   if (!p) {
     NetworkInterface& net = getSystemNetworkInterface();
@@ -296,10 +299,12 @@ template<typename T>
 T* RemoteDirectory::resolve(uintptr_t ptr, uint32_t owner, SimpleRuntimeContext *cnx) {
   assert(ptr);
   assert(owner != networkHostID);
-  uintptr_t p = haveObject(ptr, owner, cnx);
+  bool isLocallyAvail;
+  uintptr_t p = haveObject(ptr, owner, cnx, isLocallyAvail);
   while (!p) {
     NetworkInterface& net = getSystemNetworkInterface();
-    fetchRemoteObj(ptr, owner, &LocalDirectory::localReqLandingPad<T>);
+    if (!isLocallyAvail)
+      fetchRemoteObj(ptr, owner, &LocalDirectory::localReqLandingPad<T>);
     // abort the iteration if inside for each and dir_blocking not defined
     if (Galois::Runtime::inGaloisForEach && !dir_blocking<T>::value)
       throw make_remote_ex<T>(ptr, owner);
@@ -307,7 +312,7 @@ T* RemoteDirectory::resolve(uintptr_t ptr, uint32_t owner, SimpleRuntimeContext 
     // or is the first thread
     if (!Galois::Runtime::inGaloisForEach || !LL::getTID())
       net.handleReceives();
-    p = haveObject(ptr, owner, cnx);
+    p = haveObject(ptr, owner, cnx, isLocallyAvail);
   }
   return reinterpret_cast<T*>(p);
 }
@@ -354,6 +359,9 @@ void RemoteDirectory::remoteReqLandingPad(RecvBuffer &buf) {
       gSerialize(sbuf, ptr, size, *data);
       rd.curobj.erase(make_pair(ptr,owner));
       net.sendMessage(owner,&LocalDirectory::localDataLandingPad<T>,sbuf);
+#ifdef PRINT_DEBUG
+printf ("sending remote data to owner %u from %u for %lx \t%s\n", owner, Distributed::networkHostID, ptr, typeid(T).name());
+#endif
       delete data;
     }
   }
@@ -375,6 +383,9 @@ void RemoteDirectory::remoteDataLandingPad(RecvBuffer &buf) {
   lock_guard<glock> lock(rd.Lock);
   gDeserialize(buf,ptr,owner,size);
   auto iter = rd.curobj.find(make_pair(ptr,owner));
+#ifdef PRINT_DEBUG
+printf ("receiving remote data from owner %u in %u for %lx \t%s\n", owner, Distributed::networkHostID, ptr, typeid(T).name());
+#endif
   data = new T();
   gDeserialize(buf,*data);
   iter->second.state = RemoteDirectory::objstate::Local;
@@ -391,8 +402,9 @@ template<typename T>
 void LocalDirectory::prefetch(uintptr_t ptr) {
   uint32_t sent = 0;
   assert(ptr);
+  bool isavail;
   // don't lock the object if not found
-  uintptr_t p = haveObject(ptr, sent, NULL);
+  uintptr_t p = haveObject(ptr, sent, NULL, isavail);
   // don't block just place a request if not local
   if (!p) {
     NetworkInterface& net = getSystemNetworkInterface();
@@ -428,10 +440,12 @@ T* LocalDirectory::transientAcquire(uintptr_t ptr) {
 template<typename T>
 T* LocalDirectory::resolve(uintptr_t ptr, SimpleRuntimeContext *cnx) {
   uint32_t sent = 0;
-  uintptr_t p = haveObject(ptr, sent, cnx);
+  bool isLocallyAvail;
+  uintptr_t p = haveObject(ptr, sent, cnx, isLocallyAvail);
   while (!p) {
     NetworkInterface& net = getSystemNetworkInterface();
-    fetchRemoteObj(ptr, sent, &RemoteDirectory::remoteReqLandingPad<T>);
+    if (!isLocallyAvail)
+      fetchRemoteObj(ptr, sent, &RemoteDirectory::remoteReqLandingPad<T>);
     // abort the iteration if inside for each and dir_blocking not defined
     if (Galois::Runtime::inGaloisForEach && !dir_blocking<T>::value)
       throw make_remote_ex<T>(ptr, networkHostID);
@@ -439,7 +453,7 @@ T* LocalDirectory::resolve(uintptr_t ptr, SimpleRuntimeContext *cnx) {
     // or is the first thread
     if (!Galois::Runtime::inGaloisForEach || !LL::getTID())
       net.handleReceives();
-    p = haveObject(ptr, sent, cnx);
+    p = haveObject(ptr, sent, cnx, isLocallyAvail);
   }
   return reinterpret_cast<T*>(p);
 }
@@ -481,6 +495,9 @@ void LocalDirectory::localReqLandingPad(RecvBuffer &buf) {
     iter->second.sent_to = remote_to;
     iter->second.state = LocalDirectory::objstate::Remote;
     net.sendMessage(remote_to,&RemoteDirectory::remoteDataLandingPad<T>,sbuf);
+#ifdef PRINT_DEBUG
+printf ("sending local data to remote %u from %u for %lx \t%s\n", remote_to, Distributed::networkHostID, ptr, typeid(T).name());
+#endif
   }
   else if (iter->second.state != LocalDirectory::objstate::Local) {
     assert(0 && "Unexpected state in localReqLandingPad");
@@ -498,6 +515,9 @@ void LocalDirectory::localDataLandingPad(RecvBuffer &buf) {
   LocalDirectory& ld = getSystemLocalDirectory();
   lock_guard<glock> lock(ld.Lock);
   gDeserialize(buf,ptr,size);
+#ifdef PRINT_DEBUG
+printf ("receiving local data from remote  in %u for %lx \t%s\n", Distributed::networkHostID, ptr, typeid(T).name());
+#endif
   data = reinterpret_cast<T*>(ptr);
   auto iter = ld.curobj.find(ptr);
   gDeserialize(buf,*data);
@@ -543,6 +563,9 @@ void PersistentDirectory::persistentReqLandingPad(RecvBuffer &buf) {
   // object should be sent to the remote host
   gSerialize(sbuf,ptr, owner, *data);
   net.sendMessage(remote,&PersistentDirectory::persistentDataLandingPad<T>,sbuf);
+#ifdef PRINT_DEBUG
+printf ("sending persistent data to remote %u from %u for %lx \t%s\n", remote, Distributed::networkHostID, ptr, typeid(T).name());
+#endif
   return;
 }
 
@@ -555,6 +578,9 @@ void PersistentDirectory::persistentDataLandingPad(RecvBuffer &buf) {
   lock_guard<glock> lock(pd.Lock);
   data = new T();
   gDeserialize(buf, ptr, owner,*data);
+#ifdef PRINT_DEBUG
+printf ("receiving persistent data from owner %u in %u for %lx \t%s\n", owner, Distributed::networkHostID, ptr, typeid(T).name());
+#endif
   auto iter = pd.perobj.find(make_pair(ptr,owner));
   iter->second.localobj = (uintptr_t)data;
   return;

@@ -27,11 +27,12 @@
 using namespace std;
 using namespace Galois::Runtime::Distributed;
 
-uintptr_t RemoteDirectory::haveObject(uintptr_t ptr, uint32_t owner, SimpleRuntimeContext *cnx) {
+uintptr_t RemoteDirectory::haveObject(uintptr_t ptr, uint32_t owner, SimpleRuntimeContext *cnx, bool& isavail) {
 #define OBJSTATE (*iter).second
   lock_guard<glock> lock(Lock);
   auto iter = curobj.find(make_pair(ptr,owner));
   uintptr_t retval = 0;
+  isavail = false;
   // add object to list if it's not already there
   if (iter == curobj.end()) {
     objstate list_obj;
@@ -42,8 +43,10 @@ uintptr_t RemoteDirectory::haveObject(uintptr_t ptr, uint32_t owner, SimpleRunti
     iter = curobj.find(make_pair(ptr,owner));
   }
   // Returning the object even if locked as the call to acquire would fail
-  if (OBJSTATE.state != objstate::Remote)
+  if (OBJSTATE.state != objstate::Remote) {
     retval = OBJSTATE.localobj;
+    isavail = true;
+  }
   // acquire the lock if inside for_each
   if (retval && cnx && inGaloisForEach) {
     Lockable *L = reinterpret_cast<Lockable*>(retval);
@@ -90,18 +93,24 @@ void RemoteDirectory::fetchRemoteObj(uintptr_t ptr, uint32_t owner, recvFuncTy p
   NetworkInterface& net = getSystemNetworkInterface();
   gSerialize(buf,ptr,host);
   net.sendMessage (owner, pad, buf);
+#ifdef PRINT_DEBUG
+printf ("sending remote req to owner %u from %u for %lx\n", owner, Distributed::networkHostID, ptr);
+#endif
   return;
 }
 
-uintptr_t LocalDirectory::haveObject(uintptr_t ptr, uint32_t &remote, SimpleRuntimeContext *cnx) {
+uintptr_t LocalDirectory::haveObject(uintptr_t ptr, uint32_t &remote, SimpleRuntimeContext *cnx, bool& isavail) {
 #define OBJSTATE (*iter).second
   lock_guard<glock> lock(Lock);
   auto iter = curobj.find(ptr);
   uintptr_t retval = 0;
+  isavail = false;
   // Returning the object even if locked as the call to acquire would fail
   // return the object even if it is not in the list
-  if ((iter == curobj.end()) || (OBJSTATE.state == objstate::Local))
+  if ((iter == curobj.end()) || (OBJSTATE.state == objstate::Local)) {
     retval = ptr;
+    isavail = true;
+  }
   else if ((iter != curobj.end()) && (OBJSTATE.state == objstate::Remote))
     remote = OBJSTATE.sent_to;
   else
@@ -149,6 +158,9 @@ void LocalDirectory::fetchRemoteObj(uintptr_t ptr, uint32_t remote, recvFuncTy p
   NetworkInterface& net = getSystemNetworkInterface();
   gSerialize(buf,ptr,host);
   net.sendMessage (remote, pad, buf);
+#ifdef PRINT_DEBUG
+printf ("sending local req to remote %u from %u for %lx\n", remote, Distributed::networkHostID, ptr);
+#endif
   return;
 }
 
@@ -187,6 +199,9 @@ void PersistentDirectory::fetchRemoteObj(uintptr_t ptr, uint32_t owner, recvFunc
   NetworkInterface& net = getSystemNetworkInterface();
   gSerialize(buf,ptr,host);
   net.sendMessage (owner, pad, buf);
+#ifdef PRINT_DEBUG
+printf ("sending persistent req to owner %u from %u for %lx\n", owner, Distributed::networkHostID, ptr);
+#endif
   return;
 }
 
