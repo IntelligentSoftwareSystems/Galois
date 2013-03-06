@@ -107,9 +107,9 @@ public:
       std::vector<unsigned long> Values;
       gather(ii->first, ii->second, maxThreadID, Values);
       gPrint("STAT,",
-	     ii->first.c_str(), 
-	     ii->second.c_str(),
-	     maxThreadID,
+	     ii->first.c_str(), ",",
+	     ii->second.c_str(), ",",
+	     maxThreadID, ",",
 	     getSum(Values, maxThreadID)
 	     );
       for (unsigned x = 0; x < maxThreadID; ++x) {

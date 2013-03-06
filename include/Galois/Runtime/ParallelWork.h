@@ -136,15 +136,14 @@ protected:
     tld.stat.inc_iterations(); //Class specialization handles opt
     if (ForEachTraits<FunctionTy>::NeedsAborts)
       tld.cnx.start_iteration();
-    // network receive should be done only after start_iteration
-    // some objects may be locked in network receive
-    // if order is changed then start_iteration will assert due to the locked objs
-    if ((Distributed::networkHostNum > 1) && (LL::getTID() == 0)) {
-      Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
-      net.handleReceives();
-    }
     function(*p, tld.facing.data());
     commitIteration(tld);
+
+    if ((Distributed::networkHostNum > 1) && (LL::getTID() == 0)) {
+      Distributed::getSystemNetworkInterface().handleReceives();
+      getSystemLocalDirectory().makeProgress();
+      getSystemRemoteDirectory().makeProgress();
+    }
   }
 
   GALOIS_ATTRIBUTE_NOINLINE
@@ -182,14 +181,31 @@ protected:
 	}
 	p = lwl.pop();
       }
-    } catch (const Distributed::remote_ex& ex) {
-      abortIteration(*p, tld, recursiveAbort);
-      //Distributed::getSystemRemoteDirectory().fetchRemoteObj(ex.ptr,ex.owner, ex.pad);
+    // } catch (const Distributed::remote_ex& ex) {
+    //   abortIteration(*p, tld, recursiveAbort);
+    //   //Distributed::getSystemRemoteDirectory().fetchRemoteObj(ex.ptr,ex.owner, ex.pad);
     } catch (const conflict_ex& ex) {
+      Distributed::getSystemLocalDirectory().recall(ex.obj, false);
       abortIteration(*p, tld, recursiveAbort);
+
+    if ((Distributed::networkHostNum > 1) && (LL::getTID() == 0)) {
+      Distributed::getSystemNetworkInterface().handleReceives();
+      getSystemLocalDirectory().makeProgress();
+      getSystemRemoteDirectory().makeProgress();
+    }
+
     } catch (const break_ex&) {
       handleBreak(tld);
       return false;
+    } catch (int) {
+      abortIteration(*p, tld, recursiveAbort);
+
+    if ((Distributed::networkHostNum > 1) && (LL::getTID() == 0)) {
+      Distributed::getSystemNetworkInterface().handleReceives();
+      getSystemLocalDirectory().makeProgress();
+      getSystemRemoteDirectory().makeProgress();
+    }
+
     }
     return workHappened;
   }
@@ -232,14 +248,17 @@ protected:
         if (checkAbort)
           didWork |= handleAborts(tld);
 	didAnyWork |= didWork;
+
+	if ((Distributed::networkHostNum > 1) && (LL::getTID() == 0)) {
+	  Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
+	  net.handleReceives();
+	  getSystemLocalDirectory().makeProgress();
+	  getSystemRemoteDirectory().makeProgress();
+	}
+
       } while (didWork);
       if (ForEachTraits<FunctionTy>::NeedsBreak && broke.data)
         break;
-
-      if ((Distributed::networkHostNum > 1) && (LL::getTID() == 0)) {
-	Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
-	net.handleReceives();
-      }
 
       //update node color and prop token
       term.localTermination(didAnyWork);

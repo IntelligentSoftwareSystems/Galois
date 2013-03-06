@@ -67,6 +67,10 @@ void trace_obj_send_pad(RecvBuffer &buf) {
 }
 
 void Galois::Runtime::Distributed::trace_obj_send(uint32_t owner, void* ptr, uint32_t remote) {
+#ifdef NDEBUG
+  return;
+#endif
+
   if (networkHostID == 0) {
     trace_obj_send_do(networkHostID, owner, ptr, remote);
   } else {
@@ -77,6 +81,9 @@ void Galois::Runtime::Distributed::trace_obj_send(uint32_t owner, void* ptr, uin
 }
 
 void Galois::Runtime::Distributed::trace_obj_recv(uint32_t owner, void* ptr) {
+#ifdef NDEBUG
+  return;
+#endif
   if (networkHostID == 0) {
     trace_obj_recv_do(networkHostID, owner, ptr);
   } else {

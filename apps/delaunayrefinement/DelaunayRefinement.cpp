@@ -151,8 +151,8 @@ int main(int argc, char** argv) {
     }
   }
 
-  std::cout << "start configuration: " << NThirdGraphSize(graph) << " total triangles, ";
-  std::cout << Galois::ParallelSTL::count_if_local(graph, is_bad(graph)) << " bad triangles\n";
+  //  std::cout << "start configuration: " << NThirdGraphSize(graph) << " total triangles, ";
+  //  std::cout << Galois::ParallelSTL::count_if_local(graph, is_bad(graph)) << " bad triangles\n";
   //ThirdGraphSize(graph);
 
   // call prefetch to get the nodes to the owner
@@ -182,8 +182,8 @@ int main(int argc, char** argv) {
   Trefine.stop();
   T.stop();
 
-  std::cout << "final configuration: " << NThirdGraphSize(graph) << " total triangles, ";
-  std::cout << Galois::ParallelSTL::count_if_local(graph, is_bad(graph)) << " bad triangles\n";
+  //  std::cout << "final configuration: " << NThirdGraphSize(graph) << " total triangles, ";
+  //  std::cout << Galois::ParallelSTL::count_if_local(graph, is_bad(graph)) << " bad triangles\n";
 
   Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
   

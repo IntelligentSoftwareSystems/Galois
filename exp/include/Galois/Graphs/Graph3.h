@@ -1,3 +1,29 @@
+/** deque like structure with scalable allocator usage -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @author Andrew Lenharth <andrew@lenharth.org>
+ */
+
+#ifndef GALOIS_GRAPH3_H
+#define GALOIS_GRAPH3_H
+
 #include <iterator>
 #include <deque>
 
@@ -6,6 +32,8 @@
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/MethodFlags.h"
 #include "Galois/Runtime/PerThreadStorage.h"
+#include "Galois/Runtime/mm/Mem.h"
+
 #include <boost/iterator/filter_iterator.hpp>
 
 namespace Galois {
@@ -35,7 +63,7 @@ protected:
 
   void dump(std::ostream& os) const {
     os << "next: ";
-    nextNode.dump();
+    nextNode.dump(os);
     os << " active: ";
     os << active;
   }
@@ -107,7 +135,7 @@ public:
 
   void dump(std::ostream& os) const {
     os << "<{Edge: dst: ";
-    dst.dump();
+    dst.dump(os);
     os << " dst active: ";
     os << dst->getActive();
     os << " val: ";
@@ -135,7 +163,7 @@ public:
 
   void dump(std::ostream& os) const {
     os << "<{Edge: dst: ";
-    dst.dump();
+    dst.dump(os);
     os << " dst active: ";
     os << dst->getActive();
     os << "}>";
@@ -310,12 +338,20 @@ class ThirdGraph { //: public Galois::Runtime::Distributed::DistBase<ThirdGraph>
     Galois::Runtime::Distributed::gptr<SubGraphState> next;
     Galois::Runtime::Distributed::gptr<SubGraphState> master;
     typedef int tt_has_serialize;
-    typedef int tt_dir_blocking;
     void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
       gSerialize(s, head, next, master);
     }
     void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
       gDeserialize(s, head, next, master);
+    }
+    void dump(std::ostream& os) const {
+      os << "Subgraph " << this << " with master ";
+      master.dump(os);
+      os << " and next ";
+      next.dump(os);
+      os << " and head ";
+      head.dump(os);
+      os << "\n";
     }
     SubGraphState() :head(), next(), master(this) {}
   };
@@ -326,6 +362,8 @@ class ThirdGraph { //: public Galois::Runtime::Distributed::DistBase<ThirdGraph>
     bool operator()(typename gNode::EdgeType& n) const { return n.getDst()->getActive(); }
   };
 
+  Galois::Runtime::MM::FixedSizeAllocator heap;
+
 public:
   typedef typename gNode::Handle NodeHandle;
   //! Edge iterator
@@ -333,24 +371,26 @@ public:
 
   template<typename... Args>
   NodeHandle createNode(Args&&... args) {
-    NodeHandle N(new gNode(std::forward<Args...>(args...)));
+    void* vp = heap.allocate(sizeof(gNode));
+    NodeHandle N(new (vp) gNode(std::forward<Args...>(args...)));
     // lock the localState before adding the node
     gptr<SubGraphState> lStatePtr(localState.getLocal());
-    SubGraphState* lState = lStatePtr.transientAcquire();
-    N->getNextNode() = lState->head;
-    lState->head = N;
-    lStatePtr.transientRelease();
+    SubGraphState* p = transientAcquire(lStatePtr);
+    N->getNextNode() = p->head;
+    p->head = N;
+    transientRelease(lStatePtr);
     return N;
   }
 
   NodeHandle createNode() {
-    NodeHandle N(new gNode());
+    void* vp = heap.allocate(sizeof(gNode));
+    NodeHandle N(new (vp) gNode());
     // lock the localState before adding the node
     gptr<SubGraphState> lStatePtr(localState.getLocal());
-    SubGraphState* lState = lStatePtr.transientAcquire();
-    N->getNextNode() = lState->head;
-    lState->head = N;
-    lStatePtr.transientRelease();
+    SubGraphState* p = transientAcquire(lStatePtr);
+    N->getNextNode() = p->head;
+    p->head = N;
+    transientRelease(lStatePtr);
     return N;
   }
   
@@ -366,7 +406,7 @@ public:
     }
   }
   
-  class iterator : public std::iterator<std::forward_iterator_tag, const NodeHandle> {
+  class iterator : public std::iterator<std::forward_iterator_tag, NodeHandle> {
     NodeHandle n;
     Galois::Runtime::Distributed::gptr<SubGraphState> s;
     void next() {
@@ -382,11 +422,13 @@ public:
     }
 
   public:
-    using typename std::iterator<std::forward_iterator_tag, const NodeHandle>::pointer;
-    using typename std::iterator<std::forward_iterator_tag, const NodeHandle>::reference;
+    using typename std::iterator<std::forward_iterator_tag, NodeHandle>::pointer;
+    using typename std::iterator<std::forward_iterator_tag, NodeHandle>::reference;
 
   iterator() :n(), s() {}
     explicit iterator(const Galois::Runtime::Distributed::gptr<SubGraphState> ms) :n(ms->head), s(ms) {
+      assert(n);
+      assert(s);
       while (!n && s->next) {
         s = s->next;
         n = s->head;
@@ -397,16 +439,16 @@ public:
       if (!n) s.initialize(nullptr);
     }
 
-    reference operator*() const { return n; }
+    reference operator*() { return n; }
     pointer operator->() const { return &n; }
     iterator& operator++() { next(); return *this; }
     iterator operator++(int) { iterator tmp(*this); next(); return tmp; }
     bool operator==(const iterator& rhs) const { return n == rhs.n; }
     bool operator!=(const iterator& rhs) const { return n != rhs.n; }
 
-    void dump() const {
-      n.dump();
-      s.dump();
+    void dump(std::ostream& os) const {
+      n.dump(os);
+      s.dump(os);
     }
   };
 
@@ -447,7 +489,6 @@ public:
   //! Returns an iterator to the neighbors of a node 
   edge_iterator edge_begin(NodeHandle N) {
     assert(N);
-    N.acquire();
     // prefetch all the nodes
     for (auto ii = N->begin(), ee = N->end(); ii != ee; ++ii) {
       ii->getDst().prefetch();
@@ -495,17 +536,11 @@ public:
     return std::distance(begin(), end());
   }
 
-  // assuming the constructor runs only on the main thread
-  ThirdGraph() {
-    unsigned numThreads = Runtime::LL::getMaxThreads();
-    SubGraphState* first = localState.getLocal(0);
-    // initialize the linked list of the local nodes
-    for (unsigned i = 0; i < numThreads; i++) {
-      SubGraphState* lState = localState.getLocal(i);
-      lState->master.initialize(first);
-      if (i != (numThreads-1))
-        lState->next.initialize(localState.getLocal(i+1));
-    }
+  void dump(std::ostream& os) const {
+    os << "Graph at " << Galois::Runtime::Distributed::networkHostID << " with " << localState.size() << " subgraphs\n";
+    for (unsigned int i = 0; i < localState.size(); i++)
+      localState.getRemote(i)->dump(os);
+    os << "\nDone Graph\n";
   }
 
   // mark the graph as persistent so that it is distributed
@@ -513,34 +548,42 @@ public:
   typedef int tt_has_serialize;
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
     //This is what is called on the source of a replicating source
-    gptr<SubGraphState> lStatePtr(localState.getLocal());
-    SubGraphState* lState = lStatePtr.transientAcquire();
-    gSerialize(s,lState->master);
-    lStatePtr.transientRelease();
-  }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-    unsigned numThreads = Runtime::LL::getMaxThreads();
-    //This constructs the local node of the distributed graph
-    gptr<SubGraphState> lStatePtr(localState.getLocal());
-    SubGraphState* lState = lStatePtr.transientAcquire();
-    gDeserialize(s,lState->master);
-    for (unsigned i = 0; i < numThreads; i++) {
-      if (i == Runtime::LL::getTID())
-        continue;
-      localState.getLocal(i)->master = lState->master;
-    }
-    SubGraphState* mState = lState->master.transientAcquire();
-    gptr<SubGraphState> lastPtr(localState.getLocal(numThreads-1));
-    SubGraphState* lastState = lastPtr.transientAcquire();
-    // last thread's localState points to head of the master
-    lastState->next = mState->next;
-    // master's next points to first thread's localState
-    mState->next.initialize(lState);
-    lastPtr.transientRelease();
-    lState->master.transientRelease();
-    lStatePtr.transientRelease();
+    gptr<SubGraphState> lStatePtr(localState.getRemote(0));
+    assert(lStatePtr);
+    gSerialize(s,lStatePtr);
   }
   
+ ThirdGraph() :heap(sizeof(gNode)) {
+    //    std::cout << "TG " << Galois::Runtime::Distributed::networkHostID << " " << Galois::Runtime::LL::getTID() << "\n";
+    for (unsigned int i = 0; i < localState.size(); ++i)
+      localState.getRemote(i)->master.initialize(localState.getRemote(0));
+    for (unsigned i = 0; i < localState.size() - 1; ++i)
+      localState.getRemote(i)->next.initialize(localState.getRemote(i+1));
+    //    dump(std::cout);
+  }
+
+  SubGraphState* getMasterState() __attribute__((used)) {
+    return localState.getRemote(0);
+  }
+
+ ThirdGraph(Galois::Runtime::Distributed::DeSerializeBuffer& s) :heap(sizeof(gNode)) {
+    //    std::cout << "TG " << Galois::Runtime::Distributed::networkHostID << " " << Galois::Runtime::LL::getTID() << "\n";
+   //This constructs the local node of the distributed graph
+    gptr<SubGraphState> master;
+    gDeserialize(s,master);
+    assert(master);
+    for (unsigned i = 0; i < localState.size() - 1; ++i)
+      localState.getRemote(i)->next.initialize(localState.getRemote(i+1));
+    for (unsigned int i = 0; i < localState.size(); i++)
+      localState.getRemote(i)->master = master;
+
+    SubGraphState* masterPtr = transientAcquire(master);
+    localState.getRemote(localState.size() - 1)->next = masterPtr->next;
+    masterPtr->next.initialize(localState.getRemote(0));
+    transientRelease(master);
+    //    dump(std::cout);
+  }
+
 };
 
 // used to find the size of the graph
@@ -625,3 +668,5 @@ ptrdiff_t NThirdGraphSize(GraphTy g) {
 
 } //namespace Graph
 } //namespace Galois
+
+#endif

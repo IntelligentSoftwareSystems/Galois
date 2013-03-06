@@ -26,14 +26,15 @@ int main(int argc, char** argv) {
   Galois::Runtime::Distributed::networkStart();
 
   typedef G<int, int , EdgeDirection::Out> GTy;
-  GTy Gr;
+  GTy Grp;
+  gptr<GTy> Gr(&Grp);
 
   for (int x = 0; x < 100; ++x)
-    Gr.createNode(x);
+    Gr->createNode(x);
 
-  Galois::for_each<>(Gr.begin(), Gr.end(), op());
+  Galois::for_each<>(Gr->begin(), Gr->end(), op());
 
-  for (auto ii = Gr.begin(), ee = Gr.end(); ii != ee; ++ii)
+  for (auto ii = Gr->begin(), ee = Gr->end(); ii != ee; ++ii)
     std::cout << (*ii)->getData() << " " << std::distance((*ii)->begin(), (*ii)->end()) << " ";
   std::cout << "\n";
 
@@ -44,7 +45,7 @@ int main(int argc, char** argv) {
   if (false) {
     Galois::Runtime::Distributed::SerializeBuffer B;
     //serialize the pointer
-    auto oldB = *Gr.begin();
+    auto oldB = *Gr->begin();
     gSerialize(B,oldB);
     //serialize the node
     gSerialize(B,*oldB);
@@ -65,7 +66,7 @@ int main(int argc, char** argv) {
     typename GTy::NodeHandle foo;
     gDeserialize(D,foo);
     
-    auto bar = Gr.createNode();
+    auto bar = Gr->createNode();
     gDeserialize(D,*bar);
     
     B.print(std::cout);

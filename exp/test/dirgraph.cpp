@@ -80,7 +80,7 @@ int main(int argc, char** argv) {
     std::cout << (*ii)->getData() << " " << std::distance((*ii)->begin(), (*ii)->end()) << " ";
   std::cout << "\n";
 
-  std::cout << "\n" << "Dumping the graph of size " << NThirdGraphSize(Gr) << endl;
+  std::cout << "\n" << "Dumping the graph of size " << NThirdGraphSize(Gr) << std::endl;
   for (auto ii = Gr->begin(), ee = Gr->end(); ii != ee; ++ii) {
     (*ii)->dump(std::cout);
     std::cout << "\n";

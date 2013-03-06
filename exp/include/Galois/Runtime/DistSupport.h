@@ -37,36 +37,43 @@ BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_is_persistent)
 template<typename T>
 struct is_persistent : public has_tt_is_persistent<T> {};
 
+SimpleRuntimeContext& getTransCnx();
+
 namespace {
 
 template<typename T, bool> struct resolve_dispatch;
 
+//Normal objects resolve here
 template<typename T>
 struct resolve_dispatch<T, false> {
-    static T* go(uint32_t owner, T* ptr) {
-    T* rptr = nullptr;
-    assert(ptr);
+  static T* go(uint32_t owner, T* ptr) {
     if (owner == networkHostID) {
       // have to enter the directory when outside the for each to
       // check for remote objects! can't be found otherwise as
       // acquire isn't called outside the for each.
+      if (inGaloisForEach)
+	acquire(ptr, Galois::MethodFlag::ALL);
+      else if (isAcquired(ptr))
+	getSystemLocalDirectory().recall(ptr, true);
+      return ptr;
+    } else {
+      T* rptr = getSystemRemoteDirectory().resolve<T>(owner,ptr);
       if (inGaloisForEach) {
-        rptr = ptr;
-        try {
-          // acquire the lock if inside the for each
-          acquire (rptr, Galois::MethodFlag::ALL);
-        }
-        catch (const conflict_ex& ex) {
-          rptr = getSystemLocalDirectory().resolve<T>((uintptr_t)ptr, getThreadContext());
-        }
+	try {
+	  acquire(rptr, Galois::MethodFlag::ALL);
+	} catch (...) {
+	  //	  std::cerr << "HHHHHAAHAHAHA\n";
+	  throw (int)5;
+	  abort();
+	}
+      } else {
+	while (isAcquired(rptr)) {
+	  if (!LL::getTID())
+	    getSystemNetworkInterface().handleReceives();
+	}
       }
-      else {
-        rptr = getSystemLocalDirectory().resolve<T>((uintptr_t)ptr, getThreadContext());
-      }
-    } else
-      rptr = getSystemRemoteDirectory().resolve<T>((uintptr_t)ptr, owner, getThreadContext());
-    assert(rptr);
-    return rptr;
+      return rptr;
+    }
   }
 };
 
@@ -75,11 +82,10 @@ template<typename T>
 struct resolve_dispatch<T,true> {
   static T* go(uint32_t owner, T*  ptr) {
     T* rptr = nullptr;
-    assert(ptr);
     if (owner == networkHostID)
       rptr = ptr;
     else
-      rptr = getSystemPersistentDirectory().resolve<T>((uintptr_t)ptr, owner);
+      rptr = getSystemPersistentDirectory().resolve<T>(ptr, owner);
     assert(rptr);
     return rptr;
   }
@@ -88,7 +94,40 @@ struct resolve_dispatch<T,true> {
 
 template<typename T>
 T* resolve(const gptr<T>& p) {
+  if (!p.ptr) {
+    //    std::cerr << "aborting in resolve for " << typeid(T).name() << "\n";
+    assert(p.ptr);
+  }
   return resolve_dispatch<T,is_persistent<T>::value>::go(p.owner, p.ptr);
+}
+
+template <typename T>
+T* transientAcquire(const gptr<T>& p) {
+  if (p.owner == networkHostID) {
+    while (!getTransCnx().try_acquire(p.ptr)) {
+      getSystemLocalDirectory().recall(p.ptr, false);
+      if (!LL::getTID())
+	getSystemNetworkInterface().handleReceives();
+    }
+    return p.ptr;
+  } else { // REMOTE
+    do {
+      T* rptr = getSystemRemoteDirectory().resolve<T>(p.owner, p.ptr);
+      //DATA RACE with delete
+      if (getTransCnx().try_acquire(rptr))
+	return rptr;
+      if (!LL::getTID())
+	getSystemNetworkInterface().handleReceives();
+    } while (true);
+  }
+}
+
+template<typename T>
+void transientRelease(const gptr<T>& p) {
+  T* ptr = p.ptr;
+  if (p.owner != networkHostID)
+    ptr = getSystemRemoteDirectory().resolve<T>(p.owner, p.ptr);
+  getTransCnx().release(ptr);
 }
 
 template<typename T>
@@ -97,6 +136,8 @@ class gptr {
   uint32_t owner;
 
   friend T* resolve<>(const gptr<T>&);
+  friend T* transientAcquire<>(const gptr<T>& p);
+  friend void transientRelease<>(const gptr<T>& p);
 
 public:
   typedef T element_type;
@@ -107,32 +148,18 @@ public:
 
   // calling resolve acquires the lock, used after a prefetch
   // IMP: have to be changed when local objects aren't passed to the directory
-  void acquire() const {
-    (void) *resolve(*this);
-  }
+  // void acquire() const {
+  //   (void) *resolve(*this);
+  // }
 
-  // check if the object is available, else just make a call to fetch
-  T* transientAcquire() {
-    if (owner == networkHostID)
-      return getSystemLocalDirectory().transientAcquire<T>(reinterpret_cast<uintptr_t>(ptr));
-    else
-      return getSystemRemoteDirectory().transientAcquire<T>(reinterpret_cast<uintptr_t>(ptr), owner);
-  }
-
-  // check if the object is available, else just make a call to fetch
-  void transientRelease() {
-    if (owner == networkHostID)
-      getSystemLocalDirectory().transientRelease(reinterpret_cast<uintptr_t>(ptr));
-    else
-      getSystemRemoteDirectory().transientRelease(reinterpret_cast<uintptr_t>(ptr), owner);
-  }
-
-  // check if the object is available, else just make a call to fetch
+  // // check if the object is available, else just make a call to fetch
   void prefetch() {
-    if (owner == networkHostID)
-      getSystemLocalDirectory().prefetch<T>(reinterpret_cast<uintptr_t>(ptr));
-    else
-      getSystemRemoteDirectory().prefetch<T>(reinterpret_cast<uintptr_t>(ptr), owner);
+    if (0) {
+      if (owner == networkHostID)
+	getSystemLocalDirectory().recall(ptr, false); 
+      else
+	getSystemRemoteDirectory().resolve<T>(owner, ptr);
+    }
   }
 
   T& operator*() const {
@@ -182,18 +209,18 @@ public:
     gDeserialize(s,ptr, owner);
   }
 
-  void dump() const {
-    printf("[%u,%lx]", owner, (size_t)ptr);
+  void dump(std::ostream& os) const {
+    os << "[" << owner << "," << ptr << "]";
   }
 };
 
 template<typename T>
 remote_ex make_remote_ex(const Distributed::gptr<T>& p) {
-  return remote_ex{&Distributed::LocalDirectory::localReqLandingPad<T>, p.ptr, p.owner};
+  return remote_ex{&Distributed::LocalDirectory::reqLandingPad<T>, p.ptr, p.owner};
 }
 template<typename T>
-remote_ex make_remote_ex(uintptr_t ptr, uint32_t owner) {
-  return remote_ex{&Distributed::LocalDirectory::localReqLandingPad<T>, ptr, owner};
+remote_ex make_remote_ex(Lockable* ptr, uint32_t owner) {
+  return remote_ex{&Distributed::LocalDirectory::reqLandingPad<T>, ptr, owner};
 }
 
 } //namespace Distributed

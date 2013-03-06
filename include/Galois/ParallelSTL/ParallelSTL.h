@@ -73,9 +73,9 @@ ptrdiff_t count_if_local(ConTy& c, Predicate pred)
   Galois::Runtime::do_all_impl_dist(c, count_if_helper_dist<Predicate>(pred),
                                               count_if_reducer_dist(&r), true);
   // get the modified count back
-  ptr_r  = loc_r.transientAcquire();
+  ptr_r  = Runtime::Distributed::transientAcquire(loc_r);
   retval = ptr_r->i;
-  loc_r.transientRelease();
+  Runtime::Distributed::transientRelease(loc_r);
   return retval;
 #else
   return Galois::Runtime::do_all_impl(Galois::Runtime::makeLocalRange(c),

@@ -25,19 +25,20 @@
 #ifndef GALOIS_RUNTIME_DIRECTORY_H
 #define GALOIS_RUNTIME_DIRECTORY_H
 
-#include <boost/unordered_map.hpp>
 #include "Galois/Runtime/ll/TID.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Network.h"
+#include "Galois/Runtime/Tracer.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/ll/SimpleLock.h"
+#include "Galois/Runtime/ll/gio.h"
+
+#include <boost/utility.hpp>
 
 #include <mutex>
-
-// #define PRINT_DEBUG 1
-
-#define INELIGIBLE_COUNT 12
-using namespace std;
+#include <unordered_map>
+#include <map>
+#include <set>
 
 namespace Galois {
 namespace Runtime {
@@ -45,7 +46,7 @@ namespace Distributed {
 
 struct remote_ex {
   Distributed::recvFuncTy pad;
-  uintptr_t ptr;
+  Lockable* ptr;
   uint32_t owner;
 };
 
@@ -56,190 +57,137 @@ template<typename T>
 remote_ex make_remote_ex(const gptr<T>&);
 
 template<typename T>
-remote_ex make_remote_ex(uintptr_t ptr, uint32_t owner);
+remote_ex make_remote_ex(Lockable* ptr, uint32_t owner);
 
-//Objects with this tag should make blocking calls
-BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_dir_blocking)
-template<typename T>
-struct dir_blocking : public has_tt_dir_blocking<T> {};
+template<typename a, typename b>
+struct pairhash {
+private:
+  const std::hash<a> ah;
+  const std::hash<b> bh;
+public:
+  pairhash() : ah(), bh() {}
+  size_t operator()(const std::pair<a, b> &p) const {
+    return ah(p.first) ^ bh(p.second);
+  }
+};
 
-class RemoteDirectory: public SimpleRuntimeContext {
+class RemoteDirectory: public SimpleRuntimeContext, private boost::noncopyable {
 
-  struct objstate {
-    // Remote - The object has been returned to the owner
-    // Local  - Local object eligible for use as soon as received
-    //          Inelgible for transfer till INELI2ELI_COUNT reqs or local use
-    enum ObjStates { Remote, Local };
-
-    uintptr_t localobj;
-    enum ObjStates state;
-    int count;
-  };
-
-  struct ohash : public unary_function<std::pair<uintptr_t, uint32_t>, size_t> {
-    size_t operator()(const std::pair<uintptr_t, uint32_t>& v) const {
-      return std::hash<uintptr_t>()(v.first) ^ std::hash<uint32_t>()(v.second);
-    }
-  };
-
-  // using RAII for locking, done to handle lock release on exceptions
-  typedef Galois::Runtime::LL::SimpleLock<true> glock;
   Galois::Runtime::LL::SimpleLock<true> Lock;
-  boost::unordered_map<std::pair<uintptr_t, uint32_t>, objstate, ohash> curobj;
 
-  //returns a valid locked local pointer to the object if it exists
-  //or returns null
-  uintptr_t haveObject(uintptr_t ptr, uint32_t owner, SimpleRuntimeContext *cnx, bool& isavail);
+  std::unordered_map<std::pair<uint32_t, Lockable*>, Lockable*, 
+		     pairhash<uint32_t, Lockable*>> curobj;
 
-  // isavail returns if the object is available in this host
-  uintptr_t transientHaveObj(uintptr_t ptr, uint32_t owner, bool& isavail);
+  std::vector<std::function<void ()>> pending;
 
-  // tries to acquire a lock and returns true or false if acquired
-  // used before sending an object and freeing it
-  // use steal to specify if the lock can be acquired as soon as received
-  bool dirAcquire(Lockable* L, bool steal);
+  template<typename T>
+  void repeatRecall(uint32_t owner, Lockable* ptr);
 
-  // releases an object acquired with dirAcquire
-  void dirRelease(uintptr_t ptr, uint32_t owner);
+  template<typename T>
+  void doRecall(uint32_t owner, Lockable* ptr);
+
+  template<typename T>
+  void doObj(uint32_t owner, Lockable* ptr, RecvBuffer& buf);
+
+  static std::pair<uint32_t, Lockable*> k(uint32_t owner, Lockable* ptr) {
+    return std::make_pair(owner, ptr);
+  }
 
 public:
-
-  // places a remote request for the node
-  void fetchRemoteObj(uintptr_t ptr, uint32_t owner, recvFuncTy pad);
+  RemoteDirectory(): SimpleRuntimeContext(true) {}
 
   // Handles incoming requests for remote objects
-  // if Ineligible, transfer to Eligible after INELI2ELI_COUNT requests
-  // if Eligible return the object back to owner and mark as Remote
   template<typename T>
-  static void remoteReqLandingPad(RecvBuffer &);
+  static void recallLandingPad(RecvBuffer &);
 
   // Landing Pad for incoming remote objects
   template<typename T>
-  static void remoteDataLandingPad(RecvBuffer &);
-
-  //prefetch a pointer, owner pair
-  //precondition: owner != networkHostID
-  //don't lock obj, just return if found and place a request if not found
-  template<typename T>
-  void prefetch(uintptr_t ptr, uint32_t owner);
+  static void objLandingPad(RecvBuffer &);
 
   //resolve a pointer, owner pair
-  //precondition: owner != networkHostID
   template<typename T>
-  T* resolve(uintptr_t ptr, uint32_t owner, SimpleRuntimeContext *cnx);
+  T* resolve(uint32_t, Lockable*);
 
-  //resolve a pointer, owner pair
-  //blocking acquire to lock object with the directory object
-  //precondition: owner != networkHostID
-  template<typename T>
-  T* transientAcquire(uintptr_t ptr, uint32_t owner);
+  void makeProgress();
 
-  //release the lock got using transientAcquire
-  void transientRelease(uintptr_t ptr, uint32_t owner);
+  void dump();
+
 };
 
-class LocalDirectory: public SimpleRuntimeContext {
+class LocalDirectory: public SimpleRuntimeContext, private boost::noncopyable {
 
   struct objstate {
-    // Remote - Object passed to a remote host
-    // Local - Local object may be locked
-    enum ObjStates { Remote, Local };
-
-    uint32_t sent_to;  // valid only for remote objects
-    enum ObjStates state;
+    uint32_t sent_to;  // host with object currently or first pending requester
+    recvFuncTy pad; // function to call remotely to initiate recall
+    bool recalled;
   };
 
-  // using RAII for locking, done to handle lock release on exceptions
-  typedef Galois::Runtime::LL::SimpleLock<true> glock;
   Galois::Runtime::LL::SimpleLock<true> Lock;
-  boost::unordered_map<uintptr_t, objstate> curobj;
+  //use a map for stable iterators
+  std::map<Lockable*, objstate> curobj;
 
-  // returns a valid locked local pointer to the object if not remote
-  uintptr_t haveObject(uintptr_t ptr, uint32_t &remote, SimpleRuntimeContext *cnx, bool& isavail);
+  Galois::Runtime::LL::SimpleLock<true> PendingLock;
+  std::multimap<Lockable*, std::function<void ()>> pending;
 
   // places a remote request for the node
-  void fetchRemoteObj(uintptr_t ptr, uint32_t remote, recvFuncTy pad);
+  void recallObj(Lockable* ptr, uint32_t remote, recvFuncTy pad);
 
-  // blocking acquire to lock object with the directory object
-  // isavail returns if the object is available on this host
-  uintptr_t transientHaveObj(uintptr_t ptr, uint32_t& remote, bool& isavail);
+  template<typename T>
+  void sendObj(T* ptr, uint32_t remote);
 
-  // tries to acquire a lock and returns true or false if acquired
-  // used before sending an object and marking it remote
-  bool dirAcquire(Lockable* L);
+  template<typename T>
+  void doRequest(Lockable* ptr, uint32_t remote);
 
-  // releases an object acquired with dirAcquire
-  void dirRelease(uintptr_t ptr);
+  template<typename T>
+  void doObj(T* obj);
 
 public:
 
   LocalDirectory(): SimpleRuntimeContext(true) {}
 
+  //recalls a local object form a remote host.  May be blocking
+  void recall(Lockable* ptr, bool blocking);
+
   // forward the request if the state is remote
   // send the object if local and not locked, also mark as remote
   template<typename T>
-  static void localReqLandingPad(RecvBuffer &);
+  static void reqLandingPad(RecvBuffer &);
 
   // send the object if local, not locked and mark obj as remote
   template<typename T>
-  static void localDataLandingPad(RecvBuffer &);
+  static void objLandingPad(RecvBuffer &);
 
-  //prefetch a pointer
-  //don't lock obj, just return if found and place a request if not found
-  template<typename T>
-  void prefetch(uintptr_t ptr);
+  void makeProgress();
 
-  // resolve a pointer
-  template<typename T>
-  T* resolve(uintptr_t ptr, SimpleRuntimeContext *cnx);
-
-  //resolve a pointer
-  //blocking acquire to lock object with the directory object
-  template<typename T>
-  T* transientAcquire(uintptr_t ptr);
-
-  //release the lock got using transientAcquire
-  void transientRelease(uintptr_t ptr);
+  void dump();
 };
 
-class PersistentDirectory: public SimpleRuntimeContext {
-
-  struct objstate {
-    uintptr_t localobj;
-    bool requested;
-  };
-
-  struct ohash : public unary_function<std::pair<uintptr_t, uint32_t>, size_t> {
-    size_t operator()(const std::pair<uintptr_t, uint32_t>& v) const {
-      return std::hash<uintptr_t>()(v.first) ^ std::hash<uint32_t>()(v.second);
-    }
-  };
-
-  // using RAII for locking, done to handle lock release on exceptions
-  typedef Galois::Runtime::LL::SimpleLock<true> glock;
+class PersistentDirectory: public SimpleRuntimeContext, private boost::noncopyable {
   Galois::Runtime::LL::SimpleLock<true> Lock;
-  boost::unordered_map<std::pair<uintptr_t, uint32_t>, objstate, ohash> perobj;
+  std::unordered_map<std::pair<uintptr_t, uint32_t>, uintptr_t, pairhash<uintptr_t, uint32_t>> perobj;
 
-  // returns a valid local pointer to the object if not remote
-  uintptr_t haveObject(uintptr_t ptr, uint32_t owner);
-
-  // places a remote request for the node
-  void fetchRemoteObj(uintptr_t ptr, uint32_t owner, recvFuncTy pad);
+  template<typename T>
+  static std::pair<uintptr_t, uint32_t> k(T* ptr, uint32_t owner) {
+    return std::make_pair(reinterpret_cast<uintptr_t>(ptr), owner);
+  }
+  static std::pair<uintptr_t, uint32_t> k(uintptr_t ptr, uint32_t owner) {
+    return std::make_pair(ptr, owner);
+  }
 
 public:
 
   // forward the request if the state is remote
   // send the object if local and not locked, also mark as remote
   template<typename T>
-  static void persistentReqLandingPad(RecvBuffer &);
+  static void reqLandingPad(RecvBuffer &);
 
   // send the object if local, not locked and mark obj as remote
   template<typename T>
-  static void persistentDataLandingPad(RecvBuffer &);
+  static void objLandingPad(RecvBuffer &);
 
   // resolve a pointer
   template<typename T>
-  T* resolve(uintptr_t ptr, uint32_t owner);
+  T* resolve(T* ptr, uint32_t owner);
 };
 
 RemoteDirectory& getSystemRemoteDirectory();
@@ -254,336 +202,234 @@ PersistentDirectory& getSystemPersistentDirectory();
 
 using namespace Galois::Runtime::Distributed;
 
-// should never block, just place a request if not found
-template<typename T>
-void RemoteDirectory::prefetch(uintptr_t ptr, uint32_t owner) {
-  assert(ptr);
-  assert(owner != networkHostID);
-  bool isavail;
-  // don't lock the object if not found
-  uintptr_t p = haveObject(ptr, owner, NULL, isavail);
-  // don't block just place a request if not local
-  if (!p) {
-    NetworkInterface& net = getSystemNetworkInterface();
-    fetchRemoteObj(ptr, owner, &LocalDirectory::localReqLandingPad<T>);
-    // call handleReceives if only thread outside for_each
-    // or is the first thread
-    if (!Galois::Runtime::inGaloisForEach || !LL::getTID())
-      net.handleReceives();
-  }
-}
-
-// should always be a blocking call
-template<typename T>
-T* RemoteDirectory::transientAcquire(uintptr_t ptr, uint32_t owner) {
-  assert(ptr);
-  assert(owner != networkHostID);
-  bool isLocallyAvail;
-  uintptr_t p = transientHaveObj(ptr, owner, isLocallyAvail);
-  while (!p) {
-    NetworkInterface& net = getSystemNetworkInterface();
-    // make fetch object request only if remote
-    if (!isLocallyAvail)
-      fetchRemoteObj(ptr, owner, &LocalDirectory::localReqLandingPad<T>);
-    // call handleReceives if only thread outside for_each
-    // or is the first thread
-    if (!Galois::Runtime::inGaloisForEach || !LL::getTID())
-      net.handleReceives();
-    p = transientHaveObj(ptr, owner, isLocallyAvail);
-  }
-  return reinterpret_cast<T*>(p);
-}
-
 // should be blocking if not in for each
 template<typename T>
-T* RemoteDirectory::resolve(uintptr_t ptr, uint32_t owner, SimpleRuntimeContext *cnx) {
+T* RemoteDirectory::resolve(uint32_t owner, Lockable* ptr) {
   assert(ptr);
   assert(owner != networkHostID);
-  bool isLocallyAvail;
-  uintptr_t p = haveObject(ptr, owner, cnx, isLocallyAvail);
-  while (!p) {
-    NetworkInterface& net = getSystemNetworkInterface();
-    if (!isLocallyAvail)
-      fetchRemoteObj(ptr, owner, &LocalDirectory::localReqLandingPad<T>);
-    // abort the iteration if inside for each and dir_blocking not defined
-    if (Galois::Runtime::inGaloisForEach && !dir_blocking<T>::value)
-      throw make_remote_ex<T>(ptr, owner);
-    // call handleReceives if only thread outside for_each
-    // or is the first thread
-    if (!Galois::Runtime::inGaloisForEach || !LL::getTID())
-      net.handleReceives();
-    p = haveObject(ptr, owner, cnx, isLocallyAvail);
-  }
-  return reinterpret_cast<T*>(p);
-}
-
-template<typename T>
-void RemoteDirectory::remoteReqLandingPad(RecvBuffer &buf) {
-  uint32_t owner;
-  T *data;
-  uintptr_t ptr;
-  RemoteDirectory& rd = getSystemRemoteDirectory();
-  lock_guard<glock> lock(rd.Lock);
-  gDeserialize(buf,ptr, owner);
-  auto iter = rd.curobj.find(make_pair(ptr,owner));
-  // check if the object can be sent
-  if ((iter == rd.curobj.end()) || (iter->second.state == RemoteDirectory::objstate::Remote)) {
-    // object can't be remote if the owner makes a request
-    // abort();
-    // object might have been sent after this request was made by owner
-  }
-  else if (iter->second.state == RemoteDirectory::objstate::Local) {
-    bool flag = true;
-    data = reinterpret_cast<T*>(iter->second.localobj);
-    Lockable *L = reinterpret_cast<Lockable*>(data);
-/*
- * ENABLE THIS FOR GRAPH TEST CASE
- * Making sure atleast one iteration runs before returning the obj
-    // check if eligible or ineligible to be sent
-    if (isMagicLock(L)) {
-      // ineligible state - check number of requests
-      OBJSTATE.count++;
-      if (OBJSTATE.count < INELIGIBLE_COUNT) {
-        // the data should not be sent
-        flag = false;
-      }
-    }
- */
-    // if eligible and acquire lock so that no iteration begins using the object
-    // disable stealing so that atleast one iteration succeeds
-    if (flag && rd.dirAcquire(L,true)) {
-      // object should be sent to the remote host
-      SendBuffer sbuf;
-      size_t size = sizeof(*data);
-      NetworkInterface& net = getSystemNetworkInterface();
-      gSerialize(sbuf, ptr, size, *data);
-      rd.curobj.erase(make_pair(ptr,owner));
-      net.sendMessage(owner,&LocalDirectory::localDataLandingPad<T>,sbuf);
-#ifdef PRINT_DEBUG
-printf ("sending remote data to owner %u from %u for %lx \t%s\n", owner, Distributed::networkHostID, ptr, typeid(T).name());
-#endif
-      delete data;
-    }
-  }
-  else {
-    assert(0 && "Unexpected state in remoteReqLandingPad");
-    abort();
-  }
-  return;
-}
-
-template<typename T>
-void RemoteDirectory::remoteDataLandingPad(RecvBuffer &buf) {
-  uint32_t owner;
-  size_t size;
-  T *data;
-  Lockable *L;
-  uintptr_t ptr;
-  RemoteDirectory& rd = getSystemRemoteDirectory();
-  lock_guard<glock> lock(rd.Lock);
-  gDeserialize(buf,ptr,owner,size);
-  auto iter = rd.curobj.find(make_pair(ptr,owner));
-#ifdef PRINT_DEBUG
-printf ("receiving remote data from owner %u in %u for %lx \t%s\n", owner, Distributed::networkHostID, ptr, typeid(T).name());
-#endif
-  data = new T();
-  gDeserialize(buf,*data);
-  iter->second.state = RemoteDirectory::objstate::Local;
-  L = reinterpret_cast<Lockable*>(data);
-  // lock the object with magic num to mark ineligible
-  setMagicLock(L);
-  iter->second.localobj = (uintptr_t)data;
-  iter->second.count = 0;
-  return;
-}
-
-// should never block, just place a request if not found
-template<typename T>
-void LocalDirectory::prefetch(uintptr_t ptr) {
-  uint32_t sent = 0;
-  assert(ptr);
-  bool isavail;
-  // don't lock the object if not found
-  uintptr_t p = haveObject(ptr, sent, NULL, isavail);
-  // don't block just place a request if not local
-  if (!p) {
-    NetworkInterface& net = getSystemNetworkInterface();
-    fetchRemoteObj(ptr, sent, &RemoteDirectory::remoteReqLandingPad<T>);
-    // call handleReceives if only thread outside for_each
-    // or is the first thread
-    if (!Galois::Runtime::inGaloisForEach || !LL::getTID())
-      net.handleReceives();
-  }
-}
-
-// should always be blocking
-template<typename T>
-T* LocalDirectory::transientAcquire(uintptr_t ptr) {
-  uint32_t sent = 0;
-  bool isLocallyAvail;
-  uintptr_t p = transientHaveObj(ptr, sent, isLocallyAvail);
-  while (!p) {
-    NetworkInterface& net = getSystemNetworkInterface();
-    // fetch only if remote
-    if (!isLocallyAvail)
-      fetchRemoteObj(ptr, sent, &RemoteDirectory::remoteReqLandingPad<T>);
-    // call handleReceives if only thread outside for_each
-    // or is the first thread
-    if (!Galois::Runtime::inGaloisForEach || !LL::getTID())
-      net.handleReceives();
-    p = transientHaveObj(ptr, sent, isLocallyAvail);
-  }
-  return reinterpret_cast<T*>(p);
-}
-
-// should be blocking outside for each
-template<typename T>
-T* LocalDirectory::resolve(uintptr_t ptr, SimpleRuntimeContext *cnx) {
-  uint32_t sent = 0;
-  bool isLocallyAvail;
-  uintptr_t p = haveObject(ptr, sent, cnx, isLocallyAvail);
-  while (!p) {
-    NetworkInterface& net = getSystemNetworkInterface();
-    if (!isLocallyAvail)
-      fetchRemoteObj(ptr, sent, &RemoteDirectory::remoteReqLandingPad<T>);
-    // abort the iteration if inside for each and dir_blocking not defined
-    if (Galois::Runtime::inGaloisForEach && !dir_blocking<T>::value)
-      throw make_remote_ex<T>(ptr, networkHostID);
-    // call handleReceives if only thread outside for_each
-    // or is the first thread
-    if (!Galois::Runtime::inGaloisForEach || !LL::getTID())
-      net.handleReceives();
-    p = haveObject(ptr, sent, cnx, isLocallyAvail);
-  }
-  return reinterpret_cast<T*>(p);
-}
-
-template<typename T>
-void LocalDirectory::localReqLandingPad(RecvBuffer &buf) {
-  uint32_t remote_to;
-  T *data;
-  Lockable *L;
-  uintptr_t ptr;
-  LocalDirectory& ld = getSystemLocalDirectory();
-  lock_guard<glock> lock(ld.Lock);
-  gDeserialize(buf,ptr,remote_to);
-  data = reinterpret_cast<T*>(ptr);
-  L = reinterpret_cast<Lockable*>(data);
-  auto iter = ld.curobj.find(ptr);
-  // add object to list if it's not already there
-  if (iter == ld.curobj.end()) {
-    LocalDirectory::objstate list_obj;
-    list_obj.state = LocalDirectory::objstate::Local;
-    ld.curobj[ptr] = list_obj;
-    iter = ld.curobj.find(ptr);
-  }
-  // check if the object can be sent
-  if (iter->second.state == LocalDirectory::objstate::Remote) {
-    // object is remote so place a return request
-    // place the request only if a different node is asking for the object
-    if (remote_to != iter->second.sent_to)
-      ld.fetchRemoteObj(ptr, iter->second.sent_to, &RemoteDirectory::remoteReqLandingPad<T>);
-  }
-  else if ((iter->second.state == LocalDirectory::objstate::Local) && ld.dirAcquire(L)) {
-    // object should be sent to the remote host
-    // dirAcquire locks with the LocalDirectory object so that local iterations fail
+  Lock.lock();
+  Lockable*& obj = curobj[k(owner,ptr)];
+  if (!obj) {
+    //no copy
+    obj = new T();
+    bool s = try_acquire(obj);
+    assert(s);
+    //send request
     SendBuffer sbuf;
-    size_t size = sizeof(*data);
-    uint32_t host = networkHostID;
-    NetworkInterface& net = getSystemNetworkInterface();
-    gSerialize(sbuf,ptr, host, size, *data);
-    iter->second.sent_to = remote_to;
-    iter->second.state = LocalDirectory::objstate::Remote;
-    net.sendMessage(remote_to,&RemoteDirectory::remoteDataLandingPad<T>,sbuf);
-#ifdef PRINT_DEBUG
-printf ("sending local data to remote %u from %u for %lx \t%s\n", remote_to, Distributed::networkHostID, ptr, typeid(T).name());
-#endif
+    gSerialize(sbuf, ptr, networkHostID);
+    //LL::gDebug("RD: ", networkHostID, " requesting: ", owner, " ", ptr);
+    getSystemNetworkInterface().sendMessage(owner,&LocalDirectory::reqLandingPad<T>,sbuf);
   }
-  else if (iter->second.state != LocalDirectory::objstate::Local) {
-    assert(0 && "Unexpected state in localReqLandingPad");
-    abort();
-  }
-  return;
+  T* retval = static_cast<T*>(obj);
+  Lock.unlock();
+  return retval;
 }
 
 template<typename T>
-void LocalDirectory::localDataLandingPad(RecvBuffer &buf) {
-  size_t size;
-  T *data;
-  Lockable *L;
-  uintptr_t ptr;
-  LocalDirectory& ld = getSystemLocalDirectory();
-  lock_guard<glock> lock(ld.Lock);
-  gDeserialize(buf,ptr,size);
-#ifdef PRINT_DEBUG
-printf ("receiving local data from remote  in %u for %lx \t%s\n", Distributed::networkHostID, ptr, typeid(T).name());
-#endif
-  data = reinterpret_cast<T*>(ptr);
-  auto iter = ld.curobj.find(ptr);
-  gDeserialize(buf,*data);
-  L = reinterpret_cast<Lockable*>(data);
-  iter->second.state = LocalDirectory::objstate::Local;
-  unlock(L);
-  return;
+void RemoteDirectory::repeatRecall(uint32_t owner, Lockable* ptr) {
+  //LL::gDebug("RD: ", networkHostID, " repeat recall for: ", owner, " ", ptr);
+  doRecall<T>(owner, ptr);
 }
+
+template<typename T>
+void RemoteDirectory::doRecall(uint32_t owner, Lockable* ptr) {
+  Lock.lock();
+  assert(curobj.find(k(owner, ptr)) != curobj.end());
+  Lockable* obj = curobj[k(owner,ptr)];
+  if (int val = try_acquire(obj)) {
+    trace_obj_send(owner, ptr, owner);
+    //LL::gDebug("RD: ", networkHostID, " returning: ", owner, " ", ptr);
+    assert(val == 1); //New owner.  Violation implies recall happened before recieve
+    //we have the lock so we can send the object
+    SendBuffer sbuf;
+    gSerialize(sbuf, ptr, *static_cast<T*>(obj));
+    getSystemNetworkInterface().sendMessage(owner,&LocalDirectory::objLandingPad<T>,sbuf);
+    release(obj);
+    delete static_cast<T*>(obj);
+    curobj.erase(k(owner,ptr));
+  } else {
+    //currently locked locally, delay recall
+    pending.push_back(std::bind(&RemoteDirectory::repeatRecall<T>, this, owner, ptr) );
+  }
+  Lock.unlock();
+}
+
+template<typename T>
+void RemoteDirectory::recallLandingPad(RecvBuffer &buf) {
+  uint32_t owner;
+  Lockable* ptr;
+  gDeserialize(buf,ptr, owner);
+  //LL::gDebug("RD: ", networkHostID, " recall for: ", owner, " ", ptr);
+  getSystemRemoteDirectory().doRecall<T>(owner, ptr);
+}
+
+template<typename T>
+void RemoteDirectory::doObj(uint32_t owner, Lockable* ptr, RecvBuffer& buf) {
+  //LL::gDebug("RD: ", networkHostID, " receiving: ", owner, " ", ptr);
+  trace_obj_recv(owner, ptr);
+  Lock.lock();
+  assert(curobj.find(k(owner,ptr)) != curobj.end());
+  Lockable* obj = curobj[k(owner,ptr)];
+  Lock.unlock();
+  assert(isAcquiredBy(obj, this));
+  gDeserialize(buf,*static_cast<T*>(obj));
+  release(obj);
+}
+
+template<typename T>
+void RemoteDirectory::objLandingPad(RecvBuffer &buf) {
+  // Lockable*, src, data
+  Lockable* ptr;
+  uint32_t owner;
+  gDeserialize(buf,ptr,owner);
+  getSystemRemoteDirectory().doObj<T>(owner,ptr, buf);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+//Receive a remote request for a local object
+template<typename T>
+void LocalDirectory::reqLandingPad(RecvBuffer &buf) {
+  uint32_t remote_to;
+  Lockable* ptr;
+  gDeserialize(buf,ptr,remote_to);
+  getSystemLocalDirectory().doRequest<T>(ptr, remote_to);
+}
+
+template<typename T>
+void LocalDirectory::doRequest(Lockable* ptr, uint32_t remote) {
+  //LL::gDebug("LD: ", networkHostID, " remote req : ", networkHostID, " ", ptr, " from: ", remote);
+  int val = try_acquire(ptr);
+  switch (val) {
+  case 0: //local iteratrion has the lock
+    PendingLock.lock();
+    pending.insert(std::make_pair(ptr, std::bind(&LocalDirectory::doRequest<T>, this, ptr, remote)));
+    PendingLock.unlock();
+    break;
+  case 1: //new owner (obj is local)
+    {
+      Lock.lock();
+      objstate& os = curobj[ptr];
+      os.pad = &RemoteDirectory::recallLandingPad<T>;
+      os.sent_to = remote;
+      os.recalled = false;
+      Lock.unlock();
+      sendObj(static_cast<T*>(ptr), remote);
+      break;
+    }
+  case 2: //we were the owner (obj is remote)
+    {
+      PendingLock.lock();
+      bool doFetch = !pending.count(ptr);
+      pending.insert(std::make_pair(ptr, std::bind(&LocalDirectory::doRequest<T>, this, ptr, remote)));
+      PendingLock.unlock();
+      if (doFetch) {
+	Lock.lock();
+	objstate& os = curobj[ptr];
+	assert(os.sent_to != remote);
+	if (!os.recalled) {
+	  recallObj(ptr, os.sent_to, os.pad);
+	  os.recalled = true;
+	}
+	Lock.unlock();
+      }
+      break;
+    }
+  default:
+    abort();
+  }
+}
+
+//receive local data from remote host after a recall
+template<typename T>
+void LocalDirectory::objLandingPad(RecvBuffer &buf) {
+  Lockable *ptr;
+  gDeserialize(buf,ptr);
+  gDeserialize(buf,*static_cast<T*>(ptr)); //We know T is the actual object type
+  getSystemLocalDirectory().doObj(static_cast<T*>(ptr));
+}
+
+template<typename T>
+void LocalDirectory::doObj(T* ptr) {
+  trace_obj_recv(networkHostID, static_cast<Lockable*>(ptr));
+  //LL::gDebug("LD: ", networkHostID, " recieving: ", networkHostID, " ", ptr);
+  Lock.lock();
+  assert(curobj.count(ptr) && "Obj not in directory");
+  curobj.erase(ptr);
+  release(ptr);
+  Lock.unlock();
+}
+
+template<typename T>
+void LocalDirectory::sendObj(T* ptr, uint32_t dest) {
+  trace_obj_send(networkHostID, static_cast<Lockable*>(ptr), dest);
+  //LL::gDebug("LD: ", networkHostID, " sending : ", networkHostID, " ", ptr, " to: ", dest);
+  SendBuffer sbuf;
+  gSerialize(sbuf, static_cast<Lockable*>(ptr), networkHostID, *ptr);
+  getSystemNetworkInterface().sendMessage(dest, &RemoteDirectory::objLandingPad<T>, sbuf);
+}
+
+////////////////////////////////////////////////////////////////////////////////
 
 // should be blocking if not in for each
 template<typename T>
-T* PersistentDirectory::resolve(uintptr_t ptr, uint32_t owner) {
+T* PersistentDirectory::resolve(T* ptr, uint32_t owner) {
   assert(ptr);
   assert(owner != networkHostID);
-  uintptr_t p = haveObject(ptr, owner);
-  while (!p) {
-    NetworkInterface& net = getSystemNetworkInterface();
-    fetchRemoteObj(ptr, owner, &PersistentDirectory::persistentReqLandingPad<T>);
-    // abort the iteration if inside for each and dir_blocking not defined
-    if (Galois::Runtime::inGaloisForEach && !dir_blocking<T>::value)
-      throw make_remote_ex<T>(ptr, owner);
-    // call handleReceives if only thread outside for_each
-    // or is the first thread
-    if (!Galois::Runtime::inGaloisForEach || !LL::getTID())
-      net.handleReceives();
-    p = haveObject(ptr, owner);
+  //  Lock.lock();
+  auto iter = perobj.find(k(ptr,owner));
+  if (iter != perobj.end() && iter->second) {
+    T* rptr = reinterpret_cast<T*>(iter->second);
+    //    Lock.unlock();
+    return rptr;
   }
-  return reinterpret_cast<T*>(p);
+  Lock.lock();
+  if (iter == perobj.end()) {
+    //first request
+    perobj[k(ptr,owner)] = 0;
+    SendBuffer buf;
+    gSerialize(buf, ptr, networkHostID);
+    getSystemNetworkInterface().sendMessage(owner, &reqLandingPad<T>, buf);
+  } //else someone already sent the request
+  //wait until valid without holding lock
+  Lock.unlock();
+  do {
+    if (!Galois::Runtime::inGaloisForEach || !LL::getTID())
+      getSystemNetworkInterface().handleReceives();
+    Lock.lock();
+    T* rptr = reinterpret_cast<T*>(perobj[k(ptr,owner)]);
+    Lock.unlock();
+    if (rptr)
+      return rptr;
+  } while(true);
 }
 
 // everytime there's a request send the object!
 // always runs on the host owning the object
 template<typename T>
-void PersistentDirectory::persistentReqLandingPad(RecvBuffer &buf) {
-  T *data;
+void PersistentDirectory::reqLandingPad(RecvBuffer &buf) {
   uintptr_t ptr;
-  SendBuffer sbuf;
-  uint32_t remote, owner;
-  owner = networkHostID;
-  NetworkInterface& net = getSystemNetworkInterface();
+  uint32_t remote;
   gDeserialize(buf, ptr, remote);
-  data = reinterpret_cast<T*>(ptr);
   // object should be sent to the remote host
-  gSerialize(sbuf,ptr, owner, *data);
-  net.sendMessage(remote,&PersistentDirectory::persistentDataLandingPad<T>,sbuf);
-#ifdef PRINT_DEBUG
-printf ("sending persistent data to remote %u from %u for %lx \t%s\n", remote, Distributed::networkHostID, ptr, typeid(T).name());
-#endif
-  return;
+  SendBuffer sbuf;
+  gSerialize(sbuf, ptr, networkHostID, *reinterpret_cast<T*>(ptr));
+  getSystemNetworkInterface().sendMessage(remote,&PersistentDirectory::objLandingPad<T>,sbuf);
 }
 
 template<typename T>
-void PersistentDirectory::persistentDataLandingPad(RecvBuffer &buf) {
+void PersistentDirectory::objLandingPad(RecvBuffer &buf) {
   uint32_t owner;
-  T *data;
   uintptr_t ptr;
+  gDeserialize(buf, ptr, owner);
   PersistentDirectory& pd = getSystemPersistentDirectory();
-  lock_guard<glock> lock(pd.Lock);
-  data = new T();
-  gDeserialize(buf, ptr, owner,*data);
-#ifdef PRINT_DEBUG
-printf ("receiving persistent data from owner %u in %u for %lx \t%s\n", owner, Distributed::networkHostID, ptr, typeid(T).name());
-#endif
-  auto iter = pd.perobj.find(make_pair(ptr,owner));
-  iter->second.localobj = (uintptr_t)data;
-  return;
+  pd.Lock.lock();
+  try {
+    pd.perobj[k(ptr,owner)] = reinterpret_cast<uintptr_t>(new T(buf));
+  } catch (...) {
+    abort();
+  }
+  pd.Lock.unlock();
 }
 
 #endif
