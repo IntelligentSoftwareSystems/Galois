@@ -50,13 +50,13 @@ int main(int argc, char** argv) {
     gSerialize(B,*oldB);
     
     B.print(std::cout);
-    cout << "\n";
+    std::cout << "\n";
     
     Galois::Runtime::Distributed::DeSerializeBuffer D(B.size());
     memcpy(D.linearData(), B.linearData(), B.size());
     
     D.print(std::cout);
-    cout << "\n";
+    std::cout << "\n";
     
     // read the header first
     uintptr_t tmp;
@@ -69,13 +69,13 @@ int main(int argc, char** argv) {
     gDeserialize(D,*bar);
     
     B.print(std::cout);
-    cout << "\n";
-    D.print(std::cout);
-    cout << "\n";
-    
-    oldB.dump();
     std::cout << "\n";
-    foo.dump();
+    D.print(std::cout);
+    std::cout << "\n";
+    
+    oldB.dump(std::cout);
+    std::cout << "\n";
+    foo.dump(std::cout);
     std::cout << "\n";
     (*oldB).dump(std::cout);
     std::cout << "\n";
