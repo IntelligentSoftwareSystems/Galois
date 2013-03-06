@@ -73,13 +73,15 @@ struct DeterministicContext;
 class Lockable {
   LL::PtrLock<SimpleRuntimeContext, true> Owner;
   Lockable* next;
+
+  //Lots of friends!
   friend class SimpleRuntimeContext;
   friend class Distributed::LocalDirectory;
   friend class Distributed::RemoteDirectory;
   template <typename, typename>
   friend struct Galois::Runtime::DeterministicImpl::DeterministicContext;
   friend bool isAcquired(Lockable*);
-
+  friend bool isAcquiredBy(Lockable*, SimpleRuntimeContext*);
 public:
   LL::PtrLock<void, true> auxPtr;
   Lockable() :next(0) {}
@@ -94,7 +96,14 @@ protected:
   virtual void sub_acquire(Lockable* L);
 
 public:
-  SimpleRuntimeContext(bool child = false): locks(0), customAcquire(child) { }
+  //0: fail, 1: new owner, 2: already owner
+  int try_acquire(Lockable* L);
+  void release(Lockable* L);
+  
+  public:
+  SimpleRuntimeContext(bool child = false): locks(0), customAcquire(child) {
+    LL::gDebug("SRC: ", this);
+  }
   virtual ~SimpleRuntimeContext();
 
   void start_iteration() {
@@ -104,11 +113,6 @@ public:
   unsigned cancel_iteration();
   unsigned commit_iteration();
   void acquire(Lockable* L);
-  bool do_trylock(Lockable* L);
-  void do_unlock(Lockable* L);
-  void *do_getValue(Lockable* L);
-  bool do_isMagicLock(Lockable* L);
-  void do_setMagicLock(Lockable* L);
 };
 
 //! get the current conflict detection class, may be null if not in parallel region
@@ -137,53 +141,26 @@ inline bool shouldLock(Galois::MethodFlag g) {
 //! actual locking function.  Will always lock.
 void doAcquire(Lockable* C);
 
+inline void acquire(Lockable* C, SimpleRuntimeContext* cnx, Galois::MethodFlag m) {
+  if (shouldLock(m) && cnx)
+    cnx->acquire(C);
+}
+
 //! Master function which handles conflict detection
 //! used to acquire a lockable thing
 inline void acquire(Lockable* C, Galois::MethodFlag m) {
-  if (shouldLock(m))
-    doAcquire(C);
-}
-
-template<typename ContextTy>
-void acquire(Lockable* C, ContextTy* cnx, Galois::MethodFlag m) {
-  if (shouldLock(m) && cnx)
-    cnx->acquire(C);
+  if (shouldLock(m)) {
+    SimpleRuntimeContext* cnx = getThreadContext();
+    acquire(C, cnx, m);
+  }
 }
 
 inline bool isAcquired(Lockable* C) {
   return C->Owner.is_locked();
 }
 
-bool do_isMagicLock(Lockable* C);
-
-inline bool isMagicLock(Lockable* C) {
-   return do_isMagicLock(C);
-}
-
-void do_setMagicLock(Lockable* C);
-
-inline void setMagicLock(Lockable* C) {
-   do_setMagicLock(C);
-   return;
-}
-
-void *do_getValue(Lockable* C);
-
-inline void *getValue(Lockable* C) {
-   return do_getValue(C);
-}
-
-bool do_trylock(Lockable* C);
-
-inline bool trylock(Lockable* C) {
-   return do_trylock(C);
-}
-
-void do_unlock(Lockable* C);
-
-inline void unlock(Lockable* C) {
-   do_unlock(C);
-   return;
+inline bool isAcquiredBy(Lockable* C, SimpleRuntimeContext* cnx) {
+  return C->Owner.getValue() == cnx;
 }
 
 struct AlwaysLockObj {

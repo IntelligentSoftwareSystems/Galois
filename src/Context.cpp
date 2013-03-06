@@ -61,58 +61,10 @@ Galois::Runtime::SimpleRuntimeContext* Galois::Runtime::getThreadContext() {
   return thread_cnx;
 }
 
-bool Galois::Runtime::SimpleRuntimeContext::do_isMagicLock(Galois::Runtime::Lockable* L) {
-  return (L->Owner.getValue() == CHK_LOCK);
-}
-
-bool Galois::Runtime::do_isMagicLock(Galois::Runtime::Lockable* C) {
-  SimpleRuntimeContext cnx;
-  return cnx.do_isMagicLock(C);
-}
-
 void Galois::Runtime::doAcquire(Galois::Runtime::Lockable* C) {
   SimpleRuntimeContext* cnx = getThreadContext();
   if (cnx)
     cnx->acquire(C);
-}
-
-void Galois::Runtime::SimpleRuntimeContext::do_setMagicLock(Galois::Runtime::Lockable* L) {
-  L->Owner.setValue(USE_LOCK);
-  // L->Owner.stealing_CAS(NULL,USE_LOCK);
-  return;
-}
-
-void Galois::Runtime::do_setMagicLock(Galois::Runtime::Lockable* L) {
-  SimpleRuntimeContext cnx;
-  cnx.do_setMagicLock(L);
-  return;
-}
-
-void *Galois::Runtime::SimpleRuntimeContext::do_getValue(Galois::Runtime::Lockable* L) {
-  return ((void*)L->Owner.getValue());
-}
-
-void *Galois::Runtime::do_getValue(Galois::Runtime::Lockable* L) {
-  SimpleRuntimeContext cnx;
-  return cnx.do_getValue(L);
-}
-
-bool Galois::Runtime::SimpleRuntimeContext::do_trylock(Galois::Runtime::Lockable* L) {
-  return L->Owner.try_lock();
-}
-
-bool Galois::Runtime::do_trylock(Galois::Runtime::Lockable* L) {
-  SimpleRuntimeContext cnx;
-  return cnx.do_trylock(L);
-}
-
-void Galois::Runtime::SimpleRuntimeContext::do_unlock(Galois::Runtime::Lockable* L) {
-  L->Owner.unlock_and_clear();
-}
-
-void Galois::Runtime::do_unlock(Galois::Runtime::Lockable* C) {
-  SimpleRuntimeContext cnx;
-  cnx.do_unlock(C);
 }
 
 unsigned Galois::Runtime::SimpleRuntimeContext::cancel_iteration() {
@@ -127,10 +79,8 @@ unsigned Galois::Runtime::SimpleRuntimeContext::commit_iteration() {
     Lockable* L = locks;
     locks = L->next;
     L->next = 0;
-    //__sync_synchronize();
     LL::compilerBarrier();
-    L->Owner.unlock_and_clear();
-
+    release(L);
     ++numLocks;
   }
 
@@ -143,25 +93,42 @@ void Galois::Runtime::signalConflict(Lockable* L) {
   throw conflict_ex{L}; // Conflict
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// Simple Runtime Context
+////////////////////////////////////////////////////////////////////////////////
+
+int Galois::Runtime::SimpleRuntimeContext::try_acquire(Galois::Runtime::Lockable* L) {
+  assert(L);
+  if (L->Owner.try_lock()) {
+    assert(!L->Owner.getValue());
+    L->Owner.setValue(this);
+    return 1;
+  } else if (L->Owner.getValue() == this) {
+    return 2;
+  }
+  return 0;
+}
+
+void Galois::Runtime::SimpleRuntimeContext::release(Galois::Runtime::Lockable* L) {
+  assert(L);
+  assert(L->Owner.getValue() == this);
+  assert(L->Owner.is_locked());
+  assert(!L->next);
+  L->Owner.unlock_and_clear();
+}
+
 // Should allow the lock to be taken even if lock has magic value
 void Galois::Runtime::SimpleRuntimeContext::acquire(Galois::Runtime::Lockable* L) {
+  int i;
   if (customAcquire) {
     sub_acquire(L);
-  } else if (L->Owner.try_lock()) {
-    assert(!L->Owner.getValue());
-    assert(!L->next);
-    L->Owner.setValue(this);
-    L->next = locks;
-    locks = L;
-  }
-  else if (L->Owner.stealing_CAS(USE_LOCK,this)) {
-    assert(!L->next);
-    L->next = locks;
-    locks = L;
-  } else {
-    if (L->Owner.getValue() != this) {
-      Galois::Runtime::signalConflict(L);
+  } else if ((i = try_acquire(L))) {
+    if (i == 1) {
+      L->next = locks;
+      locks = L;
     }
+  } else {
+    Galois::Runtime::signalConflict(L);
   }
 }
 
