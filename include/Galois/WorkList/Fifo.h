@@ -70,7 +70,7 @@ public:
   void steal(FIFO& victim) {
     if (!Runtime::LL::TryLockPairOrdered(*this, victim))
       return;
-    typename std::deque<T>::iterator split = Galois::split_range(victim.wl.begin(), wl.victim.end());
+    typename std::deque<T>::iterator split = split_range(victim.wl.begin(), wl.victim.end());
     wl.insert(wl.end(), victim.wl.begin(), split);
     victim.wl.erase(victim.wl.begin(), split);
     UnLockPairOrdered(*this, victim);

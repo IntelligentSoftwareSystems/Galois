@@ -33,7 +33,7 @@ namespace WorkList {
 
 template<typename T = int, bool concurrent = true>
   class GFIFO : private boost::noncopyable, private Runtime::LL::PaddedLock<concurrent>  {
-  Galois::gdeque<T> wl;
+  gdeque<T> wl;
 
   using Runtime::LL::PaddedLock<concurrent>::lock;
   using Runtime::LL::PaddedLock<concurrent>::try_lock;

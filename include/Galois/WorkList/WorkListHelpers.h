@@ -64,7 +64,7 @@ public:
 
 template<typename T, bool concurrent>
 class ConExtLinkedStack {
-  Galois::Runtime::LL::PtrLock<T, concurrent> head;
+  Runtime::LL::PtrLock<T, concurrent> head;
   
 public:
   typedef ConExtListNode<T> ListNode;

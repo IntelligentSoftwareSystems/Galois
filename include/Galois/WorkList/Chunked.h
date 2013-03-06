@@ -55,7 +55,7 @@ struct squeues<false,TQ> {
 //! Common functionality to all chunked worklists
 template<typename T, template<typename, bool> class QT, bool distributed = false, bool isStack = false, int chunksize=64, bool concurrent=true>
 class ChunkedMaster : private boost::noncopyable {
-  class Chunk : public Galois::FixedSizeRing<T, chunksize>, public QT<Chunk, concurrent>::ListNode {};
+  class Chunk : public FixedSizeRing<T, chunksize>, public QT<Chunk, concurrent>::ListNode {};
 
   Runtime::MM::FixedSizeAllocator heap;
 
