@@ -341,8 +341,7 @@ StupidDistBarrier::StupidDistBarrier() : gsense(0), count(0) {
 void StupidDistBarrier::reinit(unsigned val) {
   for (unsigned x = 0; x < sense.size(); ++x)
     *sense.getRemote(x) = 1;
-  // shouldn't reinitialize count as it may have already been decreased!
-  //count = 0;
+  assert(count == 0);
   gsense = 0;
 }
 

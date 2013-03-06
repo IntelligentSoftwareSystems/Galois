@@ -22,6 +22,7 @@
  */
 
 #include "Galois/Runtime/Network.h"
+#include "Galois/Runtime/Barrier.h"
 
 #include <cassert>
 
@@ -45,6 +46,7 @@ static void networkExit(Galois::Runtime::Distributed::RecvBuffer& buf) {
 }
 
 void Galois::Runtime::Distributed::networkStart() {
+  getSystemBarrier(); // initialize barrier before anyone might be at it
   NetworkInterface& net = getSystemNetworkInterface();
   if (networkHostID != 0) {
     while (!ourexit) {
