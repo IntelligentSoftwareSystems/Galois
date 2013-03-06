@@ -29,6 +29,7 @@
 #include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/ll/SimpleLock.h"
 #include "Galois/Runtime/ll/TID.h"
+#include "Galois/Runtime/ll/EnvCheck.h"
 
 #include <cstdlib>
 #include <cstdio>
@@ -36,19 +37,16 @@
 #include <cstring>
 #include <cstdarg>
 #include <cerrno>
+#include <iostream>
+#include <fstream>
+#include <iomanip>
 
 static Galois::Runtime::LL::SimpleLock<true> IOLock;
 
-void Galois::Runtime::LL::gPrint(const char* format, ...) {
-  IOLock.lock();
-  va_list ap;
-  va_start(ap, format);
-  vprintf(format, ap);
-  va_end(ap);
-  IOLock.unlock();
-}
-
-void Galois::Runtime::LL::gDebug(const char* format, ...) {
+void Galois::Runtime::LL::gDebugStr(const std::string& s) {
+#ifndef NDEBUG
+  static bool skip = EnvCheck("GALOIS_DEBUG_SKIP");
+  if (skip) return;
   static const unsigned TIME_STR_SIZE = 32;
   char time_str[TIME_STR_SIZE];
   time_t rawtime;
@@ -59,40 +57,41 @@ void Galois::Runtime::LL::gDebug(const char* format, ...) {
 
   strftime(time_str, TIME_STR_SIZE, "[%H:%M:%S]", timeinfo);
 
-  // IOLock.lock ();
-  va_list ap;
+  IOLock.lock ();
+  if (EnvCheck("GALOIS_DEBUG_TO_FILE")) {
+    static std::ofstream debugOut;
+    if (!debugOut.is_open()) {
+      char fname[] = "gdebugXXXXXX";
+      debugOut.open(mktemp(fname));
+      IOLock.unlock();
+      gInfo("Debug output going to ", fname);
+      IOLock.lock();
+    }
 
-  va_start (ap, format);
-
-  char msg[1024];
-  vsprintf (msg, format, ap);
-  va_end(ap);
-  // vprintf (format, ap);
-  printf("[%s Thrd:%-3d] %s\n", time_str, Galois::Runtime::LL::getTID(), msg);
-  // fflush (stdout);
-
-  // IOLock.unlock();
+    debugOut << "[" << time_str << " " << std::setw(3) << getTID() << "] " << s << "\n";
+    debugOut.flush();
+  } else {
+    std::cerr << "[" << time_str << " " << std::setw(3) << getTID() << "] " << s << "\n";
+  }
+  IOLock.unlock();
+#endif
 }
 
-void Galois::Runtime::LL::gInfo(const char* format, ...) {
+void Galois::Runtime::LL::gPrintStr(const std::string& s) {
   IOLock.lock();
-  va_list ap;
-  va_start(ap, format);
-  printf("INFO: ");
-  vprintf(format, ap);
-  printf("\n");
-  va_end(ap);
+  std::cout << s;
   IOLock.unlock();
 }
 
-void Galois::Runtime::LL::gWarn(const char* format, ...) {
+void Galois::Runtime::LL::gInfoStr(const std::string& s) {
   IOLock.lock();
-  va_list ap;
-  va_start(ap, format);
-  fprintf(stderr, "WARNING: ");
-  vfprintf(stderr, format, ap);
-  printf("\n");
-  va_end(ap);
+  std::cout << "INFO: " << s << "\n";
+  IOLock.unlock();
+}
+
+void Galois::Runtime::LL::gWarnStr(const std::string& s) {
+  IOLock.lock();
+  std::cout << "WARNING: " << s << "\n";
   IOLock.unlock();
 }
 

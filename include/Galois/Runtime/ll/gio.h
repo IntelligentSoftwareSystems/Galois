@@ -28,14 +28,66 @@
 #ifndef GALOIS_RUNTIME_LL_GIO_H
 #define GALOIS_RUNTIME_LL_GIO_H
 
+#include <sstream>
+
 namespace Galois {
 namespace Runtime {
 namespace LL {
 
-void gPrint(const char* format, ...);
-void gDebug(const char* format, ...);
-void gInfo(const char* format, ...);
-void gWarn(const char* format, ...);
+//Print a string
+void gPrintStr(const std::string&);
+//print an info string (for easy parsing)
+void gInfoStr(const std::string&);
+//print a warning string (for easy parsing)
+void gWarnStr(const std::string&);
+//print a debug string (for easy parsing)
+void gDebugStr(const std::string&);
+
+//Convert a sequence of things to a string
+inline void toString(std::ostringstream& os) { }
+
+template<typename T>
+void toString(std::ostringstream& os, const T& val) {
+  os << val;
+}
+
+template<typename T1, typename T2, typename... Args>
+void toString(std::ostringstream& os, const T1& val1, const T2& val2, Args ...args) {
+  toString(os, val1);
+  toString(os, val2);
+  toString(os, args...);
+}
+
+template<typename... Args>
+void gPrint(Args... args) {
+  std::ostringstream os;
+  toString(os, args...);
+  gPrintStr(os.str());
+}
+
+template<typename... Args>
+void gInfo(Args... args) {
+  std::ostringstream os;
+  toString(os, args...);
+  gInfoStr(os.str());
+}
+
+template<typename... Args>
+void gWarn(Args... args) {
+  std::ostringstream os;
+  toString(os, args...);
+  gWarnStr(os.str());
+}
+
+template<typename... Args>
+void gDebug(Args... args) {
+#ifndef NDEBUG
+  std::ostringstream os;
+  toString(os, args...);
+  gDebugStr(os.str());
+#endif
+}
+
 void gError(bool doabort, const char* filename, int lineno, const char* format, ...);
 void gSysError(bool doabort, const char* filename, int lineno, const char* format, ...);
 void gFlush();

@@ -33,7 +33,8 @@ namespace LL {
 //HWTopoLinux.cpp: "GALOIS_DEBUG_TOPO"
 //Sampling.cpp: "GALOIS_EXIT_BEFORE_SAMPLING"
 //Sampling.cpp: "GALOIS_EXIT_AFTER_SAMPLING"
-
+//gIO.cpp: "GALOIS_DEBUG_TO_FILE"
+//gIO.cpp: "GALOIS_DEBUG_SKIP"
 //! Return true if the Enviroment variable is set
 bool EnvCheck(const char* parm);
 bool EnvCheck(const char* parm, int& val);

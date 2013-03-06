@@ -1,3 +1,4 @@
+
 /** Common command line processing for benchmarks -*- C++ -*-
  * @file
  * @section License
@@ -51,36 +52,33 @@ static void LonestarStart(int argc, char** argv, const char* app, const char* de
   NetworkInterface& net = getSystemNetworkInterface();
   net.handleReceives();
 
-  // display the name only if master host
+  // display the name only if mater host
   if (networkHostID == 0) {
-    gPrint("Galois Benchmark Suite v" GALOIS_VERSION_STRING);
-    gPrint(" (r%d)\n", SVNVERSION);
-    gPrint("Copyright (C) " GALOIS_COPYRIGHT_YEAR_STRING " The University of Texas at Austin\n");
+    gPrint("Galois Benchmark Suite v", GALOIS_VERSION_STRING, " (r", SVNVERSION, ")\n");
+    gPrint("Copyright (C) ", GALOIS_COPYRIGHT_YEAR_STRING, " The University of Texas at Austin\n");
     gPrint("http://iss.ices.utexas.edu/galois/\n\n");
-    gPrint("application: %s\n", app);
-    gPrint("%s\n", desc ? desc : "");
-    if (url) {
-      gPrint("http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/%s\n", url);
-    }
+    gPrint("application: ", app ? app : "unspecified", "\n");
+    if (desc)
+      gPrint(desc);
+    if (url)
+      gPrint("http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/", url, "\n");
 
     std::ostringstream cmdout;
     for (int i = 0; i < argc; ++i) {
       cmdout << argv[i];
       if (i != argc - 1)
-        cmdout << " ";
+	cmdout << " ";
     }
-    gInfo("CommandLine %s", cmdout.str().c_str());
+    gInfo("CommandLine ", cmdout.str().c_str());
   }
-
   char name[256];
   gethostname(name, 256);
-  gInfo("Hostname %s", name);
+  gInfo("Hostname ", name);
   gFlush();
 
   llvm::cl::ParseCommandLineOptions(argc, argv);
   numThreads = Galois::setActiveThreads(numThreads); 
 
-  // gInfo ("Using %d threads\n", numThreads.getValue());
   Galois::Runtime::reportStat(0, "Threads", numThreads);
 }
 

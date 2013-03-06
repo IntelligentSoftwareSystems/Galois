@@ -99,21 +99,21 @@ public:
     //print header
     gPrint("STATTYPE,LOOP,CATEGORY,n,sum");
     for (unsigned x = 0; x < maxThreadID; ++x)
-      gPrint(",T%d", x);
+      gPrint(",T", x);
     gPrint("\n");
     //print all values
     for(std::set<KeyTy>::iterator ii = LKs.begin(), ee = LKs.end();
 	ii != ee; ++ii) {
       std::vector<unsigned long> Values;
       gather(ii->first, ii->second, maxThreadID, Values);
-      gPrint("STAT,%s,%s,%u,%lu", 
+      gPrint("STAT,",
 	     ii->first.c_str(), 
 	     ii->second.c_str(),
 	     maxThreadID,
 	     getSum(Values, maxThreadID)
 	     );
       for (unsigned x = 0; x < maxThreadID; ++x) {
-	gPrint(",%ld", Values[x]);
+	gPrint(",", Values[x]);
       }
       gPrint("\n");
     }
