@@ -27,7 +27,7 @@ struct op {
     if (nodeval == 3) {
       graph->removeNode(node1);
       if (!graph->containsNode(node1))
-        cout << "Node: " << graph->getData(node1) << " not found as expected" << endl;
+	std::cout << "Node: " << graph->getData(node1) << " not found as expected" << std::endl;
     }
     //printf("%d iteration in host %u and thread %u\n", nodeval, Distributed::networkHostID, LL::getTID());
   }
@@ -89,13 +89,13 @@ int main(int argc, char** argv) {
   std::cout << "\n" << "Using edge_iterator:\n";
   for (auto ii = Gr->begin(), ee = Gr->end(); ii != ee; ++ii) {
     G::NodeHandle N = *ii;
-    cout << "Node: " << N->getData() << " Num Edges: ";
-    cout << std::distance(Gr->edge_begin(N), Gr->edge_end(N)) << " edges ";
+    std::cout << "Node: " << N->getData() << " Num Edges: ";
+    std::cout << std::distance(Gr->edge_begin(N), Gr->edge_end(N)) << " edges ";
     for (auto jj = Gr->edge_begin(N), ff = Gr->edge_end(N); jj != ff; ++jj) {
       G::NodeHandle N = jj->getDst();
-      N.dump();
+      N.dump(std::cout);
     }
-    cout << endl;
+    std::cout << std::endl;
   }
 
   if (NThirdGraphSize(Gr) != 29) {
