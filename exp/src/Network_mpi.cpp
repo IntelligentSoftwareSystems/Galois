@@ -26,6 +26,7 @@
 #include "Galois/Runtime/Network.h"
 #include "Galois/Runtime/ll/SimpleLock.h"
 #include "Galois/Runtime/ll/gio.h"
+#include "Galois/Runtime/ll/TID.h"
 
 #include <mpi.h>
 
@@ -83,6 +84,7 @@ public:
   //! sends a message.  assumes it is being called from a thread for which
   //! this is valid
   void sendInternal(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
+    assert(Galois::Runtime::LL::getTID() == 0);
     assert(recv);
     buf.serialize_header((uintptr_t)recv);
     int rv = MPI_Send(buf.linearData(), buf.size(), MPI_BYTE, dest, FuncTag, MPI_COMM_WORLD);
@@ -101,19 +103,20 @@ public:
   }
 
   bool recvInternal() {
+    assert(Galois::Runtime::LL::getTID() == 0);
     int flag, rv;
     bool retval = false;
     MPI_Status status;
  //printf ("\t Entering recvInternal\n");
     do {
       //async probe
-      rv = MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &status);
+      rv = MPI_Iprobe(MPI_ANY_SOURCE, FuncTag, MPI_COMM_WORLD, &flag, &status);
       handleError(rv);
       if (!flag)
         break;
       //use the lock
       lock.lock();
-      rv = MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &status);
+      rv = MPI_Iprobe(MPI_ANY_SOURCE, FuncTag, MPI_COMM_WORLD, &flag, &status);
       handleError(rv);
       if (flag) {
         retval = true;
