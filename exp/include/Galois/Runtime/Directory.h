@@ -270,6 +270,7 @@ void RemoteDirectory::doObj(uint32_t owner, Lockable* ptr, RecvBuffer& buf) {
   Lock.lock();
   assert(curobj.find(k(owner,ptr)) != curobj.end());
   Lockable* obj = curobj[k(owner,ptr)];
+  assert(obj);
   Lock.unlock();
   assert(isAcquiredBy(obj, this));
   gDeserialize(buf,*static_cast<T*>(obj));
@@ -313,8 +314,8 @@ void LocalDirectory::doRequest(Lockable* ptr, uint32_t remote) {
       os.pad = &RemoteDirectory::recallLandingPad<T>;
       os.sent_to = remote;
       os.recalled = false;
-      Lock.unlock();
       sendObj(static_cast<T*>(ptr), remote);
+      Lock.unlock();
       break;
     }
   case 2: //we were the owner (obj is remote)
