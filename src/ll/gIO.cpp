@@ -37,6 +37,7 @@
 #include <cstring>
 #include <cstdarg>
 #include <cerrno>
+#include <unistd.h>
 #include <iostream>
 #include <fstream>
 #include <iomanip>
@@ -62,7 +63,9 @@ void Galois::Runtime::LL::gDebugStr(const std::string& s) {
     static std::ofstream debugOut;
     if (!debugOut.is_open()) {
       char fname[] = "gdebugXXXXXX";
-      debugOut.open(mktemp(fname));
+      int fd = mkstemp(fname);
+      close(fd);
+      debugOut.open(fname);
       IOLock.unlock();
       gInfo("Debug output going to ", fname);
       IOLock.lock();
