@@ -377,14 +377,14 @@ template<typename T>
 T* PersistentDirectory::resolve(T* ptr, uint32_t owner) {
   assert(ptr);
   assert(owner != networkHostID);
-  //  Lock.lock();
+  Lock.lock();
   auto iter = perobj.find(k(ptr,owner));
   if (iter != perobj.end() && iter->second) {
     T* rptr = reinterpret_cast<T*>(iter->second);
-    //    Lock.unlock();
+    Lock.unlock();
     return rptr;
   }
-  Lock.lock();
+  //Lock.lock();
   if (iter == perobj.end()) {
     //first request
     perobj[k(ptr,owner)] = 0;
