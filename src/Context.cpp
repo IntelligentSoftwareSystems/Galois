@@ -30,6 +30,9 @@
 //! Global thread context for each active thread
 static __thread Galois::Runtime::SimpleRuntimeContext* thread_cnx = 0;
 
+#define CHK_LOCK ((Galois::Runtime::SimpleRuntimeContext*)0x422)
+#define USE_LOCK ((Galois::Runtime::SimpleRuntimeContext*)0x423)
+
 namespace {
 struct PendingStatus {
   Galois::Runtime::LL::CacheLineStorage<Galois::Runtime::PendingFlag> flag;
@@ -105,6 +108,8 @@ int Galois::Runtime::SimpleRuntimeContext::try_acquire(Galois::Runtime::Lockable
     return 1;
   } else if (L->Owner.getValue() == this) {
     return 2;
+  } else if (L->Owner.stealing_CAS(USE_LOCK,this)) {
+    return 1;
   }
   return 0;
 }
@@ -130,6 +135,25 @@ void Galois::Runtime::SimpleRuntimeContext::acquire(Galois::Runtime::Lockable* L
   } else {
     Galois::Runtime::signalConflict(L);
   }
+}
+
+bool Galois::Runtime::SimpleRuntimeContext::do_isMagicLock(Galois::Runtime::Lockable* L) {
+  return (L->Owner.getValue() == CHK_LOCK);
+}
+
+bool Galois::Runtime::do_isMagicLock(Galois::Runtime::Lockable* C) {
+  return thread_cnx->do_isMagicLock(C);
+}
+
+void Galois::Runtime::SimpleRuntimeContext::do_setMagicLock(Galois::Runtime::Lockable* L) {
+  L->Owner.setValue(USE_LOCK);
+  // L->Owner.stealing_CAS(NULL,USE_LOCK);
+  return;
+}
+
+void Galois::Runtime::do_setMagicLock(Galois::Runtime::Lockable* L) {
+  thread_cnx->do_setMagicLock(L);
+  return;
 }
 
 void Galois::Runtime::SimpleRuntimeContext::sub_acquire(Galois::Runtime::Lockable* L) {

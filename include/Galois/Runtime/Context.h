@@ -102,6 +102,9 @@ public:
   
   public:
   SimpleRuntimeContext(bool child = false): locks(0), customAcquire(child) {
+static int ijk;
+++ijk;
+while(ijk > 12);
     LL::gDebug("SRC: ", this);
   }
   virtual ~SimpleRuntimeContext();
@@ -112,6 +115,8 @@ public:
   
   unsigned cancel_iteration();
   unsigned commit_iteration();
+  bool do_isMagicLock(Lockable* L);
+  void do_setMagicLock(Lockable* L);
   void acquire(Lockable* L);
 };
 
@@ -161,6 +166,19 @@ inline bool isAcquired(Lockable* C) {
 
 inline bool isAcquiredBy(Lockable* C, SimpleRuntimeContext* cnx) {
   return C->Owner.getValue() == cnx;
+}
+
+bool do_isMagicLock(Lockable* C);
+
+inline bool isMagicLock(Lockable* C) {
+   return do_isMagicLock(C);
+}
+
+void do_setMagicLock(Lockable* C);
+
+inline void setMagicLock(Lockable* C) {
+   do_setMagicLock(C);
+   return;
 }
 
 struct AlwaysLockObj {
