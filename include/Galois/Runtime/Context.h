@@ -102,9 +102,6 @@ public:
   
   public:
   SimpleRuntimeContext(bool child = false): locks(0), customAcquire(child) {
-static int ijk;
-++ijk;
-while(ijk > 12);
     LL::gDebug("SRC: ", this);
   }
   virtual ~SimpleRuntimeContext();
