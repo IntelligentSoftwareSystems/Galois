@@ -24,6 +24,7 @@
  */
 
 #include "Galois/Runtime/mm/Mem.h"
+#include "Galois/Runtime/ll/gio.h"
 
 #include <map>
 #include <list>
@@ -98,8 +99,7 @@ void* allocFromOS() {
   
   allocLock.unlock();
   if (!ptr || ptr == MAP_FAILED) {
-    assert(0 && "mmap failed");
-    abort();
+    GALOIS_SYS_ERROR(true, "Out of Memory");
   }
 
   //protect the tracking structures

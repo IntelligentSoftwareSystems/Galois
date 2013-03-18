@@ -49,9 +49,9 @@ public:
 
 template<>
 struct StrictObject<void> {
-  typedef char* value_type;
-  typedef char* reference;
-  typedef char* const_reference;
+  typedef void* value_type;
+  typedef void* reference;
+  typedef void* const_reference;
   const static bool has_value = false;
 
   StrictObject() { }
@@ -78,6 +78,7 @@ public:
   typedef T& reference;
   typedef const T& const_reference;
   const static bool has_value = true;
+  const static unsigned sizeof_value = sizeof(T);
 
   void destroy() { cast()->~T(); }
   void construct(const_reference x) { new (cast()) T(x); }
@@ -91,6 +92,7 @@ struct LazyObject<void> {
   typedef void* reference;
   typedef void* const_reference;
   const static bool has_value = false;
+  const static unsigned sizeof_value = 0;
 
   void destroy() { }
   void construct(const_reference x) { }

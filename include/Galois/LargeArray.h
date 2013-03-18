@@ -29,6 +29,7 @@
 #include "Galois/Runtime/mm/Mem.h"
 
 #include <boost/utility.hpp>
+#include <type_traits>
 
 namespace Galois {
 
@@ -47,7 +48,7 @@ class LargeArray: boost::noncopyable {
   size_t m_size;
 
 protected:
-  LargeArray(T* d, size_t s): m_data(d), m_size(s) { }
+  LargeArray(void* d, size_t s): m_data(reinterpret_cast<T*>(d)), m_size(s) { }
 
 public:
   typedef T raw_value_type;
@@ -63,6 +64,7 @@ public:
   const static bool has_value = true;
 
   LargeArray(): m_data(0), m_size(0) { }
+  
   explicit LargeArray(size_t n): m_data(0), m_size(0) {
     allocate(n);
   }
@@ -127,14 +129,13 @@ public:
 template<bool isLazy, bool isWrapper>
 class LargeArray<void, isLazy, isWrapper>: boost::noncopyable {
 protected:
-  template<typename T>
-  LargeArray(T* d, size_t s) { }
+  LargeArray(void* d, size_t s) { }
 
 public:
   LargeArray() { }
 
   typedef void raw_value_type;
-  typedef char* value_type;
+  typedef void* value_type;
   typedef size_t size_type;
   typedef ptrdiff_t difference_type;
   typedef value_type reference;
@@ -172,7 +173,7 @@ template<typename T>
 class LargeArrayWrapper: public LargeArray<T,false,true> {
   typedef LargeArray<T,false,true> Super;
 public:
-  LargeArrayWrapper(T* data, size_t size): Super(data, size) { }
+  LargeArrayWrapper(void* data, size_t size): Super(data, size) { }
 
   void allocate(typename Super::size_type n) { }
   void construct() { }
