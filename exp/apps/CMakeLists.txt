@@ -1,3 +1,4 @@
+add_subdirectory(bc-inner)
 add_subdirectory(betweennesscentrality)
 add_subdirectory(bfs)
 add_subdirectory(bh_odg)
