@@ -1,4 +1,4 @@
-/** Local Computation graphs -*- C++ -*-
+/** Graph type traits -*- C++ -*-
  * @file
  * @section License
  *
@@ -20,20 +20,20 @@
  *
  * @section Description
  *
- * There are two main classes, ::FileGraph and ::LC_XXX_Graph. The former
- * represents the pure structure of a graph (i.e., whether an edge exists between
- * two nodes) and cannot be modified. The latter allows values to be stored on
- * nodes and edges, but the structure of the graph cannot be modified.
- *
- * @author Andrew Lenharth <andrewl@lenharth.org>
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#ifndef GALOIS_GRAPH_LCGRAPH_H
-#define GALOIS_GRAPH_LCGRAPH_H
+#ifndef GALOIS_GRAPH_TYPETRAITS_H
+#define GALOIS_GRAPH_TYPETRAITS_H
 
-#include "LC_CSR_Graph.h"
-#include "LC_InlineEdge_Graph.h"
-#include "LC_Linear_Graph.h"
-#include "LC_Numa_Graph.h"
+#include <boost/mpl/has_xxx.hpp>
 
+namespace Galois {
+namespace Graph {
+
+BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_is_segmented)
+template<typename T>
+struct is_segmented: public has_tt_is_segmented<T> {};
+
+}
+}
 #endif

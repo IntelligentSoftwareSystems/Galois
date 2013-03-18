@@ -149,6 +149,21 @@ private:
   void advance(ptrdiff_t n) { at += n; }
 };
 
+template<typename IdTy>
+class IntrusiveId {
+  IdTy id;
+public:
+  IdTy& getId() { return id; }
+  void setId(size_t n) { id = n; }
+};
+
+template<>
+class IntrusiveId<void> {
+public:
+  char getId() { return 0; }
+  void setId(size_t n) { }
+};
+
 //! Specializations for void node data
 template<typename NodeTy>
 class NodeInfoBase: public Galois::Runtime::Lockable {
@@ -173,14 +188,14 @@ struct NodeInfoBase<void>: public Galois::Runtime::Lockable {
 };
 
 //! Edge specialization for void edge data
-template<typename NodeInfoTy,typename EdgeTy>
+template<typename NodeInfoPtrTy,typename EdgeTy>
 struct EdgeInfoBase: public LazyObject<EdgeTy> {
   typedef LazyObject<EdgeTy> Super;
   typedef typename Super::reference reference;
   typedef typename Super::value_type value_type;
   const static bool has_value = Super::has_value;
 
-  NodeInfoTy* dst;
+  NodeInfoPtrTy dst;
 };
 
 /**
