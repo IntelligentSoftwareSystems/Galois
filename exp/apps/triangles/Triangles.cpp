@@ -60,7 +60,7 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValN(Algo::eigentriangle, "eigentriangle", "Approximate eigen triangle algorithm"),
       clEnumValEnd), cll::init(Algo::nodeiterator));
 
-typedef Galois::Graph::LC_CSR_Graph<void,void> Graph;
+typedef Galois::Graph::LC_CSR_Graph<uint32_t,void> Graph;
 //typedef Galois::Graph::LC_Linear_Graph<uint32_t,void> Graph;
 
 typedef Graph::GraphNode GNode;
