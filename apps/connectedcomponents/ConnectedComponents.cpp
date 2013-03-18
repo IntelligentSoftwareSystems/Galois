@@ -32,14 +32,16 @@
 #include "Galois/UnionFind.h"
 #include "Galois/Graph/LCGraph.h"
 #include "Galois/ParallelSTL/ParallelSTL.h"
+#include "Galois/Graph/TypeTraits.h"
 #ifdef GALOIS_USE_EXP
+#include <boost/mpl/if.hpp>
+#include "Galois/Graph/OCGraph.h"
+#include "Galois/Graph/GraphNodeBag.h"
 #include "Galois/DomainSpecificExecutors.h"
 #endif
 #include "llvm/Support/CommandLine.h"
 
 #include "Lonestar/BoilerPlate.h"
-
-#include "boost/optional.hpp"
 
 #include <utility>
 #include <vector>
@@ -51,10 +53,14 @@ const char* desc = "Compute connected components of a graph";
 const char* url = 0;
 
 enum class Algo {
-  asynchronous,
+  async,
+  asyncOc,
+  graphchi,
+  graphlab,
   ligra,
+  ligraChi,
   serial,
-  synchronous
+  sync
 };
 
 enum class WriteType {
@@ -67,6 +73,8 @@ static cll::opt<std::string> inputFilename(cll::Positional, cll::desc("<input fi
 static cll::opt<std::string> outputFilename(cll::Positional, cll::desc("[output file]"));
 static cll::opt<std::string> transposeGraphName("graphTranspose", cll::desc("Transpose of input graph"));
 static cll::opt<bool> symmetricGraph("symmetricGraph", cll::desc("Input graph is symmetric"), cll::init(false));
+static cll::opt<unsigned int> memoryLimit("memoryLimit",
+    cll::desc("Memory limit for out-of-core algorithms (in MB)"), cll::init(~0U));
 static cll::opt<WriteType> writeType("output", cll::desc("Output type:"),
     cll::values(
       clEnumValN(WriteType::none, "none", "None (default)"),
@@ -74,11 +82,15 @@ static cll::opt<WriteType> writeType("output", cll::desc("Output type:"),
       clEnumValEnd), cll::init(WriteType::none));
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
-      clEnumValN(Algo::asynchronous, "asynchronous", "Asynchronous (default)"),
+      clEnumValN(Algo::async, "async", "Asynchronous (default)"),
+      clEnumValN(Algo::asyncOc, "asyncOc", "Asynchronous out-of-core memory"),
       clEnumValN(Algo::ligra, "ligra", "Using Ligra programming model"),
+      clEnumValN(Algo::ligraChi, "ligraChi", "Using Ligra and GraphChi programming model"),
+      clEnumValN(Algo::graphlab, "graphlab", "Using GraphLab programming model"),
+      clEnumValN(Algo::graphchi, "graphchi", "Using GraphChi programming model"),
       clEnumValN(Algo::serial, "serial", "Serial"),
-      clEnumValN(Algo::synchronous, "synchronous", "Synchronous"),
-      clEnumValEnd), cll::init(Algo::asynchronous));
+      clEnumValN(Algo::sync, "sync", "Synchronous"),
+      clEnumValEnd), cll::init(Algo::async));
 
 struct Node: public Galois::UnionFindNode<Node> {
   typedef Node* component_type;
@@ -232,7 +244,9 @@ struct SynchronousAlgo {
   }
 };
 
-struct LigraAlgo {
+#ifdef GALOIS_USE_EXP
+template<bool UseGraphChi>
+struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
   struct LNode {
     typedef unsigned int component_type;
     unsigned int id;
@@ -243,18 +257,22 @@ struct LigraAlgo {
     bool isRep() { return id == comp; }
   };
 
-  typedef Galois::Graph::LC_CSR_InOutGraph<LNode,void,true> Graph;
-  typedef Graph::GraphNode GNode;
+  typedef typename boost::mpl::if_c<UseGraphChi,
+          Galois::Graph::OCImmutableEdgeGraph<LNode,void>,
+          Galois::Graph::LC_CSR_InOutGraph<LNode,void,true> >::type
+          Graph;
+  typedef typename Graph::GraphNode GNode;
 
+  template<typename Bag>
   struct Initialize {
     Graph& graph;
-    Galois::GraphNodeBag<Graph>& bag;
+    Bag& bag;
 
-    Initialize(Graph& g, Galois::GraphNodeBag<Graph>& b): graph(g), bag(b) { }
+    Initialize(Graph& g, Bag& b): graph(g), bag(b) { }
     void operator()(GNode n) {
       LNode& data = graph.getData(n, Galois::MethodFlag::NONE);
       data.comp = data.id;
-      bag.push(n);
+      bag.push(n, graph.sizeEdges() / graph.size());
     }
   };
 
@@ -262,22 +280,28 @@ struct LigraAlgo {
     Graph& graph;
 
     Copy(Graph& g): graph(g) { }
-    void operator()(GNode n) {
+    void operator()(size_t n, Galois::UserContext<size_t>&) {
+      (*this)(n);
+    }
+    void operator()(size_t id) {
+      GNode n = graph.nodeFromId(id);
       LNode& data = graph.getData(n, Galois::MethodFlag::NONE);
       data.oldComp = data.comp;
     }
   };
 
   struct EdgeOperator {
-    bool cond(Graph& graph, GNode) { return true; }
+    template<typename GTy>
+    bool cond(GTy& graph, typename GTy::GraphNode) { return true; }
     
-    bool operator()(Graph& graph, GNode src, GNode dst, typename Graph::edge_data_reference) {
+    template<typename GTy>
+    bool operator()(GTy& graph, typename GTy::GraphNode src, typename GTy::GraphNode dst, typename GTy::edge_data_reference) {
       LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
       LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
 
-      LNode::component_type orig = ddata.comp;
+      typename LNode::component_type orig = ddata.comp;
       while (true) {
-        LNode::component_type old = ddata.comp;
+        typename LNode::component_type old = ddata.comp;
         if (old <= sdata.comp)
           return false;
         if (__sync_bool_compare_and_swap(&ddata.comp, old, sdata.comp)) {
@@ -292,10 +316,216 @@ struct LigraAlgo {
     if (symmetricGraph) {
       graph.structureFromFile(inputFilename, true); 
     } else if (transposeGraphName.size()) {
-      Galois::Graph::FileGraph inputGraph, transposeGraph;
-      inputGraph.structureFromFile(inputFilename);
-      transposeGraph.structureFromFile(transposeGraphName);
-      graph.structureFromGraph(inputGraph, transposeGraph);
+      graph.structureFromFile(inputFilename, transposeGraphName);
+    } else {
+      std::cerr << "Graph type not supported\n";
+      abort();
+    }
+    this->checkIfInMemoryGraph(graph, memoryLimit);
+  }
+
+  void operator()(Graph& graph) {
+    typedef Galois::WorkList::dChunkedFIFO<256> WL;
+    typedef Galois::GraphNodeBagPair<> BagPair;
+    BagPair bags(graph.size());
+
+    Galois::do_all_local(graph, Initialize<typename BagPair::bag_type>(graph, bags.next()));
+    while (!bags.next().empty()) {
+      bags.swap();
+      Galois::for_each_local<WL>(bags.cur(), Copy(graph));
+      this->outEdgeMap(memoryLimit, graph, EdgeOperator(), bags.cur(), bags.next(), false);
+    } 
+  }
+};
+
+#if 1
+struct GraphChiAlgo {
+  struct LNode {
+    typedef unsigned int component_type;
+    unsigned int id;
+    unsigned int comp;
+    
+    component_type component() { return comp; }
+    bool isRep() { return id == comp; }
+  };
+
+  typedef Galois::Graph::OCImmutableEdgeGraph<LNode,void> Graph;
+  typedef Graph::GraphNode GNode;
+  typedef Galois::GraphNodeBagPair<> BagPair;
+
+  void readGraph(Graph& graph) {
+    if (symmetricGraph) {
+      graph.structureFromFile(inputFilename, true); 
+    } else if (transposeGraphName.size()) {
+      graph.structureFromFile(inputFilename, transposeGraphName);
+    } else {
+      std::cerr << "Graph type not supported\n";
+      abort();
+    }
+    // XXX
+    if (Galois::GraphChi::hidden::fitsInMemory(graph, memoryLimit)) {
+      graph.keepInMemory();
+    }
+  }
+
+  struct Initialize {
+    Graph& graph;
+
+    Initialize(Graph& g): graph(g) { }
+    void operator()(GNode n) {
+      LNode& data = graph.getData(n, Galois::MethodFlag::NONE);
+      data.comp = data.id;
+    }
+  };
+
+  struct Process {
+    typedef int tt_does_not_need_aborts;
+    typedef int tt_does_not_need_parallel_push;
+
+    typedef BagPair::bag_type bag_type;
+    bag_type& next;
+
+    Process(bag_type& n): next(n) { }
+
+    //! Add the next edge between components to the worklist
+    template<typename GTy>
+    void operator()(GTy& graph, const GNode& src) const {
+      LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+
+      typename LNode::component_type m = sdata.comp;
+
+      for (typename GTy::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::NONE),
+          ei = graph.edge_end(src, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+        GNode dst = graph.getEdgeDst(ii);
+        LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        m = std::min(m, ddata.comp);
+      }
+
+      for (typename GTy::in_edge_iterator ii = graph.in_edge_begin(src, Galois::MethodFlag::NONE),
+          ei = graph.in_edge_end(src, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+        GNode dst = graph.getInEdgeDst(ii);
+        LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        m = std::min(m, ddata.comp);
+      }
+
+      if (m != sdata.comp) {
+        sdata.comp = m;
+        for (typename GTy::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::NONE),
+            ei = graph.edge_end(src, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+          GNode dst = graph.getEdgeDst(ii);
+          LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+          if (m < ddata.comp) {
+            next.push(graph.idFromNode(dst), 1);
+          }
+        }
+        for (typename GTy::in_edge_iterator ii = graph.in_edge_begin(src, Galois::MethodFlag::NONE),
+            ei = graph.in_edge_end(src, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+          GNode dst = graph.getInEdgeDst(ii);
+          LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+          if (m < ddata.comp) {
+            next.push(graph.idFromNode(dst), 1);
+          }
+        }
+      }
+    }
+  };
+
+  void operator()(Graph& graph) {
+    BagPair bags(graph.size());
+
+    Galois::do_all_local(graph, Initialize(graph));
+    Galois::GraphChi::vertexMap(graph, Process(bags.next()), memoryLimit);
+    while (!bags.next().empty()) {
+      bags.swap();
+      Galois::GraphChi::vertexMap(graph, Process(bags.next()), bags.cur(), memoryLimit);
+    } 
+  }
+};
+#endif
+
+
+struct GraphLabAlgo {
+  struct LNode {
+    typedef size_t component_type;
+    unsigned int id;
+    component_type labelid;
+    
+    component_type component() { return labelid; }
+    bool isRep() { return id == labelid; }
+  };
+
+  typedef Galois::Graph::LC_CSR_InOutGraph<LNode,void,true> Graph;
+  typedef Graph::GraphNode GNode;
+
+  struct Initialize {
+    Graph& graph;
+
+    Initialize(Graph& g): graph(g) { }
+    void operator()(GNode n) {
+      LNode& data = graph.getData(n, Galois::MethodFlag::NONE);
+      data.labelid = data.id;
+    }
+  };
+
+  struct Program {
+    typedef size_t gather_type;
+
+    struct message_type {
+      size_t value;
+      message_type(): value(std::numeric_limits<size_t>::max()) { }
+      explicit message_type(size_t v): value(v) { }
+      message_type& operator+=(const message_type& other) {
+        value = std::min<size_t>(value, other.value);
+        return *this;
+      }
+    };
+
+    typedef int tt_needs_scatter_out_edges;
+    typedef int tt_needs_scatter_in_edges;
+
+  private:
+    size_t received_labelid;
+    bool perform_scatter;
+
+  public:
+    Program(): received_labelid(std::numeric_limits<size_t>::max()), perform_scatter(false) { }
+
+    void init(Graph& graph, GNode node, const message_type& msg) {
+      received_labelid = msg.value;
+    }
+
+    void apply(Graph& graph, GNode node, const gather_type&) {
+      if (received_labelid == std::numeric_limits<size_t>::max()) {
+        perform_scatter = true;
+      } else if (graph.getData(node, Galois::MethodFlag::NONE).labelid > received_labelid) {
+        perform_scatter = true;
+        graph.getData(node, Galois::MethodFlag::NONE).labelid = received_labelid;
+      }
+    }
+
+    bool needsScatter(Graph& graph, GNode node) {
+      return perform_scatter;
+    }
+
+    void gather(Graph& graph, GNode node, GNode src, GNode dst, gather_type&, typename Graph::edge_data_reference) { }
+
+    void scatter(Graph& graph, GNode node, GNode src, GNode dst,
+        Galois::GraphLab::Context<Graph,Program>& ctx, typename Graph::edge_data_reference) {
+      LNode& data = graph.getData(node, Galois::MethodFlag::NONE);
+
+      if (node == src && graph.getData(dst, Galois::MethodFlag::NONE).labelid > data.labelid) {
+        ctx.push(dst, message_type(data.labelid));
+      } else if (node == dst && graph.getData(src, Galois::MethodFlag::NONE).labelid > data.labelid) {
+        ctx.push(dst, message_type(data.labelid));
+      }
+    }
+  };
+
+  void readGraph(Graph& graph) {
+    if (symmetricGraph) {
+      graph.structureFromFile(inputFilename, true); 
+    } else if (transposeGraphName.size()) {
+      graph.structureFromFile(inputFilename, transposeGraphName);
     } else {
       std::cerr << "Graph type not supported\n";
       abort();
@@ -303,23 +533,67 @@ struct LigraAlgo {
   }
 
   void operator()(Graph& graph) {
-    Galois::GraphNodeBagPair<Graph> bags(graph);
+    Galois::do_all_local(graph, Initialize(graph));
 
-    Galois::do_all_local(graph, Initialize(graph, bags.next()));
-
-    while (!bags.next().empty()) {
-      bags.swap();
-      Galois::do_all_local(graph, Copy(graph));
-      Galois::edgeMap(graph, EdgeOperator(), bags.cur(), bags.next());
-    } 
+    Galois::GraphLab::SyncEngine<Graph,Program> engine(graph, Program());
+    engine.execute();
   }
 };
+
+struct AsyncOCAlgo {
+  typedef Galois::Graph::OCImmutableEdgeGraph<Node,void> Graph;
+  typedef Graph::GraphNode GNode;
+
+  void readGraph(Graph& graph) {
+    if (symmetricGraph) {
+      graph.structureFromFile(inputFilename, true); 
+    } else if (transposeGraphName.size()) {
+      graph.structureFromFile(inputFilename, transposeGraphName);
+    } else {
+      std::cerr << "Graph type not supported\n";
+      abort();
+    }
+  }
+
+  struct Merge {
+    typedef int tt_does_not_need_aborts;
+    typedef int tt_does_not_need_parallel_push;
+
+    Galois::Statistic& emptyMerges;
+    Merge(Galois::Statistic& e): emptyMerges(e) { }
+
+    //! Add the next edge between components to the worklist
+    template<typename GTy>
+    void operator()(GTy& graph, const GNode& src) const {
+      Node& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+
+      for (typename GTy::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::NONE),
+          ei = graph.edge_end(src, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+        GNode dst = graph.getEdgeDst(ii);
+        Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+
+        if (symmetricGraph && src >= dst)
+          continue;
+
+        if (!sdata.merge(&ddata))
+          emptyMerges += 1;
+      }
+    }
+  };
+
+  void operator()(Graph& graph) {
+    Galois::Statistic emptyMerges("EmptyMerges");
+    
+    Galois::GraphChi::vertexMap(graph, Merge(emptyMerges), memoryLimit);
+  }
+};
+#endif
 
 /**
  * Like synchronous algorithm, but if we restrict path compression, we
  * can perform unions and finds concurrently.
  */
-struct AsynchronousAlgo {
+struct AsyncAlgo {
   typedef Galois::Graph::LC_CSR_Graph<Node,void> Graph;
   typedef Graph::GraphNode GNode;
 
@@ -391,12 +665,27 @@ struct is_bad {
 };
 
 template<typename Graph>
-bool verify(Graph& graph) {
+bool verify(Graph& graph,
+    typename std::enable_if<Galois::Graph::is_segmented<Graph>::value>::type* = 0) {
+  return true;
+}
+
+template<typename Graph>
+bool verify(Graph& graph,
+    typename std::enable_if<!Galois::Graph::is_segmented<Graph>::value>::type* = 0) {
   return Galois::ParallelSTL::find_if(graph.begin(), graph.end(), is_bad<Graph>(graph)) == graph.end();
 }
 
 template<typename Graph>
-void writeComponent(Graph& graph, typename Graph::node_data_type::component_type component) {
+void writeComponent(Graph& graph, typename Graph::node_data_type::component_type component,
+    typename std::enable_if<Galois::Graph::is_segmented<Graph>::value>::type* = 0) {
+  std::cerr << "Writing component not supported for this graph\n";
+  abort();
+}
+
+template<typename Graph>
+void writeComponent(Graph& graph, typename Graph::node_data_type::component_type component,
+    typename std::enable_if<!Galois::Graph::is_segmented<Graph>::value>::type* = 0) {
   typedef typename Graph::GraphNode GNode;
   typedef typename Graph::node_data_reference node_data_reference;
 
@@ -597,15 +886,22 @@ int main(int argc, char** argv) {
   Galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
+  Galois::StatTimer T("TotalTime");
+  T.start();
   switch (algo) {
-    case Algo::asynchronous: run<AsynchronousAlgo>(); break;
+    case Algo::async: run<AsyncAlgo>(); break;
 #ifdef GALOIS_USE_EXP
-    case Algo::ligra: run<LigraAlgo>(); break;
+    case Algo::asyncOc: run<AsyncOCAlgo>(); break;
+    case Algo::graphchi: run<GraphChiAlgo>(); break;
+    case Algo::graphlab: run<GraphLabAlgo>(); break;
+    case Algo::ligraChi: run<LigraAlgo<true> >(); break;
+    case Algo::ligra: run<LigraAlgo<false> >(); break;
 #endif
     case Algo::serial: run<SerialAlgo>(); break;
-    case Algo::synchronous: run<SynchronousAlgo>(); break;
+    case Algo::sync: run<SynchronousAlgo>(); break;
     default: std::cerr << "Unknown algorithm\n"; abort();
   }
+  T.stop();
 
   return 0;
 }
