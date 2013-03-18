@@ -91,9 +91,8 @@ protected:
     ThreadLocalData(const FunctionTy& fn, const char* ln): function(fn), stat(ln) {}
   };
 
-  WLTy& wl;
+  WLTy wl;
   FunctionTy& origFunction;
-  WLTy default_wl;
   const char* loopname;
 
   TerminationDetection& term;
@@ -115,7 +114,6 @@ protected:
   GALOIS_ATTRIBUTE_NOINLINE
   void abortIteration(value_type val, ThreadLocalData& tld, bool recursiveAbort) {
     assert(ForEachTraits<FunctionTy>::NeedsAborts);
-
     tld.cnx.cancel_iteration();
     tld.stat.inc_conflicts(); //Class specialization handles opt
     if (recursiveAbort)
@@ -254,15 +252,18 @@ protected:
   }
 
 public:
-  ForEachWork(FunctionTy& f, const char* l): wl(default_wl), origFunction(f), loopname(l), term(getSystemTermination()), broke(false) { }
-
+  ForEachWork(FunctionTy& f, const char* l): origFunction(f), loopname(l), term(getSystemTermination()), broke(false) { }
+  
   template<typename W>
   ForEachWork(W& w, FunctionTy& f, const char* l): wl(w), origFunction(f), loopname(l), term(getSystemTermination()), broke(false) { }
 
   template<typename RangeTy>
   void AddInitialWork(const RangeTy& range) {
-    term.initializeThread();
     wl.push_initial(range);
+  }
+
+  void initThread(void) {
+    term.initializeThread();
   }
 
   void operator()() {
@@ -286,12 +287,15 @@ void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
   typedef ForEachWork<WLTy, T, FunctionTy> WorkTy;
 
   WorkTy W(f, loopname);
-  RunCommand init(std::bind(&WorkTy::template AddInitialWork<RangeTy>, std::ref(W), range));
-  RunCommand w[4] = {init, 
-		     std::ref(getSystemBarrier()),
-		     std::ref(W),
-		     std::ref(getSystemBarrier())};
-  getSystemThreadPool().run(&w[0], &w[4], activeThreads);
+  //RunCommand init(std::bind(&WorkTy::template AddInitialWork<RangeTy>, std::ref(W), range));
+  RunCommand w[5] = {
+    std::bind(&WorkTy::initThread, std::ref(W)),
+    std::bind(&WorkTy::template AddInitialWork<RangeTy>, std::ref(W), range), 
+    std::ref(getSystemBarrier()),
+    std::ref(W),
+    std::ref(getSystemBarrier())
+  };
+  getSystemThreadPool().run(&w[0], &w[5], activeThreads);
   inGaloisForEach = false;
 }
 
