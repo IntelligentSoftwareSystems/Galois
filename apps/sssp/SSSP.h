@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -32,21 +32,17 @@
 #include <sstream>
 #include <stdint.h>
 
-static const unsigned int DIST_INFINITY =
-  std::numeric_limits<unsigned int>::max() - 1;
+typedef unsigned int Dist;
+static const Dist DIST_INFINITY = std::numeric_limits<Dist>::max() - 1;
 
 template<typename GrNode>
 struct UpdateRequestCommon {
   GrNode n;
-  unsigned int w;
+  Dist w;
 
-  UpdateRequestCommon(const GrNode& N, unsigned int W)
-    :n(N), w(W)
-  {}
+  UpdateRequestCommon(const GrNode& N, Dist W): n(N), w(W) {}
   
-  UpdateRequestCommon()
-    :n(), w(0)
-  {}
+  UpdateRequestCommon(): n(), w(0) {}
 
   bool operator>(const UpdateRequestCommon& rhs) const {
     if (w > rhs.w) return true;
@@ -71,14 +67,6 @@ struct UpdateRequestCommon {
 };
 
 struct SNode {
-  unsigned int id;
-  unsigned int dist;
-  
-  SNode(int _id = -1) : id(_id), dist(DIST_INFINITY) {}
-  std::string toString() {
-    std::ostringstream s;
-    s << '[' << id << "] dist: " << dist;
-    return s.str();
-  }
+  Dist dist;
 };
 #endif
