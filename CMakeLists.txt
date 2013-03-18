@@ -23,6 +23,7 @@ set(USE_STRICT_CONFIG OFF CACHE BOOL "Instead of falling back gracefully, fail")
 set(USE_EXP OFF CACHE BOOL "Use experimental features") 
 set(EXP_DOALL "PTHREAD" CACHE STRING "Which type of implementation of parallel_doall")
 set(USE_PROF OFF CACHE BOOL "Use profiling specific features")
+set(USE_SUBVERSION_REVISION ON CACHE BOOL "Embed subversion numbers")
 
 ###### Configure (users don't need to go beyond here) ######
 enable_testing()
@@ -96,8 +97,6 @@ if(USE_PAPI)
 endif()
 
 if(USE_EXP)
-  find_package(GMP) # for buchberger
-
   add_definitions(-DGALOIS_USE_EXP)
   include_directories("exp/include")
 
@@ -111,7 +110,6 @@ if(USE_EXP)
     include_directories(${TBB_INCLUDE_DIRS})
   endif()
 
-  set(USE_SUBVERSION_REVISION on)
   if(USE_SUBVERSION_REVISION)
     include_directories("${PROJECT_BINARY_DIR}/include")
     include(GetSVNVersion)
@@ -130,9 +128,6 @@ endif()
 # c++11 features
 find_package(CXX11)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX11_FLAGS}")
-if (HAS_CXX11_RVALUE_REFERENCES)
-  add_definitions(-DGALOIS_HAS_RVALUE_REFERENCES)
-endif()
 
 if(USE_GPROF)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
@@ -154,6 +149,11 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
 #Disable asserts
 if(CMAKE_BUILD_TYPE MATCHES "Release")
   add_definitions("-DNDEBUG")
+endif()
+
+#Enable architecture-specific optimizations
+if(CMAKE_BUILD_TYPE MATCHES "Release" AND CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
 endif()
 
 #more warnings
@@ -196,7 +196,7 @@ function(app name)
   PARSE_ARGUMENTS(APP "REQUIRES;EXTLIBS" "" ${ARGN})
 
   foreach(required ${APP_REQUIRES})
-    if(${${required}})
+    if(${${required}} MATCHES "TRUE")
 
     else()
       message(WARNING "NOT compiling ${name} (missing: ${required})")

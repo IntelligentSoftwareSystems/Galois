@@ -332,17 +332,10 @@ struct map_reduce_helper {
   MapFn fn;
   ReduceFn reduce;
   map_reduce_helper(T i, MapFn fn, ReduceFn reduce) :init(i), fn(fn), reduce(reduce) {}
-#ifdef GALOIS_HAS_RVALUE_REFERENCES
   template<typename U>
   void operator()(U&& v) {
     init = reduce(fn(std::forward<U>(v)), init);
   }
-#else
-  template<typename U>
-  void operator()(const U& v) {
-    init = reduce(fn(v), init);
-  }
-#endif
 };
 
 template<class InputIterator, class MapFn, class T, class ReduceFn>

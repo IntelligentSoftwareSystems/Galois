@@ -676,13 +676,10 @@ public:
     new (ptr) Ty(val);
   }
 
-//#if __GNUC_MINOR__ > 5
-#ifdef GALOIS_HAS_RVALUE_REFERENCES
   template<class U, class... Args >
   inline void construct(U* p, Args&&... args ) const {
     ::new((void*)p) U(std::forward<Args>(args)...);
   }
-#endif
   
   void destroy(pointer ptr) const {
     destruct(ptr);
@@ -694,7 +691,6 @@ public:
   bool operator!=(const ExternRefGaloisAllocator<T1,A1>& rhs) const {
     return Alloc != rhs.Alloc;
   }
-
 };
 
 }
