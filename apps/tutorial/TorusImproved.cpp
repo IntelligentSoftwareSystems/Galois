@@ -83,7 +83,6 @@ public:
 struct ZOrderCompare {
   bool operator()(const Point2D& p1, const Point2D& p2) const {
     int index = 0;
-    int k = 0;
     int x = 0;
     for (int k = 0; k < p1.dim(); ++k) {
       int y = p1.at(k) ^ p2.at(k);

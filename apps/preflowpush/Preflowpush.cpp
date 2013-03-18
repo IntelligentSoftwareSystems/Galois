@@ -53,8 +53,10 @@ static cll::opt<uint32_t> sourceId(cll::Positional, cll::desc("sourceID"), cll::
 static cll::opt<uint32_t> sinkId(cll::Positional, cll::desc("sinkID"), cll::Required);
 static cll::opt<bool> useHLOrder("useHLOrder", cll::desc("Use HL ordering heuristic"), cll::init(false));
 static cll::opt<bool> useUnitCapacity("useUnitCapacity", cll::desc("Assume all capacities are unit"), cll::init(false));
-static cll::opt<bool> useSymmetricDirectly("useSymmetricDirectly", cll::desc("Assume input graph is symmetric and has unit capacities"), cll::init(false));
-static cll::opt<int> relabelInt("relabel", cll::desc("relabel interval: < 0 no relabeling, 0 use default interval, > 0 relabel every X iterations"), cll::init(0));
+static cll::opt<bool> useSymmetricDirectly("useSymmetricDirectly",
+    cll::desc("Assume input graph is symmetric and has unit capacities"), cll::init(false));
+static cll::opt<int> relabelInt("relabel",
+    cll::desc("relabel interval: < 0 no relabeling, 0 use default interval, > 0 relabel every X iterations"), cll::init(0));
 static cll::opt<DetAlgo> detAlgo(cll::desc("Deterministic algorithm:"),
     cll::values(
       clEnumVal(nondet, "Non-deterministic"),
@@ -88,9 +90,12 @@ struct Node {
 };
 
 std::ostream& operator<<(std::ostream& os, const Node& n) {
-  os << "(excess: " << n.excess
+  os << "("
+     << "id: " << n.id
+     << ", excess: " << n.excess
      << ", height: " << n.height
-     << ", current: " << n.current << ")";
+     << ", current: " << n.current
+     << ")";
   return os;
 }
 
@@ -211,8 +216,7 @@ void checkConservation(Config& orig) {
   }
 
   // Now do some checking
-  for (Graph::iterator ii = app.graph.begin(),
-      ei = app.graph.end(); ii != ei; ++ii) {
+  for (Graph::iterator ii = app.graph.begin(), ei = app.graph.end(); ii != ei; ++ii) {
     GNode src = *ii;
     const Node& node = app.graph.getData(src);
     uint32_t srcId = node.id;
@@ -240,8 +244,7 @@ void checkConservation(Config& orig) {
     }
 
     if (node.excess != sum) {
-      std::cerr << "Not pseudoflow " << node.excess << " != " << sum 
-        << " at node" << node.id << "\n";
+      std::cerr << "Not pseudoflow: " << node.excess << " != " << sum << " at " << node << "\n";
       abort();
     }
   }

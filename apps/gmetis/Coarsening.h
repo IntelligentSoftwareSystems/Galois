@@ -52,7 +52,7 @@ public:
 	void resizeEdges(MetisGraph* coarseMetisGraph) {
 
 		GGraph *coarseGraph = coarseMetisGraph->getGraph();
-		int id = 0;
+		//int id = 0;
 		for (GGraph::iterator ii = coarseGraph->begin(), ee = coarseGraph->end(); ii != ee; ++ii) {
 			GNode node = *ii;
 			MetisNode nodeData = coarseGraph->getData(node,Galois::MethodFlag::NONE);
@@ -271,7 +271,7 @@ private:
 
 
 		if(matchNode!=invMapNode) {
-			MetisNode &mapNodeData = graph->getData(matchNode,Galois::MethodFlag::NONE);
+			//MetisNode &mapNodeData = graph->getData(matchNode,Galois::MethodFlag::NONE);
 			for (GGraph::edge_iterator jj = graph->edge_begin(matchNode, Galois::MethodFlag::NONE), eejj = graph->edge_end(matchNode, Galois::MethodFlag::NONE); jj != eejj; ++jj) {
 				GNode neighbor = graph->getEdgeDst(jj);
 				if(neighbor == invMapNode)
@@ -400,7 +400,7 @@ private:
 //		}
 
 		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
-			GNode node = *ii;
+			//GNode node = *ii;
 			//addEdges(graph->getData(node,Galois::NONE).getNodeId(), node, visited, coarseMetisGraph);
 		}
 //		delete[] visited;

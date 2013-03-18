@@ -217,6 +217,8 @@ private:
       SNode& data = graph.getData(n, Galois::MethodFlag::NONE);
       
       assert(data.dist != DIST_INFINITY);
+      if (data.dist == DIST_INFINITY)
+        return;
 
       if (counts.size() <= data.dist)
         counts.resize(data.dist + 1);
