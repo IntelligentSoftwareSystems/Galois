@@ -40,8 +40,8 @@ namespace Galois {
  * supports scalable concurrent pushes but reading the bag
  * can only be done serially.
  */
-template<typename T>
-struct InsertBag: boost::noncopyable {
+template<typename T, unsigned int BlockSize = 0>
+class InsertBag: boost::noncopyable {
 
   struct header {
     header* next;
@@ -118,6 +118,7 @@ struct InsertBag: boost::noncopyable {
   };
   
   Galois::Runtime::PerThreadStorage<header*> heads;
+  Galois::Runtime::MM::FixedSizeAllocator heap;
 
   void insHeader(header* h) {
     header*& H = *heads.getLocal();
@@ -125,8 +126,7 @@ struct InsertBag: boost::noncopyable {
     H = h;
   }
 
-  header* newHeader() {
-    void* m = Galois::Runtime::MM::pageAlloc();
+  header* newHeaderFromAllocator(void *m, unsigned size) {
     header* H = new (m) header();
     int offset = 1;
     if (sizeof(T) < sizeof(header))
@@ -134,9 +134,17 @@ struct InsertBag: boost::noncopyable {
     T* a = reinterpret_cast<T*>(m);
     H->dbegin = &a[offset];
     H->dend = H->dbegin;
-    H->dlast = &a[(Galois::Runtime::MM::pageSize / sizeof(T))];
+    H->dlast = &a[(size / sizeof(T))];
     H->next = 0;
     return H;
+  }
+
+  header* newHeader() {
+    if (BlockSize) {
+      return newHeaderFromAllocator(heap.allocate(BlockSize), BlockSize);
+    } else {
+      return newHeaderFromAllocator(Galois::Runtime::MM::pageAlloc(), Galois::Runtime::MM::pageSize);
+    }
   }
 
   void destruct() {
@@ -146,12 +154,20 @@ struct InsertBag: boost::noncopyable {
         uninitialized_destroy(h->dbegin, h->dend);
         header* h2 = h;
         h = h->next;
-        Galois::Runtime::MM::pageFree(h2);
+        if (BlockSize)
+          heap.deallocate(h2);
+        else
+          Galois::Runtime::MM::pageFree(h2);
       }
     }
   }
 
 public:
+  static_assert(BlockSize == 0 || BlockSize >= (2 * sizeof(T) + sizeof(header)),
+      "BlockSize should larger than sizeof(T) + O(1)");
+
+  InsertBag(): heap(BlockSize) { }
+
   ~InsertBag() {
     destruct();
   }
