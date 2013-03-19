@@ -30,7 +30,6 @@
 #include "Galois/Runtime/ll/SimpleLock.h"
 #include "Galois/Runtime/ll/TID.h"
 #include "Galois/Runtime/ll/EnvCheck.h"
-#include "Galois/Runtime/Network.h"
 
 #include <cstdlib>
 #include <cstdio>
@@ -72,10 +71,10 @@ void Galois::Runtime::LL::gDebugStr(const std::string& s) {
       IOLock.lock();
     }
 
-    debugOut << "[" << time_str << " " << std::setw(3) << Distributed::networkHostID << ":" << getTID() << "] " << s << "\n";
+    debugOut << "[" << time_str << " " << std::setw(3) << getTID() << "] " << s << "\n";
     debugOut.flush();
   } else {
-    std::cerr << "[" << time_str << " " << std::setw(3) << Distributed::networkHostID << ":" << getTID() << "] " << s << "\n";
+    std::cerr << "[" << time_str << " " << std::setw(3) << getTID() << "] " << s << "\n";
   }
   IOLock.unlock();
 #endif

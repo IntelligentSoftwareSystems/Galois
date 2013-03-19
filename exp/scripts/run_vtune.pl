@@ -54,8 +54,8 @@ if ($sys eq "volta") {
 my $dire = "/tmp/$uname.vtune.r$threads";
 my $rdir = "-result-dir=$dire";
 my $report = "-R hw-events -format csv -csv-delimiter tab";
-my $collect = "-analyze-system -collect $type -start-paused";
-# my $collect = "-collect-with runsa -knob event-config=CPU_CLK_UNHALTED.REF -start-paused";
+# my $collect = "-analyze-system -collect $type -start-paused";
+my $collect = "-collect-with runsa -knob event-config=CPU_CLK_UNHALTED.REF -start-paused";
 my $sdir = "-search-dir all=$symbol";
 my $maxsec = 1000;
 
