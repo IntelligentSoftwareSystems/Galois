@@ -140,10 +140,10 @@ protected:
     commitIteration(tld);
 
     if ((Distributed::networkHostNum > 1) && (LL::getTID() == 0)) {
-      Distributed::getSystemNetworkInterface().handleReceives();
       getSystemLocalDirectory().makeProgress();
       getSystemRemoteDirectory().makeProgress();
-    }
+      Distributed::getSystemNetworkInterface().handleReceives();
+   }
   }
 
   GALOIS_ATTRIBUTE_NOINLINE
@@ -187,25 +187,17 @@ protected:
     } catch (const conflict_ex& ex) {
       Distributed::getSystemLocalDirectory().recall(ex.obj, false);
       abortIteration(*p, tld, recursiveAbort);
-
-    if ((Distributed::networkHostNum > 1) && (LL::getTID() == 0)) {
-      Distributed::getSystemNetworkInterface().handleReceives();
-      getSystemLocalDirectory().makeProgress();
-      getSystemRemoteDirectory().makeProgress();
-    }
-
     } catch (const break_ex&) {
       handleBreak(tld);
       return false;
     } catch (int) {
       abortIteration(*p, tld, recursiveAbort);
-
-    if ((Distributed::networkHostNum > 1) && (LL::getTID() == 0)) {
-      Distributed::getSystemNetworkInterface().handleReceives();
-      getSystemLocalDirectory().makeProgress();
-      getSystemRemoteDirectory().makeProgress();
     }
 
+    if ((Distributed::networkHostNum > 1) && (LL::getTID() == 0)) {
+      getSystemLocalDirectory().makeProgress();
+      getSystemRemoteDirectory().makeProgress();
+      Distributed::getSystemNetworkInterface().handleReceives();
     }
     return workHappened;
   }
@@ -250,10 +242,9 @@ protected:
 	didAnyWork |= didWork;
 
 	if ((Distributed::networkHostNum > 1) && (LL::getTID() == 0)) {
-	  Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
-	  net.handleReceives();
 	  getSystemLocalDirectory().makeProgress();
 	  getSystemRemoteDirectory().makeProgress();
+	  Distributed::getSystemNetworkInterface().handleReceives();
 	}
 
       } while (didWork);

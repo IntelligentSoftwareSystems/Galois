@@ -183,6 +183,8 @@ public:
 
   virtual bool handleReceives() {
     //assert master thread
+    bool retval = recvInternal();
+
     asyncOutLock.lock();
     while (!asyncOutQueue.empty()) {
       if (asyncOutQueue[0].bcast)
@@ -193,7 +195,7 @@ public:
     }
     asyncOutLock.unlock();
 
-    return recvInternal();
+    return retval;
   }
 
   virtual bool needsDedicatedThread() {
