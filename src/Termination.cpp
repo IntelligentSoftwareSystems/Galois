@@ -56,7 +56,7 @@ class LocalTerminationDetection : public TerminationDetection {
   }
 
   void propGlobalTerm() {
-    globalTerm = true;
+    globalTerm.data = true;
   }
 
   bool isSysMaster() const {
@@ -72,14 +72,14 @@ public:
     th.tokenIsBlack = false;
     th.processIsBlack = true;
     th.lastWasWhite = true;
-    globalTerm = false;
+    globalTerm.data = false;
     if (isSysMaster()) {
       th.hasToken = true;
     }
   }
 
   virtual void localTermination(bool workHappened) {
-    assert(!(workHappened && globalTerm));
+    assert(!(workHappened && globalTerm.data));
     TokenHolder& th = *data.getLocal();
     th.processIsBlack |= workHappened;
     if (th.hasToken) {
@@ -94,7 +94,7 @@ public:
 	th.lastWasWhite = !failed;
       }
       //Normal thread or recirc by master
-      assert (!globalTerm && "no token should be in progress after globalTerm");
+      assert (!globalTerm.data && "no token should be in progress after globalTerm");
       bool taint = th.processIsBlack || th.tokenIsBlack;
       th.processIsBlack = th.tokenIsBlack = false;
       th.hasToken = false;
@@ -108,9 +108,121 @@ static LocalTerminationDetection& getLocalTermination() {
   return term;
 }
 
+
+//Dijkstra style 2-pass tree termination detection
+class TreeTerminationDetection : public TerminationDetection {
+  static const int num = 2;
+
+  struct TokenHolder {
+    friend class TerminationDetection;
+    //incoming from above
+    volatile long down_token;
+    //incoming from below
+    volatile long up_token[num];
+    //my state
+    long processIsBlack;
+    bool hasToken;
+    bool lastWasWhite; // only used by the master
+    int parent;
+    int parent_offset;
+    TokenHolder* child[num];
+  };
+
+  PerThreadStorage<TokenHolder> data;
+
+  void processToken() {
+    TokenHolder& th = *data.getLocal();
+    int myid = LL::getTID();
+    //have all up tokens?
+    bool haveAll = th.hasToken;
+    bool black = th.processIsBlack;
+    for (int i = 0; i < num; ++i)
+      if (th.child[i])
+	if( th.up_token[i] == -1 )
+	  haveAll = false;
+	else
+	  black |= th.up_token[i];
+    //Have the tokens, propagate
+    if (haveAll) {
+      th.processIsBlack = false;
+      th.hasToken = false;
+      if (isSysMaster()) {
+	if (th.lastWasWhite && !black) {
+	  //This was the second success
+	  propGlobalTerm();
+	  return;
+	}
+	th.lastWasWhite = !black;
+	th.down_token = true;
+      } else {
+	data.getRemote(th.parent)->up_token[th.parent_offset] = black;
+      }
+    }
+
+    //recieved a down token, propagate
+    if (th.down_token) {
+      th.down_token = false;
+      th.hasToken = true;
+      for (int i = 0; i < num; ++i) {
+	th.up_token[i] = -1;
+	if (th.child[i])
+	  th.child[i]->down_token = true;
+      }
+    }
+  }
+
+  void propGlobalTerm() {
+    globalTerm.data = true;
+  }
+
+  bool isSysMaster() const {
+    return LL::getTID() == 0;
+  }
+
+public:
+  TreeTerminationDetection() {}
+
+  virtual void initializeThread() {
+    TokenHolder& th = *data.getLocal();
+    th.down_token = false;
+    for (int i = 0; i < num; ++i) 
+      th.up_token[i] = false;
+    th.processIsBlack = true;
+    th.hasToken = false;
+    th.lastWasWhite = false;
+    globalTerm.data = false;
+    th.parent = (LL::getTID() - 1) / num;
+    th.parent_offset = (LL::getTID() - 1) % num;
+    for (int i = 0; i < num; ++i) {
+      int cn = LL::getTID() * num + i + 1;
+      if (cn < activeThreads)
+	th.child[i] = data.getRemote(cn);
+      else
+	th.child[i] = 0;
+    }
+    if (isSysMaster()) {
+      th.down_token = true;
+    }
+  }
+
+  virtual void localTermination(bool workHappened) {
+    assert(!(workHappened && globalTerm.data));
+    TokenHolder& th = *data.getLocal();
+    th.processIsBlack |= workHappened;
+    processToken();
+  }
+};
+
+static TreeTerminationDetection& getTreeTermination() {
+  static TreeTerminationDetection term;
+  return term;
+}
+
+
 } // namespace
 
 Galois::Runtime::TerminationDetection& Galois::Runtime::getSystemTermination() {
   return getLocalTermination();
+  //return getTreeTermination();
 }
 
