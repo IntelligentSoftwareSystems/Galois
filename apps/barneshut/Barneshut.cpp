@@ -164,10 +164,8 @@ struct BoundingBox {
     for (int i = 0; i < 3; i++) {
       if (other.min[i] < min[i])
         min[i] = other.min[i];
-    }
-    for (int i = 0; i < 3; i++) {
       if (other.max[i] > max[i])
-        max[i] = other.max[i];
+	max[i] = other.max[i];
     }
   }
 
@@ -175,8 +173,6 @@ struct BoundingBox {
     for (int i = 0; i < 3; i++) {
       if (other[i] < min[i])
         min[i] = other[i];
-    }
-    for (int i = 0; i < 3; i++) {
       if (other[i] > max[i])
         max[i] = other[i];
     }
@@ -375,30 +371,33 @@ void computeDelta(Point& p, const Body* body, T* b) {
 struct ComputeForces {
   // Optimize runtime for no conflict case
   typedef int tt_does_not_need_aborts;
+  typedef int tt_needs_per_iter_alloc;
 
   OctreeInternal* top;
   double diameter;
   double root_dsq;
 
+  size_t max;
+
   ComputeForces(OctreeInternal* _top, double _diameter) :
     top(_top),
-    diameter(_diameter) {
+    diameter(_diameter), max(0) {
     root_dsq = diameter * diameter * config.itolsq;
   }
   
   template<typename Context>
-  void operator()(Body* bb, Context&) {
+  void operator()(Body* bb, Context& cnx) {
     Body& b = *bb;
     Point p = b.acc;
     for (int i = 0; i < 3; i++)
       b.acc[i] = 0;
     //recurse(b, top, root_dsq);
-    iterate(b, root_dsq);
+    iterate(b, root_dsq, cnx);
     for (int i = 0; i < 3; i++)
       b.vel[i] += (b.acc[i] - p[i]) * config.dthf;
   }
 
-  void recurse(Body& b, Body* node, double dsq) {
+  void forleaf(Body& b, Body* node, double dsq) {
     Point p;
     computeDelta(p, &b, node);
     updateForce(b.acc, p, p.dist2(), b.mass);
@@ -410,12 +409,17 @@ struct ComputeForces {
     Frame(OctreeInternal* _node, double _dsq) : dsq(_dsq), node(_node) { }
   };
 
-  void iterate(Body& b, double root_dsq) {
-    std::deque<Frame> stack;
+  template<typename Context>
+  void iterate(Body& b, double root_dsq, Context& cnx) {
+    std::deque<Frame, Galois::PerIterAllocTy::rebind<Frame>::other> stack(cnx.getPerIterAlloc());
     stack.push_back(Frame(top, root_dsq));
 
     Point p;
     while (!stack.empty()) {
+      // if (stack.size() > max) {
+      // 	max = stack.size();
+      // 	std::cout << max << " ";
+      // }
       Frame f = stack.back();
       stack.pop_back();
 
@@ -438,7 +442,7 @@ struct ComputeForces {
         if (next->isLeaf()) {
           // Check if it is me
           if (&b != next) {
-            recurse(b, static_cast<Body*>(next), dsq);
+            forleaf(b, static_cast<Body*>(next), dsq);
           }
         } else {
           stack.push_back(Frame(static_cast<OctreeInternal*>(next), dsq));
@@ -467,7 +471,7 @@ struct ComputeForces {
       if (next->isLeaf()) {
         // Check if it is me
         if (&b != next) {
-          recurse(b, static_cast<Body*>(next), dsq);
+          forleaf(b, static_cast<Body*>(next), dsq);
         }
       } else {
         recurse(b, static_cast<OctreeInternal*>(next), dsq);
@@ -484,6 +488,10 @@ struct AdvanceBodies {
 
   template<typename Context>
   void operator()(Body* bb, Context&) {
+    operator()(bb);
+  }
+
+  void operator()(Body* bb) {
     Body& b = *bb;
     Point dvel(b.acc);
     dvel *= config.dthf;
@@ -660,31 +668,29 @@ void run(Bodies& bodies, BodyPtrs& pBodies) {
     BoundingBox box;
     ReduceBoxes reduceBoxes(box);
     std::for_each(pBodies.begin(), pBodies.end(), ReduceBoxes(box));
-    OctreeInternal* top = new OctreeInternal(box.center());
+    OctreeInternal top(box.center());
 
-    std::for_each(pBodies.begin(), pBodies.end(), BuildOctree(top, box.radius()));
+    std::for_each(pBodies.begin(), pBodies.end(), BuildOctree(&top, box.radius()));
 
-    ComputeCenterOfMass computeCenterOfMass(top);
+    ComputeCenterOfMass computeCenterOfMass(&top);
     computeCenterOfMass();
 
     Galois::StatTimer T_parallel("ParallelTime");
     T_parallel.start();
-    Galois::setActiveThreads(numThreads);
 
-    Galois::for_each_local<WL>(pBodies, ComputeForces(top, box.diameter()));
+    Galois::for_each_local<WL>(pBodies, ComputeForces(&top, box.diameter()), "compute");
     if (!skipVerify) {
       std::cout << "MSE (sampled) " << checkAllPairs(bodies, std::min((int) nbodies, 100)) << "\n";
     }
-    Galois::for_each_local<WL>(pBodies, AdvanceBodies());
+    Galois::do_all_local(pBodies, AdvanceBodies());//, "advance");
     T_parallel.stop();
 
     std::cout << "Timestep " << step << " Center of Mass = ";
     std::ios::fmtflags flags = 
       std::cout.setf(std::ios::showpos|std::ios::right|std::ios::scientific|std::ios::showpoint);
-    std::cout << top->pos;
+    std::cout << top.pos;
     std::cout.flags(flags);
     std::cout << "\n";
-    delete top;
   }
 }
 
