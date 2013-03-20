@@ -110,38 +110,32 @@ std::ostream& operator<<(std::ostream& os, const Point& p) {
  * A node in an octree is either an internal node or a body (leaf).
  */
 struct Octree {
+  Point pos;
+  double mass;
+  bool Leaf;
   virtual ~Octree() { }
-  virtual bool isLeaf() const = 0;
+  Octree(bool l = true) :Leaf(l) {}
+  Octree(const Point& p, double m, bool l) :pos(p), mass(m), Leaf(l) {}
+  //  Octree(const Point& p, double m = 0.0) :pos(p), mass(m) {}
 };
 
 struct OctreeInternal : Octree {
   Octree* child[8];
-  Point pos;
-  double mass;
-  OctreeInternal(Point _pos) : pos(_pos), mass(0.0) {
+  OctreeInternal(const Point& _pos) :Octree(_pos, 0.0, false) {
     bzero(child, sizeof(*child) * 8);
   }
   virtual ~OctreeInternal() {
     for (int i = 0; i < 8; i++) {
-      if (child[i] != NULL && !child[i]->isLeaf()) {
-        delete child[i];
+      if (OctreeInternal* B = dynamic_cast<OctreeInternal*>(child[i])) {
+        delete B;
       }
     }
-  }
-  virtual bool isLeaf() const {
-    return false;
   }
 };
 
 struct Body : Octree {
-  Point pos;
   Point vel;
   Point acc;
-  double mass;
-  Body() { }
-  virtual bool isLeaf() const {
-    return true;
-  }
 };
 
 std::ostream& operator<<(std::ostream& os, const Body& b) {
@@ -265,8 +259,6 @@ struct BuildOctree {
   void insert(Body* b, OctreeInternal* node, double radius) {
     int index = getIndex(node->pos, b->pos);
 
-    assert(!node->isLeaf());
-
     Octree *child = node->child[index];
     
     if (child == NULL) {
@@ -275,7 +267,7 @@ struct BuildOctree {
     }
     
     radius *= 0.5;
-    if (child->isLeaf()) {
+    if (child->Leaf) {
       // Expand leaf
       Body* n = static_cast<Body*>(child);
       Point new_pos(node->pos);
@@ -288,8 +280,8 @@ struct BuildOctree {
       insert(n, new_node, radius);
       node->child[index] = new_node;
     } else {
-      OctreeInternal* n = static_cast<OctreeInternal*>(child);
-      insert(b, n, radius);
+      OctreeInternal* ni = static_cast<OctreeInternal*>(child);
+      insert(b, ni, radius);
     }
   }
 };
@@ -324,15 +316,11 @@ private:
       index++;
       
       double m;
-      const Point* p;
-      if (child->isLeaf()) {
-        Body* n = static_cast<Body*>(child);
-        m = n->mass;
-        p = &n->pos;
+      const Point* p = &child->pos;
+      if (child->Leaf) {
+        m = child->mass;
       } else {
-        OctreeInternal* n = static_cast<OctreeInternal*>(child);
-        m = recurse(n);
-        p = &n->pos;
+        m = recurse(static_cast<OctreeInternal*>(child));
       }
 
       mass += m;
@@ -362,8 +350,7 @@ void updateForce(Point& acc, const Point& delta, double psq, double mass) {
     acc[i] += delta[i] * scale;
 }
 
-template<typename T>
-void computeDelta(Point& p, const Body* body, T* b) {
+void computeDelta(Point& p, const Body* body, Octree* b) {
   for (int i = 0; i < 3; i++)
     p[i] = b->pos[i] - body->pos[i];
 }
@@ -377,11 +364,9 @@ struct ComputeForces {
   double diameter;
   double root_dsq;
 
-  size_t max;
-
   ComputeForces(OctreeInternal* _top, double _diameter) :
     top(_top),
-    diameter(_diameter), max(0) {
+    diameter(_diameter) {
     root_dsq = diameter * diameter * config.itolsq;
   }
   
@@ -397,7 +382,10 @@ struct ComputeForces {
       b.vel[i] += (b.acc[i] - p[i]) * config.dthf;
   }
 
-  void forleaf(Body& b, Body* node, double dsq) {
+  void forleaf(Body& __restrict__  b, Body* __restrict__ node, double dsq) {
+    //check if it is me
+    if (&b == node)
+      return;
     Point p;
     computeDelta(p, &b, node);
     updateForce(b.acc, p, p.dist2(), b.mass);
@@ -416,10 +404,6 @@ struct ComputeForces {
 
     Point p;
     while (!stack.empty()) {
-      // if (stack.size() > max) {
-      // 	max = stack.size();
-      // 	std::cout << max << " ";
-      // }
       Frame f = stack.back();
       stack.pop_back();
 
@@ -429,7 +413,6 @@ struct ComputeForces {
       // Node is far enough away, summarize contribution
       if (psq >= f.dsq) {
         updateForce(b.acc, p, psq, f.node->mass);
-        
         continue;
       }
 
@@ -439,12 +422,9 @@ struct ComputeForces {
         Octree *next = f.node->child[i];
         if (next == NULL)
           break;
-        if (next->isLeaf()) {
-          // Check if it is me
-          if (&b != next) {
-            forleaf(b, static_cast<Body*>(next), dsq);
-          }
-        } else {
+        if (next->Leaf) {
+	  forleaf(b, static_cast<Body*>(next), dsq);
+	} else {
           stack.push_back(Frame(static_cast<OctreeInternal*>(next), dsq));
         }
       }
@@ -468,11 +448,8 @@ struct ComputeForces {
       Octree *next = node->child[i];
       if (next == NULL)
         break;
-      if (next->isLeaf()) {
-        // Check if it is me
-        if (&b != next) {
-          forleaf(b, static_cast<Body*>(next), dsq);
-        }
+      if (next->Leaf) {
+	forleaf(b, static_cast<Body*>(next), dsq);
       } else {
         recurse(b, static_cast<OctreeInternal*>(next), dsq);
       }
