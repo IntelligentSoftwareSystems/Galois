@@ -51,6 +51,7 @@
 #include "Chunked.h"
 #include "OwnerComputes.h"
 #include "BulkSynchronous.h"
+#include "StableIter.h"
 
 namespace Galois {
 /**
