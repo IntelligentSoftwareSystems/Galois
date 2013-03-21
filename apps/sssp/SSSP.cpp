@@ -507,7 +507,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
   void operator()(Graph& graph, const GNode& source) {
     Galois::Statistic roundStat("Rounds");
 
-    Galois::GraphNodeBagPair<1024*4> bags(graph.size());
+    Galois::GraphNodeBagPair<> bags(graph.size());
 
     graph.getData(source).dist = 0;
 
