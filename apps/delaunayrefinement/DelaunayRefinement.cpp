@@ -167,7 +167,7 @@ int main(int argc, char** argv) {
   Galois::StatTimer T;
   T.start();
 
-  Galois::for_each_local(graph, Preprocess(graph,gwl));
+  Galois::for_each_local(graph, Preprocess(graph,gwl), "findbad");
 
   Galois::Statistic("MeminfoMid", Galois::Runtime::MM::pageAllocInfo());
   
@@ -178,7 +178,7 @@ int main(int argc, char** argv) {
   typedef LocalQueues<dChunkedLIFO<256>, ChunkedLIFO<256> > BQ;
   typedef ChunkedAdaptor<false,32> CA;
 
-  Galois::for_each_local<CA>(gwl, Process(graph,gwl));
+  Galois::for_each_local<CA>(gwl, Process(graph,gwl), "refine");
   Trefine.stop();
   T.stop();
 
