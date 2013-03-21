@@ -101,9 +101,12 @@ protected:
 
   inline void commitIteration(ThreadLocalData& tld) {
     if (ForEachTraits<FunctionTy>::NeedsPush) {
-      wl.push(tld.facing.getPushBuffer().begin(),
-              tld.facing.getPushBuffer().end());
-      tld.facing.resetPushBuffer();
+      auto ii = tld.facing.getPushBuffer().begin();
+      auto ee = tld.facing.getPushBuffer().end();
+      if (ii != ee) {
+	wl.push(ii,ee);
+	tld.facing.resetPushBuffer();
+      }
     }
     if (ForEachTraits<FunctionTy>::NeedsPIA)
       tld.facing.resetAlloc();
@@ -242,17 +245,21 @@ protected:
 	break;
       //update node color and prop token
       term.localTermination(didAnyWork);
-    } while ((ForEachTraits<FunctionTy>::NeedsPush 
-	     ||ForEachTraits<FunctionTy>::NeedsBreak
-	     ||ForEachTraits<FunctionTy>::NeedsAborts)
+    } while ((ForEachTraits<FunctionTy>::NeedsPush
+	      ||ForEachTraits<FunctionTy>::NeedsBreak
+	      ||ForEachTraits<FunctionTy>::NeedsAborts)
 	     && !term.globalTermination());
+    //FIXME: termination needs to happen if stealing does, not if the above condtion holds
+    //} while (!term.globalTermination());
 
     if (ForEachTraits<FunctionTy>::NeedsAborts)
       setThreadContext(0);
   }
 
 public:
-  ForEachWork(FunctionTy& f, const char* l): origFunction(f), loopname(l), term(getSystemTermination()), broke(false) { }
+  ForEachWork(FunctionTy& f, const char* l): origFunction(f), loopname(l), term(getSystemTermination()), broke(false) {
+    //LL::gDebug("Type traits stats ", ForEachTraits<FunctionTy>::NeedsStats, " break ", ForEachTraits<FunctionTy>::NeedsBreak, " push ", ForEachTraits<FunctionTy>::NeedsPush, " PIA ", ForEachTraits<FunctionTy>::NeedsPIA, "Aborts ", ForEachTraits<FunctionTy>::NeedsAborts);
+  }
   
   template<typename W>
   ForEachWork(W& w, FunctionTy& f, const char* l): wl(w), origFunction(f), loopname(l), term(getSystemTermination()), broke(false) { }
