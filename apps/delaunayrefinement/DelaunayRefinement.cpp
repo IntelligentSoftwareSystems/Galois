@@ -157,7 +157,7 @@ int main(int argc, char** argv) {
   T.start();
 
   if (detAlgo == nondet)
-    Galois::do_all_local(*graph, Preprocess());
+    Galois::do_all_local(*graph, Preprocess(), "findbad");
   else
     std::for_each(graph->begin(), graph->end(), Preprocess());
 
@@ -172,7 +172,7 @@ int main(int argc, char** argv) {
   
   switch (detAlgo) {
     case nondet: 
-      Galois::for_each_local<CA>(wl, Process<>()); break;
+      Galois::for_each_local<CA>(wl, Process<>(), "refine"); break;
     case detBase:
       Galois::for_each_det(wl.begin(), wl.end(), Process<>()); break;
     case detPrefix:
