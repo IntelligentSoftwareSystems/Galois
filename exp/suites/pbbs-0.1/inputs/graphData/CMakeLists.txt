@@ -16,7 +16,7 @@ function(galoisgraph base input)
 endfunction(galoisgraph)
 
 function(rmat base edges numnodes numedges)
-  if(${edges})
+  if(${edges} MATCHES "YES")
     add_custom_command(OUTPUT ${input}/${base}
       COMMAND rMatGraph -a .5 -b .1 -m ${numedges} ${numnodes} ${input}/${base}
       DEPENDS rMatGraph)
@@ -38,7 +38,7 @@ function(rmatWeighted base edges numnodes numedges)
 endfunction(rmatWeighted)
 
 function(rand base edges numnodes numedges)
-  if(${edges})
+  if(${edges} MATCHES "YES")
     add_custom_command(OUTPUT ${input}/${base}
       COMMAND randLocalGraph -d 3 -m ${numedges} ${numnodes} ${input}/${base}
       DEPENDS randLocalGraph)
@@ -60,7 +60,7 @@ function(randWeighted base edges numnodes numedges)
 endfunction(randWeighted)
 
 function(grid base edges dim numnodes)
-  if(${edges})
+  if(${edges} MATCHES "YES")
     add_custom_command(OUTPUT ${input}/${base}
       COMMAND gridGraph -d ${dim} ${numnodes} ${input}/${base}
       DEPENDS gridGraph)

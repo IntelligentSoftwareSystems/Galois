@@ -31,13 +31,14 @@
 #define GALOIS_RUNTIME_TERMINATION_H
 
 #include "Galois/Runtime/PerThreadStorage.h"
+#include "Galois/Runtime/ll/CacheLineStorage.h"
 
 namespace Galois {
 namespace Runtime {
 
 class TerminationDetection {
 protected:
-  volatile bool globalTerm;
+  LL::CacheLineStorage<volatile bool> globalTerm;
 public:
   //Initializes the per-thread state.  All threads must call this
   //before any call localTermination
@@ -54,7 +55,7 @@ public:
 
   //Returns whether global termination is detected
   bool globalTermination() const {
-    return globalTerm;
+    return globalTerm.data;
   }
 };
 

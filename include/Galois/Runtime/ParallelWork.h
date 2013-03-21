@@ -87,15 +87,15 @@ protected:
   typedef WorkList::GFIFO<value_type> AbortedList;
 
   struct ThreadLocalData {
+    FunctionTy function;
     UserContextAccess<value_type> facing;
     SimpleRuntimeContext cnx;
     LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
-    ThreadLocalData(const char* ln) :stat(ln) {}
+    ThreadLocalData(const FunctionTy& fn, const char* ln): function(fn), stat(ln) {}
   };
 
-  WLTy default_wl;
-  WLTy& wl;
-  FunctionTy& function;
+  WLTy wl;
+  FunctionTy& origFunction;
   const char* loopname;
 
   TerminationDetection& term;
@@ -117,7 +117,6 @@ protected:
   GALOIS_ATTRIBUTE_NOINLINE
   void abortIteration(value_type val, ThreadLocalData& tld, bool recursiveAbort) {
     assert(ForEachTraits<FunctionTy>::NeedsAborts);
-
     tld.cnx.cancel_iteration();
     tld.stat.inc_conflicts(); //Class specialization handles opt
     if (recursiveAbort)
@@ -136,7 +135,7 @@ protected:
     tld.stat.inc_iterations(); //Class specialization handles opt
     if (ForEachTraits<FunctionTy>::NeedsAborts)
       tld.cnx.start_iteration();
-    function(*p, tld.facing.data());
+    tld.function(*p, tld.facing.data());
     commitIteration(tld);
 
     if ((Distributed::networkHostNum > 1) && (LL::getTID() == 0)) {
@@ -216,7 +215,7 @@ protected:
   void go() {
     //Thread Local Data goes on the local stack
     //to be NUMA friendly
-    ThreadLocalData tld(loopname);
+    ThreadLocalData tld(origFunction, loopname);
     if (ForEachTraits<FunctionTy>::NeedsAborts)
       setThreadContext(&tld.cnx);
     if (false && ForEachTraits<FunctionTy>::NeedsPush && !ForEachTraits<FunctionTy>::NeedsAborts) {
@@ -263,15 +262,17 @@ protected:
   }
 
 public:
-  ForEachWork(FunctionTy& f, const char* l): wl(default_wl), function(f), loopname(l), term(getSystemTermination()), broke(false) { }
-
+  ForEachWork(FunctionTy& f, const char* l): origFunction(f), loopname(l), term(getSystemTermination()), broke(false) { }
+  
   template<typename W>
-  ForEachWork(W& w, FunctionTy& f, const char* l): wl(w), function(f), loopname(l), term(getSystemTermination()), broke(false) { }
+  ForEachWork(W& w, FunctionTy& f, const char* l): wl(w), origFunction(f), loopname(l), term(getSystemTermination()), broke(false) { }
 
   template<typename RangeTy>
   void AddInitialWork(const RangeTy& range) {
-    term.initializeThread();
     wl.push_initial(range);
+  }
+
+  void initThread(void) {
     term.initializeThread();
   }
 
@@ -297,20 +298,24 @@ void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
   typedef ForEachWork<WLTy, T, FunctionTy> WorkTy;
 
   WorkTy W(f, loopname);
-  RunCommand init(std::bind(&WorkTy::template AddInitialWork<RangeTy>, std::ref(W), range));
-  RunCommand w[4] = {init, 
-		     std::ref(getSystemBarrier()),
-		     std::ref(W),
-		     std::ref(getSystemBarrier())};
-  getSystemThreadPool().run(&w[0], &w[4], activeThreads);
+  //RunCommand init(std::bind(&WorkTy::template AddInitialWork<RangeTy>, std::ref(W), range));
+  RunCommand w[5] = {
+    std::bind(&WorkTy::initThread, std::ref(W)),
+    std::bind(&WorkTy::template AddInitialWork<RangeTy>, std::ref(W), range), 
+    std::ref(getSystemBarrier()),
+    std::ref(W),
+    std::ref(getSystemBarrier())
+  };
+  getSystemThreadPool().run(&w[0], &w[5], activeThreads);
   inGaloisForEach = false;
 }
 
 template<typename FunctionTy>
 struct WOnEach {
-  FunctionTy fn;
-  WOnEach(FunctionTy f) :fn(f) {}
+  FunctionTy& origFunction;
+  WOnEach(FunctionTy& f): origFunction(f) { }
   void operator()(void) {
+    FunctionTy fn(origFunction);
     fn(LL::getTID(), activeThreads);   
   }
 };

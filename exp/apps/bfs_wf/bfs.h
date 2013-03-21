@@ -38,8 +38,8 @@
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
 #include "Galois/Galois.h"
-#include "Galois/Graphs/LCGraph.h"
-#include "Galois/Graphs/FileGraph.h"
+#include "Galois/Graph/LCGraph.h"
+#include "Galois/Graph/FileGraph.h"
 #include "llvm/Support/CommandLine.h"
 
 #include "Galois/Runtime/ll/CacheLineStorage.h"

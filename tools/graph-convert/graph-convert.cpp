@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -22,9 +22,13 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 #include "Galois/LargeArray.h"
-#include "Galois/Graphs/FileGraph.h"
+#include "Galois/Graph/FileGraph.h"
 
 #include "llvm/Support/CommandLine.h"
+
+#include <boost/random/mersenne_twister.hpp>
+#include <boost/random/uniform_int_distribution.hpp>
+#include <boost/random/negative_binomial_distribution.hpp>
 
 #include <iostream>
 #include <vector>
@@ -36,19 +40,31 @@ namespace cll = llvm::cl;
 
 enum ConvertMode {
   dimacs2gr,
-  edgelist2gr,
+  edgelist2vgr,
   floatedgelist2gr,
   gr2bsml,
+  gr2cintgr,
   gr2dimacs,
-  gr2pbbs,
-  gr2floatpbbs,
+  gr2floatpbbsedges,
   gr2intpbbs,
+  gr2intpbbsedges,
+  gr2rmat,
+  gr2sintgr,
+  gr2tintgr,
   intedgelist2gr,
-  pbbs2gr,
+  nodelist2vgr,
   pbbs2vgr,
   rmat2gr,
   vgr2bsml,
-  vgr2svgr
+  vgr2cvgr,
+  vgr2edgelist,
+  vgr2intgr,
+  vgr2pbbs,
+  vgr2svgr,
+  vgr2trivgr,
+  vgr2tvgr,
+  vgr2vbinpbbs32,
+  vgr2vbinpbbs64
 };
 
 static cll::opt<std::string> inputfilename(cll::Positional, cll::desc("<input file>"), cll::Required);
@@ -56,23 +72,46 @@ static cll::opt<std::string> outputfilename(cll::Positional, cll::desc("<output 
 static cll::opt<ConvertMode> convertMode(cll::desc("Choose a conversion mode:"),
     cll::values(
       clEnumVal(dimacs2gr, "Convert dimacs to binary gr"),
-      clEnumVal(edgelist2gr, "Convert edge list to binary gr (default)"),
+      clEnumVal(edgelist2vgr, "Convert edge list to binary void gr"),
       clEnumVal(floatedgelist2gr, "Convert weighted (float) edge list to binary gr"),
       clEnumVal(gr2bsml, "Convert binary gr to binary sparse MATLAB matrix"),
+      clEnumVal(gr2cintgr, "Clean up binary weighted (int) gr: remove self edges and multi-edges"),
       clEnumVal(gr2dimacs, "Convert binary gr to dimacs"),
-      clEnumVal(gr2pbbs, "Convert binary gr to pbbs"),
-      clEnumVal(gr2floatpbbs, "Convert binary gr to weighted (float) pbbs"),
-      clEnumVal(gr2intpbbs, "Convert binary gr to weighted (int) pbbs"),
-      clEnumVal(intedgelist2gr, "Convert weighted (int) edge list to binary gr (default)"),
-      clEnumVal(pbbs2gr, "Convert pbbs graph to binary gr"),
+      clEnumVal(gr2floatpbbsedges, "Convert binary gr to weighted (float) pbbs edge list"),
+      clEnumVal(gr2intpbbs, "Convert binary gr to weighted (int) pbbs graph"),
+      clEnumVal(gr2intpbbsedges, "Convert binary gr to weighted (int) pbbs edge list"),
+      clEnumVal(gr2rmat, "Convert binary gr to RMAT graph"),
+      clEnumVal(gr2sintgr, "Convert binary gr to symmetric graph by adding reverse edges"),
+      clEnumVal(gr2tintgr, "Transpose binary weighted (int) gr"),
+      clEnumVal(intedgelist2gr, "Convert weighted (int) edge list to binary gr"),
+      clEnumVal(nodelist2vgr, "Convert node list to binary gr"),
       clEnumVal(pbbs2vgr, "Convert pbbs graph to binary void gr"),
       clEnumVal(rmat2gr, "Convert rmat to binary gr"),
       clEnumVal(vgr2bsml, "Convert binary void gr to binary sparse MATLAB matrix"),
+      clEnumVal(vgr2cvgr, "Clean up binary void gr: remove self edges and multi-edges"),
+      clEnumVal(vgr2edgelist, "Convert binary void gr to edgelist"),
+      clEnumVal(vgr2intgr, "Convert void binary gr to weighted (int) gr by adding random edge weights"),
       clEnumVal(vgr2svgr, "Convert binary void gr to symmetric graph by adding reverse edges"),
-      clEnumValEnd), cll::init(edgelist2gr));
+      clEnumVal(vgr2trivgr, "Convert symmetric binary void gr to triangular form by removing reverse edges"),
+      clEnumVal(vgr2tvgr, "Transpose binary gr"),
+      clEnumVal(vgr2vbinpbbs32, "Convert binary gr to unweighted binary pbbs graph"),
+      clEnumVal(vgr2vbinpbbs64, "Convert binary gr to unweighted binary pbbs graph"),
+      clEnumVal(vgr2pbbs, "Convert binary gr to unweighted pbbs graph"),
+      clEnumValEnd), cll::Required);
 
-//! Just a bunch of pairs or triples:
-//!   src dst weight?
+static void printStatus(size_t in_nodes, size_t in_edges, size_t out_nodes, size_t out_edges) {
+  std::cout << "InGraph : |V| = " << in_nodes << ", |E| = " << in_edges << "\n";
+  std::cout << "OutGraph: |V| = " << out_nodes << ", |E| = " << out_edges << "\n";
+}
+
+static void printStatus(size_t in_nodes, size_t in_edges) {
+  printStatus(in_nodes, in_edges, in_nodes, in_edges);
+}
+
+/**
+ * Just a bunch of pairs or triples:
+ * src dst weight?
+ */
 template<typename EdgeTy>
 void convert_edgelist2gr(const std::string& infilename, const std::string& outfilename) {
   typedef Galois::Graph::FileGraphParser Parser;
@@ -151,14 +190,134 @@ void convert_edgelist2gr(const std::string& infilename, const std::string& outfi
   if (EdgeData::has_value)
     std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
 
-  std::cout << "Finished reading graph. "
-    << "Nodes: " << numNodes
-    << " Edges: " << numEdges 
-    << "\n";
-
-  p.structureToFile(outfilename.c_str());
+  p.structureToFile(outfilename);
+  printStatus(numNodes, numEdges);
 }
 
+/**
+ * List of node adjacencies:
+ *
+ * <node id> <num neighbors> <neighbor id>*
+ * ...
+ */
+void convert_nodelist2vgr(const std::string& infilename, const std::string& outfilename) {
+  typedef Galois::Graph::FileGraphParser Parser;
+
+  Parser p;
+  std::ifstream infile(infilename.c_str());
+
+  size_t numNodes = 0;
+  size_t numEdges = 0;
+
+  while (infile) {
+    size_t src;
+    size_t numNeighbors;
+
+    infile >> src >> numNeighbors;
+
+    if (infile) {
+      if (src > numNodes)
+        numNodes = src;
+      numEdges += numNeighbors;
+    }
+    infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+  }
+
+  numNodes++;
+  p.setNumNodes(numNodes);
+  p.setNumEdges(numEdges);
+
+  infile.clear();
+  infile.seekg(0, std::ios::beg);
+  p.phase1();
+  while (infile) {
+    size_t src;
+    size_t numNeighbors;
+
+    infile >> src >> numNeighbors;
+
+    if (infile) {
+      p.incrementDegree(src, numNeighbors);
+    }
+    infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+  }
+
+  infile.clear();
+  infile.seekg(0, std::ios::beg);
+  p.phase2();
+  while (infile) {
+    size_t src;
+    size_t numNeighbors;
+
+    infile >> src >> numNeighbors;
+    
+    for (; infile && numNeighbors > 0; --numNeighbors) {
+      size_t dst;
+      infile >> dst;
+      if (infile)
+        p.addNeighbor(src, dst);
+    }
+
+    infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+  }
+
+  p.finish<void>();
+
+  p.structureToFile(outfilename);
+  printStatus(numNodes, numEdges);
+}
+
+
+template<typename EdgeTy>
+void convert_gr2edgelist(const std::string& infilename, const std::string& outfilename) {
+  typedef Galois::Graph::FileGraph Graph;
+  typedef Graph::GraphNode GNode;
+  typedef Galois::LargeArray<EdgeTy,true> EdgeData;
+  typedef typename EdgeData::value_type edge_value_type;
+
+  Graph graph;
+  graph.structureFromFile(infilename);
+
+  std::ofstream file(outfilename.c_str());
+  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+    GNode src = *ii;
+    for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
+      GNode dst = graph.getEdgeDst(jj);
+      if (EdgeData::has_value) {
+        file << src << " " << dst << " " << graph.getEdgeData<edge_value_type>(jj) << "\n";
+      } else {
+        file << src << " " << dst << "\n";
+      }
+    }
+  }
+  file.close();
+
+  printStatus(graph.size(), graph.sizeEdges());
+}
+
+template<typename InEdgeTy,typename OutEdgeTy>
+void add_weights(const std::string& infilename, const std::string& outfilename) {
+  typedef Galois::Graph::FileGraph Graph;
+  typedef Graph::GraphNode GNode;
+  
+  Graph graph, outgraph;
+
+  graph.structureFromFile(infilename);
+  OutEdgeTy* edgeData = outgraph.structureFromGraph<OutEdgeTy>(graph);
+  OutEdgeTy* edgeDataEnd = edgeData + graph.sizeEdges();
+
+  boost::random::mt19937 gen;
+  boost::random::uniform_int_distribution<OutEdgeTy> dist(1, 100);
+  //boost::random::negative_binomial_distribution<OutEdgeTy> dist(10, 0.1);
+  for (; edgeData != edgeDataEnd; ++edgeData) {
+    *edgeData = dist(gen);
+  }
+  
+  outgraph.structureToFile(outfilename);
+  printStatus(graph.size(), graph.sizeEdges(), outgraph.size(), outgraph.sizeEdges());
+}
+
+//! Make graph symmetric by blindly adding reverse entries
 template<typename EdgeTy>
 void convert_gr2sgr(const std::string& infilename, const std::string& outfilename) {
   typedef Galois::Graph::FileGraph Graph;
@@ -168,7 +327,242 @@ void convert_gr2sgr(const std::string& infilename, const std::string& outfilenam
   ingraph.structureFromFile(infilename);
   Galois::Graph::makeSymmetric<EdgeTy>(ingraph, outgraph);
 
-  outgraph.structureToFile(outfilename.c_str());
+  outgraph.structureToFile(outfilename);
+  printStatus(ingraph.size(), ingraph.sizeEdges(), outgraph.size(), outgraph.sizeEdges());
+}
+
+//! Transpose graph
+template<typename EdgeTy>
+void convert_gr2tgr(const std::string& infilename, const std::string& outfilename) {
+  typedef Galois::Graph::FileGraph Graph;
+  typedef Graph::GraphNode GNode;
+  typedef Galois::Graph::FileGraphParser Parser;
+  typedef Galois::LargeArray<EdgeTy,true> EdgeData;
+  typedef typename EdgeData::value_type edge_value_type;
+  
+  Graph graph;
+  graph.structureFromFile(infilename);
+
+  Parser p;
+  EdgeData edgeData;
+
+  p.setNumNodes(graph.size());
+  p.setNumEdges(graph.sizeEdges());
+  p.setSizeofEdgeData(EdgeData::has_value ? sizeof(edge_value_type) : 0);
+  edgeData.allocate(graph.sizeEdges());
+
+  p.phase1();
+  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+    GNode src = *ii;
+
+    for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
+      GNode dst = graph.getEdgeDst(jj);
+      p.incrementDegree(dst);
+    }
+  }
+
+  p.phase2();
+  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+    GNode src = *ii;
+
+    for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
+      GNode dst = graph.getEdgeDst(jj);
+      if (EdgeData::has_value) {
+        edgeData.set(p.addNeighbor(dst, src), graph.getEdgeData<edge_value_type>(jj));
+      } else {
+        p.addNeighbor(dst, src);
+      }
+    }
+  }
+
+  edge_value_type* rawEdgeData = p.finish<edge_value_type>();
+  if (EdgeData::has_value)
+    std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+  
+  p.structureToFile(outfilename);
+  printStatus(graph.size(), graph.sizeEdges(), p.size(), p.sizeEdges());
+}
+
+template<typename EdgeTy>
+struct IdLess {
+  bool operator()(const Galois::Graph::EdgeSortValue<EdgeTy>& e1, const Galois::Graph::EdgeSortValue<EdgeTy>& e2) const {
+    return e1.dst < e2.dst;
+  }
+};
+
+/**
+ * Removes self and multi-edges from a graph.
+ */
+template<typename EdgeTy>
+void convert_gr2cgr(const std::string& infilename, const std::string& outfilename) {
+  typedef Galois::Graph::FileGraph Graph;
+  typedef Graph::GraphNode GNode;
+  
+  Graph orig, graph;
+  {
+    // Original FileGraph is immutable because it is backed by a file
+    orig.structureFromFile(infilename);
+    graph.cloneFrom(orig);
+  }
+
+  size_t numEdges = 0;
+
+  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+    GNode src = *ii;
+
+    graph.sortEdges<EdgeTy>(src, IdLess<EdgeTy>());
+
+    Graph::edge_iterator prev = graph.edge_end(src);
+    for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
+      GNode dst = graph.getEdgeDst(jj);
+      if (src == dst) {
+      } else if (prev != ej && graph.getEdgeDst(prev) == dst) {
+      } else {
+        numEdges += 1;
+      }
+      prev = jj;
+    }
+  }
+
+  if (numEdges == graph.sizeEdges()) {
+    std::cout << "Graph already simplified; copy input to output\n";
+    printStatus(graph.size(), graph.sizeEdges());
+    graph.structureToFile(outfilename);
+    return;
+  }
+
+  typedef Galois::Graph::FileGraphParser Parser;
+  typedef Galois::LargeArray<EdgeTy,true> EdgeData;
+  typedef typename EdgeData::value_type edge_value_type;
+  
+  Parser p;
+  EdgeData edgeData;
+
+  p.setNumNodes(graph.size());
+  p.setNumEdges(numEdges);
+  p.setSizeofEdgeData(EdgeData::has_value ? sizeof(edge_value_type) : 0);
+  edgeData.allocate(numEdges);
+
+  p.phase1();
+  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+    GNode src = *ii;
+
+    Graph::edge_iterator prev = graph.edge_end(src);
+    for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
+      GNode dst = graph.getEdgeDst(jj);
+      if (src == dst) {
+      } else if (prev != ej && graph.getEdgeDst(prev) == dst) {
+      } else {
+        p.incrementDegree(src);
+      }
+      prev = jj;
+    }
+  }
+
+  p.phase2();
+  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+    GNode src = *ii;
+
+    Graph::edge_iterator prev = graph.edge_end(src);
+    for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
+      GNode dst = graph.getEdgeDst(jj);
+      if (src == dst) {
+      } else if (prev != ej && graph.getEdgeDst(prev) == dst) {
+      } else if (EdgeData::has_value) {
+        edgeData.set(p.addNeighbor(src, dst), graph.getEdgeData<edge_value_type>(jj));
+      } else {
+        p.addNeighbor(src, dst);
+      }
+      prev = jj;
+    }
+  }
+
+  edge_value_type* rawEdgeData = p.finish<edge_value_type>();
+  if (EdgeData::has_value)
+    std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+  
+  p.structureToFile(outfilename);
+  printStatus(graph.size(), graph.sizeEdges(), p.size(), p.sizeEdges());
+}
+
+/**
+ * Removes edges such that src > dst
+ */
+template<typename EdgeTy>
+void convert_sgr2gr(const std::string& infilename, const std::string& outfilename) {
+  typedef Galois::Graph::FileGraph Graph;
+  typedef Graph::GraphNode GNode;
+  
+  Graph graph;
+  graph.structureFromFile(infilename);
+
+  size_t numEdges = 0;
+
+  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+    GNode src = *ii;
+
+    for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
+      GNode dst = graph.getEdgeDst(jj);
+      if (src > dst) {
+      } else {
+        numEdges += 1;
+      }
+    }
+  }
+
+  if (numEdges == graph.sizeEdges()) {
+    std::cout << "Graph already simplified; copy input to output\n";
+    printStatus(graph.size(), graph.sizeEdges());
+    graph.structureToFile(outfilename);
+    return;
+  }
+
+  typedef Galois::Graph::FileGraphParser Parser;
+  typedef Galois::LargeArray<EdgeTy,true> EdgeData;
+  typedef typename EdgeData::value_type edge_value_type;
+  
+  Parser p;
+  EdgeData edgeData;
+
+  p.setNumNodes(graph.size());
+  p.setNumEdges(numEdges);
+  p.setSizeofEdgeData(EdgeData::has_value ? sizeof(edge_value_type) : 0);
+  edgeData.allocate(numEdges);
+
+  p.phase1();
+  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+    GNode src = *ii;
+
+    for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
+      GNode dst = graph.getEdgeDst(jj);
+      if (src > dst) {
+      } else {
+        p.incrementDegree(src);
+      }
+    }
+  }
+
+  p.phase2();
+  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+    GNode src = *ii;
+
+    for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
+      GNode dst = graph.getEdgeDst(jj);
+      if (src > dst) {
+      } else if (EdgeData::has_value) {
+        edgeData.set(p.addNeighbor(src, dst), graph.getEdgeData<edge_value_type>(jj));
+      } else {
+        p.addNeighbor(src, dst);
+      }
+    }
+  }
+
+  edge_value_type* rawEdgeData = p.finish<edge_value_type>();
+  if (EdgeData::has_value)
+    std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+  
+  p.structureToFile(outfilename);
+  printStatus(graph.size(), graph.sizeEdges(), p.size(), p.sizeEdges());
 }
 
 #if 1
@@ -246,14 +640,15 @@ void convert_rmat2gr(const std::string& infilename, const std::string& outfilena
     << " Edges added: " << edges_added
     << "\n";
 
-  outputGraph(outfilename.c_str(), graph);
+  outputGraph(outfilename, graph);
+  printStatus(nnodes, edges_added, graph.size(), graph.sizeEdges());
 }
 #endif
 
 // Example:
 //  c Some file
 //  c Comments
-//  p XXX XXX <num nodes> <num edges>
+//  p XXX* <num nodes> <num edges>
 //  a <src id> <dst id> <weight>
 //  ....
 void convert_dimacs2gr(const std::string& infilename, const std::string& outfilename) { 
@@ -269,22 +664,34 @@ void convert_dimacs2gr(const std::string& infilename, const std::string& outfile
   for (int phase = 0; phase < 2; ++phase) {
     std::ifstream infile(infilename.c_str());
 
+    // Skip comments
     while (infile) {
-      if (infile.peek() != 'c') {
+      if (infile.peek() == 'p') {
         break;
       }
       infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
     }
 
-    if (infile.peek() != 'p') {
-      std::cerr << "Error: missing problem specification line\n";
+    // Read header
+    char header[256];
+    infile.getline(header, 256, '\n');
+    std::istringstream line(header, std::istringstream::in);
+    std::vector<std::string> tokens;
+    while (line) {
+      std::string tmp;
+      line >> tmp;
+      if (line) {
+        tokens.push_back(tmp);
+      }
+    }
+    if (tokens.size() < 3 || tokens[0].compare("p") != 0) {
+      std::cerr << "Unknown problem specification line: " << line.str() << "\n";
       abort();
     }
+    nnodes = std::stoull(tokens[tokens.size() - 2]);
+    nedges = std::stoull(tokens[tokens.size() - 1]);
 
-    std::string tmp;
-    infile >> tmp >> tmp >> nnodes >> nedges;
-    infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-
+    // Parse edges
     if (phase == 0) {
       p.setNumNodes(nnodes);
       p.setNumEdges(nedges);
@@ -298,6 +705,7 @@ void convert_dimacs2gr(const std::string& infilename, const std::string& outfile
     for (size_t edge_num = 0; edge_num < nedges; ++edge_num) {
       uint32_t cur_id, neighbor_id;
       int32_t weight;
+      std::string tmp;
       infile >> tmp;
 
       if (tmp.compare("a") != 0) {
@@ -337,12 +745,8 @@ void convert_dimacs2gr(const std::string& infilename, const std::string& outfile
   if (EdgeData::has_value)
     std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
 
-  std::cout << "Finished reading graph. "
-    << "Nodes: " << nnodes
-    << " Edges read: " << nedges 
-    << "\n";
-
-  p.structureToFile(outfilename.c_str());
+  p.structureToFile(outfilename);
+  printStatus(p.size(), p.sizeEdges());
 }
 
 /**
@@ -359,11 +763,8 @@ void convert_dimacs2gr(const std::string& infilename, const std::string& outfile
  * <edge 1>
  * ...
  */
-template<typename EdgeTy>
-void convert_pbbs2gr(const std::string& infilename, const std::string& outfilename) { 
+void convert_pbbs2vgr(const std::string& infilename, const std::string& outfilename) { 
   typedef Galois::Graph::FileGraphParser Parser;
-  typedef Galois::LargeArray<EdgeTy,true> EdgeData;
-  typedef typename EdgeData::value_type edge_value_type;
   
   Parser p;
 
@@ -380,7 +781,6 @@ void convert_pbbs2gr(const std::string& infilename, const std::string& outfilena
 
   p.setNumNodes(nnodes);
   p.setNumEdges(nedges);
-  p.setSizeofEdgeData(EdgeData::has_value ? sizeof(edge_value_type) : 0);
 
   size_t* offsets = new size_t[nnodes];
   for (size_t i = 0; i < nnodes; ++i) {
@@ -411,16 +811,12 @@ void convert_pbbs2gr(const std::string& infilename, const std::string& outfilena
 
   p.finish<void>();
 
-  std::cout << "Finished reading graph. "
-    << "Nodes: " << nnodes
-    << " Edges read: " << nedges 
-    << "\n";
-
-  p.structureToFile(outfilename.c_str());
+  p.structureToFile(outfilename);
+  printStatus(p.size(), p.sizeEdges());
 }
 
 template<typename EdgeTy>
-void convert_gr2wpbbs(const std::string& infilename, const std::string& outfilename) {
+void convert_gr2pbbsedges(const std::string& infilename, const std::string& outfilename) {
   // Use FileGraph because it is basically in CSR format needed for pbbs
   typedef Galois::Graph::FileGraph Graph;
   typedef Graph::GraphNode GNode;
@@ -436,23 +832,45 @@ void convert_gr2wpbbs(const std::string& infilename, const std::string& outfilen
       GNode dst = graph.getEdgeDst(jj);
       EdgeTy& weight = graph.getEdgeData<EdgeTy>(jj);
       file << src << " " << dst << " " << weight << "\n";
+      //file << src << "," << dst << "," << weight << "\n";
     }
   }
   file.close();
 
-  std::cout << "Finished reading graph. "
-    << "Nodes: " << graph.size() << " Edges: " << graph.sizeEdges() 
-    << "\n";
+  printStatus(graph.size(), graph.sizeEdges());
 }
 
+/**
+ * PBBS input is an ASCII file of tokens that serialize a CSR graph. I.e., 
+ * elements in brackets are non-literals:
+ * 
+ * [Weighted]AdjacencyGraph
+ * <num nodes>
+ * <num edges>
+ * <offset node 0>
+ * <offset node 1>
+ * ...
+ * <edge 0>
+ * <edge 1>
+ * ...
+ * [
+ * <edge weight 0>
+ * <edge weight 1>
+ * ...
+ * ]
+ */
+template<typename InEdgeTy,typename OutEdgeTy>
 void convert_gr2pbbs(const std::string& infilename, const std::string& outfilename) {
-  // Use FileGraph because it is basically in CSR format needed for pbbs
   typedef Galois::Graph::FileGraph Graph;
+  typedef Galois::LargeArray<OutEdgeTy,true> EdgeData;
+  typedef typename EdgeData::value_type edge_value_type;
 
   Graph graph;
   graph.structureFromFile(infilename);
 
   std::ofstream file(outfilename.c_str());
+  if (EdgeData::has_value)
+    file << "Weighted";
   file << "AdjacencyGraph\n" << graph.size() << "\n" << graph.sizeEdges() << "\n";
   // edgeid[i] is the end of i in FileGraph while it is the beginning of i in pbbs graph
   size_t last = std::distance(graph.edge_id_begin(), graph.edge_id_end());
@@ -466,11 +884,62 @@ void convert_gr2pbbs(const std::string& infilename, const std::string& outfilena
   for (Graph::node_id_iterator ii = graph.node_id_begin(), ei = graph.node_id_end(); ii != ei; ++ii) {
     file << *ii << "\n";
   }
+  if (EdgeData::has_value) {
+    for (edge_value_type* ii = graph.edge_data_begin<edge_value_type>(), *ei = graph.edge_data_end<edge_value_type>();
+        ii != ei; ++ii) {
+      file << *ii << "\n";
+    }
+  }
   file.close();
 
-  std::cout << "Finished reading graph. "
-    << "Nodes: " << graph.size() << " Edges: " << graph.sizeEdges() 
-    << "\n";
+  printStatus(graph.size(), graph.sizeEdges());
+}
+
+/**
+ * Binary PBBS format is three files.
+ *
+ * <base>.config - ASCII file with number of vertices
+ * <base>.adj - Binary adjacencies
+ * <base>.idx - Binary offsets for adjacencies
+ */
+template<typename NodeIdx,typename Offset>
+void convert_gr2vbinpbbs(const std::string& infilename, const std::string& outfilename) { 
+  typedef Galois::Graph::FileGraph Graph;
+  typedef Graph::GraphNode GNode;
+
+  Graph graph;
+  graph.structureFromFile(infilename);
+
+  {
+    std::ofstream configFile(outfilename + ".config");
+    configFile << graph.size() << "\n";
+  }
+
+  {
+    std::ofstream idxFile(outfilename + ".idx");
+    // edgeid[i] is the end of i in FileGraph while it is the beginning of i in pbbs graph
+    size_t last = std::distance(graph.edge_id_begin(), graph.edge_id_end());
+    size_t count = 0;
+    Offset offset = 0;
+    idxFile.write(reinterpret_cast<char*>(&offset), sizeof(offset));
+    for (Graph::edge_id_iterator ii = graph.edge_id_begin(), ei = graph.edge_id_end(); ii != ei; ++ii, ++count) {
+      offset = *ii;
+      if (count < last - 1)
+        idxFile.write(reinterpret_cast<char*>(&offset), sizeof(offset));
+    }
+    idxFile.close();
+  }
+
+  {
+    std::ofstream adjFile(outfilename + ".adj");
+    for (Graph::node_id_iterator ii = graph.node_id_begin(), ei = graph.node_id_end(); ii != ei; ++ii) {
+      NodeIdx nodeIdx = *ii;
+      adjFile.write(reinterpret_cast<char*>(&nodeIdx), sizeof(nodeIdx));
+    }
+    adjFile.close();
+  }
+
+  printStatus(graph.size(), graph.sizeEdges());
 }
 
 template<typename EdgeTy>
@@ -493,9 +962,44 @@ void convert_gr2dimacs(const std::string& infilename, const std::string& outfile
   }
   file.close();
 
-  std::cout << "Finished reading graph. "
-    << "Nodes: " << graph.size() << " Edges: " << graph.sizeEdges() 
-    << "\n";
+  printStatus(graph.size(), graph.sizeEdges());
+}
+
+/**
+ * RMAT format (zero indexed):
+ *  %%% Comment1
+ *  %%% Comment2
+ *  %%% Comment3
+ *  <num nodes> <num edges>
+ *  <node id> <num edges> [<neighbor id> <neighbor weight>]*
+ *  ...
+ */
+template<typename InEdgeTy,typename OutEdgeTy>
+void convert_gr2rmat(const std::string& infilename, const std::string& outfilename) { 
+  typedef Galois::Graph::FileGraph Graph;
+  typedef Graph::GraphNode GNode;
+
+  Graph graph;
+  graph.structureFromFile(infilename);
+
+  std::ofstream file(outfilename.c_str());
+  file << "%%%\n";
+  file << "%%%\n";
+  file << "%%%\n";
+  file << graph.size() << " " << graph.sizeEdges() << "\n";
+  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+    GNode src = *ii;
+    file << *ii << " " << std::distance(graph.edge_begin(src), graph.edge_end(src));
+    for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
+      GNode dst = graph.getEdgeDst(jj);
+      OutEdgeTy weight = graph.getEdgeData<InEdgeTy>(jj);
+      file << " " << dst << " " << weight;
+    }
+    file << "\n";
+  }
+  file.close();
+
+  printStatus(graph.size(), graph.sizeEdges());
 }
 
 template<typename EdgeTy>
@@ -535,6 +1039,7 @@ void convert_gr2bsml(const std::string& infilename, const std::string& outfilena
 
   mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
   int fd = open(outfilename.c_str(), O_WRONLY | O_CREAT | O_TRUNC, mode);
+  if (fd == -1) { perror(__FILE__); abort(); }
   int retval;
 
   // Write header
@@ -578,29 +1083,38 @@ void convert_gr2bsml(const std::string& infilename, const std::string& outfilena
   }
 
   close(fd);
-
-  std::cout << "Finished reading graph. "
-    << "Nodes: " << nnodes << " Edges: " << nedges 
-    << "\n";
+  printStatus(nnodes, nedges);
 }
 
 int main(int argc, char** argv) {
   llvm::cl::ParseCommandLineOptions(argc, argv);
   switch (convertMode) {
     case dimacs2gr: convert_dimacs2gr(inputfilename, outputfilename); break;
-    case edgelist2gr: convert_edgelist2gr<void>(inputfilename, outputfilename); break;
+    case edgelist2vgr: convert_edgelist2gr<void>(inputfilename, outputfilename); break;
     case floatedgelist2gr: convert_edgelist2gr<float>(inputfilename, outputfilename); break;
     case gr2bsml: convert_gr2bsml<int32_t>(inputfilename, outputfilename); break;
+    case gr2cintgr: convert_gr2cgr<int32_t>(inputfilename, outputfilename); break;
     case gr2dimacs: convert_gr2dimacs<int32_t>(inputfilename, outputfilename); break;
-    case gr2pbbs: convert_gr2pbbs(inputfilename, outputfilename); break;
-    case gr2floatpbbs: convert_gr2wpbbs<float>(inputfilename, outputfilename); break;
-    case gr2intpbbs: convert_gr2wpbbs<int32_t>(inputfilename, outputfilename); break;
+    case gr2floatpbbsedges: convert_gr2pbbsedges<float>(inputfilename, outputfilename); break;
+    case gr2intpbbs: convert_gr2pbbs<int32_t,int32_t>(inputfilename, outputfilename); break;
+    case gr2intpbbsedges: convert_gr2pbbsedges<int32_t>(inputfilename, outputfilename); break;
+    case gr2rmat: convert_gr2rmat<int32_t,int32_t>(inputfilename, outputfilename); break;
+    case gr2sintgr: convert_gr2sgr<int32_t>(inputfilename, outputfilename); break;
+    case gr2tintgr: convert_gr2tgr<int32_t>(inputfilename, outputfilename); break;
     case intedgelist2gr: convert_edgelist2gr<int>(inputfilename, outputfilename); break;
-    case pbbs2gr: convert_pbbs2gr<int32_t>(inputfilename, outputfilename); break;
-    case pbbs2vgr: convert_pbbs2gr<void>(inputfilename, outputfilename); break;
+    case nodelist2vgr: convert_nodelist2vgr(inputfilename, outputfilename); break;
+    case pbbs2vgr: convert_pbbs2vgr(inputfilename, outputfilename); break;
     case rmat2gr: convert_rmat2gr(inputfilename, outputfilename); break;
     case vgr2bsml: convert_gr2bsml<void>(inputfilename, outputfilename); break;
+    case vgr2cvgr: convert_gr2cgr<void>(inputfilename, outputfilename); break;
+    case vgr2edgelist: convert_gr2edgelist<void>(inputfilename, outputfilename); break;
+    case vgr2intgr: add_weights<void,int32_t>(inputfilename, outputfilename); break;
+    case vgr2pbbs: convert_gr2pbbs<void,void>(inputfilename, outputfilename); break;
     case vgr2svgr: convert_gr2sgr<void>(inputfilename, outputfilename); break;
+    case vgr2trivgr: convert_sgr2gr<void>(inputfilename, outputfilename); break;
+    case vgr2tvgr: convert_gr2tgr<void>(inputfilename, outputfilename); break;
+    case vgr2vbinpbbs32: convert_gr2vbinpbbs<uint32_t,uint32_t>(inputfilename, outputfilename); break;
+    case vgr2vbinpbbs64: convert_gr2vbinpbbs<uint32_t,uint64_t>(inputfilename, outputfilename); break;
     default: abort();
   }
   return 0;

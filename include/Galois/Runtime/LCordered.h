@@ -293,8 +293,8 @@ private:
   };
 
   void resetAll () {
-    Galois::Runtime::do_all_impl<false> (allNItems.begin_all (), allNItems.end_all (),
-        Reset (niAlloc), "reset_NItems");
+    do_all_impl(makeStandardRange(allNItems.begin_all (), allNItems.end_all ()),
+        Reset (niAlloc));
   }
 
 public:
@@ -448,15 +448,14 @@ class LCorderedExec {
 
   typedef Galois::GAccumulator<size_t> Accumulator;
 
-
   struct CreateCtxtExpandNhood {
-    NhoodFunc& nhoodVisitor;
+    NhoodFunc nhoodVisitor;
     NhoodMgr& nhmgr;
     CtxtAlloc& ctxtAlloc;
     CtxtWL& ctxtWL;
 
     CreateCtxtExpandNhood (
-        NhoodFunc& nhoodVisitor,
+        const NhoodFunc& nhoodVisitor,
         NhoodMgr& nhmgr,
         CtxtAlloc& ctxtAlloc,
         CtxtWL& ctxtWL)
@@ -486,13 +485,12 @@ class LCorderedExec {
   };
 
   struct FindInitSources {
-
-    SourceTest& sourceTest;
+    SourceTest sourceTest;
     CtxtWL& initSrc;
     Accumulator& nsrc;
 
     FindInitSources (
-        SourceTest& sourceTest, 
+        const SourceTest& sourceTest, 
         CtxtWL& initSrc,
         Accumulator& nsrc)
       : 
@@ -520,12 +518,10 @@ class LCorderedExec {
 
 
   struct ApplyOperator {
-
-
-    OperFunc& op;
-    NhoodFunc& nhoodVisitor;
+    OperFunc op;
+    NhoodFunc nhoodVisitor;
     NhoodMgr& nhmgr;
-    SourceTest& sourceTest;
+    SourceTest sourceTest;
     CtxtAlloc& ctxtAlloc;
     CtxtWL& addCtxtWL;
     CtxtLocalQ& ctxtLocalQ;
@@ -534,10 +530,10 @@ class LCorderedExec {
     Accumulator& niter;
 
     ApplyOperator (
-        OperFunc& op,
-        NhoodFunc& nhoodVisitor,
+        const OperFunc& op,
+        const NhoodFunc& nhoodVisitor,
         NhoodMgr& nhmgr,
-        SourceTest& sourceTest,
+        const SourceTest& sourceTest,
         CtxtAlloc& ctxtAlloc,
         CtxtWL& addCtxtWL,
         CtxtLocalQ& ctxtLocalQ,
@@ -653,10 +649,11 @@ class LCorderedExec {
   };
 
 private:
-  NhoodFunc nhoodVisitor;
-  OperFunc operFunc;
+  const NhoodFunc& nhoodVisitor;
+  const OperFunc& operFunc;
+  // TODO: make cmp function of nhmgr thread local as well.
   NhoodMgr& nhmgr;
-  SourceTest sourceTest;
+  const SourceTest& sourceTest;
 
 
 public:
@@ -665,7 +662,7 @@ public:
       const NhoodFunc& nhoodVisitor,
       const OperFunc& operFunc,
       NhoodMgr& nhmgr,
-      SourceTest sourceTest)
+      const SourceTest& sourceTest)
     :
       nhoodVisitor (nhoodVisitor),
       operFunc (operFunc),
@@ -688,15 +685,15 @@ public:
     Galois::TimeAccumulator t_destroy;
 
     t_create.start ();
-    Galois::Runtime::do_all_impl<false> (abeg, aend, 
-        CreateCtxtExpandNhood (nhoodVisitor, nhmgr, ctxtAlloc, initCtxt),
-        "create_initial_contexts");
+    Galois::Runtime::do_all_impl(makeStandardRange(abeg, aend), 
+				 CreateCtxtExpandNhood (nhoodVisitor, nhmgr, ctxtAlloc, initCtxt));
+    //        "create_initial_contexts");
     t_create.stop ();
 
     t_find.start ();
-    Galois::Runtime::do_all_impl<false> (initCtxt.begin_all (), initCtxt.end_all (),
-        FindInitSources (sourceTest, initSrc, nInitSrc),
-        "find_initial_sources");
+    Galois::Runtime::do_all_impl(makeStandardRange(initCtxt.begin_all (), initCtxt.end_all ()),
+				 FindInitSources (sourceTest, initSrc, nInitSrc));
+    //       "find_initial_sources");
     t_find.stop ();
 
     std::cout << "Number of initial sources found: " << nInitSrc.reduce () 
@@ -729,8 +726,8 @@ public:
     t_for.stop ();
 
     t_destroy.start ();
-    Galois::Runtime::do_all_impl<false> (ctxtDelQ.begin_all (), ctxtDelQ.end_all (),
-        DelCtxt (ctxtAlloc), "delete_all_ctxt");
+    Galois::Runtime::do_all_impl(makeStandardRange(ctxtDelQ.begin_all (), ctxtDelQ.end_all ()),
+				 DelCtxt (ctxtAlloc)); //, "delete_all_ctxt");
     t_destroy.stop ();
 
     std::cout << "Number of iterations: " << niter.reduce () << std::endl;
@@ -739,12 +736,7 @@ public:
     std::cout << "Time taken in finding intial sources: " << t_find.get () << std::endl;
     std::cout << "Time taken in for_each loop: " << t_for.get () << std::endl;
     std::cout << "Time taken in destroying all the contexts: " << t_destroy.get () << std::endl;
-
   }
-
-
-  
-
 };
 
 template <typename AI, typename Cmp, typename OperFunc, typename NhoodFunc>

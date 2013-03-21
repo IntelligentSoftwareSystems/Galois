@@ -28,7 +28,7 @@
 #include "Galois/Bag.h"
 #include "Galois/Statistic.h"
 #include "Galois/UnionFind.h"
-#include "Galois/Graphs/LCGraph.h"
+#include "Galois/Graph/LCGraph.h"
 #include "Galois/ParallelSTL/ParallelSTL.h"
 #include "llvm/Support/CommandLine.h"
 
@@ -364,7 +364,7 @@ struct SortEdges {
   Accum* accum;
 
   void operator()(const GNode& src) {
-    graph.sortEdges(src, std::less<EdgeData>(), Galois::MethodFlag::NONE);
+    graph.sortEdgesByEdgeData(src, std::less<EdgeData>(), Galois::MethodFlag::NONE);
 
     Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::NONE);
     Graph::edge_iterator ei = graph.edge_end(src, Galois::MethodFlag::NONE);

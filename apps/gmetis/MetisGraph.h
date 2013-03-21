@@ -109,6 +109,20 @@ public:
 		coarseGraphMapTo = new GNode[numNodes];
 	}
 
+        GNode getInverseCoarseGraphMap(GNode node){
+                return inverseGraphMapTo[node];
+        }
+
+        void releaseInverseCoarseGraphMap(){
+                inverseGraphMapTo.erase(inverseGraphMapTo.begin(),inverseGraphMapTo.end());
+        }
+
+
+        std::map<GNode,GNode>& getInverseGraphMap() {
+                return inverseGraphMapTo;
+        }
+
+
 	void setMatch(int id, GNode node){
 		assert(id < numNodes);
 //		matchFlag[id].data = true;
@@ -558,7 +572,12 @@ public:
 	  	return nparts * maxKpwgts / sumKpwgts;
 	  }
 
+	void initNumberEdges() {
+		numberEdges = new int[numNodes];
+		memset(numberEdges,numNodes*sizeof(int),0);
+	}
 
+	int *numberEdges;
 private:
 	vector<AtomicInteger> partWeights;
 	int mincut;
@@ -574,5 +593,6 @@ private:
 	GNode* subGraphMaps;
 //	cache_line_storage<GNode>* coarseGraphMapTo;
 	GNode* coarseGraphMapTo;
+	 map<GNode,GNode> inverseGraphMapTo;
 };
 #endif /* METISGRAPH_H_ */

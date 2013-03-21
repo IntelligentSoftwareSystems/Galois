@@ -231,7 +231,6 @@ std::ostream& operator<<(std::ostream& os, const Config& c) {
   return os;
 }
 
-// XXX
 Config config;
 
 inline int getIndex(const Point& a, const Point& b) {
@@ -519,8 +518,8 @@ double nextDouble() {
 struct InsertBody {
   BodyPtrs& pBodies;
   Bodies& bodies;
-  insBody(BodyPtrs& pb, Bodies& b): pBodies(pb),bodies(b) {}
-  void operator()(Body& b) {
+  InsertBody(BodyPtrs& pb, Bodies& b): pBodies(pb), bodies(b) { }
+  void operator()(const Body& b) {
     pBodies.push_back(&(bodies.push_back(b)));
   }
 };
@@ -567,7 +566,7 @@ void divide(const Iter& b, const Iter& e) {
  * Generates random input according to the Plummer model, which is more
  * realistic but perhaps not so much so according to astrophysicists
  */
-void generateInput(Bodies& bodies, BodyPtrs& pbodies, int nbodies, int seed) {
+void generateInput(Bodies& bodies, BodyPtrs& pBodies, int nbodies, int seed) {
   double v, sq, scale;
   Point p;
   double PI = boost::math::constants::pi<double>();

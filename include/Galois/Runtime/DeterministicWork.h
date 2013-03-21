@@ -159,12 +159,12 @@ struct OrderedOptions: public Options<_Function1Ty,_Function2Ty> {
   static const bool useOrdered = true;
   typedef OrderedTag Tag;
 
-  Function1Ty& fn1;
-  Function2Ty& fn2;
-  CompareTy& comp;
+  Function1Ty fn1;
+  Function2Ty fn2;
+  CompareTy comp;
   ContextComp contextComp;
 
-  OrderedOptions(Function1Ty& fn1, Function2Ty& fn2, CompareTy& comp):
+  OrderedOptions(const Function1Ty& fn1, const Function2Ty& fn2, const CompareTy& comp):
     fn1(fn1), fn2(fn2), comp(comp), contextComp(comp) { }
 
   DetContext make_context(const DItem<T>& item) const {
@@ -190,26 +190,16 @@ struct UnorderedOptions: public Options<_Function1Ty,_Function2Ty> {
 
   typedef DummyCompareTy  CompareTy;
 
-  Function1Ty& fn1;
-  Function2Ty& fn2;
+  Function1Ty fn1;
+  Function2Ty fn2;
   CompareTy comp;
   ContextComp contextComp;
 
-  UnorderedOptions(Function1Ty& fn1, Function2Ty& fn2): fn1(fn1), fn2(fn2) { }
+  UnorderedOptions(const Function1Ty& fn1, const Function2Ty& fn2): fn1(fn1), fn2(fn2) { }
 
   DetContext make_context(const DItem<T>& item) const {
     return DetContext(item, contextComp);
   }
-};
-
-//! Some template meta programming
-template<typename T>
-struct has_local_state {
-  typedef char yes[1];
-  typedef char no[2];
-  template<typename C> static yes& test(typename C::LocalState*);
-  template<typename> static no& test(...);
-  static const bool value = sizeof(test<T>(0)) == sizeof(yes);
 };
 
 template<typename T,typename FunctionTy,typename Enable=void>
@@ -221,7 +211,7 @@ struct StateManager {
 };
 
 template<typename T,typename FunctionTy>
-struct StateManager<T,FunctionTy,typename boost::enable_if<has_local_state<FunctionTy> >::type> {
+struct StateManager<T,FunctionTy,typename boost::enable_if<has_deterministic_local_state<FunctionTy> >::type> {
   typedef typename FunctionTy::LocalState LocalState;
   void alloc(UserContextAccess<T>& c,FunctionTy& self) {
     void *p = c.data().getPerIterAlloc().allocate(sizeof(LocalState));
@@ -242,42 +232,30 @@ struct StateManager<T,FunctionTy,typename boost::enable_if<has_local_state<Funct
   }
 };
 
-template<typename T>
-struct has_break_fn {
-  typedef char yes[1];
-  typedef char no[2];
-  template<typename C> static yes& test(typename C::BreakFn*);
-  template<typename> static no& test(...);
-  static const bool value = sizeof(test<T>(0)) == sizeof(yes);
-};
-
 template<typename FunctionTy,typename Enable=void>
 struct BreakManager {
-  BreakManager(FunctionTy&) { }
-  bool checkBreak() { return false; }
+  BreakManager() { }
+  bool checkBreak(FunctionTy&) { return false; }
 };
 
 template<typename FunctionTy>
-class BreakManager<FunctionTy,typename boost::enable_if<has_break_fn<FunctionTy> >::type> {
+class BreakManager<FunctionTy,typename boost::enable_if<has_deterministic_break<FunctionTy> >::type> {
   GBarrier barrier;
   LL::CacheLineStorage<volatile long> done;
-  typename FunctionTy::BreakFn breakFn;
 
 public:
-  BreakManager(FunctionTy& fn): breakFn(fn) { 
+  BreakManager() { 
     int numActive = (int) getActiveThreads();
     barrier.reinit(numActive);
   }
 
-  bool checkBreak() {
+  bool checkBreak(FunctionTy& fn) {
     if (LL::getTID() == 0)
-      done.data = breakFn();
+      done.data = fn.galoisDeterministicBreak();
     barrier.wait();
     return done.data;
   }
 };
-
-
 
 template<typename T>
 struct DNewItem { 
@@ -669,15 +647,6 @@ public:
   }
 };
 
-template<typename T>
-struct has_id_fn {
-  typedef char yes[1];
-  typedef char no[2];
-  template<typename C> static yes& test(typename C::IdFn*);
-  template<typename> static no& test(...);
-  static const bool value = sizeof(test<T>(0)) == sizeof(yes);
-};
-
 template<typename OptionsTy,typename Enable=void>
 struct MergeTraits {
   static const bool value = false;
@@ -698,9 +667,9 @@ struct MergeTraits<OptionsTy,typename boost::enable_if_c<OptionsTy::useOrdered>:
 };
 
 template<typename OptionsTy>
-struct MergeTraits<OptionsTy,typename boost::enable_if_c<has_id_fn<typename OptionsTy::Function1Ty>::value && !OptionsTy::useOrdered>::type> {
+struct MergeTraits<OptionsTy,typename boost::enable_if_c<has_deterministic_id<typename OptionsTy::Function1Ty>::value && !OptionsTy::useOrdered>::type> {
   static const bool value = true;
-  typedef typename OptionsTy::Function1Ty::IdFn IdFn;
+  typedef typename OptionsTy::Function1Ty::GaloisDeterministicId IdFn;
   static const int ChunkSize = 32;
   static const int MinDelta = ChunkSize * 40;
 };
@@ -1007,6 +976,8 @@ public:
 };
 
 //! Implementation of merging specialized for unordered algorithms with an id function and ordered algorithms
+// TODO: For consistency should also have thread-local copies of comp and
+// idFunction
 template<typename OptionsTy>
 class DMergeManager<OptionsTy,typename boost::enable_if<MergeTraits<OptionsTy> >::type>: public DMergeManagerBase<OptionsTy> {
   typedef DMergeManagerBase<OptionsTy> Base;
@@ -1031,7 +1002,7 @@ class DMergeManager<OptionsTy,typename boost::enable_if<MergeTraits<OptionsTy> >
 
   GBarrier barrier;
   IdFn idFunction;
-  const CompareTy& comp;
+  CompareTy comp;
 
 public:
   DMergeManager(const OptionsTy& o): mergeBuf(this->alloc), comp(o.comp) {
@@ -1249,10 +1220,11 @@ class Executor {
   typedef WorkList::dChunkedFIFO<MergeTraits<OptionsTy>::ChunkSize,Item> WL;
   typedef WorkList::dChunkedFIFO<MergeTraits<OptionsTy>::ChunkSize,DetContext> PendingWork;
   typedef WorkList::ChunkedFIFO<MergeTraits<OptionsTy>::ChunkSize,DetContext,false> LocalPendingWork;
-  static const bool useLocalState = has_local_state<typename OptionsTy::Function1Ty>::value;
+  static const bool useLocalState = has_deterministic_local_state<typename OptionsTy::Function1Ty>::value;
 
   // Truly thread-local
   struct ThreadLocalData: private boost::noncopyable {
+    OptionsTy options;
     LocalPendingWork localPending;
     UserContextAccess<value_type> facing;
     LoopStatistics<OptionsTy::needsStats> stat;
@@ -1261,10 +1233,10 @@ class Executor {
     size_t rounds;
     size_t outerRounds;
     bool hasNewWork;
-    ThreadLocalData(const char* loopname): stat(loopname), rounds(0), outerRounds(0) { }
+    ThreadLocalData(const OptionsTy& o, const char* loopname): options(o), stat(loopname), rounds(0), outerRounds(0) { }
   };
 
-  const OptionsTy& options;
+  const OptionsTy& origOptions;
   MergeManager mergeManager;
   const char* loopname;
   BreakManager<typename OptionsTy::Function1Ty> breakManager;
@@ -1284,12 +1256,12 @@ class Executor {
 
 public:
   Executor(const OptionsTy& o, const char* ln):
-    options(o), mergeManager(o), loopname(ln), breakManager(o.fn1)
+    origOptions(o), mergeManager(o), loopname(ln)
   { 
     numActive = (int) getActiveThreads();
     for (unsigned i = 0; i < sizeof(barrier)/sizeof(*barrier); ++i)
       barrier[i].reinit(numActive);
-    if (OptionsTy::needsBreak && !has_break_fn<typename OptionsTy::Function1Ty>::value) {
+    if (OptionsTy::needsBreak && !has_deterministic_break<typename OptionsTy::Function1Ty>::value) {
       GALOIS_ERROR(true, "need to use break function to break loop");
     }
   }
@@ -1311,7 +1283,7 @@ public:
 
 template<typename OptionsTy>
 void Executor<OptionsTy>::go() {
-  ThreadLocalData tld(loopname);
+  ThreadLocalData tld(origOptions, loopname);
   MergeLocal& mlocal = mergeManager.get();
   tld.wlcur = &worklists[0];
   tld.wlnext = &worklists[1];
@@ -1351,7 +1323,7 @@ void Executor<OptionsTy>::go() {
 
       barrier[0].wait();
 
-      mlocal.nextWindow(tld.wlnext, options);
+      mlocal.nextWindow(tld.wlnext, tld.options);
       mlocal.resetStats();
     }
 
@@ -1361,7 +1333,7 @@ void Executor<OptionsTy>::go() {
     if (tld.hasNewWork)
       hasNewWork.data = true;
 
-    if (breakManager.checkBreak())
+    if (breakManager.checkBreak(tld.options.fn1))
       break;
 
     mergeManager.calculateWindow(false);
@@ -1378,7 +1350,7 @@ void Executor<OptionsTy>::go() {
       // NB: assumes that distributeNewWork has a barrier otherwise checking at (1) is erroneous
       hasNewWork.data = false;
     } else {
-      mlocal.nextWindow(tld.wlnext, options);
+      mlocal.nextWindow(tld.wlnext, tld.options);
     }
 
     mlocal.resetStats();
@@ -1409,9 +1381,9 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
 
     DetContext* ctx = NULL;
     if (useLocalState) {
-      ctx = tld.localPending.push(options.make_context(*p));
+      ctx = tld.localPending.push(tld.options.make_context(*p));
     } else {
-      ctx = pending.push(options.make_context(*p));
+      ctx = pending.push(tld.options.make_context(*p));
     }
 
     assert(ctx != NULL);
@@ -1423,16 +1395,16 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
       // cnx->set_comp(&options.comp);
       // cnx->set_comp_data(mlocal.itemPoolPush(p->item));
       // mlocal.assertLimits(p->item, options.comp);
-      mlocal.assertLimits(ctx->item.val, options.comp);
+      mlocal.assertLimits(ctx->item.val, tld.options.comp);
     }
 
     ctx->start_iteration();
     tld.stat.inc_iterations();
     setThreadContext(ctx);
 
-    stateManager.alloc(tld.facing, options.fn1);
+    stateManager.alloc(tld.facing, tld.options.fn1);
     try {
-      options.fn1(ctx->item.val, tld.facing.data());
+      tld.options.fn1(ctx->item.val, tld.facing.data());
     } catch (const conflict_ex& ex) {
       commit = false;
     } catch (const failsafe_ex& ex) {
@@ -1440,7 +1412,6 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
 
     if (ForEachTraits<typename OptionsTy::Function1Ty>::NeedsPIA && !useLocalState)
       tld.facing.resetAlloc();
-
 
     // if (!commit) {
       // stateManager.dealloc(tld.facing); 
@@ -1486,7 +1457,7 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
       setThreadContext(ctx);
       stateManager.restore(tld.facing, ctx->item.localState);
       try {
-        options.fn2(ctx->item.val, tld.facing.data());
+        tld.options.fn2(ctx->item.val, tld.facing.data());
       } catch (const conflict_ex& ex) {
 	commit = false;
       }
@@ -1576,10 +1547,7 @@ static inline void for_each_ordered_2p(IterTy b, IterTy e, ComparatorTy comp, Nh
 
   OptionsTy options(f1, f2, comp);
   WorkTy W(options, loopname);
-  Range range(b,e);
-  RunCommand init(std::bind(&WorkTy::template AddInitialWork<Range>, std::ref(W), std::ref(range)));
-  //  Galois::Runtime::Initializer<Range, WorkTy> init(Range(b, e), W);
-  for_each_det_impl(init, W);
+  for_each_det_impl(makeStandardRange(b,e), W);
 }
 
 
@@ -1609,10 +1577,7 @@ static inline void for_each_det(IterTy b, IterTy e, Function1Ty prefix, Function
 
   OptionsTy options(prefix, fn);
   WorkTy W(options, loopname);
-  //Galois::Runtime::Initializer<Range, WorkTy> init(Range(b, e), W);
-  Range range(b,e);
-  Runtime::RunCommand init(std::bind(&WorkTy::template AddInitialWork<Range>, std::ref(W), std::ref(range)));
-  Galois::Runtime::for_each_det_impl(init, W);
+  Runtime::for_each_det_impl(Runtime::makeStandardRange(b, e), W);
 }
 
 /**

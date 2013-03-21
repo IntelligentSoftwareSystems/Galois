@@ -125,7 +125,7 @@ void setThreadContext(SimpleRuntimeContext* n);
 
 
 //! Helper function to decide if the conflict detection lock should be taken
-inline bool shouldLock(Galois::MethodFlag g) {
+inline bool shouldLock(const Galois::MethodFlag g) {
   // Mask out additional "optional" flags
   switch (g & MethodFlag::ALL) {
   case MethodFlag::NONE:
@@ -143,7 +143,7 @@ inline bool shouldLock(Galois::MethodFlag g) {
 //! actual locking function.  Will always lock.
 void doAcquire(Lockable* C);
 
-inline void acquire(Lockable* C, SimpleRuntimeContext* cnx, Galois::MethodFlag m) {
+inline void acquire(Lockable* C, SimpleRuntimeContext* cnx, const Galois::MethodFlag m) {
   if (shouldLock(m) && cnx)
     cnx->acquire(C);
 }

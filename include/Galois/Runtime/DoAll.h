@@ -28,7 +28,12 @@
 #ifndef GALOIS_RUNTIME_DOALL_H
 #define GALOIS_RUNTIME_DOALL_H
 
+#include "Galois/gstl.h"
 #include "Galois/Runtime/Barrier.h"
+#include "Galois/Runtime/Support.h"
+#include "Galois/Runtime/Range.h"
+
+#include <algorithm>
 
 namespace Galois {
 namespace Runtime {
@@ -40,16 +45,17 @@ struct EmptyFn {
 
 // TODO(ddn): Tune stealing. DMR suffers when stealing is on
 // TODO: add loopname + stats
-template<class FunctionTy, class ReduceFunTy, class RangeTy, bool useStealing=false>
+template<class FunctionTy, class ReduceFunTy, class RangeTy>
 class DoAllWork {
   typedef typename RangeTy::local_iterator local_iterator;
   LL::SimpleLock<true> reduceLock;
   FunctionTy origF;
   FunctionTy outputF;
   ReduceFunTy RF;
-  bool needsReduce;
   RangeTy range;
   GBarrier barrier;
+  bool needsReduce;
+  bool useStealing;
 
   struct SharedState {
     local_iterator stealBegin;
@@ -148,8 +154,8 @@ class DoAllWork {
   }
 
 public:
-  DoAllWork(const FunctionTy& F, const ReduceFunTy& R, bool needsReduce, RangeTy r)
-    : origF(F), outputF(F), RF(R), needsReduce(needsReduce), range(r)
+  DoAllWork(const FunctionTy& F, const ReduceFunTy& R, bool needsReduce, RangeTy r, bool steal)
+    : origF(F), outputF(F), RF(R), range(r), needsReduce(needsReduce), useStealing(steal)
   {
     barrier.reinit(activeThreads);
   }
@@ -183,58 +189,29 @@ public:
 };
 
 template<typename RangeTy, typename FunctionTy, typename ReducerTy>
-FunctionTy do_all_impl_dispatch(RangeTy range, FunctionTy f, ReducerTy r, bool needsReduce, std::random_access_iterator_tag) {
-  // Still have no work stealing because some do_all loops are actually placing data.
-  // TODO: differentiate calls or alternatively enrich Range objects to do the right thing
-  DoAllWork<FunctionTy, ReducerTy, RangeTy, false> W(f, r, needsReduce, range);
-
-  RunCommand w[2] = {std::ref(W),
-		     std::ref(getSystemBarrier())};
-  getSystemThreadPool().run(&w[0], &w[2], activeThreads);
-  return W.getFn();
-}
-
-template<typename RangeTy, typename FunctionTy, typename ReducerTy>
-FunctionTy do_all_impl_dispatch(RangeTy range, FunctionTy f, ReducerTy r, bool needsReduce, std::input_iterator_tag) {
-  DoAllWork<FunctionTy, ReducerTy, RangeTy, false> W(f, r, needsReduce, range);
-
-  RunCommand w[2] = {std::ref(W),
-		     std::ref(getSystemBarrier())};
-  getSystemThreadPool().run(&w[0], &w[2],activeThreads);
-  return W.getFn();
-}
-
-template<typename RangeTy, typename FunctionTy, typename ReducerTy>
-FunctionTy do_all_impl(RangeTy range, FunctionTy f, ReducerTy r, bool needsReduce) {
+FunctionTy do_all_dispatch(RangeTy range, FunctionTy f, ReducerTy r, bool doReduce, bool Steal) {
   if (Galois::Runtime::inGaloisForEach) {
     return std::for_each(range.begin(), range.end(), f);
   } else {
     inGaloisForEach = true;
 
-    typename std::iterator_traits<typename RangeTy::local_iterator>::iterator_category category;
-    FunctionTy retval(do_all_impl_dispatch(range, f, r, needsReduce, category));
-
+    DoAllWork<FunctionTy, ReducerTy, RangeTy> W(f, r, doReduce, range, Steal);
+    RunCommand w[2] = {std::ref(W),
+		       std::ref(getSystemBarrier())};
+    getSystemThreadPool().run(&w[0], &w[2],activeThreads);
     inGaloisForEach = false;
-
-    return retval;
+    return W.getFn();
   }
 }
 
-//! Backdoor function to enable stealing in do_all
-template<bool Steal, typename IterTy, typename FunctionTy>
-void do_all_impl(IterTy b, IterTy e, FunctionTy f, const char* loopname=0) {
-  if (Galois::Runtime::inGaloisForEach) {
-    std::for_each(b, e, f);
-  } else {
-    inGaloisForEach = true;
+template<typename RangeTy, typename FunctionTy>
+FunctionTy do_all_impl(RangeTy range, FunctionTy f) {
+  return do_all_dispatch(range, f, EmptyFn(), false, false);
+}
 
-    typedef StandardRange<IterTy> Range;
-    DoAllWork<FunctionTy, EmptyFn, Range, Steal> W(f, EmptyFn(), false, makeStandardRange(b, e));
-    RunCommand w[2] = {std::ref(W),
-		       std::ref(getSystemBarrier())};
-    getSystemThreadPool().run(&w[0], &w[2], activeThreads);
-    inGaloisForEach = false;
-  }
+template<typename RangeTy, typename FunctionTy, typename ReduceTy>
+FunctionTy do_all_impl(RangeTy range, FunctionTy f, ReduceTy r, bool Steal = false) {
+  return do_all_dispatch(range, f, r, true, Steal);
 }
 
 } // end namespace Runtime

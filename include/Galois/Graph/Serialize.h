@@ -20,8 +20,8 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#ifndef GALOIS_GRAPHS_SERIALIZE_H
-#define GALOIS_GRAPHS_SERIALIZE_H
+#ifndef GALOIS_GRAPH_SERIALIZE_H
+#define GALOIS_GRAPH_SERIALIZE_H
 
 #include <sys/stat.h>
 #include <stdio.h>

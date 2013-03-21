@@ -304,6 +304,8 @@ public:
     return true;
   }
 
+  void initThread() {}
+
   void operator()() {
     ParaMeterInit::init();
     pstatsFile = fopen(ParaMeterInit::getStatsFileName(), "a"); // open in append mode

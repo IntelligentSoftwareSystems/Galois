@@ -85,6 +85,18 @@ public:
 
   unsigned getNumBalls () const { return numBalls; }
 
+  double getLength () const { return length; }
+
+  double getWidth () const { return width; }
+
+  const Ball& getBallByID (unsigned id) {
+    assert (id < balls.size ());
+
+    // XXX: assumes ball ids and indices are same
+    assert (balls[id] != NULL);
+    return *balls[id]; 
+  }
+
   void genInitialEvents (std::vector<Event>& initEvents, const double endtime) {
 
     initEvents.clear ();
@@ -94,6 +106,52 @@ public:
 
       addNextEventIntern (initEvents, *i, NULL, NULL, endtime); // prevObj set to null initially
     }
+  }
+
+  // TODO: debugging functions, remove later maybe
+  void advance (double simTime) {
+    for (Ball* b: balls) {
+      if (simTime > b->time ()) {
+        b->update (b->vel (), simTime);
+
+      } else {
+        assert (b->time () == simTime);
+      }
+    }
+  }
+
+  void check () const {
+
+    for (size_t i = 0; i < balls.size (); ++i) {
+      const Ball* b0 = balls[i];
+      double px = b0->pos ().getX ();
+      double py = b0->pos ().getY ();
+
+      // TODO: boundary tests don't include radius. 
+      if (px < 0.0 || px > length) {
+        std::cerr << "!!!  ERROR: Ball out of X lim: " << b0->str () << std::endl;
+      }
+
+      if (py < 0.0 || py > width) {
+        std::cerr << "!!!  ERROR: Ball out of Y lim: " << b0->str () << std::endl;
+      }
+
+      // check for overlap
+      for (size_t j = i + 1; j < balls.size (); ++j) {
+        const Ball* b1 = balls[j];
+
+        double d = b0->pos ().dist (b1->pos ());
+
+        if (d < (b0->radius () + b1->radius ())) {
+          std::cerr << "!!!  ERROR: Balls overlap, distance: " << d << ",   ";
+          std::cerr << b0->str () << "    ";
+          std::cerr << b1->str () << std::endl;
+        }
+
+      }
+
+    }
+
   }
 
   //! @param addList

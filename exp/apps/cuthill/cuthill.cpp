@@ -27,8 +27,8 @@
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
 #include "Galois/CheckedObject.h"
-#include "Galois/Graphs/LCGraph.h"
-#include "Galois/Graphs/Graph.h"
+#include "Galois/Graph/LCGraph.h"
+#include "Galois/Graph/Graph.h"
 #ifdef GALOIS_EXP
 #include "Galois/PriorityScheduling.h"
 #endif
@@ -217,6 +217,8 @@ private:
       SNode& data = graph.getData(n, Galois::MethodFlag::NONE);
       
       assert(data.dist != DIST_INFINITY);
+      if (data.dist == DIST_INFINITY)
+        return;
 
       if (counts.size() <= data.dist)
         counts.resize(data.dist + 1);
@@ -246,7 +248,7 @@ private:
     Galois::for_each<dChunk>(source, UnorderedProcess());
 
     res.counts = Galois::Runtime::do_all_impl(Galois::Runtime::makeLocalRange(graph),
-        CountLevels(reset), default_reduce(), true).counts;
+        CountLevels(reset), default_reduce()).counts;
     res.max_width = *std::max_element(res.counts.begin(), res.counts.end());
     res.complete = true;
     return res;

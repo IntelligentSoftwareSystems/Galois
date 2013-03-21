@@ -44,10 +44,6 @@ void Event::simulate (std::vector<Event>& addList, const Table& table, const dou
       addNextEvents (addList, downCast<Cushion> (otherObj), table, endtime);
       break;
 
-    case DRAWING_EVENT:
-      std::cerr << "DRAWING_EVENT not supported yet" << std::endl;
-      abort ();
-
     default:
       abort ();
 
@@ -64,10 +60,6 @@ void Event::simulateCollision () {
     case CUSHION_COLLISION:
       simulateCushionCollision (downCast<Cushion> (otherObj));
       break;
-
-    case DRAWING_EVENT:
-      std::cerr << "DRAWING_EVENT not supported yet" << std::endl;
-      abort ();
 
     default:
       abort ();
@@ -86,10 +78,6 @@ void Event::addNextEvents (std::vector<Event>& addList, const Table& table, cons
     case CUSHION_COLLISION:
       addNextEvents (addList, downCast<Cushion> (otherObj), table, endtime);
       break;
-
-    case DRAWING_EVENT:
-      std::cerr << "DRAWING_EVENT not supported yet" << std::endl;
-      abort ();
 
     default:
       abort ();

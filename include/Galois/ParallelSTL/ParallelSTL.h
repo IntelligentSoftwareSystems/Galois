@@ -59,7 +59,7 @@ template<class InputIterator, class Predicate>
 ptrdiff_t count_if(InputIterator first, InputIterator last, Predicate pred)
 {
   return Galois::Runtime::do_all_impl(Galois::Runtime::makeStandardRange(first, last),
-      count_if_helper<Predicate>(pred), count_if_reducer(), true).ret;
+				      count_if_helper<Predicate>(pred), count_if_reducer()).ret;
 }
 
 template<typename ConTy, class Predicate>
@@ -343,7 +343,7 @@ template <class InputIterator, class T, typename BinaryOperation>
 T accumulate (InputIterator first, InputIterator last, T init, BinaryOperation binary_op) {
   return Galois::Runtime::do_all_impl(Galois::Runtime::makeStandardRange(first, last),
       accumulate_helper<T,BinaryOperation>(init, binary_op),
-      accumulate_helper_reduce<BinaryOperation>(binary_op), true).init;
+      accumulate_helper_reduce<BinaryOperation>(binary_op)).init;
 }
 
 template<class InputIterator, class T>
@@ -357,24 +357,17 @@ struct map_reduce_helper {
   MapFn fn;
   ReduceFn reduce;
   map_reduce_helper(T i, MapFn fn, ReduceFn reduce) :init(i), fn(fn), reduce(reduce) {}
-#ifdef GALOIS_HAS_RVALUE_REFERENCES
   template<typename U>
   void operator()(U&& v) {
     init = reduce(fn(std::forward<U>(v)), init);
   }
-#else
-  template<typename U>
-  void operator()(const U& v) {
-    init = reduce(fn(v), init);
-  }
-#endif
 };
 
 template<class InputIterator, class MapFn, class T, class ReduceFn>
 T map_reduce(InputIterator first, InputIterator last, MapFn fn, T init, ReduceFn reduce) {
   return Galois::Runtime::do_all_impl(Galois::Runtime::makeStandardRange(first, last),
       map_reduce_helper<T,MapFn,ReduceFn>(init, fn, reduce),
-      accumulate_helper_reduce<ReduceFn>(reduce), true).init;
+      accumulate_helper_reduce<ReduceFn>(reduce)).init;
 }
 
 }

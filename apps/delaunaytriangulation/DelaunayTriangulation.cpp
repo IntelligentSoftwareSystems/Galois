@@ -32,7 +32,7 @@
 #include "Galois/Galois.h"
 #include "Galois/Bag.h"
 #include "Galois/Statistic.h"
-#include "Galois/Graphs/SpatialTree.h"
+#include "Galois/Graph/SpatialTree.h"
 #include "Galois/WorkList/WorkListAlt.h"
 #include "Lonestar/BoilerPlate.h"
 #include "llvm/Support/CommandLine.h"
@@ -62,7 +62,7 @@ static cll::opt<std::string> doWriteMesh("writemesh",
     cll::value_desc("basename"));
 
 static Graph graph;
-static Galois::SpatialTree2d<Point*> tree;
+static Galois::Graph::SpatialTree2d<Point*> tree;
 
 //! Our main functor
 struct Process {
@@ -176,11 +176,6 @@ struct Process {
 
     return planarSearch(p, someNode, node);
   }
-
-  struct LocalState {
-    Cavity<Alloc> cav;
-    LocalState(Process& self, Galois::PerIterAllocTy& alloc): cav(graph, alloc) { }
-  };
 
   //! Parallel operator
   GALOIS_ATTRIBUTE_NOINLINE

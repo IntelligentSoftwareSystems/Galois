@@ -32,7 +32,7 @@
 #include "MetisGraph.h"
 #include "PMetis.h"
 
-#include "Galois/Graphs/LCGraph.h"
+#include "Galois/Graph/LCGraph.h"
 #include "Galois/Statistic.h"
 
 #include "Lonestar/BoilerPlate.h"
@@ -62,7 +62,7 @@ void partition(MetisGraph* metisGraph, int nparts) {
 	MetisGraph* mcg = coarsener.coarsen(metisGraph);
 	t.stop();
 	cout<<"coarsening time: " << t.get() << " ms"<<endl;
-
+	T.stop();
 	float* totalPartitionWeights = new float[nparts];
 	std::fill_n(totalPartitionWeights, nparts, 1 / (float) nparts);
 	maxVertexWeight = (int) (1.5 * ((mcg->getNumNodes()) / COARSEN_FRACTION));
@@ -210,7 +210,8 @@ void readGraph(MetisGraph* metisGraph, const char* filename, bool weighted = fal
 }
 
 int main(int argc, char** argv) {
-  LonestarStart(argc, argv, name, desc, url);
+  Galois::StatManager statManager; 
+	LonestarStart(argc, argv, name, desc, url);
 
 	srand(-1);
 	MetisGraph metisGraph;
@@ -222,7 +223,11 @@ int main(int argc, char** argv) {
 	}else{
 	  readGraph(&metisGraph, filename.c_str(), weighted, directed);
 	}
+  	/*Galois::Statistic("MeminfoPre1", Galois::Runtime::MM::pageAllocInfo());
+  	Galois::preAlloc(5000);
+  	Galois::Statistic("MeminfoPre2", Galois::Runtime::MM::pageAllocInfo());*/
 	partition(&metisGraph, numPartitions);
+  	//Galois::Statistic("MeminfoPre3", Galois::Runtime::MM::pageAllocInfo());
 	verify(&metisGraph);
 }
 

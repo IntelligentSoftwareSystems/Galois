@@ -45,30 +45,31 @@ PtrLock<SizedAllocatorFactory, true> SizedAllocatorFactory::instance;
 #ifndef USEMALLOC
 SizedAllocatorFactory::SizedAlloc* 
 SizedAllocatorFactory::getAllocatorForSize(const size_t size) {
-
   typedef SizedAllocatorFactory::AllocatorsMap AllocMap;
+  if (size == 0)
+    return 0;
 
-  lock.readLock ();
-    AllocMap::const_iterator i = allocators.find (size);
+  lock.readLock();
+  AllocMap::const_iterator i = allocators.find(size);
 
-    if (i == allocators.end ()) {
-      // entry missing, needs to be created
-      lock.readUnlock ();
+  if (i == allocators.end ()) {
+    // entry missing, needs to be created
+    lock.readUnlock();
 
-      lock.writeLock ();
-        // check again to avoid overwriting existing entry
-        i = allocators.find (size);
-        if (i == allocators.end ()) {
-          allocators.insert (std::make_pair (size, new SizedAlloc ()));
-        }
-      lock.writeUnlock ();
-
-      lock.readLock ();
-        i = allocators.find (size);
+    lock.writeLock();
+    // check again to avoid overwriting existing entry
+    i = allocators.find (size);
+    if (i == allocators.end()) {
+      allocators.insert (std::make_pair (size, new SizedAlloc ()));
     }
+    lock.writeUnlock();
 
-    assert (i != allocators.end ());
-  lock.readUnlock ();
+    lock.readLock ();
+    i = allocators.find(size);
+  }
+
+  assert (i != allocators.end());
+  lock.readUnlock();
 
   return i->second;
 }

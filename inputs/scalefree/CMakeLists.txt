@@ -1,11 +1,11 @@
 function(rgraph base numnodes numedges)
-  add_custom_command(OUTPUT ${base}.rmat
-    COMMAND ${CMAKE_BINARY_DIR}/tools/bin/GTgraph-rmat -n ${numnodes} -m ${numedges}
-      -o ${base}.dimacs
+  add_custom_command(OUTPUT ${base}.dimacs
+    COMMAND python ${CMAKE_BINARY_DIR}/tools/generators/rmat.py
+      ${CMAKE_BINARY_DIR}/tools/bin/GTgraph-rmat -n ${numnodes} -m ${numedges} ${base}.rmat
     DEPENDS ${CMAKE_BINARY_DIR}/tools/bin/GTgraph-rmat)
   add_custom_command(OUTPUT ${base}.gr
-    COMMAND graph-convert -dimacs2gr ${base}.dimacs ${base}.gr
-    DEPENDS ${base}.rmat graph-convert)
+    COMMAND graph-convert-standalone -dimacs2gr ${base}.dimacs ${base}.gr
+    DEPENDS ${base}.dimacs graph-convert-standalone)
 endfunction(rgraph)
 
 rgraph(rmat8-2e14 16384 131072) 

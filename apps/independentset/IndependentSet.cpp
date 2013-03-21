@@ -26,7 +26,7 @@
 #include "Galois/Galois.h"
 #include "Galois/Bag.h"
 #include "Galois/Statistic.h"
-#include "Galois/Graphs/LCGraph.h"
+#include "Galois/Graph/LCGraph.h"
 #include "Galois/ParallelSTL/ParallelSTL.h"
 #ifdef GALOIS_USE_EXP
 #include "Galois/Runtime/ParallelWorkInline.h"
@@ -98,6 +98,8 @@ struct Process {
     bool mod;
     LocalState(Process<Version>& self, Galois::PerIterAllocTy& alloc): mod(false) { }
   };
+  typedef LocalState GaloisDeterministicLocalState;
+  static_assert(Galois::has_deterministic_local_state<Process>::value, "Oops");
 
   template<Galois::MethodFlag Flag>
   bool build(GNode src) {

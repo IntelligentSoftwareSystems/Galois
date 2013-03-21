@@ -27,8 +27,8 @@
 #include "Galois/Timer.h"
 #include "Galois/Queue.h"
 #include "Galois/UserContext.h"
-#include "Galois/Graphs/Graph.h"
-#include "Galois/Graphs/LCGraph.h"
+#include "Galois/Graph/Graph.h"
+#include "Galois/Graph/LCGraph.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
@@ -602,8 +602,8 @@ void makeGraph(const std::string& in, Graph& g) {
           g.getEdgeData(g.findEdge(gdst, gsrc)) = w;
         }
       } else if (gsrc != gdst) {
-        g.getEdgeData(g.addMultiEdge(gsrc, gdst)) = w;
-        g.getEdgeData(g.addMultiEdge(gdst, gsrc)) = w;
+        g.addMultiEdge(gsrc, gdst, Galois::MethodFlag::ALL, w);
+        g.addMultiEdge(gdst, gsrc, Galois::MethodFlag::ALL, w);
         numEdges += 2;
       }
     }

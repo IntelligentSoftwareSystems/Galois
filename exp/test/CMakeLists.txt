@@ -1,7 +1,7 @@
 function(makeTest name)
-  add_executable(${name} ${name}.cpp)
-  target_link_libraries(${name} galois)
-  add_test(${name} ${name})
+  add_executable(test-${name} ${name}.cpp)
+  target_link_libraries(test-${name} galois)
+  add_test(${name} test-${name})
 endfunction()
 
 add_definitions(-O0)
@@ -17,4 +17,3 @@ makeTest(distgraph)
 makeTest(dgraph)
 #makeTest(foreachtask)
 makeTest(networktest)
-

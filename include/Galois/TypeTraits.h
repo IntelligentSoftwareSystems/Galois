@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -37,6 +37,17 @@
  * }
  * \endcode
  *
+ * Since the compiler doesn't check the names of these traits, a good
+ * programming practice is to add a <code>static_assert</code> to check if
+ * everything is ok:
+ * \code
+ * struct MyClass {
+ *   typedef int tt_needs_parallel_break;
+ *   static_assert(Galois::needs_parallel_break<MyClass>::value, "Oops!");
+ *   ...
+ * };
+ * \endcode
+ *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 #ifndef GALOIS_TYPETRAITS_H
@@ -44,6 +55,103 @@
 
 #include <boost/mpl/has_xxx.hpp>
 namespace Galois {
+
+#define GALOIS_HAS_MEM_FUNC(func, name) \
+  template<typename T, typename Sig> \
+  struct has_##name { \
+    typedef char yes[1]; \
+    typedef char no[2]; \
+    template<typename U, U> struct type_check; \
+    template<typename W> static yes& test(type_check<Sig, &W::func>*); \
+    template<typename  > static no&  test(...); \
+    static const bool value = sizeof(test<T>(0)) == sizeof(yes); \
+  }
+
+#define GALOIS_HAS_MEM_TYPE(func, name) \
+  template<typename T> \
+  struct has_##name { \
+    typedef char yes[1]; \
+    typedef char no[2]; \
+    template<typename W> static yes& test(typename W::func*); \
+    template<typename  > static no&  test(...); \
+    static const bool value = sizeof(test<T>(0)) == sizeof(yes); \
+  }
+
+/**
+ * Indicates the operator has a member function that allows a {@link Galois::for_each}
+ * loop to be exited deterministically.
+ *
+ * The function has the following signature:
+ * \code
+ *  struct T {
+ *    bool galoisDeterministicBreak() {
+ *      // returns true if loop should end
+ *    }
+ *  };
+ *  \endcode
+ *
+ * This function will be periodically called by the deterministic scheduler.
+ * If it returns true, the loop ends as if calling {@link
+ * UserContext::breakLoop}, but unlike that function, these breaks are
+ * deterministic.
+ */
+GALOIS_HAS_MEM_FUNC(galoisDeterministicBreak, tf_deterministic_break);
+template<typename T>
+struct has_deterministic_break : public has_tf_deterministic_break<T, bool(T::*)()> {};
+
+/**
+ * Indicates the operator has a member type that optimizes the generation of
+ * unique ids for active elements.
+ *
+ * The type conforms to the following:
+ * \code
+ *  struct T {
+ *    struct GaloisDeterministicId {
+ *      GaloisDeterministicId() { } // default constructable
+ *      uintptr_t operator()(const A& item) {
+ *        // returns a unique identifer for item
+ *      }
+ *    };
+ *    void operator()(const A& item, Galois::UserContext<A>&) { ... }
+ *  };
+ * \endcode
+ */
+GALOIS_HAS_MEM_TYPE(GaloisDeterministicId, tf_deterministic_id);
+template<typename T>
+struct has_deterministic_id : public has_tf_deterministic_id<T> {};
+
+/**
+ * Indicates the operator has a member type that encapsulates state that is passed between 
+ * the suspension and resumpsion of an operator during deterministic scheduling.
+ *
+ * The type conforms to the following:
+ * \code
+ *  struct T {
+ *    struct GaloisDeteministicLocalState {
+ *      int x, y, z; // Local state
+ *      GaloisDeteministicLocalState(T& self, Galois::PerIterAllocTy& alloc) {
+ *        // initialize local state
+ *      }
+ *    };
+ *
+ *    void operator()(const A& item, Galois::UserContext<A>&) { 
+ *      // An example of using local state
+ *      typedef GaloisDeteministicLocalState LS;
+ *      bool used;
+ *      LS* p = (LS*) ctx.getLocalState(used);
+ *      if (used) {
+ *        // operator is being resumed; use p
+ *      } else {
+ *        // operator hasn't been suspended yet; execute normally
+ *        // save state into p to be used when operator resumes
+ *      }
+ *    }
+ *  };
+ * that 
+ */
+GALOIS_HAS_MEM_TYPE(GaloisDeterministicLocalState, tf_deterministic_local_state);
+template<typename T>
+struct has_deterministic_local_state : public has_tf_deterministic_local_state<T> {};
 
 /**
  * Indicates the operator may request the parallel loop to be suspended and a
@@ -81,7 +189,6 @@ struct does_not_need_stats : public has_tt_does_not_need_stats<T> {};
 BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_does_not_need_aborts)
 template<typename T>
 struct does_not_need_aborts : public has_tt_does_not_need_aborts<T> {};
-
 
 /**
  * Indicates that the neighborhood set does not change through out i.e. is not

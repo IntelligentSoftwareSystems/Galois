@@ -7,13 +7,16 @@ fi
 
 module load sl6
 module load cmake
+module use /net/faraday/workspace/local/modules/modulefiles
 module load boost/1.52
 module load lapack
 
 if [ "$1" != "min" ]; then
   module load gdb/7.5
-  module load gcc/4.7.1-scale
+  module load gcc/4.7.2-scale
   #module load tbb
   module load vtune
   module load mkl
+  module load mpich2
+  module load llvm
 fi

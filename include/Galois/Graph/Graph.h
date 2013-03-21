@@ -22,11 +22,11 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#ifndef GALOIS_GRAPHS_GRAPH_H
-#define GALOIS_GRAPHS_GRAPH_H
+#ifndef GALOIS_GRAPH_GRAPH_H
+#define GALOIS_GRAPH_GRAPH_H
 
 #include "Galois/Bag.h"
-#include "Galois/Graphs/LCGraph.h"
+#include "Galois/Graph/Util.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/MethodFlags.h"
 
@@ -237,6 +237,10 @@ class FirstGraph : private boost::noncopyable {
       return std::find_if(begin(), end(), first_eq_and_valid<gNode*>(N));
     }
 
+    void resizeEdges(size_t size) {
+      	edges.resize(size, EITy(new gNode(), 0));
+    }
+
     template<typename... Args>
     iterator createEdge(gNode* N, EdgeTy* v, Args&&... args) {
       return edges.insert(edges.end(), EITy(N, v, std::forward<Args>(args)...));
@@ -383,6 +387,16 @@ public:
     }
   }
 
+  /**
+   * Resize the edges of the node. For best performance, should be done serially.
+   */
+  void resizeEdges(GraphNode src, size_t size, Galois::MethodFlag mflag = MethodFlag::ALL) {
+    assert(src);
+    Galois::Runtime::checkWrite(mflag, false);
+    Galois::Runtime::acquire(src, mflag);
+    src->resizeEdges(size);
+   }
+
   /** 
    * Adds an edge to graph, replacing existing value if edge already exists. 
    *
@@ -473,8 +487,8 @@ public:
    * An object with begin() and end() methods to iterate over the outgoing
    * edges of N.
    */
-  LCGraphImpl::EdgesIterator<FirstGraph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
-    return LCGraphImpl::EdgesIterator<FirstGraph>(*this, N, mflag);
+  EdgesIterator<FirstGraph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+    return EdgesIterator<FirstGraph>(*this, N, mflag);
   }
 
   /**

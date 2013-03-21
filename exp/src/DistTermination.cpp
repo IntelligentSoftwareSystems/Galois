@@ -67,7 +67,7 @@ class DistTerminationDetection : public TerminationDetection {
     }
   }
 
-  //recieve remote token
+  //receive remote token
   void recvToken(bool isBlack) {
     TokenHolder& th = *data.getRemote(0);
     th.tokenIsBlack = isBlack;
@@ -80,7 +80,7 @@ class DistTerminationDetection : public TerminationDetection {
       Distributed::SendBuffer b;
       Distributed::getSystemNetworkInterface().broadcastMessage(globalTermLandingPad, b);
     }
-    globalTerm = true;
+    globalTerm.data = true;
   }
 
   bool isSysMaster() const {
@@ -96,14 +96,14 @@ public:
     th.tokenIsBlack = false;
     th.processIsBlack = true;
     th.lastWasWhite = true;
-    globalTerm = false;
+    globalTerm.data = false;
     if (isSysMaster()) {
       th.hasToken = true;
     }
   }
 
   virtual void localTermination(bool workHappened) {
-    assert(!(workHappened && globalTerm));
+    assert(!(workHappened && globalTerm.data));
     TokenHolder& th = *data.getLocal();
     th.processIsBlack |= workHappened;
     if (th.hasToken) {
@@ -118,7 +118,7 @@ public:
 	th.lastWasWhite = !failed;
       }
       //Normal thread or recirc by master
-      assert (!globalTerm && "no token should be in progress after globalTerm");
+      assert (!globalTerm.data && "no token should be in progress after globalTerm");
       bool taint = th.processIsBlack || th.tokenIsBlack;
       th.processIsBlack = th.tokenIsBlack = false;
       th.hasToken = false;
@@ -133,7 +133,7 @@ static DistTerminationDetection& getDistTermination() {
 }
 
 void DistTerminationDetection::globalTermLandingPad(Distributed::RecvBuffer&) {
-  getDistTermination().globalTerm = true;
+  getDistTermination().globalTerm.data = true;
 }
 void DistTerminationDetection::propTokenLandingPad(Distributed::RecvBuffer& b) {
   bool isBlack;

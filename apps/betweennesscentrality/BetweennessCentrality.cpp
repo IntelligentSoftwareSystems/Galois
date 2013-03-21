@@ -25,7 +25,7 @@
 #include "Galois/Statistic.h"
 #include "Galois/Galois.h"
 #include "Galois/UserContext.h"
-#include "Galois/Graphs/LCGraph.h"
+#include "Galois/Graph/LCGraph.h"
 #include "Galois/WorkList/WorkList.h"
 
 #include "llvm/Support/CommandLine.h"
@@ -53,6 +53,7 @@ static const char* url = "betweenness_centrality";
 
 static llvm::cl::opt<std::string> filename(llvm::cl::Positional, llvm::cl::desc("<input file>"), llvm::cl::Required);
 static llvm::cl::opt<int> iterLimit("limit", llvm::cl::desc("Limit number of iterations to value (0 is all nodes)"), llvm::cl::init(0));
+static llvm::cl::opt<unsigned int> startNode("startNode", llvm::cl::desc("Node to start search from"), llvm::cl::init(0));
 static llvm::cl::opt<bool> forceVerify("forceVerify", llvm::cl::desc("Abort if not verified, only makes sense for torus graphs"));
 
 typedef Galois::Graph::LC_FileGraph<void, void> Graph;
@@ -275,7 +276,7 @@ void printBCcertificate() {
   std::stringstream foutname;
   foutname << "outer_certificate_" << numThreads;
   std::ofstream outf(foutname.str().c_str());
-  std::cerr << "Writting certificate..." << std::endl;
+  std::cerr << "Writing certificate..." << std::endl;
 #if SHARE_SINGLE_BC
 #else
   const std::vector<double>& bcv = CB->reduce();
@@ -321,22 +322,29 @@ int main(int argc, char** argv) {
   
   initGraphData();
 
-  int iterations = NumNodes;
-  if (iterLimit)
-    iterations = iterLimit;
-
   boost::filter_iterator<HasOut,Graph::iterator>
     begin = boost::make_filter_iterator(HasOut(G), g.begin(), g.end()),
     end = boost::make_filter_iterator(HasOut(G), g.end(), g.end());
 
-  iterations = std::min((int) std::distance(begin, end), iterations);
+  size_t iterations;
+  size_t maxIterations = std::distance(begin, end);
+  if (iterLimit == 0) {
+    iterations = maxIterations;
+  } else if (startNode + iterLimit < maxIterations) {
+    std::advance(begin, startNode);
+    end = begin;
+    std::advance(end, iterLimit);
+    iterations = iterLimit;
+  } else {
+    std::cerr << "Asked for more iterations than nodes in the graph\n";
+    abort();
+  }
 
   std::cout 
-    << "NumNodes: " << NumNodes 
+    << "NumNodes: " << NumNodes
+    << " Start Node: " << startNode 
     << " Iterations: " << iterations << "\n";
   
-  end = begin;
-  std::advance(end, iterations);
   std::vector<GNode> tmp;
   std::copy(begin, end, std::back_inserter(tmp));
 
@@ -346,9 +354,7 @@ int main(int argc, char** argv) {
   Galois::for_each<WL>(tmp.begin(), tmp.end(), process());
   T.stop();
 
-  if (forceVerify || !skipVerify) {
-    verify();
-  } else { // print bc value for first 10 nodes
+  if (!skipVerify) {
 #if SHARE_SINGLE_BC
 #else
     const std::vector<double>& bcv = CB->reduce();
@@ -362,6 +368,10 @@ int main(int argc, char** argv) {
 #if SHOULD_PRODUCE_CERTIFICATE
     printBCcertificate();
 #endif
+  }
+
+  if (forceVerify || !skipVerify) {
+    verify();
   }
   std::cerr << "Application done...\n";
 

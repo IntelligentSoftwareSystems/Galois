@@ -43,6 +43,11 @@ BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_has_serialize)
 template<typename T>
 struct has_serialize : public has_tt_has_serialize<T> {};
 
+template<typename T>
+struct is_serializable {
+  static const bool value = has_serialize<T>::value || std::is_pod<T>::value;
+};
+
 class SerializeBuffer {
   std::vector<unsigned char> bufdata;
 public:

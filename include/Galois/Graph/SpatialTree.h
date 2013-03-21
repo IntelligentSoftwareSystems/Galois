@@ -21,8 +21,8 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-#ifndef GALOIS_GRAPHS_SPATIALTREE_H
-#define GALOIS_GRAPHS_SPATIALTREE_H
+#ifndef GALOIS_GRAPH_SPATIALTREE_H
+#define GALOIS_GRAPH_SPATIALTREE_H
 
 namespace Galois {
 namespace Graph {

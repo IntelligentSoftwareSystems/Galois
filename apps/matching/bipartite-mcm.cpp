@@ -33,8 +33,8 @@
 #include "Galois/Galois.h"
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
-#include "Galois/Graphs/Graph.h"
-#include "Galois/Graphs/FileGraph.h"
+#include "Galois/Graph/Graph.h"
+#include "Galois/Graph/FileGraph.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 #ifdef GALOIS_USE_EXP

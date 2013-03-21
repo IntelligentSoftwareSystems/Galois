@@ -56,8 +56,7 @@ class Event {
 public:
   enum EventKind {
     BALL_COLLISION,
-    CUSHION_COLLISION,
-    DRAWING_EVENT
+    CUSHION_COLLISION
   };
 
 private:
@@ -124,6 +123,11 @@ public:
 
   const Ball& getBall () const { return *ball; }
 
+  bool notStale () const { 
+    return (ball->collCounter () == this->collCounterA && 
+        otherObj->collCounter () == this->collCounterB);
+  }
+
   const Ball& getOtherBall () const { 
     assert (kind == BALL_COLLISION);
 
@@ -139,6 +143,7 @@ public:
   EventKind getKind () const { return kind; }
 
 
+
   std::string str () const {
     const char* kindName = NULL;
 
@@ -152,11 +157,6 @@ public:
       case CUSHION_COLLISION:
         kindName = "CUSHION_COLLISION";
         objBstr = getCushion ().str ();
-        break;
-
-      case DRAWING_EVENT:
-        kindName = "DRAWING_EVENT";
-        objBstr = "NULL";
         break;
 
       default:

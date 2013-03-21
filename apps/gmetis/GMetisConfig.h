@@ -27,7 +27,7 @@
 #include "MetisNode.h"
 #include "ArraySet.h"
 
-#include "Galois/Graphs/Graph.h"
+#include "Galois/Graph/Graph.h"
 #include "Galois/Galois.h"
 #include "Galois/Timer.h"
 #include "Galois/Accumulator.h"
