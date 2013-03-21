@@ -233,17 +233,20 @@ void edgeMap(Graph& graph, EdgeOperator op, Bag& input, Bag& output, bool denseF
   using namespace Galois::WorkList;
   size_t count = input.getCount();
 
-  if (count > graph.sizeEdges() / 20) {
-    typedef dChunkedFIFO<256> WL;
+  if (!denseForward && count > graph.sizeEdges() / 20) {
+    //std::cout << "(D) Count " << count << "\n"; // XXX
     input.densify();
     if (denseForward) {
+      abort(); // Never executed
       output.densify();
-      //Galois::for_each_local<WL>(graph, hidden::DenseForwardOperator<Graph,Bag,EdgeOperator,Forward,false>(graph, input, output, op));
-      Galois::do_all_local(graph, hidden::DenseForwardOperator<Graph,Bag,EdgeOperator,Forward,false>(graph, input, output, op));
+      typedef dChunkedFIFO<256*4> WL;
+      Galois::for_each_local<WL>(graph, hidden::DenseForwardOperator<Graph,Bag,EdgeOperator,Forward,false>(graph, input, output, op));
     } else {
+      typedef dChunkedFIFO<256> WL;
       Galois::for_each_local<WL>(graph, hidden::DenseOperator<Graph,Bag,EdgeOperator,Forward>(graph, input, output, op));
     }
   } else {
+    //std::cout << "(S) Count " << count << "\n"; // XXX
     typedef dChunkedFIFO<64> WL;
     Galois::for_each_local<WL>(input, hidden::SparseOperator<Graph,Bag,EdgeOperator,Forward>(graph, output, op));
   }

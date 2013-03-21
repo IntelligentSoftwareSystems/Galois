@@ -26,9 +26,10 @@ void edgeMap(Graph& graph, EdgeOperator op, Bag& input, Bag& output, bool denseF
 
   size_t count = input.getCount();
 
-  if (count > graph.sizeEdges() / 20) {
+  if (!denseForward && count > graph.sizeEdges() / 20) {
     input.densify();
     if (denseForward) {
+      abort(); // Never used now
       output.densify();
       Galois::GraphChi::hidden::vertexMap<false,false>(graph, wgraph,
         Galois::Ligra::hidden::DenseForwardOperator<WrappedGraph,Bag,EdgeOperator,Forward,false>(wgraph, input, output, op),
