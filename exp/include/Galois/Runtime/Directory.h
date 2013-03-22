@@ -164,7 +164,7 @@ public:
 
 class PersistentDirectory: public SimpleRuntimeContext, private boost::noncopyable {
   Galois::Runtime::LL::SimpleLock<true> Lock;
-  std::unordered_map<std::pair<uintptr_t, uint32_t>, uintptr_t, pairhash<uintptr_t, uint32_t>> perobj;
+  std::unordered_map<std::pair<uintptr_t, uint32_t>, volatile uintptr_t, pairhash<uintptr_t, uint32_t>> perobj;
 
   template<typename T>
   static std::pair<uintptr_t, uint32_t> k(T* ptr, uint32_t owner) {

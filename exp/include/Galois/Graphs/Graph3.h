@@ -239,9 +239,9 @@ protected:
   }
   void dump(std::ostream& os) const {
     os << "numedges: " << edges.size();
-    for (decltype(edges.size()) x = 0; x < edges.size(); ++x) {
+    for (auto ii = edges.begin(), ee = edges.end(); ii != ee; ++ii) {
       os << " ";
-      edges[x].dump(os);
+      ii->dump(os);
     }
   }
  public:
