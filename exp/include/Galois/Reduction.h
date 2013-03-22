@@ -93,7 +93,7 @@ public:
   }
 
   static void reduceData(RecvBuffer& buf) {
-    std::cout << "R: " << networkHostID << "\n";
+    //std::cout << "R: " << networkHostID << "\n";
     DGReducible* dst;
     std::vector<DGReducible*> hosts;
     T data;
@@ -104,7 +104,7 @@ public:
     dst->reduceWith(data);
     int expect = expected();
     if (expect == dst->reduced && networkHostID != 0) {
-      std::cout << "r: " << networkHostID << "->" << ((networkHostID - 1)/2) << "\n";
+      //std::cout << "r: " << networkHostID << "->" << ((networkHostID - 1)/2) << "\n";
       dst->reduced = 0;
       SendBuffer sbuf;
       gSerialize(sbuf, hosts, dst->r_data);
@@ -114,14 +114,14 @@ public:
   }
 
   static void startReduce(RecvBuffer& buf) {
-    std::cout << "S: " << networkHostID << "\n";
+    //std::cout << "S: " << networkHostID << "\n";
     std::vector<DGReducible*> hosts;
     gDeserialize(buf, hosts);
     DGReducible* dst = hosts[networkHostID];
     dst->hosts = hosts;
     dst->localReduce();
     if (expected() == 0) {
-      std::cout << "s: " << networkHostID << "->" << ((networkHostID - 1)/2) << "\n";
+      //std::cout << "s: " << networkHostID << "->" << ((networkHostID - 1)/2) << "\n";
       SendBuffer sbuf;
       gSerialize(sbuf, hosts, dst->r_data);
       getSystemNetworkInterface().sendMessage((networkHostID - 1)/2, &reduceData, sbuf);
@@ -150,13 +150,13 @@ public:
   void doBroadcast(T& data) {
     unsigned ndst;
     if ((ndst = networkHostID * 2 + 1) < networkHostNum) {
-      std::cout << "b: " << networkHostID << "->" << ndst << "\n";
+      //std::cout << "b: " << networkHostID << "->" << ndst << "\n";
       SendBuffer sbuf;
       gSerialize(sbuf, hosts, data);
       getSystemNetworkInterface().sendMessage(ndst, &broadcastData, sbuf);
     }
     if ((ndst = networkHostID * 2 + 2) < networkHostNum) {
-      std::cout << "b: " << networkHostID << "->" << ndst << "\n";
+      //std::cout << "b: " << networkHostID << "->" << ndst << "\n";
       SendBuffer sbuf;
       gSerialize(sbuf, hosts, data);
       getSystemNetworkInterface().sendMessage(ndst, &broadcastData, sbuf);
