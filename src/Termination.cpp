@@ -138,12 +138,14 @@ class TreeTerminationDetection : public TerminationDetection {
     //have all up tokens?
     bool haveAll = th.hasToken;
     bool black = th.processIsBlack;
-    for (int i = 0; i < num; ++i)
-      if (th.child[i])
+    for (int i = 0; i < num; ++i) {
+      if (th.child[i]) {
 	if( th.up_token[i] == -1 )
 	  haveAll = false;
 	else
 	  black |= th.up_token[i];
+      }
+    }
     //Have the tokens, propagate
     if (haveAll) {
       th.processIsBlack = false;
