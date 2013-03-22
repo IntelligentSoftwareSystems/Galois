@@ -34,6 +34,7 @@
 #ifdef GALOIS_USE_EXP
 #include <boost/mpl/if.hpp>
 #include "Galois/Graph/OCGraph.h"
+#include "Galois/Graph/ReplicatedGraph.h"
 #include "Galois/Graph/GraphNodeBag.h"
 #include "Galois/DomainSpecificExecutors.h"
 #endif
@@ -428,7 +429,7 @@ struct GraphLabAlgo {
     LNode(): odd_iteration(false) { }
   };
 
-  typedef Galois::Graph::LC_CSR_InOutGraph<LNode,void,true> Graph;
+  typedef Galois::Graph::ReplicatedGraph<LNode,void> Graph;
   typedef typename Graph::GraphNode GNode;
 
   void readGraph(Graph& graph) { readInOutGraph(graph); }
@@ -575,7 +576,7 @@ struct GraphLabAlgo {
     size_t diameter = 0;
     for (size_t iter = 0; iter < 100; ++iter) {
       //Galois::GraphLab::executeSync(graph, graph, Program());
-      Galois::GraphLab::SyncEngine<Graph,Program> engine(graph, Program());
+      Galois::GraphLab::SyncEngine<Graph,Program> engine(&graph);
       engine.execute();
 
       Galois::do_all(graph.begin(), graph.end(), [&](GNode n) {

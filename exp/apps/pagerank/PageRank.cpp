@@ -28,6 +28,7 @@
 #include "Galois/Graph/TypeTraits.h"
 #ifdef GALOIS_USE_EXP
 #include <boost/mpl/if.hpp>
+#include "Galois/Graph/ReplicatedGraph.h"
 #include "Galois/Graph/OCGraph.h"
 #include "Galois/Graph/GraphNodeBag.h"
 #include "Galois/DomainSpecificExecutors.h"
@@ -160,7 +161,7 @@ struct GraphLabAlgo {
     float getPageRank() { return data; }
   };
 
-  typedef Galois::Graph::LC_CSR_InOutGraph<LNode,void,true> Graph;
+  typedef Galois::Graph::ReplicatedGraph<LNode,void> Graph;
   typedef typename Graph::GraphNode GNode;
 
   std::string name() const { return "GraphLab"; }
@@ -228,10 +229,10 @@ struct GraphLabAlgo {
       Galois::GraphLab::AsyncEngine<Graph,Program<true> > engine(graph, Program<true>());
       engine.execute();
     } else if (UseDelta) {
-      Galois::GraphLab::SyncEngine<Graph,Program<true> > engine(graph, Program<true>());
+      Galois::GraphLab::SyncEngine<Graph,Program<true> > engine(&graph);
       engine.execute();
     } else {
-      Galois::GraphLab::SyncEngine<Graph,Program<false> > engine(graph, Program<false>());
+      Galois::GraphLab::SyncEngine<Graph,Program<false> > engine(&graph);
       for (unsigned i = 0; i < maxIterations; ++i)
         engine.execute();
     }
@@ -594,6 +595,8 @@ int main(int argc, char **argv) {
   LonestarStart(argc, argv, name, desc, url);
   Galois::StatManager statManager;
 
+  Galois::Runtime::Distributed::networkStart();
+
   if (outputPullFilename.size()) {
     precomputePullData();
     return 0;
@@ -613,6 +616,8 @@ int main(int argc, char **argv) {
     default: std::cerr << "Unknown algorithm\n"; abort();
   }
   T.stop();
+
+  Galois::Runtime::Distributed::networkTerminate();
 
   return 0;
 }

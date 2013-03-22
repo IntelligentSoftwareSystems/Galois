@@ -35,6 +35,7 @@
 #include "Galois/Graph/TypeTraits.h"
 #ifdef GALOIS_USE_EXP
 #include <boost/mpl/if.hpp>
+#include "Galois/Graph/ReplicatedGraph.h"
 #include "Galois/Graph/OCGraph.h"
 #include "Galois/Graph/GraphNodeBag.h"
 #include "Galois/DomainSpecificExecutors.h"
@@ -49,7 +50,7 @@
 #include <iostream>
 
 const char* name = "Connected Components";
-const char* desc = "Compute connected components of a graph";
+const char* desc = "Compute connected components of a graph\n";
 const char* url = 0;
 
 enum class Algo {
@@ -527,7 +528,7 @@ struct GraphLabAlgo {
     bool isRep() { return id == labelid; }
   };
 
-  typedef Galois::Graph::LC_CSR_InOutGraph<LNode,void,true> Graph;
+  typedef Galois::Graph::ReplicatedGraph<LNode,void> Graph;
   typedef Graph::GraphNode GNode;
 
   struct Initialize {
@@ -601,7 +602,7 @@ struct GraphLabAlgo {
   void operator()(Graph& graph) {
     Galois::do_all_local(graph, Initialize(graph));
 
-    Galois::GraphLab::SyncEngine<Graph,Program> engine(graph, Program());
+    Galois::GraphLab::SyncEngine<Graph,Program> engine(&graph);
     engine.execute();
   }
 };

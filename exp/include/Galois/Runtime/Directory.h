@@ -200,7 +200,7 @@ PersistentDirectory& getSystemPersistentDirectory();
 } //Runtime
 } //Galois
 
-using namespace Galois::Runtime::Distributed;
+using namespace Galois::Runtime::Distributed; // XXX
 
 // should be blocking if not in for each
 template<typename T>

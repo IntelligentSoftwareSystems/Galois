@@ -27,6 +27,7 @@
 #include <ostream>
 #include <vector>
 #include <deque>
+#include <string>
 
 #include <boost/mpl/has_xxx.hpp>
 
@@ -38,7 +39,7 @@ namespace Distributed {
 //Objects with this tag have a member function which replaces an
 //already constructed object with the deserializes version (inplace
 //deserialization with default constructor)
-//We can also use this to update original objects durring writeback
+//We can also use this to update original objects during writeback
 BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_has_serialize)
 template<typename T>
 struct has_serialize : public has_tt_has_serialize<T> {};
@@ -96,6 +97,15 @@ void gSerialize(SerializeBuffer& buf, const T1& a1, const T2& a2, const U&... an
   gSerialize(buf, an...);
 }
 
+template<typename T>
+void gSerialize(SerializeBuffer& buf, const std::basic_string<T>& data) {
+  typename std::basic_string<T>::size_type size;
+  size = data.size();
+  gSerialize(buf, size);
+  for (auto ii = data.begin(), ee = data.end(); ii != ee; ++ii)
+    gSerialize(buf, *ii);
+}
+
 template<typename T, typename Alloc>
 void gSerialize(SerializeBuffer& buf, const std::vector<T, Alloc>& data) {
   typename std::vector<T, Alloc>::size_type size;
@@ -125,6 +135,7 @@ template<typename T>
 void gSerialize(SerializeBuffer& buf, const T& data, typename std::enable_if<has_serialize<T>::value>::type* = 0) {
   data.serialize(buf);
 }
+
 
 class DeSerializeBuffer {
   std::vector<unsigned char> bufdata;
@@ -169,6 +180,16 @@ void gDeserialize(DeSerializeBuffer& buf, T& data, typename std::enable_if<std::
 template<typename T>
 void gDeserialize(DeSerializeBuffer& buf, T& data, typename std::enable_if<has_serialize<T>::value>::type* = 0) {
   data.deserialize(buf);
+}
+
+template<typename T>
+void gDeserialize(DeSerializeBuffer& buf, std::basic_string<T>& data) {
+  typedef typename std::basic_string<T>::size_type lsty;
+  lsty size;
+  gDeserialize(buf, size);
+  data.resize(size);
+  for (lsty x = 0; x < size; ++x)
+    gDeserialize(buf, data[x]);
 }
 
 template<typename T, typename Alloc>

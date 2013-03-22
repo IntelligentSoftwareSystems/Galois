@@ -2,6 +2,8 @@
 #define GALOIS_GRAPHLABEXECUTOR_H
 
 #include "Galois/Bag.h"
+#include "Galois/PerHostStorage.h"
+#include "Galois/Runtime/ParallelWorkDistributed.h"
 
 #include <boost/mpl/has_xxx.hpp>
 
@@ -45,13 +47,23 @@ private:
   Galois::UserContext<WorkItem>* ctx;
   Graph* graph;
   Galois::LargeArray<int,false>* scoreboard;
-  Galois::InsertBag<GNode>* next;
+  Galois::PerHostStorage<Galois::InsertBag<GNode>>* next;
   Messages* messages;
 
-  Context(Graph* g, Galois::LargeArray<int,false>* s, Galois::InsertBag<GNode>* n, Messages* m):
-    graph(g), scoreboard(s), next(n), messages(m) { }
+  Context() { }
 
-  Context(Galois::UserContext<WorkItem>* c): ctx(c) { }
+  void initializeForSync(Graph* g, Galois::LargeArray<int,false>* s, Galois::PerHostStorage<Galois::InsertBag<GNode>>* n, Messages* m) {
+    graph = g;
+    scoreboard = s;
+    next = n;
+    messages = m;
+    ctx = 0;
+  }
+
+  void initializeForAsync(Galois::UserContext<WorkItem>* c) {
+    ctx = c;  
+  }
+
 public:
 
   void push(GNode node, const message_type& message) {
@@ -142,7 +154,8 @@ class AsyncEngine {
       if (!op.needsScatter(self->graph, node))
         return;
 
-      Context<Graph,Operator> context(&ctx);
+      Context<Graph,Operator> context;
+      context.initializeForAsync(&ctx);
 
       if (needs_scatter_in_edges<Operator>::value) {
         for (in_edge_iterator ii = self->graph.in_edge_begin(node, Galois::MethodFlag::NONE),
@@ -175,6 +188,8 @@ public:
   }
 };
 
+using namespace Galois::Runtime::Distributed;
+
 template<typename Graph, typename Operator>
 class SyncEngine {
   typedef typename Operator::message_type message_type;
@@ -188,40 +203,76 @@ class SyncEngine {
   typedef std::deque<Message> MyMessages;
   typedef Galois::Runtime::PerPackageStorage<MyMessages> Messages;
 
-  Graph& graph;
-  Operator origOp;
-  Galois::LargeArray<Operator,false> ops;
-  Messages messages;
-  Galois::LargeArray<int,false> scoreboard;
-  Galois::InsertBag<GNode> wls[2];
-  Galois::Runtime::LL::SimpleLock<true> lock;
+  struct PerHostData {
+    gptr<Graph> graph;
+    Operator origOp;
+    Galois::LargeArray<Operator,false> ops;
+    Messages messages;
+    Galois::LargeArray<int,false> scoreboard;
+    Galois::Runtime::LL::SimpleLock<true> lock;
+    Context<Graph,Operator> context;
+    Graph* pGraph;
+    size_t size;
 
+    PerHostData(gptr<Graph> g): graph(g) { allocate(graph->size()); pGraph = &*graph; }
+    PerHostData(DeSerializeBuffer& s) { gDeserialize(s, graph); allocate(graph->size()); }
+    
+    ~PerHostData() {
+      std::cout << "Deallocate\n";
+    }
+
+    typedef int tt_has_serialize;
+    typedef int tt_is_persistent;
+
+    void serialize(SerializeBuffer& s) const { gSerialize(s, graph); }
+    void deserialize(DeSerializeBuffer& s) { gDeserialize(s, graph); allocate(graph->size()); pGraph = &*graph; }
+
+    void allocate(size_t s) {
+      std::cout << "Allocate\n";
+      ops.allocate(s);
+      scoreboard.allocate(s);
+      if (NeedMessages)
+        messages.getLocal()->resize(s);
+    }
+  };
+
+  PerHostData data;
+  
   struct Gather {
-    SyncEngine* self;
     typedef int tt_does_not_need_parallel_push;
     typedef int tt_does_not_need_aborts;
 
-    Gather(SyncEngine* s): self(s) { }
+    gptr<PerHostData> origPointer;
+    PerHostData* pData;
+
+    Gather() { }
+    Gather(gptr<PerHostData> p): origPointer(p) { pData = &*origPointer; }
+
+    typedef int tt_has_serialize;
+
+    void serialize(SerializeBuffer& s) const { gSerialize(s, origPointer); }
+    void deserialize(DeSerializeBuffer& s) { gDeserialize(s, origPointer); pData = &*origPointer; }
+
     void operator()(GNode node, Galois::UserContext<GNode>&) {
-      size_t id = self->graph.idFromNode(node);
-      Operator& op = self->ops[id];
+      size_t id = pData->pGraph->idFromNode(node);
+      Operator& op = pData->ops[id];
       gather_type sum;
 
       if (needs_gather_in_edges<Operator>::value) {
-        for (in_edge_iterator ii = self->graph.in_edge_begin(node, Galois::MethodFlag::NONE),
-            ei = self->graph.in_edge_end(node, Galois::MethodFlag::NONE); ii != ei; ++ii) {
-          op.gather(self->graph, node, self->graph.getInEdgeDst(ii), node, sum, self->graph.getInEdgeData(ii));
+        for (in_edge_iterator ii = pData->pGraph->in_edge_begin(node, Galois::MethodFlag::NONE),
+            ei = pData->pGraph->in_edge_end(node, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+          op.gather(*pData->pGraph, node, pData->pGraph->getInEdgeDst(ii), node, sum, pData->pGraph->getInEdgeData(ii));
         }
       }
 
       if (needs_gather_out_edges<Operator>::value) {
-        for (edge_iterator ii = self->graph.edge_begin(node, Galois::MethodFlag::NONE), 
-            ei = self->graph.edge_end(node, Galois::MethodFlag::NONE); ii != ei; ++ii) {
-          op.gather(self->graph, node, node, self->graph.getEdgeDst(ii), sum, self->graph.getEdgeData(ii));
+        for (edge_iterator ii = pData->pGraph->edge_begin(node, Galois::MethodFlag::NONE), 
+            ei = pData->pGraph->edge_end(node, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+          op.gather(*pData->pGraph, node, node, pData->pGraph->getEdgeDst(ii), sum, pData->pGraph->getEdgeData(ii));
         }
       }
 
-      op.apply(self->graph, node, sum);
+      op.apply(*pData->pGraph, node, sum);
     }
   };
 
@@ -230,30 +281,43 @@ class SyncEngine {
     typedef int tt_does_not_need_parallel_push;
     typedef int tt_does_not_need_aborts;
 
-    SyncEngine* self;
-    Context<Graph,Operator> context;
+    gptr<PerHostData> origPointer;
+    gptr<Container> next;
+    PerHostData* pData;
 
-    Scatter(SyncEngine* s, Container& next):
-      self(s), context(&self->graph, &self->scoreboard, &next, NeedMessages ? &self->messages : 0) { }
+    Scatter() { }
+    Scatter(gptr<PerHostData> p, gptr<Container> n): origPointer(p), next(n) { init(); }
 
+    typedef int tt_has_serialize;
+
+    void serialize(SerializeBuffer& s) const { gSerialize(s, origPointer); gSerialize(s, next); }
+    void deserialize(DeSerializeBuffer& s) { gDeserialize(s, origPointer); gDeserialize(s, next); init(); }
+
+    void init() {
+      pData = &*origPointer;
+      pData->context.initializeForSync(pData->pGraph, &pData->scoreboard, &*next, &pData->messages);
+    }
+    
     void operator()(GNode node, Galois::UserContext<GNode>&) {
-      size_t id = self->graph.idFromNode(node);
+      size_t id = pData->pGraph->idFromNode(node);
 
-      Operator& op = self->ops[id];
+      Operator& op = pData->ops[id];
       
-      if (!op.needsScatter(self->graph, node))
+      if (!op.needsScatter(*pData->pGraph, node))
         return;
 
       if (needs_scatter_in_edges<Operator>::value) {
-        for (in_edge_iterator ii = self->graph.in_edge_begin(node, Galois::MethodFlag::NONE),
-            ei = self->graph.in_edge_end(node, Galois::MethodFlag::NONE); ii != ei; ++ii) {
-          op.scatter(self->graph, node, self->graph.getInEdgeDst(ii), node, context, self->graph.getInEdgeData(ii));
+        for (in_edge_iterator ii = pData->pGraph->in_edge_begin(node, Galois::MethodFlag::NONE),
+            ei = pData->pGraph->in_edge_end(node, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+          op.scatter(*pData->pGraph, node, pData->pGraph->getInEdgeDst(ii), node,
+              pData->context, pData->pGraph->getInEdgeData(ii));
         }
       }
       if (needs_scatter_out_edges<Operator>::value) {
-        for (edge_iterator ii = self->graph.edge_begin(node, Galois::MethodFlag::NONE), 
-            ei = self->graph.edge_end(node, Galois::MethodFlag::NONE); ii != ei; ++ii) {
-          op.scatter(self->graph, node, node, self->graph.getEdgeDst(ii), context, self->graph.getEdgeData(ii));
+        for (edge_iterator ii = pData->pGraph->edge_begin(node, Galois::MethodFlag::NONE), 
+            ei = pData->pGraph->edge_end(node, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+          op.scatter(*pData->pGraph, node, node, pData->pGraph->getEdgeDst(ii),
+              pData->context, pData->pGraph->getEdgeData(ii));
         }
       }
     }
@@ -264,24 +328,32 @@ class SyncEngine {
     typedef int tt_does_not_need_parallel_push;
     typedef int tt_does_not_need_aborts;
 
-    SyncEngine* self;
-    Initialize(SyncEngine* s): self(s) { }
+    gptr<PerHostData> origPointer;
+    PerHostData* pData;
+
+    Initialize() { }
+    Initialize(gptr<PerHostData> p): origPointer(p) { pData = &*origPointer; }
+
+    typedef int tt_has_serialize;
+
+    void serialize(SerializeBuffer& s) const { gSerialize(s, origPointer); }
+    void deserialize(DeSerializeBuffer& s) { gDeserialize(s, origPointer); pData = &*origPointer; }
 
     void allocateMessages() {
       unsigned tid = Galois::Runtime::LL::getTID();
       if (!Galois::Runtime::LL::isPackageLeader(tid) || tid == 0)
         return;
-      MyMessages& m = *self->messages.getLocal();
-      self->lock.lock();
-      m.resize(self->graph.size());
-      self->lock.unlock();
+      MyMessages& m = *pData->messages.getLocal();
+      pData->lock.lock();
+      m.resize(pData->pGraph->size());
+      pData->lock.unlock();
     }
 
     message_type getMessage(size_t id) {
       message_type ret;
       if (NeedMessages) {
-        for (unsigned int i = 0; i < self->messages.size(); ++i) {
-          MyMessages& m = *self->messages.getRemote(i);
+        for (unsigned int i = 0; i < pData->messages.size(); ++i) {
+          MyMessages& m = *pData->messages.getRemote(i);
           if (m.empty())
             continue;
           ret += m[id].second;
@@ -295,23 +367,23 @@ class SyncEngine {
     }
 
     void operator()(GNode n, Galois::UserContext<GNode>&) {
-      size_t id = self->graph.idFromNode(n);
+      size_t id = pData->pGraph->idFromNode(n);
       if (IsFirst && NeedMessages) {
         allocateMessages();
       } else if (!IsFirst) {
-        self->scoreboard[id] = 0;
+        pData->scoreboard[id] = 0;
       }
 
-      Operator& op = self->ops[id];
-      op = self->origOp;
-      op.init(self->graph, n, getMessage(id));
+      Operator& op = pData->ops[id];
+      op = pData->origOp;
+      op.init(*pData->pGraph, n, getMessage(id));
 
       // Hoist as much as work as possible behind first barrier
       if (needs_gather_in_edges<Operator>::value || needs_gather_out_edges<Operator>::value)
         return;
       
       gather_type sum;
-      op.apply(self->graph, n, sum);
+      op.apply(*pData->pGraph, n, sum);
 
       if (needs_scatter_in_edges<Operator>::value || needs_scatter_out_edges<Operator>::value)
         return;
@@ -319,46 +391,50 @@ class SyncEngine {
   };
 
   template<bool IsFirst,typename Container1, typename Container2>
-  void executeStep(Container1& cur, Container2& next) {
-    Galois::for_each_local<WL>(cur, Initialize<IsFirst>(this));
+  void executeStep(gptr<PerHostData> p, gptr<Container1> cur, gptr<Container2> next) {
+    Galois::for_each_local<WL>(cur, Initialize<IsFirst>(p));
     
     if (needs_gather_in_edges<Operator>::value || needs_gather_out_edges<Operator>::value) {
-      Galois::for_each_local<WL>(cur, Gather(this));
+      Galois::for_each_local<WL>(cur, Gather(p));
     }
 
     if (needs_scatter_in_edges<Operator>::value || needs_scatter_out_edges<Operator>::value) {
-      Galois::for_each_local<WL>(cur, Scatter<Container2>(this, next));
+      Galois::for_each_local<WL>(cur, Scatter<Container2>(p, next));
     }
   }
 
 public:
-  SyncEngine(Graph& g, Operator op): graph(g), origOp(op) {
-    ops.allocate(graph.size());
-    scoreboard.allocate(graph.size());
-    if (NeedMessages)
-      messages.getLocal()->resize(graph.size());
-  }
+  SyncEngine(Graph* g): data(gptr<Graph>(g)) { }
+  SyncEngine(gptr<Graph> g): data(g) { }
 
   void signal(GNode node, const message_type& msg) {
     if (NeedMessages) {
-      MyMessages& m = *messages.getLocal();
-      m[graph.idFromNode(node)].second = msg;
+      MyMessages& m = *data.messages.getLocal();
+      m[data.pGraph->idFromNode(node)].second = msg;
     }
   }
 
   void execute() {
     Galois::Statistic rounds("GraphLabRounds");
-    Galois::InsertBag<GNode>* next = &wls[0];
-    Galois::InsertBag<GNode>* cur = &wls[1];
+    typedef PerHostStorage<Galois::InsertBag<GNode>> PerHostBag;
+    
+    PerHostBag wls[2];
+    gptr<PerHostBag> next(&wls[0]);
+    gptr<PerHostBag> cur(&wls[1]);
+    gptr<PerHostData> p(&data);
 
-    executeStep<true>(graph, *next);
+    executeStep<true>(p, data.graph, next);
     rounds += 1;
-    while (!next->empty()) {
+    while (!next->empty()) { // XXX check
       std::swap(cur, next);
-      executeStep<false>(*cur, *next);
+      executeStep<false>(p, cur, next);
       rounds += 1;
       cur->clear();
     }
+
+    deallocatePerHost(next);
+    deallocatePerHost(cur);
+    deallocatePerHost(p);
   }
 };
 

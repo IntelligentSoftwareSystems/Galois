@@ -36,6 +36,7 @@
 #include "llvm/Support/CommandLine.h"
 #ifdef GALOIS_USE_EXP
 #include <boost/mpl/if.hpp>
+#include "Galois/Graph/ReplicatedGraph.h"
 #include "Galois/Graph/OCGraph.h"
 #include "Galois/Graph/GraphNodeBag.h"
 #include "Galois/DomainSpecificExecutors.h"
@@ -376,7 +377,7 @@ static_assert(Galois::does_not_need_aborts<AsyncAlgo<true>::Process>::value, "Oo
 #ifdef GALOIS_USE_EXP
 struct GraphLabAlgo {
   //typedef Galois::Graph::LC_InlineEdge_InOutGraph<SNode,uint32_t,true,true> Graph; // XXX
-  typedef Galois::Graph::LC_CSR_InOutGraph<SNode,uint32_t,true> Graph;
+  typedef Galois::Graph::ReplicatedGraph<SNode,uint32_t> Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "GraphLab"; }
@@ -439,7 +440,7 @@ struct GraphLabAlgo {
   };
 
   void operator()(Graph& graph, const GNode& source) {
-    Galois::GraphLab::SyncEngine<Graph,Program> engine(graph, Program());
+    Galois::GraphLab::SyncEngine<Graph,Program> engine(&graph);
     engine.signal(source, Program::message_type(0));
     engine.execute();
   }
