@@ -43,7 +43,7 @@ private:
     unsigned int nextVictim;
 
     void populateSteal() {
-      if (localBegin != localEnd && std::distance(localBegin, localEnd) > 1) {
+      if (steal && localBegin != localEnd) {// && std::distance(localBegin, localEnd) > 1) {
 	stealLock.lock();
 	stealEnd = localEnd;
 	stealBegin = localEnd = Galois::split_range(localBegin, localEnd);
@@ -56,22 +56,24 @@ private:
 
   bool doSteal(state& dst, state& src) {
     //Unsafe for general comparisons
-    if (src.stealBegin != src.stealEnd) {
+    //    if (src.stealBegin != src.stealEnd) {
       src.stealLock.lock();
       if (src.stealBegin != src.stealEnd) {
 	dst.localBegin = src.stealBegin;
 	src.stealBegin = dst.localEnd = Galois::split_range(src.stealBegin, src.stealEnd);
       }
       src.stealLock.unlock();
-    }
+      //}
     return dst.localBegin != dst.localEnd;
   }
 
   //pop already failed, try again with stealing
   boost::optional<value_type> pop_steal(state& data) {
     //only try stealing one
-    if (doSteal(data, *TLDS.getRemote((data.nextVictim++) % Runtime::activeThreads)))
+    if (doSteal(data, *TLDS.getRemote(data.nextVictim)))
       return *data.localBegin++;
+    ++data.nextVictim;
+    data.nextVictim %= Runtime::activeThreads;
     return boost::optional<value_type>();
   }
 
