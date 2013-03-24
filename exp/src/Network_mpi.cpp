@@ -102,18 +102,18 @@ public:
       assert(com.second.size());
       int rv = MPI_Isend(com.second.linearData(), com.second.size(), MPI_BYTE, dest, FuncTag, MPI_COMM_WORLD, &com.first);
       handleError(rv);
+
+      int flag = true;
+      while (flag && !pending_sends.empty()) {
+        MPI_Status s;
+        rv = MPI_Test(&pending_sends.front().first, &flag, &s);
+        handleError(rv);
+        if (flag)
+          pending_sends.pop_front();
+      }
     } else {
       int rv = MPI_Send(buf.linearData(), buf.size(), MPI_BYTE, dest, FuncTag, MPI_COMM_WORLD);
       handleError(rv);
-    }
-
-    int flag = true;
-    while (flag && !pending_sends.empty()) {
-      MPI_Status s;
-      int rv = MPI_Test(&pending_sends.front().first, &flag, &s);
-      handleError(rv);
-      if (flag)
-	pending_sends.pop_front();
     }
   }
 
