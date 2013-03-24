@@ -28,6 +28,7 @@
 #include <vector>
 #include <deque>
 #include <string>
+#include <cassert>
 
 #include <boost/mpl/has_xxx.hpp>
 
@@ -68,6 +69,7 @@ public:
   }
 
   void serialize_header(uintptr_t data) {
+    assert(bufdata.size() >= sizeof(data));
     unsigned char* pdata = (unsigned char*)&data;
     for (size_t i = 0; i < sizeof(data); ++i)
       bufdata[i] = pdata[i];

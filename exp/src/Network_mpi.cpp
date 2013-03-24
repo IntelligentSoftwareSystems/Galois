@@ -59,9 +59,18 @@ class MPIBase {
 
 public:
   MPIBase() {
-    int rc = MPI_Init (NULL, NULL);
+    int provided;
+    int rc = MPI_Init_thread (NULL, NULL, MPI_THREAD_FUNNELED, &provided);
     handleError(rc);
     
+    switch (provided) {
+    case MPI_THREAD_SINGLE: Galois::Runtime::LL::gInfo("MPI Supports: Single"); break;
+    case MPI_THREAD_FUNNELED: Galois::Runtime::LL::gInfo("MPI Supports: Funneled"); break;
+    case MPI_THREAD_SERIALIZED: Galois::Runtime::LL::gInfo("MPI Supports: Serialized"); break;
+    case MPI_THREAD_MULTIPLE: Galois::Runtime::LL::gInfo("MPI Supports: Multiple"); break;
+    default: break;
+    };
+
     MPI_Comm_size(MPI_COMM_WORLD, &numTasks);
     MPI_Comm_rank(MPI_COMM_WORLD, &taskRank);
 
