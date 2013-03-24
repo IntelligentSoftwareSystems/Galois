@@ -2,8 +2,8 @@
 #define GALOIS_GRAPHLABEXECUTOR_H
 
 #include "Galois/Bag.h"
-#include "Galois/PerHostStorage.h"
-#include "Galois/Runtime/ParallelWorkDistributed.h"
+#include "Galois/Reduction.h"
+#include "Galois/Runtime/PerHostStorage.h"
 
 #include <boost/mpl/has_xxx.hpp>
 
@@ -30,29 +30,38 @@ struct EmptyMessage {
   EmptyMessage& operator+=(const EmptyMessage&) { return *this; }
 };
 
+//! Turn types with operator+= into binary function
+template<typename T>
+struct AddBinFunc {
+  T operator()(const T& a, const T& b) const {
+    T ret(a);
+    ret += b;
+    return ret;
+  }
+};
+
 template<typename Graph, typename Operator> 
 struct Context {
   typedef typename Graph::GraphNode GNode;
   typedef typename Operator::message_type message_type;
   typedef std::pair<GNode,message_type> WorkItem;
+  typedef DGReducibleVector<message_type, AddBinFunc<message_type>> Messages;
+  typedef LargeArray<int,false> Scoreboard;
+  typedef Runtime::PerHostStorage<Galois::InsertBag<GNode>> Next;
 
 private:
   template<typename,typename> friend class AsyncEngine;
   template<typename,typename> friend class SyncEngine;
 
-  typedef std::pair<int,message_type> Message;
-  typedef std::deque<Message> MyMessages;
-  typedef Galois::Runtime::PerPackageStorage<MyMessages> Messages;
-
   Galois::UserContext<WorkItem>* ctx;
   Graph* graph;
-  Galois::LargeArray<int,false>* scoreboard;
-  Galois::PerHostStorage<Galois::InsertBag<GNode>>* next;
+  Scoreboard* scoreboard;
+  Next* next;
   Messages* messages;
 
   Context() { }
 
-  void initializeForSync(Graph* g, Galois::LargeArray<int,false>* s, Galois::PerHostStorage<Galois::InsertBag<GNode>>* n, Messages* m) {
+  void initializeForSync(Graph* g, Scoreboard* s, Next* n, Messages* m) {
     graph = g;
     scoreboard = s;
     next = n;
@@ -64,31 +73,24 @@ private:
     ctx = c;  
   }
 
-public:
+  void pushInternal(GNode node, size_t id) {
+    // XXX check if remote node 
+    int val = (*scoreboard)[id];
+    if (val == 0 && __sync_bool_compare_and_swap(&(*scoreboard)[id], 0, 1)) {
+      next->push(node);
+    }
+  }
 
+public:
   void push(GNode node, const message_type& message) {
     if (ctx) {
       ctx->push(WorkItem(node, message));
     } else {
       size_t id = graph->idFromNode(node);
-      { 
-        int val = (*scoreboard)[id];
-        if (val == 0 && __sync_bool_compare_and_swap(&(*scoreboard)[id], 0, 1)) {
-          next->push(node);
-        }
-      }
+      pushInternal(node, id);
 
       if (messages) {
-        MyMessages& m = *messages->getLocal();
-        int val; 
-        while (true) {
-          val = m[id].first;
-          if (val == 0 && __sync_bool_compare_and_swap(&m[id].first, 0, 1)) {
-            m[id].second += message;
-            m[id].first = 0;
-            return;
-          }
-        }
+        messages->update(id, message);
       }
     }
   }
@@ -199,44 +201,55 @@ class SyncEngine {
   typedef typename Graph::edge_iterator edge_iterator;
   static const bool NeedMessages = !std::is_same<EmptyMessage,message_type>::value;
   typedef Galois::WorkList::dChunkedFIFO<256> WL;
-  typedef std::pair<int,message_type> Message;
-  typedef std::deque<Message> MyMessages;
-  typedef Galois::Runtime::PerPackageStorage<MyMessages> Messages;
+  typedef DGReducibleVector<message_type, AddBinFunc<message_type>> Messages;
+
+  template<typename T>
+  struct or_ {
+    T operator()(const T& a, const T& b) const {
+      return a || b;
+    }
+  };
+
+  typedef DGReducible<bool, or_<bool>> Terminator;
 
   struct PerHostData {
     gptr<Graph> graph;
+    gptr<Messages> messages;
+    gptr<Terminator> terminator;
     Operator origOp;
     Galois::LargeArray<Operator,false> ops;
-    Messages messages;
     Galois::LargeArray<int,false> scoreboard;
-    Galois::Runtime::LL::SimpleLock<true> lock;
     Context<Graph,Operator> context;
     Graph* pGraph;
-    size_t size;
+    Messages* pMessages;
+    Terminator* pTerminator;
 
-    PerHostData(gptr<Graph> g): graph(g) { allocate(graph->size()); pGraph = &*graph; }
-    PerHostData(DeSerializeBuffer& s) { gDeserialize(s, graph); allocate(graph->size()); }
+    PerHostData(gptr<Graph> g, gptr<Messages> m, gptr<Terminator> t): graph(g), messages(m), terminator(t) { 
+      //Runtime::allocatePerHost(this);
+    }
+
+    PerHostData(DeSerializeBuffer& s) {
+      gDeserialize(s, graph, messages, terminator);
+    }
     
-    ~PerHostData() {
-      std::cout << "Deallocate\n";
+    void allocate(size_t s) {
+      pGraph = &*graph;
+      pMessages = &*messages;
+      pTerminator = &*terminator;
+      ops.allocate(s);
+      scoreboard.allocate(s);
     }
 
     typedef int tt_has_serialize;
     typedef int tt_is_persistent;
 
-    void serialize(SerializeBuffer& s) const { gSerialize(s, graph); }
-    void deserialize(DeSerializeBuffer& s) { gDeserialize(s, graph); allocate(graph->size()); pGraph = &*graph; }
-
-    void allocate(size_t s) {
-      std::cout << "Allocate\n";
-      ops.allocate(s);
-      scoreboard.allocate(s);
-      if (NeedMessages)
-        messages.getLocal()->resize(s);
-    }
+    void serialize(SerializeBuffer& s) const { gSerialize(s, graph, messages, terminator); }
   };
 
-  PerHostData data;
+  gptr<PerHostData> data;
+  gptr<Messages> messages;
+  gptr<Terminator> terminator;
+  bool hasInitialMessages;
   
   struct Gather {
     typedef int tt_does_not_need_parallel_push;
@@ -295,7 +308,7 @@ class SyncEngine {
 
     void init() {
       pData = &*origPointer;
-      pData->context.initializeForSync(pData->pGraph, &pData->scoreboard, &*next, &pData->messages);
+      pData->context.initializeForSync(pData->pGraph, &pData->scoreboard, &*next, pData->pMessages);
     }
     
     void operator()(GNode node, Galois::UserContext<GNode>&) {
@@ -339,38 +352,17 @@ class SyncEngine {
     void serialize(SerializeBuffer& s) const { gSerialize(s, origPointer); }
     void deserialize(DeSerializeBuffer& s) { gDeserialize(s, origPointer); pData = &*origPointer; }
 
-    void allocateMessages() {
-      unsigned tid = Galois::Runtime::LL::getTID();
-      if (!Galois::Runtime::LL::isPackageLeader(tid) || tid == 0)
-        return;
-      MyMessages& m = *pData->messages.getLocal();
-      pData->lock.lock();
-      m.resize(pData->pGraph->size());
-      pData->lock.unlock();
-    }
-
     message_type getMessage(size_t id) {
-      message_type ret;
       if (NeedMessages) {
-        for (unsigned int i = 0; i < pData->messages.size(); ++i) {
-          MyMessages& m = *pData->messages.getRemote(i);
-          if (m.empty())
-            continue;
-          ret += m[id].second;
-          m[id] = std::make_pair(0, message_type());
-          // During initialization, only messages from thread zero
-          if (IsFirst)
-            break;
-        }
+        return pData->pMessages->get(id);
+      } else {
+        return message_type();
       }
-      return ret;
     }
 
     void operator()(GNode n, Galois::UserContext<GNode>&) {
       size_t id = pData->pGraph->idFromNode(n);
-      if (IsFirst && NeedMessages) {
-        allocateMessages();
-      } else if (!IsFirst) {
+      if (!IsFirst) {
         pData->scoreboard[id] = 0;
       }
 
@@ -390,51 +382,137 @@ class SyncEngine {
     }
   };
 
+  template<bool IsFirst,typename Container1,typename Container2>
+  struct Check {
+    typedef int tt_does_not_need_parallel_push;
+    typedef int tt_does_not_need_aborts;
+
+    gptr<PerHostData> data;
+    gptr<Container1> cur;
+    gptr<Container2> next;
+
+    Check() { }
+    Check(gptr<PerHostData> d, gptr<Container1> c, gptr<Container2> n): data(d), cur(c), next(n) { }
+
+    typedef int tt_has_serialize;
+
+    void serialize(SerializeBuffer& s) const { gSerialize(s, data, cur, next); }
+    void deserialize(DeSerializeBuffer& s) { gDeserialize(s, data, cur, next); }
+
+    template<bool B> void clear(typename std::enable_if<B>::type* = 0) { }
+    template<bool B> void clear(typename std::enable_if<!B>::type* = 0) { 
+      cur->clear(); 
+    }
+
+    void operator()(unsigned tid, unsigned) {
+      if (tid == 0) {
+        data->pTerminator->get() = !next->empty();
+        clear<IsFirst>();
+      }
+    }
+  };
+
+  struct Allocate {
+    gptr<PerHostData> data;
+    size_t size;
+
+    Allocate() { }
+    Allocate(gptr<PerHostData> d, size_t s): data(d), size(s) { }
+
+    void operator()(unsigned tid, unsigned) {
+      if (tid == 0)
+        data->allocate(size);
+    }
+
+    typedef int tt_has_serialize;
+    void serialize(SerializeBuffer& s) const { gSerialize(s, data, size); }
+    void deserialize(DeSerializeBuffer& s) { gDeserialize(s, data, size); }
+  };
+
   template<bool IsFirst,typename Container1, typename Container2>
-  void executeStep(gptr<PerHostData> p, gptr<Container1> cur, gptr<Container2> next) {
+  bool executeStep(gptr<PerHostData> p, gptr<Container1> cur, gptr<Container2> next) {
     Galois::for_each_local<WL>(cur, Initialize<IsFirst>(p));
     
+    if (needs_gather_in_edges<Operator>::value || needs_gather_out_edges<Operator>::value 
+        || needs_scatter_in_edges<Operator>::value || needs_scatter_out_edges<Operator>::value) {
+      // XXX: Need to update node data
+    }
+
     if (needs_gather_in_edges<Operator>::value || needs_gather_out_edges<Operator>::value) {
       Galois::for_each_local<WL>(cur, Gather(p));
+    }
+
+    if (NeedMessages) {
+      data->pMessages->doReset();
     }
 
     if (needs_scatter_in_edges<Operator>::value || needs_scatter_out_edges<Operator>::value) {
       Galois::for_each_local<WL>(cur, Scatter<Container2>(p, next));
     }
+
+    if (NeedMessages) {
+      data->pMessages->doAllReduce();
+    }
+
+    Galois::on_each(Check<IsFirst,Container1,Container2>(p, cur, next));
+    
+    bool retval = data->pTerminator->doReduce();
+    data->pTerminator->doBroadcast(false);
+    return retval;
   }
 
 public:
-  SyncEngine(Graph* g): data(gptr<Graph>(g)) { }
-  SyncEngine(gptr<Graph> g): data(g) { }
+  SyncEngine(Graph& g): hasInitialMessages(false) {
+    messages = gptr<Messages>(new Messages);
+    terminator = gptr<Terminator>(new Terminator);
+    data = gptr<PerHostData>(new PerHostData(gptr<Graph>(&g), messages, terminator));
+
+    size_t size = g.size();
+    Galois::on_each(Allocate(data, size));
+    if (NeedMessages)
+      data->messages->allocate(size);
+  }
+
+  ~SyncEngine() {
+    // XXX cannot deallocate master pointer otherwise new pointers may point
+    // to garbage
+    Runtime::deallocatePerHost(data);
+    Runtime::deallocatePerHost(messages);
+    Runtime::deallocatePerHost(terminator);
+  }
 
   void signal(GNode node, const message_type& msg) {
     if (NeedMessages) {
-      MyMessages& m = *data.messages.getLocal();
-      m[data.pGraph->idFromNode(node)].second = msg;
+      assert(Runtime::LL::getTID() == 0);
+      hasInitialMessages = true;
+      data->pMessages->update(data.pGraph->idFromNode(node), msg);
     }
   }
 
   void execute() {
     Galois::Statistic rounds("GraphLabRounds");
-    typedef PerHostStorage<Galois::InsertBag<GNode>> PerHostBag;
+    typedef Runtime::PerHostStorage<Galois::InsertBag<GNode>> PerHostBag;
     
-    PerHostBag wls[2];
-    gptr<PerHostBag> next(&wls[0]);
-    gptr<PerHostBag> cur(&wls[1]);
-    gptr<PerHostData> p(&data);
+    gptr<PerHostBag> next(new PerHostBag);
+    gptr<PerHostBag> cur(new PerHostBag);
 
-    executeStep<true>(p, data.graph, next);
+    if (NeedMessages && hasInitialMessages)
+      data->pMessages->doBroadcast();
+    Runtime::Distributed::distWait();
+    hasInitialMessages = false;
+
     rounds += 1;
-    while (!next->empty()) { // XXX check
+    bool more = executeStep<true>(data, data->graph, next);
+    while (more) {
       std::swap(cur, next);
-      executeStep<false>(p, cur, next);
+      more = executeStep<false>(data, cur, next);
       rounds += 1;
-      cur->clear();
     }
 
+    // XXX cannot deallocate master pointer otherwise new pointers may point
+    // to garbage
     deallocatePerHost(next);
     deallocatePerHost(cur);
-    deallocatePerHost(p);
   }
 };
 

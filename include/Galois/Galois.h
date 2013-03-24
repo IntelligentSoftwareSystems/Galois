@@ -235,7 +235,11 @@ static inline void on_each(FunctionTy fn, const char* loopname = 0) {
  * @param num number of pages to allocate of size {@link Galois::Runtime::pageAllocInfo()}
  */
 static inline void preAlloc(int num) {
+#if GALOIS_USE_EXP
+  Runtime::preAlloc_impl_dist(num);
+#else
   Runtime::preAlloc_impl(num);
+#endif
 }
 
 /**

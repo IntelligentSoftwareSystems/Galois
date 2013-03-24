@@ -35,6 +35,8 @@
 #include <cassert>
 
 #include "CompilerSpecific.h"
+#include "gio.h"
+#include "TID.h"
 
 namespace Galois {
 namespace Runtime {
@@ -49,7 +51,7 @@ template<>
 class SimpleLock<true> {
   volatile mutable int _lock; //Allow locking a const
 public:
-  SimpleLock() : _lock() {  }
+  SimpleLock() : _lock(0) {  }
 
   inline void lock() const {
     int oldval;
@@ -87,6 +89,33 @@ public:
   inline void unlock() const {}
   inline bool try_lock() const { return true; }
   inline bool is_locked() const { return false; }
+};
+
+template<bool isLock>
+class DebugLock {
+  SimpleLock<isLock> m_lock;
+
+public:
+  DebugLock() { }
+
+  inline void lock() const {
+    gInfo("lock ", getTID(), "\n");
+    m_lock.lock();
+  }
+
+  inline void unlock() const {
+    gInfo("unlock ", getTID(), "\n");
+    m_lock.unlock();
+  }
+
+  inline bool try_lock() const {
+    gInfo("try_lock ", getTID(), "\n");
+    return m_lock.try_lock();
+  }
+
+  inline bool is_locked() const {
+    return m_lock.is_locked();
+  }
 };
 
 

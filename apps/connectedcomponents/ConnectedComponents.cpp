@@ -35,6 +35,7 @@
 #include "Galois/Graph/TypeTraits.h"
 #ifdef GALOIS_USE_EXP
 #include <boost/mpl/if.hpp>
+#include "Galois/Reduction.h"
 #include "Galois/Graph/ReplicatedGraph.h"
 #include "Galois/Graph/OCGraph.h"
 #include "Galois/Graph/GraphNodeBag.h"
@@ -532,13 +533,25 @@ struct GraphLabAlgo {
   typedef Graph::GraphNode GNode;
 
   struct Initialize {
-    Graph& graph;
+    typedef int tt_does_not_need_aborts;
+    typedef int tt_does_not_need_parallel_push;
 
-    Initialize(Graph& g): graph(g) { }
-    void operator()(GNode n) {
-      LNode& data = graph.getData(n, Galois::MethodFlag::NONE);
+    gptr<Graph> graph;
+    Graph* pGraph;
+
+    Initialize() { }
+    Initialize(Graph& g): graph(&g) { pGraph = &*graph; }
+
+    void operator()(GNode n, Galois::UserContext<GNode>&) {
+      LNode& data = pGraph->getData(n, Galois::MethodFlag::NONE);
+      data.id = n; // Initialize distributed copies
+      //std::cout << networkHostID << " " << Galois::Runtime::LL::getTID() << " " << data.id << " " << n << "\n";
       data.labelid = data.id;
     }
+
+    typedef int tt_has_serialize;
+    void serialize(SendBuffer& buf) const { gSerialize(buf, graph); }
+    void deserialize(RecvBuffer& buf) { gDeserialize(buf, graph); pGraph = &*graph; }
   };
 
   struct Program {
@@ -551,6 +564,14 @@ struct GraphLabAlgo {
       message_type& operator+=(const message_type& other) {
         value = std::min<size_t>(value, other.value);
         return *this;
+      }
+
+      typedef int tt_has_serialize;
+      void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+        Galois::Runtime::Distributed::gSerialize(s, value);
+      }
+      void deserialize(DeSerializeBuffer& s) {
+        Galois::Runtime::Distributed::gDeserialize(s, value);
       }
     };
 
@@ -573,7 +594,8 @@ struct GraphLabAlgo {
         perform_scatter = true;
       } else if (graph.getData(node, Galois::MethodFlag::NONE).labelid > received_labelid) {
         perform_scatter = true;
-        graph.getData(node, Galois::MethodFlag::NONE).labelid = received_labelid;
+        graph.getData(node, Galois::MethodFlag::WRITE).labelid = received_labelid;
+        // XXX
       }
     }
 
@@ -590,7 +612,7 @@ struct GraphLabAlgo {
       if (node == src && graph.getData(dst, Galois::MethodFlag::NONE).labelid > data.labelid) {
         ctx.push(dst, message_type(data.labelid));
       } else if (node == dst && graph.getData(src, Galois::MethodFlag::NONE).labelid > data.labelid) {
-        ctx.push(dst, message_type(data.labelid));
+        ctx.push(src, message_type(data.labelid));
       }
     }
   };
@@ -599,11 +621,50 @@ struct GraphLabAlgo {
     readInOutGraph(graph);
   }
 
-  void operator()(Graph& graph) {
-    Galois::do_all_local(graph, Initialize(graph));
+  typedef Galois::DGReducible<size_t, std::plus<size_t>> Counter;
 
-    Galois::GraphLab::SyncEngine<Graph,Program> engine(&graph);
+  struct Count {
+    typedef int tt_does_not_need_aborts;
+    typedef int tt_does_not_need_parallel_push;
+
+    gptr<Graph> graph;
+    gptr<Counter> counter;
+    Graph* pGraph;
+    Counter* pCounter;
+
+    Count() { }
+    Count(Graph& g, gptr<Counter> c): graph(&g), counter(c) { pGraph = &*graph; pCounter = &*counter; }
+
+    void operator()(GNode n, Galois::UserContext<GNode>&) {
+      LNode& data = pGraph->getData(n, Galois::MethodFlag::NONE);
+      if (data.labelid == data.id) {
+        //std::cout << networkHostID << " " << Galois::Runtime::LL::getTID() << " " << data.id << " " << n << "\n";
+        pCounter->get() += 1;
+      }
+    }
+
+    typedef int tt_has_serialize;
+    void serialize(SendBuffer& buf) const { gSerialize(buf, graph, counter); }
+    void deserialize(RecvBuffer& buf) { gDeserialize(buf, graph, counter); pGraph = &*graph; pCounter = &*counter; }
+  };
+
+  void countComponents(Graph& graph) {
+    Counter* count = new Counter; // XXX for distributed version
+    gptr<Counter> c(count);
+    gptr<Graph> ptr(&graph);
+    Galois::for_each_local(ptr, Count(graph, c));
+    std::cout << "Components : " << c->doReduce() << "\n";
+  }
+
+  void operator()(Graph& graph) {
+    gptr<Graph> ptr(&graph);
+    Galois::for_each_local(ptr, Initialize(graph));
+    //std::for_each(graph.begin(), graph.end(), Initialize(graph));
+
+    Galois::GraphLab::SyncEngine<Graph,Program> engine(graph);
     engine.execute();
+    if (true)
+      countComponents(graph);
   }
 };
 
@@ -947,6 +1008,8 @@ int main(int argc, char** argv) {
   Galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
+  Galois::Runtime::Distributed::networkStart();
+
   Galois::StatTimer T("TotalTime");
   T.start();
   switch (algo) {
@@ -964,6 +1027,7 @@ int main(int argc, char** argv) {
     default: std::cerr << "Unknown algorithm\n"; abort();
   }
   T.stop();
+  Galois::Runtime::Distributed::networkTerminate();
 
   return 0;
 }

@@ -69,6 +69,21 @@ void Galois::Runtime::Distributed::networkTerminate() {
   return;
 }
 
+static void distWaitLandingPad(Galois::Runtime::Distributed::RecvBuffer& buf) {
+  Galois::Runtime::Distributed::getSystemNetworkInterface().systemBarrier();
+}
+
+void Galois::Runtime::Distributed::distWait() {
+  if (networkHostNum == 1)
+    return;
+
+  SendBuffer buf;
+  NetworkInterface& net = getSystemNetworkInterface();
+  net.broadcastMessage(&distWaitLandingPad, buf);
+  net.handleReceives();
+  net.systemBarrier();
+}
+
 //anchor vtable
 Galois::Runtime::Distributed::NetworkInterface::~NetworkInterface() {}
 

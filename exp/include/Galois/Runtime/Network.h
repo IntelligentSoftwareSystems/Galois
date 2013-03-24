@@ -82,6 +82,9 @@ void networkStart();
 //! only the master host should call this
 void networkTerminate();
 
+//! Distributed barrier
+void distWait();
+
 } //Distributed
 } //Runtime
 } //Galois

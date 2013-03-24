@@ -286,6 +286,27 @@ void on_each_impl_dist(FunctionTy f, const char* loopname) {
   net.systemBarrier();
 }
 
+struct preAlloc_helper {
+  size_t num;
+
+  preAlloc_helper() { }
+  preAlloc_helper(size_t n): num(n) { }
+
+  void operator()(unsigned, unsigned n) {
+    int a = n; a = (num + a - 1) / a;
+    Galois::Runtime::MM::pagePreAlloc(a); 
+  }
+
+  typedef int tt_has_serialize;
+  void serialize(SendBuffer& buf) const { gSerialize(buf, num); }
+  void deserialize(RecvBuffer& buf) const { gDeserialize(buf, num); }
+};
+
+
+void preAlloc_impl_dist(int num) {
+  on_each_impl_dist(preAlloc_helper(num), nullptr);
+}
+
 } // anon
 } // Runtime
 } // Galois

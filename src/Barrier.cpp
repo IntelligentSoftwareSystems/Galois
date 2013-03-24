@@ -373,7 +373,7 @@ void StupidDistBarrier::wait() {
 }
 
 static StupidDistBarrier& getDistBarrier() {
-  static  StupidDistBarrier b;
+  static StupidDistBarrier b;
   return b;
 }
 
