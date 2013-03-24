@@ -31,7 +31,7 @@
 #include <mpi.h>
 
 #include <deque>
-#include <iostream>
+#include <utility>
 
 using namespace Galois::Runtime::Distributed;
 
@@ -55,7 +55,7 @@ class MPIBase {
   // const int FuncTag = 1;
   #define FuncTag 1
 
-  
+  std::deque<std::pair<MPI_Request, SendBuffer>> pending_sends;
 
 public:
   MPIBase() {
@@ -87,18 +87,24 @@ public:
     assert(Galois::Runtime::LL::getTID() == 0);
     assert(recv);
     buf.serialize_header((uintptr_t)recv);
-    int rv = MPI_Send(buf.linearData(), buf.size(), MPI_BYTE, dest, FuncTag, MPI_COMM_WORLD);
-    handleError(rv);
-  }
+    if (false) {
+      pending_sends.emplace_back(MPI_REQUEST_NULL, std::move(buf));
+      std::pair<MPI_Request, SendBuffer>& com = pending_sends.back();
+      assert(com.second.size());
+      int rv = MPI_Isend(com.second.linearData(), com.second.size(), MPI_BYTE, dest, FuncTag, MPI_COMM_WORLD, &com.first);
+      handleError(rv);
+    } else {
+      int rv = MPI_Send(buf.linearData(), buf.size(), MPI_BYTE, dest, FuncTag, MPI_COMM_WORLD);
+      handleError(rv);
+    }
 
-  void broadcastInternal(recvFuncTy recv, SendBuffer& buf) {
-    assert(recv);
-    buf.serialize_header((uintptr_t)recv);
-    for (int i = 0; i < numTasks; ++i) {
-      if (i != taskRank) {
-        int rv = MPI_Send(buf.linearData(), buf.size(), MPI_BYTE, i, FuncTag, MPI_COMM_WORLD);
-        handleError(rv);
-      }
+    int flag = true;
+    while (flag && !pending_sends.empty()) {
+      MPI_Status s;
+      int rv = MPI_Test(&pending_sends.front().first, &flag, &s);
+      handleError(rv);
+      if (flag)
+	pending_sends.pop_front();
     }
   }
 
@@ -146,12 +152,11 @@ public:
 class NetworkInterfaceSyncMPI : public NetworkInterface, public MPIBase {
 
   struct outgoingMessage {
-    bool bcast;
     uint32_t dest;
     recvFuncTy recv;
     SendBuffer buf;
-    outgoingMessage(bool _bcast, uint32_t _dest, recvFuncTy _recv, SendBuffer& _buf)
-      :bcast(_bcast), dest(_dest), recv(_recv), buf(std::move(_buf))
+    outgoingMessage(uint32_t _dest, recvFuncTy _recv, SendBuffer& _buf)
+      :dest(_dest), recv(_recv), buf(std::move(_buf))
     {}
 
   };
@@ -164,13 +169,15 @@ public:
 
   virtual void sendMessage(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
     asyncOutLock.lock();
-    asyncOutQueue.push_back(outgoingMessage(false, dest, recv, buf));
-    asyncOutLock.unlock();
-  }
-
-  virtual void broadcastMessage(recvFuncTy recv, SendBuffer& buf) {
-    asyncOutLock.lock();
-    asyncOutQueue.push_back(outgoingMessage(true, ~0, recv, buf));
+    if (Galois::Runtime::LL::getTID() == 0) {
+      while (!asyncOutQueue.empty()) {
+	sendInternal(asyncOutQueue[0].dest, asyncOutQueue[0].recv, asyncOutQueue[0].buf);
+	asyncOutQueue.pop_front();
+      }
+      sendInternal(dest, recv, buf);
+    } else {
+      asyncOutQueue.emplace_back(dest, recv, buf);
+    }
     asyncOutLock.unlock();
   }
 
@@ -182,15 +189,12 @@ public:
   }
 
   virtual bool handleReceives() {
-    //assert master thread
+    assert(Galois::Runtime::LL::getTID() == 0);
     bool retval = recvInternal();
 
     asyncOutLock.lock();
     while (!asyncOutQueue.empty()) {
-      if (asyncOutQueue[0].bcast)
-	broadcastInternal(asyncOutQueue[0].recv, asyncOutQueue[0].buf);
-      else
-	sendInternal(asyncOutQueue[0].dest, asyncOutQueue[0].recv, asyncOutQueue[0].buf);
+      sendInternal(asyncOutQueue[0].dest, asyncOutQueue[0].recv, asyncOutQueue[0].buf);
       asyncOutQueue.pop_front();
     }
     asyncOutLock.unlock();
@@ -213,10 +217,6 @@ public:
 
   virtual void sendMessage(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
     sendInternal(dest, recv, buf);
-  }
-
-  virtual void broadcastMessage(recvFuncTy recv, SendBuffer& buf) {
-    broadcastInternal(recv, buf);
   }
 
   virtual bool handleReceives() {

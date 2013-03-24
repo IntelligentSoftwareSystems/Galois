@@ -22,6 +22,7 @@
  */
 
 #include "Galois/Runtime/Network.h"
+#include "Galois/Runtime/Tracer.h"
 #include "Galois/Runtime/Barrier.h"
 
 #include <cassert>
@@ -66,4 +67,58 @@ void Galois::Runtime::Distributed::networkTerminate() {
   net.broadcastMessage (&networkExit, buf);
   net.handleReceives();
   return;
+}
+
+//anchor vtable
+Galois::Runtime::Distributed::NetworkInterface::~NetworkInterface() {}
+
+//RealID -> effective ID for the broadcast tree
+static unsigned getEID(unsigned realID, unsigned srcID) {
+  return (realID + Galois::Runtime::Distributed::networkHostNum - srcID) % Galois::Runtime::Distributed::networkHostNum;
+}
+
+//Effective id in the broadcast tree -> realID
+static unsigned getRID(unsigned eID, unsigned srcID) {
+  return (eID + srcID) % Galois::Runtime::Distributed::networkHostNum;
+}
+
+//forward decl
+static void bcastLandingPad(Galois::Runtime::Distributed::RecvBuffer& buf);
+
+//forward message along tree
+static void bcastForward(unsigned source, Galois::Runtime::Distributed::RecvBuffer& buf) {
+  static const int width = 2;
+
+  unsigned eid = getEID(Galois::Runtime::Distributed::networkHostID, source);
+  
+  for (int i = 0; i < width; ++i) {
+    unsigned ndst = eid * width + i + 1;
+    if (ndst < Galois::Runtime::Distributed::networkHostNum) {
+      Galois::Runtime::Distributed::SendBuffer sbuf;
+      Galois::Runtime::Distributed::gSerialize(sbuf, source, buf);
+      Galois::Runtime::Distributed::getSystemNetworkInterface().sendMessage(getRID(ndst, source), &bcastLandingPad, sbuf);
+    }
+  }
+}
+
+//recieve broadcast message over the network
+static void bcastLandingPad(Galois::Runtime::Distributed::RecvBuffer& buf) {
+  unsigned source;
+  Galois::Runtime::Distributed::gDeserialize(buf, source);
+  Galois::Runtime::Distributed::trace_bcast_recv(source);
+  bcastForward(source, buf);
+  //deliver locally
+  Galois::Runtime::Distributed::recvFuncTy recv;
+  Galois::Runtime::Distributed::gDeserialize(buf, recv);
+  recv(buf);
+}
+
+void Galois::Runtime::Distributed::NetworkInterface::broadcastMessage(recvFuncTy recv, SendBuffer& buf, bool self) {
+  unsigned source = Galois::Runtime::Distributed::networkHostID;
+  Galois::Runtime::Distributed::trace_bcast_recv(source);
+  buf.serialize_header((uintptr_t)recv);
+  Galois::Runtime::Distributed::RecvBuffer rbuf(std::move(buf));
+  bcastForward(source, rbuf);
+  if (self)
+    recv(rbuf);
 }

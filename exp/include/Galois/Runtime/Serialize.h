@@ -49,14 +49,18 @@ struct is_serializable {
   static const bool value = has_serialize<T>::value || std::is_pod<T>::value;
 };
 
+class DeSerializeBuffer;
+
 class SerializeBuffer {
+  friend DeSerializeBuffer;
   std::vector<unsigned char> bufdata;
+  unsigned start;
 public:
 
   SerializeBuffer() {
     //reserve a header
-    for (size_t i = 0; i < sizeof(uintptr_t); ++i)
-      bufdata.push_back(0);
+    bufdata.resize(sizeof(uintptr_t));
+    start = sizeof(uintptr_t);
   }
 
   inline void push(const char c) {
@@ -67,11 +71,12 @@ public:
     unsigned char* pdata = (unsigned char*)&data;
     for (size_t i = 0; i < sizeof(data); ++i)
       bufdata[i] = pdata[i];
+    start = 0;
   }
 
-  void* linearData() { return &bufdata[0]; }
+  void* linearData() { return &bufdata[start]; }
 
-  size_t size() const { return bufdata.size(); }
+  size_t size() const { return bufdata.size() - start; }
 
   //Utility
 
@@ -147,13 +152,19 @@ public:
     bufdata.resize(count);
   }
 
+  explicit DeSerializeBuffer(SerializeBuffer&& buf) {
+    offset = 0;
+    bufdata.swap(buf.bufdata);
+  }
+
   unsigned char pop() {
     return bufdata[offset++];
   }
 
   void* linearData() { return &bufdata[0]; }
 
-  size_t size() const { return bufdata.size() - offset; }
+  const unsigned char* r_linearData() const { return &bufdata[offset]; }
+  size_t r_size() const { return bufdata.size() - offset; }
 
   //Utility
 
@@ -222,6 +233,11 @@ void gDeserialize(DeSerializeBuffer& buf, T1& a1, T2& a2, U&... an) {
   gDeserialize(buf,a1);
   gDeserialize(buf,a2);
   gDeserialize(buf,an...);
+}
+
+inline void gSerialize(SerializeBuffer& buf, const DeSerializeBuffer& rbuf) {
+  for (unsigned x = 0; x < rbuf.r_size(); ++x)
+    buf.push(rbuf.r_linearData()[x]);
 }
 
 

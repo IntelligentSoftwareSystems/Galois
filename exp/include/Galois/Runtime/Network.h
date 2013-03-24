@@ -44,7 +44,7 @@ typedef void (*recvFuncTy)(RecvBuffer&);
 
 class NetworkInterface {
 public:
-  virtual ~NetworkInterface() {}
+  virtual ~NetworkInterface();
 
   //!send a message to a given (dest) host.  A message is simply a
   //!landing pad (recv) and some data (buf)
@@ -54,7 +54,7 @@ public:
   //!send a message to all hosts.  A message is simply a
   //!landing pad (recv) and some data (buf)
   //! buf is invalidated by this operation
-  virtual void broadcastMessage(recvFuncTy recv, SendBuffer& buf) = 0;
+  virtual void broadcastMessage(recvFuncTy recv, SendBuffer& buf, bool self = false);
 
   //!system barrier. all hosts should synchronize at this call
   virtual void systemBarrier() = 0;

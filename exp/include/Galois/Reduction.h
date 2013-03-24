@@ -80,7 +80,6 @@ public:
     dst = hosts[networkHostID];
     dst->localReset(data);
     dst->hosts = hosts;
-    dst->doBroadcast(data);
   }
 
   static void registerInstance(RecvBuffer& buf) {
@@ -140,7 +139,7 @@ public:
 
     while (expect != reduced) {
       //spin processing network packets
-      assert(LL::getTID() == 0);
+      assert(Galois::Runtime::LL::getTID() == 0);
       getSystemNetworkInterface().handleReceives();
     }
     reduced = 0;
@@ -148,19 +147,10 @@ public:
   }
 
   void doBroadcast(T& data) {
-    unsigned ndst;
-    if ((ndst = networkHostID * 2 + 1) < networkHostNum) {
-      //std::cout << "b: " << networkHostID << "->" << ndst << "\n";
-      SendBuffer sbuf;
-      gSerialize(sbuf, hosts, data);
-      getSystemNetworkInterface().sendMessage(ndst, &broadcastData, sbuf);
-    }
-    if ((ndst = networkHostID * 2 + 2) < networkHostNum) {
-      //std::cout << "b: " << networkHostID << "->" << ndst << "\n";
-      SendBuffer sbuf;
-      gSerialize(sbuf, hosts, data);
-      getSystemNetworkInterface().sendMessage(ndst, &broadcastData, sbuf);
-    }
+    localReset(data);
+    SendBuffer sbuf;
+    gSerialize(sbuf, hosts, data);
+    getSystemNetworkInterface().broadcastMessage(&broadcastData, sbuf, false);
   }
 
   T& get() {
@@ -274,27 +264,11 @@ public:
 
     while (expect != reduced) {
       //spin processing network packets
-      assert(LL::getTID() == 0);
+      assert(Galois::Runtime::LL::getTID() == 0);
       getSystemNetworkInterface().handleReceives();
     }
     reduced = 0;
     return m_data;
-  }
-
-  void doBroadcast(T& data) {
-    unsigned ndst;
-    if ((ndst = networkHostID * 2 + 1) < networkHostNum) {
-      //std::cout << "b: " << networkHostID << "->" << ndst << "\n";
-      SendBuffer sbuf;
-      gSerialize(sbuf, hosts, data);
-      getSystemNetworkInterface().sendMessage(ndst, &broadcastData, sbuf);
-    }
-    if ((ndst = networkHostID * 2 + 2) < networkHostNum) {
-      //std::cout << "b: " << networkHostID << "->" << ndst << "\n";
-      SendBuffer sbuf;
-      gSerialize(sbuf, hosts, data);
-      getSystemNetworkInterface().sendMessage(ndst, &broadcastData, sbuf);
-    }
   }
 
   T& get() {

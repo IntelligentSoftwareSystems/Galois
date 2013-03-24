@@ -32,6 +32,7 @@ namespace Distributed {
 
 void trace_obj_send(uint32_t owner, void* ptr, uint32_t remote);
 void trace_obj_recv(uint32_t owner, void* ptr);
+void trace_bcast_recv(uint32_t at);
 
 }
 }

@@ -47,6 +47,10 @@ void trace_obj_recv_do(uint32_t src, uint32_t owner, void* ptr) {
   gDebug("RECV * -> ", src, " [", owner, ",", ptr, "] (", v, ")");
 }
 
+void trace_bcast_recv_do(uint32_t host, uint32_t source) {
+  gDebug("BCast at ", host, " from ", source);
+}
+
 void trace_obj_recv_pad(RecvBuffer &buf) {
   uint32_t src;
   uint32_t owner;
@@ -62,6 +66,12 @@ void trace_obj_send_pad(RecvBuffer &buf) {
   uint32_t remote;
   gDeserialize(buf, src, owner, ptr, remote);
   trace_obj_send_do(src, owner, ptr, remote);
+}
+
+void trace_bcast_recv_pad(RecvBuffer &buf) {
+  uint32_t host, source;
+  gDeserialize(buf, host, source);
+  trace_bcast_recv_do(host, source);
 }
 
 }
@@ -93,3 +103,15 @@ void Galois::Runtime::Distributed::trace_obj_recv(uint32_t owner, void* ptr) {
   }
 }
 
+void Galois::Runtime::Distributed::trace_bcast_recv(uint32_t source) {
+#ifdef NDEBUG
+  return;
+#endif
+  if (networkHostID == 0) {
+    trace_bcast_recv_do(networkHostID, source);
+  } else {
+    SendBuffer sbuf;
+    gSerialize(sbuf, networkHostID, source);
+    getSystemNetworkInterface().sendMessage(0, &trace_bcast_recv_pad, sbuf);
+  }
+}
