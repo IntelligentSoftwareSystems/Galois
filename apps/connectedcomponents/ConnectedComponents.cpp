@@ -305,6 +305,7 @@ struct LabelPropAlgo {
             break;
           if (__sync_bool_compare_and_swap(&ddata.comp, old, newV)) {
             ctx.push(dst);
+            break;
           }
         }
       }
@@ -589,7 +590,7 @@ struct GraphLabAlgo {
       if (node == src && graph.getData(dst, Galois::MethodFlag::NONE).labelid > data.labelid) {
         ctx.push(dst, message_type(data.labelid));
       } else if (node == dst && graph.getData(src, Galois::MethodFlag::NONE).labelid > data.labelid) {
-        ctx.push(dst, message_type(data.labelid));
+        ctx.push(src, message_type(data.labelid));
       }
     }
   };

@@ -173,11 +173,10 @@ size_t computeEdgeLimit(Graph& graph, size_t memoryLimit) {
 
 template<typename Graph>
 bool fitsInMemory(Graph& graph, size_t memoryLimit) {
-  // Convert memoryLimit which is in MB into edges
   size_t bytes = memoryLimit;
   bytes *= 1024 * 1024;
   size_t nodeBytes = graph.size() * sizeof(uint64_t);
-  size_t edgeBytes = 2 * (sizeof(uint64_t) + sizeof_edge<typename Graph::edge_data_type>::value);
+  size_t edgeBytes = graph.sizeEdges() * 2 * (sizeof(uint64_t) + sizeof_edge<typename Graph::edge_data_type>::value);
 
   return nodeBytes + edgeBytes < bytes;
 }

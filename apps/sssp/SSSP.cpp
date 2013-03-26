@@ -533,7 +533,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
 
 
 template<typename Algo>
-void run() {
+void run(bool prealloc = true) {
   typedef typename Algo::Graph Graph;
   typedef typename Graph::GraphNode GNode;
 
@@ -545,7 +545,8 @@ void run() {
 
   size_t approxNodeData = graph.size() * sizeof(typename Graph::node_data_type) * 2;
   //size_t approxEdgeData = graph.sizeEdges() * sizeof(typename Graph::edge_data_type) * 2;
-  Galois::preAlloc(numThreads + (approxNodeData * 4) / Galois::Runtime::MM::pageSize);
+  if (prealloc)
+    Galois::preAlloc(numThreads + (approxNodeData * 4) / Galois::Runtime::MM::pageSize);
   Galois::Statistic("MeminfoPre", Galois::Runtime::MM::pageAllocInfo());
 
   Galois::StatTimer T;
@@ -587,7 +588,7 @@ int main(int argc, char **argv) {
     case Algo::asyncWithCas: run<AsyncAlgo<true> >(); break;
 #ifdef GALOIS_USE_EXP
     case Algo::ligra: run<LigraAlgo<false> >(); break;
-    case Algo::ligraChi: run<LigraAlgo<true> >(); break;
+    case Algo::ligraChi: run<LigraAlgo<true> >(false); break;
     case Algo::graphlab: run<GraphLabAlgo>(); break;
 #endif
     default: std::cerr << "Unknown algorithm\n"; abort();

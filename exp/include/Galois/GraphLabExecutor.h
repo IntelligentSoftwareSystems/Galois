@@ -281,6 +281,8 @@ class SyncEngine {
       message_type ret;
       if (NeedMessages) {
         for (unsigned int i = 0; i < self->messages.size(); ++i) {
+          if (!Galois::Runtime::LL::isPackageLeader(i))
+            continue;
           MyMessages& m = *self->messages.getRemote(i);
           if (m.empty())
             continue;
