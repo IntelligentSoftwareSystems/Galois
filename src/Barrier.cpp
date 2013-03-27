@@ -390,11 +390,19 @@ void StupidDistBarrier::dump() {
 }
 
 GBarrier& Galois::Runtime::getSystemBarrier() {
-  //static GBarrier b;
   static unsigned num = ~0;
-  if (activeThreads != num) {
-    num = activeThreads;
-    getDistBarrier().reinit(num);
+  if (Distributed::networkHostNum == 1) {
+    static GBarrier b;
+    if (activeThreads != num) {
+      num = activeThreads;
+      b.reinit(num);
+    }
+    return b;
+  } else {
+    if (activeThreads != num) {
+      num = activeThreads;
+      getDistBarrier().reinit(num);
+    }
+    return getDistBarrier();
   }
-  return getDistBarrier();
 }
