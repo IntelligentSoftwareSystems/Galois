@@ -29,6 +29,9 @@
 
 namespace Galois {
 namespace Runtime {
+
+class PerBackend_v2;
+
 namespace Distributed {
 
 //Objects with this tag have to be stored in a persistent cache
@@ -138,6 +141,9 @@ class gptr {
   friend T* resolve<>(const gptr<T>&);
   friend T* transientAcquire<>(const gptr<T>& p);
   friend void transientRelease<>(const gptr<T>& p);
+  friend PerBackend_v2;
+
+  gptr(uint32_t o, T* p) :ptr(p), owner(o) {}
 
 public:
   typedef T element_type;
