@@ -56,6 +56,12 @@ public:
   //! buf is invalidated by this operation
   virtual void broadcastMessage(recvFuncTy recv, SendBuffer& buf, bool self = false);
 
+  template<typename... Args>
+  void sendAlt(uint32_t dest, void (*recv)(Args...), Args... param);
+
+  template<typename... Args>
+  void broadcastAlt(void (*recv)(Args...), Args... param);
+
   //!system barrier. all hosts should synchronize at this call
   virtual void systemBarrier() = 0;
 
@@ -84,6 +90,68 @@ void networkTerminate();
 
 //! Distributed barrier
 void distWait();
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Implementations
+////////////////////////////////////////////////////////////////////////////////
+
+template<typename... Args>
+struct genericLandingPad {
+  //do this the old fassion way for overhead reasons
+
+  template<typename T0>
+  static void dispatch(RecvBuffer& buf, void (*fp)(Args...) ) {
+    T0 a0;
+    gDeserialize(buf, a0);
+    fp(a0);
+  }
+
+  template<typename T0, typename T1>
+  static void dispatch(RecvBuffer& buf, void (*fp)(Args...)) {
+    T0 a0; T1 a1;
+    gDeserialize(buf, a0, a1);
+    fp(a0, a1);
+  }
+
+  template<typename T0, typename T1, typename T2>
+  static void dispatch(RecvBuffer& buf, void (*fp)(Args...)) {
+    T0 a0; T1 a1; T2 a2;
+    gDeserialize(buf, a0, a1, a2);
+    fp(a0, a1, a2);
+  }
+
+  static void func(RecvBuffer& buf) {
+    void (*fp)(Args...);
+    gDeserialize(buf, fp);
+    dispatch<Args...>(buf, fp);
+  }
+};
+
+template<>
+struct genericLandingPad<> {
+  static void func(RecvBuffer& buf) {
+    void (*fp)();
+    gDeserialize(buf, fp);
+    fp();
+  }
+};
+
+
+template<typename... Args>
+void NetworkInterface::sendAlt(uint32_t dest, void (*recv)(Args...), Args... param) {
+  SendBuffer buf;
+  gSerialize(buf, recv, param...);
+  sendMessage(dest, genericLandingPad<Args...>::func, buf);
+}
+
+template<typename... Args>
+void NetworkInterface::broadcastAlt(void (*recv)(Args...), Args... param) {
+  SendBuffer buf;
+  gSerialize(buf, recv, param...);
+  broadcastMessage(genericLandingPad<Args...>::func, buf);
+}
+
 
 } //Distributed
 } //Runtime
