@@ -37,7 +37,7 @@
 // Graph nodes
 typedef Galois::Graph::ThirdGraph<Element,void,Galois::Graph::EdgeDirection::Un> Graph;
 typedef Graph::NodeHandle GNode;
-typedef Galois::Runtime::Distributed::gptr<Graph> Graphp;
+typedef typename Graph::pointer Graphp;
 
 // Worklist Graph nodes
 typedef Galois::Graph::ThirdGraph<GNode,void,Galois::Graph::EdgeDirection::Un> WLGraph;

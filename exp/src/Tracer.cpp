@@ -86,7 +86,7 @@ void Galois::Runtime::Distributed::trace_obj_send(uint32_t owner, void* ptr, uin
   } else {
     SendBuffer sbuf;
     gSerialize(sbuf, networkHostID, owner, ptr, remote);
-    getSystemNetworkInterface().sendMessage(0, &trace_obj_send_pad, sbuf);
+    getSystemNetworkInterface().send(0, &trace_obj_send_pad, sbuf);
   }
 }
 
@@ -99,7 +99,7 @@ void Galois::Runtime::Distributed::trace_obj_recv(uint32_t owner, void* ptr) {
   } else {
     SendBuffer sbuf;
     gSerialize(sbuf, networkHostID, owner, ptr);
-    getSystemNetworkInterface().sendMessage(0, &trace_obj_recv_pad, sbuf);
+    getSystemNetworkInterface().send(0, &trace_obj_recv_pad, sbuf);
   }
 }
 
@@ -112,6 +112,6 @@ void Galois::Runtime::Distributed::trace_bcast_recv(uint32_t source) {
   } else {
     SendBuffer sbuf;
     gSerialize(sbuf, networkHostID, source);
-    getSystemNetworkInterface().sendMessage(0, &trace_bcast_recv_pad, sbuf);
+    getSystemNetworkInterface().send(0, &trace_bcast_recv_pad, sbuf);
   }
 }

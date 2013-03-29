@@ -64,7 +64,7 @@ void Galois::Runtime::Distributed::networkTerminate() {
   assert(networkHostID == 0);
   NetworkInterface& net = getSystemNetworkInterface();
   SendBuffer buf;
-  net.broadcastMessage (&networkExit, buf);
+  net.broadcast(&networkExit, buf);
   net.handleReceives();
   return;
 }
@@ -79,7 +79,7 @@ void Galois::Runtime::Distributed::distWait() {
 
   SendBuffer buf;
   NetworkInterface& net = getSystemNetworkInterface();
-  net.broadcastMessage(&distWaitLandingPad, buf);
+  net.broadcast(&distWaitLandingPad, buf);
   net.handleReceives();
   net.systemBarrier();
 }
@@ -111,7 +111,7 @@ static void bcastForward(unsigned source, Galois::Runtime::Distributed::RecvBuff
     if (ndst < Galois::Runtime::Distributed::networkHostNum) {
       Galois::Runtime::Distributed::SendBuffer sbuf;
       Galois::Runtime::Distributed::gSerialize(sbuf, source, buf);
-      Galois::Runtime::Distributed::getSystemNetworkInterface().sendMessage(getRID(ndst, source), &bcastLandingPad, sbuf);
+      Galois::Runtime::Distributed::getSystemNetworkInterface().send(getRID(ndst, source), &bcastLandingPad, sbuf);
     }
   }
 }
@@ -128,7 +128,7 @@ static void bcastLandingPad(Galois::Runtime::Distributed::RecvBuffer& buf) {
   recv(buf);
 }
 
-void Galois::Runtime::Distributed::NetworkInterface::broadcastMessage(recvFuncTy recv, SendBuffer& buf, bool self) {
+void Galois::Runtime::Distributed::NetworkInterface::broadcast(recvFuncTy recv, SendBuffer& buf, bool self) {
   unsigned source = Galois::Runtime::Distributed::networkHostID;
   Galois::Runtime::Distributed::trace_bcast_recv(source);
   buf.serialize_header((uintptr_t)recv);

@@ -218,7 +218,7 @@ T* RemoteDirectory::resolve(uint32_t owner, Lockable* ptr) {
     SendBuffer sbuf;
     gSerialize(sbuf, ptr, networkHostID);
     //LL::gDebug("RD: ", networkHostID, " requesting: ", owner, " ", ptr);
-    getSystemNetworkInterface().sendMessage(owner,&LocalDirectory::reqLandingPad<T>,sbuf);
+    getSystemNetworkInterface().send(owner,&LocalDirectory::reqLandingPad<T>,sbuf);
   }
   T* retval = static_cast<T*>(obj);
   Lock.unlock();
@@ -243,7 +243,7 @@ void RemoteDirectory::doRecall(uint32_t owner, Lockable* ptr) {
     //we have the lock so we can send the object
     SendBuffer sbuf;
     gSerialize(sbuf, ptr, *static_cast<T*>(obj));
-    getSystemNetworkInterface().sendMessage(owner,&LocalDirectory::objLandingPad<T>,sbuf);
+    getSystemNetworkInterface().send(owner,&LocalDirectory::objLandingPad<T>,sbuf);
     release(obj);
     delete static_cast<T*>(obj);
     curobj.erase(k(owner,ptr));
@@ -367,7 +367,7 @@ void LocalDirectory::sendObj(T* ptr, uint32_t dest) {
   //LL::gDebug("LD: ", networkHostID, " sending : ", networkHostID, " ", ptr, " to: ", dest);
   SendBuffer sbuf;
   gSerialize(sbuf, static_cast<Lockable*>(ptr), networkHostID, *ptr);
-  getSystemNetworkInterface().sendMessage(dest, &RemoteDirectory::objLandingPad<T>, sbuf);
+  getSystemNetworkInterface().send(dest, &RemoteDirectory::objLandingPad<T>, sbuf);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -390,7 +390,7 @@ T* PersistentDirectory::resolve(T* ptr, uint32_t owner) {
     perobj[k(ptr,owner)] = 0;
     SendBuffer buf;
     gSerialize(buf, ptr, networkHostID);
-    getSystemNetworkInterface().sendMessage(owner, &reqLandingPad<T>, buf);
+    getSystemNetworkInterface().send(owner, &reqLandingPad<T>, buf);
   } //else someone already sent the request
   //wait until valid without holding lock
   Lock.unlock();
@@ -415,7 +415,7 @@ void PersistentDirectory::reqLandingPad(RecvBuffer &buf) {
   // object should be sent to the remote host
   SendBuffer sbuf;
   gSerialize(sbuf, ptr, networkHostID, *reinterpret_cast<T*>(ptr));
-  getSystemNetworkInterface().sendMessage(remote,&PersistentDirectory::objLandingPad<T>,sbuf);
+  getSystemNetworkInterface().send(remote,&PersistentDirectory::objLandingPad<T>,sbuf);
 }
 
 template<typename T>

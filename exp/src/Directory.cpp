@@ -40,7 +40,7 @@ void LocalDirectory::recallObj(Lockable* ptr, uint32_t remote, recvFuncTy pad) {
   //LL::gDebug("LD: ", networkHostID, " recalling: ", networkHostID, " ", ptr, " from: ", remote);
   SendBuffer buf;
   gSerialize(buf,ptr,networkHostID);
-  getSystemNetworkInterface().sendMessage (remote, pad, buf);
+  getSystemNetworkInterface().send (remote, pad, buf);
 }
 
 //FIXME: remove all blocking calls from the directory

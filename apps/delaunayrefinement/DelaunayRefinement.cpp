@@ -32,7 +32,7 @@
 
 #include "Galois/Galois.h"
 #include "Galois/ParallelSTL/ParallelSTL.h"
-#include "Galois/Bag.h"
+#include "Galois/Graphs/Bag.h"
 #include "Galois/Statistic.h"
 
 #include "llvm/Support/CommandLine.h"
@@ -55,15 +55,13 @@ static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>")
 
 struct Process : public Galois::Runtime::Lockable {
   Graphp   graph;
-  WLGraphp wlgraph;
 
   typedef int tt_needs_per_iter_alloc;
 
-  Process(Graphp g, WLGraphp wlg): graph(g), wlgraph(wlg) {}
+  Process(Graphp g): graph(g) {}
   Process() {}
 
-  void operator()(WLGNode item, Galois::UserContext<WLGNode>& ctx) {
-    GNode node = wlgraph->getData(item);
+  void operator()(GNode node, Galois::UserContext<GNode>& ctx) {
     if (!graph->containsNode(node))
       return;
     
@@ -71,44 +69,38 @@ struct Process : public Galois::Runtime::Lockable {
     cav.initialize(node);
     cav.build();
     cav.computePost();
-    cav.update(node, wlgraph, ctx);
+    cav.update(node, ctx);
   }
 
   // serialization functions
   typedef int tt_has_serialize;
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
     gSerialize(s,graph);
-    gSerialize(s,wlgraph);
   }
   void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
     gDeserialize(s,graph);
-    gDeserialize(s,wlgraph);
   }
 };
 
 struct Preprocess : public Galois::Runtime::Lockable {
   Graphp   graph;
-  WLGraphp wlgraph;
+  Galois::Graph::Bag<GNode>::pointer wl;
 
-  Preprocess(Graphp g, WLGraphp wlg): graph(g), wlgraph(wlg) {}
+  Preprocess(Graphp g, Galois::Graph::Bag<GNode>::pointer wlg): graph(g), wl(wlg) {}
   Preprocess() {}
 
   void operator()(GNode item, Galois::UserContext<GNode>& ctx) const {
-    if (graph->getData(item).isBad()) {
-      WLGNode n = wlgraph->createNode(item);
-      wlgraph->addNode(n);
-    }
+    if (graph->getData(item).isBad())
+      wl->push(item);
   }
 
   // serialization functions
   typedef int tt_has_serialize;
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-    gSerialize(s,graph);
-    gSerialize(s,wlgraph);
+    gSerialize(s,graph,wl);
   }
   void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-    gDeserialize(s,graph);
-    gDeserialize(s,wlgraph);
+    gDeserialize(s,graph,wl);
   }
 };
 
@@ -139,7 +131,7 @@ int main(int argc, char** argv) {
   // check the host id and initialise the network
   Galois::Runtime::Distributed::networkStart();
 
-  Graphp graph(new Graph());
+  Graphp graph = Graph::allocate();
   {
     Mesh m;
     m.read(graph, filename.c_str());
@@ -162,7 +154,7 @@ int main(int argc, char** argv) {
   //Galois::preAlloc(15 * numThreads + Galois::Runtime::MM::pageAllocInfo() * 10);
   Galois::Statistic("MeminfoPre2", Galois::Runtime::MM::pageAllocInfo());
 
-  WLGraphp gwl(new WLGraph());
+  Galois::Graph::Bag<GNode>::pointer gwl = Galois::Graph::Bag<GNode>::allocate();
 
   Galois::StatTimer T;
   T.start();
@@ -178,7 +170,7 @@ int main(int argc, char** argv) {
   typedef LocalQueues<dChunkedLIFO<256>, ChunkedLIFO<256> > BQ;
   typedef ChunkedAdaptor<false,32> CA;
 
-  Galois::for_each_local<CA>(gwl, Process(graph,gwl), "refine");
+  Galois::for_each_local<CA>(gwl, Process(graph), "refine");
   Trefine.stop();
   T.stop();
 

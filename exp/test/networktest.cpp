@@ -10,7 +10,7 @@ using namespace Galois::Runtime::Distributed;
 bool didbcast = false;
 
 struct sayHi {
-  sayHi() { std::cout << "Hi " << this << "\n"; }
+  sayHi(Galois::Runtime::PerHost<sayHi> ptr) { std::cout << "Hi " << this << "\n"; }
   ~sayHi() { std::cout << "Bye\n"; }
 };
 

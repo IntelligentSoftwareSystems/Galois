@@ -324,7 +324,7 @@ class DGReducibleVector {
     }
   };
 
-  typedef std::deque<Item> PerPackage;
+  typedef std::vector<Item> PerPackage;
   typedef Runtime::PerPackageStorage<PerPackage> Data;
 
   BinFunc m_func;

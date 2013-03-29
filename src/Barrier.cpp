@@ -349,7 +349,7 @@ void StupidDistBarrier::wait() {
   assert(*sense.getLocal() == gsense + 1);
   //notify the world
   Distributed::SendBuffer b;
-  Distributed::getSystemNetworkInterface().broadcastMessage(broadcastLandingPad, b);
+  Distributed::getSystemNetworkInterface().broadcast(broadcastLandingPad, b);
   //broadcast skips us
   __sync_fetch_and_sub(&count, 1);
 

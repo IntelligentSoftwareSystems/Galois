@@ -49,12 +49,12 @@ public:
   //!send a message to a given (dest) host.  A message is simply a
   //!landing pad (recv) and some data (buf)
   //! buf is invalidated by this operation
-  virtual void sendMessage(uint32_t dest, recvFuncTy recv, SendBuffer& buf) = 0;
+  virtual void send(uint32_t dest, recvFuncTy recv, SendBuffer& buf) = 0;
 
   //!send a message to all hosts.  A message is simply a
   //!landing pad (recv) and some data (buf)
   //! buf is invalidated by this operation
-  virtual void broadcastMessage(recvFuncTy recv, SendBuffer& buf, bool self = false);
+  virtual void broadcast(recvFuncTy recv, SendBuffer& buf, bool self = false);
 
   template<typename... Args>
   void sendAlt(uint32_t dest, void (*recv)(Args...), Args... param);
@@ -142,14 +142,14 @@ template<typename... Args>
 void NetworkInterface::sendAlt(uint32_t dest, void (*recv)(Args...), Args... param) {
   SendBuffer buf;
   gSerialize(buf, recv, param...);
-  sendMessage(dest, genericLandingPad<Args...>::func, buf);
+  send(dest, genericLandingPad<Args...>::func, buf);
 }
 
 template<typename... Args>
 void NetworkInterface::broadcastAlt(void (*recv)(Args...), Args... param) {
   SendBuffer buf;
   gSerialize(buf, recv, param...);
-  broadcastMessage(genericLandingPad<Args...>::func, buf);
+  broadcast(genericLandingPad<Args...>::func, buf);
 }
 
 

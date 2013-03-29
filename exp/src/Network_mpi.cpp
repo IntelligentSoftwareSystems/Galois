@@ -176,7 +176,7 @@ public:
   virtual ~NetworkInterfaceSyncMPI() {
   }
 
-  virtual void sendMessage(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
+  virtual void send(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
     asyncOutLock.lock();
     if (Galois::Runtime::LL::getTID() == 0) {
       while (!asyncOutQueue.empty()) {
@@ -224,7 +224,7 @@ public:
   virtual ~NetworkInterfaceAsyncMPI() {
   }
 
-  virtual void sendMessage(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
+  virtual void send(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
     sendInternal(dest, recv, buf);
   }
 

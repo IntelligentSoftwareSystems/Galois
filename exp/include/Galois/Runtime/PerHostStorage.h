@@ -62,7 +62,7 @@ public:
   T* releaseAt(uint64_t off) { return reinterpret_cast<T*>(releaseAt_i(off)); }
 
   template<typename T>
-  void* resolve(uint64_t off ) { return reinterpret_cast<T*>(resolve_i(off)); }
+  T* resolve(uint64_t off ) { return reinterpret_cast<T*>(resolve_i(off)); }
 
   //returns pointer in remote address space
   template<typename T>
@@ -93,8 +93,10 @@ class PerHost {
 
   explicit PerHost(uint64_t off) :offset(off), localHost(~0), localPtr(nullptr) {}
 
-  static void   allocOnHost(uint64_t off) {
-    getPerHostBackend().createAt(off, new T);
+  static void allocOnHost(DeSerializeBuffer& buf) {
+    uint64_t off;
+    gDeserialize(buf, off);
+    getPerHostBackend().createAt(off, new T(PerHost(off), buf));
   }
 
   static void deallocOnHost(uint64_t off) {
@@ -105,9 +107,13 @@ public:
   //create a pointer
   static PerHost allocate() {
     uint64_t off = getPerHostBackend().allocateOffset();
-    getSystemNetworkInterface().broadcastAlt(&allocOnHost, off);
-    allocOnHost(off);
-    return PerHost(off);
+    getPerHostBackend().createAt(off, new T(PerHost(off)));
+    PerHost ptr(off);
+    SerializeBuffer buf;
+    gSerialize(buf, off);
+    ptr->getInitData(buf);
+    getSystemNetworkInterface().broadcast(&allocOnHost, buf);
+    return ptr;
   }
   static void deallocate(PerHost ptr) {
     getPerHostBackend().deallocateOffset(ptr.offset);
@@ -141,7 +147,6 @@ public:
     localPtr = nullptr;
   }
 };
-
 
 namespace hidden {
 using namespace Galois::Runtime::Distributed;

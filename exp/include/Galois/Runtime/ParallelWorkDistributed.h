@@ -29,6 +29,7 @@
 #define GALOIS_RUNTIME_PARALLELWORKDIST_H
 
 #include "Galois/Runtime/Network.h"
+#include "Galois/Runtime/PerHostStorage.h"
 
 namespace Galois {
 namespace ParallelSTL {
@@ -126,6 +127,22 @@ void for_each_local_landing_pad(Distributed::RecvBuffer& buf) {
   net.systemBarrier();
 }
 
+template<typename WLTy, typename T, typename FunctionTy>
+void for_each_local_landing_pad2(Distributed::RecvBuffer& buf) {
+  //extract stuff
+  FunctionTy f;
+  PerHost<T> data;
+  gDeserialize(buf,f,data);
+
+  Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
+
+  //Start locally
+  Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(*data), f, nullptr);
+
+  // place a MPI barrier here for all the hosts to synchronize
+  net.systemBarrier();
+}
+
 template<typename T, typename FunctionTy, typename ReducerTy>
 void do_all_impl_landing_pad(Distributed::RecvBuffer& buf) {
   //extract stuff
@@ -188,7 +205,7 @@ void for_each_dist(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
     // serialize function and data
     gSerialize(buf,f,data);
     //send data
-    net.sendMessage (i, &for_each_landing_pad<WLTy,ItemTy,FunctionTy>, buf);
+    net.send (i, &for_each_landing_pad<WLTy,ItemTy,FunctionTy>, buf);
   }
   net.handleReceives();
   //now get our data
@@ -218,7 +235,34 @@ void for_each_local_dist(Runtime::Distributed::gptr<T>& c, FunctionTy f, const c
     // serialize function and data
     gSerialize(buf,f,c);
     //send data
-    net.sendMessage (i, &for_each_local_landing_pad<WLTy,T,FunctionTy>, buf);
+    net.send (i, &for_each_local_landing_pad<WLTy,T,FunctionTy>, buf);
+  }
+  net.handleReceives();
+  //Start locally
+  for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(*c), f, loopname);
+
+  // place a MPI barrier here for all the hosts to synchronize
+  net.systemBarrier();
+}
+
+template<typename WLTy, typename T, typename FunctionTy>
+void for_each_local_dist(Runtime::PerHost<T>& c, FunctionTy f, const char* loopname) {
+  // Get a handle to the network interface
+  //  Don't move as networkHostNum and networkHostID have to be initialized first
+  Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
+
+  //fast path for non-distributed
+  if (Distributed::networkHostNum == 1) {
+    for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(*c),f,loopname);
+    return;
+  }
+
+  for (unsigned i = 1; i < Distributed::networkHostNum; i++) {
+    Distributed::SendBuffer buf;
+    // serialize function and data
+    gSerialize(buf,f,c);
+    //send data
+    net.send (i, &for_each_local_landing_pad2<WLTy,T,FunctionTy>, buf);
   }
   net.handleReceives();
   //Start locally
@@ -247,7 +291,7 @@ void do_all_impl_dist(Runtime::Distributed::gptr<T>& c, FunctionTy f, ReducerTy 
     // serialize function and data
     gSerialize(buf,f,r,needsReduce,c);
     //send data
-    net.sendMessage (i, &do_all_impl_landing_pad<T,FunctionTy,ReducerTy>, buf);
+    net.send (i, &do_all_impl_landing_pad<T,FunctionTy,ReducerTy>, buf);
   }
   net.handleReceives();
   inDoAllDistributed = true;
@@ -276,7 +320,7 @@ void on_each_impl_dist(FunctionTy f, const char* loopname) {
     // serialize function and data
     gSerialize(buf,f);
     //send data
-    net.sendMessage (i, &on_each_impl_landing_pad<FunctionTy>, buf);
+    net.send (i, &on_each_impl_landing_pad<FunctionTy>, buf);
   }
   net.handleReceives();
   //Start locally
