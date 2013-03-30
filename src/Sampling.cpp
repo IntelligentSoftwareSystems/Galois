@@ -3,6 +3,10 @@
 #include "Galois/Runtime/ll/EnvCheck.h"
 #include <cstdlib>
 
+#ifdef GALOIS_USE_EXP
+#include "Galois/Runtime/Network.h"
+#endif
+
 static void endPeriod() {
   int val;
   if (Galois::Runtime::LL::EnvCheck("GALOIS_EXIT_AFTER_SAMPLING", val)) {
@@ -113,6 +117,40 @@ static void papiEnd() {}
 static void papiReport(const char* loopname) {}
 #endif
 
+#ifdef GALOIS_USE_EXP
+using namespace Galois::Runtime;
+static void beginSampling_landing_pad(Distributed::RecvBuffer& buf) {
+  beginPeriod();
+  papiBegin();
+  vtuneBegin();
+}
+
+static void endSampling_landing_pad(Distributed::RecvBuffer& buf) {
+  vtuneEnd();
+  papiEnd();
+  endPeriod();
+}
+
+void Galois::Runtime::beginSampling() {
+  if (Distributed::networkHostNum > 1) {
+    Distributed::SendBuffer b;
+    Distributed::getSystemNetworkInterface().broadcastMessage(beginSampling_landing_pad, b);
+  }
+  beginPeriod();
+  papiBegin();
+  vtuneBegin();
+}
+
+void Galois::Runtime::endSampling() {
+  if (Distributed::networkHostNum > 1) {
+    Distributed::SendBuffer b;
+    Distributed::getSystemNetworkInterface().broadcastMessage(endSampling_landing_pad, b);
+  }
+  vtuneEnd();
+  papiEnd();
+  endPeriod();
+}
+#else
 void Galois::Runtime::beginSampling() {
   beginPeriod();
   papiBegin();
@@ -124,6 +162,7 @@ void Galois::Runtime::endSampling() {
   papiEnd();
   endPeriod();
 }
+#endif
 
 void Galois::Runtime::reportSampling(const char* loopname) {
   papiReport(loopname);
