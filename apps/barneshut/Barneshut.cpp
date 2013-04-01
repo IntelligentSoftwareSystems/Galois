@@ -330,7 +330,7 @@ struct BuildOctree : public Galois::Runtime::Lockable {
     gptr<Octree> child = node->child[index];
     
     if (!child) {
-      gptr<Octree> tmp(static_cast<Body*>(b));
+      gptr<Octree> tmp(static_cast<Octree*>(b));
       node->child[index] = tmp;
       return;
     }
@@ -343,7 +343,7 @@ struct BuildOctree : public Galois::Runtime::Lockable {
       updateCenter(new_pos, index, radius);
       OctreeInternal* nnode = new OctreeInternal(new_pos);
       gptr<OctreeInternal> new_node(nnode);
-      gptr<Octree> new_octreenode(reinterpret_cast<Octree*>(nnode));
+      gptr<Octree> new_octreenode(static_cast<Octree*>(nnode));
 
       assert(n->pos != b->pos);
       
