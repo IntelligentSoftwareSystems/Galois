@@ -80,6 +80,9 @@ public:
   //! Thread safe bag insertion
   void push_back(T&& val) { items.getLocal()->push_front(std::move(val)); }
 
+  // required for barneshut
+  T& back() { return items.getLocal()->front(); }
+
   //REMOTE Aware operations
 
   class iterator :public std::iterator<std::forward_iterator_tag, gptr<T>> {

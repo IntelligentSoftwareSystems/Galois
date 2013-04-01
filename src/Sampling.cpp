@@ -134,7 +134,7 @@ static void endSampling_landing_pad(Distributed::RecvBuffer& buf) {
 void Galois::Runtime::beginSampling() {
   if (Distributed::networkHostNum > 1) {
     Distributed::SendBuffer b;
-    Distributed::getSystemNetworkInterface().broadcastMessage(beginSampling_landing_pad, b);
+    Distributed::getSystemNetworkInterface().broadcast(beginSampling_landing_pad, b);
   }
   beginPeriod();
   papiBegin();
@@ -144,7 +144,7 @@ void Galois::Runtime::beginSampling() {
 void Galois::Runtime::endSampling() {
   if (Distributed::networkHostNum > 1) {
     Distributed::SendBuffer b;
-    Distributed::getSystemNetworkInterface().broadcastMessage(endSampling_landing_pad, b);
+    Distributed::getSystemNetworkInterface().broadcast(endSampling_landing_pad, b);
   }
   vtuneEnd();
   papiEnd();
