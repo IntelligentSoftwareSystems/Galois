@@ -351,7 +351,7 @@ struct BuildOctree : public Galois::Runtime::Lockable {
       insert(n, new_node, radius);
       node->child[index] = new_octreenode;
     } else {
-      OctreeInternal* ni = reinterpret_cast<OctreeInternal*>(child.getptr());
+      OctreeInternal* ni = static_cast<OctreeInternal*>(child.getptr());
       gptr<OctreeInternal> nni;
       nni.initialize(ni,child.getowner());
       insert(b, nni, radius);
