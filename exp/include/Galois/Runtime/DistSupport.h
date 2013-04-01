@@ -206,6 +206,18 @@ public:
     owner = ptr ? networkHostID : 0;
   }
 
+  // required in barneshut --- shouldn't do this though
+  T* getptr() {
+    return ptr;
+  }
+  uint32_t getowner() {
+    return owner;
+  }
+  void initialize(T* p, uint32_t _owner) {
+    ptr = p;
+    owner = ptr ? _owner : 0;
+  }
+
   //serialize
   typedef int tt_has_serialize;
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
