@@ -10,8 +10,10 @@ using namespace Galois::Runtime::Distributed;
 bool didbcast = false;
 
 struct sayHi {
+  sayHi(Galois::Runtime::PerHost<sayHi> ptr, DeSerializeBuffer& b) { std::cout << "Hi " << this << "\n"; }
   sayHi(Galois::Runtime::PerHost<sayHi> ptr) { std::cout << "Hi " << this << "\n"; }
   ~sayHi() { std::cout << "Bye\n"; }
+  void getInitData(SerializeBuffer& b) {}
 };
 
 void landingPad(RecvBuffer& foo) {
@@ -22,7 +24,7 @@ void landingPad(RecvBuffer& foo) {
     didbcast = true;
     SendBuffer buf;
     gSerialize(buf,(int) networkHostID);
-    getSystemNetworkInterface().broadcastMessage(&landingPad, buf);
+    getSystemNetworkInterface().broadcast(&landingPad, buf);
   }
 }
 
@@ -60,7 +62,7 @@ int main(int argc, char** argv) {
     for (unsigned int i = 0; i < 1000000; ++i) {
       net.handleReceives();
       SendBuffer buf2;
-      net.sendMessage(1, &lp2, buf2);
+      net.send(1, &lp2, buf2);
     }
     T.stop();
     std::cout << "Time " << T.get() << "\n";

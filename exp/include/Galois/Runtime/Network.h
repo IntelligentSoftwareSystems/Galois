@@ -28,6 +28,7 @@
 #include "Galois/Runtime/Serialize.h"
 
 #include <cstdint>
+#include <tuple>
 
 namespace Galois {
 namespace Runtime {
@@ -56,9 +57,12 @@ public:
   //! buf is invalidated by this operation
   virtual void broadcast(recvFuncTy recv, SendBuffer& buf, bool self = false);
 
+  //! send a message letting the network handle the serialization and deserialization
+  //! slightly slower
   template<typename... Args>
   void sendAlt(uint32_t dest, void (*recv)(Args...), Args... param);
 
+  //! broadcast a mssage allowing the network to handle serialization and deserialization
   template<typename... Args>
   void broadcastAlt(void (*recv)(Args...), Args... param);
 
@@ -95,48 +99,26 @@ void distWait();
 ////////////////////////////////////////////////////////////////////////////////
 // Implementations
 ////////////////////////////////////////////////////////////////////////////////
-
 template<typename... Args>
 struct genericLandingPad {
+  template<int ...> struct seq {};
+  template<int N, int ...S> struct gens : gens<N-1, N-1, S...> {};
+  template<int ...S> struct gens<0, S...>{ typedef seq<S...> type; };
+  
+  template<int ...S>
+  static void callFunc(void (*fp)(Args...), std::tuple<Args...>& args, seq<S...>)
+  {
+    return fp(std::get<S>(args) ...);
+  }
+
   //do this the old fassion way for overhead reasons
-
-  template<typename T0>
-  static void dispatch(RecvBuffer& buf, void (*fp)(Args...) ) {
-    T0 a0;
-    gDeserialize(buf, a0);
-    fp(a0);
-  }
-
-  template<typename T0, typename T1>
-  static void dispatch(RecvBuffer& buf, void (*fp)(Args...)) {
-    T0 a0; T1 a1;
-    gDeserialize(buf, a0, a1);
-    fp(a0, a1);
-  }
-
-  template<typename T0, typename T1, typename T2>
-  static void dispatch(RecvBuffer& buf, void (*fp)(Args...)) {
-    T0 a0; T1 a1; T2 a2;
-    gDeserialize(buf, a0, a1, a2);
-    fp(a0, a1, a2);
-  }
-
   static void func(RecvBuffer& buf) {
     void (*fp)(Args...);
-    gDeserialize(buf, fp);
-    dispatch<Args...>(buf, fp);
+    std::tuple<Args...> args;
+    gDeserialize(buf, fp, args);
+    callFunc(fp, args, typename gens<sizeof...(Args)>::type());
   }
 };
-
-template<>
-struct genericLandingPad<> {
-  static void func(RecvBuffer& buf) {
-    void (*fp)();
-    gDeserialize(buf, fp);
-    fp();
-  }
-};
-
 
 template<typename... Args>
 void NetworkInterface::sendAlt(uint32_t dest, void (*recv)(Args...), Args... param) {
@@ -151,7 +133,6 @@ void NetworkInterface::broadcastAlt(void (*recv)(Args...), Args... param) {
   gSerialize(buf, recv, param...);
   broadcast(genericLandingPad<Args...>::func, buf);
 }
-
 
 } //Distributed
 } //Runtime

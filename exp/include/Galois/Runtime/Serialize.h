@@ -29,6 +29,7 @@
 #include <deque>
 #include <string>
 #include <cassert>
+#include <tuple>
 
 #include <boost/mpl/has_xxx.hpp>
 
@@ -228,6 +229,21 @@ void gDeserialize(DeSerializeBuffer& buf, std::vector<T, Alloc>& data) {
 template<typename T1, typename T2>
 void gDeserialize(DeSerializeBuffer& buf, std::pair<T1, T2>& data) {
   gDeserialize(buf,data.first,data.second);
+}
+
+namespace {
+template<int ...> struct seq {};
+template<int N, int ...S> struct gens : gens<N-1, N-1, S...> {};
+template<int ...S> struct gens<0, S...>{ typedef seq<S...> type; };
+}
+template<typename... T, int... S>
+void gDeserialize(DeSerializeBuffer& buf, std::tuple<T...>& data, seq<S...>) {
+  gDeserialize(buf, std::get<S>(data) ...);
+}
+
+template<typename... T>
+void gDeserialize(DeSerializeBuffer& buf, std::tuple<T...>& data) {
+  gDeserialize(buf, data, typename gens<sizeof...(T)>::type());
 }
 
 template<typename T1, typename T2, typename... U>
