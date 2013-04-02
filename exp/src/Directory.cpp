@@ -140,7 +140,7 @@ void RemoteDirectory::makeProgress() {
   Lock.unlock();
   LL::compilerBarrier(); // This appears to be needed for a gcc bug
   for (auto iter = mypending.begin(); iter != mypending.end(); ++iter) {
-    assert(!Lock.is_locked());
+ // assert(!Lock.is_locked());
     (*iter)();
   }
 }
