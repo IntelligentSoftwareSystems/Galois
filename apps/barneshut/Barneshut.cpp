@@ -122,28 +122,40 @@ struct Octree : public Galois::Runtime::Lockable {
   Point pos;
   double mass;
   bool Leaf;
+  Point vel;
+  Point acc;
+  gptr<Octree> child[8];
 /*
   virtual ~Octree() { }
  */
-  Octree(bool l = true) :Leaf(l) {}
-  Octree(const Point& p, double m, bool l) :pos(p), mass(m), Leaf(l) {}
+  Octree(bool l = true) :Leaf(l) {
+    bzero(child, sizeof(gptr<Octree>) * 8);
+  }
+  Octree(const Point& p, double m, bool l) :pos(p), mass(m), Leaf(l) {
+    bzero(child, sizeof(gptr<Octree>) * 8);
+  }
   //  Octree(const Point& p, double m = 0.0) :pos(p), mass(m) {}
   // serialization functions
   typedef int tt_has_serialize;
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
     gSerialize(s,pos,mass,Leaf);
+    gSerialize(s,vel,acc);
+    for (int i = 0; i < 8; i++) {
+      gSerialize(s,child[i]);
+    }
   }
   void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
     gDeserialize(s,pos,mass,Leaf);
+    gDeserialize(s,vel,acc);
+    for (int i = 0; i < 8; i++) {
+      gDeserialize(s,child[i]);
+    }
   }
 };
 
 struct OctreeInternal : Octree {
-  gptr<Octree> child[8];
   OctreeInternal() { }
-  OctreeInternal(const Point& _pos) : Octree(_pos, 0.0, false) {
-    bzero(child, sizeof(gptr<Octree>) * 8);
-  }
+  OctreeInternal(const Point& _pos) : Octree(_pos, 0.0, false) { }
  // FIX ME ---
 /*
   virtual ~OctreeInternal() {
@@ -158,30 +170,20 @@ struct OctreeInternal : Octree {
   typedef int tt_has_serialize;
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
     gSerialize(s,*(const_cast<Octree*>(static_cast<const Octree*>(this))));
-    for (int i = 0; i < 8; i++) {
-      gSerialize(s,child[i]);
-    }
   }
   void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
     gDeserialize(s,*(const_cast<Octree*>(static_cast<const Octree*>(this))));
-    for (int i = 0; i < 8; i++) {
-      gDeserialize(s,child[i]);
-    }
   }
 };
 
 struct Body : Octree {
-  Point vel;
-  Point acc;
   // serialization functions
   typedef int tt_has_serialize;
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
     gSerialize(s,*(const_cast<Octree*>(static_cast<const Octree*>(this))));
-    gSerialize(s,vel,acc);
   }
   void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
     gDeserialize(s,*(const_cast<Octree*>(static_cast<const Octree*>(this))));
-    gDeserialize(s,vel,acc);
   }
 };
 
@@ -481,21 +483,21 @@ struct ComputeForces : Galois::Runtime::Lockable {
 
   struct Frame {
     double dsq;
-    OctreeInternal* node;
-    Frame(OctreeInternal* _node, double _dsq) : dsq(_dsq), node(_node) { }
+    gptr<OctreeInternal> node;
+    Frame(gptr<OctreeInternal>& _node, double _dsq) : dsq(_dsq), node(_node) { }
   };
 
   template<typename Context>
   void iterate(Body& b, double root_dsq, Context& cnx) {
     std::deque<Frame, Galois::PerIterAllocTy::rebind<Frame>::other> stack(cnx.getPerIterAlloc());
-    stack.push_back(Frame(&(*top), root_dsq));
+    stack.push_back(Frame(top, root_dsq));
 
     Point p;
     while (!stack.empty()) {
       Frame f = stack.back();
       stack.pop_back();
 
-      computeDelta(p, &b, f.node);
+      computeDelta(p, &b, &(*f.node));
       double psq = p.dist2();
 
       // Node is far enough away, summarize contribution
@@ -513,7 +515,9 @@ struct ComputeForces : Galois::Runtime::Lockable {
         if (next->Leaf) {
 	  forleaf(b, static_cast<Body*>(&(*next)), dsq);
 	} else {
-          stack.push_back(Frame(static_cast<OctreeInternal*>(&(*next)), dsq));
+          gptr<OctreeInternal> tmp;
+          tmp.initialize(static_cast<OctreeInternal*>(next.getptr()),next.getowner());
+          stack.push_back(Frame(tmp,dsq));
         }
       }
     }
