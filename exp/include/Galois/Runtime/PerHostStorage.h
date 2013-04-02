@@ -127,6 +127,10 @@ public:
     return getPerHostBackend().resolveRemote<T>(offset, hostID);
   }
 
+  gptr<T> local() {
+    return remote(Distributed::networkHostID);
+  }
+
   T& operator*() const { return *resolve(); }
   T* operator->() const { return resolve(); }
 
