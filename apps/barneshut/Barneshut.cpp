@@ -127,8 +127,19 @@ struct Octree : public Galois::Runtime::Lockable {
   gptr<Octree> child[8];
 /*
   virtual ~Octree() { }
+  SHOULD BE EVENTUALLY DONE
+  virtual ~OctreeInternal() {
+    for (int i = 0; i < 8; i++) {
+      if (OctreeInternal* B = dynamic_cast<OctreeInternal*>(child[i])) {
+        delete B;
+      }
+    }
+  }
  */
   Octree(bool l = true) :Leaf(l) {
+    bzero(child, sizeof(gptr<Octree>) * 8);
+  }
+  Octree(const Point& _pos) :Octree(_pos, 0.0, false) {
     bzero(child, sizeof(gptr<Octree>) * 8);
   }
   Octree(const Point& p, double m, bool l) :pos(p), mass(m), Leaf(l) {
@@ -153,41 +164,7 @@ struct Octree : public Galois::Runtime::Lockable {
   }
 };
 
-struct OctreeInternal : Octree {
-  OctreeInternal() { }
-  OctreeInternal(const Point& _pos) : Octree(_pos, 0.0, false) { }
- // FIX ME ---
-/*
-  virtual ~OctreeInternal() {
-    for (int i = 0; i < 8; i++) {
-      if (OctreeInternal* B = dynamic_cast<OctreeInternal*>(child[i])) {
-        delete B;
-      }
-    }
-  }
- */
-  // serialization functions
-  typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-    gSerialize(s,*(const_cast<Octree*>(static_cast<const Octree*>(this))));
-  }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-    gDeserialize(s,*(const_cast<Octree*>(static_cast<const Octree*>(this))));
-  }
-};
-
-struct Body : Octree {
-  // serialization functions
-  typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-    gSerialize(s,*(const_cast<Octree*>(static_cast<const Octree*>(this))));
-  }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-    gDeserialize(s,*(const_cast<Octree*>(static_cast<const Octree*>(this))));
-  }
-};
-
-std::ostream& operator<<(std::ostream& os, const Body& b) {
+std::ostream& operator<<(std::ostream& os, const Octree& b) {
   os << "(pos:" << b.pos
      << " vel:" << b.vel
      << " acc:" << b.acc
@@ -299,21 +276,38 @@ inline void updateCenter(Point& p, int index, double radius) {
   }
 }
 
-typedef Galois::Graph::Bag<Body> BodyBag;
-typedef Galois::Graph::Bag<Body>::pointer Bodies;
-typedef Galois::Graph::Bag<Body*>::pointer BodyPtrs;
+typedef Galois::Graph::Bag<Octree> BodyBag;
+typedef Galois::Graph::Bag<Octree>::pointer Bodies;
+typedef Galois::Graph::Bag<gptr<Octree> >::pointer BodyPtrs;
+
+struct PrintOctree : public Galois::Runtime::Lockable {
+  PrintOctree() { }
+
+  template<typename Context>
+  void operator()(gptr<Octree> b, Context& cnx) {
+    std::stringstream ss;
+    b.dump(ss);
+    ss << " " << *b << " host: " << Galois::Runtime::Distributed::networkHostID << "\n";
+    std::cout << ss.str();
+  }
+
+  // serialization functions
+  typedef int tt_has_serialize;
+  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const { }
+  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) { }
+};
 
 struct BuildOctree : public Galois::Runtime::Lockable {
-  gptr<OctreeInternal> root;
+  gptr<Octree> root;
   double root_radius;
 
   BuildOctree() { }
-  BuildOctree(gptr<OctreeInternal> _root, double radius) :
+  BuildOctree(gptr<Octree> _root, double radius) :
     root(_root),
     root_radius(radius) { }
 
   template<typename Context>
-  void operator()(Body* b, Context& cnx) {
+  void operator()(gptr<Octree> b, Context& cnx) {
     insert(b, root, root_radius);
   }
 
@@ -326,55 +320,50 @@ struct BuildOctree : public Galois::Runtime::Lockable {
     gDeserialize(s,root,root_radius);
   }
 
-  void insert(Body* b, gptr<OctreeInternal> node, double radius) {
+  void insert(gptr<Octree>& b, gptr<Octree> node, double radius) {
     int index = getIndex(node->pos, b->pos);
 
     gptr<Octree> child = node->child[index];
     
     if (!child) {
-      gptr<Octree> tmp(static_cast<Octree*>(b));
-      node->child[index] = tmp;
+      node->child[index] = b;
       return;
     }
     
     radius *= 0.5;
     if (child->Leaf) {
       // Expand leaf
-      Body* n = static_cast<Body*>(&(*child));
       Point new_pos(node->pos);
       updateCenter(new_pos, index, radius);
-      OctreeInternal* nnode = new OctreeInternal(new_pos);
-      gptr<OctreeInternal> new_node(nnode);
-      gptr<Octree> new_octreenode(static_cast<Octree*>(nnode));
+      Octree* nnode = new Octree(new_pos);
+      gptr<Octree> new_node(nnode);
 
-      assert(n->pos != b->pos);
+      assert(child->pos != b->pos);
       
       insert(b, new_node, radius);
-      insert(n, new_node, radius);
-      node->child[index] = new_octreenode;
+      insert(child, new_node, radius);
+      node->child[index] = new_node;
     } else {
-      OctreeInternal* ni = static_cast<OctreeInternal*>(child.getptr());
-      gptr<OctreeInternal> nni;
-      nni.initialize(ni,child.getowner());
-      insert(b, nni, radius);
+      insert(b, child, radius);
     }
   }
 };
 
+// FIX ME! --- has to be run sequentially
 struct ComputeCenterOfMass {
   // NB: only correct when run sequentially or tree-like reduction
   typedef int tt_does_not_need_stats;
-  gptr<OctreeInternal> root;
+  gptr<Octree> root;
 
   ComputeCenterOfMass() { }
-  ComputeCenterOfMass(gptr<OctreeInternal> _root) : root(_root) { }
+  ComputeCenterOfMass(gptr<Octree> _root) : root(_root) { }
 
   void operator()() {
     root->mass = recurse(root);
   }
 
 private:
-  double recurse(gptr<OctreeInternal>& node) {
+  double recurse(gptr<Octree>& node) {
     double mass = 0.0;
     int index = 0;
     Point accum;
@@ -397,10 +386,7 @@ private:
       if (child->Leaf) {
         m = child->mass;
       } else {
-        // FIX THIS!
-        gptr<OctreeInternal> tmp;
-        tmp.initialize(static_cast<OctreeInternal*>(child.getptr()),child.getowner());
-        m = recurse(tmp);
+        m = recurse(child);
       }
 
       mass += m;
@@ -430,30 +416,32 @@ void updateForce(Point& acc, const Point& delta, double psq, double mass) {
     acc[i] += delta[i] * scale;
 }
 
-void computeDelta(Point& p, const Body* body, Octree* b) {
+// FIX ME!
+void computeDelta(Point& p, const Octree* body, Octree* b) {
   for (int i = 0; i < 3; i++)
     p[i] = b->pos[i] - body->pos[i];
 }
 
+// FIX ME --- does not need aborts!
 struct ComputeForces : Galois::Runtime::Lockable {
   // Optimize runtime for no conflict case
   typedef int tt_does_not_need_aborts;
   typedef int tt_needs_per_iter_alloc;
 
-  gptr<OctreeInternal> top;
+  gptr<Octree> top;
   double diameter;
   double root_dsq;
 
   ComputeForces() { }
-  ComputeForces(gptr<OctreeInternal>& _top, double _diameter) :
+  ComputeForces(gptr<Octree>& _top, double _diameter) :
     top(_top),
     diameter(_diameter) {
     root_dsq = diameter * diameter * config.itolsq;
   }
   
   template<typename Context>
-  void operator()(Body* bb, Context& cnx) {
-    Body& b = *bb;
+  void operator()(gptr<Octree> bb, Context& cnx) {
+    Octree& b = *bb;
     Point p = b.acc;
     for (int i = 0; i < 3; i++)
       b.acc[i] = 0;
@@ -472,7 +460,7 @@ struct ComputeForces : Galois::Runtime::Lockable {
     gDeserialize(s,top,diameter,root_dsq);
   }
 
-  void forleaf(Body& __restrict__  b, Body* __restrict__ node, double dsq) {
+  void forleaf(Octree& __restrict__  b, Octree* __restrict__ node, double dsq) {
     //check if it is me
     if (&b == node)
       return;
@@ -483,21 +471,21 @@ struct ComputeForces : Galois::Runtime::Lockable {
 
   struct Frame {
     double dsq;
-    gptr<OctreeInternal> node;
-    Frame(gptr<OctreeInternal>& _node, double _dsq) : dsq(_dsq), node(_node) { }
+    Octree* node;
+    Frame(Octree* _node, double _dsq) : dsq(_dsq), node(_node) { }
   };
 
   template<typename Context>
-  void iterate(Body& b, double root_dsq, Context& cnx) {
+  void iterate(Octree& b, double root_dsq, Context& cnx) {
     std::deque<Frame, Galois::PerIterAllocTy::rebind<Frame>::other> stack(cnx.getPerIterAlloc());
-    stack.push_back(Frame(top, root_dsq));
+    stack.push_back(Frame(&(*top), root_dsq));
 
     Point p;
     while (!stack.empty()) {
       Frame f = stack.back();
       stack.pop_back();
 
-      computeDelta(p, &b, &(*f.node));
+      computeDelta(p, &b, f.node);
       double psq = p.dist2();
 
       // Node is far enough away, summarize contribution
@@ -513,17 +501,15 @@ struct ComputeForces : Galois::Runtime::Lockable {
         if (!next)
           break;
         if (next->Leaf) {
-	  forleaf(b, static_cast<Body*>(&(*next)), dsq);
+	  forleaf(b, &(*next), dsq);
 	} else {
-          gptr<OctreeInternal> tmp;
-          tmp.initialize(static_cast<OctreeInternal*>(next.getptr()),next.getowner());
-          stack.push_back(Frame(tmp,dsq));
+          stack.push_back(Frame(&(*next),dsq));
         }
       }
     }
   }
 
-  void recurse(Body& b, OctreeInternal* node, double dsq) {
+  void recurse(Octree& b, Octree* node, double dsq) {
     Point p;
     computeDelta(p, &b, node);
     double psq = p.dist2();
@@ -541,14 +527,15 @@ struct ComputeForces : Galois::Runtime::Lockable {
       if (!next)
         break;
       if (next->Leaf) {
-	forleaf(b, static_cast<Body*>(&(*next)), dsq);
+	forleaf(b, &(*next), dsq);
       } else {
-        recurse(b, static_cast<OctreeInternal*>(&(*next)), dsq);
+        recurse(b, &(*next), dsq);
       }
     }
   }
 };
 
+// FIX ME --- does not need aborts
 struct AdvanceBodies {
   // Optimize runtime for no conflict case
   typedef int tt_does_not_need_aborts;
@@ -556,12 +543,12 @@ struct AdvanceBodies {
   AdvanceBodies() { }
 
   template<typename Context>
-  void operator()(Body* bb, Context&) {
-    operator()(bb);
+  void operator()(gptr<Octree>& bb, Context&) {
+    operator()(&(*bb));
   }
 
-  void operator()(Body* bb) {
-    Body& b = *bb;
+  void operator()(Octree* bb) {
+    Octree& b = *bb;
     Point dvel(b.acc);
     dvel *= config.dthf;
 
@@ -588,7 +575,7 @@ struct ReduceBoxes : public Galois::Runtime::Lockable {
   ReduceBoxes(gptr<BoundingBox>& _initial): initial(_initial) { }
 
   template<typename Context>
-  void operator()(Body* b, const Context& cnx) {
+  void operator()(gptr<Octree> b, const Context& cnx) {
     assert(b);
     (*initial).merge(b->pos);
   }
@@ -612,9 +599,10 @@ struct InsertBody : public Galois::Runtime::Lockable {
   InsertBody() { }
   InsertBody(BodyPtrs& pb, Bodies& b): pBodies(pb), bodies(b) { }
   template<typename Context>
-  void operator()(Body& b, const Context& cnx) {
+  void operator()(Octree& b, const Context& cnx) {
     bodies->push_back(b);
-    pBodies->push_back(&bodies->back());
+    gptr<Octree> bodyptr(&bodies->back());
+    pBodies->push_back(bodyptr);
   }
   // serialization functions
   typedef int tt_has_serialize;
@@ -680,7 +668,7 @@ void generateInput(Bodies& bodies, BodyPtrs& pBodies, int nbodies, int seed) {
   double rsc = (3 * PI) / 16;
   double vsc = sqrt(1.0 / rsc);
 
-  std::vector<Body> tmp;
+  std::vector<Octree> tmp;
 
   for (int body = 0; body < nbodies; body++) {
     double r = 1.0 / sqrt(pow(nextDouble() * 0.999, -2.0 / 3.0) - 1);
@@ -691,7 +679,7 @@ void generateInput(Bodies& bodies, BodyPtrs& pBodies, int nbodies, int seed) {
     } while (sq > 1.0);
     scale = rsc * r / sqrt(sq);
 
-    Body b;
+    Octree b;
     b.mass = 1.0 / nbodies;
     for (int i = 0; i < 3; i++)
       b.pos[i] = p[i] * scale;
@@ -724,11 +712,11 @@ struct CheckAllPairs {
   
   CheckAllPairs(Bodies& b): bodies(b) { }
 
-  double operator()(const Body& body) {
-    const Body* me = &body;
+  double operator()(const Octree& body) {
+    const Octree* me = &body;
     Point acc;
     for (auto ii = bodies->local_begin(), ei = bodies->local_end(); ii != ei; ++ii) {
-      Body* b = &*ii;
+      Octree* b = &*ii;
       if (me == b)
         continue;
       Point delta;
@@ -765,8 +753,8 @@ void run(Bodies& bodies, BodyPtrs& pBodies) {
     // Do tree building sequentially
     gptr<BoundingBox> box(new BoundingBox());
     Galois::for_each_local<>(pBodies, ReduceBoxes(box));
-    OctreeInternal top(box->center());
-    gptr<OctreeInternal> gtop(&top);
+    Octree top(box->center());
+    gptr<Octree> gtop(&top);
 
     Galois::for_each_local<>(pBodies, BuildOctree(gtop, box->radius()));
 
@@ -801,8 +789,8 @@ int main(int argc, char** argv) {
   std::cout << nbodies << " bodies, "
             << ntimesteps << " time steps\n";
 
-  Bodies bodies = Galois::Graph::Bag<Body>::allocate();
-  BodyPtrs pBodies = Galois::Graph::Bag<Body*>::allocate();
+  Bodies bodies = Galois::Graph::Bag<Octree>::allocate();
+  BodyPtrs pBodies = Galois::Graph::Bag<gptr<Octree> >::allocate();
   generateInput(bodies, pBodies, nbodies, seed);
 
   Galois::StatTimer T;
