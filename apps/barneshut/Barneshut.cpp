@@ -422,10 +422,7 @@ void computeDelta(Point& p, const Octree* body, Octree* b) {
     p[i] = b->pos[i] - body->pos[i];
 }
 
-// FIX ME --- does not need aborts!
 struct ComputeForces : Galois::Runtime::Lockable {
-  // Optimize runtime for no conflict case
-  typedef int tt_does_not_need_aborts;
   typedef int tt_needs_per_iter_alloc;
 
   gptr<Octree> top;
@@ -441,7 +438,8 @@ struct ComputeForces : Galois::Runtime::Lockable {
   
   template<typename Context>
   void operator()(gptr<Octree> bb, Context& cnx) {
-    Octree& b = *bb;
+    Octree& in = *bb;
+    Octree b = in;
     Point p = b.acc;
     for (int i = 0; i < 3; i++)
       b.acc[i] = 0;
@@ -449,6 +447,7 @@ struct ComputeForces : Galois::Runtime::Lockable {
     iterate(b, root_dsq, cnx);
     for (int i = 0; i < 3; i++)
       b.vel[i] += (b.acc[i] - p[i]) * config.dthf;
+    in = b;
   }
 
   // serialization functions
@@ -535,10 +534,7 @@ struct ComputeForces : Galois::Runtime::Lockable {
   }
 };
 
-// FIX ME --- does not need aborts
 struct AdvanceBodies {
-  // Optimize runtime for no conflict case
-  typedef int tt_does_not_need_aborts;
 
   AdvanceBodies() { }
 
