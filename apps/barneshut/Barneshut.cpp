@@ -281,6 +281,7 @@ typedef Galois::Graph::Bag<Octree>::pointer Bodies;
 typedef Galois::Graph::Bag<gptr<Octree> >::pointer BodyPtrs;
 
 struct PrintOctree : public Galois::Runtime::Lockable {
+  typedef int tt_does_not_need_stats;
   PrintOctree() { }
 
   template<typename Context>
@@ -349,7 +350,6 @@ struct BuildOctree : public Galois::Runtime::Lockable {
   }
 };
 
-// FIX ME! --- has to be run sequentially
 struct ComputeCenterOfMass {
   // NB: only correct when run sequentially or tree-like reduction
   typedef int tt_does_not_need_stats;
@@ -416,7 +416,6 @@ void updateForce(Point& acc, const Point& delta, double psq, double mass) {
     acc[i] += delta[i] * scale;
 }
 
-// FIX ME!
 void computeDelta(Point& p, const Octree* body, Octree* b) {
   for (int i = 0; i < 3; i++)
     p[i] = b->pos[i] - body->pos[i];
