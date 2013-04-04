@@ -774,7 +774,7 @@ void run(Bodies& bodies, BodyPtrs& pBodies) {
     std::cout << "Timestep " << step << " Center of Mass = ";
     std::ios::fmtflags flags = 
       std::cout.setf(std::ios::showpos|std::ios::right|std::ios::scientific|std::ios::showpoint);
-    std::cout << top.pos;
+    std::cout << gtop->pos;
     std::cout.flags(flags);
     std::cout << "\n";
   }
