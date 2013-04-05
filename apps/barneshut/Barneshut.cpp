@@ -437,8 +437,8 @@ struct ComputeForces : Galois::Runtime::Lockable {
   
   template<typename Context>
   void operator()(gptr<Octree> bb, Context& cnx) {
-    Octree& in = *bb;
-    Octree b = in;
+    Octree* in = getSharedObj(bb);
+    Octree b = *in;
     Point p = b.acc;
     for (int i = 0; i < 3; i++)
       b.acc[i] = 0;
@@ -446,7 +446,7 @@ struct ComputeForces : Galois::Runtime::Lockable {
     iterate(b, root_dsq, cnx);
     for (int i = 0; i < 3; i++)
       b.vel[i] += (b.acc[i] - p[i]) * config.dthf;
-    in = b;
+    *in = b;
   }
 
   // serialization functions
@@ -476,7 +476,7 @@ struct ComputeForces : Galois::Runtime::Lockable {
   template<typename Context>
   void iterate(Octree& b, double root_dsq, Context& cnx) {
     std::deque<Frame, Galois::PerIterAllocTy::rebind<Frame>::other> stack(cnx.getPerIterAlloc());
-    stack.push_back(Frame(&(*top), root_dsq));
+    stack.push_back(Frame(getSharedObj(top), root_dsq));
 
     Point p;
     while (!stack.empty()) {
@@ -498,10 +498,11 @@ struct ComputeForces : Galois::Runtime::Lockable {
         gptr<Octree> next = f.node->child[i];
         if (!next)
           break;
-        if (next->Leaf) {
-	  forleaf(b, &(*next), dsq);
+        Octree* nextp = getSharedObj(next);
+        if (nextp->Leaf) {
+	  forleaf(b, nextp, dsq);
 	} else {
-          stack.push_back(Frame(&(*next),dsq));
+          stack.push_back(Frame(nextp,dsq));
         }
       }
     }
@@ -756,6 +757,9 @@ void run(Bodies& bodies, BodyPtrs& pBodies) {
     ComputeCenterOfMass computeCenterOfMass(gtop);
     computeCenterOfMass();
 
+    returnAllRemoteObjs();
+    clearSharedCache();
+
     Galois::StatTimer T_parallel("ParallelTime");
     T_parallel.start();
 
@@ -765,6 +769,8 @@ void run(Bodies& bodies, BodyPtrs& pBodies) {
     }
     Galois::for_each_local<>(pBodies, AdvanceBodies());//, "advance");
     T_parallel.stop();
+
+    clearSharedCache();
 
     std::cout << "Timestep " << step << " Center of Mass = ";
     std::ios::fmtflags flags = 

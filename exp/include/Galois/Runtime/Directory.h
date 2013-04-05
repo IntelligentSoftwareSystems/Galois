@@ -74,9 +74,13 @@ public:
 class RemoteDirectory: public SimpleRuntimeContext, private boost::noncopyable {
 
   Galois::Runtime::LL::SimpleLock<true> Lock;
+  Galois::Runtime::LL::SimpleLock<true> SLock;
 
   std::unordered_map<std::pair<uint32_t, Lockable*>, Lockable*, 
 		     pairhash<uint32_t, Lockable*>> curobj;
+
+  std::unordered_map<std::pair<uint32_t, Lockable*>, Lockable*, 
+		     pairhash<uint32_t, Lockable*>> shared;
 
   std::vector<std::function<void ()>> pending;
 
@@ -89,12 +93,15 @@ class RemoteDirectory: public SimpleRuntimeContext, private boost::noncopyable {
   template<typename T>
   void doObj(uint32_t owner, Lockable* ptr, RecvBuffer& buf);
 
+  template<typename T>
+  void doSharedObj(uint32_t owner, Lockable* ptr, RecvBuffer& buf);
+
   static std::pair<uint32_t, Lockable*> k(uint32_t owner, Lockable* ptr) {
     return std::make_pair(owner, ptr);
   }
 
 public:
-  RemoteDirectory(): SimpleRuntimeContext(true) {}
+  RemoteDirectory(): SimpleRuntimeContext(false) {}
 
   // Handles incoming requests for remote objects
   template<typename T>
@@ -104,9 +111,19 @@ public:
   template<typename T>
   static void objLandingPad(RecvBuffer &);
 
+  template<typename T>
+  static void sharedObjLandingPad(RecvBuffer &);
+
   //resolve a pointer, owner pair
   template<typename T>
   T* resolve(uint32_t, Lockable*);
+
+  //resolve a shared object
+  template<typename T>
+  T* sresolve(uint32_t, Lockable*);
+
+  //clear the shared cache
+  void clearSharedRemCache();
 
   void makeProgress();
 
@@ -133,17 +150,17 @@ class LocalDirectory: public SimpleRuntimeContext, private boost::noncopyable {
   void recallObj(Lockable* ptr, uint32_t remote, recvFuncTy pad);
 
   template<typename T>
-  void sendObj(T* ptr, uint32_t remote);
+  void sendObj(T* ptr, uint32_t remote, bool shared);
 
   template<typename T>
-  void doRequest(Lockable* ptr, uint32_t remote);
+  void doRequest(Lockable* ptr, uint32_t remote, bool shared);
 
   template<typename T>
   void doObj(T* obj);
 
 public:
 
-  LocalDirectory(): SimpleRuntimeContext(true) {}
+  LocalDirectory(): SimpleRuntimeContext(false) {}
 
   //recalls a local object form a remote host.  May be blocking
   void recall(Lockable* ptr, bool blocking);
@@ -156,6 +173,9 @@ public:
   // send the object if local, not locked and mark obj as remote
   template<typename T>
   static void objLandingPad(RecvBuffer &);
+
+  // return all the remote objects to the owner
+  void getAllRemoteObjs();
 
   void makeProgress();
 
@@ -202,7 +222,6 @@ PersistentDirectory& getSystemPersistentDirectory();
 
 using namespace Galois::Runtime::Distributed; // XXX
 
-// should be blocking if not in for each
 template<typename T>
 T* RemoteDirectory::resolve(uint32_t owner, Lockable* ptr) {
   assert(ptr);
@@ -216,12 +235,36 @@ T* RemoteDirectory::resolve(uint32_t owner, Lockable* ptr) {
     assert(s);
     //send request
     SendBuffer sbuf;
-    gSerialize(sbuf, ptr, networkHostID);
+    bool shared = false;
+    gSerialize(sbuf, ptr, networkHostID, shared);
     //LL::gDebug("RD: ", networkHostID, " requesting: ", owner, " ", ptr);
     getSystemNetworkInterface().send(owner,&LocalDirectory::reqLandingPad<T>,sbuf);
   }
   T* retval = static_cast<T*>(obj);
   Lock.unlock();
+  return retval;
+}
+
+template<typename T>
+T* RemoteDirectory::sresolve(uint32_t owner, Lockable* ptr) {
+  assert(ptr);
+  assert(owner != networkHostID);
+  SLock.lock();
+  Lockable*& obj = shared[k(owner,ptr)];
+  if (!obj) {
+    //no copy
+    obj = new T();
+    bool s = try_acquire(obj);
+    assert(s);
+    //send request
+    SendBuffer sbuf;
+    bool shared = true;
+    gSerialize(sbuf, ptr, networkHostID, shared);
+    //LL::gDebug("RD: ", networkHostID, " requesting: ", owner, " ", ptr);
+    getSystemNetworkInterface().send(owner,&LocalDirectory::reqLandingPad<T>,sbuf);
+  }
+  T* retval = static_cast<T*>(obj);
+  SLock.unlock();
   return retval;
 }
 
@@ -286,6 +329,29 @@ void RemoteDirectory::objLandingPad(RecvBuffer &buf) {
   getSystemRemoteDirectory().doObj<T>(owner,ptr, buf);
 }
 
+template<typename T>
+void RemoteDirectory::doSharedObj(uint32_t owner, Lockable* ptr, RecvBuffer& buf) {
+  //LL::gDebug("RD: ", networkHostID, " receiving: ", owner, " ", ptr);
+  trace_obj_recv(owner, ptr);
+  SLock.lock();
+  assert(shared.find(k(owner,ptr)) != shared.end());
+  Lockable* obj = shared[k(owner,ptr)];
+  assert(obj);
+  SLock.unlock();
+  assert(isAcquiredBy(obj, this));
+  gDeserialize(buf,*static_cast<T*>(obj));
+  release(obj);
+}
+
+template<typename T>
+void RemoteDirectory::sharedObjLandingPad(RecvBuffer &buf) {
+  // Lockable*, src, data
+  Lockable* ptr;
+  uint32_t owner;
+  gDeserialize(buf,ptr,owner);
+  getSystemRemoteDirectory().doSharedObj<T>(owner,ptr, buf);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 //Receive a remote request for a local object
@@ -293,36 +359,44 @@ template<typename T>
 void LocalDirectory::reqLandingPad(RecvBuffer &buf) {
   uint32_t remote_to;
   Lockable* ptr;
-  gDeserialize(buf,ptr,remote_to);
-  getSystemLocalDirectory().doRequest<T>(ptr, remote_to);
+  bool shared;
+  gDeserialize(buf,ptr,remote_to,shared);
+  getSystemLocalDirectory().doRequest<T>(ptr, remote_to, shared);
 }
 
 template<typename T>
-void LocalDirectory::doRequest(Lockable* ptr, uint32_t remote) {
+void LocalDirectory::doRequest(Lockable* ptr, uint32_t remote, bool shared) {
   //LL::gDebug("LD: ", networkHostID, " remote req : ", networkHostID, " ", ptr, " from: ", remote);
   int val = try_acquire(ptr);
   switch (val) {
   case 0: //local iteratrion has the lock
     PendingLock.lock();
-    pending.insert(std::make_pair(ptr, std::bind(&LocalDirectory::doRequest<T>, this, ptr, remote)));
+    pending.insert(std::make_pair(ptr, std::bind(&LocalDirectory::doRequest<T>, this, ptr, remote, shared)));
     PendingLock.unlock();
     break;
   case 1: //new owner (obj is local)
     {
-      Lock.lock();
-      objstate& os = curobj[ptr];
-      os.pad = &RemoteDirectory::recallLandingPad<T>;
-      os.sent_to = remote;
-      os.recalled = false;
-      sendObj(static_cast<T*>(ptr), remote);
-      Lock.unlock();
+      if (!shared) {
+        Lock.lock();
+        objstate& os = curobj[ptr];
+        os.pad = &RemoteDirectory::recallLandingPad<T>;
+        os.sent_to = remote;
+        os.recalled = false;
+        sendObj(static_cast<T*>(ptr), remote, shared);
+        Lock.unlock();
+      } else {
+	sendObj(static_cast<T*>(ptr), remote, shared);
+	release(ptr);
+      }
       break;
     }
   case 2: //we were the owner (obj is remote)
     {
+      // shared objects can't be remote
+      assert(!shared);
       PendingLock.lock();
       bool doFetch = !pending.count(ptr);
-      pending.insert(std::make_pair(ptr, std::bind(&LocalDirectory::doRequest<T>, this, ptr, remote)));
+      pending.insert(std::make_pair(ptr, std::bind(&LocalDirectory::doRequest<T>, this, ptr, remote, false)));
       PendingLock.unlock();
       if (doFetch) {
 	Lock.lock();
@@ -362,12 +436,15 @@ void LocalDirectory::doObj(T* ptr) {
 }
 
 template<typename T>
-void LocalDirectory::sendObj(T* ptr, uint32_t dest) {
+void LocalDirectory::sendObj(T* ptr, uint32_t dest, bool shared) {
   trace_obj_send(networkHostID, static_cast<Lockable*>(ptr), dest);
   //LL::gDebug("LD: ", networkHostID, " sending : ", networkHostID, " ", ptr, " to: ", dest);
   SendBuffer sbuf;
   gSerialize(sbuf, static_cast<Lockable*>(ptr), networkHostID, *ptr);
-  getSystemNetworkInterface().send(dest, &RemoteDirectory::objLandingPad<T>, sbuf);
+  if (shared)
+    getSystemNetworkInterface().send(dest, &RemoteDirectory::sharedObjLandingPad<T>, sbuf);
+  else
+    getSystemNetworkInterface().send(dest, &RemoteDirectory::objLandingPad<T>, sbuf);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

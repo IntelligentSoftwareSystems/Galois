@@ -133,6 +133,28 @@ void transientRelease(const gptr<T>& p) {
   getTransCnx().release(ptr);
 }
 
+template <typename T>
+T* getSharedObj(const gptr<T>& p) {
+  T* ptr = p.ptr;
+  if (p.owner != networkHostID) {
+    ptr = getSystemRemoteDirectory().sresolve<T>(p.owner, p.ptr);
+    int ret = getSystemRemoteDirectory().try_acquire(ptr);
+    // if 1 then just received the object
+    if (ret == 1)
+      getSystemRemoteDirectory().release(ptr);
+    else
+      acquire(ptr, Galois::MethodFlag::ALL);
+    assert(!isAcquired(ptr));
+  }
+  // should never lock an object that is sharable
+//assert(!isAcquired(ptr));
+  return ptr;
+}
+
+void clearSharedCache();
+
+void returnAllRemoteObjs();
+
 template<typename T>
 class gptr {
   T* ptr;
@@ -141,6 +163,7 @@ class gptr {
   friend T* resolve<>(const gptr<T>&);
   friend T* transientAcquire<>(const gptr<T>& p);
   friend void transientRelease<>(const gptr<T>& p);
+  friend T* getSharedObj<>(const gptr<T>& p);
   friend PerBackend_v2;
 
   gptr(uint32_t o, T* p) :ptr(p), owner(o) {}
@@ -204,18 +227,6 @@ public:
   void initialize(T* p) {
     ptr = p;
     owner = ptr ? networkHostID : 0;
-  }
-
-  // required in barneshut --- shouldn't do this though
-  T* getptr() {
-    return ptr;
-  }
-  uint32_t getowner() {
-    return owner;
-  }
-  void initialize(T* p, uint32_t _owner) {
-    ptr = p;
-    owner = ptr ? _owner : 0;
   }
 
   //serialize

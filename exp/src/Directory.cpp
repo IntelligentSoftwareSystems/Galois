@@ -66,6 +66,20 @@ void LocalDirectory::recall(Galois::Runtime::Lockable* ptr, bool blocking) {
   }
 }
 
+void LocalDirectory::getAllRemoteObjs() {
+  // should only be called from outside for each
+  assert(!inGaloisForEach);
+  std::set<Lockable*> remObjs;
+
+  for (auto ii = curobj.begin(), ee = curobj.end(); ii != ee; ++ii) {
+    remObjs.insert((*ii).first);
+  }
+
+  for (auto ii = remObjs.begin(); ii != remObjs.end(); ++ii) {
+    recall (*ii, true);
+  }
+}
+
 void LocalDirectory::dump() {
   LL::gDebug("Local Directory ", networkHostID, " ", Lock.is_locked()
 	 , " ", curobj.size(), " ", pending.size());
@@ -121,6 +135,7 @@ PersistentDirectory& Galois::Runtime::Distributed::getSystemPersistentDirectory(
 
 
 
+////////////////////////////////////////////////////////////////////////////////
 
 void RemoteDirectory::dump() {
   LL::gDebug("Remote Directory ", networkHostID, " ", Lock.is_locked()
@@ -133,6 +148,15 @@ void RemoteDirectory::dump() {
   LL::gDebug(os.str());
 }
 
+void RemoteDirectory::clearSharedRemCache() {
+  SLock.lock();
+  for (auto ii = shared.begin(), ee = shared.end(); ii != ee; ++ii) {
+    delete (*ii).second;
+  }
+  shared.clear();
+  SLock.unlock();
+}
+
 void RemoteDirectory::makeProgress() {
   Lock.lock();
   std::vector<std::function<void ()>> mypending;
@@ -143,4 +167,56 @@ void RemoteDirectory::makeProgress() {
  // assert(!Lock.is_locked());
     (*iter)();
   }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+static void clearSharedCache_landing_pad(RecvBuffer& buf) {
+  getSystemRemoteDirectory().clearSharedRemCache();
+}
+
+void Galois::Runtime::Distributed::clearSharedCache() {
+  // should be called from outside the ForEach loop
+  assert(!Galois::Runtime::inGaloisForEach);
+  if (Galois::Runtime::Distributed::networkHostNum > 1) {
+    SendBuffer b;
+    getSystemNetworkInterface().broadcast(clearSharedCache_landing_pad,b);
+  }
+  getSystemRemoteDirectory().clearSharedRemCache();
+  return;
+}
+
+static volatile uint32_t tmp_var = 1;
+
+static void tmp_landing_pad(RecvBuffer& buf) {
+  ++tmp_var;
+}
+
+static void tmp() {
+  SendBuffer b;
+  getSystemNetworkInterface().broadcast(tmp_landing_pad,b);
+  if (!Galois::Runtime::LL::getTID()) {
+    do { //always handle recieves once
+      getSystemNetworkInterface().handleReceives();
+    } while (tmp_var != networkHostNum);
+  }
+}
+
+static void returnAllRemoteObjs_landing_pad(RecvBuffer& buf) {
+  tmp_var = 1;
+  getSystemLocalDirectory().getAllRemoteObjs();
+  tmp();
+}
+
+void Galois::Runtime::Distributed::returnAllRemoteObjs() {
+  // should be called from outside the ForEach loop
+  assert(!Galois::Runtime::inGaloisForEach);
+  tmp_var = 1;
+  if (Galois::Runtime::Distributed::networkHostNum > 1) {
+    SendBuffer b;
+    getSystemNetworkInterface().broadcast(returnAllRemoteObjs_landing_pad,b);
+  }
+  getSystemLocalDirectory().getAllRemoteObjs();
+  tmp();
+  return;
 }
