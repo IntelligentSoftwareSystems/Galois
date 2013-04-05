@@ -28,26 +28,65 @@
 #ifndef GALOIS_RUNTIME_LL_GIO_H
 #define GALOIS_RUNTIME_LL_GIO_H
 
+#include <sstream>
+
 namespace Galois {
 namespace Runtime {
 namespace LL {
 
-void gPrint(const char* format, ...);
-void gDebug(const char* format, ...);
-void gInfo(const char* format, ...);
-void gWarn(const char* format, ...);
+//Print a string
+void gPrintStr(const std::string&);
+//print an info string (for easy parsing)
+void gInfoStr(const std::string&);
+//print a warning string (for easy parsing)
+void gWarnStr(const std::string&);
+//print a debug string (for easy parsing)
+void gDebugStr(const std::string&);
+
+//Convert a sequence of things to a string
+template<typename T>
+void toString(std::ostringstream& os, const T& val) { os << val; }
+
+//dummy for template parameter pack expansion
+struct pass { template<typename ...T> pass(T...) {} };
+ 
+template<typename... Args>
+void gPrint(Args... args) {
+  std::ostringstream os;
+  pass{(toString(os,args),1)...};
+  gPrintStr(os.str());
+}
+
+template<typename... Args>
+void gInfo(Args... args) {
+  std::ostringstream os;
+  pass{(toString(os,args),1)...};
+  gInfoStr(os.str());
+}
+
+template<typename... Args>
+void gWarn(Args... args) {
+  std::ostringstream os;
+  pass{(toString(os,args),1)...};
+  gWarnStr(os.str());
+}
+
+template<typename... Args>
+void gDebug(Args... args) {
+#ifndef NDEBUG
+  std::ostringstream os;
+  pass{(toString(os,args),1)...};
+  gDebugStr(os.str());
+#endif
+}
+
 void gError(bool doabort, const char* filename, int lineno, const char* format, ...);
 void gSysError(bool doabort, const char* filename, int lineno, const char* format, ...);
 void gFlush();
 
-#ifndef NDEBUG
-#define GALOIS_DEBUG(...) { Galois::Runtime::LL::gDebug (__VA_ARGS__); }
-#else
-#define GALOIS_DEBUG(...) { do {} while (false); }
-#endif
-
 #define GALOIS_SYS_ERROR(doabort, ...) { Galois::Runtime::LL::gSysError(doabort, __FILE__, __LINE__, ##__VA_ARGS__); }
 #define GALOIS_ERROR(doabort, ...) { Galois::Runtime::LL::gError(doabort, __FILE__, __LINE__, ##__VA_ARGS__); }
+
 }
 }
 } // end namespace Galois

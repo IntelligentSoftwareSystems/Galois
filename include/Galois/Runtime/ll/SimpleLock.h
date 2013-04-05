@@ -49,7 +49,7 @@ template<>
 class SimpleLock<true> {
   volatile mutable int _lock; //Allow locking a const
 public:
-  SimpleLock() : _lock() {  }
+  SimpleLock() : _lock(0) {  }
 
   inline void lock() const {
     int oldval;

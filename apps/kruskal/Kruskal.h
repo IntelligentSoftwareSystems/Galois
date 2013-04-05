@@ -275,8 +275,8 @@ protected:
             edgeSet.insert (edgeSet.erase (res.first), ke);
           }
         } else {
-          GALOIS_DEBUG ("Warning: Ignoring self edge (%d, %d, %d)\n",
-              src, dst, ingraph.getEdgeData (*e));
+	  Galois::Runtime::LL::gDebug("Warning: Ignoring self edge (",
+				      src, ",", dst, ",", ingraph.getEdgeData (*e), ")");
         }
       }
 

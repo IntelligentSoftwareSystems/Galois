@@ -365,7 +365,7 @@ public:
     wls[0].push_initial(WID(), range.local_begin(), range.local_end());
   }
 
-  void initThread() { }
+  void initThread() {}
 
   void operator()() {
     go();

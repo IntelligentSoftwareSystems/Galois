@@ -389,10 +389,10 @@ void refillWorkList (WL& wl, typename Range<I>::PTS& ranges, const size_t window
     }
   }
 
-  GALOIS_DEBUG ("size before refill: %zd", wl.size_all ());
+  Galois::Runtime::LL::gDebug("size before refill: ", wl.size_all ());
 
   if (windowLimit != NULL) {
-    GALOIS_DEBUG ("new window limit: %s", windowLimit->str ().c_str ());
+    Galois::Runtime::LL::gDebug("new window limit: ", windowLimit->str ().c_str ());
 
     Galois::on_each (RefillWorkList<T, I, WL> (windowLimit, ranges, wl), "refill");
 
@@ -416,7 +416,7 @@ void refillWorkList (WL& wl, typename Range<I>::PTS& ranges, const size_t window
 
   }
 
-  GALOIS_DEBUG ("size after refill: %zd", wl.size_all ())
+  Galois::Runtime::LL::gDebug("size after refill: ", wl.size_all ());
 }
 
 

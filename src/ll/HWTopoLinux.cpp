@@ -71,7 +71,7 @@ static bool linuxBindToProcessor(int proc) {
   
   /* sched_setaffinity returns 0 in success */
   if( sched_setaffinity( 0, sizeof(mask), &mask ) == -1 ) {
-    gWarn("Could not set CPU affinity for thread %d (%s)", proc, strerror(errno));
+    gWarn("Could not set CPU affinity for thread ", proc, "(", strerror(errno),")");
     return false;
   }
   return true;
@@ -294,22 +294,21 @@ struct AutoLinuxPolicy {
   void printRawConfiguration(const std::vector<cpuinfo>& vals) {
     for (unsigned i = 0; i < vals.size(); ++i) {
       const cpuinfo& p = vals[i];
-      gPrint("(proc %d, physid %d, sib %d, coreid %d, cpucores %d\n",
-             p.proc, p.physid, p.sib, p.coreid, p.cpucores);
+      gPrint("(proc ", p.proc, ", physid ", p.physid, ", sib ", p.sib, ", coreid ", p.coreid, ", cpucores ", p.cpucores, "\n");
     }
     for (unsigned i = 0; i < virtmap.size(); ++i)
-      gPrint("%d, ", virtmap[i]);
+      gPrint(", ", virtmap[i]);
     gPrint("\n");
   }
 
   void printFinalConfiguration() {
     //DEBUG: PRINT Stuff
-    gPrint("Threads: %d, %d (raw)\n", numThreads, numThreadsRaw);
-    gPrint("Cores: %d, %d (raw)\n", numCores, numCoresRaw);
-    gPrint("Packages: %d, %d (raw)\n", numPackages, numPackagesRaw);
+    gPrint("Threads: ", numThreads, ", ", numThreadsRaw, " (raw)\n");
+    gPrint("Cores: ", numCores, ", ", numCoresRaw, " (raw)\n");
+    gPrint("Packages: ", numPackages, ", ", numPackagesRaw, " (raw)\n");
 
     for (unsigned i = 0; i < virtmap.size(); ++i) {
-      gPrint("T %3d P %3d Tr %3d %d", i, packages[i], virtmap[i], ((int)i == leaders[packages[i]] ? 1 : 0));
+      gPrint("T ", i, " P ", packages[i], " Tr ", virtmap[i], " ", ((int)i == leaders[packages[i]] ? 1 : 0));
       if (i >= numCores)
 	gPrint(" HT");
       gPrint("\n");

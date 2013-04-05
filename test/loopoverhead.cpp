@@ -7,7 +7,7 @@
 int RandomNumber () { return (rand()%1000000); }
 const unsigned iter = 16*1024;
 
-struct emp {
+struct emp :public Galois::TypeBase<false,false,false,false,false>{
   template<typename T>
   void operator()(const T& t) { Galois::Runtime::LL::compilerBarrier(); }
   template<typename T, typename C>
@@ -69,7 +69,7 @@ void t_foreach() {
     Galois::Timer t;
     t.start();
     for (unsigned x = 0; x < iter; ++x)
-      Galois::for_each(V.begin(), V.end(), emp());
+      Galois::for_each<Galois::WorkList::LazyIter<std::vector<unsigned>::iterator>>(V.begin(), V.end(), emp());
     t.stop();
 
     std::cout << "Galois(" << iter << "x" << V.size() << "): " << t.get() << "\n";

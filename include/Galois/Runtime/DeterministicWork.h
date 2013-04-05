@@ -1271,6 +1271,8 @@ public:
     mergeManager.addInitialWork(range.begin(), range.end(), &worklists[1]);
   }
 
+  void initThread(void) {}
+
   template<typename IterTy>
   void presort(IterTy ii, IterTy ei) {
     mergeManager.presort(ii, ei);
@@ -1539,7 +1541,7 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
 
   setThreadContext(0);
   if (false && LL::getTID() == 0) {
-    GALOIS_DEBUG("niter = %zd, ncommits = %zd", niter, ncommits);
+    LL::gDebug("niter = ", niter, ", ncommits = ", ncommits);
   }
   return retval;
 }

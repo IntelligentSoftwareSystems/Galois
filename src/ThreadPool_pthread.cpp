@@ -32,7 +32,6 @@
 #include <cstdio>
 #include <cerrno>
 #include <cassert>
-#include <vector>
 
 #include <semaphore.h>
 #include <pthread.h>
@@ -106,7 +105,6 @@ class ThreadPool_pthread : public ThreadPool {
   pthread_t* threads; // set of threads
   Semaphore* starts;  // signal to release threads to run
   ThinBarrier started;
-  unsigned maxThreads;
   volatile bool shutdown; // Set and start threads to have them exit
   volatile unsigned starting; //Each run call uses this to control #threads
   volatile RunCommand* workBegin; //Begin iterator for work commands
@@ -160,9 +158,8 @@ class ThreadPool_pthread : public ThreadPool {
   }
   
 public:
-  ThreadPool_pthread(): started(0), shutdown(false), workBegin(0), workEnd(0)
+  ThreadPool_pthread(): ThreadPool(Galois::Runtime::LL::getMaxThreads()), started(0), shutdown(false), workBegin(0), workEnd(0)
   {
-    maxThreads = Galois::Runtime::LL::getMaxThreads();
     initThread();
 
     starts = new Semaphore[maxThreads];
@@ -203,10 +200,6 @@ public:
     doWork(0);
     //clean up
     workBegin = workEnd = 0;
-  }
-
-  virtual unsigned getMaxThreads() const {
-    return maxThreads;
   }
 };
 

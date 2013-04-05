@@ -104,8 +104,7 @@ public:
     if (inputTimes[inIdx] > e.getRecvTime () 
         && e.getRecvTime () < des::INFINITY_SIM_TIME ) {
 
-      GALOIS_DEBUG ("Non-FIFO order on input[%d], last msg time=%zd, current message =%s\n", 
-          inIdx, inputTimes[inIdx], e.str ().c_str ());
+      Galois::Runtime::LL::gDebug ("Non-FIFO order on input[",inIdx,"], last msg time=",inputTimes[inIdx],", current message =", e.str ().c_str ());
 
       assert (inputTimes[inIdx] <= e.getRecvTime ());
 
