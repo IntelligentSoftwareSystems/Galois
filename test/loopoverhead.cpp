@@ -7,7 +7,7 @@
 int RandomNumber () { return (rand()%1000000); }
 const unsigned iter = 16*1024;
 
-struct emp :public Galois::TypeBase<false,false,false,false,false>{
+struct emp {
   template<typename T>
   void operator()(const T& t) { Galois::Runtime::LL::compilerBarrier(); }
   template<typename T, typename C>
