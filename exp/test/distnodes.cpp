@@ -26,8 +26,7 @@ int main(int argc, char** argv) {
   Galois::Runtime::Distributed::networkStart();
 
   typedef G<int, int , EdgeDirection::Out> GTy;
-  GTy Grp;
-  gptr<GTy> Gr(&Grp);
+  GTy::pointer Gr = GTy::allocate();
 
   for (int x = 0; x < 100; ++x)
     Gr->createNode(x);

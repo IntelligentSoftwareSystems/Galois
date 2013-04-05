@@ -28,6 +28,8 @@
 
 #include "Galois/Runtime/Serialize.h"
 #include "Galois/Runtime/DistSupport.h"
+#include "Galois/Runtime/ThreadPool.h"
+#include <boost/iterator/iterator_facade.hpp>
 
 namespace Galois {
 namespace Runtime {
@@ -116,9 +118,9 @@ public:
     return ptr;
   }
   static void deallocate(PerHost ptr) {
-    getPerHostBackend().deallocateOffset(ptr.offset);
     getSystemNetworkInterface().broadcastAlt(&deallocOnHost, ptr.offset);
     deallocOnHost(ptr.offset);
+    getPerHostBackend().deallocateOffset(ptr.offset);
   }
 
   PerHost() : offset(0), localHost(~0), localPtr(nullptr) {}
@@ -152,77 +154,164 @@ public:
   }
 };
 
-namespace hidden {
-using namespace Galois::Runtime::Distributed;
 
-template<typename T>
-struct Deallocate {
-  gptr<T> p;
-  T* rp;
+
+class PerBackend_v3 {
+  static const int dynSlots = 1024;
+  static __thread void* space[dynSlots];
   
-  Deallocate(gptr<T> p): p(p), rp(0) { }
-  Deallocate() { }
+  std::vector<bool> freelist;
+  std::vector<void**> heads;
+  std::map<std::tuple<uint64_t, uint32_t, uint32_t>, void*> remoteCache;
+  LL::SimpleLock<true> lock;
 
-  void operator()(unsigned tid, unsigned) {
-    if (tid == 0 && rp) {
-      delete rp;
-    }
-  }
+  void* resolveRemote_i(uint64_t, uint32_t, uint32_t);
+  void addRemote(void* ptr, uint32_t srcID, uint64_t off, uint32_t threadID);
 
-  typedef int tt_has_serialize;
-  void serialize(SerializeBuffer& s) const { gSerialize(s, p); }
-  void deserialize(DeSerializeBuffer& s) { gDeserialize(s, p); rp = &*p; }
-};
-
-template<typename T>
-struct AllocateEntry {
-  gptr<T> p;
-  T* rp;
-  
-  AllocateEntry(gptr<T> p): p(p), rp(0) { }
-  AllocateEntry() { }
-
-  void operator()(unsigned tid, unsigned) {
-    if (tid == 0) {
-      rp = &*p; // Fault in persistent object
-    }
-  }
-
-  typedef int tt_has_serialize;
-  void serialize(SerializeBuffer& s) const { gSerialize(s, p); }
-  void deserialize(DeSerializeBuffer& s) { gDeserialize(s, p); }
-};
-
-} // end namespace
-
-template<typename T>
-void allocatePerHost(T* orig) {
-  //  Galois::on_each(hidden::AllocateEntry<T>(gptr<T>(orig)));
-}
-
-/**
- * Deallocate per host copies, but master still has to deallocate original (if necessary).
- */
-template<typename T>
-void deallocatePerHost(gptr<T> p) {
-  //Galois::on_each(hidden::Deallocate<T>(p));
-}
-
-template<typename T>
-class PerHostStorage : public T {
+  static void pBe2ResolveLP(void* ptr, uint32_t srcID, uint64_t off, uint32_t threadID);
+  static void pBe2Resolve(uint32_t dest, uint64_t off, uint32_t threadID);
 
 public:
-  typedef int tt_has_serialize;
-  typedef int tt_is_persistent;
+  PerBackend_v3();
 
-  PerHostStorage() { 
-    //allocatePerHost(this);
+  void initThread();
+
+  uint64_t allocateOffset();
+  void deallocateOffset(uint64_t);
+  
+  template<typename T>
+  T*& resolve(uint64_t off ) { return *reinterpret_cast<T**>(&space[off]); }
+
+  template<typename T>
+  T*& resolveThread(uint64_t off, uint32_t tid) {
+    return *reinterpret_cast<T**>(&heads.at(tid)[off]);
   }
-  PerHostStorage(DeSerializeBuffer& s) { }
 
-  void serialize(SerializeBuffer& s) const { }
-  void deserialize(DeSerializeBuffer& s) { }
+  //returns pointer in remote address space
+  template<typename T>
+  gptr<T> resolveRemote(uint64_t off, uint32_t hostID, uint32_t threadID) {
+    return gptr<T>(hostID, reinterpret_cast<T*>(resolveRemote_i(off, hostID, threadID)));
+  }
 };
+
+PerBackend_v3&  getPerThreadDistBackend();
+
+template<typename T>
+class PerThreadDist {
+  //global name
+  uint64_t offset;
+
+  T* resolve() const {
+    T* r = getPerThreadDistBackend().resolve<T>(offset);
+    assert(r);
+    return r;
+  }
+
+  explicit PerThreadDist(uint64_t off) :offset(off) {}
+
+  static void allocOnHost(DeSerializeBuffer& buf) {
+    uint64_t off;
+    gDeserialize(buf, off);
+    for (unsigned x = 0; x < getSystemThreadPool().getMaxThreads(); ++x) {
+      if (!getPerThreadDistBackend().resolveThread<T>(off, x)) {
+	auto buf2 = buf;
+	getPerThreadDistBackend().resolveThread<T>(off, x) = new T(PerThreadDist(off), buf2);
+      }
+      //std::cout << off << " " << x << " " << getPerThreadDistBackend().resolveThread<T>(off, x) << "\n";
+    }
+  }
+
+  static void deallocOnHost(uint64_t off) {
+    for (unsigned x = 0; x < getSystemThreadPool().getMaxThreads(); ++x)
+      delete getPerThreadDistBackend().resolveThread<T>(off, x);
+  }
+
+public:
+  //create a pointer
+  static PerThreadDist allocate() {
+    uint64_t off = getPerThreadDistBackend().allocateOffset();
+    getPerThreadDistBackend().resolve<T>(off) = new T(PerThreadDist(off));
+    PerThreadDist ptr(off);
+    SerializeBuffer buf, buf2;
+    gSerialize(buf, off);
+    ptr->getInitData(buf);
+    buf2 = buf;
+    getSystemNetworkInterface().broadcast(&allocOnHost, buf);
+    DeSerializeBuffer dbuf(std::move(buf2));
+    allocOnHost(dbuf);
+    return ptr;
+  }
+  static void deallocate(PerThreadDist ptr) {
+    getSystemNetworkInterface().broadcastAlt(&deallocOnHost, ptr.offset);
+    deallocOnHost(ptr.offset);
+    getPerHostBackend().deallocateOffset(ptr.offset);
+  }
+
+  PerThreadDist() : offset(~0) {}
+
+  gptr<T> remote(uint32_t hostID, unsigned threadID) const {
+    if (hostID == networkHostID)
+      return gptr<T>(getPerThreadDistBackend().resolveThread<T>(offset, threadID));
+    else
+      return getPerThreadDistBackend().resolveRemote<T>(offset, hostID, threadID);
+  }
+  
+  gptr<T> local() const {
+    return gptr<T>(Distributed::networkHostID, resolve());
+  }
+
+  T& operator*() const { return *resolve(); }
+  T* operator->() const { return resolve(); }
+
+  bool operator<(const PerThreadDist& rhs)  const { return offset <  rhs.offset; }
+  bool operator>(const PerThreadDist& rhs)  const { return offset >  rhs.offset; }
+  bool operator==(const PerThreadDist& rhs) const { return offset == rhs.offset; }
+  bool operator!=(const PerThreadDist& rhs) const { return offset != rhs.offset; }
+  explicit operator bool() const { return offset != 0; }
+
+  class iterator :public boost::iterator_facade<iterator, gptr<T>, std::forward_iterator_tag, gptr<T>>
+  {
+    friend class boost::iterator_core_access;
+    friend class PerThreadDist;
+    uint32_t hostID;
+    uint32_t threadID;
+    PerThreadDist basePtr;
+
+    gptr<T> dereference() const { return basePtr.remote(hostID, threadID); }
+    bool equal(const iterator& rhs) const { return hostID == rhs.hostID && threadID == rhs.threadID && basePtr == rhs.basePtr; }
+    void increment() {
+      if (threadID < activeThreads)
+	++threadID;
+      if (threadID == activeThreads && hostID < networkHostNum) { // FIXME: maxthreads on hostID
+	++hostID;
+	threadID = 0;
+      }
+      if (hostID == networkHostNum) {
+	threadID = activeThreads;
+	basePtr = PerThreadDist();
+      }
+    }
+    iterator(uint32_t h, uint32_t t, PerThreadDist p) :hostID(h), threadID(t), basePtr(p) {}
+  public:
+    iterator() :hostID(networkHostNum), threadID(activeThreads), basePtr() {}
+  };
+
+  iterator begin() { return iterator(0,0,*this); }
+  iterator end() { return iterator(); }
+
+  //serialize
+  typedef int tt_has_serialize;
+  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+    gSerialize(s,offset);
+  }
+  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+    gDeserialize(s,offset);
+  }
+};
+
+  
+
+
 
 } // end namespace
 } // end namespace

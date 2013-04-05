@@ -31,6 +31,9 @@ namespace Runtime {
 typedef std::function<void (void)> RunCommand;
 
 class ThreadPool {
+protected:
+  unsigned maxThreads;
+  ThreadPool(unsigned m) :maxThreads(m) {}
 public:
   virtual ~ThreadPool() { }
 
@@ -39,8 +42,7 @@ public:
   virtual void run(RunCommand* begin, RunCommand* end, unsigned num) = 0;
 
   //!return the number of threads supported by the thread pool on the current machine
-  virtual unsigned getMaxThreads() const = 0;
-
+  unsigned getMaxThreads() const { return maxThreads; }
 };
 
 //!Returns or creates the appropriate thread pool for the system

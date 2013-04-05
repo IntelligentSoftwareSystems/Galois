@@ -115,41 +115,25 @@ template<typename WLTy, typename T, typename FunctionTy>
 void for_each_local_landing_pad(Distributed::RecvBuffer& buf) {
   //extract stuff
   FunctionTy f;
-  gptr<T> data;
+  T data;
   gDeserialize(buf,f,data);
 
   Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
 
   //Start locally
   Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(*data), f, nullptr);
-
-  // place a MPI barrier here for all the hosts to synchronize
-  net.systemBarrier();
-}
-
-template<typename WLTy, typename T, typename FunctionTy>
-void for_each_local_landing_pad2(Distributed::RecvBuffer& buf) {
-  //extract stuff
-  FunctionTy f;
-  PerHost<T> data;
-  gDeserialize(buf,f,data);
-
-  Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
-
-  //Start locally
-  Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(*data), f, nullptr);
-
+  
   // place a MPI barrier here for all the hosts to synchronize
   net.systemBarrier();
 }
 
 template<typename T, typename FunctionTy, typename ReducerTy>
-void do_all_impl_landing_pad(Distributed::RecvBuffer& buf) {
+void do_all_local_landing_pad(Distributed::RecvBuffer& buf) {
   //extract stuff
   FunctionTy f;
   ReducerTy  r;
   bool       needsReduce;
-  gptr<T>    data;
+  T    data;
   gDeserialize(buf,f,r,needsReduce,data);
 
   Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
@@ -219,7 +203,7 @@ void for_each_dist(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
 }
 
 template<typename WLTy, typename T, typename FunctionTy>
-void for_each_local_dist(Runtime::Distributed::gptr<T>& c, FunctionTy f, const char* loopname) {
+void for_each_local_dist(T& c, FunctionTy f, const char* loopname) {
   // Get a handle to the network interface
   //  Don't move as networkHostNum and networkHostID have to be initialized first
   Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
@@ -245,35 +229,8 @@ void for_each_local_dist(Runtime::Distributed::gptr<T>& c, FunctionTy f, const c
   net.systemBarrier();
 }
 
-template<typename WLTy, typename T, typename FunctionTy>
-void for_each_local_dist(Runtime::PerHost<T>& c, FunctionTy f, const char* loopname) {
-  // Get a handle to the network interface
-  //  Don't move as networkHostNum and networkHostID have to be initialized first
-  Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
-
-  //fast path for non-distributed
-  if (Distributed::networkHostNum == 1) {
-    for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(*c),f,loopname);
-    return;
-  }
-
-  for (unsigned i = 1; i < Distributed::networkHostNum; i++) {
-    Distributed::SendBuffer buf;
-    // serialize function and data
-    gSerialize(buf,f,c);
-    //send data
-    net.send (i, &for_each_local_landing_pad2<WLTy,T,FunctionTy>, buf);
-  }
-  net.handleReceives();
-  //Start locally
-  for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(*c), f, loopname);
-
-  // place a MPI barrier here for all the hosts to synchronize
-  net.systemBarrier();
-}
-
 template<typename T, typename FunctionTy, typename ReducerTy>
-void do_all_impl_dist(Runtime::Distributed::gptr<T>& c, FunctionTy f, ReducerTy r, bool needsReduce) {
+void do_all_impl_dist(T& c, FunctionTy f, ReducerTy r, bool needsReduce) {
   // Get a handle to the network interface
   Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
 
@@ -291,7 +248,7 @@ void do_all_impl_dist(Runtime::Distributed::gptr<T>& c, FunctionTy f, ReducerTy 
     // serialize function and data
     gSerialize(buf,f,r,needsReduce,c);
     //send data
-    net.send (i, &do_all_impl_landing_pad<T,FunctionTy,ReducerTy>, buf);
+    net.send (i, &do_all_local_landing_pad<T,FunctionTy,ReducerTy>, buf);
   }
   net.handleReceives();
   inDoAllDistributed = true;

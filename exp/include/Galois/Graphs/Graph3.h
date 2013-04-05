@@ -334,17 +334,18 @@ template<typename NodeTy, typename EdgeTy, EdgeDirection EDir>
 class ThirdGraph { //: public Galois::Runtime::Distributed::DistBase<ThirdGraph> {
   typedef GraphNode<NodeTy, EdgeTy, EDir> gNode;
 
-  typename Bag<gNode>::pointer localState;
-  Runtime::PerHost<ThirdGraph> basePtr;
+  typename Bag<gNode>::pointer localStateStore;
+  typename Bag<gptr<gNode>>::pointer localStatePtr;
+  Runtime::PerThreadDist<ThirdGraph> basePtr;
 
   struct is_edge : public std::unary_function<typename gNode::EdgeType&, bool> {
     bool operator()(typename gNode::EdgeType& n) const { return n.getDst()->getActive(); }
   };
-  struct is_node : public std::unary_function<gNode&, bool>{
-    bool operator() (const gNode& g) const { return g.getActive(); }
+  struct is_node: public std::unary_function<gptr<gNode>&, bool>{
+    bool operator() (const gptr<gNode>& g) const { return g->getActive(); }
   };
-  struct makeGraphNode: public std::unary_function<gNode&, gNode*> {
-    gNode* operator()(gNode& data) const { return &data; }
+  struct makePtrLocal: public std::unary_function<gNode&, gptr<gNode>> {
+    gptr<gNode> operator()(gNode& data) const { return gptr<gNode>(&data); }
   };
 
 public:
@@ -354,12 +355,14 @@ public:
 
   template<typename... Args>
   NodeHandle createNode(Args&&... args) {
-    NodeHandle N(&*localState->emplace(std::forward<Args...>(args...)));
+    NodeHandle N(&*localStateStore->emplace(std::forward<Args...>(args...)));
+    localStatePtr->push(N);
     return N;
   }
 
   NodeHandle createNode() {
-    NodeHandle N(&*localState->emplace());
+    NodeHandle N(&*localStateStore->emplace());
+    localStatePtr->push(N);
     return N;
   }
   
@@ -376,25 +379,27 @@ public:
   }
 
   //! Node iterator
-  typedef boost::transform_iterator<makeGraphNode,boost::filter_iterator<is_node, typename Bag<gNode>::local_iterator>> local_iterator;
+  typedef boost::filter_iterator<is_node, typename Bag<gptr<gNode>>::local_iterator> local_iterator;
 
   local_iterator local_begin() {
-    return boost::make_transform_iterator(boost::make_filter_iterator(is_node(), localState->local_begin(), localState->local_end()),makeGraphNode());
+    return boost::make_filter_iterator<is_node>(localStatePtr->local_begin(), localStatePtr->local_end());
   }
 
   local_iterator local_end() {
-    return boost::make_transform_iterator(boost::make_filter_iterator(is_node(), localState->local_end(), localState->local_end()),makeGraphNode());
+    assert(localStatePtr->local_end() == localStatePtr->local_end());
+    return boost::make_filter_iterator<is_node>(localStatePtr->local_end(), localStatePtr->local_end());
   }
 
-  typedef boost::filter_iterator<is_node, typename Bag<gNode>::iterator> iterator;
-
+  typedef boost::filter_iterator<is_node, typename Bag<gptr<gNode>>::iterator> iterator;
+  
   iterator begin() {
-    return boost::make_filter_iterator(is_node(), localState->begin(), localState->end());
+    return boost::make_filter_iterator<is_node>(localStatePtr->begin(), localStatePtr->end());
   }
 
   iterator end() {
-    return boost::make_filter_iterator(is_node(), localState->end(), localState->end());
+    return boost::make_filter_iterator<is_node>(localStatePtr->end(), localStatePtr->end());
   }
+
 
   //! Returns an iterator to the neighbors of a node 
   edge_iterator edge_begin(NodeHandle N) {
@@ -444,24 +449,32 @@ public:
 
   size_t size() const { return 0; }
 
-  typedef Runtime::PerHost<ThirdGraph> pointer;
+  typedef Runtime::PerThreadDist<ThirdGraph> pointer;
   static pointer allocate() {
-    return Runtime::PerHost<ThirdGraph>::allocate();
+    return Runtime::PerThreadDist<ThirdGraph>::allocate();
   }
   static void deallocate(pointer ptr) {
-    Runtime::PerHost<ThirdGraph>::deallocate(ptr);
+    Runtime::PerThreadDist<ThirdGraph>::deallocate(ptr);
   }
 
   explicit ThirdGraph(pointer p) :basePtr(p) {
-    localState = Bag<gNode>::allocate();
+    localStateStore = Bag<gNode>::allocate();
+    localStatePtr = Bag<gptr<gNode>>::allocate();
   }
 
   ThirdGraph(pointer p, Runtime::Distributed::DeSerializeBuffer& buf) :basePtr(p) {
-    gDeserialize(buf, localState);
+    gDeserialize(buf, localStateStore, localStatePtr);
+    assert(localStateStore);
+    assert(localStatePtr);
+  }
+
+  ~ThirdGraph() {
+    Bag<gNode>::deallocate(localStateStore);
+    Bag<gptr<gNode>>::deallocate(localStatePtr);
   }
 
   void getInitData(Runtime::Distributed::SerializeBuffer& buf) {
-    gSerialize(buf, localState);
+    gSerialize(buf, localStateStore, localStatePtr);
   }
 };
 
@@ -524,25 +537,16 @@ unsigned ThirdGraphSize(GraphTy g) {
   return r->i;
 }
 
-template <typename GraphTy>
 struct ThirdGraph_for_size {
-  ThirdGraph_for_size() {}
-  bool operator()(typename GraphTy::element_type::NodeHandle n) const {
-    return true;
-  }
-  // serialization functions
-  typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-  }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-  }
+  template<typename T>
+  bool operator()(T& n) const { return true; }
 };
 
 template <typename GraphTy>
 ptrdiff_t NThirdGraphSize(GraphTy g) {
   // should only be called from outside the for_each
   assert(!Galois::Runtime::inGaloisForEach);
-  return Galois::ParallelSTL::count_if_local(g,ThirdGraph_for_size<GraphTy>());
+  return Galois::ParallelSTL::count_if_local(g,ThirdGraph_for_size());
 }
 
 } //namespace Graph

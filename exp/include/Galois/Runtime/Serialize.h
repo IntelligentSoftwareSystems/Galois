@@ -33,6 +33,8 @@
 
 #include <boost/mpl/has_xxx.hpp>
 
+#include <Galois/gdeque.h>
+
 namespace Galois {
 namespace Runtime {
 namespace Distributed {
@@ -133,6 +135,15 @@ void gSerialize(SerializeBuffer& buf, const std::deque<T, Alloc>& data) {
 }
 
 template<typename T>
+void gSerialize(SerializeBuffer& buf, const Galois::gdeque<T>& data) {
+  typename gdeque<T>::size_type size;
+  size = data.size();
+  gSerialize(buf,size);
+  for (auto ii = data.begin(), ee = data.end(); ii != ee; ++ii)
+    gSerialize(buf,*ii);
+}
+
+template<typename T>
 void gSerialize(SerializeBuffer& buf, const T& data, typename std::enable_if<std::is_pod<T>::value>::type* = 0) {
   unsigned char* pdata = (unsigned char*)&data;
   for (size_t i = 0; i < sizeof(data); ++i)
@@ -156,12 +167,12 @@ public:
   }
 
   explicit DeSerializeBuffer(SerializeBuffer&& buf) {
-    offset = 0;
     bufdata.swap(buf.bufdata);
+    offset = buf.start;
   }
 
   unsigned char pop() {
-    return bufdata[offset++];
+    return bufdata.at(offset++);
   }
 
   void* linearData() { return &bufdata[0]; }
@@ -224,6 +235,18 @@ void gDeserialize(DeSerializeBuffer& buf, std::vector<T, Alloc>& data) {
   data.resize(size);
   for (lsty x = 0; x < size; ++x)
     gDeserialize(buf,data[x]);
+}
+
+template<typename T>
+void gDeserialize(DeSerializeBuffer& buf, Galois::gdeque<T>& data) {
+  typename gdeque<T>::size_type size;
+  gDeserialize(buf,size);
+  data.clear();
+  for (unsigned x = 0; x < size; ++x) {
+    T t;
+    gDeserialize(buf,t);
+    data.push_back(std::move(t));
+  }
 }
 
 template<typename T1, typename T2>

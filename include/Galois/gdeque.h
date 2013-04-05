@@ -55,16 +55,11 @@ protected:
       }
     }
 
-    template<typename OtherTy>
-    bool equal(const Iterator<OtherTy>& o) const { return b == o.b && offset == o.offset; }
-
+    bool equal(const Iterator& o) const { return b == o.b && offset == o.offset; }
     U& dereference() const { return b->getAt(offset); }
 
   public:
     Iterator(Block* _b = 0, unsigned _off = 0) :b(_b), offset(_off) { }
-    
-    template<typename OtherTy>
-    Iterator(const Iterator<OtherTy>& o): b(o.b), offset(o.offset) { }
   };
 
   Block* first;
@@ -136,6 +131,7 @@ public:
   typedef const T& const_reference;
   typedef Iterator<T> iterator;
   typedef Iterator<const T> const_iterator;
+  typedef size_t size_type;
 
   gdeque(): first(), last(), num(), heap(sizeof(Block)) { }
 

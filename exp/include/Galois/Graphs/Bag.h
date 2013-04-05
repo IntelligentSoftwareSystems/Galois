@@ -32,23 +32,23 @@ namespace Galois {
 namespace Graph {
 
 template<typename T>
-class Bag :boost::noncopyable {
+class Bag :boost::noncopyable, public Runtime::Lockable {
 
-  typedef std::list<T, Runtime::MM::FSBGaloisAllocator<T>> ConTy;
+  typedef gdeque<T> ConTy;
+  ConTy items;
 
-  Runtime::PerThreadStorage<ConTy> items;
-  
-  Runtime::PerHost<Bag> basePtr;
+  Runtime::PerThreadDist<Bag> basePtr;
 
 public:
-  typedef Runtime::PerHost<Bag> pointer;
+  typedef Runtime::PerThreadDist<Bag> pointer;
   static pointer allocate() {
-    return Runtime::PerHost<Bag>::allocate();
+    return Runtime::PerThreadDist<Bag>::allocate();
   }
   static void deallocate(pointer ptr) {
-    Runtime::PerHost<Bag>::deallocate(ptr);
+    Runtime::PerThreadDist<Bag>::deallocate(ptr);
   }
 
+  Bag() {}
   explicit Bag(pointer p) :basePtr(p) {}
   Bag(pointer p, Runtime::Distributed::DeSerializeBuffer&) :basePtr(p) {}
 
@@ -57,40 +57,44 @@ public:
   //LOCAL operations
 
   typedef typename ConTy::iterator local_iterator;
-  typedef typename ConTy::const_iterator local_const_iterator;
 
-  local_iterator local_begin() { return items.getLocal()->begin(); }
-  local_iterator local_end() { return items.getLocal()->end(); }
-  local_const_iterator local_cbegin() { return items.getLocal()->cbegin(); }
-  local_const_iterator local_cend() { return items.getLocal()->cend(); }
+  local_iterator local_begin() { return items.begin(); }
+  local_iterator local_end() { return items.end(); }
 
   template<typename... Args>
   local_iterator emplace(Args&&... args) {
-    items.getLocal()->emplace_front(std::forward<Args>(args)...);
-    return items.getLocal()->begin();
+    items.emplace_front(std::forward<Args>(args)...);
+    return local_begin();
   }
 
   //! Thread safe bag insertion
-  void push(const T& val) { items.getLocal()->push_front(val); }
+  void push(const T& val) { items.push_front(val); }
   //! Thread safe bag insertion
-  void push(T&& val) { items.getLocal()->push_front(std::move(val)); }
+  void push(T&& val) { items.push_front(std::move(val)); }
 
   //! Thread safe bag insertion
-  void push_back(const T& val) { items.getLocal()->push_front(val); }
+  void push_back(const T& val) { items.push_front(val); }
   //! Thread safe bag insertion
-  void push_back(T&& val) { items.getLocal()->push_front(std::move(val)); }
+  void push_back(T&& val) { items.push_front(std::move(val)); }
 
-  // required for barneshut
-  T& back() { return items.getLocal()->front(); }
-
-  //REMOTE Aware operations
-
-  class iterator :public std::iterator<std::forward_iterator_tag, gptr<T>> {
+  struct InnerBegFnL : std::unary_function<gptr<Bag>, local_iterator> {
+    local_iterator operator()(gptr<Bag> d) { return d->local_begin(); }
   };
+  struct InnerEndFnL : std::unary_function<gptr<Bag>, local_iterator> {
+    local_iterator operator()(gptr<Bag> d) { return d->local_end(); }
+  };
+  typedef TwoLevelFwdIter<typename Runtime::PerThreadDist<Bag>::iterator, local_iterator, InnerBegFnL, InnerEndFnL> iterator;
+  iterator begin() { return iterator(basePtr.begin(), basePtr.end(), InnerBegFnL(), InnerEndFnL()); }
+  iterator end() { return iterator(basePtr.end(), basePtr.end(), InnerBegFnL(), InnerEndFnL()); }
 
-  iterator begin();
-  iterator end();
- 
+  // serialization functions
+  typedef int tt_has_serialize;
+  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+    gSerialize(s,basePtr, items);
+  }
+  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+    gDeserialize(s,basePtr, items);
+  }
 };
 
 } // namespace Graph

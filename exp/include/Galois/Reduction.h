@@ -111,7 +111,7 @@ public:
       SendBuffer sbuf;
       gSerialize(sbuf, hosts, dst->r_data);
       dst->r_data = dst->m_initial; //Reset reduce buffer
-      getSystemNetworkInterface().sendMessage((networkHostID - 1)/2, &reduceData, sbuf);
+      getSystemNetworkInterface().send((networkHostID - 1)/2, &reduceData, sbuf);
     }
   }
 
@@ -127,7 +127,7 @@ public:
       //std::cout << "s: " << networkHostID << "->" << ((networkHostID - 1)/2) << "\n";
       SendBuffer sbuf;
       gSerialize(sbuf, hosts, dst->r_data);
-      getSystemNetworkInterface().sendMessage((networkHostID - 1)/2, &reduceData, sbuf);
+      getSystemNetworkInterface().send((networkHostID - 1)/2, &reduceData, sbuf);
     }
   }
 
@@ -135,7 +135,7 @@ public:
     //Send reduce messages
     SendBuffer sbuf;
     gSerialize(sbuf, hosts);
-    getSystemNetworkInterface().broadcastMessage(&startReduce, sbuf);
+    getSystemNetworkInterface().broadcast(&startReduce, sbuf);
 
     int expect = expected();
     r_data = m_initial;
@@ -154,7 +154,7 @@ public:
     localReset(data);
     SendBuffer sbuf;
     gSerialize(sbuf, hosts, data);
-    getSystemNetworkInterface().broadcastMessage(&broadcastData, sbuf, false);
+    getSystemNetworkInterface().broadcast(&broadcastData, sbuf, false);
   }
 
   T& get() {
@@ -172,7 +172,7 @@ public:
     localReset(m_initial);
     SendBuffer buf;
     gSerialize(buf, hosts[0], networkHostID, this);
-    getSystemNetworkInterface().sendMessage(0, &registerInstance, buf);
+    getSystemNetworkInterface().send(0, &registerInstance, buf);
   }
 
   // mark the graph as persistent so that it is distributed
@@ -238,7 +238,7 @@ public:
       dst->reduced = 0;
       SendBuffer sbuf;
       gSerialize(sbuf, hosts, dst->m_data);
-      getSystemNetworkInterface().sendMessage((networkHostID - 1)/2, &reduceData, sbuf);
+      getSystemNetworkInterface().send((networkHostID - 1)/2, &reduceData, sbuf);
     }
   }
 
@@ -253,7 +253,7 @@ public:
       //std::cout << "s: " << networkHostID << "->" << ((networkHostID - 1)/2) << "\n";
       SendBuffer sbuf;
       gSerialize(sbuf, hosts, dst->m_data);
-      getSystemNetworkInterface().sendMessage((networkHostID - 1)/2, &reduceData, sbuf);
+      getSystemNetworkInterface().send((networkHostID - 1)/2, &reduceData, sbuf);
     }
   }
 
@@ -261,7 +261,7 @@ public:
     //Send reduce messages
     SendBuffer sbuf;
     gSerialize(sbuf, hosts);
-    getSystemNetworkInterface().broadcastMessage(&startReduce, sbuf);
+    getSystemNetworkInterface().broadcast(&startReduce, sbuf);
 
     int expect = expected();
 
@@ -287,7 +287,7 @@ public:
     gDeserialize(s, m_func, hosts);
     SendBuffer buf;
     gSerialize(buf, hosts[0], networkHostID, this);
-    getSystemNetworkInterface().sendMessage(0, &registerInstance, buf);
+    getSystemNetworkInterface().send(0, &registerInstance, buf);
   }
 
   // mark the graph as persistent so that it is distributed
@@ -434,7 +434,7 @@ class DGReducibleVector {
       dst->reduced = 0;
       SendBuffer sbuf;
       gSerialize(sbuf, hosts, reset, *dst->m_data.getLocal());
-      getSystemNetworkInterface().sendMessage((networkHostID - 1)/2, &reduceData, sbuf);
+      getSystemNetworkInterface().send((networkHostID - 1)/2, &reduceData, sbuf);
       if (reset)
         dst->localUpdate();
     }
@@ -452,7 +452,7 @@ class DGReducibleVector {
       //std::cout << "s: " << networkHostID << "->" << ((networkHostID - 1)/2) << "\n";
       SendBuffer sbuf;
       gSerialize(sbuf, hosts, reset, *dst->m_data.getLocal());
-      getSystemNetworkInterface().sendMessage((networkHostID - 1)/2, &reduceData, sbuf);
+      getSystemNetworkInterface().send((networkHostID - 1)/2, &reduceData, sbuf);
     }
   }
 
@@ -492,7 +492,7 @@ public:
   void doReduce(bool reset = true) {
     SendBuffer sbuf;
     gSerialize(sbuf, hosts, reset);
-    getSystemNetworkInterface().broadcastMessage(&startReduce, sbuf);
+    getSystemNetworkInterface().broadcast(&startReduce, sbuf);
 
     int expect = expected();
     localReduce();
@@ -509,13 +509,13 @@ public:
     localUpdate(*m_data.getLocal());
     SendBuffer sbuf;
     gSerialize(sbuf, hosts, *m_data.getLocal());
-    getSystemNetworkInterface().broadcastMessage(&broadcastData, sbuf, false);
+    getSystemNetworkInterface().broadcast(&broadcastData, sbuf, false);
   }
 
   void doReset() {
     SendBuffer sbuf;
     gSerialize(sbuf, hosts);
-    getSystemNetworkInterface().broadcastMessage(&startReset, sbuf);
+    getSystemNetworkInterface().broadcast(&startReset, sbuf);
 
     localUpdate();
   }
@@ -558,7 +558,7 @@ public:
     gDeserialize(s, m_func, m_initial, hosts);
     SendBuffer buf;
     gSerialize(buf, hosts[0], networkHostID, this);
-    getSystemNetworkInterface().sendMessage(0, &registerInstance, buf);
+    getSystemNetworkInterface().send(0, &registerInstance, buf);
   }
 
   typedef int tt_is_persistent;

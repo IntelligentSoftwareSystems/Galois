@@ -31,6 +31,7 @@ namespace Galois {
 namespace Runtime {
 
 class PerBackend_v2;
+class PerBackend_v3;
 
 namespace Distributed {
 
@@ -165,6 +166,7 @@ class gptr {
   friend void transientRelease<>(const gptr<T>& p);
   friend T* getSharedObj<>(const gptr<T>& p);
   friend PerBackend_v2;
+  friend PerBackend_v3;
 
   gptr(uint32_t o, T* p) :ptr(p), owner(o) {}
 

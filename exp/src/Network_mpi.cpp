@@ -112,6 +112,7 @@ public:
           pending_sends.pop_front();
       }
     } else {
+      assert(dest < networkHostNum);
       int rv = MPI_Send(buf.linearData(), buf.size(), MPI_BYTE, dest, FuncTag, MPI_COMM_WORLD);
       handleError(rv);
     }

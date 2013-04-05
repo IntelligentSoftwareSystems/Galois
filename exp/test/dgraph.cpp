@@ -9,7 +9,7 @@
 using namespace Galois::Graph;
 
 typedef ThirdGraph<int,int,EdgeDirection::Out> G;
-typedef Galois::Runtime::Distributed::gptr<G> Gptr;
+typedef typename G::pointer Gptr;
 
 int num = 1000;
 
@@ -82,7 +82,7 @@ int main(int argc, char** argv) {
   // check the host id and initialise the network
   Galois::Runtime::Distributed::networkStart();
 
-  Gptr Gr(new G());
+  Gptr Gr = G::allocate();
 
   Galois::for_each<>(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(num), cop(Gr));
   std::cout << "\nDone Building\n";

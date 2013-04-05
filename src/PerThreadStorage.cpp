@@ -22,6 +22,7 @@
  */
 
 #include "Galois/Runtime/PerThreadStorage.h"
+#include "Galois/Runtime/PerHostStorage.h"
 #include "Galois/Runtime/mm/Mem.h"
 
 __thread char* Galois::Runtime::ptsBase;
@@ -100,4 +101,5 @@ void Galois::Runtime::initPTS() {
   if (!Galois::Runtime::ppsBase) {
     Galois::Runtime::ppsBase = getPPSBackend().initPerPackage();
   }
+  getPerThreadDistBackend().initThread();
 }

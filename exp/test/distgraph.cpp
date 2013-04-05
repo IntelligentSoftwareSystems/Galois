@@ -11,9 +11,9 @@ using namespace Galois::Graph;
 typedef ThirdGraph<int,int,EdgeDirection::Out> G;
 
 struct op {
-  gptr<G> graph;
+  G::pointer graph;
 
-  op(gptr<G> g) :graph(g) {}
+  op(G::pointer g) :graph(g) {}
   op() {}
 
   template<typename Context>
@@ -40,7 +40,7 @@ int main(int argc, char** argv) {
   // check the host id and initialise the network
   Galois::Runtime::Distributed::networkStart();
 
-  Galois::Runtime::Distributed::gptr<G> Gr(new G());
+  G::pointer Gr = G::allocate();
 
   Galois::for_each<>(boost::counting_iterator<int>(0), boost::counting_iterator<int>(100), op(Gr));
 
