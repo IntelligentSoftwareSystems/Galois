@@ -1512,7 +1512,7 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
 
   setThreadContext(0);
   if (false && LL::getTID() == 0) {
-    GALOIS_DEBUG("niter = %zd, ncommits = %zd", niter, ncommits);
+    LL::gDebug("niter = ", niter, ", ncommits = ", ncommits);
   }
   return retval;
 }

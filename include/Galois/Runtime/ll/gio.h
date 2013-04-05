@@ -44,38 +44,30 @@ void gWarnStr(const std::string&);
 void gDebugStr(const std::string&);
 
 //Convert a sequence of things to a string
-inline void toString(std::ostringstream& os) { }
-
 template<typename T>
-void toString(std::ostringstream& os, const T& val) {
-  os << val;
-}
+void toString(std::ostringstream& os, const T& val) { os << val; }
 
-template<typename T1, typename T2, typename... Args>
-void toString(std::ostringstream& os, const T1& val1, const T2& val2, Args ...args) {
-  toString(os, val1);
-  toString(os, val2);
-  toString(os, args...);
-}
-
+//dummy for template parameter pack expansion
+struct pass { template<typename ...T> pass(T...) {} };
+ 
 template<typename... Args>
 void gPrint(Args... args) {
   std::ostringstream os;
-  toString(os, args...);
+  pass{(toString(os,args),1)...};
   gPrintStr(os.str());
 }
 
 template<typename... Args>
 void gInfo(Args... args) {
   std::ostringstream os;
-  toString(os, args...);
+  pass{(toString(os,args),1)...};
   gInfoStr(os.str());
 }
 
 template<typename... Args>
 void gWarn(Args... args) {
   std::ostringstream os;
-  toString(os, args...);
+  pass{(toString(os,args),1)...};
   gWarnStr(os.str());
 }
 
@@ -83,7 +75,7 @@ template<typename... Args>
 void gDebug(Args... args) {
 #ifndef NDEBUG
   std::ostringstream os;
-  toString(os, args...);
+  pass{(toString(os,args),1)...};
   gDebugStr(os.str());
 #endif
 }
@@ -92,14 +84,9 @@ void gError(bool doabort, const char* filename, int lineno, const char* format, 
 void gSysError(bool doabort, const char* filename, int lineno, const char* format, ...);
 void gFlush();
 
-#ifndef NDEBUG
-#define GALOIS_DEBUG(...) { Galois::Runtime::LL::gDebug (__VA_ARGS__); }
-#else
-#define GALOIS_DEBUG(...) { do {} while (false); }
-#endif
-
 #define GALOIS_SYS_ERROR(doabort, ...) { Galois::Runtime::LL::gSysError(doabort, __FILE__, __LINE__, ##__VA_ARGS__); }
 #define GALOIS_ERROR(doabort, ...) { Galois::Runtime::LL::gError(doabort, __FILE__, __LINE__, ##__VA_ARGS__); }
+
 }
 }
 } // end namespace Galois
