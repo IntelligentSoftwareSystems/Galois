@@ -46,7 +46,7 @@ static llvm::cl::opt<int> nbodies("n", llvm::cl::desc("Number of bodies"), llvm:
 static llvm::cl::opt<int> ntimesteps("steps", llvm::cl::desc("Number of steps"), llvm::cl::init(1));
 static llvm::cl::opt<int> seed("seed", llvm::cl::desc("Random seed"), llvm::cl::init(7));
 
-struct Point : public Galois::Runtime::Lockable {
+struct Point {
   double x, y, z;
   Point() : x(0.0), y(0.0), z(0.0) { }
   Point(double _x, double _y, double _z) : x(_x), y(_y), z(_z) { }
@@ -298,13 +298,37 @@ struct PrintOctree : public Galois::Runtime::Lockable {
   void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) { }
 };
 
+struct GetBackLocalNodes : public Galois::Runtime::Lockable {
+  typedef int tt_does_not_need_stats;
+  GetBackLocalNodes() { }
+
+  template<typename Context>
+  void operator()(gptr<Octree> b, Context& cnx) {
+    std::stringstream ss;
+    if (b->Leaf)
+      ss << "Leaf Node: ";
+    else
+      ss << "Internal Node: ";
+    b.dump(ss);
+    ss << " " << *b << " host: " << Galois::Runtime::Distributed::networkHostID << "\n";
+    // std::cout << ss.str();
+  }
+
+  // serialization functions
+  typedef int tt_has_serialize;
+  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const { }
+  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) { }
+};
+
 struct BuildOctree : public Galois::Runtime::Lockable {
   gptr<Octree> root;
+  BodyPtrs inNodes;
   double root_radius;
 
   BuildOctree() { }
-  BuildOctree(gptr<Octree> _root, double radius) :
+  BuildOctree(gptr<Octree> _root, BodyPtrs _in, double radius) :
     root(_root),
+    inNodes(_in),
     root_radius(radius) { }
 
   template<typename Context>
@@ -315,10 +339,10 @@ struct BuildOctree : public Galois::Runtime::Lockable {
   // serialization functions
   typedef int tt_has_serialize;
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-    gSerialize(s,root,root_radius);
+    gSerialize(s,root,inNodes,root_radius);
   }
   void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-    gDeserialize(s,root,root_radius);
+    gDeserialize(s,root,inNodes,root_radius);
   }
 
   void insert(gptr<Octree>& b, gptr<Octree> node, double radius) {
@@ -338,6 +362,7 @@ struct BuildOctree : public Galois::Runtime::Lockable {
       updateCenter(new_pos, index, radius);
       Octree* nnode = new Octree(new_pos);
       gptr<Octree> new_node(nnode);
+      inNodes->push_back(new_node);
 
       assert(child->pos != b->pos);
       
@@ -741,7 +766,7 @@ double checkAllPairs(Bodies& bodies, int N) {
 }
 */
 
-void run(Bodies& bodies, BodyPtrs& pBodies) {
+void run(Bodies& bodies, BodyPtrs& pBodies, BodyPtrs& inNodes) {
   typedef Galois::WorkList::dChunkedLIFO<256> WL_;
   typedef Galois::WorkList::ChunkedAdaptor<false,32> WL;
 
@@ -752,12 +777,15 @@ void run(Bodies& bodies, BodyPtrs& pBodies) {
     Octree top(box->center());
     gptr<Octree> gtop(&top);
 
-    Galois::for_each_local<>(pBodies, BuildOctree(gtop, box->radius()));
+    inNodes->push_back(gtop);
+    Galois::for_each_local<>(pBodies, BuildOctree(gtop, inNodes, box->radius()));
 
     ComputeCenterOfMass computeCenterOfMass(gtop);
     computeCenterOfMass();
 
-    returnAllRemoteObjs();
+    // return all the local objs sent to other hosts
+    Galois::for_each_local<>(inNodes, GetBackLocalNodes());
+    Galois::for_each_local<>(pBodies, GetBackLocalNodes());
     clearSharedCache();
 
     Galois::StatTimer T_parallel("ParallelTime");
@@ -792,11 +820,12 @@ int main(int argc, char** argv) {
 
   Bodies bodies = Galois::Graph::Bag<Octree>::allocate();
   BodyPtrs pBodies = Galois::Graph::Bag<gptr<Octree> >::allocate();
+  BodyPtrs inNodes = Galois::Graph::Bag<gptr<Octree> >::allocate();
   generateInput(bodies, pBodies, nbodies, seed);
 
   Galois::StatTimer T;
   T.start();
-  run(bodies, pBodies);
+  run(bodies, pBodies, inNodes);
   T.stop();
   Galois::Runtime::Distributed::networkTerminate();
   return 0;
