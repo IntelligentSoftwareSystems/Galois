@@ -174,9 +174,6 @@ public:
   template<typename T>
   static void objLandingPad(RecvBuffer &);
 
-  // return all the remote objects to the owner
-  void getAllRemoteObjs();
-
   void makeProgress();
 
   void dump();
