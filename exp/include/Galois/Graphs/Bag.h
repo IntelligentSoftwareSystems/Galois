@@ -77,6 +77,8 @@ public:
   //! Thread safe bag insertion
   void push_back(T&& val) { items.push_front(std::move(val)); }
 
+  T& back() { return items.front(); }
+
   struct InnerBegFnL : std::unary_function<gptr<Bag>, local_iterator> {
     local_iterator operator()(gptr<Bag> d) { return d->local_begin(); }
   };
