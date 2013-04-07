@@ -139,13 +139,10 @@ T* getSharedObj(const gptr<T>& p) {
   T* ptr = p.ptr;
   if (p.owner != networkHostID) {
     ptr = getSystemRemoteDirectory().sresolve<T>(p.owner, p.ptr);
-    int ret = getSystemRemoteDirectory().try_acquire(ptr);
-    // if 1 then just received the object
-    if (ret == 1)
-      getSystemRemoteDirectory().release(ptr);
-    else
-      acquire(ptr, Galois::MethodFlag::ALL);
-    assert(!isAcquired(ptr));
+    // locked by Remote Directory if not local
+    // abort the iteration
+    if (isAcquired(ptr))
+      throw 5;
   }
   // should never lock an object that is sharable
 //assert(!isAcquired(ptr));
@@ -153,8 +150,6 @@ T* getSharedObj(const gptr<T>& p) {
 }
 
 void clearSharedCache();
-
-void returnAllRemoteObjs();
 
 template<typename T>
 class gptr {
