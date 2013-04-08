@@ -29,66 +29,6 @@
 #include "Galois/Accumulator.h"
 
 class RandomKwayEdgeRefiner {
-
-public:
-	RandomKwayEdgeRefiner(float* tpwgts, int nparts, float ubfactor, int npasses, int ffactor) {
-		this->tpwgts = tpwgts;
-		this->nparts = nparts;
-		this->ubfactor = ubfactor;
-		this->npasses = npasses;
-		this->ffactor = ffactor;
-		minwgts = new int[nparts];
-		maxwgts = new int[nparts];
-		itpwgts = new int[nparts];
-	}
-	~RandomKwayEdgeRefiner(){
-		delete[] minwgts;
-		delete[] maxwgts;
-		delete[] itpwgts;
-	}
-	void refine(MetisGraph* metisGraph){
-
-		int tvwgt = 0;
-		for (int i = 0; i < nparts; i++) {
-			tvwgt += metisGraph->getPartWeight(i);
-		}
-		for (int i = 0; i < nparts; i++) {
-			itpwgts[i] = (int) (tpwgts[i] * tvwgt);
-			maxwgts[i] = (int) (tpwgts[i] * tvwgt * ubfactor);
-			minwgts[i] = (int) (tpwgts[i] * tvwgt * (1.0 / ubfactor));
-		}
-
-		for (int pass = 0; pass < npasses; pass++) {
-			int oldcut = metisGraph->getMinCut();
-
-			PerCPUValue perCPUValues;
-			parallelRefine pr(metisGraph, this, &perCPUValues);
-			Galois::for_each<Galois::WorkList::ChunkedLIFO<32, GNode> >(metisGraph->getBoundaryNodes()->begin(), metisGraph->getBoundaryNodes()->end(), pr, "RandomKWAYRefine");
-			metisGraph->incMinCut(perCPUValues.mincutInc.reduce());
-			GNodeSTLSet& changedNodes = perCPUValues.changedBndNodes.reduce();
-			for(GNodeSTLSet::iterator iter=changedNodes.begin();iter!=changedNodes.end();++iter){
-				GNode changed = *iter;
-				if(metisGraph->getGraph()->getData(changed).isBoundary()){
-					metisGraph->getBoundaryNodes()->insert(changed);
-				}else{
-					metisGraph->getBoundaryNodes()->erase(changed);
-				}
-			}
-//			GGraph* graph = metisGraph->getGraph();
-//			for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
-//				GNode node = *ii;
-//				if(node.getData().isBoundary()){
-//					metisGraph->getBoundaryNodes()->insert(node);
-//				}else{
-//					metisGraph->getBoundaryNodes()->erase(node);
-//				}
-//			}
-			if (metisGraph->getMinCut() == oldcut) {
-				break;
-			}
-		}
-	}
-
 private:
 
   void refineOneNode(MetisGraph* metisGraph, GNode n, PerCPUValue* perCPUValues) {
@@ -164,9 +104,7 @@ private:
 			}
 
 			if (nodeData.getEdegree() - nodeData.getIdegree() < 0){
-//				metisGraph->unsetBoundaryNode(n);
 				metisGraph->unMarkBoundaryNode(n);
-//				perCPUValues->get().changedBndNodes.push_back(n);
 				perCPUValues->changedBndNodes.update(n);
 			}
 
@@ -175,14 +113,8 @@ private:
 			 */
 			for (GGraph::edge_iterator jj = graph->edge_begin(n, Galois::MethodFlag::NONE), eejj = graph->edge_end(n, Galois::MethodFlag::NONE); jj != eejj; ++jj) {
 			  GNode neighbor = graph->getEdgeDst(jj);
-			  MetisNode& neighborData = graph->getData(neighbor,Galois::MethodFlag::NONE);
-				if (neighborData.getPartEd().size() == 0) {
-					int numEdges = neighborData.getNumEdges();
-//					neighborData.partIndex = new int[numEdges];
-//					neighborData.partEd = new int[numEdges];
-//					cout<<"init"<<endl;
-					neighborData.initPartEdAndIndex(numEdges);
-				}
+			  MetisNode& neighborData = graph->getData(neighbor);
+
 				int edgeWeight = graph->getEdgeData(jj, Galois::MethodFlag::NONE);
 				if (neighborData.getPartition() == from) {
 					neighborData.setEdegree(neighborData.getEdegree() + edgeWeight);
@@ -245,6 +177,69 @@ private:
 	}
 
 
+public:
+	RandomKwayEdgeRefiner(float* tpwgts, int nparts, float ubfactor, int npasses, int ffactor) {
+		this->tpwgts = tpwgts;
+		this->nparts = nparts;
+		this->ubfactor = ubfactor;
+		this->npasses = npasses;
+		this->ffactor = ffactor;
+		minwgts = new int[nparts];
+		maxwgts = new int[nparts];
+		itpwgts = new int[nparts];
+	}
+	~RandomKwayEdgeRefiner(){
+		delete[] minwgts;
+		delete[] maxwgts;
+		delete[] itpwgts;
+	}
+	void refine(MetisGraph* metisGraph){
+
+		int tvwgt = 0;
+		for (int i = 0; i < nparts; i++) {
+			tvwgt += metisGraph->getPartWeight(i);
+		}
+		for (int i = 0; i < nparts; i++) {
+			itpwgts[i] = (int) (tpwgts[i] * tvwgt);
+			maxwgts[i] = (int) (tpwgts[i] * tvwgt * ubfactor);
+			minwgts[i] = (int) (tpwgts[i] * tvwgt * (1.0 / ubfactor));
+		}
+
+		for (int pass = 0; pass < npasses; pass++) {
+			int oldcut = metisGraph->getMinCut();
+
+			PerCPUValue perCPUValues;
+			parallelRefine pr(metisGraph, this, &perCPUValues);
+
+			Galois::for_each<Galois::WorkList::ChunkedLIFO<64, GNode> >(metisGraph->getBoundaryNodes()->begin(), metisGraph->getBoundaryNodes()->end(), pr, "RandomKWAYRefine");
+			int minCutInc = perCPUValues.mincutInc.reduce();
+			//cout<<minCutInc;
+			metisGraph->incMinCut(minCutInc);
+			GNodeSTLSet& changedNodes = perCPUValues.changedBndNodes.reduce();
+			for(GNodeSTLSet::iterator iter=changedNodes.begin();iter!=changedNodes.end();++iter){
+				GNode changed = *iter;
+				if(metisGraph->getGraph()->getData(changed).isBoundary()){
+					metisGraph->getBoundaryNodes()->insert(changed);
+				}else{
+					metisGraph->getBoundaryNodes()->erase(changed);
+				}
+			}
+//			GGraph* graph = metisGraph->getGraph();
+//			for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
+//				GNode node = *ii;
+//				if(node.getData().isBoundary()){
+//					metisGraph->getBoundaryNodes()->insert(node);
+//				}else{
+//					metisGraph->getBoundaryNodes()->erase(node);
+//				}
+//			}
+			if (metisGraph->getMinCut() == oldcut) {
+				break;
+			}
+		}
+	}
+
+private:
 	struct parallelRefine {
 		MetisGraph* metisGraph;
 		RandomKwayEdgeRefiner* refiner;

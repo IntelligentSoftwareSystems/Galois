@@ -31,27 +31,57 @@
 #include "Galois/Galois.h"
 #include "Galois/Timer.h"
 #include "Galois/Accumulator.h"
-
+#include "Galois/Graph/memScalGraph.h"
 #include <stdlib.h>
 
 typedef int METISINT;
 typedef double METISDOUBLE;
 
 
+/*
+
 typedef Galois::Graph::FirstGraph<MetisNode,METISINT, true>            GGraph;
 typedef Galois::Graph::FirstGraph<MetisNode,METISINT, true>::GraphNode GNode;
 
+*/
+
+typedef Galois::Graph::MemScalGraph<MetisNode,METISINT, true>            GGraph;
+typedef Galois::Graph::MemScalGraph<MetisNode,METISINT, true>::GraphNode GNode;
+
 #include <set>
 using namespace std;
+
+namespace testMetis {
+	extern bool testCoarsening;
+	extern bool testInitialPartition;
+}
+
 typedef ArraySet< GNode > GNodeSet;
 typedef set< GNode, std::less<GNode>, Galois::Runtime::MM::FSBGaloisAllocator<GNode> > GNodeSTLSet;
 //typedef vector<GNode> GNodeSTLSet;
+typedef Galois::Runtime::PerThreadVector<GNode> NodeCtxWl;
 
 int getRandom(int num);
 
 struct PerCPUValue {
   Galois::GAccumulator<int> mincutInc;
   Galois::GSetAccumulator<GNodeSTLSet> changedBndNodes;
+};
+
+struct IteratorPairs{
+	GGraph::edge_iterator first_start;
+	GGraph::edge_iterator first_end;
+	GGraph::edge_iterator second_start;
+	GGraph::edge_iterator second_end;
+	GNode node;
+	typedef GGraph::edge_iterator ei;
+	IteratorPairs(ei first_start,ei first_end,ei second_start,ei second_end,GNode node) {
+		this->first_start = first_start;
+		this->first_end = first_end;
+		this->second_start = second_start;
+		this->second_end = second_end;
+		this->node = node;
+	}
 };
 
 struct gNodeToInt {

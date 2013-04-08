@@ -30,11 +30,11 @@ class RMMatcher{
 private:
 	int maxVertexWeight;
 	GGraph* graph;
-	GGraph* coarseGraph;
+
 	MetisGraph* metisGraph;
 public:
-	RMMatcher(MetisGraph* metisGraph, GGraph* coarseGraph, int maxVertexWeight) {
-		this->coarseGraph=coarseGraph;
+	RMMatcher(MetisGraph* metisGraph, int maxVertexWeight) {
+
 		this->metisGraph = metisGraph;
 		this->graph=metisGraph->getGraph();
 		this->maxVertexWeight=maxVertexWeight;
@@ -68,17 +68,10 @@ public:
 
 			metisGraph->setMatch(nodeData.getNodeId(), matchNode);
 			MetisNode& matchNodeData = graph->getData(matchNode,Galois::MethodFlag::NONE);
-//			int weight = nodeData.getWeight();
 			if (node != matchNode) {
 				metisGraph->setMatch(matchNodeData.getNodeId(), node);
-//				weight += matchNodeData.getWeight();
+
 			}
-//			GNode newNode = coarseGraph->createNode(MetisNode(weight));
-//			coarseGraph->addNode(newNode, Galois::Graph::MethodFlag::NONE);
-//			metisGraph->setCoarseGraphMap(nodeData.getNodeId(), newNode);
-//			if(matchNode!=node){
-//				metisGraph->setCoarseGraphMap(matchNodeData.getNodeId(), newNode);
-//			}
 		}
 
 

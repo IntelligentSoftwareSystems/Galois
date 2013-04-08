@@ -24,14 +24,17 @@
 #include "RandomKWayRefiner.h"
 #include "defs.h"
 #include "GMetisConfig.h"
-void projectNeighbors(GGraph* graph, int nparts, GNode node, int& ndegrees, int& ed) {
-  MetisNode& nodeData = graph->getData(node, Galois::MethodFlag::NONE);
-  std::vector<int> map(nparts,-1);
+void projectNeighbors(GGraph* graph, int nparts, GNode node, int& ndegrees, int& ed,int &id) {
+	MetisNode& nodeData = graph->getData(node, Galois::MethodFlag::NONE);
+	int map[nparts];
+	for(int i=0;i<nparts;i++)
+		map[i]=-1;
+
 	for (GGraph::edge_iterator jj = graph->edge_begin(node, Galois::MethodFlag::NONE), eejj = graph->edge_end(node, Galois::MethodFlag::NONE); jj != eejj; ++jj) {
-	  GNode neighbor = graph->getEdgeDst(jj);
-	  MetisNode& neighborData = graph->getData(neighbor,Galois::MethodFlag::NONE);
+		GNode neighbor = graph->getEdgeDst(jj);
+		MetisNode& neighborData = graph->getData(neighbor,Galois::MethodFlag::NONE);
+		int edgeWeight = graph->getEdgeData(jj, Galois::MethodFlag::NONE);
 		if (nodeData.getPartition() != neighborData.getPartition()) {
-			int edgeWeight = graph->getEdgeData(jj, Galois::MethodFlag::NONE);
 			ed += edgeWeight;
 			int index = map[neighborData.getPartition()];
 			if (index == -1) {
@@ -42,90 +45,100 @@ void projectNeighbors(GGraph* graph, int nparts, GNode node, int& ndegrees, int&
 			} else {
 				nodeData.getPartEd()[index] += edgeWeight;
 			}
+		}else {
+			id+=edgeWeight;
 		}
 	}
 }
 struct projectInfo {
 	int nparts;
-	GGraph* graph;
-	MetisGraph* finer;
-	projectInfo(int nparts, MetisGraph* finer){
-		this->finer = finer;
+
+	MetisGraph* finerMetisGraph;
+	MetisGraph *coarseMetisGraph;
+	GGraph *coarseGGraph;
+	GGraph *finerGGraph;
+	projectInfo(int nparts, MetisGraph* finerMetisGraph,MetisGraph *coarseMetisGraph){
 		this->nparts = nparts;
-		this->graph = finer->getGraph();
+		this->finerMetisGraph = finerMetisGraph;
+		this->coarseMetisGraph = coarseMetisGraph;
+		this->coarseGGraph = coarseMetisGraph->getGraph();
+		this->finerGGraph = finerMetisGraph->getGraph();
+
 	}
 	template<typename Context>
 	void operator()(GNode node, Context& lwl) {
 
-	  MetisNode& nodeData = graph->getData(node,Galois::MethodFlag::NONE);
+		MetisNode& nodeData = finerGGraph->getData(node,Galois::MethodFlag::NONE);
 		nodeData.setIdegree(nodeData.getAdjWgtSum());
-		if (finer->getGraph()->getData(finer->getCoarseGraphMap(nodeData.getNodeId()),Galois::MethodFlag::NONE).getEdegree() > 0) {
+		GNode multiNode = finerMetisGraph->getCoarseGraphMap(nodeData.getNodeId());
+		MetisNode &multiNodeData = coarseGGraph->getData(multiNode,Galois::MethodFlag::NONE);
 
+		if (multiNodeData.getEdegree() > 0)
+		{
 			int ed = 0;
 			int ndegrees = 0;
-			projectNeighbors(graph,  nparts, node,ndegrees, ed);
+			int id =0;
+			projectNeighbors(finerGGraph,  nparts, node,ndegrees, ed,id);
 			nodeData.setEdegree(ed);
-			nodeData.setIdegree(nodeData.getIdegree() - nodeData.getEdegree());
+			nodeData.setIdegree(id);
 			nodeData.setNDegrees(ndegrees);
 		}
 	}
 };
 
 struct projectPartition {
-	GGraph* graph;
-	MetisGraph* finer;
-	projectPartition(MetisGraph* finer){
-		this->graph = finer->getGraph();
-		this->finer = finer;
+	MetisGraph* finerMetisGraph;
+	MetisGraph *coarseMetisGraph;
+	GGraph* finerGGraph;
+	GGraph* coarseGGraph;
+	int nparts;
+	projectPartition(MetisGraph* finer,MetisGraph *coarseGraph,int nparts){
+		this->finerMetisGraph = finer;
+		this->coarseMetisGraph = coarseGraph;
+		this->coarseGGraph = coarseMetisGraph->getGraph();
+		this->finerGGraph = finerMetisGraph->getGraph();
+		this->nparts = nparts;
+
 	}
 	template<typename Context>
 	void operator()(GNode node, Context& lwl) {
-	  MetisNode& nodeData = graph->getData(node,Galois::MethodFlag::NONE);
-	  nodeData.setPartition(finer->getGraph()->getData(finer->getCoarseGraphMap(nodeData.getNodeId()),Galois::MethodFlag::NONE).getPartition());
+		MetisNode& nodeData = finerGGraph->getData(node,Galois::MethodFlag::NONE);
+		GNode multiNode = finerMetisGraph->getCoarseGraphMap(nodeData.getNodeId());
+		MetisNode &multiNodeData = coarseGGraph->getData(multiNode,Galois::MethodFlag::NONE);
+		nodeData.setPartition(multiNodeData.getPartition());
 	}
 };
 
 
+void projectKWayPartition(MetisGraph* coarseMetisGraph, int nparts){
 
-void computeKWayPartInfo(int nparts, MetisGraph* finer,
-		GGraph* coarseGraph, GGraph* graph){
-	projectInfo pi(nparts, finer);
-	Galois::for_each<Galois::WorkList::ChunkedLIFO<32> >(graph->begin(), graph->end(), pi, "ProjectInfo");
-}
-
-void projectKWayPartition(MetisGraph* metisGraph, int nparts){
-	MetisGraph* finer = metisGraph->getFinerGraph();
-	GGraph* coarseGraph = metisGraph->getGraph();
-	GGraph* graph = finer->getGraph();
-	finer->initBoundarySet();
-//	projectPartition pp(finer);
-//	Galois::for_each<Galois::Runtime::WorkList::ChunkedFIFO<128> >(graph->begin(), graph->end(), pp);
-
-	for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
-		GNode node = *ii;
-		MetisNode& nodeData = graph->getData(node);
-		nodeData.setPartition(finer->getGraph()->getData(finer->getCoarseGraphMap(nodeData.getNodeId()),Galois::MethodFlag::NONE).getPartition());
-		if(finer->getGraph()->getData(finer->getCoarseGraphMap(nodeData.getNodeId()),Galois::MethodFlag::NONE).getEdegree() > 0){
-			nodeData.initPartEdAndIndex(nodeData.getNumEdges());
-		}
-	}
-
-	computeKWayPartInfo(nparts, finer, coarseGraph, graph);
-	for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
-		GNode node = *ii;
-		MetisNode& nodeData = graph->getData(node,Galois::MethodFlag::NONE);
-		if (finer->getGraph()->getData(finer->getCoarseGraphMap(nodeData.getNodeId()),Galois::MethodFlag::NONE).getEdegree() > 0) {
-			if (nodeData.getEdegree() - nodeData.getIdegree() >= 0)
-				finer->setBoundaryNode(node);
-		}
-	}
-
-
-	finer->initPartWeight(nparts);
+	MetisGraph* finerMetisGraph = coarseMetisGraph->getFinerGraph();
+	GGraph* coarseGGraph = coarseMetisGraph->getGraph();
+	GGraph* finerGGraph = finerMetisGraph->getGraph();
+	finerMetisGraph->initBoundarySet();
+	Galois::Timer t;
+	t.start();
+	projectPartition pp(finerMetisGraph,coarseMetisGraph,nparts);
+	Galois::for_each_local<Galois::WorkList::dChunkedFIFO<64, GNode> >(*finerGGraph, pp,"Project Partition");
+	t.stop();
+	cout<<"project partition "<<t.get()<<" ms"<<endl;
+	projectInfo pi(nparts,finerMetisGraph,coarseMetisGraph);
+	Galois::for_each_local<Galois::WorkList::ChunkedLIFO<64, GNode> >(*finerGGraph, pi,"Projecting Info");
+	t.stop();
+	cout<<"projecting info "<<t.get()<<" ms "<<endl;
+	finerMetisGraph->initPartWeight(nparts);
 	for (int i = 0; i < nparts; i++) {
-		finer->setPartWeight(i, metisGraph->getPartWeight(i));
+		finerMetisGraph->setPartWeight(i, coarseMetisGraph->getPartWeight(i));
 	}
-	finer->setMinCut(metisGraph->getMinCut());
+	int numNodes=0;
+	for(GGraph::iterator ii = finerGGraph->begin(),ee=finerGGraph->end();ii!=ee;ii++) {
+		GNode node = *ii;
+		MetisNode &nodeData = finerGGraph->getData(node);
+		if(nodeData.getEdegree()-nodeData.getIdegree()>0) {
+			finerMetisGraph->setBoundaryNode(node);
+		}
+	}
+	finerMetisGraph->setMinCut(coarseMetisGraph->getMinCut());
 }
 
 void refineKWay(MetisGraph* metisGraph, MetisGraph* orgGraph, float* tpwgts, float ubfactor, int nparts){
@@ -155,6 +168,7 @@ void refineKWay(MetisGraph* metisGraph, MetisGraph* orgGraph, float* tpwgts, flo
 		delete coarseGraph;
 		i++;
 	}
+
 	if (2 * i >= nlevels && !metisGraph->isBalanced(tpwgts, (float) 1.04 * ubfactor)) {
 		metisGraph->computeKWayBalanceBoundary();
 		greedyKWayEdgeBalance(metisGraph, nparts, tpwgts, ubfactor, 8);

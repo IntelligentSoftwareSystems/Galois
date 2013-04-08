@@ -48,6 +48,80 @@ static cll::opt<bool> weighted("weighted", cll::desc("weighted"), cll::init(fals
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<int> numPartitions(cll::Positional, cll::desc("<Number of partitions>"), cll::Required);
 
+bool verifyCoarsening(MetisGraph *metisGraph) {
+	cout<<endl<<"##### Verifying coarsening #####"<<endl;
+	int matchedCount=0;
+	int unmatchedCount=0;
+	GGraph *graph = metisGraph->getGraph();
+
+	if(metisGraph->matches == NULL){
+		cout<<"Matches array has been lost. Try again by changing the code which releases matches.";
+		return false;
+	}
+
+	for(GGraph::iterator ii=graph->begin(),ee=graph->end();ii!=ee;ii++) {
+		GNode node = *ii;
+		MetisNode &nodeData = graph->getData(node);
+		if(metisGraph->getMatch(nodeData.getNodeId()) == NULL) {
+			return false;
+
+		}
+		if(metisGraph->getMatch(nodeData.getNodeId()) == node) {
+			unmatchedCount++;
+		}
+		else{
+			matchedCount++;
+			GNode match = metisGraph->getMatch(nodeData.getNodeId());
+			MetisNode &matchNodeData = graph->getData(match);
+			if(node != metisGraph->getMatch(matchNodeData.getNodeId()))
+				return false;
+		}
+
+		int edges=0;
+		for(GGraph::edge_iterator ii=graph->edge_begin(node),ee=graph->edge_end(node);ii!=ee;ii++) {
+			edges++;
+		}
+		if(edges!=nodeData.getNumEdges()) {
+			return false;
+		}
+	}
+	if(matchedCount+unmatchedCount != metisGraph->getNumNodes())
+		return false;
+	return true;
+}
+
+bool verifyRecursiveBisection(MetisGraph* metisGraph,int nparts) {
+
+	GGraph *graph = metisGraph->getGraph();
+	int partNodes[nparts];
+	memset(partNodes,0,sizeof(partNodes));
+	for(GGraph::iterator ii = graph->begin(),ee=graph->end();ii!=ee;ii++) {
+		GNode node = *ii;
+		MetisNode &nodeData = graph->getData(node);
+		if(!(nodeData.getPartition()<nparts))
+			return false;
+		partNodes[nodeData.getPartition()]++;
+		int edges=0;
+		for(GGraph::edge_iterator ii=graph->edge_begin(node),ee=graph->edge_end(node);ii!=ee;ii++) {
+			edges++;
+		}
+		if(nodeData.getNumEdges()!=edges) {
+			return false;
+		}
+	}
+	int sum=0;
+	for(int i=0;i<nparts;i++) {
+		if(partNodes[i]<=0)
+			return false;
+		sum+=partNodes[i];
+	}
+
+
+	if(sum != metisGraph->getNumNodes())
+		return false;
+	return true;
+}
+
 /**
  * KMetis Algorithm
  */
@@ -63,6 +137,16 @@ void partition(MetisGraph* metisGraph, int nparts) {
 	t.stop();
 	cout<<"coarsening time: " << t.get() << " ms"<<endl;
 	T.stop();
+
+	if(testMetis::testCoarsening) {
+		if(verifyCoarsening(mcg->getFinerGraph())) {
+			cout<<"#### Coarsening is correct ####"<<endl;
+		} else {
+			cout<<"!!!! Coarsening is wrong !!!!"<<endl;
+		}
+	}
+
+
 	float* totalPartitionWeights = new float[nparts];
 	std::fill_n(totalPartitionWeights, nparts, 1 / (float) nparts);
 	maxVertexWeight = (int) (1.5 * ((mcg->getNumNodes()) / COARSEN_FRACTION));
@@ -72,8 +156,18 @@ void partition(MetisGraph* metisGraph, int nparts) {
 	pmetis.mlevelRecursiveBisection(mcg, nparts, totalPartitionWeights, 0, 0);
 	init_part_t.stop();
 	cout << "initial partition time: "<< init_part_t.get()  << " ms"<<endl;
-	Galois::Timer refine_t;
 
+	if(testMetis::testInitialPartition) {
+		cout<<endl<<"#### Verifying initial partition ####"<<endl;
+		if(!verifyRecursiveBisection(mcg,nparts)) {
+			cout<<endl<<"!!!! Initial partition is wrong !!!!"<<endl;
+		}else {
+			cout<<endl<<"#### Initial partition is right ####"<<endl;
+		}
+	}
+
+
+	Galois::Timer refine_t;
 	std::fill_n(totalPartitionWeights, nparts, 1 / (float) nparts);
 	refine_t.start();
 	refineKWay(mcg, metisGraph, totalPartitionWeights, (float) 1.03, nparts);
@@ -82,6 +176,7 @@ void partition(MetisGraph* metisGraph, int nparts) {
 	delete[] totalPartitionWeights;
 	T.stop();
 }
+
 
 void verify(MetisGraph* metisGraph) {
 	if (!metisGraph->verify()) {
@@ -209,6 +304,12 @@ void readGraph(MetisGraph* metisGraph, const char* filename, bool weighted = fal
 	cout<<"end of transfer data to GGraph"<<endl;
 }
 
+namespace testMetis {
+	bool testCoarsening = true;
+	bool testInitialPartition = true;;
+}
+
+
 int main(int argc, char** argv) {
   Galois::StatManager statManager; 
 	LonestarStart(argc, argv, name, desc, url);
@@ -223,11 +324,11 @@ int main(int argc, char** argv) {
 	}else{
 	  readGraph(&metisGraph, filename.c_str(), weighted, directed);
 	}
-  	/*Galois::Statistic("MeminfoPre1", Galois::Runtime::MM::pageAllocInfo());
-  	Galois::preAlloc(5000);
-  	Galois::Statistic("MeminfoPre2", Galois::Runtime::MM::pageAllocInfo());*/
+  	Galois::Statistic("MeminfoPre1", Galois::Runtime::MM::pageAllocInfo());
+  	Galois::preAlloc(9000);
+  	Galois::Statistic("MeminfoPre2", Galois::Runtime::MM::pageAllocInfo());
 	partition(&metisGraph, numPartitions);
-  	//Galois::Statistic("MeminfoPre3", Galois::Runtime::MM::pageAllocInfo());
+  	Galois::Statistic("MeminfoPre3", Galois::Runtime::MM::pageAllocInfo());
 	verify(&metisGraph);
 }
 

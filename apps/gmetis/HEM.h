@@ -28,11 +28,11 @@ class HEMMatcher{
 private:
 	int maxVertexWeight;
 	GGraph* graph;
-	GGraph* coarseGraph;
+
 	MetisGraph* metisGraph;
 public:
-	HEMMatcher(MetisGraph* metisGraph, GGraph* coarseGraph, int maxVertexWeight) {
-		this->coarseGraph=coarseGraph;
+	HEMMatcher(MetisGraph* metisGraph, int maxVertexWeight) {
+
 		this->metisGraph = metisGraph;
 		this->graph=metisGraph->getGraph();
 		this->maxVertexWeight=maxVertexWeight;
