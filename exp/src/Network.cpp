@@ -21,9 +21,9 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/Runtime/Network.h"
 #include "Galois/Runtime/Tracer.h"
 #include "Galois/Runtime/Barrier.h"
+#include "Galois/Runtime/Directory.h"
 
 #include <cassert>
 
@@ -51,6 +51,8 @@ void Galois::Runtime::Distributed::networkStart() {
   NetworkInterface& net = getSystemNetworkInterface();
   if (networkHostID != 0) {
     while (!ourexit) {
+      Galois::Runtime::Distributed::getSystemLocalDirectory().makeProgress();
+      Galois::Runtime::Distributed::getSystemRemoteDirectory().makeProgress();
       net.handleReceives();
     }
     exit(0);
