@@ -360,10 +360,10 @@ struct AsyncAlgo {
 #ifdef GALOIS_USE_EXP
     Exp::PriAuto<16, UpdateRequestIndexer<UpdateRequest>, OBIM, std::less<UpdateRequest>, std::greater<UpdateRequest> >::for_each(initial.begin(), initial.end(), Process(this, graph));
 #else
-    Galois::for_each_local<OBIM>(initial, Process(this, graph));
+    Galois::for_each_local<OBIM>(&initial, Process(this, graph));
 #endif
 #endif
-    Galois::for_each_local<OBIM>(initial, Process(this, graph));
+    Galois::for_each_local<OBIM>(&initial, Process(this, graph));
   }
 };
 
@@ -440,9 +440,10 @@ struct GraphLabAlgo {
   };
 
   void operator()(Graph& graph, const GNode& source) {
-    Galois::GraphLab::SyncEngine<Graph,Program> engine(&graph);
-    engine.signal(source, Program::message_type(0));
-    engine.execute();
+    assert(0 && "fixme");
+    //Galois::GraphLab::SyncEngine<Graph,Program> engine(&graph);
+    //engine.signal(source, Program::message_type(0));
+    //engine.execute();
   }
 };
 
@@ -513,7 +514,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
     graph.getData(source).dist = 0;
 
     this->outEdgeMap(memoryLimit, graph, EdgeOperator(), source, bags.next());
-    Galois::do_all_local(bags.next(), ResetVisited(graph));
+    Galois::do_all_local(&bags.next(), ResetVisited(graph));
     
     unsigned rounds = 0;
     while (!bags.next().empty()) {
@@ -524,7 +525,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
          
       bags.swap();
       this->outEdgeMap(memoryLimit, graph, EdgeOperator(), bags.cur(), bags.next(), true);
-      Galois::do_all_local(bags.next(), ResetVisited(graph));
+      Galois::do_all_local(&bags.next(), ResetVisited(graph));
     }
 
     roundStat += rounds + 1;
@@ -552,7 +553,7 @@ void run() {
   Galois::StatTimer T;
   std::cout << "Running " << algo.name() << " version\n";
   T.start();
-  Galois::do_all_local(graph, typename Algo::Initialize(graph));
+  Galois::do_all_local(&graph, typename Algo::Initialize(graph));
   algo(graph, source);
   T.stop();
   

@@ -52,15 +52,16 @@ public:
   void clear() { 
     if (isDense) {
       if (numNodes.reduce() < bitmask.size() / 4) {
-        Galois::do_all_local(bag, [&](size_t n) {
+        Galois::do_all_local(&bag, [&](size_t n) {
           bitmask[n] = 0;
         });
       } else {
-        Galois::on_each([&](unsigned id, unsigned total) {
-          typedef typename Bitmask::iterator It;
-          std::pair<It,It> p = Galois::block_range(bitmask.begin(), bitmask.end(), id, total);
-          std::fill(p.first, p.second, 0);
-        });
+	assert(0 && "not dist safe");
+        /* Galois::on_each([&](unsigned id, unsigned total) { */
+        /*   typedef typename Bitmask::iterator It; */
+        /*   std::pair<It,It> p = Galois::block_range(bitmask.begin(), bitmask.end(), id, total); */
+        /*   std::fill(p.first, p.second, 0); */
+        /* }); */
       }
     }
     bag.clear();
@@ -83,7 +84,7 @@ public:
       bitmask.allocate(size);
     }
 
-    Galois::do_all_local(bag, [&](size_t n) {
+    Galois::do_all_local(&bag, [&](size_t n) {
       bitmask[n] = true;
     });
     //Galois::do_all(bag.begin(), bag.end(), Densify(this));

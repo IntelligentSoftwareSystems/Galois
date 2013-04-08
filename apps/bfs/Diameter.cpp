@@ -170,13 +170,13 @@ struct CountLevels {
   }
 
   std::deque<size_t> count() {
-    return Galois::Runtime::do_all_impl(Galois::Runtime::makeLocalRange(graph), *this, *this).counts;
+    return Galois::Runtime::do_all_impl(Galois::Runtime::makeLocalRange(&graph), *this, *this).counts;
   }
 };
 
 template<typename Algo>
 void resetGraph(typename Algo::Graph& g) {
-  Galois::do_all_local(g, typename Algo::Initialize(g));
+  Galois::do_all_local(&g, typename Algo::Initialize(g));
 }
 
 template<typename Graph>
@@ -289,7 +289,7 @@ struct PickKAlgo {
   
   std::deque<GNode> select(Graph& graph, unsigned topn, size_t dist) {
     Galois::InsertBag<GNode> bag;
-    Galois::do_all_local(graph, collect_nodes_with_dist<Graph>(graph, bag, dist));
+    Galois::do_all_local(&graph, collect_nodes_with_dist<Graph>(graph, bag, dist));
 
     // Incrementally sort nodes until we find least N who are not neighbors
     // of each other
@@ -576,8 +576,9 @@ struct GraphLabAlgo {
     size_t diameter = 0;
     for (size_t iter = 0; iter < 100; ++iter) {
       //Galois::GraphLab::executeSync(graph, graph, Program());
-      Galois::GraphLab::SyncEngine<Graph,Program> engine(&graph);
-      engine.execute();
+      assert(0 && "compiler error");
+      //Galois::GraphLab::SyncEngine<Graph,Program> engine(&graph);
+      //engine.execute();
 
       Galois::do_all(graph.begin(), graph.end(), [&](GNode n) {
         LNode& data = graph.getData(n);
@@ -778,7 +779,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
       newDist++;
       int cur = newDist & 1;
       int next = (newDist + 1) & 1;
-      Galois::do_all_local(bags.cur(), Update(this, graph, cur, next));
+      Galois::do_all_local(&bags.cur(), Update(this, graph, cur, next));
       this->outEdgeMap(memoryLimit, graph, EdgeOperator(this, cur, next, newDist), bags.cur(), bags.next(), false);
     }
 

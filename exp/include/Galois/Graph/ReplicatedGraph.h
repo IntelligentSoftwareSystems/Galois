@@ -37,7 +37,7 @@ using namespace Galois::Runtime::Distributed;
 
 template<typename NodeTy, typename EdgeTy>
 class ReplicatedGraph {
-  typedef Runtime::PerHostStorage<LC_CSR_InOutGraph<NodeTy, EdgeTy, true>> Inner;
+  typedef LC_CSR_InOutGraph<NodeTy, EdgeTy, true> Inner;
 
   gptr<Inner> graph;
   Inner* pGraph;
@@ -54,7 +54,8 @@ class ReplicatedGraph {
 
     void operator()(unsigned tid, unsigned) {
       if (tid != 0) return;
-      self->pGraph = &*self->graph;
+      assert(0 && "fixme");
+      //self->pGraph = &*self->graph;
 
       if (symmetric) {
         self->pGraph->structureFromFile(fname, symmetric);
@@ -95,7 +96,7 @@ public:
 
   ~ReplicatedGraph() {
     // XXX cannot deallocate
-    Runtime::deallocatePerHost(graph);
+    //Runtime::deallocatePerHost(graph);
   }
 
   void serialize(SerializeBuffer& s) const { gSerialize(s, graph); }

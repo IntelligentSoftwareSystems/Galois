@@ -32,7 +32,6 @@
 #include <cstdio>
 #include <cerrno>
 #include <cassert>
-#include <vector>
 
 #include <semaphore.h>
 #include <pthread.h>

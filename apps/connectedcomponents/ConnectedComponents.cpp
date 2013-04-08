@@ -248,11 +248,11 @@ struct SynchronousAlgo {
 
     cur = &wls[0];
     next = &wls[1];
-    Galois::do_all_local(graph, Initialize(graph, *cur));
+    Galois::do_all_local(&graph, Initialize(graph, *cur));
 
     while (!cur->empty()) {
-      Galois::do_all_local(*cur, Merge(graph, emptyMerges));
-      Galois::for_each_local(*cur, Find(graph, *next));
+      Galois::do_all_local(cur, Merge(graph, emptyMerges));
+      Galois::for_each_local(cur, Find(graph, *next));
       cur->clear();
       std::swap(cur, next);
       rounds += 1;
@@ -330,11 +330,11 @@ struct LabelPropAlgo {
   void operator()(Graph& graph) {
     typedef Galois::WorkList::dChunkedFIFO<256> WL;
 
-    Galois::do_all_local(graph, Initialize(graph));
+    Galois::do_all_local(&graph, Initialize(graph));
     if (symmetricGraph) {
-      Galois::for_each_local<WL>(graph, Process<true,false>(graph));
+      Galois::for_each_local<WL>(&graph, Process<true,false>(graph));
     } else {
-      Galois::for_each_local<WL>(graph, Process<true,true>(graph));
+      Galois::for_each_local<WL>(&graph, Process<true,true>(graph));
     }
   }
 };
@@ -417,10 +417,10 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
     typedef Galois::GraphNodeBagPair<> BagPair;
     BagPair bags(graph.size());
 
-    Galois::do_all_local(graph, Initialize<typename BagPair::bag_type>(graph, bags.next()));
+    Galois::do_all_local(&graph, Initialize<typename BagPair::bag_type>(graph, bags.next()));
     while (!bags.next().empty()) {
       bags.swap();
-      Galois::for_each_local<WL>(bags.cur(), Copy(graph));
+      Galois::for_each_local<WL>(&bags.cur(), Copy(graph));
       this->outEdgeMap(memoryLimit, graph, EdgeOperator(), bags.cur(), bags.next(), false);
     } 
   }
@@ -510,7 +510,7 @@ struct GraphChiAlgo: public Galois::LigraGraphChi::ChooseExecutor<true> {
   void operator()(Graph& graph) {
     BagPair bags(graph.size());
 
-    Galois::do_all_local(graph, Initialize(graph));
+    Galois::do_all_local(&graph, Initialize(graph));
     Galois::GraphChi::vertexMap(graph, Process(bags.next()), memoryLimit);
     while (!bags.next().empty()) {
       bags.swap();
@@ -661,8 +661,9 @@ struct GraphLabAlgo {
     Galois::for_each_local(ptr, Initialize(graph));
     //std::for_each(graph.begin(), graph.end(), Initialize(graph));
 
-    Galois::GraphLab::SyncEngine<Graph,Program> engine(graph);
-    engine.execute();
+    assert(0 && "fixme");
+    //Galois::GraphLab::SyncEngine<Graph,Program> engine(graph);
+    //engine.execute();
     if (true)
       countComponents(graph);
   }
@@ -754,7 +755,7 @@ struct AsyncAlgo {
 
   void operator()(Graph& graph) {
     Galois::Statistic emptyMerges("EmptyMerges");
-    Galois::for_each_local(graph, Merge(graph, emptyMerges));
+    Galois::for_each_local(&graph, Merge(graph, emptyMerges));
   }
 };
 

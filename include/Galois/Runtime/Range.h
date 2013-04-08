@@ -39,15 +39,15 @@ namespace Runtime {
 
 template<typename T>
 class LocalRange {
-  T* container;
+  T container;
 
 public:
-  typedef typename T::iterator iterator;
-  typedef typename T::local_iterator local_iterator;
+  typedef typename std::remove_reference<decltype(*container)>::type::iterator iterator;
+  typedef typename std::remove_reference<decltype(*container)>::type::local_iterator local_iterator;
   typedef iterator block_iterator;
   typedef typename std::iterator_traits<local_iterator>::value_type value_type;
   
-  LocalRange(T& c): container(&c) { }
+  LocalRange(T c): container(c) { }
 
   iterator begin() const { return container->begin(); }
   iterator end() const { return container->end(); }
@@ -68,7 +68,7 @@ public:
 };
 
 template<typename T>
-inline LocalRange<T> makeLocalRange(T& obj) { return LocalRange<T>(obj); }
+inline LocalRange<T> makeLocalRange(T obj) { return LocalRange<T>(obj); }
 
 template<typename IterTy>
 class StandardRange {

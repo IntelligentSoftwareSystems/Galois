@@ -621,8 +621,7 @@ struct InsertBody : public Galois::Runtime::Lockable {
   InsertBody(BodyPtrs& pb, Bodies& b): pBodies(pb), bodies(b) { }
   template<typename Context>
   void operator()(Octree& b, const Context& cnx) {
-    bodies->push_back(b);
-    gptr<Octree> bodyptr(&bodies->back());
+    gptr<Octree> bodyptr(&*bodies->emplace(b));
     pBodies->push_back(bodyptr);
   }
   // serialization functions

@@ -516,9 +516,9 @@ struct HighCentralityAlgo {
       newDist++;
       std::cout << nextSize << " " << (nextSize > graph.sizeEdges() / 20) << "\n";
       if (nextSize > graph.sizeEdges() / 20)
-        Galois::do_all_local(graph, BackwardProcess(graph, &bags[next], newDist));
+        Galois::do_all_local(&graph, BackwardProcess(graph, &bags[next], newDist));
       else
-        Galois::for_each_local<WL>(bags[cur].wl, ForwardProcess(graph, &bags[next], newDist));
+        Galois::for_each_local<WL>(&bags[cur].wl, ForwardProcess(graph, &bags[next], newDist));
       bags[cur].clear();
     }
   }
@@ -712,7 +712,7 @@ void run() {
   Galois::StatTimer T;
   std::cout << "Running " << algo.name() << " version\n";
   T.start();
-  Galois::do_all_local(graph, Initialize<typename Algo::Graph>(graph));
+  Galois::do_all_local(&graph, Initialize<typename Algo::Graph>(graph));
   algo(graph, source);
   T.stop();
   

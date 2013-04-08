@@ -47,7 +47,7 @@ struct Context {
   typedef std::pair<GNode,message_type> WorkItem;
   typedef DGReducibleVector<message_type, AddBinFunc<message_type>> Messages;
   typedef LargeArray<int,false> Scoreboard;
-  typedef Runtime::PerHostStorage<Galois::InsertBag<GNode>> Next;
+  typedef Runtime::PerHost<Galois::InsertBag<GNode>> Next;
 
 private:
   template<typename,typename> friend class AsyncEngine;
@@ -77,7 +77,8 @@ private:
     // XXX check if remote node 
     int val = (*scoreboard)[id];
     if (val == 0 && __sync_bool_compare_and_swap(&(*scoreboard)[id], 0, 1)) {
-      next->push(node);
+      assert(0 && "Fixme");
+      //next->push(node);
     }
   }
 
@@ -308,7 +309,8 @@ class SyncEngine {
 
     void init() {
       pData = &*origPointer;
-      pData->context.initializeForSync(pData->pGraph, &pData->scoreboard, &*next, pData->pMessages);
+      assert(0 && "fixme");
+      //pData->context.initializeForSync(pData->pGraph, &pData->scoreboard, &*next, pData->pMessages);
     }
     
     void operator()(GNode node, Galois::UserContext<GNode>&) {
@@ -476,9 +478,9 @@ public:
   ~SyncEngine() {
     // XXX cannot deallocate master pointer otherwise new pointers may point
     // to garbage
-    Runtime::deallocatePerHost(data);
-    Runtime::deallocatePerHost(messages);
-    Runtime::deallocatePerHost(terminator);
+    //Runtime::deallocatePerHost(data);
+    //Runtime::deallocatePerHost(messages);
+    //Runtime::deallocatePerHost(terminator);
   }
 
   void signal(GNode node, const message_type& msg) {
@@ -491,7 +493,7 @@ public:
 
   void execute() {
     Galois::Statistic rounds("GraphLabRounds");
-    typedef Runtime::PerHostStorage<Galois::InsertBag<GNode>> PerHostBag;
+    typedef Runtime::PerHost<Galois::InsertBag<GNode>> PerHostBag;
     
     gptr<PerHostBag> next(new PerHostBag);
     gptr<PerHostBag> cur(new PerHostBag);
@@ -511,8 +513,8 @@ public:
 
     // XXX cannot deallocate master pointer otherwise new pointers may point
     // to garbage
-    deallocatePerHost(next);
-    deallocatePerHost(cur);
+    //deallocatePerHost(next);
+    //deallocatePerHost(cur);
   }
 };
 

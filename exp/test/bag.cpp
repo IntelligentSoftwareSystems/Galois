@@ -12,6 +12,7 @@ struct InsertBody : public Galois::Runtime::Lockable {
   InsertBody(IntPtrs& b): pBodies(b) { }
   template<typename Context>
   void operator()(int in, const Context& cnx) {
+    Galois::Runtime::LL::gPrint("i: ", in, "\n");
     pBodies->push(in);
   }
   // serialization functions
@@ -30,9 +31,10 @@ struct PrintInt : public Galois::Runtime::Lockable {
 
   template<typename Context>
   void operator()(int i, Context& cnx) {
-    std::stringstream ss;
-    ss << "i: " << i << " host: " << Galois::Runtime::Distributed::networkHostID << "\n";
-    std::cout << ss.str();
+    Galois::Runtime::LL::gPrint("i: ", i, " host: ", Galois::Runtime::Distributed::networkHostID, "\n");
+    //    std::stringstream ss;
+    //    ss << "i: " << i << " host: " << Galois::Runtime::Distributed::networkHostID << "\n";
+    //    std::cout << ss.str();
   }
 
   // serialization functions

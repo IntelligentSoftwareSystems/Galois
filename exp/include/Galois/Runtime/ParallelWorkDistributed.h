@@ -121,7 +121,7 @@ void for_each_local_landing_pad(Distributed::RecvBuffer& buf) {
   Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
 
   //Start locally
-  Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(*data), f, nullptr);
+  Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(data), f, nullptr);
   
   // place a MPI barrier here for all the hosts to synchronize
   net.systemBarrier();
@@ -140,7 +140,7 @@ void do_all_local_landing_pad(Distributed::RecvBuffer& buf) {
 
   inDoAllDistributed = true;
   //Start locally
-  do_all_impl(Galois::Runtime::makeLocalRange(*data),f,r,needsReduce);
+  do_all_impl(Galois::Runtime::makeLocalRange(data),f,r,needsReduce);
   inDoAllDistributed = false;
 
   // place a MPI barrier here for all the hosts to synchronize
@@ -210,7 +210,7 @@ void for_each_local_dist(T& c, FunctionTy f, const char* loopname) {
 
   //fast path for non-distributed
   if (Distributed::networkHostNum == 1) {
-    for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(*c),f,loopname);
+    for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(c),f,loopname);
     return;
   }
 
@@ -223,7 +223,7 @@ void for_each_local_dist(T& c, FunctionTy f, const char* loopname) {
   }
   net.handleReceives();
   //Start locally
-  for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(*c), f, loopname);
+  for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(c), f, loopname);
 
   // place a MPI barrier here for all the hosts to synchronize
   net.systemBarrier();
@@ -239,7 +239,7 @@ void do_all_impl_dist(T& c, FunctionTy f, ReducerTy r, bool needsReduce) {
 
   //fast path for non-distributed
   if (Distributed::networkHostNum == 1) {
-    do_all_impl(Galois::Runtime::makeLocalRange(*c),f,r,needsReduce);
+    do_all_impl(Galois::Runtime::makeLocalRange(c),f,r,needsReduce);
     return;
   }
 
@@ -253,7 +253,7 @@ void do_all_impl_dist(T& c, FunctionTy f, ReducerTy r, bool needsReduce) {
   net.handleReceives();
   inDoAllDistributed = true;
   //Start locally
-  do_all_impl(Galois::Runtime::makeLocalRange(*c),f,r,needsReduce);
+  do_all_impl(Galois::Runtime::makeLocalRange(c),f,r,needsReduce);
   inDoAllDistributed = false;
 
   // place a MPI barrier here for all the hosts to synchronize

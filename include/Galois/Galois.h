@@ -143,18 +143,19 @@ void for_each(InitItemTy i, FunctionTy fn, const char* loopname = 0) {
  */
 #if GALOIS_USE_EXP
 template<typename WLTy, typename ConTy, typename FunctionTy>
-void for_each_local(ConTy& c, FunctionTy fn, const char* loopname = 0,
+void for_each_local(ConTy c, FunctionTy fn, const char* loopname = 0,
     typename std::enable_if<Runtime::Distributed::is_serializable<FunctionTy>::value>::type* = 0) {
   Runtime::for_each_local_dist<WLTy>(c, fn, loopname);
 }
+
 template<typename WLTy, typename ConTy, typename FunctionTy>
-void for_each_local(ConTy& c, FunctionTy fn, const char* loopname = 0,
+void for_each_local(ConTy c, FunctionTy fn, const char* loopname = 0,
     typename std::enable_if<!Runtime::Distributed::is_serializable<FunctionTy>::value>::type* = 0) {
   Runtime::for_each_impl<WLTy>(Runtime::makeLocalRange(c), fn, loopname);
 }
 #else
 template<typename WLTy, typename ConTy, typename FunctionTy>
-void for_each_local(ConTy& c, FunctionTy fn, const char* loopname = 0) {
+void for_each_local(ConTy c, FunctionTy fn, const char* loopname = 0) {
   Runtime::for_each_impl<WLTy>(Runtime::makeLocalRange(c), fn, loopname);
 }
 #endif
@@ -169,7 +170,7 @@ void for_each_local(ConTy& c, FunctionTy fn, const char* loopname = 0) {
  * @param loopname string to identity loop in statistics output
  */
 template<typename ConTy, typename FunctionTy>
-void for_each_local(ConTy& c, FunctionTy fn, const char* loopname = 0) {
+void for_each_local(ConTy c, FunctionTy fn, const char* loopname = 0) {
   typedef WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
   for_each_local<WLTy, ConTy, FunctionTy>(c, fn, loopname);
 }
@@ -199,7 +200,7 @@ FunctionTy do_all(const IterTy& b, const IterTy& e, FunctionTy fn, const char* l
  * @returns fn
  */
 template<typename ConTy,typename FunctionTy>
-FunctionTy do_all_local(ConTy& c, FunctionTy fn, const char* loopname = 0) {
+FunctionTy do_all_local(ConTy c, FunctionTy fn, const char* loopname = 0) {
   return Runtime::do_all_impl(Runtime::makeLocalRange(c), fn);
 }
 

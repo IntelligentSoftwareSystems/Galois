@@ -212,7 +212,7 @@ struct SparseOperator: public Transposer<Graph,Forward> {
 template<bool Forward,typename Graph,typename EdgeOperator,typename Bag>
 void edgeMap(Graph& graph, EdgeOperator op, Bag& output) {
   output.densify();
-  Galois::for_each_local(graph, hidden::DenseForwardOperator<Graph,Bag,EdgeOperator,Forward,true>(graph, output, output, op));
+  Galois::for_each_local(&graph, hidden::DenseForwardOperator<Graph,Bag,EdgeOperator,Forward,true>(graph, output, output, op));
 }
 
 template<bool Forward,typename Graph,typename EdgeOperator,typename Bag>
@@ -240,15 +240,15 @@ void edgeMap(Graph& graph, EdgeOperator op, Bag& input, Bag& output, bool denseF
       abort(); // Never executed
       output.densify();
       typedef dChunkedFIFO<256*4> WL;
-      Galois::for_each_local<WL>(graph, hidden::DenseForwardOperator<Graph,Bag,EdgeOperator,Forward,false>(graph, input, output, op));
+      Galois::for_each_local<WL>(&graph, hidden::DenseForwardOperator<Graph,Bag,EdgeOperator,Forward,false>(graph, input, output, op));
     } else {
       typedef dChunkedFIFO<256> WL;
-      Galois::for_each_local<WL>(graph, hidden::DenseOperator<Graph,Bag,EdgeOperator,Forward>(graph, input, output, op));
+      Galois::for_each_local<WL>(&graph, hidden::DenseOperator<Graph,Bag,EdgeOperator,Forward>(graph, input, output, op));
     }
   } else {
     //std::cout << "(S) Count " << count << "\n"; // XXX
     typedef dChunkedFIFO<64> WL;
-    Galois::for_each_local<WL>(input, hidden::SparseOperator<Graph,Bag,EdgeOperator,Forward>(graph, output, op));
+    Galois::for_each_local<WL>(&input, hidden::SparseOperator<Graph,Bag,EdgeOperator,Forward>(graph, output, op));
   }
 }
 

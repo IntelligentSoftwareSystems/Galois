@@ -220,7 +220,7 @@ void vertexMap(Graph& graph, WrappedGraph& wgraph, VertexOperator op, Bag* input
         Galois::for_each(graph.begin(cur), graph.end(cur), vop);
       } else {
         SparseVertexMap<PassWrappedGraph,Graph,WrappedGraph,VertexOperator> vop(graph, wgraph, op, first, prev, cur, next);
-        Galois::for_each_local(*input, vop);
+        Galois::for_each_local(input, vop);
       }
 
       // XXX Shouldn't be necessary
