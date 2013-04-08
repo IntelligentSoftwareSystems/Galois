@@ -121,16 +121,17 @@ struct Octree {
 
 struct OctreeInternal : Octree {
   Octree* child[8];
+  Galois::Runtime::LL::SimpleLock<true> Lock;
   OctreeInternal(const Point& _pos) :Octree(_pos, 0.0, false) {
     bzero(child, sizeof(*child) * 8);
   }
-  virtual ~OctreeInternal() {
-    for (int i = 0; i < 8; i++) {
-      if (OctreeInternal* B = dynamic_cast<OctreeInternal*>(child[i])) {
-        delete B;
-      }
-    }
-  }
+  // virtual ~OctreeInternal() {
+  //   for (int i = 0; i < 8; i++) {
+  //     if (OctreeInternal* B = dynamic_cast<OctreeInternal*>(child[i])) {
+  //       delete B;
+  //     }
+  //   }
+  // }
 };
 
 struct Body : Octree {
@@ -243,6 +244,8 @@ inline void updateCenter(Point& p, int index, double radius) {
 
 typedef Galois::InsertBag<Body> Bodies;
 typedef Galois::InsertBag<Body*> BodyPtrs;
+//FIXME: reclaim memory for multiple steps
+Galois::InsertBag<OctreeInternal> INodes;
 
 struct BuildOctree {
   OctreeInternal* root;
@@ -257,12 +260,14 @@ struct BuildOctree {
   }
 
   void insert(Body* b, OctreeInternal* node, double radius) {
+    node->Lock.lock();
     int index = getIndex(node->pos, b->pos);
 
     Octree *child = node->child[index];
     
     if (child == NULL) {
       node->child[index] = b;
+      node->Lock.unlock();
       return;
     }
     
@@ -272,15 +277,16 @@ struct BuildOctree {
       Body* n = static_cast<Body*>(child);
       Point new_pos(node->pos);
       updateCenter(new_pos, index, radius);
-      OctreeInternal* new_node = new OctreeInternal(new_pos);
-
-      assert(n->pos != b->pos);
-      
+      OctreeInternal* new_node = &INodes.emplace(new_pos);
+      //OctreeInternal* new_node = new OctreeInternal(new_pos);
+      assert(n->pos != b->pos);    
+      node->child[index] = new_node;
+      node->Lock.unlock();
       insert(b, new_node, radius);
       insert(n, new_node, radius);
-      node->child[index] = new_node;
     } else {
       OctreeInternal* ni = static_cast<OctreeInternal*>(child);
+      node->Lock.unlock();
       insert(b, ni, radius);
     }
   }
@@ -359,6 +365,7 @@ struct ComputeForces {
   // Optimize runtime for no conflict case
   typedef int tt_does_not_need_aborts;
   typedef int tt_needs_per_iter_alloc;
+  typedef int tt_does_not_need_push;
 
   OctreeInternal* top;
   double diameter;
@@ -382,7 +389,7 @@ struct ComputeForces {
       b.vel[i] += (b.acc[i] - p[i]) * config.dthf;
   }
 
-  void forleaf(Body& __restrict__  b, Body* __restrict__ node, double dsq) {
+  void forleaf(Body& b, Body* node, double dsq) {
     //check if it is me
     if (&b == node)
       return;
@@ -639,15 +646,16 @@ double checkAllPairs(Bodies& bodies, int N) {
 void run(Bodies& bodies, BodyPtrs& pBodies) {
   typedef Galois::WorkList::dChunkedLIFO<256> WL_;
   typedef Galois::WorkList::ChunkedAdaptor<false,32> WL;
+  typedef Galois::WorkList::LazyIter<decltype(pBodies.local_begin()), true> WLL;
 
   for (int step = 0; step < ntimesteps; step++) {
     // Do tree building sequentially
     BoundingBox box;
-    ReduceBoxes reduceBoxes(box);
     std::for_each(pBodies.begin(), pBodies.end(), ReduceBoxes(box));
     OctreeInternal top(box.center());
 
-    std::for_each(pBodies.begin(), pBodies.end(), BuildOctree(&top, box.radius()));
+    //std::for_each(pBodies.begin(), pBodies.end(), BuildOctree(&top, box.radius()));
+    Galois::do_all_local(pBodies, BuildOctree(&top, box.radius()));
 
     ComputeCenterOfMass computeCenterOfMass(&top);
     computeCenterOfMass();
@@ -655,7 +663,7 @@ void run(Bodies& bodies, BodyPtrs& pBodies) {
     Galois::StatTimer T_parallel("ParallelTime");
     T_parallel.start();
 
-    Galois::for_each_local<WL>(pBodies, ComputeForces(&top, box.diameter()), "compute");
+    Galois::for_each_local<WLL>(pBodies, ComputeForces(&top, box.diameter()), "compute");
     if (!skipVerify) {
       std::cout << "MSE (sampled) " << checkAllPairs(bodies, std::min((int) nbodies, 100)) << "\n";
     }
