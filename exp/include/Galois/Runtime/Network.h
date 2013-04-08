@@ -111,7 +111,7 @@ struct genericLandingPad {
     return fp(std::get<S>(args) ...);
   }
 
-  //do this the old fassion way for overhead reasons
+  //do this the new fancy way
   static void func(RecvBuffer& buf) {
     void (*fp)(Args...);
     std::tuple<Args...> args;

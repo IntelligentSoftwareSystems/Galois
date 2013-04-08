@@ -1,4 +1,3 @@
-
 /** Common command line processing for benchmarks -*- C++ -*-
  * @file
  * @section License

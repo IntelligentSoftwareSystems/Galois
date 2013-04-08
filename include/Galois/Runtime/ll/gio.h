@@ -45,29 +45,26 @@ void gDebugStr(const std::string&);
 
 //Convert a sequence of things to a string
 template<typename T>
-void toString(std::ostringstream& os, const T& val) { os << val; }
+bool toString(std::ostringstream& os, const T& val) { os << val; return true; }
 
-//dummy for template parameter pack expansion
-struct pass { template<typename ...T> pass(T...) {} };
- 
 template<typename... Args>
 void gPrint(Args... args) {
   std::ostringstream os;
-  pass{(toString(os,args),1)...};
+  bool tmp[] = {toString(os,args)...};
   gPrintStr(os.str());
 }
 
 template<typename... Args>
 void gInfo(Args... args) {
   std::ostringstream os;
-  pass{(toString(os,args),1)...};
+  bool tmp[] = {toString(os,args)...};
   gInfoStr(os.str());
 }
 
 template<typename... Args>
 void gWarn(Args... args) {
   std::ostringstream os;
-  pass{(toString(os,args),1)...};
+  bool tmp[] = {toString(os,args)...};
   gWarnStr(os.str());
 }
 
@@ -75,7 +72,7 @@ template<typename... Args>
 void gDebug(Args... args) {
 #ifndef NDEBUG
   std::ostringstream os;
-  pass{(toString(os,args),1)...};
+  bool tmp[] = {toString(os,args)...};
   gDebugStr(os.str());
 #endif
 }
