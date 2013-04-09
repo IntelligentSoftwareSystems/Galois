@@ -333,7 +333,9 @@ struct BuildOctree : public Galois::Runtime::Lockable {
 
   template<typename Context>
   void operator()(gptr<Octree> b, Context& cnx) {
-    insert(b, root, root_radius);
+    Octree* troot = transientAcquire(root);
+    Octree* tb = transientAcquire(b);
+    insert(b, tb, root, troot, root_radius);
   }
 
   // serialization functions
@@ -345,32 +347,40 @@ struct BuildOctree : public Galois::Runtime::Lockable {
     gDeserialize(s,root,inNodes,root_radius);
   }
 
-  void insert(gptr<Octree>& b, gptr<Octree> node, double radius) {
-    int index = getIndex(node->pos, b->pos);
+  void insert(gptr<Octree>& b, Octree* tb, gptr<Octree> node, Octree* tnode, double radius) {
+    int index = getIndex(tnode->pos, tb->pos);
 
-    gptr<Octree> child = node->child[index];
+    gptr<Octree> child = tnode->child[index];
     
     if (!child) {
-      node->child[index] = b;
+      tnode->child[index] = b;
+      transientRelease(b);
+      transientRelease(node);
       return;
     }
     
     radius *= 0.5;
-    if (child->Leaf) {
+    Octree* tchild = transientAcquire(child);
+    if (tchild->Leaf) {
       // Expand leaf
-      Point new_pos(node->pos);
+      Point new_pos(tnode->pos);
       updateCenter(new_pos, index, radius);
       Octree* nnode = new Octree(new_pos);
       gptr<Octree> new_node(nnode);
       inNodes->push_back(new_node);
 
-      assert(child->pos != b->pos);
+      assert(tchild->pos != tb->pos);
       
-      insert(b, new_node, radius);
-      insert(child, new_node, radius);
-      node->child[index] = new_node;
+      nnode = transientAcquire(new_node);
+      insert(b, tb, new_node, nnode, radius);
+      // new_node released in the previous insert
+      nnode = transientAcquire(new_node);
+      insert(child, tchild, new_node, nnode, radius);
+      tnode->child[index] = new_node;
+      transientRelease(node);
     } else {
-      insert(b, child, radius);
+      transientRelease(node);
+      insert(b, tb, child, tchild, radius);
     }
   }
 };
@@ -770,9 +780,13 @@ void run(Bodies& bodies, BodyPtrs& pBodies, BodyPtrs& inNodes) {
   typedef Galois::WorkList::ChunkedAdaptor<false,32> WL;
 
   for (int step = 0; step < ntimesteps; step++) {
-    // Do tree building sequentially
     gptr<BoundingBox> box(new BoundingBox());
-    Galois::for_each_local<>(pBodies, ReduceBoxes(box));
+
+    // Do ReduceBoxes sequentially
+    //Galois::for_each_local<>(pBodies, ReduceBoxes(box));
+    for(auto ii = pBodies->begin(), ee = pBodies->end(); ii != ee; ++ii)
+      box->merge((*ii)->pos);
+
     Octree top(box->center());
     gptr<Octree> gtop(&top);
 
