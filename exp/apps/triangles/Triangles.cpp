@@ -151,9 +151,9 @@ struct GetDegree: public std::unary_function<typename G::GraphNode, ptrdiff_t> {
   }
 };
 
-template<typename EdgeTy>
+template<typename GraphNode,typename EdgeTy>
 struct IdLess {
-  bool operator()(const Galois::Graph::EdgeSortValue<EdgeTy>& e1, const Galois::Graph::EdgeSortValue<EdgeTy>& e2) const {
+  bool operator()(const Galois::Graph::EdgeSortValue<GraphNode,EdgeTy>& e1, const Galois::Graph::EdgeSortValue<GraphNode,EdgeTy>& e2) const {
     return e1.dst < e2.dst;
   }
 };
@@ -452,7 +452,7 @@ void makeGraph(const std::string& triangleFilename) {
   }
 
   Galois::Graph::permute<void>(initial, p, permuted);
-  Galois::do_all(permuted.begin(), permuted.end(), [&](N x) { permuted.sortEdges<void>(x, IdLess<void>()); });
+  Galois::do_all(permuted.begin(), permuted.end(), [&](N x) { permuted.sortEdges<void>(x, IdLess<N,void>()); });
 
   std::cout << "Writing new input file: " << triangleFilename << "\n";
   permuted.structureToFile(triangleFilename);
