@@ -27,8 +27,8 @@
 #include "Galois/Runtime/ll/TID.h"
 
 Galois::Runtime::SimpleRuntimeContext& Galois::Runtime::Distributed::getTransCnx() {
-  static Galois::Runtime::SimpleRuntimeContext obj;
-  return obj;
+  static PerThreadStorage<Galois::Runtime::SimpleRuntimeContext> obj;
+  return *obj.getLocal();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
