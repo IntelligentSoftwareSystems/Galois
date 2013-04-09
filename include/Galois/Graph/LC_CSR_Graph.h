@@ -156,7 +156,6 @@ protected:
   typedef NodeInfoBase<NodeTy> NodeInfo;
   typedef LargeArray<uint64_t,true> EdgeIndData;
   typedef LargeArray<NodeInfo,false> NodeData;
-  typedef EdgeSortIterator<EdgeDst,EdgeData> edge_sort_iterator;
 
   NodeData nodeData;
   EdgeIndData edgeIndData;
@@ -172,13 +171,15 @@ public:
   typedef NodeTy node_data_type;
   typedef typename EdgeData::reference edge_data_reference;
   typedef typename NodeInfo::reference node_data_reference;
-  typedef boost::counting_iterator<uint64_t> edge_iterator;
-  typedef boost::counting_iterator<uint32_t> iterator;
+  typedef boost::counting_iterator<typename EdgeIndData::value_type> edge_iterator;
+  typedef boost::counting_iterator<typename EdgeDst::value_type> iterator;
   typedef iterator const_iterator;
   typedef iterator local_iterator;
   typedef iterator const_local_iterator;
 
 protected:
+  typedef EdgeSortIterator<GraphNode,typename EdgeIndData::value_type,EdgeDst,EdgeData> edge_sort_iterator;
+
   edge_iterator raw_neighbor_begin(uint32_t N) const {
     return edge_iterator((N == 0) ? 0 : edgeIndData[N-1]);
   }
@@ -188,11 +189,11 @@ protected:
   }
 
   edge_sort_iterator edge_sort_begin(uint32_t src) {
-    return EdgeSortIterator<EdgeDst,EdgeData>(*raw_neighbor_begin(src), &edgeDst, &edgeData);
+    return edge_sort_iterator(*raw_neighbor_begin(src), &edgeDst, &edgeData);
   }
 
   edge_sort_iterator edge_sort_end(uint32_t src) {
-    return EdgeSortIterator<EdgeDst,EdgeData>(*raw_neighbor_end(src), &edgeDst, &edgeData);
+    return edge_sort_iterator(*raw_neighbor_end(src), &edgeDst, &edgeData);
   }
 
 public:
@@ -247,7 +248,7 @@ public:
   template<typename CompTy>
   void sortEdgesByEdgeData(GraphNode N, const CompTy& comp = std::less<EdgeTy>(), MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::acquire(&nodeData[N], mflag);
-    std::sort(edge_sort_begin(N), edge_sort_end(N), EdgeSortCompWrapper<EdgeSortValue<EdgeTy>,CompTy>(comp));
+    std::sort(edge_sort_begin(N), edge_sort_end(N), EdgeSortCompWrapper<EdgeSortValue<GraphNode,EdgeTy>,CompTy>(comp));
   }
 
   /**
@@ -346,7 +347,7 @@ public:
   template<typename CompTy>
   void sortInEdgesByEdgeData(GraphNode N, const CompTy& comp = std::less<EdgeTy>(), MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::acquire(&this->nodeData[N], mflag);
-    std::sort(inEdges.edge_sort_begin(N), inEdges.edge_sort_end(N), EdgeSortCompWrapper<EdgeSortValue<EdgeTy>,CompTy>(comp));
+    std::sort(inEdges.edge_sort_begin(N), inEdges.edge_sort_end(N), EdgeSortCompWrapper<EdgeSortValue<GraphNode,EdgeTy>,CompTy>(comp));
   }
 
   /**

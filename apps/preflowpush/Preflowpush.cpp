@@ -599,11 +599,11 @@ void writePfpGraph(const std::string& inputFile, const std::string& outputFile) 
   ReaderGraph reader;
   reader.structureFromFile(inputFile);
 
-  typedef Galois::Graph::FileGraphParser Parser;
+  typedef Galois::Graph::FileGraphWriter Writer;
   typedef Galois::LargeArray<EdgeTy,true> EdgeData;
   typedef typename EdgeData::value_type edge_value_type;
 
-  Parser p;
+  Writer p;
   EdgeData edgeData;
 
   // Count edges

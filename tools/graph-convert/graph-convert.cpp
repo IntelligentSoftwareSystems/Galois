@@ -48,6 +48,7 @@ enum ConvertMode {
   gr2floatpbbsedges,
   gr2intpbbs,
   gr2intpbbsedges,
+  gr2randintgr,
   gr2rmat,
   gr2sintgr,
   gr2tintgr,
@@ -80,6 +81,7 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Choose a conversion mode:"),
       clEnumVal(gr2floatpbbsedges, "Convert binary gr to weighted (float) pbbs edge list"),
       clEnumVal(gr2intpbbs, "Convert binary gr to weighted (int) pbbs graph"),
       clEnumVal(gr2intpbbsedges, "Convert binary gr to weighted (int) pbbs edge list"),
+      clEnumVal(gr2randintgr, "Randomize binary weighted (int) gr"),
       clEnumVal(gr2rmat, "Convert binary gr to RMAT graph"),
       clEnumVal(gr2sintgr, "Convert binary gr to symmetric graph by adding reverse edges"),
       clEnumVal(gr2tintgr, "Transpose binary weighted (int) gr"),
@@ -114,11 +116,11 @@ static void printStatus(size_t in_nodes, size_t in_edges) {
  */
 template<typename EdgeTy>
 void convert_edgelist2gr(const std::string& infilename, const std::string& outfilename) {
-  typedef Galois::Graph::FileGraphParser Parser;
+  typedef Galois::Graph::FileGraphWriter Writer;
   typedef Galois::LargeArray<EdgeTy,true> EdgeData;
   typedef typename EdgeData::value_type edge_value_type;
 
-  Parser p;
+  Writer p;
   EdgeData edgeData;
   std::ifstream infile(infilename.c_str());
 
@@ -201,9 +203,9 @@ void convert_edgelist2gr(const std::string& infilename, const std::string& outfi
  * ...
  */
 void convert_nodelist2vgr(const std::string& infilename, const std::string& outfilename) {
-  typedef Galois::Graph::FileGraphParser Parser;
+  typedef Galois::Graph::FileGraphWriter Writer;
 
-  Parser p;
+  Writer p;
   std::ifstream infile(infilename.c_str());
 
   size_t numNodes = 0;
@@ -295,6 +297,28 @@ void convert_gr2edgelist(const std::string& infilename, const std::string& outfi
   printStatus(graph.size(), graph.sizeEdges());
 }
 
+template<typename EdgeTy>
+void convert_gr2rand(const std::string& infilename, const std::string& outfilename) {
+  typedef Galois::Graph::FileGraph Graph;
+  typedef Graph::GraphNode GNode;
+  typedef Galois::LargeArray<GNode,true> Permutation;
+
+  Graph graph;
+  graph.structureFromFile(infilename);
+
+  Permutation perm;
+  perm.allocate(graph.size());
+  std::copy(boost::counting_iterator<GNode>(0), boost::counting_iterator<GNode>(graph.size()), perm.begin());
+  boost::random::mt19937 gen;
+  std::shuffle(perm.begin(), perm.end(), gen);
+
+  Graph out;
+  Galois::Graph::permute<EdgeTy>(graph, perm, out);
+
+  out.structureToFile(outfilename);
+  printStatus(graph.size(), graph.sizeEdges());
+}
+
 template<typename InEdgeTy,typename OutEdgeTy>
 void add_weights(const std::string& infilename, const std::string& outfilename) {
   typedef Galois::Graph::FileGraph Graph;
@@ -336,14 +360,14 @@ template<typename EdgeTy>
 void convert_gr2tgr(const std::string& infilename, const std::string& outfilename) {
   typedef Galois::Graph::FileGraph Graph;
   typedef Graph::GraphNode GNode;
-  typedef Galois::Graph::FileGraphParser Parser;
+  typedef Galois::Graph::FileGraphWriter Writer;
   typedef Galois::LargeArray<EdgeTy,true> EdgeData;
   typedef typename EdgeData::value_type edge_value_type;
   
   Graph graph;
   graph.structureFromFile(infilename);
 
-  Parser p;
+  Writer p;
   EdgeData edgeData;
 
   p.setNumNodes(graph.size());
@@ -431,11 +455,11 @@ void convert_gr2cgr(const std::string& infilename, const std::string& outfilenam
     return;
   }
 
-  typedef Galois::Graph::FileGraphParser Parser;
+  typedef Galois::Graph::FileGraphWriter Writer;
   typedef Galois::LargeArray<EdgeTy,true> EdgeData;
   typedef typename EdgeData::value_type edge_value_type;
   
-  Parser p;
+  Writer p;
   EdgeData edgeData;
 
   p.setNumNodes(graph.size());
@@ -517,11 +541,11 @@ void convert_sgr2gr(const std::string& infilename, const std::string& outfilenam
     return;
   }
 
-  typedef Galois::Graph::FileGraphParser Parser;
+  typedef Galois::Graph::FileGraphWriter Writer;
   typedef Galois::LargeArray<EdgeTy,true> EdgeData;
   typedef typename EdgeData::value_type edge_value_type;
   
-  Parser p;
+  Writer p;
   EdgeData edgeData;
 
   p.setNumNodes(graph.size());
@@ -652,11 +676,11 @@ void convert_rmat2gr(const std::string& infilename, const std::string& outfilena
 //  a <src id> <dst id> <weight>
 //  ....
 void convert_dimacs2gr(const std::string& infilename, const std::string& outfilename) { 
-  typedef Galois::Graph::FileGraphParser Parser;
+  typedef Galois::Graph::FileGraphWriter Writer;
   typedef Galois::LargeArray<int32_t,true> EdgeData;
   typedef typename EdgeData::value_type edge_value_type;
 
-  Parser p;
+  Writer p;
   EdgeData edgeData;
   uint32_t nnodes;
   size_t nedges;
@@ -764,9 +788,9 @@ void convert_dimacs2gr(const std::string& infilename, const std::string& outfile
  * ...
  */
 void convert_pbbs2vgr(const std::string& infilename, const std::string& outfilename) { 
-  typedef Galois::Graph::FileGraphParser Parser;
+  typedef Galois::Graph::FileGraphWriter Writer;
   
-  Parser p;
+  Writer p;
 
   std::ifstream infile(infilename.c_str());
   std::string header;
@@ -1098,6 +1122,7 @@ int main(int argc, char** argv) {
     case gr2floatpbbsedges: convert_gr2pbbsedges<float>(inputfilename, outputfilename); break;
     case gr2intpbbs: convert_gr2pbbs<int32_t,int32_t>(inputfilename, outputfilename); break;
     case gr2intpbbsedges: convert_gr2pbbsedges<int32_t>(inputfilename, outputfilename); break;
+    case gr2randintgr: convert_gr2rand<int32_t>(inputfilename, outputfilename); break;
     case gr2rmat: convert_gr2rmat<int32_t,int32_t>(inputfilename, outputfilename); break;
     case gr2sintgr: convert_gr2sgr<int32_t>(inputfilename, outputfilename); break;
     case gr2tintgr: convert_gr2tgr<int32_t>(inputfilename, outputfilename); break;

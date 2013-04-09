@@ -98,6 +98,7 @@ protected:
 
   void* structureFromGraph(FileGraph& g, size_t sizeofEdgeData);
 
+
 public:
   // Node Handling
 
@@ -127,14 +128,15 @@ public:
   void sortEdgesByEdgeData(GraphNode N, const CompTy& comp = std::less<EdgeTy>()) {
     typedef LargeArrayWrapper<GraphNode> EdgeDst;
     typedef LargeArrayWrapper<EdgeTy> EdgeData;
+    typedef EdgeSortIterator<GraphNode,uint64_t,EdgeDst,EdgeData> edge_sort_iterator;
 
     EdgeDst edgeDst(outs, numEdges);
     EdgeData ed(edgeData, numEdges);
 
-    EdgeSortIterator<EdgeDst,EdgeData> begin(std::distance(outs, raw_neighbor_begin(N)), &edgeDst, &ed);
-    EdgeSortIterator<EdgeDst,EdgeData> end(std::distance(outs, raw_neighbor_end(N)), &edgeDst, &ed);
+    edge_sort_iterator begin(std::distance(outs, raw_neighbor_begin(N)), &edgeDst, &ed);
+    edge_sort_iterator end(std::distance(outs, raw_neighbor_end(N)), &edgeDst, &ed);
 
-    std::sort(begin, end, EdgeSortCompWrapper<EdgeSortValue<EdgeTy>,CompTy>(comp));
+    std::sort(begin, end, EdgeSortCompWrapper<EdgeSortValue<GraphNode,EdgeTy>,CompTy>(comp));
   }
 
   /**
@@ -144,12 +146,13 @@ public:
   void sortEdges(GraphNode N, const CompTy& comp) {
     typedef LargeArrayWrapper<GraphNode> EdgeDst;
     typedef LargeArrayWrapper<EdgeTy> EdgeData;
+    typedef EdgeSortIterator<GraphNode,uint64_t,EdgeDst,EdgeData> edge_sort_iterator;
 
     EdgeDst edgeDst(outs, numEdges);
     EdgeData ed(edgeData, numEdges);
 
-    EdgeSortIterator<EdgeDst,EdgeData> begin(std::distance(outs, raw_neighbor_begin(N)), &edgeDst, &ed);
-    EdgeSortIterator<EdgeDst,EdgeData> end(std::distance(outs, raw_neighbor_end(N)), &edgeDst, &ed);
+    edge_sort_iterator begin(std::distance(outs, raw_neighbor_begin(N)), &edgeDst, &ed);
+    edge_sort_iterator end(std::distance(outs, raw_neighbor_end(N)), &edgeDst, &ed);
 
     std::sort(begin, end, comp);
   }
@@ -242,9 +245,9 @@ public:
 };
 
 /** 
- * Simplifies parsing graphs from files.
+ * Simplifies writing graphs.
  * 
- * Parse your file in rounds:
+ * Writer your file in rounds:
  * <ol>
  *  <li>setNumNodes(), setNumEdges(), setSizeofEdgeData()</li>
  *  <li>phase1(), for each node, incrementDegree(Node x)</li>
@@ -253,16 +256,16 @@ public:
  *  <li>finish(), use as FileGraph</li>
  * </ol>
  */
-class FileGraphParser: public FileGraph {
+class FileGraphWriter: public FileGraph {
   uint64_t *outIdx; // outIdxs
   uint32_t *starts;
   uint32_t *outs; // outs
   size_t sizeofEdgeData;
 
 public:
-  FileGraphParser(): outIdx(0), starts(0), outs(0), sizeofEdgeData(0) { }
+  FileGraphWriter(): outIdx(0), starts(0), outs(0), sizeofEdgeData(0) { }
 
-  ~FileGraphParser() { 
+  ~FileGraphWriter() { 
     if (outIdx)
       delete [] outIdx;
     if (starts)
@@ -344,7 +347,7 @@ void makeSymmetric(FileGraph& in, FileGraph& out) {
   typedef LargeArray<EdgeTy,boost::is_pod<EdgeTy>::value> EdgeData;
   typedef typename EdgeData::value_type edge_value_type;
 
-  FileGraphParser g;
+  FileGraphWriter g;
   EdgeData edgeData;
 
   size_t numEdges = in.sizeEdges() * 2;
@@ -403,7 +406,7 @@ void permute(FileGraph& in, const PTy& p, FileGraph& out) {
   typedef LargeArray<EdgeTy,boost::is_pod<EdgeTy>::value> EdgeData;
   typedef typename EdgeData::value_type edge_value_type;
 
-  FileGraphParser g;
+  FileGraphWriter g;
   EdgeData edgeData;
 
   size_t numEdges = in.sizeEdges();

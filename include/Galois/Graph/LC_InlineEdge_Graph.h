@@ -115,7 +115,8 @@ class LC_InlineEdge_Graph: boost::noncopyable {
 protected:
   struct NodeInfo;
   typedef EdgeInfoBase<typename boost::mpl::if_c<CompressNodePtr,uint32_t,NodeInfo*>::type,EdgeTy> EdgeInfo;
-  
+  typedef LargeArray<EdgeInfo,true> EdgeData;
+
   class NodeInfo: public NodeInfoBase<NodeTy> {
     EdgeInfo* m_edgeBegin;
     EdgeInfo* m_edgeEnd;
@@ -125,7 +126,7 @@ protected:
   };
 
   LargeArray<NodeInfo,false> nodeData;
-  LargeArray<EdgeInfo,true> edgeData;
+  EdgeData edgeData;
   uint64_t numNodes;
   uint64_t numEdges;
   NodeInfo* endNode;
@@ -140,12 +141,12 @@ protected:
     return ii->dst;
   }
 
-  template<bool Compressed, typename Container,typename Index>
+  template<bool Compressed,typename Container,typename Index>
   void setEdgeDst(Container& c, EdgeInfo* edge, Index idx, typename boost::enable_if_c<Compressed>::type* = 0) {
     edge->dst = idx;
   }
 
-  template<bool Compressed, typename Container,typename Index>
+  template<bool Compressed,typename Container,typename Index>
   void setEdgeDst(Container& c, EdgeInfo* edge, Index idx, typename boost::enable_if_c<!Compressed>::type* = 0) {
     edge->dst = c[idx];
   }
@@ -217,6 +218,26 @@ public:
   EdgesIterator<LC_InlineEdge_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
     return EdgesIterator<LC_InlineEdge_Graph>(*this, N, mflag);
   }
+
+#if 0
+  /**
+   * Sorts outgoing edges of a node. Comparison function is over EdgeTy.
+   */
+  template<typename CompTy>
+  void sortEdgesByEdgeData(GraphNode N, const CompTy& comp = std::less<EdgeTy>(), MethodFlag mflag = MethodFlag::ALL) {
+    Galois::Runtime::acquire(N, mflag);
+    std::sort(edge_sort_begin(N), edge_sort_end(N), EdgeSortCompWrapper<EdgeSortValue<GraphNode,EdgeTy>,CompTy>(comp));
+  }
+
+  /**
+   * Sorts outgoing edges of a node. Comparison function is over <code>EdgeSortValue<EdgeTy></code>.
+   */
+  template<typename CompTy>
+  void sortEdges(GraphNode N, const CompTy& comp, MethodFlag mflag = MethodFlag::ALL) {
+    Galois::Runtime::acquire(N, mflag);
+    std::sort(edge_sort_begin(N), edge_sort_end(N), comp);
+  }
+#endif
 
   void structureFromFile(const std::string& fname) { Graph::structureFromFile(*this, fname); }
 

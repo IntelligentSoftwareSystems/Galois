@@ -67,6 +67,7 @@ enum class Algo {
   barrierWithInline,
   deterministic,
   deterministicDisjoint,
+  graphlab,
   highCentrality,
   hybrid,
   ligra,
@@ -95,10 +96,11 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValN(Algo::barrierWithCas, "barrierWithCas", "Using compare-and-swap to update nodes"),
       clEnumValN(Algo::deterministic, "deterministic", "Deterministic"),
       clEnumValN(Algo::deterministicDisjoint, "deterministicDisjoint", "Deterministic with disjoint optimization"),
+      clEnumValN(Algo::graphlab, "graphlab", "Use GraphLab programming model"),
       clEnumValN(Algo::highCentrality, "highCentrality", "Optimization for graphs with many shortest paths"),
       clEnumValN(Algo::hybrid, "hybrid", "Hybrid of barrier and high centrality algorithms"),
-      clEnumValN(Algo::ligra, "ligra", "Using Ligra programming model"),
       clEnumValN(Algo::ligraChi, "ligraChi", "Using Ligra and GraphChi programming model"),
+      clEnumValN(Algo::ligra, "ligra", "Using Ligra programming model"),
       clEnumValN(Algo::serial, "serial", "Serial"),
 #ifdef GALOIS_USE_EXP
       clEnumValN(Algo::barrierWithInline, "barrierWithInline", "Optimized with inlined workset"),
@@ -387,6 +389,75 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
       newDist++;
       this->outEdgeMap(memoryLimit, graph, EdgeOperator(newDist), bags.cur(), bags.next(), false);
     }
+  }
+};
+
+struct GraphLabAlgo {
+  typedef Galois::Graph::LC_CSR_InOutGraph<SNode,void,true> Graph;
+  typedef Graph::GraphNode GNode;
+
+  void readGraph(Graph& graph) {
+    readInOutGraph(graph);
+  }
+
+  std::string name() const { return "GraphLab"; }
+
+  struct Program {
+    typedef size_t gather_type;
+
+    struct message_type {
+      size_t value;
+      message_type(): value(std::numeric_limits<size_t>::max()) { }
+      explicit message_type(size_t v): value(v) { }
+      message_type& operator+=(const message_type& other) {
+        value = std::min<size_t>(value, other.value);
+        return *this;
+      }
+    };
+
+    typedef int tt_needs_scatter_out_edges;
+
+  private:
+    size_t received_dist;
+    bool changed;
+
+  public:
+    Program(): received_dist(DIST_INFINITY), changed(false) { }
+
+    void init(Graph& graph, GNode node, const message_type& msg) {
+      received_dist = msg.value;
+    }
+
+    void apply(Graph& graph, GNode node, const gather_type&) {
+      changed = false;
+      SNode& sdata = graph.getData(node, Galois::MethodFlag::NONE);
+      if (sdata.dist > received_dist) {
+        changed = true;
+        sdata.dist = received_dist;
+      }
+    }
+
+    bool needsScatter(Graph& graph, GNode node) {
+      return changed;
+    }
+
+    void gather(Graph& graph, GNode node, GNode src, GNode dst, gather_type&, typename Graph::edge_data_reference) { }
+
+    void scatter(Graph& graph, GNode node, GNode src, GNode dst,
+        Galois::GraphLab::Context<Graph,Program>& ctx, typename Graph::edge_data_reference) {
+      SNode& sdata = graph.getData(node, Galois::MethodFlag::NONE);
+      Dist newDist = sdata.dist + 1;
+
+      if (graph.getData(dst, Galois::MethodFlag::NONE).dist > newDist) {
+        ctx.push(dst, message_type(newDist));
+      }
+    }
+  };
+
+  void operator()(Graph& graph, const GNode& source) {
+    Galois::GraphLab::SyncEngine<Graph,Program> engine(graph, Program());
+    engine.signal(source, Program::message_type(0));
+    engine.execute();
   }
 };
 #endif
@@ -757,6 +828,7 @@ int main(int argc, char **argv) {
 #ifdef GALOIS_USE_EXP
     case Algo::ligra: run<LigraAlgo<false> >(); break;
     case Algo::ligraChi: run<LigraAlgo<true> >(); break;
+    case Algo::graphlab: run<GraphLabAlgo>(); break;
 #endif
     case Algo::deterministic: run<DeterministicAlgo<DetAlgo::base> >(); break;
     case Algo::deterministicDisjoint: run<DeterministicAlgo<DetAlgo::disjoint> >(); break;

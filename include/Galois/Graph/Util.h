@@ -57,14 +57,14 @@ uint64_t inline localEnd(uint64_t numNodes) {
 }
 
 //! Proxy object for {@link EdgeSortIterator}
-template<typename EdgeTy>
+template<typename GraphNode, typename EdgeTy>
 struct EdgeSortValue: public StrictObject<EdgeTy> {
   typedef StrictObject<EdgeTy> Super;
   typedef typename Super::value_type value_type;
 
-  uint32_t dst;
+  GraphNode dst;
   
-  EdgeSortValue(uint32_t d, const value_type& v): Super(v), dst(d) { }
+  EdgeSortValue(GraphNode d, const value_type& v): Super(v), dst(d) { }
 
   template<typename ER>
   EdgeSortValue(const ER& ref) {
@@ -73,32 +73,32 @@ struct EdgeSortValue: public StrictObject<EdgeTy> {
 };
 
 //! Proxy object for {@link EdgeSortIterator}
-template<typename EdgeDst, typename EdgeData>
+template<typename GraphNode, typename EdgeIndex, typename EdgeDst, typename EdgeData>
 struct EdgeSortReference {
   typedef typename EdgeData::raw_value_type EdgeTy;
-  uint64_t at;
+  EdgeIndex at;
   EdgeDst* edgeDst;
   EdgeData* edgeData;
 
-  EdgeSortReference(uint64_t x, EdgeDst* dsts, EdgeData* data): at(x), edgeDst(dsts), edgeData(data) { }
+  EdgeSortReference(EdgeIndex x, EdgeDst* dsts, EdgeData* data): at(x), edgeDst(dsts), edgeData(data) { }
 
-  EdgeSortReference operator=(const EdgeSortValue<EdgeTy>& x) {
-    edgeDst->at(at) = x.dst;
+  EdgeSortReference operator=(const EdgeSortValue<GraphNode, EdgeTy>& x) {
+    edgeDst->set(at, x.dst);
     edgeData->set(at, x.get());
     return *this;
   }
 
-  EdgeSortReference operator=(const EdgeSortReference<EdgeDst,EdgeData>& x) {
-    edgeDst->at(at) = edgeDst->at(x.at);
+  EdgeSortReference operator=(const EdgeSortReference<GraphNode,EdgeIndex,EdgeDst,EdgeData>& x) {
+    edgeDst->set(at, edgeDst->at(x.at));
     edgeData->set(at, edgeData->at(x.at));
     return *this;
   }
 
-  EdgeSortValue<EdgeTy> operator*() const {
-    return EdgeSortValue<EdgeTy>(edgeDst->at(at), edgeData->at(at));
+  EdgeSortValue<GraphNode, EdgeTy> operator*() const {
+    return EdgeSortValue<GraphNode, EdgeTy>(edgeDst->at(at), edgeData->at(at));
   }
 
-  void initialize(EdgeSortValue<EdgeTy>& value) const {
+  void initialize(EdgeSortValue<GraphNode, EdgeTy>& value) const {
     value = *(*this);
   }
 };
@@ -120,30 +120,34 @@ struct EdgeSortCompWrapper {
  * Iterator to facilitate sorting of CSR-like graphs. Converts random access operations
  * on iterator to appropriate computations on edge destinations and edge data.
  *
+ * @tparam GraphNode Graph node pointer
+ * @tparam EdgeIndex Integer-like value that is passed to EdgeDst and EdgeData
  * @tparam EdgeDst {@link LargeArray}-like container of edge destinations
  * @tparam EdgeData {@link LargeArray}-like container of edge data
  */
-template<typename EdgeDst, typename EdgeData>
+template<typename GraphNode, typename EdgeIndex, typename EdgeDst, typename EdgeData>
 class EdgeSortIterator: public boost::iterator_facade<
-                        EdgeSortIterator<EdgeDst,EdgeData>,
-                        EdgeSortValue<typename EdgeData::raw_value_type>,
+                        EdgeSortIterator<GraphNode, EdgeIndex, EdgeDst, EdgeData>,
+                        EdgeSortValue<GraphNode, typename EdgeData::raw_value_type>,
                         boost::random_access_traversal_tag,
-                        EdgeSortReference<EdgeDst, EdgeData>
+                        EdgeSortReference<GraphNode, EdgeIndex, EdgeDst, EdgeData>
                         > {
-  uint64_t at;
+  typedef EdgeSortIterator<GraphNode,EdgeIndex,EdgeDst,EdgeData> Self;
+  typedef EdgeSortReference<GraphNode,EdgeIndex,EdgeDst,EdgeData> Reference;
+
+  EdgeIndex at;
   EdgeDst* edgeDst;
   EdgeData* edgeData;
 public:
-  EdgeSortIterator(): at(~0) { }
-  EdgeSortIterator(uint64_t x, EdgeDst* dsts, EdgeData* data):
+  EdgeSortIterator(): at(0) { }
+  EdgeSortIterator(EdgeIndex x, EdgeDst* dsts, EdgeData* data):
     at(x), edgeDst(dsts), edgeData(data) { }
 private:
   friend class boost::iterator_core_access;
   
-  bool equal(const EdgeSortIterator<EdgeDst,EdgeData>& other) const { return at == other.at; }
-  EdgeSortReference<EdgeDst,EdgeData>
-    dereference() const { return EdgeSortReference<EdgeDst, EdgeData>(at, edgeDst, edgeData); }
-  ptrdiff_t distance_to(const EdgeSortIterator<EdgeDst,EdgeData>& other) const { return other.at - (ptrdiff_t) at; }
+  bool equal(const Self& other) const { return at == other.at; }
+  Reference dereference() const { return Reference(at, edgeDst, edgeData); }
+  ptrdiff_t distance_to(const Self& other) const { return std::distance(at, other.at); }
   void increment() { ++at; }
   void decrement() { --at; }
   void advance(ptrdiff_t n) { at += n; }

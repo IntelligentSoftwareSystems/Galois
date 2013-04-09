@@ -287,7 +287,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
         if (__sync_bool_compare_and_swap(ptr, *reinterpret_cast<int*>(&oldValue), *reinterpret_cast<int*>(&newValue)))
           break;
       }
-      return true;
+      return false; // Topology-driven
     }
   };
 
@@ -329,9 +329,10 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
         break;
       max_delta.reset();
       small_delta.reset();
-      bags.swap();
+      //bags.swap();
 
-      this->outEdgeMap(memoryLimit, graph, EdgeOperator(), bags.cur(), bags.next(), true);
+      //this->outEdgeMap(memoryLimit, graph, EdgeOperator(), bags.cur(), bags.next(), true);
+      this->outEdgeMap(memoryLimit, graph, EdgeOperator(), bags.next());
       Galois::do_all_local(bags.cur(), UpdateNode(this, graph));
     }
     
@@ -457,7 +458,7 @@ struct PullAlgo {
 static void precomputePullData() {
   typedef Galois::Graph::LC_CSR_Graph<size_t, void> InputGraph;
   typedef InputGraph::GraphNode InputNode;
-  typedef Galois::Graph::FileGraphParser OutputGraph;
+  typedef Galois::Graph::FileGraphWriter OutputGraph;
   typedef OutputGraph::GraphNode OutputNode;
 
   InputGraph input;

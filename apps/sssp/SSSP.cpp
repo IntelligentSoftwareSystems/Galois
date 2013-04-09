@@ -59,9 +59,9 @@ static const char* url = "single_source_shortest_path";
 enum class Algo {
   async,
   asyncWithCas,
+  graphlab,
   ligra,
   ligraChi,
-  graphlab,
   serial
 };
 
@@ -77,9 +77,9 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
       clEnumValN(Algo::async, "async", "Asynchronous"),
       clEnumValN(Algo::asyncWithCas, "asyncWithCas", "Using compare-and-swap to update nodes"),
-      clEnumValN(Algo::ligra, "ligra", "Using Ligra programming model"),
-      clEnumValN(Algo::ligraChi, "ligraChi", "Using Ligra and GraphChi programming model"),
       clEnumValN(Algo::graphlab, "graphlab", "Using GraphLab programming model"),
+      clEnumValN(Algo::ligraChi, "ligraChi", "Using Ligra and GraphChi programming model"),
+      clEnumValN(Algo::ligra, "ligra", "Using Ligra programming model"),
       clEnumValN(Algo::serial, "serial", "Serial"),
       clEnumValEnd), cll::init(Algo::asyncWithCas));
 
@@ -543,16 +543,20 @@ void run(bool prealloc = true) {
 
   initialize(algo, graph, source, report);
 
-  size_t approxNodeData = graph.size() * sizeof(typename Graph::node_data_type) * 2;
+  size_t approxNodeData = graph.size() * sizeof(typename Graph::node_data_type);
   //size_t approxEdgeData = graph.sizeEdges() * sizeof(typename Graph::edge_data_type) * 2;
   if (prealloc)
     Galois::preAlloc(numThreads + (approxNodeData * 4) / Galois::Runtime::MM::pageSize);
   Galois::Statistic("MeminfoPre", Galois::Runtime::MM::pageAllocInfo());
 
+  Galois::StatTimer Tinitial;
+  Tinitial.start();
+  Galois::do_all_local(graph, typename Algo::Initialize(graph));
+  Tinitial.stop();
+
   Galois::StatTimer T;
   std::cout << "Running " << algo.name() << " version\n";
   T.start();
-  Galois::do_all_local(graph, typename Algo::Initialize(graph));
   algo(graph, source);
   T.stop();
   
