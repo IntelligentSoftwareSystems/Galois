@@ -40,13 +40,20 @@ private:
     IterTy stealBegin;
     IterTy stealEnd;
     Runtime::LL::SimpleLock<true> stealLock;
+    bool stealAvail;
     unsigned int nextVictim;
+
+    void resetAvail() {
+      if (stealBegin == stealEnd)
+	stealAvail = true;
+    }
 
     void populateSteal() {
       if (steal && localBegin != localEnd) {// && std::distance(localBegin, localEnd) > 1) {
 	stealLock.lock();
 	stealEnd = localEnd;
 	stealBegin = localEnd = Galois::split_range(localBegin, localEnd);
+	resetAvail();
 	stealLock.unlock();
       }
     }
@@ -55,15 +62,15 @@ private:
   Runtime::PerThreadStorage<state> TLDS;
 
   bool doSteal(state& dst, state& src) {
-    //Unsafe for general comparisons
-    //    if (src.stealBegin != src.stealEnd) {
+    if (src.stealAvail) {
       src.stealLock.lock();
       if (src.stealBegin != src.stealEnd) {
 	dst.localBegin = src.stealBegin;
 	src.stealBegin = dst.localEnd = Galois::split_range(src.stealBegin, src.stealEnd);
+	src.resetAvail();
       }
       src.stealLock.unlock();
-      //}
+    }
     return dst.localBegin != dst.localEnd;
   }
 
