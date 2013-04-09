@@ -407,9 +407,9 @@ void convert_gr2tgr(const std::string& infilename, const std::string& outfilenam
   printStatus(graph.size(), graph.sizeEdges(), p.size(), p.sizeEdges());
 }
 
-template<typename EdgeTy>
+template<typename GraphNode,typename EdgeTy>
 struct IdLess {
-  bool operator()(const Galois::Graph::EdgeSortValue<EdgeTy>& e1, const Galois::Graph::EdgeSortValue<EdgeTy>& e2) const {
+  bool operator()(const Galois::Graph::EdgeSortValue<GraphNode,EdgeTy>& e1, const Galois::Graph::EdgeSortValue<GraphNode,EdgeTy>& e2) const {
     return e1.dst < e2.dst;
   }
 };
@@ -434,7 +434,7 @@ void convert_gr2cgr(const std::string& infilename, const std::string& outfilenam
   for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
     GNode src = *ii;
 
-    graph.sortEdges<EdgeTy>(src, IdLess<EdgeTy>());
+    graph.sortEdges<EdgeTy>(src, IdLess<GNode,EdgeTy>());
 
     Graph::edge_iterator prev = graph.edge_end(src);
     for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {

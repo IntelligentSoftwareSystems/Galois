@@ -763,8 +763,8 @@ void writeComponent(Graph& graph, typename Graph::node_data_type::component_type
     }
   }
 
-  typedef Galois::Graph::FileGraphParser Parser;
-  Parser p;
+  typedef Galois::Graph::FileGraphWriter Writer;
+  Writer p;
   p.setNumNodes(numNodes);
   p.setNumEdges(numEdges);
 

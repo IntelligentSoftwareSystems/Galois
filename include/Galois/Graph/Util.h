@@ -147,7 +147,7 @@ private:
   
   bool equal(const Self& other) const { return at == other.at; }
   Reference dereference() const { return Reference(at, edgeDst, edgeData); }
-  ptrdiff_t distance_to(const Self& other) const { return std::distance(at, other.at); }
+  ptrdiff_t distance_to(const Self& other) const { return other.at - (ptrdiff_t) at; }
   void increment() { ++at; }
   void decrement() { --at; }
   void advance(ptrdiff_t n) { at += n; }
