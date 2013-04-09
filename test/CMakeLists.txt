@@ -5,7 +5,6 @@ function(makeTest name)
 endfunction()
 
 makeTest(acquire)
-makeTest(barrierTime)
 makeTest(empty-member-lcgraph)
 makeTest(flatmap)
 makeTest(gdeque)

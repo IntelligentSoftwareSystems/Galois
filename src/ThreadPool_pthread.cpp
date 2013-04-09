@@ -61,20 +61,17 @@ class Semaphore: private boost::noncopyable {
   sem_t sem;
 public:
   explicit Semaphore(int val = 0) {
-    int rc = sem_init(&sem, 0, val);
-    checkResults(rc);
+    checkResults(sem_init(&sem, 0, val));
   }
 
   ~Semaphore() {
-    int rc = sem_destroy(&sem);
-    checkResults(rc);
+    checkResults(sem_destroy(&sem));
   }
 
   void release(int n = 1) {
     while (n) {
       --n;
-      int rc = sem_post(&sem);
-      checkResults(rc);
+      checkResults(sem_post(&sem));
     }
   }
 

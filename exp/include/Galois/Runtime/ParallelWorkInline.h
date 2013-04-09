@@ -243,13 +243,11 @@ class BSInlineExecutor {
     ThreadLocalData(const char* ln): stat(ln) { }
   };
 
-  Galois::Runtime::GBarrier barrier1;
-  Galois::Runtime::GBarrier barrier2;
+  Galois::Runtime::Barrier& barrier;
   WLTy wls[2];
   FunctionTy& function;
   const char* loopname;
   LL::CacheLineStorage<volatile long> done;
-  unsigned numActive;
 
   bool empty(WLTy* wl) {
     return wl->sempty();
@@ -332,14 +330,14 @@ class BSInlineExecutor {
 
       std::swap(next, cur);
 
-      barrier1.wait();
+      barrier.wait();
 
       if (tid == 0) {
         if (empty(cur))
           done.data = true;
       }
       
-      barrier2.wait();
+      barrier.wait();
 
       if (done.data)
         break;
@@ -349,15 +347,11 @@ class BSInlineExecutor {
   }
 
 public:
-  BSInlineExecutor(FunctionTy& f, const char* ln): function(f), loopname(ln) { 
+  BSInlineExecutor(FunctionTy& f, const char* ln): function(f), loopname(ln), barrier(getSystemBarrier()) { 
     if (ForEachTraits<FunctionTy>::NeedsBreak) {
       assert(0 && "not supported by this executor");
       abort();
     }
-
-    numActive = activeThreads;
-    barrier1.reinit(numActive);
-    barrier2.reinit(numActive);
   }
 
   template<typename RangeTy>

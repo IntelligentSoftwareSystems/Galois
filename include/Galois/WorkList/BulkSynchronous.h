@@ -48,8 +48,7 @@ class BulkSynchronous : private boost::noncopyable {
 
   CTy wls[2];
   Runtime::PerThreadStorage<TLD> tlds;
-  Runtime::GBarrier barrier1;
-  Runtime::GBarrier barrier2;
+  Runtime::Barrier& barrier;
   Runtime::LL::CacheLineStorage<volatile long> some;
   volatile bool empty;
 
@@ -61,11 +60,7 @@ class BulkSynchronous : private boost::noncopyable {
   template<typename Tnew>
   using retype = BulkSynchronous<typename ContainerTy::template retype<Tnew>,Tnew,concurrent>;
 
-  BulkSynchronous(): empty(false) {
-    unsigned num = Runtime::activeThreads;
-    barrier1.reinit(num);
-    barrier2.reinit(num);
-  }
+  BulkSynchronous(): empty(false), barrier(Runtime::getSystemBarrier()) { }
 
   void push(const value_type& val) {
     wls[(tlds.getLocal()->round + 1) & 1].push(val);
@@ -97,14 +92,14 @@ class BulkSynchronous : private boost::noncopyable {
       if (r)
         return r;
 
-      barrier1.wait();
+      barrier.wait();
       if (Runtime::LL::getTID() == 0) {
         if (!some.data)
           empty = true;
         some.data = false; 
       }
       tld.round = (tld.round + 1) & 1;
-      barrier2.wait();
+      barrier.wait();
 
       r = wls[tld.round].pop();
       if (r) {

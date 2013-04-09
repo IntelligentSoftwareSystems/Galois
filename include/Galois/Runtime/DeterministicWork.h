@@ -240,14 +240,11 @@ struct BreakManager {
 
 template<typename FunctionTy>
 class BreakManager<FunctionTy,typename boost::enable_if<has_deterministic_break<FunctionTy> >::type> {
-  GBarrier barrier;
+  Barrier& barrier;
   LL::CacheLineStorage<volatile long> done;
 
 public:
-  BreakManager() { 
-    int numActive = (int) getActiveThreads();
-    barrier.reinit(numActive);
-  }
+  BreakManager() : barrier(getSystemBarrier()) { }
 
   bool checkBreak(FunctionTy& fn) {
     if (LL::getTID() == 0)
@@ -788,7 +785,7 @@ class DMergeManager: public DMergeManagerBase<OptionsTy> {
   std::vector<NewItem,typename PerIterAllocTy::rebind<NewItem>::other> mergeBuf;
   std::vector<T,typename PerIterAllocTy::rebind<T>::other> distributeBuf;
 
-  GBarrier barrier[4];
+  Barrier& barrier;
 
   bool merge(int begin, int end) {
     if (begin == end)
@@ -873,9 +870,9 @@ class DMergeManager: public DMergeManagerBase<OptionsTy> {
       if (tid == 0) {
         distributeBuf.resize(dist);
       }
-      barrier[0].wait();
+      barrier.wait();
       redistribute(ii, ei, dist);
-      barrier[1].wait();
+      barrier.wait();
       mlocal.copyIn(distributeBuf.begin(), distributeBuf.end(), dist, wl, this->new_, this->numActive, CompareTy());
     } else {
       mlocal.copyIn(ii, ei, dist, wl, this->new_, this->numActive, CompareTy());
@@ -895,7 +892,7 @@ class DMergeManager: public DMergeManagerBase<OptionsTy> {
     std::sort(mlocal.newItems.begin(), mlocal.newItems.end());
     mlocal.size = mlocal.newItems.size();
     
-    barrier[2].wait();
+    barrier.wait();
 
     unsigned tid = LL::getTID();
     if (tid == 0) {
@@ -905,7 +902,7 @@ class DMergeManager: public DMergeManagerBase<OptionsTy> {
       merge(0, this->numActive);
     }
 
-    barrier[3].wait();
+    barrier.wait();
 
     MergeOuterIt bbegin(boost::make_counting_iterator(0), GetNewItem(&this->data));
     MergeOuterIt eend(boost::make_counting_iterator((int) this->numActive), GetNewItem(&this->data));
@@ -921,7 +918,7 @@ class DMergeManager: public DMergeManagerBase<OptionsTy> {
   void serialSort(WL* wl) {
     this->new_.flush();
 
-    barrier[2].wait();
+    barrier.wait();
     
     if (LL::getTID() == 0) {
       mergeBuf.clear();
@@ -935,7 +932,7 @@ class DMergeManager: public DMergeManagerBase<OptionsTy> {
       printf("DEBUG R %ld\n", mergeBuf.size());
     }
 
-    barrier[3].wait();
+    barrier.wait();
 
     distribute(boost::make_transform_iterator(mergeBuf.begin(), typename NewItem::GetFirst()),
         boost::make_transform_iterator(mergeBuf.end(), typename NewItem::GetFirst()),
@@ -943,10 +940,8 @@ class DMergeManager: public DMergeManagerBase<OptionsTy> {
   }
 
 public:
-  DMergeManager(const OptionsTy& o): mergeBuf(this->alloc), distributeBuf(this->alloc) {
-    for (unsigned i = 0; i < sizeof(barrier)/sizeof(*barrier); ++i)
-      barrier[i].reinit(this->numActive);
-  }
+  DMergeManager(const OptionsTy& o): mergeBuf(this->alloc), distributeBuf(this->alloc), barrier(getSystemBarrier()) 
+  {}
 
   template<typename InputIteratorTy>
   void presort(InputIteratorTy ii, InputIteratorTy ei) { }
@@ -1000,14 +995,13 @@ class DMergeManager<OptionsTy,typename boost::enable_if<MergeTraits<OptionsTy> >
 
   std::vector<NewItem,typename PerIterAllocTy::rebind<NewItem>::other> mergeBuf;
 
-  GBarrier barrier;
+  Barrier& barrier;
   IdFn idFunction;
   CompareTy comp;
 
 public:
-  DMergeManager(const OptionsTy& o): mergeBuf(this->alloc), comp(o.comp) {
-    barrier.reinit(this->numActive);
-  }
+  DMergeManager(const OptionsTy& o): mergeBuf(this->alloc), comp(o.comp), barrier(getSystemBarrier()) 
+  { }
 
   template<typename InputIteratorTy, typename WL>
   void addInitialWork(InputIteratorTy ii, InputIteratorTy ei, WL* wl) {
@@ -1240,7 +1234,7 @@ class Executor {
   MergeManager mergeManager;
   const char* loopname;
   BreakManager<typename OptionsTy::Function1Ty> breakManager;
-  GBarrier barrier[4];
+  Barrier& barrier;
   WL worklists[2];
   StateManager<value_type,typename OptionsTy::Function1Ty> stateManager;
   PendingWork pending;
@@ -1256,11 +1250,8 @@ class Executor {
 
 public:
   Executor(const OptionsTy& o, const char* ln):
-    origOptions(o), mergeManager(o), loopname(ln)
+    origOptions(o), mergeManager(o), loopname(ln), barrier(getSystemBarrier())
   { 
-    numActive = (int) getActiveThreads();
-    for (unsigned i = 0; i < sizeof(barrier)/sizeof(*barrier); ++i)
-      barrier[i].reinit(numActive);
     if (OptionsTy::needsBreak && !has_deterministic_break<typename OptionsTy::Function1Ty>::value) {
       GALOIS_ERROR(true, "need to use break function to break loop");
     }
@@ -1304,7 +1295,7 @@ void Executor<OptionsTy>::go() {
       bool nextPending = pendingLoop(tld);
       innerDone.data = true;
 
-      barrier[1].wait();
+      barrier.wait();
 
       setPending(COMMITTING);
       bool nextCommit = commitLoop(tld);
@@ -1312,7 +1303,7 @@ void Executor<OptionsTy>::go() {
       if (nextPending || nextCommit)
         innerDone.data = false;
 
-      barrier[2].wait();
+      barrier.wait();
 
       // contextPool.commitAll();
       // mlocal.itemPoolReset();
@@ -1323,7 +1314,7 @@ void Executor<OptionsTy>::go() {
       mergeManager.calculateWindow(true);
       mergeManager.prepareNextWindow(tld.wlnext);
 
-      barrier[0].wait();
+      barrier.wait();
 
       mlocal.nextWindow(tld.wlnext, tld.options);
       mlocal.resetStats();
@@ -1341,7 +1332,7 @@ void Executor<OptionsTy>::go() {
     mergeManager.calculateWindow(false);
     mergeManager.prepareNextWindow(tld.wlnext);
 
-    barrier[3].wait();
+    barrier.wait();
 
     if (outerDone.data) {
       if (!OptionsTy::needsPush)

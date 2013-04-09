@@ -53,7 +53,7 @@ class DoAllWork {
   FunctionTy outputF;
   ReduceFunTy RF;
   RangeTy range;
-  GBarrier barrier;
+  Barrier& barrier;
   bool needsReduce;
   bool useStealing;
 
@@ -127,10 +127,8 @@ class DoAllWork {
 
 public:
   DoAllWork(const FunctionTy& F, const ReduceFunTy& R, bool needsReduce, RangeTy r, bool steal)
-    : origF(F), outputF(F), RF(R), range(r), needsReduce(needsReduce), useStealing(steal)
-  {
-    barrier.reinit(activeThreads);
-  }
+    : origF(F), outputF(F), RF(R), range(r), needsReduce(needsReduce), useStealing(steal), barrier(getSystemBarrier())
+  { }
 
   void operator()() {
     //Assume the copy constructor on the functor is readonly

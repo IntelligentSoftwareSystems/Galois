@@ -50,21 +50,21 @@ bool toString(std::ostringstream& os, const T& val) { os << val; return true; }
 template<typename... Args>
 void gPrint(Args... args) {
   std::ostringstream os;
-  bool tmp[] = {toString(os,args)...};
+  __attribute__((unused)) bool tmp[] = {toString(os,args)...};
   gPrintStr(os.str());
 }
 
 template<typename... Args>
 void gInfo(Args... args) {
   std::ostringstream os;
-  bool tmp[] = {toString(os,args)...};
+  __attribute__((unused)) bool tmp[] = {toString(os,args)...};
   gInfoStr(os.str());
 }
 
 template<typename... Args>
 void gWarn(Args... args) {
   std::ostringstream os;
-  bool tmp[] = {toString(os,args)...};
+  __attribute__((unused)) bool tmp[] = {toString(os,args)...};
   gWarnStr(os.str());
 }
 
@@ -72,7 +72,7 @@ template<typename... Args>
 void gDebug(Args... args) {
 #ifndef NDEBUG
   std::ostringstream os;
-  bool tmp[] = {toString(os,args)...};
+  __attribute__((unused)) bool tmp[] = {toString(os,args)...};
   gDebugStr(os.str());
 #endif
 }

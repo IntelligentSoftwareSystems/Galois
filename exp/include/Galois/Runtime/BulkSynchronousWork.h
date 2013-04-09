@@ -292,7 +292,7 @@ class Executor {
   FnsTy fns;
   WLS wls;
   FirstWL first;
-  GBarrier barrier;
+  Barrier& barrier;
   InitialWorkTy init;
   const char* loopname;
   LL::CacheLineStorage<volatile long> done;
@@ -447,9 +447,8 @@ class Executor {
   }
 
 public:
-  explicit Executor(const FnsTy& f, const InitialWorkTy& i, const char* l): fns(f), init(i), loopname(l) { 
-    barrier.reinit(activeThreads);
-  }
+  explicit Executor(const FnsTy& f, const InitialWorkTy& i, const char* l): fns(f), init(i), loopname(l), barrier(getSystemBarrier()) 
+  { }
 
   void operator()() {
     ThreadLocalData tld(LL::getTID());
