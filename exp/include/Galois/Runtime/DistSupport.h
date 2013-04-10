@@ -142,7 +142,7 @@ T* getSharedObj(const gptr<T>& p) {
     // locked by Remote Directory if not local
     // abort the iteration
     if (isAcquired(ptr))
-      throw 5;
+      throw conflict_ex{ptr};
   }
   // should never lock an object that is sharable
 //assert(!isAcquired(ptr));

@@ -180,9 +180,6 @@ protected:
 	}
 	p = lwl.pop();
       }
-    // } catch (const Distributed::remote_ex& ex) {
-    //   abortIteration(*p, tld, recursiveAbort);
-    //   //Distributed::getSystemRemoteDirectory().fetchRemoteObj(ex.ptr,ex.owner, ex.pad);
     } catch (const conflict_ex& ex) {
       Distributed::getSystemLocalDirectory().recall(ex.obj, false);
       abortIteration(*p, tld, recursiveAbort);
