@@ -331,8 +331,9 @@ struct BuildOctree : public Galois::Runtime::Lockable {
     inNodes(_in),
     root_radius(radius) { }
 
-  template<typename Context>
-  void operator()(gptr<Octree> b, Context& cnx) {
+  //template<typename Context>
+  //void operator()(gptr<Octree> b, Context& cnx) {
+  void operator()(gptr<Octree> b) {
     Octree* troot = transientAcquire(root);
     Octree* tb = transientAcquire(b);
     insert(b, tb, root, troot, root_radius);
@@ -472,8 +473,7 @@ struct ComputeForces : Galois::Runtime::Lockable {
   
   template<typename Context>
   void operator()(gptr<Octree> bb, Context& cnx) {
-    Octree* in = getSharedObj(bb);
-    Octree b = *in;
+    Octree b = *bb;
     Point p = b.acc;
     for (int i = 0; i < 3; i++)
       b.acc[i] = 0;
@@ -791,7 +791,8 @@ void run(Bodies& bodies, BodyPtrs& pBodies, BodyPtrs& inNodes) {
     gptr<Octree> gtop(&top);
 
     inNodes->push_back(gtop);
-    Galois::for_each_local<>(pBodies, BuildOctree(gtop, inNodes, box->radius()));
+    //Galois::for_each_local<>(pBodies, BuildOctree(gtop, inNodes, box->radius()));
+    std::for_each(pBodies->begin(), pBodies->end(), BuildOctree(gtop, inNodes, box->radius()));
 
     ComputeCenterOfMass computeCenterOfMass(gtop);
     computeCenterOfMass();
