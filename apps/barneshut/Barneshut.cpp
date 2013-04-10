@@ -481,7 +481,7 @@ struct ComputeForces : Galois::Runtime::Lockable {
     iterate(b, root_dsq, cnx);
     for (int i = 0; i < 3; i++)
       b.vel[i] += (b.acc[i] - p[i]) * config.dthf;
-    *in = b;
+    *bb = b;
   }
 
   // serialization functions
