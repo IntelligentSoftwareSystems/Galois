@@ -34,20 +34,31 @@ public:
   typedef typename std::iterator_traits<IterTy>::value_type value_type;
 
 private:
-  struct state {
-    IterTy localBegin;
-    IterTy localEnd;
+  struct shared_state {
     IterTy stealBegin;
     IterTy stealEnd;
     Runtime::LL::SimpleLock<true> stealLock;
-    unsigned int nextVictim;
+    bool stealAvail;
+    void resetAvail() {
+      if (stealBegin != stealEnd)
+	stealAvail = true;
+    }
+  };
 
+  struct state {
+    IterTy localBegin;
+    IterTy localEnd;
+    unsigned int nextVictim;
+    Runtime::LL::CacheLineStorage<shared_state> stealState;
+    
     void populateSteal() {
-      if (localBegin != localEnd && std::distance(localBegin, localEnd) > 1) {
-	stealLock.lock();
-	stealEnd = localEnd;
-	stealBegin = localEnd = Galois::split_range(localBegin, localEnd);
-	stealLock.unlock();
+      if (steal && localBegin != localEnd) {
+	shared_state& s = stealState.data;
+	s.stealLock.lock();
+	s.stealEnd = localEnd;
+	s.stealBegin = localEnd = Galois::split_range(localBegin, localEnd);
+	s.resetAvail();
+	s.stealLock.unlock();
       }
     }
   };
@@ -55,23 +66,33 @@ private:
   Runtime::PerThreadStorage<state> TLDS;
 
   bool doSteal(state& dst, state& src) {
-    //Unsafe for general comparisons
-    if (src.stealBegin != src.stealEnd) {
-      src.stealLock.lock();
-      if (src.stealBegin != src.stealEnd) {
-	dst.localBegin = src.stealBegin;
-	src.stealBegin = dst.localEnd = Galois::split_range(src.stealBegin, src.stealEnd);
+    shared_state& s = src.stealState.data;
+    if (s.stealAvail) {
+      s.stealLock.lock();
+      if (s.stealBegin != s.stealEnd) {
+	dst.localBegin = s.stealBegin;
+	s.stealBegin = dst.localEnd = Galois::split_range(s.stealBegin, s.stealEnd);
+	s.resetAvail();
       }
-      src.stealLock.unlock();
+      s.stealLock.unlock();
     }
     return dst.localBegin != dst.localEnd;
   }
 
   //pop already failed, try again with stealing
   boost::optional<value_type> pop_steal(state& data) {
-    //only try stealing one
-    if (doSteal(data, *TLDS.getRemote((data.nextVictim++) % Runtime::activeThreads)))
+    //always try stealing self
+    if (doSteal(data, data))
       return *data.localBegin++;
+    //only try stealing one other
+    if (doSteal(data, *TLDS.getRemote(data.nextVictim))) {
+      //share the wealth
+      if (data.nextVictim != Runtime::LL::getTID())
+	data.populateSteal();
+      return *data.localBegin++;
+    }
+    ++data.nextVictim;
+    data.nextVictim %= Runtime::activeThreads;
     return boost::optional<value_type>();
   }
 
