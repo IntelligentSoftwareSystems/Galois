@@ -151,7 +151,7 @@ int main(int argc, char** argv) {
   Galois::for_each_local(graph, Prefetch(graph));
 
   Galois::Statistic("MeminfoPre1", Galois::Runtime::MM::pageAllocInfo());
-  //Galois::preAlloc(15 * numThreads + Galois::Runtime::MM::pageAllocInfo() * 10);
+  Galois::preAlloc(15 * numThreads + Galois::Runtime::MM::pageAllocInfo() * 10);
   Galois::Statistic("MeminfoPre2", Galois::Runtime::MM::pageAllocInfo());
 
   Galois::Graph::Bag<GNode>::pointer gwl = Galois::Graph::Bag<GNode>::allocate();
