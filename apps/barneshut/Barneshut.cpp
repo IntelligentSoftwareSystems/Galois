@@ -31,10 +31,14 @@
 #include <boost/math/constants/constants.hpp>
 #include <boost/iterator/transform_iterator.hpp>
 
+#include <array>
 #include <limits>
 #include <iostream>
+#include <fstream>
 #include <strings.h>
 #include <deque>
+
+#include "Point.h"
 
 const char* name = "Barnshut N-Body Simulator";
 const char* desc =
@@ -46,97 +50,32 @@ static llvm::cl::opt<int> nbodies("n", llvm::cl::desc("Number of bodies"), llvm:
 static llvm::cl::opt<int> ntimesteps("steps", llvm::cl::desc("Number of steps"), llvm::cl::init(1));
 static llvm::cl::opt<int> seed("seed", llvm::cl::desc("Random seed"), llvm::cl::init(7));
 
-struct Point {
-  double x, y, z;
-  Point() : x(0.0), y(0.0), z(0.0) { }
-  Point(double _x, double _y, double _z) : x(_x), y(_y), z(_z) { }
-  explicit Point(double v) : x(v), y(v), z(v) { }
-
-  double operator[](const int index) const {
-    switch (index) {
-      case 0: return x;
-      case 1: return y;
-      case 2: return z;
-    }
-    assert(false && "index out of bounds");
-    abort();
-  }
-
-  double& operator[](const int index) {
-    switch (index) {
-      case 0: return x;
-      case 1: return y;
-      case 2: return z;
-    }
-    assert(false && "index out of bounds");
-    abort();
-  }
-
-  bool operator==(const Point& other) {
-    if (x == other.x && y == other.y && z == other.z)
-      return true;
-    return false;
-  }
-
-  bool operator!=(const Point& other) {
-    return !operator==(other);
-  }
-
-  Point& operator+=(const Point& other) {
-    x += other.x;
-    y += other.y;
-    z += other.z;
-    return *this;
-  }
-
-  Point& operator*=(double value) {
-    x *= value;
-    y *= value;
-    z *= value;
-    return *this;
-  }
-
-  double dist2() {
-    return x * x + y * y + z * z;
-  }
-};
-
-std::ostream& operator<<(std::ostream& os, const Point& p) {
-  os << "(" << p[0] << "," << p[1] << "," << p[2] << ")";
-  return os;
-}
-
-/**
- * A node in an octree is either an internal node or a body (leaf).
- */
-struct Octree {
+struct Node {
   Point pos;
   double mass;
   bool Leaf;
-  virtual ~Octree() { }
-  Octree(bool l = true) :Leaf(l) {}
-  Octree(const Point& p, double m, bool l) :pos(p), mass(m), Leaf(l) {}
-  //  Octree(const Point& p, double m = 0.0) :pos(p), mass(m) {}
 };
 
-struct OctreeInternal : Octree {
-  Octree* child[8];
-  Galois::Runtime::LL::SimpleLock<true> Lock;
-  OctreeInternal(const Point& _pos) :Octree(_pos, 0.0, false) {
-    bzero(child, sizeof(*child) * 8);
-  }
-  // virtual ~OctreeInternal() {
-  //   for (int i = 0; i < 8; i++) {
-  //     if (OctreeInternal* B = dynamic_cast<OctreeInternal*>(child[i])) {
-  //       delete B;
-  //     }
-  //   }
-  // }
-};
-
-struct Body : Octree {
+struct Body : public Node {
   Point vel;
   Point acc;
+};
+
+/**
+ * A node in an octree is either an internal node or a leaf.
+ */
+struct Octree : public Node {
+  std::array<Node*, 8> child;
+  char cLeafs;
+  char nChildren;
+  Galois::Runtime::LL::SimpleLock<true> Lock;
+
+  Octree(const Point& p) {
+    Node::pos = p;
+    Node::Leaf = false;
+    cLeafs = 0;
+    nChildren = 0;
+  }
 };
 
 std::ostream& operator<<(std::ostream& os, const Body& b) {
@@ -156,43 +95,18 @@ struct BoundingBox {
     max(std::numeric_limits<double>::min()) { }
 
   void merge(const BoundingBox& other) {
-    for (int i = 0; i < 3; i++) {
-      if (other.min[i] < min[i])
-        min[i] = other.min[i];
-      if (other.max[i] > max[i])
-	max[i] = other.max[i];
-    }
+    min.pairMin(other.min);
+    max.pairMax(other.max);
   }
 
   void merge(const Point& other) {
-    for (int i = 0; i < 3; i++) {
-      if (other[i] < min[i])
-        min[i] = other[i];
-      if (other[i] > max[i])
-        max[i] = other[i];
-    }
+    min.pairMin(other);
+    max.pairMax(other);
   }
 
-  double diameter() const {
-    double diameter = max.x - min.x;
-    for (int i = 1; i < 3; i++) {
-      double t = max[i] - min[i];
-      if (diameter < t)
-        diameter = t;
-    }
-    return diameter;
-  }
-
-  double radius() const {
-    return diameter() / 2;
-  }
-
-  Point center() const {
-    return Point(
-        (max.x + min.x) * 0.5,
-        (max.y + min.y) * 0.5,
-        (max.z + min.z) * 0.5);
-  }
+  double diameter() const { return (max - min).minDim(); }
+  double radius() const   { return diameter() * 0.5;     }
+  Point center() const    { return (min + max) * 0.5;    }
 };
 
 std::ostream& operator<<(std::ostream& os, const BoundingBox& b) {
@@ -208,7 +122,7 @@ struct Config {
   Config():
     dtime(0.5),
     eps(0.05),
-    tol(0.025),
+    tol(0.1), //0.025),
     dthf(dtime * 0.5),
     epssq(eps * eps),
     itolsq(1.0 / (tol * tol))  { }
@@ -226,44 +140,38 @@ Config config;
 
 inline int getIndex(const Point& a, const Point& b) {
   int index = 0;
-  if (a.x < b.x)
-    index += 1;
-  if (a.y < b.y)
-    index += 2;
-  if (a.z < b.z)
-    index += 4;
+  for (int i = 0; i < 3; ++i)
+    if (a[i] < b[i]) 
+      index += (1 << i);
   return index;
 }
 
-inline void updateCenter(Point& p, int index, double radius) {
-  for (int i = 0; i < 3; i++) {
-    double v = (index & (1 << i)) > 0 ? radius : -radius;
-    p[i] += v;
-  }
+inline Point updateCenter(Point v, int index, double radius) {
+  for (int i = 0; i < 3; i++)
+    v[i] += (index & (1 << i)) > 0 ? radius : -radius;
+  return v;
 }
 
 typedef Galois::InsertBag<Body> Bodies;
 typedef Galois::InsertBag<Body*> BodyPtrs;
 //FIXME: reclaim memory for multiple steps
-Galois::InsertBag<OctreeInternal> INodes;
+typedef Galois::InsertBag<Octree> Tree;
 
 struct BuildOctree {
-  OctreeInternal* root;
+  Octree* root;
+  Tree& T;
   double root_radius;
 
-  BuildOctree(OctreeInternal* _root, double radius) :
-    root(_root),
-    root_radius(radius) { }
+  BuildOctree(Octree* _root, Tree& _t, double radius) 
+    : root(_root), T(_t), root_radius(radius) { }
 
-  void operator()(Body* b) {
-    insert(b, root, root_radius);
-  }
+  void operator()(Body* b) { insert(b, root, root_radius); }
 
-  void insert(Body* b, OctreeInternal* node, double radius) {
+  void insert(Body* b, Octree* node, double radius) {
     node->Lock.lock();
     int index = getIndex(node->pos, b->pos);
-
-    Octree *child = node->child[index];
+    
+    Node* child = node->child[index];
     
     if (child == NULL) {
       node->child[index] = b;
@@ -274,91 +182,83 @@ struct BuildOctree {
     radius *= 0.5;
     if (child->Leaf) {
       // Expand leaf
-      Body* n = static_cast<Body*>(child);
-      Point new_pos(node->pos);
-      updateCenter(new_pos, index, radius);
-      OctreeInternal* new_node = &INodes.emplace(new_pos);
-      //OctreeInternal* new_node = new OctreeInternal(new_pos);
-      assert(n->pos != b->pos);    
+      Octree* new_node = &T.emplace(updateCenter(node->pos, index, radius));
+      assert(node->pos != b->pos);
       node->child[index] = new_node;
       node->Lock.unlock();
       insert(b, new_node, radius);
-      insert(n, new_node, radius);
+      insert(static_cast<Body*>(child), new_node, radius);
     } else {
-      OctreeInternal* ni = static_cast<OctreeInternal*>(child);
       node->Lock.unlock();
-      insert(b, ni, radius);
+      insert(b, static_cast<Octree*>(child), radius);
     }
   }
 };
 
-struct ComputeCenterOfMass {
-  // NB: only correct when run sequentially or tree-like reduction
-  typedef int tt_does_not_need_stats;
-  OctreeInternal* root;
-
-  ComputeCenterOfMass(OctreeInternal* _root) : root(_root) { }
-
-  void operator()() {
-    root->mass = recurse(root);
+void computeCenterOfMass(Octree* node) {
+  double mass = 0.0;
+  Point accum;
+  
+  //Reorganize leaves to be dense
+  //remove copies values
+  std::fill(std::remove(node->child.begin(), node->child.end(), nullptr),
+	    node->child.end(), nullptr);
+  
+  for (int i = 0; i < 8 && node->child[i]; i++) {
+    Node* child = node->child[i];
+    ++node->nChildren;
+    if (!child->Leaf)
+      computeCenterOfMass(static_cast<Octree*>(child));
+    else
+      node->cLeafs |= (1 << i);
+    mass += child->mass;
+    accum += child->pos * child->mass;
   }
-
-private:
-  double recurse(OctreeInternal* node) {
-    double mass = 0.0;
-    int index = 0;
-    Point accum;
-    
-    for (int i = 0; i < 8; i++) {
-      Octree* child = node->child[i];
-      if (child == NULL)
-        continue;
-
-      // Reorganize leaves to be denser up front 
-      if (index != i) {
-        node->child[index] = child;
-        node->child[i] = NULL;
-      }
-      index++;
-      
-      double m;
-      const Point* p = &child->pos;
-      if (child->Leaf) {
-        m = child->mass;
-      } else {
-        m = recurse(static_cast<OctreeInternal*>(child));
-      }
-
-      mass += m;
-      for (int j = 0; j < 3; j++) 
-        accum[j] += (*p)[j] * m;
-    }
-
-    node->mass = mass;
-    
-    if (mass > 0.0) {
-      double inv_mass = 1.0 / mass;
-      for (int j = 0; j < 3; j++)
-        node->pos[j] = accum[j] * inv_mass;
-    }
-
-    return mass;
-  }
-};
-
-void updateForce(Point& acc, const Point& delta, double psq, double mass) {
-  // Computing force += delta * mass * (|delta|^2 + eps^2)^{-3/2}
-  psq += config.epssq;
-  double idr = 1 / sqrt((float) psq);
-  double scale = mass * idr * idr * idr;
-
-  for (int i = 0; i < 3; i++)
-    acc[i] += delta[i] * scale;
+  
+  node->mass = mass;
+  
+  if (mass > 0.0)
+    node->pos = accum / mass;
 }
 
-void computeDelta(Point& p, const Body* body, Octree* b) {
-  for (int i = 0; i < 3; i++)
-    p[i] = b->pos[i] - body->pos[i];
+/*
+void printRec(std::ofstream& file, Node* node, unsigned level) {
+  static const char* ct[] = {
+    "blue", "cyan", "aquamarine", "chartreuse", 
+    "darkorchid", "darkorange", 
+    "deeppink", "gold", "chocolate"
+  };
+  if (!node) return;
+  file << "\"" << node << "\" [color=" << ct[node->owner / 4] << (node->owner % 4 + 1) << (level ? "" : " style=filled") << " label = \"" << (node->Leaf ? "L" : "N") << "\"];\n";
+  if (!node->Leaf) {
+    Octree* node2 = static_cast<Octree*>(node);
+    for (int i = 0; i < 8 && node2->child[i]; ++i) {
+      if (level == 3 || level == 6)
+       	file << "subgraph cluster_" << level << "_" << i << " {\n";
+      file << "\"" << node << "\" -> \"" << node2->child[i] << "\" [weight=0.01]\n";
+      printRec(file, node2->child[i], level + 1);
+      if (level == 3 || level == 6)
+       	file << "}\n";
+    }
+  }
+}
+
+void printTree(Octree* node) {
+  std::ofstream file("out.txt");
+  file << "digraph octree {\n";
+  file << "ranksep = 2\n";
+  file << "root = \"" << node << "\"\n";
+  //  file << "overlap = scale\n";
+  printRec(file, node, 0);
+  file << "}\n";
+}
+*/
+
+Point updateForce(Point delta, double psq, double mass) {
+  // Computing force += delta * mass * (|delta|^2 + eps^2)^{-3/2}
+  double idr = 1 / sqrt((float) (psq + config.epssq));
+  double scale = mass * idr * idr * idr;
+  return delta * scale;
 }
 
 struct ComputeForces {
@@ -367,41 +267,28 @@ struct ComputeForces {
   typedef int tt_needs_per_iter_alloc;
   typedef int tt_does_not_need_push;
 
-  OctreeInternal* top;
+  Octree* top;
   double diameter;
   double root_dsq;
 
-  ComputeForces(OctreeInternal* _top, double _diameter) :
+  ComputeForces(Octree* _top, double _diameter) :
     top(_top),
     diameter(_diameter) {
     root_dsq = diameter * diameter * config.itolsq;
   }
   
   template<typename Context>
-  void operator()(Body* bb, Context& cnx) {
-    Body& b = *bb;
-    Point p = b.acc;
-    for (int i = 0; i < 3; i++)
-      b.acc[i] = 0;
-    //recurse(b, top, root_dsq);
-    iterate(b, root_dsq, cnx);
-    for (int i = 0; i < 3; i++)
-      b.vel[i] += (b.acc[i] - p[i]) * config.dthf;
-  }
-
-  void forleaf(Body& b, Body* node, double dsq) {
-    //check if it is me
-    if (&b == node)
-      return;
-    Point p;
-    computeDelta(p, &b, node);
-    updateForce(b.acc, p, p.dist2(), b.mass);
+  void operator()(Body* b, Context& cnx) {
+    Point p = b->acc;
+    b->acc = {0.0, 0.0, 0.0};
+    iterate(*b, root_dsq, cnx);
+    b->vel += (b->acc - p) * config.dthf;
   }
 
   struct Frame {
     double dsq;
-    OctreeInternal* node;
-    Frame(OctreeInternal* _node, double _dsq) : dsq(_dsq), node(_node) { }
+    Octree* node;
+    Frame(Octree* _node, double _dsq) : dsq(_dsq), node(_node) { }
   };
 
   template<typename Context>
@@ -409,56 +296,33 @@ struct ComputeForces {
     std::deque<Frame, Galois::PerIterAllocTy::rebind<Frame>::other> stack(cnx.getPerIterAlloc());
     stack.push_back(Frame(top, root_dsq));
 
-    Point p;
     while (!stack.empty()) {
-      Frame f = stack.back();
+      const Frame f = stack.back();
       stack.pop_back();
 
-      computeDelta(p, &b, f.node);
+      Point p = b.pos - f.node->pos;
       double psq = p.dist2();
 
       // Node is far enough away, summarize contribution
       if (psq >= f.dsq) {
-        updateForce(b.acc, p, psq, f.node->mass);
+        b.acc += updateForce(p, psq, f.node->mass);
         continue;
       }
 
       double dsq = f.dsq * 0.25;
-      
-      for (int i = 0; i < 8; i++) {
-        Octree *next = f.node->child[i];
-        if (next == NULL)
-          break;
-        if (next->Leaf) {
-	  forleaf(b, static_cast<Body*>(next), dsq);
+      for (int i = 0; i < f.node->nChildren; i++) {
+	Node* n = f.node->child[i];
+	assert(n);
+	if (f.node->cLeafs & (1 << i)) {
+	  assert(n->Leaf);
+	  if (static_cast<const Node*>(&b) != n) {
+	    Point p = b.pos - n->pos;
+	    b.acc += updateForce(p, p.dist2(), n->mass);
+	  }
 	} else {
-          stack.push_back(Frame(static_cast<OctreeInternal*>(next), dsq));
-        }
-      }
-    }
-  }
-
-  void recurse(Body& b, OctreeInternal* node, double dsq) {
-    Point p;
-    computeDelta(p, &b, node);
-    double psq = p.dist2();
-    // Node is far enough away, summarize contribution
-    if (psq >= dsq) {
-      updateForce(b.acc, p, psq, node->mass);
-      
-      return;
-    }
-
-    dsq *= 0.25;
-    
-    for (int i = 0; i < 8; i++) {
-      Octree *next = node->child[i];
-      if (next == NULL)
-        break;
-      if (next->Leaf) {
-	forleaf(b, static_cast<Body*>(next), dsq);
-      } else {
-        recurse(b, static_cast<OctreeInternal*>(next), dsq);
+	  stack.emplace_back(static_cast<Octree*>(n), dsq);
+	  __builtin_prefetch(n);
+	}
       }
     }
   }
@@ -471,35 +335,33 @@ struct AdvanceBodies {
   AdvanceBodies() { }
 
   template<typename Context>
-  void operator()(Body* bb, Context&) {
-    operator()(bb);
+  void operator()(Body* b, Context&) {
+    operator()(b);
   }
 
-  void operator()(Body* bb) {
-    Body& b = *bb;
-    Point dvel(b.acc);
+  void operator()(Body* b) {
+    Point dvel(b->acc);
     dvel *= config.dthf;
-
-    Point velh(b.vel);
+    Point velh(b->vel);
     velh += dvel;
-
-    for (int i = 0; i < 3; ++i)
-      b.pos[i] += velh[i] * config.dtime;
-    for (int i = 0; i < 3; ++i)
-      b.vel[i] = velh[i] + dvel[i];
+    b->pos += velh * config.dtime;
+    b->vel = velh + dvel;
   }
 };
 
 struct ReduceBoxes {
   // NB: only correct when run sequentially or tree-like reduction
   typedef int tt_does_not_need_stats;
-  BoundingBox& initial;
+  BoundingBox initial;
 
-  ReduceBoxes(BoundingBox& _initial): initial(_initial) { }
-
-  void operator()(Body* b) {
-    assert(b);
+  void operator()(const Body* b) {
     initial.merge(b->pos);
+  }
+};
+
+struct mergeBox {
+  void operator()(ReduceBoxes& lhs, ReduceBoxes& rhs) {
+    return lhs.initial.merge(rhs.initial);
   }
 };
 
@@ -512,6 +374,8 @@ struct InsertBody {
   Bodies& bodies;
   InsertBody(BodyPtrs& pb, Bodies& b): pBodies(pb), bodies(b) { }
   void operator()(const Body& b) {
+    //Body b2 = b;
+    //b2.owner = Galois::Runtime::LL::getTID();
     pBodies.push_back(&(bodies.push_back(b)));
   }
 };
@@ -575,29 +439,26 @@ void generateInput(Bodies& bodies, BodyPtrs& pBodies, int nbodies, int seed) {
     do {
       for (int i = 0; i < 3; i++)
         p[i] = nextDouble() * 2.0 - 1.0;
-      sq = p.x * p.x + p.y * p.y + p.z * p.z;
+      sq = p.dist2();
     } while (sq > 1.0);
     scale = rsc * r / sqrt(sq);
 
     Body b;
     b.mass = 1.0 / nbodies;
-    for (int i = 0; i < 3; i++)
-      b.pos[i] = p[i] * scale;
-
+    b.pos = p * scale;
     do {
-      p.x = nextDouble();
-      p.y = nextDouble() * 0.1;
-    } while (p.y > p.x * p.x * pow(1 - p.x * p.x, 3.5));
-    v = p.x * sqrt(2.0 / sqrt(1 + r * r));
+      p[0] = nextDouble();
+      p[1] = nextDouble() * 0.1;
+    } while (p[1] > p[0] * p[0] * pow(1 - p[0] * p[0], 3.5));
+    v = p[0] * sqrt(2.0 / sqrt(1 + r * r));
     do {
       for (int i = 0; i < 3; i++)
         p[i] = nextDouble() * 2.0 - 1.0;
-      sq = p.x * p.x + p.y * p.y + p.z * p.z;
+      sq = p.dist2();
     } while (sq > 1.0);
     scale = vsc * v / sqrt(sq);
-    for (int i = 0; i < 3; i++)
-      b.vel[i] = p[i] * scale;
-
+    b.vel = p * scale;
+    b.Leaf = true;
     tmp.push_back(b);
     //pBodies.push_back(&bodies.push_back(b));
   }
@@ -619,15 +480,13 @@ struct CheckAllPairs {
       Body* b = &*ii;
       if (me == b)
         continue;
-      Point delta;
-      computeDelta(delta, me, b);
+      Point delta = me->pos - b->pos;
       double psq = delta.dist2();
-      updateForce(acc, delta, psq, b->mass);
+      acc += updateForce(delta, psq, b->mass);
     }
 
     double dist2 = acc.dist2();
-    for (int i = 0; i < 3; ++i)
-      acc[i] -= me->acc[i];
+    acc -= me->acc;
     double retval = acc.dist2() / dist2;
     return retval;
   }
@@ -650,15 +509,17 @@ void run(Bodies& bodies, BodyPtrs& pBodies) {
 
   for (int step = 0; step < ntimesteps; step++) {
     // Do tree building sequentially
-    BoundingBox box;
-    std::for_each(pBodies.begin(), pBodies.end(), ReduceBoxes(box));
-    OctreeInternal top(box.center());
+    BoundingBox box = Galois::Runtime::do_all_impl(Galois::Runtime::makeLocalRange(pBodies), ReduceBoxes(), mergeBox(), true).initial;
+    //std::for_each(bodies.begin(), bodies.end(), ReduceBoxes(box));
 
-    //std::for_each(pBodies.begin(), pBodies.end(), BuildOctree(&top, box.radius()));
-    Galois::do_all_local(pBodies, BuildOctree(&top, box.radius()));
+    Tree t;
+    Octree& top = t.emplace(box.center());
 
-    ComputeCenterOfMass computeCenterOfMass(&top);
-    computeCenterOfMass();
+    Galois::do_all_local(pBodies, BuildOctree(&top, t, box.radius()));
+
+    //update centers of mass in tree
+    computeCenterOfMass(&top);
+    //printTree(&top);
 
     Galois::StatTimer T_parallel("ParallelTime");
     T_parallel.start();
@@ -667,6 +528,7 @@ void run(Bodies& bodies, BodyPtrs& pBodies) {
     if (!skipVerify) {
       std::cout << "MSE (sampled) " << checkAllPairs(bodies, std::min((int) nbodies, 100)) << "\n";
     }
+    //Done in compute forces
     Galois::do_all_local(pBodies, AdvanceBodies());//, "advance");
     T_parallel.stop();
 
