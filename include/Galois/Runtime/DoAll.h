@@ -127,7 +127,7 @@ class DoAllWork {
 
 public:
   DoAllWork(const FunctionTy& F, const ReduceFunTy& R, bool needsReduce, RangeTy r, bool steal)
-    : origF(F), outputF(F), RF(R), range(r), needsReduce(needsReduce), useStealing(steal), barrier(getSystemBarrier())
+    : origF(F), outputF(F), RF(R), range(r), barrier(getSystemBarrier()), needsReduce(needsReduce), useStealing(steal)
   { }
 
   void operator()() {
