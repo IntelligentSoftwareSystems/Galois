@@ -65,10 +65,9 @@ struct Body : public Node {
  * A node in an octree is either an internal node or a leaf.
  */
 struct Octree : public Node {
-  std::array<Node*, 8> child;
+  std::array<Galois::Runtime::LL::PtrLock<Node,true>, 8> child;
   char cLeafs;
   char nChildren;
-  Galois::Runtime::LL::SimpleLock<true> Lock;
 
   Octree(const Point& p) {
     Node::pos = p;
@@ -122,7 +121,7 @@ struct Config {
   Config():
     dtime(0.5),
     eps(0.05),
-    tol(0.1), //0.025),
+    tol(0.05), //0.025),
     dthf(dtime * 0.5),
     epssq(eps * eps),
     itolsq(1.0 / (tol * tol))  { }
@@ -163,19 +162,25 @@ struct BuildOctree {
   double root_radius;
 
   BuildOctree(Octree* _root, Tree& _t, double radius) 
-    : root(_root), T(_t), root_radius(radius) { }
+    : root(_root), T(_t), root_radius(radius) {  }
 
   void operator()(Body* b) { insert(b, root, root_radius); }
 
   void insert(Body* b, Octree* node, double radius) {
-    node->Lock.lock();
     int index = getIndex(node->pos, b->pos);
-    
-    Node* child = node->child[index];
+    Node* child = node->child[index].getValue();
+
+    //go through the tree lock-free while we can
+    if (child && !child->Leaf) {
+      insert(b, static_cast<Octree*>(child), radius);
+      return;
+    }
+
+    node->child[index].lock();
+    child = node->child[index].getValue();
     
     if (child == NULL) {
-      node->child[index] = b;
-      node->Lock.unlock();
+      node->child[index].unlock_and_set(b);
       return;
     }
     
@@ -184,12 +189,12 @@ struct BuildOctree {
       // Expand leaf
       Octree* new_node = &T.emplace(updateCenter(node->pos, index, radius));
       assert(node->pos != b->pos);
-      node->child[index] = new_node;
-      node->Lock.unlock();
+      //node->child[index].unlock_and_set(new_node);
       insert(b, new_node, radius);
       insert(static_cast<Body*>(child), new_node, radius);
+      node->child[index].unlock_and_set(new_node);
     } else {
-      node->Lock.unlock();
+      node->child[index].unlock();
       insert(b, static_cast<Octree*>(child), radius);
     }
   }
@@ -201,12 +206,16 @@ void computeCenterOfMass(Octree* node) {
   
   //Reorganize leaves to be dense
   //remove copies values
-  std::fill(std::remove(node->child.begin(), node->child.end(), nullptr),
-	    node->child.end(), nullptr);
-  
-  for (int i = 0; i < 8 && node->child[i]; i++) {
-    Node* child = node->child[i];
-    ++node->nChildren;
+  int index = 0;
+  for (int i = 0; i < 8; ++i)
+    if (node->child[i].getValue())
+      node->child[index++].setValue(node->child[i].getValue());
+  for (int i = index; i < 8; ++i)
+    node->child[i].setValue(nullptr);
+  node->nChildren = index;
+
+  for (int i = 0; i < index; i++) {
+    Node* child = node->child[i].getValue();
     if (!child->Leaf)
       computeCenterOfMass(static_cast<Octree*>(child));
     else
@@ -311,7 +320,7 @@ struct ComputeForces {
 
       double dsq = f.dsq * 0.25;
       for (int i = 0; i < f.node->nChildren; i++) {
-	Node* n = f.node->child[i];
+	Node* n = f.node->child[i].getValue();
 	assert(n);
 	if (f.node->cLeafs & (1 << i)) {
 	  assert(n->Leaf);
@@ -515,22 +524,25 @@ void run(Bodies& bodies, BodyPtrs& pBodies) {
     Tree t;
     Octree& top = t.emplace(box.center());
 
+    Galois::StatTimer T_build("BuildTime");
+    T_build.start();
     Galois::do_all_local(pBodies, BuildOctree(&top, t, box.radius()));
+    T_build.stop();
 
     //update centers of mass in tree
     computeCenterOfMass(&top);
     //printTree(&top);
 
-    Galois::StatTimer T_parallel("ParallelTime");
-    T_parallel.start();
-
+    Galois::StatTimer T_compute("ComputeTime");
+    T_compute.start();
     Galois::for_each_local<WLL>(pBodies, ComputeForces(&top, box.diameter()), "compute");
+    T_compute.stop();
+
     if (!skipVerify) {
       std::cout << "MSE (sampled) " << checkAllPairs(bodies, std::min((int) nbodies, 100)) << "\n";
     }
     //Done in compute forces
     Galois::do_all_local(pBodies, AdvanceBodies());//, "advance");
-    T_parallel.stop();
 
     std::cout << "Timestep " << step << " Center of Mass = ";
     std::ios::fmtflags flags = 
