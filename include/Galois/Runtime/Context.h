@@ -102,7 +102,6 @@ public:
   //0: fail, 1: new owner, 2: already owner
   int try_acquire(Lockable* L);
   void release(Lockable* L);
-  void swap_lock(Lockable* L, SimpleRuntimeContext* nptr);
 
   public:
   SimpleRuntimeContext(bool child = false): locks(0), customAcquire(child) {
@@ -117,6 +116,8 @@ public:
   unsigned cancel_iteration();
   unsigned commit_iteration();
   void acquire(Lockable* L);
+  void swap_lock(Lockable* L, SimpleRuntimeContext* nptr);
+  void swap_acquire(Lockable* L, SimpleRuntimeContext* nptr);
 };
 
 //! get the current conflict detection class, may be null if not in parallel region

@@ -97,7 +97,9 @@ void Galois::Runtime::signalConflict(Lockable* L) {
 // Simple Runtime Context
 ////////////////////////////////////////////////////////////////////////////////
 
-int Galois::Runtime::SimpleRuntimeContext::try_acquire(Galois::Runtime::Lockable* L) {
+using namespace Galois::Runtime;
+
+int SimpleRuntimeContext::try_acquire(Lockable* L) {
   assert(L);
   if (L->Owner.try_lock()) {
     assert(!L->Owner.getValue());
@@ -109,7 +111,7 @@ int Galois::Runtime::SimpleRuntimeContext::try_acquire(Galois::Runtime::Lockable
   return 0;
 }
 
-void Galois::Runtime::SimpleRuntimeContext::release(Galois::Runtime::Lockable* L) {
+void SimpleRuntimeContext::release(Lockable* L) {
   assert(L);
   assert(L->Owner.getValue() == this);
   assert(L->Owner.is_locked());
@@ -117,7 +119,7 @@ void Galois::Runtime::SimpleRuntimeContext::release(Galois::Runtime::Lockable* L
   L->Owner.unlock_and_clear();
 }
 
-void Galois::Runtime::SimpleRuntimeContext::swap_lock(Galois::Runtime::Lockable* L, Galois::Runtime::SimpleRuntimeContext* nptr) {
+void SimpleRuntimeContext::swap_lock(Lockable* L, SimpleRuntimeContext* nptr) {
   assert(L);
   assert(L->Owner.is_locked());
   assert(!L->next);
@@ -125,7 +127,7 @@ void Galois::Runtime::SimpleRuntimeContext::swap_lock(Galois::Runtime::Lockable*
 }
 
 // Should allow the lock to be taken even if lock has magic value
-void Galois::Runtime::SimpleRuntimeContext::acquire(Galois::Runtime::Lockable* L) {
+void SimpleRuntimeContext::acquire(Lockable* L) {
   int i;
   if (customAcquire) {
     sub_acquire(L);
@@ -135,11 +137,17 @@ void Galois::Runtime::SimpleRuntimeContext::acquire(Galois::Runtime::Lockable* L
       locks = L;
     }
   } else {
-    Galois::Runtime::signalConflict(L);
+    signalConflict(L);
   }
 }
 
-void Galois::Runtime::SimpleRuntimeContext::sub_acquire(Galois::Runtime::Lockable* L) {
+void SimpleRuntimeContext::swap_acquire(Lockable* L, SimpleRuntimeContext* nptr) {
+  swap_lock(L,nptr);
+  L->next = nptr->locks;
+  nptr->locks = L;
+}
+
+void SimpleRuntimeContext::sub_acquire(Lockable* L) {
   assert(0 && "Shouldn't get here");
   abort();
 }

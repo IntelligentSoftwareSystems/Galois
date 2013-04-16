@@ -183,8 +183,7 @@ protected:
       if(rp) {
         Lockable* L;
         L = rp->second;
-        getAbortCnx().release(L);
-        getThreadContext()->acquire(L);
+        getAbortCnx().swap_acquire(L,getThreadContext());
         p = rp->first;
       }
       else {
