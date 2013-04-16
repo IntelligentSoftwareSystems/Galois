@@ -42,7 +42,10 @@ class Lockable;
 //Things we can throw:
 struct conflict_ex { Lockable* obj; };
 struct failsafe_ex{};
-struct remote_ex; //tried to access a remote object
+struct remote_ex {
+  Lockable* obj;
+  uint32_t owner;
+};
 
 enum PendingFlag {
   NON_DET,
@@ -99,7 +102,8 @@ public:
   //0: fail, 1: new owner, 2: already owner
   int try_acquire(Lockable* L);
   void release(Lockable* L);
-  
+  void swap_lock(Lockable* L, SimpleRuntimeContext* nptr);
+
   public:
   SimpleRuntimeContext(bool child = false): locks(0), customAcquire(child) {
     LL::gDebug("SRC: ", this);
@@ -112,8 +116,6 @@ public:
   
   unsigned cancel_iteration();
   unsigned commit_iteration();
-  bool do_isMagicLock(Lockable* L);
-  void do_setMagicLock(Lockable* L);
   void acquire(Lockable* L);
 };
 
@@ -163,19 +165,6 @@ inline bool isAcquired(Lockable* C) {
 
 inline bool isAcquiredBy(Lockable* C, SimpleRuntimeContext* cnx) {
   return C->Owner.getValue() == cnx;
-}
-
-bool do_isMagicLock(Lockable* C);
-
-inline bool isMagicLock(Lockable* C) {
-   return do_isMagicLock(C);
-}
-
-void do_setMagicLock(Lockable* C);
-
-inline void setMagicLock(Lockable* C) {
-   do_setMagicLock(C);
-   return;
 }
 
 struct AlwaysLockObj {
