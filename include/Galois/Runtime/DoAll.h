@@ -82,7 +82,7 @@ class DoAllWork {
         if ((Distributed::networkHostNum > 1) && (!LL::getTID()))
           net.handleReceives();
         tld.F(*tld.begin);
-      } catch (const Distributed::remote_ex& ex) {
+      } catch (const remote_ex& ex) {
         tld.cnx.cancel_iteration();
         continue;
       } catch (const conflict_ex& ex) {
@@ -95,7 +95,7 @@ class DoAllWork {
           if ((Distributed::networkHostNum > 1) && (!LL::getTID()))
             net.handleReceives();
           ++tld.begin;
-        } catch (const Distributed::remote_ex& ex) {
+        } catch (const remote_ex& ex) {
           continue;
         } catch (const conflict_ex& ex) {
           continue;

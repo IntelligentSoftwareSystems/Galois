@@ -44,11 +44,7 @@ namespace Galois {
 namespace Runtime {
 namespace Distributed {
 
-struct remote_ex {
-  Distributed::recvFuncTy pad;
-  Lockable* ptr;
-  uint32_t owner;
-};
+SimpleRuntimeContext& getAbortCnx();
 
 template<typename T>
 class gptr;
@@ -314,7 +310,14 @@ void RemoteDirectory::doObj(uint32_t owner, Lockable* ptr, RecvBuffer& buf) {
   Lock.unlock();
   assert(isAcquiredBy(obj, this));
   gDeserialize(buf,*static_cast<T*>(obj));
-  release(obj);
+  // use the object atleast once
+  if (inGaloisForEach && getSystemRemoteObjects().find(obj)) {
+    swap_lock(obj,&getAbortCnx());
+    // move from Requested to Received map
+    (getSystemRemoteObjects().get_remove(obj))();
+  }
+  else
+    release(obj);
 }
 
 template<typename T>

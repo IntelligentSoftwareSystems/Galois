@@ -26,9 +26,11 @@
 #define GALOIS_RUNTIME_NETWORK_H
 
 #include "Galois/Runtime/Serialize.h"
+#include "Galois/Runtime/Context.h"
 
 #include <cstdint>
 #include <tuple>
+#include <unordered_map>
 
 namespace Galois {
 namespace Runtime {
@@ -95,6 +97,64 @@ void networkTerminate();
 //! Distributed barrier
 void distWait();
 
+
+////////////////////////////////////////////////////////////////////////////////
+// objectRecord - used to store the requested remote objects
+////////////////////////////////////////////////////////////////////////////////
+class ObjectRecord {
+private:
+  typedef std::unordered_map<Lockable*,std::function<void ()> > Map;
+
+  Galois::Runtime::LL::SimpleLock<true> Lock;
+  Map    objStore;
+
+public:
+  typedef std::function<void ()> FType;
+
+  void insert(Lockable* ptr, FType val) {
+    Lock.lock();
+    objStore[ptr] = val;
+    Lock.unlock();
+  }
+
+  void erase(Lockable* ptr) {
+    Lock.lock();
+    objStore.erase(ptr);
+    Lock.unlock();
+  }
+
+  void clear() {
+    Lock.lock();
+    objStore.clear();
+    Lock.unlock();
+  }
+
+  bool empty() {
+    Lock.lock();
+    bool emp = objStore.empty();
+    Lock.unlock();
+    return emp;
+  }
+
+  bool find(Lockable* ptr) {
+    Lock.lock();
+    typename Map::const_iterator got = objStore.find(ptr);
+    bool emp = (got != objStore.end());
+    Lock.unlock();
+    return emp;
+  }
+
+  FType get_remove(Lockable* ptr) {
+    Lock.lock();
+    typename Map::const_iterator got = objStore.find(ptr);
+    assert(got != objStore.end());
+    FType retval = got->second;
+    Lock.unlock();
+    return retval;
+  }
+};
+
+ObjectRecord& getSystemRemoteObjects();
 
 ////////////////////////////////////////////////////////////////////////////////
 // Implementations

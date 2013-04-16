@@ -66,9 +66,7 @@ struct resolve_dispatch<T, false> {
 	try {
 	  acquire(rptr, Galois::MethodFlag::ALL);
 	} catch (...) {
-	  //	  std::cerr << "HHHHHAAHAHAHA\n";
-	  throw (int)5;
-	  abort();
+	  throw remote_ex{rptr,owner};
 	}
       } else {
 	while (isAcquired(rptr)) {
@@ -241,11 +239,11 @@ public:
 
 template<typename T>
 remote_ex make_remote_ex(const Distributed::gptr<T>& p) {
-  return remote_ex{&Distributed::LocalDirectory::reqLandingPad<T>, p.ptr, p.owner};
+  return remote_ex{p.ptr, p.owner};
 }
 template<typename T>
 remote_ex make_remote_ex(Lockable* ptr, uint32_t owner) {
-  return remote_ex{&Distributed::LocalDirectory::reqLandingPad<T>, ptr, owner};
+  return remote_ex{ptr, owner};
 }
 
 } //namespace Distributed

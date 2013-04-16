@@ -31,6 +31,11 @@ Galois::Runtime::SimpleRuntimeContext& Galois::Runtime::Distributed::getTransCnx
   return *obj.getLocal();
 }
 
+Galois::Runtime::SimpleRuntimeContext& Galois::Runtime::Distributed::getAbortCnx() {
+  static Galois::Runtime::SimpleRuntimeContext obj;
+  return obj;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Local Directory
 ////////////////////////////////////////////////////////////////////////////////

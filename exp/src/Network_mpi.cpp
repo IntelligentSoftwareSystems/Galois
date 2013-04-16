@@ -251,3 +251,7 @@ NetworkInterface& Galois::Runtime::Distributed::getSystemNetworkInterface() {
   return net;
 }
 
+ObjectRecord& Galois::Runtime::Distributed::getSystemRemoteObjects() {
+  static ObjectRecord obj;
+  return obj;
+}

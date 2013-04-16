@@ -85,6 +85,7 @@ protected:
   typedef T value_type;
   typedef typename WorkListTy::template retype<value_type> WLTy;
   typedef WorkList::GFIFO<value_type> AbortedList;
+  typedef WorkList::GFIFO<std::pair<value_type,Lockable*> > ReceivedList;
 
   struct ThreadLocalData {
     FunctionTy function;
@@ -100,6 +101,7 @@ protected:
 
   TerminationDetection& term;
   PerPackageStorage<AbortedList> aborted;
+  ReceivedList received;
   LL::CacheLineStorage<bool> broke;
 
   inline void commitIteration(ThreadLocalData& tld) {
@@ -115,14 +117,16 @@ protected:
   }
 
   GALOIS_ATTRIBUTE_NOINLINE
-  void abortIteration(value_type val, ThreadLocalData& tld, bool recursiveAbort) {
+  void abortIteration(value_type val, ThreadLocalData& tld, bool recursiveAbort, bool local) {
     assert(ForEachTraits<FunctionTy>::NeedsAborts);
     tld.cnx.cancel_iteration();
     tld.stat.inc_conflicts(); //Class specialization handles opt
-    if (recursiveAbort)
-      aborted.getRemote(LL::getLeaderForPackage(LL::getPackageForSelf(LL::getTID()) / 2))->push(val);
-    else
-      aborted.getLocal()->push(val);
+    if (local) {
+      if (recursiveAbort)
+        aborted.getRemote(LL::getLeaderForPackage(LL::getPackageForSelf(LL::getTID()) / 2))->push(val);
+      else
+        aborted.getLocal()->push(val);
+    }
     //clear push buffer
     if (ForEachTraits<FunctionTy>::NeedsPush)
       tld.facing.resetPushBuffer();
@@ -133,8 +137,11 @@ protected:
 
   inline void doProcess(boost::optional<value_type>& p, ThreadLocalData& tld) {
     tld.stat.inc_iterations(); //Class specialization handles opt
+ // may havereceived remote objects already locked in the context
+ /*
     if (ForEachTraits<FunctionTy>::NeedsAborts)
       tld.cnx.start_iteration();
+  */
     tld.function(*p, tld.facing.data());
     commitIteration(tld);
 
@@ -163,10 +170,38 @@ protected:
     return workHappened;
   }
 
+  void resch_recv(value_type val, Lockable *L) {
+    received.push(std::make_pair(val,L));
+  }
+
+  template<typename WL>
+  boost::optional<value_type> getProcess(WL& lwl) {
+    boost::optional<value_type> p;
+    boost::optional<std::pair<value_type,Lockable*> > rp;
+    if (LL::getTID() == 0) {
+      rp = received.pop();
+      if(rp) {
+        Lockable* L;
+        L = rp->second;
+        getAbortCnx().release(L);
+        getThreadContext()->acquire(L);
+        p = rp->first;
+      }
+      else {
+	p = lwl.pop();
+      }
+    }
+    else {
+      p = lwl.pop();
+    }
+    return p;
+  }
+
   template<bool limit, typename WL>
   bool runQueue(ThreadLocalData& tld, WL& lwl, bool recursiveAbort) {
     bool workHappened = false;
-    boost::optional<value_type> p = lwl.pop();
+    boost::optional<value_type> p;
+    p = getProcess(lwl);
     unsigned num = 0;
     if (p)
       workHappened = true;
@@ -178,16 +213,20 @@ protected:
 	  if (num == 32)
 	    break;
 	}
-	p = lwl.pop();
+        p = getProcess(lwl);
       }
     } catch (const conflict_ex& ex) {
       Distributed::getSystemLocalDirectory().recall(ex.obj, false);
-      abortIteration(*p, tld, recursiveAbort);
+      abortIteration(*p, tld, recursiveAbort, true);
+    } catch (const remote_ex& ex) {
+      // object is remote - only for Remote Directory now
+      assert(ex.owner != Distributed::networkHostID);
+      // add to the list of remoteObjects
+      Distributed::getSystemRemoteObjects().insert(ex.obj,std::bind(&ForEachWork::resch_recv,this,*p,ex.obj));
+      abortIteration(*p, tld, recursiveAbort, false);
     } catch (const break_ex&) {
       handleBreak(tld);
       return false;
-    } catch (int) {
-      abortIteration(*p, tld, recursiveAbort);
     }
 
     if ((Distributed::networkHostNum > 1) && (LL::getTID() == 0)) {
@@ -287,12 +326,13 @@ public:
 
 template<typename WLTy, typename RangeTy, typename FunctionTy>
 void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
+  typedef typename RangeTy::value_type T;
+  typedef ForEachWork<WLTy, T, FunctionTy> WorkTy;
+
   assert(!inGaloisForEach);
 
   inGaloisForEach = true;
-
-  typedef typename RangeTy::value_type T;
-  typedef ForEachWork<WLTy, T, FunctionTy> WorkTy;
+  Distributed::getSystemRemoteObjects().clear();
 
   WorkTy W(f, loopname);
   //RunCommand init(std::bind(&WorkTy::template AddInitialWork<RangeTy>, std::ref(W), range));
