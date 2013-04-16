@@ -174,7 +174,7 @@ public:
 template<typename NHTy, typename EdgeDataTy>
 class GraphNodeEdges<NHTy, EdgeDataTy, EdgeDirection::Out> {
   typedef Edge<NHTy, EdgeDataTy> EdgeTy;
-  typedef std::deque<EdgeTy> EdgeListTy;
+  typedef gdeque<EdgeTy> EdgeListTy;
 
   EdgeListTy edges;
 
@@ -196,14 +196,12 @@ protected:
   typedef typename EdgeListTy::iterator iterator;
 
   template<typename... Args>
-  iterator createEdge(const NHTy& src, const NHTy& dst, Args&&... args) {
-    *src;
-    return edges.emplace(edges.end(), dst, std::forward<Args...>(args...));
+  void createEdge(const NHTy& src, const NHTy& dst, Args&&... args) {
+    edges.emplace_back(dst, std::forward<Args...>(args...));
   }
 
-  iterator createEdge(const NHTy& src, const NHTy& dst) {
-    *src;
-    return edges.emplace(edges.end(), dst);
+  void createEdge(const NHTy& src, const NHTy& dst) {
+    edges.emplace_back(dst);
   }
 
   void clearEdges() {
@@ -227,7 +225,7 @@ class GraphNodeEdges<NHTy, EdgeDataTy, EdgeDirection::InOut> {
 template<typename NHTy>
 class GraphNodeEdges<NHTy, void, EdgeDirection::Un> {
   typedef Edge<NHTy, void> EdgeTy;
-  typedef std::deque<EdgeTy> EdgeListTy;
+  typedef gdeque<EdgeTy> EdgeListTy;
 
   EdgeListTy edges;
 
@@ -248,10 +246,10 @@ protected:
  public:
   typedef typename EdgeListTy::iterator iterator;
 
-  iterator createEdge(NHTy& src, NHTy& dest) {
+  void createEdge(NHTy& src, NHTy& dest) {
     //assert(*src == this);
-    dest->edges.emplace(dest->edges.end(), src);
-    return edges.emplace(edges.end(), dest);
+    dest->edges.emplace_back(src);
+    edges.emplace_back(dest);
   }
 
   void clearEdges() {
