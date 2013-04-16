@@ -31,6 +31,7 @@
 
 #include <iterator>
 #include <stdexcept>
+#include <memory>
 
 namespace Galois {
 
@@ -96,7 +97,7 @@ public:
     if (__n >= _Size)
       throw std::out_of_range("lazyArray::at");
     return get(__n);
-  }  
+  }
 
   reference front() { return *get(0); }
   const_reference front() const { return *get(0); }
@@ -109,7 +110,7 @@ public:
   //missing: fill swap
 
   template<typename... Args>
-  pointer emplace(size_type __n, Args&&... args) { return new (get(__n)) _Tp(std::forward<Args>(args)...); }
+  pointer emplace(size_type __n, Args&&... args) { return new ((void *)get(__n)) _Tp(std::forward<Args>(args)...); }
 
   pointer construct(size_type __n, const _Tp& val) { return emplace(__n, val); }
   pointer construct(size_type __n, _Tp&& val) { return emplace(__n, std::move(val)); }
