@@ -200,10 +200,11 @@ struct BuildOctree {
   }
 };
 
-void computeCenterOfMass(Octree* node) {
+unsigned computeCenterOfMass(Octree* node) {
   double mass = 0.0;
   Point accum;
-  
+  unsigned num = 1;
+
   //Reorganize leaves to be dense
   //remove copies values
   int index = 0;
@@ -216,10 +217,12 @@ void computeCenterOfMass(Octree* node) {
 
   for (int i = 0; i < index; i++) {
     Node* child = node->child[i].getValue();
-    if (!child->Leaf)
-      computeCenterOfMass(static_cast<Octree*>(child));
-    else
+    if (!child->Leaf) {
+      num += computeCenterOfMass(static_cast<Octree*>(child));
+    } else {
       node->cLeafs |= (1 << i);
+      ++num;
+    }
     mass += child->mass;
     accum += child->pos * child->mass;
   }
@@ -228,6 +231,7 @@ void computeCenterOfMass(Octree* node) {
   
   if (mass > 0.0)
     node->pos = accum / mass;
+  return num;
 }
 
 /*
@@ -530,8 +534,9 @@ void run(Bodies& bodies, BodyPtrs& pBodies) {
     T_build.stop();
 
     //update centers of mass in tree
-    computeCenterOfMass(&top);
+    unsigned size = computeCenterOfMass(&top);
     //printTree(&top);
+    std::cout << "Tree Size: " << size << "\n";
 
     Galois::StatTimer T_compute("ComputeTime");
     T_compute.start();
