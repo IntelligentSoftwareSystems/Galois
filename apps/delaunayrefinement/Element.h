@@ -64,10 +64,10 @@ public:
   }
 
   // required by the new in DataLandingPad in Directory.h
-  Element():obtuse(0), bDim(true), id(0) {}
+  Element() = default; //noexcept :obtuse(0), bDim(true), id(0) {}
 
   //! Constructor for Triangles
-  Element(const Tuple& a, const Tuple& b, const Tuple& c, int _id = 0)
+  Element(const Tuple& a, const Tuple& b, const Tuple& c, int _id = 0) noexcept
    :obtuse(0), bDim(true), id(_id) 
   { 
     coords[0] = a;
@@ -94,7 +94,8 @@ public:
   }
 
   //! Constructor for segments
-  Element(const Tuple& a, const Tuple& b, int _id = 0): obtuse(0), bDim(false), id(_id) {
+  Element(const Tuple& a, const Tuple& b, int _id = 0) noexcept
+  : obtuse(0), bDim(false), id(_id) {
     coords[0] = a;
     coords[1] = b;
     if (b < a) {

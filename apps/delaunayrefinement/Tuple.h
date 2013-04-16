@@ -32,13 +32,12 @@
 class Tuple : public Galois::Runtime::Lockable {
   double _t[2];
 public:
-  Tuple(double a, double b) {
+  Tuple(double a, double b) noexcept {
     _t[0] = a;
     _t[1] = b;
   }
 
-  Tuple() {};
-  ~Tuple() {};
+  Tuple() = default;
   
   // serialization functions
   typedef int tt_has_serialize;
