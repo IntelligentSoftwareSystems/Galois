@@ -99,7 +99,7 @@ struct resolve_dispatch<T,true> {
 template<typename T>
 T* resolve(const gptr<T>& p) {
   if (!p.ptr) {
-    //    std::cerr << "aborting in resolve for " << typeid(T).name() << "\n";
+  //   //    std::cerr << "aborting in resolve for " << typeid(T).name() << "\n";
     assert(p.ptr);
   }
   return resolve_dispatch<T,is_persistent<T>::value>::go(p.owner, p.ptr);
@@ -168,10 +168,9 @@ class gptr {
 public:
   typedef T element_type;
   
-  constexpr gptr() :ptr(0), owner(0) {}
-
-  explicit gptr(T* p) :ptr(p), owner(networkHostID) {}
-
+  constexpr gptr() noexcept :ptr(0), owner(0) {}
+  explicit gptr(T* p) noexcept :ptr(p), owner(networkHostID) {}
+  
   // calling resolve acquires the lock, used after a prefetch
   // IMP: have to be changed when local objects aren't passed to the directory
   // void acquire() const {
