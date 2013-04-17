@@ -281,8 +281,8 @@ void RemoteDirectory::doRecall(uint32_t owner, Lockable* ptr) {
     gSerialize(sbuf, ptr, *static_cast<T*>(obj));
     getSystemNetworkInterface().send(owner,&LocalDirectory::objLandingPad<T>,sbuf);
     release(obj);
-    delete static_cast<T*>(obj);
     curobj.erase(k(owner,ptr));
+    delete static_cast<T*>(obj);
   } else {
     //currently locked locally, delay recall
     pending.push_back(std::bind(&RemoteDirectory::repeatRecall<T>, this, owner, ptr) );
@@ -313,7 +313,7 @@ void RemoteDirectory::doObj(uint32_t owner, Lockable* ptr, RecvBuffer& buf) {
   // use the object atleast once
   if (inGaloisForEach && getSystemRemoteObjects().find(obj)) {
     swap_lock(obj,&getAbortCnx());
-    // move from Requested to Received map
+    // move from Requested to Received map - callback resch_recv in ParallelWork.h
     (getSystemRemoteObjects().get_remove(obj))();
   }
   else
