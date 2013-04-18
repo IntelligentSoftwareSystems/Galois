@@ -282,7 +282,7 @@ void RemoteDirectory::doRecall(uint32_t owner, Lockable* ptr) {
     getSystemNetworkInterface().send(owner,&LocalDirectory::objLandingPad<T>,sbuf);
     release(obj);
     curobj.erase(k(owner,ptr));
-    delete static_cast<T*>(obj);
+    //delete static_cast<T*>(obj);
   } else {
     //currently locked locally, delay recall
     pending.push_back(std::bind(&RemoteDirectory::repeatRecall<T>, this, owner, ptr) );

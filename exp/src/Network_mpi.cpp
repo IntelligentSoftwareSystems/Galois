@@ -35,7 +35,7 @@
 
 using namespace Galois::Runtime::Distributed;
 
-#define INFLIGHT_LIMIT 1000
+#define INFLIGHT_LIMIT 100
 
 bool Galois::Runtime::inDoAllDistributed = false;
 
@@ -116,8 +116,6 @@ public:
       assert(com.second.size());
       int rv = MPI_Isend(com.second.linearData(), com.second.size(), MPI_BYTE, dest, FuncTag, MPI_COMM_WORLD, &com.first);
       handleError(rv);
-
-      update_pending_sends();
     } else {
       assert(dest < networkHostNum);
       int rv = MPI_Send(buf.linearData(), buf.size(), MPI_BYTE, dest, FuncTag, MPI_COMM_WORLD);
@@ -187,16 +185,13 @@ public:
   virtual void send(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
     asyncOutLock.lock();
     if (Galois::Runtime::LL::getTID() == 0) {
-      while (!asyncOutQueue.empty()) {
-        // break if too many objects in flight
-        if (pending_sends.size() > INFLIGHT_LIMIT) {
-          update_pending_sends();
-          break;
-        }
+      update_pending_sends();
+      while (!asyncOutQueue.empty() && pending_sends.size() < INFLIGHT_LIMIT) {
 	sendInternal(asyncOutQueue[0].dest, asyncOutQueue[0].recv, asyncOutQueue[0].buf);
 	asyncOutQueue.pop_front();
+	update_pending_sends();
       }
-      if (pending_sends.size() > INFLIGHT_LIMIT)
+      if (!asyncOutQueue.empty())
        asyncOutQueue.emplace_back(dest, recv, buf);
       else
        sendInternal(dest, recv, buf);
@@ -218,12 +213,8 @@ public:
     bool retval = recvInternal();
 
     asyncOutLock.lock();
-    while (!asyncOutQueue.empty()) {
-      // break if too many objects in flight
-      if (pending_sends.size() > INFLIGHT_LIMIT) {
-        update_pending_sends();
-        break;
-      }
+    update_pending_sends();
+    if /*while*/ (!asyncOutQueue.empty() && pending_sends.size() < INFLIGHT_LIMIT) {
       sendInternal(asyncOutQueue[0].dest, asyncOutQueue[0].recv, asyncOutQueue[0].buf);
       asyncOutQueue.pop_front();
     }
