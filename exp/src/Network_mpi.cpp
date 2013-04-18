@@ -35,7 +35,7 @@
 
 using namespace Galois::Runtime::Distributed;
 
-#define INFLIGHT_LIMIT 100
+#define INFLIGHT_LIMIT 1000
 
 bool Galois::Runtime::inDoAllDistributed = false;
 
@@ -191,7 +191,7 @@ public:
 	asyncOutQueue.pop_front();
 	update_pending_sends();
       }
-      if (!asyncOutQueue.empty() && (pending_sends.size() < INFLIGHT_LIMIT))
+      if (!asyncOutQueue.empty())
        asyncOutQueue.emplace_back(dest, recv, buf);
       else
        sendInternal(dest, recv, buf);
