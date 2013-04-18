@@ -35,6 +35,8 @@
 
 using namespace Galois::Runtime::Distributed;
 
+#define INFLIGHT_LIMIT 100
+
 bool Galois::Runtime::inDoAllDistributed = false;
 
 namespace {
@@ -55,6 +57,7 @@ class MPIBase {
   // const int FuncTag = 1;
   #define FuncTag 1
 
+protected:
   std::deque<std::pair<MPI_Request, SendBuffer>> pending_sends;
 
 public:
@@ -96,7 +99,7 @@ public:
     assert(Galois::Runtime::LL::getTID() == 0);
     assert(recv);
     buf.serialize_header((uintptr_t)recv);
-    if (false) {
+    if (true) {
       pending_sends.emplace_back(MPI_REQUEST_NULL, std::move(buf));
       std::pair<MPI_Request, SendBuffer>& com = pending_sends.back();
       assert(com.second.size());
@@ -183,6 +186,9 @@ public:
       while (!asyncOutQueue.empty()) {
 	sendInternal(asyncOutQueue[0].dest, asyncOutQueue[0].recv, asyncOutQueue[0].buf);
 	asyncOutQueue.pop_front();
+        // break if too many objects in flight
+        if (pending_sends.size() > INFLIGHT_LIMIT)
+         break;
       }
       sendInternal(dest, recv, buf);
     } else {
@@ -206,6 +212,9 @@ public:
     while (!asyncOutQueue.empty()) {
       sendInternal(asyncOutQueue[0].dest, asyncOutQueue[0].recv, asyncOutQueue[0].buf);
       asyncOutQueue.pop_front();
+      // break if too many objects in flight
+      if (pending_sends.size() > INFLIGHT_LIMIT)
+       break;
     }
     asyncOutLock.unlock();
 
