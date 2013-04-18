@@ -186,12 +186,12 @@ public:
     asyncOutLock.lock();
     if (Galois::Runtime::LL::getTID() == 0) {
       update_pending_sends();
-      while (!asyncOutQueue.empty() && pending_sends.size() < INFLIGHT_LIMIT) {
+      while (!asyncOutQueue.empty() && (pending_sends.size() < INFLIGHT_LIMIT)) {
 	sendInternal(asyncOutQueue[0].dest, asyncOutQueue[0].recv, asyncOutQueue[0].buf);
 	asyncOutQueue.pop_front();
 	update_pending_sends();
       }
-      if (!asyncOutQueue.empty())
+      if (!asyncOutQueue.empty() && (pending_sends.size() < INFLIGHT_LIMIT))
        asyncOutQueue.emplace_back(dest, recv, buf);
       else
        sendInternal(dest, recv, buf);
@@ -214,9 +214,10 @@ public:
 
     asyncOutLock.lock();
     update_pending_sends();
-    if /*while*/ (!asyncOutQueue.empty() && pending_sends.size() < INFLIGHT_LIMIT) {
+    while (!asyncOutQueue.empty() && (pending_sends.size() < INFLIGHT_LIMIT)) {
       sendInternal(asyncOutQueue[0].dest, asyncOutQueue[0].recv, asyncOutQueue[0].buf);
       asyncOutQueue.pop_front();
+      update_pending_sends();
     }
     asyncOutLock.unlock();
 
