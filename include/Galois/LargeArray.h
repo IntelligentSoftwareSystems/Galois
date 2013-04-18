@@ -70,7 +70,7 @@ public:
   }
 
   ~LargeArray() {
-    if (isLazy)
+    if (!isLazy)
       destroy();
     deallocate();
   }
