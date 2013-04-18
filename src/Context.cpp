@@ -123,7 +123,7 @@ void SimpleRuntimeContext::swap_lock(Lockable* L, SimpleRuntimeContext* nptr) {
   assert(L);
   assert(L->Owner.is_locked());
   assert(!L->next);
-  assert(L->Owner.stealing_CAS(this,nptr));
+  while(!L->Owner.stealing_CAS(this,nptr));
 }
 
 // Should allow the lock to be taken even if lock has magic value
