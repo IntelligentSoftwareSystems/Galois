@@ -60,7 +60,8 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValN(Algo::eigentriangle, "eigentriangle", "Approximate eigen triangle algorithm"),
       clEnumValEnd), cll::init(Algo::nodeiterator));
 
-typedef Galois::Graph::LC_CSR_Graph<uint32_t,void> Graph;
+typedef Galois::Graph::LC_Numa_Graph<uint32_t,void> Graph;
+//typedef Galois::Graph::LC_CSR_Graph<uint32_t,void> Graph;
 //typedef Galois::Graph::LC_Linear_Graph<uint32_t,void> Graph;
 
 typedef Graph::GraphNode GNode;
@@ -203,7 +204,7 @@ struct NodeIteratorAlgo {
   };
 
   void operator()() { 
-    Galois::for_each_local(graph, Process(this));
+    Galois::do_all_local(graph, Process(this));
     std::cout << "NumTriangles: " << numTriangles.reduce() << "\n";
   }
 };
@@ -491,8 +492,9 @@ int main(int argc, char** argv) {
   Tinitial.stop();
 
   // XXX Test if preallocation matters
-  //Galois::preAlloc(numThreads);
   Galois::Statistic("MeminfoPre", Galois::Runtime::MM::pageAllocInfo());
+  Galois::preAlloc(numThreads + 8 * Galois::Runtime::MM::pageAllocInfo());
+  Galois::Statistic("MeminfoMid", Galois::Runtime::MM::pageAllocInfo());
   switch (algo) {
     case nodeiterator: run<NodeIteratorAlgo>(); break;
     case edgeiterator: run<EdgeIteratorAlgo>(); break;
