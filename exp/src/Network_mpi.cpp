@@ -35,7 +35,7 @@
 
 using namespace Galois::Runtime::Distributed;
 
-#define INFLIGHT_LIMIT 100
+#define INFLIGHT_LIMIT 1000
 
 bool Galois::Runtime::inDoAllDistributed = false;
 
@@ -93,6 +93,17 @@ public:
     MPI_Finalize();
   }
 
+  void update_pending_sends() {
+    int flag = true;
+    while (flag && !pending_sends.empty()) {
+      MPI_Status s;
+      int rv = MPI_Test(&pending_sends.front().first, &flag, &s);
+      handleError(rv);
+      if (flag)
+        pending_sends.pop_front();
+    }
+  }
+
   //! sends a message.  assumes it is being called from a thread for which
   //! this is valid
   void sendInternal(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
@@ -106,14 +117,7 @@ public:
       int rv = MPI_Isend(com.second.linearData(), com.second.size(), MPI_BYTE, dest, FuncTag, MPI_COMM_WORLD, &com.first);
       handleError(rv);
 
-      int flag = true;
-      while (flag && !pending_sends.empty()) {
-        MPI_Status s;
-        rv = MPI_Test(&pending_sends.front().first, &flag, &s);
-        handleError(rv);
-        if (flag)
-          pending_sends.pop_front();
-      }
+      update_pending_sends();
     } else {
       assert(dest < networkHostNum);
       int rv = MPI_Send(buf.linearData(), buf.size(), MPI_BYTE, dest, FuncTag, MPI_COMM_WORLD);
@@ -184,13 +188,18 @@ public:
     asyncOutLock.lock();
     if (Galois::Runtime::LL::getTID() == 0) {
       while (!asyncOutQueue.empty()) {
+        // break if too many objects in flight
+        if (pending_sends.size() > INFLIGHT_LIMIT) {
+          update_pending_sends();
+          break;
+        }
 	sendInternal(asyncOutQueue[0].dest, asyncOutQueue[0].recv, asyncOutQueue[0].buf);
 	asyncOutQueue.pop_front();
-        // break if too many objects in flight
-        if (pending_sends.size() > INFLIGHT_LIMIT)
-         break;
       }
-      sendInternal(dest, recv, buf);
+      if (pending_sends.size() > INFLIGHT_LIMIT)
+       asyncOutQueue.emplace_back(dest, recv, buf);
+      else
+       sendInternal(dest, recv, buf);
     } else {
       asyncOutQueue.emplace_back(dest, recv, buf);
     }
@@ -210,11 +219,13 @@ public:
 
     asyncOutLock.lock();
     while (!asyncOutQueue.empty()) {
+      // break if too many objects in flight
+      if (pending_sends.size() > INFLIGHT_LIMIT) {
+        update_pending_sends();
+        break;
+      }
       sendInternal(asyncOutQueue[0].dest, asyncOutQueue[0].recv, asyncOutQueue[0].buf);
       asyncOutQueue.pop_front();
-      // break if too many objects in flight
-      if (pending_sends.size() > INFLIGHT_LIMIT)
-       break;
     }
     asyncOutLock.unlock();
 
