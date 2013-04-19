@@ -35,7 +35,7 @@
 
 using namespace Galois::Runtime::Distributed;
 
-#define INFLIGHT_LIMIT 1000
+#define INFLIGHT_LIMIT 100000
 
 bool Galois::Runtime::inDoAllDistributed = false;
 
@@ -128,7 +128,6 @@ public:
     int flag, rv;
     bool retval = false;
     MPI_Status status;
- //printf ("\t Entering recvInternal\n");
     do {
       //async probe
       rv = MPI_Iprobe(MPI_ANY_SOURCE, FuncTag, MPI_COMM_WORLD, &flag, &status);
@@ -158,7 +157,6 @@ public:
         lock.unlock();
       }
     } while (true);
- //printf ("\t Exiting recvInternal\n");
     return retval;
   }
 };
@@ -191,7 +189,7 @@ public:
 	asyncOutQueue.pop_front();
 	update_pending_sends();
       }
-      if (!asyncOutQueue.empty())
+      if (!asyncOutQueue.empty() || (pending_sends.size() >= INFLIGHT_LIMIT))
        asyncOutQueue.emplace_back(dest, recv, buf);
       else
        sendInternal(dest, recv, buf);
