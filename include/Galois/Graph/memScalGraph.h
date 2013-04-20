@@ -36,12 +36,12 @@ class MemScalGraph : private boost::noncopyable {
     first_eq_and_valid(T& n) :N2(n) {}
     template <typename T2>
     bool operator()(const T2& ii) const {
-      return ii.first() == N2 && ii.first() && ii.first()->active;
+      return ii.first() == N2 && ii.first();
     }
   };
   struct first_not_valid {
     template <typename T2>
-    bool operator()(const T2& ii) const { return !ii.first() || !ii.first()->active; }
+    bool operator()(const T2& ii) const { return !ii.first();}
   };
 
   struct gNode: public Galois::Runtime::Lockable {
@@ -55,10 +55,10 @@ class MemScalGraph : private boost::noncopyable {
 
     EdgesTy edges;
     NodeTy data;
-    bool active;
+
 
     template<typename... Args>
-    gNode(Args&&... args): data(std::forward<Args>(args)...), active(false) { }
+    gNode(Args&&... args): data(std::forward<Args>(args)...) { }
 
     iterator begin() { return edges.begin(); }
     iterator end()   { return edges.end();  }
@@ -106,10 +106,10 @@ class MemScalGraph : private boost::noncopyable {
 
   //Helpers for iterator classes
   struct is_node : public std::unary_function<gNode&, bool>{
-    bool operator() (const gNode& g) const { return g.active; }
+    bool operator() (const gNode& g) const { return true; }
   };
   struct is_edge : public std::unary_function<typename gNode::EITy&, bool> {
-    bool operator()(typename gNode::EITy& e) const { return e.first()->active; }
+    bool operator()(typename gNode::EITy& e) const { return true; }
   };
   struct makeGraphNode: public std::unary_function<gNode&, gNode*> {
     gNode* operator()(gNode& data) const { return &data; }
@@ -123,7 +123,7 @@ public:
   //! Node data type
   typedef NodeTy node_type;
   //! Edge iterator
-  typedef typename boost::filter_iterator<is_edge, typename gNode::iterator> edge_iterator;
+  typedef typename  gNode::iterator edge_iterator;
   //! Reference to edge data
   typedef typename gNode::EITy::reference edge_data_reference;
   //! Node iterator
@@ -149,7 +149,8 @@ private:
 	ii = src->createEdgeWithReuse(dst, e, std::forward<Args>(args)...);
       }
     }
-    return boost::make_filter_iterator(is_edge(), ii, src->end());
+    //return boost::make_filter_iterator(is_edge(), ii, src->end());
+    return ii;
   }
 
   template<typename... Args>
@@ -169,7 +170,7 @@ private:
 	ii = src->createEdge(dst, e, std::forward<Args>(args)...);
       }
     }
-    return boost::make_filter_iterator(is_edge(), ii, src->end());
+    return ii;
   }
 
 public:
@@ -180,7 +181,6 @@ public:
   template<typename... Args>
   GraphNode createNode(Args&&... args) {
     gNode* N = &(nodes.emplace(std::forward<Args>(args)...));
-    N->active = false;
     return GraphNode(N);
   }
 
@@ -190,7 +190,6 @@ public:
   void addNode(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::checkWrite(mflag, true);
     Galois::Runtime::acquire(n, mflag);
-    n->active = true;
   }
 
   //! Gets the node data for a node.
@@ -205,27 +204,8 @@ public:
   bool containsNode(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::ALL) const {
     assert(n);
     Galois::Runtime::acquire(n, mflag);
-    return n->active;
   }
 
-  /**
-   * Removes a node from the graph along with all its outgoing/incoming edges
-   * for undirected graphs or outgoing edges for directed graphs.
-   */
-  //FIXME: handle edge memory
-  void removeNode(GraphNode n, Galois::MethodFlag mflag = MethodFlag::ALL) {
-    assert(n);
-    Galois::Runtime::checkWrite(mflag, true);
-    Galois::Runtime::acquire(n, mflag);
-    gNode* N = n;
-    if (N->active) {
-      N->active = false;
-      if (!Directional && edges.mustDel())
-	for (edge_iterator ii = edge_begin(n, MethodFlag::NONE), ee = edge_end(n, MethodFlag::NONE); ii != ee; ++ii)
-	  edges.delEdge(ii->second());
-      N->edges.clear();
-    }
-  }
 
 
   /**
@@ -245,28 +225,14 @@ public:
     return createEdge(src, dst, mflag, std::forward<Args>(args)...);
   }
 
-  //! Removes an edge from the graph
-  void removeEdge(GraphNode src, edge_iterator dst, Galois::MethodFlag mflag = MethodFlag::ALL) {
-    assert(src);
-    Galois::Runtime::checkWrite(mflag, true);
-    Galois::Runtime::acquire(src, mflag);
-    if (Directional) {
-      src->erase(dst.base());
-    } else {
-      Galois::Runtime::acquire(dst->first(), mflag);
-      EdgeTy* e = dst->second();
-      edges.delEdge(e);
-      src->erase(dst.base());
-      dst->first()->erase(src);
-    }
-  }
 
   //! Finds if an edge between src and dst exists
   edge_iterator findEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::ALL) {
     assert(src);
     assert(dst);
     Galois::Runtime::acquire(src, mflag);
-    return boost::make_filter_iterator(is_edge(), src->find(dst), src->end());
+    /*return boost::make_filter_iterator(is_edge(), src->find(dst), src->end());*/
+    return src->find(dst);
   }
 
   /**
@@ -277,7 +243,7 @@ public:
    * appropriate locking.
    */
   edge_data_reference getEdgeData(edge_iterator ii, Galois::MethodFlag mflag = MethodFlag::NONE) const {
-    assert(ii->first()->active);
+
     Galois::Runtime::checkWrite(mflag, false);
     Galois::Runtime::acquire(ii->first(), mflag);
     return *ii->second();
@@ -285,7 +251,7 @@ public:
 
   //! Returns the destination of an edge
   GraphNode getEdgeDst(edge_iterator ii) {
-    assert(ii->first()->active);
+
     return GraphNode(ii->first());
   }
 
@@ -298,11 +264,11 @@ public:
 
     if (Galois::Runtime::shouldLock(mflag)) {
       for (typename gNode::iterator ii = N->begin(), ee = N->end(); ii != ee; ++ii) {
-	if (ii->first()->active)
+
 	  Galois::Runtime::acquire(ii->first(), mflag);
       }
     }
-    return boost::make_filter_iterator(is_edge(), N->begin(), N->end());
+    return N->begin();
   }
 
   //! Returns the end of the neighbor iterator
@@ -311,7 +277,7 @@ public:
     // Not necessary; no valid use for an end pointer should ever require it
     //if (shouldLock(mflag))
     //  acquire(N);
-    return boost::make_filter_iterator(is_edge(), N->end(), N->end());
+    return N->end();
   }
 
   /**
@@ -326,34 +292,23 @@ public:
    * Returns an iterator to all the nodes in the graph. Not thread-safe.
    */
   iterator begin() {
-    return boost::make_transform_iterator(
-           boost::make_filter_iterator(is_node(),
-				       nodes.begin(), nodes.end()),
-	   makeGraphNode());
+    return boost::make_transform_iterator(nodes.begin(),makeGraphNode());
   }
 
   //! Returns the end of the node iterator. Not thread-safe.
   iterator end() {
-    return boost::make_transform_iterator(
-           boost::make_filter_iterator(is_node(),
-				       nodes.end(), nodes.end()),
-	   makeGraphNode());
+    return boost::make_transform_iterator(nodes.end(),makeGraphNode());
   }
 
   typedef iterator local_iterator;
 
   local_iterator local_begin() {
-    return boost::make_transform_iterator(
-           boost::make_filter_iterator(is_node(),
-				       nodes.local_begin(), nodes.local_end()),
-	   makeGraphNode());
+	  return boost::make_transform_iterator(nodes.local_begin(),makeGraphNode());
   }
 
   local_iterator local_end() {
-    return boost::make_transform_iterator(
-           boost::make_filter_iterator(is_node(),
-				       nodes.local_end(), nodes.local_end()),
-	   makeGraphNode());
+  return boost::make_transform_iterator(nodes.local_end(),makeGraphNode());
+
   }
 
   /**

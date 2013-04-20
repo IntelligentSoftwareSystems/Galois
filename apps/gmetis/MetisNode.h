@@ -30,10 +30,14 @@ typedef double METISDOUBLE;
 #include <vector>
 #include "llvm/ADT/SmallVector.h"
 #include <iostream>
+#include "Galois/gdeque.h"
 using namespace std;
 class MetisNode{
 public:
 	typedef llvm::SmallVector <METISINT,128> svm;
+	//typedef int* svm;
+	/*typedef Galois::gdeque <int*,128> sve;
+	sve blah;*/
 	int processed;
 	MetisNode(int id, int weight) {
 		init();
@@ -65,6 +69,9 @@ public:
 		_numEdges = 0;
 		_partition = -1;
 		processed=0;
+		matchNode = NULL;
+		multiNode = NULL;
+		matched = false;
 	}
 
 	int getNodeId() {
@@ -190,7 +197,40 @@ public:
 
 	}
 
+
+/*
+	void * getMatchNode() {
+		return matchNode;
+	}
+
+	void* getMultiNode() {
+		return multiNode;
+	}
+*/
+
+	bool isMatched() {
+		return matched;
+	}
+
+	void setMatched(bool matched) {
+		this->matched = matched;
+	}
+
+	void* getMatchNode() {
+		return matchNode;
+	}
+
+	void* getMultiNode() {
+		return multiNode;
+	}
+
+
+	void* matchNode;
+	void *multiNode;
+
+
 private:
+	bool matched;
 	METISINT _weight;
 	METISINT _numEdges;
 	//the sum of weights of its edges

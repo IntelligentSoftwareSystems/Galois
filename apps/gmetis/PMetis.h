@@ -112,9 +112,11 @@ public:
 		bisectionWeights[0] = (int) (totalVertexWeight * vertexWeightRatio);
 		bisectionWeights[1] = totalVertexWeight - bisectionWeights[0];
 
-		MetisGraph* mcg = coarsener.coarsen(metisGraph);
+		MetisGraph* mcg = coarsener.coarsen(metisGraph,true);
+		//MetisGraph* mcg = metisGraph;
 		bisection(mcg, bisectionWeights, coarsener.getCoarsenTo());
 		refineTwoWay(mcg, metisGraph, bisectionWeights);
+
 
 		if (nparts <= 2) {
 			for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {

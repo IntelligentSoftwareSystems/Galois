@@ -33,6 +33,7 @@
 #include "Galois/Accumulator.h"
 #include "Galois/Graph/memScalGraph.h"
 #include <stdlib.h>
+#include "Galois/Graph/LCGraph.h"
 
 typedef int METISINT;
 typedef double METISDOUBLE;
@@ -45,8 +46,15 @@ typedef Galois::Graph::FirstGraph<MetisNode,METISINT, true>::GraphNode GNode;
 
 */
 
+
 typedef Galois::Graph::MemScalGraph<MetisNode,METISINT, true>            GGraph;
 typedef Galois::Graph::MemScalGraph<MetisNode,METISINT, true>::GraphNode GNode;
+
+/*
+
+typedef Galois::Graph::LC_CSR_Graph<MetisNode,METISINT> GGraph;
+typedef Galois::Graph::LC_CSR_Graph<MetisNode,METISINT>::GraphNode GNode;
+*/
 
 #include <set>
 using namespace std;
@@ -56,7 +64,15 @@ namespace testMetis {
 	extern bool testInitialPartition;
 }
 
+namespace variantMetis {
+	extern bool mergeMatching;
+	extern bool bagRefining;
+	extern bool noPartInfo;
+	extern bool localNodeData;
+}
+
 typedef ArraySet< GNode > GNodeSet;
+
 typedef set< GNode, std::less<GNode>, Galois::Runtime::MM::FSBGaloisAllocator<GNode> > GNodeSTLSet;
 //typedef vector<GNode> GNodeSTLSet;
 typedef Galois::Runtime::PerThreadVector<GNode> NodeCtxWl;

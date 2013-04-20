@@ -29,7 +29,6 @@
  * project the partitioning information back the finer graph
  */
 void projectTwoWayPartition(MetisGraph* metisGraph) {
-
 	MetisGraph* finer = metisGraph->getFinerGraph();
 	finer->setMinCut(metisGraph->getMinCut());
 	finer->initPartWeight(2);
@@ -42,7 +41,16 @@ void projectTwoWayPartition(MetisGraph* metisGraph) {
 	for (GGraph::iterator ii = finerGraph->begin(), ee = finerGraph->end(); ii != ee; ++ii) {
 		GNode node = *ii;
 		MetisNode& nodeData = finerGraph->getData(node);
-		nodeData.setPartition(metisGraph->getGraph()->getData(finer->getCoarseGraphMap(nodeData.getNodeId())).getPartition());
+		GNode multiNode;
+		if(variantMetis::localNodeData) {
+			if(nodeData.multiNode == NULL)
+				cout<<"Error";
+			multiNode = static_cast<GNode>(nodeData.multiNode);
+		}else {
+			multiNode = finer->getCoarseGraphMap(nodeData.getNodeId());
+		}
+		nodeData.setPartition(metisGraph->getGraph()->getData(multiNode).getPartition());
+		//nodeData.setPartition(metisGraph->getGraph()->getData((GNode)nodeData.getMultiNode()).getPartition());
 		assert(nodeData.getPartition()>=0);
 		nodeData.setEdegree(0);
 		nodeData.setIdegree(0);
@@ -54,7 +62,16 @@ void projectTwoWayPartition(MetisGraph* metisGraph) {
 
 		MetisNode& nodeData = finerGraph->getData(node);
 		nodeData.setIdegree(nodeData.getAdjWgtSum());
-		if (finerGraph->edge_begin(node) != finerGraph->edge_end(node) && metisGraph->getGraph()->getData(finer->getCoarseGraphMap(nodeData.getNodeId())).isBoundary()) {
+		GNode multiNode;
+		if(variantMetis::localNodeData) {
+			if(nodeData.multiNode == NULL)
+				cout<<"Error";
+			multiNode = static_cast<GNode>(nodeData.multiNode);
+
+		}else {
+			multiNode = finer->getCoarseGraphMap(nodeData.getNodeId());
+		}
+		if (finerGraph->edge_begin(node) != finerGraph->edge_end(node) && metisGraph->getGraph()->getData(multiNode).isBoundary()) {
 			for (GGraph::edge_iterator jj = finerGraph->edge_begin(node, Galois::MethodFlag::NONE), eejj = finerGraph->edge_end(node, Galois::MethodFlag::NONE); jj != eejj; ++jj) {
 			  GNode neighbor = finerGraph->getEdgeDst(jj);
 				MetisNode& neighborData = finerGraph->getData(neighbor);

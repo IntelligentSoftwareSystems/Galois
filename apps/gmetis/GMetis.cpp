@@ -49,45 +49,68 @@ static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>")
 static cll::opt<int> numPartitions(cll::Positional, cll::desc("<Number of partitions>"), cll::Required);
 
 bool verifyCoarsening(MetisGraph *metisGraph) {
+
+	if(metisGraph == NULL)
+		return true;
 	cout<<endl<<"##### Verifying coarsening #####"<<endl;
 	int matchedCount=0;
 	int unmatchedCount=0;
 	GGraph *graph = metisGraph->getGraph();
 
-	if(metisGraph->matches == NULL){
-		cout<<"Matches array has been lost. Try again by changing the code which releases matches.";
-		return false;
-	}
-
 	for(GGraph::iterator ii=graph->begin(),ee=graph->end();ii!=ee;ii++) {
 		GNode node = *ii;
 		MetisNode &nodeData = graph->getData(node);
-		if(metisGraph->getMatch(nodeData.getNodeId()) == NULL) {
-			return false;
-
+		GNode matchNode;
+		if(variantMetis::localNodeData) {
+			if(!nodeData.isMatched())
+				return false;
+			matchNode = static_cast<GNode>(nodeData.getMatchNode());
+		} else {
+			if(!metisGraph->isMatched(nodeData.getNodeId())) {
+				return false;
+			}
+			matchNode = metisGraph->getMatch(nodeData.getNodeId());
 		}
-		if(metisGraph->getMatch(nodeData.getNodeId()) == node) {
+
+		if(matchNode == node) {
 			unmatchedCount++;
 		}
 		else{
 			matchedCount++;
-			GNode match = metisGraph->getMatch(nodeData.getNodeId());
-			MetisNode &matchNodeData = graph->getData(match);
-			if(node != metisGraph->getMatch(matchNodeData.getNodeId()))
-				return false;
-		}
+			MetisNode &matchNodeData = graph->getData(matchNode);
+			GNode mmatch;
+			if(variantMetis::localNodeData) {
+				if(!matchNodeData.isMatched())
+					return false;
+				mmatch = static_cast<GNode>(matchNodeData.getMatchNode());
+			} else {
+				if(!metisGraph->isMatched(matchNodeData.getNodeId()))
+						return false;
+				mmatch = metisGraph->getMatch(matchNodeData.getNodeId());
+			}
 
+			if(node!=mmatch){
+				cout<<"Node's matched node is not matched to this node";
+				return false;
+			}
+		}
 		int edges=0;
 		for(GGraph::edge_iterator ii=graph->edge_begin(node),ee=graph->edge_end(node);ii!=ee;ii++) {
 			edges++;
 		}
 		if(edges!=nodeData.getNumEdges()) {
+			cout<<"Number of edges dont match";
 			return false;
 		}
 	}
+	bool ret = verifyCoarsening(metisGraph->getFinerGraph());
+	cout<<matchedCount<<" "<<unmatchedCount<<endl;
 	if(matchedCount+unmatchedCount != metisGraph->getNumNodes())
 		return false;
+	if(ret == false)
+		return false;
 	return true;
+
 }
 
 bool verifyRecursiveBisection(MetisGraph* metisGraph,int nparts) {
@@ -137,7 +160,7 @@ void partition(MetisGraph* metisGraph, int nparts) {
 	t.stop();
 	cout<<"coarsening time: " << t.get() << " ms"<<endl;
 	T.stop();
-
+	//return;
 	if(testMetis::testCoarsening) {
 		if(verifyCoarsening(mcg->getFinerGraph())) {
 			cout<<"#### Coarsening is correct ####"<<endl;
@@ -145,7 +168,6 @@ void partition(MetisGraph* metisGraph, int nparts) {
 			cout<<"!!!! Coarsening is wrong !!!!"<<endl;
 		}
 	}
-
 
 	float* totalPartitionWeights = new float[nparts];
 	std::fill_n(totalPartitionWeights, nparts, 1 / (float) nparts);
@@ -157,6 +179,8 @@ void partition(MetisGraph* metisGraph, int nparts) {
 	init_part_t.stop();
 	cout << "initial partition time: "<< init_part_t.get()  << " ms"<<endl;
 
+	//return;
+
 	if(testMetis::testInitialPartition) {
 		cout<<endl<<"#### Verifying initial partition ####"<<endl;
 		if(!verifyRecursiveBisection(mcg,nparts)) {
@@ -166,7 +190,7 @@ void partition(MetisGraph* metisGraph, int nparts) {
 		}
 	}
 
-
+	//return;
 	Galois::Timer refine_t;
 	std::fill_n(totalPartitionWeights, nparts, 1 / (float) nparts);
 	refine_t.start();
@@ -308,10 +332,15 @@ namespace testMetis {
 	bool testCoarsening = true;
 	bool testInitialPartition = true;;
 }
+namespace variantMetis {
+	bool mergeMatching = true;
+	bool noPartInfo = false;
+	bool localNodeData = true;
+}
 
 
 int main(int argc, char** argv) {
-  Galois::StatManager statManager; 
+	Galois::StatManager statManager;
 	LonestarStart(argc, argv, name, desc, url);
 
 	srand(-1);
@@ -322,7 +351,7 @@ int main(int argc, char** argv) {
 	if(mtxInput){
 	  readMetisGraph(&metisGraph, filename.c_str());
 	}else{
-	  readGraph(&metisGraph, filename.c_str(), weighted, directed);
+	  readGraph(&metisGraph, filename.c_str(), weighted, false);
 	}
   	Galois::Statistic("MeminfoPre1", Galois::Runtime::MM::pageAllocInfo());
   	Galois::preAlloc(9000);

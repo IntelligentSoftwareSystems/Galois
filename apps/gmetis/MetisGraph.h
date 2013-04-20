@@ -40,6 +40,7 @@ public:
 		boundaryNodes = NULL;
 		coarseGraphMapTo = NULL;
 		inverseGraphMapFrom = NULL;
+		finerGraph = NULL;
 
 	}
 
@@ -66,11 +67,13 @@ public:
 		return matchFlag[id];
 	}
 
+
 	GNode getMatch(int id){
 		assert(id < numNodes);
 		//		return matches[id].data;
 		return matches[id];
 	}
+
 
 	void initSubGraphMapTo(){
 		subGraphMaps = new GNode[numNodes];
@@ -90,6 +93,7 @@ public:
 		return coarseGraphMapTo[id];
 	}
 
+
 	void releaseCoarseGraphMap(){
 		if(coarseGraphMapTo!=NULL){
 			delete[] coarseGraphMapTo;
@@ -98,32 +102,12 @@ public:
 	}
 
 	void initCoarseGraphMap(){
-		//		coarseGraphMapTo = new cache_line_storage<GNode>[numNodes];
 		coarseGraphMapTo = new GNode[numNodes];
 	}
 
 	void initInverseCoarseGraphMap() {
 		inverseGraphMapFrom= new GNode[numNodes];
 	}
-
-	GNode getInverseCoarseGraphMap(int id){
-		assert(id<numNodes);
-		return inverseGraphMapFrom[id];
-	}
-
-	void releaseInverseCoarseGraphMap(){
-		if(inverseGraphMapFrom!=NULL) {
-			delete[] inverseGraphMapFrom;
-			inverseGraphMapFrom = NULL;
-		}
-	}
-
-	void setInverseCoarseGraphMap(int id,GNode node) {
-		assert(id<numNodes);
-		inverseGraphMapFrom[id]=node;
-	}
-
-
 
 
 	void setMatch(int id, GNode node){
@@ -281,6 +265,9 @@ public:
 			partWeights[me] +=  nodeData.getWeight();
 
 			updateNodeEdAndId(node);
+
+			if(variantMetis::noPartInfo)
+				continue;//NOTUSINGMEMHACK
 
 			if (nodeData.getEdegree() > 0) {
 				mincut += nodeData.getEdegree();
