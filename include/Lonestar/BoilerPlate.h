@@ -68,6 +68,7 @@ static void LonestarStart(int argc, char** argv, const char* app, const char* de
       if (i != argc - 1)
 	cmdout << " ";
     }
+    gPrint("Num of Hosts: ", networkHostNum, "\n");
     gInfo("CommandLine ", cmdout.str().c_str());
   }
   char name[256];
