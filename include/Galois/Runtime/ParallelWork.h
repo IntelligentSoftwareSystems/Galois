@@ -148,8 +148,8 @@ protected:
       // otherwise let the iteration proceed and handle the other cases
       //  - could be locked locally by another iteration!
       //  - could have been sent to another host
-      //    * FIXME: can lead to data race with delete (Directory.h) for remote objs
-      //    * this case should be handled by storing the dist pointer
+      //    * get_latest calls resolve to get the object back
+      tld.obj = getSystemRemoteDirectory().get_latest(tld.obj);
       getAbortCnx().swap_acquire(tld.obj,&tld.cnx);
     }
     tld.function(*p, tld.facing.data());
@@ -207,6 +207,7 @@ protected:
         tld.obj = rp.first.second;
         tld.numLocks = rp.second.first;
         tld.live_lock = rp.second.second;
+        tld.obj = getSystemRemoteDirectory().get_latest(tld.obj);
         if (tld.live_lock) {
           if (!transientAcquireNonBlocking(Distributed::lock_sync)) {
             // release the lock so that we don't block on the iteration locks

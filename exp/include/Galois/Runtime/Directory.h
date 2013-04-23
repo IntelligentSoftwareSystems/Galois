@@ -88,6 +88,11 @@ class RemoteDirectory: public SimpleRuntimeContext, private boost::noncopyable {
 
   std::vector<std::function<void ()>> pending;
 
+  std::unordered_map<Lockable*,std::function<Lockable* ()> > resolve_callback;
+
+  template<typename T>
+  Lockable* resolve_call(uint32_t owner, Lockable* ptr);
+
   template<typename T>
   void repeatRecall(uint32_t owner, Lockable* ptr);
 
@@ -128,6 +133,8 @@ public:
 
   //clear the shared cache
   void clearSharedRemCache();
+
+  Lockable* get_latest(Lockable*);
 
   void makeProgress();
 
@@ -240,10 +247,24 @@ T* RemoteDirectory::resolve(uint32_t owner, Lockable* ptr) {
     gSerialize(sbuf, ptr, networkHostID, shared);
     //LL::gDebug("RD: ", networkHostID, " requesting: ", owner, " ", ptr);
     getSystemNetworkInterface().send(owner,&LocalDirectory::reqLandingPad<T>,sbuf);
+    resolve_callback[obj] = std::bind(&RemoteDirectory::resolve_call<T>,this,owner,ptr);
   }
   T* retval = static_cast<T*>(obj);
   Lock.unlock();
   return retval;
+}
+
+template<typename T>
+Galois::Runtime::Lockable* RemoteDirectory::resolve_call(uint32_t owner, Lockable* ptr) {
+  T* obj = resolve<T>(owner,ptr);
+  return static_cast<Lockable*>(obj);
+}
+
+inline Galois::Runtime::Lockable* RemoteDirectory::get_latest(Lockable* obj) {
+  Lockable* new_obj;
+  if(!resolve_callback[obj]) return obj;
+  new_obj = (resolve_callback[obj])();
+  return new_obj;
 }
 
 template<typename T>
