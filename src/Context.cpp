@@ -119,11 +119,10 @@ void SimpleRuntimeContext::release(Lockable* L) {
   L->Owner.unlock_and_clear();
 }
 
-void SimpleRuntimeContext::swap_lock(Lockable* L, SimpleRuntimeContext* nptr) {
+bool SimpleRuntimeContext::swap_lock(Lockable* L, SimpleRuntimeContext* nptr) {
   assert(L);
-  assert(L->Owner.is_locked());
-  assert(!L->next);
-  while(!L->Owner.stealing_CAS(this,nptr));
+  if (L->next) return false;
+  return L->Owner.stealing_CAS(this,nptr);
 }
 
 // Should allow the lock to be taken even if lock has magic value
@@ -141,10 +140,24 @@ void SimpleRuntimeContext::acquire(Lockable* L) {
   }
 }
 
-void SimpleRuntimeContext::swap_acquire(Lockable* L, SimpleRuntimeContext* nptr) {
-  swap_lock(L,nptr);
-  L->next = nptr->locks;
-  nptr->locks = L;
+bool SimpleRuntimeContext::swap_acquire(Lockable* L, SimpleRuntimeContext* nptr) {
+  if (swap_lock(L,nptr)) {
+    L->next = nptr->locks;
+    nptr->locks = L;
+    return true;
+  }
+  return false;
+}
+
+unsigned SimpleRuntimeContext::count_locks() {
+  unsigned numLocks = 0;
+  Lockable* L = locks;
+  while (L) {
+    ++numLocks;
+    L = L->next;
+  }
+
+  return numLocks;
 }
 
 void SimpleRuntimeContext::sub_acquire(Lockable* L) {

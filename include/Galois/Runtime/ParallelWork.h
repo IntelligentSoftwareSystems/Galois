@@ -48,6 +48,7 @@
 namespace Galois {
 //! Internal Galois functionality - Use at your own risk.
 namespace Runtime {
+
 namespace {
 
 template <bool Enabled> 
@@ -85,12 +86,15 @@ protected:
   typedef T value_type;
   typedef typename WorkListTy::template retype<value_type> WLTy;
   typedef WorkList::GFIFO<value_type> AbortedList;
-  typedef WorkList::GFIFO<std::pair<value_type,Lockable*> > ReceivedList;
+  typedef gdeque<std::pair<std::pair<value_type,Lockable*>,std::pair<unsigned,bool> > > ReceivedList;
 
   struct ThreadLocalData {
     FunctionTy function;
     UserContextAccess<value_type> facing;
     SimpleRuntimeContext cnx;
+    Lockable* obj;
+    unsigned numLocks;
+    bool live_lock;
     LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
     ThreadLocalData(const FunctionTy& fn, const char* ln): function(fn), stat(ln) {}
   };
@@ -137,13 +141,22 @@ protected:
 
   inline void doProcess(boost::optional<value_type>& p, ThreadLocalData& tld) {
     tld.stat.inc_iterations(); //Class specialization handles opt
- // may havereceived remote objects already locked in the context
- /*
     if (ForEachTraits<FunctionTy>::NeedsAborts)
       tld.cnx.start_iteration();
-  */
+    if (tld.obj) {
+      // try swapping the abort context or check if unlocked
+      // otherwise let the iteration proceed and handle the other cases
+      //  - could be locked locally by another iteration!
+      //  - could have been sent to another host
+      //    * FIXME: can lead to data race with delete (Directory.h) for remote objs
+      //    * this case should be handled by storing the dist pointer
+      getAbortCnx().swap_acquire(tld.obj,&tld.cnx);
+    }
     tld.function(*p, tld.facing.data());
     commitIteration(tld);
+    if (tld.live_lock) {
+      transientRelease(Distributed::lock_sync);
+    }
 
     if ((Distributed::networkHostNum > 1) && (LL::getTID() == 0)) {
       getSystemLocalDirectory().makeProgress();
@@ -170,21 +183,39 @@ protected:
     return workHappened;
   }
 
-  void resch_recv(value_type val, Lockable *L) {
-    received.push(std::make_pair(val,L));
+  void resch_recv(value_type val, Lockable *L, unsigned numLocks, bool llock, bool front) {
+    if (front)
+      received.push_front(std::make_pair(std::make_pair(val,L),std::make_pair(numLocks,llock)));
+    else
+      received.push_back(std::make_pair(std::make_pair(val,L),std::make_pair(numLocks,llock)));
   }
 
   template<typename WL>
-  boost::optional<value_type> getProcess(WL& lwl) {
+  boost::optional<value_type> getProcess(ThreadLocalData& tld, WL& lwl, bool& q) {
     boost::optional<value_type> p;
-    boost::optional<std::pair<value_type,Lockable*> > rp;
+    std::pair<std::pair<value_type,Lockable*>,std::pair<unsigned,bool> > rp;
+    tld.numLocks = 0;
+    tld.live_lock = false;
+    tld.obj = NULL;
+    q = false;
     if (LL::getTID() == 0) {
-      rp = received.pop();
-      if(rp) {
-        Lockable* L;
-        L = rp->second;
-        getAbortCnx().swap_acquire(L,getThreadContext());
-        p = rp->first;
+      if(!received.empty()) {
+        rp = received.front();
+        // FIXME: possible race with the previous statement
+        received.pop_front();
+        p = rp.first.first;
+        tld.obj = rp.first.second;
+        tld.numLocks = rp.second.first;
+        tld.live_lock = rp.second.second;
+        if (tld.live_lock) {
+          if (!transientAcquireNonBlocking(Distributed::lock_sync)) {
+            // release the lock so that we don't block on the iteration locks
+            // acquired for all the iterations
+            if (isAcquiredBy(tld.obj,&getAbortCnx()))
+              getAbortCnx().swap_acquire(tld.obj,&tld.cnx);
+            q = true;
+          }
+        }
       }
       else {
 	p = lwl.pop();
@@ -200,28 +231,49 @@ protected:
   bool runQueue(ThreadLocalData& tld, WL& lwl, bool recursiveAbort) {
     bool workHappened = false;
     boost::optional<value_type> p;
-    p = getProcess(lwl);
-    unsigned num = 0;
-    if (p)
-      workHappened = true;
+    bool q;
     try {
-      while (p) {
-	doProcess(p, tld);
-	if (limit) {
-	  ++num;
-	  if (num == 32)
-	    break;
-	}
-        p = getProcess(lwl);
-      }
+      p = getProcess(tld, lwl, q);
+      if (q) throw conflict_ex{tld.obj};
+      unsigned num = 0;
+      if (p)
+        workHappened = true;
+        while (p) {
+	  doProcess(p, tld);
+	  if (limit) {
+	    ++num;
+	    if (num == 32)
+	      break;
+	  }
+          p = getProcess(tld, lwl, q);
+          if (q) throw conflict_ex{tld.obj};
+        }
     } catch (const conflict_ex& ex) {
-      Distributed::getSystemLocalDirectory().recall(ex.obj, false);
-      abortIteration(*p, tld, recursiveAbort, true);
+      if (tld.obj) {
+        // if required ex.obj object is locked in the getAbortCnx() then another
+        // queued iteration is waiting on the same object so add to the end
+        if ((tld.obj != ex.obj) && !isAcquiredBy(ex.obj,&getAbortCnx())) {
+          resch_recv(*p,tld.obj,tld.cnx.count_locks(),tld.live_lock,true);
+        }
+        else {
+          // recall object if remote
+          if (isAcquiredBy(tld.obj,&getSystemLocalDirectory()))
+            getSystemLocalDirectory().recall(tld.obj, false);
+          resch_recv(*p,tld.obj,tld.cnx.count_locks(),tld.live_lock,false);
+        }
+        abortIteration(*p, tld, recursiveAbort, false);
+      }
+      else
+        abortIteration(*p, tld, recursiveAbort, true);
     } catch (const remote_ex& ex) {
-      // object is remote - only for Remote Directory now
-      assert(ex.owner != Distributed::networkHostID);
-      // add to the list of remoteObjects
-      Distributed::getSystemRemoteObjects().insert(ex.obj,std::bind(&ForEachWork::resch_recv,this,*p,ex.obj));
+      unsigned numLocks = tld.cnx.count_locks();
+      bool live_lock = tld.live_lock || (tld.numLocks && (numLocks < tld.numLocks));
+      // add to the list of remoteObjects - push to front if already a live lock
+      // also make sure that the conflicting object isn't locked by getAbortCnx()
+      // as that would mean another iteration is waiting on this remote object!
+      bool front = tld.live_lock && !isAcquiredBy(ex.obj,&getAbortCnx());
+      Distributed::getSystemRemoteObjects().insert(ex.obj,
+        std::bind(&ForEachWork::resch_recv,this,*p,ex.obj,numLocks,live_lock,front));
       abortIteration(*p, tld, recursiveAbort, false);
     } catch (const break_ex&) {
       handleBreak(tld);

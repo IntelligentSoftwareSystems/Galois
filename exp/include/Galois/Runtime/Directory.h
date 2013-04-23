@@ -49,12 +49,6 @@ SimpleRuntimeContext& getAbortCnx();
 template<typename T>
 class gptr;
 
-template<typename T>
-remote_ex make_remote_ex(const gptr<T>&);
-
-template<typename T>
-remote_ex make_remote_ex(Lockable* ptr, uint32_t owner);
-
 template<typename a, typename b>
 struct pairhash {
 private:
@@ -67,16 +61,30 @@ public:
   }
 };
 
+struct PreventLiveLock: public Galois::Runtime::Lockable {
+  int i;
+  // serialization functions
+  typedef int tt_has_serialize;
+  void serialize(SerializeBuffer& s) const {
+    gSerialize(s,i);
+  }
+  void deserialize(DeSerializeBuffer& s) {
+    gDeserialize(s,i);
+  }
+};
+
+extern gptr<PreventLiveLock> lock_sync;
+
 class RemoteDirectory: public SimpleRuntimeContext, private boost::noncopyable {
 
   Galois::Runtime::LL::SimpleLock<true> Lock;
   Galois::Runtime::LL::SimpleLock<true> SLock;
 
   std::unordered_map<std::pair<uint32_t, Lockable*>, Lockable*, 
-		     pairhash<uint32_t, Lockable*>> curobj;
+		     pairhash<uint32_t, Lockable*> > curobj;
 
   std::unordered_map<std::pair<uint32_t, Lockable*>, Lockable*, 
-		     pairhash<uint32_t, Lockable*>> shared;
+		     pairhash<uint32_t, Lockable*> > shared;
 
   std::vector<std::function<void ()>> pending;
 
@@ -307,17 +315,19 @@ void RemoteDirectory::doObj(uint32_t owner, Lockable* ptr, RecvBuffer& buf) {
   assert(curobj.find(k(owner,ptr)) != curobj.end());
   Lockable* obj = curobj[k(owner,ptr)];
   assert(obj);
-  Lock.unlock();
   assert(isAcquiredBy(obj, this));
   gDeserialize(buf,*static_cast<T*>(obj));
   // use the object atleast once
   if (inGaloisForEach && getSystemRemoteObjects().find(obj)) {
-    swap_lock(obj,&getAbortCnx());
+    // swap_lock should succeed!
+    if (!swap_lock(obj,&getAbortCnx()))
+      abort();
     // move from Requested to Received map - callback resch_recv in ParallelWork.h
     (getSystemRemoteObjects().get_remove(obj))();
   }
   else
     release(obj);
+  Lock.unlock();
 }
 
 template<typename T>
@@ -431,7 +441,16 @@ void LocalDirectory::doObj(T* ptr) {
   Lock.lock();
   assert(curobj.count(ptr) && "Obj not in directory");
   curobj.erase(ptr);
-  release(ptr);
+  // use the object atleast once
+  if (inGaloisForEach && getSystemRemoteObjects().find(ptr)) {
+    // swap_lock should succeed!
+    if (!swap_lock(ptr,&getAbortCnx()))
+      abort();
+    // move from Requested to Received map - callback resch_recv in ParallelWork.h
+    (getSystemRemoteObjects().get_remove(ptr))();
+  }
+  else
+    release(ptr);
   Lock.unlock();
 }
 

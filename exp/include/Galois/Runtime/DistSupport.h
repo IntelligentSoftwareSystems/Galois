@@ -55,8 +55,19 @@ struct resolve_dispatch<T, false> {
       // have to enter the directory when outside the for each to
       // check for remote objects! can't be found otherwise as
       // acquire isn't called outside the for each.
-      if (inGaloisForEach)
-	acquire(ptr, Galois::MethodFlag::ALL);
+      if (inGaloisForEach) {
+	try {
+	  acquire(ptr, Galois::MethodFlag::ALL);
+	} catch (...) {
+          getSystemLocalDirectory().recall(ptr, false);
+          if (isAcquiredBy(ptr,&getSystemLocalDirectory())) {
+	    throw remote_ex{ptr,owner,ptr};
+          }
+          else {
+            throw conflict_ex{ptr};
+          }
+	}
+      }
       else if (isAcquired(ptr))
 	getSystemLocalDirectory().recall(ptr, true);
       return ptr;
@@ -66,7 +77,7 @@ struct resolve_dispatch<T, false> {
 	try {
 	  acquire(rptr, Galois::MethodFlag::ALL);
 	} catch (...) {
-	  throw remote_ex{rptr,owner};
+	  throw remote_ex{rptr,owner,ptr};
 	}
       } else {
 	while (isAcquired(rptr)) {
@@ -124,6 +135,23 @@ T* transientAcquire(const gptr<T>& p) {
   }
 }
 
+template <typename T>
+T* transientAcquireNonBlocking(const gptr<T>& p) {
+  if (p.owner == networkHostID) {
+    if (!getTransCnx().try_acquire(p.ptr)) {
+      getSystemLocalDirectory().recall(p.ptr, false);
+      return NULL;
+    }
+    return p.ptr;
+  } else { // REMOTE
+    T* rptr = getSystemRemoteDirectory().resolve<T>(p.owner, p.ptr);
+    //DATA RACE with delete
+    if (getTransCnx().try_acquire(rptr))
+      return rptr;
+    return NULL;
+  }
+}
+
 template<typename T>
 void transientRelease(const gptr<T>& p) {
   T* ptr = p.ptr;
@@ -156,6 +184,7 @@ class gptr {
 
   friend T* resolve<>(const gptr<T>&);
   friend T* transientAcquire<>(const gptr<T>& p);
+  friend T* transientAcquireNonBlocking<>(const gptr<T>& p);
   friend void transientRelease<>(const gptr<T>& p);
   friend T* getSharedObj<>(const gptr<T>& p);
   friend PerBackend_v2;
@@ -236,15 +265,6 @@ public:
     os << "[" << owner << "," << ptr << "]";
   }
 };
-
-template<typename T>
-remote_ex make_remote_ex(const Distributed::gptr<T>& p) {
-  return remote_ex{p.ptr, p.owner};
-}
-template<typename T>
-remote_ex make_remote_ex(Lockable* ptr, uint32_t owner) {
-  return remote_ex{ptr, owner};
-}
 
 } //namespace Distributed
 } //namespace Runtime

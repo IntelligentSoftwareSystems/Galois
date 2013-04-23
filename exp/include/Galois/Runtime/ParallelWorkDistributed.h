@@ -29,6 +29,7 @@
 #define GALOIS_RUNTIME_PARALLELWORKDIST_H
 
 #include "Galois/Runtime/Network.h"
+#include "Galois/Runtime/DistSupport.h"
 #include "Galois/Runtime/PerHostStorage.h"
 
 namespace Galois {
@@ -100,7 +101,7 @@ void for_each_landing_pad(Distributed::RecvBuffer& buf) {
   //extract stuff
   FunctionTy f;
   std::deque<ItemTy> data;
-  gDeserialize(buf,f,data);
+  gDeserialize(buf,f,data,Distributed::lock_sync);
 
   Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
 
@@ -116,7 +117,7 @@ void for_each_local_landing_pad(Distributed::RecvBuffer& buf) {
   //extract stuff
   FunctionTy f;
   T data;
-  gDeserialize(buf,f,data);
+  gDeserialize(buf,f,data,Distributed::lock_sync);
 
   Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
 
@@ -181,13 +182,15 @@ void for_each_dist(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
   //copy out all data
   std::deque<ItemTy> allData;
   allData.insert(allData.end(), b,e);
+  Distributed::PreventLiveLock sync;
+  Distributed::lock_sync.initialize(&sync);
 
   for (unsigned i = 1; i < Distributed::networkHostNum; i++) {
     auto blk = block_range(allData.begin(), allData.end(), i, Distributed::networkHostNum);
     std::deque<ItemTy> data(blk.first, blk.second);
     Distributed::SendBuffer buf;
     // serialize function and data
-    gSerialize(buf,f,data);
+    gSerialize(buf,f,data,Distributed::lock_sync);
     //send data
     net.send (i, &for_each_landing_pad<WLTy,ItemTy,FunctionTy>, buf);
   }
@@ -214,10 +217,12 @@ void for_each_local_dist(T& c, FunctionTy f, const char* loopname) {
     return;
   }
 
+  Distributed::PreventLiveLock sync;
+  Distributed::lock_sync.initialize(&sync);
   for (unsigned i = 1; i < Distributed::networkHostNum; i++) {
     Distributed::SendBuffer buf;
     // serialize function and data
-    gSerialize(buf,f,c);
+    gSerialize(buf,f,c,Distributed::lock_sync);
     //send data
     net.send (i, &for_each_local_landing_pad<WLTy,T,FunctionTy>, buf);
   }

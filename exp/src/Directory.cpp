@@ -26,6 +26,14 @@
 #include "Galois/Runtime/Directory.h"
 #include "Galois/Runtime/ll/TID.h"
 
+namespace Galois {
+namespace Runtime {
+namespace Distributed {
+gptr<PreventLiveLock> lock_sync;
+}
+}
+}
+
 Galois::Runtime::SimpleRuntimeContext& Galois::Runtime::Distributed::getTransCnx() {
   static PerThreadStorage<Galois::Runtime::SimpleRuntimeContext> obj;
   return *obj.getLocal();
