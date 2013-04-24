@@ -136,6 +136,13 @@ public:
     return emp;
   }
 
+  unsigned size() {
+    Lock.lock();
+    unsigned emp = objStore.size();
+    Lock.unlock();
+    return emp;
+  }
+
   bool find(Lockable* ptr) {
     Lock.lock();
     typename Map::const_iterator got = objStore.find(ptr);
@@ -149,6 +156,7 @@ public:
     typename Map::const_iterator got = objStore.find(ptr);
     assert(got != objStore.end());
     FType retval = got->second;
+    objStore.erase(ptr);
     Lock.unlock();
     return retval;
   }
