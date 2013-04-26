@@ -101,64 +101,83 @@ void distWait();
 ////////////////////////////////////////////////////////////////////////////////
 // objectRecord - used to store the requested remote objects
 ////////////////////////////////////////////////////////////////////////////////
+
+// Not thread-safe make sure the caller takes care to lock before access to any
+// method except empty or size
 class ObjectRecord {
 private:
-  typedef std::unordered_map<Lockable*,std::function<void ()> > Map;
+  typedef std::multimap<Lockable*,std::function<void ()> > Map;
 
   Galois::Runtime::LL::SimpleLock<true> Lock;
-  Map    objStore;
+  Map      objStore;
+  unsigned num;
 
 public:
   typedef std::function<void ()> FType;
 
-  void insert(Lockable* ptr, FType val) {
-    Lock.lock();
-    objStore[ptr] = val;
-    Lock.unlock();
+  void insert(std::pair<Lockable*,FType>& val) {
+    // multiple threads call insert so locking before use
+    lock();
+    objStore.insert(val);
+    num = objStore.size();
+    unlock();
   }
 
   void erase(Lockable* ptr) {
-    Lock.lock();
+    // locking as it may be called along with insert
+    lock();
     objStore.erase(ptr);
-    Lock.unlock();
+    num = objStore.size();
+    unlock();
   }
 
   void clear() {
-    Lock.lock();
     objStore.clear();
-    Lock.unlock();
+    num = 0;
   }
 
   bool empty() {
-    Lock.lock();
-    bool emp = objStore.empty();
-    Lock.unlock();
+    bool emp = (num == 0);
     return emp;
   }
 
   unsigned size() {
-    Lock.lock();
-    unsigned emp = objStore.size();
-    Lock.unlock();
-    return emp;
+    return num;
   }
 
   bool find(Lockable* ptr) {
-    Lock.lock();
-    typename Map::const_iterator got = objStore.find(ptr);
+    typename Map::iterator got = objStore.find(ptr);
     bool emp = (got != objStore.end());
-    Lock.unlock();
     return emp;
   }
 
-  FType get_remove(Lockable* ptr) {
+  void lock() {
     Lock.lock();
-    typename Map::const_iterator got = objStore.find(ptr);
-    assert(got != objStore.end());
-    FType retval = got->second;
-    objStore.erase(ptr);
+  }
+
+  void unlock() {
     Lock.unlock();
-    return retval;
+  }
+
+  Map::iterator begin() {
+    return objStore.begin();
+  }
+
+  Map::iterator end() {
+    return objStore.end();
+  }
+
+  Map::iterator get_begin(Lockable* ptr) {
+    return objStore.lower_bound(ptr);
+  }
+
+  Map::iterator get_end(Lockable* ptr) {
+    return objStore.upper_bound(ptr);
+  }
+
+  unsigned get_count(Lockable* ptr) {
+    unsigned got = objStore.count(ptr);
+    return got;
   }
 };
 

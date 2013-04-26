@@ -77,7 +77,6 @@ struct count_if_reducer_dist : public Galois::Runtime::Lockable {
   count_if_reducer_dist(count_if_R* _r = nullptr) :r(_r) {}
   template<typename CIH>
   void operator()(CIH& dest, const CIH& src) {
- //printf ("adding %ld and %ld in host %u and thread %u\n", dest.ret, src.ret, Runtime::Distributed::networkHostID, Runtime::LL::getTID());
     count_if_R* transient_r = transientAcquire(r);
     transient_r->add(dest.ret+src.ret);
     transientRelease(r);

@@ -136,6 +136,8 @@ public:
 
   Lockable* get_latest(Lockable*);
 
+  Lockable* move_to_requested();
+
   void makeProgress();
 
   void dump();
@@ -261,9 +263,50 @@ Galois::Runtime::Lockable* RemoteDirectory::resolve_call(uint32_t owner, Lockabl
 }
 
 inline Galois::Runtime::Lockable* RemoteDirectory::get_latest(Lockable* obj) {
-  Lockable* new_obj;
+  Lockable* new_obj = obj;
   if(!resolve_callback[obj]) return obj;
-  new_obj = (resolve_callback[obj])();
+  if(resolve_callback[obj]) new_obj = (resolve_callback[obj])();
+  return new_obj;
+}
+
+inline Galois::Runtime::Lockable* RemoteDirectory::move_to_requested() {
+  bool flag, remove;
+  std::vector<Lockable*> v;
+  std::vector<Lockable*> o;
+  Lockable *obj, *new_obj, *prev;
+  assert(LL::getTID() == 0);
+  prev = NULL;
+  remove = false;
+  // have to lock as no object should be inserted while iterating
+  getSystemRemoteObjects().lock();
+  for(auto ii = getSystemRemoteObjects().begin(); ii != getSystemRemoteObjects().end(); ++ii) {
+    obj = ii->first;
+    // enter if checking obj for the first time
+    if (obj != prev) {
+      prev = obj;
+      flag = true;
+      new_obj = get_latest(obj);
+      remove = !isAcquiredBy(new_obj,this) && !isAcquiredBy(new_obj,&getSystemLocalDirectory());
+      // place recall request if local object sent out
+      if (isAcquiredBy(new_obj,&getSystemLocalDirectory()))
+        o.push_back(new_obj);
+    }
+    // remove objects that have been marked for removal
+    if (remove) {
+      (ii->second)();
+      if(flag) v.push_back(obj);
+    }
+    flag = false;
+  }
+  getSystemRemoteObjects().unlock();
+  // erase all marked objects from the Remote Objects map
+  for(auto ii = v.begin(); ii != v.end(); ++ii) {
+    getSystemRemoteObjects().erase(*ii);
+  }
+  // recall all the marked objects
+  for(auto ii = o.begin(); ii != o.end(); ++ii) {
+    getSystemLocalDirectory().recall(*ii, false);
+  }
   return new_obj;
 }
 
@@ -332,6 +375,7 @@ template<typename T>
 void RemoteDirectory::doObj(uint32_t owner, Lockable* ptr, RecvBuffer& buf) {
   //LL::gDebug("RD: ", networkHostID, " receiving: ", owner, " ", ptr);
   trace_obj_recv(owner, ptr);
+  assert(LL::getTID() == 0);
   Lock.lock();
   assert(curobj.find(k(owner,ptr)) != curobj.end());
   Lockable* obj = curobj[k(owner,ptr)];
@@ -339,12 +383,20 @@ void RemoteDirectory::doObj(uint32_t owner, Lockable* ptr, RecvBuffer& buf) {
   assert(isAcquiredBy(obj, this));
   gDeserialize(buf,*static_cast<T*>(obj));
   // use the object atleast once
-  if (inGaloisForEach && getSystemRemoteObjects().find(obj)) {
-    // swap_lock should succeed!
-    if (!swap_lock(obj,&getAbortCnx()))
+  ObjectRecord& mmap = getSystemRemoteObjects();
+  if (inGaloisForEach && mmap.find(obj)) {
+    // swap_acquire should succeed!
+    // use acquire as the object should be released if the first iteration fails
+    if (!swap_acquire(obj,&getAbortCnx()))
       abort();
     // move from Requested to Received map - callback resch_recv in ParallelWork.h
-    (getSystemRemoteObjects().get_remove(obj))();
+    // no one should insert when iterating!
+    getSystemRemoteObjects().lock();
+    for(auto ii = mmap.get_begin(obj); ii != mmap.get_end(obj); ++ii) {
+      (ii->second)();
+    }
+    getSystemRemoteObjects().unlock();
+    getSystemRemoteObjects().erase(obj);
   }
   else
     release(obj);
@@ -459,16 +511,25 @@ template<typename T>
 void LocalDirectory::doObj(T* ptr) {
   trace_obj_recv(networkHostID, static_cast<Lockable*>(ptr));
   //LL::gDebug("LD: ", networkHostID, " recieving: ", networkHostID, " ", ptr);
+  assert(LL::getTID() == 0);
   Lock.lock();
   assert(curobj.count(ptr) && "Obj not in directory");
   curobj.erase(ptr);
   // use the object atleast once
-  if (inGaloisForEach && getSystemRemoteObjects().find(ptr)) {
-    // swap_lock should succeed!
-    if (!swap_lock(ptr,&getAbortCnx()))
+  ObjectRecord& mmap = getSystemRemoteObjects();
+  if (inGaloisForEach && mmap.find(ptr)) {
+    // swap_acquire should succeed!
+    // use acquire as the object should be released if the first iteration fails
+    if (!swap_acquire(ptr,&getAbortCnx()))
       abort();
     // move from Requested to Received map - callback resch_recv in ParallelWork.h
-    (getSystemRemoteObjects().get_remove(ptr))();
+    // no one should insert when iterating!
+    getSystemRemoteObjects().lock();
+    for(auto ii = mmap.get_begin(ptr); ii != mmap.get_end(ptr); ++ii) {
+      (ii->second)();
+    }
+    getSystemRemoteObjects().unlock();
+    getSystemRemoteObjects().erase(ptr);
   }
   else
     release(ptr);

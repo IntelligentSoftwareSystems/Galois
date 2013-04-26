@@ -64,7 +64,7 @@ struct Process : public Galois::Runtime::Lockable {
   void operator()(GNode node, Galois::UserContext<GNode>& ctx) {
     if (!graph->containsNode(node))
       return;
-    
+
     Cavity cav(graph, ctx.getPerIterAlloc());
     cav.initialize(node);
     cav.build();
@@ -101,6 +101,28 @@ struct Preprocess : public Galois::Runtime::Lockable {
   }
   void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
     gDeserialize(s,graph,wl);
+  }
+};
+
+struct Verification : public Galois::Runtime::Lockable {
+  Graphp   graph;
+
+  Verification(Graphp g): graph(g) {}
+  Verification() {}
+
+  void operator()(GNode item, Galois::UserContext<GNode>& ctx) const {
+    if (graph->getData(item).isBad()) {
+      printf("Found bad triangle\n");
+    }
+  }
+
+  // serialization functions
+  typedef int tt_has_serialize;
+  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+    gSerialize(s,graph);
+  }
+  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+    gDeserialize(s,graph);
   }
 };
 
@@ -173,6 +195,8 @@ int main(int argc, char** argv) {
   Galois::for_each_local<CA>(gwl, Process(graph), "refine");
   Trefine.stop();
   T.stop();
+
+  Galois::for_each_local<CA>(graph, Verification(graph), "verification");
 
   //  std::cout << "final configuration: " << NThirdGraphSize(graph) << " total triangles, ";
   //  std::cout << Galois::ParallelSTL::count_if_local(graph, is_bad(graph)) << " bad triangles\n";
