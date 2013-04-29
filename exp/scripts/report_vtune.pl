@@ -1,13 +1,18 @@
 #!/usr/bin/perl
+#
+# Take output of run_vtune.pl and produce tab-deliminated file
 
 use strict; 
 use warnings;
 use Getopt::Long;
+use Pod::Usage;
 
+# Command line options
 my $InType = "line";
 my %validInTypes = map { $_ => 1 } ("line", "function");
-my $showType = "raw";
+my $ShowType = "raw";
 my %validShowTypes = map { $_ => 1 } ("raw", "ratio", "scalebythread");
+my $Help = 0;
 
 my %Stats = ();
 my %Thread_keys = ();
@@ -20,20 +25,20 @@ sub show {
     print STDERR "ERROR: missing key: tk=$tk, lk=$lk\n";
   }
 
-  if ($showType eq "scalebythread") {
+  if ($ShowType eq "scalebythread") {
     return $tmap->{$lk}{$tk} / $tk;
-  } elsif ($showType eq "ratio") {
+  } elsif ($ShowType eq "ratio") {
     return $tmap->{$lk}{$tk} / $tmap->{$TOTAL}{$tk};
-  } elsif ($showType eq "raw") {
+  } elsif ($ShowType eq "raw") {
     return $tmap->{$lk}{$tk};
   } else {
     die;
   }
-
 }
 
-GetOptions('show=s'=>\$showType, 'in=s'=>\$InType) or die;
-die("unknown show type") unless ($validShowTypes{$showType});
+GetOptions('show=s'=>\$ShowType, 'in=s'=>\$InType, "help"=> \$Help) or pod2usage(2);
+pod2usage(-exitstatus=>0, -verbose=>2, -noperldoc=>1) if $Help;
+die("unknown show type") unless ($validShowTypes{$ShowType});
 die("unknown in type") unless ($validInTypes{$InType});
 
 my $newSet = 0;
@@ -47,19 +52,15 @@ while (<>) {
   # print "line:@line\n";
   # print "line:$line[0],$line[1]\n";
 
-
   if ($line[0] =~ /^THREADS$/) {
     # print "Threads line: @line\n";
     $newSet = 1;
     $curThread = $line[1];
     $Thread_keys{$curThread} = 1;
-
   } elsif ($newSet) {
     $newSet = 0;
     @heads = @line;
-
     # print "headers:@heads\n";
-
   } else {
     my $ind;
     my $offset = 0;
@@ -82,20 +83,15 @@ while (<>) {
       $ind = "$module:$function";
     }
 
-
     for (my $i = 0; $i < $#line; $i++) {
-
       my $nk = $heads[$i + $offset];
       $Stats{$nk}{$curThread}{$ind} = $line[$i];
       $Stats{$nk}{$curThread}{$TOTAL} += $line[$i];
-
       # print "nk=$nk, val=$line[$i]\n";
     }
     # print "###\n";
   }
 }
-
-
 
 # for the combinations of (line_keys, Thread_keys) for a given stat_name that don't
 # have corresponding Stats, we put a 0. e.g. a particular function/line shows
@@ -117,7 +113,6 @@ foreach my $nk (keys %Stats) {
   }
 }
 
-
 my $maxThread = (sort { $a <=> $b } keys %Thread_keys)[-1];
 
 foreach my $nk (sort keys %Stats) {
@@ -134,7 +129,6 @@ foreach my $nk (sort keys %Stats) {
     }
   }
 
-
   # delete lines with all 0s from transpose
   foreach my $lk (keys %transpose) {
     my $all_zeros = 1;
@@ -150,7 +144,6 @@ foreach my $nk (sort keys %Stats) {
     }
   }
 
-
   #sort by final thread performance
   foreach my $lk (sort { show(\%transpose, $b, $maxThread) <=> show(\%transpose, $a, $maxThread) }
     keys %transpose) {
@@ -164,3 +157,42 @@ foreach my $nk (sort keys %Stats) {
 
   print "\n\n\n";
 }
+
+__END__
+
+=head1 NAME
+
+report_vtune - Emit tab-separated file from output of run_vtune
+
+=head1 SYNOPSIS
+
+cat output | report_vtune [options] > output.tsv
+
+ Options:
+   -help             brief help message
+   -in=INTYPE        format of run_vtune output
+   -show=SHOWTYPE    output format
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<-help>
+
+Print a brief help message and exits.
+
+=item B<-in>=INTYPE
+
+run_vtune output is by INTYPE instead function: line, function
+
+=item B<-show>=SHOWTYPE
+
+Output SHOWTYPE instead of raw counts: raw, ratio, scalebythread
+
+=back
+
+=head1 DESCRIPTION
+
+Emit tab-separated file from output of run_vtune
+
+=cut
