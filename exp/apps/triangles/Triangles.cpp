@@ -150,7 +150,7 @@ struct NodeIteratorAlgo {
   };
 
   void operator()() { 
-    Galois::do_all_local(graph, Process(this));
+    Galois::do_all_local(&graph, Process(this));
     std::cout << "NumTriangles: " << numTriangles.reduce() << "\n";
   }
 };
