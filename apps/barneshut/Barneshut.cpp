@@ -26,7 +26,6 @@
 #include "Galois/Bag.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
-#include "Galois/WorkList/WorkListAlt.h"
 
 #include <boost/math/constants/constants.hpp>
 #include <boost/iterator/transform_iterator.hpp>
@@ -517,7 +516,7 @@ double checkAllPairs(Bodies& bodies, int N) {
 
 void run(Bodies& bodies, BodyPtrs& pBodies) {
   typedef Galois::WorkList::dChunkedLIFO<256> WL_;
-  typedef Galois::WorkList::ChunkedAdaptor<false,32> WL;
+  typedef Galois::WorkList::AltChunkedLIFO<32> WL;
   typedef Galois::WorkList::LazyIter<decltype(pBodies.local_begin()), true> WLL;
 
   for (int step = 0; step < ntimesteps; step++) {
