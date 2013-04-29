@@ -44,9 +44,9 @@ class LC_Numa_Graph: boost::noncopyable {
 protected:
   struct NodeInfo;
   typedef EdgeInfoBase<NodeInfo*,EdgeTy> EdgeInfo;
-  typedef LargeArray<NodeInfo*,true> Nodes;
+  typedef LargeArray<NodeInfo*> Nodes;
 
-  struct NodeInfo : public NodeInfoBase<NodeTy> {
+  struct NodeInfo : public NodeInfoBase<NodeTy,true> {
     int numEdges;
 
     EdgeInfo* edgeBegin() {
@@ -349,7 +349,7 @@ public:
     Galois::Runtime::PerThreadStorage<DistributeInfo> dinfo;
     distribute(graph, dinfo);
 
-    nodes.allocate(numNodes);
+    nodes.create(numNodes);
 
     Galois::on_each(AllocateNodes(dinfo, headers, nodes.data(), graph));
     Galois::on_each(AllocateEdges(dinfo, nodes.data(), graph));

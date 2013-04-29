@@ -115,9 +115,9 @@ class LC_InlineEdge_Graph: boost::noncopyable {
 protected:
   struct NodeInfo;
   typedef EdgeInfoBase<typename boost::mpl::if_c<CompressNodePtr,uint32_t,NodeInfo*>::type,EdgeTy> EdgeInfo;
-  typedef LargeArray<EdgeInfo,true> EdgeData;
+  typedef LargeArray<EdgeInfo> EdgeData;
 
-  class NodeInfo: public NodeInfoBase<NodeTy> {
+  class NodeInfo: public NodeInfoBase<NodeTy,true> {
     EdgeInfo* m_edgeBegin;
     EdgeInfo* m_edgeEnd;
   public:
@@ -125,7 +125,7 @@ protected:
     EdgeInfo*& edgeEnd() { return m_edgeEnd; }
   };
 
-  LargeArray<NodeInfo,false> nodeData;
+  LargeArray<NodeInfo> nodeData;
   EdgeData edgeData;
   uint64_t numNodes;
   uint64_t numEdges;
@@ -246,8 +246,8 @@ public:
 
     numNodes = graph.size();
     numEdges = graph.sizeEdges();
-    nodeData.allocate(numNodes);
-    edgeData.allocate(numEdges);
+    nodeData.create(numNodes);
+    edgeData.allocateInterleaved(numEdges);
 
     std::vector<NodeInfo*> node_ids;
     node_ids.resize(numNodes);

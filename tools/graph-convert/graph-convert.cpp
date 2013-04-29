@@ -131,7 +131,7 @@ static void printStatus(size_t in_nodes, size_t in_edges) {
 template<typename EdgeTy>
 void convert_edgelist2gr(const std::string& infilename, const std::string& outfilename) {
   typedef Galois::Graph::FileGraphWriter Writer;
-  typedef Galois::LargeArray<EdgeTy,true> EdgeData;
+  typedef Galois::LargeArray<EdgeTy> EdgeData;
   typedef typename EdgeData::value_type edge_value_type;
 
   Writer p;
@@ -164,7 +164,7 @@ void convert_edgelist2gr(const std::string& infilename, const std::string& outfi
   p.setNumNodes(numNodes);
   p.setNumEdges(numEdges);
   p.setSizeofEdgeData(EdgeData::has_value ? sizeof(edge_value_type) : 0); 
-  edgeData.allocate(numEdges);
+  edgeData.create(numEdges);
 
   infile.clear();
   infile.seekg(0, std::ios::beg);
@@ -288,7 +288,7 @@ template<typename EdgeTy>
 void convert_gr2edgelist(const std::string& infilename, const std::string& outfilename) {
   typedef Galois::Graph::FileGraph Graph;
   typedef Graph::GraphNode GNode;
-  typedef Galois::LargeArray<EdgeTy,true> EdgeData;
+  typedef Galois::LargeArray<EdgeTy> EdgeData;
   typedef typename EdgeData::value_type edge_value_type;
 
   Graph graph;
@@ -315,13 +315,13 @@ template<typename EdgeTy>
 void convert_gr2rand(const std::string& infilename, const std::string& outfilename) {
   typedef Galois::Graph::FileGraph Graph;
   typedef Graph::GraphNode GNode;
-  typedef Galois::LargeArray<GNode,true> Permutation;
+  typedef Galois::LargeArray<GNode> Permutation;
 
   Graph graph;
   graph.structureFromFile(infilename);
 
   Permutation perm;
-  perm.allocate(graph.size());
+  perm.create(graph.size());
   std::copy(boost::counting_iterator<GNode>(0), boost::counting_iterator<GNode>(graph.size()), perm.begin());
   boost::random::mt19937 gen;
   std::shuffle(perm.begin(), perm.end(), gen);
@@ -371,7 +371,7 @@ void add_ring(const std::string& infilename, const std::string& outfilename) {
   typedef Galois::Graph::FileGraph Graph;
   typedef Galois::Graph::FileGraphWriter Writer;
   typedef Graph::GraphNode GNode;
-  typedef Galois::LargeArray<EdgeTy,true> EdgeData;
+  typedef Galois::LargeArray<EdgeTy> EdgeData;
   typedef typename EdgeData::value_type edge_value_type;
   
   Graph graph;
@@ -386,8 +386,8 @@ void add_ring(const std::string& infilename, const std::string& outfilename) {
   p.setNumNodes(size);
   p.setNumEdges(graph.sizeEdges() + size);
   p.setSizeofEdgeData(EdgeData::has_value ? sizeof(edge_value_type) : 0);
-  edgeData.allocate(graph.sizeEdges() + size);
-  edgeValue.allocate(1);
+  edgeData.create(graph.sizeEdges() + size);
+  edgeValue.create(1);
   //edgeValue.set(0, maxValue + 1);
   setEdgeValue<EdgeData,EdgeData::has_value>(edgeValue);
 
@@ -433,7 +433,7 @@ void add_tree(const std::string& infilename, const std::string& outfilename) {
   typedef Galois::Graph::FileGraph Graph;
   typedef Galois::Graph::FileGraphWriter Writer;
   typedef Graph::GraphNode GNode;
-  typedef Galois::LargeArray<EdgeTy,true> EdgeData;
+  typedef Galois::LargeArray<EdgeTy> EdgeData;
   typedef typename EdgeData::value_type edge_value_type;
   
   Graph graph;
@@ -456,8 +456,8 @@ void add_tree(const std::string& infilename, const std::string& outfilename) {
   p.setNumNodes(size);
   p.setNumEdges(graph.sizeEdges() + newEdges);
   p.setSizeofEdgeData(EdgeData::has_value ? sizeof(edge_value_type) : 0);
-  edgeData.allocate(graph.sizeEdges() + newEdges);
-  edgeValue.allocate(1);
+  edgeData.create(graph.sizeEdges() + newEdges);
+  edgeValue.create(1);
   //edgeValue.set(0, maxValue + 1);
   setEdgeValue<EdgeData,EdgeData::has_value>(edgeValue);
 
@@ -533,7 +533,7 @@ void remove_high_degree(const std::string& infilename, const std::string& outfil
   typedef Galois::Graph::FileGraph Graph;
   typedef Graph::GraphNode GNode;
   typedef Galois::Graph::FileGraphWriter Writer;
-  typedef Galois::LargeArray<EdgeTy,true> EdgeData;
+  typedef Galois::LargeArray<EdgeTy> EdgeData;
   typedef typename EdgeData::value_type edge_value_type;
   
   Graph graph;
@@ -570,7 +570,7 @@ void remove_high_degree(const std::string& infilename, const std::string& outfil
   p.setNumNodes(numNodes);
   p.setNumEdges(numEdges);
   p.setSizeofEdgeData(EdgeData::has_value ? sizeof(edge_value_type) : 0);
-  edgeData.allocate(numEdges);
+  edgeData.create(numEdges);
 
   p.phase1();
   for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
@@ -618,7 +618,7 @@ void transpose(const std::string& infilename, const std::string& outfilename) {
   typedef Galois::Graph::FileGraph Graph;
   typedef Graph::GraphNode GNode;
   typedef Galois::Graph::FileGraphWriter Writer;
-  typedef Galois::LargeArray<EdgeTy,true> EdgeData;
+  typedef Galois::LargeArray<EdgeTy> EdgeData;
   typedef typename EdgeData::value_type edge_value_type;
   
   Graph graph;
@@ -630,7 +630,7 @@ void transpose(const std::string& infilename, const std::string& outfilename) {
   p.setNumNodes(graph.size());
   p.setNumEdges(graph.sizeEdges());
   p.setSizeofEdgeData(EdgeData::has_value ? sizeof(edge_value_type) : 0);
-  edgeData.allocate(graph.sizeEdges());
+  edgeData.create(graph.sizeEdges());
 
   p.phase1();
   for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
@@ -713,7 +713,7 @@ void convert_gr2cgr(const std::string& infilename, const std::string& outfilenam
   }
 
   typedef Galois::Graph::FileGraphWriter Writer;
-  typedef Galois::LargeArray<EdgeTy,true> EdgeData;
+  typedef Galois::LargeArray<EdgeTy> EdgeData;
   typedef typename EdgeData::value_type edge_value_type;
   
   Writer p;
@@ -722,7 +722,7 @@ void convert_gr2cgr(const std::string& infilename, const std::string& outfilenam
   p.setNumNodes(graph.size());
   p.setNumEdges(numEdges);
   p.setSizeofEdgeData(EdgeData::has_value ? sizeof(edge_value_type) : 0);
-  edgeData.allocate(numEdges);
+  edgeData.create(numEdges);
 
   p.phase1();
   for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
@@ -799,7 +799,7 @@ void convert_sgr2gr(const std::string& infilename, const std::string& outfilenam
   }
 
   typedef Galois::Graph::FileGraphWriter Writer;
-  typedef Galois::LargeArray<EdgeTy,true> EdgeData;
+  typedef Galois::LargeArray<EdgeTy> EdgeData;
   typedef typename EdgeData::value_type edge_value_type;
   
   Writer p;
@@ -808,7 +808,7 @@ void convert_sgr2gr(const std::string& infilename, const std::string& outfilenam
   p.setNumNodes(graph.size());
   p.setNumEdges(numEdges);
   p.setSizeofEdgeData(EdgeData::has_value ? sizeof(edge_value_type) : 0);
-  edgeData.allocate(numEdges);
+  edgeData.create(numEdges);
 
   p.phase1();
   for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
@@ -934,7 +934,7 @@ void convert_rmat2gr(const std::string& infilename, const std::string& outfilena
 //  ....
 void convert_dimacs2gr(const std::string& infilename, const std::string& outfilename) { 
   typedef Galois::Graph::FileGraphWriter Writer;
-  typedef Galois::LargeArray<int32_t,true> EdgeData;
+  typedef Galois::LargeArray<int32_t> EdgeData;
   typedef typename EdgeData::value_type edge_value_type;
 
   Writer p;
@@ -977,7 +977,7 @@ void convert_dimacs2gr(const std::string& infilename, const std::string& outfile
       p.setNumNodes(nnodes);
       p.setNumEdges(nedges);
       p.setSizeofEdgeData(EdgeData::has_value ? sizeof(edge_value_type) : 0); 
-      edgeData.allocate(nedges);
+      edgeData.create(nedges);
       p.phase1();
     } else {
       p.phase2();
@@ -1143,7 +1143,7 @@ void convert_gr2pbbsedges(const std::string& infilename, const std::string& outf
 template<typename InEdgeTy,typename OutEdgeTy>
 void convert_gr2pbbs(const std::string& infilename, const std::string& outfilename) {
   typedef Galois::Graph::FileGraph Graph;
-  typedef Galois::LargeArray<OutEdgeTy,true> EdgeData;
+  typedef Galois::LargeArray<OutEdgeTy> EdgeData;
   typedef typename EdgeData::value_type edge_value_type;
 
   Graph graph;

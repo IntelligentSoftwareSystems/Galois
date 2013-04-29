@@ -107,9 +107,9 @@ class LC_Linear_Graph: boost::noncopyable {
 protected:
   struct NodeInfo;
   typedef EdgeInfoBase<NodeInfo*,EdgeTy> EdgeInfo;
-  typedef LargeArray<NodeInfo*,true> Nodes;
+  typedef LargeArray<NodeInfo*> Nodes;
 
-  struct NodeInfo : public NodeInfoBase<NodeTy>, public IntrusiveId<IntrusiveIdTy> {
+  struct NodeInfo : public NodeInfoBase<NodeTy,true>, public IntrusiveId<IntrusiveIdTy> {
     int numEdges;
 
     EdgeInfo* edgeBegin() {
@@ -133,7 +133,7 @@ protected:
     }
   };
  
-  LargeArray<char,true> data;
+  LargeArray<char> data;
   uint64_t numNodes;
   uint64_t numEdges;
   Nodes nodes;
@@ -238,8 +238,8 @@ public:
 
     numNodes = graph.size();
     numEdges = graph.sizeEdges();
-    data.allocate(sizeof(NodeInfo) * numNodes * 2 + sizeof(EdgeInfo) * numEdges);
-    nodes.allocate(numNodes);
+    data.allocateInterleaved(sizeof(NodeInfo) * numNodes * 2 + sizeof(EdgeInfo) * numEdges);
+    nodes.create(numNodes);
     NodeInfo* curNode = reinterpret_cast<NodeInfo*>(data.data());
     size_t id = 0;
     for (FileGraph::iterator ii = graph.begin(), ee = graph.end(); ii != ee; ++ii, ++id) {

@@ -10,7 +10,7 @@ namespace Galois {
 template<unsigned int BlockSize = 0>
 class GraphNodeBag {
   typedef Galois::InsertBag<size_t, BlockSize> Bag;
-  typedef Galois::LargeArray<bool,false> Bitmask;
+  typedef Galois::LargeArray<bool> Bitmask;
 
   Bag bag;
   Galois::GAccumulator<size_t> counts;
@@ -80,7 +80,7 @@ public:
   void densify() {
     isDense = true;
     if (bitmask.size() == 0) {
-      bitmask.allocate(size);
+      bitmask.create(size);
     }
 
     Galois::do_all_local(bag, [&](size_t n) {

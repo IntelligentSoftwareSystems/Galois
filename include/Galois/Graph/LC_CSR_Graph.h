@@ -151,11 +151,11 @@ class LC_CSR_Graph: boost::noncopyable {
     friend class CSR_InOutGraphImpl::InEdges;
 
 protected:
-  typedef LargeArray<EdgeTy,false> EdgeData;
-  typedef LargeArray<uint32_t,true> EdgeDst;
-  typedef NodeInfoBase<NodeTy> NodeInfo;
-  typedef LargeArray<uint64_t,true> EdgeIndData;
-  typedef LargeArray<NodeInfo,false> NodeData;
+  typedef LargeArray<EdgeTy> EdgeData;
+  typedef LargeArray<uint32_t> EdgeDst;
+  typedef NodeInfoBase<NodeTy,true> NodeInfo;
+  typedef LargeArray<uint64_t> EdgeIndData;
+  typedef LargeArray<NodeInfo> NodeData;
 
   NodeData nodeData;
   EdgeIndData edgeIndData;
@@ -265,10 +265,10 @@ public:
   void structureFromGraph(FileGraph& graph) {
     numNodes = graph.size();
     numEdges = graph.sizeEdges();
-    nodeData.allocate(numNodes);
-    edgeIndData.allocate(numNodes);
-    edgeDst.allocate(numEdges);
-    edgeData.allocate(numEdges);
+    nodeData.create(numNodes);
+    edgeIndData.create(numNodes);
+    edgeDst.create(numEdges);
+    edgeData.create(numEdges);
 
     typedef typename EdgeData::value_type EDV;
 

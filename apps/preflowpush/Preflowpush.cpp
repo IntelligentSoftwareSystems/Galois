@@ -600,7 +600,7 @@ void writePfpGraph(const std::string& inputFile, const std::string& outputFile) 
   reader.structureFromFile(inputFile);
 
   typedef Galois::Graph::FileGraphWriter Writer;
-  typedef Galois::LargeArray<EdgeTy,true> EdgeData;
+  typedef Galois::LargeArray<EdgeTy> EdgeData;
   typedef typename EdgeData::value_type edge_value_type;
 
   Writer p;
@@ -638,7 +638,7 @@ void writePfpGraph(const std::string& inputFile, const std::string& outputFile) 
   }
 
   p.phase2();
-  edgeData.allocate(numEdges);
+  edgeData.create(numEdges);
   for (ReaderGraph::iterator ii = reader.begin(), ei = reader.end(); ii != ei; ++ii) {
     ReaderGNode rsrc = *ii;
     for (ReaderGraph::edge_iterator jj = reader.edge_begin(rsrc),

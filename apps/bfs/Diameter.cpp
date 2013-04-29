@@ -608,29 +608,19 @@ struct GraphLabAlgo {
   }
 };
 
-//#define INLINEDATA
 template<bool UseGraphChi>
 struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
   typedef int Visited;
 
-#ifdef INLINEDATA
-  typedef SNode LNode;
-#else
   struct LNode:  public SNode {
     Visited visited[2];
   };
-#endif
 
   typedef typename boost::mpl::if_c<UseGraphChi,
           Galois::Graph::OCImmutableEdgeGraph<LNode,void>,
           Galois::Graph::LC_CSR_InOutGraph<LNode,void,true> >::type
           Graph;
   typedef typename Graph::GraphNode GNode;
-
-#ifdef INLINEDATA
-  Galois::LargeArray<Visited,false> visited;
-  Galois::LargeArray<Visited,false> nextVisited;
-#endif
 
   void readGraph(Graph& graph) {
     readInOutGraph(graph); 
@@ -643,10 +633,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
     void operator()(GNode n) {
       LNode& data = graph.getData(n, Galois::MethodFlag::NONE);
       data.dist = DIST_INFINITY;
-#ifdef INLINEDATA
-#else
       data.visited[0] = data.visited[1] = 0;
-#endif
     }
   };
 
@@ -655,53 +642,17 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
     int cur;
     int next;
     Dist newDist;
-#ifdef INLINEDATA
-    Galois::LargeArray<Visited,false>* visited;
-    Galois::LargeArray<Visited,false>* nextVisited;
-#endif
-    EdgeOperator(LigraAlgo* s, int c, int n, Dist d): self(s), cur(c), next(n), newDist(d) { 
-#ifdef INLINEDATA
-      if (cur) { visited = &self->visited; nextVisited = &self->nextVisited; }
-      else { visited = &self->nextVisited; nextVisited = &self->visited; }
-#endif
-    }
+    EdgeOperator(LigraAlgo* s, int c, int n, Dist d): self(s), cur(c), next(n), newDist(d) { }
 
     template<typename GTy>
     bool cond(GTy& graph, typename GTy::GraphNode) { return true; }
 
     template<typename GTy>
     bool operator()(GTy& graph, typename GTy::GraphNode src, typename GTy::GraphNode dst, typename GTy::edge_data_reference) {
-#ifdef INLINEDATA
-      size_t sid = graph.idFromNode(src);
-      size_t did = graph.idFromNode(dst);
-      LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
-      Visited toWrite = (*visited)[sid] | (*visited)[did];
-#else
       LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
       LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
       Visited toWrite = sdata.visited[cur] | ddata.visited[cur];
-#endif
 
-#ifdef INLINEDATA
-      if (toWrite != (*visited)[did]) {
-        (*nextVisited)[did] |= toWrite;
-        if (ddata.dist != newDist) {
-          ddata.dist = newDist;
-          return true;
-        }
-      }
-      return false;
-#else
-#if 0
-      if (toWrite != ddata.visited[cur]) {
-        ddata.visited[next] |= toWrite;
-        if (ddata.dist != newDist) {
-          ddata.dist = newDist;
-          return true;
-        }
-      }
-      return false;
-#else
       if (toWrite != ddata.visited[cur]) {
         while (true) {
           Visited old = ddata.visited[next];
@@ -716,8 +667,6 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
           return __sync_bool_compare_and_swap(&ddata.dist, oldDist, newDist);
       }
       return false;
-#endif
-#endif
     }
   };
 
@@ -726,23 +675,11 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
     Graph& graph;
     int cur;
     int next;
-#ifdef INLINEDATA
-    Galois::LargeArray<Visited,false>* visited;
-    Galois::LargeArray<Visited,false>* nextVisited;
-#endif
     Update(LigraAlgo* s, Graph& g, int c, int n): self(s), graph(g), cur(c), next(n) { 
-#ifdef INLINEDATA
-      if (cur) { visited = &self->visited; nextVisited = &self->nextVisited; }
-      else { visited = &self->nextVisited; nextVisited = &self->visited; }
-#endif
     }
     void operator()(size_t id) {
-#ifdef INLINEDATA
-      (*nextVisited)[id] |= (*visited)[id];
-#else
       LNode& data = graph.getData(graph.nodeFromId(id), Galois::MethodFlag::NONE);
       data.visited[next] |= data.visited[cur];
-#endif
     }
   };
 
@@ -751,21 +688,13 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
 
     if (startNode != 0)
       std::cerr << "Warning: Ignoring user-requested start node\n";
-#ifdef INLINEDATA
-    visited.allocate(graph.size());
-    nextVisited.allocate(graph.size());
-#endif
     Dist newDist = 0;
     unsigned sampleSize = std::min(graph.size(), sizeof(Visited) * 8);
     unsigned count = 0;
     for (typename Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
       LNode& data = graph.getData(*ii);
       data.dist = 0;
-#ifdef INLINEDATA
-      visited[graph.idFromNode(*ii)] = (Visited)1 << count;
-#else
       data.visited[1] = (Visited)1 << count;
-#endif
       bags.next().push(graph.idFromNode(*ii), graph.size());
 
       if (++count >= sampleSize)

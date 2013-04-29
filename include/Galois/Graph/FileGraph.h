@@ -126,8 +126,8 @@ public:
    */
   template<typename EdgeTy, typename CompTy>
   void sortEdgesByEdgeData(GraphNode N, const CompTy& comp = std::less<EdgeTy>()) {
-    typedef LargeArrayWrapper<GraphNode> EdgeDst;
-    typedef LargeArrayWrapper<EdgeTy> EdgeData;
+    typedef LargeArray<GraphNode> EdgeDst;
+    typedef LargeArray<EdgeTy> EdgeData;
     typedef EdgeSortIterator<GraphNode,uint64_t,EdgeDst,EdgeData> edge_sort_iterator;
 
     EdgeDst edgeDst(outs, numEdges);
@@ -144,8 +144,8 @@ public:
    */
   template<typename EdgeTy, typename CompTy>
   void sortEdges(GraphNode N, const CompTy& comp) {
-    typedef LargeArrayWrapper<GraphNode> EdgeDst;
-    typedef LargeArrayWrapper<EdgeTy> EdgeData;
+    typedef LargeArray<GraphNode> EdgeDst;
+    typedef LargeArray<EdgeTy> EdgeData;
     typedef EdgeSortIterator<GraphNode,uint64_t,EdgeDst,EdgeData> edge_sort_iterator;
 
     EdgeDst edgeDst(outs, numEdges);
@@ -344,7 +344,7 @@ public:
 template<typename EdgeTy>
 void makeSymmetric(FileGraph& in, FileGraph& out) {
   typedef FileGraph::GraphNode GNode;
-  typedef LargeArray<EdgeTy,boost::is_pod<EdgeTy>::value> EdgeData;
+  typedef LargeArray<EdgeTy> EdgeData;
   typedef typename EdgeData::value_type edge_value_type;
 
   FileGraphWriter g;
@@ -366,7 +366,7 @@ void makeSymmetric(FileGraph& in, FileGraph& out) {
   }
 
   g.phase2();
-  edgeData.allocate(numEdges);
+  edgeData.create(numEdges);
   for (FileGraph::iterator ii = in.begin(), ei = in.end(); ii != ei; ++ii) {
     GNode src = *ii;
     for (FileGraph::edge_iterator jj = in.edge_begin(src), ej = in.edge_end(src); jj != ej; ++jj) {
@@ -403,7 +403,7 @@ void makeSymmetric(FileGraph& in, FileGraph& out) {
 template<typename EdgeTy,typename PTy>
 void permute(FileGraph& in, const PTy& p, FileGraph& out) {
   typedef FileGraph::GraphNode GNode;
-  typedef LargeArray<EdgeTy,boost::is_pod<EdgeTy>::value> EdgeData;
+  typedef LargeArray<EdgeTy> EdgeData;
   typedef typename EdgeData::value_type edge_value_type;
 
   FileGraphWriter g;
@@ -423,7 +423,7 @@ void permute(FileGraph& in, const PTy& p, FileGraph& out) {
   }
 
   g.phase2();
-  edgeData.allocate(numEdges);
+  edgeData.create(numEdges);
   for (FileGraph::iterator ii = in.begin(), ei = in.end(); ii != ei; ++ii) {
     GNode src = *ii;
     for (FileGraph::edge_iterator jj = in.edge_begin(src), ej = in.edge_end(src); jj != ej; ++jj) {

@@ -232,8 +232,8 @@ public:
 
 template<typename NodeTy, typename EdgeTy>
 class OCImmutableEdgeGraph {
-  typedef NodeInfoBase<NodeTy> NodeInfo;
-  typedef LargeArray<NodeInfo,false> NodeData;
+  typedef NodeInfoBase<NodeTy,true> NodeInfo;
+  typedef LargeArray<NodeInfo> NodeData;
 
   NodeData nodeData;
   OCFileGraph outGraph;
@@ -444,7 +444,7 @@ public:
       outGraph.structureFromFile(fname);
       numNodes = outGraph.size();
       numEdges = outGraph.sizeEdges();
-      nodeData.allocate(numNodes);
+      nodeData.create(numNodes);
       inGraph = &outGraph;
       return;
     }
@@ -456,7 +456,7 @@ public:
     inGraphStorage.structureFromFile(transpose);
     numNodes = outGraph.size();
     numEdges = outGraph.sizeEdges();
-    nodeData.allocate(numNodes);
+    nodeData.create(numNodes);
     inGraph = &inGraphStorage;
   }
 };

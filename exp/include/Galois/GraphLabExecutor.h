@@ -44,11 +44,11 @@ private:
 
   Galois::UserContext<WorkItem>* ctx;
   Graph* graph;
-  Galois::LargeArray<int,false>* scoreboard;
+  Galois::LargeArray<int>* scoreboard;
   Galois::InsertBag<GNode>* next;
   Messages* messages;
 
-  Context(Graph* g, Galois::LargeArray<int,false>* s, Galois::InsertBag<GNode>* n, Messages* m):
+  Context(Graph* g, Galois::LargeArray<int>* s, Galois::InsertBag<GNode>* n, Messages* m):
     graph(g), scoreboard(s), next(n), messages(m) { }
 
   Context(Galois::UserContext<WorkItem>* c): ctx(c) { }
@@ -190,9 +190,9 @@ class SyncEngine {
 
   Graph& graph;
   Operator origOp;
-  Galois::LargeArray<Operator,false> ops;
+  Galois::LargeArray<Operator> ops;
   Messages messages;
-  Galois::LargeArray<int,false> scoreboard;
+  Galois::LargeArray<int> scoreboard;
   Galois::InsertBag<GNode> wls[2];
   Galois::Runtime::LL::SimpleLock<true> lock;
 
@@ -335,8 +335,8 @@ class SyncEngine {
 
 public:
   SyncEngine(Graph& g, Operator op): graph(g), origOp(op) {
-    ops.allocate(graph.size());
-    scoreboard.allocate(graph.size());
+    ops.create(graph.size());
+    scoreboard.create(graph.size());
     if (NeedMessages)
       messages.getLocal()->resize(graph.size());
   }

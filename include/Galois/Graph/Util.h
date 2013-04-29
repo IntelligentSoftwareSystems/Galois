@@ -38,6 +38,7 @@
 #include "Galois/Runtime/MethodFlags.h"
 #include "Galois/Runtime/mm/Mem.h"
 
+#include <boost/mpl/if.hpp>
 #include <algorithm>
 
 namespace Galois {
@@ -168,9 +169,12 @@ public:
   void setId(size_t n) { }
 };
 
+//! Empty class for HasLockable optimization
+class NoLockable { };
+
 //! Specializations for void node data
-template<typename NodeTy>
-class NodeInfoBase: public Galois::Runtime::Lockable {
+template<typename NodeTy, bool HasLockable>
+class NodeInfoBase: public boost::mpl::if_c<HasLockable,Galois::Runtime::Lockable,NoLockable>::type {
   NodeTy data;
 public:
   typedef NodeTy& reference;
@@ -183,8 +187,8 @@ public:
   }
 };
 
-template<>
-struct NodeInfoBase<void>: public Galois::Runtime::Lockable {
+template<bool HasLockable>
+struct NodeInfoBase<void, HasLockable>: public boost::mpl::if_c<HasLockable,Galois::Runtime::Lockable,NoLockable>::type {
   typedef void* reference;
   reference getData() { return 0; }
   void destruct() { }
