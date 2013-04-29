@@ -5,6 +5,7 @@ function(makeTest name)
 endfunction()
 
 makeTest(acquire)
+makeTest(bandwidth)
 makeTest(empty-member-lcgraph)
 makeTest(flatmap)
 makeTest(gdeque)
