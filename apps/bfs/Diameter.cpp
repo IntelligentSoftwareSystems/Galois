@@ -75,7 +75,7 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValN(Algo::simple, "simple", "Simple pseudo-peripheral algorithm (default)"),
       clEnumValN(Algo::pickK, "pickK", "Pick K candidates"),
       clEnumValN(Algo::ligra, "ligra", "Use Ligra programming model"),
-      clEnumValN(Algo::ligraChi, "ligraChi", "Using Ligra and GraphChi programming model"),
+      clEnumValN(Algo::ligraChi, "ligraChi", "Use Ligra and GraphChi programming model"),
       clEnumValN(Algo::graphlab, "graphlab", "Use GraphLab programming model"),
       clEnumValEnd), cll::init(Algo::simple));
 

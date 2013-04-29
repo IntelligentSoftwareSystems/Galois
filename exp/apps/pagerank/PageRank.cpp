@@ -65,10 +65,10 @@ static cll::opt<unsigned int> memoryLimit("memoryLimit",
     cll::desc("Memory limit for out-of-core algorithms (in MB)"), cll::init(~0U));
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
-      clEnumValN(Algo::graphlab, "graphlab", "Using GraphLab programming model"),
-      clEnumValN(Algo::graphlabAsync, "graphlabAsync", "Using GraphLab-Asynchronous programming model"),
-      clEnumValN(Algo::ligra, "ligra", "Using Ligra programming model"),
-      clEnumValN(Algo::ligraChi, "ligraChi", "Using Ligra and GraphChi programming model"),
+      clEnumValN(Algo::graphlab, "graphlab", "Use GraphLab programming model"),
+      clEnumValN(Algo::graphlabAsync, "graphlabAsync", "Use GraphLab-Asynchronous programming model"),
+      clEnumValN(Algo::ligra, "ligra", "Use Ligra programming model"),
+      clEnumValN(Algo::ligraChi, "ligraChi", "Use Ligra and GraphChi programming model"),
       clEnumValN(Algo::pull, "pull", "Use precomputed data perform pull-based algorithm"),
       clEnumValN(Algo::serial, "serial", "Compute PageRank in serial"),
       clEnumValEnd), cll::init(Algo::pull));
@@ -352,7 +352,7 @@ struct PullAlgo {
     void setPageRank(unsigned it, float v) { value[(it+1) & 1] = v; }
   };
   typedef Galois::Graph::LC_InlineEdge_Graph<LNode,float,true> Graph;
-  typedef Graph::GraphNode GNode;;
+  typedef Graph::GraphNode GNode;
 
   std::string name() const { return "Pull"; }
 
@@ -543,7 +543,7 @@ static void printTop(Graph& graph, int topn) {
   Top top;
 
   for (GNode src : graph) {
-    node_data_reference& n = graph.getData(src);
+    node_data_reference n = graph.getData(src);
     float value = n.getPageRank();
     Pair key(value, src);
 

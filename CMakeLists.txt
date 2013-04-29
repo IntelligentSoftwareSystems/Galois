@@ -101,9 +101,9 @@ if (CMAKE_COMPILER_IS_GNUCC)
 execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion
                 OUTPUT_VARIABLE GCC_VERSION)
 if (GCC_VERSION VERSION_GREATER 4.6 OR GCC_VERSION VERSION_EQUAL 4.6)
-        message(STATUS "Gcc Version >= 4.6")
+  message(STATUS "GCC Version >= 4.6")
 else()
-	message(FATAL_ERROR "GCC must be 4.6 or higher")
+  message(FATAL_ERROR "GCC must be 4.6 or higher")
 endif()
 endif()
 
