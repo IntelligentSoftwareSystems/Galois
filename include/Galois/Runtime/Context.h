@@ -133,7 +133,7 @@ inline bool shouldLock(const Galois::MethodFlag g) {
   case MethodFlag::CHECK_CONFLICT:
     return true;
   default:
-    GALOIS_ERROR(true, "shouldn't get here");
+    GALOIS_DIE("shouldn't get here");
     return false;
   }
 }

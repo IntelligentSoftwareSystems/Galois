@@ -197,7 +197,7 @@ protected:
       handleBreak(tld);
       return false;
     default:
-      GALOIS_ERROR(true, "unknown conflict type");
+      GALOIS_DIE("unknown conflict type");
     }
     return workHappened;
   }
@@ -219,7 +219,7 @@ protected:
     ThreadLocalData tld(origFunction, loopname);
     if (ForEachTraits<FunctionTy>::NeedsAborts)
       setThreadContext(&tld.cnx);
-    if (false && ForEachTraits<FunctionTy>::NeedsPush && !ForEachTraits<FunctionTy>::NeedsAborts) {
+    if (ForEachTraits<FunctionTy>::NeedsPush && !ForEachTraits<FunctionTy>::NeedsAborts) {
       tld.facing.setFastPushBack(std::bind(&ForEachWork::fastPushBack, std::ref(*this), std::placeholders::_1));
     }
     bool didAnyWork;
