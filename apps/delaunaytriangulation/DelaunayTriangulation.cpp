@@ -33,7 +33,6 @@
 #include "Galois/Bag.h"
 #include "Galois/Statistic.h"
 #include "Galois/Graph/SpatialTree.h"
-#include "Galois/WorkList/WorkListAlt.h"
 #include "Lonestar/BoilerPlate.h"
 #include "llvm/Support/CommandLine.h"
 
@@ -485,7 +484,7 @@ static void writeMesh(const std::string& filename) {
 }
 
 static void generateMesh() {
-  typedef Galois::WorkList::ChunkedAdaptor<false,32> CA;
+  typedef Galois::WorkList::AltChunkedLIFO<32> CA;
   Galois::for_each_local<CA>(ptrPoints, Process());
 }
 

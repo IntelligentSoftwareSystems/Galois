@@ -38,9 +38,6 @@
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
-#include "Galois/WorkList/WorkListAlt.h"
-#include "Galois/WorkList/WorkListDebug.h"
-
 #include <iostream>
 #include <string.h>
 #include <cassert>
@@ -168,11 +165,11 @@ int main(int argc, char** argv) {
   using namespace Galois::WorkList;
   
   typedef LocalQueues<dChunkedLIFO<256>, ChunkedLIFO<256> > BQ;
-  typedef ChunkedAdaptor<false,32> CA;
+  typedef AltChunkedLIFO<32> Chunked;
   
   switch (detAlgo) {
     case nondet: 
-      Galois::for_each_local<CA>(wl, Process<>(), "refine"); break;
+      Galois::for_each_local<Chunked>(wl, Process<>(), "refine"); break;
     case detBase:
       Galois::for_each_det(wl.begin(), wl.end(), Process<>()); break;
     case detPrefix:

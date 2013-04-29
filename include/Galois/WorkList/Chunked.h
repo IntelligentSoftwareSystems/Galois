@@ -53,7 +53,7 @@ struct squeues<false,TQ> {
 };
 
 //! Common functionality to all chunked worklists
-template<typename T, template<typename, bool> class QT, bool distributed = false, bool isStack = false, int chunksize=64, bool concurrent=true>
+template<typename T, template<typename, bool> class QT, bool distributed, bool isStack, int chunksize, bool concurrent>
 class ChunkedMaster : private boost::noncopyable {
   class Chunk : public FixedSizeRing<T, chunksize>, public QT<Chunk, concurrent>::ListNode {};
 
@@ -190,7 +190,7 @@ public:
 };
 
 /**
- * Chunked FIFO. A FIFO of chunks of some fixed size.
+ * Chunked FIFO. A global FIFO of chunks of some fixed size.
  *
  * @tparam chunksize chunk size
  */
@@ -199,7 +199,7 @@ class ChunkedFIFO : public ChunkedMaster<T, ConExtLinkedQueue, false, false, chu
 GALOIS_WLCOMPILECHECK(ChunkedFIFO)
 
 /**
- * Chunked LIFO. A LIFO of chunks of some fixed size.
+ * Chunked LIFO. A global LIFO of chunks of some fixed size.
  *
  * @tparam chunksize chunk size
  */
@@ -224,6 +224,16 @@ GALOIS_WLCOMPILECHECK(dChunkedFIFO)
 template<int chunksize=64, typename T = int, bool concurrent=true>
 class dChunkedLIFO : public ChunkedMaster<T, ConExtLinkedStack, true, true, chunksize, concurrent> {};
 GALOIS_WLCOMPILECHECK(dChunkedLIFO)
+
+/**
+ * Distributed chunked bag. A scalable and resource-efficient policy when you
+ * are agnostic to the particular scheduling order.
+ *
+ * @tparam chunksize chunk size
+ */
+template<int chunksize=64, typename T = int, bool concurrent=true>
+class dChunkedBag : public ChunkedMaster<T, ConExtLinkedQueue, true, true, chunksize, concurrent> {};
+GALOIS_WLCOMPILECHECK(dChunkedBag)
 
 
 } // end namespace WorkList

@@ -49,8 +49,12 @@ namespace WorkList {
  * \endcode
  *
  * @tparam Indexer Indexer class
+ * @tparam ContainerTy Scheduler for each bucket
+ * @tparam CheckPeriod Check for higher priority work every 2^CheckPeriod
+ *                     iterations
+ * @tparam BSP Use back-scan prevention
  */
-template<class Indexer = DummyIndexer<int>, typename ContainerTy = FIFO<>, bool BSP=true, typename T = int, typename IndexTy = int, bool concurrent = true>
+template<class Indexer = DummyIndexer<int>, typename ContainerTy = FIFO<>, unsigned CheckPeriod=0, bool BSP=true, typename T = int, typename IndexTy = int, bool concurrent = true>
 class OrderedByIntegerMetric : private boost::noncopyable {
   typedef typename ContainerTy::template rethread<concurrent> CTy;
 
@@ -63,11 +67,12 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     IndexTy scanStart;
     CTy* current;
     unsigned int lastMasterVersion;
+    unsigned int numPops;
 
     perItem() :
       curIndex(std::numeric_limits<IndexTy>::min()), 
       scanStart(std::numeric_limits<IndexTy>::min()),
-      current(0), lastMasterVersion(0) { }
+      current(0), lastMasterVersion(0), numPops(0) { }
   };
 
   std::deque<std::pair<IndexTy, CTy*> > masterLog;
@@ -93,8 +98,8 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     return false;
   }
 
-  GALOIS_ATTRIBUTE_NOINLINE boost::optional<T> _slow_pop(perItem& p) {
-    //Failed, find minimum bin
+  GALOIS_ATTRIBUTE_NOINLINE
+  bool better_bucket(perItem& p) {
     updateLocal(p);
     unsigned myID = Runtime::LL::getTID();
     bool localLeader = Runtime::LL::isPackageLeaderForSelf(myID);
@@ -109,8 +114,27 @@ class OrderedByIntegerMetric : private boost::noncopyable {
 	msS = std::min(msS, current.getRemote(Runtime::LL::getLeaderForThread(myID))->scanStart);
     }
 
-    for (auto ii = p.local.lower_bound(msS),
-	   ee = p.local.end(); ii != ee; ++ii) {
+    return p.curIndex != msS;
+  }
+
+  GALOIS_ATTRIBUTE_NOINLINE
+  boost::optional<T> _slow_pop(perItem& p) {
+    //Failed, find minimum bin
+    updateLocal(p);
+    unsigned myID = Runtime::LL::getTID();
+    bool localLeader = Runtime::LL::isPackageLeaderForSelf(myID);
+
+    IndexTy msS = std::numeric_limits<IndexTy>::min();
+    if (BSP) {
+      msS = p.scanStart;
+      if (localLeader)
+	for (unsigned i = 0; i < Runtime::activeThreads; ++i)
+	  msS = std::min(msS, current.getRemote(i)->scanStart);
+      else
+	msS = std::min(msS, current.getRemote(Runtime::LL::getLeaderForThread(myID))->scanStart);
+    }
+
+    for (auto ii = p.local.lower_bound(msS), ee = p.local.end(); ii != ee; ++ii) {
       boost::optional<T> retval;
       if ((retval = ii->second->pop())) {
 	p.current = ii->second;
@@ -122,7 +146,8 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     return boost::optional<value_type>();
   }
 
-  GALOIS_ATTRIBUTE_NOINLINE CTy* _slow_updateLocalOrCreate(perItem& p, IndexTy i) {
+  GALOIS_ATTRIBUTE_NOINLINE
+  CTy* _slow_updateLocalOrCreate(perItem& p, IndexTy i) {
     //update local until we find it or we get the write lock
     do {
       CTy* lC;
@@ -154,9 +179,9 @@ class OrderedByIntegerMetric : private boost::noncopyable {
 
  public:
   template<bool newconcurrent>
-    using rethread = OrderedByIntegerMetric<Indexer,ContainerTy,BSP,T,IndexTy,newconcurrent>;
+    using rethread = OrderedByIntegerMetric<Indexer,ContainerTy,CheckPeriod,BSP,T,IndexTy,newconcurrent>;
   template<typename Tnew>
-    using retype = OrderedByIntegerMetric<Indexer,typename ContainerTy::template retype<Tnew>,BSP,Tnew,decltype(Indexer()(Tnew())),concurrent>;
+    using retype = OrderedByIntegerMetric<Indexer,typename ContainerTy::template retype<Tnew>,CheckPeriod,BSP,Tnew,decltype(Indexer()(Tnew())),concurrent>;
 
   typedef T value_type;
 
@@ -207,6 +232,9 @@ class OrderedByIntegerMetric : private boost::noncopyable {
     //Find a successful pop
     perItem& p = *current.getLocal();
     CTy* C = p.current;
+    if (CheckPeriod && (p.numPops++ & ((1<<CheckPeriod)-1)) == 0 && better_bucket(p))
+      return _slow_pop(p);
+
     boost::optional<value_type> retval;
     if (C && (retval = C->pop()))
       return retval;
