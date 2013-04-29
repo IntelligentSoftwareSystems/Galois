@@ -58,27 +58,27 @@ bool outputGraph(const char* file, Graph& G) {
   mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
   int fd = open(file, O_WRONLY | O_CREAT |O_TRUNC, mode);
   if (fd == -1) {
-    GALOIS_SYS_ERROR(true, "failed opening %s", file);
+    GALOIS_SYS_DIE("failed opening ", file);
   }
 
   //version
   uint64_t version = 1;
   retval = write(fd, &version, sizeof(uint64_t));
   if (retval == -1 || retval != sizeof(uint64_t)) {
-    GALOIS_SYS_ERROR(true, "failed writing to %s", file);
+    GALOIS_SYS_DIE("failed writing to ", file);
   }
 
   uint64_t sizeof_edge_data = G.sizeOfEdgeData();
   retval = write(fd, &sizeof_edge_data, sizeof(uint64_t));
   if (retval == -1 || retval != sizeof(uint64_t)) {
-    GALOIS_SYS_ERROR(true, "failed writing to %s", file);
+    GALOIS_SYS_DIE("failed writing to ", file);
   }
 
   //num nodes
   uint64_t num_nodes = G.size();
   retval = write(fd, &num_nodes, sizeof(uint64_t));
   if (retval == -1 || retval != sizeof(uint64_t)) {
-    GALOIS_SYS_ERROR(true, "failed writing to %s", file);
+    GALOIS_SYS_DIE("failed writing to ", file);
   }
 
   typedef typename Graph::GraphNode GNode;
@@ -105,7 +105,7 @@ bool outputGraph(const char* file, Graph& G) {
   }
   retval = write(fd, &offset, sizeof(uint64_t));
   if (retval == -1 || retval != sizeof(uint64_t)) {
-    GALOIS_SYS_ERROR(true, "failed writing to %s", file);
+    GALOIS_SYS_DIE("failed writing to ", file);
   }
 
   //outIdx
@@ -115,9 +115,9 @@ bool outputGraph(const char* file, Graph& G) {
   while (total) {
     written = write(fd, ptr, total);
     if (written == -1) {
-      GALOIS_SYS_ERROR(true, "failed writing to %s", file);
+      GALOIS_SYS_DIE("failed writing to ", file);
     } else if (written == 0) {
-      GALOIS_ERROR(true, "ran out of space writing to %s", file);
+      GALOIS_DIE("ran out of space writing to ", file);
     }
     total -= written;
     ptr += written;
@@ -132,7 +132,7 @@ bool outputGraph(const char* file, Graph& G) {
       uint32_t id = node_ids[G.getEdgeDst(jj)];
       retval = write(fd, &id, sizeof(uint32_t));
       if (retval == -1 || retval != sizeof(uint32_t)) {
-        GALOIS_SYS_ERROR(true, "failed writing to %s", file);
+        GALOIS_SYS_DIE("failed writing to ", file);
       }
     }
   }
@@ -140,7 +140,7 @@ bool outputGraph(const char* file, Graph& G) {
     uint32_t padding = 0;
     retval = write(fd, &padding, sizeof(uint32_t));
     if (retval == -1 || retval != sizeof(uint32_t)) {
-      GALOIS_SYS_ERROR(true, "failed writing to %s", file);
+      GALOIS_SYS_DIE("failed writing to ", file);
     }
   }
 
@@ -153,7 +153,7 @@ bool outputGraph(const char* file, Graph& G) {
         void *b = &G.getEdgeData(jj);
         retval = write(fd, b, sizeof_edge_data);
         if (retval == -1 || retval != (int) sizeof_edge_data) {
-          GALOIS_SYS_ERROR(true, "failed writing to %s", file);
+          GALOIS_SYS_DIE("failed writing to ", file);
         }
       }
     }

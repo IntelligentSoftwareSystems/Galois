@@ -99,7 +99,7 @@ void* allocFromOS() {
   
   allocLock.unlock();
   if (!ptr || ptr == MAP_FAILED) {
-    GALOIS_SYS_ERROR(true, "Out of Memory");
+    GALOIS_SYS_DIE("Out of Memory");
   }
 
   //protect the tracking structures
@@ -149,4 +149,32 @@ void Galois::Runtime::MM::pagePreAlloc(int numPages) {
 
 unsigned Galois::Runtime::MM::pageAllocInfo() {
   return getPAState().num;
+}
+
+void* Galois::Runtime::MM::largeAlloc(size_t len, bool preFault) {
+  size_t size = (len + pageSize - 1) & (~(size_t)(pageSize - 1));
+  void * ptr = 0;
+
+  allocLock.lock();
+#ifdef MAP_HUGETLB
+  ptr = mmap(0, size, _PROT, _MAP_HUGE, -1, 0);
+#endif
+#ifdef MAP_POPULATE
+  if (preFault && (!ptr || ptr == MAP_FAILED))
+    ptr = mmap(0, size, _PROT, _MAP_POP, -1, 0);
+#endif
+  if (!ptr || ptr == MAP_FAILED)
+    ptr = mmap(0, size, _PROT, _MAP_BASE, -1, 0);
+  allocLock.unlock();
+
+  if (!ptr || ptr == MAP_FAILED)
+    GALOIS_SYS_DIE("Out of Memory");
+  return ptr;
+}
+
+void Galois::Runtime::MM::largeFree(void* m, size_t len) {
+  size_t size = (len + pageSize - 1) & (~(size_t)(pageSize - 1));
+  allocLock.lock();
+  munmap(m, size);
+  allocLock.unlock();
 }

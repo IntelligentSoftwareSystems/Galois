@@ -60,7 +60,7 @@ void OCFileGraph::Block::unload() {
     return;
 
   if (munmap(m_mapping, m_length) != 0) {
-    GALOIS_SYS_ERROR(true, "failed unallocating");
+    GALOIS_SYS_DIE("failed unallocating");
   }
   m_mapping = 0;
 }
@@ -92,7 +92,7 @@ void OCFileGraph::Block::load(int fd, off64_t offset, size_t begin, size_t len, 
   m_length = len * sizeof_data + conf.pagesize; // account for round off due to alignment
   m_mapping = mmap64(0, m_length, PROT_READ, _MAP_BASE, fd, aligned);
   if (m_mapping == MAP_FAILED) {
-    GALOIS_SYS_ERROR(true, "failed allocating %d", fd);
+    GALOIS_SYS_DIE("failed allocating ", fd);
   }
 
   m_data = reinterpret_cast<char*>(m_mapping);
@@ -120,7 +120,7 @@ void OCFileGraph::load(segment_type& s, edge_iterator begin, edge_iterator end, 
 static void readHeader(int fd, uint64_t& numNodes, uint64_t& numEdges) {
   void* m = mmap(0, 4 * sizeof(uint64_t), PROT_READ, MAP_PRIVATE, fd, 0);
   if (m == MAP_FAILED) {
-    GALOIS_SYS_ERROR(true, "failed reading %d", fd);
+    GALOIS_SYS_DIE("failed reading ", fd);
   }
 
   uint64_t* ptr = reinterpret_cast<uint64_t*>(m);
@@ -129,14 +129,14 @@ static void readHeader(int fd, uint64_t& numNodes, uint64_t& numEdges) {
   numEdges = ptr[3];
 
   if (munmap(m, 4 * sizeof(uint64_t))) {
-    GALOIS_SYS_ERROR(true, "failed reading %d", fd);
+    GALOIS_SYS_DIE("failed reading ", fd);
   }
 }
 
 void OCFileGraph::structureFromFile(const std::string& filename) {
   masterFD = open(filename.c_str(), O_RDONLY);
   if (masterFD == -1) {
-    GALOIS_SYS_ERROR(true, "failed opening %s", filename.c_str());
+    GALOIS_SYS_DIE("failed opening ", filename);
   }
   
   readHeader(masterFD, numNodes, numEdges);
@@ -147,7 +147,7 @@ void OCFileGraph::structureFromFile(const std::string& filename) {
 #endif
   masterMapping = mmap(0, masterLength, PROT_READ, _MAP_BASE, masterFD, 0);
   if (masterMapping == MAP_FAILED) {
-    GALOIS_SYS_ERROR(true, "failed reading %s", filename.c_str());
+    GALOIS_SYS_DIE("failed reading ", filename);
   }
 
   outIdx = reinterpret_cast<uint64_t*>(masterMapping);

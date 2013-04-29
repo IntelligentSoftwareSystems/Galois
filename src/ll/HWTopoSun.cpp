@@ -83,6 +83,10 @@ bool Galois::Runtime::LL::bindThreadToProcessor(int id) {
   return sunBindToProcessor(A.procmap[id]);
 }
 
+unsigned Galois::Runtime::LL::getProcessorForThread(int id) {
+  return A.procmap[id];
+}
+
 unsigned Galois::Runtime::LL::getMaxThreads() {
   return A.numThreads;
 }

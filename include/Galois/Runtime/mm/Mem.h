@@ -52,11 +52,20 @@ void  pageFree(void*);
 unsigned pageAllocInfo();
 void pagePreAlloc(int numpages);
 
-void* largeInterleavedAlloc(size_t bytes);
+/**
+ * Allocates memory interleaved across NUMA nodes. 
+ * 
+ * If full, allocate across all NUMA nodes; otherwise,
+ * allocate across NUMA nodes corresponding to active
+ * threads.
+ */
+void* largeInterleavedAlloc(size_t bytes, bool full = true);
 void  largeInterleavedFree(void* mem, size_t bytes);
 
-void* largeAlloc(size_t bytes);
+void* largeAlloc(size_t bytes, bool preFault = true);
 void  largeFree(void* mem, size_t bytes);
+
+void printInterleavedStats();
 
 //! Per-thread heaps using Galois thread aware construct
 template<class LocalHeap>

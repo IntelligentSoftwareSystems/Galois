@@ -100,7 +100,7 @@ class InEdges<Graph,true> {
 } // end namespace
 
 //! Local computation graph (i.e., graph structure does not change)
-template<typename NodeTy, typename EdgeTy, typename _IntrusiveId=void>
+template<typename NodeTy, typename EdgeTy, typename IntrusiveIdTy=void>
 class LC_Linear_Graph: boost::noncopyable {
   template<typename Graph,bool HasPointerData>
     friend class Linear_InOutGraphImpl::InEdges;
@@ -109,7 +109,7 @@ protected:
   typedef EdgeInfoBase<NodeInfo*,EdgeTy> EdgeInfo;
   typedef LargeArray<NodeInfo*,true> Nodes;
 
-  struct NodeInfo : public NodeInfoBase<NodeTy>, public IntrusiveId<_IntrusiveId> {
+  struct NodeInfo : public NodeInfoBase<NodeTy>, public IntrusiveId<IntrusiveIdTy> {
     int numEdges;
 
     EdgeInfo* edgeBegin() {
@@ -363,9 +363,9 @@ public:
 
   void structureFromGraph(FileGraph& graph, FileGraph& transpose, typename boost::enable_if_c<CopyInEdgeData>::type* dummy = 0) {
     if (graph.size() != transpose.size()) {
-      GALOIS_ERROR(true, "number of nodes in graph and its transpose do not match");
+      GALOIS_DIE("number of nodes in graph and its transpose do not match");
     } else if (graph.sizeEdges() != transpose.sizeEdges()) {
-      GALOIS_ERROR(true, "number of edges in graph and its transpose do not match");
+      GALOIS_DIE("number of edges in graph and its transpose do not match");
     }
 
     Super::structureFromGraph(graph);

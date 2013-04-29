@@ -91,7 +91,7 @@ void FileGraph::structureFromMem(void* mem, size_t len, bool clone) {
     
     void* m = mmap(0, masterLength, PROT_READ | PROT_WRITE, _MAP_BASE, -1, 0);
     if (m == MAP_FAILED) {
-      GALOIS_SYS_ERROR(true, "failed copying graph");
+      GALOIS_SYS_DIE("failed copying graph");
     }
     memcpy(m, mem, len);
     parse(m);
@@ -112,7 +112,7 @@ void* FileGraph::structureFromGraph(FileGraph& g, size_t sizeof_edge_data) {
 #endif
   void* m = mmap(0, len, PROT_READ | PROT_WRITE, _MAP_BASE, -1, 0);
   if (m == MAP_FAILED) {
-    GALOIS_SYS_ERROR(true, "failed copying graph");
+    GALOIS_SYS_DIE("failed copying graph");
   }
   memcpy(m, g.masterMapping, common);
   uint64_t* fptr = (uint64_t*)m;
@@ -144,7 +144,7 @@ void* FileGraph::structureFromArrays(uint64_t* out_idx, uint64_t num_nodes,
   char* t = (char*) mmap(0, nBytes, PROT_READ | PROT_WRITE, _MAP_BASE, -1, 0);
   if (t == MAP_FAILED) {
     t = 0;
-    GALOIS_SYS_ERROR(true, "failed allocating graph");
+    GALOIS_SYS_DIE("failed allocating graph");
   }
   char* base = t;
   memcpy(t, &version, sizeof(version));
@@ -169,13 +169,13 @@ void* FileGraph::structureFromArrays(uint64_t* out_idx, uint64_t num_nodes,
 void FileGraph::structureFromFile(const std::string& filename) {
   masterFD = open(filename.c_str(), O_RDONLY);
   if (masterFD == -1) {
-    GALOIS_SYS_ERROR(true, "failed opening %s", filename.c_str());
+    GALOIS_SYS_DIE("failed opening ", filename);
   }
 
   struct stat buf;
   int f = fstat(masterFD, &buf);
   if (f == -1) {
-    GALOIS_SYS_ERROR(true, "failed reading %s", filename.c_str());
+    GALOIS_SYS_DIE("failed reading ", filename);
   }
   masterLength = buf.st_size;
 
@@ -187,7 +187,7 @@ void FileGraph::structureFromFile(const std::string& filename) {
   void* m = mmap(0, masterLength, PROT_READ, _MAP_BASE, masterFD, 0);
   if (m == MAP_FAILED) {
     m = 0;
-    GALOIS_SYS_ERROR(true, "failed reading %s", filename.c_str());
+    GALOIS_SYS_DIE("failed reading ", filename);
   }
   parse(m);
   masterMapping = m;
@@ -204,9 +204,9 @@ void FileGraph::structureToFile(const std::string& file) {
   while (total) {
     retval = write(fd, ptr, total);
     if (retval == -1) {
-      GALOIS_SYS_ERROR(true, "failed writing to %s", file.c_str());
+      GALOIS_SYS_DIE("failed writing to ", file);
     } else if (retval == 0) {
-      GALOIS_ERROR(true, "ran out of space writing to %s", file.c_str());
+      GALOIS_DIE("ran out of space writing to ", file);
     }
     total -= retval;
     ptr += retval;

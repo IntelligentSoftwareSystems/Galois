@@ -1252,9 +1252,8 @@ public:
   Executor(const OptionsTy& o, const char* ln):
     origOptions(o), mergeManager(o), loopname(ln), barrier(getSystemBarrier())
   { 
-    if (OptionsTy::needsBreak && !has_deterministic_break<typename OptionsTy::Function1Ty>::value) {
-      GALOIS_ERROR(true, "need to use break function to break loop");
-    }
+    static_assert(!OptionsTy::needsBreak || has_deterministic_break<typename OptionsTy::Function1Ty>::value,
+        "need to use break function to break loop");
   }
 
   template<typename RangeTy>

@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -98,31 +98,17 @@ void Galois::Runtime::LL::gWarnStr(const std::string& s) {
   IOLock.unlock();
 }
 
-void Galois::Runtime::LL::gError(bool doabort, const char* filename, int lineno, const char* format, ...) {
+void Galois::Runtime::LL::gErrorStr(const char* filename, int lineno, const std::string& s) {
   IOLock.lock();
-  va_list ap;
-  va_start(ap, format);
-  fprintf(stderr, "ERROR: %s:%d ", filename, lineno);
-  vfprintf(stderr, format, ap);
-  fprintf(stderr, "\n");
-  va_end(ap);
+  std::cerr << "ERROR: " << filename << ":" << lineno << " " << s << "\n";
   IOLock.unlock();
-  if (doabort)
-    abort();
 }
 
-void Galois::Runtime::LL::gSysError(bool doabort, const char* filename, int lineno, const char* format, ...) {
+void Galois::Runtime::LL::gSysErrorStr(const char* filename, int lineno, int err, const std::string& s) {
   int err_saved = errno;
   IOLock.lock();
-  va_list ap;
-  va_start(ap, format);
-  fprintf(stderr, "ERROR: %s:%d: %s: ", filename, lineno, strerror(err_saved));
-  vfprintf(stderr, format, ap);
-  fprintf(stderr, "\n");
-  va_end(ap);
+  std::cerr << "ERROR: " << filename << ":" << lineno << ": " << strerror(err) << ": " << s << "\n";
   IOLock.unlock();
-  if (doabort)
-    abort();
 }
 
 void Galois::Runtime::LL::gFlush() {

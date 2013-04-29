@@ -71,14 +71,10 @@ static bool linuxBindToProcessor(int proc) {
   
   /* sched_setaffinity returns 0 in success */
   if( sched_setaffinity( 0, sizeof(mask), &mask ) == -1 ) {
-    gWarn("Could not set CPU affinity for thread ", proc, "(", strerror(errno),")");
+    gWarn("Could not set CPU affinity for thread ", proc, "(", strerror(errno), ")");
     return false;
   }
   return true;
-}
-
-static void openFailed(const char* s) {
-  GALOIS_SYS_ERROR(true, "failed opening %s", s);
 }
 
 static std::vector<cpuinfo> parseCPUInfo() {
@@ -89,7 +85,7 @@ static std::vector<cpuinfo> parseCPUInfo() {
 
   FILE* f = fopen(sProcInfo, "r");
   if (!f) {
-    openFailed(sProcInfo);
+    GALOIS_SYS_DIE("failed opening ", sProcInfo);
     return vals; //Shouldn't get here
   }
 
@@ -160,7 +156,7 @@ std::vector<int> parseCPUSet() {
   if (!f) {
     free(path2);
     free(path);
-    openFailed(path2);
+    GALOIS_SYS_DIE("failed opening ", path2);
     return vals; //Shouldn't get here
   }
 
@@ -393,6 +389,10 @@ AutoLinuxPolicy& getPolicy() {
 bool Galois::Runtime::LL::bindThreadToProcessor(int id) {
   assert(id < (int)getPolicy().virtmap.size());
   return linuxBindToProcessor(getPolicy().virtmap[id]);
+}
+
+unsigned Galois::Runtime::LL::getProcessorForThread(int id) {
+  return getPolicy().virtmap[id];
 }
 
 unsigned Galois::Runtime::LL::getMaxThreads() {

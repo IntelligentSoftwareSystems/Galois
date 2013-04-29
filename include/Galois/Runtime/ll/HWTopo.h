@@ -35,6 +35,8 @@ namespace LL {
 
 //! Bind thread specified by id to the correct OS thread
 bool bindThreadToProcessor(int galois_thread_id);
+//! Get physical processor id from virtual Galois thread id
+unsigned getProcessorForThread(int galois_thread_id);
 //! Get number of threads supported
 unsigned getMaxThreads();
 //! Get number of cores supported
