@@ -224,7 +224,9 @@ struct create_nodes {
 static void recvRemoteNode_landing_pad(Distributed::RecvBuffer& buf) {
   DGNode n;
   unsigned num;
-  Distributed::gDeserialize(buf,num,n);
+  uint32_t host;
+  Distributed::gDeserialize(buf,host,num,n);
+        printf("\t host %u - Receiving node %u from %u\n", networkHostID, num, host);
   slock.lock();
   rlookup[num] = n;
   slock.unlock();
@@ -236,7 +238,7 @@ static void getRemoteNode_landing_pad(Distributed::RecvBuffer& buf) {
   Distributed::gDeserialize(buf,host,num);
   Distributed::SendBuffer b;
   slock.lock();
-  Distributed::gSerialize(b, num, rlookup[num]);
+  Distributed::gSerialize(b, networkHostID, num, rlookup[num]);
   slock.unlock();
   Distributed::getSystemNetworkInterface().send(host,recvRemoteNode_landing_pad,b);
 }
@@ -279,13 +281,13 @@ scount++;
 count++;
       }
       else {
-        printf("host %u - Edge to external node\n", networkHostID);
         uint32_t host = num/block;
         if (host == networkHostNum) --host;
         if (host > networkHostNum) {
           printf("Wrong host ID: %u\n", host);
           abort();
         }
+        printf("host %u - Requesting node %u from %u\n", networkHostID, num, host);
         Distributed::SendBuffer b;
         Distributed::gSerialize(b, networkHostID, num);
         Distributed::getSystemNetworkInterface().send(host,getRemoteNode_landing_pad,b);
