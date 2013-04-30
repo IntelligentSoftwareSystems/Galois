@@ -134,9 +134,9 @@ void gSerialize(SerializeBuffer& buf, const std::deque<T, Alloc>& data) {
     gSerialize(buf,*ii);
 }
 
-template<typename T>
-void gSerialize(SerializeBuffer& buf, const Galois::gdeque<T>& data) {
-  typename gdeque<T>::size_type size;
+template<typename T, unsigned CS>
+void gSerialize(SerializeBuffer& buf, const Galois::gdeque<T,CS>& data) {
+  typename gdeque<T,CS>::size_type size;
   size = data.size();
   gSerialize(buf,size);
   for (auto ii = data.begin(), ee = data.end(); ii != ee; ++ii)
@@ -237,9 +237,9 @@ void gDeserialize(DeSerializeBuffer& buf, std::vector<T, Alloc>& data) {
     gDeserialize(buf,data[x]);
 }
 
-template<typename T>
-void gDeserialize(DeSerializeBuffer& buf, Galois::gdeque<T>& data) {
-  typename gdeque<T>::size_type size;
+template<typename T, unsigned CS>
+void gDeserialize(DeSerializeBuffer& buf, Galois::gdeque<T,CS>& data) {
+  typename gdeque<T,CS>::size_type size;
   gDeserialize(buf,size);
   data.clear();
   for (unsigned x = 0; x < size; ++x) {
