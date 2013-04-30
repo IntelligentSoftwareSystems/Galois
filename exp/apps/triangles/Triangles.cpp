@@ -182,8 +182,8 @@ struct NodeIteratorAlgo {
   };
 
   void operator()(Graphp g) { 
-    Galois::for_each_local(g, Process(this,g));
-    std::cout << "NumTriangles: " << numTriangles.reduce() << "\n";
+    Galois::for_each_local(g, Process(this,g), "process");
+ // std::cout << "NumTriangles: " << numTriangles.reduce() << "\n";
   }
 };
 
