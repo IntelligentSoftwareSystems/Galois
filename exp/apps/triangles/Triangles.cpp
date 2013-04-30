@@ -303,7 +303,7 @@ printf ("host: %u done creating local edges\n", networkHostID);
     lsize = rlookup.size();
     slock.unlock();
     if (lsize > rcount) {
-      printf("ERROR in incoming objects count %lu host ID: %u\n", lsize, networkHostID);
+      printf("ERROR in incoming objects count is %lu only %u requested host ID: %u\n", lsize, rcount, networkHostID);
       abort();
     }
   } while(rcount != lsize);
