@@ -142,12 +142,13 @@ struct GreaterThanOrEqual {
 struct NodeIteratorAlgo {
   Galois::GAccumulator<size_t> numTriangles;
   
-  struct Process {
+  struct Process : public Galois::Runtime::Lockable {
     Graphp g;
     NodeIteratorAlgo* self;
+    Process() { }
     Process(NodeIteratorAlgo* s,Graphp _g): g(_g), self(s) { }
 
-    void operator()(const DGNode& n, Galois::UserContext<GNode>&) { (*this)(n); }
+    void operator()(const DGNode& n, Galois::UserContext<DGNode>&) { (*this)(n); }
     void operator()(const DGNode& n) {
       // Partition neighbors
       // [first, ea) [n] [bb, last)
@@ -169,10 +170,19 @@ struct NodeIteratorAlgo {
         }
       }
     }
+
+    // serialization functions
+    typedef int tt_has_serialize;
+    void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+      gSerialize(s,g);
+    }
+    void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+      gDeserialize(s,g);
+    }
   };
 
   void operator()(Graphp g) { 
-    Galois::do_all_local(g, Process(this,g));
+    Galois::for_each_local(g, Process(this,g));
     std::cout << "NumTriangles: " << numTriangles.reduce() << "\n";
   }
 };

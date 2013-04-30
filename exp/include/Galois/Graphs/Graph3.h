@@ -174,7 +174,7 @@ public:
 template<typename NHTy, typename EdgeDataTy>
 class GraphNodeEdges<NHTy, EdgeDataTy, EdgeDirection::Out> {
   typedef Edge<NHTy, EdgeDataTy> EdgeTy;
-  typedef gdeque<EdgeTy> EdgeListTy;
+  typedef gdeque<EdgeTy,4> EdgeListTy;
 
   EdgeListTy edges;
 
@@ -225,7 +225,7 @@ class GraphNodeEdges<NHTy, EdgeDataTy, EdgeDirection::InOut> {
 template<typename NHTy>
 class GraphNodeEdges<NHTy, void, EdgeDirection::Un> {
   typedef Edge<NHTy, void> EdgeTy;
-  typedef gdeque<EdgeTy> EdgeListTy;
+  typedef gdeque<EdgeTy,4> EdgeListTy;
 
   EdgeListTy edges;
 
