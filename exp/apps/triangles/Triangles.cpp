@@ -109,21 +109,21 @@ Iterator lowerBound(Iterator first, Iterator last, Compare comp) {
  */
 template<typename G>
 struct LessThan {
-  G& g;
-  typename G::GraphNode n;
-  LessThan(G& g, typename G::GraphNode n): g(g), n(n) { }
+  Graphp& g;
+  DGNode n;
+  LessThan(Graphp& g, DGNode n): g(g), n(n) { }
   bool operator()(typename G::edge_iterator it) {
-    return g.getEdgeDst(it) < n;
+    return g->getEdgeDst(it) < n;
   }
 };
 
 template<typename G>
 struct GreaterThanOrEqual {
-  G& g;
-  typename G::GraphNode n;
-  GreaterThanOrEqual(G& g, typename G::GraphNode n): g(g), n(n) { }
+  Graphp& g;
+  DGNode n;
+  GreaterThanOrEqual(Graphp& g, DGNode n): g(g), n(n) { }
   bool operator()(typename G::edge_iterator it) {
-    return !(n < g.getEdgeDst(it));
+    return !(n < g->getEdgeDst(it));
   }
 };
 
@@ -143,26 +143,27 @@ struct NodeIteratorAlgo {
   Galois::GAccumulator<size_t> numTriangles;
   
   struct Process {
+    Graphp g;
     NodeIteratorAlgo* self;
-    Process(NodeIteratorAlgo* s): self(s) { }
+    Process(NodeIteratorAlgo* s,Graphp _g): g(_g), self(s) { }
 
-    void operator()(const GNode& n, Galois::UserContext<GNode>&) { (*this)(n); }
-    void operator()(const GNode& n) {
+    void operator()(const DGNode& n, Galois::UserContext<GNode>&) { (*this)(n); }
+    void operator()(const DGNode& n) {
       // Partition neighbors
       // [first, ea) [n] [bb, last)
-      Graph::edge_iterator first = graph.edge_begin(n, Galois::MethodFlag::NONE);
-      Graph::edge_iterator last = graph.edge_end(n, Galois::MethodFlag::NONE);
-      Graph::edge_iterator ea = lowerBound(first, last, LessThan<Graph>(graph, n));
-      Graph::edge_iterator bb = lowerBound(first, last, GreaterThanOrEqual<Graph>(graph, n));
+      DGraph::edge_iterator first = g->edge_begin(n);
+      DGraph::edge_iterator last = g->edge_end(n);
+      DGraph::edge_iterator ea = lowerBound(first, last, LessThan<DGraph>(g, n));
+      DGraph::edge_iterator bb = lowerBound(first, last, GreaterThanOrEqual<DGraph>(g, n));
 
       for (; bb != last; ++bb) {
-        GNode B = graph.getEdgeDst(bb);
+        DGNode B = g->getEdgeDst(bb);
         for (auto aa = first; aa != ea; ++aa) {
-          GNode A = graph.getEdgeDst(aa);
-          Graph::edge_iterator vv = graph.edge_begin(A, Galois::MethodFlag::NONE);
-          Graph::edge_iterator ev = graph.edge_end(A, Galois::MethodFlag::NONE);
-          Graph::edge_iterator it = lowerBound(vv, ev, LessThan<Graph>(graph, B));
-          if (it != ev && graph.getEdgeDst(it) == B) {
+          DGNode A = g->getEdgeDst(aa);
+          DGraph::edge_iterator vv = g->edge_begin(A);
+          DGraph::edge_iterator ev = g->edge_end(A);
+          DGraph::edge_iterator it = lowerBound(vv, ev, LessThan<DGraph>(g, B));
+          if (it != ev && g->getEdgeDst(it) == B) {
             self->numTriangles += 1;
           }
         }
@@ -170,8 +171,8 @@ struct NodeIteratorAlgo {
     }
   };
 
-  void operator()() { 
-    Galois::do_all_local(&graph, Process(this));
+  void operator()(Graphp g) { 
+    Galois::do_all_local(g, Process(this,g));
     std::cout << "NumTriangles: " << numTriangles.reduce() << "\n";
   }
 };
@@ -187,67 +188,89 @@ void run() {
 }
 
 using namespace Galois::Runtime;
+using namespace Galois::Runtime::Distributed;
 
-struct create_nodes : public Galois::Runtime::Lockable {
+typedef  Galois::Runtime::LL::SimpleLock<true> SLock;
+
+struct create_nodes {
   Graphp g;
-  create_nodes() {}
-  create_nodes(Graphp _g): g(_g) {}
+  SLock& l;
+  create_nodes(Graphp _g, SLock& _l): g(_g), l(_l) {}
 
-  template<typename Context>
-  void operator()(element& item, const Context& cnx) {
-    DGNode n = g->createNode(item.v);
+  void operator()(GNode& item, Galois::UserContext<GNode>& ctx) {
+    unsigned val = graph.getData(item,Galois::MethodFlag::NONE);
+    DGNode n = g->createNode(val);
     g->addNode(n);
-    mapping[item.g] = n;
-  }
-
-  // serialization functions
-  typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-    gSerialize(s,g);
-  }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-    gDeserialize(s,g);
+    l.lock();
+    mapping[item] = n;
+    l.unlock();
   }
 };
 
-static void readInputGraph_landing_pad(Distributed::RecvBuffer& buf) {
-  std::string triangleFilename;
-  printf("host: %u and thread id: %d\n", Distributed::networkHostID, LL::getTID());
-abort();
-  Distributed::gDeserialize(buf, triangleFilename);
-  //graph.structureFromFile(triangleFilename);
-}
-
-void readInputGraph(std::string triangleFilename) {
-  std::vector<element> e;
-  Graphp dgraph = DGraph::allocate();;
-  if (Distributed::networkHostNum > 1) {
-    Distributed::SendBuffer b;
-    Distributed::gSerialize(b, triangleFilename);
-sleep(2);
-printf("Before Broadcast\n");
-    Distributed::getSystemNetworkInterface().broadcast(readInputGraph_landing_pad, b);
-    getSystemLocalDirectory().makeProgress();
-    getSystemRemoteDirectory().makeProgress();
-    Distributed::getSystemNetworkInterface().handleReceives();
-printf("After Broadcast\n");
-    getSystemLocalDirectory().makeProgress();
-    getSystemRemoteDirectory().makeProgress();
-    Distributed::getSystemNetworkInterface().handleReceives();
-  }
+static void create_dist_graph(Graphp dgraph, std::string triangleFilename) {
+  SLock lk;
+  uint64_t block, f, l;
+  Graph::iterator first, last;
+  std::unordered_map<GNode,unsigned> e;
 
   graph.structureFromFile(triangleFilename);
+  unsigned size = 0;
   for (auto ii = graph.begin(); ii != graph.end(); ++ii) {
-    unsigned val = graph.getData(*ii,Galois::MethodFlag::NONE);
-    e.push_back(element(*ii,val));
+    e[*ii] = size;
+    ++size;
   }
-
-printf("adding the vector elements to dist graph\n");
-  Galois::for_each<>(e.begin(), e.end(), create_nodes(dgraph));
-printf("done with adding the vector elements to dist graph\n");
+  block = size / networkHostNum;
+  f = networkHostID * block;
+  l = (networkHostID + 1) * block;
+  first = graph.begin() + (networkHostID * block);
+  last  = graph.begin() + ((networkHostID + 1) * block);
+  if (networkHostID == (networkHostNum-1)) last = graph.end();
+  // create the nodes
+printf ("host: %u creating nodes\n", networkHostID);
+  Galois::for_each(first,last,create_nodes(dgraph,lk));
+  printf ("%lu nodes in %u host with block size %lu\n", mapping.size(), networkHostID, block);
+  // create the local edges
+printf ("host: %u creating edges\n", networkHostID);
+unsigned count = 0;
+unsigned scount = 0;
+  for(auto ii = first; ii != last; ++ii) {
+    Graph::edge_iterator vv = graph.edge_begin(*ii, Galois::MethodFlag::NONE);
+    Graph::edge_iterator ev = graph.edge_end(*ii, Galois::MethodFlag::NONE);
+scount++;
+    for (Graph::edge_iterator jj = vv; jj != ev; ++jj) {
+      unsigned num = e[graph.getEdgeDst(jj)];
+      if ((f <= num) && (num < l)) {
+        dgraph->addEdge(mapping[*ii],mapping[graph.getEdgeDst(jj)]);
+count++;
+      }
+      else {
+        printf("host %u - Edge to external node\n", networkHostID);
+      }
+    }
+  }
+printf("nodes %u and edges %u\n", scount, count);
+printf ("host: %u done creating edges\n", networkHostID);
 }
 
-void readGraph() {
+static void readInputGraph_landing_pad(Distributed::RecvBuffer& buf) {
+  Graphp dgraph;
+  std::string triangleFilename;
+  Distributed::gDeserialize(buf, triangleFilename, dgraph);
+printf("host: %u and thread id: %d\t %s\n", Distributed::networkHostID, LL::getTID(), triangleFilename.c_str());
+  create_dist_graph(dgraph,triangleFilename);
+}
+
+void readInputGraph(Graphp dgraph, std::string triangleFilename) {
+  if (Distributed::networkHostNum > 1) {
+    Distributed::SendBuffer b;
+    Distributed::gSerialize(b, triangleFilename, dgraph);
+    Distributed::getSystemNetworkInterface().broadcast(readInputGraph_landing_pad, b);
+    Distributed::getSystemNetworkInterface().handleReceives();
+  }
+  create_dist_graph(dgraph,triangleFilename);
+}
+
+void readGraph(Graphp dgraph) {
   if (inputFilename.find(".gr.triangles") != inputFilename.size() - strlen(".gr.triangles")) {
     // Not directly passed .gr.triangles file
     std::string triangleFilename = inputFilename + ".triangles";
@@ -258,7 +281,7 @@ void readGraph() {
       abort();
     } else {
       // triangles does exist, load it
-      readInputGraph(triangleFilename);
+      readInputGraph(dgraph, triangleFilename);
     }
   } else {
     //graph.structureFromFile(inputFilename);
@@ -279,21 +302,22 @@ int main(int argc, char** argv) {
   // check the host id and initialise the network
   Galois::Runtime::Distributed::networkStart();
 
-  Galois::StatTimer Tinitial("InitializeTime");
-  Tinitial.start();
-  readGraph();
-  Tinitial.stop();
+  Graphp dgraph = DGraph::allocate();
 
-/*
   // XXX Test if preallocation matters
   Galois::Statistic("MeminfoPre", Galois::Runtime::MM::pageAllocInfo());
   Galois::preAlloc(numThreads + 8 * Galois::Runtime::MM::pageAllocInfo());
   Galois::Statistic("MeminfoMid", Galois::Runtime::MM::pageAllocInfo());
- */
-  switch (algo) {
-    case nodeiterator: run<NodeIteratorAlgo>(); break;
-    default: std::cerr << "Unknown algo: " << algo << "\n";
-  }
+
+  Galois::StatTimer Tinitial("InitializeTime");
+  Tinitial.start();
+  readGraph(dgraph);
+  Tinitial.stop();
+
+  Galois::StatTimer T;
+  T.start();
+  NodeIteratorAlgo()(dgraph);
+  T.stop();
   Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
 
   // TODO Print num triangles
