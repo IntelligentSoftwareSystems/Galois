@@ -66,7 +66,9 @@ typedef Galois::Graph::ThirdGraph<uint32_t,void,Galois::Graph::EdgeDirection::Un
 typedef DGraph::NodeHandle DGNode;
 typedef typename DGraph::pointer Graphp;
 
+std::unordered_map<GNode,unsigned> lookup;
 std::unordered_map<GNode,DGNode> mapping;
+std::unordered_map<unsigned,DGNode> rlookup;
 
 struct element: public Galois::Runtime::Lockable {
   GNode g;
@@ -201,6 +203,7 @@ using namespace Galois::Runtime;
 using namespace Galois::Runtime::Distributed;
 
 typedef  Galois::Runtime::LL::SimpleLock<true> SLock;
+SLock slock;
 
 struct create_nodes {
   Graphp g;
@@ -213,20 +216,40 @@ struct create_nodes {
     g->addNode(n);
     l.lock();
     mapping[item] = n;
+    rlookup[lookup[item]] = n;
     l.unlock();
   }
 };
+
+static void recvRemoteNode_landing_pad(Distributed::RecvBuffer& buf) {
+  DGNode n;
+  unsigned num;
+  Distributed::gDeserialize(buf,num,n);
+  slock.lock();
+  rlookup[num] = n;
+  slock.unlock();
+}
+
+static void getRemoteNode_landing_pad(Distributed::RecvBuffer& buf) {
+  unsigned num;
+  uint32_t host;
+  Distributed::gDeserialize(buf,host,num);
+  Distributed::SendBuffer b;
+  slock.lock();
+  Distributed::gSerialize(b, num, rlookup[num]);
+  slock.unlock();
+  Distributed::getSystemNetworkInterface().send(host,recvRemoteNode_landing_pad,b);
+}
 
 static void create_dist_graph(Graphp dgraph, std::string triangleFilename) {
   SLock lk;
   uint64_t block, f, l;
   Graph::iterator first, last;
-  std::unordered_map<GNode,unsigned> e;
 
   graph.structureFromFile(triangleFilename);
   unsigned size = 0;
   for (auto ii = graph.begin(); ii != graph.end(); ++ii) {
-    e[*ii] = size;
+    lookup[*ii] = size;
     ++size;
   }
   block = size / networkHostNum;
@@ -240,26 +263,63 @@ printf ("host: %u creating nodes\n", networkHostID);
   Galois::for_each(first,last,create_nodes(dgraph,lk));
   printf ("%lu nodes in %u host with block size %lu\n", mapping.size(), networkHostID, block);
   // create the local edges
-printf ("host: %u creating edges\n", networkHostID);
+printf ("host: %u creating local edges\n", networkHostID);
 unsigned count = 0;
 unsigned scount = 0;
+unsigned rcount = 0;
+  rlookup.clear();
   for(auto ii = first; ii != last; ++ii) {
     Graph::edge_iterator vv = graph.edge_begin(*ii, Galois::MethodFlag::NONE);
     Graph::edge_iterator ev = graph.edge_end(*ii, Galois::MethodFlag::NONE);
 scount++;
     for (Graph::edge_iterator jj = vv; jj != ev; ++jj) {
-      unsigned num = e[graph.getEdgeDst(jj)];
+      unsigned num = lookup[graph.getEdgeDst(jj)];
       if ((f <= num) && (num < l)) {
         dgraph->addEdge(mapping[*ii],mapping[graph.getEdgeDst(jj)]);
 count++;
       }
       else {
         printf("host %u - Edge to external node\n", networkHostID);
+        uint32_t host = num/block;
+        if (host == networkHostNum) --host;
+        if (host > networkHostNum) {
+          printf("Wrong host ID: %u\n", host);
+          abort();
+        }
+        Distributed::SendBuffer b;
+        Distributed::gSerialize(b, networkHostID, num);
+        Distributed::getSystemNetworkInterface().send(host,getRemoteNode_landing_pad,b);
+        Distributed::getSystemNetworkInterface().handleReceives();
+        ++rcount;
       }
     }
   }
-printf("nodes %u and edges %u\n", scount, count);
-printf ("host: %u done creating edges\n", networkHostID);
+printf("nodes %u and edges %u remote edges %u\n", scount, count, rcount);
+printf ("host: %u done creating local edges\n", networkHostID);
+  uint64_t lsize;
+  do {
+    Distributed::getSystemNetworkInterface().handleReceives();
+    slock.lock();
+    lsize = rlookup.size();
+    slock.unlock();
+    if (lsize > rcount) {
+      printf("ERROR in incoming objects count %lu host ID: %u\n", lsize, networkHostID);
+      abort();
+    }
+  } while(rcount != lsize);
+
+printf ("host: %u creating remote edges\n", networkHostID);
+  for(auto ii = first; ii != last; ++ii) {
+    Graph::edge_iterator vv = graph.edge_begin(*ii, Galois::MethodFlag::NONE);
+    Graph::edge_iterator ev = graph.edge_end(*ii, Galois::MethodFlag::NONE);
+    for (Graph::edge_iterator jj = vv; jj != ev; ++jj) {
+      unsigned num = lookup[graph.getEdgeDst(jj)];
+      if (!((f <= num) && (num < l))) {
+        dgraph->addEdge(mapping[*ii],rlookup[num]);
+      }
+    }
+  }
+printf ("host: %u done creating remote edges\n", networkHostID);
 }
 
 static void readInputGraph_landing_pad(Distributed::RecvBuffer& buf) {
