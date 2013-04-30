@@ -40,8 +40,8 @@ struct f1 {
       return;
    }
 
-	// serialization functions
-	typedef int tt_has_serialize;
+  // serialization functions
+  typedef int tt_has_serialize;
   void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
     gSerialize(s,r);
   }
