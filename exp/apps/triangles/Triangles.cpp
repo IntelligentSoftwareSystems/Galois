@@ -255,6 +255,8 @@ static void program_barrier() {
   Distributed::getSystemNetworkInterface().broadcast(progBarrier_landing_pad, b);
   ++prog_barrier;
   do {
+    getSystemLocalDirectory().makeProgress();
+    getSystemRemoteDirectory().makeProgress();
     Distributed::getSystemNetworkInterface().handleReceives();
   } while (prog_barrier != networkHostNum);
   prog_barrier = 0;
