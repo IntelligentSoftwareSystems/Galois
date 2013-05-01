@@ -79,15 +79,13 @@ while (<>) {
       my $module = shift @line;
 
       $offset = 2;
-      $function =~ s/,/;/g;
       $ind = "$module:$function";
     }
 
     for (my $i = 0; $i < $#line; $i++) {
       my $nk = $heads[$i + $offset];
-      $Stats{$nk}{$curThread}{$ind} = $line[$i];
+      $Stats{$nk}{$curThread}{$ind} += $line[$i];
       $Stats{$nk}{$curThread}{$TOTAL} += $line[$i];
-      # print "nk=$nk, val=$line[$i]\n";
     }
     # print "###\n";
   }
