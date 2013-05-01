@@ -68,7 +68,11 @@ typedef typename DGraph::pointer Graphp;
 
 std::unordered_map<GNode,unsigned> lookup;
 std::unordered_map<GNode,DGNode> mapping;
+std::unordered_map<unsigned,DGNode> llookup;
 std::unordered_map<unsigned,DGNode> rlookup;
+std::set<unsigned> requested;
+
+volatile unsigned prog_barrier = 0;
 
 struct element: public Galois::Runtime::Lockable {
   GNode g;
@@ -216,7 +220,7 @@ struct create_nodes {
     g->addNode(n);
     l.lock();
     mapping[item] = n;
-    rlookup[lookup[item]] = n;
+    llookup[lookup[item]] = n;
     l.unlock();
   }
 };
@@ -226,7 +230,7 @@ static void recvRemoteNode_landing_pad(Distributed::RecvBuffer& buf) {
   unsigned num;
   uint32_t host;
   Distributed::gDeserialize(buf,host,num,n);
-        printf("\t host %u - Receiving node %u from %u\n", networkHostID, num, host);
+  if(networkHostID) printf("\t host %u - Receiving node %u from %u\n", networkHostID, num, host);
   slock.lock();
   rlookup[num] = n;
   slock.unlock();
@@ -238,9 +242,23 @@ static void getRemoteNode_landing_pad(Distributed::RecvBuffer& buf) {
   Distributed::gDeserialize(buf,host,num);
   Distributed::SendBuffer b;
   slock.lock();
-  Distributed::gSerialize(b, networkHostID, num, rlookup[num]);
+  Distributed::gSerialize(b, networkHostID, num, llookup[num]);
   slock.unlock();
   Distributed::getSystemNetworkInterface().send(host,recvRemoteNode_landing_pad,b);
+}
+
+static void progBarrier_landing_pad(Distributed::RecvBuffer& buf) {
+  ++prog_barrier;
+}
+
+static void program_barrier() {
+  Distributed::SendBuffer b;
+  Distributed::getSystemNetworkInterface().broadcast(progBarrier_landing_pad, b);
+  ++prog_barrier;
+  do {
+    Distributed::getSystemNetworkInterface().handleReceives();
+  } while (prog_barrier != networkHostNum);
+  prog_barrier = 0;
 }
 
 static void create_dist_graph(Graphp dgraph, std::string triangleFilename) {
@@ -248,6 +266,7 @@ static void create_dist_graph(Graphp dgraph, std::string triangleFilename) {
   uint64_t block, f, l;
   Graph::iterator first, last;
 
+  prog_barrier = 0;
   graph.structureFromFile(triangleFilename);
   unsigned size = 0;
   for (auto ii = graph.begin(); ii != graph.end(); ++ii) {
@@ -270,6 +289,7 @@ unsigned count = 0;
 unsigned scount = 0;
 unsigned rcount = 0;
   rlookup.clear();
+  assert(!rlookup.size());
   for(auto ii = first; ii != last; ++ii) {
     Graph::edge_iterator vv = graph.edge_begin(*ii, Galois::MethodFlag::NONE);
     Graph::edge_iterator ev = graph.edge_end(*ii, Galois::MethodFlag::NONE);
@@ -284,31 +304,35 @@ count++;
         uint32_t host = num/block;
         if (host == networkHostNum) --host;
         if (host > networkHostNum) {
-          printf("Wrong host ID: %u\n", host);
+          printf("ERROR Wrong host ID: %u\n", host);
           abort();
         }
-        printf("host %u - Requesting node %u from %u\n", networkHostID, num, host);
+        if (networkHostID) printf("host %u - Requesting node %u from %u\n", networkHostID, num, host);
         Distributed::SendBuffer b;
         Distributed::gSerialize(b, networkHostID, num);
         Distributed::getSystemNetworkInterface().send(host,getRemoteNode_landing_pad,b);
         Distributed::getSystemNetworkInterface().handleReceives();
+        requested.insert(num);
         ++rcount;
       }
     }
   }
 printf("nodes %u and edges %u remote edges %u\n", scount, count, rcount);
 printf ("host: %u done creating local edges\n", networkHostID);
-  uint64_t lsize;
+  uint64_t recvsize, reqsize;
+  reqsize = requested.size();
   do {
     Distributed::getSystemNetworkInterface().handleReceives();
     slock.lock();
-    lsize = rlookup.size();
+    recvsize = rlookup.size();
     slock.unlock();
-    if (lsize > rcount) {
-      printf("ERROR in incoming objects count is %lu only %u requested host ID: %u\n", lsize, rcount, networkHostID);
+    if (recvsize > reqsize) {
+      printf("ERROR in incoming objects count is %lu only %lu requested host ID: %u\n", recvsize, reqsize, networkHostID);
       abort();
     }
-  } while(rcount != lsize);
+  } while(recvsize != reqsize);
+
+  program_barrier();
 
 printf ("host: %u creating remote edges\n", networkHostID);
   for(auto ii = first; ii != last; ++ii) {
@@ -322,6 +346,8 @@ printf ("host: %u creating remote edges\n", networkHostID);
     }
   }
 printf ("host: %u done creating remote edges\n", networkHostID);
+
+  program_barrier();
 }
 
 static void readInputGraph_landing_pad(Distributed::RecvBuffer& buf) {
