@@ -60,7 +60,7 @@
 static const char* name = "Breadth-first Search Example";
 static const char* desc =
   "Computes the shortest path from a source node to all nodes in a directed "
-  "graph using a modified Bellman-Ford algorithm\n";
+  "graph using a modified Bellman-Ford algorithm";
 static const char* url = "breadth_first_search";
 
 //****** Command Line Options ******

@@ -53,7 +53,7 @@
 namespace cll = llvm::cl;
 
 static const char* name = "Delaunay Triangulation";
-static const char* desc = "Produces a Delaunay triangulation for a set of points\n";
+static const char* desc = "Produces a Delaunay triangulation for a set of points";
 static const char* url = "delaunay_triangulation";
 
 static cll::opt<std::string> doWriteMesh("writemesh", 

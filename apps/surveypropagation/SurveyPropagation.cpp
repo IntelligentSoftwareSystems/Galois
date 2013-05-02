@@ -48,7 +48,7 @@ using namespace Galois::WorkList;
 namespace cll = llvm::cl;
 
 static const char* name = "Survey Propagation";
-static const char* desc = "Solves SAT problems using survey propagation\n";
+static const char* desc = "Solves SAT problems using survey propagation";
 static const char* url = "survey_propagation";
 
 static cll::opt<int> seed(cll::Positional, cll::desc("<seed>"), cll::Required);

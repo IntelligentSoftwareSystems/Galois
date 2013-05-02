@@ -57,7 +57,7 @@ namespace des {
 namespace cll = llvm::cl;
 
 static const char* name = "Discrete Event Simulation";
-static const char* desc = "Discrete Event Simulation used to perform logic circuit simulations";
+static const char* desc = "Perform logic circuit simulation using Discrete Event Simulation";
 static const char* url = "discrete_event_simulation";
 
 static cll::opt<std::string> netlistFile(cll::Positional, cll::desc("<input file>"), cll::Required);

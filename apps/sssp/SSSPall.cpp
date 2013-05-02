@@ -43,7 +43,7 @@ namespace cll = llvm::cl;
 static const char* name = "Single Source Shortest Path";
 static const char* desc =
   "Computes the shortest path from a source node to all nodes in a directed "
-  "graph using a modified Bellman-Ford algorithm\n";
+  "graph using a modified Bellman-Ford algorithm";
 static const char* url = "single_source_shortest_path";
 
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);

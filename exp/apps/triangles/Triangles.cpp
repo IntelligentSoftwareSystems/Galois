@@ -40,7 +40,7 @@
 #include <iostream>
 
 const char* name = "Triangles";
-const char* desc = "Count triangles in a graph";
+const char* desc = "Counts the triangles in a graph";
 const char* url = 0;
 
 enum Algo {

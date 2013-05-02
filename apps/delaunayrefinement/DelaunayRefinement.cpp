@@ -45,7 +45,7 @@
 namespace cll = llvm::cl;
 
 static const char* name = "Delaunay Mesh Refinement";
-static const char* desc = "Refines a Delaunay triangulation mesh such that no angle in the mesh is less than 30 degrees\n";
+static const char* desc = "Refines a Delaunay triangulation mesh such that no angle in the mesh is less than 30 degrees";
 static const char* url = "delaunay_mesh_refinement";
 
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);

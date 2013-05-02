@@ -45,7 +45,7 @@
 namespace cll = llvm::cl;
 
 static const char* name = "Boruvka's Minimum Spanning Tree Algorithm";
-static const char* desc = "Compute the minimum spanning forest of a graph";
+static const char* desc = "Computes the minimum spanning forest of a graph";
 static const char* url = "mst";
 
 enum Algo {

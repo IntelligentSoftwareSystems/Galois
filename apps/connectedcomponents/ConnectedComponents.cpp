@@ -49,7 +49,7 @@
 #include <iostream>
 
 const char* name = "Connected Components";
-const char* desc = "Compute connected components of a graph";
+const char* desc = "Computes the connected components of a graph";
 const char* url = 0;
 
 enum class Algo {

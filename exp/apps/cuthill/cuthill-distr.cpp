@@ -70,10 +70,10 @@
 //#define SERIAL_SWAP
 //#define TOTAL_PREFIX
 
-static const char* name = "Breadth-first Search Example";
+static const char* name = "Cuthill-McKee Reordering";
 static const char* desc =
-  "Computes the shortest path from a source node to all nodes in a directed "
-  "graph using a modified Bellman-Ford algorithm\n";
+  "Computes a reordering of matrix rows and columns (or a relabeling of graph nodes)"
+  "according to the Cuthill-McKee heuristic";
 static const char* url = 0;
 
 //****** Command Line Options ******

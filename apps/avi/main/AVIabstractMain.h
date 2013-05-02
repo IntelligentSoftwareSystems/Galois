@@ -64,7 +64,7 @@ static cll::opt<double> simEndTimeOpt("e", cll::desc("simulation end time"), cll
 
 
 static const char* name = "Asynchronous Variational Integrators";
-static const char* desc = "Elasto-dynamic simulation of a mesh with minimal number of simulation updates";
+static const char* desc = "Performs elasto-dynamic simulation of a mesh with minimal number of simulation updates";
 static const char* url = "asynchronous_variational_integrators";
 
 /**

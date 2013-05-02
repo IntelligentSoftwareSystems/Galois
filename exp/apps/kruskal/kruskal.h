@@ -57,7 +57,7 @@
 namespace cll = llvm::cl;
 
 static const char* const name = "Kruskal MST";
-static const char* const desc = "Compute minimum weight spanning tree of an undirected graph";
+static const char* const desc = "Computes minimum weight spanning tree of an undirected graph";
 static const char* const url = "kruskal";
 
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);

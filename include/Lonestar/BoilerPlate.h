@@ -49,9 +49,10 @@ static void LonestarStart(int argc, char** argv, const char* app, const char* de
   gPrint("http://iss.ices.utexas.edu/galois/\n\n");
   gPrint("application: ", app ? app : "unspecified", "\n");
   if (desc)
-    gPrint(desc);
+    gPrint(desc, "\n");
   if (url)
     gPrint("http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/", url, "\n");
+  gPrint("\n");
 
   std::ostringstream cmdout;
   for (int i = 0; i < argc; ++i) {
@@ -61,7 +62,7 @@ static void LonestarStart(int argc, char** argv, const char* app, const char* de
   }
   gInfo("CommandLine ", cmdout.str().c_str());
   
-    char name[256];
+  char name[256];
   gethostname(name, 256);
   gInfo("Hostname ", name);
   gFlush();

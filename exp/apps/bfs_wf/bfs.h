@@ -51,7 +51,7 @@
 namespace cll = llvm::cl;
 
 static const char* const name = "Breadth First Search";
-static const char* const desc = "Level of a node is shortest number of edges from root to node";
+static const char* const desc = "Computes BFS levels in a graph";
 static const char* const url = "bfs";
 
 static cll::opt<unsigned int> startId("startnode", cll::desc("Node to start search from"), cll::init(0));

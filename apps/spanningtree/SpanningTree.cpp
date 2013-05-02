@@ -41,7 +41,7 @@
 namespace cll = llvm::cl;
 
 const char* name = "Spanning Tree Algorithm";
-const char* desc = "Compute the spanning forest of a graph";
+const char* desc = "Computes the spanning forest of a graph";
 const char* url = NULL;
 
 enum Algo {

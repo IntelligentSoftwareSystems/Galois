@@ -45,8 +45,10 @@
 #include <queue>
 #include <numeric>
 
-static const char* name = "Cuthill-McKee";
-static const char* desc = "";
+static const char* name = "Cuthill-McKee Reordering";
+static const char* desc =
+  "Computes a reordering of matrix rows and columns (or a relabeling of graph nodes)"
+  "according to the Cuthill-McKee heuristic";
 static const char* url = 0;
 
 enum PseudoAlgo {

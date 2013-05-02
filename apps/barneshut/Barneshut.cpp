@@ -41,8 +41,8 @@
 
 const char* name = "Barnshut N-Body Simulator";
 const char* desc =
-  "Simulation of the gravitational forces in a galactic cluster using the "
-  "Barnes-Hut n-body algorithm\n";
+  "Simulates gravitational forces in a galactic cluster using the "
+  "Barnes-Hut n-body algorithm";
 const char* url = "barneshut";
 
 static llvm::cl::opt<int> nbodies("n", llvm::cl::desc("Number of bodies"), llvm::cl::init(10000));

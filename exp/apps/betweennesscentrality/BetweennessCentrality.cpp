@@ -45,8 +45,7 @@
 #include <sys/mman.h>
 
 static const char* name = "Betweenness Centrality";
-static const char* desc =
-  "Computes the betweenness centrality of all nodes in a graph\n";
+static const char* desc = "Computes the betweenness centrality of all nodes in a graph";
 static const char* url = "betweenness_centrality";
 
 static llvm::cl::opt<std::string> filename(llvm::cl::Positional, llvm::cl::desc("<input file>"), llvm::cl::Required);

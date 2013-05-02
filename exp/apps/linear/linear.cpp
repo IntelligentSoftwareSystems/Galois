@@ -11,7 +11,7 @@
 namespace cll = llvm::cl;
 
 static const char* name = "Iterative methods";
-static const char* desc = "Iterative methods for solving PD linear systems Ax=b\n";
+static const char* desc = "Solves PD linear systems Ax=b using iterative methods";
 static const char* url = 0;
 
 static cll::opt<int> algo("algo", cll::desc("Node to start search from"), cll::init(0));

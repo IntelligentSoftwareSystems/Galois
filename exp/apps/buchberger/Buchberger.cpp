@@ -56,7 +56,7 @@
 namespace cll = llvm::cl;
 
 static const char* name = "Buchberger Algorithm";
-static const char* desc = "Generate Groebner basis for polynomial ideal using Buchberger Algorithm\n";
+static const char* desc = "Generates Groebner basis for polynomial ideal using Buchberger Algorithm";
 static const char* url = 0;
 
 enum MonomialOrder {

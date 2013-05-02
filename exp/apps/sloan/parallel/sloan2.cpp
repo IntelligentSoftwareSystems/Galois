@@ -33,7 +33,7 @@
 //#define PRINT_DEGREE_DISTR
 
 static const char* name = "Sloan's reordering algorithm";
-static const char* desc = "Computes a permutation of a matrix according to Sloan's algorithm\n";
+static const char* desc = "Computes a permutation of a matrix according to Sloan's algorithm";
 static const char* url = 0;
 
 //****** Command Line Options ******

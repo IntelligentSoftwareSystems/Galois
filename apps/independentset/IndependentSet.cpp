@@ -43,7 +43,7 @@
 #include <iostream>
 
 const char* name = "Maximal Independent Set";
-const char* desc = "Compute a maximal independent set (not maximum) of nodes in a graph";
+const char* desc = "Computes a maximal independent set (not maximum) of nodes in a graph";
 const char* url = "independent_set";
 
 enum Algo {

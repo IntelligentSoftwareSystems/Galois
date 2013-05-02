@@ -41,7 +41,7 @@ namespace cll = llvm::cl;
  
 static const char* name = "Parallel MST";
 static const char* desc = "Computes the Minimal Spanning Tree using combination of "
-  "Boruvka's and Prim's algorithm\n";
+  "Boruvka's and Prim's algorithm";
 static const char* url = 0;
 
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);

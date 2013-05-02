@@ -56,7 +56,7 @@
 namespace cll = llvm::cl;
 
 static const char* name = "Unordered Agglomerative Clustering";
-static const char* desc = "Unordered Implementation of the well-known data-mining algorithm\n";
+static const char* desc = "Clusters data points using the well-known data-mining algorithm";
 static const char* url = "agglomerative_clustering";
 
 static cll::opt<int> numPoints("numPoints", cll::desc("Number of Points"), cll::init(1000));

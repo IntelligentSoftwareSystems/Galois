@@ -45,7 +45,7 @@
 #include <iomanip>
 
 static const char* name = "Betweenness Centrality";
-static const char* desc = "\n";
+static const char* desc = 0;
 static const char* url = 0;
 
 //****** Command Line Options ******

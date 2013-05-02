@@ -40,7 +40,7 @@
 namespace cll = llvm::cl;
 
 static const char* name = "GMetis";
-static const char* desc = "Partion a graph into K parts and minimize the graph cut\n";
+static const char* desc = "Partitions a graph into K parts and minimizing the graph cut";
 static const char* url = "gMetis";
 
 static cll::opt<bool> mtxInput("mtxinput", cll::desc("Use text mtx files instead binary based ones"), cll::init(false));

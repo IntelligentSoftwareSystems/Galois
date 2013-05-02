@@ -12,7 +12,7 @@
 namespace cll = llvm::cl;
 
 static const char* name = "Belief propagation";
-static const char* desc = "Belief propagation on Ising Grids";
+static const char* desc = "Performs belief propagation on Ising Grids";
 static const char* url = 0;
 
 static cll::opt<int> algo("algo", cll::desc("Algorithm"), cll::init(1));

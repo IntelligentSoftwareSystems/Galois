@@ -891,8 +891,8 @@ static cll::opt<std::string> filename(cll::Positional,
 static cll::opt<unsigned int> startNode("startNode", cll::desc("Node to start search from"), cll::init(0));
 
 
-static const char* name = "betweenness centality";
-static const char* desc = "unweighted bwc";
+static const char* name = "Betweenness Centrality";
+static const char* desc = "Computes betwenness centrality in an unweighted graph";
 
 
 int main(int argc, char** argv) {

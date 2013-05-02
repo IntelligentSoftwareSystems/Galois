@@ -52,7 +52,7 @@ namespace cll = llvm::cl;
 static const char* name = "Single Source Shortest Path";
 static const char* desc =
   "Computes the shortest path from a source node to all nodes in a directed "
-  "graph using a modified chaotic iteration algorithm\n";
+  "graph using a modified chaotic iteration algorithm";
 static const char* url = "single_source_shortest_path";
 
 enum class Algo {

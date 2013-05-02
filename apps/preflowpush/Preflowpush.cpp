@@ -39,7 +39,7 @@
 namespace cll = llvm::cl;
 
 const char* name = "Preflow Push";
-const char* desc = "Finds the maximum flow in a network using the preflow push technique\n";
+const char* desc = "Finds the maximum flow in a network using the preflow push technique";
 const char* url = "preflow_push";
 
 enum DetAlgo {

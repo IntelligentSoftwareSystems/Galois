@@ -50,7 +50,7 @@
 #include <iostream>
 
 static const char* name = "Diameter Estimation";
-static const char* desc = "Estimate the diameter of a graph\n";
+static const char* desc = "Estimates the diameter of a graph";
 static const char* url = 0;
 
 //****** Command Line Options ******
