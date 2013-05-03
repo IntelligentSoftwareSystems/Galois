@@ -927,14 +927,14 @@ void run() {
   }
   
   Galois::preAlloc(numThreads + (2 * graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::pageSize);
-  Galois::Statistic("MeminfoPre", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPre");
 
   Galois::StatTimer T;
   T.start();
   algo(graph);
   T.stop();
 
-  Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPost");
 
   if (!skipVerify || writeType == WriteType::largest) {
     auto component = findLargest(graph);

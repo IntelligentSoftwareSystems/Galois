@@ -184,12 +184,22 @@ static inline void on_each(FunctionTy fn, const char* loopname = 0) {
 }
 
 /**
- * Preallocate pages on each thread.
+ * Preallocates pages on each thread.
  *
- * @param num number of pages to allocate of size {@link Galois::Runtime::pageAllocInfo()}
+ * @param num number of pages to allocate of size {@link Galois::Runtime::MM::pageSize}
  */
 static inline void preAlloc(int num) {
   Runtime::preAlloc_impl(num);
+}
+
+/**
+ * Reports number of pages allocated by the Galois system so far. The value is printing using
+ * the statistics infrastructure. 
+ *
+ * @param label Label to associated with report at this program point
+ */
+static inline void reportPageAlloc(const char* label) {
+  Runtime::reportPageAlloc(label);
 }
 
 /**

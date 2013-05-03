@@ -134,7 +134,7 @@ void verify() {
     bool firstTime = true;
     for (int i=0; i<NumNodes; ++i) {
       double bc = (*CB.getRemote(0))[i];
-      for (int j = 1; j < Galois::getActiveThreads(); ++j)
+      for (unsigned int j = 1; j < Galois::getActiveThreads(); ++j)
 	bc += (*CB.getRemote(j))[i];
       if (firstTime) {
         sampleBC = bc;
@@ -193,9 +193,9 @@ int main(int argc, char** argv) {
       std::fill(&(*CB.getLocal())[0], &(*CB.getLocal())[NumNodes], 0.0);
     });
 
-  Galois::Statistic("MeminfoPre", Galois::Runtime::MM::pageAllocInfo());
-  Galois::preAlloc(numThreads * Galois::Runtime::MM::pageAllocInfo() / 3);
-  Galois::Statistic("MeminfoMid", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPre");
+  Galois::preAlloc(numThreads * Galois::Runtime::MM::pageAllocTotal() / 3);
+  Galois::reportPageAlloc("MeminfoMid");
 
   boost::filter_iterator<HasOut,Graph::iterator>
     begin  = boost::make_filter_iterator(HasOut(G), g.begin(), g.end()),
@@ -231,7 +231,7 @@ int main(int argc, char** argv) {
 #endif
   }
 
-  Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPost");
 
   if (forceVerify || !skipVerify) {
     verify();

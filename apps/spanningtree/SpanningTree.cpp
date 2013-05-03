@@ -238,13 +238,13 @@ int main(int argc, char** argv) {
   Tinitial.stop();
 
   //Galois::preAlloc(numThreads);
-  Galois::Statistic("MeminfoPre", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPre");
   switch (algo) {
     case demo: run<DemoAlgo>(); break;
     case asynchronous: run<AsynchronousAlgo>(); break;
     default: std::cerr << "Unknown algo: " << algo << "\n";
   }
-  Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPost");
 
   if (!skipVerify && !verify()) {
     std::cerr << "verification failed\n";

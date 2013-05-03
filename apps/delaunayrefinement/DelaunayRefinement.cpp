@@ -146,9 +146,9 @@ int main(int argc, char** argv) {
   std::cout << "configuration: " << std::distance(graph->begin(), graph->end())
 	    << " total triangles, " << std::count_if(graph->begin(), graph->end(), is_bad(graph)) << " bad triangles\n";
 
-  Galois::Statistic("MeminfoPre1", Galois::Runtime::MM::pageAllocInfo());
-  Galois::preAlloc(15 * numThreads + Galois::Runtime::MM::pageAllocInfo() * 10);
-  Galois::Statistic("MeminfoPre2", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPre1");
+  Galois::preAlloc(15 * numThreads + Galois::Runtime::MM::pageAllocTotal() * 10);
+  Galois::reportPageAlloc("MeminfoPre2");
 
   Galois::StatTimer T;
   T.start();
@@ -158,7 +158,7 @@ int main(int argc, char** argv) {
   else
     std::for_each(graph->begin(), graph->end(), Preprocess());
 
-  Galois::Statistic("MeminfoMid", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoMid");
   
   Galois::StatTimer Trefine("refine");
   Trefine.start();
@@ -182,7 +182,7 @@ int main(int argc, char** argv) {
   Trefine.stop();
   T.stop();
   
-  Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPost");
   
   if (!skipVerify) {
     int size = Galois::ParallelSTL::count_if(graph->begin(), graph->end(), is_bad(graph));

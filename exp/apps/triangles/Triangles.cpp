@@ -498,9 +498,9 @@ int main(int argc, char** argv) {
   Tinitial.stop();
 
   // XXX Test if preallocation matters
-  Galois::Statistic("MeminfoPre", Galois::Runtime::MM::pageAllocInfo());
-  Galois::preAlloc(numThreads + 8 * Galois::Runtime::MM::pageAllocInfo());
-  Galois::Statistic("MeminfoMid", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPre");
+  Galois::preAlloc(numThreads + 8 * Galois::Runtime::MM::pageAllocTotal());
+  Galois::reportPageAlloc("MeminfoMid");
   switch (algo) {
     case nodeiterator: run<NodeIteratorAlgo>(); break;
     case edgeiterator: run<EdgeIteratorAlgo>(); break;
@@ -510,7 +510,7 @@ int main(int argc, char** argv) {
 #endif
     default: std::cerr << "Unknown algo: " << algo << "\n";
   }
-  Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPost");
 
   // TODO Print num triangles
 

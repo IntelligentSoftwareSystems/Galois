@@ -412,7 +412,7 @@ static void readInput(const std::string& filename) {
       * 32 // include graph node size
       / (Galois::Runtime::MM::pageSize) // in pages
       );
-  Galois::Statistic("MeminfoPre", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPre");
 
   layoutPoints(points);
 }
@@ -500,7 +500,7 @@ int main(int argc, char** argv) {
   T.stop();
   std::cout << "mesh size: " << graph.size() << "\n";
 
-  Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPost");
 
   if (!skipVerify) {
     Verifier verifier;

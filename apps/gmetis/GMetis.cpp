@@ -353,11 +353,11 @@ int main(int argc, char** argv) {
 	}else{
 	  readGraph(&metisGraph, filename.c_str(), weighted, false);
 	}
-  	Galois::Statistic("MeminfoPre1", Galois::Runtime::MM::pageAllocInfo());
+        Galois::reportPageAlloc("MeminfoPre1");
   	Galois::preAlloc(9000);
-  	Galois::Statistic("MeminfoPre2", Galois::Runtime::MM::pageAllocInfo());
+        Galois::reportPageAlloc("MeminfoPre2");
 	partition(&metisGraph, numPartitions);
-  	Galois::Statistic("MeminfoPre3", Galois::Runtime::MM::pageAllocInfo());
+        Galois::reportPageAlloc("MeminfoPre3");
 	verify(&metisGraph);
 }
 

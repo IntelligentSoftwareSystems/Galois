@@ -587,7 +587,7 @@ void run() {
   algo.readGraph(graph);
 
   Galois::preAlloc(numThreads + (graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::pageSize);
-  Galois::Statistic("MeminfoPre", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPre");
 
   Galois::StatTimer T;
   std::cout << "Running " << algo.name() << " version\n";
@@ -597,7 +597,7 @@ void run() {
   algo(graph);
   T.stop();
   
-  Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPost");
 
   if (!skipVerify)
     printTop(graph, 10);

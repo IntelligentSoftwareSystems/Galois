@@ -20,12 +20,12 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#include "Galois/Runtime/ll/StaticInstance.h"
-#include "Galois/Runtime/ll/gio.h"
+#include "Galois/Statistic.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/Support.h"
-
-#include "Galois/Statistic.h"
+#include "Galois/Runtime/ll/StaticInstance.h"
+#include "Galois/Runtime/ll/gio.h"
+#include "Galois/Runtime/mm/Mem.h"
 
 #include <set>
 #include <map>
@@ -38,7 +38,6 @@ using Galois::Runtime::LL::gPrint;
 namespace {
 
 class StatManager {
-
   typedef std::pair<std::string, std::string> KeyTy;
 
   Galois::Runtime::PerThreadStorage<std::map<KeyTy, unsigned long> > Stats;
@@ -70,7 +69,6 @@ class StatManager {
   }
 
 public:
-
   StatManager() :maxID(0) {}
 
   void addToStat(const std::string& loop, const std::string& category, size_t value) {
@@ -81,6 +79,12 @@ public:
   void addToStat(Galois::Statistic* value) {
     for (unsigned x = 0; x < Galois::Runtime::activeThreads; ++x)
       (*Stats.getRemote(x))[mkKey(value->getLoopname(), value->getStatname())] += value->getValue(x);
+    updateMax();
+  }
+
+  void addPageAllocToStat(const std::string& loop, const std::string& category) {
+    for (unsigned x = 0; x < Galois::Runtime::activeThreads; ++x)
+      (*Stats.getRemote(x))[mkKey(loop, category)] += Galois::Runtime::MM::pageAllocForThread(x);
     updateMax();
   }
 
@@ -102,8 +106,7 @@ public:
       gPrint(",T", x);
     gPrint("\n");
     //print all values
-    for(std::set<KeyTy>::iterator ii = LKs.begin(), ee = LKs.end();
-	ii != ee; ++ii) {
+    for (std::set<KeyTy>::iterator ii = LKs.begin(), ee = LKs.end(); ii != ee; ++ii) {
       std::vector<unsigned long> Values;
       gather(ii->first, ii->second, maxThreadID, Values);
       gPrint("STAT,",
@@ -124,7 +127,6 @@ static Galois::Runtime::LL::StaticInstance<StatManager> SM;
 
 }
 
-
 bool Galois::Runtime::inGaloisForEach = false;
 
 void Galois::Runtime::reportStat(const char* loopname, const char* category, unsigned long value) {
@@ -143,4 +145,8 @@ void Galois::Runtime::reportStat(Galois::Statistic* value) {
 
 void Galois::Runtime::printStats() {
   SM.get()->printStats();
+}
+
+void Galois::Runtime::reportPageAlloc(const char* category) {
+  SM.get()->addPageAllocToStat(std::string("(NULL)"), std::string(category ? category : "(NULL)"));
 }

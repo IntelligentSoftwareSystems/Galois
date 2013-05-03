@@ -789,7 +789,7 @@ void run() {
   initialize(algo, graph, source, report);
 
   Galois::preAlloc(numThreads + (3*graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::pageSize);
-  Galois::Statistic("MeminfoPre", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPre");
 
   Galois::StatTimer T;
   std::cout << "Running " << algo.name() << " version\n";
@@ -798,7 +798,7 @@ void run() {
   algo(graph, source);
   T.stop();
   
-  Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPost");
 
   std::cout << "Node " << reportNode << " has distance " << graph.getData(report).dist << "\n";
 

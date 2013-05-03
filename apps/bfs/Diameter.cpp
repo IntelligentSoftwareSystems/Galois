@@ -754,7 +754,7 @@ void run() {
   initialize(algo, graph, source);
 
   //Galois::preAlloc((numThreads + (graph.size() * sizeof(SNode) * 2) / Galois::Runtime::MM::pageSize)*8);
-  Galois::Statistic("MeminfoPre", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPre");
 
   Galois::StatTimer T;
   T.start();
@@ -762,7 +762,7 @@ void run() {
   size_t diameter = algo(graph, source);
   T.stop();
   
-  Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPost");
 
   std::cout << "Estimated diameter: " << diameter << "\n";
 }

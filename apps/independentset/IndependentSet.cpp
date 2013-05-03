@@ -276,7 +276,7 @@ int main(int argc, char** argv) {
   
   // XXX Test if this matters
   Galois::preAlloc(numThreads + (graph.size() * sizeof(Node) * numThreads / 8) / Galois::Runtime::MM::pageSize);
-  //Galois::Statistic("MeminfoPre", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPre");
   Galois::StatTimer T;
   T.start();
   switch (algo) {
@@ -284,7 +284,7 @@ int main(int argc, char** argv) {
     default: GaloisAlgo()(); break;
   }
   T.stop();
-  //Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPost");
 
   std::cout << "Cardinality of maximal independent set: " 
     << Galois::ParallelSTL::count_if(graph.begin(), graph.end(), is_matched()) 

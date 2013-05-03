@@ -50,12 +50,12 @@ const size_t smallPageSize = 4*1024;
 const size_t pageSize = 2*1024*1024;
 void* pageAlloc();
 void  pageFree(void*);
-unsigned pageAllocInfo();
+int pageAllocTotal();
+int pageAllocForThread(unsigned tid);
 void pagePreAlloc(int numpages);
 
 //! Forces the given block to be paged into physical memory
 void pageIn(void *buf, size_t len);
-
 
 /**
  * Allocates memory interleaved across NUMA nodes. 

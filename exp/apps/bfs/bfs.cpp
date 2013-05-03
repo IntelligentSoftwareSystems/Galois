@@ -753,7 +753,7 @@ void run() {
   GNode source, report;
   readGraph(source, report);
   Galois::preAlloc((numThreads + (graph.size() * sizeof(SNode) * 2) / Galois::Runtime::MM::pageSize)*8);
-  Galois::Statistic("MeminfoPre", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPre");
 
   Galois::StatTimer T;
   std::cout << "Running " << algo.name() << " version\n";
@@ -761,7 +761,7 @@ void run() {
   algo(source);
   T.stop();
   
-  Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPost");
 
   std::cout << "Report node: " << reportNode << " " << graph.getData(report) << "\n";
 

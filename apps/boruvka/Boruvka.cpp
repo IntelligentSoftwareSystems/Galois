@@ -442,8 +442,8 @@ int main(int argc, char** argv) {
   initializeGraph();
   Tinitial.stop();
 
-  Galois::preAlloc(Galois::Runtime::MM::pageAllocInfo() * 10);
-  Galois::Statistic("MeminfoPre", Galois::Runtime::MM::pageAllocInfo());
+  Galois::preAlloc(Galois::Runtime::MM::pageAllocTotal() * 10);
+  Galois::reportPageAlloc("MeminfoPre");
   Galois::StatTimer T;
   T.start();
   switch (algo) {
@@ -452,7 +452,7 @@ int main(int argc, char** argv) {
     default: std::cerr << "Unknown algo: " << algo << "\n";
   }
   T.stop();
-  Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPost");
 
   std::cout << "MST weight: "
     << Galois::ParallelSTL::map_reduce(mst.begin(), mst.end(),
