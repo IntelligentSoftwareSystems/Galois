@@ -99,8 +99,7 @@ protected:
   virtual void initGraph (const std::string& filename, Graph& graph) const {
     std::cout << "Reading graph from file: " << filename << std::endl;
 
-
-    graph.structureFromFile (filename);
+    Galois::Graph::readGraph(graph, filename);
 
     unsigned numNodes = graph.size ();
     unsigned numEdges = 0;

@@ -491,8 +491,8 @@ public:
    * An object with begin() and end() methods to iterate over the outgoing
    * edges of N.
    */
-  EdgesIterator<FirstGraph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
-    return EdgesIterator<FirstGraph>(*this, N, mflag);
+  detail::EdgesIterator<FirstGraph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+    return detail::EdgesIterator<FirstGraph>(*this, N, mflag);
   }
 
   /**

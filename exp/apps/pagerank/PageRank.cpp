@@ -87,12 +87,12 @@ struct PNode {
 };
 
 struct SerialAlgo {
-  typedef Galois::Graph::LC_CSR_Graph<PNode,void> Graph;
+  typedef Galois::Graph::LC_CSR_Graph<PNode,void>::with_no_lockable<true> Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "Serial"; }
   
-  void readGraph(Graph& graph) { graph.structureFromFile(filename); }
+  void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, filename); }
 
   struct Initialize {
     Graph& g;
@@ -160,14 +160,18 @@ struct GraphLabAlgo {
     float getPageRank() { return data; }
   };
 
-  typedef Galois::Graph::LC_CSR_InOutGraph<LNode,void,true> Graph;
+  typedef typename Galois::Graph::LC_CSR_Graph<LNode,void>
+    ::template with_numa_alloc<true>
+    ::template with_no_lockable<true>
+    InnerGraph;
+  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef typename Graph::GraphNode GNode;
 
   std::string name() const { return "GraphLab"; }
 
   void readGraph(Graph& graph) {
     // Using dense forward option, so we don't need in-edge information
-    graph.structureFromFile(filename, true); 
+    Galois::Graph::readGraph(graph, filename); 
   }
 
   struct Initialize {
@@ -240,9 +244,13 @@ struct GraphLabAlgo {
 
 template<bool UseGraphChi>
 struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
+  typedef typename Galois::Graph::LC_CSR_Graph<PNode,void>
+    ::template with_numa_alloc<true>
+    ::template with_no_lockable<true>
+    InnerGraph;
   typedef typename boost::mpl::if_c<UseGraphChi,
           Galois::Graph::OCImmutableEdgeGraph<PNode,void>,
-          Galois::Graph::LC_CSR_InOutGraph<PNode,void,true> >::type
+          Galois::Graph::LC_InOut_Graph<InnerGraph>>::type
           Graph;
   typedef typename Graph::GraphNode GNode;
 
@@ -253,7 +261,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
 
   void readGraph(Graph& graph) {
     // Using dense forward option, so we don't need in-edge information
-    graph.structureFromFile(filename, true); 
+    Galois::Graph::readGraph(graph, filename); 
     this->checkIfInMemoryGraph(graph, memoryLimit);
   }
 
@@ -351,7 +359,11 @@ struct PullAlgo {
     float getPageRank(unsigned int it) { return value[it & 1]; }
     void setPageRank(unsigned it, float v) { value[(it+1) & 1] = v; }
   };
-  typedef Galois::Graph::LC_InlineEdge_Graph<LNode,float,true> Graph;
+  typedef Galois::Graph::LC_InlineEdge_Graph<LNode,float>
+    ::with_compressed_node_ptr<true>
+    ::with_no_lockable<true>
+    ::with_numa_alloc<true>
+    Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "Pull"; }
@@ -361,7 +373,7 @@ struct PullAlgo {
 
   void readGraph(Graph& graph) {
     if (transposeGraphName.size()) {
-      graph.structureFromFile(transposeGraphName); 
+      Galois::Graph::readGraph(graph, transposeGraphName); 
     } else {
       std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
       abort();
@@ -456,14 +468,14 @@ struct PullAlgo {
 
 //! Transpose in-edges to out-edges
 static void precomputePullData() {
-  typedef Galois::Graph::LC_CSR_Graph<size_t, void> InputGraph;
+  typedef Galois::Graph::LC_CSR_Graph<size_t, void>::with_no_lockable<true> InputGraph;
   typedef InputGraph::GraphNode InputNode;
   typedef Galois::Graph::FileGraphWriter OutputGraph;
   typedef OutputGraph::GraphNode OutputNode;
 
   InputGraph input;
   OutputGraph output;
-  input.structureFromFile(filename);
+  Galois::Graph::readGraph(input, filename); 
 
   size_t node_id = 0;
   for (InputNode src : input) {

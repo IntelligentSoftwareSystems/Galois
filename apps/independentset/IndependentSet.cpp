@@ -78,11 +78,7 @@ struct Node {
   Node() : flag(UNMATCHED), pendingFlag(UNMATCHED) { }
 };
 
-#ifdef GALOIS_USE_NUMA
-typedef Galois::Graph::LC_Numa_Graph<Node,void> Graph;
-#else
-typedef Galois::Graph::LC_CSR_Graph<Node,void> Graph;
-#endif
+typedef Galois::Graph::LC_InlineEdge_Graph<Node,void>::with_numa_alloc<true>::with_compressed_node_ptr<true> Graph;
 
 typedef Graph::GraphNode GNode;
 
@@ -272,7 +268,7 @@ int main(int argc, char** argv) {
   Galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
-  graph.structureFromFile(filename);
+  Galois::Graph::readGraph(graph, filename);
 
   unsigned int id = 0;
   for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii, ++id)

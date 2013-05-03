@@ -558,11 +558,11 @@ struct BoruvkaUnionFind {
 template<typename Graph>
 void makeGraph(const std::string& in, Graph& g) {
   typedef typename Graph::GraphNode GraphNode;
-  typedef Galois::Graph::LC_Linear_Graph<size_t, Weight> ReaderGraph;
+  typedef Galois::Graph::LC_CSR_Graph<size_t, Weight> ReaderGraph;
   typedef ReaderGraph::GraphNode ReaderGNode;
 
   ReaderGraph reader;
-  reader.structureFromFile(in.c_str());
+  Galois::Graph::readGraph(reader, in);
 
   // Assign ids to ReaderGNodes
   size_t numNodes = 0;

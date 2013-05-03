@@ -669,7 +669,7 @@ static void printDegreeDistribution() {
 
 // Read graph from a binary .gr as dirived from a Matrix Market .mtx using graph-convert
 static void readGraph(GNode& source, GNode& report) {
-  graph.structureFromFile(filename);
+  Galois::Graph::readGraph(graph, filename);
 
   source = *graph.begin();
   report = *graph.begin();
@@ -919,7 +919,7 @@ struct SerialCM {
 		perm.push_back(source);
 
 		unsigned int index = 0;
-		unsigned int count = 0;
+		//unsigned int count = 0;
 
 		while (index < perm.size()) {
 			counter += 1;

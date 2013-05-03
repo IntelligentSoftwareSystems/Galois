@@ -53,7 +53,7 @@ static llvm::cl::opt<int> iterLimit("limit", llvm::cl::desc("Limit number of ite
 static llvm::cl::opt<unsigned int> startNode("startNode", llvm::cl::desc("Node to start search from"), llvm::cl::init(0));
 static llvm::cl::opt<bool> forceVerify("forceVerify", llvm::cl::desc("Abort if not verified, only makes sense for torus graphs"));
 
-typedef Galois::Graph::LC_FileGraph<void, void> Graph;
+typedef Galois::Graph::LC_CSR_Graph<void, void>::with_no_lockable<true>::with_numa_alloc<true> Graph;
 typedef Graph::GraphNode GNode;
 
 Graph* G;
@@ -67,7 +67,7 @@ struct PerIt {
 };
 
 struct process {
-  typedef int tt__does_not_need_aborts;
+  typedef int tt_does_not_need_aborts;
   typedef int tt_needs_per_iter_alloc;
   typedef int tt_does_not_need_push;
 
@@ -78,7 +78,7 @@ struct process {
     std::deque<int, typename PerIt<int>::Ty> d(NumNodes, 0, lwl.getPerIterAlloc());
     std::deque<double, typename PerIt<double>::Ty> delta(NumNodes, 0.0, lwl.getPerIterAlloc());
     std::deque<GNdeque, typename PerIt<GNdeque>::Ty> succ(NumNodes, GNdeque(lwl.getPerIterAlloc()), lwl.getPerIterAlloc());
-    int QAt = 0;
+    unsigned int QAt = 0;
     
     int req = _req;
     
@@ -90,10 +90,10 @@ struct process {
     while (QAt != SQ.size()) {
       GNode _v = SQ[QAt++];
       int v = _v;
-      for (Graph::neighbor_iterator
-          ii = G->neighbor_begin(_v, Galois::MethodFlag::NONE),
-          ee = G->neighbor_end(_v, Galois::MethodFlag::NONE); ii != ee; ++ii) {
-	GNode _w = *ii;
+      for (Graph::edge_iterator
+          ii = G->edge_begin(_v, Galois::MethodFlag::NONE),
+          ee = G->edge_end(_v, Galois::MethodFlag::NONE); ii != ee; ++ii) {
+	GNode _w = G->getEdgeDst(ii);
 	int w = _w;
 	if (!d[w]) {
 	  SQ.push_back(_w);
@@ -121,7 +121,7 @@ struct process {
       delta[w] = delta_w;
     }
     double* Vec = *CB.getLocal();
-    for (int i = 0; i < delta.size(); ++i) {
+    for (unsigned int i = 0; i < delta.size(); ++i) {
       Vec[i] += delta[i];
     }
   }
@@ -160,7 +160,7 @@ void printBCcertificate() {
 
   for (int i=0; i<NumNodes; ++i) {
     double bc = (*CB.getRemote(0))[i];
-    for (int j = 1; j < Galois::getActiveThreads(); ++j)
+    for (unsigned int j = 1; j < Galois::getActiveThreads(); ++j)
       bc += (*CB.getRemote(j))[i];
     outf << i << ": " << setiosflags(std::ios::fixed) << std::setprecision(9) << bc << std::endl;
   }
@@ -171,7 +171,7 @@ struct HasOut: public std::unary_function<GNode,bool> {
   Graph* graph;
   HasOut(Graph* g): graph(g) { }
   bool operator()(const GNode& n) const {
-    return graph->neighbor_begin(n) != graph->neighbor_end(n);
+    return graph->edge_begin(n) != graph->edge_end(n);
   }
 };
 
@@ -181,7 +181,7 @@ int main(int argc, char** argv) {
 
   Graph g;
   G = &g;
-  G->structureFromFile(filename.c_str());
+  Galois::Graph::readGraph(*G, filename);
 
   NumNodes = G->size();
 
@@ -222,7 +222,7 @@ int main(int argc, char** argv) {
   if (!skipVerify) {
     for (int i=0; i<10; ++i) {
       double bc = (*CB.getRemote(0))[i];
-      for (int j = 1; j < Galois::getActiveThreads(); ++j)
+      for (unsigned int j = 1; j < Galois::getActiveThreads(); ++j)
 	bc += (*CB.getRemote(j))[i];
       std::cout << i << ": " << setiosflags(std::ios::fixed) << std::setprecision(6) << bc << "\n";
     }

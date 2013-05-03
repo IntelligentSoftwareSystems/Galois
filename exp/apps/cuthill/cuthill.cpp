@@ -87,8 +87,7 @@ struct SNode {
   bool done;
 };
 
-//typedef Galois::Graph::LC_Linear_Graph<SNode, void> Graph;
-typedef Galois::Graph::LC_CSR_Graph<SNode, void> Graph;
+typedef Galois::Graph::LC_CSR_Graph<SNode, void>::with_no_lockable<true>::with_numa_alloc<true> Graph;
 typedef Graph::GraphNode GNode;
 
 Graph graph;
@@ -326,7 +325,7 @@ public:
 				GNode dst = graph.getEdgeDst(ii);
 				SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
 
-				unsigned long int diff = abs(sdata.id - ddata.id);
+				long int diff = abs(sdata.id - ddata.id);
 				//long int diff = (long int) sdata.id - (long int) ddata.id;
 				maxdiff = diff > maxdiff ? diff : maxdiff;
 			}
@@ -825,7 +824,7 @@ int main(int argc, char **argv) {
 
   Galois::StatTimer itimer("InitTime");
   itimer.start();
-  graph.structureFromFile(filename);
+  Galois::Graph::readGraph(graph, filename); 
   {
     size_t id = 0;
 		for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii){

@@ -314,7 +314,7 @@ static void makeGraph(const char* input) {
    typedef InGraph::GraphNode InGNode;
    InGraph in_graph;
    //Read graph from file.
-   in_graph.structureFromFile(input);
+   Galois::Graph::readGraph(in_graph, input);
    std::cout << "Read " << in_graph.size() << " nodes\n";
    //A node and a int is an element.
    typedef std::pair<InGNode, EdgeDataType> Element;

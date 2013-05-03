@@ -160,7 +160,7 @@ std::ostream& operator<<(std::ostream& out, const SNode& n) {
   return out;
 }
 
-typedef Galois::Graph::LC_CSR_Graph<SNode, void> Graph;
+typedef Galois::Graph::LC_CSR_Graph<SNode, void>::with_no_lockable<true> Graph;
 typedef Graph::GraphNode GNode;
 
 Graph graph;
@@ -576,7 +576,7 @@ static void printDegreeDistribution() {
 
 // Read graph from a binary .gr as dirived from a Matrix Market .mtx using graph-convert
 static void readGraph(GNode& source, GNode& terminal) {
-  graph.structureFromFile(filename);
+  Galois::Graph::readGraph(graph, filename);
 
   source = *graph.begin();
   terminal = *graph.begin();

@@ -180,13 +180,13 @@ void resetGraph(typename Algo::Graph& g) {
 
 template<typename Graph>
 void readInOutGraph(Graph& graph) {
+  using namespace Galois::Graph;
   if (symmetricGraph) {
-    graph.structureFromFile(filename, true); 
+    Galois::Graph::readGraph(graph, filename);
   } else if (transposeGraphName.size()) {
-    graph.structureFromFile(filename, transposeGraphName);
+    Galois::Graph::readGraph(graph, filename, transposeGraphName);
   } else {
-    std::cerr << "Graph type not supported\n";
-    abort();
+    GALOIS_DIE("Graph type not supported");
   }
 }
 
@@ -428,7 +428,10 @@ struct GraphLabAlgo {
     LNode(): odd_iteration(false) { }
   };
 
-  typedef Galois::Graph::LC_CSR_InOutGraph<LNode,void,true> Graph;
+  typedef typename Galois::Graph::LC_CSR_Graph<LNode,void>
+    ::template with_no_lockable<true> 
+    ::template with_numa_alloc<true> InnerGraph;
+  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef typename Graph::GraphNode GNode;
 
   void readGraph(Graph& graph) { readInOutGraph(graph); }
@@ -616,9 +619,12 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
     Visited visited[2];
   };
 
+  typedef typename Galois::Graph::LC_CSR_Graph<LNode,void>
+    ::template with_no_lockable<true> 
+    ::template with_numa_alloc<true> InnerGraph;
   typedef typename boost::mpl::if_c<UseGraphChi,
           Galois::Graph::OCImmutableEdgeGraph<LNode,void>,
-          Galois::Graph::LC_CSR_InOutGraph<LNode,void,true> >::type
+          Galois::Graph::LC_InOut_Graph<InnerGraph> >::type
           Graph;
   typedef typename Graph::GraphNode GNode;
 

@@ -99,7 +99,7 @@ std::ostream& operator<<(std::ostream& out, const SNode& n) {
   return out;
 }
 
-typedef Galois::Graph::LC_Linear_Graph<SNode, void> Graph;
+typedef Galois::Graph::LC_Linear_Graph<SNode, void>::with_no_lockable<true>::with_numa_alloc<true> Graph;
 typedef Graph::GraphNode GNode;
 
 Graph graph;
@@ -501,7 +501,7 @@ struct PseudoPeripheral {
     BFS::Result res;
     std::deque<GNode> candidates;
 
-    if (limit == ~0 || pseudoAlgo == fullPseudo) {
+    if (limit == ~(size_t)0 || pseudoAlgo == fullPseudo) {
       res = BFS::go(start, false);
       if (computeCandidates)
         candidates = select_candidates::go(5, res.ecc());
@@ -978,7 +978,7 @@ static void printDegreeDistribution() {
 
 // Read graph from a binary .gr as dirived from a Matrix Market .mtx using graph-convert
 static void readGraph() {
-  graph.structureFromFile(filename);
+  Galois::Graph::readGraph(graph, filename);
 
   size_t nnodes = graph.size();
   std::cout << "Read " << nnodes << " nodes\n";

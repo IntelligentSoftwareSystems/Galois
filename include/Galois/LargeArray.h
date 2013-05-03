@@ -58,6 +58,7 @@ public:
   typedef pointer iterator;
   typedef const_pointer const_iterator;
   const static bool has_value = true;
+  const static size_t sizeof_value = sizeof(T);
 
 protected:
   void allocate(size_type n, bool interleave, bool prefault) {
@@ -149,11 +150,6 @@ public:
     (&m_data[n])->~T();
   }
 
-  template<typename It>
-  void copyIn(It begin, It end) {
-    std::copy(begin, end, data());
-  }
-
   // The following methods are not shared with void specialization
   const_pointer data() const { return m_data; }
   pointer data() { return m_data; }
@@ -177,6 +173,7 @@ public:
   typedef pointer iterator;
   typedef const_pointer const_iterator;
   const static bool has_value = false;
+  const static size_t sizeof_value = 0;
 
   const_reference at(difference_type x) const { return 0; }
   reference at(difference_type x) { return 0; }
@@ -198,7 +195,6 @@ public:
   void destroy() { }
   void destroyAt(size_type n) { }
 
-  template<typename It> void copyIn(It begin, It end) { }
   const_pointer data() const { return 0; }
   pointer data() { return 0; }
 };

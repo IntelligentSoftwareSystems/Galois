@@ -262,7 +262,7 @@ void readMetisGraph(MetisGraph* metisGraph, const char* filename){
 
 void readGraph(MetisGraph* metisGraph, const char* filename, bool weighted = false, bool directed = true){
 	InputGraph inputGraph;
-	inputGraph.structureFromFile(filename);
+	Galois::Graph::readGraph(inputGraph, filename);
 	cout<<"start to transfer data to GGraph"<<endl;
 	int id = 0;
 	for (InputGraph::iterator ii = inputGraph.begin(), ee = inputGraph.end(); ii != ee; ++ii) {
@@ -347,7 +347,7 @@ int main(int argc, char** argv) {
 	MetisGraph metisGraph;
 	GGraph graph;
 	metisGraph.setGraph(&graph);
-	bool directed = true;
+	//bool directed = true;
 	if(mtxInput){
 	  readMetisGraph(&metisGraph, filename.c_str());
 	}else{

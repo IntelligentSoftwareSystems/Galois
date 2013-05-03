@@ -105,7 +105,6 @@ void Galois::Runtime::LL::gErrorStr(const char* filename, int lineno, const std:
 }
 
 void Galois::Runtime::LL::gSysErrorStr(const char* filename, int lineno, int err, const std::string& s) {
-  int err_saved = errno;
   IOLock.lock();
   std::cerr << "ERROR: " << filename << ":" << lineno << ": " << strerror(err) << ": " << s << "\n";
   IOLock.unlock();

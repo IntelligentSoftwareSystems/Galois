@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -34,12 +34,21 @@ namespace LL {
 inline static void asmPause() {
 #if defined(__i386__) || defined(__amd64__)
   //__builtin_ia32_pause();
-  asm volatile ( "pause");
+  asm volatile ("pause");
 #endif
 }
 
 inline static void compilerBarrier() {
   asm volatile ("":::"memory");
+}
+
+inline static void flushInstructionPipeline() {
+#if defined(__i386__) || defined(__amd64__)
+  asm volatile (
+      "xor %%eax, %%eax;"
+      "cpuid;"
+      :::"%eax", "%ebx", "%ecx", "%edx");
+#endif
 }
 
 //xeons have 64 byte cache lines, but will prefetch 2 at a time

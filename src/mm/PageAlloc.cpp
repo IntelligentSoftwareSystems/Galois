@@ -41,7 +41,8 @@ static const int _MAP_BASE = MAP_ANONYMOUS | MAP_PRIVATE;
 static const int _MAP_POP  = MAP_POPULATE | _MAP_BASE;
 #endif
 #ifdef MAP_HUGETLB
-static const int _MAP_HUGE = MAP_HUGETLB | _MAP_POP;
+static const int _MAP_HUGE_POP = MAP_HUGETLB | _MAP_POP;
+static const int _MAP_HUGE = MAP_HUGETLB;
 #endif
 
 namespace {
@@ -83,7 +84,7 @@ void* allocFromOS() {
   void* ptr = 0;
 #ifdef MAP_HUGETLB
   //First try huge
-  ptr = mmap(0, Galois::Runtime::MM::pageSize, _PROT, _MAP_HUGE, -1, 0);
+  ptr = mmap(0, Galois::Runtime::MM::pageSize, _PROT, _MAP_HUGE_POP, -1, 0);
 #endif
 
   //FIXME: improve failure case to ensure pageSize alignment
@@ -116,6 +117,12 @@ void* allocFromOS() {
 }
 
 } // end anon namespace
+
+void Galois::Runtime::MM::pageIn(void* buf, size_t len) {
+  volatile char* ptr = reinterpret_cast<volatile char*>(buf);
+  for (size_t i = 0; i < len; i += smallPageSize)
+    ptr[i];
+}
 
 void* Galois::Runtime::MM::pageAlloc() {
   HeadPtr* phead = head;
@@ -157,14 +164,23 @@ void* Galois::Runtime::MM::largeAlloc(size_t len, bool preFault) {
 
   allocLock.lock();
 #ifdef MAP_HUGETLB
-  ptr = mmap(0, size, _PROT, _MAP_HUGE, -1, 0);
+  ptr = mmap(0, size, _PROT, preFault ? _MAP_HUGE_POP : _MAP_HUGE, -1, 0);
+# ifndef MAP_POPULATE
+  if (ptr != MAP_FAILED && ptr && preFault) {
+    pageIn(ptr, size); // XXX should use hugepage stride
+  }
+# endif
 #endif
 #ifdef MAP_POPULATE
   if (preFault && (!ptr || ptr == MAP_FAILED))
     ptr = mmap(0, size, _PROT, _MAP_POP, -1, 0);
 #endif
-  if (!ptr || ptr == MAP_FAILED)
+  if (!ptr || ptr == MAP_FAILED) {
     ptr = mmap(0, size, _PROT, _MAP_BASE, -1, 0);
+    if (ptr != MAP_FAILED && ptr && preFault) {
+      pageIn(ptr, size);
+    }
+  }
   allocLock.unlock();
 
   if (!ptr || ptr == MAP_FAILED)

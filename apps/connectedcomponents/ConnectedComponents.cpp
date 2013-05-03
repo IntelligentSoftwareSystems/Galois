@@ -103,13 +103,13 @@ struct Node: public Galois::UnionFindNode<Node> {
 
 template<typename Graph>
 void readInOutGraph(Graph& graph) {
+  using namespace Galois::Graph;
   if (symmetricGraph) {
-    graph.structureFromFile(inputFilename, true); 
+    Galois::Graph::readGraph(graph, inputFilename);
   } else if (transposeGraphName.size()) {
-    graph.structureFromFile(inputFilename, transposeGraphName);
+    Galois::Graph::readGraph(graph, inputFilename, transposeGraphName);
   } else {
-    std::cerr << "Graph type not supported\n";
-    abort();
+    GALOIS_DIE("Graph type not supported");
   }
 }
 
@@ -117,12 +117,10 @@ void readInOutGraph(Graph& graph) {
  * Serial connected components algorithm. Just use union-find.
  */
 struct SerialAlgo {
-  typedef Galois::Graph::LC_CSR_Graph<Node,void> Graph;
+  typedef Galois::Graph::LC_CSR_Graph<Node,void>::with_no_lockable<true> Graph;
   typedef Graph::GraphNode GNode;
 
-  void readGraph(Graph& graph) {
-    graph.structureFromFile(inputFilename);
-  }
+  void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, inputFilename); }
 
   struct Merge {
     Graph& graph;
@@ -155,12 +153,10 @@ struct SerialAlgo {
  * component.
  */
 struct SynchronousAlgo {
-  typedef Galois::Graph::LC_CSR_Graph<Node,void> Graph;
+  typedef Galois::Graph::LC_CSR_Graph<Node,void>::with_no_lockable<true>::with_numa_alloc<true> Graph;
   typedef Graph::GraphNode GNode;
 
-  void readGraph(Graph& graph) {
-    graph.structureFromFile(inputFilename);
-  }
+  void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, inputFilename); }
 
   struct Edge {
     GNode src;
@@ -268,7 +264,10 @@ struct LabelPropAlgo {
     bool isRep() { return id == comp; }
   };
 
-  typedef Galois::Graph::LC_CSR_InOutGraph<LNode,void,true> Graph;
+  typedef Galois::Graph::LC_CSR_Graph<LNode,void>
+    ::with_no_lockable<true> 
+    ::with_numa_alloc<true> InnerGraph;
+  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
   typedef LNode::component_type component_type;
 
@@ -351,9 +350,12 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
     bool isRep() { return id == comp; }
   };
 
+  typedef typename Galois::Graph::LC_CSR_Graph<LNode,void>
+    ::template with_no_lockable<true> 
+    ::template with_numa_alloc<true> InnerGraph;
   typedef typename boost::mpl::if_c<UseGraphChi,
           Galois::Graph::OCImmutableEdgeGraph<LNode,void>,
-          Galois::Graph::LC_CSR_InOutGraph<LNode,void,true> >::type
+          Galois::Graph::LC_InOut_Graph<InnerGraph>>::type
           Graph;
   typedef typename Graph::GraphNode GNode;
 
@@ -528,7 +530,10 @@ struct GraphLabAlgo {
     bool isRep() { return id == labelid; }
   };
 
-  typedef Galois::Graph::LC_CSR_InOutGraph<LNode,void,true> Graph;
+  typedef Galois::Graph::LC_CSR_Graph<LNode,void>
+    ::with_no_lockable<true> 
+    ::with_numa_alloc<true> InnerGraph;
+  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
   struct Initialize {
@@ -650,16 +655,17 @@ struct AsyncOCAlgo {
 #endif
 
 /**
- * Like synchronous algorithm, but if we restrict path compression, we
- * can perform unions and finds concurrently.
+ * Like synchronous algorithm, but if we restrict path compression (as done is
+ * @link{UnionFindNode}), we can perform unions and finds concurrently.
  */
 struct AsyncAlgo {
-  typedef Galois::Graph::LC_CSR_Graph<Node,void> Graph;
+  typedef Galois::Graph::LC_CSR_Graph<Node,void>
+    ::with_numa_alloc<true>
+    ::with_no_lockable<true> 
+    Graph;
   typedef Graph::GraphNode GNode;
 
-  void readGraph(Graph& graph) {
-    graph.structureFromFile(inputFilename);
-  }
+  void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, inputFilename); }
 
   struct Merge {
     typedef int tt_does_not_need_aborts;
@@ -884,7 +890,7 @@ typename Graph::node_data_type::component_type findLargest(Graph& graph) {
   typedef ReduceMax<Graph> RM;
 
   typename CL::Accums accums;
-  Galois::do_all(graph.begin(), graph.end(), CL(graph, accums));
+  Galois::do_all_local(graph, CL(graph, accums));
   typename CL::Map& map = accums.map.reduce();
   size_t trivialComponents = accums.trivial.reduce();
 

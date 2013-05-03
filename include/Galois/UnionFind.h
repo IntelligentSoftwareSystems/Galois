@@ -72,10 +72,10 @@ public:
     while (rep->m_component != rep) {
       T* next = rep->m_component;
 
-      if (prev && prev->m_component == rep)
+      if (prev && prev->m_component == rep) {
         prev->m_component = next;
+      }
       prev = rep;
-
       rep = next;
     }
     return rep;

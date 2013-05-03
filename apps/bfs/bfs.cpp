@@ -230,24 +230,23 @@ void initialize(Algo& algo,
 
 template<typename Graph>
 void readInOutGraph(Graph& graph) {
+  using namespace Galois::Graph;
   if (symmetricGraph) {
-    graph.structureFromFile(filename, true); 
+    Galois::Graph::readGraph(graph, filename);
   } else if (transposeGraphName.size()) {
-    graph.structureFromFile(filename, transposeGraphName);
+    Galois::Graph::readGraph(graph, filename, transposeGraphName);
   } else {
-    std::cerr << "Graph type not supported\n";
-    abort();
+    GALOIS_DIE("Graph type not supported");
   }
 }
 
-
 //! Serial BFS using optimized flags based off asynchronous algo
 struct SerialAlgo {
-  typedef Galois::Graph::LC_CSR_Graph<SNode,void> Graph;
+  typedef Galois::Graph::LC_CSR_Graph<SNode,void>::with_no_lockable<true> Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "Serial"; }
-  void readGraph(Graph& graph) { graph.structureFromFile(filename); }
+  void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, filename); }
 
   void operator()(Graph& graph, const GNode source) const {
     std::deque<GNode> wl;
@@ -278,11 +277,11 @@ struct SerialAlgo {
 
 //! Galois BFS using optimized flags
 struct AsyncAlgo {
-  typedef Galois::Graph::LC_CSR_Graph<SNode,void> Graph;
+  typedef Galois::Graph::LC_CSR_Graph<SNode,void>::with_no_lockable<true>::with_numa_alloc<true> Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "Asynchronous"; }
-  void readGraph(Graph& graph) { graph.structureFromFile(filename); }
+  void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, filename); }
 
   typedef std::pair<GNode, Dist> WorkItem;
 
@@ -337,9 +336,12 @@ struct AsyncAlgo {
 #ifdef GALOIS_USE_EXP
 template<bool UseGraphChi>
 struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
+  typedef typename Galois::Graph::LC_CSR_Graph<SNode,void>
+    ::template with_no_lockable<true> 
+    ::template with_numa_alloc<true> InnerGraph;
   typedef typename boost::mpl::if_c<UseGraphChi,
           Galois::Graph::OCImmutableEdgeGraph<SNode,void>,
-          Galois::Graph::LC_CSR_InOutGraph<SNode,void,true> >::type
+          Galois::Graph::LC_InOut_Graph<InnerGraph>>::type
           Graph;
   typedef typename Graph::GraphNode GNode;
 
@@ -393,7 +395,10 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
 };
 
 struct GraphLabAlgo {
-  typedef Galois::Graph::LC_CSR_InOutGraph<SNode,void,true> Graph;
+  typedef typename Galois::Graph::LC_CSR_Graph<SNode,void>
+    ::with_no_lockable<true> 
+    ::with_numa_alloc<true> InnerGraph;
+  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
   void readGraph(Graph& graph) {
@@ -470,7 +475,10 @@ struct GraphLabAlgo {
  * search. In Supercomputing. 2012.
  */
 struct HighCentralityAlgo {
-  typedef Galois::Graph::LC_CSR_InOutGraph<SNode,void,true> Graph;
+  typedef typename Galois::Graph::LC_CSR_Graph<SNode,void>
+    ::with_no_lockable<true> 
+    ::with_numa_alloc<true> InnerGraph;
+  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
   
   std::string name() const { return "High Centrality"; }
@@ -598,12 +606,15 @@ struct HighCentralityAlgo {
 //! BFS using optimized flags and barrier scheduling 
 template<typename WL, bool useCas>
 struct BarrierAlgo {
-  typedef Galois::Graph::LC_CSR_Graph<SNode,void> Graph;
+  typedef Galois::Graph::LC_CSR_Graph<SNode,void>
+    ::template with_numa_alloc<true>
+    ::template with_no_lockable<true> 
+    Graph;
   typedef Graph::GraphNode GNode;
   typedef std::pair<GNode,Dist> WorkItem;
 
   std::string name() const { return "Barrier"; }
-  void readGraph(Graph& graph) { graph.structureFromFile(filename); }
+  void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, filename); }
 
   struct Process {
     typedef int tt_does_not_need_aborts;
@@ -651,12 +662,12 @@ struct HybridAlgo: public HybridBFS<SNode,Dist> {
 
 template<DetAlgo Version>
 struct DeterministicAlgo {
-  typedef Galois::Graph::LC_CSR_Graph<SNode,void> Graph;
+  typedef Galois::Graph::LC_CSR_Graph<SNode,void>::template with_numa_alloc<true> Graph;
   typedef Graph::GraphNode GNode;
 
 
   std::string name() const { return "Deterministic"; }
-  void readGraph(Graph& graph) { graph.structureFromFile(filename); }
+  void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, filename); }
 
   typedef std::pair<GNode,int> WorkItem;
 

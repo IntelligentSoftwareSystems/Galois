@@ -203,23 +203,23 @@ void initialize(Algo& algo,
 
 template<typename Graph>
 void readInOutGraph(Graph& graph) {
+  using namespace Galois::Graph;
   if (symmetricGraph) {
-    graph.structureFromFile(filename, true); 
+    Galois::Graph::readGraph(graph, filename);
   } else if (transposeGraphName.size()) {
-    graph.structureFromFile(filename, transposeGraphName);
+    Galois::Graph::readGraph(graph, filename, transposeGraphName);
   } else {
-    std::cerr << "Graph type not supported\n";
-    abort();
+    GALOIS_DIE("Graph type not supported");
   }
 }
 
 struct SerialAlgo {
-  typedef Galois::Graph::LC_CSR_Graph<SNode, uint32_t> Graph;
+  typedef Galois::Graph::LC_CSR_Graph<SNode, uint32_t>::with_no_lockable<true> Graph;
   typedef Graph::GraphNode GNode;
   typedef UpdateRequestCommon<GNode> UpdateRequest;
 
   std::string name() const { return "Serial"; }
-  void readGraph(Graph& graph) { graph.structureFromFile(filename); }
+  void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, filename); }
 
   struct Initialize {
     Graph& g;
@@ -264,10 +264,11 @@ template<bool UseCas>
 struct AsyncAlgo {
   typedef SNode Node;
 
-  //typedef Galois::Graph::LC_Linear_Graph<Node, uint32_t> Graph;
-  //typedef Galois::Graph::LC_Numa_Graph<Node, uint32_t> Graph;
-  typedef Galois::Graph::LC_InlineEdge_Graph<Node, uint32_t, true> Graph;
-  //typedef Galois::Graph::LC_CSR_Graph<Node, uint32_t> Graph;
+  typedef Galois::Graph::LC_InlineEdge_Graph<Node, uint32_t>
+    ::template with_out_of_line_lockable<true>
+    ::template with_compressed_node_ptr<true>
+    ::template with_numa_alloc<true>
+    Graph;
   typedef typename Graph::GraphNode GNode;
   typedef UpdateRequestCommon<GNode> UpdateRequest;
 
@@ -275,7 +276,7 @@ struct AsyncAlgo {
     return UseCas ? "Asynchronous with CAS" : "Asynchronous"; 
   }
 
-  void readGraph(Graph& graph) { graph.structureFromFile(filename); }
+  void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, filename); }
 
   struct Initialize {
     Graph& g;
@@ -381,8 +382,10 @@ static_assert(Galois::does_not_need_aborts<AsyncAlgo<true>::Process>::value, "Oo
 
 #ifdef GALOIS_USE_EXP
 struct GraphLabAlgo {
-  //typedef Galois::Graph::LC_InlineEdge_InOutGraph<SNode,uint32_t,true,true> Graph; // XXX
-  typedef Galois::Graph::LC_CSR_InOutGraph<SNode,uint32_t,true> Graph;
+  typedef Galois::Graph::LC_CSR_Graph<SNode,uint32_t>
+    ::with_no_lockable<true>
+    ::with_numa_alloc<true> InnerGraph;
+  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "GraphLab"; }
@@ -457,9 +460,13 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
     bool visited;
   };
 
+  typedef typename Galois::Graph::LC_InlineEdge_Graph<LNode,uint32_t>
+    ::template with_compressed_node_ptr<true>
+    ::template with_no_lockable<true> 
+    ::template with_numa_alloc<true> InnerGraph;
   typedef typename boost::mpl::if_c<UseGraphChi,
           Galois::Graph::OCImmutableEdgeGraph<LNode,uint32_t>,
-          Galois::Graph::LC_InlineEdge_InOutGraph<LNode,uint32_t,true,true> >::type
+          Galois::Graph::LC_InOut_Graph<InnerGraph>>::type
           Graph;
   typedef typename Graph::GraphNode GNode;
 

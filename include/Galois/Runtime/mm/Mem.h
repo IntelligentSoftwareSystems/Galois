@@ -46,11 +46,16 @@ namespace Runtime {
 //! Memory management functionality.
 namespace MM {
 
+const size_t smallPageSize = 4*1024;
 const size_t pageSize = 2*1024*1024;
 void* pageAlloc();
 void  pageFree(void*);
 unsigned pageAllocInfo();
 void pagePreAlloc(int numpages);
+
+//! Forces the given block to be paged into physical memory
+void pageIn(void *buf, size_t len);
+
 
 /**
  * Allocates memory interleaved across NUMA nodes. 
@@ -65,7 +70,8 @@ void  largeInterleavedFree(void* mem, size_t bytes);
 void* largeAlloc(size_t bytes, bool preFault = true);
 void  largeFree(void* mem, size_t bytes);
 
-void printInterleavedStats();
+//! Print lines from /proc/<pid>/numa_maps that contain at least minPages
+void printInterleavedStats(int minPages = 16*1024);
 
 //! Per-thread heaps using Galois thread aware construct
 template<class LocalHeap>

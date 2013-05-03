@@ -32,7 +32,7 @@
 static int is_numa_available;
 static const char* sNumaStat = "/proc/self/numa_maps";
 
-void Galois::Runtime::MM::printInterleavedStats() {
+void Galois::Runtime::MM::printInterleavedStats(int minPages) {
   FILE* f = fopen(sNumaStat, "r");
   if (!f) {
     GALOIS_SYS_DIE("failed opening ", sNumaStat);
@@ -51,12 +51,12 @@ void Galois::Runtime::MM::printInterleavedStats() {
       LL::gInfo(line);
     } else if ((start = strstr(line, "anon=")) != 0) {
       int pages;
-      if (sscanf(start, "anon=%d", &pages) == 1 && pages > 16*1024) {
+      if (sscanf(start, "anon=%d", &pages) == 1 && pages >= minPages) {
         LL::gInfo(line);
       }
     } else if ((start = strstr(line, "mapped=")) != 0) {
       int pages;
-      if (sscanf(start, "mapped=%d", &pages) == 1 && pages > 16*1024) {
+      if (sscanf(start, "mapped=%d", &pages) == 1 && pages >= minPages) {
         LL::gInfo(line);
       }
     }
@@ -111,7 +111,7 @@ void* Galois::Runtime::MM::largeInterleavedAlloc(size_t len, bool full) {
       data = alloc_interleaved_subset(len);
     // NB(ddn): Some strange bugs when empty interleaved mappings are
     // coalesced. Eagerly fault in interleaved pages to circumvent.
-    memset(data, 0, len);
+    pageIn(data, len);
   } else {
     data = largeAlloc(len);
   }

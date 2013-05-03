@@ -69,7 +69,7 @@ struct Node: public Galois::UnionFindNode<Node> {
   const EdgeData* lightest;
 };
 
-typedef Galois::Graph::LC_CSR_Graph<Node,EdgeData> Graph;
+typedef Galois::Graph::LC_CSR_Graph<Node,EdgeData>::with_numa_alloc<true>::with_no_lockable<true> Graph;
 
 typedef Graph::GraphNode GNode;
 
@@ -407,13 +407,13 @@ void initializeGraph() {
   Galois::Graph::FileGraph origGraph;
   Galois::Graph::FileGraph symGraph;
   
-  origGraph.structureFromFile(inputFilename.c_str());
+  origGraph.structureFromFileInterleaved<EdgeData>(inputFilename);
   if (!symmetricGraph) 
     Galois::Graph::makeSymmetric<EdgeData>(origGraph, symGraph);
   else
     symGraph.swap(origGraph);
 
-  graph.structureFromGraph(symGraph);
+  Galois::Graph::readGraph(graph, symGraph);
   
   Galois::StatTimer Tsort("InitializeSortTime");
   Tsort.start();

@@ -119,10 +119,10 @@ static cll::opt<std::string> filename(cll::Positional,
     cll::Required);
 
 struct SNode;
-typedef Galois::Graph::LC_CSR_Graph<SNode, void> Graph;
 // Hack: Resolve circular definition of Graph and SNode.parent with fact that
 // all LC_CSR_Graph::GraphNodes have the same type.
-typedef Galois::Graph::LC_CSR_Graph<void, void>::GraphNode GNode;
+typedef Galois::Graph::LC_CSR_Graph<void, void>::with_no_lockable<true>::with_numa_alloc<true> DummyGraph;
+typedef DummyGraph::GraphNode GNode;
 
 //****** Work Item and Node Data Defintions ******
 struct SNode {
@@ -143,6 +143,8 @@ struct SNode {
 	//Galois::gdeque<Galois::Graph::LC_CSR_Graph<SNode, void>::GraphNode>* bucket;
 	//Galois::Runtime::LL::SimpleLock<true> mutex;
 };
+
+typedef DummyGraph::with_node_data<SNode> Graph;
 
 // Check hack above
 struct CheckAssertion {
@@ -791,7 +793,7 @@ static void resetGraph() {
 
 // Read graph from a binary .gr as dirived from a Matrix Market .mtx using graph-convert
 static void readGraph(GNode& source, GNode& report) {
-  graph.structureFromFile(filename);
+  Galois::Graph::readGraph(graph, filename); 
 
   source = *graph.begin();
   report = *graph.begin();
@@ -906,7 +908,7 @@ struct BarrierNoDup {
 		Galois::GAtomic<unsigned int> added = Galois::GAtomic<unsigned int>(0);;
 		Galois::GAtomic<unsigned int> temp = Galois::GAtomic<unsigned int>(0);;
 
-		unsigned int depth = 0;
+		//unsigned int depth = 0;
 		unsigned int thr = Galois::getActiveThreads();
 		//Galois::Runtime::PthreadBarrier barrier(thr);
 		Galois::Runtime::Barrier& barrier = Galois::Runtime::getSystemBarrier();

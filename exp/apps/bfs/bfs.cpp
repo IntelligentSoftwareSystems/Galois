@@ -245,7 +245,7 @@ static bool verify(GNode source) {
 }
 
 static void readGraph(GNode& source, GNode& report) {
-  graph.structureFromFile(filename);
+  Galois::Graph::readGraph(graph, filename); 
 
   source = *graph.begin();
   report = *graph.begin();

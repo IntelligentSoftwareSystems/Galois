@@ -29,7 +29,7 @@
 #include "Galois/Galois.h"
 #include "Galois/LargeArray.h"
 #include "Galois/Graph/FileGraph.h"
-#include "Galois/Graph/Util.h"
+#include "Galois/Graph/Details.h"
 #include "Galois/Runtime/MethodFlags.h"
 
 #include <boost/utility/enable_if.hpp>
@@ -43,10 +43,10 @@ template<typename NodeTy, typename EdgeTy>
 class LC_Numa_Graph: boost::noncopyable {
 protected:
   struct NodeInfo;
-  typedef EdgeInfoBase<NodeInfo*,EdgeTy> EdgeInfo;
+  typedef detail::EdgeInfoBase<NodeInfo*,EdgeTy> EdgeInfo;
   typedef LargeArray<NodeInfo*> Nodes;
 
-  struct NodeInfo : public NodeInfoBase<NodeTy,true> {
+  struct NodeInfo : public detail::NodeInfoBase<NodeTy,true> {
     int numEdges;
 
     EdgeInfo* edgeBegin() {
@@ -336,8 +336,8 @@ public:
     return N->edgeEnd();
   }
 
-  EdgesIterator<LC_Numa_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
-    return EdgesIterator<LC_Numa_Graph>(*this, N, mflag);
+  detail::EdgesIterator<LC_Numa_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+    return detail::EdgesIterator<LC_Numa_Graph>(*this, N, mflag);
   }
 
   void structureFromFile(const std::string& fname) { Graph::structureFromFile(*this, fname); }

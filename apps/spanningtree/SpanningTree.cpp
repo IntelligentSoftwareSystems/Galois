@@ -60,11 +60,7 @@ struct Node: public Galois::UnionFindNode<Node> {
   Node* component;
 };
 
-#ifdef GALOIS_USE_NUMA
-typedef Galois::Graph::LC_Numa_Graph<Node,void> Graph;
-#else
-typedef Galois::Graph::LC_CSR_Graph<Node,void> Graph;
-#endif
+typedef Galois::Graph::LC_Linear_Graph<Node,void>::with_numa_alloc<true> Graph;
 
 typedef Graph::GraphNode GNode;
 
@@ -237,7 +233,7 @@ int main(int argc, char** argv) {
 
   Galois::StatTimer Tinitial("InitializeTime");
   Tinitial.start();
-  graph.structureFromFile(inputFilename.c_str());
+  Galois::Graph::readGraph(graph, inputFilename);
   std::cout << "Num nodes: " << graph.size() << "\n";
   Tinitial.stop();
 

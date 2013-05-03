@@ -56,7 +56,7 @@ run apps/kruskal/KruskalHand -maxRounds 600 -lowThresh 16 -preAlloc 32 "$BASEINP
 run apps/independentset/independentset "$BASEINPUT/random/r4-2e26.gr"
 run apps/matching/bipartite-mcm 1000000 100000000 10000 0
 run apps/preflowpush/preflowpush "$BASEINPUT/random/r4-2e23.gr" 0 100
-run apps/spanningtree/spanningtree "$BASEINPUT/inputs/random/r4-2e26.gr"
+run apps/spanningtree/spanningtree "$BASEINPUT/random/r4-2e26.gr"
 run apps/sssp/sssp -delta 8 "$BASEINPUT/random/r4-2e26.gr"
 run apps/surveypropagation/surveypropagation 9 1000000 3000000 3
 

@@ -33,7 +33,9 @@
 #include "Lonestar/BoilerPlate.h"
 
 #include <boost/iterator/transform_iterator.hpp>
+#ifdef HAS_EIGEN
 #include <Eigen/Dense>
+#endif
 #include <utility>
 #include <vector>
 #include <algorithm>
@@ -60,7 +62,7 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValN(Algo::eigentriangle, "eigentriangle", "Approximate eigen triangle algorithm"),
       clEnumValEnd), cll::init(Algo::nodeiterator));
 
-typedef Galois::Graph::LC_Numa_Graph<uint32_t,void> Graph;
+typedef Galois::Graph::LC_Linear_Graph<uint32_t,void>::with_numa_alloc<true>::with_no_lockable<true> Graph;
 //typedef Galois::Graph::LC_CSR_Graph<uint32_t,void> Graph;
 //typedef Galois::Graph::LC_Linear_Graph<uint32_t,void> Graph;
 
@@ -209,6 +211,7 @@ struct NodeIteratorAlgo {
   }
 };
 
+#ifdef HAS_EIGEN
 /**
  * AYZ algorithm. Combine node iterator algorithm with matrix multiplication.
  * Divide nodes into two categories. Low and high degree ones. Apply node
@@ -241,6 +244,7 @@ struct HybridAlgo {
   //! Node iterator algorithm + populate 
   template<bool HasLimit>
   struct ProcessLow {
+    typedef int tt_does_not_need_aborts;
     HybridAlgo* self;
     ProcessLow(HybridAlgo* s): self(s) { }
 
@@ -351,6 +355,7 @@ struct HybridAlgo {
     std::cout << "NumTriangles: " << numTriangles.reduce() << "\n";
   }
 };
+#endif
 
 /**
  * Edge Iterator algorithm for counting triangles.
@@ -389,6 +394,7 @@ struct EdgeIteratorAlgo {
   };
 
   struct Process {
+    typedef int tt_does_not_need_aborts;
     EdgeIteratorAlgo* self;
     Process(EdgeIteratorAlgo* s): self(s) { }
 
@@ -436,7 +442,7 @@ void makeGraph(const std::string& triangleFilename) {
 
   G initial, permuted;
 
-  initial.structureFromFile(inputFilename);
+  initial.structureFromFileInterleaved<void>(inputFilename);
   
   // Getting around lack of resize for deque
   std::deque<N> nodes;
@@ -457,7 +463,7 @@ void makeGraph(const std::string& triangleFilename) {
 
   std::cout << "Writing new input file: " << triangleFilename << "\n";
   permuted.structureToFile(triangleFilename);
-  graph.structureFromGraph(permuted);
+  Galois::Graph::readGraph(graph, permuted);
 }
 
 void readGraph() {
@@ -470,10 +476,10 @@ void readGraph() {
       makeGraph(triangleFilename);
     } else {
       // triangles does exist, load it
-      graph.structureFromFile(triangleFilename);
+      Galois::Graph::readGraph(graph, triangleFilename);
     }
   } else {
-    graph.structureFromFile(inputFilename);
+    Galois::Graph::readGraph(graph, inputFilename);
   }
 
   size_t index = 0;
@@ -498,8 +504,10 @@ int main(int argc, char** argv) {
   switch (algo) {
     case nodeiterator: run<NodeIteratorAlgo>(); break;
     case edgeiterator: run<EdgeIteratorAlgo>(); break;
+#ifdef HAS_EIGEN
     case hybrid: run<HybridAlgo>(); break;
     case eigentriangle: run<EigenTriangleAlgo>(); break;
+#endif
     default: std::cerr << "Unknown algo: " << algo << "\n";
   }
   Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());

@@ -83,7 +83,7 @@ int main(int argc, char **argv) {
   Galois::StatManager statManager;
   LonestarStart(argc, argv, 0,0,0);
 
-  graph.structureFromFile(filename);
+  Galois::Graph::readGraph(graph, filename);
   Galois::for_each<>(graph.begin(), graph.end(), Init());
 
   using namespace Galois::WorkList;

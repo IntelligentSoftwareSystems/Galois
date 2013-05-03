@@ -5,11 +5,11 @@
  *      Author: nyadav
  */
 
-#ifndef MEMSCALGRAPH_H_
-#define MEMSCALGRAPH_H_
+#ifndef GALOIS_GRAPH_MEMSCALGRAPH_H
+#define GALOIS_GRAPH_MEMSCALGRAPH_H
 
 #include "Galois/Bag.h"
-#include "Galois/Graph/Util.h"
+#include "Galois/Graph/Details.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/MethodFlags.h"
 
@@ -25,7 +25,6 @@
 #include <vector>
 
 namespace Galois {
-//! Parallel graph data structures.
 namespace Graph {
 
 template<typename NodeTy, typename EdgeTy, bool Directional>
@@ -284,8 +283,8 @@ public:
    * An object with begin() and end() methods to iterate over the outgoing
    * edges of N.
    */
-  EdgesIterator<MemScalGraph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
-    return EdgesIterator<MemScalGraph>(*this, N, mflag);
+  detail::EdgesIterator<MemScalGraph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+    return detail::EdgesIterator<MemScalGraph>(*this, N, mflag);
   }
 
   /**
@@ -330,4 +329,4 @@ public:
 }
 
 
-#endif /* MEMSCALGRAPH_H_ */
+#endif

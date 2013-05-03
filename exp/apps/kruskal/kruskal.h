@@ -95,7 +95,7 @@ protected:
     typedef InGraph::GraphNode InGNode;
 
     InGraph ingraph;
-    ingraph.structureFromFile (filename);
+    Galois::Graph::readGraph(ingraph, filename);
 
     // numbering nodes 0..N-1, where N is number of nodes
     // in the graph
