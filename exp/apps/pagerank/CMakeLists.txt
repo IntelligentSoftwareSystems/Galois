@@ -1,1 +1,1 @@
-app(PageRank)
+app(pagerank PageRank.cpp)
