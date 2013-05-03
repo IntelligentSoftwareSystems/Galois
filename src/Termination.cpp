@@ -215,11 +215,11 @@ public:
   }
 };
 
+__attribute__((unused))
 static TreeTerminationDetection& getTreeTermination() {
   static TreeTerminationDetection term;
   return term;
 }
-
 
 } // namespace
 

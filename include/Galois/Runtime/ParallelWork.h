@@ -286,7 +286,8 @@ public:
 
 template<typename WLTy, typename RangeTy, typename FunctionTy>
 void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
-  assert(!inGaloisForEach);
+  if (inGaloisForEach)
+    GALOIS_DIE("Nested for_each not supported");
 
   inGaloisForEach = true;
 
@@ -318,9 +319,30 @@ struct WOnEach {
 
 template<typename FunctionTy>
 void on_each_impl(FunctionTy fn, const char* loopname = 0) {
+  if (inGaloisForEach)
+    GALOIS_DIE("Nested for_each not supported");
+
+  inGaloisForEach = true;
   RunCommand w[2] = {WOnEach<FunctionTy>(fn),
 		     std::ref(getSystemBarrier())};
   getSystemThreadPool().run(&w[0], &w[2], activeThreads);
+  inGaloisForEach = false;
+}
+
+//! on each executor with simple barrier.
+template<typename FunctionTy>
+void on_each_simple_impl(FunctionTy fn, const char* loopname = 0) {
+  if (inGaloisForEach)
+    GALOIS_DIE("Nested for_each not supported");
+
+  inGaloisForEach = true;
+  Barrier* b = createSimpleBarrier();
+  b->reinit(activeThreads);
+  RunCommand w[2] = {WOnEach<FunctionTy>(fn),
+		     std::ref(*b)};
+  getSystemThreadPool().run(&w[0], &w[2], activeThreads);
+  delete b;
+  inGaloisForEach = false;
 }
 
 } // end namespace anonymous

@@ -26,7 +26,8 @@ namespace Galois {
 /**
  * Sets the number of threads to use when running any Galois iterator. Returns
  * the actual value of threads used, which could be less than the requested
- * value.
+ * value. System behavior is undefined if this function is called during
+ * parallel execution or after the first parallel execution.
  */
 unsigned int setActiveThreads(unsigned int num);
 

@@ -282,7 +282,6 @@ struct AutoLinuxPolicy {
       if (leaders[packages[i]] == -1)
 	leaders[packages[i]] = i;
 
-    
     if (EnvCheck("GALOIS_DEBUG_TOPO"))
       printFinalConfiguration(); 
   }
@@ -304,7 +303,11 @@ struct AutoLinuxPolicy {
     gPrint("Packages: ", numPackages, ", ", numPackagesRaw, " (raw)\n");
 
     for (unsigned i = 0; i < virtmap.size(); ++i) {
-      gPrint("T ", i, " P ", packages[i], " Tr ", virtmap[i], " ", ((int)i == leaders[packages[i]] ? 1 : 0));
+      gPrint(
+          "T ", i, 
+          " P ", packages[i],
+          " Tr ", virtmap[i], 
+          " L? ", ((int)i == leaders[packages[i]] ? 1 : 0));
       if (i >= numCores)
 	gPrint(" HT");
       gPrint("\n");

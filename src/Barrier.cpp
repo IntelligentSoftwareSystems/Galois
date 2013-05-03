@@ -35,11 +35,7 @@
 #include <cstdlib>
 #include <cstdio>
 
-#ifdef GALOIS_USE_DMP
-#include "dmp.h"
-#endif
-
-class PthreadBarrier {
+class PthreadBarrier: public Galois::Runtime::Barrier {
   pthread_barrier_t bar;
 
   void checkResults(int val) {
@@ -67,7 +63,7 @@ public:
     checkResults(rc);
   }
 
-  virtual void reinit(int val) {
+  virtual void reinit(unsigned val) {
     int rc = pthread_barrier_destroy(&bar);
     checkResults(rc);
     rc = pthread_barrier_init(&bar, 0, val);
@@ -81,7 +77,7 @@ public:
   }
 };
 
-class MCSBarrier :public Galois::Runtime::Barrier {
+class MCSBarrier: public Galois::Runtime::Barrier {
   struct treenode {
     //vpid is Galois::Runtime::LL::getTID()
     volatile bool* parentpointer; //null of vpid == 0
@@ -94,7 +90,6 @@ class MCSBarrier :public Galois::Runtime::Barrier {
   };
 
   Galois::Runtime::PerThreadStorage<treenode> nodes;
-  
   
   void _reinit(unsigned P) {
     for (unsigned i = 0; i < nodes.size(); ++i) {
@@ -113,7 +108,6 @@ class MCSBarrier :public Galois::Runtime::Barrier {
   }
 
 public:
-
   MCSBarrier(unsigned P = Galois::Runtime::activeThreads) {
     _reinit(P);
   }
@@ -146,10 +140,6 @@ public:
   }
 };
 
-
-
-
-
 class TopoBarrier : public Galois::Runtime::Barrier {
   struct treenode {
     //vpid is Galois::Runtime::LL::getTID()
@@ -178,14 +168,15 @@ class TopoBarrier : public Galois::Runtime::Barrier {
       for (int j = 0; j < 4; ++j) {
 	if ((4*i+j+1) < pkgs) {
 	  ++n.childnotready;
-	  ++n.havechild;
+          ++n.havechild;
 	}
       }
-      for (unsigned j = 0; j < P; ++j)
+      for (unsigned j = 0; j < P; ++j) {
 	if (Galois::Runtime::LL::getPackageForThread(j) == i && !Galois::Runtime::LL::isPackageLeader(j)) {
-	  ++n.childnotready;
-	  ++n.havechild;
-	}
+          ++n.childnotready;
+          ++n.havechild;
+        }
+      }
       n.parentpointer = (i == 0) ? 0 : nodes.getRemoteByPkg((i-1)/4);
       n.childpointers[0] = ((2*i + 1) >= pkgs) ? 0 : nodes.getRemoteByPkg(2*i+1);
       n.childpointers[1] = ((2*i + 2) >= pkgs) ? 0 : nodes.getRemoteByPkg(2*i+2);
@@ -193,6 +184,18 @@ class TopoBarrier : public Galois::Runtime::Barrier {
     }
     for (unsigned i = 0; i < P; ++i)
       *sense.getRemote(i) = 1;
+#if 0
+    for (unsigned i = 0; i < pkgs; ++i) {
+      treenode& n = *nodes.getRemoteByPkg(i);
+      Galois::Runtime::LL::gPrint(i, 
+          " this ", &n,
+          " parent ", n.parentpointer, 
+          " child[0] ", n.childpointers[0],
+          " child[1] ", n.childpointers[1],
+          " havechild ", n.havechild,
+          "\n");
+    }
+#endif
   }
 
 public:
@@ -242,6 +245,10 @@ public:
 };
 
 Galois::Runtime::Barrier::~Barrier() {}
+
+Galois::Runtime::Barrier* Galois::Runtime::createSimpleBarrier() {
+  return new PthreadBarrier();
+}
 
 Galois::Runtime::Barrier& Galois::Runtime::getSystemBarrier() {
   static TopoBarrier b;
