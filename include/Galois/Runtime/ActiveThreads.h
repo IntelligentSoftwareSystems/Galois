@@ -31,4 +31,3 @@ extern unsigned int activeThreads;
 }
 
 #endif
-

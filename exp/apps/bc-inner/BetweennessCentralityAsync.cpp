@@ -33,7 +33,7 @@
 
 using namespace std;
 
-static const char* help = "<input file>";
+//static const char* help = "<input file>";
 
 int DEF_DISTANCE;
 
@@ -113,7 +113,7 @@ struct firstForEachNodeBased {
           Bpreds.resize(0);
           Bpreds.push_back(A);
           B->distance = ADist + 1;
-          int newBDist = ADist + 1;
+          //int newBDist = ADist + 1;
           B->nsuccs = 0;
           B->sigma = ASigma;
           ed.val = ASigma;

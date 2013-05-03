@@ -58,7 +58,6 @@ struct StaticInstance {
     _lock = 0;
   }
 
-
   T* get() {
     volatile T* val = V;
     if (val)

@@ -35,7 +35,8 @@ static const char* sNumaStat = "/proc/self/numa_maps";
 void Galois::Runtime::MM::printInterleavedStats(int minPages) {
   FILE* f = fopen(sNumaStat, "r");
   if (!f) {
-    GALOIS_SYS_DIE("failed opening ", sNumaStat);
+    LL::gInfo("No NUMA support");
+    return; //GALOIS_SYS_DIE("failed opening ", sNumaStat);
   }
 
   char line[2048];
