@@ -118,7 +118,6 @@ protected:
   EdgeData edgeData;
   uint64_t numNodes;
   uint64_t numEdges;
-  NodeInfo* endNode;
 
   template<bool _C = HasCompressedNodePtr>
   NodeInfo* getDst(edge_iterator ii, typename std::enable_if<_C>::type* x = 0) const {
@@ -174,7 +173,7 @@ public:
     if (!EdgeInfo::has_value) return;
     if (numNodes == 0) return;
 
-    for (edge_iterator ii = nodeData[0].edgeBegin(), ei = endNode->edgeEnd(); ii != ei; ++ii) {
+    for (edge_iterator ii = nodeData[0].edgeBegin(), ei = nodeData[numNodes-1].edgeEnd(); ii != ei; ++ii) {
       ii->destroy();
     }
   }
@@ -197,10 +196,10 @@ public:
   uint64_t size() const { return numNodes; }
   uint64_t sizeEdges() const { return numEdges; }
 
-  const_iterator begin() const { return const_iterator(nodeData.data()); }
-  const_iterator end() const { return const_iterator(endNode); }
+  const_iterator begin() const { return const_iterator(nodeData.begin()); }
+  const_iterator end() const { return const_iterator(nodeData.end()); }
   iterator begin() { return iterator(nodeData.data()); }
-  iterator end() { return iterator(endNode); }
+  iterator end() { return iterator(nodeData.end()); }
 
   local_iterator local_begin() { return local_iterator(&nodeData[this->localBegin(numNodes)]); }
   local_iterator local_end() { return local_iterator(&nodeData[this->localEnd(numNodes)]); }
@@ -259,7 +258,6 @@ public:
       edgeData.allocateInterleaved(numEdges);
       this->outOfLineAllocateInterleaved(numNodes);
     }
-    endNode = numNodes ? &nodeData[numNodes] : 0;
   }
 
   void constructFrom(FileGraph& graph, unsigned tid, unsigned total) {
