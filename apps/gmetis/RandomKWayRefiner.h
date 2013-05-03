@@ -120,7 +120,7 @@ private:
 		metisGraph->incPartWeight(from, -vwgt);
 
 		nodeData.setEdegree(nodeData.getEdegree() + nodeData.getIdegree() - partEd[to]);
-		int temp = nodeData.getIdegree();
+		//int temp = nodeData.getIdegree();
 		nodeData.setIdegree(partEd[to]);
 
 

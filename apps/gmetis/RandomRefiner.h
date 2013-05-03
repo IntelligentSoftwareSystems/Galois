@@ -122,7 +122,7 @@ private:
 		metisGraph->incPartWeight(from, -vwgt);
 
 		nodeData.setEdegree(nodeData.getEdegree() + nodeData.getIdegree() - partEd[to]);
-		int temp = nodeData.getIdegree();
+		//int temp = nodeData.getIdegree();
 		nodeData.setIdegree(partEd[to]);
 
 
@@ -339,7 +339,7 @@ public:
 		}
 
 
-		int oldcut = metisGraph->getMinCut();
+		//int oldcut = metisGraph->getMinCut();
 		cout<<metisGraph->getBoundaryNodes()->size()<<endl;
 		PerCPUValue perCPUValues;
 		Galois::InsertBag<GNode> boundaryBag;

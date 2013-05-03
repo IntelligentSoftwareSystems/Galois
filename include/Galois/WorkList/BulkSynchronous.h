@@ -60,7 +60,7 @@ class BulkSynchronous : private boost::noncopyable {
   template<typename Tnew>
   using retype = BulkSynchronous<typename ContainerTy::template retype<Tnew>,Tnew,concurrent>;
 
-  BulkSynchronous(): empty(false), barrier(Runtime::getSystemBarrier()) { }
+  BulkSynchronous(): barrier(Runtime::getSystemBarrier()), empty(false) { }
 
   void push(const value_type& val) {
     wls[(tlds.getLocal()->round + 1) & 1].push(val);

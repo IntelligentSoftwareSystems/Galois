@@ -59,7 +59,7 @@ int main(int argc, char** argv) {
     mega = atoi(argv[1]);
   }
   size_t seed = time(NULL);
-  printf("Working set: %d MB\n\n", mega);
+  printf("Working set: %zu MB\n\n", mega);
   printf("Effective random-access bandwidth (MB/s)\n");
   printf("T    LOCAL    INTERLEAVE    FULL-INTERLEAVE\n");
   for (unsigned threads = 1; threads <= M; ++threads) {

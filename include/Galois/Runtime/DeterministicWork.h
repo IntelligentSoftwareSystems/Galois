@@ -994,10 +994,9 @@ class DMergeManager<OptionsTy,typename boost::enable_if<MergeTraits<OptionsTy> >
   };
 
   std::vector<NewItem,typename PerIterAllocTy::rebind<NewItem>::other> mergeBuf;
-
-  Barrier& barrier;
   IdFn idFunction;
   CompareTy comp;
+  Barrier& barrier;
 
 public:
   DMergeManager(const OptionsTy& o): mergeBuf(this->alloc), comp(o.comp), barrier(getSystemBarrier()) 

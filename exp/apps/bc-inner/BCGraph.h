@@ -59,7 +59,7 @@ class BCGraph {
 
         int fileFD = open(filename, O_RDONLY);
         struct stat buf;
-        int f = fstat(fileFD, &buf);
+        fstat(fileFD, &buf);
         size_t fileLength = buf.st_size;
 
         int _MAP_BASE = MAP_PRIVATE /*| MAP_HUGETLB*/;
@@ -413,7 +413,7 @@ class BCGraph {
 //		int maxInNbrs = 0;
 //    int maxId;
 //    int sumInNbrs = 0;
-      int maxOutNbrs = 0;
+      //int maxOutNbrs = 0;
       
     for (int i=0; i<nnodes; ++i) {
 			ND & n = nodes[i].data;

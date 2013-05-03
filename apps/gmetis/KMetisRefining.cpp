@@ -144,7 +144,7 @@ struct projectPartition {
 void projectKWayPartition(MetisGraph* coarseMetisGraph, int nparts){
 
 	MetisGraph* finerMetisGraph = coarseMetisGraph->getFinerGraph();
-	GGraph* coarseGGraph = coarseMetisGraph->getGraph();
+	//GGraph* coarseGGraph = coarseMetisGraph->getGraph();
 	GGraph* finerGGraph = finerMetisGraph->getGraph();
 	finerMetisGraph->initBoundarySet();
 	Galois::Timer t;

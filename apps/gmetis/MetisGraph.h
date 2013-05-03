@@ -271,10 +271,10 @@ public:
 
 			if (nodeData.getEdegree() > 0) {
 				mincut += nodeData.getEdegree();
-				int numEdges = std::distance(graph->edge_begin(node, Galois::MethodFlag::NONE), graph->edge_end(node, Galois::MethodFlag::NONE));
+				//int numEdges = std::distance(graph->edge_begin(node, Galois::MethodFlag::NONE), graph->edge_end(node, Galois::MethodFlag::NONE));
 				vector <int> map(nparts,-1);
 				int ndegrees=0;
-				int ed=0;
+				//int ed=0;
 				for (GGraph::edge_iterator jj = graph->edge_begin(node, Galois::MethodFlag::NONE), eejj = graph->edge_end(node, Galois::MethodFlag::NONE); jj != eejj; ++jj) {
 					GNode neighbor = graph->getEdgeDst(jj);
 					MetisNode& neighborData = graph->getData(neighbor,Galois::MethodFlag::NONE);
