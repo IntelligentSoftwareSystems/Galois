@@ -292,9 +292,9 @@ class Executor {
   FnsTy fns;
   WLS wls;
   FirstWL first;
-  Barrier& barrier;
   InitialWorkTy init;
   const char* loopname;
+  Barrier& barrier;
   LL::CacheLineStorage<volatile long> done;
 
   struct ExecuteFn {

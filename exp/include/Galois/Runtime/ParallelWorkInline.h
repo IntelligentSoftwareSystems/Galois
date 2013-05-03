@@ -243,10 +243,10 @@ class BSInlineExecutor {
     ThreadLocalData(const char* ln): stat(ln) { }
   };
 
-  Galois::Runtime::Barrier& barrier;
   WLTy wls[2];
   FunctionTy& function;
   const char* loopname;
+  Galois::Runtime::Barrier& barrier;
   LL::CacheLineStorage<volatile long> done;
 
   bool empty(WLTy* wl) {
