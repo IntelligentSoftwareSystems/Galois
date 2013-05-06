@@ -389,8 +389,8 @@ class DMergeLocal: private boost::noncopyable {
   boost::optional<T> windowElement;
 
   // For id based execution
-  unsigned long minId;
-  unsigned long maxId;
+  size_t minId;
+  size_t maxId;
 
   // For general execution
   size_t size;
@@ -408,8 +408,8 @@ private:
   //! Update min and max from sorted iterator
   template<typename BiIteratorTy>
   void initialLimits(BiIteratorTy ii, BiIteratorTy ei) {
-    minId = std::numeric_limits<unsigned long>::max();
-    maxId = std::numeric_limits<unsigned long>::min();
+    minId = std::numeric_limits<size_t>::max();
+    maxId = std::numeric_limits<size_t>::min();
     mostElement = windowElement = boost::optional<T>();
 
     if (ii != ei) {
@@ -929,7 +929,7 @@ class DMergeManager: public DMergeManagerBase<OptionsTy> {
 
       std::sort(mergeBuf.begin(), mergeBuf.end());
 
-      printf("DEBUG R %ld\n", mergeBuf.size());
+      printf("DEBUG R %zd\n", mergeBuf.size());
     }
 
     barrier.wait();
