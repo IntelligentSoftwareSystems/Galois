@@ -569,6 +569,7 @@ void run(bool prealloc = true) {
   T.stop();
   
   Galois::reportPageAlloc("MeminfoPost");
+  Galois::Runtime::reportNumaAlloc("NumaPost");
 
   std::cout << "Node " << reportNode << " has distance " << graph.getData(report).dist << "\n";
 

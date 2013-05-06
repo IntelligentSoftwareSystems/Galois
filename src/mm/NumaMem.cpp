@@ -41,7 +41,7 @@ void Galois::Runtime::MM::printInterleavedStats(int minPages) {
 
   char line[2048];
   LL::gInfo("INTERLEAVED STATS BEGIN");
-  while (fgets(line, 2048, f)) {
+  while (fgets(line, sizeof(line)/sizeof(*line), f)) {
     // Chomp \n
     size_t len = strlen(line);
     if (len && line[len-1] == '\n')
@@ -67,20 +67,84 @@ void Galois::Runtime::MM::printInterleavedStats(int minPages) {
   fclose(f);
 }
 
-#if defined(GALOIS_USE_NUMA)
+static int num_numa_pages_for(unsigned nodeid) {
+  FILE* f = fopen(sNumaStat, "r");
+  if (!f) {
+    Galois::Runtime::LL::gInfo("No NUMA support");
+    return 0;
+  }
+
+  char format[2048];
+  char search[2048];
+  int written;
+  written = snprintf(format, sizeof(format)/sizeof(*format), "N%u=%%d", nodeid);
+  assert((unsigned)written < sizeof(format)/sizeof(*format));
+  written = snprintf(search, sizeof(search)/sizeof(*search), "N%u=", nodeid);
+  assert((unsigned)written < sizeof(search)/sizeof(*search));
+
+  char line[2048];
+  int totalPages = 0;
+  while (fgets(line, sizeof(line)/sizeof(*line), f)) {
+    char* start;
+    if ((start = strstr(line, search)) != 0) {
+      int pages;
+      if (sscanf(start, format, &pages) == 1) {
+        totalPages += pages;
+      }
+    }
+  }
+
+  fclose(f);
+
+  return totalPages;
+}
+
+static int check_numa() {
+#ifdef GALOIS_USE_NUMA
+  if (is_numa_available == 0) {
+    is_numa_available = numa_available() == -1 ? -1 : 1;
+    if (is_numa_available == -1)
+      Galois::Runtime::LL::gWarn("NUMA not available");
+  }
+  return is_numa_available == 1;
+#else
+  return false;
+#endif
+}
+
+int Galois::Runtime::MM::numNumaAllocForNode(unsigned nodeid) {
+  if (!check_numa())
+    return 0;
+#ifdef GALOIS_USE_NUMA
+  return num_numa_pages_for(nodeid);
+#else
+  return 0;
+#endif
+}
+
+int Galois::Runtime::MM::numNumaNodes() {
+  if (!check_numa())
+    return 1;
+#ifdef GALOIS_USE_NUMA
+  return numa_num_configured_nodes();
+#else
+  return 1;
+#endif
+}
+
 static void *alloc_interleaved_subset(size_t len) {
   void* data = 0;
-# if defined(GALOIS_USE_NUMA_OLD)
+#if defined(GALOIS_USE_NUMA_OLD)
   nodemask_t nm = numa_no_nodes;
   unsigned int num = Galois::Runtime::activeThreads;
-  int max_nodes = numa_max_node();
+  int num_nodes = numa_num_configured_nodes();
   for (unsigned y = 0; y < num; ++y) {
     unsigned proc = Galois::Runtime::LL::getProcessorForThread(y);
     // Assume block distribution from physical processors to numa nodes
-    nodemask_set(&nm, proc/max_nodes);
+    nodemask_set(&nm, proc/num_nodes);
   }
   data = numa_alloc_interleaved_subset(len, &nm);
-# elif defined(GALOIS_USE_NUMA)  
+#elif defined(GALOIS_USE_NUMA)  
   bitmask* nm = numa_allocate_nodemask();
   unsigned int num = Galois::Runtime::activeThreads;
   for (unsigned y = 0; y < num; ++y) {
@@ -90,22 +154,16 @@ static void *alloc_interleaved_subset(size_t len) {
   }
   data = numa_alloc_interleaved_subset(len, nm);
   numa_free_nodemask(nm);
-# else
-#  error "Missing case"
-# endif
+#else
+  data = Galois::Runtime::MM::largeAlloc(len);
+#endif
   return data;
 }
-#endif
 
 void* Galois::Runtime::MM::largeInterleavedAlloc(size_t len, bool full) {
   void* data = 0;
 #if defined(GALOIS_USE_NUMA)
-  if (is_numa_available == 0) {
-    is_numa_available = numa_available() == -1 ? -1 : 1;
-    if (is_numa_available == -1)
-      LL::gWarn("NUMA not available");
-  }
-  if (is_numa_available == 1) {
+  if (check_numa()) {
     if (full) 
       data = numa_alloc_interleaved(len);
     else 
@@ -125,11 +183,10 @@ void* Galois::Runtime::MM::largeInterleavedAlloc(size_t len, bool full) {
 }
 
 void Galois::Runtime::MM::largeInterleavedFree(void* m, size_t len) {
-#if defined(GALOIS_USE_NUMA)
-  if (is_numa_available == 1)
-    numa_free(m, len);
-  else
+  if (!check_numa())
     largeFree(m, len);
+#ifdef GALOIS_USE_NUMA
+  numa_free(m, len);
 #else
   largeFree(m, len);
 #endif

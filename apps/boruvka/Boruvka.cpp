@@ -442,7 +442,7 @@ int main(int argc, char** argv) {
   initializeGraph();
   Tinitial.stop();
 
-  Galois::preAlloc(Galois::Runtime::MM::pageAllocTotal() * 10);
+  Galois::preAlloc(Galois::Runtime::MM::numPageAllocTotal() * 10);
   Galois::reportPageAlloc("MeminfoPre");
   Galois::StatTimer T;
   T.start();

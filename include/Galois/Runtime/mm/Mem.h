@@ -50,12 +50,20 @@ const size_t smallPageSize = 4*1024;
 const size_t pageSize = 2*1024*1024;
 void* pageAlloc();
 void  pageFree(void*);
-int pageAllocTotal();
-int pageAllocForThread(unsigned tid);
+//! Preallocate numpages large pages for each thread
 void pagePreAlloc(int numpages);
-
 //! Forces the given block to be paged into physical memory
 void pageIn(void *buf, size_t len);
+
+//! Returns total large pages allocated by Galois memory management subsystem
+int numPageAllocTotal();
+//! Returns total large pages allocated for thread by Galois memory management subsystem
+int numPageAllocForThread(unsigned tid);
+
+//! Returns total small pages allocated by OS on a NUMA node
+int numNumaAllocForNode(unsigned nodeid);
+//! Returns number of NUMA nodes on machine
+int numNumaNodes();
 
 /**
  * Allocates memory interleaved across NUMA nodes. 
@@ -65,12 +73,15 @@ void pageIn(void *buf, size_t len);
  * threads.
  */
 void* largeInterleavedAlloc(size_t bytes, bool full = true);
+//! Frees memory allocated by {@link largeInterleavedAlloc}
 void  largeInterleavedFree(void* mem, size_t bytes);
 
+//! Allocates a large block of memory
 void* largeAlloc(size_t bytes, bool preFault = true);
+//! Frees memory allocated by {@link largeAlloc}
 void  largeFree(void* mem, size_t bytes);
 
-//! Print lines from /proc/<pid>/numa_maps that contain at least minPages
+//! Print lines from /proc/<pid>/numa_maps that contain at least n small pages
 void printInterleavedStats(int minPages = 16*1024);
 
 //! Per-thread heaps using Galois thread aware construct

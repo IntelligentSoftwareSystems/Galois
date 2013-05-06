@@ -194,7 +194,7 @@ int main(int argc, char** argv) {
     });
 
   Galois::reportPageAlloc("MeminfoPre");
-  Galois::preAlloc(numThreads * Galois::Runtime::MM::pageAllocTotal() / 3);
+  Galois::preAlloc(numThreads * Galois::Runtime::MM::numPageAllocTotal() / 3);
   Galois::reportPageAlloc("MeminfoMid");
 
   boost::filter_iterator<HasOut,Graph::iterator>

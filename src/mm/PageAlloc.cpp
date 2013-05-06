@@ -152,12 +152,12 @@ void Galois::Runtime::MM::pagePreAlloc(int numPages) {
     Galois::Runtime::MM::pageFree(allocFromOS());
 }
 
-int Galois::Runtime::MM::pageAllocTotal() {
+int Galois::Runtime::MM::numPageAllocTotal() {
   PAState& p = *PA.get();
   return std::accumulate(p.counts.begin(), p.counts.end(), 0);
 }
 
-int Galois::Runtime::MM::pageAllocForThread(unsigned tid) {
+int Galois::Runtime::MM::numPageAllocForThread(unsigned tid) {
   return PA.get()->counts[tid];
 }
 

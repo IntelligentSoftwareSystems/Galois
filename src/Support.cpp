@@ -44,8 +44,7 @@ class StatManager {
 
   volatile unsigned maxID;
 
-  void updateMax() {
-    unsigned n = Galois::Runtime::activeThreads;
+  void updateMax(unsigned n) {
     unsigned c;
     while (n > (c = maxID))
       __sync_bool_compare_and_swap(&maxID, c, n);
@@ -73,19 +72,26 @@ public:
 
   void addToStat(const std::string& loop, const std::string& category, size_t value) {
     (*Stats.getLocal())[mkKey(loop, category)] += value;
-    updateMax();
+    updateMax(Galois::Runtime::activeThreads);
   }
 
   void addToStat(Galois::Statistic* value) {
     for (unsigned x = 0; x < Galois::Runtime::activeThreads; ++x)
       (*Stats.getRemote(x))[mkKey(value->getLoopname(), value->getStatname())] += value->getValue(x);
-    updateMax();
+    updateMax(Galois::Runtime::activeThreads);
   }
 
   void addPageAllocToStat(const std::string& loop, const std::string& category) {
     for (unsigned x = 0; x < Galois::Runtime::activeThreads; ++x)
-      (*Stats.getRemote(x))[mkKey(loop, category)] += Galois::Runtime::MM::pageAllocForThread(x);
-    updateMax();
+      (*Stats.getRemote(x))[mkKey(loop, category)] += Galois::Runtime::MM::numPageAllocForThread(x);
+    updateMax(Galois::Runtime::activeThreads);
+  }
+
+  void addNumaAllocToStat(const std::string& loop, const std::string& category) {
+    int nodes = Galois::Runtime::MM::numNumaNodes();
+    for (int x = 0; x < nodes; ++x)
+      (*Stats.getRemote(x))[mkKey(loop, category)] += Galois::Runtime::MM::numNumaAllocForNode(x);
+    updateMax(nodes);
   }
 
   //Assume called serially
@@ -149,4 +155,8 @@ void Galois::Runtime::printStats() {
 
 void Galois::Runtime::reportPageAlloc(const char* category) {
   SM.get()->addPageAllocToStat(std::string("(NULL)"), std::string(category ? category : "(NULL)"));
+}
+
+void Galois::Runtime::reportNumaAlloc(const char* category) {
+  SM.get()->addNumaAllocToStat(std::string("(NULL)"), std::string(category ? category : "(NULL)"));
 }

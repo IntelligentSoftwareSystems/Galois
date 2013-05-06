@@ -42,9 +42,10 @@ void reportStat(const char* loopname, const char* category, unsigned long value)
 void reportStat(const std::string& loopname, const std::string& category, unsigned long value);
 //! Reports stats for all threads
 void reportStat(Galois::Statistic* value);
-//! Reports memory stats for all threads
+//! Reports Galois system memory stats for all threads
 void reportPageAlloc(const char* category);
-
+//! Reports NUMA memory stats for all NUMA nodes
+void reportNumaAlloc(const char* category);
 
 //! Prints all stats
 void printStats();

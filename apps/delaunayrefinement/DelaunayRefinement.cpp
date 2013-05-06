@@ -147,7 +147,7 @@ int main(int argc, char** argv) {
 	    << " total triangles, " << std::count_if(graph->begin(), graph->end(), is_bad(graph)) << " bad triangles\n";
 
   Galois::reportPageAlloc("MeminfoPre1");
-  Galois::preAlloc(15 * numThreads + Galois::Runtime::MM::pageAllocTotal() * 10);
+  Galois::preAlloc(15 * numThreads + Galois::Runtime::MM::numPageAllocTotal() * 10);
   Galois::reportPageAlloc("MeminfoPre2");
 
   Galois::StatTimer T;
