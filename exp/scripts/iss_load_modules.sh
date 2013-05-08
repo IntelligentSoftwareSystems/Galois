@@ -10,6 +10,7 @@ module load cmake
 module use /net/faraday/workspace/local/modules/modulefiles
 module load boost/1.52
 module load lapack
+module load eigen
 
 if [ "$1" != "min" ]; then
   module load gdb/7.5
