@@ -23,31 +23,24 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 #include "Galois/Galois.h"
+#include "Galois/Atomic.h"
 #include "Galois/Bag.h"
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
-#include "Galois/CheckedObject.h"
 #include "Galois/Graph/LCGraph.h"
-#include "Galois/Graph/Graph.h"
-#ifdef GALOIS_EXP
-#include "Galois/PriorityScheduling.h"
-#endif
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
-
-#include "Galois/Atomic.h"
 
 #include <string>
 #include <sstream>
 #include <limits>
 #include <iostream>
 #include <deque>
-#include <queue>
 #include <numeric>
 
 static const char* name = "Cuthill-McKee Reordering";
 static const char* desc =
-  "Computes a reordering of matrix rows and columns (or a relabeling of graph nodes)"
+  "Computes a reordering of matrix rows and columns (or a relabeling of graph nodes) "
   "according to the Cuthill-McKee heuristic";
 static const char* url = 0;
 
@@ -57,25 +50,38 @@ enum PseudoAlgo {
   fullPseudo
 };
 
+enum class WriteType {
+  none,
+  graph,
+  perm
+};
+
 typedef unsigned int DistType;
 static const DistType DIST_INFINITY = std::numeric_limits<DistType>::max() - 1;
 
 namespace cll = llvm::cl;
-static cll::opt<std::string> filename(cll::Positional,
-    cll::desc("<input file>"),
-    cll::Required);
+static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<std::string> outputFilename(cll::Positional, cll::desc("[output file]"), "permuted");
+static cll::opt<WriteType> writeType("output", cll::desc("Output type:"),
+    cll::values(
+      clEnumValN(WriteType::none, "none", "None (default)"),
+      clEnumValN(WriteType::graph, "graph", "Permuted graph"),
+      clEnumValN(WriteType::perm, "perm", "Permutation"),
+      clEnumValEnd), cll::init(WriteType::none));
 static cll::opt<PseudoAlgo> pseudoAlgo(cll::desc("Psuedo-Peripheral algorithm:"),
     cll::values(
       clEnumVal(simplePseudo, "Simple"),
       clEnumVal(eagerPseudo, "Eager terminiation of full algorithm"),
       clEnumVal(fullPseudo, "Full algorithm"),
       clEnumValEnd), cll::init(fullPseudo));
-
 static cll::opt<bool> anyBFS("anyBFS", cll::desc("Use Any BFS ordering"), cll::init(false));
-
+static cll::opt<bool> useFloatEdgeWeights("useFloatEdgeWeights", 
+    cll::desc("Input and output graph edge weights are floats. By default, assume that they are doubles."), 
+    cll::init(false));
 static cll::opt<unsigned int> startNode("startnode",
-    cll::desc("Node to start search from"),
-    cll::init(DIST_INFINITY));
+    cll::desc("Node to start search from. Overrides pseudo-peripheral search."), cll::init(DIST_INFINITY));
+static cll::opt<unsigned int> pseudoStartNode("pseudoStartNode",
+    cll::desc("Node to pseudo-peripheral search from"), cll::init(0));
 
 namespace {
 
@@ -115,10 +121,10 @@ struct sortDegFn {
   bool operator()(const GNode& lhs, const GNode& rhs) const {
     return
       std::distance(graph.edge_begin(lhs, Galois::MethodFlag::NONE),
-		    graph.edge_end(lhs, Galois::MethodFlag::NONE))
+        graph.edge_end(lhs, Galois::MethodFlag::NONE))
       <
       std::distance(graph.edge_begin(rhs, Galois::MethodFlag::NONE),
-		    graph.edge_end(rhs, Galois::MethodFlag::NONE))
+        graph.edge_end(rhs, Galois::MethodFlag::NONE))
       ;
   }
 };
@@ -305,131 +311,125 @@ public:
     Galois::do_all_local(graph, resetNode);
   }
 
-		// Compute maximum bandwidth for a given graph
-	struct banddiff {
+    // Compute maximum bandwidth for a given graph
+  struct banddiff {
+    Galois::GAtomic<long int>& maxband;
+    Galois::GAtomic<long int>& profile;
+    std::vector<GNode>& nmap; 
 
-		Galois::GAtomic<long int>& maxband;
-		Galois::GAtomic<long int>& profile;
-		std::vector<GNode>& nmap; 
+    banddiff(Galois::GAtomic<long int>& _mb, Galois::GAtomic<long int>& _pr, std::vector<GNode>& _nm) : maxband(_mb), profile(_pr), nmap(_nm) { }
 
-		banddiff(Galois::GAtomic<long int>& _mb, Galois::GAtomic<long int>& _pr, std::vector<GNode>& _nm) : maxband(_mb), profile(_pr), nmap(_nm) { }
+    void operator()(const GNode& source) const {
+      long int maxdiff = 0;
+      SNode& sdata = graph.getData(source, Galois::MethodFlag::NONE);
 
-		void operator()(const GNode& source) const {
+      for (Graph::edge_iterator ii = graph.edge_begin(source, Galois::MethodFlag::NONE), 
+          ei = graph.edge_end(source, Galois::MethodFlag::NONE); ii != ei; ++ii) {
 
-			long int maxdiff = 0;
-			SNode& sdata = graph.getData(source, Galois::MethodFlag::NONE);
+        GNode dst = graph.getEdgeDst(ii);
+        SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
 
-			for (Graph::edge_iterator ii = graph.edge_begin(source, Galois::MethodFlag::NONE), 
-					ei = graph.edge_end(source, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+        long int diff = abs(sdata.id - ddata.id);
+        //long int diff = (long int) sdata.id - (long int) ddata.id;
+        maxdiff = diff > maxdiff ? diff : maxdiff;
+      }
 
-				GNode dst = graph.getEdgeDst(ii);
-				SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+      long int globalmax = maxband;
+      profile += maxdiff;
 
-				long int diff = abs(sdata.id - ddata.id);
-				//long int diff = (long int) sdata.id - (long int) ddata.id;
-				maxdiff = diff > maxdiff ? diff : maxdiff;
-			}
+      if (maxdiff > globalmax){
+        while (!maxband.cas(globalmax, maxdiff)){
+          globalmax = maxband;
+          if (!maxdiff > globalmax)
+            break;
+        }
+      }
+    }
+  };
 
-			long int globalmax = maxband;
-			profile += maxdiff;
+  // Parallel loop for maximum bandwidth computation
+  static void bandwidth(std::string msg) {
+    Galois::GAtomic<long int> bandwidth = Galois::GAtomic<long int>(0);
+    Galois::GAtomic<long int> profile = Galois::GAtomic<long int>(0);
+    std::vector<GNode> nodemap;
+    std::vector<bool> visited;
+    visited.reserve(graph.size());;
+    visited.resize(graph.size(), false);;
+    nodemap.reserve(graph.size());;
 
-			if(maxdiff > globalmax){
-				while(!maxband.cas(globalmax, maxdiff)){
-					globalmax = maxband;
-					if(!maxdiff > globalmax)
-						break;
-				}
-			}
-		}
-	};
+    //static int count = 0;
+    //std::cout << graph.size() << "Run: " << count++ << "\n";
 
-	// Parallel loop for maximum bandwidth computation
-	static void bandwidth(std::string msg) {
-		Galois::GAtomic<long int> bandwidth = Galois::GAtomic<long int>(0);
-		Galois::GAtomic<long int> profile = Galois::GAtomic<long int>(0);
-		std::vector<GNode> nodemap;
-		std::vector<bool> visited;
-		visited.reserve(graph.size());;
-		visited.resize(graph.size(), false);;
-		nodemap.reserve(graph.size());;
+    for (Graph::iterator src = graph.begin(), ei =
+        graph.end(); src != ei; ++src) {
+      nodemap[graph.getData(*src, Galois::MethodFlag::NONE).id] = *src;
+    }
 
-		//static int count = 0;
-		//std::cout << graph.size() << "Run: " << count++ << "\n";
+    //Computation of bandwidth and profile in parallel
+    Galois::do_all(graph.begin(), graph.end(), banddiff(bandwidth, profile, nodemap));
 
-		for (Graph::iterator src = graph.begin(), ei =
-				graph.end(); src != ei; ++src) {
-			nodemap[graph.getData(*src, Galois::MethodFlag::NONE).id] = *src;
-		}
+    unsigned int nactiv = 0;
+    unsigned int maxwf = 0;
+    unsigned int curwf = 0;
+    double mswf = 0.0;
 
-		//Computation of bandwidth and profile in parallel
-		Galois::do_all(graph.begin(), graph.end(), banddiff(bandwidth, profile, nodemap));
+    //Computation of maximum and root-square-mean wavefront. Serial
+    for (unsigned int i = 0; i < graph.size(); ++i){
+      for (Graph::edge_iterator ii = graph.edge_begin(nodemap[i], Galois::MethodFlag::NONE), 
+          ei = graph.edge_end(nodemap[i], Galois::MethodFlag::NONE); ii != ei; ++ii) {
 
-		unsigned int nactiv = 0;
-		unsigned int maxwf = 0;
-		unsigned int curwf = 0;
-		double mswf = 0.0;
+        GNode neigh = graph.getEdgeDst(ii);
+        SNode& ndata = graph.getData(neigh, Galois::MethodFlag::NONE);
 
-		//Computation of maximum and root-square-mean wavefront. Serial
-		for(unsigned int i = 0; i < graph.size(); ++i){
+        //std::cerr << "neigh: " << ndata.id << "\n";
+        if(visited[ndata.id] == false){
+          visited[ndata.id] = true;
+          nactiv++;
+          //  std::cerr << "val: " << nactiv<< "\n";
+        }
+      }
 
-			for (Graph::edge_iterator ii = graph.edge_begin(nodemap[i], Galois::MethodFlag::NONE), 
-					ei = graph.edge_end(nodemap[i], Galois::MethodFlag::NONE); ii != ei; ++ii) {
+      SNode& idata = graph.getData(nodemap[i], Galois::MethodFlag::NONE);
 
-				GNode neigh = graph.getEdgeDst(ii);
-				SNode& ndata = graph.getData(neigh, Galois::MethodFlag::NONE);
+      if (visited[idata.id] == false){
+        visited[idata.id] = true;
+        curwf = nactiv+1;
+      } else {
+        curwf = nactiv--;
+      }
 
-				//std::cerr << "neigh: " << ndata.id << "\n";
-				if(visited[ndata.id] == false){
-					visited[ndata.id] = true;
-					nactiv++;
-					//	std::cerr << "val: " << nactiv<< "\n";
-				}
-			}
+      maxwf = curwf > maxwf ? curwf : maxwf;
+      mswf += (double) curwf * curwf;
+    }
 
-			SNode& idata = graph.getData(nodemap[i], Galois::MethodFlag::NONE);
+    mswf = mswf / graph.size();
 
-			if(visited[idata.id] == false){
-				visited[idata.id] = true;
-				curwf = nactiv+1;
-			}
-			else
-				curwf = nactiv--;
+    std::cout << msg << " Bandwidth: " << bandwidth << "\n";
+    std::cout << msg << " Profile: " << profile << "\n";
+    std::cout << msg << " Max WF: " << maxwf << "\n";
+    std::cout << msg << " Mean-Square WF: " << mswf << "\n";
+    std::cout << msg << " RMS WF: " << sqrt(mswf) << "\n";
 
-			maxwf = curwf > maxwf ? curwf : maxwf;
-			mswf += (double) curwf * curwf;
-		}
+    //nodemap.clear();
+  }
 
-		mswf = mswf / graph.size();
+  static void permute(std::vector<GNode>& ordering) {
+    std::vector<GNode> nodemap;
+    nodemap.reserve(graph.size());;
 
-		std::cout << msg << " Bandwidth: " << bandwidth << "\n";
-		std::cout << msg << " Profile: " << profile << "\n";
-		std::cout << msg << " Max WF: " << maxwf << "\n";
-		std::cout << msg << " Mean-Square WF: " << mswf << "\n";
-		std::cout << msg << " RMS WF: " << sqrt(mswf) << "\n";
+    for (Graph::iterator src = graph.begin(), ei = graph.end(); src != ei; ++src) {
+      nodemap[graph.getData(*src, Galois::MethodFlag::NONE).id] = *src;
+    }
 
-		//nodemap.clear();
-	}
+    unsigned int N = ordering.size() - 1;
 
-	static void permute(std::vector<GNode>& ordering) {
-
-		std::vector<GNode> nodemap;
-		nodemap.reserve(graph.size());;
-
-		for (Graph::iterator src = graph.begin(), ei =
-				graph.end(); src != ei; ++src) {
-
-			nodemap[graph.getData(*src, Galois::MethodFlag::NONE).id] = *src;
-		}
-
-		unsigned int N = ordering.size() - 1;
-
-		for(int i = N; i >= 0; --i) {
-			// RCM
-			graph.getData(ordering[i], Galois::MethodFlag::NONE).id = N - i;
-			// CM
-			//graph.getData(ordering[i], Galois::MethodFlag::NONE).id = i;
-		}
-	}
+    for (int i = N; i >= 0; --i) {
+      // RCM
+      graph.getData(ordering[i], Galois::MethodFlag::NONE).id = N - i;
+      // CM
+      //graph.getData(ordering[i], Galois::MethodFlag::NONE).id = i;
+    }
+  }
 
   static Result go(GNode source, bool reset) {
     return unorderedAlgo(source, reset);
@@ -689,53 +689,40 @@ struct CuthillUnordered {
     void operator()(unsigned me, unsigned int tot) const {
       DistType n = me;
       while (n < counts.size()) {
-	unsigned start = read_offset[n];
-	unsigned t_wo = write_offset[n+1].data;
-	volatile unsigned* endp = (volatile unsigned*)&write_offset[n].data;
-	unsigned cend;
-	unsigned todo = counts[n];
-	while (todo) {
-	  //spin
-	  while (start == (cend = *endp)) { Galois::Runtime::LL::asmPause(); }
-	  while (start != cend) {
-	    GNode next = perm[start];
-	    unsigned t_worig = t_wo;
-	    //find eligible nodes
-	    //prefetch?
-	    if (0) {
-	      if (start + 1 < cend) {
-		GNode nnext = perm[start+1];
-		for (Graph::edge_iterator ii = graph.edge_begin(nnext, Galois::MethodFlag::NONE),
-		       ei = graph.edge_end(nnext, Galois::MethodFlag::NONE); ii != ei; ++ii) {
-		  GNode dst = graph.getEdgeDst(ii);
-		  SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
-		  __builtin_prefetch(&ddata.done);
-		  __builtin_prefetch(&ddata.dist);
-		}
-	      }
-	    }
-	    for (Graph::edge_iterator ii = graph.edge_begin(next, Galois::MethodFlag::NONE),
-		   ei = graph.edge_end(next, Galois::MethodFlag::NONE); ii != ei; ++ii) {
-	      GNode dst = graph.getEdgeDst(ii);
-	      SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
-	      if (!ddata.done && (ddata.dist == n + 1)) {
-		ddata.done = true;
-		perm[t_wo] = dst;
-		++t_wo;
-	      }
-	    }
-	    //sort to get cuthill ordering
-	    std::sort(&perm[t_worig], &perm[t_wo], sortDegFn());
-	    //output nodes
-	    Galois::Runtime::LL::compilerBarrier();
-	    write_offset[n+1].data = t_wo;
-	    //	++read_offset[n];
-	    //	--level_count[n];
-	    ++start;
-	    --todo;
-	  }
-	}
-	n += tot;
+        unsigned start = read_offset[n];
+        unsigned t_wo = write_offset[n+1].data;
+        volatile unsigned* endp = (volatile unsigned*)&write_offset[n].data;
+        unsigned cend;
+        unsigned todo = counts[n];
+        while (todo) {
+          //spin
+          while (start == (cend = *endp)) { Galois::Runtime::LL::asmPause(); }
+          while (start != cend) {
+            GNode next = perm[start];
+            unsigned t_worig = t_wo;
+            //find eligible nodes
+            for (Graph::edge_iterator ii = graph.edge_begin(next, Galois::MethodFlag::NONE),
+             ei = graph.edge_end(next, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+              GNode dst = graph.getEdgeDst(ii);
+              SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+              if (!ddata.done && (ddata.dist == n + 1)) {
+                ddata.done = true;
+                perm[t_wo] = dst;
+                ++t_wo;
+              }
+            }
+            //sort to get cuthill ordering
+            std::sort(&perm[t_worig], &perm[t_wo], sortDegFn());
+            //output nodes
+            Galois::Runtime::LL::compilerBarrier();
+            write_offset[n+1].data = t_wo;
+            //  ++read_offset[n];
+            //  --level_count[n];
+            ++start;
+            --todo;
+          }
+        }
+        n += tot;
       }
     }
   };
@@ -814,44 +801,97 @@ struct AnyBFSUnordered {
   }
 };
 
+template<typename EdgeTy>
+void writeGraph() {
+  typedef Galois::Graph::FileGraphWriter Writer;
+  typedef Galois::LargeArray<EdgeTy> EdgeData;
+  typedef typename EdgeData::value_type edge_value_type;
+  
+  Galois::Graph::FileGraph origGraph;
+  EdgeData edgeData;
+  Writer p;
+
+  origGraph.structureFromFileInterleaved<EdgeTy>(filename);
+  p.setNumNodes(graph.size());
+  p.setNumEdges(graph.sizeEdges());
+  p.setSizeofEdgeData(EdgeData::has_value ? sizeof(edge_value_type) : 0); 
+  edgeData.create(graph.sizeEdges());
+
+  p.phase1();
+  for (GNode n : graph) {
+    p.incrementDegree(graph.getData(n).id, std::distance(graph.edge_begin(n), graph.edge_end(n)));
+  }
+  
+  p.phase2();
+  for (GNode n : graph) {
+    size_t sid = graph.getData(n).id;
+    for (Graph::edge_iterator ii : graph.out_edges(n)) {
+      GNode dst = graph.getEdgeDst(ii);
+      size_t did = graph.getData(dst).id;
+      edgeData.set(p.addNeighbor(sid, did), origGraph.getEdgeData<EdgeTy>(n, dst));
+    }
+  }
+
+  edge_value_type* rawEdgeData = p.finish<edge_value_type>();
+  if (EdgeData::has_value)
+    std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+  std::cout 
+    << "Writing permuted graph to " << outputFilename 
+    << " (nodes: " << p.size() << " edges: " << p.sizeEdges() << ")\n";
+  p.structureToFile(outputFilename);
+}
+
+void writePermutation() {
+  std::ofstream file(outputFilename.c_str());
+
+  for (GNode n : graph) {
+    file << graph.getData(n).id << "\n";
+  }
+
+  std::cout << "Writing permutation to " << outputFilename << "\n";
+  file.close();
+}
+
 } // end anonymous
 
 int main(int argc, char **argv) {
   Galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
-	BFS::Result result; 
+  BFS::Result result; 
 
   Galois::StatTimer itimer("InitTime");
   itimer.start();
   Galois::Graph::readGraph(graph, filename); 
   {
     size_t id = 0;
-		for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii){
-			if (id == startNode) {
-				result.source = *ii;
-			}
-			graph.getData(*ii).id = id++;
-		}
+    for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii){
+      if (id == startNode) {
+        result.source = *ii;
+      }
+      graph.getData(*ii).id = id++;
+    }
   }
   BFS::init();
   itimer.stop();
 
-  std::cout << "read " << std::distance(graph.begin(), graph.end()) << " nodes\n";
+  std::cout << "Read " << std::distance(graph.begin(), graph.end()) << " nodes\n";
   perm.resize(std::distance(graph.begin(), graph.end()));
 
-	BFS::bandwidth("Initial");
+  BFS::bandwidth("Initial");
 
   Galois::StatTimer T;
   T.start();
 
-	if(startNode == DIST_INFINITY){
-		Galois::StatTimer Tpseudo("PseudoTime");
-		Tpseudo.start();
-		result = pseudoAlgo == simplePseudo ? 
-			SimplePseudoPeripheral::go(*graph.begin()) : PseudoPeripheral::go(*graph.begin());
-		Tpseudo.stop();
-	}
+  if (startNode == DIST_INFINITY) {
+    Galois::StatTimer Tpseudo("PseudoTime");
+    Tpseudo.start();
+    Graph::iterator ii = graph.begin();
+    std::advance(ii, pseudoStartNode);
+    result = pseudoAlgo == simplePseudo ? 
+      SimplePseudoPeripheral::go(*ii) : PseudoPeripheral::go(*ii);
+    Tpseudo.stop();
+  }
 
   Galois::StatTimer Tcuthill("CuthillTime");
   Tcuthill.start();
@@ -869,8 +909,15 @@ int main(int argc, char **argv) {
   Tcuthill.stop();
   T.stop();
 
-	BFS::permute(perm);
-	BFS::bandwidth("Permuted");
+  BFS::permute(perm);
+  BFS::bandwidth("Permuted");
+
+  switch (writeType) {
+    case WriteType::none: break;
+    case WriteType::perm: writePermutation(); break;
+    case WriteType::graph: if (useFloatEdgeWeights) writeGraph<float>(); else writeGraph<double>(); break;
+    default: abort();
+  }
 
   std::cout << "done!\n";
   return 0;
