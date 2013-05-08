@@ -49,6 +49,8 @@ enum ConvertMode {
   gr2intpbbs,
   gr2intpbbsedges,
   gr2lowdegreeintgr,
+  gr2doublemtx,
+  gr2floatmtx,
   gr2randintgr,
   gr2ringintgr,
   gr2rmat,
@@ -56,9 +58,10 @@ enum ConvertMode {
   gr2tintgr,
   gr2treeintgr,
   intedgelist2gr,
+  mtx2floatgr,
+  mtx2doublegr,
   nodelist2vgr,
   pbbs2vgr,
-  rmat2gr,
   vgr2bsml,
   vgr2cvgr,
   vgr2edgelist,
@@ -84,6 +87,8 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Choose a conversion mode:"),
       clEnumVal(gr2bsml, "Convert binary gr to binary sparse MATLAB matrix"),
       clEnumVal(gr2cintgr, "Clean up binary weighted (int) gr: remove self edges and multi-edges"),
       clEnumVal(gr2dimacs, "Convert binary gr to dimacs"),
+      clEnumVal(gr2doublemtx, "Convert binary gr to matrix market format"),
+      clEnumVal(gr2floatmtx, "Convert binary gr to matrix market format"),
       clEnumVal(gr2floatpbbsedges, "Convert binary gr to weighted (float) pbbs edge list"),
       clEnumVal(gr2intpbbs, "Convert binary gr to weighted (int) pbbs graph"),
       clEnumVal(gr2intpbbsedges, "Convert binary gr to weighted (int) pbbs edge list"),
@@ -95,9 +100,10 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Choose a conversion mode:"),
       clEnumVal(gr2tintgr, "Transpose binary weighted (int) gr"),
       clEnumVal(gr2treeintgr, "Convert binary gr to strongly connected graph by adding tree overlay"),
       clEnumVal(intedgelist2gr, "Convert weighted (int) edge list to binary gr"),
+      clEnumVal(mtx2doublegr, "Convert matrix market format to binary gr"),
+      clEnumVal(mtx2floatgr, "Convert matrix market format to binary gr"),
       clEnumVal(nodelist2vgr, "Convert node list to binary gr"),
       clEnumVal(pbbs2vgr, "Convert pbbs graph to binary void gr"),
-      clEnumVal(rmat2gr, "Convert rmat to binary gr"),
       clEnumVal(vgr2bsml, "Convert binary void gr to binary sparse MATLAB matrix"),
       clEnumVal(vgr2cvgr, "Clean up binary void gr: remove self edges and multi-edges"),
       clEnumVal(vgr2edgelist, "Convert binary void gr to edgelist"),
@@ -112,7 +118,8 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Choose a conversion mode:"),
       clEnumVal(vgr2vbinpbbs32, "Convert binary gr to unweighted binary pbbs graph"),
       clEnumVal(vgr2vbinpbbs64, "Convert binary gr to unweighted binary pbbs graph"),
       clEnumValEnd), cll::Required);
-static cll::opt<int> maxValue("maxValue", cll::desc("maximum weight to add"), cll::init(100));
+static cll::opt<int> maxValue("maxValue", cll::desc("maximum weight to add (tree/ring edges are maxValue + 1)"),
+    cll::init(100));
 static cll::opt<int> maxDegree("maxDegree", cll::desc("maximum degree to keep"), cll::init(2*1024));
 
 static void printStatus(size_t in_nodes, size_t in_edges, size_t out_nodes, size_t out_edges) {
@@ -208,6 +215,128 @@ void convert_edgelist2gr(const std::string& infilename, const std::string& outfi
 
   p.structureToFile(outfilename);
   printStatus(numNodes, numEdges);
+}
+
+/**
+ * Convert matrix market matrix to binary graph.
+ *
+ * %% comments
+ * % ...
+ * <num nodes> <num nodes> <num edges>
+ * <src> <dst> <float>
+ *
+ * src and dst start at 1.
+ */
+template<typename EdgeTy>
+void convert_mtx2gr(const std::string& infilename, const std::string& outfilename) {
+  typedef Galois::Graph::FileGraphWriter Writer;
+  typedef Galois::LargeArray<EdgeTy> EdgeData;
+  typedef typename EdgeData::value_type edge_value_type;
+
+  Writer p;
+  EdgeData edgeData;
+  uint32_t nnodes;
+  size_t nedges;
+
+  for (int phase = 0; phase < 2; ++phase) {
+    std::ifstream infile(infilename.c_str());
+
+    // Skip comments
+    while (infile) {
+      if (infile.peek() != '%') {
+        break;
+      }
+      infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    }
+
+    // Read header
+    char header[256];
+    infile.getline(header, 256, '\n');
+    std::istringstream line(header, std::istringstream::in);
+    std::vector<std::string> tokens;
+    while (line) {
+      std::string tmp;
+      line >> tmp;
+      if (line) {
+        tokens.push_back(tmp);
+      }
+    }
+    if (tokens.size() != 3) {
+      GALOIS_DIE("Unknown problem specification line: ", line.str());
+    }
+    nnodes = std::stoull(tokens[0]);
+    nedges = std::stoull(tokens[2]);
+
+    // Parse edges
+    if (phase == 0) {
+      p.setNumNodes(nnodes);
+      p.setNumEdges(nedges);
+      p.setSizeofEdgeData(EdgeData::has_value ? sizeof(edge_value_type) : 0); 
+      edgeData.create(nedges);
+      p.phase1();
+    } else {
+      p.phase2();
+    }
+
+    for (size_t edge_num = 0; edge_num < nedges; ++edge_num) {
+      uint32_t cur_id, neighbor_id;
+      edge_value_type weight;
+
+      infile >> cur_id >> neighbor_id >> weight;
+      if (cur_id == 0 || cur_id > nnodes) {
+        GALOIS_DIE("Error: node id out of range: ", cur_id);
+      }
+      if (neighbor_id == 0 || neighbor_id > nnodes) {
+        GALOIS_DIE("Error: neighbor id out of range: ", neighbor_id);
+      }
+
+      // 1 indexed
+      if (phase == 0) {
+        p.incrementDegree(cur_id - 1);
+        //p.incrementDegree(neighbor_id - 1);
+      } else {
+        edgeData.set(p.addNeighbor(cur_id - 1, neighbor_id - 1), weight);
+        //edgeData.set(p.addNeighbor(neighbor_id - 1, cur_id - 1), weight);
+      }
+
+      infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    }
+
+    infile.peek();
+    if (!infile.eof()) {
+      GALOIS_DIE("Error: additional lines in file");
+    }
+  }
+
+  edge_value_type* rawEdgeData = p.finish<edge_value_type>();
+  if (EdgeData::has_value)
+    std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+
+  p.structureToFile(outfilename);
+  printStatus(p.size(), p.sizeEdges());
+}
+
+template<typename EdgeTy>
+void convert_gr2mtx(const std::string& infilename, const std::string& outfilename) { 
+  typedef Galois::Graph::FileGraph Graph;
+  typedef Graph::GraphNode GNode;
+
+  Graph graph;
+  graph.structureFromFile(infilename);
+
+  std::ofstream file(outfilename.c_str());
+  file << graph.size() << " " << graph.size() << " " << graph.sizeEdges() << "\n";
+  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+    GNode src = *ii;
+    for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
+      GNode dst = graph.getEdgeDst(jj);
+      EdgeTy& weight = graph.getEdgeData<EdgeTy>(jj);
+      file << src + 1 << " " << dst + 1 << " " << weight << "\n";
+    }
+  }
+  file.close();
+
+  printStatus(graph.size(), graph.sizeEdges());
 }
 
 /**
@@ -846,86 +975,6 @@ void convert_sgr2gr(const std::string& infilename, const std::string& outfilenam
   printStatus(graph.size(), graph.sizeEdges(), p.size(), p.sizeEdges());
 }
 
-#if 1
-void convert_rmat2gr(const std::string& infilename, const std::string& outfilename) { abort(); }
-#else
-void convert_rmat2gr(const std::string& infilename, const std::string& outfilename) {
-  typedef Galois::Graph::FirstGraph<uint32_t,int32_t,true> Graph;
-  typedef Graph::GraphNode GNode;
-  Graph graph;
-
-  std::ifstream infile(infilename.c_str());
-
-  // Skip to first non-comment line
-  while (infile) {
-    if (infile.peek() != '%') {
-      break;
-    }
-    infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-  }
-
-  uint32_t nnodes;
-  size_t nedges;
-  infile >> nnodes >> nedges;
-  infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-
-  std::vector<GNode> nodes;
-  nodes.resize(nnodes);
-  for (uint32_t i = 0; i < nnodes; ++i) {
-    GNode n = graph.createNode(i);
-    graph.addNode(n);
-    nodes[i] = n;
-    graph.addNode(n);
-  }
-
-  for (size_t edge_num = 0; edge_num < nnodes; ++edge_num) {
-    uint32_t cur_id;
-    size_t cur_edges;
-    infile >> cur_id >> cur_edges;
-    if (cur_id >= nnodes) {
-      std::cerr << "Error: node id out of range: " << cur_id << "\n";
-      abort();
-    }
-    
-    for (size_t j = 0; j < cur_edges; ++j) {
-      uint32_t neighbor_id;
-      int32_t weight;
-      infile >> neighbor_id >> weight;
-      if (neighbor_id >= nnodes) {
-        std::cerr << "Error: neighbor id out of range: " << neighbor_id << "\n";
-        abort();
-      }
-      GNode& src = nodes[cur_id];
-      GNode& dst = nodes[neighbor_id];
-      // replaces existing edge if it exists
-      graph.getEdgeData(graph.addEdge(src, dst)) = weight;
-    }
-
-    infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-  }
-
-  infile.peek();
-  if (!infile.eof()) {
-    std::cerr << "Error: additional lines in file\n";
-    abort();
-  }
-
-  size_t edges_added = 0;
-  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
-    edges_added += std::distance(graph.edge_begin(*ii), graph.edge_end(*ii));
-  }
-
-  std::cout << "Finished reading graph. "
-    << "Nodes: " << nnodes
-    << " Edges read: " << nedges 
-    << " Edges added: " << edges_added
-    << "\n";
-
-  outputGraph(outfilename, graph);
-  printStatus(nnodes, edges_added, graph.size(), graph.sizeEdges());
-}
-#endif
-
 // Example:
 //  c Some file
 //  c Comments
@@ -966,8 +1015,7 @@ void convert_dimacs2gr(const std::string& infilename, const std::string& outfile
       }
     }
     if (tokens.size() < 3 || tokens[0].compare("p") != 0) {
-      std::cerr << "Unknown problem specification line: " << line.str() << "\n";
-      abort();
+      GALOIS_DIE("Unknown problem specification line: ", line.str());
     }
     nnodes = std::stoull(tokens[tokens.size() - 2]);
     nedges = std::stoull(tokens[tokens.size() - 1]);
@@ -997,12 +1045,10 @@ void convert_dimacs2gr(const std::string& infilename, const std::string& outfile
 
       infile >> cur_id >> neighbor_id >> weight;
       if (cur_id == 0 || cur_id > nnodes) {
-        std::cerr << "Error: node id out of range: " << cur_id << "\n";
-        abort();
+        GALOIS_DIE("Error: node id out of range: ", cur_id);
       }
       if (neighbor_id == 0 || neighbor_id > nnodes) {
-        std::cerr << "Error: neighbor id out of range: " << neighbor_id << "\n";
-        abort();
+        GALOIS_DIE("Error: neighbor id out of range: ", neighbor_id);
       }
 
       // 1 indexed
@@ -1017,8 +1063,7 @@ void convert_dimacs2gr(const std::string& infilename, const std::string& outfile
 
     infile.peek();
     if (!infile.eof()) {
-      std::cerr << "Error: additional lines in file\n";
-      abort();
+      GALOIS_DIE("Error: additional lines in file");
     }
   }
 
@@ -1056,8 +1101,7 @@ void convert_pbbs2vgr(const std::string& infilename, const std::string& outfilen
 
   infile >> header >> nnodes >> nedges;
   if (header != "AdjacencyGraph") {
-    std::cerr << "Error: unknown file format\n";
-    abort();
+    GALOIS_DIE("Error: unknown file format");
   }
 
   p.setNumNodes(nnodes);
@@ -1320,16 +1364,16 @@ void convert_gr2bsml(const std::string& infilename, const std::string& outfilena
 
   mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
   int fd = open(outfilename.c_str(), O_WRONLY | O_CREAT | O_TRUNC, mode);
-  if (fd == -1) { perror(__FILE__); abort(); }
+  if (fd == -1) { GALOIS_SYS_DIE(""); }
   int retval;
 
   // Write header
   retval = write(fd, &nnodes, sizeof(nnodes));
-  if (retval == -1) { perror(__FILE__); abort(); }
+  if (retval == -1) { GALOIS_SYS_DIE(""); }
   retval = write(fd, &nnodes, sizeof(nnodes));
-  if (retval == -1) { perror(__FILE__); abort(); }
+  if (retval == -1) { GALOIS_SYS_DIE(""); }
   retval = write(fd, &nedges, sizeof(nedges));
-  if (retval == -1) { perror(__FILE__); abort(); }
+  if (retval == -1) { GALOIS_SYS_DIE(""); }
 
   // Write row adjacency
   for (typename Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
@@ -1337,7 +1381,7 @@ void convert_gr2bsml(const std::string& infilename, const std::string& outfilena
     uint32_t sid = src;
     for (typename Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
       retval = write(fd, &sid, sizeof(sid));
-      if (retval == -1) { perror(__FILE__); abort(); }
+      if (retval == -1) { GALOIS_SYS_DIE(""); }
     }
   }
 
@@ -1348,7 +1392,7 @@ void convert_gr2bsml(const std::string& infilename, const std::string& outfilena
       GNode dst = graph.getEdgeDst(jj);
       uint32_t did = dst;
       retval = write(fd, &did, sizeof(did));
-      if (retval == -1) { perror(__FILE__); abort(); }
+      if (retval == -1) { GALOIS_SYS_DIE(""); }
     }
   }
 
@@ -1359,7 +1403,7 @@ void convert_gr2bsml(const std::string& infilename, const std::string& outfilena
     for (typename Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
       double weight = convert(graph, jj);
       retval = write(fd, &weight, sizeof(weight));
-      if (retval == -1) { perror(__FILE__); abort(); }
+      if (retval == -1) { GALOIS_SYS_DIE(""); }
     }
   }
 
@@ -1376,6 +1420,8 @@ int main(int argc, char** argv) {
     case gr2bsml: convert_gr2bsml<int32_t>(inputfilename, outputfilename); break;
     case gr2cintgr: convert_gr2cgr<int32_t>(inputfilename, outputfilename); break;
     case gr2dimacs: convert_gr2dimacs<int32_t>(inputfilename, outputfilename); break;
+    case gr2doublemtx: convert_gr2mtx<double>(inputfilename, outputfilename); break;
+    case gr2floatmtx: convert_gr2mtx<float>(inputfilename, outputfilename); break;
     case gr2floatpbbsedges: convert_gr2pbbsedges<float>(inputfilename, outputfilename); break;
     case gr2intpbbs: convert_gr2pbbs<int32_t,int32_t>(inputfilename, outputfilename); break;
     case gr2intpbbsedges: convert_gr2pbbsedges<int32_t>(inputfilename, outputfilename); break;
@@ -1387,9 +1433,10 @@ int main(int argc, char** argv) {
     case gr2tintgr: transpose<int32_t>(inputfilename, outputfilename); break;
     case gr2treeintgr: add_tree<int32_t>(inputfilename, outputfilename); break;
     case intedgelist2gr: convert_edgelist2gr<int>(inputfilename, outputfilename); break;
+    case mtx2doublegr: convert_mtx2gr<double>(inputfilename, outputfilename); break;
+    case mtx2floatgr: convert_mtx2gr<float>(inputfilename, outputfilename); break;
     case nodelist2vgr: convert_nodelist2vgr(inputfilename, outputfilename); break;
     case pbbs2vgr: convert_pbbs2vgr(inputfilename, outputfilename); break;
-    case rmat2gr: convert_rmat2gr(inputfilename, outputfilename); break;
     case vgr2bsml: convert_gr2bsml<void>(inputfilename, outputfilename); break;
     case vgr2cvgr: convert_gr2cgr<void>(inputfilename, outputfilename); break;
     case vgr2edgelist: convert_gr2edgelist<void>(inputfilename, outputfilename); break;
