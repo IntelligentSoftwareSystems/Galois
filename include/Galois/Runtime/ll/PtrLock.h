@@ -36,6 +36,7 @@
 
 #include <stdint.h>
 #include <cassert>
+#include <atomic>
 
 #include "CompilerSpecific.h"
 
@@ -46,77 +47,105 @@ namespace LL {
 /// PtrLock is a spinlock and a pointer.  If the second template
 /// parameter is false, the lock is a noop.  This wraps a pointer and
 /// uses the low order bit for the lock flag
+/// Copying a lock is unsynchronized (relaxed ordering)
 template<typename T, bool isALock>
 class PtrLock;
 
 template<typename T>
 class PtrLock<T, true> {
-  volatile uintptr_t _lock;
-public:
-  PtrLock() : _lock() {}
+  std::atomic<uintptr_t> _lock;
 
-  inline void lock() {
+  GALOIS_ATTRIBUTE_NOINLINE
+  void slow_lock() {
     uintptr_t oldval;
     do {
-      while ((_lock & 1) != 0) {
+      while (((oldval = _lock) & 1) != 0) {
 	asmPause();
       }
-      oldval = __sync_fetch_and_or(&_lock, 1);
-    } while (oldval & 1);
+      assert(oldval & 1 == 0);
+    } while (!_lock.compare_exchange_weak(oldval, oldval | 1));
+    assert(_lock);
+  }
+
+public:
+  PtrLock() : _lock(0) {}
+  //relaxed order for copy
+  PtrLock(const PtrLock& p) : _lock(p._lock.load(std::memory_order_relaxed)) {}
+
+  PtrLock& operator= (const PtrLock& p) {
+    if (&p == this) return *this;
+    //relaxed order for initialization
+    _lock.store(p._lock.load(std::memory_order_relaxed), std::memory_order_relaxed);
+  }
+
+  inline void lock() {
+    uintptr_t oldval = _lock.load(std::memory_order_relaxed);
+    if (oldval & 1)
+      goto slow_path;
+    if (!_lock.compare_exchange_weak(oldval, oldval | 1, std::memory_order_acq_rel, std::memory_order_relaxed))
+      goto slow_path;
+    assert(_lock & 1);
+    return;
+  slow_path:
+    slow_lock();
   }
 
   inline void unlock() {
     assert(_lock & 1);
-    compilerBarrier();
-    _lock = _lock & ~(uintptr_t)1;
+    _lock.fetch_xor(1, std::memory_order_release);
   }
 
   inline void unlock_and_clear() {
     assert(_lock & 1);
-    compilerBarrier();
-    _lock = 0;
+    _lock.store(0, std::memory_order_release);
   }
 
   inline void unlock_and_set(T* val) {
     assert(_lock & 1);
     assert(!((uintptr_t)val & 1));
-    compilerBarrier();
-    _lock = (uintptr_t)val;
+    _lock.store((uintptr_t)val, std::memory_order_release);
   }
   
   inline T* getValue() const {
-    return (T*)(_lock & ~(uintptr_t)1);
+    return (T*)(_lock.load(std::memory_order_relaxed) & ~(uintptr_t)1);
   }
 
   inline void setValue(T* val) {
     uintptr_t nval = (uintptr_t)val;
     nval |= (_lock & 1);
-    _lock = nval;
+    //relaxed OK since this doesn't clear lock
+    _lock.store(nval, std::memory_order_relaxed);
   }
 
   inline bool try_lock() {
-    uintptr_t oldval = _lock;
+    uintptr_t oldval = _lock.load(std::memory_order_acquire);
     if ((oldval & 1) != 0)
       return false;
-    oldval = __sync_fetch_and_or(&_lock, 1);
-    return !(oldval & 1);
+    if (!_lock.compare_exchange_weak(oldval, oldval | 1, std::memory_order_acq_rel))
+      return false;
+    assert(_lock & 1);
+    return true;
   }
 
   inline bool is_locked() const {
-    return _lock & 1;
+    return _lock.load(std::memory_order_acquire) & 1;
   }
 
   //! CAS only works on unlocked values
   //! the lock bit will prevent a successful cas
   inline bool CAS(T* oldval, T* newval) {
     assert(!((uintptr_t)oldval & 1) && !((uintptr_t)newval & 1));
-    return __sync_bool_compare_and_swap(&_lock, (uintptr_t)oldval, (uintptr_t)newval);
+    uintptr_t old = (uintptr_t)oldval;
+    return _lock.compare_exchange_strong(old, (uintptr_t)newval);
+    //return __sync_bool_compare_and_swap(&_lock, (uintptr_t)oldval, (uintptr_t)newval);
   }
 
   //! CAS that works on locked values; this can be very dangerous
   //! when used incorrectly
   inline bool stealing_CAS(T* oldval, T* newval) {
-    return __sync_bool_compare_and_swap(&_lock, (uintptr_t)oldval|1, (uintptr_t)newval|1);
+    uintptr_t old = 1 | (uintptr_t)oldval;
+    return _lock.compare_exchange_strong(old, 1 | (uintptr_t)newval);
+    //return __sync_bool_compare_and_swap(&_lock, (uintptr_t)oldval|1, (uintptr_t)newval|1);
   }
 };
 
