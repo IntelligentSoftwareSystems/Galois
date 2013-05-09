@@ -35,5 +35,7 @@
 #include "LC_InlineEdge_Graph.h"
 #include "LC_Linear_Graph.h"
 #include "LC_Numa_Graph.h"
+#include "LC_InOut_Graph.h"
+#include "Util.h"
 
 #endif

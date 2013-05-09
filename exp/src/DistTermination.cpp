@@ -46,19 +46,19 @@ class DistTerminationDetection : public TerminationDetection {
 
   PerThreadStorage<TokenHolder> data;
   
-  static void globalTermLandingPad(Distributed::RecvBuffer&);
-  static void propTokenLandingPad(Distributed::RecvBuffer&);
+  static void globalTermLandingPad(RecvBuffer&);
+  static void propTokenLandingPad(RecvBuffer&);
 
   //send token onwards
   void propToken(bool isBlack) {
     unsigned id = LL::getTID();
     assert(id < activeThreads);
-    if (id + 1 == activeThreads && Distributed::networkHostNum > 1) {
+    if (id + 1 == activeThreads && networkHostNum > 1) {
       //remote
       //send message to networkHost + 1
-     Distributed::SendBuffer b;
+     SendBuffer b;
      gSerialize(b,isBlack);
-     Distributed::getSystemNetworkInterface().send((Distributed::networkHostID + 1) % Distributed::networkHostNum, propTokenLandingPad, b);
+     getSystemNetworkInterface().send((networkHostID + 1) % networkHostNum, propTokenLandingPad, b);
     } else {
       TokenHolder& th = *data.getRemote((id + 1) % activeThreads);
       th.tokenIsBlack = isBlack;
@@ -76,15 +76,15 @@ class DistTerminationDetection : public TerminationDetection {
   }
 
   void propGlobalTerm() {
-    if (Distributed::networkHostNum > 1) {
-      Distributed::SendBuffer b;
-      Distributed::getSystemNetworkInterface().broadcast(globalTermLandingPad, b);
+    if (networkHostNum > 1) {
+      SendBuffer b;
+      getSystemNetworkInterface().broadcast(globalTermLandingPad, b);
     }
     globalTerm.data = true;
   }
 
   bool isSysMaster() const {
-    return LL::getTID() == 0 && Distributed::networkHostID == 0;
+    return LL::getTID() == 0 && networkHostID == 0;
   }
 
 public:
@@ -132,10 +132,10 @@ static DistTerminationDetection& getDistTermination() {
   return term;
 }
 
-void DistTerminationDetection::globalTermLandingPad(Distributed::RecvBuffer&) {
+void DistTerminationDetection::globalTermLandingPad(RecvBuffer&) {
   getDistTermination().globalTerm.data = true;
 }
-void DistTerminationDetection::propTokenLandingPad(Distributed::RecvBuffer& b) {
+void DistTerminationDetection::propTokenLandingPad(RecvBuffer& b) {
   bool isBlack;
   gDeserialize(b,isBlack);
   getDistTermination().recvToken(isBlack);

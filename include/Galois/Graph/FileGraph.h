@@ -34,13 +34,12 @@
 #include "Galois/Endian.h"
 #include "Galois/MethodFlags.h"
 #include "Galois/LargeArray.h"
-#include "Galois/Graph/Util.h"
+#include "Galois/Graph/Details.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/ll/CacheLineStorage.h"
 
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/iterator/transform_iterator.hpp>
-#include <boost/type_traits/is_pod.hpp>
 #include <boost/utility.hpp>
 
 #include <map>
@@ -60,7 +59,7 @@ public:
 protected:
   void* volatile masterMapping;
   size_t masterLength;
-  uint64_t sizeEdgeTy;
+  uint64_t sizeofEdge;
   int masterFD;
 
   uint64_t* outIdx;
@@ -87,10 +86,10 @@ protected:
     }
   };
 
-  //! Initialize graph from block of memory
+  //! Initializes a graph from block of memory
   void parse(void* m);
 
-  //! Read graph connectivity information from memory
+  //! Reads graph connectivity information from memory
   void structureFromMem(void* mem, size_t len, bool clone);
 
   void* structureFromArrays(uint64_t* outIdxs, uint64_t numNodes,
@@ -98,16 +97,30 @@ protected:
 
   void* structureFromGraph(FileGraph& g, size_t sizeofEdgeData);
 
+  /**
+   * Finds the first node N such that
+   *
+   *  N * nodeSize + 
+   *  (sum_{i=0}^{N-1} E[i]) * edgeSize 
+   *    >=
+   *  targetSize 
+   *
+   *  in range [lb, ub). Returns ub if unsuccessful.
+   */
+  size_t findIndex(size_t nodeSize, size_t edgeSize, size_t targetSize, size_t lb, size_t ub);
+  
 public:
   // Node Handling
 
-  //! Check if a node is in the graph (already added)
-  bool containsNode(const GraphNode n) const;
+  //! Checks if a node is in the graph (already added)
+  bool containsNode(const GraphNode n) const {
+    return n < numNodes;
+  }
 
   // Edge Handling
   template<typename EdgeTy>
   EdgeTy& getEdgeData(GraphNode src, GraphNode dst) {
-    assert(sizeEdgeTy == sizeof(EdgeTy));
+    assert(sizeofEdge == sizeof(EdgeTy));
     return reinterpret_cast<EdgeTy*>(edgeData)[getEdgeIdx(src, dst)];
   }
 
@@ -116,8 +129,8 @@ public:
   edge_iterator edge_begin(GraphNode N) const;
   edge_iterator edge_end(GraphNode N) const;
 
-  EdgesWithNoFlagIterator<FileGraph> out_edges(GraphNode N) {
-    return EdgesWithNoFlagIterator<FileGraph>(*this, N);
+  detail::EdgesWithNoFlagIterator<FileGraph> out_edges(GraphNode N) {
+    return detail::EdgesWithNoFlagIterator<FileGraph>(*this, N);
   }
 
   /**
@@ -125,16 +138,17 @@ public:
    */
   template<typename EdgeTy, typename CompTy>
   void sortEdgesByEdgeData(GraphNode N, const CompTy& comp = std::less<EdgeTy>()) {
-    typedef LargeArrayWrapper<GraphNode> EdgeDst;
-    typedef LargeArrayWrapper<EdgeTy> EdgeData;
+    typedef LargeArray<GraphNode> EdgeDst;
+    typedef LargeArray<EdgeTy> EdgeData;
+    typedef detail::EdgeSortIterator<GraphNode,uint64_t,EdgeDst,EdgeData> edge_sort_iterator;
 
     EdgeDst edgeDst(outs, numEdges);
     EdgeData ed(edgeData, numEdges);
 
-    EdgeSortIterator<EdgeDst,EdgeData> begin(std::distance(outs, raw_neighbor_begin(N)), &edgeDst, &ed);
-    EdgeSortIterator<EdgeDst,EdgeData> end(std::distance(outs, raw_neighbor_end(N)), &edgeDst, &ed);
+    edge_sort_iterator begin(std::distance(outs, raw_neighbor_begin(N)), &edgeDst, &ed);
+    edge_sort_iterator end(std::distance(outs, raw_neighbor_end(N)), &edgeDst, &ed);
 
-    std::sort(begin, end, EdgeSortCompWrapper<EdgeSortValue<EdgeTy>,CompTy>(comp));
+    std::sort(begin, end, detail::EdgeSortCompWrapper<EdgeSortValue<GraphNode,EdgeTy>,CompTy>(comp));
   }
 
   /**
@@ -142,14 +156,15 @@ public:
    */
   template<typename EdgeTy, typename CompTy>
   void sortEdges(GraphNode N, const CompTy& comp) {
-    typedef LargeArrayWrapper<GraphNode> EdgeDst;
-    typedef LargeArrayWrapper<EdgeTy> EdgeData;
+    typedef LargeArray<GraphNode> EdgeDst;
+    typedef LargeArray<EdgeTy> EdgeData;
+    typedef detail::EdgeSortIterator<GraphNode,uint64_t,EdgeDst,EdgeData> edge_sort_iterator;
 
     EdgeDst edgeDst(outs, numEdges);
     EdgeData ed(edgeData, numEdges);
 
-    EdgeSortIterator<EdgeDst,EdgeData> begin(std::distance(outs, raw_neighbor_begin(N)), &edgeDst, &ed);
-    EdgeSortIterator<EdgeDst,EdgeData> end(std::distance(outs, raw_neighbor_end(N)), &edgeDst, &ed);
+    edge_sort_iterator begin(std::distance(outs, raw_neighbor_begin(N)), &edgeDst, &ed);
+    edge_sort_iterator end(std::distance(outs, raw_neighbor_end(N)), &edgeDst, &ed);
 
     std::sort(begin, end, comp);
   }
@@ -164,6 +179,7 @@ public:
   typedef boost::transform_iterator<Convert32, uint32_t*> neighbor_iterator;
   typedef boost::transform_iterator<Convert32, uint32_t*> node_id_iterator;
   typedef boost::transform_iterator<Convert64, uint64_t*> edge_id_iterator;
+  typedef boost::counting_iterator<uint64_t> iterator;
   
   neighbor_iterator neighbor_begin(GraphNode N) const {
     return boost::make_transform_iterator(raw_neighbor_begin(N), Convert32());
@@ -172,6 +188,26 @@ public:
   neighbor_iterator neighbor_end(GraphNode N) const {
     return boost::make_transform_iterator(raw_neighbor_end(N), Convert32());
   }
+
+  template<typename EdgeTy>
+  EdgeTy* edge_data_begin() const {
+    return reinterpret_cast<EdgeTy*>(edgeData);
+  }
+
+  template<typename EdgeTy>
+  EdgeTy* edge_data_end() const {
+    assert(sizeof(EdgeTy) == sizeofEdge);
+    EdgeTy* r = reinterpret_cast<EdgeTy*>(edgeData);
+    return &r[numEdges];
+  }
+
+  iterator begin() const;
+  iterator end() const;
+
+  /**
+   * Divides nodes into balanced ranges.
+   */
+  std::pair<iterator,iterator> divideBy(size_t nodeSize, size_t edgeSize, unsigned id, unsigned total);
 
   node_id_iterator node_id_begin() const;
   node_id_iterator node_id_end() const;
@@ -183,68 +219,72 @@ public:
     return reinterpret_cast<EdgeTy*>(edgeData)[std::distance(outs, it.base())];
   }
 
-  template<typename EdgeTy>
-  EdgeTy* edge_data_begin() const {
-    return reinterpret_cast<EdgeTy*>(edgeData);
-  }
-
-  template<typename EdgeTy>
-  EdgeTy* edge_data_end() const {
-    assert(sizeof(EdgeTy) == sizeEdgeTy);
-    EdgeTy* r = reinterpret_cast<EdgeTy*>(edgeData);
-    return &r[numEdges];
-  }
-
   bool hasNeighbor(GraphNode N1, GraphNode N2) const;
 
-  typedef boost::counting_iterator<uint64_t> iterator;
+  //! Returns the number of nodes in the graph
+  unsigned int size() const { return numNodes; }
 
-  //! Iterate over nodes in graph (not thread safe)
-  iterator begin() const;
+  //! Returns the number of edges in the graph
+  unsigned int sizeEdges() const { return numEdges; }
 
-  iterator end() const;
-
-  //! The number of nodes in the graph
-  unsigned int size() const;
-
-  //! The number of edges in the graph
-  unsigned int sizeEdges() const;
-
-  //! sizeof an edge
-  size_t sizeEdge() const { return sizeEdgeTy; }
+  //! Returns the size of an edge
+  size_t edgeSize() const { return sizeofEdge; }
 
   FileGraph();
   ~FileGraph();
 
-  //! Read graph connectivity information from file
-  void structureFromFile(const std::string& filename);
+  //! Reads graph connectivity information from file
+  void structureFromFile(const std::string& filename, bool preFault = true);
 
-  //! Read graph connectivity information from arrays.
-  //! Return a pointer to array to populate with edge data.
+  /**
+   * Reads graph connectivity information from file. Tries to balance memory
+   * evenly across system.  Cannot be called during parallel execution.
+   */
+  void structureFromFileInterleaved(const std::string& filename, size_t sizeofEdgeData);
+
+  template<typename EdgeTy>
+  void structureFromFileInterleaved(const std::string& filename, 
+      typename std::enable_if<!std::is_void<EdgeTy>::value>::type* = 0) {
+    structureFromFileInterleaved(filename, sizeof(EdgeTy));
+  }
+
+  template<typename EdgeTy>
+  void structureFromFileInterleaved(const std::string& filename, 
+      typename std::enable_if<std::is_void<EdgeTy>::value>::type* = 0) {
+    structureFromFileInterleaved(filename, 0);
+  }
+
+  /**
+   * Reads graph connectivity information from arrays. Returns a pointer to
+   * array to populate with edge data.
+   */
   template<typename T>
   T* structureFromArrays(uint64_t* outIdxs, uint64_t numNodes,
       uint32_t* outs, uint64_t numEdges) {
     return reinterpret_cast<T*>(structureFromArrays(outIdx, numNodes, outs, numEdges, sizeof(T)));
   }
 
-  //! Read graph connectivity information from arrays.
-  //! Return a pointer to array to populate with edge data.
+  /** 
+   * Reads graph connectivity information from arrays. Returns a pointer to
+   * array to populate with edge data.
+   */
   template<typename T>
   T* structureFromGraph(FileGraph& g) {
     return reinterpret_cast<T*>(structureFromGraph(g, sizeof(T)));
   }
 
-  //! Write graph connectivity information to file
+  //! Writes graph connectivity information to file
   void structureToFile(const std::string& file);
 
   void swap(FileGraph& other);
+
   void cloneFrom(FileGraph& other);
 };
 
 /** 
- * Simplifies parsing graphs from files.
+ * Simplifies writing graphs.
  * 
- * Parse your file in rounds:
+ * Writer your file in rounds:
  * <ol>
  *  <li>setNumNodes(), setNumEdges(), setSizeofEdgeData()</li>
  *  <li>phase1(), for each node, incrementDegree(Node x)</li>
@@ -253,16 +293,16 @@ public:
  *  <li>finish(), use as FileGraph</li>
  * </ol>
  */
-class FileGraphParser: public FileGraph {
+class FileGraphWriter: public FileGraph {
   uint64_t *outIdx; // outIdxs
   uint32_t *starts;
   uint32_t *outs; // outs
   size_t sizeofEdgeData;
 
 public:
-  FileGraphParser(): outIdx(0), starts(0), outs(0), sizeofEdgeData(0) { }
+  FileGraphWriter(): outIdx(0), starts(0), outs(0), sizeofEdgeData(0) { }
 
-  ~FileGraphParser() { 
+  ~FileGraphWriter() { 
     if (outIdx)
       delete [] outIdx;
     if (starts)
@@ -341,10 +381,10 @@ public:
 template<typename EdgeTy>
 void makeSymmetric(FileGraph& in, FileGraph& out) {
   typedef FileGraph::GraphNode GNode;
-  typedef LargeArray<EdgeTy,boost::is_pod<EdgeTy>::value> EdgeData;
+  typedef LargeArray<EdgeTy> EdgeData;
   typedef typename EdgeData::value_type edge_value_type;
 
-  FileGraphParser g;
+  FileGraphWriter g;
   EdgeData edgeData;
 
   size_t numEdges = in.sizeEdges() * 2;
@@ -363,7 +403,7 @@ void makeSymmetric(FileGraph& in, FileGraph& out) {
   }
 
   g.phase2();
-  edgeData.allocate(numEdges);
+  edgeData.create(numEdges);
   for (FileGraph::iterator ii = in.begin(), ei = in.end(); ii != ei; ++ii) {
     GNode src = *ii;
     for (FileGraph::edge_iterator jj = in.edge_begin(src), ej = in.edge_end(src); jj != ej; ++jj) {
@@ -400,10 +440,10 @@ void makeSymmetric(FileGraph& in, FileGraph& out) {
 template<typename EdgeTy,typename PTy>
 void permute(FileGraph& in, const PTy& p, FileGraph& out) {
   typedef FileGraph::GraphNode GNode;
-  typedef LargeArray<EdgeTy,boost::is_pod<EdgeTy>::value> EdgeData;
+  typedef LargeArray<EdgeTy> EdgeData;
   typedef typename EdgeData::value_type edge_value_type;
 
-  FileGraphParser g;
+  FileGraphWriter g;
   EdgeData edgeData;
 
   size_t numEdges = in.sizeEdges();
@@ -420,7 +460,7 @@ void permute(FileGraph& in, const PTy& p, FileGraph& out) {
   }
 
   g.phase2();
-  edgeData.allocate(numEdges);
+  edgeData.create(numEdges);
   for (FileGraph::iterator ii = in.begin(), ei = in.end(); ii != ei; ++ii) {
     GNode src = *ii;
     for (FileGraph::edge_iterator jj = in.edge_begin(src), ej = in.edge_end(src); jj != ej; ++jj) {
@@ -442,186 +482,12 @@ void permute(FileGraph& in, const PTy& p, FileGraph& out) {
 }
 
 template<typename GraphTy,typename... Args>
+GALOIS_ATTRIBUTE_DEPRECATED
 void structureFromFile(GraphTy& g, const std::string& fname, Args&&... args) {
   FileGraph graph;
   graph.structureFromFile(fname);
   g.structureFromGraph(graph, std::forward<Args>(args)...);
 }
-
-//! Local computation graph (i.e., graph structure does not change)
-//! THIS GRAPH SHOULD GO AWAY
-template<typename NodeTy, typename EdgeTy>
-class LC_FileGraph : public FileGraph {
-
-  struct gNode : public Galois::Runtime::Lockable {
-    NodeTy data;
-    gNode() {}
-  };
-
-  //null if type is void
-  Galois::Runtime::LL::CacheLineStorage<gNode>* nodeData;
-
-public:
-  GALOIS_ATTRIBUTE_DEPRECATED
-  LC_FileGraph(): nodeData(0) { }
-
-  ~LC_FileGraph() {
-    if (nodeData)
-      delete[] nodeData;
-  }
-  
-  NodeTy& getData(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
-    Galois::Runtime::acquire(&nodeData[N].data, mflag);
-    return nodeData[N].data.data;
-  }
-
-  EdgeTy& getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = MethodFlag::ALL) {
-    return FileGraph::getEdgeData<EdgeTy>(src, dst, mflag);
-  }
-
-  EdgeTy& getEdgeData(FileGraph::edge_iterator it, MethodFlag mflag = MethodFlag::ALL) {
-    return FileGraph::getEdgeData<EdgeTy>(it, mflag);
-  }
-
-  EdgeTy& getEdgeData(FileGraph::neighbor_iterator it, MethodFlag mflag = MethodFlag::ALL) {
-    return FileGraph::getEdgeData<EdgeTy>(it, mflag);
-  }
-
-  neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) const {
-    return FileGraph::neighbor_begin(N);
-  }
-
-  neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = MethodFlag::ALL) const {
-    return FileGraph::neighbor_end(N);
-  }
-
-  //! Loads node data from file
-  void nodeDataFromFile(const char* filename) {
-    emptyNodeData();
-    std::ifstream file(filename);
-    for (uint64_t i = 0; i < size(); ++i)
-      file >> nodeData[i];
-  }
-  
-  //! Initializes node data for the graph to default values
-  void emptyNodeData(NodeTy init = NodeTy()) {
-    nodeData = new Galois::Runtime::LL::CacheLineStorage<gNode>[size()];
-    for (uint64_t i = 0; i < size(); ++i)
-      nodeData[i].data.data = init;
-  }
-
-  void swap(LC_FileGraph& other) {
-    std::swap(nodeData, other.nodeData);
-    FileGraph::swap(other);
-  }
-
-  void cloneFrom(LC_FileGraph& other) {
-    nodeData = other.nodeData;
-    FileGraph::cloneFrom(other);
-  }
-
-  template<typename GTy>
-  void copyGraph(GTy& graph) {
-    structureFromGraph(graph);
-    emptyNodeData();
-    int i = 0;
-    for (typename GTy::iterator ii = graph.begin(), ee = graph.end(); ii != ee; ++ii, ++i)
-      nodeData[i].data.data = graph.getData(*ii);
-  }
-};
-
-//! Local computation graph (i.e., graph structure does not change)
-template<typename EdgeTy>
-class LC_FileGraph<void, EdgeTy> : public FileGraph {
-  struct gNode : public Galois::Runtime::Lockable {
-    gNode() {}
-  };
-
-  //null if type is void
-  Galois::Runtime::LL::CacheLineStorage<gNode>* nodeData;
-
-public:
-  GALOIS_ATTRIBUTE_DEPRECATED
-  LC_FileGraph(): nodeData(0) {}
-  ~LC_FileGraph() {
-    if (nodeData)
-      delete[] nodeData;
-  }
-  
-  EdgeTy& getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = MethodFlag::ALL) {
-    return FileGraph::getEdgeData<EdgeTy>(src, dst, mflag);
-  }
-  EdgeTy& getEdgeData(FileGraph::edge_iterator it, MethodFlag mflag = MethodFlag::ALL) {
-    return FileGraph::getEdgeData<EdgeTy>(it, mflag);
-  }
-  EdgeTy& getEdgeData(FileGraph::neighbor_iterator it, MethodFlag mflag = MethodFlag::ALL) {
-    return FileGraph::getEdgeData<EdgeTy>(it, mflag);
-  }
-  neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) const {
-    return FileGraph::neighbor_begin(N);
-  }
-  neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = MethodFlag::ALL) const {
-    return FileGraph::neighbor_end(N);
-  }
-};
-
-template<typename NodeTy>
-class LC_FileGraph<NodeTy, void>: public FileGraph { 
-  struct gNode : public Galois::Runtime::Lockable {
-    NodeTy data;
-    gNode() {}
-  };
-
-  //null if type is void
-  Galois::Runtime::LL::CacheLineStorage<gNode>* nodeData;
-
-public:
-  GALOIS_ATTRIBUTE_DEPRECATED
-  LC_FileGraph(): nodeData(0) {}
-  ~LC_FileGraph() {
-    if (nodeData)
-      delete[] nodeData;
-  }
-  
-  NodeTy& getData(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
-    Galois::Runtime::acquire(&nodeData[N].data, mflag);
-    return nodeData[N].data.data;
-  }
-
-  void nodeDataFromFile(const char* filename) {
-    emptyNodeData();
-    std::ifstream file(filename);
-    for (uint64_t i = 0; i < numNodes; ++i)
-      file >> nodeData[i];
-  }
-  
-  void emptyNodeData(NodeTy init = NodeTy()) {
-    nodeData = new Galois::Runtime::LL::CacheLineStorage<gNode>[numNodes];
-    for (uint64_t i = 0; i < numNodes; ++i)
-      nodeData[i].data.data = init;
-  }
-
-  neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) const {
-    return FileGraph::neighbor_begin(N);
-  }
-
-  neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = MethodFlag::ALL) const {
-    return FileGraph::neighbor_end(N);
-  }
-};
-
-template<>
-class LC_FileGraph<void, void>: public FileGraph { 
-public:
-  GALOIS_ATTRIBUTE_DEPRECATED
-  LC_FileGraph() { }
-  neighbor_iterator neighbor_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) const {
-    return FileGraph::neighbor_begin(N);
-  }
-  neighbor_iterator neighbor_end(GraphNode N, MethodFlag mflag = MethodFlag::ALL) const {
-    return FileGraph::neighbor_end(N);
-  }
-};
 
 }
 }

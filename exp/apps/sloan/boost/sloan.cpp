@@ -94,10 +94,8 @@
 #define W1 1               //default weight for the distance in the Sloan algorithm
 #define W2 2               //default weight for the degree in the Sloan algorithm
 
-static const char* name = "Breadth-first Search Example";
-static const char* desc =
-  "Computes the shortest path from a source node to all nodes in a directed "
-  "graph using a modified Bellman-Ford algorithm\n";
+static const char* name = "Sloan's reordering algorithm";
+static const char* desc = "Computes a permutation of a matrix according to Sloan's algorithm";
 static const char* url = 0;
 
 //****** Command Line Options ******
@@ -155,7 +153,7 @@ struct Prefix {
 };
 
 //typedef Galois::Graph::LC_Linear_Graph<SNode, void> Graph;
-typedef Galois::Graph::LC_CSR_Graph<SNode, void> Graph;
+typedef Galois::Graph::LC_CSR_Graph<SNode, void>::with_no_lockable<true>::with_numa_alloc<true> Graph;
 //typedef Galois::Graph::LC_CSRInline_Graph<SNode, char> Graph;
 //typedef Galois::Graph::FirstGraph<SNode, void, false> Graph;
 typedef Graph::GraphNode GNode;
@@ -442,7 +440,7 @@ static bool verify(GNode& source) {
     return false;
   }
   
-  size_t id = 0;
+  //size_t id = 0;
   
 #ifdef GALOIS_JUNE
   bool okay = Galois::find_if(graph.begin(), graph.end(), not_consistent()) == graph.end()
@@ -501,8 +499,7 @@ static void printDegreeDistribution() {
 
 // Read graph from a binary .gr as dirived from a Matrix Market .mtx using graph-convert
 static void readGraph(GNode& source, GNode& report) {
-  graph.structureFromFile(filename);
-
+  Galois::Graph::readGraph(graph, filename); 
   source = *graph.begin();
 
   size_t nnodes = graph.size();
@@ -510,7 +507,7 @@ static void readGraph(GNode& source, GNode& report) {
   
   size_t id = 0;
 
-	bgraph = new BGraph(nnodes);
+  bgraph = new BGraph(nnodes);
 
   for (Graph::iterator src = graph.begin(), ei = graph.end(); src != ei; ++src) {
     SNode& node = graph.getData(*src, Galois::MethodFlag::NONE);

@@ -33,7 +33,7 @@
 #include <deque>
 #include <utility>
 
-using namespace Galois::Runtime::Distributed;
+using namespace Galois::Runtime;
 
 #define INFLIGHT_LIMIT 100000
 
@@ -66,14 +66,6 @@ public:
     int rc = MPI_Init_thread (NULL, NULL, MPI_THREAD_FUNNELED, &provided);
     handleError(rc);
     
-    switch (provided) {
-    case MPI_THREAD_SINGLE: Galois::Runtime::LL::gInfo("MPI Supports: Single"); break;
-    case MPI_THREAD_FUNNELED: Galois::Runtime::LL::gInfo("MPI Supports: Funneled"); break;
-    case MPI_THREAD_SERIALIZED: Galois::Runtime::LL::gInfo("MPI Supports: Serialized"); break;
-    case MPI_THREAD_MULTIPLE: Galois::Runtime::LL::gInfo("MPI Supports: Multiple"); break;
-    default: break;
-    };
-
     MPI_Comm_size(MPI_COMM_WORLD, &numTasks);
     MPI_Comm_rank(MPI_COMM_WORLD, &taskRank);
 
@@ -84,6 +76,14 @@ public:
 
     if (taskRank == 0) {
       //master
+      //printing on lead host doesn't require this object to be fully initialized
+      switch (provided) {
+      case MPI_THREAD_SINGLE: Galois::Runtime::LL::gInfo("MPI Supports: Single"); break;
+      case MPI_THREAD_FUNNELED: Galois::Runtime::LL::gInfo("MPI Supports: Funneled"); break;
+      case MPI_THREAD_SERIALIZED: Galois::Runtime::LL::gInfo("MPI Supports: Serialized"); break;
+      case MPI_THREAD_MULTIPLE: Galois::Runtime::LL::gInfo("MPI Supports: Multiple"); break;
+      default: break;
+      }
     } else {
       //slave
     }
@@ -114,7 +114,7 @@ public:
       pending_sends.emplace_back(MPI_REQUEST_NULL, std::move(buf));
       std::pair<MPI_Request, SendBuffer>& com = pending_sends.back();
       assert(com.second.size());
-      int rv = MPI_Isend(com.second.linearData(), com.second.size(), MPI_BYTE, dest, FuncTag, MPI_COMM_WORLD, &com.first);
+      int rv = MPI_Issend(com.second.linearData(), com.second.size(), MPI_BYTE, dest, FuncTag, MPI_COMM_WORLD, &com.first);
       handleError(rv);
     } else {
       assert(dest < networkHostNum);
@@ -185,9 +185,9 @@ public:
     if (Galois::Runtime::LL::getTID() == 0) {
       update_pending_sends();
       while (!asyncOutQueue.empty() && (pending_sends.size() < INFLIGHT_LIMIT)) {
-	sendInternal(asyncOutQueue[0].dest, asyncOutQueue[0].recv, asyncOutQueue[0].buf);
-	asyncOutQueue.pop_front();
-	update_pending_sends();
+        sendInternal(asyncOutQueue[0].dest, asyncOutQueue[0].recv, asyncOutQueue[0].buf);
+        asyncOutQueue.pop_front();
+        update_pending_sends();
       }
       if (!asyncOutQueue.empty() || (pending_sends.size() >= INFLIGHT_LIMIT))
        asyncOutQueue.emplace_back(dest, recv, buf);
@@ -256,12 +256,12 @@ public:
 }
 
 
-NetworkInterface& Galois::Runtime::Distributed::getSystemNetworkInterface() {
+NetworkInterface& Galois::Runtime::getSystemNetworkInterface() {
   static NetworkInterfaceSyncMPI net;
   return net;
 }
 
-ObjectRecord& Galois::Runtime::Distributed::getSystemRemoteObjects() {
+ObjectRecord& Galois::Runtime::getSystemRemoteObjects() {
   static ObjectRecord obj;
   return obj;
 }

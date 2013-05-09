@@ -28,15 +28,22 @@ typedef int METISINT;
 typedef double METISDOUBLE;
 #include <stddef.h>
 #include <vector>
+#include "llvm/ADT/SmallVector.h"
 #include <iostream>
+#include "Galois/gdeque.h"
 using namespace std;
 class MetisNode{
 public:
-
-	MetisNode(int id, int weight){
+	typedef llvm::SmallVector <METISINT,128> svm;
+	//typedef int* svm;
+	/*typedef Galois::gdeque <int*,128> sve;
+	sve blah;*/
+	int processed;
+	MetisNode(int id, int weight) {
 		init();
 		_id = id;
 		_weight = weight;
+	//	initPartEdAndIndex(128);
 //		_isMatched = false;
 	}
 
@@ -61,6 +68,10 @@ public:
 		_ndgrees = 0;
 		_numEdges = 0;
 		_partition = -1;
+		processed=0;
+		matchNode = NULL;
+		multiNode = NULL;
+		matched = false;
 	}
 
 	int getNodeId() {
@@ -107,13 +118,6 @@ public:
 		_isBoundary = isBoundary;
 	}
 
-//	void setMapTo(GNode mapTo) {
-//		_mapTo = mapTo;
-//	}
-
-//	GNode getMapTo() {
-//		return _mapTo;
-//	}
 
 	int getIdegree() {
 		return _idegree;
@@ -177,42 +181,62 @@ public:
 //		return _partIndex;
 //	}
 
-	vector<METISINT>& getPartEd(){
+	svm& getPartEd(){
 		return _partEd;
 	}
 
-	vector<METISINT>& getPartIndex(){
+	svm& getPartIndex(){
 		return _partIndex;
 	}
 
-	void initPartEdAndIndex(int num){
-//		_partEd = new int[num];
-//		_partIndex = new int[num];
-//		if(_partEd == NULL){
-//			_partEd = new int[num]; //.resize(num);
-//			_partIndex = new int[num];
-//		}
-		_partEd.resize(num);
-		_partIndex.resize(num);
-
-		for(int i=0;i<num;i++){
-			_partEd[i] = 0;
-			_partIndex[i] = 0;
-		}
+	void initPartEdAndIndex(int nparts){
+			for(int i=0;i<nparts;i++) {
+				_partEd[i]=0;
+				_partIndex[i]=0;
+			}
 
 	}
 
+
+/*
+	void * getMatchNode() {
+		return matchNode;
+	}
+
+	void* getMultiNode() {
+		return multiNode;
+	}
+*/
+
+	bool isMatched() {
+		return matched;
+	}
+
+	void setMatched(bool matched) {
+		this->matched = matched;
+	}
+
+	void* getMatchNode() {
+		return matchNode;
+	}
+
+	void* getMultiNode() {
+		return multiNode;
+	}
+
+
+	void* matchNode;
+	void *multiNode;
+
+
 private:
+	bool matched;
 	METISINT _weight;
 	METISINT _numEdges;
 	//the sum of weights of its edges
 	METISINT _edgeWgtSum;
 	METISINT _partition;
 	bool _isBoundary;
-//	GNode _match;
-//	bool _isMatched;
-	// the node it maps to in the coarser graph
-//	GNode _mapTo;
 
 	METISINT _id;
 	// the sum of the weights of its edges connecting neighbors in its partition
@@ -223,13 +247,11 @@ private:
 	METISINT _gain;
 
 	// the node it mapped in the subgraph got by bisecting the current graph
-
 	//for kway partitioning
 	METISINT _ndgrees;
-	vector<METISINT> _partEd;
-	vector<METISINT> _partIndex;
-//	METISINT* _partEd;
-//	METISINT* _partIndex;
+	svm _partEd;
+	svm _partIndex;
+
 };
 
 #endif /* METISNODE_H_ */

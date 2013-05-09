@@ -41,10 +41,6 @@ class Statistic {
   bool valid;
 
 public:
-  Statistic(const std::string& _sn, unsigned long v, const std::string& _ln = "(NULL)"): statname(_sn), loopname(_ln), valid(true) {
-    *val.getLocal() = v;
-  }
-  
   Statistic(const std::string& _sn, const std::string& _ln = "(NULL)"): statname(_sn), loopname(_ln), valid(true) { }
 
   ~Statistic() {
@@ -103,6 +99,7 @@ class StatTimer : public Timer {
 public:
   StatTimer(): name("Time"), loopname(0), main(true) { }
   StatTimer(const char* n, const char* l = 0): name(n), loopname(l), main(false) { }
+
   ~StatTimer() {
     Galois::Runtime::reportStat(loopname, name, get());
     if (main)

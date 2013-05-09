@@ -33,7 +33,6 @@
 #include "Galois/Bag.h"
 #include "Galois/Statistic.h"
 #include "Galois/Graph/SpatialTree.h"
-#include "Galois/WorkList/WorkListAlt.h"
 #include "Lonestar/BoilerPlate.h"
 #include "llvm/Support/CommandLine.h"
 
@@ -53,7 +52,7 @@
 namespace cll = llvm::cl;
 
 static const char* name = "Delaunay Triangulation";
-static const char* desc = "Produces a Delaunay triangulation for a set of points\n";
+static const char* desc = "Produces a Delaunay triangulation for a set of points";
 static const char* url = "delaunay_triangulation";
 
 static cll::opt<std::string> inputname(cll::Positional, cll::desc("<input file>"), cll::Required);
@@ -413,7 +412,7 @@ static void readInput(const std::string& filename) {
       * 32 // include graph node size
       / (Galois::Runtime::MM::pageSize) // in pages
       );
-  Galois::Statistic("MeminfoPre", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPre");
 
   layoutPoints(points);
 }
@@ -485,7 +484,7 @@ static void writeMesh(const std::string& filename) {
 }
 
 static void generateMesh() {
-  typedef Galois::WorkList::ChunkedAdaptor<false,32> CA;
+  typedef Galois::WorkList::AltChunkedLIFO<32> CA;
   Galois::for_each_local<CA>(ptrPoints, Process());
 }
 
@@ -501,7 +500,7 @@ int main(int argc, char** argv) {
   T.stop();
   std::cout << "mesh size: " << graph.size() << "\n";
 
-  Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPost");
 
   if (!skipVerify) {
     Verifier verifier;

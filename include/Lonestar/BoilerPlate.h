@@ -46,19 +46,18 @@ static llvm::cl::opt<int> numThreads("t", llvm::cl::desc("Number of threads"), l
 //! initialize lonestar benchmark
 static void LonestarStart(int argc, char** argv, const char* app, const char* desc = 0, const char* url = 0) {
   using namespace Galois::Runtime::LL;
-  using namespace Galois::Runtime::Distributed;
+  using namespace Galois::Runtime;
   // initialize the network layer
   NetworkInterface& net = getSystemNetworkInterface();
   net.handleReceives();
 
   // display the name only if mater host
   if (networkHostID == 0) {
-    gPrint("Galois Benchmark Suite v", GALOIS_VERSION_STRING, " (r", SVNVERSION, ")\n");
-    gPrint("Copyright (C) ", GALOIS_COPYRIGHT_YEAR_STRING, " The University of Texas at Austin\n");
-    gPrint("http://iss.ices.utexas.edu/galois/\n\n");
-    gPrint("application: ", app ? app : "unspecified", "\n");
-    if (desc)
-      gPrint(desc);
+    gPrint("Galois Benchmark Suite v", GALOIS_VERSION_STRING, " (r", SVNVERSION, ")\n",
+	   "Copyright (C) ", GALOIS_COPYRIGHT_YEAR_STRING, " The University of Texas at Austin\n",
+	   "http://iss.ices.utexas.edu/galois/\n\n",
+	   "application: ", app ? app : "unspecified", "\n",
+	   desc ? desc : "");
     if (url)
       gPrint("http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/", url, "\n");
 
@@ -68,7 +67,7 @@ static void LonestarStart(int argc, char** argv, const char* app, const char* de
       if (i != argc - 1)
 	cmdout << " ";
     }
-    gPrint("Num of Hosts: ", networkHostNum, "\n");
+    gInfo("Number of Hosts: ", networkHostNum);
     gInfo("CommandLine ", cmdout.str().c_str());
   }
   char name[256];
@@ -78,8 +77,6 @@ static void LonestarStart(int argc, char** argv, const char* app, const char* de
 
   llvm::cl::ParseCommandLineOptions(argc, argv);
   numThreads = Galois::setActiveThreads(numThreads); 
-
-  Galois::Runtime::reportStat(0, "Threads", numThreads);
 }
 
 #endif

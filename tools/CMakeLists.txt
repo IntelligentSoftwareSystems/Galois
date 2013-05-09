@@ -67,7 +67,7 @@ ExternalProject_Add(triangle
 )
 
 #set(more_tools hi_pr triangle cats-gens snap GTgraph-rmat SSCA2)
-set(more_tools hi_pr triangle GTgraph-rmat SSCA2)
+set(more_tools triangle GTgraph-rmat SSCA2)
 
 # Simple download and patch
 function(dl name url)
@@ -95,7 +95,7 @@ function(cilkdl name url)
   endif()
 endfunction(cilkdl)
 
-dl(hi_pr http://www.avglab.com/andrew/soft/hipr.tar)
+#dl(hi_pr http://www.avglab.com/andrew/soft/hipr.tar)
 dl(GTgraph-rmat http://www.cse.psu.edu/~madduri/software/GTgraph/GTgraph.tar.gz)
 dl(SSCA2 http://www.graphanalysis.org/benchmark/SSCA2-2.2.tar.gz)
 cilkdl(bfs-schardl http://web.mit.edu/~neboat/www/code/bfs-icc-20120304.tar.gz)

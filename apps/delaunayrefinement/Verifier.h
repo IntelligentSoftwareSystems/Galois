@@ -61,10 +61,10 @@ class Verifier : public Galois::Runtime::Lockable {
     }
     // serialization functions
     typedef int tt_has_serialize;
-    void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+    void serialize(Galois::Runtime::SerializeBuffer& s) const {
       gSerialize(s,graph);
     }
-    void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+    void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
       gDeserialize(s,graph);
     }
   };
@@ -125,10 +125,10 @@ class Verifier : public Galois::Runtime::Lockable {
     }
     // serialization functions
     typedef int tt_has_serialize;
-    void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+    void serialize(Galois::Runtime::SerializeBuffer& s) const {
       gSerialize(s,graph);
     }
-    void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+    void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
       gDeserialize(s,graph);
     }
   };

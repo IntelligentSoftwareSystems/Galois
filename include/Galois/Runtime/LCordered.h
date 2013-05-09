@@ -257,7 +257,7 @@ public:
     if (l->auxPtr.getValue () == NULL) {
       NItem* nv = niAlloc.allocate (1);
       assert (nv != NULL);
-      niAlloc.construct (nv, NItem (l, cmp));
+      niAlloc.construct (nv, l, cmp);
       // NItem* nv = new NItem (l, cmp);
 
       if (l->auxPtr.CAS (NULL, nv)) {

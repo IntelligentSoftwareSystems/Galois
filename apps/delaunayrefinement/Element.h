@@ -46,7 +46,7 @@ public:
 //NOTE!!! serialize and deserialize the data
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+  void serialize(Galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s,coords[0]);
     gSerialize(s,coords[1]);
     gSerialize(s,coords[2]);
@@ -54,7 +54,7 @@ public:
     gSerialize(s,bDim);
     gSerialize(s,id);
   }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s,coords[0]);
     gDeserialize(s,coords[1]);
     gDeserialize(s,coords[2]);

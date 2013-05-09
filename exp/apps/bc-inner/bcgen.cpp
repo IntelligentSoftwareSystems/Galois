@@ -47,7 +47,7 @@ using namespace std;
 //potential padding (32bit max) to Re-Align to 64bits
 
 int DEF_DISTANCE;
-static const char* help = "(rmat|snap) <input file> <output file name scheme>";
+//static const char* help = "(rmat|snap) <input file> <output file name scheme>";
 
 string fname1;
 string fname2;
@@ -59,7 +59,7 @@ mapFile(const char *filename) {
   
   int fileFD = open(filename, O_RDONLY);
   struct stat buf;
-  int f = fstat(fileFD, &buf);
+  fstat(fileFD, &buf);
   size_t fileLength = buf.st_size;
 
   int _MAP_BASE = MAP_PRIVATE;
@@ -94,15 +94,15 @@ void readFromFiles() {
   int idxArraysLen = numNodes+1;
 
   uint32_t *fptr32 = (uint32_t *)fptr;
-  int * inIdx = (int *)fptr32;
+  //int * inIdx = (int *)fptr32;
   fptr32 += idxArraysLen;
   if (idxArraysLen % 2)
     fptr32++;
-  int * ins = (int *)fptr32; 
+  //int * ins = (int *)fptr32; 
   fptr32 += numEdges;
   if (numEdges % 2)
     fptr32 += 1;
-  int * outIdx = (int *)fptr32;
+  //int * outIdx = (int *)fptr32;
   fptr32 += idxArraysLen;
   if (idxArraysLen % 2)
     fptr32++;
@@ -113,7 +113,7 @@ void readFromFiles() {
   version = *fptr++;
   assert(version == 2);
   fptr32 = (uint32_t *)fptr;
-  int * outs = (int *)fptr32; 
+  //int * outs = (int *)fptr32; 
   fptr32 += numEdges;
   if (numEdges % 2)
     fptr32 += 1;
@@ -187,7 +187,7 @@ void readFromFilesChangeEndianessAndWrite() {
 
   int * ins = (int *)fptr32; 
   fptr32 += numEdges;
-	for (int i=0; i<numEdges; ++i) {
+	for (unsigned int i=0; i<numEdges; ++i) {
 		uint32_t sw_ins = __bswap_32(ins[i]);
 		fout.write((char*)(&sw_ins), sizeof(sw_ins));
 	}
@@ -221,7 +221,7 @@ void readFromFilesChangeEndianessAndWrite() {
   fptr32 = (uint32_t *)fptr;
   int * outs = (int *)fptr32;
   fptr32 += numEdges;
-	for (int i=0; i<numEdges; ++i) {
+	for (unsigned int i=0; i<numEdges; ++i) {
 		uint32_t sw_outs = __bswap_32(outs[i]);
 		fout2.write((char*)(&sw_outs), sizeof(sw_outs));
 	}

@@ -30,57 +30,74 @@ class RMMatcher{
 private:
 	int maxVertexWeight;
 	GGraph* graph;
-	GGraph* coarseGraph;
+
 	MetisGraph* metisGraph;
 public:
-	RMMatcher(MetisGraph* metisGraph, GGraph* coarseGraph, int maxVertexWeight) {
-		this->coarseGraph=coarseGraph;
+	RMMatcher(MetisGraph* metisGraph, int maxVertexWeight) {
+
 		this->metisGraph = metisGraph;
 		this->graph=metisGraph->getGraph();
 		this->maxVertexWeight=maxVertexWeight;
 	}
-		void match(GNode node) {
-		  MetisNode& nodeData = graph->getData(node, Galois::MethodFlag::NONE);
-			if (metisGraph->isMatched(nodeData.getNodeId())) {
-				return;
-			}
-			GNode matchNode;
-			while(true){
-				matchNode = node;
-				for (GGraph::edge_iterator jj = graph->edge_begin(node, Galois::MethodFlag::NONE), eejj = graph->edge_end(node, Galois::MethodFlag::NONE); jj != eejj; ++jj) {
-				  GNode neighbor = graph->getEdgeDst(jj);
-				  MetisNode& neighMNode = graph->getData(neighbor, Galois::MethodFlag::NONE);
-					if (!metisGraph->isMatched(neighMNode.getNodeId()) && nodeData.getWeight() + neighMNode.getWeight() <= maxVertexWeight) {
-						matchNode = neighbor;
-						break;
-					}
-				}
+	bool match(GNode node) {
+		//matchLockFree(node);
+		MetisNode& nodeData = graph->getData(node, Galois::MethodFlag::NONE);
+		/*if (metisGraph->isMatched(nodeData.getNodeId())) {
+			return;
+		}*/
 
-				MetisNode& matchNodeData = graph->getData(matchNode, Galois::MethodFlag::CHECK_CONFLICT);
-				if(node == matchNode || !metisGraph->isMatched(matchNodeData.getNodeId())){
+		if(nodeData.isMatched())
+			return false;
+
+		GNode matchNode;
+		while(true){
+			matchNode = node;
+			for (GGraph::edge_iterator jj = graph->edge_begin(node, Galois::MethodFlag::NONE), eejj = graph->edge_end(node, Galois::MethodFlag::NONE); jj != eejj; ++jj) {
+				GNode neighbor = graph->getEdgeDst(jj);
+				MetisNode& neighMNode = graph->getData(neighbor, Galois::MethodFlag::NONE);
+				if (!neighMNode.isMatched() && nodeData.getWeight() + neighMNode.getWeight() <= maxVertexWeight) {
+					matchNode = neighbor;
 					break;
 				}
 			}
-			graph->getData(node, Galois::MethodFlag::CHECK_CONFLICT);
-			if(metisGraph->isMatched(nodeData.getNodeId())){
-				return;
-			}
 
-			metisGraph->setMatch(nodeData.getNodeId(), matchNode);
-			MetisNode& matchNodeData = graph->getData(matchNode,Galois::MethodFlag::NONE);
-//			int weight = nodeData.getWeight();
-			if (node != matchNode) {
-				metisGraph->setMatch(matchNodeData.getNodeId(), node);
-//				weight += matchNodeData.getWeight();
+			MetisNode& matchNodeData = graph->getData(matchNode, Galois::MethodFlag::CHECK_CONFLICT);
+			if(node == matchNode || !matchNodeData.isMatched()){
+				break;
 			}
-//			GNode newNode = coarseGraph->createNode(MetisNode(weight));
-//			coarseGraph->addNode(newNode, Galois::Graph::MethodFlag::NONE);
-//			metisGraph->setCoarseGraphMap(nodeData.getNodeId(), newNode);
-//			if(matchNode!=node){
-//				metisGraph->setCoarseGraphMap(matchNodeData.getNodeId(), newNode);
-//			}
 		}
+		nodeData = graph->getData(node, Galois::MethodFlag::CHECK_CONFLICT);
 
+		if(nodeData.isMatched())
+			return false;
+
+		MetisNode& matchNodeData = graph->getData(matchNode,Galois::MethodFlag::NONE);
+		if(variantMetis::mergeMatching)
+			if(nodeData.getNodeId()<matchNodeData.getNodeId()) {
+				int id = nodeData.getNodeId();
+				nodeData.setNodeId(matchNodeData.getNodeId());
+				matchNodeData.setNodeId(id);
+			}
+
+		if(variantMetis::localNodeData) {
+			nodeData.matchNode = matchNode;
+		}else {
+			metisGraph->setMatch(nodeData.getNodeId(), matchNode);
+		}
+		nodeData.setMatched(true);
+
+
+		if (node != matchNode) {
+			if(variantMetis::localNodeData) {
+				matchNodeData.matchNode = node;
+			}else {
+				metisGraph->setMatch(matchNodeData.getNodeId(), node);
+			}
+
+			matchNodeData.setMatched(true);
+		}
+		return true;
+	}
 
 };
 #endif /* RM_H_ */

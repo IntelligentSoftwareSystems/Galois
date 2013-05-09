@@ -41,11 +41,11 @@ public:
   
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+  void serialize(Galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s,_t[0]);
     gSerialize(s,_t[1]);
   }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s,_t[0]);
     gDeserialize(s,_t[1]);
   }

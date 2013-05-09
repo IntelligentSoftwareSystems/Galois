@@ -36,7 +36,6 @@
 #include "llvm/Support/CommandLine.h"
 #ifdef GALOIS_USE_EXP
 #include <boost/mpl/if.hpp>
-#include "Galois/Graph/ReplicatedGraph.h"
 #include "Galois/Graph/OCGraph.h"
 #include "Galois/Graph/GraphNodeBag.h"
 #include "Galois/DomainSpecificExecutors.h"
@@ -44,7 +43,6 @@
 #endif
 
 #include "Lonestar/BoilerPlate.h"
-
 #include <iostream>
 #include <deque>
 #include <set>
@@ -54,15 +52,15 @@ namespace cll = llvm::cl;
 static const char* name = "Single Source Shortest Path";
 static const char* desc =
   "Computes the shortest path from a source node to all nodes in a directed "
-  "graph using a modified chaotic iteration algorithm\n";
+  "graph using a modified chaotic iteration algorithm";
 static const char* url = "single_source_shortest_path";
 
 enum class Algo {
   async,
   asyncWithCas,
+  graphlab,
   ligra,
   ligraChi,
-  graphlab,
   serial
 };
 
@@ -77,22 +75,16 @@ static cll::opt<unsigned int> memoryLimit("memoryLimit",
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
       clEnumValN(Algo::async, "async", "Asynchronous"),
-      clEnumValN(Algo::asyncWithCas, "asyncWithCas", "Using compare-and-swap to update nodes"),
-      clEnumValN(Algo::ligra, "ligra", "Using Ligra programming model"),
-      clEnumValN(Algo::ligraChi, "ligraChi", "Using Ligra and GraphChi programming model"),
-      clEnumValN(Algo::graphlab, "graphlab", "Using GraphLab programming model"),
+      clEnumValN(Algo::asyncWithCas, "asyncWithCas", "Use compare-and-swap to update nodes"),
+      clEnumValN(Algo::graphlab, "graphlab", "Use GraphLab programming model"),
+      clEnumValN(Algo::ligraChi, "ligraChi", "Use Ligra and GraphChi programming model"),
+      clEnumValN(Algo::ligra, "ligra", "Use Ligra programming model"),
       clEnumValN(Algo::serial, "serial", "Serial"),
       clEnumValEnd), cll::init(Algo::asyncWithCas));
 
 static const bool trackBadWork = false;
-
-template<typename UpdateRequest>
-struct UpdateRequestIndexer: public std::unary_function<UpdateRequest, unsigned int> {
-  unsigned int operator() (const UpdateRequest& val) const {
-    unsigned int t = val.w >> stepShift;
-    return t;
-  }
-};
+static Galois::Statistic* BadWork;
+static Galois::Statistic* WLEmptyWork;
 
 template<typename Graph>
 struct not_visited {
@@ -126,7 +118,7 @@ struct not_consistent<Graph, typename std::enable_if<!Galois::Graph::is_segmente
       Dist ddist = g.getData(g.getEdgeDst(ii)).dist;
       Dist w = g.getEdgeData(ii);
       if (ddist > dist + w) {
-        std::cout << ddist << " " << dist + w << " " << n << " " << g.getEdgeDst(ii) << "\n"; // XXX
+        //std::cout << ddist << " " << dist + w << " " << n << " " << g.getEdgeDst(ii) << "\n"; // XXX
 	return true;
       }
     }
@@ -148,6 +140,15 @@ struct max_dist {
     m.update(d);
   }
 };
+
+template<typename UpdateRequest>
+struct UpdateRequestIndexer: public std::unary_function<UpdateRequest, unsigned int> {
+  unsigned int operator() (const UpdateRequest& val) const {
+    unsigned int t = val.w >> stepShift;
+    return t;
+  }
+};
+
 
 template<typename Graph>
 bool verify(Graph& graph, typename Graph::GraphNode source) {
@@ -202,27 +203,28 @@ void initialize(Algo& algo,
 
 template<typename Graph>
 void readInOutGraph(Graph& graph) {
+  using namespace Galois::Graph;
   if (symmetricGraph) {
-    graph.structureFromFile(filename, true); 
+    Galois::Graph::readGraph(graph, filename);
   } else if (transposeGraphName.size()) {
-    graph.structureFromFile(filename, transposeGraphName);
+    Galois::Graph::readGraph(graph, filename, transposeGraphName);
   } else {
-    std::cerr << "Graph type not supported\n";
-    abort();
+    GALOIS_DIE("Graph type not supported");
   }
 }
 
 struct SerialAlgo {
-  typedef Galois::Graph::LC_CSR_Graph<SNode, uint32_t> Graph;
+  typedef Galois::Graph::LC_CSR_Graph<SNode, uint32_t>::with_no_lockable<true> Graph;
   typedef Graph::GraphNode GNode;
   typedef UpdateRequestCommon<GNode> UpdateRequest;
 
   std::string name() const { return "Serial"; }
-  void readGraph(Graph& graph) { graph.structureFromFile(filename); }
+  void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, filename); }
 
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
+
     void operator()(typename Graph::GraphNode n) {
       g.getData(n).dist = DIST_INFINITY;
     }
@@ -258,36 +260,37 @@ struct SerialAlgo {
   }
 };
 
-static Galois::Statistic* BadWork;
-static Galois::Statistic* WLEmptyWork;
-
 template<bool UseCas>
 struct AsyncAlgo {
-  //typedef Galois::Graph::LC_Linear_Graph<SNode, uint32_t> Graph;
-  typedef Galois::Graph::LC_InlineEdge_Graph<SNode, uint32_t,true> Graph;
-  //typedef Galois::Graph::LC_CSR_Graph<SNode, uint32_t> Graph;
-  typedef Graph::GraphNode GNode;
+  typedef SNode Node;
+
+  typedef Galois::Graph::LC_InlineEdge_Graph<Node, uint32_t>
+    ::template with_out_of_line_lockable<true>
+    ::template with_compressed_node_ptr<true>
+    ::template with_numa_alloc<true>
+    Graph;
+  typedef typename Graph::GraphNode GNode;
   typedef UpdateRequestCommon<GNode> UpdateRequest;
 
   std::string name() const {
     return UseCas ? "Asynchronous with CAS" : "Asynchronous"; 
   }
 
-  void readGraph(Graph& graph) { graph.structureFromFile(filename); }
+  void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, filename); }
 
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(typename Graph::GraphNode n) {
-      g.getData(n).dist = DIST_INFINITY;
+      g.getData(n, Galois::MethodFlag::NONE).dist = DIST_INFINITY;
     }
   };
 
   template<typename Pusher>
-  void relaxEdge(Graph& graph, SNode& sdata, typename Graph::edge_iterator ii, Pusher& pusher) {
+  void relaxEdge(Graph& graph, Node& sdata, typename Graph::edge_iterator ii, Pusher& pusher) {
     GNode dst = graph.getEdgeDst(ii);
     Dist d = graph.getEdgeData(ii);
-    SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+    Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
     Dist newDist = sdata.dist + d;
     Dist oldDist;
     while (newDist < (oldDist = ddata.dist)) {
@@ -305,15 +308,15 @@ struct AsyncAlgo {
   template<typename Pusher>
   void relaxNode(Graph& graph, GNode src, Dist prevDist, Pusher& pusher) {
     const Galois::MethodFlag flag = UseCas ? Galois::MethodFlag::NONE : Galois::MethodFlag::ALL;
-    SNode& sdata = graph.getData(src, flag);
+    Node& sdata = graph.getData(src, flag);
 
     if (prevDist > sdata.dist) {
       if (trackBadWork)
         *WLEmptyWork += 1;
       return;
     }
-    
-    for (typename Graph::edge_iterator ii = graph.edge_begin(src, flag), ee = graph.edge_end(src, flag); ii != ee; ++ii) {
+
+    for (typename Graph::edge_iterator ii = graph.edge_begin(src, flag), ei = graph.edge_end(src, flag); ii != ei; ++ii) {
       relaxEdge(graph, sdata, ii, pusher);
     }
   }
@@ -333,17 +336,19 @@ struct AsyncAlgo {
     AsyncAlgo* self;
     Graph& graph;
     Bag& bag;
-    SNode& sdata;
-    InitialProcess(AsyncAlgo* s, Graph& g, Bag& b, SNode& d): self(s), graph(g), bag(b), sdata(d) { }
-    void operator()(Graph::edge_iterator ii) {
+    Node& sdata;
+    InitialProcess(AsyncAlgo* s, Graph& g, Bag& b, Node& d): self(s), graph(g), bag(b), sdata(d) { }
+    void operator()(typename Graph::edge_iterator ii) {
       self->relaxEdge(graph, sdata, ii, bag);
     }
   };
 
   void operator()(Graph& graph, GNode source) {
     using namespace Galois::WorkList;
-    typedef dChunkedLIFO<64> dChunk;
-    typedef OrderedByIntegerMetric<UpdateRequestIndexer<UpdateRequest>, dChunk> OBIM;
+    //typedef AltChunkedFIFO<64> Chunk;
+    //typedef dChunkedFIFO<64> Chunk;
+    typedef dChunkedFIFO<64> Chunk;
+    typedef OrderedByIntegerMetric<UpdateRequestIndexer<UpdateRequest>, Chunk, 10> OBIM;
 
     std::cout << "INFO: Using delta-step of " << (1 << stepShift) << "\n";
     std::cout << "WARNING: Performance varies considerably due to delta parameter.\n";
@@ -360,10 +365,10 @@ struct AsyncAlgo {
 #ifdef GALOIS_USE_EXP
     Exp::PriAuto<16, UpdateRequestIndexer<UpdateRequest>, OBIM, std::less<UpdateRequest>, std::greater<UpdateRequest> >::for_each(initial.begin(), initial.end(), Process(this, graph));
 #else
-    Galois::for_each_local<OBIM>(&initial, Process(this, graph));
+    Galois::for_each_local<OBIM>(initial, Process(this, graph));
 #endif
 #endif
-    Galois::for_each_local<OBIM>(&initial, Process(this, graph));
+    Galois::for_each_local<OBIM>(initial, Process(this, graph));
   }
 };
 
@@ -374,10 +379,13 @@ struct does_not_need_aborts<typename AsyncAlgo<true>::Process> : public boost::t
 
 static_assert(Galois::does_not_need_aborts<AsyncAlgo<true>::Process>::value, "Oops");
 
+
 #ifdef GALOIS_USE_EXP
 struct GraphLabAlgo {
-  //typedef Galois::Graph::LC_InlineEdge_InOutGraph<SNode,uint32_t,true,true> Graph; // XXX
-  typedef Galois::Graph::ReplicatedGraph<SNode,uint32_t> Graph;
+  typedef Galois::Graph::LC_CSR_Graph<SNode,uint32_t>
+    ::with_no_lockable<true>
+    ::with_numa_alloc<true> InnerGraph;
+  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "GraphLab"; }
@@ -440,10 +448,9 @@ struct GraphLabAlgo {
   };
 
   void operator()(Graph& graph, const GNode& source) {
-    assert(0 && "fixme");
-    //Galois::GraphLab::SyncEngine<Graph,Program> engine(&graph);
-    //engine.signal(source, Program::message_type(0));
-    //engine.execute();
+    Galois::GraphLab::SyncEngine<Graph,Program> engine(graph, Program());
+    engine.signal(source, Program::message_type(0));
+    engine.execute();
   }
 };
 
@@ -453,9 +460,13 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
     bool visited;
   };
 
+  typedef typename Galois::Graph::LC_InlineEdge_Graph<LNode,uint32_t>
+    ::template with_compressed_node_ptr<true>
+    ::template with_no_lockable<true> 
+    ::template with_numa_alloc<true> InnerGraph;
   typedef typename boost::mpl::if_c<UseGraphChi,
           Galois::Graph::OCImmutableEdgeGraph<LNode,uint32_t>,
-          Galois::Graph::LC_InlineEdge_InOutGraph<LNode,uint32_t,true,true> >::type
+          Galois::Graph::LC_InOut_Graph<InnerGraph>>::type
           Graph;
   typedef typename Graph::GraphNode GNode;
 
@@ -514,7 +525,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
     graph.getData(source).dist = 0;
 
     this->outEdgeMap(memoryLimit, graph, EdgeOperator(), source, bags.next());
-    Galois::do_all_local(&bags.next(), ResetVisited(graph));
+    Galois::do_all_local(bags.next(), ResetVisited(graph));
     
     unsigned rounds = 0;
     while (!bags.next().empty()) {
@@ -525,7 +536,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
          
       bags.swap();
       this->outEdgeMap(memoryLimit, graph, EdgeOperator(), bags.cur(), bags.next(), true);
-      Galois::do_all_local(&bags.next(), ResetVisited(graph));
+      Galois::do_all_local(bags.next(), ResetVisited(graph));
     }
 
     roundStat += rounds + 1;
@@ -533,9 +544,8 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
 };
 #endif
 
-
 template<typename Algo>
-void run() {
+void run(bool prealloc = true) {
   typedef typename Algo::Graph Graph;
   typedef typename Graph::GraphNode GNode;
 
@@ -545,19 +555,21 @@ void run() {
 
   initialize(algo, graph, source, report);
 
-  size_t approxNodeData = graph.size() * sizeof(typename Graph::node_data_type) * 2;
+  size_t approxNodeData = graph.size() * 64;
   //size_t approxEdgeData = graph.sizeEdges() * sizeof(typename Graph::edge_data_type) * 2;
-  Galois::preAlloc(numThreads + (approxNodeData * 4) / Galois::Runtime::MM::pageSize);
-  Galois::Statistic("MeminfoPre", Galois::Runtime::MM::pageAllocInfo());
+  if (prealloc)
+    Galois::preAlloc(numThreads + approxNodeData / Galois::Runtime::MM::pageSize);
+  Galois::reportPageAlloc("MeminfoPre");
 
   Galois::StatTimer T;
   std::cout << "Running " << algo.name() << " version\n";
   T.start();
-  Galois::do_all_local(&graph, typename Algo::Initialize(graph));
+  Galois::do_all_local(graph, typename Algo::Initialize(graph));
   algo(graph, source);
   T.stop();
   
-  Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPost");
+  Galois::Runtime::reportNumaAlloc("NumaPost");
 
   std::cout << "Node " << reportNode << " has distance " << graph.getData(report).dist << "\n";
 
@@ -589,7 +601,7 @@ int main(int argc, char **argv) {
     case Algo::asyncWithCas: run<AsyncAlgo<true> >(); break;
 #ifdef GALOIS_USE_EXP
     case Algo::ligra: run<LigraAlgo<false> >(); break;
-    case Algo::ligraChi: run<LigraAlgo<true> >(); break;
+    case Algo::ligraChi: run<LigraAlgo<true> >(false); break;
     case Algo::graphlab: run<GraphLabAlgo>(); break;
 #endif
     default: std::cerr << "Unknown algorithm\n"; abort();

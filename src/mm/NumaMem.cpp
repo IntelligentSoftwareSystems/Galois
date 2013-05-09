@@ -23,36 +23,159 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 #include "Galois/Runtime/mm/Mem.h"
+#include "Galois/Runtime/ll/gio.h"
 
 #ifdef GALOIS_USE_NUMA
 #include <numa.h>
 #endif
 
-void* Galois::Runtime::MM::largeAlloc(size_t len) {
-  return malloc(len);
+static int is_numa_available;
+static const char* sNumaStat = "/proc/self/numa_maps";
+
+void Galois::Runtime::MM::printInterleavedStats(int minPages) {
+  FILE* f = fopen(sNumaStat, "r");
+  if (!f) {
+    LL::gInfo("No NUMA support");
+    return; //GALOIS_SYS_DIE("failed opening ", sNumaStat);
+  }
+
+  char line[2048];
+  LL::gInfo("INTERLEAVED STATS BEGIN");
+  while (fgets(line, sizeof(line)/sizeof(*line), f)) {
+    // Chomp \n
+    size_t len = strlen(line);
+    if (len && line[len-1] == '\n')
+      line[len-1] = '\0';
+
+    char* start;
+    if (strstr(line, "interleave") != 0) {
+      LL::gInfo(line);
+    } else if ((start = strstr(line, "anon=")) != 0) {
+      int pages;
+      if (sscanf(start, "anon=%d", &pages) == 1 && pages >= minPages) {
+        LL::gInfo(line);
+      }
+    } else if ((start = strstr(line, "mapped=")) != 0) {
+      int pages;
+      if (sscanf(start, "mapped=%d", &pages) == 1 && pages >= minPages) {
+        LL::gInfo(line);
+      }
+    }
+  }
+  LL::gInfo("INTERLEAVED STATS END");
+
+  fclose(f);
 }
 
-void Galois::Runtime::MM::largeFree(void* m, size_t len) {
-  free(m);
+static int num_numa_pages_for(unsigned nodeid) {
+  FILE* f = fopen(sNumaStat, "r");
+  if (!f) {
+    Galois::Runtime::LL::gInfo("No NUMA support");
+    return 0;
+  }
+
+  char format[2048];
+  char search[2048];
+  int written;
+  written = snprintf(format, sizeof(format)/sizeof(*format), "N%u=%%d", nodeid);
+  assert((unsigned)written < sizeof(format)/sizeof(*format));
+  written = snprintf(search, sizeof(search)/sizeof(*search), "N%u=", nodeid);
+  assert((unsigned)written < sizeof(search)/sizeof(*search));
+
+  char line[2048];
+  int totalPages = 0;
+  while (fgets(line, sizeof(line)/sizeof(*line), f)) {
+    char* start;
+    if ((start = strstr(line, search)) != 0) {
+      int pages;
+      if (sscanf(start, format, &pages) == 1) {
+        totalPages += pages;
+      }
+    }
+  }
+
+  fclose(f);
+
+  return totalPages;
 }
 
-void* Galois::Runtime::MM::largeInterleavedAlloc(size_t len) {
+static int check_numa() {
+#ifdef GALOIS_USE_NUMA
+  if (is_numa_available == 0) {
+    is_numa_available = numa_available() == -1 ? -1 : 1;
+    if (is_numa_available == -1)
+      Galois::Runtime::LL::gWarn("NUMA not available");
+  }
+  return is_numa_available == 1;
+#else
+  return false;
+#endif
+}
+
+int Galois::Runtime::MM::numNumaAllocForNode(unsigned nodeid) {
+  if (!check_numa())
+    return 0;
+#ifdef GALOIS_USE_NUMA
+  return num_numa_pages_for(nodeid);
+#else
+  return 0;
+#endif
+}
+
+int Galois::Runtime::MM::numNumaNodes() {
+  if (!check_numa())
+    return 1;
+#ifdef GALOIS_USE_NUMA
+  return numa_num_configured_nodes();
+#else
+  return 1;
+#endif
+}
+
+static void *alloc_interleaved_subset(size_t len) {
   void* data = 0;
-#if defined GALOIS_USE_NUMA_OLD
+#if defined(GALOIS_USE_NUMA_OLD)
   nodemask_t nm = numa_no_nodes;
-  unsigned int num = activeThreads;
-  for (unsigned y = 0; y < num; ++y)
-    nodemask_set(&nm, y/4);
+  unsigned int num = Galois::Runtime::activeThreads;
+  int num_nodes = numa_num_configured_nodes();
+  for (unsigned y = 0; y < num; ++y) {
+    unsigned proc = Galois::Runtime::LL::getProcessorForThread(y);
+    // Assume block distribution from physical processors to numa nodes
+    nodemask_set(&nm, proc/num_nodes);
+  }
   data = numa_alloc_interleaved_subset(len, &nm);
-#elif defined GALOIS_USE_NUMA
+#elif defined(GALOIS_USE_NUMA)  
   bitmask* nm = numa_allocate_nodemask();
-  unsigned int num = activeThreads;
-  for (unsigned y = 0; y < num; ++y)
-    numa_bitmask_setbit(nm, y/4);
+  unsigned int num = Galois::Runtime::activeThreads;
+  for (unsigned y = 0; y < num; ++y) {
+    unsigned proc = Galois::Runtime::LL::getProcessorForThread(y);
+    int node = numa_node_of_cpu(proc);
+    numa_bitmask_setbit(nm, node);
+  }
   data = numa_alloc_interleaved_subset(len, nm);
   numa_free_nodemask(nm);
 #else
-  data = malloc(len);
+  data = Galois::Runtime::MM::largeAlloc(len);
+#endif
+  return data;
+}
+
+void* Galois::Runtime::MM::largeInterleavedAlloc(size_t len, bool full) {
+  void* data = 0;
+#if defined(GALOIS_USE_NUMA)
+  if (check_numa()) {
+    if (full) 
+      data = numa_alloc_interleaved(len);
+    else 
+      data = alloc_interleaved_subset(len);
+    // NB(ddn): Some strange bugs when empty interleaved mappings are
+    // coalesced. Eagerly fault in interleaved pages to circumvent.
+    pageIn(data, len);
+  } else {
+    data = largeAlloc(len);
+  }
+#else
+  data = largeAlloc(len);
 #endif
   if (!data)
     abort();
@@ -60,9 +183,11 @@ void* Galois::Runtime::MM::largeInterleavedAlloc(size_t len) {
 }
 
 void Galois::Runtime::MM::largeInterleavedFree(void* m, size_t len) {
+  if (!check_numa())
+    largeFree(m, len);
 #ifdef GALOIS_USE_NUMA
   numa_free(m, len);
 #else
-  free(m);
+  largeFree(m, len);
 #endif
 }

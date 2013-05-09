@@ -33,7 +33,7 @@
 
 using namespace std;
 
-static const char* help = "<input file>";
+//static const char* help = "<input file>";
 
 int DEF_DISTANCE;
 
@@ -113,7 +113,7 @@ struct firstForEachNodeBased {
           Bpreds.resize(0);
           Bpreds.push_back(A);
           B->distance = ADist + 1;
-          int newBDist = ADist + 1;
+          //int newBDist = ADist + 1;
           B->nsuccs = 0;
           B->sigma = ASigma;
           ed.val = ASigma;
@@ -770,7 +770,7 @@ struct fringeFindDOALL2 {
 				fringeCnts.get()++;
 #endif
 //				fringeBuffs.get(i).push_back(f2Item(false,n,n->delta));
-f2Item f = {false, n, n->delta};
+//f2Item f = {false, n, n->delta};
 //        fringewl->push(f);//2Item(false,n,n->delta));
 			}
 		}
@@ -829,7 +829,7 @@ struct cleanupGraphDOALL {
     void operator()(int i,int) {
 //      assert(i<nodeArrayRanges.size());
 //      std::pair<int,int> p1 = nodeArrayRanges[i];
-      assert(i<edgeArrayRanges.size());
+      assert(i<(int)edgeArrayRanges.size());
       std::pair<int,int> p2 = edgeArrayRanges[i];
       //if (DBG) { cerr << "Cleaning up: nodes[" << p1.first << "," << p1.second << "] Edges[" << p2.first << "," << p2.second << "]" << endl; }
       graph->cleanupData(/*p1.first, p1.second,*/ p2.first, p2.second);
@@ -891,8 +891,8 @@ static cll::opt<std::string> filename(cll::Positional,
 static cll::opt<unsigned int> startNode("startNode", cll::desc("Node to start search from"), cll::init(0));
 
 
-static const char* name = "betweenness centality";
-static const char* desc = "unweighted bwc";
+static const char* name = "Betweenness Centrality";
+static const char* desc = "Computes betwenness centrality in an unweighted graph";
 
 
 int main(int argc, char** argv) {

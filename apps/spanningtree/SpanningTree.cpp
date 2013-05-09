@@ -41,7 +41,7 @@
 namespace cll = llvm::cl;
 
 const char* name = "Spanning Tree Algorithm";
-const char* desc = "Compute the spanning forest of a graph";
+const char* desc = "Computes the spanning forest of a graph";
 const char* url = NULL;
 
 enum Algo {
@@ -60,11 +60,7 @@ struct Node: public Galois::UnionFindNode<Node> {
   Node* component;
 };
 
-#ifdef GALOIS_USE_NUMA
-typedef Galois::Graph::LC_Numa_Graph<Node,void> Graph;
-#else
-typedef Galois::Graph::LC_CSR_Graph<Node,void> Graph;
-#endif
+typedef Galois::Graph::LC_Linear_Graph<Node,void>::with_numa_alloc<true> Graph;
 
 typedef Graph::GraphNode GNode;
 
@@ -237,18 +233,18 @@ int main(int argc, char** argv) {
 
   Galois::StatTimer Tinitial("InitializeTime");
   Tinitial.start();
-  graph.structureFromFile(inputFilename.c_str());
+  Galois::Graph::readGraph(graph, inputFilename);
   std::cout << "Num nodes: " << graph.size() << "\n";
   Tinitial.stop();
 
   //Galois::preAlloc(numThreads);
-  Galois::Statistic("MeminfoPre", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPre");
   switch (algo) {
     case demo: run<DemoAlgo>(); break;
     case asynchronous: run<AsynchronousAlgo>(); break;
     default: std::cerr << "Unknown algo: " << algo << "\n";
   }
-  Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPost");
 
   if (!skipVerify && !verify()) {
     std::cerr << "verification failed\n";

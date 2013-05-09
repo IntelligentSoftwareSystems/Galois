@@ -53,7 +53,7 @@ class DoAllWork {
   FunctionTy outputF;
   ReduceFunTy RF;
   RangeTy range;
-  GBarrier barrier;
+  Barrier& barrier;
   bool needsReduce;
   bool useStealing;
 
@@ -75,11 +75,11 @@ class DoAllWork {
 
   //! Master execution function for this loop type
   void processRange(PrivateState& tld) {
-    Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
+    NetworkInterface& net = getSystemNetworkInterface();
     while(tld.begin != tld.end) {
       try {
         tld.cnx.start_iteration();
-        if ((Distributed::networkHostNum > 1) && (!LL::getTID()))
+        if ((networkHostNum > 1) && (!LL::getTID()))
           net.handleReceives();
         tld.F(*tld.begin);
       } catch (const remote_ex& ex) {
@@ -92,7 +92,7 @@ class DoAllWork {
       // make sure the increment occurs before proceeding
       do {
         try {
-          if ((Distributed::networkHostNum > 1) && (!LL::getTID()))
+          if ((networkHostNum > 1) && (!LL::getTID()))
             net.handleReceives();
           ++tld.begin;
         } catch (const remote_ex& ex) {
@@ -155,10 +155,8 @@ class DoAllWork {
 
 public:
   DoAllWork(const FunctionTy& F, const ReduceFunTy& R, bool needsReduce, RangeTy r, bool steal)
-    : origF(F), outputF(F), RF(R), range(r), needsReduce(needsReduce), useStealing(steal)
-  {
-    barrier.reinit(activeThreads);
-  }
+    : origF(F), outputF(F), RF(R), range(r), barrier(getSystemBarrier()), needsReduce(needsReduce), useStealing(steal)
+  { }
 
   void operator()() {
     //Assume the copy constructor on the functor is readonly

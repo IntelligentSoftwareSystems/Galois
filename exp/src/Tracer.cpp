@@ -27,11 +27,11 @@
 #include "Galois/Runtime/ll/gio.h"
 
 using Galois::Runtime::LL::gDebug;
-using Galois::Runtime::Distributed::getSystemNetworkInterface;
-using Galois::Runtime::Distributed::RecvBuffer;
-using Galois::Runtime::Distributed::gSerialize;
-using Galois::Runtime::Distributed::gDeserialize;
-using Galois::Runtime::Distributed::networkHostID;
+using Galois::Runtime::getSystemNetworkInterface;
+using Galois::Runtime::RecvBuffer;
+using Galois::Runtime::gSerialize;
+using Galois::Runtime::gDeserialize;
+using Galois::Runtime::networkHostID;
 
 namespace {
 
@@ -76,7 +76,7 @@ void trace_bcast_recv_pad(RecvBuffer &buf) {
 
 }
 
-void Galois::Runtime::Distributed::trace_obj_send(uint32_t owner, void* ptr, uint32_t remote) {
+void Galois::Runtime::trace_obj_send(uint32_t owner, void* ptr, uint32_t remote) {
 #ifdef NDEBUG
   return;
 #endif
@@ -90,7 +90,7 @@ void Galois::Runtime::Distributed::trace_obj_send(uint32_t owner, void* ptr, uin
   }
 }
 
-void Galois::Runtime::Distributed::trace_obj_recv(uint32_t owner, void* ptr) {
+void Galois::Runtime::trace_obj_recv(uint32_t owner, void* ptr) {
 #ifdef NDEBUG
   return;
 #endif
@@ -103,7 +103,7 @@ void Galois::Runtime::Distributed::trace_obj_recv(uint32_t owner, void* ptr) {
   }
 }
 
-void Galois::Runtime::Distributed::trace_bcast_recv(uint32_t source) {
+void Galois::Runtime::trace_bcast_recv(uint32_t source) {
 #ifdef NDEBUG
   return;
 #endif

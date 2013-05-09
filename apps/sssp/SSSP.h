@@ -69,4 +69,5 @@ struct UpdateRequestCommon {
 struct SNode {
   Dist dist;
 };
+
 #endif

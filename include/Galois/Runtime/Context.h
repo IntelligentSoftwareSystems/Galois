@@ -43,9 +43,9 @@ class Lockable;
 struct conflict_ex { Lockable* obj; };
 struct failsafe_ex{};
 struct remote_ex {
-  Lockable* obj;
+  Lockable* LocalObj;
   uint32_t owner;
-  void *actual;
+  Lockable* actual;
 };
 
 enum PendingFlag {
@@ -140,7 +140,7 @@ inline bool shouldLock(const Galois::MethodFlag g) {
   case MethodFlag::CHECK_CONFLICT:
     return true;
   default:
-    GALOIS_ERROR(true, "shouldn't get here");
+    GALOIS_DIE("shouldn't get here");
     return false;
   }
 }

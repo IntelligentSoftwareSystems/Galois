@@ -49,6 +49,7 @@
 #include "LocalQueues.h"
 #include "Obim.h"
 #include "Chunked.h"
+#include "AltChunked.h"
 #include "OwnerComputes.h"
 #include "BulkSynchronous.h"
 #include "StableIter.h"

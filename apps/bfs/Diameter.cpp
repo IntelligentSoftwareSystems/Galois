@@ -34,7 +34,6 @@
 #ifdef GALOIS_USE_EXP
 #include <boost/mpl/if.hpp>
 #include "Galois/Graph/OCGraph.h"
-#include "Galois/Graph/ReplicatedGraph.h"
 #include "Galois/Graph/GraphNodeBag.h"
 #include "Galois/DomainSpecificExecutors.h"
 #endif
@@ -51,7 +50,7 @@
 #include <iostream>
 
 static const char* name = "Diameter Estimation";
-static const char* desc = "Estimate the diameter of a graph\n";
+static const char* desc = "Estimates the diameter of a graph";
 static const char* url = 0;
 
 //****** Command Line Options ******
@@ -76,7 +75,7 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValN(Algo::simple, "simple", "Simple pseudo-peripheral algorithm (default)"),
       clEnumValN(Algo::pickK, "pickK", "Pick K candidates"),
       clEnumValN(Algo::ligra, "ligra", "Use Ligra programming model"),
-      clEnumValN(Algo::ligraChi, "ligraChi", "Using Ligra and GraphChi programming model"),
+      clEnumValN(Algo::ligraChi, "ligraChi", "Use Ligra and GraphChi programming model"),
       clEnumValN(Algo::graphlab, "graphlab", "Use GraphLab programming model"),
       clEnumValEnd), cll::init(Algo::simple));
 
@@ -170,24 +169,24 @@ struct CountLevels {
   }
 
   std::deque<size_t> count() {
-    return Galois::Runtime::do_all_impl(Galois::Runtime::makeLocalRange(&graph), *this, *this).counts;
+    return Galois::Runtime::do_all_impl(Galois::Runtime::makeLocalRange(graph), *this, *this).counts;
   }
 };
 
 template<typename Algo>
 void resetGraph(typename Algo::Graph& g) {
-  Galois::do_all_local(&g, typename Algo::Initialize(g));
+  Galois::do_all_local(g, typename Algo::Initialize(g));
 }
 
 template<typename Graph>
 void readInOutGraph(Graph& graph) {
+  using namespace Galois::Graph;
   if (symmetricGraph) {
-    graph.structureFromFile(filename, true); 
+    Galois::Graph::readGraph(graph, filename);
   } else if (transposeGraphName.size()) {
-    graph.structureFromFile(filename, transposeGraphName);
+    Galois::Graph::readGraph(graph, filename, transposeGraphName);
   } else {
-    std::cerr << "Graph type not supported\n";
-    abort();
+    GALOIS_DIE("Graph type not supported");
   }
 }
 
@@ -289,7 +288,7 @@ struct PickKAlgo {
   
   std::deque<GNode> select(Graph& graph, unsigned topn, size_t dist) {
     Galois::InsertBag<GNode> bag;
-    Galois::do_all_local(&graph, collect_nodes_with_dist<Graph>(graph, bag, dist));
+    Galois::do_all_local(graph, collect_nodes_with_dist<Graph>(graph, bag, dist));
 
     // Incrementally sort nodes until we find least N who are not neighbors
     // of each other
@@ -429,7 +428,10 @@ struct GraphLabAlgo {
     LNode(): odd_iteration(false) { }
   };
 
-  typedef Galois::Graph::ReplicatedGraph<LNode,void> Graph;
+  typedef typename Galois::Graph::LC_CSR_Graph<LNode,void>
+    ::template with_no_lockable<true> 
+    ::template with_numa_alloc<true> InnerGraph;
+  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef typename Graph::GraphNode GNode;
 
   void readGraph(Graph& graph) { readInOutGraph(graph); }
@@ -576,9 +578,8 @@ struct GraphLabAlgo {
     size_t diameter = 0;
     for (size_t iter = 0; iter < 100; ++iter) {
       //Galois::GraphLab::executeSync(graph, graph, Program());
-      assert(0 && "compiler error");
-      //Galois::GraphLab::SyncEngine<Graph,Program> engine(&graph);
-      //engine.execute();
+      Galois::GraphLab::SyncEngine<Graph,Program> engine(graph, Program());
+      engine.execute();
 
       Galois::do_all(graph.begin(), graph.end(), [&](GNode n) {
         LNode& data = graph.getData(n);
@@ -610,29 +611,22 @@ struct GraphLabAlgo {
   }
 };
 
-//#define INLINEDATA
 template<bool UseGraphChi>
 struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
   typedef int Visited;
 
-#ifdef INLINEDATA
-  typedef SNode LNode;
-#else
   struct LNode:  public SNode {
     Visited visited[2];
   };
-#endif
 
+  typedef typename Galois::Graph::LC_CSR_Graph<LNode,void>
+    ::template with_no_lockable<true> 
+    ::template with_numa_alloc<true> InnerGraph;
   typedef typename boost::mpl::if_c<UseGraphChi,
           Galois::Graph::OCImmutableEdgeGraph<LNode,void>,
-          Galois::Graph::LC_CSR_InOutGraph<LNode,void,true> >::type
+          Galois::Graph::LC_InOut_Graph<InnerGraph> >::type
           Graph;
   typedef typename Graph::GraphNode GNode;
-
-#ifdef INLINEDATA
-  Galois::LargeArray<Visited,false> visited;
-  Galois::LargeArray<Visited,false> nextVisited;
-#endif
 
   void readGraph(Graph& graph) {
     readInOutGraph(graph); 
@@ -645,10 +639,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
     void operator()(GNode n) {
       LNode& data = graph.getData(n, Galois::MethodFlag::NONE);
       data.dist = DIST_INFINITY;
-#ifdef INLINEDATA
-#else
       data.visited[0] = data.visited[1] = 0;
-#endif
     }
   };
 
@@ -657,53 +648,17 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
     int cur;
     int next;
     Dist newDist;
-#ifdef INLINEDATA
-    Galois::LargeArray<Visited,false>* visited;
-    Galois::LargeArray<Visited,false>* nextVisited;
-#endif
-    EdgeOperator(LigraAlgo* s, int c, int n, Dist d): self(s), cur(c), next(n), newDist(d) { 
-#ifdef INLINEDATA
-      if (cur) { visited = &self->visited; nextVisited = &self->nextVisited; }
-      else { visited = &self->nextVisited; nextVisited = &self->visited; }
-#endif
-    }
+    EdgeOperator(LigraAlgo* s, int c, int n, Dist d): self(s), cur(c), next(n), newDist(d) { }
 
     template<typename GTy>
     bool cond(GTy& graph, typename GTy::GraphNode) { return true; }
 
     template<typename GTy>
     bool operator()(GTy& graph, typename GTy::GraphNode src, typename GTy::GraphNode dst, typename GTy::edge_data_reference) {
-#ifdef INLINEDATA
-      size_t sid = graph.idFromNode(src);
-      size_t did = graph.idFromNode(dst);
-      LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
-      Visited toWrite = (*visited)[sid] | (*visited)[did];
-#else
       LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
       LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
       Visited toWrite = sdata.visited[cur] | ddata.visited[cur];
-#endif
 
-#ifdef INLINEDATA
-      if (toWrite != (*visited)[did]) {
-        (*nextVisited)[did] |= toWrite;
-        if (ddata.dist != newDist) {
-          ddata.dist = newDist;
-          return true;
-        }
-      }
-      return false;
-#else
-#if 0
-      if (toWrite != ddata.visited[cur]) {
-        ddata.visited[next] |= toWrite;
-        if (ddata.dist != newDist) {
-          ddata.dist = newDist;
-          return true;
-        }
-      }
-      return false;
-#else
       if (toWrite != ddata.visited[cur]) {
         while (true) {
           Visited old = ddata.visited[next];
@@ -718,8 +673,6 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
           return __sync_bool_compare_and_swap(&ddata.dist, oldDist, newDist);
       }
       return false;
-#endif
-#endif
     }
   };
 
@@ -728,23 +681,11 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
     Graph& graph;
     int cur;
     int next;
-#ifdef INLINEDATA
-    Galois::LargeArray<Visited,false>* visited;
-    Galois::LargeArray<Visited,false>* nextVisited;
-#endif
     Update(LigraAlgo* s, Graph& g, int c, int n): self(s), graph(g), cur(c), next(n) { 
-#ifdef INLINEDATA
-      if (cur) { visited = &self->visited; nextVisited = &self->nextVisited; }
-      else { visited = &self->nextVisited; nextVisited = &self->visited; }
-#endif
     }
     void operator()(size_t id) {
-#ifdef INLINEDATA
-      (*nextVisited)[id] |= (*visited)[id];
-#else
       LNode& data = graph.getData(graph.nodeFromId(id), Galois::MethodFlag::NONE);
       data.visited[next] |= data.visited[cur];
-#endif
     }
   };
 
@@ -753,21 +694,13 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
 
     if (startNode != 0)
       std::cerr << "Warning: Ignoring user-requested start node\n";
-#ifdef INLINEDATA
-    visited.allocate(graph.size());
-    nextVisited.allocate(graph.size());
-#endif
     Dist newDist = 0;
     unsigned sampleSize = std::min(graph.size(), sizeof(Visited) * 8);
     unsigned count = 0;
     for (typename Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
       LNode& data = graph.getData(*ii);
       data.dist = 0;
-#ifdef INLINEDATA
-      visited[graph.idFromNode(*ii)] = (Visited)1 << count;
-#else
       data.visited[1] = (Visited)1 << count;
-#endif
       bags.next().push(graph.idFromNode(*ii), graph.size());
 
       if (++count >= sampleSize)
@@ -779,7 +712,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
       newDist++;
       int cur = newDist & 1;
       int next = (newDist + 1) & 1;
-      Galois::do_all_local(&bags.cur(), Update(this, graph, cur, next));
+      Galois::do_all_local(bags.cur(), Update(this, graph, cur, next));
       this->outEdgeMap(memoryLimit, graph, EdgeOperator(this, cur, next, newDist), bags.cur(), bags.next(), false);
     }
 
@@ -821,7 +754,7 @@ void run() {
   initialize(algo, graph, source);
 
   //Galois::preAlloc((numThreads + (graph.size() * sizeof(SNode) * 2) / Galois::Runtime::MM::pageSize)*8);
-  Galois::Statistic("MeminfoPre", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPre");
 
   Galois::StatTimer T;
   T.start();
@@ -829,7 +762,7 @@ void run() {
   size_t diameter = algo(graph, source);
   T.stop();
   
-  Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPost");
 
   std::cout << "Estimated diameter: " << diameter << "\n";
 }

@@ -45,7 +45,7 @@
 namespace cll = llvm::cl;
 
 static const char* name = "Boruvka's Minimum Spanning Tree Algorithm";
-static const char* desc = "Compute the minimum spanning forest of a graph";
+static const char* desc = "Computes the minimum spanning forest of a graph";
 static const char* url = "mst";
 
 enum Algo {
@@ -69,7 +69,7 @@ struct Node: public Galois::UnionFindNode<Node> {
   const EdgeData* lightest;
 };
 
-typedef Galois::Graph::LC_CSR_Graph<Node,EdgeData> Graph;
+typedef Galois::Graph::LC_CSR_Graph<Node,EdgeData>::with_numa_alloc<true>::with_no_lockable<true> Graph;
 
 typedef Graph::GraphNode GNode;
 
@@ -407,13 +407,13 @@ void initializeGraph() {
   Galois::Graph::FileGraph origGraph;
   Galois::Graph::FileGraph symGraph;
   
-  origGraph.structureFromFile(inputFilename.c_str());
+  origGraph.structureFromFileInterleaved<EdgeData>(inputFilename);
   if (!symmetricGraph) 
     Galois::Graph::makeSymmetric<EdgeData>(origGraph, symGraph);
   else
     symGraph.swap(origGraph);
 
-  graph.structureFromGraph(symGraph);
+  Galois::Graph::readGraph(graph, symGraph);
   
   Galois::StatTimer Tsort("InitializeSortTime");
   Tsort.start();
@@ -442,8 +442,8 @@ int main(int argc, char** argv) {
   initializeGraph();
   Tinitial.stop();
 
-  Galois::preAlloc(Galois::Runtime::MM::pageAllocInfo() * 10);
-  Galois::Statistic("MeminfoPre", Galois::Runtime::MM::pageAllocInfo());
+  Galois::preAlloc(Galois::Runtime::MM::numPageAllocTotal() * 10);
+  Galois::reportPageAlloc("MeminfoPre");
   Galois::StatTimer T;
   T.start();
   switch (algo) {
@@ -452,7 +452,7 @@ int main(int argc, char** argv) {
     default: std::cerr << "Unknown algo: " << algo << "\n";
   }
   T.stop();
-  Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPost");
 
   std::cout << "MST weight: "
     << Galois::ParallelSTL::map_reduce(mst.begin(), mst.end(),

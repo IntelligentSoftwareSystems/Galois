@@ -49,7 +49,7 @@ Graph graph;
 void do_summary() {
   std::cout << "NumNodes: " << graph.size() << "\n";
   std::cout << "NumEdges: " << graph.sizeEdges() << "\n";
-  std::cout << "SizeofEdge: " << graph.sizeEdge() << "\n";
+  std::cout << "SizeofEdge: " << graph.edgeSize() << "\n";
 }
 
 void do_degrees() {

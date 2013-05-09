@@ -54,7 +54,7 @@
 namespace cll = llvm::cl;
 
 static const char* const name = "Kruskal's Minimum Spanning Tree Algorithm ";
-static const char* const desc = "Compute minimum weight spanning tree of an undirected graph";
+static const char* const desc = "Computes minimum weight spanning tree of an undirected graph";
 static const char* const url = "mst";
 
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
@@ -233,11 +233,11 @@ protected:
 
   void readGraph (const std::string& filename, size_t& numNodes, SetInEdge& edgeSet) {
 
-    typedef Galois::Graph::LC_CSR_Graph<unsigned, unsigned> InGraph;
+    typedef Galois::Graph::LC_CSR_Graph<unsigned, uint32_t> InGraph;
     typedef InGraph::GraphNode InGNode;
 
     InGraph ingraph;
-    ingraph.structureFromFile (filename);
+    Galois::Graph::readGraph (ingraph, filename);
 
     // numbering nodes 0..N-1, where N is number of nodes
     // in the graph
@@ -275,8 +275,8 @@ protected:
             edgeSet.insert (edgeSet.erase (res.first), ke);
           }
         } else {
-          GALOIS_DEBUG ("Warning: Ignoring self edge (%d, %d, %d)\n",
-              src, dst, ingraph.getEdgeData (*e));
+	  Galois::Runtime::LL::gDebug("Warning: Ignoring self edge (",
+				      src, ",", dst, ",", ingraph.getEdgeData (*e), ")");
         }
       }
 

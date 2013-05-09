@@ -26,162 +26,127 @@
 #include "Galois/Runtime/Directory.h"
 #include "Galois/Runtime/ll/TID.h"
 
-namespace Galois {
-namespace Runtime {
-namespace Distributed {
-gptr<PreventLiveLock> lock_sync;
-}
-}
-}
+#include <mutex>
 
-Galois::Runtime::SimpleRuntimeContext& Galois::Runtime::Distributed::getTransCnx() {
+using namespace Galois::Runtime;
+
+SimpleRuntimeContext& Galois::Runtime::getTransCnx() {
   static PerThreadStorage<Galois::Runtime::SimpleRuntimeContext> obj;
   return *obj.getLocal();
 }
 
-Galois::Runtime::SimpleRuntimeContext& Galois::Runtime::Distributed::getAbortCnx() {
+SimpleRuntimeContext& Galois::Runtime::getAbortCnx() {
   static Galois::Runtime::SimpleRuntimeContext obj;
   return obj;
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Local Directory
-////////////////////////////////////////////////////////////////////////////////
-
-// NOTE: make sure that the handleReceives() is called by another thread
-void LocalDirectory::recallObj(Lockable* ptr, uint32_t remote, recvFuncTy pad) {
-  //LL::gDebug("LD: ", networkHostID, " recalling: ", networkHostID, " ", ptr, " from: ", remote);
-  SendBuffer buf;
-  gSerialize(buf,ptr,networkHostID);
-  getSystemNetworkInterface().send (remote, pad, buf);
+uint32_t Directory::getCurLoc(fatPointer ptr) {
+  return 0;
 }
 
-//FIXME: remove all blocking calls from the directory
-void LocalDirectory::recall(Galois::Runtime::Lockable* ptr, bool blocking) {
-  if (Galois::Runtime::isAcquiredBy(ptr, this)) {
-    Lock.lock();
-    if (Galois::Runtime::isAcquiredBy(ptr, this)) {
-      assert(curobj.count(ptr));
-      objstate& os = curobj[ptr];
-      if (!os.recalled) {
-	recallObj(ptr, os.sent_to, os.pad);
-	os.recalled = true;
-      }
-    }
-    Lock.unlock();
-    if (!LL::getTID()) {
-      do { //always handle recieves once
-	getSystemNetworkInterface().handleReceives();
-      } while (blocking && Galois::Runtime::isAcquiredBy(ptr, this));
-    } else {
-      while (blocking && Galois::Runtime::isAcquiredBy(ptr, this)) {}
-    }
-  }
+void Directory::notifyWhenAvailable(fatPointer ptr, std::function<void(fatPointer)> func) {
+  //FIXME: check of obj is resident
+  Lock.lock();
+  notifiers.insert(std::make_pair(ptr,func));
+  Lock.unlock();
+  //  if (checkAvailable(ptr))
+  //    notify(ptr);
 }
 
-void LocalDirectory::dump() {
-  LL::gDebug("Local Directory ", networkHostID, " ", Lock.is_locked()
-	 , " ", curobj.size(), " ", pending.size());
-  std::ostringstream os;
-  os << "STATE: ";
-  for (auto iter = curobj.begin(); iter != curobj.end(); ++iter) {
-    os << "{" << iter->first << "," << iter->second.sent_to << "," << iter->second.recalled;
-    if (pending.find(iter->first) != pending.end())
-      os << ";p";
-    os <<"} ";
-  }
-  LL::gDebug(os.str());
+void Directory::notify(fatPointer ptr) {
+  std::vector<std::function<void(fatPointer)>> V;
+  Lock.lock();
+  std::for_each(notifiers.lower_bound(ptr), notifiers.upper_bound(ptr),
+                [&V] (decltype(*notifiers.begin())& val) { V.push_back(val.second); });
+  notifiers.erase(notifiers.lower_bound(ptr), notifiers.upper_bound(ptr));
+  Lock.unlock();
+  std::for_each(V.begin(), V.end(), [ptr] (std::function<void(fatPointer)>& f) { f(ptr); });
 }
 
-void LocalDirectory::makeProgress() { 
-  PendingLock.lock();
-  std::set<Lockable*> toTest;
-  for(auto iter = pending.begin(); iter != pending.end(); ++iter)
-    toTest.insert(iter->first);
-  PendingLock.unlock();
-
-  for (auto ii = toTest.begin(), ee = toTest.end(); ii != ee; ++ii) {
-    PendingLock.lock();
-    auto iter = pending.find(*ii);
-    if (iter != pending.end()) {
-      auto func = iter->second;
-      pending.erase(iter);
-      PendingLock.unlock();
-      func();
-    } else { 
-      PendingLock.unlock();
-    }
-  }
+void Directory::delayWork(std::function<void ()> f) {
+  std::lock_guard<LL::SimpleLock<true>> L(Lock);
+  pending.push_back(f);
 }
 
-////////////////////////////////////////////////////////////////////////////////
-
-RemoteDirectory& Galois::Runtime::Distributed::getSystemRemoteDirectory() {
-  static RemoteDirectory obj;
-  return obj;
-}
-
-LocalDirectory& Galois::Runtime::Distributed::getSystemLocalDirectory() {
-  static LocalDirectory obj;
-  return obj;
-}
-
-PersistentDirectory& Galois::Runtime::Distributed::getSystemPersistentDirectory() {
-  static PersistentDirectory obj;
-  return obj;
-}
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-
-void RemoteDirectory::dump() {
-  LL::gDebug("Remote Directory ", networkHostID, " ", Lock.is_locked()
-	     , " ", curobj.size(), " ", pending.size());
-  std::ostringstream os;
-  os << "STATE: ";
-  for (auto iter = curobj.begin(); iter != curobj.end(); ++iter) {
-    os << "{" << iter->first.first << "," << iter->first.second << "," << iter->second << "} }";
-  }
-  LL::gDebug(os.str());
-}
-
-void RemoteDirectory::clearSharedRemCache() {
-  SLock.lock();
-  for (auto ii = shared.begin(), ee = shared.end(); ii != ee; ++ii) {
-    delete (*ii).second;
-  }
-  shared.clear();
-  SLock.unlock();
-}
-
-void RemoteDirectory::makeProgress() {
+void Directory::doPendingWork() {
   Lock.lock();
   std::vector<std::function<void ()>> mypending;
   mypending.swap(pending);
   Lock.unlock();
   LL::compilerBarrier(); // This appears to be needed for a gcc bug
-  for (auto iter = mypending.begin(); iter != mypending.end(); ++iter) {
- // assert(!Lock.is_locked());
+  for (auto iter = mypending.begin(); iter != mypending.end(); ++iter)
     (*iter)();
+}
+
+size_t Directory::pendingSize() {
+  std::lock_guard<LL::SimpleLock<true>> L(Lock);
+  return pending.size();
+}
+
+Lockable* Directory::remoteResolve(fatPointer ptr) {
+  assert(ptr.first != networkHostID);
+  std::lock_guard<LL::SimpleLock<true> > lg(remoteLock);
+  auto iter = remoteObjects.find(ptr);
+  if (iter == remoteObjects.end())
+    return nullptr;
+  else
+    return iter->second;
+}
+
+void Directory::remoteSet(fatPointer ptr, Lockable* obj) {
+  assert (ptr.first != networkHostID);
+  std::lock_guard<LL::SimpleLock<true> > lg(remoteLock);
+  assert(!remoteObjects.count(ptr));
+  remoteObjects[ptr] = obj;
+}
+
+void Directory::remoteClear(fatPointer ptr) {
+  assert (ptr.first != networkHostID);
+  std::lock_guard<LL::SimpleLock<true> > lg(remoteLock);
+  assert(remoteObjects.count(ptr));
+  remoteObjects.erase(ptr);
+}
+
+
+void Directory::sendRequest(fatPointer ptr, uint32_t msgTo, recvFuncTy f, uint32_t objTo) {
+  SendBuffer sbuf;
+  gSerialize(sbuf, ptr, objTo);
+  getSystemNetworkInterface().send(msgTo, f, sbuf);
+}
+
+void Directory::fetchObj(fatPointer ptr, uint32_t msgTo, recvFuncTy f, uint32_t objTo) {
+  fetchLock.lock();
+  if (!pendingFetches.count(ptr)) {
+    pendingFetches.insert(ptr);
+    fetchLock.unlock();
+    //don't need lock to send request
+    sendRequest(ptr, msgTo, f, objTo);
+  } else {
+    fetchLock.unlock();
   }
+}
+
+void Directory::dropPending(fatPointer ptr) {
+  std::lock_guard<LL::SimpleLock<true> > lg(fetchLock);
+  pendingFetches.erase(ptr);
+}
+
+bool Directory::isPending(fatPointer ptr) {
+  std::lock_guard<LL::SimpleLock<true> > lg(fetchLock);
+  return pendingFetches.count(ptr);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-static void clearSharedCache_landing_pad(RecvBuffer& buf) {
-  getSystemRemoteDirectory().clearSharedRemCache();
+Directory& Galois::Runtime::getSystemRemoteDirectory() {
+  return getSystemDirectory();
 }
 
-void Galois::Runtime::Distributed::clearSharedCache() {
-  // should be called from outside the ForEach loop
-  assert(!Galois::Runtime::inGaloisForEach);
-  if (Galois::Runtime::Distributed::networkHostNum > 1) {
-    SendBuffer b;
-    getSystemNetworkInterface().broadcast(clearSharedCache_landing_pad,b);
-  }
-  getSystemRemoteDirectory().clearSharedRemCache();
-  return;
+Directory& Galois::Runtime::getSystemLocalDirectory() {
+  return getSystemDirectory();
 }
 
+Directory& Galois::Runtime::getSystemDirectory() {
+  static Directory obj;
+  return obj;
+}

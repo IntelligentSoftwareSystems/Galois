@@ -213,6 +213,7 @@ void growBisection(MetisGraph* metisGraph, int* tpwgts, int coarsenTo) {
 
 	GGraph* graph = metisGraph->getGraph();
 	int numNodes = metisGraph->getNumNodes();
+
 	GNode* nodes = new GNode[numNodes];
 
 	for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {

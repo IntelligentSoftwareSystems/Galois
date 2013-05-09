@@ -57,7 +57,7 @@
 namespace cll = llvm::cl;
 
 static const char* const name = "Kruskal MST";
-static const char* const desc = "Compute minimum weight spanning tree of an undirected graph";
+static const char* const desc = "Computes minimum weight spanning tree of an undirected graph";
 static const char* const url = "kruskal";
 
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
@@ -95,7 +95,7 @@ protected:
     typedef InGraph::GraphNode InGNode;
 
     InGraph ingraph;
-    ingraph.structureFromFile (filename);
+    Galois::Graph::readGraph(ingraph, filename);
 
     // numbering nodes 0..N-1, where N is number of nodes
     // in the graph

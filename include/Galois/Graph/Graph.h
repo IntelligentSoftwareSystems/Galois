@@ -198,12 +198,15 @@ class FirstGraph : private boost::noncopyable {
       return ii.first() == N2 && ii.first() && ii.first()->active;
     }
   };
+
   struct first_not_valid {
     template <typename T2>
     bool operator()(const T2& ii) const { return !ii.first() || !ii.first()->active; }
   };
   
-  struct gNode: public Galois::Runtime::Lockable {
+  class gNode: public Galois::Runtime::Lockable {
+    friend class FirstGraph;
+
     //! The storage type for an edge
     typedef GraphImpl::EdgeItem<gNode, EdgeTy, Directional> EITy;
     
@@ -215,9 +218,6 @@ class FirstGraph : private boost::noncopyable {
     EdgesTy edges;
     NodeTy data;
     bool active;
-    
-    template<typename... Args>
-    gNode(Args&&... args): data(std::forward<Args>(args)...), active(false) { }
     
     iterator begin() { return edges.begin(); }
     iterator end()   { return edges.end();  }
@@ -256,6 +256,10 @@ class FirstGraph : private boost::noncopyable {
       }
       return edges.insert(edges.end(), EITy(N, v, std::forward<Args>(args)...));
     }
+
+  public:
+    template<typename... Args>
+    gNode(Args&&... args): data(std::forward<Args>(args)...), active(false) { }
   };
 
   //The graph manages the lifetimes of the data in the nodes and edges
@@ -487,8 +491,8 @@ public:
    * An object with begin() and end() methods to iterate over the outgoing
    * edges of N.
    */
-  EdgesIterator<FirstGraph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
-    return EdgesIterator<FirstGraph>(*this, N, mflag);
+  detail::EdgesIterator<FirstGraph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+    return detail::EdgesIterator<FirstGraph>(*this, N, mflag);
   }
 
   /**

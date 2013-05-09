@@ -77,7 +77,7 @@ void PerBackend_v2::addRemote(void* ptr, uint32_t srcID, uint64_t off) {
 }
 
 void* PerBackend_v2::resolveRemote_i(uint64_t off, uint32_t hostID) {
-  if (hostID == Distributed::networkHostID) {
+  if (hostID == networkHostID) {
     return resolve_i(off);
   } else {
     //FIXME: remote message
@@ -155,7 +155,7 @@ void PerBackend_v3::initThread() {
 }
 
 void* PerBackend_v3::resolveRemote_i(uint64_t offset, uint32_t hostID, uint32_t threadID) {
-  if (hostID == Distributed::networkHostID) {
+  if (hostID == networkHostID) {
     return resolveThread<void>(offset, threadID);
   } else {
     //FIXME: remote message

@@ -46,7 +46,10 @@ def main(options):
     # 'Threads' key duplicated so just directly assign instead of accumulate
     if key != "Threads":
       try:
-        row.r[key] = int(row.r[key]) + int(value)
+        if options.sum_duplicates:
+          row.r[key] = int(row.r[key]) + int(value)
+        else:
+          row.r[key] = value
       except ValueError:
         row.r[key] = value
       except KeyError:
@@ -113,6 +116,9 @@ if __name__ == '__main__':
       dest="include", default=[], action='append',
       help='column to include in output. Multiple columns can be specified '
            + 'with multiple options or a comma separated list of columns.')
+  parser.add_option('--sum-duplicates',
+      dest="sum_duplicates", default=False,
+      help='sum duplicate keys together')
   parser.add_option('-e', '--exclude',
       dest="exclude", default=[], action='append',
       help='column to include in output. Multiple columns can be specified '

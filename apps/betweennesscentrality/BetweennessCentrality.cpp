@@ -39,205 +39,91 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
+#include <deque>
 #include <cstdlib>
 
-#define DEBUG 0 
-#define USE_SUCCS 1
-#define SHARE_SINGLE_BC 0 
 #define SHOULD_PRODUCE_CERTIFICATE 0
 
 static const char* name = "Betweenness Centrality";
-static const char* desc =
-  "Computes the betweenness centrality of all nodes in a graph\n";
-static const char* url = "betweenness_centrality";
+static const char* desc = "Computes the betweenness centrality of all nodes in a graph";
+static const char* url  = "betweenness_centrality";
 
 static llvm::cl::opt<std::string> filename(llvm::cl::Positional, llvm::cl::desc("<input file>"), llvm::cl::Required);
 static llvm::cl::opt<int> iterLimit("limit", llvm::cl::desc("Limit number of iterations to value (0 is all nodes)"), llvm::cl::init(0));
 static llvm::cl::opt<unsigned int> startNode("startNode", llvm::cl::desc("Node to start search from"), llvm::cl::init(0));
 static llvm::cl::opt<bool> forceVerify("forceVerify", llvm::cl::desc("Abort if not verified, only makes sense for torus graphs"));
 
-typedef Galois::Graph::LC_FileGraph<void, void> Graph;
+typedef Galois::Graph::LC_CSR_Graph<void, void>::with_no_lockable<true>::with_numa_alloc<true> Graph;
 typedef Graph::GraphNode GNode;
 
 Graph* G;
 int NumNodes;
 
-#if SHARE_SINGLE_BC
-struct BCrecord {
-  Galois::Runtime::SimpleLock<unsigned char, true> lock;
-  double bc; 
-  BCrecord(): lock(), bc(0.0) {}
-};
-std::vector<cache_line_storage<BCrecord> > *CB;
-#else
-struct merge {
-  void operator()(std::vector<double>& lhs, std::vector<double>& rhs) {
-    if (lhs.size() < rhs.size())
-      lhs.resize(rhs.size());
-    for (unsigned int i = 0; i < rhs.size(); i++)
-      lhs[i] += rhs[i];
-  }
-};
-
-Galois::GVectorElementAccumulator<std::vector<double> >* CB;
-#endif
-
-Galois::Runtime::PerThreadStorage<std::vector<GNode>*> SQG;
-Galois::Runtime::PerThreadStorage<std::vector<double> *> sigmaG;
-Galois::Runtime::PerThreadStorage<std::vector<double> *> deltaG;
-Galois::Runtime::PerThreadStorage<std::vector<int>*> distG;
+Galois::Runtime::PerThreadStorage<double*> CB;
 
 template<typename T>
 struct PerIt {  
   typedef typename Galois::PerIterAllocTy::rebind<T>::other Ty;
 };
 
-Galois::Runtime::PerThreadStorage< std::vector<std::vector<GNode> > > succsGlobal;
-
-std::vector<GNode> & getSuccs(GNode n) {
-  return (*succsGlobal.getLocal())[n];
-}
-
-void initGraphData() {
-  // Pre-compute successors sizes in tmp
-  std::vector< std::vector<GNode> > tmp(NumNodes);
-  for (Graph::iterator ii = G->begin(), ee = G->end();
-      ii != ee; ++ii) {
-    int nnbrs = std::distance(G->neighbor_begin(*ii, Galois::MethodFlag::NONE),
-        G->neighbor_end(*ii, Galois::MethodFlag::NONE));
-    //std::cerr << "Node : " << *ii << " has " << nnbrs << " neighbors " << std::endl;
-    tmp[*ii].reserve(nnbrs); 
-  }
-
-  // Init all structures
-  std::cerr << "Pre-allocating graph metadata for " << numThreads << " threads." << std::endl;
-  for (int i=0; i<numThreads; ++i) {
-    *succsGlobal.getRemote(i) = tmp;
-    *SQG.getRemote(i) = new std::vector<GNode>(NumNodes); 
-    *sigmaG.getRemote(i) = new std::vector<double>(NumNodes);
-    *deltaG.getRemote(i) = new std::vector<double>(NumNodes); 
-    *distG.getRemote(i) = new std::vector<int>(NumNodes); 
-  }
-}
-
-void resetData() {
-  std::vector<GNode> *sq = *SQG.getLocal();
-  std::fill(sq->begin(), sq->end(), 0);
-
-  std::vector<double> *sigma = *sigmaG.getLocal();
-  std::fill(sigma->begin(), sigma->end(), 0);
-
-  std::vector<double> *delta = *deltaG.getLocal();
-  std::fill(delta->begin(), delta->end(), 0);
-
-  std::vector<int> *dist = *distG.getLocal();
-  std::fill(dist->begin(), dist->end(), 0);
-
-  std::vector< std::vector<GNode> > & svec = *succsGlobal.getLocal();
-  std::vector< std::vector<GNode> >::iterator it = svec.begin();
-  std::vector< std::vector<GNode> >::iterator end = svec.end();
-  while (it != end) {
-    it->resize(0);
-    ++it;
-  }
-}
-
-void cleanupData() {
-  for (int i=0; i<numThreads; ++i) {
-    delete *SQG.getRemote(i);
-    delete *sigmaG.getRemote(i);
-    delete *deltaG.getRemote(i);
-    delete *distG.getRemote(i);
-  }
-}
-
 struct process {
-  void operator()(GNode& _req, Galois::UserContext<GNode>& lwl) {
-    std::vector<GNode> & SQ = *(*SQG.getLocal());
-    std::vector<double> & sigma = *(*sigmaG.getLocal());
-    std::vector<int> &d = *(*distG.getLocal());
-    int QPush = 0;
-    int QAt = 0;
-    
-#if DEBUG
-    std::cerr << ".";
-#endif
+  typedef int tt_does_not_need_aborts;
+  typedef int tt_needs_per_iter_alloc;
+  typedef int tt_does_not_need_push;
 
+  void operator()(GNode& _req, Galois::UserContext<GNode>& lwl) {
+    typedef std::deque<GNode, typename PerIt<GNode>::Ty> GNdeque;
+    GNdeque SQ(lwl.getPerIterAlloc());
+    std::deque<double, typename PerIt<double>::Ty> sigma(NumNodes, 0.0, lwl.getPerIterAlloc());
+    std::deque<int, typename PerIt<int>::Ty> d(NumNodes, 0, lwl.getPerIterAlloc());
+    std::deque<double, typename PerIt<double>::Ty> delta(NumNodes, 0.0, lwl.getPerIterAlloc());
+    std::deque<GNdeque, typename PerIt<GNdeque>::Ty> succ(NumNodes, GNdeque(lwl.getPerIterAlloc()), lwl.getPerIterAlloc());
+    unsigned int QAt = 0;
+    
     int req = _req;
     
     sigma[req] = 1;
     d[req] = 1;
     
-    SQ[QPush++] = _req;
+    SQ.push_back(_req);
     
-    while (QAt != QPush) {
+    while (QAt != SQ.size()) {
       GNode _v = SQ[QAt++];
       int v = _v;
-      for (Graph::neighbor_iterator
-          ii = G->neighbor_begin(_v, Galois::MethodFlag::NONE),
-          ee = G->neighbor_end(_v, Galois::MethodFlag::NONE); ii != ee; ++ii) {
-	GNode _w = *ii;
+      for (Graph::edge_iterator
+          ii = G->edge_begin(_v, Galois::MethodFlag::NONE),
+          ee = G->edge_end(_v, Galois::MethodFlag::NONE); ii != ee; ++ii) {
+	GNode _w = G->getEdgeDst(ii);
 	int w = _w;
 	if (!d[w]) {
-	  SQ[QPush++] = _w;
+	  SQ.push_back(_w);
 	  d[w] = d[v] + 1;
 	}
 	if (d[w] == d[v] + 1) {
 	  sigma[w] = sigma[w] + sigma[v];
-#if USE_SUCCS
-	  std::vector<GNode> & slist = getSuccs(v);
-          slist.push_back(w);
-#else
-	  std::vector<GNode> & plist = getSuccs(w);
-          plist.push_back(v);
-#endif
+	  succ[v].push_back(w);
 	}
       }
     }
-    std::vector<double> & delta = *(*deltaG.getLocal());
-#if USE_SUCCS
-    --QAt;
-#endif
-    while (QAt > 1) {
-      int w = SQ[--QAt];
+
+    while(SQ.size()) {
+      int w = SQ.back();
+      SQ.pop_back();
 
       double sigma_w = sigma[w];
       double delta_w = delta[w];
-#if USE_SUCCS
-      std::vector<GNode> & slist = getSuccs(w);
-      std::vector<GNode>::iterator it = slist.begin();
-      std::vector<GNode>::iterator end = slist.end();
-      while (it != end) {
+      auto slist = succ[w];
+      for (auto ii = slist.begin(), ee = slist.end(); ii != ee; ++ii) {
 	//std::cerr << "Processing node " << w << std::endl;
-	GNode v = *it;
+	GNode v = *ii;
 	delta_w += (sigma_w/sigma[v])*(1.0 + delta[v]);
-	++it;
       }
       delta[w] = delta_w;
-#else
-      std::vector<GNode> & plist = getSuccs(w);
-      std::vector<GNode>::iterator it = plist.begin();
-      std::vector<GNode>::iterator end = plist.end();
-      while (it != end) {
-	//std::cerr << "Processing node " << w << std::endl;
-	GNode v = *it;
-	delta[v] += (sigma[v]/sigma_w)*(1.0 + delta_w);
-	++it;
-      }
-#endif
-#if SHARE_SINGLE_BC
-      BCrecord & r = (*CB)[w].data;
-      r.lock.lock();
-      r.bc += delta_w;
-      r.lock.unlock();
-#else 
-      CB->update(w, delta_w);
-//      if (CB->get().size() < (unsigned int)w + 1)
-//	CB->get().resize(w+1);
-//      CB->get()[w] += delta_w;
-#endif
     }
-    resetData();
+    double* Vec = *CB.getLocal();
+    for (unsigned int i = 0; i < delta.size(); ++i) {
+      Vec[i] += delta[i];
+    }
   }
 };
 
@@ -246,16 +132,10 @@ struct process {
 void verify() {
     double sampleBC = 0.0;
     bool firstTime = true;
-#if SHARE_SINGLE_BC
-#else
-    const std::vector<double>& bcv = CB->reduce();
-#endif
     for (int i=0; i<NumNodes; ++i) {
-#if SHARE_SINGLE_BC
-      double bc = (*CB)[i].data.bc;
-#else
-      double bc = bcv[i];
-#endif
+      double bc = (*CB.getRemote(0))[i];
+      for (unsigned int j = 1; j < Galois::getActiveThreads(); ++j)
+	bc += (*CB.getRemote(j))[i];
       if (firstTime) {
         sampleBC = bc;
         std::cerr << "BC: " << sampleBC << std::endl;
@@ -277,17 +157,11 @@ void printBCcertificate() {
   foutname << "outer_certificate_" << numThreads;
   std::ofstream outf(foutname.str().c_str());
   std::cerr << "Writing certificate..." << std::endl;
-#if SHARE_SINGLE_BC
-#else
-  const std::vector<double>& bcv = CB->reduce();
-#endif
 
   for (int i=0; i<NumNodes; ++i) {
-#if SHARE_SINGLE_BC
-      double bc = (*CB)[i].data.bc;
-#else
-      double bc = bcv[i];
-#endif
+    double bc = (*CB.getRemote(0))[i];
+    for (unsigned int j = 1; j < Galois::getActiveThreads(); ++j)
+      bc += (*CB.getRemote(j))[i];
     outf << i << ": " << setiosflags(std::ios::fixed) << std::setprecision(9) << bc << std::endl;
   }
   outf.close();
@@ -297,7 +171,7 @@ struct HasOut: public std::unary_function<GNode,bool> {
   Graph* graph;
   HasOut(Graph* g): graph(g) { }
   bool operator()(const GNode& n) const {
-    return graph->neighbor_begin(n) != graph->neighbor_end(n);
+    return graph->edge_begin(n) != graph->edge_end(n);
   }
 };
 
@@ -307,78 +181,62 @@ int main(int argc, char** argv) {
 
   Graph g;
   G = &g;
-
-  G->structureFromFile(filename.c_str());
+  Galois::Graph::readGraph(*G, filename);
 
   NumNodes = G->size();
 
-#if SHARE_SINGLE_BC
-  std::vector<cache_line_storage<BCrecord> > cb(NumNodes);
-  CB = &cb;
-#else
-  Galois::GVectorElementAccumulator<std::vector<double> > cb;
-  CB = &cb; 
-#endif
-  
-  initGraphData();
+  //CB.resize(NumNodes);
+  //FIXME
+  assert(Galois::Runtime::MM::pageSize >= NumNodes * sizeof(double));
+  Galois::on_each([](unsigned,unsigned) {
+      *CB.getLocal() = (double*)Galois::Runtime::MM::pageAlloc(); 
+      std::fill(&(*CB.getLocal())[0], &(*CB.getLocal())[NumNodes], 0.0);
+    });
+
+  Galois::reportPageAlloc("MeminfoPre");
+  Galois::preAlloc(numThreads * Galois::Runtime::MM::numPageAllocTotal() / 3);
+  Galois::reportPageAlloc("MeminfoMid");
 
   boost::filter_iterator<HasOut,Graph::iterator>
-    begin = boost::make_filter_iterator(HasOut(G), g.begin(), g.end()),
-    end = boost::make_filter_iterator(HasOut(G), g.end(), g.end());
+    begin  = boost::make_filter_iterator(HasOut(G), g.begin(), g.end()),
+    end    = boost::make_filter_iterator(HasOut(G), g.end(), g.end());
 
-  size_t iterations;
-  size_t maxIterations = std::distance(begin, end);
-  if (iterLimit == 0) {
-    iterations = maxIterations;
-  } else if (startNode + iterLimit < maxIterations) {
-    std::advance(begin, startNode);
-    end = begin;
-    std::advance(end, iterLimit);
-    iterations = iterLimit;
-  } else {
-    std::cerr << "Asked for more iterations than nodes in the graph\n";
-    abort();
-  }
+  boost::filter_iterator<HasOut,Graph::iterator> begin2 = 
+    iterLimit ? Galois::safe_advance(begin, end, (int)iterLimit) : end;
+
+  size_t iterations = std::distance(begin, begin2);
+
+  std::vector<GNode> v(begin, begin2);
 
   std::cout 
     << "NumNodes: " << NumNodes
     << " Start Node: " << startNode 
     << " Iterations: " << iterations << "\n";
   
-  std::vector<GNode> tmp;
-  std::copy(begin, end, std::back_inserter(tmp));
-
-  typedef Galois::WorkList::dChunkedLIFO<1> WL;
+  typedef Galois::WorkList::LazyIter< std::vector<GNode>::iterator, true> WLL;
   Galois::StatTimer T;
   T.start();
-  Galois::for_each<WL>(tmp.begin(), tmp.end(), process());
+  Galois::for_each<WLL>(v.begin(), v.end(), process());
   T.stop();
 
   if (!skipVerify) {
-#if SHARE_SINGLE_BC
-#else
-    const std::vector<double>& bcv = CB->reduce();
-#endif
-    for (int i=0; i<10; ++i)
-#if SHARE_SINGLE_BC
-    std::cout << i << ": " << setiosflags(std::ios::fixed) << std::setprecision(6) << (*CB)[i].data.bc << "\n";
-#else
-    std::cout << i << ": " << setiosflags(std::ios::fixed) << std::setprecision(6) << bcv[i] << "\n";
-#endif
+    for (int i=0; i<10; ++i) {
+      double bc = (*CB.getRemote(0))[i];
+      for (unsigned int j = 1; j < Galois::getActiveThreads(); ++j)
+	bc += (*CB.getRemote(j))[i];
+      std::cout << i << ": " << setiosflags(std::ios::fixed) << std::setprecision(6) << bc << "\n";
+    }
 #if SHOULD_PRODUCE_CERTIFICATE
     printBCcertificate();
 #endif
   }
 
+  Galois::reportPageAlloc("MeminfoPost");
+
   if (forceVerify || !skipVerify) {
     verify();
   }
   std::cerr << "Application done...\n";
-
-  Galois::StatTimer tt("cleanup");
-  tt.start();
-  cleanupData();
-  tt.stop();
 
   return 0;
 }

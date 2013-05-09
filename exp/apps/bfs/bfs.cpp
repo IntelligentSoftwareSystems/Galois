@@ -60,7 +60,7 @@
 static const char* name = "Breadth-first Search Example";
 static const char* desc =
   "Computes the shortest path from a source node to all nodes in a directed "
-  "graph using a modified Bellman-Ford algorithm\n";
+  "graph using a modified Bellman-Ford algorithm";
 static const char* url = "breadth_first_search";
 
 //****** Command Line Options ******
@@ -245,7 +245,7 @@ static bool verify(GNode source) {
 }
 
 static void readGraph(GNode& source, GNode& report) {
-  graph.structureFromFile(filename);
+  Galois::Graph::readGraph(graph, filename); 
 
   source = *graph.begin();
   report = *graph.begin();
@@ -753,7 +753,7 @@ void run() {
   GNode source, report;
   readGraph(source, report);
   Galois::preAlloc((numThreads + (graph.size() * sizeof(SNode) * 2) / Galois::Runtime::MM::pageSize)*8);
-  Galois::Statistic("MeminfoPre", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPre");
 
   Galois::StatTimer T;
   std::cout << "Running " << algo.name() << " version\n";
@@ -761,7 +761,7 @@ void run() {
   algo(source);
   T.stop();
   
-  Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPost");
 
   std::cout << "Report node: " << reportNode << " " << graph.getData(report) << "\n";
 

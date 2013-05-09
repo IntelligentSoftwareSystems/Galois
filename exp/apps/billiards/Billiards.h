@@ -48,7 +48,7 @@
 namespace cll = llvm::cl;
 
 static const char* const name = "Billiards Simulation";
-static const char* const desc = "A simulation of elastic collisions between billiard balls on a table";
+static const char* const desc = "Simulates elastic collisions between billiard balls on a table";
 static const char* const url = "billiards";
 
 static cll::opt<double>   length("length", cll::desc("length of the billiards table"), cll::init(400.0));

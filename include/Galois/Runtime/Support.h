@@ -36,15 +36,18 @@ namespace Runtime {
 
 extern bool inGaloisForEach;
 
-//reports stats for a given thread
+//! Reports stats for a given thread
 void reportStat(const char* loopname, const char* category, unsigned long value);
+//! Reports stats for a given thread
 void reportStat(const std::string& loopname, const std::string& category, unsigned long value);
-//reports stats for all threads
+//! Reports stats for all threads
 void reportStat(Galois::Statistic* value);
-void reportStat(Galois::Statistic* value);
+//! Reports Galois system memory stats for all threads
+void reportPageAlloc(const char* category);
+//! Reports NUMA memory stats for all NUMA nodes
+void reportNumaAlloc(const char* category);
 
-
-//Prints all stats
+//! Prints all stats
 void printStats();
 
 }

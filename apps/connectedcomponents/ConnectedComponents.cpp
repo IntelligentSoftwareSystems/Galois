@@ -35,8 +35,6 @@
 #include "Galois/Graph/TypeTraits.h"
 #ifdef GALOIS_USE_EXP
 #include <boost/mpl/if.hpp>
-#include "Galois/Reduction.h"
-#include "Galois/Graph/ReplicatedGraph.h"
 #include "Galois/Graph/OCGraph.h"
 #include "Galois/Graph/GraphNodeBag.h"
 #include "Galois/DomainSpecificExecutors.h"
@@ -51,7 +49,7 @@
 #include <iostream>
 
 const char* name = "Connected Components";
-const char* desc = "Compute connected components of a graph\n";
+const char* desc = "Computes the connected components of a graph";
 const char* url = 0;
 
 enum class Algo {
@@ -73,7 +71,7 @@ enum class WriteType {
 
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputFilename(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<std::string> outputFilename(cll::Positional, cll::desc("[output file]"));
+static cll::opt<std::string> outputFilename(cll::Positional, cll::desc("[output file]"), cll::init("largest.gr"));
 static cll::opt<std::string> transposeGraphName("graphTranspose", cll::desc("Transpose of input graph"));
 static cll::opt<bool> symmetricGraph("symmetricGraph", cll::desc("Input graph is symmetric"), cll::init(false));
 static cll::opt<unsigned int> memoryLimit("memoryLimit",
@@ -105,13 +103,13 @@ struct Node: public Galois::UnionFindNode<Node> {
 
 template<typename Graph>
 void readInOutGraph(Graph& graph) {
+  using namespace Galois::Graph;
   if (symmetricGraph) {
-    graph.structureFromFile(inputFilename, true); 
+    Galois::Graph::readGraph(graph, inputFilename);
   } else if (transposeGraphName.size()) {
-    graph.structureFromFile(inputFilename, transposeGraphName);
+    Galois::Graph::readGraph(graph, inputFilename, transposeGraphName);
   } else {
-    std::cerr << "Graph type not supported\n";
-    abort();
+    GALOIS_DIE("Graph type not supported");
   }
 }
 
@@ -119,12 +117,10 @@ void readInOutGraph(Graph& graph) {
  * Serial connected components algorithm. Just use union-find.
  */
 struct SerialAlgo {
-  typedef Galois::Graph::LC_CSR_Graph<Node,void> Graph;
+  typedef Galois::Graph::LC_CSR_Graph<Node,void>::with_no_lockable<true> Graph;
   typedef Graph::GraphNode GNode;
 
-  void readGraph(Graph& graph) {
-    graph.structureFromFile(inputFilename);
-  }
+  void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, inputFilename); }
 
   struct Merge {
     Graph& graph;
@@ -157,12 +153,10 @@ struct SerialAlgo {
  * component.
  */
 struct SynchronousAlgo {
-  typedef Galois::Graph::LC_CSR_Graph<Node,void> Graph;
+  typedef Galois::Graph::LC_CSR_Graph<Node,void>::with_no_lockable<true>::with_numa_alloc<true> Graph;
   typedef Graph::GraphNode GNode;
 
-  void readGraph(Graph& graph) {
-    graph.structureFromFile(inputFilename);
-  }
+  void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, inputFilename); }
 
   struct Edge {
     GNode src;
@@ -248,11 +242,11 @@ struct SynchronousAlgo {
 
     cur = &wls[0];
     next = &wls[1];
-    Galois::do_all_local(&graph, Initialize(graph, *cur));
+    Galois::do_all_local(graph, Initialize(graph, *cur));
 
     while (!cur->empty()) {
-      Galois::do_all_local(cur, Merge(graph, emptyMerges));
-      Galois::for_each_local(cur, Find(graph, *next));
+      Galois::do_all_local(*cur, Merge(graph, emptyMerges));
+      Galois::for_each_local(*cur, Find(graph, *next));
       cur->clear();
       std::swap(cur, next);
       rounds += 1;
@@ -270,7 +264,10 @@ struct LabelPropAlgo {
     bool isRep() { return id == comp; }
   };
 
-  typedef Galois::Graph::LC_CSR_InOutGraph<LNode,void,true> Graph;
+  typedef Galois::Graph::LC_CSR_Graph<LNode,void>
+    ::with_no_lockable<true> 
+    ::with_numa_alloc<true> InnerGraph;
+  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
   typedef LNode::component_type component_type;
 
@@ -307,6 +304,7 @@ struct LabelPropAlgo {
             break;
           if (__sync_bool_compare_and_swap(&ddata.comp, old, newV)) {
             ctx.push(dst);
+            break;
           }
         }
       }
@@ -330,11 +328,11 @@ struct LabelPropAlgo {
   void operator()(Graph& graph) {
     typedef Galois::WorkList::dChunkedFIFO<256> WL;
 
-    Galois::do_all_local(&graph, Initialize(graph));
+    Galois::do_all_local(graph, Initialize(graph));
     if (symmetricGraph) {
-      Galois::for_each_local<WL>(&graph, Process<true,false>(graph));
+      Galois::for_each_local<WL>(graph, Process<true,false>(graph));
     } else {
-      Galois::for_each_local<WL>(&graph, Process<true,true>(graph));
+      Galois::for_each_local<WL>(graph, Process<true,true>(graph));
     }
   }
 };
@@ -352,9 +350,12 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
     bool isRep() { return id == comp; }
   };
 
+  typedef typename Galois::Graph::LC_CSR_Graph<LNode,void>
+    ::template with_no_lockable<true> 
+    ::template with_numa_alloc<true> InnerGraph;
   typedef typename boost::mpl::if_c<UseGraphChi,
           Galois::Graph::OCImmutableEdgeGraph<LNode,void>,
-          Galois::Graph::LC_CSR_InOutGraph<LNode,void,true> >::type
+          Galois::Graph::LC_InOut_Graph<InnerGraph>>::type
           Graph;
   typedef typename Graph::GraphNode GNode;
 
@@ -417,10 +418,10 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
     typedef Galois::GraphNodeBagPair<> BagPair;
     BagPair bags(graph.size());
 
-    Galois::do_all_local(&graph, Initialize<typename BagPair::bag_type>(graph, bags.next()));
+    Galois::do_all_local(graph, Initialize<typename BagPair::bag_type>(graph, bags.next()));
     while (!bags.next().empty()) {
       bags.swap();
-      Galois::for_each_local<WL>(&bags.cur(), Copy(graph));
+      Galois::for_each_local<WL>(bags.cur(), Copy(graph));
       this->outEdgeMap(memoryLimit, graph, EdgeOperator(), bags.cur(), bags.next(), false);
     } 
   }
@@ -510,7 +511,7 @@ struct GraphChiAlgo: public Galois::LigraGraphChi::ChooseExecutor<true> {
   void operator()(Graph& graph) {
     BagPair bags(graph.size());
 
-    Galois::do_all_local(&graph, Initialize(graph));
+    Galois::do_all_local(graph, Initialize(graph));
     Galois::GraphChi::vertexMap(graph, Process(bags.next()), memoryLimit);
     while (!bags.next().empty()) {
       bags.swap();
@@ -529,29 +530,20 @@ struct GraphLabAlgo {
     bool isRep() { return id == labelid; }
   };
 
-  typedef Galois::Graph::ReplicatedGraph<LNode,void> Graph;
+  typedef Galois::Graph::LC_CSR_Graph<LNode,void>
+    ::with_no_lockable<true> 
+    ::with_numa_alloc<true> InnerGraph;
+  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
   struct Initialize {
-    typedef int tt_does_not_need_aborts;
-    typedef int tt_does_not_need_parallel_push;
+    Graph& graph;
 
-    gptr<Graph> graph;
-    Graph* pGraph;
-
-    Initialize() { }
-    Initialize(Graph& g): graph(&g) { pGraph = &*graph; }
-
-    void operator()(GNode n, Galois::UserContext<GNode>&) {
-      LNode& data = pGraph->getData(n, Galois::MethodFlag::NONE);
-      data.id = n; // Initialize distributed copies
-      //std::cout << networkHostID << " " << Galois::Runtime::LL::getTID() << " " << data.id << " " << n << "\n";
+    Initialize(Graph& g): graph(g) { }
+    void operator()(GNode n) {
+      LNode& data = graph.getData(n, Galois::MethodFlag::NONE);
       data.labelid = data.id;
     }
-
-    typedef int tt_has_serialize;
-    void serialize(SendBuffer& buf) const { gSerialize(buf, graph); }
-    void deserialize(RecvBuffer& buf) { gDeserialize(buf, graph); pGraph = &*graph; }
   };
 
   struct Program {
@@ -564,14 +556,6 @@ struct GraphLabAlgo {
       message_type& operator+=(const message_type& other) {
         value = std::min<size_t>(value, other.value);
         return *this;
-      }
-
-      typedef int tt_has_serialize;
-      void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-        Galois::Runtime::Distributed::gSerialize(s, value);
-      }
-      void deserialize(DeSerializeBuffer& s) {
-        Galois::Runtime::Distributed::gDeserialize(s, value);
       }
     };
 
@@ -594,8 +578,7 @@ struct GraphLabAlgo {
         perform_scatter = true;
       } else if (graph.getData(node, Galois::MethodFlag::NONE).labelid > received_labelid) {
         perform_scatter = true;
-        graph.getData(node, Galois::MethodFlag::WRITE).labelid = received_labelid;
-        // XXX
+        graph.getData(node, Galois::MethodFlag::NONE).labelid = received_labelid;
       }
     }
 
@@ -621,51 +604,11 @@ struct GraphLabAlgo {
     readInOutGraph(graph);
   }
 
-  typedef Galois::DGReducible<size_t, std::plus<size_t>> Counter;
-
-  struct Count {
-    typedef int tt_does_not_need_aborts;
-    typedef int tt_does_not_need_parallel_push;
-
-    gptr<Graph> graph;
-    gptr<Counter> counter;
-    Graph* pGraph;
-    Counter* pCounter;
-
-    Count() { }
-    Count(Graph& g, gptr<Counter> c): graph(&g), counter(c) { pGraph = &*graph; pCounter = &*counter; }
-
-    void operator()(GNode n, Galois::UserContext<GNode>&) {
-      LNode& data = pGraph->getData(n, Galois::MethodFlag::NONE);
-      if (data.labelid == data.id) {
-        //std::cout << networkHostID << " " << Galois::Runtime::LL::getTID() << " " << data.id << " " << n << "\n";
-        pCounter->get() += 1;
-      }
-    }
-
-    typedef int tt_has_serialize;
-    void serialize(SendBuffer& buf) const { gSerialize(buf, graph, counter); }
-    void deserialize(RecvBuffer& buf) { gDeserialize(buf, graph, counter); pGraph = &*graph; pCounter = &*counter; }
-  };
-
-  void countComponents(Graph& graph) {
-    Counter* count = new Counter; // XXX for distributed version
-    gptr<Counter> c(count);
-    gptr<Graph> ptr(&graph);
-    Galois::for_each_local(ptr, Count(graph, c));
-    std::cout << "Components : " << c->doReduce() << "\n";
-  }
-
   void operator()(Graph& graph) {
-    gptr<Graph> ptr(&graph);
-    Galois::for_each_local(ptr, Initialize(graph));
-    //std::for_each(graph.begin(), graph.end(), Initialize(graph));
+    Galois::do_all_local(graph, Initialize(graph));
 
-    assert(0 && "fixme");
-    //Galois::GraphLab::SyncEngine<Graph,Program> engine(graph);
-    //engine.execute();
-    if (true)
-      countComponents(graph);
+    Galois::GraphLab::SyncEngine<Graph,Program> engine(graph, Program());
+    engine.execute();
   }
 };
 
@@ -712,16 +655,17 @@ struct AsyncOCAlgo {
 #endif
 
 /**
- * Like synchronous algorithm, but if we restrict path compression, we
- * can perform unions and finds concurrently.
+ * Like synchronous algorithm, but if we restrict path compression (as done is
+ * @link{UnionFindNode}), we can perform unions and finds concurrently.
  */
 struct AsyncAlgo {
-  typedef Galois::Graph::LC_CSR_Graph<Node,void> Graph;
+  typedef Galois::Graph::LC_CSR_Graph<Node,void>
+    ::with_numa_alloc<true>
+    ::with_no_lockable<true> 
+    Graph;
   typedef Graph::GraphNode GNode;
 
-  void readGraph(Graph& graph) {
-    graph.structureFromFile(inputFilename);
-  }
+  void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, inputFilename); }
 
   struct Merge {
     typedef int tt_does_not_need_aborts;
@@ -755,7 +699,7 @@ struct AsyncAlgo {
 
   void operator()(Graph& graph) {
     Galois::Statistic emptyMerges("EmptyMerges");
-    Galois::for_each_local(&graph, Merge(graph, emptyMerges));
+    Galois::for_each_local(graph, Merge(graph, emptyMerges));
   }
 };
 
@@ -825,8 +769,8 @@ void writeComponent(Graph& graph, typename Graph::node_data_type::component_type
     }
   }
 
-  typedef Galois::Graph::FileGraphParser Parser;
-  Parser p;
+  typedef Galois::Graph::FileGraphWriter Writer;
+  Writer p;
   p.setNumNodes(numNodes);
   p.setNumEdges(numEdges);
 
@@ -946,7 +890,7 @@ typename Graph::node_data_type::component_type findLargest(Graph& graph) {
   typedef ReduceMax<Graph> RM;
 
   typename CL::Accums accums;
-  Galois::do_all(graph.begin(), graph.end(), CL(graph, accums));
+  Galois::do_all_local(graph, CL(graph, accums));
   typename CL::Map& map = accums.map.reduce();
   size_t trivialComponents = accums.trivial.reduce();
 
@@ -983,14 +927,14 @@ void run() {
   }
   
   Galois::preAlloc(numThreads + (2 * graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::pageSize);
-  Galois::Statistic("MeminfoPre", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPre");
 
   Galois::StatTimer T;
   T.start();
   algo(graph);
   T.stop();
 
-  Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPost");
 
   if (!skipVerify || writeType == WriteType::largest) {
     auto component = findLargest(graph);
@@ -1009,8 +953,6 @@ int main(int argc, char** argv) {
   Galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
-  Galois::Runtime::Distributed::networkStart();
-
   Galois::StatTimer T("TotalTime");
   T.start();
   switch (algo) {
@@ -1028,7 +970,6 @@ int main(int argc, char** argv) {
     default: std::cerr << "Unknown algorithm\n"; abort();
   }
   T.stop();
-  Galois::Runtime::Distributed::networkTerminate();
 
   return 0;
 }

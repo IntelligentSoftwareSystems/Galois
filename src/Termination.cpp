@@ -134,7 +134,7 @@ class TreeTerminationDetection : public TerminationDetection {
 
   void processToken() {
     TokenHolder& th = *data.getLocal();
-    int myid = LL::getTID();
+    //int myid = LL::getTID();
     //have all up tokens?
     bool haveAll = th.hasToken;
     bool black = th.processIsBlack;
@@ -199,7 +199,7 @@ public:
     th.parent_offset = (LL::getTID() - 1) % num;
     for (int i = 0; i < num; ++i) {
       int cn = LL::getTID() * num + i + 1;
-      if (cn < activeThreads)
+      if (cn < (int) activeThreads)
 	th.child[i] = data.getRemote(cn);
       else
 	th.child[i] = 0;
@@ -217,10 +217,10 @@ public:
   }
 };
 
+__attribute__((unused))
 static TreeTerminationDetection& getTreeTermination() {
   static TreeTerminationDetection term;
   return term;
 }
-
 
 } // namespace

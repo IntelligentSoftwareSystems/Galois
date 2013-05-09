@@ -70,10 +70,10 @@
 //#define SERIAL_SWAP
 //#define TOTAL_PREFIX
 
-static const char* name = "Breadth-first Search Example";
+static const char* name = "Cuthill-McKee Reordering";
 static const char* desc =
-  "Computes the shortest path from a source node to all nodes in a directed "
-  "graph using a modified Bellman-Ford algorithm\n";
+  "Computes a reordering of matrix rows and columns (or a relabeling of graph nodes)"
+  "according to the Cuthill-McKee heuristic";
 static const char* url = 0;
 
 //****** Command Line Options ******
@@ -119,10 +119,10 @@ static cll::opt<std::string> filename(cll::Positional,
     cll::Required);
 
 struct SNode;
-typedef Galois::Graph::LC_CSR_Graph<SNode, void> Graph;
 // Hack: Resolve circular definition of Graph and SNode.parent with fact that
 // all LC_CSR_Graph::GraphNodes have the same type.
-typedef Galois::Graph::LC_CSR_Graph<void, void>::GraphNode GNode;
+typedef Galois::Graph::LC_CSR_Graph<void, void>::with_no_lockable<true>::with_numa_alloc<true> DummyGraph;
+typedef DummyGraph::GraphNode GNode;
 
 //****** Work Item and Node Data Defintions ******
 struct SNode {
@@ -143,6 +143,8 @@ struct SNode {
 	//Galois::gdeque<Galois::Graph::LC_CSR_Graph<SNode, void>::GraphNode>* bucket;
 	//Galois::Runtime::LL::SimpleLock<true> mutex;
 };
+
+typedef DummyGraph::with_node_data<SNode> Graph;
 
 // Check hack above
 struct CheckAssertion {
@@ -791,7 +793,7 @@ static void resetGraph() {
 
 // Read graph from a binary .gr as dirived from a Matrix Market .mtx using graph-convert
 static void readGraph(GNode& source, GNode& report) {
-  graph.structureFromFile(filename);
+  Galois::Graph::readGraph(graph, filename); 
 
   source = *graph.begin();
   report = *graph.begin();
@@ -906,10 +908,10 @@ struct BarrierNoDup {
 		Galois::GAtomic<unsigned int> added = Galois::GAtomic<unsigned int>(0);;
 		Galois::GAtomic<unsigned int> temp = Galois::GAtomic<unsigned int>(0);;
 
-		unsigned int depth = 0;
+		//unsigned int depth = 0;
 		unsigned int thr = Galois::getActiveThreads();
-		Galois::Runtime::PthreadBarrier barrier(thr);
-		//Galois::Runtime::GBarrier& barrier = Galois::Runtime::getSystemBarrier();
+		//Galois::Runtime::PthreadBarrier barrier(thr);
+		Galois::Runtime::Barrier& barrier = Galois::Runtime::getSystemBarrier();
 
 		while (true) {
 			unsigned next = (round + 1) & 1;

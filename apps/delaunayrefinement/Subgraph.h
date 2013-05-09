@@ -42,7 +42,7 @@ typedef typename Graph::pointer Graphp;
 // Worklist Graph nodes
 typedef Galois::Graph::ThirdGraph<GNode,void,Galois::Graph::EdgeDirection::Un> WLGraph;
 typedef WLGraph::NodeHandle WLGNode;
-typedef Galois::Runtime::Distributed::gptr<WLGraph> WLGraphp;
+typedef Galois::Runtime::gptr<WLGraph> WLGraphp;
 
 struct EdgeTuple {
   GNode src;

@@ -34,12 +34,10 @@
 namespace Galois {
 namespace Runtime {
 
-using namespace Galois::Runtime::Distributed;
-
 class PerBackend_v2 {
   std::unordered_map<uint64_t, void*> items;
   std::unordered_map<std::pair<uint64_t, uint32_t>, void*,
-		     pairhash<uint64_t, uint32_t>> remoteCache;
+		     pairhash<std::pair<uint64_t, uint32_t>>> remoteCache;
 
   uint32_t nextID;
   LL::SimpleLock<true> lock;
@@ -130,7 +128,7 @@ public:
   }
 
   gptr<T> local() {
-    return remote(Distributed::networkHostID);
+    return remote(networkHostID);
   }
 
   T& operator*() const { return *resolve(); }
@@ -144,10 +142,10 @@ public:
 
   //serialize
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+  void serialize(Galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s,offset);
   }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s,offset);
     localHost = ~0;
     localPtr = nullptr;
@@ -257,7 +255,7 @@ public:
   }
   
   gptr<T> local() const {
-    return gptr<T>(Distributed::networkHostID, resolve());
+    return gptr<T>(networkHostID, resolve());
   }
 
   T& operator*() const { return *resolve(); }
@@ -301,10 +299,10 @@ public:
 
   //serialize
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+  void serialize(Galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s,offset);
   }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s,offset);
   }
 };

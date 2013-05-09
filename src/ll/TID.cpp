@@ -29,46 +29,16 @@
 #include "Galois/Runtime/ll/HWTopo.h"
 #include <cassert>
 
-#ifdef GALOIS_USE_DRF
-#include <pthread.h>
-#endif
-
-#ifdef GALOIS_USE_DMP
-#include "dmp.h"
-#endif
-
 __thread unsigned Galois::Runtime::LL::TID = 0;
 static unsigned nextID = 0;
 
 namespace {
 struct AtomicNextId {
   unsigned next() {
-    return __sync_fetch_and_add(&::nextID, 1);
+    return __sync_fetch_and_add(&nextID, 1);
   }
 };
-#ifdef GALOIS_USE_DRF
-struct PthreadNextId {
-  pthread_mutex_t lock;
-  PthreadNextId() {
-    pthread_mutex_init(&lock, NULL);
-  }
-  ~PthreadNextId() {
-    pthread_mutex_destroy(&lock);
-  }
-  unsigned next() {
-    unsigned val;
-    pthread_mutex_lock(&lock);
-    val = ::nextID;
-    ++::nextID;
-    pthread_mutex_unlock(&lock);
-    return val;
-  }
-};
-
-typedef PthreadNextId NextId;
-#else
 typedef AtomicNextId NextId;
-#endif
 }
 
 static NextId next;

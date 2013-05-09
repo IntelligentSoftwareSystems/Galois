@@ -25,9 +25,11 @@
 
 #include "Galois/Runtime/mm/Mem.h"
 #include "Galois/Runtime/ll/gio.h"
+#include "Galois/Runtime/ll/StaticInstance.h"
 
 #include <map>
-#include <list>
+#include <vector>
+#include <algorithm>
 
 #ifdef __linux__
 #include <linux/mman.h>
@@ -41,7 +43,8 @@ static const int _MAP_BASE = MAP_ANONYMOUS | MAP_PRIVATE;
 static const int _MAP_POP  = MAP_POPULATE | _MAP_BASE;
 #endif
 #ifdef MAP_HUGETLB
-static const int _MAP_HUGE = MAP_HUGETLB | _MAP_POP;
+static const int _MAP_HUGE_POP = MAP_HUGETLB | _MAP_POP;
+static const int _MAP_HUGE = MAP_HUGETLB;
 #endif
 
 namespace {
@@ -52,20 +55,16 @@ struct FreeNode {
 typedef Galois::Runtime::LL::PtrLock<FreeNode, true> HeadPtr;
 typedef Galois::Runtime::LL::CacheLineStorage<HeadPtr> HeadPtrStorage;
 
-//Number of pages allocated
+// Tracks pages allocated
 struct PAState {
-  unsigned num;
+  std::vector<int> counts;
   std::map<void*, HeadPtr*> ownerMap;
-  PAState(): num(0) { }
+  PAState() { 
+    counts.resize(Galois::Runtime::LL::getMaxThreads(), 0);
+  }
 };
 
-//FIXME: make thread safe
-PAState& getPAState() {
-  static PAState* p;
-  if (!p)
-    p = new PAState();
-  return *p;
-}
+static Galois::Runtime::LL::StaticInstance<PAState> PA;
 
 #ifdef __linux__
 #define DoAllocLock true
@@ -83,7 +82,7 @@ void* allocFromOS() {
   void* ptr = 0;
 #ifdef MAP_HUGETLB
   //First try huge
-  ptr = mmap(0, Galois::Runtime::MM::pageSize, _PROT, _MAP_HUGE, -1, 0);
+  ptr = mmap(0, Galois::Runtime::MM::pageSize, _PROT, _MAP_HUGE_POP, -1, 0);
 #endif
 
   //FIXME: improve failure case to ensure pageSize alignment
@@ -99,7 +98,7 @@ void* allocFromOS() {
   
   allocLock.unlock();
   if (!ptr || ptr == MAP_FAILED) {
-    GALOIS_SYS_ERROR(true, "Out of Memory");
+    GALOIS_SYS_DIE("Out of Memory");
   }
 
   //protect the tracking structures
@@ -108,14 +107,20 @@ void* allocFromOS() {
   if (!h) { //first allocation
     h = &((new HeadPtrStorage())->data);
   }
-  PAState& p = getPAState();
+  PAState& p = *PA.get();
   p.ownerMap[ptr] = h;
-  ++p.num;
+  p.counts[Galois::Runtime::LL::getTID()] += 1;
   dataLock.unlock();
   return ptr;
 }
 
 } // end anon namespace
+
+void Galois::Runtime::MM::pageIn(void* buf, size_t len) {
+  volatile char* ptr = reinterpret_cast<volatile char*>(buf);
+  for (size_t i = 0; i < len; i += smallPageSize)
+    ptr[i];
+}
 
 void* Galois::Runtime::MM::pageAlloc() {
   HeadPtr* phead = head;
@@ -133,7 +138,7 @@ void* Galois::Runtime::MM::pageAlloc() {
 
 void Galois::Runtime::MM::pageFree(void* m) {
   dataLock.lock();
-  HeadPtr* phead = getPAState().ownerMap[m];
+  HeadPtr* phead = PA.get()->ownerMap[m];
   dataLock.unlock();
   assert(phead);
   phead->lock();
@@ -147,6 +152,48 @@ void Galois::Runtime::MM::pagePreAlloc(int numPages) {
     Galois::Runtime::MM::pageFree(allocFromOS());
 }
 
-unsigned Galois::Runtime::MM::pageAllocInfo() {
-  return getPAState().num;
+int Galois::Runtime::MM::numPageAllocTotal() {
+  PAState& p = *PA.get();
+  return std::accumulate(p.counts.begin(), p.counts.end(), 0);
+}
+
+int Galois::Runtime::MM::numPageAllocForThread(unsigned tid) {
+  return PA.get()->counts[tid];
+}
+
+void* Galois::Runtime::MM::largeAlloc(size_t len, bool preFault) {
+  size_t size = (len + pageSize - 1) & (~(size_t)(pageSize - 1));
+  void * ptr = 0;
+
+  allocLock.lock();
+#ifdef MAP_HUGETLB
+  ptr = mmap(0, size, _PROT, preFault ? _MAP_HUGE_POP : _MAP_HUGE, -1, 0);
+# ifndef MAP_POPULATE
+  if (ptr != MAP_FAILED && ptr && preFault) {
+    pageIn(ptr, size); // XXX should use hugepage stride
+  }
+# endif
+#endif
+#ifdef MAP_POPULATE
+  if (preFault && (!ptr || ptr == MAP_FAILED))
+    ptr = mmap(0, size, _PROT, _MAP_POP, -1, 0);
+#endif
+  if (!ptr || ptr == MAP_FAILED) {
+    ptr = mmap(0, size, _PROT, _MAP_BASE, -1, 0);
+    if (ptr != MAP_FAILED && ptr && preFault) {
+      pageIn(ptr, size);
+    }
+  }
+  allocLock.unlock();
+
+  if (!ptr || ptr == MAP_FAILED)
+    GALOIS_SYS_DIE("Out of Memory");
+  return ptr;
+}
+
+void Galois::Runtime::MM::largeFree(void* m, size_t len) {
+  size_t size = (len + pageSize - 1) & (~(size_t)(pageSize - 1));
+  allocLock.lock();
+  munmap(m, size);
+  allocLock.unlock();
 }

@@ -33,14 +33,6 @@ namespace Runtime {
 class PerBackend_v2;
 class PerBackend_v3;
 
-namespace Distributed {
-
-//Objects with this tag have to be stored in a persistent cache
-//Objects with this tag use the Persistent Directory
-BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_is_persistent)
-template<typename T>
-struct is_persistent : public has_tt_is_persistent<T> {};
-
 SimpleRuntimeContext& getTransCnx();
 
 namespace {
@@ -59,7 +51,7 @@ struct resolve_dispatch<T, false> {
 	try {
 	  acquire(ptr, Galois::MethodFlag::ALL);
 	} catch (...) {
-          getSystemLocalDirectory().recall(ptr, false);
+          getSystemLocalDirectory().recall<T>(std::make_pair(owner, ptr));
           if (isAcquiredBy(ptr,&getSystemLocalDirectory())) {
 	    throw remote_ex{ptr,owner,ptr};
           }
@@ -68,11 +60,13 @@ struct resolve_dispatch<T, false> {
           }
 	}
       }
-      else if (isAcquired(ptr))
-	getSystemLocalDirectory().recall(ptr, true);
+      else if (isAcquired(ptr)) {
+	getSystemLocalDirectory().recall<T>(std::make_pair(owner, ptr));
+        while (isAcquiredBy(ptr, &getSystemLocalDirectory())) {}
+      }
       return ptr;
     } else {
-      T* rptr = getSystemRemoteDirectory().resolve<T>(owner,ptr);
+      T* rptr = getSystemRemoteDirectory().resolve<T>(std::make_pair(owner,ptr));
       if (inGaloisForEach) {
 	try {
 	  acquire(rptr, Galois::MethodFlag::ALL);
@@ -89,20 +83,6 @@ struct resolve_dispatch<T, false> {
     }
   }
 };
-
-// resolve for persistent objects!
-template<typename T>
-struct resolve_dispatch<T,true> {
-  static T* go(uint32_t owner, T*  ptr) {
-    T* rptr = nullptr;
-    if (owner == networkHostID)
-      rptr = ptr;
-    else
-      rptr = getSystemPersistentDirectory().resolve<T>(ptr, owner);
-    assert(rptr);
-    return rptr;
-  }
-};
 }
 
 template<typename T>
@@ -111,21 +91,21 @@ T* resolve(const gptr<T>& p) {
   //   //    std::cerr << "aborting in resolve for " << typeid(T).name() << "\n";
     assert(p.ptr);
   }
-  return resolve_dispatch<T,is_persistent<T>::value>::go(p.owner, p.ptr);
+  return resolve_dispatch<T,false>::go(p.owner, p.ptr);
 }
 
 template <typename T>
 T* transientAcquire(const gptr<T>& p) {
   if (p.owner == networkHostID) {
     while (!getTransCnx().try_acquire(p.ptr)) {
-      getSystemLocalDirectory().recall(p.ptr, false);
+      getSystemLocalDirectory().recall<T>(std::make_pair(p.owner, p.ptr));
       if (!LL::getTID())
 	getSystemNetworkInterface().handleReceives();
     }
     return p.ptr;
   } else { // REMOTE
     do {
-      T* rptr = getSystemRemoteDirectory().resolve<T>(p.owner, p.ptr);
+      T* rptr = getSystemRemoteDirectory().resolve<T>(std::make_pair(p.owner, p.ptr));
       //DATA RACE with delete
       if (getTransCnx().try_acquire(rptr))
 	return rptr;
@@ -139,7 +119,7 @@ template <typename T>
 T* transientAcquireNonBlocking(const gptr<T>& p) {
   if (p.owner == networkHostID) {
     if (!getTransCnx().try_acquire(p.ptr)) {
-      getSystemLocalDirectory().recall(p.ptr, false);
+      getSystemLocalDirectory().recall<T>(p.ptr);
       return NULL;
     }
     return p.ptr;
@@ -156,26 +136,9 @@ template<typename T>
 void transientRelease(const gptr<T>& p) {
   T* ptr = p.ptr;
   if (p.owner != networkHostID)
-    ptr = getSystemRemoteDirectory().resolve<T>(p.owner, p.ptr);
+    ptr = getSystemRemoteDirectory().resolve<T>(std::make_pair(p.owner, p.ptr));
   getTransCnx().release(ptr);
 }
-
-template <typename T>
-T* getSharedObj(const gptr<T>& p) {
-  T* ptr = p.ptr;
-  if (p.owner != networkHostID) {
-    ptr = getSystemRemoteDirectory().sresolve<T>(p.owner, p.ptr);
-    // locked by Remote Directory if not local
-    // abort the iteration
-    if (isAcquired(ptr))
-      throw conflict_ex{ptr};
-  }
-  // should never lock an object that is sharable
-//assert(!isAcquired(ptr));
-  return ptr;
-}
-
-void clearSharedCache();
 
 template<typename T>
 class gptr {
@@ -186,7 +149,6 @@ class gptr {
   friend T* transientAcquire<>(const gptr<T>& p);
   friend T* transientAcquireNonBlocking<>(const gptr<T>& p);
   friend void transientRelease<>(const gptr<T>& p);
-  friend T* getSharedObj<>(const gptr<T>& p);
   friend PerBackend_v2;
   friend PerBackend_v3;
 
@@ -208,9 +170,9 @@ public:
   void prefetch() {
     if (0) {
       if (owner == networkHostID)
-	getSystemLocalDirectory().recall(ptr, false); 
+	getSystemLocalDirectory().recall<T>(std::make_pair(owner,ptr)); 
       else
-	getSystemRemoteDirectory().resolve<T>(owner, ptr);
+	getSystemRemoteDirectory().resolve<T>(std::make_pair(owner, ptr));
     }
   }
 
@@ -240,7 +202,7 @@ public:
   explicit operator bool() const { return ptr != 0; }
 
   bool isLocal() const {
-    return owner == Galois::Runtime::Distributed::networkHostID;
+    return owner == Galois::Runtime::networkHostID;
   }
 
   bool sameHost(const gptr& rhs) const {
@@ -254,10 +216,10 @@ public:
 
   //serialize
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+  void serialize(Galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s,ptr, owner);
   }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s,ptr, owner);
   }
 
@@ -266,7 +228,6 @@ public:
   }
 };
 
-} //namespace Distributed
 } //namespace Runtime
 } //namespace Galois
 

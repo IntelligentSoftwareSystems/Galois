@@ -337,10 +337,6 @@ void greedyKWayEdgeBalance(MetisGraph* metisGraph, int nparts, float* tpwgts, fl
 			  MetisNode& neighborData = graph->getData(neighbor,Galois::MethodFlag::NONE);
 				assert(neighborData.getNodeId()<graphSize);
 				int oldgain = neighborData.getGain();
-				if (neighborData.getPartEd().size() == 0) {
-					int numEdges = neighborData.getNumEdges();
-					neighborData.initPartEdAndIndex(numEdges);
-				}
 				int edgeWeight = graph->getEdgeData(jj);
 				if (neighborData.getPartition() == from) {
 					neighborData.setEdegree(neighborData.getEdegree() + edgeWeight);

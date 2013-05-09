@@ -50,8 +50,9 @@ namespace cll = llvm::cl;
 
 static const char* name = "Maximum cardinality matching in bipartite graphs";
 static const char* desc =
-  "A matching of G is a subset of edges that do not share an endpoint. The "
-  "maximum cardinality matching is the matching with the most number of edges.";
+  "Computes maximum cardinality matching in bipartite graphs. "
+  "A matching of G is a subset of edges that do not share an endpoint. "
+  "The maximum cardinality matching is the matching with the most number of edges.";
 static const char* url = "bipartite_mcm";
 
 enum MatchingAlgo {

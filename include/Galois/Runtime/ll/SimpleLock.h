@@ -33,6 +33,7 @@
 #define GALOIS_RUNTIME_LL_SIMPLE_LOCK_H
 
 #include <cassert>
+#include <atomic>
 
 #include "CompilerSpecific.h"
 #include "gio.h"
@@ -44,41 +45,70 @@ namespace LL {
 
 /// SimpleLock is a spinlock.  If the template parameter is
 /// false, the lock is a noop.
+/// Copying a lock is unsynchronized (relaxed ordering)
+
 template<bool isALock>
 class SimpleLock;
 
 template<>
 class SimpleLock<true> {
-  volatile mutable int _lock; //Allow locking a const
-public:
-  SimpleLock() : _lock(0) {  }
-
-  inline void lock() const {
-    int oldval;
+  mutable std::atomic<int> _lock;
+  GALOIS_ATTRIBUTE_NOINLINE
+  void slow_lock() const {
+    int oldval = 0;
     do {
-      while (_lock != 0) {
+      while (_lock.load(std::memory_order_acquire) != 0) {
 	asmPause();
       }
-      oldval = __sync_fetch_and_or(&_lock, 1);
-    } while (oldval & 1);
+      oldval = 0;
+    } while (!_lock.compare_exchange_weak(oldval, 1, std::memory_order_acq_rel, std::memory_order_relaxed));
     assert(_lock);
+  }
+
+public:
+  SimpleLock() : _lock(0) {  }
+  //relaxed order for copy
+  SimpleLock(const SimpleLock& p) :_lock(p._lock.load(std::memory_order_relaxed)) {}
+
+  SimpleLock& operator= (const SimpleLock& p) {
+    if (&p == this) return *this;
+    //relaxed order for initialization
+    _lock.store(p._lock.load(std::memory_order_relaxed), std::memory_order_relaxed);
+    return *this;
+  }
+
+
+  inline void lock() const {
+    int oldval = 0;
+    if (_lock.load(std::memory_order_relaxed))
+      goto slow_path;
+    if (!_lock.compare_exchange_weak(oldval, 1, std::memory_order_acq_rel, std::memory_order_relaxed))
+      goto slow_path;
+    assert(_lock);
+    return;
+  slow_path:
+    slow_lock();
   }
 
   inline void unlock() const {
     assert(_lock);
-    compilerBarrier();
-    _lock = 0;
+    //HMMMM
+    _lock.store(0,std::memory_order_release);
+    //_lock = 0;
   }
 
   inline bool try_lock() const {
-    if (_lock != 0)
+    int oldval = 0;
+    if (_lock.load(std::memory_order_acquire))
       return false;
-    int oldval = __sync_fetch_and_or(&_lock, 1);
-    return !(oldval & 1);
+    if (!_lock.compare_exchange_weak(oldval, 1, std::memory_order_acq_rel))
+      return false;
+    assert(_lock);
+    return true;
   }
 
   inline bool is_locked() const {
-    return _lock & 1;
+    return _lock.load(std::memory_order_acquire) & 1;
   }
 };
 

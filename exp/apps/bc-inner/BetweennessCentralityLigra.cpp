@@ -45,7 +45,7 @@
 #include <iomanip>
 
 static const char* name = "Betweenness Centrality";
-static const char* desc = "\n";
+static const char* desc = 0;
 static const char* url = 0;
 
 //****** Command Line Options ******
@@ -88,13 +88,13 @@ void initialize(Algo& algo,
 
 template<typename Graph>
 void readInOutGraph(Graph& graph) {
+  using namespace Galois::Graph;
   if (symmetricGraph) {
-    graph.structureFromFile(filename, true); 
+    Galois::Graph::readGraph(graph, filename);
   } else if (transposeGraphName.size()) {
-    graph.structureFromFile(filename, transposeGraphName);
+    Galois::Graph::readGraph(graph, filename, transposeGraphName);
   } else {
-    std::cerr << "Graph type not supported\n";
-    abort();
+    GALOIS_DIE("Graph type not supported");
   }
 }
 
@@ -120,9 +120,13 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
     bool visited;
   };
 
+  typedef typename Galois::Graph::LC_CSR_Graph<SNode,void>
+    ::template with_no_lockable<true> 
+    ::template with_numa_alloc<true> InnerGraph;
+
   typedef typename boost::mpl::if_c<UseGraphChi,
           Galois::Graph::OCImmutableEdgeGraph<SNode,void>,
-          Galois::Graph::LC_CSR_InOutGraph<SNode,void,true> >::type
+          Galois::Graph::LC_InOut_Graph<InnerGraph> >::type
           Graph;
   typedef typename Graph::GraphNode GNode;
   typedef Galois::GraphNodeBag<1024*4> Bag;
@@ -252,7 +256,7 @@ void run() {
   initialize(algo, graph, source);
 
   Galois::preAlloc(numThreads + (3*graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::pageSize);
-  Galois::Statistic("MeminfoPre", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPre");
 
   Galois::StatTimer T;
   std::cout << "Running " << algo.name() << " version\n";
@@ -261,7 +265,7 @@ void run() {
   algo(graph, source);
   T.stop();
   
-  Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPost");
 
   if (!skipVerify) {
     int count = 0;

@@ -28,7 +28,6 @@
 #include "Galois/UserContext.h"
 #include "Galois/Graph/LCGraph.h"
 #include "Galois/WorkList/WorkList.h"
-#include "Galois/WorkList/WorkListAlt.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
@@ -46,15 +45,14 @@
 #include <sys/mman.h>
 
 static const char* name = "Betweenness Centrality";
-static const char* desc =
-  "Computes the betweenness centrality of all nodes in a graph\n";
+static const char* desc = "Computes the betweenness centrality of all nodes in a graph";
 static const char* url = "betweenness_centrality";
 
 static llvm::cl::opt<std::string> filename(llvm::cl::Positional, llvm::cl::desc("<input file>"), llvm::cl::Required);
 static llvm::cl::opt<int> iterLimit("limit", llvm::cl::desc("Limit number of iterations to value (0 is all nodes)"), llvm::cl::init(0));
 static llvm::cl::opt<bool> forceVerify("forceVerify", llvm::cl::desc("Abort if not verified, only makes sense for torus graphs"));
 
-typedef Galois::Graph::LC_FileGraph<void, void> Graph;
+typedef Galois::Graph::LC_CSR_Graph<void, void> Graph;
 typedef Graph::GraphNode GNode;
 
 Graph* G;
@@ -116,8 +114,8 @@ Galois::Runtime::PerThreadStorage<TempState*> state;
 void computeSucSize() {
   sucSize.resize(NumNodes);
   for (Graph::iterator ii = G->begin(), ee = G->end(); ii != ee; ++ii)
-    sucSize[*ii] = std::distance(G->neighbor_begin(*ii, Galois::MethodFlag::NONE),
-				 G->neighbor_end(*ii, Galois::MethodFlag::NONE));
+    sucSize[*ii] = std::distance(G->edge_begin(*ii, Galois::MethodFlag::NONE),
+				 G->edge_end(*ii, Galois::MethodFlag::NONE));
 }
 
 struct popstate {
@@ -149,10 +147,10 @@ struct process {
     while (QAt != QPush) {
       GNode _v = SQ[QAt++];
       int v = _v;
-      for (Graph::neighbor_iterator
-          ii = G->neighbor_begin(_v, Galois::MethodFlag::NONE),
-          ee = G->neighbor_end(_v, Galois::MethodFlag::NONE); ii != ee; ++ii) {
-	GNode _w = *ii;
+      for (Graph::edge_iterator
+          ii = G->edge_begin(_v, Galois::MethodFlag::NONE),
+          ee = G->edge_end(_v, Galois::MethodFlag::NONE); ii != ee; ++ii) {
+	GNode _w = G->getEdgeDst(ii);
 	int w = _w;
 	if (!d[w]) {
 	  SQ[QPush++] = _w;
@@ -235,7 +233,7 @@ struct HasOut: public std::unary_function<GNode,bool> {
   Graph* graph;
   HasOut(Graph* g): graph(g) { }
   bool operator()(const GNode& n) const {
-    return graph->neighbor_begin(n) != graph->neighbor_end(n);
+    return graph->edge_begin(n) != graph->edge_end(n);
   }
 };
 
@@ -245,7 +243,7 @@ int main(int argc, char** argv) {
 
   Graph g;
   G = &g;
-  G->structureFromFile(filename.c_str());
+  Galois::Graph::readGraph(*G, filename); 
   NumNodes = G->size();
   computeSucSize();
 
@@ -271,7 +269,7 @@ int main(int argc, char** argv) {
   Galois::on_each(popstate());
 
   typedef Galois::WorkList::dChunkedLIFO<8> WL;
-  typedef Galois::WorkList::ChunkedAdaptor<false,32> CA;
+  //typedef Galois::WorkList::AltChunkedLIFO<32> CA;
   Galois::StatTimer T;
   T.start();
   Galois::for_each<WL>(tmp.begin(), tmp.end(), process());

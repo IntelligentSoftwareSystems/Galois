@@ -74,10 +74,10 @@ struct Process : public Galois::Runtime::Lockable {
 
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+  void serialize(Galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s,graph);
   }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s,graph);
   }
 };
@@ -96,10 +96,10 @@ struct Preprocess : public Galois::Runtime::Lockable {
 
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+  void serialize(Galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s,graph,wl);
   }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s,graph,wl);
   }
 };
@@ -118,10 +118,10 @@ struct Verification : public Galois::Runtime::Lockable {
 
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+  void serialize(Galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s,graph);
   }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s,graph);
   }
 };
@@ -138,10 +138,10 @@ struct Prefetch : public Galois::Runtime::Lockable {
 
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+  void serialize(Galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s,graph);
   }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s,graph);
   }
 };
@@ -151,7 +151,7 @@ int main(int argc, char** argv) {
   LonestarStart(argc, argv, name, desc, url);
 
   // check the host id and initialise the network
-  Galois::Runtime::Distributed::networkStart();
+  Galois::Runtime::networkStart();
 
   Graphp graph = Graph::allocate();
   {
@@ -172,9 +172,9 @@ int main(int argc, char** argv) {
   // call prefetch to get the nodes to the owner
   Galois::for_each_local(graph, Prefetch(graph));
 
-  Galois::Statistic("MeminfoPre1", Galois::Runtime::MM::pageAllocInfo());
-  Galois::preAlloc(15 * numThreads + Galois::Runtime::MM::pageAllocInfo() * 10);
-  Galois::Statistic("MeminfoPre2", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPre1");
+  Galois::preAlloc(15 * numThreads + Galois::Runtime::MM::numPageAllocTotal() * 10);
+  Galois::reportPageAlloc("MeminfoPre2");
 
   Galois::Graph::Bag<GNode>::pointer gwl = Galois::Graph::Bag<GNode>::allocate();
 
@@ -183,26 +183,26 @@ int main(int argc, char** argv) {
 
   Galois::for_each_local(graph, Preprocess(graph,gwl), "findbad");
 
-  Galois::Statistic("MeminfoMid", Galois::Runtime::MM::pageAllocInfo());
-  
+  Galois::reportPageAlloc("MeminfoMid");
+
   Galois::StatTimer Trefine("refine");
   Trefine.start();
   using namespace Galois::WorkList;
   
   typedef LocalQueues<dChunkedLIFO<256>, ChunkedLIFO<256> > BQ;
-  typedef ChunkedAdaptor<false,32> CA;
+  typedef AltChunkedLIFO<32> Chunked;
 
-  Galois::for_each_local<CA>(gwl, Process(graph), "refine");
+  Galois::for_each_local<Chunked>(gwl, Process(graph), "refine");
   Trefine.stop();
   T.stop();
 
-  Galois::for_each_local<CA>(graph, Verification(graph), "verification");
+  Galois::for_each_local<Chunked>(graph, Verification(graph), "verification");
 
   //  std::cout << "final configuration: " << NThirdGraphSize(graph) << " total triangles, ";
   //  std::cout << Galois::ParallelSTL::count_if_local(graph, is_bad(graph)) << " bad triangles\n";
 
-  Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
-  
+  Galois::reportPageAlloc("MeminfoPost");
+
   if (!skipVerify) {
     int size = Galois::ParallelSTL::count_if_local(graph, is_bad(graph));
     if (size != 0) {
@@ -220,7 +220,7 @@ int main(int argc, char** argv) {
   }
 
   // master_terminate();
-  Galois::Runtime::Distributed::networkTerminate();
+  Galois::Runtime::networkTerminate();
 
   return 0;
 }

@@ -44,10 +44,10 @@ struct count_if_R : public Galois::Runtime::Lockable {
   typedef int tt_dir_blocking;
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+  void serialize(Galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s,i);
   }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s,i);
   }
 };
@@ -64,16 +64,16 @@ struct count_if_helper_dist : public Galois::Runtime::Lockable {
   }
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+  void serialize(Galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s,f);
   }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s,f);
   }
 };
 
 struct count_if_reducer_dist : public Galois::Runtime::Lockable {
-  gptr<count_if_R> r;
+  Runtime::gptr<count_if_R> r;
   count_if_reducer_dist(count_if_R* _r = nullptr) :r(_r) {}
   template<typename CIH>
   void operator()(CIH& dest, const CIH& src) {
@@ -83,10 +83,10 @@ struct count_if_reducer_dist : public Galois::Runtime::Lockable {
   }
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+  void serialize(Galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s,r);
   }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s,r);
   }
 };
@@ -96,13 +96,13 @@ struct count_if_reducer_dist : public Galois::Runtime::Lockable {
 namespace Runtime {
 
 template<typename WLTy, typename ItemTy, typename FunctionTy>
-void for_each_landing_pad(Distributed::RecvBuffer& buf) {
+void for_each_landing_pad(RecvBuffer& buf) {
   //extract stuff
   FunctionTy f;
   std::deque<ItemTy> data;
-  gDeserialize(buf,f,data,Distributed::lock_sync);
+  gDeserialize(buf,f,data);
 
-  Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
+  NetworkInterface& net = getSystemNetworkInterface();
 
   //Start locally
   Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeStandardRange(data.begin(), data.end()), f, nullptr);
@@ -112,13 +112,13 @@ void for_each_landing_pad(Distributed::RecvBuffer& buf) {
 }
 
 template<typename WLTy, typename T, typename FunctionTy>
-void for_each_local_landing_pad(Distributed::RecvBuffer& buf) {
+void for_each_local_landing_pad(RecvBuffer& buf) {
   //extract stuff
   FunctionTy f;
   T data;
-  gDeserialize(buf,f,data,Distributed::lock_sync);
+  gDeserialize(buf,f,data);
 
-  Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
+  NetworkInterface& net = getSystemNetworkInterface();
 
   //Start locally
   Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(data), f, nullptr);
@@ -128,7 +128,7 @@ void for_each_local_landing_pad(Distributed::RecvBuffer& buf) {
 }
 
 template<typename T, typename FunctionTy, typename ReducerTy>
-void do_all_local_landing_pad(Distributed::RecvBuffer& buf) {
+void do_all_local_landing_pad(RecvBuffer& buf) {
   //extract stuff
   FunctionTy f;
   ReducerTy  r;
@@ -136,7 +136,7 @@ void do_all_local_landing_pad(Distributed::RecvBuffer& buf) {
   T    data;
   gDeserialize(buf,f,r,needsReduce,data);
 
-  Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
+  NetworkInterface& net = getSystemNetworkInterface();
 
   inDoAllDistributed = true;
   //Start locally
@@ -148,12 +148,12 @@ void do_all_local_landing_pad(Distributed::RecvBuffer& buf) {
 }
 
 template<typename FunctionTy>
-void on_each_impl_landing_pad(Distributed::RecvBuffer& buf) {
+void on_each_impl_landing_pad(RecvBuffer& buf) {
   //extract stuff
   FunctionTy f;
   gDeserialize(buf,f);
 
-  Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
+  NetworkInterface& net = getSystemNetworkInterface();
 
   //Start locally
   on_each_impl(f);
@@ -168,10 +168,10 @@ template<typename WLTy, typename IterTy, typename FunctionTy>
 void for_each_dist(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
   // Get a handle to the network interface
   //  Don't move as networkHostNum and networkHostID have to be initialized first
-  Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
+  NetworkInterface& net = getSystemNetworkInterface();
 
   //fast path for non-distributed
-  if (Distributed::networkHostNum == 1) {
+  if (networkHostNum == 1) {
     for_each_impl<WLTy>(Galois::Runtime::makeStandardRange(b, e),f,loopname);
     return;
   }
@@ -181,21 +181,19 @@ void for_each_dist(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
   //copy out all data
   std::deque<ItemTy> allData;
   allData.insert(allData.end(), b,e);
-  Distributed::PreventLiveLock sync;
-  Distributed::lock_sync.initialize(&sync);
 
-  for (unsigned i = 1; i < Distributed::networkHostNum; i++) {
-    auto blk = block_range(allData.begin(), allData.end(), i, Distributed::networkHostNum);
+  for (unsigned i = 1; i < networkHostNum; i++) {
+    auto blk = block_range(allData.begin(), allData.end(), i, networkHostNum);
     std::deque<ItemTy> data(blk.first, blk.second);
-    Distributed::SendBuffer buf;
+    SendBuffer buf;
     // serialize function and data
-    gSerialize(buf,f,data,Distributed::lock_sync);
+    gSerialize(buf,f,data);
     //send data
     net.send (i, &for_each_landing_pad<WLTy,ItemTy,FunctionTy>, buf);
   }
   net.handleReceives();
   //now get our data
-  auto myblk = block_range(allData.begin(), allData.end(), 0, Distributed::networkHostNum);
+  auto myblk = block_range(allData.begin(), allData.end(), 0, networkHostNum);
 
   //Start locally
   for_each_impl<WLTy>(Galois::Runtime::makeStandardRange(myblk.first, myblk.second), f, loopname);
@@ -208,20 +206,18 @@ template<typename WLTy, typename T, typename FunctionTy>
 void for_each_local_dist(T& c, FunctionTy f, const char* loopname) {
   // Get a handle to the network interface
   //  Don't move as networkHostNum and networkHostID have to be initialized first
-  Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
+  NetworkInterface& net = getSystemNetworkInterface();
 
   //fast path for non-distributed
-  if (Distributed::networkHostNum == 1) {
+  if (networkHostNum == 1) {
     for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(c),f,loopname);
     return;
   }
 
-  Distributed::PreventLiveLock sync;
-  Distributed::lock_sync.initialize(&sync);
-  for (unsigned i = 1; i < Distributed::networkHostNum; i++) {
-    Distributed::SendBuffer buf;
+  for (unsigned i = 1; i < networkHostNum; i++) {
+    SendBuffer buf;
     // serialize function and data
-    gSerialize(buf,f,c,Distributed::lock_sync);
+    gSerialize(buf,f,c);
     //send data
     net.send (i, &for_each_local_landing_pad<WLTy,T,FunctionTy>, buf);
   }
@@ -236,19 +232,19 @@ void for_each_local_dist(T& c, FunctionTy f, const char* loopname) {
 template<typename T, typename FunctionTy, typename ReducerTy>
 void do_all_impl_dist(T& c, FunctionTy f, ReducerTy r, bool needsReduce) {
   // Get a handle to the network interface
-  Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
+  NetworkInterface& net = getSystemNetworkInterface();
 
   // Should be called only outside a for_each for now
   assert(!inGaloisForEach);
 
   //fast path for non-distributed
-  if (Distributed::networkHostNum == 1) {
+  if (networkHostNum == 1) {
     do_all_impl(Galois::Runtime::makeLocalRange(c),f,r,needsReduce);
     return;
   }
 
-  for (unsigned i = 1; i < Distributed::networkHostNum; i++) {
-    Distributed::SendBuffer buf;
+  for (unsigned i = 1; i < networkHostNum; i++) {
+    SendBuffer buf;
     // serialize function and data
     gSerialize(buf,f,r,needsReduce,c);
     //send data
@@ -268,16 +264,16 @@ template<typename FunctionTy>
 void on_each_impl_dist(FunctionTy f, const char* loopname) {
   // Get a handle to the network interface
   //  Don't move as networkHostNum and networkHostID have to be initialized first
-  Distributed::NetworkInterface& net = Distributed::getSystemNetworkInterface();
+  NetworkInterface& net = getSystemNetworkInterface();
 
   //fast path for non-distributed
-  if (Distributed::networkHostNum == 1) {
+  if (networkHostNum == 1) {
     on_each_impl(f, loopname);
     return;
   }
 
-  for (unsigned i = 1; i < Distributed::networkHostNum; i++) {
-    Distributed::SendBuffer buf;
+  for (unsigned i = 1; i < networkHostNum; i++) {
+    SendBuffer buf;
     // serialize function and data
     gSerialize(buf,f);
     //send data

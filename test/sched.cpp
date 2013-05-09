@@ -35,7 +35,7 @@
 #endif
 
 static const char* name = "Scheduler Micro Benchmark";
-static const char* desc = "Measure stuff\n";
+static const char* desc = "Measures stuff";
 static const char* url = 0;
 
 static llvm::cl::opt<int> sval(llvm::cl::Positional, llvm::cl::desc("<start value>"), llvm::cl::init(-1));

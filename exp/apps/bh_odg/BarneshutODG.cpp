@@ -45,9 +45,8 @@
 
 namespace {
 const char* name = "Barnshut N-Body Simulator";
-const char* desc =
-  "Simulation of the gravitational forces in a galactic cluster using the "
-  "Barnes-Hut n-body algorithm\n";
+const char* desc = "Simulates the gravitational forces in a galactic cluster using the "
+  "Barnes-Hut n-body algorithm";
 const char* url = "barneshut";
 
 const char* const SUMM_SERIAL = "serial";

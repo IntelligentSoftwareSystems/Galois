@@ -37,7 +37,6 @@
 
 namespace Galois {
 namespace Runtime {
-namespace Distributed {
 
 //Objects with this tag have a member function which serializes them.
 //Objects with this tag have a member function which replaces an
@@ -282,7 +281,6 @@ inline void gSerialize(SerializeBuffer& buf, const DeSerializeBuffer& rbuf) {
 }
 
 
-} //Distributed
 } //Runtime
 } //Galois
 #endif //SERIALIZE

@@ -45,7 +45,7 @@ template <typename Iter, typename Cmp, typename NhFunc, typename OpFunc>
 void for_each_ordered_impl (Iter beg, Iter end, Cmp cmp, NhFunc nhFunc, OpFunc opFunc, const char* loopname) {
   if (!OrderedTraits<NhFunc, OpFunc>::NeedsPush && OrderedTraits<NhFunc, OpFunc>::HasFixedNeighborhood) {
     // TODO: Remove-only/DAG executor
-    GALOIS_ERROR(true, "Remove-only executor not implemented yet");
+    GALOIS_DIE("Remove-only executor not implemented yet");
 
   } else if (OrderedTraits<NhFunc, OpFunc>::HasFixedNeighborhood) {
     for_each_ordered_lc (beg, end, cmp, nhFunc, opFunc, loopname);
@@ -60,14 +60,14 @@ template <typename Iter, typename Cmp, typename NhFunc, typename OpFunc, typenam
 void for_each_ordered_impl (Iter beg, Iter end, Cmp cmp, NhFunc nhFunc, OpFunc opFunc, StableTest stabilityTest, const char* loopname) {
 
   if (!OrderedTraits<NhFunc, OpFunc>::NeedsPush && OrderedTraits<NhFunc, OpFunc>::HasFixedNeighborhood) {
-    GALOIS_ERROR(true, "no-adds + fixed-neighborhood == stable-source");
+    GALOIS_DIE("no-adds + fixed-neighborhood == stable-source");
 
   }
   else if (OrderedTraits<NhFunc, OpFunc>::HasFixedNeighborhood) {
     for_each_ordered_lc (beg, end, cmp, nhFunc, opFunc, stabilityTest, loopname);
 
   } else {
-    GALOIS_ERROR(true, "two-phase executor for unstable-source algorithms not implemented yet");
+    GALOIS_DIE("two-phase executor for unstable-source algorithms not implemented yet");
     // TODO: implement following
     // for_each_ordered_2p (beg, end, cmp, nhFunc, opFunc, stabilityTest, loopname); 
   }

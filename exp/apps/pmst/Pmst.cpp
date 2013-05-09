@@ -41,7 +41,7 @@ namespace cll = llvm::cl;
  
 static const char* name = "Parallel MST";
 static const char* desc = "Computes the Minimal Spanning Tree using combination of "
-  "Boruvka's and Prim's algorithm\n";
+  "Boruvka's and Prim's algorithm";
 static const char* url = 0;
 
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
@@ -558,11 +558,11 @@ struct BoruvkaUnionFind {
 template<typename Graph>
 void makeGraph(const std::string& in, Graph& g) {
   typedef typename Graph::GraphNode GraphNode;
-  typedef Galois::Graph::LC_Linear_Graph<size_t, Weight> ReaderGraph;
+  typedef Galois::Graph::LC_CSR_Graph<size_t, Weight> ReaderGraph;
   typedef ReaderGraph::GraphNode ReaderGNode;
 
   ReaderGraph reader;
-  reader.structureFromFile(in.c_str());
+  Galois::Graph::readGraph(reader, in);
 
   // Assign ids to ReaderGNodes
   size_t numNodes = 0;

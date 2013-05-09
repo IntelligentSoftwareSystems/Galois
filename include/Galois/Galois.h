@@ -64,16 +64,16 @@ static const unsigned GALOIS_DEFAULT_CHUNK_SIZE = 32;
 template<typename WLTy, typename IterTy, typename FunctionTy>
 void for_each(IterTy b, IterTy e, FunctionTy f, const char* loopname = 0,
     typename std::enable_if<
-      Runtime::Distributed::is_serializable<FunctionTy>::value
-      && Runtime::Distributed::is_serializable<typename std::iterator_traits<IterTy>::value_type>::value
+      Runtime::is_serializable<FunctionTy>::value
+      && Runtime::is_serializable<typename std::iterator_traits<IterTy>::value_type>::value
       >::type* = 0) {
   Runtime::for_each_dist<WLTy>(b, e, f, loopname);
 }
 template<typename WLTy, typename IterTy, typename FunctionTy>
 void for_each(IterTy b, IterTy e, FunctionTy f, const char* loopname = 0, 
     typename std::enable_if<
-      !Runtime::Distributed::is_serializable<FunctionTy>::value
-      || !Runtime::Distributed::is_serializable<typename std::iterator_traits<IterTy>::value_type>::value
+      !Runtime::is_serializable<FunctionTy>::value
+      || !Runtime::is_serializable<typename std::iterator_traits<IterTy>::value_type>::value
       >::type* = 0) {
   Runtime::for_each_impl<WLTy>(Runtime::makeStandardRange(b, e), f, loopname);
 }
@@ -144,13 +144,13 @@ void for_each(InitItemTy i, FunctionTy fn, const char* loopname = 0) {
 #if GALOIS_USE_EXP
 template<typename WLTy, typename ConTy, typename FunctionTy>
 void for_each_local(ConTy c, FunctionTy fn, const char* loopname = 0,
-    typename std::enable_if<Runtime::Distributed::is_serializable<FunctionTy>::value>::type* = 0) {
+    typename std::enable_if<Runtime::is_serializable<FunctionTy>::value>::type* = 0) {
   Runtime::for_each_local_dist<WLTy>(c, fn, loopname);
 }
 
 template<typename WLTy, typename ConTy, typename FunctionTy>
 void for_each_local(ConTy c, FunctionTy fn, const char* loopname = 0,
-    typename std::enable_if<!Runtime::Distributed::is_serializable<FunctionTy>::value>::type* = 0) {
+    typename std::enable_if<!Runtime::is_serializable<FunctionTy>::value>::type* = 0) {
   Runtime::for_each_impl<WLTy>(Runtime::makeLocalRange(c), fn, loopname);
 }
 #else
@@ -215,12 +215,12 @@ FunctionTy do_all_local(ConTy c, FunctionTy fn, const char* loopname = 0) {
 #if GALOIS_USE_EXP
 template<typename FunctionTy>
 static inline void on_each(FunctionTy fn, const char* loopname = 0,
-    typename std::enable_if<Runtime::Distributed::is_serializable<FunctionTy>::value>::type* = 0) {
+    typename std::enable_if<Runtime::is_serializable<FunctionTy>::value>::type* = 0) {
   Runtime::on_each_impl_dist(fn, loopname);
 }
 template<typename FunctionTy>
 static inline void on_each(FunctionTy fn, const char* loopname = 0,
-    typename std::enable_if<!Runtime::Distributed::is_serializable<FunctionTy>::value>::type* = 0) {
+    typename std::enable_if<!Runtime::is_serializable<FunctionTy>::value>::type* = 0) {
   Runtime::on_each_impl(fn, loopname);
 }
 #else
@@ -231,9 +231,9 @@ static inline void on_each(FunctionTy fn, const char* loopname = 0) {
 #endif
 
 /**
- * Preallocate pages on each thread.
+ * Preallocates pages on each thread.
  *
- * @param num number of pages to allocate of size {@link Galois::Runtime::pageAllocInfo()}
+ * @param num number of pages to allocate of size {@link Galois::Runtime::MM::pageSize}
  */
 static inline void preAlloc(int num) {
 #if GALOIS_USE_EXP
@@ -241,6 +241,16 @@ static inline void preAlloc(int num) {
 #else
   Runtime::preAlloc_impl(num);
 #endif
+}
+
+/**
+ * Reports number of pages allocated by the Galois system so far. The value is printing using
+ * the statistics infrastructure. 
+ *
+ * @param label Label to associated with report at this program point
+ */
+static inline void reportPageAlloc(const char* label) {
+  Runtime::reportPageAlloc(label);
 }
 
 /**

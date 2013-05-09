@@ -29,60 +29,78 @@
 #define GALOIS_RUNTIME_LL_GIO_H
 
 #include <sstream>
+#include <cerrno>
+
+//FIXME: move to Runtime
 
 namespace Galois {
 namespace Runtime {
 namespace LL {
 
-//Print a string
+//! Prints a string
 void gPrintStr(const std::string&);
-//print an info string (for easy parsing)
+//! Prints an info string (for easy parsing)
 void gInfoStr(const std::string&);
-//print a warning string (for easy parsing)
+//! Prints a warning string (for easy parsing)
 void gWarnStr(const std::string&);
-//print a debug string (for easy parsing)
+//! Prints a debug string (for easy parsing)
 void gDebugStr(const std::string&);
+//! Prints an error string (for easy parsing)
+void gErrorStr(const std::string&);
 
-//Convert a sequence of things to a string
+//! Converts a sequence of things to a string
 template<typename T>
 bool toString(std::ostringstream& os, const T& val) { os << val; return true; }
 
+//! Prints a sequence of things
 template<typename... Args>
 void gPrint(Args... args) {
   std::ostringstream os;
-  __attribute__((unused)) bool tmp[] = {toString(os,args)...};
+  __attribute__((unused)) bool tmp[] = {toString(os, args)...};
   gPrintStr(os.str());
 }
 
+//! Prints an info string from a sequence of things
 template<typename... Args>
 void gInfo(Args... args) {
   std::ostringstream os;
-  __attribute__((unused)) bool tmp[] = {toString(os,args)...};
+  __attribute__((unused)) bool tmp[] = {toString(os, args)...};
   gInfoStr(os.str());
 }
 
+//! Prints a warning string from a sequence of things
 template<typename... Args>
 void gWarn(Args... args) {
   std::ostringstream os;
-  __attribute__((unused)) bool tmp[] = {toString(os,args)...};
+  __attribute__((unused)) bool tmp[] = {toString(os, args)...};
   gWarnStr(os.str());
 }
 
+//! Prints a debug string from a sequence of things; prints nothing if NDEBUG
+//! is defined.
 template<typename... Args>
 void gDebug(Args... args) {
 #ifndef NDEBUG
   std::ostringstream os;
-  __attribute__((unused)) bool tmp[] = {toString(os,args)...};
+  __attribute__((unused)) bool tmp[] = {toString(os, args)...};
   gDebugStr(os.str());
 #endif
 }
 
-void gError(bool doabort, const char* filename, int lineno, const char* format, ...);
-void gSysError(bool doabort, const char* filename, int lineno, const char* format, ...);
+//! Prints error message
+template<typename... Args>
+void gError(Args... args) {
+  std::ostringstream os;
+  __attribute__((unused)) bool tmp[] = {toString(os, args)...};
+  gErrorStr(os.str());
+}
+
 void gFlush();
 
-#define GALOIS_SYS_ERROR(doabort, ...) { Galois::Runtime::LL::gSysError(doabort, __FILE__, __LINE__, ##__VA_ARGS__); }
-#define GALOIS_ERROR(doabort, ...) { Galois::Runtime::LL::gError(doabort, __FILE__, __LINE__, ##__VA_ARGS__); }
+#define GALOIS_SYS_ERROR(...) { Galois::Runtime::LL::gError(__FILE__, ":", __LINE__, ": ", strerror(errno), ": ", ##__VA_ARGS__); }
+#define GALOIS_ERROR(...)     { Galois::Runtime::LL::gError(__FILE__, ":", __LINE__, ##__VA_ARGS__); }
+#define GALOIS_SYS_DIE(...)   { Galois::Runtime::LL::gError(__FILE__, ":", __LINE__, ": ", strerror(errno), ": ", ##__VA_ARGS__); abort(); }
+#define GALOIS_DIE(...)       { Galois::Runtime::LL::gError(__FILE__, ":", __LINE__, ##__VA_ARGS__); abort(); }
 
 }
 }

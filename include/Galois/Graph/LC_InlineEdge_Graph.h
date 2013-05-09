@@ -28,95 +28,70 @@
 
 #include "Galois/LargeArray.h"
 #include "Galois/Graph/FileGraph.h"
-#include "Galois/Graph/Util.h"
+#include "Galois/Graph/Details.h"
 #include "Galois/Runtime/MethodFlags.h"
 
-#include <boost/utility/enable_if.hpp>
+#include <boost/mpl/if.hpp>
+#include <type_traits>
 
 namespace Galois {
 namespace Graph {
 
-namespace InlineEdge_InOutGraphImpl {
-
-//! Dispatch type to handle implementation of in edges
-template<typename Graph, bool HasPointerData>
-class InEdges;
-
-template<typename Graph>
-class InEdges<Graph,false> {
-  typedef typename Graph::EdgeInfo EdgeInfo;
-  typedef typename Graph::NodeInfo NodeInfo;
-  Graph graphStore;
-  Graph* graph;
-
-public:
-  EdgeInfo* raw_begin(size_t n) const {
-    return graph->nodeData[n].edgeBegin();
-  }
-
-  EdgeInfo* raw_end(size_t n) const {
-    return graph->nodeData[n].edgeEnd();
-  }
-
-#if 0
-  EdgeInfo* edge_sort_begin(NodeInfo* n) {
-    return raw_begin(n);
-  }
-
-  EdgeInfo* edge_sort_end(NodeInfo* n) {
-    return raw_end(n);
-  }
-#endif
-
-  typename EdgeInfo::reference getEdgeData(EdgeInfo* e) {
-    return e->get();
-  }
-
-  size_t getEdgeDst(EdgeInfo* n) {
-    return std::distance(graph->nodeData.data(), graph->getEdgeDst(n));
-  }
-
-  void initialize(Graph* g, bool symmetric) {
-    if (symmetric) {
-      this->graph = g;
-      return;
-    }
-
-    // TODO: Transpose graph
-    abort();
-  }
-
-  void initialize(FileGraph& transpose) {
-    graphStore.structureFromGraph(transpose);
-    graph = &graphStore;
-  }
-};
-
-template<typename Graph>
-class InEdges<Graph,true> {
-  // TODO: implement for when we don't store copies of edges
-};
-
-} // end namespace
-
 /**
  * Local computation graph (i.e., graph structure does not change). The data representation
  * is a modification of {@link LC_CSR_Graph} where the edge data is stored inline with the
- * adjacency information.
+ * adjacency information. 
  *
- * @tparam CompressNodePtr
- *  Compress representation of graph at the expense of one level of indirection on accessing
- *  neighbors of a node
+ * The position of template parameters may change between Galois releases; the
+ * most robust way to specify them is through the with_XXX nested templates.
  */
-template<typename NodeTy, typename EdgeTy, bool CompressNodePtr=false>
-class LC_InlineEdge_Graph: boost::noncopyable {
-  template<typename Graph,bool HasPointerData>
-    friend class InlineEdge_InOutGraphImpl::InEdges;
+template<typename NodeTy, typename EdgeTy,
+  bool HasNoLockable=false,
+  bool UseNumaAlloc=false,
+  bool HasOutOfLineLockable=false,
+  bool HasCompressedNodePtr=false>
+class LC_InlineEdge_Graph:
+    boost::noncopyable,
+    detail::LocalIteratorFeature<UseNumaAlloc>,
+    detail::OutOfLineLockableFeature<HasOutOfLineLockable && !HasNoLockable> {
+  template<typename Graph> friend class LC_InOut_Graph;
+
+public:
+  template<bool _has_id>
+  using with_id = LC_InlineEdge_Graph;
+
+  template<typename _node_data>
+  using with_node_data =
+    LC_InlineEdge_Graph<_node_data,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,HasCompressedNodePtr>;
+
+  template<bool _has_no_lockable>
+  using with_no_lockable =
+    LC_InlineEdge_Graph<NodeTy,EdgeTy,_has_no_lockable,UseNumaAlloc,HasOutOfLineLockable,HasCompressedNodePtr>;
+
+  template<bool _use_numa_alloc>
+  using with_numa_alloc =
+    LC_InlineEdge_Graph<NodeTy,EdgeTy,HasNoLockable,_use_numa_alloc,HasOutOfLineLockable,HasCompressedNodePtr>;
+
+  template<bool _has_out_of_line_lockable>
+  using with_out_of_line_lockable =
+    LC_InlineEdge_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,_has_out_of_line_lockable,HasCompressedNodePtr>;
+
+  /**
+   * Compress representation of graph at the expense of one level of indirection on accessing
+   * neighbors of a node
+   */
+  template<bool _has_compressed_node_ptr>
+  using with_compressed_node_ptr =
+    LC_InlineEdge_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,_has_compressed_node_ptr>;
+
+  typedef read_default_graph_tag read_tag;
+
 protected:
   struct NodeInfo;
-  typedef EdgeInfoBase<typename boost::mpl::if_c<CompressNodePtr,uint32_t,NodeInfo*>::type,EdgeTy> EdgeInfo;
-  
-  class NodeInfo: public NodeInfoBase<NodeTy> {
+  typedef detail::EdgeInfoBase<typename boost::mpl::if_c<HasCompressedNodePtr,uint32_t,NodeInfo*>::type,EdgeTy> EdgeInfo;
+  typedef LargeArray<EdgeInfo> EdgeData;
+
+  class NodeInfo: public detail::NodeInfoBase<NodeTy,!HasNoLockable && !HasOutOfLineLockable> {
     EdgeInfo* m_edgeBegin;
     EdgeInfo* m_edgeEnd;
   public:
@@ -124,31 +99,7 @@ protected:
     EdgeInfo*& edgeEnd() { return m_edgeEnd; }
   };
 
-  LargeArray<NodeInfo,false> nodeData;
-  LargeArray<EdgeInfo,true> edgeData;
-  uint64_t numNodes;
-  uint64_t numEdges;
-  NodeInfo* endNode;
-
-  template<bool Compressed>
-  NodeInfo* getDst(EdgeInfo* ii, typename boost::enable_if_c<Compressed>::type* x = 0) const {
-    return const_cast<NodeInfo*>(&nodeData[ii->dst]);
-  }
-
-  template<bool Compressed>
-  NodeInfo* getDst(EdgeInfo* ii, typename boost::enable_if_c<!Compressed>::type* x = 0) const {
-    return ii->dst;
-  }
-
-  template<bool Compressed, typename Container,typename Index>
-  void setEdgeDst(Container& c, EdgeInfo* edge, Index idx, typename boost::enable_if_c<Compressed>::type* = 0) {
-    edge->dst = idx;
-  }
-
-  template<bool Compressed, typename Container,typename Index>
-  void setEdgeDst(Container& c, EdgeInfo* edge, Index idx, typename boost::enable_if_c<!Compressed>::type* = 0) {
-    edge->dst = c[idx];
-  }
+  typedef LargeArray<NodeInfo> NodeData;
 
 public:
   typedef NodeInfo* GraphNode;
@@ -162,18 +113,74 @@ public:
   typedef iterator local_iterator;
   typedef const_iterator const_local_iterator;
 
+protected:
+  NodeData nodeData;
+  EdgeData edgeData;
+  uint64_t numNodes;
+  uint64_t numEdges;
+
+  template<bool _C = HasCompressedNodePtr>
+  NodeInfo* getDst(edge_iterator ii, typename std::enable_if<_C>::type* x = 0) const {
+    return const_cast<NodeInfo*>(&nodeData[ii->dst]);
+  }
+
+  template<bool _C = HasCompressedNodePtr>
+  NodeInfo* getDst(edge_iterator ii, typename std::enable_if<!_C>::type* x = 0) const {
+    return ii->dst;
+  }
+
+  template<typename Container,typename Index, bool _C = HasCompressedNodePtr>
+  void setEdgeDst(Container& c, edge_iterator edge, Index idx, typename std::enable_if<_C>::type* = 0) {
+    edge->dst = idx;
+  }
+
+  template<typename Container,typename Index, bool _C = HasCompressedNodePtr>
+  void setEdgeDst(Container& c, edge_iterator edge, Index idx, typename std::enable_if<!_C>::type* = 0) {
+    edge->dst = &c[idx];
+  }
+
+  template<bool _A1 = HasNoLockable, bool _A2 = HasOutOfLineLockable>
+  void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<!_A1 && !_A2>::type* = 0) {
+    Galois::Runtime::acquire(N, mflag);
+  }
+
+  template<bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
+  void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<_A1 && !_A2>::type* = 0) {
+    this->outOfLineAcquire(getId(N), mflag);
+  }
+
+  template<bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
+  void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<_A2>::type* = 0) { }
+
+  edge_iterator raw_begin(GraphNode N) {
+    return nodeData[getId(N)].edgeBegin();
+  }
+
+  edge_iterator raw_end(GraphNode N) {
+    return nodeData[getId(N)].edgeEnd();
+  }
+
+  size_t getId(GraphNode N) {
+    return std::distance(this->nodeData.data(), N);
+  }
+
+  GraphNode getNode(size_t n) {
+    return &nodeData[n];
+  }
+
+public:
   ~LC_InlineEdge_Graph() {
     if (!EdgeInfo::has_value) return;
     if (numNodes == 0) return;
 
-    for (edge_iterator ii = nodeData[0].edgeBegin(), ei = endNode->edgeEnd(); ii != ei; ++ii) {
+    for (edge_iterator ii = nodeData[0].edgeBegin(), ei = nodeData[numNodes-1].edgeEnd(); ii != ei; ++ii) {
       ii->destroy();
     }
   }
 
   node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::checkWrite(mflag, false);
-    Galois::Runtime::acquire(N, mflag);
+    acquireNode(N, mflag);
     return N->getData();
   }
 
@@ -183,187 +190,99 @@ public:
    }
 
   GraphNode getEdgeDst(edge_iterator ni) const {
-    return getDst<CompressNodePtr>(ni);
+    return getDst(ni);
   }
 
   uint64_t size() const { return numNodes; }
   uint64_t sizeEdges() const { return numEdges; }
 
-  const_iterator begin() const { return const_iterator(nodeData.data()); }
-  const_iterator end() const { return const_iterator(endNode); }
+  const_iterator begin() const { return const_iterator(nodeData.begin()); }
+  const_iterator end() const { return const_iterator(nodeData.end()); }
   iterator begin() { return iterator(nodeData.data()); }
-  iterator end() { return iterator(endNode); }
+  iterator end() { return iterator(nodeData.end()); }
 
-  local_iterator local_begin() { return local_iterator(&nodeData[localStart(numNodes)]); }
-  local_iterator local_end() { return local_iterator(&nodeData[localEnd(numNodes)]); }
-  const_local_iterator local_begin() const { return const_local_iterator(&nodeData[localStart(numNodes)]); }
-  const_local_iterator local_end() const { return const_local_iterator(&nodeData[localEnd(numNodes)]); }
+  local_iterator local_begin() { return local_iterator(&nodeData[this->localBegin(numNodes)]); }
+  local_iterator local_end() { return local_iterator(&nodeData[this->localEnd(numNodes)]); }
+  const_local_iterator local_begin() const { return const_local_iterator(&nodeData[this->localBegin(numNodes)]); }
+  const_local_iterator local_end() const { return const_local_iterator(&nodeData[this->localEnd(numNodes)]); }
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
-    Galois::Runtime::acquire(N, mflag);
+    acquireNode(N, mflag);
     if (Galois::Runtime::shouldLock(mflag)) {
       for (edge_iterator ii = N->edgeBegin(), ee = N->edgeEnd(); ii != ee; ++ii) {
-        Galois::Runtime::acquire(getDst<CompressNodePtr>(ii), mflag);
+        acquireNode(getDst(ii), mflag);
       }
     }
     return N->edgeBegin();
   }
 
   edge_iterator edge_end(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
-    Galois::Runtime::acquire(N, mflag);
+    acquireNode(N, mflag);
     return N->edgeEnd();
   }
 
-  EdgesIterator<LC_InlineEdge_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
-    return EdgesIterator<LC_InlineEdge_Graph>(*this, N, mflag);
-  }
-
-  void structureFromFile(const std::string& fname) { Graph::structureFromFile(*this, fname); }
-
-  void structureFromGraph(FileGraph& graph) {
-    typedef typename EdgeInfo::value_type EDV;
-
-    numNodes = graph.size();
-    numEdges = graph.sizeEdges();
-    nodeData.allocate(numNodes);
-    edgeData.allocate(numEdges);
-
-    std::vector<NodeInfo*> node_ids;
-    node_ids.resize(numNodes);
-    for (FileGraph::iterator ii = graph.begin(), ee = graph.end(); ii != ee; ++ii) {
-      NodeInfo* curNode = &nodeData[*ii];
-      node_ids[*ii] = curNode;
-    }
-    endNode = numNodes ? &nodeData[numNodes-1] : 0;
-
-    //layout the edges
-    EdgeInfo* curEdge = edgeData.data();
-    for (FileGraph::iterator ii = graph.begin(), ee = graph.end(); ii != ee; ++ii) {
-      node_ids[*ii]->edgeBegin() = curEdge;
-      for (FileGraph::neighbor_iterator ni = graph.neighbor_begin(*ii), ne = graph.neighbor_end(*ii); ni != ne; ++ni) {
-        if (EdgeInfo::has_value)
-          curEdge->construct(graph.getEdgeData<EDV>(ni));
-        setEdgeDst<CompressNodePtr>(node_ids, curEdge, *ni);
-        ++curEdge;
-      }
-      node_ids[*ii]->edgeEnd() = curEdge;
-    }
-  }
-};
-
-/**
- * Local computation graph (i.e., graph structure does not change) that
- * supports in and out edges.
- *
- * An additional template parameter specifies whether the in edge stores a
- * reference to the corresponding out edge data (the default) or a copy of the
- * corresponding out edge data. If you want to populate this graph from a
- * FileGraph that is already symmetric (i.e., (u,v) \in E ==> (v,u) \in E),
- * this parameter should be true.
- *
- * @tparam NodeTy data on nodes
- * @tparam EdgeTy data on out edges
- * @tparam CopyInEdgeData in edges hold a copy of out edge data
- */
-template<typename NodeTy, typename EdgeTy, bool CompressNodePtr = false, bool CopyInEdgeData = false>
-class LC_InlineEdge_InOutGraph: public LC_InlineEdge_Graph<NodeTy,EdgeTy,CompressNodePtr> {
-  typedef LC_InlineEdge_Graph<NodeTy,EdgeTy,CompressNodePtr> Super;
-
-protected:
-  InlineEdge_InOutGraphImpl::InEdges<Super,!CopyInEdgeData> inEdges;
-
-public:
-  typedef typename Super::GraphNode GraphNode;
-  typedef typename Super::edge_data_type edge_data_type;
-  typedef typename Super::node_data_type node_data_type;
-  typedef typename Super::edge_data_reference edge_data_reference;
-  typedef typename Super::node_data_reference node_data_reference;
-  typedef typename Super::edge_iterator edge_iterator;
-  typedef edge_iterator in_edge_iterator;
-  typedef typename Super::iterator iterator;
-  typedef typename Super::const_iterator const_iterator;
-  typedef typename Super::local_iterator local_iterator;
-  typedef typename Super::const_local_iterator const_local_iterator;
-
-  edge_data_reference getInEdgeData(in_edge_iterator ni, MethodFlag mflag = MethodFlag::NONE) { 
-    Galois::Runtime::checkWrite(mflag, false);
-    return inEdges.getEdgeData(ni);
-  }
-
-  GraphNode getInEdgeDst(in_edge_iterator ni) {
-    return &this->nodeData[inEdges.getEdgeDst(ni)];
-  }
-
-  in_edge_iterator in_edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
-    Galois::Runtime::acquire(N, mflag);
-    if (Galois::Runtime::shouldLock(mflag)) {
-      for (edge_iterator ii = inEdges.raw_begin(idFromNode(N)), ee = inEdges.raw_end(idFromNode(N)); ii != ee; ++ii) {
-        Galois::Runtime::acquire(&this->nodeData[inEdges.getEdgeDst(ii)], mflag);
-      }
-    }
-    return in_edge_iterator(inEdges.raw_begin(idFromNode(N)));
-  }
-
-  in_edge_iterator in_edge_end(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
-    Galois::Runtime::acquire(N, mflag);
-    return in_edge_iterator(inEdges.raw_end(idFromNode(N)));
-  }
-
-  InEdgesIterator<LC_InlineEdge_InOutGraph> in_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
-    return InEdgesIterator<LC_InlineEdge_InOutGraph>(*this, N, mflag);
+  detail::EdgesIterator<LC_InlineEdge_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+    return detail::EdgesIterator<LC_InlineEdge_Graph>(*this, N, mflag);
   }
 
 #if 0
   /**
-   * Sorts incoming edges of a node. Comparison function is over EdgeTy.
+   * Sorts outgoing edges of a node. Comparison function is over EdgeTy.
    */
   template<typename CompTy>
-  void sortInEdgesByEdgeData(GraphNode N, const CompTy& comp = std::less<EdgeTy>(), MethodFlag mflag = MethodFlag::ALL) {
+  void sortEdgesByEdgeData(GraphNode N, const CompTy& comp = std::less<EdgeTy>(), MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::acquire(N, mflag);
-    std::sort(inEdges.edge_sort_begin(N), inEdges.edge_sort_end(N), EdgeSortCompWrapper<EdgeSortValue<EdgeTy>,CompTy>(comp));
+    std::sort(edge_sort_begin(N), edge_sort_end(N), EdgeSortCompWrapper<EdgeSortValue<GraphNode,EdgeTy>,CompTy>(comp));
   }
 
   /**
-   * Sorts incoming edges of a node. Comparison function is over <code>EdgeSortValue<EdgeTy></code>.
+   * Sorts outgoing edges of a node. Comparison function is over <code>EdgeSortValue<EdgeTy></code>.
    */
   template<typename CompTy>
-  void sortInEdges(GraphNode N, const CompTy& comp, MethodFlag mflag = MethodFlag::ALL) {
+  void sortEdges(GraphNode N, const CompTy& comp, MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::acquire(N, mflag);
-    std::sort(inEdges.edge_sort_begin(N), inEdges.edge_sort_end(N), comp);
+    std::sort(edge_sort_begin(N), edge_sort_end(N), comp);
   }
 #endif
 
-  size_t idFromNode(GraphNode N) {
-    return std::distance(this->nodeData.data(), N);
-  }
+  void allocateFrom(FileGraph& graph) {
+    numNodes = graph.size();
+    numEdges = graph.sizeEdges();
 
-  GraphNode nodeFromId(size_t N) {
-    return &this->nodeData[N];
-  }
-
-  void structureFromFile(const std::string& fname, bool symmetric) { Graph::structureFromFile(*this, fname, symmetric); }
-
-  void structureFromFile(const std::string& fname, const std::string& tname, typename boost::enable_if_c<CopyInEdgeData>::type* dummy = 0) {
-    FileGraph inputGraph, transposeGraph;
-    inputGraph.structureFromFile(fname);
-    transposeGraph.structureFromFile(tname);
-    structureFromGraph(inputGraph, transposeGraph);
-  }
-
-  void structureFromGraph(FileGraph& graph, FileGraph& transpose, typename boost::enable_if_c<CopyInEdgeData>::type* dummy = 0) {
-    if (graph.size() != transpose.size()) {
-      GALOIS_ERROR(true, "number of nodes in graph and its transpose do not match");
-    } else if (graph.sizeEdges() != transpose.sizeEdges()) {
-      GALOIS_ERROR(true, "number of edges in graph and its transpose do not match");
+    if (UseNumaAlloc) {
+      nodeData.allocateLocal(numNodes, false);
+      edgeData.allocateLocal(numEdges, false);
+      this->outOfLineAllocateLocal(numNodes, false);
+    } else {
+      nodeData.allocateInterleaved(numNodes);
+      edgeData.allocateInterleaved(numEdges);
+      this->outOfLineAllocateInterleaved(numNodes);
     }
-
-    Super::structureFromGraph(graph);
-    inEdges.initialize(transpose);
   }
 
-  void structureFromGraph(FileGraph& graph, bool symmetric) {
-    Super::structureFromGraph(graph);
-    inEdges.initialize(this, symmetric);
+  void constructFrom(FileGraph& graph, unsigned tid, unsigned total) {
+    typedef typename EdgeInfo::value_type EDV;
+    auto r = graph.divideBy(
+        NodeData::sizeof_value + LC_InlineEdge_Graph::sizeof_out_of_line_value,
+        EdgeData::sizeof_value,
+        tid, total);
+
+    EdgeInfo* curEdge = edgeData.data() + *graph.edge_begin(*r.first);
+
+    this->setLocalRange(*r.first, *r.second);
+
+    for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
+      nodeData.constructAt(*ii);
+      this->outOfLineConstructAt(*ii);
+      nodeData[*ii].edgeBegin() = curEdge;
+      for (FileGraph::edge_iterator nn = graph.edge_begin(*ii), en = graph.edge_end(*ii); nn != en; ++nn) {
+        if (EdgeInfo::has_value)
+          curEdge->construct(graph.getEdgeData<EDV>(nn));
+        setEdgeDst(nodeData, curEdge, graph.getEdgeDst(nn));
+        ++curEdge;
+      }
+      nodeData[*ii].edgeEnd() = curEdge;
+    }
   }
 };
 

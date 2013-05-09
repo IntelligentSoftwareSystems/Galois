@@ -23,178 +23,45 @@
 #ifndef GALOIS_RUNTIME_BARRIER_H
 #define GALOIS_RUNTIME_BARRIER_H
 
-#include "PerThreadStorage.h"
-#include "Galois/Runtime/Network.h"
-#include <pthread.h>
-
 namespace Galois {
 namespace Runtime {
 
-class PthreadBarrier {
-  pthread_barrier_t bar;
-  void checkResults(int val);
-
+class Barrier {
 public:
-  PthreadBarrier();
-  PthreadBarrier(unsigned int val);
-  ~PthreadBarrier();
-
-  void reinit(int val);
-  void wait();
-  void operator()(void) { wait(); }
-};
-
-//! Simple busy waiting barrier, not cyclic
-class SimpleBarrier {
-  struct PLD {
-    int count;
-    int total;
-    PLD(): count(0) { }
-  };
-
-  struct TLD {
-    volatile int flag;
-    TLD(): flag(0) { }
-  };
-
-  volatile int globalTotal;
-  PerThreadStorage<TLD> tlds;
-  PerPackageStorage<PLD> plds;
-  int size;
-
-  void cascade(int tid);
-
-public:
-  SimpleBarrier(): globalTotal(0), size(-1) { }
-
-  //! Not thread-safe and should only be called when no threads are in wait()/increment()
-  void reinit(int val, int init = 0);
-
-  void increment();
-  void wait();
-  void barrier();
-};
-
-//! Busy waiting barrier biased towards getting master thread out as soon
-//! as possible. Cyclic.
-class FastBarrier {
-  SimpleBarrier in;
-  SimpleBarrier out;
-  int size;
-
-public:
-  FastBarrier(): size(-1) { }
-  explicit FastBarrier(unsigned int val): size(-1) { reinit(val); }
-
-  void reinit(int val);
-  void wait(); 
-  void operator()(void) { wait(); }
-};
-
-class FasterBarrier {
-  volatile unsigned count;
-  unsigned P;
-  PerThreadStorage<volatile bool> local_sense;
-
-public:
-  FasterBarrier() :count(~0), P(~0) {}
-  explicit FasterBarrier(unsigned int val): count(~0), P(~0) {
-    reinit(val);
-  }
-
-  void reinit(unsigned num) {
-    P = count = num;
-  }
-
-  void wait();
-  void operator()(void) { wait(); }
-};
-
-class MCSBarrier {
-  struct treenode {
-    //vpid is LL::getTID()
-    volatile bool* parentpointer; //null of vpid == 0
-    volatile bool* childpointers[2];
-    bool havechild[4];
-
-    volatile bool childnotready[4];
-    volatile bool parentsense;
-    bool sense;
-  };
-
-  PerThreadStorage<treenode> nodes;
-  
-  void _reinit(unsigned P);
-
-public:
-  MCSBarrier();
-  explicit MCSBarrier(unsigned val);
+  virtual ~Barrier();
 
   //not safe if any thread is in wait
-  void reinit(unsigned val);
+  virtual void reinit(unsigned val) = 0;
 
-  void wait();
+  //Wait at this barrier
+  virtual void wait() = 0;
 
+  //wait at this barrier
   void operator()(void) { wait(); }
 };
 
-class TopoBarrier {
-  struct treenode {
-    //vpid is LL::getTID()
+/**
+ * Have a pre-instantiated barrier available for use.
+ * This is initialized to the current activeThreads. This barrier
+ * is designed to be fast and should be used in the common
+ * case. 
+ *
+ * However, there is a race if the number of active threads
+ * is modified after using this barrier: some threads may still
+ * be in the barrier while the main thread reinitializes this
+ * barrier to the new number of active threads. If that may
+ * happen, use {@link createSimpleBarrier} instead. 
+ */
+Barrier& getSystemBarrier();
 
-    //package binary tree
-    treenode* parentpointer; //null of vpid == 0
-    treenode* childpointers[2];
-
-    //waiting values:
-    unsigned havechild;
-    volatile unsigned childnotready;
-
-    //signal values
-    volatile unsigned parentsense;
-  };
-
-  PerPackageStorage<treenode> nodes;
-  PerThreadStorage<unsigned> sense;
-
-  void _reinit(unsigned P);
-
-public:
-  TopoBarrier();
-  explicit TopoBarrier(unsigned val);
-
-  //not safe if any thread is in wait
-  void reinit(unsigned val);
-
-  void wait();
-
-  void operator()(void) { wait(); }
-
-  //  void dump();
-};
-
-class StupidDistBarrier {
-  volatile unsigned gsense;
-  PerThreadStorage<unsigned> sense;
-  volatile int count;
-
-  static void broadcastLandingPad(Distributed::RecvBuffer&);
-
-public:
-  StupidDistBarrier();
-  //not safe if any thread is in wait
-  void reinit(unsigned val);
-  void wait();
-  void operator()(void) { wait(); }
-  void dump();
-};
-
-//typedef TopoBarrier GBarrier;
-typedef StupidDistBarrier GBarrier;
-
-//! Have a pre-instantiated barrier available for use
-GBarrier& getSystemBarrier();
-
+/**
+ * Creates a new simple barrier. This barrier is not designed to be fast but
+ * does gaurantee that all threads have left the barrier before returning
+ * control. Useful when the number of active threads is modified to avoid a
+ * race in {@link getSystemBarrier}.  Client is reponsible for deallocating
+ * returned barrier.
+ */
+Barrier* createSimpleBarrier();
 }
 } // end namespace Galois
 

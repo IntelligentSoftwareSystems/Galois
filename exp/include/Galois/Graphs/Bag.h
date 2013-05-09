@@ -50,9 +50,9 @@ public:
 
   Bag() {}
   explicit Bag(pointer p) :basePtr(p) {}
-  Bag(pointer p, Runtime::Distributed::DeSerializeBuffer&) :basePtr(p) {}
+  Bag(pointer p, Runtime::DeSerializeBuffer&) :basePtr(p) {}
 
-  void getInitData(Runtime::Distributed::SerializeBuffer&) {}
+  void getInitData(Runtime::SerializeBuffer&) {}
 
   //LOCAL operations
 
@@ -79,11 +79,11 @@ public:
 
   T& back() { return items.front(); }
 
-  struct InnerBegFnL : std::unary_function<gptr<Bag>, local_iterator> {
-    local_iterator operator()(gptr<Bag> d) { return d->local_begin(); }
+  struct InnerBegFnL : std::unary_function<Runtime::gptr<Bag>, local_iterator> {
+    local_iterator operator()(Runtime::gptr<Bag> d) { return d->local_begin(); }
   };
-  struct InnerEndFnL : std::unary_function<gptr<Bag>, local_iterator> {
-    local_iterator operator()(gptr<Bag> d) { return d->local_end(); }
+  struct InnerEndFnL : std::unary_function<Runtime::gptr<Bag>, local_iterator> {
+    local_iterator operator()(Runtime::gptr<Bag> d) { return d->local_end(); }
   };
   typedef TwoLevelFwdIter<typename Runtime::PerThreadDist<Bag>::iterator, local_iterator, InnerBegFnL, InnerEndFnL> iterator;
   iterator begin() { return iterator(basePtr.begin(), basePtr.end(), InnerBegFnL(), InnerEndFnL()); }
@@ -91,10 +91,10 @@ public:
 
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+  void serialize(Galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s,basePtr, items);
   }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s,basePtr, items);
   }
 };

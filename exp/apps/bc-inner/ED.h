@@ -72,7 +72,8 @@ struct ED {
 /*    char retval = b;
     b = 1;
     return retval;
-	*/	
+	*/
+    return 0;
 #else
     char retval = b;
     b = 1;

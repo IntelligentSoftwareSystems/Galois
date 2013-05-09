@@ -12,7 +12,7 @@ if(EIGEN_INCLUDE_DIR)
   set(EIGEN_FIND_QUIETLY TRUE)
 endif()
 
-find_path(EIGEN_INCLUDE_DIRS NAMES Eigen/Eigen PATHS ${EIGEN_DIR})
+find_path(EIGEN_INCLUDE_DIRS NAMES Eigen/Eigen PATHS ${EIGEN_DIR} ${EIGEN_HOME})
 
 include(FindPackageHandleStandardArgs)
 # handle the QUIETLY and REQUIRED arguments and set QGLVIEWER_FOUND to TRUE

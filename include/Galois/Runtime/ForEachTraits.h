@@ -32,7 +32,7 @@
 
 namespace Galois {
 namespace Runtime {
-
+namespace {
 template<typename FunctionTy>
 struct ForEachTraits {
   enum {
@@ -44,6 +44,7 @@ struct ForEachTraits {
   };
 };
 
+}
 }
 } // end namespace Galois
 

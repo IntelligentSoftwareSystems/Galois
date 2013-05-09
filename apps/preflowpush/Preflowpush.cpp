@@ -39,7 +39,7 @@
 namespace cll = llvm::cl;
 
 const char* name = "Preflow Push";
-const char* desc = "Finds the maximum flow in a network using the preflow push technique\n";
+const char* desc = "Finds the maximum flow in a network using the preflow push technique";
 const char* url = "preflow_push";
 
 enum DetAlgo {
@@ -99,11 +99,7 @@ std::ostream& operator<<(std::ostream& os, const Node& n) {
   return os;
 }
 
-#ifdef GALOIS_USE_NUMA
-typedef Galois::Graph::LC_Numa_Graph<Node, int> Graph;
-#else
-typedef Galois::Graph::LC_CSR_Graph<Node, int> Graph;
-#endif
+typedef Galois::Graph::LC_Linear_Graph<Node, int32_t>::with_numa_alloc<true> Graph;
 typedef Graph::GraphNode GNode;
 
 struct Config {
@@ -368,7 +364,7 @@ template<typename IncomingWL>
 void globalRelabel(IncomingWL& incoming) {
   Galois::StatTimer T1("ResetHeightsTime");
   T1.start();
-  Galois::do_all(app.graph.begin(), app.graph.end(), ResetHeights(), "ResetHeights");
+  Galois::do_all_local(app.graph, ResetHeights(), "ResetHeights");
   T1.stop();
 
   Galois::StatTimer T("UpdateHeightsTime");
@@ -394,7 +390,7 @@ void globalRelabel(IncomingWL& incoming) {
 
   Galois::StatTimer T2("FindWorkTime");
   T2.start();
-  Galois::do_all(app.graph.begin(), app.graph.end(), FindWork<IncomingWL>(incoming), "FindWork");
+  Galois::do_all_local(app.graph, FindWork<IncomingWL>(incoming), "FindWork");
   T2.stop();
 }
 
@@ -599,11 +595,11 @@ void writePfpGraph(const std::string& inputFile, const std::string& outputFile) 
   ReaderGraph reader;
   reader.structureFromFile(inputFile);
 
-  typedef Galois::Graph::FileGraphParser Parser;
-  typedef Galois::LargeArray<EdgeTy,true> EdgeData;
+  typedef Galois::Graph::FileGraphWriter Writer;
+  typedef Galois::LargeArray<EdgeTy> EdgeData;
   typedef typename EdgeData::value_type edge_value_type;
 
-  Parser p;
+  Writer p;
   EdgeData edgeData;
 
   // Count edges
@@ -638,7 +634,7 @@ void writePfpGraph(const std::string& inputFile, const std::string& outputFile) 
   }
 
   p.phase2();
-  edgeData.allocate(numEdges);
+  edgeData.create(numEdges);
   for (ReaderGraph::iterator ii = reader.begin(), ei = reader.end(); ii != ei; ++ii) {
     ReaderGNode rsrc = *ii;
     for (ReaderGraph::edge_iterator jj = reader.edge_begin(rsrc),
@@ -661,23 +657,22 @@ void writePfpGraph(const std::string& inputFile, const std::string& outputFile) 
 void initializeGraph(std::string inputFile,
     uint32_t sourceId, uint32_t sinkId, Config *newApp) {
   if (useSymmetricDirectly) {
-    Galois::Graph::FileGraph orig, mod;
-    orig.structureFromFile(inputFile.c_str());
-    int* edgeData = mod.structureFromGraph<int>(orig);
-    for (int *pp = edgeData, *ep = edgeData + mod.sizeEdges(); pp != ep; ++pp)
-      *pp = 1;
-    newApp->graph.structureFromGraph(mod);
+    Galois::Graph::readGraph(newApp->graph, inputFile);
+    for (GNode src : newApp->graph) {
+      for (Graph::edge_iterator ii : newApp->graph.out_edges(src))
+        newApp->graph.getEdgeData(ii) = 1;
+    }
   } else {
     if (inputFile.find(".gr.pfp") != inputFile.size() - strlen(".gr.pfp")) {
       std::string pfpName = inputFile + ".pfp";
       std::ifstream pfpFile(pfpName.c_str());
       if (!pfpFile.good()) {
         std::cout << "Writing new input file: " << pfpName << "\n";
-        writePfpGraph<int>(inputFile, pfpName);
+        writePfpGraph<int32_t>(inputFile, pfpName);
       }
       inputFile = pfpName;
     }
-    newApp->graph.structureFromFile(inputFile.c_str());
+    Galois::Graph::readGraph(newApp->graph, inputFile);
   }
   
   Graph& g = newApp->graph;
@@ -727,13 +722,9 @@ void run() {
     switch (detAlgo) {
       case nondet:
         if (useHLOrder) {
-#ifdef GALOIS_USE_EXP
-          Exp::PriAuto<16, Indexer, OBIM, GLess, GGreater>::for_each(initial.begin(), initial.end(), Process<nondet>(counter), "Discharge");
-#else
-          Galois::for_each<OBIM>(initial.begin(), initial.end(), Process<nondet>(counter), "Discharge");
-#endif
+          Galois::for_each_local<OBIM>(initial, Process<nondet>(counter), "Discharge");
         } else {
-          Galois::for_each(initial.begin(), initial.end(), Process<nondet>(counter), "Discharge");
+          Galois::for_each_local(initial, Process<nondet>(counter), "Discharge");
         }
         break;
       case detBase:

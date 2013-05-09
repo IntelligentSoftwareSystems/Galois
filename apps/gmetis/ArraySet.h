@@ -24,6 +24,7 @@
 #ifndef ARRAYSET_H_
 #define ARRAYSET_H_
 #include <vector>
+#include <set>
 #include <algorithm>
 #include <boost/function.hpp>
 
@@ -39,7 +40,8 @@ public:
 		fill(indexes.begin(), indexes.end(), -1);
 		setsize = 0;
 	}
-	typedef typename vector<T>::iterator iterator;
+	//typedef typename vector<T>::iterator iterator;
+  	 typedef typename set<T>::iterator iterator;
 	iterator begin(){
 		return setElements.begin();
 	}
@@ -47,17 +49,21 @@ public:
 		return setElements.end();
 	}
 	bool insert(T ele){
-		int index = mapToInt(ele);
+		/*int index = mapToInt(ele);
 		if(indexes[index]==-1){
 			setsize++;
 			indexes[index] = setElements.size();
 			setElements.push_back(ele);
 			return true;
 		}
-		return false;
+		return false;*/
+		if(setElements.find(ele)!=setElements.end())
+			return false;
+		setElements.insert(ele);
+		return true;
 	}
 	bool erase(T ele){
-		int index = mapToInt(ele);
+		/*int index = mapToInt(ele);
 		if(indexes[index]!=-1){
 			setsize--;
 			int indexEle = indexes[index];
@@ -68,7 +74,11 @@ public:
 			indexes[index] = -1;
 			return true;
 		}
-		return false;
+		return false;*/
+		if(setElements.find(ele)!=setElements.end())
+			return false;
+		setElements.erase(ele);
+		return true;
 	}
 
 	void clear(){
@@ -80,11 +90,13 @@ public:
 	int size(){
 //		return setElements.size();
 		return setsize;
+		//return setElements.size();
 	}
 
 private:
 	vector<int> indexes;
-	vector<T> setElements;
+	//vector<T> setElements;
+	set<T> setElements;
   boost::function<int(T)> mapToInt;
 	int setsize;
 };

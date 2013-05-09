@@ -119,22 +119,22 @@ static void papiReport(const char* loopname) {}
 
 #ifdef GALOIS_USE_EXP
 using namespace Galois::Runtime;
-static void beginSampling_landing_pad(Distributed::RecvBuffer& buf) {
+static void beginSampling_landing_pad(RecvBuffer& buf) {
   beginPeriod();
   papiBegin();
   vtuneBegin();
 }
 
-static void endSampling_landing_pad(Distributed::RecvBuffer& buf) {
+static void endSampling_landing_pad(RecvBuffer& buf) {
   vtuneEnd();
   papiEnd();
   endPeriod();
 }
 
 void Galois::Runtime::beginSampling() {
-  if (Distributed::networkHostNum > 1) {
-    Distributed::SendBuffer b;
-    Distributed::getSystemNetworkInterface().broadcast(beginSampling_landing_pad, b);
+  if (networkHostNum > 1) {
+    SendBuffer b;
+    getSystemNetworkInterface().broadcast(beginSampling_landing_pad, b);
   }
   beginPeriod();
   papiBegin();
@@ -142,9 +142,9 @@ void Galois::Runtime::beginSampling() {
 }
 
 void Galois::Runtime::endSampling() {
-  if (Distributed::networkHostNum > 1) {
-    Distributed::SendBuffer b;
-    Distributed::getSystemNetworkInterface().broadcast(endSampling_landing_pad, b);
+  if (networkHostNum > 1) {
+    SendBuffer b;
+    getSystemNetworkInterface().broadcast(endSampling_landing_pad, b);
   }
   vtuneEnd();
   papiEnd();

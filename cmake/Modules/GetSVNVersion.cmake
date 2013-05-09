@@ -4,7 +4,8 @@ add_custom_target(svnversion ALL DEPENDS DUMMY ${PROJECT_BINARY_DIR}/include/Gal
 find_file(_MODULE "GetSVNVersion-write.cmake" PATHS ${CMAKE_MODULE_PATH})
 
 add_custom_command(OUTPUT DUMMY ${PROJECT_BINARY_DIR}/include/Galois/svnversion.h
-  COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${CMAKE_SOURCE_DIR} -P ${_MODULE})
+  COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+  -DCMAKE_MODULE_PATH="${CMAKE_SOURCE_DIR}/cmake/Modules/" -P ${_MODULE})
 
 set(_MODULE off)
 

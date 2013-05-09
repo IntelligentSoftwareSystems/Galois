@@ -35,7 +35,6 @@
 namespace Galois {
 namespace Runtime {
 extern bool inDoAllDistributed;
-namespace Distributed {
 
 extern uint32_t networkHostID;
 extern uint32_t networkHostNum;
@@ -95,6 +94,7 @@ void networkStart();
 void networkTerminate();
 
 //! Distributed barrier
+//FIXME: See why this exists
 void distWait();
 
 
@@ -221,7 +221,6 @@ void NetworkInterface::broadcastAlt(void (*recv)(Args...), Args... param) {
   broadcast(genericLandingPad<Args...>::func, buf);
 }
 
-} //Distributed
 } //Runtime
 } //Galois
 #endif
