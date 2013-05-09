@@ -31,7 +31,26 @@ enable_testing()
 #ICC
 if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd68 -wd981 -wd383 -wd869 -wd2196 -wd279 -wd2504 -wd2943")
+  execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion
+                  OUTPUT_VARIABLE ICC_VERSION)
+  if(GCC_VERSION VERSION_GREATER 13.0 OR GCC_VERSION VERSION_EQUAL 13.0)
+    #message(STATUS "ICC Version >= 13.0")
+  else()
+    message(FATAL_ERROR "ICC must be 13.0 or higher")
+  endif()
 endif()
+
+#check for incompatible GCC
+if(CMAKE_COMPILER_IS_GNUCC)
+  execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion
+                  OUTPUT_VARIABLE GCC_VERSION)
+  if(GCC_VERSION VERSION_GREATER 4.6 OR GCC_VERSION VERSION_EQUAL 4.6)
+    #message(STATUS "GCC Version >= 4.6")
+  else()
+    message(FATAL_ERROR "GCC must be 4.6 or higher")
+  endif()
+endif()
+
 
 #PThreads
 find_package(Threads REQUIRED)
@@ -93,17 +112,6 @@ if(USE_PAPI)
     include_directories(${PAPI_INCLUDE_DIR})
   else()
     message(WARNING "PAPI required but not found")
-  endif()
-endif()
-
-#check for incompatible GCC
-if(CMAKE_COMPILER_IS_GNUCC)
-  execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion
-                  OUTPUT_VARIABLE GCC_VERSION)
-  if(GCC_VERSION VERSION_GREATER 4.6 OR GCC_VERSION VERSION_EQUAL 4.6)
-    #message(STATUS "GCC Version >= 4.6")
-  else()
-    message(FATAL_ERROR "GCC must be 4.6 or higher")
   endif()
 endif()
 
