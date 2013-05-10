@@ -61,7 +61,7 @@ static const DistType DIST_INFINITY = std::numeric_limits<DistType>::max() - 1;
 
 namespace cll = llvm::cl;
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<std::string> outputFilename(cll::Positional, cll::desc("[output file]"), "permuted");
+static cll::opt<std::string> outputFilename(cll::Positional, cll::desc("[output file]"), cll::init("permuted"));
 static cll::opt<WriteType> writeType("output", cll::desc("Output type:"),
     cll::values(
       clEnumValN(WriteType::none, "none", "None (default)"),
@@ -353,15 +353,13 @@ public:
     Galois::GAtomic<long int> profile = Galois::GAtomic<long int>(0);
     std::vector<GNode> nodemap;
     std::vector<bool> visited;
-    visited.reserve(graph.size());;
-    visited.resize(graph.size(), false);;
-    nodemap.reserve(graph.size());;
+    visited.resize(graph.size(), false);
+    nodemap.resize(graph.size());
 
     //static int count = 0;
     //std::cout << graph.size() << "Run: " << count++ << "\n";
 
-    for (Graph::iterator src = graph.begin(), ei =
-        graph.end(); src != ei; ++src) {
+    for (Graph::iterator src = graph.begin(), ei = graph.end(); src != ei; ++src) {
       nodemap[graph.getData(*src, Galois::MethodFlag::NONE).id] = *src;
     }
 
@@ -374,7 +372,7 @@ public:
     double mswf = 0.0;
 
     //Computation of maximum and root-square-mean wavefront. Serial
-    for (unsigned int i = 0; i < graph.size(); ++i){
+    for (unsigned int i = 0; i < graph.size(); ++i) {
       for (Graph::edge_iterator ii = graph.edge_begin(nodemap[i], Galois::MethodFlag::NONE), 
           ei = graph.edge_end(nodemap[i], Galois::MethodFlag::NONE); ii != ei; ++ii) {
 
@@ -382,7 +380,7 @@ public:
         SNode& ndata = graph.getData(neigh, Galois::MethodFlag::NONE);
 
         //std::cerr << "neigh: " << ndata.id << "\n";
-        if(visited[ndata.id] == false){
+        if (visited[ndata.id] == false){
           visited[ndata.id] = true;
           nactiv++;
           //  std::cerr << "val: " << nactiv<< "\n";
@@ -391,7 +389,7 @@ public:
 
       SNode& idata = graph.getData(nodemap[i], Galois::MethodFlag::NONE);
 
-      if (visited[idata.id] == false){
+      if (visited[idata.id] == false) {
         visited[idata.id] = true;
         curwf = nactiv+1;
       } else {
@@ -415,7 +413,7 @@ public:
 
   static void permute(std::vector<GNode>& ordering) {
     std::vector<GNode> nodemap;
-    nodemap.reserve(graph.size());;
+    nodemap.resize(graph.size());
 
     for (Graph::iterator src = graph.begin(), ei = graph.end(); src != ei; ++src) {
       nodemap[graph.getData(*src, Galois::MethodFlag::NONE).id] = *src;
@@ -843,10 +841,13 @@ void writeGraph() {
 
 void writePermutation() {
   std::ofstream file(outputFilename.c_str());
-
+  std::vector<unsigned int> transpose;
+  transpose.resize(graph.size());
   for (GNode n : graph) {
-    file << graph.getData(n).id << "\n";
+    transpose[graph.getData(n).id] = n;
   }
+  for (unsigned int id : transpose)
+    file << id << "\n";
 
   std::cout << "Writing permutation to " << outputFilename << "\n";
   file.close();
