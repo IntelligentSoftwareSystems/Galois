@@ -34,7 +34,7 @@
 
 #include "Galois/Graph/LCGraph.h"
 #include "Galois/Statistic.h"
-
+#include "GraphReader.h"
 #include "Lonestar/BoilerPlate.h"
 
 namespace cll = llvm::cl;
@@ -61,16 +61,16 @@ bool verifyCoarsening(MetisGraph *metisGraph) {
 		GNode node = *ii;
 		MetisNode &nodeData = graph->getData(node);
 		GNode matchNode;
-		if(variantMetis::localNodeData) {
-			if(!nodeData.isMatched())
-				return false;
-			matchNode = static_cast<GNode>(nodeData.getMatchNode());
-		} else {
-			if(!metisGraph->isMatched(nodeData.getNodeId())) {
-				return false;
-			}
-			matchNode = metisGraph->getMatch(nodeData.getNodeId());
+#ifdef localNodeData
+		if(!nodeData.isMatched())
+			return false;
+		matchNode = static_cast<GNode>(nodeData.getMatchNode());
+#else
+		if(!metisGraph->isMatched(nodeData.getNodeId())) {
+			return false;
 		}
+		matchNode = metisGraph->getMatch(nodeData.getNodeId());
+#endif
 
 		if(matchNode == node) {
 			unmatchedCount++;
@@ -79,15 +79,15 @@ bool verifyCoarsening(MetisGraph *metisGraph) {
 			matchedCount++;
 			MetisNode &matchNodeData = graph->getData(matchNode);
 			GNode mmatch;
-			if(variantMetis::localNodeData) {
-				if(!matchNodeData.isMatched())
-					return false;
-				mmatch = static_cast<GNode>(matchNodeData.getMatchNode());
-			} else {
-				if(!metisGraph->isMatched(matchNodeData.getNodeId()))
-						return false;
-				mmatch = metisGraph->getMatch(matchNodeData.getNodeId());
-			}
+#ifdef localNodeData
+			if(!matchNodeData.isMatched())
+				return false;
+			mmatch = static_cast<GNode>(matchNodeData.getMatchNode());
+#else
+			if(!metisGraph->isMatched(matchNodeData.getNodeId()))
+				return false;
+			mmatch = metisGraph->getMatch(matchNodeData.getNodeId());
+#endif
 
 			if(node!=mmatch){
 				cout<<"Node's matched node is not matched to this node";
@@ -160,7 +160,7 @@ void partition(MetisGraph* metisGraph, int nparts) {
 	t.stop();
 	cout<<"coarsening time: " << t.get() << " ms"<<endl;
 	T.stop();
-	//return;
+
 	if(testMetis::testCoarsening) {
 		if(verifyCoarsening(mcg->getFinerGraph())) {
 			cout<<"#### Coarsening is correct ####"<<endl;
@@ -168,6 +168,7 @@ void partition(MetisGraph* metisGraph, int nparts) {
 			cout<<"!!!! Coarsening is wrong !!!!"<<endl;
 		}
 	}
+
 
 	float* totalPartitionWeights = new float[nparts];
 	std::fill_n(totalPartitionWeights, nparts, 1 / (float) nparts);
@@ -178,8 +179,6 @@ void partition(MetisGraph* metisGraph, int nparts) {
 	pmetis.mlevelRecursiveBisection(mcg, nparts, totalPartitionWeights, 0, 0);
 	init_part_t.stop();
 	cout << "initial partition time: "<< init_part_t.get()  << " ms"<<endl;
-
-	//return;
 
 	if(testMetis::testInitialPartition) {
 		cout<<endl<<"#### Verifying initial partition ####"<<endl;
@@ -210,133 +209,41 @@ void verify(MetisGraph* metisGraph) {
 	}
 }
 
-typedef Galois::Graph::LC_CSR_Graph<int, unsigned int> InputGraph;
-typedef Galois::Graph::LC_CSR_Graph<int, unsigned int>::GraphNode InputGNode;
-
-void readMetisGraph(MetisGraph* metisGraph, const char* filename){
-	std::ifstream file(filename);
-	string line;
-	std::getline(file, line);
-	while(line.find('%')!=string::npos){
-		std::getline(file, line);
-	}
-
-	int numNodes, numEdges;
-	sscanf(line.c_str(), "%d %d", &numNodes, &numEdges);
-	cout<<numNodes<<" "<<numEdges<<endl;
-	GGraph* graph = metisGraph->getGraph();
-	vector<GNode> nodes(numNodes);
-	for (int i = 0; i < numNodes; i++) {
-		GNode n = graph->createNode(MetisNode(i, 1));
-		nodes[i] = n;
-		graph->addNode(n);
-	}
-	int countEdges = 0;
-	for (int i = 0; i < numNodes; i++) {
-		std::getline(file, line);
-		char const * items = line.c_str();
-		char* remaining;
-		GNode n1 = nodes[i];
-
-		while (true) {
-			int index = strtol(items, &remaining,10) - 1;
-			if(index < 0) break;
-			items = remaining;
-			GNode n2 = nodes[index];
-			if(n1==n2){
-				continue;
-			}
-			graph->getEdgeData(graph->addEdge(n1, n2)) = 1;
-			graph->getData(n1).addEdgeWeight(1);
-			graph->getData(n1).incNumEdges();
-			countEdges++;
-		}
-	}
-
-	assert(countEdges == numEdges*2);
-	metisGraph->setNumEdges(numEdges);
-	metisGraph->setNumNodes(numNodes);
-	cout<<"finshied reading graph " << metisGraph->getNumNodes() << " " << metisGraph->getNumEdges()<<endl;
-}
-
-
-void readGraph(MetisGraph* metisGraph, const char* filename, bool weighted = false, bool directed = true){
-	InputGraph inputGraph;
-	Galois::Graph::readGraph(inputGraph, filename);
-	cout<<"start to transfer data to GGraph"<<endl;
-	int id = 0;
-	for (InputGraph::iterator ii = inputGraph.begin(), ee = inputGraph.end(); ii != ee; ++ii) {
-		InputGNode node = *ii;
-		inputGraph.getData(node)=id++;
-	}
-
-	GGraph* graph = metisGraph->getGraph();
-	vector<GNode> gnodes(inputGraph.size());
-	id = 0;
-	for(uint64_t i=0;i<inputGraph.size();i++){
-		GNode node = graph->createNode(MetisNode(id, 1));
-		graph->addNode(node);
-		gnodes[id++] = node;
-	}
-
-	int numEdges = 0;
-	for (InputGraph::iterator ii = inputGraph.begin(), ee = inputGraph.end(); ii != ee; ++ii) {
-		InputGNode inNode = *ii;
-
-		int nodeId = inputGraph.getData(inNode);
-		GNode node = gnodes[nodeId];
-
-		MetisNode& nodeData = graph->getData(node);
-
-		for (InputGraph::edge_iterator jj = inputGraph.edge_begin(inNode), eejj = inputGraph.edge_end(inNode); jj != eejj; ++jj) {
-		  InputGNode inNeighbor = inputGraph.getEdgeDst(jj);
-			if(inNode == inNeighbor) continue;
-			int neighId = inputGraph.getData(inNeighbor);
-			int weight = 1;
-			if(weighted){
-			  weight = inputGraph.getEdgeData(jj);
-			}
-			if(!directed){
-			  graph->getEdgeData(graph->addEdge(node, gnodes[neighId])) = weight;//
-				nodeData.incNumEdges();
-				nodeData.addEdgeWeight(weight);//inputGraph.getEdgeData(inNode, inNeighbor));
-				numEdges++;
-			}else{
-			  graph->getEdgeData(graph->addEdge(node, gnodes[neighId])) = weight;//
-			  graph->getEdgeData(graph->addEdge(gnodes[neighId], node)) = weight;//
-			}
-		}
-
-	}
-
-	if(directed){
-		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
-			GNode node = *ii;
-			MetisNode& nodeData = graph->getData(node);
-			for (GGraph::edge_iterator jj = graph->edge_begin(node), eejj = graph->edge_end(node); jj != eejj; ++jj) {
-			  GNode neighbor = graph->getEdgeDst(jj);
-				nodeData.incNumEdges();
-				nodeData.addEdgeWeight(graph->getEdgeData(jj));
-				assert(graph->getEdgeData(jj) == graph->getEdgeData(graph->findEdge(neighbor, node)));
-				numEdges++;
-			}
-		}
-	}
-	cout<<"numNodes: "<<inputGraph.size()<<"|numEdges: "<<numEdges/2<<endl;
-	metisGraph->setNumEdges(numEdges/2);
-	metisGraph->setNumNodes(gnodes.size());
-	cout<<"end of transfer data to GGraph"<<endl;
-}
-
 namespace testMetis {
-	bool testCoarsening = true;
-	bool testInitialPartition = true;;
+bool testCoarsening = false;
+bool testInitialPartition = false;;
 }
 namespace variantMetis {
-	bool mergeMatching = true;
-	bool noPartInfo = false;
-	bool localNodeData = true;
+bool mergeMatching = true;
+bool noPartInfo = true;
 }
+
+struct parallelInitMorphGraph {
+	GGraph &graph;
+	parallelInitMorphGraph(GGraph &g):graph(g) {
+
+	}
+	void operator()(unsigned int tid, unsigned int num) {
+		int id = tid;
+		for(GGraph::iterator ii = graph.local_begin(),ee=graph.local_end();ii!=ee;ii++) {
+			GNode node = *ii;
+			MetisNode &nodeData = graph.getData(node);
+			nodeData.setNodeId(id);
+			nodeData.init();
+			nodeData.setWeight(1);
+			int count = std::distance(graph.edge_begin(node),graph.edge_end(node));
+			nodeData.incNumEdges(count);
+			int weight=0;
+			for(GGraph::edge_iterator jj = graph.edge_begin(node),kk=graph.edge_end(node);jj!=kk;jj++) {
+				graph.getEdgeData(jj)=1;
+				weight+=1;
+			}
+			nodeData.addEdgeWeight(weight);
+			id+=num;
+		}
+	}
+};
+
 
 
 int main(int argc, char** argv) {
@@ -348,22 +255,40 @@ int main(int argc, char** argv) {
 	GGraph graph;
 	metisGraph.setGraph(&graph);
 	//bool directed = true;
+
+	Galois::reportPageAlloc("MeminfoPre1");
+	//You will need to allocate 2-4 the total memory of graph. So pre alloc pages.
+	Galois::preAlloc(10000);
+	Galois::reportPageAlloc("MeminfoPre1");
+#ifndef LC_MORPH
 	if(mtxInput){
-	  readMetisGraph(&metisGraph, filename.c_str());
+		readMetisGraph(&metisGraph, filename.c_str());
 	}else{
-	  readGraph(&metisGraph, filename.c_str(), weighted, false);
+		readGraph(&metisGraph, filename.c_str(), weighted, false);
 	}
-        Galois::reportPageAlloc("MeminfoPre1");
-  	Galois::preAlloc(9000);
-        Galois::reportPageAlloc("MeminfoPre2");
+#else
+	graph.structureFromFile(filename);
+#endif
+
+
+	Galois::on_each(parallelInitMorphGraph(graph));
+
+	metisGraph.setNumNodes(graph.size());
+	metisGraph.setNumEdges(graph.sizeEdges());
+	cout<<"Nodes "<<graph.size()<<"| Edges "<<graph.sizeEdges()<<endl;
+
+	Galois::Timer t;
+	t.start();
 	partition(&metisGraph, numPartitions);
-        Galois::reportPageAlloc("MeminfoPre3");
+	t.stop();
+	cout<<"Total Time "<<t.get()<<" ms "<<endl;
+	Galois::reportPageAlloc("MeminfoPre3");
 	verify(&metisGraph);
 }
 
 int getRandom(int num){
-//	int randNum = rand()%num;
-//	return (rand()>>3)%(num);
+	//	int randNum = rand()%num;
+	//	return (rand()>>3)%(num);
 	//	return randNum;
 	return ((int)(drand48()*((double)(num))));
 }

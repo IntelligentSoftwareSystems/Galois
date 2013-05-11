@@ -36,8 +36,13 @@ class RandomKwayEdgeRefiner {
 	};
 private:
 
+/*
+ *Refine operator which moves the node from one partition to another based on the controbution of its neighbors to each
+ *partition. This version of the operator recalculates the information of each partition node interaction again. 
+ * There is noe other operator which assumes there is a fixed memory and where we have that information.
+ */
 	void refineOneNode(MetisGraph* metisGraph, GNode n, PerCPUValue* perCPUValues,perNodeValues &nodeValues) {
-	//void refineOneNode(MetisGraph* metisGraph, GNode n, PerCPUValue* perCPUValues) {
+		//void refineOneNode(MetisGraph* metisGraph, GNode n, PerCPUValue* perCPUValues) {
 		GGraph* graph = metisGraph->getGraph();
 		MetisNode& nodeData = graph->getData(n,Galois::MethodFlag::CHECK_CONFLICT);
 		svi &partEd = nodeValues.partEd;
@@ -55,8 +60,6 @@ private:
 			return;
 
 
-		//int partEd[nparts];
-		//memset(partEd,0,sizeof(partEd));
 		for (GGraph::edge_iterator jj = graph->edge_begin(n, Galois::MethodFlag::NONE), eejj = graph->edge_end(n, Galois::MethodFlag::NONE); jj != eejj; ++jj) {
 			GNode neighbor = graph->getEdgeDst(jj);
 			MetisNode &neighborData = graph->getData(neighbor);
@@ -87,7 +90,7 @@ private:
 			int to_weight=metisGraph->getPartWeight(to);
 			if ((partEd[to] > partEd[prev_to] && to_weight + vwgt <= maxwgts[to])
 					|| (partEd[to] == partEd[prev_to]
-					    && itpwgts[prev_to] * to_weight < itpwgts[to]* metisGraph->getPartWeight(prev_to)))
+					                         && itpwgts[prev_to] * to_weight < itpwgts[to]* metisGraph->getPartWeight(prev_to)))
 				prev_to=to;
 		}
 
@@ -155,148 +158,149 @@ private:
 		}
 	}
 
+
 	void refineOneNodeAlternate(MetisGraph* metisGraph, GNode n, PerCPUValue* perCPUValues) {
 		GGraph* graph = metisGraph->getGraph();
-				MetisNode& nodeData = graph->getData(n,Galois::MethodFlag::CHECK_CONFLICT);
-				if (nodeData.getEdegree() >= nodeData.getIdegree()) {
-					int from = nodeData.getPartition();
-					//TODO
-					int from_weight=metisGraph->getPartWeight(from);
-					int vwgt = nodeData.getWeight();
-					if (nodeData.getIdegree() > 0 && from_weight - vwgt < minwgts[from])
-						return;
-					int k = 0;
-					int to = 0;
-					long id = nodeData.getIdegree();
-					for (k = 0; k < nodeData.getNDegrees(); k++) {
-						long gain = nodeData.getPartEd()[k] - id;
-						if (gain < 0)
-							continue;
-						to = nodeData.getPartIndex()[k];
+		MetisNode& nodeData = graph->getData(n,Galois::MethodFlag::CHECK_CONFLICT);
+		if (nodeData.getEdegree() >= nodeData.getIdegree()) {
+			int from = nodeData.getPartition();
+			//TODO
+			int from_weight=metisGraph->getPartWeight(from);
+			int vwgt = nodeData.getWeight();
+			if (nodeData.getIdegree() > 0 && from_weight - vwgt < minwgts[from])
+				return;
+			int k = 0;
+			int to = 0;
+			long id = nodeData.getIdegree();
+			for (k = 0; k < nodeData.getNDegrees(); k++) {
+				long gain = nodeData.getPartEd()[k] - id;
+				if (gain < 0)
+					continue;
+				to = nodeData.getPartIndex()[k];
 
-						if (metisGraph->getPartWeight(to) + vwgt <= maxwgts[to] + ffactor * gain && gain >= 0)
+				if (metisGraph->getPartWeight(to) + vwgt <= maxwgts[to] + ffactor * gain && gain >= 0)
+					break;
+			}
+			if (k == nodeData.getNDegrees())
+				return;
+			for (int j = k + 1; j < nodeData.getNDegrees(); j++) {
+				to = nodeData.getPartIndex()[j];
+				int to_weight=metisGraph->getPartWeight(to);
+				if ((nodeData.getPartEd()[j] > nodeData.getPartEd()[k] && to_weight + vwgt <= maxwgts[to])
+						|| (nodeData.getPartEd()[j] == nodeData.getPartEd()[k]
+						                                                    && itpwgts[nodeData.getPartIndex()[k]] * to_weight < itpwgts[to]
+						                                                                                                                 * metisGraph->getPartWeight(nodeData.getPartIndex()[k])))
+					k = j;
+			}
+
+			to = nodeData.getPartIndex()[k];
+			int to_weight=metisGraph->getPartWeight(to);
+			int j = 0;
+			if (nodeData.getPartEd()[k] - nodeData.getIdegree() > 0)
+				j = 1;
+			else if (nodeData.getPartEd()[k] - nodeData.getIdegree() == 0) {
+				if (from_weight >= maxwgts[from]
+				                           || itpwgts[from] * (to_weight + vwgt) < itpwgts[to] * from_weight)
+					j = 1;
+			}
+			if (j == 0)
+				return;
+
+			/*
+			 * if we got here, we can now move the vertex from 'from' to 'to'
+			 */
+			//dummy for cautious
+			graph->edge_begin(n, Galois::MethodFlag::CHECK_CONFLICT);
+			graph->edge_end(n, Galois::MethodFlag::CHECK_CONFLICT);
+
+			perCPUValues->mincutInc += -(nodeData.getPartEd()[k] - nodeData.getIdegree());
+			nodeData.setPartition(to);
+			metisGraph->incPartWeight(to, vwgt);
+			metisGraph->incPartWeight(from, -vwgt);
+
+			nodeData.setEdegree(nodeData.getEdegree() + nodeData.getIdegree() - nodeData.getPartEd()[k]);
+			int temp = nodeData.getIdegree();
+			nodeData.setIdegree(nodeData.getPartEd()[k]);
+			nodeData.getPartEd()[k] = temp;
+
+			if (nodeData.getPartEd()[k] == 0) {
+				nodeData.setNDegrees(nodeData.getNDegrees() - 1);
+				nodeData.getPartEd()[k] = nodeData.getPartEd()[nodeData.getNDegrees()];
+				nodeData.getPartIndex()[k] = nodeData.getPartIndex()[nodeData.getNDegrees()];
+			} else {
+				nodeData.getPartIndex()[k] = from;
+			}
+
+			if (nodeData.getEdegree() - nodeData.getIdegree() < 0){
+				metisGraph->unMarkBoundaryNode(n);
+				perCPUValues->changedBndNodes.update(n);
+			}
+
+			/*
+			 * update the degrees of adjacent vertices
+			 */
+			for (GGraph::edge_iterator jj = graph->edge_begin(n, Galois::MethodFlag::NONE), eejj = graph->edge_end(n, Galois::MethodFlag::NONE); jj != eejj; ++jj) {
+				GNode neighbor = graph->getEdgeDst(jj);
+				MetisNode& neighborData = graph->getData(neighbor);
+
+				int edgeWeight = graph->getEdgeData(jj, Galois::MethodFlag::NONE);
+				if (neighborData.getPartition() == from) {
+					neighborData.setEdegree(neighborData.getEdegree() + edgeWeight);
+					neighborData.setIdegree(neighborData.getIdegree() - edgeWeight);
+					if (neighborData.getEdegree() - neighborData.getIdegree() >= 0 && !neighborData.isBoundary())
+					{
+						//						metisGraph->setBoundaryNode(neighbor);
+						metisGraph->markBoundaryNode(neighbor);
+						//						perCPUValues->get().changedBndNodes.push_back(neighbor);
+						perCPUValues->changedBndNodes.update(neighbor);
+					}
+				} else if (neighborData.getPartition() == to) {
+					neighborData.setEdegree(neighborData.getEdegree() - edgeWeight);
+					neighborData.setIdegree(neighborData.getIdegree() + edgeWeight);
+					if (neighborData.getEdegree() - neighborData.getIdegree() < 0 && neighborData.isBoundary())
+					{
+						//						metisGraph->unsetBoundaryNode(neighbor);
+						metisGraph->unMarkBoundaryNode(neighbor);
+						//						perCPUValues->get().changedBndNodes.push_back(neighbor);
+						perCPUValues->changedBndNodes.update(neighbor);
+					}
+
+				}
+				/*Remove contribution from the .ed of 'from' */
+				if (neighborData.getPartition() != from) {
+					for (int i = 0; i < neighborData.getNDegrees(); i++) {
+						if (neighborData.getPartIndex()[i] == from) {
+							if (neighborData.getPartEd()[i] == edgeWeight) {
+								neighborData.setNDegrees(neighborData.getNDegrees() - 1);
+								neighborData.getPartEd()[i] = neighborData.getPartEd()[neighborData.getNDegrees()];
+								neighborData.getPartIndex()[i] = neighborData.getPartIndex()[neighborData.getNDegrees()];
+							} else {
+								neighborData.getPartEd()[i] -= edgeWeight;
+							}
 							break;
-					}
-					if (k == nodeData.getNDegrees())
-						return;
-					for (int j = k + 1; j < nodeData.getNDegrees(); j++) {
-						to = nodeData.getPartIndex()[j];
-						int to_weight=metisGraph->getPartWeight(to);
-						if ((nodeData.getPartEd()[j] > nodeData.getPartEd()[k] && to_weight + vwgt <= maxwgts[to])
-								|| (nodeData.getPartEd()[j] == nodeData.getPartEd()[k]
-								                                         && itpwgts[nodeData.getPartIndex()[k]] * to_weight < itpwgts[to]
-								                                                                                                 * metisGraph->getPartWeight(nodeData.getPartIndex()[k])))
-							k = j;
-					}
-
-					to = nodeData.getPartIndex()[k];
-					int to_weight=metisGraph->getPartWeight(to);
-					int j = 0;
-					if (nodeData.getPartEd()[k] - nodeData.getIdegree() > 0)
-						j = 1;
-					else if (nodeData.getPartEd()[k] - nodeData.getIdegree() == 0) {
-						if (from_weight >= maxwgts[from]
-						                           || itpwgts[from] * (to_weight + vwgt) < itpwgts[to] * from_weight)
-							j = 1;
-					}
-					if (j == 0)
-						return;
-
-					/*
-					 * if we got here, we can now move the vertex from 'from' to 'to'
-					 */
-					//dummy for cautious
-					graph->edge_begin(n, Galois::MethodFlag::CHECK_CONFLICT);
-					graph->edge_end(n, Galois::MethodFlag::CHECK_CONFLICT);
-
-					perCPUValues->mincutInc += -(nodeData.getPartEd()[k] - nodeData.getIdegree());
-					nodeData.setPartition(to);
-					metisGraph->incPartWeight(to, vwgt);
-					metisGraph->incPartWeight(from, -vwgt);
-
-					nodeData.setEdegree(nodeData.getEdegree() + nodeData.getIdegree() - nodeData.getPartEd()[k]);
-					int temp = nodeData.getIdegree();
-					nodeData.setIdegree(nodeData.getPartEd()[k]);
-					nodeData.getPartEd()[k] = temp;
-
-					if (nodeData.getPartEd()[k] == 0) {
-						nodeData.setNDegrees(nodeData.getNDegrees() - 1);
-						nodeData.getPartEd()[k] = nodeData.getPartEd()[nodeData.getNDegrees()];
-						nodeData.getPartIndex()[k] = nodeData.getPartIndex()[nodeData.getNDegrees()];
-					} else {
-						nodeData.getPartIndex()[k] = from;
-					}
-
-					if (nodeData.getEdegree() - nodeData.getIdegree() < 0){
-						metisGraph->unMarkBoundaryNode(n);
-						perCPUValues->changedBndNodes.update(n);
-					}
-
-					/*
-					 * update the degrees of adjacent vertices
-					 */
-					for (GGraph::edge_iterator jj = graph->edge_begin(n, Galois::MethodFlag::NONE), eejj = graph->edge_end(n, Galois::MethodFlag::NONE); jj != eejj; ++jj) {
-					  GNode neighbor = graph->getEdgeDst(jj);
-					  MetisNode& neighborData = graph->getData(neighbor);
-
-						int edgeWeight = graph->getEdgeData(jj, Galois::MethodFlag::NONE);
-						if (neighborData.getPartition() == from) {
-							neighborData.setEdegree(neighborData.getEdegree() + edgeWeight);
-							neighborData.setIdegree(neighborData.getIdegree() - edgeWeight);
-							if (neighborData.getEdegree() - neighborData.getIdegree() >= 0 && !neighborData.isBoundary())
-							{
-		//						metisGraph->setBoundaryNode(neighbor);
-								metisGraph->markBoundaryNode(neighbor);
-		//						perCPUValues->get().changedBndNodes.push_back(neighbor);
-								perCPUValues->changedBndNodes.update(neighbor);
-							}
-						} else if (neighborData.getPartition() == to) {
-							neighborData.setEdegree(neighborData.getEdegree() - edgeWeight);
-							neighborData.setIdegree(neighborData.getIdegree() + edgeWeight);
-							if (neighborData.getEdegree() - neighborData.getIdegree() < 0 && neighborData.isBoundary())
-							{
-		//						metisGraph->unsetBoundaryNode(neighbor);
-								metisGraph->unMarkBoundaryNode(neighbor);
-		//						perCPUValues->get().changedBndNodes.push_back(neighbor);
-								perCPUValues->changedBndNodes.update(neighbor);
-							}
-
-						}
-						/*Remove contribution from the .ed of 'from' */
-						if (neighborData.getPartition() != from) {
-							for (int i = 0; i < neighborData.getNDegrees(); i++) {
-								if (neighborData.getPartIndex()[i] == from) {
-									if (neighborData.getPartEd()[i] == edgeWeight) {
-										neighborData.setNDegrees(neighborData.getNDegrees() - 1);
-										neighborData.getPartEd()[i] = neighborData.getPartEd()[neighborData.getNDegrees()];
-										neighborData.getPartIndex()[i] = neighborData.getPartIndex()[neighborData.getNDegrees()];
-									} else {
-										neighborData.getPartEd()[i] -= edgeWeight;
-									}
-									break;
-								}
-							}
-						}
-						/*
-						 * add contribution to the .ed of 'to'
-						 */
-						if (neighborData.getPartition() != to) {
-							int i;
-							for (i = 0; i < neighborData.getNDegrees(); i++) {
-								if (neighborData.getPartIndex()[i] == to) {
-									neighborData.getPartEd()[i] += edgeWeight;
-									break;
-								}
-							}
-							if (i == neighborData.getNDegrees()) {
-								int nd = neighborData.getNDegrees();
-								neighborData.getPartIndex()[nd] = to;
-								neighborData.getPartEd()[nd++] = edgeWeight;
-								neighborData.setNDegrees(nd);
-							}
 						}
 					}
 				}
+				/*
+				 * add contribution to the .ed of 'to'
+				 */
+				if (neighborData.getPartition() != to) {
+					int i;
+					for (i = 0; i < neighborData.getNDegrees(); i++) {
+						if (neighborData.getPartIndex()[i] == to) {
+							neighborData.getPartEd()[i] += edgeWeight;
+							break;
+						}
+					}
+					if (i == neighborData.getNDegrees()) {
+						int nd = neighborData.getNDegrees();
+						neighborData.getPartIndex()[nd] = to;
+						neighborData.getPartEd()[nd++] = edgeWeight;
+						neighborData.setNDegrees(nd);
+					}
+				}
+			}
+		}
 	}
 
 
@@ -327,17 +331,22 @@ public:
 			maxwgts[i] = (int) (tpwgts[i] * tvwgt * ubfactor);
 			minwgts[i] = (int) (tpwgts[i] * tvwgt * (1.0 / ubfactor));
 		}
+		PerCPUValue pc;
+		getBoundary gb(metisGraph,&pc);
+		Galois::for_each_local<Galois::WorkList::dChunkedLIFO<256, GNode> >(*(metisGraph->getGraph()), gb, "get boundary");
+
+		GNodeSTLSet &boundary = pc.changedBndNodes.reduce();
 
 		for (int pass = 0; pass < npasses; pass++) {
 			int oldcut = metisGraph->getMinCut();
 			PerCPUValue perCPUValues;
 			parallelRefine pr(metisGraph, this, &perCPUValues);
 
-			Galois::for_each<Galois::WorkList::ChunkedLIFO<64, GNode> >(metisGraph->getBoundaryNodes()->begin(), metisGraph->getBoundaryNodes()->end(), pr, "RandomKWAYRefine");
+			//Galois::for_each<Galois::WorkList::dChunkedLIFO<256, GNode> >(metisGraph->getBoundaryNodes()->begin(), metisGraph->getBoundaryNodes()->end(), pr, "RandomKWAYRefine");
+			Galois::for_each<Galois::WorkList::dChunkedLIFO<256, GNode> >(boundary.begin(), boundary.end(), pr, "RandomKWAYRefine");
 			int minCutInc = perCPUValues.mincutInc.reduce();
-
 			metisGraph->incMinCut(minCutInc);
-			GNodeSTLSet& changedNodes = perCPUValues.changedBndNodes.reduce();
+			/*GNodeSTLSet& changedNodes = perCPUValues.changedBndNodes.reduce();
 			for(GNodeSTLSet::iterator iter=changedNodes.begin();iter!=changedNodes.end();++iter){
 				GNode changed = *iter;
 				if(metisGraph->getGraph()->getData(changed).isBoundary()){
@@ -346,23 +355,54 @@ public:
 					metisGraph->getBoundaryNodes()->erase(changed);
 				}
 			}
+			 */
+			boundary = perCPUValues.changedBndNodes.reduce();
+			 for(GNodeSTLSet::iterator iter=boundary.begin();iter!=boundary.end();++iter){
+				 GNode changed = *iter;
+				 if(metisGraph->getGraph()->getData(changed).isBoundary()){
+					 metisGraph->getBoundaryNodes()->insert(changed);
+				 }else{
+					 metisGraph->getBoundaryNodes()->erase(changed);
+				 }
+			 }
 
-			//			GGraph* graph = metisGraph->getGraph();
-			//			for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
-			//				GNode node = *ii;
-			//				if(node.getData().isBoundary()){
-			//					metisGraph->getBoundaryNodes()->insert(node);
-			//				}else{
-			//					metisGraph->getBoundaryNodes()->erase(node);
-			//				}
-			//			}
-			if (metisGraph->getMinCut() == oldcut) {
-				break;
-			}
+			 //			GGraph* graph = metisGraph->getGraph();
+			 //			for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
+			 //				GNode node = *ii;
+			 //				if(node.getData().isBoundary()){
+			 //					metisGraph->getBoundaryNodes()->insert(node);
+			 //				}else{
+			 //					metisGraph->getBoundaryNodes()->erase(node);
+			 //				}
+			 //			}
+			 if (metisGraph->getMinCut() == oldcut) {
+				 break;
+			 }
 		}
 	}
 
 private:
+/*
+ *This operator goes over each node and checks whether this node is on boundary or not.  
+ * If it is adds it to the accumuluator over set.
+ */
+	struct getBoundary {
+		MetisGraph* metisGraph;
+		PerCPUValue* perCPUValues;
+		GGraph *graph;
+		getBoundary(MetisGraph* metisGraph,PerCPUValue* perCPUValues) {
+			this->metisGraph = metisGraph;
+			this->perCPUValues = perCPUValues;
+			this->graph = metisGraph->getGraph();
+		}
+		void operator()(GNode item, Galois::UserContext<GNode>& ctx) {
+			MetisNode &nodeData = graph->getData(item,Galois::MethodFlag::NONE);
+			if(nodeData.getEdegree()-nodeData.getIdegree()>0) {
+				perCPUValues->changedBndNodes.update(item);
+			}
+
+		}
+	};
 	struct parallelRefine {
 		MetisGraph* metisGraph;
 		RandomKwayEdgeRefiner* refiner;
@@ -381,7 +421,7 @@ private:
 				refiner->refineOneNode(metisGraph, item, perCPUValues,values);
 			}
 			else
-			refiner->refineOneNodeAlternate(metisGraph,item,perCPUValues);
+				refiner->refineOneNodeAlternate(metisGraph,item,perCPUValues);
 		}
 	};
 

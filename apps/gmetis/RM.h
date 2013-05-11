@@ -41,7 +41,7 @@ public:
 	}
 	bool match(GNode node) {
 		//matchLockFree(node);
-		MetisNode& nodeData = graph->getData(node, Galois::MethodFlag::NONE);
+		MetisNode& nodeData = graph->getData(node);
 		/*if (metisGraph->isMatched(nodeData.getNodeId())) {
 			return;
 		}*/
@@ -49,50 +49,43 @@ public:
 		if(nodeData.isMatched())
 			return false;
 
-		GNode matchNode;
-		while(true){
-			matchNode = node;
-			for (GGraph::edge_iterator jj = graph->edge_begin(node, Galois::MethodFlag::NONE), eejj = graph->edge_end(node, Galois::MethodFlag::NONE); jj != eejj; ++jj) {
-				GNode neighbor = graph->getEdgeDst(jj);
-				MetisNode& neighMNode = graph->getData(neighbor, Galois::MethodFlag::NONE);
-				if (!neighMNode.isMatched() && nodeData.getWeight() + neighMNode.getWeight() <= maxVertexWeight) {
-					matchNode = neighbor;
-					break;
-				}
-			}
-
-			MetisNode& matchNodeData = graph->getData(matchNode, Galois::MethodFlag::CHECK_CONFLICT);
-			if(node == matchNode || !matchNodeData.isMatched()){
+		GNode matchNode = node;
+		for (GGraph::edge_iterator jj = graph->edge_begin(node, Galois::MethodFlag::NONE), eejj = graph->edge_end(node, Galois::MethodFlag::NONE); jj != eejj; ++jj) {
+			GNode neighbor = graph->getEdgeDst(jj);
+			MetisNode& neighMNode = graph->getData(neighbor);
+			if (!neighMNode.isMatched() && nodeData.getWeight() + neighMNode.getWeight() <= maxVertexWeight) {
+				matchNode = neighbor;
 				break;
 			}
 		}
-		nodeData = graph->getData(node, Galois::MethodFlag::CHECK_CONFLICT);
 
-		if(nodeData.isMatched())
+		//nodeData = graph->getData(node, Galois::MethodFlag::CHECK_CONFLICT);
+
+		/*if(nodeData.isMatched())
 			return false;
-
-		MetisNode& matchNodeData = graph->getData(matchNode,Galois::MethodFlag::NONE);
+*/
+		MetisNode& matchNodeData = graph->getData(matchNode);
 		if(variantMetis::mergeMatching)
-			if(nodeData.getNodeId()<matchNodeData.getNodeId()) {
+			if(nodeData.getNodeId()>matchNodeData.getNodeId()) {
 				int id = nodeData.getNodeId();
 				nodeData.setNodeId(matchNodeData.getNodeId());
 				matchNodeData.setNodeId(id);
 			}
 
-		if(variantMetis::localNodeData) {
+#ifdef localNodeData
 			nodeData.matchNode = matchNode;
-		}else {
+#else
 			metisGraph->setMatch(nodeData.getNodeId(), matchNode);
-		}
+#endif
 		nodeData.setMatched(true);
 
 
 		if (node != matchNode) {
-			if(variantMetis::localNodeData) {
+#ifdef localNodeData
 				matchNodeData.matchNode = node;
-			}else {
+#else
 				metisGraph->setMatch(matchNodeData.getNodeId(), node);
-			}
+#endif
 
 			matchNodeData.setMatched(true);
 		}

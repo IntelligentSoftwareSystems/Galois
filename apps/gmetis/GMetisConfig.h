@@ -33,7 +33,8 @@
 #include "Galois/Accumulator.h"
 #include "Galois/Graph/memScalGraph.h"
 #include <stdlib.h>
-#include "Galois/Graph/LCGraph.h"
+//#include "Galois/Graph/LCGraph.h"
+#include "Galois/Graph/LC_Morph_Graph.h"
 
 typedef int METISINT;
 typedef double METISDOUBLE;
@@ -45,16 +46,20 @@ typedef Galois::Graph::FirstGraph<MetisNode,METISINT, true>            GGraph;
 typedef Galois::Graph::FirstGraph<MetisNode,METISINT, true>::GraphNode GNode;
 
 */
-
+#define localNodeData
+#define LC_MORPH
+#ifndef LC_MORPH
 
 typedef Galois::Graph::MemScalGraph<MetisNode,METISINT, true>            GGraph;
 typedef Galois::Graph::MemScalGraph<MetisNode,METISINT, true>::GraphNode GNode;
-
+#else
 /*
-
-typedef Galois::Graph::LC_CSR_Graph<MetisNode,METISINT> GGraph;
-typedef Galois::Graph::LC_CSR_Graph<MetisNode,METISINT>::GraphNode GNode;
-*/
+ *I imagine this might become a graph where instead of int being the edge we might be storing a struct of int and pair<int,int> 
+ *The first int will be the normal weight, second would be a pair specifying partition number and weight related to that partition.
+ */
+typedef Galois::Graph::LC_Morph_Graph<MetisNode,METISINT> GGraph;
+typedef Galois::Graph::LC_Morph_Graph<MetisNode,METISINT>::GraphNode GNode;
+#endif
 
 #include <set>
 using namespace std;
@@ -68,7 +73,6 @@ namespace variantMetis {
 	extern bool mergeMatching;
 	extern bool bagRefining;
 	extern bool noPartInfo;
-	extern bool localNodeData;
 }
 
 typedef ArraySet< GNode > GNodeSet;

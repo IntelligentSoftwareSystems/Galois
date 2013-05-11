@@ -77,10 +77,16 @@ public:
 
 	void initSubGraphMapTo(){
 		subGraphMaps = new GNode[numNodes];
+		for(int i=0;i<numNodes;i++) {
+			subGraphMaps[i]=NULL;
+		}
 	}
 
 	GNode getSubGraphMapTo(int id){
-		assert(id < numNodes);
+		//assert(id < numNodes);
+		if(id>numNodes){
+			cout<<"Error";
+		}
 		return subGraphMaps[id];
 	}
 
@@ -222,6 +228,8 @@ public:
 			if (nodeData.getEdegree() > 0 || (graph->edge_begin(node, Galois::MethodFlag::NONE) == graph->edge_end(node,Galois::MethodFlag::NONE))) {
 				mincut += nodeData.getEdegree();
 				setBoundaryNode(node);
+			}else {
+				unsetBoundaryNode(node);
 			}
 		}
 		this->mincut =mincut / 2;
@@ -266,8 +274,10 @@ public:
 
 			updateNodeEdAndId(node);
 
-			if(variantMetis::noPartInfo)
+			if(variantMetis::noPartInfo){
+				mincut += nodeData.getEdegree();
 				continue;//NOTUSINGMEMHACK
+			}
 
 			if (nodeData.getEdegree() > 0) {
 				mincut += nodeData.getEdegree();

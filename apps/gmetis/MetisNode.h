@@ -34,8 +34,11 @@ typedef double METISDOUBLE;
 using namespace std;
 class MetisNode{
 public:
+	#ifdef NOPARTINFO
 	typedef llvm::SmallVector <METISINT,128> svm;
-	//typedef int* svm;
+	#else
+	typedef int* svm;
+	#endif
 	/*typedef Galois::gdeque <int*,128> sve;
 	sve blah;*/
 	int processed;
@@ -71,7 +74,9 @@ public:
 		processed=0;
 		matchNode = NULL;
 		multiNode = NULL;
+		subGraphNode = NULL;
 		matched = false;
+
 	}
 
 	int getNodeId() {
@@ -173,6 +178,10 @@ public:
 		_numEdges++;
 	}
 
+	void incNumEdges(int inc) {
+		_numEdges+=inc;
+	}
+
 //	METISINT* getPartEd(){
 //		return _partEd;
 //	}
@@ -227,7 +236,7 @@ public:
 
 	void* matchNode;
 	void *multiNode;
-
+	void *subGraphNode;
 
 private:
 	bool matched;

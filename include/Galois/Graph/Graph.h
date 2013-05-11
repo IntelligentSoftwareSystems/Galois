@@ -52,20 +52,29 @@ namespace GraphImpl {
 template<typename NTy, typename ETy, bool Directed>
 struct EdgeItem;
 
+
 template<typename NTy, typename ETy>
 struct EdgeItem<NTy, ETy, true> {
-  typedef ETy& reference;
-  
-  NTy* N;
-  ETy Ea;
+	typedef ETy& reference;
 
-  inline NTy*&       first()       { assert(N); return N; }
-  inline NTy* const& first() const { assert(N); return N; }
-  inline ETy*       second()       { return &Ea; }
-  inline const ETy* second() const { return &Ea; }
-  template<typename... Args>
-  EdgeItem(NTy* n, ETy* v, Args&&... args) : N(n), Ea(std::forward<Args>(args)...) {}
-  static size_t sizeOfSecond()     { return sizeof(ETy); }
+	NTy* N;
+	ETy Ea;
+
+	inline NTy*&       first()       { assert(N); return N; }
+	inline NTy* const& first() const { assert(N); return N; }
+	inline ETy*       second()       { return &Ea; }
+	inline const ETy* second() const { return &Ea; }
+	template<typename... Args>
+	EdgeItem(NTy* n, ETy* v, Args&&... args) : N(n), Ea(std::forward<Args>(args)...) {}
+
+	template<typename... Args>
+	EdgeItem(ETy* v, Args&&... args) :Ea(std::forward<Args>(args)...) {}
+
+	template<typename... Args>
+	EdgeItem(NTy* n,ETy &v, Args&&... args):N(n){
+		Ea=v;
+	}
+	static size_t sizeOfSecond()     { return sizeof(ETy); }
 };
 
 template<typename NTy, typename ETy>
