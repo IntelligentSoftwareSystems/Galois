@@ -1,7 +1,7 @@
 app(cuthill cuthill.cpp)
 app(cuthill-distr cuthill-distr.cpp)
 
-if(1)
+if(0)
   set(CMAKE_PREFIX_PATH /net/faraday/workspace/local/modules/trilinos-11.2.3/lib/cmake/Trilinos ${CMAKE_PREFIX_PATH})
   find_package(Trilinos REQUIRED)
   include_directories(${Trilinos_INCLUDE_DIRS} ${Trilinos_TPL_INCLUDE_DIRS})

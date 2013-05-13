@@ -72,6 +72,7 @@ public:
     if (&p == this) return *this;
     //relaxed order for initialization
     _lock.store(p._lock.load(std::memory_order_relaxed), std::memory_order_relaxed);
+    return *this;
   }
 
 

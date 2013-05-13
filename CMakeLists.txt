@@ -119,6 +119,8 @@ if(USE_EXP)
   add_definitions(-DGALOIS_USE_EXP)
   include_directories("exp/include")
 
+  find_package(OpenMP)
+
   if(USE_PROF) 
     add_definitions(-DGALOIS_USE_PROF)
   endif()

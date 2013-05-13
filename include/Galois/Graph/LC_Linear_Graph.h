@@ -145,11 +145,11 @@ protected:
   void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<_A2>::type* = 0) { }
 
   edge_iterator raw_begin(GraphNode N) {
-    return N.edgeBegin();
+    return N->edgeBegin();
   }
 
   edge_iterator raw_end(GraphNode N) {
-    return N.edgeEnd();
+    return N->edgeEnd();
   }
 
   template<bool _Enable = HasId>
