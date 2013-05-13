@@ -76,12 +76,27 @@ public:
   inline void inc_conflicts() const { }
 };
 
+template<typename value_type>
+class AbortHandler {
+  typedef WorkList::GFIFO<value_type> AbortedList;
+  PerPackageStorage<AbortedList> queues;
+
+public:
+  void push(bool recursiveAbort, value_type val) {
+    if (recursiveAbort)
+      queues.getRemote(LL::getLeaderForPackage(LL::getPackageForSelf(LL::getTID()) / 2))->push(val);
+    else
+      queues.getLocal()->push(val);
+  }
+
+  AbortedList* getQueue() { return queues.getLocal(); }
+};
+
 template<class WorkListTy, class T, class FunctionTy>
 class ForEachWork {
 protected:
   typedef T value_type;
   typedef typename WorkListTy::template retype<value_type> WLTy;
-  typedef WorkList::GFIFO<value_type> AbortedList;
 
   struct ThreadLocalData {
     FunctionTy function;
@@ -96,7 +111,7 @@ protected:
   const char* loopname;
 
   TerminationDetection& term;
-  PerPackageStorage<AbortedList> aborted;
+  AbortHandler<value_type> aborted;
   LL::CacheLineStorage<bool> broke;
 
   inline void commitIteration(ThreadLocalData& tld) {
@@ -119,10 +134,7 @@ protected:
     assert(ForEachTraits<FunctionTy>::NeedsAborts);
     tld.cnx.cancel_iteration();
     tld.stat.inc_conflicts(); //Class specialization handles opt
-    if (recursiveAbort)
-      aborted.getRemote(LL::getLeaderForPackage(LL::getPackageForSelf(LL::getTID()) / 2))->push(val);
-    else
-      aborted.getLocal()->push(val);
+    aborted.push(recursiveAbort, val);
     //clear push buffer
     if (ForEachTraits<FunctionTy>::NeedsPush)
       tld.facing.resetPushBuffer();
@@ -204,7 +216,7 @@ protected:
 
   GALOIS_ATTRIBUTE_NOINLINE
   bool handleAborts(ThreadLocalData& tld) {
-    return runQueue<false>(tld, *aborted.getLocal(), true);
+    return runQueue<false>(tld, *aborted.getQueue(), true);
   }
 
   void fastPushBack(typename UserContextAccess<value_type>::PushBufferTy& x) {
