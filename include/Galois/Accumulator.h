@@ -251,6 +251,16 @@ class GVectorElementAccumulator: public GReducible<VectorTy, ReduceVectorWrap<Re
   ElementFunc func;
 
 public:
+
+  void resize(size_t s) {
+    for (int i = 0; i < this->m_data.size(); ++i)
+      this->m_data.getRemote(i)->resize(s);
+  }
+
+  VectorTy& getLocal() {
+    return *this->m_data.getLocal();
+  }
+
   void update(size_t index, const value_type& rhs) {
     VectorTy& v = *this->m_data.getLocal();
     if (v.size() <= index)
