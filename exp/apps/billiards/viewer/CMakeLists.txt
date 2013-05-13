@@ -14,7 +14,7 @@ include(${QT_USE_FILE})
 add_definitions(${QT_DEFINITIONS})
 
 find_package(QGLViewer)
-if(QGLVIEWER_FOUND AND QT4_FOUND)
+if(QGLViewer_FOUND AND QT4_FOUND)
   app(billiards-viewer main.cpp Viewer.cpp Scene.cpp ${viewer_HEADERS_MOC})
   target_link_libraries(billiards-viewer ${OPENGL_LIBRARIES} ${QT_LIBRARIES} ${QGLVIEWER_LIBRARIES})
 endif()

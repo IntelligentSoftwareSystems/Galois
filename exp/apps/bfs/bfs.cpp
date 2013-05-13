@@ -38,7 +38,7 @@
 //#include "Galois/Runtime/ParallelWorkInline.h"
 #include "Galois/Runtime/BulkSynchronousWork.h"
 #endif
-#ifdef GALOIS_USE_TBB
+#ifdef USE_TBB
 #include "tbb/parallel_for.h"
 #include "tbb/parallel_for_each.h"
 #include "tbb/cache_aligned_allocator.h"

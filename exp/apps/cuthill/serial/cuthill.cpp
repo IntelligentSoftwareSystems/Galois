@@ -15,13 +15,6 @@
 //kik 
 #include "Galois/Atomic.h"
 
-#ifdef GALOIS_USE_TBB
-#include "tbb/parallel_for_each.h"
-#include "tbb/cache_aligned_allocator.h"
-#include "tbb/concurrent_vector.h"
-#include "tbb/task_scheduler_init.h"
-#endif
-
 #include <string>
 #include <sstream>
 #include <limits>

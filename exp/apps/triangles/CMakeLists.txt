@@ -1,6 +1,6 @@
 find_package(Eigen)
-if(EIGEN_FOUND)
-  include_directories(${EIGEN_INCLUDE_DIRS})
+if(Eigen_FOUND)
+  include_directories(${Eigen_INCLUDE_DIRS})
   add_definitions(-DHAS_EIGEN)
 endif()
 find_package(OpenMP)

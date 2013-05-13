@@ -23,13 +23,8 @@
 #ifndef LONESTAR_BOILERPLATE_H
 #define LONESTAR_BOILERPLATE_H
 
-#ifdef GALOIS_USE_SVNVERSION
-#include "Galois/svnversion.h"
-#else
-#define SVNVERSION 0
-#endif
-#include "Galois/Version.h"
 #include "Galois/Galois.h"
+#include "Galois/Version.h"
 #include "Galois/Runtime/ll/gio.h"
 #include "llvm/Support/CommandLine.h"
 
@@ -44,7 +39,7 @@ static void LonestarStart(int argc, char** argv, const char* app, const char* de
   using namespace Galois::Runtime::LL;
 
   // display the name only if mater host
-  gPrint("Galois Benchmark Suite v", GALOIS_VERSION_STRING, " (r", SVNVERSION, ")\n");
+  gPrint("Galois Benchmark Suite v", GALOIS_VERSION_STRING, " (r", GALOIS_SVNVERSION, ")\n");
   gPrint("Copyright (C) ", GALOIS_COPYRIGHT_YEAR_STRING, " The University of Texas at Austin\n");
   gPrint("http://iss.ices.utexas.edu/galois/\n\n");
   gPrint("application: ", app ? app : "unspecified", "\n");

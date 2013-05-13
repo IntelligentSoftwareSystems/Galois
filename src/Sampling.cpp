@@ -1,3 +1,4 @@
+#include "Galois/config.h"
 #include "Galois/Runtime/Sampling.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/ll/EnvCheck.h"

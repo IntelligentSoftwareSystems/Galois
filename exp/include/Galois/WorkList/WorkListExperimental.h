@@ -38,7 +38,7 @@
 
 #include "llvm/Support/CommandLine.h"
 
-#ifdef GALOIS_USE_TBB
+#ifdef USE_TBB
 #define TBB_PREVIEW_CONCURRENT_PRIORITY_QUEUE 1
 #include <tbb/concurrent_hash_map.h>
 #include <tbb/concurrent_priority_queue.h>
@@ -1716,7 +1716,7 @@ template <typename T> struct GETID<T*> {
   }
 };
 
-#ifdef GALOIS_USE_TBB
+#ifdef USE_TBB
 template<typename T = int>
 class TbbFIFO : private boost::noncopyable  {
   tbb::concurrent_bounded_queue<T> wl;

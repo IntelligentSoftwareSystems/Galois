@@ -1,10 +1,13 @@
+# Find C++11 flags
+# Once done this will define
+#  CXX11_FLAGS - Compiler flags to enable C++11
 include(CheckCXXCompilerFlag)
 
 #this covers gcc, icc, clang
 set(CXX11_FLAG_CANDIDATES -std=c++11 -std=c++0x)
 
 # Don't do anything when already set
-if(DEFINED CXX11_FLAGS)
+if(CXX11_FLAGS)
   set(CXX11_FLAG_CANDIDATES)
   set(CXX11_FOUND_INTERNAL "YES")
 endif()
@@ -20,6 +23,7 @@ foreach(FLAG ${CXX11_FLAG_CANDIDATES})
   endif()
 endforeach()
 
+include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(CXX11 DEFAULT_MSG CXX11_FOUND_INTERNAL CXX11_FLAGS)
 mark_as_advanced(CXX11_FLAGS)
 

@@ -66,6 +66,9 @@ add_custom_target(more-suites)
 include(ParseArguments)
 
 set(Parallel ${CMAKE_CURRENT_SOURCE_DIR}/src/Parallel.cpp)
+if(GALOIS_USE_VTUNE)
+  add_definitions(-DGALOIS_USE_VTUNE)
+endif()
 file(GLOB DMPRUNTIME ${CMAKE_CURRENT_SOURCE_DIR}/lib/dmpruntime/*.cpp)
 set(HOARD ${CMAKE_CURRENT_SOURCE_DIR}/lib/dmpruntime/libhoard/src/libhoard.cpp)
 

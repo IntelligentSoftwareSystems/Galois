@@ -22,10 +22,11 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
+#include "Galois/config.h"
 #include "Galois/Runtime/mm/Mem.h"
 #include "Galois/Runtime/ll/gio.h"
 
-#ifdef GALOIS_USE_NUMA
+#if defined(GALOIS_USE_NUMA) && !defined(GALOIS_FORCE_NO_NUMA)
 #include <numa.h>
 #endif
 
@@ -100,7 +101,7 @@ static int num_numa_pages_for(unsigned nodeid) {
 }
 
 static int check_numa() {
-#ifdef GALOIS_USE_NUMA
+#if defined(GALOIS_USE_NUMA) && !defined(GALOIS_FORCE_NO_NUMA)
   if (is_numa_available == 0) {
     is_numa_available = numa_available() == -1 ? -1 : 1;
     if (is_numa_available == -1)
@@ -115,7 +116,7 @@ static int check_numa() {
 int Galois::Runtime::MM::numNumaAllocForNode(unsigned nodeid) {
   if (!check_numa())
     return 0;
-#ifdef GALOIS_USE_NUMA
+#if defined(GALOIS_USE_NUMA) && !defined(GALOIS_FORCE_NO_NUMA)
   return num_numa_pages_for(nodeid);
 #else
   return 0;
@@ -125,7 +126,7 @@ int Galois::Runtime::MM::numNumaAllocForNode(unsigned nodeid) {
 int Galois::Runtime::MM::numNumaNodes() {
   if (!check_numa())
     return 1;
-#ifdef GALOIS_USE_NUMA
+#if defined(GALOIS_USE_NUMA) && !defined(GALOIS_FORCE_NO_NUMA)
   return numa_num_configured_nodes();
 #else
   return 1;
@@ -134,7 +135,7 @@ int Galois::Runtime::MM::numNumaNodes() {
 
 static void *alloc_interleaved_subset(size_t len) {
   void* data = 0;
-#if defined(GALOIS_USE_NUMA_OLD)
+#if defined(GALOIS_USE_NUMA_OLD) && !defined(GALOIS_FORCE_NO_NUMA)
   nodemask_t nm = numa_no_nodes;
   unsigned int num = Galois::Runtime::activeThreads;
   int num_nodes = numa_num_configured_nodes();
@@ -144,7 +145,7 @@ static void *alloc_interleaved_subset(size_t len) {
     nodemask_set(&nm, proc/num_nodes);
   }
   data = numa_alloc_interleaved_subset(len, &nm);
-#elif defined(GALOIS_USE_NUMA)  
+#elif defined(GALOIS_USE_NUMA) && !defined(GALOIS_FORCE_NO_NUMA)
   bitmask* nm = numa_allocate_nodemask();
   unsigned int num = Galois::Runtime::activeThreads;
   for (unsigned y = 0; y < num; ++y) {
@@ -162,7 +163,7 @@ static void *alloc_interleaved_subset(size_t len) {
 
 void* Galois::Runtime::MM::largeInterleavedAlloc(size_t len, bool full) {
   void* data = 0;
-#if defined(GALOIS_USE_NUMA)
+#if defined(GALOIS_USE_NUMA) && !defined(GALOIS_FORCE_NO_NUMA)
   if (check_numa()) {
     if (full) 
       data = numa_alloc_interleaved(len);
@@ -185,7 +186,7 @@ void* Galois::Runtime::MM::largeInterleavedAlloc(size_t len, bool full) {
 void Galois::Runtime::MM::largeInterleavedFree(void* m, size_t len) {
   if (!check_numa())
     largeFree(m, len);
-#ifdef GALOIS_USE_NUMA
+#if defined(GALOIS_USE_NUMA) && !defined(GALOIS_FORCE_NO_NUMA)
   numa_free(m, len);
 #else
   largeFree(m, len);

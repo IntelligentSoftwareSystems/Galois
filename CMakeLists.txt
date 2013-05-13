@@ -4,6 +4,7 @@ project(Galois)
 set(GALOIS_VERSION_MAJOR "2")
 set(GALOIS_VERSION_MINOR "2")
 set(GALOIS_VERSION_PATCH "0")
+set(GALOIS_VERSION ${GALOIS_VERSION_MAJOR}.${GALOIS_VERSION_MINOR}.${GALOIS_VERSION_PATCH})
 set(GALOIS_COPYRIGHT_YEAR "2013") # Also in COPYRIGHT
 
 if(NOT CMAKE_BUILD_TYPE)
@@ -12,12 +13,24 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 ###### Options (alternatively pass as options to cmake -DName=Value) ######
-
-#use profiling
 set(USE_GPROF OFF CACHE BOOL "Enable GCC profiling")
-set(USE_VTUNE ON CACHE BOOL "Use vtune (if found) for profiling")
+set(USE_VTUNE OFF CACHE BOOL "Use VTune (if found) for profiling")
 set(USE_PAPI OFF CACHE BOOL "Use PAPI counters for profiling")
 set(USE_STRICT_CONFIG OFF CACHE BOOL "Instead of falling back gracefully, fail")
+set(INSTALL_APPS OFF CACHE BOOL "Install apps as well as library")
+set(SKIP_COMPILE_APPS OFF CACHE BOOL "Skip compilation of applications using Galois library")
+
+set(INSTALL_LIB_DIR lib CACHE PATH "Installation directory for libraries")
+set(INSTALL_BIN_DIR bin CACHE PATH "Installation directory for executables")
+set(INSTALL_INCLUDE_DIR include CACHE PATH "Installation directory for header files")
+set(INSTALL_CMAKE_DIR lib/cmake/Galois CACHE PATH "Installation directory for CMake files")
+# Make relative paths absolute
+foreach(p LIB BIN INCLUDE CMAKE)
+  set(var INSTALL_${p}_DIR)
+  if(NOT IS_ABSOLUTE "${${var}}")
+    set(${var} "${CMAKE_INSTALL_PREFIX}/${${var}}")
+  endif()
+endforeach()
 
 #Enable iss specific options; should be OFF in the general release; all guarded by USE_EXP
 set(USE_EXP OFF CACHE BOOL "Use experimental features") 
@@ -51,21 +64,16 @@ if(CMAKE_COMPILER_IS_GNUCC)
   endif()
 endif()
 
-
 #PThreads
 find_package(Threads REQUIRED)
 
 #NUMA (linux)
-find_package(LIBNUMA)
-if(LIBNUMA_FOUND)
-  add_definitions(-DGALOIS_USE_NUMA)
+find_package(NUMA)
+if(NUMA_FOUND)
+  set(GALOIS_USE_NUMA on)
 elseif(USE_STRICT_CONFIG)
   message(FATAL_ERROR "Need libnuma")
 endif()
-
-#LAPACK
-enable_language(Fortran)
-find_package(LAPACK)
 
 #CILK
 include(CheckCilk)
@@ -76,46 +84,22 @@ if(NOT HAVE_HUGEPAGES AND USE_STRICT_CONFIG)
   message(FATAL_ERROR "Need huge pages")
 endif()
 
-#ZLIB
-find_package(ZLIB REQUIRED)
-include_directories(${ZLIB_INCLUDE_DIRS})
-
 #Boost
 #not needed now but will be needed for newer version of Boost after 1.4X ish
 set(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0" "1.47" "1.47.0" "1.49" "1.49.0" "1.51.0")
 set(Boost_USE_MULTITHREADED OFF) # newer boost builds don't use -mt extension
 #Other options that can be used with find_package(Boost)
 
-if (NOT "$ENV{BOOST_DIR}" STREQUAL "") 
+if(NOT "$ENV{BOOST_DIR}" STREQUAL "") 
   set(BOOST_ROOT $ENV{BOOST_DIR})
-endif ()
+endif()
 
-set(BOOST_LIBS system iostreams filesystem)
 #set(BOOST_LIBS)
 find_package(Boost 1.36.0 COMPONENTS ${BOOST_LIBS} REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 
-if(USE_VTUNE)
-  find_package(VTUNE)
-  if (VTUNE_FOUND)
-    add_definitions(-DGALOIS_USE_VTUNE)
-    include_directories(${VTUNE_INCLUDE_DIRS})
-  else()
-    message(WARNING "VTUNE required but not found")
-  endif()
-endif()
-
-if(USE_PAPI)
-  find_package(PAPI)
-  if (PAPI_FOUND)
-    add_definitions(-DGALOIS_USE_PAPI)
-    include_directories(${PAPI_INCLUDE_DIR})
-  else()
-    message(WARNING "PAPI required but not found")
-  endif()
-endif()
-
 if(USE_EXP)
+  set(USE_VTUNE ON)
   add_definitions(-DGALOIS_USE_EXP)
   include_directories("exp/include")
 
@@ -125,25 +109,10 @@ if(USE_EXP)
     add_definitions(-DGALOIS_USE_PROF)
   endif()
 
-  find_package(TBB)
-  if(TBB_FOUND)
-    add_definitions(-DGALOIS_USE_TBB -DTBB_USE_THREADING_TOOLS=0)
-    include_directories(${TBB_INCLUDE_DIRS})
-  endif()
-
   if(USE_SUBVERSION_REVISION)
-    include_directories("${PROJECT_BINARY_DIR}/include")
     include(GetSVNVersion)
-    add_definitions(-DGALOIS_USE_SVNVERSION)
+    set(GALOIS_USE_SVNVERSION on)
   endif()
-  #find_package(MPI)
-  #if(MPI_FOUND)
-  #  add_definitions(-DGALOIS_MPI)
-  #  include_directories(${MPI_INCLUDE_PATH})
-  #  set(RT_LINK ${MPI_LIBRARIES} ${RT_LINK})
-  #else()
-  #  message(WARNING "MPI specified but not found")
-  #endif()
 endif()
 
 # c++11 features
@@ -158,7 +127,6 @@ endif(USE_GPROF)
 
 #solaris
 if(CMAKE_SYSTEM MATCHES "SunOS.*")
-  add_definitions(-DSOLARIS)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -m64 -mcpu=niagara2 -lposix4")
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -m64 -lposix4")
 endif()
@@ -166,11 +134,6 @@ endif()
 #Always include debug symbols
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
-
-#Disable asserts
-if(CMAKE_BUILD_TYPE MATCHES "Release")
-  add_definitions("-DNDEBUG")
-endif()
 
 #Enable architecture-specific optimizations
 if(CMAKE_BUILD_TYPE MATCHES "Release" AND CMAKE_CXX_COMPILER_ID MATCHES "GNU")
@@ -183,20 +146,19 @@ if(CMAKE_BUILD_TYPE MATCHES "Debug")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
 endif()
 
-#always import c99 stdint functions into c++
-#include(UseStdMacro) # HandleLLVMOptions.cmake already does this for us
-
 include(CheckEndian)
 
-set(LLVM_ENABLE_ASSERTIONS on) # enable assertions in non-release builds
 include(llvm-extras)
+#always import c99 stdint functions into c++
+#include(UseStdMacro) # HandleLLVMOptions.cmake (via llvm-extras) already does this for us
+#include_directories("${PROJECT_BINARY_DIR}/include") # llvm-extra already does this for us
 
 ###### Build Hacks ######
 
 #XXX(ddn): Hack for lonestar machines
-if(LIBNUMA_FOUND)
-  if(LIBNUMA_OLD)
-    add_definitions(-DGALOIS_USE_NUMA_OLD)
+if(NUMA_FOUND)
+  if(NUMA_OLD)
+    set(GALOIS_USE_NUMA_OLD on)
   endif()
 endif()
 
@@ -220,7 +182,7 @@ function(app name)
     if(${${required}} MATCHES "TRUE")
 
     else()
-      message(WARNING "NOT compiling ${name} (missing: ${required})")
+      message("-- NOT compiling ${name} (missing: ${required})")
       return()
     endif()
   endforeach()
@@ -228,13 +190,13 @@ function(app name)
   compileApp(${name} ${APP_DEFAULT_ARGS})
   target_link_libraries(${name} ${APP_EXTLIBS})
   target_link_libraries(${name} galois)
-  install(TARGETS ${name} DESTINATION bin)
+  if(INSTALL_APPS)
+    install(TARGETS ${name} DESTINATION bin)
+  endif()
 endfunction(app)
 
 ###### Source finding ######
-
-configure_file("${PROJECT_SOURCE_DIR}/include/Galois/config.h.in" "${PROJECT_BINARY_DIR}/include/Galois/config.h")
-include_directories("include")
+include_directories(include)
 
 add_subdirectory(lib)
 add_subdirectory(src)
@@ -242,7 +204,9 @@ add_subdirectory(tools)
 add_subdirectory(inputs)
 add_subdirectory(test)
 add_subdirectory(scripts)
-add_subdirectory(apps)
+if(NOT SKIP_COMPILE_APPS)
+  add_subdirectory(apps)
+endif()
 if(USE_EXP)
   add_subdirectory(exp)
 endif()
@@ -262,5 +226,52 @@ set(CPACK_PACKAGE_VERSION_PATCH ${GALOIS_VERSION_PATCH})
 include(CPack)
 
 ###### Installation ######
-install(DIRECTORY include/ DESTINATION include PATTERN ".svn" EXCLUDE PATTERN ".in" EXCLUDE)
 
+export(TARGETS galois FILE "${PROJECT_BINARY_DIR}/GaloisTargets.cmake")
+export(PACKAGE Galois)
+
+# Galois include files
+file(RELATIVE_PATH rel_include_dir "${INSTALL_CMAKE_DIR}" "${INSTALL_INCLUDE_DIR}")
+set(GALOIS_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include" "${PROJECT_BINARY_DIR}/include")
+if(USE_EXP)
+  set(GALOIS_INCLUDE_DIR "${GALOIS_INCLUDE_DIR}" "${PROJECT_SOURCE_DIR}/exp/include")
+endif()
+
+# Galois include dependencies
+set(GALOIS_INCLUDE_DIRS)
+get_target_property(defs galois INCLUDE_DIRECTORIES)
+foreach(d ${defs})
+  string(FIND ${d} ${PROJECT_BINARY_DIR} pos1)
+  string(FIND ${d} ${PROJECT_SOURCE_DIR} pos2)
+  if(NOT ${pos1} EQUAL 0 AND NOT ${pos2} EQUAL 0)
+    set(GALOIS_INCLUDE_DIRS ${GALOIS_INCLUDE_DIRS} ${d})
+  endif()
+endforeach()
+
+# Galois compiler definitions
+set(galois_defs)
+get_directory_property(defs DIRECTORY "${PROJECT_SOURCE_DIR}/src" COMPILE_DEFINITIONS)
+foreach(d ${defs})
+  set(galois_defs "-D${d} ${galois_defs}")
+endforeach()
+get_directory_property(defs DIRECTORY "${PROJECT_SOURCE_DIR}/src" COMPILE_DEFINITIONS_${CMAKE_BUILD_TYPE})
+foreach(d ${defs})
+  set(galois_defs "-D${d} ${galois_defs}")
+endforeach()
+string(TOUPPER ${CMAKE_BUILD_TYPE} upper_build_type)
+set(GALOIS_FLAGS "${galois_defs} ${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_${upper_build_type}}")
+set(GALOIS_CXX_COMPILER "${CMAKE_CXX_COMPILER}")
+
+# Generate appropriate CMake files for installation and build trees
+configure_file("${PROJECT_SOURCE_DIR}/cmake/Modules/GaloisConfig.cmake.in" 
+  "${PROJECT_BINARY_DIR}/GaloisConfig.cmake" @ONLY)
+set(GALOIS_INCLUDE_DIR "\${GALOIS_CMAKE_DIR}/${rel_include_dir}")
+configure_file("${PROJECT_SOURCE_DIR}/cmake/Modules/GaloisConfig.cmake.in" 
+  "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/GaloisConfig.cmake" @ONLY)
+configure_file("${PROJECT_SOURCE_DIR}/cmake/Modules/GaloisConfigVersion.cmake.in"
+  "${PROJECT_BINARY_DIR}/GaloisConfigVersion.cmake" @ONLY)
+install(FILES 
+  "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/GaloisConfig.cmake"
+  "${PROJECT_BINARY_DIR}/GaloisConfigVersion.cmake"
+  DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT dev)
+install(EXPORT GaloisTargets DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT dev)

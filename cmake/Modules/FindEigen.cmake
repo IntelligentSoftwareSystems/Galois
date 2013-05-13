@@ -1,22 +1,23 @@
-set(EIGEN_DIR "$ENV{EIGEN_HOME}")
-
-# - Try to find Eigen library
+# Find Eigen library
 # Once done this will define
-#  EIGEN_FOUND - System has Eigen
-#  EIGEN_INCLUDE_DIRS - The Eigen include directories
-#  EIGEN_LIBRARIES - The libraries needed to use Eigen
+#  Eigen_FOUND - System has Eigen
+#  Eigen_INCLUDE_DIRS - The Eigen include directories
+#  Eigen_LIBRARIES - The libraries needed to use Eigen
 
-set(EIGEN_LIBRARIES) # Include-only library
+set(Eigen_LIBRARIES) # Include-only library
 
-if(EIGEN_INCLUDE_DIR)
-  set(EIGEN_FIND_QUIETLY TRUE)
+if(Eigen_INCLUDE_DIR)
+  set(Eigen_FIND_QUIETLY TRUE)
 endif()
 
-find_path(EIGEN_INCLUDE_DIRS NAMES Eigen/Eigen PATHS ${EIGEN_DIR})
+find_path(Eigen_INCLUDE_DIRS NAMES Eigen/Eigen PATHS ENV EIGEN_HOME)
 
 include(FindPackageHandleStandardArgs)
-# handle the QUIETLY and REQUIRED arguments and set QGLVIEWER_FOUND to TRUE
+# handle the QUIETLY and REQUIRED arguments and set Eigen_FOUND to TRUE
 # if all listed variables are TRUE
-find_package_handle_standard_args(EIGEN DEFAULT_MSG EIGEN_INCLUDE_DIRS)
+find_package_handle_standard_args(Eigen DEFAULT_MSG Eigen_INCLUDE_DIRS)
+if(EIGEN_FOUND)
+  set(Eigen_FOUND TRUE)
+endif()
 
-mark_as_advanced(EIGEN_INCLUDE_DIRS)
+mark_as_advanced(Eigen_INCLUDE_DIRS)
