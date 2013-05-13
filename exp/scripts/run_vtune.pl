@@ -107,6 +107,7 @@ print "RUN: CommandLine $cmdline\n";
 my $dire = "/tmp/$uname.vtune.r$threads";
 my $rdir = "-result-dir=$dire";
 my $report = "-R hw-events -format csv -csv-delimiter tab";
+# my $type = "hotspots";
 
 my $collect;
 if (1) {
@@ -121,10 +122,11 @@ if (1) {
     OFFCORE_RESPONSE_0.ANY_DATA.LOCAL_DRAM
     );
   $collect = "-collect-with runsa -start-paused -knob event-config=" . join(',', @counters);
+    $type = "lightweight-hotspots";
 }
 
 my $sdir = "-search-dir all=$symbol";
-my $maxsec = 1000;
+my $maxsec = 100000;
 
 system("rm -rf $dire");
 system("mkdir $dire");

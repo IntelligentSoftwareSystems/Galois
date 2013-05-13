@@ -31,6 +31,8 @@
 #include <sstream>
 #include <cerrno>
 
+//FIXME: move to Runtime
+
 namespace Galois {
 namespace Runtime {
 namespace LL {
@@ -44,9 +46,7 @@ void gWarnStr(const std::string&);
 //! Prints a debug string (for easy parsing)
 void gDebugStr(const std::string&);
 //! Prints an error string (for easy parsing)
-void gErrorStr(const char* filename, int lineno, const std::string&);
-//! Prints an error string (for easy parsing)
-void gSysErrorStr(const char* filename, int lineno, int err, const std::string&);
+void gErrorStr(const std::string&);
 
 //! Converts a sequence of things to a string
 template<typename T>
@@ -89,29 +89,18 @@ void gDebug(Args... args) {
 
 //! Prints error message
 template<typename... Args>
-void gError(const char* filename, int lineno, Args... args) {
+void gError(Args... args) {
   std::ostringstream os;
   __attribute__((unused)) bool tmp[] = {toString(os, args)...};
-  gErrorStr(filename, lineno, os.str());
-}
-
-/**
- * Prints error message for function that set errno
- */
-template<typename... Args>
-void gSysError(const char* filename, int lineno, Args... args) {
-  int err = errno;
-  std::ostringstream os;
-  __attribute__((unused)) bool tmp[] = {toString(os, args)...};
-  gSysErrorStr(filename, lineno, err, os.str());
+  gErrorStr(os.str());
 }
 
 void gFlush();
 
-#define GALOIS_SYS_ERROR(...) { Galois::Runtime::LL::gSysError(__FILE__, __LINE__, ##__VA_ARGS__); }
-#define GALOIS_ERROR(...) { Galois::Runtime::LL::gError(__FILE__, __LINE__, ##__VA_ARGS__); }
-#define GALOIS_SYS_DIE(...) { Galois::Runtime::LL::gSysError(__FILE__, __LINE__, ##__VA_ARGS__); abort(); }
-#define GALOIS_DIE(...) { Galois::Runtime::LL::gError(__FILE__, __LINE__, ##__VA_ARGS__); abort(); }
+#define GALOIS_SYS_ERROR(...) { Galois::Runtime::LL::gError(__FILE__, ":", __LINE__, ": ", strerror(errno), ": ", ##__VA_ARGS__); }
+#define GALOIS_ERROR(...)     { Galois::Runtime::LL::gError(__FILE__, ":", __LINE__, ##__VA_ARGS__); }
+#define GALOIS_SYS_DIE(...)   { Galois::Runtime::LL::gError(__FILE__, ":", __LINE__, ": ", strerror(errno), ": ", ##__VA_ARGS__); abort(); }
+#define GALOIS_DIE(...)       { Galois::Runtime::LL::gError(__FILE__, ":", __LINE__, ##__VA_ARGS__); abort(); }
 
 }
 }

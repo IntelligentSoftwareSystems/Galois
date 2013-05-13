@@ -53,6 +53,12 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
   endif()
 endif()
 
+#iss hack
+message(STATUS "Using ${CMAKE_CXX_COMPILER_ID}")
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -isystem=/net/faraday/workspace/local/modules/gcc-4.7")
+endif()
+
 #check for incompatible GCC
 if(CMAKE_COMPILER_IS_GNUCC)
   execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion

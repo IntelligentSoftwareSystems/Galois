@@ -60,7 +60,7 @@ class AVIodgReadonly: public AVIodgExplicit {
   // typedef std::vector<AtomicBool> VecAtomicBool;
   //
 
-  typedef GaloisRuntime::PerThreadVector<GNode> WL_ty;
+  typedef Galois::Runtime::PerThreadVector<GNode> WL_ty;
 
 protected:
 
@@ -132,7 +132,7 @@ protected:
     Graph& graph;
     MeshInit& meshInit;
     GlobalVec& g;
-    GaloisRuntime::PerThreadStorage<LocalVec>& perIterLocalVec;
+    Galois::Runtime::PerThreadStorage<LocalVec>& perIterLocalVec;
     bool createSyncFiles;
     IterCounter& opIter;
 
@@ -140,7 +140,7 @@ protected:
         Graph& graph,
         MeshInit& meshInit,
         GlobalVec& g,
-        GaloisRuntime::PerThreadStorage<LocalVec>& perIterLocalVec,
+        Galois::Runtime::PerThreadStorage<LocalVec>& perIterLocalVec,
         bool createSyncFiles,
         IterCounter& opIter)
       :
@@ -176,7 +176,7 @@ public:
     const size_t nrows = meshInit.getSpatialDim ();
     const size_t ncols = meshInit.getNodesPerElem();
 
-    GaloisRuntime::PerThreadStorage<LocalVec> perIterLocalVec;
+    Galois::Runtime::PerThreadStorage<LocalVec> perIterLocalVec;
     for (unsigned int i = 0; i < perIterLocalVec.size(); ++i)
       *perIterLocalVec.getRemote(i) = LocalVec(nrows, ncols);
 

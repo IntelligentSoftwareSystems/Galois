@@ -881,7 +881,7 @@ void buchberger(PolySet& ideal, PolySet& basis, R& ring) {
       continue;
     update(*ii, basis, pairs, ring, ring, initial);
   }
-  using namespace GaloisRuntime::WorkList;
+  using namespace Galois::Runtime::WorkList;
   typedef OrderedByIntegerMetric<Indexer,dChunkedLIFO<8> > OBIM;
   Galois::for_each<OBIM>(initial.begin(), initial.end(), Process<R>(basis, pairs, ring));
 

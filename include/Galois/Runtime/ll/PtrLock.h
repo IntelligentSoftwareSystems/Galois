@@ -62,7 +62,7 @@ class PtrLock<T, true> {
       while (((oldval = _lock) & 1) != 0) {
 	asmPause();
       }
-      assert(oldval & 1 == 0);
+      assert((oldval & 1) == 0);
     } while (!_lock.compare_exchange_weak(oldval, oldval | 1));
     assert(_lock);
   }

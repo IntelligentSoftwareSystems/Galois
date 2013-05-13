@@ -56,8 +56,8 @@ template <typename KNode_tp>
 struct WLfactory {
 
   typedef KEdge<KNode_tp> Edge_ty;
-  typedef typename GaloisRuntime::PerThreadVector<Edge_ty* > WL_ty;
-  typedef typename GaloisRuntime::PerThreadVector<Markable<Edge_ty* > > WLmarkable_ty;
+  typedef typename Galois::Runtime::PerThreadVector<Edge_ty* > WL_ty;
+  typedef typename Galois::Runtime::PerThreadVector<Markable<Edge_ty* > > WLmarkable_ty;
 
 };
 
@@ -229,7 +229,7 @@ void kruskalNoAdjNonSrc (
 
       matchTimer.start ();
 
-      GaloisRuntime::do_all_coupled (
+      Galois::Runtime::do_all_coupled (
           edges.begin (), edges.end (),
           FindLoop<KNode_tp> (matchIter), "match_loop");
 
@@ -238,7 +238,7 @@ void kruskalNoAdjNonSrc (
 
       mergeTimer.start ();
 
-      GaloisRuntime::do_all_coupled (
+      Galois::Runtime::do_all_coupled (
           edges.begin (), edges.end (),
           LinkUpLoop<KNode_tp> (*nextWorkList, round, numUnions, mstSum, mergeIter), "merge_loop");
 
@@ -248,7 +248,7 @@ void kruskalNoAdjNonSrc (
 
       matchTimer.start ();
 
-      GaloisRuntime::do_all_coupled (
+      Galois::Runtime::do_all_coupled (
           *currWorkList,
           FindLoop<KNode_tp> (matchIter), "match_loop");
 
@@ -257,7 +257,7 @@ void kruskalNoAdjNonSrc (
 
       mergeTimer.start ();
 
-      GaloisRuntime::do_all_coupled (
+      Galois::Runtime::do_all_coupled (
           *currWorkList,
           LinkUpLoop<KNode_tp> (*nextWorkList, round, numUnions, mstSum, mergeIter), "merge_loop");
 
@@ -439,7 +439,7 @@ void kruskalNoAdjSrc (std::vector<KNode_tp*>& nodes,
 
     matchTimer.start ();
 
-    GaloisRuntime::do_all_coupled (
+    Galois::Runtime::do_all_coupled (
         workList,
         FindLoop<KNode_tp> (matchIter), "match_loop");
 
@@ -450,7 +450,7 @@ void kruskalNoAdjSrc (std::vector<KNode_tp*>& nodes,
 
     // std::cout << "Starting merge_loop" << std::endl;
 
-    GaloisRuntime::do_all_coupled (
+    Galois::Runtime::do_all_coupled (
         workList,
         UnionLoop<KNode_tp> (round, numUnions, mstSum, mergeIter), "merge_loop");
 

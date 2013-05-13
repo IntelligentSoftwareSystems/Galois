@@ -89,10 +89,10 @@ private:
   struct ODGnode;
 
   static const unsigned CHUNK_SIZE = 16;
-  typedef GaloisRuntime::WorkList::ChunkedFIFO<CHUNK_SIZE, ODGnode*> WLTy;
+  typedef Galois::Runtime::WorkList::ChunkedFIFO<CHUNK_SIZE, ODGnode*> WLTy;
 
   typedef Galois::GAccumulator<size_t> Accumulator;
-  typedef GaloisRuntime::PerCPU < std::vector<ODGnode*> > VecPerThrd;
+  typedef Galois::Runtime::PerCPU < std::vector<ODGnode*> > VecPerThrd;
 
   struct ODGnode {
 

@@ -41,11 +41,22 @@
 #include <iostream>
 #include <fstream>
 #include <iomanip>
+#include <mutex>
 
-static Galois::Runtime::LL::SimpleLock<true> IOLock;
+static void printString(bool error, bool newline, const std::string prefix, const std::string s) {
+  static Galois::Runtime::LL::SimpleLock<true> IOLock;
+//  if (Galois::Runtime::networkHostID == 0) {
+    std::lock_guard<decltype(IOLock)> lock(IOLock);
+    std::ostream& o = error ? std::cerr : std::cout;
+    if (prefix.length()) o << prefix << ": ";
+    o << s;
+    if (newline) o << "\n";
+//  } else {
+//    Galois::Runtime::getSystemNetworkInterface().sendAlt(0, printString, error, newline, host, prefix, s);
+//  }
+}
 
 void Galois::Runtime::LL::gDebugStr(const std::string& s) {
-#ifndef NDEBUG
   static bool skip = EnvCheck("GALOIS_DEBUG_SKIP");
   if (skip) return;
   static const unsigned TIME_STR_SIZE = 32;
@@ -58,56 +69,41 @@ void Galois::Runtime::LL::gDebugStr(const std::string& s) {
 
   strftime(time_str, TIME_STR_SIZE, "[%H:%M:%S]", timeinfo);
 
-  IOLock.lock ();
+  std::ostringstream os;
+  os << "[" << time_str << " " << std::setw(3) << getTID() << "] " << s;
+
   if (EnvCheck("GALOIS_DEBUG_TO_FILE")) {
+    static Galois::Runtime::LL::SimpleLock<true> dIOLock;
+    std::lock_guard<decltype(dIOLock)> lock(dIOLock);
     static std::ofstream debugOut;
     if (!debugOut.is_open()) {
       char fname[] = "gdebugXXXXXX";
       int fd = mkstemp(fname);
       close(fd);
       debugOut.open(fname);
-      IOLock.unlock();
       gInfo("Debug output going to ", fname);
-      IOLock.lock();
     }
-
-    debugOut << "[" << time_str << " " << std::setw(3) << getTID() << "] " << s << "\n";
+    debugOut << os.str() << "\n";
     debugOut.flush();
   } else {
-    std::cerr << "[" << time_str << " " << std::setw(3) << getTID() << "] " << s << "\n";
+    printString(true, true, "DEBUG", os.str());
   }
-  IOLock.unlock();
-#endif
 }
 
 void Galois::Runtime::LL::gPrintStr(const std::string& s) {
-  IOLock.lock();
-  std::cout << s;
-  IOLock.unlock();
+  printString(false, false, "", s);
 }
 
 void Galois::Runtime::LL::gInfoStr(const std::string& s) {
-  IOLock.lock();
-  std::cout << "INFO: " << s << "\n";
-  IOLock.unlock();
+  printString(false, true, "INFO", s);
 }
 
 void Galois::Runtime::LL::gWarnStr(const std::string& s) {
-  IOLock.lock();
-  std::cout << "WARNING: " << s << "\n";
-  IOLock.unlock();
+  printString(false, true, "WARNING", s);
 }
 
-void Galois::Runtime::LL::gErrorStr(const char* filename, int lineno, const std::string& s) {
-  IOLock.lock();
-  std::cerr << "ERROR: " << filename << ":" << lineno << " " << s << "\n";
-  IOLock.unlock();
-}
-
-void Galois::Runtime::LL::gSysErrorStr(const char* filename, int lineno, int err, const std::string& s) {
-  IOLock.lock();
-  std::cerr << "ERROR: " << filename << ":" << lineno << ": " << strerror(err) << ": " << s << "\n";
-  IOLock.unlock();
+void Galois::Runtime::LL::gErrorStr(const std::string& s) {
+  printString(false, true, "ERROR", s);
 }
 
 void Galois::Runtime::LL::gFlush() {
