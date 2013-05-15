@@ -502,11 +502,9 @@ struct DetBarrierAlgo {
   typedef LocalState GaloisDeterministicLocalState;
   static_assert(Galois::has_deterministic_local_state<DetBarrierAlgo>::value, "Oops");
 
-  struct GaloisDeterministicId {
-    unsigned long operator()(const ItemTy& item) const {
-      return graph.getData(item.first, Galois::MethodFlag::NONE).id;
-    }
-  };
+  uintptr_t galoisDeterministicId(const ItemTy& item) const {
+    return graph.getData(item.first, Galois::MethodFlag::NONE).id;
+  }
   static_assert(Galois::has_deterministic_id<DetBarrierAlgo>::value, "Oops");
 
   void operator()(const GNode& source) const {

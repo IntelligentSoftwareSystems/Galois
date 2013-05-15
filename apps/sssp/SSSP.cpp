@@ -188,7 +188,7 @@ void initialize(Algo& algo,
   if (startNode >= graph.size() || reportNode >= graph.size()) {
     std::cerr 
       << "failed to set report: " << reportNode 
-      << "or failed to set source: " << startNode << "\n";
+      << " or failed to set source: " << startNode << "\n";
     assert(0);
     abort();
   }

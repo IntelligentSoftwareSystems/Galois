@@ -687,11 +687,9 @@ struct DeterministicAlgo {
     typedef LocalState GaloisDeterministicLocalState;
     static_assert(Galois::has_deterministic_local_state<Process>::value, "Oops");
 
-    struct GaloisDeterministicId {
-      unsigned long operator()(const WorkItem& item) const {
-        return item.first;
-      }
-    };
+    uintptr_t galoisDeterministicId(const WorkItem& item) const {
+      return item.first;
+    }
     static_assert(Galois::has_deterministic_id<Process>::value, "Oops");
 
     void build(const WorkItem& item, typename LocalState::Pending* pending) const {
