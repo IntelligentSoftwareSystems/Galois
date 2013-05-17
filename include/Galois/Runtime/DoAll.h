@@ -75,12 +75,11 @@ class DoAllWork {
 
   //! Master execution function for this loop type
   void processRange(PrivateState& tld) {
-    NetworkInterface& net = getSystemNetworkInterface();
     while(tld.begin != tld.end) {
       try {
         tld.cnx.start_iteration();
         if ((networkHostNum > 1) && (!LL::getTID()))
-          net.handleReceives();
+          doNetworkWork();
         tld.F(*tld.begin);
       } catch (const remote_ex& ex) {
         tld.cnx.cancel_iteration();
@@ -93,7 +92,7 @@ class DoAllWork {
       do {
         try {
           if ((networkHostNum > 1) && (!LL::getTID()))
-            net.handleReceives();
+            doNetworkWork();
           ++tld.begin;
         } catch (const remote_ex& ex) {
           continue;

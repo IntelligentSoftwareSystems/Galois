@@ -17,10 +17,10 @@ struct InsertBody : public Galois::Runtime::Lockable {
   }
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+  void serialize(Galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s,pBodies);
   }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s,pBodies);
   }
 };
@@ -31,7 +31,7 @@ struct PrintInt : public Galois::Runtime::Lockable {
 
   template<typename Context>
   void operator()(int i, Context& cnx) {
-    Galois::Runtime::LL::gPrint("i: ", i, " host: ", Galois::Runtime::Distributed::networkHostID, "\n");
+    Galois::Runtime::LL::gPrint("i: ", i, " host: ", Galois::Runtime::networkHostID, "\n");
     //    std::stringstream ss;
     //    ss << "i: " << i << " host: " << Galois::Runtime::Distributed::networkHostID << "\n";
     //    std::cout << ss.str();
@@ -39,15 +39,15 @@ struct PrintInt : public Galois::Runtime::Lockable {
 
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const { }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) { }
+  void serialize(Galois::Runtime::SerializeBuffer& s) const { }
+  void deserialize(Galois::Runtime::DeSerializeBuffer& s) { }
 };
 
 int main(int argc, char** argv) {
   LonestarStart(argc, argv, nullptr, nullptr, nullptr);
 
   // check the host id and initialise the network
-  Galois::Runtime::Distributed::networkStart();
+  Galois::Runtime::networkStart();
 
   IntPtrs pBodies = Galois::Graph::Bag<int>::allocate();
   Galois::for_each<>(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(10), InsertBody(pBodies));
@@ -55,7 +55,7 @@ int main(int argc, char** argv) {
   Galois::for_each_local<>(pBodies,PrintInt());
 
   // master_terminate();
-  Galois::Runtime::Distributed::networkTerminate();
+  Galois::Runtime::networkTerminate();
 
   return 0;
 }

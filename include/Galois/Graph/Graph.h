@@ -55,7 +55,7 @@ struct EdgeItem;
 template<typename NTy, typename ETy>
 struct EdgeItem<NTy, ETy, true> {
   typedef ETy& reference;
-  
+
   NTy* N;
   ETy Ea;
 

@@ -12,20 +12,19 @@ typedef vector<int>::iterator IterTy;
 struct R : public Galois::Runtime::Lockable {
    int i;
 
-   R() { i = 0; }
+  R() :i(0) {}
 
-   void add(int v) {
-      //printf ("In Host %u and thread %u processing number %d\n", networkHostID, LL::getTID(), v);
-      i += v;
-      return;
-   }
+  void add(int v) {
+    std::cerr << "In Host " << networkHostID << " and thread " << LL::getTID() << " processing number " << v << " old value " << i << "\n";
+    i += v;
+    return;
+  }
 
-  // serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+  void serialize(Galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s,i);
   }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s,i);
   }
 };
@@ -42,10 +41,10 @@ struct f1 {
 
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+  void serialize(Galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s,r);
   }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s,r);
   }
 };
@@ -59,7 +58,7 @@ int main(int argc, char *argv[])
    LonestarStart(argc, argv, name, desc, url);
 
    // check the host id and initialise the network
-   Galois::Runtime::Distributed::networkStart();
+   Galois::Runtime::networkStart();
 
    vector<int> myvec;
    typedef Galois::WorkList::LIFO<int,true> chunk;
@@ -67,11 +66,13 @@ int main(int argc, char *argv[])
    f1 f(&r);
    for (int i=1; i<=40; i++) myvec.push_back(i);
 
-   Galois::for_each<chunk,IterTy,f1> (myvec.begin(), myvec.end(), f);
-   printf ("sum is %d\n", f.r->i);
+   std::cerr << "stating\n";
 
+   Galois::for_each<chunk,IterTy,f1> (myvec.begin(), myvec.end(), f);
+   std::cerr << "sum is " << f.r->i << "\n";
+   std::cerr << "sum should be " << std::accumulate(myvec.begin(), myvec.end(), 0) << "\n";
    // master_terminate();
-   Galois::Runtime::Distributed::networkTerminate();
+   Galois::Runtime::networkTerminate();
 
    return 0;
 }

@@ -29,9 +29,27 @@
 namespace Galois {
 namespace Runtime {
 
-void trace_obj_send(uint32_t owner, void* ptr, uint32_t remote);
-void trace_obj_recv(uint32_t owner, void* ptr);
-void trace_bcast_recv(uint32_t at);
+void trace_obj_send_impl(uint32_t owner, void* ptr, uint32_t remote);
+void trace_obj_recv_impl(uint32_t owner, void* ptr);
+void trace_bcast_recv_impl(uint32_t at);
+
+//#define NOTRACE
+
+inline void trace_obj_send(uint32_t owner, void* ptr, uint32_t remote) {
+#ifndef NOTRACE
+  trace_obj_send_impl(owner, ptr, remote);
+#endif
+}
+inline void trace_obj_recv(uint32_t owner, void* ptr) {
+#ifndef NOTRACE
+  trace_obj_recv_impl(owner, ptr);
+#endif
+}
+inline void trace_bcast_recv(uint32_t at) {
+#ifdef NOTRACE
+  trace_bcast_recv_impl(at);
+#endif
+}
 
 }
 }

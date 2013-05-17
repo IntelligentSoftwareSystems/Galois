@@ -36,16 +36,6 @@ struct op {
       L.unlock();
     }
   }
-
-  // serialization functions
-  typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-    gSerialize(s,Gr);
-  }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-    gDeserialize(s,Gr);
-  }
-
 };
 
 struct cop {
@@ -60,19 +50,9 @@ struct cop {
     Gr->addNode(node);
     // static Galois::Runtime::LL::SimpleLock<true> L;
     // L.lock();
-    // std::cout << x << " " << Galois::Runtime::Distributed::networkHostID << " " << Galois::Runtime::LL::getTID() << "\n";
+    //std::cout << x << " " << Galois::Runtime::networkHostID << " " << Galois::Runtime::LL::getTID() << "\n";
     // L.unlock();
   }
-
-  // serialization functions
-  typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-    gSerialize(s,Gr);
-  }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-    gDeserialize(s,Gr);
-  }
-
 };
 
 int main(int argc, char** argv) {
@@ -80,29 +60,27 @@ int main(int argc, char** argv) {
   LonestarStart(argc, argv, nullptr, nullptr, nullptr);
 
   // check the host id and initialise the network
-  Galois::Runtime::Distributed::networkStart();
+  Galois::Runtime::networkStart();
 
   Gptr Gr = G::allocate();
 
   Galois::for_each<>(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(num), cop(Gr));
   std::cout << "\nDone Building\n";
 
-  //  volatile int br = 1;
-  //  while (br) {}
   std::cout << "\nTotal Size " << std::distance(Gr->begin(), Gr->end()) << " (should be " << num << ")\n";
   unsigned r;
   for (int x = 0; x < num; ++x)
     if (!check(x, Gr, r))
       std::cout << "Mismatch " << x << " " << num - x << " " << r << "\n";
   std::cout << "\nDone Local Check\n";
-  // br = 0;
-  // while (br) {}
+  volatile int brx = 1;
+  while (brx) {}
   Galois::for_each<>(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(num), op(Gr));
 
   std::cout << "\nDone Remote Check\n";
 
   // master_terminate();
-  Galois::Runtime::Distributed::networkTerminate();
+  Galois::Runtime::networkTerminate();
 
   return 0;
 }

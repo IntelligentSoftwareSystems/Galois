@@ -42,7 +42,7 @@ endif()
 
 message(STATUS "Using ${CMAKE_CXX_COMPILER_ID}")
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -isystem=/net/faraday/workspace/local/modules/gcc-4.7")
+#   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -isystem=/net/faraday/workspace/local/modules/gcc-4.7")
 endif()
 
 #check for incompatible GCC
@@ -127,6 +127,8 @@ if(USE_EXP)
 
   add_definitions(-DGALOIS_USE_EXP)
   include_directories("exp/include")
+
+  find_package(OpenMP)
 
   if(USE_PROF) 
     add_definitions(-DGALOIS_USE_PROF)

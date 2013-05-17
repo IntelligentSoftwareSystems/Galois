@@ -7,10 +7,10 @@ using namespace Galois::Runtime;
 typedef vector<int>::iterator IterTy;
 
 struct f1 {
-   void operator()(int& data, Galois::UserContext<int>& lwl) {
-      printf (" %d", data);
-      return;
-   }
+  void operator()(int& data, Galois::UserContext<int>& lwl) {
+    printf ("%d,%d ", Galois::Runtime::networkHostID, data);
+    return;
+  }
 };
 
 int main(int argc, char *argv[])
@@ -18,7 +18,7 @@ int main(int argc, char *argv[])
    // Galois::setActiveThreads(4);
 
    // check the host id and initialise the network
-   Galois::Runtime::Distributed::networkStart();
+   Galois::Runtime::networkStart();
 
    vector<int> myvec;
    f1 f;
@@ -29,7 +29,7 @@ int main(int argc, char *argv[])
    printf ("\n");
 
    // master_terminate();
-   Galois::Runtime::Distributed::networkTerminate();
+   Galois::Runtime::networkTerminate();
 
    return 0;
 }

@@ -109,7 +109,7 @@ public:
   void sendInternal(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
     assert(Galois::Runtime::LL::getTID() == 0);
     assert(recv);
-    buf.serialize_header((uintptr_t)recv);
+    buf.serialize_header((void*)recv);
     if (true) {
       pending_sends.emplace_back(MPI_REQUEST_NULL, std::move(buf));
       std::pair<MPI_Request, SendBuffer>& com = pending_sends.back();
@@ -259,9 +259,4 @@ public:
 NetworkInterface& Galois::Runtime::getSystemNetworkInterface() {
   static NetworkInterfaceSyncMPI net;
   return net;
-}
-
-ObjectRecord& Galois::Runtime::getSystemRemoteObjects() {
-  static ObjectRecord obj;
-  return obj;
 }

@@ -21,16 +21,6 @@ struct op {
     G::NodeHandle node = graph->createNode(nodeval);
     node->createEdge(node, node, -node->getData());
   }
-
-  // serialization functions
-  typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-    gSerialize(s,graph);
-  }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-    gDeserialize(s,graph);
-  }
-
 };
 
 int main(int argc, char** argv) {
@@ -38,7 +28,7 @@ int main(int argc, char** argv) {
   LonestarStart(argc, argv, nullptr, nullptr, nullptr);
 
   // check the host id and initialise the network
-  Galois::Runtime::Distributed::networkStart();
+  Galois::Runtime::networkStart();
 
   G::pointer Gr = G::allocate();
 
@@ -49,7 +39,7 @@ int main(int argc, char** argv) {
   std::cout << "\n";
 
   // master_terminate();
-  Galois::Runtime::Distributed::networkTerminate();
+  Galois::Runtime::networkTerminate();
 
   return 0;
 }

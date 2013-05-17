@@ -89,7 +89,7 @@ void* PerBackend_v2::resolveRemote_i(uint64_t off, uint32_t hostID) {
      getSystemNetworkInterface().sendAlt(hostID, pBe2Resolve, networkHostID, off);
      do {
        if (LL::getTID() == 0)
-	 getSystemNetworkInterface().handleReceives();
+         doNetworkWork();
        lock.lock();
        void* retval = remoteCache[std::make_pair(off, hostID)];
        lock.unlock();
@@ -167,7 +167,7 @@ void* PerBackend_v3::resolveRemote_i(uint64_t offset, uint32_t hostID, uint32_t 
      getSystemNetworkInterface().sendAlt(hostID, pBe2Resolve, networkHostID, offset, threadID);
      do {
        if (LL::getTID() == 0)
-	 getSystemNetworkInterface().handleReceives();
+         doNetworkWork();
        lock.lock();
        void* retval = remoteCache[std::make_tuple(offset, hostID, threadID)];
        lock.unlock();

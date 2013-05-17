@@ -254,13 +254,13 @@ public:
 
   NItem& getNhoodItem (Lockable* l) {
 
-    if (l->auxPtr.getValue () == NULL) {
+    if ((void*)l->auxData == NULL) {
       NItem* nv = niAlloc.allocate (1);
       assert (nv != NULL);
       niAlloc.construct (nv, l, cmp);
       // NItem* nv = new NItem (l, cmp);
 
-      if (l->auxPtr.CAS (NULL, nv)) {
+      if (__sync_bool_compare_and_swap(&l->auxData, 0, (uintptr_t)nv)) {
         allNItems.get ().push_back (nv);
       } else {
         // delete nv; nv = NULL;
@@ -270,10 +270,10 @@ public:
       }
 
 
-      assert (l->auxPtr.getValue () != NULL);
+      assert (l->auxData);
     }
 
-    NItem* ret = static_cast<NItem*> (l->auxPtr.getValue ());
+    NItem* ret = static_cast<NItem*> (l->auxData);
     assert (ret != NULL);
     return *ret;
   }

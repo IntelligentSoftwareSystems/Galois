@@ -23,7 +23,7 @@ int main(int argc, char** argv) {
   LonestarStart(argc, argv, nullptr, nullptr, nullptr);
 
   // check the host id and initialise the network
-  Galois::Runtime::Distributed::networkStart();
+  Galois::Runtime::networkStart();
 
   typedef G<int, int , EdgeDirection::Out> GTy;
   GTy::pointer Gr = GTy::allocate();
@@ -38,11 +38,11 @@ int main(int argc, char** argv) {
   std::cout << "\n";
 
   // master_terminate();
-  Galois::Runtime::Distributed::networkTerminate();
+  Galois::Runtime::networkTerminate();
 
   ///debugging stuff below this point
   if (false) {
-    Galois::Runtime::Distributed::SerializeBuffer B;
+    Galois::Runtime::SerializeBuffer B;
     //serialize the pointer
     auto oldB = *Gr->begin();
     gSerialize(B,oldB);
@@ -52,7 +52,7 @@ int main(int argc, char** argv) {
     B.print(std::cout);
     std::cout << "\n";
     
-    Galois::Runtime::Distributed::DeSerializeBuffer D(B.size());
+    Galois::Runtime::DeSerializeBuffer D(B.size());
     memcpy(D.linearData(), B.linearData(), B.size());
     
     D.print(std::cout);

@@ -5,11 +5,11 @@
 #include <iostream>
 #include <cmath>
 
-using namespace Galois::Runtime::Distributed;
+using namespace Galois::Runtime;
 
 bool didbcast = false;
 
-struct sayHi {
+struct sayHi : public Galois::Runtime::Lockable {
   sayHi(Galois::Runtime::PerHost<sayHi> ptr, DeSerializeBuffer& b) { std::cout << "Hi " << this << "\n"; }
   sayHi(Galois::Runtime::PerHost<sayHi> ptr) { std::cout << "Hi " << this << "\n"; }
   ~sayHi() { std::cout << "Bye\n"; }

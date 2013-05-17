@@ -45,14 +45,11 @@ static void networkExit() {
 
 void Galois::Runtime::networkStart() {
   getSystemBarrier(); // initialize barrier before anyone might be at it
-  auto& net = getSystemNetworkInterface();
-  auto& ld = getSystemLocalDirectory();
-  auto& rd = getSystemRemoteDirectory();
+  getSystemNetworkInterface();
+  getSystemDirectory();
   if (networkHostID != 0) {
     while (!ourexit) {
-      ld.makeProgress();
-      rd.makeProgress();
-      net.handleReceives();
+      doNetworkWork();
     }
     exit(0);
   }
@@ -65,7 +62,7 @@ void Galois::Runtime::networkTerminate() {
   assert(networkHostID == 0);
   NetworkInterface& net = getSystemNetworkInterface();
   net.broadcastAlt(&networkExit);
-  net.handleReceives();
+  doNetworkWork();
   return;
 }
 
@@ -80,7 +77,7 @@ void Galois::Runtime::distWait() {
   SendBuffer buf;
   NetworkInterface& net = getSystemNetworkInterface();
   net.broadcast(&distWaitLandingPad, buf);
-  net.handleReceives();
+  doNetworkWork();
   net.systemBarrier();
 }
 
@@ -131,7 +128,7 @@ static void bcastLandingPad(Galois::Runtime::RecvBuffer& buf) {
 void Galois::Runtime::NetworkInterface::broadcast(recvFuncTy recv, SendBuffer& buf, bool self) {
   unsigned source = Galois::Runtime::networkHostID;
   Galois::Runtime::trace_bcast_recv(source);
-  buf.serialize_header((uintptr_t)recv);
+  buf.serialize_header((void*)recv);
   Galois::Runtime::RecvBuffer rbuf(std::move(buf));
   bcastForward(source, rbuf);
   if (self)

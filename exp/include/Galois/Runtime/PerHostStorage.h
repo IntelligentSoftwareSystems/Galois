@@ -297,14 +297,14 @@ public:
   iterator begin() { return iterator(0,0,*this); }
   iterator end() { return iterator(); }
 
-  //serialize
-  typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
-    gSerialize(s,offset);
-  }
-  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
-    gDeserialize(s,offset);
-  }
+  // //serialize
+  // typedef int tt_has_serialize;
+  // void serialize(Galois::Runtime::SerializeBuffer& s) const {
+  //   gSerialize(s,offset);
+  // }
+  // void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+  //   gDeserialize(s,offset);
+  //  }
 };
 
   

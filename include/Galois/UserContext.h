@@ -69,7 +69,7 @@ protected:
     localStateUsed = used;
   }
 
-  constexpr unsigned fastPushBackLimit() {
+  unsigned fastPushBackLimit() const {
     return 64;
   }
 

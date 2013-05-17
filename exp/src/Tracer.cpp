@@ -25,6 +25,7 @@
 #include "Galois/Runtime/Tracer.h"
 #include "Galois/Runtime/Network.h"
 #include "Galois/Runtime/ll/gio.h"
+#include "Galois/Runtime/ll/EnvCheck.h"
 
 using Galois::Runtime::LL::gDebug;
 using Galois::Runtime::getSystemNetworkInterface;
@@ -35,7 +36,7 @@ using Galois::Runtime::networkHostID;
 
 namespace {
 
-int count;
+static int count;
 
 void trace_obj_send_do(uint32_t src, uint32_t owner, void* ptr, uint32_t remote) {
   int v = __sync_add_and_fetch(&count, 1);
@@ -51,67 +52,30 @@ void trace_bcast_recv_do(uint32_t host, uint32_t source) {
   gDebug("BCast at ", host, " from ", source);
 }
 
-void trace_obj_recv_pad(RecvBuffer &buf) {
-  uint32_t src;
-  uint32_t owner;
-  void* ptr;
-  gDeserialize(buf, src, owner, ptr);
-  trace_obj_recv_do(src, owner, ptr);
 }
 
-void trace_obj_send_pad(RecvBuffer &buf) {
-  uint32_t src;
-  uint32_t owner;
-  void* ptr;
-  uint32_t remote;
-  gDeserialize(buf, src, owner, ptr, remote);
-  trace_obj_send_do(src, owner, ptr, remote);
-}
+static const bool traceLocal = Galois::Runtime::LL::EnvCheck("GALOIS_TRACE_LOCAL");
 
-void trace_bcast_recv_pad(RecvBuffer &buf) {
-  uint32_t host, source;
-  gDeserialize(buf, host, source);
-  trace_bcast_recv_do(host, source);
-}
-
-}
-
-void Galois::Runtime::trace_obj_send(uint32_t owner, void* ptr, uint32_t remote) {
-#ifdef NDEBUG
-  return;
-#endif
-
-  if (networkHostID == 0) {
+void Galois::Runtime::trace_obj_send_impl(uint32_t owner, void* ptr, uint32_t remote) {
+  if (networkHostID == 0 || traceLocal) {
     trace_obj_send_do(networkHostID, owner, ptr, remote);
   } else {
-    SendBuffer sbuf;
-    gSerialize(sbuf, networkHostID, owner, ptr, remote);
-    getSystemNetworkInterface().send(0, &trace_obj_send_pad, sbuf);
+    getSystemNetworkInterface().sendAlt(0, &trace_obj_send_do, networkHostID, owner, ptr, remote);
   }
 }
 
-void Galois::Runtime::trace_obj_recv(uint32_t owner, void* ptr) {
-#ifdef NDEBUG
-  return;
-#endif
-  if (networkHostID == 0) {
+void Galois::Runtime::trace_obj_recv_impl(uint32_t owner, void* ptr) {
+  if (networkHostID == 0 || traceLocal) {
     trace_obj_recv_do(networkHostID, owner, ptr);
   } else {
-    SendBuffer sbuf;
-    gSerialize(sbuf, networkHostID, owner, ptr);
-    getSystemNetworkInterface().send(0, &trace_obj_recv_pad, sbuf);
+    getSystemNetworkInterface().sendAlt(0, &trace_obj_recv_do, networkHostID, owner, ptr);
   }
 }
 
-void Galois::Runtime::trace_bcast_recv(uint32_t source) {
-#ifdef NDEBUG
-  return;
-#endif
-  if (networkHostID == 0) {
+void Galois::Runtime::trace_bcast_recv_impl(uint32_t source) {
+  if (networkHostID == 0 || traceLocal) {
     trace_bcast_recv_do(networkHostID, source);
   } else {
-    SendBuffer sbuf;
-    gSerialize(sbuf, networkHostID, source);
-    getSystemNetworkInterface().send(0, &trace_bcast_recv_pad, sbuf);
+    getSystemNetworkInterface().sendAlt(0, &trace_bcast_recv_do, networkHostID, source);
   }
 }

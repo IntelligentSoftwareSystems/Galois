@@ -31,15 +31,12 @@
 #include "Galois/Runtime/ActiveThreads.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 #include "Galois/Runtime/Network.h"
+#include "Galois/Runtime/Directory.h"
 
 #include <pthread.h>
 
 #include <cstdlib>
 #include <cstdio>
-
-#ifdef GALOIS_USE_DMP
-#include "dmp.h"
-#endif
 
 class PthreadBarrier {
   pthread_barrier_t bar;
@@ -293,7 +290,7 @@ public:
     if (Galois::Runtime::LL::getTID() == 0) {
       __sync_fetch_and_add(&count, Galois::Runtime::networkHostNum * Galois::Runtime::activeThreads);
       while (count > 0)
-        Galois::Runtime::getSystemNetworkInterface().handleReceives();
+        Galois::Runtime::doNetworkWork();
       //passed barrier, notify local
       ++gsense;
     } else {
@@ -305,7 +302,7 @@ public:
     // there's a possibility that one of the thread's broadcast
     // message wasn't communicated
     if (Galois::Runtime::LL::getTID() == 0)
-      Galois::Runtime::getSystemNetworkInterface().handleReceives();
+      Galois::Runtime::doNetworkWork();
   }
 
   static void broadcastLandingPad(Galois::Runtime::RecvBuffer&) {

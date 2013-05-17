@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -46,7 +46,8 @@
 
 static void printString(bool error, bool newline, uint32_t host, const std::string prefix, const std::string s) {
   static Galois::Runtime::LL::SimpleLock<true> IOLock;
-  if (Galois::Runtime::networkHostID == 0) {
+  static bool local = Galois::Runtime::LL::EnvCheck("GALOIS_DEBUG_LOCAL");
+  if (Galois::Runtime::networkHostID == 0 || local) {
     std::lock_guard<decltype(IOLock)> lock(IOLock);
     std::ostream& o = error ? std::cerr : std::cout;
     if (prefix.length()) o << prefix << " " << host << ": ";
@@ -73,7 +74,9 @@ void Galois::Runtime::LL::gDebugStr(const std::string& s) {
   std::ostringstream os;
   os << "[" << time_str << " " << std::setw(3) << getTID() << "] " << s;
 
-  if (EnvCheck("GALOIS_DEBUG_TO_FILE")) {
+  static bool tofile = EnvCheck("GALOIS_DEBUG_TO_FILE");
+
+  if (tofile) {
     static Galois::Runtime::LL::SimpleLock<true> dIOLock;
     std::lock_guard<decltype(dIOLock)> lock(dIOLock);
     static std::ofstream debugOut;

@@ -40,17 +40,32 @@ SimpleRuntimeContext& Galois::Runtime::getAbortCnx() {
   return obj;
 }
 
-uint32_t Directory::getCurLoc(fatPointer ptr) {
-  return 0;
+std::pair<Lockable*, boost::intrusive_ptr<remoteObj>> Directory::getObjUntyped(fatPointer ptr) {
+  //Get the object
+  std::pair<Lockable*, boost::intrusive_ptr<remoteObj> > retval;
+  if (ptr.first == networkHostID) {
+    retval.first = ptr.second;
+  } else {
+    retval.second = remoteWeakResolve(ptr);
+    if (retval.second)
+      retval.first = retval.second->getObj();
+  }
+  return retval;
 }
 
+
 void Directory::notifyWhenAvailable(fatPointer ptr, std::function<void(fatPointer)> func) {
-  //FIXME: check of obj is resident
   Lock.lock();
   notifiers.insert(std::make_pair(ptr,func));
   Lock.unlock();
-  //  if (checkAvailable(ptr))
-  //    notify(ptr);
+
+  //check for existance
+  //Get the object
+  std::pair<Lockable*, boost::intrusive_ptr<remoteObj> > obj = getObjUntyped(ptr);
+  if (obj.first && !isAcquiredBy(obj.first, this)) {
+    assert(!getPending(obj.first));
+    notify(ptr);
+  }
 }
 
 void Directory::notify(fatPointer ptr) {
@@ -63,50 +78,9 @@ void Directory::notify(fatPointer ptr) {
   std::for_each(V.begin(), V.end(), [ptr] (std::function<void(fatPointer)>& f) { f(ptr); });
 }
 
-void Directory::delayWork(std::function<void ()> f) {
-  std::lock_guard<LL::SimpleLock<true>> L(Lock);
-  pending.push_back(f);
+void Directory::tryNotifyAll() {
+  
 }
-
-void Directory::doPendingWork() {
-  Lock.lock();
-  std::vector<std::function<void ()>> mypending;
-  mypending.swap(pending);
-  Lock.unlock();
-  LL::compilerBarrier(); // This appears to be needed for a gcc bug
-  for (auto iter = mypending.begin(); iter != mypending.end(); ++iter)
-    (*iter)();
-}
-
-size_t Directory::pendingSize() {
-  std::lock_guard<LL::SimpleLock<true>> L(Lock);
-  return pending.size();
-}
-
-Lockable* Directory::remoteResolve(fatPointer ptr) {
-  assert(ptr.first != networkHostID);
-  std::lock_guard<LL::SimpleLock<true> > lg(remoteLock);
-  auto iter = remoteObjects.find(ptr);
-  if (iter == remoteObjects.end())
-    return nullptr;
-  else
-    return iter->second;
-}
-
-void Directory::remoteSet(fatPointer ptr, Lockable* obj) {
-  assert (ptr.first != networkHostID);
-  std::lock_guard<LL::SimpleLock<true> > lg(remoteLock);
-  assert(!remoteObjects.count(ptr));
-  remoteObjects[ptr] = obj;
-}
-
-void Directory::remoteClear(fatPointer ptr) {
-  assert (ptr.first != networkHostID);
-  std::lock_guard<LL::SimpleLock<true> > lg(remoteLock);
-  assert(remoteObjects.count(ptr));
-  remoteObjects.erase(ptr);
-}
-
 
 void Directory::sendRequest(fatPointer ptr, uint32_t msgTo, recvFuncTy f, uint32_t objTo) {
   SendBuffer sbuf;
@@ -114,37 +88,32 @@ void Directory::sendRequest(fatPointer ptr, uint32_t msgTo, recvFuncTy f, uint32
   getSystemNetworkInterface().send(msgTo, f, sbuf);
 }
 
-void Directory::fetchObj(fatPointer ptr, uint32_t msgTo, recvFuncTy f, uint32_t objTo) {
-  fetchLock.lock();
-  if (!pendingFetches.count(ptr)) {
-    pendingFetches.insert(ptr);
-    fetchLock.unlock();
-    //don't need lock to send request
+void Directory::fetchObj(Lockable* obj, fatPointer ptr, uint32_t msgTo, recvFuncTy f, uint32_t objTo) {
+  if (!getPending(obj)) {
+    setPending(obj);
     sendRequest(ptr, msgTo, f, objTo);
-  } else {
-    fetchLock.unlock();
   }
 }
 
-void Directory::dropPending(fatPointer ptr) {
-  std::lock_guard<LL::SimpleLock<true> > lg(fetchLock);
-  pendingFetches.erase(ptr);
+void Directory::setContended(fatPointer ptr) {
+  //check for existance
+  //Get the object
+  std::pair<Lockable*, boost::intrusive_ptr<remoteObj> > obj = getObjUntyped(ptr);
+  if (obj.first)
+    setPriority(obj.first);
 }
 
-bool Directory::isPending(fatPointer ptr) {
-  std::lock_guard<LL::SimpleLock<true> > lg(fetchLock);
-  return pendingFetches.count(ptr);
+void Directory::clearContended(fatPointer ptr) {
+  //check for existance
+  //Get the object
+  std::pair<Lockable*, boost::intrusive_ptr<remoteObj> > obj = getObjUntyped(ptr);
+  if (obj.first) {
+    delPriority(obj.first);
+    notify(ptr);
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-
-Directory& Galois::Runtime::getSystemRemoteDirectory() {
-  return getSystemDirectory();
-}
-
-Directory& Galois::Runtime::getSystemLocalDirectory() {
-  return getSystemDirectory();
-}
 
 Directory& Galois::Runtime::getSystemDirectory() {
   static Directory obj;

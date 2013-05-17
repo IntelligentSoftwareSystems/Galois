@@ -59,14 +59,14 @@ class Verifier : public Galois::Runtime::Lockable {
       }
       return false;
     }
-    // serialization functions
-    typedef int tt_has_serialize;
-    void serialize(Galois::Runtime::SerializeBuffer& s) const {
-      gSerialize(s,graph);
-    }
-    void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
-      gDeserialize(s,graph);
-    }
+    // // serialization functions
+    // typedef int tt_has_serialize;
+    // void serialize(Galois::Runtime::SerializeBuffer& s) const {
+    //   gSerialize(s,graph);
+    // }
+    // void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+    //   gDeserialize(s,graph);
+    // }
   };
 
   struct not_delaunay: public std::unary_function<GNode,bool>, public Galois::Runtime::Lockable {

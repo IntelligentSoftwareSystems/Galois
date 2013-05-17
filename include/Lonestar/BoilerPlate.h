@@ -48,8 +48,8 @@ static void LonestarStart(int argc, char** argv, const char* app, const char* de
   using namespace Galois::Runtime::LL;
   using namespace Galois::Runtime;
   // initialize the network layer
-  NetworkInterface& net = getSystemNetworkInterface();
-  net.handleReceives();
+  getSystemNetworkInterface();
+  doNetworkWork();
 
   // display the name only if mater host
   if (networkHostID == 0) {

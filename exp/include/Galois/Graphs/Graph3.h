@@ -187,9 +187,9 @@ protected:
   }
   void dump(std::ostream& os) const {
     os << "numedges: " << edges.size();
-    for (decltype(edges.size()) x = 0; x < edges.size(); ++x) {
+    for (auto ii = edges.begin(), ee =edges.end(); ii != ee; ++ii) {
       os << " ";
-      edges[x].dump(os);
+      ii->dump(os);
     }
   }
  public:
@@ -404,7 +404,7 @@ public:
     assert(N);
     // prefetch all the nodes
     for (auto ii = N->begin(), ee = N->end(); ii != ee; ++ii) {
-      ii->getDst().prefetch();
+      //ii->getDst().prefetch();
     }
     // lock all the nodes
     for (auto ii = N->begin(), ee = N->end(); ii != ee; ++ii) {

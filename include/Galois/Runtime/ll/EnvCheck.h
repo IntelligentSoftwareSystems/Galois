@@ -35,6 +35,9 @@ namespace LL {
 //Sampling.cpp: "GALOIS_EXIT_AFTER_SAMPLING"
 //gIO.cpp: "GALOIS_DEBUG_TO_FILE"
 //gIO.cpp: "GALOIS_DEBUG_SKIP"
+//gIO.cpp: "GALOIS_DEBUG_LOCAL"
+//Tracer.cpp: "GALOIS_TRACE_LOCAL"
+
 //! Return true if the Enviroment variable is set
 bool EnvCheck(const char* parm);
 bool EnvCheck(const char* parm, int& val);

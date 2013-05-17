@@ -1,4 +1,4 @@
-/** Galois Distributed Pointer and Object Types -*- C++ -*-
+/** Galois Distributed Pointer Manipulation -*- C++ -*-
  * @file
  * @section License
  *
@@ -26,207 +26,102 @@
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Serialize.h"
 #include "Galois/Runtime/Directory.h"
+#include "Galois/Runtime/RemotePointer.h"
 
 namespace Galois {
 namespace Runtime {
 
-class PerBackend_v2;
-class PerBackend_v3;
-
 SimpleRuntimeContext& getTransCnx();
-
-namespace {
-
-template<typename T, bool> struct resolve_dispatch;
-
-//Normal objects resolve here
-template<typename T>
-struct resolve_dispatch<T, false> {
-  static T* go(uint32_t owner, T* ptr) {
-    if (owner == networkHostID) {
-      // have to enter the directory when outside the for each to
-      // check for remote objects! can't be found otherwise as
-      // acquire isn't called outside the for each.
-      if (inGaloisForEach) {
-	try {
-	  acquire(ptr, Galois::MethodFlag::ALL);
-	} catch (...) {
-          getSystemLocalDirectory().recall<T>(std::make_pair(owner, ptr));
-          if (isAcquiredBy(ptr,&getSystemLocalDirectory())) {
-	    throw remote_ex{ptr,owner,ptr};
-          }
-          else {
-            throw conflict_ex{ptr};
-          }
-	}
-      }
-      else if (isAcquired(ptr)) {
-	getSystemLocalDirectory().recall<T>(std::make_pair(owner, ptr));
-        while (isAcquiredBy(ptr, &getSystemLocalDirectory())) {}
-      }
-      return ptr;
-    } else {
-      T* rptr = getSystemRemoteDirectory().resolve<T>(std::make_pair(owner,ptr));
-      if (inGaloisForEach) {
-	try {
-	  acquire(rptr, Galois::MethodFlag::ALL);
-	} catch (...) {
-	  throw remote_ex{rptr,owner,ptr};
-	}
-      } else {
-	while (isAcquired(rptr)) {
-	  if (!LL::getTID())
-	    getSystemNetworkInterface().handleReceives();
-	}
-      }
-      return rptr;
-    }
-  }
-};
-}
 
 template<typename T>
 T* resolve(const gptr<T>& p) {
-  if (!p.ptr) {
-  //   //    std::cerr << "aborting in resolve for " << typeid(T).name() << "\n";
-    assert(p.ptr);
+  fatPointer ptr = p;
+  if (!ptr.second)
+    return nullptr;
+
+  boost::intrusive_ptr<remoteObjImpl<T> > robj = nullptr;
+  Lockable* obj = ptr.second;
+  if (ptr.first != networkHostID) {
+    robj = getSystemDirectory().resolve<T>(ptr);
+    obj = robj->getObj();
   }
-  return resolve_dispatch<T,false>::go(p.owner, p.ptr);
+
+  if (inGaloisForEach) {
+    try {
+      acquire(obj, Galois::MethodFlag::ALL);
+      return static_cast<T*>(obj);
+    } catch (const conflict_ex& ex) {
+      if (isAcquiredBy(obj, &getSystemDirectory())) {
+        if (ptr.first == networkHostID)
+          getSystemDirectory().recall<T>(ptr);
+        throw remote_ex{ptr};
+      } else {
+        throw ex;
+      }
+    }
+  } else { //serial code
+    while (isAcquiredBy(obj, &getSystemDirectory())) {
+      if (ptr.first == networkHostID)
+        getSystemDirectory().recall<T>(ptr);
+      doNetworkWork();
+    }
+    return static_cast<T*>(obj);
+  }
 }
 
 template <typename T>
 T* transientAcquire(const gptr<T>& p) {
-  if (p.owner == networkHostID) {
-    while (!getTransCnx().try_acquire(p.ptr)) {
-      getSystemLocalDirectory().recall<T>(std::make_pair(p.owner, p.ptr));
-      if (!LL::getTID())
-	getSystemNetworkInterface().handleReceives();
-    }
-    return p.ptr;
-  } else { // REMOTE
-    do {
-      T* rptr = getSystemRemoteDirectory().resolve<T>(std::make_pair(p.owner, p.ptr));
-      //DATA RACE with delete
-      if (getTransCnx().try_acquire(rptr))
-	return rptr;
-      if (!LL::getTID())
-	getSystemNetworkInterface().handleReceives();
-    } while (true);
+  fatPointer ptr = p;
+  if (!ptr.second)
+    return nullptr;
+  
+  boost::intrusive_ptr<remoteObjImpl<T>> robj = nullptr;
+  Lockable* obj = ptr.second;
+  if (ptr.first != networkHostID) {
+    robj = getSystemDirectory().resolve<T>(ptr);
+    obj = robj->getObj();
   }
+
+  while (!getTransCnx().try_acquire(obj)) {
+    if (isAcquiredBy(obj, &getSystemDirectory()))
+      if (ptr.first == networkHostID)
+        getSystemDirectory().recall<T>(ptr);
+    doNetworkWork();
+  }
+  return static_cast<T*>(obj);
 }
 
+#if 0
 template <typename T>
 T* transientAcquireNonBlocking(const gptr<T>& p) {
-  if (p.owner == networkHostID) {
-    if (!getTransCnx().try_acquire(p.ptr)) {
-      getSystemLocalDirectory().recall<T>(p.ptr);
+  fatPointer ptr = p;
+  if (ptr.first == networkHostID) {
+    if (!getTransCnx().try_acquire(ptr.second)) {
+      getSystemLocalDirectory().recall<T>(ptr);
       return NULL;
     }
-    return p.ptr;
+    return ptr.second;
   } else { // REMOTE
-    T* rptr = getSystemRemoteDirectory().resolve<T>(p.owner, p.ptr);
+    T* rptr = getSystemRemoteDirectory().resolve<T>(ptr);
     //DATA RACE with delete
     if (getTransCnx().try_acquire(rptr))
       return rptr;
     return NULL;
   }
 }
+#endif
 
 template<typename T>
 void transientRelease(const gptr<T>& p) {
-  T* ptr = p.ptr;
-  if (p.owner != networkHostID)
-    ptr = getSystemRemoteDirectory().resolve<T>(std::make_pair(p.owner, p.ptr));
-  getTransCnx().release(ptr);
+  fatPointer ptr = p;
+  boost::intrusive_ptr<remoteObjImpl<T>> robj = nullptr;
+  Lockable* rptr = ptr.second;
+  if (ptr.first != networkHostID) {
+    robj = getSystemDirectory().resolve<T>(ptr);
+    rptr = robj->getObj();
+  }
+  getTransCnx().release(rptr);
 }
-
-template<typename T>
-class gptr {
-  T* ptr;
-  uint32_t owner;
-
-  friend T* resolve<>(const gptr<T>&);
-  friend T* transientAcquire<>(const gptr<T>& p);
-  friend T* transientAcquireNonBlocking<>(const gptr<T>& p);
-  friend void transientRelease<>(const gptr<T>& p);
-  friend PerBackend_v2;
-  friend PerBackend_v3;
-
-  gptr(uint32_t o, T* p) :ptr(p), owner(o) {}
-
-public:
-  typedef T element_type;
-  
-  constexpr gptr() noexcept :ptr(0), owner(0) {}
-  explicit gptr(T* p) noexcept :ptr(p), owner(networkHostID) {}
-  
-  // calling resolve acquires the lock, used after a prefetch
-  // IMP: have to be changed when local objects aren't passed to the directory
-  // void acquire() const {
-  //   (void) *resolve(*this);
-  // }
-
-  // // check if the object is available, else just make a call to fetch
-  void prefetch() {
-    if (0) {
-      if (owner == networkHostID)
-	getSystemLocalDirectory().recall<T>(std::make_pair(owner,ptr)); 
-      else
-	getSystemRemoteDirectory().resolve<T>(std::make_pair(owner, ptr));
-    }
-  }
-
-  T& operator*() const {
-    return *resolve(*this);
-  }
-  T* operator->() const {
-    return resolve(*this);
-  }
-
-  bool operator<(const gptr& rhs) const {
-    if (owner == rhs.owner)
-      return ptr < rhs.ptr;
-    return owner < rhs.owner;
-  }
-  bool operator>(const gptr& rhs) const {
-    if (owner == rhs.owner)
-      return ptr > rhs.ptr;
-    return owner > rhs.owner;
-  }
-  bool operator==(const gptr& rhs) const {
-    return rhs.ptr == ptr && rhs.owner == owner;
-  }
-  bool operator!=(const gptr& rhs) const {
-    return rhs.ptr != ptr || rhs.owner != owner;
-  }
-  explicit operator bool() const { return ptr != 0; }
-
-  bool isLocal() const {
-    return owner == Galois::Runtime::networkHostID;
-  }
-
-  bool sameHost(const gptr& rhs) const {
-    return owner == rhs.owner;
-  }
-
-  void initialize(T* p) {
-    ptr = p;
-    owner = ptr ? networkHostID : 0;
-  }
-
-  //serialize
-  typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
-    gSerialize(s,ptr, owner);
-  }
-  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
-    gDeserialize(s,ptr, owner);
-  }
-
-  void dump(std::ostream& os) const {
-    os << "[" << owner << "," << ptr << "]";
-  }
-};
 
 } //namespace Runtime
 } //namespace Galois

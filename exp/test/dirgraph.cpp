@@ -31,16 +31,6 @@ struct op {
     }
     //printf("%d iteration in host %u and thread %u\n", nodeval, Distributed::networkHostID, LL::getTID());
   }
-
-  // serialization functions
-  typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-    gSerialize(s,graph);
-  }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-    gDeserialize(s,graph);
-  }
-
 };
 
 struct checking {
@@ -53,16 +43,6 @@ struct checking {
   void operator()(G::NodeHandle n, const Context& cnx) {
     printf("value: %d\n", graph->getData(n));
   }
-
-  // serialization functions
-  typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-    gSerialize(s,graph);
-  }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-    gDeserialize(s,graph);
-  }
-
 };
 
 int main(int argc, char** argv) {
@@ -70,7 +50,7 @@ int main(int argc, char** argv) {
   LonestarStart(argc, argv, nullptr, nullptr, nullptr);
 
   // check the host id and initialise the network
-  Galois::Runtime::Distributed::networkStart();
+  Galois::Runtime::networkStart();
 
   G::pointer Gr = G::allocate();
 
@@ -105,7 +85,7 @@ int main(int argc, char** argv) {
   Galois::for_each_local(Gr,checking(Gr));
 
   // master_terminate();
-  Galois::Runtime::Distributed::networkTerminate();
+  Galois::Runtime::networkTerminate();
 
   return 0;
 }

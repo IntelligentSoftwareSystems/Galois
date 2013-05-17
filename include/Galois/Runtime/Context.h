@@ -42,11 +42,7 @@ class Lockable;
 //Things we can throw:
 struct conflict_ex { Lockable* obj; };
 struct failsafe_ex{};
-struct remote_ex {
-  Lockable* LocalObj;
-  uint32_t owner;
-  Lockable* actual;
-};
+//struct remote_ex { fatPointer ptr; };
 
 enum PendingFlag {
   NON_DET,
@@ -87,7 +83,7 @@ class Lockable {
   friend bool isAcquired(Lockable*);
   friend bool isAcquiredBy(Lockable*, SimpleRuntimeContext*);
 public:
-  LL::PtrLock<void, true> auxPtr;
+  uintptr_t auxData;
   Lockable() :next(0) {}
 };
 

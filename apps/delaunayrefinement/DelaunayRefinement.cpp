@@ -117,13 +117,13 @@ struct Verification : public Galois::Runtime::Lockable {
   }
 
   // serialization functions
-  typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
-    gSerialize(s,graph);
-  }
-  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
-    gDeserialize(s,graph);
-  }
+  // typedef int tt_has_serialize;
+  // void serialize(Galois::Runtime::SerializeBuffer& s) const {
+  //   gSerialize(s,graph);
+  // }
+  // void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+  //   gDeserialize(s,graph);
+  // }
 };
 
 struct Prefetch : public Galois::Runtime::Lockable {
@@ -136,14 +136,14 @@ struct Prefetch : public Galois::Runtime::Lockable {
     (void)graph->getData(item).isBad();
   }
 
-  // serialization functions
-  typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
-    gSerialize(s,graph);
-  }
-  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
-    gDeserialize(s,graph);
-  }
+  // // serialization functions
+  // typedef int tt_has_serialize;
+  // void serialize(Galois::Runtime::SerializeBuffer& s) const {
+  //   gSerialize(s,graph);
+  // }
+  // void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+  //   gDeserialize(s,graph);
+  // }
 };
 
 int main(int argc, char** argv) {

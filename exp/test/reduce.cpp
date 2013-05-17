@@ -10,7 +10,6 @@
 
 using namespace Galois::Graph;
 using namespace Galois::Runtime;
-using namespace Galois::Runtime::Distributed;
 
 typedef Galois::DGReducible<unsigned, std::plus<unsigned> > RD1;
 

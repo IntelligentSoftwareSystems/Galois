@@ -571,7 +571,6 @@ static size_t runSimInternal (Table& table, WLTy& workList, const double endtime
           // currStep, indepList.size_all (), workList.size_all ());
 
       simTimer.start ();
-      //Galois::Runtime::do_all_serial (indepList, _SimulateFunc (), "simulate_indep_events");
       std::for_each (indepList.begin_all (), indepList.end_all (), _SimulateFunc ());
       simTimer.stop ();
 

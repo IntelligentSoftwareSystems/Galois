@@ -297,10 +297,6 @@ struct preAlloc_helper {
     int a = n; a = (num + a - 1) / a;
     Galois::Runtime::MM::pagePreAlloc(a); 
   }
-
-  typedef int tt_has_serialize;
-  void serialize(SendBuffer& buf) const { gSerialize(buf, num); }
-  void deserialize(RecvBuffer& buf) const { gDeserialize(buf, num); }
 };
 
 

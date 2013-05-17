@@ -99,91 +99,6 @@ void distWait();
 
 
 ////////////////////////////////////////////////////////////////////////////////
-// objectRecord - used to store the requested remote objects
-////////////////////////////////////////////////////////////////////////////////
-
-// Not thread-safe make sure the caller takes care to lock before access to any
-// method except empty or size
-class ObjectRecord {
-private:
-  typedef std::multimap<Lockable*,std::function<void ()> > Map;
-
-  Galois::Runtime::LL::SimpleLock<true> Lock;
-  Map      objStore;
-  unsigned num;
-
-public:
-  typedef std::function<void ()> FType;
-
-  void insert(std::pair<Lockable*,FType>& val) {
-    // multiple threads call insert so locking before use
-    lock();
-    objStore.insert(val);
-    num = objStore.size();
-    unlock();
-  }
-
-  void erase(Lockable* ptr) {
-    // locking as it may be called along with insert
-    lock();
-    objStore.erase(ptr);
-    num = objStore.size();
-    unlock();
-  }
-
-  void clear() {
-    objStore.clear();
-    num = 0;
-  }
-
-  bool empty() {
-    bool emp = (num == 0);
-    return emp;
-  }
-
-  unsigned size() {
-    return num;
-  }
-
-  bool find(Lockable* ptr) {
-    typename Map::iterator got = objStore.find(ptr);
-    bool emp = (got != objStore.end());
-    return emp;
-  }
-
-  void lock() {
-    Lock.lock();
-  }
-
-  void unlock() {
-    Lock.unlock();
-  }
-
-  Map::iterator begin() {
-    return objStore.begin();
-  }
-
-  Map::iterator end() {
-    return objStore.end();
-  }
-
-  Map::iterator get_begin(Lockable* ptr) {
-    return objStore.lower_bound(ptr);
-  }
-
-  Map::iterator get_end(Lockable* ptr) {
-    return objStore.upper_bound(ptr);
-  }
-
-  unsigned get_count(Lockable* ptr) {
-    unsigned got = objStore.count(ptr);
-    return got;
-  }
-};
-
-ObjectRecord& getSystemRemoteObjects();
-
-////////////////////////////////////////////////////////////////////////////////
 // Implementations
 ////////////////////////////////////////////////////////////////////////////////
 template<typename... Args>
@@ -200,18 +115,23 @@ struct genericLandingPad {
 
   //do this the new fancy way
   static void func(RecvBuffer& buf) {
+    //    std::cerr << "RA\n";
     void (*fp)(Args...);
     std::tuple<Args...> args;
     gDeserialize(buf, fp, args);
+    //    std::cerr << "end RA " << fp << "\n";
     callFunc(fp, args, typename gens<sizeof...(Args)>::type());
   }
 };
 
 template<typename... Args>
 void NetworkInterface::sendAlt(uint32_t dest, void (*recv)(Args...), Args... param) {
+  //  std::cerr << "SA : " << dest << " " << (void*)recv << " " << sizeof...(Args) << "\n";
   SendBuffer buf;
   gSerialize(buf, recv, param...);
+  //  std::cerr << "end SA\n";
   send(dest, genericLandingPad<Args...>::func, buf);
+  //  std::cerr << "end SA\n";
 }
 
 template<typename... Args>
