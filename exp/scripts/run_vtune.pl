@@ -122,7 +122,6 @@ if (1) {
     OFFCORE_RESPONSE_0.ANY_DATA.LOCAL_DRAM
     );
   $collect = "-collect-with runsa -start-paused -knob event-config=" . join(',', @counters);
-    $type = "lightweight-hotspots";
 }
 
 my $sdir = "-search-dir all=$symbol";

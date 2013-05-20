@@ -7,7 +7,6 @@ if(USE_EXP)
   set(Sources ${Sources} ${ExpSources})
 endif()
 
-configure_file("${PROJECT_SOURCE_DIR}/include/Galois/config.h.in" "${PROJECT_BINARY_DIR}/include/Galois/config.h")
 set(include_dirs ${include_dirs} "${PROJECT_BINARY_DIR}/include/")
 
 add_library(galois ${Sources})
@@ -43,6 +42,8 @@ endif()
 if(USE_SUBVERSION_REVISION)
   add_dependencies(galois svnversion)
 endif()
+
+configure_file("${PROJECT_SOURCE_DIR}/include/Galois/config.h.in" "${PROJECT_BINARY_DIR}/include/Galois/config.h")
 
 ###### Installation ######
 install(TARGETS galois 
