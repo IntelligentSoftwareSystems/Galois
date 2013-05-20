@@ -30,9 +30,10 @@
 #include "Galois/Runtime/ll/gio.h"
 
 #include <boost/iterator/iterator_adaptor.hpp>
+#include <cassert>
 #include <iterator>
 #include <type_traits>
-#include <cassert>
+#include <utility>
 
 namespace Galois {
 
@@ -299,7 +300,6 @@ private:
         return me_count;
     }
 
-    difference_type ddd = safe_distance(m_outer, x.m_outer, m_outer_end);
     GALOIS_DIE("invalid iterator ", std::distance(m_outer, x.m_outer));
   }
 
@@ -355,7 +355,7 @@ template<
   class InnerIter = decltype(std::declval<OuterIter>()->begin()),
   class InnerBeginFn = GetBegin,
   class InnerEndFn = GetEnd,
-  class Iter = TwoLevelIteratorA<OuterIter,InnerIter,CategoryOrTraversal,InnerBeginFn,InnerEndFn>
+  class Iter = TwoLevelIteratorA<OuterIter, InnerIter, CategoryOrTraversal, InnerBeginFn, InnerEndFn>
   >
 auto make_two_level_iterator(OuterIter outer_begin, OuterIter outer_end) -> 
   std::pair<Iter,Iter>
