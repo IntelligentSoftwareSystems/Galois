@@ -91,7 +91,7 @@ public:
 };
 
 //! Provides statistic interface around timer
-class StatTimer : public Timer {
+class StatTimer : public TimeAccumulator {
   const char* name;
   const char* loopname;
   bool main;
@@ -109,11 +109,11 @@ public:
   void start() {
     if (main)
       Galois::Runtime::beginSampling();
-    Timer::start();
+    TimeAccumulator::start();
   }
 
   void stop() {
-    Timer::stop();
+    TimeAccumulator::stop();
     if (main)
       Galois::Runtime::endSampling();
   }
