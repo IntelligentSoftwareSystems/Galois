@@ -92,6 +92,43 @@ public:
   AbortedList* getQueue() { return queues.getLocal(); }
 };
 
+template<typename FunctionTy>
+class BreakHandler {
+  LL::CacheLineStorage<bool> broke;
+
+  template<typename WorkListTy, bool HasReceive = Galois::has_parallel_break_receive_remaining<FunctionTy>::value>
+  GALOIS_ATTRIBUTE_NOINLINE
+  void drain(WorkListTy& wl, FunctionTy& fn, typename std::enable_if<HasReceive>::type* = 0) {
+    auto p = wl.pop();
+    while (p) {
+      fn.galoisParallelBreakReceiveRemaining(*p);
+      p = wl.pop();
+    }
+  }
+
+  template<typename WorkListTy, bool HasReceive = Galois::has_parallel_break_receive_remaining<FunctionTy>::value>
+  void drain(WorkListTy&, FunctionTy&, typename std::enable_if<!HasReceive>::type* = 0) { }
+
+public:
+  BreakHandler(): broke(false) { }
+
+  void updateBreak() { broke.data = true; }
+
+  template<typename WorkListTy, bool NeedsBreak = ForEachTraits<FunctionTy>::NeedsBreak>
+  bool checkBreak(WorkListTy& wl, FunctionTy& fn, typename std::enable_if<NeedsBreak>::type* = 0) {
+    if (broke.data) {
+      drain(wl, fn);
+      return true;
+    }
+    return false;
+  }
+
+  template<typename WorkListTy, bool NeedsBreak = ForEachTraits<FunctionTy>::NeedsBreak>
+  bool checkBreak(WorkListTy&, FunctionTy&, typename std::enable_if<!NeedsBreak>::type* = 0) {
+    return false;
+  }
+};
+
 template<class WorkListTy, class T, class FunctionTy>
 class ForEachWork {
 protected:
@@ -106,13 +143,15 @@ protected:
     ThreadLocalData(const FunctionTy& fn, const char* ln): function(fn), stat(ln) {}
   };
 
+  // NB: Place dynamically growing wl after fixed-size PerThreadStorage
+  // members to give higher likelihood of reclaiming PerThreadStorage
+  AbortHandler<value_type> aborted; 
+  BreakHandler<FunctionTy> breakHandler;
+  TerminationDetection& term;
+
   WLTy wl;
   FunctionTy& origFunction;
   const char* loopname;
-
-  TerminationDetection& term;
-  AbortHandler<value_type> aborted;
-  LL::CacheLineStorage<bool> broke;
 
   inline void commitIteration(ThreadLocalData& tld) {
     if (ForEachTraits<FunctionTy>::NeedsPush) {
@@ -154,7 +193,7 @@ protected:
   GALOIS_ATTRIBUTE_NOINLINE
   void handleBreak(ThreadLocalData& tld) {
     commitIteration(tld);
-    broke.data = true;
+    breakHandler.updateBreak();
   }
 
   bool runQueueSimple(ThreadLocalData& tld) {
@@ -246,14 +285,14 @@ protected:
 	else //No try/catch
 	  didWork = runQueueSimple(tld);
 	//Check for break
-	if (ForEachTraits<FunctionTy>::NeedsBreak && broke.data)
+	if (breakHandler.checkBreak(wl, tld.function))
 	  break;
 	//Check for abort
 	if (checkAbort)
 	  didWork |= handleAborts(tld);
 	didAnyWork |= didWork;
       } while (didWork);
-      if (ForEachTraits<FunctionTy>::NeedsBreak && broke.data)
+      if (breakHandler.checkBreak(wl, tld.function))
 	break;
       //update node color and prop token
       term.localTermination(didAnyWork);
@@ -269,12 +308,10 @@ protected:
   }
 
 public:
-  ForEachWork(FunctionTy& f, const char* l): origFunction(f), loopname(l), term(getSystemTermination()), broke(false) {
-    //LL::gDebug("Type traits stats ", ForEachTraits<FunctionTy>::NeedsStats, " break ", ForEachTraits<FunctionTy>::NeedsBreak, " push ", ForEachTraits<FunctionTy>::NeedsPush, " PIA ", ForEachTraits<FunctionTy>::NeedsPIA, "Aborts ", ForEachTraits<FunctionTy>::NeedsAborts);
-  }
+  ForEachWork(FunctionTy& f, const char* l): term(getSystemTermination()), origFunction(f), loopname(l) { }
   
   template<typename W>
-  ForEachWork(W& w, FunctionTy& f, const char* l): wl(w), origFunction(f), loopname(l), term(getSystemTermination()), broke(false) { }
+  ForEachWork(W& w, FunctionTy& f, const char* l): wl(w), term(getSystemTermination()), origFunction(f), loopname(l) { }
 
   template<typename RangeTy>
   void AddInitialWork(const RangeTy& range) {
@@ -306,14 +343,18 @@ void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
   typedef typename RangeTy::value_type T;
   typedef ForEachWork<WLTy, T, FunctionTy> WorkTy;
 
+  // NB: Initialize barrier before creating WorkTy to increase
+  // PerThreadStorage reclaimation likelihood
+  Barrier& barrier = getSystemBarrier();
+
   WorkTy W(f, loopname);
   //RunCommand init(std::bind(&WorkTy::template AddInitialWork<RangeTy>, std::ref(W), range));
   RunCommand w[5] = {
     std::bind(&WorkTy::initThread, std::ref(W)),
     std::bind(&WorkTy::template AddInitialWork<RangeTy>, std::ref(W), range), 
-    std::ref(getSystemBarrier()),
+    std::ref(barrier),
     std::ref(W),
-    std::ref(getSystemBarrier())
+    std::ref(barrier)
   };
   getSystemThreadPool().run(&w[0], &w[5], activeThreads);
   inGaloisForEach = false;

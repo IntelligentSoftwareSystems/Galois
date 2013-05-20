@@ -75,13 +75,16 @@ class OrderedByIntegerMetric : private boost::noncopyable {
       current(0), lastMasterVersion(0), numPops(0) { }
   };
 
-  std::deque<std::pair<IndexTy, CTy*> > masterLog;
-  Runtime::LL::PaddedLock<concurrent> masterLock;
-  volatile unsigned int masterVersion;
+  typedef std::deque<std::pair<IndexTy, CTy*> > MasterLog;
 
-  Indexer I;
-
+  // NB: Place dynamically growing masterLog after fixed-size PerThreadStorage
+  // members to give higher likelihood of reclaiming PerThreadStorage
   Runtime::PerThreadStorage<perItem> current;
+  Runtime::LL::PaddedLock<concurrent> masterLock;
+  MasterLog masterLog;
+
+  volatile unsigned int masterVersion;
+  Indexer I;
 
   void updateLocal_i(perItem& p) {
     for (; p.lastMasterVersion < masterVersion; ++p.lastMasterVersion)
@@ -190,7 +193,9 @@ class OrderedByIntegerMetric : private boost::noncopyable {
   { }
 
   ~OrderedByIntegerMetric() {
-    for (typename std::deque<std::pair<IndexTy, CTy*> >::iterator ii = masterLog.begin(), ee = masterLog.end(); ii != ee; ++ii) {
+    // Deallocate in LIFO order to give opportunity for simple garbage
+    // collection
+    for (typename MasterLog::reverse_iterator ii = masterLog.rbegin(), ee = masterLog.rend(); ii != ee; ++ii) {
       delete ii->second;
     }
   }

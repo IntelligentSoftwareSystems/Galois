@@ -239,7 +239,7 @@ struct BreakManager {
 };
 
 template<typename FunctionTy>
-class BreakManager<FunctionTy,typename boost::enable_if<has_deterministic_break<FunctionTy> >::type> {
+class BreakManager<FunctionTy,typename boost::enable_if<has_deterministic_parallel_break<FunctionTy> >::type> {
   Barrier& barrier;
   LL::CacheLineStorage<volatile long> done;
 
@@ -248,7 +248,7 @@ public:
 
   bool checkBreak(FunctionTy& fn) {
     if (LL::getTID() == 0)
-      done.data = fn.galoisDeterministicBreak();
+      done.data = fn.galoisDeterministicParallelBreak();
     barrier.wait();
     return done.data;
   }
@@ -1256,7 +1256,7 @@ public:
     origOptions(o), mergeManager(o), loopname(ln), barrier(getSystemBarrier())
   { 
     static_assert(!OptionsTy::needsBreak
-        || has_deterministic_break<typename OptionsTy::Function1Ty>::value,
+        || has_deterministic_parallel_break<typename OptionsTy::Function1Ty>::value,
         "need to use break function to break loop");
   }
 

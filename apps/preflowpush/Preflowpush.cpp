@@ -520,14 +520,14 @@ struct Process {
   }
   static_assert(Galois::has_deterministic_id<Process>::value, "Oops");
 
-  bool galoisDeterministicBreak() {
+  bool galoisDeterministicParallelBreak() {
     if (app.global_relabel_interval > 0 && counter.accum.reduce() >= app.global_relabel_interval) {
       app.should_global_relabel = true;
       return true;
     }
     return false;
   }
-  static_assert(Galois::has_deterministic_break<Process>::value, "Oops");
+  static_assert(Galois::has_deterministic_parallel_break<Process>::value, "Oops");
 
   Counter& counter;
 
