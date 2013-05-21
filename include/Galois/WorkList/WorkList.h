@@ -1,11 +1,11 @@
-/** Scalable local worklists -*- C++ -*-
+/** Worklists -*- C++ -*-
  * @file
  * @section License
  *
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -23,36 +23,18 @@
 #ifndef GALOIS_RUNTIME_WORKLIST_H
 #define GALOIS_RUNTIME_WORKLIST_H
 
-#include "Galois/Runtime/PerThreadStorage.h"
-#include "Galois/Runtime/ActiveThreads.h"
-#include "Galois/WorkList/WorkListHelpers.h"
-#include "Galois/Runtime/ll/PaddedLock.h"
-#include "Galois/Runtime/mm/Mem.h"
-
-#include "Galois/FixedSizeRing.h"
-#include "Galois/gstl.h"
-
-#include <iterator>
-#include <vector>
-#include <deque>
-#include <algorithm>
-#include <iterator>
-#include <utility>
-
-#include <boost/utility.hpp>
 #include <boost/optional.hpp>
-#include <boost/ref.hpp>
 
-#include "Lifo.h"
+#include "AltChunked.h"
+#include "BulkSynchronous.h"
+#include "Chunked.h"
 #include "Fifo.h"
 #include "GFifo.h"
-#include "LocalQueues.h"
+#include "Lifo.h"
+#include "LocalQueue.h"
 #include "Obim.h"
-#include "Chunked.h"
-#include "AltChunked.h"
 #include "OwnerComputes.h"
-#include "BulkSynchronous.h"
-#include "StableIter.h"
+#include "StableIterator.h"
 
 namespace Galois {
 /**
@@ -75,7 +57,7 @@ namespace { // don't pollute the symbol table with the example
 // Worklists may not be copied.
 // Worklists should be default instantiatable
 // All classes (should) conform to:
-template<typename T, bool concurrent>
+template<typename T, bool Concurrent>
 class AbstractWorkList {
   AbstractWorkList(const AbstractWorkList&);
   const AbstractWorkList& operator=(const AbstractWorkList&);
@@ -87,12 +69,12 @@ public:
   typedef T value_type;
 
   //! change the concurrency flag
-  template<bool newconcurrent>
-  using rethread = AbstractWorkList<T, newconcurrent>;
+  template<bool _concurrent>
+  using rethread = AbstractWorkList<T, _concurrent>;
 
   //! change the type the worklist holds
-  template<typename Tnew>
-  using retype = AbstractWorkList<Tnew, concurrent>;
+  template<typename _T>
+  using retype = AbstractWorkList<_T, Concurrent>;
 
   //! push a value onto the queue
   void push(const value_type& val);
@@ -106,12 +88,8 @@ public:
   template<typename RangeTy>
   void push_initial(const RangeTy&);
 
-  //Optional, but this is the likely interface for stealing
-  //! steal from a similar worklist
-  boost::optional<value_type> steal(AbstractWorkList& victim, bool half, bool pop);
-
   //! pop a value from the queue.
-  boost::optional<value_type> pop() { abort(); }
+  boost::optional<value_type> pop();
 };
 
 } // end namespace anonymous

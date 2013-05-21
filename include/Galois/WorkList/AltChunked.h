@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -23,8 +23,13 @@
 #ifndef GALOIS_RUNTIME_ALTCHUNKED_H
 #define GALOIS_RUNTIME_ALTCHUNKED_H
 
-#include "Galois/Runtime/ll/CompilerSpecific.h"
+#include "Galois/FixedSizeRing.h"
 #include "Galois/Threads.h"
+#include "Galois/Runtime/PerThreadStorage.h"
+#include "Galois/Runtime/ll/CompilerSpecific.h"
+#include "Galois/Runtime/ll/PtrLock.h"
+#include "Galois/Runtime/mm/Mem.h"
+#include "WLCompileCheck.h"
 
 namespace Galois {
 namespace WorkList {
@@ -301,7 +306,7 @@ public:
 };
 
 template<typename InnerWL>
-class StealingQueues : private boost::noncopyable {
+class StealingQueue : private boost::noncopyable {
   Runtime::PerThreadStorage<std::pair<InnerWL, unsigned> > local;
 
   GALOIS_ATTRIBUTE_NOINLINE
@@ -352,13 +357,23 @@ public:
   }
 };
 
-template<bool isLocallyLIFO, int chunksize, typename gWL, typename T>
-class AltChunkedMaster : private boost::noncopyable {
-  class Chunk : public ChunkHeader, public Galois::FixedSizeRing<T, chunksize> {};
+template<bool IsLocallyLIFO, int ChunkSize, typename Container, typename T>
+struct AltChunkedMaster : private boost::noncopyable {
+  template<typename _T>
+  using retype = AltChunkedMaster<IsLocallyLIFO, ChunkSize, Container, _T>;
+
+  template<bool _concurrent>
+  using rethread = AltChunkedMaster<IsLocallyLIFO, ChunkSize, Container, T>;
+
+  template<int _chunk_size>
+  using with_chunk_size = AltChunkedMaster<IsLocallyLIFO, _chunk_size, Container, T>;
+
+private:
+  class Chunk : public ChunkHeader, public Galois::FixedSizeRing<T, ChunkSize> {};
 
   Runtime::MM::FixedSizeAllocator heap;
   Runtime::PerThreadStorage<std::pair<Chunk*, Chunk*> > data;
-  gWL worklist;
+  Container worklist;
 
   Chunk* mkChunk() {
     return new (heap.allocate(sizeof(Chunk))) Chunk();
@@ -370,12 +385,12 @@ class AltChunkedMaster : private boost::noncopyable {
   }
 
   void swapInPush(std::pair<Chunk*, Chunk*>& d) {
-    if (!isLocallyLIFO)
+    if (!IsLocallyLIFO)
       std::swap(d.first, d.second);
   }
 
   Chunk*& getPushChunk(std::pair<Chunk*, Chunk*>& d) {
-    if (!isLocallyLIFO)
+    if (!IsLocallyLIFO)
       return d.second;
     else
       return d.first;
@@ -390,7 +405,7 @@ class AltChunkedMaster : private boost::noncopyable {
   }
 
   boost::optional<T> doPop(Chunk* c) {
-    if (!isLocallyLIFO)
+    if (!IsLocallyLIFO)
       return c->extract_front();
     else
       return c->extract_back();
@@ -410,12 +425,6 @@ class AltChunkedMaster : private boost::noncopyable {
   }
 
 public:
-  template<typename Tnew>
-  using retype = AltChunkedMaster<isLocallyLIFO, chunksize, gWL, Tnew>;
-
-  template<bool newconcurrent>
-  using rethread = AltChunkedMaster<isLocallyLIFO, chunksize, gWL, T>;
-
   typedef T value_type;
 
   AltChunkedMaster() : heap(sizeof(Chunk)) {}
@@ -462,12 +471,12 @@ public:
   }
 };
 
-template<int chunksize=64, typename T = int>
-class AltChunkedLIFO : public AltChunkedMaster<true, chunksize, StealingQueues<AltChunkedStack>, T> {};
+template<int ChunkSize=64, typename T = int>
+class AltChunkedLIFO : public AltChunkedMaster<true, ChunkSize, StealingQueue<AltChunkedStack>, T> {};
 GALOIS_WLCOMPILECHECK(AltChunkedLIFO)
 
-template<int chunksize=64, typename T = int>
-class AltChunkedFIFO : public AltChunkedMaster<false, chunksize, StealingQueues<AltChunkedQueue>, T> {};
+template<int ChunkSize=64, typename T = int>
+class AltChunkedFIFO : public AltChunkedMaster<false, ChunkSize, StealingQueue<AltChunkedQueue>, T> {};
 GALOIS_WLCOMPILECHECK(AltChunkedFIFO)
 
 } // end namespace

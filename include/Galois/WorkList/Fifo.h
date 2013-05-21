@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -20,7 +20,6 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-
 #ifndef GALOIS_WORKLIST_FIFO_H
 #define GALOIS_WORKLIST_FIFO_H
 
@@ -32,20 +31,22 @@ namespace Galois {
 namespace WorkList {
 
 //! Simple FIFO worklist (not scalable).
-template<typename T = int, bool concurrent = true>
-class FIFO : private boost::noncopyable, private Runtime::LL::PaddedLock<concurrent>  {
+template<typename T = int, bool Concurrent = true>
+struct FIFO : private boost::noncopyable, private Runtime::LL::PaddedLock<Concurrent>  {
+  template<bool _concurrent>
+  using rethread = FIFO<T, _concurrent>;
+
+  template<typename _T>
+  using retype = FIFO<_T, Concurrent>;
+
+private:
   std::deque<T> wl;
 
-  using Runtime::LL::PaddedLock<concurrent>::lock;
-  using Runtime::LL::PaddedLock<concurrent>::try_lock;
-  using Runtime::LL::PaddedLock<concurrent>::unlock;
+  using Runtime::LL::PaddedLock<Concurrent>::lock;
+  using Runtime::LL::PaddedLock<Concurrent>::try_lock;
+  using Runtime::LL::PaddedLock<Concurrent>::unlock;
 
 public:
-  template<bool newconcurrent>
-  using rethread = FIFO<T, newconcurrent>;
-  template<typename Tnew>
-  using retype = FIFO<Tnew, concurrent>;
-
   typedef T value_type;
 
   void push(const value_type& val) {

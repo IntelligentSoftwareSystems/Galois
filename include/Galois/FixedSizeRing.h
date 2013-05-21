@@ -27,6 +27,7 @@
 
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/optional.hpp>
+#include <boost/utility.hpp>
 
 namespace Galois {
 

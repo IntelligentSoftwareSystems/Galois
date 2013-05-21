@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -24,19 +24,36 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
+#ifndef GALOIS_WORKLIST_STABLEITERATOR_H
+#define GALOIS_WORKLIST_STABLEITERATOR_H
+
+#include "Galois/gstl.h"
 
 namespace Galois {
 namespace WorkList {
 
-template<typename IterTy, bool steal = false>
-class LazyIter {
-public:
-  typedef typename std::iterator_traits<IterTy>::value_type value_type;
+template<typename Iterator=int*, bool Steal = false>
+struct StableIterator {
+  typedef typename std::iterator_traits<Iterator>::value_type value_type;
+
+  //! change the concurrency flag
+  template<bool _concurrent>
+  using rethread = StableIterator<Iterator, Steal>;
+  
+  //! change the type the worklist holds
+  template<typename _T>
+  using retype = StableIterator<Iterator, Steal>;
+
+  template<typename _iterator>
+  using with_iterator = StableIterator<_iterator, Steal>;
+
+  template<bool _steal>
+  using with_steal = StableIterator<Iterator, _steal>;
 
 private:
   struct shared_state {
-    IterTy stealBegin;
-    IterTy stealEnd;
+    Iterator stealBegin;
+    Iterator stealEnd;
     Runtime::LL::SimpleLock<true> stealLock;
     bool stealAvail;
     void resetAvail() {
@@ -46,13 +63,13 @@ private:
   };
 
   struct state {
-    IterTy localBegin;
-    IterTy localEnd;
+    Iterator localBegin;
+    Iterator localEnd;
     unsigned int nextVictim;
     Runtime::LL::CacheLineStorage<shared_state> stealState;
     
     void populateSteal() {
-      if (steal && localBegin != localEnd) {
+      if (Steal && localBegin != localEnd) {
 	shared_state& s = stealState.data;
 	s.stealLock.lock();
 	s.stealEnd = localEnd;
@@ -97,15 +114,6 @@ private:
   }
 
 public:
-
-  //! change the concurrency flag
-  template<bool newconcurrent>
-  using rethread = LazyIter<IterTy, steal>;
-  
-  //! change the type the worklist holds
-  template<typename Tnew>
-  using retype = LazyIter<IterTy, steal>;
-
   //! push initial range onto the queue
   //! called with the same b and e on each thread
   template<typename RangeTy>
@@ -122,12 +130,12 @@ public:
     state& data = *TLDS.getLocal();
     if (data.localBegin != data.localEnd)
       return *data.localBegin++;
-    if (steal)
+    if (Steal)
       return pop_steal(data);
     return boost::optional<value_type>();
   }
 
-  void push(value_type& val) {
+  void push(const value_type& val) {
     abort();
   }
 
@@ -135,9 +143,9 @@ public:
   void push(Iter b, Iter e) {
     abort();
   }
-
 };
-
+GALOIS_WLCOMPILECHECK(StableIterator)
 
 }
 }
+#endif

@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -20,12 +20,11 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-
 #ifndef GALOIS_WORKLIST_BULKSYNCHRONOUS_H
 #define GALOIS_WORKLIST_BULKSYNCHRONOUS_H
 
 #include "Galois/Runtime/Barrier.h"
-
+#include "Chunked.h"
 #include "WLCompileCheck.h"
 
 namespace Galois {
@@ -36,10 +35,20 @@ namespace WorkList {
  * created work is processed after all the current work in a round is
  * completed.
  */
-template<class ContainerTy=dChunkedFIFO<>, class T=int, bool concurrent = true>
+template<class Container=dChunkedFIFO<>, class T=int, bool Concurrent = true>
 class BulkSynchronous : private boost::noncopyable {
+public:
+  template<bool _concurrent>
+  using rethread = BulkSynchronous<Container, T, _concurrent>;
 
-  typedef typename ContainerTy::template rethread<concurrent> CTy;
+  template<typename _T>
+  using retype = BulkSynchronous<typename Container::template retype<_T>, _T, Concurrent>;
+
+  template<typename _container>
+  using with_container = BulkSynchronous<_container, T, Concurrent>;
+
+private:
+  typedef typename Container::template rethread<Concurrent> CTy;
 
   struct TLD {
     unsigned round;
@@ -54,11 +63,6 @@ class BulkSynchronous : private boost::noncopyable {
 
  public:
   typedef T value_type;
-
-  template<bool newconcurrent>
-  using rethread = BulkSynchronous<ContainerTy,T,newconcurrent>;
-  template<typename Tnew>
-  using retype = BulkSynchronous<typename ContainerTy::template retype<Tnew>,Tnew,concurrent>;
 
   BulkSynchronous(): barrier(Runtime::getSystemBarrier()), empty(false) { }
 

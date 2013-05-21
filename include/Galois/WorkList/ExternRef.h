@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -23,26 +23,30 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
+#ifndef GALOIS_WORKLIST_EXTERNREF_H
+#define GALOIS_WORKLIST_EXTERNREF_H
 
 namespace Galois {
 namespace WorkList {
 
-template<typename eWLTy, bool pushinit = true>
-class ExternRef {
-  eWLTy& wl;
-public:
-  ExternRef(eWLTy& _wl) :wl(_wl) {}
-
-  //! T is the value type of the WL
-  typedef typename eWLTy::value_type value_type;
-
+template<typename Container, bool pushinit = true>
+struct ExternRef {
   //! change the concurrency flag
-  template<bool newconcurrent>
-  using rethread = ExternRef<typename eWLTy::template rethread<newconcurrent> >;
+  template<bool _concurrent>
+  using rethread = ExternRef<typename Container::template rethread<_concurrent> >;
   
   //! change the type the worklist holds
-  template<typename Tnew>
-  using retype = ExternRef<typename eWLTy::template retype<Tnew> >;
+  template<typename _T>
+  using retype = ExternRef<typename Container::template retype<_T> >;
+
+private:
+  Container& wl;
+
+public:
+  ExternRef(Container& _wl) :wl(_wl) {}
+
+  //! T is the value type of the WL
+  typedef typename Container::value_type value_type;
 
   //! push a value onto the queue
   void push(const value_type& val) { wl.push(val); }
@@ -60,6 +64,6 @@ public:
   boost::optional<value_type> pop() { return wl.pop(); }
 };
 
-
 }
 }
+#endif

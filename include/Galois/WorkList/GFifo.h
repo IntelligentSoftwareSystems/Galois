@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -31,20 +31,22 @@
 namespace Galois {
 namespace WorkList {
 
-template<typename T = int, bool concurrent = true>
-  class GFIFO : private boost::noncopyable, private Runtime::LL::PaddedLock<concurrent>  {
+template<typename T = int, bool Concurrent = true>
+struct GFIFO : private boost::noncopyable, private Runtime::LL::PaddedLock<Concurrent>  {
+  template<bool _concurrent>
+  using rethread = GFIFO<T, _concurrent>;
+
+  template<typename _T>
+  using retype = GFIFO<_T, Concurrent>;
+
+private:
   gdeque<T> wl;
 
-  using Runtime::LL::PaddedLock<concurrent>::lock;
-  using Runtime::LL::PaddedLock<concurrent>::try_lock;
-  using Runtime::LL::PaddedLock<concurrent>::unlock;
+  using Runtime::LL::PaddedLock<Concurrent>::lock;
+  using Runtime::LL::PaddedLock<Concurrent>::try_lock;
+  using Runtime::LL::PaddedLock<Concurrent>::unlock;
 
 public:
-  template<bool newconcurrent>
-  using rethread = GFIFO<T, newconcurrent>;
-  template<typename Tnew>
-  using retype = GFIFO<Tnew, concurrent>;
-
   typedef T value_type;
 
   void push(const value_type& val) {

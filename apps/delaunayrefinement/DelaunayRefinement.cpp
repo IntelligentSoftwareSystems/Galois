@@ -164,7 +164,7 @@ int main(int argc, char** argv) {
   Trefine.start();
   using namespace Galois::WorkList;
   
-  typedef LocalQueues<dChunkedLIFO<256>, ChunkedLIFO<256> > BQ;
+  typedef LocalQueue<dChunkedLIFO<256>, ChunkedLIFO<256> > BQ;
   typedef AltChunkedLIFO<32> Chunked;
   
   switch (detAlgo) {

@@ -213,7 +213,7 @@ int main(int argc, char** argv) {
     << " Start Node: " << startNode 
     << " Iterations: " << iterations << "\n";
   
-  typedef Galois::WorkList::LazyIter< std::vector<GNode>::iterator, true> WLL;
+  typedef Galois::WorkList::StableIterator< std::vector<GNode>::iterator, true> WLL;
   Galois::StatTimer T;
   T.start();
   Galois::for_each<WLL>(v.begin(), v.end(), process());

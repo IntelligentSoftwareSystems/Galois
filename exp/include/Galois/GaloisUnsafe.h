@@ -25,29 +25,30 @@
 #define GALOIS_GALOISUNSAFE_H
 
 #include "Galois/Galois.h"
-#include "Galois/WorkList/Ref.h"
+#include "Galois/WorkList/ExternRef.h"
 
 namespace Galois {
 
 namespace hidden {
 
-  template <typename ExecutorTy>
-  static inline void for_each_wl_impl (ExecutorTy& exec, const bool isParallel) {
-    assert(!Galois::Runtime::inGaloisForEach);
+template <typename ExecutorTy>
+static inline void for_each_wl_impl (ExecutorTy& exec, const bool isParallel) {
+  assert(!Galois::Runtime::inGaloisForEach);
 
-    Galois::Runtime::inGaloisForEach = true;
+  Galois::Runtime::inGaloisForEach = true;
 
-    Galois::Runtime::RunCommand w[4] = { 
-      std::bind(&ExecutorTy::initThread, std::ref(exec)),
-      std::ref (Galois::Runtime::getSystemBarrier ()),
-      std::ref (exec), 
-      std::ref (Galois::Runtime::getSystemBarrier ())
-    };
+  Galois::Runtime::RunCommand w[4] = { 
+    std::bind(&ExecutorTy::initThread, std::ref(exec)),
+    std::ref (Galois::Runtime::getSystemBarrier ()),
+    std::ref (exec), 
+    std::ref (Galois::Runtime::getSystemBarrier ())
+  };
 
-    Galois::Runtime::getSystemThreadPool().run(&w[0], &w[4], Galois::Runtime::activeThreads);
+  Galois::Runtime::getSystemThreadPool().run(&w[0], &w[4], Galois::Runtime::activeThreads);
 
-    Galois::Runtime::inGaloisForEach = false;
-  }
+  Galois::Runtime::inGaloisForEach = false;
+}
+
 }
 
 // XXX: the basic idea of treating executor type as a WorkList e.g. WorkList::ParaMeter
@@ -57,22 +58,17 @@ namespace hidden {
 // and when usin galois say: for_each_wl (wl,...)
 template <typename ExecTy, typename WLTy, typename FunctionTy>
 static inline void for_each_wl (WLTy& wl, FunctionTy f, const char* loopname=0) {
-
   typedef typename WLTy::value_type T;
-
   typedef Galois::Runtime::ForEachWork<WorkList::ExternRef<ExecTy>, T, FunctionTy> WorkTy;
 
   WorkTy W (wl, f, loopname);
 
   hidden::for_each_wl_impl (W, false);
- 
 }
 
 template <typename WLTy, typename FunctionTy>
 static inline void for_each_wl (WLTy& wl, FunctionTy f, const char* loopname=0) {
-
   typedef typename WLTy::value_type T;
-
   typedef Galois::Runtime::ForEachWork<WorkList::ExternRef<WLTy>, T, FunctionTy> WorkTy;
 
   WorkTy W (wl, f, loopname);
@@ -80,11 +76,5 @@ static inline void for_each_wl (WLTy& wl, FunctionTy f, const char* loopname=0) 
   hidden::for_each_wl_impl (W, true);
 }
 
-
-
-
-
 }
-
 #endif //  GALOIS_GALOISUNSAFE_H
-
