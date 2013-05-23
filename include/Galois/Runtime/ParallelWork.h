@@ -242,6 +242,7 @@ protected:
     remote_aborted.commit(*p);
   }
 
+  GALOIS_ATTRIBUTE_NOINLINE
   template<typename WL>
   bool runQueueSimple(FunctionTy& func, ThreadLocalData& tld, WL& lwl) {
     boost::optional<value_type> p = lwl.pop();
@@ -254,45 +255,29 @@ protected:
     return false;
   }
 
+  GALOIS_ATTRIBUTE_NOINLINE
   template<unsigned limit, typename WL>
   bool runQueue(FunctionTy& func, ThreadLocalData& tld, WL& lwl, bool recursiveAbort) {
-    boost::optional<value_type> p; 
-    try {
-      p = lwl.pop();
-      if (p) {
-	unsigned runlimit = limit;
-	do {
+    boost::optional<value_type> p = lwl.pop();
+    if (p) {
+      unsigned runlimit = limit;
+      do {
+	try {
 	  execItem(p, func, tld);
-	  if (limit)
-            --runlimit;
-	} while ((limit == 0 || runlimit != 0) && (p = lwl.pop()));
-	return true;
-      }
-      return false;
-    } catch (const conflict_ex& ex) {
-      tld.abort(*p);
-      aborted.push(recursiveAbort, *p);
-    } catch (const remote_ex& ex) {
-      tld.abort(*p);
-      //aborted.push(recursiveAbort, *p);
-      remote_aborted.push(*p, ex.ptr);
+	} catch (const conflict_ex& ex) {
+	  tld.abort(*p);
+	  aborted.push(recursiveAbort, *p);
+	} catch (const remote_ex& ex) {
+	  tld.abort(*p);
+	  //aborted.push(recursiveAbort, *p);
+	  remote_aborted.push(*p, ex.ptr);
+	}
+	if (limit)
+	  --runlimit;
+      } while ((limit == 0 || runlimit != 0) && (p = lwl.pop()));
+      return true;
     }
-    //doNetworkWork();
-    return true;
-  }
-
-  GALOIS_ATTRIBUTE_NOINLINE
-  bool runAborts(FunctionTy& func, ThreadLocalData& tld) {
-    bool r = runQueue<0>(func, tld, aborted, true);
-    while (r && runQueue<0>(func, tld, aborted, true)) {};
-    return r;
-  }
-
-  GALOIS_ATTRIBUTE_NOINLINE
-  bool runRemoteAborts(FunctionTy& func, ThreadLocalData& tld) {
-    bool r = runQueue<0>(func, tld, remote_aborted, true);
-    while (r && runQueue<0>(func, tld, remote_aborted, true)) {};
-    return r;
+    return false;
   }
 
   void fastPushBack(typename UserContextAccess<value_type>::PushBufferTy& x) {
@@ -322,10 +307,10 @@ protected:
         //Check for break
         if (ForEachTraits<FunctionTy>::NeedsBreak && broke.data)
           break;
-        //Check for abort, allso guards random network work
+        //Check for abort, also guards random network work
         if (checkAbort) {
-          didWork |= runAborts(func, tld);
-          didWork |= runRemoteAborts(func, tld);
+          didWork |= runQueue<32>(func, tld, aborted, true);
+          didWork |= runQueue<32>(func, tld, remote_aborted, true);
           didWork |= !remote_aborted.empty();
           doNetworkWork();
         }
