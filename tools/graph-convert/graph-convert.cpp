@@ -845,7 +845,7 @@ void partition_by_destination(const std::string& infilename, const std::string& 
   typedef Graph::GraphNode GNode;
   typedef Galois::Graph::FileGraphWriter Writer;
   typedef Galois::LargeArray<EdgeTy> EdgeData;
-  typedef Galois::LargeArray<int> InDegree;
+  typedef Galois::LargeArray<size_t> InDegree;
   typedef typename EdgeData::value_type edge_value_type;
   
   Graph graph;
