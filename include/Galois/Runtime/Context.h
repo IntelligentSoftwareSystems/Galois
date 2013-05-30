@@ -125,12 +125,12 @@ void setThreadContext(SimpleRuntimeContext* n);
 //! Helper function to decide if the conflict detection lock should be taken
 inline bool shouldLock(const Galois::MethodFlag g) {
   // Mask out additional "optional" flags
-  switch (g & MethodFlag::ALL) {
-  case MethodFlag::NONE:
-  case MethodFlag::SAVE_UNDO:
+  switch (g & ALL) {
+  case NONE:
+  case SAVE_UNDO:
     return false;
-  case MethodFlag::ALL:
-  case MethodFlag::CHECK_CONFLICT:
+  case ALL:
+  case CHECK_CONFLICT:
     return true;
   default:
     GALOIS_DIE("shouldn't get here");
