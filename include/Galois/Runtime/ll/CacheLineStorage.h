@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in
  * irregular programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights
+ * Copyright (C) 2013, The University of Texas at Austin. All rights
  * reserved.  UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES
  * CONCERNING THIS SOFTWARE AND DOCUMENTATION, INCLUDING ANY
  * WARRANTIES OF MERCHANTABILITY, FITNESS FOR ANY PARTICULAR PURPOSE,
@@ -22,48 +22,63 @@
  *
  * @section Description
  *
- * This wrapper ensures the contents occupie its own cache line(s).
+ * This wrapper ensures the contents occupy its own cache line(s).
  *
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
-#ifndef GALOIS_RUNTIME_CACHE_LINE_STORAGE_H
-#define GALOIS_RUNTIME_CACHE_LINE_STORAGE_H
+#ifndef GALOIS_RUNTIME_CACHELINESTORAGE_H
+#define GALOIS_RUNTIME_CACHELINESTORAGE_H
 
 #include "CompilerSpecific.h"
+
+#include <utility>
 
 namespace Galois {
 namespace Runtime {
 namespace LL {
 
-
-
 template<typename T, int REM>
-struct CacheLineImp {
+struct CacheLineImpl {
   GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE T data;
   char pad[REM];
-  CacheLineImp() :data() {}
-  explicit CacheLineImp(const T& v) :data(v) {}
+  
+  CacheLineImpl() :data() {}
+  
+  template<typename A>
+  explicit CacheLineImpl(A&& v) :data(std::forward<A>(v)) {}
+
+  explicit operator T() { return data; }
 };
 
 template<typename T>
-struct CacheLineImp<T, 0> {
+struct CacheLineImpl<T, 0> {
   GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE T data;
-  CacheLineImp() :data() {}
-  explicit CacheLineImp(const T& v) :data(v) {}
+  
+  CacheLineImpl() :data() {}
+
+  template<typename A>
+  explicit CacheLineImpl(A&& v) :data(std::forward<A>(v)) {}
+
+  explicit operator T() { return data; }
 };
 
 // Store an item with padding
 template<typename T>
-struct CacheLineStorage : public CacheLineImp<T, GALOIS_CACHE_LINE_SIZE % sizeof(T)> {
-  typedef CacheLineImp<T, GALOIS_CACHE_LINE_SIZE % sizeof(T)> PTy;
-  using PTy::data;
+struct CacheLineStorage : public CacheLineImpl<T, GALOIS_CACHE_LINE_SIZE % sizeof(T)> {
+  typedef CacheLineImpl<T, GALOIS_CACHE_LINE_SIZE % sizeof(T)> PTy;
+  
   CacheLineStorage() :PTy() {}
-  explicit CacheLineStorage(const T& v) :PTy(v) {}
-  CacheLineStorage& operator=(const T& v) { data = v; return *this; }
+
+  template<typename A>
+  explicit CacheLineStorage(A&& v) :PTy(std::forward<A>(v)) {}
+
+  explicit operator T() { return this->data; }
+
+  CacheLineStorage& operator=(const T& v) { this->data = v; return *this; }
 };
 
 }
 }
 } // end namespace Galois
 
-#endif //_CACHE_LINE_STORAGE_H
+#endif
