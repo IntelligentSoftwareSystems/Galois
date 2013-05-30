@@ -169,22 +169,6 @@ template<typename T>
 struct needs_parallel_break : public has_tt_needs_parallel_break<T> {};
 
 /**
- * Indicates the operator has a member function that can receive the remaining
- * work not executed when a parallel break is performed. This function should
- * be thread-safe.
- *
- * The type conforms to the following:
- * \code
- *  struct T {
- *    void galoisParallelBreakReceiveRemaining(const A&) { }
- *  };
- * \endcode
- */
-GALOIS_HAS_MEM_FUNC_ANY(galoisParallelBreakReceiveRemaining, tf_parallel_break_receive_remaining);
-template<typename T>
-struct has_parallel_break_receive_remaining : public has_tf_parallel_break_receive_remaining<T> {};
-
-/**
  * Indicates the operator does not generate new work and push it on the worklist
  */
 BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_does_not_need_push)

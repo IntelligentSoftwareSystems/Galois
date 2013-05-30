@@ -96,35 +96,18 @@ template<typename FunctionTy>
 class BreakHandler {
   LL::CacheLineStorage<bool> broke;
 
-  template<typename WorkListTy, bool HasReceive = Galois::has_parallel_break_receive_remaining<FunctionTy>::value>
-  GALOIS_ATTRIBUTE_NOINLINE
-  void drain(WorkListTy& wl, FunctionTy& fn, typename std::enable_if<HasReceive>::type* = 0) {
-    auto p = wl.pop();
-    while (p) {
-      fn.galoisParallelBreakReceiveRemaining(*p);
-      p = wl.pop();
-    }
-  }
-
-  template<typename WorkListTy, bool HasReceive = Galois::has_parallel_break_receive_remaining<FunctionTy>::value>
-  void drain(WorkListTy&, FunctionTy&, typename std::enable_if<!HasReceive>::type* = 0) { }
-
 public:
   BreakHandler(): broke(false) { }
 
   void updateBreak() { broke.data = true; }
 
-  template<typename WorkListTy, bool NeedsBreak = ForEachTraits<FunctionTy>::NeedsBreak>
-  bool checkBreak(WorkListTy& wl, FunctionTy& fn, typename std::enable_if<NeedsBreak>::type* = 0) {
-    if (broke.data) {
-      drain(wl, fn);
-      return true;
-    }
-    return false;
+  template<bool NeedsBreak = ForEachTraits<FunctionTy>::NeedsBreak>
+  bool checkBreak(typename std::enable_if<NeedsBreak>::type* = 0) {
+    return broke.data;
   }
 
-  template<typename WorkListTy, bool NeedsBreak = ForEachTraits<FunctionTy>::NeedsBreak>
-  bool checkBreak(WorkListTy&, FunctionTy&, typename std::enable_if<!NeedsBreak>::type* = 0) {
+  template<bool NeedsBreak = ForEachTraits<FunctionTy>::NeedsBreak>
+  bool checkBreak(typename std::enable_if<!NeedsBreak>::type* = 0) {
     return false;
   }
 };
@@ -285,14 +268,14 @@ protected:
 	else //No try/catch
 	  didWork = runQueueSimple(tld);
 	//Check for break
-	if (breakHandler.checkBreak(wl, tld.function))
+	if (breakHandler.checkBreak())
 	  break;
 	//Check for abort
 	if (checkAbort)
 	  didWork |= handleAborts(tld);
 	didAnyWork |= didWork;
       } while (didWork);
-      if (breakHandler.checkBreak(wl, tld.function))
+      if (breakHandler.checkBreak())
 	break;
       //update node color and prop token
       term.localTermination(didAnyWork);
