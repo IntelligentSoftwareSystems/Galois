@@ -55,7 +55,7 @@ static const char* desc =
   "graph using a modified chaotic iteration algorithm";
 static const char* url = "single_source_shortest_path";
 
-enum class Algo {
+enum Algo {
   async,
   asyncWithCas,
   graphlab,
@@ -82,7 +82,7 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValN(Algo::serial, "serial", "Serial"),
       clEnumValEnd), cll::init(Algo::asyncWithCas));
 
-static const bool trackBadWork = false;
+static const bool trackWork = true;
 static Galois::Statistic* BadWork;
 static Galois::Statistic* WLEmptyWork;
 
@@ -297,7 +297,7 @@ struct AsyncAlgo {
       if (!UseCas || __sync_bool_compare_and_swap(&ddata.dist, oldDist, newDist)) {
         if (!UseCas)
           ddata.dist = newDist;
-        if (trackBadWork && oldDist != DIST_INFINITY)
+        if (trackWork && oldDist != DIST_INFINITY)
           *BadWork += 1;
         pusher.push(UpdateRequest(dst, newDist));
         break;
@@ -306,17 +306,23 @@ struct AsyncAlgo {
   }
 
   template<typename Pusher>
-  void relaxNode(Graph& graph, GNode src, Dist prevDist, Pusher& pusher) {
+  void relaxNode(Graph& graph, UpdateRequest& req, Pusher& pusher) {
     const Galois::MethodFlag flag = UseCas ? Galois::MethodFlag::NONE : Galois::MethodFlag::ALL;
-    Node& sdata = graph.getData(src, flag);
+    Node& sdata = graph.getData(req.n, flag);
+    volatile Dist* sdist = &sdata.dist;
 
-    if (prevDist > sdata.dist) {
-      if (trackBadWork)
+    if (req.w != *sdist) {
+      if (trackWork)
         *WLEmptyWork += 1;
       return;
     }
 
-    for (typename Graph::edge_iterator ii = graph.edge_begin(src, flag), ei = graph.edge_end(src, flag); ii != ei; ++ii) {
+    for (typename Graph::edge_iterator ii = graph.edge_begin(req.n, flag), ei = graph.edge_end(req.n, flag); ii != ei; ++ii) {
+      if (req.w != *sdist) {
+        if (trackWork)
+          *WLEmptyWork += 1;
+        break;
+      }
       relaxEdge(graph, sdata, ii, pusher);
     }
   }
@@ -326,7 +332,7 @@ struct AsyncAlgo {
     Graph& graph;
     Process(AsyncAlgo* s, Graph& g): self(s), graph(g) { }
     void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& ctx) {
-      self->relaxNode(graph, req.n, req.w, ctx);
+      self->relaxNode(graph, req, ctx);
     }
   };
 
@@ -345,14 +351,12 @@ struct AsyncAlgo {
 
   void operator()(Graph& graph, GNode source) {
     using namespace Galois::WorkList;
-    //typedef AltChunkedFIFO<64> Chunk;
-    //typedef dChunkedFIFO<64> Chunk;
     typedef dChunkedFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer<UpdateRequest>, Chunk, 10> OBIM;
 
     std::cout << "INFO: Using delta-step of " << (1 << stepShift) << "\n";
     std::cout << "WARNING: Performance varies considerably due to delta parameter.\n";
-    std::cout << "WARNING: Do not expect the default to be good for your graph\n";
+    std::cout << "WARNING: Do not expect the default to be good for your graph.\n";
 
     Bag initial;
     graph.getData(source).dist = 0;
@@ -360,14 +364,6 @@ struct AsyncAlgo {
         graph.out_edges(source, Galois::MethodFlag::NONE).begin(),
         graph.out_edges(source, Galois::MethodFlag::NONE).end(),
         InitialProcess(this, graph, initial, graph.getData(source)));
-
-#if 0
-#ifdef GALOIS_USE_EXP
-    Exp::PriAuto<16, UpdateRequestIndexer<UpdateRequest>, OBIM, std::less<UpdateRequest>, std::greater<UpdateRequest> >::for_each(initial.begin(), initial.end(), Process(this, graph));
-#else
-    Galois::for_each_local<OBIM>(initial, Process(this, graph));
-#endif
-#endif
     Galois::for_each_local<OBIM>(initial, Process(this, graph));
   }
 };
@@ -588,7 +584,7 @@ int main(int argc, char **argv) {
   Galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
-  if (trackBadWork) {
+  if (trackWork) {
     BadWork = new Galois::Statistic("BadWork");
     WLEmptyWork = new Galois::Statistic("EmptyWork");
   }
@@ -608,7 +604,7 @@ int main(int argc, char **argv) {
   }
   T.stop();
 
-  if (trackBadWork) {
+  if (trackWork) {
     delete BadWork;
     delete WLEmptyWork;
   }

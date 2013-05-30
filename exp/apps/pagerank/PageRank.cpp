@@ -47,7 +47,7 @@ static const char* name = "Page Rank";
 static const char* desc = "Computes page ranks a la Page and Brin";
 static const char* url = 0;
 
-enum class Algo {
+enum Algo {
   graphlab,
   graphlabAsync,
   ligra,

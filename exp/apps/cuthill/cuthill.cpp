@@ -50,7 +50,7 @@ enum PseudoAlgo {
   fullPseudo
 };
 
-enum class WriteType {
+enum WriteType {
   none,
   graph,
   perm

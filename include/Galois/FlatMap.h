@@ -26,6 +26,7 @@
 
 #include <functional>
 #include <algorithm>
+#include <type_traits>
 #include <vector>
 
 namespace Galois {
@@ -112,7 +113,7 @@ public:
   flat_map(const flat_map& __x) :_data(__x._data), _comp(__x._comp) {}
   
   flat_map(flat_map&& __x)
-  noexcept(std::is_nothrow_copy_constructible<_Compare>::value)
+  /* noexcept(std::is_nothrow_copy_constructible<_Compare>::value) */
   : _data(std::move(__x._data)), _comp(std::move(__x._comp)) {}
   
   flat_map(std::initializer_list<value_type> __l,
@@ -150,36 +151,37 @@ public:
     return *this;
   }
   
-  allocator_type get_allocator() const noexcept { 
+  allocator_type get_allocator() const /* noexcept */ { 
     return allocator_type(_data.get_allocator()); 
   }
   
   // iterators
   
-  iterator  begin() noexcept { return _data.begin(); }
-  const_iterator begin() const noexcept { return _data.begin(); }
-  iterator  end() noexcept { return _data.end(); }
-  const_iterator end() const noexcept { return _data.end(); }
-  reverse_iterator rbegin() noexcept { return _data.rbegin(); }
-  const_reverse_iterator rbegin() const noexcept { return _data.rbegin(); }
-  reverse_iterator rend() noexcept { return _data.rend(); }
-  const_reverse_iterator  rend() const noexcept { return _data.rend(); }
-  const_iterator cbegin() const noexcept { return _data.cbegin(); }
-  const_iterator  cend() const noexcept { return _data.cend(); }
-  const_reverse_iterator crbegin() const noexcept { return _data.rbegin(); }
-  const_reverse_iterator crend() const noexcept { return _data.rend(); }
+  iterator  begin() /* noexcept */ { return _data.begin(); }
+  const_iterator begin() const /* noexcept */ { return _data.begin(); }
+  iterator  end() /* noexcept */ { return _data.end(); }
+  const_iterator end() const /* noexcept */ { return _data.end(); }
+  reverse_iterator rbegin() /* noexcept */ { return _data.rbegin(); }
+  const_reverse_iterator rbegin() const /* noexcept */ { return _data.rbegin(); }
+  reverse_iterator rend() /* noexcept */ { return _data.rend(); }
+  const_reverse_iterator  rend() const /* noexcept */ { return _data.rend(); }
+  const_iterator cbegin() const /* noexcept */ { return _data.cbegin(); }
+  const_iterator  cend() const /* noexcept */ { return _data.cend(); }
+  const_reverse_iterator crbegin() const /* noexcept */ { return _data.rbegin(); }
+  const_reverse_iterator crend() const /* noexcept */ { return _data.rend(); }
   
-  bool empty() const noexcept { return _data.empty(); }
-  size_type size() const noexcept { return _data.size(); }
-  size_type max_size() const noexcept { return _data.max_size(); }
+  bool empty() const /* noexcept */ { return _data.empty(); }
+  size_type size() const /* noexcept */ { return _data.size(); }
+  size_type max_size() const /* noexcept */ { return _data.max_size(); }
   
   mapped_type& operator[](const key_type& __k) {
     iterator __i = lower_bound(__k);
     // __i->first is greater than or equivalent to __k.
     if (__i == end() || key_comp()(__k, (*__i).first))
-      __i = _data.emplace(__i, std::piecewise_construct,
-			  std::tuple<const key_type&>(__k),
-			  std::tuple<>());
+//      __i = _data.emplace(__i, std::piecewise_construct,
+//			  std::tuple<const key_type&>(__k),
+//			  std::tuple<>());
+      __i = _data.emplace(__i, __k, mapped_type());
     return (*__i).second;
   }
   
@@ -187,9 +189,10 @@ public:
     iterator __i = lower_bound(__k);
     // __i->first is greater than or equivalent to __k.
     if (__i == end() || key_comp()(__k, (*__i).first))
-      __i = _data.emplace(__i, std::piecewise_construct, 
-			  std::forward_as_tuple(std::move(__k)),
-			  std::tuple<>());
+//      __i = _data.emplace(__i, std::piecewise_construct, 
+//			  std::forward_as_tuple(std::move(__k)),
+//			  std::tuple<>());
+      __i = _data.emplace(__i, std::move(__k), mapped_type());
     return (*__i).second;
   }
   
@@ -214,7 +217,8 @@ public:
     return std::make_pair(_data.insert(i, __x), true);
   }
   
-  template<typename _Pair, typename = typename std::enable_if<std::is_constructible<value_type, _Pair&&>::value>::type>
+  //template<typename _Pair, typename = typename std::enable_if<std::is_constructible<value_type, _Pair&&>::value>::type>
+  template<typename _Pair>
   std::pair<iterator, bool> insert(_Pair&& __x) {
     auto i = lower_bound(__x.first);
     if (i != end() && key_eq(i->first, __x.first))
@@ -230,7 +234,8 @@ public:
     return insert(__x).first;
   }
   
-  template<typename _Pair, typename = typename std::enable_if<std::is_constructible<value_type, _Pair&&>::value>::type>
+  //template<typename _Pair, typename = typename std::enable_if<std::is_constructible<value_type, _Pair&&>::value>::type>
+  template<typename _Pair>
   iterator insert(const_iterator __position, _Pair&& __x) {
     return insert(std::forward<_Pair>(__x)).first;
   }
@@ -259,7 +264,7 @@ public:
 
   void swap(flat_map& __x) { _data.swap(__x._data); std::swap(_comp, __x._comp); }
 
-  void clear() noexcept{ _data.clear(); }
+  void clear() /* noexcept */ { _data.clear(); }
 
   key_compare key_comp() const { return _comp; }
   value_compare value_comp() const { return value_compare(key_comp()); }

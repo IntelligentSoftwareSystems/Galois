@@ -29,7 +29,7 @@
 
 #include <map>
 #include <vector>
-#include <algorithm>
+#include <numeric>
 
 #ifdef __linux__
 #include <linux/mman.h>

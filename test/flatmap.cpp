@@ -25,7 +25,10 @@ int main() {
 
   Galois::flat_map<int, double> m;
   Galois::flat_map<int, double> m2(m);
-  Galois::flat_map<int, double> m3 {{10,0},{20,0}};
+  //Galois::flat_map<int, double> m3 {{10,0},{20,0}};
+  Galois::flat_map<int, double> m3;
+  m3.insert(std::make_pair(10, 0.0));
+  m3.insert(std::make_pair(20, 0.0));
   Galois::flat_map<int, double> m4(m3.begin(), m3.end());
   m2 = m3;
   m3 = std::move(m2);

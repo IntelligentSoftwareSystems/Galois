@@ -49,7 +49,7 @@ static const char* desc = 0;
 static const char* url = 0;
 
 //****** Command Line Options ******
-enum class Algo {
+enum Algo {
   ligra,
   ligraChi
 };

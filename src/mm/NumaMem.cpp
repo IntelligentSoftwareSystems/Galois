@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -37,6 +37,9 @@
 #ifdef USE_NUMA
 static int is_numa_available;
 #endif
+
+// TODO Remove dependency on USE_NUMA for non-interleaved functionality because
+// libnuma dev is not widely available
 
 static const char* sNumaStat = "/proc/self/numa_maps";
 
@@ -75,11 +78,10 @@ void Galois::Runtime::MM::printInterleavedStats(int minPages) {
   fclose(f);
 }
 
-#ifdef USE_NUMA
 static int num_numa_pages_for(unsigned nodeid) {
   FILE* f = fopen(sNumaStat, "r");
   if (!f) {
-    Galois::Runtime::LL::gInfo("No NUMA support");
+    //Galois::Runtime::LL::gInfo("No NUMA support");
     return 0;
   }
 
@@ -107,7 +109,6 @@ static int num_numa_pages_for(unsigned nodeid) {
 
   return totalPages;
 }
-#endif
 
 static int check_numa() {
 #ifdef USE_NUMA
@@ -123,13 +124,7 @@ static int check_numa() {
 }
 
 int Galois::Runtime::MM::numNumaAllocForNode(unsigned nodeid) {
-  if (!check_numa())
-    return 0;
-#ifdef USE_NUMA
   return num_numa_pages_for(nodeid);
-#else
-  return 0;
-#endif
 }
 
 int Galois::Runtime::MM::numNumaNodes() {

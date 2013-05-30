@@ -388,7 +388,7 @@ struct get_weight {
 };
 
 template<typename Algo>
-typename std::result_of<Algo()>::type run() {
+void run() {
   Algo algo;
 
   return algo();
@@ -397,7 +397,8 @@ typename std::result_of<Algo()>::type run() {
 bool verify() {
   if (Galois::ParallelSTL::find_if(graph.begin(), graph.end(), is_bad_graph()) == graph.end()) {
     if (Galois::ParallelSTL::find_if(mst.begin(), mst.end(), is_bad_mst()) == mst.end()) {
-      return run<CheckAcyclic>();
+      CheckAcyclic c;
+      return c();
     }
   }
   return false;
@@ -417,7 +418,8 @@ void initializeGraph() {
   
   Galois::StatTimer Tsort("InitializeSortTime");
   Tsort.start();
-  heaviest = run<SortEdges>();
+  SortEdges sortEdges;
+  heaviest = sortEdges();
   if (heaviest == std::numeric_limits<EdgeData>::max() || 
       heaviest == std::numeric_limits<EdgeData>::min()) {
     std::cerr << "Edge weights of graph out of range\n";

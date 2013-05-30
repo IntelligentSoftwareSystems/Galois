@@ -54,7 +54,7 @@ static const char* desc = "Estimates the diameter of a graph";
 static const char* url = 0;
 
 //****** Command Line Options ******
-enum class Algo {
+enum Algo {
   graphlab,
   ligra,
   ligraChi,

@@ -449,11 +449,24 @@ void convert_gr2edgelist(const std::string& infilename, const std::string& outfi
   printStatus(graph.size(), graph.sizeEdges());
 }
 
+//! Wrap generator into form form std::random_shuffle
+template<typename T>
+struct UniformDist {
+  boost::random::mt19937& gen;
+  
+  UniformDist(boost::random::mt19937& g): gen(g) { }
+  T operator()(T m) {
+    boost::random::uniform_int_distribution<T> r(0, m - 1);
+    return r(gen);
+  }
+};
+
 template<typename EdgeTy>
 void convert_gr2rand(const std::string& infilename, const std::string& outfilename) {
   typedef Galois::Graph::FileGraph Graph;
   typedef Graph::GraphNode GNode;
   typedef Galois::LargeArray<GNode> Permutation;
+  typedef typename std::iterator_traits<typename Permutation::iterator>::difference_type difference_type;
 
   Graph graph;
   graph.structureFromFile(infilename);
@@ -462,7 +475,10 @@ void convert_gr2rand(const std::string& infilename, const std::string& outfilena
   perm.create(graph.size());
   std::copy(boost::counting_iterator<GNode>(0), boost::counting_iterator<GNode>(graph.size()), perm.begin());
   boost::random::mt19937 gen;
-  std::shuffle(perm.begin(), perm.end(), gen);
+
+  UniformDist<difference_type> dist(gen);
+  //std::shuffle(perm.begin(), perm.end(), gen);
+  std::random_shuffle(perm.begin(), perm.end(), dist);
 
   Graph out;
   Galois::Graph::permute<EdgeTy>(graph, perm, out);

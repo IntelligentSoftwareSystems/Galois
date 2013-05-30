@@ -292,7 +292,7 @@ struct ComputeForces {
   template<typename Context>
   void operator()(Body* b, Context& cnx) {
     Point p = b->acc;
-    b->acc = {0.0, 0.0, 0.0};
+    b->acc = Point(0.0, 0.0, 0.0);
     iterate(*b, root_dsq, cnx);
     b->vel += (b->acc - p) * config.dthf;
   }

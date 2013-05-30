@@ -52,7 +52,7 @@ const char* name = "Connected Components";
 const char* desc = "Computes the connected components of a graph";
 const char* url = 0;
 
-enum class Algo {
+enum Algo {
   async,
   asyncOc,
   graphchi,
@@ -61,10 +61,10 @@ enum class Algo {
   ligra,
   ligraChi,
   serial,
-  sync
+  synchronous
 };
 
-enum class WriteType {
+enum WriteType {
   none,
   largest
 };
@@ -91,7 +91,7 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValN(Algo::ligraChi, "ligraChi", "Using Ligra and GraphChi programming model"),
       clEnumValN(Algo::ligra, "ligra", "Using Ligra programming model"),
       clEnumValN(Algo::serial, "serial", "Serial"),
-      clEnumValN(Algo::sync, "sync", "Synchronous"),
+      clEnumValN(Algo::synchronous, "sync", "Synchronous"),
       clEnumValEnd), cll::init(Algo::async));
 
 struct Node: public Galois::UnionFindNode<Node> {
@@ -966,7 +966,7 @@ int main(int argc, char** argv) {
     case Algo::ligra: run<LigraAlgo<false> >(); break;
 #endif
     case Algo::serial: run<SerialAlgo>(); break;
-    case Algo::sync: run<SynchronousAlgo>(); break;
+    case Algo::synchronous: run<SynchronousAlgo>(); break;
     default: std::cerr << "Unknown algorithm\n"; abort();
   }
   T.stop();

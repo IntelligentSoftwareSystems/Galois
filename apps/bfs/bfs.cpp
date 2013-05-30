@@ -60,7 +60,7 @@ static const char* desc =
 static const char* url = "breadth_first_search";
 
 //****** Command Line Options ******
-enum class Algo {
+enum Algo {
   async,
   barrier,
   barrierWithCas,
@@ -75,7 +75,7 @@ enum class Algo {
   serial
 };
 
-enum class DetAlgo {
+enum DetAlgo {
   none,
   base,
   disjoint

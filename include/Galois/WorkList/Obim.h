@@ -28,8 +28,8 @@
 #include "Galois/WorkList/Fifo.h"
 #include "Galois/WorkList/WorkListHelpers.h"
 
-//#include <map>
 #include <type_traits>
+#include <limits>
 
 namespace Galois {
 namespace WorkList {
