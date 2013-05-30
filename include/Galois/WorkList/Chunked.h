@@ -66,7 +66,6 @@ struct ChunkedMaster : private boost::noncopyable {
   template<int _chunk_size>
   using with_chunk_size = ChunkedMaster<T, QT, Distributed, IsStack, _chunk_size, Concurrent>;
 
-
 private:
   class Chunk : public FixedSizeRing<T, ChunkSize>, public QT<Chunk, Concurrent>::ListNode {};
 

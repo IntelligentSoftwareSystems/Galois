@@ -23,9 +23,13 @@
 #ifndef GALOIS_WORKLIST_OBIM_H
 #define GALOIS_WORKLIST_OBIM_H
 
+#include "Galois/FlatMap.h"
+#include "Galois/Runtime/PerThreadStorage.h"
+#include "Galois/WorkList/Fifo.h"
+#include "Galois/WorkList/WorkListHelpers.h"
+
 //#include <map>
 #include <type_traits>
-#include "Galois/FlatMap.h"
 
 namespace Galois {
 namespace WorkList {
