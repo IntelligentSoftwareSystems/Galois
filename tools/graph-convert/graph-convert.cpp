@@ -53,6 +53,7 @@ enum ConvertMode {
   gr2partsrcintgr,
   gr2randintgr,
   gr2sorteddstintgr,
+  gr2sortedweightintgr,
   gr2ringintgr,
   gr2rmat,
   gr2sintgr,
@@ -101,6 +102,7 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Choose a conversion mode:"),
       clEnumVal(gr2rmat, "Convert binary gr to RMAT graph"),
       clEnumVal(gr2sintgr, "Convert binary gr to symmetric graph by adding reverse edges"),
       clEnumVal(gr2sorteddstintgr, "Sort outgoing edges of binary weighted (int) gr by edge destination"),
+      clEnumVal(gr2sortedweightintgr, "Sort outgoing edges of binary weighted (int) gr by edge weight"),
       clEnumVal(gr2tintgr, "Transpose binary weighted (int) gr"),
       clEnumVal(gr2treeintgr, "Convert binary gr to strongly connected graph by adding tree overlay"),
       clEnumVal(intedgelist2gr, "Convert weighted (int) edge list to binary gr"),
@@ -973,6 +975,13 @@ struct IdLess {
   }
 };
 
+template<typename GraphNode,typename EdgeTy>
+struct WeightLess {
+  bool operator()(const Galois::Graph::EdgeSortValue<GraphNode,EdgeTy>& e1, const Galois::Graph::EdgeSortValue<GraphNode,EdgeTy>& e2) const {
+    return e1.get() < e2.get();
+  }
+};
+
 /**
  * Removes self and multi-edges from a graph.
  */
@@ -1068,11 +1077,8 @@ void convert_gr2cgr(const std::string& infilename, const std::string& outfilenam
   printStatus(graph.size(), graph.sizeEdges(), p.size(), p.sizeEdges());
 }
 
-/**
- * Removes self and multi-edges from a graph.
- */
-template<typename EdgeTy>
-void sort_destinations(const std::string& infilename, const std::string& outfilename) {
+template<typename EdgeTy,template<typename,typename> class SortBy>
+void sort_edges(const std::string& infilename, const std::string& outfilename) {
   typedef Galois::Graph::FileGraph Graph;
   typedef Graph::GraphNode GNode;
   typedef Galois::Graph::FileGraphWriter Writer;
@@ -1089,7 +1095,7 @@ void sort_destinations(const std::string& infilename, const std::string& outfile
   for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
     GNode src = *ii;
 
-    graph.sortEdges<EdgeTy>(src, IdLess<GNode,EdgeTy>());
+    graph.sortEdges<EdgeTy>(src, SortBy<GNode,EdgeTy>());
   }
 
   graph.structureToFile(outfilename);
@@ -1630,7 +1636,8 @@ int main(int argc, char** argv) {
     case gr2partdstintgr: partition_by_destination<int32_t>(inputfilename, outputfilename, numParts); break;
     case gr2partsrcintgr: partition_by_source<int32_t>(inputfilename, outputfilename, numParts); break;
     case gr2randintgr: convert_gr2rand<int32_t>(inputfilename, outputfilename); break;
-    case gr2sorteddstintgr: sort_destinations<int32_t>(inputfilename, outputfilename); break;
+    case gr2sorteddstintgr: sort_edges<int32_t,IdLess>(inputfilename, outputfilename); break;
+    case gr2sortedweightintgr: sort_edges<int32_t,WeightLess>(inputfilename, outputfilename); break;
     case gr2ringintgr: add_ring<int32_t>(inputfilename, outputfilename, maxValue); break;
     case gr2rmat: convert_gr2rmat<int32_t,int32_t>(inputfilename, outputfilename); break;
     case gr2sintgr: convert_gr2sgr<int32_t>(inputfilename, outputfilename); break;
