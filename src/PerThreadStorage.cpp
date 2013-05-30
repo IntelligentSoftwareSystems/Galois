@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -26,21 +26,38 @@
 #include "Galois/Runtime/mm/Mem.h"
 
 __thread char* Galois::Runtime::ptsBase;
+
 Galois::Runtime::PerBackend& Galois::Runtime::getPTSBackend() {
   static Galois::Runtime::PerBackend b;
   return b;
 }
+
 __thread char* Galois::Runtime::ppsBase;
+
 Galois::Runtime::PerBackend& Galois::Runtime::getPPSBackend() {
   static Galois::Runtime::PerBackend b;
   return b;
 }
 
+#define MORE_MEM_HACK
+#ifdef MORE_MEM_HACK
+const size_t allocSize = Galois::Runtime::MM::pageSize * 10;
+inline void* alloc() {
+  return malloc(allocSize);
+}
+
+#else
+const size_t allocSize = Galois::Runtime::MM::pageSize;
+inline void* alloc() {
+  return Galois::Runtime::MM::pageAlloc();
+}
+#endif
+#undef MORE_MEM_HACK
 
 unsigned Galois::Runtime::PerBackend::allocOffset(unsigned size) {
   size = (size + 15) & ~15;
   unsigned retval = __sync_fetch_and_add(&nextLoc, size);
-  if (retval + size > Galois::Runtime::MM::pageSize) {
+  if (retval + size > allocSize) {
     GALOIS_DIE("no more memory");
   }
   return retval;
@@ -69,8 +86,8 @@ void Galois::Runtime::PerBackend::initCommon() {
 
 char* Galois::Runtime::PerBackend::initPerThread() {
   initCommon();
-  char* b = heads[LL::getTID()] = (char*)Galois::Runtime::MM::pageAlloc();
-  memset(b, 0, Galois::Runtime::MM::pageSize);
+  char* b = heads[LL::getTID()] = (char*) alloc();
+  memset(b, 0, allocSize);
   return b;
 }
 
@@ -79,8 +96,8 @@ char* Galois::Runtime::PerBackend::initPerPackage() {
   unsigned id = LL::getTID();
   unsigned leader = LL::getLeaderForThread(id);
   if (id == leader) {
-    char* b = heads[id] = (char*)Galois::Runtime::MM::pageAlloc();
-    memset(b, 0, Galois::Runtime::MM::pageSize);
+    char* b = heads[id] = (char*) alloc();
+    memset(b, 0, allocSize);
     return b;
   } else {
     //wait for leader to fix up package
