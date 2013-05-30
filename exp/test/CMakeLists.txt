@@ -6,4 +6,6 @@ endfunction()
 
 makeTest(pairingheap)
 makeTest(skiplist)
-makeTest(twoleveliteratora)
+if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Intel")
+  makeTest(twoleveliteratora)
+endif()

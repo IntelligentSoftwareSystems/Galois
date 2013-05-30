@@ -127,7 +127,7 @@ struct SNode {
 };
 
 //! ICC + GLIB 4.6 + C++0X (at least) has a faulty implementation of std::pair
-#if __INTEL_COMPILER <= 1210
+#if __INTEL_COMPILER <= 1310
 template<typename A,typename B>
 struct Pair {
   A first;

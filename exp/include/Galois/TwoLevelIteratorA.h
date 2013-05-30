@@ -65,7 +65,6 @@ private:
 
   friend class boost::iterator_core_access;
 
-
   /**
    * Update base iterator to beginning of first non-empty inner range after
    * current one. Also update outer iterators appropriately.

@@ -52,8 +52,8 @@ enum PseudoAlgo {
 
 enum WriteType {
   none,
-  graph,
-  perm
+  permutedgraph,
+  permutation
 };
 
 typedef unsigned int DistType;
@@ -65,8 +65,8 @@ static cll::opt<std::string> outputFilename(cll::Positional, cll::desc("[output 
 static cll::opt<WriteType> writeType("output", cll::desc("Output type:"),
     cll::values(
       clEnumValN(WriteType::none, "none", "None (default)"),
-      clEnumValN(WriteType::graph, "graph", "Permuted graph"),
-      clEnumValN(WriteType::perm, "perm", "Permutation"),
+      clEnumValN(WriteType::permutedgraph, "graph", "Permuted graph"),
+      clEnumValN(WriteType::permutation, "perm", "Permutation"),
       clEnumValEnd), cll::init(WriteType::none));
 static cll::opt<PseudoAlgo> pseudoAlgo(cll::desc("Psuedo-Peripheral algorithm:"),
     cll::values(
@@ -915,8 +915,8 @@ int main(int argc, char **argv) {
 
   switch (writeType) {
     case WriteType::none: break;
-    case WriteType::perm: writePermutation(); break;
-    case WriteType::graph: if (useFloatEdgeWeights) writeGraph<float>(); else writeGraph<double>(); break;
+    case WriteType::permutation: writePermutation(); break;
+    case WriteType::permutedgraph: if (useFloatEdgeWeights) writeGraph<float>(); else writeGraph<double>(); break;
     default: abort();
   }
 

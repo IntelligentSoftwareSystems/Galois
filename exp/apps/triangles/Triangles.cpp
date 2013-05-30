@@ -133,7 +133,7 @@ struct GreaterThanOrEqual {
 };
 
 template<typename G>
-struct DegreeLess {
+struct DegreeLess: public std::binary_function<typename G::GraphNode,typename G::GraphNode,bool> {
   typedef typename G::GraphNode N;
   G* g;
   DegreeLess(G& g): g(&g) { }
