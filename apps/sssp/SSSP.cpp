@@ -58,6 +58,7 @@ static const char* url = "single_source_shortest_path";
 enum Algo {
   async,
   asyncWithCas,
+  asyncPP,
   graphlab,
   ligra,
   ligraChi,
@@ -76,6 +77,7 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
       clEnumValN(Algo::async, "async", "Asynchronous"),
       clEnumValN(Algo::asyncWithCas, "asyncWithCas", "Use compare-and-swap to update nodes"),
+      clEnumValN(Algo::asyncPP, "asyncPP", "Async, CAS, push-pull"),
       clEnumValN(Algo::graphlab, "graphlab", "Use GraphLab programming model"),
       clEnumValN(Algo::ligraChi, "ligraChi", "Use Ligra and GraphChi programming model"),
       clEnumValN(Algo::ligra, "ligra", "Use Ligra programming model"),
@@ -368,6 +370,116 @@ struct AsyncAlgo {
   }
 };
 
+struct AsyncAlgoPP {
+  typedef SNode Node;
+
+  typedef Galois::Graph::LC_InlineEdge_Graph<Node, uint32_t>
+    ::with_out_of_line_lockable<true>
+    ::with_compressed_node_ptr<true>
+    ::with_numa_alloc<true>
+    Graph;
+  typedef typename Graph::GraphNode GNode;
+  typedef UpdateRequestCommon<GNode> UpdateRequest;
+
+  std::string name() const {
+    return "Asynchronous with CAS and Push and pull";
+  }
+
+  void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, filename); }
+
+  struct Initialize {
+    Graph& g;
+    Initialize(Graph& g): g(g) { }
+    void operator()(typename Graph::GraphNode n) {
+      g.getData(n, Galois::MethodFlag::NONE).dist = DIST_INFINITY;
+    }
+  };
+
+  template <typename Pusher>
+  Dist relaxEdge(Graph& graph, Dist& sdata, typename Graph::edge_iterator ii, Pusher& pusher) {
+      GNode dst = graph.getEdgeDst(ii);
+      Dist d = graph.getEdgeData(ii);
+      Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+      Dist newDist = sdata + d;
+      Dist oldDist;
+      if (newDist < (oldDist = ddata.dist)) {
+        do {
+          if (__sync_bool_compare_and_swap(&ddata.dist, oldDist, newDist)) {
+            if (trackWork && oldDist != DIST_INFINITY)
+              *BadWork += 1;
+            pusher.push(UpdateRequest(dst, newDist));
+            break;
+          }
+        } while (newDist < (oldDist = ddata.dist));
+      } else {
+        sdata = std::min(oldDist + d, sdata);
+      }
+    }
+
+  struct Process {
+    AsyncAlgoPP* self;
+    Graph& graph;
+    Process(AsyncAlgoPP* s, Graph& g): self(s), graph(g) { }
+
+    void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& ctx) {
+      const Galois::MethodFlag flag = Galois::MethodFlag::NONE;
+      Node& sdata = graph.getData(req.n, flag);
+      volatile Dist* psdist = &sdata.dist;
+      Dist sdist = *psdist;
+
+      if (req.w != sdist) {
+        if (trackWork)
+          *WLEmptyWork += 1;
+        return;
+      }
+
+      for (typename Graph::edge_iterator ii = graph.edge_begin(req.n, flag), ei = graph.edge_end(req.n, flag); ii != ei; ++ii) {
+        self->relaxEdge(graph, sdist, ii, ctx);
+      }
+
+      // //try doing a pull
+      // Dist oldDist;
+      // while (sdist < (oldDist = *psdist)) {
+      //   if (__sync_bool_compare_and_swap(psdist, oldDist, sdist)) {
+      //     req.w = sdist;
+      //     operator()(req, ctx);
+      //   }
+      // }
+    }
+  };
+
+  typedef Galois::InsertBag<UpdateRequest> Bag;
+
+  struct InitialProcess {
+    AsyncAlgoPP* self;
+    Graph& graph;
+    Bag& bag;
+    InitialProcess(AsyncAlgoPP* s, Graph& g, Bag& b): self(s), graph(g), bag(b) { }
+    void operator()(typename Graph::edge_iterator ii) {
+      Dist d = 0;
+      self->relaxEdge(graph, d, ii, bag);
+    }
+  };
+
+  void operator()(Graph& graph, GNode source) {
+    using namespace Galois::WorkList;
+    typedef dChunkedFIFO<64> Chunk;
+    typedef OrderedByIntegerMetric<UpdateRequestIndexer<UpdateRequest>, Chunk, 10> OBIM;
+
+    std::cout << "INFO: Using delta-step of " << (1 << stepShift) << "\n";
+    std::cout << "WARNING: Performance varies considerably due to delta parameter.\n";
+    std::cout << "WARNING: Do not expect the default to be good for your graph.\n";
+
+    Bag initial;
+    graph.getData(source).dist = 0;
+    Galois::do_all(
+        graph.out_edges(source, Galois::MethodFlag::NONE).begin(),
+        graph.out_edges(source, Galois::MethodFlag::NONE).end(),
+        InitialProcess(this, graph, initial));
+    Galois::for_each_local<OBIM>(initial, Process(this, graph));
+  }
+};
+
 namespace Galois {
 template<>
 struct does_not_need_aborts<typename AsyncAlgo<true>::Process> : public boost::true_type {};
@@ -595,6 +707,7 @@ int main(int argc, char **argv) {
     case Algo::serial: run<SerialAlgo>(); break;
     case Algo::async: run<AsyncAlgo<false> >(); break;
     case Algo::asyncWithCas: run<AsyncAlgo<true> >(); break;
+    case Algo::asyncPP: run<AsyncAlgoPP>(); break;
 #ifdef GALOIS_USE_EXP
     case Algo::ligra: run<LigraAlgo<false> >(); break;
     case Algo::ligraChi: run<LigraAlgo<true> >(false); break;
