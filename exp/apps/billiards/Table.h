@@ -89,7 +89,7 @@ public:
 
   double getWidth () const { return width; }
 
-  const Ball& getBallByID (unsigned id) {
+  const Ball& getBallByID (unsigned id) const {
     assert (id < balls.size ());
 
     // XXX: assumes ball ids and indices are same
@@ -284,6 +284,38 @@ public:
 
   }
 
+  void writeConfig (const char* const confName="config.csv") const {
+
+    FILE* confFile = fopen (confName, "w");
+    assert (confFile != NULL);
+
+    fprintf (confFile, "length, width, num_balls, ball.mass, ball.radius\n");
+    fprintf (confFile, "%e, %e, %d, %e, %e\n",
+        getLength (), getWidth (), getNumBalls (), DefaultValues::BALL_MASS, DefaultValues::BALL_RADIUS);
+
+    fclose (confFile);
+
+  }
+
+  void ballsToCSV (const char* ballsFile = "balls.csv") const {
+    FILE* ballsFH = fopen (ballsFile, "w");
+
+    if( ballsFH == NULL) { abort (); }
+
+    // fprintf (ballsFH, "ball_id, mass, radius, pos_x, pos_y, vel_x, vel_y\n");
+    fprintf (ballsFH, "ball.id, ball.pos.x, ball.pos.y, ball.vel.x, ball.vel.y\n");
+
+    for (std::vector<Ball*>::const_iterator i = balls.begin ()
+        , ei = balls.end (); i != ei; ++i) {
+      const Ball& b = *(*i);
+      
+//       fprintf (ballsFH, "%d, %g, %g, %g, %g, %g, %g\n"
+  //         , b.getID (), b.mass (), b.radius (), b.pos ().getX (), b.pos ().getY (), b.vel ().getX (), b.vel ().getY ());
+      fprintf (ballsFH, "%d, %e, %e, %e, %e\n", b.getID (), b.pos ().getX (), b.pos ().getY (), b.vel ().getX (), b.vel ().getY ());
+    }
+    
+    fclose (ballsFH);
+  }
 
   void cushionsToCSV (const char* cushionsFile="cushions.csv") const {
 
@@ -301,23 +333,6 @@ public:
           , c.getID (), c.start ().getX (), c.start ().getY (), c.end ().getX (), c.end ().getY ());
     }
   }
-
-  void ballsToCSV (const char* ballsFile = "balls.csv") const {
-    FILE* ballsFH = fopen (ballsFile, "w");
-
-    if( ballsFH == NULL) { abort (); }
-
-    fprintf (ballsFH, "ball_id, mass, radius, pos_x, pos_y, vel_x, vel_y\n");
-
-    for (std::vector<Ball*>::const_iterator i = balls.begin ()
-        , ei = balls.end (); i != ei; ++i) {
-      const Ball& b = *(*i);
-      
-      fprintf (ballsFH, "%d, %g, %g, %g, %g, %g, %g\n"
-          , b.getID (), b.mass (), b.radius (), b.pos ().getX (), b.pos ().getY (), b.vel ().getX (), b.vel ().getY ());
-    }
-  }
-
 
 private:
 

@@ -28,6 +28,7 @@
 
 class Viewer: public QGLViewer {
   Scene& scene;
+  unsigned refdelay;
 
   void initLights();
 
@@ -40,7 +41,7 @@ protected:
   virtual QString helpString() const override;
 
 public:
-  Viewer(Scene& s): scene(s) { }
+  Viewer(Scene& s, unsigned refdelay): scene(s), refdelay (refdelay) { }
 };
 
 #endif
