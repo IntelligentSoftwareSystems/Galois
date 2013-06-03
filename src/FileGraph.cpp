@@ -69,11 +69,11 @@ FileGraph::~FileGraph() {
 void FileGraph::parse(void* m) {
   //parse file
   uint64_t* fptr = (uint64_t*)m;
-  __attribute__((unused)) uint64_t version = le64toh(*fptr++);
+  __attribute__((unused)) uint64_t version = le64toh(*fptr); fptr++;
   assert(version == 1);
-  sizeofEdge = le64toh(*fptr++);
-  numNodes = le64toh(*fptr++);
-  numEdges = le64toh(*fptr++);
+  sizeofEdge = le64toh(*fptr); fptr++;
+  numNodes = le64toh(*fptr); fptr++;
+  numEdges = le64toh(*fptr); fptr++;
   outIdx = fptr;
   fptr += numNodes;
   uint32_t* fptr32 = (uint32_t*)fptr;

@@ -18,7 +18,11 @@ file(GLOB Sources
 enable_language(Fortran OPTIONAL)
 find_package(LAPACK)
 find_package(ZLIB)
-find_package(Boost 1.36.0 COMPONENTS system iostreams filesystem)
+# TODO(ddn): CMake Boost module on BG/Q cannot be called multiple times. Skip
+# avi althogether for now.
+if(NOT USE_BGQ)
+  find_package(Boost 1.36.0 COMPONENTS system iostreams filesystem)
+endif()
 
 if(CMAKE_Fortran_COMPILER_WORKS AND LAPACK_FOUND AND ZLIB_FOUND AND Boost_FOUND)
   include_directories(${ZLIB_INCLUDE_DIRS})

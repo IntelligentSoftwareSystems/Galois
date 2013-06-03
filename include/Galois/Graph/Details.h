@@ -313,6 +313,14 @@ public:
   iterator end() { return make_no_deref_iterator(g.edge_end(n)); }
 };
 
+template<typename GN, typename EI, typename EdgeData,typename Data>
+void swap(EdgeSortReference<GN,EI,EdgeData,Data> a, EdgeSortReference<GN,EI,EdgeData,Data> b) {
+  auto aa = *a;
+  auto bb = *b;
+  a = bb;
+  b = aa;
+}
+
 } // end namespace
 } // end namespace
 } // end namespace

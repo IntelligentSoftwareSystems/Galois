@@ -45,7 +45,7 @@
 #include "llvm/ADT/SmallVector.h"
 
 #include <iostream>
-#include <tr1/unordered_map>
+#include <unordered_map>
 
 namespace Galois {
 namespace Runtime {
@@ -320,10 +320,10 @@ public:
   typedef MM::ThreadAwarePrivateHeap<BasicHeap> PerThreadHeap;
   typedef MM::ExternRefGaloisAllocator<std::pair<Lockable*, NItem>, PerThreadHeap> PerThreadAllocator;
 
-  typedef std::tr1::unordered_map<
+  typedef std::unordered_map<
       Lockable*,
       NItem,
-      std::tr1::hash<Lockable*>,
+      std::hash<Lockable*>,
       std::equal_to<Lockable*>,
       PerThreadAllocator
     > NhoodMap;
@@ -342,7 +342,7 @@ public:
   MapBasedNhoodMgr (const Cmp& cmp): 
     cmp (cmp),
     heap (),
-    nhoodMap (8, std::tr1::hash<Lockable*> (), std::equal_to<Lockable*> (), PerThreadAllocator (&heap))
+    nhoodMap (8, std::hash<Lockable*> (), std::equal_to<Lockable*> (), PerThreadAllocator (&heap))
 
   {}
 

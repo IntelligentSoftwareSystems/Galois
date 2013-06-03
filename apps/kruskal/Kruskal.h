@@ -34,7 +34,7 @@
 #include <limits>
 #include <iostream>
 #include <set>
-#include <tr1/unordered_set>
+#include <unordered_set>
 
 #include <cstdlib>
 #include <cstdio>
@@ -217,7 +217,7 @@ public:
 
   typedef std::vector<Edge> VecEdge;
 
-  typedef std::tr1::unordered_set<InEdge, InEdge::Hash> SetInEdge;
+  typedef std::unordered_set<InEdge, InEdge::Hash> SetInEdge;
 
 protected:
 

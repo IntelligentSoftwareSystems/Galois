@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -28,6 +28,7 @@
 
 #include "boost/utility.hpp"
 
+#include <algorithm>
 #include <cstdlib>
 #include <cstdio>
 #include <cerrno>

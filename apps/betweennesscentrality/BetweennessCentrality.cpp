@@ -162,7 +162,7 @@ void printBCcertificate() {
     double bc = (*CB.getRemote(0))[i];
     for (unsigned int j = 1; j < Galois::getActiveThreads(); ++j)
       bc += (*CB.getRemote(j))[i];
-    outf << i << ": " << setiosflags(std::ios::fixed) << std::setprecision(9) << bc << std::endl;
+    outf << i << ": " << std::setiosflags(std::ios::fixed) << std::setprecision(9) << bc << std::endl;
   }
   outf.close();
 }
@@ -224,7 +224,7 @@ int main(int argc, char** argv) {
       double bc = (*CB.getRemote(0))[i];
       for (unsigned int j = 1; j < Galois::getActiveThreads(); ++j)
 	bc += (*CB.getRemote(j))[i];
-      std::cout << i << ": " << setiosflags(std::ios::fixed) << std::setprecision(6) << bc << "\n";
+      std::cout << i << ": " << std::setiosflags(std::ios::fixed) << std::setprecision(6) << bc << "\n";
     }
 #if SHOULD_PRODUCE_CERTIFICATE
     printBCcertificate();

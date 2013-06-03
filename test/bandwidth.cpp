@@ -2,13 +2,21 @@
 #include "Galois/Timer.h"
 
 #include <boost/random/mersenne_twister.hpp>
+#if (BOOST_VERSION < 104700)
+#include <boost/random/uniform_int.hpp>
+#else
 #include <boost/random/uniform_int_distribution.hpp>
+#endif
 #include <cstdio>
 #include <time.h>
 
 template<typename Gen>
 void random_access(Gen& gen, int* buf, size_t size, size_t accesses) {
+#if (BOOST_VERSION < 104700)
+  boost::uniform_int<size_t> randIndex(0, size - 1);
+#else
   boost::random::uniform_int_distribution<size_t> randIndex(0, size - 1);
+#endif
   for (unsigned i = 0; i < accesses; ++i) {
     size_t idx = randIndex(gen);
     buf[idx] += 1;
@@ -20,8 +28,13 @@ void run_local(size_t seed, size_t mega) {
   int *block = (int*) malloc(size*sizeof(*block));
   // Assuming first touch policy
   Galois::on_each([=](unsigned int tid, unsigned int num) {
+#if (BOOST_VERSION < 104700)
+    boost::mt19937 gen(seed + tid);
+    boost::uniform_int<int> randSeed;
+#else
     boost::random::mt19937 gen(seed + tid);
     boost::random::uniform_int_distribution<int> randSeed;
+#endif
     auto r = Galois::block_range(block, block + size, tid, num);
     size_t d = std::distance(r.first, r.second);
     random_access(gen, r.first, d, d);
@@ -33,8 +46,13 @@ void run_interleaved(size_t seed, size_t mega, bool full) {
   size_t size = mega*1024*1024;
   int *block = (int*) Galois::Runtime::MM::largeInterleavedAlloc(size*sizeof(*block), full);
   Galois::on_each([=](unsigned int tid, unsigned int num) {
+#if (BOOST_VERSION < 104700)
+    boost::mt19937 gen(seed + tid);
+    boost::uniform_int<int> randSeed;
+#else
     boost::random::mt19937 gen(seed + tid);
     boost::random::uniform_int_distribution<int> randSeed;
+#endif
     auto r = Galois::block_range(block, block + size, tid, num);
     size_t d = std::distance(r.first, r.second);
     random_access(gen, block, size, d);

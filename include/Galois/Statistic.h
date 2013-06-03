@@ -41,7 +41,7 @@ class Statistic {
   bool valid;
 
 public:
-  Statistic(const std::string& _sn, const std::string& _ln = "(NULL)"): statname(_sn), loopname(_ln), valid(true) { }
+  Statistic(const std::string& _sn, std::string _ln = "(NULL)"): statname(_sn), loopname(_ln), valid(true) { }
 
   ~Statistic() {
     report();

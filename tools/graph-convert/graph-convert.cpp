@@ -26,7 +26,11 @@
 
 #include "llvm/Support/CommandLine.h"
 #include <boost/random/mersenne_twister.hpp>
+#if (BOOST_VERSION < 104700)
+#include <boost/random/uniform_int.hpp>
+#else
 #include <boost/random/uniform_int_distribution.hpp>
+#endif
 
 #include <iostream>
 #include <vector>
@@ -450,13 +454,13 @@ void convert_gr2edgelist(const std::string& infilename, const std::string& outfi
 }
 
 //! Wrap generator into form form std::random_shuffle
-template<typename T>
+template<typename T,typename Gen,template<typename> class Dist>
 struct UniformDist {
-  boost::random::mt19937& gen;
+  Gen& gen;
   
-  UniformDist(boost::random::mt19937& g): gen(g) { }
+  UniformDist(Gen& g): gen(g) { }
   T operator()(T m) {
-    boost::random::uniform_int_distribution<T> r(0, m - 1);
+    Dist<T> r(0, m - 1);
     return r(gen);
   }
 };
@@ -474,9 +478,15 @@ void convert_gr2rand(const std::string& infilename, const std::string& outfilena
   Permutation perm;
   perm.create(graph.size());
   std::copy(boost::counting_iterator<GNode>(0), boost::counting_iterator<GNode>(graph.size()), perm.begin());
-  boost::random::mt19937 gen;
 
-  UniformDist<difference_type> dist(gen);
+#if (BOOST_VERSION < 104700)
+  boost::mt19937 gen;
+  UniformDist<difference_type,boost::mt19937,boost::uniform_int> dist(gen);
+#else
+  boost::random::mt19937 gen;
+  UniformDist<difference_type,boost::random::mt19937,boost::random::uniform_int_distribution> dist(gen);
+#endif
+
   //std::shuffle(perm.begin(), perm.end(), gen);
   std::random_shuffle(perm.begin(), perm.end(), dist);
 
@@ -498,9 +508,13 @@ void add_weights(const std::string& infilename, const std::string& outfilename, 
   OutEdgeTy* edgeData = outgraph.structureFromGraph<OutEdgeTy>(graph);
   OutEdgeTy* edgeDataEnd = edgeData + graph.sizeEdges();
 
+#if (BOOST_VERSION < 104700)
+  boost::mt19937 gen;
+  boost::uniform_int<OutEdgeTy> dist(1, maxvalue);
+#else
   boost::random::mt19937 gen;
   boost::random::uniform_int_distribution<OutEdgeTy> dist(1, maxvalue);
-  //boost::random::negative_binomial_distribution<OutEdgeTy> dist(10, 0.1);
+#endif
   for (; edgeData != edgeDataEnd; ++edgeData) {
     *edgeData = dist(gen);
   }

@@ -13,6 +13,10 @@ add_library(galois ${Sources})
 
 target_link_libraries(galois ${CMAKE_THREAD_LIBS_INIT})
 
+if(GALOIS_ADDITIONAL_SYSTEM_LIBRARIES)
+  target_link_libraries(galois ${GALOIS_ADDITIONAL_SYSTEM_LIBRARIES})
+endif()
+
 if(NUMA_FOUND)
   target_link_libraries(galois ${NUMA_LIBRARIES})
 endif()
@@ -44,6 +48,8 @@ if(USE_SUBVERSION_REVISION)
 endif()
 
 configure_file("${PROJECT_SOURCE_DIR}/include/Galois/config.h.in" "${PROJECT_BINARY_DIR}/include/Galois/config.h")
+
+add_subdirectory(graphonly)
 
 ###### Installation ######
 install(TARGETS galois 

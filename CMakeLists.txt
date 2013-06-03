@@ -54,9 +54,12 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
 endif()
 
 #iss hack
-message(STATUS "Using ${CMAKE_CXX_COMPILER_ID}")
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -isystem=/net/faraday/workspace/local/modules/gcc-4.7")
+  #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -isystem /usr/apps/gnu/clang/include")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -isystem /usr/apps/gnu/clang/libc++/include")
+  link_directories(/usr/apps/gnu/clang/libc++/lib)
+  set(GALOIS_ADDITIONAL_SYSTEM_LIBRARIES c++)
 endif()
 
 #check for incompatible GCC
@@ -93,15 +96,12 @@ endif()
 #Boost
 #not needed now but will be needed for newer version of Boost after 1.4X ish
 set(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0" "1.47" "1.47.0" "1.49" "1.49.0" "1.51.0")
-set(Boost_USE_MULTITHREADED OFF) # newer boost builds don't use -mt extension
-#Other options that can be used with find_package(Boost)
+#set(Boost_USE_MULTITHREADED OFF) # newer boost builds don't use -mt extension
 
 if(NOT "$ENV{BOOST_DIR}" STREQUAL "") 
   set(BOOST_ROOT $ENV{BOOST_DIR})
 endif()
-
-#set(BOOST_LIBS)
-find_package(Boost 1.36.0 COMPONENTS ${BOOST_LIBS} REQUIRED)
+find_package(Boost 1.36.0 REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 
 if(USE_EXP)

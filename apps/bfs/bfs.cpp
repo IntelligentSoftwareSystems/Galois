@@ -680,7 +680,8 @@ struct DeterministicAlgo {
     Process(Graph& g): graph(g) { }
 
     struct LocalState {
-      typedef std::deque<GNode,Galois::PerIterAllocTy> Pending;
+      typedef typename Galois::PerIterAllocTy::rebind<GNode>::other Alloc;
+      typedef std::deque<GNode,Alloc> Pending;
       Pending pending;
       LocalState(Process& self, Galois::PerIterAllocTy& alloc): pending(alloc) { }
     };

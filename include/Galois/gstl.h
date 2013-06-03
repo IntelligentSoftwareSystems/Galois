@@ -23,7 +23,9 @@
 #ifndef GALOIS_GSTL_H
 #define GALOIS_GSTL_H
 
+#include <algorithm>
 #include <iterator>
+#include <utility>
 
 namespace Galois {
 

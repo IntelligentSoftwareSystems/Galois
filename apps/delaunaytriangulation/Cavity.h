@@ -31,8 +31,10 @@
 //! A cavity which will be retrangulated
 template<typename Alloc=std::allocator<char> >
 class Cavity: private boost::noncopyable {
-  typedef std::vector<GNode, Alloc> GNodeVector;
-  typedef std::vector<std::pair<GNode,int>, Alloc> GNodeIntPairVector;
+  typedef typename Alloc::template rebind<GNode>::other GNodeVectorAlloc;
+  typedef std::vector<GNode, GNodeVectorAlloc> GNodeVector;
+  typedef typename Alloc::template rebind<std::pair<GNode,int>>::other GNodeIntPairVectorAlloc;
+  typedef std::vector<std::pair<GNode,int>, GNodeIntPairVectorAlloc> GNodeIntPairVector;
 
   struct InCircumcenter {
     const Graph& graph;
