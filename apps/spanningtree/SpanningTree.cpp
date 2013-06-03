@@ -58,6 +58,7 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
 
 struct Node: public Galois::UnionFindNode<Node> {
   Node* component;
+  Node(): component(this) { }
 };
 
 typedef Galois::Graph::LC_Linear_Graph<Node,void>::with_numa_alloc<true> Graph;
