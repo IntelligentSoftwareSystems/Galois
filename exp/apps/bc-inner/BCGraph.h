@@ -288,7 +288,7 @@ class BCGraph {
   ND * getNode(int id) {
 	return &nodes[id].data;
   }
-  Galois::Runtime::LL::CacheLineStorage<ND> * const getNodes() const {
+  Galois::Runtime::LL::CacheLineStorage<ND> * getNodes() const {
 		return nodes;
 	}
  
