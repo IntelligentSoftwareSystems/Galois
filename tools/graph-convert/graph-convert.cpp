@@ -25,16 +25,11 @@
 #include "Galois/Graph/FileGraph.h"
 
 #include "llvm/Support/CommandLine.h"
-#include <boost/random/mersenne_twister.hpp>
-#if (BOOST_VERSION < 104700)
-#include <boost/random/uniform_int.hpp>
-#else
-#include <boost/random/uniform_int_distribution.hpp>
-#endif
 
 #include <iostream>
 #include <vector>
 #include <string>
+#include <random>
 
 #include <fcntl.h>
 
@@ -479,15 +474,12 @@ void convert_gr2rand(const std::string& infilename, const std::string& outfilena
   perm.create(graph.size());
   std::copy(boost::counting_iterator<GNode>(0), boost::counting_iterator<GNode>(graph.size()), perm.begin());
 
-#if (BOOST_VERSION < 104700)
-  boost::mt19937 gen;
-  UniformDist<difference_type,boost::mt19937,boost::uniform_int> dist(gen);
+  std::mt19937 gen;
+#if __cplusplus >= 201103L
+  UniformDist<difference_type,std::mt19937,std::uniform_int_distribution> dist(gen);
 #else
-  boost::random::mt19937 gen;
-  UniformDist<difference_type,boost::random::mt19937,boost::random::uniform_int_distribution> dist(gen);
+  UniformDist<difference_type,std::mt19937,std::uniform_int> dist(gen);
 #endif
-
-  //std::shuffle(perm.begin(), perm.end(), gen);
   std::random_shuffle(perm.begin(), perm.end(), dist);
 
   Graph out;
@@ -508,12 +500,11 @@ void add_weights(const std::string& infilename, const std::string& outfilename, 
   OutEdgeTy* edgeData = outgraph.structureFromGraph<OutEdgeTy>(graph);
   OutEdgeTy* edgeDataEnd = edgeData + graph.sizeEdges();
 
-#if (BOOST_VERSION < 104700)
-  boost::mt19937 gen;
-  boost::uniform_int<OutEdgeTy> dist(1, maxvalue);
+  std::mt19937 gen;
+#if __cplusplus >= 201103L
+  std::uniform_int_distribution<OutEdgeTy> dist(1, maxvalue);
 #else
-  boost::random::mt19937 gen;
-  boost::random::uniform_int_distribution<OutEdgeTy> dist(1, maxvalue);
+  std::uniform_int<OutEdgeTy> dist(1, maxvalue);
 #endif
   for (; edgeData != edgeDataEnd; ++edgeData) {
     *edgeData = dist(gen);
