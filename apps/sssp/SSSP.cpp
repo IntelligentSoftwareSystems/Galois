@@ -396,7 +396,7 @@ struct AsyncAlgoPP {
   };
 
   template <typename Pusher>
-  Dist relaxEdge(Graph& graph, Dist& sdata, typename Graph::edge_iterator ii, Pusher& pusher) {
+  void relaxEdge(Graph& graph, Dist& sdata, typename Graph::edge_iterator ii, Pusher& pusher) {
       GNode dst = graph.getEdgeDst(ii);
       Dist d = graph.getEdgeData(ii);
       Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
