@@ -56,10 +56,6 @@ endif()
 #iss hack
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -isystem=/net/faraday/workspace/local/modules/gcc-4.7")
-  #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -isystem /usr/apps/gnu/clang/include")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -isystem /usr/apps/gnu/clang/libc++/include")
-  link_directories(/usr/apps/gnu/clang/libc++/lib)
-  set(GALOIS_ADDITIONAL_SYSTEM_LIBRARIES c++)
 endif()
 
 #check for incompatible GCC
