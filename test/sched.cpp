@@ -24,7 +24,6 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-
 #include "Galois/Statistic.h"
 #include "Galois/Galois.h"
 
@@ -72,20 +71,4 @@ int main(int argc, char** argv) {
   using namespace Galois::WorkList;
   Galois::for_each<dChunkedLIFO<64> >(v.begin(), v.end(), process());
   T2.stop();
-
-#ifdef GALOIS_USE_EXP
-  // Galois::StatTimer T3("T3");
-  // T3.start();
-  // using namespace Galois::Runtime::WorkList;
-  // //  Galois::for_each<Alt::ChunkedAdaptor<Alt::LevelStealingAlt, 64> >(v.begin(), v.end(), process());
-  // Galois::for_each<Alt::ChunkedAdaptor<Alt::InitialQueue<Alt::LevelStealingAlt, Alt::LevelLocalAlt>, 64> >(v.begin(), v.end(), process());
-
-  // T3.stop();
-#endif
-
-  // Galois::StatTimer T4("T4");
-  // T4.start();
-  // using namespace Galois::Runtime::WorkList;
-  // Galois::for_each<Alt::LevelStealingAlt<Alt::LIFO_SB<> > >(v.begin(), v.end(), process());
-  // T4.stop();
 }

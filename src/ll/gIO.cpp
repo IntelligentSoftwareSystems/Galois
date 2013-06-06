@@ -25,7 +25,7 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-
+#include "Galois/config.h"
 #include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/ll/SimpleLock.h"
 #include "Galois/Runtime/ll/TID.h"
@@ -41,7 +41,7 @@
 #include <iostream>
 #include <fstream>
 #include <iomanip>
-#include <mutex>
+#include GALOIS_C11_STD_HEADER(mutex)
 
 static void printString(bool error, bool newline, const std::string prefix, const std::string s) {
   static Galois::Runtime::LL::SimpleLock<true> IOLock;

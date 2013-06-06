@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -26,12 +26,15 @@
 #ifndef GALOIS_BAG_H
 #define GALOIS_BAG_H
 
+#include "Galois/config.h"
 #include "Galois/gstl.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/mm/Mem.h"
 
 #include <boost/iterator/iterator_facade.hpp>
+
+#include GALOIS_C11_STD_HEADER(algorithm)
 
 namespace Galois {
 
@@ -41,7 +44,7 @@ namespace Galois {
  * can only be done serially.
  */
 template<typename T, unsigned int BlockSize = 0>
-class InsertBag: boost::noncopyable {
+class InsertBag: private boost::noncopyable {
 
   struct header {
     header* next;
@@ -222,7 +225,7 @@ public:
   //! Thread safe bag insertion
   reference push_back(const T& val) { return emplace(val); }
   //! Thread safe bag insertion
-  reference push_back(T&& val) { return emplace(val); }
+  reference push_back(T&& val) { return emplace(std::move(val)); }
 };
 
 }

@@ -114,7 +114,9 @@ static cll::opt<std::string> filename(cll::Positional,
 struct SNode;
 // Hack: Resolve circular definition of Graph and SNode.parent with fact that
 // all LC_CSR_Graph::GraphNodes have the same type.
-typedef Galois::Graph::LC_CSR_Graph<void, void>::with_no_lockable<true>::with_numa_alloc<true> DummyGraph;
+typedef Galois::Graph::LC_CSR_Graph<void, void>
+  ::with_no_lockable<true>::type
+  ::with_numa_alloc<true>::type DummyGraph;
 typedef DummyGraph::GraphNode GNode;
 
 //****** Work Item and Node Data Defintions ******
@@ -137,7 +139,7 @@ struct SNode {
 	//Galois::Runtime::LL::SimpleLock<true> mutex;
 };
 
-typedef DummyGraph::with_node_data<SNode> Graph;
+typedef DummyGraph::with_node_data<SNode>::type Graph;
 
 // Check hack above
 struct CheckAssertion {

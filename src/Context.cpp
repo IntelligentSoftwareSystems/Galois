@@ -163,5 +163,5 @@ Galois::Runtime::SimpleRuntimeContext::~SimpleRuntimeContext() {}
 
 
 void Galois::Runtime::forceAbort() {
-  signalConflict(nullptr);
+  signalConflict(NULL);
 }

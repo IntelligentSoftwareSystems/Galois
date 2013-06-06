@@ -429,8 +429,8 @@ struct GraphLabAlgo {
   };
 
   typedef typename Galois::Graph::LC_CSR_Graph<LNode,void>
-    ::template with_no_lockable<true> 
-    ::template with_numa_alloc<true> InnerGraph;
+    ::template with_no_lockable<true>::type
+    ::template with_numa_alloc<true>::type InnerGraph;
   typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef typename Graph::GraphNode GNode;
 
@@ -620,8 +620,8 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
   };
 
   typedef typename Galois::Graph::LC_CSR_Graph<LNode,void>
-    ::template with_no_lockable<true> 
-    ::template with_numa_alloc<true> InnerGraph;
+    ::template with_no_lockable<true>::type
+    ::template with_numa_alloc<true>::type InnerGraph;
   typedef typename boost::mpl::if_c<UseGraphChi,
           Galois::Graph::OCImmutableEdgeGraph<LNode,void>,
           Galois::Graph::LC_InOut_Graph<InnerGraph> >::type

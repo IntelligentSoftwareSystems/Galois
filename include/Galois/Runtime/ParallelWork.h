@@ -99,16 +99,16 @@ class BreakHandler {
 public:
   BreakHandler(): broke(false) { }
 
-  void updateBreak() { broke.data = true; }
-
-  template<bool NeedsBreak = ForEachTraits<FunctionTy>::NeedsBreak>
-  bool checkBreak(typename std::enable_if<NeedsBreak>::type* = 0) {
-    return broke.data;
+  void updateBreak() { 
+    if (ForEachTraits<FunctionTy>::NeedsBreak)
+      broke.data = true; 
   }
 
-  template<bool NeedsBreak = ForEachTraits<FunctionTy>::NeedsBreak>
-  bool checkBreak(typename std::enable_if<!NeedsBreak>::type* = 0) {
-    return false;
+  bool checkBreak() {
+    if (ForEachTraits<FunctionTy>::NeedsBreak)
+      return broke.data;
+    else
+      return false;
   }
 };
 
@@ -116,7 +116,7 @@ template<class WorkListTy, class T, class FunctionTy>
 class ForEachWork {
 protected:
   typedef T value_type;
-  typedef typename WorkListTy::template retype<value_type> WLTy;
+  typedef typename WorkListTy::template retype<value_type>::type WLTy;
 
   struct ThreadLocalData {
     FunctionTy function;
@@ -315,7 +315,6 @@ public:
   }
 };
 
-
 template<typename WLTy, typename RangeTy, typename FunctionTy>
 void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
   if (inGaloisForEach)
@@ -331,7 +330,6 @@ void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
   Barrier& barrier = getSystemBarrier();
 
   WorkTy W(f, loopname);
-  //RunCommand init(std::bind(&WorkTy::template AddInitialWork<RangeTy>, std::ref(W), range));
   RunCommand w[5] = {
     std::bind(&WorkTy::initThread, std::ref(W)),
     std::bind(&WorkTy::template AddInitialWork<RangeTy>, std::ref(W), range), 

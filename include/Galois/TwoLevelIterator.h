@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -84,8 +84,11 @@
 #ifndef GALOIS_TWO_LEVEL_ITER_H
 #define GALOIS_TWO_LEVEL_ITER_H
 
+#include "Galois/config.h"
+
 #include <iterator>
-#include <functional>
+#include GALOIS_C11_STD_HEADER(functional)
+#include GALOIS_C11_STD_HEADER(type_traits)
 
 #include <cstdlib>
 #include <cassert>

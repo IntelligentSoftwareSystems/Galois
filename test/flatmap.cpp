@@ -4,17 +4,17 @@
 #include <iostream>
 #include <map>
 
-template<typename T, unsigned X>
+template<typename T, int X>
 void maptime(const char* c) {
   T m;
   Galois::Timer t1, t2;
   t1.start();
-  for (unsigned x = 0; x < X; ++x) {
+  for (int x = 0; x < X; ++x) {
     m[x] = (double)x;
   }
   t1.stop();
   t2.start();
-  for (unsigned x = 0; x < X; ++x) {
+  for (int x = 0; x < X; ++x) {
     m[x];
   }
   t2.stop();
@@ -74,7 +74,7 @@ int main() {
     std::cout << ii->first << " " << ii->second << " ";
   std::cout << "\n";
 
-  const unsigned X = 1000000;
+  const int X = 1000000;
   maptime<Galois::flat_map<int, double>,X>("fm");
   maptime<Galois::flat_map<int, double>,X>("fm");
   maptime<Galois::flat_map<int, double>,X>("fm");

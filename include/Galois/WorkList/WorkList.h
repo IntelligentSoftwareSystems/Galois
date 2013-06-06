@@ -70,11 +70,11 @@ public:
 
   //! change the concurrency flag
   template<bool _concurrent>
-  using rethread = AbstractWorkList<T, _concurrent>;
+  struct rethread { typedef AbstractWorkList<T, _concurrent> type; };
 
   //! change the type the worklist holds
   template<typename _T>
-  using retype = AbstractWorkList<_T, Concurrent>;
+  struct retype { typedef AbstractWorkList<_T, Concurrent> type; };
 
   //! push a value onto the queue
   void push(const value_type& val);
@@ -97,4 +97,3 @@ public:
 } // end namespace Galois
 
 #endif
-

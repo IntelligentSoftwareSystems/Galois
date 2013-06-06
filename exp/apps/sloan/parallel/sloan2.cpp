@@ -99,7 +99,9 @@ std::ostream& operator<<(std::ostream& out, const SNode& n) {
   return out;
 }
 
-typedef Galois::Graph::LC_Linear_Graph<SNode, void>::with_no_lockable<true>::with_numa_alloc<true> Graph;
+typedef Galois::Graph::LC_Linear_Graph<SNode, void>
+  ::with_no_lockable<true>::type
+  ::with_numa_alloc<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
 Graph graph;

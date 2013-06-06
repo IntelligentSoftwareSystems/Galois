@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -23,11 +23,14 @@
 #ifndef GALOIS_FIXEDSIZERING_H
 #define GALOIS_FIXEDSIZERING_H
 
+#include "Galois/config.h"
 #include "Galois/LazyArray.h"
 
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/optional.hpp>
 #include <boost/utility.hpp>
+
+#include GALOIS_C11_STD_HEADER(utility)
 
 namespace Galois {
 

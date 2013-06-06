@@ -27,14 +27,14 @@
 #include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/ll/StaticInstance.h"
 
+#include <sys/mman.h>
 #include <map>
 #include <vector>
 #include <numeric>
 
-#ifdef __linux__
+#if defined(__linux__) && !defined(__bgq__)
 #include <linux/mman.h>
 #endif
-#include <sys/mman.h>
 
 // mmap flags
 static const int _PROT = PROT_READ | PROT_WRITE;

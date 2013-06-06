@@ -99,7 +99,7 @@ std::ostream& operator<<(std::ostream& os, const Node& n) {
   return os;
 }
 
-typedef Galois::Graph::LC_Linear_Graph<Node, int32_t>::with_numa_alloc<true> Graph;
+typedef Galois::Graph::LC_Linear_Graph<Node, int32_t>::with_numa_alloc<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
 struct Config {
@@ -656,8 +656,8 @@ void initializeGraph(std::string inputFile,
     uint32_t sourceId, uint32_t sinkId, Config *newApp) {
   if (useSymmetricDirectly) {
     Galois::Graph::readGraph(newApp->graph, inputFile);
-    for (GNode src : newApp->graph) {
-      for (Graph::edge_iterator ii : newApp->graph.out_edges(src))
+    for (Graph::iterator ss = newApp->graph.begin(), es = newApp->graph.end(); ss != es; ++ss) {
+      for (Graph::edge_iterator ii = newApp->graph.edge_begin(*ss), ei = newApp->graph.edge_end(*ss); ii != ei; ++ii)
         newApp->graph.getEdgeData(ii) = 1;
     }
   } else {

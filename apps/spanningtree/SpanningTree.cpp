@@ -61,7 +61,7 @@ struct Node: public Galois::UnionFindNode<Node> {
   Node(): component(this) { }
 };
 
-typedef Galois::Graph::LC_Linear_Graph<Node,void>::with_numa_alloc<true> Graph;
+typedef Galois::Graph::LC_Linear_Graph<Node,void>::with_numa_alloc<true>::type Graph;
 
 typedef Graph::GraphNode GNode;
 

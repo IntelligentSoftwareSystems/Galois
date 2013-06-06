@@ -125,7 +125,6 @@ std::vector<int> parseCPUSet() {
   //PARSE: /proc/self/cpuset
   FILE* f = fopen(sCPUSet, "r");
   if (!f) {
-    fclose(f);
     return vals;
   }
 

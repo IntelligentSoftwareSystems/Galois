@@ -26,13 +26,14 @@
 #ifndef GALOIS_GRAPH_LC_LINEAR_GRAPH_H
 #define GALOIS_GRAPH_LC_LINEAR_GRAPH_H
 
+#include "Galois/config.h"
 #include "Galois/LargeArray.h"
 #include "Galois/Graph/FileGraph.h"
 #include "Galois/Graph/Details.h"
 #include "Galois/Runtime/MethodFlags.h"
 
 #include <boost/mpl/if.hpp>
-#include <type_traits>
+#include GALOIS_C11_STD_HEADER(type_traits)
 
 namespace Galois {
 namespace Graph {
@@ -53,31 +54,26 @@ template<typename NodeTy, typename EdgeTy,
   bool HasOutOfLineLockable=false,
   bool HasId=false>
 class LC_Linear_Graph:
-    boost::noncopyable,
-    detail::LocalIteratorFeature<UseNumaAlloc>,
-    detail::OutOfLineLockableFeature<HasOutOfLineLockable && !HasNoLockable> {
+    private boost::noncopyable,
+    private detail::LocalIteratorFeature<UseNumaAlloc>,
+    private detail::OutOfLineLockableFeature<HasOutOfLineLockable && !HasNoLockable> {
   template<typename Graph> friend class LC_InOut_Graph;
 
 public:
   template<bool _has_id>
-  using with_id =
-    LC_Linear_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,_has_id>;
+  struct with_id { typedef LC_Linear_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,_has_id> type; };
 
   template<typename _node_data>
-  using with_node_data =
-    LC_Linear_Graph<_node_data,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,HasId>;
+  struct with_node_data { typedef  LC_Linear_Graph<_node_data,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,HasId> type; };
 
   template<bool _has_no_lockable>
-  using with_no_lockable =
-    LC_Linear_Graph<NodeTy,EdgeTy,_has_no_lockable,UseNumaAlloc,HasOutOfLineLockable,HasId>;
+  struct with_no_lockable { typedef LC_Linear_Graph<NodeTy,EdgeTy,_has_no_lockable,UseNumaAlloc,HasOutOfLineLockable,HasId> type; };
 
   template<bool _use_numa_alloc>
-  using with_numa_alloc =
-    LC_Linear_Graph<NodeTy,EdgeTy,HasNoLockable,_use_numa_alloc,HasOutOfLineLockable,HasId>;
+  struct with_numa_alloc { typedef LC_Linear_Graph<NodeTy,EdgeTy,HasNoLockable,_use_numa_alloc,HasOutOfLineLockable,HasId> type; };
 
   template<bool _has_out_of_line_lockable>
-  using with_out_of_line_lockable =
-    LC_Linear_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,_has_out_of_line_lockable,_has_out_of_line_lockable||HasId>;
+  struct with_out_of_line_lockable { typedef LC_Linear_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,_has_out_of_line_lockable,_has_out_of_line_lockable||HasId> type; };
 
   typedef read_lc_linear_graph_tag read_tag;
 

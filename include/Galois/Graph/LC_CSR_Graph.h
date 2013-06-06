@@ -26,13 +26,13 @@
 #ifndef GALOIS_GRAPH_LC_CSR_GRAPH_H
 #define GALOIS_GRAPH_LC_CSR_GRAPH_H
 
+#include "Galois/config.h"
 #include "Galois/LargeArray.h"
 #include "Galois/Graph/FileGraph.h"
 #include "Galois/Graph/Details.h"
 #include "Galois/Runtime/MethodFlags.h"
 
-#include <boost/mpl/if.hpp>
-#include <type_traits>
+#include GALOIS_C11_STD_HEADER(type_traits)
 
 namespace Galois {
 namespace Graph {
@@ -92,33 +92,29 @@ template<typename NodeTy, typename EdgeTy,
   bool UseNumaAlloc=false,
   bool HasOutOfLineLockable=false>
 class LC_CSR_Graph:
-    boost::noncopyable,
-    detail::LocalIteratorFeature<UseNumaAlloc>,
-    detail::OutOfLineLockableFeature<HasOutOfLineLockable && !HasNoLockable> {
+    private boost::noncopyable,
+    private detail::LocalIteratorFeature<UseNumaAlloc>,
+    private detail::OutOfLineLockableFeature<HasOutOfLineLockable && !HasNoLockable> {
   template<typename Graph> friend class LC_InOut_Graph;
 
 public:
   template<bool _has_id>
-  using with_id = LC_CSR_Graph;
+  struct with_id { typedef LC_CSR_Graph type; };
 
   template<typename _node_data>
-  using with_node_data =
-    LC_CSR_Graph<_node_data,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable>;
+  struct with_node_data { typedef LC_CSR_Graph<_node_data,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable> type; };
 
   //! If true, do not use abstract locks in graph
   template<bool _has_no_lockable>
-  using with_no_lockable =
-    LC_CSR_Graph<NodeTy,EdgeTy,_has_no_lockable,UseNumaAlloc,HasOutOfLineLockable>;
+  struct with_no_lockable { typedef LC_CSR_Graph<NodeTy,EdgeTy,_has_no_lockable,UseNumaAlloc,HasOutOfLineLockable> type; };
 
   //! If true, use NUMA-aware graph allocation
   template<bool _use_numa_alloc>
-  using with_numa_alloc =
-    LC_CSR_Graph<NodeTy,EdgeTy,HasNoLockable,_use_numa_alloc,HasOutOfLineLockable>;
+  struct with_numa_alloc { typedef LC_CSR_Graph<NodeTy,EdgeTy,HasNoLockable,_use_numa_alloc,HasOutOfLineLockable> type; };
 
   //! If true, store abstract locks separate from nodes
   template<bool _has_out_of_line_lockable>
-  using with_out_of_line_lockable =
-    LC_CSR_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,_has_out_of_line_lockable>;
+  struct with_out_of_line_lockable { typedef LC_CSR_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,_has_out_of_line_lockable> type; };
 
   typedef read_default_graph_tag read_tag;
 

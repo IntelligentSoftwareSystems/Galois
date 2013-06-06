@@ -53,7 +53,8 @@ static llvm::cl::opt<int> iterLimit("limit", llvm::cl::desc("Limit number of ite
 static llvm::cl::opt<unsigned int> startNode("startNode", llvm::cl::desc("Node to start search from"), llvm::cl::init(0));
 static llvm::cl::opt<bool> forceVerify("forceVerify", llvm::cl::desc("Abort if not verified, only makes sense for torus graphs"));
 
-typedef Galois::Graph::LC_CSR_Graph<void, void>::with_no_lockable<true>::with_numa_alloc<true> Graph;
+typedef Galois::Graph::LC_CSR_Graph<void, void>::with_no_lockable<true>::type
+  ::with_numa_alloc<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
 Graph* G;
@@ -72,12 +73,12 @@ struct process {
   typedef int tt_does_not_need_push;
 
   void operator()(GNode& _req, Galois::UserContext<GNode>& lwl) {
-    typedef std::deque<GNode, typename PerIt<GNode>::Ty> GNdeque;
+    typedef std::deque<GNode, PerIt<GNode>::Ty> GNdeque;
     GNdeque SQ(lwl.getPerIterAlloc());
-    std::deque<double, typename PerIt<double>::Ty> sigma(NumNodes, 0.0, lwl.getPerIterAlloc());
-    std::deque<int, typename PerIt<int>::Ty> d(NumNodes, 0, lwl.getPerIterAlloc());
-    std::deque<double, typename PerIt<double>::Ty> delta(NumNodes, 0.0, lwl.getPerIterAlloc());
-    std::deque<GNdeque, typename PerIt<GNdeque>::Ty> succ(NumNodes, GNdeque(lwl.getPerIterAlloc()), lwl.getPerIterAlloc());
+    std::deque<double, PerIt<double>::Ty> sigma(NumNodes, 0.0, lwl.getPerIterAlloc());
+    std::deque<int, PerIt<int>::Ty> d(NumNodes, 0, lwl.getPerIterAlloc());
+    std::deque<double, PerIt<double>::Ty> delta(NumNodes, 0.0, lwl.getPerIterAlloc());
+    std::deque<GNdeque, PerIt<GNdeque>::Ty> succ(NumNodes, GNdeque(lwl.getPerIterAlloc()), lwl.getPerIterAlloc());
     unsigned int QAt = 0;
     
     int req = _req;
@@ -175,6 +176,13 @@ struct HasOut: public std::unary_function<GNode,bool> {
   }
 };
 
+struct InitializeLocal {
+  void operator()(unsigned, unsigned) {
+    *CB.getLocal() = (double*)Galois::Runtime::MM::pageAlloc(); 
+    std::fill(&(*CB.getLocal())[0], &(*CB.getLocal())[NumNodes], 0.0);
+  }
+};
+
 int main(int argc, char** argv) {
   Galois::StatManager M;
   LonestarStart(argc, argv, name, desc, url);
@@ -188,10 +196,7 @@ int main(int argc, char** argv) {
   //CB.resize(NumNodes);
   //FIXME
   assert(Galois::Runtime::MM::pageSize >= NumNodes * sizeof(double));
-  Galois::on_each([](unsigned,unsigned) {
-      *CB.getLocal() = (double*)Galois::Runtime::MM::pageAlloc(); 
-      std::fill(&(*CB.getLocal())[0], &(*CB.getLocal())[NumNodes], 0.0);
-    });
+  Galois::on_each(InitializeLocal());
 
   Galois::reportPageAlloc("MeminfoPre");
   Galois::preAlloc(numThreads * Galois::Runtime::MM::numPageAllocTotal() / 3);

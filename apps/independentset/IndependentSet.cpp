@@ -78,7 +78,9 @@ struct Node {
   Node() : flag(UNMATCHED), pendingFlag(UNMATCHED) { }
 };
 
-typedef Galois::Graph::LC_InlineEdge_Graph<Node,void>::with_numa_alloc<true>::with_compressed_node_ptr<true> Graph;
+typedef Galois::Graph::LC_InlineEdge_Graph<Node,void>
+  ::with_numa_alloc<true>::type
+  ::with_compressed_node_ptr<true>::type Graph;
 
 typedef Graph::GraphNode GNode;
 

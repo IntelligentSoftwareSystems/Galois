@@ -216,7 +216,8 @@ void readInOutGraph(Graph& graph) {
 }
 
 struct SerialAlgo {
-  typedef Galois::Graph::LC_CSR_Graph<SNode, uint32_t>::with_no_lockable<true> Graph;
+  typedef Galois::Graph::LC_CSR_Graph<SNode, uint32_t>
+    ::with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
   typedef UpdateRequestCommon<GNode> UpdateRequest;
 
@@ -227,7 +228,7 @@ struct SerialAlgo {
     Graph& g;
     Initialize(Graph& g): g(g) { }
 
-    void operator()(typename Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) {
       g.getData(n).dist = DIST_INFINITY;
     }
   };
@@ -267,9 +268,9 @@ struct AsyncAlgo {
   typedef SNode Node;
 
   typedef Galois::Graph::LC_InlineEdge_Graph<Node, uint32_t>
-    ::template with_out_of_line_lockable<true>
-    ::template with_compressed_node_ptr<true>
-    ::template with_numa_alloc<true>
+    ::template with_out_of_line_lockable<true>::type
+    ::template with_compressed_node_ptr<true>::type
+    ::template with_numa_alloc<true>::type
     Graph;
   typedef typename Graph::GraphNode GNode;
   typedef UpdateRequestCommon<GNode> UpdateRequest;
@@ -374,11 +375,11 @@ struct AsyncAlgoPP {
   typedef SNode Node;
 
   typedef Galois::Graph::LC_InlineEdge_Graph<Node, uint32_t>
-    ::with_out_of_line_lockable<true>
-    ::with_compressed_node_ptr<true>
-    ::with_numa_alloc<true>
+    ::with_out_of_line_lockable<true>::type
+    ::with_compressed_node_ptr<true>::type
+    ::with_numa_alloc<true>::type
     Graph;
-  typedef typename Graph::GraphNode GNode;
+  typedef Graph::GraphNode GNode;
   typedef UpdateRequestCommon<GNode> UpdateRequest;
 
   std::string name() const {
@@ -390,7 +391,7 @@ struct AsyncAlgoPP {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    void operator()(typename Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) {
       g.getData(n, Galois::MethodFlag::NONE).dist = DIST_INFINITY;
     }
   };
@@ -433,7 +434,7 @@ struct AsyncAlgoPP {
         return;
       }
 
-      for (typename Graph::edge_iterator ii = graph.edge_begin(req.n, flag), ei = graph.edge_end(req.n, flag); ii != ei; ++ii) {
+      for (Graph::edge_iterator ii = graph.edge_begin(req.n, flag), ei = graph.edge_end(req.n, flag); ii != ei; ++ii) {
         self->relaxEdge(graph, sdist, ii, ctx);
       }
 
@@ -455,7 +456,7 @@ struct AsyncAlgoPP {
     Graph& graph;
     Bag& bag;
     InitialProcess(AsyncAlgoPP* s, Graph& g, Bag& b): self(s), graph(g), bag(b) { }
-    void operator()(typename Graph::edge_iterator ii) {
+    void operator()(Graph::edge_iterator ii) {
       Dist d = 0;
       self->relaxEdge(graph, d, ii, bag);
     }
@@ -482,7 +483,7 @@ struct AsyncAlgoPP {
 
 namespace Galois {
 template<>
-struct does_not_need_aborts<typename AsyncAlgo<true>::Process> : public boost::true_type {};
+struct does_not_need_aborts<AsyncAlgo<true>::Process> : public boost::true_type {};
 }
 
 static_assert(Galois::does_not_need_aborts<AsyncAlgo<true>::Process>::value, "Oops");
@@ -491,8 +492,8 @@ static_assert(Galois::does_not_need_aborts<AsyncAlgo<true>::Process>::value, "Oo
 #ifdef GALOIS_USE_EXP
 struct GraphLabAlgo {
   typedef Galois::Graph::LC_CSR_Graph<SNode,uint32_t>
-    ::with_no_lockable<true>
-    ::with_numa_alloc<true> InnerGraph;
+    ::with_no_lockable<true>::type
+    ::with_numa_alloc<true>::type InnerGraph;
   typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
@@ -569,9 +570,9 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
   };
 
   typedef typename Galois::Graph::LC_InlineEdge_Graph<LNode,uint32_t>
-    ::template with_compressed_node_ptr<true>
-    ::template with_no_lockable<true> 
-    ::template with_numa_alloc<true> InnerGraph;
+    ::template with_compressed_node_ptr<true>::type
+    ::template with_no_lockable<true>::type
+    ::template with_numa_alloc<true>::type InnerGraph;
   typedef typename boost::mpl::if_c<UseGraphChi,
           Galois::Graph::OCImmutableEdgeGraph<LNode,uint32_t>,
           Galois::Graph::LC_InOut_Graph<InnerGraph>>::type

@@ -53,8 +53,23 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
   endif()
 endif()
 
-#iss hack
+#XL
+if(CMAKE_CXX_COMPILER_ID MATCHES "XL")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -qsuppress=1540-0724")
+  execute_process(COMMAND ${CMAKE_CXX_COMPILER} -qversion
+                  COMMAND sed 1d
+                  COMMAND sed s/Version://
+                  OUTPUT_VARIABLE XLC_VERSION)
+  if(XLC_VERSION VERSION_GREATER 12.0)
+    #message(STATUS "XLC Version > 12.0")
+  else()
+    message(FATAL_ERROR "XLC must be higher than 12.0")
+  endif()
+endif()
+
+#clang 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  #iss hack
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -isystem=/net/faraday/workspace/local/modules/gcc-4.7")
 endif()
 
@@ -98,7 +113,7 @@ if(NOT "$ENV{BOOST_DIR}" STREQUAL "")
   set(BOOST_ROOT $ENV{BOOST_DIR})
 endif()
 find_package(Boost 1.36.0 REQUIRED)
-include_directories(${Boost_INCLUDE_DIRS})
+include_directories(${Boost_INCLUDE_DIR})
 
 if(USE_EXP)
   set(USE_VTUNE ON)
@@ -144,8 +159,10 @@ endif()
 
 #more warnings
 if(CMAKE_BUILD_TYPE MATCHES "Debug")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
+  if(NOT CMAKE_CXX_COMPILER_ID MATCHES "XL")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
+  endif()
 endif()
 
 include(CheckEndian)

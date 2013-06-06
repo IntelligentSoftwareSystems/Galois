@@ -23,9 +23,14 @@
 #ifndef GALOIS_GDEQUE_H
 #define GALOIS_GDEQUE_H
 
-#include "Galois/Runtime/mm/Mem.h"
+#include "Galois/config.h"
 #include "Galois/FixedSizeRing.h"
+#include "Galois/Runtime/mm/Mem.h"
+
 #include <boost/iterator/iterator_facade.hpp>
+
+#include GALOIS_C11_STD_HEADER(algorithm)
+#include GALOIS_C11_STD_HEADER(utility)
 
 namespace Galois {
 
@@ -37,34 +42,6 @@ protected:
     Block* next;
     Block* prev;
     Block(): next(), prev() {}
-  };
-
-  template<typename U>
-  class Iterator: public boost::iterator_facade<Iterator<U>, U, boost::forward_traversal_tag> {
-    friend class boost::iterator_core_access;
-
-    Block* b;
-    unsigned offset;
-
-    void increment() {
-      if (!b) return;
-      ++offset;
-      if (offset == b->size()) {
-	b = b->next;
-	offset = 0;
-      }
-    }
-
-    template<typename OtherTy>
-    bool equal(const Iterator<OtherTy>& o) const { return b == o.b && offset == o.offset; }
-
-    U& dereference() const { return b->getAt(offset); }
-
-  public:
-    Iterator(Block* _b = 0, unsigned _off = 0) :b(_b), offset(_off) { }
-    
-    template<typename OtherTy>
-    Iterator(const Iterator<OtherTy>& o): b(o.b), offset(o.offset) { }
   };
 
   Block* first;
@@ -130,6 +107,34 @@ private:
   }
 
 public:
+  template<typename U>
+  class Iterator: public boost::iterator_facade<Iterator<U>, U, boost::forward_traversal_tag> {
+    friend class boost::iterator_core_access;
+
+    Block* b;
+    unsigned offset;
+
+    void increment() {
+      if (!b) return;
+      ++offset;
+      if (offset == b->size()) {
+	b = b->next;
+	offset = 0;
+      }
+    }
+
+    template<typename OtherTy>
+    bool equal(const Iterator<OtherTy>& o) const { return b == o.b && offset == o.offset; }
+
+    U& dereference() const { return b->getAt(offset); }
+
+  public:
+    Iterator(Block* _b = 0, unsigned _off = 0) :b(_b), offset(_off) { }
+    
+    template<typename OtherTy>
+    Iterator(const Iterator<OtherTy>& o): b(o.b), offset(o.offset) { }
+  };
+
   typedef T value_type;
   typedef T* pointer;
   typedef T& reference;
@@ -245,5 +250,4 @@ public:
 };
 
 }
-
 #endif

@@ -25,12 +25,13 @@
 #ifndef GALOIS_LARGEARRAY_H
 #define GALOIS_LARGEARRAY_H
 
+#include "Galois/config.h"
 #include "Galois/gstl.h"
 #include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/mm/Mem.h"
 
 #include <boost/utility.hpp>
-#include <type_traits>
+#include GALOIS_C11_STD_HEADER(utility)
 
 namespace Galois {
 
@@ -41,7 +42,7 @@ namespace Galois {
  * @tparam T value type of container
  */
 template<typename T>
-class LargeArray: boost::noncopyable {
+class LargeArray: private boost::noncopyable {
   T* m_data;
   size_t m_size;
   int allocated;
@@ -157,7 +158,7 @@ public:
 
 //! Void specialization
 template<>
-class LargeArray<void>: boost::noncopyable {
+class LargeArray<void>: private boost::noncopyable {
 public:
   LargeArray(void* d, size_t s) { }
   LargeArray() { }

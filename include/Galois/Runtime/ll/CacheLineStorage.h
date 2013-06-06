@@ -29,9 +29,10 @@
 #ifndef GALOIS_RUNTIME_CACHELINESTORAGE_H
 #define GALOIS_RUNTIME_CACHELINESTORAGE_H
 
-#include "CompilerSpecific.h"
+#include "Galois/config.h"
+#include "Galois/Runtime/ll/CompilerSpecific.h"
 
-#include <utility>
+#include GALOIS_C11_STD_HEADER(utility)
 
 namespace Galois {
 namespace Runtime {
@@ -43,6 +44,8 @@ struct CacheLineImpl {
   char pad[REM];
   
   CacheLineImpl() :data() {}
+
+  CacheLineImpl(const T& v) :data(v) {}
   
   template<typename A>
   explicit CacheLineImpl(A&& v) :data(std::forward<A>(v)) {}
@@ -55,6 +58,8 @@ struct CacheLineImpl<T, 0> {
   GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE T data;
   
   CacheLineImpl() :data() {}
+
+  CacheLineImpl(const T& v) :data(v) {}
 
   template<typename A>
   explicit CacheLineImpl(A&& v) :data(std::forward<A>(v)) {}
@@ -69,8 +74,13 @@ struct CacheLineStorage : public CacheLineImpl<T, GALOIS_CACHE_LINE_SIZE % sizeo
   
   CacheLineStorage() :PTy() {}
 
+  CacheLineStorage(const T& v) :PTy(v) {}
+
+// XXX(ddn): Forwarding is still wonky in XLC
+#if !defined(__IBMCPP__) || __IBMCPP__ > 1210
   template<typename A>
   explicit CacheLineStorage(A&& v) :PTy(std::forward<A>(v)) {}
+#endif
 
   explicit operator T() { return this->data; }
 

@@ -24,10 +24,10 @@
  *
  * @author <ahassaan@ices.utexas.edu>
  */
-
 #ifndef GALOIS_RUNTIME_LC_ORDERED_H
 #define GALOIS_RUNTIME_LC_ORDERED_H
 
+#include "Galois/config.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Atomic.h"
 #include "Galois/gdeque.h"
@@ -45,7 +45,7 @@
 #include "llvm/ADT/SmallVector.h"
 
 #include <iostream>
-#include <unordered_map>
+#include GALOIS_C11_STD_HEADER(unordered_map)
 
 namespace Galois {
 namespace Runtime {
@@ -257,7 +257,12 @@ public:
     if (l->auxPtr.getValue () == NULL) {
       NItem* nv = niAlloc.allocate (1);
       assert (nv != NULL);
+// XXX(ddn): Forwarding still wonky on XLC
+#if !defined(__IBMCPP__) || __IBMCPP__ > 1210
       niAlloc.construct (nv, l, cmp);
+#else
+      niAlloc.construct (nv, NItem(l, cmp));
+#endif
       // NItem* nv = new NItem (l, cmp);
 
       if (l->auxPtr.CAS (NULL, nv)) {

@@ -36,7 +36,6 @@
 #include "Galois/Runtime/ParaMeter.h"
 #endif
 
-
 /**
  * Main Galois namespace. All the core Galois functionality will be found in here.
  */

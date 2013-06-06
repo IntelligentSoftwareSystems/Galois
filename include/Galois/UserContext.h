@@ -65,9 +65,7 @@ protected:
     localStateUsed = used;
   }
 
-  constexpr unsigned fastPushBackLimit() const {
-    return 64;
-  }
+  static const unsigned int fastPushBackLimit = 64;
 
   typedef std::function<void(PushBufferTy&)> FastPushBack; 
   FastPushBack fastPushBack;
@@ -96,7 +94,7 @@ public:
   void push(Args&&... args) {
     Galois::Runtime::checkWrite(MethodFlag::WRITE, true);
     pushBuffer.emplace_back(std::forward<Args>(args)...);
-    if (fastPushBack && pushBuffer.size() > fastPushBackLimit())
+    if (fastPushBack && pushBuffer.size() > fastPushBackLimit)
       fastPushBack(pushBuffer);
   }
 

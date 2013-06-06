@@ -33,11 +33,11 @@ template<typename Container, bool pushinit = true>
 struct ExternRef {
   //! change the concurrency flag
   template<bool _concurrent>
-  using rethread = ExternRef<typename Container::template rethread<_concurrent> >;
+  struct rethread { typedef ExternRef<typename Container::template rethread<_concurrent>::type> type; };
   
   //! change the type the worklist holds
   template<typename _T>
-  using retype = ExternRef<typename Container::template retype<_T> >;
+  struct retype { typedef ExternRef<typename Container::template retype<_T>::type> type; };
 
 private:
   Container& wl;

@@ -87,7 +87,8 @@ struct PNode {
 };
 
 struct SerialAlgo {
-  typedef Galois::Graph::LC_CSR_Graph<PNode,void>::with_no_lockable<true> Graph;
+  typedef Galois::Graph::LC_CSR_Graph<PNode,void>
+    ::with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "Serial"; }
@@ -161,8 +162,8 @@ struct GraphLabAlgo {
   };
 
   typedef typename Galois::Graph::LC_CSR_Graph<LNode,void>
-    ::template with_numa_alloc<true>
-    ::template with_no_lockable<true>
+    ::template with_numa_alloc<true>::type
+    ::template with_no_lockable<true>::type
     InnerGraph;
   typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef typename Graph::GraphNode GNode;
@@ -245,8 +246,8 @@ struct GraphLabAlgo {
 template<bool UseGraphChi>
 struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
   typedef typename Galois::Graph::LC_CSR_Graph<PNode,void>
-    ::template with_numa_alloc<true>
-    ::template with_no_lockable<true>
+    ::template with_numa_alloc<true>::type
+    ::template with_no_lockable<true>::type
     InnerGraph;
   typedef typename boost::mpl::if_c<UseGraphChi,
           Galois::Graph::OCImmutableEdgeGraph<PNode,void>,
@@ -360,9 +361,9 @@ struct PullAlgo {
     void setPageRank(unsigned it, float v) { value[(it+1) & 1] = v; }
   };
   typedef Galois::Graph::LC_InlineEdge_Graph<LNode,float>
-    ::with_compressed_node_ptr<true>
-    ::with_no_lockable<true>
-    ::with_numa_alloc<true>
+    ::with_compressed_node_ptr<true>::type
+    ::with_no_lockable<true>::type
+    ::with_numa_alloc<true>::type
     Graph;
   typedef Graph::GraphNode GNode;
 
@@ -468,7 +469,8 @@ struct PullAlgo {
 
 //! Transpose in-edges to out-edges
 static void precomputePullData() {
-  typedef Galois::Graph::LC_CSR_Graph<size_t, void>::with_no_lockable<true> InputGraph;
+  typedef Galois::Graph::LC_CSR_Graph<size_t, void>
+    ::with_no_lockable<true>::type InputGraph;
   typedef InputGraph::GraphNode InputNode;
   typedef Galois::Graph::FileGraphWriter OutputGraph;
   typedef OutputGraph::GraphNode OutputNode;

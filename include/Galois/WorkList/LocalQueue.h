@@ -29,19 +29,19 @@ namespace WorkList {
 template<typename Global = FIFO<>, typename Local = FIFO<>, typename T = int>
 struct LocalQueue : private boost::noncopyable {
   template<bool _concurrent>
-  using rethread = LocalQueue<Global, Local, T>;
+  struct rethread { typedef LocalQueue<Global, Local, T> type; };
 
   template<typename _T>
-  using retype = LocalQueue<typename Global::template retype<_T>, typename Local::template retype<_T>, _T>;
+  struct retype { typedef LocalQueue<typename Global::template retype<_T>::type, typename Local::template retype<_T>::type, _T> type; };
 
   template<typename _global>
-  using with_global = LocalQueue<_global, Local, T>;
+  struct with_global { typedef LocalQueue<_global, Local, T> type; };
 
   template<typename _local>
-  using with_local = LocalQueue<Global, _local, T>;
+  struct with_local { typedef LocalQueue<Global, _local, T> type; };
 
 private:
-  typedef typename Local::template rethread<false> lWLTy;
+  typedef typename Local::template rethread<false>::type lWLTy;
   Runtime::PerThreadStorage<lWLTy> local;
   Global global;
 

@@ -143,9 +143,10 @@ private:
 
 public:
   template<typename Tnew>
-  using retype = PerThreadQueues<typename QueueTy::template retype<Tnew>::WL>;
+  struct retype { typedef PerThreadQueues<typename QueueTy::template retype<Tnew>::type> type; };
+
   template<bool newConcurrent>
-  using rethread = PerThreadQueues<typename QueueTy::template rethread<newConcurrent>::WL>;
+  struct rethread { typedef PerThreadQueues<typename QueueTy::template rethread<newConcurrent>::type> type; };
 
   void push(const value_type& val) {
     local.getLocal()->push(val);
@@ -172,14 +173,15 @@ public:
 
 template<typename WLTy = FIFO<>, typename T = int>
 class LocalWorklist : private boost::noncopyable {
-  typedef typename WLTy::template rethread<false>::WL lWLTy;
+  typedef typename WLTy::template rethread<false>::type lWLTy;
   Runtime::PerThreadStorage<lWLTy> local;
 
 public:
   template<bool newconcurrent>
-  using rethread = LocalWorklist<typename WLTy::template rethread<newconcurrent>::WL, T>;
+  struct rethread { typedef LocalWorklist<typename WLTy::template rethread<newconcurrent>::type, T> type; };
+
   template<typename Tnew>
-  using retype = LocalWorklist<typename WLTy::template retype<Tnew>::WL, Tnew>;
+  struct retype { typedef LocalWorklist<typename WLTy::template retype<Tnew>::type, Tnew> type; };
 
   typedef T value_type;
 
@@ -285,9 +287,10 @@ public:
   typedef T value_type;
 
   template<bool newconcurrent>
-  using rethread = OwnerComputeChunkedMaster<T, OwnerFn,QT, distributed, isStack, chunksize, newconcurrent>;
+  struct rethread { typedef OwnerComputeChunkedMaster<T, OwnerFn,QT, distributed, isStack, chunksize, newconcurrent> type; };
+
   template<typename Tnew>
-  using retype = OwnerComputeChunkedMaster<Tnew, OwnerFn, QT, distributed, isStack, chunksize, concurrent>;
+  struct retype { typedef OwnerComputeChunkedMaster<Tnew, OwnerFn, QT, distributed, isStack, chunksize, concurrent> type; };
 
   OwnerComputeChunkedMaster() : heap(sizeof(Chunk)) { }
 

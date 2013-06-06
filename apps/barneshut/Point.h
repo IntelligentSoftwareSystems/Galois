@@ -1,7 +1,7 @@
 
 struct Point {
   double val[3];
-  Point() :val{0.0, 0.0, 0.0} {}
+  Point() { val[0] = val[1] = val[2] = 0.0; }
   //Point(double _x, double _y, double _z) : val{_x,_y,_z} {}
   Point(double _x, double _y, double _z) { val[0] = _x; val[1] = _y; val[2] = _z; }
   //explicit Point(double v) : val{v,v,v} {} 

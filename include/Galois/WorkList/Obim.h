@@ -23,12 +23,13 @@
 #ifndef GALOIS_WORKLIST_OBIM_H
 #define GALOIS_WORKLIST_OBIM_H
 
+#include "Galois/config.h"
 #include "Galois/FlatMap.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/WorkList/Fifo.h"
 #include "Galois/WorkList/WorkListHelpers.h"
 
-#include <type_traits>
+#include GALOIS_C11_STD_HEADER(type_traits)
 #include <limits>
 
 namespace Galois {
@@ -66,27 +67,27 @@ template<class Indexer = DummyIndexer<int>, typename Container = FIFO<>,
   bool Concurrent=true>
 struct OrderedByIntegerMetric : private boost::noncopyable {
   template<bool _concurrent>
-  using rethread = OrderedByIntegerMetric<Indexer, typename Container::template rethread<_concurrent>, BlockPeriod, BSP, T, Index, _concurrent>;
+  struct rethread { typedef OrderedByIntegerMetric<Indexer, typename Container::template rethread<_concurrent>::type, BlockPeriod, BSP, T, Index, _concurrent> type; };
 
   template<typename _T>
-  using retype = OrderedByIntegerMetric<Indexer, typename Container::template retype<_T>, BlockPeriod, BSP, _T, typename std::result_of<Indexer(_T)>::type, Concurrent>;
+  struct retype { typedef OrderedByIntegerMetric<Indexer, typename Container::template retype<_T>::type, BlockPeriod, BSP, _T, typename std::result_of<Indexer(_T)>::type, Concurrent> type; };
 
   template<unsigned _period>
-  using with_block_period = OrderedByIntegerMetric<Indexer, Container, _period, BSP, T, Index, Concurrent>;
+  struct with_block_period { typedef OrderedByIntegerMetric<Indexer, Container, _period, BSP, T, Index, Concurrent> type; };
 
   template<typename _container>
-  using with_container = OrderedByIntegerMetric<Indexer, _container, BlockPeriod, BSP, T, Index, Concurrent>;
+  struct with_container { typedef OrderedByIntegerMetric<Indexer, _container, BlockPeriod, BSP, T, Index, Concurrent> type; };
 
   template<typename _indexer>
-  using with_indexer = OrderedByIntegerMetric<_indexer, Container, BlockPeriod, BSP, T, Index, Concurrent>;
+  struct with_indexer { typedef OrderedByIntegerMetric<_indexer, Container, BlockPeriod, BSP, T, Index, Concurrent> type; };
 
   template<bool _bsp>
-  using with_back_scan_prevention = OrderedByIntegerMetric<Indexer, Container, BlockPeriod, _bsp, T, Index, Concurrent>;
+  struct with_back_scan_prevention { typedef OrderedByIntegerMetric<Indexer, Container, BlockPeriod, _bsp, T, Index, Concurrent> type; };
 
   typedef T value_type;
 
 private:
-  typedef typename Container::template rethread<Concurrent> CTy;
+  typedef typename Container::template rethread<Concurrent>::type CTy;
   typedef Galois::flat_map<Index, CTy*> LMapTy;
   //typedef std::map<Index, CTy*> LMapTy;
 

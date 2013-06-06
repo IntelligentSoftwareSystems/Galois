@@ -25,7 +25,7 @@
 #ifndef GALOIS_RUNTIME_CONTEXTPOOL_H
 #define GALOIS_RUNTIME_CONTEXTPOOL_H
 
-#include "Galois/WorkList/WorkList.h"
+#include "Galois/WorkList/Chunked.h"
 
 namespace Galois {
 namespace Runtime {

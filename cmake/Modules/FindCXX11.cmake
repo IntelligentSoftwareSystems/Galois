@@ -3,8 +3,11 @@
 #  CXX11_FLAGS - Compiler flags to enable C++11
 include(CheckCXXCompilerFlag)
 
-#this covers gcc, icc, clang
-set(CXX11_FLAG_CANDIDATES -std=c++11 -std=c++0x)
+# This covers gcc, icc, clang, xlc
+
+# Place xlc (-qlanglvl=extended0x) first because xlc parses -std but does not
+# halt even with -qhalt=i
+set(CXX11_FLAG_CANDIDATES -qlanglvl=extended0x -std=c++11 -std=c++0x)
 
 # Don't do anything when already set
 if(CXX11_FLAGS)

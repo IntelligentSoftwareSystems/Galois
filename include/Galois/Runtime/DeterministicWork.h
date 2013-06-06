@@ -25,6 +25,7 @@
 #ifndef GALOIS_RUNTIME_DETERMINISTICWORK_H
 #define GALOIS_RUNTIME_DETERMINISTICWORK_H
 
+#include "Galois/config.h"
 #include "Galois/Threads.h"
 
 #include "Galois/ParallelSTL/ParallelSTL.h"
@@ -32,11 +33,11 @@
 #include "Galois/Runtime/ContextPool.h"
 #include "Galois/Runtime/ll/gio.h"
 
-#include <boost/utility/enable_if.hpp>
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/iterator/counting_iterator.hpp>
 
+#include GALOIS_C11_STD_HEADER(type_traits)
 #include <deque>
 #include <queue>
 
@@ -211,7 +212,7 @@ struct StateManager {
 };
 
 template<typename T,typename FunctionTy>
-struct StateManager<T,FunctionTy,typename boost::enable_if<has_deterministic_local_state<FunctionTy> >::type> {
+struct StateManager<T,FunctionTy,typename std::enable_if<has_deterministic_local_state<FunctionTy>::value>::type> {
   typedef typename FunctionTy::LocalState LocalState;
   void alloc(UserContextAccess<T>& c,FunctionTy& self) {
     void *p = c.data().getPerIterAlloc().allocate(sizeof(LocalState));
@@ -239,7 +240,7 @@ struct BreakManager {
 };
 
 template<typename FunctionTy>
-class BreakManager<FunctionTy,typename boost::enable_if<has_deterministic_parallel_break<FunctionTy> >::type> {
+class BreakManager<FunctionTy,typename std::enable_if<has_deterministic_parallel_break<FunctionTy>::value>::type> {
   Barrier& barrier;
   LL::CacheLineStorage<volatile long> done;
 
@@ -380,7 +381,9 @@ class DMergeLocal: private boost::noncopyable {
   size_t committed;
   size_t iterations;
   size_t aborted;
+public:
   NewItemsTy newItems;
+private:
   ReserveTy reserve;
 
   // For ordered execution
@@ -652,7 +655,7 @@ struct MergeTraits {
 };
 
 template<typename OptionsTy>
-struct MergeTraits<OptionsTy,typename boost::enable_if_c<OptionsTy::useOrdered>::type> {
+struct MergeTraits<OptionsTy,typename std::enable_if<OptionsTy::useOrdered>::type> {
   static const bool value = true;
   static const int ChunkSize = 16;
   static const int MinDelta = 4;
@@ -664,7 +667,7 @@ struct MergeTraits<OptionsTy,typename boost::enable_if_c<OptionsTy::useOrdered>:
 };
 
 template<typename OptionsTy>
-struct MergeTraits<OptionsTy,typename boost::enable_if_c<has_deterministic_id<typename OptionsTy::Function1Ty>::value && !OptionsTy::useOrdered>::type> {
+struct MergeTraits<OptionsTy,typename std::enable_if<has_deterministic_id<typename OptionsTy::Function1Ty>::value && !OptionsTy::useOrdered>::type> {
   static const bool value = true;
   static const int ChunkSize = 32;
   static const int MinDelta = ChunkSize * 40;
@@ -980,7 +983,7 @@ public:
  */
 // TODO: For consistency should also have thread-local copies of comp
 template<typename OptionsTy>
-class DMergeManager<OptionsTy,typename boost::enable_if<MergeTraits<OptionsTy> >::type>: public DMergeManagerBase<OptionsTy> {
+class DMergeManager<OptionsTy,typename std::enable_if<MergeTraits<OptionsTy>::value>::type>: public DMergeManagerBase<OptionsTy> {
   typedef DMergeManagerBase<OptionsTy> Base;
   typedef typename Base::T T;
   typedef typename Base::Item Item;

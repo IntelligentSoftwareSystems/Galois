@@ -69,7 +69,9 @@ struct Node: public Galois::UnionFindNode<Node> {
   const EdgeData* lightest;
 };
 
-typedef Galois::Graph::LC_CSR_Graph<Node,EdgeData>::with_numa_alloc<true>::with_no_lockable<true> Graph;
+typedef Galois::Graph::LC_CSR_Graph<Node,EdgeData>
+  ::with_numa_alloc<true>::type
+  ::with_no_lockable<true>::type Graph;
 
 typedef Graph::GraphNode GNode;
 

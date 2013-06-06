@@ -35,7 +35,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#ifdef __linux__
+#if defined(__linux__) && !defined(__bgq__)
 #include <linux/mman.h>
 #endif
 

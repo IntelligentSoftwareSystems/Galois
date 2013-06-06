@@ -28,13 +28,15 @@
 #ifndef _KRUSKAL_H_ 
 #define _KRUSKAL_H_ 
 
+#include "Galois/config.h"
+
 #include <vector>
 #include <string>
 #include <sstream>
 #include <limits>
 #include <iostream>
 #include <set>
-#include <unordered_set>
+#include GALOIS_C11_STD_HEADER(unordered_set)
 
 #include <cstdlib>
 #include <cstdio>

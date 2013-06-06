@@ -1,11 +1,12 @@
 // std_tr1__type_traits__is_pod.cpp 
 
-#include <type_traits> 
-#include <iostream> 
-
+#include "Galois/config.h"
 #include "Galois/Runtime/ll/PtrLock.h"
 #include "Galois/Runtime/ll/SimpleLock.h"
 #include "Galois/Runtime/ll/StaticInstance.h"
+
+#include GALOIS_C11_STD_HEADER(type_traits)
+#include <iostream> 
 
 using namespace Galois::Runtime;
 using namespace Galois::Runtime::LL;

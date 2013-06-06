@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in
  * irregular programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights
+ * Copyright (C) 2013, The University of Texas at Austin. All rights
  * reserved.  UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES
  * CONCERNING THIS SOFTWARE AND DOCUMENTATION, INCLUDING ANY
  * WARRANTIES OF MERCHANTABILITY, FITNESS FOR ANY PARTICULAR PURPOSE,
@@ -30,15 +30,15 @@
  *
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
-
 #ifndef GALOIS_RUNTIME_LL_PTRLOCK_H
 #define GALOIS_RUNTIME_LL_PTRLOCK_H
 
+#include "Galois/config.h"
+#include "Galois/Runtime/ll/CompilerSpecific.h"
+
 #include <stdint.h>
 #include <cassert>
-#include <atomic>
-
-#include "CompilerSpecific.h"
+#include GALOIS_C11_STD_HEADER(atomic)
 
 namespace Galois {
 namespace Runtime {

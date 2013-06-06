@@ -21,6 +21,7 @@
  * @author Martin Burtscher <burtscher@txstate.edu>
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
+#include "Galois/config.h"
 #include "Galois/Galois.h"
 #include "Galois/Statistic.h"
 #include "Galois/Bag.h"
@@ -30,12 +31,12 @@
 #include <boost/math/constants/constants.hpp>
 #include <boost/iterator/transform_iterator.hpp>
 
-#include <array>
+#include GALOIS_C11_STD_HEADER(array)
 #include <limits>
 #include <iostream>
 #include <fstream>
 #include <strings.h>
-#include <deque>
+#include GALOIS_C11_STD_HEADER(deque)
 
 #include "Point.h"
 
@@ -211,7 +212,7 @@ unsigned computeCenterOfMass(Octree* node) {
     if (node->child[i].getValue())
       node->child[index++].setValue(node->child[i].getValue());
   for (int i = index; i < 8; ++i)
-    node->child[i].setValue(nullptr);
+    node->child[i].setValue(NULL);
   node->nChildren = index;
 
   for (int i = 0; i < index; i++) {
@@ -332,7 +333,11 @@ struct ComputeForces {
 	    b.acc += updateForce(p, p.dist2(), n->mass);
 	  }
 	} else {
+#ifndef GALOIS_C11_DEQUE_HAS_NO_EMPLACE
 	  stack.emplace_back(static_cast<Octree*>(n), dsq);
+#else
+	  stack.push_back(Frame(static_cast<Octree*>(n), dsq));
+#endif
 	  __builtin_prefetch(n);
 	}
       }

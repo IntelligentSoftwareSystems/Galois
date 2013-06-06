@@ -58,13 +58,13 @@ struct squeues<false,TQ> {
 template<typename T, template<typename, bool> class QT, bool Distributed, bool IsStack, int ChunkSize, bool Concurrent>
 struct ChunkedMaster : private boost::noncopyable {
   template<bool _concurrent>
-  using rethread = ChunkedMaster<T, QT, Distributed, IsStack, ChunkSize, _concurrent>;
+  struct rethread { typedef ChunkedMaster<T, QT, Distributed, IsStack, ChunkSize, _concurrent> type; };
 
   template<typename _T>
-  using retype = ChunkedMaster<_T, QT, Distributed, IsStack, ChunkSize, Concurrent>;
+  struct retype { typedef ChunkedMaster<_T, QT, Distributed, IsStack, ChunkSize, Concurrent> type; };
 
   template<int _chunk_size>
-  using with_chunk_size = ChunkedMaster<T, QT, Distributed, IsStack, _chunk_size, Concurrent>;
+  struct with_chunk_size { typedef ChunkedMaster<T, QT, Distributed, IsStack, _chunk_size, Concurrent> type; };
 
 private:
   class Chunk : public FixedSizeRing<T, ChunkSize>, public QT<Chunk, Concurrent>::ListNode {};

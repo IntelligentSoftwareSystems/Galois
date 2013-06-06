@@ -32,8 +32,6 @@
 #include "Galois/Graph/Details.h"
 #include "Galois/Runtime/MethodFlags.h"
 
-#include <boost/utility/enable_if.hpp>
-
 namespace Galois {
 namespace Graph {
 

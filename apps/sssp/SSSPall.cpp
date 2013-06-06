@@ -50,9 +50,9 @@ static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>")
 static cll::opt<int> stepShift("delta", cll::desc("Shift value for the deltastep"), cll::init(10));
 
 typedef Galois::Graph::LC_InlineEdge_Graph<SNode, uint32_t>
-  ::with_out_of_line_lockable<true>
-  ::with_compressed_node_ptr<true>
-  ::with_numa_alloc<true>
+  ::with_out_of_line_lockable<true>::type
+  ::with_compressed_node_ptr<true>::type
+  ::with_numa_alloc<true>::type
   Graph;
 typedef Graph::GraphNode GNode;
 

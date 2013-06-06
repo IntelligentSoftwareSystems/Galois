@@ -32,15 +32,13 @@
 #include "Galois/Runtime/MethodFlags.h"
 #include "Galois/gdeque.h"
 
-#include <boost/utility/enable_if.hpp>
-
 namespace Galois {
 namespace Graph {
 #define ES 128
 //! Local computation graph (i.e., graph structure does not change)
 //! Specialization of LC_Linear_Graph for NUMA architectures
 template<typename NodeTy, typename EdgeTy>
-class LC_Morph_Graph: boost::noncopyable {
+class LC_Morph_Graph: private boost::noncopyable {
 protected:
 	struct NodeInfo;
 	typedef GraphImpl::EdgeItem<NodeInfo, EdgeTy, true> EITy;

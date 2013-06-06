@@ -50,11 +50,41 @@ void readGraphDispatch(GraphTy& graph, read_default_graph_tag tag, const std::st
 }
 
 template<typename GraphTy>
+struct ReadGraphDispatchHelper1 {
+  GraphTy& graph;
+  FileGraph& f;
+  ReadGraphDispatchHelper1(GraphTy& g, FileGraph& _f): graph(g), f(_f) { }
+  void operator()(unsigned tid, unsigned total) {
+    graph.constructFrom(f, tid, total);
+  }
+};
+
+template<typename GraphTy>
+struct ReadGraphDispatchHelper2 {
+  GraphTy& graph;
+  FileGraph& f;
+  ReadGraphDispatchHelper2(GraphTy& g, FileGraph& _f): graph(g), f(_f) { }
+  void operator()(unsigned tid, unsigned total) {
+    graph.constructNodesFrom(f, tid, total);
+  }
+};
+
+template<typename GraphTy>
+struct ReadGraphDispatchHelper3 {
+  GraphTy& graph;
+  FileGraph& f;
+  ReadGraphDispatchHelper3(GraphTy& g, FileGraph& _f): graph(g), f(_f) { }
+  void operator()(unsigned tid, unsigned total) {
+    graph.constructEdgesFrom(f, tid, total);
+  }
+};
+
+  
+template<typename GraphTy>
 void readGraphDispatch(GraphTy& graph, read_default_graph_tag, FileGraph& f) {
   graph.allocateFrom(f);
-  Galois::on_each([&](unsigned tid, unsigned total) {
-    graph.constructFrom(f, tid, total);
-  });
+
+  Galois::on_each(ReadGraphDispatchHelper1<GraphTy>(graph, f));
 }
 
 template<typename GraphTy>
@@ -67,12 +97,10 @@ void readGraphDispatch(GraphTy& graph, read_lc_linear_graph_tag tag, const std::
 template<typename GraphTy>
 void readGraphDispatch(GraphTy& graph, read_lc_linear_graph_tag, FileGraph& f) {
   graph.allocateFrom(f);
-  Galois::on_each([&](unsigned tid, unsigned total) {
-    graph.constructNodesFrom(f, tid, total);
-  });
-  Galois::on_each([&](unsigned tid, unsigned total) {
-    graph.constructEdgesFrom(f, tid, total);
-  });
+
+  Galois::on_each(ReadGraphDispatchHelper2<GraphTy>(graph, f));
+
+  Galois::on_each(ReadGraphDispatchHelper3<GraphTy>(graph, f));
 }
 
 template<typename GraphTy>

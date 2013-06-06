@@ -617,7 +617,7 @@ public:
     Alloc.deallocate(ptr);
   }
   
-  template<class U, class... Args >
+  template<class U, class... Args>
   inline void construct(U* p, Args&&... args ) const {
     ::new((void*)p) U(std::forward<Args>(args)...);
   }

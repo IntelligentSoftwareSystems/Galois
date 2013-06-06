@@ -260,6 +260,7 @@ public:
 			return n.getLocationZ();
 		assert(false && "Invalid splitType requested in findSplitComponent");
 		abort();
+                return 0.0;
 	}
 	/**
 	 *

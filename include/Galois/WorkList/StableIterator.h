@@ -38,17 +38,17 @@ struct StableIterator {
 
   //! change the concurrency flag
   template<bool _concurrent>
-  using rethread = StableIterator<Iterator, Steal>;
+  struct rethread { typedef StableIterator<Iterator, Steal> type; };
   
   //! change the type the worklist holds
   template<typename _T>
-  using retype = StableIterator<Iterator, Steal>;
+  struct retype { typedef StableIterator<Iterator, Steal> type; };
 
   template<typename _iterator>
-  using with_iterator = StableIterator<_iterator, Steal>;
+  struct with_iterator { typedef StableIterator<_iterator, Steal> type; };
 
   template<bool _steal>
-  using with_steal = StableIterator<Iterator, _steal>;
+  struct with_steal { typedef StableIterator<Iterator, _steal> type; };
 
 private:
   struct shared_state {

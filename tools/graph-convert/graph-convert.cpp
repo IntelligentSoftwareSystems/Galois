@@ -21,17 +21,19 @@
  * @author Dimitrios Prountzos <dprountz@cs.utexas.edu>
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
+#include "Galois/config.h"
 #include "Galois/LargeArray.h"
 #include "Galois/Graph/FileGraph.h"
 
 #include "llvm/Support/CommandLine.h"
 
 #include <iostream>
+#include <fstream>
 #include <vector>
-#include <string>
-#include <random>
+#include GALOIS_C11_STD_HEADER(random)
 
 #include <fcntl.h>
+#include <cstdlib>
 
 namespace cll = llvm::cl;
 
@@ -272,8 +274,11 @@ void convert_mtx2gr(const std::string& infilename, const std::string& outfilenam
     if (tokens.size() != 3) {
       GALOIS_DIE("Unknown problem specification line: ", line.str());
     }
-    nnodes = std::stoull(tokens[0]);
-    nedges = std::stoull(tokens[2]);
+    // Prefer C functions for maximum compatibility
+    //nnodes = std::stoull(tokens[0]);
+    //nedges = std::stoull(tokens[2]);
+    nnodes = strtoull(tokens[0].c_str(), NULL, 0);
+    nedges = strtoull(tokens[2].c_str(), NULL, 0);
 
     // Parse edges
     if (phase == 0) {
@@ -850,8 +855,8 @@ template<typename GraphTy, typename InDegree>
 static void compute_indegree(GraphTy& graph, InDegree& inDegree) {
   inDegree.create(graph.size());
 
-  for (auto n : graph) {
-    for (auto jj : graph.out_edges(n)) {
+  for (auto nn = graph.begin(), en = graph.end(); nn != en; ++nn) {
+    for (auto jj = graph.edge_begin(*nn), ej = graph.edge_end(*nn); jj != ej; ++jj) {
       auto dst = graph.getEdgeDst(jj);
       inDegree[dst] += 1;
     }
@@ -1212,7 +1217,7 @@ void convert_sgr2gr(const std::string& infilename, const std::string& outfilenam
 void convert_dimacs2gr(const std::string& infilename, const std::string& outfilename) { 
   typedef Galois::Graph::FileGraphWriter Writer;
   typedef Galois::LargeArray<int32_t> EdgeData;
-  typedef typename EdgeData::value_type edge_value_type;
+  typedef EdgeData::value_type edge_value_type;
 
   Writer p;
   EdgeData edgeData;
@@ -1245,8 +1250,11 @@ void convert_dimacs2gr(const std::string& infilename, const std::string& outfile
     if (tokens.size() < 3 || tokens[0].compare("p") != 0) {
       GALOIS_DIE("Unknown problem specification line: ", line.str());
     }
-    nnodes = std::stoull(tokens[tokens.size() - 2]);
-    nedges = std::stoull(tokens[tokens.size() - 1]);
+    // Prefer C functions for maximum compatibility
+    //nnodes = std::stoull(tokens[tokens.size() - 2]);
+    //nedges = std::stoull(tokens[tokens.size() - 1]);
+    nnodes = strtoull(tokens[tokens.size() - 2].c_str(), NULL, 0);
+    nedges = strtoull(tokens[tokens.size() - 1].c_str(), NULL, 0);
 
     // Parse edges
     if (phase == 0) {
@@ -1464,12 +1472,14 @@ void convert_gr2vbinpbbs(const std::string& infilename, const std::string& outfi
   graph.structureFromFile(infilename);
 
   {
-    std::ofstream configFile(outfilename + ".config");
+    std::string configName = outfilename + ".config";
+    std::ofstream configFile(configName.c_str());
     configFile << graph.size() << "\n";
   }
 
   {
-    std::ofstream idxFile(outfilename + ".idx");
+    std::string idxName = outfilename + ".idx";
+    std::ofstream idxFile(idxName.c_str());
     // edgeid[i] is the end of i in FileGraph while it is the beginning of i in pbbs graph
     size_t last = std::distance(graph.edge_id_begin(), graph.edge_id_end());
     size_t count = 0;
@@ -1484,7 +1494,8 @@ void convert_gr2vbinpbbs(const std::string& infilename, const std::string& outfi
   }
 
   {
-    std::ofstream adjFile(outfilename + ".adj");
+    std::string adjName = outfilename + ".adj";
+    std::ofstream adjFile(adjName.c_str());
     for (Graph::node_id_iterator ii = graph.node_id_begin(), ei = graph.node_id_end(); ii != ei; ++ii) {
       NodeIdx nodeIdx = *ii;
       adjFile.write(reinterpret_cast<char*>(&nodeIdx), sizeof(nodeIdx));
@@ -1654,7 +1665,10 @@ int main(int argc, char** argv) {
     case gr2intpbbs: convert_gr2pbbs<int32_t,int32_t>(inputfilename, outputfilename); break;
     case gr2intpbbsedges: convert_gr2pbbsedges<int32_t>(inputfilename, outputfilename); break;
     case gr2lowdegreeintgr: remove_high_degree<int32_t>(inputfilename, outputfilename, maxDegree); break;
+// XXX(ddn): The below triggers some internal XLC bug
+#if !defined(__IBMCPP__) || __IBMCPP__ > 1210
     case gr2partdstintgr: partition_by_destination<int32_t>(inputfilename, outputfilename, numParts); break;
+#endif
     case gr2partsrcintgr: partition_by_source<int32_t>(inputfilename, outputfilename, numParts); break;
     case gr2randintgr: convert_gr2rand<int32_t>(inputfilename, outputfilename); break;
     case gr2sorteddstintgr: sort_edges<int32_t,IdLess>(inputfilename, outputfilename); break;

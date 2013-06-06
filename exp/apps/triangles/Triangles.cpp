@@ -39,7 +39,7 @@
 #include <utility>
 #include <vector>
 #include <algorithm>
-#include <iostream>
+#include <fstream>
 
 const char* name = "Triangles";
 const char* desc = "Counts the triangles in a graph";
@@ -62,7 +62,9 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValN(Algo::eigentriangle, "eigentriangle", "Approximate eigen triangle algorithm"),
       clEnumValEnd), cll::init(Algo::nodeiterator));
 
-typedef Galois::Graph::LC_Linear_Graph<uint32_t,void>::with_numa_alloc<true>::with_no_lockable<true> Graph;
+typedef Galois::Graph::LC_Linear_Graph<uint32_t,void>
+  ::with_numa_alloc<true>::type
+  ::with_no_lockable<true>::type Graph;
 //typedef Galois::Graph::LC_CSR_Graph<uint32_t,void> Graph;
 //typedef Galois::Graph::LC_Linear_Graph<uint32_t,void> Graph;
 

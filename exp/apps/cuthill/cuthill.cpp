@@ -35,6 +35,7 @@
 #include <sstream>
 #include <limits>
 #include <iostream>
+#include <fstream>
 #include <deque>
 #include <numeric>
 
@@ -93,7 +94,9 @@ struct SNode {
   bool done;
 };
 
-typedef Galois::Graph::LC_CSR_Graph<SNode, void>::with_no_lockable<true>::with_numa_alloc<true> Graph;
+typedef Galois::Graph::LC_CSR_Graph<SNode, void>
+  ::with_no_lockable<true>::type
+  ::with_numa_alloc<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
 Graph graph;

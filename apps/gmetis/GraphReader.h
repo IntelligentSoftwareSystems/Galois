@@ -22,25 +22,26 @@
 
 #ifndef GRAPHREADER_H_
 #define GRAPHREADER_H_
+
 #include "GMetisConfig.h"
 #include <iostream>
+#include <fstream>
 #include <vector>
-using namespace std;
 
 typedef Galois::Graph::LC_CSR_Graph<int, unsigned int> InputGraph;
 typedef Galois::Graph::LC_CSR_Graph<int, unsigned int>::GraphNode InputGNode;
 
 void readMetisGraph(MetisGraph* metisGraph, const char* filename){
 	std::ifstream file(filename);
-	string line;
+        std::string line;
 	std::getline(file, line);
 	while(line.find('%')!=string::npos){
 		std::getline(file, line);
 	}
 
 	int numNodes, numEdges;
-	sscanf(line.c_str(), "%d %d", &numNodes, &numEdges);
-	cout<<numNodes<<" "<<numEdges<<endl;
+        std::sscanf(line.c_str(), "%d %d", &numNodes, &numEdges);
+        std::cout<<numNodes<<" "<<numEdges<<endl;
 	GGraph* graph = metisGraph->getGraph();
 	vector<GNode> nodes(numNodes);
 	for (int i = 0; i < numNodes; i++) {
@@ -96,7 +97,7 @@ struct parallelMakeNodes {
 struct parallelMakeEdges {
 	GGraph *graph;
 	InputGraph *inputGraph;
-	vector <GNode>  &gnodes;
+        std::vector <GNode>  &gnodes;
 	bool weighted;
 	bool directed;
 	Galois::GAccumulator<int> &pnumEdges;
@@ -190,12 +191,9 @@ void readGraph(MetisGraph* metisGraph, const char* filename, bool weighted = fal
 	metisGraph->setNumNodes(numNodes);
 	metisGraph->setNumEdges(numEdges/2);
 
-	cout<<"Done Reading Graph ";
-	cout<<"numNodes: "<<numNodes<<"|numEdges: "<<numEdges/2<<endl;
+        std::cout<<"Done Reading Graph ";
+	std::cout<<"numNodes: "<<numNodes<<"|numEdges: "<<numEdges/2<<endl;
 
 }
-
-
-
 
 #endif /* GRAPHREADER_H_ */

@@ -34,10 +34,10 @@ namespace WorkList {
 template<typename T = int, bool Concurrent = true>
 struct FIFO : private boost::noncopyable, private Runtime::LL::PaddedLock<Concurrent>  {
   template<bool _concurrent>
-  using rethread = FIFO<T, _concurrent>;
+  struct rethread { typedef FIFO<T, _concurrent> type; };
 
   template<typename _T>
-  using retype = FIFO<_T, Concurrent>;
+  struct retype { typedef FIFO<_T, Concurrent> type; };
 
 private:
   std::deque<T> wl;

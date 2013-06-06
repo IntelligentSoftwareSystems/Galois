@@ -58,7 +58,8 @@ class Cavity {
 	return neighbor;
       }
     }
-    abort();
+    GALOIS_DIE("unreachable");
+    return node;
   }
 
   void expand(GNode node, GNode next) {

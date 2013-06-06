@@ -72,6 +72,7 @@ inline static void flushInstructionPipeline() {
 #else
 #define GALOIS_ATTRIBUTE_NOINLINE
 #define GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE
+#define GALOIS_ATTRIBUTE_DEPRECATED __attribute__ ((deprecated))
 #endif
 
 // used to disable inlining of functions so that they

@@ -39,16 +39,16 @@ template<class Container=dChunkedFIFO<>, class T=int, bool Concurrent = true>
 class BulkSynchronous : private boost::noncopyable {
 public:
   template<bool _concurrent>
-  using rethread = BulkSynchronous<Container, T, _concurrent>;
+  struct rethread { typedef BulkSynchronous<Container, T, _concurrent> type; };
 
   template<typename _T>
-  using retype = BulkSynchronous<typename Container::template retype<_T>, _T, Concurrent>;
+  struct retype { typedef BulkSynchronous<typename Container::template retype<_T>::type, _T, Concurrent> type; };
 
   template<typename _container>
-  using with_container = BulkSynchronous<_container, T, Concurrent>;
+  struct with_container { typedef BulkSynchronous<_container, T, Concurrent> type; };
 
 private:
-  typedef typename Container::template rethread<Concurrent> CTy;
+  typedef typename Container::template rethread<Concurrent>::type CTy;
 
   struct TLD {
     unsigned round;

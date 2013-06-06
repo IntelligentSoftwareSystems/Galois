@@ -108,7 +108,8 @@ struct BipartiteGraph: public Galois::Graph::FirstGraph<NodeTy,EdgeTy,true> {
 
 //******************************** Common ************************
 
-template<typename G, template<typename,bool> class Algo> struct Exists {
+template<typename G, template<typename,bool> class Algo>
+struct Exists {
   bool operator()(G& g, const typename G::edge_iterator&) { return true; }
 };
 
@@ -117,9 +118,6 @@ struct GraphTypes {
   typedef typename G::GraphNode GraphNode;
   typedef std::pair<GraphNode,GraphNode> Edge;
   typedef std::vector<Edge> Matching;
-  template<template<typename,bool> class Algo> struct Functions {
-    typedef Exists<G,Algo> ExistsFn;
-  };
 };
 
 struct BaseNode {
@@ -165,7 +163,7 @@ struct PrepareForVerifier {
   typedef typename G::edge_iterator edge_iterator;
 
   void operator()(G& g, Matching* matching) {
-    typename GraphTypes<G>::template Functions<Algo>::ExistsFn exists;
+    Exists<G,Algo> exists;
 
     for (typename NodeList::iterator src = g.B.begin(), esrc = g.B.end(); src != esrc; ++src) {
       for (edge_iterator ii = g.edge_begin(*src), ei = g.edge_end(*src); ii != ei; ++ii) {

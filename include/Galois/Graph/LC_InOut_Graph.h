@@ -41,12 +41,16 @@ struct read_lc_inout_graph_tag { };
  * modifying them does not modify the corresponding out edge.
  */
 template<typename GraphTy>
-class LC_InOut_Graph: public GraphTy::template with_id<true> {
+class LC_InOut_Graph: public GraphTy::template with_id<true>::type {
   template<typename G>
   friend void readGraphDispatch(G&, read_lc_inout_graph_tag, const std::string&, const std::string&);
 
-  typedef typename GraphTy::template with_id<true> Super;
-  typedef typename GraphTy::template with_id<true>::template with_node_data<void>::template with_no_lockable<true> InGraph;
+  typedef typename GraphTy
+    ::template with_id<true>::type Super;
+  typedef typename GraphTy
+    ::template with_id<true>::type
+    ::template with_node_data<void>::type
+    ::template with_no_lockable<true>::type InGraph;
   InGraph inGraph;
   bool asymmetric;
 

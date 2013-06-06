@@ -104,7 +104,7 @@ struct FindMatching {
 	{
 	}
 	template<typename ContextTy>
-	void __attribute__((noinline)) operator()(NodeWrapper * nodeA, ContextTy& lwl) {
+	void operator()(NodeWrapper * nodeA, ContextTy& lwl) {
 		if (tree->contains(*nodeA)) {
 				NodeWrapper * nodeB = tree->findBestMatch((*nodeA));
 				if (nodeB != NULL && tree->contains(*nodeB)) {

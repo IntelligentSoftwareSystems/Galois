@@ -19,6 +19,7 @@
 #include <sstream>
 #include <limits>
 #include <iostream>
+#include <fstream>
 #include <deque>
 #include <cmath>
 #include <functional>

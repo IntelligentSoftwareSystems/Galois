@@ -35,10 +35,10 @@ namespace WorkList {
 template<typename T = int, bool Concurrent = true>
 struct LIFO : private boost::noncopyable, private Runtime::LL::PaddedLock<Concurrent> {
   template<bool _concurrent>
-  using rethread = LIFO<T, _concurrent>;
+  struct rethread { typedef LIFO<T, _concurrent> type; };
 
   template<typename _T>
-  using retype = LIFO<_T, Concurrent>;
+  struct retype { typedef LIFO<_T, Concurrent> type; };
 
 private:
   std::deque<T> wl;

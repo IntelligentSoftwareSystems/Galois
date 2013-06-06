@@ -228,7 +228,7 @@ struct LinkUpLoop {
         ctx.resetStatus ();
 
         if (usingOrderedRuntime) {
-          Galois::Runtime::signalConflict (nullptr);
+          Galois::Runtime::signalConflict (NULL);
 
         } else {
           nextWL.get ().push_back (ctx);

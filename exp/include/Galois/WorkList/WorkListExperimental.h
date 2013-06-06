@@ -56,7 +56,7 @@ namespace WorkList {
 
 template<class T, class Indexer = DummyIndexer<T>, typename ContainerTy = FIFO<T>, bool concurrent=true >
 class ApproxOrderByIntegerMetric : private boost::noncopyable {
-  typename ContainerTy::template rethread<concurrent> data[2048];
+  typename ContainerTy::template rethread<concurrent>::type data[2048];
   
   Indexer I;
   Runtime::PerThreadStorage<unsigned int> cursor;
@@ -69,7 +69,7 @@ public:
   typedef T value_type;
   template<bool newconcurrent>
   struct rethread {
-    typedef ApproxOrderByIntegerMetric<T, Indexer, ContainerTy, newconcurrent> WL;
+    typedef ApproxOrderByIntegerMetric<T, Indexer, ContainerTy, newconcurrent> type;
   };
   
   ApproxOrderByIntegerMetric(const Indexer& x = Indexer())
@@ -117,7 +117,7 @@ GALOIS_WLCOMPILECHECK(ApproxOrderByIntegerMetric)
 
 template<class T, class Indexer = DummyIndexer<T>, typename ContainerTy = FIFO<T>, bool concurrent=true >
 class LogOrderByIntegerMetric : private boost::noncopyable {
-  typename ContainerTy::template rethread<concurrent> data[sizeof(unsigned int)*8 + 1];
+  typename ContainerTy::template rethread<concurrent>::type data[sizeof(unsigned int)*8 + 1];
   
   Indexer I;
   Runtime::PerThreadStorage<unsigned int> cursor;
@@ -135,7 +135,7 @@ public:
   typedef T value_type;
   template<bool newconcurrent>
   struct rethread {
-    typedef LogOrderByIntegerMetric<T, Indexer, ContainerTy, newconcurrent> WL;
+    typedef LogOrderByIntegerMetric<T, Indexer, ContainerTy, newconcurrent> type;
   };
   
   LogOrderByIntegerMetric(const Indexer& x = Indexer())
@@ -185,7 +185,7 @@ class LocalFilter {
   GlobalTy globalQ;
 
   struct p {
-    typename LocalTy::template rethread<false> Q;
+    typename LocalTy::template rethread<false>::type Q;
     unsigned int current;
   };
   Runtime::PerThreadStorage<p> localQs;
@@ -202,7 +202,7 @@ public:
   //! change the concurrency flag
   template<bool newconcurrent>
   struct rethread {
-    typedef LocalFilter WL;
+    typedef LocalFilter type;
   };
 
   //! push a value onto the queue
@@ -323,7 +323,7 @@ public:
   typedef T value_type;
 
 private:
-  Runtime::PerThreadStorage<typename LocalWL::template rethread<false>> localQueues;
+  Runtime::PerThreadStorage<typename LocalWL::template rethread<false>::type> localQueues;
   Runtime::PerPackageStorage<GlobalWL> sharedQueues;
   Runtime::PerPackageStorage<unsigned long> starvingFlags;
   GlobalWL gwl;
@@ -1179,7 +1179,7 @@ class PartitionedWL : private boost::noncopyable {
 public:
   template<bool newconcurrent>
   struct rethread {
-    typedef PartitionedWL<T, Partitioner, ChildWLTy, newconcurrent> WL;
+    typedef PartitionedWL<T, Partitioner, ChildWLTy, newconcurrent> type;
   };
 
   typedef T value_type;
@@ -1227,9 +1227,10 @@ class SkipListQueue : private boost::noncopyable {
 
 public:
   template<bool newconcurrent>
-  using rethread = SkipListQueue<Compare, T>;
+  struct rethread { typedef SkipListQueue<Compare, T> type; };
+
   template<typename Tnew>
-  using retype = SkipListQueue<Compare, Tnew>;
+  struct retype { typedef SkipListQueue<Compare, Tnew> type; };
 
   typedef T value_type;
 
@@ -1267,9 +1268,10 @@ class SetQueue : private boost::noncopyable, private Runtime::LL::PaddedLock<con
 
 public:
   template<bool newconcurrent>
-  using rethread = SetQueue<Compare, T, newconcurrent>;
+  struct rethread { typedef SetQueue<Compare, T, newconcurrent> type; };
+
   template<typename Tnew>
-  using retype = SetQueue<Compare, Tnew, concurrent>;
+  struct retype { typedef SetQueue<Compare, Tnew, concurrent> type; };
 
   typedef T value_type;
 
@@ -1313,9 +1315,10 @@ class FCPairingHeapQueue : private boost::noncopyable {
 
 public:
   template<bool newconcurrent>
-  using rethread = FCPairingHeapQueue<Compare, T>;
+  struct rethread { typedef FCPairingHeapQueue<Compare, T> type; };
+
   template<typename Tnew>
-  using retype = FCPairingHeapQueue<Compare, Tnew>;
+  struct retype { typedef FCPairingHeapQueue<Compare, Tnew> type; };
 
   typedef T value_type;
 
@@ -1374,9 +1377,10 @@ class SimpleOrderedByIntegerMetric : private boost::noncopyable, private Galois:
 
  public:
   template<bool newconcurrent>
-  using rethread = SimpleOrderedByIntegerMetric<Indexer,ContainerTy,T,newconcurrent>;
+  struct rethread { typedef SimpleOrderedByIntegerMetric<Indexer,ContainerTy,T,newconcurrent> type; };
+
   template<typename Tnew>
-  using retype = SimpleOrderedByIntegerMetric<Indexer,typename ContainerTy::template retype<Tnew>,Tnew,concurrent>;
+  struct retype { typedef SimpleOrderedByIntegerMetric<Indexer,typename ContainerTy::template retype<Tnew>::type,Tnew,concurrent> type; };
   
   typedef T value_type;
   
@@ -1431,8 +1435,7 @@ class SimpleOrderedByIntegerMetric : private boost::noncopyable, private Galois:
 
 template<class Indexer, typename ContainerTy = Galois::WorkList::ChunkedLIFO<16>, bool BSP = true, typename T = int, bool concurrent = true>
 class CTOrderedByIntegerMetric : private boost::noncopyable {
-
-  typedef typename ContainerTy::template rethread<concurrent> CTy;
+  typedef typename ContainerTy::template rethread<concurrent>::type CTy;
 
   struct perItem {
     CTy* current;
@@ -1469,9 +1472,10 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
 
  public:
   template<bool newconcurrent>
-  using rethread = CTOrderedByIntegerMetric<Indexer,ContainerTy,BSP,T,newconcurrent>;
+  struct rethread { typedef CTOrderedByIntegerMetric<Indexer,ContainerTy,BSP,T,newconcurrent> type; };
+
   template<typename Tnew>
-  using retype = CTOrderedByIntegerMetric<Indexer,typename ContainerTy::template retype<Tnew>,BSP,Tnew,concurrent>;
+  struct retype { typedef CTOrderedByIntegerMetric<Indexer,typename ContainerTy::template retype<Tnew>::type,BSP,Tnew,concurrent> type; };
 
   typedef T value_type;
 
@@ -1556,7 +1560,7 @@ GALOIS_WLCOMPILECHECK(CTOrderedByIntegerMetric)
 
 template<class Indexer, typename ContainerTy, bool concurrent = true, int binmax = 1024*1024 >
 class BarrierOBIM : private boost::noncopyable {
-  typedef typename ContainerTy::template rethread<concurrent> CTy;
+  typedef typename ContainerTy::template rethread<concurrent>::type CTy;
 
   volatile unsigned int current;
   volatile unsigned int pushmax;
@@ -1571,9 +1575,10 @@ class BarrierOBIM : private boost::noncopyable {
 
  public:
   template<bool newconcurrent>
-  using rethread = BarrierOBIM<Indexer,ContainerTy,newconcurrent,binmax>;
+  struct rethread { typedef BarrierOBIM<Indexer,ContainerTy,newconcurrent,binmax> type; };
+
   template<typename Tnew>
-  using retype = BarrierOBIM<Indexer,typename ContainerTy::template retype<Tnew>,concurrent, binmax>;
+  struct retype { typedef BarrierOBIM<Indexer,typename ContainerTy::template retype<Tnew>::type,concurrent, binmax> type; };
 
   typedef typename CTy::value_type value_type;
 
@@ -1662,9 +1667,10 @@ public:
   Random(): seed(0xDEADBEEF) { }
 
   template<bool newconcurrent>
-  using rethread = Random<T, newconcurrent>;
+  struct rethread { typedef Random<T, newconcurrent> type; };
+
   template<typename Tnew>
-  using retype = Random<Tnew, concurrent>;
+  struct retype { typedef Random<Tnew, concurrent> type; };
 
   typedef T value_type;
 
@@ -1723,9 +1729,10 @@ class TbbFIFO : private boost::noncopyable  {
 
 public:
   template<bool newconcurrent>
-  using rethread = TbbFIFO<T>;
+  struct rethread { typedef TbbFIFO<T> type; };
+
   template<typename Tnew>
-  using retype = TbbFIFO<Tnew>;
+  struct retype { typedef TbbFIFO<Tnew> type; };
 
   typedef T value_type;
 
@@ -1780,9 +1787,10 @@ public:
   }
 
   template<bool newconcurrent>
-  using rethread = PTbb<Compare, T>;
+  struct rethread { typedef PTbb<Compare, T> type; };
+
   template<typename Tnew>
-  using retype = PTbb<Compare, Tnew>;
+  struct retype { typedef PTbb<Compare, Tnew> type; };
   
   typedef T value_type;
   
@@ -1846,9 +1854,10 @@ class STbb : private boost::noncopyable {
 
 public:
   template<bool newconcurrent>
-  using rethread = STbb<Compare, T>;
+  struct rethread { typedef STbb<Compare, T> type; };
+
   template<typename Tnew>
-  using retype = STbb<Compare, Tnew>;
+  struct retype { typedef STbb<Compare, Tnew> type; };
   
   typedef T value_type;
   
@@ -1885,9 +1894,10 @@ class TbbPriQueue : private boost::noncopyable {
 
 public:
   template<bool newconcurrent>
-  using rethread = TbbPriQueue<Compare, T>;
+  struct rethread { typedef TbbPriQueue<Compare, T> type; };
+
   template<typename Tnew>
-  using retype = TbbPriQueue<Compare, Tnew>;
+  struct retype { typedef TbbPriQueue<Compare, Tnew> type; };
 
   typedef T value_type;
 
@@ -2125,7 +2135,7 @@ class ChunkedAdaptor : private boost::noncopyable {
 
 public:
   template<typename Tnew>
-  using retype = ChunkedAdaptor<gWL, chunksize, Tnew>;
+  struct retype { typedef ChunkedAdaptor<gWL, chunksize, Tnew> type; };
 
   typedef T value_type;
 
