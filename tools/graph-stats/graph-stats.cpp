@@ -32,7 +32,9 @@ namespace cll = llvm::cl;
 
 enum StatMode {
   summary,
-  degrees
+  degrees,
+  degreehist,
+  indegreehist
 };
 
 static cll::opt<std::string> inputfilename(cll::Positional, cll::desc("<graph file>"), cll::Required);
@@ -40,6 +42,8 @@ static cll::list<StatMode> statModeList(cll::desc("Available stats:"),
     cll::values(
       clEnumVal(summary, "Graph summary"),
       clEnumVal(degrees, "Node degrees"),
+      clEnumVal(degreehist, "Histogram of degrees"),
+      clEnumVal(indegreehist, "Histogram of indegrees"),
       clEnumValEnd));
 
 typedef Galois::Graph::FileGraph Graph;
@@ -58,15 +62,42 @@ void do_degrees() {
   }
 }
 
+void do_hist() {
+  unsigned numEdges = 0;
+  std::map<unsigned, unsigned> hist;
+  for (auto ii = graph.begin(), ee = graph.end(); ii != ee; ++ii) {
+    unsigned val = std::distance(graph.neighbor_begin(*ii), graph.neighbor_end(*ii));
+    numEdges += val;
+    ++hist[val];
+  }
+  for (auto& p : hist)
+    std::cout << p.first << " : " << p.second << "\n";
+}
+
+void do_inhist() {
+  unsigned numEdges = 0;
+  std::map<GNode, unsigned> inv;
+  std::map<unsigned, unsigned> hist;
+  for (auto ii = graph.begin(), ee = graph.end(); ii != ee; ++ii)
+    for (auto ei = graph.edge_begin(*ii), eie = graph.edge_end(*ii); ei != eie; ++ei)
+      ++inv[graph.getEdgeDst(ei)];
+  for (auto& p : inv)
+    ++hist[p.second];
+  for (auto& p : hist)
+    std::cout << p.first << " : " << p.second << "\n";
+}
+
 int main(int argc, char** argv) {
   llvm::cl::ParseCommandLineOptions(argc, argv);
   graph.structureFromFile(inputfilename);
   
   for (unsigned i = 0; i != statModeList.size(); ++i) {
     switch (statModeList[i]) {
-      case summary: do_summary(); break;
-      case degrees: do_degrees(); break;
-      default: abort(); break;
+    case summary: do_summary(); break;
+    case degrees: do_degrees(); break;
+    case degreehist: do_hist(); break;
+    case indegreehist: do_inhist(); break;
+    default: abort(); break;
     }
   }
 
