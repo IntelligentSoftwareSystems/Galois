@@ -28,7 +28,6 @@
 #include <vector>
 #include <iostream>
 #include "Galois/Atomic.h"
-#include "boost/optional.hpp"
 using namespace std;
 
 class MetisGraph{

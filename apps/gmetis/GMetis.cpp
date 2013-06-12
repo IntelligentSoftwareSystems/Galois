@@ -97,7 +97,7 @@ bool verifyCoarsening(MetisGraph *metisGraph) {
         return false;
       }
     }
-    int edges=0;
+    unsigned edges=0;
     for(GGraph::edge_iterator ii=graph->edge_begin(node),ee=graph->edge_end(node);ii!=ee;ii++) {
       edges++;
     }
@@ -127,7 +127,7 @@ bool verifyRecursiveBisection(MetisGraph* metisGraph,int nparts) {
     if(!(nodeData.getPartition()<nparts))
       return false;
     partNodes[nodeData.getPartition()]++;
-    int edges=0;
+    unsigned edges=0;
     for(GGraph::edge_iterator ii=graph->edge_begin(node),ee=graph->edge_end(node);ii!=ee;ii++) {
       edges++;
     }
