@@ -210,6 +210,19 @@ public:
     num = 0;
   }
 
+  //FIXME: support alternate insert locations
+  iterator insert(iterator position, size_t n, const value_type& val) {
+    assert(position == end());
+    if (!n)
+      return end();
+
+    push_back(val);
+    iterator retval = iterator(last, last->size()-1);
+    for (size_t x = 1; x < n; ++x)
+      push_back(val);
+    return retval;
+  }
+
   template<typename... Args>
   void emplace_back(Args&&... args) {
     assert(precondition());
