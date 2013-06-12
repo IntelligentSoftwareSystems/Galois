@@ -75,7 +75,7 @@ void do_hist() {
 }
 
 void do_inhist() {
-  unsigned numEdges = 0;
+  //unsigned numEdges = 0;
   std::map<GNode, unsigned> inv;
   std::map<unsigned, unsigned> hist;
   for (auto ii = graph.begin(), ee = graph.end(); ii != ee; ++ii)

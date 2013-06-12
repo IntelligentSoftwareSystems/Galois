@@ -93,7 +93,6 @@ void FileGraph::structureFromFileInterleaved(const std::string& filename, size_t
   if ((pret = pthread_cond_init(&cond, NULL)))
     GALOIS_DIE("pthread error: ", pret);
 
-  FileGraph* self = this;
   // NB(ddn): Use on_each_simple_impl because we are fiddling with the
   // number of active threads after this loop. Otherwise, the main
   // thread might change the number of active threads while some threads

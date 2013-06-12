@@ -935,15 +935,15 @@ int main(int argc, char** argv) {
   createCleanupChunks(nnodes, nedges, numThreads);
 
 	gnodes = graph->getNodes();
-  firstForEach feach1;
+  //firstForEach feach1;
   firstForEachNodeBased feach1NodeBased;
   //secondForEachWithInline feach2;
   secondForEach feach2;
-  fourthForEach feach4;
-	//fringeFindDOALL2 findFringe;
-	fringeFindDOALL2NoInline findFringe;
-	cleanupGraphDOALL cleanupGloop;
-	initCapDOALL setPredCapacitiesloop;
+  //fourthForEach feach4;
+  //fringeFindDOALL2 findFringe;
+  fringeFindDOALL2NoInline findFringe;
+  //cleanupGraphDOALL cleanupGloop;
+  //initCapDOALL setPredCapacitiesloop;
 
   int stepCnt = 0;
   Galois::TimeAccumulator firstLoopTimer;

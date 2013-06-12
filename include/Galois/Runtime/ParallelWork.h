@@ -294,7 +294,7 @@ public:
   ForEachWork(FunctionTy& f, const char* l): term(getSystemTermination()), origFunction(f), loopname(l) { }
   
   template<typename W>
-  ForEachWork(W& w, FunctionTy& f, const char* l): wl(w), term(getSystemTermination()), origFunction(f), loopname(l) { }
+  ForEachWork(W& w, FunctionTy& f, const char* l): term(getSystemTermination()), wl(w), origFunction(f), loopname(l) { }
 
   template<typename RangeTy>
   void AddInitialWork(const RangeTy& range) {

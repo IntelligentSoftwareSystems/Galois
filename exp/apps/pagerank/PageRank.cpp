@@ -20,6 +20,7 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
+#include "Galois/config.h"
 #include "Galois/Galois.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Bag.h"
@@ -35,6 +36,7 @@
 
 #include "Lonestar/BoilerPlate.h"
 
+#include GALOIS_C11_STD_HEADER(atomic)
 #include <string>
 #include <sstream>
 #include <limits>
@@ -79,9 +81,35 @@ static const float alpha = 1.0 - 0.85;
 //! maximum relative change until we deem convergence
 static const float tolerance = 0.01;
 
+//ICC v13.1 doesn't yet support std::atomic<float> completely, emmulate its
+//behavor with std::atomic<int>
+struct atomic_float : public std::atomic<int> {
+  static_assert(sizeof(int) == sizeof(float), "int and float must be the same size");
+
+  float atomicIncrement(float value) {
+    while (true) {
+      union { float as_float; int as_int; } oldValue = { read() };
+      union { float as_float; int as_int; } newValue = { oldValue.as_float + value };
+      if (this->compare_exchange_strong(oldValue.as_int, newValue.as_int))
+        return newValue.as_float;
+    }
+  }
+
+  float read() {
+    union { int as_int; float as_float; } caster = { this->load(std::memory_order_relaxed) };
+    return caster.as_float;
+  }
+
+  void write(float v) {
+    union { float as_float; int as_int; } caster = { v };
+    this->store(caster.as_int, std::memory_order_relaxed);
+  }
+};
+
 struct PNode {
   float value;
-  float accum;
+  atomic_float accum;
+  PNode() { }
 
   float getPageRank() { return value; }
 };
@@ -100,7 +128,7 @@ struct SerialAlgo {
     Initialize(Graph& g): g(g) { }
     void operator()(typename Graph::GraphNode n) {
       g.getData(n).value = 1.0;
-      g.getData(n).accum = 0.0;
+      g.getData(n).accum.write(0.0);
     }
   };
 
@@ -119,20 +147,20 @@ struct SerialAlgo {
           GNode dst = graph.getEdgeDst(edge);
           PNode& ddata = graph.getData(dst);
           float delta =  sdata.value / neighbors;
-          ddata.accum += delta;
+          ddata.accum.write(ddata.accum.read() + delta);
         }
       }
 
       for (GNode src : graph) {
         PNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
-        float value = (1.0 - alpha) * sdata.accum + alpha;
+        float value = (1.0 - alpha) * sdata.accum.read() + alpha;
         float diff = std::fabs(value - sdata.value);
         if (diff <= tolerance)
           ++small_delta;
         if (diff > max_delta)
           max_delta = diff;
         sdata.value = value;
-        sdata.accum = 0;
+        sdata.accum.write(0);
       }
 
       iteration += 1;
@@ -272,7 +300,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
     void operator()(typename Graph::GraphNode n) {
       PNode& data = g.getData(n, Galois::MethodFlag::NONE);
       data.value = 1.0;
-      data.accum = 0.0;
+      data.accum.write(0.0);
     }
   };
 
@@ -288,14 +316,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
       PNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
       float delta =  sdata.value / neighbors;
       
-      while (true) {
-        float oldValue = ddata.accum;
-        float newValue = oldValue + delta;
-        int *ptr = reinterpret_cast<int*>(&ddata.accum);
-        static_assert(sizeof(int) == sizeof(float), "Oops");
-        if (__sync_bool_compare_and_swap(ptr, *reinterpret_cast<int*>(&oldValue), *reinterpret_cast<int*>(&newValue)))
-          break;
-      }
+      ddata.accum.atomicIncrement(delta);
       return false; // Topology-driven
     }
   };
@@ -306,13 +327,13 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
     UpdateNode(LigraAlgo* s, Graph& g): self(s), graph(g) { }
     void operator()(GNode src) {
       PNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
-      float value = (1.0 - alpha) * sdata.accum + alpha;
+      float value = (1.0 - alpha) * sdata.accum.read() + alpha;
       float diff = std::fabs(value - sdata.value);
       if (diff <= tolerance)
         self->small_delta += 1;
       self->max_delta.update(diff);
       sdata.value = value;
-      sdata.accum = 0;
+      sdata.accum.write(0);
     }
   };
 

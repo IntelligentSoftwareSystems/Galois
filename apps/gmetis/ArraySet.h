@@ -23,10 +23,13 @@
 
 #ifndef ARRAYSET_H_
 #define ARRAYSET_H_
+
+#include "Galois/config.h"
+
 #include <vector>
 #include <set>
 #include <algorithm>
-#include <boost/function.hpp>
+#include GALOIS_C11_STD_HEADER(functional)
 
 using namespace std;
 template<typename T>
@@ -35,7 +38,7 @@ public:
 	ArraySet(){
 		setsize= 0;
 	}
-  ArraySet(int maxSize, boost::function<int(T)> mapToInt):indexes(maxSize){
+  ArraySet(int maxSize, std::function<int(T)> mapToInt):indexes(maxSize){
 		this->mapToInt = mapToInt;
 		fill(indexes.begin(), indexes.end(), -1);
 		setsize = 0;
@@ -97,7 +100,7 @@ private:
 	vector<int> indexes;
 	//vector<T> setElements;
 	set<T> setElements;
-  boost::function<int(T)> mapToInt;
+  std::function<int(T)> mapToInt;
 	int setsize;
 };
 

@@ -36,6 +36,7 @@
 #include <cstddef>
 #include GALOIS_C11_STD_HEADER(algorithm)
 #include GALOIS_C11_STD_HEADER(utility)
+#include GALOIS_C11_STD_HEADER(type_traits)
 
 namespace Galois {
 
@@ -46,13 +47,19 @@ namespace Galois {
  */
 template<typename _Tp, unsigned _Size>
 class LazyArray {
-  char __datac[sizeof(_Tp[(_Size > 0 ? _Size : 1)])];
+  typedef typename std::aligned_storage<sizeof(_Tp), std::alignment_of<_Tp>::value>::type Data;
+  
+  //__attribute__((may_alias))
+  Data data_[(_Size > 0 ? _Size : 1)];
 
+  //XXX(ddn): These casts are not correct according to ANSI strict aliasing rules
   _Tp* get(size_t __n) {
-    return &(reinterpret_cast<_Tp*>(&__datac[0]))[__n];
+    union { Data* as_pdata; _Tp* as_pvalue; } caster = { data_ };
+    return caster.as_pvalue + __n;
   }
   const _Tp* get(size_t __n) const {
-    return &(reinterpret_cast<_Tp*>(&__datac[0]))[__n];
+    union { const Data* as_pdata; const _Tp* as_pvalue; } caster = { data_ };
+    return caster.as_pvalue + __n;
   }
 
 public:
@@ -108,8 +115,8 @@ public:
   reference back() { return *get(_Size > 0 ? _Size - 1 : 0); }
   const_reference back() const { return *get(_Size > 0 ? _Size - 1 : 0); }
 
-  pointer data() { return &get(0); }
-  const_pointer data() const { return &get(0); }
+  pointer data() { return get(0); }
+  const_pointer data() const { return get(0); }
 
   //missing: fill swap
 

@@ -23,6 +23,7 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
+#include "Galois/config.h"
 #include "Galois/Galois.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Bag.h"
@@ -38,6 +39,7 @@
 
 #include "Lonestar/BoilerPlate.h"
 
+#include GALOIS_C11_STD_HEADER(atomic)
 #include <utility>
 #include <algorithm>
 #include <iostream>
@@ -66,7 +68,7 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
 typedef int EdgeData;
 
 struct Node: public Galois::UnionFindNode<Node> {
-  const EdgeData* lightest;
+  std::atomic<EdgeData*> lightest;
 };
 
 typedef Galois::Graph::LC_CSR_Graph<Node,EdgeData>
@@ -129,7 +131,7 @@ struct ParallelAlgo {
     for (; ii != ei; ++ii, ++cur) {
       GNode dst = graph.getEdgeDst(ii);
       Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
-      const EdgeData& weight = graph.getEdgeData(ii);
+      EdgeData& weight = graph.getEdgeData(ii);
       if (useLimit && weight > self->limit) {
         pending.push(WorkItem(src, dst, &weight, cur));
         return;
@@ -137,15 +139,11 @@ struct ParallelAlgo {
       Node* rep;
       if ((rep = sdata.findAndCompress()) != ddata.findAndCompress()) {
         //const EdgeData& weight = graph.getEdgeData(ii);
-        const EdgeData* old;
+        EdgeData* old;
         ctx.push(WorkItem(src, dst, &weight, cur));
         while (weight < *(old = rep->lightest)) {
-          if (__sync_bool_compare_and_swap(
-                reinterpret_cast<uintptr_t*>(&rep->lightest),
-                reinterpret_cast<uintptr_t>(old),
-                reinterpret_cast<uintptr_t>(&weight))) {
+          if (rep->lightest.compare_exchange_strong(old, &weight))
             break;
-          }
         }
         return;
       }

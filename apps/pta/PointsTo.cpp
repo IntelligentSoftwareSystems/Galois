@@ -108,7 +108,7 @@ typedef Galois::WorkList::OrderedByIntegerMetric<UpdateRequestIndexer, Galois::W
 
 class PtsToCons {
 public:
-	typedef enum {AddressOf, Copy, Load, Store} ConstraintType;
+	typedef enum {AddressOf = 0, Copy, Load, Store} ConstraintType;
 
 	PtsToCons(ConstraintType tt, unsigned ss, unsigned dd) {
 		src = ss;
@@ -519,7 +519,9 @@ unsigned readConstraints(const char *file, PointsToConstraints &addrcopyconstrai
 
         for (unsigned ii = 0; ii < nconstraints; ++ii) {
 		getline(cfile, cstr);
-		sscanf(cstr.c_str(), "%d,%d,%d,%d,%d", &consno, &src, &dst, (int *)&type, &offset);
+                union { int as_int; PtsToCons::ConstraintType as_ctype; } type_converter;
+		sscanf(cstr.c_str(), "%d,%d,%d,%d,%d", &consno, &src, &dst, &type_converter.as_int, &offset);
+                type = type_converter.as_ctype;
 		PtsToCons cc(type, src, dst);
 		if (type == PtsToCons::AddressOf || type == PtsToCons::Copy) {
 			addrcopyconstraints.push_back(cc);

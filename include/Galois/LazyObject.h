@@ -25,6 +25,9 @@
 #ifndef GALOIS_LAZYOBJECT_H
 #define GALOIS_LAZYOBJECT_H
 
+#include "Galois/config.h"
+#include GALOIS_C11_STD_HEADER(type_traits)
+
 namespace Galois {
 
 /**
@@ -65,14 +68,24 @@ struct StrictObject<void> {
  * otherwise the compiler will insert non-zero padding for fields (even when
  * empty).
  */
-// TODO(ddn): Use T's copy constructor and assignment operator; current assumes
-// memcpy is okay
 template<typename T>
 class LazyObject {
-  char data[sizeof(T)];
+  typedef typename std::aligned_storage<sizeof(T), std::alignment_of<T>::value>::type Data;
 
-  T* cast() { return reinterpret_cast<T*>(&data[0]); }
-  const T* cast() const { return reinterpret_cast<const T*>(&data[0]); }
+  //__attribute__((may_alias))
+  Data data_[1];
+
+  //XXX(ddn): These casts are not correct according to ANSI strict aliasing rules
+  T* cast() { 
+    union { Data* as_pdata; T* as_pvalue; } caster = { data_ };
+    return caster.as_pvalue;
+  }
+
+  const T* cast() const {
+    union { const Data* as_pdata; const T* as_pvalue; } caster = { data_ };
+    return caster.as_pvalue;
+  }
+
 public:
   typedef T value_type;
   typedef T& reference;

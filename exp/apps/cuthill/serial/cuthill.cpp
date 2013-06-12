@@ -144,7 +144,7 @@ std::vector<GNode> perm;
 std::vector<unsigned int> levelptr;
 std::vector<GNode> otherperm;
 
-static void printCM(std::vector<GNode>& ordering){
+void printCM(std::vector<GNode>& ordering){
 	std::cerr << "Cuthill-McKee Permutation:\n";
 	for(std::vector<GNode>::iterator nit = ordering.begin(); nit != ordering.end(); nit++){
 		SNode& data = graph.getData(*nit, Galois::MethodFlag::NONE);
@@ -153,7 +153,7 @@ static void printCM(std::vector<GNode>& ordering){
 	std::cerr << "\n";
 }
 
-static void printRCM(std::vector<GNode>& ordering){
+void printRCM(std::vector<GNode>& ordering){
 	std::cerr << "Reverse Cuthill-McKee Permutation:\n";
 	for(std::vector<GNode>::reverse_iterator nit = ordering.rbegin(); nit != ordering.rend(); nit++){
 		SNode& data = graph.getData(*nit, Galois::MethodFlag::NONE);
@@ -182,7 +182,7 @@ void loadPerm() {
 		infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 	}
 
-	int nnodes, dim;
+	unsigned nnodes, dim;
 	infile >> nnodes >> dim;
 
 	if(nnodes != graph.size() || dim != 1){
@@ -192,7 +192,7 @@ void loadPerm() {
 
 	otherperm.reserve(nnodes);
 	otherperm.resize(nnodes);
-	for (int i = 0; i < nnodes; ++i) {
+	for (unsigned i = 0; i < nnodes; ++i) {
 		int idx;
 		infile >> idx;
 		if (!infile) {
@@ -369,7 +369,7 @@ struct is_touched {
   }
 };
 
-static unsigned int count_touched() {
+unsigned int count_touched() {
 #ifdef GALOIS_JUNE
     return Galois::count_if(graph.begin(), graph.end(), is_touched());
 #else
@@ -377,7 +377,7 @@ static unsigned int count_touched() {
 #endif
 }
 
-static bool pick_source(Graph::iterator& start) {
+bool pick_source(Graph::iterator& start) {
 #ifdef GALOIS_JUNE
   Graph::iterator iter = Galois::find_if(start, graph.end(), not_visited());
 #else
@@ -399,7 +399,7 @@ static bool verify(GNode& source) {
     return false;
   }
   
-  size_t id = 0;
+  //size_t id = 0;
   
 #ifdef GALOIS_JUNE
   bool okay = Galois::find_if(graph.begin(), graph.end(), not_consistent()) == graph.end()
@@ -469,7 +469,7 @@ struct banddiff {
 			GNode dst = graph.getEdgeDst(ii);
 			SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
 
-			unsigned long int diff = abs(sdata.id - ddata.id);
+			long int diff = abs(sdata.id - ddata.id);
 			//long int diff = (long int) sdata.id - (long int) ddata.id;
 			maxdiff = diff > maxdiff ? diff : maxdiff;
 		}
@@ -648,7 +648,7 @@ static void resetGraph() {
 	//perm.clear();
 }
 
-static void printDegreeDistribution() {
+void printDegreeDistribution() {
 	std::map<unsigned int, unsigned int> distr;
 
 	for (Graph::iterator n = graph.begin(), ei = graph.end(); n != ei; ++n) {
@@ -826,7 +826,7 @@ struct SerialBFS {
 				//std::cerr << "height: " << forward.getHeight() << " width[last]: " << forward.getWidth(forward.getHeight()) << " maxwidth: " << forward.getMaxWidth() << "\n";
 				//std::cerr << "lastset size: " << lastset.size() << "\n";
 
-				for(int i = 0; i < chosen.size(); ++i) {
+				for(unsigned i = 0; i < chosen.size(); ++i) {
 					std::cout << "rnode: "
 						<< graph.getData(chosen[i], Galois::MethodFlag::NONE).id << " "
 						<< graph.getData(chosen[i], Galois::MethodFlag::NONE).dist << "\n";
@@ -1001,7 +1001,7 @@ void run(const AlgoTy& algo) {
 	bandwidth("Initial");
 
 	Galois::StatTimer T("CuthillTime", "");
-	for(int i = 0; i < niter; i++){
+	for(unsigned i = 0; i < niter; i++){
 		vT[RUN].start();
 
 		T.start();

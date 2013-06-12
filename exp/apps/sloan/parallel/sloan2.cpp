@@ -647,7 +647,7 @@ struct Permutation {
 Permutation perm;
 
 //debugging 
-static void printAccess(std::string msg){
+void printAccess(std::string msg){
   std::cerr << msg << " Access Pattern:\n";
 
   std::vector<unsigned int> temp;
@@ -683,7 +683,7 @@ static void printAccess(std::string msg){
   std::cerr << "\n";
 }
 
-static void findStartingNode(GNode& starting) {
+void findStartingNode(GNode& starting) {
   unsigned int mindegree = DIST_INFINITY; 
 
   for (Graph::iterator src = graph.begin(), ei =
@@ -865,7 +865,7 @@ struct banddiff {
 			GNode dst = graph.getEdgeDst(ii);
 			SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
 
-			unsigned long int diff = abs(sdata.id - ddata.id);
+			long int diff = abs(sdata.id - ddata.id);
 			//long int diff = (long int) sdata.id - (long int) ddata.id;
 			maxdiff = diff > maxdiff ? diff : maxdiff;
 		}
@@ -964,7 +964,7 @@ static void resetGraph() {
   perm.reset();
 }
 
-static void printDegreeDistribution() {
+void printDegreeDistribution() {
   std::map<unsigned int, unsigned int> distr;
 
   for (Graph::iterator n = graph.begin(), ei = graph.end(); n != ei; ++n) {
@@ -986,8 +986,8 @@ static void readGraph() {
   std::cout << "Read " << nnodes << " nodes\n";
   
   size_t id = 0;
-  bool foundTerminal = false;
-  bool foundSource = false;
+  //bool foundTerminal = false;
+  //bool foundSource = false;
 
   perm.init(nnodes);
 

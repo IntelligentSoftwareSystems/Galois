@@ -23,12 +23,15 @@
 #ifndef GALOIS_QUEUE_H
 #define GALOIS_QUEUE_H
 
+#include "Galois/config.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/mm/Mem.h"
 #include "Galois/Runtime/PerThreadStorage.h"
+
 #include <boost/utility.hpp>
 #include <boost/optional.hpp>
-#include <stdlib.h>
+#include GALOIS_C11_STD_HEADER(atomic)
+#include <cstdlib>
 #include <limits>
 #include <vector>
 #include <sys/time.h>
@@ -307,7 +310,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
   /**
    * The topmost head index of the skiplist.
    */
-  /*volatile*/ HeadIndex* head;
+  std::atomic<HeadIndex*> head;
 
   /**
    * Seed for simple random number generator. Not volatile since it doesn't
@@ -346,7 +349,8 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * compareAndSet head node
    */
   bool casHead(HeadIndex* cmp, HeadIndex* val) {
-    return __sync_bool_compare_and_swap((uintptr_t*)&head, reinterpret_cast<uintptr_t>(cmp), reinterpret_cast<uintptr_t>(val));
+    //return __sync_bool_compare_and_swap((uintptr_t*)&head, reinterpret_cast<uintptr_t>(cmp), reinterpret_cast<uintptr_t>(val));
+    return head.compare_exchange_strong(cmp, val);
   }
 
   /* ---------------- Nodes -------------- */
@@ -360,21 +364,23 @@ class ConcurrentSkipListMap : private boost::noncopyable {
   struct Node {
     boost::optional<K> key;
     bool voidKey;
-    /*volatile*/ void* value;
-    /*volatile*/ Node* next;
+    std::atomic<void*> value;
+    std::atomic<Node*> next;
 
     /**
      * compareAndSet value field
      */
     bool casValue(void* cmp, void* val) {
-      return __sync_bool_compare_and_swap((uintptr_t*)&value, reinterpret_cast<uintptr_t>(cmp), reinterpret_cast<uintptr_t>(val));
+      return value.compare_exchange_strong(cmp, val);
+      //return __sync_bool_compare_and_swap((uintptr_t*)&value, reinterpret_cast<uintptr_t>(cmp), reinterpret_cast<uintptr_t>(val));
     }
 
     /**
      * compareAndSet next field
      */
     bool casNext(Node* cmp, Node* val) {
-      return __sync_bool_compare_and_swap((uintptr_t*)&next, reinterpret_cast<uintptr_t>(cmp), reinterpret_cast<uintptr_t>(val));
+      //return __sync_bool_compare_and_swap((uintptr_t*)&next, reinterpret_cast<uintptr_t>(cmp), reinterpret_cast<uintptr_t>(val));
+      return next.compare_exchange_strong(cmp, val);
     }
 
     /**
@@ -472,7 +478,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
     const boost::optional<K> key;
     /*final*/Node* node;
     /*final*/ Index* down;
-    /*volatile*/ Index* right;
+    std::atomic<Index*> right;
 
     /**
      * Creates index node with given values
@@ -483,7 +489,8 @@ class ConcurrentSkipListMap : private boost::noncopyable {
      * compareAndSet right field
      */
     bool casRight(Index* cmp, Index* val) {
-      return __sync_bool_compare_and_swap((uintptr_t*)&right, reinterpret_cast<uintptr_t>(cmp), reinterpret_cast<uintptr_t>(val)); 
+      //return __sync_bool_compare_and_swap((uintptr_t*)&right, reinterpret_cast<uintptr_t>(cmp), reinterpret_cast<uintptr_t>(val)); 
+      return right.compare_exchange_strong(cmp, val);
     }
 
     /**
@@ -772,7 +779,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
           continue;
         }
         if (c == 0) {
-          V* v = static_cast<V*>(r->node->value);
+          V* v = static_cast<V*>(r->node->value.load());
           return v ? v : getUsingFindNode(key);
         }
         bound = r->node; 
@@ -784,7 +791,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
           if (!n->voidKey) {
             int c = JComp(comp, key, *n->key);
             if (c == 0) {
-              V* v = static_cast<V*>(n->value);
+              V* v = static_cast<V*>(n->value.load());
               return v ? v : getUsingFindNode(key);
             }
             if (c < 0)
@@ -814,7 +821,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
       Node* n = findNode(key);
       if (!n)
         return NULL;
-      V* v = static_cast<V*>(n->value);
+      V* v = static_cast<V*>(n->value.load());
       if (v)
         return v;
     }
@@ -1042,9 +1049,9 @@ class ConcurrentSkipListMap : private boost::noncopyable {
     HeadIndex* e;
     if (h->level > 3 && (d = static_cast<HeadIndex*>(h->down)) != NULL
         && (e = static_cast<HeadIndex*>(d->down)) != NULL 
-        && e->right == NULL && d->right == NULL
-        && h->right == NULL && casHead(h, d) && // try to set
-        h->right != NULL) // recheck
+        && e->right.load() == NULL && d->right.load() == NULL
+        && h->right.load() == NULL && casHead(h, d) && // try to set
+        h->right.load() != NULL) // recheck
       casHead(d, h); // try to backout
   }
 
@@ -1057,7 +1064,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    */
   Node* findFirst() const {
     for (;;) {
-      Node* b = head->node;
+      Node* b = head.load()->node;
       Node* n = b->next;
       if (n == NULL)
         return NULL;
@@ -1077,7 +1084,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    */
   SnapshotEntry doRemoveFirst() {
     for (;;) {
-      Node* b = head->node;
+      Node* b = head.load()->node;
       Node* n = b->next;
       if (n == NULL)
         return SnapshotEntry();
@@ -1110,7 +1117,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
         if (r != NULL && r->indexesDeletedNode() && !q->unlink(r))
           break;
         if ((q = q->down) == NULL) {
-          if (head->right == NULL)
+          if (head.load()->right.load() == NULL)
             tryReduceLevel();
           return;
         }
@@ -1636,7 +1643,7 @@ class FCPairingHeap: private boost::noncopyable {
   Galois::Runtime::PerThreadStorage<std::vector<Op*> > ops;
   Galois::Runtime::LL::PaddedLock<Concurrent> lock;
   PairingHeap<T,Compare> heap;
-  Slot* slots;
+  std::atomic<Slot*> slots;
   const int maxTries;
 
   void flatCombine() {
@@ -1670,7 +1677,8 @@ class FCPairingHeap: private boost::noncopyable {
     do {
       cur = slots;
       slot->next = cur;
-    } while (!__sync_bool_compare_and_swap((uintptr_t*)&slots, reinterpret_cast<uintptr_t>(cur), reinterpret_cast<uintptr_t>(slot)));
+    //} while (!__sync_bool_compare_and_swap((uintptr_t*)&slots, reinterpret_cast<uintptr_t>(cur), reinterpret_cast<uintptr_t>(slot)));
+    } while (!slots.compare_exchange_strong(cur, slot));
     cur->prev = slot;
   }
 

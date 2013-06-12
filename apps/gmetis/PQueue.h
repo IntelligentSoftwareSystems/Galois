@@ -23,10 +23,11 @@
 
 #ifndef PQUEUE_H_
 #define PQUEUE_H_
+#include "Galois/config.h"
 #include "GMetisConfig.h"
 #include <algorithm>
 #include <vector>
-#include <boost/function.hpp>
+#include GALOIS_C11_STD_HEADER(functional)
 using namespace std;
 
 template<class T>
@@ -67,7 +68,7 @@ public:
 template <class T>
 class HeapQueue: public SuperPQueue<T>{
 public:
-	HeapQueue(int maxNumNodes, int maxPriority, boost::function<int(T)> mapToInt){
+	HeapQueue(int maxNumNodes, int maxPriority, std::function<int(T)> mapToInt){
 		numNodes = 0;
 		heap.resize(maxNumNodes);
 		locator.resize(maxNumNodes); //= new int[maxNumNodes];
@@ -230,7 +231,7 @@ private:
 	typedef KeyValue<T> TKV;
 	vector<TKV> heap;
 	vector<int> locator;
-	boost::function<int(T)> mapToInt;
+	std::function<int(T)> mapToInt;
 	int numNodes;
 	int maxNumNodes;
 };
@@ -238,7 +239,7 @@ private:
 template <class T>
 class LimitedPriorityQueue: public SuperPQueue<T>{
 public:
-	LimitedPriorityQueue(int maxNumNodes, int maxPriority, boost::function<int(T)> mapToInt):PLUS_PRIORITYSPAN(500), NEG_PRIORITYSPAN(500){
+	LimitedPriorityQueue(int maxNumNodes, int maxPriority, std::function<int(T)> mapToInt):PLUS_PRIORITYSPAN(500), NEG_PRIORITYSPAN(500){
 		pPrioritySpan = min(PLUS_PRIORITYSPAN, maxPriority);
 		nPrioritySpan = min(NEG_PRIORITYSPAN, maxPriority);
 		nodes = new ListNode<T>[maxNumNodes];
@@ -340,7 +341,7 @@ private:
 	int bucketIndex;
 	const int PLUS_PRIORITYSPAN;
 	const int NEG_PRIORITYSPAN;
-  boost::function<int(T)> _mapToInt;
+  std::function<int(T)> _mapToInt;
 };
 
 class PQueue{

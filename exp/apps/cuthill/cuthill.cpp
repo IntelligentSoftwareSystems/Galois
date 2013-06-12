@@ -604,7 +604,7 @@ struct PseudoPeripheral {
     BFS::Result res;
     std::deque<GNode> candidates;
 
-    if (limit == ~0 || pseudoAlgo == fullPseudo) {
+    if (limit == (size_t)-1 || pseudoAlgo == fullPseudo) {
       res = BFS::go(start, false);
       if (computeCandidates)
         candidates = select_candidates::go(5, res.ecc());

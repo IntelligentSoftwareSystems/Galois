@@ -206,12 +206,8 @@ class NodeInfoBase: public boost::mpl::if_c<HasLockable,Galois::Runtime::Lockabl
 public:
   typedef NodeTy& reference;
   reference getData() { return data; } 
-  void destruct() {
-    (&data)->~NodeTy();
-  }
-  void construct() { 
-    new (&data) NodeTy;
-  }
+  void destruct() { (&data)->~NodeTy(); }
+  void construct() { new (&data) NodeTy; }
 };
 
 template<bool HasLockable>

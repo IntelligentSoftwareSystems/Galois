@@ -204,7 +204,6 @@ public:
 
     out << "}\n";
   }
-
 };
 
 } // end namespace
