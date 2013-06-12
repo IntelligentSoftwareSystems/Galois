@@ -166,8 +166,8 @@ class InsertBag: private boost::noncopyable {
   }
 
 public:
-  static_assert(BlockSize == 0 || BlockSize >= (2 * sizeof(T) + sizeof(header)),
-      "BlockSize should larger than sizeof(T) + O(1)");
+  // static_assert(BlockSize == 0 || BlockSize >= (2 * sizeof(T) + sizeof(header)),
+  //     "BlockSize should larger than sizeof(T) + O(1)");
 
   InsertBag(): heap(BlockSize) { }
 
