@@ -275,10 +275,10 @@ void growBisection(MetisGraph* metisGraph, int* tpwgts, int coarsenTo) {
 }
 
 void bisection(MetisGraph* metisGraph, int* tpwgts, int coarsenTo) {
-
-	if(metisGraph->getNumEdges()==0){
-		randomBisection(metisGraph, tpwgts, coarsenTo);
-	} else{
-		growBisection(metisGraph, tpwgts, coarsenTo);
-	}
+  //FIXME
+  // if(metisGraph->getNumEdges()==0){
+  //   randomBisection(metisGraph, tpwgts, coarsenTo);
+  // } else{
+    growBisection(metisGraph, tpwgts, coarsenTo);
+  // }
 }

@@ -31,8 +31,16 @@ typedef double METISDOUBLE;
 #include "llvm/ADT/SmallVector.h"
 #include <iostream>
 #include "Galois/gdeque.h"
+#include "Galois/Graph/LC_Morph_Graph.h"
+
+
+class MetisNode;
+typedef Galois::Graph::LC_Morph_Graph<MetisNode,METISINT> GGraph;
+typedef Galois::Graph::LC_Morph_Graph<MetisNode,METISINT>::GraphNode GNode;
+
 using namespace std;
 class MetisNode{
+
 public:
 	#ifdef NOPARTINFO
 	typedef llvm::SmallVector <METISINT,128> svm;
@@ -72,11 +80,9 @@ public:
 		_numEdges = 0;
 		_partition = -1;
 		processed=0;
-		matchNode = NULL;
-		multiNode = NULL;
 		subGraphNode = NULL;
-		matched = false;
-
+                bmatched = false;
+                bparent = false;
 	}
 
 	int getNodeId() {
@@ -170,18 +176,6 @@ public:
 		_ndgrees = degrees;
 	}
 
-	int getNumEdges() {
-		return _numEdges;
-	}
-
-	void incNumEdges() {
-		_numEdges++;
-	}
-
-	void incNumEdges(int inc) {
-		_numEdges+=inc;
-	}
-
 //	METISINT* getPartEd(){
 //		return _partEd;
 //	}
@@ -207,41 +201,48 @@ public:
 	}
 
 
-/*
-	void * getMatchNode() {
-		return matchNode;
-	}
-
-	void* getMultiNode() {
-		return multiNode;
-	}
-*/
-
-	bool isMatched() {
-		return matched;
-	}
-
-	void setMatched(bool matched) {
-		this->matched = matched;
-	}
-
-	void* getMatchNode() {
-		return matchNode;
-	}
-
-	void* getMultiNode() {
-		return multiNode;
-	}
-
-
-	void* matchNode;
-	void *multiNode;
 	void *subGraphNode;
 
+
+  //ADL
+  void setParent(GNode p)  { parent = p; bparent = true; }
+  GNode getParent() const  { assert(bparent); return parent; }
+
+  void setMatched(GNode v) { matched = v; bmatched = true; }
+  GNode getMatched() const { assert(bmatched); return matched; }
+  bool isMatched() const   { return bmatched; }
+
+  GNode getChild(unsigned x) const { return children[x]; }
+  unsigned numChildren() const { return onlyOneChild ? 1 : 2; }
+
+  unsigned getNumEdges() const { return _numEdges; }
+  void setNumEdges(unsigned val) { _numEdges = val; }
+
+  unsigned getPart() const { return _partition; }
+  void setPart(unsigned val) { _partition = val; }
+
+  MetisNode(GNode child0, unsigned weight)
+    : bmatched(false), bparent(false), onlyOneChild(true), _weight(weight) {
+    children[0] = child0;
+  }
+
+  MetisNode(GNode child0, GNode child1, unsigned weight)
+    : bmatched(false), bparent(false), onlyOneChild(false), _weight(weight) {
+    children[0] = child0;
+    children[1] = child1;
+  }
+
 private:
-	bool matched;
-	METISINT _weight;
-	METISINT _numEdges;
+  bool bmatched;
+  GNode matched;
+  bool bparent;
+  GNode parent;
+  GNode children[2];
+  bool onlyOneChild;
+  unsigned _weight;
+  unsigned _numEdges;
+
+
 	//the sum of weights of its edges
 	METISINT _edgeWgtSum;
 	METISINT _partition;

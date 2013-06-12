@@ -28,27 +28,40 @@
 #include <vector>
 #include <iostream>
 #include "Galois/Atomic.h"
+#include "boost/optional.hpp"
 using namespace std;
 
 class MetisGraph{
 	typedef Galois::GAtomic<int> AtomicInteger;
+
+  MetisGraph* coarser;
+  MetisGraph* finer;
+
+  GGraph graph;
+
 public:
-	MetisGraph(){
+	MetisGraph()
+          :coarser(nullptr), finer(nullptr)
+{
 		mincut =0;
 		numEdges =0;
 		numNodes = 0;
 		boundaryNodes = NULL;
 		coarseGraphMapTo = NULL;
 		inverseGraphMapFrom = NULL;
-		finerGraph = NULL;
-
 	}
+
+  explicit MetisGraph(MetisGraph* finerGraph)
+    :coarser(nullptr), finer(finerGraph) {
+    finer->coarser = this;
+  }
 
 	~MetisGraph() {
 		if(boundaryNodes != NULL){
 			delete boundaryNodes;
 		}
 	}
+
 
 	void initMatches(){
 		matchFlag = new bool[numNodes];
@@ -180,32 +193,6 @@ public:
 
 
 	/**
-	 * increase the num of edges by 1 in the graph
-	 */
-	void incNumEdges() {
-		numEdges++;
-	}
-
-	/**
-	 * return the num of edges in the graph
-	 */
-	int getNumEdges() {
-		return numEdges;
-	}
-
-	void setNumEdges(int num) {
-		numEdges = num;
-	}
-
-	void setNumNodes(int num){
-		numNodes = num;
-	}
-	int getNumNodes(){
-		assert(numNodes > 0);
-		return numNodes;
-	}
-
-	/**
 	 * compute the parameters for two-way refining
 	 */
 	void computeTwoWayPartitionParams() {
@@ -214,18 +201,18 @@ public:
 		partWeights[1] = 0;
 		//unsetAllBoundaryNodes();
 		if(boundaryNodes == NULL){
-			boundaryNodes = new GNodeSet(numNodes, gNodeToInt(graph));
+			boundaryNodes = new GNodeSet(numNodes, gNodeToInt(&graph));
 		}else{
 			unsetAllBoundaryNodes();
 		}
 		int mincut = 0;
-		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
+		for (GGraph::iterator ii = graph.begin(), ee = graph.end(); ii != ee; ++ii) {
 			GNode node = *ii;
-			MetisNode& nodeData = graph->getData(node,Galois::MethodFlag::NONE);
+			MetisNode& nodeData = graph.getData(node,Galois::MethodFlag::NONE);
 			int me = nodeData.getPartition();
 			partWeights[me] += nodeData.getWeight();//set(partWeights[me].get() + nodeData.getWeight(), MethodFlag.MethodFlag::NONE);
 			updateNodeEdAndId(node);
-			if (nodeData.getEdegree() > 0 || (graph->edge_begin(node, Galois::MethodFlag::NONE) == graph->edge_end(node,Galois::MethodFlag::NONE))) {
+			if (nodeData.getEdegree() > 0 || (graph.edge_begin(node, Galois::MethodFlag::NONE) == graph.edge_end(node,Galois::MethodFlag::NONE))) {
 				mincut += nodeData.getEdegree();
 				setBoundaryNode(node);
 			}else {
@@ -240,9 +227,9 @@ public:
 	 */
 	int getMaxAdjSum() {
 		int maxAdjSum = -1;
-		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
+		for (GGraph::iterator ii = graph.begin(), ee = graph.end(); ii != ee; ++ii) {
 			GNode node = *ii;
-			int adjwgtsum = graph->getData(node,Galois::MethodFlag::NONE).getAdjWgtSum();
+			int adjwgtsum = graph.getData(node,Galois::MethodFlag::NONE).getAdjWgtSum();
 			assert(adjwgtsum>=0||numEdges == 0);
 			if (maxAdjSum < adjwgtsum) {
 				maxAdjSum = adjwgtsum;
@@ -257,7 +244,7 @@ public:
 	void computeKWayPartitionParams(int nparts) {
 		//		unsetAllBoundaryNodes();
 		if(boundaryNodes == NULL){
-			boundaryNodes = new GNodeSet(numNodes, gNodeToInt(graph));
+			boundaryNodes = new GNodeSet(numNodes, gNodeToInt(&graph));
 		}else{
 			unsetAllBoundaryNodes();
 		}
@@ -266,9 +253,9 @@ public:
 			partWeights[i] = 0;
 		}
 		int mincut = 0;
-		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
+		for (GGraph::iterator ii = graph.begin(), ee = graph.end(); ii != ee; ++ii) {
 			GNode node = *ii;
-			MetisNode& nodeData = graph->getData(node,Galois::MethodFlag::NONE);
+			MetisNode& nodeData = graph.getData(node,Galois::MethodFlag::NONE);
 			int me = nodeData.getPartition();
 			partWeights[me] +=  nodeData.getWeight();
 
@@ -281,14 +268,14 @@ public:
 
 			if (nodeData.getEdegree() > 0) {
 				mincut += nodeData.getEdegree();
-				//int numEdges = std::distance(graph->edge_begin(node, Galois::MethodFlag::NONE), graph->edge_end(node, Galois::MethodFlag::NONE));
+				//int numEdges = std::distance(graph.edge_begin(node, Galois::MethodFlag::NONE), graph.edge_end(node, Galois::MethodFlag::NONE));
 				vector <int> map(nparts,-1);
 				int ndegrees=0;
 				//int ed=0;
-				for (GGraph::edge_iterator jj = graph->edge_begin(node, Galois::MethodFlag::NONE), eejj = graph->edge_end(node, Galois::MethodFlag::NONE); jj != eejj; ++jj) {
-					GNode neighbor = graph->getEdgeDst(jj);
-					MetisNode& neighborData = graph->getData(neighbor,Galois::MethodFlag::NONE);
-					int edgeWeight = graph->getEdgeData(jj, Galois::MethodFlag::NONE);
+				for (GGraph::edge_iterator jj = graph.edge_begin(node, Galois::MethodFlag::NONE), eejj = graph.edge_end(node, Galois::MethodFlag::NONE); jj != eejj; ++jj) {
+					GNode neighbor = graph.getEdgeDst(jj);
+					MetisNode& neighborData = graph.getData(neighbor,Galois::MethodFlag::NONE);
+					int edgeWeight = graph.getEdgeData(jj, Galois::MethodFlag::NONE);
 					if (nodeData.getPartition() != neighborData.getPartition()) {
 						int index = map[neighborData.getPartition()];
 						if (index == -1) {
@@ -319,11 +306,11 @@ public:
 	void updateNodeEdAndId(GNode node) {
 		int ed = 0;
 		int id = 0;
-		MetisNode& nodeData = graph->getData(node,Galois::MethodFlag::NONE);
-		for (GGraph::edge_iterator jj = graph->edge_begin(node, Galois::MethodFlag::NONE), eejj = graph->edge_end(node, Galois::MethodFlag::NONE); jj != eejj; ++jj) {
-		  GNode neighbor = graph->getEdgeDst(jj);
-			int weight = (int) graph->getEdgeData(jj, Galois::MethodFlag::NONE);
-			if (nodeData.getPartition() != graph->getData(neighbor, Galois::MethodFlag::NONE).getPartition()) {
+		MetisNode& nodeData = graph.getData(node,Galois::MethodFlag::NONE);
+		for (GGraph::edge_iterator jj = graph.edge_begin(node, Galois::MethodFlag::NONE), eejj = graph.edge_end(node, Galois::MethodFlag::NONE); jj != eejj; ++jj) {
+		  GNode neighbor = graph.getEdgeDst(jj);
+			int weight = (int) graph.getEdgeData(jj, Galois::MethodFlag::NONE);
+			if (nodeData.getPartition() != graph.getData(neighbor, Galois::MethodFlag::NONE).getPartition()) {
 				ed = ed + weight;
 			} else {
 				id = id + weight;
@@ -334,33 +321,14 @@ public:
 	}
 
 
-	/**
-	 * return the intgraph in the wrapper
-	 */
-	GGraph* getGraph() {
-		return graph;
-	}
+  const GGraph* getGraph() const { return &graph; }
+  GGraph* getGraph() { return &graph; }
+  MetisGraph* getFinerGraph() const { return finer; }
+  MetisGraph* getCoarserGraph() const { return coarser; }
 
-	/**
-	 * set the graph for the wrapper
-	 */
-	void setGraph(GGraph* graph) {
-		this->graph = graph;
-	}
-
-	/**
-	 * return the finer metisGraph
-	 */
-	MetisGraph* getFinerGraph() {
-		return finerGraph;
-	}
-
-	/**
-	 * set the finer metisGraph
-	 */
-	void setFinerGraph(MetisGraph* finer) {
-		finerGraph = finer;
-	}
+  unsigned getNumNodes() {
+    return std::distance(graph.begin(), graph.end());
+  }
 
 	/**
 	 * return the graphcut
@@ -398,25 +366,25 @@ public:
 	 * set a node as a boundary node
 	 */
 	void setBoundaryNode(GNode node) {
-		graph->getData(node, Galois::MethodFlag::NONE).setBoundary(true);
+		graph.getData(node, Galois::MethodFlag::NONE).setBoundary(true);
 		//		 pthread_mutex_lock(&mutex);
 		boundaryNodes->insert(node);
 		//		 pthread_mutex_unlock(&mutex);
 	}
 	//only marks
 	void markBoundaryNode(GNode node) {
-		graph->getData(node,Galois::MethodFlag::NONE).setBoundary(true);
+		graph.getData(node,Galois::MethodFlag::NONE).setBoundary(true);
 	}
 
 	//only marks
 	void unMarkBoundaryNode(GNode node) {
-		graph->getData(node,Galois::MethodFlag::NONE).setBoundary(false);
+		graph.getData(node,Galois::MethodFlag::NONE).setBoundary(false);
 	}
 	/**
 	 * unmark a boundary nodes
 	 */
 	void unsetBoundaryNode(GNode node) {
-		graph->getData(node,Galois::MethodFlag::NONE).setBoundary(false);
+		graph.getData(node,Galois::MethodFlag::NONE).setBoundary(false);
 		//		 pthread_mutex_lock(&mutex);
 
 		boundaryNodes->erase(node);
@@ -429,7 +397,7 @@ public:
 	void unsetAllBoundaryNodes() {
 		for(GNodeSet::iterator iter = boundaryNodes->begin();iter != boundaryNodes->end();++iter){
 			GNode node = *iter;
-			graph->getData(node,Galois::MethodFlag::NONE).setBoundary(false);
+			graph.getData(node,Galois::MethodFlag::NONE).setBoundary(false);
 		}
 		boundaryNodes->clear();
 	}
@@ -443,7 +411,7 @@ public:
 
 	void initBoundarySet(){
 		if(boundaryNodes == NULL){
-			boundaryNodes = new GNodeSet(numNodes, gNodeToInt(graph));
+			boundaryNodes = new GNodeSet(numNodes, gNodeToInt(&graph));
 		}else{
 			unsetAllBoundaryNodes();
 		}
@@ -453,9 +421,9 @@ public:
 	 * Compute the sum of the weights of all the outgoing edges for each node in the graph
 	 */
 	void computeAdjWgtSums() {
-		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
+		for (GGraph::iterator ii = graph.begin(), ee = graph.end(); ii != ee; ++ii) {
 			GNode node = *ii;
-			graph->getData(node, Galois::MethodFlag::NONE).setAdjWgtSum(computeAdjWgtSum(node));
+			graph.getData(node, Galois::MethodFlag::NONE).setAdjWgtSum(computeAdjWgtSum(node));
 		}
 	}
 
@@ -464,12 +432,12 @@ public:
 	 */
 	int computeCut() {
 		int cut = 0;
-		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
+		for (GGraph::iterator ii = graph.begin(), ee = graph.end(); ii != ee; ++ii) {
 			GNode node = *ii;
-			for (GGraph::edge_iterator jj = graph->edge_begin(node, Galois::MethodFlag::NONE), eejj = graph->edge_end(node, Galois::MethodFlag::NONE); jj != eejj; ++jj) {
-				GNode neighbor = graph->getEdgeDst(jj);
-				if (graph->getData(neighbor,Galois::MethodFlag::NONE).getPartition() != graph->getData(node,Galois::MethodFlag::NONE).getPartition()) {
-					int edgeWeight = (int) graph->getEdgeData(jj, Galois::MethodFlag::NONE);
+			for (GGraph::edge_iterator jj = graph.edge_begin(node, Galois::MethodFlag::NONE), eejj = graph.edge_end(node, Galois::MethodFlag::NONE); jj != eejj; ++jj) {
+				GNode neighbor = graph.getEdgeDst(jj);
+				if (graph.getData(neighbor,Galois::MethodFlag::NONE).getPartition() != graph.getData(node,Galois::MethodFlag::NONE).getPartition()) {
+					int edgeWeight = (int) graph.getEdgeData(jj, Galois::MethodFlag::NONE);
 					cut = cut + edgeWeight;
 				}
 			}
@@ -484,9 +452,9 @@ public:
 	 */
 	int computeEdges() {
 		int num = 0;
-		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
+		for (GGraph::iterator ii = graph.begin(), ee = graph.end(); ii != ee; ++ii) {
 			GNode node = *ii;
-			num += std::distance(graph->edge_begin(node), graph->edge_end(node));
+			num += std::distance(graph.edge_begin(node), graph.edge_end(node));
 		}
 		return num / 2;
 	}
@@ -496,12 +464,12 @@ public:
 	 */
 	int computeAdjWgtSum(GNode node) {
 		int num = 0;
-		for (GGraph::edge_iterator jj = graph->edge_begin(node, Galois::MethodFlag::NONE), eejj = graph->edge_end(node, Galois::MethodFlag::NONE); jj != eejj; ++jj) {
-			//GNode neighbor = graph->getEdgeDst(jj);
-			int weight = (int) graph->getEdgeData(jj, Galois::MethodFlag::NONE);
+		for (GGraph::edge_iterator jj = graph.edge_begin(node, Galois::MethodFlag::NONE), eejj = graph.edge_end(node, Galois::MethodFlag::NONE); jj != eejj; ++jj) {
+			//GNode neighbor = graph.getEdgeDst(jj);
+			int weight = (int) graph.getEdgeData(jj, Galois::MethodFlag::NONE);
 			num = num + weight;
 		}
-		MetisNode &nodeData = graph->getData(node);
+		MetisNode &nodeData = graph.getData(node);
 		nodeData.setAdjWgtSum(num);
 		return num;
 	}
@@ -540,9 +508,9 @@ public:
 
 	void computeKWayBalanceBoundary() {
 		unsetAllBoundaryNodes();
-		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
+		for (GGraph::iterator ii = graph.begin(), ee = graph.end(); ii != ee; ++ii) {
 			GNode node = *ii;
-			if (graph->getData(node).getEdegree() > 0) {
+			if (graph.getData(node).getEdegree() > 0) {
 				setBoundaryNode(node);
 			}
 		}
@@ -551,9 +519,9 @@ public:
 
 	void computeKWayBoundary() {
 		unsetAllBoundaryNodes();
-		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
+		for (GGraph::iterator ii = graph.begin(), ee = graph.end(); ii != ee; ++ii) {
 			GNode node = *ii;
-			MetisNode& nodeData = graph->getData(node);
+			MetisNode& nodeData = graph.getData(node);
 			if (nodeData.getEdegree() - nodeData.getIdegree() >= 0) {
 				setBoundaryNode(node);
 			}
@@ -563,9 +531,9 @@ public:
 	float computePartitionBalance(int nparts){
 		vector<int> kpwgts(nparts);
 
-		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
+		for (GGraph::iterator ii = graph.begin(), ee = graph.end(); ii != ee; ++ii) {
 			GNode node = *ii;
-			kpwgts[graph->getData(node).getPartition()]++;
+			kpwgts[graph.getData(node).getPartition()]++;
 		}
 		float sumKpwgts=0;
 		int maxKpwgts=0;
@@ -589,8 +557,6 @@ private:
 	int mincut;
 	int numEdges;
 	int numNodes;
-	MetisGraph* finerGraph;
-	GGraph* graph;
 	GNodeSet* boundaryNodes;
 	//	cache_line_storage<GNode>* matches;
 

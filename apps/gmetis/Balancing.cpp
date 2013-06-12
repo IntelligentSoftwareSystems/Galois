@@ -208,7 +208,7 @@ void balanceTwoWay(MetisGraph* metisGraph, int* tpwgts) {
 	int pwgts0 = metisGraph->getPartWeight(0);
 	int pwgts1 = metisGraph->getPartWeight(1);
 
-	int mindiff = abs(tpwgts[0] - pwgts0);
+	unsigned mindiff = abs(tpwgts[0] - pwgts0);
 	if (mindiff < 3 * (pwgts0 + pwgts1) / metisGraph->getNumNodes()) {
 		return;
 	}

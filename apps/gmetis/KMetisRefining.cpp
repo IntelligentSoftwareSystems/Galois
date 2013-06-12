@@ -101,7 +101,7 @@ struct projectInfo {
 		nodeData.setIdegree(nodeData.getAdjWgtSum());
 		GNode multiNode;
 #ifdef localNodeData
-			multiNode = static_cast<GNode>(nodeData.multiNode);
+                //FIXME			multiNode = static_cast<GNode>(nodeData.multiNode);
 #else
 			multiNode = finerMetisGraph->getCoarseGraphMap(nodeData.getNodeId());
 #endif
@@ -140,7 +140,7 @@ struct projectPartition {
 		MetisNode& nodeData = finerGGraph->getData(node,Galois::MethodFlag::NONE);
 		GNode multiNode;
 #ifdef localNodeData
-			multiNode = static_cast<GNode>(nodeData.multiNode);
+                //FIXME			multiNode = static_cast<GNode>(nodeData.multiNode);
 #else
 			multiNode = finerMetisGraph->getCoarseGraphMap(nodeData.getNodeId());
 #endif

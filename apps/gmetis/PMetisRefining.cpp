@@ -43,7 +43,7 @@ void projectTwoWayPartition(MetisGraph* metisGraph) {
 		MetisNode& nodeData = finerGraph->getData(node);
 		GNode multiNode;
 #ifdef localNodeData
-			multiNode = static_cast<GNode>(nodeData.multiNode);
+                //FIXME			multiNode = static_cast<GNode>(nodeData.multiNode);
 #else
 			multiNode = finer->getCoarseGraphMap(nodeData.getNodeId());
 
@@ -63,7 +63,7 @@ void projectTwoWayPartition(MetisGraph* metisGraph) {
 		nodeData.setIdegree(nodeData.getAdjWgtSum());
 		GNode multiNode;
 #ifdef localNodeData
-			multiNode = static_cast<GNode>(nodeData.multiNode);
+                //FIXME			multiNode = static_cast<GNode>(nodeData.multiNode);
 #else
 			multiNode = finer->getCoarseGraphMap(nodeData.getNodeId());
 #endif

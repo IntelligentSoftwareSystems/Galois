@@ -33,239 +33,233 @@ const static double UB_FACTOR = 1;
 
 class PMetis{
 private:
-	struct parallelSplitGraphAddNodes {
-		MetisGraph *parentMetisGraph;
-		MetisGraph *subGraphs;
-		parallelSplitGraphAddNodes(MetisGraph *parentMetisGraph,MetisGraph *subGraphs) {
-			this->parentMetisGraph = parentMetisGraph;
-			this->subGraphs = subGraphs;
-		}
-		template<typename Context>
-		void operator()(GNode node, Context& lwl) {
-			GGraph *graph = parentMetisGraph->getGraph();
-			MetisNode& nodeData = graph->getData(node);
-			GNode newNode = subGraphs[nodeData.getPartition()].getGraph()->createNode(
-					MetisNode(nodeData.getNodeId(), nodeData.getWeight()));
-			subGraphs[nodeData.getPartition()].getGraph()->addNode(newNode);
-			parentMetisGraph->setSubGraphMapTo(nodeData.getNodeId(), newNode);
-			parentMetisGraph->computeAdjWgtSum(node);
-		}
+  struct parallelSplitGraphAddNodes {
+    MetisGraph *parentMetisGraph;
+    MetisGraph *subGraphs;
+    parallelSplitGraphAddNodes(MetisGraph *parentMetisGraph,MetisGraph *subGraphs) {
+      this->parentMetisGraph = parentMetisGraph;
+      this->subGraphs = subGraphs;
+    }
+    template<typename Context>
+    void operator()(GNode node, Context& lwl) {
+      GGraph *graph = parentMetisGraph->getGraph();
+      MetisNode& nodeData = graph->getData(node);
+      //FIXME: edgecount
+      GNode newNode = subGraphs[nodeData.getPartition()].getGraph()->createNode(0, nodeData.getNodeId(), nodeData.getWeight());
+      //subGraphs[nodeData.getPartition()].getGraph()->addNode(newNode);
+      parentMetisGraph->setSubGraphMapTo(nodeData.getNodeId(), newNode);
+      parentMetisGraph->computeAdjWgtSum(node);
+    }
 
-	};
-	struct parallelSplitGraphAddEdges {
-		MetisGraph *parentMetisGraph;
-		MetisGraph *subGraphs;
-		parallelSplitGraphAddEdges(MetisGraph *parentMetisGraph,MetisGraph *subGraphs) {
-			this->parentMetisGraph = parentMetisGraph;
-			this->subGraphs = subGraphs;
-		}
-		template<typename Context>
-		void operator()(GNode node, Context& lwl) {
-			GGraph *graph = parentMetisGraph->getGraph();
-			MetisNode &nodeData = graph->getData(node,Galois::MethodFlag::NONE);
-			int index = nodeData.getPartition();
-			GGraph* subGraph = subGraphs[index].getGraph();
-			subGraph->getData(parentMetisGraph->getSubGraphMapTo(nodeData.getNodeId())).setAdjWgtSum(nodeData.getAdjWgtSum());
+  };
+  struct parallelSplitGraphAddEdges {
+    MetisGraph *parentMetisGraph;
+    MetisGraph *subGraphs;
+    parallelSplitGraphAddEdges(MetisGraph *parentMetisGraph,MetisGraph *subGraphs) {
+      this->parentMetisGraph = parentMetisGraph;
+      this->subGraphs = subGraphs;
+    }
+    template<typename Context>
+    void operator()(GNode node, Context& lwl) {
+      GGraph *graph = parentMetisGraph->getGraph();
+      MetisNode &nodeData = graph->getData(node,Galois::MethodFlag::NONE);
+      int index = nodeData.getPartition();
+      GGraph* subGraph = subGraphs[index].getGraph();
+      subGraph->getData(parentMetisGraph->getSubGraphMapTo(nodeData.getNodeId())).setAdjWgtSum(nodeData.getAdjWgtSum());
 
-			for (GGraph::edge_iterator jj = graph->edge_begin(node, Galois::MethodFlag::NONE), eejj = graph->edge_end(node, Galois::MethodFlag::NONE); jj != eejj; ++jj) {
-				GNode neighbor = graph->getEdgeDst(jj);
-				MetisNode& neighborData = graph->getData(neighbor);
-				int edgeWeight = graph->getEdgeData(jj);
-				//if (!nodeData.isBoundary() || nodeData.getPartition() == neighborData.getPartition()) {
-				if (nodeData.getPartition() == neighborData.getPartition()) {
+      for (GGraph::edge_iterator jj = graph->edge_begin(node, Galois::MethodFlag::NONE), eejj = graph->edge_end(node, Galois::MethodFlag::NONE); jj != eejj; ++jj) {
+        GNode neighbor = graph->getEdgeDst(jj);
+        MetisNode& neighborData = graph->getData(neighbor);
+        int edgeWeight = graph->getEdgeData(jj);
+        //if (!nodeData.isBoundary() || nodeData.getPartition() == neighborData.getPartition()) {
+        if (nodeData.getPartition() == neighborData.getPartition()) {
 #ifdef LC_MORPH
-					subGraph->getEdgeData(subGraph->addEdgeDynamic(parentMetisGraph->getSubGraphMapTo(nodeData.getNodeId()), parentMetisGraph->getSubGraphMapTo(neighborData.getNodeId()))) = edgeWeight;
+          //FIXME!!
+          //          subGraph->getEdgeData(subGraph->addEdgeDynamic(parentMetisGraph->getSubGraphMapTo(nodeData.getNodeId()), parentMetisGraph->getSubGraphMapTo(neighborData.getNodeId()))) = edgeWeight;
 #else
-					subGraph->getEdgeData(subGraph->addEdge(parentMetisGraph->getSubGraphMapTo(nodeData.getNodeId()), parentMetisGraph->getSubGraphMapTo(neighborData.getNodeId()))) = edgeWeight;
+          subGraph->getEdgeData(subGraph->addEdge(parentMetisGraph->getSubGraphMapTo(nodeData.getNodeId()), parentMetisGraph->getSubGraphMapTo(neighborData.getNodeId()))) = edgeWeight;
 #endif
-				} else {
-					subGraph->getData(parentMetisGraph->getSubGraphMapTo(nodeData.getNodeId())).setAdjWgtSum(
-							subGraph->getData(parentMetisGraph->getSubGraphMapTo(nodeData.getNodeId())).getAdjWgtSum() - edgeWeight);
+        } else {
+          subGraph->getData(parentMetisGraph->getSubGraphMapTo(nodeData.getNodeId())).setAdjWgtSum(
+                                                                                                   subGraph->getData(parentMetisGraph->getSubGraphMapTo(nodeData.getNodeId())).getAdjWgtSum() - edgeWeight);
 
-				}
-			}
-		}
+        }
+      }
+    }
 
-	};
+  };
 
 
+  int coarsenTo;
 
 public:
-	PMetis(int coasenTo, int maxVertexWeight):coarsener(false, coasenTo, maxVertexWeight) {
-	}
+  PMetis(int _coasenTo, int maxVertexWeight):coarsenTo(_coasenTo) {}
 
 public:
-	/**
-	 * totalPartWeights: This is an array containing "nparts" floating point numbers. For partition i , totalPartitionWeights[i] stores the fraction
-	 * of the total weight that should be assigned to it.
-	 */
-	void mlevelRecursiveBisection(MetisGraph* metisGraph, int nparts, float* totalPartWeights, int tpindex,
-			int partStartIndex) {
+  /**
+   * totalPartWeights: This is an array containing "nparts" floating point numbers. For partition i , totalPartitionWeights[i] stores the fraction
+   * of the total weight that should be assigned to it.
+   */
+  void mlevelRecursiveBisection(MetisGraph* metisGraph, int nparts, float* totalPartWeights, int tpindex,
+                                int partStartIndex) {
 
-		GGraph* graph = metisGraph->getGraph();
-		int totalVertexWeight = 0;
-		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
-			GNode node = *ii;
-			totalVertexWeight += graph->getData(node).getWeight();
-		}
+    GGraph* graph = metisGraph->getGraph();
+    int totalVertexWeight = 0;
+    for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
+      GNode node = *ii;
+      totalVertexWeight += graph->getData(node).getWeight();
+    }
 
-		float vertexWeightRatio = 0;
-		for (int i = 0; i < nparts / 2; i++) {
-			vertexWeightRatio += totalPartWeights[tpindex + i];
-		}
-		int bisectionWeights[2];
-		bisectionWeights[0] = (int) (totalVertexWeight * vertexWeightRatio);
-		bisectionWeights[1] = totalVertexWeight - bisectionWeights[0];
-		Galois::Timer t;
-		t.start();
-		//cout<<metisGraph->getNumNodes()<<" ";
-		MetisGraph* mcg = coarsener.coarsen(metisGraph,true);
-		//cout<<mcg->getNumNodes()<<endl;
-		t.stop();
+    float vertexWeightRatio = 0;
+    for (int i = 0; i < nparts / 2; i++) {
+      vertexWeightRatio += totalPartWeights[tpindex + i];
+    }
+    int bisectionWeights[2];
+    bisectionWeights[0] = (int) (totalVertexWeight * vertexWeightRatio);
+    bisectionWeights[1] = totalVertexWeight - bisectionWeights[0];
+    Galois::Timer t;
+    t.start();
+    //cout<<metisGraph->getNumNodes()<<" ";
+    MetisGraph* mcg = coarsen(metisGraph,coarsenTo);
+    //cout<<mcg->getNumNodes()<<endl;
+    t.stop();
 
-		//MetisGraph* mcg = metisGraph;
-		t.start();
-		bisection(mcg, bisectionWeights, coarsener.getCoarsenTo());
-		t.stop();
-		//cout<<"bisection : "<<t.get()<<"  ms "<<endl;
-		t.start();
-		refineTwoWay(mcg, metisGraph, bisectionWeights);
-		t.stop();
-		//cout<<"Refining : "<<t.get()<<"  ms "<<endl;
+    //MetisGraph* mcg = metisGraph;
+    t.start();
+    bisection(mcg, bisectionWeights, coarsenTo);
+    t.stop();
+    //cout<<"bisection : "<<t.get()<<"  ms "<<endl;
+    t.start();
+    refineTwoWay(mcg, metisGraph, bisectionWeights);
+    t.stop();
+    //cout<<"Refining : "<<t.get()<<"  ms "<<endl;
 
-		if (nparts <= 2) {
-			for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
-				GNode node = *ii;
-				assert(graph->getData(node).getPartition()>=0);
-				graph->getData(node).setPartition(graph->getData(node).getPartition() + partStartIndex);
-			}
-		} else {
-			for (int i = 0; i < nparts / 2; i++) {
-				totalPartWeights[i + tpindex] *= (1 / vertexWeightRatio);
-			}
-			//nparts/2 may not be equal to nparts-nparts/2
-			for (int i = 0; i < nparts - nparts / 2; i++) {
-				totalPartWeights[i + tpindex + nparts / 2] *= (1 / (1 - vertexWeightRatio));
-			}
-			MetisGraph* subGraphs = new MetisGraph[2];
-			//splitGraph(metisGraph, subGraphs);
-			splitGraphParallel(metisGraph,subGraphs);
-			if (nparts > 3) {
-				mlevelRecursiveBisection(&subGraphs[0], nparts / 2, totalPartWeights, tpindex, partStartIndex);
-				mlevelRecursiveBisection(&subGraphs[1], nparts - nparts / 2, totalPartWeights, tpindex + nparts / 2,
-						partStartIndex + nparts / 2);
-				metisGraph->setMinCut(metisGraph->getMinCut() + subGraphs[0].getMinCut() + subGraphs[1].getMinCut());
-			} else if (nparts == 3) {
-				for (GGraph::iterator ii = subGraphs[0].getGraph()->begin(), ee = subGraphs[0].getGraph()->end(); ii != ee; ++ii) {
-					GNode node = *ii;
-					MetisNode& nodeData = subGraphs[0].getGraph()->getData(node,Galois::MethodFlag::NONE);
-					nodeData.setPartition(partStartIndex);
-					assert(nodeData.getPartition()>=0);
-				}
-				mlevelRecursiveBisection(&subGraphs[1], nparts - nparts / 2, totalPartWeights, tpindex + nparts / 2,
-						partStartIndex + nparts / 2);
-				metisGraph->setMinCut(metisGraph->getMinCut() + subGraphs[1].getMinCut());
-			}
-			t.start();
-			for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
-				GNode node = *ii;
-				MetisNode& nodeData = graph->getData(node);
-				nodeData.setPartition(graph->getData(metisGraph->getSubGraphMapTo(nodeData.getNodeId())).getPartition());
-				assert(nodeData.getPartition()>=0);
-			}
-			t.stop();
-			//cout<<"Waste time "<<t.get()<<" ms "<<endl;
+    if (nparts <= 2) {
+      for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
+        GNode node = *ii;
+        assert(graph->getData(node).getPartition()>=0);
+        graph->getData(node).setPartition(graph->getData(node).getPartition() + partStartIndex);
+      }
+    } else {
+      for (int i = 0; i < nparts / 2; i++) {
+        totalPartWeights[i + tpindex] *= (1 / vertexWeightRatio);
+      }
+      //nparts/2 may not be equal to nparts-nparts/2
+      for (int i = 0; i < nparts - nparts / 2; i++) {
+        totalPartWeights[i + tpindex + nparts / 2] *= (1 / (1 - vertexWeightRatio));
+      }
+      MetisGraph* subGraphs = new MetisGraph[2];
+      //splitGraph(metisGraph, subGraphs);
+      splitGraphParallel(metisGraph,subGraphs);
+      if (nparts > 3) {
+        mlevelRecursiveBisection(&subGraphs[0], nparts / 2, totalPartWeights, tpindex, partStartIndex);
+        mlevelRecursiveBisection(&subGraphs[1], nparts - nparts / 2, totalPartWeights, tpindex + nparts / 2,
+                                 partStartIndex + nparts / 2);
+        metisGraph->setMinCut(metisGraph->getMinCut() + subGraphs[0].getMinCut() + subGraphs[1].getMinCut());
+      } else if (nparts == 3) {
+        for (GGraph::iterator ii = subGraphs[0].getGraph()->begin(), ee = subGraphs[0].getGraph()->end(); ii != ee; ++ii) {
+          GNode node = *ii;
+          MetisNode& nodeData = subGraphs[0].getGraph()->getData(node,Galois::MethodFlag::NONE);
+          nodeData.setPartition(partStartIndex);
+          assert(nodeData.getPartition()>=0);
+        }
+        mlevelRecursiveBisection(&subGraphs[1], nparts - nparts / 2, totalPartWeights, tpindex + nparts / 2,
+                                 partStartIndex + nparts / 2);
+        metisGraph->setMinCut(metisGraph->getMinCut() + subGraphs[1].getMinCut());
+      }
+      t.start();
+      for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
+        GNode node = *ii;
+        MetisNode& nodeData = graph->getData(node);
+        nodeData.setPartition(graph->getData(metisGraph->getSubGraphMapTo(nodeData.getNodeId())).getPartition());
+        assert(nodeData.getPartition()>=0);
+      }
+      t.stop();
+      //cout<<"Waste time "<<t.get()<<" ms "<<endl;
 
-			metisGraph->releaseSubGraphMapTo();
-			delete subGraphs[0].getGraph();
-			delete subGraphs[1].getGraph();
-			delete[] subGraphs;
-		}
-	}
+      metisGraph->releaseSubGraphMapTo();
+      delete subGraphs[0].getGraph();
+      delete subGraphs[1].getGraph();
+      delete[] subGraphs;
+    }
+  }
 
-	void splitGraphParallel(MetisGraph* metisGraph,MetisGraph *subGraphs) {
-		Galois::Timer t;
-		t.start();
-		subGraphs[0].setGraph(new GGraph());
-		subGraphs[1].setGraph(new GGraph());
-#ifdef LC_MORPH
-		subGraphs[0].getGraph()->initialize();
-		subGraphs[1].getGraph()->initialize();
-#endif
-		metisGraph->initSubGraphMapTo();
-		GGraph *graph = metisGraph->getGraph();
-		parallelSplitGraphAddNodes pSplitAddNodes(metisGraph,subGraphs);
-		Galois::for_each_local<Galois::WorkList::dChunkedLIFO<256, GNode> >(*graph,pSplitAddNodes,"Graph Split");
+  void splitGraphParallel(MetisGraph* metisGraph,MetisGraph *subGraphs) {
+    Galois::Timer t;
+    t.start();
+    // subGraphs[0].setGraph(new GGraph());
+    // subGraphs[1].setGraph(new GGraph());
+    metisGraph->initSubGraphMapTo();
+    GGraph *graph = metisGraph->getGraph();
+    parallelSplitGraphAddNodes pSplitAddNodes(metisGraph,subGraphs);
+    Galois::for_each_local<Galois::WorkList::dChunkedLIFO<256, GNode> >(*graph,pSplitAddNodes,"Graph Split");
 
-/*
-		parallelSplitGraphAddEdges pSplitAddEdges(metisGraph,subGraphs);
-		Galois::for_each_local<Galois::WorkList::dChunkedLIFO<256, GNode> >(*graph,pSplitAddNodes,"Graph Split");*/
+    /*
+      parallelSplitGraphAddEdges pSplitAddEdges(metisGraph,subGraphs);
+      Galois::for_each_local<Galois::WorkList::dChunkedLIFO<256, GNode> >(*graph,pSplitAddNodes,"Graph Split");*/
 
-		GGraph *graphs[2];
-		for(int i=0;i<2;i++) {
-			graphs[i]=subGraphs[i].getGraph();
-			int id =0;
-			for(GGraph::iterator ii = graphs[i]->begin(),ee=graphs[i]->end();ii!=ee;++ii) {
-				MetisNode &nodeData = graphs[i]->getData(*ii);
-				nodeData.setNodeId(id);
-				id++;
-			}
-			subGraphs[i].setNumNodes(id);
-		}
-		t.stop();
-		//cout<<"Parallel Split "<<t.get()<<"  ms "<<endl;
-	}
+    GGraph *graphs[2];
+    for(int i=0;i<2;i++) {
+      graphs[i]=subGraphs[i].getGraph();
+      int id =0;
+      for(GGraph::iterator ii = graphs[i]->begin(),ee=graphs[i]->end();ii!=ee;++ii) {
+        MetisNode &nodeData = graphs[i]->getData(*ii);
+        nodeData.setNodeId(id);
+        id++;
+      }
+      //subGraphs[i].setNumNodes(id);
+    }
+    t.stop();
+    //cout<<"Parallel Split "<<t.get()<<"  ms "<<endl;
+  }
 
-	void splitGraph(MetisGraph* metisGraph, MetisGraph* subGraphs) {
-		int subGraphNodeNum[2];
-		subGraphNodeNum[0] = 0;
-		subGraphNodeNum[1] = 0;
-		GGraph* graph = metisGraph->getGraph();
+  void splitGraph(MetisGraph* metisGraph, MetisGraph* subGraphs) {
+    int subGraphNodeNum[2];
+    subGraphNodeNum[0] = 0;
+    subGraphNodeNum[1] = 0;
+    GGraph* graph = metisGraph->getGraph();
 
-		subGraphs[0].setGraph(new GGraph());
-		subGraphs[1].setGraph(new GGraph());
-		metisGraph->initSubGraphMapTo();
-		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
-			GNode node = *ii;
-			MetisNode& nodeData = graph->getData(node);
-			assert(nodeData.getPartition()>=0);
-			GNode newNode = subGraphs[nodeData.getPartition()].getGraph()->createNode(
-					MetisNode(subGraphNodeNum[nodeData.getPartition()], nodeData.getWeight()));
-			subGraphs[nodeData.getPartition()].getGraph()->addNode(newNode);
-			metisGraph->setSubGraphMapTo(nodeData.getNodeId(), newNode);
-			subGraphNodeNum[nodeData.getPartition()]++;
-		}
+    // subGraphs[0].setGraph(new GGraph());
+    // subGraphs[1].setGraph(new GGraph());
+    metisGraph->initSubGraphMapTo();
+    for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
+      GNode node = *ii;
+      MetisNode& nodeData = graph->getData(node);
+      assert(nodeData.getPartition()>=0);
+      //FIXME: num edges
+      GNode newNode = subGraphs[nodeData.getPartition()].getGraph()->createNode(0, subGraphNodeNum[nodeData.getPartition()], nodeData.getWeight());
+      //subGraphs[nodeData.getPartition()].getGraph()->addNode(newNode);
+      metisGraph->setSubGraphMapTo(nodeData.getNodeId(), newNode);
+      subGraphNodeNum[nodeData.getPartition()]++;
+    }
 
-		subGraphs[0].setNumNodes(subGraphNodeNum[0]);
-		subGraphs[1].setNumNodes(subGraphNodeNum[1]);
-		assert(subGraphs[0].getNumNodes() == subGraphNodeNum[0]);
-		assert(subGraphs[1].getNumNodes() == subGraphNodeNum[1]);
+    //subGraphs[0].setNumNodes(subGraphNodeNum[0]);
+    //subGraphs[1].setNumNodes(subGraphNodeNum[1]);
+    //assert(subGraphs[0].getNumNodes() == subGraphNodeNum[0]);
+    //assert(subGraphs[1].getNumNodes() == subGraphNodeNum[1]);
 
-		for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
-			GNode node = *ii;
-			MetisNode& nodeData = graph->getData(node);
-			int index = nodeData.getPartition();
-			GGraph* subGraph = subGraphs[index].getGraph();
-			subGraph->getData(metisGraph->getSubGraphMapTo(nodeData.getNodeId())).setAdjWgtSum(nodeData.getAdjWgtSum());
-			assert(subGraph->getData(metisGraph->getSubGraphMapTo(nodeData.getNodeId())).getAdjWgtSum()>=0);
-			for (GGraph::edge_iterator jj = graph->edge_begin(node, Galois::MethodFlag::NONE), eejj = graph->edge_end(node, Galois::MethodFlag::NONE); jj != eejj; ++jj) {
-				GNode neighbor = graph->getEdgeDst(jj);
+    for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
+      GNode node = *ii;
+      MetisNode& nodeData = graph->getData(node);
+      int index = nodeData.getPartition();
+      GGraph* subGraph = subGraphs[index].getGraph();
+      subGraph->getData(metisGraph->getSubGraphMapTo(nodeData.getNodeId())).setAdjWgtSum(nodeData.getAdjWgtSum());
+      assert(subGraph->getData(metisGraph->getSubGraphMapTo(nodeData.getNodeId())).getAdjWgtSum()>=0);
+      for (GGraph::edge_iterator jj = graph->edge_begin(node, Galois::MethodFlag::NONE), eejj = graph->edge_end(node, Galois::MethodFlag::NONE); jj != eejj; ++jj) {
+        GNode neighbor = graph->getEdgeDst(jj);
 
-				MetisNode& neighborData = graph->getData(neighbor);
-				int edgeWeight = graph->getEdgeData(jj);
-				if (!nodeData.isBoundary() || nodeData.getPartition() == neighborData.getPartition()) {
-					subGraph->getEdgeData(subGraph->addEdge(metisGraph->getSubGraphMapTo(nodeData.getNodeId()), metisGraph->getSubGraphMapTo(neighborData.getNodeId()))) = edgeWeight;
-				} else {
-					subGraph->getData(metisGraph->getSubGraphMapTo(nodeData.getNodeId())).setAdjWgtSum(
-							subGraph->getData(metisGraph->getSubGraphMapTo(nodeData.getNodeId())).getAdjWgtSum() - edgeWeight);
+        MetisNode& neighborData = graph->getData(neighbor);
+        int edgeWeight = graph->getEdgeData(jj);
+        if (!nodeData.isBoundary() || nodeData.getPartition() == neighborData.getPartition()) {
+          subGraph->getEdgeData(subGraph->addEdge(metisGraph->getSubGraphMapTo(nodeData.getNodeId()), metisGraph->getSubGraphMapTo(neighborData.getNodeId()))) = edgeWeight;
+        } else {
+          subGraph->getData(metisGraph->getSubGraphMapTo(nodeData.getNodeId())).setAdjWgtSum(
+                                                                                             subGraph->getData(metisGraph->getSubGraphMapTo(nodeData.getNodeId())).getAdjWgtSum() - edgeWeight);
 
-				}
-			}
-		}
-	}
-private:
-	Coarsener coarsener;
-
+        }
+      }
+    }
+  }
 };
 
 #endif /* PMETIS_H_ */
