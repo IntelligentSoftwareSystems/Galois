@@ -19,10 +19,15 @@ partInfo bisect_GGP(partInfo& oldPart) {
   do {
 
     //pick a seed
+    int i = getRandom((oldPart.partSize-newSize)/2)+1;
     for (auto ii = g.begin(), ee = g.end(); ii != ee; ++ii)
       if (g.getData(*ii, Galois::MethodFlag::NONE).getTryPart(newPart.tryPart) == oldPart.partNum) {
-        boundary.push_back(*ii);
-        break;
+	i--;
+	if(i)
+	{
+		boundary.push_back(*ii);
+		break;
+	}
       }
     
     //grow partition
