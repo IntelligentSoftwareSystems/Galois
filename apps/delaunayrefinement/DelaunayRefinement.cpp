@@ -109,9 +109,9 @@ struct Process {
   }
 };
 
-Galois::InsertBag<GNode> wl;
-
 struct Preprocess {
+  Galois::InsertBag<GNode>& wl;
+  Preprocess(Galois::InsertBag<GNode>& w): wl(w) { }
   void operator()(GNode item) const {
     if (graph->getData(item, Galois::MethodFlag::NONE).isBad())
       wl.push(item);
@@ -137,12 +137,9 @@ int main(int argc, char** argv) {
     m.read(graph, filename.c_str(), detAlgo == nondet);
     Verifier v;
     if (!skipVerify && !v.verify(graph)) {
-      std::cerr << "bad input mesh\n";
-      assert(0 && "Refinement failed");
-      abort();
+      GALOIS_DIE("bad input mesh");
     }
   }
-
   std::cout << "configuration: " << std::distance(graph->begin(), graph->end())
 	    << " total triangles, " << std::count_if(graph->begin(), graph->end(), is_bad(graph)) << " bad triangles\n";
 
@@ -153,10 +150,12 @@ int main(int argc, char** argv) {
   Galois::StatTimer T;
   T.start();
 
+  Galois::InsertBag<GNode> initialBad;
+
   if (detAlgo == nondet)
-    Galois::do_all_local(*graph, Preprocess(), "findbad");
+    Galois::do_all_local(*graph, Preprocess(initialBad), "findbad");
   else
-    std::for_each(graph->begin(), graph->end(), Preprocess());
+    std::for_each(graph->begin(), graph->end(), Preprocess(initialBad));
 
   Galois::reportPageAlloc("MeminfoMid");
   
@@ -169,14 +168,14 @@ int main(int argc, char** argv) {
   
   switch (detAlgo) {
     case nondet: 
-      Galois::for_each_local<Chunked>(wl, Process<>(), "refine"); break;
+      Galois::for_each_local<Chunked>(initialBad, Process<>(), "refine"); break;
     case detBase:
-      Galois::for_each_det(wl.begin(), wl.end(), Process<>()); break;
+      Galois::for_each_det(initialBad.begin(), initialBad.end(), Process<>()); break;
     case detPrefix:
-      Galois::for_each_det(wl.begin(), wl.end(), Process<detPrefix>(), Process<>());
+      Galois::for_each_det(initialBad.begin(), initialBad.end(), Process<detPrefix>(), Process<>());
       break;
     case detDisjoint:
-      Galois::for_each_det(wl.begin(), wl.end(), Process<detDisjoint>()); break;
+      Galois::for_each_det(initialBad.begin(), initialBad.end(), Process<detDisjoint>()); break;
     default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
   }
   Trefine.stop();
@@ -187,15 +186,11 @@ int main(int argc, char** argv) {
   if (!skipVerify) {
     int size = Galois::ParallelSTL::count_if(graph->begin(), graph->end(), is_bad(graph));
     if (size != 0) {
-      std::cerr << size << " bad triangles remaining.\n";
-      assert(0 && "Refinement failed");
-      abort();
+      GALOIS_DIE("Bad triangles remaining");
     }
     Verifier v;
     if (!v.verify(graph)) {
-      std::cerr << "Refinement failed.\n";
-      assert(0 && "Refinement failed");
-      abort();
+      GALOIS_DIE("Refinement failed");
     }
     std::cout << "Refinement OK\n";
   }

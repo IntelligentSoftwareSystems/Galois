@@ -87,6 +87,7 @@ public:
       goto slow_path;
     assert(_lock & 1);
     return;
+
   slow_path:
     slow_lock();
   }
@@ -104,7 +105,7 @@ public:
   inline void unlock_and_set(T* val) {
     assert(_lock & 1);
     assert(!((uintptr_t)val & 1));
-    _lock.store((uintptr_t)val, std::memory_order_release);
+    _lock.store((uintptr_t) val, std::memory_order_release);
   }
   
   inline T* getValue() const {

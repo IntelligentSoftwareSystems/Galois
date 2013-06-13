@@ -123,7 +123,7 @@ public:
 	     ee = graph->edge_end(curr, Galois::MethodFlag::ALL); 
 	   ii != ee; ++ii) {
 	GNode neighbor = graph->getEdgeDst(ii);
-	expand(curr, neighbor); //VTune: Lots of work
+	expand(curr, neighbor);
       }
     }
   }

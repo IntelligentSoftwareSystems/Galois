@@ -64,6 +64,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "XL")
   else()
     message(FATAL_ERROR "XLC must be higher than 12.0")
   endif()
+  #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -qsuppress=1540-0724 -qmaxmem=-1 -qalias=noansi")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -qsuppress=1540-0724 -qmaxmem=-1")
 endif()
 
@@ -82,7 +83,6 @@ if(CMAKE_COMPILER_IS_GNUCC)
   else()
     message(FATAL_ERROR "GCC must be 4.6 or higher")
   endif()
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fstrict-aliasing")
 endif()
 
 #PThreads
@@ -200,7 +200,6 @@ function(app name)
 
   foreach(required ${APP_REQUIRES})
     if(${${required}} MATCHES "TRUE")
-
     else()
       message("-- NOT compiling ${name} (missing: ${required})")
       return()
@@ -247,7 +246,7 @@ include(CPack)
 
 ###### Installation ######
 
-export(TARGETS galois FILE "${PROJECT_BINARY_DIR}/GaloisTargets.cmake")
+export(TARGETS galois APPEND FILE "${PROJECT_BINARY_DIR}/GaloisTargets.cmake")
 export(PACKAGE Galois)
 
 # Galois include files

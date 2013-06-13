@@ -28,6 +28,7 @@
 #include "Galois/MethodFlags.h"
 #include "Galois/Runtime/ll/PtrLock.h"
 #include "Galois/Runtime/ll/gio.h"
+
 #include <cassert>
 #include <cstdlib>
 #include <setjmp.h>
@@ -46,6 +47,7 @@ namespace Runtime {
 
 enum ConflictFlag {
   CONFLICT = -1,
+  NO_CONFLICT = 0,
   REACHED_FAILSAFE = 1,
   BREAK = 2
 };
@@ -139,41 +141,41 @@ inline bool shouldLock(const Galois::MethodFlag g) {
 }
 
 //! actual locking function.  Will always lock.
-void doAcquire(Lockable* C);
+void doAcquire(Lockable* L);
 
-inline void acquire(Lockable* C, SimpleRuntimeContext* cnx, const Galois::MethodFlag m) {
+inline void acquire(Lockable* L, SimpleRuntimeContext* cnx, const Galois::MethodFlag m) {
   if (shouldLock(m) && cnx)
-    cnx->acquire(C);
+    cnx->acquire(L);
 }
 
 //! Master function which handles conflict detection
 //! used to acquire a lockable thing
-inline void acquire(Lockable* C, Galois::MethodFlag m) {
+inline void acquire(Lockable* L, Galois::MethodFlag m) {
   if (shouldLock(m)) {
     SimpleRuntimeContext* cnx = getThreadContext();
-    acquire(C, cnx, m);
+    acquire(L, cnx, m);
   }
 }
 
-inline bool isAcquired(Lockable* C) {
-  return C->Owner.is_locked();
+inline bool isAcquired(Lockable* L) {
+  return L->Owner.is_locked();
 }
 
-inline bool isAcquiredBy(Lockable* C, SimpleRuntimeContext* cnx) {
-  return C->Owner.getValue() == cnx;
+inline bool isAcquiredBy(Lockable* L, SimpleRuntimeContext* cnx) {
+  return L->Owner.getValue() == cnx;
 }
 
 struct AlwaysLockObj {
-  void operator()(Lockable* C) const {
-    doAcquire(C);
+  void operator()(Lockable* L) const {
+    doAcquire(L);
   }
 };
 
 struct CheckedLockObj {
   Galois::MethodFlag m;
   CheckedLockObj(Galois::MethodFlag _m) :m(_m) {}
-  void operator()(Lockable* C) const {
-    acquire(C, m);
+  void operator()(Lockable* L) const {
+    acquire(L, m);
   }
 };
 

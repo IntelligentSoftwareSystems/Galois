@@ -1,11 +1,11 @@
-/** Machine Descriptions on Sun -*- C++ -*-
+/** Machine Descriptions on BlueGeneQ -*- C++ -*-
  * @file
  * @section License
  *
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS SOFTWARE
  * AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR ANY
  * PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF PERFORMANCE, AND ANY
@@ -22,85 +22,89 @@
  *
  * See HWTopoLinux.cpp.
  *
- * @author Andrew Lenharth <andrewl@lenharth.org>
+ * @author Donald Nguyen <ddn@cs.utexas.edu>
 */
-#if defined(sun) || defined(__sun)
-
 #include "Galois/Runtime/ll/HWTopo.h"
+#include "Galois/Runtime/ll/gio.h"
 
 #include <vector>
+#include <sched.h>
 
-#include <unistd.h>
-#include <stdio.h>
-#include <thread.h>
-#include <sys/types.h>
-#include <sys/processor.h>
-#include <sys/procset.h>
-
-using namespace Galois::Runtime;
+using namespace Galois::Runtime::LL;
 
 namespace {
 
-static bool sunBindToProcessor(int proc) {
-  if (processor_bind(P_LWPID,  thr_self(), proc, 0) == -1) {
-    perror("Error");
+static bool linuxBindToProcessor(int proc) {
+  cpu_set_t mask;
+  /* CPU_ZERO initializes all the bits in the mask to zero. */
+  CPU_ZERO( &mask );
+  
+  /* CPU_SET sets only the bit corresponding to cpu. */
+  // void to cancel unused result warning
+  (void)CPU_SET( proc, &mask );
+  
+  /* sched_setaffinity returns 0 in success */
+  if( sched_setaffinity( 0, sizeof(mask), &mask ) == -1 ) {
+    gWarn("Could not set CPU affinity for thread ", proc, "(", strerror(errno), ")");
     return false;
-    //reportWarning("Could not set CPU Affinity for thread", (unsigned)proc);
   }
   return true;
 }
 
-//Flat machine with the correct number of threads and binding
-struct AutoSunPolicy {
-  
-  std::vector<int> procmap; //Galoid id -> solaris id
+//! Flat machine with the correct number of threads and binding
+struct Policy {
+  std::vector<int> procmap; //Galois id -> cpu id
 
   unsigned numThreads, numCores, numPackages;
 
-  AutoSunPolicy() {
-
-    processorid_t i, cpuid_max;
-    cpuid_max = sysconf(_SC_CPUID_MAX);
-    for (i = 0; i <= cpuid_max; i++) {
-      if (p_online(i, P_STATUS) != -1) {
-	procmap.push_back(i);
-	//printf("processor %d present\n", i);
+  Policy() {
+#if 1
+    for (int i = 0; i < 16; ++i) {
+      for (int j = 0; j < 4; ++j) {
+        procmap.push_back(j*16 + i);
       }
     }
-
+#else
+    int cpuid_max = 63;
+    for (int i = 0; i <= cpuid_max; i++) {
+      procmap.push_back(i);
+    }
+#endif
     numThreads = procmap.size();
     numCores = procmap.size();
     numPackages = 1;
   }
 };
-AutoSunPolicy A;
+
+Policy& getPolicy() {
+  static Policy A;
+  return A;
+}
 
 } //namespace
 
-
-
 bool Galois::Runtime::LL::bindThreadToProcessor(int id) {
-  return sunBindToProcessor(A.procmap[id]);
+  return linuxBindToProcessor(getPolicy().procmap[id]);
 }
 
 unsigned Galois::Runtime::LL::getProcessorForThread(int id) {
-  return A.procmap[id];
+  return getPolicy().procmap[id];
 }
 
 unsigned Galois::Runtime::LL::getMaxThreads() {
-  return A.numThreads;
+  return getPolicy().numThreads;
 }
 
 unsigned Galois::Runtime::LL::getMaxCores() {
-  return A.numCores;
+  return getPolicy().numCores;
 }
 
 unsigned Galois::Runtime::LL::getMaxPackages() {
-  return A.numPackages;
+  return getPolicy().numPackages;
 }
 
 unsigned Galois::Runtime::LL::getMaxPackageForThread(int id) {
-  return A.numPackages - 1;
+  return getPolicy().numPackages - 1;
 }
 
 unsigned Galois::Runtime::LL::getPackageForThread(int id) {
@@ -111,4 +115,10 @@ bool Galois::Runtime::LL::isPackageLeader(int id) {
   return id == 0;
 }
 
-#endif //sun
+unsigned Galois::Runtime::LL::getLeaderForThread(int id) {
+  return 0;
+}
+
+unsigned Galois::Runtime::LL::getLeaderForPackage(int id) {
+  return 0;
+}

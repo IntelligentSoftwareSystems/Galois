@@ -95,8 +95,6 @@ unsigned Galois::Runtime::SimpleRuntimeContext::commit_iteration() {
     ++numLocks;
   }
 
-  // XXX not_ready = false;
-
   return numLocks;
 }
 
@@ -154,8 +152,7 @@ void Galois::Runtime::SimpleRuntimeContext::acquire(Galois::Runtime::Lockable* L
 }
 
 void Galois::Runtime::SimpleRuntimeContext::sub_acquire(Galois::Runtime::Lockable* L) {
-  assert(0 && "Shouldn't get here");
-  abort();
+  GALOIS_DIE("Shouldn't get here");
 }
 
 //anchor vtable

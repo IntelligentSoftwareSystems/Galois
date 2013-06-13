@@ -33,20 +33,17 @@ namespace Galois {
 namespace WorkList {
 
 //This overly complex specialization avoids a pointer indirection for non-distributed WL when accessing PerLevel
-template<bool d, typename TQ>
-struct squeues;
-
-template<typename TQ>
-struct squeues<true,TQ> {
-  Runtime::PerPackageStorage<TQ> queues;
+template<bool, template<typename> class PS, typename TQ>
+struct squeue {
+  PS<TQ> queues;
   TQ& get(int i) { return *queues.getRemote(i); }
   TQ& get() { return *queues.getLocal(); }
   int myEffectiveID() { return Runtime::LL::getTID(); }
   int size() { return Runtime::activeThreads; }
 };
 
-template<typename TQ>
-struct squeues<false,TQ> {
+template<template<typename> class PS, typename TQ>
+struct squeue<false, PS, TQ> {
   TQ queue;
   TQ& get(int i) { return queue; }
   TQ& get() { return queue; }
@@ -74,12 +71,13 @@ private:
   struct p {
     Chunk* cur;
     Chunk* next;
+    p(): cur(0), next(0) { }
   };
 
   typedef QT<Chunk, Concurrent> LevelItem;
 
-  Runtime::PerThreadStorage<p> data;
-  squeues<Distributed, LevelItem> Q;
+  squeue<Concurrent, Runtime::PerThreadStorage, p> data;
+  squeue<Distributed, Runtime::PerPackageStorage, LevelItem> Q;
 
   Chunk* mkChunk() {
     return new (heap.allocate(sizeof(Chunk))) Chunk();
@@ -121,15 +119,14 @@ private:
     return 0;
   }
 
-  T* pushi(const T& val, p* n)  {
+  T* pushi(const T& val, p& n)  {
     T* retval = 0;
-
-    if (n->next && (retval = n->next->push_back(val)))
+    if (n.next && (retval = n.next->push_back(val)))
       return retval;
-    if (n->next)
-      pushChunk(n->next);
-    n->next = mkChunk();
-    retval = n->next->push_back(val);
+    if (n.next)
+      pushChunk(n.next);
+    n.next = mkChunk();
+    retval = n.next->push_back(val);
     assert(retval);
     return retval;
   }
@@ -140,7 +137,7 @@ public:
   ChunkedMaster() : heap(sizeof(Chunk)) { }
 
   void flush() {
-    p& n = *data.getLocal();
+    p& n = data.get();
     if (n.next)
       pushChunk(n.next);
     n.next = 0;
@@ -150,13 +147,13 @@ public:
   //! of placed item to facilitate some internal runtime uses. The address is
   //! generally not safe to use in the presence of concurrent pops.
   value_type* push(const value_type& val)  {
-    p* n = data.getLocal();
+    p& n = data.get();
     return pushi(val, n);
   }
 
   template<typename Iter>
   void push(Iter b, Iter e) {
-    p* n = data.getLocal();
+    p& n = data.get();
     while (b != e)
       pushi(*b++, n);
   }
@@ -168,7 +165,7 @@ public:
   }
 
   Galois::optional<value_type> pop()  {
-    p& n = *data.getLocal();
+    p& n = data.get();
     Galois::optional<value_type> retval;
     if (IsStack) {
       if (n.next && (retval = n.next->extract_back()))

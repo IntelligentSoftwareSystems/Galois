@@ -26,8 +26,10 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */ 
 
-#ifndef TETRAHEDRON
-#define TETRAHEDRON
+#ifndef TETRAHEDRON_H
+#define TETRAHEDRON_H
+
+#include "Galois/Runtime/ll/gio.h"
 
 #include <algorithm>
 #include <cassert>
@@ -143,7 +145,6 @@ public:
   //! \param e facenumber , starting from 0.
   //! Prompts an error if an invalid face is requested.
   Triangle<3> * getFaceGeometry(size_t e) const {
-
     if(e<=3) {
       std::vector<GlobalNodalIndex> conn(FaceNodes + 3*e, FaceNodes + 3*e + 2);
 
@@ -153,10 +154,8 @@ public:
       // AbstractGeom<TET_SPD>::getConnectivity()[FaceNodes[3*e+1]], 
       // AbstractGeom<TET_SPD>::getConnectivity()[FaceNodes[3*e+2]]);
     }
-    else {
-      std::cout<<"\nTetrahedron::getFaceGeometry() : Request for invalid face. Quitting...\n";
-      exit(1);
-    }
+    GALOIS_DIE("Tetrahedron::getFaceGeometry() : Request for invalid face.");
+    return NULL;
   }
 
   //! get the inradius

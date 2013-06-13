@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS SOFTWARE
  * AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR ANY
  * PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF PERFORMANCE, AND ANY
@@ -29,8 +29,6 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
 */
-#ifdef __linux__
-
 #include "Galois/Runtime/ll/HWTopo.h"
 #include "Galois/Runtime/ll/EnvCheck.h"
 #include "Galois/Runtime/ll/gio.h"
@@ -77,9 +75,8 @@ static bool linuxBindToProcessor(int proc) {
   return true;
 }
 
+//! Parse /proc/cpuinfo
 static std::vector<cpuinfo> parseCPUInfo() {
-  //PARSE: /proc/cpuinfo
-
   std::vector<cpuinfo> vals;
   vals.reserve(64);
 
@@ -288,7 +285,7 @@ struct AutoLinuxPolicy {
   void printRawConfiguration(const std::vector<cpuinfo>& vals) {
     for (unsigned i = 0; i < vals.size(); ++i) {
       const cpuinfo& p = vals[i];
-      gPrint("(proc ", p.proc, ", physid ", p.physid, ", sib ", p.sib, ", coreid ", p.coreid, ", cpucores ", p.cpucores, "\n");
+      gPrint("proc ", p.proc, ", physid ", p.physid, ", sib ", p.sib, ", coreid ", p.coreid, ", cpucores ", p.cpucores, "\n");
     }
     for (unsigned i = 0; i < virtmap.size(); ++i)
       gPrint(", ", virtmap[i]);
@@ -386,8 +383,6 @@ AutoLinuxPolicy& getPolicy() {
 
 } //namespace
 
-
-
 bool Galois::Runtime::LL::bindThreadToProcessor(int id) {
   assert(id < (int)getPolicy().virtmap.size());
   return linuxBindToProcessor(getPolicy().virtmap[id]);
@@ -433,6 +428,3 @@ unsigned Galois::Runtime::LL::getLeaderForPackage(int id) {
   assert(id < (int)getPolicy().leaders.size());
   return getPolicy().leaders[id];
 }
-
-
-#endif //__linux__

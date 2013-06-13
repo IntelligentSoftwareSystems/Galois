@@ -44,7 +44,7 @@
 #include "TriLinearCoordConn.h"
 #include "TetLinearCoordConn.h"
 
-class MeshInit : boost::noncopyable {
+class MeshInit : private boost::noncopyable {
 
 public:
   typedef StandardAVI::BCFunc BCFunc;

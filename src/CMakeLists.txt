@@ -1,23 +1,58 @@
-#file(GLOB Sources *.cpp llvm/*.cpp mm/*.cpp ll/*.cpp)
-file(GLOB_RECURSE Sources *.cpp)
+set(sources Barrier.cpp Context.cpp FileGraph.cpp FileGraphParallel.cpp
+  PerThreadStorage.cpp PreAlloc.cpp Sampling.cpp Support.cpp Termination.cpp
+  Threads.cpp ThreadPool_pthread.cpp Timer.cpp)
 set(include_dirs "${PROJECT_SOURCE_DIR}/include/")
 if(USE_EXP)
-  file(GLOB ExpSources ../exp/src/*.cpp)
+  file(GLOB exp_sources ../exp/src/*.cpp)
   set(include_dirs ${include_dirs} "${PROJECT_SOURCE_DIR}/exp/include/")
-  set(Sources ${Sources} ${ExpSources})
+  set(sources ${sources} ${exp_sources})
 endif()
-
 set(include_dirs ${include_dirs} "${PROJECT_BINARY_DIR}/include/")
 
-#HACK(ddn): Workaround for bug in Clang-BGQ compiler:
-#clang version 3.4
-#(hfinkel@login1.mcs.anl.gov:src/llvm-trunk/tools/clang c210ac88e0d229a47343d2162f29f87827f515d1)
-#(hfinkel@login1.mcs.anl.gov:src/llvm-trunk 29d31684b696d035f6352c36511267689a0501dd)
-if (USE_BGQ AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  set_source_files_properties(llvm/CommandLine.cpp PROPERTIES COMPILE_FLAGS "-O0")
+include(ParseArguments)
+
+if(CMAKE_VERSION VERSION_GREATER 2.8.8 OR CMAKE_VERSION VERSION_EQUAL 2.8.8)
+  function(add_internal_library name)
+    add_library(${name} OBJECT ${ARGN})
+  endfunction()
+
+  function(add_galois_library name)
+    PARSE_ARGUMENTS(X "LIBS" "" ${ARGN})
+    set(objects)
+    foreach(lib ${X_LIBS})
+      list(APPEND objects "$<TARGET_OBJECTS:${lib}>")
+    endforeach()
+    add_library(${name} ${X_DEFAULT_ARGS} ${objects})
+  endfunction()
+else()
+  function(add_internal_library name)
+    add_library(${name} ${ARGN})
+    install(TARGETS ${name}
+      EXPORT GaloisTargets
+      RUNTIME DESTINATION "${INSTALL_BIN_DIR}" COMPONENT bin
+      LIBRARY DESTINATION "${INSTALL_LIB_DIR}" COMPONENT shlib
+      ARCHIVE DESTINATION "${INSTALL_LIB_DIR}" COMPONENT dev
+      )
+    export(TARGETS ${name} APPEND FILE
+      "${PROJECT_BINARY_DIR}/GaloisTargets.cmake")
+  endfunction()
+
+  function(add_galois_library name)
+    PARSE_ARGUMENTS(X "LIBS" "" ${ARGN})
+    add_library(${name} ${X_DEFAULT_ARGS})
+    foreach(lib ${X_LIBS})
+      target_link_libraries(${name} ${lib})
+    endforeach()
+  endfunction()
 endif()
 
-add_library(galois ${Sources})
+add_galois_library(galois ${sources} LIBS llvm mm ll)
+add_galois_library(galois-nothreads FileGraph.cpp LIBS llvm mm-nonuma ll)
+
+add_subdirectory(ll)
+add_subdirectory(llvm)
+add_subdirectory(mm)
+add_subdirectory(mm-nonuma)
 
 target_link_libraries(galois ${CMAKE_THREAD_LIBS_INIT})
 
@@ -53,10 +88,8 @@ endif()
 
 configure_file("${PROJECT_SOURCE_DIR}/include/Galois/config.h.in" "${PROJECT_BINARY_DIR}/include/Galois/config.h")
 
-add_subdirectory(graphonly)
-
 ###### Installation ######
-install(TARGETS galois 
+install(TARGETS galois
   EXPORT GaloisTargets
   RUNTIME DESTINATION "${INSTALL_BIN_DIR}" COMPONENT bin
   LIBRARY DESTINATION "${INSTALL_LIB_DIR}" COMPONENT shlib
