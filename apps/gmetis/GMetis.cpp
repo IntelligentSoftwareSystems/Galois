@@ -33,6 +33,7 @@
 #include "Coarsening.h"
 #include "Partitioning.h"
 #include "Refine.h"
+#include "Metrics.h"
 
 #include "Galois/Graph/LCGraph.h"
 #include "Galois/Statistic.h"
@@ -264,22 +265,12 @@ int main(int argc, char** argv) {
   GGraph* graph = metisGraph.getGraph();
   //bool directed = true;
 
-#ifndef LC_MORPH
-  if(mtxInput){
-    readMetisGraph(&metisGraph, filename.c_str());
-  }else{
-    readGraph(&metisGraph, filename.c_str(), weighted, false);
-  }
-#else
   graph->structureFromFile(filename);
 
   if (0)  {
     std::ofstream dot("dump.dot");
     graph->dump(dot);
   }
-
-#endif
-
 
   Galois::on_each(parallelInitMorphGraph(*graph));
 
@@ -307,6 +298,21 @@ int main(int argc, char** argv) {
   cout<<"Total Time "<<t.get()<<" ms "<<endl;
   Galois::reportPageAlloc("MeminfoPost");
   verify(&metisGraph);
+
+  MetisGraph* coarseGraph = &metisGraph;
+  while (coarseGraph->getCoarserGraph())
+    coarseGraph = coarseGraph->getCoarserGraph();
+  std::vector<unsigned> iec = edgeCut(*coarseGraph->getGraph(), numPartitions);
+  std::cout << "Initial Edge Cuts:\n";
+  for (unsigned x = 0; x < numPartitions; ++x)
+    std::cout << x << " " << iec[x] << "\n";
+
+
+  std::vector<unsigned> ec = edgeCut(*metisGraph.getGraph(), numPartitions);
+  std::cout << "Edge Cuts:\n";
+  for (unsigned x = 0; x < numPartitions; ++x)
+    std::cout << x << " " << ec[x] << "\n";
+
 }
 
 int getRandom(int num){
