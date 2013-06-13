@@ -147,6 +147,19 @@ unsigned log2_mask(unsigned index) {
   return targetlevel;
 }
 
+struct projectPart {
+  GGraph* fineGraph;
+  GGraph* coarseGraph;
+  projectPart(MetisGraph* Graph) :fineGraph(Graph->getFinerGraph()->getGraph()), coarseGraph(Graph->getGraph()) {}
+
+  void operator()(GNode n) {
+    auto& cn = coarseGraph->getData(n);
+    unsigned part = cn.getPart();
+    for (unsigned x = 0; x < cn.numChildren(); ++x)
+      fineGraph->getData(cn.getChild(0)).setPart(part);
+  }
+};
+
 /**
  * KMetis Algorithm
  */
@@ -199,8 +212,16 @@ void partition(MetisGraph* metisGraph, unsigned nparts) {
   Galois::Timer t3;
   T3.start();
   t3.start();
-  for (int x = 0; x < nparts * 100; ++x)
-    refine_BKL(*mcg->getGraph(),np);
+  MetisGraph* coarseGraph = mcg;
+  do {
+    //refine nparts times
+    for (int x = 0; x < nparts; ++x) 
+      refine_BKL(*coarseGraph->getGraph(),np);
+    //project up
+    MetisGraph* fineGraph = coarseGraph->getFinerGraph();
+    if (coarseGraph->getFinerGraph())
+      Galois::do_all_local(*coarseGraph->getGraph(), projectPart(coarseGraph), "project");
+  } while (coarseGraph = coarseGraph->getFinerGraph());
   t3.stop();
   T3.stop();
   cout<<"refinement time: " << t3.get() << " ms"<<endl;
