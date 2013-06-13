@@ -106,7 +106,7 @@ struct Prim {
       node->id = i++;
     }
 
-    boost::optional<HeapItem> retval = heap.pollMin();
+    Galois::optional<HeapItem> retval = heap.pollMin();
     while (retval) {
       GraphNode src = retval->node;
       //std::cout << " Got (" << retval.second.weight << "," << src.getData()->id << ")\n";

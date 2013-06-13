@@ -70,8 +70,8 @@ void do_hist() {
     numEdges += val;
     ++hist[val];
   }
-  for (auto& p : hist)
-    std::cout << p.first << " : " << p.second << "\n";
+  for (auto pp = hist.begin(), ep = hist.end(); pp != ep; ++pp)
+    std::cout << pp->first << " : " << pp->second << "\n";
 }
 
 void do_inhist() {
@@ -81,10 +81,10 @@ void do_inhist() {
   for (auto ii = graph.begin(), ee = graph.end(); ii != ee; ++ii)
     for (auto ei = graph.edge_begin(*ii), eie = graph.edge_end(*ii); ei != eie; ++ei)
       ++inv[graph.getEdgeDst(ei)];
-  for (auto& p : inv)
-    ++hist[p.second];
-  for (auto& p : hist)
-    std::cout << p.first << " : " << p.second << "\n";
+  for (auto pp = inv.begin(), ep = inv.end(); pp != ep; ++pp)
+    ++hist[pp->second];
+  for (auto pp = hist.begin(), ep = hist.end(); pp != ep; ++pp)
+    std::cout << pp->first << " : " << pp->second << "\n";
 }
 
 int main(int argc, char** argv) {

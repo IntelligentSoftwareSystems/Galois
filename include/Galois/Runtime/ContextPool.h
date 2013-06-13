@@ -36,7 +36,7 @@ class ContextPool {
   Pool pool;
 public:
   ~ContextPool() {
-    boost::optional<Context> p;
+    Galois::optional<Context> p;
     while ((p = pool.pop()))
       ;
   }
@@ -47,7 +47,7 @@ public:
   }
 
   void commitAll() {
-    boost::optional<Context> p;
+    Galois::optional<Context> p;
     while ((p = pool.pop())) {
       p->commit_iteration();
     }

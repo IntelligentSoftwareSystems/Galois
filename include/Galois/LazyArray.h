@@ -30,6 +30,7 @@
 #define GALOIS_LAZYARRAY_H
 
 #include "Galois/config.h"
+#include "Galois/LazyObject.h"
 
 #include <iterator>
 #include <stdexcept>
@@ -47,20 +48,12 @@ namespace Galois {
  */
 template<typename _Tp, unsigned _Size>
 class LazyArray {
-  typedef typename std::aligned_storage<sizeof(_Tp), std::alignment_of<_Tp>::value>::type Data;
-  
-  //__attribute__((may_alias))
-  Data data_[(_Size > 0 ? _Size : 1)];
+  typedef typename std::aligned_storage<sizeof(_Tp), std::alignment_of<_Tp>::value>::type CharData;
 
-  //XXX(ddn): These casts are not correct according to ANSI strict aliasing rules
-  _Tp* get(size_t __n) {
-    union { Data* as_pdata; _Tp* as_pvalue; } caster = { data_ };
-    return caster.as_pvalue + __n;
-  }
-  const _Tp* get(size_t __n) const {
-    union { const Data* as_pdata; const _Tp* as_pvalue; } caster = { data_ };
-    return caster.as_pvalue + __n;
-  }
+  LazyObject<_Tp> data_[(_Size > 0 ? _Size : 1)];
+
+  _Tp* get(size_t __n) { return &data_[__n].get(); }
+  const _Tp* get(size_t __n) const { return &data_[__n].get(); }
 
 public:
   typedef _Tp value_type;

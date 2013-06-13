@@ -79,18 +79,6 @@ struct UpdateRequest {
   UpdateRequest(GNode& N, unsigned int W)
     :n(N), w(W)
   {}
-
-  UpdateRequest()
-    :n(), w(0)
-  {}
-
-  bool operator>(const UpdateRequest& rhs) const {
-    return w > rhs.w;
-  }
-
-  bool operator<(const UpdateRequest& rhs) const {
-    return w < rhs.w;
-  }
 };
 
 struct UpdateRequestIndexer

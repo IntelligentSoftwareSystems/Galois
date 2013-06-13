@@ -165,7 +165,7 @@ protected:
       tld.facing.resetAlloc();
   }
 
-  inline void doProcess(boost::optional<value_type>& p, ThreadLocalData& tld) {
+  inline void doProcess(Galois::optional<value_type>& p, ThreadLocalData& tld) {
     tld.stat.inc_iterations(); //Class specialization handles opt
     if (ForEachTraits<FunctionTy>::NeedsAborts)
       tld.cnx.start_iteration();
@@ -181,7 +181,7 @@ protected:
 
   bool runQueueSimple(ThreadLocalData& tld) {
     bool workHappened = false;
-    boost::optional<value_type> p = wl.pop();
+    Galois::optional<value_type> p = wl.pop();
     if (p)
       workHappened = true;
     while (p) {
@@ -194,7 +194,7 @@ protected:
   template<bool limit, typename WL>
   bool runQueue(ThreadLocalData& tld, WL& lwl, bool recursiveAbort) {
     bool workHappened = false;
-    boost::optional<value_type> p = lwl.pop();
+    Galois::optional<value_type> p = lwl.pop();
     unsigned num = 0;
     int result = 0;
     if (p)

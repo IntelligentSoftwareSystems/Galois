@@ -90,9 +90,7 @@ protected:
   Event (size_t id, BaseSimObj_ty* sendObj, BaseSimObj_ty* recvObj, const A& action, const Type& type, const SimTime& sendTime, const SimTime& recvTime):
     id (id), sendObj (sendObj), recvObj (recvObj), action (action), type (type), sendTime (sendTime), recvTime (recvTime) {}
 
-
 public:
-
   friend bool operator == (const Event& left, const Event& right) {
     return (left.id == right.id)
         && (left.sendObj == right.sendObj)

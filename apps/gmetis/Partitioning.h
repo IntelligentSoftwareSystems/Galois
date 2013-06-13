@@ -10,7 +10,7 @@ struct partInfo {
   partInfo(GGraph* g, unsigned tw, unsigned mw = 0)
   :partNum(0), partMask(1), partWeight(mw), totalWeight(tw), graph(g) {}
 
-  partInfo() = default;
+  partInfo() { } 
 
   partInfo split() {
     partInfo np(*this);

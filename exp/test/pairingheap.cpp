@@ -12,7 +12,7 @@ void check(const char* func, bool r) {
   }
 }
 
-void check(const char* func, const boost::optional<int>& r, int exp) {
+void check(const char* func, const Galois::optional<int>& r, int exp) {
   if (r && *r == exp)
     return;
   else if (!r)

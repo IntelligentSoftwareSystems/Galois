@@ -40,7 +40,7 @@ class MetisGraph{
 
 public:
 	MetisGraph()
-          :coarser(nullptr), finer(nullptr)
+          :coarser(0), finer(0)
 {
 		mincut =0;
 		numEdges =0;
@@ -51,7 +51,7 @@ public:
 	}
 
   explicit MetisGraph(MetisGraph* finerGraph)
-    :coarser(nullptr), finer(finerGraph) {
+    :coarser(0), finer(finerGraph) {
     finer->coarser = this;
   }
 

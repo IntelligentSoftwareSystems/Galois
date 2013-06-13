@@ -43,7 +43,6 @@ enable_testing()
 
 #ICC
 if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd68 -wd981 -wd383 -wd869 -wd2196 -wd279 -wd2504 -wd2943")
   execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
                   OUTPUT_VARIABLE ICC_VERSION)
   if(ICC_VERSION VERSION_GREATER 13.0 OR ICC_VERSION VERSION_EQUAL 13.0)
@@ -51,11 +50,11 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
   else()
     message(FATAL_ERROR "ICC must be 13.0 or higher")
   endif()
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd68 -wd981 -wd383 -wd869 -wd2196 -wd279 -wd2504 -wd2943")
 endif()
 
 #XL
 if(CMAKE_CXX_COMPILER_ID MATCHES "XL")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -qsuppress=1540-0724")
   execute_process(COMMAND ${CMAKE_CXX_COMPILER} -qversion
                   COMMAND sed 1d
                   COMMAND sed s/Version://
@@ -65,6 +64,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "XL")
   else()
     message(FATAL_ERROR "XLC must be higher than 12.0")
   endif()
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -qsuppress=1540-0724 -qmaxmem=-1")
 endif()
 
 #clang 
@@ -82,6 +82,7 @@ if(CMAKE_COMPILER_IS_GNUCC)
   else()
     message(FATAL_ERROR "GCC must be 4.6 or higher")
   endif()
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fstrict-aliasing")
 endif()
 
 #PThreads

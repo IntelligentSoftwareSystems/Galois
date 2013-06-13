@@ -35,8 +35,6 @@
 
 #include "Lonestar/BoilerPlate.h"
 
-#include "boost/optional.hpp"
-
 #include <utility>
 #include <vector>
 #include <algorithm>

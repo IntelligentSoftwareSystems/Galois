@@ -147,7 +147,7 @@ private:
   }
 
   GALOIS_ATTRIBUTE_NOINLINE
-  boost::optional<T> slowPop(perItem& p) {
+  Galois::optional<T> slowPop(perItem& p) {
     //Failed, find minimum bin
     updateLocal(p);
     unsigned myID = Runtime::LL::getTID();
@@ -164,7 +164,7 @@ private:
     }
 
     for (auto ii = p.local.lower_bound(msS), ee = p.local.end(); ii != ee; ++ii) {
-      boost::optional<T> retval;
+      Galois::optional<T> retval;
       if ((retval = ii->second->pop())) {
 	p.current = ii->second;
 	p.curIndex = ii->first;
@@ -172,7 +172,7 @@ private:
 	return retval;
       }
     }
-    return boost::optional<value_type>();
+    return Galois::optional<value_type>();
   }
 
   GALOIS_ATTRIBUTE_NOINLINE
@@ -250,14 +250,14 @@ public:
     push(rp.first, rp.second);
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     //Find a successful pop
     perItem& p = *current.getLocal();
     CTy* C = p.current;
     if (BlockPeriod && (p.numPops++ & ((1<<BlockPeriod)-1)) == 0 && betterBucket(p))
       return slowPop(p);
 
-    boost::optional<value_type> retval;
+    Galois::optional<value_type> retval;
     if (C && (retval = C->pop()))
       return retval;
 

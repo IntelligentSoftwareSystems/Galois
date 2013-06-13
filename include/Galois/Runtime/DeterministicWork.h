@@ -306,23 +306,23 @@ struct FIFO {
   FIFO(): m_size(0) { }
 
   ~FIFO() {
-    boost::optional<T> p;
+    Galois::optional<T> p;
     while ((p = m_buffer.pop()))
       ;
     while ((p = m_data.pop()))
       ;
   }
 
-  boost::optional<T> pop() {
-    boost::optional<T> p;
+  Galois::optional<T> pop() {
+    Galois::optional<T> p;
     if ((p = m_buffer.pop()) || (p = m_data.pop())) {
       --m_size;
     }
     return p;
   }
 
-  boost::optional<T> peek() {
-    boost::optional<T> p;
+  Galois::optional<T> peek() {
+    Galois::optional<T> p;
     if ((p = m_buffer.pop())) {
       m_buffer.push(*p);
     } else if ((p = m_data.pop())) {
@@ -388,8 +388,8 @@ private:
 
   // For ordered execution
   PQ newReserve;
-  boost::optional<T> mostElement;
-  boost::optional<T> windowElement;
+  Galois::optional<T> mostElement;
+  Galois::optional<T> windowElement;
 
   // For id based execution
   size_t minId;
@@ -413,16 +413,16 @@ private:
   void initialLimits(BiIteratorTy ii, BiIteratorTy ei) {
     minId = std::numeric_limits<size_t>::max();
     maxId = std::numeric_limits<size_t>::min();
-    mostElement = windowElement = boost::optional<T>();
+    mostElement = windowElement = Galois::optional<T>();
 
     if (ii != ei) {
       if (ii + 1 == ei) {
         minId = maxId = ii->parent;
-        mostElement = boost::optional<T>(ii->val);
+        mostElement = Galois::optional<T>(ii->val);
       } else {
         minId = ii->parent;
         maxId = (ei-1)->parent;
-        mostElement = boost::optional<T>(ei[-1].val);
+        mostElement = Galois::optional<T>(ei[-1].val);
       }
     }
   }
@@ -430,7 +430,7 @@ private:
   template<typename WL>
   void nextWindowDispatch(WL* wl, const OptionsTy& options, UnorderedTag) {
     window += delta;
-    boost::optional<Item> p;
+    Galois::optional<Item> p;
     while ((p = reserve.peek())) {
       if (p->id >= window)
         break;
@@ -476,8 +476,8 @@ private:
 
     size_t c = 0;
     while (true) {
-      boost::optional<Item> p1 = reserve.peek();
-      boost::optional<T> p2 = peekNewReserve();
+      Galois::optional<Item> p1 = reserve.peek();
+      Galois::optional<T> p2 = peekNewReserve();
 
       bool fromReserve;
       if (p1 && p2)
@@ -498,7 +498,7 @@ private:
       if (!updateWE && !comp(*val, *windowElement))
         break;
       if (updateWE && ++c >= count) {
-        windowElement = boost::optional<T>(*val);
+        windowElement = Galois::optional<T>(*val);
         break;
       }
       
@@ -602,11 +602,11 @@ private:
     std::push_heap(newReserve.begin(), newReserve.end(), HeapCompare(comp));
   }
 
-  boost::optional<T> peekNewReserve() {
+  Galois::optional<T> peekNewReserve() {
     if (newReserve.empty())
-      return boost::optional<T>();
+      return Galois::optional<T>();
     else
-      return boost::optional<T>(newReserve.front());
+      return Galois::optional<T>(newReserve.front());
   }
   
   template<typename InputIteratorTy,typename WL,typename NewTy>
@@ -719,7 +719,7 @@ public:
   }
 
   ~DMergeManagerBase() {
-    boost::optional<NewItem> p;
+    Galois::optional<NewItem> p;
     assert(!(p = new_.pop()));
   }
 
@@ -890,7 +890,7 @@ class DMergeManager: public DMergeManagerBase<OptionsTy> {
     MergeLocal& mlocal = *this->data.getLocal();
 
     mlocal.newItems.clear();
-    boost::optional<NewItem> p;
+    Galois::optional<NewItem> p;
     while ((p = this->new_.pop())) {
       mlocal.newItems.push_back(*p);
     }
@@ -928,7 +928,7 @@ class DMergeManager: public DMergeManagerBase<OptionsTy> {
     
     if (LL::getTID() == 0) {
       mergeBuf.clear();
-      boost::optional<NewItem> p;
+      Galois::optional<NewItem> p;
       while ((p = this->new_.pop())) {
         mergeBuf.push_back(*p);
       }
@@ -1044,7 +1044,7 @@ public:
     mlocal.initialLimits(mergeBuf.begin(), mergeBuf.end());
     if (OptionsTy::useOrdered) {
       if (window)
-        mlocal.windowElement = boost::optional<T>(mergeBuf[window-1].val);
+        mlocal.windowElement = Galois::optional<T>(mergeBuf[window-1].val);
     }
     
     this->broadcastLimits(mlocal, tid);
@@ -1093,7 +1093,7 @@ public:
     assert(mlocal.emptyReserve());
 
     mlocal.newItems.clear();
-    boost::optional<NewItem> p;
+    Galois::optional<NewItem> p;
     while ((p = this->new_.pop()))
       mlocal.newItems.push_back(*p);
 
@@ -1110,7 +1110,7 @@ public:
       // current workset
       size_t w = std::min(std::max(mlocal.delta / this->numActive, (size_t) 2), mlocal.newItems.size());
       if (w)
-        mlocal.windowElement = boost::optional<T>(mlocal.newItems[w-1].val);
+        mlocal.windowElement = Galois::optional<T>(mlocal.newItems[w-1].val);
     }
 
     barrier.wait();
@@ -1138,7 +1138,7 @@ public:
 
       // TODO: improve this
       if (mlocal.windowElement && mlocal.mostElement && !comp(*mlocal.windowElement, *mlocal.mostElement)) {
-        mlocal.windowElement = mlocal.mostElement = boost::optional<T>();
+        mlocal.windowElement = mlocal.mostElement = Galois::optional<T>();
         for (; ii != ei; ++ii) {
           wl->push(Item(ii->val, 0));
         }
@@ -1373,7 +1373,7 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
 {
   MergeLocal& mlocal = mergeManager.get();
   bool retval = false;
-  boost::optional<Item> p;
+  Galois::optional<Item> p;
   while ((p = tld.wlcur->pop())) {
     // Use a new context for each item.
     // There is a race when reusing between aborted iterations.
@@ -1456,7 +1456,7 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
   size_t ncommits = 0;
   size_t niter = 0;
 
-  boost::optional<DetContext> p;
+  Galois::optional<DetContext> p;
   while ((p = (useLocalState) ? tld.localPending.pop() : pending.pop())) {
     ++niter;
     bool commit = true;

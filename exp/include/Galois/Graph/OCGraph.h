@@ -25,6 +25,7 @@
 #ifndef GALOIS_GRAPH_OCGRAPH_H
 #define GALOIS_GRAPH_OCGRAPH_H
 
+#include "Galois/optional.h"
 #include "Galois/LazyObject.h"
 #include "Galois/LargeArray.h"
 #include "Galois/Graph/Details.h"
@@ -32,7 +33,6 @@
 
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/utility.hpp>
-#include <boost/optional.hpp>
 #include <type_traits>
 #include <list>
 #include <string>
@@ -310,7 +310,7 @@ public:
   };
 
 private:
-  boost::optional<segment_type> memorySegment;
+  Galois::optional<segment_type> memorySegment;
 
   segment_type computeSegment(size_t startNode, size_t numEdges) {
     typedef typename OCFileGraph::edge_offset_iterator edge_offset_iterator;
@@ -371,7 +371,7 @@ public:
   }
 
   void keepInMemory() {
-    memorySegment = boost::optional<segment_type>(computeSegment(0, numEdges));
+    memorySegment = Galois::optional<segment_type>(computeSegment(0, numEdges));
     load(*memorySegment, LazyObject<EdgeTy>::sizeof_value);
   }
 

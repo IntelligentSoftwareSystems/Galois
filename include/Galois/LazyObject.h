@@ -26,7 +26,13 @@
 #define GALOIS_LAZYOBJECT_H
 
 #include "Galois/config.h"
+#include "Galois/Runtime/ll/gio.h"
+
+// For consistent name, use boost rather than C++11 std::is_trivially_constuctible
+#include <boost/type_traits/has_trivial_constructor.hpp>
+
 #include GALOIS_C11_STD_HEADER(type_traits)
+#include GALOIS_C11_STD_HEADER(utility)
 
 namespace Galois {
 
@@ -62,6 +68,44 @@ struct StrictObject<void> {
   reference get() const { return 0; }
 };
 
+#if !defined(__IBMCPP__) || __IBMCPP__ > 1210
+#else
+namespace LazyObjectDetail {
+
+template<typename T, typename CharData, bool>
+struct SafeDataBase {
+  union type {
+    CharData buf;
+    T value_;
+    T& value() { return value_; }
+    const T& value() const { return value_; }
+  };
+};
+
+template<typename T, typename CharData>
+struct SafeDataBase<T, CharData, false> {
+  union type {
+    CharData buf;
+    T& value() { return *reinterpret_cast<T*>(&buf); }
+    const T& value() const { return *reinterpret_cast<const T*>(&buf); }
+
+    type() {
+      // XXX: Keep this as a runtime exception rather than a compile-time one
+      GALOIS_DIE("Unsafe construct when expecting strict aliasing");
+    }
+  };
+};
+
+/**
+ * Works around compilers that do not support non-trivially constructible
+ * members in unions.
+ */
+template<typename T, typename CharData>
+struct SafeData: public SafeDataBase<T, CharData, boost::has_trivial_constructor<T>::value> { };
+
+} // end detail
+#endif
+
 /**
  * Single (uninitialized) object with specialization for void type. To take
  * advantage of empty member optimization, users should subclass this class,
@@ -70,21 +114,27 @@ struct StrictObject<void> {
  */
 template<typename T>
 class LazyObject {
-  typedef typename std::aligned_storage<sizeof(T), std::alignment_of<T>::value>::type Data;
+  typedef typename std::aligned_storage<sizeof(T), std::alignment_of<T>::value>::type CharData;
 
-  //__attribute__((may_alias))
-  Data data_[1];
+#if !defined(__IBMCPP__) || __IBMCPP__ > 1210
+  union Data {
+    CharData buf;
+    T value_;
 
-  //XXX(ddn): These casts are not correct according to ANSI strict aliasing rules
-  T* cast() { 
-    union { Data* as_pdata; T* as_pvalue; } caster = { data_ };
-    return caster.as_pvalue;
-  }
+    Data() { }
+    ~Data() { }
 
-  const T* cast() const {
-    union { const Data* as_pdata; const T* as_pvalue; } caster = { data_ };
-    return caster.as_pvalue;
-  }
+    T& value() { return value_; }
+    const T& value() const { return value_; }
+  };
+#else
+  typedef typename LazyObjectDetail::SafeData<T, CharData>::type Data;
+#endif
+
+  Data data_;
+
+  T* cast() { return &data_.value(); }
+  const T* cast() const { return &data_.value(); }
 
 public:
   typedef T value_type;
@@ -95,6 +145,10 @@ public:
 
   void destroy() { cast()->~T(); }
   void construct(const_reference x) { new (cast()) T(x); }
+
+  template<typename... Args>
+  void construct(Args&&... args) { new (cast()) T(std::forward<Args>(args)...); }
+  
   const_reference get() const { return *cast(); }
   reference get() { return *cast(); }
 };
@@ -109,6 +163,10 @@ struct LazyObject<void> {
 
   void destroy() { }
   void construct(const_reference x) { }
+
+  template<typename... Args>
+  void construct(Args&&... args) { }
+
   const_reference get() const { return 0; }
 };
 

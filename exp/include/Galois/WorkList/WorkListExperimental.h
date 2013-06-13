@@ -25,16 +25,16 @@
 #ifndef GALOIS_RUNTIME_WORKLISTEXPERIMENTAL_H
 #define GALOIS_RUNTIME_WORKLISTEXPERIMENTAL_H
 
+#include "Galois/Bag.h"
+#include "Galois/optional.h"
+#include "Galois/Queue.h"
+
 #include "Galois/WorkList/WorkList.h"
 #include "Galois/WorkList/WorkListDebug.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/Termination.h"
 #include "Galois/Runtime/ThreadPool.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
-
-#include "Galois/Bag.h"
-#include "Galois/Queue.h"
-//#include "Galois/SkipList.h"
 
 #include "llvm/Support/CommandLine.h"
 
@@ -46,9 +46,7 @@
 #endif
 
 #include <boost/utility.hpp>
-#include <boost/optional.hpp>
 #include <cstdlib>
-//#include <ostream>
 #include <set>
 
 namespace Galois {
@@ -97,9 +95,9 @@ public:
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     unsigned int& cur = concurrent ? *cursor.getLocal() : *cursor.getRemote(0);
-    boost::optional<value_type> ret = data[cur].pop();
+    Galois::optional<value_type> ret = data[cur].pop();
     if (ret)
       return ret;
 
@@ -110,7 +108,7 @@ public:
       if (ret.first)
 	return ret;
     }
-    return boost::optional<value_type>();
+    return Galois::optional<value_type>();
   }
 };
 GALOIS_WLCOMPILECHECK(ApproxOrderByIntegerMetric)
@@ -162,9 +160,9 @@ public:
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     unsigned int& cur = concurrent ? *cursor.getLocal() : *cursor.getRemote(0);
-    boost::optional<value_type> ret = data[cur].pop();
+    Galois::optional<value_type> ret = data[cur].pop();
     if (ret)
       return ret;
 
@@ -175,7 +173,7 @@ public:
 	return ret;
     }
     cur = 0;
-    return boost::optional<value_type>();
+    return Galois::optional<value_type>();
   }
 };
 GALOIS_WLCOMPILECHECK(LogOrderByIntegerMetric)
@@ -226,8 +224,8 @@ public:
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
-    boost::optional<value_type> r = localQs.get().Q.pop();
+  Galois::optional<value_type> pop() {
+    Galois::optional<value_type> r = localQs.get().Q.pop();
     if (r)
       return r;
     
@@ -357,9 +355,9 @@ public:
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     //Try the local queue first
-    boost::optional<value_type> ret = localQueues.getLocal()->pop();
+    Galois::optional<value_type> ret = localQueues.getLocal()->pop();
     if (ret)
       return ret;
 
@@ -425,9 +423,9 @@ public:
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     int myIsland = DistPolicy::getThreadIsland();
-    boost::optional<value_type> val = WL[myIsland].data.pop();
+    Galois::optional<value_type> val = WL[myIsland].data.pop();
     if (val || !DistPolicy::isThreadMaster())
       return val;
 
@@ -1151,12 +1149,12 @@ public:
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     bool Empty;
     T retval = take(Empty);
     return !Empty ? 
-      boost::optional<value_type>(retval) :
-      boost::optional<value_type>();
+      Galois::optional<value_type>(retval) :
+      Galois::optional<value_type>();
   }
     
   //This can be called by any thread
@@ -1205,15 +1203,15 @@ public:
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
-    boost::optional<value_type> r = Items.get().pop();
+  Galois::optional<value_type> pop() {
+    Galois::optional<value_type> r = Items.get().pop();
     // std::cerr << "{" << Items.myEffectiveID() << "}";
     // if (r.first)
     //   std::cerr << r.first;
     return r;
   }
   
-  boost::optional<value_type> try_pop() {
+  Galois::optional<value_type> try_pop() {
     return pop();
   }
 };
@@ -1251,7 +1249,7 @@ public:
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     return wl.pollFirstKey();
   }
 };
@@ -1295,16 +1293,16 @@ public:
       push(range.begin(), range.end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     lock();
     if (wl.empty()) {
       unlock();
-      return boost::optional<value_type>();
+      return Galois::optional<value_type>();
     }
     value_type r = *wl.begin();
     wl.erase(wl.begin());
     unlock();
-    return boost::optional<value_type>(r);
+    return Galois::optional<value_type>(r);
   }
 };
 GALOIS_WLCOMPILECHECK(SetQueue)
@@ -1339,7 +1337,7 @@ public:
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     return wl.pollMin();
   }
 };
@@ -1406,10 +1404,10 @@ class SimpleOrderedByIntegerMetric : private boost::noncopyable, private Galois:
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     //Fastpath
     CTy* c = current;
-    boost::optional<value_type> retval;
+    Galois::optional<value_type> retval;
     if (c && (retval = c->pop()))
       return retval;
 
@@ -1518,11 +1516,11 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     //Find a successful pop
     perItem& pI = *current.getLocal();
     CTy*& C = pI.current;
-    boost::optional<value_type> retval;
+    Galois::optional<value_type> retval;
     if (C && (retval = C->pop()))
       return retval;
 
@@ -1552,7 +1550,7 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
 	  return retval;
       }
     }
-    return boost::optional<value_type>();
+    return Galois::optional<value_type>();
   }
 };
 GALOIS_WLCOMPILECHECK(CTOrderedByIntegerMetric)
@@ -1623,13 +1621,13 @@ class BarrierOBIM : private boost::noncopyable {
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     do {
       if (current > pushmax)
-	return boost::optional<value_type>();
+	return Galois::optional<value_type>();
       do {
 	//Find a successful pop
-	boost::optional<value_type> retval = B[current].pop();
+	Galois::optional<value_type> retval = B[current].pop();
 	if (retval) {
 	  term.localTermination(true);
 	  return retval;
@@ -1691,11 +1689,11 @@ public:
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     lock();
     if (wl.empty()) {
       unlock();
-      return boost::optional<value_type>();
+      return Galois::optional<value_type>();
     } else {
       size_t size = wl.size();
       unsigned int index = nextRand() % size;
@@ -1703,7 +1701,7 @@ public:
       std::swap(wl[index], wl[size-1]);
       wl.pop_back();
       unlock();
-      return boost::optional<value_type>(retval);
+      return Galois::optional<value_type>(retval);
     }
   }
 };
@@ -1751,11 +1749,11 @@ public:
     wl.push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     T V = T();
     return wl.try_pop(V) ?
-      boost::optional<value_type>(V) :
-      boost::optional<value_type>();
+      Galois::optional<value_type>(V) :
+      Galois::optional<value_type>();
   }
 };
 GALOIS_WLCOMPILECHECK(TbbFIFO)
@@ -1774,7 +1772,7 @@ class PTbb : private boost::noncopyable {
   Galois::Runtime::PerThreadStorage<PTD> tld;
 
   void pull_in(PTD* N) {
-    boost::optional<T> r;
+    Galois::optional<T> r;
     while ((r = N->inq.pop()))
       N->wl.push(*r);
   }
@@ -1833,14 +1831,14 @@ public:
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     value_type retval;
     PTD* N = tld.getLocal();
     pull_in(N);
     if (N->wl.try_pop(retval)) {
-      return boost::optional<value_type>(retval);
+      return Galois::optional<value_type>(retval);
     } else {
-      return boost::optional<value_type>();
+      return Galois::optional<value_type>();
     }
   }
 };
@@ -1876,7 +1874,7 @@ public:
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     value_type retval;
     if (tld.getLocal()->try_pop(retval))
       return retval;
@@ -1884,7 +1882,7 @@ public:
       if (tld.getRemote(i)->try_pop(retval))
 	return retval;
     }
-    return boost::optional<value_type>();
+    return Galois::optional<value_type>();
   }
 };
 
@@ -1916,12 +1914,12 @@ public:
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     value_type retval;
     if (wl.try_pop(retval)) {
-      return boost::optional<value_type>(retval);
+      return Galois::optional<value_type>(retval);
     } else {
-      return boost::optional<value_type>();
+      return Galois::optional<value_type>();
     }
   }
 };
@@ -1954,11 +1952,11 @@ class Chunk : public ChunkHeader {
   int num;
 public:
   Chunk() :num(0) {}
-  boost::optional<T> pop() {
+  Galois::optional<T> pop() {
     if (num)
-      return boost::optional<T>(data[--num]);
+      return Galois::optional<T>(data[--num]);
     else
-      return boost::optional<T>();
+      return Galois::optional<T>();
   }
   bool push(T val) {
     if (num < chunksize) {
@@ -2185,9 +2183,9 @@ public:
     }
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     ChunkTy*& n = data.get();
-    boost::optional<value_type> retval;
+    Galois::optional<value_type> retval;
     //simple case, things in current chunk
     if (n && (retval = n->pop()))
       return retval;
@@ -2199,7 +2197,7 @@ public:
     if (n) {
       return n->pop();
     } else {
-      return boost::optional<value_type>();
+      return Galois::optional<value_type>();
     }
   }
 };

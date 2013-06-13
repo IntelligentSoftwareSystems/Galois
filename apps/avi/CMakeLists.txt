@@ -20,7 +20,9 @@ find_package(LAPACK)
 find_package(ZLIB)
 # TODO(ddn): CMake Boost module on BG/Q cannot be called multiple times. Skip
 # avi althogether for now.
-if(NOT USE_BGQ)
+if(CMAKE_SYSTEM_NAME MATCHES "BlueGeneQ")
+  set(Boost_FOUND off)
+else()
   find_package(Boost 1.36.0 COMPONENTS system iostreams filesystem)
 endif()
 

@@ -28,9 +28,9 @@
 
 #include "Element.h"
 
+#include "Galois/optional.h"
 #include "Galois/Graph/Graph.h"
 
-#include <boost/optional.hpp>
 #include <vector>
 #include <deque>
 
@@ -89,7 +89,7 @@ struct Searcher: private boost::noncopyable {
 
   template<typename Pred>
   void find_(const GNode& start, const Pred& pred, bool all) {
-    typedef boost::optional<GNode> SomeGNode;
+    typedef Galois::optional<GNode> SomeGNode;
     typedef typename Alloc::template rebind<std::pair<GNode,SomeGNode>>::other WorklistAlloc;
     typedef std::deque<std::pair<GNode,SomeGNode>, WorklistAlloc> Worklist;
 

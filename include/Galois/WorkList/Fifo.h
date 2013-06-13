@@ -77,8 +77,8 @@ public:
     UnLockPairOrdered(*this, victim);
   }
 
-  boost::optional<value_type> pop() {
-    boost::optional<value_type> retval;
+  Galois::optional<value_type> pop() {
+    Galois::optional<value_type> retval;
     lock();
     if (!wl.empty()) {
       retval = wl.front();

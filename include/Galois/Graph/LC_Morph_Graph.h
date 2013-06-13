@@ -66,6 +66,12 @@ protected:
     NodeInfo* operator()(NodeInfo& data) const { return &data; }
   };
   
+  struct first_equals {
+    NodeInfo* dst;
+    first_equals(NodeInfo* d): dst(d) { }
+    bool operator()(const EITy& edge) { return edge.first() == dst; }
+  };
+
 public:
   
   typedef boost::transform_iterator<makeGraphNode,typename NodeListTy::iterator > iterator;
@@ -144,7 +150,7 @@ public:
     Galois::Runtime::checkWrite(mflag, true);
     Galois::Runtime::acquire(src, mflag);
     
-    auto it = std::find_if(src->edgeBegin, src->edgeEnd, [dst] (EITy& edge) { return edge.first() == dst; });
+    auto it = std::find_if(src->edgeBegin, src->edgeEnd, first_equals(dst));
     if (it == src->edgeEnd) {
       it->setFirst(dst);
       ++src->edgeEnd;
@@ -166,40 +172,67 @@ public:
   edge_iterator findEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::checkWrite(mflag, true);
     Galois::Runtime::acquire(src, mflag);
-    return std::find_if(src->edgeBegin, src->edgeEnd, [dst] (EITy& edge) { return edge.first() == dst; });
+    return std::find_if(src->edgeBegin, src->edgeEnd, first_equals(dst)); 
   }
   
   
   void structureFromFile(const std::string& fname) { Graph::structureFromFile(*this, fname); }
   
+  struct CreateNodes {
+    LC_Morph_Graph* self;
+    std::vector<GraphNode>& tracking;
+    FileGraph& graph;
+    std::atomic<unsigned>& nNodes;
+    
+    CreateNodes(
+      LC_Morph_Graph* _self,
+      std::vector<GraphNode>& _tracking,
+      FileGraph& _graph,
+      std::atomic<unsigned>& _nNodes): self(_self), tracking(_tracking), graph(_graph), nNodes(_nNodes) { }
+
+    void operator()(FileGraph::GraphNode gn) {
+       tracking[gn] = self->createNode(std::distance(graph.edge_begin(gn), graph.edge_end(gn))); 
+       ++nNodes;
+    }
+  };
+
+  struct CreateEdges {
+    LC_Morph_Graph* self;
+    std::vector<GraphNode>& tracking;
+    FileGraph& graph;
+    std::atomic<unsigned>& nEdges;
+    
+    CreateEdges(
+      LC_Morph_Graph* _self,
+      std::vector<GraphNode>& _tracking,
+      FileGraph& _graph,
+      std::atomic<unsigned>& _nEdges): self(_self), tracking(_tracking), graph(_graph), nEdges(_nEdges) { }
+
+    void operator()(FileGraph::GraphNode gn) {
+       for (auto ii = graph.edge_begin(gn), ee = graph.edge_end(gn); ii != ee; ++ii) {
+         self->getEdgeData(self->addEdge(tracking[gn], tracking[graph.getEdgeDst(ii)])) += graph.getEdgeData<uint32_t>(ii);
+         ++nEdges;
+       }
+    }
+  };
+
   void structureFromGraph(FileGraph& graph) {
     std::vector<GraphNode> tracking;
     tracking.resize(graph.size());
-    LC_Morph_Graph* THIS(this);
     std::atomic<unsigned> nEdges(0), nNodes(0);
-    Galois::do_all(graph.begin(), graph.end(), 
-                   [THIS, &tracking, &graph, &nNodes] (FileGraph::GraphNode gn) { 
-                     tracking[gn] = THIS->createNode(std::distance(graph.edge_begin(gn), graph.edge_end(gn))); 
-                     ++nNodes;
-                   });
-    Galois::do_all(graph.begin(), graph.end(),
-                   [THIS, &tracking, &graph, &nEdges] (FileGraph::GraphNode gn) {
-                     for (auto ii = graph.edge_begin(gn), ee = graph.edge_end(gn); ii != ee; ++ii) {
-                       THIS->getEdgeData(THIS->addEdge(tracking[gn], tracking[graph.getEdgeDst(ii)])) += graph.getEdgeData<uint32_t>(ii);
-                       ++nEdges;
-                     }
-                   });
+    Galois::do_all(graph.begin(), graph.end(), CreateNodes(this, tracking, graph, nNodes));
+    Galois::do_all(graph.begin(), graph.end(), CreateEdges(this, tracking, graph, nEdges));
     std::cout << "Created Graph with " << nNodes << " nodes and " << nEdges << " edges\n";
   }
 
   void dump(std::ostream& out) {
     out << "digraph {\n";
-    for (GraphNode n : *this) {
-      out << '"' << n << "\" [shape=box];\n";
+    for (auto nn = begin(), en = end(); nn != en; ++nn) {
+      out << '"' << *nn << "\" [shape=box];\n";
     }
-    for (GraphNode n : *this) {
-      for (auto ii = edge_begin(n), ee = edge_end(n); ii != ee; ++ii)
-        out << '"' << n << "\" -> \"" << getEdgeDst(ii) << "\";\n";
+    for (auto nn = begin(), en = end(); nn != en; ++nn) {
+      for (auto ii = edge_begin(*nn), ee = edge_end(*nn); ii != ee; ++ii)
+        out << '"' << *nn << "\" -> \"" << getEdgeDst(ii) << "\";\n";
     }
 
     out << "}\n";

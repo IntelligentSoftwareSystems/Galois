@@ -35,10 +35,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#if defined(__linux__) && !defined(__bgq__)
-#include <linux/mman.h>
-#endif
-
 using namespace Galois::Graph;
 
 //File format V1:

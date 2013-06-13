@@ -167,9 +167,9 @@ public:
     push(rp.first, rp.second);
   }
 
-  boost::optional<value_type> pop()  {
+  Galois::optional<value_type> pop()  {
     p& n = *data.getLocal();
-    boost::optional<value_type> retval;
+    Galois::optional<value_type> retval;
     if (IsStack) {
       if (n.next && (retval = n.next->extract_back()))
 	return retval;
@@ -178,7 +178,7 @@ public:
       n.next = popChunk();
       if (n.next)
 	return n.next->extract_back();
-      return boost::optional<value_type>();
+      return Galois::optional<value_type>();
     } else {
       if (n.cur && (retval = n.cur->extract_front()))
 	return retval;
@@ -191,7 +191,7 @@ public:
       }
       if (n.cur)
 	return n.cur->extract_front();
-      return boost::optional<value_type>();
+      return Galois::optional<value_type>();
     }
   }
 };

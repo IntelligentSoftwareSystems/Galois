@@ -35,6 +35,7 @@ class atomic {
   atomic& operator=(const atomic&) volatile;
 
 public:
+  atomic() { }
   constexpr atomic(_Tp __i): _M_i(__i) { }
   operator _Tp() const { return load(); }
   operator _Tp() const volatile { return load(); }
@@ -77,6 +78,7 @@ public:
   bool compare_exchange_strong(_Tp& __e, _Tp __i, memory_order _m = memory_order_seq_cst) volatile {
     return compare_exchange_strong(__e, __i, _m, _m);
   }
+
   template<bool Enable = std::is_integral<_Tp>::value>
   _Tp fetch_xor(_Tp __i, memory_order _m = memory_order_seq_cst, typename std::enable_if<Enable>::type* = 0) {
     return __atomic_fetch_xor(&_M_i, __i, _m);
@@ -85,6 +87,24 @@ public:
   _Tp fetch_xor(_Tp __i, memory_order _m = memory_order_seq_cst, typename std::enable_if<Enable>::type* = 0) volatile {
     return __atomic_fetch_xor(&_M_i, __i, _m);
   }
+
+  template<bool Enable = std::is_integral<_Tp>::value>
+  _Tp fetch_add(_Tp __i, memory_order _m = memory_order_seq_cst, typename std::enable_if<Enable>::type* = 0) {
+    return __atomic_fetch_add(&_M_i, __i, _m);
+  }
+  template<bool Enable = std::is_integral<_Tp>::value>
+  _Tp operator++() {
+    return fetch_add(1) + 1;
+  }
+  template<bool Enable = std::is_integral<_Tp>::value>
+  _Tp fetch_add(_Tp __i, memory_order _m = memory_order_seq_cst, typename std::enable_if<Enable>::type* = 0) volatile {
+    return __atomic_fetch_add(&_M_i, __i, _m);
+  }
+  template<bool Enable = std::is_integral<_Tp>::value>
+  _Tp operator++() volatile {
+    return fetch_add(1) + 1;
+  }
+
 };
 
 }

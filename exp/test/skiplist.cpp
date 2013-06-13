@@ -3,7 +3,7 @@
 #include <iostream>
 #include <vector>
 
-void check(const boost::optional<int>& r, int exp) {
+void check(const Galois::optional<int>& r, int exp) {
   if (r && *r == exp)
     ;
   else {

@@ -35,8 +35,8 @@ void assertAllMatched(GNode node, GGraph* graph) {
 }
 
 void assertNoMatched(GGraph* graph) {
-  for (GNode n : *graph)
-    assert(!graph->getData(n).isMatched());
+  for (auto nn = graph->begin(), en = graph->end(); nn != en; ++nn)
+    assert(!graph->getData(*nn).isMatched());
 }
 
 struct HEMmatch {
@@ -178,11 +178,12 @@ struct parallelPopulateEdges {
         edges[fineGGraph->getData(fineGGraph->getEdgeDst(ii, Galois::MethodFlag::NONE), Galois::MethodFlag::NONE).getParent()] += fineGGraph->getEdgeData(ii, Galois::MethodFlag::NONE);
     
     //insert edges
-    for (auto& p : edges)
-      if (node != p.first) { // no self edges
-        coarseGGraph->getEdgeData(coarseGGraph->addEdgeWithoutCheck(node, p.first), Galois::MethodFlag::NONE) = p.second;
+    for (auto pp = edges.begin(), ep = edges.end(); pp != ep; ++pp) {
+      if (node != pp->first) { // no self edges
+        coarseGGraph->getEdgeData(coarseGGraph->addEdgeWithoutCheck(node, pp->first), Galois::MethodFlag::NONE) = pp->second;
         ++e;
       }
+    }
     //    assert(e);
     nodeData.setNumEdges(e);
   }
@@ -281,8 +282,8 @@ void graphStat(GGraph* graph) {
   }
   
   std::cout<<"Nodes "<<std::distance(graph->begin(), graph->end())<<"| Edges " << numEdges << endl;
-  for (auto& p : hist)
-    std::cout << p.first << " : " << p.second << "\n";
+  for (auto pp = hist.begin(), ep = hist.end(); pp != ep; ++pp)
+    std::cout << pp->first << " : " << pp->second << "\n";
 }
 
 MetisGraph* coarsen(MetisGraph* fineMetisGraph, unsigned coarsenTo) {

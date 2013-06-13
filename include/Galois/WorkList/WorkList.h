@@ -23,7 +23,7 @@
 #ifndef GALOIS_RUNTIME_WORKLIST_H
 #define GALOIS_RUNTIME_WORKLIST_H
 
-#include <boost/optional.hpp>
+#include "Galois/optional.h"
 
 #include "AltChunked.h"
 #include "BulkSynchronous.h"
@@ -89,7 +89,7 @@ public:
   void push_initial(const RangeTy&);
 
   //! pop a value from the queue.
-  boost::optional<value_type> pop();
+  Galois::optional<value_type> pop();
 };
 
 } // end namespace anonymous

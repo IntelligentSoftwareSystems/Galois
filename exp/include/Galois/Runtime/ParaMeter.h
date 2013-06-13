@@ -113,7 +113,7 @@ class ForEachWork<Galois::WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
     WorkListTy* next;
 
     void copyWL(WorkListTy& wl) {
-      for (boost::optional<value_type> item = wl.pop(); item; item = wl.pop()) {
+      for (Galois::optional<value_type> item = wl.pop(); item; item = wl.pop()) {
         curr->push(*item);
       }
     }
@@ -187,7 +187,7 @@ class ForEachWork<Galois::WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
       //
       size_t numIter = 0;
 
-      boost::optional<value_type> item;
+      Galois::optional<value_type> item;
       while ((item = workList.getCurr().pop())) {
         IterationContext& it = newIteration();
 

@@ -29,13 +29,13 @@ namespace Galois {
 namespace WorkList {
 
 template<typename QueueTy>
-boost::optional<typename QueueTy::value_type>
+Galois::optional<typename QueueTy::value_type>
 stealHalfInPackage(Runtime::PerThreadStorage<QueueTy>& queues) {
   unsigned id = Runtime::LL::getTID();
   unsigned pkg = Runtime::LL::getPackageForSelf(id);
   unsigned num = Galois::getActiveThreads();
   QueueTy* me = queues.getLocal();
-  boost::optional<typename QueueTy::value_type> retval;
+  Galois::optional<typename QueueTy::value_type> retval;
   
   //steal from this package
   //Having 2 loops avoids a modulo, though this is a slow path anyway
@@ -51,13 +51,13 @@ stealHalfInPackage(Runtime::PerThreadStorage<QueueTy>& queues) {
 }
 
 template<typename QueueTy>
-boost::optional<typename QueueTy::value_type>
+Galois::optional<typename QueueTy::value_type>
 stealRemote(Runtime::PerThreadStorage<QueueTy>& queues) {
   unsigned id = Runtime::LL::getTID();
   //  unsigned pkg = Runtime::LL::getPackageForThread(id);
   unsigned num = Galois::getActiveThreads();
   QueueTy* me = queues.getLocal();
-  boost::optional<typename QueueTy::value_type> retval;
+  Galois::optional<typename QueueTy::value_type> retval;
   
   //steal from this package
   //Having 2 loops avoids a modulo, though this is a slow path anyway
@@ -78,8 +78,8 @@ public:
 private:
   Runtime::PerThreadStorage<QueueTy> local;
 
-  boost::optional<value_type> doSteal() {
-    boost::optional<value_type> retval = stealHalfInPackage(local);
+  Galois::optional<value_type> doSteal() {
+    Galois::optional<value_type> retval = stealHalfInPackage(local);
     if (retval)
       return retval;
     return stealRemote(local);
@@ -162,8 +162,8 @@ public:
     fill_work_l1(range.begin(), range.end());
   }
 
-  boost::optional<value_type> pop() {
-    boost::optional<value_type> retval = local.getLocal()->pop();
+  Galois::optional<value_type> pop() {
+    Galois::optional<value_type> retval = local.getLocal()->pop();
     if (retval)
       return retval;
     return doSteal();// stealHalfInPackage(local);
@@ -199,7 +199,7 @@ public:
     local.getLocal()->push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     return local.getLocal()->pop();
   }
 };
@@ -321,9 +321,9 @@ public:
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop()  {
+  Galois::optional<value_type> pop()  {
     p& n = *data.getLocal();
-    boost::optional<value_type> retval;
+    Galois::optional<value_type> retval;
     if (isStack) {
       if (n.next && (retval = n.next->extract_back()))
 	return retval;
@@ -332,7 +332,7 @@ public:
       n.next = popChunk();
       if (n.next)
 	return n.next->extract_back();
-      return boost::optional<value_type>();
+      return Galois::optional<value_type>();
     } else {
       if (n.cur && (retval = n.cur->extract_front()))
 	return retval;
@@ -345,7 +345,7 @@ public:
       }
       if (n.cur)
 	return n.cur->extract_front();
-      return boost::optional<value_type>();
+      return Galois::optional<value_type>();
     }
   }
 };

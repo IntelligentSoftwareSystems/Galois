@@ -93,7 +93,7 @@ struct min_degree {
   Graph& graph;
   min_degree(Graph& g): graph(g) { }
 
-  boost::optional<GNode> operator()(const boost::optional<GNode>& a, const boost::optional<GNode>& b) const {
+  Galois::optional<GNode> operator()(const Galois::optional<GNode>& a, const Galois::optional<GNode>& b) const {
     if (!a) return b;
     if (!b) return a;
     if (std::distance(graph.edge_begin(*a), graph.edge_end(*a))
@@ -137,10 +137,10 @@ struct has_dist {
   Graph& graph;
   Dist dist;
   has_dist(Graph& g, Dist d): graph(g), dist(d) { }
-  boost::optional<GNode> operator()(const GNode& a) const {
+  Galois::optional<GNode> operator()(const GNode& a) const {
     if (graph.getData(a).dist == dist)
-      return boost::optional<GNode>(a);
-    return boost::optional<GNode>();
+      return Galois::optional<GNode>(a);
+    return Galois::optional<GNode>();
   }
 };
 
@@ -230,7 +230,7 @@ struct SimpleAlgo {
     size_t ecc = counts.size() - 1;
     //size_t maxWidth = *std::max_element(counts.begin(), counts.end());
     GNode candidate = *Galois::ParallelSTL::map_reduce(graph.begin(), graph.end(),
-        has_dist<Graph>(graph, ecc), boost::optional<GNode>(), min_degree<Graph>(graph));
+        has_dist<Graph>(graph, ecc), Galois::optional<GNode>(), min_degree<Graph>(graph));
     resetGraph<SimpleAlgo>(graph);
     return Result(ecc, candidate);
   }
@@ -364,7 +364,7 @@ struct PickKAlgo {
   }
 
   size_t operator()(Graph& graph, GNode source) {
-    boost::optional<size_t> terminal;
+    Galois::optional<size_t> terminal;
 
     Result v = search(graph, source, ~0, true);
 
@@ -384,11 +384,11 @@ struct PickKAlgo {
           continue;
         } else if (u.ecc > v.ecc) {
           v = u;
-          terminal = boost::optional<size_t>();
+          terminal = Galois::optional<size_t>();
           break;
         } else if (u.maxWidth < last) {
           last = u.maxWidth;
-          terminal = boost::optional<size_t>(u.ecc);
+          terminal = Galois::optional<size_t>(u.ecc);
         }
       }
 
@@ -438,7 +438,7 @@ struct GraphLabAlgo {
 
   struct Initialize {
     Graph& graph;
-    boost::optional<boost::random::mt19937> gen;
+    Galois::optional<boost::random::mt19937> gen;
     boost::random::uniform_01<float> dist;
 
     Initialize(Graph& g): graph(g) { }

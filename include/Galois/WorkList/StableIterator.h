@@ -97,7 +97,7 @@ private:
   }
 
   //pop already failed, try again with stealing
-  boost::optional<value_type> pop_steal(state& data) {
+  Galois::optional<value_type> pop_steal(state& data) {
     //always try stealing self
     if (doSteal(data, data))
       return *data.localBegin++;
@@ -110,7 +110,7 @@ private:
     }
     ++data.nextVictim;
     data.nextVictim %= Runtime::activeThreads;
-    return boost::optional<value_type>();
+    return Galois::optional<value_type>();
   }
 
 public:
@@ -126,13 +126,13 @@ public:
   }
 
   //! pop a value from the queue.
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     state& data = *TLDS.getLocal();
     if (data.localBegin != data.localEnd)
       return *data.localBegin++;
     if (Steal)
       return pop_steal(data);
-    return boost::optional<value_type>();
+    return Galois::optional<value_type>();
   }
 
   void push(const value_type& val) {

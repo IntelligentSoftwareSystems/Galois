@@ -32,10 +32,6 @@
 #include <vector>
 #include <numeric>
 
-#if defined(__linux__) && !defined(__bgq__)
-#include <linux/mman.h>
-#endif
-
 // mmap flags
 static const int _PROT = PROT_READ | PROT_WRITE;
 static const int _MAP_BASE = MAP_ANONYMOUS | MAP_PRIVATE;

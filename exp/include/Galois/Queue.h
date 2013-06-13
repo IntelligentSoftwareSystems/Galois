@@ -24,12 +24,12 @@
 #define GALOIS_QUEUE_H
 
 #include "Galois/config.h"
+#include "Galois/optional.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/mm/Mem.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 
 #include <boost/utility.hpp>
-#include <boost/optional.hpp>
 #include GALOIS_C11_STD_HEADER(atomic)
 #include <cstdlib>
 #include <limits>
@@ -362,7 +362,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * it takes special non-V values for marker and header nodes.
    */
   struct Node {
-    boost::optional<K> key;
+    Galois::optional<K> key;
     bool voidKey;
     std::atomic<void*> value;
     std::atomic<Node*> next;
@@ -475,7 +475,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * placing field in a shared abstract class.
    */
   struct Index {
-    const boost::optional<K> key;
+    const Galois::optional<K> key;
     /*final*/Node* node;
     /*final*/ Index* down;
     std::atomic<Index*> right;
@@ -551,7 +551,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * <tt>Map.Entry.setValue</tt> method.
    */
   struct SnapshotEntry {
-    boost::optional<K> key;
+    Galois::optional<K> key;
     V* value;
     const bool valid;
 
@@ -1363,23 +1363,23 @@ public:
    * @return the removed first entry of this map, or <tt>null</tt> if the map
    *         is empty.
    */
-  boost::optional<V*> pollFirstValue() {
+  Galois::optional<V*> pollFirstValue() {
     SnapshotEntry retval = doRemoveFirst();
     if (retval.valid)
-      return boost::optional<V*>(retval.value);
+      return Galois::optional<V*>(retval.value);
     else
-      return boost::optional<V*>();
+      return Galois::optional<V*>();
   }
 
   /**
    * Remove first entry; return key or null if empty.
    */
-  boost::optional<K> pollFirstKey() {
+  Galois::optional<K> pollFirstKey() {
     SnapshotEntry retval = doRemoveFirst();
     if (retval.valid)
       return retval.key;
     else
-      return boost::optional<K>();
+      return Galois::optional<K>();
   }
 
   /* ---------------- Finding and removing last element -------------- */
@@ -1612,13 +1612,13 @@ public:
     }
   }
 
-  boost::optional<T> pollMin() {
+  Galois::optional<T> pollMin() {
     if (empty())
-      return boost::optional<T>();
+      return Galois::optional<T>();
     T retval = m_root->value;
     m_root = deleteMin(m_root);
 
-    return boost::optional<T>(retval);
+    return Galois::optional<T>(retval);
   }
 };
 
@@ -1627,7 +1627,7 @@ template<class T,class Compare=std::less<T>,bool Concurrent=true>
 class FCPairingHeap: private boost::noncopyable {
   struct Op {
     T item;
-    boost::optional<T> retval;
+    Galois::optional<T> retval;
     Op* response;
     bool req;
   };
@@ -1778,7 +1778,7 @@ public:
     } while(1);
   }
 
-  boost::optional<T> pollMin() {
+  Galois::optional<T> pollMin() {
     Slot* mySlot = getMySlot();
     //Slot* volatile& myNext = mySlot->next;
     Op* volatile& myReq = mySlot->req;
@@ -1796,7 +1796,7 @@ public:
         flatCombine();
         lock.unlock();
 
-	boost::optional<T> retval = myReq->retval;
+	Galois::optional<T> retval = myReq->retval;
         recycleOp(req->response);
         recycleOp(req);
         return retval;
@@ -1806,7 +1806,7 @@ public:
 	  Galois::Runtime::LL::asmPause();
         }
         _GLIBCXX_READ_MEM_BARRIER;
-	boost::optional<T> retval = myReq->retval;
+	Galois::optional<T> retval = myReq->retval;
         recycleOp(req->response);
         recycleOp(req);
         return retval;

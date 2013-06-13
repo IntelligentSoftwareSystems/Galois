@@ -57,7 +57,7 @@ struct EdgeCtx: public Edge {
 
   bool srcFail;
   bool dstFail;
-
+  
   EdgeCtx (const Edge& e)
     : Edge (e)
       , srcFail (false), dstFail(false)

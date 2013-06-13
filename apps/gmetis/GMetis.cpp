@@ -299,8 +299,8 @@ int main(int argc, char** argv) {
   }
 
   cout<<"Nodes "<<std::distance(graph->begin(), graph->end())<<"| Edges " << numEdges << endl;
-  for (auto& p : hist)
-    std::cout << p.first << " : " << p.second << "\n";
+  for (auto pp = hist.begin(), ep = hist.end(); pp != ep; ++pp)
+    std::cout << pp->first << " : " << pp->second << "\n";
 
   Galois::reportPageAlloc("MeminfoPre");
   Galois::preAlloc(Galois::Runtime::MM::numPageAllocTotal() * 12);

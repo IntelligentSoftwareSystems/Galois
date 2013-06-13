@@ -118,3 +118,14 @@ _Tp __atomic_fetch_xor(volatile _Tp* __a, _Tp __i, std::memory_order _m) {
   } while (!__atomic_compare_exchange(__a, &old, &newval, true, _m, _m));
   return old;
 }
+
+template<class _Tp>
+_Tp __atomic_fetch_add(volatile _Tp* __a, _Tp __i, std::memory_order _m) {
+  _Tp old;
+  _Tp newval;
+  do {
+    old = *__a;
+    newval = old + __i;
+  } while (!__atomic_compare_exchange(__a, &old, &newval, true, _m, _m));
+  return old;
+}

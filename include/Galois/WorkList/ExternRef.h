@@ -61,7 +61,7 @@ public:
   void push_initial(const RangeTy& r) { if (pushinit) wl.push_initial(r); }
 
   //! pop a value from the queue.
-  boost::optional<value_type> pop() { return wl.pop(); }
+  Galois::optional<value_type> pop() { return wl.pop(); }
 };
 
 }

@@ -120,8 +120,8 @@ public:
     wl.push_initial(range);
   }
 
-  boost::optional<value_type> pop() {
-    boost::optional<value_type> ret = wl.pop();
+  Galois::optional<value_type> pop() {
+    Galois::optional<value_type> ret = wl.pop();
     if (!ret) return ret;
     p& P = *tracking.getRemote();
     unsigned int cclock = clock.data;
@@ -235,13 +235,13 @@ public:
     wl.push_initial(range);
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     p& P = *tracking.getLocal();
 
     if (P.epoch != P.newEpoch)
       updateEpoch(P);
 
-    boost::optional<value_type> ret = wl.pop();
+    Galois::optional<value_type> ret = wl.pop();
     if (!ret) return ret;
     unsigned num = ++P.values[P.epoch];
     if (num >= perEpoch)
@@ -284,7 +284,7 @@ public:
   }
 
   GALOIS_ATTRIBUTE_NOINLINE
-  boost::optional<value_type> pop()  {
+  Galois::optional<value_type> pop()  {
     return wl.pop();
   }
 };

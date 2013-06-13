@@ -370,10 +370,10 @@ struct SimplePseudoPeripheral {
   struct has_dist {
     DistType dist;
     explicit has_dist(DistType d): dist(d) { }
-    boost::optional<GNode> operator()(const GNode& a) const {
+    Galois::optional<GNode> operator()(const GNode& a) const {
       if (graph.getData(a).dist == dist)
-        return boost::optional<GNode>(a);
-      return boost::optional<GNode>();
+        return Galois::optional<GNode>(a);
+      return Galois::optional<GNode>();
     }
   };
 
@@ -381,7 +381,7 @@ struct SimplePseudoPeripheral {
     BFS::Result res = BFS::go(start, false);
     GNode candidate =
       *Galois::ParallelSTL::map_reduce(graph.begin(), graph.end(),
-          has_dist(res.ecc()), boost::optional<GNode>(), min_degree());
+          has_dist(res.ecc()), Galois::optional<GNode>(), min_degree());
     return std::make_pair(res, candidate);
   }
 
@@ -523,7 +523,7 @@ struct PseudoPeripheral {
   static std::pair<BFS::Result,GNode> go(GNode source) {
     int skips = 0;
     int searches = 0;
-    boost::optional<BFS::Result> terminal;
+    Galois::optional<BFS::Result> terminal;
 
     ++searches;
     std::pair<BFS::Result, std::deque<GNode> > v = search(source, ~0, true);
@@ -546,11 +546,11 @@ struct PseudoPeripheral {
           continue;
         } else if (u.first.ecc() > v.first.ecc()) {
           v = u;
-          terminal = boost::optional<BFS::Result>();
+          terminal = Galois::optional<BFS::Result>();
           break;
         } else if (u.first.max_width < last) {
           last = u.first.max_width;
-          terminal = boost::optional<BFS::Result>(u.first);
+          terminal = Galois::optional<BFS::Result>(u.first);
         }
       }
 

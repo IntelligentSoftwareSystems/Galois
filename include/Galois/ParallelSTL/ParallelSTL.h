@@ -65,7 +65,7 @@ struct find_if_helper {
   typedef int tt_does_not_need_aborts;
   typedef int tt_needs_parallel_break;
 
-  typedef boost::optional<InputIterator> ElementTy;
+  typedef Galois::optional<InputIterator> ElementTy;
   typedef Runtime::PerThreadStorage<ElementTy> AccumulatorTy;
   AccumulatorTy& accum;
   Predicate& f;

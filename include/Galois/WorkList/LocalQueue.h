@@ -62,8 +62,8 @@ public:
     global.push_initial(range);
   }
 
-  boost::optional<value_type> pop() {
-    boost::optional<value_type> ret = local.getLocal()->pop();
+  Galois::optional<value_type> pop() {
+    Galois::optional<value_type> ret = local.getLocal()->pop();
     if (ret)
       return ret;
     return global.pop();

@@ -84,9 +84,9 @@ private:
     some.data = true;
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     TLD& tld = *tlds.getLocal();
-    boost::optional<value_type> r;
+    Galois::optional<value_type> r;
     
     while (true) {
       if (empty)

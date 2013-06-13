@@ -80,9 +80,9 @@ public:
       pushBuffer.getRemote(x)->flush();
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     cWL& wl = *items.getLocal();
-    boost::optional<value_type> retval = wl.pop();
+    Galois::optional<value_type> retval = wl.pop();
     if (retval)
       return retval;
     pWL& p = *pushBuffer.getLocal();

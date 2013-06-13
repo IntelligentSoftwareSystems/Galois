@@ -404,7 +404,7 @@ private:
     return c->push_back(val);
   }
 
-  boost::optional<T> doPop(Chunk* c) {
+  Galois::optional<T> doPop(Chunk* c) {
     if (!IsLocallyLIFO)
       return c->extract_front();
     else
@@ -449,10 +449,10 @@ public:
     push(rp.first, rp.second);
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     std::pair<Chunk*, Chunk*>& tld = *data.getLocal();
     Chunk*& n = getPopChunk(tld);
-    boost::optional<value_type> retval;
+    Galois::optional<value_type> retval;
     //simple case, things in current chunk
     if (n && (retval = doPop(n)))
       return retval;
