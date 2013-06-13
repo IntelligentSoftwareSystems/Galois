@@ -44,7 +44,7 @@ void readMetisGraph(MetisGraph* metisGraph, const char* filename){
   GGraph* graph = metisGraph->getGraph();
   vector<GNode> nodes(numNodes);
   for (int i = 0; i < numNodes; i++) {
-    GNode n = graph->createNode(0, i, 1); //FIXME: edge numbers
+    GNode n = graph->createNode(100, 1); //FIXME: edge numbers
     nodes[i] = n;
     //graph->addNode(n);
   }
@@ -64,7 +64,7 @@ void readMetisGraph(MetisGraph* metisGraph, const char* filename){
         continue;
       }
       graph->getEdgeData(graph->addEdge(n1, n2)) = 1;
-      graph->getData(n1).addEdgeWeight(1);
+      graph->getData(n1).setEdgeWeight(graph->getData(n1).getEdgeWeight() + 1);
       graph->getData(n1).setNumEdges(graph->getData(n1).getNumEdges() + 1);
       countEdges++;
     }
@@ -86,7 +86,7 @@ parallelMakeNodes(GGraph *g,vector <GNode> &gn,InputGraph *in,Galois::GAccumulat
   graph(g),inputGraph(in),gnodes(gn),pnumNodes(numNodes) {}
   void operator()(InputGNode node,Galois::UserContext<InputGNode> &ctx) {
     int id = inputGraph->getData(node);
-    GNode item = graph->createNode(0,id,1); // FIXME: edge num
+    GNode item = graph->createNode(100,1); // FIXME: edge num
     //    graph->addNode(item);
     gnodes[id]=item;
     pnumNodes+=1;
@@ -121,7 +121,7 @@ struct parallelMakeEdges {
       }
       graph->getEdgeData(graph->addEdge(node, gnodes[neighId])) = weight;//
       nodeData.setNumEdges(nodeData.getNumEdges() + 1);
-      nodeData.addEdgeWeight(weight);
+      nodeData.setEdgeWeight(nodeData.getEdgeWeight() + weight);
       /*if(!directed){
         graph->getEdgeData(graph->addEdge(node, gnodes[neighId])) = weight;//
         nodeData.incNumEdges();

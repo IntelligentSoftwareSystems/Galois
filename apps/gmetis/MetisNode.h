@@ -42,167 +42,38 @@ using namespace std;
 class MetisNode{
 
 public:
-	#ifdef NOPARTINFO
-	typedef llvm::SmallVector <METISINT,128> svm;
-	#else
-	typedef int* svm;
-	#endif
-	/*typedef Galois::gdeque <int*,128> sve;
-	sve blah;*/
-	int processed;
-	MetisNode(int id, int weight) {
-		init();
-		_id = id;
-		_weight = weight;
-	//	initPartEdAndIndex(128);
-//		_isMatched = false;
-	}
+  explicit MetisNode(int weight) :_weight(weight) {
+    init();
+  }
+  
+  MetisNode(GNode child0, unsigned weight)
+    : _weight(weight) {
+    children[0] = child0;
+    init();
+    onlyOneChild = true;
+  }
 
-	MetisNode(int weight) {
-		_id = -1;
-		_weight = weight;
-		init();
-	}
+  MetisNode(GNode child0, GNode child1, unsigned weight)
+    : onlyOneChild(false), _weight(weight) {
+    children[0] = child0;
+    children[1] = child1;
+    init();
+  }
 
-	MetisNode() {
-		_weight = 0;
-		_id = -1;
-		init();
-	}
+  void init(){
+    _numEdges = 0;
+    _weightEdge = 0;
+    _partition = 0;
+    bmatched = false;
+    bparent = false;
+    onlyOneChild = false;
+  }
 
-	void init(){
-		_edgeWgtSum = 0;
-		_isBoundary = false;
-		_gain = 0;
-		_edegree = 0;
-		_idegree = 0;
-		_ndgrees = 0;
-		_numEdges = 0;
-		_partition = -1;
-		processed=0;
-		subGraphNode = NULL;
-                bmatched = false;
-                bparent = false;
-	}
-
-	int getNodeId() {
-		return _id;
-	}
-
-	void setNodeId(int i) {
-		_id = i;
-	}
-
-	int getWeight() {
-		return _weight;
-	}
-
-	void setWeight(int weight) {
-		_weight = weight;
-	}
-
-	int getAdjWgtSum() {
-		return _edgeWgtSum;
-	}
-
-	void addEdgeWeight(int weight) {
-		_edgeWgtSum += weight;
-	}
-
-	void setAdjWgtSum(int sum) {
-		_edgeWgtSum = sum;
-	}
-
-	int getPartition() {
-		return _partition;
-	}
-
-	void setPartition(int part) {
-		_partition = part;
-	}
-
-	bool isBoundary() {
-		return _isBoundary;
-	}
-
-	void setBoundary(bool isBoundary) {
-		_isBoundary = isBoundary;
-	}
-
-
-	int getIdegree() {
-		return _idegree;
-	}
-
-	void setIdegree(int idegree) {
-		_idegree = idegree;
-	}
-
-	int getEdegree() {
-		return _edegree;
-	}
-
-	void setEdegree(int edegree) {
-		_edegree = edegree;
-	}
-
-	void swapEDAndID() {
-		int temp = _idegree;
-		_idegree = _edegree;
-		_edegree = temp;
-	}
-
-	int getGain() {
-		return _gain;
-	}
-
-	void updateGain() {
-		_gain = _edegree - _idegree;
-	}
-
-//	void setSubGraphMap(GNode map) {
-//		_subGraphMapTo = map;
-//	}
-//
-//	GNode getSubGraphMap() {
-//		return _subGraphMapTo;
-//	}
-
-	int getNDegrees() {
-		return _ndgrees;
-	}
-
-	void setNDegrees(int degrees) {
-		_ndgrees = degrees;
-	}
-
-//	METISINT* getPartEd(){
-//		return _partEd;
-//	}
-//
-//	METISINT* getPartIndex(){
-//		return _partIndex;
-//	}
-
-	svm& getPartEd(){
-		return _partEd;
-	}
-
-	svm& getPartIndex(){
-		return _partIndex;
-	}
-
-	void initPartEdAndIndex(int nparts){
-			for(int i=0;i<nparts;i++) {
-				_partEd[i]=0;
-				_partIndex[i]=0;
-			}
-
-	}
-
-
-	void *subGraphNode;
-
+  int getWeight() const { return _weight; }
+  void setWeight(int weight) { _weight = weight; }
+  
+  unsigned getEdgeWeight() const { return _weightEdge; }
+  void setEdgeWeight(unsigned w) { _weightEdge = w; }
 
   //ADL
   void setParent(GNode p)  { parent = p; bparent = true; }
@@ -221,16 +92,8 @@ public:
   unsigned getPart() const { return _partition; }
   void setPart(unsigned val) { _partition = val; }
 
-  MetisNode(GNode child0, unsigned weight)
-    : bmatched(false), bparent(false), onlyOneChild(true), _weight(weight) {
-    children[0] = child0;
-  }
 
-  MetisNode(GNode child0, GNode child1, unsigned weight)
-    : bmatched(false), bparent(false), onlyOneChild(false), _weight(weight) {
-    children[0] = child0;
-    children[1] = child1;
-  }
+
 
 private:
   bool bmatched;
@@ -241,27 +104,8 @@ private:
   bool onlyOneChild;
   unsigned _weight;
   unsigned _numEdges;
-
-
-	//the sum of weights of its edges
-	METISINT _edgeWgtSum;
-	METISINT _partition;
-	bool _isBoundary;
-
-	METISINT _id;
-	// the sum of the weights of its edges connecting neighbors in its partition
-	METISINT _idegree;
-	// the sum of the weights of its edges connecting neighbors in the other partition
-	METISINT _edegree;
-	// if moving this node to the other partition, the reduced cut
-	METISINT _gain;
-
-	// the node it mapped in the subgraph got by bisecting the current graph
-	//for kway partitioning
-	METISINT _ndgrees;
-	svm _partEd;
-	svm _partIndex;
-
+  unsigned _partition;
+  unsigned _weightEdge;
 };
 
 #endif /* METISNODE_H_ */

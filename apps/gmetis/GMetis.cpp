@@ -30,8 +30,9 @@
 
 #include "GMetisConfig.h"
 #include "MetisGraph.h"
-#include "PMetis.h"
+#include "Coarsening.h"
 #include "Partitioning.h"
+#include "Refine.h"
 
 #include "Galois/Graph/LCGraph.h"
 #include "Galois/Statistic.h"
@@ -64,16 +65,9 @@ bool verifyCoarsening(MetisGraph *metisGraph) {
     GNode node = *ii;
     MetisNode &nodeData = graph->getData(node);
     GNode matchNode;
-#ifdef localNodeData
     if(!nodeData.isMatched())
       return false;
     matchNode = nodeData.getMatched();
-#else
-    if(!metisGraph->isMatched(nodeData.getNodeId())) {
-      return false;
-    }
-    matchNode = metisGraph->getMatch(nodeData.getNodeId());
-#endif
 
     if(matchNode == node) {
       unmatchedCount++;
@@ -82,15 +76,9 @@ bool verifyCoarsening(MetisGraph *metisGraph) {
       matchedCount++;
       MetisNode &matchNodeData = graph->getData(matchNode);
       GNode mmatch;
-#ifdef localNodeData
       if(!matchNodeData.isMatched())
         return false;
       mmatch = matchNodeData.getMatched();
-#else
-      if(!metisGraph->isMatched(matchNodeData.getNodeId()))
-        return false;
-      mmatch = metisGraph->getMatch(matchNodeData.getNodeId());
-#endif
 
       if(node!=mmatch){
         cout<<"Node's matched node is not matched to this node";
@@ -124,9 +112,9 @@ bool verifyRecursiveBisection(MetisGraph* metisGraph,int nparts) {
   for(GGraph::iterator ii = graph->begin(),ee=graph->end();ii!=ee;ii++) {
     GNode node = *ii;
     MetisNode &nodeData = graph->getData(node);
-    if(!(nodeData.getPartition()<nparts))
+    if(!(nodeData.getPart()<nparts))
       return false;
-    partNodes[nodeData.getPartition()]++;
+    partNodes[nodeData.getPart()]++;
     unsigned edges=0;
     for(GGraph::edge_iterator ii=graph->edge_begin(node),ee=graph->edge_end(node);ii!=ee;ii++) {
       edges++;
@@ -148,22 +136,32 @@ bool verifyRecursiveBisection(MetisGraph* metisGraph,int nparts) {
   return true;
 }
 
+
+unsigned log2_mask(unsigned index) {
+  unsigned targetlevel = 0;
+  while (index >>= 1) {
+    targetlevel <<= 1;
+    targetlevel |= 1;
+  }
+  return targetlevel;
+}
+
 /**
  * KMetis Algorithm
  */
 void partition(MetisGraph* metisGraph, unsigned nparts) {
   unsigned coarsenTo = std::max(metisGraph->getNumNodes() / (40 * intlog2(nparts)), 20 * (nparts));
   int maxVertexWeight = (int) (1.5 * ((metisGraph->getNumNodes()) / (double) coarsenTo));
-  Galois::StatTimer T;
-  T.start();
+  Galois::StatTimer T("Coarsening");
   Galois::Timer t;
+  T.start();
   t.start();
   MetisGraph* mcg = coarsen(metisGraph, coarsenTo);
   t.stop();
-  cout<<"coarsening time: " << t.get() << " ms"<<endl;
   T.stop();
+  cout<<"coarsening time: " << t.get() << " ms"<<endl;
 
-  if(0 && testMetis::testCoarsening) {
+  if(0) {
     if(verifyCoarsening(mcg->getFinerGraph())) {
       cout<<"#### Coarsening is correct ####"<<endl;
     } else {
@@ -171,30 +169,22 @@ void partition(MetisGraph* metisGraph, unsigned nparts) {
     }
   }
 
-  //Testing
-  partInfo base(mcg->getGraph(), metisGraph->getNumNodes(), metisGraph->getNumNodes());
-  partInfo np[3];
-  np[0] = bisect_GGP(base);
-  np[1] = bisect_GGP(base);
-  np[2] = bisect_GGP(np[0]);
-  std::cout << "Base " << base << "\n";
-  for (unsigned x = 0; x < 3; ++x)
-    std::cout << "Part " << x << ": " << np[x] << "\n";
+  Galois::StatTimer T2("Partition");
+  Galois::Timer t2;
+  T2.start();
+  t2.start();
 
-  return;
-  //END testing
+  std::vector<partInfo> np;
+  np.push_back(partInfo(mcg->getGraph(), metisGraph->getNumNodes(), metisGraph->getNumNodes()));
+  for (unsigned x = 1; x < nparts; ++x)
+    np.push_back(bisect_GGP(np[x & log2_mask(x)]));
+  t2.stop();
+  T2.stop();
+  cout<<"initial part time: " << t2.get() << " ms"<<endl;
+  for (unsigned x = 0; x < nparts; ++x)
+    std::cout << "Part " << x << ":\t" << np[x] << "\n";
 
-  float* totalPartitionWeights = new float[nparts];
-  std::fill_n(totalPartitionWeights, nparts, 1 / (float) nparts);
-  maxVertexWeight = (int) (1.5 * ((mcg->getNumNodes()) / COARSEN_FRACTION));
-  PMetis pmetis(20, maxVertexWeight);
-  Galois::Timer init_part_t;
-  init_part_t.start();
-  pmetis.mlevelRecursiveBisection(mcg, nparts, totalPartitionWeights, 0, 0);
-  init_part_t.stop();
-  cout << "initial partition time: "<< init_part_t.get()  << " ms"<<endl;
-
-  if(testMetis::testInitialPartition) {
+  if(0) {
     cout<<endl<<"#### Verifying initial partition ####"<<endl;
     if(!verifyRecursiveBisection(mcg,nparts)) {
       cout<<endl<<"!!!! Initial partition is wrong !!!!"<<endl;
@@ -203,24 +193,29 @@ void partition(MetisGraph* metisGraph, unsigned nparts) {
     }
   }
 
-  //return;
-  Galois::Timer refine_t;
-  std::fill_n(totalPartitionWeights, nparts, 1 / (float) nparts);
-  refine_t.start();
-  refineKWay(mcg, metisGraph, totalPartitionWeights, (float) 1.03, nparts);
-  refine_t.stop();
-  cout << "refine time: " << refine_t.get() << " ms"<<endl;
-  delete[] totalPartitionWeights;
-  T.stop();
+  std::cout << "\n\n";
+  Galois::StatTimer T3("Refine");
+  Galois::Timer t3;
+  T3.start();
+  t3.start();
+  for (int x = 0; x < nparts * 100; ++x)
+    refine_BKL(*mcg->getGraph(),np);
+  t3.stop();
+  T3.stop();
+  cout<<"refinement time: " << t3.get() << " ms"<<endl;
+  for (unsigned x = 0; x < nparts; ++x)
+    std::cout << "Part " << x << ":\t" << np[x] << "\n";
+
+  return;
 }
 
 
 void verify(MetisGraph* metisGraph) {
-  if (!metisGraph->verify()) {
-    cout<<"KMetis failed."<<endl;
-  }else{
-    cout<<"KMetis okay"<<endl;
-  }
+  // if (!metisGraph->verify()) {
+  //   cout<<"KMetis failed."<<endl;
+  // }else{
+  //   cout<<"KMetis okay"<<endl;
+  // }
 }
 
 namespace testMetis {
@@ -242,7 +237,7 @@ struct parallelInitMorphGraph {
     for(GGraph::iterator ii = graph.local_begin(),ee=graph.local_end();ii!=ee;ii++) {
       GNode node = *ii;
       MetisNode &nodeData = graph.getData(node);
-      nodeData.setNodeId(id);
+      //nodeData.setNodeId(id);
       nodeData.init();
       nodeData.setWeight(1);
       int count = std::distance(graph.edge_begin(node),graph.edge_end(node));
@@ -252,7 +247,7 @@ struct parallelInitMorphGraph {
         graph.getEdgeData(jj)=1;
         weight+=1;
       }
-      nodeData.addEdgeWeight(weight);
+      nodeData.setEdgeWeight(nodeData.getEdgeWeight() + weight);
       id+=num;
     }
   }
