@@ -204,6 +204,9 @@ template<typename NodeTy, bool HasLockable>
 class NodeInfoBase: public boost::mpl::if_c<HasLockable,Galois::Runtime::Lockable,NoLockable>::type {
   NodeTy data;
 public:
+  template<typename... Args>
+  NodeInfoBase(Args&&... args): data(std::forward<Args>(args)...) { }
+
   typedef NodeTy& reference;
   reference getData() { return data; } 
   void destruct() { (&data)->~NodeTy(); }

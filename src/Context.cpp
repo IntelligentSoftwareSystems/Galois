@@ -38,12 +38,14 @@ static __thread jmp_buf Galois::Runtime::hackjmp;
 static __thread Galois::Runtime::SimpleRuntimeContext* thread_cnx = 0;
 
 namespace {
+
 struct PendingStatus {
   Galois::Runtime::LL::CacheLineStorage<Galois::Runtime::PendingFlag> flag;
   PendingStatus(): flag(Galois::Runtime::NON_DET) { }
 };
 
 PendingStatus pendingStatus;
+
 }
 
 void Galois::Runtime::setPending(Galois::Runtime::PendingFlag value) {
@@ -55,7 +57,7 @@ Galois::Runtime::PendingFlag Galois::Runtime::getPending () {
 }
 
 void Galois::Runtime::doCheckWrite() {
-  if (Galois::Runtime::getPending () == Galois::Runtime::PENDING) {
+  if (Galois::Runtime::getPending() == Galois::Runtime::PENDING) {
 #if GALOIS_USE_EXCEPTION_HANDLER
     throw Galois::Runtime::REACHED_FAILSAFE;
 #else

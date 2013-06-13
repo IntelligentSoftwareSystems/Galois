@@ -196,8 +196,16 @@ struct EdgeFactory<void> {
  * @tparam EdgeTy Type of edge data
  * @tparam Directional true if graph is directed
  */
-template<typename NodeTy, typename EdgeTy, bool Directional>
+template<typename NodeTy, typename EdgeTy, bool Directional,
+  bool HasNoLockable=false
+  >
 class FirstGraph : private boost::noncopyable {
+public:
+  //! If true, do not use abstract locks in graph
+  template<bool _has_no_lockable>
+  struct with_no_lockable { typedef FirstGraph<NodeTy,EdgeTy,Directional,_has_no_lockable> type; };
+
+private:
   template<typename T>
   struct first_eq_and_valid {
     T N2;
@@ -213,8 +221,9 @@ class FirstGraph : private boost::noncopyable {
     bool operator()(const T2& ii) const { return !ii.first() || !ii.first()->active; }
   };
   
-  class gNode: public Galois::Runtime::Lockable {
+  class gNode: public detail::NodeInfoBase<NodeTy, !HasNoLockable> {
     friend class FirstGraph;
+    typedef detail::NodeInfoBase<NodeTy, !HasNoLockable> Super;
 
     //! The storage type for an edge
     typedef GraphImpl::EdgeItem<gNode, EdgeTy, Directional> EITy;
@@ -225,7 +234,6 @@ class FirstGraph : private boost::noncopyable {
     typedef typename EdgesTy::iterator iterator;
     
     EdgesTy edges;
-    NodeTy data;
     bool active;
     
     iterator begin() { return edges.begin(); }
@@ -247,7 +255,7 @@ class FirstGraph : private boost::noncopyable {
     }
 
     void resizeEdges(size_t size) {
-      	edges.resize(size, EITy(new gNode(), 0));
+      edges.resize(size, EITy(new gNode(), 0));
     }
 
     template<typename... Args>
@@ -266,9 +274,17 @@ class FirstGraph : private boost::noncopyable {
       return edges.insert(edges.end(), EITy(N, v, std::forward<Args>(args)...));
     }
 
+    template<bool _A1 = HasNoLockable>
+    void acquire(MethodFlag mflag, typename std::enable_if<!_A1>::type* = 0) {
+      Galois::Runtime::acquire(this, mflag);
+    }
+
+    template<bool _A1 = HasNoLockable>
+    void acquire(MethodFlag mflag, typename std::enable_if<_A1>::type* = 0) { }
+
   public:
     template<typename... Args>
-    gNode(Args&&... args): data(std::forward<Args>(args)...), active(false) { }
+    gNode(Args&&... args): Super(std::forward<Args>(args)...), active(false) { }
   };
 
   //The graph manages the lifetimes of the data in the nodes and edges
@@ -310,13 +326,13 @@ private:
     assert(src);
     assert(dst);
     Galois::Runtime::checkWrite(mflag, true);
-    Galois::Runtime::acquire(src, mflag);
+    src->acquire(mflag);
     typename gNode::iterator ii = src->find(dst);
     if (ii == src->end()) {
       if (Directional) {
 	ii = src->createEdgeWithReuse(dst, 0, std::forward<Args>(args)...);
       } else {
-	Galois::Runtime::acquire(dst, mflag);
+        dst->acquire(mflag);
 	EdgeTy* e = edges.mkEdge(std::forward<Args>(args)...);
 	ii = dst->createEdgeWithReuse(src, e, std::forward<Args>(args)...);
 	ii = src->createEdgeWithReuse(dst, e, std::forward<Args>(args)...);
@@ -330,13 +346,13 @@ private:
     assert(src);
     assert(dst);
     Galois::Runtime::checkWrite(mflag, true);
-    Galois::Runtime::acquire(src, mflag);
+    src->acquire(mflag);
     typename gNode::iterator ii = src->end();
     if (ii == src->end()) {
       if (Directional) {
 	ii = src->createEdge(dst, 0, std::forward<Args>(args)...);
       } else {
-	Galois::Runtime::acquire(dst, mflag);
+        dst->acquire(mflag);
 	EdgeTy* e = edges.mkEdge(std::forward<Args>(args)...);
 	ii = dst->createEdge(src, e, std::forward<Args>(args)...);
 	ii = src->createEdge(dst, e, std::forward<Args>(args)...);
@@ -362,7 +378,7 @@ public:
    */
   void addNode(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::checkWrite(mflag, true);
-    Galois::Runtime::acquire(n, mflag);
+    n->acquire(mflag);
     n->active = true;
   }
 
@@ -370,14 +386,14 @@ public:
   NodeTy& getData(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::ALL) const {
     assert(n);
     Galois::Runtime::checkWrite(mflag, false);
-    Galois::Runtime::acquire(n, mflag);
-    return n->data;
+    n->acquire(mflag);
+    return n->getData();
   }
 
   //! Checks if a node is in the graph
   bool containsNode(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::ALL) const {
     assert(n);
-    Galois::Runtime::acquire(n, mflag);
+    n->acquire(mflag);
     return n->active;
   }
 
@@ -389,7 +405,7 @@ public:
   void removeNode(GraphNode n, Galois::MethodFlag mflag = MethodFlag::ALL) {
     assert(n);
     Galois::Runtime::checkWrite(mflag, true);
-    Galois::Runtime::acquire(n, mflag);
+    n->acquire(mflag);
     gNode* N = n;
     if (N->active) {
       N->active = false;
@@ -406,7 +422,7 @@ public:
   void resizeEdges(GraphNode src, size_t size, Galois::MethodFlag mflag = MethodFlag::ALL) {
     assert(src);
     Galois::Runtime::checkWrite(mflag, false);
-    Galois::Runtime::acquire(src, mflag);
+    src->acquire(mflag);
     src->resizeEdges(size);
    }
 
@@ -431,11 +447,11 @@ public:
   void removeEdge(GraphNode src, edge_iterator dst, Galois::MethodFlag mflag = MethodFlag::ALL) {
     assert(src);
     Galois::Runtime::checkWrite(mflag, true);
-    Galois::Runtime::acquire(src, mflag);
+    src->acquire(mflag);
     if (Directional) {
       src->erase(dst.base());
     } else {
-      Galois::Runtime::acquire(dst->first(), mflag);
+      dst->first()->acquire(mflag);
       EdgeTy* e = dst->second();
       edges.delEdge(e);
       src->erase(dst.base());
@@ -447,7 +463,7 @@ public:
   edge_iterator findEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::ALL) {
     assert(src);
     assert(dst);
-    Galois::Runtime::acquire(src, mflag);
+    src->acquire(mflag);
     return boost::make_filter_iterator(is_edge(), src->find(dst), src->end());
   }
 
@@ -461,7 +477,7 @@ public:
   edge_data_reference getEdgeData(edge_iterator ii, Galois::MethodFlag mflag = MethodFlag::NONE) const {
     assert(ii->first()->active);
     Galois::Runtime::checkWrite(mflag, false);
-    Galois::Runtime::acquire(ii->first(), mflag);
+    ii->first()->acquire(mflag);
     return *ii->second();
   }
 
@@ -476,12 +492,12 @@ public:
   //! Returns an iterator to the neighbors of a node 
   edge_iterator edge_begin(GraphNode N, Galois::MethodFlag mflag = MethodFlag::ALL) {
     assert(N);
-    Galois::Runtime::acquire(N, mflag);
+    N->acquire(mflag);
 
     if (Galois::Runtime::shouldLock(mflag)) {
       for (typename gNode::iterator ii = N->begin(), ee = N->end(); ii != ee; ++ii) {
 	if (ii->first()->active)
-	  Galois::Runtime::acquire(ii->first(), mflag);
+	  ii->first()->acquire(mflag);
       }
     }
     return boost::make_filter_iterator(is_edge(), N->begin(), N->end());
@@ -490,9 +506,9 @@ public:
   //! Returns the end of the neighbor iterator 
   edge_iterator edge_end(GraphNode N, Galois::MethodFlag mflag = MethodFlag::ALL) {
     assert(N);
-    // Not necessary; no valid use for an end pointer should ever require it
-    //if (shouldLock(mflag))
-    //  acquire(N);
+    // Acquiring lock is not necessary: no valid use for an end pointer should
+    // ever require it
+    // N->acquire(mflag);
     return boost::make_filter_iterator(is_edge(), N->end(), N->end());
   }
 
@@ -549,8 +565,6 @@ public:
   size_t sizeOfEdgeData() const {
     return gNode::EITy::sizeOfSecond();
   }
-
-  FirstGraph() { }
 };
 
 }
