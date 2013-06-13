@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <algorithm>
 #include <cmath>
+#include <fstream>
 
 #include "GMetisConfig.h"
 #include "MetisGraph.h"
@@ -188,15 +189,34 @@ void partition(MetisGraph* metisGraph, unsigned nparts) {
   T2.start();
   t2.start();
 
-  std::vector<partInfo> np;
-  np.push_back(partInfo(mcg->getGraph(), metisGraph->getNumNodes(), metisGraph->getNumNodes()));
-  for (unsigned x = 1; x < nparts; ++x)
-    np.push_back(bisect_GGP(np[x & log2_mask(x)]));
+  int nbTry = 4;
+  partInfo** npt = new partInfo*[nbTry];
+  for(int i =0; i<nbTry; i++)
+    npt[i]=new partInfo[nparts];
+  std::deque<partInfo> workList;
+
+  for (GGraph::iterator ii = mcg->getGraph()->begin(), ee = mcg->getGraph()->end(); ii != ee; ++ii)
+    mcg->getGraph()->getData(*ii).initTryPart(nparts);
+  for (int j =0; j<nbTry; j++)
+    workList.push_back(partInfo(mcg->getGraph(), mcg->getNumNodes(), metisGraph->getNumNodes(), j, nparts, metisGraph->getNumNodes()));
+
+  Galois::for_each(workList.begin(), workList.end(), parallelBisect(npt));
+
+
   t2.stop();
   T2.stop();
   cout<<"initial part time: " << t2.get() << " ms"<<endl;
+
+  for (unsigned i = 0; i < nbTry; ++i)
+    for (unsigned x = 0; x < nparts; ++x)
+      std::cout << "Part " << x << ": " << npt[i][x] << "\n";
+
+  std::vector<partInfo> np;
   for (unsigned x = 0; x < nparts; ++x)
-    std::cout << "Part " << x << ":\t" << np[x] << "\n";
+      np.push_back(npt[0][x]);
+  for (auto ii = mcg->getGraph()->begin(), ee = mcg->getGraph()->end(); ii != ee; ++ii) {
+    mcg->getGraph()->getData(*ii).setPart(mcg->getGraph()->getData(*ii).getTryPart(0));
+  }
 
   if(0) {
     cout<<endl<<"#### Verifying initial partition ####"<<endl;
