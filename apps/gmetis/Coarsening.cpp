@@ -23,8 +23,9 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
+#include "GMetisConfig.h"
 #include "MetisGraph.h"
-#include "Coarsening.h"
+#include "Metis.h"
 
 namespace {
 

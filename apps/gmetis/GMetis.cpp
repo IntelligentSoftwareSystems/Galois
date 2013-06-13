@@ -31,9 +31,7 @@
 
 #include "GMetisConfig.h"
 #include "MetisGraph.h"
-#include "Coarsening.h"
-#include "Partitioning.h"
-#include "Refine.h"
+#include "Metis.h"
 #include "Metrics.h"
 
 #include "Galois/Graph/LCGraph.h"
@@ -199,7 +197,7 @@ void partition(MetisGraph* metisGraph, unsigned nparts) {
     mcg->getGraph()->getData(*ii).initTryPart(nparts);
   for (int j =0; j<nbTry; j++)
     workList.push_back(partInfo(mcg->getGraph(), mcg->getNumNodes(), metisGraph->getNumNodes(), j, nparts, metisGraph->getNumNodes()));
-
+  
   Galois::for_each(workList.begin(), workList.end(), parallelBisect(npt));
 
 
@@ -241,7 +239,7 @@ void partition(MetisGraph* metisGraph, unsigned nparts) {
     MetisGraph* fineGraph = coarseGraph->getFinerGraph();
     if (coarseGraph->getFinerGraph())
       Galois::do_all_local(*coarseGraph->getGraph(), projectPart(coarseGraph), "project");
-  } while (coarseGraph = coarseGraph->getFinerGraph());
+  } while ((coarseGraph = coarseGraph->getFinerGraph()));
   t3.stop();
   T3.stop();
   cout<<"refinement time: " << t3.get() << " ms"<<endl;
@@ -353,6 +351,9 @@ int main(int argc, char** argv) {
   std::cout << "Edge Cuts:\n";
   for (unsigned x = 0; x < numPartitions; ++x)
     std::cout << x << " " << ec[x] << "\n";
+
+  std::cout << "Average Edge Cut: " << (std::accumulate(ec.begin(), ec.end(), 0) / numPartitions) << "\n";
+  std::cout << "Minimum Edge Cut: " << *std::min_element(ec.begin(), ec.end()) << "\n";
 
 }
 
