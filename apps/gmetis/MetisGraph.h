@@ -56,5 +56,13 @@ public:
   unsigned getNumNodes() {
     return std::distance(graph.begin(), graph.end());
   }
+  
+  unsigned getTotalWeight() {
+    MetisGraph* f = this;
+    while (f->finer)
+      f = f->finer;
+    return std::distance(f->graph.begin(), f->graph.end());
+  }
+
 };
 #endif /* METISGRAPH_H_ */

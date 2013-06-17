@@ -15,10 +15,6 @@ int gain(GGraph& g, GNode n) {
   return retval;
 }
 
-void refine_FL_pair(partInfo& p1, partInfo& p2) {
-  
-}
-
 void refine_BKL(GGraph& g, std::vector<partInfo>& parts) {
   std::set<GNode> boundary;
   

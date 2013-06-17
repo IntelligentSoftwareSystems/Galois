@@ -31,50 +31,46 @@ struct partInfo {
   unsigned partNum;
   unsigned partMask;
   unsigned partWeight;
-  unsigned totalWeight;
   unsigned partSize; 
-  int neededParts; 
-  GGraph* graph;
-  int tryPart;
   
-  //  partInfo(GGraph* g, unsigned tw, unsigned mw = 0)
-  // :partNum(0), partMask(1), partWeight(mw), totalWeight(tw), graph(g) {}
-  partInfo(GGraph* g,unsigned size, unsigned tw, int tryN, int neededParts=1, unsigned mw = 0)
-    :partNum(0), partMask(1), partWeight(mw), totalWeight(tw), partSize(size), neededParts(neededParts), graph(g), tryPart(tryN) { 
-  } 
+  partInfo(unsigned mw, unsigned ms)
+    :partNum(0), partMask(1), partWeight(mw), partSize(ms) {}
 
-  partInfo() { } 
+  partInfo() :partNum(~0), partMask(~0), partWeight(~0), partSize(~0) {}
+
+  partInfo(unsigned pn, unsigned pm, unsigned pw, unsigned ps) :partNum(pn), partMask(pm), partWeight(pw), partSize(ps) {}
+
+  unsigned splitID() const {
+    return partNum | partMask;
+  }
+
+  std::pair<unsigned, unsigned> splitRatio(unsigned numParts) {
+    unsigned L = 0, R = 0;
+    unsigned LM = partMask - 1; // 00100 -> 00011
+    for (unsigned x = 0; x < numParts; ++x)
+      if ((x & LM) == partNum) {
+        if (x & partMask)
+          ++R;
+        else
+          ++L;
+      }
+    return std::make_pair(L, R);
+  }
 
   partInfo split() {
-    partInfo np(*this);
-    np.partNum = partNum | partMask;
+    partInfo np = {splitID(), partMask << 1, 0, 0};
     partMask <<= 1;
-    np.partMask = partMask;
-    np.neededParts = neededParts/2;
-    neededParts -= np.neededParts;
-    np.partWeight = 0;
-    np.tryPart = tryPart;
     return np;
   }
 };
 
 std::ostream& operator<<(std::ostream& os, const partInfo& p);
 
-struct parallelBisect { 
-  //bisect_policy bisect; 
-  partInfo** parts; 
-  parallelBisect(partInfo** parts);  
-  void operator()(partInfo &item, Galois::UserContext<partInfo> &workList);
-}; 
-
-
 //Coarsening
 MetisGraph* coarsen(MetisGraph* fineMetisGraph, unsigned coarsenTo);
 
 //Partitioning
-partInfo bisect_GGP(partInfo& oldPart);
-partInfo bisect_GGGP(partInfo& oldPart);
-
+std::vector<partInfo> partition(MetisGraph* coarseMetisGraph, unsigned numPartitions);
 
 //Refinement
 void refine_FL_pair(partInfo& p1, partInfo& p2);

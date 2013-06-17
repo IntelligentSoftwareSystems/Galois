@@ -94,11 +94,6 @@ public:
   unsigned getPart() const { return _partition; }
   void setPart(unsigned val) { _partition = val; }
 
-  unsigned getTryPart(int n) const { return tryPart[n]; }
-  void setTryPart(int n, unsigned val) { tryPart[n] = val; }
-  void initTryPart(int nbTry){tryPart = new int[nbTry]; while(nbTry--) tryPart[nbTry]=0;}
-
-
 private:
   bool bmatched;
   GNode matched;
@@ -110,7 +105,6 @@ private:
   unsigned _numEdges;
   unsigned _partition;
   unsigned _weightEdge;
-  int* tryPart;
 };
 
 #endif /* METISNODE_H_ */
