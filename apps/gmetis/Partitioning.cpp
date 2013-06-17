@@ -11,15 +11,15 @@ std::ostream& operator<<(std::ostream& os, const partInfo& p) {
 }
 
 //gain of moving n from it's current part to new part
-int gain_limited(GGraph& g, GNode n, unsigned newpart) {
+int gain_limited(GGraph& g, GNode n, unsigned newpart, Galois::MethodFlag flag) {
   int retval = 0;
-  unsigned nPart = g.getData(n).getPart();
-  for (auto ii = g.edge_begin(n), ee =g.edge_end(n); ii != ee; ++ii) {
-    GNode neigh = g.getEdgeDst(ii);
-    if (g.getData(neigh).getPart() == nPart)
-      retval -= g.getEdgeData(ii);
-    else if (g.getData(neigh).getPart() == newpart)
-      retval += g.getEdgeData(ii);
+  unsigned nPart = g.getData(n,flag).getPart();
+  for (auto ii = g.edge_begin(n,flag), ee =g.edge_end(n,flag); ii != ee; ++ii) {
+    GNode neigh = g.getEdgeDst(ii,flag);
+    if (g.getData(neigh,flag).getPart() == nPart)
+      retval -= g.getEdgeData(ii,flag);
+    else if (g.getData(neigh,flag).getPart() == newpart)
+      retval += g.getEdgeData(ii,flag);
   }
   return retval;
 }
@@ -69,16 +69,6 @@ struct bisect_GGP {
   }
 };
 
-
-struct gainSorter {
-  std::map<GNode, int>& gains;
-  gainSorter(std::map<GNode, int>& _g) :gains(_g) {}
-  bool operator()(GNode n1, GNode n2) {
-    assert(gains.count(n1) && gains.count(n2));
-    return gains[n1] > gains[n2];
-  }
-};
-
 struct bisect_GGGP {
   partInfo operator()(GGraph& g, partInfo& oldPart, std::pair<unsigned, unsigned> ratio) {
     partInfo newPart = oldPart.split();
@@ -125,7 +115,7 @@ struct bisect_GGGP {
             gains.erase(dst);
           }
           if (g.getData(dst, flag).getPart() == oldPart.partNum) {
-            int newgain = gains[dst] = gain_limited(g, dst, newPart.partNum);
+            int newgain = gains[dst] = gain_limited(g, dst, newPart.partNum, flag);
             boundary[newgain].insert(dst);
           }
         }
@@ -145,31 +135,27 @@ struct parallelBisect {
   unsigned nparts;
   GGraph* graph;
   bisector bisect;
-  Galois::InsertBag<partInfo>& parts;
+  std::vector<partInfo>& parts;
 
-  parallelBisect(MetisGraph* mg, unsigned parts, Galois::InsertBag<partInfo>& pb, bisector b = bisector())
+  parallelBisect(MetisGraph* mg, unsigned parts, std::vector<partInfo>& pb, bisector b = bisector())
     :totalWeight(mg->getTotalWeight()), nparts(parts), graph(mg->getGraph()), bisect(b), parts(pb)
   {}
   void operator()(partInfo* item, Galois::UserContext<partInfo*> &cnx) {
     if (item->splitID() >= nparts) //when to stop
       return;
     std::pair<unsigned, unsigned> ratio = item->splitRatio(nparts);
-    //    std::cout << "Splitting " << item->partNum << ":" << item->partMask << " L " << ratio.first << " R " << ratio.second << "\n";
+    //std::cout << "Splitting " << item->partNum << ":" << item->partMask << " L " << ratio.first << " R " << ratio.second << "\n";
     partInfo newPart = bisect(*graph, *item, ratio);
-    cnx.push(&parts.push(newPart));
+    //std::cout << "Result " << item->partNum << " " << newPart.partNum << "\n";
+    parts[newPart.partNum] = newPart;
+    cnx.push(&parts[newPart.partNum]);
     cnx.push(item);
   }
 }; 
   
 std::vector<partInfo> partition(MetisGraph* mcg, unsigned numPartitions) {
-  Galois::InsertBag<partInfo> parts;
-  partInfo initPart(mcg->getTotalWeight(), mcg->getNumNodes());
-
-  partInfo* p = &parts.push(initPart);
-  Galois::for_each(p, parallelBisect<bisect_GGGP>(mcg, numPartitions, parts));
-
-  std::vector<partInfo> np(numPartitions);
-  for (partInfo& tp : parts)
-    np.at(tp.partNum) = tp;
-  return np;
+  std::vector<partInfo> parts(numPartitions);
+  parts[0] = partInfo(mcg->getTotalWeight(), mcg->getNumNodes());
+  Galois::for_each<Galois::WorkList::GFIFO<>>(&parts[0], parallelBisect<bisect_GGGP>(mcg, numPartitions, parts));
+  return parts;
 }

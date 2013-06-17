@@ -58,7 +58,7 @@ struct partInfo {
   }
 
   partInfo split() {
-    partInfo np = {splitID(), partMask << 1, 0, 0};
+    partInfo np(splitID(), partMask << 1, 0, 0);
     partMask <<= 1;
     return np;
   }
