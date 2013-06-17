@@ -82,8 +82,8 @@ struct gainSorter {
 struct bisect_GGGP {
   partInfo operator()(GGraph& g, partInfo& oldPart, std::pair<unsigned, unsigned> ratio) {
     partInfo newPart = oldPart.split();
-    std::deque<GNode> boundary;
     std::map<GNode, int> gains;
+    std::map<int, std::set<GNode>> boundary;
 
     unsigned& newWeight = newPart.partWeight = 0;
     unsigned& newSize = newPart.partSize = 0;
@@ -98,15 +98,18 @@ struct bisect_GGGP {
       for (auto ii = g.begin(), ee = g.end(); ii != ee; ++ii)
         if (g.getData(*ii, flag).getPart() == oldPart.partNum) {
           if(--i) {
-            boundary.push_back(*ii);
+            boundary[0].insert(*ii);
             break;
           }
         }
     
       //grow partition
       while (newWeight < targetWeight && !boundary.empty()) {
-        GNode n =  boundary.front();
-        boundary.pop_front();
+        auto bi = boundary.rbegin();
+        GNode n =  *bi->second.begin();
+        bi->second.erase(bi->second.begin());
+        if (bi->second.empty())
+          boundary.erase(bi->first);
         if (g.getData(n, flag).getPart() == newPart.partNum)
           continue;
         newWeight += g.getData(n, flag).getWeight();
@@ -114,12 +117,18 @@ struct bisect_GGGP {
         g.getData(n, flag).setPart(newPart.partNum);
         for (auto ii = g.edge_begin(n, flag), ee = g.edge_end(n, flag); ii != ee; ++ii) {
           GNode dst = g.getEdgeDst(ii, flag);
-          gains[dst] = gain_limited(g, dst, newPart.partNum);
+          auto gi = gains.find(dst);
+          if (gi != gains.end()) { //update
+            boundary[gi->second].erase(dst);
+            if (boundary[gi->second].empty())
+              boundary.erase(gi->second);
+            gains.erase(dst);
+          }
           if (g.getData(dst, flag).getPart() == oldPart.partNum) {
-            boundary.push_back(dst);
+            int newgain = gains[dst] = gain_limited(g, dst, newPart.partNum);
+            boundary[newgain].insert(dst);
           }
         }
-        std::sort(boundary.begin(), boundary.end(), gainSorter(gains));
       }
     } while (newWeight < targetWeight);
   
@@ -145,7 +154,7 @@ struct parallelBisect {
     if (item->splitID() >= nparts) //when to stop
       return;
     std::pair<unsigned, unsigned> ratio = item->splitRatio(nparts);
-    std::cout << "Splitting " << item->partNum << ":" << item->partMask << " L " << ratio.first << " R " << ratio.second << "\n";
+    //    std::cout << "Splitting " << item->partNum << ":" << item->partMask << " L " << ratio.first << " R " << ratio.second << "\n";
     partInfo newPart = bisect(*graph, *item, ratio);
     cnx.push(&parts.push(newPart));
     cnx.push(item);
@@ -157,7 +166,7 @@ std::vector<partInfo> partition(MetisGraph* mcg, unsigned numPartitions) {
   partInfo initPart(mcg->getTotalWeight(), mcg->getNumNodes());
 
   partInfo* p = &parts.push(initPart);
-  Galois::for_each(p, parallelBisect<bisect_GGP>(mcg, numPartitions, parts));
+  Galois::for_each(p, parallelBisect<bisect_GGGP>(mcg, numPartitions, parts));
 
   std::vector<partInfo> np(numPartitions);
   for (partInfo& tp : parts)
