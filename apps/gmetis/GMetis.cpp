@@ -25,6 +25,7 @@
 #include <iostream>
 #include <string.h>
 #include <stdlib.h>
+#include <numeric>
 #include <algorithm>
 #include <cmath>
 #include <fstream>
