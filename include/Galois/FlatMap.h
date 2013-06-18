@@ -26,10 +26,10 @@
 
 #include "Galois/config.h"
 
-#include GALOIS_C11_STD_HEADER(functional)
-#include GALOIS_C11_STD_HEADER(algorithm)
-#include GALOIS_C11_STD_HEADER(utility)
-#include GALOIS_C11_STD_HEADER(vector)
+#include GALOIS_CXX11_STD_HEADER(functional)
+#include GALOIS_CXX11_STD_HEADER(algorithm)
+#include GALOIS_CXX11_STD_HEADER(utility)
+#include GALOIS_CXX11_STD_HEADER(vector)
 #include <stdexcept>
 
 namespace Galois {
@@ -188,7 +188,7 @@ public:
 //      __i = _data.emplace(__i, std::piecewise_construct,
 //			  std::tuple<const key_type&>(__k),
 //			  std::tuple<>());
-#ifndef GALOIS_C11_VECTOR_HAS_NO_EMPLACE
+#ifndef GALOIS_CXX11_VECTOR_HAS_NO_EMPLACE
       __i = _data.emplace(__i, __k, mapped_type());
 #else
       __i = _data.insert(__i, value_type(__k, mapped_type()));
@@ -203,7 +203,7 @@ public:
 //      __i = _data.emplace(__i, std::piecewise_construct, 
 //			  std::forward_as_tuple(std::move(__k)),
 //			  std::tuple<>());
-#ifndef GALOIS_C11_VECTOR_HAS_NO_EMPLACE
+#ifndef GALOIS_CXX11_VECTOR_HAS_NO_EMPLACE
       __i = _data.emplace(__i, std::move(__k), mapped_type());
 #else
       __i = _data.insert(__i, value_type(std::move(__k), mapped_type()));

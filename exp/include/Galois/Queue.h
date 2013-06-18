@@ -30,7 +30,7 @@
 #include "Galois/Runtime/PerThreadStorage.h"
 
 #include <boost/utility.hpp>
-#include GALOIS_C11_STD_HEADER(atomic)
+#include GALOIS_CXX11_STD_HEADER(atomic)
 #include <cstdlib>
 #include <limits>
 #include <vector>

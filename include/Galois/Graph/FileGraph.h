@@ -43,7 +43,7 @@
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/utility.hpp>
 
-#include GALOIS_C11_STD_HEADER(type_traits)
+#include GALOIS_CXX11_STD_HEADER(type_traits)
 //#include <fstream>
 
 #include <string.h>

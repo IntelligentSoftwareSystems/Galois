@@ -37,7 +37,7 @@
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/iterator/counting_iterator.hpp>
 
-#include GALOIS_C11_STD_HEADER(type_traits)
+#include GALOIS_CXX11_STD_HEADER(type_traits)
 #include <deque>
 #include <queue>
 

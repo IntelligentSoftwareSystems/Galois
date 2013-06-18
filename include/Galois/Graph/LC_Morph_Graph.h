@@ -175,7 +175,6 @@ public:
     return std::find_if(src->edgeBegin, src->edgeEnd, first_equals(dst)); 
   }
   
-  
   void structureFromFile(const std::string& fname) { Graph::structureFromFile(*this, fname); }
   
   struct CreateNodes {

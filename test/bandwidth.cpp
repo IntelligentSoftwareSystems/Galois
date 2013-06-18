@@ -2,13 +2,13 @@
 #include "Galois/Galois.h"
 #include "Galois/Timer.h"
 
-#include GALOIS_C11_STD_HEADER(random)
+#include GALOIS_CXX11_STD_HEADER(random)
 #include <cstdio>
 #include <time.h>
 
 template<typename Gen>
 void random_access(Gen& gen, int* buf, size_t size, size_t accesses) {
-#if __cplusplus >= 201103L
+#if __cplusplus >= 201103L || defined(HAVE_CXX11_UNIFORM_INT_DISTRIBUTION)
   std::uniform_int_distribution<size_t> randIndex(0, size - 1);
 #else
   std::uniform_int<size_t> randIndex(0, size - 1);
@@ -26,7 +26,7 @@ struct run_local_helper {
   run_local_helper(int* b, size_t s, size_t ss): block(b), seed(s), size(ss) { }
   void operator()(unsigned int tid, unsigned int num) {
     std::mt19937 gen(seed + tid);
-#if __cplusplus >= 201103L
+#if __cplusplus >= 201103L || defined(HAVE_CXX11_UNIFORM_INT_DISTRIBUTION)
     std::uniform_int_distribution<int> randSeed;
 #else
     std::uniform_int<int> randSeed;
@@ -53,7 +53,7 @@ struct run_interleaved_helper {
   run_interleaved_helper(int* b, size_t s, size_t ss): block(b), seed(s), size(ss) { }
   void operator()(unsigned int tid, unsigned int num) {
     std::mt19937 gen(seed + tid);
-#if __cplusplus >= 201103L
+#if __cplusplus >= 201103L || defined(HAVE_CXX11_UNIFORM_INT_DISTRIBUTION)
     std::uniform_int_distribution<int> randSeed;
 #else
     std::uniform_int<int> randSeed;

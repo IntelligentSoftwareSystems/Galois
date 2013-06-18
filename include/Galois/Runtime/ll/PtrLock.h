@@ -38,7 +38,7 @@
 
 #include <stdint.h>
 #include <cassert>
-#include GALOIS_C11_STD_HEADER(atomic)
+#include GALOIS_CXX11_STD_HEADER(atomic)
 
 namespace Galois {
 namespace Runtime {

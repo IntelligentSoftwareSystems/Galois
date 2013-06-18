@@ -32,7 +32,7 @@
 #include "Galois/config.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 
-#include GALOIS_C11_STD_HEADER(utility)
+#include GALOIS_CXX11_STD_HEADER(utility)
 
 namespace Galois {
 namespace Runtime {

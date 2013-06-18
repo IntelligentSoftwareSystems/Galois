@@ -35,9 +35,9 @@
 #include <iterator>
 #include <stdexcept>
 #include <cstddef>
-#include GALOIS_C11_STD_HEADER(algorithm)
-#include GALOIS_C11_STD_HEADER(utility)
-#include GALOIS_C11_STD_HEADER(type_traits)
+#include GALOIS_CXX11_STD_HEADER(algorithm)
+#include GALOIS_CXX11_STD_HEADER(utility)
+#include GALOIS_CXX11_STD_HEADER(type_traits)
 
 namespace Galois {
 

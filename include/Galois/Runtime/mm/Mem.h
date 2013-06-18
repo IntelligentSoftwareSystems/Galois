@@ -583,7 +583,7 @@ public:
 
 template<typename Ty>
 class FSBGaloisAllocator {
-  inline void destruct(char*) const {}
+  inline void destruct(char*) const { }
   inline void destruct(wchar_t*) const { }
   template<typename T> inline void destruct(T* t) const { t->~T(); }
 

@@ -32,7 +32,7 @@
 #include "Galois/Graph/Details.h"
 #include "Galois/Runtime/MethodFlags.h"
 
-#include GALOIS_C11_STD_HEADER(type_traits)
+#include GALOIS_CXX11_STD_HEADER(type_traits)
 
 namespace Galois {
 namespace Graph {

@@ -29,8 +29,8 @@
 
 #include <boost/iterator/iterator_facade.hpp>
 
-#include GALOIS_C11_STD_HEADER(algorithm)
-#include GALOIS_C11_STD_HEADER(utility)
+#include GALOIS_CXX11_STD_HEADER(algorithm)
+#include GALOIS_CXX11_STD_HEADER(utility)
 
 namespace Galois {
 
@@ -108,12 +108,13 @@ private:
 
 public:
   template<typename U>
-  class Iterator: public boost::iterator_facade<Iterator<U>, U, boost::forward_traversal_tag> {
+  struct Iterator: public boost::iterator_facade<Iterator<U>, U, boost::forward_traversal_tag> {
     friend class boost::iterator_core_access;
 
     Block* b;
     unsigned offset;
 
+  private:
     void increment() {
       if (!b) return;
       ++offset;

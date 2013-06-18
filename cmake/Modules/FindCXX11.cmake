@@ -30,4 +30,4 @@ include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(CXX11 DEFAULT_MSG CXX11_FOUND_INTERNAL CXX11_FLAGS)
 mark_as_advanced(CXX11_FLAGS)
 
-#include(CheckCXX11Features)
+include(CheckCXX11Features)

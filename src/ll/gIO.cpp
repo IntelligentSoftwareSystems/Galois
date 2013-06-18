@@ -41,7 +41,7 @@
 #include <iostream>
 #include <fstream>
 #include <iomanip>
-#include GALOIS_C11_STD_HEADER(mutex)
+#include GALOIS_CXX11_STD_HEADER(mutex)
 
 static void printString(bool error, bool newline, const std::string prefix, const std::string s) {
   static Galois::Runtime::LL::SimpleLock<true> IOLock;

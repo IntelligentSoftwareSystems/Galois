@@ -18,8 +18,11 @@ typedef enum memory_order
 
 }
 
-#if __IBMCPP__ && __PPC64__ 
-# include "atomic_internal_xlc_ppc64.h"
+#if __IBMCPP__ && __PPC__ 
+//# include "atomic_internal_xlc_ppc.h"
+# include "atomic_internal_gcc_generic.h"
+#elif __GNUC__
+# include "atomic_internal_gcc_generic.h"
 #else
 # error "Unknown machine architecture"
 #endif

@@ -30,7 +30,7 @@
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/utility.hpp>
 
-#include GALOIS_C11_STD_HEADER(utility)
+#include GALOIS_CXX11_STD_HEADER(utility)
 
 namespace Galois {
 

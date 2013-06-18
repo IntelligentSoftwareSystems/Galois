@@ -30,7 +30,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
-#include GALOIS_C11_STD_HEADER(random)
+#include GALOIS_CXX11_STD_HEADER(random)
 
 #include <fcntl.h>
 #include <cstdlib>
@@ -478,9 +478,8 @@ void convert_gr2rand(const std::string& infilename, const std::string& outfilena
   Permutation perm;
   perm.create(graph.size());
   std::copy(boost::counting_iterator<GNode>(0), boost::counting_iterator<GNode>(graph.size()), perm.begin());
-
   std::mt19937 gen;
-#if __cplusplus >= 201103L
+#if __cplusplus >= 201103L || defined(HAVE_CXX11_UNIFORM_INT_DISTRIBUTION)
   UniformDist<difference_type,std::mt19937,std::uniform_int_distribution> dist(gen);
 #else
   UniformDist<difference_type,std::mt19937,std::uniform_int> dist(gen);
@@ -506,7 +505,7 @@ void add_weights(const std::string& infilename, const std::string& outfilename, 
   OutEdgeTy* edgeDataEnd = edgeData + graph.sizeEdges();
 
   std::mt19937 gen;
-#if __cplusplus >= 201103L
+#if __cplusplus >= 201103L || defined(HAVE_CXX11_UNIFORM_INT_DISTRIBUTION)
   std::uniform_int_distribution<OutEdgeTy> dist(1, maxvalue);
 #else
   std::uniform_int<OutEdgeTy> dist(1, maxvalue);

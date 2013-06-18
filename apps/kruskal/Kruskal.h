@@ -36,7 +36,7 @@
 #include <limits>
 #include <iostream>
 #include <set>
-#include GALOIS_C11_STD_HEADER(unordered_set)
+#include GALOIS_CXX11_STD_HEADER(unordered_set)
 
 #include <cstdlib>
 #include <cstdio>

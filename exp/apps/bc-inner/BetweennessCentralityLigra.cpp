@@ -40,7 +40,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
-#include GALOIS_C11_STD_HEADER(atomic)
+#include GALOIS_CXX11_STD_HEADER(atomic)
 #include <string>
 #include <deque>
 #include <iostream>

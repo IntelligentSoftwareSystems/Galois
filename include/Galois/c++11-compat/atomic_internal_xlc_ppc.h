@@ -26,6 +26,7 @@ inline bool atomic_compare_exchange_strong32(volatile int* __a, int* __e, int* _
   return tmp;
 }
 
+#ifdef __PPC64__
 inline bool atomic_compare_exchange_strong64(volatile long* __a, long* __e, long* __d, std::memory_order _succ, std::memory_order _fail) {
   bool tmp;
   long v = *__e;
@@ -41,17 +42,25 @@ inline bool atomic_compare_exchange_strong64(volatile long* __a, long* __e, long
   // v contains old value in __a;
   return tmp;
 }
-
+#endif
 
 template<class _Tp>
 bool atomic_compare_exchange_strong(volatile _Tp* __a, _Tp* __e, _Tp* __d, std::memory_order _succ, std::memory_order _fail) {
   // __sync_XXX gcc-type intrinsics issue a full barrier so implement using
   // lower level intrinsics
+#ifdef __PPC64__
   static_assert(sizeof(_Tp) <= 8, "Operation undefined on larger types");
+#else
+  static_assert(sizeof(_Tp) <= 4, "Operation undefined on larger types");
+#endif
   if (sizeof(_Tp) <= 4)
     return detail::atomic_compare_exchange_strong32(reinterpret_cast<volatile int*>(__a), reinterpret_cast<int*>(__e), reinterpret_cast<int*>(__d), _succ, _fail);
+#ifdef __PPC64__
   else
     return detail::atomic_compare_exchange_strong64(reinterpret_cast<volatile long*>(__a), reinterpret_cast<long*>(__e), reinterpret_cast<long*>(__d), _succ, _fail);
+#endif
+  abort();
+  return false;
 }
 
 /* 

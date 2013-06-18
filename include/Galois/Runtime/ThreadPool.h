@@ -24,7 +24,7 @@
 #define GALOIS_RUNTIME_THREADPOOL_H
 
 #include "Galois/config.h"
-#include GALOIS_C11_STD_HEADER(functional)
+#include GALOIS_CXX11_STD_HEADER(functional)
 
 namespace Galois {
 namespace Runtime {

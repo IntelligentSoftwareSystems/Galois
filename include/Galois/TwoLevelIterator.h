@@ -87,8 +87,8 @@
 #include "Galois/config.h"
 
 #include <iterator>
-#include GALOIS_C11_STD_HEADER(functional)
-#include GALOIS_C11_STD_HEADER(type_traits)
+#include GALOIS_CXX11_STD_HEADER(functional)
+#include GALOIS_CXX11_STD_HEADER(type_traits)
 
 #include <cstdlib>
 #include <cassert>

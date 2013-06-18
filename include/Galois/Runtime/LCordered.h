@@ -45,7 +45,7 @@
 #include "llvm/ADT/SmallVector.h"
 
 #include <iostream>
-#include GALOIS_C11_STD_HEADER(unordered_map)
+#include GALOIS_CXX11_STD_HEADER(unordered_map)
 
 namespace Galois {
 namespace Runtime {

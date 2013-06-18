@@ -34,7 +34,7 @@
 
 #include <boost/iterator/iterator_facade.hpp>
 
-#include GALOIS_C11_STD_HEADER(algorithm)
+#include GALOIS_CXX11_STD_HEADER(algorithm)
 
 namespace Galois {
 

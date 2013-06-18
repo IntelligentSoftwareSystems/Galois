@@ -31,8 +31,8 @@
 // For consistent name, use boost rather than C++11 std::is_trivially_constuctible
 #include <boost/type_traits/has_trivial_constructor.hpp>
 
-#include GALOIS_C11_STD_HEADER(type_traits)
-#include GALOIS_C11_STD_HEADER(utility)
+#include GALOIS_CXX11_STD_HEADER(type_traits)
+#include GALOIS_CXX11_STD_HEADER(utility)
 
 namespace Galois {
 

@@ -5,7 +5,7 @@
 #include "Galois/Runtime/ll/SimpleLock.h"
 #include "Galois/Runtime/ll/StaticInstance.h"
 
-#include GALOIS_C11_STD_HEADER(type_traits)
+#include GALOIS_CXX11_STD_HEADER(type_traits)
 #include <iostream> 
 
 using namespace Galois::Runtime;

@@ -31,12 +31,12 @@
 #include <boost/math/constants/constants.hpp>
 #include <boost/iterator/transform_iterator.hpp>
 
-#include GALOIS_C11_STD_HEADER(array)
+#include GALOIS_CXX11_STD_HEADER(array)
 #include <limits>
 #include <iostream>
 #include <fstream>
 #include <strings.h>
-#include GALOIS_C11_STD_HEADER(deque)
+#include GALOIS_CXX11_STD_HEADER(deque)
 
 #include "Point.h"
 
@@ -333,7 +333,7 @@ struct ComputeForces {
 	    b.acc += updateForce(p, p.dist2(), n->mass);
 	  }
 	} else {
-#ifndef GALOIS_C11_DEQUE_HAS_NO_EMPLACE
+#ifndef GALOIS_CXX11_DEQUE_HAS_NO_EMPLACE
 	  stack.emplace_back(static_cast<Octree*>(n), dsq);
 #else
 	  stack.push_back(Frame(static_cast<Octree*>(n), dsq));
