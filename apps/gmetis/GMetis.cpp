@@ -137,27 +137,10 @@ bool verifyRecursiveBisection(MetisGraph* metisGraph,int nparts) {
 }
 
 
-unsigned log2_mask(unsigned index) {
-  unsigned targetlevel = 0;
-  while (index >>= 1) {
-    targetlevel <<= 1;
-    targetlevel |= 1;
-  }
-  return targetlevel;
+void printPartStats(std::vector<partInfo>& parts) {
+  for (unsigned x = 0; x < parts.size(); ++x)
+    std::cout << parts[x] << "\n";
 }
-
-struct projectPart {
-  GGraph* fineGraph;
-  GGraph* coarseGraph;
-  projectPart(MetisGraph* Graph) :fineGraph(Graph->getFinerGraph()->getGraph()), coarseGraph(Graph->getGraph()) {}
-
-  void operator()(GNode n) {
-    auto& cn = coarseGraph->getData(n);
-    unsigned part = cn.getPart();
-    for (unsigned x = 0; x < cn.numChildren(); ++x)
-      fineGraph->getData(cn.getChild(0)).setPart(part);
-  }
-};
 
 /**
  * KMetis Algorithm
@@ -191,8 +174,7 @@ void Partition(MetisGraph* metisGraph, unsigned nparts) {
   T2.stop();
   cout<<"initial part time: " << t2.get() << " ms"<<endl;
 
-  for (unsigned x = 0; x < nparts; ++x)
-    std::cout << parts[x] << "\n";
+  printPartStats(parts);
 
   if(0) {
     cout<<endl<<"#### Verifying initial partition ####"<<endl;
@@ -208,21 +190,12 @@ void Partition(MetisGraph* metisGraph, unsigned nparts) {
   Galois::Timer t3;
   T3.start();
   t3.start();
-  MetisGraph* coarseGraph = mcg;
-  do {
-    //refine nparts times
-    for (int x = 0; x < nparts; ++x) 
-      refine_BKL(*coarseGraph->getGraph(),parts);
-    //project up
-    MetisGraph* fineGraph = coarseGraph->getFinerGraph();
-    if (coarseGraph->getFinerGraph())
-      Galois::do_all_local(*coarseGraph->getGraph(), projectPart(coarseGraph), "project");
-  } while ((coarseGraph = coarseGraph->getFinerGraph()));
+  coarsen(mcg, parts);
   t3.stop();
   T3.stop();
   cout<<"refinement time: " << t3.get() << " ms"<<endl;
-  for (unsigned x = 0; x < nparts; ++x)
-    std::cout << parts[x] << "\n";
+
+  printPartStats(parts);
 
   return;
 }
@@ -234,15 +207,6 @@ void verify(MetisGraph* metisGraph) {
   // }else{
   //   cout<<"KMetis okay"<<endl;
   // }
-}
-
-namespace testMetis {
-bool testCoarsening = false;
-bool testInitialPartition = false;;
-}
-namespace variantMetis {
-bool mergeMatching = true;
-bool noPartInfo = true;
 }
 
 struct parallelInitMorphGraph {
@@ -271,6 +235,15 @@ struct parallelInitMorphGraph {
   }
 };
 
+void printCuts(const char* str, MetisGraph* g) {
+  std::vector<unsigned> ec = edgeCut(*g->getGraph(), numPartitions);
+  std::cout << str << " Edge Cuts:\n";
+  for (unsigned x = 0; x < ec.size(); ++x)
+    std::cout << (x == 0 ? "" : " " ) << ec[x];
+  std::cout << "\n";
+  std::cout << str << " Average Edge Cut: " << (std::accumulate(ec.begin(), ec.end(), 0) / ec.size()) << "\n";
+  std::cout << str << " Minimum Edge Cut: " << *std::min_element(ec.begin(), ec.end()) << "\n";
+}
 
 
 int main(int argc, char** argv) {
@@ -319,20 +292,10 @@ int main(int argc, char** argv) {
   MetisGraph* coarseGraph = &metisGraph;
   while (coarseGraph->getCoarserGraph())
     coarseGraph = coarseGraph->getCoarserGraph();
-  std::vector<unsigned> iec = edgeCut(*coarseGraph->getGraph(), numPartitions);
-  std::cout << "Initial Edge Cuts:\n";
-  for (unsigned x = 0; x < numPartitions; ++x)
-    std::cout << x << " " << iec[x] << "\n";
+  printCuts("Initial", coarseGraph);
+  printCuts("Final", &metisGraph);
 
-
-  std::vector<unsigned> ec = edgeCut(*metisGraph.getGraph(), numPartitions);
-  std::cout << "Edge Cuts:\n";
-  for (unsigned x = 0; x < numPartitions; ++x)
-    std::cout << x << " " << ec[x] << "\n";
-
-  std::cout << "Average Edge Cut: " << (std::accumulate(ec.begin(), ec.end(), 0) / numPartitions) << "\n";
-  std::cout << "Minimum Edge Cut: " << *std::min_element(ec.begin(), ec.end()) << "\n";
-
+  return 0;
 }
 
 int getRandom(int num){

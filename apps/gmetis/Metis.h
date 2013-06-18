@@ -73,7 +73,6 @@ MetisGraph* coarsen(MetisGraph* fineMetisGraph, unsigned coarsenTo);
 std::vector<partInfo> partition(MetisGraph* coarseMetisGraph, unsigned numPartitions);
 
 //Refinement
-void refine_FL_pair(partInfo& p1, partInfo& p2);
-void refine_BKL(GGraph& g, std::vector<partInfo>& parts);
+void coarsen(MetisGraph* coarseGraph, std::vector<partInfo>& parts);
 
 #endif

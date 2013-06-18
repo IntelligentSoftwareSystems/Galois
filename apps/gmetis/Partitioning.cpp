@@ -4,6 +4,7 @@
 
 #include <iomanip>
 
+const bool multiSeed = false;
 
 std::ostream& operator<<(std::ostream& os, const partInfo& p) {
   os << "Num " << std::setw(3) << p.partNum << "\tmask " << std::setw(5) << p.partMask << "\tweight " << p.partWeight << " size: " << p.partSize;
@@ -61,7 +62,7 @@ struct bisect_GGP {
           if (g.getData(g.getEdgeDst(ii, flag), flag).getPart() == oldPart.partNum)
             boundary.push_back(g.getEdgeDst(ii, flag));
       }
-    } while (newWeight < targetWeight);
+    } while (newWeight < targetWeight && multiSeed);
   
     oldPart.partWeight -= newWeight;
     oldPart.partSize -= newSize;
@@ -120,7 +121,7 @@ struct bisect_GGGP {
           }
         }
       }
-    } while (newWeight < targetWeight);
+    } while (newWeight < targetWeight && multiSeed);
   
     oldPart.partWeight -= newWeight;
     oldPart.partSize -= newSize;
