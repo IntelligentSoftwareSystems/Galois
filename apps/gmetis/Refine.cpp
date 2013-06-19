@@ -19,13 +19,13 @@ void refine_BKL(GGraph& g, std::vector<partInfo>& parts) {
   std::set<GNode> boundary;
   
   //find boundary nodes with positive gain
-  for (GNode n : g) {
-    unsigned gPart = g.getData(n).getPart();
-    for (auto ii = g.edge_begin(n), ee = g.edge_end(n); ii != ee; ++ii)
+  for (auto nn = g.begin(), en = g.end(); nn != en; ++nn) {
+    unsigned gPart = g.getData(*nn).getPart();
+    for (auto ii = g.edge_begin(*nn), ee = g.edge_end(*nn); ii != ee; ++ii)
       if (g.getData(g.getEdgeDst(ii)).getPart() != gPart) {
-        int ga = gain(g,n);
+        int ga = gain(g, *nn);
         if (ga > 0)
-          boundary.insert(n);
+          boundary.insert(*nn);
         break;
       }
   }

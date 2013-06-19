@@ -60,7 +60,7 @@ public:
     init();
   }
 
-  MetisNode() = default;
+  MetisNode() { }
 
   void init(){
     _numEdges = 0;

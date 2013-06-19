@@ -157,6 +157,6 @@ struct parallelBisect {
 std::vector<partInfo> partition(MetisGraph* mcg, unsigned numPartitions) {
   std::vector<partInfo> parts(numPartitions);
   parts[0] = partInfo(mcg->getTotalWeight(), mcg->getNumNodes());
-  Galois::for_each<Galois::WorkList::GFIFO<>>(&parts[0], parallelBisect<bisect_GGGP>(mcg, numPartitions, parts));
+  Galois::for_each<Galois::WorkList::GFIFO<> >(&parts[0], parallelBisect<bisect_GGGP>(mcg, numPartitions, parts));
   return parts;
 }

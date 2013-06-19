@@ -39,9 +39,7 @@ class MetisGraph{
   GGraph graph;
 
 public:
-  MetisGraph()
-    :coarser(nullptr), finer(nullptr)
-  {}
+  MetisGraph() :coarser(0), finer(0) { }
   
   explicit MetisGraph(MetisGraph* finerGraph)
     :coarser(0), finer(finerGraph) {

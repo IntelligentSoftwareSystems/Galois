@@ -24,6 +24,7 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
+#include "Galois/config.h"
 #include "Galois/Galois.h"
 #include "Galois/Bag.h"
 #include "Galois/Accumulator.h"
@@ -42,8 +43,7 @@
 
 #include "HybridBFS.h"
 
-#include <boost/random/mersenne_twister.hpp>
-#include <boost/random/uniform_01.hpp>
+#include GALOIS_CXX11_STD_HEADER(random)
 #include <deque>
 #include <string>
 #include <limits>
@@ -438,14 +438,18 @@ struct GraphLabAlgo {
 
   struct Initialize {
     Graph& graph;
-    Galois::optional<boost::random::mt19937> gen;
-    boost::random::uniform_01<float> dist;
+    Galois::optional<std::mt19937> gen;
+#if __cplusplus >= 201103L || defined(HAVE_CXX11_UNIFORM_REAL_DISTRIBUTION)
+    std::uniform_real_distribution<float> dist;
+#else
+    std::uniform_real<float> dist;
+#endif
 
     Initialize(Graph& g): graph(g) { }
 
     size_t hash_value() {
       if (!gen) {
-        gen = boost::random::mt19937();
+        gen = std::mt19937();
         gen->seed(Galois::Runtime::LL::getTID());
       }
       size_t ret = 0;
