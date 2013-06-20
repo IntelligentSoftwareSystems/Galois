@@ -29,6 +29,8 @@
 #include "Galois/Runtime/ll/PtrLock.h"
 #include "Galois/Runtime/ll/gio.h"
 
+#include <boost/utility.hpp>
+
 #include <cassert>
 #include <cstdlib>
 #include <setjmp.h>
@@ -92,7 +94,7 @@ public:
   Lockable() :next(0) {}
 };
 
-class SimpleRuntimeContext {
+class SimpleRuntimeContext: private boost::noncopyable {
 protected:
   //! The locks we hold
   Lockable* locks;

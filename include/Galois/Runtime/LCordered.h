@@ -64,7 +64,6 @@ protected:
   Lockable* lockable;
 
 public:
-
   template <typename Cmp>
   NhoodItem (Lockable* l, const Cmp& cmp):  sharers (CtxtCmp (cmp)), lockable (l) {}
 
@@ -98,7 +97,6 @@ public:
   void print () const { 
     // TODO
   }
-
 };
 
 
@@ -475,7 +473,8 @@ class LCorderedExec {
       Ctxt* ctxt = ctxtAlloc.allocate (1);
       assert (ctxt != NULL);
       // new (ctxt) Ctxt (active, nhmgr);
-      ctxtAlloc.construct (ctxt, Ctxt (active, nhmgr));
+      //ctxtAlloc.construct (ctxt, Ctxt (active, nhmgr));
+      ctxtAlloc.construct (ctxt, active, nhmgr);
 
       ctxtWL.get ().push_back (ctxt);
 

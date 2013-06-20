@@ -119,14 +119,15 @@ private:
     return 0;
   }
 
-  T* pushi(const T& val, p& n)  {
+  template<typename... Args>
+  T* emplacei(p& n, Args&&... args)  {
     T* retval = 0;
-    if (n.next && (retval = n.next->push_back(val)))
+    if (n.next && (retval = n.next->emplace_back(std::forward<Args>(args)...)))
       return retval;
     if (n.next)
       pushChunk(n.next);
     n.next = mkChunk();
-    retval = n.next->push_back(val);
+    retval = n.next->emplace_back(std::forward<Args>(args)...);
     assert(retval);
     return retval;
   }
@@ -144,28 +145,16 @@ public:
   }
   
   /**
-   * Push an item onto the worklist and return a pointer to its value.
+   * Construct an item on the worklist and return a pointer to its value.
    *
-   * Most worklists have void return value for push. This push returns address
-   * of placed item to facilitate some internal runtime uses. The address is
-   * generally not safe to use in the presence of concurrent pops.
+   * This pointer facilitates some internal runtime uses and is not designed
+   * to be used by general clients. The address is generally not safe to use
+   * in the presence of concurrent pops.
    */
-  value_type* push(const value_type& val)  {
+  template<typename... Args>
+  value_type* emplace(Args&&... args) {
     p& n = data.get();
-    return pushi(val, n);
-  }
-
-  template<typename Iter>
-  void push(Iter b, Iter e) {
-    p& n = data.get();
-    while (b != e)
-      pushi(*b++, n);
-  }
-
-  template<typename RangeTy>
-  void push_initial(const RangeTy& range) {
-    auto rp = range.local_pair();
-    push(rp.first, rp.second);
+    return emplacei(n, std::forward<Args>(args)...);
   }
 
   /**
@@ -198,6 +187,40 @@ public:
 	return &n.cur->front();
       return NULL;
     }
+  }
+
+  /**
+   * Remove the value returned from peek() from the worklist. 
+   *
+   * For internal runtime use.
+   */
+  void pop_peeked() {
+    p& n = data.get();
+    if (IsStack) {
+      n.next->pop_back();
+      return;
+    } else {
+      n.cur->pop_front();
+      return;
+    }
+  }
+
+  void push(const value_type& val)  {
+    p& n = data.get();
+    emplacei(n, val);
+  }
+
+  template<typename Iter>
+  void push(Iter b, Iter e) {
+    p& n = data.get();
+    while (b != e)
+      emplacei(n, *b++);
+  }
+
+  template<typename RangeTy>
+  void push_initial(const RangeTy& range) {
+    auto rp = range.local_pair();
+    push(rp.first, rp.second);
   }
 
   Galois::optional<value_type> pop()  {

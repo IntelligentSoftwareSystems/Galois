@@ -160,8 +160,9 @@ struct OrderedOptions: public Options<_Function1Ty,_Function2Ty> {
   OrderedOptions(const Function1Ty& fn1, const Function2Ty& fn2, const CompareTy& comp):
     fn1(fn1), fn2(fn2), comp(comp), contextComp(comp) { }
 
-  DetContext make_context(const DItem<T>& item) const {
-    return DetContext(item, contextComp);
+  template<typename WL>
+  DetContext* emplaceContext(WL& wl, const DItem<T>& item) const {
+    return wl.emplace(item, contextComp);
   }
 };
 
@@ -190,8 +191,9 @@ struct UnorderedOptions: public Options<_Function1Ty,_Function2Ty> {
 
   UnorderedOptions(const Function1Ty& fn1, const Function2Ty& fn2): fn1(fn1), fn2(fn2) { }
 
-  DetContext make_context(const DItem<T>& item) const {
-    return DetContext(item, contextComp);
+  template<typename WL>
+  DetContext* emplaceContext(WL& wl, const DItem<T>& item) const {
+    return wl.emplace(item, contextComp);
   }
 };
 
@@ -1373,9 +1375,9 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
 
     DetContext* ctx = NULL;
     if (useLocalState) {
-      ctx = tld.localPending.push(tld.options.make_context(*p));
+      ctx = tld.options.emplaceContext(tld.localPending, *p);
     } else {
-      ctx = pending.push(tld.options.make_context(*p));
+      ctx = tld.options.emplaceContext(pending, *p);
     }
 
     assert(ctx != NULL);
@@ -1518,7 +1520,7 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
       tld.facing.resetAlloc();
 
     tld.facing.resetPushBuffer();
-    if (useLocalState) { tld.localPending.pop(); } else { pending.pop(); }
+    if (useLocalState) { tld.localPending.pop_peeked(); } else { pending.pop_peeked(); }
   }
 
   if (ForEachTraits<typename OptionsTy::Function2Ty>::NeedsPIA && useLocalState)
