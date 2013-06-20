@@ -31,8 +31,8 @@ struct partInfo {
   unsigned partNum;
   unsigned partMask;
   unsigned partWeight;
-  unsigned partSize; 
-  
+  unsigned partSize;
+
   partInfo(unsigned mw, unsigned ms)
     :partNum(0), partMask(1), partWeight(mw), partSize(ms) {}
 
@@ -66,6 +66,11 @@ struct partInfo {
 
 std::ostream& operator<<(std::ostream& os, const partInfo& p);
 
+//gain of moving n from it's current part to new part
+int gain_limited(GGraph& g, GNode n, unsigned newpart, Galois::MethodFlag flag);
+
+void printPartStats(std::vector<partInfo>&);
+
 //Coarsening
 MetisGraph* coarsen(MetisGraph* fineMetisGraph, unsigned coarsenTo);
 
@@ -73,6 +78,6 @@ MetisGraph* coarsen(MetisGraph* fineMetisGraph, unsigned coarsenTo);
 std::vector<partInfo> partition(MetisGraph* coarseMetisGraph, unsigned numPartitions);
 
 //Refinement
-void coarsen(MetisGraph* coarseGraph, std::vector<partInfo>& parts);
+void refine(MetisGraph* coarseGraph, std::vector<partInfo>& parts, unsigned maxSize);
 
 #endif

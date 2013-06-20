@@ -139,14 +139,21 @@ bool verifyRecursiveBisection(MetisGraph* metisGraph,int nparts) {
 
 
 void printPartStats(std::vector<partInfo>& parts) {
-  for (unsigned x = 0; x < parts.size(); ++x)
+  unsigned tW = 0;
+  unsigned tS = 0;
+  for (unsigned x = 0; x < parts.size(); ++x) {
     std::cout << parts[x] << "\n";
+    tW += parts[x].partWeight;
+    tS += parts[x].partSize;
+  }
+  std::cout << "Total Weight: " << tW << "\nTotal Size: " << tS << "\n";
 }
 
 /**
  * KMetis Algorithm
  */
 void Partition(MetisGraph* metisGraph, unsigned nparts) {
+  unsigned maxWeight = 1.1 * metisGraph->getTotalWeight() / nparts;
   unsigned coarsenTo = std::max(metisGraph->getNumNodes() / (40 * intlog2(nparts)), 20 * (nparts));
   int maxVertexWeight = (int) (1.5 * ((metisGraph->getNumNodes()) / (double) coarsenTo));
   Galois::StatTimer T("Coarsening");
@@ -191,7 +198,7 @@ void Partition(MetisGraph* metisGraph, unsigned nparts) {
   Galois::Timer t3;
   T3.start();
   t3.start();
-  coarsen(mcg, parts);
+  refine(mcg, parts, maxWeight);
   t3.stop();
   T3.stop();
   cout<<"refinement time: " << t3.get() << " ms"<<endl;
