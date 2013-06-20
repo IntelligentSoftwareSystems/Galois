@@ -472,9 +472,13 @@ struct BarrierExpAlgo {
   void operator()(const GNode& source) {
     GNode initial[1] = { source };
     typedef boost::fusion::vector<ItemTy> Items;
+#ifndef GALOIS_HAS_NO_BULKSYNCHRONOUS_EXECUTOR
     Galois::do_all_bs<Items>(&initial[0], &initial[1],
         boost::fusion::make_vector(Process()),
         Initialize());
+#else
+    abort();
+#endif
   }
 };
 #else

@@ -38,6 +38,7 @@
 #include <boost/utility.hpp>
 #include <cstdlib>
 #include <map>
+#include <cstddef>
 
 #include <memory.h>
 

@@ -113,7 +113,7 @@ set(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0" "1.47" "1.47.0" "1.49" "1.49.0" "1
 if(NOT "$ENV{BOOST_DIR}" STREQUAL "") 
   set(BOOST_ROOT $ENV{BOOST_DIR})
 endif()
-find_package(Boost 1.36.0 REQUIRED)
+find_package(Boost 1.38.0 REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})
 
 if(USE_EXP)

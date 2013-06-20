@@ -269,7 +269,7 @@ struct ParallelAlgo {
     }
   }
 
-#ifdef GALOIS_USE_EXP
+#if defined(GALOIS_USE_EXP) && !defined(GALOIS_HAS_NO_BULKSYNCHRONOUS_EXECUTOR)
   void processExp() {
     typedef boost::fusion::vector<WorkItem,WorkItem> Items;
 
