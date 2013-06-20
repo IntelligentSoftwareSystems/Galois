@@ -190,17 +190,23 @@ struct parallelPopulateEdges {
   }
 };
 
-struct DegreeIndexer: public std::unary_function<GNode, unsigned int> {
+struct HighDegreeIndexer: public std::unary_function<GNode, unsigned int> {
   static GGraph* indexgraph;
   unsigned int operator()(const GNode& val) const {
     return std::numeric_limits<unsigned int>::max() - indexgraph->getData(val, Galois::MethodFlag::NONE).getNumEdges();
   }
 };
-GGraph* DegreeIndexer::indexgraph = 0;
+GGraph* HighDegreeIndexer::indexgraph = 0;
+
+struct LowDegreeIndexer: public std::unary_function<GNode, unsigned int> {
+  unsigned int operator()(const GNode& val) const {
+    return HighDegreeIndexer::indexgraph->getData(val, Galois::MethodFlag::NONE).getNumEdges();
+  }
+};
 
 struct WeightIndexer: public std::unary_function<GNode, int> {
   int operator()(const GNode& val) const {
-    return DegreeIndexer::indexgraph->getData(val, Galois::MethodFlag::NONE).getWeight();
+    return HighDegreeIndexer::indexgraph->getData(val, Galois::MethodFlag::NONE).getWeight();
   }
 };
 
@@ -235,12 +241,15 @@ void findMatching(MetisGraph* coarseMetisGraph, unsigned iterNum, bool useRM = f
     typedef decltype(fineMetisGraph->getGraph()->local_begin()) ITY;
     typedef Galois::WorkList::StableIterator<ITY, true> WL;
     typedef Galois::WorkList::dChunkedFIFO<8> Chunk;
-    typedef Galois::WorkList::OrderedByIntegerMetric<WeightIndexer, Chunk, 10> OBIM;
-    DegreeIndexer::indexgraph = fineMetisGraph->getGraph();
+    typedef Galois::WorkList::OrderedByIntegerMetric<WeightIndexer, Chunk, 10> pW;
+    typedef Galois::WorkList::OrderedByIntegerMetric<LowDegreeIndexer, Chunk, 10> pLD;
+    typedef Galois::WorkList::OrderedByIntegerMetric<HighDegreeIndexer, Chunk, 10> pHD;
+
+    HighDegreeIndexer::indexgraph = fineMetisGraph->getGraph();
     parallelMatchAndCreateNodes<HEMmatch> pHEM(coarseMetisGraph);
     std::ostringstream name;
     name << "HEM_Match_" << iterNum;
-    Galois::for_each_local<OBIM>(*fineMetisGraph->getGraph(), pHEM, name.str().c_str());
+    Galois::for_each_local<pLD>(*fineMetisGraph->getGraph(), pHEM, name.str().c_str());
   }
 }
 
