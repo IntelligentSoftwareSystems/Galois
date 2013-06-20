@@ -30,7 +30,6 @@
 
 #include "Galois/ParallelSTL/ParallelSTL.h"
 #include "Galois/TwoLevelIterator.h"
-#include "Galois/Runtime/ContextPool.h"
 #include "Galois/Runtime/ll/gio.h"
 
 #include <boost/iterator/iterator_facade.hpp>
@@ -78,13 +77,6 @@ struct DeterministicContext: public SimpleRuntimeContext {
   }
 
   virtual void sub_acquire(Lockable* L) {
-    // TODO: should be redundant with new context hierarchy and virtual function call
-    // Normal path
-    // if (pendingFlag.flag.data == NON_DET) {
-      // Galois::Runtime::SimpleRuntimeContext::acquire(L);
-      // return;
-    // }
-
     // Ordered and deterministic path
     if (getPending() == COMMITTING)
       return;
@@ -1441,7 +1433,6 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
     } else {
       retval = true; 
     }
-
   }
 
   return retval;
@@ -1456,18 +1447,17 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
   size_t ncommits = 0;
   size_t niter = 0;
 
-  Galois::optional<DetContext> p;
-  while ((p = (useLocalState) ? tld.localPending.pop() : pending.pop())) {
+  DetContext* ctx;
+  while ((ctx = (useLocalState) ? tld.localPending.peek() : pending.peek())) {
     ++niter;
     bool commit = true;
-    // Can skip this check in prefix repeating computations but eagerly aborting
-    // seems more efficient
-    DetContext* ctx = &*p;
+    // Can skip this check in prefix by repeating computations but eagerly
+    // aborting seems more efficient
     if (ctx->notReady())
       commit = false;
 
+    setThreadContext(ctx);
     if (commit) {
-      setThreadContext(ctx);
       stateManager.restore(tld.facing, ctx->item.localState);
       int result = 0;
 #if GALOIS_USE_EXCEPTION_HANDLER
@@ -1487,7 +1477,6 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
         case CONFLICT: commit = false; break;
         default: assert(0 && "Unknown conflict flag"); abort(); break;
       }
-
     }
 
     stateManager.dealloc(tld.facing);
@@ -1525,14 +1514,12 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
       ctx->cancel_iteration();
     }
 
-
     if (ForEachTraits<typename OptionsTy::Function2Ty>::NeedsPIA && !useLocalState)
       tld.facing.resetAlloc();
 
     tld.facing.resetPushBuffer();
-
-
-  } // end while
+    if (useLocalState) { tld.localPending.pop(); } else { pending.pop(); }
+  }
 
   if (ForEachTraits<typename OptionsTy::Function2Ty>::NeedsPIA && useLocalState)
     tld.facing.resetAlloc();

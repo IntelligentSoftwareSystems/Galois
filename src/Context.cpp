@@ -81,7 +81,6 @@ void Galois::Runtime::doAcquire(Galois::Runtime::Lockable* C) {
 }
 
 unsigned Galois::Runtime::SimpleRuntimeContext::cancel_iteration() {
-  //FIXME: not handled yet
   return commit_iteration();
 }
 
@@ -134,7 +133,9 @@ int Galois::Runtime::SimpleRuntimeContext::try_acquire(Galois::Runtime::Lockable
 
 void Galois::Runtime::SimpleRuntimeContext::release(Galois::Runtime::Lockable* L) {
   assert(L);
-  assert(L->Owner.getValue() == this);
+  // The deterministic executor, for instance, steals locks from other
+  // iterations
+  assert(customAcquire || L->Owner.getValue() == this);
   assert(!L->next);
   L->Owner.unlock_and_clear();
 }

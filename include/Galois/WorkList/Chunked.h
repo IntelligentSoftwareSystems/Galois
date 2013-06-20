@@ -143,9 +143,13 @@ public:
     n.next = 0;
   }
   
-  //! Most worklists have void return value for push. This push returns address
-  //! of placed item to facilitate some internal runtime uses. The address is
-  //! generally not safe to use in the presence of concurrent pops.
+  /**
+   * Push an item onto the worklist and return a pointer to its value.
+   *
+   * Most worklists have void return value for push. This push returns address
+   * of placed item to facilitate some internal runtime uses. The address is
+   * generally not safe to use in the presence of concurrent pops.
+   */
   value_type* push(const value_type& val)  {
     p& n = data.get();
     return pushi(val, n);
@@ -162,6 +166,38 @@ public:
   void push_initial(const RangeTy& range) {
     auto rp = range.local_pair();
     push(rp.first, rp.second);
+  }
+
+  /**
+   * Return pointer to next value to be returned by pop.
+   *
+   * For internal runtime use.
+   */
+  value_type* peek() {
+    p& n = data.get();
+    if (IsStack) {
+      if (n.next && !n.next->empty())
+	return &n.next->back();
+      if (n.next)
+	delChunk(n.next);
+      n.next = popChunk();
+      if (n.next && !n.next->empty())
+	return &n.next->back();
+      return NULL;
+    } else {
+      if (n.cur && !n.cur->empty())
+	return &n.cur->front();
+      if (n.cur)
+	delChunk(n.cur);
+      n.cur = popChunk();
+      if (!n.cur) {
+	n.cur = n.next;
+	n.next = 0;
+      }
+      if (n.cur && !n.cur->empty())
+	return &n.cur->front();
+      return NULL;
+    }
   }
 
   Galois::optional<value_type> pop()  {
