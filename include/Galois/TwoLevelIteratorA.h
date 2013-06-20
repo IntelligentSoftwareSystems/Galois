@@ -27,13 +27,14 @@
 #ifndef GALOIS_TWOLEVELITERATORA_H
 #define GALOIS_TWOLEVELITERATORA_H
 
+#include "Galois/config.h"
 #include "Galois/Runtime/ll/gio.h"
 
 #include <boost/iterator/iterator_adaptor.hpp>
 #include <cassert>
 #include <iterator>
-#include <type_traits>
-#include <utility>
+#include GALOIS_CXX11_STD_HEADER(type_traits)
+#include GALOIS_CXX11_STD_HEADER(utility)
 
 namespace Galois {
 
@@ -56,12 +57,14 @@ private:
   InnerBeginFn m_inner_begin_fn;
   InnerEndFn m_inner_end_fn;
 
+#if __cplusplus >= 201103L
   static_assert(std::is_convertible<InnerIter, 
         typename std::result_of<InnerBeginFn(decltype(*std::declval<OuterIter>()))>::type>::value,
         "InnerIter should be convertable to result of InnerBeginFn(*OuterIter)");
   static_assert(std::is_convertible<InnerIter, 
       typename std::result_of<InnerEndFn(decltype(*std::declval<OuterIter>()))>::type>::value,
         "InnerIter should be convertable to result of InnerEndFn(*OuterIter)");
+#endif
 
   friend class boost::iterator_core_access;
 
@@ -300,6 +303,7 @@ private:
     }
 
     GALOIS_DIE("invalid iterator ", std::distance(m_outer, x.m_outer));
+    return 0;
   }
 
   template<class OtherOuterIter, class OtherInnerIter, class C, class BF, class EF>
@@ -348,6 +352,7 @@ struct GetEnd {
   auto operator()(T&& x) const -> decltype(std::forward<T>(x).end()) { return std::forward<T>(x).end(); }
 };
 
+#if __cplusplus >= 201103L
 template<
   class CategoryOrTraversal = std::forward_iterator_tag,
   class OuterIter,
@@ -356,13 +361,35 @@ template<
   class InnerEndFn = GetEnd,
   class Iter = TwoLevelIteratorA<OuterIter, InnerIter, CategoryOrTraversal, InnerBeginFn, InnerEndFn>
   >
-auto make_two_level_iterator(OuterIter outer_begin, OuterIter outer_end) -> 
-  std::pair<Iter,Iter>
+std::pair<Iter,Iter>
+make_two_level_iterator(OuterIter outer_begin, OuterIter outer_end)
 {
   return std::make_pair(
       Iter(outer_begin, outer_end, outer_begin, InnerBeginFn(), InnerEndFn()),
       Iter(outer_begin, outer_end, outer_end, InnerBeginFn(), InnerEndFn()));
 }
+#else
+// XXX(ddn): More direct encoding crashes XL 12.1, so lean towards more verbose types
+template<
+  class CategoryOrTraversal,
+  class OuterIter,
+  class InnerIter,
+  class InnerBeginFn,
+  class InnerEndFn
+  >
+std::pair<
+  TwoLevelIteratorA<OuterIter, InnerIter, CategoryOrTraversal, InnerBeginFn, InnerEndFn>,
+  TwoLevelIteratorA<OuterIter, InnerIter, CategoryOrTraversal, InnerBeginFn, InnerEndFn>
+  >
+make_two_level_iterator(OuterIter outer_begin, OuterIter outer_end)
+{
+  return std::make_pair(
+      TwoLevelIteratorA<OuterIter, InnerIter, CategoryOrTraversal, InnerBeginFn, InnerEndFn>
+        (outer_begin, outer_end, outer_begin, InnerBeginFn(), InnerEndFn()),
+      TwoLevelIteratorA<OuterIter, InnerIter, CategoryOrTraversal, InnerBeginFn, InnerEndFn>
+        (outer_begin, outer_end, outer_end, InnerBeginFn(), InnerEndFn()));
+}
+#endif
 
 } // end namespace Galois
 

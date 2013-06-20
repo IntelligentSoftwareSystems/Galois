@@ -4,6 +4,11 @@ function(makeTest name)
   add_test(${name} test-${name})
 endfunction()
 
+# XXX(ddn): Avoid internal compiler error
+if(CMAKE_CXX_COMPILER_ID MATCHES "XL")
+  set_source_files_properties(worklists-compile.cpp PROPERTIES COMPILE_FLAGS "-O0")
+endif()
+
 makeTest(acquire)
 makeTest(bandwidth)
 makeTest(empty-member-lcgraph)
@@ -17,7 +22,4 @@ makeTest(sort)
 makeTest(static)
 makeTest(worklists-compile)
 makeTest(lock)
-# XXX(ddn): Avoid internal compiler error
-if(CMAKE_CXX_COMPILER_ID MATCHES "XL")
-  set_source_files_properties(worklists-compile.cpp PROPERTIES COMPILE_FLAGS "-O0")
-endif()
+makeTest(twoleveliteratora)
