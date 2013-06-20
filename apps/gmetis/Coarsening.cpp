@@ -233,9 +233,9 @@ void findMatching(MetisGraph* coarseMetisGraph, unsigned iterNum, bool useRM = f
     typedef decltype(fineMetisGraph->getGraph()->local_begin()) ITY;
     typedef Galois::WorkList::StableIterator<ITY, true> WL;
     parallelMatchAndCreateNodes<RMmatch> pRM(coarseMetisGraph);
-    std::ostringstream name;
-    name << "RM_Match_" << iterNum;
-    Galois::for_each_local<WL>(*fineMetisGraph->getGraph(), pRM, name.str().c_str());
+    // std::ostringstream name;
+    // name << "RM_Match_" << iterNum;
+    Galois::for_each_local<WL>(*fineMetisGraph->getGraph(), pRM, "match");//name.str().c_str());
   } else {
     //FIXME: use obim for SHEM matching
     typedef decltype(fineMetisGraph->getGraph()->local_begin()) ITY;
@@ -247,9 +247,9 @@ void findMatching(MetisGraph* coarseMetisGraph, unsigned iterNum, bool useRM = f
 
     HighDegreeIndexer::indexgraph = fineMetisGraph->getGraph();
     parallelMatchAndCreateNodes<HEMmatch> pHEM(coarseMetisGraph);
-    std::ostringstream name;
-    name << "HEM_Match_" << iterNum;
-    Galois::for_each_local<pLD>(*fineMetisGraph->getGraph(), pHEM, name.str().c_str());
+    // std::ostringstream name;
+    // name << "HEM_Match_" << iterNum;
+    Galois::for_each_local<pLD>(*fineMetisGraph->getGraph(), pHEM, "match"); //name.str().c_str());
   }
 }
 
@@ -260,7 +260,7 @@ void createCoarseEdges(MetisGraph *coarseMetisGraph, unsigned iterNum) {
   parallelPopulateEdges pPE(coarseMetisGraph);
   std::ostringstream name;
   name << "Populate_Edges_" << iterNum;
-  Galois::for_each_local<WL>(*coarseMetisGraph->getGraph(), pPE, name.str().c_str());
+  Galois::for_each_local<WL>(*coarseMetisGraph->getGraph(), pPE, "popedge");//name.str().c_str());
 }
 
 MetisGraph* coarsenOnce(MetisGraph *fineMetisGraph, unsigned iterNum, bool useRM = false) {

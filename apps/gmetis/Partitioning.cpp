@@ -4,7 +4,7 @@
 
 #include <iomanip>
 
-const bool multiSeed = false;
+const bool multiSeed = true;
 
 std::ostream& operator<<(std::ostream& os, const partInfo& p) {
   os << "Num " << std::setw(3) << p.partNum << "\tmask " << std::setw(5) << p.partMask << "\tweight " << p.partWeight << " size: " << p.partSize;

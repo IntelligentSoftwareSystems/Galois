@@ -156,7 +156,7 @@ void Partition(MetisGraph* metisGraph, unsigned nparts) {
   unsigned maxWeight = 1.1 * metisGraph->getTotalWeight() / nparts;
   unsigned coarsenTo = std::max(metisGraph->getNumNodes() / (40 * intlog2(nparts)), 20 * (nparts));
   int maxVertexWeight = (int) (1.5 * ((metisGraph->getNumNodes()) / (double) coarsenTo));
-  Galois::StatTimer T("Coarsening");
+  Galois::StatTimer T("Coarsen");
   Galois::Timer t;
   T.start();
   t.start();

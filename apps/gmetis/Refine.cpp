@@ -2,18 +2,26 @@
 #include "MetisGraph.h"
 #include "Metis.h"
 
-int gain(GGraph& g, GNode n) {
-  int retval = 0;
-  unsigned nPart = g.getData(n).getPart();
-  for (auto ii = g.edge_begin(n), ee =g.edge_end(n); ii != ee; ++ii) {
-    GNode neigh = g.getEdgeDst(ii);
-    if (g.getData(neigh).getPart() == nPart)
-      retval -= g.getEdgeData(ii);
-    else
-      retval += g.getEdgeData(ii);
+
+struct gainIndexer {
+  static GGraph* g;
+
+  int operator()(GNode n) {
+    int retval = 0;
+    Galois::MethodFlag flag = Galois::NONE;
+    unsigned nPart = g->getData(n, flag).getPart();
+    for (auto ii = g->edge_begin(n, flag), ee = g->edge_end(n); ii != ee; ++ii) {
+      GNode neigh = g->getEdgeDst(ii, flag);
+      if (g->getData(neigh, flag).getPart() == nPart)
+        retval -= g->getEdgeData(ii, flag);
+      else
+        retval += g->getEdgeData(ii, flag);
+    }
+    return -retval / 16;
   }
-  return retval;
-}
+};
+
+GGraph* gainIndexer::g;
 
 bool isBoundary(GGraph& g, GNode n) {
   unsigned nPart = g.getData(n).getPart();
@@ -75,9 +83,12 @@ struct refine_BKL2 {
   }
 
   static void go(unsigned ms, GGraph& gg, std::vector<partInfo>& p) {
+    typedef Galois::WorkList::dChunkedFIFO<8> Chunk;
+    typedef Galois::WorkList::OrderedByIntegerMetric<gainIndexer, Chunk, 10> pG;
+    gainIndexer::g = &gg;
     Galois::InsertBag<GNode> boundary;
-    Galois::do_all_local(gg, findBoundary(boundary, gg));
-    Galois::for_each_local(boundary, refine_BKL2(ms, gg, p));
+    Galois::do_all_local(gg, findBoundary(boundary, gg), "boundary");
+    Galois::for_each_local<pG>(boundary, refine_BKL2(ms, gg, p), "refine");
   }
 };
 
@@ -92,7 +103,7 @@ struct projectPart {
     auto& cn = coarseGraph->getData(n);
     unsigned part = cn.getPart();
     for (unsigned x = 0; x < cn.numChildren(); ++x)
-      fineGraph->getData(cn.getChild(0)).setPart(part);
+      fineGraph->getData(cn.getChild(x)).setPart(part);
     //This slows us down.  I don't think we need size (number of nodes in the current coarsening level)
     if (cn.numChildren() > 1)
       __sync_fetch_and_add(&parts[part].partSize, cn.numChildren() - 1);
