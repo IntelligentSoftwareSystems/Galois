@@ -15,7 +15,8 @@ To perform numeric factorization:
   NumericCholesky matrix1.txt.filled.gr matrix1.txt.dep
   diff choleskyedges.txt matrix1.txt.choleskyedges 
 
-Unfortunately, the edge weights are not formatted exactly the same way.
+Unfortunately, the edge weights are not formatted exactly the same way, so you
+might prefer to use paste instead of diff.
 
 ===============================================================================
 

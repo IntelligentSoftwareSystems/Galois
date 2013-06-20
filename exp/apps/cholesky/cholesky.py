@@ -47,6 +47,33 @@ def load_matrix(fn):
                 G.add_edge(i, j, weight=data[i][j])
     return G
 
+# Convert a tree to a total ordering
+def write_total_ordering(T, f=None):
+    my_str = ' '.join(str(i) for i in follow_tree(T))
+    if f:
+        fh = open(f, 'w')
+        fh.write(my_str)
+        fh.write("\n")
+        fh.close()
+    else:
+        print my_str
+
+# Write a matrix to a file
+def write_matrix(A, fn=None):
+    if fn:
+        fh = open(fn, 'w')
+    else:
+        fh = sys.stdout
+    rows, cols = A.shape
+    for i in range(rows):
+        for j in range(cols):
+            if j != 0:
+                fh.write("\t")
+            fh.write(str(A[i][j]))
+        fh.write("\n")
+    if fn:
+        fh.close()
+
 # Draw a graph on the screen
 def draw(G, show=False, color='r', labels='weight', title=None):
     layout = nx.shell_layout(G)
@@ -72,7 +99,7 @@ def ordering_sequential(G):
     for i in range(G.number_of_nodes()):
         yield i
 
-# Return nodes of the graph in order [1, 6, 4, 5, 0, 3, 7, 2] 
+# Return nodes of the graph in order [1, 6, 4, 5, 0, 3, 7, 2]
 def ordering_given(G):
     order = [1, 6, 4, 5, 0, 3, 7, 2]
     assert(G.number_of_nodes() == len(order))
@@ -128,18 +155,17 @@ def matrix(G):
     return L
 
 # Convert a graph to an edgelist
-def edgelist(G, f=None):
+def write_edgelist(G, f=None):
     if f:
         fh = open(f, 'w')
+    else:
+        fh = sys.stdout
     for i in G.edges_iter(data=True):
         line = "%d %d" % (i[0], i[1])
         if 'weight' in i[2]:
             line += " %f" % i[2]['weight']
-        if f:
-            fh.write(line)
-            fh.write("\n")
-        else:
-            print line
+        fh.write(line)
+        fh.write("\n")
     if f:
         fh.close()
 
@@ -190,9 +216,9 @@ def main(matrixfn, filledfn, depfn, choleskyfn,
     
     # Write filled matrix, dependency graph
     if filledfn:
-        edgelist(G, f=filledfn)
+        write_edgelist(G, f=filledfn)
     if depfn:
-        edgelist(T, f=depfn)
+        write_total_ordering(T, f=depfn)
 
     # Draw elimination graph
     plt.subplot(2,2,3)
@@ -229,10 +255,7 @@ def main(matrixfn, filledfn, depfn, choleskyfn,
     # Write Cholesky matrix
     print matrix(G)
     if choleskyfn:
-        edgelist(G, f=choleskyfn)    
-
-    # Show plots
-    plt.show()
+        write_edgelist(G, f=choleskyfn)    
 
 if __name__ == '__main__':
     if len(sys.argv) != 2 and len(sys.argv) != 5:
@@ -258,4 +281,6 @@ if __name__ == '__main__':
         choleskyfn = matrixfn + ".choleskyedges"
     main(matrixfn, filledfn, depfn, choleskyfn,
          ordering=ordering_sequential)#least_degree)
+    # Show plots
+    plt.show()
 

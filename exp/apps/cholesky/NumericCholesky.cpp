@@ -76,10 +76,9 @@ typedef Graph::GraphNode GNode;
 
 Graph graph;
 
-// The dependency graph is stored as an array of linked lists. (Supports
-// indexing for node A and search for node B. Maybe this should be a Graph)
-typedef std::list<unsigned int> DepList;
-DepList *depgraph;
+// The dependency list is stored as a total ordering
+typedef unsigned int DepItem;
+DepItem *depgraph;
 
 
 std::ostream& operator<<(std::ostream& os, const Node& n) {
@@ -118,28 +117,33 @@ bool outputTextEdgeData(const char* ofile, Graph& G) {
   return true;
 }
 
-struct Cmp {
-  bool searchTree(unsigned int a, unsigned int b) const {
-    // Follow the dependency graph from node a looking for node b.
-    if ( a == b ) return true;
-    for (DepList::iterator ii=depgraph[a].begin(), ei = depgraph[a].end();
-         ii != ei; ++ii) {
-      if ( *ii == b ) return true;
-      if ( *ii != a && searchTree(*ii, b) ) return true; 
-    }
-    return false;
+void probe_graph() {
+#if 1
+  unsigned int n = graph.size(), i = 0;
+  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+    Node& data = graph.getData(*ii, Galois::MethodFlag::NONE);
+    assert(data.id == i++);
   }
+  assert(i == n);
+#endif
+}
 
+struct Cmp {
   bool operator()(const GNode& item1, const GNode& item2) const {
+    probe_graph();
     Node &a = graph.getData(item1, Galois::MethodFlag::NONE);
     Node &b = graph.getData(item2, Galois::MethodFlag::NONE);
+    unsigned int posa = -1, posb = -1;
+
     // Check if path exists from A to B. Then A <= B.
-    bool result = searchTree(a.id, b.id);
-    if ( !result && !searchTree(b.id, a.id) ) {
-      // These nodes are totally disconnected!
-      std::cout << "BAD";
-      //result = b.id < a.id; //true; // FIXME - need transitivity.
+    for ( unsigned int n = graph.size(), i = 0; i < n; i++ ) {
+      if ( depgraph[i] == a.id ) posa = i;
+      else if ( depgraph[i] == b.id ) posb = i;
+      else continue;
+      if ( posa >= 0 && posb >= 0 ) break;
     }
+    assert(posa >= 0 && posb >= 0); // FIXME: Implements a total ordering
+    bool result = posa <= posb;
     std::cout << "Cmp: " << a.id << " <= " << b.id << ": " << (result ? "true" : "false") << "\n";
     return result;
   }
@@ -155,7 +159,9 @@ struct NhFunc {
   }
   void operator()(GNode& item) {
     // Touch all neighbors
+    probe_graph();
     Graph::edge_iterator ii = graph.edge_begin(item, Galois::MethodFlag::ALL); // This seems to be enough
+    probe_graph();
 #if 0
     unsigned a = graph.getData(item, Galois::MethodFlag::NONE).id;
     std::cout << "Neighbors of " << a << "\n";
@@ -174,6 +180,7 @@ struct DemoAlgo {
   Node* root;
 
   void operator()(GNode src, Galois::UserContext<GNode>& ctx) {
+    probe_graph();
     // Find self-edge for this node, update it
     edgedata& factor = graph.getEdgeData(findEdge(graph, src, src), Galois::MethodFlag::NONE);
     factor = sqrt(factor);
@@ -185,6 +192,7 @@ struct DemoAlgo {
     srcd.seen = true;
 
     // Update all edges (except self-edge)
+    
     for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::ALL),
          ei = graph.edge_end(src, Galois::MethodFlag::ALL); ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
@@ -211,12 +219,14 @@ struct DemoAlgo {
     }
     std::cout << "OPERATED ON " << srcd.id << "\n";
     //sleep(1); // Use this to help debug parallelism
+    probe_graph();
   }
 
   void operator()() {
     Graph::iterator ii = graph.begin(), ei = graph.end();
     if (ii != ei) {
-      Galois::for_each_ordered(ii, ei, Cmp(), NhFunc(), *this);
+      //Galois::for_each_ordered(ii, ei, Cmp(), NhFunc(), *this);
+      Galois::for_each(ii, ei, *this);
       //Galois::for_each(ii, ei, *this);
     }
   }
@@ -261,34 +271,43 @@ int main(int argc, char** argv) {
   Galois::Graph::readGraph(graph, inputFilename.c_str());
   std::cout << "Num nodes: " << graph.size() << "\n";
 
-  // Load dependence tree
+  // Assign IDs to each node
   {
-    unsigned int n = graph.size();
-    depgraph = new DepList[n];
-    assert(depgraph);
-    std::ifstream depfile(depFilename.c_str());
-    while (depfile) {
-      unsigned int src;
-      unsigned int dest;
-      depfile >> src >> dest;
-      assert(src < n && dest < n);
-      depgraph[src].push_back(dest);
-    }
-    depfile.close();
-  }
-
-  Tinitial.stop();
-
-  {
-    unsigned i = 0;
+    unsigned int n = graph.size(), i = 0;
     for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
       Node& data = graph.getData(*ii);
       data.id = i++;
     }
+    assert(i == n);
+#if 0
+    // Load dependence tree
+    depgraph = new DepItem[n];
+    assert(depgraph);
+    std::ifstream depfile(depFilename.c_str());
+    i = 0;
+    while (depfile) {
+      unsigned int node;
+      depfile >> node;
+      if ( !depfile ) break;
+      assert(node < n);
+      if ( i < 0 || i >= n ) {
+        std::cout << "Error loading dependency graph.\n";
+        abort();
+      }
+      depgraph[i] = node;
+      i++;
+    }
+    assert(i == n);
+    depfile.close();
+#endif
   }
+  //probe_graph();
 
+  Tinitial.stop();
+  
   //Galois::preAlloc(numThreads);
   Galois::reportPageAlloc("MeminfoPre");
+
   switch (algo) {
     case demo: run<DemoAlgo>(); break;
     //case asynchronous: run<AsynchronousAlgo>(); break;
