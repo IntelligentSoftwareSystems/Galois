@@ -165,13 +165,13 @@ public:
       EdgeInfo* edgeBegin = n->edgeBegin();
       EdgeInfo* edgeEnd = n->edgeEnd();
 
-      n->destruct();
       if (EdgeInfo::has_value) {
         while (edgeBegin != edgeEnd) {
           edgeBegin->destroy();
           ++edgeBegin;
         }
       }
+      n->~NodeInfo();
     }
   }
 
@@ -268,7 +268,8 @@ public:
     curNode += bytes / sizeof(NodeInfo);
     for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii, ++id) {
       nodes.constructAt(*ii);
-      curNode->construct();
+      new (curNode) NodeInfo();
+      //curNode->construct();
       curNode->setId(id);
       curNode->numEdges = std::distance(graph.edge_begin(*ii), graph.edge_end(*ii));
       nodes[*ii] = curNode;

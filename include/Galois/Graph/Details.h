@@ -209,16 +209,16 @@ public:
 
   typedef NodeTy& reference;
   reference getData() { return data; } 
-  void destruct() { (&data)->~NodeTy(); }
-  void construct() { new (&data) NodeTy; }
+  //void destruct() { (&data)->~NodeTy(); }
+  //void construct() { new (&data) NodeTy; }
 };
 
 template<bool HasLockable>
 struct NodeInfoBase<void, HasLockable>: public boost::mpl::if_c<HasLockable,Galois::Runtime::Lockable,NoLockable>::type {
   typedef void* reference;
   reference getData() { return 0; }
-  void destruct() { }
-  void construct() { }
+  //void destruct() { }
+  //void construct() { }
 };
 
 template<bool Enable>
