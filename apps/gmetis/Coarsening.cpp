@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -23,8 +23,6 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-#include "GMetisConfig.h"
-#include "MetisGraph.h"
 #include "Metis.h"
 
 namespace {
@@ -281,20 +279,6 @@ MetisGraph* coarsenOnce(MetisGraph *fineMetisGraph, unsigned iterNum, bool useRM
 }
 
 } // anon namespace
-
-void graphStat(GGraph* graph) {
-  unsigned numEdges = 0;
-  std::map<unsigned, unsigned> hist;
-  for (auto ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
-    unsigned val = std::distance(graph->edge_begin(*ii), graph->edge_end(*ii));
-    numEdges += val;
-    ++hist[val];
-  }
-  
-  std::cout<<"Nodes "<<std::distance(graph->begin(), graph->end())<<"| Edges " << numEdges << endl;
-  for (auto pp = hist.begin(), ep = hist.end(); pp != ep; ++pp)
-    std::cout << pp->first << " : " << pp->second << "\n";
-}
 
 MetisGraph* coarsen(MetisGraph* fineMetisGraph, unsigned coarsenTo) {
   unsigned iRuns = minRuns(coarsenTo, std::distance(fineMetisGraph->getGraph()->begin(), fineMetisGraph->getGraph()->end()));

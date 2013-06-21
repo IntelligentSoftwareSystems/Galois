@@ -22,7 +22,6 @@
 
 #ifndef GRAPHREADER_H_
 #define GRAPHREADER_H_
-#include "GMetisConfig.h"
 #include <fstream>
 #include <vector>
 using namespace std;

@@ -1,15 +1,35 @@
-#include "GMetisConfig.h"
-#include "MetisGraph.h"
+/** GMetis -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @author Xin Sui <xinsui@cs.utexas.edu>
+ * @author Nikunj Yadav <nikunj@cs.utexas.edu>
+ * @author Andrew Lenharth <andrew@lenharth.org>
+ */
+
 #include "Metis.h"
 
-#include <iomanip>
+#include <cstdlib>
 
 const bool multiSeed = true;
 
-std::ostream& operator<<(std::ostream& os, const partInfo& p) {
-  os << "Num " << std::setw(3) << p.partNum << "\tmask " << std::setw(5) << p.partMask << "\tweight " << p.partWeight << " size: " << p.partSize;
-  return os;
-}
+namespace {
 
 //gain of moving n from it's current part to new part
 int gain_limited(GGraph& g, GNode n, unsigned newpart, Galois::MethodFlag flag) {
@@ -40,7 +60,7 @@ struct bisect_GGP {
 
     do {
       //pick a seed
-      int i = getRandom((oldPart.partSize-newSize)/2)+1;
+      int i = ((int)(drand48()*((double)(((oldPart.partSize-newSize)/2)))))+1;
       for (auto ii = g.begin(), ee = g.end(); ii != ee; ++ii)
         if (g.getData(*ii, flag).getPart() == oldPart.partNum) {
           if(--i) {
@@ -85,7 +105,7 @@ struct bisect_GGGP {
 
     do {
       //pick a seed
-      int i = getRandom((oldPart.partSize-newSize)/2)+1;
+      int i = (int)(drand48()*((oldPart.partSize-newSize)/2)) +1;
       for (auto ii = g.begin(), ee = g.end(); ii != ee; ++ii)
         if (g.getData(*ii, flag).getPart() == oldPart.partNum) {
           if(--i) {
@@ -153,6 +173,8 @@ struct parallelBisect {
     cnx.push(item);
   }
 }; 
+
+} //anon namespace
   
 std::vector<partInfo> partition(MetisGraph* mcg, unsigned numPartitions) {
   std::vector<partInfo> parts(numPartitions);

@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -19,6 +19,7 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  *
  * @author Xin Sui <xinsui@cs.utexas.edu>
+ * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
 #include <vector>
@@ -30,12 +31,8 @@
 #include <cmath>
 #include <fstream>
 
-#include "GMetisConfig.h"
-#include "MetisGraph.h"
 #include "Metis.h"
-#include "Metrics.h"
 
-#include "Galois/Graph/LCGraph.h"
 #include "Galois/Statistic.h"
 #include "GraphReader.h"
 #include "Lonestar/BoilerPlate.h"
@@ -137,24 +134,13 @@ bool verifyRecursiveBisection(MetisGraph* metisGraph,int nparts) {
   return true;
 }
 
-
-void printPartStats(std::vector<partInfo>& parts) {
-  unsigned tW = 0;
-  unsigned tS = 0;
-  for (unsigned x = 0; x < parts.size(); ++x) {
-    std::cout << parts[x] << "\n";
-    tW += parts[x].partWeight;
-    tS += parts[x].partSize;
-  }
-  std::cout << "Total Weight: " << tW << "\nTotal Size: " << tS << "\n";
-}
-
 /**
  * KMetis Algorithm
  */
 void Partition(MetisGraph* metisGraph, unsigned nparts) {
   unsigned maxWeight = 1.1 * metisGraph->getTotalWeight() / nparts;
-  unsigned coarsenTo = std::max(metisGraph->getNumNodes() / (40 * intlog2(nparts)), 20 * (nparts));
+  //unsigned coarsenTo = std::max(metisGraph->getNumNodes() / (40 * intlog2(nparts)), 20 * (nparts));
+  unsigned coarsenTo = 20 * nparts;
   int maxVertexWeight = (int) (1.5 * ((metisGraph->getNumNodes()) / (double) coarsenTo));
   Galois::StatTimer T("Coarsen");
   Galois::Timer t;

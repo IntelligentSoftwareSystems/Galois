@@ -26,7 +26,114 @@
 #ifndef METIS_H_
 #define METIS_H_
 
+#include "Galois/Graph/LC_Morph_Graph.h"
 
+class MetisNode;
+typedef Galois::Graph::LC_Morph_Graph<MetisNode,int> GGraph;
+typedef Galois::Graph::LC_Morph_Graph<MetisNode,int>::GraphNode GNode;
+
+//Nodes in the metis graph
+class MetisNode {
+
+public:
+  explicit MetisNode(int weight) :_weight(weight) {
+    init();
+  }
+  
+  MetisNode(GNode child0, unsigned weight)
+    : _weight(weight) {
+    children[0] = child0;
+    init();
+    onlyOneChild = true;
+  }
+
+  MetisNode(GNode child0, GNode child1, unsigned weight)
+    : onlyOneChild(false), _weight(weight) {
+    children[0] = child0;
+    children[1] = child1;
+    init();
+  }
+
+  MetisNode() { }
+
+  void init(){
+    _numEdges = 0;
+    _weightEdge = 0;
+    _partition = 0;
+    bmatched = false;
+    bparent = false;
+    onlyOneChild = false;
+  }
+
+  int getWeight() const { return _weight; }
+  void setWeight(int weight) { _weight = weight; }
+  
+  unsigned getEdgeWeight() const { return _weightEdge; }
+  void setEdgeWeight(unsigned w) { _weightEdge = w; }
+
+  void setParent(GNode p)  { parent = p; bparent = true; }
+  GNode getParent() const  { assert(bparent); return parent; }
+
+  void setMatched(GNode v) { matched = v; bmatched = true; }
+  GNode getMatched() const { assert(bmatched); return matched; }
+  bool isMatched() const   { return bmatched; }
+
+  GNode getChild(unsigned x) const { return children[x]; }
+  unsigned numChildren() const { return onlyOneChild ? 1 : 2; }
+
+  unsigned getNumEdges() const { return _numEdges; }
+  void setNumEdges(unsigned val) { _numEdges = val; }
+
+  unsigned getPart() const { return _partition; }
+  void setPart(unsigned val) { _partition = val; }
+
+private:
+  bool bmatched;
+  GNode matched;
+  bool bparent;
+  GNode parent;
+  GNode children[2];
+  bool onlyOneChild;
+  unsigned _weight;
+  unsigned _numEdges;
+  unsigned _partition;
+  unsigned _weightEdge;
+};
+
+//Structure to keep track of graph hirarchy
+class MetisGraph{
+  MetisGraph* coarser;
+  MetisGraph* finer;
+
+  GGraph graph;
+
+public:
+  MetisGraph() :coarser(0), finer(0) { }
+  
+  explicit MetisGraph(MetisGraph* finerGraph)
+    :coarser(0), finer(finerGraph) {
+    finer->coarser = this;
+  }
+  
+  const GGraph* getGraph() const { return &graph; }
+  GGraph* getGraph() { return &graph; }
+  MetisGraph* getFinerGraph() const { return finer; }
+  MetisGraph* getCoarserGraph() const { return coarser; }
+
+  unsigned getNumNodes() {
+    return std::distance(graph.begin(), graph.end());
+  }
+  
+  unsigned getTotalWeight() {
+    MetisGraph* f = this;
+    while (f->finer)
+      f = f->finer;
+    return std::distance(f->graph.begin(), f->graph.end());
+  }
+};
+
+
+//Structure to store working partition information
 struct partInfo {
   unsigned partNum;
   unsigned partMask;
@@ -66,10 +173,11 @@ struct partInfo {
 
 std::ostream& operator<<(std::ostream& os, const partInfo& p);
 
-//gain of moving n from it's current part to new part
-int gain_limited(GGraph& g, GNode n, unsigned newpart, Galois::MethodFlag flag);
-
+//Metrics
 void printPartStats(std::vector<partInfo>&);
+void graphStat(GGraph* graph);
+std::vector<unsigned> edgeCut(GGraph& g, unsigned nparts);
+
 
 //Coarsening
 MetisGraph* coarsen(MetisGraph* fineMetisGraph, unsigned coarsenTo);
@@ -79,5 +187,8 @@ std::vector<partInfo> partition(MetisGraph* coarseMetisGraph, unsigned numPartit
 
 //Refinement
 void refine(MetisGraph* coarseGraph, std::vector<partInfo>& parts, unsigned maxSize);
+
+//Balancing
+void balance(MetisGraph* Graph, std::vector<partInfo>& parts, unsigned maxSize);
 
 #endif
