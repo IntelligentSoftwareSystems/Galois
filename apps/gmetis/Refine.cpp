@@ -65,7 +65,7 @@ struct findBoundary {
   }
 };
 
-template<bool ignoreSizeOnSelf>
+template<bool balance>
 struct refine_BKL2 {
   unsigned maxSize;
   GGraph& g;
@@ -74,36 +74,51 @@ struct refine_BKL2 {
   refine_BKL2(unsigned ms, GGraph& _g, std::vector<partInfo>& _p) : maxSize(ms), g(_g), parts(_p) {}
 
   //Find the partition n is most connected to
-  unsigned pickPartition(GNode n) {
+  unsigned pickPartitionEC(GNode n) {
     std::vector<unsigned> edges(parts.size(), 0);
     unsigned P = g.getData(n).getPart();
     for (auto ii = g.edge_begin(n), ee =g.edge_end(n); ii != ee; ++ii) {
       GNode neigh = g.getEdgeDst(ii);
       auto& nd = g.getData(neigh);
       if (parts[nd.getPart()].partWeight < maxSize
-          || (ignoreSizeOnSelf && nd.getPart() == P))
+          || nd.getPart() == P)
         edges[nd.getPart()] += g.getEdgeData(ii);
     }
     return std::distance(edges.begin(), std::max_element(edges.begin(), edges.end()));
   }
 
+  //Find the smallest partition n is connected to
+  unsigned pickPartitionMP(GNode n) {
+    unsigned P = g.getData(n).getPart();
+    unsigned W = parts[P].partWeight;
+    std::vector<unsigned> edges(parts.size(), ~0);
+    edges[P] = W;
+    W = (double)W * 0.9;
+    for (auto ii = g.edge_begin(n), ee =g.edge_end(n); ii != ee; ++ii) {
+      GNode neigh = g.getEdgeDst(ii);
+      auto& nd = g.getData(neigh);
+      if (parts[nd.getPart()].partWeight < W)
+        edges[nd.getPart()] = parts[nd.getPart()].partWeight;
+    }
+    return std::distance(edges.begin(), std::min_element(edges.begin(), edges.end()));
+  }
+
+
   template<typename Context>
   void operator()(GNode n, Context& cnx) {
     auto& nd = g.getData(n);
     unsigned curpart = nd.getPart();
-    unsigned newpart = pickPartition(n);
+    unsigned newpart = balance ? pickPartitionMP(n) : pickPartitionEC(n);
     if (curpart != newpart) {
       nd.setPart(newpart);
       //__sync_fetch_and_sub(&maxSize, 1);
       __sync_fetch_and_sub(&parts[curpart].partWeight, nd.getWeight());
       __sync_fetch_and_add(&parts[newpart].partWeight, nd.getWeight());
-      __sync_fetch_and_sub(&parts[curpart].partSize, 1);
-      __sync_fetch_and_add(&parts[newpart].partSize, 1);
       for (auto ii = g.edge_begin(n), ee = g.edge_end(n); ii != ee; ++ii) {
         GNode neigh = g.getEdgeDst(ii);
         auto& ned = g.getData(neigh);
-        if (ned.getPart() != newpart)
-          cnx.push(neigh);
+        //if (ned.getPart() != newpart)
+        cnx.push(neigh);
       }
     }
   }
@@ -130,9 +145,6 @@ struct projectPart {
     unsigned part = cn.getPart();
     for (unsigned x = 0; x < cn.numChildren(); ++x)
       fineGraph->getData(cn.getChild(x)).setPart(part);
-    //This slows us down.  I don't think we need size (number of nodes in the current coarsening level)
-    if (cn.numChildren() > 1)
-      __sync_fetch_and_add(&parts[part].partSize, cn.numChildren() - 1);
   }
 
   static void go(MetisGraph* Graph, std::vector<partInfo>& p) {
@@ -145,7 +157,7 @@ struct projectPart {
 void refine(MetisGraph* coarseGraph, std::vector<partInfo>& parts, unsigned maxSize) {
   do {
     //refine nparts times
-    refine_BKL2<true>::go(maxSize, *coarseGraph->getGraph(), parts);
+    refine_BKL2<false>::go(maxSize, *coarseGraph->getGraph(), parts);
     // std::cout << "Refinement of " << coarseGraph->getGraph() << "\n";
     // printPartStats(parts);
 
@@ -158,6 +170,6 @@ void refine(MetisGraph* coarseGraph, std::vector<partInfo>& parts, unsigned maxS
 }
 
 void balance(MetisGraph* coarseGraph, std::vector<partInfo>& parts, unsigned maxSize) {
-  refine_BKL2<false>::go(maxSize, *coarseGraph->getGraph(), parts);
+  refine_BKL2<true>::go(maxSize, *coarseGraph->getGraph(), parts);
 }
 

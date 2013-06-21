@@ -59,16 +59,25 @@ std::vector<unsigned> edgeCut(GGraph& g, unsigned nparts) {
 
 void printPartStats(std::vector<partInfo>& parts) {
   unsigned tW = 0;
-  unsigned tS = 0;
   for (unsigned x = 0; x < parts.size(); ++x) {
     std::cout << parts[x] << "\n";
     tW += parts[x].partWeight;
-    tS += parts[x].partSize;
   }
-  std::cout << "Total Weight: " << tW << "\nTotal Size: " << tS << "\n";
+  std::cout << "Total Weight: " << tW << "\n";
+  std::cout << "Target Weight: " << tW / parts.size() << "\n";
 }
 
 std::ostream& operator<<(std::ostream& os, const partInfo& p) {
-  os << "Num " << std::setw(3) << p.partNum << "\tmask " << std::setw(5) << p.partMask << "\tweight " << p.partWeight << " size: " << p.partSize;
+  os << "Num " << std::setw(3) << p.partNum << "\tmask " << std::setw(5) << std::hex << p.partMask << std::dec << "\tweight " << p.partWeight;
   return os;
+}
+
+void printCuts(const char* str, MetisGraph* g, unsigned numPartitions) {
+  std::vector<unsigned> ec = edgeCut(*g->getGraph(), numPartitions);
+  std::cout << str << " Edge Cuts:\n";
+  for (unsigned x = 0; x < ec.size(); ++x)
+    std::cout << (x == 0 ? "" : " " ) << ec[x];
+  std::cout << "\n";
+  std::cout << str << " Average Edge Cut: " << (std::accumulate(ec.begin(), ec.end(), 0) / ec.size()) << "\n";
+  std::cout << str << " Minimum Edge Cut: " << *std::min_element(ec.begin(), ec.end()) << "\n";
 }

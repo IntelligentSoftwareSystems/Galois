@@ -138,14 +138,13 @@ struct partInfo {
   unsigned partNum;
   unsigned partMask;
   unsigned partWeight;
-  unsigned partSize;
 
-  partInfo(unsigned mw, unsigned ms)
-    :partNum(0), partMask(1), partWeight(mw), partSize(ms) {}
+  explicit partInfo(unsigned mw)
+    :partNum(0), partMask(1), partWeight(mw) {}
 
-  partInfo() :partNum(~0), partMask(~0), partWeight(~0), partSize(~0) {}
+  partInfo() :partNum(~0), partMask(~0), partWeight(~0) {}
 
-  partInfo(unsigned pn, unsigned pm, unsigned pw, unsigned ps) :partNum(pn), partMask(pm), partWeight(pw), partSize(ps) {}
+  partInfo(unsigned pn, unsigned pm, unsigned pw) :partNum(pn), partMask(pm), partWeight(pw) {}
 
   unsigned splitID() const {
     return partNum | partMask;
@@ -165,7 +164,7 @@ struct partInfo {
   }
 
   partInfo split() {
-    partInfo np(splitID(), partMask << 1, 0, 0);
+    partInfo np(splitID(), partMask << 1, 0);
     partMask <<= 1;
     return np;
   }
@@ -177,7 +176,7 @@ std::ostream& operator<<(std::ostream& os, const partInfo& p);
 void printPartStats(std::vector<partInfo>&);
 void graphStat(GGraph* graph);
 std::vector<unsigned> edgeCut(GGraph& g, unsigned nparts);
-
+void printCuts(const char* str, MetisGraph* g, unsigned numPartitions);
 
 //Coarsening
 MetisGraph* coarsen(MetisGraph* fineMetisGraph, unsigned coarsenTo);

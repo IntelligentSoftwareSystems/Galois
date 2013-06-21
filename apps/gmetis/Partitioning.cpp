@@ -46,29 +46,36 @@ int gain_limited(GGraph& g, GNode n, unsigned newpart, Galois::MethodFlag flag) 
 }
 
 
+GNode findSeed(GGraph& g, unsigned partNum, Galois::MethodFlag flag) {
+  //pick a seed
+  GNode seed;
+  bool validSeed = false;
+  for (auto ii = g.begin(), ee = g.end(); ii != ee; ++ii) {
+    if (g.getData(*ii, flag).getPart() == partNum) {
+      if (!validSeed) {
+        validSeed = true;
+        seed = *ii;
+      } else if (drand48() < 0.01) {
+        seed = *ii;
+      }
+    }
+  }
+  assert(validSeed);
+  return seed;
+}
+
 struct bisect_GGP {
   partInfo operator()(GGraph& g, partInfo& oldPart, std::pair<unsigned, unsigned> ratio) {
     partInfo newPart = oldPart.split();
     std::deque<GNode> boundary;
     unsigned& newWeight = newPart.partWeight = 0;
-    unsigned& newSize = newPart.partSize;
-    newSize =0;
     unsigned targetWeight = oldPart.partWeight * ratio.second / (ratio.first + ratio.second);
-    //pick a seed
 
     auto flag = Galois::MethodFlag::NONE;
 
     do {
-      //pick a seed
-      int i = ((int)(drand48()*((double)(((oldPart.partSize-newSize)/2)))))+1;
-      for (auto ii = g.begin(), ee = g.end(); ii != ee; ++ii)
-        if (g.getData(*ii, flag).getPart() == oldPart.partNum) {
-          if(--i) {
-            boundary.push_back(*ii);
-            break;
-          }
-        }
-    
+      boundary.push_back(findSeed(g, oldPart.partNum, flag));
+
       //grow partition
       while (newWeight < targetWeight && !boundary.empty()) {
         GNode n =  boundary.front();
@@ -77,7 +84,6 @@ struct bisect_GGP {
           continue;
         newWeight += g.getData(n, flag).getWeight();
         g.getData(n, flag).setPart(newPart.partNum);
-        newSize++;
         for (auto ii = g.edge_begin(n, flag), ee = g.edge_end(n, flag); ii != ee; ++ii)
           if (g.getData(g.getEdgeDst(ii, flag), flag).getPart() == oldPart.partNum)
             boundary.push_back(g.getEdgeDst(ii, flag));
@@ -85,7 +91,6 @@ struct bisect_GGP {
     } while (newWeight < targetWeight && multiSeed);
   
     oldPart.partWeight -= newWeight;
-    oldPart.partSize -= newSize;
     return newPart;
   }
 };
@@ -97,22 +102,13 @@ struct bisect_GGGP {
     std::map<int, std::set<GNode>> boundary;
 
     unsigned& newWeight = newPart.partWeight = 0;
-    unsigned& newSize = newPart.partSize = 0;
     unsigned targetWeight = oldPart.partWeight * ratio.second / (ratio.first + ratio.second);
     //pick a seed
 
     auto flag = Galois::MethodFlag::NONE;
 
     do {
-      //pick a seed
-      int i = (int)(drand48()*((oldPart.partSize-newSize)/2)) +1;
-      for (auto ii = g.begin(), ee = g.end(); ii != ee; ++ii)
-        if (g.getData(*ii, flag).getPart() == oldPart.partNum) {
-          if(--i) {
-            boundary[0].insert(*ii);
-            break;
-          }
-        }
+      boundary[0].insert(findSeed(g, oldPart.partNum, flag));
     
       //grow partition
       while (newWeight < targetWeight && !boundary.empty()) {
@@ -124,7 +120,6 @@ struct bisect_GGGP {
         if (g.getData(n, flag).getPart() == newPart.partNum)
           continue;
         newWeight += g.getData(n, flag).getWeight();
-        newSize++;
         g.getData(n, flag).setPart(newPart.partNum);
         for (auto ii = g.edge_begin(n, flag), ee = g.edge_end(n, flag); ii != ee; ++ii) {
           GNode dst = g.getEdgeDst(ii, flag);
@@ -144,7 +139,6 @@ struct bisect_GGGP {
     } while (newWeight < targetWeight && multiSeed);
   
     oldPart.partWeight -= newWeight;
-    oldPart.partSize -= newSize;
     return newPart;
   }
 };
@@ -178,7 +172,14 @@ struct parallelBisect {
   
 std::vector<partInfo> partition(MetisGraph* mcg, unsigned numPartitions) {
   std::vector<partInfo> parts(numPartitions);
-  parts[0] = partInfo(mcg->getTotalWeight(), mcg->getNumNodes());
+  parts[0] = partInfo(mcg->getTotalWeight());
   Galois::for_each<Galois::WorkList::GFIFO<> >(&parts[0], parallelBisect<bisect_GGGP>(mcg, numPartitions, parts));
+
+  if (!multiSeed) {
+    printPartStats(parts);
+    unsigned maxWeight = 1.01 * mcg->getTotalWeight() / numPartitions;
+    balance(mcg, parts, maxWeight);
+  }
+
   return parts;
 }

@@ -229,17 +229,6 @@ struct parallelInitMorphGraph {
   }
 };
 
-void printCuts(const char* str, MetisGraph* g) {
-  std::vector<unsigned> ec = edgeCut(*g->getGraph(), numPartitions);
-  std::cout << str << " Edge Cuts:\n";
-  for (unsigned x = 0; x < ec.size(); ++x)
-    std::cout << (x == 0 ? "" : " " ) << ec[x];
-  std::cout << "\n";
-  std::cout << str << " Average Edge Cut: " << (std::accumulate(ec.begin(), ec.end(), 0) / ec.size()) << "\n";
-  std::cout << str << " Minimum Edge Cut: " << *std::min_element(ec.begin(), ec.end()) << "\n";
-}
-
-
 int main(int argc, char** argv) {
   Galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
@@ -273,7 +262,7 @@ int main(int argc, char** argv) {
     std::cout << pp->first << " : " << pp->second << "\n";
 
   Galois::reportPageAlloc("MeminfoPre");
-  Galois::preAlloc(Galois::Runtime::MM::numPageAllocTotal() * 12);
+  Galois::preAlloc(Galois::Runtime::MM::numPageAllocTotal() * 3);
 
   Galois::Timer t;
   t.start();
@@ -286,8 +275,8 @@ int main(int argc, char** argv) {
   MetisGraph* coarseGraph = &metisGraph;
   while (coarseGraph->getCoarserGraph())
     coarseGraph = coarseGraph->getCoarserGraph();
-  printCuts("Initial", coarseGraph);
-  printCuts("Final", &metisGraph);
+  printCuts("Initial", coarseGraph, numPartitions);
+  printCuts("Final", &metisGraph, numPartitions);
 
   return 0;
 }
