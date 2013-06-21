@@ -154,10 +154,116 @@ struct projectPart {
 
 } //anon namespace
 
-void refine(MetisGraph* coarseGraph, std::vector<partInfo>& parts, unsigned maxSize) {
+
+int gain(GGraph& g, GNode n) {
+  int retval = 0;
+  unsigned nPart = g.getData(n).getPart();
+  for (auto ii = g.edge_begin(n), ee =g.edge_end(n); ii != ee; ++ii) {
+    GNode neigh = g.getEdgeDst(ii);
+    if (g.getData(neigh).getPart() == nPart)
+      retval -= g.getEdgeData(ii);
+    else
+      retval += g.getEdgeData(ii);
+  }
+  return retval;
+}
+
+struct parallelBoundary {
+  GGraph& g;
+  Galois::InsertBag<GNode> &bag;
+  parallelBoundary(Galois::InsertBag<GNode> &bag, GGraph& graph):bag(bag),g(graph) {
+
+  }
+  void operator()(GNode n,Galois::UserContext<GNode>&ctx) {
+      if (gain(g,n) > 0)  
+        bag.push(n);
+  }
+};
+void refineOneByOne(GGraph& g, std::vector<partInfo>& parts) {
+  std::vector<GNode>  boundary;
+  int meanWeight =0;
+  for (int i =0; i<parts.size(); i++)
+    meanWeight += parts[i].partWeight;
+  meanWeight /= parts.size();
+  Galois::InsertBag<GNode> boundaryBag;
+  parallelBoundary pB(boundaryBag, g);
+  Galois::for_each(g.begin(), g.end(), pB, "Get Boundary" );
+
+  for (auto ii = boundaryBag.begin(), ie =boundaryBag.end(); ii!=ie;ii++){
+      GNode n = (*ii) ;
+      unsigned nPart = g.getData(n).getPart();
+      int part[parts.size()];
+      for (int i =0; i<parts.size(); i++)part[i]=0;
+      for (auto ii = g.edge_begin(n), ee = g.edge_end(n); ii != ee; ++ii) {
+        GNode neigh = g.getEdgeDst(ii);
+        part[g.getData(neigh).getPart()]+=g.getEdgeData(ii);
+      }
+      int t = part[nPart];
+      int p = nPart;
+      for (int i =0; i<parts.size(); i++)
+        if (i!=nPart && part[i] > t && parts[nPart].partWeight>  parts[i].partWeight*(98)/(100) && parts[nPart].partWeight > meanWeight*98/100){
+          t = part[i];
+          p = i;
+        }
+    if(p != nPart){ 
+      g.getData(n).setPart(p);
+      parts[p].partWeight += g.getData(n).getWeight();
+      parts[nPart].partWeight -= g.getData(n).getWeight();
+    }
+  }
+}
+
+void refine_BKL(GGraph& g, std::vector<partInfo>& parts) {
+  std::set<GNode> boundary;
+  
+  //find boundary nodes with positive gain
+  Galois::InsertBag<GNode> boundaryBag;
+  parallelBoundary pB(boundaryBag, g);
+  Galois::for_each(g.begin(), g.end(), pB, "Get Boundary" );
+  for (auto ii = boundaryBag.begin(), ie =boundaryBag.end(); ii!=ie;ii++ ){
+    boundary.insert(*ii);}
+
+  //refine by swapping with a neighbor high-gain node
+  while (!boundary.empty()) {
+    GNode n = *boundary.begin();
+    boundary.erase(boundary.begin());
+    unsigned nPart = g.getData(n).getPart();
+    for (auto ii = g.edge_begin(n), ee = g.edge_end(n); ii != ee; ++ii) {
+      GNode neigh = g.getEdgeDst(ii);
+      unsigned neighPart = g.getData(neigh).getPart();
+      if (neighPart != nPart && boundary.count(neigh) &&
+          gain(g, n) > 0 && gain(g, neigh) > 0 ) {
+        unsigned nWeight = g.getData(n).getWeight();
+        unsigned neighWeight = g.getData(neigh).getWeight();
+        //swap
+        g.getData(n).setPart(neighPart);
+        g.getData(neigh).setPart(nPart);
+        //update partinfo
+        parts[neighPart].partWeight += nWeight;
+        parts[neighPart].partWeight -= neighWeight;
+        parts[nPart].partWeight += neighWeight;
+        parts[nPart].partWeight -= nWeight;
+        //remove nodes
+        boundary.erase(neigh);
+        break;
+      }
+    }
+  }
+}
+
+
+void refine(MetisGraph* coarseGraph, std::vector<partInfo>& parts, unsigned maxSize, refinementMode refM) {
+
   do {
+  
     //refine nparts times
-    refine_BKL2<false>::go(maxSize, *coarseGraph->getGraph(), parts);
+    
+  switch (refM) {
+    case BKL2:refine_BKL2<false>::go(maxSize, *coarseGraph->getGraph(), parts); break;
+    case BKL: refine_BKL(*coarseGraph->getGraph(), parts); break;
+    case ROBO: refineOneByOne(*coarseGraph->getGraph(), parts); break;
+    default: abort();
+  }
     // std::cout << "Refinement of " << coarseGraph->getGraph() << "\n";
     // printPartStats(parts);
 

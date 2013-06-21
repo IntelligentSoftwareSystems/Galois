@@ -287,9 +287,10 @@ MetisGraph* coarsen(MetisGraph* fineMetisGraph, unsigned coarsenTo) {
   //graphStat(fineMetisGraph->getGraph());
 
   MetisGraph* coarseGraph = fineMetisGraph;
-
+  int newSize =std::distance(coarseGraph->getGraph()->begin(), coarseGraph->getGraph()->end()), oldSize =2*std::distance(coarseGraph->getGraph()->begin(), coarseGraph->getGraph()->end());
   unsigned iterNum = 0;
-  while (iRuns) {
+  while (iRuns && oldSize*9 > newSize*10) {
+    oldSize =newSize;
     coarseGraph = coarsenOnce(coarseGraph, iterNum, iterNum == 0);
     //std::cout << "coarsening " << iterNum << " done, now " <<  std::distance(coarseGraph->getGraph()->begin(), coarseGraph->getGraph()->end()) << " on " << coarseGraph << " targeting " << coarsenTo << "\n";
     //    graphStat(coarseGraph->getGraph());
@@ -297,6 +298,7 @@ MetisGraph* coarsen(MetisGraph* fineMetisGraph, unsigned coarsenTo) {
       --iRuns;
     if (!iRuns)
       iRuns = minRuns(coarsenTo, std::distance(coarseGraph->getGraph()->begin(), coarseGraph->getGraph()->end()));
+    newSize= std::distance(coarseGraph->getGraph()->begin(), coarseGraph->getGraph()->end());
     ++iterNum;
   }
   return coarseGraph;

@@ -170,10 +170,23 @@ struct parallelBisect {
 
 } //anon namespace
   
-std::vector<partInfo> partition(MetisGraph* mcg, unsigned numPartitions) {
+
+
+  
+std::vector<partInfo> partition(MetisGraph* mcg, unsigned numPartitions, InitialPartMode partMode) {
   std::vector<partInfo> parts(numPartitions);
   parts[0] = partInfo(mcg->getTotalWeight());
-  Galois::for_each<Galois::WorkList::GFIFO<> >(&parts[0], parallelBisect<bisect_GGGP>(mcg, numPartitions, parts));
+ switch (partMode) {
+    case GGP:
+      std::cout <<"Sarting initial partitioning using GGP:\n";
+      Galois::for_each<Galois::WorkList::GFIFO<> >(&parts[0], parallelBisect<bisect_GGP>(mcg, numPartitions, parts));
+      break;
+    case GGGP: 
+      std::cout <<"Sarting initial partitioning using GGGP:\n";
+      Galois::for_each<Galois::WorkList::GFIFO<> >(&parts[0], parallelBisect<bisect_GGGP>(mcg, numPartitions, parts));
+      break;
+    default: abort();
+  }
 
   if (!multiSeed) {
     printPartStats(parts);
@@ -183,3 +196,129 @@ std::vector<partInfo> partition(MetisGraph* mcg, unsigned numPartitions) {
 
   return parts;
 }
+
+
+
+int computeCut(GGraph& g) {
+  int cuts=0;
+
+ //find boundary nodes with positive gain
+  for (auto nn = g.begin(), en = g.end(); nn != en; ++nn) {
+    unsigned gPart = g.getData(*nn).getPart();
+    for (auto ii = g.edge_begin(*nn), ee = g.edge_end(*nn); ii != ee; ++ii) {
+      auto& m = g.getData(g.getEdgeDst(ii));
+      if (m.getPart() != gPart) {
+        cuts += g.getEdgeData(ii);
+      }
+    }
+  }
+
+  return cuts/2;
+}
+
+
+std::vector<partInfo> BisectAll(MetisGraph* mcg, unsigned numPartitions)
+{
+  std::cout <<"Sarting initial partitioning using MGGGP:\n";
+  auto flag = Galois::MethodFlag::NONE;
+  int meanWeight= mcg->getTotalWeight()/numPartitions;
+  GGraph& g = *mcg->getGraph();
+
+  int bestCut = mcg->getTotalWeight();
+  std::map<GNode, int> bestParts;
+  std::vector<partInfo> bestPartInfos(numPartitions);
+
+  for(int nbTry =0; nbTry <20; nbTry ++){
+	  std::vector<partInfo> partInfos(numPartitions);
+
+	  std::vector<std::map<GNode, int> > gains(numPartitions);
+	  std::vector<std::map<int, std::set<GNode>>> boundary(numPartitions);
+	  std::map<int, std::set<int>> partitions;
+	  for(GGraph::iterator ii = g.begin(),ee = g.end();ii!=ee;ii++) 
+	    g.getData(*ii).setPart(-1);
+	  auto seedIter = g.begin();
+	  int k =0;
+	  for (int i =0; i<numPartitions; i++){  
+	    int seed = (int)(drand48()*(mcg->getNumNodes())) +1;
+	    bool goodseed = true;
+	    while(seed--)
+	      if(++seedIter== g.end())seedIter = g.begin();
+	    GNode n = *seedIter;
+
+	    for(int j=0; j<i && k <mcg->getNumNodes()/2; j++){
+	      goodseed = goodseed && (*boundary[j][0].begin() != n);
+	      for (auto ii = g.edge_begin(n, flag), ee = g.edge_end(n, flag); ii != ee; ++ii) 
+		goodseed = goodseed && (*boundary[j][0].begin() !=  g.getEdgeDst(ii, flag));
+	    }
+	    if (!goodseed){
+	      k++;
+	      i--;
+	      continue;
+	    }
+	    gains[i][n] = 0;
+	    partInfos[i] = partInfo(i, 0, 0);
+	    boundary[i][0].insert(n);
+	    partitions[0].insert(i);
+	  }
+	  while(!partitions.empty()){
+	    //find next partition to improove 
+	    auto bb = partitions.begin();
+	    int partToMod = *bb->second.begin();
+	    bb->second.erase(bb->second.begin());
+	    if (bb->second.empty())
+	      partitions.erase(bb->first);
+	    //node to add to the partition
+	    GNode n;
+	    if(boundary[partToMod].empty()){
+	      GGraph::iterator ii = g.begin(),ee = g.end();
+	      for(;ii!=ee;ii++)
+		if(g.getData(*ii).getPart() == -1) break; 
+	      if (ii == ee) break;
+	      else n = *ii;
+	    }
+	    else{
+	      auto bi = boundary[partToMod].rbegin();
+	      n =  *bi->second.begin();
+	      bi->second.erase(bi->second.begin());
+	      if (bi->second.empty())
+		boundary[partToMod].erase(bi->first);
+	    }
+	    if (g.getData(n, flag).getPart() != -1){
+	      partitions[partInfos[partToMod].partWeight].insert(partToMod);
+	      continue;}
+	    //add the node
+	     partInfos[partToMod].partWeight += g.getData(n, flag).getWeight();
+	     //if(partInfos[partToMod].partWeight < meanWeight) 
+	       partitions[partInfos[partToMod].partWeight].insert(partToMod);
+	     g.getData(n, flag).setPart(partToMod);
+	     for (auto ii = g.edge_begin(n, flag), ee = g.edge_end(n, flag); ii != ee; ++ii) {
+		GNode dst = g.getEdgeDst(ii, flag);
+		/*auto gi = gains[partToMod].find(dst);
+		if (gi != gains[partToMod].end()) { //update
+		  boundary[partToMod][gi->second].erase(dst);
+		  if (boundary[gi->second].empty())
+		    boundary[partToMod].erase(gi->second);
+		  gains[partToMod].erase(dst);
+		}*/
+		int newgain = gains[partToMod][dst] = gain_limited(g, dst, partToMod, flag);
+		boundary[partToMod][newgain].insert(dst);
+	     }
+	  }
+    int newCut = computeCut(g);
+    if(newCut<bestCut){
+      bestCut = newCut;
+      for(GGraph::iterator ii = g.begin(),ee = g.end();ii!=ee;ii++) 
+        bestParts[*ii] = g.getData(*ii,flag).getPart();
+      for (int i =0; i<numPartitions; i++)
+        bestPartInfos[i] = partInfos[i];
+    }   
+  }
+
+  for(GGraph::iterator ii = g.begin(),ee = g.end();ii!=ee;ii++) 
+     g.getData(*ii,flag).setPart(bestParts[*ii]);
+  
+  return bestPartInfos;
+}
+
+
+

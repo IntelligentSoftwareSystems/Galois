@@ -32,6 +32,9 @@ class MetisNode;
 typedef Galois::Graph::LC_Morph_Graph<MetisNode,int> GGraph;
 typedef Galois::Graph::LC_Morph_Graph<MetisNode,int>::GraphNode GNode;
 
+//algorithms
+enum InitialPartMode {GGP, GGGP, MGGGP};
+enum refinementMode {BKL, BKL2, ROBO};
 //Nodes in the metis graph
 class MetisNode {
 
@@ -182,10 +185,10 @@ void printCuts(const char* str, MetisGraph* g, unsigned numPartitions);
 MetisGraph* coarsen(MetisGraph* fineMetisGraph, unsigned coarsenTo);
 
 //Partitioning
-std::vector<partInfo> partition(MetisGraph* coarseMetisGraph, unsigned numPartitions);
-
+std::vector<partInfo> partition(MetisGraph* coarseMetisGraph, unsigned numPartitions, InitialPartMode partMode);
+std::vector<partInfo> BisectAll(MetisGraph* mcg, unsigned numPartitions);
 //Refinement
-void refine(MetisGraph* coarseGraph, std::vector<partInfo>& parts, unsigned maxSize);
+void refine(MetisGraph* coarseGraph, std::vector<partInfo>& parts, unsigned maxSize, refinementMode refM);
 
 //Balancing
 void balance(MetisGraph* Graph, std::vector<partInfo>& parts, unsigned maxSize);

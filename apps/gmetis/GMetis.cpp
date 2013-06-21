@@ -43,6 +43,20 @@ static const char* name = "GMetis";
 static const char* desc = "Partitions a graph into K parts and minimizing the graph cut";
 static const char* url = "gMetis";
 
+
+static cll::opt<InitialPartMode> partMode(cll::desc("Choose a inital part mode:"),
+    cll::values(
+      clEnumVal(GGP, "GGP"),
+      clEnumVal(GGGP, "GGGP"),
+      clEnumVal(MGGGP, "MGGGP"),
+      clEnumValEnd), cll::init(GGGP));
+static cll::opt<refinementMode> refineMode(cll::desc("Choose a refinement mode:"),
+    cll::values(
+      clEnumVal(BKL, "BKL"),
+      clEnumVal(BKL2, "BKL2"),
+      clEnumVal(ROBO, "ROBO"),
+      clEnumValEnd), cll::init(BKL2));
+
 static cll::opt<bool> mtxInput("mtxinput", cll::desc("Use text mtx files instead binary based ones"), cll::init(false));
 static cll::opt<bool> weighted("weighted", cll::desc("weighted"), cll::init(false));
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
@@ -163,11 +177,16 @@ void Partition(MetisGraph* metisGraph, unsigned nparts) {
   Galois::Timer t2;
   T2.start();
   t2.start();
-  std::vector<partInfo> parts = partition(mcg, nparts);
+  std::vector<partInfo> parts;
+  switch (partMode) {
+    case GGP:parts = partition(mcg, nparts, GGP); break;
+    case GGGP: parts = partition(mcg, nparts, GGGP); break;
+    case MGGGP: parts = BisectAll(mcg, nparts); break;
+    default: abort();
+  }
   t2.stop();
   T2.stop();
   cout<<"initial part time: " << t2.get() << " ms"<<endl;
-
   printPartStats(parts);
 
   if(0) {
@@ -184,9 +203,12 @@ void Partition(MetisGraph* metisGraph, unsigned nparts) {
   Galois::Timer t3;
   T3.start();
   t3.start();
-  refine(mcg, parts, maxWeight);
+  refinementMode refM =refineMode;
+  refine(mcg, parts, maxWeight, refM);
   t3.stop();
   T3.stop();
+
+
   cout<<"refinement time: " << t3.get() << " ms"<<endl;
 
   printPartStats(parts);
@@ -281,19 +303,3 @@ int main(int argc, char** argv) {
   return 0;
 }
 
-int getRandom(int num){
-  //      int randNum = rand()%num;
-  //      return (rand()>>3)%(num);
-  //      return randNum;
-  return ((int)(drand48()*((double)(num))));
-}
-
-// int gNodeToInt(GNode node){
-//      return graph->getData(node).getNodeId();
-// }
-
-int intlog2(int a){
-  int i;
-  for (i=1; a > 1; i++, a = a>>1);
-  return i-1;
-}
