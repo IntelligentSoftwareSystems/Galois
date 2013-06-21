@@ -60,11 +60,23 @@ std::vector<unsigned> edgeCut(GGraph& g, unsigned nparts) {
 void printPartStats(std::vector<partInfo>& parts) {
   unsigned tW = 0;
   for (unsigned x = 0; x < parts.size(); ++x) {
-    std::cout << parts[x] << "\n";
+    //std::cout << parts[x] << "\n";
     tW += parts[x].partWeight;
   }
-  std::cout << "Total Weight: " << tW << "\n";
-  std::cout << "Target Weight: " << tW / parts.size() << "\n";
+  unsigned target = tW / parts.size();
+  //  std::cout << "Total Weight: " << tW << "\n";
+  //  std::cout << "Target Weight: " << target << "\n";
+
+  std::map<double, unsigned> hist;
+  for (unsigned x = 0; x < parts.size(); ++x) {
+    double pdiff = 10.0 * ((double)parts[x].partWeight - (double)target) / (double)target;
+    hist[round(pdiff)]++;
+  }
+  std::cout << "Size in decade percentages: ";
+  for(auto ii = hist.begin(), ee = hist.end(); ii != ee; ++ii)
+    std::cout << " " << ii->first << "," << ii->second;
+  std::cout << "\n";
+    
 }
 
 std::ostream& operator<<(std::ostream& os, const partInfo& p) {
