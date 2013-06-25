@@ -149,11 +149,11 @@ public:
   edge_iterator addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::checkWrite(mflag, true);
     Galois::Runtime::acquire(src, mflag);
-    
+    assert(std::distance(src->edgeBegin, src->edgeEnd) < src->debugEdges);
     auto it = std::find_if(src->edgeBegin, src->edgeEnd, first_equals(dst));
     if (it == src->edgeEnd) {
       it->setFirst(dst);
-      ++src->edgeEnd;
+      src->edgeEnd++;
     }
     assert(std::distance(src->edgeBegin, src->edgeEnd) <= src->debugEdges);
     return it;
@@ -162,6 +162,7 @@ public:
   edge_iterator addEdgeWithoutCheck(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::checkWrite(mflag, true);
     Galois::Runtime::acquire(src, mflag);
+    assert(std::distance(src->edgeBegin, src->edgeEnd) < src->debugEdges);
     auto it = src->edgeEnd;
     src->edgeEnd++;
     it->setFirst(dst);
