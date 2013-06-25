@@ -25,6 +25,8 @@
 
 #include "Metis.h"
 
+#include <set>
+
 namespace {
 
 struct gainIndexer {
@@ -65,38 +67,58 @@ struct findBoundary {
   }
 };
 
+struct findBoundaryAndProject {
+  Galois::InsertBag<GNode>& b;
+  GGraph& cg;
+  GGraph& fg;
+  findBoundaryAndProject(Galois::InsertBag<GNode>& _b, GGraph& _cg, GGraph& _fg) :b(_b), cg(_cg), fg(_fg) {}
+  void operator()(GNode n) {
+    if (isBoundary(cg, n))
+      b.push(n);
+    auto& cn = cg.getData(n, Galois::MethodFlag::NONE);
+    unsigned part = cn.getPart();
+    for (unsigned x = 0; x < cn.numChildren(); ++x)
+      fg.getData(cn.getChild(x), Galois::MethodFlag::NONE).setPart(part);
+  }
+};
+
 template<bool balance>
 struct refine_BKL2 {
   unsigned maxSize;
-  GGraph& g;
+  GGraph& cg;
+  GGraph* fg;
   std::vector<partInfo>& parts;
 
-  refine_BKL2(unsigned ms, GGraph& _g, std::vector<partInfo>& _p) : maxSize(ms), g(_g), parts(_p) {}
+  typedef int tt_needs_per_iter_alloc;
+
+  refine_BKL2(unsigned ms, GGraph& _cg, GGraph* _fg, std::vector<partInfo>& _p) : maxSize(ms), cg(_cg), fg(_fg), parts(_p) {}
 
   //Find the partition n is most connected to
-  unsigned pickPartitionEC(GNode n) {
-    std::vector<unsigned> edges(parts.size(), 0);
-    unsigned P = g.getData(n).getPart();
-    for (auto ii = g.edge_begin(n), ee =g.edge_end(n); ii != ee; ++ii) {
-      GNode neigh = g.getEdgeDst(ii);
-      auto& nd = g.getData(neigh);
+  template<typename Context>
+  unsigned pickPartitionEC(GNode n, Context& cnx) {
+    std::vector<unsigned, Galois::PerIterAllocTy::rebind<unsigned>::other> edges(parts.size(), 0, cnx.getPerIterAlloc());
+    unsigned P = cg.getData(n).getPart();
+    for (auto ii = cg.edge_begin(n), ee = cg.edge_end(n); ii != ee; ++ii) {
+      GNode neigh = cg.getEdgeDst(ii);
+      auto& nd = cg.getData(neigh);
       if (parts[nd.getPart()].partWeight < maxSize
           || nd.getPart() == P)
-        edges[nd.getPart()] += g.getEdgeData(ii);
+        edges[nd.getPart()] += cg.getEdgeData(ii);
     }
     return std::distance(edges.begin(), std::max_element(edges.begin(), edges.end()));
   }
 
   //Find the smallest partition n is connected to
-  unsigned pickPartitionMP(GNode n) {
-    unsigned P = g.getData(n).getPart();
+  template<typename Context>
+  unsigned pickPartitionMP(GNode n, Context& cnx) {
+    unsigned P = cg.getData(n).getPart();
     unsigned W = parts[P].partWeight;
-    std::vector<unsigned> edges(parts.size(), ~0);
-    edges[P] = W;
+    std::vector<unsigned, Galois::PerIterAllocTy::rebind<unsigned>::other> edges(parts.size(), ~0, cnx.getPerIterAlloc());
+     edges[P] = W;
     W = (double)W * 0.9;
-    for (auto ii = g.edge_begin(n), ee =g.edge_end(n); ii != ee; ++ii) {
-      GNode neigh = g.getEdgeDst(ii);
-      auto& nd = g.getData(neigh);
+    for (auto ii = cg.edge_begin(n), ee = cg.edge_end(n); ii != ee; ++ii) {
+      GNode neigh = cg.getEdgeDst(ii);
+      auto& nd = cg.getData(neigh);
       if (parts[nd.getPart()].partWeight < W)
         edges[nd.getPart()] = parts[nd.getPart()].partWeight;
     }
@@ -106,30 +128,36 @@ struct refine_BKL2 {
 
   template<typename Context>
   void operator()(GNode n, Context& cnx) {
-    auto& nd = g.getData(n);
+    auto& nd = cg.getData(n);
     unsigned curpart = nd.getPart();
-    unsigned newpart = balance ? pickPartitionMP(n) : pickPartitionEC(n);
+    unsigned newpart = balance ? pickPartitionMP(n, cnx) : pickPartitionEC(n, cnx);
     if (curpart != newpart) {
       nd.setPart(newpart);
       //__sync_fetch_and_sub(&maxSize, 1);
       __sync_fetch_and_sub(&parts[curpart].partWeight, nd.getWeight());
       __sync_fetch_and_add(&parts[newpart].partWeight, nd.getWeight());
-      for (auto ii = g.edge_begin(n), ee = g.edge_end(n); ii != ee; ++ii) {
-        GNode neigh = g.getEdgeDst(ii);
-        auto& ned = g.getData(neigh);
+      for (auto ii = cg.edge_begin(n), ee = cg.edge_end(n); ii != ee; ++ii) {
+        GNode neigh = cg.getEdgeDst(ii);
+        auto& ned = cg.getData(neigh);
         //if (ned.getPart() != newpart)
         cnx.push(neigh);
       }
+      if (fg)
+        for (unsigned x = 0; x < nd.numChildren(); ++x)
+          fg->getData(nd.getChild(x), Galois::MethodFlag::NONE).setPart(newpart);
     }
   }
 
-  static void go(unsigned ms, GGraph& gg, std::vector<partInfo>& p) {
+  static void go(unsigned ms, GGraph& cg, GGraph* fg, std::vector<partInfo>& p) {
     typedef Galois::WorkList::dChunkedFIFO<8> Chunk;
     typedef Galois::WorkList::OrderedByIntegerMetric<gainIndexer, Chunk, 10> pG;
-    gainIndexer::g = &gg;
+    gainIndexer::g = &cg;
     Galois::InsertBag<GNode> boundary;
-    Galois::do_all_local(gg, findBoundary(boundary, gg), "boundary");
-    Galois::for_each_local<pG>(boundary, refine_BKL2(ms, gg, p), "refine");
+    if (fg)
+      Galois::do_all_local(cg, findBoundaryAndProject(boundary, cg, *fg), "boundary");
+    else
+      Galois::do_all_local(cg, findBoundary(boundary, cg), "boundary");
+    Galois::for_each_local<pG>(boundary, refine_BKL2(ms, cg, fg, p), "refine");
   }
 };
 
@@ -256,26 +284,27 @@ void refine(MetisGraph* coarseGraph, std::vector<partInfo>& parts, unsigned maxS
 
   do {
   
+    MetisGraph* fineGraph = coarseGraph->getFinerGraph();
+    bool doProject = true;
     //refine nparts times
-    
-  switch (refM) {
-    case BKL2:refine_BKL2<false>::go(maxSize, *coarseGraph->getGraph(), parts); break;
+    switch (refM) {
+    case BKL2:refine_BKL2<false>::go(maxSize, *coarseGraph->getGraph(), fineGraph ? fineGraph->getGraph() : nullptr, parts); doProject = false; break;
     case BKL: refine_BKL(*coarseGraph->getGraph(), parts); break;
     case ROBO: refineOneByOne(*coarseGraph->getGraph(), parts); break;
     default: abort();
-  }
+    }
     // std::cout << "Refinement of " << coarseGraph->getGraph() << "\n";
     // printPartStats(parts);
 
     //project up
-    MetisGraph* fineGraph = coarseGraph->getFinerGraph();
-    if (fineGraph) {
+    if (fineGraph && doProject) {
       projectPart::go(coarseGraph, parts);
     }
   } while ((coarseGraph = coarseGraph->getFinerGraph()));
 }
 
 void balance(MetisGraph* coarseGraph, std::vector<partInfo>& parts, unsigned maxSize) {
-  refine_BKL2<true>::go(maxSize, *coarseGraph->getGraph(), parts);
+    MetisGraph* fineGraph = coarseGraph->getFinerGraph();
+    refine_BKL2<true>::go(maxSize, *coarseGraph->getGraph(), fineGraph ? fineGraph->getGraph() : nullptr, parts);
 }
 

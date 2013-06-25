@@ -168,18 +168,38 @@ struct parallelPopulateEdges {
     //fineGGraph is read only in this loop, so skip locks
     MetisNode &nodeData = coarseGGraph->getData(node);
 
-    unsigned e = 0;
-    typedef Galois::flat_map<GNode, unsigned, std::less<GNode>, Galois::PerIterAllocTy::rebind<std::pair<GNode,unsigned> >::other> GD;
+    typedef std::deque<std::pair<GNode, unsigned>, Galois::PerIterAllocTy::rebind<std::pair<GNode,unsigned> >::other> GD;
     //copy and translate all edges
-    GD edges(std::less<GNode>(), GD::allocator_type(lwl.getPerIterAlloc()));
+    GD edges(GD::allocator_type(lwl.getPerIterAlloc()));
+
+    //prefetch as locality sucks
+    if (false) {
+      for (unsigned x = 0; x < nodeData.numChildren(); ++x)
+        for (auto ii = fineGGraph->edge_begin(nodeData.getChild(x), Galois::MethodFlag::NONE), ee = fineGGraph->edge_end(nodeData.getChild(x)); ii != ee; ++ii) {
+          __builtin_prefetch(fineGGraph->getEdgeDst(ii, Galois::MethodFlag::NONE));
+        }
+    }
+
     for (unsigned x = 0; x < nodeData.numChildren(); ++x)
-      for (auto ii = fineGGraph->edge_begin(nodeData.getChild(x), Galois::MethodFlag::NONE), ee = fineGGraph->edge_end(nodeData.getChild(x)); ii != ee; ++ii)
-        edges[fineGGraph->getData(fineGGraph->getEdgeDst(ii, Galois::MethodFlag::NONE), Galois::MethodFlag::NONE).getParent()] += fineGGraph->getEdgeData(ii, Galois::MethodFlag::NONE);
+      for (auto ii = fineGGraph->edge_begin(nodeData.getChild(x), Galois::MethodFlag::NONE), ee = fineGGraph->edge_end(nodeData.getChild(x)); ii != ee; ++ii) {
+        GNode dst = fineGGraph->getEdgeDst(ii, Galois::MethodFlag::NONE);
+        edges.emplace_back(fineGGraph->getData(dst, Galois::MethodFlag::NONE).getParent(), fineGGraph->getEdgeData(ii, Galois::MethodFlag::NONE));
+      }
     
+    std::sort(edges.begin(), edges.end());
+
     //insert edges
-    for (auto pp = edges.begin(), ep = edges.end(); pp != ep; ++pp) {
-      if (node != pp->first) { // no self edges
-        coarseGGraph->getEdgeData(coarseGGraph->addEdgeWithoutCheck(node, pp->first), Galois::MethodFlag::NONE) = pp->second;
+    unsigned e = 0;
+    for (auto pp = edges.begin(), ep = edges.end(); pp != ep;) {
+      GNode dst = pp->first;
+      unsigned sum = pp->second;
+      ++pp;
+      while (pp != ep && pp->first == dst) {
+        sum += pp->second;
+        ++pp;
+      }
+      if (node != dst) { // no self edges
+        coarseGGraph->getEdgeData(coarseGGraph->addEdgeWithoutCheck(node, dst), Galois::MethodFlag::NONE) = sum;
         ++e;
       }
     }
@@ -187,6 +207,42 @@ struct parallelPopulateEdges {
     nodeData.setNumEdges(e);
   }
 };
+
+struct parallelPopulateEdges2 {
+  typedef int tt_does_not_need_parallel_push;
+    
+  GGraph *coarseGGraph;
+  GGraph *fineGGraph;
+  parallelPopulateEdges2(MetisGraph *Graph)
+    :coarseGGraph(Graph->getGraph()), fineGGraph(Graph->getFinerGraph()->getGraph()) {
+    assert(fineGGraph != coarseGGraph);
+  }
+
+  template<typename Context>
+  void operator()(GNode node, Context& lwl) {
+    //fineGGraph is read only in this loop, so skip locks
+    GNode pnode = fineGGraph->getData(node, Galois::MethodFlag::NONE).getParent();
+
+    //Lock parent
+    MetisNode& nodeData = coarseGGraph->getData(pnode);
+
+    //copy and translate all edges
+    unsigned e = 0;
+    for (auto ii = fineGGraph->edge_begin(node, Galois::MethodFlag::NONE),
+           ee = fineGGraph->edge_end(node); ii != ee; ++ii) {
+      GNode dst = fineGGraph->getEdgeDst(ii, Galois::MethodFlag::NONE);
+      GNode pdst = fineGGraph->getData(dst, Galois::MethodFlag::NONE).getParent();
+      unsigned n = fineGGraph->getEdgeData(ii, Galois::MethodFlag::NONE);
+      if (pnode != pdst) {
+        coarseGGraph->getEdgeData(coarseGGraph->addEdge(pnode, pdst)) += n;
+        ++e;
+      }
+    }
+
+    nodeData.setNumEdges(nodeData.getNumEdges() + e);
+  }
+};
+
 
 struct HighDegreeIndexer: public std::unary_function<GNode, unsigned int> {
   static GGraph* indexgraph;
@@ -238,10 +294,10 @@ void findMatching(MetisGraph* coarseMetisGraph, unsigned iterNum, bool useRM = f
     //FIXME: use obim for SHEM matching
     typedef decltype(fineMetisGraph->getGraph()->local_begin()) ITY;
     typedef Galois::WorkList::StableIterator<ITY, true> WL;
-    typedef Galois::WorkList::dChunkedFIFO<8> Chunk;
-    typedef Galois::WorkList::OrderedByIntegerMetric<WeightIndexer, Chunk, 10> pW;
-    typedef Galois::WorkList::OrderedByIntegerMetric<LowDegreeIndexer, Chunk, 10> pLD;
-    typedef Galois::WorkList::OrderedByIntegerMetric<HighDegreeIndexer, Chunk, 10> pHD;
+    typedef Galois::WorkList::dChunkedLIFO<16> Chunk;
+    typedef Galois::WorkList::OrderedByIntegerMetric<WeightIndexer, Chunk> pW;
+    typedef Galois::WorkList::OrderedByIntegerMetric<LowDegreeIndexer, Chunk> pLD;
+    typedef Galois::WorkList::OrderedByIntegerMetric<HighDegreeIndexer, Chunk> pHD;
 
     HighDegreeIndexer::indexgraph = fineMetisGraph->getGraph();
     parallelMatchAndCreateNodes<HEMmatch> pHEM(coarseMetisGraph);
@@ -255,26 +311,33 @@ void createCoarseEdges(MetisGraph *coarseMetisGraph, unsigned iterNum) {
   MetisGraph* fineMetisGraph = coarseMetisGraph->getFinerGraph();
   GGraph* fineGGraph = fineMetisGraph->getGraph();
   typedef Galois::WorkList::StableIterator<decltype(fineGGraph->local_begin()), true> WL;
-  parallelPopulateEdges pPE(coarseMetisGraph);
-  std::ostringstream name;
-  name << "Populate_Edges_" << iterNum;
-  Galois::for_each_local<WL>(*coarseMetisGraph->getGraph(), pPE, "popedge");//name.str().c_str());
+  if (true) {
+    parallelPopulateEdges pPE(coarseMetisGraph);
+    std::ostringstream name;
+    name << "Populate_Edges_" << iterNum;
+    Galois::for_each_local<WL>(*coarseMetisGraph->getGraph(), pPE, "popedge");//name.str().c_str());
+  } else {
+    parallelPopulateEdges2 pPE(coarseMetisGraph);
+    std::ostringstream name;
+    name << "Populate_Edges_" << iterNum;
+    Galois::for_each_local<WL>(*fineGGraph, pPE, "popedge");//name.str().c_str());
+  }
 }
 
 MetisGraph* coarsenOnce(MetisGraph *fineMetisGraph, unsigned iterNum, bool useRM = false) {
   MetisGraph *coarseMetisGraph = new MetisGraph(fineMetisGraph);
   //assertNoMatched(fineMetisGraph->getGraph());
-  // Galois::Timer t;
-  // t.start();
+  //Galois::Timer t;
+  //t.start();
   findMatching(coarseMetisGraph, iterNum, useRM);
-  // t.stop();
-  // std::cout << "Time Matching " << iterNum << " is " << t.get() << "\n";
+  //t.stop();
+  //std::cout << "Time Matching " << iterNum << " is " << t.get() << "\n";
   //assertNoMatched(coarseMetisGraph->getGraph());
-  // Galois::Timer t2;
-  // t2.start();
+  //Galois::Timer t2;
+  //t2.start();
   createCoarseEdges(coarseMetisGraph, iterNum);
-  // t2.stop();
-  // std::cout << "Time Creating " << iterNum << " is " << t2.get() << "\n";
+  //t2.stop();
+  //std::cout << "Time Creating " << iterNum << " is " << t2.get() << "\n";
   return coarseMetisGraph;
 }
 
@@ -291,7 +354,7 @@ MetisGraph* coarsen(MetisGraph* fineMetisGraph, unsigned coarsenTo) {
   unsigned iterNum = 0;
   while (iRuns && oldSize*9 > newSize*10) {
     oldSize =newSize;
-    coarseGraph = coarsenOnce(coarseGraph, iterNum, iterNum == 0);
+    coarseGraph = coarsenOnce(coarseGraph, iterNum); //, iterNum == 0);
     //std::cout << "coarsening " << iterNum << " done, now " <<  std::distance(coarseGraph->getGraph()->begin(), coarseGraph->getGraph()->end()) << " on " << coarseGraph << " targeting " << coarsenTo << "\n";
     //    graphStat(coarseGraph->getGraph());
     if (iRuns)
