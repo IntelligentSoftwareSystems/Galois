@@ -63,10 +63,10 @@ private:
   };
 
   struct state {
+    Runtime::LL::CacheLineStorage<shared_state> stealState;
     Iterator localBegin;
     Iterator localEnd;
     unsigned int nextVictim;
-    Runtime::LL::CacheLineStorage<shared_state> stealState;
     
     void populateSteal() {
       if (Steal && localBegin != localEnd) {
@@ -82,10 +82,14 @@ private:
 
   Runtime::PerThreadStorage<state> TLDS;
 
-  bool doSteal(state& dst, state& src) {
+  bool doSteal(state& dst, state& src, bool wait) {
     shared_state& s = src.stealState.data;
     if (s.stealAvail) {
-      s.stealLock.lock();
+      if (wait) {
+        s.stealLock.lock();
+      } else if (!s.stealLock.try_lock()) {
+        return false;
+      }
       if (s.stealBegin != s.stealEnd) {
 	dst.localBegin = s.stealBegin;
 	s.stealBegin = dst.localEnd = Galois::split_range(s.stealBegin, s.stealEnd);
@@ -99,10 +103,10 @@ private:
   //pop already failed, try again with stealing
   Galois::optional<value_type> pop_steal(state& data) {
     //always try stealing self
-    if (doSteal(data, data))
+    if (doSteal(data, data, true))
       return *data.localBegin++;
     //only try stealing one other
-    if (doSteal(data, *TLDS.getRemote(data.nextVictim))) {
+    if (doSteal(data, *TLDS.getRemote(data.nextVictim), false)) {
       //share the wealth
       if (data.nextVictim != Runtime::LL::getTID())
 	data.populateSteal();
