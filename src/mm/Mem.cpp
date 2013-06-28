@@ -28,8 +28,7 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 #include "Galois/Runtime/mm/Mem.h"
-#include "Galois/Runtime/ActiveThreads.h"
-#include "Galois/Runtime/Support.h"
+//#include "Galois/Runtime/Support.h"
 
 #include <map>
 
@@ -42,38 +41,53 @@ SystemBaseAlloc::SystemBaseAlloc() {}
 SystemBaseAlloc::~SystemBaseAlloc() {}
 
 PtrLock<SizedAllocatorFactory, true> SizedAllocatorFactory::instance;
+__thread SizedAllocatorFactory::AllocatorsMap* SizedAllocatorFactory::localAllocators = 0;
+
 #ifndef USEMALLOC
 SizedAllocatorFactory::SizedAlloc* 
 SizedAllocatorFactory::getAllocatorForSize(const size_t size) {
-  typedef SizedAllocatorFactory::AllocatorsMap AllocMap;
   if (size == 0)
     return 0;
-
-  lock.readLock();
-  AllocMap::const_iterator i = allocators.find(size);
-
-  if (i == allocators.end ()) {
-    // entry missing, needs to be created
-    lock.readUnlock();
-
-    lock.writeLock();
-    // check again to avoid overwriting existing entry
-    i = allocators.find (size);
-    if (i == allocators.end()) {
-      allocators.insert (std::make_pair (size, new SizedAlloc ()));
-    }
-    lock.writeUnlock();
-
-    lock.readLock ();
-    i = allocators.find(size);
-  }
-
-  assert (i != allocators.end());
-  lock.readUnlock();
-
-  return i->second;
+  return getInstance()->getAllocForSize(size);
 }
 
+SizedAllocatorFactory::SizedAlloc* 
+SizedAllocatorFactory::getAllocForSize(const size_t size) {
+  typedef SizedAllocatorFactory::AllocatorsMap AllocMap;
+
+  if (!localAllocators)
+    localAllocators = new AllocMap;
+
+  auto& lentry = (*localAllocators)[size];
+  if (lentry)
+    return lentry;
+
+  lock.lock();
+  auto& gentry = allocators[size];
+  if (!gentry)
+    gentry = new SizedAlloc();
+  lentry = gentry;
+  lock.unlock();
+  return  lentry;
+}
+
+SizedAllocatorFactory* SizedAllocatorFactory::getInstance() {
+  SizedAllocatorFactory* f = instance.getValue();
+  if (f)
+    return f;
+  
+  instance.lock();
+  f = instance.getValue();
+  if (f) {
+    instance.unlock();
+  } else {
+    f = new SizedAllocatorFactory();
+    instance.unlock_and_set(f);
+  }
+  return f;
+}
+
+SizedAllocatorFactory::SizedAllocatorFactory() :lock() {}
 
 SizedAllocatorFactory::~SizedAllocatorFactory() {
   for (AllocatorsMap::iterator it = allocators.begin(), end = allocators.end();

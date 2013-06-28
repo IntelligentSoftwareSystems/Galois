@@ -33,7 +33,8 @@
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/ll/SimpleLock.h"
 #include "Galois/Runtime/ll/PtrLock.h"
-#include "Galois/Runtime/ll/ThreadRWlock.h"
+#include "Galois/Runtime/ll/CacheLineStorage.h"
+//#include "Galois/Runtime/ll/ThreadRWlock.h"
 
 #include <boost/utility.hpp>
 #include <cstdlib>
@@ -512,32 +513,20 @@ public:
   typedef ThreadAwarePrivateHeap<
     FreeListHeap<SimpleBumpPtr<SystemBaseAlloc> > > SizedAlloc;
 
-  SizedAlloc* getAllocatorForSize(const size_t);
-
-  static SizedAllocatorFactory* getInstance() {
-    SizedAllocatorFactory* f = instance.getValue();
-    if (f)
-      return f;
-
-    instance.lock();
-    f = instance.getValue();
-    if (f) {
-      instance.unlock();
-    } else {
-      f = new SizedAllocatorFactory();
-      instance.unlock_and_set(f);
-    }
-    return f;
-  }
+  static SizedAlloc* getAllocatorForSize(const size_t);
 
 private:
+  static SizedAllocatorFactory* getInstance();
   static LL::PtrLock<SizedAllocatorFactory, true> instance;
   typedef std::map<size_t, SizedAlloc*> AllocatorsMap;
   AllocatorsMap allocators;
-  // LL::SimpleLock<true> lock;
-  LL::ThreadRWlock lock;
+  LL::SimpleLock<true> lock;
 
-  SizedAllocatorFactory() :lock() {}
+  SizedAlloc* getAllocForSize(const size_t);
+
+  static __thread AllocatorsMap* localAllocators;
+
+  SizedAllocatorFactory();
   ~SizedAllocatorFactory();
 };
 
@@ -545,7 +534,7 @@ class FixedSizeAllocator {
   SizedAllocatorFactory::SizedAlloc* alloc;
 public:
   FixedSizeAllocator(size_t sz) {
-    alloc = SizedAllocatorFactory::getInstance()->getAllocatorForSize(sz);
+    alloc = SizedAllocatorFactory::getAllocatorForSize(sz);
   }
 
   inline void* allocate(size_t sz) {
