@@ -256,35 +256,23 @@ protected:
     if (ForEachTraits<FunctionTy>::NeedsPush && !ForEachTraits<FunctionTy>::NeedsAborts) {
       tld.facing.setFastPushBack(std::bind(&ForEachWork::fastPushBack, std::ref(*this), std::placeholders::_1));
     }
-    bool didAnyWork;
+    bool didWork;
     do {
-      didAnyWork = false;
-      bool didWork;
-      do {
-	didWork = false;
-	//Run some iterations
-	if (ForEachTraits<FunctionTy>::NeedsBreak || ForEachTraits<FunctionTy>::NeedsAborts)
-	  didWork = runQueue<checkAbort || ForEachTraits<FunctionTy>::NeedsBreak>(tld, wl, false);
-	else //No try/catch
-	  didWork = runQueueSimple(tld);
-	//Check for break
-	if (breakHandler.checkBreak())
-	  break;
-	//Check for abort
-	if (checkAbort)
-	  didWork |= handleAborts(tld);
-	didAnyWork |= didWork;
-      } while (didWork);
+      didWork = false;
+      //Run some iterations
+      if (ForEachTraits<FunctionTy>::NeedsBreak || ForEachTraits<FunctionTy>::NeedsAborts)
+        didWork = runQueue<checkAbort || ForEachTraits<FunctionTy>::NeedsBreak>(tld, wl, false);
+      else //No try/catch
+        didWork = runQueueSimple(tld);
+      //Check for break
       if (breakHandler.checkBreak())
-	break;
+        break;
+      //Check for abort
+      if (checkAbort)
+        didWork |= handleAborts(tld);
       //update node color and prop token
-      term.localTermination(didAnyWork);
-    } while ((ForEachTraits<FunctionTy>::NeedsPush
-	      ||ForEachTraits<FunctionTy>::NeedsBreak
-	      ||ForEachTraits<FunctionTy>::NeedsAborts)
-	     && !term.globalTermination());
-    //FIXME: termination needs to happen if stealing does, not if the above condtion holds
-    //} while (!term.globalTermination());
+      term.localTermination(didWork);
+    } while (!term.globalTermination());
 
     if (ForEachTraits<FunctionTy>::NeedsAborts)
       setThreadContext(0);
