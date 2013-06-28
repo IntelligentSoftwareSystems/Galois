@@ -1,4 +1,6 @@
-add_subdirectory(apps)
+if(NOT SKIP_COMPILE_APPS)
+  add_subdirectory(apps)
+endif()
 add_subdirectory(lib)
 add_subdirectory(test)
 add_subdirectory(suites)

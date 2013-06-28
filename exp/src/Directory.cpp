@@ -40,77 +40,161 @@ SimpleRuntimeContext& Galois::Runtime::getAbortCnx() {
   return obj;
 }
 
-std::pair<Lockable*, boost::intrusive_ptr<remoteObj>> Directory::getObjUntyped(fatPointer ptr) {
-  //Get the object
-  std::pair<Lockable*, boost::intrusive_ptr<remoteObj> > retval;
-  if (ptr.first == networkHostID) {
-    retval.first = ptr.second;
-  } else {
-    retval.second = remoteWeakResolve(ptr);
-    if (retval.second)
-      retval.first = retval.second->getObj();
-  }
-  return retval;
+
+
+void Directory::doRequest(fatPointer ptr, typeHelper* th, uint32_t remoteHost) {
+  LL::SLguard lg(getLock(ptr));
+  tracking& tr = getTracking(lg, ptr);
+  tr.addRequest(remoteHost, th);
+  addPending(ptr);
+}
+
+bool Directory::doObj(fatPointer ptr, typeHelper* th) {
+  LL::SLguard lg(getLock(ptr));
+  tracking& tr = getExistingTracking(lg, ptr);
+  tr.setLocal();
+  addPending(ptr);
+  return true;
+}
+
+void Directory::setContended(fatPointer ptr) {
+  LL::SLguard lg(getLock(ptr));
+  tracking& tr = getTracking(lg, ptr);
+  tr.setContended();
+  addPending(ptr);
+}
+
+void Directory::clearContended(fatPointer ptr) {
+  LL::SLguard lg(getLock(ptr));
+  tracking& tr = getTracking(lg, ptr);
+  tr.clearContended();
+  addPending(ptr);
 }
 
 
 void Directory::notifyWhenAvailable(fatPointer ptr, std::function<void(fatPointer)> func) {
-  Lock.lock();
-  notifiers.insert(std::make_pair(ptr,func));
-  Lock.unlock();
+  LL::SLguard lg(getLock(ptr));
+  tracking& tr = getExistingTracking(lg, ptr);
+  tr.addNotify(func);
+}
 
-  //check for existance
-  //Get the object
-  std::pair<Lockable*, boost::intrusive_ptr<remoteObj> > obj = getObjUntyped(ptr);
-  if (obj.first && !isAcquiredBy(obj.first, this)) {
-    assert(!getPending(obj.first));
-    notify(ptr);
+void Directory::processObj(LL::SLguard& lg, fatPointer ptr, Lockable* obj) {
+  tracking& tr = getTracking(lg, ptr);
+
+  //invalid objects just need requests
+  if (isAcquiredBy(obj, this)) {
+    if (tr.hasRequest()) {
+      uint32_t wanter = tr.getRequest();
+      if (!tr.isRecalled() || wanter < tr.getRecalled()) {
+        tr.getHelper()->sendRequest(ptr, ptr.first == networkHostID ? tr.getCurLoc() : ptr.first, wanter);
+        tr.setRecalled(wanter);
+      }
+    }
+    return;
+  }
+
+  //only worry about objects with outstanding requests
+  if (tr.hasRequest()) {
+    uint32_t wanter = tr.getRequest();
+    //check if existential lock overwrites transfer
+    if (wanter > networkHostID && tr.isContended()) {
+      LL::gDebug("Contended Protection of [", ptr.first, ",", ptr.second, "] from ", wanter);
+      return;
+    }
+    //Don't need to move object if requestor is local
+    if (wanter == networkHostID) {
+      tr.delRequest(networkHostID); //eat local request
+      if (tr.hasRequest())
+        addPending(ptr);
+      return;
+    }
+    //figure out to whom to send it 
+    switch (SimpleRuntimeContext::try_acquire(obj)) {
+    case 0: // Local iteration has the lock
+      addPending(ptr);
+      return; // delay processing
+    case 1: { //now owner (was free and on this host)
+      //compute who to send the object too
+      //non-owner sends back to owner
+      uint32_t dest = ptr.first == networkHostID ? wanter : ptr.first;
+      tr.getHelper()->sendObject(ptr, obj, dest);
+      if (ptr.first == networkHostID) {
+        //remember who has it
+        tr.setCurLoc(dest);
+        //we handled this request
+        tr.delRequest(dest);
+        if (tr.hasRequest())
+          addPending(ptr);
+      } else {
+        //don't need to track pending requests for remote objects
+        tr.clearRequest();
+      }
+      break;
+    }
+    case 2: //already owner, should have been caught above
+    default: //unknown
+      abort();
+    }
+  } else {
+    //no outstanding requests? might be able to kill record
+    assert(!tr.isRecalled());
+    if (!tr.isContended())
+      delTracking(lg ,ptr);
+    return;
   }
 }
 
-void Directory::notify(fatPointer ptr) {
-  std::vector<std::function<void(fatPointer)>> V;
-  Lock.lock();
-  std::for_each(notifiers.lower_bound(ptr), notifiers.upper_bound(ptr),
-                [&V] (decltype(*notifiers.begin())& val) { V.push_back(val.second); });
-  notifiers.erase(notifiers.lower_bound(ptr), notifiers.upper_bound(ptr));
-  Lock.unlock();
-  std::for_each(V.begin(), V.end(), [ptr] (std::function<void(fatPointer)>& f) { f(ptr); });
+
+
+void Directory::dump() {
+#if 0
+  LL::gDebug("Directory has ",
+             delayed.size(), " delayed requests, ",
+             notifiers.size(), " registered notifcations, ",
+             fetches.size(), " pending fetches, ",
+             remoteObjects.size(), " remote objects");
+  if (fetches.size() < 10) {
+    std::set<fatPointer> r = fetches.getAllRequests();
+    for (auto k : r)
+      LL::gDebug("Directory pending fetch: ", k.first, ",", k.second);
+  }
+  if (remoteObjects.size() < 10) {
+    for (auto& k : remoteObjects)
+      LL::gDebug("Directory remote object: ", k.first.first, ",", k.first.second);
+  }
+  if (notifiers.size() < 10) {
+    for (auto& k : notifiers)
+      LL::gDebug("Directory notification: ", k.first.first, ",", k.first.second);
+  }
+  if (delayed.size() < 10) {
+    for (auto k : delayed)
+      LL::gDebug("Directory delayed: ", k.first, ",", k.second);
+  }
+#endif
 }
 
-void Directory::tryNotifyAll() {
-  
-}
+void Directory::queryObj(fatPointer ptr, bool forward) {
+  LL::SLguard lg(getLock(ptr));
+  tracking* tr = nullptr;
+  if (hasTracking(lg, ptr))
+    tr = &getExistingTracking(lg, ptr);
+  LL::gDebug("Directory query for ", ptr.first, ",", ptr.second,
+             ptr.first == networkHostID ? " Mine" : " Other",
+             tr ? " Tracked" : " **Untracked**",
+             tr && tr->isRecalled() ? " Recalled" : "",
+             tr && tr->isContended() ? " Contended" : "",
+             "");
 
-void Directory::sendRequest(fatPointer ptr, uint32_t msgTo, recvFuncTy f, uint32_t objTo) {
-  SendBuffer sbuf;
-  gSerialize(sbuf, ptr, objTo);
-  getSystemNetworkInterface().send(msgTo, f, sbuf);
-}
-
-void Directory::fetchObj(Lockable* obj, fatPointer ptr, uint32_t msgTo, recvFuncTy f, uint32_t objTo) {
-  if (!getPending(obj)) {
-    setPending(obj);
-    sendRequest(ptr, msgTo, f, objTo);
+  if (forward) {
+    if (ptr.first == networkHostID && tr && tr->getCurLoc() != networkHostID)
+      getSystemNetworkInterface().sendAlt(tr->getCurLoc(), queryObjRemote, ptr, false);
+    else if (ptr.first != networkHostID)
+      getSystemNetworkInterface().sendAlt(ptr.first, queryObjRemote, ptr, false);
   }
 }
 
-void Directory::setContended(fatPointer ptr) {
-  //check for existance
-  //Get the object
-  std::pair<Lockable*, boost::intrusive_ptr<remoteObj> > obj = getObjUntyped(ptr);
-  if (obj.first)
-    setPriority(obj.first);
-}
-
-void Directory::clearContended(fatPointer ptr) {
-  //check for existance
-  //Get the object
-  std::pair<Lockable*, boost::intrusive_ptr<remoteObj> > obj = getObjUntyped(ptr);
-  if (obj.first) {
-    delPriority(obj.first);
-    notify(ptr);
-  }
+void Directory::queryObjRemote(fatPointer ptr, bool forward) {
+  getSystemDirectory().queryObj(ptr, forward);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -119,3 +203,9 @@ Directory& Galois::Runtime::getSystemDirectory() {
   static Directory obj;
   return obj;
 }
+
+CacheManager& Galois::Runtime::getCacheManager() {
+  static CacheManager obj;
+  return obj;
+}
+

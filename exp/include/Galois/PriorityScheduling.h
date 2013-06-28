@@ -46,7 +46,7 @@ struct PriAuto {
   typedef CTOrderedByIntegerMetric<Ind, Chunk,false> OBIM_CSN;
 
   //TBB
-#ifdef GALOIS_USE_TBB
+#ifdef USE_TBB
   typedef TbbPriQueue<Greater> TBB;
   typedef PTbb<Greater> PTBB;
   typedef STbb<Greater> STBB;

@@ -55,35 +55,6 @@ namespace Runtime {
 
 namespace {
 
-template <bool Enabled> 
-class LoopStatistics {
-  unsigned long conflicts;
-  unsigned long iterations;
-  const char* loopname;
-
-public:
-  explicit LoopStatistics(const char* ln) :conflicts(0), iterations(0), loopname(ln) { }
-  ~LoopStatistics() {
-    reportStat(loopname, "Conflicts", conflicts);
-    reportStat(loopname, "Iterations", iterations);
-  }
-  inline void inc_iterations(int amount = 1) {
-    iterations += amount;
-  }
-  inline void inc_conflicts() {
-    ++conflicts;
-  }
-};
-
-
-template <>
-class LoopStatistics<false> {
-public:
-  explicit LoopStatistics(const char* ln) {}
-  inline void inc_iterations(int amount = 1) const { }
-  inline void inc_conflicts() const { }
-};
-
 template<typename value_type>
 class AbortHandler {
   typedef WorkList::GFIFO<value_type> AbortedList;
@@ -104,13 +75,15 @@ public:
 
 template<typename value_type>
 class RemoteAbortHandler {
-  WorkList::GFIFO<value_type> queues;
-  std::multimap<fatPointer, value_type> waiting;
-  std::multimap<value_type, fatPointer> holding;
-  std::unordered_set<value_type> hasState;
+  std::deque<value_type> queues;
+  LL::SimpleLock<true> Lock;
+  std::map<fatPointer, std::set<value_type> > waiting;
+  std::map<value_type, std::set<fatPointer> > holding;
 
   void arrive(fatPointer ptr) {
-    assert(waiting.count(ptr));
+    //    assert(waiting.count(ptr));
+    std::lock_guard<LL::SimpleLock<true>> lg(Lock);
+    //LL::gDebug("Arrive notification ", ptr.first, ",", ptr.second, ": ", waiting.count(ptr));
     for (auto ii = waiting.lower_bound(ptr), ee = waiting.upper_bound(ptr); ii != ee; ++ii)
       queues.push(ii->second);
     waiting.erase(ptr);
@@ -122,72 +95,111 @@ class RemoteAbortHandler {
 
 public:
 
+  void push(value_type val) {
+    LL::SLguard lg(Lock);
+    queues.push_back(val);
+  }
+
   void push(value_type val, fatPointer ptr) {
     //    std::cerr << "pushing " << val << " to " << ptr.first << " " << ptr.second << " with " << waiting.size() << "\n";
-    hasState.insert(val);
-    bool skipNotify =  waiting.count(ptr);
-    waiting.insert(std::make_pair(ptr, val));
-    holding.insert(std::make_pair(val, ptr));
+    bool skipNotify;
     auto& dir = getSystemDirectory();
-    dir.setContended(ptr);
-    if (!skipNotify)
-      dir.notifyWhenAvailable(ptr, std::bind(&RemoteAbortHandler::arrive, this, std::placeholders::_1));
+    { //limit scope of guard
+      LL::SLguard lg(Lock);
+      skipNotify =  waiting[ptr].size();
+      waiting[ptr].insert(val);
+      if (holding[val].insert(ptr).second) //first insert, inc contended
+        dir.setContended(ptr);
+      queues.push_back(val);
+    }
+    //    if (!skipNotify)
+    //      dir.notifyWhenAvailable(ptr, std::bind(&RemoteAbortHandler::arrive, this, std::placeholders::_1));
   }
 
   boost::optional<value_type> pop() {
-    return queues.pop();
+    boost::optional<value_type> retval;
+    if (!queues.empty()) {
+      retval = queues.front();
+      queues.pop_front();
+    }
+    return retval;
   }
 
   void commit(value_type val) {
-    if (hasState.count(val)) {
-      //std::cerr << "commit remote " << val << "\n";
-      hasState.erase(val);
-      auto& dir = getSystemDirectory();
-      for (auto ii = holding.lower_bound(val), ee = holding.upper_bound(val); ii != ee; ++ii)
-        dir.clearContended(ii->second);
-      holding.erase(val);
+    std::set<fatPointer> held;
+    { //bound lock
+      LL::SLguard lg(Lock);
+      if (holding.count(val)) {
+        holding[val].swap(held);
+        holding.erase(val);
+      }
+    }
+    //std::cerr << "commit remote " << val << "\n";
+    auto& dir = getSystemDirectory();
+    for (auto key : held)
+      dir.clearContended(key);
+  }
+
+  void dump() {
+    LL::gDebug("RAQ: waiting size ", waiting.size(), ", holding size ", holding.size(), ", queue size ", queues.size());
+    if (waiting.size() < 10) {
+      for (auto& k : waiting)
+        LL::gDebug("RAQ waiting on: ", k.first.first, ",", k.first.second);
+      for (auto& k : waiting)
+        getSystemDirectory().queryObj(k.first);
     }
   }
 
   //doesn't check queue, just hidden work
   bool empty() {
-    return waiting.empty();
+    static std::chrono::system_clock::time_point oldtime = std::chrono::system_clock::now();
+    std::lock_guard<LL::SimpleLock<true>> lg(Lock);
+    // unsigned num = getSystemDirectory().countContended();
+    // if (!waiting.empty() || num) {
+    //   std::unordered_set<fatPointer, ptrHash> items;
+    //   if (num < 200) {
+    //     for (auto& a : waiting)
+    //       items.insert(a.first);
+    //   }
+    //   std::cerr << networkHostID << " Waiting on " << items.size() << " holding " << num << "\n";
+    // }
+    std::chrono::duration<int> onesec(1);
+    if (std::chrono::system_clock::now() - oldtime > onesec) {
+      oldtime = std::chrono::system_clock::now();
+      getSystemDirectory().dump();
+      dump();
+    }
+    return holding.empty();
   }
 };
 
 
-template<typename value_type, bool NeedsStats, bool NeedsPIA, bool NeedsAborts, bool NeedsPush>
+template<typename value_type, typename FunctionTy, typename WLTy>
 class ThreadLocalExec {
-  LoopStatistics<NeedsStats> stat;
   SimpleRuntimeContext context;
-  
-  inline void resetAlloc() {
-    if (NeedsPIA) facing.resetAlloc();
-  }
-  
-public:
   UserContextAccess<value_type> facing;
+  FunctionTy func;
+  WLTy& wl;
+  unsigned long conflicts; // all conflicts
+  unsigned long iterations; // all iterations
+  unsigned long remote; // remote conflicts
 
-  ThreadLocalExec(const char* ln): stat(ln) {
-    if (NeedsAborts)
-      setThreadContext(&context);
-  }
+  const char* loopname;
 
-  ~ThreadLocalExec() {
-    if (NeedsAborts)
-      setThreadContext(nullptr);
-  }
-  
-  //commit with no intention of continuing computation
-  void commit_terminal() {
-    if (NeedsAborts)
-      context.commit_iteration();
-    resetAlloc();
-  }
+  const bool NeedsStats  = ForEachTraits<FunctionTy>::NeedsStats;
+  const bool NeedsPIA    = ForEachTraits<FunctionTy>::NeedsPIA;
+  const bool NeedsPush   = ForEachTraits<FunctionTy>::NeedsPush;
+  const bool NeedsAborts = ForEachTraits<FunctionTy>::NeedsAborts;
 
-  //commit with every intention of doing more work
-  template<typename WLTy>
-  inline void commit(WLTy& wl, value_type val) {
+
+  inline void resetAlloc() { if (NeedsPIA) facing.resetAlloc(); }
+  inline void inc_stat_iterations() { if (NeedsStats) ++iterations; }
+  inline void inc_stat_conflicts()  { if (NeedsStats) ++conflicts;  }
+  inline void context_start()  { if (NeedsAborts) context.start_iteration();  }
+  inline void context_commit() { if (NeedsAborts) context.commit_iteration(); }
+  inline void context_abort() { context.cancel_iteration(); }
+
+  inline void push_work() {
     if (NeedsPush) {
       auto ii = facing.getPushBuffer().begin();
       auto ee = facing.getPushBuffer().end();
@@ -196,25 +208,57 @@ public:
         facing.resetPushBuffer();
       }
     }
-    commit_terminal();
-  }
-  
-  //abort an item
-  GALOIS_ATTRIBUTE_NOINLINE
-  void abort(value_type val) {
-    assert(NeedsAborts);
-    context.cancel_iteration();
-    stat.inc_conflicts(); //Class specialization handles opt
-    if (NeedsPush)
-      facing.resetPushBuffer();
-    resetAlloc();
   }
 
-  //begin an iteration
-  inline void start() {
-    stat.inc_iterations();
+  inline void push_reset() { if (NeedsPush) facing.resetPushBuffer(); }
+
+  void fastPushBack(typename UserContextAccess<value_type>::PushBufferTy& x) {
+    wl.push(x.begin(), x.end());
+    x.clear();
+  }
+
+public:
+  ThreadLocalExec(FunctionTy& _func, WLTy& _wl, const char* ln)
+    : func(_func), wl(_wl), 
+      conflicts(0), iterations(0), remote(0), loopname(ln) {
     if (NeedsAborts)
-      context.start_iteration();
+      setThreadContext(&context);
+    if (false && NeedsPush && !NeedsAborts)
+      facing.setFastPushBack(std::bind(&ThreadLocalExec::fastPushBack, this, std::placeholders::_1));
+  }
+
+  ~ThreadLocalExec() {
+    if (NeedsAborts)
+      setThreadContext(nullptr);
+    if (NeedsStats) {
+      reportStat(loopname, "Conflicts", conflicts);
+      reportStat(loopname, "Iterations", iterations);
+      reportStat(loopname, "RemoteEx", remote);
+    }
+  }
+
+  inline void inc_stat_remote()     { if (NeedsStats) ++remote;     }
+
+  inline void execItem(value_type& p) {
+    inc_stat_iterations();
+    context_start();
+    if (NeedsAborts) {
+      try {
+        func(p, facing.data());
+      } catch (...) {
+        context_abort();
+        inc_stat_conflicts();
+        push_reset();
+        resetAlloc();
+        throw;
+      }
+    } else {
+      func(p, facing.data());
+    }
+    push_work();
+    context_commit();
+    resetAlloc();
+    //remote_aborted.commit(*p);
   }
 };
 
@@ -223,8 +267,7 @@ class ForEachWork {
 protected:
   typedef T value_type;
   typedef typename WorkListTy::template retype<value_type> WLTy;
-  typedef gdeque<std::pair<std::pair<value_type,Lockable*>,std::pair<unsigned,bool> > > ReceivedList;
-  typedef ThreadLocalExec<value_type, ForEachTraits<FunctionTy>::NeedsStats, ForEachTraits<FunctionTy>::NeedsPIA, ForEachTraits<FunctionTy>::NeedsAborts, ForEachTraits<FunctionTy>::NeedsPush> ThreadLocalData;
+  typedef ThreadLocalExec<value_type, FunctionTy, WLTy> ThreadLocalData;
 
   WLTy wl;
   FunctionTy& origFunction;
@@ -235,90 +278,71 @@ protected:
   RemoteAbortHandler<value_type> remote_aborted;
   LL::CacheLineStorage<bool> broke;
 
-  inline void execItem(boost::optional<value_type>& p, FunctionTy& func, ThreadLocalData& tld) {
-    tld.start();
-    func(*p, tld.facing.data());
-    tld.commit(wl, *p);
-    remote_aborted.commit(*p);
-  }
-
-  GALOIS_ATTRIBUTE_NOINLINE
-  template<typename WL>
-  bool runQueueSimple(FunctionTy& func, ThreadLocalData& tld, WL& lwl) {
-    boost::optional<value_type> p = lwl.pop();
-    if (p) {
-      do {
-	execItem(p, func, tld);
-      } while ((p = lwl.pop()));
-      return true;
-    }
-    return false;
-  }
-
-  GALOIS_ATTRIBUTE_NOINLINE
   template<unsigned limit, typename WL>
-  bool runQueue(FunctionTy& func, ThreadLocalData& tld, WL& lwl, bool recursiveAbort) {
+  GALOIS_ATTRIBUTE_NOINLINE
+  bool runQueue(ThreadLocalData& tld, WL& lwl, bool recursiveAbort, bool remoteAbort) {
     boost::optional<value_type> p = lwl.pop();
     if (p) {
-      unsigned runlimit = limit;
-      do {
-	try {
-	  execItem(p, func, tld);
-	} catch (const conflict_ex& ex) {
-	  tld.abort(*p);
-	  aborted.push(recursiveAbort, *p);
-	} catch (const remote_ex& ex) {
-	  tld.abort(*p);
-	  //aborted.push(recursiveAbort, *p);
-	  remote_aborted.push(*p, ex.ptr);
-	}
-	if (limit)
-	  --runlimit;
-      } while ((limit == 0 || runlimit != 0) && (p = lwl.pop()));
-      return true;
+      if (ForEachTraits<FunctionTy>::NeedsAborts) {
+        unsigned runlimit = limit;
+        do {
+          try {
+            tld.execItem(*p);
+            if (remoteAbort)
+              remote_aborted.commit(*p);
+            doNetworkWork();
+          } catch (const conflict_ex& ex) {
+            if (remoteAbort) //if in the remote queue, stay in the remote queue
+              remote_aborted.push(*p);
+            else
+              aborted.push(recursiveAbort, *p);
+          } catch (const remote_ex& ex) {
+            tld.inc_stat_remote();
+            //aborted.push(recursiveAbort, *p);
+            remote_aborted.push(*p, ex.ptr);
+          }
+          if (limit)
+            --runlimit;
+        } while ((limit == 0 || runlimit != 0) && (p = lwl.pop()));
+        return true;
+      } else {
+        do {
+          tld.execItem(*p);
+        } while ((p = lwl.pop()));
+        return true;
+      }
     }
     return false;
-  }
-
-  void fastPushBack(typename UserContextAccess<value_type>::PushBufferTy& x) {
-    wl.push(x.begin(), x.end());
-    x.clear();
   }
 
   template<bool checkAbort>
   void go() {
     //Thread Local Data goes on the local stack
     //to be NUMA friendly
-    ThreadLocalData tld(loopname);
-    FunctionTy func(origFunction);
-
-    if (false && ForEachTraits<FunctionTy>::NeedsPush && !ForEachTraits<FunctionTy>::NeedsAborts)
-      tld.facing.setFastPushBack(std::bind(&ForEachWork::fastPushBack, this, std::placeholders::_1));
+    ThreadLocalData tld(origFunction, wl, loopname);
 
     bool didWork;
     try {
       do {
         didWork = false;
         //Run some iterations
-        if (ForEachTraits<FunctionTy>::NeedsAborts)
-          didWork = runQueue<checkAbort ? 32 : 0>(func, tld, wl, false);
-        else //No try/catch
-          didWork = runQueueSimple(func, tld, wl);
+        didWork = runQueue<checkAbort ? 32 : 0>(tld, wl, false, false);
         //Check for break
         if (ForEachTraits<FunctionTy>::NeedsBreak && broke.data)
           break;
         //Check for abort, also guards random network work
         if (checkAbort) {
-          didWork |= runQueue<32>(func, tld, aborted, true);
-          didWork |= runQueue<32>(func, tld, remote_aborted, true);
-          didWork |= !remote_aborted.empty();
-          doNetworkWork();
+          didWork |= runQueue<32>(tld, aborted, true, false);
+          if (LL::getTID() == 0) {
+            didWork |= runQueue<32>(tld, remote_aborted, true, true);
+            didWork |= !remote_aborted.empty();
+            doNetworkWork();
+          }
         }
         // update node color and prop token
         term.localTermination(didWork);
       } while (!term.globalTermination());
     } catch (const break_ex& ex) {
-      tld.commit_terminal();
       broke.data = true;
     }
   }
@@ -349,7 +373,6 @@ public:
   }
 };
 
-
 template<typename WLTy, typename RangeTy, typename FunctionTy>
 void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
   typedef typename RangeTy::value_type T;
@@ -368,7 +391,9 @@ void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
     std::ref(W),
     std::ref(getSystemBarrier())
   };
+  trace_loop_start(loopname);
   getSystemThreadPool().run(&w[0], &w[5], activeThreads);
+  trace_loop_end(loopname);
   inGaloisForEach = false;
 }
 

@@ -260,9 +260,9 @@ static StupidDistBarrier& getDistBarrier();
 
 class StupidDistBarrier : public Galois::Runtime::Barrier {
 
-  volatile unsigned gsense;
+  std::atomic<unsigned> gsense;
   Galois::Runtime::PerThreadStorage<unsigned> sense;
-  volatile int count;
+  std::atomic<int> count;
 
 public:
   
@@ -284,11 +284,11 @@ public:
     Galois::Runtime::SendBuffer b;
     Galois::Runtime::getSystemNetworkInterface().broadcast(broadcastLandingPad, b);
     //broadcast skips us
-    __sync_fetch_and_sub(&count, 1);
+    --count;
     
     //wait for barrier
     if (Galois::Runtime::LL::getTID() == 0) {
-      __sync_fetch_and_add(&count, Galois::Runtime::networkHostNum * Galois::Runtime::activeThreads);
+      count += Galois::Runtime::networkHostNum * Galois::Runtime::activeThreads;
       while (count > 0)
         Galois::Runtime::doNetworkWork();
       //passed barrier, notify local
@@ -306,7 +306,8 @@ public:
   }
 
   static void broadcastLandingPad(Galois::Runtime::RecvBuffer&) {
-    __sync_fetch_and_sub(&getDistBarrier().count, 1);
+    --getDistBarrier().count;
+    //    std::cout << "BLP: " << Galois::Runtime::networkHostID << " " << getDistBarrier().count << "\n";
   }
   
   void dump() {
@@ -314,7 +315,7 @@ public:
     for (unsigned x = 0; x < sense.size(); ++x)
       printf(" %d", *sense.getRemote(x));
     printf("\n");
-    printf("count %d, gsense %d\n", count, gsense);
+    printf("count %d, gsense %d\n", (int)count, (unsigned)gsense);
   }
   
 };

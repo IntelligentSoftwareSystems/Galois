@@ -26,4 +26,10 @@
 #define GALOIS_VERSION_H
 
 #include "Galois/config.h"
+#ifdef GALOIS_USE_SVNVERSION
+#include "Galois/svnversion.h"
+#else
+#define GALOIS_SVNVERSION 0
+#endif
+
 #endif

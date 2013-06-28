@@ -63,7 +63,7 @@ protected:
 public:
   MPIBase() {
     int provided;
-    int rc = MPI_Init_thread (NULL, NULL, MPI_THREAD_FUNNELED, &provided);
+    int rc = MPI_Init_thread (NULL, NULL, MPI_THREAD_SERIALIZED /*MPI_THREAD_FUNNELED*/, &provided);
     handleError(rc);
     
     MPI_Comm_size(MPI_COMM_WORLD, &numTasks);

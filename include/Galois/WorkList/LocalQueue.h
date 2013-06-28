@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -20,25 +20,32 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-
-#ifndef GALOIS_WORKLIST_LOCALQUEUES_H
-#define GALOIS_WORKLIST_LOCALQUEUES_H
+#ifndef GALOIS_WORKLIST_LOCALQUEUE_H
+#define GALOIS_WORKLIST_LOCALQUEUE_H
 
 namespace Galois {
 namespace WorkList {
 
-template<typename GlobalQueueTy = FIFO<>, typename LocalQueueTy = FIFO<>, typename T = int >
-class LocalQueues : private boost::noncopyable {
-  typedef typename LocalQueueTy::template rethread<false> lWLTy;
+template<typename Global = FIFO<>, typename Local = FIFO<>, typename T = int>
+struct LocalQueue : private boost::noncopyable {
+  template<bool _concurrent>
+  using rethread = LocalQueue<Global, Local, T>;
+
+  template<typename _T>
+  using retype = LocalQueue<typename Global::template retype<_T>, typename Local::template retype<_T>, _T>;
+
+  template<typename _global>
+  using with_global = LocalQueue<_global, Local, T>;
+
+  template<typename _local>
+  using with_local = LocalQueue<Global, _local, T>;
+
+private:
+  typedef typename Local::template rethread<false> lWLTy;
   Runtime::PerThreadStorage<lWLTy> local;
-  GlobalQueueTy global;
+  Global global;
 
 public:
-  template<bool newconcurrent>
-  using rethread = LocalQueues<GlobalQueueTy, LocalQueueTy, T>;
-  template<typename Tnew>
-  using retype = LocalQueues<typename GlobalQueueTy::template retype<Tnew>, typename LocalQueueTy::template retype<Tnew>, Tnew>;
-
   typedef T value_type;
 
   void push(const value_type& val) {
@@ -62,7 +69,7 @@ public:
     return global.pop();
   }
 };
-GALOIS_WLCOMPILECHECK(LocalQueues)
+GALOIS_WLCOMPILECHECK(LocalQueue)
 
 } // end namespace WorkList
 } // end namespace Galois

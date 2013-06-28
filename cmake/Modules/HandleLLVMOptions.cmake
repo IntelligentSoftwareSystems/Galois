@@ -27,6 +27,8 @@ endif()
 set(LLVM_LIT_ARGS "${LIT_ARGS_DEFAULT}"
     CACHE STRING "Default options for lit")
 
+#XXX(ddn): Don't pollute with extra definitions
+if(0) 
 if( LLVM_ENABLE_ASSERTIONS )
   # MSVC doesn't like _DEBUG on release builds. See PR 4379.
   if( NOT MSVC )
@@ -43,6 +45,7 @@ else()
       add_definitions( -DNDEBUG )
     endif()
   endif()
+endif()
 endif()
 
 if(WIN32)

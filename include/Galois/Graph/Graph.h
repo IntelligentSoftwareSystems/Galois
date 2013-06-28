@@ -65,6 +65,14 @@ struct EdgeItem<NTy, ETy, true> {
   inline const ETy* second() const { return &Ea; }
   template<typename... Args>
   EdgeItem(NTy* n, ETy* v, Args&&... args) : N(n), Ea(std::forward<Args>(args)...) {}
+
+	template<typename... Args>
+	EdgeItem(ETy* v, Args&&... args) :Ea(std::forward<Args>(args)...) {}
+
+	template<typename... Args>
+	EdgeItem(NTy* n,ETy &v, Args&&... args):N(n){
+		Ea=v;
+	}
   static size_t sizeOfSecond()     { return sizeof(ETy); }
 };
 

@@ -67,6 +67,17 @@ namespace Galois {
     static const bool value = sizeof(test<T>(0)) == sizeof(yes); \
   }
 
+#define GALOIS_HAS_MEM_FUNC_ANY(func, name) \
+  template<typename T> \
+  struct has_##name { \
+    typedef char yes[1]; \
+    typedef char no[2]; \
+    template<typename U, U> struct type_check; \
+    template<typename W> static yes& test(type_check<decltype(&W::func), &W::func>*); \
+    template<typename  > static no&  test(...); \
+    static const bool value = sizeof(test<T>(0)) == sizeof(yes); \
+  }
+
 #define GALOIS_HAS_MEM_TYPE(func, name) \
   template<typename T> \
   struct has_##name { \
@@ -84,7 +95,7 @@ namespace Galois {
  * The function has the following signature:
  * \code
  *  struct T {
- *    bool galoisDeterministicBreak() {
+ *    bool galoisDeterministicParallelBreak() {
  *      // returns true if loop should end
  *    }
  *  };
@@ -95,28 +106,24 @@ namespace Galois {
  * UserContext::breakLoop}, but unlike that function, these breaks are
  * deterministic.
  */
-GALOIS_HAS_MEM_FUNC(galoisDeterministicBreak, tf_deterministic_break);
+GALOIS_HAS_MEM_FUNC(galoisDeterministicParallelBreak, tf_deterministic_parallel_break);
 template<typename T>
-struct has_deterministic_break : public has_tf_deterministic_break<T, bool(T::*)()> {};
+struct has_deterministic_parallel_break : public has_tf_deterministic_parallel_break<T, bool(T::*)()> {};
 
 /**
- * Indicates the operator has a member type that optimizes the generation of
- * unique ids for active elements.
+ * Indicates the operator has a member function that optimizes the generation
+ * of unique ids for active elements. This function should be thread-safe.
  *
  * The type conforms to the following:
  * \code
  *  struct T {
- *    struct GaloisDeterministicId {
- *      GaloisDeterministicId() { } // default constructable
- *      uintptr_t operator()(const A& item) {
- *        // returns a unique identifer for item
- *      }
- *    };
- *    void operator()(const A& item, Galois::UserContext<A>&) { ... }
+ *    uintptr_t galoisDeterministicId(const A& item) const { 
+ *      // returns a unique identifier for item
+ *    }
  *  };
  * \endcode
  */
-GALOIS_HAS_MEM_TYPE(GaloisDeterministicId, tf_deterministic_id);
+GALOIS_HAS_MEM_FUNC_ANY(galoisDeterministicId, tf_deterministic_id);
 template<typename T>
 struct has_deterministic_id : public has_tf_deterministic_id<T> {};
 
@@ -160,6 +167,22 @@ struct has_deterministic_local_state : public has_tf_deterministic_local_state<T
 BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_needs_parallel_break)
 template<typename T>
 struct needs_parallel_break : public has_tt_needs_parallel_break<T> {};
+
+/**
+ * Indicates the operator has a member function that can receive the remaining
+ * work not executed when a parallel break is performed. This function should
+ * be thread-safe.
+ *
+ * The type conforms to the following:
+ * \code
+ *  struct T {
+ *    void galoisParallelBreakReceiveRemaining(const A&) { }
+ *  };
+ * \endcode
+ */
+GALOIS_HAS_MEM_FUNC_ANY(galoisParallelBreakReceiveRemaining, tf_parallel_break_receive_remaining);
+template<typename T>
+struct has_parallel_break_receive_remaining : public has_tf_parallel_break_receive_remaining<T> {};
 
 /**
  * Indicates the operator does not generate new work and push it on the worklist

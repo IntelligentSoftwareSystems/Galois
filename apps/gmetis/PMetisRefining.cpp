@@ -42,13 +42,12 @@ void projectTwoWayPartition(MetisGraph* metisGraph) {
 		GNode node = *ii;
 		MetisNode& nodeData = finerGraph->getData(node);
 		GNode multiNode;
-		if(variantMetis::localNodeData) {
-			if(nodeData.multiNode == NULL)
-				cout<<"Error";
+#ifdef localNodeData
 			multiNode = static_cast<GNode>(nodeData.multiNode);
-		}else {
+#else
 			multiNode = finer->getCoarseGraphMap(nodeData.getNodeId());
-		}
+
+#endif
 		nodeData.setPartition(metisGraph->getGraph()->getData(multiNode).getPartition());
 		//nodeData.setPartition(metisGraph->getGraph()->getData((GNode)nodeData.getMultiNode()).getPartition());
 		assert(nodeData.getPartition()>=0);
@@ -63,14 +62,12 @@ void projectTwoWayPartition(MetisGraph* metisGraph) {
 		MetisNode& nodeData = finerGraph->getData(node);
 		nodeData.setIdegree(nodeData.getAdjWgtSum());
 		GNode multiNode;
-		if(variantMetis::localNodeData) {
-			if(nodeData.multiNode == NULL)
-				cout<<"Error";
+#ifdef localNodeData
 			multiNode = static_cast<GNode>(nodeData.multiNode);
-
-		}else {
+#else
 			multiNode = finer->getCoarseGraphMap(nodeData.getNodeId());
-		}
+#endif
+
 		if (finerGraph->edge_begin(node) != finerGraph->edge_end(node) && metisGraph->getGraph()->getData(multiNode).isBoundary()) {
 			for (GGraph::edge_iterator jj = finerGraph->edge_begin(node, Galois::MethodFlag::NONE), eejj = finerGraph->edge_end(node, Galois::MethodFlag::NONE); jj != eejj; ++jj) {
 			  GNode neighbor = finerGraph->getEdgeDst(jj);

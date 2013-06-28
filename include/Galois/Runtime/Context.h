@@ -103,7 +103,7 @@ public:
 
   public:
   SimpleRuntimeContext(bool child = false): locks(0), customAcquire(child) {
-    LL::gDebug("SRC: ", this);
+    //    LL::gDebug("SRC: ", this);
   }
   virtual ~SimpleRuntimeContext();
 

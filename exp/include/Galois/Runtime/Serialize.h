@@ -115,13 +115,12 @@ bool gSerialize(SerializeBuffer& buf, const Args&... args) {
 }
 
 
-template<typename T>
-bool gSerialize(SerializeBuffer& buf, const std::basic_string<T>& data) {
-  typename std::basic_string<T>::size_type size;
+inline bool gSerialize(SerializeBuffer& buf, const std::string& data) {
+  typename std::string::size_type size;
   size = data.size();
   gSerialize(buf, size);
-  for (auto ii = data.begin(), ee = data.end(); ii != ee; ++ii)
-    gSerialize(buf, *ii);
+  for (auto x = 0 ; x < size; ++x)
+    gSerialize(buf, data.at(x));
   return true;
 }
 
@@ -225,14 +224,13 @@ bool gDeserialize(DeSerializeBuffer& buf, T& data, typename std::enable_if<has_s
   return true;
 }
 
-template<typename T>
-bool gDeserialize(DeSerializeBuffer& buf, std::basic_string<T>& data) {
-  typedef typename std::basic_string<T>::size_type lsty;
+inline bool gDeserialize(DeSerializeBuffer& buf, std::string& data) {
+  typedef typename std::string::size_type lsty;
   lsty size;
   gDeserialize(buf, size);
   data.resize(size);
   for (lsty x = 0; x < size; ++x)
-    gDeserialize(buf, data[x]);
+    gDeserialize(buf, data.at(x));
   return true;
 }
 

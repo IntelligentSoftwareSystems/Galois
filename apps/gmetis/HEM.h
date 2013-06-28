@@ -74,25 +74,25 @@ public:
 
 		MetisNode& matchNodeData = graph->getData(matchNode, Galois::MethodFlag::NONE);
 		if(variantMetis::mergeMatching)
-			if(nodeData.getNodeId()<matchNodeData.getNodeId()) {
+			if(nodeData.getNodeId()>matchNodeData.getNodeId()) {
 				int id = nodeData.getNodeId();
 				nodeData.setNodeId(matchNodeData.getNodeId());
 				matchNodeData.setNodeId(id);
 			}
 
-		if(variantMetis::localNodeData) {
+#ifdef localNodeData
 			nodeData.matchNode = matchNode;
-		}else {
+#else
 			metisGraph->setMatch(nodeData.getNodeId(), matchNode);
-		}
+#endif
 		nodeData.setMatched(true);
 
 		if (node != matchNode) {
-			if(variantMetis::localNodeData) {
+#ifdef localNodeData
 				matchNodeData.matchNode = node;
-			}else {
+#else
 				metisGraph->setMatch(matchNodeData.getNodeId(), node);
-			}
+#endif
 			matchNodeData.setMatched(true);
 		}
 		return true;

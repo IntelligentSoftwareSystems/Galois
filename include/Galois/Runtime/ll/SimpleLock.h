@@ -34,6 +34,7 @@
 
 #include <cassert>
 #include <atomic>
+#include <mutex>
 
 #include "CompilerSpecific.h"
 
@@ -126,6 +127,8 @@ void UnLockPairOrdered(SimpleLock<true>& L1, SimpleLock<true>& L2);
 void LockPairOrdered(SimpleLock<false>& L1, SimpleLock<false>& L2);
 bool TryLockPairOrdered(SimpleLock<false>& L1, SimpleLock<false>& L2);
 void UnLockPairOrdered(SimpleLock<false>& L1, SimpleLock<false>& L2);
+
+typedef std::lock_guard<LL::SimpleLock<true> > SLguard;
 
 }
 }

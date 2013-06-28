@@ -98,9 +98,9 @@ void gError(Args... args) {
 void gFlush();
 
 #define GALOIS_SYS_ERROR(...) { Galois::Runtime::LL::gError(__FILE__, ":", __LINE__, ": ", strerror(errno), ": ", ##__VA_ARGS__); }
-#define GALOIS_ERROR(...)     { Galois::Runtime::LL::gError(__FILE__, ":", __LINE__, ##__VA_ARGS__); }
+#define GALOIS_ERROR(...)     { Galois::Runtime::LL::gError(__FILE__, ":", __LINE__, ": ", ##__VA_ARGS__); }
 #define GALOIS_SYS_DIE(...)   { Galois::Runtime::LL::gError(__FILE__, ":", __LINE__, ": ", strerror(errno), ": ", ##__VA_ARGS__); abort(); }
-#define GALOIS_DIE(...)       { Galois::Runtime::LL::gError(__FILE__, ":", __LINE__, ##__VA_ARGS__); abort(); }
+#define GALOIS_DIE(...)       { Galois::Runtime::LL::gError(__FILE__, ":", __LINE__, ": ", ##__VA_ARGS__); abort(); }
 
 }
 }

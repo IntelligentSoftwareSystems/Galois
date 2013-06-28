@@ -1,3 +1,4 @@
+#include "Galois/config.h"
 #include "Galois/Runtime/Sampling.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/ll/EnvCheck.h"
@@ -26,7 +27,6 @@ static void beginPeriod() {
 #include "Galois/Runtime/ll/TID.h"
 
 static bool isOn;
-
 static void vtuneBegin() {
   if (!isOn && Galois::Runtime::LL::getTID() == 0)
     __itt_resume();

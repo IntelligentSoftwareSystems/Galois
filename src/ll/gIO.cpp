@@ -81,11 +81,15 @@ void Galois::Runtime::LL::gDebugStr(const std::string& s) {
     std::lock_guard<decltype(dIOLock)> lock(dIOLock);
     static std::ofstream debugOut;
     if (!debugOut.is_open()) {
-      char fname[] = "gdebugXXXXXX";
-      int fd = mkstemp(fname);
+      std::ostringstream fname;
+      fname << "gdebug." << networkHostID << ".XXXXXX";
+      assert(fname.str().size() < 256);
+      char cfname[256];
+      strncpy(cfname, fname.str().c_str(), 256);
+      int fd = mkstemp(cfname);
       close(fd);
-      debugOut.open(fname);
-      gInfo("Debug output going to ", fname);
+      debugOut.open(cfname);
+      gInfo("Debug output going to ", cfname);
     }
     debugOut << os.str() << "\n";
     debugOut.flush();

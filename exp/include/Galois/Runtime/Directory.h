@@ -25,6 +25,7 @@
 #ifndef GALOIS_RUNTIME_DIRECTORY_H
 #define GALOIS_RUNTIME_DIRECTORY_H
 
+#include "Galois/gstl.h"
 #include "Galois/Runtime/ll/TID.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Network.h"
@@ -32,6 +33,7 @@
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/ll/SimpleLock.h"
 #include "Galois/Runtime/ll/gio.h"
+#include "Galois/Runtime/CacheManager.h"
 
 #include <boost/utility.hpp>
 #include <boost/intrusive_ptr.hpp>
@@ -40,29 +42,15 @@
 #include <unordered_map>
 #include <set>
 #include <functional>
+#include <array>
 
 namespace Galois {
 namespace Runtime {
 
 SimpleRuntimeContext& getAbortCnx();
 
-template<typename a>
-struct pairhash {
-private:
-  const std::hash<typename a::first_type> ah;
-  const std::hash<typename a::second_type> bh;
-public:
-  pairhash() : ah(), bh() {}
-  size_t operator()(const a& p) const {
-    return ah(p.first) ^ bh(p.second);
-  }
-};
-
 typedef std::pair<uint32_t, Lockable*> fatPointer;
-typedef pairhash<fatPointer> ptrHash;
-
 struct remote_ex { fatPointer ptr; };
-
 
 // requests for objects go to owner first
 // owner forwards a request to current owner to recall object
@@ -72,313 +60,223 @@ struct remote_ex { fatPointer ptr; };
 
 class Directory;
 
-class remoteObj {
-  std::atomic<unsigned> count;
+//These wrap type information for various dispatching purposes.  This
+//let's us keep vtables out of user objects
+class typeHelper {
+  template<typename T> recvFuncTy getRecvRequestImpl() const;
+  template<typename T> recvFuncTy getRecvObjImpl() const;
+
 public:
-  remoteObj() :count(0) {}
-  virtual void sendObj(recvFuncTy f, fatPointer ptr, uint32_t dest) = 0;
-  virtual Lockable* getObj() = 0;
-  void decLock() { --count; }
-  void incLock() { ++count; }
-  bool emptyLock() { return count == 0; }
+  virtual void sendObject(fatPointer ptr, Lockable* obj, uint32_t dest) const = 0;
+  virtual void sendRequest(fatPointer ptr, uint32_t dest, uint32_t reqFor) const = 0;
 };
 
 template<typename T>
-class remoteObjImpl : public remoteObj {
-  friend class Directory;
-  T obj;
+class typeHelperImpl : public typeHelper {
 public:
-  virtual void sendObj(recvFuncTy f, fatPointer ptr, uint32_t dest) {
-    SendBuffer sbuf;
-    gSerialize(sbuf, ptr, obj);
-    getSystemNetworkInterface().send(dest, f, sbuf);
-  }
-  virtual Lockable* getObj() {
-    return &obj;
+  virtual void sendObject(fatPointer ptr, Lockable* obj, uint32_t dest) const;
+  virtual void sendRequest(fatPointer ptr, uint32_t dest, uint32_t reqFor) const;
+
+  static typeHelperImpl* get() {
+    static typeHelperImpl th;
+    return &th;
   }
 };
 
-inline void intrusive_ptr_add_ref(remoteObj* ptr) {
-  ptr->incLock();
-}
+class tracking {
+  std::set<uint32_t> requests;
+  typeHelper* helper;
+  bool recalled;
+  uint32_t recalledFor;
+  uint32_t contended;
+  uint32_t curLoc;
 
-inline void intrusive_ptr_release(remoteObj* ptr) {
-  ptr->decLock();
-}
+  std::vector<std::function<void(fatPointer)> > notifiers;
 
+  //set typehelper
+  void setTypeHelper(typeHelper* th) {
+    assert(!helper || helper == th);
+    helper = th;
+  }
 
-//track here to send objects
-class fetchTracking {
-  LL::SimpleLock<true> fetchLock;
-  std::unordered_map<fatPointer, std::set<uint32_t>, pairhash<fatPointer> > requestors;
-  
 public:
-  // add the request, returning the current lowest
-  uint32_t addRequest(fatPointer ptr, uint32_t host) {
-    std::lock_guard<LL::SimpleLock<true> > lg(fetchLock);
-    auto& entry = requestors[ptr];
-    entry.insert(host);
-    return *(entry.begin());
-  }
-  
-  //del the request
-  void delRequest(fatPointer ptr, uint32_t host) {
-    std::lock_guard<LL::SimpleLock<true> > lg(fetchLock);
-    auto iter = requestors.find(ptr);
-    if (iter != requestors.end()) {
-      iter->second.erase(host);
-      if (iter->second.empty())
-        requestors.erase(iter);
-    }
-  }
-  
-  void clearRequest(fatPointer ptr) {
-    std::lock_guard<LL::SimpleLock<true> > lg(fetchLock);
-    requestors.erase(ptr);
+
+  void addNotify(std::function<void(fatPointer)> func) {
+    notifiers.push_back(func);
   }
 
-  std::pair<bool, uint32_t> getRequest(fatPointer ptr) {
-    std::lock_guard<LL::SimpleLock<true> > lg(fetchLock);
-    auto iter = requestors.find(ptr);
-    if (iter != requestors.end() && !iter->second.empty())
-      return std::make_pair(true, *iter->second.begin());
-    return std::make_pair(false, 0);
+  void notifyAll(fatPointer ptr) {
+    for (auto& func : notifiers)
+      func(ptr);
+    notifiers.clear();
   }
+
+  //add a request to the queue
+  void addRequest(uint32_t remoteHost, typeHelper* th = nullptr) {
+    requests.insert(remoteHost);
+    if (th)
+      setTypeHelper(th);
+    assert(helper);
+  }
+  void delRequest(uint32_t remoteHost) {
+    assert(requests.count(remoteHost));
+    requests.erase(remoteHost);
+  }
+  void clearRequest()     { requests.clear(); }
+  uint32_t getRequest()   { return *requests.begin(); }
+  bool hasRequest() const { return !requests.empty(); }
+
+  //set the object as being on this host
+  void setLocal() {
+    recalled = false;
+    curLoc = networkHostID;
+  }
+
+  void setCurLoc(uint32_t host) { curLoc = host; }
+  uint32_t getCurLoc() const { return curLoc; }
+
+  bool isRecalled() const { return recalled; }
+  uint32_t getRecalled() const { assert(recalled); return recalledFor; }
+  void setRecalled(uint32_t host) { recalled = true; recalledFor = host; }
+
+  void setContended()      { ++contended; }
+  void clearContended()    { --contended; }
+  bool isContended() const { return contended; }
+
+  typeHelper* getHelper() const { return helper; }
 };
+
 
 class Directory : public SimpleRuntimeContext, private boost::noncopyable {
 
-  template<unsigned bit> bool setBit(uintptr_t& val) {
-    bool retval = val & (1UL << bit);
-    if (!retval)
-      val |= (1UL << bit);
-    return retval;
-  }
-
-  template<unsigned bit> bool getBit(uintptr_t& val) {
-    return val & (1UL << bit);
-  }
-
-  template<unsigned bit> bool delBit(uintptr_t& val) {
-    bool retval = val & (1UL << bit);
-    if (retval)
-      val ^= (1UL << bit);
-    return retval;
-  }
-
-  //////////////////////////////////////////////////////////////////////////////
-  // remote obj handling
-  //////////////////////////////////////////////////////////////////////////////
-
-  LL::SimpleLock<true> remoteLock;
-  std::unordered_map<fatPointer, boost::intrusive_ptr<remoteObj>, pairhash<fatPointer> > remoteObjects;
-
   template<typename T>
-  boost::intrusive_ptr<remoteObjImpl<T>> remoteResolve(fatPointer ptr) {
-    std::lock_guard<LL::SimpleLock<true>> lg(remoteLock);
-    boost::intrusive_ptr<remoteObj>& retval = remoteObjects[ptr];
-    if (!retval) {
-      auto t = new remoteObjImpl<T>();
-      retval = t;
-      SimpleRuntimeContext::try_acquire(&t->obj);
-    }
-    return boost::static_pointer_cast<remoteObjImpl<T>>(retval);
+  friend class typeHelperImpl;
+
+  std::unordered_map<fatPointer, tracking, boost::hash<fatPointer> > tracks;
+  LL::SimpleLock<true> trackLock;
+
+  tracking& getTracking(LL::SLguard& lg, fatPointer ptr) {
+    LL::SLguard lgt(trackLock);
+    return tracks[ptr];
   }
 
-  //this may return a null pointer equivalent
-  boost::intrusive_ptr<remoteObj> remoteWeakResolve(fatPointer ptr) {
-    std::lock_guard<LL::SimpleLock<true>> lg(remoteLock);
-    boost::intrusive_ptr<remoteObj> retval;
-    if ( remoteObjects.count(ptr))
-      retval = remoteObjects[ptr];
+  tracking& getExistingTracking(LL::SLguard& lg, fatPointer ptr) {
+    LL::SLguard lgt(trackLock);
+    assert(tracks.count(ptr));
+    return tracks[ptr];
+  }
+
+  void delTracking(LL::SLguard& lg, fatPointer ptr) {
+    LL::SLguard lgt(trackLock);
+    assert(tracks.count(ptr));
+    tracks.erase(ptr);
+  }
+
+  bool hasTracking(LL::SLguard& lg, fatPointer ptr) {
+    LL::SLguard lgt(trackLock);
+    return tracks.count(ptr);
+ }
+
+  std::vector<fatPointer> getTracks() {
+    LL::SLguard lgt(trackLock);
+    std::vector<fatPointer> retval;
+    retval.reserve(tracks.size());
+    for (auto& k : tracks)
+      retval.push_back(k.first);
     return retval;
   }
 
-  void remoteClear(fatPointer ptr) {
-    std::lock_guard<LL::SimpleLock<true>> lg(remoteLock);
-    assert(remoteObjects.count(ptr));
-    remoteObjects.erase(ptr);
+  std::deque<fatPointer> pending;
+  LL::SimpleLock<true> pendingLock;
+
+  void addPending(fatPointer ptr) {
+    LL::SLguard lgp(pendingLock);
+    pending.push_back(ptr);
   }
 
-  //May return a null pointer
-  std::pair<Lockable*, boost::intrusive_ptr<remoteObj>> getObjUntyped(fatPointer ptr);
-
-  //always returns a valid pointer
-  template<typename T>
-  std::pair<T*, boost::intrusive_ptr<remoteObjImpl<T> > > getObj(fatPointer ptr) {
-    //Get the object
-    std::pair<T*, boost::intrusive_ptr<remoteObjImpl<T> > > retval;
-    if (ptr.first == networkHostID) {
-      retval.first = static_cast<T*>(ptr.second);
-    } else {
-      retval.second = remoteResolve<T>(ptr);
-      retval.first = &retval.second->obj;
-    }
+  std::deque<fatPointer> getPending() {
+    LL::SLguard lgp(pendingLock);
+    std::deque<fatPointer> retval;
+    retval.swap(pending);
     return retval;
   }
 
-  //////////////////////////////////////////////////////////////////////////////
-  // fetch handling
-  //////////////////////////////////////////////////////////////////////////////
-  bool getPending(Lockable* ptr) {
-    return getBit<32>(ptr->auxData);
-  }
+  //main request processor
+  void processObj(LL::SLguard& lg, fatPointer ptr, Lockable* obj);
 
-  bool delPending(Lockable* ptr) {
-    return delBit<32>(ptr->auxData);
-  }
-
-  bool setPending(Lockable* ptr) {
-    return setBit<32>(ptr->auxData);
-  }
-
-  bool getPriority(Lockable* ptr) {
-    return getBit<33>(ptr->auxData);
-  }
-
-  bool delPriority(Lockable* ptr) {
-    return delBit<33>(ptr->auxData);
-  }
-
-  bool setPriority(Lockable* ptr) {
-    return setBit<33>(ptr->auxData);
-  }
-
-  uint32_t getCurLoc(fatPointer ptr) {
-    if (ptr.first == networkHostID) {
-      return (uint32_t) ptr.second->auxData;
-    }
-    return ptr.first;
-  }
-  
-  void setCurLoc(fatPointer ptr, uint32_t host) {
-    if (ptr.first == networkHostID) {
-      uintptr_t val = ptr.second->auxData >> 32;
-      val <<= 32;
-      val |= host;
-      ptr.second->auxData = val;
-    }
-  }
-
-  fetchTracking fetches;
-
-  //////////////////////////////////////////////////////////////////////////////
-  // external notification
-  //////////////////////////////////////////////////////////////////////////////
-
-  LL::SimpleLock<true> Lock;
-  std::multimap<fatPointer, std::function<void (fatPointer)> > notifiers;
-  void notify(fatPointer ptr);
-  void tryNotifyAll();
-
-  //////////////////////////////////////////////////////////////////////////////
-  // pending handling
-  //////////////////////////////////////////////////////////////////////////////
-
-  //Central request sender
-  //by default, request object be sent to this host
-  void sendRequest(fatPointer ptr, uint32_t msgTo, recvFuncTy f, uint32_t objTo = networkHostID);
-  //Fetch object.  Checks for duplicate requests
-  //by default, request object be sent to this host
-  void fetchObj(Lockable* obj, fatPointer ptr, uint32_t msgTo, recvFuncTy f, uint32_t objTo = networkHostID);
-
-  //////////////////////////////////////////////////////////////////////////////
-  // Communication
-  //////////////////////////////////////////////////////////////////////////////
 
   //Generic landing pad for requests
   template<typename T>
   static void recvRequest(RecvBuffer&);
 
-  template<typename T>
-  void doRequest(fatPointer ptr, uint32_t remoteHost) {
-     //Get the object
-    std::pair<T*, boost::intrusive_ptr<remoteObjImpl<T>> > obj = getObj<T>(ptr);
-
-    //delay processing while we have an existential lock and request is low priority
-    if (remoteHost > networkHostID && getPriority(obj.first)) {
-      fetches.addRequest(ptr, remoteHost);
-      return;
-    }
-
-    int val = SimpleRuntimeContext::try_acquire(obj.first);
-    switch(val) {
-    case 0: { // Local iteration has the lock
-      fetches.addRequest(ptr, remoteHost);
-    } break;
-    case 1: { // Now owner (was free and on this host)
-      //compute who to send the object too
-      //non-owner sends back to owner
-      uintptr_t dest = ptr.first;
-      if (ptr.first == networkHostID) {
-        //owner sends to highest priority requestor
-        dest = fetches.addRequest(ptr, remoteHost);
-      }
-      trace_obj_send(ptr.first, ptr.second, dest);
-      SendBuffer sbuf;
-      gSerialize(sbuf, ptr, *static_cast<T*>(obj.first));
-      getSystemNetworkInterface().send(dest, &recvObj<T>, sbuf);
-      setCurLoc(ptr, dest);
-      if (ptr.first == networkHostID) {
-        fetches.delRequest(ptr, dest);
-      } else {
-        fetches.clearRequest(ptr);
-        remoteClear(ptr);
-      }
-    } break;
-    case 2: { // already owner, so obj is somewhere else
-      fetchObj(obj.first, ptr, getCurLoc(ptr), &recvRequest<T>);
-    } break;
-    default: // unknown condition
-      abort();
-    }
-  }
+  //update requests simply notify of a higher priority requestor.  If
+  // the object has already been sent away, this does nothing
+  void doRequest(fatPointer ptr, typeHelper* th, uint32_t remoteHost);
 
   //Generic landing pad for objects
   template<typename T>
   static void recvObj(RecvBuffer&);
 
   //Generic handling of received objects
+  //returns whether release should happen
+  bool doObj(fatPointer ptr, typeHelper* th);
+
+
+  enum { numLocks = 1024 };
+  std::array<LL::SimpleLock<true>, numLocks> objLocks;
+  boost::hash<fatPointer> lockhash;
+  LL::SimpleLock<true>& getLock(fatPointer ptr) {
+    return objLocks[lockhash(ptr) % numLocks];
+  }
+
   template<typename T>
-  void doObj(fatPointer ptr, RecvBuffer& buf) {
-    std::pair<T*, boost::intrusive_ptr<remoteObjImpl<T>> > obj = getObj<T>(ptr);
-    assert(isAcquiredBy(obj.first, this));
-    gDeserialize(buf, *obj.first);
-    delPending(obj.first);
-    release(obj.first);
-    notify(ptr);
+  static void sendObject(fatPointer ptr, Lockable* obj, uint32_t dest) {
+    trace_obj_send(ptr.first, ptr.second, dest);
+    SendBuffer sbuf;
+    gSerialize(sbuf, ptr, *static_cast<T*>(obj));
+    getSystemNetworkInterface().send(dest, recvObj<T>, sbuf);
+  }
+
+  template<typename T>
+  static void sendRequest(fatPointer ptr, uint32_t dest, uint32_t reqFor) {
+    trace_req_send(ptr.first, ptr.second, dest, reqFor);
+    SendBuffer sbuf;
+    gSerialize(sbuf, ptr, reqFor);
+    getSystemNetworkInterface().send(dest, recvRequest<T>, sbuf);
   }
 
 public:
   Directory() : SimpleRuntimeContext(false) {}
   
-  void notifyWhenAvailable(fatPointer ptr, std::function<void(fatPointer)> func);
-
   template<typename T>
-  void recall(fatPointer ptr) {
-    assert(ptr.first == networkHostID);
-    assert(getCurLoc(ptr) != networkHostID);
-    ////do a self request to participate in prioritization
-    //doRequest<T>(ptr, networkHostID);
-    fetchObj(ptr.second, ptr, getCurLoc(ptr), &recvRequest<T>);
-  }
-
-  template<typename T>
-  boost::intrusive_ptr<remoteObjImpl<T>> resolve(fatPointer ptr) {
-    assert(ptr.first != networkHostID);
-    auto i = remoteResolve<T>(ptr);
-    if (isAcquiredBy(&i->obj, this))
-      fetchObj(&i->obj, ptr, ptr.first, &recvRequest<T>);
-    return i;
+  void fetch(fatPointer ptr, T* obj) {
+    doRequest(ptr, typeHelperImpl<T>::get(), networkHostID);
   }
 
   void setContended(fatPointer ptr);
   void clearContended(fatPointer ptr);
 
-  void makeProgress() { 
-    tryNotifyAll();
+  void notifyWhenAvailable(fatPointer ptr, std::function<void(fatPointer)> func);
+
+  void makeProgress() {
+    std::deque<fatPointer> outstanding = getPending();
+    auto& cm = getCacheManager();
+    for (auto ptr : outstanding) {
+      LL::SLguard lg(getLock(ptr));
+      if (ptr.first == networkHostID) {
+        processObj(lg, ptr, ptr.second);
+      } else {
+        remoteObj* obj = cm.weakResolve(ptr);
+        if (obj)
+          processObj(lg, ptr, obj->getObj());
+      }
+    }
   }
 
+  void dump();
+
+  void queryObj(fatPointer ptr, bool forward = true);
+  static void queryObjRemote(fatPointer ptr, bool forward);
 };
 
 Directory& getSystemDirectory();
@@ -386,6 +284,7 @@ Directory& getSystemDirectory();
 //! Make progress in the network
 inline void doNetworkWork() {
   if ((networkHostNum > 1) && (LL::getTID() == 0)) {
+    getSystemNetworkInterface().handleReceives();
     getSystemDirectory().makeProgress();
     getSystemNetworkInterface().handleReceives();
   }
@@ -400,7 +299,18 @@ void Galois::Runtime::Directory::recvObj(RecvBuffer& buf) {
   fatPointer ptr;
   gDeserialize(buf, ptr);
   trace_obj_recv(ptr.first, ptr.second);
-  getSystemDirectory().doObj<T>(ptr, buf);
+  T* obj = nullptr;
+  if (ptr.first == networkHostID) {
+    obj = static_cast<T*>(ptr.second);
+  } else {
+    obj = static_cast<T*>(getCacheManager().resolve<T>(ptr)->getObj());
+  }
+  gDeserialize(buf, *obj);
+  auto& dir = getSystemDirectory();
+  if (dir.doObj(ptr, typeHelperImpl<T>::get())) {
+    assert(isAcquiredBy(obj, &dir));
+    dir.release(obj);
+  }
 }
 
 //Generic landing pad for requests
@@ -409,7 +319,32 @@ void Galois::Runtime::Directory::recvRequest(RecvBuffer& buf) {
   fatPointer ptr;
   uint32_t remoteHost;
   gDeserialize(buf, ptr, remoteHost);
-  getSystemDirectory().doRequest<T>(ptr, remoteHost);
+  trace_req_recv(ptr.first, ptr.second, remoteHost);
+  getSystemDirectory().doRequest(ptr, typeHelperImpl<T>::get(), remoteHost);
+}
+
+template<typename T>
+void Galois::Runtime::typeHelperImpl<T>::sendObject(Galois::Runtime::fatPointer ptr, Lockable* obj, uint32_t dest) const {
+  Directory::sendObject<T>(ptr, obj, dest);
+}
+
+template<typename T>
+void Galois::Runtime::typeHelperImpl<T>::sendRequest(fatPointer ptr, uint32_t dest, uint32_t reqFor) const {
+  Directory::sendRequest<T>(ptr, dest, reqFor);
+}
+
+template<typename T>
+Galois::Runtime::remoteObjImpl<T>* Galois::Runtime::CacheManager::resolve(fatPointer ptr) {
+  assert(ptr.first != networkHostID);
+  LL::SLguard lgr(Lock);
+  remoteObj*& retval = remoteObjects[ptr];
+  if (!retval) {
+    auto t = new remoteObjImpl<T>();
+    retval = t;
+    auto& dir = getSystemDirectory();
+    dir.try_acquire(t->getObj());
+  }
+  return static_cast<remoteObjImpl<T>*>(retval);
 }
 
 #endif

@@ -36,7 +36,7 @@ using namespace boost;
 
 void generalTwoWayBalance(MetisGraph* metisGraph, int* tpwgts) {
 	GGraph* graph = metisGraph->getGraph();
-	int numNodes = graph->size();
+	int numNodes = metisGraph->getNumNodes();
 	int* moved = new int[numNodes];
 
 	int mindiff = abs(tpwgts[0] - metisGraph->getPartWeight(0));
@@ -122,7 +122,7 @@ void generalTwoWayBalance(MetisGraph* metisGraph, int* tpwgts) {
 void boundaryTwoWayBalance(MetisGraph* metisGraph, int* tpwgts) {
 
 	GGraph* graph = metisGraph->getGraph();
-	int numNodes = graph->size();
+	int numNodes = metisGraph->getNumNodes();;
 	int* moved = new int[numNodes];
 	std::fill_n(moved, numNodes, -1);
 	int mindiff = abs(tpwgts[0] - metisGraph->getPartWeight(0));

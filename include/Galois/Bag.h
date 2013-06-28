@@ -117,8 +117,8 @@ class InsertBag: boost::noncopyable {
     }
   };
   
-  Galois::Runtime::PerThreadStorage<header*> heads;
   Galois::Runtime::MM::FixedSizeAllocator heap;
+  Galois::Runtime::PerThreadStorage<header*> heads;
 
   void insHeader(header* h) {
     header*& H = *heads.getLocal();

@@ -38,7 +38,7 @@
 //#include "Galois/Runtime/ParallelWorkInline.h"
 #include "Galois/Runtime/BulkSynchronousWork.h"
 #endif
-#ifdef GALOIS_USE_TBB
+#ifdef USE_TBB
 #include "tbb/parallel_for.h"
 #include "tbb/parallel_for_each.h"
 #include "tbb/cache_aligned_allocator.h"
@@ -502,11 +502,9 @@ struct DetBarrierAlgo {
   typedef LocalState GaloisDeterministicLocalState;
   static_assert(Galois::has_deterministic_local_state<DetBarrierAlgo>::value, "Oops");
 
-  struct GaloisDeterministicId {
-    unsigned long operator()(const ItemTy& item) const {
-      return graph.getData(item.first, Galois::MethodFlag::NONE).id;
-    }
-  };
+  uintptr_t galoisDeterministicId(const ItemTy& item) const {
+    return graph.getData(item.first, Galois::MethodFlag::NONE).id;
+  }
   static_assert(Galois::has_deterministic_id<DetBarrierAlgo>::value, "Oops");
 
   void operator()(const GNode& source) const {

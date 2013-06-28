@@ -36,13 +36,13 @@ SimpleRuntimeContext& getTransCnx();
 template<typename T>
 T* resolve(const gptr<T>& p) {
   fatPointer ptr = p;
-  if (!ptr.second)
-    return nullptr;
+  // if (!ptr.second)
+  //   return nullptr;
 
-  boost::intrusive_ptr<remoteObjImpl<T> > robj = nullptr;
+  remoteObjImpl<T>* robj = nullptr;
   Lockable* obj = ptr.second;
   if (ptr.first != networkHostID) {
-    robj = getSystemDirectory().resolve<T>(ptr);
+    robj = getCacheManager().resolve<T>(ptr);
     obj = robj->getObj();
   }
 
@@ -52,8 +52,7 @@ T* resolve(const gptr<T>& p) {
       return static_cast<T*>(obj);
     } catch (const conflict_ex& ex) {
       if (isAcquiredBy(obj, &getSystemDirectory())) {
-        if (ptr.first == networkHostID)
-          getSystemDirectory().recall<T>(ptr);
+        getSystemDirectory().fetch(ptr, static_cast<T*>(obj));
         throw remote_ex{ptr};
       } else {
         throw ex;
@@ -61,8 +60,7 @@ T* resolve(const gptr<T>& p) {
     }
   } else { //serial code
     while (isAcquiredBy(obj, &getSystemDirectory())) {
-      if (ptr.first == networkHostID)
-        getSystemDirectory().recall<T>(ptr);
+      getSystemDirectory().fetch(ptr, static_cast<T*>(obj));
       doNetworkWork();
     }
     return static_cast<T*>(obj);
@@ -75,17 +73,16 @@ T* transientAcquire(const gptr<T>& p) {
   if (!ptr.second)
     return nullptr;
   
-  boost::intrusive_ptr<remoteObjImpl<T>> robj = nullptr;
+  remoteObjImpl<T>* robj = nullptr;
   Lockable* obj = ptr.second;
   if (ptr.first != networkHostID) {
-    robj = getSystemDirectory().resolve<T>(ptr);
+    robj = getCacheManager().resolve<T>(ptr);
     obj = robj->getObj();
   }
 
   while (!getTransCnx().try_acquire(obj)) {
     if (isAcquiredBy(obj, &getSystemDirectory()))
-      if (ptr.first == networkHostID)
-        getSystemDirectory().recall<T>(ptr);
+      getSystemDirectory().fetch(ptr, static_cast<T*>(obj));
     doNetworkWork();
   }
   return static_cast<T*>(obj);
@@ -114,10 +111,10 @@ T* transientAcquireNonBlocking(const gptr<T>& p) {
 template<typename T>
 void transientRelease(const gptr<T>& p) {
   fatPointer ptr = p;
-  boost::intrusive_ptr<remoteObjImpl<T>> robj = nullptr;
+  remoteObjImpl<T>* robj = nullptr;
   Lockable* rptr = ptr.second;
   if (ptr.first != networkHostID) {
-    robj = getSystemDirectory().resolve<T>(ptr);
+    robj = getCacheManager().resolve<T>(ptr);
     rptr = robj->getObj();
   }
   getTransCnx().release(rptr);

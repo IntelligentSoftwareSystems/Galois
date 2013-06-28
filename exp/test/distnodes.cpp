@@ -32,6 +32,7 @@ int main(int argc, char** argv) {
     Gr->createNode(x);
 
   Galois::for_each<>(Gr->begin(), Gr->end(), op());
+  //Galois::for_each_local(Gr, op());
 
   for (auto ii = Gr->begin(), ee = Gr->end(); ii != ee; ++ii)
     std::cout << (*ii)->getData() << " " << std::distance((*ii)->begin(), (*ii)->end()) << " ";

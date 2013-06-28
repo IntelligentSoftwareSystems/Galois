@@ -24,6 +24,9 @@
 #define GALOIS_GSTL_H
 
 #include <iterator>
+#include <set>
+#include <map>
+#include <vector>
 
 namespace Galois {
 
@@ -89,6 +92,23 @@ void uninitialized_destroy ( InputIterator first, InputIterator last )
   for (; first!=last; ++first)
     (&*first)->~T();
 }
+
+template<typename T, typename K>
+std::vector<T> extractValues(std::multimap<K, T>& m, const K& k) {
+  std::vector<T> r;
+  for (auto ii = m.lower_bound(k), ee = m.upper_bound(k); ii != ee; ++ii)
+    r.push_back(ii->second);
+  return r;
+}
+
+template<typename T, typename K>
+std::set<K> extractKeys(std::multimap<K, T>& m) {
+  std::set<K> r;
+  for (auto ii = m.begin(), ee = m.end(); ii != ee; ++ii)
+    r.insert(ii->first);
+  return r;
+}
+
 
 }
 #endif

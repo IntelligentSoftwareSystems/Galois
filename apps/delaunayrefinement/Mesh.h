@@ -402,7 +402,10 @@ private:
     //std::sort(elements.begin(), elements.end(), centerXCmp());
     divide(elements.begin(), elements.end());
 
-    Galois::for_each<>(elements.begin(), elements.end(), create_nodes(mesh));
+    // volatile int x = 1;
+    // while (x) {}
+
+    Galois::for_each<Galois::WorkList::StableIterator<std::deque<Element>::iterator > > (elements.begin(), elements.end(), create_nodes(mesh), "create");
 
     std::map<Edge, GNode> edge_map;
     for (Graph::iterator ii = mesh->begin(), ee = mesh->end(); ii != ee; ++ii)

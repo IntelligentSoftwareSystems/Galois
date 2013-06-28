@@ -107,6 +107,7 @@ print "RUN: CommandLine $cmdline\n";
 my $dire = "/tmp/$uname.vtune.r$threads";
 my $rdir = "-result-dir=$dire";
 my $report = "-R hw-events -format csv -csv-delimiter tab";
+# my $type = "hotspots";
 
 my $collect;
 if (1) {
@@ -124,7 +125,7 @@ if (1) {
 }
 
 my $sdir = "-search-dir all=$symbol";
-my $maxsec = 1000;
+my $maxsec = 100000;
 
 system("rm -rf $dire");
 system("mkdir $dire");

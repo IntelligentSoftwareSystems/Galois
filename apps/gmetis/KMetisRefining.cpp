@@ -25,6 +25,15 @@
 #include "RandomRefiner.h"
 #include "defs.h"
 #include "GMetisConfig.h"
+/*
+ *Goes over all the edges of the nodes and notes down how much controbution is there for each partition.
+ * You couldn't write this in parallel because the previous version was using int* and you can't malloc. 
+ * I used a fixed size small vector of 128 assuming you are going to partition in max 128 parts.  
+ * The above approach uses too much memory, so you can specify the flag variantMetis::nopartInfo  to false 
+ * to not use that approach and rather re calculate the information about partition again and again.  
+ * 
+ */
+
 void projectNeighbors(GGraph* graph, int nparts, GNode node, int& ndegrees, int& ed,int &id) {
 	if(!variantMetis::noPartInfo){
 	MetisNode& nodeData = graph->getData(node, Galois::MethodFlag::NONE);
@@ -91,11 +100,11 @@ struct projectInfo {
 		MetisNode& nodeData = finerGGraph->getData(node,Galois::MethodFlag::NONE);
 		nodeData.setIdegree(nodeData.getAdjWgtSum());
 		GNode multiNode;
-		if(variantMetis::localNodeData){
+#ifdef localNodeData
 			multiNode = static_cast<GNode>(nodeData.multiNode);
-		}else {
+#else
 			multiNode = finerMetisGraph->getCoarseGraphMap(nodeData.getNodeId());
-		}
+#endif
 		MetisNode &multiNodeData = coarseGGraph->getData(multiNode,Galois::MethodFlag::NONE);
 
 		if (multiNodeData.getEdegree() > 0)
@@ -130,11 +139,11 @@ struct projectPartition {
 	void operator()(GNode node) {
 		MetisNode& nodeData = finerGGraph->getData(node,Galois::MethodFlag::NONE);
 		GNode multiNode;
-		if(variantMetis::localNodeData){
+#ifdef localNodeData
 			multiNode = static_cast<GNode>(nodeData.multiNode);
-		}else {
+#else
 			multiNode = finerMetisGraph->getCoarseGraphMap(nodeData.getNodeId());
-		}
+#endif
 		MetisNode &multiNodeData = coarseGGraph->getData(multiNode,Galois::MethodFlag::NONE);
 		nodeData.setPartition(multiNodeData.getPartition());
 	}
@@ -147,34 +156,34 @@ void projectKWayPartition(MetisGraph* coarseMetisGraph, int nparts){
 	//GGraph* coarseGGraph = coarseMetisGraph->getGraph();
 	GGraph* finerGGraph = finerMetisGraph->getGraph();
 	finerMetisGraph->initBoundarySet();
-	Galois::Timer t;
-	t.start();
+	//Galois::Timer t;
+	//t.start();
 	projectPartition pp(finerMetisGraph,coarseMetisGraph,nparts);
 	//Galois::for_each_local<Galois::WorkList::dChunkedFIFO<64, GNode> >(*finerGGraph, pp,"Project Partition");
 	Galois::do_all_local(*finerGGraph,pp,"project partition");
-	t.stop();
+	//t.stop();
 	//cout<<"project partition "<<t.get()<<" ms"<<endl;
 	projectInfo pi(nparts,finerMetisGraph,coarseMetisGraph);
-	Galois::for_each_local<Galois::WorkList::ChunkedLIFO<64, GNode> >(*finerGGraph, pi,"Projecting Info");
-	t.stop();
+	Galois::for_each_local<Galois::WorkList::dChunkedLIFO<256, GNode> >(*finerGGraph, pi,"Projecting Info");
+	//t.stop();
 	//cout<<"projecting info "<<t.get()<<" ms "<<endl;
-	t.start();
+	//t.start();
 	finerMetisGraph->initPartWeight(nparts);
 
 	for (int i = 0; i < nparts; i++) {
 		finerMetisGraph->setPartWeight(i, coarseMetisGraph->getPartWeight(i));
 	}
 
-	for(GGraph::iterator ii = finerGGraph->begin(),ee=finerGGraph->end();ii!=ee;ii++) {
+/*	for(GGraph::iterator ii = finerGGraph->begin(),ee=finerGGraph->end();ii!=ee;ii++) {
 		GNode node = *ii;
 		MetisNode &nodeData = finerGGraph->getData(node);
 		if(nodeData.getEdegree()-nodeData.getIdegree()>0) {
 			finerMetisGraph->setBoundaryNode(node);
 		}
-	}
+	}*/
 	finerMetisGraph->setMinCut(coarseMetisGraph->getMinCut());
-	t.stop();
-	//cout<<"Waste time "<<t.get()<<" ms"<<endl;
+	//t.stop();
+
 }
 
 void refineKWay(MetisGraph* metisGraph, MetisGraph* orgGraph, float* tpwgts, float ubfactor, int nparts){
@@ -187,9 +196,15 @@ void refineKWay(MetisGraph* metisGraph, MetisGraph* orgGraph, float* tpwgts, flo
 	}
 	int i = 0;
 	RandomKwayEdgeRefiner rkRefiner(tpwgts, nparts, ubfactor, 10, 1);
+	/* 
+ 	* No need to balance the partitions right now.
+ 	* I am testing out different approach for refining with respet to data arrangement which would change  
+ 	* code for balancing.
+ 	*
+	*/
 
 	while (metisGraph != orgGraph) {
-		if (2 * i >= nlevels && !metisGraph->isBalanced(tpwgts, (float) 1.04 * ubfactor)) {
+		/*if (2 * i >= nlevels && !metisGraph->isBalanced(tpwgts, (float) 1.04 * ubfactor)) {
 			Galois::Timer t;
 			t.start();
 			metisGraph->computeKWayBalanceBoundary();
@@ -197,19 +212,20 @@ void refineKWay(MetisGraph* metisGraph, MetisGraph* orgGraph, float* tpwgts, flo
 			metisGraph->computeKWayBoundary();
 			t.stop();
 			cout<<"Balance and computing boundary "<<t.get()<<" ms "<<endl;
-		}
-		Galois::Timer t;
-		t.start();
+		}*/
+	//	Galois::Timer t;
+		//t.start();
 		rkRefiner.refine(metisGraph);
-		t.stop();
-		cout<<"Refine "<<t.get()<<" ms "<<endl;
+	//	t.stop();
+	//	cout<<"Refine "<<t.get()<<" ms "<<endl;
 		projectKWayPartition(metisGraph, nparts);
 
 		MetisGraph* coarseGraph = metisGraph;
 		metisGraph = metisGraph->getFinerGraph();
 
-		if(!variantMetis::localNodeData)
+#ifndef localNodeData
 		metisGraph->releaseCoarseGraphMap();
+#endif
 
 		delete coarseGraph->getGraph();
 		delete coarseGraph;

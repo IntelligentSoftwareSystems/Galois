@@ -229,7 +229,7 @@ FileGraph::divideBy(size_t nodeSize, size_t edgeSize, unsigned id, unsigned tota
   else
     eb = findIndex(nodeSize, edgeSize, block * (id + 1), bb, numNodes);
   //Runtime::LL::gInfo("(", id, "/", total, ") ", bb, " ", eb, " ", numNodes);
-  return std::pair<iterator,iterator>(iterator(bb), iterator(eb));
+  return std::make_pair(iterator(bb), iterator(eb));
 }
 
 //FIXME: perform host -> le on data

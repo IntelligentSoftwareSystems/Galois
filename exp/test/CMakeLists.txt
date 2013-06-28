@@ -4,8 +4,6 @@ function(makeTest name)
   add_test(${name} test-${name})
 endfunction()
 
-add_definitions(-O0)
-
 makeTest(addhost)
 makeTest(printhost)
 #makeTest(pairingheap)
@@ -19,3 +17,7 @@ makeTest(dgraph)
 makeTest(networktest)
 #makeTest(reduce)
 makeTest(bag)
+makeTest(pairingheap)
+makeTest(skiplist)
+makeTest(twoleveliteratora)
+

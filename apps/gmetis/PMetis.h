@@ -71,8 +71,13 @@ private:
 				GNode neighbor = graph->getEdgeDst(jj);
 				MetisNode& neighborData = graph->getData(neighbor);
 				int edgeWeight = graph->getEdgeData(jj);
-				if (!nodeData.isBoundary() || nodeData.getPartition() == neighborData.getPartition()) {
+				//if (!nodeData.isBoundary() || nodeData.getPartition() == neighborData.getPartition()) {
+				if (nodeData.getPartition() == neighborData.getPartition()) {
+#ifdef LC_MORPH
+					subGraph->getEdgeData(subGraph->addEdgeDynamic(parentMetisGraph->getSubGraphMapTo(nodeData.getNodeId()), parentMetisGraph->getSubGraphMapTo(neighborData.getNodeId()))) = edgeWeight;
+#else
 					subGraph->getEdgeData(subGraph->addEdge(parentMetisGraph->getSubGraphMapTo(nodeData.getNodeId()), parentMetisGraph->getSubGraphMapTo(neighborData.getNodeId()))) = edgeWeight;
+#endif
 				} else {
 					subGraph->getData(parentMetisGraph->getSubGraphMapTo(nodeData.getNodeId())).setAdjWgtSum(
 							subGraph->getData(parentMetisGraph->getSubGraphMapTo(nodeData.getNodeId())).getAdjWgtSum() - edgeWeight);
@@ -111,12 +116,22 @@ public:
 		int bisectionWeights[2];
 		bisectionWeights[0] = (int) (totalVertexWeight * vertexWeightRatio);
 		bisectionWeights[1] = totalVertexWeight - bisectionWeights[0];
-
+		Galois::Timer t;
+		t.start();
+		//cout<<metisGraph->getNumNodes()<<" ";
 		MetisGraph* mcg = coarsener.coarsen(metisGraph,true);
-		//MetisGraph* mcg = metisGraph;
-		bisection(mcg, bisectionWeights, coarsener.getCoarsenTo());
-		refineTwoWay(mcg, metisGraph, bisectionWeights);
+		//cout<<mcg->getNumNodes()<<endl;
+		t.stop();
 
+		//MetisGraph* mcg = metisGraph;
+		t.start();
+		bisection(mcg, bisectionWeights, coarsener.getCoarsenTo());
+		t.stop();
+		//cout<<"bisection : "<<t.get()<<"  ms "<<endl;
+		t.start();
+		refineTwoWay(mcg, metisGraph, bisectionWeights);
+		t.stop();
+		//cout<<"Refining : "<<t.get()<<"  ms "<<endl;
 
 		if (nparts <= 2) {
 			for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
@@ -151,12 +166,15 @@ public:
 						partStartIndex + nparts / 2);
 				metisGraph->setMinCut(metisGraph->getMinCut() + subGraphs[1].getMinCut());
 			}
+			t.start();
 			for (GGraph::iterator ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
 				GNode node = *ii;
 				MetisNode& nodeData = graph->getData(node);
 				nodeData.setPartition(graph->getData(metisGraph->getSubGraphMapTo(nodeData.getNodeId())).getPartition());
 				assert(nodeData.getPartition()>=0);
 			}
+			t.stop();
+			//cout<<"Waste time "<<t.get()<<" ms "<<endl;
 
 			metisGraph->releaseSubGraphMapTo();
 			delete subGraphs[0].getGraph();
@@ -166,16 +184,22 @@ public:
 	}
 
 	void splitGraphParallel(MetisGraph* metisGraph,MetisGraph *subGraphs) {
+		Galois::Timer t;
+		t.start();
 		subGraphs[0].setGraph(new GGraph());
 		subGraphs[1].setGraph(new GGraph());
+#ifdef LC_MORPH
+		subGraphs[0].getGraph()->initialize();
+		subGraphs[1].getGraph()->initialize();
+#endif
 		metisGraph->initSubGraphMapTo();
 		GGraph *graph = metisGraph->getGraph();
 		parallelSplitGraphAddNodes pSplitAddNodes(metisGraph,subGraphs);
-		Galois::for_each_local<Galois::WorkList::ChunkedFIFO<64, GNode> >(*graph,pSplitAddNodes,"Graph Split");
+		Galois::for_each_local<Galois::WorkList::dChunkedLIFO<256, GNode> >(*graph,pSplitAddNodes,"Graph Split");
 
-		parallelSplitGraphAddNodes pSplitAddEdges(metisGraph,subGraphs);
-		Galois::for_each_local<Galois::WorkList::ChunkedFIFO<64, GNode> >(*graph,pSplitAddNodes,"Graph Split");
-
+/*
+		parallelSplitGraphAddEdges pSplitAddEdges(metisGraph,subGraphs);
+		Galois::for_each_local<Galois::WorkList::dChunkedLIFO<256, GNode> >(*graph,pSplitAddNodes,"Graph Split");*/
 
 		GGraph *graphs[2];
 		for(int i=0;i<2;i++) {
@@ -188,6 +212,8 @@ public:
 			}
 			subGraphs[i].setNumNodes(id);
 		}
+		t.stop();
+		//cout<<"Parallel Split "<<t.get()<<"  ms "<<endl;
 	}
 
 	void splitGraph(MetisGraph* metisGraph, MetisGraph* subGraphs) {

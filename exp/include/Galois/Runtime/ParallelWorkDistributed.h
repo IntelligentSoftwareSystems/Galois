@@ -100,12 +100,13 @@ void for_each_landing_pad(RecvBuffer& buf) {
   //extract stuff
   FunctionTy f;
   std::deque<ItemTy> data;
-  gDeserialize(buf,f,data);
+  std::string loopname;
+  gDeserialize(buf,f,data,loopname);
 
   NetworkInterface& net = getSystemNetworkInterface();
 
   //Start locally
-  Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeStandardRange(data.begin(), data.end()), f, nullptr);
+  Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeStandardRange(data.begin(), data.end()), f, loopname.c_str());
 
   // place a MPI barrier here for all the hosts to synchronize
   net.systemBarrier();
@@ -116,12 +117,13 @@ void for_each_local_landing_pad(RecvBuffer& buf) {
   //extract stuff
   FunctionTy f;
   T data;
-  gDeserialize(buf,f,data);
+  std::string loopname;
+  gDeserialize(buf,f,data,loopname);
 
   NetworkInterface& net = getSystemNetworkInterface();
 
   //Start locally
-  Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(data), f, nullptr);
+  Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(data), f, loopname.c_str());
   
   // place a MPI barrier here for all the hosts to synchronize
   net.systemBarrier();
@@ -170,24 +172,28 @@ void for_each_dist(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
   //  Don't move as networkHostNum and networkHostID have to be initialized first
   NetworkInterface& net = getSystemNetworkInterface();
 
+  typedef typename std::iterator_traits<IterTy>::value_type ItemTy;
+
   //fast path for non-distributed
   if (networkHostNum == 1) {
-    for_each_impl<WLTy>(Galois::Runtime::makeStandardRange(b, e),f,loopname);
+    std::deque<ItemTy> allData;
+    allData.insert(allData.end(), b,e);
+    for_each_impl<WLTy>(Galois::Runtime::makeStandardRange(allData.begin(), allData.end()),f,loopname);
     return;
   }
-
-  typedef typename std::iterator_traits<IterTy>::value_type ItemTy;
 
   //copy out all data
   std::deque<ItemTy> allData;
   allData.insert(allData.end(), b,e);
+
+  std::string lname(loopname);
 
   for (unsigned i = 1; i < networkHostNum; i++) {
     auto blk = block_range(allData.begin(), allData.end(), i, networkHostNum);
     std::deque<ItemTy> data(blk.first, blk.second);
     SendBuffer buf;
     // serialize function and data
-    gSerialize(buf,f,data);
+    gSerialize(buf,f,data, lname);
     //send data
     net.send (i, &for_each_landing_pad<WLTy,ItemTy,FunctionTy>, buf);
   }
@@ -214,10 +220,12 @@ void for_each_local_dist(T& c, FunctionTy f, const char* loopname) {
     return;
   }
 
+  std::string lname(loopname);
+
   for (unsigned i = 1; i < networkHostNum; i++) {
     SendBuffer buf;
     // serialize function and data
-    gSerialize(buf,f,c);
+    gSerialize(buf,f,c, lname);
     //send data
     net.send (i, &for_each_local_landing_pad<WLTy,T,FunctionTy>, buf);
   }

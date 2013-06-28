@@ -37,7 +37,7 @@ namespace Runtime {
 class PerBackend_v2 {
   std::unordered_map<uint64_t, void*> items;
   std::unordered_map<std::pair<uint64_t, uint32_t>, void*,
-		     pairhash<std::pair<uint64_t, uint32_t>>> remoteCache;
+		     boost::hash<std::pair<uint64_t, uint32_t>>> remoteCache;
 
   uint32_t nextID;
   LL::SimpleLock<true> lock;

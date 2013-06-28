@@ -239,7 +239,7 @@ struct BreakManager {
 };
 
 template<typename FunctionTy>
-class BreakManager<FunctionTy,typename boost::enable_if<has_deterministic_break<FunctionTy> >::type> {
+class BreakManager<FunctionTy,typename boost::enable_if<has_deterministic_parallel_break<FunctionTy> >::type> {
   Barrier& barrier;
   LL::CacheLineStorage<volatile long> done;
 
@@ -248,7 +248,7 @@ public:
 
   bool checkBreak(FunctionTy& fn) {
     if (LL::getTID() == 0)
-      done.data = fn.galoisDeterministicBreak();
+      done.data = fn.galoisDeterministicParallelBreak();
     barrier.wait();
     return done.data;
   }
@@ -654,23 +654,26 @@ struct MergeTraits {
 template<typename OptionsTy>
 struct MergeTraits<OptionsTy,typename boost::enable_if_c<OptionsTy::useOrdered>::type> {
   static const bool value = true;
-  struct DummyIdFn {
-    typedef typename OptionsTy::T T;
-    unsigned long operator()(const T& x) const { return 0; }
-  };
-  typedef DummyIdFn IdFn;
   static const int ChunkSize = 16;
   static const int MinDelta = 4;
+
+  template<typename Arg>
+  static uintptr_t id(const typename OptionsTy::Function1Ty& fn, Arg arg) { 
+    return 0;
+  }
 };
 
 template<typename OptionsTy>
 struct MergeTraits<OptionsTy,typename boost::enable_if_c<has_deterministic_id<typename OptionsTy::Function1Ty>::value && !OptionsTy::useOrdered>::type> {
   static const bool value = true;
-  typedef typename OptionsTy::Function1Ty::GaloisDeterministicId IdFn;
   static const int ChunkSize = 32;
   static const int MinDelta = ChunkSize * 40;
-};
 
+  template<typename Arg>
+  static uintptr_t id(const typename OptionsTy::Function1Ty& fn, Arg arg) {
+    return fn.galoisDeterministicId(std::forward<Arg>(arg));
+  }
+};
 
 template<typename OptionsTy>
 class DMergeManagerBase {
@@ -944,7 +947,7 @@ public:
   {}
 
   template<typename InputIteratorTy>
-  void presort(InputIteratorTy ii, InputIteratorTy ei) { }
+  void presort(const typename OptionsTy::Function1Ty&, InputIteratorTy ii, InputIteratorTy ei) { }
 
   template<typename InputIteratorTy, typename WL>
   void addInitialWork(InputIteratorTy b, InputIteratorTy e, WL* wl) {
@@ -952,13 +955,14 @@ public:
   }
 
   template<typename WL>
-  void pushNew(const T& val, unsigned long parent, unsigned count, WL* wl, bool& hasNewWork, bool& nextCommit) {
+  void pushNew(const typename OptionsTy::Function1Ty& fn1, const T& val, unsigned long parent, unsigned count,
+      WL* wl, bool& hasNewWork, bool& nextCommit) {
     this->new_.push(NewItem(val, parent, count));
     hasNewWork = true;
   }
 
   template<typename WL>
-  bool distributeNewWork(WL* wl) {
+  bool distributeNewWork(const typename OptionsTy::Function1Ty&, WL* wl) {
     if (true)
       parallelSort(wl);
     else
@@ -970,9 +974,11 @@ public:
   void prepareNextWindow(WL* wl) { }
 };
 
-//! Implementation of merging specialized for unordered algorithms with an id function and ordered algorithms
-// TODO: For consistency should also have thread-local copies of comp and
-// idFunction
+/**
+ * Implementation of merging specialized for unordered algorithms with an id
+ * function and ordered algorithms.
+ */
+// TODO: For consistency should also have thread-local copies of comp
 template<typename OptionsTy>
 class DMergeManager<OptionsTy,typename boost::enable_if<MergeTraits<OptionsTy> >::type>: public DMergeManagerBase<OptionsTy> {
   typedef DMergeManagerBase<OptionsTy> Base;
@@ -982,7 +988,6 @@ class DMergeManager<OptionsTy,typename boost::enable_if<MergeTraits<OptionsTy> >
   typedef typename Base::MergeLocal MergeLocal;
   typedef typename Base::NewItemsTy NewItemsTy;
   typedef typename Base::NewItemsIterator NewItemsIterator;
-  typedef typename MergeTraits<OptionsTy>::IdFn IdFn;
   typedef typename Base::CompareTy CompareTy;
 
   struct CompareNewItems: public std::binary_function<NewItem,NewItem,bool> {
@@ -994,13 +999,11 @@ class DMergeManager<OptionsTy,typename boost::enable_if<MergeTraits<OptionsTy> >
   };
 
   std::vector<NewItem,typename PerIterAllocTy::rebind<NewItem>::other> mergeBuf;
-  IdFn idFunction;
   CompareTy comp;
   Barrier& barrier;
 
 public:
-  DMergeManager(const OptionsTy& o): mergeBuf(this->alloc), comp(o.comp), barrier(getSystemBarrier()) 
-  { }
+  DMergeManager(const OptionsTy& o): mergeBuf(this->alloc), comp(o.comp), barrier(getSystemBarrier()) { }
 
   template<typename InputIteratorTy, typename WL>
   void addInitialWork(InputIteratorTy ii, InputIteratorTy ei, WL* wl) {
@@ -1012,7 +1015,7 @@ public:
   }
 
   template<typename InputIteratorTy>
-  void presort(InputIteratorTy ii, InputIteratorTy ei) {
+  void presort(const typename OptionsTy::Function1Ty& fn1, InputIteratorTy ii, InputIteratorTy ei) {
     unsigned int tid = LL::getTID();
     MergeLocal& mlocal = *this->data.getLocal();
     size_t dist = std::distance(ii, ei);
@@ -1028,7 +1031,7 @@ public:
 
     mergeBuf.reserve(dist);
     for (; ii != ei; ++ii)
-      mergeBuf.push_back(NewItem(*ii, idFunction(*ii), 1));
+      mergeBuf.push_back(NewItem(*ii, MergeTraits<OptionsTy>::id(fn1, *ii), 1));
 
     if (OptionsTy::useOrdered)
       ParallelSTL::sort(mergeBuf.begin(), mergeBuf.end(), CompareNewItems(comp));
@@ -1053,9 +1056,10 @@ public:
   }
 
   template<typename WL>
-  void pushNew(const T& val, unsigned long parent, unsigned count, WL* wl, bool& hasNewWork, bool& nextCommit) {
+  void pushNew(const typename OptionsTy::Function1Ty& fn1, const T& val, unsigned long parent, unsigned count,
+      WL* wl, bool& hasNewWork, bool& nextCommit) {
     if (!OptionsTy::useOrdered) {
-      this->new_.push(NewItem(val, idFunction(val), 1));
+      this->new_.push(NewItem(val, MergeTraits<OptionsTy>::id(fn1, val), 1));
       hasNewWork = true;
       return;
     }
@@ -1067,7 +1071,7 @@ public:
     // NB: Tricky conditions. If we can not definitively place an item, it must
     // go into the current wl.
     if (mlocal.mostElement && !comp(val, *mlocal.mostElement)) {
-      this->new_.push(NewItem(val, idFunction(val), 1));
+      this->new_.push(NewItem(val, MergeTraits<OptionsTy>::id(fn1, val), 1));
       hasNewWork = true;
     } else if (mlocal.mostElement && mlocal.windowElement && !comp(val, *mlocal.windowElement)) {
       mlocal.pushNewReserve(val, comp);
@@ -1079,7 +1083,7 @@ public:
   }
 
   template<typename WL>
-  bool distributeNewWork(WL* wl) {
+  bool distributeNewWork(const typename OptionsTy::Function1Ty& fn1, WL* wl) {
     unsigned int tid = LL::getTID();
     MergeLocal& mlocal = *this->data.getLocal();
 
@@ -1151,7 +1155,7 @@ public:
 
       for (; ii != ei; ++ii) {
         retval = true;
-        this->new_.push(NewItem(ii->val, idFunction(ii->val), 1));
+        this->new_.push(NewItem(ii->val, MergeTraits<OptionsTy>::id(fn1, ii->val), 1));
       }
     } else {
       mlocal.initialWindow(std::max((mlocal.maxId - mlocal.minId) / 100, (size_t) MergeTraits<OptionsTy>::MinDelta) + mlocal.minId);
@@ -1220,13 +1224,13 @@ class Executor {
     OptionsTy options;
     LocalPendingWork localPending;
     UserContextAccess<value_type> facing;
-    LoopStatistics<OptionsTy::needsStats> stat;
+    //LoopStatistics<OptionsTy::needsStats> stat;
     WL* wlcur;
     WL* wlnext;
     size_t rounds;
     size_t outerRounds;
     bool hasNewWork;
-    ThreadLocalData(const OptionsTy& o, const char* loopname): options(o), stat(loopname), rounds(0), outerRounds(0) { }
+    ThreadLocalData(const OptionsTy& o, const char* loopname): options(o), rounds(0), outerRounds(0) { }
   };
 
   const OptionsTy& origOptions;
@@ -1251,7 +1255,8 @@ public:
   Executor(const OptionsTy& o, const char* ln):
     origOptions(o), mergeManager(o), loopname(ln), barrier(getSystemBarrier())
   { 
-    static_assert(!OptionsTy::needsBreak || has_deterministic_break<typename OptionsTy::Function1Ty>::value,
+    static_assert(!OptionsTy::needsBreak
+        || has_deterministic_parallel_break<typename OptionsTy::Function1Ty>::value,
         "need to use break function to break loop");
   }
 
@@ -1260,11 +1265,12 @@ public:
     mergeManager.addInitialWork(range.begin(), range.end(), &worklists[1]);
   }
 
-  void initThread(void) {}
+  void initThread() {}
 
   template<typename IterTy>
   void presort(IterTy ii, IterTy ei) {
-    mergeManager.presort(ii, ei);
+    ThreadLocalData tld(origOptions, loopname);
+    mergeManager.presort(tld.options.fn1, ii, ei);
   }
 
   void operator()() {
@@ -1337,7 +1343,7 @@ void Executor<OptionsTy>::go() {
         break;
       if (!hasNewWork.data) // (1)
         break;
-      tld.hasNewWork = mergeManager.distributeNewWork(tld.wlnext);
+      tld.hasNewWork = mergeManager.distributeNewWork(tld.options.fn1, tld.wlnext);
       // NB: assumes that distributeNewWork has a barrier otherwise checking at (1) is erroneous
       hasNewWork.data = false;
     } else {
@@ -1390,16 +1396,23 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
     }
 
     ctx->start_iteration();
-    tld.stat.inc_iterations();
+    //    tld.stat.inc_iterations();
     setThreadContext(ctx);
 
     stateManager.alloc(tld.facing, tld.options.fn1);
-    try {
+    int result = 0;
+    //    try {
       tld.options.fn1(ctx->item.val, tld.facing.data());
-    } catch (const conflict_ex& ex) {
-      commit = false;
-    } catch (const failsafe_ex& ex) {
-    }
+    // } catch (ConflictFlag flag) {
+    //   clearConflictLock();
+    //   result = flag;
+    // }
+    // switch (result) {
+    //   case 0: 
+    //   case REACHED_FAILSAFE: break;
+    //   case CONFLICT: commit = false; break;
+    //   default: assert(0 && "Unknown conflict flag"); abort(); break;
+    // }
 
     if (ForEachTraits<typename OptionsTy::Function1Ty>::NeedsPIA && !useLocalState)
       tld.facing.resetAlloc();
@@ -1447,11 +1460,24 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
     if (commit) {
       setThreadContext(ctx);
       stateManager.restore(tld.facing, ctx->item.localState);
-      try {
+      int result = 0;
+      //      try {
         tld.options.fn2(ctx->item.val, tld.facing.data());
-      } catch (const conflict_ex& ex) {
-	commit = false;
-      }
+//       } catch (ConflictFlag flag) {
+//         clearConflictLock();
+//         result = flag;
+//       }
+// #else
+//       if ((result = setjmp(hackjmp)) == 0) {
+//         tld.options.fn2(ctx->item.val, tld.facing.data());
+//       }
+// #endif
+//       switch (result) {
+//         case 0: break;
+//         case CONFLICT: commit = false; break;
+//         default: assert(0 && "Unknown conflict flag"); abort(); break;
+//       }
+
     }
 
     stateManager.dealloc(tld.facing);
@@ -1465,7 +1491,7 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
         unsigned count = 0;
         for (iterator ii = tld.facing.getPushBuffer().begin(), 
             ei = tld.facing.getPushBuffer().end(); ii != ei; ++ii) {
-          mergeManager.pushNew(*ii, parent, ++count, tld.wlnext, tld.hasNewWork, retval);
+          mergeManager.pushNew(tld.options.fn1, *ii, parent, ++count, tld.wlnext, tld.hasNewWork, retval);
           if (count == 0) {
             assert(0 && "Counter overflow");
             abort();
@@ -1479,7 +1505,7 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
       //if (useLocalState) p->localState = NULL;
       if (useLocalState) { ctx->item.localState = NULL; }
       tld.wlnext->push(ctx->item);
-      tld.stat.inc_conflicts();
+      //      tld.stat.inc_conflicts();
       retval = true;
     }
 

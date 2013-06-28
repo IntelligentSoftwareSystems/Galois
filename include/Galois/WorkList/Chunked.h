@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -24,7 +24,9 @@
 #ifndef GALOIS_WORKLIST_CHUNKED_H
 #define GALOIS_WORKLIST_CHUNKED_H
 
+#include "Galois/FixedSizeRing.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
+#include "Galois/WorkList/WorkListHelpers.h"
 #include "WLCompileCheck.h"
 
 namespace Galois {
@@ -53,9 +55,20 @@ struct squeues<false,TQ> {
 };
 
 //! Common functionality to all chunked worklists
-template<typename T, template<typename, bool> class QT, bool distributed, bool isStack, int chunksize, bool concurrent>
-class ChunkedMaster : private boost::noncopyable {
-  class Chunk : public FixedSizeRing<T, chunksize>, public QT<Chunk, concurrent>::ListNode {};
+template<typename T, template<typename, bool> class QT, bool Distributed, bool IsStack, int ChunkSize, bool Concurrent>
+struct ChunkedMaster : private boost::noncopyable {
+  template<bool _concurrent>
+  using rethread = ChunkedMaster<T, QT, Distributed, IsStack, ChunkSize, _concurrent>;
+
+  template<typename _T>
+  using retype = ChunkedMaster<_T, QT, Distributed, IsStack, ChunkSize, Concurrent>;
+
+  template<int _chunk_size>
+  using with_chunk_size = ChunkedMaster<T, QT, Distributed, IsStack, _chunk_size, Concurrent>;
+
+
+private:
+  class Chunk : public FixedSizeRing<T, ChunkSize>, public QT<Chunk, Concurrent>::ListNode {};
 
   Runtime::MM::FixedSizeAllocator heap;
 
@@ -64,10 +77,10 @@ class ChunkedMaster : private boost::noncopyable {
     Chunk* next;
   };
 
-  typedef QT<Chunk, concurrent> LevelItem;
+  typedef QT<Chunk, Concurrent> LevelItem;
 
   Runtime::PerThreadStorage<p> data;
-  squeues<distributed, LevelItem> Q;
+  squeues<Distributed, LevelItem> Q;
 
   Chunk* mkChunk() {
     return new (heap.allocate(sizeof(Chunk))) Chunk();
@@ -125,11 +138,6 @@ class ChunkedMaster : private boost::noncopyable {
 public:
   typedef T value_type;
 
-  template<bool newconcurrent>
-  using rethread = ChunkedMaster<T, QT, distributed, isStack, chunksize, newconcurrent>;
-  template<typename Tnew>
-  using retype = ChunkedMaster<Tnew, QT, distributed, isStack, chunksize, concurrent>;
-
   ChunkedMaster() : heap(sizeof(Chunk)) { }
 
   void flush() {
@@ -163,7 +171,7 @@ public:
   boost::optional<value_type> pop()  {
     p& n = *data.getLocal();
     boost::optional<value_type> retval;
-    if (isStack) {
+    if (IsStack) {
       if (n.next && (retval = n.next->extract_back()))
 	return retval;
       if (n.next)
@@ -192,28 +200,28 @@ public:
 /**
  * Chunked FIFO. A global FIFO of chunks of some fixed size.
  *
- * @tparam chunksize chunk size
+ * @tparam ChunkSize chunk size
  */
-template<int chunksize=64, typename T = int, bool concurrent=true>
-class ChunkedFIFO : public ChunkedMaster<T, ConExtLinkedQueue, false, false, chunksize, concurrent> {};
+template<int ChunkSize=64, typename T = int, bool Concurrent=true>
+class ChunkedFIFO : public ChunkedMaster<T, ConExtLinkedQueue, false, false, ChunkSize, Concurrent> {};
 GALOIS_WLCOMPILECHECK(ChunkedFIFO)
 
 /**
  * Chunked LIFO. A global LIFO of chunks of some fixed size.
  *
- * @tparam chunksize chunk size
+ * @tparam ChunkSize chunk size
  */
-template<int chunksize=64, typename T = int, bool concurrent=true>
-class ChunkedLIFO : public ChunkedMaster<T, ConExtLinkedStack, false, true, chunksize, concurrent> {};
+template<int ChunkSize=64, typename T = int, bool Concurrent=true>
+class ChunkedLIFO : public ChunkedMaster<T, ConExtLinkedStack, false, true, ChunkSize, Concurrent> {};
 GALOIS_WLCOMPILECHECK(ChunkedLIFO)
 
 /**
  * Distributed chunked FIFO. A more scalable version of {@link ChunkedFIFO}.
  *
- * @tparam chunksize chunk size
+ * @tparam ChunkSize chunk size
  */
-template<int chunksize=64, typename T = int, bool concurrent=true>
-class dChunkedFIFO : public ChunkedMaster<T, ConExtLinkedQueue, true, false, chunksize, concurrent> {};
+template<int ChunkSize=64, typename T = int, bool Concurrent=true>
+class dChunkedFIFO : public ChunkedMaster<T, ConExtLinkedQueue, true, false, ChunkSize, Concurrent> {};
 GALOIS_WLCOMPILECHECK(dChunkedFIFO)
 
 /**
@@ -221,8 +229,8 @@ GALOIS_WLCOMPILECHECK(dChunkedFIFO)
  *
  * @tparam chunksize chunk size
  */
-template<int chunksize=64, typename T = int, bool concurrent=true>
-class dChunkedLIFO : public ChunkedMaster<T, ConExtLinkedStack, true, true, chunksize, concurrent> {};
+template<int ChunkSize=64, typename T = int, bool Concurrent=true>
+class dChunkedLIFO : public ChunkedMaster<T, ConExtLinkedStack, true, true, ChunkSize, Concurrent> {};
 GALOIS_WLCOMPILECHECK(dChunkedLIFO)
 
 /**
@@ -231,8 +239,8 @@ GALOIS_WLCOMPILECHECK(dChunkedLIFO)
  *
  * @tparam chunksize chunk size
  */
-template<int chunksize=64, typename T = int, bool concurrent=true>
-class dChunkedBag : public ChunkedMaster<T, ConExtLinkedQueue, true, true, chunksize, concurrent> {};
+template<int ChunkSize=64, typename T = int, bool Concurrent=true>
+class dChunkedBag : public ChunkedMaster<T, ConExtLinkedQueue, true, true, ChunkSize, Concurrent> {};
 GALOIS_WLCOMPILECHECK(dChunkedBag)
 
 

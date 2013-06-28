@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -20,7 +20,6 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-
 #ifndef GALOIS_WORKLIST_OWNERCOMPUTES_H
 #define GALOIS_WORKLIST_OWNERCOMPUTES_H
 
@@ -29,9 +28,22 @@
 namespace Galois {
 namespace WorkList {
 
-template<typename OwnerFn=DummyIndexer<int>, typename WLTy=ChunkedLIFO<256>, typename T = int>
-class OwnerComputes : private boost::noncopyable {
-  typedef typename WLTy::template retype<T> lWLTy;
+template<typename OwnerFn=DummyIndexer<int>, typename Container=ChunkedLIFO<>, typename T = int>
+struct OwnerComputes : private boost::noncopyable {
+  template<bool _concurrent>
+  using rethread = OwnerComputes<OwnerFn, typename Container::template rethread<_concurrent>, T>;
+
+  template<typename _T>
+  using retype = OwnerComputes<OwnerFn, typename Container::template retype<_T>, _T>;
+
+  template<typename _container>
+  using with_container = OwnerComputes<OwnerFn, _container, T>;
+
+  template<typename _indexer>
+  using with_indexer = OwnerComputes<_indexer, Container, T>;
+
+private:
+  typedef typename Container::template retype<T> lWLTy;
 
   typedef lWLTy cWL;
   typedef lWLTy pWL;
@@ -41,11 +53,6 @@ class OwnerComputes : private boost::noncopyable {
   Runtime::PerPackageStorage<pWL> pushBuffer;
 
 public:
-  template<bool newconcurrent>
-  using rethread = OwnerComputes<OwnerFn,typename WLTy::template rethread<newconcurrent>, T>;
-  template<typename Tnew>
-  using retype = OwnerComputes<OwnerFn,typename WLTy::template retype<Tnew>,Tnew>;
-
   typedef T value_type;
 
   void push(const value_type& val)  {

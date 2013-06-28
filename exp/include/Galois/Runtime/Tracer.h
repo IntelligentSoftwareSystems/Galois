@@ -25,15 +25,21 @@
 #define GALOIS_RUNTIME_TRACER_H
 
 #include <stdint.h>
+#include <string>
 
 namespace Galois {
 namespace Runtime {
 
 void trace_obj_send_impl(uint32_t owner, void* ptr, uint32_t remote);
 void trace_obj_recv_impl(uint32_t owner, void* ptr);
+void trace_req_send_impl(uint32_t owner, void* ptr, uint32_t dest, uint32_t reqFor);
+void trace_req_recv_impl(uint32_t owner, void* ptr, uint32_t reqFor);
 void trace_bcast_recv_impl(uint32_t at);
+void trace_loop_start_impl(const std::string& name);
+void trace_loop_end_impl(const std::string& name);
+#define NOTRACE
 
-//#define NOTRACE
+void setTrace(bool);
 
 inline void trace_obj_send(uint32_t owner, void* ptr, uint32_t remote) {
 #ifndef NOTRACE
@@ -45,9 +51,29 @@ inline void trace_obj_recv(uint32_t owner, void* ptr) {
   trace_obj_recv_impl(owner, ptr);
 #endif
 }
+inline void trace_req_send(uint32_t owner, void* ptr, uint32_t dest, uint32_t reqFor) {
+#ifndef NOTRACE
+  trace_req_send_impl(owner, ptr, dest, reqFor);
+#endif
+}
+inline void trace_req_recv(uint32_t owner, void* ptr, uint32_t reqFor) {
+#ifndef NOTRACE
+  trace_req_recv_impl(owner, ptr, reqFor);
+#endif
+}
 inline void trace_bcast_recv(uint32_t at) {
-#ifdef NOTRACE
+#ifndef NOTRACE
   trace_bcast_recv_impl(at);
+#endif
+}
+inline void trace_loop_start(const std::string& name) {
+#ifndef NOTRACE
+  trace_loop_start_impl(name);
+#endif
+}
+inline void trace_loop_end(const std::string& name) {
+#ifndef NOTRACE
+  trace_loop_end_impl(name);
 #endif
 }
 

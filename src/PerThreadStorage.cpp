@@ -23,6 +23,7 @@
 
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/PerHostStorage.h"
+#include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/mm/Mem.h"
 
 __thread char* Galois::Runtime::ptsBase;
@@ -41,10 +42,8 @@ unsigned Galois::Runtime::PerBackend::allocOffset(unsigned size) {
   size = (size + 15) & ~15;
   unsigned retval = __sync_fetch_and_add(&nextLoc, size);
   if (retval + size > Galois::Runtime::MM::pageSize) {
-    assert(0 && "no more memory");
-    abort();
+    GALOIS_DIE("no more memory");
   }
-
   return retval;
 }
 

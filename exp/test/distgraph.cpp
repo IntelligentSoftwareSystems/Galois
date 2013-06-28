@@ -20,6 +20,7 @@ struct op {
   void operator()(const int& nodeval, const Context& cnx) {
     G::NodeHandle node = graph->createNode(nodeval);
     node->createEdge(node, node, -node->getData());
+    std::cout << ".";
   }
 };
 
@@ -34,9 +35,15 @@ int main(int argc, char** argv) {
 
   Galois::for_each<>(boost::counting_iterator<int>(0), boost::counting_iterator<int>(100), op(Gr));
 
+  std::cout << "done loop\n";
+
+  std::cout << "count: " << std::distance(Gr->begin(), Gr->end()) << "\n";
+
   for (auto ii = Gr->begin(), ee = Gr->end(); ii != ee; ++ii)
     std::cout << (*ii)->getData() << " " << std::distance((*ii)->begin(), (*ii)->end()) << " ";
   std::cout << "\n";
+
+  std::cout << "done print\n";
 
   // master_terminate();
   Galois::Runtime::networkTerminate();
