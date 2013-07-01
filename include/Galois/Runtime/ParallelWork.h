@@ -124,6 +124,10 @@ protected:
     SimpleRuntimeContext cnx;
     LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
     ThreadLocalData(const FunctionTy& fn, const char* ln): function(fn), stat(ln) {}
+#if GALOIS_USE_EXCEPTION_HANDLER
+#else
+    jmp_buf outbuf;
+#endif
   };
 
   // NB: Place dynamically growing wl after fixed-size PerThreadStorage
@@ -229,7 +233,11 @@ protected:
       break;
     case BREAK:
       handleBreak(tld);
-      return false;
+#if GALOIS_USE_EXCEPTION_HANDLER
+      throw result;
+#else
+      longjmp(tld.outbuf, flag);
+#endif
     default:
       GALOIS_DIE("unknown conflict type");
     }
@@ -257,22 +265,30 @@ protected:
       tld.facing.setFastPushBack(std::bind(&ForEachWork::fastPushBack, std::ref(*this), std::placeholders::_1));
     }
     bool didWork;
+#if GALOIS_USE_EXCEPTION_HANDLER
+    try {
+#else
+    if ((result = setjmp(tld.outjmp)) == 0) {
+#endif
     do {
       didWork = false;
       //Run some iterations
       if (ForEachTraits<FunctionTy>::NeedsBreak || ForEachTraits<FunctionTy>::NeedsAborts)
-        didWork = runQueue<checkAbort || ForEachTraits<FunctionTy>::NeedsBreak>(tld, wl, false);
+        didWork = runQueue<checkAbort|| ForEachTraits<FunctionTy>::NeedsBreak>(tld, wl, false);
       else //No try/catch
         didWork = runQueueSimple(tld);
-      //Check for break
-      if (breakHandler.checkBreak())
-        break;
       //Check for abort
       if (checkAbort)
         didWork |= handleAborts(tld);
       //update node color and prop token
       term.localTermination(didWork);
     } while (!term.globalTermination());
+#if GALOIS_USE_EXCEPTION_HANDLER
+    } catch (ConflictFlag const& flag) {
+    }
+#else
+    }
+#endif
 
     if (ForEachTraits<FunctionTy>::NeedsAborts)
       setThreadContext(0);
