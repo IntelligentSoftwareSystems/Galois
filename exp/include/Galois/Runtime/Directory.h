@@ -129,7 +129,7 @@ public:
   //set the object as being on this host
   void setLocal() {
     recalled = false;
-    curLoc = networkHostID;
+    curLoc = NetworkInterface::ID;
   }
 
   void setCurLoc(uint32_t host) { curLoc = host; }
@@ -194,12 +194,21 @@ class Directory : public SimpleRuntimeContext, private boost::noncopyable {
     pending.push_back(ptr);
   }
 
-  std::deque<fatPointer> getPending() {
+  fatPointer popPending() {
     LL::SLguard lgp(pendingLock);
-    std::deque<fatPointer> retval;
-    retval.swap(pending);
+    if (pending.empty())
+      return fatPointer(0,0);
+    fatPointer retval = pending.front();
+    pending.pop_front();
     return retval;
   }
+
+  // std::deque<fatPointer> getPending() {
+  //   LL::SLguard lgp(pendingLock);
+  //   std::deque<fatPointer> retval;
+  //   retval.swap(pending);
+  //   return retval;
+  // }
 
   //main request processor
   void processObj(LL::SLguard& lg, fatPointer ptr, Lockable* obj);
@@ -250,7 +259,7 @@ public:
   
   template<typename T>
   void fetch(fatPointer ptr, T* obj) {
-    doRequest(ptr, typeHelperImpl<T>::get(), networkHostID);
+    doRequest(ptr, typeHelperImpl<T>::get(), NetworkInterface::ID);
   }
 
   void setContended(fatPointer ptr);
@@ -259,17 +268,24 @@ public:
   void notifyWhenAvailable(fatPointer ptr, std::function<void(fatPointer)> func);
 
   void makeProgress() {
-    std::deque<fatPointer> outstanding = getPending();
     auto& cm = getCacheManager();
-    for (auto ptr : outstanding) {
-      LL::SLguard lg(getLock(ptr));
-      if (ptr.first == networkHostID) {
-        processObj(lg, ptr, ptr.second);
+    auto& net = getSystemNetworkInterface();
+    fatPointer ptr;
+    while ((ptr = popPending()) != fatPointer(0,0)) {
+      auto& ptrlock = getLock(ptr);
+      if (ptrlock.try_lock()) {
+        LL::SLguard lg(getLock(ptr), std::adopt_lock_t());
+        if (ptr.first == NetworkInterface::ID) {
+          processObj(lg, ptr, ptr.second);
+        } else {
+          remoteObj* obj = cm.weakResolve(ptr);
+          if (obj)
+            processObj(lg, ptr, obj->getObj());
+        }
       } else {
-        remoteObj* obj = cm.weakResolve(ptr);
-        if (obj)
-          processObj(lg, ptr, obj->getObj());
+        addPending(ptr);
       }
+      while (net.handleReceives()) {}
     }
   }
 
@@ -283,10 +299,10 @@ Directory& getSystemDirectory();
 
 //! Make progress in the network
 inline void doNetworkWork() {
-  if ((networkHostNum > 1) && (LL::getTID() == 0)) {
-    getSystemNetworkInterface().handleReceives();
+  if ((NetworkInterface::Num > 1)) {// && (LL::getTID() == 0)) {
+    while (getSystemNetworkInterface().handleReceives()) {}
     getSystemDirectory().makeProgress();
-    getSystemNetworkInterface().handleReceives();
+    while (getSystemNetworkInterface().handleReceives()) {}
   }
 }
 
@@ -300,7 +316,7 @@ void Galois::Runtime::Directory::recvObj(RecvBuffer& buf) {
   gDeserialize(buf, ptr);
   trace_obj_recv(ptr.first, ptr.second);
   T* obj = nullptr;
-  if (ptr.first == networkHostID) {
+  if (ptr.first == NetworkInterface::ID) {
     obj = static_cast<T*>(ptr.second);
   } else {
     obj = static_cast<T*>(getCacheManager().resolve<T>(ptr)->getObj());
@@ -335,7 +351,7 @@ void Galois::Runtime::typeHelperImpl<T>::sendRequest(fatPointer ptr, uint32_t de
 
 template<typename T>
 Galois::Runtime::remoteObjImpl<T>* Galois::Runtime::CacheManager::resolve(fatPointer ptr) {
-  assert(ptr.first != networkHostID);
+  assert(ptr.first != NetworkInterface::ID);
   LL::SLguard lgr(Lock);
   remoteObj*& retval = remoteObjects[ptr];
   if (!retval) {

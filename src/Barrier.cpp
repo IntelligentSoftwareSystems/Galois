@@ -288,7 +288,7 @@ public:
     
     //wait for barrier
     if (Galois::Runtime::LL::getTID() == 0) {
-      count += Galois::Runtime::networkHostNum * Galois::Runtime::activeThreads;
+      count += Galois::Runtime::NetworkInterface::Num * Galois::Runtime::activeThreads;
       while (count > 0)
         Galois::Runtime::doNetworkWork();
       //passed barrier, notify local
@@ -328,7 +328,7 @@ static StupidDistBarrier& getDistBarrier() {
 
 Galois::Runtime::Barrier& Galois::Runtime::getSystemBarrier() {
   static unsigned num = ~0;
-  if (networkHostNum == 1) {
+  if (NetworkInterface::Num == 1) {
     static TopoBarrier b;
     if (activeThreads != num) {
       num = activeThreads;

@@ -100,7 +100,7 @@ public:
 static Galois::Runtime::LL::StaticInstance<StatCollector> SM;
 
 static void reportStatInternal(const std::string loop, const std::string category, uint32_t host, uint32_t tid, size_t value) {
-  if (Galois::Runtime::networkHostID == 0)
+  if (Galois::Runtime::NetworkInterface::ID == 0)
     SM.get()->addToStat(loop, category, host, tid, value);
   else
     Galois::Runtime::getSystemNetworkInterface().sendAlt(0, reportStatInternal, loop, category, host, tid, value);
@@ -111,16 +111,16 @@ static void reportStatInternal(const std::string loop, const std::string categor
 void Galois::Runtime::reportStat(const char* loopname, const char* category, unsigned long value) {
   reportStatInternal(std::string(loopname ? loopname : "(NULL)"), 
 		     std::string(category ? category : "(NULL)"),
-		     networkHostID, LL::getTID(), value);
+		     NetworkInterface::ID, LL::getTID(), value);
 }
 
 void Galois::Runtime::reportStat(const std::string& loopname, const std::string& category, unsigned long value) {
-  reportStatInternal(loopname, category, networkHostID,  LL::getTID(), value);
+  reportStatInternal(loopname, category, NetworkInterface::ID,  LL::getTID(), value);
 }
 
 void Galois::Runtime::reportStat(Galois::Statistic* value) {
   for (unsigned x = 0; x < activeThreads; ++x)
-    reportStatInternal(value->getLoopname(), value->getStatname(), networkHostID, x, value->getValue(x));
+    reportStatInternal(value->getLoopname(), value->getStatname(), NetworkInterface::ID, x, value->getValue(x));
 }
 
 void Galois::Runtime::printStats() {

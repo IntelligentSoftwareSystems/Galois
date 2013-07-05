@@ -86,7 +86,7 @@ void Directory::processObj(LL::SLguard& lg, fatPointer ptr, Lockable* obj) {
     if (tr.hasRequest()) {
       uint32_t wanter = tr.getRequest();
       if (!tr.isRecalled() || wanter < tr.getRecalled()) {
-        tr.getHelper()->sendRequest(ptr, ptr.first == networkHostID ? tr.getCurLoc() : ptr.first, wanter);
+        tr.getHelper()->sendRequest(ptr, ptr.first == NetworkInterface::ID ? tr.getCurLoc() : ptr.first, wanter);
         tr.setRecalled(wanter);
       }
     }
@@ -97,13 +97,13 @@ void Directory::processObj(LL::SLguard& lg, fatPointer ptr, Lockable* obj) {
   if (tr.hasRequest()) {
     uint32_t wanter = tr.getRequest();
     //check if existential lock overwrites transfer
-    if (wanter > networkHostID && tr.isContended()) {
+    if (wanter > NetworkInterface::ID && tr.isContended()) {
       LL::gDebug("Contended Protection of [", ptr.first, ",", ptr.second, "] from ", wanter);
       return;
     }
     //Don't need to move object if requestor is local
-    if (wanter == networkHostID) {
-      tr.delRequest(networkHostID); //eat local request
+    if (wanter == NetworkInterface::ID) {
+      tr.delRequest(NetworkInterface::ID); //eat local request
       if (tr.hasRequest())
         addPending(ptr);
       return;
@@ -116,9 +116,9 @@ void Directory::processObj(LL::SLguard& lg, fatPointer ptr, Lockable* obj) {
     case 1: { //now owner (was free and on this host)
       //compute who to send the object too
       //non-owner sends back to owner
-      uint32_t dest = ptr.first == networkHostID ? wanter : ptr.first;
+      uint32_t dest = ptr.first == NetworkInterface::ID ? wanter : ptr.first;
       tr.getHelper()->sendObject(ptr, obj, dest);
-      if (ptr.first == networkHostID) {
+      if (ptr.first == NetworkInterface::ID) {
         //remember who has it
         tr.setCurLoc(dest);
         //we handled this request
@@ -179,16 +179,16 @@ void Directory::queryObj(fatPointer ptr, bool forward) {
   if (hasTracking(lg, ptr))
     tr = &getExistingTracking(lg, ptr);
   LL::gDebug("Directory query for ", ptr.first, ",", ptr.second,
-             ptr.first == networkHostID ? " Mine" : " Other",
+             ptr.first == NetworkInterface::ID ? " Mine" : " Other",
              tr ? " Tracked" : " **Untracked**",
              tr && tr->isRecalled() ? " Recalled" : "",
              tr && tr->isContended() ? " Contended" : "",
              "");
 
   if (forward) {
-    if (ptr.first == networkHostID && tr && tr->getCurLoc() != networkHostID)
+    if (ptr.first == NetworkInterface::ID && tr && tr->getCurLoc() != NetworkInterface::ID)
       getSystemNetworkInterface().sendAlt(tr->getCurLoc(), queryObjRemote, ptr, false);
-    else if (ptr.first != networkHostID)
+    else if (ptr.first != NetworkInterface::ID)
       getSystemNetworkInterface().sendAlt(ptr.first, queryObjRemote, ptr, false);
   }
 }

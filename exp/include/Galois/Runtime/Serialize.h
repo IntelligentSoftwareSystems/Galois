@@ -71,8 +71,8 @@ public:
 
   SerializeBuffer() {
     //reserve a header
-    bufdata.resize(sizeof(void*));
-    start = sizeof(void*);
+    bufdata.resize(sizeof(void*) + sizeof(uintptr_t));
+    start = sizeof(void*) + sizeof(uintptr_t);
   }
 
   inline void push(const char c) {
@@ -83,6 +83,16 @@ public:
     assert(bufdata.size() >= sizeof(uintptr_t));
     unsigned char* pdata = (unsigned char*)&data;
     for (size_t i = 0; i < sizeof(void*); ++i)
+      bufdata[sizeof(uintptr_t) + i] = pdata[i];
+    start = sizeof(uintptr_t);
+  }
+  void serialize_header(uintptr_t data1, void* data2) {
+    assert(bufdata.size() >= sizeof(uintptr_t));
+    unsigned char* pdata = (unsigned char*)&data1;
+    for (size_t i = 0; i < sizeof(uintptr_t); ++i)
+      bufdata[i] = pdata[i];
+    pdata = (unsigned char*)&data2;
+    for (size_t i = sizeof(uintptr_t); i < sizeof(void*); ++i)
       bufdata[i] = pdata[i];
     start = 0;
   }
@@ -154,8 +164,6 @@ bool gSerialize(SerializeBuffer& buf, const Galois::gdeque<T,CS>& data) {
   return true;
 }
 
-extern uint32_t networkHostID;
-
 template<typename T>
 bool gSerialize(SerializeBuffer& buf, const T& data, typename std::enable_if<std::is_trivially_copyable<T>::value>::type* = 0) {
   //  std::cerr << networkHostID <<  " sesize " << sizeof(T) << " of " << typeid(T).name() << " " << "\n";
@@ -186,6 +194,13 @@ public:
     bufdata.swap(buf.bufdata);
     offset = buf.start;
   }
+
+  void reset(int count) {
+    offset = 0;
+    bufdata.resize(count);
+  }
+
+  unsigned size() const { return bufdata.size(); }
 
   unsigned char pop() {
     return bufdata.at(offset++);

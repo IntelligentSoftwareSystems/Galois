@@ -47,7 +47,7 @@
 static void printString(bool error, bool newline, uint32_t host, const std::string prefix, const std::string s) {
   static Galois::Runtime::LL::SimpleLock<true> IOLock;
   static bool local = Galois::Runtime::LL::EnvCheck("GALOIS_DEBUG_LOCAL");
-  if (Galois::Runtime::networkHostID == 0 || local) {
+  if (Galois::Runtime::NetworkInterface::ID == 0 || local) {
     std::lock_guard<decltype(IOLock)> lock(IOLock);
     std::ostream& o = error ? std::cerr : std::cout;
     if (prefix.length()) o << prefix << " " << host << ": ";
@@ -82,7 +82,7 @@ void Galois::Runtime::LL::gDebugStr(const std::string& s) {
     static std::ofstream debugOut;
     if (!debugOut.is_open()) {
       std::ostringstream fname;
-      fname << "gdebug." << networkHostID << ".XXXXXX";
+      fname << "gdebug." << NetworkInterface::ID << ".XXXXXX";
       assert(fname.str().size() < 256);
       char cfname[256];
       strncpy(cfname, fname.str().c_str(), 256);
@@ -94,24 +94,24 @@ void Galois::Runtime::LL::gDebugStr(const std::string& s) {
     debugOut << os.str() << "\n";
     debugOut.flush();
   } else {
-    printString(true, true, networkHostID, "DEBUG", os.str());
+    printString(true, true, NetworkInterface::ID, "DEBUG", os.str());
   }
 }
 
 void Galois::Runtime::LL::gPrintStr(const std::string& s) {
-  printString(false, false, networkHostID, "", s);
+  printString(false, false, NetworkInterface::ID, "", s);
 }
 
 void Galois::Runtime::LL::gInfoStr(const std::string& s) {
-  printString(false, true, networkHostID, "INFO", s);
+  printString(false, true, NetworkInterface::ID, "INFO", s);
 }
 
 void Galois::Runtime::LL::gWarnStr(const std::string& s) {
-  printString(false, true, networkHostID, "WARNING", s);
+  printString(false, true, NetworkInterface::ID, "WARNING", s);
 }
 
 void Galois::Runtime::LL::gErrorStr(const std::string& s) {
-  printString(false, true, networkHostID, "ERROR", s);
+  printString(false, true, NetworkInterface::ID, "ERROR", s);
 }
 
 void Galois::Runtime::LL::gFlush() {

@@ -47,7 +47,7 @@ static void LonestarStart(int argc, char** argv, const char* app, const char* de
   doNetworkWork();
 
   // display the name only if mater host
-  if (networkHostID == 0) {
+  if (NetworkInterface::ID == 0) {
     gPrint("Galois Benchmark Suite v", GALOIS_VERSION_STRING, " (r", GALOIS_SVNVERSION, ")\n",
 	   "Copyright (C) ", GALOIS_COPYRIGHT_YEAR_STRING, " The University of Texas at Austin\n",
 	   "http://iss.ices.utexas.edu/galois/\n\n",
@@ -62,7 +62,7 @@ static void LonestarStart(int argc, char** argv, const char* app, const char* de
       if (i != argc - 1)
 	cmdout << " ";
     }
-    gInfo("Number of Hosts: ", networkHostNum);
+    gInfo("Number of Hosts: ", NetworkInterface::Num);
     gInfo("CommandLine ", cmdout.str().c_str());
   }
   char name[256];

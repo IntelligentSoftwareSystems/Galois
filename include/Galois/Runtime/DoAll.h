@@ -78,7 +78,7 @@ class DoAllWork {
     while(tld.begin != tld.end) {
       try {
         tld.cnx.start_iteration();
-        if ((networkHostNum > 1) && (!LL::getTID()))
+        if ((NetworkInterface::Num > 1) && (!LL::getTID()))
           doNetworkWork();
         tld.F(*tld.begin);
       } catch (const remote_ex& ex) {
@@ -91,7 +91,7 @@ class DoAllWork {
       // make sure the increment occurs before proceeding
       do {
         try {
-          if ((networkHostNum > 1) && (!LL::getTID()))
+          if ((NetworkInterface::Num > 1) && (!LL::getTID()))
             doNetworkWork();
           ++tld.begin;
         } catch (const remote_ex& ex) {

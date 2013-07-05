@@ -39,3 +39,13 @@ bool Galois::Runtime::LL::EnvCheck(const char* parm, int& val) {
   }
   return false;
 }
+
+bool Galois::Runtime::LL::EnvCheck(const char* parm, std::string& val) {
+  char* t = getenv(parm);
+  if (t) {
+    val = t;
+    return true;
+  }
+  return false;
+}
+

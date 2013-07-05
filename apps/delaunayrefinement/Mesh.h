@@ -408,8 +408,14 @@ private:
     Galois::for_each<Galois::WorkList::StableIterator<std::deque<Element>::iterator > > (elements.begin(), elements.end(), create_nodes(mesh), "create");
 
     std::map<Edge, GNode> edge_map;
-    for (Graph::iterator ii = mesh->begin(), ee = mesh->end(); ii != ee; ++ii)
+    unsigned x = 0;
+    for (Graph::iterator ii = mesh->begin(), ee = mesh->end(); ii != ee; ++ii) {
       addElement(mesh, *ii, edge_map);
+      ++x;
+      if (x % 1024 == 0)
+        std::cerr << ".";
+    }
+    std::cerr << "\n";
   }
 
 public:

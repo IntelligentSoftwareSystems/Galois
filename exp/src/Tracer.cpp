@@ -32,7 +32,6 @@ using Galois::Runtime::getSystemNetworkInterface;
 using Galois::Runtime::RecvBuffer;
 using Galois::Runtime::gSerialize;
 using Galois::Runtime::gDeserialize;
-using Galois::Runtime::networkHostID;
 
 bool doTrace = true;
 
@@ -84,70 +83,70 @@ static const bool traceLocal = Galois::Runtime::LL::EnvCheck("GALOIS_TRACE_LOCAL
 
 void Galois::Runtime::trace_obj_send_impl(uint32_t owner, void* ptr, uint32_t remote) {
   if (doTrace) {
-    if (networkHostID == 0 || traceLocal) {
-      trace_obj_send_do(networkHostID, owner, ptr, remote);
+    if (NetworkInterface::ID == 0 || traceLocal) {
+      trace_obj_send_do(NetworkInterface::ID, owner, ptr, remote);
     } else {
-      getSystemNetworkInterface().sendAlt(0, &trace_obj_send_do, networkHostID, owner, ptr, remote);
+      getSystemNetworkInterface().sendAlt(0, &trace_obj_send_do, NetworkInterface::ID, owner, ptr, remote);
     }
   }
 }
 
 void Galois::Runtime::trace_obj_recv_impl(uint32_t owner, void* ptr) {
   if (doTrace) {
-    if (networkHostID == 0 || traceLocal) {
-      trace_obj_recv_do(networkHostID, owner, ptr);
+    if (NetworkInterface::ID == 0 || traceLocal) {
+      trace_obj_recv_do(NetworkInterface::ID, owner, ptr);
     } else {
-      getSystemNetworkInterface().sendAlt(0, &trace_obj_recv_do, networkHostID, owner, ptr);
+      getSystemNetworkInterface().sendAlt(0, &trace_obj_recv_do, NetworkInterface::ID, owner, ptr);
     }
   }
 }
 
 void Galois::Runtime::trace_req_send_impl(uint32_t owner, void* ptr, uint32_t dest, uint32_t reqFor) {
   if (doTrace) {
-    if (networkHostID == 0 || traceLocal) {
-      trace_req_send_do(networkHostID, owner, ptr, dest, reqFor);
+    if (NetworkInterface::ID == 0 || traceLocal) {
+      trace_req_send_do(NetworkInterface::ID, owner, ptr, dest, reqFor);
     } else {
-      getSystemNetworkInterface().sendAlt(0, &trace_req_send_do, networkHostID, owner, ptr, dest, reqFor);
+      getSystemNetworkInterface().sendAlt(0, &trace_req_send_do, NetworkInterface::ID, owner, ptr, dest, reqFor);
     }
   }
 }
 
 void Galois::Runtime::trace_req_recv_impl(uint32_t owner, void* ptr, uint32_t reqFor) {
   if (doTrace) {
-    if (networkHostID == 0 || traceLocal) {
-      trace_req_recv_do(networkHostID, owner, ptr, reqFor);
+    if (NetworkInterface::ID == 0 || traceLocal) {
+      trace_req_recv_do(NetworkInterface::ID, owner, ptr, reqFor);
     } else {
-      getSystemNetworkInterface().sendAlt(0, &trace_req_recv_do, networkHostID, owner, ptr, reqFor);
+      getSystemNetworkInterface().sendAlt(0, &trace_req_recv_do, NetworkInterface::ID, owner, ptr, reqFor);
     }
   }
 }
 
 void Galois::Runtime::trace_bcast_recv_impl(uint32_t source) {
   if (doTrace) {
-    if (networkHostID == 0 || traceLocal) {
-      trace_bcast_recv_do(networkHostID, source);
+    if (NetworkInterface::ID == 0 || traceLocal) {
+      trace_bcast_recv_do(NetworkInterface::ID, source);
     } else {
-      getSystemNetworkInterface().sendAlt(0, &trace_bcast_recv_do, networkHostID, source);
+      getSystemNetworkInterface().sendAlt(0, &trace_bcast_recv_do, NetworkInterface::ID, source);
     }
   }
 }
 
 void Galois::Runtime::trace_loop_start_impl(const std::string& name) {
   if (doTrace) {
-    if (networkHostID == 0 || traceLocal) {
-      trace_loop_start_do(networkHostID, name);
+    if (NetworkInterface::ID == 0 || traceLocal) {
+      trace_loop_start_do(NetworkInterface::ID, name);
     } else {
-      getSystemNetworkInterface().sendAlt(0, &trace_loop_start_do, networkHostID, name);
+      getSystemNetworkInterface().sendAlt(0, &trace_loop_start_do, NetworkInterface::ID, name);
     }
   }
 }
 
 void Galois::Runtime::trace_loop_end_impl(const std::string& name) {
   if (doTrace) {
-    if (networkHostID == 0 || traceLocal) {
-      trace_loop_end_do(networkHostID, name);
+    if (NetworkInterface::ID == 0 || traceLocal) {
+      trace_loop_end_do(NetworkInterface::ID, name);
     } else {
-      getSystemNetworkInterface().sendAlt(0, &trace_loop_end_do, networkHostID, name);
+      getSystemNetworkInterface().sendAlt(0, &trace_loop_end_do, NetworkInterface::ID, name);
     }
   }
 }

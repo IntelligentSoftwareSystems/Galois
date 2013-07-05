@@ -48,49 +48,29 @@ static void handleError(int rc) {
   }
 }
 
-class MPIBase {
+static const int FuncTag = 1;
 
-  int numTasks, taskRank;
+class NetworkInterfaceAsyncMPI : public NetworkInterface {
 
   Galois::Runtime::LL::SimpleLock<true> lock;
-
-  // const int FuncTag = 1;
-  #define FuncTag 1
-
-protected:
   std::deque<std::pair<MPI_Request, SendBuffer>> pending_sends;
 
-public:
-  MPIBase() {
-    int provided;
-    int rc = MPI_Init_thread (NULL, NULL, MPI_THREAD_SERIALIZED /*MPI_THREAD_FUNNELED*/, &provided);
-    handleError(rc);
-    
-    MPI_Comm_size(MPI_COMM_WORLD, &numTasks);
-    MPI_Comm_rank(MPI_COMM_WORLD, &taskRank);
-
-    // std::cout << "I am " << taskRank << " of " << numTasks << "\n";
-
-    networkHostID = taskRank;
-    networkHostNum = numTasks;
-
-    if (taskRank == 0) {
-      //master
-      //printing on lead host doesn't require this object to be fully initialized
-      switch (provided) {
-      case MPI_THREAD_SINGLE: Galois::Runtime::LL::gInfo("MPI Supports: Single"); break;
-      case MPI_THREAD_FUNNELED: Galois::Runtime::LL::gInfo("MPI Supports: Funneled"); break;
-      case MPI_THREAD_SERIALIZED: Galois::Runtime::LL::gInfo("MPI Supports: Serialized"); break;
-      case MPI_THREAD_MULTIPLE: Galois::Runtime::LL::gInfo("MPI Supports: Multiple"); break;
-      default: break;
-      }
-    } else {
-      //slave
+  boost::optional<RecvBuffer> doOneRecv() {
+    std::lock_guard<decltype(lock)> lg(lock);
+    update_pending_sends();
+    boost::optional<RecvBuffer> retval;
+    MPI_Status status;
+    //async probe
+    int flag, rv;
+    rv = MPI_Iprobe(MPI_ANY_SOURCE, FuncTag, MPI_COMM_WORLD, &flag, &status);
+    handleError(rv);
+    if (flag) {
+      int count;
+      MPI_Get_count(&status, MPI_BYTE, &count);
+      retval = RecvBuffer(count);
+      MPI_Recv(retval->linearData(), count, MPI_BYTE, MPI_ANY_SOURCE, FuncTag, MPI_COMM_WORLD, &status);
     }
-  }
-
-  ~MPIBase() {
-    MPI_Finalize();
+    return retval;
   }
 
   void update_pending_sends() {
@@ -104,99 +84,81 @@ public:
     }
   }
 
-  //! sends a message.  assumes it is being called from a thread for which
-  //! this is valid
-  void sendInternal(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
-    assert(Galois::Runtime::LL::getTID() == 0);
-    assert(recv);
-    buf.serialize_header((void*)recv);
-    if (true) {
-      pending_sends.emplace_back(MPI_REQUEST_NULL, std::move(buf));
-      std::pair<MPI_Request, SendBuffer>& com = pending_sends.back();
-      assert(com.second.size());
-      int rv = MPI_Issend(com.second.linearData(), com.second.size(), MPI_BYTE, dest, FuncTag, MPI_COMM_WORLD, &com.first);
-      handleError(rv);
+public:
+
+  using NetworkInterface::ID;
+  using NetworkInterface::Num;
+
+
+  NetworkInterfaceAsyncMPI() {
+    int provided;
+    int rc = MPI_Init_thread (NULL, NULL, MPI_THREAD_SERIALIZED, &provided);
+    handleError(rc);
+
+    int numTasks, taskRank;
+    MPI_Comm_size(MPI_COMM_WORLD, &numTasks);
+    MPI_Comm_rank(MPI_COMM_WORLD, &taskRank);
+    
+    ID = taskRank;
+    Num = numTasks;
+    
+    if (taskRank == 0) {
+      //master
+      //printing on lead host doesn't require this object to be fully initialized
+      switch (provided) {
+      case MPI_THREAD_SINGLE: 
+      case MPI_THREAD_FUNNELED: 
+        assert(0 && "Insufficient mpi support");
+        abort();
+        break;
+      case MPI_THREAD_SERIALIZED: Galois::Runtime::LL::gInfo("MPI Supports: Serialized"); break;
+      case MPI_THREAD_MULTIPLE: Galois::Runtime::LL::gInfo("MPI Supports: Multiple"); break;
+      default: break;
+      }
     } else {
-      assert(dest < networkHostNum);
-      int rv = MPI_Send(buf.linearData(), buf.size(), MPI_BYTE, dest, FuncTag, MPI_COMM_WORLD);
-      handleError(rv);
+      //slave
     }
   }
 
-  bool recvInternal() {
-    assert(Galois::Runtime::LL::getTID() == 0);
-    int flag, rv;
-    bool retval = false;
-    MPI_Status status;
-    do {
-      //async probe
-      rv = MPI_Iprobe(MPI_ANY_SOURCE, FuncTag, MPI_COMM_WORLD, &flag, &status);
-      handleError(rv);
-      if (!flag)
-        break;
-      //use the lock
-      lock.lock();
-      rv = MPI_Iprobe(MPI_ANY_SOURCE, FuncTag, MPI_COMM_WORLD, &flag, &status);
-      handleError(rv);
-      if (flag) {
-        retval = true;
-        int count;
-        MPI_Get_count(&status, MPI_BYTE, &count);
-        RecvBuffer buf(count);
-        MPI_Recv(buf.linearData(), count, MPI_BYTE, MPI_ANY_SOURCE, FuncTag, MPI_COMM_WORLD, &status);
-        lock.unlock();
-        //Unlocked call so reciever can call handleRecv()
-        recvFuncTy f;
-        uintptr_t fp;
-        gDeserialize(buf,fp);
-        assert(fp);
-        f = (recvFuncTy)fp;
-        //Call deserialized function
-        f(buf);
-      } else {
-        lock.unlock();
-      }
-    } while (true);
-    return retval;
-  }
-};
-
-//! handle mpi implementations which require a single thread to communicate
-class NetworkInterfaceSyncMPI : public NetworkInterface, public MPIBase {
-
-  struct outgoingMessage {
-    uint32_t dest;
-    recvFuncTy recv;
-    SendBuffer buf;
-    outgoingMessage(uint32_t _dest, recvFuncTy _recv, SendBuffer& _buf)
-      :dest(_dest), recv(_recv), buf(std::move(_buf))
-    {}
-
-  };
-  std::deque<outgoingMessage> asyncOutQueue;
-  Galois::Runtime::LL::SimpleLock<true> asyncOutLock;
-
-public:
-  virtual ~NetworkInterfaceSyncMPI() {
+  virtual ~NetworkInterfaceAsyncMPI() {
+    MPI_Finalize();
   }
 
   virtual void send(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
-    asyncOutLock.lock();
-    if (Galois::Runtime::LL::getTID() == 0) {
-      update_pending_sends();
-      while (!asyncOutQueue.empty() && (pending_sends.size() < INFLIGHT_LIMIT)) {
-        sendInternal(asyncOutQueue[0].dest, asyncOutQueue[0].recv, asyncOutQueue[0].buf);
-        asyncOutQueue.pop_front();
-        update_pending_sends();
-      }
-      if (!asyncOutQueue.empty() || (pending_sends.size() >= INFLIGHT_LIMIT))
-       asyncOutQueue.emplace_back(dest, recv, buf);
-      else
-       sendInternal(dest, recv, buf);
-    } else {
-      asyncOutQueue.emplace_back(dest, recv, buf);
+    lock.lock();
+    //wait for a send slot
+    // while (pending_sends.size() >= 128)
+    //   update_pending_sends();
+    assert(recv);
+    buf.serialize_header((void*)recv);
+    assert(dest < Num);
+    pending_sends.emplace_back(MPI_REQUEST_NULL, std::move(buf));
+    auto & com = pending_sends.back();
+    int rv = MPI_Issend(com.second.linearData(), com.second.size(), MPI_BYTE, dest, FuncTag, MPI_COMM_WORLD, &com.first);
+    handleError(rv);
+    update_pending_sends();
+    lock.unlock();
+  }
+
+  virtual bool handleReceives() {
+    boost::optional<RecvBuffer> data;
+    bool retval = false;
+    while ((data = doOneRecv())) {
+      retval = true;
+      //Unlocked call so reciever can call handleRecv()
+      recvFuncTy f;
+      uintptr_t fp;
+      gDeserialize(*data,fp);
+      assert(fp);
+      f = (recvFuncTy)fp;
+      //Call deserialized function
+      f(*data);
     }
-    asyncOutLock.unlock();
+    return retval;
+  }
+
+  virtual bool needsDedicatedThread() {
+    return true;
   }
 
   virtual void systemBarrier() {
@@ -206,57 +168,13 @@ public:
     return;
   }
 
-  virtual bool handleReceives() {
-    assert(Galois::Runtime::LL::getTID() == 0);
-    bool retval = recvInternal();
-
-    asyncOutLock.lock();
-    update_pending_sends();
-    while (!asyncOutQueue.empty() && (pending_sends.size() < INFLIGHT_LIMIT)) {
-      sendInternal(asyncOutQueue[0].dest, asyncOutQueue[0].recv, asyncOutQueue[0].buf);
-      asyncOutQueue.pop_front();
-      update_pending_sends();
-    }
-    asyncOutLock.unlock();
-
-    return retval;
-  }
-
-  virtual bool needsDedicatedThread() {
-    return true;
-  }
-
-};
-
-//! handle mpi implementatinos which are multithreaded
-class NetworkInterfaceAsyncMPI : public NetworkInterface, public MPIBase {
-
-public:
-  virtual ~NetworkInterfaceAsyncMPI() {
-  }
-
-  virtual void send(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
-    sendInternal(dest, recv, buf);
-  }
-
-  virtual bool handleReceives() {
-    return recvInternal();
-  }
-
-  virtual bool needsDedicatedThread() {
-    return false;
-  }
-
-  virtual void systemBarrier() {
-    return;
-  }
-
 };
 
 }
 
-
+#if 0
 NetworkInterface& Galois::Runtime::getSystemNetworkInterface() {
-  static NetworkInterfaceSyncMPI net;
+  static NetworkInterfaceAsyncMPI net;
   return net;
 }
+#endif

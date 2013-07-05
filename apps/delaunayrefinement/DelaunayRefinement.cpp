@@ -126,6 +126,8 @@ struct Verification : public Galois::Runtime::Lockable {
   }
 };
 
+unsigned yy = 0;
+
 struct Prefetch : public Galois::Runtime::Lockable {
   Graphp   graph;
 
@@ -135,6 +137,9 @@ struct Prefetch : public Galois::Runtime::Lockable {
   void operator()(GNode item, Galois::UserContext<GNode>& ctx) const {
     //std::cerr << Galois::Runtime::networkHostID;
     (void)graph->getData(item).isBad();
+    unsigned x = __sync_fetch_and_add(&yy, 1);
+    if (x % 1024 == 0)
+      std::cerr << ".";
   }
 
   // serialization functions
@@ -152,7 +157,7 @@ int main(int argc, char** argv) {
   LonestarStart(argc, argv, name, desc, url);
 
   // check the host id and initialise the network
-  Galois::Runtime::networkStart();
+  Galois::Runtime::NetworkInterface::start();
   Galois::Runtime::setTrace(false);
 
   Graphp graph = Graph::allocate();
@@ -230,7 +235,7 @@ int main(int argc, char** argv) {
   }
 
   // master_terminate();
-  Galois::Runtime::networkTerminate();
+  Galois::Runtime::NetworkInterface::terminate();
 
   return 0;
 }

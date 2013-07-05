@@ -84,8 +84,8 @@ class PerHost {
   mutable T* localPtr;
 
   T* resolve() const {
-    if (localHost != networkHostID || !localPtr) {
-      localHost = networkHostID;
+    if (localHost != NetworkInterface::ID || !localPtr) {
+      localHost = NetworkInterface::ID;
       localPtr = getPerHostBackend().resolve<T>(offset);
     }
     return localPtr;  
@@ -128,7 +128,7 @@ public:
   }
 
   gptr<T> local() {
-    return remote(networkHostID);
+    return remote(NetworkInterface::ID);
   }
 
   T& operator*() const { return *resolve(); }
@@ -248,14 +248,14 @@ public:
   PerThreadDist() : offset(~0) {}
 
   gptr<T> remote(uint32_t hostID, unsigned threadID) const {
-    if (hostID == networkHostID)
+    if (hostID == NetworkInterface::ID)
       return gptr<T>(getPerThreadDistBackend().resolveThread<T>(offset, threadID));
     else
       return getPerThreadDistBackend().resolveRemote<T>(offset, hostID, threadID);
   }
   
   gptr<T> local() const {
-    return gptr<T>(networkHostID, resolve());
+    return gptr<T>(NetworkInterface::ID, resolve());
   }
 
   T& operator*() const { return *resolve(); }
@@ -280,18 +280,18 @@ public:
     void increment() {
       if (threadID < activeThreads)
 	++threadID;
-      if (threadID == activeThreads && hostID < networkHostNum) { // FIXME: maxthreads on hostID
+      if (threadID == activeThreads && hostID < NetworkInterface::Num) { // FIXME: maxthreads on hostID
 	++hostID;
 	threadID = 0;
       }
-      if (hostID == networkHostNum) {
+      if (hostID == NetworkInterface::Num) {
 	threadID = activeThreads;
 	basePtr = PerThreadDist();
       }
     }
     iterator(uint32_t h, uint32_t t, PerThreadDist p) :hostID(h), threadID(t), basePtr(p) {}
   public:
-    iterator() :hostID(networkHostNum), threadID(activeThreads), basePtr() {}
+    iterator() :hostID(NetworkInterface::Num), threadID(activeThreads), basePtr() {}
   };
 
   iterator begin() { return iterator(0,0,*this); }

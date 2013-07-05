@@ -151,7 +151,7 @@ void for_each_local(ConTy c, FunctionTy fn, const char* loopname = "(NULL)",
 template<typename WLTy, typename ConTy, typename FunctionTy>
 void for_each_local(ConTy c, FunctionTy fn, const char* loopname = "(NULL)",
     typename std::enable_if<!Runtime::is_serializable<FunctionTy>::value>::type* = 0) {
-  assert(Galois::Runtime::networkHostNum == 1);
+  assert(Galois::Runtime::NetworkInterface::Num == 1);
   Runtime::for_each_impl<WLTy>(Runtime::makeLocalRange(c), fn, loopname);
 }
 #else

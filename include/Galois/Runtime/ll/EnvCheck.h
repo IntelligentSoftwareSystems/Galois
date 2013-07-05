@@ -23,6 +23,8 @@
 #ifndef GALOIS_RUNTIME_LL_ENVCHECK_H
 #define GALOIS_RUNTIME_LL_ENVCHECK_H
 
+#include <string>
+
 namespace Galois {
 namespace Runtime {
 namespace LL {
@@ -37,10 +39,13 @@ namespace LL {
 //gIO.cpp: "GALOIS_DEBUG_SKIP"
 //gIO.cpp: "GALOIS_DEBUG_LOCAL"
 //Tracer.cpp: "GALOIS_TRACE_LOCAL"
+//Network_tcp.cpp: "GALOIS_TCP_HOST"
+//Network_tcp.cpp: "GALOIS_TCP_PORT"
 
 //! Return true if the Enviroment variable is set
 bool EnvCheck(const char* parm);
 bool EnvCheck(const char* parm, int& val);
+bool EnvCheck(const char* parm, std::string& val);
 
 }
 }

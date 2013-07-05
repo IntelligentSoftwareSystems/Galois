@@ -132,7 +132,7 @@ static void endSampling_landing_pad(RecvBuffer& buf) {
 }
 
 void Galois::Runtime::beginSampling() {
-  if (networkHostNum > 1) {
+  if (NetworkInterface::Num > 1) {
     SendBuffer b;
     getSystemNetworkInterface().broadcast(beginSampling_landing_pad, b);
   }
@@ -142,7 +142,7 @@ void Galois::Runtime::beginSampling() {
 }
 
 void Galois::Runtime::endSampling() {
-  if (networkHostNum > 1) {
+  if (NetworkInterface::Num > 1) {
     SendBuffer b;
     getSystemNetworkInterface().broadcast(endSampling_landing_pad, b);
   }

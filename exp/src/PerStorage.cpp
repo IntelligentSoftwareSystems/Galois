@@ -32,7 +32,7 @@ PerBackend_v2::PerBackend_v2() :nextID(0) {}
 
 uint64_t PerBackend_v2::allocateOffset() {
   uint64_t off = __sync_add_and_fetch(&nextID, 1);
-  off |= (uint64_t)networkHostID << 32;
+  off |= (uint64_t)NetworkInterface::ID << 32;
   return off;
 }
 
@@ -67,7 +67,7 @@ void PerBackend_v2::pBe2ResolveLP(void* ptr, uint32_t srcID, uint64_t off) {
 
 void PerBackend_v2::pBe2Resolve(uint32_t dest, uint64_t off) {
   void* ptr = getPerHostBackend().resolve_i(off);
-  getSystemNetworkInterface().sendAlt(dest, pBe2ResolveLP, ptr, networkHostID, off);
+  getSystemNetworkInterface().sendAlt(dest, pBe2ResolveLP, ptr, NetworkInterface::ID, off);
 }
 
 void PerBackend_v2::addRemote(void* ptr, uint32_t srcID, uint64_t off) {
@@ -77,7 +77,7 @@ void PerBackend_v2::addRemote(void* ptr, uint32_t srcID, uint64_t off) {
 }
 
 void* PerBackend_v2::resolveRemote_i(uint64_t off, uint32_t hostID) {
-  if (hostID == networkHostID) {
+  if (hostID == NetworkInterface::ID) {
     return resolve_i(off);
   } else {
     //FIXME: remote message
@@ -86,7 +86,7 @@ void* PerBackend_v2::resolveRemote_i(uint64_t off, uint32_t hostID) {
      lock.unlock();
      if (retval)
        return retval;
-     getSystemNetworkInterface().sendAlt(hostID, pBe2Resolve, networkHostID, off);
+     getSystemNetworkInterface().sendAlt(hostID, pBe2Resolve, NetworkInterface::ID, off);
      do {
        if (LL::getTID() == 0)
          doNetworkWork();
@@ -112,7 +112,7 @@ Galois::Runtime::PerBackend_v2& Galois::Runtime::getPerHostBackend() {
 ////////////////////////////////////////////////////////////////////////////////
 
 uint64_t PerBackend_v3::allocateOffset() {
-  if (networkHostID == 0) {
+  if (NetworkInterface::ID == 0) {
     std::lock_guard<LL::SimpleLock<true>> lg(lock);
     auto ii = std::find(freelist.begin(), freelist.end(), false);
     if (ii == freelist.end()) {
@@ -129,7 +129,7 @@ uint64_t PerBackend_v3::allocateOffset() {
 }
 
 void PerBackend_v3::deallocateOffset(uint64_t off) {
-  if (networkHostID == 0) {
+  if (NetworkInterface::ID == 0) {
     std::lock_guard<LL::SimpleLock<true>> lg(lock);
     assert(freelist[off] && "not allocated");
     freelist[off] = false;
@@ -155,7 +155,7 @@ void PerBackend_v3::initThread() {
 }
 
 void* PerBackend_v3::resolveRemote_i(uint64_t offset, uint32_t hostID, uint32_t threadID) {
-  if (hostID == networkHostID) {
+  if (hostID == NetworkInterface::ID) {
     return resolveThread<void>(offset, threadID);
   } else {
     //FIXME: remote message
@@ -164,7 +164,7 @@ void* PerBackend_v3::resolveRemote_i(uint64_t offset, uint32_t hostID, uint32_t 
      lock.unlock();
      if (retval)
        return retval;
-     getSystemNetworkInterface().sendAlt(hostID, pBe2Resolve, networkHostID, offset, threadID);
+     getSystemNetworkInterface().sendAlt(hostID, pBe2Resolve, NetworkInterface::ID, offset, threadID);
      do {
        if (LL::getTID() == 0)
          doNetworkWork();
@@ -183,7 +183,7 @@ void PerBackend_v3::pBe2ResolveLP(void* ptr, uint32_t srcID, uint64_t off, uint3
 
 void PerBackend_v3::pBe2Resolve(uint32_t dest, uint64_t off, uint32_t threadID) {
   void* ptr = getPerThreadDistBackend().resolveThread<void>(off, threadID);
-  getSystemNetworkInterface().sendAlt(dest, pBe2ResolveLP, ptr, networkHostID, off, threadID);
+  getSystemNetworkInterface().sendAlt(dest, pBe2ResolveLP, ptr, NetworkInterface::ID, off, threadID);
 }
 
 void PerBackend_v3::addRemote(void* ptr, uint32_t srcID, uint64_t off, uint32_t threadID) {

@@ -27,58 +27,56 @@
 
 #include <cassert>
 
-namespace Galois {
-namespace Runtime {
-uint32_t networkHostID = 0;
-uint32_t networkHostNum = 1;
-}
-}
+uint32_t Galois::Runtime::NetworkInterface::ID = 0;
+uint32_t Galois::Runtime::NetworkInterface::Num = 1;
 
 static bool ourexit = false;
+static std::deque<std::pair<Galois::Runtime::recvFuncTy, Galois::Runtime::RecvBuffer>> loopwork;
 
 //!landing pad for worker hosts
 static void networkExit() {
-  assert(Galois::Runtime::networkHostNum > 1);
-  assert(Galois::Runtime::networkHostID > 0);
+  assert(Galois::Runtime::NetworkInterface::Num > 1);
+  assert(Galois::Runtime::NetworkInterface::ID > 0);
   ourexit = true;
 }
 
-void Galois::Runtime::networkStart() {
+static void loop_pad(Galois::Runtime::RecvBuffer& b) {
+  uintptr_t f;
+  gDeserialize(b, f);
+  loopwork.push_back(std::make_pair((Galois::Runtime::recvFuncTy)f, b));
+}
+
+void Galois::Runtime::NetworkInterface::start() {
   getSystemBarrier(); // initialize barrier before anyone might be at it
   getSystemNetworkInterface();
   getSystemDirectory();
-  if (networkHostID != 0) {
+  if (NetworkInterface::ID != 0) {
     while (!ourexit) {
       doNetworkWork();
+      if (!loopwork.empty()) {
+        auto p = loopwork.front();
+        loopwork.pop_front();
+        p.first(p.second);
+      }
     }
     exit(0);
   }
 }
 
-void Galois::Runtime::networkTerminate() {
+void Galois::Runtime::NetworkInterface::terminate() {
   //return if just one host is running
-  if (networkHostNum == 1)
+  if (NetworkInterface::Num == 1)
     return;
-  assert(networkHostID == 0);
+  assert(NetworkInterface::ID == 0);
   NetworkInterface& net = getSystemNetworkInterface();
   net.broadcastAlt(&networkExit);
   doNetworkWork();
   return;
 }
 
-static void distWaitLandingPad(Galois::Runtime::RecvBuffer& buf) {
-  Galois::Runtime::getSystemNetworkInterface().systemBarrier();
-}
-
-void Galois::Runtime::distWait() {
-  if (networkHostNum == 1)
-    return;
-
-  SendBuffer buf;
-  NetworkInterface& net = getSystemNetworkInterface();
-  net.broadcast(&distWaitLandingPad, buf);
-  doNetworkWork();
-  net.systemBarrier();
+void Galois::Runtime::NetworkInterface::sendLoop(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
+  buf.serialize_header((void*)recv);
+  Galois::Runtime::getSystemNetworkInterface().send(dest, &loop_pad, buf);
 }
 
 //anchor vtable
@@ -86,12 +84,12 @@ Galois::Runtime::NetworkInterface::~NetworkInterface() {}
 
 //RealID -> effective ID for the broadcast tree
 static unsigned getEID(unsigned realID, unsigned srcID) {
-  return (realID + Galois::Runtime::networkHostNum - srcID) % Galois::Runtime::networkHostNum;
+  return (realID + Galois::Runtime::NetworkInterface::Num - srcID) % Galois::Runtime::NetworkInterface::Num;
 }
 
 //Effective id in the broadcast tree -> realID
 static unsigned getRID(unsigned eID, unsigned srcID) {
-  return (eID + srcID) % Galois::Runtime::networkHostNum;
+  return (eID + srcID) % Galois::Runtime::NetworkInterface::Num;
 }
 
 //forward decl
@@ -101,11 +99,11 @@ static void bcastLandingPad(Galois::Runtime::RecvBuffer& buf);
 static void bcastForward(unsigned source, Galois::Runtime::RecvBuffer& buf) {
   static const int width = 2;
 
-  unsigned eid = getEID(Galois::Runtime::networkHostID, source);
+  unsigned eid = getEID(Galois::Runtime::NetworkInterface::ID, source);
   
   for (int i = 0; i < width; ++i) {
     unsigned ndst = eid * width + i + 1;
-    if (ndst < Galois::Runtime::networkHostNum) {
+    if (ndst < Galois::Runtime::NetworkInterface::Num) {
       Galois::Runtime::SendBuffer sbuf;
       Galois::Runtime::gSerialize(sbuf, source, buf);
       Galois::Runtime::getSystemNetworkInterface().send(getRID(ndst, source), &bcastLandingPad, sbuf);
@@ -126,7 +124,7 @@ static void bcastLandingPad(Galois::Runtime::RecvBuffer& buf) {
 }
 
 void Galois::Runtime::NetworkInterface::broadcast(recvFuncTy recv, SendBuffer& buf, bool self) {
-  unsigned source = Galois::Runtime::networkHostID;
+  unsigned source = Galois::Runtime::NetworkInterface::ID;
   Galois::Runtime::trace_bcast_recv(source);
   buf.serialize_header((void*)recv);
   Galois::Runtime::RecvBuffer rbuf(std::move(buf));

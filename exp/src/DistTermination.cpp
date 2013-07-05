@@ -53,12 +53,12 @@ class DistTerminationDetection : public TerminationDetection {
   void propToken(bool isBlack) {
     unsigned id = LL::getTID();
     assert(id < activeThreads);
-    if (id + 1 == activeThreads && networkHostNum > 1) {
+    if (id + 1 == activeThreads && NetworkInterface::Num > 1) {
       //remote
       //send message to networkHost + 1
      SendBuffer b;
      gSerialize(b,isBlack);
-     getSystemNetworkInterface().send((networkHostID + 1) % networkHostNum, propTokenLandingPad, b);
+     getSystemNetworkInterface().send((NetworkInterface::ID + 1) % NetworkInterface::Num, propTokenLandingPad, b);
     } else {
       TokenHolder& th = *data.getRemote((id + 1) % activeThreads);
       th.tokenIsBlack = isBlack;
@@ -76,7 +76,7 @@ class DistTerminationDetection : public TerminationDetection {
   }
 
   void propGlobalTerm() {
-    if (networkHostNum > 1) {
+    if (NetworkInterface::Num > 1) {
       SendBuffer b;
       getSystemNetworkInterface().broadcast(globalTermLandingPad, b);
     }
@@ -84,7 +84,7 @@ class DistTerminationDetection : public TerminationDetection {
   }
 
   bool isSysMaster() const {
-    return LL::getTID() == 0 && networkHostID == 0;
+    return LL::getTID() == 0 && NetworkInterface::ID == 0;
   }
 
 public:

@@ -109,7 +109,7 @@ void for_each_landing_pad(RecvBuffer& buf) {
   Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeStandardRange(data.begin(), data.end()), f, loopname.c_str());
 
   // place a MPI barrier here for all the hosts to synchronize
-  net.systemBarrier();
+  //net.systemBarrier();
 }
 
 template<typename WLTy, typename T, typename FunctionTy>
@@ -126,7 +126,7 @@ void for_each_local_landing_pad(RecvBuffer& buf) {
   Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(data), f, loopname.c_str());
   
   // place a MPI barrier here for all the hosts to synchronize
-  net.systemBarrier();
+  //net.systemBarrier();
 }
 
 template<typename T, typename FunctionTy, typename ReducerTy>
@@ -146,7 +146,7 @@ void do_all_local_landing_pad(RecvBuffer& buf) {
   inDoAllDistributed = false;
 
   // place a MPI barrier here for all the hosts to synchronize
-  net.systemBarrier();
+  //net.systemBarrier();
 }
 
 template<typename FunctionTy>
@@ -161,7 +161,7 @@ void on_each_impl_landing_pad(RecvBuffer& buf) {
   on_each_impl(f);
 
   // place a MPI barrier here for all the hosts to synchronize
-  net.systemBarrier();
+  //net.systemBarrier();
 }
 
 namespace {
@@ -169,13 +169,13 @@ namespace {
 template<typename WLTy, typename IterTy, typename FunctionTy>
 void for_each_dist(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
   // Get a handle to the network interface
-  //  Don't move as networkHostNum and networkHostID have to be initialized first
+  //  Don't move as NetworkInterface::Num and NetworkInterface::ID have to be initialized first
   NetworkInterface& net = getSystemNetworkInterface();
 
   typedef typename std::iterator_traits<IterTy>::value_type ItemTy;
 
   //fast path for non-distributed
-  if (networkHostNum == 1) {
+  if (NetworkInterface::Num == 1) {
     std::deque<ItemTy> allData;
     allData.insert(allData.end(), b,e);
     for_each_impl<WLTy>(Galois::Runtime::makeStandardRange(allData.begin(), allData.end()),f,loopname);
@@ -188,53 +188,53 @@ void for_each_dist(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
 
   std::string lname(loopname);
 
-  for (unsigned i = 1; i < networkHostNum; i++) {
-    auto blk = block_range(allData.begin(), allData.end(), i, networkHostNum);
+  for (unsigned i = 1; i < NetworkInterface::Num; i++) {
+    auto blk = block_range(allData.begin(), allData.end(), i, NetworkInterface::Num);
     std::deque<ItemTy> data(blk.first, blk.second);
     SendBuffer buf;
     // serialize function and data
     gSerialize(buf,f,data, lname);
     //send data
-    net.send (i, &for_each_landing_pad<WLTy,ItemTy,FunctionTy>, buf);
+    net.sendLoop (i, &for_each_landing_pad<WLTy,ItemTy,FunctionTy>, buf);
   }
   net.handleReceives();
   //now get our data
-  auto myblk = block_range(allData.begin(), allData.end(), 0, networkHostNum);
+  auto myblk = block_range(allData.begin(), allData.end(), 0, NetworkInterface::Num);
 
   //Start locally
   for_each_impl<WLTy>(Galois::Runtime::makeStandardRange(myblk.first, myblk.second), f, loopname);
 
   // place a MPI barrier here for all the hosts to synchronize
-  net.systemBarrier();
+  // net.systemBarrier();
 }
 
 template<typename WLTy, typename T, typename FunctionTy>
 void for_each_local_dist(T& c, FunctionTy f, const char* loopname) {
   // Get a handle to the network interface
-  //  Don't move as networkHostNum and networkHostID have to be initialized first
+  //  Don't move as NetworkInterface::Num and NetworkInterface::ID have to be initialized first
   NetworkInterface& net = getSystemNetworkInterface();
 
   //fast path for non-distributed
-  if (networkHostNum == 1) {
+  if (NetworkInterface::Num == 1) {
     for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(c),f,loopname);
     return;
   }
 
   std::string lname(loopname);
 
-  for (unsigned i = 1; i < networkHostNum; i++) {
+  for (unsigned i = 1; i < NetworkInterface::Num; i++) {
     SendBuffer buf;
     // serialize function and data
     gSerialize(buf,f,c, lname);
     //send data
-    net.send (i, &for_each_local_landing_pad<WLTy,T,FunctionTy>, buf);
+    net.sendLoop (i, &for_each_local_landing_pad<WLTy,T,FunctionTy>, buf);
   }
   net.handleReceives();
   //Start locally
   for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(c), f, loopname);
 
   // place a MPI barrier here for all the hosts to synchronize
-  net.systemBarrier();
+  //  net.systemBarrier();
 }
 
 template<typename T, typename FunctionTy, typename ReducerTy>
@@ -246,17 +246,17 @@ void do_all_impl_dist(T& c, FunctionTy f, ReducerTy r, bool needsReduce) {
   assert(!inGaloisForEach);
 
   //fast path for non-distributed
-  if (networkHostNum == 1) {
+  if (NetworkInterface::Num == 1) {
     do_all_impl(Galois::Runtime::makeLocalRange(c),f,r,needsReduce);
     return;
   }
 
-  for (unsigned i = 1; i < networkHostNum; i++) {
+  for (unsigned i = 1; i < NetworkInterface::Num; i++) {
     SendBuffer buf;
     // serialize function and data
     gSerialize(buf,f,r,needsReduce,c);
     //send data
-    net.send (i, &do_all_local_landing_pad<T,FunctionTy,ReducerTy>, buf);
+    net.sendLoop (i, &do_all_local_landing_pad<T,FunctionTy,ReducerTy>, buf);
   }
   net.handleReceives();
   inDoAllDistributed = true;
@@ -265,34 +265,34 @@ void do_all_impl_dist(T& c, FunctionTy f, ReducerTy r, bool needsReduce) {
   inDoAllDistributed = false;
 
   // place a MPI barrier here for all the hosts to synchronize
-  net.systemBarrier();
+  //  net.systemBarrier();
 }
 
 template<typename FunctionTy>
 void on_each_impl_dist(FunctionTy f, const char* loopname) {
   // Get a handle to the network interface
-  //  Don't move as networkHostNum and networkHostID have to be initialized first
+  //  Don't move as NetworkInterface::Num and NetworkInterface::ID have to be initialized first
   NetworkInterface& net = getSystemNetworkInterface();
 
   //fast path for non-distributed
-  if (networkHostNum == 1) {
+  if (NetworkInterface::Num == 1) {
     on_each_impl(f, loopname);
     return;
   }
 
-  for (unsigned i = 1; i < networkHostNum; i++) {
+  for (unsigned i = 1; i < NetworkInterface::Num; i++) {
     SendBuffer buf;
     // serialize function and data
     gSerialize(buf,f);
     //send data
-    net.send (i, &on_each_impl_landing_pad<FunctionTy>, buf);
+    net.sendLoop (i, &on_each_impl_landing_pad<FunctionTy>, buf);
   }
   net.handleReceives();
   //Start locally
   on_each_impl(f, loopname);
 
   // place a MPI barrier here for all the hosts to synchronize
-  net.systemBarrier();
+  // net.systemBarrier();
 }
 
 struct preAlloc_helper {

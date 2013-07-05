@@ -36,9 +36,6 @@ namespace Galois {
 namespace Runtime {
 extern bool inDoAllDistributed;
 
-extern uint32_t networkHostID;
-extern uint32_t networkHostNum;
-
 typedef SerializeBuffer SendBuffer;
 typedef DeSerializeBuffer RecvBuffer;
 
@@ -46,6 +43,10 @@ typedef void (*recvFuncTy)(RecvBuffer&);
 
 class NetworkInterface {
 public:
+
+  static uint32_t ID;
+  static uint32_t Num;
+
   virtual ~NetworkInterface();
 
   //!send a message to a given (dest) host.  A message is simply a
@@ -67,9 +68,6 @@ public:
   template<typename... Args>
   void broadcastAlt(void (*recv)(Args...), Args... param);
 
-  //!system barrier. all hosts should synchronize at this call
-  virtual void systemBarrier() = 0;
-
   //!receive and dispatch messages
   //!returns true if at least one message was received
   //! if the network requires a dedicated thread, then 
@@ -82,21 +80,17 @@ public:
   //! if true, handleReceives will process pending sends
   virtual bool needsDedicatedThread() = 0;
 
+  //! start a listen loop if not the lead process
+  static void start();
+
+  //! terminate all processes
+  static void terminate();
+
+  //! send a top level loop item (executed in the top level event loop)
+  static void sendLoop(uint32_t dest, recvFuncTy recv, SendBuffer& buf);
 };
 
 NetworkInterface& getSystemNetworkInterface();
-
-//!calls handleReceives on the worker threads
-void networkStart();
-
-//!terminate a distributed program
-//! only the master host should call this
-void networkTerminate();
-
-//! Distributed barrier
-//FIXME: See why this exists
-void distWait();
-
 
 ////////////////////////////////////////////////////////////////////////////////
 // Implementations

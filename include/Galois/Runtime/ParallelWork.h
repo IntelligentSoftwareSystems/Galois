@@ -161,7 +161,7 @@ public:
     //     for (auto& a : waiting)
     //       items.insert(a.first);
     //   }
-    //   std::cerr << networkHostID << " Waiting on " << items.size() << " holding " << num << "\n";
+    //   std::cerr << NetworkInterface::ID << " Waiting on " << items.size() << " holding " << num << "\n";
     // }
     std::chrono::duration<int> onesec(1);
     if (std::chrono::system_clock::now() - oldtime > onesec) {
@@ -290,7 +290,6 @@ protected:
             tld.execItem(*p);
             if (remoteAbort)
               remote_aborted.commit(*p);
-            doNetworkWork();
           } catch (const conflict_ex& ex) {
             if (remoteAbort) //if in the remote queue, stay in the remote queue
               remote_aborted.push(*p);
@@ -326,17 +325,19 @@ protected:
       do {
         didWork = false;
         //Run some iterations
-        didWork = runQueue<checkAbort ? 32 : 0>(tld, wl, false, false);
+        didWork = runQueue<checkAbort ? 1 /*32*/ : 0>(tld, wl, false, false);
         //Check for break
         if (ForEachTraits<FunctionTy>::NeedsBreak && broke.data)
           break;
         //Check for abort, also guards random network work
         if (checkAbort) {
-          didWork |= runQueue<32>(tld, aborted, true, false);
+          didWork |= runQueue<1>(tld, aborted, true, false);
           if (LL::getTID() == 0) {
-            didWork |= runQueue<32>(tld, remote_aborted, true, true);
+            didWork |= runQueue<1>(tld, remote_aborted, true, true);
             didWork |= !remote_aborted.empty();
             doNetworkWork();
+          } else {
+            while (getSystemNetworkInterface().handleReceives()) {}
           }
         }
         // update node color and prop token
@@ -362,11 +363,15 @@ public:
 
   // in the distributed case even with 1 thread there can be aborts
   void operator()() {
-    if ((LL::isPackageLeaderForSelf(LL::getTID()) &&
-         activeThreads > 1 && 
-         ForEachTraits<FunctionTy>::NeedsAborts)
-        ||
-        (networkHostNum > 1 && LL::getTID() == 0))
+    // if ((LL::isPackageLeaderForSelf(LL::getTID()) &&
+    //      activeThreads > 1 && 
+    //      ForEachTraits<FunctionTy>::NeedsAborts)
+    //     ||
+    //     (NetworkInterface::Num > 1 && LL::getTID() == 0))
+    if (LL::isPackageLeaderForSelf(LL::getTID()) &&
+        ((activeThreads > 1 && ForEachTraits<FunctionTy>::NeedsAborts)
+         ||
+         (NetworkInterface::Num > 1)))
       go<true>();
     else
       go<false>();

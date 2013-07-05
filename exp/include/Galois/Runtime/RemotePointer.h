@@ -46,7 +46,7 @@ public:
   typedef T element_type;
   
   constexpr gptr() noexcept :ptr({0, nullptr}) {}
-  explicit gptr(T* p) noexcept :ptr({networkHostID, p}) {}
+  explicit gptr(T* p) noexcept :ptr({NetworkInterface::ID, p}) {}
   gptr(uint32_t o, T* p) :ptr({o, static_cast<Lockable*>(p)}) {}
   
   operator fatPointer() const { return ptr; }
@@ -73,7 +73,7 @@ public:
   explicit operator bool() const { return ptr.second != 0; }
 
   bool isLocal() const {
-    return ptr.first == Galois::Runtime::networkHostID;
+    return ptr.first == Galois::Runtime::NetworkInterface::ID;
   }
 
   bool sameHost(const gptr& rhs) const {
@@ -82,7 +82,7 @@ public:
 
   void initialize(T* p) {
     ptr.second = p;
-    ptr.first = ptr.second ? networkHostID : 0;
+    ptr.first = ptr.second ? NetworkInterface::ID : 0;
   }
 
   //serialize
