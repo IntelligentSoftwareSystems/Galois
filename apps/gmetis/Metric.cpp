@@ -34,10 +34,10 @@ void graphStat(GGraph* graph) {
     numEdges += val;
     ++hist[val];
   }
-  
+ 
   std::cout<<"Nodes "<<std::distance(graph->begin(), graph->end())<<"| Edges " << numEdges << std::endl;
-  for (auto pp = hist.begin(), ep = hist.end(); pp != ep; ++pp)
-    std::cout << pp->first << " : " << pp->second << "\n";
+ // for (auto pp = hist.begin(), ep = hist.end(); pp != ep; ++pp)
+ //   std::cout << pp->first << " : " << pp->second << "\n";
 }
 
 std::vector<unsigned> edgeCut(GGraph& g, unsigned nparts) {

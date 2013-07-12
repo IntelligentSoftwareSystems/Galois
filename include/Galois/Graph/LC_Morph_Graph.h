@@ -76,7 +76,7 @@ protected:
   };
 
 public:
-  
+
   typedef boost::transform_iterator<makeGraphNode,typename NodeListTy::iterator > iterator;
   typedef iterator local_iterator;
   typedef NodeInfo* GraphNode;
@@ -84,7 +84,9 @@ public:
   typedef NodeTy node_data_type;
   typedef typename EITy::reference edge_data_reference;
   typedef EITy* edge_iterator;
-  
+    
+  std::vector<GraphNode> trackingG;//FIXE ME: keep the real order of the graph, usefull for output the partitioning. Need to be removed.
+
   NodeTy& getData(const GraphNode& N, MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::checkWrite(mflag, false);
     Galois::Runtime::acquire(N, mflag);
@@ -236,12 +238,18 @@ public:
   };
 
   void structureFromGraph(FileGraph& graph) {
-    std::vector<GraphNode> tracking;
+
+    //if we can keep the node order we should delete trackingG and turn tracking into a vector and not a ref.
+    //std::vector<GraphNode> tracking;
+    std::vector<GraphNode>& tracking = trackingG;
+
     tracking.resize(graph.size());
+
     std::atomic<unsigned> nEdges(0), nNodes(0);
     Galois::do_all(graph.begin(), graph.end(), CreateNodes(this, tracking, graph, nNodes));
     Galois::do_all(graph.begin(), graph.end(), CreateEdges(this, tracking, graph, nEdges));
     std::cout << "Created Graph with " << nNodes << " nodes and " << nEdges << " edges\n";
+
   }
 
   void dump(std::ostream& out) {

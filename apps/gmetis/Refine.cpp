@@ -22,9 +22,9 @@
  * @author Nikunj Yadav <nikunj@cs.utexas.edu>
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
-
+#include "Galois/Statistic.h"
 #include "Metis.h"
-
+#include "Galois/Accumulator.h"
 #include <set>
 
 namespace {
@@ -35,7 +35,7 @@ struct gainIndexer : public std::unary_function<GNode, int> {
   int operator()(GNode n) {
     int retval = 0;
     Galois::MethodFlag flag = Galois::NONE;
-    unsigned nPart = g->getData(n, flag).getPart();
+    unsigned int nPart = g->getData(n, flag).getPart();
     for (auto ii = g->edge_begin(n, flag), ee = g->edge_end(n); ii != ee; ++ii) {
       GNode neigh = g->getEdgeDst(ii, flag);
       if (g->getData(neigh, flag).getPart() == nPart)
@@ -50,7 +50,7 @@ struct gainIndexer : public std::unary_function<GNode, int> {
 GGraph* gainIndexer::g;
 
 bool isBoundary(GGraph& g, GNode n) {
-  unsigned nPart = g.getData(n).getPart();
+  unsigned int nPart = g.getData(n).getPart();
   for (auto ii = g.edge_begin(n), ee =g.edge_end(n); ii != ee; ++ii)
     if (g.getData(g.getEdgeDst(ii)).getPart() != nPart)
       return true;
@@ -60,10 +60,16 @@ bool isBoundary(GGraph& g, GNode n) {
 struct findBoundary {
   Galois::InsertBag<GNode>& b;
   GGraph& g;
-  findBoundary(Galois::InsertBag<GNode>& _b, GGraph& _g) :b(_b), g(_g) {}
+  GGraph* oldGraph;
+  findBoundary(Galois::InsertBag<GNode>& _b, GGraph& _g, GGraph* _oldGraph) : b(_b), g(_g), oldGraph(_oldGraph) {}
   void operator()(GNode n) {
-    if (isBoundary(g, n))
-      b.push(n);
+    auto& cn = g.getData(n, Galois::MethodFlag::NONE);
+    cn.setmaybeBoundary(false);
+    if(!oldGraph || oldGraph->getData(cn.getParent(), Galois::MethodFlag::NONE).getmaybeBoundary())
+      if (isBoundary(g, n)){
+        b.push(n);
+        cn.setmaybeBoundary(true);
+      }
   }
 };
 
@@ -71,27 +77,35 @@ struct findBoundaryAndProject {
   Galois::InsertBag<GNode>& b;
   GGraph& cg;
   GGraph& fg;
-  findBoundaryAndProject(Galois::InsertBag<GNode>& _b, GGraph& _cg, GGraph& _fg) :b(_b), cg(_cg), fg(_fg) {}
+  GGraph* oldGraph;
+  findBoundaryAndProject(Galois::InsertBag<GNode>& _b, GGraph& _cg, GGraph& _fg, GGraph* _oldGraph) :b(_b), cg(_cg), fg(_fg),oldGraph(_oldGraph) {}
   void operator()(GNode n) {
-    if (isBoundary(cg, n))
-      b.push(n);
     auto& cn = cg.getData(n, Galois::MethodFlag::NONE);
+    cn.setmaybeBoundary(false);
+    if(!oldGraph || oldGraph->getData(cn.getParent(), Galois::MethodFlag::NONE).getmaybeBoundary())
+      if (isBoundary(cg, n)){
+        b.push(n);
+        cn.setmaybeBoundary(true);
+      }
     unsigned part = cn.getPart();
-    for (unsigned x = 0; x < cn.numChildren(); ++x)
+    for (unsigned x = 0; x < cn.numChildren(); ++x){
       fg.getData(cn.getChild(x), Galois::MethodFlag::NONE).setPart(part);
+
+    }
   }
 };
 
+
 template<bool balance>
 struct refine_BKL2 {
-  unsigned maxSize;
+  unsigned meanSize;
   GGraph& cg;
   GGraph* fg;
   std::vector<partInfo>& parts;
 
   typedef int tt_needs_per_iter_alloc;
 
-  refine_BKL2(unsigned ms, GGraph& _cg, GGraph* _fg, std::vector<partInfo>& _p) : maxSize(ms), cg(_cg), fg(_fg), parts(_p) {}
+  refine_BKL2(unsigned ms, GGraph& _cg, GGraph* _fg, std::vector<partInfo>& _p) : meanSize(ms), cg(_cg), fg(_fg), parts(_p) {}
 
   //Find the partition n is most connected to
   template<typename Context>
@@ -101,7 +115,7 @@ struct refine_BKL2 {
     for (auto ii = cg.edge_begin(n), ee = cg.edge_end(n); ii != ee; ++ii) {
       GNode neigh = cg.getEdgeDst(ii);
       auto& nd = cg.getData(neigh);
-      if (parts[nd.getPart()].partWeight < maxSize
+      if (parts[nd.getPart()].partWeight < ( int)((double)meanSize*1.1)
           || nd.getPart() == P)
         edges[nd.getPart()] += cg.getEdgeData(ii);
     }
@@ -131,16 +145,17 @@ struct refine_BKL2 {
     auto& nd = cg.getData(n);
     unsigned curpart = nd.getPart();
     unsigned newpart = balance ? pickPartitionMP(n, cnx) : pickPartitionEC(n, cnx);
+    if(parts[curpart].partWeight< meanSize/10 *9) return;
     if (curpart != newpart) {
       nd.setPart(newpart);
-      //__sync_fetch_and_sub(&maxSize, 1);
       __sync_fetch_and_sub(&parts[curpart].partWeight, nd.getWeight());
       __sync_fetch_and_add(&parts[newpart].partWeight, nd.getWeight());
       for (auto ii = cg.edge_begin(n), ee = cg.edge_end(n); ii != ee; ++ii) {
         GNode neigh = cg.getEdgeDst(ii);
         auto& ned = cg.getData(neigh);
+        ned.setmaybeBoundary(true);
         //if (ned.getPart() != newpart)
-        cnx.push(neigh);
+        //cnx.push(neigh);
       }
       if (fg)
         for (unsigned x = 0; x < nd.numChildren(); ++x)
@@ -148,15 +163,15 @@ struct refine_BKL2 {
     }
   }
 
-  static void go(unsigned ms, GGraph& cg, GGraph* fg, std::vector<partInfo>& p) {
+  static void go(unsigned ms, GGraph& cg, GGraph* fg, GGraph* oldGraph, std::vector<partInfo>& p) {
     typedef Galois::WorkList::dChunkedFIFO<8> Chunk;
     typedef Galois::WorkList::OrderedByIntegerMetric<gainIndexer, Chunk, 10> pG;
     gainIndexer::g = &cg;
     Galois::InsertBag<GNode> boundary;
     if (fg)
-      Galois::do_all_local(cg, findBoundaryAndProject(boundary, cg, *fg), "boundary");
+      Galois::do_all_local(cg, findBoundaryAndProject(boundary, cg, *fg, oldGraph), "boundary");
     else
-      Galois::do_all_local(cg, findBoundary(boundary, cg), "boundary");
+      Galois::do_all_local(cg, findBoundary(boundary, cg, oldGraph), "boundary");
     Galois::for_each_local<pG>(boundary, refine_BKL2(ms, cg, fg, p), "refine");
   }
 };
@@ -183,9 +198,11 @@ struct projectPart {
 } //anon namespace
 
 
+
+
 int gain(GGraph& g, GNode n) {
   int retval = 0;
-  unsigned nPart = g.getData(n).getPart();
+  unsigned int nPart = g.getData(n).getPart();
   for (auto ii = g.edge_begin(n), ee =g.edge_end(n); ii != ee; ++ii) {
     GNode neigh = g.getEdgeDst(ii);
     if (g.getData(neigh).getPart() == nPart)
@@ -197,20 +214,20 @@ int gain(GGraph& g, GNode n) {
 }
 
 struct parallelBoundary {
-  GGraph& g;
   Galois::InsertBag<GNode> &bag;
+  GGraph& g;
   parallelBoundary(Galois::InsertBag<GNode> &bag, GGraph& graph):bag(bag),g(graph) {
 
   }
   void operator()(GNode n,Galois::UserContext<GNode>&ctx) {
-      if (gain(g,n) > 0)  
+      if (gain(g,n) > 0)
         bag.push(n);
   }
 };
 void refineOneByOne(GGraph& g, std::vector<partInfo>& parts) {
   std::vector<GNode>  boundary;
-  int meanWeight =0;
-  for (int i =0; i<parts.size(); i++)
+  unsigned int meanWeight =0;
+  for (unsigned int i =0; i<parts.size(); i++)
     meanWeight += parts[i].partWeight;
   meanWeight /= parts.size();
   Galois::InsertBag<GNode> boundaryBag;
@@ -221,19 +238,19 @@ void refineOneByOne(GGraph& g, std::vector<partInfo>& parts) {
       GNode n = (*ii) ;
       unsigned nPart = g.getData(n).getPart();
       int part[parts.size()];
-      for (int i =0; i<parts.size(); i++)part[i]=0;
+      for (unsigned int i =0; i<parts.size(); i++)part[i]=0;
       for (auto ii = g.edge_begin(n), ee = g.edge_end(n); ii != ee; ++ii) {
         GNode neigh = g.getEdgeDst(ii);
         part[g.getData(neigh).getPart()]+=g.getEdgeData(ii);
       }
       int t = part[nPart];
-      int p = nPart;
-      for (int i =0; i<parts.size(); i++)
+      unsigned int p = nPart;
+      for (unsigned int i =0; i<parts.size(); i++)
         if (i!=nPart && part[i] > t && parts[nPart].partWeight>  parts[i].partWeight*(98)/(100) && parts[nPart].partWeight > meanWeight*98/100){
           t = part[i];
           p = i;
         }
-    if(p != nPart){ 
+    if(p != nPart){
       g.getData(n).setPart(p);
       parts[p].partWeight += g.getData(n).getWeight();
       parts[nPart].partWeight -= g.getData(n).getWeight();
@@ -241,9 +258,10 @@ void refineOneByOne(GGraph& g, std::vector<partInfo>& parts) {
   }
 }
 
+
 void refine_BKL(GGraph& g, std::vector<partInfo>& parts) {
   std::set<GNode> boundary;
-  
+
   //find boundary nodes with positive gain
   Galois::InsertBag<GNode> boundaryBag;
   parallelBoundary pB(boundaryBag, g);
@@ -279,32 +297,157 @@ void refine_BKL(GGraph& g, std::vector<partInfo>& parts) {
   }
 }
 
+struct ChangePart {//move each node to its "closest" cluster
+  GGraph& g;
+  int nbCluster;
+  double* Dist;
+  int* card;
 
-void refine(MetisGraph* coarseGraph, std::vector<partInfo>& parts, unsigned maxSize, refinementMode refM) {
+  ChangePart(GGraph& g, int nb_cluster, double* Dist, int* card): g(g), nbCluster(nb_cluster), Dist(Dist), card(card){
+  }
 
+  void operator()(GNode n, Galois::UserContext<GNode>& ctx) {
+    double dmin;
+    int partition =-1;
+    std::map <int, int> degreein;
+    degreein[g.getData(n, Galois::MethodFlag::NONE).getOldPart()] +=1;
+    for (GGraph::edge_iterator ii = g.edge_begin(n, Galois::MethodFlag::NONE), ei = g.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii){
+      int nclust = g.getData(g.getEdgeDst(ii, Galois::MethodFlag::NONE), Galois::MethodFlag::NONE).getOldPart();
+      degreein[nclust] += (int) g.getEdgeData(ii, Galois::MethodFlag::NONE);
+    }
+
+    for(auto clust = degreein.begin(), ee = degreein.end(); clust != ee; clust++)
+    {
+      //the distqnce between the cluster clust and the noden is :
+      double d = Dist[clust->first]-(2.0*(double)clust->second/(double)card[clust->first]);
+      if(d < dmin || partition ==-1)
+      {
+        dmin = d;
+        partition = clust->first;
+      }
+    }
+    g.getData(n, Galois::MethodFlag::NONE).setPart(partition);
+  }
+
+
+};
+
+ // Galois::GAccumulator<size_t> count
+struct ComputeClusterDist {
+  GGraph& g;
+  int nbCluster;
+  Galois::GAccumulator<size_t> *card;
+  Galois::GAccumulator<size_t> *degreeIn;
+
+  ComputeClusterDist(GGraph& g, int nb_cluster): g(g), nbCluster(nb_cluster) {
+    card = new Galois::GAccumulator<size_t>[nbCluster];
+    degreeIn = new Galois::GAccumulator<size_t>[nbCluster];
+  }
+
+  /*~ComputeClusterDist(){
+    std::cout <<"destruct\n"; delete[] card; delete[] degreeIn;
+  }*/
+
+  void operator()(GNode n, Galois::UserContext<GNode>& ctx) {
+    unsigned int clust = g.getData(n, Galois::MethodFlag::NONE).getPart();
+    int degreet =0;
+
+    g.getData(n, Galois::MethodFlag::NONE).OldPartCpyNew();
+    for (GGraph::edge_iterator ii = g.edge_begin(n, Galois::MethodFlag::NONE), ei = g.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii)
+      if( g.getData(g.getEdgeDst(ii, Galois::MethodFlag::NONE), Galois::MethodFlag::NONE).getPart() == clust)
+        degreet+=(int) g.getEdgeData(ii, Galois::MethodFlag::NONE);
+    card[clust]+=g.getData(n, Galois::MethodFlag::NONE).getWeight();
+    degreeIn[clust] += degreet;
+  }
+};
+double ratiocut(int nbClust, int* degree, int* card)
+{
+  double res=0;
+  for (int i=0; i<nbClust;i++)
+    res += (double)(degree[i])/(double)(card[i]);
+
+  return res;
+}
+
+
+
+void GraclusRefining(GGraph* graph, int nbParti, int nbIter)
+{
+
+  nbIter = std::min(15, nbIter);
+  double Dist[nbParti];
+  int card[nbParti];
+  int degreeIn[nbParti];
+
+
+  for(int j=0;j<nbIter;j++)
+  {
+    Galois::StatTimer T3("1st loop");
+    T3.start();
+    ComputeClusterDist comp(*graph, nbParti);
+    Galois::for_each(graph->begin(), graph->end(), comp,"compute dists");
+    T3.stop();
+    //std::cout << "Time calc:  "<<T3.get()<<'\n';
+
+    for (int i=0; i<nbParti; i++)
+    {
+      card[i] = comp.card[i].reduce();
+      Dist[i] = (card[i]!=0)?(double)((degreeIn[i]= comp.degreeIn[i].reduce())+card[i] )/((double)card[i]*(double)card[i]) : 0;
+    }
+    delete[] comp.card; delete[] comp.degreeIn;
+    Galois::StatTimer T4("2nd loop");
+    T4.start();
+
+    Galois::for_each(graph->begin(), graph->end(), ChangePart(*graph, nbParti, Dist, card), "make moves");
+    T4.stop();
+    //std::cout << "Time move:  "<<T4.get()<<'\n';
+  }
+  /*  std::cout<<ratiocut(nbParti, degreeIn, card)<< '\n';
+  for (int i=0; i<nbParti; i++)
+    std::cout<<card[i]<< ' ';
+  std::cout<<std::endl;*/
+
+}
+
+
+
+void refine(MetisGraph* coarseGraph, std::vector<partInfo>& parts, unsigned meanSize, refinementMode refM) {
+  switch (refM) {
+    case BKL2: std::cout<< "\n  Sarting refinnement with BKL2\n"; break;
+    case BKL: std::cout<< "\n  Sarting refinnement with BKL\n";  break;
+    case ROBO: std::cout<< "\n  Sarting refinnement with ROBO\n"; break;
+    case GRACLUS: std::cout<< "\n  Sarting refinnement with GRACLUS\n";; break;
+    default: abort();
+  }
+  MetisGraph* tGraph = coarseGraph;
+  int nbIter=1;
+  while ((tGraph = tGraph->getFinerGraph()))nbIter*=2;
+  nbIter /=4;
+  MetisGraph* oldGraph = NULL;
   do {
-  
+
     MetisGraph* fineGraph = coarseGraph->getFinerGraph();
     bool doProject = true;
     //refine nparts times
     switch (refM) {
-    case BKL2:refine_BKL2<false>::go(maxSize, *coarseGraph->getGraph(), fineGraph ? fineGraph->getGraph() : nullptr, parts); doProject = false; break;
+    case BKL2: refine_BKL2<false>::go(meanSize, *coarseGraph->getGraph(), fineGraph ? fineGraph->getGraph() : nullptr, oldGraph ? oldGraph->getGraph() : nullptr, parts); doProject = false; break;
     case BKL: refine_BKL(*coarseGraph->getGraph(), parts); break;
     case ROBO: refineOneByOne(*coarseGraph->getGraph(), parts); break;
+    case GRACLUS: GraclusRefining(coarseGraph->getGraph(), parts.size(), nbIter);nbIter =(nbIter+1)/2;break;
     default: abort();
     }
-    // std::cout << "Refinement of " << coarseGraph->getGraph() << "\n";
-    // printPartStats(parts);
-
+    //std::cout << "Refinement of " << coarseGraph->getGraph() << "\n";
+    //printPartStats(parts);
     //project up
     if (fineGraph && doProject) {
       projectPart::go(coarseGraph, parts);
     }
+    oldGraph = coarseGraph;
   } while ((coarseGraph = coarseGraph->getFinerGraph()));
 }
 
-void balance(MetisGraph* coarseGraph, std::vector<partInfo>& parts, unsigned maxSize) {
+/*void balance(MetisGraph* coarseGraph, std::vector<partInfo>& parts, unsigned meanSize) {
     MetisGraph* fineGraph = coarseGraph->getFinerGraph();
-    refine_BKL2<true>::go(maxSize, *coarseGraph->getGraph(), fineGraph ? fineGraph->getGraph() : nullptr, parts);
-}
+    refine_BKL2<true>::go(meanSize, *coarseGraph->getGraph(), fineGraph ? fineGraph->getGraph() : nullptr, parts);
+}*/
 

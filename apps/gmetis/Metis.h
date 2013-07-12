@@ -29,78 +29,91 @@
 #include "Galois/Graph/LC_Morph_Graph.h"
 
 class MetisNode;
-typedef Galois::Graph::LC_Morph_Graph<MetisNode,int> GGraph;
-typedef Galois::Graph::LC_Morph_Graph<MetisNode,int>::GraphNode GNode;
+typedef Galois::Graph::LC_Morph_Graph<MetisNode, int> GGraph;
+typedef Galois::Graph::LC_Morph_Graph<MetisNode, int>::GraphNode GNode;
 
 //algorithms
 enum InitialPartMode {GGP, GGGP, MGGGP};
-enum refinementMode {BKL, BKL2, ROBO};
+enum refinementMode {BKL, BKL2, ROBO, GRACLUS};
 //Nodes in the metis graph
 class MetisNode {
 
 public:
+  //int num;
   explicit MetisNode(int weight) :_weight(weight) {
     init();
   }
   
   MetisNode(GNode child0, unsigned weight)
     : _weight(weight) {
-    children[0] = child0;
     init();
-    onlyOneChild = true;
+    children[0] = child0;
+    children[1] = NULL;
+    //onlyOneChild = true;
+
   }
 
   MetisNode(GNode child0, GNode child1, unsigned weight)
-    : onlyOneChild(false), _weight(weight) {
+    : _weight(weight) {
+    init();
     children[0] = child0;
     children[1] = child1;
-    init();
+    //onlyOneChild = false;
   }
 
   MetisNode() { }
 
   void init(){
-    _numEdges = 0;
-    _weightEdge = 0;
-    _partition = 0;
-    bmatched = false;
-    bparent = false;
-    onlyOneChild = false;
+    compress2.numEdges = 0;
+    //_partition = 0;
+    compress.matched = NULL;
+    parent = NULL;
+    maybeBoundary = false;
   }
 
   int getWeight() const { return _weight; }
   void setWeight(int weight) { _weight = weight; }
-  
-  unsigned getEdgeWeight() const { return _weightEdge; }
-  void setEdgeWeight(unsigned w) { _weightEdge = w; }
 
-  void setParent(GNode p)  { parent = p; bparent = true; }
-  GNode getParent() const  { assert(bparent); return parent; }
+  void setParent(GNode p)  { parent = p;/* bparent = true;*/ }
+  GNode getParent() const  { /*assert(bparent);*/ assert(parent); return parent; }
 
-  void setMatched(GNode v) { matched = v; bmatched = true; }
-  GNode getMatched() const { assert(bmatched); return matched; }
-  bool isMatched() const   { return bmatched; }
+  void setMatched(GNode v) { compress.matched = v; /*bmatched = true; */}
+  GNode getMatched() const { /*assert(bmatched);*/ return compress.matched; }
+  bool isMatched() const   { /*return bmatched;*/ return compress.matched != NULL; }
 
   GNode getChild(unsigned x) const { return children[x]; }
-  unsigned numChildren() const { return onlyOneChild ? 1 : 2; }
+  unsigned numChildren() const { /*return onlyOneChild ? 1 : 2;*/return children[1] ? 2 : 1; }
 
-  unsigned getNumEdges() const { return _numEdges; }
-  void setNumEdges(unsigned val) { _numEdges = val; }
+  unsigned getNumEdges() const { return compress2.numEdges; }
+  void setNumEdges(unsigned val) { compress2.numEdges = val; }
 
-  unsigned getPart() const { return _partition; }
-  void setPart(unsigned val) { _partition = val; }
+  unsigned getPart() const { return compress.partition; }
+  void setPart(unsigned val) { compress.partition = val; }
 
+  int getOldPart() const {return compress2.oldPartition;}
+  void OldPartCpyNew(){compress2.oldPartition = compress.partition; }
+
+  bool getmaybeBoundary() const {return maybeBoundary; }
+  void setmaybeBoundary(bool val){maybeBoundary = val; }
 private:
-  bool bmatched;
-  GNode matched;
-  bool bparent;
+  union {
+    GNode matched;
+    unsigned partition;
+  } compress;
+  union{
+    unsigned numEdges;
+    unsigned int oldPartition;
+  } compress2;
+
+  // bool bmatched;
+  // bool bparent;
   GNode parent;
   GNode children[2];
-  bool onlyOneChild;
+  //bool onlyOneChild;
+
   unsigned _weight;
-  unsigned _numEdges;
-  unsigned _partition;
-  unsigned _weightEdge;
+
+  bool maybeBoundary;
 };
 
 //Structure to keep track of graph hirarchy
@@ -186,10 +199,10 @@ MetisGraph* coarsen(MetisGraph* fineMetisGraph, unsigned coarsenTo);
 
 //Partitioning
 std::vector<partInfo> partition(MetisGraph* coarseMetisGraph, unsigned numPartitions, InitialPartMode partMode);
-std::vector<partInfo> BisectAll(MetisGraph* mcg, unsigned numPartitions);
+std::vector<partInfo> BisectAll(MetisGraph* mcg, unsigned numPartitions, unsigned maxSize);
 //Refinement
 void refine(MetisGraph* coarseGraph, std::vector<partInfo>& parts, unsigned maxSize, refinementMode refM);
-
+//void refinePart(GGraph& g, std::vector<partInfo>& parts, unsigned maxSize);
 //Balancing
 void balance(MetisGraph* Graph, std::vector<partInfo>& parts, unsigned maxSize);
 

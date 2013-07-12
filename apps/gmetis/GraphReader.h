@@ -29,30 +29,7 @@ using namespace std;
 typedef Galois::Graph::LC_CSR_Graph<int, unsigned int> InputGraph;
 typedef Galois::Graph::LC_CSR_Graph<int, unsigned int>::GraphNode InputGNode;
 
-void readMetisGraph(MetisGraph* metisGraph, const char* filename){
-  std::ifstream file(filename);
-  string line;
-  std::getline(file, line);
-  while(line.find('%')!=string::npos){
-    std::getline(file, line);
-  }
 
-  int numNodes, numEdges;
-  sscanf(line.c_str(), "%d %d", &numNodes, &numEdges);
-  cout<<numNodes<<" "<<numEdges<<endl;
-  GGraph* graph = metisGraph->getGraph();
-  vector<GNode> nodes(numNodes);
-  for (int i = 0; i < numNodes; i++) {
-    GNode n = graph->createNode(100, 1); //FIXME: edge numbers
-    nodes[i] = n;
-    //graph->addNode(n);
-  }
-  int countEdges = 0;
-  for (int i = 0; i < numNodes; i++) {
-    std::getline(file, line);
-    char const * items = line.c_str();
-    char* remaining;
-    GNode n1 = nodes[i];
 
     while (true) {
       int index = strtol(items, &remaining,10) - 1;
@@ -69,17 +46,7 @@ void readMetisGraph(MetisGraph* metisGraph, const char* filename){
     }
   }
 
-  assert(countEdges == numEdges*2);
-  // metisGraph->setNumEdges(numEdges);
-  // metisGraph->setNumNodes(numNodes);
-  cout<<"finshied reading graph " << metisGraph->getNumNodes() << " " << /* FIXME metisGraph->getNumEdges()*/ "Unknown" <<endl;
-}
 
-struct parallelMakeNodes {
-  GGraph *graph;
-  InputGraph *inputGraph;
-  vector <GNode>  &gnodes;
-  Galois::GAccumulator<int> &pnumNodes;
 
 parallelMakeNodes(GGraph *g,vector <GNode> &gn,InputGraph *in,Galois::GAccumulator<int> &numNodes):
   graph(g),inputGraph(in),gnodes(gn),pnumNodes(numNodes) {}
