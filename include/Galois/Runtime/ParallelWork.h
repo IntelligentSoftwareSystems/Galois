@@ -274,7 +274,7 @@ protected:
       didWork = false;
       //Run some iterations
       if (ForEachTraits<FunctionTy>::NeedsBreak || ForEachTraits<FunctionTy>::NeedsAborts)
-        didWork = runQueue<checkAbort|| ForEachTraits<FunctionTy>::NeedsBreak>(tld, wl, false);
+        didWork = runQueue<checkAbort || ForEachTraits<FunctionTy>::NeedsBreak>(tld, wl, false);
       else //No try/catch
         didWork = runQueueSimple(tld);
       //Check for abort

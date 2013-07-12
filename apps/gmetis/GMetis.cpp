@@ -166,7 +166,7 @@ int main(int argc, char** argv) {
     std::cout << pp->first << " : " << pp->second << "\n";
 
   Galois::reportPageAlloc("MeminfoPre");
-  Galois::preAlloc(Galois::Runtime::MM::numPageAllocTotal() * 3);
+  Galois::preAlloc(Galois::Runtime::MM::numPageAllocTotal() * 4);
 
   Partition(&metisGraph, numPartitions);
 

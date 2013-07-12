@@ -62,7 +62,7 @@ void readMetisGraph(MetisGraph* metisGraph, const char* filename){
       if(n1==n2){
         continue;
       }
-      graph->getEdgeData(graph->addEdge(n1, n2)) = 1;
+      graph->addEdge(n1, n2, Galois::MethodFlag::ALL, 1);
       graph->getData(n1).setEdgeWeight(graph->getData(n1).getEdgeWeight() + 1);
       graph->getData(n1).setNumEdges(graph->getData(n1).getNumEdges() + 1);
       countEdges++;
@@ -118,7 +118,7 @@ struct parallelMakeEdges {
       if(weighted){
         weight = inputGraph->getEdgeData(jj);
       }
-      graph->getEdgeData(graph->addEdge(node, gnodes[neighId])) = weight;//
+      graph->addEdge(node, gnodes[neighId], Galois::MethodFlag::ALL, weight);
       nodeData.setNumEdges(nodeData.getNumEdges() + 1);
       nodeData.setEdgeWeight(nodeData.getEdgeWeight() + weight);
       /*if(!directed){

@@ -61,7 +61,6 @@ struct EdgeItem<NTy, ETy, true> {
 
   inline NTy*&       first()       { assert(N); return N; }
   inline NTy* const& first() const { assert(N); return N; }
-  inline void setFirst(NTy* v) { N = v; } //Hack for LC_Morph_Graph
   inline ETy*       second()       { return &Ea; }
   inline const ETy* second() const { return &Ea; }
 

@@ -199,7 +199,7 @@ struct parallelPopulateEdges {
         ++pp;
       }
       if (node != dst) { // no self edges
-        coarseGGraph->getEdgeData(coarseGGraph->addEdgeWithoutCheck(node, dst), Galois::MethodFlag::NONE) = sum;
+        coarseGGraph->addEdgeWithoutCheck(node, dst, Galois::MethodFlag::NONE, sum);
         ++e;
       }
     }
@@ -234,7 +234,7 @@ struct parallelPopulateEdges2 {
       GNode pdst = fineGGraph->getData(dst, Galois::MethodFlag::NONE).getParent();
       unsigned n = fineGGraph->getEdgeData(ii, Galois::MethodFlag::NONE);
       if (pnode != pdst) {
-        coarseGGraph->getEdgeData(coarseGGraph->addEdge(pnode, pdst)) += n;
+        coarseGGraph->getEdgeData(coarseGGraph->addEdge(pnode, pdst, Galois::MethodFlag::NONE)) += n;
         ++e;
       }
     }

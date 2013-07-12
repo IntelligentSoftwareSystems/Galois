@@ -32,7 +32,8 @@
 #include "Galois/Graph/Util.h"
 #include "Galois/Runtime/MethodFlags.h"
 #include "Galois/Runtime/Context.h"
-#include "Galois/gdeque.h"
+#include "Galois/Runtime/mm/Mem.h"
+
 namespace Galois {
 namespace Graph {
 //! Local computation graph (i.e., graph structure does not change)
@@ -44,15 +45,17 @@ protected:
   typedef GraphImpl::EdgeItem<NodeInfo, EdgeTy, true> EITy;
   //typedef Galois::gdeque<NodeInfo,64> NodeListTy;
   
-  typedef Galois::gdeque<EITy,128> Edges;
-  typedef typename Edges::iterator eiter;
-  
-  
+  struct EdgeHolder {
+    EITy* begin;
+    EITy* end;
+    EdgeHolder* next;
+  };
+
   struct NodeInfo: public Galois::Runtime::Lockable {
     NodeTy data;
     unsigned debugEdges;
-    eiter edgeBegin;
-    eiter edgeEnd;
+    EITy* edgeBegin;
+    EITy* edgeEnd;
     template<typename... Args>
     NodeInfo(Args&& ...args):data(std::forward<Args>(args)...){
     }
@@ -60,7 +63,7 @@ protected:
 
   typedef Galois::InsertBag<NodeInfo> NodeListTy;
   NodeListTy nodes;
-  Galois::Runtime::PerThreadStorage<Edges> edges;
+  Galois::Runtime::PerThreadStorage<EdgeHolder*> edges;
 
   struct makeGraphNode: public std::unary_function<NodeInfo&, NodeInfo*> {
     NodeInfo* operator()(NodeInfo& data) const { return &data; }
@@ -80,7 +83,7 @@ public:
   typedef EdgeTy edge_data_type;
   typedef NodeTy node_data_type;
   typedef typename EITy::reference edge_data_reference;
-  typedef typename Galois::gdeque<EITy,128>::iterator edge_iterator;
+  typedef EITy* edge_iterator;
   
   NodeTy& getData(const GraphNode& N, MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::checkWrite(mflag, false);
@@ -139,33 +142,49 @@ public:
     Galois::Runtime::checkWrite(MethodFlag::ALL, true);
     NodeInfo* N = &(nodes.emplace(std::forward<Args>(args)...));
     Galois::Runtime::acquire(N, MethodFlag::ALL);
-    Edges &local_edges = *edges.getLocal();
-    //ensure one item exists to use so begin is stable (not null)
-    N->edgeBegin = N->edgeEnd = local_edges.insert(local_edges.end(), nedges, EITy(0));
+    EdgeHolder*& local_edges = *edges.getLocal();
+    if (!local_edges || std::distance(local_edges->begin, local_edges->end) < nedges) {
+      EdgeHolder* old = local_edges;
+      char* newblock = (char*)Runtime::MM::pageAlloc();
+      local_edges = (EdgeHolder*)newblock;
+      local_edges->next = old;
+      char* estart = newblock + sizeof(EdgeHolder);
+      if ((uintptr_t)estart % sizeof(EITy)) //not aligned
+        estart += sizeof(EITy) - ((uintptr_t)estart % alignof(EITy));
+
+      local_edges->begin = (EITy*)estart;
+      char* eend = newblock + Runtime::MM::pageSize;
+      eend -= (uintptr_t)eend % sizeof(EITy);
+      local_edges->end = (EITy*)eend;
+    }
+    N->edgeBegin = N->edgeEnd = local_edges->begin;
+    local_edges->begin += nedges;
     N->debugEdges = nedges;
     return GraphNode(N);
   }
 
-  edge_iterator addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::ALL) {
+  template<typename... Args>
+  edge_iterator addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag, Args&&... args) {
     Galois::Runtime::checkWrite(mflag, true);
     Galois::Runtime::acquire(src, mflag);
     assert(std::distance(src->edgeBegin, src->edgeEnd) < src->debugEdges);
     auto it = std::find_if(src->edgeBegin, src->edgeEnd, first_equals(dst));
     if (it == src->edgeEnd) {
-      it->setFirst(dst);
+      new (it) EITy(dst, 0, std::forward<Args>(args)...);
       src->edgeEnd++;
     }
     assert(std::distance(src->edgeBegin, src->edgeEnd) <= src->debugEdges);
     return it;
   }
 
-  edge_iterator addEdgeWithoutCheck(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::ALL) {
+  template<typename... Args>
+  edge_iterator addEdgeWithoutCheck(GraphNode src, GraphNode dst, Galois::MethodFlag mflag, Args&&... args) {
     Galois::Runtime::checkWrite(mflag, true);
     Galois::Runtime::acquire(src, mflag);
     assert(std::distance(src->edgeBegin, src->edgeEnd) < src->debugEdges);
     auto it = src->edgeEnd;
+    new (it) EITy(dst, 0, std::forward<Args>(args)...);
     src->edgeEnd++;
-    it->setFirst(dst);
     assert(std::distance(src->edgeBegin, src->edgeEnd) <= src->debugEdges);
     return it;
   }
@@ -210,7 +229,7 @@ public:
 
     void operator()(FileGraph::GraphNode gn) {
        for (auto ii = graph.edge_begin(gn), ee = graph.edge_end(gn); ii != ee; ++ii) {
-         self->getEdgeData(self->addEdge(tracking[gn], tracking[graph.getEdgeDst(ii)])) += graph.getEdgeData<uint32_t>(ii);
+         self->addEdgeWithoutCheck(tracking[gn], tracking[graph.getEdgeDst(ii)], Galois::MethodFlag::NONE, graph.getEdgeData<uint32_t>(ii));
          ++nEdges;
        }
     }
