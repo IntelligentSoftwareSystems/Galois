@@ -29,7 +29,7 @@
 
 namespace {
 
-struct gainIndexer {
+struct gainIndexer : public std::unary_function<GNode, int> {
   static GGraph* g;
 
   int operator()(GNode n) {
