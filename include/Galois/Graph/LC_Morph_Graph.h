@@ -53,7 +53,7 @@ protected:
 
   struct NodeInfo: public Galois::Runtime::Lockable {
     NodeTy data;
-    unsigned debugEdges;
+    //    unsigned debugEdges;
     EITy* edgeBegin;
     EITy* edgeEnd;
     template<typename... Args>
@@ -85,8 +85,6 @@ public:
   typedef typename EITy::reference edge_data_reference;
   typedef EITy* edge_iterator;
     
-  std::vector<GraphNode> trackingG;//FIXE ME: keep the real order of the graph, usefull for output the partitioning. Need to be removed.
-
   NodeTy& getData(const GraphNode& N, MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::checkWrite(mflag, false);
     Galois::Runtime::acquire(N, mflag);
@@ -161,7 +159,7 @@ public:
     }
     N->edgeBegin = N->edgeEnd = local_edges->begin;
     local_edges->begin += nedges;
-    N->debugEdges = nedges;
+    //    N->debugEdges = nedges;
     return GraphNode(N);
   }
 
@@ -169,13 +167,13 @@ public:
   edge_iterator addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag, Args&&... args) {
     Galois::Runtime::checkWrite(mflag, true);
     Galois::Runtime::acquire(src, mflag);
-    assert(std::distance(src->edgeBegin, src->edgeEnd) < src->debugEdges);
+    //    assert(std::distance(src->edgeBegin, src->edgeEnd) < src->debugEdges);
     auto it = std::find_if(src->edgeBegin, src->edgeEnd, first_equals(dst));
     if (it == src->edgeEnd) {
       new (it) EITy(dst, 0, std::forward<Args>(args)...);
       src->edgeEnd++;
     }
-    assert(std::distance(src->edgeBegin, src->edgeEnd) <= src->debugEdges);
+    //    assert(std::distance(src->edgeBegin, src->edgeEnd) <= src->debugEdges);
     return it;
   }
 
@@ -183,11 +181,11 @@ public:
   edge_iterator addEdgeWithoutCheck(GraphNode src, GraphNode dst, Galois::MethodFlag mflag, Args&&... args) {
     Galois::Runtime::checkWrite(mflag, true);
     Galois::Runtime::acquire(src, mflag);
-    assert(std::distance(src->edgeBegin, src->edgeEnd) < src->debugEdges);
+    //    assert(std::distance(src->edgeBegin, src->edgeEnd) < src->debugEdges);
     auto it = src->edgeEnd;
     new (it) EITy(dst, 0, std::forward<Args>(args)...);
     src->edgeEnd++;
-    assert(std::distance(src->edgeBegin, src->edgeEnd) <= src->debugEdges);
+    //    assert(std::distance(src->edgeBegin, src->edgeEnd) <= src->debugEdges);
     return it;
   }
   
@@ -241,7 +239,7 @@ public:
 
     //if we can keep the node order we should delete trackingG and turn tracking into a vector and not a ref.
     //std::vector<GraphNode> tracking;
-    std::vector<GraphNode>& tracking = trackingG;
+    std::vector<GraphNode> tracking;
 
     tracking.resize(graph.size());
 
