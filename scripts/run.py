@@ -149,7 +149,10 @@ def main(args, options):
     run(args, [], options)
   else:
     for prod in product(ranges):
-      cmd = [args[0]]
+      if options.append_arguments:
+        cmd = args
+      else:
+        cmd = [args[0]]
       values = []
       for ((name, arg), value) in zip(variables, prod):
         if arg:
@@ -157,7 +160,8 @@ def main(args, options):
         else:
           cmd.extend([str(value)])
         values.append((name, str(value)))
-      cmd.extend(args[1:])
+      if not options.append_arguments:
+        cmd.extend(args[1:])
 
       run(cmd, values, options)
 
@@ -177,7 +181,9 @@ if __name__ == '__main__':
   parser.add_option('-o', '--timeout', dest="timeout", default=0, type='int',
       help="timeout a run after SEC seconds", metavar='SEC')
   parser.add_option('--no-default-thread', dest='no_default_thread', default=False, action='store_true',
-      help='run command default thread parameter')
+      help='supress run command default thread argument')
+  parser.add_option('--append-arguments', dest='append_arguments', default=False, action='store_true',
+      help='append instead of prepend additional command line arguments')
   (options, args) = parser.parse_args()
   if not args:
     parser.error('need command to run')
