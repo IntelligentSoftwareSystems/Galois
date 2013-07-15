@@ -53,6 +53,7 @@ class InsertBag: private boost::noncopyable {
     T* dlast; //end of storage
   };
 
+public:
   template<typename U>
   class Iterator: public boost::iterator_facade<Iterator<U>, U, boost::forward_traversal_tag> {
     friend class boost::iterator_core_access;
@@ -120,6 +121,7 @@ class InsertBag: private boost::noncopyable {
     }
   };
   
+private:
   Galois::Runtime::MM::FixedSizeAllocator heap;
   Galois::Runtime::PerThreadStorage<header*> heads;
 

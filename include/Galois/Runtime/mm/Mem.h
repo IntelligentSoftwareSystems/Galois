@@ -38,6 +38,7 @@
 
 #include <boost/utility.hpp>
 #include <cstdlib>
+#include <cstring>
 #include <map>
 #include <cstddef>
 

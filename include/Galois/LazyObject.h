@@ -27,6 +27,7 @@
 
 #include "Galois/config.h"
 #include "Galois/Runtime/ll/gio.h"
+#include "Galois/TypeTraits.h"
 
 // For consistent name, use boost rather than C++11 std::is_trivially_constuctible
 #include <boost/type_traits/has_trivial_constructor.hpp>
@@ -68,8 +69,7 @@ struct StrictObject<void> {
   reference get() const { return 0; }
 };
 
-#if !defined(__IBMCPP__) || __IBMCPP__ > 1210
-#else
+#if defined(__IBMCPP__) && __IBMCPP__ <= 1210
 namespace LazyObjectDetail {
 
 template<typename T, typename CharData, bool>
@@ -91,7 +91,7 @@ struct SafeDataBase<T, CharData, false> {
 
     type() {
       // XXX: Keep this as a runtime exception rather than a compile-time one
-      GALOIS_DIE("Unsafe construct when expecting strict aliasing");
+      GALOIS_DIE("Unsafe construct for type '", __PRETTY_FUNCTION__, "' when expecting strict aliasing");
     }
   };
 };
@@ -101,7 +101,8 @@ struct SafeDataBase<T, CharData, false> {
  * members in unions.
  */
 template<typename T, typename CharData>
-struct SafeData: public SafeDataBase<T, CharData, boost::has_trivial_constructor<T>::value> { };
+struct SafeData: public SafeDataBase<T, CharData,
+  boost::has_trivial_constructor<T>::value || Galois::has_known_trivial_constructor<T>::value > { };
 
 } // end detail
 #endif
@@ -116,7 +117,9 @@ template<typename T>
 class LazyObject {
   typedef typename std::aligned_storage<sizeof(T), std::alignment_of<T>::value>::type CharData;
 
-#if !defined(__IBMCPP__) || __IBMCPP__ > 1210
+#if defined(__IBMCPP__) && __IBMCPP__ <= 1210 
+  typedef typename LazyObjectDetail::SafeData<T, CharData>::type Data;
+#else
   union Data {
     CharData buf;
     T value_;
@@ -127,8 +130,6 @@ class LazyObject {
     T& value() { return value_; }
     const T& value() const { return value_; }
   };
-#else
-  typedef typename LazyObjectDetail::SafeData<T, CharData>::type Data;
 #endif
 
   Data data_;

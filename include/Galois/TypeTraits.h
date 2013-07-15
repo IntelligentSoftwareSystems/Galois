@@ -53,7 +53,9 @@
 #ifndef GALOIS_TYPETRAITS_H
 #define GALOIS_TYPETRAITS_H
 
+#include "Galois/Runtime/ll/CompilerSpecific.h"
 #include <boost/mpl/has_xxx.hpp>
+
 namespace Galois {
 
 #define GALOIS_HAS_MEM_FUNC(func, name) \
@@ -207,6 +209,14 @@ struct does_not_need_aborts : public has_tt_does_not_need_aborts<T> {};
 BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_has_fixed_neighborhood)
 template <typename T>
 struct has_fixed_neighborhood: public has_tt_has_fixed_neighborhood<T> {};
+
+/**
+ * Temporary type trait for pre-C++11 compilers, which don't support exact
+ * std::is_trivially_constructible. 
+ */
+BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_has_known_trivial_constructor)
+template <typename T>
+struct has_known_trivial_constructor: public has_tt_has_known_trivial_constructor<T> { };
 
 }
 #endif
