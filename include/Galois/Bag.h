@@ -58,13 +58,13 @@ public:
   class Iterator: public boost::iterator_facade<Iterator<U>, U, boost::forward_traversal_tag> {
     friend class boost::iterator_core_access;
 
-    Galois::Runtime::PerThreadStorage<header*>* hd;
+    Galois::Runtime::PerThreadStorage<std::pair<header*,header*> >* hd;
     unsigned int thr;
     header* p;
     U* v;
 
     bool init_thread() {
-      p = thr < hd->size() ? *hd->getRemote(thr) : 0;
+      p = thr < hd->size() ? hd->getRemote(thr)->first : 0;
       v = p ? p->dbegin : 0;
       return p;
     }
@@ -112,7 +112,7 @@ public:
     template<typename OtherTy>
     Iterator(const Iterator<OtherTy>& o): hd(o.hd), thr(o.thr), p(o.p), v(o.v) { }
 
-    Iterator(Galois::Runtime::PerThreadStorage<header*>* h, unsigned t):
+    Iterator(Galois::Runtime::PerThreadStorage<std::pair<header*,header*> >* h, unsigned t):
       hd(h), thr(t), p(0), v(0)
     {
       // find first valid item
@@ -123,12 +123,16 @@ public:
   
 private:
   Galois::Runtime::MM::FixedSizeAllocator heap;
-  Galois::Runtime::PerThreadStorage<header*> heads;
+  Galois::Runtime::PerThreadStorage<std::pair<header*,header*> > heads;
 
   void insHeader(header* h) {
-    header*& H = *heads.getLocal();
-    h->next = H;
-    H = h;
+    std::pair<header*,header*>& H = *heads.getLocal();
+    if (H.second) {
+      H.second->next = h;
+      H.second = h;
+    } else {
+      H.first = H.second = h;
+    }
   }
 
   header* newHeaderFromAllocator(void *m, unsigned size) {
@@ -154,7 +158,7 @@ private:
 
   void destruct() {
     for (unsigned x = 0; x < heads.size(); ++x) {
-      header*& h = *heads.getRemote(x);
+      header*& h = heads.getRemote(x)->first;
       while (h) {
         uninitialized_destroy(h->dbegin, h->dend);
         header* h2 = h;
@@ -198,7 +202,7 @@ public:
 
   bool empty() const {
     for (unsigned x = 0; x < heads.size(); ++x) {
-      header* h = *heads.getRemote(x);
+      header* h = heads.getRemote(x)->first;
       if (h)
         return false;
     }
@@ -208,7 +212,7 @@ public:
   //! Thread safe bag insertion
   template<typename... Args>
   reference emplace(Args&&... args) {
-    header* H = *heads.getLocal();
+    header* H = heads.getLocal()->second;
     T* rv;
     if (!H || H->dend == H->dlast) {
       H = newHeader();
