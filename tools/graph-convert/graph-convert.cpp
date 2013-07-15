@@ -1661,7 +1661,9 @@ int main(int argc, char** argv) {
     case gr2doublemtx: convert_gr2mtx<double>(inputfilename, outputfilename); break;
     case gr2floatmtx: convert_gr2mtx<float>(inputfilename, outputfilename); break;
     case gr2floatpbbsedges: convert_gr2pbbsedges<float>(inputfilename, outputfilename); break;
+#if !defined(__IBMCPP__) || __IBMCPP__ > 1210
     case gr2intpbbs: convert_gr2pbbs<int32_t,int32_t>(inputfilename, outputfilename); break;
+#endif
     case gr2intpbbsedges: convert_gr2pbbsedges<int32_t>(inputfilename, outputfilename); break;
     case gr2lowdegreeintgr: remove_high_degree<int32_t>(inputfilename, outputfilename, maxDegree); break;
 // XXX(ddn): The below triggers some internal XLC bug
@@ -1687,14 +1689,18 @@ int main(int argc, char** argv) {
     case vgr2edgelist: convert_gr2edgelist<void>(inputfilename, outputfilename); break;
     case vgr2intgr: add_weights<void,int32_t>(inputfilename, outputfilename, maxValue); break;
     case vgr2lowdegreevgr: remove_high_degree<void>(inputfilename, outputfilename, maxDegree); break;
+#if !defined(__IBMCPP__) || __IBMCPP__ > 1210
     case vgr2pbbs: convert_gr2pbbs<void,void>(inputfilename, outputfilename); break;
+#endif
     case vgr2ringvgr: add_ring<void>(inputfilename, outputfilename, maxValue); break;
     case vgr2svgr: convert_gr2sgr<void>(inputfilename, outputfilename); break;
     case vgr2treevgr: add_tree<void>(inputfilename, outputfilename, maxValue); break;
     case vgr2trivgr: convert_sgr2gr<void>(inputfilename, outputfilename); break;
     case vgr2tvgr: transpose<void>(inputfilename, outputfilename); break;
+#if !defined(__IBMCPP__) || __IBMCPP__ > 1210
     case vgr2vbinpbbs32: convert_gr2vbinpbbs<uint32_t,uint32_t>(inputfilename, outputfilename); break;
     case vgr2vbinpbbs64: convert_gr2vbinpbbs<uint32_t,uint64_t>(inputfilename, outputfilename); break;
+#endif
     default: abort();
   }
   return 0;
