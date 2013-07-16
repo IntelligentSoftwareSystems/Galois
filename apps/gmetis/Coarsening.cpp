@@ -41,13 +41,6 @@ void assertNoMatched(GGraph* graph) {
 }
 
 struct HEMmatch {
-  // unsigned matched;
-  // unsigned self;
-  // unsigned checked;
-  // unsigned nume;
-  ~HEMmatch() {
-    //    std::cout << Galois::Runtime::LL::getTID() << " matched " << matched << " self " << self << " checked " << checked << " edges of " << nume << "\n";
-  }
   GNode operator()(GNode node, GGraph* graph) {
     GNode retval = node; // match self if nothing else
     int maxwgt = std::numeric_limits<int>::min();
@@ -63,12 +56,6 @@ struct HEMmatch {
         retval = neighbor;
       }
     }
-    // assert(!graph->getData(retval).isMatched());
-    // assert(!graph->getData(node).isMatched());
-    // if (retval == node)
-    //   ++self;
-    // else
-    //   ++matched;
     return retval;
   }
 };
@@ -87,22 +74,20 @@ struct RMmatch {
   }
 };
 
-unsigned int impr;
-GNode RMmatch2hop(GNode node, GGraph* graph ) {
-//if (graph->getData(node, Galois::MethodFlag::NONE).getNumEdges() < 1+impr)
-  for (auto jj = graph->edge_begin(node, Galois::MethodFlag::NONE), eejj = graph->edge_end(node, Galois::MethodFlag::NONE); jj != eejj; ++jj) {
-    GNode neighbor = graph->getEdgeDst(jj, Galois::MethodFlag::NONE);
-    for (auto ii = graph->edge_begin(neighbor, Galois::MethodFlag::NONE), eeii = graph->edge_end(neighbor, Galois::MethodFlag::NONE); ii != eeii; ++ii){
-       GNode neighborHop = graph->getEdgeDst(ii, Galois::MethodFlag::NONE);
-       if (!graph->getData(neighborHop, Galois::MethodFlag::NONE).isMatched() && neighborHop != node 
-            && graph->getData(neighborHop, Galois::MethodFlag::NONE).getNumEdges() < 1+impr)
-       return neighborHop;
+template<typename MatchingPolicy>
+struct TwoHopMatcher {
+  MatchingPolicy matcher;
+  GNode operator()(GNode node, GGraph* graph) {
+    for (auto jj = graph->edge_begin(node, Galois::MethodFlag::NONE), eejj = graph->edge_end(node);
+         jj != eejj; ++jj) {
+      GNode neighbor = graph->getEdgeDst(jj, Galois::MethodFlag::NONE);
+      GNode retval = matcher(neighbor, graph);
+      if (retval != node && retval != neighbor)
+        return retval;
     }
+    return node;
   }
-  return node;
-    //Don't actually do random, just choose first
-}
-
+};
 
 /*
  *This operator is responsible for matching.
@@ -114,24 +99,26 @@ GNode RMmatch2hop(GNode node, GGraph* graph ) {
 */
 template<typename MatchingPolicy>
 struct parallelMatchAndCreateNodes {
-  //typedef int tt_does_not_need_parallel_push;
   MatchingPolicy matcher;
+  TwoHopMatcher<MatchingPolicy> matcher2;
+
   GGraph *fineGGraph;
   GGraph *coarseGGraph;
-  unsigned dual;
   parallelMatchAndCreateNodes(MetisGraph* Graph)
-    : matcher(), fineGGraph(Graph->getFinerGraph()->getGraph()), coarseGGraph(Graph->getGraph()), dual(0) {
+    : matcher(), matcher2(),
+      fineGGraph(Graph->getFinerGraph()->getGraph()), coarseGGraph(Graph->getGraph()) {
     assert(fineGGraph != coarseGGraph);
   }
-
-  ~parallelMatchAndCreateNodes() { if (dual) std::cout << "Dual matched " << dual << "\n"; }
 
   void operator()(GNode item, Galois::UserContext<GNode> &lwl) {
     if (fineGGraph->getData(item).isMatched())
       return;
     GNode ret;
     do {
-      ret = matcher(item, fineGGraph);
+      if (fineGGraph->getData(item).isFailedMatch())
+        ret = matcher2(item, fineGGraph);
+      else
+        ret = matcher(item, fineGGraph);
       //lock ret, since we found it lock-free it may be matched, so try again
     } while (fineGGraph->getData(ret).isMatched());
 
@@ -140,167 +127,37 @@ struct parallelMatchAndCreateNodes {
     //the node and check the matched status of the locked node.  the
     //lock before (final) read ensures that we will see any write to matched
 
-    unsigned numEdges = fineGGraph->getData(item).getNumEdges();
+    unsigned numEdges = std::distance(fineGGraph->edge_begin(item, Galois::MethodFlag::NONE), fineGGraph->edge_end(item, Galois::MethodFlag::NONE));
     //assert(numEdges == std::distance(fineGGraph->edge_begin(item), fineGGraph->edge_end(item)));
 
     GNode N;
     if (ret != item) {
-      //__sync_fetch_and_add(&dual, 1);
       //match found
-      numEdges += fineGGraph->getData(ret).getNumEdges();
+      numEdges += std::distance(fineGGraph->edge_begin(ret, Galois::MethodFlag::NONE), fineGGraph->edge_end(ret, Galois::MethodFlag::NONE));
       //Cautious point
-      N = coarseGGraph->createNode(numEdges, item, ret, 
+      N = coarseGGraph->createNode(numEdges, 
                                    fineGGraph->getData(item).getWeight() +
-                                   fineGGraph->getData(ret).getWeight() );
-    } else {
-      //assertAllMatched(item, fineGGraph);
-      //Cautious point
-      //no match
-      N = coarseGGraph->createNode(numEdges, item, fineGGraph->getData(item).getWeight());
-    }
-    fineGGraph->getData(item).setMatched(ret);
-    fineGGraph->getData(ret).setMatched(item);
-    fineGGraph->getData(item).setParent(N);
-    fineGGraph->getData(ret).setParent(N);
-  }
-};
-
-GNode findUnmatchedNode(GNode item, GGraph* graph, GGraph::iterator* it) {
-
-  for (auto jj = *it, eejj = graph->end(); jj != eejj; ++jj) {
-    GNode node = *jj;
-    if (!graph->getData(node, Galois::MethodFlag::NONE).isMatched() && item != node ){
-      *it = jj;
-      return node;
-    }
-  }
-  return item;
-    //Don't actually do random, just choose first
-}
-Galois::Runtime::PerThreadStorage<GGraph::iterator> perThreadIt;
-
-template<typename MatchingPolicy>
-struct parallelMatchAndCreateNodesWithBag {
-  //typedef int tt_does_not_need_parallel_push;
-  MatchingPolicy matcher;
-  GGraph *fineGGraph;
-  GGraph *coarseGGraph;
-  Galois::InsertBag<GNode>& bag;
-
-  unsigned dual;
-  parallelMatchAndCreateNodesWithBag(MetisGraph* Graph, Galois::InsertBag<GNode>& bagUnmatched)
-    : matcher(), fineGGraph(Graph->getFinerGraph()->getGraph()), coarseGGraph(Graph->getGraph()), bag(bagUnmatched), dual(0) {
-    assert(fineGGraph != coarseGGraph);
-    for (unsigned int i =0; i<perThreadIt.size(); i++) *perThreadIt.getLocal(i) = fineGGraph->begin(); 
-  }
-
-  ~parallelMatchAndCreateNodesWithBag() { if (dual) std::cout << "Dual matched " << dual << "\n"; }
-
-  void operator()(GNode item, Galois::UserContext<GNode> &lwl) {
-    if (fineGGraph->getData(item).isMatched())
-      return;
-    GNode ret;
-    if(fineGGraph->getData(item).getNumEdges() == 0)
-      do {
-        ret = findUnmatchedNode(item, fineGGraph, perThreadIt.getLocal());
-        //lock ret, since we found it lock-free it may be matched, so try again
-      } while (fineGGraph->getData(ret).isMatched());
-    else
-      do {
-        ret = matcher(item, fineGGraph);
-        //lock ret, since we found it lock-free it may be matched, so try again
-      } while (fineGGraph->getData(ret).isMatched());
-
-    //at this point both ret and item (and failed matches) are locked.
-    //We do not leave the above loop until we both have the lock on
-    //the node and check the matched status of the locked node.  the
-    //lock before (final) read ensures that we will see any write to matched
-
-    unsigned numEdges = fineGGraph->getData(item).getNumEdges();
-    //assert(numEdges == std::distance(fineGGraph->edge_begin(item), fineGGraph->edge_end(item)));
-
-    GNode N;
-    if (ret != item) {
-      //__sync_fetch_and_add(&dual, 1);
-      //match found
-      numEdges += fineGGraph->getData(ret).getNumEdges();
-      //Cautious point
-      N = coarseGGraph->createNode(numEdges, item, ret, 
-                                   fineGGraph->getData(item).getWeight() +
-                                   fineGGraph->getData(ret).getWeight() );
-
-      fineGGraph->getData(item).setMatched(ret);
-      fineGGraph->getData(ret).setMatched(item);
+                                   fineGGraph->getData(ret).getWeight(),
+                                   item, ret);
+      fineGGraph->getData(item).setMatched();
+      fineGGraph->getData(ret).setMatched();
       fineGGraph->getData(item).setParent(N);
       fineGGraph->getData(ret).setParent(N);
-    } else if (fineGGraph->getData(item).getNumEdges() >= 1+impr){
-      //assertAllMatched(item, fineGGraph);
-      //Cautious point
-      //no match
-      N = coarseGGraph->createNode(numEdges, item, fineGGraph->getData(item).getWeight());
-
-      fineGGraph->getData(item).setMatched(ret);
-      fineGGraph->getData(item).setParent(N);
- 
-    } else{
-      bag.push(item);;
-    }
-  }
-};
-
-struct parallelMatchAndCreateNodes2Hop {
-  GGraph *fineGGraph;
-  GGraph *coarseGGraph;
-  unsigned dual;
-
-  parallelMatchAndCreateNodes2Hop(MetisGraph* Graph)
-    : fineGGraph(Graph->getFinerGraph()->getGraph()), coarseGGraph(Graph->getGraph()), dual(0) {
-    assert(fineGGraph != coarseGGraph);
-  }
-
-  ~parallelMatchAndCreateNodes2Hop() { if (dual) std::cout << "Dual matched " << dual << "\n"; }
-
-  void operator()(GNode item, Galois::UserContext<GNode> &lwl) {
-    if (fineGGraph->getData(item).isMatched())
-      return;
-    GNode ret;
-
-    do {
-      ret = RMmatch2hop(item, fineGGraph);
-      //lock ret, since we found it lock-free it may be matched, so try again
-    } while (fineGGraph->getData(ret).isMatched());
-
-    //at this point both ret and item (and failed matches) are locked.
-    //We do not leave the above loop until we both have the lock on
-    //the node and check the matched status of the locked node.  the
-    //lock before (final) read ensures that we will see any write to matched
-
-    unsigned numEdges = fineGGraph->getData(item).getNumEdges();
-    //assert(numEdges == std::distance(fineGGraph->edge_begin(item), fineGGraph->edge_end(item)));
-
-    GNode N;
-    if (ret != item) {
-      //__sync_fetch_and_add(&dual, 1);
-      //match found
-      numEdges += fineGGraph->getData(ret).getNumEdges();
-      //Cautious point
-      N = coarseGGraph->createNode(numEdges, item, ret, 
-                                   fineGGraph->getData(item).getWeight() +
-                                   fineGGraph->getData(ret).getWeight() );
     } else {
       //assertAllMatched(item, fineGGraph);
       //Cautious point
       //no match
-      N = coarseGGraph->createNode(numEdges, item, fineGGraph->getData(item).getWeight());
+      if (fineGGraph->getData(item).isFailedMatch()) {
+        N = coarseGGraph->createNode(numEdges, fineGGraph->getData(item).getWeight(), item);
+        fineGGraph->getData(item).setMatched();
+        fineGGraph->getData(item).setParent(N);
+      } else {
+        fineGGraph->getData(item).setFailedMatch();
+        lwl.push(item);
+      }
     }
-    fineGGraph->getData(item).setMatched(ret);
-    fineGGraph->getData(ret).setMatched(item);
-    fineGGraph->getData(item).setParent(N);
-    fineGGraph->getData(ret).setParent(N);
   }
 };
-
-
 
 /*
  * This operator is responsible for doing a union find of the edges
@@ -320,7 +177,7 @@ struct parallelPopulateEdges {
   }
 
   template<typename Context>
-  void operator()(GNode node, Context& lwl) {
+  void goSort(GNode node, Context& lwl) {
     //    std::cout << 'p';
     //fineGGraph is read only in this loop, so skip locks
     MetisNode &nodeData = coarseGGraph->getData(node, Galois::MethodFlag::NONE);
@@ -329,89 +186,61 @@ struct parallelPopulateEdges {
     //copy and translate all edges
     GD edges(GD::allocator_type(lwl.getPerIterAlloc()));
 
-    //prefetch as locality sucks
-    if (false) {
-      for (unsigned x = 0; x < nodeData.numChildren(); ++x)
-        for (auto ii = fineGGraph->edge_begin(nodeData.getChild(x), Galois::MethodFlag::NONE), ee = fineGGraph->edge_end(nodeData.getChild(x)); ii != ee; ++ii) {
-          __builtin_prefetch(fineGGraph->getEdgeDst(ii, Galois::MethodFlag::NONE));
-        }
-    }
-
     for (unsigned x = 0; x < nodeData.numChildren(); ++x)
       for (auto ii = fineGGraph->edge_begin(nodeData.getChild(x), Galois::MethodFlag::NONE), ee = fineGGraph->edge_end(nodeData.getChild(x)); ii != ee; ++ii) {
         GNode dst = fineGGraph->getEdgeDst(ii, Galois::MethodFlag::NONE);
-        edges.emplace_back(fineGGraph->getData(dst, Galois::MethodFlag::NONE).getParent(), fineGGraph->getEdgeData(ii, Galois::MethodFlag::NONE));
+        GNode p = fineGGraph->getData(dst, Galois::MethodFlag::NONE).getParent();
+        edges.emplace_back(p, fineGGraph->getEdgeData(ii, Galois::MethodFlag::NONE));
       }
     
-    std::sort(edges.begin(), edges.end());
+    //slightly faster not ordering by edge weight
+    std::sort(edges.begin(), edges.end(), [] (const std::pair<GNode, unsigned>& lhs, const std::pair<GNode, unsigned>& rhs) { return lhs.first < rhs.first; } );
 
     //insert edges
-    unsigned e = 0;
     for (auto pp = edges.begin(), ep = edges.end(); pp != ep;) {
       GNode dst = pp->first;
       unsigned sum = pp->second;
       ++pp;
-      while (pp != ep && pp->first == dst) {
-        sum += pp->second;
-        ++pp;
-      }
-      if (node != dst) { // no self edges
+      if (node != dst) { //no self edges
+        while (pp != ep && pp->first == dst) {
+          sum += pp->second;
+          ++pp;
+        }
         coarseGGraph->addEdgeWithoutCheck(node, dst, Galois::MethodFlag::NONE, sum);
-        ++e;
       }
     }
     //    assert(e);
-    nodeData.setNumEdges(e);
-  }
-};
-
-struct parallelPopulateEdges2 {
-  typedef int tt_does_not_need_parallel_push;
-    
-  GGraph *coarseGGraph;
-  GGraph *fineGGraph;
-  parallelPopulateEdges2(MetisGraph *Graph)
-    :coarseGGraph(Graph->getGraph()), fineGGraph(Graph->getFinerGraph()->getGraph()) {
-    assert(fineGGraph != coarseGGraph);
+    //nodeData.setNumEdges(e);
   }
 
   template<typename Context>
   void operator()(GNode node, Context& lwl) {
-    //fineGGraph is read only in this loop, so skip locks
-    GNode pnode = fineGGraph->getData(node, Galois::MethodFlag::NONE).getParent();
-
-    //Lock parent
-    MetisNode& nodeData = coarseGGraph->getData(pnode);
-
-    //copy and translate all edges
-    unsigned e = 0;
-    for (auto ii = fineGGraph->edge_begin(node, Galois::MethodFlag::NONE),
-           ee = fineGGraph->edge_end(node); ii != ee; ++ii) {
-      GNode dst = fineGGraph->getEdgeDst(ii, Galois::MethodFlag::NONE);
-      GNode pdst = fineGGraph->getData(dst, Galois::MethodFlag::NONE).getParent();
-      unsigned n = fineGGraph->getEdgeData(ii, Galois::MethodFlag::NONE);
-      if (pnode != pdst) {
-        coarseGGraph->getEdgeData(coarseGGraph->addEdge(pnode, pdst, Galois::MethodFlag::NONE)) += n;
-        ++e;
-      }
-    }
-
-    nodeData.setNumEdges(nodeData.getNumEdges() + e);
+    // MetisNode &nodeData = coarseGGraph->getData(node, Galois::MethodFlag::NONE);
+    // if (std::distance(fineGGraph->edge_begin(nodeData.getChild(0), Galois::MethodFlag::NONE),
+    //                   fineGGraph->edge_begin(nodeData.getChild(0), Galois::MethodFlag::NONE))
+    //     < 256)
+    //   goSort(node,lwl);
+    // else
+    //   goHM(node,lwl);
+    goSort(node, lwl);
+    //goHeap(node,lwl);
   }
 };
-
 
 struct HighDegreeIndexer: public std::unary_function<GNode, unsigned int> {
   static GGraph* indexgraph;
   unsigned int operator()(const GNode& val) const {
-    return std::numeric_limits<unsigned int>::max() - indexgraph->getData(val, Galois::MethodFlag::NONE).getNumEdges();
+    return std::numeric_limits<unsigned int>::max() - std::distance(indexgraph->edge_begin(val, Galois::MethodFlag::NONE), indexgraph->edge_end(val, Galois::MethodFlag::NONE));
   }
 };
+
 GGraph* HighDegreeIndexer::indexgraph = 0;
 
 struct LowDegreeIndexer: public std::unary_function<GNode, unsigned int> {
   unsigned int operator()(const GNode& val) const {
-    return HighDegreeIndexer::indexgraph->getData(val, Galois::MethodFlag::NONE).getNumEdges();
+    return std::distance(HighDegreeIndexer::indexgraph->edge_begin(val, Galois::MethodFlag::NONE), HighDegreeIndexer::indexgraph->edge_end(val, Galois::MethodFlag::NONE))
+      *
+      (HighDegreeIndexer::indexgraph->getData(val, Galois::MethodFlag::NONE).isFailedMatch() ? 4: 0);
   }
 };
 
@@ -456,16 +285,13 @@ void findMatching(MetisGraph* coarseMetisGraph, unsigned iterNum, bool useRM = f
     typedef Galois::WorkList::OrderedByIntegerMetric<LowDegreeIndexer, Chunk> pLD;
     typedef Galois::WorkList::OrderedByIntegerMetric<HighDegreeIndexer, Chunk> pHD;
 
-   /* HighDegreeIndexer::indexgraph = fineMetisGraph->getGraph();
+    HighDegreeIndexer::indexgraph = fineMetisGraph->getGraph();
     parallelMatchAndCreateNodes<HEMmatch> pHEM(coarseMetisGraph);
     // std::ostringstream name;
     // name << "HEM_Match_" << iterNum;
     Galois::for_each_local<pLD>(*fineMetisGraph->getGraph(), pHEM, "match"); //name.str().c_str());*/
 
-    Galois::InsertBag<GNode> bagUnmatched;
-    parallelMatchAndCreateNodesWithBag<HEMmatch> pHEM(coarseMetisGraph, bagUnmatched);
-    Galois::for_each_local<pLD>(*fineMetisGraph->getGraph(), pHEM, "match"); //name.str().c_str());
-    Galois::for_each(bagUnmatched.begin(),bagUnmatched.end(), parallelMatchAndCreateNodes2Hop(coarseMetisGraph), "match");
+    //FIXME: decide if we should match null-edge nodes here
   }
 }
 
@@ -473,17 +299,10 @@ void createCoarseEdges(MetisGraph *coarseMetisGraph, unsigned iterNum) {
   MetisGraph* fineMetisGraph = coarseMetisGraph->getFinerGraph();
   GGraph* fineGGraph = fineMetisGraph->getGraph();
   typedef Galois::WorkList::StableIterator<decltype(fineGGraph->local_begin()), true> WL;
-  if (true) {
-    parallelPopulateEdges pPE(coarseMetisGraph);
-    std::ostringstream name;
-    name << "Populate_Edges_" << iterNum;
-    Galois::for_each_local<WL>(*coarseMetisGraph->getGraph(), pPE, "popedge");//name.str().c_str());
-  } else {
-    parallelPopulateEdges2 pPE(coarseMetisGraph);
-    std::ostringstream name;
-    name << "Populate_Edges_" << iterNum;
-    Galois::for_each_local<WL>(*fineGGraph, pPE, "popedge");//name.str().c_str());
-  }
+  parallelPopulateEdges pPE(coarseMetisGraph);
+  std::ostringstream name;
+  name << "Populate_Edges_" << iterNum;
+  Galois::for_each_local<WL>(*coarseMetisGraph->getGraph(), pPE, "popedge");//name.str().c_str());
 }
 
 MetisGraph* coarsenOnce(MetisGraph *fineMetisGraph, unsigned iterNum, bool useRM = false) {
@@ -510,12 +329,9 @@ MetisGraph* coarsen(MetisGraph* fineMetisGraph, unsigned coarsenTo) {
   
   //std::cout << "coarsening stating, now " <<  std::distance(fineMetisGraph->getGraph()->begin(), fineMetisGraph->getGraph()->end()) << " on " << fineMetisGraph << "\n";
   //graphStat(fineMetisGraph->getGraph());
-  impr = 2;
   MetisGraph* coarseGraph = fineMetisGraph;
-  int newSize =std::distance(coarseGraph->getGraph()->begin(), coarseGraph->getGraph()->end()), oldSize =2*std::distance(coarseGraph->getGraph()->begin(), coarseGraph->getGraph()->end());
   unsigned iterNum = 0;
-  while (iRuns && oldSize/100 > newSize/97) {//overflow
-    oldSize =newSize;
+  while (iRuns) {//overflow
     coarseGraph = coarsenOnce(coarseGraph, iterNum); //, iterNum == 0);
     //std::cout << "coarsening " << iterNum << " done, now " <<  std::distance(coarseGraph->getGraph()->begin(), coarseGraph->getGraph()->end()) << " on " << coarseGraph << " targeting " << coarsenTo << "\n";
     //    graphStat(coarseGraph->getGraph());
@@ -523,11 +339,7 @@ MetisGraph* coarsen(MetisGraph* fineMetisGraph, unsigned coarsenTo) {
       --iRuns;
     if (!iRuns)
       iRuns = minRuns(coarsenTo, std::distance(coarseGraph->getGraph()->begin(), coarseGraph->getGraph()->end()));
-
-    newSize= std::distance(coarseGraph->getGraph()->begin(), coarseGraph->getGraph()->end());
-    //std::cout <<newSize<< ' ' << oldSize << '\n';
     ++iterNum;
-    if(oldSize*7 < newSize*8)impr=impr*2+1;
   }
   
   return coarseGraph;

@@ -172,7 +172,7 @@ struct initPart {
   GGraph& g;
   initPart(GGraph& _g): g(_g) {}
   void operator()(GNode item) {
-    g.getData(item, Galois::MethodFlag::NONE).setPart(0);
+    g.getData(item, Galois::MethodFlag::NONE).initRefine(0,true);
   }
 };
 

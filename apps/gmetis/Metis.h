@@ -38,82 +38,75 @@ enum refinementMode {BKL, BKL2, ROBO, GRACLUS};
 //Nodes in the metis graph
 class MetisNode {
 
+  struct coarsenData {
+    int matched:1;
+    int failedmatch:1;
+    GNode parent;
+  };
+  struct refineData {
+    unsigned partition;
+    unsigned oldPartition;
+    bool maybeBoundary;
+  };
+
+  void initCoarsen(){
+    data.cd.matched = false;
+    data.cd.failedmatch = false;
+    data.cd.parent = NULL;
+  }
+
 public:
   //int num;
   explicit MetisNode(int weight) :_weight(weight) {
-    init();
+    initCoarsen();
   }
   
-  MetisNode(GNode child0, unsigned weight)
+  MetisNode(unsigned weight, GNode child0, GNode child1 = NULL)
     : _weight(weight) {
-    init();
-    children[0] = child0;
-    children[1] = NULL;
-    //onlyOneChild = true;
-
-  }
-
-  MetisNode(GNode child0, GNode child1, unsigned weight)
-    : _weight(weight) {
-    init();
+    initCoarsen();
     children[0] = child0;
     children[1] = child1;
-    //onlyOneChild = false;
   }
 
-  MetisNode() { }
+  MetisNode():_weight(1) { initCoarsen(); }
 
-  void init(){
-    compress2.numEdges = 0;
-    //_partition = 0;
-    compress.matched = NULL;
-    parent = NULL;
-    maybeBoundary = false;
+  //call to switch data to refining
+  void initRefine(unsigned part = 0, bool bound = false) {
+    data.rd = {part, part, bound};
   }
 
   int getWeight() const { return _weight; }
   void setWeight(int weight) { _weight = weight; }
 
-  void setParent(GNode p)  { parent = p;/* bparent = true;*/ }
-  GNode getParent() const  { /*assert(bparent);*/ assert(parent); return parent; }
+  void setParent(GNode p)  { data.cd.parent = p; }
+  GNode getParent() const  {  assert(data.cd.parent); return data.cd.parent; }
 
-  void setMatched(GNode v) { compress.matched = v; /*bmatched = true; */}
-  GNode getMatched() const { /*assert(bmatched);*/ return compress.matched; }
-  bool isMatched() const   { /*return bmatched;*/ return compress.matched != NULL; }
+  void setMatched() { data.cd.matched = true; }
+  bool isMatched() const   { return data.cd.matched; }
+
+  void setFailedMatch() { data.cd.failedmatch = true; }
+  bool isFailedMatch() const { return data.cd.failedmatch; }
 
   GNode getChild(unsigned x) const { return children[x]; }
-  unsigned numChildren() const { /*return onlyOneChild ? 1 : 2;*/return children[1] ? 2 : 1; }
+  unsigned numChildren() const { return children[1] ? 2 : 1; }
 
-  unsigned getNumEdges() const { return compress2.numEdges; }
-  void setNumEdges(unsigned val) { compress2.numEdges = val; }
+  unsigned getPart() const { return data.rd.partition; }
+  void setPart(unsigned val) { data.rd.partition = val; }
 
-  unsigned getPart() const { return compress.partition; }
-  void setPart(unsigned val) { compress.partition = val; }
+  int getOldPart() const {return data.rd.oldPartition;}
+  void OldPartCpyNew(){ data.rd.oldPartition = data.rd.partition; }
 
-  int getOldPart() const {return compress2.oldPartition;}
-  void OldPartCpyNew(){compress2.oldPartition = compress.partition; }
+  bool getmaybeBoundary() const {return data.rd.maybeBoundary; }
+  void setmaybeBoundary(bool val){ data.rd.maybeBoundary = val; }
 
-  bool getmaybeBoundary() const {return maybeBoundary; }
-  void setmaybeBoundary(bool val){maybeBoundary = val; }
 private:
   union {
-    GNode matched;
-    unsigned partition;
-  } compress;
-  union{
-    unsigned numEdges;
-    unsigned int oldPartition;
-  } compress2;
+    coarsenData cd;
+    refineData rd;
+  } data;
 
-  // bool bmatched;
-  // bool bparent;
-  GNode parent;
   GNode children[2];
-  //bool onlyOneChild;
-
   unsigned _weight;
-
-  bool maybeBoundary;
 };
 
 //Structure to keep track of graph hirarchy

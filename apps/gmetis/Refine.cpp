@@ -57,41 +57,38 @@ bool isBoundary(GGraph& g, GNode n) {
   return false;
 }
 
+//This is only used on the terminal graph (find graph)
 struct findBoundary {
   Galois::InsertBag<GNode>& b;
   GGraph& g;
-  GGraph* oldGraph;
-  findBoundary(Galois::InsertBag<GNode>& _b, GGraph& _g, GGraph* _oldGraph) : b(_b), g(_g), oldGraph(_oldGraph) {}
+  findBoundary(Galois::InsertBag<GNode>& _b, GGraph& _g) : b(_b), g(_g) {}
   void operator()(GNode n) {
     auto& cn = g.getData(n, Galois::MethodFlag::NONE);
-    cn.setmaybeBoundary(false);
-    if(!oldGraph || oldGraph->getData(cn.getParent(), Galois::MethodFlag::NONE).getmaybeBoundary())
-      if (isBoundary(g, n)){
-        b.push(n);
-        cn.setmaybeBoundary(true);
-      }
+    if (cn.getmaybeBoundary())
+      cn.setmaybeBoundary(isBoundary(g,n));
+    if (cn.getmaybeBoundary())
+      b.push(n);
   }
 };
 
+//this is used on the coarse graph to project to the fine graph
 struct findBoundaryAndProject {
   Galois::InsertBag<GNode>& b;
   GGraph& cg;
   GGraph& fg;
-  GGraph* oldGraph;
-  findBoundaryAndProject(Galois::InsertBag<GNode>& _b, GGraph& _cg, GGraph& _fg, GGraph* _oldGraph) :b(_b), cg(_cg), fg(_fg),oldGraph(_oldGraph) {}
+  findBoundaryAndProject(Galois::InsertBag<GNode>& _b, GGraph& _cg, GGraph& _fg) :b(_b), cg(_cg), fg(_fg) {}
   void operator()(GNode n) {
     auto& cn = cg.getData(n, Galois::MethodFlag::NONE);
-    cn.setmaybeBoundary(false);
-    if(!oldGraph || oldGraph->getData(cn.getParent(), Galois::MethodFlag::NONE).getmaybeBoundary())
-      if (isBoundary(cg, n)){
-        b.push(n);
-        cn.setmaybeBoundary(true);
-      }
-    unsigned part = cn.getPart();
-    for (unsigned x = 0; x < cn.numChildren(); ++x){
-      fg.getData(cn.getChild(x), Galois::MethodFlag::NONE).setPart(part);
+    if (cn.getmaybeBoundary())
+      cn.setmaybeBoundary(isBoundary(cg,n));
 
+    //project part and maybe boundary
+    unsigned part = cn.getPart();
+    for (unsigned x = 0; x < cn.numChildren(); ++x) {
+      fg.getData(cn.getChild(x), Galois::MethodFlag::NONE).initRefine(cn.getPart(), cn.getmaybeBoundary());
     }
+    if (cn.getmaybeBoundary())
+      b.push(n);
   }
 };
 
@@ -153,7 +150,12 @@ struct refine_BKL2 {
       for (auto ii = cg.edge_begin(n), ee = cg.edge_end(n); ii != ee; ++ii) {
         GNode neigh = cg.getEdgeDst(ii);
         auto& ned = cg.getData(neigh);
-        ned.setmaybeBoundary(true);
+        if (ned.getPart() != newpart && !ned.getmaybeBoundary()) {
+          ned.setmaybeBoundary(true);
+          if (fg)
+            for (unsigned x = 0; x < ned.numChildren(); ++x)
+              fg->getData(ned.getChild(x), Galois::MethodFlag::NONE).setmaybeBoundary(true);
+        }
         //if (ned.getPart() != newpart)
         //cnx.push(neigh);
       }
@@ -163,15 +165,15 @@ struct refine_BKL2 {
     }
   }
 
-  static void go(unsigned ms, GGraph& cg, GGraph* fg, GGraph* oldGraph, std::vector<partInfo>& p) {
+  static void go(unsigned ms, GGraph& cg, GGraph* fg,  std::vector<partInfo>& p) {
     typedef Galois::WorkList::dChunkedFIFO<8> Chunk;
     typedef Galois::WorkList::OrderedByIntegerMetric<gainIndexer, Chunk, 10> pG;
     gainIndexer::g = &cg;
     Galois::InsertBag<GNode> boundary;
     if (fg)
-      Galois::do_all_local(cg, findBoundaryAndProject(boundary, cg, *fg, oldGraph), "boundary");
+      Galois::do_all_local(cg, findBoundaryAndProject(boundary, cg, *fg), "boundary");
     else
-      Galois::do_all_local(cg, findBoundary(boundary, cg, oldGraph), "boundary");
+      Galois::do_all_local(cg, findBoundary(boundary, cg), "boundary");
     Galois::for_each_local<pG>(boundary, refine_BKL2(ms, cg, fg, p), "refine");
   }
 };
@@ -430,7 +432,7 @@ void refine(MetisGraph* coarseGraph, std::vector<partInfo>& parts, unsigned mean
     bool doProject = true;
     //refine nparts times
     switch (refM) {
-    case BKL2: refine_BKL2<false>::go(meanSize, *coarseGraph->getGraph(), fineGraph ? fineGraph->getGraph() : nullptr, oldGraph ? oldGraph->getGraph() : nullptr, parts); doProject = false; break;
+    case BKL2: refine_BKL2<false>::go(meanSize, *coarseGraph->getGraph(), fineGraph ? fineGraph->getGraph() : nullptr, parts); doProject = false; break;
     case BKL: refine_BKL(*coarseGraph->getGraph(), parts); break;
     case ROBO: refineOneByOne(*coarseGraph->getGraph(), parts); break;
     case GRACLUS: GraclusRefining(coarseGraph->getGraph(), parts.size(), nbIter);nbIter =(nbIter+1)/2;break;

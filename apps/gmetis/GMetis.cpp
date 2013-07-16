@@ -113,26 +113,11 @@ void Partition(MetisGraph* metisGraph, unsigned nparts) {
 
 struct parallelInitMorphGraph {
   GGraph &graph;
-  parallelInitMorphGraph(GGraph &g):graph(g) {
-
-  }
-  void operator()(unsigned int tid, unsigned int num) {
-    int id = tid;
-    for(GGraph::iterator ii = graph.local_begin(),ee=graph.local_end();ii!=ee;ii++) {
-      GNode node = *ii;
-      MetisNode &nodeData = graph.getData(node);
-      //nodeData.setNodeId(id);
-      nodeData.init();
-      nodeData.setWeight(1);
-      int count = std::distance(graph.edge_begin(node),graph.edge_end(node));
-      nodeData.setNumEdges(count);
-     // int weight=0;
-      for(GGraph::edge_iterator jj = graph.edge_begin(node),kk=graph.edge_end(node);jj!=kk;jj++) {
-        graph.getEdgeData(jj)=1;
-       // weight+=1;
-      }
-      //nodeData.setEdgeWeight(nodeData.getEdgeWeight() + weight);
-      id+=num;
+  parallelInitMorphGraph(GGraph &g):graph(g) {  }
+  void operator()(GNode node) {
+    for(GGraph::edge_iterator jj = graph.edge_begin(node),kk=graph.edge_end(node);jj!=kk;jj++) {
+      graph.getEdgeData(jj)=1;
+      // weight+=1;
     }
   }
 };
@@ -196,7 +181,7 @@ int main(int argc, char** argv) {
     graph->dump(dot);
   }
 
-  Galois::on_each(parallelInitMorphGraph(*graph));
+  Galois::do_all_local(*graph, parallelInitMorphGraph(*graph));
 
   unsigned numEdges = 0;
   std::map<unsigned, unsigned> hist;
@@ -213,7 +198,7 @@ int main(int argc, char** argv) {
 //printGraphBeg(*graph);
 
   Galois::reportPageAlloc("MeminfoPre");
-  Galois::preAlloc(Galois::Runtime::MM::numPageAllocTotal() * 4);
+  Galois::preAlloc(Galois::Runtime::MM::numPageAllocTotal() * 5);
 
   Partition(&metisGraph, numPartitions);
 
@@ -232,7 +217,7 @@ int main(int argc, char** argv) {
     outFile<< gPart<< '\n';
   }*/
 
-  for (auto it = graph->trackingG.begin(), ie = graph->trackingG.end(); it!=ie; it++)
+  for (auto it = graph->begin(), ie = graph->end(); it!=ie; it++)
   {
     unsigned gPart = graph->getData(*it).getPart();
     outFile<< gPart<< '\n';
