@@ -299,7 +299,7 @@ void refine_BKL(GGraph& g, std::vector<partInfo>& parts) {
   }
 }
 
-struct ChangePart {//move each node to its "closest" cluster
+struct ChangePart {//move each node to its nearest cluster
   GGraph& g;
   int nbCluster;
   double* Dist;
@@ -320,7 +320,7 @@ struct ChangePart {//move each node to its "closest" cluster
 
     for(auto clust = degreein.begin(), ee = degreein.end(); clust != ee; clust++)
     {
-      //the distqnce between the cluster clust and the noden is :
+      //the distance between the cluster clust and the noden is :
       double d = Dist[clust->first]-(2.0*(double)clust->second/(double)card[clust->first]);
       if(d < dmin || partition ==-1)
       {
