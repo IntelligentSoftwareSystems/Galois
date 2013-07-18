@@ -41,6 +41,7 @@ enum ConvertMode {
   dimacs2gr,
   edgelist2vgr,
   floatedgelist2gr,
+  doubleedgelist2gr,
   gr2bsml,
   gr2cintgr,
   gr2dimacs,
@@ -87,6 +88,7 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Choose a conversion mode:"),
       clEnumVal(dimacs2gr, "Convert dimacs to binary gr"),
       clEnumVal(edgelist2vgr, "Convert edge list to binary void gr"),
       clEnumVal(floatedgelist2gr, "Convert weighted (float) edge list to binary gr"),
+      clEnumVal(doubleedgelist2gr, "Convert weighted (double) edge list to binary gr"),
       clEnumVal(gr2bsml, "Convert binary gr to binary sparse MATLAB matrix"),
       clEnumVal(gr2cintgr, "Clean up binary weighted (int) gr: remove self edges and multi-edges"),
       clEnumVal(gr2dimacs, "Convert binary gr to dimacs"),
@@ -1655,6 +1657,7 @@ int main(int argc, char** argv) {
     case dimacs2gr: convert_dimacs2gr(inputfilename, outputfilename); break;
     case edgelist2vgr: convert_edgelist2gr<void>(inputfilename, outputfilename); break;
     case floatedgelist2gr: convert_edgelist2gr<float>(inputfilename, outputfilename); break;
+    case doubleedgelist2gr: convert_edgelist2gr<double>(inputfilename, outputfilename); break;
     case gr2bsml: convert_gr2bsml<int32_t>(inputfilename, outputfilename); break;
     case gr2cintgr: convert_gr2cgr<int32_t>(inputfilename, outputfilename); break;
     case gr2dimacs: convert_gr2dimacs<int32_t>(inputfilename, outputfilename); break;
