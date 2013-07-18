@@ -26,7 +26,6 @@
 
 #include "Metis.h"
 #include "Galois/Runtime/PerThreadStorage.h"
-
 namespace {
 
 void assertAllMatched(GNode node, GGraph* graph) {
@@ -291,9 +290,8 @@ GGraph* HighDegreeIndexer::indexgraph = 0;
 
 struct LowDegreeIndexer: public std::unary_function<GNode, unsigned int> {
   unsigned int operator()(const GNode& val) const {
-    return std::distance(HighDegreeIndexer::indexgraph->edge_begin(val, Galois::MethodFlag::NONE), HighDegreeIndexer::indexgraph->edge_end(val, Galois::MethodFlag::NONE))
-      *
-      (HighDegreeIndexer::indexgraph->getData(val, Galois::MethodFlag::NONE).isFailedMatch() ? 4: 0);
+    return  HighDegreeIndexer::indexgraph->getData(val, Galois::MethodFlag::NONE).isFailedMatch() ? std::numeric_limits<unsigned int>::max():
+     (std::distance(HighDegreeIndexer::indexgraph->edge_begin(val, Galois::MethodFlag::NONE), HighDegreeIndexer::indexgraph->edge_end(val, Galois::MethodFlag::NONE)));
   }
 };
 
