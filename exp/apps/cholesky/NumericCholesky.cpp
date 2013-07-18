@@ -42,6 +42,7 @@
 #include <algorithm>
 #include <iostream>
 #include <fstream>
+#include <cstdio> // For certain debugging output
 
 namespace cll = llvm::cl;
 
@@ -64,11 +65,13 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
 
 struct Node {
   unsigned id;
-  bool seen;
-  Node(): seen(false) { };
+  int seen;
+  Node(): seen(0) { };
 };
 
-typedef float edgedata;
+// WARNING: Will silently behave oddly when given wrong data type
+typedef double edgedata;
+//typedef float edgedata;
 
 typedef Galois::Graph::LC_Linear_Graph<Node,edgedata>::with_numa_alloc<true>::type Graph;
 
@@ -86,17 +89,16 @@ std::ostream& operator<<(std::ostream& os, const Node& n) {
   return os;
 }
 
-typedef std::pair<GNode,GNode> Edge;
-
-Galois::InsertBag<Edge> mst;
-
-// Copied from preflowpush/Preflowpush.cpp
-Graph::edge_iterator findEdge(Graph& g, GNode src, GNode dst) {
+// Adapted from preflowpush/Preflowpush.cpp
+Graph::edge_iterator findEdge(Graph& g, GNode src, GNode dst, bool *hasEdge) {
   Graph::edge_iterator ii = g.edge_begin(src, Galois::MethodFlag::NONE),
                        ei = g.edge_end(src, Galois::MethodFlag::NONE);
+  *hasEdge = false;
   for (; ii != ei; ++ii) {
-    if (g.getEdgeDst(ii) == dst)
+    if (g.getEdgeDst(ii) == dst) {
+      *hasEdge = true;
       break;
+    }
   }
   return ii;
 }
@@ -117,121 +119,144 @@ bool outputTextEdgeData(const char* ofile, Graph& G) {
   return true;
 }
 
-void probe_graph() {
-#if 1
-  unsigned int n = graph.size(), i = 0;
-  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
-    Node& data = graph.getData(*ii, Galois::MethodFlag::NONE);
-    assert(data.id == i++);
-  }
-  assert(i == n);
-#endif
-}
-
+/**
+ * Comparison function. The symbolic factorization produces a total
+ * ordering of the nodes. This defines the traversal order for the
+ * numeric factorization.
+ */
 struct Cmp {
-  bool operator()(const GNode& item1, const GNode& item2) const {
-    probe_graph();
-    Node &a = graph.getData(item1, Galois::MethodFlag::NONE);
-    Node &b = graph.getData(item2, Galois::MethodFlag::NONE);
-    unsigned int posa = -1, posb = -1;
+  bool operator()(const GNode& node1, const GNode& node2) const {
+    Node &node1d = graph.getData(node1, Galois::MethodFlag::NONE);
+    Node &node2d = graph.getData(node2, Galois::MethodFlag::NONE);
+    int pos1 = -1, pos2 = -1;
 
-    // Check if path exists from A to B. Then A <= B.
-    for ( unsigned int n = graph.size(), i = 0; i < n; i++ ) {
-      if ( depgraph[i] == a.id ) posa = i;
-      else if ( depgraph[i] == b.id ) posb = i;
-      else continue;
-      if ( posa >= 0 && posb >= 0 ) break;
+    // Check the total ordering to determine if item1 <= item2
+    for ( int n = graph.size(), i = 0; i < n; i++ ) {
+      if ( depgraph[i] == node1d.id ) pos1 = i;
+      if ( depgraph[i] == node2d.id ) pos2 = i; // FIXME: make else if
+      if ( pos1 >= 0 && pos2 >= 0 ) break;      // FIXME: eliminate
     }
-    assert(posa >= 0 && posb >= 0); // FIXME: Implements a total ordering
-    bool result = posa <= posb;
-    std::cout << "Cmp: " << a.id << " <= " << b.id << ": " << (result ? "true" : "false") << "\n";
+    assert(pos1 >= 0 && pos2 >= 0);
+    bool result = pos1 <= pos2;
+    /*
+    std::cout << "Cmp: " << node1d.id << " <= " << node2d.id << ": " <<
+      (result ? "true" : "false") << "\n";
+    */
     return result;
   }
 };
 
+/**
+ * Defining the neighborhood of the operator. The operator touches all
+ * of the edges to and between neighbors.
+ */
 struct NhFunc {
-  void operator()(GNode& item, Galois::UserContext<GNode>& ctx) {
-    (*this)(item);
+  /*
+  typedef int tt_has_fixed_neighborhood;
+  static_assert(Galois::has_fixed_neighborhood<NhFunc>::value, "Oops!");
+  */
+
+  template<typename C>
+  void operator()(GNode& node, C& ctx) {
+    (*this)(node);
   }
-  void operator()(GNode& item, int &something) {
-    // include/Galois/Runtime/LCordered.h:477
-    (*this)(item);
-  }
-  void operator()(GNode& item) {
-    // Touch all neighbors
-    probe_graph();
-    Graph::edge_iterator ii = graph.edge_begin(item, Galois::MethodFlag::ALL); // This seems to be enough
-    probe_graph();
-#if 0
-    unsigned a = graph.getData(item, Galois::MethodFlag::NONE).id;
-    std::cout << "Neighbors of " << a << "\n";
-    for (Graph::edge_iterator ei = graph.edge_end(item, Galois::MethodFlag::ALL); ii != ei; ++ii) {
-      std::cout << a << "-" << graph.getData(graph.getEdgeDst(ii), Galois::MethodFlag::NONE).id << "\n";
-    }
-#endif
+  void operator()(GNode& node) {
+    // Touch all neighbors (this seems to be good enough)
+    Graph::edge_iterator ii = graph.edge_begin(node);
   }
 };
 
-/** 
- * Do stuff
+/**
+ * Perform the numeric factorization. Assumes the graph is a directed
+ * graph produced by symbolic factorization.
  */
 struct DemoAlgo {
-  typedef int tt_has_fixed_neighborhood;
-  Node* root;
+  //typedef int tt_does_not_need_push;
+  //static_assert(Galois::does_not_need_push<DemoAlgo>::value, "Oops!");
 
-  void operator()(GNode src, Galois::UserContext<GNode>& ctx) {
-    probe_graph();
+  void operator()(GNode node, Galois::UserContext<GNode>& ctx) {
     // Find self-edge for this node, update it
-    edgedata& factor = graph.getEdgeData(findEdge(graph, src, src), Galois::MethodFlag::NONE);
+    bool hasEdge = false;
+    edgedata& factor = graph.getEdgeData(findEdge(graph, node, node, &hasEdge),
+                                         Galois::MethodFlag::NONE);
+    assert(hasEdge);
+    assert(factor > 0);
     factor = sqrt(factor);
-    assert(factor != 0);
+    assert(factor != 0 && !isnan(factor));
 
-    // Update seen flag on node
-    Node &srcd = graph.getData(src);
-    assert(!srcd.seen);
-    srcd.seen = true;
+    //std::cout << "STARTING " << node << "\n";
+
+    // Check seen flag on node
+    Node &noded = graph.getData(node);
+    assert(noded.seen == 0);
+    // DO NOT UPDATE THE SEEN FLAG YET, it may cause problems.
+
+    //std::cout << "STARTING " << noded.id << " " << factor << "\n";
+    //printf("STARTING %4d %10.5f\n", noded.id, factor);
 
     // Update all edges (except self-edge)
-    
-    for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::ALL),
-         ei = graph.edge_end(src, Galois::MethodFlag::ALL); ii != ei; ++ii) {
+    for (Graph::edge_iterator ii = graph.edge_begin(node),
+           ei = graph.edge_end(node); ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
-      if ( !graph.getData(dst).seen )
-        graph.getEdgeData(ii, Galois::MethodFlag::NONE) /= factor;
+      Node &dstd = graph.getData(dst);
+      if ( !dstd.seen && dst != node ) {
+        edgedata &ed = graph.getEdgeData(ii, Galois::MethodFlag::NONE);
+        ed /= factor;
+        //printf("N-EDGE %4d %4d %10.5f\n", noded.id, graph.getData(dst).id, ed);
+        //std::cout << noded.id << " " << dstd.id << " " << ed << "\n";
+      }
     }
 
     // Update all edges between neighbors (we're operating on the filled graph,
-    // so we can assume they form a clique)
-    for (Graph::edge_iterator ii1 = graph.edge_begin(src, Galois::MethodFlag::ALL),
-         ei1 = graph.edge_end(src, Galois::MethodFlag::ALL); ii1 != ei1; ++ii1) {
-      GNode srcn = graph.getEdgeDst(ii1);
-      if ( graph.getData(srcn).seen ) continue;
-      edgedata& ed1 = graph.getEdgeData(ii1, Galois::MethodFlag::NONE);
-      for (Graph::edge_iterator ii2 = graph.edge_begin(src, Galois::MethodFlag::ALL),
-           ei2 = graph.edge_end(src, Galois::MethodFlag::ALL); ii2 != ei2; ++ii2) {
-        GNode dstn = graph.getEdgeDst(ii2);
-        if ( graph.getData(dstn).seen ) continue;
-        edgedata &ed2 = graph.getEdgeData(ii2, Galois::MethodFlag::NONE),
-          &ed3 = graph.getEdgeData(findEdge(graph, srcn, dstn), Galois::MethodFlag::NONE);
-        // Update the edge between these two neighbors
-        ed3 -= ed1*ed2;
+    // so we they form a (directed) clique)
+    for (Graph::edge_iterator iis = graph.edge_begin(node),
+         eis = graph.edge_end(node);
+         iis != eis; ++iis) {
+      GNode src = graph.getEdgeDst(iis);
+      Node &srcd = graph.getData(src);
+      if ( srcd.seen || src == node ) continue;
+      edgedata& eds = graph.getEdgeData(iis, Galois::MethodFlag::NONE);
+
+      // Enumerate all other neighbors
+      for (Graph::edge_iterator iid = graph.edge_begin(node),
+           eid = graph.edge_end(node);
+           iid != eid; ++iid) {
+        GNode dst = graph.getEdgeDst(iid);
+        Node &dstd = graph.getData(dst);
+        if ( dstd.seen || dst == node ) continue;
+
+        // Find the edge that bridges these two neighbors
+        hasEdge = false; // FIXME: There must be a better way
+        Graph::edge_iterator bridge = findEdge(graph, src, dst, &hasEdge);
+        if ( !hasEdge ) continue;
+
+        // Update the weight of the bridge edge
+        edgedata &edd = graph.getEdgeData(iid, Galois::MethodFlag::NONE),
+          &edb = graph.getEdgeData(bridge, Galois::MethodFlag::NONE);
+        edb -= eds*edd;
+
+        //printf("I-EDGE %4d %4d %10.5f\n", srcd.id, dstd.id, edb);
+        //std::cout << srcd.id << " " << dstd.id << " " << edb << "\n";
       }
     }
-    std::cout << "OPERATED ON " << srcd.id << "\n";
+    //std::cout << "OPERATED ON " << noded.id << "\n";
     //sleep(1); // Use this to help debug parallelism
-    probe_graph();
+
+    // Now update the seen flag.
+    assert(noded.seen == 0);
+    noded.seen = 1;
+    assert(noded.seen == 1);
+    //printf("FINISHED %4d %d\n", noded.id, noded.seen);
   }
 
   void operator()() {
     Graph::iterator ii = graph.begin(), ei = graph.end();
-    if (ii != ei) {
-      //Galois::for_each_ordered(ii, ei, Cmp(), NhFunc(), *this);
-      Galois::for_each(ii, ei, *this);
+    if (ii != ei) { // Ensure there is at least one node in the graph.
+      Galois::for_each_ordered(ii, ei, Cmp(), NhFunc(), *this);
       //Galois::for_each(ii, ei, *this);
     }
   }
 };
-static_assert(Galois::has_fixed_neighborhood<DemoAlgo>::value, "OOps");
 
 // FIXME: implement verify, etc. See SpanningTree.
 
@@ -277,10 +302,11 @@ int main(int argc, char** argv) {
     for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
       Node& data = graph.getData(*ii);
       data.id = i++;
+      assert(!data.seen);
     }
     assert(i == n);
-#if 0
-    // Load dependence tree
+
+    // Load dependence ordering
     depgraph = new DepItem[n];
     assert(depgraph);
     std::ifstream depfile(depFilename.c_str());
@@ -291,7 +317,7 @@ int main(int argc, char** argv) {
       if ( !depfile ) break;
       assert(node < n);
       if ( i < 0 || i >= n ) {
-        std::cout << "Error loading dependency graph.\n";
+        std::cout << "Error loading dependencies.\n";
         abort();
       }
       depgraph[i] = node;
@@ -299,12 +325,10 @@ int main(int argc, char** argv) {
     }
     assert(i == n);
     depfile.close();
-#endif
   }
-  //probe_graph();
 
   Tinitial.stop();
-  
+
   //Galois::preAlloc(numThreads);
   Galois::reportPageAlloc("MeminfoPre");
 
