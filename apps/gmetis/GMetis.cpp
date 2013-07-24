@@ -64,6 +64,22 @@ static cll::opt<int> numPartitions(cll::Positional, cll::desc("<Number of partit
 
 const double COARSEN_FRACTION = 0.9;
 
+
+int computeCut(GGraph& g) {
+  int cuts=0;
+  for (auto nn = g.begin(), en = g.end(); nn != en; ++nn) {
+    unsigned gPart = g.getData(*nn).getPart();
+    for (auto ii = g.edge_begin(*nn), ee = g.edge_end(*nn); ii != ee; ++ii) {
+      auto& m = g.getData(g.getEdgeDst(ii));
+      if (m.getPart() != gPart) 
+        cuts += g.getEdgeData(ii);
+    }
+  }
+  return cuts/2;
+}
+
+
+
 /**
  * KMetis Algorithm
  */
@@ -72,7 +88,7 @@ void Partition(MetisGraph* metisGraph, unsigned nparts) {
   TM.start();
   unsigned meanWeight = ( (double)metisGraph->getTotalWeight()) / (double)nparts;
   //unsigned coarsenTo = std::max(metisGraph->getNumNodes() / (40 * intlog2(nparts)), 20 * (nparts));
-  unsigned coarsenTo = 40 * nparts;
+  unsigned coarsenTo = 100 * nparts;
 
   std::cout << "\n  Starting coarsening: \n";
   Galois::StatTimer T("Coarsen");
@@ -91,6 +107,8 @@ void Partition(MetisGraph* metisGraph, unsigned nparts) {
     default: abort();
   }
   T2.stop();
+
+  //std::cout << "Init edge cut : " << computeCut(*mcg->getGraph()) << "\n\n";
 
   std::vector<partInfo> initParts = parts;
   std::cout << "Time clustering:  "<<T2.get()<<'\n';
@@ -111,6 +129,9 @@ void Partition(MetisGraph* metisGraph, unsigned nparts) {
   return;
 }
 
+
+//printGraphBeg(*graph)
+
 struct parallelInitMorphGraph {
   GGraph &graph;
   parallelInitMorphGraph(GGraph &g):graph(g) {  }
@@ -121,49 +142,6 @@ struct parallelInitMorphGraph {
     }
   }
 };
-
-int edgeCount2(GGraph& g) {
-  int count=0;
-  for (auto nn = g.begin(), en = g.end(); nn != en; ++nn) {
-    for (auto ii = g.edge_begin(*nn), ee = g.edge_end(*nn); ii != ee; ++ii)
-        count += g.getEdgeData(ii);
-  }
-  return count/2;
-}
-
-int computeCut(GGraph& g) {
-  int cuts=0;
-  for (auto nn = g.begin(), en = g.end(); nn != en; ++nn) {
-    unsigned gPart = g.getData(*nn).getPart();
-    for (auto ii = g.edge_begin(*nn), ee = g.edge_end(*nn); ii != ee; ++ii) {
-      auto& m = g.getData(g.getEdgeDst(ii));
-      if (m.getPart() != gPart) 
-        cuts += g.getEdgeData(ii);
-    }
-  }
-  return cuts/2;
-}
-
-
-
-
-/*void printGraphBeg(GGraph& g) {
-  int i=0;
-  for (auto nn = g.begin(), en = g.end() ; nn != en; ++nn)
-    g.getData(*nn).num =i++;
-  i=0;
-  for (auto nn = g.begin(), en = g.end() ; nn != en && i<10000; ++nn) {
-    for (auto ii = g.edge_begin(*nn), ee = g.edge_end(*nn); ii != ee; ++ii) {
-      auto& m = g.getData(g.getEdgeDst(ii));
-      std::cout<<g.getData(g.getEdgeDst(ii)).num<<' ';
-      i++;
-    }
-   std::cout<<'\n';
-  }
-  std::cout<<'\n';
-}*/
-
-
 
 
 int main(int argc, char** argv) {
@@ -191,7 +169,7 @@ int main(int argc, char** argv) {
     ++hist[val];
   }
 
-  std::cout << "Nodes " << std::distance(graph->begin(), graph->end()) << "| Edges " << numEdges << ' ' << edgeCount2(*graph)<<std::endl;
+  std::cout << "Nodes " << std::distance(graph->begin(), graph->end()) << "| Edges " << numEdges << std::endl;
  // for (auto pp = hist.begin(), ep = hist.end(); pp != ep; ++pp)
   //std::cout << pp->first << " : " << pp->second << "\n";
 
