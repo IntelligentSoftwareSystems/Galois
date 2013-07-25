@@ -170,6 +170,7 @@ protected:
     if (ForEachTraits<FunctionTy>::NeedsAborts)
       tld.cnx.start_iteration();
     tld.function(*p, tld.facing.data());
+    clearReleasable();
     commitIteration(tld);
   }
 
@@ -214,14 +215,17 @@ protected:
 	p = lwl.pop();
       }
 #ifdef GALOIS_USE_LONGJMP
-    } else { clearConflictLock(); }
+    } else { 
+      clearReleasable();
+      clearConflictLock(); 
+    }
 #else
     } catch (ConflictFlag const& flag) {
+      clearReleasable();
       clearConflictLock();
       result = flag;
     }
 #endif
-    clearReleasable();
     switch (result) {
     case 0:
       break;
