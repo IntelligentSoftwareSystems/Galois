@@ -126,26 +126,6 @@ struct SNode {
   unsigned int id;
 };
 
-//! ICC + GLIB 4.6 + C++0X (at least) has a faulty implementation of std::pair
-#if __INTEL_COMPILER <= 1310
-template<typename A,typename B>
-struct Pair {
-  A first;
-  B second;
-  Pair(const A& a, const B& b): first(a), second(b) { }
-  Pair<A,B>& operator=(const Pair<A,B>& other) {
-    if (this != &other) {
-      first = other.first;
-      second = other.second;
-    }
-    return *this;
-  }
-};
-#else
-template<typename A,typename B>
-struct Pair: std::pair<A,B> { };
-#endif
-
 typedef Galois::Graph::LC_CSR_Graph<SNode, void> Graph;
 typedef Graph::GraphNode GNode;
 
@@ -381,7 +361,7 @@ struct BarrierAlgo {
   typedef int tt_does_not_need_aborts;
 
   std::string name() const { return "Parallel (Barrier)"; }
-  typedef Pair<GNode,int> ItemTy;
+  typedef std::pair<GNode,int> ItemTy;
 
   void operator()(const GNode& source) const {
     std::deque<ItemTy> initial;
@@ -427,7 +407,7 @@ struct BarrierAlgo {
 //! BFS using optimized flags and barrier scheduling 
 struct BarrierExpAlgo {
   std::string name() const { return "Parallel (Exp)"; }
-  typedef Pair<GNode,int> ItemTy;
+  typedef std::pair<GNode,int> ItemTy;
 
   struct Initialize {
     template<typename Context>
@@ -496,7 +476,7 @@ struct DetBarrierAlgo {
   static_assert(Galois::needs_per_iter_alloc<DetBarrierAlgo>::value, "Oops");
 
   std::string name() const { return "Parallel (Deterministic Barrier)"; }
-  typedef Pair<GNode,int> ItemTy;
+  typedef std::pair<GNode,int> ItemTy;
 
   struct LocalState {
     typedef std::deque<GNode,Galois::PerIterAllocTy> Pending;

@@ -246,7 +246,7 @@ public:
     std::atomic<unsigned> nEdges(0), nNodes(0);
     Galois::do_all(graph.begin(), graph.end(), CreateNodes(this, tracking, graph, nNodes));
     Galois::do_all(graph.begin(), graph.end(), CreateEdges(this, tracking, graph, nEdges));
-    std::cout << "Created Graph with " << nNodes << " nodes and " << nEdges << " edges\n";
+    //std::cout << "Created Graph with " << nNodes << " nodes and " << nEdges << " edges\n";
 
   }
 

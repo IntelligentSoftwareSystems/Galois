@@ -92,7 +92,7 @@ struct GetPointer: public std::unary_function<Point&,Point*> {
 template<int Version=detBase>
 struct Process {
   typedef int tt_needs_per_iter_alloc;
-  typedef int tt_does_not_need_parallel_push;
+  typedef int tt_does_not_need_push;
   typedef Galois::PerIterAllocTy Alloc;
 
   QuadTree* tree;
@@ -558,11 +558,18 @@ static void readInput(const std::string& filename, bool addBoundary) {
 
   graph = new Graph();
 
+#if 1
+  Galois::preAlloc(
+      32 * points.size() * sizeof(Element) * 1.5 // mesh is about 2x number of points (for random points)
+      / (Galois::Runtime::MM::pageSize) // in pages
+      );
+#else
   Galois::preAlloc(1 * numThreads // some per-thread state
       + 2 * points.size() * sizeof(Element) // mesh is about 2x number of points (for random points)
       * 32 // include graph node size
       / (Galois::Runtime::MM::pageSize) // in pages
       );
+#endif
   Galois::reportPageAlloc("MeminfoPre");
 
   Galois::StatTimer T("generateRounds");
@@ -675,7 +682,7 @@ int main(int argc, char** argv) {
   case detDisjoint: name = "detDisjoint"; break;
   default: name = "unknown"; break;
   }
-  Galois::Runtime::LL::gInfo("Algorithm %s", name);
+  Galois::Runtime::LL::gInfo("Algorithm ", name);
   
   Galois::StatTimer T;
   T.start();

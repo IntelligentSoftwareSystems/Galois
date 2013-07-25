@@ -87,7 +87,7 @@ Graph graph;
 //! Basic operator for default and deterministic scheduling
 template<int Version=detBase>
 struct Process {
-  typedef int tt_does_not_need_parallel_push;
+  typedef int tt_does_not_need_push;
   typedef int tt_needs_per_iter_alloc; // For LocalState
 
   struct LocalState {
@@ -161,7 +161,7 @@ struct Process {
 
 template<bool prefix>
 struct OrderedProcess {
-  typedef int tt_does_not_need_parallel_push;
+  typedef int tt_does_not_need_push;
 
   Process<> process;
 
@@ -183,42 +183,6 @@ struct OrderedProcess {
 struct Compare {
   bool operator()(const GNode& a, const GNode& b) const {
     return graph.getData(a, Galois::MethodFlag::NONE).id < graph.getData(b, Galois::MethodFlag::NONE).id;
-  }
-};
-
-struct GaloisAlgo {
-  void operator()() {
-#ifdef GALOIS_USE_EXP
-    typedef Galois::WorkList::BulkSynchronousInline<> WL;
-#else
-    typedef Galois::WorkList::dChunkedFIFO<256> WL;
-#endif
-
-    switch (algo) {
-      case nondet: 
-        Galois::for_each<WL>(graph.begin(), graph.end(), Process<>());
-        break;
-      case detBase:
-        Galois::for_each_det(graph.begin(), graph.end(), Process<>());
-        break;
-      case detPrefix:
-        Galois::for_each_det(graph.begin(), graph.end(), Process<detPrefix>(), Process<>());
-        break;
-      case detDisjoint:
-        Galois::for_each_det(graph.begin(), graph.end(), Process<detDisjoint>());
-        break;
-      case orderedBase:
-        Galois::for_each_ordered(graph.begin(), graph.end(), Compare(),
-            OrderedProcess<true>(), OrderedProcess<false>());
-        break;
-      default: std::cerr << "Unknown algorithm" << algo << "\n"; abort();
-    }
-  }
-};
-
-struct SerialAlgo {
-  void operator()() {
-    std::for_each(graph.begin(), graph.end(), Process<>());
   }
 };
 
@@ -274,14 +238,37 @@ int main(int argc, char** argv) {
   for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii, ++id)
     graph.getData(*ii).id = id;
   
+#ifdef GALOIS_USE_EXP
+    typedef Galois::WorkList::BulkSynchronousInline<> WL;
+#else
+    typedef Galois::WorkList::dChunkedFIFO<256> WL;
+#endif
   // XXX Test if this matters
   Galois::preAlloc(numThreads + (graph.size() * sizeof(Node) * numThreads / 8) / Galois::Runtime::MM::pageSize);
   Galois::reportPageAlloc("MeminfoPre");
   Galois::StatTimer T;
   T.start();
   switch (algo) {
-    case serial: SerialAlgo()(); break;
-    default: GaloisAlgo()(); break;
+    case serial:
+      std::for_each(graph.begin(), graph.end(), Process<>());
+      break;
+    case nondet: 
+      Galois::for_each<WL>(graph.begin(), graph.end(), Process<>());
+      break;
+    case detBase:
+      Galois::for_each_det(graph.begin(), graph.end(), Process<>());
+      break;
+    case detPrefix:
+      Galois::for_each_det(graph.begin(), graph.end(), Process<detPrefix>(), Process<>());
+      break;
+    case detDisjoint:
+      Galois::for_each_det(graph.begin(), graph.end(), Process<detDisjoint>());
+      break;
+    case orderedBase:
+      Galois::for_each_ordered(graph.begin(), graph.end(), Compare(),
+          OrderedProcess<true>(), OrderedProcess<false>());
+      break;
+    default: std::cerr << "Unknown algorithm" << algo << "\n"; abort();
   }
   T.stop();
   Galois::reportPageAlloc("MeminfoPost");

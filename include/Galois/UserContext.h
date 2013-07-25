@@ -101,7 +101,7 @@ public:
   //! Force the abort of this iteration
   void abort() { Galois::Runtime::forceAbort(); }
 
-  //! Store and retrieve local state for deterministic and ordered executor
+  //! Store and retrieve local state for deterministic
   void* getLocalState(bool& used) { used = localStateUsed; return localState; }
 };
 

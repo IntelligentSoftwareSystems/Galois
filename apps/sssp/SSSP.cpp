@@ -26,11 +26,11 @@
  */
 #include "SSSP.h"
 
-#include "Galois/Timer.h"
-#include "Galois/Statistic.h"
 #include "Galois/Galois.h"
+#include "Galois/Accumulator.h"
 #include "Galois/Bag.h"
-#include "Galois/UserContext.h"
+#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 #include "Galois/Graph/LCGraph.h"
 #include "Galois/Graph/TypeTraits.h"
 #include "llvm/Support/CommandLine.h"

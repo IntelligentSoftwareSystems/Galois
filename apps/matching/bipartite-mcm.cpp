@@ -313,13 +313,19 @@ struct MatchingFF {
   }
 
   //! Makes sure that ``reached'' to properly reset even if we get aborted
-  struct ReachedCleanup {
+  struct ReachedCleanup: public Galois::Runtime::Releasable {
     G& g;
     typename ReachedWrapper::Type& reached;
 
     ReachedCleanup(G& _g, typename ReachedWrapper::Type& r): g(_g), reached(r) { }
     
     ~ReachedCleanup() {
+      cleanup();
+    }
+
+    virtual void release() { cleanup(); }
+
+    void cleanup() {
       // In non-concurrent case, we can continue reusing reached
       if (Concurrent)
         clear();

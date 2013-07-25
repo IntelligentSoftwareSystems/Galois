@@ -220,7 +220,7 @@ void matchNoNeighborNodes(MetisGraph* Graph, Galois::InsertBag<GNode>& bag){
  */
 
 struct parallelPopulateEdges {
-  typedef int tt_does_not_need_parallel_push;
+  typedef int tt_does_not_need_push;
   typedef int tt_needs_per_iter_alloc;
     
   GGraph *coarseGGraph;

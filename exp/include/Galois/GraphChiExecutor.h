@@ -43,7 +43,7 @@ class SparseVertexMap: public DispatchOperator<PassWrappedGraph> {
   bool updated;
 
 public:
-  typedef int tt_does_not_need_parallel_push;
+  typedef int tt_does_not_need_push;
   typedef int tt_does_not_need_aborts;
 
   SparseVertexMap(Graph& g, WrappedGraph& w, VertexOperator op, int& f,
@@ -91,7 +91,7 @@ class DenseVertexMap: public DispatchOperator<PassWrappedGraph> {
   bool updated;
 
 public:
-  typedef int tt_does_not_need_parallel_push;
+  typedef int tt_does_not_need_push;
   typedef int tt_does_not_need_aborts;
 
   DenseVertexMap(Graph& g, WrappedGraph& w, VertexOperator op, Bag* b, int& f,

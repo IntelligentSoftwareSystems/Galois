@@ -25,6 +25,7 @@
 #include "Metis.h"
 
 #include <iomanip>
+#include <iostream>
 
 void graphStat(GGraph* graph) {
   unsigned numEdges = 0;

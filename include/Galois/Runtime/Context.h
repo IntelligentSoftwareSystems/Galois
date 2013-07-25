@@ -25,6 +25,7 @@
 #ifndef GALOIS_RUNTIME_CONTEXT_H
 #define GALOIS_RUNTIME_CONTEXT_H
 
+#include "Galois/config.h"
 #include "Galois/MethodFlags.h"
 #include "Galois/Runtime/ll/PtrLock.h"
 #include "Galois/Runtime/ll/gio.h"
@@ -33,16 +34,10 @@
 
 #include <cassert>
 #include <cstdlib>
-#include <setjmp.h>
 
-//! Throwing exceptions can be a scalability bottleneck.
-//! Set to zero to use longjmp hack, otherwise make sure that
-//! you use a fixed c++ runtime that improves scalability of
-//! exceptions. 
-//!
-//! Update: longjmp hack is broken on newer g++ (e.g. 4.7.1)
-//#define GALOIS_USE_EXCEPTION_HANDLER 0
-#define GALOIS_USE_EXCEPTION_HANDLER 1
+#ifdef GALOIS_USE_LONGJMP
+#include <setjmp.h>
+#endif
 
 namespace Galois {
 namespace Runtime {
@@ -74,15 +69,39 @@ template <typename, typename>
 class DeterministicContext;
 }
 
-#if GALOIS_USE_EXCEPTION_HANDLER
-#else
+#ifdef GALOIS_USE_LONGJMP
 extern __thread jmp_buf hackjmp;
+
+/**
+ * Stack-allocated classes that require their deconstructors to be called,
+ * after an abort for instance, should inherit from this class. 
+ */
+class Releasable {
+  Releasable* next;
+public:
+  Releasable();
+  virtual ~Releasable() { }
+  virtual void release() = 0;
+  void releaseAll();
+};
+void clearReleasable();
+#else
+class Releasable {
+public:
+  virtual ~Releasable() { }
+  virtual void release() = 0;
+};
+static inline void clearReleasable() { }
 #endif
 
-//! All objects that may be locked (nodes primarily) must inherit from Lockable.
-//! Use an intrusive list to track objects in a context without allocation overhead
+
+/**
+ * All objects that may be locked (nodes primarily) must inherit from
+ * Lockable. 
+ */
 class Lockable {
   LL::PtrLock<SimpleRuntimeContext, true> Owner;
+  //! Use an intrusive list to track objects in a context without allocation overhead.
   Lockable* next;
   friend class SimpleRuntimeContext;
   template <typename, typename>
@@ -106,9 +125,9 @@ protected:
   int try_acquire(Lockable* L);
   void release(Lockable* L);
   
-  public:
+public:
   SimpleRuntimeContext(bool child = false): locks(0), customAcquire(child) { }
-  virtual ~SimpleRuntimeContext();
+  virtual ~SimpleRuntimeContext() { }
 
   void start_iteration() {
     assert(!locks);

@@ -150,7 +150,7 @@ def main(args, options):
   else:
     for prod in product(ranges):
       if options.append_arguments:
-        cmd = args
+        cmd = args[:]
       else:
         cmd = [args[0]]
       values = []

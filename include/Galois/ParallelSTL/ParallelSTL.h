@@ -61,7 +61,7 @@ ptrdiff_t count_if(InputIterator first, InputIterator last, Predicate pred)
 template<typename InputIterator, class Predicate>
 struct find_if_helper {
   typedef int tt_does_not_need_stats;
-  typedef int tt_does_not_need_parallel_push;
+  typedef int tt_does_not_need_push;
   typedef int tt_does_not_need_aborts;
   typedef int tt_needs_parallel_break;
 

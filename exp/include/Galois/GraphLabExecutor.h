@@ -198,7 +198,7 @@ class SyncEngine {
 
   struct Gather {
     SyncEngine* self;
-    typedef int tt_does_not_need_parallel_push;
+    typedef int tt_does_not_need_push;
     typedef int tt_does_not_need_aborts;
 
     Gather(SyncEngine* s): self(s) { }
@@ -227,7 +227,7 @@ class SyncEngine {
 
   template<typename Container>
   struct Scatter {
-    typedef int tt_does_not_need_parallel_push;
+    typedef int tt_does_not_need_push;
     typedef int tt_does_not_need_aborts;
 
     SyncEngine* self;
@@ -261,7 +261,7 @@ class SyncEngine {
 
   template<bool IsFirst>
   struct Initialize {
-    typedef int tt_does_not_need_parallel_push;
+    typedef int tt_does_not_need_push;
     typedef int tt_does_not_need_aborts;
 
     SyncEngine* self;

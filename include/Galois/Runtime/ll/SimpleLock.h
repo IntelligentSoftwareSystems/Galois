@@ -60,7 +60,7 @@ class SimpleLock<true> {
       }
       oldval = 0;
     } while (!_lock.compare_exchange_weak(oldval, 1, std::memory_order_acq_rel, std::memory_order_relaxed));
-    assert(_lock);
+    assert(is_locked());
   }
 
 public:
@@ -82,16 +82,16 @@ public:
       goto slow_path;
     if (!_lock.compare_exchange_weak(oldval, 1, std::memory_order_acq_rel, std::memory_order_relaxed))
       goto slow_path;
-    assert(_lock);
+    assert(is_locked());
     return;
   slow_path:
     slow_lock();
   }
 
   inline void unlock() const {
-    assert(_lock);
+    assert(is_locked());
     //HMMMM
-    _lock.store(0,std::memory_order_release);
+    _lock.store(0, std::memory_order_release);
     //_lock = 0;
   }
 
@@ -101,7 +101,7 @@ public:
       return false;
     if (!_lock.compare_exchange_weak(oldval, 1, std::memory_order_acq_rel))
       return false;
-    assert(_lock);
+    assert(is_locked());
     return true;
   }
 

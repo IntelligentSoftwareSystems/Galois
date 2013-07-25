@@ -24,6 +24,7 @@
  */
 #include "Galois/Galois.h"
 #include "Galois/Atomic.h"
+#include "Galois/Accumulator.h"
 #include "Galois/Bag.h"
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"

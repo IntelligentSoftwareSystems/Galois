@@ -66,7 +66,7 @@ static Galois::Graph::SpatialTree2d<Point*> tree;
 //! Our main functor
 struct Process {
   typedef int tt_needs_per_iter_alloc;
-  typedef int tt_does_not_need_parallel_push;
+  typedef int tt_does_not_need_push;
   typedef Galois::PerIterAllocTy Alloc;
 
   struct ContainsTuple {

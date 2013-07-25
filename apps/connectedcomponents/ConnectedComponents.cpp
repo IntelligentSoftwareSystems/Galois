@@ -205,7 +205,7 @@ struct SynchronousAlgo {
 
   struct Find {
     typedef int tt_does_not_need_aborts;
-    typedef int tt_does_not_need_parallel_push;
+    typedef int tt_does_not_need_push;
     typedef int tt_does_not_need_stats;
 
     Graph& graph;
@@ -473,7 +473,7 @@ struct GraphChiAlgo: public Galois::LigraGraphChi::ChooseExecutor<true> {
 
   struct Process {
     typedef int tt_does_not_need_aborts;
-    typedef int tt_does_not_need_parallel_push;
+    typedef int tt_does_not_need_push;
 
     typedef BagPair::bag_type bag_type;
     bag_type& next;
@@ -637,7 +637,7 @@ struct AsyncOCAlgo {
 
   struct Merge {
     typedef int tt_does_not_need_aborts;
-    typedef int tt_does_not_need_parallel_push;
+    typedef int tt_does_not_need_push;
 
     Galois::Statistic& emptyMerges;
     Merge(Galois::Statistic& e): emptyMerges(e) { }
@@ -684,7 +684,7 @@ struct AsyncAlgo {
 
   struct Merge {
     typedef int tt_does_not_need_aborts;
-    typedef int tt_does_not_need_parallel_push;
+    typedef int tt_does_not_need_push;
 
     Graph& graph;
     Galois::Statistic& emptyMerges;

@@ -114,7 +114,7 @@ struct DemoAlgo {
 struct AsynchronousAlgo {
   struct Merge {
     typedef int tt_does_not_need_aborts;
-    typedef int tt_does_not_need_parallel_push;
+    typedef int tt_does_not_need_push;
     typedef int tt_does_not_need_stats;
 
     Galois::Statistic& emptyMerges;

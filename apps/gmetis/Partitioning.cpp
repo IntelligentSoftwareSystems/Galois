@@ -26,6 +26,7 @@
 #include "Metis.h"
 #include "Galois/Statistic.h"
 #include <cstdlib>
+#include <iostream>
 
 const bool multiSeed = true;
 

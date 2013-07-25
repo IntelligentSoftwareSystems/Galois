@@ -138,14 +138,14 @@ struct has_deterministic_id : public has_tf_deterministic_id<T> {};
  *  struct T {
  *    struct GaloisDeteministicLocalState {
  *      int x, y, z; // Local state
- *      GaloisDeteministicLocalState(T& self, Galois::PerIterAllocTy& alloc) {
+ *      GaloisDeterministicLocalState(T& self, Galois::PerIterAllocTy& alloc) {
  *        // initialize local state
  *      }
  *    };
  *
  *    void operator()(const A& item, Galois::UserContext<A>&) { 
  *      // An example of using local state
- *      typedef GaloisDeteministicLocalState LS;
+ *      typedef GaloisDeterministicLocalState LS;
  *      bool used;
  *      LS* p = (LS*) ctx.getLocalState(used);
  *      if (used) {

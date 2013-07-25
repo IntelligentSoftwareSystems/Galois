@@ -103,7 +103,7 @@ struct EdgeCtx: public Edge {
 
 struct FindLoop {
 
-  // typedef char tt_does_not_need_parallel_push;
+  // typedef char tt_does_not_need_push;
 
   VecRep_ty& repVec;
   VecAtomicCtxPtr& repOwnerCtxVec;
@@ -175,7 +175,7 @@ struct FindLoop {
 
 template <bool usingOrderedRuntime=false>
 struct LinkUpLoop {
-  // typedef char tt_does_not_need_parallel_push;
+  // typedef char tt_does_not_need_push;
 
   VecRep_ty& repVec;
   VecAtomicCtxPtr& repOwnerCtxVec;

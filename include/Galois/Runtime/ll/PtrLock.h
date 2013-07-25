@@ -59,12 +59,12 @@ class PtrLock<T, true> {
   void slow_lock() {
     uintptr_t oldval;
     do {
-      while (((oldval = _lock) & 1) != 0) {
+      while (((oldval = _lock.load(std::memory_order_acquire)) & 1) != 0) {
 	asmPause();
       }
       assert((oldval & 1) == 0);
-    } while (!_lock.compare_exchange_weak(oldval, oldval | 1));
-    assert(_lock);
+    } while (!_lock.compare_exchange_weak(oldval, oldval | 1, std::memory_order_acq_rel, std::memory_order_relaxed));
+    assert(is_locked());
   }
 
 public:
@@ -85,7 +85,7 @@ public:
       goto slow_path;
     if (!_lock.compare_exchange_weak(oldval, oldval | 1, std::memory_order_acq_rel, std::memory_order_relaxed))
       goto slow_path;
-    assert(_lock & 1);
+    assert(is_locked());
     return;
 
   slow_path:
@@ -93,17 +93,17 @@ public:
   }
 
   inline void unlock() {
-    assert(_lock & 1);
+    assert(is_locked());
     _lock.fetch_xor(1, std::memory_order_release);
   }
 
   inline void unlock_and_clear() {
-    assert(_lock & 1);
+    assert(is_locked());
     _lock.store(0, std::memory_order_release);
   }
 
   inline void unlock_and_set(T* val) {
-    assert(_lock & 1);
+    assert(is_locked());
     assert(!((uintptr_t)val & 1));
     _lock.store((uintptr_t) val, std::memory_order_release);
   }
@@ -125,7 +125,7 @@ public:
       return false;
     if (!_lock.compare_exchange_weak(oldval, oldval | 1, std::memory_order_acq_rel))
       return false;
-    assert(_lock & 1);
+    assert(is_locked());
     return true;
   }
 

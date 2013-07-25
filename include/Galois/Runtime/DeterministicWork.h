@@ -1398,18 +1398,21 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
 
     stateManager.alloc(tld.facing, tld.options.fn1);
     int result = 0;
-#if GALOIS_USE_EXCEPTION_HANDLER
+#ifdef GALOIS_USE_LONGJMP
+    if ((result = setjmp(hackjmp)) == 0) {
+#else
     try {
+#endif
       tld.options.fn1(ctx->item.val, tld.facing.data());
+#ifdef GALOIS_USE_LONGJMP
+    } else { clearConflictLock(); }
+#else
     } catch (ConflictFlag flag) {
       clearConflictLock();
       result = flag;
     }
-#else
-    if ((result = setjmp(hackjmp)) == 0) {
-      tld.options.fn1(ctx->item.val, tld.facing.data());
-    }
 #endif
+    clearReleasable();
     switch (result) {
       case 0: 
       case REACHED_FAILSAFE: break;
@@ -1462,18 +1465,21 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
     if (commit) {
       stateManager.restore(tld.facing, ctx->item.localState);
       int result = 0;
-#if GALOIS_USE_EXCEPTION_HANDLER
+#ifdef GALOIS_USE_LONGJMP
+      if ((result = setjmp(hackjmp)) == 0) {
+#else
       try {
+#endif
         tld.options.fn2(ctx->item.val, tld.facing.data());
+#ifdef GALOIS_USE_LONGJMP
+      } else { clearConflictLock(); }
+#else
       } catch (ConflictFlag flag) {
         clearConflictLock();
         result = flag;
       }
-#else
-      if ((result = setjmp(hackjmp)) == 0) {
-        tld.options.fn2(ctx->item.val, tld.facing.data());
-      }
 #endif
+      clearReleasable();
       switch (result) {
         case 0: break;
         case CONFLICT: commit = false; break;

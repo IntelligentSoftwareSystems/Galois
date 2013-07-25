@@ -124,10 +124,6 @@ protected:
     SimpleRuntimeContext cnx;
     LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
     ThreadLocalData(const FunctionTy& fn, const char* ln): function(fn), stat(ln) {}
-#if GALOIS_USE_EXCEPTION_HANDLER
-#else
-    jmp_buf outbuf;
-#endif
   };
 
   // NB: Place dynamically growing wl after fixed-size PerThreadStorage
@@ -203,10 +199,10 @@ protected:
     int result = 0;
     if (p)
       workHappened = true;
-#if GALOIS_USE_EXCEPTION_HANDLER
-    try {
-#else
+#ifdef GALOIS_USE_LONGJMP
     if ((result = setjmp(hackjmp)) == 0) {
+#else
+    try {
 #endif
       while (p) {
 	doProcess(p, tld);
@@ -217,14 +213,15 @@ protected:
 	}
 	p = lwl.pop();
       }
-#if GALOIS_USE_EXCEPTION_HANDLER
+#ifdef GALOIS_USE_LONGJMP
+    } else { clearConflictLock(); }
+#else
     } catch (ConflictFlag const& flag) {
       clearConflictLock();
       result = flag;
     }
-#else
-    }
 #endif
+    clearReleasable();
     switch (result) {
     case 0:
       break;
@@ -233,11 +230,7 @@ protected:
       break;
     case BREAK:
       handleBreak(tld);
-#if GALOIS_USE_EXCEPTION_HANDLER
       throw result;
-#else
-      longjmp(tld.outbuf, flag);
-#endif
     default:
       GALOIS_DIE("unknown conflict type");
     }
@@ -265,30 +258,21 @@ protected:
       tld.facing.setFastPushBack(std::bind(&ForEachWork::fastPushBack, std::ref(*this), std::placeholders::_1));
     }
     bool didWork;
-#if GALOIS_USE_EXCEPTION_HANDLER
     try {
-#else
-    if ((result = setjmp(tld.outjmp)) == 0) {
-#endif
-    do {
-      didWork = false;
-      //Run some iterations
-      if (ForEachTraits<FunctionTy>::NeedsBreak || ForEachTraits<FunctionTy>::NeedsAborts)
-        didWork = runQueue<checkAbort || ForEachTraits<FunctionTy>::NeedsBreak>(tld, wl, false);
-      else //No try/catch
-        didWork = runQueueSimple(tld);
-      //Check for abort
-      if (checkAbort)
-        didWork |= handleAborts(tld);
-      //update node color and prop token
-      term.localTermination(didWork);
-    } while (!term.globalTermination());
-#if GALOIS_USE_EXCEPTION_HANDLER
-    } catch (ConflictFlag const& flag) {
-    }
-#else
-    }
-#endif
+      do {
+        didWork = false;
+        //Run some iterations
+        if (ForEachTraits<FunctionTy>::NeedsBreak || ForEachTraits<FunctionTy>::NeedsAborts)
+          didWork = runQueue<checkAbort || ForEachTraits<FunctionTy>::NeedsBreak>(tld, wl, false);
+        else //No try/catch
+          didWork = runQueueSimple(tld);
+        //Check for abort
+        if (checkAbort)
+          didWork |= handleAborts(tld);
+        //update node color and prop token
+        term.localTermination(didWork);
+      } while (!term.globalTermination());
+    } catch (int flag) { }
 
     if (ForEachTraits<FunctionTy>::NeedsAborts)
       setThreadContext(0);

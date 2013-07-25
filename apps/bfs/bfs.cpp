@@ -85,6 +85,8 @@ namespace cll = llvm::cl;
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
 static cll::opt<std::string> transposeGraphName("graphTranspose", cll::desc("Transpose of input graph"));
 static cll::opt<bool> symmetricGraph("symmetricGraph", cll::desc("Input graph is symmetric"));
+static cll::opt<bool> useDetBase("detBase", cll::desc("Deterministic"));
+static cll::opt<bool> useDetDisjoint("detDisjoint", cll::desc("Deterministic with disjoint optimization"));
 static cll::opt<unsigned int> startNode("startNode", cll::desc("Node to start search from"), cll::init(0));
 static cll::opt<unsigned int> reportNode("reportNode", cll::desc("Node to report distance to"), cll::init(1));
 static cll::opt<unsigned int> memoryLimit("memoryLimit",
@@ -94,8 +96,8 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValN(Algo::async, "async", "Asynchronous"),
       clEnumValN(Algo::barrier, "barrier", "Parallel optimized with barrier (default)"),
       clEnumValN(Algo::barrierWithCas, "barrierWithCas", "Use compare-and-swap to update nodes"),
-      clEnumValN(Algo::deterministic, "deterministic", "Deterministic"),
-      clEnumValN(Algo::deterministicDisjoint, "deterministicDisjoint", "Deterministic with disjoint optimization"),
+      clEnumValN(Algo::deterministic, "detBase", "Deterministic"),
+      clEnumValN(Algo::deterministicDisjoint, "detDisjoint", "Deterministic with disjoint optimization"),
       clEnumValN(Algo::graphlab, "graphlab", "Use GraphLab programming model"),
       clEnumValN(Algo::highCentrality, "highCentrality", "Optimization for graphs with many shortest paths"),
       clEnumValN(Algo::hybrid, "hybrid", "Hybrid of barrier and high centrality algorithms"),
@@ -669,7 +671,6 @@ struct DeterministicAlgo {
     ::template with_numa_alloc<true>::type Graph;
   typedef Graph::GraphNode GNode;
 
-
   std::string name() const { return "Deterministic"; }
   void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, filename); }
 
@@ -828,6 +829,10 @@ int main(int argc, char **argv) {
 #else
   typedef BSWL BSInline;
 #endif
+  if (useDetDisjoint)
+    algo = Algo::deterministicDisjoint;
+  else if (useDetBase)
+    algo = Algo::deterministic;
 
   Galois::StatTimer T("TotalTime");
   T.start();

@@ -30,6 +30,7 @@
 #include "Galois/Atomic.h"
 #include "Galois/Galois.h"
 
+#include "Galois/Runtime/LCordered.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 

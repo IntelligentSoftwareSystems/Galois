@@ -254,8 +254,8 @@ void verify(Config& orig) {
 }
 
 void reduceCapacity(const Graph::edge_iterator& ii, const GNode& src, const GNode& dst, int amount) {
-  int& cap1 = app.graph.getEdgeData(ii);
-  int& cap2 = app.graph.getEdgeData(findEdge(app.graph, dst, src));
+  Graph::edge_data_type& cap1 = app.graph.getEdgeData(ii);
+  Graph::edge_data_type& cap2 = app.graph.getEdgeData(findEdge(app.graph, dst, src));
   cap1 -= amount;
   cap2 += amount;
 }
@@ -631,6 +631,10 @@ void writePfpGraph(const std::string& inputFile, const std::string& outputFile) 
     }
   }
 
+  EdgeTy one = 1;
+  static_assert(sizeof(one) == sizeof(uint32_t), "Unexpected edge data size");
+  one = Galois::convert_le32(one);
+
   p.phase2();
   edgeData.create(numEdges);
   for (ReaderGraph::iterator ii = reader.begin(), ei = reader.end(); ii != ei; ++ii) {
@@ -641,7 +645,7 @@ void writePfpGraph(const std::string& inputFile, const std::string& outputFile) 
       if (rsrc == rdst) continue;
       if (!reader.hasNeighbor(rdst, rsrc)) 
         edgeData.set(p.addNeighbor(rdst, rsrc), 0);
-      EdgeTy cap = useUnitCapacity ? 1 : reader.getEdgeData<EdgeTy>(jj);
+      EdgeTy cap = useUnitCapacity ? one : reader.getEdgeData<EdgeTy>(jj);
       edgeData.set(p.addNeighbor(rsrc, rdst), cap);
     }
   }
@@ -652,8 +656,7 @@ void writePfpGraph(const std::string& inputFile, const std::string& outputFile) 
   p.structureToFile(outputFile);
 }
 
-void initializeGraph(std::string inputFile,
-    uint32_t sourceId, uint32_t sinkId, Config *newApp) {
+void initializeGraph(std::string inputFile, uint32_t sourceId, uint32_t sinkId, Config *newApp) {
   if (useSymmetricDirectly) {
     Galois::Graph::readGraph(newApp->graph, inputFile);
     for (Graph::iterator ss = newApp->graph.begin(), es = newApp->graph.end(); ss != es; ++ss) {
@@ -666,11 +669,22 @@ void initializeGraph(std::string inputFile,
       std::ifstream pfpFile(pfpName.c_str());
       if (!pfpFile.good()) {
         std::cout << "Writing new input file: " << pfpName << "\n";
-        writePfpGraph<int32_t>(inputFile, pfpName);
+        writePfpGraph<Graph::edge_data_type>(inputFile, pfpName);
       }
       inputFile = pfpName;
     }
     Galois::Graph::readGraph(newApp->graph, inputFile);
+
+#ifdef HAVE_BIG_ENDIAN
+    // Convert edge data to host ordering
+    for (Graph::iterator ss = newApp->graph.begin(), es = newApp->graph.end(); ss != es; ++ss) {
+      for (Graph::edge_iterator ii = newApp->graph.edge_begin(*ss), ei = newApp->graph.edge_end(*ss); ii != ei; ++ii) {
+        Graph::edge_data_type& cap = newApp->graph.getEdgeData(ii);
+        static_assert(sizeof(cap) == sizeof(uint32_t), "Unexpected edge data size");
+        cap = Galois::convert_le32(cap);
+      }
+    }
+#endif
   }
   
   Graph& g = newApp->graph;

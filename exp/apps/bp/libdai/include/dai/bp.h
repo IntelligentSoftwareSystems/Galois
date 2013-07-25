@@ -135,7 +135,7 @@ class BP : public DAIAlgFG {
 
         struct ComputeDiffs {
           typedef int tt_does_not_need_stats;
-          typedef int tt_does_not_need_parallel_push;
+          typedef int tt_does_not_need_push;
           BP& parent;
           Galois::GReduceMax<Real>& accMaxDiff;
           ComputeDiffs(BP& p, Galois::GReduceMax<Real>& a): parent(p), accMaxDiff(a) { }
@@ -146,7 +146,7 @@ class BP : public DAIAlgFG {
 
         struct Initialize {
           typedef int tt_does_not_need_stats;
-          typedef int tt_does_not_need_parallel_push;
+          typedef int tt_does_not_need_push;
           BP& parent;
           std::vector<Task>& initial;
           std::vector<std::vector<EdgeData> >& edgeData;

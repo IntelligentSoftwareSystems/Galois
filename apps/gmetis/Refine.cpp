@@ -26,6 +26,7 @@
 #include "Metis.h"
 #include "Galois/Accumulator.h"
 #include <set>
+#include <iostream>
 
 namespace {
 

@@ -22,7 +22,7 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#include "Galois/Galois.h"
+#include "Galois/Runtime/ParallelWork.h"
 #include "Galois/Graph/FileGraph.h"
 
 #include <pthread.h>

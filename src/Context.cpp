@@ -29,9 +29,30 @@
 
 #include <stdio.h>
 
-#if GALOIS_USE_EXCEPTION_HANDLER
-#else
-static __thread jmp_buf Galois::Runtime::hackjmp;
+#ifdef GALOIS_USE_LONGJMP
+#include <setjmp.h>
+
+__thread jmp_buf Galois::Runtime::hackjmp;
+static __thread Galois::Runtime::Releasable* releasableHead = 0;
+
+Galois::Runtime::Releasable::Releasable() {
+  this->next = releasableHead;
+  releasableHead = this;
+}
+
+void Galois::Runtime::Releasable::releaseAll() {
+  Galois::Runtime::Releasable* head = this;
+  while (head) {
+    head->release();
+    Galois::Runtime::Releasable* next = head->next;
+    head->~Releasable();
+    head = next;
+  }
+}
+
+void Galois::Runtime::clearReleasable() {
+  releasableHead = 0;
+}
 #endif
 
 //! Global thread context for each active thread
@@ -52,16 +73,17 @@ void Galois::Runtime::setPending(Galois::Runtime::PendingFlag value) {
   pendingStatus.flag.data = value;
 }
 
-Galois::Runtime::PendingFlag Galois::Runtime::getPending () {
+Galois::Runtime::PendingFlag Galois::Runtime::getPending() {
   return pendingStatus.flag.data;
 }
 
 void Galois::Runtime::doCheckWrite() {
   if (Galois::Runtime::getPending() == Galois::Runtime::PENDING) {
-#if GALOIS_USE_EXCEPTION_HANDLER
-    throw Galois::Runtime::REACHED_FAILSAFE;
-#else
+#ifdef GALOIS_USE_LONGJMP
+    if (releasableHead) releasableHead->releaseAll();
     longjmp(hackjmp, Galois::Runtime::REACHED_FAILSAFE);
+#else
+    throw Galois::Runtime::REACHED_FAILSAFE;
 #endif
   }
 }
@@ -100,18 +122,20 @@ unsigned Galois::Runtime::SimpleRuntimeContext::commit_iteration() {
 }
 
 void Galois::Runtime::breakLoop() {
-#if GALOIS_USE_EXCEPTION_HANDLER
-  throw Galois::Runtime::BREAK;
-#else
+#ifdef GALOIS_USE_LONGJMP
+  if (releasableHead) releasableHead->releaseAll();
   longjmp(hackjmp, Galois::Runtime::BREAK);
+#else
+  throw Galois::Runtime::BREAK;
 #endif
 }
 
 void Galois::Runtime::signalConflict(Lockable* L) {
-#if GALOIS_USE_EXCEPTION_HANDLER
-  throw Galois::Runtime::CONFLICT; // Conflict
-#else
+#ifdef GALOIS_USE_LONGJMP
+  if (releasableHead) releasableHead->releaseAll();
   longjmp(hackjmp, Galois::Runtime::CONFLICT);
+#else
+  throw Galois::Runtime::CONFLICT; // Conflict
 #endif
 }
 
@@ -157,10 +181,6 @@ void Galois::Runtime::SimpleRuntimeContext::acquire(Galois::Runtime::Lockable* L
 void Galois::Runtime::SimpleRuntimeContext::sub_acquire(Galois::Runtime::Lockable* L) {
   GALOIS_DIE("Shouldn't get here");
 }
-
-//anchor vtable
-Galois::Runtime::SimpleRuntimeContext::~SimpleRuntimeContext() {}
-
 
 void Galois::Runtime::forceAbort() {
   signalConflict(NULL);

@@ -91,7 +91,7 @@ struct SafeDataBase<T, CharData, false> {
 
     type() {
       // XXX: Keep this as a runtime exception rather than a compile-time one
-      GALOIS_DIE("Unsafe construct for type '", __PRETTY_FUNCTION__, "' when expecting strict aliasing");
+      //GALOIS_DIE("Unsafe construct for type '", __PRETTY_FUNCTION__, "' when expecting strict aliasing");
     }
   };
 };
