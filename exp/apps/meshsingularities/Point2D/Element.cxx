@@ -168,7 +168,6 @@ void Element::comp(int indx1, int indx2, IDoubleArgFunction* f1, IDoubleArgFunct
 		
 		DoubleArgFunctionProduct* product = new DoubleArgFunctionProduct();
 		product->SetFunctions(f1,f2);
-		printf("doaje do %d %d ", indx1, indx2); 
 		matrix[indx1][indx2] += GaussianQuadrature::definiteDoubleIntegral(xl, xr, yl, yr, product);
 		delete product;
 }
@@ -177,7 +176,7 @@ void Element::comp(int indx1, int indx2, IDoubleArgFunction* f1, IDoubleArgFunct
 void Element::fillMatrix(double** matrix)
 {
 	
-		printf("zzzz %d\n",bot_left_vertex_nr); 
+		
 		int functionNumbers[] = { bot_left_vertex_nr, left_edge_nr, top_left_vertex_nr, top_edge_nr, top_right_vertex_nr, bot_edge_nr, interior_nr, right_edge_nr, bot_right_vertex_nr }; 
 					
 		for(int i = 0; i<9; i++){

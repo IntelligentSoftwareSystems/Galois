@@ -53,7 +53,7 @@ void MatrixGenerator::CreateMatrixAndRhs(int nr_of_tiers, double bot_left_x, dou
 
 		while(!element_stack.empty())
 		{
-			printf("ITERACJA \n\n"); 
+
 			
 			Element* matrix_creation_element = element_stack.top();
 			matrix_creation_element->fillMatrix(matrix); 
