@@ -23,6 +23,7 @@ const double lenLimit = 0.001;
 const int RmaxMult = 16;
 const bool useMomentum = false;
 const bool useScaling = true;
+const bool noLimit = true;
 
 bool doExit = false;
 
@@ -64,8 +65,6 @@ static int filter(const SDL_Event * event)
     doExit = true;
   return event->type == SDL_QUIT;
 }
-
-#define mask32(BYTE) (*(uint32_t *)(uint8_t [4]){ [BYTE] = 0xff })
 
 template<typename T>
 class Point {
@@ -175,7 +174,7 @@ static bool renderGraph(struct rgbData data[][WIDTH], unsigned width, unsigned h
   //clear
   //edges
   if (true)
-    Galois::do_all_local(g, [&g, &data, black] (GNode& n) {
+    Galois::do_all(g.begin(), g.end(), [&g, &data, black] (GNode& n) {
         Vertex& v = g.getData(n);
         for(Graph::edge_iterator ee = g.edge_begin(n), eee = g.edge_end(n); ee!=eee; ee++) {
           GNode n3 = g.getEdgeDst(ee);
@@ -185,7 +184,7 @@ static bool renderGraph(struct rgbData data[][WIDTH], unsigned width, unsigned h
       } );
   if (forces) {
     if (true)
-      Galois::do_all_local(g, [&g, &data, red] (GNode& n) {
+      Galois::do_all(g.begin(), g.end(), [&g, &data, red] (GNode& n) {
         Vertex& v = g.getData(n);
         drawline(data, v.coord.x, v.coord.y, 
                  v.coord.x - WIDTH * v.velocity.x / W, v.coord.y - HEIGHT * v.velocity.y / H,
@@ -245,94 +244,80 @@ void computeBaryCen(Graph& g, double& cx, double& cy) {
   //std::cout << " cx " << cx << " cy " << cy << "\n";
 }
 
-
-void computeImpulseRandom(Graph& g) {
-  for (Graph::iterator ii = g.begin(), ei = g.end(); ii!=ei; ii++) {
-    Vertex& v = g.getData(*ii);
-    v.fRandom = randPoint() * sqrt(v.velocity.lengthSQ());
-    // double lenSQ = v.velocity.lengthSQ();
-    // if (lenSQ > lenLimit) {
-    //   v.fRandom = v.velocity / sqrt(lenSQ);
-    //   std::swap(v.fRandom.x, v.fRandom.y);
-    //   if (drand48() > 0.5)
-    //     v.fRandom *= -1;
-    //   //v.fRandom *= log(v.t);
-    // }
-    // else
-    //   v.fRandom = {0,0};
+//Computes spring force given ideal spring with natural length
+void computeForceSpringIdeal (GNode n, Graph& g) {
+  Vertex& v = g.getData(n);
+  v.fSpring = {0.0,0.0};
+  for(Graph::edge_iterator ee = g.edge_begin(n), eee = g.edge_end(n); ee!=eee; ee++) {
+    Vertex& u2 = g.getData(g.getEdgeDst(ee));
+    Point<double> change = u2.position - v.position;
+    double lenSQ = change.lengthSQ();
+    if (lenSQ > lenLimit) {
+      double len = sqrt(lenSQ);
+      auto dir = change / len;
+      double spring = len - idealDist;
+      // if (idealDist < len)
+      //   spring *= log(log(spring));
+      double force = spring * springK;
+      v.fSpring += dir * force;
+    }
   }
 }
 
-void computeImpulseGravity(Graph& g, Point<double> center) {
-  for (Graph::iterator ii = g.begin(), ei = g.end(); ii!=ei; ii++) {
-    Vertex& v = g.getData(*ii);
-    Point<double> dir = center - v.position;
-    //dir = dir / sqrt(dir.lengthSQ());
-    v.fGravity = dir * gravConst;
+//Computes spring force given ideal spring with natural length of zero
+void computeForceSpringZero(GNode n, Graph& g) {
+  Vertex& v = g.getData(n);
+  v.fSpring = {0.0,0.0};
+  for(Graph::edge_iterator ee = g.edge_begin(n), eee = g.edge_end(n); ee!=eee; ee++) {
+    Vertex& u2 = g.getData(g.getEdgeDst(ee));
+    Point<double> change = u2.position - v.position;
+    double lenSQ = change.lengthSQ();
+    if (lenSQ > lenLimit) {
+      double len = sqrt(lenSQ);
+      auto dir = change / len;
+      double force = len * springK;
+      v.fSpring += dir * force;
+    }
   }
 }
 
-void computeImpulseEdge(Graph& g) {
-  Galois::do_all_local(g, [&g] (GNode& n) {
-      //for (Graph::iterator ii = g.begin(), ei = g.end(); ii!=ei; ii++) {
-    Vertex& v = g.getData(n);
-    v.fSpring = {0.0,0.0};
-    for(Graph::edge_iterator ee = g.edge_begin(n), eee = g.edge_end(n); ee!=eee; ee++) {
-      Vertex& u2 = g.getData(g.getEdgeDst(ee));
-      Point<double> change = v.position - u2.position;
+void computeForceRepulsive(GNode n, Graph& g) {
+  Vertex& v = g.getData(n);
+  v.fRepulse = {0.0,0.0};
+  for (Graph::iterator jj = g.begin(), ej = g.end(); jj!=ej; jj++) {
+    if (n != *jj) {
+      Vertex& u = g.getData(*jj);
+      auto change = v.position - u.position;
       double lenSQ = change.lengthSQ();
-      if (lenSQ > lenLimit) {
-        double len = sqrt(lenSQ);
-        auto dir = change / len;
-        double spring = idealDist - len;
-        // if (idealDist < len)
-        //   spring *= log(log(spring));
-        double force = spring * springK;
-        v.fSpring += dir * force;
-      }
-    }
-    } );
-}
-
-void computeImpulseRepulsive(Graph& g) {
-  for (Graph::iterator ii = g.begin(), ei = g.end(); ii!=ei; ii++) {
-    Vertex& v = g.getData(*ii);
-    v.fRepulse = {0.0,0.0};
-    for (Graph::iterator jj = g.begin(), ej = g.end(); jj!=ej; jj++) {
-      if (ii != jj) {
-        Vertex& u = g.getData(*jj);
-        auto change = v.position - u.position;
-        double lenSQ = change.lengthSQ();
-        auto dir = (lenSQ > lenLimit) ? change / sqrt(lenSQ) : randPoint();
-        v.fRepulse += dir * repulseK / lenSQ;
-      }
+      auto dir = (lenSQ > lenLimit) ? change / sqrt(lenSQ) : randPoint();
+      if (lenSQ > lenLimit)
+        v.fRepulse += dir * repulseK * v.mass / lenSQ;
     }
   }
 }
 
-void computeImpulseRepulsive2(Graph& g) {
-  Galois::do_all_local(g, [&g] (GNode& n) {
-      //for (Graph::iterator ii = g.begin(), ei = g.end(); ii!=ei; ii++) {
-    Vertex& v = g.getData(n);
-    v.fRepulse = {0.0,0.0};
-    // std::set<GNode> neigh;
-    // for(Graph::edge_iterator ee = g.edge_begin(n), eee = g.edge_end(n); ee!=eee; ee++)
-    //   neigh.insert(g.getEdgeDst(ee));
-    for (Graph::iterator jj = g.begin(), ej = g.end(); jj!=ej; jj++) {
-      if (n != *jj) {
-        Vertex& u = g.getData(*jj);
-        auto change = v.position - u.position;
-        double lenSQ = change.lengthSQ();
-        auto dir = (lenSQ > lenLimit) ? change / sqrt(lenSQ) : randPoint();
-        // if (neigh.count(*jj))
-        //   dir *= -1;
-        if (lenSQ > lenLimit)
-          v.fRepulse += dir * repulseK * v.mass / lenSQ;
-        // else
-        //   v.fRepulse += dir * repulseK; //reuse random constant
-      }
-    }
-    } );
+void computeForceRandom(GNode n, Graph& g) {
+  Vertex& v = g.getData(n);
+  v.fRandom = randPoint() * sqrt(sqrt(v.velocity.lengthSQ()));
+}
+
+void computeForceGravity(GNode n, Graph& g) {
+  Vertex& v = g.getData(n);
+  Point<double> dir = Point<double>(0,0) - v.position;
+  v.fGravity = dir * gravConst;
+}
+
+void computeImpulse(Graph& g) {
+  Galois::do_all(g.begin(), g.end(), [&g] (GNode& n) { 
+      if (!opt_no_random)
+        computeForceRandom(n, g);
+      if (!opt_no_gravity)
+        computeForceGravity(n, g);
+      if (!opt_no_spring)
+        computeForceSpringZero(n, g); 
+      if (!opt_no_repulse)
+        computeForceRepulsive(n, g);
+    });
 }
 
 void updateVSimple(Graph& g) {
@@ -349,7 +334,7 @@ void updateVSimple(Graph& g) {
     v.position += v.velocity;
     v.position.boundBy(Point<double>(-1000000,-1000000),Point<double>(1000000, 1000000));
     v.velocity = v.position - oldPos;
-    v.t -= 1;
+    //    v.t -= 1;
   }
 }
 
@@ -422,35 +407,28 @@ int main(int argc, char **argv) {
 
   init_data(buffer);
 
-  SDL_Surface * data_sf = SDL_CreateRGBSurfaceFrom(
-                                                   (char*)buffer, WIDTH, HEIGHT, 24, WIDTH * 3,
-                                                   0x000000FF, 0x0000FF00, 0x00FF0000, 0);
-
+  SDL_Surface * data_sf = 
+    SDL_CreateRGBSurfaceFrom((char*)buffer, WIDTH, HEIGHT, 24, WIDTH * 3,
+                             0x000000FF, 0x0000FF00, 0x00FF0000, 0);
+  
   SDL_SetEventFilter(filter);
 
   computeCoord(graph);
-  renderGraph(buffer, WIDTH, HEIGHT, graph, false);// SDL_Delay(1000/60))
+  renderGraph(buffer, WIDTH, HEIGHT, graph, false);
   render(data_sf);
 
   //Begin stages of algorithm
   Galois::StatTimer T;
   T.start();
-  while(!doExit && (Tglob > Tmin) && (numRounds < Rmax)){
+  while(!doExit && (noLimit || (Tglob > Tmin) && (numRounds < Rmax))) {
 
     double cx = 0, cy = 0;
     computeBaryCen(graph,cx,cy);
 
     //Compute v's impulse
-    if (!opt_no_random)
-      computeImpulseRandom(graph);
-    if (!opt_no_gravity)
-      computeImpulseGravity(graph, Point<double>());
-    if (!opt_no_spring)
-      computeImpulseEdge(graph);
-    if (!opt_no_repulse)
-      computeImpulseRepulsive2(graph);
+    computeImpulse(graph);
 
-    if (false) { //false && numRounds % 4 == 0) {
+    if (numRounds % 10 == 0) { //false && numRounds % 4 == 0) {
       computeCoord(graph);
       renderGraph(buffer, WIDTH, HEIGHT, graph, true);// SDL_Delay(1000/60))
       render(data_sf);
@@ -474,7 +452,7 @@ int main(int argc, char **argv) {
   init_data(buffer);
   renderGraph(buffer, WIDTH, HEIGHT, graph, false);
   while (!doExit) {
-    SDL_Delay(1000/60);
+    SDL_Delay(1000/30);
     render(data_sf);
   }
   return 0;
