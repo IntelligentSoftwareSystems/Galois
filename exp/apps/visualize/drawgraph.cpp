@@ -25,6 +25,7 @@ const bool useScaling = true;
 
 bool doExit = false;
 double alpha = 1.0;
+double nnodes = 0.0;
 
 namespace cll = llvm::cl;
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
@@ -223,7 +224,7 @@ void initializeVertices(Graph& g) {
   for (auto ii = g.begin(), ei = g.end(); ii!=ei; ii++) {
     Vertex& v = g.getData(*ii);
     v.mass = 1 + std::distance(g.edge_begin(*ii), g.edge_end(*ii));
-    //    v.position *= 1 / v.mass;
+    v.position *= idealDist * idealDist * (1.0 / v.mass);
   }
 }
 
@@ -258,10 +259,15 @@ Point<double> computeForceRepulsive(Vertex& v, GNode n, Graph& g) {
       } else {
         double len = sqrt(lenSQ);
         auto dir = change / len;
-        //        if (len <= idealDist)
-          fRepulse += dir * (1.0 - alpha) * (idealDist * idealDist) / len; //short range
-          //        else
-          fRepulse += dir * alpha * (idealDist * idealDist * idealDist) / lenSQ; //long range
+        if (true) {
+          if (len <= idealDist)
+            fRepulse += dir * (idealDist * idealDist) / len; //short range
+          else
+            fRepulse += dir * (idealDist * idealDist * idealDist) / lenSQ; //long range
+        } else {
+          fRepulse += dir * alpha * (idealDist * idealDist) / len; //short range
+          fRepulse += dir * (1.0 - alpha) * (idealDist * idealDist * idealDist) / lenSQ; //long range
+        }
       }
     }
   }
@@ -269,7 +275,10 @@ Point<double> computeForceRepulsive(Vertex& v, GNode n, Graph& g) {
 }
 
 Point<double> computeForceRandom(Vertex& v, GNode n, Graph& g) {
-  return randPoint() * drand48() * log(1 + v.velocity.lengthSQ()) * v.temp / Tmax;
+  if ( drand48() < (v.temp / Tmax))
+    return randPoint() * idealDist * Tmax / v.temp;
+  else
+    return Point<double>(); // randPoint() * v.temp / Tmax;
 }
 
 Point<double> computeForceGravity(Vertex& v, GNode n, Graph& g) {
@@ -293,12 +302,11 @@ double updatePosition(Vertex& v, double time, Point<double> force) {
   v.position += v.velocity * step;
   v.position.boundBy(Point<double>(-1000000,-1000000),Point<double>(1000000, 1000000));
   v.velocity = v.position - oldPos;
-  return time - step;
+  return step;
 }
 
 void updateTemp(Vertex& v) {
-  if (v.temp > 1)
-    v.temp -= 1;
+  v.temp *= 0.99;//(1/nnodes);
   //v.temp = std::max(0.5, std::min(Tmax, idealDist * v.velocity.lengthSQ())); 
 }
 
@@ -331,7 +339,9 @@ struct computeImpulse {
         fSpring = computeForceSpringZero(v,n,g);
       if (!opt_no_repulse)
         fRepulse = computeForceRepulsive(v, n, g);
-      time = updatePosition(v, time, fGravity + fRepulse + fSpring + fRandom);
+      double fr = fRepulse.lengthSQ(), fs = fSpring.lengthSQ();
+      double step = (fr > 4 * fs || fs > 4 * fr) ? time / 2 : time;
+      time -= updatePosition(v, step, fGravity + fRepulse + fSpring + fRandom);
 
       if (false) {
         if (fGravity.lengthSQ() > maxGravity)
@@ -398,7 +408,8 @@ int main(int argc, char **argv) {
   //assign points in space to nodes
   initializeVertices(graph);
 
-  int Rmax = RmaxMult*std::distance(graph.begin(), graph.end());
+  nnodes = std::distance(graph.begin(), graph.end());
+  int Rmax = RmaxMult*nnodes;
 
   double Tglob = 0.0;
   computeGlobalTemp(graph, Tglob);
@@ -440,7 +451,7 @@ int main(int argc, char **argv) {
     alpha *= .995;
     //Galois::for_each(graph.begin(), graph.end(), computeImpulse(graph));
     
-    if (true) { // || numRounds % 256 == 0) { //false && numRounds % 4 == 0) {
+    if (false && numRounds % 64 == 0) { //false && numRounds % 4 == 0) {
       computeCoord(graph);
       renderGraph(buffer, WIDTH, HEIGHT, graph, true);// SDL_Delay(1000/60))
       render(data_sf);
