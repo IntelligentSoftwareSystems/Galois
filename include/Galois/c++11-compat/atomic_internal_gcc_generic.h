@@ -10,23 +10,26 @@ bool atomic_compare_exchange_strong(volatile _Tp* __a, _Tp* __e, _Tp* __d, std::
 
 template<class _Tp>
 void __atomic_store(volatile _Tp* __a, _Tp* __i, std::memory_order _m) {
-  __sync_synchronize();
-  *__a = *__i;
-  __sync_synchronize();
+  switch (_m) {
+    case std::memory_order_relaxed: *__a = *__i; break;
+    default: __sync_synchronize(); *__a = *__i; __sync_synchronize(); break;
+  }
 }
 
 template<class _Tp>
 void __atomic_load(volatile _Tp* __a, _Tp* __i, std::memory_order _m) {
-  __sync_synchronize();
-  *__i = *__a;
-  __sync_synchronize();
+  switch (_m) {
+    case std::memory_order_relaxed: *__i = *__a; break;
+    default: __sync_synchronize(); *__i = *__a; __sync_synchronize(); break;
+  }
 }
 
 template<class _Tp>
 void __atomic_load(volatile const _Tp* __a, _Tp* __i, std::memory_order _m) {
-  __sync_synchronize();
-  *__i = *__a;
-  __sync_synchronize();
+  switch (_m) {
+    case std::memory_order_relaxed: *__i = *__a; break;
+    default: __sync_synchronize(); *__i = *__a; __sync_synchronize(); break;
+  }
 }
 
 template<class _Tp>
