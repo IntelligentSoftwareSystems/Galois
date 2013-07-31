@@ -22,22 +22,50 @@ static void beginPeriod() {
 #include "ittnotify.h"
 #include "Galois/Runtime/ll/TID.h"
 
+namespace vtune {
 static bool isOn;
-static void vtuneBegin() {
+static void begin() {
   if (!isOn && Galois::Runtime::LL::getTID() == 0)
     __itt_resume();
   isOn = true;
 }
 
-static void vtuneEnd() {
+static void end() {
   if (isOn && Galois::Runtime::LL::getTID() == 0)
     __itt_pause();
   isOn = false;
 }
-
+}
 #else
-static void vtuneBegin() {}
-static void vtuneEnd() {}
+namespace vtune {
+static void begin() {}
+static void end() {}
+}
+#endif
+
+#ifdef GALOIS_USE_HPCTOOLKIT
+#include <hpctoolkit.h>
+#include "Galois/Runtime/ll/TID.h"
+
+namespace hpctoolkit {
+static bool isOn;
+static void begin() {
+  if (!isOn && Galois::Runtime::LL::getTID() == 0)
+    hpctoolkit_sampling_start();
+  isOn = true;
+}
+
+static void end() {
+  if (isOn && Galois::Runtime::LL::getTID() == 0)
+    hpctoolkit_sampling_stop();
+  isOn = false;
+}
+}
+#else
+namespace hpctoolkit {
+static void begin() {}
+static void end() {}
+}
 #endif
 
 #ifdef GALOIS_USE_PAPI
@@ -45,9 +73,9 @@ extern "C" {
 #include <papi.h>
 #include <papiStdEventDefs.h>
 }
-
 #include <iostream>
 
+namespace papi {
 static bool isInit = false;
 static int papiEventSet = PAPI_NULL;
 static long_long papiResults[2];
@@ -63,7 +91,7 @@ static void handle_error(int retval) {
   abort();
 }
 
-static void papiBegin() {
+static void begin() {
   int rv;
   // Init library
   if (!isInit) {
@@ -86,7 +114,7 @@ static void papiBegin() {
     handle_error(rv);
 }
 
-static void papiEnd() {
+static void end() {
   int rv;
 
   /* get the values */
@@ -102,29 +130,33 @@ static void papiEnd() {
     handle_error(rv);
 }
 
-static void papiReport(const char* loopname) {
+static void report(const char* loopname) {
   Galois::Runtime::reportStat(loopname, papiNames[0], papiResults[0]);
   Galois::Runtime::reportStat(loopname, papiNames[1], papiResults[1]);
 }
-
+}
 #else
-static void papiBegin() {}
-static void papiEnd() {}
-static void papiReport(const char* loopname) {}
+namespace papi {
+static void begin() {}
+static void end() {}
+static void report(const char* loopname) {}
+}
 #endif
 
 void Galois::Runtime::beginSampling() {
   beginPeriod();
-  papiBegin();
-  vtuneBegin();
+  papi::begin();
+  vtune::begin();
+  hpctoolkit::begin();
 }
 
 void Galois::Runtime::endSampling() {
-  vtuneEnd();
-  papiEnd();
+  hpctoolkit::end();
+  vtune::end();
+  papi::end();
   endPeriod();
 }
 
 void Galois::Runtime::reportSampling(const char* loopname) {
-  papiReport(loopname);
+  papi::report(loopname);
 }

@@ -3,14 +3,13 @@
 #  VTune_FOUND - System has VTune
 #  VTune_INCLUDE_DIRS - The VTune include directories
 #  VTune_LIBRARIES - The libraries needed to use VTune
-set(VTune_DIR "/opt/intel/vtune_amplifier_xe_2013;/opt/intel/vtune_amplifier_xe_2011")
 
 if(VTune_INCLUDE_DIRS AND VTune_LIBRARIES)
   set(VTune_FIND_QUIETLY TRUE)
 endif()
 
-find_path(VTune_INCLUDE_DIRS ittnotify.h PATHS ${VTune_DIR} PATH_SUFFIXES include)
-find_library(VTune_LIBRARY NAMES ittnotify PATHS ${VTune_DIR} PATH_SUFFIXES lib lib64 lib32)
+find_path(VTune_INCLUDE_DIRS ittnotify.h PATHS ${VTune_ROOT} PATH_SUFFIXES include)
+find_library(VTune_LIBRARY NAMES ittnotify PATHS ${VTune_ROOT} PATH_SUFFIXES lib lib64 lib32)
 find_library(VTune_LIBRARIES NAMES dl PATH_SUFFIXES lib lib64 lib32)
 set(VTune_LIBRARIES ${VTune_LIBRARY} ${VTune_LIBRARIES})
 
