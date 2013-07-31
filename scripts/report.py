@@ -91,11 +91,15 @@ def main(options):
   
   matcher = [(re.compile(s), fn) for (s,fn) in table.iteritems()]
   for line in sys.stdin:
-    for (regex, fn) in matcher:
-      m = regex.match(line)
-      if m:
-        fn(m)
-        break
+    try:
+      for (regex, fn) in matcher:
+        m = regex.match(line)
+        if m:
+          fn(m)
+          break
+    except:
+      sys.stderr.write('Error parsing line: %s' % line)
+      raise
   if row.r:
     rows.append(row.r)
   
