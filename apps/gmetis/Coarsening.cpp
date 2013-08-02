@@ -287,8 +287,8 @@ struct HighDegreeIndexer: public std::unary_function<GNode, unsigned int> {
     return indexgraph->getData(val, Galois::MethodFlag::NONE).isFailedMatch() ?
       std::numeric_limits<unsigned int>::max() :
       (std::numeric_limits<unsigned int>::max() - 
-      (std::distance(indexgraph->edge_begin(val, Galois::MethodFlag::NONE), 
-                     indexgraph->edge_end(val, Galois::MethodFlag::NONE))) >> 2);
+       ((std::distance(indexgraph->edge_begin(val, Galois::MethodFlag::NONE), 
+                       indexgraph->edge_end(val, Galois::MethodFlag::NONE))) >> 2));
   }
 };
 
