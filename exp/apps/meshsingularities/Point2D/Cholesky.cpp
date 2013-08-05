@@ -25,7 +25,7 @@
  * @author Noah Anderson <noah@ices.utexas.edu>
  */
 
-// A bunch of this is copied from SpanningTree
+// A bunch of this is copied from SpanningTree zzzzz
 
 #include "Galois/Galois.h"
 #include "Galois/Accumulator.h"
@@ -44,7 +44,9 @@
 #include <iostream>
 #include <fstream>
 #include <cstdio>               // For certain debugging output
+#include <stack>
 #include "MatrixGenerator.hxx"
+
 
 namespace cll = llvm::cl;
 
@@ -490,6 +492,7 @@ static void makeGraph(GraphType &graph, const char* input) {
    // Create nodes in output graph
    nodes.resize(in_graph.size());
    int nodeID = 0;
+   
    for (Map::iterator i = edges.begin(), ei = edges.end(); i != ei; ++i) {
       Node n;
       n.id = nodeID;
@@ -524,7 +527,6 @@ static void makeGraph(GraphType &graph, const char* input) {
 }
 
 // FIXME: implement verify, etc. See SpanningTree.
-
 
 // Load a double[][] matrix into a FirstGraph. 
 template <typename GraphType>
@@ -588,6 +590,7 @@ template <typename GraphType>
 int get_solution_from_graph(GraphType &outgraph, double* rhs){
 	
 	
+	
 	std::stack<Graph::GraphNode> node_stack; 
 	int i = 0; 
     int j; 
@@ -595,11 +598,12 @@ int get_solution_from_graph(GraphType &outgraph, double* rhs){
 		node_stack.push(src); 
 		for(Graph::edge_iterator edge : outgraph.out_edges(src)) {
 			Graph::GraphNode dst = outgraph.getEdgeDst(edge);
-			
+			Node &nodex = outgraph.getData(src);
 			double edgeData = outgraph.getEdgeData(edge);
 			Node &noded = outgraph.getData(dst);
 			j = noded.id; 
-			
+	
+	
 			if(j == i){
 				rhs[i] /= edgeData; 
 			}
@@ -608,10 +612,12 @@ int get_solution_from_graph(GraphType &outgraph, double* rhs){
 			}
 			
 		}
+	
 		i++; 
 	}
 	
-	int diagonal_value;
+	
+	double diagonal_value;
 	while(!node_stack.empty()){
 		Graph::GraphNode src = node_stack.top(); 
 		node_stack.pop(); 
@@ -624,6 +630,7 @@ int get_solution_from_graph(GraphType &outgraph, double* rhs){
 			Node &noded = outgraph.getData(dst);
 			j = noded.id; 
 			if(j == i){
+				
 				diagonal_value = edgeData; 
 			}
 			else{
@@ -631,18 +638,16 @@ int get_solution_from_graph(GraphType &outgraph, double* rhs){
 			}
 			
 		}
-		
-		rhs[i]/=diagonal_value;
+
+		rhs[i] = rhs[i] / diagonal_value;
 	}
-	
-	
-	
-	printf("\nGETting solution\n"); 
+/*
+	printf("\nGetting solution\n"); 
 	
 	for(int i = 0; i<outgraph.size(); i++){
 		printf("%d %lf\n",i,rhs[i]); 
 	}
-	
+*/	
 	
 	
 }
@@ -673,26 +678,16 @@ int main(int argc, char** argv) {
   
 	MatrixGenerator* matrix_generator = new MatrixGenerator();
 	IDoubleArgFunction* my_function = new MyFunction();
-	int nr_of_tiers = 2; 
+	int nr_of_tiers = 25; 
 	double left_bot_x = 0; 
 	double left_bot_y = 0; 
 	//334
-	double size = 335; 
+	double size = 100; 
 	matrix_generator->CreateMatrixAndRhs(nr_of_tiers, left_bot_x, left_bot_y, size, my_function);
 					  
 	double** matrix = matrix_generator->GetMatrix();
 	double* rhs = matrix_generator->GetRhs(); 
 	int matrix_size = matrix_generator->GetMatrixSize();
-  
-  
-  for(int i = 0; i<matrix_size; i++){
-	for(int j = 0; j<matrix_size; j++){
-		
-		printf("%.10lf ", matrix[i][j]);
-	} 
-	printf("| %.10lf\n", rhs[i]); 
-  }
-  
   
   
   clock_t t_start = clock();
@@ -750,10 +745,9 @@ int main(int argc, char** argv) {
   }
   printf("%d MATRIX_SIZE",matrix_size); 
   
-  
-  
   get_solution_from_graph(outgraph, rhs);
   
+
   printf("\nTime taken: %.4fs\n", (float)(clock() - t_start)/CLOCKS_PER_SEC);
   return 0;
 }

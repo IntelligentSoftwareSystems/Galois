@@ -7,6 +7,11 @@ class IDoubleArgFunction
 	
 	public:
 		virtual double ComputeValue(double x, double y) = 0; 
+
+	virtual ~IDoubleArgFunction()
+	{
+
+	}
 };
 
 
@@ -40,10 +45,7 @@ class ShapeFunction : public IDoubleArgFunction
 			
 		}
 		
-		~ShapeFunction()
-		{
-		}
-		
+
 };
 
 
@@ -92,7 +94,7 @@ class VertexTopRightShapeFunction : public ShapeFunction
 		}
 		
 		virtual double ComputeValue(double x, double y);
-		~VertexTopRightShapeFunction()
+		virtual ~VertexTopRightShapeFunction()
 		{
 		}
 };

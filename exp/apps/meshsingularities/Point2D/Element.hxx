@@ -94,10 +94,16 @@ class Element{
 		Element** CreateLastTier(int nr); 
 		
 		void fillMatrix(double** matrix);
+		void fillMatrix(double** matrix, int start_nr_adj);
 		void fillRhs(double* rhs, IDoubleArgFunction* f);
+		void fillRhs(double* rhs, IDoubleArgFunction* f, int start_nr_adj);
+		void fillTierMatrix(double** matrix, double* rhs, IDoubleArgFunction* f, int start_nr_adj);
 		
 		void set_bot_left_vertex_nr(int nr){
 			bot_left_vertex_nr = nr; 
+		}
+		int get_bot_left_vertex_nr(){
+			return bot_left_vertex_nr;
 		}
 		void set_top_left_vertex_nr(int nr){
 			top_left_vertex_nr = nr; 

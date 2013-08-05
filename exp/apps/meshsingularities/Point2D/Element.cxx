@@ -175,27 +175,39 @@ void Element::comp(int indx1, int indx2, IDoubleArgFunction* f1, IDoubleArgFunct
 
 void Element::fillMatrix(double** matrix)
 {
-	
-		
-		int functionNumbers[] = { bot_left_vertex_nr, left_edge_nr, top_left_vertex_nr, top_edge_nr, top_right_vertex_nr, bot_edge_nr, interior_nr, right_edge_nr, bot_right_vertex_nr }; 
-					
-		for(int i = 0; i<9; i++){
-			for(int j = 0; j<9; j++){
-				comp(functionNumbers[i], functionNumbers[j], shapeFunctions[i], shapeFunctions[j], matrix);
-			}
-		}
-		
+	fillMatrix(matrix,0);
 		
 }
 
-void Element::fillRhs(double* rhs, IDoubleArgFunction* f)
+void Element::fillMatrix(double** matrix, int start_adj_nr)
+{
+	int functionNumbers[] = { bot_left_vertex_nr, left_edge_nr, top_left_vertex_nr, top_edge_nr, top_right_vertex_nr, bot_edge_nr, interior_nr, right_edge_nr, bot_right_vertex_nr };
+					
+		for(int i = 0; i<9; i++){
+			for(int j = 0; j<9; j++){
+				comp(functionNumbers[i] - start_adj_nr, functionNumbers[j] - start_adj_nr,
+						shapeFunctions[i], shapeFunctions[j], matrix);
+			}
+		}
+}
+
+void Element::fillRhs(double* rhs, IDoubleArgFunction* f){
+	fillRhs(rhs, f, 0);
+}
+
+void Element::fillRhs(double* rhs, IDoubleArgFunction* f, int start_adj_nr)
 {
 		int functionNumbers[] = { bot_left_vertex_nr, left_edge_nr, top_left_vertex_nr, top_edge_nr, top_right_vertex_nr, bot_edge_nr, interior_nr, right_edge_nr, bot_right_vertex_nr }; 
 		for(int i = 0; i<9; i++){
 			DoubleArgFunctionProduct* product = new DoubleArgFunctionProduct();
 			product->SetFunctions(shapeFunctions[i], f);
 			
-			rhs[functionNumbers[i]] += GaussianQuadrature::definiteDoubleIntegral(xl, xr, yl, yr, product);
+			rhs[functionNumbers[i] - start_adj_nr] += GaussianQuadrature::definiteDoubleIntegral(xl, xr, yl, yr, product);
 			delete product; 
 		}		
+}
+
+void Element::fillTierMatrix(double** matrix, double* rhs, IDoubleArgFunction* f, int start_nr_adj){
+		fillMatrix(matrix, start_nr_adj);
+		fillRhs(rhs, f, start_nr_adj);
 }
