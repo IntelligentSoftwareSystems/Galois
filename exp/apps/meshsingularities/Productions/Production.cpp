@@ -122,39 +122,39 @@ void AbstractProduction::AN(Vertex *v, EquationSystem *inData)
 	int i, j;
 	int offset = leafSize - 2*interfaceSize;
 
-	int a1Offset = anSize - leafSize;
+	int anOffset = anSize - leafSize;
 	if (offset > 0) {
 		for (i=0; i<interfaceSize; i++) {
 			for (j=0; j<interfaceSize; j++) {
-				v->system->matrix[i+offset][j+offset] = inData->matrix[i+a1Offset][j+a1Offset]; // 1
-				v->system->matrix[i+offset][j+offset+interfaceSize] = inData->matrix[i+a1Offset][j+offset+interfaceSize+a1Offset]; // 3
-				v->system->matrix[i+offset+interfaceSize][j+offset] = inData->matrix[i+offset+interfaceSize+a1Offset][j+a1Offset]; // 7
-				v->system->matrix[i+offset+interfaceSize][j+offset+interfaceSize] = inData->matrix[i+offset+interfaceSize+a1Offset][j+offset+interfaceSize+a1Offset]; // 9
+				v->system->matrix[i+offset][j+offset] = inData->matrix[i+anOffset][j+anOffset]; // 1
+				v->system->matrix[i+offset][j+offset+interfaceSize] = inData->matrix[i+anOffset][j+offset+interfaceSize+anOffset]; // 3
+				v->system->matrix[i+offset+interfaceSize][j+offset] = inData->matrix[i+offset+interfaceSize+anOffset][j+anOffset]; // 7
+				v->system->matrix[i+offset+interfaceSize][j+offset+interfaceSize] = inData->matrix[i+offset+interfaceSize+anOffset][j+offset+interfaceSize+anOffset]; // 9
 			}
 		}
 
 		for (i=0; i<offset; i++) {
 			for (j=0; j<offset; j++) {
-				v->system->matrix[i][j] = inData->matrix[i+interfaceSize+a1Offset][j+interfaceSize+a1Offset]; // 5
+				v->system->matrix[i][j] = inData->matrix[i+interfaceSize+anOffset][j+interfaceSize+anOffset]; // 5
 			}
 		}
 
 		for (i=0; i<offset; i++) {
 			for (j=0; j<interfaceSize; j++) {
-				v->system->matrix[i][j+offset] = inData->matrix[i+interfaceSize+a1Offset][j+a1Offset]; // 4
-				v->system->matrix[i][j+offset+interfaceSize] = inData->matrix[i+interfaceSize+a1Offset][j+offset+interfaceSize+a1Offset]; // 6
-				v->system->matrix[j+offset][i] = inData->matrix[j+a1Offset][i+interfaceSize+a1Offset]; // 2
-				v->system->matrix[j+offset+interfaceSize][i] = inData->matrix[j+offset+interfaceSize+a1Offset][i+interfaceSize+a1Offset]; // 8
+				v->system->matrix[i][j+offset] = inData->matrix[i+interfaceSize+anOffset][j+anOffset]; // 4
+				v->system->matrix[i][j+offset+interfaceSize] = inData->matrix[i+interfaceSize+anOffset][j+offset+interfaceSize+anOffset]; // 6
+				v->system->matrix[j+offset][i] = inData->matrix[j+anOffset][i+interfaceSize+anOffset]; // 2
+				v->system->matrix[j+offset+interfaceSize][i] = inData->matrix[j+offset+interfaceSize+anOffset][i+interfaceSize+anOffset]; // 8
 			}
 		}
 
 		for (i=0; i<interfaceSize; i++) {
-			v->system->rhs[i+offset] = inData->rhs[i+a1Offset];
-			v->system->rhs[i+offset+interfaceSize] = inData->rhs[i+offset+interfaceSize+a1Offset];
+			v->system->rhs[i+offset] = inData->rhs[i+anOffset];
+			v->system->rhs[i+offset+interfaceSize] = inData->rhs[i+offset+interfaceSize+anOffset];
 		}
 
 		for (int i=0; i<offset; i++) {
-			v->system->rhs[i] = inData->rhs[i+interfaceSize+a1Offset];
+			v->system->rhs[i] = inData->rhs[i+interfaceSize+anOffset];
 		}
 
 		v->system->eliminate(leafSize-2*interfaceSize);
