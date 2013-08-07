@@ -122,7 +122,7 @@ void AbstractProduction::AN(Vertex *v, EquationSystem *inData)
 	int i, j;
 	int offset = leafSize - 2*interfaceSize;
 
-	int a1Offset = a1Size - leafSize;
+	int a1Offset = anSize - leafSize;
 	if (offset > 0) {
 		for (i=0; i<interfaceSize; i++) {
 			for (j=0; j<interfaceSize; j++) {
