@@ -33,8 +33,8 @@ public:
 				tier_matrix_size = 21;
 				tier_matrix = new double*[tier_matrix_size];
 				for(int i = 0; i<tier_matrix_size; i++)
-					tier_matrix[i] = new double[tier_matrix_size];
-				tier_rhs = new double[tier_matrix_size];
+					tier_matrix[i] = new double[tier_matrix_size]();
+				tier_rhs = new double[tier_matrix_size]();
 				start_nr_adj = bot_left_element->get_bot_left_vertex_nr();
 
 				bot_left_element->fillTierMatrix(tier_matrix, tier_rhs, f, start_nr_adj);

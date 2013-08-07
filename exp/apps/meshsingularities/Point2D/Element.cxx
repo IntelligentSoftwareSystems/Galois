@@ -1,5 +1,6 @@
 #include "Element.hxx"
 #include <stdio.h>
+
 Element** Element::CreateAnotherTier(int nr)
 {
 
@@ -170,6 +171,7 @@ void Element::comp(int indx1, int indx2, IDoubleArgFunction* f1, IDoubleArgFunct
 		product->SetFunctions(f1,f2);
 		matrix[indx1][indx2] += GaussianQuadrature::definiteDoubleIntegral(xl, xr, yl, yr, product);
 		delete product;
+
 }
 
 

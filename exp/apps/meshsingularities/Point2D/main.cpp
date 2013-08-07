@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include "../GraphGeneration/GraphGenerator.hxx"
 #include "MatrixGenerator.hxx"
 
 class MyFunction : public IDoubleArgFunction
@@ -6,7 +7,7 @@ class MyFunction : public IDoubleArgFunction
 	public:
 		virtual double ComputeValue(double x, double y)
 		{
-			return x*y + (1-x)*y + x*x+y*y; 
+			return 1;
 		}
 };
 
@@ -14,16 +15,35 @@ void print_matrix_rhs(double** matrix, double* rhs, int size)
 {
 	for(int i = 0; i<size; i++){
 		for(int j = 0; j<size; j++){
-				printf("%0.3lf ",matrix[i][j]);
+				printf("%0.7lf ",matrix[i][j]);
 		}
-		printf("| %0.3lf\n",rhs[i]);
+		printf("| %0.7lf\n",rhs[i]);
 
 	}
 }
 
+void print_matrix(double** matrix, int size)
+{
+	for(int i = 0; i<size; i++){
+		for(int j = 0; j<size; j++){
+				printf("%0.7lf ",matrix[i][j]);
+		}
+		printf("\n");
+
+	}
+}
+
+void print_rhs(double* rhs, int size)
+{
+	for(int i = 0; i<size; i++){
+		printf("%0.7lf\n",rhs[i]);
+	}
+}
+
+
 int main(int argc, char** argv)
 {
-
+	/*
 	MatrixGenerator* matrix_generator = new MatrixGenerator();
 	IDoubleArgFunction* my_function = new MyFunction();
 	
@@ -32,8 +52,13 @@ int main(int argc, char** argv)
 	double** matrix = matrix_generator->GetMatrix();
 	double* rhs = matrix_generator->GetRhs(); 
 	int size = matrix_generator->GetMatrixSize(); 
-	printf("%d\n\n",size); 
+	printf("%d\n\n",size);
+	*/
+	//print_matrix(matrix,size);
+
+	//print_rhs(rhs,size);
 	//print_matrix_rhs(matrix,rhs,size);
+	/*
 	printf("----------------------------------------------------------\n");
 
 
@@ -50,6 +75,11 @@ int main(int argc, char** argv)
 		++it;
 	}
 	print_matrix_rhs(matrix2,rhs2,size);
-	return 0; 
+
+	*/
+	GraphGenerator* generator = new GraphGenerator();
+	generator->GenerateGraph(100);
+	return 0;
+
 }
 

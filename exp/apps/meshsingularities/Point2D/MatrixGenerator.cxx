@@ -1,6 +1,6 @@
 #include "MatrixGenerator.hxx"
 #include <stdio.h>
-
+#include <iostream>
 
 
 std::list<Tier*>* MatrixGenerator::CreateMatrixAndRhs(int nr_of_tiers, double bot_left_x, double bot_left_y, double size, IDoubleArgFunction* f)
@@ -43,14 +43,15 @@ std::list<Tier*>* MatrixGenerator::CreateMatrixAndRhs(int nr_of_tiers, double bo
 		element_list.push_back(element);
 		
 		matrix_size = 9 + nr_of_tiers*12 + 4; 
-		rhs = new double[matrix_size];
+		rhs = new double[matrix_size]();
 		matrix = new double*[matrix_size];
 		for(int i = 0; i<matrix_size; i++)
-			matrix[i] = new double[matrix_size];
+			matrix[i] = new double[matrix_size]();
 		
 		std::list<Element*>::iterator it = element_list.begin();
 		while(it != element_list.end())
 		{
+
 				Element* matrix_creation_element = (*it);
 				matrix_creation_element->fillMatrix(matrix);
 				matrix_creation_element->fillRhs(rhs, f);
