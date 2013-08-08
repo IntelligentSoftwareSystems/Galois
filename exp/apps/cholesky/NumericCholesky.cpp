@@ -1,4 +1,4 @@
-/** Elimination game -*- C++ -*-
+/** NumericCholesky application -*- C++ -*-
  * @file
  * @section License
  *
@@ -20,7 +20,7 @@
  *
  * @section Description
  *
- * Play the elimination game on a graph.
+ * Compute numeric Cholesky factorization of a filled graph.
  *
  * @author Noah Anderson <noah@ices.utexas.edu>
  */

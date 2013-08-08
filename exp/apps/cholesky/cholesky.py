@@ -75,7 +75,7 @@ def write_matrix(matrix, filename=None):
         for j in range(cols):
             if j != 0:
                 outfh.write("\t")
-            outfh.write(str(matrix[i][j]))
+            outfh.write(str(matrix[i,j]))
         outfh.write("\n")
     if filename:
         outfh.close()

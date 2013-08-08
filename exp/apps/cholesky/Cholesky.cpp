@@ -1,4 +1,4 @@
-/** Elimination game -*- C++ -*-
+/** Cholesky application -*- C++ -*-
  * @file
  * @section License
  *
@@ -20,7 +20,7 @@
  *
  * @section Description
  *
- * compute Cholesky factorization of a graph.
+ * Compute Cholesky factorization of a graph.
  *
  * @author Noah Anderson <noah@ices.utexas.edu>
  */
@@ -68,11 +68,13 @@ static cll::opt<Ordering> ordering("ordering",
 
 struct Node {
   unsigned id;
-  bool seen;
-  Node(): seen(false) { };
+  unsigned int seen;
+  unsigned int nedges;
+  Node(): seen(0), nedges(0) { };
 };
 
-// WARNING: Will silently behave oddly when given wrong data type
+// WARNING: Will silently behave oddly when given a .gr file with the
+// wrong data type
 typedef double edgedata;
 //typedef float edgedata;
 
@@ -132,14 +134,15 @@ bool outputTextEdgeData(const char* ofile, GraphType& G) {
 }
 
 // Find the unseen node in the graph of least degree
-unsigned int ordering_leastdegree(SymbolicGraph &graph, unsigned int i) {
+unsigned int ordering_leastdegree(SymbolicGraph &graph, unsigned int i,
+                                  unsigned int seenbase = 0) {
   unsigned int nseen = 0, bestid = 0, bestdegree = graph.size()+1;
   // Iterate over nodes
   for ( SymbolicGraph::iterator ii = graph.begin(), ei = graph.end();
         ii != ei; ++ii ) {
     SGNode node = *ii;
     Node &noded = graph.getData(node);
-    if ( noded.seen ) {
+    if ( noded.seen > seenbase ) {
       nseen++;
       continue;
     }
@@ -150,7 +153,7 @@ unsigned int ordering_leastdegree(SymbolicGraph &graph, unsigned int i) {
            eis = graph.edge_end(node, Galois::MethodFlag::ALL);
 	 iis != eis; ++iis) {
       // Only include unseen (not yet eliminated) neighbors in the degree
-      if ( graph.getData(graph.getEdgeDst(iis)).seen ) continue;
+      if ( graph.getData(graph.getEdgeDst(iis)).seen > seenbase ) continue;
       degree++;
       // Maybe this isn't going to work out; abort if degree is too high
       if ( degree >= bestdegree ) break;
@@ -170,7 +173,8 @@ unsigned int ordering_leastdegree(SymbolicGraph &graph, unsigned int i) {
 
 // For the given ordering, return the ID of the next node that should
 // be eliminated.
-unsigned int ordering_next_node(SymbolicGraph &graph, unsigned int i) {
+unsigned int ordering_next_node(SymbolicGraph &graph, unsigned int i,
+                                unsigned int seenbase = 0) {
   const unsigned int pointless_len = 8,
     pointless_data[] = {1, 6, 4, 5, 0, 3, 7, 2}; // For "pointless" ordering
   unsigned int n = graph.size();
@@ -180,7 +184,7 @@ unsigned int ordering_next_node(SymbolicGraph &graph, unsigned int i) {
   case sequential:
     return i;
   case leastdegree:
-    return ordering_leastdegree(graph, i);
+    return ordering_leastdegree(graph, i, seenbase);
   case pointless:
     for ( unsigned int offset = i % pointless_len, base = i-offset, j = 0;
           j < pointless_len; j++ ) {
@@ -212,8 +216,9 @@ struct SymbolicAlgo {
   void operator()(SGNode node, C& ctx) {
     // Update seen flag on node
     Node &noded = graph.getData(node);
-    assert(!noded.seen);
-    noded.seen = true;
+    assert(noded.seen == 0);
+    noded.seen = 1;
+    // FIXME: Be "cautious"
 
     // Make sure remaining neighbors form a clique
     // It should be safe to add edges between neighbors here.
@@ -223,7 +228,7 @@ struct SymbolicAlgo {
 	 iis != eis; ++iis) {
       SGNode src = graph.getEdgeDst(iis);
       Node &srcd = graph.getData(src);
-      if ( srcd.seen ) continue;
+      if ( srcd.seen > 0 ) continue;
 
       // Enumerate all other neighbors
       for (typename GraphType::edge_iterator
@@ -232,7 +237,7 @@ struct SymbolicAlgo {
 	   iid != eid; ++iid) {
         SGNode dst = graph.getEdgeDst(iid);
         Node &dstd = graph.getData(dst);
-        if ( dstd.seen ) continue;
+        if ( dstd.seen > 0 ) continue;
 
 	// Find the edge that bridges these two neighbors
 	bool hasEdge = false;
@@ -248,20 +253,68 @@ struct SymbolicAlgo {
       }
     }
 
-    // Determine dependencies; build elimination graph from these edges.
+    //std::cout << "Counting edges for node " << noded.id << ": ";
+
+    // Count number of edges to add to the output graph. These will be
+    // preallocated and added later.
     for (typename GraphType::edge_iterator
            iis = graph.edge_begin(node, Galois::MethodFlag::ALL),
            eis = graph.edge_end(node, Galois::MethodFlag::ALL);
 	 iis != eis; ++iis) {
       SGNode src = graph.getEdgeDst(iis);
       Node &srcd = graph.getData(src);
-      if ( !srcd.seen ) continue;
+      if ( srcd.seen == 0 ) continue;
+      srcd.nedges++;
+      //std::cout << "(" << srcd.id << ")";
+    }
+    //std::cout << "\n";
+  }
+
+  void add_outedges(SGNode node) {
+    Node &noded = graph.getData(node);
+    assert(noded.seen == 1);
+    noded.seen = 2;
+    bool doneself = false;
+
+    //std::cout << "Adding edges targeting node " << noded.id << " ";
+
+    // Undirected graph double-counts self-edge
+    assert(noded.nedges > 1);
+    noded.nedges--;
+    //std::cout << "[a source of " << noded.nedges << " edges]: ";
+    // Create our node and allocate our edges
+    GNode outnode = outgraph.createNode(noded);
+    outgraph.addNode(outnode);
+    outgraph.resizeEdges(outnode, noded.nedges);
+    outnodes[noded.id] = outnode;
+    assert(outgraph.getData(outnode).id == noded.id);
+    assert(outgraph.getData(outnode).seen == 2);
+
+    // Add edges to the output (elimination graph).
+    for (typename GraphType::edge_iterator
+           iis = graph.edge_begin(node, Galois::MethodFlag::ALL),
+           eis = graph.edge_end(node, Galois::MethodFlag::ALL);
+	 iis != eis; ++iis) {
+      SGNode src = graph.getEdgeDst(iis);
+      Node &srcd = graph.getData(src);
+      //std::cout << "(" << srcd.id << ")";
+      if ( srcd.seen == 1 ) continue; // 1 = not seen; 2 = seen
+      if ( srcd.id == noded.id ) {
+        if ( doneself ) continue;
+        doneself = true;
+      }
+      assert(srcd.nedges > 0);
+      //std::cout << "Y ";
       // Add a directed edge from src to node (copying weight)
       typename OutGraphType::edge_iterator
-        edge = outgraph.addEdge(outnodes[srcd.id],outnodes[noded.id]);
+        edge = outgraph.addEdge(outnodes[srcd.id], outnode,
+                                Galois::MethodFlag::ALL);
       edgedata &ed = outgraph.getEdgeData(edge);
       ed = graph.getEdgeData(iis);
+      // Bookkeeping
+      srcd.nedges--;
     }
+    //std::cout << "\n";
   }
 
   std::vector<GNode> outnodes;
@@ -275,23 +328,30 @@ struct SymbolicAlgo {
     for ( typename GraphType::iterator ii = graph.begin(), ei = graph.end();
           ii != ei; ++ii ) {
       innodes[nodeID] = *ii;
-      GNode node = outgraph.createNode(graph.getData(*ii));
-      outgraph.addNode(node);
-      outnodes[nodeID] = node;
-      assert(outgraph.getData(node).id == nodeID);
       nodeID++;
     }
 
     // Eliminate each node in given traversal order.
     // FIXME: parallelize? See paper.
-    for (unsigned int i = 0; i < n; i++ ) {
+    for ( unsigned int i = 0; i < n; i++ ) {
       nodeID = ordering_next_node(graph, i);
+      //std::cout << "Eliminating " << i << "\n";
       SGNode node = innodes[nodeID];
       void *emptyctx = NULL;
       (*this)(node, emptyctx);
       // Append to execution order
       depgraph[i] = nodeID;
     }
+
+    // Verify that all nodes have been eliminated before building outgraph
+    for ( unsigned int i = 0; i < n; i++ )
+      assert(graph.getData(innodes[i]).seen == 1);
+    // Preallocate edges and add them to the output graph
+    for ( unsigned int i = 0; i < n; i++ )
+      add_outedges(innodes[depgraph[i]]);
+    // Verify that the correct number of edges were added
+    for ( unsigned int i = 0; i < n; i++ )
+      assert(graph.getData(innodes[i]).nedges == 0);
   }
 };
 
@@ -369,6 +429,13 @@ struct NumericAlgo {
   NumericAlgo(GraphType &graph): graph(graph) { };
 
   void operator()(GNode node, Galois::UserContext<GNode>& ctx) {
+    // Update seen flag on node
+    Node &noded = graph.getData(node);
+    assert(noded.seen == 0);
+    noded.seen = 1;
+
+    //std::cout << "STARTING " << noded.id << "\n";
+
     // Find self-edge for this node, update it
     bool hasEdge = false;
     edgedata& factor = graph.getEdgeData(findEdge(graph, node, node, &hasEdge),
@@ -377,11 +444,6 @@ struct NumericAlgo {
     assert(factor > 0);
     factor = sqrt(factor);
     assert(factor != 0 && !isnan(factor));
-
-    // Update seen flag on node
-    Node &noded = graph.getData(node);
-    assert(!noded.seen);
-    noded.seen = true;
 
     //std::cout << "STARTING " << noded.id << " " << factor << "\n";
     //printf("STARTING %4d %10.5f\n", noded.id, factor);
@@ -393,7 +455,7 @@ struct NumericAlgo {
          ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
       Node &dstd = graph.getData(dst);
-      if ( !dstd.seen ) {
+      if ( dstd.seen == 0 ) {
         edgedata &ed = graph.getEdgeData(ii, Galois::MethodFlag::NONE);
         ed /= factor;
         //printf("N-EDGE %4d %4d %10.5f\n", noded.id, graph.getData(dst).id, ed);
@@ -409,7 +471,7 @@ struct NumericAlgo {
          iis != eis; ++iis) {
       GNode src = graph.getEdgeDst(iis);
       Node &srcd = graph.getData(src);
-      if ( srcd.seen ) continue;
+      if ( srcd.seen > 0 ) continue;
       edgedata& eds = graph.getEdgeData(iis, Galois::MethodFlag::NONE);
 
       // Enumerate all other neighbors
@@ -419,7 +481,7 @@ struct NumericAlgo {
            iid != eid; ++iid) {
         GNode dst = graph.getEdgeDst(iid);
         Node &dstd = graph.getData(dst);
-        if ( dstd.seen ) continue;
+        if ( dstd.seen > 0 ) continue;
 
         // Find the edge that bridges these two neighbors
         hasEdge = false;
@@ -492,7 +554,7 @@ static void makeGraph(GraphType &graph, const char* input) {
    for (Map::iterator i = edges.begin(), ei = edges.end(); i != ei; ++i) {
       Node n;
       n.id = nodeID;
-      assert(!n.seen);
+      assert(n.seen == 0);
       SGNode node = graph.createNode(n);
       graph.addNode(node);
       nodes[nodeID] = node;
@@ -557,6 +619,7 @@ int main(int argc, char** argv) {
 
   SymbolicGraph graph;
   Graph outgraph;
+  unsigned int edgecount = 0;
 
   // Load input graph. Read to an LC_Graph and then convert to a
   // FirstGraph. (based on makeGraph from Boruvka.)
@@ -571,7 +634,13 @@ int main(int argc, char** argv) {
          ii != ei; ++ii) {
       Node& data = graph.getData(*ii);
       assert(data.id == i++);
-      assert(!data.seen);
+      assert(data.seen == 0);
+      edgecount++;
+      for (SymbolicGraph::edge_iterator
+             iid = graph.edge_begin(*ii, Galois::MethodFlag::ALL),
+             eid = graph.edge_end(*ii, Galois::MethodFlag::ALL);
+           iid != eid; ++iid)
+        if ( data.id < graph.getData(graph.getEdgeDst(iid)).id ) edgecount++;
     }
     assert(i == nodecount);
   }
@@ -590,12 +659,20 @@ int main(int argc, char** argv) {
   run(SymbolicAlgo<SymbolicGraph,Graph>(graph, outgraph), "SymbolicTime");
 
   // Clear the seen flags for the numeric factorization.
-  for (SymbolicGraph::iterator ii = graph.begin(), ei = graph.end();
+  unsigned int newedgecount = 0;
+  for (Graph::iterator ii = outgraph.begin(), ei = outgraph.end();
        ii != ei; ++ii) {
-    Node& data = graph.getData(*ii);
-    assert(data.seen);
-    data.seen = false;
+    Node& data = outgraph.getData(*ii);
+    assert(data.seen == 2);
+    data.seen = 0;
+    for (Graph::edge_iterator
+           iid = outgraph.edge_begin(*ii, Galois::MethodFlag::ALL),
+           eid = outgraph.edge_end(*ii, Galois::MethodFlag::ALL);
+         iid != eid; ++iid)
+      newedgecount++;
   }
+  assert(newedgecount >= edgecount);
+  std::cout << "Added " << (newedgecount-edgecount) << " edges\n";
 
   // We should now have built a directed graph (outgraph) and total
   // ordering. Now run the numeric factorization.
