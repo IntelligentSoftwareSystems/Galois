@@ -26,6 +26,7 @@
 
 #include <iomanip>
 #include <iostream>
+#include <numeric>
 
 void graphStat(GGraph* graph) {
   unsigned numEdges = 0;

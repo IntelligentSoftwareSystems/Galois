@@ -150,7 +150,11 @@ public:
       local_edges->next = old;
       char* estart = newblock + sizeof(EdgeHolder);
       if ((uintptr_t)estart % sizeof(EITy)) //not aligned
+#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
+        estart += sizeof(EITy) - ((uintptr_t)estart % 8);
+#else
         estart += sizeof(EITy) - ((uintptr_t)estart % alignof(EITy));
+#endif
 
       local_edges->begin = (EITy*)estart;
       char* eend = newblock + Runtime::MM::pageSize;

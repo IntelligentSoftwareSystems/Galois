@@ -176,7 +176,8 @@ static bool renderGraph(struct rgbData data[][WIDTH], unsigned width, unsigned h
   rgbData green3 = {128,0,128};
   rgbData green4 = {0,127,0};
 
-  drawcircle(data, midX, midY, 10, {200,70,110});
+  rgbData color = {200,70,110};
+  drawcircle(data, midX, midY, 10, color);
 
   //clear
   //edges

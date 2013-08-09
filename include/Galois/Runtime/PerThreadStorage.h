@@ -79,6 +79,19 @@ protected:
   PerBackend& b;
 
 public:
+#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
+  // ICC 13.1 doesn't detect the other constructor as the default constructor
+  PerThreadStorage(): b(getPTSBackend()) {
+    //in case we make one of these before initializing the thread pool
+    //This will call initPTS for each thread if it hasn't already
+    Galois::Runtime::getSystemThreadPool();
+
+    offset = b.allocOffset(sizeof(T));
+    for (unsigned n = 0; n < LL::getMaxThreads(); ++n)
+      new (b.getRemote(n, offset)) T();
+  }
+#endif
+
   template<typename... Args>
   PerThreadStorage(Args&&... args) :b(getPTSBackend()) {
     //in case we make one of these before initializing the thread pool
@@ -124,6 +137,19 @@ protected:
   PerBackend& b;
 
 public:
+#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
+  // ICC 13.1 doesn't detect the other constructor as the default constructor
+  PerPackageStorage(): b(getPPSBackend()) {
+    //in case we make one of these before initializing the thread pool
+    //This will call initPTS for each thread if it hasn't already
+    Galois::Runtime::getSystemThreadPool();
+
+    offset = b.allocOffset(sizeof(T));
+    for (unsigned n = 0; n < LL::getMaxPackages(); ++n)
+      new (b.getRemote(LL::getLeaderForPackage(n), offset)) T();
+  }
+#endif
+
   template<typename... Args>
   PerPackageStorage(Args&&... args) :b(getPPSBackend()) {
     //in case we make one of these before initializing the thread pool
