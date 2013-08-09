@@ -158,7 +158,8 @@ private:
 
   void destruct() {
     for (unsigned x = 0; x < heads.size(); ++x) {
-      header*& h = heads.getRemote(x)->first;
+      std::pair<header*,header*>& hpair = *heads.getRemote(x);
+      header*& h = hpair.first;
       while (h) {
         uninitialized_destroy(h->dbegin, h->dend);
         header* h2 = h;
@@ -168,6 +169,7 @@ private:
         else
           Galois::Runtime::MM::pageFree(h2);
       }
+      hpair.second = 0;
     }
   }
 
