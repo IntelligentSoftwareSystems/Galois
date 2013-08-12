@@ -266,3 +266,20 @@ void AbstractProduction::BS(Vertex *v)
 
 	}
 }
+
+int AbstractProduction::getInterfaceSize() {
+	return this->interfaceSize;
+}
+
+int AbstractProduction::getLeafSize() {
+	return this->leafSize;
+}
+
+int AbstractProduction::getA1Size() {
+	return this->a1Size;
+}
+
+int AbstractProduction::getANSize() {
+	return this->anSize;
+}
+
