@@ -3,7 +3,7 @@
 std::vector<EquationSystem*>* Mes2DPreprocessor::preprocess(std::list<Tier * > *tier_list)
 {
 	int i = 0;
-	std::vector<EquationSystem *> *esList = new std::list<EquationSystem*>();
+	std::vector<EquationSystem *> *esList = new std::vector<EquationSystem*>();
 
 	std::list<Tier*>::iterator it = tier_list->begin();
 	for (; it != tier_list->end(); ++it, ++i) {

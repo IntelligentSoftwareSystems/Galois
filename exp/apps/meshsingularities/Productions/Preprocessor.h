@@ -2,6 +2,7 @@
 #define PREPROCESSOR_H_
 
 #include <vector>
+#include <list>
 #include "../Point2D/Tier.hxx"
 #include "EquationSystem.h"
 
