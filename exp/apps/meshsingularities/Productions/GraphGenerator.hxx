@@ -39,7 +39,7 @@ public:
 		delete S;
 	}
 
-	void generateGraph(int nr_of_leafs, AbstractProduction &prod, std::vector<EquationSystem*> *inputData);
+	void generateGraph(int nr_of_leafs, AbstractProduction *prod, std::vector<EquationSystem*> *inputData);
 	Graph *getGraph();
 
 private:
@@ -47,7 +47,7 @@ private:
 	EdgeData edge_data = 0;
 	Graph* graph;
 	Vertex *S;
-	AbstractProduction productions;
+	AbstractProduction *productions;
 	std::vector<EquationSystem*> *inputData;
 
 	void recursiveGraphGeneration(int nr_of_leafs,
@@ -69,11 +69,11 @@ struct Node {
 	int x;
 	int nr_of_incoming_edges;
 	EProduction productionToExecute;
-	AbstractProduction &productions;
+	AbstractProduction *productions;
 	Vertex *v;
 	EquationSystem *input;
 	Node(int nr_of_incoming_edges, EProduction production,
-			AbstractProduction &prod, Vertex *v, EquationSystem *input):
+			AbstractProduction *prod, Vertex *v, EquationSystem *input):
 				nr_of_incoming_edges(nr_of_incoming_edges),
 				productionToExecute(production),
 				productions(prod), v(v),

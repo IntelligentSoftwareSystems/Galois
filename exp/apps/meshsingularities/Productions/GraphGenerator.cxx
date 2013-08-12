@@ -23,7 +23,7 @@ GraphNode GraphGenerator::addNode(int nr_of_incoming_edges, EProduction producti
 	return graph_node;
 }
 
-void GraphGenerator::generateGraph(int nr_of_leafs, AbstractProduction &productions, std::vector<EquationSystem*> *inputData)
+void GraphGenerator::generateGraph(int nr_of_leafs, AbstractProduction *productions, std::vector<EquationSystem*> *inputData)
 {
 	if(nr_of_leafs < 2)
 		throw std::runtime_error("At least 2 leafs required");
@@ -33,7 +33,7 @@ void GraphGenerator::generateGraph(int nr_of_leafs, AbstractProduction &producti
 
 	graph = new Graph();
 
-	S = new Vertex(NULL, NULL, NULL, ROOT, productions.getInterfaceSize()*3);
+	S = new Vertex(NULL, NULL, NULL, ROOT, productions->getInterfaceSize()*3);
 	Node eroot_node(2,EProduction::EROOT, productions, S, NULL);
 	GraphNode eroot_graph_node = graph->createNode(2,eroot_node);
 	GraphNode new_graph_node = addNode(2,EProduction::A2,NULL,eroot_graph_node,1, S, NULL);
@@ -55,8 +55,8 @@ void GraphGenerator::recursiveGraphGeneration(int nr_of_leafs, int low_range, in
 	if((high_range - low_range) > 2)
 	{
 
-		left = new Vertex(NULL, NULL, parent, NODE, productions.getInterfaceSize()*3);
-		right = new Vertex(NULL, NULL, parent, NODE, productions.getInterfaceSize()*3);
+		left = new Vertex(NULL, NULL, parent, NODE, productions->getInterfaceSize()*3);
+		right = new Vertex(NULL, NULL, parent, NODE, productions->getInterfaceSize()*3);
 
 		parent->setLeft(left);
 		parent->setRight(right);
@@ -87,11 +87,11 @@ void GraphGenerator::recursiveGraphGeneration(int nr_of_leafs, int low_range, in
 		//first leaf
 		//leaf creation
 		if(low_range == 0) {
-			left = new Vertex(NULL, NULL, parent, LEAF, productions.getA1Size());
+			left = new Vertex(NULL, NULL, parent, LEAF, productions->getA1Size());
 			addNode(0,EProduction::A1,NULL,merging_dst_node,1, left, inputData->at(low_range));
 		}
 		else {
-			left = new Vertex(NULL, NULL, parent, LEAF, productions.getLeafSize());
+			left = new Vertex(NULL, NULL, parent, LEAF, productions->getLeafSize());
 			addNode(0,EProduction::A,NULL,merging_dst_node,1, left, inputData->at(low_range));
 		}
 		//leaf bs
@@ -100,7 +100,7 @@ void GraphGenerator::recursiveGraphGeneration(int nr_of_leafs, int low_range, in
 		//second and third leaf
 		//elimination
 
-		Vertex *node = new Vertex(NULL, NULL, parent, NODE, productions.getInterfaceSize()*3);
+		Vertex *node = new Vertex(NULL, NULL, parent, NODE, productions->getInterfaceSize()*3);
 
 		parent->setLeft(left);
 		parent->setRight(node);
@@ -112,15 +112,15 @@ void GraphGenerator::recursiveGraphGeneration(int nr_of_leafs, int low_range, in
 		new_bs_graph_node = addNode(1,EProduction::BS,backward_substitution_src_node,NULL,2, node, NULL);
 
 		//left leaf creation
-		left = new Vertex(NULL, NULL, node, LEAF, productions.getLeafSize());
+		left = new Vertex(NULL, NULL, node, LEAF, productions->getLeafSize());
 		addNode(0,EProduction::A,NULL,new_graph_node,1,left, inputData->at(low_range+1));
 		//right leaf creation
 		if(high_range == nr_of_leafs - 1) {
-			right = new Vertex(NULL, NULL, node, LEAF, productions.getANSize());
+			right = new Vertex(NULL, NULL, node, LEAF, productions->getANSize());
 			addNode(0,EProduction::AN,NULL,new_graph_node,1, right, inputData->at(low_range+2));
 		}
 		else{
-			right = new Vertex(NULL, NULL, node, LEAF, productions.getLeafSize());
+			right = new Vertex(NULL, NULL, node, LEAF, productions->getLeafSize());
 			addNode(0,EProduction::A,NULL,new_graph_node,1, right, inputData->at(low_range+2));
 		}
 
@@ -138,15 +138,15 @@ void GraphGenerator::recursiveGraphGeneration(int nr_of_leafs, int low_range, in
 	else if((high_range - low_range) == 1)
 	{
 		if (low_range == 0) {
-			left = new Vertex(NULL, NULL, parent, NODE, productions.getA1Size());
+			left = new Vertex(NULL, NULL, parent, NODE, productions->getA1Size());
 		} else {
-			left = new Vertex(NULL, NULL, parent, NODE, productions.getLeafSize());
+			left = new Vertex(NULL, NULL, parent, NODE, productions->getLeafSize());
 		}
 
 		if (high_range == nr_of_leafs - 1) {
-			right = new Vertex(NULL, NULL, parent, NODE, productions.getANSize());
+			right = new Vertex(NULL, NULL, parent, NODE, productions->getANSize());
 		} else {
-			right = new Vertex(NULL, NULL, parent, NODE, productions.getLeafSize());
+			right = new Vertex(NULL, NULL, parent, NODE, productions->getLeafSize());
 		}
 
 		parent->setLeft(left);

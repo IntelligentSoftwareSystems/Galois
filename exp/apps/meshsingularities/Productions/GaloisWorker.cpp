@@ -13,25 +13,25 @@ void ProductionProcess::operator()(Graph::GraphNode src, Context& ctx)
 	Node node = src->data;
 	switch (node.productionToExecute) {
 	case A1:
-		node.productions.A1(node.v, node.input);
+		node.productions->A1(node.v, node.input);
 		break;
 	case A:
-		node.productions.A(node.v, node.input);
+		node.productions->A(node.v, node.input);
 		break;
 	case AN:
-		node.productions.AN(node.v, node.input);
+		node.productions->AN(node.v, node.input);
 		break;
 	case A2:
-		node.productions.A2(node.v);
+		node.productions->A2(node.v);
 		break;
 	case E:
-		node.productions.E(node.v);
+		node.productions->E(node.v);
 		break;
 	case EROOT:
-		node.productions.ERoot(node.v);
+		node.productions->ERoot(node.v);
 		break;
 	case BS:
-		node.productions.BS(node.v);
+		node.productions->BS(node.v);
 		break;
 	default:
 	}
@@ -58,7 +58,7 @@ void ProductionProcess::operator()()
 	// preprocessing,
 	IDoubleArgFunction *function = new TestFunction();
 	GraphGenerator* generator = new GraphGenerator();
-	AbstractProduction production = new AbstractProduction(5, 17, 21, 21);
+	AbstractProduction *production = new AbstractProduction(5, 17, 21, 21);
 
 	MatrixGenerator *matrixGenerator = new MatrixGenerator();
 	std::list<Tier*> *tiers = matrixGenerator->CreateMatrixAndRhs(6, 0, 0, 1, function);
