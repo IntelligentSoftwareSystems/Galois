@@ -9,10 +9,10 @@
 
 GraphNode GraphGenerator::addNode(int nr_of_incoming_edges, EProduction production,
 		GraphNode src_graph_node, GraphNode dst_graph_node, int nr_of_outgoing_edges,
-		AbstractProduction &productions, Vertex *v, EquationSystem *input)
+		Vertex *v, EquationSystem *system)
 {
 
-	Node node(nr_of_incoming_edges, production, productions, v, input);
+	Node node(nr_of_incoming_edges, production, productions, v, system);
 	GraphNode graph_node = graph->createNode(nr_of_outgoing_edges,node);
 
 	if(src_graph_node == NULL)
@@ -30,17 +30,16 @@ void GraphGenerator::generateGraph(int nr_of_leafs, AbstractProduction &producti
 
 	graph = new Graph();
 
-	Node eroot_node(2,EProduction::EROOT);
 	S = new Vertex(NULL, NULL, NULL, ROOT, productions.getInterfaceSize()*3);
+	Node eroot_node(2,EProduction::EROOT, productions, S, NULL);
 	GraphNode eroot_graph_node = graph->createNode(2,eroot_node);
-	GraphNode new_graph_node = addNode(2,EProduction::A2,NULL,eroot_graph_node,1,productions, S, NULL);
-	recursiveGraphGeneration(nr_of_leafs,0,nr_of_leafs-1,eroot_graph_node, new_graph_node, productions, inputData, S);
+	GraphNode new_graph_node = addNode(2,EProduction::A2,NULL,eroot_graph_node,1, S, NULL);
+	recursiveGraphGeneration(nr_of_leafs,0,nr_of_leafs-1,eroot_graph_node, new_graph_node, S);
 
 }
 
 void GraphGenerator::recursiveGraphGeneration(int nr_of_leafs, int low_range, int high_range,
 		GraphNode backward_substitution_src_node, GraphNode merging_dst_node,
-		AbstractProduction &productions, std::vector<EquationSystem*> *inputData,
 		Vertex *parent)
 {
 	GraphNode new_graph_node;
@@ -60,24 +59,24 @@ void GraphGenerator::recursiveGraphGeneration(int nr_of_leafs, int low_range, in
 		parent->setRight(right);
 
 		//left elimination
-		new_graph_node = addNode(1,EProduction::E,NULL,merging_dst_node,1,productions, left, NULL);
+		new_graph_node = addNode(1,EProduction::E,NULL,merging_dst_node,1, left, NULL);
 		//left merging
-		new_graph_node = addNode(2,EProduction::A2,NULL,new_graph_node,1,productions, left, NULL);
+		new_graph_node = addNode(2,EProduction::A2,NULL,new_graph_node,1, left, NULL);
 		//left bs
 		new_bs_graph_node = addNode(1,EProduction::BS,backward_substitution_src_node,NULL,2,productions, left, NULL);
 		//left subtree generation
 
-		recursiveGraphGeneration(nr_of_leafs,low_range,low_range + (high_range-low_range)/2,new_bs_graph_node,new_graph_node,productions,inputData, left);
+		recursiveGraphGeneration(nr_of_leafs,low_range,low_range + (high_range-low_range)/2,new_bs_graph_node,new_graph_node, left);
 
 		//right elimination
-		new_graph_node = addNode(1,EProduction::E,NULL,merging_dst_node,1, productions, right, NULL);
+		new_graph_node = addNode(1,EProduction::E,NULL,merging_dst_node,1, right, NULL);
 		//right merging
-		new_graph_node = addNode(2,EProduction::A2,NULL,new_graph_node,1, productions, right, NULL);
+		new_graph_node = addNode(2,EProduction::A2,NULL,new_graph_node,1, right, NULL);
 		//right bs
-		new_bs_graph_node = addNode(1,EProduction::BS,backward_substitution_src_node,NULL,2,productions, right, NULL);
+		new_bs_graph_node = addNode(1,EProduction::BS,backward_substitution_src_node,NULL,2, right, NULL);
 		//right subtree generation
 
-		recursiveGraphGeneration(nr_of_leafs,low_range + (high_range-low_range)/2 + 1,high_range,new_bs_graph_node,new_graph_node,productions,inputData,right);
+		recursiveGraphGeneration(nr_of_leafs,low_range + (high_range-low_range)/2 + 1,high_range,new_bs_graph_node,new_graph_node,right);
 	}
 	//only 3 leafs remaining
 	else if((high_range - low_range) == 2)
@@ -86,14 +85,14 @@ void GraphGenerator::recursiveGraphGeneration(int nr_of_leafs, int low_range, in
 		//leaf creation
 		if(low_range == 0) {
 			left = new Vertex(NULL, NULL, parent, LEAF, productions.getA1Size());
-			addNode(0,EProduction::A1,NULL,merging_dst_node,1,productions, left, inputData->at(low_range));
+			addNode(0,EProduction::A1,NULL,merging_dst_node,1, left, inputData->at(low_range));
 		}
 		else {
 			left = new Vertex(NULL, NULL, parent, LEAF, productions.getLeafSize());
-			addNode(0,EProduction::A,NULL,merging_dst_node,1,productions, left, inputData->at(low_range));
+			addNode(0,EProduction::A,NULL,merging_dst_node,1, left, inputData->at(low_range));
 		}
 		//leaf bs
-		addNode(1,EProduction::BS,backward_substitution_src_node,NULL,0,productions, left, NULL);
+		addNode(1,EProduction::BS,backward_substitution_src_node,NULL,0, left, NULL);
 
 		//second and third leaf
 		//elimination
@@ -103,32 +102,32 @@ void GraphGenerator::recursiveGraphGeneration(int nr_of_leafs, int low_range, in
 		parent->setLeft(left);
 		parent->setRight(node);
 
-		new_graph_node = addNode(1,EProduction::E,NULL,merging_dst_node,1,productions, node, NULL);
+		new_graph_node = addNode(1,EProduction::E,NULL,merging_dst_node,1, node, NULL);
 		//merging
-		new_graph_node = addNode(2,EProduction::A2,NULL,new_graph_node,1,productions, node, NULL);
+		new_graph_node = addNode(2,EProduction::A2,NULL,new_graph_node,1, node, NULL);
 		//bs
-		new_bs_graph_node = addNode(1,EProduction::BS,backward_substitution_src_node,NULL,2,productions, node, NULL);
+		new_bs_graph_node = addNode(1,EProduction::BS,backward_substitution_src_node,NULL,2, node, NULL);
 
 		//left leaf creation
 		left = new Vertex(NULL, NULL, node, LEAF, productions.getLeafSize());
-		addNode(0,EProduction::A,NULL,new_graph_node,1,productions,left, inputData->at(low_range+1));
+		addNode(0,EProduction::A,NULL,new_graph_node,1,left, inputData->at(low_range+1));
 		//right leaf creation
 		if(high_range == nr_of_leafs - 1) {
 			right = new Vertex(NULL, NULL, node, LEAF, productions.getANSize());
-			addNode(0,EProduction::AN,NULL,new_graph_node,1,productions, right, inputData->at(low_range+2));
+			addNode(0,EProduction::AN,NULL,new_graph_node,1, right, inputData->at(low_range+2));
 		}
 		else{
 			right = new Vertex(NULL, NULL, node, LEAF, productions.getLeafSize());
-			addNode(0,EProduction::A,NULL,new_graph_node,1,productions, right, inputData->at(low_range+2));
+			addNode(0,EProduction::A,NULL,new_graph_node,1, right, inputData->at(low_range+2));
 		}
 
 		node->setLeft(left);
 		node->setRight(right);
 
 		//left leaf bs
-		addNode(1,EProduction::BS,new_bs_graph_node,NULL,0,productions, left, NULL);
+		addNode(1,EProduction::BS,new_bs_graph_node,NULL,0, left, NULL);
 		//right leaf bs
-		addNode(1,EProduction::BS,new_bs_graph_node,NULL,0,productions, right, NULL);
+		addNode(1,EProduction::BS,new_bs_graph_node,NULL,0, right, NULL);
 
 
 	}
@@ -158,19 +157,19 @@ void GraphGenerator::recursiveGraphGeneration(int nr_of_leafs, int low_range, in
 		//leaf creation
 		//left leaf
 		if(low_range == 0)
-			addNode(0,EProduction::A1,NULL,new_graph_node,1,productions, left,  inputData->at(low_range));
+			addNode(0,EProduction::A1,NULL,new_graph_node,1, left,  inputData->at(low_range));
 		else
-			addNode(0,EProduction::A,NULL,new_graph_node,1,productions, left,  inputData->at(low_range));
+			addNode(0,EProduction::A,NULL,new_graph_node,1, left,  inputData->at(low_range));
 		//right leaf
 		if(high_range == nr_of_leafs - 1)
-			addNode(0,EProduction::AN,NULL,new_graph_node,1,productions, right, inputData->at(high_range));
+			addNode(0,EProduction::AN,NULL,new_graph_node,1, right, inputData->at(high_range));
 		else
-			addNode(0,EProduction::A,NULL,new_graph_node,1,productions, right, inputData->at(high_range));
+			addNode(0,EProduction::A,NULL,new_graph_node,1, right, inputData->at(high_range));
 
 		//left leaf bs
-		addNode(1,EProduction::BS,backward_substitution_src_node,NULL,0,productions, left, NULL);
+		addNode(1,EProduction::BS,backward_substitution_src_node,NULL,0, left, NULL);
 		//right leaf bs
-		addNode(1,EProduction::BS,backward_substitution_src_node,NULL,0,productions, right, NULL);
+		addNode(1,EProduction::BS,backward_substitution_src_node,NULL,0, right, NULL);
 	}
 
 }
