@@ -47,7 +47,7 @@ private:
 	EdgeData edge_data = 0;
 	Graph* graph;
 	Vertex *S;
-	AbstractProduction &productions;
+	AbstractProduction productions;
 	std::vector<EquationSystem*> *inputData;
 
 	void recursiveGraphGeneration(int nr_of_leafs,
