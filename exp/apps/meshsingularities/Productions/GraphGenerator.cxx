@@ -28,6 +28,9 @@ void GraphGenerator::generateGraph(int nr_of_leafs, AbstractProduction &producti
 	if(nr_of_leafs < 2)
 		throw std::runtime_error("At least 2 leafs required");
 
+	this->productions = productions;
+	this->inputData = inputData;
+
 	graph = new Graph();
 
 	S = new Vertex(NULL, NULL, NULL, ROOT, productions.getInterfaceSize()*3);
@@ -63,7 +66,7 @@ void GraphGenerator::recursiveGraphGeneration(int nr_of_leafs, int low_range, in
 		//left merging
 		new_graph_node = addNode(2,EProduction::A2,NULL,new_graph_node,1, left, NULL);
 		//left bs
-		new_bs_graph_node = addNode(1,EProduction::BS,backward_substitution_src_node,NULL,2,productions, left, NULL);
+		new_bs_graph_node = addNode(1,EProduction::BS,backward_substitution_src_node,NULL,2, left, NULL);
 		//left subtree generation
 
 		recursiveGraphGeneration(nr_of_leafs,low_range,low_range + (high_range-low_range)/2,new_bs_graph_node,new_graph_node, left);
