@@ -85,7 +85,7 @@ class Element{
 			
 			delete interior_function; 
 			
-			delete shapeFunctions;
+			delete[] shapeFunctions;
 			
 		}
 		
