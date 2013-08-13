@@ -37,10 +37,10 @@ void GraphGenerator::generateGraph(int nr_of_leafs, AbstractProduction *producti
 
 	S = new Vertex(NULL, NULL, NULL, ROOT, productions->getInterfaceSize()*3);
 	Node eroot_node(2,EProduction::EROOT, productions, S, NULL);
-	GraphNode eroot_graph_node = graph->createNode(2,eroot_node);
+	GraphNode eroot_graph_node = graph->createNode(1,eroot_node);
 	GraphNode new_graph_node = addNode(2,EProduction::A2,NULL,eroot_graph_node,1, S, NULL);
-	recursiveGraphGeneration(nr_of_leafs,0,nr_of_leafs-1,eroot_graph_node, new_graph_node, S);
-
+	GraphNode bs_graph_node = addNode(1,EProduction::BS,eroot_graph_node,NULL,2, S, NULL);
+	recursiveGraphGeneration(nr_of_leafs,0,nr_of_leafs-1,bs_graph_node, new_graph_node, S);
 }
 
 void GraphGenerator::recursiveGraphGeneration(int nr_of_leafs, int low_range, int high_range,
