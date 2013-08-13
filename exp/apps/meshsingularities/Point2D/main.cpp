@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "../GraphGeneration/GraphGenerator.hxx"
+#include "../Productions/GraphGenerator.hxx"
 #include "MatrixGenerator.hxx"
 
 class MyFunction : public IDoubleArgFunction
@@ -78,7 +78,7 @@ int main(int argc, char** argv)
 
 	*/
 	GraphGenerator* generator = new GraphGenerator();
-	generator->GenerateGraph(100);
+	generator->generateGraph(100);
 	return 0;
 
 }

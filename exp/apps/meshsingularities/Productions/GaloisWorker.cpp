@@ -42,7 +42,7 @@ void ProductionProcess::operator()(Graph::GraphNode src, Context& ctx)
 	for(LCM_edge_iterator ii = src->edgeBegin, ei = src->edgeEnd; ii != ei; ++ii)
 	{
 		std::cout << "przechodze przez krawedz\n";
-		GraphNode graphNode = graph->getEdgeDst((*ii),Galois::MethodFlag::NONE);
+		GraphNode graphNode = graph->getEdgeDst(ii,Galois::MethodFlag::NONE);
 
 		std::cout << "mam polaczenie z " << graphNode->data.x << "\n";
 

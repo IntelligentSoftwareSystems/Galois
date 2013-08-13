@@ -31,12 +31,8 @@ class GraphGenerator {
 public:
 	static int id;
 
-	GraphGenerator()
-	{
-		id=0;
-		S=NULL;
-		graph=NULL;
-		edge_data=0;
+	GraphGenerator() : S(NULL), graph(NULL), edge_data(0) { 
+		GraphGenerator::id=0;
 	}
 
 	virtual ~GraphGenerator()
