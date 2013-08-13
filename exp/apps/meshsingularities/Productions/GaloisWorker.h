@@ -2,6 +2,7 @@
 #define GALOISWORKER_H
 
 #include "GraphGenerator.hxx"
+#include "Galois/Graph/LC_Morph_Graph.h"
 
 struct ProductionProcess {
 public:

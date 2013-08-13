@@ -1,7 +1,8 @@
 #include "GaloisWorker.h"
 #include "../Point2D/MatrixGenerator.hxx"
 #include <vector>
-class TestFunction : IDoubleArgFunction {
+
+class TestFunction : public IDoubleArgFunction {
 	double ComputeValue(double x, double y) {
 		return 1.0;
 	}
@@ -34,6 +35,7 @@ void ProductionProcess::operator()(Graph::GraphNode src, Context& ctx)
 		node.productions->BS(node.v);
 		break;
 	default:
+		break;
 	}
 
 	std::cout << "jestem w wierzcholku " << src->data.x << "\n";
