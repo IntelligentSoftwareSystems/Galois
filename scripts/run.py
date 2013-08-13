@@ -184,7 +184,9 @@ if __name__ == '__main__':
   parser.add_option('-r', '--runs', default=1, type='int',
       help='set number of runs')
   parser.add_option('-x', '--extra', dest="extra", default=[], action='append',
-      help='add another parameter to range over (format: <name>::<arg>::<range> or ::<arg>::<range> or <name>::<range>). E.g., delta::-delta::1,5 or ::-delta::1,5 or schedule::-useFIFO,-useLIFO')
+      help='add commandline parameter to range over (format: <name>::<arg>::<range> or ::<arg>::<range> or <name>::<range>). E.g., delta::-delta::1,5 or ::-delta::1,5 or schedule::-useFIFO,-useLIFO')
+  parser.add_option('-e', '--extra-env', dest="extra_env", default=[], action='append',
+      help='add environment variable to range over (format: <name>::<arg>::<range> or ::<arg>::<range> or <name>::<range>). E.g., delta::-delta::1,5 or ::-delta::1,5 or schedule::-useFIFO,-useLIFO')
   parser.add_option('-o', '--timeout', dest="timeout", default=0, type='int',
       help="timeout a run after SEC seconds", metavar='SEC')
   parser.add_option('--no-default-thread', dest='no_default_thread', default=False, action='store_true',
