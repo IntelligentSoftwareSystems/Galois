@@ -3,7 +3,7 @@
 #include <iostream>
 #include "Galois/Graph/LC_Morph_Graph.h"
 #include "Production.h"
-
+#include "GaloisWorker.h"
 template<typename Algorithm>
 void run() {
 	Algorithm algorithm;
