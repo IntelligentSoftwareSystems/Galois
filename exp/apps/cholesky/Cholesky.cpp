@@ -136,7 +136,7 @@ bool outputTextEdgeData(const char* ofile, GraphType& G) {
 // Find the unseen node in the graph of least degree
 unsigned int ordering_leastdegree(SymbolicGraph &graph, unsigned int i,
                                   unsigned int seenbase = 0) {
-  unsigned int nseen = 0, bestid = 0, bestdegree = graph.size()+1;
+  unsigned int nseen = 0, bestid = 0, bestdegree = nodecount+1;
   // Iterate over nodes
   for ( SymbolicGraph::iterator ii = graph.begin(), ei = graph.end();
         ii != ei; ++ii ) {
@@ -175,29 +175,38 @@ unsigned int ordering_leastdegree(SymbolicGraph &graph, unsigned int i,
 // be eliminated.
 unsigned int ordering_next_node(SymbolicGraph &graph, unsigned int i,
                                 unsigned int seenbase = 0) {
-  const unsigned int pointless_len = 8,
+  static const unsigned int pointless_len = 8,
     pointless_data[] = {1, 6, 4, 5, 0, 3, 7, 2}; // For "pointless" ordering
-  unsigned int n = graph.size();
-  assert(i<n);
+  assert(i < nodecount);
+  unsigned int result = 0;
+  bool overflow = true;
 
   switch (ordering) {
   case sequential:
-    return i;
+    result = i;
+    break;
   case leastdegree:
-    return ordering_leastdegree(graph, i, seenbase);
+    result = ordering_leastdegree(graph, i, seenbase);
+    break;
   case pointless:
     for ( unsigned int offset = i % pointless_len, base = i-offset, j = 0;
           j < pointless_len; j++ ) {
       unsigned int pointless_result = base + pointless_data[j];
-      if ( pointless_result >= n ) continue;
-      if ( offset == 0 ) return pointless_result;
+      if ( pointless_result >= nodecount ) continue;
+      if ( offset == 0 ) {
+        result = pointless_result;
+        overflow = false;
+        break;
+      }
       offset--;
     }
-    assert(false && "Pointless overflow");
+    assert(!overflow && "Pointless overflow");
+    break;
   default:
     std::cerr << "Unknown ordering: " << ordering << "\n";
     assert(false && "Unknown ordering");
   }
+  return result;
 }
 
 /**
@@ -322,35 +331,35 @@ struct SymbolicAlgo {
 
   void operator()() {
     // Initialize the output (directed) graph: create nodes
-    unsigned int nodeID = 0, n = graph.size();
-    outnodes.resize(n);
-    innodes.resize(n);
+    unsigned int nodeID = 0;
+    outnodes.resize(nodecount);
+    innodes.resize(nodecount);
     for ( typename GraphType::iterator ii = graph.begin(), ei = graph.end();
           ii != ei; ++ii ) {
       innodes[nodeID] = *ii;
       nodeID++;
     }
+    assert(nodeID == nodecount);
 
     // Eliminate each node in given traversal order.
     // FIXME: parallelize? See paper.
-    for ( unsigned int i = 0; i < n; i++ ) {
-      nodeID = ordering_next_node(graph, i);
+    for ( unsigned int i = 0; i < nodecount; i++ ) {
+      // Append next node to execution order
+      depgraph[i] = ordering_next_node(graph, i);
       //std::cout << "Eliminating " << i << "\n";
-      SGNode node = innodes[nodeID];
+      SGNode node = innodes[depgraph[i]];
       void *emptyctx = NULL;
       (*this)(node, emptyctx);
-      // Append to execution order
-      depgraph[i] = nodeID;
     }
 
     // Verify that all nodes have been eliminated before building outgraph
-    for ( unsigned int i = 0; i < n; i++ )
+    for ( unsigned int i = 0; i < nodecount; i++ )
       assert(graph.getData(innodes[i]).seen == 1);
     // Preallocate edges and add them to the output graph
-    for ( unsigned int i = 0; i < n; i++ )
+    for ( unsigned int i = 0; i < nodecount; i++ )
       add_outedges(innodes[depgraph[i]]);
     // Verify that the correct number of edges were added
-    for ( unsigned int i = 0; i < n; i++ )
+    for ( unsigned int i = 0; i < nodecount; i++ )
       assert(graph.getData(innodes[i]).nedges == 0);
   }
 };
@@ -656,7 +665,7 @@ int main(int argc, char** argv) {
 
   // First run the symbolic factorization
   std::cout << "Symbolic factorization\n";
-  run(SymbolicAlgo<SymbolicGraph,Graph>(graph, outgraph), "SymbolicTime");
+  run(SymbolicAlgo<SymbolicGraph,Graph>(graph, outgraph), "TimeSymbolic");
 
   // Clear the seen flags for the numeric factorization.
   unsigned int newedgecount = 0;
@@ -679,7 +688,7 @@ int main(int argc, char** argv) {
   //
   // FIXME: Convert back to a LC_Graph?
   std::cout << "Numeric factorization\n";
-  run(NumericAlgo<Graph>(outgraph), "NumericTime");
+  run(NumericAlgo<Graph>(outgraph), "TimeNumeric");
 
   Galois::reportPageAlloc("MeminfoPost");
 
