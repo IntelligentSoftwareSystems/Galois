@@ -1,5 +1,5 @@
 #include "GaloisWorker.h"
-#include "../Point2D/MatrixGenerator.hxx"
+#include "Point2D/MatrixGenerator.hxx"
 #include <vector>
 
 class TestFunction : public IDoubleArgFunction {

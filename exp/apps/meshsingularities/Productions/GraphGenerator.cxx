@@ -7,6 +7,8 @@
 
 #include "GraphGenerator.hxx"
 
+int GraphGenerator::id;
+
 GraphNode GraphGenerator::addNode(int nr_of_incoming_edges, EProduction production,
 		GraphNode src_graph_node, GraphNode dst_graph_node, int nr_of_outgoing_edges,
 		Vertex *v, EquationSystem *system)

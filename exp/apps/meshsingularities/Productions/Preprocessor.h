@@ -3,7 +3,7 @@
 
 #include <vector>
 #include <list>
-#include "../Point2D/Tier.hxx"
+#include "Point2D/Tier.hxx"
 #include "EquationSystem.h"
 
 class Mes2DPreprocessor{
