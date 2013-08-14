@@ -7,11 +7,11 @@
 #include "EquationSystem.h"
 
 class Preprocessor {
-	virtual template<typename Input>
-	std::vector<EquationSystem *>* preprocess(std::list<Input*>* input);
+	template<typename Input>
+	virtual std::vector<EquationSystem *>* preprocess(std::list<Input*>* input);
 };
 
-class Mes2DPreprocessor : public Preprocessor<Tier> {
+class Mes2DPreprocessor : public Preprocessor {
 public:
 	std::vector<EquationSystem*>* preprocess(std::list<Tier *> *tier_list);
 };
