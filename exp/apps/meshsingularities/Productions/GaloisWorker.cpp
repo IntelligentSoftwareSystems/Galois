@@ -4,7 +4,7 @@
 
 class TestFunction : public IDoubleArgFunction {
 	double ComputeValue(double x, double y) {
-		return 1.0;
+		return x*x+y*y;
 	}
 };
 
@@ -38,7 +38,7 @@ void ProductionProcess::operator()(Graph::GraphNode src, Context& ctx)
 		break;
 	}
 
-	std::cout << "jestem w wierzcholku " << src->data.x << "\n";
+	std::cout << "Prod: " << node.productionToExecute << " vertex: " << src->data.x << "\n";
 	for(LCM_edge_iterator ii = src->edgeBegin, ei = src->edgeEnd; ii != ei; ++ii)
 	{
 		std::cout << "przechodze przez krawedz\n";

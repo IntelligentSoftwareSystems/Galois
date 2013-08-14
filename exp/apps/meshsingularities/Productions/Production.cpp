@@ -263,7 +263,7 @@ void AbstractProduction::BS(Vertex *v)
 		}
 
 		v->system->backwardSubstitute(leafSize-2*interfaceSize);
-
+		v->system->print();
 	}
 }
 

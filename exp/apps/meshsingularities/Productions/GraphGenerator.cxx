@@ -36,7 +36,7 @@ void GraphGenerator::generateGraph(int nr_of_leafs, AbstractProduction *producti
 	graph = new Graph();
 
 	S = new Vertex(NULL, NULL, NULL, ROOT, productions->getInterfaceSize()*3);
-	Node eroot_node(2,EProduction::EROOT, productions, S, NULL);
+	Node eroot_node(1,EProduction::EROOT, productions, S, NULL);
 	GraphNode eroot_graph_node = graph->createNode(1,eroot_node);
 	GraphNode new_graph_node = addNode(2,EProduction::A2,NULL,eroot_graph_node,1, S, NULL);
 	GraphNode bs_graph_node = addNode(1,EProduction::BS,eroot_graph_node,NULL,2, S, NULL);
