@@ -23,13 +23,8 @@ const char* url = NULL;
 template<typename Algorithm>
 void run() {
 	Algorithm algorithm;
-
-	//Galois::StatTimer T;
-	//T.start();
 	algorithm();
-	//T.stop();
 }
-
 
 int main(int argc, char** argv)
 {
@@ -38,5 +33,4 @@ int main(int argc, char** argv)
 
 	run<ProductionProcess>();
 	return 0;
-
 }

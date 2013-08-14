@@ -38,13 +38,9 @@ void ProductionProcess::operator()(Graph::GraphNode src, Context& ctx)
 		break;
 	}
 
-	std::cout << "Prod: " << node.productionToExecute << " vertex: " << src->data.x << "\n";
 	for(LCM_edge_iterator ii = src->edgeBegin, ei = src->edgeEnd; ii != ei; ++ii)
 	{
-		std::cout << "przechodze przez krawedz\n";
 		GraphNode graphNode = graph->getEdgeDst(ii,Galois::MethodFlag::NONE);
-
-		std::cout << "mam polaczenie z " << graphNode->data.x << "\n";
 
 		int nr_of_incoming_edges = atomic_dec(&graphNode->data.nr_of_incoming_edges);
 
@@ -86,7 +82,7 @@ void ProductionProcess::operator()()
 
 }
 
-int ProductionProcess::atomic_dec(int *value) {
+inline int ProductionProcess::atomic_dec(int *value) {
 	// XXX: more portable solution?
 	return __sync_add_and_fetch(value, -1);
 }

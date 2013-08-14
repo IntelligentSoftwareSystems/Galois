@@ -6,7 +6,12 @@
 #include "Point2D/Tier.hxx"
 #include "EquationSystem.h"
 
-class Mes2DPreprocessor{
+class Preprocessor {
+	virtual template<typename Input>
+	std::vector<EquationSystem *>* preprocess(std::list<Input*>* input);
+};
+
+class Mes2DPreprocessor : public Preprocessor<Tier> {
 public:
 	std::vector<EquationSystem*>* preprocess(std::list<Tier *> *tier_list);
 };
