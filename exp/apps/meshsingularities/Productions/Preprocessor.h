@@ -8,7 +8,7 @@
 
 class Preprocessor {
 	template<typename Input>
-	virtual std::vector<EquationSystem *>* preprocess(std::list<Input*>* input);
+	std::vector<EquationSystem *>* preprocess(std::list<Input*>* input);
 };
 
 class Mes2DPreprocessor : public Preprocessor {
