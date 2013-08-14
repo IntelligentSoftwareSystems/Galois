@@ -48,12 +48,12 @@ std::vector<double> *Postprocessor::postprocess(std::vector<Vertex *> *leafs,
 			a1->backwardSubstitute(offset);
 
 			for (j=0;j<offset;j+=2) {
-				result[j] = a1->rhs[j];
-				result[j+1] = a1->rhs[j+offset];
+				(*result)[j] = a1->rhs[j];
+				(*result)[j+1] = a1->rhs[j+offset];
 			}
 
 			for (j=0;j<a1->n-2*offset;++j) {
-				result[j+2*offset] = a1->rhs[j+2*offset];
+				(*result)[j+2*offset] = a1->rhs[j+2*offset];
 			}
 
 		} else if (i == leafs->size()-1) {
@@ -62,15 +62,15 @@ std::vector<double> *Postprocessor::postprocess(std::vector<Vertex *> *leafs,
 			offset = productions->getANSize() - productions->getLeafSize();
 
 			for (j=0; j<leafOffset-productions->getLeafSize(); ++j) {
-				result[j+totalOffset] = leafs->at(i)->system->rhs[j+offset];
+				(*result)[j+totalOffset] = leafs->at(i)->system->rhs[j+offset];
 			}
 
 			for (j=0; j<productions->getInterfaceSize(); ++j) {
-				result[j+totalOffset+leafOffset-productions->getInterfaceSize()] = leafs->at(i)->system->rhs[j+offset+leafOffset];
+				(*result)[j+totalOffset+leafOffset-productions->getInterfaceSize()] = leafs->at(i)->system->rhs[j+offset+leafOffset];
 			}
 
 			for (j=0; j<offset; ++j) {
-				result[j+totalOffset+leafOffset] = leafs->at(i)->system->rhs[j];
+				(*result)[j+totalOffset+leafOffset] = leafs->at(i)->system->rhs[j];
 			}
 
 		} else {
@@ -78,11 +78,11 @@ std::vector<double> *Postprocessor::postprocess(std::vector<Vertex *> *leafs,
 			leafOffset = productions->getLeafSize() - productions->getInterfaceSize();
 
 			for (j=0; j<productions->getInterfaceSize(); ++j) {
-				result[i+totalOffset+productions->getInterfaceSize()] = leafs->at(i)->system->rhs[j+leafOffset];
+				(*result)[i+totalOffset+productions->getInterfaceSize()] = leafs->at(i)->system->rhs[j+leafOffset];
 			}
 
 			for (j=0; j<leafOffset-productions->getInterfaceSize(); ++j) {
-				result[i+totalOffset] = leafs->at(i)->system->rhs[j];
+				(*result)[i+totalOffset] = leafs->at(i)->system->rhs[j];
 			}
 		}
 	}
