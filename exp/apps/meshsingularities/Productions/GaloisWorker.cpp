@@ -54,15 +54,16 @@ void ProductionProcess::operator()()
 {
 	// implement everything is needed to input data to solver,
 	// preprocessing,
+	const int nrOfTiers = 50;
 	IDoubleArgFunction *function = new TestFunction();
 	GraphGenerator* generator = new GraphGenerator();
 	AbstractProduction *production = new AbstractProduction(5, 17, 21, 21);
 
 	MatrixGenerator *matrixGenerator = new MatrixGenerator();
-	std::list<Tier*> *tiers = matrixGenerator->CreateMatrixAndRhs(6, 0, 0, 1, function);
+	std::list<Tier*> *tiers = matrixGenerator->CreateMatrixAndRhs(nrOfTiers, 0, 0, 1, function);
 	Mes2DPreprocessor *preprocessor = new Mes2DPreprocessor();
 	std::vector<EquationSystem *> *inputMatrices = preprocessor->preprocess(tiers);
-	generator->generateGraph(6, production, inputMatrices);
+	generator->generateGraph(nrOfTiers, production, inputMatrices);
 
 	graph = generator->getGraph();
 	LCM_iterator it = graph->begin();
