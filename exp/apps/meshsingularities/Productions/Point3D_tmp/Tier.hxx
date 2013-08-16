@@ -12,7 +12,7 @@
 #include "Element.hxx"
 #include "TripleArgFunction.hxx"
 #include <stdio.h>
-namespace tmp{
+namespace D3{
 class Tier {
 
 private:

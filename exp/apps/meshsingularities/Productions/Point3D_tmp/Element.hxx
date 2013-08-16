@@ -4,8 +4,10 @@
 #include "EPosition.hxx"
 #include "TripleArgFunction.hxx"
 #include "GaussianQuadrature.hxx"
-#include <stdio.h>
-namespace tmp{
+#include <cstdlib>
+#include <cmath>
+#include <map>
+namespace D3{
 class Element{
 	
 	private:
@@ -119,6 +121,7 @@ class Element{
 		void fillRhs(double* rhs, ITripleArgFunction* f);
 		void fillRhs(double* rhs, ITripleArgFunction* f, int start_nr_adj);
 		void fillTierMatrix(double** matrix, double* rhs, ITripleArgFunction* f, int start_nr_adj);
+		bool checkSolution(std::map<int,double> *solution_map, ITripleArgFunction* f);
 		
 		void set_node_nr(int node, int node_nr)
 		{

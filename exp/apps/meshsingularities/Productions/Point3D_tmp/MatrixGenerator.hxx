@@ -6,7 +6,8 @@
 #include "EPosition.hxx"
 #include "Tier.hxx"
 #include <list>
-namespace tmp{
+#include <map>
+namespace D3{
 class MatrixGenerator {
 		
 	private:
@@ -19,6 +20,7 @@ class MatrixGenerator {
 	public:
 		std::list<Tier*>* CreateMatrixAndRhs(int nr_of_tiers, double bot_left_x,
 				double bot_left_y, double bot_left_z, double size, ITripleArgFunction* f);
+		void checkSolution(std::map<int,double> *solution_map, ITripleArgFunction* f);
 		
 		double** GetMatrix()
 		{

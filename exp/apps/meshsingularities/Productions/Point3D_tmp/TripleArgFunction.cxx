@@ -1,6 +1,6 @@
 #include "TripleArgFunction.hxx"
 
-using namespace tmp;
+using namespace D3;
 double get_chi1(double var)
 {
 	return var; 
@@ -49,23 +49,23 @@ double vertex_bot_right_far_function(double x, double y, double z)
 }
 double edge_left_near_function(double x, double y, double z)
 {
-	return get_chi2(x)*get_chi3(y)*get_chi2(z);
+	return get_chi2(x)*get_chi2(y)*get_chi3(z);
 }
 double edge_left_far_function(double x, double y, double z)
 {
-	return get_chi2(x)*get_chi3(y)*get_chi1(z);
+	return get_chi2(x)*get_chi1(y)*get_chi3(z);
 }
 double edge_bot_left_function(double x, double y, double z)
 {
-	return get_chi2(x)*get_chi2(y)*get_chi3(z);
+	return get_chi2(x)*get_chi3(y)*get_chi2(z);
 }
 double edge_top_left_function(double x, double y, double z)
 {
-	return get_chi2(x)*get_chi1(y)*get_chi3(z);
+	return get_chi2(x)*get_chi3(y)*get_chi1(z);
 }
 double edge_top_near_function(double x, double y, double z)
 {
-	return get_chi3(x)*get_chi1(y)*get_chi2(z);
+	return get_chi3(x)*get_chi2(y)*get_chi1(z);
 }
 double edge_top_far_function(double x, double y, double z)
 {
@@ -73,19 +73,19 @@ double edge_top_far_function(double x, double y, double z)
 }
 double edge_right_near_function(double x, double y, double z)
 {
-	return get_chi1(x)*get_chi3(y)*get_chi2(z);
+	return get_chi1(x)*get_chi2(y)*get_chi3(z);
 }
 double edge_right_far_function(double x, double y, double z)
 {
-	return get_chi1(x)*get_chi3(y)*get_chi1(z);
+	return get_chi1(x)*get_chi1(y)*get_chi3(z);
 }
 double edge_top_right_function(double x, double y, double z)
 {
-	return get_chi1(x)*get_chi1(y)*get_chi3(z);
+	return get_chi1(x)*get_chi3(y)*get_chi1(z);
 }
 double edge_bot_right_function(double x, double y, double z)
 {
-	return get_chi1(x)*get_chi2(y)*get_chi3(z);
+	return get_chi1(x)*get_chi3(y)*get_chi2(z);
 }
 double edge_bot_near_function(double x, double y, double z)
 {
@@ -93,7 +93,7 @@ double edge_bot_near_function(double x, double y, double z)
 }
 double edge_bot_far_function(double x, double y, double z)
 {
-	return get_chi3(x)*get_chi2(y)*get_chi1(z);
+	return get_chi3(x)*get_chi1(y)*get_chi2(z);
 }
 double face_left_function(double x, double y, double z)
 {
@@ -105,19 +105,19 @@ double face_right_function(double x, double y, double z)
 }
 double face_top_function(double x, double y, double z)
 {
-	return get_chi3(x)*get_chi1(y)*get_chi3(z);
+	return get_chi3(x)*get_chi3(y)*get_chi1(z);
 }
 double face_bot_function(double x, double y, double z)
 {
-	return get_chi3(x)*get_chi2(y)*get_chi3(z);
+	return get_chi3(x)*get_chi3(y)*get_chi2(z);
 }
 double face_near_function(double x, double y, double z)
 {
-	return get_chi3(x)*get_chi3(y)*get_chi2(z);
+	return get_chi3(x)*get_chi2(y)*get_chi3(z);
 }
 double face_far_function(double x, double y, double z)
 {
-	return get_chi3(x)*get_chi3(y)*get_chi1(z);
+	return get_chi3(x)*get_chi1(y)*get_chi3(z);
 }
 double interior_function(double x, double y, double z)
 {

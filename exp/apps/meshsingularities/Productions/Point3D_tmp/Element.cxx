@@ -1,6 +1,5 @@
 #include "Element.hxx"
-#include <stdio.h>
-using namespace tmp;
+using namespace D3;
 void set_big_interface_lower_vertex_edge_nrs_first_tier(int nr,
 		Element* left_near_element, Element* left_far_element, Element* right_far_element)
 {
@@ -485,4 +484,38 @@ void Element::fillRhs(double* rhs, ITripleArgFunction* f, int start_adj_nr)
 void Element::fillTierMatrix(double** matrix, double* rhs, ITripleArgFunction* f, int start_nr_adj){
 		fillMatrix(matrix, start_nr_adj);
 		fillRhs(rhs, f, start_nr_adj);
+}
+
+bool Element::checkSolution(std::map<int,double> *solution_map, ITripleArgFunction* f)
+{
+	double coefficients[nr_of_nodes];
+
+	for(int i = 0; i<nr_of_nodes; i++)
+		coefficients[i] = solution_map->find(shapeFunctionNrs[i])->second;
+
+	int nr_of_samples = 5;
+	double epsilon = 1e-8;
+
+
+	double rnd_x_within_element;
+	double rnd_y_within_element;
+	double rnd_z_within_element;
+
+	for(int i = 0; i<nr_of_samples; i++)
+	{
+		double value = 0;
+		double rnd_x_within_element = ((double) rand() / (RAND_MAX))*size + xl;
+		double rnd_y_within_element = ((double) rand() / (RAND_MAX))*size + yl;
+		double rnd_z_within_element = ((double) rand() / (RAND_MAX))*size + zl;
+		for(int i = 0; i<nr_of_nodes; i++)
+			value+=coefficients[i]*shapeFunctions[i]->ComputeValue(rnd_x_within_element,rnd_y_within_element,rnd_z_within_element);
+		//printf("%d %lf Checking at: %lf %lf %lf values: %lf %lf\n",position,size,rnd_x_within_element,rnd_y_within_element,rnd_z_within_element,value,f->ComputeValue(rnd_x_within_element,rnd_y_within_element,rnd_z_within_element));
+		if(fabs(value - f->ComputeValue(rnd_x_within_element,rnd_y_within_element,rnd_z_within_element)) > epsilon)
+		{
+
+			return false;
+		}
+	}
+
+	return true;
 }

@@ -4,7 +4,7 @@
 #include <stdarg.h>
 #include <vector>
 #include <stdio.h>
-namespace tmp{
+namespace D3{
 class NArgFunction
 {
 	public:
@@ -17,7 +17,7 @@ class NArgFunction
 };
 
 
-class ITripleArgFunction : public NArgFunction
+class ITripleArgFunction //: public NArgFunction
 {
 	
 	public:

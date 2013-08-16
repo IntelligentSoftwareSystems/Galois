@@ -2,7 +2,7 @@
 #define __GAUSSIANQUADRATURE_H_INCLUDED__
 
 #include "TripleArgFunction.hxx"
-namespace tmp{
+namespace D3{
 class GaussianQuadrature
 {
 	private:
