@@ -20,4 +20,15 @@ public:
 	virtual ~Postprocessor();
 };
 
+class Postprocessor2D : public Postprocessor {
+// everything same
+};
+
+class Postprocessor3D : public Postprocessor {
+public:
+	std::vector<double> *postprocess(std::vector<Vertex *> *leafs,
+									 std::vector<EquationSystem *> *inputData,
+									 AbstractProduction *productions);
+};
+
 #endif /* POSTPROCESSOR_H_ */

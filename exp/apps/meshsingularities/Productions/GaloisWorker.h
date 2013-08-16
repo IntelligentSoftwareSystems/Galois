@@ -8,7 +8,7 @@ struct ProductionProcess {
 public:
 	ProductionProcess() { };
 	template<typename Context> void operator()(Graph::GraphNode src, Context& ctx);
-	void operator()();
+	std::vector<double> *operator()(int nrOfTiers);
 private:
 	Graph *graph;
 	int atomic_dec(int *value);

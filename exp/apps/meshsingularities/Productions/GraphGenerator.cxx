@@ -25,7 +25,7 @@ GraphNode GraphGenerator::addNode(int nr_of_incoming_edges, EProduction producti
 	return graph_node;
 }
 
-void GraphGenerator::generateGraph(int nr_of_leafs, AbstractProduction *productions, std::vector<EquationSystem*> *inputData)
+Vertex *GraphGenerator::generateGraph(int nr_of_leafs, AbstractProduction *productions, std::vector<EquationSystem*> *inputData)
 {
 	if(nr_of_leafs < 2)
 		throw std::runtime_error("At least 2 leafs required");
@@ -41,6 +41,7 @@ void GraphGenerator::generateGraph(int nr_of_leafs, AbstractProduction *producti
 	GraphNode new_graph_node = addNode(2,EProduction::A2,NULL,eroot_graph_node,1, S, NULL);
 	GraphNode bs_graph_node = addNode(1,EProduction::BS,eroot_graph_node,NULL,2, S, NULL);
 	recursiveGraphGeneration(nr_of_leafs,0,nr_of_leafs-1,bs_graph_node, new_graph_node, S);
+	return S;
 }
 
 void GraphGenerator::recursiveGraphGeneration(int nr_of_leafs, int low_range, int high_range,

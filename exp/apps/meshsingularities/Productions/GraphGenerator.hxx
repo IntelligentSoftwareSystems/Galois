@@ -39,7 +39,7 @@ public:
 		delete S;
 	}
 
-	void generateGraph(int nr_of_leafs, AbstractProduction *prod, std::vector<EquationSystem*> *inputData);
+	Vertex* generateGraph(int nr_of_leafs, AbstractProduction *prod, std::vector<EquationSystem*> *inputData);
 	Graph *getGraph();
 
 private:

@@ -60,20 +60,59 @@ void ProductionProcess::operator()(Graph::GraphNode src, Context& ctx)
 
 }
 
-void ProductionProcess::operator()()
+std::vector<Vertex*> *collectLeafs(Vertex *p)
+{
+	std::vector<Vertex *> *left = NULL;
+	std::vector<Vertex *> *right = NULL;
+	std::vector<Vertex*> *result;
+
+	if (p!=NULL && p->left!=NULL) {
+		left = collectLeafs(p->left);
+	}
+	if (p!=NULL && p->right!=NULL) {
+		right = collectLeafs(p->right);
+	}
+	if (p!=NULL && p->right==NULL && p->left==NULL) {
+		result = new std::vector<Vertex*>(1);
+		result->push_back(p);
+		return result;
+	}
+	if (p!= NULL) {
+		result = new std::vector<Vertex*>();
+	} else {
+		result = NULL;
+	}
+	if (left != NULL) {
+		for (std::vector<Vertex*>::iterator it = left->iterator; (it); it++) {
+			result->push_back(*it);
+
+		}
+		delete left;
+	}
+	if (right != NULL) {
+		for (std::vector<Vertex*>::iterator it = right->iterator; (it); it++) {
+			result->push_back(*it);
+		}
+		delete right;
+	}
+
+	return result;
+
+}
+
+std::vector<double> *ProductionProcess::operator()(int nrOfTiers)
 {
 	// implement everything is needed to input data to solver,
 	// preprocessing,
-	const int nrOfTiers = 50;
 	ITripleArgFunction *function = new TestFunction3D();
 	GraphGenerator* generator = new GraphGenerator();
 	AbstractProduction *production = new AbstractProduction(19, 75, 117, 83);
-
+	Vertex *S;
 	MatrixGenerator *matrixGenerator = new MatrixGenerator();
 	std::list<tmp::Tier*> *tiers = matrixGenerator->CreateMatrixAndRhs(nrOfTiers, 0, 0, 0, 1, function);
 	Mes3DPreprocessor *preprocessor = new Mes3DPreprocessor();
 	std::vector<EquationSystem *> *inputMatrices = preprocessor->preprocess(tiers);
-	generator->generateGraph(nrOfTiers, production, inputMatrices);
+	S = generator->generateGraph(nrOfTiers, production, inputMatrices);
 
 	graph = generator->getGraph();
 	LCM_iterator it = graph->begin();
@@ -91,6 +130,15 @@ void ProductionProcess::operator()()
 		++iii;
 	}
 
+	std::vector<Vertex*> leafs = collectLeafs(S);
+	Postprocessor3D *mes3dProcessor = new Postprocessor3D();
+	std::vector<double> *result = mes3dProcessor->postprocess(leafs, inputMatrices, production);
+
+	delete leafs;
+	delete mes3dProcessor;
+	delete S;
+
+	return result;
 }
 
 inline int ProductionProcess::atomic_dec(int *value) {
