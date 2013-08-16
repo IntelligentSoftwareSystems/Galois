@@ -81,7 +81,7 @@ std::vector<EquationSystem*>* Mes3DPreprocessor::preprocess(std::list<tmp::Tier 
 {
 	std::vector<EquationSystem *> *esVector = new std::vector<EquationSystem*>();
 	int i = 0;
-	std::list<Tier*>::iterator it = tier_list->begin();
+	std::list<tmp::Tier*>::iterator it = tier_list->begin();
 	for (; it != tier_list->end(); ++it, ++i) {
 		if (i==0) {
 			EquationSystem *system = new EquationSystem((*it)->get_tier_matrix(), (*it)->get_tier_rhs(), 117);
