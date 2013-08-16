@@ -2,6 +2,7 @@
 #include "Point3D_tmp/MatrixGenerator.hxx"
 #include <vector>
 #include "Point3D_tmp/TripleArgFunction.hxx"
+#include "Postprocessor.h"
 /*
 class TestFunction : public IDoubleArgFunction {
 	double ComputeValue(double x, double y) {
@@ -83,14 +84,14 @@ std::vector<Vertex*> *collectLeafs(Vertex *p)
 		result = NULL;
 	}
 	if (left != NULL) {
-		for (std::vector<Vertex*>::iterator it = left->iterator; (it); it++) {
+		for (std::vector<Vertex*>::iterator it = left->begin(); it!=left->end(); ++it) {
 			result->push_back(*it);
 
 		}
 		delete left;
 	}
 	if (right != NULL) {
-		for (std::vector<Vertex*>::iterator it = right->iterator; (it); it++) {
+		for (std::vector<Vertex*>::iterator it = right->begin(); it!=right->end(); ++it) {
 			result->push_back(*it);
 		}
 		delete right;
@@ -130,7 +131,7 @@ std::vector<double> *ProductionProcess::operator()(int nrOfTiers)
 		++iii;
 	}
 
-	std::vector<Vertex*> leafs = collectLeafs(S);
+	std::vector<Vertex*> *leafs = collectLeafs(S);
 	Postprocessor3D *mes3dProcessor = new Postprocessor3D();
 	std::vector<double> *result = mes3dProcessor->postprocess(leafs, inputMatrices, production);
 
