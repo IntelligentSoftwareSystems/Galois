@@ -5,7 +5,7 @@ std::vector<EquationSystem *>* Preprocessor::preprocess(std::list<Input*>* input
 {
 	return NULL;
 }
-
+/*
 std::vector<EquationSystem*>* Mes2DPreprocessor::preprocess(std::list<Tier * > *tier_list)
 {
 	int i = 0;
@@ -75,7 +75,7 @@ std::vector<EquationSystem*>* Mes2DPreprocessor::preprocess(std::list<Tier * > *
 		}
 	}
 	return esList;
-}
+} */
 
 std::vector<EquationSystem*>* Mes3DPreprocessor::preprocess(std::list<tmp::Tier * > *tier_list)
 {
