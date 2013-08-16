@@ -1,12 +1,21 @@
 #include "GaloisWorker.h"
-#include "Point2D/MatrixGenerator.hxx"
+#include "Point3D_tmp/MatrixGenerator.hxx"
 #include <vector>
-
+#include "Point3D_tmp/TripleArgFunction.hxx"
 class TestFunction : public IDoubleArgFunction {
 	double ComputeValue(double x, double y) {
 		return x*x+y*y;
 	}
 };
+
+using namespace tmp;
+
+class TestFunction3D : public ITripleArgFunction {
+	double ComputeValue(double x, double y, double z) {
+		return 1.0;
+	}
+};
+
 
 template<typename Context>
 void ProductionProcess::operator()(Graph::GraphNode src, Context& ctx)
@@ -55,13 +64,13 @@ void ProductionProcess::operator()()
 	// implement everything is needed to input data to solver,
 	// preprocessing,
 	const int nrOfTiers = 50;
-	IDoubleArgFunction *function = new TestFunction();
+	ITripleArgFunction *function = new TestFunction3D();
 	GraphGenerator* generator = new GraphGenerator();
-	AbstractProduction *production = new AbstractProduction(5, 17, 21, 21);
+	AbstractProduction *production = new AbstractProduction(19, 75, 117, 83);
 
 	MatrixGenerator *matrixGenerator = new MatrixGenerator();
-	std::list<Tier*> *tiers = matrixGenerator->CreateMatrixAndRhs(nrOfTiers, 0, 0, 1, function);
-	Mes2DPreprocessor *preprocessor = new Mes2DPreprocessor();
+	std::list<tmp::Tier*> *tiers = matrixGenerator->CreateMatrixAndRhs(nrOfTiers, 0, 0, 0, 1, function);
+	Mes3DPreprocessor *preprocessor = new Mes3DPreprocessor();
 	std::vector<EquationSystem *> *inputMatrices = preprocessor->preprocess(tiers);
 	generator->generateGraph(nrOfTiers, production, inputMatrices);
 

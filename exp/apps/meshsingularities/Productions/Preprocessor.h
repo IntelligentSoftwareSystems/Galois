@@ -4,6 +4,7 @@
 #include <vector>
 #include <list>
 #include "Point2D/Tier.hxx"
+#include "Point3D_tmp/Tier.hxx"
 #include "EquationSystem.h"
 
 class Preprocessor {
@@ -17,7 +18,7 @@ public:
 };
 
 class Mes3DPreprocessor : public Preprocessor {
-	std::vector<EquationSystem*>* preprocess(std::list<Tier *> *tier_list);
+	std::vector<EquationSystem*>* preprocess(std::list<tmp::Tier *> *tier_list);
 };
 
 #endif /* PREPROCESSOR_H_ */
