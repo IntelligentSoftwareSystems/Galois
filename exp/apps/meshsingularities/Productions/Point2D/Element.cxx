@@ -1,6 +1,6 @@
 #include "Element.hxx"
 #include <stdio.h>
-
+using namespace D2;
 Element** Element::CreateAnotherTier(int nr)
 {
 
@@ -212,4 +212,45 @@ void Element::fillRhs(double* rhs, IDoubleArgFunction* f, int start_adj_nr)
 void Element::fillTierMatrix(double** matrix, double* rhs, IDoubleArgFunction* f, int start_nr_adj){
 		fillMatrix(matrix, start_nr_adj);
 		fillRhs(rhs, f, start_nr_adj);
+}
+
+bool Element::checkSolution(std::map<int,double> *solution_map, IDoubleArgFunction* f)
+{
+	int nr_of_nodes = 9;
+	double coefficients[nr_of_nodes];
+
+
+	coefficients[0] = solution_map->find(bot_left_vertex_nr)->second;
+	coefficients[1] = solution_map->find(left_edge_nr)->second;
+	coefficients[2] = solution_map->find(top_left_vertex_nr)->second;
+	coefficients[3] = solution_map->find(top_edge_nr)->second;
+	coefficients[4] = solution_map->find(top_right_vertex_nr)->second;
+	coefficients[5] = solution_map->find(bot_edge_nr)->second;
+	coefficients[6] = solution_map->find(interior_nr)->second;
+	coefficients[7] = solution_map->find(right_edge_nr)->second;
+	coefficients[8] = solution_map->find(bot_right_vertex_nr)->second;
+
+	int nr_of_samples = 5;
+	double epsilon = 1e-8;
+
+	double rnd_x_within_element;
+	double rnd_y_within_element;
+
+	for(int i = 0; i<nr_of_samples; i++)
+	{
+		double value = 0;
+		double rnd_x_within_element = ((double) rand() / (RAND_MAX))*(xr-xl) + xl;
+		double rnd_y_within_element = ((double) rand() / (RAND_MAX))*(yr-yl) + yl;
+		for(int i = 0; i<nr_of_nodes; i++)
+			value+=coefficients[i]*shapeFunctions[i]->ComputeValue(rnd_x_within_element,rnd_y_within_element);
+		printf("%d Checking at: %lf %lf values: %lf %lf\n",position,rnd_x_within_element,rnd_y_within_element,value,f->ComputeValue(rnd_x_within_element,rnd_y_within_element));
+		if(fabs(value - f->ComputeValue(rnd_x_within_element,rnd_y_within_element)) > epsilon)
+		{
+			for(int i = 0; i<9; i++)
+				printf("%lf %d\n",coefficients[i],bot_right_vertex_nr);
+			return false;
+		}
+	}
+
+	return true;
 }

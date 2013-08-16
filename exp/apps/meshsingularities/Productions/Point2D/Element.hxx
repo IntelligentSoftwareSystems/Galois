@@ -4,7 +4,10 @@
 #include "EPosition.hxx"
 #include "DoubleArgFunction.hxx"
 #include "GaussianQuadrature.hxx"
-
+#include <cstdlib>
+#include <cmath>
+#include <map>
+using namespace D2;
 class Element{
 	
 	private:
@@ -67,7 +70,6 @@ class Element{
 			shapeFunctions[6] = interior_function; 
 			shapeFunctions[7] = edge_right_function; 
 			shapeFunctions[8] = vertex_bot_right_function;
-			
 					
 		}
 		
@@ -98,6 +100,7 @@ class Element{
 		void fillRhs(double* rhs, IDoubleArgFunction* f);
 		void fillRhs(double* rhs, IDoubleArgFunction* f, int start_nr_adj);
 		void fillTierMatrix(double** matrix, double* rhs, IDoubleArgFunction* f, int start_nr_adj);
+		bool checkSolution(std::map<int,double> *solution_map, IDoubleArgFunction* f);
 		
 		void set_bot_left_vertex_nr(int nr){
 			bot_left_vertex_nr = nr; 

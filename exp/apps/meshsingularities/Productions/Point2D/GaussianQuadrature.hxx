@@ -2,7 +2,7 @@
 #define __GAUSSIANQUADRATURE_H_INCLUDED__
 
 #include "DoubleArgFunction.hxx"
-
+namespace D2{
 class GaussianQuadrature
 {
 	private:
@@ -32,4 +32,5 @@ class GaussianQuadrature
 		
 	}
 };
+}
 #endif

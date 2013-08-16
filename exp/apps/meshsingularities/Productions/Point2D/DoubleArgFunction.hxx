@@ -1,7 +1,7 @@
 #ifndef __DOUBLEARGFUNCTION_H_INCLUDED
 #define __DOUBLEARGFUNCTION_H_INCLUDED
 #include "EPosition.hxx"
-
+using namespace D2;
 class IDoubleArgFunction
 {
 	

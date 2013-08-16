@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include "Element.hxx"
 #include "DoubleArgFunction.hxx"
-
+namespace D2{
 class Tier {
 
 private:
@@ -68,5 +68,5 @@ public:
 		return tier_rhs;
 	}
 };
-
+}
 #endif /* TIER_H_ */

@@ -6,7 +6,7 @@
  */
 
 #include "Tier.hxx"
-
+using namespace D2;
 void Tier::FillMatrixAndRhs(double** matrix, double* rhs, int matrix_size)
 {
 		for(int i=0; i<tier_matrix_size; i++)

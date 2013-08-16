@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <iostream>
 
-
+using namespace D2;
 std::list<Tier*>* MatrixGenerator::CreateMatrixAndRhs(int nr_of_tiers, double bot_left_x, double bot_left_y, double size, IDoubleArgFunction* f)
 {	
 		
@@ -74,5 +74,22 @@ std::list<Tier*>* MatrixGenerator::CreateMatrixAndRhs(int nr_of_tiers, double bo
 		}
 
 		return tier_list;
+}
+
+void MatrixGenerator::checkSolution(std::map<int,double> *solution_map, IDoubleArgFunction* f)
+{
+	std::list<Element*>::iterator it = element_list.begin();
+	bool solution_ok = true;
+	while(it != element_list.end() && solution_ok)
+	{
+		Element* element = (*it);
+		solution_ok = element->checkSolution(solution_map,f);
+		++it;
+	}
+	if(solution_ok)
+		printf("SOLUTION OK\n");
+	else
+		printf("WRONG SOLUTION\n");
+
 }
 
