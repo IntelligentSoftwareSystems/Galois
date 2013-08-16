@@ -17,6 +17,7 @@ public:
 };*/
 
 class Mes3DPreprocessor : public Preprocessor {
+public:
 	std::vector<EquationSystem*>* preprocess(std::list<tmp::Tier *> *tier_list);
 };
 
