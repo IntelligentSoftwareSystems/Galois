@@ -2,11 +2,12 @@
 #include "Point3D_tmp/MatrixGenerator.hxx"
 #include <vector>
 #include "Point3D_tmp/TripleArgFunction.hxx"
+/*
 class TestFunction : public IDoubleArgFunction {
 	double ComputeValue(double x, double y) {
 		return x*x+y*y;
 	}
-};
+}; */
 
 using namespace tmp;
 
