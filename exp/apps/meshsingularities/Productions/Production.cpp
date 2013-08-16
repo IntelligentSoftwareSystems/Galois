@@ -180,7 +180,7 @@ void AbstractProduction::A2(Vertex *v)
 
 
 	for (i=0; i<this->interfaceSize; ++i) {
-		for (j=0; j<this->interfaceSize; j++) {
+		for (j=0; j<this->interfaceSize; ++j) {
 			// x: left y: top
 			v->system->matrix[i][j] = v->left->system->matrix[i+offsetLeft+interfaceSize][j+offsetLeft+interfaceSize] +
 					v->right->system->matrix[i+offsetRight][j+offsetRight];

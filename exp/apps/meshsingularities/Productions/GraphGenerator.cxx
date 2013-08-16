@@ -140,15 +140,15 @@ void GraphGenerator::recursiveGraphGeneration(int nr_of_leafs, int low_range, in
 	else if((high_range - low_range) == 1)
 	{
 		if (low_range == 0) {
-			left = new Vertex(NULL, NULL, parent, NODE, productions->getA1Size());
+			left = new Vertex(NULL, NULL, parent, LEAF, productions->getA1Size());
 		} else {
-			left = new Vertex(NULL, NULL, parent, NODE, productions->getLeafSize());
+			left = new Vertex(NULL, NULL, parent, LEAF, productions->getLeafSize());
 		}
 
 		if (high_range == nr_of_leafs - 1) {
-			right = new Vertex(NULL, NULL, parent, NODE, productions->getANSize());
+			right = new Vertex(NULL, NULL, parent, LEAF, productions->getANSize());
 		} else {
-			right = new Vertex(NULL, NULL, parent, NODE, productions->getLeafSize());
+			right = new Vertex(NULL, NULL, parent, LEAF, productions->getLeafSize());
 		}
 
 		parent->setLeft(left);

@@ -5,6 +5,7 @@ std::vector<EquationSystem *>* Preprocessor::preprocess(std::list<Input*>* input
 {
 	return NULL;
 }
+
 std::vector<EquationSystem*>* Mes2DPreprocessor::preprocess(std::list<Tier * > *tier_list)
 {
 	int i = 0;
@@ -74,4 +75,54 @@ std::vector<EquationSystem*>* Mes2DPreprocessor::preprocess(std::list<Tier * > *
 		}
 	}
 	return esList;
+}
+
+std::vector<EquationSystem*>* Mes3DPreprocessor::preprocess(std::list<Tier * > *tier_list)
+{
+	std::vector<EquationSystem *> *esVector = new std::vector<EquationSystem*>();
+	int i = 0;
+	std::list<Tier*>::iterator it = tier_list->begin();
+		for (; it != tier_list->end(); ++it, ++i) {
+			if (i==0) {
+				EquationSystem *system = new EquationSystem((*it)->get_tier_matrix(), (*it)->get_tier_rhs(), 117);
+				// in A1 we need to move 2,4,6,8 [row,col] to the top-left corner of matrix
+
+				system->eliminate(42);
+
+				esVector->push_back(system);
+			} else if (i==tier_list->size()-1) {
+				EquationSystem *system = new EquationSystem(83);
+				double ** tierMatrix = (*it)->get_tier_matrix();
+				double *tierRhs = (*it)->get_tier_rhs();
+
+				for (int i=0; i<75; i++) {
+					for (int j=0; j<75; j++) {
+						system->matrix[i+8][j+8] = tierMatrix[i][j];
+					}
+					system->rhs[i+8] = tierRhs[i];
+				}
+
+				for (int i=0;i<8;i++) {
+					for (int j=0;j<75;j++) {
+						system->matrix[i][j+8] = tierMatrix[i+75][j];
+						system->matrix[j+8][i] = tierMatrix[j][i+75];
+					}
+				}
+
+				for (int i=0; i<8; i++) {
+					for (int j=0; j<8; j++) {
+						system->matrix[i][j] = tierMatrix[i+75][j+75];
+					}
+					system->rhs[i] = tierRhs[i+75];
+				}
+
+				system->eliminate(8);
+
+				esVector->push_back(system);
+			} else {
+				EquationSystem *system = new EquationSystem((*it)->get_tier_matrix(), (*it)->get_tier_rhs(), 75);
+				esVector->push_back(system);
+			}
+		}
+	return esVector;
 }
