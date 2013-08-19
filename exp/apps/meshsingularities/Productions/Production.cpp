@@ -225,6 +225,7 @@ void AbstractProduction::BS(Vertex *v)
 
 	if (v->type == ROOT) {
 		v->system->backwardSubstitute(this->interfaceSize * 3-1);
+		//v->system->print();
 	}
 
 	if (v->type == NODE) {
@@ -263,6 +264,8 @@ void AbstractProduction::BS(Vertex *v)
 		}
 
 		v->system->backwardSubstitute(leafSize-2*interfaceSize);
+		//if (v->parent->left == v && v->parent->parent->left == v->parent) 
+		//	v->system->print();
 	}
 }
 

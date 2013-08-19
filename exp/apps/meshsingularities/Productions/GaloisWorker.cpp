@@ -6,7 +6,7 @@
 /*
 class TestFunction : public IDoubleArgFunction {
 	double ComputeValue(double x, double y) {
-		return x*x+y*y;
+		return 1.0;
 	}
 }; */
 
@@ -23,27 +23,36 @@ template<typename Context>
 void ProductionProcess::operator()(Graph::GraphNode src, Context& ctx)
 {
 	Node node = src->data;
+//	std::cout << "Node: " << src->data.x;
+//	std::cout << " Production: ";
 	switch (node.productionToExecute) {
 	case A1:
 		node.productions->A1(node.v, node.input);
+		//std::cout << "A1" << std::endl;
 		break;
 	case A:
 		node.productions->A(node.v, node.input);
+		//std::cout << "A" << std::endl;
 		break;
 	case AN:
 		node.productions->AN(node.v, node.input);
+		//std::cout << "AN" << std::endl;
 		break;
 	case A2:
 		node.productions->A2(node.v);
+		//std::cout << "A2" << std::endl;
 		break;
 	case E:
 		node.productions->E(node.v);
+		//std::cout << "E" << std::endl;
 		break;
 	case EROOT:
 		node.productions->ERoot(node.v);
+		//std::cout << "EROOT" << std::endl;
 		break;
 	case BS:
 		node.productions->BS(node.v);
+		//std::cout << "BS" << std::endl;
 		break;
 	default:
 		break;
@@ -70,35 +79,42 @@ std::vector<Vertex*> *collectLeafs(Vertex *p)
 	if (p!=NULL && p->left!=NULL) {
 		left = collectLeafs(p->left);
 	}
+
 	if (p!=NULL && p->right!=NULL) {
 		right = collectLeafs(p->right);
 	}
+
 	if (p!=NULL && p->right==NULL && p->left==NULL) {
 		result = new std::vector<Vertex*>(1);
 		result->push_back(p);
 		return result;
 	}
+
 	if (p!= NULL) {
 		result = new std::vector<Vertex*>();
 	} else {
 		result = NULL;
 	}
+
 	if (left != NULL) {
 		for (std::vector<Vertex*>::iterator it = left->begin(); it!=left->end(); ++it) {
-			result->push_back(*it);
-
+			if (*it != NULL) {
+				result->push_back(*it);
+			}
 		}
 		delete left;
 	}
+
 	if (right != NULL) {
 		for (std::vector<Vertex*>::iterator it = right->begin(); it!=right->end(); ++it) {
-			result->push_back(*it);
+			if (*it != NULL) {
+				result->push_back(*it);
+			}
 		}
 		delete right;
 	}
 
 	return result;
-
 }
 
 std::vector<double> *ProductionProcess::operator()(int nrOfTiers)
@@ -135,6 +151,11 @@ std::vector<double> *ProductionProcess::operator()(int nrOfTiers)
 	Postprocessor3D *mes3dProcessor = new Postprocessor3D();
 	std::vector<double> *result = mes3dProcessor->postprocess(leafs, inputMatrices, production);
 
+	/*
+	for (std::vector<double>::iterator it=result->begin(); it!=result->end(); ++it) {
+		printf("%.16g\n", *it);
+	}
+	 */
 	delete leafs;
 	delete mes3dProcessor;
 	delete S;
