@@ -15,6 +15,7 @@
 #endif
 
 #include "Galois/Runtime/ll/SimpleLock.h"
+#include "llvm/ADT/SmallVector.h"
 #include "control.h"
 //#include "datatypes.h"
 
@@ -32,7 +33,9 @@ struct ND {
 #else
   unsigned char spinLock;
 #endif 
-  std::vector<ND*> preds;
+  //  typedef std::vector<ND*> predTY;
+  typedef llvm::SmallVector<ND*, 2> predTY;
+  predTY preds;
   int distance;
   int nsuccs;
 #if USE_MARKING
@@ -79,7 +82,7 @@ struct ND {
         return true;
     }
     return false;*/
-    std::vector<ND*>::const_iterator it = preds.end();
+    predTY::const_iterator it = preds.end();
     return (std::find(preds.begin(), it, a) != it); 
   }
 
@@ -89,6 +92,17 @@ struct ND {
     pthread_mutex_lock(&spinLock);
 #else
     spinLock.lock();
+#endif
+#endif
+  }
+
+  bool try_lock() {
+#if CONCURRENT
+#if USEPTHREADSM
+    pthread_mutex_lock(&spinLock);
+    return true;
+#else
+    return spinLock.try_lock();
 #endif
 #endif
   }
@@ -110,7 +124,7 @@ struct ND {
   }
 
   inline void reset() {
-    preds.resize(0);
+    preds.clear();//resize(0);
     distance = DEF_DISTANCE;
     nsuccs = 0; // Reset flags as follows: inFringe = false, deltaDone = false
     sigma = 0;

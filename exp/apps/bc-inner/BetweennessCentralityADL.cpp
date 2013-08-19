@@ -81,31 +81,25 @@ void readInOutGraph(Graph& graph) {
   if (symmetricGraph) {
     Galois::Graph::readGraph(graph, filename);
   } else if (transposeGraphName.size()) {
-    Galois::Graph::readGraph(graph, filename, transposeGraphName);
+    //Galois::Graph::readGraph(graph, filename, transposeGraphName);
   } else {
     GALOIS_DIE("Graph type not supported");
   }
 }
 
-struct ADLAlgo: public Galois::LigraGraphChi::ChooseExecutor<false> {
+static const int ChunkSize = 8;
+
+struct ADLAlgo {
 
   struct SNode {
-    std::atomic<int> numPaths;
-    std::atomic<int> numPathsProp;
-    std::atomic<double> dependencies;
+    unsigned long numPaths, numPathsProp;
+    float dependencies;
     int dist;
-    std::atomic<bool> visited;
-    SNode() { }
+    bool visited;
+    SNode() :numPaths(0), numPathsProp(0), dependencies(0.0), dist(std::numeric_limits<int>::max()), visited(false) { }
   };
 
-  typedef typename Galois::Graph::LC_CSR_Graph<SNode,void>
-    ::with_no_lockable<true>::type 
-    ::with_numa_alloc<true>::type InnerGraph;
-
-  typedef typename boost::mpl::if_c<false,
-          Galois::Graph::OCImmutableEdgeGraph<SNode,void>,
-          Galois::Graph::LC_InOut_Graph<InnerGraph> >::type
-          Graph;
+  typedef Galois::Graph::LC_CSR_Graph<SNode, void> Graph;
   typedef typename Graph::GraphNode GNode;
   typedef Galois::GraphNodeBag<1024*4> Bag;
 
@@ -123,8 +117,8 @@ struct ADLAlgo: public Galois::LigraGraphChi::ChooseExecutor<false> {
       data.numPaths = 0;
       data.numPathsProp = 0;
       data.dependencies = 0.0;
-      data.visited = false;
       data.dist = std::numeric_limits<int>::max();
+      data.visited = false;
     }
   };
 
@@ -138,7 +132,7 @@ struct ADLAlgo: public Galois::LigraGraphChi::ChooseExecutor<false> {
       }
     };
 
-    typedef Galois::WorkList::OrderedByIntegerMetric<Indexer,Galois::WorkList::dChunkedFIFO<64> > OBIM;
+    typedef Galois::WorkList::OrderedByIntegerMetric<Indexer,Galois::WorkList::dChunkedFIFO<ChunkSize> > OBIM;
 
     Graph& g;
     BFS(Graph& g) :g(g) {}
@@ -146,14 +140,17 @@ struct ADLAlgo: public Galois::LigraGraphChi::ChooseExecutor<false> {
     void operator()(WorkItem& item, Galois::UserContext<WorkItem>& ctx) const {
       GNode n = item.first;
       int newDist = item.second;
+      if (newDist > g.getData(n).dist + 1)
+        return;
       
       for (Graph::edge_iterator ii = g.edge_begin(n, Galois::MethodFlag::NONE),
             ei = g.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii) {
         GNode dst = g.getEdgeDst(ii);
         SNode& ddata = g.getData(dst, Galois::MethodFlag::NONE);
 
+        int oldDist;
         while (true) {
-          int oldDist = ddata.dist;
+          oldDist = ddata.dist;
           if (oldDist <= newDist)
             break;
           if (__sync_bool_compare_and_swap(&ddata.dist, oldDist, newDist)) {
@@ -175,17 +172,17 @@ struct ADLAlgo: public Galois::LigraGraphChi::ChooseExecutor<false> {
       }
     };
 
-    typedef Galois::WorkList::OrderedByIntegerMetric<Indexer,Galois::WorkList::dChunkedFIFO<64> > OBIM;
+    typedef Galois::WorkList::OrderedByIntegerMetric<Indexer,Galois::WorkList::dChunkedFIFO<ChunkSize> > OBIM;
 
     Graph& g;
     CountPaths(Graph& g) :g(g) { Indexer::g = &g; }
 
     void operator()(GNode& n, Galois::UserContext<GNode>& ctx) const {
       SNode& sdata = g.getData(n, Galois::MethodFlag::NONE);
-      int toProp = 0;
-      int oldPaths, oldPathsProp;
+      unsigned long toProp = 0;
+      unsigned long oldPaths, oldPathsProp;
       while ((oldPaths = sdata.numPaths) > (oldPathsProp = sdata.numPathsProp)) {
-        if (sdata.numPathsProp.compare_exchange_weak(oldPathsProp, oldPaths)) {
+        if (__sync_bool_compare_and_swap(&sdata.numPathsProp, oldPathsProp, oldPaths)) {
           toProp = oldPaths - oldPathsProp;
           break;
         }
@@ -196,8 +193,9 @@ struct ADLAlgo: public Galois::LigraGraphChi::ChooseExecutor<false> {
           GNode dst = g.getEdgeDst(ii);
           SNode& ddata = g.getData(dst, Galois::MethodFlag::NONE);
           if (ddata.dist == sdata.dist + 1) {
-            ddata.numPaths += toProp;
-            ctx.push(dst);
+            __sync_fetch_and_add(&ddata.numPaths, toProp);
+            if (ddata.numPaths != ddata.numPathsProp)
+              ctx.push(dst);
           }
         }
       }
@@ -214,60 +212,56 @@ struct ADLAlgo: public Galois::LigraGraphChi::ChooseExecutor<false> {
       }
     };
 
-    typedef Galois::WorkList::OrderedByIntegerMetric<Indexer,Galois::WorkList::dChunkedFIFO<64> > OBIM;
+    typedef Galois::WorkList::OrderedByIntegerMetric<Indexer,Galois::WorkList::dChunkedFIFO<ChunkSize> > OBIM;
 
     Graph& g;
     ComputeDep(Graph& g) :g(g) { Indexer::g = &g; }
 
     void operator()(GNode& n, Galois::UserContext<GNode>& ctx) const {
-      SNode& sdata = g.getData(n);
+      SNode& sdata = g.getData(n, Galois::MethodFlag::NONE);
       if (sdata.visited)
         return;
-      bool allReady = true;
-      double newDep = 0.0;
+      float newDep = 0.0;
       for (Graph::edge_iterator ii = g.edge_begin(n, Galois::MethodFlag::NONE),
              ei = g.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii) {
         GNode dst = g.getEdgeDst(ii);
         SNode& ddata = g.getData(dst, Galois::MethodFlag::NONE);
         if (ddata.dist == sdata.dist + 1) {
-          if (ddata.visited)
-            newDep += ((double)sdata.numPaths / (double)ddata.numPaths) * (1 + ddata.dependencies);
-          else
-            allReady = false;
-        }
-      }
-      if (allReady) {
-        sdata.dependencies = newDep;
-        sdata.visited = true;
-        for (Graph::edge_iterator ii = g.edge_begin(n, Galois::MethodFlag::NONE),
-               ei = g.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii) {
-          GNode dst = g.getEdgeDst(ii);
-          SNode& ddata = g.getData(dst, Galois::MethodFlag::NONE);
-          if (ddata.dist + 1 == sdata.dist)
+          if (ddata.visited) {
+            newDep += ((float)sdata.numPaths / (float)ddata.numPaths) * (1 + ddata.dependencies);
+          } else {
+            ctx.push(n);
             ctx.push(dst);
+            return;
+          }
         }
       }
+      sdata.visited = true;
+      sdata.dependencies = newDep;
     }
   };
 
   void operator()(Graph& graph, GNode source) {
-    Galois::StatTimer Tinit("InitTime"), Tbfs("BFSTime"), Tcount("CountTime"), Tdep("DepTime");
+    Galois::StatTimer Tinit("InitTime"), Tlevel("LevelTime"), Tbfs("BFSTime"), Tcount("CountTime"), Tdep("DepTime");
     Tinit.start();
-    Galois::do_all_local(graph, Initialize(graph));
+    Galois::do_all_local(graph, Initialize(graph), "INIT");
     Tinit.stop();
+    std::cout << "INIT DONE " << Tinit.get() << "\n";
     Tbfs.start();
     graph.getData(source).dist = 0;
-    Galois::for_each<BFS::OBIM>(BFS::WorkItem(source, 1), BFS(graph));
+    Galois::for_each<BFS::OBIM>(BFS::WorkItem(source, 1), BFS(graph), "BFS");
     Tbfs.stop();
+    std::cout << "BFS DONE " << Tbfs.get() << "\n";
     Tcount.start();
-    CountPaths::Indexer::g = &graph;
     graph.getData(source).numPaths = 1;
-    Galois::for_each<CountPaths::OBIM>(source, CountPaths(graph));
+    Galois::for_each<CountPaths::OBIM>(source, CountPaths(graph), "COUNT");
     Tcount.stop();
+    std::cout << "COUNT DONE " << Tcount.get() << "\n";
     Tdep.start();
-    ComputeDep::Indexer::g = &graph;
-    Galois::for_each<ComputeDep::OBIM>(graph.begin(), graph.end(), ComputeDep(graph));
+    graph.getData(source).visited = true;
+    Galois::for_each<ComputeDep::OBIM>(graph.begin(), graph.end(), ComputeDep(graph), "DEP");
     Tdep.stop();
+    std::cout << "DEP DONE " << Tdep.get() << "\n";
   }
 };
 
@@ -284,8 +278,9 @@ void run() {
 
   initialize(algo, graph, source);
 
-  Galois::preAlloc(numThreads + (3*graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::pageSize);
   Galois::reportPageAlloc("MeminfoPre");
+  Galois::preAlloc(numThreads + (3*graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::pageSize);
+  Galois::reportPageAlloc("MeminfoMid");
 
   Galois::StatTimer T;
   std::cout << "Running " << algo.name() << " version\n";
@@ -300,9 +295,13 @@ void run() {
     for (typename Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei && count < 20; ++ii, ++count) {
       std::cout << count << ": "
         << std::setiosflags(std::ios::fixed) << std::setprecision(6) << graph.getData(*ii).dependencies
-                << " " << graph.getData(*ii).numPaths
+                << " " << graph.getData(*ii).numPaths << " " << graph.getData(*ii).dist
         << "\n";
     }
+    count = 0;
+    // for (typename Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii, ++count)
+    //   std::cout << ((count % 128 == 0) ? "\n" : " ") << graph.getData(*ii).numPaths;
+    std::cout << "\n";
   }
 }
 

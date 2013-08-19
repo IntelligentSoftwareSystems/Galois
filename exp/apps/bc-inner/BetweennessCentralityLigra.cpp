@@ -288,11 +288,16 @@ void run() {
 
   if (!skipVerify) {
     int count = 0;
-    for (typename Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei && count < 10; ++ii, ++count) {
+    for (typename Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei && count < 20; ++ii, ++count) {
       std::cout << count << ": "
         << std::setiosflags(std::ios::fixed) << std::setprecision(6) << graph.getData(*ii).dependencies.read()
-        << "\n";
+                << " " << (int)round(1.0 / graph.getData(*ii).numPaths.read())
+                << "\n";
     }
+    count = 0;
+    // for (typename Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii, ++count)
+    //   std::cout << ((count % 128 == 0) ? "\n" : " ") << (int)round(1.0 / graph.getData(*ii).numPaths.read());
+    std::cout << "\n";
   }
 }
 
