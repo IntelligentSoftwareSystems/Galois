@@ -33,6 +33,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 #include "Galois/Graph/GraphNodeBag.h"
+#include "../../../apps/bfs/HybridBFS.h"
 
 #include GALOIS_CXX11_STD_HEADER(atomic)
 #include <string>
@@ -97,10 +98,10 @@ static const int bfsChunkSize = 32+64;
 struct ADLAlgo {
 
   struct SNode {
-    unsigned long numPaths;
+    float numPaths;
     float dependencies;
     int dist;
-    SNode() :numPaths(~0UL), dependencies(std::numeric_limits<float>::lowest()), dist(std::numeric_limits<int>::max()) { }
+    SNode() :numPaths(std::numeric_limits<float>::lowest()), dependencies(std::numeric_limits<float>::lowest()), dist(std::numeric_limits<int>::max()) { }
   };
 
   typedef typename Galois::Graph::LC_CSR_Graph<SNode,void>
@@ -121,7 +122,7 @@ struct ADLAlgo {
     Initialize(Graph& g): g(g) { }
     void operator()(typename Graph::GraphNode n) {
       SNode& data = g.getData(n, Galois::MethodFlag::NONE);
-      data.numPaths = ~0UL;
+      data.numPaths = std::numeric_limits<float>::lowest();
       data.dependencies = std::numeric_limits<float>::lowest();
       data.dist = std::numeric_limits<int>::max();
     }
@@ -169,10 +170,15 @@ struct ADLAlgo {
 
   struct CountPaths {
     typedef int tt_does_not_need_aborts;
-    
+
     struct Indexer: public std::unary_function<GNode,int> {
       static Graph* g;
       int operator()(const GNode& val) const {
+        // //use out edges as that signifies how many people will wait on this node
+        // auto ii = g->edge_begin(val, Galois::MethodFlag::NONE);
+        // auto ee = g->edge_end(val, Galois::MethodFlag::NONE);
+        // bool big = Galois::safe_advance(ii, ee, 10) != ee;
+        // return 2 * g->getData(val, Galois::MethodFlag::NONE).dist + (big ? 0 : 1);
         return g->getData(val, Galois::MethodFlag::NONE).dist;
       }
     };
@@ -184,7 +190,7 @@ struct ADLAlgo {
 
     void operator()(GNode& n, Galois::UserContext<GNode>& ctx) const {
       SNode& sdata = g.getData(n, Galois::MethodFlag::NONE);
-      while (sdata.numPaths == ~0UL) {
+      while (sdata.numPaths == std::numeric_limits<float>::lowest()) {
         unsigned long np = 0;
         bool allready = true;
         for (Graph::in_edge_iterator ii = g.in_edge_begin(n, Galois::MethodFlag::NONE),
@@ -192,11 +198,12 @@ struct ADLAlgo {
           GNode dst = g.getInEdgeDst(ii);
           SNode& ddata = g.getData(dst, Galois::MethodFlag::NONE);
           if (ddata.dist + 1 == sdata.dist) {
-            if (ddata.numPaths != ~0UL) {
+            if (ddata.numPaths != std::numeric_limits<float>::lowest()) {
               np += ddata.numPaths;
             } else {
               allready = false;
-              break;
+              // ctx.push(n);
+              // return;
             }
           }
         }
@@ -212,6 +219,11 @@ struct ADLAlgo {
     struct Indexer: public std::unary_function<GNode,int> {
       static Graph* g;
       int operator()(const GNode& val) const {
+        // //use in edges as that signifies how many people will wait on this node
+        // auto ii = g->in_edge_begin(val, Galois::MethodFlag::NONE);
+        // auto ee = g->in_edge_end(val, Galois::MethodFlag::NONE);
+        // bool big = Galois::safe_advance(ii, ee, 10) != ee;
+        // return std::numeric_limits<int>::max() - 2 * g->getData(val, Galois::MethodFlag::NONE).dist + (big ? 0 : 1);
         return std::numeric_limits<int>::max() - g->getData(val, Galois::MethodFlag::NONE).dist;
       }
     };
@@ -235,6 +247,8 @@ struct ADLAlgo {
               newDep += ((float)sdata.numPaths / (float)ddata.numPaths) * (1 + ddata.dependencies);
             } else {
               allready =false;
+              // ctx.push(n);
+              // return;
             }
           }
         }
@@ -252,7 +266,9 @@ struct ADLAlgo {
     std::cout << "INIT DONE " << Tinit.get() << "\n";
     Tbfs.start();
     graph.getData(source).dist = 0;
-    Galois::for_each<BFS::OBIM>(BFS::WorkItem(source, 1), BFS(graph), "BFS");
+    //Galois::for_each<BFS::OBIM>(BFS::WorkItem(source, 1), BFS(graph), "BFS");
+    HybridBFS<SNode, int> H;
+    H(graph,source);
     Tbfs.stop();
     std::cout << "BFS DONE " << Tbfs.get() << "\n";
     Tcount.start();
