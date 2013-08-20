@@ -22,27 +22,27 @@ public:
 	/* preprocess the input and convert data to form needed by production,
 	   this is sequential code */
 	std::vector<EquationSystem *>* preprocess(std::list<EquationSystem*>* input,
-			AbstractProduction *productions);
+			AbstractProduction *productions) const;
 
 	/* pull data from leafs and return the solution of MES
 	   this is sequential code*/
 	std::vector<double> *postprocess(std::vector<Vertex *> *leafs,
 			std::vector<EquationSystem *> *inputData,
-			AbstractProduction *productions);
+			AbstractProduction *productions) const;
 
 	virtual ~Processing();
 
 	/* these methods may be useful in order to parallelize {pre,post}processing */
-	EquationSystem *preprocessA1(EquationSystem *input, AbstractProduction *productions);
-	EquationSystem *preprocessA(EquationSystem *input, AbstractProduction *productions);
-	EquationSystem *preprocessAN(EquationSystem *input, AbstractProduction *productions);
+	EquationSystem *preprocessA1(EquationSystem *input, AbstractProduction *productions) const;
+	EquationSystem *preprocessA(EquationSystem *input, AbstractProduction *productions) const;
+	EquationSystem *preprocessAN(EquationSystem *input, AbstractProduction *productions) const;
 
 	void postprocessA1(Vertex *leaf, EquationSystem *inputData,
-			AbstractProduction *productions, std::vector<double> *result, int num);
+			AbstractProduction *productions, std::vector<double> *result, int num) const;
 	void postprocessA(Vertex *leaf, EquationSystem *inputData,
-			AbstractProduction *productions, std::vector<double> *result, int num);
+			AbstractProduction *productions, std::vector<double> *result, int num) const;
 	void postprocessAN(Vertex *leaf, EquationSystem *inputData,
-			AbstractProduction *productions, std::vector<double> *result, int num);
+			AbstractProduction *productions, std::vector<double> *result, int num) const;
 };
 
 #endif /* PROCESSING_H_ */

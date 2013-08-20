@@ -1,9 +1,9 @@
 #include <stdio.h>
-#include "GraphGenerator.hxx"
 #include <iostream>
-#include "Galois/Graph/LC_Morph_Graph.h"
+
 #include "Production.h"
 #include "GaloisWorker.h"
+#include "GraphGenerator.hxx"
 
 #include "Galois/Galois.h"
 #include "Galois/Accumulator.h"
@@ -12,12 +12,15 @@
 #include "Galois/UnionFind.h"
 #include "Galois/Graph/LCGraph.h"
 #include "Galois/ParallelSTL/ParallelSTL.h"
-#include "llvm/Support/CommandLine.h"
+#include "Galois/Graph/LC_Morph_Graph.h"
+
 #include "Lonestar/BoilerPlate.h"
 
-const char* name = "Mesh singularities";
-const char* desc = "Compute the solution of differential equation";
-const char* url = NULL;
+#include "llvm/Support/CommandLine.h"
+
+const char* const name = "Mesh singularities";
+const char* const desc = "Compute the solution of differential equation";
+const char* const url = NULL;
 
 namespace cll = llvm::cl;
 static cll::opt<int> nrOfTiers("nrOfTiers", cll::desc("Number of Tiers"), cll::init(16));

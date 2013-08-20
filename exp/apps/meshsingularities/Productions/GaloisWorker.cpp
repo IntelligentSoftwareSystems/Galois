@@ -161,17 +161,14 @@ std::vector<double> *ProductionProcess::operator()(int nrOfTiers)
 	std::vector<Vertex*> *leafs = collectLeafs(S);
 	std::vector<double> *result = processing->postprocess(leafs, inputMatrices, production);
 	std::map<int, double> *mapa = new std::map<int, double>();
+
 	int i = 0;
 
 	double totalError = 0;
 
-
 	for (std::vector<double>::iterator it=result->begin(); it!=result->end(); ++it, ++i) {
 		(*mapa)[i] = *it;
 		totalError += ((*it)-globalSystem->rhs[i])*((*it)-globalSystem->rhs[i]);
-		if (fabs(globalSystem->rhs[i] - *it) > 1e-9) {
-			printf("Error at: %d [mat: %.16f vs prod: %.16f]\n", i, globalSystem->rhs[i], *it);
-		}
 	}
 
 	printf("Error: %.16f\n", totalError);

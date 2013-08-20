@@ -7,12 +7,12 @@ EquationSystem::EquationSystem(int n)
 	// we are working on continuous area of memory
 
 	matrix = new double*[n];
-	matrix[0] = new double[n*n]();
+	matrix[0] = new double[n*(n+1)]();
 	for (int i = 0; i < n; ++i) {
 		matrix[i] = matrix[0] + i * n;
 	}
 
-	rhs = new double[n]();
+	rhs = matrix[0]+n*n;
 }
 
 EquationSystem::EquationSystem(double ** matrix, double *rhs, int size)
@@ -23,13 +23,13 @@ EquationSystem::EquationSystem(double ** matrix, double *rhs, int size)
 
 	this->matrix = new double*[n];
 	//this->matrix[0] = new double[n * n]();
-	this->matrix[0] = new double[n*n]();
+	this->matrix[0] = new double[n*(n+1)]();
 	for (int i = 1; i < n; ++i) {
 		//this->matrix[i] = this->matrix[0] + i * n;
 		this->matrix[i] = this->matrix[0] + i*n;
 	}
 
-	this->rhs = new double[n]();
+	this->rhs = this->matrix[0]+n*n;
 
 	for (int i=0; i<size; ++i) {
 		for (int j=0; j<size; ++j) {
@@ -44,24 +44,23 @@ EquationSystem::~EquationSystem()
 {
 	delete [] matrix[0];
 	delete [] matrix;
-	delete [] rhs;
 
 	matrix = (double**) NULL;
 	rhs = (double*) NULL;
 }
 
-void EquationSystem::eliminate(int rows)
+void EquationSystem::eliminate(const int rows)
 {
 	double x;
 	double maxX;
 	int maxRow;
 	int i, j, k;
 
-	for (i=0;i<rows;i++) {
+	for (i=0;i<rows;++i) {
 		maxX = fabs(matrix[i][i]);
 		maxRow = i;
 
-		for (int k=i+1; k<rows; k++) {
+		for (int k=i+1; k<rows; ++k) {
 			if (fabs(matrix[k][i]) > maxX) {
 				maxX = fabs(matrix[k][i]);
 				maxRow = k;
@@ -75,16 +74,16 @@ void EquationSystem::eliminate(int rows)
 		x = matrix[i][i];
 		matrix[i][i] = 1.0;
 
-		for (j=i+1;j<n;j++) {
+		for (j=i+1;j<n;++j) {
 			// on diagonal - only 1.0
 			matrix[i][j] /= x;
 		}
 
 		rhs[i] /= x;
 
-		for (j=i+1; j<n; j++) {
+		for (j=i+1; j<n; ++j) {
 			x = matrix[j][i];
-			for (k=i; k<n; k++) {
+			for (k=i; k<n; ++k) {
 				matrix[j][k] -= x*matrix[i][k];
 			}
 			rhs[j] -= x*rhs[i];
@@ -93,7 +92,7 @@ void EquationSystem::eliminate(int rows)
 	}
 }
 
-void EquationSystem::backwardSubstitute(int startingRow)
+void EquationSystem::backwardSubstitute(const int startingRow)
 {
 	int i, j;
 	double sum;
@@ -109,24 +108,24 @@ void EquationSystem::backwardSubstitute(int startingRow)
 }
 
 
-void EquationSystem::swapCols(int i, int j)
+void EquationSystem::swapCols(const int i, const int j)
 {
 	double tmp;
 	int k;
 
-	for (k=0; k<n; k++) {
+	for (k=0; k<n; ++k) {
 		tmp = matrix[k][i];
 		matrix[k][i] = matrix[k][j];
 		matrix[k][j] = tmp;
 	}
 }
 
-void EquationSystem::swapRows(int i, int j)
+void EquationSystem::swapRows(const int i, const int j)
 {
 	double tmp;
 	int k;
 
-	for (k = 0; k<n; k++) {
+	for (k = 0; k<n; ++k) {
 		tmp = matrix[i][k];
 		matrix[i][k] = matrix[j][k];
 		matrix[j][k] = tmp;
@@ -137,10 +136,10 @@ void EquationSystem::swapRows(int i, int j)
 	rhs[j] = tmp;
 }
 
-void EquationSystem::print()
+void EquationSystem::print() const
 {
-	for (int i=0; i<n; i++) {
-		for (int j=0; j<n; j++) {
+	for (int i=0; i<n; ++i) {
+		for (int j=0; j<n; ++j) {
 			std::printf("% .15f ", matrix[i][j]);
 		}
 		std::printf (" | % .15f\n", rhs[i]);

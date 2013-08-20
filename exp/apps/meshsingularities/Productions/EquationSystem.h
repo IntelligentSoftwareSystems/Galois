@@ -24,13 +24,13 @@ class EquationSystem {
 	EquationSystem(double ** matrix, double *rhs, int size);
 	virtual ~EquationSystem();
 
-	void swapRows(int i, int j);
-	void swapCols(int i, int j);
+	void swapRows(const int i, const int j);
+	void swapCols(const int i, const int j);
 
-	void eliminate(int rows);
-	void backwardSubstitute(int startingRow);
+	void eliminate(const int rows);
+	void backwardSubstitute(const int startingRow);
 
-	void print();
+	void print() const;
 };
 
 #endif /* EQUATIONSYSTEM_H_ */
