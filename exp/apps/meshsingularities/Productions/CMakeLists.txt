@@ -1,2 +1,2 @@
-app(Productions EquationSystem.cpp Production.cpp Vertex.cpp GraphGenerator.cxx Preprocessor.cpp PointSingularitySolver.cpp GaloisWorker.cpp Point3D/TripleArgFunction.cxx Point3D/Element.cxx Point3D/MatrixGenerator.cxx Point3D/Tier.cxx Postprocessor.cpp)
-app(Test2D Test2D.cpp EquationSystem.cpp Production.cpp Vertex.cpp Preprocessor.cpp Postprocessor.cpp Point2D/DoubleArgFunction.cxx Point2D/Element.cxx Point2D//MatrixGenerator.cxx Point2D/Tier.cxx)
+app(Productions EquationSystem.cpp Production.cpp Vertex.cpp GraphGenerator.cxx Processing.cpp PointSingularitySolver.cpp GaloisWorker.cpp Point3D/TripleArgFunction.cxx Point3D/Element.cxx Point3D/MatrixGenerator.cxx Point3D/Tier.cxx)
+app(Test2D Test2D.cpp EquationSystem.cpp Production.cpp Vertex.cpp Processing.cpp Point2D/DoubleArgFunction.cxx Point2D/Element.cxx Point2D/MatrixGenerator.cxx Point2D/Tier.cxx)

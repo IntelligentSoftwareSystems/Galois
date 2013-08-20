@@ -2,7 +2,9 @@
 #include "Point3D/MatrixGenerator.hxx"
 #include <vector>
 #include "Point3D/TripleArgFunction.hxx"
-#include "Postprocessor.h"
+
+#include "Processing.h"
+
 /*
 class TestFunction : public IDoubleArgFunction {
 	double ComputeValue(double x, double y) {
@@ -126,8 +128,9 @@ std::vector<double> *ProductionProcess::operator()(int nrOfTiers)
 	Vertex *S;
 	D3::MatrixGenerator *matrixGenerator = new D3::MatrixGenerator();
 	std::list<D3::Tier*> *tiers = matrixGenerator->CreateMatrixAndRhs(nrOfTiers, 0, 0, 0, 1, function);
-	Mes3DPreprocessor *preprocessor = new Mes3DPreprocessor();
-	std::vector<EquationSystem *> *inputMatrices = preprocessor->preprocess(tiers);
+	Processing *processing = new Processing();
+	std::vector<EquationSystem *> *inputMatrices = processing->preprocess((std::list<EquationSystem*> *)tiers,
+		production);
 	S = generator->generateGraph(nrOfTiers, production, inputMatrices);
 
 
@@ -156,8 +159,7 @@ std::vector<double> *ProductionProcess::operator()(int nrOfTiers)
 	}
 
 	std::vector<Vertex*> *leafs = collectLeafs(S);
-	Postprocessor3D *mes3dProcessor = new Postprocessor3D();
-	std::vector<double> *result = mes3dProcessor->postprocess(leafs, inputMatrices, production);
+	std::vector<double> *result = processing->postprocess(leafs, inputMatrices, production);
 	std::map<int, double> *mapa = new std::map<int, double>();
 	int i = 0;
 
@@ -184,7 +186,7 @@ std::vector<double> *ProductionProcess::operator()(int nrOfTiers)
 	}
 	 */
 	delete leafs;
-	delete mes3dProcessor;
+	delete processing;
 	delete S;
 	delete tiers;
 	//delete matrixGenerator;

@@ -45,9 +45,9 @@ EquationSystem::~EquationSystem()
 	delete [] matrix[0];
 	delete [] matrix;
 	delete [] rhs;
+
 	matrix = (double**) NULL;
 	rhs = (double*) NULL;
-
 }
 
 void EquationSystem::eliminate(int rows)

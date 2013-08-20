@@ -1,10 +1,10 @@
 #include <cstdio>
 #include <cstdlib>
 
-#include "Preprocessor.h"
-#include "Postprocessor.h"
+#include "Processing.h"
 #include "Vertex.h"
 #include "Production.h"
+
 #include "Point2D/DoubleArgFunction.hxx"
 #include "Point2D/Tier.hxx"
 #include "Point2D/MatrixGenerator.hxx"
@@ -13,7 +13,7 @@ using namespace D2;
 
 class TestFunction2D : public IDoubleArgFunction {
 	double ComputeValue(double x, double y) {
-		return x*x*x-y*y;
+		return x*x-y*y;
 	}
 };
 
@@ -25,11 +25,10 @@ int main(int argc, char ** argv)
 	AbstractProduction *production = new AbstractProduction(5, 17, 21, 21);
 	MatrixGenerator *matrixGenerator = new MatrixGenerator();
 	IDoubleArgFunction *function = new TestFunction2D();
-	Mes2DPreprocessor *preprocessor = new Mes2DPreprocessor();
-	Postprocessor *postprocessor = new Postprocessor();
+	Processing *processing = new Processing();
 
 	std::list<D2::Tier*> *tiers = matrixGenerator->CreateMatrixAndRhs(nrOfTiers, 0, 0, 1, function);
-	std::vector<EquationSystem*> *equations = preprocessor->preprocess(tiers);
+	std::vector<EquationSystem*> *equations = processing->preprocess((std::list<EquationSystem*>*) tiers, production);
 
 	EquationSystem *globalSystem = new EquationSystem(matrixGenerator->GetMatrix(),
 													  matrixGenerator->GetRhs(),
@@ -92,7 +91,7 @@ int main(int argc, char ** argv)
 	data->push_back(p5);
 	data->push_back(p6);
 
-	std::vector<double> *result = postprocessor->postprocess(data, equations, production);
+	std::vector<double> *result = processing->postprocess(data, equations, production);
 
 	for (std::vector<double>::iterator it=result->begin(); it!=result->end(); ++it, ++i) {
 		printf("[%4d] %.16f %.16f diff=%.16f\n", i, *it, globalSystem->rhs[i], fabs(*it-globalSystem->rhs[i]));
@@ -104,6 +103,7 @@ int main(int argc, char ** argv)
 
 	delete S;
 	delete globalSystem;
+	delete processing;
 
 	return 0;
 }
