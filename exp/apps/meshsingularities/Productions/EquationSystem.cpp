@@ -29,7 +29,7 @@ EquationSystem::EquationSystem(double ** matrix, double *rhs, int size)
 		this->matrix[i] = this->matrix[0] + i*n;
 	}
 
-	this->rhs = new double[n];
+	this->rhs = new double[n]();
 
 	for (int i=0; i<size; ++i) {
 		for (int j=0; j<size; ++j) {

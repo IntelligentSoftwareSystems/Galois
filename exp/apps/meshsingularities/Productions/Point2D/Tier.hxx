@@ -5,12 +5,13 @@
  *      Author: dgoik
  */
 
-#ifndef TIER_H_
-#define TIER_H_
+#ifndef TIER_2D_H_
+#define TIER_2D_H_
 
 #include <stdlib.h>
 #include "Element.hxx"
 #include "DoubleArgFunction.hxx"
+
 namespace D2{
 class Tier {
 
@@ -69,4 +70,4 @@ public:
 	}
 };
 }
-#endif /* TIER_H_ */
+#endif /* TIER_2D_H_ */

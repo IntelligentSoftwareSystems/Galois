@@ -1,5 +1,5 @@
-#ifndef __ELEMENT_H_INCLUDED__
-#define __ELEMENT_H_INCLUDED__
+#ifndef __ELEMENT_2D_H_INCLUDED__
+#define __ELEMENT_2D_H_INCLUDED__
 
 #include "EPosition.hxx"
 #include "DoubleArgFunction.hxx"
@@ -7,7 +7,9 @@
 #include <cstdlib>
 #include <cmath>
 #include <map>
+
 using namespace D2;
+
 class Element{
 	
 	private:

@@ -5,13 +5,13 @@ std::vector<EquationSystem *>* Preprocessor::preprocess(std::list<Input*>* input
 {
 	return NULL;
 }
-/*
-std::vector<EquationSystem*>* Mes2DPreprocessor::preprocess(std::list<Tier * > *tier_list)
+
+std::vector<EquationSystem*>* Mes2DPreprocessor::preprocess(std::list<D2::Tier * > *tier_list)
 {
 	int i = 0;
-	std::vector<EquationSystem *> *esList = new std::vector<EquationSystem*>();
+	std::vector<EquationSystem *> *esVector = new std::vector<EquationSystem*>();
 
-	std::list<Tier*>::iterator it = tier_list->begin();
+	std::list<D2::Tier*>::iterator it = tier_list->begin();
 	for (; it != tier_list->end(); ++it, ++i) {
 		if (i==0) {
 			EquationSystem *system = new EquationSystem((*it)->get_tier_matrix(), (*it)->get_tier_rhs(), 21);
@@ -39,7 +39,7 @@ std::vector<EquationSystem*>* Mes2DPreprocessor::preprocess(std::list<Tier * > *
 			system->swapRows(3, 4);
 			system->eliminate(4);
 
-			esList->push_back(system);
+			esVector->push_back(system);
 		} else if (i==tier_list->size()-1) {
 			EquationSystem *system = new EquationSystem(21);
 			double ** tierMatrix = (*it)->get_tier_matrix();
@@ -68,24 +68,23 @@ std::vector<EquationSystem*>* Mes2DPreprocessor::preprocess(std::list<Tier * > *
 
 			system->eliminate(4);
 
-			esList->push_back(system);
+			esVector->push_back(system);
 		} else {
 			EquationSystem *system = new EquationSystem((*it)->get_tier_matrix(), (*it)->get_tier_rhs(), 17);
-			esList->push_back(system);
+			esVector->push_back(system);
 		}
 	}
-	return esList;
-} */
+	return esVector;
+}
 
-std::vector<EquationSystem*>* Mes3DPreprocessor::preprocess(std::list<tmp::Tier * > *tier_list)
+std::vector<EquationSystem*>* Mes3DPreprocessor::preprocess(std::list<D3::Tier * > *tier_list)
 {
 	std::vector<EquationSystem *> *esVector = new std::vector<EquationSystem*>();
 	int i = 0;
-	std::list<tmp::Tier*>::iterator it = tier_list->begin();
+	std::list<D3::Tier*>::iterator it = tier_list->begin();
 	for (; it != tier_list->end(); ++it, ++i) {
 		if (i==0) {
 			EquationSystem *system = new EquationSystem((*it)->get_tier_matrix(), (*it)->get_tier_rhs(), 117);
-			// in A1 we need to move 2,4,6,8 [row,col] to the top-left corner of matrix
 
 			system->eliminate(42);
 

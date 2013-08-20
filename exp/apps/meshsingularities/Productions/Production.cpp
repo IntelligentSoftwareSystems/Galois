@@ -157,7 +157,7 @@ void AbstractProduction::AN(Vertex *v, EquationSystem *inData)
 			v->system->rhs[i] = inData->rhs[i+interfaceSize+anOffset];
 		}
 
-		v->system->eliminate(leafSize-2*interfaceSize);
+		v->system->eliminate(offset);
 	}
 	else {
 		// just copy data?

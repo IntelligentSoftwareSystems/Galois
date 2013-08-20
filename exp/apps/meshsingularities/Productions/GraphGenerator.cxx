@@ -90,7 +90,7 @@ void GraphGenerator::recursiveGraphGeneration(int nr_of_leafs, int low_range, in
 		//first leaf
 		//leaf creation
 		if(low_range == 0) {
-			left = new Vertex(NULL, NULL, parent, LEAF, productions->getA1Size());
+			left = new Vertex(NULL, NULL, parent, LEAF, productions->getLeafSize());
 			addNode(0,EProduction::A1,NULL,merging_dst_node,1, left, inputData->at(low_range));
 		}
 		else {
@@ -119,7 +119,7 @@ void GraphGenerator::recursiveGraphGeneration(int nr_of_leafs, int low_range, in
 		addNode(0,EProduction::A,NULL,new_graph_node,1,left, inputData->at(low_range+1));
 		//right leaf creation
 		if(high_range == nr_of_leafs - 1) {
-			right = new Vertex(NULL, NULL, node, LEAF, productions->getANSize());
+			right = new Vertex(NULL, NULL, node, LEAF, productions->getLeafSize());
 			addNode(0,EProduction::AN,NULL,new_graph_node,1, right, inputData->at(low_range+2));
 		}
 		else{
@@ -141,13 +141,13 @@ void GraphGenerator::recursiveGraphGeneration(int nr_of_leafs, int low_range, in
 	else if((high_range - low_range) == 1)
 	{
 		if (low_range == 0) {
-			left = new Vertex(NULL, NULL, parent, LEAF, productions->getA1Size());
+			left = new Vertex(NULL, NULL, parent, LEAF, productions->getLeafSize());
 		} else {
 			left = new Vertex(NULL, NULL, parent, LEAF, productions->getLeafSize());
 		}
 
 		if (high_range == nr_of_leafs - 1) {
-			right = new Vertex(NULL, NULL, parent, LEAF, productions->getANSize());
+			right = new Vertex(NULL, NULL, parent, LEAF, productions->getLeafSize());
 		} else {
 			right = new Vertex(NULL, NULL, parent, LEAF, productions->getLeafSize());
 		}

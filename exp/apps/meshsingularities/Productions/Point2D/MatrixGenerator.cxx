@@ -58,7 +58,7 @@ std::list<Tier*>* MatrixGenerator::CreateMatrixAndRhs(int nr_of_tiers, double bo
 				++it;
 		}
 
-		std::list<Tier*>* tier_list = new std::list<Tier*>();
+		tier_list = new std::list<Tier*>();
 		it = element_list.begin();
 
 		for(int i = 0; i<nr_of_tiers; i++){

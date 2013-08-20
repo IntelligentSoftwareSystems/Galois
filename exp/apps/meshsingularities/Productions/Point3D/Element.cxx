@@ -509,10 +509,11 @@ bool Element::checkSolution(std::map<int,double> *solution_map, ITripleArgFuncti
 		double rnd_z_within_element = ((double) rand() / (RAND_MAX))*size + zl;
 		for(int i = 0; i<nr_of_nodes; i++)
 			value+=coefficients[i]*shapeFunctions[i]->ComputeValue(rnd_x_within_element,rnd_y_within_element,rnd_z_within_element);
-		//printf("%d %lf Checking at: %lf %lf %lf values: %lf %lf\n",position,size,rnd_x_within_element,rnd_y_within_element,rnd_z_within_element,value,f->ComputeValue(rnd_x_within_element,rnd_y_within_element,rnd_z_within_element));
+		printf("%d %lf Checking at: %lf %lf %lf values: %lf %lf\n",position,size,rnd_x_within_element,rnd_y_within_element,rnd_z_within_element,value,f->ComputeValue(rnd_x_within_element,rnd_y_within_element,rnd_z_within_element));
 		if(fabs(value - f->ComputeValue(rnd_x_within_element,rnd_y_within_element,rnd_z_within_element)) > epsilon)
 		{
-
+			for(int i = 0; i<nr_of_nodes; i++)
+					printf("%.16f\n", coefficients[i]);
 			return false;
 		}
 	}

@@ -1,5 +1,5 @@
-#ifndef __ELEMENT_H_INCLUDED__
-#define __ELEMENT_H_INCLUDED__
+#ifndef __ELEMENT_3D_H_INCLUDED__
+#define __ELEMENT_3D_H_INCLUDED__
 
 #include "EPosition.hxx"
 #include "TripleArgFunction.hxx"

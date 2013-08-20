@@ -1,5 +1,5 @@
-#ifndef __GAUSSIANQUADRATURE_H_INCLUDED__
-#define __GAUSSIANQUADRATURE_H_INCLUDED__
+#ifndef __GAUSSIANQUADRATURE_2D_H_INCLUDED__
+#define __GAUSSIANQUADRATURE_2D_H_INCLUDED__
 
 #include "DoubleArgFunction.hxx"
 namespace D2{

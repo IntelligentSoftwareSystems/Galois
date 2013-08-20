@@ -1,5 +1,5 @@
-#ifndef __DOUBLEARGFUNCTION_H_INCLUDED
-#define __DOUBLEARGFUNCTION_H_INCLUDED
+#ifndef __TRIPLEARGFUNCTION_H_INCLUDED
+#define __TRIPLEARGFUNCTION_H_INCLUDED
 #include "EPosition.hxx"
 #include <stdarg.h>
 #include <vector>

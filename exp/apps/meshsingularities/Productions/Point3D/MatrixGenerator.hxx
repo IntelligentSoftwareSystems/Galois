@@ -1,5 +1,5 @@
-#ifndef __MATRIXGENERATOR_H_INCLUDED
-#define __MATRIXGENERATOR_H_INCLUDED
+#ifndef __MATRIXGENERATOR_3D_H_INCLUDED
+#define __MATRIXGENERATOR_3D_H_INCLUDED
 
 #include "TripleArgFunction.hxx"
 #include "Element.hxx"

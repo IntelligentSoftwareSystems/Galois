@@ -1,5 +1,5 @@
-#ifndef __GAUSSIANQUADRATURE_H_INCLUDED__
-#define __GAUSSIANQUADRATURE_H_INCLUDED__
+#ifndef __GAUSSIANQUADRATURE_3D_H_INCLUDED__
+#define __GAUSSIANQUADRATURE_3D_H_INCLUDED__
 
 #include "TripleArgFunction.hxx"
 namespace D3{

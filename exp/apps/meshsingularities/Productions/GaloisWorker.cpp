@@ -1,7 +1,7 @@
 #include "GaloisWorker.h"
-#include "Point3D_tmp/MatrixGenerator.hxx"
+#include "Point3D/MatrixGenerator.hxx"
 #include <vector>
-#include "Point3D_tmp/TripleArgFunction.hxx"
+#include "Point3D/TripleArgFunction.hxx"
 #include "Postprocessor.h"
 /*
 class TestFunction : public IDoubleArgFunction {
@@ -10,11 +10,11 @@ class TestFunction : public IDoubleArgFunction {
 	}
 }; */
 
-using namespace tmp;
+using namespace D3;
 
 class TestFunction3D : public ITripleArgFunction {
 	double ComputeValue(double x, double y, double z) {
-		return 1.0;
+		return x*x+y*y;
 	}
 };
 
@@ -74,7 +74,18 @@ std::vector<Vertex*> *collectLeafs(Vertex *p)
 {
 	std::vector<Vertex *> *left = NULL;
 	std::vector<Vertex *> *right = NULL;
-	std::vector<Vertex*> *result;
+	std::vector<Vertex*> *result = NULL;
+
+	if (p == NULL) {
+		return NULL;
+	}
+
+	result = new std::vector<Vertex*>();
+
+	if (p!=NULL && p->right==NULL && p->left==NULL) {
+		result->push_back(p);
+		return result;
+	}
 
 	if (p!=NULL && p->left!=NULL) {
 		left = collectLeafs(p->left);
@@ -82,18 +93,6 @@ std::vector<Vertex*> *collectLeafs(Vertex *p)
 
 	if (p!=NULL && p->right!=NULL) {
 		right = collectLeafs(p->right);
-	}
-
-	if (p!=NULL && p->right==NULL && p->left==NULL) {
-		result = new std::vector<Vertex*>(1);
-		result->push_back(p);
-		return result;
-	}
-
-	if (p!= NULL) {
-		result = new std::vector<Vertex*>();
-	} else {
-		result = NULL;
 	}
 
 	if (left != NULL) {
@@ -125,11 +124,20 @@ std::vector<double> *ProductionProcess::operator()(int nrOfTiers)
 	GraphGenerator* generator = new GraphGenerator();
 	AbstractProduction *production = new AbstractProduction(19, 75, 117, 83);
 	Vertex *S;
-	MatrixGenerator *matrixGenerator = new MatrixGenerator();
-	std::list<tmp::Tier*> *tiers = matrixGenerator->CreateMatrixAndRhs(nrOfTiers, 0, 0, 0, 1, function);
+	D3::MatrixGenerator *matrixGenerator = new D3::MatrixGenerator();
+	std::list<D3::Tier*> *tiers = matrixGenerator->CreateMatrixAndRhs(nrOfTiers, 0, 0, 0, 1, function);
 	Mes3DPreprocessor *preprocessor = new Mes3DPreprocessor();
 	std::vector<EquationSystem *> *inputMatrices = preprocessor->preprocess(tiers);
 	S = generator->generateGraph(nrOfTiers, production, inputMatrices);
+
+
+	EquationSystem *globalSystem = new EquationSystem(matrixGenerator->GetMatrix(),
+			matrixGenerator->GetRhs(),
+			matrixGenerator->GetMatrixSize());
+
+	globalSystem->eliminate(matrixGenerator->GetMatrixSize());
+	globalSystem->backwardSubstitute(matrixGenerator->GetMatrixSize()-1);
+
 
 	graph = generator->getGraph();
 	LCM_iterator it = graph->begin();
@@ -150,6 +158,25 @@ std::vector<double> *ProductionProcess::operator()(int nrOfTiers)
 	std::vector<Vertex*> *leafs = collectLeafs(S);
 	Postprocessor3D *mes3dProcessor = new Postprocessor3D();
 	std::vector<double> *result = mes3dProcessor->postprocess(leafs, inputMatrices, production);
+	std::map<int, double> *mapa = new std::map<int, double>();
+	int i = 0;
+
+	double totalError = 0;
+
+
+	for (std::vector<double>::iterator it=result->begin(); it!=result->end(); ++it, ++i) {
+		(*mapa)[i] = *it;
+		totalError += ((*it)-globalSystem->rhs[i])*((*it)-globalSystem->rhs[i]);
+		if (fabs(globalSystem->rhs[i] - *it) > 1e-9) {
+			printf("Error at: %d [mat: %.16f vs prod: %.16f]\n", i, globalSystem->rhs[i], *it);
+		}
+	}
+
+	printf("Error: %.16f\n", totalError);
+
+	matrixGenerator->checkSolution(mapa, function);
+
+	mapa->clear();
 
 	/*
 	for (std::vector<double>::iterator it=result->begin(); it!=result->end(); ++it) {
@@ -159,6 +186,11 @@ std::vector<double> *ProductionProcess::operator()(int nrOfTiers)
 	delete leafs;
 	delete mes3dProcessor;
 	delete S;
+	delete tiers;
+	//delete matrixGenerator;
+
+	delete mapa;
+	delete globalSystem;
 
 	return result;
 }

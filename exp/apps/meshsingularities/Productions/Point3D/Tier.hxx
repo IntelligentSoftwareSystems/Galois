@@ -5,8 +5,8 @@
  *      Author: dgoik
  */
 
-#ifndef TIER_H_
-#define TIER_H_
+#ifndef TIER_3D_H_
+#define TIER_3D_H_
 
 #include <stdlib.h>
 #include "Element.hxx"
@@ -86,4 +86,4 @@ public:
 	}
 };
 }
-#endif /* TIER_H_ */
+#endif /* TIER_3D_H_ */
