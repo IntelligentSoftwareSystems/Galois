@@ -171,8 +171,8 @@ FunctionTy do_all_dispatch(RangeTy range, FunctionTy f, ReducerTy r, bool doRedu
 }
 
 template<typename RangeTy, typename FunctionTy>
-FunctionTy do_all_impl(RangeTy range, FunctionTy f) {
-  return do_all_dispatch(range, f, EmptyFn(), false, false);
+FunctionTy do_all_impl(RangeTy range, FunctionTy f, bool steel = false) {
+  return do_all_dispatch(range, f, EmptyFn(), false, steel);
 }
 
 template<typename RangeTy, typename FunctionTy, typename ReduceTy>
