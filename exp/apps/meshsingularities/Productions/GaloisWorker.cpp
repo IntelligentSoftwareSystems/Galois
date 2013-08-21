@@ -1,9 +1,13 @@
-#include "GaloisWorker.h"
-#include "Point3D/MatrixGenerator.hxx"
 #include <vector>
+
+#include "GaloisWorker.h"
+#include "Processing.h"
+
+#include "Galois/Statistic.h"
+
+#include "Point3D/MatrixGenerator.hxx"
 #include "Point3D/TripleArgFunction.hxx"
 
-#include "Processing.h"
 
 /*
 class TestFunction : public IDoubleArgFunction {
@@ -127,21 +131,29 @@ std::vector<double> *ProductionProcess::operator()(int nrOfTiers)
 	AbstractProduction *production = new AbstractProduction(19, 75, 117, 83);
 	Vertex *S;
 	D3::MatrixGenerator *matrixGenerator = new D3::MatrixGenerator();
+
+	Galois::StatTimer timerMatrix("matrix generation");
+	timerMatrix.start();
 	std::list<D3::Tier*> *tiers = matrixGenerator->CreateMatrixAndRhs(nrOfTiers, 0, 0, 0, 1, function);
+	timerMatrix.stop();
+
 	Processing *processing = new Processing();
+
+	Galois::StatTimer timer_preproc("preprocessing");
+
+	timer_preproc.start();
 	std::vector<EquationSystem *> *inputMatrices = processing->preprocess((std::list<EquationSystem*> *)tiers,
 		production);
+	timer_preproc.stop();
+
+
+	Galois::StatTimer timer_S("Graph generation");
+	timer_S.start();
 	S = generator->generateGraph(nrOfTiers, production, inputMatrices);
+	timer_S.stop();
 
-
-	EquationSystem *globalSystem = new EquationSystem(matrixGenerator->GetMatrix(),
-			matrixGenerator->GetRhs(),
-			matrixGenerator->GetMatrixSize());
-
-	globalSystem->eliminate(matrixGenerator->GetMatrixSize());
-	globalSystem->backwardSubstitute(matrixGenerator->GetMatrixSize()-1);
-
-
+	Galois::StatTimer T("productions");
+	T.start();
 	graph = generator->getGraph();
 	LCM_iterator it = graph->begin();
 	std::vector<GraphNode> initial_nodes_vector;
@@ -153,10 +165,10 @@ std::vector<double> *ProductionProcess::operator()(int nrOfTiers)
 		++it;
 	}
 	std::vector<GraphNode>::iterator iii = initial_nodes_vector.begin();
-	while(iii != initial_nodes_vector.end()){
-		Galois::for_each(*iii,*this);
-		++iii;
-	}
+	Galois::for_each(initial_nodes_vector.begin(), initial_nodes_vector.end(), *this);
+	T.stop();
+
+	printf("%f[s]\n", T.get()/1000.0);
 
 	std::vector<Vertex*> *leafs = collectLeafs(S);
 	std::vector<double> *result = processing->postprocess(leafs, inputMatrices, production);
@@ -164,15 +176,9 @@ std::vector<double> *ProductionProcess::operator()(int nrOfTiers)
 
 	int i = 0;
 
-	double totalError = 0;
-
 	for (std::vector<double>::iterator it=result->begin(); it!=result->end(); ++it, ++i) {
 		(*mapa)[i] = *it;
-		totalError += ((*it)-globalSystem->rhs[i])*((*it)-globalSystem->rhs[i]);
 	}
-
-	printf("Error: %.16f\n", totalError);
-
 	matrixGenerator->checkSolution(mapa, function);
 
 	mapa->clear();
@@ -189,7 +195,6 @@ std::vector<double> *ProductionProcess::operator()(int nrOfTiers)
 	//delete matrixGenerator;
 
 	delete mapa;
-	delete globalSystem;
 
 	return result;
 }

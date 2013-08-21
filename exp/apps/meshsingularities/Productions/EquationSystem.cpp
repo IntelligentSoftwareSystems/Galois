@@ -51,14 +51,9 @@ EquationSystem::~EquationSystem()
 
 void EquationSystem::eliminate(const int rows)
 {
-	double x;
-	double maxX;
-	int maxRow;
-	int i, j, k;
-
-	for (i=0;i<rows;++i) {
-		maxX = fabs(matrix[i][i]);
-		maxRow = i;
+	for (int i=0;i<rows;++i) {
+		double maxX = fabs(matrix[i][i]);
+		int maxRow = i;
 
 		for (int k=i+1; k<rows; ++k) {
 			if (fabs(matrix[k][i]) > maxX) {
@@ -71,19 +66,19 @@ void EquationSystem::eliminate(const int rows)
 			swapRows(i, maxRow);
 		}
 
-		x = matrix[i][i];
+		double x = matrix[i][i];
 		matrix[i][i] = 1.0;
 
-		for (j=i+1;j<n;++j) {
+		for (int j=i+1;j<n;++j) {
 			// on diagonal - only 1.0
 			matrix[i][j] /= x;
 		}
 
 		rhs[i] /= x;
 
-		for (j=i+1; j<n; ++j) {
+		for (int j=i+1; j<n; ++j) {
 			x = matrix[j][i];
-			for (k=i; k<n; ++k) {
+			for (int k=i; k<n; ++k) {
 				matrix[j][k] -= x*matrix[i][k];
 			}
 			rhs[j] -= x*rhs[i];
@@ -94,12 +89,9 @@ void EquationSystem::eliminate(const int rows)
 
 void EquationSystem::backwardSubstitute(const int startingRow)
 {
-	int i, j;
-	double sum;
-
-	for (i=startingRow; i>=0; --i) {
-		sum = rhs[i];
-		for (j=n-1;j>=i+1;--j) {
+	for (int i=startingRow; i>=0; --i) {
+		double sum = rhs[i];
+		for (int j=n-1;j>=i+1;--j) {
 			sum -= matrix[i][j] * rhs[j];
 			matrix[i][j] = 0.0;
 		}
@@ -107,14 +99,10 @@ void EquationSystem::backwardSubstitute(const int startingRow)
 	}
 }
 
-
 void EquationSystem::swapCols(const int i, const int j)
 {
-	double tmp;
-	int k;
-
-	for (k=0; k<n; ++k) {
-		tmp = matrix[k][i];
+	for (int k=0; k<n; ++k) {
+		double tmp = matrix[k][i];
 		matrix[k][i] = matrix[k][j];
 		matrix[k][j] = tmp;
 	}
@@ -123,9 +111,8 @@ void EquationSystem::swapCols(const int i, const int j)
 void EquationSystem::swapRows(const int i, const int j)
 {
 	double tmp;
-	int k;
 
-	for (k = 0; k<n; ++k) {
+	for (int k=0; k<n; ++k) {
 		tmp = matrix[i][k];
 		matrix[i][k] = matrix[j][k];
 		matrix[j][k] = tmp;

@@ -67,8 +67,7 @@ EquationSystem *Processing::preprocessA1(EquationSystem *input, AbstractProducti
 
 EquationSystem *Processing::preprocessA(EquationSystem *input, AbstractProduction *productions) const
 {
-	EquationSystem *system = new EquationSystem(input->matrix, input->rhs, input->n);
-	return (system);
+	return new EquationSystem(input->matrix, input->rhs, input->n);
 }
 
 EquationSystem *Processing::preprocessAN(EquationSystem *input, AbstractProduction *productions) const

@@ -27,8 +27,11 @@ static cll::opt<int> nrOfTiers("nrOfTiers", cll::desc("Number of Tiers"), cll::i
 
 template<typename Algorithm>
 void run(int nrOfTiers) {
+	Galois::StatTimer U(name);
 	Algorithm algorithm;
+	U.start();
 	algorithm(nrOfTiers);
+	U.stop();
 }
 
 int main(int argc, char** argv)
