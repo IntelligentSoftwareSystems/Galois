@@ -30,50 +30,29 @@ private:
 
 	int start_nr_adj;
 	static const int tier_matrix_size = 117;
-	//int tier_matrix_size;
-
-	//double** tier_matrix;
-	//double* tier_rhs;
 
 public:
 	Tier(Element* bot_left_near_element, Element* bot_left_far_element, Element* bot_right_far_element, Element* top_left_near_element,
-			Element* top_left_far_element, Element* top_right_far_element, Element* top_right_near_element, Element* bot_right_near_element, ITripleArgFunction* f) : EquationSystem(tier_matrix_size),
+			Element* top_left_far_element, Element* top_right_far_element, Element* top_right_near_element, Element* bot_right_near_element, ITripleArgFunction* f,
+			double** global_matrix, double* global_rhs) : EquationSystem(tier_matrix_size),
 	bot_left_far_element(bot_left_far_element),bot_left_near_element(bot_left_near_element), bot_right_far_element(bot_right_far_element), bot_right_near_element(bot_right_near_element),
 	top_left_near_element(top_left_near_element), top_left_far_element(top_left_far_element), top_right_far_element(top_right_far_element), top_right_near_element(top_right_near_element)
 	{
 
 		start_nr_adj = bot_left_near_element->get_bot_left_near_vertex_nr();
-		bot_left_near_element->fillTierMatrix(matrix,rhs,f,start_nr_adj);
-		bot_left_far_element->fillTierMatrix(matrix,rhs,f,start_nr_adj);
-		bot_right_far_element->fillTierMatrix(matrix,rhs,f,start_nr_adj);
+		bot_left_near_element->fillMatrices(matrix,global_matrix,rhs,global_rhs,f,start_nr_adj);
+		bot_left_far_element->fillMatrices(matrix,global_matrix,rhs,global_rhs,f,start_nr_adj);
+		bot_right_far_element->fillMatrices(matrix,global_matrix,rhs,global_rhs,f,start_nr_adj);
 		if(bot_right_near_element != NULL)
-			bot_right_near_element->fillTierMatrix(matrix,rhs,f,start_nr_adj);
-		top_left_near_element->fillTierMatrix(matrix,rhs,f,start_nr_adj);
-		top_left_far_element->fillTierMatrix(matrix,rhs,f,start_nr_adj);
-		top_right_far_element->fillTierMatrix(matrix,rhs,f,start_nr_adj);
-		top_right_near_element->fillTierMatrix(matrix,rhs,f,start_nr_adj);
-
-		/*
-		tier_matrix_size = 117;
-		tier_matrix = new double*[tier_matrix_size];
-		for(int i = 0; i<tier_matrix_size; i++)
-			tier_matrix[i] = new double[tier_matrix_size]();
-		tier_rhs = new double[tier_matrix_size]();
-		start_nr_adj = bot_left_near_element->get_bot_left_near_vertex_nr();
-		bot_left_near_element->fillTierMatrix(tier_matrix,tier_rhs,f,start_nr_adj);
-		bot_left_far_element->fillTierMatrix(tier_matrix,tier_rhs,f,start_nr_adj);
-		bot_right_far_element->fillTierMatrix(tier_matrix,tier_rhs,f,start_nr_adj);
-		if(bot_right_near_element != NULL)
-			bot_right_near_element->fillTierMatrix(tier_matrix,tier_rhs,f,start_nr_adj);
-		top_left_near_element->fillTierMatrix(tier_matrix,tier_rhs,f,start_nr_adj);
-		top_left_far_element->fillTierMatrix(tier_matrix,tier_rhs,f,start_nr_adj);
-		top_right_far_element->fillTierMatrix(tier_matrix,tier_rhs,f,start_nr_adj);
-		top_right_near_element->fillTierMatrix(tier_matrix,tier_rhs,f,start_nr_adj);
-		*/
+			bot_right_near_element->fillMatrices(matrix,global_matrix,rhs,global_rhs,f,start_nr_adj);
+		top_left_near_element->fillMatrices(matrix,global_matrix,rhs,global_rhs,f,start_nr_adj);
+		top_left_far_element->fillMatrices(matrix,global_matrix,rhs,global_rhs,f,start_nr_adj);
+		top_right_far_element->fillMatrices(matrix,global_matrix,rhs,global_rhs,f,start_nr_adj);
+		top_right_near_element->fillMatrices(matrix,global_matrix,rhs,global_rhs,f,start_nr_adj);
 
 	}
 
-	void FillMatrixAndRhs(double** matrix, double* rhs, int matrix_size);
+	//void FillMatrixAndRhs(double** matrix, double* rhs, int matrix_size);
 
 	virtual ~Tier()
 	{

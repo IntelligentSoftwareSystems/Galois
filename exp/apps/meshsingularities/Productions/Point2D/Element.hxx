@@ -8,7 +8,28 @@
 #include <cmath>
 #include <map>
 
-using namespace D2;
+namespace D2{
+
+class DoubleArgFunctionProduct : public IDoubleArgFunction
+{
+
+	private:
+		IDoubleArgFunction* function1;
+		IDoubleArgFunction* function2;
+
+	public:
+		void SetFunctions(IDoubleArgFunction* _function1, IDoubleArgFunction* _function2)
+		{
+			function1 = _function1;
+			function2 = _function2;
+		}
+
+		virtual double ComputeValue(double x, double y)
+		{
+			return function1->ComputeValue(x,y)*function2->ComputeValue(x,y);
+		}
+
+};
 
 class Element{
 	
@@ -43,7 +64,7 @@ class Element{
 		
 		IDoubleArgFunction** shapeFunctions;
 		 
-		 
+		DoubleArgFunctionProduct* product;
 	public:
 		Element(double xl, double yl, double xr, double yr, EPosition position, bool is_first_tier)
 			: xl(xl), yl(yl), xr(xr), yr(yr), position(position), is_first_tier(is_first_tier)
@@ -72,6 +93,8 @@ class Element{
 			shapeFunctions[6] = interior_function; 
 			shapeFunctions[7] = edge_right_function; 
 			shapeFunctions[8] = vertex_bot_right_function;
+
+			product = new DoubleArgFunctionProduct();
 					
 		}
 		
@@ -88,7 +111,7 @@ class Element{
 			delete edge_right_function; 
 			
 			delete interior_function; 
-			
+			delete product;
 			delete[] shapeFunctions;
 			
 		}
@@ -97,11 +120,10 @@ class Element{
 		Element** CreateFirstTier(int nr);
 		Element** CreateLastTier(int nr); 
 		
-		void fillMatrix(double** matrix);
-		void fillMatrix(double** matrix, int start_nr_adj);
-		void fillRhs(double* rhs, IDoubleArgFunction* f);
-		void fillRhs(double* rhs, IDoubleArgFunction* f, int start_nr_adj);
-		void fillTierMatrix(double** matrix, double* rhs, IDoubleArgFunction* f, int start_nr_adj);
+
+		void fillMatrix(double** tier_matrix, double** global_matrix, int start_nr_adj);
+		void fillRhs(double* tier_rhs, double* global_rhs, IDoubleArgFunction* f, int start_nr_adj);
+		void fillMatrices(double** tier_matrix, double** global_matrix, double* tier_rhs, double* global_rhs, IDoubleArgFunction* f, int start_nr_adj);
 		bool checkSolution(std::map<int,double> *solution_map, IDoubleArgFunction* f);
 		
 		void set_bot_left_vertex_nr(int nr){
@@ -135,6 +157,7 @@ class Element{
 			interior_nr = nr; 
 		}
 		private:
-			void comp(int indx1, int indx2, IDoubleArgFunction* f1, IDoubleArgFunction* f2,double** matrix);
+			void comp(int indx1, int indx2, IDoubleArgFunction* f1, IDoubleArgFunction* f2,double** tier_matrix, double** global_matrix, int start_nr_adj);
 };
+}
 #endif

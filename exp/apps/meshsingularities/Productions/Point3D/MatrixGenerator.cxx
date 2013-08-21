@@ -53,25 +53,19 @@ std::list<Tier*>* MatrixGenerator::CreateMatrixAndRhs(int nr_of_tiers, double bo
 		for(int i = 0; i<matrix_size; i++)
 			matrix[i] = new double[matrix_size]();
 
-		std::list<Element*>::iterator it = element_list.begin();
-		while(it != element_list.end())
-		{
-				Element* matrix_creation_element = (*it);
-				matrix_creation_element->fillMatrix(matrix);
-				matrix_creation_element->fillRhs(rhs, f);
-				++it;
-		}
 
-		std::list<Tier*>* tier_list = new std::list<Tier*>();
+
+		tier_list = new std::list<Tier*>();
+		std::list<Element*>::iterator it = element_list.begin();
 		it = element_list.begin();
 
 		for(int i = 0; i<nr_of_tiers; i++){
 			Tier* tier;
 			if(i == nr_of_tiers -1){
-				tier = new Tier(*it,*(++it),*(++it),*(++it),*(++it),*(++it),*(++it),*(++it),f);
+				tier = new Tier(*it,*(++it),*(++it),*(++it),*(++it),*(++it),*(++it),*(++it),f,matrix,rhs);
 			}
 			else{
-				tier = new Tier(*it,*(++it),*(++it),*(++it),*(++it),*(++it),*(++it),NULL,f);
+				tier = new Tier(*it,*(++it),*(++it),*(++it),*(++it),*(++it),*(++it),NULL,f,matrix,rhs);
 				++it;
 			}
 			tier_list->push_back(tier);

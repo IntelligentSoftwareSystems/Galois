@@ -8,6 +8,28 @@
 #include <cmath>
 #include <map>
 namespace D3{
+
+class TripleArgFunctionProduct : public ITripleArgFunction
+{
+
+	private:
+		ITripleArgFunction* function1;
+		ITripleArgFunction* function2;
+
+	public:
+		void SetFunctions(ITripleArgFunction* _function1, ITripleArgFunction* _function2)
+		{
+			function1 = _function1;
+			function2 = _function2;
+		}
+
+		virtual double ComputeValue(double x, double y, double z)
+		{
+			return function1->ComputeValue(x,y,z)*function2->ComputeValue(x,y,z);
+		}
+
+};
+
 class Element{
 	
 	private:
@@ -26,6 +48,7 @@ class Element{
 
 		ITripleArgFunction** shapeFunctions;
 		int* shapeFunctionNrs;
+		TripleArgFunctionProduct* product;
 
 		void SetIternalBotInterfaceNumbers(int nr, Element* bot_left_near_element, Element* bot_left_far_element, Element* bot_right_far_element,
 				Element* top_left_near_element, Element* top_left_far_element, Element* top_right_far_elemnt, Element* top_right_near_element);
@@ -100,6 +123,8 @@ class Element{
 			shapeFunctions[face_far] = new FaceFarShapeFunction(is_first_tier,xl,yl,zl,xr,yr,zr,position);
 			
 			shapeFunctions[interior] = new InteriorShapeFunction(is_first_tier,xl,yl,zl,xr,yr,zr,position);
+			product = new TripleArgFunctionProduct();
+
 		}
 		
 		~Element()
@@ -109,6 +134,7 @@ class Element{
 				delete shapeFunctions[i];
 			
 			delete[] shapeFunctions;
+			delete product;
 			
 		}
 		
@@ -116,11 +142,10 @@ class Element{
 		Element** CreateFirstTier(int nr);
 		Element** CreateLastTier(int nr);
 		
-		void fillMatrix(double** matrix);
-		void fillMatrix(double** matrix, int start_nr_adj);
-		void fillRhs(double* rhs, ITripleArgFunction* f);
-		void fillRhs(double* rhs, ITripleArgFunction* f, int start_nr_adj);
-		void fillTierMatrix(double** matrix, double* rhs, ITripleArgFunction* f, int start_nr_adj);
+
+		void fillMatrix(double** tier_matrix, double** global_matrix, int start_nr_adj);
+		void fillRhs(double* tier_rhs, double* global_rhs, ITripleArgFunction* f, int start_nr_adj);
+		void fillMatrices(double** tier_matrix, double** global_matrix, double* tier_rhs, double* global_rhs, ITripleArgFunction* f, int start_nr_adj);
 		bool checkSolution(std::map<int,double> *solution_map, ITripleArgFunction* f);
 		
 		void set_node_nr(int node, int node_nr)
@@ -136,7 +161,9 @@ class Element{
 			return shapeFunctionNrs[vertex_bot_left_near];
 		}
 		private:
-			void comp(int indx1, int indx2, ITripleArgFunction* f1, ITripleArgFunction* f2,double** matrix);
+			void comp(int indx1, int indx2, ITripleArgFunction* f1, ITripleArgFunction* f2,double** tier_matrix, double** global_matrix, int start_nr_adj);
 };
 }
+
+
 #endif

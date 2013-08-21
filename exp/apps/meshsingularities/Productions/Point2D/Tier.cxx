@@ -7,6 +7,7 @@
 
 #include "Tier.hxx"
 using namespace D2;
+/*
 void D2::Tier::FillMatrixAndRhs(double** matrix, double* rhs, int matrix_size)
 {
 		for(int i=0; i<tier_matrix_size; i++)
@@ -19,3 +20,4 @@ void D2::Tier::FillMatrixAndRhs(double** matrix, double* rhs, int matrix_size)
 			if(i+start_nr_adj < matrix_size)
 				rhs[i+start_nr_adj] += rhs[i];
 }
+*/
