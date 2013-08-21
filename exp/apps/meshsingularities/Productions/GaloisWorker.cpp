@@ -20,7 +20,7 @@ using namespace D3;
 
 class TestFunction3D : public ITripleArgFunction {
 	double ComputeValue(double x, double y, double z) {
-		return x*x+y*y;
+		return 1.0;
 	}
 };
 
@@ -72,6 +72,7 @@ void ProductionProcess::operator()(Graph::GraphNode src, Context& ctx)
 
 		if(!nr_of_incoming_edges)
 			ctx.push(graphNode);
+			//(*this)(graphNode, ctx);
 	}
 
 }
@@ -126,6 +127,7 @@ std::vector<double> *ProductionProcess::operator()(int nrOfTiers)
 {
 	// implement everything is needed to input data to solver,
 	// preprocessing,
+	srand(0xfafa);
 	ITripleArgFunction *function = new TestFunction3D();
 	GraphGenerator* generator = new GraphGenerator();
 	AbstractProduction *production = new AbstractProduction(19, 75, 117, 83);
@@ -134,7 +136,7 @@ std::vector<double> *ProductionProcess::operator()(int nrOfTiers)
 
 	Galois::StatTimer timerMatrix("matrix generation");
 	timerMatrix.start();
-	std::list<D3::Tier*> *tiers = matrixGenerator->CreateMatrixAndRhs(nrOfTiers, 0, 0, 0, 1, function);
+	std::list<D3::Tier*> *tiers = matrixGenerator->CreateMatrixAndRhs(nrOfTiers, -1e10, -1e10, -1e10, 1e+11, function);
 	timerMatrix.stop();
 
 	Processing *processing = new Processing();
