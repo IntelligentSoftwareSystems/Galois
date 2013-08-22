@@ -36,14 +36,4 @@ class AbstractProduction {
     const int getANSize() const;
 };
 
-class MES2DP2 : public AbstractProduction {
-  public:
-	MES2DP2() : AbstractProduction(5, 17, 21, 21) {} ;
-};
-
-class MES3DP2 : public AbstractProduction {
-  public:
-	MES3DP2() : AbstractProduction(19, 75, 117, 83) {} ;
-};
-
 #endif

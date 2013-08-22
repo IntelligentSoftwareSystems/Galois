@@ -29,36 +29,27 @@ template<typename Context>
 void ProductionProcess::operator()(Graph::GraphNode src, Context& ctx)
 {
 	Node node = src->data;
-//	std::cout << "Node: " << src->data.x;
-//	std::cout << " Production: ";
 	switch (node.productionToExecute) {
 	case A1:
 		node.productions->A1(node.v, node.input);
-		//std::cout << "A1" << std::endl;
 		break;
 	case A:
 		node.productions->A(node.v, node.input);
-		//std::cout << "A" << std::endl;
 		break;
 	case AN:
 		node.productions->AN(node.v, node.input);
-		//std::cout << "AN" << std::endl;
 		break;
 	case A2:
 		node.productions->A2(node.v);
-		//std::cout << "A2" << std::endl;
 		break;
 	case E:
 		node.productions->E(node.v);
-		//std::cout << "E" << std::endl;
 		break;
 	case EROOT:
 		node.productions->ERoot(node.v);
-		//std::cout << "EROOT" << std::endl;
 		break;
 	case BS:
 		node.productions->BS(node.v);
-		//std::cout << "BS" << std::endl;
 		break;
 	default:
 		break;
@@ -72,7 +63,6 @@ void ProductionProcess::operator()(Graph::GraphNode src, Context& ctx)
 
 		if(!nr_of_incoming_edges)
 			ctx.push(graphNode);
-			//(*this)(graphNode, ctx);
 	}
 
 }
@@ -123,7 +113,7 @@ std::vector<Vertex*> *collectLeafs(Vertex *p)
 	return result;
 }
 
-std::vector<double> *ProductionProcess::operator()(int nrOfTiers)
+std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescription)
 {
 	// implement everything is needed to input data to solver,
 	// preprocessing,
@@ -132,72 +122,70 @@ std::vector<double> *ProductionProcess::operator()(int nrOfTiers)
 	GraphGenerator* generator = new GraphGenerator();
 	AbstractProduction *production = new AbstractProduction(19, 75, 117, 83);
 	Vertex *S;
+
 	D3::MatrixGenerator *matrixGenerator = new D3::MatrixGenerator();
 
 	Galois::StatTimer timerMatrix("matrix generation");
 	timerMatrix.start();
-	std::list<D3::Tier*> *tiers = matrixGenerator->CreateMatrixAndRhs(nrOfTiers, -1e10, -1e10, -1e10, 1e+11, function);
+	std::list<D3::Tier*> *tiers = matrixGenerator->CreateMatrixAndRhs(taskDescription.nrOfTiers,
+			taskDescription.x, taskDescription.y, taskDescription.z, taskDescription.size, function);
 	timerMatrix.stop();
 
 	Processing *processing = new Processing();
 
-	Galois::StatTimer timer_preproc("preprocessing");
+	Galois::StatTimer timerPreprocess("preprocessing");
 
-	timer_preproc.start();
+	timerPreprocess.start();
 	std::vector<EquationSystem *> *inputMatrices = processing->preprocess((std::list<EquationSystem*> *)tiers,
 		production);
-	timer_preproc.stop();
+	timerPreprocess.stop();
 
 
-	Galois::StatTimer timer_S("Graph generation");
-	timer_S.start();
-	S = generator->generateGraph(nrOfTiers, production, inputMatrices);
-	timer_S.stop();
+	Galois::StatTimer timerGraphGeneration("Graph generation");
+	timerGraphGeneration.start();
+	S = generator->generateGraph(taskDescription.nrOfTiers, production, inputMatrices);
+	timerGraphGeneration.stop();
 
-	Galois::StatTimer T("productions");
-	T.start();
+	Galois::StatTimer timerProductions("productions");
+	timerProductions.start();
 	graph = generator->getGraph();
-	LCM_iterator it = graph->begin();
+
 	std::vector<GraphNode> initial_nodes_vector;
-	while(it != graph->end())
-	{
+	for(LCM_iterator it = graph->begin(); it != graph->end(); ++it) {
 		GraphNode graphNode = *(it);
 		if(graphNode->data.nr_of_incoming_edges == 0)
 			initial_nodes_vector.push_back(graphNode);
-		++it;
 	}
+
 	std::vector<GraphNode>::iterator iii = initial_nodes_vector.begin();
 	typedef Galois::WorkList::dChunkedLIFO<1> WL;
 	Galois::for_each<WL>(initial_nodes_vector.begin(), initial_nodes_vector.end(), *this);
-	T.stop();
+	timerProductions.stop();
 
-	printf("%f[s]\n", T.get()/1000.0);
 
 	std::vector<Vertex*> *leafs = collectLeafs(S);
 	std::vector<double> *result = processing->postprocess(leafs, inputMatrices, production);
-	std::map<int, double> *mapa = new std::map<int, double>();
 
-	int i = 0;
+	if (taskDescription.performTests) {
 
-	for (std::vector<double>::iterator it=result->begin(); it!=result->end(); ++it, ++i) {
-		(*mapa)[i] = *it;
+		std::map<int, double> *mapa = new std::map<int, double>();
+		int i = 0;
+
+		for (std::vector<double>::iterator it=result->begin(); it!=result->end(); ++it, ++i) {
+			(*mapa)[i] = *it;
+		}
+
+		matrixGenerator->checkSolution(mapa, function);
+
+		mapa->clear();
+		delete mapa;
 	}
-	matrixGenerator->checkSolution(mapa, function);
 
-	mapa->clear();
-
-	/*
-	for (std::vector<double>::iterator it=result->begin(); it!=result->end(); ++it) {
-		printf("%.16g\n", *it);
-	}
-	 */
 	delete leafs;
 	delete processing;
 	delete S;
 	delete tiers;
-	//delete matrixGenerator;
 
-	delete mapa;
 
 	return result;
 }
