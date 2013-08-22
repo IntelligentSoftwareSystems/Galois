@@ -167,7 +167,8 @@ std::vector<double> *ProductionProcess::operator()(int nrOfTiers)
 		++it;
 	}
 	std::vector<GraphNode>::iterator iii = initial_nodes_vector.begin();
-	Galois::for_each(initial_nodes_vector.begin(), initial_nodes_vector.end(), *this);
+	typedef Galois::WorkList::dChunkedLIFO<1> WL;
+	Galois::for_each<WL>(initial_nodes_vector.begin(), initial_nodes_vector.end(), *this);
 	T.stop();
 
 	printf("%f[s]\n", T.get()/1000.0);
