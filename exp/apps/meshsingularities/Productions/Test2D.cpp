@@ -6,8 +6,9 @@
 #include "Production.h"
 
 #include "Point2D/DoubleArgFunction.hxx"
-#include "Point2D/Tier.hxx"
 #include "Point2D/MatrixGenerator.hxx"
+#include "Functions.h"
+#include "MatrixGeneration/GenericMatrixGenerator.hxx"
 
 using namespace D2;
 
@@ -23,11 +24,18 @@ int main(int argc, char ** argv)
 	int i = 0;
 
 	AbstractProduction *production = new AbstractProduction(5, 17, 21, 21);
-	MatrixGenerator *matrixGenerator = new MatrixGenerator();
+	GenericMatrixGenerator *matrixGenerator = new MatrixGenerator();
 	IDoubleArgFunction *function = new TestFunction2D();
 	Processing *processing = new Processing();
 
-	std::list<D2::Tier*> *tiers = matrixGenerator->CreateMatrixAndRhs(nrOfTiers, 0, 0, 1, function);
+	TaskDescription taskDescription;
+	taskDescription.dimensions=2;
+	taskDescription.nrOfTiers=4;
+	taskDescription.size=1;
+	taskDescription.function=functionsTable[2].func;
+	taskDescription.x=0;
+	taskDescription.y=0;
+	std::list<EquationSystem*> *tiers = matrixGenerator->CreateMatrixAndRhs(taskDescription);
 	std::vector<EquationSystem*> *equations = processing->preprocess((std::list<EquationSystem*>*) tiers, production);
 
 	EquationSystem *globalSystem = new EquationSystem(matrixGenerator->GetMatrix(),

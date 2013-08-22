@@ -14,7 +14,7 @@
 #include "../EquationSystem.h"
 
 namespace D2{
-class Tier : EquationSystem
+class Tier : public EquationSystem
 {
 
 private:

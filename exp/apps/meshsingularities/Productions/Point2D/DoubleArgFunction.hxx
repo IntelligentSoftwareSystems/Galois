@@ -1,7 +1,14 @@
 #ifndef __DOUBLEARGFUNCTION_H_INCLUDED
 #define __DOUBLEARGFUNCTION_H_INCLUDED
 #include "EPosition.hxx"
-using namespace D2;
+namespace D2
+{
+
+double get_chi1(double var);
+double get_chi2(double var);
+double get_chi3(double var);
+
+
 class IDoubleArgFunction
 {
 	
@@ -12,6 +19,28 @@ class IDoubleArgFunction
 	{
 
 	}
+};
+
+class DoubleArgFunctionWrapper : public IDoubleArgFunction
+{
+	private:
+		double (*f)(int,...);
+	public:
+		virtual double ComputeValue(double x, double y)
+		{
+			return (*f)(2,x,y);
+		}
+
+		DoubleArgFunctionWrapper(double (*f)(int,...)) : f(f)
+		{
+
+		}
+
+		virtual ~DoubleArgFunctionWrapper()
+		{
+
+		}
+
 };
 
 
@@ -194,7 +223,7 @@ class InteriorShapeFunction : public ShapeFunction
 		{
 		}
 };
-
+}
 #endif
 
 

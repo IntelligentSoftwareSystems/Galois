@@ -5,20 +5,7 @@
 #include "Galois/Graph/LC_Morph_Graph.h"
 
 #include <functional>
-
-struct TaskDescription {
-	int dimensions;
-	int nrOfTiers;
-	double size;
-
-	double x;
-	double y;
-	double z;
-
-	double (*function)(int, ...);
-
-	bool performTests;
-};
+#include "TaskDescription.h"
 
 struct ProductionProcess {
 public:

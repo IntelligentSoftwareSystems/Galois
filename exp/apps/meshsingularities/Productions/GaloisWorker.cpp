@@ -5,24 +5,8 @@
 
 #include "Galois/Statistic.h"
 
+#include "Point2D/MatrixGenerator.hxx"
 #include "Point3D/MatrixGenerator.hxx"
-#include "Point3D/TripleArgFunction.hxx"
-
-
-/*
-class TestFunction : public IDoubleArgFunction {
-	double ComputeValue(double x, double y) {
-		return 1.0;
-	}
-}; */
-
-using namespace D3;
-
-class TestFunction3D : public ITripleArgFunction {
-	double ComputeValue(double x, double y, double z) {
-		return 1.0;
-	}
-};
 
 
 template<typename Context>
@@ -115,20 +99,23 @@ std::vector<Vertex*> *collectLeafs(Vertex *p)
 
 std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescription)
 {
+
 	// implement everything is needed to input data to solver,
 	// preprocessing,
-	srand(0xfafa);
-	ITripleArgFunction *function = new TestFunction3D();
+	//srand(0xfafa);
 	GraphGenerator* generator = new GraphGenerator();
 	AbstractProduction *production = new AbstractProduction(19, 75, 117, 83);
 	Vertex *S;
 
-	D3::MatrixGenerator *matrixGenerator = new D3::MatrixGenerator();
+	GenericMatrixGenerator* matrixGenerator;
+	if(taskDescription.dimensions == 3)
+		matrixGenerator = new D3::MatrixGenerator();
+	else if (taskDescription.dimensions == 2)
+		matrixGenerator = new D2::MatrixGenerator();
 
 	Galois::StatTimer timerMatrix("matrix generation");
 	timerMatrix.start();
-	std::list<D3::Tier*> *tiers = matrixGenerator->CreateMatrixAndRhs(taskDescription.nrOfTiers,
-			taskDescription.x, taskDescription.y, taskDescription.z, taskDescription.size, function);
+	std::list<EquationSystem*> *tiers = matrixGenerator->CreateMatrixAndRhs(taskDescription);
 	timerMatrix.stop();
 
 	Processing *processing = new Processing();
@@ -175,7 +162,7 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 			(*mapa)[i] = *it;
 		}
 
-		matrixGenerator->checkSolution(mapa, function);
+		matrixGenerator->checkSolution(mapa, taskDescription.function);
 
 		mapa->clear();
 		delete mapa;

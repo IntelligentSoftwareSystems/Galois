@@ -2,12 +2,17 @@
 
 
 using namespace D3;
-std::list<Tier*>* MatrixGenerator::CreateMatrixAndRhs(int nr_of_tiers, double bot_left_near_x,
-		double bot_left_near_y, double bot_left_near_z, double size, ITripleArgFunction* f)
+std::list<EquationSystem*>* MatrixGenerator::CreateMatrixAndRhs(TaskDescription& task_description)
 {	
-		
+
+		TripleArgFunctionWrapper* f = new TripleArgFunctionWrapper(task_description.function);
+		int nr_of_tiers = task_description.nrOfTiers;
+		double bot_left_near_x = task_description.x;
+		double bot_left_near_y = task_description.y;
+		double bot_left_near_z = task_description.z;
+		double size = task_description.size;
+
 		int nr = 0; 
-		
 		Element* element = new Element(bot_left_near_x, bot_left_near_y + size / 2.0, bot_left_near_z,
 				 size / 2.0, BOT_LEFT_FAR, true);
 		
@@ -55,7 +60,7 @@ std::list<Tier*>* MatrixGenerator::CreateMatrixAndRhs(int nr_of_tiers, double bo
 
 
 
-		tier_list = new std::list<Tier*>();
+		tier_list = new std::list<EquationSystem*>();
 		std::list<Element*>::iterator it = element_list.begin();
 		it = element_list.begin();
 
@@ -74,8 +79,10 @@ std::list<Tier*>* MatrixGenerator::CreateMatrixAndRhs(int nr_of_tiers, double bo
 		return tier_list;
 }
 
-void MatrixGenerator::checkSolution(std::map<int,double> *solution_map, ITripleArgFunction* f)
+void MatrixGenerator::checkSolution(std::map<int,double> *solution_map, double (*function)(int dim,...))
 {
+	srand(time(NULL));
+	TripleArgFunctionWrapper* f = new TripleArgFunctionWrapper(function);
 	std::list<Element*>::iterator it = element_list.begin();
 	bool solution_ok = true;
 	while(it != element_list.end() && solution_ok)

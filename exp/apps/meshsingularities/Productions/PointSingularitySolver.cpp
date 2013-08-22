@@ -27,7 +27,7 @@ const char* const url = NULL;
 namespace cll = llvm::cl;
 
 static cll::opt<int> tiers("tiers", cll::desc("Number of Tiers"), cll::init(16));
-static cll::opt<int> dimensions("dimensions", cll::desc("Dimensions"), cll::init(2));
+static cll::opt<int> dimensions("dimensions", cll::desc("Dimensions"), cll::init(3));
 
 static cll::opt<Functions> function("function", cll::desc("Choose a function:"),
     cll::values(

@@ -1,18 +1,20 @@
 #include "DoubleArgFunction.hxx"
+using namespace D2;
 
-double get_chi1(double var)
-{
-	return var; 
+namespace D2{
+	double get_chi1(double var)
+	{
+		return var;
+	}
+	double get_chi2(double var)
+	{
+		return 1-var;
+	}
+	double get_chi3(double var)
+	{
+		return var*(1-var);
+	}
 }
-double get_chi2(double var)
-{
-	return 1-var;
-}
-double get_chi3(double var)
-{
-	return var*(1-var);
-}
-
 
 double vertex_bot_left_function(double x, double y)
 {

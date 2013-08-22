@@ -1,17 +1,20 @@
 #include "TripleArgFunction.hxx"
 
 using namespace D3;
-double get_chi1(double var)
-{
-	return var; 
-}
-double get_chi2(double var)
-{
-	return 1-var;
-}
-double get_chi3(double var)
-{
-	return var*(1-var);
+
+namespace D3 {
+	double get_chi1(double var)
+	{
+		return var;
+	}
+	double get_chi2(double var)
+	{
+		return 1-var;
+	}
+	double get_chi3(double var)
+	{
+		return var*(1-var);
+	}
 }
 
 double vertex_bot_left_near_function(double x, double y, double z)

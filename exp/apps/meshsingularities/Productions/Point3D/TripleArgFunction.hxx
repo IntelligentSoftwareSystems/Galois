@@ -5,6 +5,11 @@
 #include <vector>
 #include <stdio.h>
 namespace D3{
+
+double get_chi1(double var);
+double get_chi2(double var);
+double get_chi3(double var);
+
 class NArgFunction
 {
 	public:
@@ -31,6 +36,27 @@ class ITripleArgFunction //: public NArgFunction
 		}
 
 		virtual ~ITripleArgFunction()
+		{
+
+		}
+};
+
+class TripleArgFunctionWrapper : public ITripleArgFunction
+{
+	private:
+		double (*f)(int,...);
+	public:
+		virtual double ComputeValue(double x, double y, double z)
+		{
+			return (*f)(3,x,y,z);
+		}
+
+		TripleArgFunctionWrapper(double (*f)(int,...)) : f(f)
+		{
+
+		}
+
+		virtual ~TripleArgFunctionWrapper()
 		{
 
 		}
