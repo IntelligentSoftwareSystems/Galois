@@ -26,7 +26,7 @@ const char* const url = NULL;
 
 namespace cll = llvm::cl;
 
-static cll::opt<int> nrOfTiers("nrOfTiers", cll::desc("Number of Tiers"), cll::init(16));
+static cll::opt<int> tiers("tiers", cll::desc("Number of Tiers"), cll::init(16));
 static cll::opt<int> dimensions("dimensions", cll::desc("Dimensions"), cll::init(2));
 
 static cll::opt<Functions> function("function", cll::desc("Choose a function:"),
@@ -63,7 +63,7 @@ int main(int argc, char** argv)
 
  	taskDescription.dimensions = dimensions;
  	taskDescription.function = functionsTable[function].func;
- 	taskDescription.nrOfTiers = nrOfTiers;
+ 	taskDescription.nrOfTiers = tiers;
  	taskDescription.size = size;
  	taskDescription.x = coord_x;
  	taskDescription.y = coord_y;

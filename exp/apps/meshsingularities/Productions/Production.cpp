@@ -260,22 +260,22 @@ void AbstractProduction::BS(Vertex *v) const
 	}
 }
 
-const int AbstractProduction::getInterfaceSize() const
+int AbstractProduction::getInterfaceSize() const
 {
 	return this->interfaceSize;
 }
 
-const int AbstractProduction::getLeafSize() const
+int AbstractProduction::getLeafSize() const
 {
 	return this->leafSize;
 }
 
-const int AbstractProduction::getA1Size() const
+int AbstractProduction::getA1Size() const
 {
 	return this->a1Size;
 }
 
-const int AbstractProduction::getANSize() const
+int AbstractProduction::getANSize() const
 {
 	return this->anSize;
 }

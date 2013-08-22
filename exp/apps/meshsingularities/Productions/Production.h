@@ -30,10 +30,10 @@ class AbstractProduction {
     void ERoot(Vertex *v) const;
     void BS(Vertex *v) const;
 
-    const int getInterfaceSize() const;
-    const int getLeafSize() const;
-    const int getA1Size() const;
-    const int getANSize() const;
+    int getInterfaceSize() const;
+    int getLeafSize() const;
+    int getA1Size() const;
+    int getANSize() const;
 };
 
 #endif
