@@ -22,10 +22,9 @@ EquationSystem::EquationSystem(double ** matrix, double *rhs, int size)
 	// we are working on continuous area of memory
 
 	this->matrix = new double*[n];
-	//this->matrix[0] = new double[n * n]();
 	this->matrix[0] = new double[n*(n+1)]();
+
 	for (int i = 1; i < n; ++i) {
-		//this->matrix[i] = this->matrix[0] + i * n;
 		this->matrix[i] = this->matrix[0] + i*n;
 	}
 
@@ -45,15 +44,18 @@ EquationSystem::~EquationSystem()
 	delete [] matrix[0];
 	delete [] matrix;
 
-	matrix = (double**) NULL;
-	rhs = (double*) NULL;
+	matrix = (double**) 0;
+	rhs = (double*) 0;
 }
 
 void EquationSystem::eliminate(const int rows)
 {
+	double maxX;
+	int maxRow;
+	double x;
 	for (int i=0;i<rows;++i) {
-		double maxX = fabs(matrix[i][i]);
-		int maxRow = i;
+		maxX = fabs(matrix[i][i]);
+		maxRow = i;
 
 		for (int k=i+1; k<rows; ++k) {
 			if (fabs(matrix[k][i]) > maxX) {
@@ -82,7 +84,7 @@ void EquationSystem::eliminate(const int rows)
 				matrix[j][k] -= x*matrix[i][k];
 			}
 			rhs[j] -= x*rhs[i];
-			matrix[j][i] = 0.0;
+			//matrix[j][i] = 0.0;
 		}
 	}
 }
@@ -110,13 +112,11 @@ void EquationSystem::swapCols(const int i, const int j)
 
 void EquationSystem::swapRows(const int i, const int j)
 {
+	// reduced complexity from O(n) to O(1)
 	double tmp;
-
-	for (int k=0; k<n; ++k) {
-		tmp = matrix[i][k];
-		matrix[i][k] = matrix[j][k];
-		matrix[j][k] = tmp;
-	}
+	double *tmpPtr = matrix[i];
+	matrix[i] = matrix[j];
+	matrix[j] = tmpPtr;
 
 	tmp = rhs[i];
 	rhs[i] = rhs[j];
@@ -127,9 +127,9 @@ void EquationSystem::print() const
 {
 	for (int i=0; i<n; ++i) {
 		for (int j=0; j<n; ++j) {
-			std::printf("% .15f ", matrix[i][j]);
+			std::printf("% .16f ", matrix[i][j]);
 		}
-		std::printf (" | % .15f\n", rhs[i]);
+		std::printf (" | % .16f\n", rhs[i]);
 	}
 }
 

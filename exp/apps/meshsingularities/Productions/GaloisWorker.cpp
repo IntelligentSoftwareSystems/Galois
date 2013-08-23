@@ -8,6 +8,7 @@
 #include "Point2D/MatrixGenerator.hxx"
 #include "Point3D/MatrixGenerator.hxx"
 
+#include <sys/time.h>
 
 template<typename Context>
 void ProductionProcess::operator()(Graph::GraphNode src, Context& ctx)
@@ -104,15 +105,21 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 	// preprocessing,
 	//srand(0xfafa);
 	GraphGenerator* generator = new GraphGenerator();
-	AbstractProduction *production = new AbstractProduction(19, 75, 117, 83);
+	AbstractProduction *production;new AbstractProduction(19, 75, 117, 83);
 	Vertex *S;
 
-	GenericMatrixGenerator* matrixGenerator;
-	if(taskDescription.dimensions == 3)
-		matrixGenerator = new D3::MatrixGenerator();
-	else if (taskDescription.dimensions == 2)
-		matrixGenerator = new D2::MatrixGenerator();
+	timeval start_time;
+	timeval end_time;
 
+	GenericMatrixGenerator* matrixGenerator;
+	if(taskDescription.dimensions == 3) {
+		matrixGenerator = new D3::MatrixGenerator();
+		production = new AbstractProduction(19, 75, 117, 83);
+	}
+	else if (taskDescription.dimensions == 2) {
+		matrixGenerator = new D2::MatrixGenerator();
+		production = new AbstractProduction(5, 17, 21, 21);
+	}
 	Galois::StatTimer timerMatrix("matrix generation");
 	timerMatrix.start();
 	std::list<EquationSystem*> *tiers = matrixGenerator->CreateMatrixAndRhs(taskDescription);
@@ -130,11 +137,13 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 
 	Galois::StatTimer timerGraphGeneration("Graph generation");
 	timerGraphGeneration.start();
+	gettimeofday(&start_time, NULL);
 	S = generator->generateGraph(taskDescription.nrOfTiers, production, inputMatrices);
 	timerGraphGeneration.stop();
 
 	Galois::StatTimer timerProductions("productions");
 	timerProductions.start();
+
 	graph = generator->getGraph();
 
 	std::vector<GraphNode> initial_nodes_vector;
@@ -143,11 +152,12 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 		if(graphNode->data.nr_of_incoming_edges == 0)
 			initial_nodes_vector.push_back(graphNode);
 	}
-
 	std::vector<GraphNode>::iterator iii = initial_nodes_vector.begin();
-	typedef Galois::WorkList::dChunkedLIFO<1> WL;
+	typedef Galois::WorkList::dChunkedLIFO<2> WL;
 	Galois::for_each<WL>(initial_nodes_vector.begin(), initial_nodes_vector.end(), *this);
+	gettimeofday(&end_time, NULL);
 	timerProductions.stop();
+	printf("Prod time %f [s]\n", ((end_time.tv_sec - start_time.tv_sec)*1000000 +(end_time.tv_usec - start_time.tv_usec))/1000000.0);
 
 
 	std::vector<Vertex*> *leafs = collectLeafs(S);

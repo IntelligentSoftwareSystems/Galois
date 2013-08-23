@@ -44,6 +44,12 @@ static cll::opt<double> coord_z("coord_z", cll::desc("Z coord for left-bottom ve
 static cll::opt<double> size("size", cll::desc("Size of the shape"), cll::init(1.0));
 static cll::opt<bool> performTests("performTests", cll::desc("Run extended tests of computed solution"), cll::init(true));
 
+#define WITH_MUMPS_ENABLED 0
+
+#ifdef WITH_MUMPS_ENABLED
+static cll::opt<bool> mumps("mumps", cll::desc("Pass data to MUMPS"), cll::init(false));
+#endif
+
 template<typename Algorithm>
 std::vector<double> *run(TaskDescription &td) {
 	Galois::StatTimer U(name);
@@ -53,6 +59,10 @@ std::vector<double> *run(TaskDescription &td) {
 	U.stop();
 	return res;
 }
+
+#ifdef WITH_MUMPS_ENABLED
+extern int execute_mumps(int argc, char** argv, TaskDescription &taskDescription);
+#endif
 
 int main(int argc, char** argv)
 {
@@ -71,8 +81,15 @@ int main(int argc, char** argv)
 
  	taskDescription.performTests = performTests;
 
+#ifdef WITH_MUMPS_ENABLED
+ 	if (mumps)
+ 		execute_mumps(argc, argv, taskDescription);
+ 	else
+#endif
+ 	{
 	std::vector<double> *result = run<ProductionProcess>(taskDescription);
 
-	delete result;
+ 	delete result;
+ 	}
 	return 0;
 }
