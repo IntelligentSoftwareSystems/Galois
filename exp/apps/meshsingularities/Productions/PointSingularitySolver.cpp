@@ -87,9 +87,9 @@ int main(int argc, char** argv)
  	else
 #endif
  	{
-	std::vector<double> *result = run<ProductionProcess>(taskDescription);
+		std::vector<double> *result = run<ProductionProcess>(taskDescription);
 
- 	delete result;
+		delete result;
  	}
 	return 0;
 }

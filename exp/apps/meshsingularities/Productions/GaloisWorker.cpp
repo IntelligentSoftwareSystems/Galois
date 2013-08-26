@@ -24,14 +24,11 @@ void ProductionProcess::operator()(Graph::GraphNode src, Context& ctx)
 	case AN:
 		node.productions->AN(node.v, node.input);
 		break;
-	case A2:
-		node.productions->A2(node.v);
+	case A2NODE:
+		node.productions->A2Node(node.v);
 		break;
-	case E:
-		node.productions->E(node.v);
-		break;
-	case EROOT:
-		node.productions->ERoot(node.v);
+	case A2ROOT:
+		node.productions->A2Root(node.v);
 		break;
 	case BS:
 		node.productions->BS(node.v);
@@ -182,7 +179,6 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 	delete processing;
 	delete S;
 	delete tiers;
-
 
 	return result;
 }

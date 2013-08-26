@@ -71,14 +71,11 @@ int main(int argc, char ** argv)
 	production->A(p5, equations->at(2));
 	production->AN(p6, equations->at(3));
 
-	production->A2(p1);
-	production->A2(p2);
+	production->A2Node(p1);
+	production->A2Node(p2);
 
-	production->E(p1);
-	production->E(p2);
 
-	production->A2(S);
-	production->ERoot(S);
+	production->A2Root(S);
 
 	production->BS(S);
 

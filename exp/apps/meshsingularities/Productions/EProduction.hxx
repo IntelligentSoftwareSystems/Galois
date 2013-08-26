@@ -8,7 +8,7 @@
 #ifndef EPRODUCTION_HXX_
 #define EPRODUCTION_HXX_
 
-enum EProduction { A1, A, AN, A2, E, EROOT, BS };
+enum EProduction { A1, A, AN, A2NODE, A2ROOT, BS };
 
 
 #endif /* EPRODUCTION_HXX_ */

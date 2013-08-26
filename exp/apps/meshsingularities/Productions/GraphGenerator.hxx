@@ -29,7 +29,8 @@ typedef Galois::Graph::LC_Morph_Graph<Node,EdgeData>::edge_iterator LCM_edge_ite
 class GraphGenerator {
 public:
 	static int id;
-	GraphGenerator() : S(NULL), graph(NULL), edge_data(0) { 
+	GraphGenerator() : S(NULL), graph(NULL), edge_data(0), productions(NULL),
+					   inputData(NULL) {
 	   id = 0;
 	}
 

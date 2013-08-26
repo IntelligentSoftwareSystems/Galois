@@ -156,7 +156,7 @@ void AbstractProduction::AN(Vertex *v, EquationSystem *inData) const
 	}
 }
 
-void AbstractProduction::A2(Vertex *v) const
+void AbstractProduction::A2Node(Vertex *v) const
 {
 	const int offsetLeft = v->left->type == LEAF ? leafSize-2*interfaceSize : interfaceSize;
 	const int offsetRight = v->right->type == LEAF ? leafSize-2*interfaceSize : interfaceSize;
@@ -197,15 +197,52 @@ void AbstractProduction::A2(Vertex *v) const
 		sys_rhs[i+interfaceSize] = left_rhs[i+offsetLeft];
 		sys_rhs[i+2*interfaceSize] = right_rhs[i+offsetRight + interfaceSize];
 	}
-}
 
-void AbstractProduction::E(Vertex *v) const
-{
 	v->system->eliminate(this->interfaceSize);
 }
 
-void AbstractProduction::ERoot(Vertex *v) const
+void AbstractProduction::A2Root(Vertex *v) const
 {
+	const int offsetLeft = v->left->type == LEAF ? leafSize-2*interfaceSize : interfaceSize;
+	const int offsetRight = v->right->type == LEAF ? leafSize-2*interfaceSize : interfaceSize;
+
+	double** const sys_matrix = v->system->matrix;
+	double* const sys_rhs = v->system->rhs;
+
+	const double** const left_matrix = (const double **) v->left->system->matrix;
+	const double** const right_matrix = (const double **) v->right->system->matrix;
+	const double* const left_rhs = (const double *) v->left->system->rhs;
+	const double* const right_rhs = (const double *) v->right->system->rhs;
+
+	for (int i=0; i<this->interfaceSize; ++i) {
+		for (int j=0; j<this->interfaceSize; ++j) {
+			// x: left y: top
+			sys_matrix[i][j] = left_matrix[i+offsetLeft+interfaceSize][j+offsetLeft+interfaceSize] +
+					right_matrix[i+offsetRight][j+offsetRight];
+
+			// x: center y: top
+			sys_matrix[i][j+interfaceSize] = left_matrix[i+offsetLeft+interfaceSize][j+offsetLeft];
+
+			// x: left y:center
+			sys_matrix[i+interfaceSize][j] = left_matrix[i+offsetLeft][j+offsetLeft+interfaceSize];
+
+			// x: center y:center
+			sys_matrix[i+interfaceSize][j+interfaceSize] = left_matrix[i+offsetLeft][j+offsetLeft];
+
+			// x: bottom y: bottom
+			sys_matrix[i+2*interfaceSize][j+2*interfaceSize] = right_matrix[i+offsetRight+interfaceSize][j+offsetRight+interfaceSize];
+
+			// x: left y:bottom
+			sys_matrix[i+2*interfaceSize][j] = right_matrix[i+offsetRight+interfaceSize][j+offsetRight];
+
+			// x: right y: top
+			sys_matrix[i][j+2*interfaceSize] = right_matrix[i+offsetRight][j+offsetRight+interfaceSize];
+		}
+		sys_rhs[i] = left_rhs[i+offsetLeft+interfaceSize] + right_rhs[i+offsetRight];
+		sys_rhs[i+interfaceSize] = left_rhs[i+offsetLeft];
+		sys_rhs[i+2*interfaceSize] = right_rhs[i+offsetRight + interfaceSize];
+	}
+
 	v->system->eliminate(this->interfaceSize * 3);
 }
 
@@ -224,7 +261,7 @@ void AbstractProduction::BS(Vertex *v) const
 		const double* const par_rhs = (const double *) v->parent->system->rhs;
 
 		for (int i=interfaceSize;i<3*interfaceSize; ++i) {
-			for (int j=interfaceSize; j<3*interfaceSize; ++j) {
+			for (int j=i; j<3*interfaceSize; ++j) {
 				sys_matrix[i][j] = i == j ? 1.0 : 0.0;
 			}
 		}
@@ -246,7 +283,7 @@ void AbstractProduction::BS(Vertex *v) const
 		const double* const par_rhs = (const double *) v->parent->system->rhs;
 
 		for (int i=leafSize-2*interfaceSize; i<leafSize; ++i) {
-			for (int j=leafSize-2*interfaceSize; j<leafSize; ++j) {
+			for (int j=i; j<leafSize; ++j) {
 				sys_matrix[i][j] = (i==j) ? 1.0 : 0.0;
 			}
 		}

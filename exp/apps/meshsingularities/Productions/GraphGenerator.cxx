@@ -36,11 +36,10 @@ Vertex *GraphGenerator::generateGraph(int nr_of_leafs, AbstractProduction *produ
 	graph = new Graph();
 
 	S = new Vertex(NULL, NULL, NULL, ROOT, productions->getInterfaceSize()*3);
-	Node eroot_node(1,EProduction::EROOT, productions, S, NULL);
+	Node eroot_node(2,EProduction::A2ROOT, productions, S, NULL);
 	GraphNode eroot_graph_node = graph->createNode(1,eroot_node);
-	GraphNode new_graph_node = addNode(2,EProduction::A2,NULL,eroot_graph_node,1, S, NULL);
 	GraphNode bs_graph_node = addNode(1,EProduction::BS,eroot_graph_node,NULL,2, S, NULL);
-	recursiveGraphGeneration(nr_of_leafs,0,nr_of_leafs-1,bs_graph_node, new_graph_node, S);
+	recursiveGraphGeneration(nr_of_leafs,0,nr_of_leafs-1,bs_graph_node, eroot_graph_node, S);
 	return S;
 }
 
@@ -65,20 +64,14 @@ void GraphGenerator::recursiveGraphGeneration(int nr_of_leafs, int low_range, in
 		parent->setRight(right);
 
 		//left elimination
-		new_graph_node = addNode(1,EProduction::E,NULL,merging_dst_node,1, left, NULL);
-		//left merging
-		new_graph_node = addNode(2,EProduction::A2,NULL,new_graph_node,1, left, NULL);
-		//left bs
+		new_graph_node = addNode(2,EProduction::A2NODE,NULL,merging_dst_node,1, left, NULL);
 		new_bs_graph_node = addNode(1,EProduction::BS,backward_substitution_src_node,NULL,2, left, NULL);
 		//left subtree generation
 
 		recursiveGraphGeneration(nr_of_leafs,low_range,low_range + (high_range-low_range)/2,new_bs_graph_node,new_graph_node, left);
 
 		//right elimination
-		new_graph_node = addNode(1,EProduction::E,NULL,merging_dst_node,1, right, NULL);
-		//right merging
-		new_graph_node = addNode(2,EProduction::A2,NULL,new_graph_node,1, right, NULL);
-		//right bs
+		new_graph_node = addNode(2,EProduction::A2NODE,NULL,merging_dst_node,1, right, NULL);
 		new_bs_graph_node = addNode(1,EProduction::BS,backward_substitution_src_node,NULL,2, right, NULL);
 		//right subtree generation
 
@@ -108,9 +101,7 @@ void GraphGenerator::recursiveGraphGeneration(int nr_of_leafs, int low_range, in
 		parent->setLeft(left);
 		parent->setRight(node);
 
-		new_graph_node = addNode(1,EProduction::E,NULL,merging_dst_node,1, node, NULL);
-		//merging
-		new_graph_node = addNode(2,EProduction::A2,NULL,new_graph_node,1, node, NULL);
+		new_graph_node = addNode(2,EProduction::A2NODE,NULL,merging_dst_node,1, node, NULL);
 		//bs
 		new_bs_graph_node = addNode(1,EProduction::BS,backward_substitution_src_node,NULL,2, node, NULL);
 
