@@ -58,21 +58,28 @@ double VertexBotLeftShapeFunction::ComputeValue(double x, double y)
 {
 	x = getXValueOnElement(x); 
 	y = getYValueOnElement(y); 
-	double value = vertex_bot_left_function(x,y); 
-	if(is_first_tier)
-		return value; 
+	double value = vertex_bot_left_function(x,y);
+
 	switch(position)
 	{
 		case BOT_LEFT:
-			return value + vertex_top_left_function(x,y)/2.0;
+			if(!neighbours[LEFT])
+				value += vertex_top_left_function(x,y)/2.0;
+			if(!neighbours[BOT])
+				value += vertex_bot_right_function(x,y)/2.0;
+			break;
 		case TOP_LEFT:
-			return value / 2.0;
+			if(!neighbours[LEFT])
+				return value/2.0;
+			break;
 		case TOP_RIGHT:
-			return value;
+			break;
 		case BOT_RIGHT:
-			return value;
-		return 0; 
+			if(!neighbours[BOT])
+				return value/2.0;
+			break;
 	}
+	return value;
 }
 
 double VertexTopLeftShapeFunction::ComputeValue(double x, double y)
@@ -80,19 +87,27 @@ double VertexTopLeftShapeFunction::ComputeValue(double x, double y)
 	x = getXValueOnElement(x); 
 	y = getYValueOnElement(y); 
 	double value = vertex_top_left_function(x,y);
-	if(is_first_tier)
-		return value; 
+
 	switch(position)
 	{
-		case BOT_LEFT: 
-			return value/2.0;
+		case BOT_LEFT:
+			if(!neighbours[LEFT])
+				return value/2.0;
+			break;
 		case TOP_LEFT:
-			return value + vertex_bot_left_function(x,y)/2.0 + vertex_top_right_function(x,y)/2.0;
+			if(!neighbours[LEFT])
+				value += vertex_bot_left_function(x,y)/2.0;
+			if(!neighbours[TOP])
+				value += vertex_top_right_function(x,y)/2.0;
+			break;
 		case TOP_RIGHT:
-			return value/2.0;
+			if(!neighbours[TOP])
+				return value/2.0;
+			break;
 		case BOT_RIGHT:
-			return value; 
+			return value;
 	}
+	return value;
 }
 
 
@@ -101,19 +116,28 @@ double VertexTopRightShapeFunction::ComputeValue(double x, double y)
 	x = getXValueOnElement(x); 
 	y = getYValueOnElement(y); 
 	double value =  vertex_top_right_function(x,y);
-	if(is_first_tier)
-		return value;
+
 	switch(position)
 	{
 	case BOT_LEFT:
 		return value;
 	case TOP_LEFT:
-		return value/2.0;
+		if(!neighbours[TOP])
+			return value/2.0;
+		break;
 	case TOP_RIGHT:
-		return value + vertex_top_left_function(x,y)/2.0;
+		if(!neighbours[TOP])
+			value+= vertex_top_left_function(x,y)/2.0;
+		if(!neighbours[RIGHT])
+			value+= vertex_bot_right_function(x,y)/2.0;
+		break;
 	case BOT_RIGHT:
-		return value;
+		if(!neighbours[RIGHT])
+			return value/2.0;
+		break;
 	}
+
+	return value;
 }
 
 
@@ -121,8 +145,30 @@ double VertexBotRightShapeFunction::ComputeValue(double x, double y)
 {
 	x = getXValueOnElement(x); 
 	y = getYValueOnElement(y); 
-	return vertex_bot_right_function(x,y);
+	double value = vertex_bot_right_function(x,y);
+
+	switch(position)
+	{
+	case BOT_LEFT:
+		if(!neighbours[BOT])
+			return value/2.0;
+		break;
+	case TOP_LEFT:
+		return value;
+	case TOP_RIGHT:
+		if(!neighbours[RIGHT])
+			return value/2.0;
+		break;
+	case BOT_RIGHT:
+		if(!neighbours[BOT])
+			value += vertex_bot_left_function(x,y)/2.0;
+		if(!neighbours[RIGHT])
+			value += vertex_top_right_function(x,y)/2.0;
+		break;
 	
+	}
+
+	return value;
 }
 
 
@@ -131,20 +177,23 @@ double EdgeLeftShapeFunction::ComputeValue(double x, double y)
 	x = getXValueOnElement(x); 
 	y = getYValueOnElement(y); 
 	double value = edge_left_function(x,y); 
-	if(is_first_tier)
-			return value;
+
 	switch(position)
 	{
 	case BOT_LEFT: 
-		return (value + vertex_top_left_function(x,y))*0.25;
+		if(!neighbours[LEFT])
+			return (value + vertex_top_left_function(x,y))*0.25;
+		return value;
 	case TOP_LEFT:
-		return (value + vertex_bot_left_function(x,y))*0.25;
+		if(!neighbours[LEFT])
+			return (value + vertex_bot_left_function(x,y))*0.25;
+		return value;
 	case TOP_RIGHT:
 		return value; 
 	case BOT_RIGHT:
 		return value;
 	}
-	
+	return value;
 }
 
 double EdgeTopShapeFunction::ComputeValue(double x, double y)
@@ -152,34 +201,70 @@ double EdgeTopShapeFunction::ComputeValue(double x, double y)
 	x = getXValueOnElement(x); 
 	y = getYValueOnElement(y); 
 	double value = edge_top_function(x,y); 
-	if(is_first_tier)
-			return value;
+
 	switch(position){
 	case BOT_LEFT:
 		return value;
 	case TOP_LEFT:
-		return (value + vertex_top_right_function(x,y))*0.25;
+		if(!neighbours[TOP])
+			return (value + vertex_top_right_function(x,y))*0.25;
+		return value;
 	case TOP_RIGHT:
-		return (value + vertex_top_left_function(x,y))*0.25;
+		if(!neighbours[TOP])
+			return (value + vertex_top_left_function(x,y))*0.25;
+		return value;
 	case BOT_RIGHT:
 		return value;
 	}
-	
+	return value;
 }
 
 
 double EdgeBotShapeFunction::ComputeValue(double x, double y)
 {
+
 	x = getXValueOnElement(x); 
 	y = getYValueOnElement(y); 
-	return edge_bot_function(x,y); 
+	double value = edge_bot_function(x,y);
+
+	switch(position){
+	case BOT_LEFT:
+		if(!neighbours[BOT])
+			return (value + vertex_bot_right_function(x,y))*0.25;
+		return value;
+	case TOP_LEFT:
+		return value;
+	case TOP_RIGHT:
+		return value;
+	case BOT_RIGHT:
+		if(!neighbours[BOT])
+			return (value + vertex_bot_left_function(x,y))*0.25;
+		return value;
+	}
+	return value;
 }
 
 double EdgeRightShapeFunction::ComputeValue(double x, double y)
 {
 	x = getXValueOnElement(x); 
 	y = getYValueOnElement(y); 
-	return edge_right_function(x,y); 
+	double value = edge_right_function(x,y);
+
+	switch(position){
+	case BOT_LEFT:
+		return value;
+	case TOP_LEFT:
+		return value;
+	case TOP_RIGHT:
+		if(!neighbours[RIGHT])
+			return (value + vertex_bot_right_function(x,y))*0.25;
+		return value;
+	case BOT_RIGHT:
+		if(!neighbours[RIGHT])
+			return (value + vertex_top_right_function(x,y))*0.25;
+		return value;
+	}
+	return value;
 }
 
 double InteriorShapeFunction::ComputeValue(double x, double y)

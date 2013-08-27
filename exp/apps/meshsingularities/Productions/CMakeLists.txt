@@ -1,5 +1,8 @@
 app(Test2D Test2D.cpp EquationSystem.cpp Production.cpp Vertex.cpp Processing.cpp Functions.cpp Point2D/DoubleArgFunction.cxx Point2D/Element.cxx Point2D/MatrixGenerator.cxx Point2D/Tier.cxx MatrixGeneration/GenericMatrixGenerator.cxx)
 
+add_subdirectory(Point2D)
+add_subdirectory(Point3D)
+
 SET(MUMPS "SEQ" CACHE STRING "Mumps type")
 if( ${MUMPS} STREQUAL "SEQ" )
 	message("Sequential mumps")
@@ -20,3 +23,4 @@ elseif (${MUMPS} STREQUAL "PAR")
 	target_link_libraries(Solver -lifcore -lsvml libdmumps.a libmumps_common.a libpord.a -lscalapack /h1/dgoik/measurements/libs/blacs1.a /h1/dgoik/measurements/libs/blacs2.a
 	-llammpio -llamf77mpi -lmpi -llam -lutil -ldl /h1/dgoik/measurements/gilbert_blas/libblas.so -lirc -liomp5 -lpthread)	
 endif()
+

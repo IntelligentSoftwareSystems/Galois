@@ -2,8 +2,10 @@
 #define __ELEMENT_2D_H_INCLUDED__
 
 #include "EPosition.hxx"
+#include "NPosition.hxx"
 #include "DoubleArgFunction.hxx"
 #include "GaussianQuadrature.hxx"
+#include <string.h>
 #include <cstdlib>
 #include <cmath>
 #include <map>
@@ -38,6 +40,8 @@ class Element{
 		double yl; 
 		double xr;
 		double yr;
+		double* coordinates;
+		bool* neighbours;
 		EPosition position;
 		bool is_first_tier;
 		int bot_left_vertex_nr; 
@@ -66,21 +70,27 @@ class Element{
 		 
 		DoubleArgFunctionProduct* product;
 	public:
-		Element(double xl, double yl, double xr, double yr, EPosition position, bool is_first_tier)
-			: xl(xl), yl(yl), xr(xr), yr(yr), position(position), is_first_tier(is_first_tier)
+		Element(double* _coordinates, bool* _neighbours, EPosition position, bool is_first_tier)
+			: position(position), is_first_tier(is_first_tier)
 		{
+			coordinates = new double[4];
+			coordinates[0] = _coordinates[0]; coordinates[1] = _coordinates[1]; coordinates[2] = _coordinates[2]; coordinates[3] = _coordinates[3];
+			neighbours = new bool[4];
+			neighbours[0] = _neighbours[0]; neighbours[1] = _neighbours[1]; neighbours[2] = _neighbours[2]; neighbours[3] = _neighbours[3];
+			xl = coordinates[0]; xr = coordinates[1]; yl = coordinates[2]; yr = coordinates[3];
+
 			
-			vertex_bot_left_function = new VertexBotLeftShapeFunction(is_first_tier, xl, yl, xr, yr, position); 
-			vertex_top_left_function = new VertexTopLeftShapeFunction(is_first_tier, xl, yl, xr, yr, position); 
-			vertex_top_right_function = new VertexTopRightShapeFunction(is_first_tier, xl, yl, xr, yr, position); 
-			vertex_bot_right_function = new VertexBotRightShapeFunction(is_first_tier, xl, yl, xr, yr, position);
+			vertex_bot_left_function = new VertexBotLeftShapeFunction(is_first_tier, coordinates, neighbours, position);
+			vertex_top_left_function = new VertexTopLeftShapeFunction(is_first_tier, coordinates, neighbours, position);
+			vertex_top_right_function = new VertexTopRightShapeFunction(is_first_tier, coordinates, neighbours, position);
+			vertex_bot_right_function = new VertexBotRightShapeFunction(is_first_tier, coordinates, neighbours, position);
 			
-			edge_left_function = new EdgeLeftShapeFunction(is_first_tier, xl, yl, xr, yr, position); 
-			edge_top_function = new EdgeTopShapeFunction(is_first_tier, xl, yl, xr, yr, position);
-			edge_bot_function = new EdgeBotShapeFunction(is_first_tier, xl, yl, xr, yr, position); 
-			edge_right_function = new EdgeRightShapeFunction(is_first_tier, xl, yl, xr, yr, position); 
+			edge_left_function = new EdgeLeftShapeFunction(is_first_tier, coordinates, neighbours, position);
+			edge_top_function = new EdgeTopShapeFunction(is_first_tier, coordinates, neighbours, position);
+			edge_bot_function = new EdgeBotShapeFunction(is_first_tier, coordinates, neighbours, position);
+			edge_right_function = new EdgeRightShapeFunction(is_first_tier, coordinates, neighbours, position);
 			
-			interior_function = new InteriorShapeFunction(is_first_tier, xl, yl, xr, yr, position); 
+			interior_function = new InteriorShapeFunction(is_first_tier, coordinates, neighbours, position);
 			
 			
 			shapeFunctions = new IDoubleArgFunction*[9];
@@ -113,6 +123,8 @@ class Element{
 			delete interior_function; 
 			delete product;
 			delete[] shapeFunctions;
+			delete coordinates;
+			delete neighbours;
 			
 		}
 		

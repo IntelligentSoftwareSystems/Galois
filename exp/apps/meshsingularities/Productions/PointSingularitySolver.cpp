@@ -44,7 +44,7 @@ static cll::opt<double> coord_z("coord_z", cll::desc("Z coord for left-bottom ve
 static cll::opt<double> size("size", cll::desc("Size of the shape"), cll::init(1.0));
 static cll::opt<bool> performTests("performTests", cll::desc("Run extended tests of computed solution"), cll::init(true));
 
-#define WITH_MUMPS_ENABLED 0
+#define WITH_MUMPS_ENABLED 1
 
 #ifdef WITH_MUMPS_ENABLED
 static cll::opt<bool> mumps("mumps", cll::desc("Pass data to MUMPS"), cll::init(false));

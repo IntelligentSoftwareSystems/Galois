@@ -3,6 +3,8 @@
 using namespace D2;
 std::list<EquationSystem*>* MatrixGenerator::CreateMatrixAndRhs(TaskDescription& task_description)
 {	
+		double* coordinates = new double[4];
+		bool* neighbours = new bool[4];
 
 		IDoubleArgFunction* f = new DoubleArgFunctionWrapper(task_description.function);
 		double bot_left_x = task_description.x;
@@ -11,7 +13,12 @@ std::list<EquationSystem*>* MatrixGenerator::CreateMatrixAndRhs(TaskDescription&
 		double size = task_description.size;
 
 		int nr = 0; 
-		Element* element = new Element(bot_left_x, bot_left_y + size / 2.0, bot_left_x + size / 2.0, bot_left_y + size, TOP_LEFT, true);
+		neighbours[LEFT] = true; neighbours[TOP] = true; neighbours[RIGHT] = true; neighbours[BOT] = true;
+		coordinates[0] = bot_left_x;
+		coordinates[1] = bot_left_x + size / 2.0;
+		coordinates[2] = bot_left_y + size / 2.0;
+		coordinates[3] = bot_left_y + size;
+		Element* element = new Element(coordinates, neighbours, TOP_LEFT, true);
 		
 		Element** elements = element->CreateFirstTier(nr);
 		
@@ -23,13 +30,15 @@ std::list<EquationSystem*>* MatrixGenerator::CreateMatrixAndRhs(TaskDescription&
 		double x = bot_left_x;
 		double y = bot_left_y + size / 2.0;
 		double s = size / 2.0;
-		
+		neighbours[LEFT] = false;
+		neighbours[TOP] = false;
 		for(int i = 1; i < nr_of_tiers ; i++){
 			
 			x = x + s; 
 			y = y - s / 2.0;
 			s = s /2.0;
-			element = new Element(x,y, x + s, y + s, TOP_LEFT, false);
+			coordinates[0] = x; coordinates[1] = x+s; coordinates[2] = y; coordinates[3] = y+s;
+			element = new Element(coordinates, neighbours, TOP_LEFT, false);
 			elements = element->CreateAnotherTier(nr);
 			
 			element_list.push_back(element);
@@ -41,7 +50,9 @@ std::list<EquationSystem*>* MatrixGenerator::CreateMatrixAndRhs(TaskDescription&
 		
 		x = x + s; 
 		y = y - s;
-		element = new Element(x, y, x + s, y + s, BOT_RIGHT, false);
+		coordinates[0] = x; coordinates[1] = x+s; coordinates[2] = y; coordinates[3] = y+s;
+		neighbours[LEFT] = true; neighbours[TOP] = true; neighbours[RIGHT] = true; neighbours[BOT] = true;
+		element = new Element(coordinates, neighbours, BOT_RIGHT, false);
 		element->CreateLastTier(nr);
 		element_list.push_back(element);
 		
@@ -66,6 +77,8 @@ std::list<EquationSystem*>* MatrixGenerator::CreateMatrixAndRhs(TaskDescription&
 			}
 			tier_list->push_back(tier);
 		}
+		delete coordinates;
+		delete neighbours;
 		return tier_list;
 }
 

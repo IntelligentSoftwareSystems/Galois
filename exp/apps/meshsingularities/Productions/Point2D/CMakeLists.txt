@@ -8,3 +8,4 @@
 #target_link_libraries(Mumps2D_SEQ -lifcore -lsvml -ldl libdmumps.a libmumps_common.a libpord.a libmpiseq.a /h1/dgoik/measurements/gilbert_blas/libblas.so libmpiseq.a -lirc -liomp5 -lpthread)
 
 
+app(Point2DTest main.cpp MatrixGenerator.cxx DoubleArgFunction.cxx Element.cxx Tier.cxx ../EquationSystem.cpp)

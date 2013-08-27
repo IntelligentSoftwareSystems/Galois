@@ -2,112 +2,70 @@
 #include "MatrixGenerator.hxx"
 #include <map>
 #include <time.h>
+#include <map>
+#include "../EquationSystem.h"
 
 using namespace D2;
-class MyFunction : public IDoubleArgFunction
-{
-	public:
-		virtual double ComputeValue(double x, double y)
-		{
-			return 1;
-		}
-};
 
-void print_matrix_rhs(double** matrix, double* rhs, int size)
+double test_function(int dim, ...)
 {
-	for(int i = 0; i<size; i++){
-		for(int j = 0; j<size; j++){
-				printf("%0.7lf ",matrix[i][j]);
-		}
-		printf("| %0.7lf\n",rhs[i]);
+	double *data = new double[dim];
+	double result = 0;
+	va_list args;
 
+	va_start (args, dim);
+	for (int i=0; i<dim; ++i) {
+		data[i] = va_arg (args, double);
 	}
-}
+	va_end(args);
 
-void print_matrix(double** matrix, int size)
-{
-	for(int i = 0; i<size; i++){
-		for(int j = 0; j<size; j++){
-				printf("%0.7lf ",matrix[i][j]);
-		}
-		printf("\n");
+	if (dim == 2)
+	{
 
+
+		result = data[0]*data[1]+data[0]+data[0]*data[1]*data[0]*data[1] + 13;
 	}
-}
-
-void print_rhs(double* rhs, int size)
-{
-	for(int i = 0; i<size; i++){
-		printf("%0.7lf\n",rhs[i]);
+	else
+	{
+		result = -1;
 	}
-}
 
+	delete [] data;
+	return result;
+}
 
 int main(int argc, char** argv)
 {
 
-	MatrixGenerator* matrix_generator = new MatrixGenerator();
-	IDoubleArgFunction* my_function = new MyFunction();
-	
-	std::list<Tier*>* tier_list = matrix_generator->CreateMatrixAndRhs(2, -1, -1, 4, my_function);
-	srand(time(NULL));
-	double** matrix = matrix_generator->GetMatrix();
-	double* rhs = matrix_generator->GetRhs(); 
-	int size = matrix_generator->GetMatrixSize(); 
-	std::map<int,double>* mapp = new std::map<int,double>();
-	(*mapp)[0] = 1.0;
-	(*mapp)[1] = 0.0;
-	(*mapp)[2] = 1.0;
-	(*mapp)[3] = 0.0;
-	(*mapp)[4] = 1.0;
-	(*mapp)[5] = 0.0;
-	(*mapp)[6] = 1.0;
-	(*mapp)[7] = 0.0;
-	(*mapp)[8] = 1.0;
-	(*mapp)[9] = 0.0;
-	(*mapp)[10] = 0.0;
-	(*mapp)[11] = 0.0;
-	(*mapp)[12] = 0.0;
-	(*mapp)[13] = 0.0;
-	(*mapp)[14] = 0.0;
-	(*mapp)[15] = 0.0;
-	(*mapp)[16] = 1.0;
-	(*mapp)[17] = 0.0;
-	(*mapp)[18] = 1.0;
-	(*mapp)[19] = 0.0;
-	(*mapp)[20] = 1.0;
-	(*mapp)[28] = 1.0;
-	(*mapp)[30] = 1.0;
-	(*mapp)[32] = 1.0;
-	(*mapp)[36] = 1.0;
 
-	matrix_generator->checkSolution(mapp,my_function);
+		GenericMatrixGenerator *matrixGenerator = new MatrixGenerator();
 
-	//print_matrix(matrix,size);
+		TaskDescription taskDescription;
+		taskDescription.dimensions=2;
+		taskDescription.nrOfTiers=10;
+		taskDescription.size=2;
+		taskDescription.function=test_function;
+		taskDescription.x=-1;
+		taskDescription.y=-1;
+		std::list<EquationSystem*> *tiers = matrixGenerator->CreateMatrixAndRhs(taskDescription);
+		EquationSystem *globalSystem = new EquationSystem(matrixGenerator->GetMatrix(),
+														  matrixGenerator->GetRhs(),
+														  matrixGenerator->GetMatrixSize());
 
-	//print_rhs(rhs,size);
-	//print_matrix_rhs(matrix,rhs,size);
-	/*
-	printf("----------------------------------------------------------\n");
+		//globalSystem->print();
+		globalSystem->eliminate(matrixGenerator->GetMatrixSize());
+		globalSystem->backwardSubstitute(matrixGenerator->GetMatrixSize()-1);
 
+		std::map<int,double>* result_map = new std::map<int,double>();
+		for(int i = 0; i<matrixGenerator->GetMatrixSize(); i++)
+		{
+			(*result_map)[i] = globalSystem->rhs[i];
+		}
 
+		matrixGenerator->checkSolution(result_map,test_function);
 
-	// przyklad stworzenia i wypisywania macierzy frontalnych
-	double** matrix2 = new double*[size];
-	double* rhs2 = new double[size]();
-	for(int i = 0; i<size; i++)
-		matrix2[i] = new double[size]();
-	
-	std::list<Tier*>::iterator it = tier_list->begin();
-	while(it != tier_list->end()){
-		(*it)->FillMatrixAndRhs(matrix2,rhs2,size);
-		++it;
-	}
-	print_matrix_rhs(matrix2,rhs2,size);
-
-	*/
-
-	return 0;
-
+		delete matrixGenerator;
+		delete result_map;
+		return 0;
 }
 

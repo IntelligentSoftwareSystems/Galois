@@ -1,6 +1,10 @@
 #ifndef __DOUBLEARGFUNCTION_H_INCLUDED
 #define __DOUBLEARGFUNCTION_H_INCLUDED
 #include "EPosition.hxx"
+#include "NPosition.hxx"
+#include "../MatrixGeneration/Function.hxx"
+#include <stdio.h>
+
 namespace D2
 {
 
@@ -9,12 +13,20 @@ double get_chi2(double var);
 double get_chi3(double var);
 
 
-class IDoubleArgFunction
+class IDoubleArgFunction : public Function
 {
 	
 	public:
 		virtual double ComputeValue(double x, double y) = 0; 
 
+	IDoubleArgFunction(double* coordinates, bool is_first_tier, bool* neighbours) : Function(coordinates,is_first_tier,neighbours)
+	{
+
+	}
+	IDoubleArgFunction()
+	{
+
+	}
 	virtual ~IDoubleArgFunction()
 	{
 
@@ -51,7 +63,6 @@ class ShapeFunction : public IDoubleArgFunction
 		double yl; 
 		double xr; 
 		double yr;
-		bool is_first_tier; 
 		EPosition position; 
 		
 	
@@ -68,10 +79,13 @@ class ShapeFunction : public IDoubleArgFunction
 		
 	
 	public:
-		ShapeFunction(bool is_first_tier, double xl, double yl, double xr, double yr, EPosition position) 
-			:  xl(xl), yl(yl), xr(xr), yr(yr), is_first_tier(is_first_tier), position(position)
+		ShapeFunction(double* coordinates, bool is_first_tier, bool* neighbours, EPosition position)
+			:  IDoubleArgFunction(coordinates, is_first_tier, neighbours), position(position)
 		{
-			
+			xl = coordinates[0];
+			xr = coordinates[1];
+			yl = coordinates[2];
+			yr = coordinates[3];
 		}
 		
 
@@ -82,8 +96,8 @@ class VertexBotLeftShapeFunction : public ShapeFunction
 {
 	public:
 
-		VertexBotLeftShapeFunction(bool is_first_tier, double xl, double yl, double xr, double yr, EPosition position) 
-			: ShapeFunction(is_first_tier, xl, yl, xr, yr, position)
+		VertexBotLeftShapeFunction(bool is_first_tier, double* coordinates, bool* neighbours, EPosition position)
+			: ShapeFunction(coordinates, is_first_tier, neighbours, position)
 		{
 			
 		}
@@ -100,8 +114,8 @@ class VertexTopLeftShapeFunction : public ShapeFunction
 {
 	public:
 
-		VertexTopLeftShapeFunction(bool is_first_tier, double xl, double yl, double xr, double yr, EPosition position) 
-			: ShapeFunction(is_first_tier, xl, yl, xr, yr, position)
+		VertexTopLeftShapeFunction(bool is_first_tier, double* coordinates, bool* neighbours, EPosition position)
+			: ShapeFunction(coordinates, is_first_tier, neighbours, position)
 		{
 			
 		}
@@ -116,8 +130,8 @@ class VertexTopRightShapeFunction : public ShapeFunction
 {
 	public:
 
-		VertexTopRightShapeFunction(bool is_first_tier, double xl, double yl, double xr, double yr, EPosition position) 
-			: ShapeFunction(is_first_tier, xl, yl, xr, yr, position)
+		VertexTopRightShapeFunction(bool is_first_tier, double* coordinates, bool* neighbours, EPosition position)
+			: ShapeFunction(coordinates, is_first_tier, neighbours, position)
 		{
 			
 		}
@@ -132,8 +146,8 @@ class VertexBotRightShapeFunction : public ShapeFunction
 {
 	public:
 
-		VertexBotRightShapeFunction(bool is_first_tier, double xl, double yl, double xr, double yr, EPosition position) 
-			: ShapeFunction(is_first_tier, xl, yl, xr, yr, position)
+		VertexBotRightShapeFunction(bool is_first_tier, double* coordinates, bool* neighbours, EPosition position)
+			: ShapeFunction(coordinates, is_first_tier, neighbours, position)
 		{
 			
 		}
@@ -148,11 +162,11 @@ class EdgeLeftShapeFunction : public ShapeFunction
 {
 	public:
 	
-		EdgeLeftShapeFunction(bool is_first_tier, double xl, double yl, double xr, double yr, EPosition position) 
-				: ShapeFunction(is_first_tier, xl, yl, xr, yr, position)
-			{
+		EdgeLeftShapeFunction(bool is_first_tier, double* coordinates, bool* neighbours, EPosition position)
+			: ShapeFunction(coordinates, is_first_tier, neighbours, position)
+		{
 				
-			}
+		}
 			
 		virtual double ComputeValue(double x, double y);
 		~EdgeLeftShapeFunction()
@@ -164,8 +178,8 @@ class EdgeTopShapeFunction : public ShapeFunction
 {
 	public:
 
-		EdgeTopShapeFunction(bool is_first_tier, double xl, double yl, double xr, double yr, EPosition position) 
-			: ShapeFunction(is_first_tier, xl, yl, xr, yr, position)
+		EdgeTopShapeFunction(bool is_first_tier, double* coordinates, bool* neighbours, EPosition position)
+			: ShapeFunction(coordinates, is_first_tier, neighbours, position)
 		{
 			
 		}
@@ -180,8 +194,8 @@ class EdgeBotShapeFunction : public ShapeFunction
 {
 	public:
 
-		EdgeBotShapeFunction(bool is_first_tier, double xl, double yl, double xr, double yr, EPosition position) 
-			: ShapeFunction(is_first_tier, xl, yl, xr, yr, position)
+		EdgeBotShapeFunction(bool is_first_tier, double* coordinates, bool* neighbours, EPosition position)
+			: ShapeFunction(coordinates, is_first_tier, neighbours, position)
 		{
 			
 		}
@@ -196,8 +210,8 @@ class EdgeRightShapeFunction : public ShapeFunction
 {	
 	public:
 
-		EdgeRightShapeFunction(bool is_first_tier, double xl, double yl, double xr, double yr, EPosition position) 
-			: ShapeFunction(is_first_tier, xl, yl, xr, yr, position)
+		EdgeRightShapeFunction(bool is_first_tier, double* coordinates, bool* neighbours, EPosition position)
+			: ShapeFunction(coordinates, is_first_tier, neighbours, position)
 		{
 			
 		}
@@ -212,8 +226,8 @@ class InteriorShapeFunction : public ShapeFunction
 {
 	public:
 
-		InteriorShapeFunction(bool is_first_tier, double xl, double yl, double xr, double yr, EPosition position) 
-			: ShapeFunction(is_first_tier, xl, yl, xr, yr, position)
+		InteriorShapeFunction(bool is_first_tier, double* coordinates, bool* neighbours, EPosition position)
+			: ShapeFunction(coordinates, is_first_tier, neighbours, position)
 		{
 			
 		}

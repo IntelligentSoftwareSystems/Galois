@@ -56,14 +56,6 @@ public:
 
 	virtual ~Tier()
 	{
-		delete bot_left_near_element;
-		delete bot_left_far_element;
-		delete bot_right_near_element;
-		delete bot_right_far_element;
-		delete top_left_near_element;
-		delete top_left_far_element;
-		delete top_right_near_element;
-		delete top_right_far_element;
 
 	}
 

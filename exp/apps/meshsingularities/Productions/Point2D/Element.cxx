@@ -1,22 +1,56 @@
 #include "Element.hxx"
-#include <stdio.h>
+
 using namespace D2;
+
+void prepare_coordinates(double xl, double xr, double yl, double yr, double* coordinates,
+		double& bot_element_xl, double& bot_element_xr, double& bot_element_yl, double& bot_element_yr,
+		double& right_element_xl, double& right_element_xr, double& right_element_yl, double& right_element_yr)
+{
+	bot_element_xl = xl;
+	bot_element_xr = xr;
+	bot_element_yl = yl - (yr-yl);
+	bot_element_yr = yl;
+
+	right_element_xl = xr;
+	right_element_xr = xr + (xr-xl);
+	right_element_yl = yl;
+	right_element_yr = yr;
+
+	coordinates[0] = right_element_xl;
+	coordinates[1] = right_element_xr;
+	coordinates[2] = right_element_yl;
+	coordinates[3] = right_element_yr;
+}
+
 Element** Element::CreateAnotherTier(int nr)
 {
 
-	double bot_element_xl = xl; 
-	double bot_element_xr = xr;
-	double bot_element_yl = yl - (yr-yl); 
-	double bot_element_yr = yl;
+	double* coordinates = new double[4];
+	bool* neighbours = new bool[4];
+
+	double bot_element_xl;
+	double bot_element_xr;
+	double bot_element_yl;
+	double bot_element_yr;
 		
-	double right_element_xl = xr; 
-	double right_element_xr = xr + (xr-xl); 	
-	double right_element_yl = yl; 
-	double right_element_yr = yr; 
+	double right_element_xl;
+	double right_element_xr;
+	double right_element_yl;
+	double right_element_yr;
 
-	Element* right_element = new Element(right_element_xl,right_element_yl,right_element_xr,right_element_yr,TOP_RIGHT,false); 	
-	Element* bot_element = new Element(bot_element_xl,bot_element_yl,bot_element_xr,bot_element_yr,BOT_LEFT,false); 	
+	prepare_coordinates(xl,xr,yl,yr,coordinates,bot_element_xl,bot_element_xr,bot_element_yl,bot_element_yr,
+			right_element_xl,right_element_xr,right_element_yl,right_element_yr);
 
+	neighbours[LEFT] = true; neighbours[TOP] = false; neighbours[RIGHT] = true; neighbours[BOT] = true;
+
+	Element* right_element = new Element(coordinates,neighbours,TOP_RIGHT,false);
+	coordinates[0] = bot_element_xl;
+	coordinates[1] = bot_element_xr;
+	coordinates[2] = bot_element_yl;
+	coordinates[3] = bot_element_yr;
+	neighbours[LEFT] = false; neighbours[TOP] = true;
+
+	Element* bot_element = new Element(coordinates,neighbours,BOT_LEFT,false);
 
 	top_left_vertex_nr = nr + 2; 
 	bot_left_vertex_nr = nr; 
@@ -58,25 +92,39 @@ Element** Element::CreateAnotherTier(int nr)
 	Element** elements = new Element*[2]; 
 	elements[0] = right_element;
 	elements[1] = bot_element; 
+	delete coordinates;
+	delete neighbours;
 	return elements;
 
 }
 
 
 Element** Element::CreateFirstTier(int nr){
-		
-	double bot_element_xl = xl; 
-	double bot_element_xr = xr;
-	double bot_element_yl = yl - (yr-yl); 
-	double bot_element_yr = yl;
-		
-	double right_element_xl = xr; 
-	double right_element_xr = xr + (xr-xl); 	
-	double right_element_yl = yl; 
-	double right_element_yr = yr; 
 
-	Element* right_element = new Element(right_element_xl,right_element_yl,right_element_xr,right_element_yr,TOP_RIGHT,true); 	
-	Element* bot_element = new Element(bot_element_xl,bot_element_yl,bot_element_xr,bot_element_yr,BOT_LEFT,true); 	
+	double* coordinates = new double[4];
+	bool* neighbours = new bool[4];
+
+	neighbours[0] = true; neighbours[1] = true; neighbours[2] = true; neighbours[3] = true;
+		
+	double bot_element_xl;
+	double bot_element_xr;
+	double bot_element_yl;
+	double bot_element_yr;
+		
+	double right_element_xl;
+	double right_element_xr;
+	double right_element_yl;
+	double right_element_yr;
+
+	prepare_coordinates(xl,xr,yl,yr,coordinates,bot_element_xl,bot_element_xr,bot_element_yl,bot_element_yr,
+			right_element_xl,right_element_xr,right_element_yl,right_element_yr);
+
+	Element* right_element = new Element(coordinates,neighbours,TOP_RIGHT,true);
+	coordinates[0] = bot_element_xl;
+	coordinates[1] = bot_element_xr;
+	coordinates[2] = bot_element_yl;
+	coordinates[3] = bot_element_yr;
+	Element* bot_element = new Element(coordinates,neighbours,BOT_LEFT,true);
 		
 	top_left_vertex_nr = nr + 4; 
 	bot_left_vertex_nr = nr + 2; 
@@ -118,7 +166,8 @@ Element** Element::CreateFirstTier(int nr){
 	Element** elements = new Element*[2]; 
 	elements[0] = right_element; 
 	elements[1] = bot_element; 	
-
+	delete coordinates;
+	delete neighbours;
 	return elements;
 		
 }
@@ -162,6 +211,7 @@ void Element::fillMatrix(double** tier_matrix, double** global_matrix, int start
 			for(int j = 0; j<9; j++){
 				comp(functionNumbers[i], functionNumbers[j],
 						shapeFunctions[i], shapeFunctions[j], tier_matrix, global_matrix, start_adj_nr);
+
 			}
 		}
 }
@@ -169,13 +219,16 @@ void Element::fillMatrix(double** tier_matrix, double** global_matrix, int start
 
 void Element::fillRhs(double* tier_rhs, double* global_rhs, IDoubleArgFunction* f, int start_adj_nr)
 {
+
 		int functionNumbers[] = { bot_left_vertex_nr, left_edge_nr, top_left_vertex_nr, top_edge_nr, top_right_vertex_nr, bot_edge_nr, interior_nr, right_edge_nr, bot_right_vertex_nr }; 
 		for(int i = 0; i<9; i++){
 
 			product->SetFunctions(shapeFunctions[i], f);
+
 			double value = GaussianQuadrature::definiteDoubleIntegral(xl, xr, yl, yr, product);
 			tier_rhs[functionNumbers[i] - start_adj_nr] += value;
 			global_rhs[functionNumbers[i]] += value;
+
 
 		}		
 }
@@ -217,8 +270,8 @@ bool Element::checkSolution(std::map<int,double> *solution_map, IDoubleArgFuncti
 		//printf("%d Checking at: %lf %lf values: %lf %lf\n",position,rnd_x_within_element,rnd_y_within_element,value,f->ComputeValue(rnd_x_within_element,rnd_y_within_element));
 		if(!(fabs(value - f->ComputeValue(rnd_x_within_element,rnd_y_within_element)) < epsilon))
 		{
-			for(int i = 0; i<9; i++)
-				printf("%lf %d\n",coefficients[i],bot_right_vertex_nr);
+			//for(int i = 0; i<9; i++)
+				//printf("%lf\n",coefficients[i]);
 			return false;
 		}
 	}

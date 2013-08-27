@@ -44,10 +44,6 @@ public:
 
 	virtual ~Tier()
 	{
-		delete bot_left_element;
-		delete bot_right_element;
-		delete top_left_element;
-		delete top_right_element;
 
 	}
 
