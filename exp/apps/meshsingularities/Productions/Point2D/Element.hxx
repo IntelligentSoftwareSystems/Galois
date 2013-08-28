@@ -105,7 +105,6 @@ class Element{
 			shapeFunctions[8] = vertex_bot_right_function;
 
 			product = new DoubleArgFunctionProduct();
-					
 		}
 		
 		~Element()
@@ -123,8 +122,8 @@ class Element{
 			delete interior_function; 
 			delete product;
 			delete[] shapeFunctions;
-			delete coordinates;
-			delete neighbours;
+			delete[] coordinates;
+			delete[] neighbours;
 			
 		}
 		
@@ -168,6 +167,7 @@ class Element{
 		void set_interior_nr(int nr){
 			interior_nr = nr; 
 		}
+
 		private:
 			void comp(int indx1, int indx2, IDoubleArgFunction* f1, IDoubleArgFunction* f2,double** tier_matrix, double** global_matrix, int start_nr_adj);
 };

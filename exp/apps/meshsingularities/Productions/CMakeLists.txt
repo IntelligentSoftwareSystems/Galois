@@ -1,6 +1,7 @@
 app(Test2D Test2D.cpp EquationSystem.cpp Production.cpp Vertex.cpp Processing.cpp Functions.cpp Point2D/DoubleArgFunction.cxx Point2D/Element.cxx Point2D/MatrixGenerator.cxx Point2D/Tier.cxx MatrixGeneration/GenericMatrixGenerator.cxx)
 
 add_subdirectory(Point2D)
+add_subdirectory(Point2DQuad)
 add_subdirectory(Point3D)
 
 SET(MUMPS "SEQ" CACHE STRING "Mumps type")

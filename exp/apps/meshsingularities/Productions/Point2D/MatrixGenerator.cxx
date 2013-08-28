@@ -77,8 +77,10 @@ std::list<EquationSystem*>* MatrixGenerator::CreateMatrixAndRhs(TaskDescription&
 			}
 			tier_list->push_back(tier);
 		}
-		delete coordinates;
-		delete neighbours;
+		//xyz
+		delete[] elements;
+		delete[] coordinates;
+		delete[] neighbours;
 		return tier_list;
 }
 

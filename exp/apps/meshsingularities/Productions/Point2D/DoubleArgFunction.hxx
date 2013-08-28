@@ -2,7 +2,7 @@
 #define __DOUBLEARGFUNCTION_H_INCLUDED
 #include "EPosition.hxx"
 #include "NPosition.hxx"
-#include "../MatrixGeneration/Function.hxx"
+#include "../MatrixGeneration/IFunction.hxx"
 #include <stdio.h>
 
 namespace D2
@@ -13,13 +13,13 @@ double get_chi2(double var);
 double get_chi3(double var);
 
 
-class IDoubleArgFunction : public Function
+class IDoubleArgFunction : public IFunction
 {
 	
 	public:
 		virtual double ComputeValue(double x, double y) = 0; 
 
-	IDoubleArgFunction(double* coordinates, bool is_first_tier, bool* neighbours) : Function(coordinates,is_first_tier,neighbours)
+	IDoubleArgFunction(double* coordinates, bool is_first_tier, bool* neighbours) : IFunction(coordinates,is_first_tier,neighbours)
 	{
 
 	}

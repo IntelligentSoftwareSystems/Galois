@@ -92,8 +92,8 @@ Element** Element::CreateAnotherTier(int nr)
 	Element** elements = new Element*[2]; 
 	elements[0] = right_element;
 	elements[1] = bot_element; 
-	delete coordinates;
-	delete neighbours;
+	delete[] coordinates;
+	delete[] neighbours;
 	return elements;
 
 }
@@ -166,8 +166,8 @@ Element** Element::CreateFirstTier(int nr){
 	Element** elements = new Element*[2]; 
 	elements[0] = right_element; 
 	elements[1] = bot_element; 	
-	delete coordinates;
-	delete neighbours;
+	delete[] coordinates;
+	delete[] neighbours;
 	return elements;
 		
 }
