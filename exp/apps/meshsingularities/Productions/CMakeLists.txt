@@ -11,7 +11,7 @@ if( ${MUMPS} STREQUAL "SEQ" )
 	include_directories(${MUMPS}include ${MUMPS}libseq)
 	link_directories(${MUMPS}lib /opt/apps/sysnet/intel/13.1/lib/intel64/ ${MUMPS}libseq/ /usr/lib64/)
 	
-	app(Solver EquationSystem.cpp Production.cpp Vertex.cpp GraphGenerator.cxx Processing.cpp Functions.cpp PointSingularitySolver.cpp GaloisWorker.cpp MatrixGeneration/GenericMatrixGenerator.cxx Point3D/TripleArgFunction.cxx Point3D/Element.cxx Point3D/MatrixGenerator.cxx Point3D/Tier.cxx Point2D/DoubleArgFunction.cxx Point2D/Element.cxx Point2D/MatrixGenerator.cxx Point2D/Tier.cxx Mumps.cxx)
+	app(Solver EquationSystem.cpp Production.cpp Vertex.cpp GraphGenerator.cxx Processing.cpp Functions.cpp PointSingularitySolver.cpp GaloisWorker.cpp MatrixGeneration/GenericMatrixGenerator.cxx Point3D/TripleArgFunction.cxx Point3D/Element.cxx Point3D/MatrixGenerator.cxx Point3D/Tier.cxx Point2D/DoubleArgFunction.cxx Point2D/Element.cxx Point2D/MatrixGenerator.cxx Point2D/Tier.cxx Point2DQuad/MatrixGenerator.cxx Point2DQuad/Tier.cxx Mumps.cxx)
 	target_link_libraries(Solver -lifcore -lsvml -ldl libdmumps.a libmumps_common.a libpord.a libmpiseq.a /h1/dgoik/measurements/gilbert_blas/libblas.so libmpiseq.a -lirc -liomp5 -lpthread)
 elseif (${MUMPS} STREQUAL "PAR")
 	message("parallel mumps")

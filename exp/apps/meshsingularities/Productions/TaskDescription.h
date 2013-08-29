@@ -5,7 +5,7 @@ struct TaskDescription {
 	int dimensions;
 	int nrOfTiers;
 	double size;
-
+	bool quad;
 	double x;
 	double y;
 	double z;

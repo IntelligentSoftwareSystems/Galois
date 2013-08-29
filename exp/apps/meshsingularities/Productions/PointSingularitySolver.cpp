@@ -28,6 +28,7 @@ namespace cll = llvm::cl;
 
 static cll::opt<int> tiers("tiers", cll::desc("Number of Tiers"), cll::init(16));
 static cll::opt<int> dimensions("dimensions", cll::desc("Dimensions"), cll::init(3));
+static cll::opt<bool> quad("quad", cll::desc("Quad singularity"), cll::init(false));
 
 static cll::opt<Functions> function("function", cll::desc("Choose a function:"),
     cll::values(
@@ -78,7 +79,7 @@ int main(int argc, char** argv)
  	taskDescription.x = coord_x;
  	taskDescription.y = coord_y;
  	taskDescription.z = coord_z;
-
+ 	taskDescription.quad = quad;
  	taskDescription.performTests = performTests;
 
 #ifdef WITH_MUMPS_ENABLED

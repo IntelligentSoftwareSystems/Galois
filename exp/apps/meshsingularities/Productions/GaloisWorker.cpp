@@ -7,6 +7,7 @@
 
 #include "Point2D/MatrixGenerator.hxx"
 #include "Point3D/MatrixGenerator.hxx"
+#include "Point2DQuad/MatrixGenerator.hxx"
 
 #include <sys/time.h>
 
@@ -113,9 +114,13 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 		matrixGenerator = new D3::MatrixGenerator();
 		production = new AbstractProduction(19, 75, 117, 83);
 	}
-	else if (taskDescription.dimensions == 2) {
+	else if (taskDescription.dimensions == 2 && !taskDescription.quad) {
 		matrixGenerator = new D2::MatrixGenerator();
 		production = new AbstractProduction(5, 17, 21, 21);
+	}
+	else if (taskDescription.dimensions == 2 && taskDescription.quad) {
+		matrixGenerator = new D2Quad::MatrixGenerator();
+		production = new AbstractProduction(16, 56, 72, 65);
 	}
 	Galois::StatTimer timerMatrix("matrix generation");
 	timerMatrix.start();

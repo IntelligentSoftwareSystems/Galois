@@ -7,18 +7,13 @@ Vertex::Vertex(Vertex *Left, Vertex *Right, Vertex *Parent, VertexType type, int
     this->parent = Parent;
     this->type = type;
     this->system = new EquationSystem(systemSize);
-    this->orig_system = new EquationSystem(systemSize);
 }
 
 Vertex::~Vertex()
 {
-    if (this->system != NULL) {
+    /*if (this->system != NULL) {
         delete this->system;
-    }
-    
-    if (this->orig_system != NULL) {
-        delete this->orig_system;
-    }
+    } */
 
     if (this->left != NULL) {
         delete this->left;

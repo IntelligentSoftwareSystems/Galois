@@ -19,7 +19,6 @@ class Vertex
     VertexType type;
     
     EquationSystem *system;
-    EquationSystem *orig_system;
     
     Vertex(Vertex *Left, Vertex *Right, Vertex *Parent, VertexType type, int systemSize);
     ~Vertex();
