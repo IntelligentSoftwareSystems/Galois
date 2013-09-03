@@ -18,7 +18,7 @@ std::list<EquationSystem*>* MatrixGenerator::CreateMatrixAndRhs(TaskDescription&
 		coordinates[1] = bot_left_x + size / 2.0;
 		coordinates[2] = bot_left_y + size / 2.0;
 		coordinates[3] = bot_left_y + size;
-		Element* element = new Element(coordinates, neighbours, TOP_LEFT, true);
+		Element* element = new Element(coordinates, neighbours, TOP_LEFT);
 		
 		Element** elements = element->CreateFirstTier(nr);
 		
@@ -38,7 +38,7 @@ std::list<EquationSystem*>* MatrixGenerator::CreateMatrixAndRhs(TaskDescription&
 			y = y - s / 2.0;
 			s = s /2.0;
 			coordinates[0] = x; coordinates[1] = x+s; coordinates[2] = y; coordinates[3] = y+s;
-			element = new Element(coordinates, neighbours, TOP_LEFT, false);
+			element = new Element(coordinates, neighbours, TOP_LEFT);
 			elements = element->CreateAnotherTier(nr);
 			
 			element_list.push_back(element);
@@ -52,7 +52,7 @@ std::list<EquationSystem*>* MatrixGenerator::CreateMatrixAndRhs(TaskDescription&
 		y = y - s;
 		coordinates[0] = x; coordinates[1] = x+s; coordinates[2] = y; coordinates[3] = y+s;
 		neighbours[LEFT] = true; neighbours[TOP] = true; neighbours[RIGHT] = true; neighbours[BOT] = true;
-		element = new Element(coordinates, neighbours, BOT_RIGHT, false);
+		element = new Element(coordinates, neighbours, BOT_RIGHT);
 		element->CreateLastTier(nr);
 		element_list.push_back(element);
 		

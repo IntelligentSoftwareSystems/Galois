@@ -263,48 +263,48 @@ Element** MatrixGenerator::CreateElements(double x, double y, double element_siz
 	coordinates[0] = x; coordinates[1] = x + element_size; coordinates[2] = y; coordinates[3] = y + element_size;
 
 	if(!first_tier) {neighbours[LEFT] = false; neighbours[BOT] = false; }
-	elements[i++] = new Element(coordinates,neighbours,BOT_LEFT,true);
+	elements[i++] = new Element(coordinates,neighbours,BOT_LEFT);
 	coordinates[2] += element_size; coordinates[3] += element_size;
 	if(!first_tier) {neighbours[BOT] = true;}
-	elements[i++] = new Element(coordinates,neighbours,TOP_LEFT,true);
+	elements[i++] = new Element(coordinates,neighbours,TOP_LEFT);
 	coordinates[2] += element_size; coordinates[3] += element_size;
-	elements[i++] = new Element(coordinates,neighbours,BOT_LEFT,true);
+	elements[i++] = new Element(coordinates,neighbours,BOT_LEFT);
 	coordinates[2] += element_size; coordinates[3] += element_size;
 	if(!first_tier) {neighbours[TOP] = false;}
-	elements[i++] = new Element(coordinates,neighbours,TOP_LEFT,true);
+	elements[i++] = new Element(coordinates,neighbours,TOP_LEFT);
 	coordinates[0] += element_size; coordinates[1] += element_size;
-	if(!first_tier) {neighbours[LEFT] = true;}//
-	elements[i++] = new Element(coordinates,neighbours,TOP_RIGHT,true);
+	if(!first_tier) {neighbours[LEFT] = true;}
+	elements[i++] = new Element(coordinates,neighbours,TOP_RIGHT);
 	coordinates[0] += element_size; coordinates[1] += element_size;
-	elements[i++] = new Element(coordinates,neighbours,TOP_LEFT,true);
+	elements[i++] = new Element(coordinates,neighbours,TOP_LEFT);
 	coordinates[0] += element_size; coordinates[1] += element_size;
 	if(!first_tier) {neighbours[RIGHT] = false;}
-	elements[i++] = new Element(coordinates,neighbours,TOP_RIGHT,true);
+	elements[i++] = new Element(coordinates,neighbours,TOP_RIGHT);
 	coordinates[2] -= element_size; coordinates[3] -= element_size;
 	if(!first_tier) {neighbours[TOP] = true;}
-	elements[i++] = new Element(coordinates,neighbours,BOT_RIGHT,true);
+	elements[i++] = new Element(coordinates,neighbours,BOT_RIGHT);
 	coordinates[2] -= element_size; coordinates[3] -= element_size;
-	elements[i++] = new Element(coordinates,neighbours,TOP_RIGHT,true);
+	elements[i++] = new Element(coordinates,neighbours,TOP_RIGHT);
 	coordinates[2] -= element_size; coordinates[3] -= element_size;
 	if(!first_tier) {neighbours[BOT] = false;}
-	elements[i++] = new Element(coordinates,neighbours,BOT_RIGHT,true);
+	elements[i++] = new Element(coordinates,neighbours,BOT_RIGHT);
 	coordinates[0] -= element_size; coordinates[1] -= element_size;
 	if(!first_tier) {neighbours[RIGHT] = true;}
-	elements[i++] = new Element(coordinates,neighbours,BOT_LEFT,true);
+	elements[i++] = new Element(coordinates,neighbours,BOT_LEFT);
 	coordinates[0] -= element_size; coordinates[1] -= element_size;
-	elements[i++] = new Element(coordinates,neighbours,BOT_RIGHT,true);
+	elements[i++] = new Element(coordinates,neighbours,BOT_RIGHT);
 
 	if(size == 16)
 	{
 		neighbours[0] = true; neighbours[1] = true; neighbours[2] = true; neighbours[3] = true;
 		coordinates[0] = x+element_size; coordinates[1] = x + 2*element_size; coordinates[2] = y + element_size; coordinates[3] = y + 2*element_size;
-		elements[i++] = new Element(coordinates,neighbours,TOP_RIGHT,true);
+		elements[i++] = new Element(coordinates,neighbours,TOP_RIGHT);
 		coordinates[2] += element_size; coordinates[3] += element_size;
-		elements[i++] = new Element(coordinates,neighbours,BOT_RIGHT,true);
+		elements[i++] = new Element(coordinates,neighbours,BOT_RIGHT);
 		coordinates[0] += element_size; coordinates[1] += element_size;
-		elements[i++] = new Element(coordinates,neighbours,BOT_LEFT,true);
+		elements[i++] = new Element(coordinates,neighbours,BOT_LEFT);
 		coordinates[2] -= element_size; coordinates[3] -= element_size;
-		elements[i] = new Element(coordinates,neighbours,TOP_LEFT,true);
+		elements[i] = new Element(coordinates,neighbours,TOP_LEFT);
 	}
 
 	return elements;

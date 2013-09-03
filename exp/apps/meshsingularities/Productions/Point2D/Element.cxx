@@ -43,14 +43,14 @@ Element** Element::CreateAnotherTier(int nr)
 
 	neighbours[LEFT] = true; neighbours[TOP] = false; neighbours[RIGHT] = true; neighbours[BOT] = true;
 
-	Element* right_element = new Element(coordinates,neighbours,TOP_RIGHT,false);
+	Element* right_element = new Element(coordinates,neighbours,TOP_RIGHT);
 	coordinates[0] = bot_element_xl;
 	coordinates[1] = bot_element_xr;
 	coordinates[2] = bot_element_yl;
 	coordinates[3] = bot_element_yr;
 	neighbours[LEFT] = false; neighbours[TOP] = true;
 
-	Element* bot_element = new Element(coordinates,neighbours,BOT_LEFT,false);
+	Element* bot_element = new Element(coordinates,neighbours,BOT_LEFT);
 
 	top_left_vertex_nr = nr + 2; 
 	bot_left_vertex_nr = nr; 
@@ -119,12 +119,12 @@ Element** Element::CreateFirstTier(int nr){
 	prepare_coordinates(xl,xr,yl,yr,coordinates,bot_element_xl,bot_element_xr,bot_element_yl,bot_element_yr,
 			right_element_xl,right_element_xr,right_element_yl,right_element_yr);
 
-	Element* right_element = new Element(coordinates,neighbours,TOP_RIGHT,true);
+	Element* right_element = new Element(coordinates,neighbours,TOP_RIGHT);
 	coordinates[0] = bot_element_xl;
 	coordinates[1] = bot_element_xr;
 	coordinates[2] = bot_element_yl;
 	coordinates[3] = bot_element_yr;
-	Element* bot_element = new Element(coordinates,neighbours,BOT_LEFT,true);
+	Element* bot_element = new Element(coordinates,neighbours,BOT_LEFT);
 		
 	top_left_vertex_nr = nr + 4; 
 	bot_left_vertex_nr = nr + 2; 
