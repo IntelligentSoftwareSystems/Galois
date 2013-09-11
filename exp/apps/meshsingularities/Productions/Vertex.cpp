@@ -9,12 +9,22 @@ Vertex::Vertex(Vertex *Left, Vertex *Right, Vertex *Parent, VertexType type, int
     this->system = new EquationSystem(systemSize);
 }
 
+Vertex::Vertex(Vertex *Left, Vertex *Right, Vertex *Parent, VertexType type, int systemSize, int node)
+{
+    this->left = Left;
+    this->right = Right;
+    this->parent = Parent;
+    this->type = type;
+    this->system = new NumaEquationSystem(systemSize, node);
+}
+
+
 Vertex::~Vertex()
 {
-    /*if (this->system != NULL) {
+    if (this->system != NULL) {
         delete this->system;
-    } */
-
+    }
+    
     if (this->left != NULL) {
         delete this->left;
     }

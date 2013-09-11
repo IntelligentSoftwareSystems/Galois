@@ -2,6 +2,7 @@
 #define VERTEX_H
 
 #include "EquationSystem.h"
+#include "NumaEquationSystem.h"
 
 typedef enum {
 	ROOT=0,
@@ -21,6 +22,8 @@ class Vertex
     EquationSystem *system;
     
     Vertex(Vertex *Left, Vertex *Right, Vertex *Parent, VertexType type, int systemSize);
+    Vertex(Vertex *Left, Vertex *Right, Vertex *Parent, VertexType type, int systemSize, int node);
+
     ~Vertex();
     
 	void setLeft(Vertex *v);

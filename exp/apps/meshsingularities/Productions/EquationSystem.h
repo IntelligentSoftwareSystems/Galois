@@ -12,6 +12,9 @@
 #include <cstdlib>
 
 class EquationSystem {
+  private:
+        // needed because of implementation of swapRows
+        double *origPtr;
   public:
 	// this variables _should_ be public
 	// Productions will use them directly
@@ -20,6 +23,7 @@ class EquationSystem {
 	double ** matrix;
 	double *rhs;
 
+	EquationSystem() {} ;
 	EquationSystem(int n);
 	EquationSystem(double ** matrix, double *rhs, int size);
 	virtual ~EquationSystem();

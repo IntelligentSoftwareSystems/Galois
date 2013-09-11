@@ -1,15 +1,24 @@
 #include "EquationSystem.h"
 #include <cmath>
+
+#include <Galois/Galois.h>
+#include <boost/iterator.hpp>
+
 EquationSystem::EquationSystem(int n)
 {
 	this->n = n;
+	unsigned long i;
 
 	// we are working on continuous area of memory
 
 	matrix = new double*[n];
 	matrix[0] = new double[n*(n+1)]();
-	for (int i = 0; i < n; ++i) {
+	for (i = 0; i < n; ++i) {
 		matrix[i] = matrix[0] + i * n;
+	}
+
+	if (matrix == NULL || matrix[0] == NULL) {
+		throw std::string("Cannot allocate memory!");
 	}
 
 	rhs = matrix[0]+n*n;
@@ -18,19 +27,24 @@ EquationSystem::EquationSystem(int n)
 EquationSystem::EquationSystem(double ** matrix, double *rhs, int size)
 {
 	this->n = size;
-
+	unsigned long i;
 	// we are working on continuous area of memory
 
 	this->matrix = new double*[n];
 	this->matrix[0] = new double[n*(n+1)]();
 
-	for (int i = 1; i < n; ++i) {
+	for (i = 1; i < n; ++i) {
 		this->matrix[i] = this->matrix[0] + i*n;
 	}
 
+	if (matrix == NULL || matrix[0] == NULL) {
+		throw std::string("Cannot allocate memory!");
+	}
+
+
 	this->rhs = this->matrix[0]+n*n;
 
-	for (int i=0; i<size; ++i) {
+	for (i=0; i<size; ++i) {
 		for (int j=0; j<size; ++j) {
 			this->matrix[i][j] = matrix[i][j];
 		}
@@ -41,17 +55,23 @@ EquationSystem::EquationSystem(double ** matrix, double *rhs, int size)
 
 EquationSystem::~EquationSystem()
 {
-	delete [] matrix[0];
-	delete [] matrix;
+	if (matrix != NULL) {
+		delete [] matrix[0];
+		delete [] matrix;
+	}
 
 }
 
 void EquationSystem::eliminate(const int rows)
 {
+
+
 	double maxX;
-	int maxRow;
+	register int maxRow;
 	double x;
-	for (int i=0;i<rows;++i) {
+	int i, j;
+
+	for (i=0;i<rows;++i) {
 		maxX = fabs(matrix[i][i]);
 		maxRow = i;
 
@@ -66,23 +86,29 @@ void EquationSystem::eliminate(const int rows)
 			swapRows(i, maxRow);
 		}
 
-		double x = matrix[i][i];
+		x = matrix[i][i];
+		// on diagonal - only 1.0
 		matrix[i][i] = 1.0;
 
-		for (int j=i+1;j<n;++j) {
-			// on diagonal - only 1.0
+		for (j=i+1;j<n;++j) {
 			matrix[i][j] /= x;
 		}
 
 		rhs[i] /= x;
-
-		for (int j=i+1; j<n; ++j) {
+		/*Galois::do_all(boost::counting_iterator<int>(i+1),
+				boost::counting_iterator<int>(n), [&] (int j) {
+				x = matrix[j][i];
+				for (int k = i+1; k<n; ++k) {
+					matrix[j][k] -= x*matrix[i][k];
+				}
+				rhs[j] -= x*rhs[i];
+			}); */
+		for (j=i+1; j<n; ++j) {
 			x = matrix[j][i];
-			for (int k=i; k<n; ++k) {
+			for (int k = i+1; k<n; ++k) {
 				matrix[j][k] -= x*matrix[i][k];
 			}
 			rhs[j] -= x*rhs[i];
-			//matrix[j][i] = 0.0;
 		}
 	}
 }
@@ -91,11 +117,12 @@ void EquationSystem::backwardSubstitute(const int startingRow)
 {
 	for (int i=startingRow; i>=0; --i) {
 		double sum = rhs[i];
-		for (int j=n-1;j>=i+1;--j) {
+		for (int j=n-1; j>=i+1;--j) {
 			sum -= matrix[i][j] * rhs[j];
 			matrix[i][j] = 0.0;
 		}
-		rhs[i] = sum / matrix[i][i];
+		rhs[i] = sum;// / matrix[i][i]; // after elimination we have always 1.0 at matrix[i][i]
+		// do not need to divide by matrix[i][i]
 	}
 }
 

@@ -14,24 +14,19 @@
 #include "Vertex.h"
 #include "EquationSystem.h"
 #include <vector>
-
-struct Node;
+#include "Node.h"
 
 typedef int EdgeData;
-
 
 typedef Galois::Graph::LC_Morph_Graph<Node,EdgeData> Graph;
 typedef Galois::Graph::LC_Morph_Graph<Node,EdgeData>::GraphNode GraphNode;
 typedef Galois::Graph::LC_Morph_Graph<Node,EdgeData>::iterator LCM_iterator;
 typedef Galois::Graph::LC_Morph_Graph<Node,EdgeData>::edge_iterator LCM_edge_iterator;
 
-
 class GraphGenerator {
 public:
-	static int id;
 	GraphGenerator() : S(NULL), graph(NULL), edge_data(0), productions(NULL),
-					   inputData(NULL) {
-	   id = 0;
+					   inputData(NULL), leafs(0) {
 	}
 
 	virtual ~GraphGenerator()
@@ -39,7 +34,7 @@ public:
 		delete S;
 	}
 
-	Vertex* generateGraph(int nr_of_leafs, AbstractProduction *prod, std::vector<EquationSystem*> *inputData);
+	Vertex* generateGraph(int leafs, AbstractProduction *prod, std::vector<EquationSystem*> *inputData);
 	Graph *getGraph();
 
 private:
@@ -49,43 +44,50 @@ private:
 	Vertex *S;
 	AbstractProduction *productions;
 	std::vector<EquationSystem*> *inputData;
+	int leafs;
 
-	void recursiveGraphGeneration(int nr_of_leafs,
-			int low_range, int high_range,
-			GraphNode backward_substitution_src_node,
-			GraphNode merging_dst_node,
+	void recursiveGraphGeneration(int low_range, int high_range,
+			GraphNode bsSrcNode,
+			GraphNode mergingDstNode,
 			Vertex *parent);
 
-	GraphNode addNode(int nr_of_incoming_edges,
+	GraphNode addNode(int incomingEdges,
+			int outgoingEdges,
+			int leafNumber,
 			EProduction production,
 			GraphNode src,
 			GraphNode dst,
-			int nr_of_outgoing_edges,
 			Vertex *v,
 			EquationSystem *system);
 };
 
-struct Node {
-	int x;
-	int nr_of_incoming_edges;
-	EProduction productionToExecute;
+class GraphGeneratorQuad {
+private:
+	EdgeData edge_data = 0;
+	Graph *graph;
+	Vertex *S;
 	AbstractProduction *productions;
-	Vertex *v;
-	EquationSystem *input;
-	Node(int nr_of_incoming_edges, EProduction production,
-			AbstractProduction *prod, Vertex *v, EquationSystem *input):
-				nr_of_incoming_edges(nr_of_incoming_edges),
-				productionToExecute(production),
-				productions(prod), v(v),
-				input(input)
+	int leafs;
+	std::vector<EquationSystem *> *inputData;
 
-	{
-		x = GraphGenerator::id++;
+	Vertex *recursiveGraphGeneration(int low_range, int high_range,
+			GraphNode mergingDstNode);
 
-	};
+	GraphNode addNode(int incomingEdges,
+			int outgoingEdges,
+			VertexType type,
+			EProduction production,
+			GraphNode src,
+			GraphNode dst,
+			int eqSystemSize);
+
+public:
+	GraphGeneratorQuad() : S(NULL), graph(NULL), productions(NULL), leafs(0) {
+
+	}
+
+	Vertex *generateGraph(int leafs, AbstractProduction *prod, std::vector<EquationSystem*> *inputData);
+	Graph *getGraph();
+
 };
-
-
-
-
 #endif /* GRAPHGENERATOR_HXX_ */

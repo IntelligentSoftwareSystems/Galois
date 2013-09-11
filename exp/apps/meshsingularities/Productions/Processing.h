@@ -43,6 +43,9 @@ public:
 			AbstractProduction *productions, std::vector<double> *result, int num) const;
 	void postprocessAN(Vertex *leaf, EquationSystem *inputData,
 			AbstractProduction *productions, std::vector<double> *result, int num) const;
+
+	// iterate over leafs and return them in correct order
+	std::vector<Vertex*> *collectLeafs(Vertex *p);
 };
 
 #endif /* PROCESSING_H_ */

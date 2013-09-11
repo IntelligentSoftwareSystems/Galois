@@ -3,97 +3,47 @@
 #include "GaloisWorker.h"
 #include "Processing.h"
 
-#include "Galois/Statistic.h"
-
 #include "Point2D/MatrixGenerator.hxx"
 #include "Point3D/MatrixGenerator.hxx"
 #include "Point2DQuad/MatrixGenerator.hxx"
 
-#include <sys/time.h>
+#include "FakeMatrixGenerator.h"
+
+#include "Node.h"
+
+//Galois::Runtime::LL::SimpleLock<true> foo;
 
 template<typename Context>
 void ProductionProcess::operator()(Graph::GraphNode src, Context& ctx)
 {
-	Node node = src->data;
-	switch (node.productionToExecute) {
-	case A1:
-		node.productions->A1(node.v, node.input);
-		break;
-	case A:
-		node.productions->A(node.v, node.input);
-		break;
-	case AN:
-		node.productions->AN(node.v, node.input);
-		break;
-	case A2NODE:
-		node.productions->A2Node(node.v);
-		break;
-	case A2ROOT:
-		node.productions->A2Root(node.v);
-		break;
-	case BS:
-		node.productions->BS(node.v);
-		break;
-	default:
-		break;
-	}
+	//unsigned tid = Galois::Runtime::LL::getTID();
+
+	Node &node = src->data;
+	// node-related work is here:
+	node.execute();
 
 	for(LCM_edge_iterator ii = src->edgeBegin, ei = src->edgeEnd; ii != ei; ++ii)
 	{
 		GraphNode graphNode = graph->getEdgeDst(ii,Galois::MethodFlag::NONE);
 
-		int nr_of_incoming_edges = atomic_dec(&graphNode->data.nr_of_incoming_edges);
+		int nr_of_incoming_edges = atomic_dec(&(graphNode->data.incomingEdges));
 
 		if(!nr_of_incoming_edges)
 			ctx.push(graphNode);
 	}
-
 }
 
-std::vector<Vertex*> *collectLeafs(Vertex *p)
+int ProductionProcess::leftRange(int tasks, int cpus, int i)
 {
-	std::vector<Vertex *> *left = NULL;
-	std::vector<Vertex *> *right = NULL;
-	std::vector<Vertex*> *result = NULL;
-
-	if (p == NULL) {
-		return NULL;
+	if (i == 0) {
+		return 0;
 	}
+	return rightRange(tasks, cpus, i-1);
+}
 
-	result = new std::vector<Vertex*>();
-
-	if (p!=NULL && p->right==NULL && p->left==NULL) {
-		result->push_back(p);
-		return result;
-	}
-
-	if (p!=NULL && p->left!=NULL) {
-		left = collectLeafs(p->left);
-	}
-
-	if (p!=NULL && p->right!=NULL) {
-		right = collectLeafs(p->right);
-	}
-
-	if (left != NULL) {
-		for (std::vector<Vertex*>::iterator it = left->begin(); it!=left->end(); ++it) {
-			if (*it != NULL) {
-				result->push_back(*it);
-			}
-		}
-		delete left;
-	}
-
-	if (right != NULL) {
-		for (std::vector<Vertex*>::iterator it = right->begin(); it!=right->end(); ++it) {
-			if (*it != NULL) {
-				result->push_back(*it);
-			}
-		}
-		delete right;
-	}
-
-	return result;
+int ProductionProcess::rightRange(int tasks, int cpus, int i)
+{
+	return ((i+1)*tasks)/cpus + ((i < (tasks % cpus)) ? 1 : 0) - 1;
 }
 
 std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescription)
@@ -103,47 +53,83 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 	// preprocessing,
 	//srand(0xfafa);
 	GraphGenerator* generator = new GraphGenerator();
-	AbstractProduction *production;new AbstractProduction(19, 75, 117, 83);
+	AbstractProduction *production;
 	Vertex *S;
+	Galois::StatTimer TMain;
+	TMain.start();
 
-	timeval start_time;
-	timeval end_time;
+	FakeMatrixGenerator* matrixGenerator;
 
-	GenericMatrixGenerator* matrixGenerator;
 	if(taskDescription.dimensions == 3) {
-		matrixGenerator = new D3::MatrixGenerator();
-		production = new AbstractProduction(19, 75, 117, 83);
+		switch (taskDescription.singularity) {
+		case POINT:
+			matrixGenerator = new Point3DMatrixGenerator();
+			break;
+		case CENTRAL_POINT:
+			matrixGenerator = new PointCentral3DMatrixGenerator();
+			break;
+		case EDGE:
+			matrixGenerator = new Edge3DMatrixGenerator();
+			break;
+		case FACE:
+			matrixGenerator = new Face3DMatrixGenerator();
+			break;
+		case ANISOTROPIC:
+			matrixGenerator = new Anisotropic3DMatrixGenerator();
+			break;
+		}
 	}
 	else if (taskDescription.dimensions == 2 && !taskDescription.quad) {
-		matrixGenerator = new D2::MatrixGenerator();
-		production = new AbstractProduction(5, 17, 21, 21);
+		switch (taskDescription.singularity) {
+		case POINT:
+			matrixGenerator = new Point2DMatrixGenerator();
+			break;
+		case CENTRAL_POINT:
+			matrixGenerator = new PointCentral2DMatrixGenerator();
+			break;
+		case EDGE:
+			matrixGenerator = new Edge2DMatrixGenerator();
+			break;
+		default:
+			printf("Error: unknown type of singularity in 2D!\n");
+			exit(1);
+			break;
+		}
+		//matrixGenerator = new D2::MatrixGenerator();
+		//production = new AbstractProduction(5, 17, 21, 21);
 	}
-	else if (taskDescription.dimensions == 2 && taskDescription.quad) {
-		matrixGenerator = new D2Quad::MatrixGenerator();
-		production = new AbstractProduction(16, 56, 72, 65);
-	}
-	Galois::StatTimer timerMatrix("matrix generation");
+
+	production = new AbstractProduction(matrixGenerator->getiSize(taskDescription.polynomialDegree),
+			matrixGenerator->getLeafSize(taskDescription.polynomialDegree),
+			matrixGenerator->getA1Size(taskDescription.polynomialDegree),
+			matrixGenerator->getANSize(taskDescription.polynomialDegree));
+
+	printf("Problem size: %d\n", matrixGenerator->getA1Size(taskDescription.polynomialDegree) +
+			matrixGenerator->getANSize(taskDescription.polynomialDegree)
+			+ matrixGenerator->getLeafSize(taskDescription.polynomialDegree)*taskDescription.nrOfTiers
+			- taskDescription.nrOfTiers*matrixGenerator->getiSize(taskDescription.polynomialDegree));
+
+	Galois::StatTimer timerMatrix("MATRIX GENERATION");
 	timerMatrix.start();
 	std::list<EquationSystem*> *tiers = matrixGenerator->CreateMatrixAndRhs(taskDescription);
 	timerMatrix.stop();
 
 	Processing *processing = new Processing();
 
-	Galois::StatTimer timerPreprocess("preprocessing");
+	Galois::StatTimer timerPreprocess("PREPROCESSING");
 
 	timerPreprocess.start();
 	std::vector<EquationSystem *> *inputMatrices = processing->preprocess((std::list<EquationSystem*> *)tiers,
-		production);
+			production);
 	timerPreprocess.stop();
 
 
-	Galois::StatTimer timerGraphGeneration("Graph generation");
+	Galois::StatTimer timerGraphGeneration("GRAPH GENERATION");
 	timerGraphGeneration.start();
-	gettimeofday(&start_time, NULL);
 	S = generator->generateGraph(taskDescription.nrOfTiers, production, inputMatrices);
 	timerGraphGeneration.stop();
 
-	Galois::StatTimer timerProductions("productions");
+	Galois::StatTimer timerProductions("PRODUCTIONS");
 	timerProductions.start();
 
 	graph = generator->getGraph();
@@ -151,18 +137,64 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 	std::vector<GraphNode> initial_nodes_vector;
 	for(LCM_iterator it = graph->begin(); it != graph->end(); ++it) {
 		GraphNode graphNode = *(it);
-		if(graphNode->data.nr_of_incoming_edges == 0)
+		if(graphNode->data.incomingEdges == 0) {
 			initial_nodes_vector.push_back(graphNode);
+		}
 	}
+
 	std::vector<GraphNode>::iterator iii = initial_nodes_vector.begin();
-	typedef Galois::WorkList::dChunkedLIFO<2> WL;
+
+	/*const int maxPackages = Galois::Runtime::LL::getMaxPackages();
+	const int coresPerPackages = Galois::Runtime::LL::getMaxCores()/maxPackages;
+
+	const int activePackages = std::ceil(Galois::Runtime::activeThreads*1.0/coresPerPackages);
+
+	printf("Active threads: %d\n",Galois::Runtime::activeThreads);
+	printf("Max cores: %d\n", Galois::Runtime::LL::getMaxCores());
+	printf("Active packages: %d\n", activePackages);
+	const int tasks = initial_nodes_vector.size();
+
+	for (int pack=0; pack < activePackages; ++pack) {
+		std::vector<GraphNode> packNodes;
+		printf("%d -> %d\n", leftRange(tasks, activePackages, pack), rightRange(tasks, activePackages, pack));
+		for (int i=leftRange(tasks, activePackages, pack); i<rightRange(tasks, activePackages, pack); ++i) {
+			packNodes.push_back(*iii);
+			++iii;
+			printf("adding %d to %d\n", i, pack);
+
+		}
+		pps.getRemoteByPkg(pack)->
+				push(packNodes.begin(), packNodes.end());
+
+	} */
+
+
+	//printf ("PerPackageStorage size: %d\n", pps.size());
 	Galois::for_each<WL>(initial_nodes_vector.begin(), initial_nodes_vector.end(), *this);
-	gettimeofday(&end_time, NULL);
+	//Galois::do_all(initial_nodes_vector.begin(), initial_nodes_vector.end(), *this);
+	//for (;iii != initial_nodes_vector.end(); ++iii) {
+	//	(*this)(*iii);
+	//}
+
+	//Galois::on_each([&] (unsigned tid, unsigned totalThreads) {
+	//	printf("Hello from: [%d, %d]\n", tid, totalThreads);
+	//	Galois::Runtime::getSystemTermination().initializeThread();
+	//	if (Galois::Runtime::LL::isPackageLeaderForSelf(tid)) {
+	//		do {
+	//			printf("TID: %d is leader\n", tid);
+	//			GraphNode graphNode = pps.getLocal(tid)->pop().get();
+	//
+	//			Node &node = graphNode->data;
+	//			node.execute();
+	//		} while(!Galois::Runtime::getSystemTermination().globalTermination());
+
+	//	}
+	//	Galois::Runtime::getSystemTermination().localTermination(true);
+	//});
+
 	timerProductions.stop();
-	printf("Prod time %f [s]\n", ((end_time.tv_sec - start_time.tv_sec)*1000000 +(end_time.tv_usec - start_time.tv_usec))/1000000.0);
 
-
-	std::vector<Vertex*> *leafs = collectLeafs(S);
+	std::vector<Vertex*> *leafs = processing->collectLeafs(S);
 	std::vector<double> *result = processing->postprocess(leafs, inputMatrices, production);
 
 	if (taskDescription.performTests) {
@@ -184,11 +216,12 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 	delete processing;
 	delete S;
 	delete tiers;
+	TMain.stop();
 
 	return result;
 }
 
 inline int ProductionProcess::atomic_dec(int *value) {
 	// XXX: more portable solution?
-	return __sync_add_and_fetch(value, -1);
+	return __sync_sub_and_fetch(value, 1);
 }
