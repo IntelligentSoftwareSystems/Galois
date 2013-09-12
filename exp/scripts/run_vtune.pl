@@ -27,8 +27,8 @@ sub find_kernel_sym () {
 }
 
 sub find_analysis_type () {
-  #my $type = "nehalem-memory-access";
-  my $type = "nehalem-general-exploration";
+  my $type = "nehalem-memory-access";
+  # my $type = "nehalem-general-exploration";
 
   my $sys = `hostname`;
   chomp($sys);
@@ -104,7 +104,8 @@ if ($found_threads) {
 
 print "RUN: CommandLine $cmdline\n";
 
-my $dire = "/tmp/$uname.vtune.r$threads";
+# my $dire = "/tmp/$uname.vtune.r$threads";
+my $dire = "/workspace/$uname/tmp/vtune--r$threads";
 my $rdir = "-result-dir=$dire";
 my $report = "-R hw-events -format csv -csv-delimiter tab";
 # my $type = "hotspots";
