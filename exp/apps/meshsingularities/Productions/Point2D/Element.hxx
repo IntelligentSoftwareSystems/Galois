@@ -75,6 +75,7 @@ class Element{
 
 			neighbours = new bool[4];
 			neighbours[0] = _neighbours[0]; neighbours[1] = _neighbours[1]; neighbours[2] = _neighbours[2]; neighbours[3] = _neighbours[3];
+
 			xl = _coordinates[0]; xr = _coordinates[1]; yl = _coordinates[2]; yr = _coordinates[3];
 
 			
@@ -164,6 +165,32 @@ class Element{
 		}
 		void set_interior_nr(int nr){
 			interior_nr = nr; 
+		}
+
+		void get_nrs(int* nrs)
+		{
+			nrs[0] = bot_right_vertex_nr;
+			nrs[1] = right_edge_nr;
+			nrs[2] = top_right_vertex_nr;
+			nrs[3] = top_edge_nr;
+			nrs[4] = top_left_vertex_nr;
+			nrs[5] = left_edge_nr;
+			nrs[6] = bot_left_vertex_nr;
+			nrs[7] = bot_edge_nr;
+			nrs[8] = interior_nr;
+		}
+
+		void set_nrs(int* nrs)
+		{
+			bot_right_vertex_nr = nrs[0];
+			right_edge_nr = nrs[1];
+			top_right_vertex_nr = nrs[2];
+			top_edge_nr = nrs[3];
+			top_left_vertex_nr = nrs[4];
+			left_edge_nr = nrs[5];
+			bot_left_vertex_nr = nrs[6];
+			bot_edge_nr = nrs[7];
+			interior_nr = nrs[8];
 		}
 
 		private:

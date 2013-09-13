@@ -15,7 +15,7 @@ Processing::~Processing() {
 }
 
 std::vector<EquationSystem*>* Processing::preprocess(std::list<EquationSystem*>* input,
-		AbstractProduction *productions) const
+		PointProduction *productions) const
 {
 	std::vector<EquationSystem *> *outputVector = new std::vector<EquationSystem*>();
 	std::list<EquationSystem*>::iterator it = input->begin();
@@ -34,7 +34,7 @@ std::vector<EquationSystem*>* Processing::preprocess(std::list<EquationSystem*>*
 
 std::vector<double> *Processing::postprocess(std::vector<Vertex *> *leafs,
 		std::vector<EquationSystem *> *inputData,
-		AbstractProduction *productions) const
+		PointProduction *productions) const
 {
 	std::vector<double> * result = new std::vector<double>(
 			(leafs->size()-2)*productions->getLeafSize()+
@@ -56,7 +56,7 @@ std::vector<double> *Processing::postprocess(std::vector<Vertex *> *leafs,
 }
 
 
-EquationSystem *Processing::preprocessA1(EquationSystem *input, AbstractProduction *productions) const
+EquationSystem *Processing::preprocessA1(EquationSystem *input, PointProduction *productions) const
 {
 	EquationSystem *system = new EquationSystem(input->matrix, input->rhs, input->n);
 
@@ -65,12 +65,12 @@ EquationSystem *Processing::preprocessA1(EquationSystem *input, AbstractProducti
 	return (system);
 }
 
-EquationSystem *Processing::preprocessA(EquationSystem *input, AbstractProduction *productions) const
+EquationSystem *Processing::preprocessA(EquationSystem *input, PointProduction *productions) const
 {
 	return new EquationSystem(input->matrix, input->rhs, input->n);
 }
 
-EquationSystem *Processing::preprocessAN(EquationSystem *input, AbstractProduction *productions) const
+EquationSystem *Processing::preprocessAN(EquationSystem *input, PointProduction *productions) const
 {
 	EquationSystem *system = new EquationSystem(productions->getANSize());
 	double ** const tierMatrix = input->matrix;
@@ -109,7 +109,7 @@ EquationSystem *Processing::preprocessAN(EquationSystem *input, AbstractProducti
 }
 
 void Processing::postprocessA1(Vertex *leaf, EquationSystem *inputData,
-		AbstractProduction *productions, std::vector<double> *result, int num) const
+		PointProduction *productions, std::vector<double> *result, int num) const
 {
 	EquationSystem *a1 = inputData;
 
@@ -141,7 +141,7 @@ void Processing::postprocessA1(Vertex *leaf, EquationSystem *inputData,
 }
 
 void Processing::postprocessA(Vertex *leaf, EquationSystem *inputData,
-		AbstractProduction *productions, std::vector<double> *result, int num) const
+		PointProduction *productions, std::vector<double> *result, int num) const
 {
 	const int leafOffset = productions->getLeafSize() - 2*productions->getInterfaceSize();
 	const int totalOffset = (productions->getA1Size()-productions->getInterfaceSize())+(num-1)*(productions->getLeafSize()-productions->getInterfaceSize());
@@ -156,7 +156,7 @@ void Processing::postprocessA(Vertex *leaf, EquationSystem *inputData,
 }
 
 void Processing::postprocessAN(Vertex *leaf, EquationSystem *inputData,
-		AbstractProduction *productions, std::vector<double> *result, int num) const
+		PointProduction *productions, std::vector<double> *result, int num) const
 {
 
 	const int leafOffset = productions->getLeafSize() - 2*productions->getInterfaceSize();

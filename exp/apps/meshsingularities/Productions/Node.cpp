@@ -16,35 +16,13 @@
 
 void Node::execute()
 {
+
+	productions->Execute(productionToExecute,v,input);
 	//struct timeval t1, t2;
 
 	//gettimeofday(&t1, NULL);
 
 	//int tid = Galois::Runtime::LL::getTID();
-
-	switch (productionToExecute) {
-	case A1:
-		productions->A1(v, input);
-		break;
-	case A:
-		productions->A(v, input);
-		break;
-	case AN:
-		productions->AN(v, input);
-		break;
-	case A2NODE:
-		productions->A2Node(v);
-		break;
-	case A2ROOT:
-		productions->A2Root(v);
-		break;
-	case BS:
-		productions->BS(v);
-		break;
-	default:
-		printf("Invalid production!\n");
-		break;
-	}
 
 	//gettimeofday(&t2, NULL);
 

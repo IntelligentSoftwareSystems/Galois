@@ -19,6 +19,15 @@ class MatrixGenerator : public GenericMatrixGenerator{
 		virtual std::list<EquationSystem*>* CreateMatrixAndRhs(TaskDescription& task_description);
 		virtual void checkSolution(std::map<int,double> *solution_map, double (*f)(int dim, ...));
 
+		virtual std::vector<int>* GetProductionParameters(int polynomial_degree)
+		{
+			std::vector<int>* vec = new std::vector<int>(4);
+			(*vec)[0] = 5;
+			(*vec)[1] = 17;
+			(*vec)[2] = 21;
+			(*vec)[3] = 21;
+			return vec;
+		}
 
 		virtual ~MatrixGenerator(){
 			std::list<Element*>::iterator it_e = element_list.begin();

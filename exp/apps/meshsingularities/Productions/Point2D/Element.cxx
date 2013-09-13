@@ -196,8 +196,10 @@ void Element::comp(int indx1, int indx2, IDoubleArgFunction* f1, IDoubleArgFunct
 {
 		product->SetFunctions(f1,f2);
 		double value = GaussianQuadrature::definiteDoubleIntegral(xl, xr, yl, yr, product);
-		global_matrix[indx1][indx2] += value;
-		tier_matrix[indx1 - start_nr_adj][indx2 - start_nr_adj] += value;
+		if(global_matrix != NULL)
+			global_matrix[indx1][indx2] += value;
+		if(tier_matrix != NULL)
+			tier_matrix[indx1 - start_nr_adj][indx2 - start_nr_adj] += value;
 }
 
 
@@ -226,8 +228,10 @@ void Element::fillRhs(double* tier_rhs, double* global_rhs, IDoubleArgFunction* 
 			product->SetFunctions(shapeFunctions[i], f);
 
 			double value = GaussianQuadrature::definiteDoubleIntegral(xl, xr, yl, yr, product);
-			tier_rhs[functionNumbers[i] - start_adj_nr] += value;
-			global_rhs[functionNumbers[i]] += value;
+			if(tier_rhs != NULL)
+				tier_rhs[functionNumbers[i] - start_adj_nr] += value;
+			if(global_rhs != NULL)
+				global_rhs[functionNumbers[i]] += value;
 
 
 		}		
@@ -240,6 +244,7 @@ void Element::fillMatrices(double** tier_matrix, double** global_matrix, double*
 
 bool Element::checkSolution(std::map<int,double> *solution_map, IDoubleArgFunction* f)
 {
+
 	int nr_of_nodes = 9;
 	double coefficients[nr_of_nodes];
 

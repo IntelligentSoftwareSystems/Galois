@@ -27,8 +27,8 @@ const char* const url = NULL;
 
 namespace cll = llvm::cl;
 
-static cll::opt<int> tiers("tiers", cll::desc("Number of Tiers"), cll::init(16));
-static cll::opt<int> dimensions("dimensions", cll::desc("Dimensions"), cll::init(3));
+static cll::opt<int> tiers("tiers", cll::desc("Number of Tiers"), cll::init(1));
+static cll::opt<int> dimensions("dimensions", cll::desc("Dimensions"), cll::init(2));
 static cll::opt<int> polynomial("polynomial", cll::desc("Polynomial degree"), cll::init(2));
 
 static cll::opt<Functions> function("function", cll::desc("Choose a function:"),
@@ -46,7 +46,7 @@ static cll::opt<Singularities> singularity("singularity", cll::desc("Singularity
 	      clEnumVal(EDGE, "Edge singularity"),
 	      clEnumVal(FACE, "Face singularity"),
 	      clEnumVal(ANISOTROPIC, "Anisotropic mesh"),
-	      clEnumValEnd), cll::init(POINT));
+	      clEnumValEnd), cll::init(EDGE));
 
 static cll::opt<double> coord_x("coord_x", cll::desc("X coordinate for left-bottom vertex of shape"), cll::init(0.0));
 static cll::opt<double> coord_y("coord_y", cll::desc("Y coordinate for left-bottom vertex of shape"), cll::init(0.0));

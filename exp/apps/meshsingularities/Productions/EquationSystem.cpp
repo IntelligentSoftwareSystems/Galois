@@ -105,9 +105,12 @@ void EquationSystem::eliminate(const int rows)
 			}); */
 		for (j=i+1; j<n; ++j) {
 			x = matrix[j][i];
+
 			for (int k = i+1; k<n; ++k) {
 				matrix[j][k] -= x*matrix[i][k];
 			}
+			//xyz
+			matrix[j][i] = 0;
 			rhs[j] -= x*rhs[i];
 		}
 	}
@@ -148,13 +151,22 @@ void EquationSystem::swapRows(const int i, const int j)
 	rhs[j] = tmp;
 }
 
+void EquationSystem::checkRow(int row_nr, int* values, int values_cnt)
+{
+	double v = 0;
+	for(int i = 0; i<values_cnt; i++)
+		v += matrix[row_nr][values[i]];
+
+	printf("DIFF : %lf\n",rhs[row_nr] - v);
+}
+
 void EquationSystem::print() const
 {
 	for (int i=0; i<n; ++i) {
 		for (int j=0; j<n; ++j) {
-			std::printf("% .16f ", matrix[i][j]);
+			std::printf("% .6f ", matrix[i][j]);
 		}
-		std::printf (" | % .16f\n", rhs[i]);
+		std::printf (" | % .6f\n", rhs[i]);
 	}
 }
 

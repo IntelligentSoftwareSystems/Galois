@@ -1,4 +1,5 @@
-
+#ifndef IFUNCTION_HXX_
+#define IFUNCTION_HXX_
 
 class IFunction
 {
@@ -23,3 +24,4 @@ class IFunction
 
 		}
 };
+#endif

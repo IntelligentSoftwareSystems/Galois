@@ -34,6 +34,7 @@ class EquationSystem {
 	void eliminate(const int rows);
 	void backwardSubstitute(const int startingRow);
 
+	void checkRow(int row_nr, int* values, int values_cnt);
 	void print() const;
 };
 

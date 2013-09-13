@@ -2,10 +2,12 @@
 
 #include "GaloisWorker.h"
 #include "Processing.h"
-
+#include "PointProduction.hxx"
+#include "EdgeProduction.h"
 #include "Point2D/MatrixGenerator.hxx"
 #include "Point3D/MatrixGenerator.hxx"
 #include "Point2DQuad/MatrixGenerator.hxx"
+#include "Edge2D/MatrixGenerator.hxx"
 
 #include "FakeMatrixGenerator.h"
 
@@ -25,7 +27,6 @@ void ProductionProcess::operator()(Graph::GraphNode src, Context& ctx)
 	for(LCM_edge_iterator ii = src->edgeBegin, ei = src->edgeEnd; ii != ei; ++ii)
 	{
 		GraphNode graphNode = graph->getEdgeDst(ii,Galois::MethodFlag::NONE);
-
 		int nr_of_incoming_edges = atomic_dec(&(graphNode->data.incomingEdges));
 
 		if(!nr_of_incoming_edges)
@@ -52,18 +53,20 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 	// implement everything is needed to input data to solver,
 	// preprocessing,
 	//srand(0xfafa);
+
 	GraphGenerator* generator = new GraphGenerator();
+	GraphGeneratorQuad* quadGenerator = new GraphGeneratorQuad();
 	AbstractProduction *production;
 	Vertex *S;
 	Galois::StatTimer TMain;
 	TMain.start();
 
-	FakeMatrixGenerator* matrixGenerator;
+	GenericMatrixGenerator* matrixGenerator;
 
 	if(taskDescription.dimensions == 3) {
 		switch (taskDescription.singularity) {
 		case POINT:
-			matrixGenerator = new Point3DMatrixGenerator();
+			matrixGenerator = new D3::MatrixGenerator();
 			break;
 		case CENTRAL_POINT:
 			matrixGenerator = new PointCentral3DMatrixGenerator();
@@ -77,18 +80,19 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 		case ANISOTROPIC:
 			matrixGenerator = new Anisotropic3DMatrixGenerator();
 			break;
+
 		}
 	}
 	else if (taskDescription.dimensions == 2 && !taskDescription.quad) {
 		switch (taskDescription.singularity) {
 		case POINT:
-			matrixGenerator = new Point2DMatrixGenerator();
+			matrixGenerator = new D2::MatrixGenerator();
 			break;
 		case CENTRAL_POINT:
 			matrixGenerator = new PointCentral2DMatrixGenerator();
 			break;
 		case EDGE:
-			matrixGenerator = new Edge2DMatrixGenerator();
+			matrixGenerator = new D2Edge::MatrixGenerator();
 			break;
 		default:
 			printf("Error: unknown type of singularity in 2D!\n");
@@ -99,15 +103,24 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 		//production = new AbstractProduction(5, 17, 21, 21);
 	}
 
-	production = new AbstractProduction(matrixGenerator->getiSize(taskDescription.polynomialDegree),
+	/*production = new AbstractProduction(matrixGenerator->getiSize(taskDescription.polynomialDegree),
 			matrixGenerator->getLeafSize(taskDescription.polynomialDegree),
 			matrixGenerator->getA1Size(taskDescription.polynomialDegree),
-			matrixGenerator->getANSize(taskDescription.polynomialDegree));
+			matrixGenerator->getANSize(taskDescription.polynomialDegree));*/
+	bool edge = taskDescription.dimensions == 2 && !taskDescription.quad && taskDescription.singularity == EDGE;
+	if(edge)
+		printf("EDGE SOLVER!\n");
+	std::vector<int>* vec = matrixGenerator->GetProductionParameters(taskDescription.polynomialDegree);
+	if(edge)
+		production = new EdgeProduction(vec);
+	else
+		production = new PointProduction(vec);
 
-	printf("Problem size: %d\n", matrixGenerator->getA1Size(taskDescription.polynomialDegree) +
+
+	/*printf("Problem size: %d\n", matrixGenerator->getA1Size(taskDescription.polynomialDegree) +
 			matrixGenerator->getANSize(taskDescription.polynomialDegree)
 			+ matrixGenerator->getLeafSize(taskDescription.polynomialDegree)*taskDescription.nrOfTiers
-			- taskDescription.nrOfTiers*matrixGenerator->getiSize(taskDescription.polynomialDegree));
+			- taskDescription.nrOfTiers*matrixGenerator->getiSize(taskDescription.polynomialDegree));*/
 
 	Galois::StatTimer timerMatrix("MATRIX GENERATION");
 	timerMatrix.start();
@@ -115,24 +128,39 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 	timerMatrix.stop();
 
 	Processing *processing = new Processing();
+	std::vector<EquationSystem *> *inputMatrices;
+	if(edge)
+	{
+		inputMatrices = new std::vector<EquationSystem*>();
+		for(std::list<EquationSystem*>::iterator it = tiers->begin(); it != tiers->end(); ++it)
+		{
+			inputMatrices->push_back(*it);
+		}
+	}
+	else
+	{
+		Galois::StatTimer timerPreprocess("PREPROCESSING");
 
-	Galois::StatTimer timerPreprocess("PREPROCESSING");
-
-	timerPreprocess.start();
-	std::vector<EquationSystem *> *inputMatrices = processing->preprocess((std::list<EquationSystem*> *)tiers,
-			production);
-	timerPreprocess.stop();
-
+		timerPreprocess.start();
+		inputMatrices = processing->preprocess((std::list<EquationSystem*> *)tiers,
+				(PointProduction*)production);
+		timerPreprocess.stop();
+	}
 
 	Galois::StatTimer timerGraphGeneration("GRAPH GENERATION");
 	timerGraphGeneration.start();
-	S = generator->generateGraph(taskDescription.nrOfTiers, production, inputMatrices);
+	if(edge)
+		S = quadGenerator->generateGraph(inputMatrices->size(),(EdgeProduction*)production,inputMatrices);
+	else
+		S = generator->generateGraph(taskDescription.nrOfTiers, (PointProduction*)production, inputMatrices);
 	timerGraphGeneration.stop();
 
 	Galois::StatTimer timerProductions("PRODUCTIONS");
 	timerProductions.start();
-
-	graph = generator->getGraph();
+	if(edge)
+		graph = quadGenerator->getGraph();
+	else
+		graph = generator->getGraph();
 
 	std::vector<GraphNode> initial_nodes_vector;
 	for(LCM_iterator it = graph->begin(); it != graph->end(); ++it) {
@@ -193,11 +221,15 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 	//});
 
 	timerProductions.stop();
+	std::vector<double> *result;
+	if(!edge)
+	{
+		std::vector<Vertex*> *leafs = processing->collectLeafs(S);
+		result = processing->postprocess(leafs, inputMatrices, (PointProduction*)production);
+		delete leafs;
+	}
 
-	std::vector<Vertex*> *leafs = processing->collectLeafs(S);
-	std::vector<double> *result = processing->postprocess(leafs, inputMatrices, production);
-
-	if (taskDescription.performTests) {
+	if (taskDescription.performTests && !edge) {
 
 		std::map<int, double> *mapa = new std::map<int, double>();
 		int i = 0;
@@ -212,10 +244,12 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 		delete mapa;
 	}
 
-	delete leafs;
+	/*
+	delete vec;
 	delete processing;
 	delete S;
 	delete tiers;
+	*/
 	TMain.stop();
 
 	return result;

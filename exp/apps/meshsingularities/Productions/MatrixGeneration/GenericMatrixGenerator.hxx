@@ -43,6 +43,11 @@ class GenericMatrixGenerator {
 			return matrix_size;
 		}
 
+		virtual std::vector<int>* GetProductionParameters(int polynomial_degree)
+		{
+			return new std::vector<int>();
+		}
+
 		virtual ~GenericMatrixGenerator(){
 			for(int i = 0; i<matrix_size; i++)
 				delete[] matrix[i];

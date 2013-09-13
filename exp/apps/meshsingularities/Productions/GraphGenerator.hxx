@@ -10,7 +10,7 @@
 
 #include "EProduction.hxx"
 #include "Galois/Graph/LC_Morph_Graph.h"
-#include "Production.h"
+#include "PointProduction.hxx"
 #include "Vertex.h"
 #include "EquationSystem.h"
 #include <vector>
@@ -34,7 +34,7 @@ public:
 		delete S;
 	}
 
-	Vertex* generateGraph(int leafs, AbstractProduction *prod, std::vector<EquationSystem*> *inputData);
+	Vertex* generateGraph(int leafs, PointProduction *prod, std::vector<EquationSystem*> *inputData);
 	Graph *getGraph();
 
 private:
@@ -42,7 +42,7 @@ private:
 	EdgeData edge_data = 0;
 	Graph* graph;
 	Vertex *S;
-	AbstractProduction *productions;
+	PointProduction *productions;
 	std::vector<EquationSystem*> *inputData;
 	int leafs;
 
