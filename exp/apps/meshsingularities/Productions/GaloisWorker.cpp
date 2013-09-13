@@ -228,6 +228,10 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 		result = processing->postprocess(leafs, inputMatrices, (PointProduction*)production);
 		delete leafs;
 	}
+	else
+	{
+		result = new std::vector<double>();
+	}
 
 	if (taskDescription.performTests && !edge) {
 
@@ -244,12 +248,12 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 		delete mapa;
 	}
 
-	/*
+
 	delete vec;
 	delete processing;
 	delete S;
 	delete tiers;
-	*/
+
 	TMain.stop();
 
 	return result;

@@ -21,16 +21,18 @@ Vertex::Vertex(Vertex *Left, Vertex *Right, Vertex *Parent, VertexType type, int
 
 Vertex::~Vertex()
 {
-    if (this->system != NULL) {
-        delete this->system;
-    }
-    
+
     if (this->left != NULL) {
         delete this->left;
     }
     if (this->right != NULL) {
         delete this->right;
     }
+
+    if (this->system != NULL) {
+        delete this->system;
+    }
+
 
 }
 	

@@ -19,13 +19,13 @@ class EquationSystem {
 	// this variables _should_ be public
 	// Productions will use them directly
 
-	int n;
+	unsigned long n;
 	double ** matrix;
 	double *rhs;
 
 	EquationSystem() {} ;
-	EquationSystem(int n);
-	EquationSystem(double ** matrix, double *rhs, int size);
+	EquationSystem(unsigned long n);
+	EquationSystem(double ** matrix, double *rhs, unsigned long size);
 	virtual ~EquationSystem();
 
 	void swapRows(const int i, const int j);

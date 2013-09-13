@@ -4,7 +4,7 @@
 #include <Galois/Galois.h>
 #include <boost/iterator.hpp>
 
-EquationSystem::EquationSystem(int n)
+EquationSystem::EquationSystem(unsigned long n)
 {
 	this->n = n;
 	unsigned long i;
@@ -22,12 +22,15 @@ EquationSystem::EquationSystem(int n)
 	}
 
 	rhs = matrix[0]+n*n;
+
+	origPtr = matrix[0];
 }
 
-EquationSystem::EquationSystem(double ** matrix, double *rhs, int size)
+EquationSystem::EquationSystem(double ** matrix, double *rhs, unsigned long size)
 {
 	this->n = size;
 	unsigned long i;
+
 	// we are working on continuous area of memory
 
 	this->matrix = new double*[n];
@@ -51,12 +54,14 @@ EquationSystem::EquationSystem(double ** matrix, double *rhs, int size)
 		this->rhs[i] = rhs[i];
 	}
 
+	origPtr = this->matrix[0];
+
 }
 
 EquationSystem::~EquationSystem()
 {
 	if (matrix != NULL) {
-		delete [] matrix[0];
+		delete [] origPtr;
 		delete [] matrix;
 	}
 
