@@ -47,7 +47,7 @@ int main(int argc, char** argv)
 		taskDescription.function=test_function;
 		taskDescription.x=-1;
 		taskDescription.y=-1;
-		std::list<EquationSystem*> *tiers = matrixGenerator->CreateMatrixAndRhs(taskDescription);
+		std::vector<EquationSystem*> *tiers = matrixGenerator->CreateMatrixAndRhs(taskDescription);
 		EquationSystem *globalSystem = new EquationSystem(matrixGenerator->GetMatrix(),
 														  matrixGenerator->GetRhs(),
 														  matrixGenerator->GetMatrixSize());

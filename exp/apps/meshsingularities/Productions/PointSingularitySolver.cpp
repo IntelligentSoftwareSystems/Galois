@@ -27,7 +27,7 @@ const char* const url = NULL;
 
 namespace cll = llvm::cl;
 
-static cll::opt<int> tiers("tiers", cll::desc("Number of Tiers"), cll::init(1));
+static cll::opt<int> tiers("tiers", cll::desc("Number of Tiers"), cll::init(2));
 static cll::opt<int> dimensions("dimensions", cll::desc("Dimensions"), cll::init(2));
 static cll::opt<int> polynomial("polynomial", cll::desc("Polynomial degree"), cll::init(2));
 

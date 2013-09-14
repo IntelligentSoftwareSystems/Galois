@@ -13,7 +13,6 @@
 #include "PointProduction.hxx"
 
 #include <vector>
-#include <list>
 
 class Processing {
 public:
@@ -21,7 +20,7 @@ public:
 
 	/* preprocess the input and convert data to form needed by production,
 	   this is sequential code */
-	std::vector<EquationSystem *>* preprocess(std::list<EquationSystem*>* input,
+	std::vector<EquationSystem *>* preprocess(std::vector<EquationSystem*>* input,
 			PointProduction *productions) const;
 
 	/* pull data from leafs and return the solution of MES

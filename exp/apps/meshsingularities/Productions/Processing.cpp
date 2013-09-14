@@ -14,11 +14,11 @@ Processing::Processing() {
 Processing::~Processing() {
 }
 
-std::vector<EquationSystem*>* Processing::preprocess(std::list<EquationSystem*>* input,
+std::vector<EquationSystem*>* Processing::preprocess(std::vector<EquationSystem*>* input,
 		PointProduction *productions) const
 {
 	std::vector<EquationSystem *> *outputVector = new std::vector<EquationSystem*>();
-	std::list<EquationSystem*>::iterator it = input->begin();
+	std::vector<EquationSystem*>::iterator it = input->begin();
 
 	for (int i = 0; it != input->end(); ++it, ++i) {
 		if (i==0) {

@@ -34,7 +34,7 @@ public:
 	void InitTier()
 	{
 
-		element->fillMatrices(NULL,global_matrix,NULL,global_rhs,f,0);
+		//element->fillMatrices(NULL,global_matrix,NULL,global_rhs,f,0);
 
 		int global_numbers[9];
 		element->get_nrs(global_numbers);

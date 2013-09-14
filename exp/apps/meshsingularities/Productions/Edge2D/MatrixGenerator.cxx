@@ -104,7 +104,7 @@ void MatrixGenerator::CreateTiers(int to_create, int element_id, double size, do
 
 
 		elements[element_id] = element;
-		tier_list->push_back(new Tier(element,f,matrix,rhs));
+		tier_vector->push_back(new Tier(element,f,matrix,rhs));
 		return;
 	}
 
@@ -137,16 +137,16 @@ void MatrixGenerator::CreateTiers(int to_create, int element_id, double size, do
 	CreateTiers((to_create - 2) / 2, (element_id+1)*2 + 2, size, coordinates, f, false);
 	elements[element_id] = left_element;
 	elements[element_id+1] = right_element;
-	tier_list->push_back(new Tier(left_element,f,matrix,rhs));
-	tier_list->push_back(new Tier(right_element,f,matrix,rhs));
+	tier_vector->push_back(new Tier(left_element,f,matrix,rhs));
+	tier_vector->push_back(new Tier(right_element,f,matrix,rhs));
 
 }
 
 //if nr_of_tiers = 1 then nr_of_elements = 10 !
 
-std::list<EquationSystem*>* MatrixGenerator::CreateMatrixAndRhs(TaskDescription& task_description)
+std::vector<EquationSystem*>* MatrixGenerator::CreateMatrixAndRhs(TaskDescription& task_description)
 {
-		tier_list = new std::list<EquationSystem*>();
+		tier_vector = new std::vector<EquationSystem*>();
 
 
 		IDoubleArgFunction* f = new DoubleArgFunctionWrapper(task_description.function);
@@ -165,21 +165,21 @@ std::list<EquationSystem*>* MatrixGenerator::CreateMatrixAndRhs(TaskDescription&
 		coordinates[3] = 0;
 
 		matrix_size = 3*pow(2,nr_of_tiers+3) + 2 * nr_of_tiers + 1;
-		rhs = new double[matrix_size]();
-		matrix = new double*[matrix_size];
-		for(int i = 0; i<matrix_size; i++)
-			matrix[i] = new double[matrix_size]();
+		//rhs = new double[matrix_size]();
+		//matrix = new double*[matrix_size];
+		//for(int i = 0; i<matrix_size; i++)
+			//matrix[i] = new double[matrix_size]();
 
 		CreateTiers(nr_of_elements,0,size,coordinates,f,true);
 
 		set_numbers(elements,0,1 + nr_of_tiers,0);
-		std::list<EquationSystem*>::iterator it_e = tier_list->begin();
-		for(; it_e != tier_list->end(); ++it_e){
+		std::vector<EquationSystem*>::iterator it_e = tier_vector->begin();
+		for(; it_e != tier_vector->end(); ++it_e){
 			((Tier*)(*it_e))->InitTier();
 
 		}
 
-		return tier_list;
+		return tier_vector;
 }
 
 void MatrixGenerator::checkSolution(std::map<int,double> *solution_map, double (*function)(int dim, ...))

@@ -111,25 +111,26 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 
 	Galois::StatTimer timerMatrix("MATRIX GENERATION");
 	timerMatrix.start();
-	std::list<EquationSystem*> *tiers = matrixGenerator->CreateMatrixAndRhs(taskDescription);
+	std::vector<EquationSystem*> *tiers = matrixGenerator->CreateMatrixAndRhs(taskDescription);
 	timerMatrix.stop();
 
 	Processing *processing = new Processing();
 	std::vector<EquationSystem *> *inputMatrices;
 	if(edge)
 	{
-		inputMatrices = new std::vector<EquationSystem*>();
-		for(std::list<EquationSystem*>::iterator it = tiers->begin(); it != tiers->end(); ++it)
-		{
-			inputMatrices->push_back(*it);
-		}
+		inputMatrices = tiers;
+//		inputMatrices = new std::vector<EquationSystem*>();
+//		for(std::list<EquationSystem*>::iterator it = tiers->begin(); it != tiers->end(); ++it)
+//		{
+//			inputMatrices->push_back(*it);
+//		}
 	}
 	else
 	{
 		Galois::StatTimer timerPreprocess("PREPROCESSING");
 
 		timerPreprocess.start();
-		inputMatrices = processing->preprocess((std::list<EquationSystem*> *)tiers,
+		inputMatrices = processing->preprocess((std::vector<EquationSystem*> *)tiers,
 				(PointProduction*)production);
 		timerPreprocess.stop();
 	}

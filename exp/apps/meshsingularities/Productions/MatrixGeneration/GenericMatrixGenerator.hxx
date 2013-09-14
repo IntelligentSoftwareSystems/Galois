@@ -10,7 +10,7 @@
 #include <cstdarg>
 #include <boost/function.hpp>
 #include <boost/bind.hpp>
-#include <list>
+#include <vector>
 #include <map>
 #include <stdio.h>
 #include "../EquationSystem.h"
@@ -22,10 +22,10 @@ class GenericMatrixGenerator {
 		double** matrix;
 		double* rhs;
 		int matrix_size;
-		std::list<EquationSystem*>* tier_list;
+		std::vector<EquationSystem*>* tier_vector;
 
 	public:
-		virtual std::list<EquationSystem*>* CreateMatrixAndRhs(TaskDescription& task_description) = 0;
+		virtual std::vector<EquationSystem*>* CreateMatrixAndRhs(TaskDescription& task_description) = 0;
 		virtual void checkSolution(std::map<int,double> *solution_map, double (*f)(int dim, ...)) = 0;
 
 		double** GetMatrix()
@@ -54,11 +54,11 @@ class GenericMatrixGenerator {
 			delete[] matrix;
 			delete[] rhs;
 
-			std::list<EquationSystem*>::iterator it_t = tier_list->begin();
-			for(; it_t != tier_list->end(); ++it_t)
+			std::vector<EquationSystem*>::iterator it_t = tier_vector->begin();
+			for(; it_t != tier_vector->end(); ++it_t)
 				delete *it_t;
 
-			delete tier_list;
+			delete tier_vector;
 		}
 
 };

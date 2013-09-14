@@ -239,6 +239,7 @@ void EdgeProduction::Execute(EProduction productionToExecute, Vertex* v, Equatio
 
 }
 
+//general base for B C D productions
 void Pre(Vertex* v, EquationSystem* inData, int offset, bool eliminate)
 {
 	double** const sys_matrix = v->system->matrix;
@@ -298,19 +299,6 @@ void EdgeProduction::D(Vertex* v, EquationSystem* inData) const
 	v->system->swapCols(4,3);
 	v->system->swapRows(4,3);
 	v->system->eliminate(2);
-
-}
-
-void EdgeProduction::Copy(Vertex* v, EquationSystem* inData) const
-{
-	for(int i = 0; i< inData->n; i++)
-	{
-		for(int j = 0; j<inData->n; j++)
-			v->system->matrix[i][j] = inData->matrix[i][j];
-
-		v->system->rhs[i] = inData->rhs[i];
-	}
-
 
 }
 

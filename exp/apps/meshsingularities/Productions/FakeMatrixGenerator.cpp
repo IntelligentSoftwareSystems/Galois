@@ -7,10 +7,10 @@
 
 #include "FakeMatrixGenerator.h"
 
-std::list<EquationSystem*> *FakeMatrixGenerator::CreateMatrixAndRhs(TaskDescription& taskDescription)
+std::vector<EquationSystem*> *FakeMatrixGenerator::CreateMatrixAndRhs(TaskDescription& taskDescription)
 {
 
-	std::list<EquationSystem*> *leafList = new std::list<EquationSystem*>();
+	std::vector<EquationSystem*> *leafVector = new std::vector<EquationSystem*>();
 
 	const int iSize = this->getiSize(taskDescription.polynomialDegree);
 	const int leafSize = this->getLeafSize(taskDescription.polynomialDegree);
@@ -36,10 +36,10 @@ std::list<EquationSystem*> *FakeMatrixGenerator::CreateMatrixAndRhs(TaskDescript
 			system->matrix[j][0] = 2.0;
 		}
 
-		leafList->push_back(system);
+		leafVector->push_back(system);
 	}
 
-	return leafList;
+	return leafVector;
 }
 
 void FakeMatrixGenerator::checkSolution(std::map<int,double> *solution_map, double (*f)(int dim, ...))

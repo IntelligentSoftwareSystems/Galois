@@ -6,7 +6,7 @@
 #include "../Point2D/EPosition.hxx"
 #include "Tier.hxx"
 #include "../MatrixGeneration/GenericMatrixGenerator.hxx"
-#include <list>
+#include <vector>
 #include <map>
 namespace D2Quad{
 class MatrixGenerator : public GenericMatrixGenerator{
@@ -17,7 +17,7 @@ class MatrixGenerator : public GenericMatrixGenerator{
 		void CreateTier(double x, double y, double element_size, int tier_size, int function_nr, IDoubleArgFunction* f, bool first_tier);
 
 	public:
-		virtual std::list<EquationSystem*>* CreateMatrixAndRhs(TaskDescription& task_description);
+		virtual std::vector<EquationSystem*>* CreateMatrixAndRhs(TaskDescription& task_description);
 		virtual void checkSolution(std::map<int,double> *solution_map, double (*f)(int dim, ...));
 
 

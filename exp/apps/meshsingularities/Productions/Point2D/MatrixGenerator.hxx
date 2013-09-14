@@ -6,7 +6,7 @@
 #include "EPosition.hxx"
 #include "Tier.hxx"
 #include "../MatrixGeneration/GenericMatrixGenerator.hxx"
-#include <list>
+#include <vector>
 #include <map>
 namespace D2{
 class MatrixGenerator : public GenericMatrixGenerator{
@@ -16,7 +16,7 @@ class MatrixGenerator : public GenericMatrixGenerator{
 
 
 	public:
-		virtual std::list<EquationSystem*>* CreateMatrixAndRhs(TaskDescription& task_description);
+		virtual std::vector<EquationSystem*>* CreateMatrixAndRhs(TaskDescription& task_description);
 		virtual void checkSolution(std::map<int,double> *solution_map, double (*f)(int dim, ...));
 
 		virtual std::vector<int>* GetProductionParameters(int polynomial_degree)

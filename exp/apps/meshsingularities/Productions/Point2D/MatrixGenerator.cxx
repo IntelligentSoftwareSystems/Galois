@@ -1,7 +1,7 @@
 #include "MatrixGenerator.hxx"
 
 using namespace D2;
-std::list<EquationSystem*>* MatrixGenerator::CreateMatrixAndRhs(TaskDescription& task_description)
+std::vector<EquationSystem*>* MatrixGenerator::CreateMatrixAndRhs(TaskDescription& task_description)
 {	
 		double* coordinates = new double[4];
 		bool* neighbours = new bool[4];
@@ -62,7 +62,7 @@ std::list<EquationSystem*>* MatrixGenerator::CreateMatrixAndRhs(TaskDescription&
 		for(int i = 0; i<matrix_size; i++)
 			matrix[i] = new double[matrix_size]();
 
-		tier_list = new std::list<EquationSystem*>();
+		tier_vector = new std::vector<EquationSystem*>();
 		std::list<Element*>::iterator it = element_list.begin();
 		it = element_list.begin();
 
@@ -75,13 +75,13 @@ std::list<EquationSystem*>* MatrixGenerator::CreateMatrixAndRhs(TaskDescription&
 				tier = new Tier(*it,*(++it),*(++it),NULL,f,matrix,rhs);
 				++it;
 			}
-			tier_list->push_back(tier);
+			tier_vector->push_back(tier);
 		}
 		//xyz
 		delete[] elements;
 		delete[] coordinates;
 		delete[] neighbours;
-		return tier_list;
+		return tier_vector;
 }
 
 void MatrixGenerator::checkSolution(std::map<int,double> *solution_map, double (*function)(int dim, ...))

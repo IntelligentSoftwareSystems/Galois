@@ -6,7 +6,7 @@
 #include "../Point2D/EPosition.hxx"
 #include "Tier.hxx"
 #include "../MatrixGeneration/GenericMatrixGenerator.hxx"
-#include <list>
+#include <vector>
 #include <map>
 #include <cmath>
 namespace D2Edge{
@@ -19,7 +19,7 @@ class MatrixGenerator : public GenericMatrixGenerator{
 		void CreateTiers(int to_create, int element_id, double size, double* coordinates, IDoubleArgFunction* f, bool first_tier);
 
 	public:
-		virtual std::list<EquationSystem*>* CreateMatrixAndRhs(TaskDescription& task_description);
+		virtual std::vector<EquationSystem*>* CreateMatrixAndRhs(TaskDescription& task_description);
 		virtual void checkSolution(std::map<int,double> *solution_map, double (*f)(int dim, ...));
 
 

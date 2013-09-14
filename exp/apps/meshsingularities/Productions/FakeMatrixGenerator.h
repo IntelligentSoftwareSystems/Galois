@@ -19,7 +19,7 @@
 class FakeMatrixGenerator : public GenericMatrixGenerator
 {
 public:
-	virtual std::list<EquationSystem*>* CreateMatrixAndRhs(TaskDescription& task_description);
+	virtual std::vector<EquationSystem*>* CreateMatrixAndRhs(TaskDescription& task_description);
 	virtual void checkSolution(std::map<int,double> *solution_map, double (*f)(int dim, ...));
 
 	virtual int getiSize(int p) {

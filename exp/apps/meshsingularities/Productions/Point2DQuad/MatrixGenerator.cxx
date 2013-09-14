@@ -187,10 +187,10 @@ void set_last_tier_interior_nrs(int nr, Element** elements)
 	elements[3]->set_top_left_vertex_nr(nr);
 }
 
-std::list<EquationSystem*>* MatrixGenerator::CreateMatrixAndRhs(TaskDescription& task_description)
+std::vector<EquationSystem*>* MatrixGenerator::CreateMatrixAndRhs(TaskDescription& task_description)
 {
 
-		tier_list = new std::list<EquationSystem*>();
+		tier_vector = new std::vector<EquationSystem*>();
 
 		IDoubleArgFunction* f = new DoubleArgFunctionWrapper(task_description.function);
 		double bot_left_x = task_description.x;
@@ -233,8 +233,8 @@ std::list<EquationSystem*>* MatrixGenerator::CreateMatrixAndRhs(TaskDescription&
 		nr+=24;
 		set_small_interface_nrs(nr,elements);
 		set_last_tier_interior_nrs(nr,elements+nr_of_tier_elements);
-		tier_list->push_back(new Tier(elements,f,matrix,rhs, nr_of_last_tier_elements));
-		return tier_list;
+		tier_vector->push_back(new Tier(elements,f,matrix,rhs, nr_of_last_tier_elements));
+		return tier_vector;
 }
 
 void MatrixGenerator::CreateTier(double x, double y, double element_size, int tier_size, int function_nr, IDoubleArgFunction* f, bool first_tier)
@@ -250,7 +250,7 @@ void MatrixGenerator::CreateTier(double x, double y, double element_size, int ti
 	set_interior_nrs(function_nr,elements);
 	function_nr+=24;
 	set_small_interface_nrs(function_nr,elements);
-	tier_list->push_back(new Tier(elements,f,matrix,rhs, tier_size));
+	tier_vector->push_back(new Tier(elements,f,matrix,rhs, tier_size));
 
 }
 
