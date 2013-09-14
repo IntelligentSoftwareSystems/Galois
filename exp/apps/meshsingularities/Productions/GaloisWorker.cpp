@@ -99,10 +99,6 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 	if(edge)
 		printf("EDGE SOLVER!\n");
 	std::vector<int>* vec = matrixGenerator->GetProductionParameters(taskDescription.polynomialDegree);
-	if(edge)
-		production = new EdgeProduction(vec);
-	else
-		production = new PointProduction(vec);
 
 	/*printf("Problem size: %d\n", matrixGenerator->getA1Size(taskDescription.polynomialDegree) +
 			matrixGenerator->getANSize(taskDescription.polynomialDegree)
@@ -134,6 +130,11 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 				(PointProduction*)production);
 		timerPreprocess.stop();
 	}
+
+        if(edge)
+                production = new EdgeProduction(vec, inputMatrices);
+        else
+            	production = new PointProduction(vec, inputMatrices);
 
 	S = production->getRootVertex();
 

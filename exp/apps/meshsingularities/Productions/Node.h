@@ -8,10 +8,13 @@
 #ifndef NODE_H_
 #define NODE_H_
 
-
 #include "EProduction.hxx"
 #include "EquationSystem.h"
-#include "Production.h"
+#include "Vertex.h"
+
+#include "Galois/Graph/LC_Morph_Graph.h"
+
+class AbstractProduction;
 
 class Node
 {
@@ -40,6 +43,13 @@ public:
 	void setVertex(Vertex *v1) { this->v = v1; }
 	void execute();
 };
+
+typedef int EdgeData;
+
+typedef Galois::Graph::LC_Morph_Graph<Node,EdgeData> Graph;
+typedef Galois::Graph::LC_Morph_Graph<Node,EdgeData>::GraphNode GraphNode;
+typedef Galois::Graph::LC_Morph_Graph<Node,EdgeData>::iterator LCM_iterator;
+typedef Galois::Graph::LC_Morph_Graph<Node,EdgeData>::edge_iterator LCM_edge_iterator;
 
 
 #endif /* NODE_H_ */

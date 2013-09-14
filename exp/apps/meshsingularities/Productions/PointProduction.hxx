@@ -21,14 +21,14 @@ class PointProduction : public AbstractProduction{
 	const int a1Offset;
 	const int anOffset;
 
-	virtual void generateGraph();
+	void generateGraph();
 
-	void recursiveGraphGeneration(int low_range, int high_range,
+	virtual void recursiveGraphGeneration(int low_range, int high_range,
 			GraphNode bsSrcNode,
 			GraphNode mergingDstNode,
 			Vertex *parent);
 
-	GraphNode addNode(int incomingEdges,
+	virtual GraphNode addNode(int incomingEdges,
 			int outgoingEdges,
 			int leafNumber,
 			EProduction production,
@@ -39,8 +39,7 @@ class PointProduction : public AbstractProduction{
 
   public:
 	PointProduction(std::vector<int>* productionParameters,
-					int leafs,
-					std::vector<EquationSystem*> *inputData) : AbstractProduction(productionParameters, leafs, inputData),
+					std::vector<EquationSystem*> *inputData) : AbstractProduction(productionParameters, inputData),
 		interfaceSize((*productionParameters)[0]),
 		leafSize((*productionParameters)[1]),
 		a1Size((*productionParameters)[2]),
@@ -48,10 +47,12 @@ class PointProduction : public AbstractProduction{
 		offset((*productionParameters)[1] - 2*(*productionParameters)[0]),
 		a1Offset((*productionParameters)[2] - (*productionParameters)[1]),
 		anOffset((*productionParameters)[3] - (*productionParameters)[1]) {
-
+		generateGraph();
   	  };
 
 	virtual void Execute(EProduction productionToExecute, Vertex* v, EquationSystem* input);
+	virtual Vertex *getRootVertex();
+	virtual Graph *getGraph();
     void A1(Vertex *v, EquationSystem *inData) const;
     void A(Vertex *v, EquationSystem *inData) const;
     void AN(Vertex *v, EquationSystem *inData) const;

@@ -30,6 +30,7 @@ GraphNode PointProduction::addNode(int incomingEdges,
 
 void PointProduction::generateGraph()
 {
+	int leafs = inputData->size();
 	if(leafs < 2)
 		throw std::runtime_error("At least 2 leafs required");
 
@@ -87,6 +88,7 @@ void PointProduction::recursiveGraphGeneration(int low_range,
 	//only 3 leafs remaining
 	else if((high_range - low_range) == 2)
 	{
+		int leafs = inputData->size();
 		//first leaf
 		//leaf creation
 		if(low_range == 0) {
@@ -138,6 +140,7 @@ void PointProduction::recursiveGraphGeneration(int low_range,
 	//two leafs remaining
 	else if((high_range - low_range) == 1)
 	{
+		int leafs = inputData->size();
 		//left = new Vertex(NULL, NULL, parent, LEAF, productions->getLeafSize(), low_range/4);
 		left = new Vertex(NULL, NULL, parent, LEAF, this->getLeafSize());
 

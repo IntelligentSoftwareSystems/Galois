@@ -16,21 +16,23 @@ class EdgeProduction : public AbstractProduction{
   private:
 	const int bOffset;
 	const int cOffset;
-
-	virtual void generateGraph();
-
+	
 	Vertex *recursiveGraphGeneration(int low_range,
 			int high_range,
 			GraphNode mergingDstNode);
+	void generateGraph();
   public:
 	EdgeProduction(std::vector<int>* productionParameters,
-			int leafs,
 			std::vector<EquationSystem*> *inputData) :
-				AbstractProduction(productionParameters, leafs, inputData),
+				AbstractProduction(productionParameters, inputData),
 		bOffset(2), cOffset(1)
-		{};
+		{
+			generateGraph();
+		};
 
 	virtual void Execute(EProduction productionToExecute, Vertex* v, EquationSystem* input);
+	virtual Vertex *getRootVertex();
+	virtual Graph *getGraph();
     void B(Vertex *v, EquationSystem *inData) const;
     void C(Vertex *v, EquationSystem *inData) const;
     void D(Vertex *v, EquationSystem *inData) const;

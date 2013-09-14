@@ -10,6 +10,7 @@
 
 void EdgeProduction::generateGraph()
 {
+	int leafs = inputData->size();
 	if(leafs < 2)
 		throw std::runtime_error("At least 2 leafs required");
 
@@ -196,6 +197,10 @@ Vertex *EdgeProduction::recursiveGraphGeneration(int low_range,
 	}
 }
 
+Vertex *EdgeProduction::getRootVertex()
+{
+	return this->S;
+}
 
 Graph *EdgeProduction::getGraph()
 {

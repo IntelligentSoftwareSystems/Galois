@@ -6,10 +6,10 @@
  */
 
 #include "Node.h"
+#include "Production.h"
 #include "EProduction.hxx"
 
 #include <Galois/Galois.h>
-
 
 #include <sys/time.h>
 #include <sched.h>
