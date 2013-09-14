@@ -27,6 +27,7 @@ class EdgeProduction : public AbstractProduction{
 				AbstractProduction(productionParameters, inputData),
 		bOffset(2), cOffset(1)
 		{
+			this->inputData = inputData;
 			generateGraph();
 		};
 
