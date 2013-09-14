@@ -2,7 +2,7 @@
 
 
 using namespace D3;
-std::list<EquationSystem*>* MatrixGenerator::CreateMatrixAndRhs(TaskDescription& task_description)
+std::vector<EquationSystem*>* MatrixGenerator::CreateMatrixAndRhs(TaskDescription& task_description)
 {	
 
 		TripleArgFunctionWrapper* f = new TripleArgFunctionWrapper(task_description.function);
@@ -13,8 +13,9 @@ std::list<EquationSystem*>* MatrixGenerator::CreateMatrixAndRhs(TaskDescription&
 		double size = task_description.size;
 
 		int nr = 0; 
+		bool neigbours[18] = {true};
 		Element* element = new Element(bot_left_near_x, bot_left_near_y + size / 2.0, bot_left_near_z,
-				 size / 2.0, BOT_LEFT_FAR, true);
+				 size / 2.0, neigbours, BOT_LEFT_FAR);
 		
 		Element** elements = element->CreateFirstTier(nr);
 		
@@ -29,13 +30,14 @@ std::list<EquationSystem*>* MatrixGenerator::CreateMatrixAndRhs(TaskDescription&
 		double y = bot_left_near_y + size / 2.0;
 		double z = bot_left_near_z;
 		double s = size / 2.0;
-		
+		neigbours[LEFT2] = false; neigbours[BOT_LEFT] = false; neigbours[LEFT_NEAR] = false; neigbours[LEFT_FAR] = false; neigbours[TOP_LEFT] = false;
+		neigbours[FAR] = false; neigbours[TOP_FAR] = false; neigbours[BOT_FAR] = false; neigbours[RIGHT_FAR] = false;
 		for(int i = 1; i < nr_of_tiers ; i++){
 			
 			x = x + s; 
 			y = y - s / 2.0;
 			s = s /2.0;
-			element = new Element(x, y, z, s, BOT_LEFT_FAR, false);
+			element = new Element(x, y, z, s, neigbours, BOT_LEFT_FAR);
 			elements = element->CreateAnotherTier(nr);
 			
 			for(int i = 0; i<7; i++)
@@ -48,7 +50,8 @@ std::list<EquationSystem*>* MatrixGenerator::CreateMatrixAndRhs(TaskDescription&
 		
 		x = x + s; 
 		y = y - s;
-		element = new Element(x, y, z, s, BOT_RIGHT_NEAR, false);
+		for(int i = 0; i<18; i++) neigbours[i] = true;
+		element = new Element(x, y, z, s, neigbours, BOT_RIGHT_NEAR);
 		element->CreateLastTier(nr);
 		element_list.push_back(element);
 		
@@ -60,7 +63,7 @@ std::list<EquationSystem*>* MatrixGenerator::CreateMatrixAndRhs(TaskDescription&
 
 
 
-		tier_list = new std::list<EquationSystem*>();
+		tier_vector = new std::vector<EquationSystem*>();
 		std::list<Element*>::iterator it = element_list.begin();
 		it = element_list.begin();
 
@@ -73,10 +76,10 @@ std::list<EquationSystem*>* MatrixGenerator::CreateMatrixAndRhs(TaskDescription&
 				tier = new Tier(*it,*(++it),*(++it),*(++it),*(++it),*(++it),*(++it),NULL,f,matrix,rhs);
 				++it;
 			}
-			tier_list->push_back(tier);
+			tier_vector->push_back(tier);
 		}
 
-		return tier_list;
+		return tier_vector;
 }
 
 void MatrixGenerator::checkSolution(std::map<int,double> *solution_map, double (*function)(int dim,...))

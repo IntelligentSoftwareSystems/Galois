@@ -24,7 +24,7 @@ double test_function(int dim, ...)
 		double x = data[0];
 		double y = data[1];
 		double z = data[2];
-		result = 3*x*x + 2*y*y + z*z + x*y*z + x*x*z + y*y;
+		result = 3*x*x + 2*y*y + z*z + x*y*z + x*x*z + y*y + 2*x*x*y*y*z*z;
 	}
 	else
 	{
@@ -51,7 +51,7 @@ int main(int argc, char** argv)
 		taskDescription.x=-1;
 		taskDescription.y=-1;
 		taskDescription.z=-1;
-		std::list<EquationSystem*> *tiers = matrixGenerator->CreateMatrixAndRhs(taskDescription);
+		std::vector<EquationSystem*> *tiers = matrixGenerator->CreateMatrixAndRhs(taskDescription);
 		EquationSystem *globalSystem = new EquationSystem(matrixGenerator->GetMatrix(),
 														  matrixGenerator->GetRhs(),
 														  matrixGenerator->GetMatrixSize());

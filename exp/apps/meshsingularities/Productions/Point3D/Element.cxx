@@ -280,12 +280,20 @@ void set_internal_top_right_near_edge_face_interior_nrs(int nr,
 
 Element** Element::CreateAnotherTier(int nr)
 {
-	Element* bot_left_near_element = new Element(xl,yl - size, zl, size,BOT_LEFT_NEAR,false);
-	Element* bot_right_far_element = new Element(xr,yl,zl,size,BOT_RIGHT_FAR,false);
-	Element* top_left_near_element = new Element(xl,yl - size, zl + size, size,TOP_LEFT_NEAR,false);
-	Element* top_right_far_element = new Element(xr,yl,zl+size,size,TOP_RIGHT_FAR,false);
-	Element* top_left_far_element = new Element(xl,yl,zl+size,size,TOP_LEFT_FAR,false);
-	Element* top_right_near_element = new Element(xl+size,yl-size,zl+size,size,TOP_RIGHT_NEAR,false);
+	bool neighbours[18] = {true};
+	neighbours[LEFT2] = false; neighbours[TOP_LEFT] = false; neighbours[BOT_LEFT] = false; neighbours[LEFT_NEAR] = false; neighbours[LEFT_FAR] = false;
+	Element* bot_left_near_element = new Element(xl,yl - size, zl, size, neighbours,BOT_LEFT_NEAR);
+	neighbours[TOP2] = false; neighbours[TOP_NEAR] = false; neighbours[TOP_FAR] = false; neighbours[TOP_RIGHT] = false;
+	Element* top_left_near_element = new Element(xl,yl - size, zl + size, size,neighbours,TOP_LEFT_NEAR);
+	neighbours[FAR] = false; neighbours[BOT_FAR] = false; neighbours[RIGHT_FAR] = false;
+	Element* top_left_far_element = new Element(xl,yl,zl+size,size,neighbours, TOP_LEFT_FAR);
+	neighbours[LEFT2] = true; neighbours[LEFT_NEAR] = true; neighbours[BOT_LEFT] = true;
+	Element* top_right_far_element = new Element(xr,yl,zl+size,size,neighbours,TOP_RIGHT_FAR);
+	neighbours[TOP2] = true; neighbours[TOP_LEFT] = true; neighbours[TOP_RIGHT] = true; neighbours[TOP_NEAR] = true;
+	Element* bot_right_far_element = new Element(xr,yl,zl,size, neighbours,BOT_RIGHT_FAR);
+	for(int i = 0; i<18; i++) neighbours[i] = true;
+	neighbours[TOP2] = false; neighbours[TOP_LEFT] = false; neighbours[TOP_RIGHT] = false; neighbours[TOP_NEAR] = false; neighbours[TOP_FAR] = true;
+	Element* top_right_near_element = new Element(xl+size,yl-size,zl+size,size,neighbours,TOP_RIGHT_NEAR);
 
 
 	set_big_interface_lower_vertex_edge_nrs(nr,bot_left_near_element,this,bot_right_far_element);
@@ -322,12 +330,14 @@ Element** Element::CreateAnotherTier(int nr)
 
 Element** Element::CreateFirstTier(int nr){
 
-	Element* bot_left_near_element = new Element(xl,yl - size, zl, size,BOT_LEFT_NEAR, true);
-	Element* bot_right_far_element = new Element(xr,yl,zl,size,BOT_RIGHT_FAR,true);
-	Element* top_left_near_element = new Element(xl,yl - size, zl + size, size,TOP_LEFT_NEAR, true);
-	Element* top_right_far_element = new Element(xr,yl,zl+size,size,TOP_RIGHT_FAR,true);
-	Element* top_left_far_element = new Element(xl,yl,zl+size,size,TOP_LEFT_FAR,true);
-	Element* top_right_near_element = new Element(xl+size,yl-size,zl+size,size,TOP_RIGHT_NEAR,true);
+	bool neighbours[18] = {true};
+
+	Element* bot_left_near_element = new Element(xl,yl - size, zl, size, neighbours, BOT_LEFT_NEAR);
+	Element* bot_right_far_element = new Element(xr,yl,zl,size, neighbours, BOT_RIGHT_FAR);
+	Element* top_left_near_element = new Element(xl,yl - size, zl + size, size, neighbours, TOP_LEFT_NEAR);
+	Element* top_right_far_element = new Element(xr,yl,zl+size,size, neighbours, TOP_RIGHT_FAR);
+	Element* top_left_far_element = new Element(xl,yl,zl+size,size, neighbours, TOP_LEFT_FAR);
+	Element* top_right_near_element = new Element(xl+size,yl-size,zl+size,size, neighbours, TOP_RIGHT_NEAR);
 
 	set_big_interface_lower_vertex_edge_nrs_first_tier(nr,bot_left_near_element,this,bot_right_far_element);
 	nr+=9;

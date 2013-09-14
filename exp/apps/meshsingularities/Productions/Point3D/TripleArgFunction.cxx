@@ -233,26 +233,38 @@ double VertexBotLeftNearShapeFunction::ComputeValue(double x, double y, double z
 	y = getYValueOnElement(y); 
 	z = getZValueOnElement(z);
 	double value = vertex_bot_left_near_function(x,y,z);
-	if(is_first_tier)
-		return value; 
+
 	switch(position)
 	{
 		case BOT_LEFT_NEAR:
-			return value + vertex_top_left_near_function(x,y,z)/2.0 + vertex_bot_left_far_function(x,y,z)/2.0 +
-					vertex_top_left_far_function(x,y,z)/4.0;
+			return value + vertex_top_left_near_function(x,y,z)/2*(!neighbours[LEFT_NEAR]) + vertex_bot_left_far_function(x,y,z)/2*(!neighbours[BOT_LEFT]) +
+					vertex_top_left_far_function(x,y,z)/4.0*(!neighbours[LEFT2]) + vertex_bot_right_near_function(x,y,z)/2.0*(!neighbours[BOT_NEAR]) +
+						vertex_top_right_near_function(x,y,z)/4.0*(!neighbours[NEAR]) + vertex_bot_right_far_function(x,y,z)/4.0*(!neighbours[BOT2]);
 		case BOT_LEFT_FAR:
-			return value / 2.0 + vertex_top_left_near_function(x,y,z)/4.0;
+			if(!neighbours[BOT_LEFT])
+				value /= 2.0;
+			return value + vertex_top_left_near_function(x,y,z)/4.0*(!neighbours[LEFT2]) + vertex_bot_right_near_function(x,y,z)/4.0*(!neighbours[BOT2]);
 		case TOP_LEFT_NEAR:
-			return value / 2.0 + vertex_bot_left_far_function(x,y,z)/4.0;
+			if(!neighbours[LEFT_NEAR])
+				value /= 2.0;
+			return value + vertex_bot_left_far_function(x,y,z)/4.0*(!neighbours[LEFT2]) + vertex_bot_right_near_function(x,y,z)/4.0*(!neighbours[NEAR]);
 		case TOP_LEFT_FAR:
-			return value / 4.0;
+			if(!neighbours[LEFT2])
+				 value /= 4.0;
+			return value;
 		case TOP_RIGHT_NEAR:
+			if(!neighbours[NEAR])
+				value /= 4.0;
 			return value;
 		case TOP_RIGHT_FAR:
 			return value;
 		case BOT_RIGHT_NEAR:
-			return value;
+			if(!neighbours[BOT_NEAR])
+				value /= 2.0;
+			return value + vertex_top_left_near_function(x,y,z)/4.0*(!neighbours[NEAR]) + vertex_bot_left_far_function(x,y,z)/4.0*(!neighbours[BOT2]);
 		case BOT_RIGHT_FAR:
+			if(!neighbours[BOT2])
+				value /= 4.0;
 			return value;
 		return 0; 
 	}
@@ -264,28 +276,39 @@ double VertexBotLeftFarShapeFunction::ComputeValue(double x, double y, double z)
 	y = getYValueOnElement(y);
 	z = getZValueOnElement(z);
 	double value = vertex_bot_left_far_function(x,y,z);
-	if(is_first_tier)
-		return value;
+
 	switch(position)
 	{
 		case BOT_LEFT_NEAR:
-			return value / 2.0 + vertex_top_left_far_function(x,y,z)/4.0;
+			if(!neighbours[BOT_LEFT])
+				value /= 2.0;
+			return value + vertex_top_left_far_function(x,y,z)/4.0*(!neighbours[LEFT2]) + vertex_bot_right_far_function(x,y,z)/4.0*(!neighbours[BOT2]);
 		case BOT_LEFT_FAR:
-			return value + vertex_bot_left_near_function(x,y,z)/2.0 + vertex_top_left_far_function(x,y,z)/2.0 +
-					vertex_bot_right_far_function(x,y,z)/2.0 + vertex_top_right_far_function(x,y,z)/4.0 +
-					vertex_top_left_near_function(x,y,z)/4.0;
+			return value + vertex_bot_left_near_function(x,y,z)/2.0*(!neighbours[BOT_LEFT]) + vertex_top_left_far_function(x,y,z)/2.0*(!neighbours[LEFT_FAR]) +
+					vertex_bot_right_far_function(x,y,z)/2.0*(!neighbours[BOT_FAR]) + vertex_top_right_far_function(x,y,z)/4.0*(!neighbours[FAR]) +
+					vertex_top_left_near_function(x,y,z)/4.0*(!neighbours[LEFT2]) + vertex_bot_right_near_function(x,y,z)/4.0*(!neighbours[BOT2]);
 		case TOP_LEFT_NEAR:
-			return value / 4.0;
+			if(!neighbours[LEFT2])
+				value /= 4.0;
+			return value;
 		case TOP_LEFT_FAR:
-			return value / 2.0 + vertex_bot_left_near_function(x,y,z)/4.0 + vertex_bot_right_far_function(x,y,z)/4.0;
+			if(!neighbours[LEFT_FAR])
+				value /= 2.0;
+			return value + vertex_bot_left_near_function(x,y,z)/4.0*(!neighbours[LEFT2]) + vertex_bot_right_far_function(x,y,z)/4.0*(!neighbours[FAR]);
 		case TOP_RIGHT_NEAR:
 			return value;
 		case TOP_RIGHT_FAR:
-			return value/4.0;
+			if(!neighbours[FAR])
+				value /= 4.0;
+			return value;
 		case BOT_RIGHT_NEAR:
+			if(!neighbours[BOT2])
+				value /= 4.0;
 			return value;
 		case BOT_RIGHT_FAR:
-			return value / 2.0 + vertex_top_left_far_function(x,y,z)/4.0;
+			if(!neighbours[BOT_FAR])
+				value /= 2.0;
+			return value + vertex_bot_left_near_function(x,y,z)/4.0*(!neighbours[BOT2]) + vertex_top_left_far_function(x,y,z)/4.0*(!neighbours[FAR]);
 
 	}
 }
@@ -296,27 +319,38 @@ double VertexTopLeftNearShapeFunction::ComputeValue(double x, double y, double z
 	y = getYValueOnElement(y);
 	z = getZValueOnElement(z);
 	double value = vertex_top_left_near_function(x,y,z);
-	if(is_first_tier)
-		return value; 
 	switch(position)
 	{
 		case BOT_LEFT_NEAR:
-			return value / 2.0 + vertex_top_left_far_function(x,y,z) / 4.0;
+			if(!neighbours[LEFT_NEAR])
+				value /= 2.0;
+			return value + vertex_top_right_near_function(x,y,z)/4.0*(!neighbours[NEAR]) + vertex_top_left_far_function(x,y,z)/4.0*(!neighbours[LEFT2]);
 		case BOT_LEFT_FAR:
-			return value / 4.0;
+			if(!neighbours[LEFT2])
+				value /= 4.0;
+			return value;
 		case TOP_LEFT_NEAR:
-			return value + vertex_bot_left_near_function(x,y,z)/2.0 +
-					vertex_top_left_far_function(x,y,z)/2.0 + vertex_top_right_near_function(x,y,z)/2.0 +
-						vertex_bot_left_far_function(x,y,z)/4.0 +vertex_top_right_far_function(x,y,z)/4.0;
+			return value + vertex_bot_left_near_function(x,y,z)/2.0*(!neighbours[LEFT_NEAR]) +
+					vertex_top_left_far_function(x,y,z)/2.0*(!neighbours[TOP_LEFT]) + vertex_top_right_near_function(x,y,z)/2.0*(!neighbours[TOP_NEAR]) +
+						vertex_bot_left_far_function(x,y,z)/4.0*(!neighbours[LEFT2]) + vertex_top_right_far_function(x,y,z)/4.0*(!neighbours[TOP2]) +
+							vertex_bot_right_near_function(x,y,z)/4.0*(!neighbours[NEAR]);
 		case TOP_LEFT_FAR:
-			return value / 2.0 + vertex_bot_left_near_function(x,y,z)/4.0 + vertex_top_right_near_function(x,y,z)/4.0;
+			if(!neighbours[TOP_LEFT])
+				value /= 2.0;
+			return value + vertex_bot_left_near_function(x,y,z)/4.0*(!neighbours[LEFT2]) + vertex_top_right_near_function(x,y,z)/4.0*(!neighbours[TOP2]);
 		case TOP_RIGHT_NEAR:
-			return value / 2.0 + vertex_top_left_far_function(x,y,z)/4.0;
+			if(!neighbours[TOP_NEAR])
+				value /= 2.0;
+			return value + vertex_top_left_far_function(x,y,z)/4.0*(!neighbours[TOP2]) + vertex_bot_left_near_function(x,y,z)/4.0*(!neighbours[NEAR]);
 		case TOP_RIGHT_FAR:
-			return value/4.0;
+			if(!neighbours[TOP2])
+				value /= 4.0;
+			return value;
 		case BOT_RIGHT_FAR:
 			return value;
 		case BOT_RIGHT_NEAR:
+			if(!neighbours[NEAR])
+				value /= 4.0;
 			return value; 
 	}
 }
@@ -326,9 +360,7 @@ double VertexTopLeftFarShapeFunction::ComputeValue(double x, double y, double z)
 	x = getXValueOnElement(x);
 	y = getYValueOnElement(y);
 	z = getZValueOnElement(z);
-	double value = vertex_top_left_far_function(x,y,z);
-	if(is_first_tier)
-		return value;
+	double value = vertex_top_left_far_function(x,y,z);//xyz
 	switch(position)
 	{
 		case BOT_LEFT_NEAR:
@@ -359,7 +391,7 @@ double VertexTopRightNearShapeFunction::ComputeValue(double x, double y, double 
 	y = getYValueOnElement(y);
 	z = getZValueOnElement(z);
 	double value =  vertex_top_right_near_function(x,y,z);
-	if(is_first_tier)
+	//if(is_first_tier)
 		return value;
 	switch(position)
 	{
@@ -390,7 +422,7 @@ double VertexTopRightFarShapeFunction::ComputeValue(double x, double y, double z
 	y = getYValueOnElement(y); 
 	z = getZValueOnElement(z);
 	double value =  vertex_top_right_far_function(x,y,z);
-	if(is_first_tier)
+	//if(is_first_tier)
 		return value;
 	switch(position)
 	{
@@ -421,7 +453,7 @@ double VertexBotRightFarShapeFunction::ComputeValue(double x, double y, double z
 	y = getYValueOnElement(y);
 	z = getZValueOnElement(z);
 	double value =  vertex_bot_right_far_function(x,y,z);
-	if(is_first_tier)
+	//if(is_first_tier)
 		return value;
 	switch(position)
 	{
@@ -461,7 +493,7 @@ double EdgeBotLeftShapeFunction::ComputeValue(double x, double y, double z)
 	y = getYValueOnElement(y); 
 	z = getZValueOnElement(z);
 	double value = edge_bot_left_function(x,y,z);
-	if(is_first_tier)
+	//if(is_first_tier)
 			return value;
 	switch(position)
 	{
@@ -491,7 +523,7 @@ double EdgeTopLeftShapeFunction::ComputeValue(double x, double y, double z)
 	y = getYValueOnElement(y);
 	z = getZValueOnElement(z);
 	double value = edge_top_left_function(x,y,z);
-	if(is_first_tier)
+	//if(is_first_tier)
 			return value;
 	switch(position)
 	{
@@ -523,7 +555,7 @@ double EdgeTopRightShapeFunction::ComputeValue(double x, double y, double z)
 	y = getYValueOnElement(y);
 	z = getZValueOnElement(z);
 	double value = edge_top_right_function(x,y,z);
-	if(is_first_tier)
+	//if(is_first_tier)
 			return value;
 	switch(position)
 	{
@@ -564,7 +596,7 @@ double EdgeTopNearShapeFunction::ComputeValue(double x, double y, double z)
 	y = getYValueOnElement(y); 
 	z = getZValueOnElement(z);
 	double value = edge_top_near_function(x,y,z);
-	if(is_first_tier)
+	//if(is_first_tier)
 			return value;
 	switch(position){
 	case BOT_LEFT_NEAR:
@@ -603,7 +635,7 @@ double EdgeTopFarShapeFunction::ComputeValue(double x, double y, double z)
 	y = getYValueOnElement(y);
 	z = getZValueOnElement(z);
 	double value = edge_top_far_function(x,y,z);
-	if(is_first_tier)
+	//if(is_first_tier)
 			return value;
 	switch(position){
 	case BOT_LEFT_NEAR:
@@ -634,7 +666,7 @@ double EdgeBotFarShapeFunction::ComputeValue(double x, double y, double z)
 	y = getYValueOnElement(y);
 	z = getZValueOnElement(z);
 	double value = edge_bot_far_function(x,y,z);
-	if(is_first_tier)
+	//if(is_first_tier)
 			return value;
 	switch(position){
 	case BOT_LEFT_NEAR:
@@ -663,7 +695,7 @@ double EdgeLeftNearShapeFunction::ComputeValue(double x, double y, double z)
 	y = getYValueOnElement(y);
 	z = getZValueOnElement(z);
 	double value = edge_left_near_function(x,y,z);
-	if(is_first_tier)
+	//if(is_first_tier)
 		return value;
 	switch(position){
 	case BOT_LEFT_NEAR:
@@ -692,7 +724,7 @@ double EdgeLeftFarShapeFunction::ComputeValue(double x, double y, double z)
 	y = getYValueOnElement(y);
 	z = getZValueOnElement(z);
 	double value = edge_left_far_function(x,y,z);
-	if(is_first_tier)
+	//if(is_first_tier)
 		return value;
 	switch(position){
 	case BOT_LEFT_NEAR:
@@ -723,7 +755,7 @@ double EdgeRightFarShapeFunction::ComputeValue(double x, double y, double z)
 	y = getYValueOnElement(y);
 	z = getZValueOnElement(z);
 	double value = edge_right_far_function(x,y,z);
-	if(is_first_tier)
+	//if(is_first_tier)
 		return value;
 	switch(position){
 	case BOT_LEFT_NEAR:
@@ -763,7 +795,7 @@ double FaceLeftShapeFunction::ComputeValue(double x, double y, double z)
 	y = getYValueOnElement(y);
 	z = getZValueOnElement(z);
 	double value = face_left_function(x,y,z);
-	if(is_first_tier)
+	//if(is_first_tier)
 		return value;
 	switch(position){
 	case BOT_LEFT_NEAR:
@@ -800,7 +832,7 @@ double FaceTopShapeFunction::ComputeValue(double x, double y, double z)
 	y = getYValueOnElement(y);
 	z = getZValueOnElement(z);
 	double value = face_top_function(x,y,z);
-	if(is_first_tier)
+	//if(is_first_tier)
 		return value;
 	switch(position){
 	case TOP_LEFT_NEAR:
@@ -836,7 +868,7 @@ double FaceFarShapeFunction::ComputeValue(double x, double y, double z)
 	y = getYValueOnElement(y);
 	z = getZValueOnElement(z);
 	double value = face_far_function(x,y,z);
-	if(is_first_tier)
+	//if(is_first_tier)
 		return value;
 	switch(position){
 	case BOT_LEFT_FAR:

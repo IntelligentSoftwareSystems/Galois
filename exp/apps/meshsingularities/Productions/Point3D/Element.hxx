@@ -4,6 +4,7 @@
 #include "EPosition.hxx"
 #include "TripleArgFunction.hxx"
 #include "GaussianQuadrature.hxx"
+#include "NPosition.hxx"
 #include <cstdlib>
 #include <cmath>
 #include <map>
@@ -40,9 +41,10 @@ class Element{
 		double zl;
 		double zr;
 		double size;
+		bool* neighbours;
 		EPosition position;
-		bool is_first_tier;
 		
+
 		static const int nr_of_nodes = 27;
 		
 
@@ -83,46 +85,51 @@ class Element{
 		static const int edge_right_near = 25;
 		static const int vertex_top_right_near = 26;
 		
-		Element(double xl, double yl, double zl, double size,  EPosition position, bool is_first_tier)
-			: xl(xl), yl(yl), zl(zl), size(size), position(position), is_first_tier(is_first_tier)
+		Element(double xl, double yl, double zl, double size, bool* _neighbours,  EPosition position)
+			: xl(xl), yl(yl), zl(zl), size(size), position(position)
 		{
 
 			xr = xl + size;
 			yr = yl + size;
 			zr = zl + size;
+			neighbours = new bool[18];
+			for(int i = 0; i<18; i++)
+				neighbours[i] = _neighbours[i];
+			double coordinates[6];
+			coordinates[0] = xl; coordinates[1] = xr; coordinates[2] = yl; coordinates[3] = yr; coordinates[4] = zl; coordinates[5] = zr;
 			shapeFunctions = new ITripleArgFunction*[nr_of_nodes];
 			shapeFunctionNrs = new int[nr_of_nodes];
 			
-			shapeFunctions[vertex_bot_left_near] = new VertexBotLeftNearShapeFunction(is_first_tier,xl,yl,zl,xr,yr,zr,position);
-			shapeFunctions[vertex_bot_left_far] = new VertexBotLeftFarShapeFunction(is_first_tier,xl,yl,zl,xr,yr,zr,position);
-			shapeFunctions[vertex_bot_right_near] = new VertexBotRightNearShapeFunction(is_first_tier,xl,yl,zl,xr,yr,zr,position);
-			shapeFunctions[vertex_bot_right_far] = new VertexBotRightFarShapeFunction(is_first_tier,xl,yl,zl,xr,yr,zr,position);
-			shapeFunctions[vertex_top_left_near] = new VertexTopLeftNearShapeFunction(is_first_tier,xl,yl,zl,xr,yr,zr,position);
-			shapeFunctions[vertex_top_left_far] = new VertexTopLeftFarShapeFunction(is_first_tier,xl,yl,zl,xr,yr,zr,position);
-			shapeFunctions[vertex_top_right_near] = new VertexTopRightNearShapeFunction(is_first_tier,xl,yl,zl,xr,yr,zr,position);
-			shapeFunctions[vertex_top_right_far] = new VertexTopRightFarShapeFunction(is_first_tier,xl,yl,zl,xr,yr,zr,position);
+			shapeFunctions[vertex_bot_left_near] = new VertexBotLeftNearShapeFunction(coordinates,neighbours,position);
+			shapeFunctions[vertex_bot_left_far] = new VertexBotLeftFarShapeFunction(coordinates,neighbours,position);
+			shapeFunctions[vertex_bot_right_near] = new VertexBotRightNearShapeFunction(coordinates,neighbours,position);
+			shapeFunctions[vertex_bot_right_far] = new VertexBotRightFarShapeFunction(coordinates,neighbours,position);
+			shapeFunctions[vertex_top_left_near] = new VertexTopLeftNearShapeFunction(coordinates,neighbours,position);
+			shapeFunctions[vertex_top_left_far] = new VertexTopLeftFarShapeFunction(coordinates,neighbours,position);
+			shapeFunctions[vertex_top_right_near] = new VertexTopRightNearShapeFunction(coordinates,neighbours,position);
+			shapeFunctions[vertex_top_right_far] = new VertexTopRightFarShapeFunction(coordinates,neighbours,position);
 			
-			shapeFunctions[edge_bot_left] = new EdgeBotLeftShapeFunction(is_first_tier,xl,yl,zl,xr,yr,zr,position);
-			shapeFunctions[edge_bot_right] = new EdgeBotRightShapeFunction(is_first_tier,xl,yl,zl,xr,yr,zr,position);
-			shapeFunctions[edge_bot_near] = new EdgeBotNearShapeFunction(is_first_tier,xl,yl,zl,xr,yr,zr,position);
-			shapeFunctions[edge_bot_far] = new EdgeBotFarShapeFunction(is_first_tier,xl,yl,zl,xr,yr,zr,position);
-			shapeFunctions[edge_top_left] = new EdgeTopLeftShapeFunction(is_first_tier,xl,yl,zl,xr,yr,zr,position);
-			shapeFunctions[edge_top_right] = new EdgeTopRightShapeFunction(is_first_tier,xl,yl,zl,xr,yr,zr,position);
-			shapeFunctions[edge_top_near] = new EdgeTopNearShapeFunction(is_first_tier,xl,yl,zl,xr,yr,zr,position);
-			shapeFunctions[edge_top_far] = new EdgeTopFarShapeFunction(is_first_tier,xl,yl,zl,xr,yr,zr,position);
-			shapeFunctions[edge_left_near] = new EdgeLeftNearShapeFunction(is_first_tier,xl,yl,zl,xr,yr,zr,position);
-			shapeFunctions[edge_left_far] = new EdgeLeftFarShapeFunction(is_first_tier,xl,yl,zl,xr,yr,zr,position);
-			shapeFunctions[edge_right_near] = new EdgeRightNearShapeFunction(is_first_tier,xl,yl,zl,xr,yr,zr,position);
-			shapeFunctions[edge_right_far] = new EdgeRightFarShapeFunction(is_first_tier,xl,yl,zl,xr,yr,zr,position);
+			shapeFunctions[edge_bot_left] = new EdgeBotLeftShapeFunction(coordinates,neighbours,position);
+			shapeFunctions[edge_bot_right] = new EdgeBotRightShapeFunction(coordinates,neighbours,position);
+			shapeFunctions[edge_bot_near] = new EdgeBotNearShapeFunction(coordinates,neighbours,position);
+			shapeFunctions[edge_bot_far] = new EdgeBotFarShapeFunction(coordinates,neighbours,position);
+			shapeFunctions[edge_top_left] = new EdgeTopLeftShapeFunction(coordinates,neighbours,position);
+			shapeFunctions[edge_top_right] = new EdgeTopRightShapeFunction(coordinates,neighbours,position);
+			shapeFunctions[edge_top_near] = new EdgeTopNearShapeFunction(coordinates,neighbours,position);
+			shapeFunctions[edge_top_far] = new EdgeTopFarShapeFunction(coordinates,neighbours,position);
+			shapeFunctions[edge_left_near] = new EdgeLeftNearShapeFunction(coordinates,neighbours,position);
+			shapeFunctions[edge_left_far] = new EdgeLeftFarShapeFunction(coordinates,neighbours,position);
+			shapeFunctions[edge_right_near] = new EdgeRightNearShapeFunction(coordinates,neighbours,position);
+			shapeFunctions[edge_right_far] = new EdgeRightFarShapeFunction(coordinates,neighbours,position);
 			
-			shapeFunctions[face_left] = new FaceLeftShapeFunction(is_first_tier,xl,yl,zl,xr,yr,zr,position);
-			shapeFunctions[face_right] = new FaceRightShapeFunction(is_first_tier,xl,yl,zl,xr,yr,zr,position);
-			shapeFunctions[face_top] = new FaceTopShapeFunction(is_first_tier,xl,yl,zl,xr,yr,zr,position);
-			shapeFunctions[face_bot] = new FaceBotShapeFunction(is_first_tier,xl,yl,zl,xr,yr,zr,position);
-			shapeFunctions[face_near] = new FaceNearShapeFunction(is_first_tier,xl,yl,zl,xr,yr,zr,position);
-			shapeFunctions[face_far] = new FaceFarShapeFunction(is_first_tier,xl,yl,zl,xr,yr,zr,position);
+			shapeFunctions[face_left] = new FaceLeftShapeFunction(coordinates,neighbours,position);
+			shapeFunctions[face_right] = new FaceRightShapeFunction(coordinates,neighbours,position);
+			shapeFunctions[face_top] = new FaceTopShapeFunction(coordinates,neighbours,position);
+			shapeFunctions[face_bot] = new FaceBotShapeFunction(coordinates,neighbours,position);
+			shapeFunctions[face_near] = new FaceNearShapeFunction(coordinates,neighbours,position);
+			shapeFunctions[face_far] = new FaceFarShapeFunction(coordinates,neighbours,position);
 			
-			shapeFunctions[interior] = new InteriorShapeFunction(is_first_tier,xl,yl,zl,xr,yr,zr,position);
+			shapeFunctions[interior] = new InteriorShapeFunction(coordinates,neighbours,position);
 			product = new TripleArgFunctionProduct();
 
 		}
@@ -134,6 +141,7 @@ class Element{
 				delete shapeFunctions[i];
 			
 			delete[] shapeFunctions;
+			delete[] neighbours;
 			delete product;
 			
 		}
