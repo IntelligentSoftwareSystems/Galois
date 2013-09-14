@@ -7,6 +7,170 @@
 
 #include "PointProduction.hxx"
 
+GraphNode PointProduction::addNode(int incomingEdges,
+		int outgoingEdges,
+		int leafNumber,
+		EProduction production,
+		GraphNode src,
+		GraphNode dst,
+		Vertex *v,
+		EquationSystem *system)
+{
+
+	Node node(incomingEdges, production, this, v, system);
+	GraphNode graph_node = graph->createNode(outgoingEdges,node);
+
+	if(src == NULL)
+		graph->addEdge(graph_node,dst,Galois::MethodFlag::NONE);
+	else
+		graph->addEdge(src,graph_node,Galois::MethodFlag::NONE);
+
+	return graph_node;
+}
+
+void PointProduction::generateGraph()
+{
+	if(leafs < 2)
+		throw std::runtime_error("At least 2 leafs required");
+
+	graph = new Graph();
+
+	this->S = new Vertex(NULL, NULL, NULL, ROOT, getInterfaceSize()*3);
+
+	Node eroot_node(2,EProduction::A2ROOT, this, S, NULL);
+
+	GraphNode eroot_graph_node = graph->createNode(1,eroot_node);
+	GraphNode bs_graph_node = addNode(1, 2, 0xff, EProduction::BS, eroot_graph_node, NULL, S, NULL);
+
+	recursiveGraphGeneration(0,leafs-1,bs_graph_node, eroot_graph_node, S);
+}
+
+void PointProduction::recursiveGraphGeneration(int low_range,
+		int high_range,
+		GraphNode bsSrcNode,
+		GraphNode mergingDstNode,
+		Vertex *parent)
+{
+	GraphNode new_graph_node;
+	GraphNode new_bs_graph_node;
+
+	Vertex *left;
+	Vertex *right;
+
+	if((high_range - low_range) > 2)
+	{
+
+		left = new Vertex(NULL, NULL, parent, NODE, this->getInterfaceSize()*3);
+		right = new Vertex(NULL, NULL, parent, NODE, this->getInterfaceSize()*3);
+
+		parent->setLeft(left);
+		parent->setRight(right);
+
+		//left elimination
+		new_graph_node = addNode(2, 1, 0xff, EProduction::A2NODE, NULL, mergingDstNode, left, NULL);
+		new_bs_graph_node = addNode(1, 2, 0xff, EProduction::BS, bsSrcNode, NULL, left, NULL);
+		//left subtree generation
+
+		recursiveGraphGeneration(low_range,
+				low_range + (high_range-low_range)/2,
+				new_bs_graph_node,
+				new_graph_node,
+				left);
+
+		//right elimination
+		new_graph_node = addNode(2, 1, 0xff, EProduction::A2NODE, NULL,mergingDstNode, right, NULL);
+		new_bs_graph_node = addNode(1, 2, 0xff, EProduction::BS, bsSrcNode, NULL, right, NULL);
+		//right subtree generation
+
+		recursiveGraphGeneration(low_range + (high_range-low_range)/2 + 1,high_range,new_bs_graph_node,new_graph_node,right);
+	}
+	//only 3 leafs remaining
+	else if((high_range - low_range) == 2)
+	{
+		//first leaf
+		//leaf creation
+		if(low_range == 0) {
+			left = new Vertex(NULL, NULL, parent, LEAF, this->getLeafSize());
+			addNode(0, 1, 0, EProduction::A1, NULL, mergingDstNode, left, inputData->at(low_range));
+		}
+		else {
+			left = new Vertex(NULL, NULL, parent, LEAF, this->getLeafSize());
+			addNode(0, 1, low_range, EProduction::A, NULL, mergingDstNode, left, inputData->at(low_range));
+		}
+		//leaf bs
+		addNode(1, 0, 0xff, EProduction::BS, bsSrcNode, NULL, left, NULL);
+
+		//second and third leaf
+		//elimination
+
+		Vertex *node = new Vertex(NULL, NULL, parent, NODE, this->getInterfaceSize()*3);
+
+		parent->setLeft(left);
+		parent->setRight(node);
+
+		new_graph_node = addNode(2, 1, 0xff, EProduction::A2NODE, NULL, mergingDstNode, node, NULL);
+		//bs
+		new_bs_graph_node = addNode(1, 2, 0xff, EProduction::BS, bsSrcNode, NULL, node, NULL);
+
+		//left leaf creation
+		left = new Vertex(NULL, NULL, node, LEAF, this->getLeafSize());
+		addNode(0, 1, low_range+1, EProduction::A, NULL, new_graph_node, left, inputData->at(low_range+1));
+		//right leaf creation
+		if(high_range == leafs - 1) {
+			right = new Vertex(NULL, NULL, node, LEAF, this->getLeafSize());
+			addNode(0, 1, low_range+2, EProduction::AN, NULL, new_graph_node, right, inputData->at(low_range+2));
+		}
+		else{
+			right = new Vertex(NULL, NULL, node, LEAF, this->getLeafSize());
+			addNode(0, 1, low_range+2, EProduction::A, NULL, new_graph_node, right, inputData->at(low_range+2));
+		}
+
+		node->setLeft(left);
+		node->setRight(right);
+
+		//left leaf bs
+		addNode(1, 0, 0xff, EProduction::BS, new_bs_graph_node, NULL, left, NULL);
+		//right leaf bs
+		addNode(1, 0, 0xff, EProduction::BS, new_bs_graph_node, NULL, right, NULL);
+
+
+	}
+	//two leafs remaining
+	else if((high_range - low_range) == 1)
+	{
+		//left = new Vertex(NULL, NULL, parent, LEAF, productions->getLeafSize(), low_range/4);
+		left = new Vertex(NULL, NULL, parent, LEAF, this->getLeafSize());
+
+		//right = new Vertex(NULL, NULL, parent, LEAF, productions->getLeafSize(), high_range/4);
+		right = new Vertex(NULL, NULL, parent, LEAF, this->getLeafSize());
+
+		parent->setLeft(left);
+		parent->setRight(right);
+
+		//elimination and merging already finished at previous level
+		new_graph_node = mergingDstNode;
+
+		//leaf creation
+		//left leaf
+		if(low_range == 0)
+			addNode(0, 1, low_range, EProduction::A1, NULL, new_graph_node, left,  inputData->at(low_range));
+		else
+			addNode(0, 1, low_range, EProduction::A, NULL, new_graph_node, left,  inputData->at(low_range));
+		//right leaf
+		if(high_range == leafs - 1)
+			addNode(0, 1, high_range, EProduction::AN, NULL, new_graph_node, right, inputData->at(high_range));
+		else
+			addNode(0, 1, high_range, EProduction::A, NULL, new_graph_node, right, inputData->at(high_range));
+
+		//left leaf bs
+		addNode(1, 0, 0xff, EProduction::BS, bsSrcNode, NULL, left, NULL);
+		//right leaf bs
+		addNode(1, 0, 0xff, EProduction::BS, bsSrcNode, NULL, right, NULL);
+	}
+
+}
+
+
 void PointProduction::Execute(EProduction productionToExecute, Vertex* v, EquationSystem* input)
 {
 	switch (productionToExecute) {
@@ -32,9 +196,15 @@ void PointProduction::Execute(EProduction productionToExecute, Vertex* v, Equati
 		printf("Invalid production!\n");
 		break;
 	}
-
 }
 
+Vertex *PointProduction::getRootVertex() {
+	return S;
+}
+
+Graph *PointProduction::getGraph() {
+	return graph;
+}
 
 void PointProduction::A1(Vertex *v, EquationSystem *inData) const
 {

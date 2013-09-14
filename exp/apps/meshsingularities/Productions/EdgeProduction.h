@@ -14,19 +14,19 @@
 class EdgeProduction : public AbstractProduction{
 
   private:
-	//const int bSize;
-	//const int cSize;
-	/*const int bInterfaceSize;
-	const int cInterfaceSize;
-	const int c2cCommonInterfaceSize;
-	const int b2bCommonInterfaceSize;
-	const int b2cCommonINterfaceSize;
-	*/
 	const int bOffset;
 	const int cOffset;
 
+	virtual void generateGraph();
+
+	Vertex *recursiveGraphGeneration(int low_range,
+			int high_range,
+			GraphNode mergingDstNode);
   public:
-	EdgeProduction(std::vector<int>* production_parameters) : AbstractProduction(production_parameters),
+	EdgeProduction(std::vector<int>* productionParameters,
+			int leafs,
+			std::vector<EquationSystem*> *inputData) :
+				AbstractProduction(productionParameters, leafs, inputData),
 		bOffset(2), cOffset(1)
 		{};
 
@@ -44,9 +44,7 @@ class EdgeProduction : public AbstractProduction{
     void BSMBLeaf(Vertex *v) const;
     void MBC(Vertex *v, bool root) const;
     void BSMBC(Vertex *v) const;
-    //void MBCRoot(Vertex *v) const;
     void Copy(Vertex* v, EquationSystem* inData) const;
-    //void BS(Vertex *v) const;
 
 };
 

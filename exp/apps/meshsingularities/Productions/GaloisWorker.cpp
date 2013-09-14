@@ -54,8 +54,6 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 	// preprocessing,
 	//srand(0xfafa);
 
-	GraphGenerator* generator = new GraphGenerator();
-	GraphGeneratorQuad* quadGenerator = new GraphGeneratorQuad();
 	AbstractProduction *production;
 	Vertex *S;
 	Galois::StatTimer TMain;
@@ -147,20 +145,11 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 		timerPreprocess.stop();
 	}
 
-	Galois::StatTimer timerGraphGeneration("GRAPH GENERATION");
-	timerGraphGeneration.start();
-	if(edge)
-		S = quadGenerator->generateGraph(inputMatrices->size(),(EdgeProduction*)production,inputMatrices);
-	else
-		S = generator->generateGraph(taskDescription.nrOfTiers, (PointProduction*)production, inputMatrices);
-	timerGraphGeneration.stop();
+	S = production->getRootVertex();
 
 	Galois::StatTimer timerProductions("PRODUCTIONS");
 	timerProductions.start();
-	if(edge)
-		graph = quadGenerator->getGraph();
-	else
-		graph = generator->getGraph();
+	graph = production->getGraph();
 
 	std::vector<GraphNode> initial_nodes_vector;
 	for(LCM_iterator it = graph->begin(); it != graph->end(); ++it) {

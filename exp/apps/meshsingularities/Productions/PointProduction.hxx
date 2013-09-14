@@ -21,11 +21,33 @@ class PointProduction : public AbstractProduction{
 	const int a1Offset;
 	const int anOffset;
 
+	virtual void generateGraph();
+
+	void recursiveGraphGeneration(int low_range, int high_range,
+			GraphNode bsSrcNode,
+			GraphNode mergingDstNode,
+			Vertex *parent);
+
+	GraphNode addNode(int incomingEdges,
+			int outgoingEdges,
+			int leafNumber,
+			EProduction production,
+			GraphNode src,
+			GraphNode dst,
+			Vertex *v,
+			EquationSystem *system);
+
   public:
-	PointProduction(std::vector<int>* production_parameters) : AbstractProduction(production_parameters), interfaceSize((*production_parameters)[0]), leafSize((*production_parameters)[1]),
-	a1Size((*production_parameters)[2]), anSize((*production_parameters)[3]), offset((*production_parameters)[1] - 2*(*production_parameters)[0]),
-	a1Offset((*production_parameters)[2] - (*production_parameters)[1]), anOffset((*production_parameters)[3] - (*production_parameters)[1])
-  	  {
+	PointProduction(std::vector<int>* productionParameters,
+					int leafs,
+					std::vector<EquationSystem*> *inputData) : AbstractProduction(productionParameters, leafs, inputData),
+		interfaceSize((*productionParameters)[0]),
+		leafSize((*productionParameters)[1]),
+		a1Size((*productionParameters)[2]),
+		anSize((*productionParameters)[3]),
+		offset((*productionParameters)[1] - 2*(*productionParameters)[0]),
+		a1Offset((*productionParameters)[2] - (*productionParameters)[1]),
+		anOffset((*productionParameters)[3] - (*productionParameters)[1]) {
 
   	  };
 
@@ -33,11 +55,8 @@ class PointProduction : public AbstractProduction{
     void A1(Vertex *v, EquationSystem *inData) const;
     void A(Vertex *v, EquationSystem *inData) const;
     void AN(Vertex *v, EquationSystem *inData) const;
- //   void A2(Vertex *v) const;
     void A2Node(Vertex *v) const;
     void A2Root(Vertex *v) const;
-//    void E(Vertex *v) const;
-//    void ERoot(Vertex *v) const;
     void BS(Vertex *v) const;
 
 
