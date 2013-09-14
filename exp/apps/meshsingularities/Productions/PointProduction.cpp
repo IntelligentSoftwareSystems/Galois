@@ -725,7 +725,7 @@ std::vector<EquationSystem*>* PointProduction::preprocess(std::vector<EquationSy
 	return outputVector;
 }
 
-std::vector<double> *PointProduction::getResult(std::vector<EquationSystem *> *originalData) const
+std::vector<double> *PointProduction::getResult(std::vector<EquationSystem *> *originalData)
 {
 	std::vector<Vertex *> *leafs = collectLeafs(S);
 	std::vector<double> * result = new std::vector<double>(

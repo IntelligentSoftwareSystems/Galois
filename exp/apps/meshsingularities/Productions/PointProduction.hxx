@@ -65,13 +65,13 @@ class PointProduction : public AbstractProduction{
 		offset((*productionParameters)[1] - 2*(*productionParameters)[0]),
 		a1Offset((*productionParameters)[2] - (*productionParameters)[1]),
 		anOffset((*productionParameters)[3] - (*productionParameters)[1]) {
-		inputData = preprocess(inputData);
+		this->inputData = preprocess(inputData);
 		generateGraph();
   	  };
 
 	/* pull data from leafs and return the solution of MES
 		   this is sequential code*/
-	std::vector<double> *getResult(std::vector<EquationSystem *> *originalData) const;
+	std::vector<double> *getResult(std::vector<EquationSystem *> *originalData);
 
 
 	virtual void Execute(EProduction productionToExecute, Vertex* v, EquationSystem* input);

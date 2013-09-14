@@ -3,7 +3,6 @@
 
 #include "Production.h"
 #include "GaloisWorker.h"
-#include "GraphGenerator.hxx"
 
 #include "Galois/Galois.h"
 #include "Galois/Accumulator.h"

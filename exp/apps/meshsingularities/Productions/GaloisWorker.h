@@ -1,7 +1,6 @@
 #ifndef GALOISWORKER_H
 #define GALOISWORKER_H
 
-#include "GraphGenerator.hxx"
 #include "Galois/Graph/LC_Morph_Graph.h"
 #include "Galois/Runtime/ParallelWork.h"
 
@@ -11,6 +10,7 @@
 #include "Galois/Statistic.h"
 #include "Galois/Runtime/ll/SimpleLock.h"
 #include "Galois/Runtime/ParallelWork.h"
+#include "Node.h"
 
 
 typedef Galois::WorkList::dChunkedLIFO<1> WL;

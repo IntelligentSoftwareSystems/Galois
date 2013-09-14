@@ -11,7 +11,6 @@
 #include "FakeMatrixGenerator.h"
 
 #include "Node.h"
-
 //Galois::Runtime::LL::SimpleLock<true> foo;
 
 template<typename Context>
@@ -110,19 +109,7 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 	timerMatrix.stop();
 
 	std::vector<EquationSystem *> *inputMatrices;
-	if(edge)
-	{
-		inputMatrices = tiers;
-//		inputMatrices = new std::vector<EquationSystem*>();
-//		for(std::list<EquationSystem*>::iterator it = tiers->begin(); it != tiers->end(); ++it)
-//		{
-//			inputMatrices->push_back(*it);
-//		}
-	}
-	else
-	{
-		Galois::StatTimer timerPreprocess("PREPROCESSING");
-	}
+	inputMatrices = tiers;
 
         if(edge)
                 production = new EdgeProduction(vec, inputMatrices);
