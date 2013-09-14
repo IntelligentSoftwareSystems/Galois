@@ -1,7 +1,6 @@
 #include <vector>
 
 #include "GaloisWorker.h"
-#include "Processing.h"
 #include "PointProduction.hxx"
 #include "EdgeProduction.h"
 #include "Point2D/MatrixGenerator.hxx"
@@ -110,7 +109,6 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 	std::vector<EquationSystem*> *tiers = matrixGenerator->CreateMatrixAndRhs(taskDescription);
 	timerMatrix.stop();
 
-	Processing *processing = new Processing();
 	std::vector<EquationSystem *> *inputMatrices;
 	if(edge)
 	{
@@ -124,11 +122,6 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 	else
 	{
 		Galois::StatTimer timerPreprocess("PREPROCESSING");
-
-		timerPreprocess.start();
-		inputMatrices = processing->preprocess((std::vector<EquationSystem*> *)tiers,
-				(PointProduction*)production);
-		timerPreprocess.stop();
 	}
 
         if(edge)
@@ -177,7 +170,6 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 	} */
 
 
-	//printf ("PerPackageStorage size: %d\n", pps.size());
 	Galois::for_each<WL>(initial_nodes_vector.begin(), initial_nodes_vector.end(), *this);
 	//Galois::do_all(initial_nodes_vector.begin(), initial_nodes_vector.end(), *this);
 	//for (;iii != initial_nodes_vector.end(); ++iii) {
@@ -204,9 +196,7 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 	std::vector<double> *result;
 	if(!edge)
 	{
-		std::vector<Vertex*> *leafs = processing->collectLeafs(S);
-		result = processing->postprocess(leafs, inputMatrices, (PointProduction*)production);
-		delete leafs;
+		result = ((PointProduction*)production)->getResult(inputMatrices);
 	}
 	else
 	{
@@ -230,7 +220,6 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 
 
 	delete vec;
-	delete processing;
 	delete S;
 	delete tiers;
 

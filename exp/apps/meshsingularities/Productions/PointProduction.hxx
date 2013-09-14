@@ -37,6 +37,24 @@ class PointProduction : public AbstractProduction{
 			Vertex *v,
 			EquationSystem *system);
 
+	std::vector<EquationSystem *>* preprocess(std::vector<EquationSystem*>* input) const;
+
+	/* these methods may be useful in order to parallelize {pre,post}processing */
+	EquationSystem *preprocessA1(EquationSystem *input) const;
+	EquationSystem *preprocessA(EquationSystem *input) const;
+	EquationSystem *preprocessAN(EquationSystem *input) const;
+
+	void postprocessA1(Vertex *leaf, EquationSystem *inputData,
+			std::vector<double> *result, int num) const;
+	void postprocessA(Vertex *leaf, EquationSystem *inputData,
+			std::vector<double> *result, int num) const;
+	void postprocessAN(Vertex *leaf, EquationSystem *inputData,
+			std::vector<double> *result, int num) const;
+
+	// iterate over leafs and return them in correct order
+	std::vector<Vertex*> *collectLeafs(Vertex *p);
+
+
   public:
 	PointProduction(std::vector<int>* productionParameters,
 					std::vector<EquationSystem*> *inputData) : AbstractProduction(productionParameters, inputData),
@@ -47,8 +65,14 @@ class PointProduction : public AbstractProduction{
 		offset((*productionParameters)[1] - 2*(*productionParameters)[0]),
 		a1Offset((*productionParameters)[2] - (*productionParameters)[1]),
 		anOffset((*productionParameters)[3] - (*productionParameters)[1]) {
+		inputData = preprocess(inputData);
 		generateGraph();
   	  };
+
+	/* pull data from leafs and return the solution of MES
+		   this is sequential code*/
+	std::vector<double> *getResult(std::vector<EquationSystem *> *originalData) const;
+
 
 	virtual void Execute(EProduction productionToExecute, Vertex* v, EquationSystem* input);
 	virtual Vertex *getRootVertex();
@@ -65,6 +89,8 @@ class PointProduction : public AbstractProduction{
     int getLeafSize() const;
     int getA1Size() const;
     int getANSize() const;
+
+
 
 };
 

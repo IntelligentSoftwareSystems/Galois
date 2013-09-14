@@ -18,7 +18,7 @@ class AbstractProduction {
 
   public:
 	AbstractProduction(std::vector<int>* productionParameters,
-					   std::vector<EquationSystem*> *inputData) : inputData(inputData) {
+					   std::vector<EquationSystem*> *inputData)  {
   	};
 
 	virtual ~AbstractProduction() {
