@@ -18,7 +18,6 @@
 template<typename Context>
 void ProductionProcess::operator()(Graph::GraphNode src, Context& ctx)
 {
-	//unsigned tid = Galois::Runtime::LL::getTID();
 
 	Node &node = src->data;
 	// node-related work is here:
@@ -49,11 +48,6 @@ int ProductionProcess::rightRange(int tasks, int cpus, int i)
 
 std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescription)
 {
-
-	// implement everything is needed to input data to solver,
-	// preprocessing,
-	//srand(0xfafa);
-
 	AbstractProduction *production;
 	Vertex *S;
 	Galois::StatTimer TMain;
@@ -101,10 +95,6 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 		//production = new AbstractProduction(5, 17, 21, 21);
 	}
 
-	/*production = new AbstractProduction(matrixGenerator->getiSize(taskDescription.polynomialDegree),
-			matrixGenerator->getLeafSize(taskDescription.polynomialDegree),
-			matrixGenerator->getA1Size(taskDescription.polynomialDegree),
-			matrixGenerator->getANSize(taskDescription.polynomialDegree));*/
 	bool edge = taskDescription.dimensions == 2 && !taskDescription.quad && taskDescription.singularity == EDGE;
 	if(edge)
 		printf("EDGE SOLVER!\n");
@@ -113,7 +103,6 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 		production = new EdgeProduction(vec);
 	else
 		production = new PointProduction(vec);
-
 
 	/*printf("Problem size: %d\n", matrixGenerator->getA1Size(taskDescription.polynomialDegree) +
 			matrixGenerator->getANSize(taskDescription.polynomialDegree)
