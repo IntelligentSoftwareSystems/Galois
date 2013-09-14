@@ -81,24 +81,16 @@ void Pre(Vertex* v, EquationSystem* inData, int offset, bool eliminate)
 
 void EdgeProduction::B(Vertex* v, EquationSystem* inData) const
 {
-	printf("B\n");
 	Pre(v,inData,bOffset,true);
-	//printf("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\n");
-	//v->system->print();
 }
 
 void EdgeProduction::C(Vertex* v, EquationSystem* inData) const
 {
-	printf("C\n");
 	Pre(v,inData,cOffset,true);
-	//printf("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC\n");
-	//v->system->print();
-	//printf("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC\n");
 }
 
 void EdgeProduction::D(Vertex* v, EquationSystem* inData) const
 {
-	printf("D\n");
 	double** const sys_matrix = v->system->matrix;
 	double* const sys_rhs = v->system->rhs;
 
@@ -113,9 +105,6 @@ void EdgeProduction::D(Vertex* v, EquationSystem* inData) const
 	v->system->swapCols(4,3);
 	v->system->swapRows(4,3);
 	v->system->eliminate(2);
-
-	//printf("DDDDDDDDDDDDDDDDDDDDDDDDDDD\n");
-	//v->system->print();
 
 }
 
@@ -134,7 +123,6 @@ void EdgeProduction::Copy(Vertex* v, EquationSystem* inData) const
 
 void EdgeProduction::MB(Vertex *v) const
 {
-	printf("MB\n");
 	double** const matrix = v->system->matrix;
 	double* const rhs = v->system->rhs;
 	double system_size = v->system->n;
@@ -144,12 +132,8 @@ void EdgeProduction::MB(Vertex *v) const
 	const double* const left_rhs = (const double *) v->left->system->rhs;
 	const double* const right_rhs = (const double *) v->right->system->rhs;
 
-	//printf("PRZED SUMOWANIEM LEWA\n");
-	//v->left->system->print();
-	//printf("PRZED SUMOWANIEM PRAWA\n");
-	//v->right->system->print();
 
-	int offset;
+	int offset = 3;
 	int common_b = 2;
 	int common_b_growth = 2;
 	int separate_b = 5;
@@ -159,15 +143,7 @@ void EdgeProduction::MB(Vertex *v) const
 	div_t lvl = div(adaptation_lvl, common_b_growth + 2*separate_b_growth);
 	adaptation_lvl = lvl.quot;
 
-	/*
-	if(adaptation_lvl == 0)
-		offset = bOffset;
-	else
-		offset = common_b + adaptation_lvl*common_b_growth;
-	*/
-	offset = 3;
 	int nr_of_rows_to_eliminate  = common_b + common_b_growth*adaptation_lvl;
-	//int rest_of_rows = separate_b + separate_b_growth*adaptation_lvl;
 
 	int current_common_b = common_b + common_b_growth*adaptation_lvl;
 	int current_separate_b = separate_b + separate_b_growth*adaptation_lvl;
@@ -220,16 +196,44 @@ void EdgeProduction::MB(Vertex *v) const
 		rhs[i] += left_rhs[offset + i - current_separate_b + common_bc];
 	}
 
-	//printf("PO SUMOWANIU\n");
-	//v->system->print();
-
-	//printf("CHECKING DIFF MB\n");
-	//int values[9] = {1,3,4,6,8,10,12,14,16};
-	//for(int i = 0; i<16; i++)
-		//v->system->checkRow(i,values,9);
-
-
 	v->system->eliminate(current_common_b);
+
+}
+
+void EdgeProduction::BSMB(Vertex *v) const
+{
+	double* const rhs = v->system->rhs;
+	double system_size = v->system->n;
+
+	double* left_rhs = (double *) v->left->system->rhs;
+	double* right_rhs = (double *) v->right->system->rhs;
+
+	int offset = 3;
+	int common_b = 2;
+	int common_b_growth = 2;
+	int separate_b = 5;
+	int separate_b_growth = 2;
+	int common_bc = 1;
+	int adaptation_lvl = system_size - common_b - 2*separate_b + common_bc;
+	div_t lvl = div(adaptation_lvl, common_b_growth + 2*separate_b_growth);
+	adaptation_lvl = lvl.quot;
+
+	int nr_of_rows_to_eliminate  = common_b + common_b_growth*adaptation_lvl;
+
+	int current_common_b = common_b + common_b_growth*adaptation_lvl;
+	int current_separate_b = separate_b + separate_b_growth*adaptation_lvl;
+
+	for(int i = 0; i<current_common_b; i++)
+	{
+		right_rhs[offset + i + current_separate_b] = rhs[i];
+		left_rhs[offset + current_common_b - 1 - i] = rhs[i];
+	}
+
+	for(int i = current_common_b; i<current_common_b + current_separate_b; i++)
+		right_rhs[offset + i - current_common_b] = rhs[i];
+
+	for(int i = current_common_b + current_separate_b - common_bc; i<system_size; i++)
+		left_rhs[offset + i - current_separate_b + common_bc] = rhs[i];
 
 }
 
@@ -284,6 +288,24 @@ void Mp1(Vertex* v, int offset, int non_separate_c_length, int adj)
 
 }
 
+void Mp1Bs(Vertex* v, int offset, int non_separate_c_length, int adj)
+{
+
+	double* const rhs = v->system->rhs;
+
+	double* const left_rhs = (double *) v->left->system->rhs;
+	double* const right_rhs = (double *) v->right->system->rhs;
+
+	for(int i = 0; i<non_separate_c_length; i++)
+		right_rhs[offset + i + 5 + adj] = rhs[i];
+
+	for(int i = 0; i<2; i++)
+		left_rhs[offset + 1 - i] = rhs[i];
+
+	for(int i = non_separate_c_length; i<non_separate_c_length + 5 + adj; i++)
+		right_rhs[offset + i - non_separate_c_length] = rhs[i];
+}
+
 void Mp2(Vertex* v, int offset, int non_separate_c_length)
 {
 
@@ -312,43 +334,40 @@ void Mp2(Vertex* v, int offset, int non_separate_c_length)
 	}
 }
 
+void Mp2Bs(Vertex* v, int offset, int non_separate_c_length)
+{
+	double* const rhs = v->system->rhs;
+	double* const left_rhs = v->left->system->rhs;
+
+	for(int i = 8 - non_separate_c_length; i<11; i++)
+	{
+		left_rhs[offset + i - 6 + non_separate_c_length] = rhs[i];
+	}
+}
+
 void EdgeProduction::MD(Vertex* v) const
 {
-	printf("MD\n");
-	double** const matrix = v->system->matrix;
-	double* const rhs = v->system->rhs;
-	double system_size = v->system->n;
-
-	const double** const left_matrix = (const double **) v->left->system->matrix;
-	const double** const right_matrix = (const double **) v->right->system->matrix;
-	const double* const left_rhs = (const double *) v->left->system->rhs;
-	const double* const right_rhs = (const double *) v->right->system->rhs;
-
 	int offset = 2;
 	int non_separate_c_length = 3;
 	Mp1(v,offset,non_separate_c_length,-1);
 	non_separate_c_length = 2;
 	Mp2(v,offset,non_separate_c_length);
 
-
-
 	int common_c = 1;
 	v->system->eliminate(common_c);
 }
 
+void EdgeProduction::BSMD(Vertex* v) const
+{
+	int offset = 2;
+	int non_separate_c_length = 3;
+	Mp1Bs(v,offset,non_separate_c_length,-1);
+	non_separate_c_length = 2;
+	Mp2Bs(v,offset,non_separate_c_length);
+}
+
 void EdgeProduction::MC(Vertex* v) const
 {
-	printf("MC\n");
-	double** const matrix = v->system->matrix;
-	double* const rhs = v->system->rhs;
-	double system_size = v->system->n;
-
-	const double** const left_matrix = (const double **) v->left->system->matrix;
-	const double** const right_matrix = (const double **) v->right->system->matrix;
-	const double* const left_rhs = (const double *) v->left->system->rhs;
-	const double* const right_rhs = (const double *) v->right->system->rhs;
-
-
 	int offset = cOffset;
 	int non_separate_c_length = 3;
 
@@ -360,50 +379,54 @@ void EdgeProduction::MC(Vertex* v) const
 
 }
 
+void EdgeProduction::BSMC(Vertex* v) const
+{
+	int offset = cOffset;
+	int non_separate_c_length = 3;
+
+	Mp1Bs(v,offset,non_separate_c_length,0);
+	Mp2Bs(v,offset,non_separate_c_length);
+}
 
 
 void EdgeProduction::MBLeaf(Vertex* v) const
 {
-	printf("MBLeaf\n");
-	double** const matrix = v->system->matrix;
-	double* const rhs = v->system->rhs;
-	double system_size = v->system->n;
-
-	const double** const left_matrix = (const double **) v->left->system->matrix;
-	const double** const right_matrix = (const double **) v->right->system->matrix;
-	const double* const left_rhs = (const double *) v->left->system->rhs;
-	const double* const right_rhs = (const double *) v->right->system->rhs;
-
 	int offset = 2;
 	int non_separate_c_length = 2;
 
 	Mp1(v,offset,non_separate_c_length,0);
 	Mp2(v,offset,non_separate_c_length);
 
-
-
 	int common_c = 2;
 	v->system->eliminate(common_c);
 }
 
+void EdgeProduction::BSMBLeaf(Vertex* v) const
+{
+	int offset = 2;
+	int non_separate_c_length = 2;
+
+	Mp1Bs(v,offset,non_separate_c_length,0);
+	Mp2Bs(v,offset,non_separate_c_length);
+}
+
 void EdgeProduction::MBC(Vertex* v, bool root) const
 {
-	printf("MBC\n");
 	double** const matrix = v->system->matrix;
 	double* const rhs = v->system->rhs;
 	double system_size = v->system->n;
-	//xyz
+
 	const double** const left_matrix = (const double **) v->left->system->matrix;
 	const double** const right_matrix = (const double **) v->right->system->matrix;
-	const double* const left_rhs = (const double *) v->left->system->rhs;
-	const double* const right_rhs = (const double *) v->right->system->rhs;
+	double* const left_rhs = v->left->system->rhs;
+	double* const right_rhs = v->right->system->rhs;
 
 	int first_mbc_system_size = 14;
 	int adaptation_lvl = system_size - first_mbc_system_size;
 	div_t lvl = div(adaptation_lvl, 4);
 	adaptation_lvl = lvl.quot;
 
-	//mc is always right mb is always left
+	//mc md is always right mb mbleaf is always left
 	int mc_offset = 1;
 	int mb_offset = 2 + 2*adaptation_lvl;
 	int mb_growth = adaptation_lvl*2;
@@ -483,24 +506,67 @@ void EdgeProduction::MBC(Vertex* v, bool root) const
 	if(root){
 		v->system->eliminate(v->system->n);
 		v->system->backwardSubstitute(v->system->n-1);
-
 		v->system->print();
+		//backward substitution
+		for(int i = 0; i<3; i++)
+		{
+			left_rhs[mb_offset + i + 3 + mb_growth] = rhs[i];
+			right_rhs[mc_elimination_row_nrs[i]] = rhs[i];
+		}
+
+		for(int i = 3; i < 3 + 3 + mb_growth; i++)
+			left_rhs[mb_offset - 3 + i] = rhs[i];
+
+		for(int i = 5 + mb_growth; i < 12 + mb_growth; i++)
+			right_rhs[mc_offset + 2 + i - 5 - mb_growth] = rhs[i];
+
+		for(int i = 11 + mb_growth; i < 11 + mb_growth + 3 + mb_growth; i++)
+			 left_rhs[mb_offset + 6 + i - 11] = rhs[i];
+
 	}
 	else
 	{
 		v->system->eliminate(3);
 	}
 }
-/*
-void EdgeProduction::MBCRoot(Vertex* v) const
+
+void EdgeProduction::BSMBC(Vertex* v) const
 {
-	printf("A\n");
-	v->system->print();
-	MBC(v);
-	printf("B\n");
-	v->system->eliminate(v->system->n);
-	v->system->print();
-	printf("C\n");
-	v->system->print();
+	double* const rhs = v->system->rhs;
+	double system_size = v->system->n;
+
+	double* const left_rhs = v->left->system->rhs;
+	double* const right_rhs =  v->right->system->rhs;
+
+	int first_mbc_system_size = 14;
+	int adaptation_lvl = system_size - first_mbc_system_size;
+	div_t lvl = div(adaptation_lvl, 4);
+	adaptation_lvl = lvl.quot;
+
+	//mc md is always right mb mbleaf is always left
+	int mc_offset = 1;
+	int mb_offset = 2 + 2*adaptation_lvl;
+	int mb_growth = adaptation_lvl*2;
+
+	int mc_elimination_row_nrs[3];
+	mc_elimination_row_nrs[0] = mc_offset + 1;
+	mc_elimination_row_nrs[1] = mc_offset;
+	mc_elimination_row_nrs[2] = mc_offset + 9;
+
+	//backward substitution
+	for(int i = 0; i<3; i++)
+	{
+		left_rhs[mb_offset + i + 3 + mb_growth] = rhs[i];
+		right_rhs[mc_elimination_row_nrs[i]] = rhs[i];
+	}
+
+	for(int i = 3; i < 3 + 3 + mb_growth; i++)
+		left_rhs[mb_offset - 3 + i] = rhs[i];
+
+	for(int i = 5 + mb_growth; i < 12 + mb_growth; i++)
+		right_rhs[mc_offset + 2 + i - 5 - mb_growth] = rhs[i];
+
+	for(int i = 11 + mb_growth; i < 11 + mb_growth + 3 + mb_growth; i++)
+		 left_rhs[mb_offset + 6 + i - 11] = rhs[i];
+
 }
-*/

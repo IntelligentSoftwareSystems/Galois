@@ -35,10 +35,15 @@ class EdgeProduction : public AbstractProduction{
     void C(Vertex *v, EquationSystem *inData) const;
     void D(Vertex *v, EquationSystem *inData) const;
     void MB(Vertex *v) const;
+    void BSMB(Vertex *v) const;
     void MC(Vertex *v) const;
+    void BSMC(Vertex *v) const;
     void MD(Vertex *v) const;
+    void BSMD(Vertex *v) const;
     void MBLeaf(Vertex *v) const;
+    void BSMBLeaf(Vertex *v) const;
     void MBC(Vertex *v, bool root) const;
+    void BSMBC(Vertex *v) const;
     //void MBCRoot(Vertex *v) const;
     void Copy(Vertex* v, EquationSystem* inData) const;
     //void BS(Vertex *v) const;
