@@ -19,7 +19,8 @@ class EdgeProduction : public AbstractProduction{
 	
 	Vertex *recursiveGraphGeneration(int low_range,
 			int high_range,
-			GraphNode mergingDstNode);
+			GraphNode mergingDstNode,
+			GraphNode bsSrcNode);
 	void generateGraph();
   public:
 	EdgeProduction(std::vector<int>* productionParameters,

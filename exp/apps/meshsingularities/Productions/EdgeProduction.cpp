@@ -17,8 +17,11 @@ void EdgeProduction::generateGraph()
 	graph = new Graph();
 
 	Node rootNode (2, EProduction::MBRoot, this, NULL, NULL);
-
+	Node bsRootNode (1, EProduction::BSMBRoot, this, NULL, NULL);
 	GraphNode mbRoot = graph->createNode(1, rootNode);
+	GraphNode bsRootGraphNode = graph->createNode(2, bsRootNode);
+
+	graph->addEdge(mbRoot, bsRootGraphNode, Galois::MethodFlag::NONE);
 
 	Vertex *vd1 = new Vertex(NULL, NULL, NULL, LEAF, 9);
 	Vertex *vd2 = new Vertex(NULL, NULL, NULL, LEAF, 9);
@@ -36,51 +39,70 @@ void EdgeProduction::generateGraph()
 	GraphNode d2GraphNode = graph->createNode(1, d2Node);
 
 	Node mdNode(2, EProduction::MD, this, vmd, NULL);
+	Node bsMdNode(1, EProduction::BSMD, this, vmd, NULL);
 	GraphNode mdGraphNode = graph->createNode(1, mdNode);
+	GraphNode bsMdGraphNode = graph->createNode(0, bsMdNode);
 
 	graph->addEdge(mdGraphNode, mbRoot, Galois::MethodFlag::NONE);
+	graph->addEdge(bsRootGraphNode, bsMdGraphNode, Galois::MethodFlag::NONE);
 
 	graph->addEdge(d1GraphNode, mdGraphNode, Galois::MethodFlag::NONE);
 	graph->addEdge(d2GraphNode, mdGraphNode, Galois::MethodFlag::NONE);
 
 
 	Node mbNode (2, EProduction::MB, this, NULL, NULL);
+	Node bsMbNode(1, EProduction::BSMB, this, NULL, NULL);
+
 	GraphNode mbGraphNode = graph->createNode(1, mbNode);
+	GraphNode bsMbGraphNode = graph->createNode(2, bsMbNode);
 	graph->addEdge(mbGraphNode, mbRoot, Galois::MethodFlag::NONE);
+	graph->addEdge(bsRootGraphNode, bsMbGraphNode, Galois::MethodFlag::NONE);
 
 	Node mbc1Node(2, EProduction::MBC, this, NULL, NULL);
 	Node mbc2Node(2, EProduction::MBC, this, NULL, NULL);
 
+	Node bsMbc1Node(1, EProduction::BSMBC, this, NULL, NULL);
+	Node bsMbc2Node(1, EProduction::BSMBC, this, NULL, NULL);
+
 	GraphNode mbc1GraphNode = graph->createNode(1, mbc1Node);
 	GraphNode mbc2GraphNode = graph->createNode(1, mbc2Node);
+	GraphNode bsMbc1GraphNode = graph->createNode(2, bsMbc1Node);
+	GraphNode bsMbc2GraphNode = graph->createNode(2, bsMbc2Node);
 
 	graph->addEdge(mbc1GraphNode, mbGraphNode, Galois::MethodFlag::NONE);
 	graph->addEdge(mbc2GraphNode, mbGraphNode, Galois::MethodFlag::NONE);
 
-	Vertex *mbc1Vertex = recursiveGraphGeneration(0, (leafs-3)/2, mbc1GraphNode);
-	Vertex *mbc2Vertex = recursiveGraphGeneration((leafs-3)/2+1, leafs-3, mbc2GraphNode);
+	graph->addEdge(bsMbGraphNode, bsMbc1GraphNode, Galois::MethodFlag::NONE);
+	graph->addEdge(bsMbGraphNode, bsMbc2GraphNode, Galois::MethodFlag::NONE);
+
+	Vertex *mbc1Vertex = recursiveGraphGeneration(0, (leafs-3)/2, mbc1GraphNode, bsMbc1GraphNode);
+	Vertex *mbc2Vertex = recursiveGraphGeneration((leafs-3)/2+1, leafs-3, mbc2GraphNode, bsMbc2GraphNode);
 
 	Vertex *vmb = new Vertex(NULL, NULL, NULL, NODE, mbc1Vertex->left->system->n+6);
 	vmb->setLeft(mbc1Vertex);
 	vmb->setRight(mbc2Vertex);
 
 	mbGraphNode->data.setVertex(vmb);
+	bsMbGraphNode->data.setVertex(vmb);
 
 	Vertex *vmbRoot = new Vertex(NULL, NULL, NULL, NODE, vmb->left->system->n+4);
 	vmbRoot->setLeft(vmb);
 	vmbRoot->setRight(vmd);
 
 	mbRoot->data.setVertex(vmbRoot);
+	bsRootGraphNode->data.setVertex(vmbRoot);
 
 	mbc1GraphNode->data.setVertex(mbc1Vertex);
+	bsMbc1GraphNode->data.setVertex(mbc1Vertex);
 	mbc2GraphNode->data.setVertex(mbc2Vertex);
-
+	bsMbc1GraphNode->data.setVertex(mbc2Vertex);
 	S = vmbRoot;
 }
 
 Vertex *EdgeProduction::recursiveGraphGeneration(int low_range,
 		int high_range,
-		GraphNode mergingDstNode)
+		GraphNode mergingDstNode,
+		GraphNode bsSrcNode)
 {
 	if (high_range - low_range == 3) {
 		// bottom part of tree
@@ -109,13 +131,19 @@ Vertex *EdgeProduction::recursiveGraphGeneration(int low_range,
 
         Node vmcNode(2, EProduction::MC, this, vmc, NULL);
         Node vmbNode(2, EProduction::MBLeaf, this, vmb, NULL);
-
+        Node bsMcNode(1, EProduction::BSMC, this, vmc, NULL);
+        Node bsMbNode(1, EProduction::BSMB, this, vmb, NULL);
 
         GraphNode vmbGraphNode = graph->createNode(1, vmbNode);
         GraphNode vmcGraphNode = graph->createNode(1, vmcNode);
 
+        GraphNode bsMcGraphNode = graph->createNode(0, bsMcNode);
+        GraphNode bsMbGraphNode = graph->createNode(0, bsMbNode);
+
         graph->addEdge(vmbGraphNode, mergingDstNode, Galois::MethodFlag::NONE);
         graph->addEdge(vmcGraphNode, mergingDstNode, Galois::MethodFlag::NONE);
+        graph->addEdge(bsSrcNode, bsMcGraphNode, Galois::MethodFlag::NONE);
+        graph->addEdge(bsSrcNode, bsMbGraphNode, Galois::MethodFlag::NONE);
 
         Node vc1Node(0, EProduction::C, this, vc1, inputData->at(low_range+2));
         Node vc2Node(0, EProduction::C, this, vc2, inputData->at(low_range+3));
@@ -154,41 +182,60 @@ Vertex *EdgeProduction::recursiveGraphGeneration(int low_range,
 		GraphNode c2GraphNode = graph->createNode(1, c2Node);
 
 		Node mcNode(2, EProduction::MC, this, mc, NULL);
+		Node bsMcNode(1, EProduction::BSMC, this, mc, NULL);
 		GraphNode mcGraphNode = graph->createNode(1, mcNode);
+		GraphNode bsMcGraphNode = graph->createNode(0, bsMcNode);
 
 		graph->addEdge(mcGraphNode, mergingDstNode, Galois::MethodFlag::NONE);
+		graph->addEdge(bsSrcNode, bsMcGraphNode, Galois::MethodFlag::NONE);
 
 		graph->addEdge(c1GraphNode, mcGraphNode, Galois::MethodFlag::NONE);
 		graph->addEdge(c2GraphNode, mcGraphNode, Galois::MethodFlag::NONE);
 
 		Node mbNode (2, EProduction::MB, this, NULL, NULL);
+		Node bsMbNode(1, EProduction::BSMB, this, NULL, NULL);
 		GraphNode mbGraphNode = graph->createNode(1, mbNode);
+		GraphNode bsMbGraphNode = graph->createNode(2, bsMbNode);
+
 		graph->addEdge(mbGraphNode, mergingDstNode, Galois::MethodFlag::NONE);
+		graph->addEdge(bsSrcNode, bsMbGraphNode, Galois::MethodFlag::NONE);
 
 		Node mbc1Node(2, EProduction::MBC, this, NULL, NULL);
 		Node mbc2Node(2, EProduction::MBC, this, NULL, NULL);
 
+		Node bsMbc1Node(1, EProduction::BSMBC, this, NULL, NULL);
+		Node bsMbc2Node(1, EProduction::BSMBC, this, NULL, NULL);
+
 		GraphNode mbc1GraphNode = graph->createNode(1, mbc1Node);
 		GraphNode mbc2GraphNode = graph->createNode(1, mbc2Node);
+
+		GraphNode bsMbc1GraphNode = graph->createNode(2, bsMbc1Node);
+		GraphNode bsMbc2GraphNode = graph->createNode(2, bsMbc2Node);
 
 		graph->addEdge(mbc1GraphNode, mbGraphNode, Galois::MethodFlag::NONE);
 		graph->addEdge(mbc2GraphNode, mbGraphNode, Galois::MethodFlag::NONE);
 
-		Vertex *mbc1Vertex = recursiveGraphGeneration(low_range, low_range+(high_range-low_range-2)/2, mbc1GraphNode);
-		Vertex *mbc2Vertex = recursiveGraphGeneration(low_range+(high_range-low_range-2)/2+1, high_range-2, mbc2GraphNode);
+		graph->addEdge(bsMbGraphNode, bsMbc1GraphNode, Galois::MethodFlag::NONE);
+		graph->addEdge(bsMbGraphNode, bsMbc2GraphNode, Galois::MethodFlag::NONE);
+
+		Vertex *mbc1Vertex = recursiveGraphGeneration(low_range, low_range+(high_range-low_range-2)/2, mbc1GraphNode, bsMbc1GraphNode);
+		Vertex *mbc2Vertex = recursiveGraphGeneration(low_range+(high_range-low_range-2)/2+1, high_range-2, mbc2GraphNode, bsMbc2GraphNode);
 
 		Vertex *vmb = new Vertex(NULL, NULL, NULL, NODE, mbc1Vertex->left->system->n+6);
 		vmb->setLeft(mbc1Vertex);
 		vmb->setRight(mbc2Vertex);
 
 		mbGraphNode->data.setVertex(vmb);
+		bsMbGraphNode->data.setVertex(vmb);
 
 		Vertex *vmbc = new Vertex(NULL, NULL, NULL, NODE, vmb->left->system->n+4);
 		vmbc->setLeft(vmb);
 		vmbc->setRight(mc);
 
 		mbc1GraphNode->data.setVertex(mbc1Vertex);
+		bsMbc1GraphNode->data.setVertex(mbc1Vertex);
 		mbc2GraphNode->data.setVertex(mbc2Vertex);
+		bsMbc2GraphNode->data.setVertex(mbc2Vertex);
 
 		return vmbc;
 
