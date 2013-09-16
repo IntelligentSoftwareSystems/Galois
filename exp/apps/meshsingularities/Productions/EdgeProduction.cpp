@@ -17,11 +17,7 @@ void EdgeProduction::generateGraph()
 	graph = new Graph();
 
 	Node rootNode (2, EProduction::MBRoot, this, NULL, NULL);
-	Node bsRootNode (1, EProduction::BSMBRoot, this, NULL, NULL);
-	GraphNode mbRoot = graph->createNode(1, rootNode);
-	GraphNode bsRootGraphNode = graph->createNode(2, bsRootNode);
-
-	graph->addEdge(mbRoot, bsRootGraphNode, Galois::MethodFlag::NONE);
+	GraphNode mbRoot = graph->createNode(2, rootNode);
 
 	Vertex *vd1 = new Vertex(NULL, NULL, NULL, LEAF, 9);
 	Vertex *vd2 = new Vertex(NULL, NULL, NULL, LEAF, 9);
@@ -44,7 +40,7 @@ void EdgeProduction::generateGraph()
 	GraphNode bsMdGraphNode = graph->createNode(0, bsMdNode);
 
 	graph->addEdge(mdGraphNode, mbRoot, Galois::MethodFlag::NONE);
-	graph->addEdge(bsRootGraphNode, bsMdGraphNode, Galois::MethodFlag::NONE);
+	graph->addEdge(mbRoot, bsMdGraphNode, Galois::MethodFlag::NONE);
 
 	graph->addEdge(d1GraphNode, mdGraphNode, Galois::MethodFlag::NONE);
 	graph->addEdge(d2GraphNode, mdGraphNode, Galois::MethodFlag::NONE);
@@ -56,7 +52,7 @@ void EdgeProduction::generateGraph()
 	GraphNode mbGraphNode = graph->createNode(1, mbNode);
 	GraphNode bsMbGraphNode = graph->createNode(2, bsMbNode);
 	graph->addEdge(mbGraphNode, mbRoot, Galois::MethodFlag::NONE);
-	graph->addEdge(bsRootGraphNode, bsMbGraphNode, Galois::MethodFlag::NONE);
+	graph->addEdge(mbRoot, bsMbGraphNode, Galois::MethodFlag::NONE);
 
 	Node mbc1Node(2, EProduction::MBC, this, NULL, NULL);
 	Node mbc2Node(2, EProduction::MBC, this, NULL, NULL);
@@ -90,12 +86,11 @@ void EdgeProduction::generateGraph()
 	vmbRoot->setRight(vmd);
 
 	mbRoot->data.setVertex(vmbRoot);
-	bsRootGraphNode->data.setVertex(vmbRoot);
 
 	mbc1GraphNode->data.setVertex(mbc1Vertex);
 	bsMbc1GraphNode->data.setVertex(mbc1Vertex);
 	mbc2GraphNode->data.setVertex(mbc2Vertex);
-	bsMbc1GraphNode->data.setVertex(mbc2Vertex);
+	bsMbc2GraphNode->data.setVertex(mbc2Vertex);
 	S = vmbRoot;
 }
 
@@ -279,10 +274,25 @@ void EdgeProduction::Execute(EProduction productionToExecute, Vertex* v, Equatio
 		MBLeaf(v);
 		break;
 	case EProduction::MBC:
-		MBC(v,false);
+		MBC(v, false);
 		break;
 	case EProduction::MBRoot:
-		MBC(v,true);
+		MBC(v, true);
+		break;
+	case EProduction::BSMD:
+		BSMD(v);
+		break;
+	case EProduction::BSMB:
+		BSMB(v);
+		break;
+	case EProduction::BSMC:
+		BSMC(v);
+		break;
+	case EProduction::BSMBC:
+		BSMBC(v);
+		break;
+	case EProduction::BSMBLeaf:
+		BSMBLeaf(v);
 		break;
 	default:
 		printf("Invalid production!\n");
@@ -435,6 +445,7 @@ void EdgeProduction::MB(Vertex *v) const
 
 void EdgeProduction::BSMB(Vertex *v) const
 {
+	printf("BS MB\n");
 	double* const rhs = v->system->rhs;
 	double system_size = v->system->n;
 
@@ -467,7 +478,8 @@ void EdgeProduction::BSMB(Vertex *v) const
 
 	for(int i = current_common_b + current_separate_b - common_bc; i<system_size; i++)
 		left_rhs[offset + i - current_separate_b + common_bc] = rhs[i];
-
+	v->left->system->print();
+	v->right->system->print();
 }
 
 
@@ -592,11 +604,15 @@ void EdgeProduction::MD(Vertex* v) const
 
 void EdgeProduction::BSMD(Vertex* v) const
 {
+	printf("BS MD\n");
 	int offset = 2;
 	int non_separate_c_length = 3;
 	Mp1Bs(v,offset,non_separate_c_length,-1);
 	non_separate_c_length = 2;
 	Mp2Bs(v,offset,non_separate_c_length);
+	v->left->system->print();
+	v->right->system->print();
+
 }
 
 void EdgeProduction::MC(Vertex* v) const
@@ -614,11 +630,14 @@ void EdgeProduction::MC(Vertex* v) const
 
 void EdgeProduction::BSMC(Vertex* v) const
 {
+	printf("BS MC\n");
 	int offset = cOffset;
 	int non_separate_c_length = 3;
 
 	Mp1Bs(v,offset,non_separate_c_length,0);
 	Mp2Bs(v,offset,non_separate_c_length);
+	v->left->system->print();
+	v->right->system->print();
 }
 
 
@@ -636,11 +655,15 @@ void EdgeProduction::MBLeaf(Vertex* v) const
 
 void EdgeProduction::BSMBLeaf(Vertex* v) const
 {
+	printf("BS MB LEAF\n");
 	int offset = 2;
 	int non_separate_c_length = 2;
 
 	Mp1Bs(v,offset,non_separate_c_length,0);
 	Mp2Bs(v,offset,non_separate_c_length);
+	v->left->system->print();
+	v->right->system->print();
+
 }
 
 void EdgeProduction::MBC(Vertex* v, bool root) const
@@ -765,6 +788,7 @@ void EdgeProduction::MBC(Vertex* v, bool root) const
 
 void EdgeProduction::BSMBC(Vertex* v) const
 {
+	printf("BS MBC\n");
 	double* const rhs = v->system->rhs;
 	double system_size = v->system->n;
 
@@ -801,5 +825,7 @@ void EdgeProduction::BSMBC(Vertex* v) const
 
 	for(int i = 11 + mb_growth; i < 11 + mb_growth + 3 + mb_growth; i++)
 		 left_rhs[mb_offset + 6 + i - 11] = rhs[i];
+	v->left->system->print();
+	v->right->system->print();
 
 }
