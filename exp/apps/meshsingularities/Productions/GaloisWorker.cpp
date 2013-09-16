@@ -183,7 +183,7 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 	std::vector<double> *result;
 	if(!edge)
 	{
-		result = ((PointProduction*)production)->getResult(inputMatrices);
+		result = ((PointProduction*)production)->getResult();
 	}
 	else
 	{

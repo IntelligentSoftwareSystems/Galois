@@ -191,9 +191,11 @@ void PointProduction::Execute(EProduction productionToExecute, Vertex* v, Equati
 		break;
 	case EProduction::A2ROOT:
 		A2Root(v);
+		v->system->print();
 		break;
 	case EProduction::BS:
 		BS(v);
+		v->system->print();
 		break;
 	default:
 		printf("Invalid production!\n");
@@ -578,10 +580,10 @@ EquationSystem *PointProduction::preprocessAN(EquationSystem *input) const
 	return (system);
 }
 
-void PointProduction::postprocessA1(Vertex *leaf, EquationSystem *inputData,
+void PointProduction::postprocessA1(Vertex *leaf, EquationSystem *outputData,
 		std::vector<double> *result, int num) const
 {
-	EquationSystem *a1 = inputData;
+	EquationSystem *a1 = outputData;
 
 	int offset = this->getA1Size() - this->getLeafSize();
 	int leafOffset = this->getLeafSize() - 2*this->getInterfaceSize();
@@ -610,7 +612,7 @@ void PointProduction::postprocessA1(Vertex *leaf, EquationSystem *inputData,
 	}
 }
 
-void PointProduction::postprocessA(Vertex *leaf, EquationSystem *inputData,
+void PointProduction::postprocessA(Vertex *leaf, EquationSystem *outputData,
 		std::vector<double> *result, int num) const
 {
 	const int leafOffset = this->getLeafSize() - 2*this->getInterfaceSize();
@@ -625,7 +627,7 @@ void PointProduction::postprocessA(Vertex *leaf, EquationSystem *inputData,
 	}
 }
 
-void PointProduction::postprocessAN(Vertex *leaf, EquationSystem *inputData,
+void PointProduction::postprocessAN(Vertex *leaf, EquationSystem *outputData,
 		std::vector<double> *result, int num) const
 {
 
@@ -633,7 +635,7 @@ void PointProduction::postprocessAN(Vertex *leaf, EquationSystem *inputData,
 	const int totalOffset = (this->getA1Size()-this->getInterfaceSize())+(num-1)*(this->getLeafSize()-this->getInterfaceSize());
 	const int offset = this->getANSize() - this->getLeafSize();
 
-	EquationSystem *an = inputData;
+	EquationSystem *an = outputData;
 
 	for (int j=0; j<this->getLeafSize(); ++j) {
 		for (int k=0; k<this->getLeafSize(); ++k) {
@@ -725,7 +727,7 @@ std::vector<EquationSystem*>* PointProduction::preprocess(std::vector<EquationSy
 	return outputVector;
 }
 
-std::vector<double> *PointProduction::getResult(std::vector<EquationSystem *> *originalData)
+std::vector<double> *PointProduction::getResult()
 {
 	std::vector<Vertex *> *leafs = collectLeafs(S);
 	std::vector<double> * result = new std::vector<double>(
@@ -736,11 +738,11 @@ std::vector<double> *PointProduction::getResult(std::vector<EquationSystem *> *o
 
 	for (int i=0; i<leafs->size(); ++i) {
 		if (i==0) {
-			this->postprocessA1(leafs->at(i), originalData->at(i), result, i);
+			this->postprocessA1(leafs->at(i), inputData->at(i), result, i);
 		} else if (i == leafs->size()-1) {
-			this->postprocessAN(leafs->at(i), originalData->at(i), result, i);
+			this->postprocessAN(leafs->at(i), inputData->at(i), result, i);
 		} else {
-			this->postprocessA(leafs->at(i), originalData->at(i), result, i);
+			this->postprocessA(leafs->at(i), inputData->at(i), result, i);
 		}
 	}
 
