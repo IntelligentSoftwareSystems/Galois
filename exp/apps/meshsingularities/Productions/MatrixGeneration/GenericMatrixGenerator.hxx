@@ -48,6 +48,11 @@ class GenericMatrixGenerator {
 			return new std::vector<int>();
 		}
 
+		virtual bool GetMumpsArrays(int*& in, int*& jn, double*& a, double*& rhs, int& n, int& nz)
+		{
+			return false;
+		}
+
 		virtual ~GenericMatrixGenerator(){
 			for(int i = 0; i<matrix_size; i++)
 				delete[] matrix[i];

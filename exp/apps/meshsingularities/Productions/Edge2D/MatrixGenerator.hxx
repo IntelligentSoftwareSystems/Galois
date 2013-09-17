@@ -18,9 +18,19 @@ class MatrixGenerator : public GenericMatrixGenerator{
 		int nr_of_elements;
 		void CreateTiers(int to_create, int element_id, double size, double* coordinates, IDoubleArgFunction* f, bool first_tier);
 
+		//mumps
+		bool mumps_arrays_created;
+		int* in;
+		int* jn;
+		double* a;
+		int n;
+		int nz;
+
 	public:
 		virtual std::vector<EquationSystem*>* CreateMatrixAndRhs(TaskDescription& task_description);
 		virtual void checkSolution(std::map<int,double> *solution_map, double (*f)(int dim, ...));
+		virtual bool GetMumpsArrays(int*& in, int*& jn, double*& a, double*& rhs, int& n, int& nz);
+		virtual std::vector<int>* GetProductionParameters(int polynomial_degree);
 
 
 		virtual ~MatrixGenerator(){

@@ -71,7 +71,7 @@ class PointProduction : public AbstractProduction{
 
 	/* pull data from leafs and return the solution of MES
 		   this is sequential code*/
-	std::vector<double> *getResult();
+	virtual std::vector<double> *getResult();
 
 
 	virtual void Execute(EProduction productionToExecute, Vertex* v, EquationSystem* input);

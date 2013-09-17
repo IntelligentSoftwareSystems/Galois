@@ -31,6 +31,33 @@ void ProductionProcess::operator()(Graph::GraphNode src, Context& ctx)
 	}
 }
 
+double test_function(int dim, ...)
+{
+	double *data = new double[dim];
+	double result = 0;
+	va_list args;
+
+	va_start (args, dim);
+	for (int i=0; i<dim; ++i) {
+		data[i] = va_arg (args, double);
+	}
+	va_end(args);
+
+	if (dim == 2)
+	{
+
+		result = 1;
+		//result = data[0]*data[1]+data[0]+data[0]*data[1]*data[0]*data[1] + 11;
+	}
+	else
+	{
+		result = -1;
+	}
+
+	delete [] data;
+	return result;
+}
+
 int ProductionProcess::leftRange(int tasks, int cpus, int i)
 {
 	if (i == 0) {
@@ -94,9 +121,8 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 	}
 
 	bool edge = taskDescription.dimensions == 2 && !taskDescription.quad && taskDescription.singularity == EDGE;
-	if(edge)
-		printf("EDGE SOLVER!\n");
-	std::vector<int>* vec = matrixGenerator->GetProductionParameters(taskDescription.polynomialDegree);
+
+
 
 	/*printf("Problem size: %d\n", matrixGenerator->getA1Size(taskDescription.polynomialDegree) +
 			matrixGenerator->getANSize(taskDescription.polynomialDegree)
@@ -106,20 +132,26 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 	Galois::StatTimer timerMatrix("MATRIX GENERATION");
 	timerMatrix.start();
 	std::vector<EquationSystem*> *tiers = matrixGenerator->CreateMatrixAndRhs(taskDescription);
+
+	//parameters are ready after matrix creation
+	std::vector<int>* vec = matrixGenerator->GetProductionParameters(taskDescription.polynomialDegree);
+
 	timerMatrix.stop();
 
 	std::vector<EquationSystem *> *inputMatrices;
 	inputMatrices = tiers;
 
-        if(edge)
-                production = new EdgeProduction(vec, inputMatrices);
-        else
-            	production = new PointProduction(vec, inputMatrices);
+	Galois::StatTimer timerSolution("SOLUTION");
+	timerSolution.start();
+
+    if(edge)
+    	production = new EdgeProduction(vec, inputMatrices);
+    else
+        production = new PointProduction(vec, inputMatrices);
 
 	S = production->getRootVertex();
 
-	Galois::StatTimer timerProductions("PRODUCTIONS");
-	timerProductions.start();
+
 	graph = production->getGraph();
 
 	std::vector<GraphNode> initial_nodes_vector;
@@ -179,7 +211,7 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 	//	Galois::Runtime::getSystemTermination().localTermination(true);
 	//});
 
-	timerProductions.stop();
+	timerSolution.stop();
 	std::vector<double> *result;
 	if(!edge)
 	{
@@ -187,14 +219,13 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 	}
 	else
 	{
-		result = new std::vector<double>();
+		//edge tiers check their solution based on local numeration
+		result = ((EdgeProduction*)production)->getResult();
 	}
 
-	if (taskDescription.performTests && !edge) {
-
+	if (taskDescription.performTests) {
 		std::map<int, double> *mapa = new std::map<int, double>();
 		int i = 0;
-
 		for (std::vector<double>::iterator it=result->begin(); it!=result->end(); ++it, ++i) {
 			(*mapa)[i] = *it;
 		}
@@ -204,7 +235,6 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 		mapa->clear();
 		delete mapa;
 	}
-
 
 	delete vec;
 	delete S;

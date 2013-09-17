@@ -165,10 +165,14 @@ std::vector<EquationSystem*>* MatrixGenerator::CreateMatrixAndRhs(TaskDescriptio
 		coordinates[3] = 0;
 
 		matrix_size = 3*pow(2,nr_of_tiers+3) + 2 * nr_of_tiers + 1;
-		//rhs = new double[matrix_size]();
-		//matrix = new double*[matrix_size];
-		//for(int i = 0; i<matrix_size; i++)
-			//matrix[i] = new double[matrix_size]();
+
+		rhs = new double[matrix_size]();
+		//matrix is too large to be creted in this type of singularity, therefore we will create mumps arrays directly
+		matrix = NULL;
+		/*matrix = new double*[matrix_size];
+		for(int i = 0; i<matrix_size; i++)
+			matrix[i] = new double[matrix_size]();
+			*/
 
 		CreateTiers(nr_of_elements,0,size,coordinates,f,true);
 
@@ -182,8 +186,59 @@ std::vector<EquationSystem*>* MatrixGenerator::CreateMatrixAndRhs(TaskDescriptio
 		return tier_vector;
 }
 
+bool MatrixGenerator::GetMumpsArrays(int*& _in, int*& _jn, double*& _a, double*& _rhs, int& _n, int& _nz)
+{
+	if(!mumps_arrays_created)
+	{
+		std::vector<EquationSystem*>::iterator it_t = tier_vector->begin();
+		std::map<std::pair<int,int>, double>* map = new std::map<std::pair<int,int>, double>();
+		for(; it_t != tier_vector->end(); ++it_t){
+			((Tier*)(*it_t))->FillNumberPairs(map,rhs);
+		}
+		long mumps_array_length = map->size();
+
+		in = new int[mumps_array_length]();
+		jn = new int[mumps_array_length]();
+		a = new double[mumps_array_length]();
+
+		std::map<std::pair<int,int>, double>::iterator it_m = map->begin();
+		int i = 0;
+		for(; it_m != map->end(); ++it_m)
+		{
+			in[i] = it_m->first.first;
+			jn[i] = it_m->first.second;
+			a[i++] = it_m->second;
+		}
+
+		delete map;
+
+		n = matrix_size;
+		//???? is that ok? what should be nz value if the input is triangle of diagonal matrix? non zeros in global matrix or just length of mumps arrays?
+		//nz = 2*mumps_array_length - n;
+		nz = mumps_array_length;
+		//nz = 18;
+	}
+
+	mumps_arrays_created = true;
+	_in = in;
+	_jn = jn;
+	_a = a;
+	_rhs = rhs;
+	_n = n;
+	_nz = nz;
+	return true;
+}
+
+std::vector<int>* MatrixGenerator::GetProductionParameters(int polynomial_degree)
+{
+	std::vector<int>* param = new std::vector<int>(1);
+	(*param)[0] = matrix_size;
+	return param;
+}
+
 void MatrixGenerator::checkSolution(std::map<int,double> *solution_map, double (*function)(int dim, ...))
 {
+
 	srand(time(NULL));
 	IDoubleArgFunction* f = new DoubleArgFunctionWrapper(*function);
 	int i = 0;

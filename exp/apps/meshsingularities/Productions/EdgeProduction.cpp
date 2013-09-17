@@ -7,6 +7,7 @@
 
 #include "EdgeProduction.h"
 #include <stdio.h>
+#include "Edge2D/Tier.hxx"
 
 void EdgeProduction::generateGraph()
 {
@@ -27,7 +28,6 @@ void EdgeProduction::generateGraph()
 	vmd->setLeft(vd1);
 	vmd->setRight(vd2);
 
-	printf("PODMIENIONE D\n");
 	Node d1Node(0, EProduction::D, this, vd1, inputData->at(leafs-2));
 	Node d2Node(0, EProduction::D, this, vd2, inputData->at(leafs-1));
 
@@ -445,7 +445,6 @@ void EdgeProduction::MB(Vertex *v) const
 
 void EdgeProduction::BSMB(Vertex *v) const
 {
-	printf("BS MB\n");
 	double* const rhs = v->system->rhs;
 	double system_size = v->system->n;
 
@@ -478,8 +477,9 @@ void EdgeProduction::BSMB(Vertex *v) const
 
 	for(int i = current_common_b + current_separate_b - common_bc; i<system_size; i++)
 		left_rhs[offset + i - current_separate_b + common_bc] = rhs[i];
-	v->left->system->print();
-	v->right->system->print();
+
+	v->left->system->backwardSubstitute(2);
+	v->right->system->backwardSubstitute(2);
 }
 
 
@@ -604,14 +604,17 @@ void EdgeProduction::MD(Vertex* v) const
 
 void EdgeProduction::BSMD(Vertex* v) const
 {
-	printf("BS MD\n");
+
 	int offset = 2;
 	int non_separate_c_length = 3;
 	Mp1Bs(v,offset,non_separate_c_length,-1);
 	non_separate_c_length = 2;
 	Mp2Bs(v,offset,non_separate_c_length);
-	v->left->system->print();
-	v->right->system->print();
+	v->left->system->backwardSubstitute(1);
+	v->right->system->backwardSubstitute(1);
+
+	for(int i = 0; i<9; i++)
+		printf("%lf %lf\n",v->left->system->rhs[i], v->right->system->rhs[i]);
 
 }
 
@@ -630,14 +633,16 @@ void EdgeProduction::MC(Vertex* v) const
 
 void EdgeProduction::BSMC(Vertex* v) const
 {
-	printf("BS MC\n");
 	int offset = cOffset;
 	int non_separate_c_length = 3;
 
 	Mp1Bs(v,offset,non_separate_c_length,0);
 	Mp2Bs(v,offset,non_separate_c_length);
-	v->left->system->print();
-	v->right->system->print();
+	v->left->system->backwardSubstitute(0);
+	v->right->system->backwardSubstitute(0);
+
+	for(int i = 0; i<9; i++)
+		printf("%lf %lf\n",v->left->system->rhs[i], v->right->system->rhs[i]);
 }
 
 
@@ -655,14 +660,16 @@ void EdgeProduction::MBLeaf(Vertex* v) const
 
 void EdgeProduction::BSMBLeaf(Vertex* v) const
 {
-	printf("BS MB LEAF\n");
+
 	int offset = 2;
 	int non_separate_c_length = 2;
 
 	Mp1Bs(v,offset,non_separate_c_length,0);
 	Mp2Bs(v,offset,non_separate_c_length);
-	v->left->system->print();
-	v->right->system->print();
+	v->left->system->backwardSubstitute(1);
+	v->right->system->backwardSubstitute(1);
+	for(int i = 0; i<9; i++)
+		printf("%lf %lf\n",v->left->system->rhs[i], v->right->system->rhs[i]);
 
 }
 
@@ -762,7 +769,7 @@ void EdgeProduction::MBC(Vertex* v, bool root) const
 	if(root){
 		v->system->eliminate(v->system->n);
 		v->system->backwardSubstitute(v->system->n-1);
-		v->system->print();
+		//v->system->print();
 		//backward substitution
 		for(int i = 0; i<3; i++)
 		{
@@ -779,6 +786,8 @@ void EdgeProduction::MBC(Vertex* v, bool root) const
 		for(int i = 11 + mb_growth; i < 11 + mb_growth + 3 + mb_growth; i++)
 			 left_rhs[mb_offset + 6 + i - 11] = rhs[i];
 
+		v->right->system->backwardSubstitute(0);
+		v->left->system->backwardSubstitute(1 + 2*adaptation_lvl);
 	}
 	else
 	{
@@ -788,7 +797,7 @@ void EdgeProduction::MBC(Vertex* v, bool root) const
 
 void EdgeProduction::BSMBC(Vertex* v) const
 {
-	printf("BS MBC\n");
+
 	double* const rhs = v->system->rhs;
 	double system_size = v->system->n;
 
@@ -825,7 +834,19 @@ void EdgeProduction::BSMBC(Vertex* v) const
 
 	for(int i = 11 + mb_growth; i < 11 + mb_growth + 3 + mb_growth; i++)
 		 left_rhs[mb_offset + 6 + i - 11] = rhs[i];
-	v->left->system->print();
-	v->right->system->print();
 
+	v->right->system->backwardSubstitute(0);
+	v->left->system->backwardSubstitute(1 + 2*adaptation_lvl);
+
+}
+
+std::vector<double> *EdgeProduction::getResult()
+{
+	std::vector<double>* result = new std::vector<double>((*productionParameters)[0]);
+	std::vector<EquationSystem*>::iterator it = inputData->begin();
+	for(; it != inputData->end(); ++it)
+	{
+		((D2Edge::Tier*)(*it))->add_results(result);
+	}
+	return result;
 }

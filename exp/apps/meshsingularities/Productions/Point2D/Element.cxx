@@ -272,11 +272,11 @@ bool Element::checkSolution(std::map<int,double> *solution_map, IDoubleArgFuncti
 		double rnd_y_within_element = ((double) rand() / (RAND_MAX))*(yr-yl) + yl;
 		for(int i = 0; i<nr_of_nodes; i++)
 			value+=coefficients[i]*shapeFunctions[i]->ComputeValue(rnd_x_within_element,rnd_y_within_element);
-		//printf("%d Checking at: %lf %lf values: %lf %lf\n",position,rnd_x_within_element,rnd_y_within_element,value,f->ComputeValue(rnd_x_within_element,rnd_y_within_element));
+		printf("%d Checking at: %lf %lf values: %lf %lf\n",position,rnd_x_within_element,rnd_y_within_element,value,f->ComputeValue(rnd_x_within_element,rnd_y_within_element));
 		if(!(fabs(value - f->ComputeValue(rnd_x_within_element,rnd_y_within_element)) < epsilon))
 		{
-			//for(int i = 0; i<9; i++)
-				//printf("%lf\n",coefficients[i]);
+			for(int i = 0; i<9; i++)
+				printf("%lf\n",coefficients[i]);
 			return false;
 		}
 	}

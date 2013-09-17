@@ -15,10 +15,12 @@ class AbstractProduction {
 	Graph *graph;
 
 	std::vector<EquationSystem*> *inputData;
+	std::vector<int>* productionParameters;
 
   public:
-	AbstractProduction(std::vector<int>* productionParameters,
-					   std::vector<EquationSystem*> *inputData)  {
+	AbstractProduction(std::vector<int>* productionParameters, std::vector<EquationSystem*> *inputData) : productionParameters(productionParameters)
+    {
+
   	};
 
 	virtual ~AbstractProduction() {
@@ -27,7 +29,7 @@ class AbstractProduction {
 	}
 
 	virtual void Execute(EProduction productionToExecute, Vertex* v, EquationSystem* input) = 0;
-
+	virtual std::vector<double> *getResult() = 0;
 	virtual Vertex *getRootVertex() = 0;
 	virtual Graph *getGraph() = 0;
 

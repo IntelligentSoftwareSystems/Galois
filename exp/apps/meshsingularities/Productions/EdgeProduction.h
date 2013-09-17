@@ -31,7 +31,7 @@ class EdgeProduction : public AbstractProduction{
 			this->inputData = inputData;
 			generateGraph();
 		};
-
+	virtual std::vector<double> *getResult();
 	virtual void Execute(EProduction productionToExecute, Vertex* v, EquationSystem* input);
 	virtual Vertex *getRootVertex();
 	virtual Graph *getGraph();
