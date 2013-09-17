@@ -22,6 +22,7 @@ class EdgeProduction : public AbstractProduction{
 			GraphNode mergingDstNode,
 			GraphNode bsSrcNode);
 	void generateGraph();
+
   public:
 	EdgeProduction(std::vector<int>* productionParameters,
 			std::vector<EquationSystem*> *inputData) :
