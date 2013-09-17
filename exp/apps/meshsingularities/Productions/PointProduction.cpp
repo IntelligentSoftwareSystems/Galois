@@ -466,16 +466,9 @@ void PointProduction::BS(Vertex *v) const
 		const int offsetA = v->parent->left == v ? interfaceSize*2 : interfaceSize;
 		const int offsetB = v->parent->left == v ? interfaceSize : interfaceSize*2;
 
-		double** const sys_matrix = v->system->matrix;
 		double* const sys_rhs = v->system->rhs;
 
 		const double* const par_rhs = (const double *) v->parent->system->rhs;
-
-		for (int i=interfaceSize;i<3*interfaceSize; ++i) {
-			for (int j=i; j<3*interfaceSize; ++j) {
-				sys_matrix[i][j] = i == j ? 1.0 : 0.0;
-			}
-		}
 
 		for (int i=0; i<this->interfaceSize; ++i) {
 			sys_rhs[i+offsetA] = par_rhs[i];
@@ -488,23 +481,16 @@ void PointProduction::BS(Vertex *v) const
 		const int offsetA = v->parent->left == v ? interfaceSize : 0;
 		const int offsetB = v->parent->left == v ? 0 : 2*interfaceSize;
 
-		double** const sys_matrix = v->system->matrix;
 		double* const sys_rhs = v->system->rhs;
 
 		const double* const par_rhs = (const double *) v->parent->system->rhs;
-
-		for (int i=leafSize-2*interfaceSize; i<leafSize; ++i) {
-			for (int j=i; j<leafSize; ++j) {
-				sys_matrix[i][j] = (i==j) ? 1.0 : 0.0;
-			}
-		}
 
 		for (int i=0; i<this->interfaceSize; ++i) {
 			sys_rhs[i+offset] = par_rhs[i+offsetA];
 			sys_rhs[i+offset+interfaceSize] = par_rhs[i+offsetB];
 		}
 
-		v->system->backwardSubstitute(leafSize-2*interfaceSize);
+		v->system->backwardSubstitute(leafSize-2*interfaceSize-1);
 	}
 }
 
