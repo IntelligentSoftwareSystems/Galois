@@ -127,7 +127,7 @@ Vertex *EdgeProduction::recursiveGraphGeneration(int low_range,
         Node vmcNode(2, EProduction::MC, this, vmc, NULL);
         Node vmbNode(2, EProduction::MBLeaf, this, vmb, NULL);
         Node bsMcNode(1, EProduction::BSMC, this, vmc, NULL);
-        Node bsMbNode(1, EProduction::BSMB, this, vmb, NULL);
+        Node bsMbNode(1, EProduction::BSMBLeaf, this, vmb, NULL);
 
         GraphNode vmbGraphNode = graph->createNode(1, vmbNode);
         GraphNode vmcGraphNode = graph->createNode(1, vmcNode);
