@@ -37,8 +37,11 @@ class EdgeProduction : public AbstractProduction{
 	virtual Vertex *getRootVertex();
 	virtual Graph *getGraph();
     void B(Vertex *v, EquationSystem *inData) const;
+    void BSB(Vertex *v, EquationSystem *inData) const;
     void C(Vertex *v, EquationSystem *inData) const;
+    void BSC(Vertex *v, EquationSystem *inData) const;
     void D(Vertex *v, EquationSystem *inData) const;
+    void BSD(Vertex *v, EquationSystem *inData) const;
     void MB(Vertex *v) const;
     void BSMB(Vertex *v) const;
     void MC(Vertex *v) const;

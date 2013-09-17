@@ -32,7 +32,7 @@ void EdgeProduction::generateGraph()
 	Node d2Node(0, EProduction::D, this, vd2, inputData->at(leafs-1));
 
 	Node bsD1Node(1, EProduction::BSD, this, vd1, inputData->at(leafs-2));
-	Node bsD1Node(1, EProduction::BSD, this, vd2, inputData->at(leafs-1));
+	Node bsD2Node(1, EProduction::BSD, this, vd2, inputData->at(leafs-1));
 
 	GraphNode d1GraphNode = graph->createNode(1, d1Node);
 	GraphNode d2GraphNode = graph->createNode(1, d2Node);
@@ -327,6 +327,16 @@ void EdgeProduction::Execute(EProduction productionToExecute, Vertex* v, Equatio
 	case EProduction::BSMBLeaf:
 		BSMBLeaf(v);
 		break;
+	case EProduction::BSC:
+		BSC(v,input);
+		break;
+	case EProduction::BSD:
+		BSD(v,input);
+		break;
+	case EProduction::BSB:
+		BSB(v,input);
+		break;
+
 	default:
 		printf("Invalid production!\n");
 		break;
@@ -373,9 +383,27 @@ void EdgeProduction::B(Vertex* v, EquationSystem* inData) const
 	Pre(v,inData,bOffset,true);
 }
 
+void EdgeProduction::BSB(Vertex* v, EquationSystem* inData) const
+{
+	for(int i = 0; i<9 - bOffset; i++)
+		inData->rhs[i] = v->system->rhs[i + bOffset];
+	for(int i = 9 - bOffset; i<9; i++)
+		inData->rhs[i] = v->system->rhs[i - 9 + bOffset];
+
+}
+
 void EdgeProduction::C(Vertex* v, EquationSystem* inData) const
 {
 	Pre(v,inData,cOffset,true);
+}
+
+void EdgeProduction::BSC(Vertex* v, EquationSystem* inData) const
+{
+	for(int i = 0; i<9 - cOffset; i++)
+		inData->rhs[i] = v->system->rhs[i + cOffset];
+	for(int i = 9 - cOffset; i<9; i++)
+		inData->rhs[i] = v->system->rhs[i - 9 + cOffset];
+
 }
 
 void EdgeProduction::D(Vertex* v, EquationSystem* inData) const
@@ -397,6 +425,19 @@ void EdgeProduction::D(Vertex* v, EquationSystem* inData) const
 
 }
 
+void EdgeProduction::BSD(Vertex* v, EquationSystem* inData) const
+{
+
+	inData->rhs[0] = v->system->rhs[2];
+	inData->rhs[1] = v->system->rhs[3];
+	inData->rhs[2] = v->system->rhs[4];
+	inData->rhs[3] = v->system->rhs[1];
+	inData->rhs[8] = v->system->rhs[0];
+
+	for(int i = 4; i<8; i++)
+		inData->rhs[i] = v->system->rhs[i+1];
+
+}
 void EdgeProduction::MB(Vertex *v) const
 {
 	double** const matrix = v->system->matrix;
@@ -646,9 +687,6 @@ void EdgeProduction::BSMD(Vertex* v) const
 	v->left->system->backwardSubstitute(1);
 	v->right->system->backwardSubstitute(1);
 
-	for(int i = 0; i<9; i++)
-		printf("%lf %lf\n",v->left->system->rhs[i], v->right->system->rhs[i]);
-
 }
 
 void EdgeProduction::MC(Vertex* v) const
@@ -674,8 +712,6 @@ void EdgeProduction::BSMC(Vertex* v) const
 	v->left->system->backwardSubstitute(0);
 	v->right->system->backwardSubstitute(0);
 
-	for(int i = 0; i<9; i++)
-		printf("%lf %lf\n",v->left->system->rhs[i], v->right->system->rhs[i]);
 }
 
 
@@ -701,8 +737,7 @@ void EdgeProduction::BSMBLeaf(Vertex* v) const
 	Mp2Bs(v,offset,non_separate_c_length);
 	v->left->system->backwardSubstitute(1);
 	v->right->system->backwardSubstitute(1);
-	for(int i = 0; i<9; i++)
-		printf("%lf %lf\n",v->left->system->rhs[i], v->right->system->rhs[i]);
+
 
 }
 

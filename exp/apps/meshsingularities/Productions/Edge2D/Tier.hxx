@@ -87,7 +87,6 @@ public:
 		element->get_nrs(global_numbers);
 		for(int i = 0; i<9; i++)
 		{
-			printf("adding result %lf\n",rhs[i]);
 			(*result)[global_numbers[i]] = rhs[i];
 		}
 	}
